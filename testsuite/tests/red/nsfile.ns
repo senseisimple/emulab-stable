@@ -1,0 +1,22 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set nodeA [$ns node]
+set nodeB [$ns node]
+
+#
+# Only one Queue associated with a Duplex Link; Changing its params
+# change both pipes. Hope to support asymmetric queues soon!
+# 
+set link0  [$ns duplex-link $nodeA $nodeB 100Mb 0ms RED]
+set queue0 [[$ns link $nodeA $nodeB] queue]
+$queue0 set gentle_ 1
+$queue0 set queue-in-bytes_ 0
+$queue0 set limit_ 50
+$queue0 set maxthresh_ 20
+$queue0 set thresh_ 7
+$queue0 set linterm_ 11
+$queue0 set q_weight_ 0.004
+
+$ns run

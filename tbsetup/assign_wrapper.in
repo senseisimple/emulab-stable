@@ -203,7 +203,7 @@ $result->finish;
 
 printdb "Loading virt_lans.\n";
 $result = DBQueryFatal("SELECT vname,member,delay,bandwidth,lossrate," .
-		       "rdelay,rbandwidth,rlossrate" .
+		       "rdelay,rbandwidth,rlossrate " .
 		       " from virt_lans where pid=\"$pid\" and eid=\"$eid\"");
 while (($vname,$member,$delay,$bandwidth,$lossrate,
 	$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array) {
@@ -213,6 +213,36 @@ while (($vname,$member,$delay,$bandwidth,$lossrate,
     push(@{$lans{$vname}},$member);
     $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate,
 				    $rdelay,$rbandwidth,$rlossrate];
+
+    #
+    # Grab the Q stuff from virt_lans. I'm keeping this separate for
+    # now until I understand whats going on. There are no "r" params
+    # either. I have no idea how do to this stuff for lans, and for
+    # duplex links the "r" params are not necessary. Each virt_lans
+    # entry gives the params towards the switch, which equal the
+    # reverse params for the other member. 
+    #
+    my $query_result =
+	DBQueryFatal("select q_limit,q_maxthresh,q_minthresh,q_weight, ".
+		     "       q_linterm,q_qinbytes,q_bytes,q_meanpsize, ".
+		     "       q_wait,q_setbit,q_droptail,q_red,q_gentle ".
+		     "from virt_lans ".
+		     "where pid='$pid' and eid='$eid' and ".
+		     "      vname='$vname' and member='$member'");
+    
+    my ($q_limit,$q_maxthresh,$q_minthresh,$q_weight,$q_linterm,
+	$q_qinbytes,$q_bytes,$q_meanpsize,$q_wait,$q_setbit,
+	$q_droptail,$q_red,$q_gentle) = $query_result->fetchrow_array;
+    
+    $queueinfo{"$vname:$member"} =
+	[$q_limit,$q_maxthresh,$q_minthresh,$q_weight,$q_linterm,
+	 $q_qinbytes,$q_bytes,$q_meanpsize,$q_wait,$q_setbit,
+	 $q_droptail,$q_red,$q_gentle];
+
+    if ($q_red) {
+	$mustdelay{$vname} = 1;
+    }
+    
     ($node,$port) = split(":",$member);
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
@@ -271,7 +301,8 @@ foreach $lan (keys(%lans)) {
 	    join(" ",@$sharks) . ")\n";
 	$sharkshelfid++;
 	$sharkshelves{$shelfid} = $sharks;
-	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0,0,$S100Kbs,0.0];
+	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0,0,
+					      0,$S100Kbs,0.0];
 	push(@$realmembers,"$shelfid:uplink");
 	$nodes{$shelfid} = "shark-shelf";
     }
@@ -404,8 +435,8 @@ foreach $lan (keys(%lans)) {
 					 ($nonsharks > 1)))) ||
 		 ($rloss != 0))) {
 		$delayname = "tbdelay$delayid";
-		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss,
-							    $rdelay,$rbw,$rloss];
+		$delaynodes{"linkdelaysrc/$lan/$member"} =
+		    [$delay,$bw,$loss,$rdelay,$rbw,$rloss];
 		printdb "Delay node linkdelaysrc/$lan/$member ($delayname) " .
 		    " = " . join(" ",@{$delaynodes{"linkdelaysrc/$lan/$member"}}) . "\n";
 		$delayid++;
@@ -805,13 +836,55 @@ foreach $delay (keys(%delays)) {
     my $pipe0 = $pipeid;
     my $pipe1 = $pipeid + 10;
     $pipeid += 100;
-    DBQueryFatal("insert into delays" .
-		 " (pid,eid,node_id,vname,iface0,iface1" .
-		 ",pipe0,delay0,bandwidth0,lossrate0" .
-		 ",pipe1,delay1,bandwidth1,lossrate1)" .
-		 " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
-		 ",$pipe0,$delay,$bandwidth,$lossrate".
-		 ",$pipe1,$rdelay,$rbandwidth,$rlossrate)");
+
+    #
+    # Okay, this is terible. If this is link (not a lan) then find the
+    # the queue info. We do not support queues in lans yet.
+    #
+    my @members = @{$lans{$vname}};
+    if (@members == 2) {
+	my ($nodeport0,$nodeport1) = @members;
+
+	my ($q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,
+	    $q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit,
+	    $q0_droptail,$q0_red,$q0_gentle) =
+		          @{$queueinfo{"$vname:$nodeport0"}};
+
+	my ($q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm,
+	    $q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit,
+	    $q1_droptail,$q1_red,$q1_gentle) =
+		          @{$queueinfo{"$vname:$nodeport1"}};
+    
+	DBQueryFatal("insert into delays " .
+	     " (pid,eid,node_id,vname,iface0,iface1" .
+	     ",pipe0,delay0,bandwidth0,lossrate0" .
+	     ",pipe1,delay1,bandwidth1,lossrate1" .
+	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
+	     ",q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit" .
+	     ",q0_droptail,q0_red,q0_gentle" .
+	     ",q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm" .
+	     ",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
+	     ",q1_droptail,q1_red,q1_gentle)" .
+	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
+	     ",$pipe0,$delay,$bandwidth,$lossrate".
+	     ",$pipe1,$rdelay,$rbandwidth,$rlossrate".
+	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
+	     ",$q0_qinbytes,$q0_bytes,$q0_meanpsize,$q0_wait,$q0_setbit".
+	     ",$q0_droptail,$q0_red,$q0_gentle".
+  	     ",$q1_limit,$q1_maxthresh,$q1_minthresh,$q1_weight,$q1_linterm".
+	     ",$q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit".
+	     ",$q1_droptail,$q1_red,$q1_gentle)");
+    }
+    else {
+	DBQueryFatal("insert into delays" .
+	     " (pid,eid,node_id,vname,iface0,iface1" .
+	     ",pipe0,delay0,bandwidth0,lossrate0" .
+	     ",pipe1,delay1,bandwidth1,lossrate1)" .
+	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
+	     ",$pipe0,$delay,$bandwidth,$lossrate".
+	     ",$pipe1,$rdelay,$rbandwidth,$rlossrate)");
+    }
+    
     #
     # XXX - Whenever a delay node is inserted, port speeds are set to
     #       100Mbs on the delay node ports. This is to ensure that

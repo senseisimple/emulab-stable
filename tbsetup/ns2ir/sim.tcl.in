@@ -82,9 +82,9 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
     if {$verbose && ($args != {})} {
 	puts stderr "Unsupported: Arguments for duplex-link: $args"
     }
-    if {$verbose && ($type != "DropTail")} {
-	puts stderr "Unsupported: Link type $type, using DropTail"
-    }
+#    if {$verbose && ($type != "DropTail") && ($type != "RED")} {
+#	puts stderr "Unsupported: Link type $type, using DropTail."
+#    }
     set error 0
     if {! [$n1 info class Node]} {
 	perror "\[duplex-link] $n1 is not a node."
@@ -102,7 +102,7 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
     set rbw [parse_bw $bw]
     set rdelay [parse_delay $delay]
     
-    Link $curlink $self "$n1 $n2" $rbw $rdelay
+    Link $curlink $self "$n1 $n2" $rbw $rdelay $type
     set lanlink_list($curlink) {}
     set link_map($n1:$n2) $curlink
     set link_map($n2:$n1) $curlink
@@ -122,7 +122,7 @@ Simulator instproc make-lan {nodelist bw delay args} {
     $self instvar lanlink_list
 
     if {$verbose && ($args != {})} {
-	puts stderr "Unsupported: Arguments for make-lan: $args"
+		puts stderr "Unsupported: Arguments for make-lan: $args"
     }
     
     set curlan lan[incr id_counter]
@@ -131,7 +131,7 @@ Simulator instproc make-lan {nodelist bw delay args} {
     set rbw [parse_bw $bw]
     set rdelay [parse_delay $delay]
     
-    Lan $curlan $self $nodelist $rbw $rdelay
+    Lan $curlan $self $nodelist $rbw $rdelay {}
     set lanlink_list($curlan) {}
     set last_class $curlan
 
@@ -487,6 +487,12 @@ Simulator instproc find_link {src dst} {
     } else {
 	return ""
     }
+}
+
+Simulator instproc link {src dst} {
+    set reallink [$self find_link $src $dst]
+
+    return $reallink
 }
 
 # get_subnet

@@ -292,7 +292,18 @@ sub dodelays ()
 	    $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
 	    $pat .= q(PIPE0=(\d+) DELAY0=([\d\.]+) BW0=(\d+) PLR0=([\d\.]+) );
 	    $pat .= q(PIPE1=(\d+) DELAY1=([\d\.]+) BW1=(\d+) PLR1=([\d\.]+) );
-	    $pat .= q(LINKNAME=([\d\w]+));
+	    $pat .= q(LINKNAME=([\d\w]+) );
+	    $pat .= q(RED0=(\d) RED1=(\d) );
+	    $pat .= q(LIMIT0=(\d+) );
+	    $pat .= q(MAXTHRESH0=(\d+) MINTHRESH0=(\d+) WEIGHT0=([\d\.]+) );
+	    $pat .= q(LINTERM0=(\d+) QINBYTES0=(\d+) BYTES0=(\d+) );
+	    $pat .= q(MEANPSIZE0=(\d+) WAIT0=(\d+) SETBIT0=(\d+) );
+	    $pat .= q(DROPTAIL0=(\d+) GENTLE0=(\d+) );
+	    $pat .= q(LIMIT1=(\d+) );
+	    $pat .= q(MAXTHRESH1=(\d+) MINTHRESH1=(\d+) WEIGHT1=([\d\.]+) );
+	    $pat .= q(LINTERM1=(\d+) QINBYTES1=(\d+) BYTES1=(\d+) );
+	    $pat .= q(MEANPSIZE1=(\d+) WAIT1=(\d+) SETBIT1=(\d+) );
+	    $pat .= q(DROPTAIL1=(\d+) GENTLE1=(\d+));
 	    
 	    $delay =~ /$pat/;
 
@@ -310,6 +321,37 @@ sub dodelays ()
 	    $bandw2    = $9;
 	    $plr2      = $10;
 	    $linkname  = $11;
+	    $red1      = $12;
+	    $red2      = $13;
+		
+	    #
+	    # Only a few of these NS RED params make sense for dummynet,
+	    # but they all come through; someday they might be used.
+	    #
+	    $limit1     = $14;
+	    $maxthresh1 = $15;
+	    $minthresh1 = $16;
+	    $weight1    = $17;
+	    $linterm1   = $18;
+	    $qinbytes1  = $19;
+	    $bytes1     = $20;
+	    $meanpsize1 = $21;
+	    $wait1      = $22;
+	    $setbit1    = $23;
+	    $droptail1  = $24;
+	    $gentle1    = $25;
+	    $limit2     = $26;
+	    $maxthresh2 = $27;
+	    $minthresh2 = $28;
+	    $weight2    = $29;
+	    $linterm2   = $30;
+	    $qinbytes2  = $31;
+	    $bytes2     = $32;
+	    $meanpsize2 = $33;
+	    $wait2      = $34;
+	    $setbit2    = $35;
+	    $droptail2  = $36;
+	    $gentle2    = $37;
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
@@ -320,6 +362,71 @@ sub dodelays ()
 	    $delay1 = int($delay1 + 0.5);
 	    $delay2 = int($delay2 + 0.5);
 
+	    #
+	    # Qsizes are in slots or packets. My perusal of the 4.3 code
+	    # shows the limits are 50 < slots <= 100 or 0 <= bytes <= 1MB.
+	    #
+	    my $queue1 = "";
+	    my $queue2 = "";
+	    if ($qinbytes1) {
+		if ($limit1 <= 0 || $limit1 > (1024 * 1024)) {
+		    print "Q limit $limit1 for pipe $p1 is bogus.\n";
+		}
+		else {
+		    $queue1 = "queue ${limit1}bytes";
+		}
+	    }
+	    elsif ($limit1 != 0) {
+		if ($limit1 < 0 || $limit1 > 100) {
+		    print "Q limit $limit1 for pipe $p1 is bogus.\n";
+		}
+		else {
+		    $queue1 = "queue $limit1";
+		}
+	    }
+	    if ($qinbytes2) {
+		if ($limit2 <= 0 || $limit2 > (1024 * 1024)) {
+		    print "Q limit $limit2 for pipe $p2 is bogus.\n";
+		}
+		else {
+		    $queue2 = "queue ${limit2}bytes";
+		}
+	    }
+	    elsif ($limit2 != 0) {
+		if ($limit2 < 0 || $limit2 > 100) {
+		    print "Q limit $limit2 for pipe $p2 is bogus.\n";
+		}
+		else {
+		    $queue2 = "queue $limit2";
+		}
+	    }
+
+	    #
+	    # RED/GRED stuff
+	    #
+	    my $redparams1 = "";
+	    my $redparams2 = "";
+	    if ($red1) {
+		if ($gentle1) {
+		    $redparams1 = "gred ";
+		}
+		else {
+		    $redparams1 = "red ";
+		}
+		my $max_p = 1 / $linterm1;
+		$redparams1 .= "$weight1/$minthresh1/$maxthresh1/$max_p";
+	    }
+	    if ($red2) {
+		if ($gentle2) {
+		    $redparams2 = "gred ";
+		}
+		else {
+		    $redparams2 = "red ";
+		}
+		my $max_p = 1 / $linterm2;
+		$redparams2 .= "$weight2/$minthresh2/$maxthresh2/$max_p";
+	    }
+
 	    print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex";
 	    print DEL "\n";
 	    print DEL "ifconfig $iface2 media 100baseTX mediaopt full-duplex";
@@ -327,14 +434,16 @@ sub dodelays ()
 	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
 	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
-	    print DEL "bw ${bandw1}Kbit/s plr $plr1\n";
+	    print DEL "bw ${bandw1}Kbit/s plr $plr1 $queue1 $redparams1\n";
 	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
-	    print DEL "bw ${bandw2}Kbit/s plr $plr2\n";
+	    print DEL "bw ${bandw2}Kbit/s plr $plr2 $queue2 $redparams2\n";
 
 	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
-	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1\n";
+	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1 ";
+	    print STDOUT "$queue1 $redparams1\n";
 	    print STDOUT "  $iface1/$iface2 pipe $p2 config delay ";
-	    print STDOUT "${delay2}ms bw ${bandw2}Kbit/s plr $plr2\n";
+	    print STDOUT "${delay2}ms bw ${bandw2}Kbit/s plr $plr2 ";
+	    print STDOUT "$queue2 $redparams2\n";
 
 	    print MAP "$linkname duplex $iface1 $iface2 $p1 $p2\n";
 

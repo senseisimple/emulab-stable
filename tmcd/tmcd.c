@@ -913,7 +913,7 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		buf[MYBUFSIZE];
+	char		buf[2*MYBUFSIZE];
 	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -934,16 +934,22 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	 * course, this assumes that the type is the BSD name, not linux.
 	 */
 	res = mydb_query("select i.MAC,j.MAC, "
-			 "pipe0,delay0,bandwidth0,lossrate0, "
-			 "pipe1,delay1,bandwidth1,lossrate1, "
-			 "vname "
-                         " from delays as d "
-			 "left join interfaces as i on "
-			 " i.node_id=d.node_id and i.iface=iface0 "
-			 "left join interfaces as j on "
-			 " j.node_id=d.node_id and j.iface=iface1 "
-			 " where d.node_id='%s'",	 
-			 11, nodeid);
+		 "pipe0,delay0,bandwidth0,lossrate0,q0_red, "
+		 "pipe1,delay1,bandwidth1,lossrate1,q1_red, "
+		 "vname, "
+		 "q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm, " 
+		 "q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit, " 
+		 "q0_droptail,q0_gentle, "
+		 "q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm, "
+		 "q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit, "
+		 "q1_droptail,q1_gentle "
+                 " from delays as d "
+		 "left join interfaces as i on "
+		 " i.node_id=d.node_id and i.iface=iface0 "
+		 "left join interfaces as j on "
+		 " j.node_id=d.node_id and j.iface=iface1 "
+		 " where d.node_id='%s'",	 
+		 37, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "DELAY: %s: DB Error getting delays!",
 		       nodeid);
@@ -971,11 +977,29 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		sprintf(buf, "DELAY INT0=%s INT1=%s "
 			"PIPE0=%s DELAY0=%s BW0=%s PLR0=%s "
 			"PIPE1=%s DELAY1=%s BW1=%s PLR1=%s "
-			"LINKNAME=%s\n",
+			"LINKNAME=%s "
+			"RED0=%s RED1=%s "
+			"LIMIT0=%s MAXTHRESH0=%s MINTHRESH0=%s WEIGHT0=%s "
+			"LINTERM0=%s QINBYTES0=%s BYTES0=%s "
+			"MEANPSIZE0=%s WAIT0=%s SETBIT0=%s "
+			"DROPTAIL0=%s GENTLE0=%s "
+			"LIMIT1=%s MAXTHRESH1=%s MINTHRESH1=%s WEIGHT1=%s "
+			"LINTERM1=%s QINBYTES1=%s BYTES1=%s "
+			"MEANPSIZE1=%s WAIT1=%s SETBIT1=%s " 
+			"DROPTAIL1=%s GENTLE1=%s \n",
 			row[0], row[1],
 			row[2], row[3], row[4], row[5],
-			row[6], row[7], row[8], row[9],
-			row[10]);
+			row[7], row[8], row[9], row[10],
+			row[12],
+			row[6], row[11],
+			row[13], row[14], row[15], row[16],
+			row[17], row[18], row[19],
+			row[20], row[21], row[22],
+			row[23], row[24],
+			row[25], row[26], row[27], row[28],
+			row[29], row[30], row[31],
+			row[32], row[33], row[34],
+			row[35], row[36]);
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;

@@ -11,8 +11,51 @@
 Class LanLink -superclass NSObject
 Class Link -superclass LanLink
 Class Lan -superclass LanLink
+Class Queue -superclass NSObject
 
-LanLink instproc init {s nodes bw d} {
+Queue instproc init {type} {
+    # These control whether the link was created RED or GRED. It
+    # filters through the DB.
+    $self set gentle_ 0
+    $self set red_ 0
+
+    #
+    # These are NS variables for queues (with NS defaults).
+    #
+    $self set limit_ 50
+    $self set maxthresh_ 15
+    $self set thresh_ 5
+    $self set q_weight_ 0.002
+    $self set linterm_ 10
+    $self set queue-in-bytes_ 0
+    $self set bytes_ 0
+    $self set mean_pktsize_ 500
+    $self set wait_ 1
+    $self set setbit_ 0
+    $self set drop-tail_ 1
+
+    if {$type != {}} {
+	$self instvar red_
+	$self instvar gentle_
+	
+	if {$type == "RED"} {
+	    set red_ 1
+	} elseif {$type == "GRED"} {
+	    set red_ 1
+	    set gentle_ 1
+	} elseif {$type != "DropTail"} {
+	    puts stderr "Unsupported: Link type $type, using DropTail."
+	}
+    }
+}
+
+LanLink instproc queue {} {
+    $self instvar linkqueue
+
+    return $linkqueue
+}
+
+LanLink instproc init {s nodes bw d type} {
     # This is a list of {node port} pairs.
     $self set nodelist {}
 
@@ -22,6 +65,14 @@ LanLink instproc init {s nodes bw d} {
     # Now we need to fill out the nodelist
     $self instvar nodelist
 
+    var_import GLOBALS::new_counter
+    set q1 q[incr new_counter]
+
+    Queue $q1 $type
+
+    # For now, a single queue for the link. Makes no sense for lans.
+    $self set linkqueue $q1
+
     # r* indicates the switch->node chars, others are node->switch
     $self instvar bandwidth
     $self instvar rbandwidth
@@ -29,6 +80,7 @@ LanLink instproc init {s nodes bw d} {
     $self instvar rdelay
     $self instvar loss
     $self instvar rloss
+
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
 	set bandwidth($nodepair) $bw
@@ -150,12 +202,27 @@ LanLink instproc updatedb {DB} {
     $self instvar rdelay
     $self instvar loss
     $self instvar rloss
+    $self instvar linkqueue
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
+    # For now, the return params are the same.
+    set limit_ [$linkqueue set limit_]
+    set maxthresh_ [$linkqueue set maxthresh_]
+    set thresh_ [$linkqueue set thresh_]
+    set q_weight_ [$linkqueue set q_weight_]
+    set linterm_ [$linkqueue set linterm_]
+    set queue-in-bytes_ [$linkqueue set queue-in-bytes_]
+    set bytes_ [$linkqueue set bytes_]
+    set mean_pktsize_ [$linkqueue set mean_pktsize_]
+    set red_ [$linkqueue set red_]
+    set gentle_ [$linkqueue set gentle_]
+    set wait_ [$linkqueue set wait_]
+    set setbit_ [$linkqueue set setbit_]
+    set droptail_ [$linkqueue set drop-tail_]
+
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport))"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm,q_qinbytes,q_bytes,q_meanpsize,q_wait,q_setbit,q_droptail,q_red,q_gentle) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$limit_,$maxthresh_,$thresh_,$q_weight_,$linterm_,${queue-in-bytes_},$bytes_,$mean_pktsize_,$wait_,$setbit_,$droptail_,$red_,$gentle_)"
     }
 }
-
