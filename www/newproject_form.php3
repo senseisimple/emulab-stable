@@ -149,7 +149,7 @@ echo "     </td>
 # Email:
 #
 echo "<tr>
-         <td>*Email<br>Address:</td>
+         <td>*Email Address[1]:</td>
          <td class=\"left\">
              <input name=\"usr_email\"";
 if ($row) {
@@ -165,7 +165,7 @@ echo "    </td>
 # Postal Address
 #
 echo "<tr>
-         <td>*Postal<br>Address:</td>
+         <td>*PostalAddress:</td>
          <td class=\"left\">
               <input name=\"usr_addr\"";
 if ($row) {
@@ -196,7 +196,7 @@ echo "    </td>
 #
 if (! $row) {
 echo "<tr>
-         <td>*Password:</td>
+         <td>*Password[1]:</td>
          <td><input type=\"password\" name=\"password1\" size=\"8\"></td>
       </tr>\n";
 
@@ -319,8 +319,18 @@ echo "<tr>
 </tr>
 </form>
 </table>
-
 <?php
+
+echo "<h4><blockquote><blockquote>
+      <dl COMPACT>
+        <dt>[1]                
+            <dd>Please consult our
+                <a href = 'docwrapper.php3?docname=security.html'>
+                security policies</a> for information
+                regarding passwords and email addresses.
+     </dl>
+     </blockquote></blockquote></h4>\n";
+
 #
 # Standard Testbed Footer
 # 

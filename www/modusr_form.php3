@@ -94,7 +94,7 @@ echo "<tr>
 # Only admins can change the email address.
 # 
 echo "<tr>
-          <td>*Email Address:</td>
+          <td>*Email Address[1]:</td>
           <td class=left>\n";
 if ($isadmin) {
     echo "<input type=text ";
@@ -148,7 +148,7 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
-          <td>New Password:</td>
+          <td>New Password[1]:</td>
           <td class=\"left\">
               <input type=\"password\" name=\"new_password1\" size=\"8\"></td>
      </tr>\n";
@@ -164,8 +164,18 @@ echo "<tr>
 </form>
 </table>
 </center>
-
 <?php
+
+echo "<h4><blockquote><blockquote>
+      <dl COMPACT>
+        <dt>[1]                
+            <dd>Please consult our
+                <a href = 'docwrapper.php3?docname=security.html'>
+                security policies</a> for information
+                regarding passwords and email addresses.
+     </dl>
+     </blockquote></blockquote></h4>\n";
+
 #
 # Standard Testbed Footer
 # 
