@@ -145,6 +145,19 @@ sub os_useradd($$$$$$$$)
 }
 
 #
+# Create a directory including all intermediate directories.
+#
+sub os_mkdir($$)
+{
+    my ($dir, $mode) = @_;
+
+    if (system("$MKDIR -p -m $mode $dir")) {
+	return 0;
+    }
+    return 1;
+}
+
+#
 # OS dependent, routing-related commands
 #
 
