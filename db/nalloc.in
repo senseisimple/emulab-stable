@@ -70,10 +70,6 @@ if (!$error && @vals) {
   $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
   if ($sth = $dbh->query($cmd)) {
     print "Succeeded.\n";    
-    foreach $n ( @nodes ) { 
-      system("$consetup $n") == 0 or
-	print STDERR "WARNING: $consetup $n failed!\n";
-    }
   } else { 
     print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
     $error++;
@@ -84,5 +80,15 @@ print "Unlocking tables.\n";
 $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
+
+if (!$error && @nodes) {
+  foreach $n ( @nodes ) { 
+    print "Setting up console for $n...\n";
+    system("$consetup $n") == 0 or
+      print STDERR "WARNING: $consetup $n failed!\n";
+  }
+}
+
+print "Done.\n";
 
 exit($error);

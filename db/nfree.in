@@ -23,9 +23,7 @@ my $reloadeid="reloading";
 my $pid = shift;
 my $eid = shift;
 my @node_names=@ARGV;
-my @machines = @node_names;
-foreach my $m (@machines) { $m = "node_id='".$m."'"; }
-my $list= join(" or ",@machines);
+my @freed_nodes=();
 
 my $cmd = "";
 my $sth = "";
@@ -55,12 +53,14 @@ if ($#node_names == -1) {
 my %reloads = ();
 foreach my $n (@node_names) { 
   $sth = $dbh->query("select * from reserved where node_id='$n' ".
-		     "and eid='$eid'");
+		     "and eid='$eid' and pid='$pid'");
   if ($sth->numrows == 0) {
     print "Node '$n' is not reserved by your experiment.\n";
     $error++;
     next;
-  } 
+  } else {
+    push(@freed_nodes,$n);
+  }
 
   # If the node has a reloads entry, change the reservation and start it
   $cmd = "select node_id,partition,image_id,path from reloads where ".
@@ -111,9 +111,6 @@ foreach my $n (@node_names) {
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++);
   }
-
-  system("$consetup $n") == 0 or
-      print STDERR "WARNING: $consetup $n failed!\n";
 }
 
 print "Unlocking tables.\n";
@@ -154,5 +151,13 @@ if ( %reloads > 0 ) {
   $sth = $dbh->query($cmd) 
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 }
+
+foreach $n ( @freed_nodes ) {
+  print "Setting up console for $n...\n";
+  system("$consetup $n") == 0 or
+    print STDERR "WARNING: $consetup $n failed!\n";
+}
+
+print "Done.\n";
 
 exit($error);
