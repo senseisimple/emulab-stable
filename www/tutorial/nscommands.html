@@ -7,6 +7,7 @@
 <ul>
   <li><a href="#INTRO">Introduction</a>
   <li><a href="#TCL">TCL, NS, and node names</a>
+  <li><a href="#ORDER">Ordering issues</a>
   <li><a href="#HARD">Hardware Commands</a>
   <li><a href="#IP">IP Commands</a>
   <li><a href="#OS">OS Commands</a>
@@ -107,6 +108,15 @@ set link1 [$ns duplex-link $node0 $node1 100Mb .1ms DropTail]
 tb-set-link-loss $link1 0.05
 tb-set-ip-link $node0 $link1 192.0.0.128
 </pre>
+
+<hr>
+
+<a name="ORDER"></a><h3>Ordering Issues</h3>
+
+<p>tb- commands have the same status as all other Tcl and NS commands.
+Thus the order matters not only relative to each other but also
+relative other commands.  One common example of this is that IP
+commands must be issued after the links or lans are created.
 
 <hr>
 
