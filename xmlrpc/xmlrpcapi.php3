@@ -139,6 +139,11 @@ Dictionary) of the form:
     </ul>
 </blockquote>
 
+Unless specifically stated, the return value of most commands is a
+simple integer reflecting an exit code from the server, and some
+output that to help you determine what went wrong. Otherwise, the
+return value is documented in each method description. 
+
 <ul>
 <li><b>/XMLRPC/experiment</b>
 <p>
@@ -604,7 +609,58 @@ experiments.
    </tr>
   </table>
   
+  <br>
+  <li><tt><b>reload</b></tt>: Reload the disks on all nodes in an
+  experiment. You may specify an imageid to use for all nodes, or you can
+  allow the system to load the default imageid for each node. 
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <td>name</td><td>type</td><td>description</td>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>pid</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID in which the experiment was created</td>
+  </tr>
+  <tr>
+    <td><tt>eid</tt></td>
+    <td>string</td>
+    <td>The Emulab ID of the experiment</td>
+  </tr>
+  </table>
   
+  <br>
+  The optional arguments are:<br><br>
+  <table cellpadding=2>
+   <tr>
+    <td>name</td><td>type</td><td>default</td><td>description</td>
+   </tr>
+   <tr></tr>
+   <tr>
+    <td><tt>wait</tt></td>
+    <td>boolean</td>
+    <td>true</td>
+    <td>If true, wait synchronously for all nodes to complete their
+    reload. The default is to wait; you must turn this off if you want
+    the reload to proceed in the background (not a good idea)</td>
+   </tr>
+   <tr>
+    <td><tt>imageid</tt></td>
+    <td>string</td>
+    <td>&nbsp</td>
+    <td>Specify the imageid to load on all of the nodes</td>
+   </tr>
+   <tr>
+    <td><tt>imagepid</tt></td>
+    <td>string</td>
+    <td>&nbsp</td>
+    <td>Specify the Emulab project ID of the imageid. By default the
+    system will look in the project of the experiment, and then in the
+    system project for globally shared images.</td>
+   </tr>
+  </table>
   </ul>
 
 <br>
@@ -641,8 +697,99 @@ The <tt>node</tt> module lets you control nodes in your experiments.
       <td>If true, wait synchronously for all nodes to complete their reboot</td>
      </tr>
     </table>
-  </ul>
+
+   <br>
+   <li><tt><b>create_image</b></tt>: Create an image from a node using
+   a previously created
+   <a href="<?php echo $TBBASE ?>/newimageid_ez.php3">imageid</a>. The 
+   The required arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <td>name</td><td>type</td><td>description</td>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>node</tt></td>
+      <td>string</td>
+      <td>The node to create the image from</td>
+     </tr>
+     <tr>
+      <td><tt>imageid</tt></td>
+      <td>string</td>
+      <td>The image id (descriptor)</td>
+     </tr>
+    </table>
+
+    <br>
+    The optional arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <td>name</td><td>type</td><td>default</td><td>description</td>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>wait</tt></td>
+      <td>boolean</td>
+      <td>false</td>
+      <td>If true, wait synchronously for all nodes to complete their reboot</td>
+     </tr>
+     <tr>
+      <td><tt>pid</tt></td>
+      <td>string</td>
+      <td>emulab-ops</td>
+      <td>The project ID in which the imageid was created; defaults to
+      the system project</td>
+     </tr>
+    </table>
+
+    <br>
+    <li><tt><b>reload</b></tt>: Reload the disks on all nodes specified.
+    You may specify an imageid to use for all nodes, or you can
+    allow the system to load the default imageid for each node. 
+    The required arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <td>name</td><td>type</td><td>description</td>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>nodes</tt></td>
+      <td>string</td>
+      <td>A comma separated list of nodes to reload</td>
+     </tr>
+    </table>
   
+    <br>
+    The optional arguments are:<br><br>
+    <table cellpadding=2>
+     <tr>
+      <td>name</td><td>type</td><td>default</td><td>description</td>
+     </tr>
+     <tr></tr>
+     <tr>
+      <td><tt>wait</tt></td>
+      <td>boolean</td>
+      <td>true</td>
+      <td>If true, wait synchronously for all nodes to complete their
+      reload. The default is to wait; you must turn this off if you want
+      the reload to proceed in the background (not a good idea)</td>
+     </tr>
+     <tr>
+      <td><tt>imageid</tt></td>
+      <td>string</td>
+      <td>&nbsp</td>
+      <td>Specify the imageid to load on all of the nodes</td>
+     </tr>
+     <tr>
+      <td><tt>imagepid</tt></td>
+      <td>string</td>
+      <td>&nbsp</td>
+      <td>Specify the Emulab project ID of the imageid. By default the
+      system will look in the system project for globally shared images.</td>
+     </tr>
+    </table>
+    
+  </ul>
 </ul>
 
 <?php

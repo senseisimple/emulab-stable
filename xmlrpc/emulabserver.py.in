@@ -72,36 +72,36 @@ class experiment:
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("batch"):
+            if opt == "batch":
                 if val == "false":
                     argstr += " -i"
                     pass
                 pass
-            elif opt in ("description"):
+            elif opt == "description":
                 argstr += " -E "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("gid"):
+            elif opt == "gid":
                 argstr += " -g "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("eid"):
+            elif opt == "eid":
                 argstr += " -e "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("pid"):
+            elif opt == "pid":
                 argstr += " -p "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("swappable"):
+            elif opt == "swappable":
                 if val == "false":
                     argstr += " -S "
                     argstr += argdict["noswap_reason"]
                     pass
                 pass
-            elif opt in ("noswap_reason"):
+            elif opt == "noswap_reason":
                 pass
-            elif opt in ("idleswap"):
+            elif opt == "idleswap":
                 if val == 0:
                     argstr += " -L "
                     argstr += escapeshellarg(argdict["noidleswap_reason"])
@@ -111,27 +111,27 @@ class experiment:
                     argstr += escapeshellarg(val)
                     pass
                 pass
-            elif opt in ("noidleswap_reason"):
+            elif opt == "noidleswap_reason":
                 pass
-            elif opt in ("autoswap"):
+            elif opt == "autoswap":
                 argstr += " -a "
                 argstr += escapeshellarg(val)
                 pass
-            elif opt in ("noswapin"):
+            elif opt == "noswapin":
                 if val == "true":
                     argstr += " -f "
                     pass
                 pass
-            elif opt in ("wait"):
+            elif opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
                 pass
-            elif opt in ("nsfilepath"):
+            elif opt == "nsfilepath":
                 # Backend script will verify this local path. 
                 nsfilename = escapeshellarg(val)
                 pass
-            elif opt in ("nsfilestr"):
+            elif opt == "nsfilestr":
                 nsfilestr = val
             
                 if len(nsfilestr) > (1024 * 512):
@@ -173,7 +173,7 @@ class experiment:
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("wait"):
+            if opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
@@ -210,26 +210,26 @@ class experiment:
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("wait"):
+            if opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
                 pass
-            elif opt in ("reboot"):
+            elif opt == "reboot":
                 if val == "true":
                     argstr += " -r "
                     pass
                 pass
-            elif opt in ("restart_eventsys"):
+            elif opt == "restart_eventsys":
                 if val == "true":
                     argstr += " -e "
                     pass
                 pass
-            elif opt in ("nsfilepath"):
+            elif opt == "nsfilepath":
                 # Backend script will verify this local path. 
                 nsfilename = escapeshellarg(val)
                 pass
-            elif opt in ("nsfilestr"):
+            elif opt == "nsfilestr":
                 nsfilestr = val
             
                 if len(nsfilestr) > (1024 * 512):
@@ -274,7 +274,7 @@ class experiment:
         argstr     = ""
         
         for opt, val in argdict.items():
-            if opt in ("wait"):
+            if opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
@@ -345,12 +345,12 @@ class experiment:
         argstr = ""
         
         for opt, val in argdict.items():
-            if opt in ("persist"):
+            if opt == "persist":
                 if val == "true":
                     argstr += " -m "
                     pass
                 pass
-            elif opt in ("src"):
+            elif opt == "src":
                 argstr += " -s "
                 argstr += escapeshellarg(val)
                 pass
@@ -389,7 +389,7 @@ class experiment:
         argstr = ""
         
         for opt, val in argdict.items():
-            if opt in ("wait"):
+            if opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
@@ -404,6 +404,47 @@ class experiment:
         argstr += " -e " + escapeshellarg(argdict["pid"] + "," + argdict["eid"])
         
         (exitval, output) = runcommand(TBDIR + "/bin/node_reboot " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Reload all nodes in an experiment.
+    #
+    def reload(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argstr = ""
+        
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if val == "false":
+                    argstr += " -s "
+                    pass
+                pass
+            elif opt == "imagepid":
+                argstr += " -p "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "imageid":
+                argstr += " -i "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        if not (argdict.has_key("pid") and
+                argdict.has_key("eid")):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                 output="Must supply pid and eid!");
+
+        argstr += " -e " + escapeshellarg(argdict["pid"] + "," + argdict["eid"])
+        
+        (exitval, output) = runcommand(TBDIR + "/bin/os_load " + argstr)
+
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
@@ -434,7 +475,7 @@ class node:
         argstr = ""
         
         for opt, val in argdict.items():
-            if opt in ("wait"):
+            if opt == "wait":
                 if val == "true":
                     argstr += " -w "
                     pass
@@ -451,6 +492,86 @@ class node:
             pass
 
         (exitval, output) = runcommand(TBDIR + "/bin/node_reboot " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # create_image.
+    #
+    def create_image(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argstr = ""
+        
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if val == "true":
+                    argstr += " -w "
+                    pass
+                pass
+            elif opt == "pid":
+                argstr += " -p "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        if not (argdict.has_key("imageid") and
+                argdict.has_key("node")):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                 output="Must supply imageid and node!");
+
+        argstr += " " + escapeshellarg(argdict["imageid"])
+        argstr += " " + escapeshellarg(argdict["node"])
+
+        (exitval, output) = runcommand(TBDIR + "/bin/create_image " + argstr)
+        if exitval:
+            return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
+        
+        return EmulabResponse(RESPONSE_SUCCESS, output=output)
+
+    #
+    # Reload nodes.
+    #
+    def reload(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                 output="Client version mismatch!");
+            pass
+
+        argstr = ""
+        
+        for opt, val in argdict.items():
+            if opt == "wait":
+                if val == "false":
+                    argstr += " -s "
+                    pass
+                pass
+            elif opt == "imagepid":
+                argstr += " -p "
+                argstr += escapeshellarg(val)
+                pass
+            elif opt == "imageid":
+                argstr += " -i "
+                argstr += escapeshellarg(val)
+                pass
+            pass
+
+        if not (argdict.has_key("nodes")):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                 output="Must supply a list of nodes!");
+
+        tokens = argdict["nodes"].split(",")
+        for token in tokens:
+            argstr += " " + escapeshellarg(token)
+            pass
+
+        (exitval, output) = runcommand(TBDIR + "/bin/os_load " + argstr)
+
         if exitval:
             return EmulabResponse(RESPONSE_ERROR, exitval >> 8, output=output)
         
