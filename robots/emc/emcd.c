@@ -512,14 +512,19 @@ void parse_config_file(char *config_file) {
     }
     else if (strcmp(directive, "camera") == 0) {
       char area[32], hostname[MAXHOSTNAMELEN];
+      float x, y, width, height;
       int port;
 
       if (sscanf(line,
-		 "%16s %32s %" __XSTRING(MAXHOSTNAMELEN) "s %d",
+		 "%16s %32s %" __XSTRING(MAXHOSTNAMELEN) "s %d %f %f %f %f",
 		 directive,
 		 area,
 		 hostname,
-		 &port) != 4) {
+		 &port,
+		 &x,
+		 &y,
+		 &width,
+		 &height) != 8) {
 	fprintf(stderr,
 		"error:%d: syntax error in config file - %s\n",
 		line_no,
@@ -535,6 +540,10 @@ void parse_config_file(char *config_file) {
       else {
 	cc[cc_size].hostname = strdup(hostname);
 	cc[cc_size].port = port;
+	cc[cc_size].x = x;
+	cc[cc_size].y = y;
+	cc[cc_size].width = width;
+	cc[cc_size].height = height;
 	cc_size += 1;
       }
     }
@@ -1509,6 +1518,9 @@ int vmc_callback(elvin_io_handler_t handler,
 
     mtp_delete_handle(vmc->handle);
     vmc->handle = NULL;
+
+    robot_list_destroy(vmc->position_list);
+    vmc->position_list = NULL;
     
     close(fd);
     fd = -1;

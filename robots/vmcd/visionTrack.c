@@ -90,6 +90,7 @@ int vtUpdate(struct lnMinList *now,
 	    assert(vt != NULL);
 
 	    vt->vt_position = mup->position;
+	    vt->vt_client = vc;
 	    vt->vt_age = 0;
 	    vt->vt_userdata = NULL;
 	    lnAddTail(now, &vt->vt_link);
@@ -102,6 +103,14 @@ int vtUpdate(struct lnMinList *now,
 		vc->vc_top = mup->position.y;
 	    if (mup->position.y > vc->vc_bottom)
 		vc->vc_bottom = mup->position.y;
+
+	    
+	    printf("vc %p %f %f %f %f\n",
+		   vc,
+		   vc->vc_left,
+		   vc->vc_right,
+		   vc->vc_top,
+		   vc->vc_bottom);
 	    
 	    retval = (mup->status == MTP_POSITION_STATUS_CYCLE_COMPLETE);
 	}
@@ -131,6 +140,15 @@ void vtCoalesce(struct lnMinList *extra,
 	int in_camera_count = 0, lpc;
 	
 	for (lpc = 0; lpc < vc_len; lpc++) {
+#if 0
+	    printf("vc2 %f %f -- %f %f %f %f\n",
+		   vt->vt_position.x,
+		   vt->vt_position.y,
+		   vc[lpc].vc_left,
+		   vc[lpc].vc_right,
+		   vc[lpc].vc_top,
+		   vc[lpc].vc_bottom);
+#endif
 	    if ((vt->vt_position.x >= vc[lpc].vc_left) &&
 		(vt->vt_position.x <= vc[lpc].vc_right) &&
 		(vt->vt_position.y >= vc[lpc].vc_top) &&
@@ -148,7 +166,12 @@ void vtCoalesce(struct lnMinList *extra,
 	    while (vt_extra->vt_link.ln_Succ != NULL) {
 		vt_succ = (struct vision_track *)vt_extra->vt_link.ln_Succ;
 
-		if (vtCompare(vt, vt_extra, 0.35)) {
+		printf("try coalesce %f %f  --  %f %f  %d %d\n",
+		       vt->vt_position.x, vt->vt_position.y,
+		       vt_extra->vt_position.x, vt_extra->vt_position.y,
+		       vt->vt_client->vc_port, vt_extra->vt_client->vc_port);
+		if ((vt->vt_client != vt_extra->vt_client) &&
+		    vtCompare(vt, vt_extra, 0.35)) {
 		    printf("coalesce %f %f  --  %f %f\n",
 			   vt->vt_position.x, vt->vt_position.y,
 			   vt_extra->vt_position.x, vt_extra->vt_position.y);
@@ -181,7 +204,7 @@ void vtMatch(struct lnMinList *pool,
 	float distance;
 	
 	if ((vt_prev = vtFindMin(vt, prev, &distance)) != NULL) {
-	    if (distance < 0.50) {
+	    if (distance < 0.30) {
 		vt->vt_userdata = vt_prev->vt_userdata;
 		lnRemove(&vt_prev->vt_link);
 		lnAddHead(pool, &vt_prev->vt_link);
@@ -259,6 +282,7 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
 		   vt->vt_position.theta);
 	    if (diff > (M_PI - M_PI_4) || (diff < (-M_PI + M_PI_4))) {
 		retval = vt;
+		printf(" found it %p\n", retval);
 	    }
 	}
 	vt = (struct vision_track *)vt->vt_link.ln_Succ;

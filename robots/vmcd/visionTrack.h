@@ -10,6 +10,7 @@
 struct vision_track {
     struct lnMinNode vt_link;
     struct robot_position vt_position;
+    struct vmc_client *vt_client;
     int vt_age;
     void *vt_userdata;
 };

@@ -363,16 +363,32 @@ class emulab:
         table = {
             "MEB-ROBOTS" : [ { "name" : "camera0",
                                "host" : "junk.flux.utah.edu",
-                               "port" : 6100 },
+                               "port" : 6100,
+                               "x" : 0.25,
+                               "y" : 1.80,
+                               "width" : 1.45,
+                               "height" : 2.20 },
                              { "name" : "camera1",
                                "host" : "junk.flux.utah.edu",
-                               "port" : 6101 },
+                               "port" : 6101,
+                               "x" : 1.7,
+                               "y" : 1.5,
+                               "width" : 1.45,
+                               "height" : 1.6 },
                              { "name" : "camera2",
                                "host" : "junk.flux.utah.edu",
-                               "port" : 6102 },
+                               "port" : 6102,
+                               "x" : 3.1,
+                               "y" : 1.5,
+                               "width" : 1.45,
+                               "height" : 1.6 },
                              { "name" : "camera3",
                                "host" : "junk.flux.utah.edu",
-                               "port" : 6103 } ]
+                               "port" : 6103,
+                               "x" : 4.50,
+                               "y" : 1.5,
+                               "width" : 1.4,
+                               "height" : 1.6 } ]
             }
         
         if not table.has_key(argdict["area"]):

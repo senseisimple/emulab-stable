@@ -22,7 +22,7 @@ class pilotMoveCallback : public wmCallback
 
 public:
 
-    pilotMoveCallback(pilotClient::list &pcl);
+    pilotMoveCallback(pilotClient::list &pcl, int command_id);
 
     /**
      * Callback that will send an MTP_UPDATE_POSITION packet back to the client
@@ -35,11 +35,13 @@ public:
 private:
 
     pilotClient::list &notify_list;
+
+    int command_id;
     
 };
 
-pilotMoveCallback::pilotMoveCallback(pilotClient::list &pcl)
-    : notify_list(pcl)
+pilotMoveCallback::pilotMoveCallback(pilotClient::list &pcl, int command_id)
+    : notify_list(pcl), command_id(command_id)
 {
 }
 
@@ -58,6 +60,7 @@ void pilotMoveCallback::call(int status)
 	ms = MTP_POSITION_STATUS_ABORTED;
 	break;
     default:
+	fprintf(stderr, "error: couldn't complete move %d\n", status);
 	ms = MTP_POSITION_STATUS_ERROR;
 	break;
     }
@@ -66,6 +69,7 @@ void pilotMoveCallback::call(int status)
 		    MA_Opcode, MTP_UPDATE_POSITION,
 		    MA_Role, MTP_ROLE_ROBOT,
 		    MA_Status, ms,
+		    MA_CommandID, this->command_id,
 		    MA_TAG_DONE);
 
     for (i = this->notify_list.begin(); i != this->notify_list.end(); i++) {
@@ -110,6 +114,7 @@ pilotClient::~pilotClient()
 bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 {
     struct mtp_command_goto *mcg;
+    struct mtp_command_stop *mcs;
     struct mtp_control *mc;
     bool retval = false;
 
@@ -162,8 +167,9 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    for (i = notify_list.begin(); i != notify_list.end(); i++) {
 		pilotClient *pc = *i;
 		
-		if (pc->getRole() == MTP_ROLE_EMULAB)
+		if (pc->getRole() == MTP_ROLE_EMULAB) {
 		    mtp_send_packet(pc->getHandle(), &cmp);
+		}
 	    }
 	    
 	    if ((mcg->position.x != 0.0) || (mcg->position.y != 0.0)) {
@@ -178,7 +184,8 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		this->pc_wheel_manager.
 		    setDestination(mcg->position.x,
 				   mcg->position.y,
-				   new pilotMoveCallback(notify_list));
+				   new pilotMoveCallback(notify_list,
+							 mcg->command_id));
 	    }
 	    else {
 		if (debug) {
@@ -189,7 +196,8 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		
 		this->pc_wheel_manager.setOrientation(
 			mcg->position.theta,
-			new pilotMoveCallback(notify_list));
+			new pilotMoveCallback(notify_list,
+					      mcg->command_id));
 	    }
 	    
 	    retval = true;
@@ -201,6 +209,8 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    struct mtp_packet cmp, rmp;
 	    pilotClient::iterator i;
 	    
+	    mcs = &mp->data.mtp_payload_u.command_stop;
+	    
 	    if (debug) {
 		fprintf(stderr, "debug: full stop\n");
 	    }
@@ -210,6 +220,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    MA_Opcode, MTP_UPDATE_POSITION,
 			    MA_Role, MTP_ROLE_ROBOT,
 			    MA_Status, MTP_POSITION_STATUS_IDLE,
+			    MA_CommandID, mcs->command_id,
 			    MA_TAG_DONE);
 
 	    cmp = *mp;

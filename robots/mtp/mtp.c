@@ -519,8 +519,20 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		va_arg(args, int);
 	    break;
 	case MA_CommandID:
-	    mp->data.mtp_payload_u.command_goto.command_id =
-		va_arg(args, int);
+	    switch (mp->data.opcode) {
+	    case MTP_UPDATE_POSITION:
+		mp->data.mtp_payload_u.update_position.command_id =
+		    va_arg(args, int);
+		break;
+	    case MTP_COMMAND_GOTO:
+	    case MTP_COMMAND_STOP:
+		mp->data.mtp_payload_u.command_goto.command_id =
+		    va_arg(args, int);
+		break;
+	    default:
+		assert(0);
+		break;
+	    }
 	    break;
 	case MA_GarciaTelemetry:
 	    mp->data.mtp_payload_u.telemetry.type = MTP_ROBOT_GARCIA;

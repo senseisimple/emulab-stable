@@ -328,10 +328,14 @@ RPC_cameralist(FILE *emcd_config, char *area)
 		tmp = attr.getMember("host");
 		port = ((ulxr::Integer)attr.getMember("port")).getInteger();
 		fprintf(emcd_config,
-			"camera %s %s %d\n",
+			"camera %s %s %d %f %f %f %f\n",
 			area,
 			tmp.getString().c_str(),
-			port);
+			port,
+			((ulxr::Double)attr.getMember("x")).getDouble(),
+			((ulxr::Double)attr.getMember("y")).getDouble(),
+			((ulxr::Double)attr.getMember("width")).getDouble(),
+			((ulxr::Double)attr.getMember("height")).getDouble());
 	}
 	
 	return 0;

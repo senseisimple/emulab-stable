@@ -17,8 +17,10 @@
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <ucontext.h>
 
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -123,7 +125,6 @@ int main(int argc, char *argv[])
     int retval = EXIT_SUCCESS;
     unsigned long now;
     FILE *batterylog;
-    acpGarcia garcia;
     aIOLib ioRef;
     aErr err;
 
@@ -157,23 +158,27 @@ int main(int argc, char *argv[])
 	}
     }
 
+#if 0
     if (getuid() != 0) {
 	fprintf(stderr, "error: must run as root!\n");
 	exit(1);
     }
+#endif
 
     if (!debug) {
 	/* Become a daemon */
 	daemon(0, 0);
 
 	if (logfile) {
-	    FILE *file;
+	    int logfd;
 
-	    if ((file = fopen(logfile, "w")) != NULL) {
-		dup2(fileno(file), 1);
-		dup2(fileno(file), 2);
-		stdout = file;
-		stderr = file;
+	    if ((logfd = open(logfile,
+			      O_CREAT|O_WRONLY|O_APPEND,
+			      0644)) != -1) {
+		dup2(logfd, 1);
+		dup2(logfd, 2);
+		if (logfd > 2)
+		    close(logfd);
 	    }
 	}
     }
@@ -193,6 +198,8 @@ int main(int argc, char *argv[])
 		batteryfile);
     }
 
+    acpGarcia garcia;
+    
     signal(SIGUSR1, sigdebug);
 
     signal(SIGQUIT, sigquit);

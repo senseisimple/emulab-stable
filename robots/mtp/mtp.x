@@ -164,6 +164,10 @@ struct robot_config {
 struct camera_config {
     string hostname<>;
     int port;
+    float x;
+    float y;
+    float width;
+    float height;
 };
 
 struct obstacle_config {
@@ -207,6 +211,7 @@ struct mtp_update_position {
     int robot_id;
     robot_position position;
     mtp_status_t status;
+    int command_id;
 };
 
 struct mtp_request_id {

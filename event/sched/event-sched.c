@@ -294,6 +294,28 @@ main(int argc, char *argv[])
 		
 		sleep(2);
 
+		rmcd_pid = fork();
+		switch (rmcd_pid) {
+		case -1:
+			fatal("could not start rmcd");
+			break;
+		case 0:
+			execlp("rmcd",
+			       "rmcd",
+			       "-d",
+			       "-l",
+			       "logs/rmcd.log",
+			       "-U",
+			       emc_path,
+			       NULL);
+			exit(0);
+			break;
+		default:
+			break;
+		}
+		
+		sleep(2);
+
 #if 1
 		vmcd_pid = fork();
 		switch (vmcd_pid) {
@@ -318,28 +340,6 @@ main(int argc, char *argv[])
 		systemf("vmcd -d -l logs/vmcd.log -e localhost -p 2626 "
 			"-c junk.flux.utah.edu -P 6969 &");
 #endif
-		
-		sleep(2);
-
-		rmcd_pid = fork();
-		switch (rmcd_pid) {
-		case -1:
-			fatal("could not start rmcd");
-			break;
-		case 0:
-			execlp("rmcd",
-			       "rmcd",
-			       "-d",
-			       "-l",
-			       "logs/rmcd.log",
-			       "-U",
-			       emc_path,
-			       NULL);
-			exit(0);
-			break;
-		default:
-			break;
-		}
 	}
 
 	/*
