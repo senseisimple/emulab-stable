@@ -36,6 +36,16 @@ $exp_eid = substr($exp_eid, 2);
 $exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "\$\$", 0));
 
 #
+# Stop now if the Confirm box was not Depressed
+#
+if (!isset($confirm) ||
+    strcmp($confirm, "yes")) {
+  USERERROR("The \"Confirm\" button was not depressed! If you really ".
+            "want to end experiment '$exp_eid' in project '$exp_pid', ".
+            "please go back and try again.", 1);
+}
+
+#
 # Check to make sure thats this is a valid PID/EID tuple.
 #
 $query_result = mysql_db_query($TBDBNAME,

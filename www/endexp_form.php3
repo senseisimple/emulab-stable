@@ -72,15 +72,36 @@ echo "<tr></tr>";
 # experiments as an option list.
 #
 echo "<tr>";
-echo "    <td><select name=\"exp_pideid\">";
+echo "    <td align=\"center\"><select name=\"exp_pideid\">";
 echo "         $experiments";
 echo "        </select>";
 echo "    </td>
       </tr>\n";
 
 ?>
-<td align="center">
-<b><input type="submit" value="Submit"></b></td></tr>
+<tr>
+    <td height=25></td>
+</tr>
+
+<tr>
+    <td align="center" height=50>
+        <em>Do you really want to do this?<br>
+           (Depress the Confirm button)</em></td>
+</tr>
+
+<tr>
+    <td heght=25 align="center">
+        <input type="checkbox" name="confirm" value="yes"></td>
+</tr>
+
+<tr>
+    <td height=25></td>
+</tr>
+
+<tr>
+   <td align="center">
+      <b><input type="submit" value="Submit"></b></td>
+</tr>
 </form>
 </table>
 </center>
