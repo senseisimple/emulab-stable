@@ -129,6 +129,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 		rm -f icons; \
 		ln -s /usr/local/www/icons icons;
 		$(INSTALL_CVSWEBCGI)
+	wget -q -O /dev/null http://${WWW}/clearapc.php
 
 post-install:
 
