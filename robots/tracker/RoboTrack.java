@@ -49,7 +49,7 @@ public class RoboTrack extends JApplet {
 	    auth    = this.getParameter("auth");
 	    pipeurl = this.getParameter("pipeurl");
 	    baseurl = this.getParameter("baseurl");
-	    pixels_per_meter = Float.parseFloat(this.getParameter("ppm"));
+	    pixels_per_meter = Double.parseDouble(this.getParameter("ppm"));
 
 	    // form the URL that we use to get the background image
 	    floorurl = new URL(urlServer,
@@ -143,7 +143,7 @@ public class RoboTrack extends JApplet {
     }
 
     /*
-     * A containter for coordinate information.
+     * A container for coordinate information.
      */
     static class Robot {
         int x, y;			// Current x,y coords in pixels
@@ -160,8 +160,10 @@ public class RoboTrack extends JApplet {
 	String battery_percentage = "";
 	String x_meters           = "";
 	String y_meters           = "";
+	String or_string          = "";
 	String dx_meters          = "";
 	String dy_meters          = "";
+	String dor_string         = "";
 	String pname, vname;		
 	int index;
     }
@@ -195,10 +197,10 @@ public class RoboTrack extends JApplet {
 					    int dist, double angle) {
 	    int retvals[] = new int[2];
 
-	    retvals[0] = x + dist *
-		(int) Math.cos(-(angle) * 3.1415926536 / 180.0);
-	    retvals[1] = y + dist *
-		(int) Math.sin(-(angle) * 3.1415926536 / 180.0);
+	    retvals[0] = (int) (x + dist *
+				Math.cos(-angle * 3.1415926536 / 180.0));
+	    retvals[1] = (int) (y + dist *
+				Math.sin(-angle * 3.1415926536 / 180.0));
     
 	    return retvals;	    
 	}
@@ -251,24 +253,34 @@ public class RoboTrack extends JApplet {
 	    robbie.y_meters = FORMATTER.format(robbie.y / pixels_per_meter);
 
 	    str = tokens.nextToken().trim();
-	    if (str.length() > 0)
-		robbie.or = Float.parseFloat(str);
+	    if (str.length() > 0) {
+		robbie.or = Double.parseDouble(str);
+		robbie.or_string = FORMATTER.format(robbie.or);
+	    }
+	    else {
+		robbie.or        = 500.0;
+		robbie.or_string = "";
+	    }
 
 	    str = tokens.nextToken().trim();
 	    if (str.length() > 0) {
 		robbie.dx  = Integer.parseInt(str);
 		robbie.dy  = Integer.parseInt(tokens.nextToken().trim());
-		robbie.dor = Float.parseFloat(tokens.nextToken().trim());
-		robbie.dx_meters = FORMATTER.format(robbie.dx /
+		robbie.dor = Double.parseDouble(tokens.nextToken().trim());
+		robbie.dx_meters  = FORMATTER.format(robbie.dx /
 						    pixels_per_meter);
-		robbie.dy_meters = FORMATTER.format(robbie.dy /
+		robbie.dy_meters  = FORMATTER.format(robbie.dy /
 						    pixels_per_meter);
+		robbie.dor_string = FORMATTER.format(robbie.dor);
 		robbie.gotdest = true;
 	    }
 	    else {
-		// Consume next two tokens.
+		// Consume next two tokens and clear strings.
 		str = tokens.nextToken();
 		str = tokens.nextToken();
+		robbie.dx_meters  = "";
+		robbie.dy_meters  = "";
+		robbie.dor_string = "";
 	    }
 
 	    // Store these as strings for easy display.
@@ -311,6 +323,9 @@ public class RoboTrack extends JApplet {
 	     */
 	    if (or != 500.0) {
 		int endpoint[] = ComputeOrientationLine(x, y, STICK_LEN, or);
+
+		//System.out.println(or + " " + x + " " + y + " " +
+		//                   endpoint[0] + " " + endpoint[1]);
 		
 		g2.drawLine(x, y, endpoint[0], endpoint[1]);
 	    }
@@ -491,10 +506,10 @@ public class RoboTrack extends JApplet {
 	    case 1: return robbie.vname;
 	    case 2: return robbie.x_meters;
 	    case 3: return robbie.y_meters;
-	    case 4: return (robbie.or != 500.0 ? "" + robbie.or : "");
-	    case 5: return (robbie.gotdest ? robbie.dx_meters  : "");
-	    case 6: return (robbie.gotdest ? robbie.dy_meters  : "");
-	    case 7: return (robbie.dor != 500.0 ? "" + robbie.dor : "");
+	    case 4: return robbie.or_string;
+	    case 5: return robbie.dx_meters;
+	    case 6: return robbie.dy_meters;
+	    case 7: return robbie.dor_string;
 	    case 8: return robbie.battery_percentage;
 	    case 9: return robbie.battery_voltage;
 	    }

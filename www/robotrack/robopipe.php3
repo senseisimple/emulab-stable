@@ -61,18 +61,27 @@ if (isset($fake)) {
     return;
 }
 
+$last_stamp = 0;
+
+$base_query_string =
+    "select loc.*,r.pid,r.eid,r.vname, ".
+    "  n.battery_voltage,n.battery_percentage, ".
+    "  n.destination_x,n.destination_y, ".
+    "  n.destination_orientation ".
+    "  from location_info as loc ".
+    "left join reserved as r on r.node_id=loc.node_id ".
+    "left join nodes as n on n.node_id=loc.node_id ".
+    "where loc.building='$building' and ".
+    "      loc.floor='$floor' ";
+
 # Loop forever.
 while (1) {
-    $query_result = 
-	DBQueryFatal("select loc.*,r.pid,r.eid,r.vname, ".
-		     "  n.battery_voltage,n.battery_percentage, ".
-		     "  n.destination_x,n.destination_y, ".
-		     "  n.destination_orientation ".
-		     "  from location_info as loc ".
-		     "left join reserved as r on r.node_id=loc.node_id ".
-		     "left join nodes as n on n.node_id=loc.node_id ".
-		     "where loc.building='$building' and ".
-		     "      loc.floor='$floor'");
+    if ($last_stamp) 
+	$query_string = $base_query_string . "and stamp>$last_stamp";
+    else
+	$query_string = $base_query_string;
+
+    $query_result = DBQueryFatal($query_string);
 
     while ($row = mysql_fetch_array($query_result)) {
 	$pname = $row["node_id"];
@@ -85,6 +94,10 @@ while (1) {
 	$dor   = $row["destination_orientation"];
 	$bvolts= $row["battery_voltage"];
 	$bper  = $row["battery_percentage"];
+	$stamp = $row["stamp"];
+
+	if ($stamp > $last_stamp)
+	    $last_stamp = $stamp;
 
 	if (!isset($vname))
 	    $vname = $pname;
