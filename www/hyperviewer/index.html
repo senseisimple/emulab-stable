@@ -24,7 +24,7 @@ Windows</a><br>
     <li><a href="#building_windows">Building hypview on Windows</a></li>
   </ol>
   <li><a href="#run">Running hypview as a script</a></li>
-  <li><a href="#gui">The hypview Graphical User Interface</a></li>
+  <li><a href="#gui">Using the hypview Graphical User Interface</a></li>
 </ol>
 <hr style="width: 100%; height: 2px;">
 <h3><a name="intro"></a>Introduction</h3>
@@ -38,14 +38,16 @@ interface, and connected it to the Emulab database via XML-RPC over SSH.<br>
 <br>
 <span style="font-style: italic; font-weight: bold;">hypview</span>
 supports interactive three-dimensional exploration of experiment
-network topologies, and scales to very large topologies.&nbsp; Here is
-a before-and-after view of a moderate-sized network with 541
+network topologies, and scales to very large topologies.&nbsp; Below is
+a before-and-after view of a mid-sized network with 541
 nodes.&nbsp; First is the static 2D Graphviz view, using an algorithm
 which is perfectly adequate for smaller topologies.&nbsp; Then a
 snapshot
-from hypview of the same topology, where more detail is apparent.&nbsp;
+from hypview of the same topology, where more structure is
+apparent.&nbsp;
 Interactively, it is easy to reach out from the high-detail area in the
-center of the sphere to look more closely into the compressed areas
+center of the HyperVIewer sphere to look more closely into the
+compressed areas
 near the outside surface of the sphere.<br>
 <br>
 <div style="margin-left: 40px;"><a href="graphviz_biglan.jpg"><img
@@ -88,7 +90,8 @@ The basic idea is that a graph is presented within a sphere that
 resembles a fish-eye lens: objects in the center of the sphere appear
 full-size, but objects get smaller as they approach the surface of the
 sphere.&nbsp; A hyperbolic projection is used, which actually maps an
-infinite 3D space onto the finite sphere.&nbsp; M.C. Esher did likewise
+infinite 3D space onto the finite sphere.&nbsp; M.C. Escher did
+likewise
 in 2D with <a href="http://mathworld.wolfram.com/HyperbolicTiling.html">hyperbolic
 tilings</a>.<br>
 <br>
@@ -287,18 +290,38 @@ way is to get it all packaged together in <a
  href="http://www.emulab.net/downloads/Python22-wxWindows-PyOpenGL.exe">one
 exe file</a>, and unpack to the location of your choice.&nbsp; <br>
   </li>
+</ul>
+<ul>
   <ul>
     <li>The download size is 25 meg and when installed it becomes 56
 meg.&nbsp; <br>
     </li>
-    <li>The default unpack location is C:\, in which case you can also
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>Everything goes under a Python22 directory.&nbsp; The default
+unpack location for Python22 is C:\, in which case you can also
 unpack <a
  href="http://www.emulab.net/downloads/Python22-wxWindows-shortcuts.exe">these
-shortcuts</a> into your Start Menu/Programs folder for the effect of a
-normal installation.</li>
-    <li>Add the Python22 install directory to your PATH environment
-variable in Control Panel/System/Advanced/Environment Variables so
-shell scripts will find python.exe .<br>
+shortcuts</a> into a Start Menu/Programs folder for the effect of a
+normal installation.&nbsp; <br>
+    </li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>The default unpack location for the shortcuts is C:\Documents
+and Settings\All Users\Start Menu\Programs, so change the "All Users"
+to your login name if you are doing a User install instead of All
+Users, which requires Administrators group privileges.</li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>Add the Python install directory, C:\Python22 by default,
+following a semi-colon, to the end of your PATH environment
+variable in Control Panel/System/Advanced/Environment Variables.<br>
     </li>
   </ul>
 </ul>
@@ -462,26 +485,34 @@ in Windows cmd shells.)<br>
 <pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview testbed BigLan clan<br><br></big></pre>
 <br>
 <hr style="width: 100%; height: 2px;">
-<h3><a name="gui"></a>The hypview Graphical User Interface</h3>
-Getting out: pick the File/Exit menu item, or type Ctrl-Q, or just
+<h3><a name="gui"></a>Using the hypview Graphical User Interface</h3>
+<span style="font-weight: bold;">Getting out: </span>pick the
+File/Exit menu item, or type Ctrl-Q, or just
 close the
 window.<br>
 <br>
-Here's an example of the appearance of hypview once it is running:<br>
+Here's an example of the appearance of hypview once it is
+running.&nbsp; The pane on the left contains the <span
+ style="font-weight: bold;">HyperViewer</span>.&nbsp; The pane on the
+right is the <span style="font-weight: bold;">control panel</span>.
 <ul style="margin-left: 120px;">
   <li>Note: the window comes up split down the middle now.&nbsp; Drag
 the
-divider to the right so it looks like the picture below.&nbsp; Also,
-resizing the window mis-aligns the OpenGL picking, so don't do that
+divider to the right so it looks like the picture below.&nbsp; Be
+careful not to drag the divider outside the right window boundary,
+since that will leave you with a blank control panel pane.&nbsp; Also,
+resizing the top-level window mis-aligns the OpenGL picking, so don't
+do that
 yet...</li>
 </ul>
+<br>
+<div style="margin-left: 40px;">
 <div style="margin-left: 40px;"><a href="gui_top.jpg"><img
  src="gui_top_small.jpg" title="Click for full-size image." alt=""
  style="border: 2px solid ; width: 380px; height: 326px;"></a><br>
 </div>
 <br>
-The pane on the left contains the HyperViewer.&nbsp; The pane on the
-right is the control panel.<br>
+</div>
 <br>
 <ul style="margin-left: 40px;">
   <li>Pressing the "Help" button, or selecting Help/Usage from the menu
@@ -493,22 +524,36 @@ the HyperViewer mouse controls which apply to the left pane:</li>
  style="width: 354px; height: 261px;"></div>
 <div style="margin-left: 40px;"><br>
 <ul>
-  <li>One way to navigate is to drag the view.&nbsp; Here is a picture
+  <li><span style="font-weight: bold;">Dragging:</span> One way to
+navigate is to drag the view.&nbsp; Here is a picture
 just like the one above, but dragged to the left a bit with the left
 mouse button.&nbsp; Notice how the mid-level branching is more
 visible.&nbsp; <br>
   </li>
   <li>You can walk through the graph this way, dragging from top-level
-details to lower levels.&nbsp; The middle mouse button (or holding down
+details to lower levels. <br>
+  </li>
+</ul>
+<ul>
+  <li><span style="font-weight: bold;">Rotating: </span>The middle
+mouse button (or holding down
 a control or shift key while clicking the left mouse button) rotates
 what is
-behind to the front so you can better see it.</li>
+behind to the front so you can better see it.&nbsp; <br>
+  </li>
+  <li>Hint: Graph nodes that appear around the periphery of the sphere
+can be dragged to the center of the sphere to magnify them.&nbsp;
+Rotate nodes that are in front of or behind of the sphere center plane
+into the plane containing the sphere center; then you can drag them to
+the center.<br>
+  </li>
 </ul>
 <div style="margin-left: 40px;"><a href="gui_top2.jpg"><img align="top"
  style="border: 2px solid ; width: 380px; height: 326px;" alt=""
  src="gui_top_small2.jpg" title="Click for full-size image."></a></div>
 <ul>
-  <li>As you move the mouse over the boxes representing nodes (hosts or
+  <li><span style="font-weight: bold;">Picking: </span>As you move the
+mouse over the boxes representing nodes (hosts or
 lans), they turn bright green.&nbsp; Clicking on a bright green box
 selects it to move to the center of the sphere.&nbsp; Its bright yellow
 color denotes its selected status.&nbsp; So you can walk through a tree
@@ -519,11 +564,12 @@ that way as well.</li>
  src="gui_top_small3.jpg" title="Click for full-size image."></a><br>
 </div>
 <br>
-The control panel at the right is divided into two sections.&nbsp; The
+The <span style="font-weight: bold;">control panel</span> at the right
+is divided into two sections.&nbsp; The
 one on the top gives information about the last-selected node, and the
 one in the middle controls modes of HyperViewer.<br>
 <br>
-The node controls include:<br>
+The <span style="font-weight: bold;">node controls</span> include:<br>
 <ul>
   <li>A "go to top" button to re-center the root node,</li>
   <li>The name of the last-selected node,</li>
@@ -560,7 +606,8 @@ from the root):<br>
 <div style="margin-left: 40px;"><br>
 </div>
 <br>
-The mode controls are still changing.&nbsp; There are a lot of modes in
+The <span style="font-weight: bold;">mode controls</span> are still
+changing.&nbsp; There are a lot of modes in
 HyperViewer to control the drawing and layout of graphs.&nbsp; (There
 are no layout controls visible yet.)<br>
 <ul>
@@ -584,7 +631,8 @@ working yet.)<br>
 <br>
 </div>
 There is one more dialog panel which pops up when you select the
-File/Open menu item, or type Ctrl-O.&nbsp; You can read a .hyp file, or
+<span style="font-weight: bold;">File/Open</span> menu item, or type
+Ctrl-O.&nbsp; You can read a .hyp file, or
 load an experiment from the database via XML-RPC.<br>
 <ul>
   <li>There is no browser option yet.&nbsp; Ya just gotta type or
