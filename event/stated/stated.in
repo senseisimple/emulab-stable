@@ -35,6 +35,7 @@ use Getopt::Std;
 use English;
 use POSIX; # for strftime, and sigprocmask and friends
 use Sys::Syslog;
+use Fcntl; # file constants for pidfile
 
 # Number of iterations (roughly, seconds) after which we'll reload 
 # information from the database. This is so we don't end up with information
@@ -81,6 +82,16 @@ if (!$debug) {
   if (TBBackGround("/dev/null")) { exit(0); }
   # set up syslog
   openlog("stated","pid","user");
+  my $str=$TB;
+  $str =~ s/\/usr\/testbed//g;
+  $str =~ s/\//\./g;
+  my $pidfile = ($TB eq "/usr/testbed" ?
+		 "/var/run/stated.pid" :
+		 "/var/run/stated$str.pid" );
+  sysopen(PIDFILE, $pidfile, O_WRONLY | O_EXCL | O_CREAT) ||
+    die ("Couldn't create '$pidfile': $? $!\n");
+  print PIDFILE "$$";
+  close PIDFILE;
 }
 
 # Change my $0 so that it is easier to see in a ps/top
@@ -335,7 +346,7 @@ sub stateTransition($$) {
     if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
-	       "to $newstate\n");
+	       "to $newstate\n".`/usr/testbed/sbin/inuse | grep $node\  `);
     }
 
     my $now = time();
@@ -494,7 +505,7 @@ sub handleCtrlEvent($$) {
 	    }
 	    notify("Node $node has timed out in state $mode/$state".
 		   ($action ne "" ? "\n\tRequested action $action." : "").
-		   "\n".`/home/newbold/z/bin/statetime | grep $node`);
+		   "\n".`/home/newbold/z/bin/statetime | grep '$node\t'`);
 	    next;
 	};
 	notify("$node: Unknown CtrlEvent: $event\n");
@@ -641,7 +652,9 @@ sub debug(@) {
 sub notify($) {
     	my $message = shift;
 	if (!$debug) {
-	    SENDMAIL($TBOPS,"Node State Daemon Messsage",$message,$TBOPS);
+	    SENDMAIL("Stated List ".$TBOPS,
+		     "Node State Daemon Messsage",$message,
+		     "Stated Daemon ".$TBOPS);
 	} else {
 	    print "notify: Not sending mail in debug mode\n";
 	}
@@ -674,6 +687,7 @@ sub restart {
   if ($handle && event_unregister($handle) == 0) {
     warn "Unable to unregister with event system\n";
   }
+  unlink $pidfile;
   if (!defined(sigprocmask(SIG_UNBLOCK, POSIX::SigSet->new(SIGUSR1,SIGHUP)))) {
     notify("sigprocmask: sig unblock failed! $?, $!\n");
     die("\n");
@@ -696,13 +710,14 @@ sub cleanup {
 
 # This gets called if we die of 'natural causes' (exit, die, etc.)
 END {
+  info("Exiting, cleaning up\n");
+  unlink $pidfile;
+  # clean up Syslog if we were using it.
+  if (!$debug) { closelog(); }
   if ($handle) {
-    info("Exiting, cleaning up\n");
     if (event_unregister($handle) == 0) {
       die "Unable to unregister with event system\n";
     }
   }
-  # clean up Syslog if we were using it.
-  if (!$debug) { closelog(); }
 }
 
