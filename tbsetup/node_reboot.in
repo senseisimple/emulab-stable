@@ -156,7 +156,7 @@ if ($freemode) {
 	print STDOUT "There are no free nodes to reboot\n";
 	usage();
     }
-    
+
     while (@row = $query_result->fetchrow_array()) {
 	push(@nodes, $row[0]);
     }
@@ -373,7 +373,7 @@ if (! $force) {
 	    waitpid($mypid, 0);
 	    $status = $? >> 8;
 	}
-	
+
 	if ($status == 2) {
 	    # Child signaled to us that this node needs a power cycle
 	    push @needPowercycle, $node;
@@ -472,7 +472,7 @@ sub RebootNode {
 	#
 	# In killmode, we do not want to bother with sending a wakeup event.
 	# Just do the power cycle. This is used to unstick a machine that
-	# is in waitmode, but not responding to the wakeups. 
+	# is in waitmode, but not responding to the wakeups.
 	#
 	if ($killmode) {
 	    info("$pc: in $nodestate: but power cycling in killmode");
@@ -481,12 +481,12 @@ sub RebootNode {
 	    # Signal to the caller that the node needs to be power cycled
 	    return -2;
 	}
-	
+
 	#
 	# The aux program sends the event to stated ...
 	#
 	my $optarg = ($debug ? "-dd" : "");
-	    
+
 	print STDERR "$pc: in $nodestate: sending wakeup command.\n" if $debug;
 	system("$bisend $optarg -q $pc");
 	if ($?) {
@@ -501,7 +501,7 @@ sub RebootNode {
     #
     # Do the rest in a child process. After the fork, we do the ping test
     # before we reconnect to the DB. This cuts down on the flurry of connects
-    # by a bunch of children (ping will take a moment to run). 
+    # by a bunch of children (ping will take a moment to run).
     #
     $mypid = fork();
     if ($mypid) {
@@ -708,7 +708,7 @@ sub WaitTillDead {
 
 #
 # Returns 1 if host is responding to pings, 0 otherwise
-# This routine is NOT allowed to do any DB queries! 
+# This routine is NOT allowed to do any DB queries!
 #
 sub DoesPing {
     my ($pc) = @_;
