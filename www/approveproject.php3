@@ -235,7 +235,7 @@ elseif (strcmp($approval, "approve") == 0) {
     #
     # Create the user accounts. 
     # 
-    SUEXEC($uid, "flux", "mkacct-ctrl $pid $headuid", 0);	 	
+    SUEXEC($uid, "flux", "mkacct-ctrl_wrapper $pid $headuid", 0);	 	
 	
     echo "<h3><p>
               Project $pid (User: $headuid) has been approved.
