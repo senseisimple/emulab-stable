@@ -43,7 +43,7 @@ char *usagestr =
  " -v versnum	   Specify a version number for tmcd\n"
  " -n vnodeid	   Specify the vnodeid\n"
  " -u		   Use UDP instead of TCP\n"
- " -t timeout	   Timeout waiting for a reply from master (UDP ONLY).\n"
+ " -t timeout	   Timeout waiting for the controller.\n"
  "\n";
 
 void
@@ -65,8 +65,8 @@ main(int argc, char **argv)
 	char			*bossnode = DEFAULT_BOSSNODE;
 	int			version = CURRENT_VERSION;
 	char			*vnodeid = NULL;
-#ifdef UDP
 	int			waitfor = 0;
+#ifdef UDP
 	int			useudp  = 0;
 #endif
 
@@ -86,10 +86,10 @@ main(int argc, char **argv)
 		case 'v':
 			version = atoi(optarg);
 			break;
-#ifdef UDP
 		case 't':
 			waitfor = atoi(optarg);
 			break;
+#ifdef UDP
 		case 'u':
 			useudp = 1;
 			break;
@@ -132,6 +132,10 @@ main(int argc, char **argv)
 	else {
 		fprintf(stderr, "gethostbyname(%s) failed\n", bossnode); 
 		exit(1);
+	}
+
+	if (waitfor) {
+		alarm(waitfor);
 	}
 
 	/*
@@ -346,9 +350,6 @@ doudp(int argc, char **argv,
 		exit(1);
 	}
 
-	if (waitfor) {
-		alarm(waitfor);
-	}
 	cc = recvfrom(sock, buf, sizeof(buf), 0,
 		      (struct sockaddr *)&client, &length);
 
