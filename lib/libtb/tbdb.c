@@ -117,6 +117,38 @@ mydb_iptonodeid(char *ipaddr, char *bufp)
 }
  
 /*
+ * Map node ID to IP (control net interface).
+ */
+int
+mydb_nodeidtoip(char *nodeid, char *bufp)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+
+	res = mydb_query("select IP from nodes as n "
+			 "left join node_types as nt on n.type=nt.type "
+			 "left join interfaces as i on "
+			 " i.node_id=n.node_id and i.iface=nt.control_iface "
+			 "where n.node_id='%s'", 1, nodeid);
+
+	if (!res) {
+		error("nodeidtoip: DB Error: %s", nodeid);
+		return 0;
+	}
+
+	if (! (int)mysql_num_rows(res)) {
+		error("nodeidtoip: No such nodeid: %s", nodeid);
+		mysql_free_result(res);
+		return 0;
+	}
+	row = mysql_fetch_row(res);
+	mysql_free_result(res);
+	strcpy(bufp, row[0]);
+
+	return 1;
+}
+ 
+/*
  * Set the node event status.
  */
 int

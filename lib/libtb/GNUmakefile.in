@@ -11,7 +11,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 SYSTEM	:= $(shell uname -s)
 
-OBJS		= log.o
+OBJS		= log.o tbdefs.o
 ifneq ($(SYSTEM),Linux)
 OBJS	       += tbdb.o
 endif
@@ -22,7 +22,8 @@ libtb.a:	$(OBJS)
 	$(RANLIB) $@
 
 log.o:		log.h
-tbdb.o:		tbdb.h log.h
+tbdb.o:		tbdb.h log.h tbdefs.h
+tbdefs.o:	tbdefs.h
 
 install:
 
