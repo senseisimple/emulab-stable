@@ -898,6 +898,19 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 						one direct connection to this node */
 	while (nnodes--) {
 		MYSQL_ROW node_row = mysql_fetch_row(nodes_result);
+		char	  *vname, vbuf[256];
+
+		/*
+		 * Watch for null vnames. Just construct something to make
+		 * everyone happy.
+		 */
+		if (node_row[3])
+			vname = node_row[3];
+		else {
+			strcpy(vbuf, "V");
+			strcat(vbuf, node_row[0]);
+			vname = vbuf;
+		}
 
 		/*
 		 * Either the IP or IPalias column (or both!) could have
@@ -920,13 +933,13 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 
 
 			if (insubnet(subnets,node_row[1])) {
-				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-						node_row[3], link, node_row[1],
-						(!seen_direct) ? node_row[3] : " ");
+				sprintf(buf,"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+					vname, link, node_row[1],
+					(!seen_direct) ? vname : " ");
 				seen_direct = 1;
 			} else {
 				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
-						node_row[3], link, node_row[1]);
+					vname, link, node_row[1]);
 			}
 
 			client_writeback(sock, buf, strlen(buf), tcp);
@@ -946,13 +959,13 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			}
 
 			if (insubnet(subnets,node_row[2])) {
-				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-						node_row[3], link, node_row[2],
-						(!seen_direct) ? node_row[3] : " ");
+				sprintf(buf,"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+					vname, link, node_row[2],
+					(!seen_direct) ? vname : " ");
 				seen_direct = 1;
 			} else {
 				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
-						node_row[3], link, node_row[2]);
+					vname, link, node_row[2]);
 			}
 
 			client_writeback(sock, buf, strlen(buf), tcp);
