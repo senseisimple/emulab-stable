@@ -988,7 +988,7 @@ function SHOWNODES($pid, $eid) {
     # entered the experiment, since it won't match the experiment's
     # swapin date.
     $nodename="<a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=1\">".
-	"Node Name</a>";
+	"Name</a>";
     $vnamefield="vname";
     if (!strcmp($pid, $TBOPSPID)) {
       $nodename="<a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=2\">".
@@ -1014,6 +1014,8 @@ function SHOWNODES($pid, $eid) {
                 <th>Node<br>Status</th>
                 <th>Hours<br>Idle[<b>1</b>]</th>
                 <th>Startup<br>Status[<b>2</b>]</th>
+                <th>Console</th>
+                <th>SSH</th>
               </tr>\n";
 
 	$sort = "type,priority";
@@ -1076,8 +1078,15 @@ function SHOWNODES($pid, $eid) {
 	    }
 	    
 	    echo "  <td>$idlestr</td>
-                    <td align=center>$startstatus</td>
-                   </tr>\n";
+                    <td align=center>$startstatus</td>\n";
+
+	    echo "  <td align=center>
+                     <A href='nodetipacl.php3?node_id=$node_id'>
+                     <img src=\"console.gif\" alt=c></A></td>\n";
+	    echo "  <td align=center>
+                     <A href='nodessh.php3?node_id=$node_id'>
+                     <img src=\"ssh.gif\" alt=s></A></td>\n";
+	    echo "</tr>\n";
 	}
 	echo "</table>\n";
 	echo "<h4><blockquote><blockquote><blockquote>
