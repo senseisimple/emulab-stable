@@ -171,7 +171,7 @@ sub doboot()
     # server.  All that's left is to CygWin mount the //fs directory paths.
     if (WINDOWS()) {
 	while (($remote, $local) = each %mounts) {
-	    my $host = "fs.bsd-fs.testbed.emulab.net"; ###"fs";
+	    my $host = "fs";
 	    print "Mount $local from //$host\n";
 	    os_samba_mount($local, $host, 0);
 	}

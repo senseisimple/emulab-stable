@@ -138,14 +138,23 @@ sub os_account_cleanup()
 	os_accounts_sync();
     }
 
-    # Clean out the user /sshkeys directories.
-    $cmd = "$CHOWN -R root /sshkeys";
-    if (system($cmd) != 0) {
-	warning("Failed ($cmd): $!");
-    }
-    $cmd = "$RM -rf /sshkeys";
-    if (system($cmd) != 0) {
-	warning("Failed ($cmd): $!");
+    # Clean out the user /sshkeys directories, leaving /sshkeys/root alone.
+    if (opendir(DIRHANDLE, "/sshkeys")) {
+	while ($name = readdir(DIRHANDLE)) {
+	    if ($name =~ m/^\.+/ || $name =~ m/^root$/) {
+		next;
+	    }
+
+	    $cmd = "$CHOWN -R root /sshkeys/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed ($cmd): $!");
+	    }
+	    $cmd = "$RM -rf /sshkeys/$name";
+	    if (system($cmd) != 0) {
+		warning("Failed ($cmd): $!");
+	    }
+	}
+	closedir(DIRHANDLE);
     }
 
     # Clean out the /proj directories.
@@ -280,8 +289,9 @@ sub os_accounts_start()
 	return -1;
     }
 
-    if (! open(USERSHELLS, "> $usershellsfile")) {
-	warning("os_accounts_start: Cannot create $usershellsfile .\n");
+    # Don't wipe out previous user shell preferences, just add new ones.
+    if (! open(USERSHELLS, ">> $usershellsfile")) {
+	warning("os_accounts_start: Cannot create or append to $usershellsfile .\n");
 	return -1;
     }
 
@@ -578,6 +588,10 @@ sub os_samba_mount($$$)
 {
     my ($local, $host, $verbose) = @_;
 
+    # Unmount each one first, ignore errors.
+    $cmd = "$UMOUNT $local";
+    system($cmd);
+
     # Make the CygWin mount from the Samba path to the local mount point directory.
     my $sambapath = $local;
     $sambapath =~ s|.*/(.*)|//$host/$1|;
@@ -598,7 +612,7 @@ sub os_samba_mount($$$)
     #     mount: defaulting to '--no-executable' flag for speed since native path
     #            references a remote share.  Use '-f' option to override.
     # Even with -E, exe's and scripts still work properly, so put it in.
-    $cmd = "$MOUNT -E $sambapath $local";
+    $cmd = "$MOUNT -f -E $sambapath $local";
     if (system($cmd) != 0) {
 	warning("os_samba_mount: Failed, $cmd.\n");
     }

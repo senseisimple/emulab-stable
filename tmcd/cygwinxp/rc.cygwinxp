@@ -18,11 +18,6 @@ uname -r > $iscygwin
 chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
-# Set up to run rc.cygwinxp-user as part of all logins.
-regtool -s set \
-    /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabLogin \
-    'C:\cygwin\bin\bash /usr/local/etc/emulab/rc/rc.cygwinxp-user'
-
 # Make sure the computer name is right, reboots to change it if necessary.
 nodeid=`$tmcc nodeid`
 hostname=`/bin/hostname`
