@@ -91,7 +91,7 @@ my $eid;
 #
 # Untaint the arguments.
 #
-if ($nodeid =~ /^([-\@\w]+)$/) {
+if ($nodeid =~ /^([-\w]+)$/) {
     $nodeid = $1;
 }
 else {
@@ -195,7 +195,7 @@ sub VerifyFile()
     # to hand out a file outside the appropriate files systems.
     #
     my $translated = `realpath $file`;
-    if ($translated =~ /^([-\@\w.\/]+)$/) {
+    if ($translated =~ /^([-\@\w\.\/]+)$/) {
 	$translated = $1;
     }
     else {
