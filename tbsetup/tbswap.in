@@ -70,7 +70,6 @@ my $updateReconfig = 1;
 my $updateEventsys_restart = 0;
 my $force  = 0;
 my $errors = 0;
-my $assignWrapperErrorCode = 0;
 my $updatehosed = 0;
 my $state;
 my $canceled;
@@ -269,15 +268,13 @@ elsif ($swapop eq "in") {
 # Write appropriate message and exit.
 #
 if ($errors) {
-    print "Failingly finished swap-$swapop for $pid/$eid. " .TBTimeStamp(). "\n";
+    print "Failingly finished swap-$swapop for $pid/$eid. ".TBTimeStamp()."\n";
     TBDebugTimeStamp("tbswap $swapop finished (failed)");
 
-    # pass assign wrapper info along.
-    # other codes in 'errors' (3 or 7) are meaningless and
-    # should just be reported as 1's.
-    exit(1 | $assignWrapperErrorCode | ($updatehosed ? 0x40 : 0));
+    # Pass out magic value to indicate that update failed!
+    exit(1 | ($updatehosed ? 0x40 : 0));
 }
-print "Successfully finished swap-$swapop for $pid/$eid. " . TBTimeStamp() ."\n";
+print "Successfully finished swap-$swapop for $pid/$eid. " .TBTimeStamp()."\n";
 TBDebugTimeStamp("tbswap $swapop finished (succeeded)");
 exit(0);
 
@@ -552,24 +549,17 @@ sub doSwapin($) {
 	    if ($type == RETRY);
 	
 	if (system("$wrapper $pid $eid")) {
-	    #
-	    # save this off so it will get passed back later.
-	    # Note that -1 is an uncontrolled error. No recovery.
-	    #
-	    $assignWrapperErrorCode = $? >> 8;
 	    $exitcode = $? >> 8;
 
 	    print STDERR "*** Failed ($exitcode) to map to reality.\n";
 
-	    if (($exitcode & 64) && ($exitcode != 255)) {
-		# so batchexp doesn't choke.
-		$assignWrapperErrorCode -= 64
-		    if ($exitcode != 255);
+	    # Wrapper sets this bit when recovery is possible.
+	    if ($exitcode & 64) {
 		# We can recover. 
 		return 7;
 	    }
 	    else {
-		# No recovery.
+		# No recovery, no retry.
 		return 1;
 	    }
 	}

@@ -473,12 +473,14 @@ sub startexp($)
 			"where eid='$eid' and pid='$pid'");
 
 	#
-	# The exit value is important. If its -1 or 1, thats bad. Anything
-	# else implies an assign violation that is (hopefully) transient.
+	# The exit status does not tell us if the experiment can ever be
+	# mapped. In fact, that is really hard to know at this level;
+	# it depends on what resources the testbed actually has. So,
+	# unless status is -1 (really really fatal) just keep going.
 	# We leave it up the user to kill the batch if it looks like its
 	# never going to work.
 	#
-	if ($exit_status == 1 || $exit_status == -1) {
+	if ($exit_status == 255) {
 	    TBBatchUnLockExp($pid, $eid, EXPTSTATE_SWAPPED());
 	    
 	    email_status("Experiment startup has failed with a fatal error!\n".

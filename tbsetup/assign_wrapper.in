@@ -21,21 +21,18 @@ use POSIX ":sys_wait_h";
 #      Internally created nodes (jailhost,delay,sim) are not treated
 #        consistently. Needs more thought.
 #
-# Return codes: -1 is an uncontrolled error (someone called die()). No
-# recovery is possible so the caller has to check for this explicitly.
+# Return codes: We catch all errors with the END block below, and if
+# anyone calls die() (exit value is 255) we add in the CANRECOVER bit.
+# Failures in assign always cause the caller to stop retrying. 
+#
 # The CANRECOVER bit indicates 'recoverability' (no db or physical
-# state was modified by the time the error occurred). It also is used
-# to signal that a retry is possible. 
+# state was modified by the time the error occurred). This is relavent
+# to only modify operations (update).
 #
 my $WRAPPER_SUCCESS		 = 0x00;
 my $WRAPPER_FAILED		 = 0x01;	# Failed (Add other values)
-my  $WRAPPER_FAILED_MAXCONCURENT = 0x02;	# max_concurrent violation
-my  $WRAPPER_FAILED_BANDWIDTH    = 0x04;	# Bandwidth violation
-my  $WRAPPER_FAILED_LINKUSERS    = 0x08;	# Linkusers violation
-my  $WRAPPER_FAILED_DESIRES      = 0x10;	# Desires violation
-my  $WRAPPER_FAILED_UNASSIGNED   = 0x20;	# Unassigned violation
-my  $WRAPPER_FAILED_CANRECOVER   = 0x40;        # Can recover, retry.
-my $WRAPPER_DIED_A_HORRIBLE_DEATH= 0x80;	# Do not use this.
+my  $WRAPPER_FAILED_CANRECOVER   = 0x40;        # Can recover from update
+my  $WRAPPER_FAILED_FATALLY      = 0x80;	# Do not use this.
 # Set this once we modify DB state; forces no recover in fatal().
 my $NoRecover = 0;
     
@@ -47,7 +44,7 @@ sub usage ()
     print STDERR " -f   - Fix current resources during update mode\n";
     print STDERR " -t   - Create the TOP file and then exit\n";
     print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
-    exit(-1);
+    exit($WRAPPER_FAILED);
 }
 my $optlist  = "vutnf";
 my $verbose  = 0;
@@ -55,6 +52,7 @@ my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
 my $impotent = 0;
+my $warnings = 0;
 
 #
 # Configure variables
@@ -74,7 +72,6 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-require exitonwarn;
 
 #
 # assign_wrapper Settings
@@ -139,18 +136,47 @@ my $ptopfile = "$pid-$eid-$$.ptop";
 # degugging.
 my $topfile  = "$pid-$eid-$$.top";
 
-sub fatal ($$)
+#
+# All exits happen via this function!
+#
+sub fatal ($)
 {
-    my($exitcode, $message) = @_;
+    my($message) = @_;
 
     print STDERR "*** $0:\n".
 	         "    $message\n";
 
-    # Remove recover bit.
-    $exitcode = $exitcode & ~$WRAPPER_FAILED_CANRECOVER
-	if ($NoRecover);
+    # We next go to the END block below.
+    exit($WRAPPER_FAILED);
+}
+
+#
+# We want warnings to cause assign_wrapper to exit abnormally.
+# We will come through here no matter how we exit though.
+# 
+$SIG{__WARN__} = sub { print STDERR $_[0];$warnings++; };
+
+END {
+    # Watch for getting here cause of a die()/exit() statement someplace.
+    my $exitcode = $?;
+
+    if ($exitcode && $exitcode != $WRAPPER_FAILED) {
+	$exitcode = $WRAPPER_FAILED|$WRAPPER_FAILED_FATALLY;
+    }
     
-    exit($exitcode);
+    if ($warnings > 0) {
+	print STDERR "*** $0:\n".
+	             "    $warnings warnings.\n";
+
+	$exitcode |= $WRAPPER_FAILED;
+    }
+
+    # Set recover bit if we are going to fail.
+    $exitcode = $exitcode|$WRAPPER_FAILED_CANRECOVER
+	if ($exitcode && !$NoRecover);
+
+    # And change the exitcode to be what we want it to be!
+    $? = $exitcode;
 }
 
 sub printdb ($)
@@ -490,35 +516,31 @@ TBDebugTimeStamp("assign_loop started");
 while (1) {
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	  "Cancel flag set; aborting assign run!")
+    fatal("Cancel flag set; aborting assign run!")
 	if ($canceled);
 
     print "Assign Run $currentrun\n";
 
     #
-    # RunAssign returns 0 if successful. Returns -1 if there was an
-    # an error in RunAssign that is deemed fatal; do not try anymore.
-    # The exitcode is returned in $exitcode. If RunAssign returns a
-    # postive value, it means there was a problem, but we can keep
-    # trying.
+    # RunAssign returns  0 if successful.
+    #           returns -1 if failure, but assign says to stop trying.
+    #           returns -1 if failure, but assign says to try again.
     #
-    my $exitcode = 0;
-    my $retval   = RunAssign(\$exitcode);
+    my $retval = RunAssign();
 
     # Success!
     last
 	if ($retval == 0);
 
     if ($currentrun >= $maxrun) {
-	fatal($exitcode, "Reached run limit. Giving up.");
+	fatal("Reached run limit. Giving up.");
     }
 
     if ($retval < 0) {
 	#
 	# Failure in assign.
 	#
-	fatal($exitcode, "Unretriable error. Giving up.");
+	fatal("Unretriable error. Giving up.");
     }
     
     print "Waiting 5 seconds and trying again...\n";
@@ -530,10 +552,8 @@ TBDebugTimeStamp("assign_loop finished");
 #
 # Run assign once.
 # 
-sub RunAssign ($)
+sub RunAssign ()
 {
-    my ($retval) = @_;
-
     # Clear globals for each run.
     undef %v2pmap;
     undef %p2vmap;
@@ -562,16 +582,7 @@ sub RunAssign ($)
     $ptopargs   .= "-S "
 	if ($simcount);
     system("ptopgen $ptopargs > $ptopfile");
-
     TBDebugTimeStamp("ptopgen finished");
-
-    # Get number of nodes
-    my $numnodes = TBAvailablePCs($pid);
-    
-    if ($numnodes < ($minimum_nodes - $reserved_pcount)) {
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "Insufficient nodes available.");
-    }
 
     TBDebugTimeStamp("assign started");
     # Run assign
@@ -613,9 +624,9 @@ sub RunAssign ($)
 		if ((my $pgrp = getpgrp($childpid)) > 0) {
 		    kill('TERM', -$pgrp);
 		    waitpid($childpid, 0);
-	    
-		    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-			  "Cancel flag set; aborting assign run!");
+
+		    print "Cancel flag set; aborting assign run!\n";
+		    return -1;
 		}
 		# Loop again to reap child above before exit.
 	    }
@@ -634,86 +645,56 @@ sub RunAssign ($)
 
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER, 
-	  "Cancel flag set; aborting assign run!")
-	if ($canceled);
-
-    my $violations = 0;
-    my $score = -1;
-
+    if ($canceled) {
+	print("Cancel flag set; aborting assign run!\n");
+	return -1;
+    }
 
     # Saving up assign.log coz each swapin/modify is
     # different and it is nice to have every mapping
     # for debugging and archiving purposes
     system("/bin/cp assign.log assign-$pid-$eid-$$.log");
-    open(ASSIGNFP, "assign.log") or
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "Could not open assign logfile!");
+    if (!open(ASSIGNFP, "assign.log")) {
+	print("Could not open assign logfile!\n");
+	return -1;
+    }
+    printdb "Reading assign results.\n";
 
-    if ($assignexitcode == 0) {
-	# read output
-	# Header
-	printdb "Reading assign results.\n";
+    #
+    # We no longer care what assign has to say when it fails! Just
+    # tell the caller whether we want to keep trying or not. We still
+    # send some of the goo to the output stream so that Rob can quickly
+    # deduce what what wrong.
+    #
+    if ($assignexitcode) {
+	my $violations = 0;
+	
+	print "ASSIGN FAILED:\n";
+	while (<ASSIGNFP> !~ /^[\w\s]*precheck:$/) {}
 	while (<ASSIGNFP>) {
 	    chop;
-	    /No physical nodes of type (.+)$/ && do {
-		$score=-2;
-		print $_ . "\n";
+	    /^\w*\s*precheck:$/ && do {
+		next;
 	    };
 	    /^With ([0-9]+) violations$/ && do {
 		$violations = $1;
 		last;
 	    };
-	    /^[ \t]+BEST SCORE: [ \t]+([0-9]+(\.[0-9]+)?)/ && do {
-		$score=$1;
-		print $_ . "\n";
-	    };
+	    print $_ . "\n";
 	}
-	if ($score == -2) {
-	    # Type error
-	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		  "Type error. Giving up!");
-	}
-	printdb "Found score $score, violations $violations.\n";
-    }
-
-    #
-    # If we found violations above, or if the score is <0 then figure
-    # out what happened, and return the result. I am not sure if this
-    # stuff is set when the assign exitcode is 2 (no retry), but we end up
-    # in here anyway. Should be harmless.
-    #
-    if ($violations || $score < 0 || $assignexitcode) {
-	# Compute the exitcode and return it. Caller decides what to do.
-	my $exitcode = $WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER;
-
-	# spit out up to nodes
-	print "ASSIGN FAILED: \n";       
-	while (<ASSIGNFP>) {
-	    if (/link_users:\s*(\d+)$/) {
-		$exitcode |= $WRAPPER_FAILED_LINKUSERS;
+	if ($violations) {
+	    while (<ASSIGNFP> !~ /^Violations:/) {}
+	    while (<ASSIGNFP>) {
+		if (/^Nodes:/) {
+		    last;
+		}
+		print "$_";
 	    }
-	    elsif (/bandwidth:\s*(\d+)$/) {
-		$exitcode |= $WRAPPER_FAILED_BANDWIDTH;
-	    }
-	    elsif (/unassigned:\s*(\d+)$/) {
-		$exitcode |= $WRAPPER_FAILED_UNASSIGNED;
-	    }
-	    elsif (/desires:\s*(\d+)$/) {
-		$exitcode |= $WRAPPER_FAILED_DESIRES;
-	    }
-	    if (/^Nodes:/) {last;}
-	    print "$_";
 	}
 	close(ASSIGNFP);
-	$$retval = $exitcode;
-
-	# Signal retriable to caller, since assign thinks it is.
-	return 1
-	    if ($assignexitcode == 1);
-	return -1;
+	return (($assignexitcode == 1) ? 1 : -1);
     }
-
+    
     #
     # Assign success; parse results.
     # 
@@ -938,9 +919,10 @@ sub RunAssign ($)
 	# If nalloc failed with a fatal error, lets give it up. No retry.
 	# 
 	if ($exitval != 0) {
-	    fatal($WRAPPER_FAILED,
-	    	  "Failed to move back Old Reserved nodes back to reserved\n");
+	    print("Failed to move back Old Reserved nodes back to reserved\n");
+	    return -1;
 	}
+
 	# We need to move this back and forth the holding reservation only
 	# once i.e. in the first call to RunAssign(). If it gets repeatedly
 	# called coz only some pnode resources got nalloc'ed, we don't have
@@ -958,7 +940,6 @@ sub RunAssign ($)
     # 
     if ($exitval < 0) {
 	print "Failed to reserve any nodes.\n";
-	$$retval = $WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER;
 	return -1; 
     }
 
@@ -996,7 +977,6 @@ sub RunAssign ($)
 	foreach my $node (values(%fixed_nodes)) {
 	    if (! grep {$_ eq $node} @reserved) {
 		printdb "  Could not allocate fixed node $node!\n";
-		$$retval = $WRAPPER_FAILED;
 		return -1;
 	    }
 	}
@@ -1013,7 +993,6 @@ sub RunAssign ($)
 	    }
 	}
 	CreateTopFile();
-	$$retval = 0;
 	return 1;
     }
 
@@ -1073,8 +1052,7 @@ if ($needwanassign) {
 
     print "Running 'wanassign -d $pid $eid'\n";
     open(WANFP,"wanassign -d $pid $eid 2>&1 | tee wanassign.log |") or
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "Failed to start wanassign: $!");
+	fatal("Failed to start wanassign: $!");
 
     printdb "Reading wanassign results.\n";
     while (<WANFP>) {
@@ -1089,20 +1067,17 @@ if ($needwanassign) {
 	# Skip other output. Usually its debugging output.
     }
     close(WANFP) or
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "wanassign: " .
+	fatal("wanassign: " .
 	      ($? ? "exited with status: $?." :
 	            "error closing pipe: $!"));
 
     if (!$success) {
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "wanassign could not find a solution!");
+	fatal("wanassign could not find a solution!");
     }
     foreach my $virtual (keys(%wanmap)) {
 	my $physical = $wanmap{$virtual};
 
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "Improper mapping from wanassign: $virtual/$physical")
+	fatal("Improper mapping from wanassign: $virtual/$physical")
 	    if (!virtnodeisvirt($virtual));
 	
 	#
@@ -1145,8 +1120,7 @@ foreach my $pnode (keys(%virtnodes)) {
 
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
-    fatal($WRAPPER_FAILED,
-	  "Cancel flag set; aborting assign run!")
+    fatal("Cancel flag set; aborting assign run!")
 	if ($canceled);
 
     #
@@ -1217,7 +1191,7 @@ foreach my $pnode (keys(%virtnodes)) {
 	printdb "Asking avail for $numvs for vnodes: @vlist on $pnode\n";
     
 	open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$numvs |")
-	    or fatal($WRAPPER_FAILED, "avail failed");
+	    or fatal("avail failed");
 
 	while (<AVAIL>) {
 	    next
@@ -1229,17 +1203,16 @@ foreach my $pnode (keys(%virtnodes)) {
 		push(@plist, $1);
 	    }
 	    else {
-		fatal($WRAPPER_FAILED,
-		      "Bad line from avail: $_");
+		fatal("Bad line from avail: $_");
 	    }
 	}
 	close(AVAIL);
 
 	# Sanity check.
 	if (scalar(@vlist) != scalar(@plist)) {
-	    printdb "avail gave " . scalar(@plist) . " vnodes: @plist on $pnode\n";
-	    fatal($WRAPPER_FAILED,
-		  "Could not map some virtual nodes on $pnode");
+	    printdb "avail gave " . scalar(@plist) .
+		" vnodes: @plist on $pnode\n";
+	    fatal("Could not map some virtual nodes on $pnode");
 	}
 
 	#
@@ -1253,8 +1226,7 @@ foreach my $pnode (keys(%virtnodes)) {
 	else {
 	    print "Reserving on $pnode: @plist ...\n";
 	    if (system("nalloc $pid $eid @plist")) {
-		fatal($WRAPPER_FAILED,
-		      "Failed to reserve @plist (on $pnode)");
+		fatal("Failed to reserve @plist (on $pnode)");
 	    }
 	}
     }
@@ -1307,8 +1279,7 @@ foreach my $pnode (keys(%virtnodes)) {
 
 # Check cancel flag before continuing. 
 TBGetCancelFlag($pid, $eid, \$canceled);
-fatal($WRAPPER_FAILED,
-      "Cancel flag set; aborting assign run!")
+fatal("Cancel flag set; aborting assign run!")
     if ($canceled);
 
 # Set port range (see below for how we deal with update).
@@ -1801,13 +1772,15 @@ foreach $delayid (keys(%nodedelays)) {
     #       is set.
     #
 
-    my $speed0 = interfacespeedmbps(physinterfacetype($pnode,$int0), "ethernet");
+    my $speed0 = interfacespeedmbps(physinterfacetype($pnode,$int0),
+				    "ethernet");
     DBQueryFatal("update interfaces set " .
 		 "current_speed='$speed0' " .
 		 "where node_id='$pnode' and ".
 		 "iface='$int0'");
 
-    my $speed1 = interfacespeedmbps(physinterfacetype($pnode,$int1), "ethernet");
+    my $speed1 = interfacespeedmbps(physinterfacetype($pnode,$int1),
+				    "ethernet");
     DBQueryFatal("update interfaces set " .
 		 "current_speed='$speed1' " .
 		 "where node_id='$pnode' and ".
@@ -2082,8 +2055,7 @@ foreach $lan (keys(%virt_lans)) {
 
     my @members = virtlanmembers($lan);
     if (@members != 2) {
-	fatal($WRAPPER_FAILED,
-	      "Too many members for a tunnel!");
+	fatal("Too many members for a tunnel!");
     }
     my $server = $lantotunnelserver{$lan};
     my $ipport = $rnodetotunnelport{$server};
@@ -2126,8 +2098,7 @@ foreach $lan (keys(%virt_lans)) {
 	# physical node.
 	#
 	if (! TBControlNetIP($peervvnode, \$ip)) {
-	    fatal($WRAPPER_FAILED,
-		  "No Control Network IP for $peervvnode!");
+	    fatal("No Control Network IP for $peervvnode!");
 	}
 	
         printdb "Tunnel: ".
@@ -2304,7 +2275,7 @@ TBDebugTimeStamp("uploading finished");
 if( $simcount > 0 ) {
     TBDebugTimeStamp("generating otcl sub-specifications for make-simulated code");
     if (system("parse-nse $pid $eid")) {
-	fatal($WRAPPER_FAILED, "NSE Parsing failed!\n");
+	fatal("NSE Parsing failed!\n");
     }
     TBDebugTimeStamp("generating otcl sub-specifications finished");
 }
@@ -2329,8 +2300,7 @@ sub getbandwidth($$$) {
     my $node_class = nodetypeclass($node_type);
     my $protocol   = virtlanprotocol($lan);
 
-    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	  "getbandwidth(): $node - invalid type/class $node_type/$node_class!")
+    fatal("getbandwidth(): $node - invalid type/class $node_type/$node_class!")
 	if (!exists($node_type_linkbw{$node_type}{$protocol}) &&
 	    ($node_class && !exists($node_type_linkbw{$node_class}{$protocol})));
 
@@ -2450,8 +2420,7 @@ sub InitPnode($pnode, $vnode)
 	    $routertype = TBDB_ROUTERTYPE_MANUAL;
 	    $cmdline = "/kernel.jail";
 	}
-	fatal($WRAPPER_FAILED,
-	      "No OSID is defined for internal node $vname!")
+	fatal("No OSID is defined for internal node $vname!")
 	    if (!defined($osid));
 	
 	DBQueryFatal("UPDATE nodes set ".
@@ -2519,8 +2488,7 @@ sub InitPnode($pnode, $vnode)
     if (defined($osid)) {
 	printdb("os_select $osid $pnode\n");
 	system("os_select $osid $pnode") == 0 or
-	    fatal($WRAPPER_FAILED,
-		  "    os_select $osid $pnode failed!\n");
+	    fatal("    os_select $osid $pnode failed!\n");
     }
     return 0;
 }
@@ -2647,8 +2615,7 @@ sub nextipportnum($) {
     my $port     = $portnext{$pnode};
 
     if ($port >= $porthigh{$pnode}) {
-	fatal($WRAPPER_FAILED,
-	      "No more dynamic ports available for $pnode!");
+	fatal("No more dynamic ports available for $pnode!");
     }
     $portnext{$pnode}++;
     return $port;
@@ -2794,9 +2761,7 @@ sub CheckMaxConcurrent()
 	my $count = $counts{$osid};
 
 	if (!TBOSLoadMaxOkay($osid, $count)) {
-	    fatal($WRAPPER_FAILED|
-		  $WRAPPER_FAILED_MAXCONCURENT|$WRAPPER_FAILED_CANRECOVER,
-		  "Too many nodes are already running OSID $osid!");
+	    fatal("Too many nodes are already running OSID $osid!");
 	}
     }
 }
@@ -3012,8 +2977,7 @@ sub LoadPhysInfo()
 	my $type    = $rowref->{"type"};
 	my $auxtype = $rowref->{"auxtype"};
 
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "Invalid type/auxtype $type/$auxtype!")
+	fatal("Invalid type/auxtype $type/$auxtype!")
 	    if (!exists($node_types{$type}));
 
 	$node_types{$auxtype}  = $node_types{$type};
@@ -3041,8 +3005,7 @@ sub LoadPhysInfo()
 	    if (!defined($node_type_linkbw{$node_class}));
 
 	if (!defined($interface_capabilities{$iface_type}->{"protocols"})) {
-	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		  "No protocols listed in capabilities for $iface_type!");
+	    fatal("No protocols listed in capabilities for $iface_type!");
 	}
 	my @protolist =
 	    split(",", $interface_capabilities{$iface_type}->{"protocols"});
@@ -3154,8 +3117,7 @@ sub requires_delay($$$)
     my $node_class = nodetypeclass($node_type);
     my $protocol   = virtlanprotocol($lan);
 
-    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	  "requires_delay(): $node - invalid type/class $node_type/$node_class!")
+    fatal("requires_delay(): $node - invalid type/class $node_type/$node_class!")
 	if (!exists($node_type_linkbw{$node_type}{$protocol}) &&
 	    !exists($node_type_linkbw{$node_class}{$protocol}));
 
@@ -3238,8 +3200,7 @@ sub LoadVirtNodes()
 	    $issim    = nodetypeissim($vtype);
 	}
 	else {
-	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		  "Improper type $type for node $vname!");
+	    fatal("Improper type $type for node $vname!");
 	}
 
 	# Extend the DB info with this stuff:
@@ -3272,8 +3233,7 @@ sub LoadVirtNodes()
 	    # Must be a parent. Set in the parser, either explicitly, or else
 	    # one is created if the user leaves it out.
 	    if (!defined($fixed) || $fixed eq "") {
-		fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		      "Subnode $vname must be fixed to its parent!");
+		fatal("Subnode $vname must be fixed to its parent!");
 	    }
 	    $rowref->{"__parent"} = $fixed;
 	    $rowref->{"fixed"} = "";
@@ -3341,8 +3301,7 @@ sub LoadVirtNodes()
 
 	    if (! ($osid = TBOSID($pid, $osname)) &&
 		! ($osid = TBOSID(TB_OPSPID, $osname))) {
-		fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		      "Invalid OS $osname in project $pid!");
+		fatal("Invalid OS $osname in project $pid!");
 	    }
 	    # Stash this in the virt_nodes data structure.
 	    $rowref->{"__osid"}	= $osid;
@@ -3693,15 +3652,13 @@ sub LoadExperiment()
     if (!defined($jail_osid) && defined($jail_osname)) {
 	if (! ($jail_osid = TBOSID($pid, $jail_osname)) &&
 	    ! ($jail_osid = TBOSID(TB_OPSPID, $jail_osname))) {
-	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		  "Invalid OS $jail_osname in project $pid!");
+	    fatal("Invalid OS $jail_osname in project $pid!");
 	}
     }
     if (!defined($delay_osid) && defined($delay_osname)) {
 	if (! ($delay_osid = TBOSID($pid, $delay_osname)) &&
 	    ! ($delay_osid = TBOSID(TB_OPSPID, $delay_osname))) {
-	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-		  "Invalid OS $delay_osname in project $pid!");
+	    fatal("Invalid OS $delay_osname in project $pid!");
 	}
     }
     $experiment_idx = $idx;
@@ -3737,8 +3694,7 @@ sub CreateTopFile()
     
     # Open the TOP file
     open(TOPFILE,"> $topfile") or
-	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
-	      "Could not open $topfile: $!");
+	fatal("Could not open $topfile: $!");
 
     # Print out vtypes
     foreach my $vtype (keys(%virt_vtypes)) {
@@ -4223,8 +4179,7 @@ sub LoadPhysNode($)
 			 "left join node_types as nt on nt.type=n.type ".
 			 "where n.node_id='$pnode'");
 
-	fatal($WRAPPER_FAILED,
-	      "No such pnode $pnode in nodes table!")
+	fatal("No such pnode $pnode in nodes table!")
 	    if (!$query_result->num_rows);
 
 	my $rowref = $query_result->fetchrow_hashref();
@@ -4340,8 +4295,7 @@ sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
 sub physnodenextpipe($)  {
     my $pipeno = $phys_nodes{$_[0]}->{"__pipeno"} += 10;
 
-    fatal($WRAPPER_FAILED,
-	  "Too many ipfw pipes on node $pnode!")
+    fatal("Too many ipfw pipes on node $pnode!")
 	if ($pipeno >= 65535);
     
     return $pipeno;
@@ -4410,8 +4364,7 @@ sub LoadCurrent()
 	#
 	# WIDEAREA nodes are going to break. Hmm, so are "sim" nodes.
 	#
-	fatal($WRAPPER_FAILED,
-	      "Cannot update widearea nodes yet!")
+	fatal("Cannot update widearea nodes yet!")
 	    if ($isremote && !$isplab);
 	
 	LoadPhysNode($reserved);
@@ -4490,3 +4443,5 @@ sub LoadCurrent()
 	if ($reserved_simcount);
     printdb "Old Reserved Nodes: " . join(" ", keys %oldreservednodes) . "\n";
 }
+
+
