@@ -1249,6 +1249,7 @@ address_tuple_free(address_tuple_t tuple)
 /*
  * Insert an HMAC into the notifcation. 
  */
+#include <openssl/opensslv.h>
 #include <openssl/hmac.h>
 
 /*
@@ -1313,7 +1314,7 @@ event_notification_insert_hmac(event_handle_t handle,
 	}
 
 	memset(&ctx, 0, sizeof(ctx));
-#ifdef  linux
+#if (OPENSSL_VERSION_NUMBER < 0x0090703f)
 	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
 #else	
 	HMAC_CTX_init(&ctx);
@@ -1387,7 +1388,7 @@ event_notification_check_hmac(event_handle_t handle,
 	}
 	
 	memset(&ctx, 0, sizeof(ctx));
-#ifdef  linux
+#if (OPENSSL_VERSION_NUMBER < 0x0090703f)
 	HMAC_Init(&ctx, handle->keydata, handle->keylen, EVP_sha1());
 #else	
 	HMAC_CTX_init(&ctx);
