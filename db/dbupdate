@@ -32,20 +32,31 @@ sub failed {
 #  }
 #}
 
-foreach my $node ( 1..40 ) {
-    my $node_id = "tbpc".sprintf("%02d",$node);
-    print "$node_id,eth4: cable #? ";
-    $_ = <STDIN>; chop;
-    my $cable = $_;
-    print "$node_id,eth4: card #? ";
-    $_ = <STDIN>; chop;
-    my $card = $_;
-    print "$node_id,eth4: port #? ";
-    $_ = <STDIN>; chop;
-    my $port = $_;
-    print "Inserting ($cable,$node_id,4,$card,$port)...\n";
-    $cmd = "replace into wires ".
-      "(cable,node_id1,card1,card2,port2,port1,node_id2,type)".
-      " values ($cable,'$node_id',4,$card,$port,1,'cisco2','Control');";
+#foreach my $node ( 1..40 ) {
+#    my $node_id = "tbpc".sprintf("%02d",$node);
+#    print "$node_id,eth4: cable #? ";
+#    $_ = <STDIN>; chop;
+#    my $cable = $_;
+#    print "$node_id,eth4: card #? ";
+#    $_ = <STDIN>; chop;
+#    my $card = $_;
+#    print "$node_id,eth4: port #? ";
+#    $_ = <STDIN>; chop;
+#    my $port = $_;
+#    print "Inserting ($cable,$node_id,4,$card,$port)...\n";
+#    $cmd = "replace into wires ".
+#      "(cable,node_id1,card1,card2,port2,port1,node_id2,type)".
+#      " values ($cable,'$node_id',4,$card,$port,1,'cisco2','Control');";
+#    $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr) && last;
+#}
+
+foreach my $shelf ( 1..20 ) {
+  foreach my $shark ( 1..8) {
+    my $shelf_id = "tbsh".sprintf("%02d",$shelf);
+    print "Changing $shelf_id-$shark to $shelf_id:$shark...\n";
+    $cmd = "update interfaces set node_id='$shelf_id',card='$shark' ".
+      "where node_id='$shelf_id-$shark';";
     $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr) && last;
+  }
 }
+
