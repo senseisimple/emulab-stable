@@ -85,7 +85,7 @@ main(int argc, char **argv)
 	if (debug)
 		info("%s\n", build_info);
 
-	/* Make sure we can map target */
+	/* Make sure we can map target. */
 	if ((he = gethostbyname(argv[0])) == NULL) {
 		errorc("gethostbyname(%s)", argv[0]);
 		exit(1);
@@ -173,7 +173,11 @@ main(int argc, char **argv)
 	log_bootwhat(target.sin_addr, boot_whatp);
 	boot_info.status  = BISTAT_SUCCESS;
 	boot_info.opcode  = BIOPCODE_BOOTWHAT_ORDER;
-	
+
+#ifdef  ELABINELAB
+	/* This is too brutal to even describe */
+	elabinelab_hackcheck(&target);
+#endif
 	if (sendto(sock, (char *)&boot_info, sizeof(boot_info), 0,
 		   (struct sockaddr *)&target, sizeof(target)) < 0)
 		errorc("sendto");

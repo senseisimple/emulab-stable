@@ -300,6 +300,7 @@ boot_newnode_mfs(struct in_addr ipaddr, int version, boot_what_t *info)
 		break;
 	default:
 		error("Too many DB entries for OSID %s\n", NEWNODEOSID);
+		mysql_free_result(res);
 		return 1;
 	}
 	row = mysql_fetch_row(res);
@@ -310,6 +311,7 @@ boot_newnode_mfs(struct in_addr ipaddr, int version, boot_what_t *info)
 		mysql_free_result(res);
 		return 0;
 	}
+	mysql_free_result(res);
 	error("No path info for OSID %s\n", NEWNODEOSID);
 	return 1;
 #undef  MFS_PATH
@@ -354,6 +356,56 @@ parse_mfs_path(char *str, boot_what_t *info)
 	strncat(info->what.mfs, path,
 		sizeof(info->what.mfs)-strlen(info->what.mfs));
 }
+
+/*
+ * ElabinElab hack. Its really terrible!
+ */
+#ifdef ELABINELAB
+int
+elabinelab_hackcheck(struct sockaddr_in *target)
+{
+	int		nrows;
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+
+	res = mydb_query("select i2.IP from interfaces as i1 "
+			 "left join interfaces as i2 on i2.node_id=i1.node_id "
+			 "     and i2.role='outer_ctrl' "
+			 "where i1.IP='%s'", 1, inet_ntoa(target->sin_addr));
+	if (!res) {
+		error("elabinelab_hackcheck failed for host %s\n",
+		      inet_ntoa(target->sin_addr));
+		/* XXX Wrong. Should fail so client can request again later */
+		return 0;
+	}
+
+	nrows = mysql_num_rows(res);
+
+	switch (nrows) {
+	case 0:
+		/* No hack interface */
+		mysql_free_result(res);
+		return 0;
+	case 1:
+		break;
+	default:
+		error("elabinelab_hackcheck: Too many DB entries %s\n",
+		      inet_ntoa(target->sin_addr));
+		mysql_free_result(res);
+		return 1;
+	}
+	row = mysql_fetch_row(res);
+
+	if (row[0] != 0 && row[0][0] != '\0') {
+		inet_aton(row[0], &(target->sin_addr));
+		return 0;
+	}
+	mysql_free_result(res);
+	error("elabinelab_hackcheck: No IP address %s\n",
+	      inet_ntoa(target->sin_addr));
+	return 1;
+}
+#endif
 
 #ifdef TEST
 #include <stdarg.h>
