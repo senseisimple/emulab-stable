@@ -59,6 +59,14 @@ function SPITFORM($formfields, $returning, $errors)
 	     your widearea node.
           </font></center><br>\n";
 
+    if (! $returning) {
+	echo "<center><font size=+1>
+               If you already have an Emulab account,
+               <a href=login.php3?refer=1>
+               <font color=red>please log on first!</font></a>
+              </font></center><br>\n";
+    }
+
     if ($errors) {
 	echo "<table class=nogrid
                      align=center border=0 cellpadding=6 cellspacing=0>
