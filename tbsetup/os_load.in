@@ -17,14 +17,15 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: os_load [-sw] <imageid> <node> [node ...]\n".
+    print STDOUT "Usage: os_load [-sw] [-f] <imageid> <node> [node ...]\n".
 	"Use -s to setup reload only, but do not issue a reboot\n".
 	"Use -w to block waiting for nodes to finish reloading\n".
 	"    (-s and -w are mutually exclusive)\n".
-	"Use -l to get a list of images you are permitted to load\n";
+	"Use -l to get a list of images you are permitted to load\n" .
+	"Use -f to use (highly experimental) frisbee support instead of netdisk\n";
     exit(-1);
 }
-my  $optlist = "sldw";
+my  $optlist = "sldwf";
 
 #
 # Configure variables
@@ -48,6 +49,7 @@ use libtestbed;
 my $BOSSADDR	= "boss.emulab.net";
 my $USERADDR	= "users.emulab.net";
 my $NETDISKOSID = "NETDISK-STD";
+my $FRISBEEPATH = "boss.emulab.net:/tftpboot/pxeboot.frisbee";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
@@ -59,6 +61,7 @@ my $setuponly   = 0;
 my $waitmode    = 0;
 my $failures    = 0;
 my $startwait   = 0;
+my $frisbee     = 0;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -86,6 +89,9 @@ if (defined($options{"s"})) {
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
+}
+if (defined($options{"f"})) {
+    $frisbee = 1;
 }
 if ($waitmode && $setuponly) {
     usage();
@@ -228,10 +234,18 @@ foreach my $node (@nodes) {
     
     print STDOUT "Setting up reload for $pc\n";
     if (!$TESTMODE) {
-      DBQueryFatal("update nodes set ".
-		   "next_boot_osid='$NETDISKOSID',".
-		   "next_boot_cmd_line='$cmdline' ".
-		   "where node_id='$pc'");
+         if ($frisbee) {
+	     DBQueryFatal("update nodes set ".
+	                  "next_pxe_boot_path='$FRISBEEPATH'" .
+	 		  "where node_id='$pc'");
+			  # XXX: Need to pass image somehow
+
+	 } else {
+	     DBQueryFatal("update nodes set ".
+	                  "next_boot_osid='$NETDISKOSID',".
+	 		  "next_boot_cmd_line='$cmdline' ".
+	 		  "where node_id='$pc'");
+	}
     }
 }
 
@@ -344,9 +358,15 @@ sub WaitTillReloadDone {
     while (1) {
 	my ($query_result, @row);
 
-	$query_result =
-	    DBQueryFatal("SELECT next_boot_osid FROM nodes ".
-			 "where node_id='$pc'");
+	if ($frisbee) {
+	    $query_result =
+		DBQueryFatal("SELECT next_pxe_boot_path FROM nodes ".
+			     "where node_id='$pc'");
+	} else {
+	    $query_result =
+		DBQueryFatal("SELECT next_boot_osid FROM nodes ".
+			     "where node_id='$pc'");
+	}
 
         @row = $query_result->fetchrow_array();
 	if (! $row[0]) {
