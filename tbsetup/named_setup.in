@@ -106,7 +106,7 @@ close(MAP);
 # Concat the head and tail files to create the new map.
 #
 if (-e $mapfile) {
-    system("mv $mapfile $mapfileback") == 0 or
+    system("mv -f $mapfile $mapfileback") == 0 or
 	fatal("Could not back up $mapfile to $mapfileback\n");
 }
 
