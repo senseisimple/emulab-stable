@@ -129,10 +129,10 @@ if (-f $NTPDRIFT) {
     close(DRIFT);
 }
 
-print "Cleaing .pid files ...\n";
-system("rm -rf $RUNDIR/*.pid");
+print "Clearing out $RUNDIR ...\n";
+system("rm -rf $RUNDIR/*.pid $RUNDIR/sudo/* $RUNDIR/pump.sock");
 
-print "Cleaing out /tmp ...\n";
+print "Clearing out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
 
 print "Removing SFS files ...\n";
