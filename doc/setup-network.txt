@@ -21,12 +21,15 @@ these switches if they are Ciscos.)
 
 ##### Splitting up the control net
 
-We basically have 4 VLANs on the control network:
+We basically have 5 VLANs on the control network:
 'external' contains our connection to the outside world
-'private' contains the boss node, and all IP-controllable devices
-        (namely, power controllers and switch IP interfaces)
+'private' contains the boss node, and our backup server
 'public' contains our ops node
 'control' contains the control net interfaces of all experimental nodes
+'control-hardware' contains all IP-controllable devices (namely, power
+	controllers and switch IP interfaces, as well as a second
+	interface on the boss node. This VLAN uses private IP addresses,
+	and does NOT contain a router interface.
 
 This is done for security - we route (using a module in our control-net switch)
 between these VLANs, and do some firewalling between each of them. The main
@@ -62,8 +65,8 @@ I'd recommend at least going after #1, #2, and #3. We've put a lot of thought
 into this, so if you're wondering how your choice here will affect other
 aspects of security, ask Utah, and we can probably help you.
 
-A (somewhat outdated) overview of the firewall rules we have in place can be
-found in vlans.txt.
+Since our firewall rules change frequently as we add new services, it's best to
+contact Utah and ask us for the current set.
 
 ##### Connecting the contol net to the experimental net
 
@@ -73,13 +76,12 @@ your control net to the experimental net. However, you will need to be _very_
 careful that no experimental traffic can leak across this line, and that it
 cannot be used as a 'back door' into the private net by nodes.
 
-On the control switch, it should be in the same VLAN as your boss node.
+On the control switch, it should be put into the 'control-hardware' VLAN.
 
 On the experimental switch, it should be in the same VLAN as the switch's IP
-interface. The simplest way to accomplish this is just to leave it in VLAN 1,
-the default one. However, you want to make sure that no ports on the nodes can
-talk to it, so you'll want to disable them all. (Our software will re-enable
-them, and disable them as needed.)                           
+interface. The best thing to do is create a new VLAN, and move the switch's IP
+interface into it. On CatOS, you accomplish this with:
+  set interface sc0 <vlan #>
 
 You will also need to give the experimental switch(es) IP addresses. With
 CatOS, you do it like this:
@@ -126,24 +128,3 @@ after the master switch.) On this one, run
   set vtp mode server
 On all the others, run
   set vtp mode client
-
-##### Some variations on the above configuration
-
-There are some variations on the above configuration that we haven't tried, but
-may work for you.
-
-First, you may try putting all IP-controllable control hardware on a VLAN (or
-another switch/hub) hanging directly off another interface on the boss node. In
-the example above, the control hardware is given 'real' IP addresses, but
-prevented from talking to the outside worly by firewall rules. An alternative
-to this would be to give them 'private' (ie. 10.0.0.X) addresses, and put
-another interface in the boss node that talks only to these devices.
-
-As an added measure of security on the experimental network, you could move
-your switch IP interfaces (and the wire that runs from them to the control net)
-out of VLAN 1. When ports are not in use, we put them in VLAN 1 and disable
-them. But, if a port accidentally ends up in VLAN 1 still enabled, it could
-theoretically talk to the switch and change configurations. Furthermore, we've
-had circumstances in which delay nodes accidentally ended up in tis VLAN, still
-forwarding packets, which created a very nasty forwarding loop. Using some
-VLAN other than #1 prevents such problems from impacting the boss node.
