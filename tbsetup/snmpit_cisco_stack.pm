@@ -556,6 +556,111 @@ sub getStats($) {
 }
 
 #
+# Turns on trunking on a given port, allowing only the given VLANs on it
+#
+# usage: enableTrunking(self, port, vlan identifier list)
+#
+# returns: 1 on success
+# returns: 0 on failure
+#
+sub enableTrunking($$@) {
+    my $self = shift;
+    my $port = shift;
+    my @vlan_ids = @_;
+
+    #
+    # On a Cisco, the first VLAN given becomes the native VLAN for the trunk
+    #
+    my $native_vlan_id = shift @vlan_ids;
+    if (!$native_vlan_id) {
+	print STDERR "ERROR: No native VLAN passed to enableTrunking()!\n";
+	return 0;
+    }
+
+    #
+    # Grab the VLAN number for the native VLAN
+    #
+    my $vlan_number = $self->{LEADER}->findVlan($native_vlan_id);
+    if (!$vlan_number) {
+	print STDERR "ERROR: Native VLAN $native_vlan_id does not exist!\n";
+	return 0;
+    }
+
+    #
+    # Split up the ports among the devices involved
+    #
+    my %map = mapPortsToDevices($port);
+    my ($devicename) = keys %map;
+    my $device = $self->{DEVICES}{$devicename};
+    if (!defined($device)) {
+	warn "ERROR: Unable to find device entry for $devicename\n";
+	return 0;
+    }
+
+    #
+    # Simply make the appropriate call on the device
+    #
+    print "Enable trunking: Port is $port, native VLAN is $native_vlan_id\n"
+	if ($self->{DEBUG});
+    my $rv = $device->enablePortTrunking($port, $vlan_number);
+
+    #
+    # If other VLANs were given, add them to the port too
+    #
+    if (@vlan_ids) {
+	my %vlan_numbers = $self->{LEADER}->findVlans(@vlan_ids);
+	my @vlan_numbers;
+	foreach my $vlan_id (@vlan_ids) {
+	    #
+	    # First, make sure that the VLAN really does exist
+	    #
+	    my $vlan_number = $vlan_numbers{$vlan_id};
+	    if (!$vlan_number) {
+		warn "ERROR: VLAN $vlan_id not found on switch!";
+		next;
+	    }
+	    push @vlan_numbers, $vlan_number;
+	}
+	$device->setVlansOnTrunk($port,1,@vlan_numbers);
+    }
+
+    return $rv;
+
+}
+
+#
+# Turns off trunking for a given port
+#
+# usage: disableTrunking(self, ports)
+#
+# returns: 1 on success
+# returns: 0 on failure
+#
+sub disableTrunking($$) {
+    my $self = shift;
+    my $port = shift;
+
+    #
+    # Split up the ports among the devices involved
+    #
+    my %map = mapPortsToDevices($port);
+    my ($devicename) = keys %map;
+    my $device = $self->{DEVICES}{$devicename};
+    if (!defined($device)) {
+	warn "ERROR: Unable to find device entry for $devicename\n";
+	return 0;
+    }
+
+    #
+    # Simply make the appropriate call on the device
+    #
+    my $rv = $device->disablePortTrunking($port);
+
+    return $rv;
+
+}
+
+#
 # Not a 'public' function - only needs to get called by other functions in
 # this file, not external functions.
 #

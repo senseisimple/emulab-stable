@@ -43,6 +43,8 @@ sub usage {
 Usage: $0 [-h] [-v] [-n] [-i device]
 	  [-l] [-s] [-g]
 	  [-m name [ports]]
+	  [-T port name]
+	  [-U port]
 	  [-o name]
           [-r pid eid]
 	  [-t pid eid]
@@ -83,6 +85,9 @@ Port Control:
   -a <ports>             Enable auto-negotiation of port speed/duplex
   -p <10|100> <ports>    Set speed of <ports> to 10 or 100 Mbps
   -u <half|full> <ports> Set duplex of <ports> to half or full
+  -T <port> <names>      Enable trunking on the given <port>, and allow VLANs
+                             with the given <names> across it
+  -U <port>              Turn off trunking for the given <port>
 
 More than one operation can be specified - However, beware that the order in
 which operations will occur is undefined, and some combinations of operations
@@ -96,7 +101,7 @@ END
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
 GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','M','n','o=s@',
-    'p=s','r','s','t','u=s','v','w','y=s','x=s','z=s');
+    'p=s','r','s','t','T=s','u=s','U','v','w','y=s','x=s','z=s');
 # Unused: b,f,j,q
 
 if ($opt{h}) {
@@ -133,11 +138,27 @@ if ($opt{t} || $opt{r}) {
     if (@ARGV) {
 	@optvlanids = @ARGV;
     }
-} elsif ($opt{d} || $opt{e} || $opt{a} || $opt{p} || $opt{u} || $opt{m}) {
+} elsif ($opt{d} || $opt{e} || $opt{a} || $opt{p} || $opt{u} || $opt{m}
+         || $opt{U}) {
     #
     # Options that take a list of ports
     #
     @ports = @ARGV;
+} elsif ($opt{T}) {
+    #
+    # Options that take both a port and a list of VLANs - we require at least
+    # one VLAN to be given
+    #
+    if (!@ARGV) {
+	warn "ERROR: At least one VLAN required";
+	exit &usage;
+    }
+    @optvlanids = @ARGV;
+
+    #
+    # Set the @ports array so that we'll do proper permission checking on it
+    #
+    @ports = ($opt{T});
 } else {
     #
     # Everything else
@@ -164,6 +185,7 @@ if ($opt{g}) { push @commands, ["getstats"]; }
 if ($opt{t}) { push @commands, ["tables"]; }
 if ($opt{r}) { push @commands, ["reset"]; }
 if ($opt{c}) { push @commands, ["recreate"]; }
+if ($opt{U}) { push @commands, ["trunkdisable"]; }
 
 #
 # Commands that can appear once, and take an agurment
@@ -171,6 +193,7 @@ if ($opt{c}) { push @commands, ["recreate"]; }
 if ($opt{d}) { push @commands, ["portcontrol","disable"]; }
 if ($opt{e}) { push @commands, ["portcontrol","enable"]; }
 if ($opt{a}) { push @commands, ["portcontrol","auto"]; }
+if ($opt{T}) { push @commands, ["trunkenable", $opt{T}]; }
 
 #
 # Commands that can occur more than once
@@ -375,7 +398,7 @@ foreach my $command (@commands) {
 	    @devicenames = $opt{i}? @{$opt{i}} : getTestSwitches();
 	    last;
 	};
-	(/portcontrol/) && do {
+	(/portcontrol/ || /trunkdisable/) && do {
 	    @devicenames = $opt{i}? @{$opt{i}} : getDeviceNames(@ports);
 	    last;
 	};
@@ -390,6 +413,11 @@ foreach my $command (@commands) {
 	    @devicenames = getTestSwitches();
 	    last;
 	};
+	(/trunkenable/) && do {
+	    @devicenames = $opt{i}? @{$opt{i}} : getDeviceNames(@ports);
+	    @vlans = @optvlanids;
+	    last;
+	}
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
@@ -510,6 +538,15 @@ foreach my $command (@commands) {
 	    $exitval += doRecreateVlans(\@stacks);
 	    last;
 	};
+	/trunkenable/ && do {
+	    my ($port) = @args;
+	    $exitval += doTrunkEnable(\@stacks,$port,@vlans);
+	    last;
+	}; # /trunkenable/ && do
+	/trunkdisable/ && do {
+	    $exitval += doTrunkDisable(\@stacks,@ports);
+	    last;
+	}; # /trunkenable/ && do
     }
 }
 
@@ -1007,4 +1044,57 @@ sub doRecreateVlans($) {
 
     return 1;
 
+}
+
+#
+# Enable trunking on a port, and enable a set of VLANs on it 
+#
+sub doTrunkEnable($$@) {
+    my $stacks = shift;
+    my $port = shift;
+    my @vlans = @_;
+
+    #
+    # Sanity checking
+    #
+    if (@$stacks != 1) {
+	die "Enabling trunk ports should only involve one stack\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+
+    #
+    # Simple, just call the right function on the stack
+    #
+    my $stack = $$stacks[0];
+    print "Enabling trunking on $port ...\n";
+    return $stack->enableTrunking($port,@vlans);
+}
+
+#
+# Disable trunking on a port
+#
+sub doTrunkDisable($$) {
+    my $stacks = shift;
+    my $port = shift;
+
+    #
+    # Sanity checking
+    #
+    if (@$stacks != 1) {
+	die "Disabling trunk ports should only involve one stack\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+
+    #
+    # Simple, just call the right function on the stack
+    #
+    my $stack = $$stacks[0];
+    my $errors = 0;
+    foreach my $port (@ports) {
+	print "Disabling trunking on port $port ...\n";
+	if (!$stack->disableTrunking($port)) {
+	    $errors++;
+	}
+    }
+    return $errors;
 }

@@ -1311,7 +1311,7 @@ sub setVlansOnTrunk($$$$) {
 	die "VLAN 1 passed to setVlanOnTrunk\n"
     }
 
-    my $ifIndex = $self->{IFINDEX}{$modport};
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
 
     #
     # If this is part of an EtherChannel, we have to find the ifIndex for the
@@ -1354,6 +1354,166 @@ sub setVlansOnTrunk($$$$) {
 	return 0;
     }
 
+}
+
+#
+# Clear the list of allowed VLANs from a trunk
+#
+# usage: clearAllVlansOnTrunk(self, modport)
+#        modport: module.port of the trunk to operate on
+#        Returns 1 on success, 0 otherwise
+#
+sub clearAllVlansOnTrunk($$) {
+    my $self = shift;
+    my ($modport) = @_;
+
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
+
+    #
+    # If this is part of an EtherChannel, we have to find the ifIndex for the
+    # channel.
+    # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
+    # the channel ifIndex the the port is in a channel. Not sure that
+    # this is _always_ beneficial, though
+    #
+    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
+    if (($channel =~ /^\d+$/) && ($channel != 0)) {
+	$ifIndex = $channel;
+    }
+
+    #
+    # Get the exisisting bitfield for allowed VLANs on the trunk
+    #
+    my $bitfield = snmpitGetFatal($self->{SESS},
+	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
+    my $unpacked = unpack("B*",$bitfield);
+    
+    # Put this into an array of 1s and 0s for easy manipulation
+    my @bits = split //,$unpacked;
+
+    # Clear the bit for every VLAN
+    foreach my $index (0 .. $#bits) {
+	$bits[$index] = 0;
+    }
+
+    # Pack it back up...
+    $unpacked = join('',@bits);
+
+    $bitfield = pack("B*",$unpacked);
+
+    # And save it back...
+    my $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
+    	    "OCTETSTR"]);
+    if ($rv) {
+	return 1;
+    } else {
+	return 0;
+    }
+
+}
+
+#
+# Enable trunking on a port
+#
+# usage: enablePortTrunking(self, modport, nativevlan)
+#        modport: module.port of the trunk to operate on
+#        nativevlan: VLAN number of the native VLAN for this trunk
+#        Returns 1 on success, 0 otherwise
+#
+sub enablePortTrunking($$$) {
+    my $self = shift;
+    my ($port,$native_vlan) = @_;
+
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
+
+    #
+    # Clear out the list of allowed VLANs for this trunk port, so that when it
+    # comes up, there is not some race condition
+    #
+    my $rv = $self->clearAllVlansOnTrunk($port);
+    if (!$rv) {
+	warn "ERROR: Unable to clear VLANs on trunk\n";
+	return 0;
+    } 
+
+    #
+    # Set the type of the trunk - we only do dot1q for now
+    #
+    my $trunkType = ["vlanTrunkPortEncapsulationType",$ifIndex,"dot1Q","INTEGER"];
+    $rv = snmpitSetWarn($self->{SESS},$trunkType);
+    if (!$rv) {
+	warn "ERROR: Unable to set encapsulation type\n";
+	return 0;
+    }
+
+    #
+    # Set the native VLAN for this trunk
+    #
+    my $nativeVlan = ["vlanTrunkPortNativeVlan",$ifIndex,$native_vlan,"INTEGER"];
+    $rv = snmpitSetWarn($self->{SESS},$nativeVlan);
+    if (!$rv) {
+	warn "ERROR: Unable to set native VLAN on trunk\n";
+	return 0;
+    }
+
+    #
+    # Finally, enable trunking!
+    #
+    my $trunkEnable = ["vlanTrunkPortDynamicState",$ifIndex,"on","INTEGER"];
+    $rv = snmpitSetWarn($self->{SESS},$trunkEnable);
+    if (!$rv) {
+	warn "ERROR: Unable to enable trunking\n";
+	return 0;
+    }
+
+    #
+    # Allow the native VLAN to cross the trunk
+    #
+    if (!$rv) {
+	warn "ERROR: Unable to enable native VLAN on trunk\n";
+	return 0;
+    }
+
+
+    return 1;
+    
+}
+
+#
+# Disable trunking on a port
+#
+# usage: disablePortTrunking(self, modport)
+#        modport: module.port of the trunk to operate on
+#        Returns 1 on success, 0 otherwise
+#
+sub disablePortTrunking($$) {
+    my $self = shift;
+    my ($port) = @_;
+
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
+
+
+    #
+    # Clear out the list of allowed VLANs for this trunk port
+    #
+    my $rv = $self->clearAllVlansOnTrunk($port);
+    if (!$rv) {
+	warn "ERROR: Unable to clear VLANs on trunk\n";
+	return 0;
+    } 
+
+    #
+    # Disable trunking!
+    #
+    my $trunkDisable = ["vlanTrunkPortDynamicState",$ifIndex,"off","INTEGER"];
+    $rv = snmpitSetWarn($self->{SESS},$trunkDisable);
+    if (!$rv) {
+	warn "ERROR: Unable to enable trunking\n";
+	return 0;
+    }
+
+    return 1;
+    
 }
 
 #
