@@ -16,7 +16,8 @@ SUBMENUSTART("CDROM Options");
 WRITESUBMENUBUTTON("Request a CD Key", "cdromnewkey.php");
 WRITESUBMENUBUTTON("View Installation Instructions", "cdrominstallhelp.php");
 WRITESUBMENUBUTTON("Download the latest CD image", "cdromdownload.php");
-WRITESUBMENUBUTTON("Request a local account", "widearea_register.php");
+WRITESUBMENUBUTTON("Request a local account",
+		   "$TBBASE/widearea_register.php");
 SUBMENUEND();
 
 echo "<h3 align=center>
