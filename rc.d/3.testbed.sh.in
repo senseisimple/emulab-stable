@@ -59,9 +59,9 @@ case "$1" in
 			@prefix@/sbin/stated
 		fi
 
-		if [ -x @prefix@/sbin/eventsys_start  ]; then
-			echo -n " eventboot"
-			@prefix@/sbin/eventsys_start
+		if [ -e @prefix@/etc/inetd.conf  ]; then
+			echo -n " testbed-inetd"
+			inetd -a @BOSSNODE@ -p /var/run/testbed-inetd.pid @prefix@/etc/inetd.conf
 		fi
 
 		#
