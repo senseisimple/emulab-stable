@@ -11,8 +11,5 @@ Class NSObject
 # This is invoked whenever any method is called on the object that is
 # not defined.  We display a warning message and otherwise ignore it.
 NSObject instproc unknown {m args} {
-   global ::GLOBALS::verbose
-    if {${::GLOBALS::verbose}} {
-	puts stderr "Unsupported: [$self info class] $m"
-    }
+    punsup "[$self info class] $m"
 }

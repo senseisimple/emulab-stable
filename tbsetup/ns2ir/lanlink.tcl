@@ -46,7 +46,7 @@ Queue instproc init {link type} {
 	    set red_ 1
 	    set gentle_ 1
 	} elseif {$type != "DropTail"} {
-	    puts stderr "Unsupported: Link type $type, using DropTail."
+	    punsup "Link type $type, using DropTail!"
 	}
     }
 }

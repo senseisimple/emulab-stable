@@ -51,13 +51,12 @@ Simulator instproc init {args} {
 # This method adds a new node to the topology and returns the id
 # of the node.
 Simulator instproc node {args} {
-    var_import ::GLOBALS::verbose
     var_import ::GLOBALS::last_class
     $self instvar id_counter
     $self instvar node_list
 
-    if {$verbose && ($args != {})} {
-	puts stderr "Unsupported: Arguments for node: $args"
+    if {($args != {})} {
+	punsup "Arguments for node: $args"
     }
     
     set curnode n[incr id_counter]
@@ -73,18 +72,14 @@ Simulator instproc node {args} {
 # form accepted by parse_bw and <delay> in any form accepted by
 # parse_delay.  Currently only the type 'DropTail' is supported.
 Simulator instproc duplex-link {n1 n2 bw delay type args} {
-    var_import ::GLOBALS::verbose
     var_import ::GLOBALS::last_class
     $self instvar id_counter
     $self instvar lanlink_list
     $self instvar link_map
 
-    if {$verbose && ($args != {})} {
-	puts stderr "Unsupported: Arguments for duplex-link: $args"
+    if {($args != {})} {
+	punsup "Arguments for duplex-link: $args"
     }
-#    if {$verbose && ($type != "DropTail") && ($type != "RED")} {
-#	puts stderr "Unsupported: Link type $type, using DropTail."
-#    }
     set error 0
     if {! [$n1 info class Node]} {
 	perror "\[duplex-link] $n1 is not a node."
@@ -116,13 +111,12 @@ Simulator instproc duplex-link {n1 n2 bw delay type args} {
 # form accepted by parse_bw and <delay> in any form accepted by
 # parse_delay.
 Simulator instproc make-lan {nodelist bw delay args} {
-    var_import ::GLOBALS::verbose
     var_import ::GLOBALS::last_class
     $self instvar id_counter
     $self instvar lanlink_list
 
-    if {$verbose && ($args != {})} {
-		puts stderr "Unsupported: Arguments for make-lan: $args"
+    if {($args != {})} {
+	punsup "Arguments for make-lan: $args"
     }
     
     set curlan lan[incr id_counter]
@@ -443,11 +437,8 @@ Simulator instproc at {time eventstring} {
 # request to create an object of that type.  We create display an
 # unsupported message and create a NullClass to fulfill the request.
 Simulator instproc unknown {m args} {
-    global ::GLOBALS::verbose
     $self instvar id_counter
-    if {${::GLOBALS::verbose}} {
-	puts stderr "Unsupported: Object $m"
-    }
+    punsup "Object $m"
     NullClass null[incr id_counter] $m
 }
 

@@ -14,9 +14,5 @@ NullClass instproc init {mytype} {
 }
 
 NullClass instproc unknown {m args} {
-    var_import ::GLOBALS::verbose
-    $self instvar type
-    if {$verbose} {
-	puts stderr "Unsupported: $type $m"
-    }
+    punsup "$type $m"
 }

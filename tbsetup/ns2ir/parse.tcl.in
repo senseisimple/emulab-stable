@@ -63,13 +63,14 @@ proc perror {msg} {
 
 ###
 # punsup {msg}
-# Print an unsupported message if verbose is on.
+# Print an unsupported message.
 ###
 proc punsup {msg} {
-	global ::GLOBALS::verbose
-	if {${::GLOBALS::verbose}} {
-	    puts stderr "Unsupported: $msg"
-	}
+    var_import ::GLOBALS::verbose
+    if {$verbose == 1} {
+	puts stderr "*** WARNING: Unsupported NS Statement!"
+	puts stderr "    $msg"
+    }
 }	
 
 # Parse Arguments
@@ -244,20 +245,15 @@ namespace eval GLOBALS {
 }
 proc new {class args} {
     var_import GLOBALS::new_counter
-    var_import GLOBALS::verbose
     var_import GLOBALS::new_classes
     if {! [info exists new_classes($class)]} {
-	if {$verbose} {
-	    puts stderr "Unsupported object: $class"
-	}
+	punsup "Object: $class"
 	set id null[incr new_counter]
 	NullClass $id
 	return $id
     }
     if {$args != {}} {
-	if {$verbose} {
-	    puts stderr "Unsupported args for $class."
-	}
+	punsup "args for $class"
     }
     set id $class[incr new_counter]
     eval $class $id 
