@@ -323,6 +323,7 @@ foreach $node (keys(%nodes)) {
 	push(@types, $auxinfo);
     }
 
+    my $cpu_ram_features_present = 0;
     #
     # This stuff is extra goo for local virtual nodes.
     # 
@@ -331,8 +332,7 @@ foreach $node (keys(%nodes)) {
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:400000";
 	# Add CPU and RAM information
-	push @features, "?+cpu:$cpu_speed";
-	push @features, "?+ram:$ram";
+	$cpu_ram_features_present++;
 	# This number can be use for fine-tuning packing
 	push @features, "?+virtpercent:100";
 	# Put this silly feature in so that we can try to keep vnodes
@@ -351,11 +351,15 @@ foreach $node (keys(%nodes)) {
 	    push @types, "sim:$simnode_capacity";
 	}
 	# Add CPU and RAM information
-	push @features, "?+cpu:$cpu_speed";
-	push @features, "?+ram:$ram";
+	$cpu_ram_features_present++;
 	push @types, "*lan:*";
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:100000";
+    }
+    if ($cpu_ram_features_present) {
+	# Add CPU and RAM information
+	push @features, "?+cpu:$cpu_speed";
+	push @features, "?+ram:$ram";
     }
 
     # Add features
