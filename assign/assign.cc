@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #include <LEDA/graph_alg.h>
 #include <LEDA/graphwin.h>
 #include <LEDA/ugraph.h>

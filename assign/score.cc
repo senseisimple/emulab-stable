@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * ASSUMPTIONS:
  *  1. Any switch can get to any other switch either directly
  *     or via at most one other switch (star formation).
