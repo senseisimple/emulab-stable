@@ -175,7 +175,8 @@ use Exporter;
 	 TBDB_ROUTERTYPE_NONE	TBDB_ROUTERTYPE_OSPF
 	 TBDB_ROUTERTYPE_STATIC TBDB_ROUTERTYPE_MANUAL
 	 TBDB_EVENTKEY
-         max min
+	 TBDB_CHECKDBSLOT_NOFLAGS TBDB_CHECKDBSLOT_WARN TBDB_CHECKDBSLOT_ERROR
+         max min TBcheck_dbslot
 	 );
 
 # Must come after package declaration!
@@ -554,6 +555,11 @@ sub TBDB_ROUTERTYPE_MANUAL()	{ "manual"; }
 
 # Event Stuff
 sub TBDB_EVENTKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/eventkey"; }
+
+# Regex stuff
+sub TBDB_CHECKDBSLOT_NOFLAGS()	{ 0x0; }
+sub TBDB_CHECKDBSLOT_WARN()	{ 0x1; }
+sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
 
 #
 # Auth stuff.
@@ -3757,6 +3763,150 @@ sub max ( $$ ) {
 
 sub min ( $$ ) {
     return ($_[0] < $_[1] ? $_[0] : $_[1]);
+}
+
+#
+# Support for checking field values against what is specified.
+#
+my %DBFieldData;
+my $DBFieldErrstr = "";
+
+sub TBFieldErrorString() { return $DBFieldErrstr; }
+
+#
+# Download all data from the DB and store in hash for latter access.
+# 
+sub TBGrabFieldData()
+{
+    $DBFieldData = ();
+    
+    my $query_result =
+	DBQueryFatal("select * from table_regex");
+
+    while (my %row = $query_result->fetchhash()) {
+	my $table_name  = $row{"table_name"};
+	my $column_name = $row{"column_name"};
+
+	$DBFieldData{$table_name . ":" . $column_name} =
+	    { "check"       => $row{"check"},
+	      "check_type"  => $row{"check_type"},
+	      "column_type" => $row{"column_type"},
+	      "min"         => $row{"min"},
+	      "max"         => $row{"max"}
+	    };
+    }
+}
+
+#
+# Return the field data for a specific table/slot. If none, return the default
+# entry.
+#
+# The top level entry defines some stuff that is not to be overidden by the
+# redirected entries. For example, the top level entry is the only place we
+# can specify a field is optional when inserting a record. We could do this
+# with default entries in the DB table defintion, but I do not like that idea.
+# The min/max lengths also override, unless they are both zero in which case
+# let the first non-zero defs set them.
+#
+sub TBFieldData($$;$)
+{
+    my ($table, $column, $flag) = @_;
+    my $toplevel;
+    my $fielddata;
+   
+    if (! defined($DBFieldData)) {
+	TBGrabFieldData();
+    }
+    my $key = $table . ":" . $column;
+    
+    while (exists($DBFieldData{$key})) {
+	$fielddata = $DBFieldData{$key};
+
+	#
+	# See if a redirect to another entry. 
+	#
+	if ($fielddata->{"check_type"} eq "redirect") {
+	    if (!defined($toplevel)) {
+		$toplevel = $fielddata;
+	    }
+	    
+	    $key = $fielddata->{"check"};
+	    #print STDERR "Redirecting to $key for $table/$column!\n";
+	    next;
+	}
+	last;
+    }
+    # Resort to a default entry.
+    if (!defined($fielddata)) {
+	if (defined($flag)) {
+	    if ($flag & TBDB_CHECKDBSLOT_WARN()) {
+		print STDERR "*** $0:\n" .
+		             "    WARNING: No slot data for $table/$column!\n";
+	    }
+	    return undef
+		if ($flag & TBDB_CHECKDBSLOT_ERROR());
+	}
+	$fielddata = $DBFieldData{"default:default"};
+    }
+    # Overwrite final entry with toplevel data.
+    if (defined($toplevel) &&
+	($toplevel->{"min"} || $toplevel->{"max"})) {
+	$fielddata->{"min"} = $toplevel->{"min"};
+	$fielddata->{"max"} = $toplevel->{"max"};
+    }
+    return $fielddata;
+}
+
+#
+# Generic wrapper to check a slot.
+#
+sub TBcheck_dbslot($$$;$)
+{
+    my ($token, $table, $column, $flag) = @_;
+    
+    my $fielddata   = TBFieldData($table, $column, $flag);
+
+    return 0
+	if (!defined($fielddata));
+
+    my $check       = $fielddata->{"check"};
+    my $check_type  = $fielddata->{"check_type"};
+    my $column_type = $fielddata->{"column_type"};
+    my $min         = $fielddata->{"min"};
+    my $max         = $fielddata->{"max"};
+
+#    print STDERR "Using $check/$check_type/$column_type for $table/$column\n";
+
+    #
+    # Functional checks not implemented yet. 
+    #
+    if ($check_type eq "function") {
+	die("*** $0:\n" .
+	    "    Functional DB checks not implemented: $table/$column!\n");
+    }
+
+    # Check regex.
+    return 0
+	if (! ("$token" =~ /$check/));
+
+    # Check min/max. 
+    if ($column_type eq "text") {
+	return 1
+	    if ((!$min && !$max) ||
+		(length($token) >= $min &&
+		 length($token) <= $max));
+    }
+    elsif ($column_type eq "int" ||
+	   $column_type eq "float") {
+	# If both min/max are zero, then skip check; allow anything.
+	return 1
+	    if ((!$min && !$max) || ($token >= $min && $token <= $max));
+    }
+    else {
+	die("*** $0:\n" .
+	    "    Unrecognized column_type $column_type\n");
+    }
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

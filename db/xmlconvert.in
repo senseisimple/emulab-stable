@@ -235,18 +235,19 @@ sub readXML($$$) {
 
 	foreach my $key (keys(%experiments_table)) {
 	    my $val = $experiments_table{$key};
-	    
+
 	    if ($val eq "NULL") {
 		push(@setlist, "$key=NULL");
 	    }
 	    else {
-		# Sanity check. The particular set of fields should not need
-		# anything more than alphanumeric.
-		if ($val =~ /^[-\d\w]+$/) {
+		# Sanity check the fields.
+		if (TBcheck_dbslot($val, "experiments", $key,
+				TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
 		    push(@setlist, "$key='$val'");
 		}
 		else {
-		    fatal("Illegal characters in table data: $key/$val");
+		    fatal("Illegal characters in table data: ".
+			  "experiments:$key - $val");
 		}
 	    }	    
 	}
@@ -294,9 +295,20 @@ sub readXML($$$) {
 		if ($val eq "NULL") {
 		    push(@values, "NULL");
 		}
+		elsif ($val eq "") {
+		    push(@values, "''");
+		}
 		else {
-		    push(@values, DBQuoteSpecial($val));
-		}	    
+		    # Sanity check the fields.
+		    if (TBcheck_dbslot($val, $table, $key,
+				 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+			push(@values, DBQuoteSpecial($val));
+		    }
+		    else {
+			fatal("Illegal characters in table data: ".
+			      "$table:$key - $val");
+		    }
+		}
 		push(@fields, $key);
 	    }
 	    $query = "insert into $table (" . join(",", @fields) . ") ".

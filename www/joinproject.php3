@@ -98,7 +98,7 @@ function SPITFORM($formfields, $returning, $errors)
         # UserName:
         #
         echo "<tr>
-                  <td colspan=2>*Username (no blanks, lowercase):</td>
+                  <td colspan=2>*Username (alphanumeric, lowercase):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[joining_uid]\"
@@ -277,7 +277,7 @@ function SPITFORM($formfields, $returning, $errors)
     # Project Name:
     #
     echo "<tr>
-              <td colspan=2>*Project Name (no blanks):</td>
+              <td colspan=2>*Project Name:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[pid]\"
@@ -410,42 +410,36 @@ if (! $returning) {
 	strcmp($formfields[joining_uid], "") == 0) {
 	$errors["Username"] = "Missing Field";
     }
-    else {
-	if (! TBvalid_uid($formfields[joining_uid])) {
-	    $errors["UserName"] =
-		"Must be lowercase alphanumeric only<br>".
-		"and must begin with a lowercase alpha";
-	}
-	elseif (strlen($formfields[joining_uid]) > $TBDB_UIDLEN) {
-	    $errors["UserName"] =
-		"Too long! Must be less than or to $TBDB_UIDLEN";
-	}
-	elseif (TBCurrentUser($formfields[joining_uid])) {
-	    $errors["UserName"] =
-		"Already in use. Select another";
-	}
+    elseif (!TBvalid_uid($formfields[joining_uid])) {
+	$errors["UserName"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_title]) ||
 	strcmp($formfields[usr_title], "") == 0) {
 	$errors["Title/Position"] = "Missing Field";
+    }
+    elseif (! TBvalid_title($formfields[usr_title])) {
+	$errors["Title/Position"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_name]) ||
 	strcmp($formfields[usr_name], "") == 0) {
 	$errors["Full Name"] = "Missing Field";
     }
     elseif (! TBvalid_usrname($formfields[usr_name])) {
-	$errors["Full Name"] = "Invalid characters";
+	$errors["Full Name"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_affil]) ||
 	strcmp($formfields[usr_affil], "") == 0) {
 	$errors["Affiliation"] = "Missing Field";
+    }
+    elseif (! TBvalid_affiliation($formfields[usr_affil])) {
+	$errors["Affiliation"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_email]) ||
 	strcmp($formfields[usr_email], "") == 0) {
 	$errors["Email Address"] = "Missing Field";
     }
     elseif (! TBvalid_email($formfields[usr_email])) {
-	$errors["Email Address"] = "Looks invalid!";
+	$errors["Email Address"] = TBFieldErrorString();
     }
     if (isset($formfields[usr_URL]) &&
 	strcmp($formfields[usr_URL], "") &&
@@ -457,28 +451,48 @@ if (! $returning) {
 	strcmp($formfields[usr_addr], "") == 0) {
 	$errors["Address 1"] = "Missing Field";
     }
+    elseif (! TBvalid_addr($formfields[usr_addr])) {
+	$errors["Address 1"] = TBFieldErrorString();
+    }
+    # Optional
+    if (isset($formfields[usr_addr2]) &&
+	!TBvalid_addr($formfields[usr_addr2])) {
+	$errors["Address 2"] = TBFieldErrorString();
+    }
     if (!isset($formfields[usr_city]) ||
 	strcmp($formfields[usr_city], "") == 0) {
 	$errors["City"] = "Missing Field";
+    }
+    elseif (! TBvalid_city($formfields[usr_city])) {
+	$errors["City"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_state]) ||
 	strcmp($formfields[usr_state], "") == 0) {
 	$errors["State"] = "Missing Field";
     }
+    elseif (! TBvalid_state($formfields[usr_state])) {
+	$errors["State"] = TBFieldErrorString();
+    }
     if (!isset($formfields[usr_zip]) ||
 	strcmp($formfields[usr_zip], "") == 0) {
 	$errors["ZIP/Postal Code"] = "Missing Field";
     }
+    elseif (! TBvalid_zip($formfields[usr_zip])) {
+	$errors["Zip/Postal Code"] = TBFieldErrorString();
+    }
     if (!isset($formfields[usr_country]) ||
 	strcmp($formfields[usr_country], "") == 0) {
 	$errors["Country"] = "Missing Field";
+    }
+    elseif (! TBvalid_country($formfields[usr_country])) {
+	$errors["Country"] = TBFieldErrorString();
     }
     if (!isset($formfields[usr_phone]) ||
 	strcmp($formfields[usr_phone], "") == 0) {
 	$errors["Phone #"] = "Missing Field";
     }
     elseif (!TBvalid_phone($formfields[usr_phone])) {
-	$errors["Phone"] = "Invalid characters";
+	$errors["Phone #"] = TBFieldErrorString();
     }
     if (!isset($formfields[password1]) ||
 	strcmp($formfields[password1], "") == 0) {

@@ -2,10 +2,13 @@
 #
 # Database Constants
 #
+require("dbcheck.php3");
+
 $TBDBNAME       = "@TBDBNAME@";
 $TBOPSPID	= "emulab-ops";
 
-$TBDB_MINLEN    = 2;
+# All these constants need to go at some point, replaced by data from
+# the regex table. 
 $TBDB_UIDLEN    = 8;
 $TBDB_PIDLEN    = 12;
 $TBDB_GIDLEN	= 12;
@@ -140,66 +143,6 @@ define("TBDB_USER_INTERFACE_EMULAB",	"emulab");
 define("TBDB_USER_INTERFACE_PLAB",	"plab");
 $TBDB_USER_INTERFACE_LIST = array(TBDB_USER_INTERFACE_EMULAB,
 				  TBDB_USER_INTERFACE_PLAB);
-
-# Some regex functions to check various arguments
-function TBvalid_uid($uid) {
-    global $TBDB_UIDLEN, $TBDB_MINLEN;
-    
-    return (strlen($uid) <= $TBDB_UIDLEN) && (strlen($uid) >= $TBDB_MINLEN) &&
-	preg_match("/^[a-zA-Z][-\w]+$/", $uid);
-}
-function TBvalid_pid($pid) {
-    global $TBDB_PIDLEN, $TBDB_MINLEN;
-    
-    return (strlen($pid) <= $TBDB_PIDLEN) && (strlen($pid) >= $TBDB_MINLEN) &&
-	preg_match("/^[a-zA-Z][-\w]+$/", $pid);
-}
-function TBvalid_gid($gid) {
-    global $TBDB_GIDLEN, $TBDB_MINLEN;
-    
-    return (strlen($gid) <= $TBDB_GIDLEN) && (strlen($gid) >= $TBDB_MINLEN) &&
-	preg_match("/^[a-zA-Z][-\w]+$/", $gid);
-}
-function TBvalid_eid($eid) {
-    global $TBDB_EIDLEN, $TBDB_MINLEN;
-    
-    return (strlen($eid) <= $TBDB_EIDLEN) && (strlen($eid) >= $TBDB_MINLEN) &&
-	preg_match("/^[a-zA-Z][-\w]+$/", $eid);
-}
-function TBvalid_phone($phone) {
-    global $TBDB_PHONELEN;
-    
-    return (strlen($phone) <= $TBDB_PHONELEN) &&
-	preg_match("/^[-\d\(\)\+\.x ]+$/", $phone);
-}
-function TBvalid_usrname($name) {
-    global $TBDB_USRNAMELEN;
-
-    return (strlen($name) <= $TBDB_USRNAMELEN) &&
-	preg_match("/^[-\w\. ]+$/", $name);
-}
-function TBvalid_description($token) {
-    return (strlen($token) <= 256) &&
-	preg_match("/^[\\040-\\176]*$/", $token);
-}
-function TBvalid_email($email)
-{
-    global $TBDB_EMAILLEN, $TBDB_MINLEN;
-    
-    if (strlen($email) < $TBDB_MINLEN || strlen($email) > $TBDB_EMAILLEN) 
-	return 0;
-    
-    $parts = preg_split("/\@/", $email);
-    
-    if (!isset($parts[0]) ||
-	!isset($parts[1]) ||
-	count($parts) != 2 ||
-	!preg_match("/^[-\w\+\.]+$/", $parts[0]) ||
-	!preg_match("/^[-\w\.]+$/", $parts[1])) 
-	return 0;
-    
-    return 1;
-}
 
 #
 # Convert a trust string to the above numeric values.
@@ -1974,13 +1917,12 @@ function DBWarn($message)
 #
 function DBFatal($message)
 {
-    global $TBMAILADDR;
+    global	$PHP_SELF, $DBErrorString;
 
-    DBWarn($message);
+    $text = "$message - In $PHP_SELF\n" .
+  	    "$DBErrorString\n";
 
-    PAGEERROR("<p><p>".
-	      "Unexpected Error. Could not continue. ".
-              "Please contact $TBMAILADDR\n");
+    TBERROR($text, 1);
 }
 
 #

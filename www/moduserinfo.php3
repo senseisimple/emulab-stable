@@ -372,7 +372,7 @@ $defaults = array();
 # Construct a defaults array based on current DB info. Used for the initial
 # form, and to determine if any changes were made. This is to avoid churning
 # the passwd file for no reason, given that most people use this page
-# simply yo change their password. 
+# simply to change their password. 
 # 
 $row = mysql_fetch_array($query_result);
 $defaults[target_uid]  = $target_uid;
@@ -413,16 +413,22 @@ if (!isset($formfields[usr_title]) ||
     strcmp($formfields[usr_title], "") == 0) {
     $errors["Title/Position"] = "Missing Field";
 }
+elseif (! TBvalid_title($formfields[usr_title])) {
+    $errors["Title/Position"] = TBFieldErrorString();
+}
 if (!isset($formfields[usr_name]) ||
     strcmp($formfields[usr_name], "") == 0) {
     $errors["Full Name"] = "Missing Field";
 }
 elseif (! TBvalid_usrname($formfields[usr_name])) {
-    $errors["Full Name"] = "Invalid characters";
+    $errors["Full Name"] = TBFieldErrorString();
 }
 if (!isset($formfields[usr_affil]) ||
     strcmp($formfields[usr_affil], "") == 0) {
     $errors["Affiliation"] = "Missing Field";
+}
+elseif (! TBvalid_affiliation($formfields[usr_affil])) {
+    $errors["Affiliation"] = TBFieldErrorString();
 }
 if (!isset($formfields[usr_shell]) ||
     !in_array($formfields[usr_shell], $shelllist)) {
@@ -433,7 +439,7 @@ if (!isset($formfields[usr_email]) ||
     $errors["Email Address"] = "Missing Field";
 }
 elseif (! TBvalid_email($formfields[usr_email])) {
-    $errors["Email Address"] = "Looks invalid!";
+    $errors["Email Address"] = TBFieldErrorString();
 }
 if (isset($formfields[usr_URL]) &&
     strcmp($formfields[usr_URL], "") &&
@@ -445,7 +451,7 @@ if (!$isadmin) {
     # Admins can leave these fields blank, but must error check them anyway.
     if (!isset($formfields[usr_addr]) ||
 	strcmp($formfields[usr_addr], "") == 0) {
-	$errors["Postal Address"] = "Missing Field";
+	$errors["Postal Address 1"] = "Missing Field";
     }
     if (!isset($formfields[usr_city]) ||
 	strcmp($formfields[usr_city], "") == 0) {
@@ -468,9 +474,34 @@ if (!$isadmin) {
 	$errors["Phone #"] = "Missing Field";
     } 
 }
+if (isset($formfields[usr_addr]) &&
+    !TBvalid_addr($formfields[usr_addr])) {
+    $errors["Postal Address 1"] = TBFieldErrorString();
+}
+# Optional
+if (isset($formfields[usr_addr2]) &&
+    !TBvalid_addr($formfields[usr_addr2])) {
+    $errors["Postal Address 2"] = TBFieldErrorString();
+}
+if (isset($formfields[usr_city]) &&
+    !TBvalid_city($formfields[usr_city])) {
+    $errors["City"] = TBFieldErrorString();
+}
+if (isset($formfields[usr_state]) &&
+    !TBvalid_state($formfields[usr_state])) {
+    $errors["State"] = TBFieldErrorString();
+}
+if (isset($formfields[usr_zip]) &&
+    !TBvalid_zip($formfields[usr_zip])) {
+    $errors["Zip/Postal Code"] = TBFieldErrorString();
+}
+if (isset($formfields[usr_country]) &&
+    !TBvalid_country($formfields[usr_zip])) {
+    $errors["Zip/Postal Code"] = TBFieldErrorString();
+}
 if (isset($formfields[usr_phone]) &&
     !TBvalid_phone($formfields[usr_phone])) {
-    $errors["Phone #"] = "Invalid characters";
+    $errors["Phone #"] = TBFieldErrorString();
 }
 if (isset($formfields[password1]) &&
     strcmp($formfields[password1], "")) {
