@@ -652,7 +652,7 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $pnode  = $vnode2pnode{$node};
 	my $wstart = $waitstart{$node};
-	my $maxwait = 90 + (3000 * $pnodevcount{$pnode});
+	my $maxwait = 90 + (30 * $pnodevcount{$pnode});
 
 	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, $maxwait)) {
 	    print "$node is alive and well\n";
