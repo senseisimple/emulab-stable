@@ -18,12 +18,14 @@ use English;
 # no matter what happens though.
 #
 
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
 #
-# Untaint path
+# Prototypes.
 #
-$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/local/bin:/etc/testbed" .
-               ":/usr/local/etc/emulab";
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+sub fatal($);
+sub ntpstart();
 
 #
 # Turn off line buffering on output
@@ -34,7 +36,6 @@ $| = 1;
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/usr/local/etc/emulab";
 use libsetup;
 
 # Locals
@@ -63,7 +64,11 @@ sub ntpstart () {
 # but no servers/peers, then need to leave the config alone and just
 # replace the drift file.
 #
-open(TM, "tmcc -t 5 ntpinfo |")
+my $args = "";
+if (REMOTE()) {
+    $args .= "-t 5";
+}
+open(TM, "tmcc $args ntpinfo |")
     or fatal("Could not start tmcc: $!");
 
 while (<TM>) {
