@@ -9,17 +9,20 @@
 import sys
 sys.path.append("@prefix@/lib")
 import getopt
-import libtestbed
+from libtestbed import *
 import libplab
 
-def usage(me):
-    print "Usage: %s [ -vd ] { create | destroy } pid eid" % me
-    sys.exit(-1)
+usage = "%prog [ -vd ] { create | destroy } pid eid"
 
 def main(args):
     me = args[0]
-    parser = TBParser()
-    parser.parse_args()
+    parser = TBParser(usage)
+    (opts, args) = parser.parse_args()
+
+    if len(args) < 3:
+        parser.error("Incorrect number of arguments")
+
+    command,pid,eid = args
 
     plab = libplab.Plab()
     if command == "create":

@@ -88,8 +88,8 @@ my $logfile = "$TB/log/plabmonitord";
 my @oldnodes = ();
 my $LOOPSLEEP = 1800;  # 1/2 hour between successive loops.
 my $PAUSETIME = 120;   # 2 minute pause after running vnode_setup
-my $SETUPWAIT = 960;   # 16 minutes to wait for vnode to setup.
-my $BATCHNUM = 20;     # degree of parallelization
+my $SETUPWAIT = 960;   # how long to wait for vnode to setup.
+my $BATCHNUM = 40;     # degree of parallelization
 
 #
 # daemonize
@@ -178,16 +178,33 @@ while (1) {
         # Check the nodes to find out which are up, and which failed
         # in the vnode_setup we just ran.
         print "Checking vnode_setup run status\n";
-        my @failed = grep(nodepostalloc($_), @batch2);
+        my @failed = ();
+        my @succeeded = ();
+        foreach $vnode (@batch2) {
+            if (nodepostalloc($vnode)) {
+                push(@succeeded, $vnode);
+            } else {
+                push(@failed, $vnode);
+            }
+        }
         
         # If any fail, try to tear them down.
         if (@failed) {
             my @fvnodes = map {$_->[0]} @failed;
-            my @fpnodes = map {$_->[1]} @failed;
             
             print "### vnode_setup failed for the following vnodes: @fvnodes\n";
             print "### Proceding to tear them down.\n";
             system("vnode_setup -f -d -k -n $BATCHNUM $PLABMOND_PID $PLABMOND_EID @fvnodes");
+        }
+
+        # If any succedded, let tbops know about it.
+        if (@succeeded) {
+            my @spnodes = map {$_->[1]} @succeeded;
+
+            SENDMAIL($TBOPS, @succeeded ." plab nodes revived.",
+                     "The following nodes have been brought back from the afterworld:\n\n".
+                     join("\n", @spnodes) ."\n",
+                     $TBOPS);
         }
 
         # Keep track of failed nodes for next daemon loop iteration.
@@ -207,7 +224,7 @@ while (1) {
 sub nodepostalloc($) {
     my ($vnode, $pnode) = @{$_[0]};
     my $revive = 0;
-    my $retval = 1;
+    my $retval = 0;
     my $state = TBDB_NODESTATE_UNKNOWN();
 
     # Did the node send ISUP (boot up completely)?
@@ -233,16 +250,12 @@ sub nodepostalloc($) {
         TBSetNodeLogEntry($pnode, "root", TB_DEFAULT_NODELOGTYPE(),
                           "'Moved to $PLABHOLDING_EID; ".
                           "plab node $vnode setup okay by monitor.'");
-        
-        SENDMAIL($TBOPS, "$pnode is alive",
-                 "$pnode has been brought back from the afterworld!",
-                 $TBOPS);
-        $retval = 0;
+        $retval = 1;
 
-    # It didn't come up..
+    # We couldn't get it up..
     } else {
         print "Leaving $pnode in hwdown!\n";
-        $retval = 1
+        $retval = 0;
     }
 
     return $retval;

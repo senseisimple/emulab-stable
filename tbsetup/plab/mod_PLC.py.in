@@ -278,6 +278,7 @@ class mod_PLC:
 
     def freeNode(self, node):
         agent = PLCagent(node.slice.slicename)
+        res = None
         tries = 3
         while 1:
             TIMESTAMP("freenode %s try %d started." % (node.nodeid,

@@ -28,6 +28,7 @@ import httplib
 import xml.parsers.expat
 import re
 
+from popen2 import Popen4
 from warnings import warn
 
 #
@@ -1021,9 +1022,21 @@ class Node:
         """
         TIMESTAMP("emulabify started on %s." % self.nodeid)
         print "Overlaying Emulab files on %s ..." % self.nodeid
-        self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh")
-        self.__perform("-tt sh /tmp/fixsudo.sh")
-        self.addToGroup(self.slice.slicename, "root")
+        try:
+            self.__copy(DEFAULT_DATA_PATH + "fixsudo.sh", "/tmp/fixsudo.sh")
+            self.__perform("-tt sh /tmp/fixsudo.sh", quiet = True)
+            pass
+        except RuntimeError:
+            print "fixsudo failed on %s; attempting to carry on anyway.." % \
+                  self.nodeid
+            pass
+        try:
+            self.addToGroup(self.slice.slicename, "root")
+            pass
+        except RuntimeError:
+            print "Adding slice user to 'root' group on %s failed; " \
+                  "attempting to carry on anyway." % self.nodeid
+            pass
         self.unpackTgz(rootballpath, rootballname)
         TIMESTAMP("emulabify finished on %s." % self.nodeid)
 
@@ -1050,38 +1063,50 @@ class Node:
             print "Warning: couldn't get tarball via local service on %s: " \
                   "Falling back to remote transfer." % self.nodeid
             self.__copy(tgzpath + tgzname, "/tmp/" + tgzname)
+            pass
             
-        self.__perform("sudo tar -jxf /tmp/" + tgzname + " -C %s" % destpath)
+        self.__perform("sudo tar -jxf /tmp/" + tgzname + " -C %s" % destpath,
+                       quiet = True)
+        return
 
-    def __perform(self, command):
+    def __perform(self, command, quiet = False):
         """
-        Executes the given command on the remote node via sshtb
+        Executes the given command on the remote node via sshtb, run as
+        the slice user.
         """
         if debug:
             print "Performing '%s' on %s" % (command, self.nodeid)
-        if os.spawnl(os.P_WAIT, SSH, SSH, "-host", self.nodeid, command):
-            raise RuntimeError, "ssh '%s' failed" % command
+        command = "%s -host %s %s" % (SSH, self.nodeid, command)
+        return self.__execute(command, quiet)
 
     def __copy(self, localfile, remotefile):
         """
         Copies a file from the local system to the remote node, doing so
-        as root.
+        as the slice user.
         """
-        import popen2
         if debug:
             print "Copying %s to %s on %s" % \
                   (localfile, remotefile, self.nodeid)
-        # dd is a bit overbearing for this job, but I can't do something
-        # simply like an scp (because the I can't get remote root), or a
-        # cat with a redirect (because sshtb munges the redirect and
-        # winds up evaluating it in a local shell)
-        cpyobj = popen2.Popen4("%s -host %s 'dd of=%s' < '%s'" %
-                               (SSH, self.nodeid, remotefile, localfile))
-        cpyout = cpyobj.fromchild.read()
-        cpystatus = cpyobj.wait()
-        if os.WEXITSTATUS(cpystatus):
-            raise RuntimeError, "Copying %s to %s failed (excode: %s):\n%s" % \
-                  (localfile, remotefile, os.WEXITSTATUS(cpystatus), cpyout)
+            pass
+        # We're using rsync now.
+        command = "rsync -e '%s -host' %s %s:%s" % \
+                  (SSH, localfile, self.nodeid, remotefile)
+        return self.__execute(command)
+
+    def __execute(self, command, quiet = False):
+        """
+        Executes the given command, optionally squelching the output.
+        """
+        cmdobj = Popen4(command)
+        cmdout = cmdobj.fromchild.read()
+        cmdstatus = cmdobj.wait()
+        if (not quiet) and cmdout:
+            print cmdout
+            pass
+        if cmdstatus:
+            raise RuntimeError, "'%s' failed (excode: %s). output:\n%s" % \
+                  (command, cmdstatus, cmdout)
+        return
 
     def __findIP(self):
         """

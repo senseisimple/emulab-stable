@@ -46,8 +46,8 @@ class TBParser (OptionParser):
     Slightly modified OptionParser that simply adds some universally
     useful options.  May want to extend to have different error behavior.
     """
-    def __init__(self):
-        OptionParser.__init__(self)
+    def __init__(self, *args):
+        OptionParser.__init__(self, *args)
         self.add_option("-v", "--verbose", dest="verbose", default=False,
                         action="store_true", help="Say more about internal stuff")
         self.add_option("-d", "--debug", dest="debug", default=False,

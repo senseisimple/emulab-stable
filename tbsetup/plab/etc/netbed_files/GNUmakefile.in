@@ -23,7 +23,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 mkdirs: $(LOG_DIR) $(WWW_DIR)
 
 rootball-link:
-	-ln -s $(INSTALL_ETCDIR)/plab/$(ROOTBALL) $(WWW_DIR)/$(ROOTBALL)
+	-ln -fs $(INSTALL_ETCDIR)/plab/$(ROOTBALL) $(WWW_DIR)/$(ROOTBALL)
 
 install: sbin-install mkdirs rootball-link
 
