@@ -21,23 +21,65 @@
 #
 my $PREFIX = '@prefix@';
 
-my @mailing_lists = ('@TBOPSEMAIL@','@TBLOGSEMAIL@','@TBWWWEMAIL@',
-    '@TBAPPROVALEMAIL@','@TBLOGSEMAIL@','@TBAUDITEMAIL@','@TBSTATEDEMAIL@',
-    '@TBTESTSUITEEMAIL@');
+my @MAILING_LISTS = ("@TBOPSEMAIL@","@TBLOGSEMAIL@","@TBWWWEMAIL@",
+    "@TBAPPROVALEMAIL@","@TBLOGSEMAIL@","@TBAUDITEMAIL@","@TBSTATEDEMAIL@",
+    "@TBTESTSUITEEMAIL@");
+
 
 my $OURDOMAIN = '@OURDOMAIN@';
 
 my $USERNODE = '@USERNODE@';
-my $FSNODE = '@FSNODE@';
+my $FSNODE =   '@FSNODE@';
 my $BOSSNODE = '@BOSSNODE@';
 
+#
+# Allow this to work if the library is left in the source directory
+#
+use lib '@srcdir@';
+   
 use English;
+use libinstall;
+
+#
+# Some programs we use
+#
+my $CHGRP      = "/usr/bin/chgrp";
+my $CHMOD      = "/bin/chmod";
+my $PW         = "/usr/sbin/pw";
+my $NEWALIASES = "/usr/bin/newaliases";
+
+#
+# Some files we edit/create
+#
+my $RCCONF          = "/etc/rc.conf";
+my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
+my $ALIASES_FILE    = "/etc/mail/aliases";
+my $EXPORTS_FILE    = "/etc/exports";
+my $EXPORTS_HEAD    = "$EXPORTS_FILE.head";
+my $SYSLOG_CONF     = "/etc/syslog.conf";
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+my $SUDOERS         = "/usr/local/etc/sudoers";
+
+#
+# Some directories we care about
+#
+my $LIST_DIR   = "/etc/mail/lists";
+my $TIPLOG_DIR = "/var/log/tiplogs";
+
+#
+# And some lists that we use
+#
+my @LOCAL_HOSTS       = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
+my @LOGFILES          = ("/var/log/logins","/var/log/tiplogs/capture.log",
+    "/var/log/mountd.log");
+my @MAILING_LIST_NAMES = map { /^([\w-]+)\@/ } @MAILING_LISTS;
+my @TESTBED_DIRS       = ($PREFIX,"/users","/proj","/groups");
 
 #
 # Make sure they know what they're getting into...
 #
-warn "WARNING: This script is ONLY intended to be run on a machine that is\n";
-warn "being set up as a dedicated ops node. Continue? [y/N]\n";
+print STDERR "WARNING: This script is ONLY intended to be run on a machine\n";
+print STDERR "that is being set up as a dedicated ops node. Continue? [y/N] ";
 my $response = <>;
 die "Installation aborted!\n" unless ($response =~ /^y/i);
 
@@ -46,229 +88,198 @@ if ($UID != 0) {
 }
 
 #
-# Create the tbadmin group
+# The phases are fairly self-explanatory
 #
-print "Creating tbadmin group ...\n";
 
-#
-# We don't want to fail if pw fails - we want to be able to run this script
-# mutliple times
-#
-system "/usr/sbin/pw groupadd tbadmin -g 101 -q";
-
-#
-# Make sure that they have all the proper directories created, and chmod 'em
-# to the proper thing.
-#
-print "Setting up directories ...\n";
-my @testbeddirs = ($PREFIX,"/users","/proj","/groups");
-foreach my $dir (@testbeddirs) {
-    if (-d $dir) {
-	system "/usr/bin/chgrp tbadmin $dir" and
-	    die "Unable to chgrp $dir!\n";
-	chmod 0775, $dir or die "Unable to chmod $dir : $!\n";
-    } else {
-	die "ERROR - Directory $dir has not yet been created - please see\n",
-	    "Step 0 in doc/setup-ops.txt\n";
+Phase "groups", "Creating admin group", sub {
+    if (getgrnam("tbadmin")) {
+	PhaseSkip("tbadmin group already exists");
     }
-}
+    ExecQuietFatal("$PW groupadd tbadmin -g 101");
+};
 
-#
-# Add stuff to /etc/rc.conf
-#
-print "Editing /etc/rc.conf ... \n";
-open(RC,"+</etc/rc.conf") or die "Unable to open /etc/rc.conf: $!\n";
-
-#
-# See if we've already done this
-#
-if (grep /testbed installation/,<RC>) {
-    print "    Already done, skipping\n";
-} else {
-    print RC "\n# The following lines were added by the testbed installation ".
-    	"process\n";
-    print RC "sendmail_enable=\"YES\"\n";
-    print RC "nfs_server_enable=\"YES\"\n";
-    print RC "nfs_server_flags=\"-u -t -n 16\"\n";
-    print RC "syslogd_flags=\"\"\n";
-    print RC "# End of testbed section\n";
-}
-close RC;
-
-#
-# Set up sendmail
-#
-print "Setting up sendmail ...\n";
-
-#
-# Tell sendmail which hosts it's supposed to receive mail for
-#
-my $local_hostnames = "/etc/mail/local-host-names";
-print "    Setting up $local_hostnames ...\n";
-if (-e $local_hostnames) {
-    print "        $local_hostnames already exists, skipping\n";
-} else {
-    open(LHN,">$local_hostnames") or die "Unable to open $local_hostnames : $!\n";
-    my @hostnames = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
-    print LHN map "$_\n",@hostnames;
-    close LHN;
-}
-
-#
-# Create the directory for auto-generated lists
-#
-my $lists_dir = "/etc/mail/lists";
-print "    Creating $lists_dir ...\n";
-if (-d $lists_dir) {
-    print "        $lists_dir already exists, skipping\n";
-} else {
-    mkdir($lists_dir,0755) or die "Unable to make $lists_dir : $!\n";
-}
-
-#
-# Find lists that are to be hosted on this machine - put them in the aliases
-# file, and make a file to put the addresses in
-#
-print "    Creating mailing lists ...";
-@mailing_lists = grep /\@$OURDOMAIN$/, @mailing_lists;
-open(MA,">>/etc/mail/aliases") or die "Unable to open /etc/mail/aliases: $!\n";
-foreach $list (@mailing_lists) {
-    $list =~ /^([\w-]+)\@/;
-    my $list_name = $1;
-    if (!$list_name) {
-	die "Malformed email address: $list\n";
+Phase "dirs", "Setting directory permissions", sub {
+    foreach my $dir (@TESTBED_DIRS) {
+	Phase $dir, $dir, sub {
+	    if (!-d $dir) {
+		PhaseFail("Directory $dir does not exist");
+	    }
+	    my ($mode,$group) = (stat($dir))[2,5];
+	    # Fix up the mode (strip file type)
+	    $mode = $mode & 0777;
+	    if ($mode == 0775 && $group eq getgrnam("tbadmin")) {
+		PhaseSkip("Already done");
+	    }
+	    ExecQuietFatal("$CHGRP tbadmin $dir");
+	    ExecQuietFatal("$CHMOD 0775 $dir");
+	};
     }
-    if (-e "$lists_dir/$list_name") {
-	next;
-    }
-    system "touch $lists_dir/$list_name" and die
-	"Unable to create $lists_dir/$list_name";
-    print MA "$list_name:\t:include:$lists_dir/$list_name\n";
-}
-close MA;
+};
 
-if (@mailing_lists) {
-    print "    Running newaliases ...\n";
-    system "newaliases" and die "Error running newaliases!\n";
-}
+Phase "rc.conf", "Adding testbed content to rc.conf", sub {
+    DoneIfEdited($RCCONF);
+    AppendToFileFatal($RCCONF,
+		      qq|sendmail_enable   = "YES"|,
+		      qq|nfs_server_enable = "YES"|,
+		      qq|nfs_server_flags  = "-u -t -n 16"|,
+		      qq|syslogd_flags     = ""|);
+};
 
-#
-# Set up exports
-#
-print "Creating /etc/exports.head ...\n";
-if (-e "/etc/exports.head") {
-    print "    Already done, skipping\n";
-} else {
-    #
-    # Figure out which of these directories are on the same
-    # filesystems
-    #
-    my @dirs = ('/users','/groups','/proj','/var');
-    @dirs = map {`realpath $_`} @dirs;
-    chomp @dirs;
-    my %filesystems;
-    foreach my $dir (@dirs) {
-	my ($dev,@junk) = stat $dir;
-	push @{$filesystems{$dev}}, $dir;
-    }
-    
-    #
-    # Now, make the exports entries
-    #
-    open(EX,">>/etc/exports.head") or die
-	"Unable to open /etc/exports.head: $!\n";
-    foreach my $key (keys %filesystems) {
-	print EX join(" ",@{$filesystems{$key}}), "\t$BOSSNODE -alldirs -maproot=root\n";
-    }
-    close EX;
-    system "cp /etc/exports.head /etc/exports" and die
-    	"Unable to copy /etc/exports.head to /etc/exports\n";
-}
+Phase "sendmail","Configuring sendmail", sub {
+    Phase "localhosts", "Setting up $LOCAL_HOSTNAMES", sub {
+	DoneIfExists($LOCAL_HOSTNAMES);
+	CreateFileFatal($LOCAL_HOSTNAMES,@LOCAL_HOSTS);
+    };
+    Phase "maillists", "Setting up mailing lists", sub {
+	Phase "listdir", "Creating $LIST_DIR", sub { 
+	    DoneIfExists($LIST_DIR);
+	    mkdir($LIST_DIR,0755) or
+		PhaseFail("Unable to create $LIST_DIR: $!");
+	};
+	Phase "listfiles", "Creating mailing list files", sub {
+	    foreach my $list (@MAILING_LIST_NAMES) {
+		Phase $list, $list, sub {
+		    DoneIfExists("$LIST_DIR/$list");
+		    CreateFileFatal("$LIST_DIR/$list");
+		};
+	    }
+	};
+	Phase "aliases", "Adding lists to $ALIASES_FILE", sub {
+	    DoneIfEdited($ALIASES_FILE);
+	    AppendToFileFatal($ALIASES_FILE,
+		map("$_:\t:include:$LIST_DIR/$_",@MAILING_LIST_NAMES));
+	};
+	Phase "newaliases", "Running newaliases", sub {
+	    PhaseSkip("No new aliases") unless @MAILING_LISTS;
+	    PhaseSkip("No new aliases") if PhaseWasSkipped("aliases");
+	    ExecQuietFatal($NEWALIASES);
+	};
+    };
+};
+
+
+Phase "exports", "Setting up exports", sub {
+    Phase "ex.head", "Creating $EXPORTS_HEAD", sub {
+	DoneIfExists($EXPORTS_HEAD);
+
+	#
+	# Figure out which of these directories are on the same
+	# filesystems
+	#
+	my @dirs = ('/users','/groups','/proj','/var');
+	@dirs = map {`realpath $_`} @dirs;
+	chomp @dirs;
+	my %filesystems;
+	foreach my $dir (@dirs) {
+	    my ($dev,@junk) = stat $dir;
+	    push @{$filesystems{$dev}}, $dir;
+	}
+
+	#
+	# Use that knowledge to create lines for /etc/exports.head
+	#
+	my @exports_lines;
+	foreach my $key (keys %filesystems) {
+	    push @exports_lines,
+		join(" ",@{$filesystems{$key}}) . "\t$BOSSNODE -alldirs -maproot=root";
+	}
+
+	#
+	# Put them in exports.head, and copy that to /etc/exports
+	#
+	CreateFileFatal($EXPORTS_HEAD, @exports_lines);
+	ExecQuietFatal("cp $EXPORTS_HEAD $EXPORTS_FILE");
+    };
+
+    Phase "mountd", "HUPing mountd", sub {
+	PhaseSkip("No new exports file") if PhaseWasSkipped("ex.head");
+	PhaseSkip("mountd not running") unless `ps -auxw | grep mountd | grep -v grep`;
+	ExecQuietFatal("killall -HUP mountd");
+    };
+};
 
 #
 # Set up syslog
 #
-print "Setting up syslog ...\n";
-print "    Editing /etc/syslog.conf\n";
-open(SC,"+</etc/syslog.conf") or die "Unable to open /etc/syslog.conf: $!\n";
-#
-# See if we've already done this
-#
-my @sc = <SC>;
-if (grep /testbed installation/, @sc) {
-    print "        Already done, skipping\n";
-} else {
-    # Make sure we can find what we're looking for before we clobber
-    # the file!
-    if (scalar(grep(/^cron/, @sc)) != 1) {
-	die "Unable to find marker in /etc/syslog.conf!\n";
-    }
-    # Clobber and re-write
-    seek(SC,0,0);
-    truncate(SC,0);
-
-    #
-    # Find the ftp line, after which we place our auth.info line
-    #
-    foreach my $line (@sc) {
-	print SC $line;
-	if ($line =~ /^cron/) {
-	    print SC "# The following line was added by the testbed " .
-		"installation process\n";
-	    print SC "auth.info\t\t\t\t\t/var/log/logins\n";
+Phase "syslog", "Setting up syslog", sub {
+    Phase "sysconf", "Editing $SYSLOG_CONF", sub {
+	DoneIfEdited($SYSLOG_CONF);
+	
+	#
+	# Can't just append to this file, unfortunately. Have to put some of
+	# the lines in the middle of the file
+	#
+	open(SC,"+<$SYSLOG_CONF") or
+	    PhaseFail("Unable to open $SYSLOG_CONF : $!");
+	my @sc = <SC>;
+	if (scalar(grep(/^cron/, @sc)) != 1) {
+	    PhaseFail("Unable to find marker in /etc/syslog.conf!");
 	}
-    }
 
-    #
-    # Put a few more lines at the end
-    #
-    print SC "# The following line was added by the testbed installation ".
-	"process\n";
-    print SC "!capture\n";
-    print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
-    print SC "!mountd\n";
-    print SC "*.*\t\t\t\t\t\t/var/log/mountd.log\n";
-}
-close SC;
+	#
+	# Clobber and re-write
+	#
+	seek(SC,0,0);
+	truncate(SC,0);
 
-my $tiplog_dir = "/var/log/tiplogs";
-print "    Creating $tiplog_dir ...\n";
-if (-d $tiplog_dir) {
-    print "        $tiplog_dir already exists, skipping\n";
-} else {
-    mkdir($tiplog_dir,0755) or die "Unable to make $tiplog_dir : $!\n";
-}
+	#
+	# Find the cron line, after which we place our auth.info line
+	#
+	foreach my $line (@sc) {
+	    print SC $line;
+	    if ($line =~ /^cron/) {
+		print SC "# " . MAGIC_TESTBED_START . "\n";
+		print SC "auth.info\t\t\t\t\t/var/log/logins\n";
+		print SC "# " . MAGIC_TESTBED_END . "\n";
+	    }
+	}
 
-print "    Creatings logs ...\n";
-my @logfiles = ("/var/log/logins","/var/log/tiplogs/capture.log",
-    "/var/log/mountd.log");
-foreach my $logfile (@logfiles) {
-    system "touch $logfile" and die "Unable to create $logfile!\n";
-    chmod 0640, $logfile or die "Unable to change permissions on $logfile!\n";
-}
+	#
+	# Put a few more lines at the end
+	#
+	print SC "# " . MAGIC_TESTBED_START . "\n";
+	print SC "!capture\n";
+	print SC "*.*\t\t\t\t\t\t/var/log/tiplogs/capture.log\n";
+	print SC "!mountd\n";
+	print SC "*.*\t\t\t\t\t\t/var/log/mountd.log\n";
+	print SC "# " . MAGIC_TESTBED_END . "\n";
+	close SC;
+    };
 
-print "    Editing /etc/newsyslog.conf ...\n";
-open(NS,"+</etc/newsyslog.conf") or die "Unable to open /etc/newsyslog.conf: $!\n";
-#
-# See if we've already done this
-#
-if (grep /testbed installation/,<NS>) {
-    print "        Already done, skipping\n";
-} else {
-    print NS "\n# The following lines were added by the testbed installation ".
-    	"process\n";
-    print NS "/var/log/logins\t\t\t\t640  7     200 *      Z\n";
-    print NS "/var/log/mountd.log\t\t\t640  5     200 *      Z\n";
-    print NS "/var/log/tiplogs/capture.log\t\t644  7     *    168   Z\n";
-}
-close NS;
+    Phase "tiplog", "Creating $TIPLOG_DIR", sub {
+	DoneIfExists($TIPLOG_DIR);
+	mkdir($TIPLOG_DIR,0755) or PhaseFail("Unable to make $TIPLOG_DIR : $!");
+    };
+    
+    Phase "logfiles", "Creating log files", sub {
+	foreach my $logfile (@LOGFILES) {
+	    Phase $logfile, $logfile, sub {
+		DoneIfExists($logfile);
+		CreateFileFatal($logfile);
+		ExecQuietFatal("$CHMOD 640 $logfile");
+	    };
+	}
+    };
+
+    Phase "newsyslog", "Setting up $NEWSYSLOG_CONF", sub {
+	DoneIfEdited($NEWSYSLOG_CONF);
+	AppendToFileFatal($NEWSYSLOG_CONF,
+	    "/var/log/logins\t\t\t\t640  7     200 *      Z",
+	    "/var/log/mountd.log\t\t\t640  5     200 *      Z",
+	    "/var/log/tiplogs/capture.log\t\t644  7     *    168   Z");
+    };
+};
+
+Phase "sudoers", "Editing $SUDOERS", sub {
+    DoneIfEdited($SUDOERS);
+    AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
+};
 
 print "----------------------------------------------------------------------\n";
 print "Installation completed succesfully!\n";
 print "Please reboot this machine before proceeding with boss setup\n";
-if (@mailing_lists) {
+if (!PhaseWasSkipped("maillists")) {
     print "Local mailing lists have been created, with no members, in\n";
-    print "/etc/mail/lists/ . Please add members to the following lists:\n";
-    print map "$_\n", @mailing_lists;
+    print "$LIST_DIR . Please add members to the following lists:\n";
+    print map "$_\n", @MAILING_LISTS;
 }
-exit 0;
