@@ -5,13 +5,15 @@ use Fcntl ':flock';
 #
 # Insert new version of testbed emails lists into place on operations node.
 # The single argument indicates which list is being piped into the script
-# from the control node. 
+# from the control node. We create a new alias in the aliases file as well.
 #
-# usage: genelists.proxy [-all | -active]
+# NB: We do not prune dead lists yet.
+#
+# usage: genelists.proxy <list name>
 #
 sub usage() {
-    print STDOUT "Usage: genelists.proxy [-all | -active]\n".
-	"Generate the email list files after things change\n";
+    print STDOUT "Usage: genelists.proxy <list name>\n".
+	"Generate email list file after things change!\n";
     exit(-1);
 }
 
@@ -20,17 +22,19 @@ sub usage() {
 #
 my $TBOPS       = "@TBOPSEMAIL@";
 
-my $maildir     = "/etc/mail/lists";
-my $tempfile    = "$maildir/tempfile.$$";
-my $alllist     = "$maildir/testbed-users";
-my $activelist  = "$maildir/testbed-active-users";
+my $maildir     = "/etc/mail";
+my $listdir     = "$maildir/lists";
+my $tempfile    = "$listdir/tempfile.$$";
+my $aliasfile   = "$maildir/aliases";
+my $listname;
 my $thelist;
 
 #
 # We don't want to run this script unless its the real version.
 #
 if ($UID != 0) {
-    die("Must be root!");
+    die("*** $0:\n".
+	"    Must be root!\n");
 }
 
 # un-taint path
@@ -46,15 +50,21 @@ $| = 1;
 use lib "@prefix@/lib";
 use libtestbed;
 
-if (@ARGV != 1 || ($ARGV[0] ne "-all" && $ARGV[0] ne "-active")) {
+if (@ARGV != 1) {
     usage();
 }
-if ($ARGV[0] eq "-active") {
-    $thelist = $activelist;
+$listname = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+if ($listname =~ /^([-\@\w]+)$/) {
+    $listname = $1;
 }
 else {
-    $thelist = $alllist;
+    die("Tainted argument $listname!\n");
 }
+$thelist = "$listdir/$listname";
 
 #
 # Take our input and write it to the temp file.
@@ -73,12 +83,32 @@ chmod(0644, $tempfile);
 system("/bin/mv $tempfile $thelist") == 0 ||
     fatal("Could not move $tempfile to $thelist: $!");
 
+#
+# See if the aliases exists in the alias file. If not, append it and
+# rebuild with newaliases.
+#
+if (system("egrep -q -s '^${listname}:' $aliasfile")) {
+    print "Adding new alias $listname to aliases file\n";
+
+    open(ALIASES, ">>$aliasfile") or
+	fatal("opening $aliasfile to append new alias: $!");
+
+    printf ALIASES "%-24s%s\n", "${listname}:", ":include:${thelist}";
+
+    close(ALIASES) or
+	fatal("Could not close $aliasfile after modification: $!");
+
+    system("newaliases") == 0 or
+	fatal("Could not rebuild the aliases database!");
+}
+
 exit(0);
 
 sub fatal {
     local($msg) = $_[0];
 
     SENDMAIL($TBOPS, "genelists.proxy failure", $msg);
-    die($msg);
+    die("*** $0:\n".
+	"    $msg\n");
 }
 

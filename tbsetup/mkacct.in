@@ -177,7 +177,7 @@ $UID = $EUID;
 # this command must be run when EUID==UID==0 because its a setuid
 # PERL script.
 #
-system("$GENELISTS");
+system("$GENELISTS -n $user");
 
 #
 # Make user on local. We don't give them a password since they are not
