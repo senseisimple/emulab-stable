@@ -174,7 +174,7 @@ $args .=  " -x START";
 $args .= " STARTAT=1 STOPAT=3"
     if ($quick);
 $args .= " DEBUG=$debug"
-    if (defined($debug));
+    if ($debug);
 
 system($args);
 if ($?) {
@@ -186,7 +186,7 @@ print "Linktest in progress...\n";
 print "Quick termination requested.\n"
     if ($quick);
 print "Debug mode requested.\n"
-    if (defined($debug));
+    if ($debug);
 
 # wait for the shutdown event.
 $args = starter();
