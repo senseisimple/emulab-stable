@@ -300,10 +300,17 @@ int main(int argc, char *argv[])
 		    vmc_config.cameras.cameras_val[lpc].hostname;
 		vmc_clients[vmc_client_count].vc_port =
 		    vmc_config.cameras.cameras_val[lpc].port;
-		vmc_clients[vmc_client_count].vc_left = FLT_MAX;
-		vmc_clients[vmc_client_count].vc_top = FLT_MAX;
-		vmc_clients[vmc_client_count].vc_right = 0;
-		vmc_clients[vmc_client_count].vc_bottom = 0;
+		vmc_clients[vmc_client_count].vc_left =
+		    vmc_config.cameras.cameras_val[lpc].x;
+		vmc_clients[vmc_client_count].vc_top = 
+		    vmc_config.cameras.cameras_val[lpc].y;
+		vmc_clients[vmc_client_count].vc_right =
+		    vmc_config.cameras.cameras_val[lpc].x +
+		    vmc_config.cameras.cameras_val[lpc].width;
+		vmc_clients[vmc_client_count].vc_bottom =
+		    vmc_config.cameras.cameras_val[lpc].y +
+		    vmc_config.cameras.cameras_val[lpc].height;
+
 		vmc_client_count += 1;
 		
                 info(" camera[%d] = %s:%d\n",
