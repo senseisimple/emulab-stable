@@ -2553,3 +2553,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table obstacles add label tinytext;
 	alter table obstacles add draw tinyint(1) NOT NULL default '0';
+
+1.325: Add a wikionly boolean to the users table.
+
+	alter table users add wikionly tinyint(1) default '0';
+

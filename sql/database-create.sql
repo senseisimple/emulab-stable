@@ -1858,6 +1858,7 @@ CREATE TABLE users (
   chpasswd_key varchar(32) default NULL,
   chpasswd_expires int(10) unsigned NOT NULL default '0',
   wikiname tinytext,
+  wikionly tinyint(1) default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)
