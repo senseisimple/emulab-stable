@@ -83,6 +83,7 @@ my $SSH_CONFIG      = "/etc/ssh/ssh_config";
 # Some directories we care about
 #
 my $LOGDIR       = "$PREFIX/log";
+my $MYSQL_LOGDIR = "$LOGDIR/mysql";
 my $RCDIR        = "/usr/local/etc/rc.d";
 my $USERSVAR_DIR = "$PREFIX/usersvar";
 my $PORTSDIR     = "/usr/ports/misc";
@@ -389,8 +390,14 @@ Phase "syslog", "Setting up syslog", sub {
 
     Phase "logdir", "Creating log directory", sub {
 	DoneIfExists($LOGDIR);
-	mkdir $LOGDIR, 0770 or PhaseFail("Unable to create $LOGDIR : $!");
+	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $LOGDIR : $!");
 	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
+    };
+
+    Phase "logdir", "Creating mysql log directory", sub {
+	DoneIfExists($MYSQL_LOGDIR);
+	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
+	ExecQuietFatal("$CHGRP mysql:mysql $LOGDIR");
     };
 
     Phase "logfiles", "Creating log files", sub {
