@@ -57,7 +57,8 @@ proc var_import {varspec} {
 proc perror {msg} {
     var_import ::GLOBALS::errors 
     global argv0
-    puts stderr "$argv0: *** $msg"
+    puts stderr "*** $argv0: "
+    puts stderr "    $msg"
     set errors 1
 }
 
