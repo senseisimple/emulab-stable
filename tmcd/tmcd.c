@@ -51,6 +51,7 @@
 #define DEFAULT_DBNAME	TBDBNAME
 
 int		debug = 0;
+static int	insecure = 0;
 static int	portnum = TBSERVER_PORT;
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
@@ -85,7 +86,8 @@ static event_handle_t	event_handle = NULL;
  */
 #define COMMAND_PROTOTYPE(x) \
 	static int \
-	x(int sock, char *nodeid, char *rdata, int tcp, int vers)
+	x(int sock, char *nodeid, char *rdata, int tcp, \
+	  int islocal, char *nodetype, int vers)
 
 COMMAND_PROTOTYPE(doreboot);
 COMMAND_PROTOTYPE(dostatus);
@@ -116,7 +118,7 @@ COMMAND_PROTOTYPE(doisalive);
 
 struct command {
 	char	*cmdname;
-	int    (*func)(int, char *, char *, int, int);
+	int    (*func)(int, char *, char *, int, int, char *, int);
 } command_array[] = {
 	{ "reboot",	doreboot },
 	{ "status",	dostatus },
@@ -191,7 +193,7 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	extern char		build_info[];
 
-	while ((ch = getopt(argc, argv, "dp:c:")) != -1)
+	while ((ch = getopt(argc, argv, "dp:c:X")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
@@ -202,6 +204,11 @@ main(int argc, char **argv)
 		case 'c':
 			maxchildren = atoi(optarg);
 			break;
+#ifdef LBS
+		case 'X':
+			insecure = 1;
+			break;
+#endif
 		case 'h':
 		case '?':
 		default:
@@ -575,11 +582,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			/*
 			 * Simple "isalive" support for remote nodes.
 			 */
-			doisalive(sock, nodeid, rdata, istcp, version);
+			doisalive(sock, nodeid, rdata, istcp,
+				  islocal, type, version);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
-		goto skipit;
+		if (!insecure)
+			goto skipit;
 	}
 #else
 	/*
@@ -590,11 +599,13 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 			/*
 			 * Simple "isup" daemon support!
 			 */
-			doisalive(sock, nodeid, rdata, istcp, version);
+			doisalive(sock, nodeid, rdata, istcp,
+				  islocal, type, version);
 			goto skipit;
 		}
 		error("%s: Remote node connected without SSL!\n", nodeid);
-		goto skipit;
+		if (!insecure)
+			goto skipit;
 	}
 #endif
 	/*
@@ -639,7 +650,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		info("%s: vers:%d %s %s %s\n", nodeid, version,
 		     istcp ? "TCP" : "UDP", cp, command_array[i].cmdname);
 
-	err = command_array[i].func(sock, nodeid, rdata, istcp, version);
+	err = command_array[i].func(sock, nodeid, rdata, istcp,
+				    islocal, type, version);
 
 	if (err)
 		info("%s: %s: returned %d\n",
@@ -891,7 +903,7 @@ COMMAND_PROTOTYPE(doaccounts)
 	char		gid[64];
 	char		buf[MYBUFSIZE];
 	int		nrows, gidint;
-	int		shared = 0, tbadmin;
+	int		tbadmin;
 
 	if (! tcp) {
 		error("ACCOUNTS: %s: Cannot give account info out over UDP!\n",
@@ -907,26 +919,30 @@ COMMAND_PROTOTYPE(doaccounts)
 		return 1;
 	}
 
-#ifdef  NOSHAREDEXPTS
-	/*
-	 * We have the pid name, but we need the GID number from the
-	 * projects table to send over. 
+        /*
+	 * We need the unix GID and unix name for each group in the project.
 	 */
-	res = mydb_query("select unix_name,unix_gid from groups "
-			 "where pid='%s'",
-			 2, pid);
-#else
-	/*
-	 * Get a list of gid/unix_gid for each group that is allowed
-	 * access to the experiments nodes. This is the owner of the
-	 * node, plus the additional pids granted access. 
-	 */
-	res = mydb_query("select g.unix_name,g.unix_gid from groups as g "
-			 "left join exppid_access as a on g.pid=a.pid "
-			 "where g.pid='%s' or "
-			 "      (a.exp_pid='%s' and a.exp_eid='%s')",
-			 2, pid, pid, eid);
-#endif
+	if (islocal) {
+		res = mydb_query("select unix_name,unix_gid from groups "
+				 "where pid='%s'",
+				 2, pid);
+	}
+	else {
+		/*
+		 * XXX
+		 * Temporary hack until we figure out the right model for
+		 * remote nodes. For now, we use the pcremote-ok slot in
+		 * in the project table to determine what remote nodes are
+		 * okay'ed for the project. If connecting node type is in
+		 * that list, then return all of the project groups, for
+		 * each project that is allowed to get accounts on the type.
+		 */
+		res = mydb_query("select g.unix_name,g.unix_gid "
+				 "  from projects as p "
+				 "left join groups as g on p.pid=g.pid "
+				 "where FIND_IN_SET('%s',pcremote_ok)>0",
+				 2, nodetype);
+	}
 	if (!res) {
 		error("ACCOUNTS: %s: DB Error getting gids!\n", pid);
 		return 1;
@@ -971,76 +987,73 @@ COMMAND_PROTOTYPE(doaccounts)
 	/*
 	 * Now onto the users in the project.
 	 */
-#ifdef  NOSHAREDEXPTS
-	res = mydb_query("select distinct "
-			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "  p.trust,p.pid,p.gid,g.unix_gid,u.admin, "
-			 "  u.emulab_pubkey,u.home_pubkey "
-			 "from users as u "
-			 "left join group_membership as p on p.uid=u.uid "
-			 "left join groups as g on p.pid=g.pid "
-			 "where p.pid='%s' and p.gid='%s' "
-			 "      and u.status='active' order by u.uid",
-			 11, pid, eid, pid, gid);
-#else
-	/*
-	 * See if a shared experiment. Used below.
-	 */
-	res = mydb_query("select shared from experiments "
-			 "where pid='%s' and eid='%s'",
-			 1, pid, eid);
-	
-	if (!res) {
-		error("ACCOUNTS: %s: DB Error getting shared!\n", pid);
-		return 1;
-	}
-
-	if ((nrows = (int)mysql_num_rows(res)) == 0) {
-		error("ACCOUNTS: %s: No Experiment %s!\n", pid, eid);
-		mysql_free_result(res);
-		return 0;
-	}
-	row = mysql_fetch_row(res);
-	shared = atoi(row[0]);
-	mysql_free_result(res);
-	
-	/*
-	 * This crazy join is going to give us multiple lines for each
-	 * user that is allowed on the node, where each line (for each user)
-	 * differs by the project PID and it unix GID. The intent is to
-	 * build up a list of GIDs for each user to return. Well, a primary
-	 * group and a list of aux groups for that user. It might be cleaner
-	 * to do this as multiple querys, but this makes it atomic.
-	 */
-	if (strcmp(pid, gid)) {
-		res = mydb_query("select distinct "
-			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
-			 "  u.emulab_pubkey,u.home_pubkey, "
-			 "  UNIX_TIMESTAMP(u.usr_modified) "
-			 "from users as u "
-			 "left join group_membership as p on p.uid=u.uid "
-			 "left join groups as g on p.pid=g.pid "
-			 "where ((p.pid='%s' and p.gid='%s')) "
-			 "      and p.trust!='none' "
-			 "      and u.status='active' order by u.uid",
-			 12, pid, gid);
+	if (islocal) {
+		/*
+		 * This crazy join is going to give us multiple lines for
+		 * each user that is allowed on the node, where each line
+		 * (for each user) differs by the project PID and it unix
+		 * GID. The intent is to build up a list of GIDs for each
+		 * user to return. Well, a primary group and a list of aux
+		 * groups for that user. It might be cleaner to do this as
+		 * multiple querys, but this makes it atomic.
+		 */
+		if (strcmp(pid, gid)) {
+			res = mydb_query("select distinct "
+			     "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+			     "  u.emulab_pubkey,u.home_pubkey, "
+			     "  UNIX_TIMESTAMP(u.usr_modified) "
+			     "from users as u "
+			     "left join group_membership as p on p.uid=u.uid "
+			     "left join groups as g on p.pid=g.pid "
+			     "where ((p.pid='%s' and p.gid='%s')) "
+			     "      and p.trust!='none' "
+			     "      and u.status='active' order by u.uid",
+			     12, pid, gid);
+		}
+		else {
+			res = mydb_query("select distinct "
+			     "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+			     "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+			     "  u.emulab_pubkey,u.home_pubkey, "
+			     "  UNIX_TIMESTAMP(u.usr_modified) "
+			     "from users as u "
+			     "left join group_membership as p on p.uid=u.uid "
+			     "left join groups as g on "
+			     "     p.pid=g.pid and p.gid=g.gid "
+			     "where ((p.pid='%s')) and p.trust!='none' "
+			     "      and u.status='active' order by u.uid",
+			     12, pid);
+		}
 	}
 	else {
-		res = mydb_query("select distinct "
-			 "  u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
-			 "  p.trust,g.pid,g.gid,g.unix_gid,u.admin, "
-			 "  u.emulab_pubkey,u.home_pubkey, "
-			 "  UNIX_TIMESTAMP(u.usr_modified) "
-			 "from users as u "
-			 "left join group_membership as p on p.uid=u.uid "
-			 "left join groups as g on "
-			 "     p.pid=g.pid and p.gid=g.gid "
-			 "where ((p.pid='%s')) and p.trust!='none' "
-			 "      and u.status='active' order by u.uid",
-			 12, pid);
+		/*
+		 * XXX
+		 * Temporary hack until we figure out the right model for
+		 * remote nodes. For now, we use the pcremote-ok slot in
+		 * in the project table to determine what remote nodes are
+		 * okay'ed for the project. If connecting node type is in
+		 * that list, then return user info for all of the users
+		 * in those projects (crossed with group in the project). 
+		 */
+		res = mydb_query("select distinct  "
+				 "u.uid,u.usr_pswd,u.unix_uid,u.usr_name, "
+				 "m.trust,g.pid,g.gid,g.unix_gid,u.admin, "
+				 "u.emulab_pubkey,u.home_pubkey, "
+				 "UNIX_TIMESTAMP(u.usr_modified) "
+				 "from projects as p "
+				 "left join group_membership as m "
+				 "  on m.pid=p.pid "
+				 "left join groups as g on "
+				 "  g.pid=m.pid and g.gid=m.gid "
+				 "left join users as u on u.uid=m.uid "
+				 "where FIND_IN_SET('%s',pcremote_ok)>0 "
+				 "      and m.trust!='none' "
+				 "      and u.status='active' "
+				 "order by u.uid",
+				 12, nodetype);
 	}
-#endif
+
 	if (!res) {
 		error("ACCOUNTS: %s: DB Error getting users!\n", pid);
 		return 1;
@@ -1127,13 +1140,6 @@ COMMAND_PROTOTYPE(doaccounts)
 			if (i < gcount-1)
 				strcat(glist, ",");
 		}
-
-		/*
-		 * Override root when a shared experiment, except for
-		 * TB admin people.
-		 */
-		if (shared && !tbadmin)
-			root = 0;
 
 		if (vers < 4) {
 			sprintf(buf,
@@ -1316,7 +1322,8 @@ COMMAND_PROTOTYPE(dohostsV2)
 	/*
 	 * This will go away. Ignore version and assume latest.
 	 */
-	return(dohosts(sock, nodeid, rdata, tcp, CURRENT_VERSION));
+	return(dohosts(sock, nodeid, rdata, tcp, islocal,
+		       nodetype, CURRENT_VERSION));
 }
 
 COMMAND_PROTOTYPE(dohosts)
