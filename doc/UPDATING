@@ -254,7 +254,13 @@ earliest time one of the steps needs to occur.
 		cat sql/database-fill-suplement.sql | mysql tbdb
 
         * Create the emulab-ops/opsnode experiment. Do this the same way
-          that hwdown is created in setup-db.txt.
+          that hwdown is created in setup-db.txt. 
+
+          Then go to the experiment information page (in red dot mode)
+          for the emulab-ops/opsnode experiment, and then click on the
+          "Edit Experiment MetaData". In the "Swapping" Section, make
+          sure Idle Ignore is checked, and the other three entries
+          (Swappable, Idle-Swap, Max Duration) are unchecked.
 
 	* Make sure your source tree on ops is updated. Then, from that source
 	  tree, run 'install/newclient -o'. (Note: You will probably have to
