@@ -45,6 +45,8 @@ DOCFILES  = $(wildcard $(SRCDIR)/doc/*.html)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.jpg)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.gif)
 DOCFILES += $(wildcard $(SRCDIR)/doc/*.php3)
+DOCFILES += $(wildcard $(SRCDIR)/doc/*.ps)
+DOCFILES += $(wildcard $(SRCDIR)/doc/*.pdf)
 
 TUTFILES  = $(wildcard $(SRCDIR)/tutorial/*.html)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.jpg)
