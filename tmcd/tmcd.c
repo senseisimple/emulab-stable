@@ -83,10 +83,10 @@ int		mydb_update(char *query, ...);
 static int	safesymlink(char *name1, char *name2);
 
 /* thread support */
-#define MAXCHILDREN	25
+#define MAXCHILDREN	20
 #define MINCHILDREN	5
 static int	numchildren;
-static int	maxchildren = 15;
+static int	maxchildren = 10;
 static volatile int killme;
 
 /*
