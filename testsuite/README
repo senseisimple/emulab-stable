@@ -199,6 +199,30 @@ corrupt the DB.  The user of this option is a matter of taste, as you
 can always use tests/<test>/db.txt to restore the database state.
 
 
+dbdump
+------
+
+dbdump is a utility for constructing the results structure used in
+tb_compare.
+
+	dbdump <database> <query>
+
+the output will be Perl code constructing the an array, @result, which
+matches the result of <query> on DB <database>.  This should be copied
+into the test script and the appropriate tb_compare command inserted
+afterwards:
+
+	tb_compare("<query>",\@result);
+
+Notes: 
+
+Make sure you change " to \" in <query> for the tb_compare statement.
+
+This makes an exact copy.  As such it is inappropriate for information
+that can vary from experiment to experiment such as the
+virtual<->physical mapping.
+
+
 Test Format
 -----------
 
