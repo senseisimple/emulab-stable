@@ -1,73 +1,27 @@
-node CENTER switch
-node switch_3 switch
-node switch_2 switch
-node switch_1 switch
-node switch_0 switch
-node node_3_7 pc
-node node_3_6 pc
-node node_3_5 pc
-node node_3_4 pc
-node node_3_3 pc
-node node_3_2 pc
-node node_3_1 pc
-node node_3_0 pc
-node node_2_7 pc
-node node_2_6 pc
-node node_2_5 pc
-node node_2_4 pc
-node node_2_3 pc
-node node_2_2 pc
-node node_2_1 pc
-node node_2_0 pc
-node node_1_7 pc
-node node_1_6 pc
-node node_1_5 pc
-node node_1_4 pc
-node node_1_3 pc
-node node_1_2 pc
-node node_1_1 pc
-node node_1_0 pc
-node node_0_7 pc
-node node_0_6 pc
-node node_0_5 pc
-node node_0_4 pc
-node node_0_3 pc
-node node_0_2 pc
-node node_0_1 pc
-node node_0_0 pc
-link switch_3 CENTER 400 1
-link switch_2 CENTER 400 1
-link switch_1 CENTER 400 1
-link switch_0 CENTER 400 1
-link node_3_7 switch_3 100 3
-link node_3_6 switch_3 100 3
-link node_3_5 switch_3 100 3
-link node_3_4 switch_3 100 3
-link node_3_3 switch_3 100 3
-link node_3_2 switch_3 100 3
-link node_3_1 switch_3 100 3
-link node_3_0 switch_3 100 3
-link node_2_7 switch_2 100 3
-link node_2_6 switch_2 100 3
-link node_2_5 switch_2 100 3
-link node_2_4 switch_2 100 3
-link node_2_3 switch_2 100 3
-link node_2_2 switch_2 100 3
-link node_2_1 switch_2 100 3
-link node_2_0 switch_2 100 3
-link node_1_7 switch_1 100 3
-link node_1_6 switch_1 100 3
-link node_1_5 switch_1 100 3
-link node_1_4 switch_1 100 3
-link node_1_3 switch_1 100 3
-link node_1_2 switch_1 100 3
-link node_1_1 switch_1 100 3
-link node_1_0 switch_1 100 3
-link node_0_7 switch_0 100 3
-link node_0_6 switch_0 100 3
-link node_0_5 switch_0 100 3
-link node_0_4 switch_0 100 3
-link node_0_3 switch_0 100 3
-link node_0_2 switch_0 100 3
-link node_0_1 switch_0 100 3
-link node_0_0 switch_0 100 3
+node alpha switch
+node beta switch
+node gamma switch
+node delta switch
+node tbpc01 pc:1 delay:2
+node tbpc02 pc:1 delay:2
+node tbpc03 pc:1 delay:2
+node tbpc04 pc:1 delay:2
+node tbpc05 pc:1 delay:2
+node tbpc06 pc:1 delay:2
+node tbpc07 pc:1 delay:2
+node tbpc08 pc:1 delay:2
+node tbpc09 pc:1 delay:2
+node tbpc10 pc:1 delay:2
+link alpha gamma 400 1
+link beta gamma 400 1
+link delta gamma 400 1
+link tbpc01 alpha 100 4
+link tbpc02 alpha 100 4
+link tbpc03 alpha 100 4
+link tbpc04 alpha 100 4
+link tbpc05 alpha 100 4
+link tbpc06 alpha 100 4
+link tbpc07 beta 100 4
+link tbpc08 beta 100 4
+link tbpc09 beta 100 4
+link tbpc10 beta 100 4
