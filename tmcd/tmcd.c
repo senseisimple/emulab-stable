@@ -2481,6 +2481,10 @@ COMMAND_PROTOTYPE(dostate)
 
 	info("%s\n", rdata);
 
+#ifdef LBS
+	return 0;
+#endif
+
 	/*
 	 * Dig out state that the node is reporting
 	 */
