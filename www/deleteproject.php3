@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -27,23 +27,9 @@ if (! $isadmin) {
 
 #
 # Confirm a real project
-# 
-$query_result =
-    DBQueryFatal("SELECT head_uid FROM projects where pid='$pid'");
-if (mysql_num_rows($query_result) == 0) {
+#
+if (! TBValidProject($pid)) {
     USERERROR("No such project '$pid'", 1);
-}
-$row = mysql_fetch_row($query_result);
-$head_uid = $row[0];
-
-#
-# Check user. 
-#
-if (!$isadmin) {
-    if (strcmp($uid, $head_uid)) {
-	USERERROR("Only the project leader or an administrator may ".
-		  "terminate a project!", 1);
-    }
 }
 
 #
@@ -54,16 +40,6 @@ $query_result =
 if (mysql_num_rows($query_result)) {
     USERERROR("Project '$pid' has active experiments. You must terminate ".
 	      "those experiments before you can remove the project!", 1);
-}
-
-#
-# Check to see if there are any groups. Force them to be deleted.
-#
-$query_result =
-    DBQueryFatal("SELECT * FROM groups where pid='$pid' and pid!=gid");
-if (mysql_num_rows($query_result)) {
-    USERERROR("Project '$pid' has active groups. You must delete ".
-	      "those groups before you can remove the project!", 1);
 }
 
 #
@@ -115,47 +91,24 @@ if (!$confirmed_twice) {
     return;
 }
 
-#
-# The group membership table needs to be cleaned.
-#
-$query_result =
-    DBQueryFatal("delete FROM group_membership where pid='$pid'");
+echo "<br>
+      Project '$pid' is being removed!<br><br>
+      This will take a minute or two. <b>Please</b> do not click the Stop
+      button during this time. If you do not receive notification within
+      a reasonable amount of time, please contact $TBMAILADDR.<br>\n";
+flush();
 
 #
 # Remove the project directory and the group.
 #
-SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 0);
-
-#
-# Then the project table itself.
-# 
-$query_result =
-    DBQueryFatal("delete FROM projects where pid='$pid'");
+SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 1);
 
 #
 # Warm fuzzies.
 #
-echo "<center><h2>
-     Project '$pid' has been removed with prejudice!
-     </h2></center>\n";
-
-#
-# Generate an email to the testbed list so we all know what happened.
-#
-$query_result =
-    DBQueryFatal("select usr_name,usr_email FROM users where uid='$uid'");
-if (($row = mysql_fetch_row($query_result)) == 0) {
-    DBFatal("Getting user info for $uid");
-}
-$uid_name  = $row[0];
-$uid_email = $row[1];
-
-TBMAIL($TBMAIL_OPS,
-     "Project $pid removed",
-     "Project '$pid' has been removed by $uid ($uid_name).\n\n".
-     "Please remember to remove the backup directory in /proj\n\n",
-     "From: $uid_name <$uid_email>\n".
-     "Errors-To: $TBMAIL_WWW");
+echo "<br>
+      <b>Done!</b>
+      <br>\n";
 
 #
 # Standard Testbed Footer
