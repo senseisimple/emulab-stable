@@ -1287,10 +1287,10 @@ void HypViewer::hiliteFunc(int x, int y, int shift, int control)
 {
   HypNode *n;
   int picked = doPick(x,y);
-#ifdef WIN32
+#if 0 //#ifdef WIN32
   //TRACE("hiliteFunc %d\n", picked);
   // Kluge around problems with picking nodes on Windows.
-  if (picked < 0 && picked!= -INT_MAX ) picked = -picked;
+  if (picked < 0 && picked != -INT_MAX ) picked = -picked;
 #endif
   if (picked != hiliteNode) {
     n = hg->getNodeFromIndex(hiliteNode);
@@ -1343,9 +1343,9 @@ void HypViewer::pickFunc(int x, int y, int shift, int control)
     //    fprintf(stderr, "total trans %g %g\n", sdx, sdy);
     if (sdx <= .01 && sdx >= -.01 && sdy <= .01 && sdy >= -.01) {
       int picked = doPick(x,y);
-#ifdef WIN32
+#if 0 //#ifdef WIN32
       // Kluge around problems with picking nodes on Windows.
-      if (picked < 0 && picked!= -INT_MAX ) picked = -picked;
+      if (picked < 0 && picked != -INT_MAX ) picked = -picked;
 #endif
       if (picked >= 0) {
 	// got a node
