@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -117,7 +117,9 @@ ntfs_read_data_attr(ntfs_attr *na)
 		assert(tmp != 0 && "Not supposed to happen error!  "
 		       "Either na->data_size is wrong or there is another "
 		       "problem");
+#ifndef linux
 		assert(tmp % secsize == 0 && "Not supposed to happen");
+#endif
 		pos += tmp;
 	}
 #if 0 /*Turn on if you want to look at the free list directly*/
