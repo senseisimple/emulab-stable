@@ -470,7 +470,7 @@ while (1) {
     # Run assign
     $fail = 0;
     my $cmdargs = "$ptopfile $topfile";
-    $cmdargs = "-Pod $cmdargs"
+    $cmdargs = "-Pop $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
     if (system("assign $cmdargs > assign.log") < 0) {
