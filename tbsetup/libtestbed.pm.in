@@ -13,7 +13,7 @@ use Exporter;
 @EXPORT =
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
 	 TBMakeLogname TB_BOSSNODE TB_OPSEMAIL TBGenSecretKey TBDebugTimeStamp
-	 TBDebugTimeStampsOn TBForkCmd);
+	 TBDebugTimeStampsOn TBForkCmd TB_BOSSEVENTPORT TB_EVENTSERVER);
 
 # After package decl.
 use English;
@@ -36,6 +36,10 @@ sub TB_BOSSNODE()	{ $BOSSNODE; }
 
 # Testbed ops email address
 sub TB_OPSEMAIL()	{ $TBOPSEMAIL; }
+
+# This is for the swigged event library which includes this file.
+sub TB_BOSSEVENTPORT()  { "@BOSSEVENTPORT@"; }
+sub TB_EVENTSERVER()    { "@EVENTSERVER@"; }
 
 # Untainted scriptname for email below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
