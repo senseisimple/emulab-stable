@@ -36,7 +36,7 @@ RESPONSE_SERVERERROR    = 5
 RESPONSE_TOOBIG         = 6
 
 class EmulabResponse:
-    def __init__(self, code, value=0, output=None):
+    def __init__(self, code, value=0, output=""):
         self.code     = code            # A RESPONSE code
         self.value    = value           # A return value; any valid XML type.
         self.output   = output          # Pithy output to print
