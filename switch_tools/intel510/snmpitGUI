@@ -1,0 +1,323 @@
+#!/usr/local/bin/perl -w
+use strict;
+use Tk;
+
+#Color values
+
+my $main_bg = 'slateblue';
+my $main_abg = 'mediumslateblue';
+my $main_fg = 'white';
+my $btn_bg = 'darkslateblue';
+my $btn_fg = 'white';
+my $btn_abg = 'slateblue';
+my $stat_bg = 'mediumslateblue';
+my $stat_fg = 'white';
+
+#Build the Widgets now
+
+#set up main
+my $main = MainWindow->new();
+$main->title("SnmpIt!");
+$main->configure(-background => $main_bg );
+
+#set up the frames
+my $btn_bar = 
+    $main->Frame(-relief=>'groove',-borderwidth=>3,-background=>$btn_bg,
+		 -foreground=>$btn_fg,-width=>50
+		 )->pack(-side=>'top',-fill=>'x');
+my $area_frm = 
+    $main->Frame(-relief=>'flat',-borderwidth=>3,-background=>$main_bg,
+		 -foreground=>$main_fg,-width=>50
+		 )->pack(-side=>'top',-fill=>'both');
+my $area = 
+    $area_frm->Frame(-relief=>'flat',-borderwidth=>3,-background=>$main_bg,
+		 -foreground=>$main_fg,-width=>50
+		 )->pack(-side=>'top',-fill=>'both');
+my $stat_bar = 
+    $main->Frame(-relief=>'sunken',-borderwidth=>3,-background=>$stat_bg,
+		 -foreground=>$stat_bg,-width=>50
+		 )->pack(-side=>'bottom',-expand=>"1",-fill=>'x');
+
+#set up the buttons
+my $VLAN_btn =
+    $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-background=>$btn_bg,
+		     -activebackground=>$btn_abg,-foreground=>$btn_fg,
+		     -width=>9, -anchor=>'center',-text=>"VLAN Setup",
+		     -command=> \&vlanSetup
+		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+my $port_btn =
+    $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-background=>$btn_bg,
+		     -activebackground=>$btn_abg,-foreground=>$btn_fg,
+		     -width=>8, -anchor=>'center',-text=>"Port Setup",
+		     -command=> \&portSetup
+		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+my $opt_btn =
+    $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-background=>$btn_bg,
+		     -activebackground=>$btn_abg,-foreground=>$btn_fg,
+		     -width=>7, -anchor=>'center',-text=>"Options",
+		     -command=> \&optSetup
+		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+my $exit_btn= 
+    $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-background => $btn_bg,
+		     -activebackground=>$btn_abg,-foreground=>$btn_fg,
+		     -width=>2,-anchor=>'center',-text=>'Exit', 
+		     -command=>sub{$main->destroy}
+		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+
+#set up the status bar
+my $status = 
+    $stat_bar->Label(-background=>$stat_bg,-foreground=>$stat_fg,
+		     -anchor=>'nw'
+		     )->pack(-side=>'left',-expand=>"1",-fill=>'both');
+
+
+&msg($status,"Welcome to SnmpIt!");
+
+
+&MainLoop();
+
+sub msg {
+    (my $area, my @lines)=@_;
+    my $text=join("",@lines);
+    $area->configure(-text=>$text);
+    $area->update();
+}
+
+sub vlanSetup {
+    my $add_name = "";
+    my @members =();
+    my $name_field= "";
+    my $memb_field= "";
+    my $file_field= "";
+    $area->pack('forget');
+    $area = 
+	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-background=>$main_bg,
+			 -foreground=>$main_fg,-width=>50
+			 )->pack(-side=>'top',-fill=>'both');
+    my $titles =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-background=>$main_bg,
+		     -foreground=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $table =
+	$area->Frame(-relief=>'raised',-borderwidth=>3,-background=>$main_bg,
+		     -foreground=>$main_fg
+		     )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $remove = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-background=>$main_bg,
+		     -foreground=>$main_fg,-text=>'Remove',-width=>8
+		     )->pack(-side=>'left',-fill=>'x');
+    my $number = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-background=>$main_bg,
+		     -foreground=>$main_fg,-text=>'VLAN #',-width=>8
+		     )->pack(-side=>'left',-fill=>'x');
+    my $name = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-background=>$main_bg,
+		     -foreground=>$main_fg,-text=>'VLAN Name',-width=>12
+		     )->pack(-side=>'left',-fill=>'x');
+    my $members = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-background=>$main_bg,
+		     -foreground=>$main_fg,-text=>'VLAN Members',-width=>16
+		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    my %names=();
+    my %members=();
+    my @line=();
+    my $ID=0;
+    open(DATA,"snmpit -l 2>&1 |");
+    while (<DATA>) {
+	chop;
+	if (/^ID/) {next;}
+	if (/^-----/) {next;}
+	s/\t\t/\t/g;
+	@line= split("\t",$_);
+	$ID = shift(@line);
+	$names{$ID}= shift(@line);
+	$members{$ID}= join(" ",sort @line);
+    }
+    close (DATA);
+    my %vlans = ();
+    foreach $ID ( sort keys(%names)) {
+	my $row = 
+	    $table->Frame(-relief=>'flat',
+			 -background=>$main_bg,-foreground=>$main_fg
+			 )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+	if ($ID != 25) {
+	    $row->Checkbutton(-variable=>\$vlans{$ID},-relief=>'sunken',
+			      -width=>5,-anchor=>'center',
+			      -background=>$main_bg,-foreground=>$main_fg,
+			      -activebackground=>$main_abg,
+			      -borderwidth=>3
+			      )->pack(-side=>'left');
+	} else {
+	    $row->Label(-relief=>'sunken',
+			-width=>8,-anchor=>'center',
+			-background=>$main_bg,-foreground=>$main_fg,
+			-borderwidth=>3
+			)->pack(-side=>'left');
+	}	    
+	$row->Label(-relief=>'sunken',-text=>$ID,-width=>8,
+		    -background=>$main_bg,-foreground=>$main_fg,
+		    -borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$names{$ID},-width=>12,
+		    -background=>$main_bg,-foreground=>$main_fg,
+		    -borderwidth=>3
+		    )->pack(-side=>'left');
+	$row->Label(-relief=>'sunken',-text=>$members{$ID},
+		    -background=>$main_bg,-foreground=>$main_fg,-anchor=>'w',
+		    -borderwidth=>3
+		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+    }
+    my $row = 
+	$table->Frame(-relief=>'flat',-borderwidth=>2,
+		      -background=>$main_bg,-foreground=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $remove_btn = 
+	$row->Button(-text=>'Remove',-background=>$main_bg,-width=>'5', 
+		     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+		     -foreground=>$main_fg,-activebackground=>$main_abg,
+		     -command=> sub { 
+			 my @removeMe = ();
+			 foreach $ID (sort keys %vlans) {
+			     if ($vlans{$ID}) {
+				 push (@removeMe, $ID);
+			     }
+			 }
+			 if (@removeMe) {
+			     &msg($status,"Removing VLAN(s) ",
+				  join(" ",@removeMe),
+				  "\nThis may take about 25 seconds...");
+			     &removeVLANs(@removeMe);     
+			     &vlanSetup;
+			 }
+		     }
+		     )->pack(-side=>'left');
+    my $add_btn = 
+	$row->Button(-text=>'Add:',-background=>$main_bg,-width=>'5', 
+		     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+		     -foreground=>$main_fg,-activebackground=>$main_abg,
+		     -command=> sub {     
+			 $add_name = $name_field->get();
+			 if (! $add_name) {
+			     $add_name="";
+			 }
+			 my $memberentry = $memb_field->get();
+			 $memberentry =~ s/,/ /g;
+			 $memberentry =~ s/  / /g;
+			 @members = split(' ',$memberentry);
+			 if (@members) {
+			     &msg($status,"Adding VLAN $add_name with ",
+				  join(", ",@members),
+				  "\nThis may take about 25 seconds...");
+			     &addVLAN($add_name,@members);     
+			     &vlanSetup;} }
+		     )->pack(-side=>'left');
+    $name_field = 
+	$row->Entry(-relief=>'sunken',-width=>12,
+		    -background=>$main_bg,-foreground=>$main_fg,
+		    -borderwidth=>3
+		    )->pack(-side=>'left');
+    $memb_field = 
+	$row->Entry(-relief=>'sunken',
+		    -background=>$main_bg,-foreground=>$main_fg,
+		    -borderwidth=>3
+		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+
+    $row = 
+	$table->Frame(-relief=>'flat',-borderwidth=>2,
+		      -background=>$main_bg,-foreground=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'x');
+    my $refresh =
+	$row->Button(-text=>'Refresh',-background=>$main_bg,-width=>'14', 
+		     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+		     -foreground=>$main_fg,-activebackground=>$main_abg,
+		     -command=> sub {     
+			 &vlanSetup; }
+		     )->pack(-side=>'left');
+    my $file_btn = 
+	$row->Button(-text=>'From File:',-background=>$main_bg,-width=>'9', 
+		     -anchor=>'center', -relief=>'raised',-borderwidth=>3,
+		     -foreground=>$main_fg,-activebackground=>$main_abg,
+		     -command=> sub {     
+			 my $file_name = $file_field->get();
+			 if ($file_name) {
+			     &msg($status,"Adding VLAN(s) from file $file_name",
+				  "\nThis may take about 25 seconds...");
+			     &fileVLAN($file_name);     
+			     &vlanSetup;} }
+		     )->pack(-side=>'left');
+    $file_field = 
+	$row->Entry(-relief=>'sunken',
+		    -background=>$main_bg,-foreground=>$main_fg,
+		    -borderwidth=>3
+		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
+
+
+    $area->pack();
+}
+
+sub addVLAN {
+    (my $name, my @v) = @_;
+    if ($name) {
+	open(DATA,"snmpit -u -m \"$name\" -vlan ".join(" ",@v)." 2>&1  |");
+    } else {
+	open(DATA,"snmpit -u -vlan ".join(" ",@v)." 2>&1  |");
+    }
+    my @output =();
+    while (<DATA>) {
+	chop;
+	push(@output, $_);
+    }
+    close (DATA);
+    if (join('',@output) =~ /Succeeded/i) {
+	push(@output,"Switch VLAN table updated.");
+    }
+    &msg($status,join("\n",@output));
+}
+
+sub removeVLANs {
+    (my @v) = @_;
+    open(DATA,"snmpit -u -r ".join(" ",@v)." 2>&1  |");
+    my @output =();
+    while (<DATA>) {
+	chop;
+	push(@output, $_);
+    }
+    close (DATA);
+    &msg($status,join("\n",@output));
+}
+
+sub fileVLAN {
+    (my $file) = @_;
+    open(DATA,"snmpit -u -f $file 2>&1  |");
+    my @output =();
+    while (<DATA>) {
+	chop;
+	push(@output, $_);
+    }
+    close (DATA);
+    &msg($status,join("\n",@output));
+}
+
+sub portSetup {
+    $area->packForget();
+    $area = 
+	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-background=>$main_bg,
+			 -foreground=>$main_fg,-width=>50
+			 )->pack(-side=>'top',-fill=>'both');
+
+
+
+    $area->pack();
+}
+
+sub optSetup {
+    $area->packForget();
+    $area = 
+	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-background=>$main_bg,
+			 -foreground=>$main_fg,-width=>50
+			 )->pack(-side=>'top',-fill=>'both');
+
+
+
+    $area->pack();
+}
