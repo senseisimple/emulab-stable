@@ -18,7 +18,7 @@ my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
 my $HISTORY     = "/root/.history";
-my $MAILFILE    = "/var/mail/root";
+my $MAILDIR     = "/var/mail";
 my $LEASES      = "/var/db/dhclient.leases";
 my $NTPDRIFT    = "/etc/ntp.drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
@@ -126,11 +126,8 @@ if (-f $HISTORY) {
         die("Could not unlink $HISTORY: $!");
 }
 
-print "Removing root's mailfile ...\n";
-if (-f $MAILFILE) {
-    unlink($MAILFILE) or
-        die("Could not unlink $MAILFILE: $!");
-}
+print "Cleaning mail spool files ...\n";
+system("rm -rf $MAILDIR/*");
 
 #
 # Just removing the drift file results in no drift being tracked,
