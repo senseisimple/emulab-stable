@@ -6,8 +6,8 @@
 # Run with -h option to see command line syntax/options.                #
 #                                                                       #
 #      Author: Mac Newbold, Flux Research Group, University of Utah     #
-# Last Change: April 29, 2000                                           #
-#     Version: 1.0                                                      #
+# Last Change: May 18, 2000                                             #
+#     Version: 1.1                                                      #
 #                                                                       #
 #########################################################################
 
@@ -250,22 +250,33 @@ sub ParseArgs {
     #print "Done:\nS=$i p=@p D=$d E=$e a=$a d=$dup s=$s C=$m vlan=@vlan B=$b V=$c on=$on off=$off cyc=$cyc\n";
     if ($help) {
 	print
-	    "SnmpIt! - A general purpose SNMP Tool\n",
+	    "snmpit - A general purpose SNMP Tool - Version 1.1\n",
 	    "Syntax:\n",
-	    "$0 [-h] [-v] [+b|-b] [+c|-c] -i<ip>\n",
-	    "\t[-p<port> <port> <x>..<y> ... ]\n",
-	    "\t[-d[isable]|-e[nable]] [+a|-a] [-s<speed>] [-dup<duplex>]\n", 
-	    "\t[-m<vlan name>] [[-vlan<MAC Addr.>] | [-f<filename>]]\n",
-	    "\t[-r<vlan #> <vlan #> ... ] [-l]\n",
-	    "\t[ [-on|-off|-cyc] [-all] | [-<n>] ]\n";
+	    " snmpit [-h] [-v] -i<ip>\n",
+	    "\t[-u] [-l] [-m<vlan name>] [-vlan<MAC Addr.>]\n",
+	    "\t[-f<filename>] [-r<vlan #> <vlan #> ... ]\n",
+	    "\t[+b|-b] [+c|-c] [-p<port> <port> <x>..<y> ... ]\n",
+	    "\t[-d|-e] [+a|-a] [-s<speed>] [-dup<duplex>]\n";
+
+# Hidden Power control functionality
+#,
+#	    "\t[ [-on|-off|-cyc] [-all] | [-<n>] ]\n";
 	
     }
     if ($help == 1) {
 	print
-	    "\n",
+	    "\nGeneral:\n",
 	    "  -h    Display this help message\n",
 	    "  -v    Verbose mode (now ",($v?"on":"off"),")\n",
 	    "  -i    IP address or switch name\n",
+	    "\nVLAN Control:\n",
+	    "  -u    Wait for Update of VLAN tables (takes ~10 seconds)\n",
+	    "  -l    List all VLANs on switch (ell, not #1)\n",
+	    "  -m    Make a VLAN\n",
+	    "  -vlan Add MAC Address to VLAN\n",
+	    "  -f    File mode - Automatically set up set of VLANs\n",
+	    "  -r    Remove VLAN(s)",
+	    "\nPort Control:\n",
 	    "  +b/-b Blocking mode (now ",($b?"on":"off"),")\n",
 	    "  +c/-c Confirm Changes (now ",($c?"on":"off"),")\n",
 	    "  -p    List of port numbers and ranges\n",
@@ -273,19 +284,21 @@ sub ParseArgs {
 	    "  -e    Enable port(s)\n",
 	    "  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex\n",
 	    "  -s    Port Speed (10 or 100 Mbits)\n",
-	    "  -dup  Port Duplex (half or full)\n",
-	    "  -f    File mode - Automatically set up set of VLANs\n",
-	    "  -l    List all VLANs on switch (ell, not #1)\n",
-	    "  -m    Make a VLAN\n",
-	    "  -vlan Add MAC Address to VLAN\n",
-	    "  -r    Remove VLAN(s)",
-	    "  -u    Wait for Update of VLAN tables (takes about 20 seconds)\n",
-	    "  -on   Turn on outlets\n",
-	    "  -off  Turn off outlets\n",
-	    "  -cyc  Power Cycle outlets\n",
-	    "  -all  All outlets\n",
-	    "  -(n)  Outlet #(n) (n=1-8)\n";
+	    "  -dup  Port Duplex (half or full)\n";
+
+# Hidden Power control functionality
+#,
+#	    "  -on   Turn on outlets\n",
+#	    "  -off  Turn off outlets\n",
+#	    "  -cyc  Power Cycle outlets\n",
+#	    "  -all  All outlets\n",
+#	    "  -(n)  Outlet #(n) (n=1-8)\n";
     }
+    
+    #Unused letters of the alphabet:
+    #
+    # g, j, k, n, q, t, w, x, y, z
+    #
     #If help only, end here...
     die("\b\n") if ($help);
     #Now die on any combinations that don't make sense...
@@ -343,6 +356,14 @@ sub ParseArgs {
     }
 }
 
+#
+# SUB UpdateField----------------------
+#
+
+sub listPorts {
+
+
+}
 #
 # SUB UpdateField----------------------
 #
@@ -537,7 +558,18 @@ sub ReadIRFile {
    my $skip = 1;
    my $switch = $i;
    my $section = "";
-   if ( !open(IR,$f) ) { die("Couldn't open $f for VLAN Setup.\n"); }
+   if ( -e "/usr/testbed/etc/$f") {
+       open(IR,"/usr/testbed/etc/$f") 
+	   || die("Couldn't open /usr/testbed/etc/$f\n");
+   } elsif ( -e "$f" ) {
+       open(IR,"$f") 
+	   || die("Couldn't open $f\n");
+   } elsif ( -e "/home/newbold/switch/$f" ) {
+       open(IR,"/home/newbold/switch/$f") 
+	   || die("Couldn't open /home/newbold/switch/$f\n");
+   } else {
+       die("Couldn't locate $f for VLAN setup.\n");
+   }
    while (<IR>) {
        chop;
        if ( /^\#/ ) {  next; } #skip comments
@@ -581,10 +613,13 @@ sub ReadTranslationTable {
    my $mac="";
    if ( -e "/usr/testbed/etc/macslist") {
        open(FILE,"/usr/testbed/etc/macslist") 
-	   || die("Couldn't open /usr/testbed/macslist\n");
+	   || die("Couldn't open /usr/testbed/etc/macslist\n");
    } elsif ( -e "macslist" ) {
        open(FILE,"macslist") 
 	   || die("Couldn't open macslist\n");
+   } elsif ( -e "/home/newbold/switch/macslist" ) {
+       open(FILE,"/home/newbold/switch/macslist") 
+	   || die("Couldn't open /home/newbold/switch/macslist\n");
    } else {
        print "Couldn't locate macslist configuration file.\n",
 	   "Translation of MAC addresses will be disabled.\n";
