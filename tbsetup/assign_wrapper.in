@@ -4008,8 +4008,8 @@ sub CreateTopFile()
 		    my $delayname = "tbsdelay" . $delayid++;
 		    my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
 		    
-		    $delaylinks{$plink} = [$nodeport0,$delay,$top_bw,$loss,
-					   $nodeport1,$rdelay,$top_rbw,$rloss,
+		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
+					   $nodeport1,$rdelay,$rbw,$rloss,
 					   0];
 
 		    print TOPFILE "node $delayname delay\n";
