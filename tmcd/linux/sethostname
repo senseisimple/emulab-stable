@@ -46,6 +46,15 @@ if (@ARGV) {
     }
 }
 
+my $domain = `dnsdomainname`;
+chomp($domain);
+if ($domain =~ /[\w\.]+/) {
+    $domain = ".$domain";
+}
+else {
+    $domain = ".foo.net";
+}
+
 my $nickname = whatsmynickname();
 if (! $nickname) {
     print STDOUT "No Testbed nickname available!\n";
@@ -53,9 +62,9 @@ if (! $nickname) {
 }
 $nickname = lc($nickname);
 
-print STDOUT "Resetting hostname to ${nickname} ... ";
+print STDOUT "Resetting hostname to ${nickname}${domain} ... ";
 
-if (system("hostname", "${nickname}")) {
+if (system("hostname", "${nickname}${domain}")) {
     print STDOUT "*** FAILED!\n";
     exit 1;
 }

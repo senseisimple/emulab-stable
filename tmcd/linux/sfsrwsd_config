@@ -1,0 +1,4 @@
+Export /var/sfs/root	/
+Export /var             /var
+Export /usr             /usr
+

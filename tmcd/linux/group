@@ -26,4 +26,5 @@ pppusers:x:44:
 popusers:x:45:
 slipusers:x:46:
 xfs:x:43:
+sfs:x:77:
 abone:x:500:

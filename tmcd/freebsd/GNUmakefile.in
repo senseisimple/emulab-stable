@@ -26,6 +26,7 @@ DESTDIR		=
 ETCDIR		= $(DESTDIR)/etc
 INSTALL_DIR	= $(ETCDIR)/testbed
 RC_DIR		= $(INSTALL_DIR)/rc.d
+RRC_DIR		= $(DESTDIR)/usr/local/etc/rc.d
 ISMFS		= $(INSTALL_DIR)/ismfs
 INSTALL_FILES	= group master.passwd setup
 INSTALL		= /usr/bin/install -c 
@@ -35,15 +36,14 @@ mfs-install:	script-install bin-install
 	echo >$(ISMFS) "This file indicates its the MFS. DO NOT DELETE!"
 
 dir-install:
-	-mkdir -p $(INSTALL_DIR)
-	-mkdir -p $(RC_DIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(RC_DIR)
 
 misc-install:	dir-install
-	-rm -rf $(INSTALL_DIR)/sup/sup
-	-mkdir -p $(INSTALL_DIR)/sup
+	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)/sup
 	$(INSTALL) -m 755 $(SRCDIR)/supfile $(INSTALL_DIR)/supfile
-	-mkdir -p /root/.cvsup
-	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth /root/.cvsup/auth
+	$(INSTALL) -m 750 -o root -g wheel -d $(DESTDIR)/root/.cvsup
+	$(INSTALL) -m 600 $(SRCDIR)/cvsup.auth $(DESTDIR)/root/.cvsup/auth
 
 bin-install:	dir-install
 	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
@@ -75,25 +75,29 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(INSTALL_DIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
-	$(INSTALL) -m 755 $(SRCDIR)/control_interface $(INSTALL_DIR)/control_interface
+	$(INSTALL) -m 755 $(SRCDIR)/control_interface \
+		$(INSTALL_DIR)/control_interface
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp0 $(ETCDIR)/start_if.fxp0
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp1 $(ETCDIR)/start_if.fxp1
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.fxp4 $(ETCDIR)/start_if.fxp4
 	$(INSTALL) -m 755 $(SRCDIR)/start_if.xl0  $(ETCDIR)/start_if.xl0
 	$(INSTALL) -m 755 $(SRCDIR)/rc.conf  $(ETCDIR)/rc.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf $(INSTALL_DIR)/gated_fxp0.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf $(INSTALL_DIR)/gated_fxp1.conf
-	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf $(INSTALL_DIR)/gated_fxp4.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp0.conf \
+			$(INSTALL_DIR)/gated_fxp0.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp1.conf \
+			$(INSTALL_DIR)/gated_fxp1.conf
+	$(INSTALL) -m 644 $(SRCDIR)/gated_fxp4.conf \
+			$(INSTALL_DIR)/gated_fxp4.conf
 	$(INSTALL) -m 755 $(SRCDIR)/shutdown.sh  $(RC_DIR)/shutdown.sh
-	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh  $(RC_DIR)/testbed.sh
+	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh  $(RRC_DIR)/testbed.sh
 
 sfs-install:
-	$(INSTALL) -m 755 -o root -g wheel -d /etc/sfs
+	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
 	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RC_DIR)/sfs.sh
 	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
 	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config
 	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config $(ETCDIR)/sfs/sfssd_config
-	$(INSTALL) -m 755 -o sfs -g sfs -d /var/sfs
-	$(INSTALL) -m 775 -o sfs -g sfs -d /var/sfs/root
-	$(INSTALL) -m 775 -o sfs -g sfs -d /var/sfs/root/var
-	$(INSTALL) -m 775 -o sfs -g sfs -d /var/sfs/root/usr
+	$(INSTALL) -m 755 -o sfs -g sfs -d $(DESTDIR)/var/sfs
+	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root
+	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/var
+	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/usr
