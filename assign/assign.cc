@@ -457,20 +457,7 @@ int mapping_precheck() {
 
 		bool potential_match = true;
 		// Grab the first node of the pclass as a representative sample
-		tb_pnode *pnode = *((*it)->members[this_type]->L.begin());
-
-#if 0
-		// Check the number of interfaces - if the pnode is a switch,
-		// for now, we don't check this, since it can end up with more
-		// 'interfaces' due to the fact that it can have interswitch
-		// links
-		if ((pnode->total_interfaces >= v->num_links) ||
-			(!pnode->current_type.compare("switch"))) {
-		    matched_links++;
-		} else {
-		    potential_match = false;
-		}
-#endif
+	 	tb_pnode *pnode = *((*it)->members[this_type]->L.begin());
 
 		// Check to see if any of the link that this pnode has are of
 		// the correct type for the virtual node
@@ -497,7 +484,6 @@ int mapping_precheck() {
 		/*
 		 * Check features and desires
 		*/
-
 		tb_featuredesire_set_iterator
 		    fdit(v->desires.begin(),v->desires.end(),
 			 pnode->features.begin(),pnode->features.end());
@@ -509,22 +495,26 @@ int mapping_precheck() {
 		    // Only check for FDs that would result in a violation if
 		    // unmatched.
 		    if (fdit.either_violateable()) {
+			if (fdit.membership() !=
+				tb_featuredesire_set_iterator::BOTH) {
+			    potential_match = false;
+			}
+
 			// We look for violateable desires on vnodes so that we
 			// can report them to the user
-			if (fdit.membership() ==
-				tb_featuredesire_set_iterator::BOTH &&
-				fdit.membership() ==
-				tb_featuredesire_set_iterator::FIRST_ONLY &&
-				fdit.first_iterator()->is_violateable() &&
-				matched_desires.find(fdit->name())
-				== matched_desires.end()) {
-			    matched_desires[fdit->name()] = 0;
+			if ((fdit.membership() ==
+				tb_featuredesire_set_iterator::FIRST_ONLY ||
+			    fdit.membership() ==
+				 tb_featuredesire_set_iterator::BOTH)
+				&& fdit.first_iterator()->is_violateable()) {
+			    if (matched_desires.find(fdit->name()) ==
+				    matched_desires.end()) {
+				matched_desires[fdit->name()] = 0;
+			    }
 			}
 			if (fdit.membership() ==
 				tb_featuredesire_set_iterator::BOTH) {
 			    matched_desires[fdit->name()]++;
-			} else {
-			    potential_match = false;
 			}
 		    }
 		}
