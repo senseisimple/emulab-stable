@@ -25,3 +25,4 @@ FSDIR_PROJ=/z/proj
 FSDIR_USERS=/z/users
 TBSTATEDEMAIL=minitestbed-stated@flux.cs.utah.edu
 TBTESTSUITEEMAIL=minitestbed-testsuite@flux.cs.utah.edu
+SFSSUPPORT=0
