@@ -81,7 +81,7 @@ if (system("mysqldump --all --flush-logs --lock-tables $DBNAME > $backname")) {
     fatal();
 }
 
-if (system("gzip $backname")) {
+if (system("gzip -9 $backname")) {
     print STDERR "gzip $backname failed!\n";
     fatal();
 }
@@ -94,7 +94,7 @@ if (! chdir($LOGDIR)) {
     fatal();
 }
 
-if (-e $basename && system("gzip $basename")) {
+if (-e $basename && system("gzip -9 $basename")) {
     print STDERR "gzip $basename failed!\n";
     fatal();
 }
