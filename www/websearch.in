@@ -58,7 +58,7 @@ chdir($WWW) or
 # we will be able to avoid this extra shell call. For now, we are stuck
 # calling swish-e.
 #
-open(SWISH, "swish-e -f $index -x '%r %p %l \"%D\" \"%d\"\n' ".
+open(SWISH, "swish-e -f $index -x '%r %p %l \"%D\"\n' ".
      "-w '$searchstring' |") or
     die("*** $0:\n".
 	"    Could not invoke swish-e on '$searchstring'!\n");
@@ -89,16 +89,15 @@ while (<SWISH>) {
 	if (!defined($searchwords) || !defined($numhits)) {
 	    next;
 	}
-	if ($_ =~ /^(\d*) (.*) (\d*) \"(.*)\" \"(.*)\"$/) {
+	if ($_ =~ /^(\d*) (.*) (\d*) \"(.*)\"$/) {
 	    my $rank = $1;
 	    my $path = $2;
 	    my $size = $3;
 	    my $mod  = $4;
-	    my $text = $5;
 
-	 #   print "$path\n";
+	    #print "$path $mod\n";
 
-	    $hits{$path}  = [ $rank, $path, $size, $mod, substr($text, 0, 300) ];
+	    $hits{$path}  = [ $rank, $path, $size, $mod ];
 	    $lines{$path} = [];
 	    push(@order, $path);
 	}
@@ -120,7 +119,7 @@ $query =~ s/(?<!\\)\"//ig;
 #
 # Run agrep on the list of files. 
 # 
-open(AGREP, "agrep -i '$query' " . join(" ", keys(%hits)) .
+open(AGREP, "agrep -w -i '$query' " . join(" ", keys(%hits)) .
      " /dev/null 2> /dev/null |") or
     die("*** $0:\n".
 	"    Could not invoke agrep with '$query'!\n");
@@ -129,14 +128,14 @@ while (<AGREP>) {
 #    print $_;
     if ($_ =~ /^(.*): (.*)$/) {
 	push(@{ $lines{$1} }, $2)
-	    if (scalar(@{ $lines{$1} }) < 10);
+	    if (exists($lines{$1}) && scalar(@{ $lines{$1} }) < 10);
     }
 }
 close(AGREP);
 
 print "Rank, filename, modification date, matching lines<br>\n";
 foreach my $hit (@order) {
-    my ($rank, $path, $size, $mod, $text) = @{ $hits{$hit} };
+    my ($rank, $path, $size, $mod) = @{ $hits{$hit} };
     $dir  = dirname($path);
     $file = basename($path);
 
