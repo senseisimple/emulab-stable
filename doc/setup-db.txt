@@ -12,9 +12,6 @@ sql subdirectory of the testbed tree, like so:
 mysqladmin create tbdb
 mysql tbdb < sql/database-create.sql
 
-It's a good idea to contact Utah to make sure that the database-create.sql file
-is up-to-date.
-
 ##### Step 1 - Setup users
 
 You'll need to start by creating an admin user. Currently, there is no
