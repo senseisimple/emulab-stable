@@ -4805,7 +4805,7 @@ COMMAND_PROTOTYPE(dorusage)
 		    " (node_id, status_timestamp, "
 		    "  load_1min, load_5min, load_15min, disk_used) "
 		    " values ('%s', now(), %f, %f, %f, %f)",
-		    reqp->nodeid, la1, la5, la15, dused);
+		    reqp->pnodeid, la1, la5, la15, dused);
 
 	if (reqp->isplabdslice) {
 		mydb_update("replace delayed into node_status "
