@@ -5,6 +5,12 @@
 # All rights reserved.
 #
 
+#
+# Amount of memory in MB to leave for everyone else in the system.  If you
+# get out-of-memory or vm_pager error while running frisbee, increase this.
+#
+RESIDMEM=32
+
 if [ -r /etc/emulab/paths.sh ]; then
 	. /etc/emulab/paths.sh
 else
@@ -38,7 +44,7 @@ DISK=`echo $LOADINFO | awk -F= '{ printf $5 }' | awk -F' ' '{ print $1 }'`
 DISK=${DISK:-'ad0'}
 
 if [ "$PARTITION" != "0" ]; then
-	SLICE="-s $PARTITION";
+	SLICE="-s $PARTITION"
 	case $PARTOS in
 	FreeBSD)
 		SLICE="$SLICE -D 165"
@@ -64,16 +70,21 @@ fi
 
 #
 # set memory limits:
-#	allow 16MB for non-frisbee stuff
-#	split remaining memory (at least 2MB) between network/disk buffering
-#	in frisbee
+#	allow $RESIDMEM MB for non-frisbee stuff
+#	split remaining memory (min of 2MB) between network/disk buffering
 #
 HOSTMEM=`sysctl -n hw.usermem`
-HOSTMEM=`expr $HOSTMEM / 1024`
-if [ $HOSTMEM -ge 26624 ]; then
-	HOSTMEM=`expr $HOSTMEM - 24576`
-	ulimit -v $HOSTMEM
-	HOSTMEM=`expr $HOSTMEM / 1024`
+HOSTMEM=`expr $HOSTMEM / 1048576`
+if [ $HOSTMEM -ge `expr $RESIDMEM + 2` ]; then
+	HOSTMEM=`expr $HOSTMEM - $RESIDMEM`
+	BYTES=`expr $HOSTMEM \* 1024`
+	DATASEGSZ=`ulimit -d`
+	if [ $BYTES -gt $DATASEGSZ ]; then
+	    BYTES=$DATASEGSZ
+	    HOSTMEM=`expr $BYTES / 1024`
+	    echo "WARNING: kernel limits buffering to $HOSTMEM MB"
+	fi
+	ulimit -v $BYTES
 
 	## For GaTech we use more memory for disks since the disks are so slow
 	#NETMEM=`expr $HOSTMEM \* 1 / 3`
@@ -86,24 +97,24 @@ if [ $HOSTMEM -ge 26624 ]; then
 fi
 
 if [ x"$ADDRESS" != x ]; then
-        PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`;
-	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`;
+        PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
+	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
 	if [ -e $BOOTDIR/myip ]; then
 		MCASTIF="-i `cat $BOOTDIR/myip`"
 	else
 		MCASTIF=""
 	fi
-	MCASTADDR="-m $MCAST -p $PORT";
+	MCASTADDR="-m $MCAST -p $PORT"
 
-	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`";
-	$BINDIR/tmcc state RELOADING;
+	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
+	$BINDIR/tmcc state RELOADING
 
-	$BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTIF $MCASTADDR /dev/$DISK;
+	$BINDIR/frisbee $LOADIP $MEMARGS $SLICE $MCASTIF $MCASTADDR /dev/$DISK
 	case $? in
 	0)
-		echo "Frisbee run finished";
-		echo "Resizing final disk partition";
-		$BINDIR/growdisk -vW /dev/$DISK;
+		echo "Frisbee run finished"
+		echo "Resizing final disk partition"
+		$BINDIR/growdisk -vW /dev/$DISK
 		#
 		# XXX limit the use of slicefix for now to just
 		# those machines with "ad4" as their root disk
@@ -112,10 +123,10 @@ if [ x"$ADDRESS" != x ]; then
 			echo "Adjusting slice-related files";
 			$BINDIR/slicefix $PARTITION $DISK
 		fi
-		echo "Image load complete, rebooting ...";
-		$BINDIR/tmcc state RELOADDONE;
-		/sbin/reboot;
-		sleep 100;
+		echo "Image load complete, rebooting ..."
+		$BINDIR/tmcc state RELOADDONE
+		/sbin/reboot
+		sleep 100
 		;;
 	*)
 		echo "Frisbee run failed, status $?"
