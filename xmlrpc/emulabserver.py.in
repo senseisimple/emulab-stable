@@ -1126,8 +1126,7 @@ class experiment:
                 pass
             pass
         
-        return EmulabResponse(RESPONSE_SUCCESS,
-                              value=result, output=str(result))
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output="")
 
     #
     # nscheck an NS file.
@@ -1415,8 +1414,8 @@ class experiment:
             pass
 
         result   = {}
-        result["experiments"] = {}
-        result["experiments"]["settings"] = res[0];
+        result["experiment"] = {}
+        result["experiment"]["settings"] = res[0];
 
         #
         # Get the rest of the virtual tables.
@@ -1447,12 +1446,12 @@ class experiment:
                     pass
                 pass
             
-            result["experiments"][tag] = rows
+            result["experiment"][tag] = rows
             pass
 
         result = (result,)
         
-        return EmulabResponse(RESPONSE_SUCCESS, value=result, output="bar")
+        return EmulabResponse(RESPONSE_SUCCESS, value=result, output="")
     
     #
     # Return the visualization data for the experiment.
