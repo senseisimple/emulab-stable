@@ -964,7 +964,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/startexp tbsetup/endexp tbsetup/webstartexp tbsetup/webendexp \
 	tbsetup/ir/GNUmakefile tbsetup/ir/postassign tbsetup/snmpit \
 	tbsetup/ir/assign_wrapper tbsetup/ns2ir/GNUmakefile \
-	tbsetup/ir/handle_virt \
 	tbsetup/ns2ir/postparse tbsetup/ir/handle_os tbsetup/ir/handle_ip \
 	tbsetup/ns2ir/parse.tcl tbsetup/ns2ir/tb_compat.tcl \
 	tbsetup/savevlans tbsetup/ir/extract_tb \
