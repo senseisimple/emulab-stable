@@ -14,6 +14,7 @@ use lib '@prefix@/lib';
 
 use libdb;
 use English;
+use Getopt::Std;
 
 use strict;
 
@@ -36,15 +37,14 @@ my $dhcpd_rc = "/usr/local/etc/rc.d/2.dhcpd.sh";
 my $sudo = "/usr/local/bin/sudo -S";
 
 #
-# Initial event system state to put the nodes into
-#
-my $INITIAL_STATE = TBDB_NODESTATE_SHUTDOWN;
-my $INITIAL_OPMODE = TBDB_NODEOPMODE_RELOAD;
-
-#
 # MFS to boot the nodes into initially
 #
 my $INITIAL_MFS = TB_OSID_FREEBSD_MFS();
+
+#
+# Initial event system state to put the nodes into
+#
+my $INITIAL_STATE = TBDB_NODESTATE_SHUTDOWN;
 
 #
 # Number of vnodes to create for each physical node
@@ -59,13 +59,30 @@ if (!TBAdmin()) {
 }
 
 #
+# Handle command-line options
+#
+my $force_unconnected_interfaces = 0;
+my %options = ();
+if (! getopts("f", \%options)) {
+    usage();
+}
+
+if ($options{f}) {
+    $force_unconnected_interfaces = 1;
+}
+
+sub usage() {
+    die "Usage: $0 [-f] <node_id> ...\n";
+}
+
+#
 # We seem to have to do this so that ssh gets proper root permissions to read
 # the key file. Argh.
 #
 $UID = $EUID = 0;
 
 if (@ARGV < 1) {
-    die "Usage: $0 <node_id> ...\n";
+    usage();
 }
 
 #
@@ -85,6 +102,16 @@ if (!-e $dhcpd_template) {
 if (!-w $dhcpd_conf) {
     die "In order to use this script, you must be able to write $dhcpd_conf\n";
 }
+
+#
+# Find out what op_mode the $INITIAL_MFS runs in
+#
+my $result = DBQueryFatal("select op_mode from os_info where " .
+    " osid='$INITIAL_MFS'");
+if ($result->numrows() != 1) {
+    die "Unable to find OS information for $INITIAL_MFS\n";
+}
+my ($INITIAL_OPMODE) = $result->fetchrow();
 
 #
 # For vnodes - figure out the jail IP base
@@ -127,6 +154,27 @@ NODE: foreach my $node_id (@node_ids) {
     my ($new_node_id, $type, $IP, $tempIP) = $query_result->fetchrow();
 
     #
+    # Make sure they've given it an IP address that looks valid
+    #
+    if ($IP !~ /^(\d+).(\d+).(\d+).(\d+)/) {
+	warn "Node $node_id has an invalid IP address ($IP) - skipping\n";
+	next NODE;
+    }
+
+    #
+    # Make sure some other node doesn't already have this IP address on its
+    # control interface
+    #
+    $query_result = DBQueryFatal("SELECT node_id FROM interfaces WHERE " .
+	"IP='$IP' AND role='" . TBDB_IFACEROLE_CONTROL() . "'");
+    if ($query_result->num_rows()) {
+	my ($existing_node_id) = $query_result->fetchrow();
+	warn "Node $node_id failed: $existing_node_id is already using IP " .
+		"address $IP\n";
+	next NODE;
+    }
+
+    #
     # Make sure that the new node is of a valid type, and grab a few other
     # things to fill in as initial values
     #
@@ -142,7 +190,7 @@ NODE: foreach my $node_id (@node_ids) {
     # Grab the node's MACs from the new_interfaces table
     #
     $query_result = DBQueryFatal("SELECT card, MAC, interface_type, " .
-	"switch_id, switch_card, switch_port " .
+	"switch_id, switch_card, switch_port, cable, len " .
 	"FROM new_interfaces WHERE new_node_id='$new_node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: Must have at least one interface!\n";
@@ -151,7 +199,7 @@ NODE: foreach my $node_id (@node_ids) {
 
     my %interfaces;
     while (my ($card, $MAC, $iface_type, $switch_id, $switch_card,
-	    $switch_port) = $query_result->fetchrow()) {
+	    $switch_port, $cable, $len) = $query_result->fetchrow()) {
 	#
 	# Get some more information about this interface type
 	#
@@ -159,8 +207,21 @@ NODE: foreach my $node_id (@node_ids) {
 	    "FROM interface_types WHERE type='$iface_type'");
 	if (!$iface_query->num_rows()) {
 	    warn "Node $node_id failed: Interface $card is of unknown type " .
-	    	"$iface_type";
+	    	"$iface_type\n";
 	    next NODE;
+	}
+
+	#
+	# Do a sanity check - make sure that we have a switch recorded for all
+	# experimental interfaces
+	#
+	unless ($force_unconnected_interfaces) {
+	    my $iface = "eth$card";
+	    if (($iface ne $control_iface) && !$switch_id) {
+		warn "Node $node_id failed: Don't know which switch " .
+		    "card $iface is connected to\n";
+		next NODE;
+	    }
 	}
 
 	my ($max_speed, $full_duplex) = $iface_query->fetchrow();
@@ -169,7 +230,7 @@ NODE: foreach my $node_id (@node_ids) {
 	# Stash it away...
 	#
 	$interfaces{$card} = [$MAC, $iface_type, $max_speed, $full_duplex,
-		$switch_id, $switch_card, $switch_port];
+		$switch_id, $switch_card, $switch_port, $cable, $len];
 
     }
 
@@ -191,7 +252,10 @@ NODE: foreach my $node_id (@node_ids) {
     
     DBQueryFatal("INSERT INTO nodes SET node_id='$node_id', type='$type', " .
 	"phys_nodeid='$node_id', role='testnode', priority=$priority, " .
-    	"eventstate='$INITIAL_STATE', op_mode='$INITIAL_OPMODE'");
+    	"eventstate='$INITIAL_STATE', op_mode='$INITIAL_OPMODE', " .
+	"def_boot_osid='$INITIAL_MFS', " .
+	"state_timestamp=unix_timestamp(NOW()), " .
+	"op_mode_timestamp=unix_timestamp(NOW())");
 
     #
     # Add some vnodes
@@ -221,7 +285,7 @@ NODE: foreach my $node_id (@node_ids) {
 
     while (my ($card, $aref) = each %interfaces) {
 	my ($MAC, $iface_type, $speed, $duplex, $switch_id, $switch_card,
-	    $switch_port) = @$aref;
+	    $switch_port, $cable, $len) = @$aref;
 	my $iface = "eth$card";
 	my $iface_IP = "";
 	my $wire_type = "Node";
@@ -240,10 +304,18 @@ NODE: foreach my $node_id (@node_ids) {
 	    print "No switch found for ${node_id}:$iface - skipping\n";
 	    next;
 	}
+
+	my $cable_len = "";
+	if ($cable) {
+	    $cable_len .= ", cable=$cable";
+	}
+	if ($len) {
+	    $cable_len .= ", len=$len";
+	}
 	DBQueryFatal("INSERT INTO wires SET type='$wire_type', " .
 	    "node_id1='$node_id', card1=$card, port1=1, " .
 	    "node_id2='$switch_id', card2='$switch_card', " .
-	    "port2='$switch_port'");
+	    "port2='$switch_port' $cable_len");
     }
 
     #
@@ -309,18 +381,6 @@ print "Running exports_setup\n";
 my $exports_rv = system "$exports_setup";
 if ($exports_rv) {
     warn "WARNING - exports_setup returned $exports_rv";
-}
-
-#
-# Tell the nodes to boot into the FreeBSD MFS, so that we have them in a state
-# which we can control - this also puts them into a state that the event system
-# likes better
-#
-print "Instructing nodes to boot into the FreeBSD MFS\n";
-my $select_rv = system "$os_select $INITIAL_MFS " .
-    join(" ",@succeeded_nodes);
-if ($select_rv) {
-    warn "WARNING - failed to select FreeBSD MFS for nodes";
 }
 
 #
