@@ -149,6 +149,8 @@ if (&tbs_exec("handle_os $irfile $nsfile")) {
     exit(1);
 }
 
+unlink $ptopfile;
+
 &tbs_out("Pre run finished - " . &ctime(time) . "\n");
 
 0;
