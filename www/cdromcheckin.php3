@@ -68,7 +68,7 @@ $cdvers = $row[version];
 # 
 if (isset($needscript)) {
     header("Content-Type: text/plain");
-    echo "MD5=21bff97fead2dd5e07135708d9bf7316\n";
+    echo "MD5=5ed48bdf6def666d5a5d643cbc2ce4d0\n";
     echo "URL=https://${WWWHOST}/images/netbed-setup.pl\n";
     echo "emulab_status=0\n";
     return;
@@ -150,7 +150,8 @@ if (isset($updated) && $updated == 1) {
 	    # Silly, but effective since we will never have anything else
 	    # besides wa/ron.
             #
-	    if (strstr($wahostname, ".ron.")) {
+	    if (strstr($wahostname, ".ron.") ||
+		strstr($wahostname, "roncluster")) {
 		$type = "pcron";
 	    }
 	}
@@ -206,7 +207,7 @@ if (strcmp($privIP, "1.1.1.1")) {
     if ($cdvers == 3) {
 #	    echo "slice1_image=slice1.ndz\n";
 	    echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	    echo "slice1_md5=d1f8e883f7e20fad0a1794beae3e9137\n";
+	    echo "slice1_md5=a9af4a08310a314c5b38e5e33a2b9c3e\n";
 	    echo "slicex_slice=3\n";
 	    echo "slicex_mount=/users\n";
     }
@@ -281,7 +282,7 @@ else {
     if (0) {
 	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v3.ndz\n";
-	echo "slice1_md5=d1f8e883f7e20fad0a1794beae3e9137\n";
+	echo "slice1_md5=a9af4a08310a314c5b38e5e33a2b9c3e\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v3.tar.gz\n";
@@ -290,7 +291,7 @@ else {
     else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
-	echo "slice1_md5=d1f8e883f7e20fad0a1794beae3e9137\n";
+	echo "slice1_md5=a9af4a08310a314c5b38e5e33a2b9c3e\n";
 	echo "slicex_slice=3\n";
 	echo "slicex_mount=/users\n";
 	echo "slicex_tarball=slicex.tar.gz\n";
