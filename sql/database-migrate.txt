@@ -2558,3 +2558,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table users add wikionly tinyint(1) default '0';
 
+
+1.326: Add "role" to the new_interfaces table, that mirrors the role
+       slot of the interfaces table. This will be used to override the
+       default setting in newnode, which is necessary for elabinelab,
+       where the roles of the interfaces are not going to be node_type
+       specific, since its assign that is choosing the interfaces.
+
+       alter table new_interfaces add role tinytext default NULL;
+

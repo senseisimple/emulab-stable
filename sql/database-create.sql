@@ -839,6 +839,7 @@ CREATE TABLE new_interfaces (
   switch_port tinyint(3) default NULL,
   cable smallint(6) default NULL,
   len tinyint(4) default NULL,
+  role tinytext default NULL,
   PRIMARY KEY  (new_node_id,card)
 ) TYPE=MyISAM;
 
