@@ -561,7 +561,7 @@ class Slice:
                               "where pid=%s "
                               "and eid=%s",
                               (self.pid, self.eid))
-        if !len(res):
+        if len(res) == 0:
             raise RuntimeError, "Didn't get any results while looking for idx"
         ((eindex, ), ) = res
         self.slicename = "emulab_%s_%s_%s" % (self.pid, self.eid, eindex)
