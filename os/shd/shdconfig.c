@@ -252,7 +252,7 @@ do_single(argc, argv, action, flags)
         if (strcmp (cp, "-gm") == 0)
         {
             long buf[512];
-            struct shd_mod mod;
+            struct shd_modinfo mod;
             mod.command = 1; /* To initialize iterator */
             mod.buf = buf;
             mod.bufsiz = 512;

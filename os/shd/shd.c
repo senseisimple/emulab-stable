@@ -1411,7 +1411,7 @@ shdioctl(dev, cmd, data, flag, p)
 	struct shd_ioctl *shio = (struct shd_ioctl *)data;
         struct shd_readbuf *shread; 
 	struct shddevice shd;
-        struct shd_mod *shmod;
+        struct shd_modinfo *shmod;
 
         struct vnode * vp;        
 /*#ifdef SHDDEBUG
@@ -1428,7 +1428,7 @@ shdioctl(dev, cmd, data, flag, p)
 
 	switch (cmd) {
         case SHDGETMODBLOCKS:
-                shmod = (struct shd_mod *) data;
+                shmod = (struct shd_modinfo *) data;
                 shmod->retsiz = get_mod_blocks (shmod->command, shmod->buf, shmod->bufsiz);
                 break;
         case SHDREADBLOCK:
