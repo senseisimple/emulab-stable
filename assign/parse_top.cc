@@ -80,6 +80,7 @@ int parse_top(tb_vgraph &VG, istream& i)
 	v->fixed = false;	// this may get set to true later
 #ifdef PER_VNODE_TT
 	v->num_links = 0;
+	v->total_bandwidth = 0;
 #endif
 	
 	for (unsigned int i = 3;i < parsed_line.size();++i) {
@@ -167,13 +168,6 @@ int parse_top(tb_vgraph &VG, istream& i)
 	l->src = node1;
 	l->dst = node2;
 	put(vedge_pmap,e,l);
-	
-#ifdef PER_VNODE_TT
-	tb_vnode *vnode1 = get(vvertex_pmap,node1);
-	vnode1->num_links++;
-	tb_vnode *vnode2 = get(vvertex_pmap,node2);
-	vnode2->num_links++;
-#endif
 
 	if ((sscanf(bw.c_str(),"%d",&(l->delay_info.bandwidth)) != 1) ||
 	    (sscanf(bwunder.c_str(),"%d",&(l->delay_info.bw_under)) != 1) ||
@@ -211,6 +205,18 @@ int parse_top(tb_vgraph &VG, istream& i)
 		      parsed_line[i] << ".");
 	  }
 	}
+	
+#ifdef PER_VNODE_TT
+	tb_vnode *vnode1 = get(vvertex_pmap,node1);
+	tb_vnode *vnode2 = get(vvertex_pmap,node2);
+	if (l->emulated) {
+	    vnode1->total_bandwidth += l->delay_info.bandwidth;
+	    vnode2->total_bandwidth += l->delay_info.bandwidth;
+	} else {
+	    vnode1->num_links++;
+	    vnode2->num_links++;
+	}
+#endif
       }
     } else if (command.compare("make-vclass") == 0) {
       if (parsed_line.size() < 4) {

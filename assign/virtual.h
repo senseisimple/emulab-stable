@@ -95,6 +95,7 @@ public:
 
 #ifdef PER_VNODE_TT
   int num_links;
+  int total_bandwidth;
 #endif
 
 };

@@ -41,9 +41,11 @@ CXXFLAGS += -DMELT -DEPSILON_TERMINATE -DCHILL -DNEIGHBOR_LENGTH \
 CXXFLAGS += -DINTERSWITCH_LENGTH -DPNODE_SWITCH_LOAD -DFIX_SHARED_INTERFACES 
 # Various tweaks to the simulated annealing behavior
 CXXFLAGS += -DFIND_PNODE_SEARCH -DNO_REVERT
-# This should be enabled, for better mapping, but has to be disabled
-# for now because it breaks vclasses
-#CXXFLAGS += -DPER_VNODE_TT -DSMART_UNMAP
+# Keeps information about which pclasses are potential mappings for vnodes on a
+# per-vnode basis, not a per-type basis
+CXXFLAGS += -DPER_VNODE_TT
+# Should be on by default, but not well tested enough
+#CXXFLAGS += -DSMART_UNMAP
 # Make sure that all emulated links that are assigned to a plink have the same
 # endpoints
 CXXFLAGS += -DFIX_PLINK_ENDPOINTS

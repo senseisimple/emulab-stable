@@ -214,16 +214,18 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	if (ISSWITCH(srcnode) &&
 	    ! ISSWITCH(dstnode)) {
 	  dstnode->switches.insert(srcv);
-//#ifdef PENALIZE_UNUSED_INTERFACES
 	  dstnode->total_interfaces++;
-//#endif
+#ifdef PER_VNODE_TT
+	  dstnode->total_bandwidth += ibw;
+#endif
 	}
 	else if (ISSWITCH(dstnode) &&
 		 ! ISSWITCH(srcnode)) {
 	  srcnode->switches.insert(dstv);
-//#ifdef PENALIZE_UNUSED_INTERFACES
+#ifdef PER_VNODE_TT
+	  srcnode->total_bandwidth += ibw;
+#endif
 	  srcnode->total_interfaces++;
-//#endif
 	}
       }
     } else {

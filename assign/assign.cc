@@ -372,6 +372,16 @@ REDO_SEARCH:
     tb_pnode* firstmatch = NULL;
 #endif
 #ifdef FIND_PNODE_SEARCH
+#ifdef PER_VNODE_TT
+    // If using PER_VNODE_TT and vclasses, it's possible that there are
+    // some pclasses in this node's type table that can't be used right now,
+    // becuase they contain entires that don't contain the vnodes _current_
+    // type
+    if ((*acceptable_types)[i]->members.find(vn->type) ==
+	    (*acceptable_types)[i]->members.end()) {
+	continue;
+    }
+#endif
     list<tb_pnode*>::iterator it = (*acceptable_types)[i]->members[vn->type]->L.begin();
 #ifdef LOAD_BALANCE
     int skip = std::rand() % (*acceptable_types)[i]->members[vn->type]->L.size();
@@ -1655,43 +1665,113 @@ int main(int argc,char **argv)
       }
     }
   }
-  if (! ok) exit(-1);
+  if (! ok) {
+      cout << "Type preecheck failed!" << endl;
+      exit(-1);
+  }
 
   cout << "Type preecheck passed." << endl;
 
 #ifdef PER_VNODE_TT
+  cout << "Node mapping precheck:" << endl;
+  /*
+   * Build up an entry in the type table for each vnode, by first looking at the
+   * type table entry for the vnode's type, then checking each entry to make
+   * sure that it:
+   * (1) Has enough interfaces
+   * (2) Has enough total bandwidth (for emulated links)
+   * (3) TODO: Meets any 1.0-weight features and/or desires
+   */
   vvertex_iterator vit,vendit;
   tie(vit,vendit) = vertices(VG);
 
+  /*
+   * Indicates whether all nodes have potential matches or not
+   */
+  ok = true;
+
   for (;vit != vendit;vit++) {
       tb_vnode *v = get(vvertex_pmap,*vit);
-      int size = type_table[v->type].first;
-      pclass_vector *vec = new pclass_vector(size); // Could be an over-estimate
-      vnode_type_table[v->name] = tt_entry(size,vec);
-      pclass_vector::iterator it;
-      int i = 0;
-      // No reason to look for these for LAN nodes!
+      //
+      // No reason to do this work for LAN nodes!
       if (!v->type.compare("lan")) {
 	  continue;
       }
-      for (it = type_table[v->type].second->begin();
-	      it != type_table[v->type].second->end(); it++) {
-	  tb_pnode *first = *((*it)->members[v->type]->L.begin());
-	  //cout << "Checking " << first->total_interfaces << " >= " <<
-	  //    v->num_links << " ";
-	  if ((first->total_interfaces >= v->num_links) ||
-		  (first->types[v->type] > 1)) {
-	      (*vec)[i++] = *it;
-	      //cout << "Allowing!" << endl;
+
+      pclass_vector *vec = new pclass_vector();
+      vnode_type_table[v->name] = tt_entry(0,vec);
+      
+      // This constitutes a list of the number of ptypes that matched the
+      // criteria. We use to guess what's wrong with the vnode.
+      int matched_links = 0;
+      int matched_bw    = 0;
+
+      tb_vclass *vclass = v->vclass;
+      tb_vclass::members_map::iterator mit;
+      if (vclass) {
+	  mit = vclass->members.begin();
+      }
+      for (;;) {
+	  // Loop over all types this node can take on, which might be only
+	  // one, if it's not part of a vclass
+	  crope this_type;
+	  if (vclass) {
+	      this_type = mit->first;
 	  } else {
-	      //cout << "Skipping!" << endl;
-	      vnode_type_table[v->name].first--;
+	      this_type = v->type;
+	  }
+
+	  for (pclass_vector::iterator it = type_table[this_type].second->begin();
+		  it != type_table[this_type].second->end(); it++) {
+
+	      bool potential_match = true;
+	      // Grab the first node of the pclass as a representative sample
+	      tb_pnode *pnode = *((*it)->members[this_type]->L.begin());
+
+	      // Check the number of interfaces
+	      if (pnode->total_interfaces >= v->num_links) {
+		  matched_links++;
+	      } else {
+		  potential_match = false;
+	      }
+
+	      // Check bandwidth on emulated links
+	      if (pnode->total_bandwidth >= v->total_bandwidth) {
+		  matched_bw++;
+	      } else {
+		  potential_match = false;
+	      }
+
+	      if (potential_match) {
+		  vec->push_back(*it);
+		  vnode_type_table[v->name].first++;
+#ifdef PCLASS_DEBUG
+		  cerr << v->name << " can map to " << (*it)->name << endl;
+#endif
+	      }
+	  }
+
+	  if (vclass) { 
+	      mit++;
+	      if (mit == vclass->members.end()) {
+		  break;
+	      }
+	  } else {
+	      // If not a vtype, we only had to do this once
+	      break;
 	  }
       }
-      assert(vnode_type_table[v->name].first >= 0);
+
       if (vnode_type_table[v->name].first == 0) {
-	  cerr << "No possible mapping for " << v->name;
-	  exit(1);
+	  cerr << "  *** No possible mapping for " << v->name << endl;
+	  // Make an attempt to figure out why it didn't match
+	  if (!matched_links) {
+	      cerr << "      Too many links!" << endl;
+	  }
+	  if (!matched_bw) {
+	      cerr << "      Too much bandwidth on emulated links!" << endl;
+	  }
+	  ok = false;
       }
 #ifdef PCLASS_DEBUG
       cerr << v->name << " can map to " << vnode_type_table[v->name].first << " pclasses"
@@ -1699,6 +1779,12 @@ int main(int argc,char **argv)
 #endif
 
   }
+
+  if (!ok) {
+      cout << "Node mapping precheck failed!" << endl;
+      exit(-1);
+  }
+  cout << "Node mapping precheck succeeded" << endl;
 #endif
 
   // Output graphviz if necessary

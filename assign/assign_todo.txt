@@ -58,18 +58,6 @@ This is the current TODO list for assign (not in order by priority):
 
    Merge back in Chris's delay node support.
 
-6.   fix PER_VNODE_TT and vclasses
-
-   PER_VNODE_TT is definitely a good thing, but it currently breaks vclasses, so
-   we can't use it in production. This might be tricky to fix, but is definitely
-   worth it. This will help to give better error messages when a vnode has too
-   many vlinks to fit into any of the pnodes.
-
-7.   fix PER_VNODE_TT and emulated vlinks
-   
-   PER_VNODE_TT assume that each vlink is going to consume one plink - need to 
-   relax this for emulated links.
-
 8.   prune pclasses when using PER_VNODE_TT
    
    Right now, we use all pclasses, even those which we cannot possibly use, in

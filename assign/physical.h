@@ -114,6 +114,9 @@ public:
 #ifdef PENALIZE_UNUSED_INTERFACES
   int used_interfaces;
 #endif
+#ifdef PER_VNODE_TT
+  int total_bandwidth;
+#endif
 
   tb_pclass *my_class;
 
