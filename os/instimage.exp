@@ -1,5 +1,12 @@
 #!/usr/local/bin/expect
 
+# Takes a number of parameters and installs and boots a disk
+# image. Will install the new redhat image and boot it. Use "" for the
+# partition to install an entire disk image. It can be run from any
+# host.
+#            Example:
+#            instimage tbpc17 rh62_080100.ndz s2 linux
+
 set RLT "\r\n"
 set NetDisk "155.99.214.74:/q/testbed/images/netdisk"
 set ImagePrefix "155.99.214.74:/q/testbed/images"
@@ -173,8 +180,21 @@ while {$state != "EXIT"} {
 	    doflush
 	    send "$RLT"
 	    set tries 0
+	    set bootptries 0
 	    set ok 0
 	    expect {
+		"No bootp server found for any interfaces" {
+		    if {$bootptries < 5} {
+			send "y$RLT"
+			incr bootptries
+			exp_continue
+		    } else {
+			puts "Couldn't find bootp server."
+			set exitcode 1
+			send "n$RLT"
+			set state "RECOVER_NETDISK"
+		    }
+		}
 		"Bad command line" {
 		    puts "NetDisk didn't like our command line - $ImagePrefix/$image $partition - Recovering"
 		    set exitcode 1
