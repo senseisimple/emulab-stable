@@ -263,14 +263,14 @@ sub dodelays ()
 	    print DEL "ipfw add pipe $p1 ip from any to any in recv $iface1\n";
 	    print DEL "ipfw add pipe $p2 ip from any to any in recv $iface2\n";
 	    print DEL "ipfw pipe $p1 config delay ${delay1}ms ";
-	    print DEL "bw ${bandw1}Mbit/s plr $plr1\n";
+	    print DEL "bw ${bandw1}Kbit/s plr $plr1\n";
 	    print DEL "ipfw pipe $p2 config delay ${delay2}ms ";
-	    print DEL "bw ${bandw2}Mbit/s plr $plr2\n";
+	    print DEL "bw ${bandw2}Kbit/s plr $plr2\n";
 
 	    print STDOUT "  $iface1/$iface2 pipe $p1 config delay ";
-	    print STDOUT "${delay1}ms bw ${bandw1}Mbit/s plr $plr1\n";
+	    print STDOUT "${delay1}ms bw ${bandw1}Kbit/s plr $plr1\n";
 	    print STDOUT "  $iface1/$iface2 pipe $p2 config delay ";
-	    print STDOUT "${delay2}ms bw ${bandw2}Mbit/s plr $plr2\n";
+	    print STDOUT "${delay2}ms bw ${bandw2}Kbit/s plr $plr2\n";
     
 	    $count++;
 	}
