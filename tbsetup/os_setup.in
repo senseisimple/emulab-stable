@@ -726,7 +726,7 @@ foreach my $vnode (@vnodelist) {
     my $pnode  = $vnode2pnode{$vnode};
 
     # Default retry count.
-    $retries{$vnode} = 1;
+    $retries{$vnode} = 0;
 
     # Remote node, always does setup.
     next
