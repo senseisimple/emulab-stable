@@ -509,10 +509,6 @@ Phase "cron", "Adding cron jobs", sub {
 	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/node_status",
 	    "*/5\t*\t*\t*\t*\troot\t$PREFIX/sbin/idlemail");
     };
-    Phase "cronhup", "HUPing cron", sub {
-	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
-	HUPDaemon("cron");
-    };
 };
 
 Phase "sudoers", "Editing $SUDOERS", sub {
