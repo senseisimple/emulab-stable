@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -252,6 +252,12 @@ if ($EVENTSYS) {
     print KEY $eventkey;
     close(KEY);
 }
+
+# And dump the web key too.
+open(KEY, ">" . TBDB_WEBKEY($pid, $eid)) or
+    fatal("Could not create webkey file: $!");
+print KEY $webkey;
+close(KEY);
 
 #
 # If no NS file, we are done. We must unlock it and reset its state
