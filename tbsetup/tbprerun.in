@@ -195,6 +195,16 @@ if (system("staticroutes -j -f $pid $eid")) {
 	"    staticroutes linkmap generation failed!\n");
 }
 
+#
+# Generate a topo map that is used by the remote nodes to create the
+# routes (ddijk) and the /etc/hosts file.
+#
+if (system("gentopofile $pid $eid")) {
+    cleanup();
+    die("*** $0:\n".
+	"    gentopofile failed!\n");
+}
+
 TBDebugTimeStamp("routes finished");
 print "Static routing done! " . TBTimeStamp() . "\n";
 
