@@ -10,7 +10,7 @@ cli: ${OBJS} ${COBJS}
 	$(CC) $(OBJS) $(COBJS) -o cli
 
 serv: ${OBJS} ${SOBJS}
-	$(CC) $(OBJS) $(COBJS) -o serv
+	$(CC) $(OBJS) $(SOBJS) -o serv
 
 clean: 
-	/bin/rm -rf $(OBJS) cli serv
+	/bin/rm -rf $(OBJS) $(SOBJS) $COBJS) cli serv
