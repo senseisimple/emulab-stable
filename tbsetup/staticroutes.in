@@ -1,8 +1,8 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,7 +16,10 @@ use IO::Handle;     # thousands of lines just for autoflush :-(
 #
 sub usage()
 {
-    print("Usage: staticroutes [-n [-s|-l|-b]] [-d] [-m] [-f] [-t] <pid> <eid>\n".
+    print("Usage: staticroutes [-n [-s|-l|-b]] [-d] [-m] [-f] [-t] <pid> <eid>".
+	  "\n".
+	  "       staticroutes -j [-n] [-f] [-d] <pid> <eid>\n".
+	  "       Use -j to generate linkmap only and exit.\n".
 	  "       Use -n to print routes, but leave the DB alone.\n".
 	  "       Use -s (with -n) to print routes in NS format.\n".
 	  "       Use -b (with -n) to print routes in Freebsd format.\n".
@@ -27,7 +30,7 @@ sub usage()
 	  "       Use -f to force route calculation; ignore 'static' flag.\n");
     exit(-1);
 }
-my  $optlist = "dnftslbm";
+my  $optlist = "dnftslbmj";
 
 #
 # Configure variables
@@ -41,6 +44,8 @@ my $memdebug    = 0;
 my $routecalc   = "$TB/libexec/routecalc";
 my $impotent    = 0;
 my $force	= 0;
+my $dolinkmap   = 0;
+my $linkmapname = "linkmap";
 my $optimize    = 1;
 my $edgeoptimize= 0; # Turned off till netmask problem can be fixed
 my $format      = "";
@@ -95,6 +100,9 @@ if (defined($options{"b"})) {
 }
 if (defined($options{"l"})) {
     $format = "suxs";
+}
+if (defined($options{"j"})) {
+    $dolinkmap = 1;
 }
 if ($format && !$impotent) {
     usage();
@@ -221,6 +229,73 @@ while (my ($vname,$member,$cost,$mask) = $query_result->fetchrow_array) {
     $nodeport2lan{$member} = $vname;
     $costs{$vname} = $cost;
     $masks{$vname} = $mask;
+}
+
+#
+# if generating just a linkmap, so that and exit. This format was specified
+# by Jon, and is intended to be used as input to his route calculator that
+# runs on the nodes.
+#
+if ($dolinkmap) {
+    if (!$impotent) {
+	open(MAP, "> $linkmapname") or
+	    die("Could not create $linkmapname: $!\n");
+    }
+    my $edges = 0;
+    foreach my $lan (keys(%lans)) {
+	my @members = @{$lans{$lan}};
+	
+	for (my $i = 0; $i < scalar(@members); $i++) {
+	    for (my $j = $i; $j < scalar(@members); $j++) {
+		my $member1 = $members[$i];
+		my $member2 = $members[$j];
+	    
+		$edges++
+		    if ($member1 ne $member2);
+	    }
+	}
+    }
+    if ($impotent) {
+	print "$index $edges\n";
+    }
+    else {
+	print MAP "$index $edges\n";
+    }
+    foreach my $lan (keys(%lans)) {
+	my @members = @{$lans{$lan}};
+	
+	for (my $i = 0; $i < scalar(@members); $i++) {
+	    for (my $j = $i; $j < scalar(@members); $j++) {
+		my $member1 = $members[$i];
+		my $member2 = $members[$j];
+	    
+		if ($member1 ne $member2) {
+		    my ($node1,$port1) = split(":", $member1);
+		    my ($node2,$port2) = split(":", $member2);
+		    my $id1 = $map{$node1};
+		    my $id2 = $map{$node2};
+
+		    if ($debug) {
+			print STDERR "$member1($id1) $member2($id2)\n";
+		    }
+		    if ($impotent) {
+			print "$node1 " . $ips{$member1} . " " .
+			      "$node2 " . $ips{$member2} . " $costs{$lan}\n";
+			    
+		    }
+		    else {
+			print MAP "$node1 " . $ips{$member1} . " " .
+			          "$node2 " . $ips{$member2} . " $costs{$lan}\n";
+
+		    }
+		}
+	    }
+	}
+    }
+    close(MAP)
+	if (!$impotent);
+
+    exit(0);
 }
 
 #
