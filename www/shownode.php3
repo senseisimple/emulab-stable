@@ -123,6 +123,8 @@ if ($isadmin) {
 		       "shownodelog.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Free Node",
 		       "freenode.php3?node_id=$node_id");
+    WRITESUBMENUBUTTON("Set Node Location",
+		       "setnodeloc.php3?node_id=$node_id");
 }
 SUBMENUEND();
 
