@@ -276,6 +276,8 @@ function SUEXEC($uid, $gid, $cmdandargs, $action) {
 	return $suexec_retval;
     }
     SUEXECERROR($action);
+    # Must return the shell value!
+    return $suexec_retval;
 }
 
 function ADDPUBKEY($uid, $cmdandargs) {
