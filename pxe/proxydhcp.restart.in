@@ -1,7 +1,0 @@
-#!/bin/sh
-
-IDIR=@prefix@/sbin
-EDIR=@prefix@/etc
-
-killall proxydhcp
-${IDIR}/proxydhcp > /dev/null 2>&1 &

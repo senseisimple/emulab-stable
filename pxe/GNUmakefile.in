@@ -16,7 +16,7 @@ include $(OBJDIR)/Makeconf
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all: proxydhcp bootinfo bootinfosend proxydhcp.restart bootinfo.restart
+all: bootinfo bootinfosend bootinfo.restart
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -25,8 +25,6 @@ DBFLAG	= -DUSE_MYSQL_DB
 #DBFLAG = -DUSE_NULL_DB
 BI_DBSRC   = bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
 BI_DBOBJ   = bootinfo_null.o bootinfo_cfile.o bootinfo_mysql.o
-PR_DBSRC   = proxydhcp_cfile.c proxydhcp_mysql.c 
-PR_DBOBJ   = proxydhcp_cfile.o proxydhcp_mysql.o 
 
 INCS    = -I${OBJDIR} -I/usr/local/include -I$(TESTBED_SRCDIR)/lib/libtb
 
@@ -46,11 +44,6 @@ CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib \
 LFLAGS  += $(OBJDIR)/event/lib/libevent.a ${OBJDIR}/lib/libtb/libtb.a \
 		`elvin-config --libs vin4c` -lcrypto
 endif
-
-proxydhcp: proxydhcp.o $(PR_DBOBJ)
-	cc $(CFLAGS) $(DBFLAG) $(INCS) \
-		-o proxydhcp proxydhcp.o $(PR_DBOBJ) \
-		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 bootinfo: bootinfo.o bootinfo.h bootinfo_version.o bootwhat.h $(BI_DBOBJ)
 	cc $(CFLAGS) $(DBFLAG) $(INCS) \
@@ -72,30 +65,16 @@ testbootinfo_mysql: bootinfo_mysql.c
 testbootinfo_cfile: bootinfo_cfile.c
 	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile $< $(LFLAGS)
 
-testproxydhcp_mysql: proxydhcp_mysql.c
-	cc $(CFLAGS) -DUSE_MYSQL_DB -DTEST $(INCS) \
-		-o testmysql $< \
-		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
-
-testproxydhcp_cfile: proxydhcp_cfile.c
-	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile $< $(LFLAGS)
-
-proxydhcp_version.c: proxydhcp.c proxydhcp_mysql.c
-	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
-
 bootinfo_version.c: bootinfo.c bootinfo_mysql.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 
 install:	all
 
-install:	$(INSTALL_SBINDIR)/proxydhcp \
-		$(INSTALL_SBINDIR)/proxydhcp.restart \
-		$(INSTALL_SBINDIR)/bootinfo \
+install:	$(INSTALL_SBINDIR)/bootinfo \
 		$(INSTALL_SBINDIR)/bootinfo.restart \
 		$(INSTALL_SBINDIR)/bootinfosend \
-		$(INSTALL_ETCDIR)/proxydhcp.conf \
 		$(INSTALL_ETCDIR)/bootinfo.conf
 
 clean: 
-	rm -f *.o core proxydhcp bootinfo *.restart testmysql
+	rm -f *.o core bootinfo bootinfosend *.restart testmysql

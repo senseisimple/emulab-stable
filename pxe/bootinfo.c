@@ -230,4 +230,7 @@ log_bootwhat(struct in_addr ipaddr, boot_what_t *bootinfo)
 		info("%s: REPLY: boot from mfs %s\n", ipstr, bootinfo->what.mfs);
 		break;
 	}
+	if (bootinfo->cmdline[0]) {
+		info("%s: REPLY: command line: %s\n", ipstr, bootinfo->cmdline);
+	}
 }
