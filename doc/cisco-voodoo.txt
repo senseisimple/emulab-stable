@@ -143,3 +143,25 @@ ID  Name                            Members of VLAN
 
    messages.  To clear the arp entry (actually the whole cache), enable at
    the Router> prompt and then do "clear arp".
+
+6. Replacing a node/NIC
+
+   If you replace a node, you'll need to change the secure MAC address for that port.
+   The following command should work:
+   	Console> (enable) set port security 3/1 enable 01-02-03-04-05-06
+   Of course, use the real port number and MAC address (noting the funky MAC
+   syntax). Note that you will proably also need to use the 'Sticky ARP Entry' 
+   clearing procedure covered above.
+
+7. Checking on port security
+   To find out what MAC address(es) are associated with a given port. use:
+   	Console> (enable) show port security <port>
+   To find out if a given port has been disabled for being a Bad Boy (tm) w/
+   respect to MAC addresses, use:
+   	Console> (enable) show port <port>
+   - the state will be 'disabled', and you should see some information on the
+   security violation
+   To re-enable a port after it has been disabled due to security violations:
+   	Console> (enable) set port enable <port>
+   To disable security for a port:
+   	Console> (enable) set port security <port> disable
