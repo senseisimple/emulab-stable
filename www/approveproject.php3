@@ -89,6 +89,7 @@ elseif (strcmp($approval, "moreinfo") == 0) {
          "\n".
          "This message is to notify you that your project application\n".
          "for $pid has been postponed until we have more information\n".
+         "You can just reply to this message to provide more information\n".
          "\n$message".
          "\n\n".
          "Thanks,\n".
