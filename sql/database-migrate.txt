@@ -1227,3 +1227,10 @@ last_net_act,last_cpu_act,last_ext_act);
          eventrate int(11) unsigned not null default '0', \
          PRIMARY KEY (pid,eid,vname));
 
+1.216: Add mfs flag to os_info table, and temp_boot_osid to nodes
+       table.
+
+	alter table nodes add temp_boot_osid varchar(35) NOT NULL \
+		default '' after def_boot_cmd_line;
+	alter table os_info add mfs tinyint(4) NOT NULL default '0' \
+		after max_concurrent;
