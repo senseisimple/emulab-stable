@@ -12,10 +12,10 @@ SUBDIRS		= checkpass ns2ir
 
 BIN_STUFF	= power snmpit tbend tbswapin tbswapout tbprerun tbreport \
 		  os_load savevlans startexp endexp batchexp swapexp \
-		  node_reboot nscheck node_update savelogs
+		  node_reboot nscheck node_update savelogs node_control
 
 # Stuff that mere users get on plastic.
-USERBINS        = os_load node_reboot nscheck node_update savelogs
+USERBINS        = os_load node_reboot nscheck node_update savelogs node_control
 
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
@@ -26,7 +26,7 @@ LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
 		  assign_wrapper ptopgen webnodeupdate webgroupupdate \
-		  webrmgroup webswapexp
+		  webrmgroup webswapexp webnodecontrol
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
                   snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \

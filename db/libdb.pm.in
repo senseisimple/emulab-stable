@@ -991,25 +991,35 @@ sub IsShelved ($;$$) {
 }
 
 #
-# Map nodeid to its pid/eid.
+# Map nodeid to its pid/eid/vname. vname is optional.
 #
-# usage: NodeToExp(char *nodeid, \$pid, \$eid)
+# usage: NodeidToExp(char *nodeid, \$pid, \$eid, \$vname)
 #        returns 1 if the node is reserved.
 #        returns 0 if the node is not reserved.
 #
-sub NodeidToExp ($$$) {
-    my($nodeid, $pid, $eid) = @_;
+sub NodeidToExp ($$$;$) {
+    my($nodeid, $pid, $eid, $vname) = @_;
 
     my $query_result =
-	DBQueryFatal("select pid,eid from reserved where node_id='$nodeid'");
+	DBQueryWarn("select pid,eid,vname from reserved ".
+		    "where node_id='$nodeid'");
 
-    if ($query_result->num_rows < 1) {
+    if (! $query_result ||
+	! $query_result->num_rows) {
 	return 0;
     }
     
     my @row = $query_result->fetchrow_array();
     $$pid = $row[0];
     $$eid = $row[1];
+    if (defined($vname)) {
+	if (defined($row[2])) {
+	    $$vname = $row[2];
+	}
+	else {
+	    $$vname = undef;
+	}
+    }
     return 1;
 }
 

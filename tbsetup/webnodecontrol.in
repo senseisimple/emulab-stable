@@ -1,0 +1,20 @@
+#!/usr/bin/perl -w
+use English;
+
+#
+# This gets invoked from the Web interface. Simply a wrapper ...
+#
+# usage: webnodecontrol pid eid
+#
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+
+#
+# Run the real thing, and never return.
+# 
+exec "$TB/bin/node_control", @ARGV;
+
+die("webnodecontrol: Could not exec node_control: $!");

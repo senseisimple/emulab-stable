@@ -188,7 +188,7 @@ echo "<tr>
           <td>Startup Command[1]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"startupcmd\" size=\"60\"
-                     maxlength=\"256\" value=\"$startupcmd\"></td>
+                     maxlength=\"256\" value='$startupcmd'></td>
       </tr>\n";
 
 

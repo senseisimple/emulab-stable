@@ -889,6 +889,7 @@ function SHOWNODE($node_id) {
 
     $node_id            = $row[node_id]; 
     $type               = $row[type];
+    $bios               = $row[bios_version];
     $def_boot_osid      = $row[def_boot_osid];
     $def_boot_path      = $row[def_boot_path];
     $def_boot_cmd_line  = $row[def_boot_cmd_line];
@@ -915,6 +916,8 @@ function SHOWNODE($node_id) {
 	$tarballs = "&nbsp";
     if (!$startupcmd)
 	$startupcmd = "&nbsp";
+    if (!$bios)
+	$bios = "&nbsp";
 
     echo "<table border=2 cellpadding=0 cellspacing=2
                  align=center>\n";
@@ -927,6 +930,11 @@ function SHOWNODE($node_id) {
     echo "<tr>
               <td>Node Type:</td>
               <td class=left>$type</td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Bios Version:</td>
+              <td class=left>$bios</td>
           </tr>\n";
 
     echo "<tr>

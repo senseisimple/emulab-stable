@@ -38,27 +38,28 @@ if (isset($def_boot_osid) && strcmp($def_boot_osid, "None") == 0) {
 }
 
 #
-# Create an update string, that is slightly different if an admin; we allow
+# Create a command string, that is slightly different if an admin; we allow
 # admin people to set next_boot parameters. Ordinary folks cannot.
 #
-$query_string =
-	"UPDATE nodes SET ".
-	"def_boot_osid=\"$def_boot_osid\",             ".
-	"def_boot_path=\"$def_boot_path\",             ".
-	"def_boot_cmd_line=\"$def_boot_cmd_line\",     ".
-	"startupcmd='$startupcmd',                     ".
-	"tarballs='$tarballs',                         ".
-	"rpms='$rpms'                                  ";
+$command_string =
+	"default_boot_osid='$def_boot_osid'		".
+	"default_boot_path='$def_boot_path'		".
+	"default_boot_cmdline='$def_boot_cmd_line'	".
+	"startup_command='$startupcmd'			".
+	"tarfiles='$tarballs'                           ".
+	"rpms='$rpms'                                   ";
 
 if ($isadmin) {
-    $query_string = "$query_string, ".
-	"next_boot_osid=\"$next_boot_osid\",           ".
-	"next_boot_path=\"$next_boot_path\",           ".
-	"next_boot_cmd_line=\"$next_boot_cmd_line\"    ";
+    $command_string = "$command_string			".
+	"next_boot_osid='$next_boot_osid'		".
+	"next_boot_path='$next_boot_path'		".
+	"next_boot_cmdline='$next_boot_cmd_line'	";
 }
-$query_string = "$query_string WHERE node_id=\"$node_id\"";
 
-DBQueryFatal($query_string);
+#
+# Pass it off to the script.
+#
+SUEXEC($uid, "nobody", "webnodecontrol $command_string $node_id", 1);
 
 echo "<center>
       <br>

@@ -172,6 +172,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/frisbeelauncher tbsetup/node_update tbsetup/webnodeupdate \
 	tbsetup/savelogs tbsetup/group-update tbsetup/webgroupupdate \
 	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
+	tbsetup/webnodecontrol tbsetup/node_control \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \

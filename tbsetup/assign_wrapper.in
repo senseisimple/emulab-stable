@@ -821,16 +821,16 @@ foreach $pair (@nodepairs) {
 	    $osid = $defosids{$type};
 	}
 	DBQueryFatal("UPDATE nodes set def_boot_osid=\"$osid\"," .
-		       " def_boot_cmd_line=\"$cmdline\"," .
-		       " startstatus=\"none\"," .
-		       " bootstatus=\"unknown\"," .
+		       " def_boot_cmd_line='$cmdline'," .
+		       " startstatus='none'," .
+		       " bootstatus='unknown'," .
 		       " ready=0," .
-		       " rpms=\"$rpms\"," .
-		       " deltas=\"$deltas\"," .
-		       " tarballs=\"$tarfiles\"," .
-		       " startupcmd=\"$startupcmd\"," .
-		       " failureaction=\"$failureaction\"" .
-		       " where node_id=\"$pnode\"");
+		       " rpms='$rpms'," .
+		       " deltas='$deltas'," .
+		       " tarballs='$tarfiles'," .
+		       " startupcmd='$startupcmd'," .
+		       " failureaction='$failureaction'" .
+		       " where node_id='$pnode'");
     } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
 	# Delay node
 	DBQueryFatal("UPDATE nodes set def_boot_osid=\"" .
