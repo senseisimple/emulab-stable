@@ -115,7 +115,7 @@ if (@row = $sth->fetchrow_array) {
 ##
 ## Select machines.
 ##
-print "Selecting machines.\n";
+print "Selecting machines...";
 $cmd = 
   "select IP from interfaces as ip ".
   "left join reserved as r on r.node_id=ip.node_id ".
@@ -125,7 +125,9 @@ $sth = $dbh->query($cmd);
 my @nodes = ();
 while (@row = $sth->fetchrow_array) {
     push(@nodes,$row[0]);
+    print " $row[0] ";
 }
+print "\n";
 
 ##
 ## For each machine, ping to see if its alive.
@@ -166,7 +168,7 @@ foreach $IP (@nodes) {
 	    }
 
         } else {
-	    print "Couldn't ping machine $IP\n";
+	    die "Couldn't ping machine $IP\n";
 	}
 
         if ( $OS =~ /Linux/ ) {  
@@ -200,12 +202,9 @@ foreach $IP (@nodes) {
 
 	    my $addon = "";
 	    foreach my $user (keys %passwd) {
-		print "user:$user\n";
-		print "unix_gid:$unix_gid\n";
 		$addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:" .
 		         "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
 			 "/bin/tcsh\n";
-		print $addon;
 
 		## Create home directory
 		if ( !(-e "/users/$user") ) {
