@@ -374,7 +374,7 @@ sub step_init {
     tbexec("gmake boss-install","$path/install.log");
     
     prints "  Post-Installing ";
-    tbexec("su1 gmake post-install","$path/postinstall.log");
+    tbexec("sudo gmake post-install","$path/postinstall.log");
         
     chdir $path;
     
