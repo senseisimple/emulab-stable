@@ -978,15 +978,15 @@ sub getStats ($) {
 #
 # Enable, or disable,  port on a trunk
 #
-# usage: removeVlan(self, vlan_number, modport, value)
-#	 vlan_number: The cisco-native VLAN top operate on
+# usage: setVlansOnTrunk(self, modport, value, vlan_numbers)
 #        modport: module.port of the trunk to operate on
 #        value: 0 to disallow the VLAN on the trunk, 1 to allow it
+#	 vlan_numbers: An array of cisco-native VLAN numbers operate on
 #        Returns 1 on success, 0 otherwise
 #
-sub setVlanOnTrunk($$$$) {
+sub setVlansOnTrunk($$$$) {
     my $self = shift;
-    my ($vlan_number, $modport, $value) = @_;
+    my ($modport, $value, @vlan_numbers) = @_;
 
     #
     # Some error checking
@@ -994,7 +994,7 @@ sub setVlanOnTrunk($$$$) {
     if (($value != 1) && ($value != 0)) {
 	die "Invalid value $value passed to setVlanOnTrunk\n";
     }
-    if ($vlan_number == 1) {
+    if (grep(/^1$/,@vlan_numbers)) {
 	die "VLAN 1 passed to setVlanOnTrunk\n"
     }
 
@@ -1021,8 +1021,10 @@ sub setVlanOnTrunk($$$$) {
     # Put this into an array of 1s and 0s for easy manipulation
     my @bits = split //,$unpacked;
 
-    # Just set the bit of the one we want to change
-    $bits[$vlan_number] = $value;
+    # Just set the bit of the ones we want to change
+    foreach my $vlan_number (@vlan_numbers) {
+	$bits[$vlan_number] = $value;
+    }
 
     # Pack it back up...
     $unpacked = join('',@bits);

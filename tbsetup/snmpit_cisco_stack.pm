@@ -497,8 +497,8 @@ sub setVlanOnTrunks($$$;@) {
 	    # first
 	    #
 	    my $modport = $trunks{$src}{$dst}[0];
-	    $errors += !($self->{DEVICES}{$src}->setVlanOnTrunk($vlan_number,
-		$modport,$value));
+	    $errors += !($self->{DEVICES}{$src}->setVlansOnTrunk($modport,
+		    $value,$vlan_number));
 	}
 	if (!$self->{DEVICES}{$dst}) {
 	    warn "ERROR - Bad device $dst found in setVlanOnTrunks!\n";
@@ -509,8 +509,8 @@ sub setVlanOnTrunks($$$;@) {
 	    # first
 	    #
 	    my $modport = $trunks{$dst}{$src}[0];
-	    $errors += !($self->{DEVICES}{$dst}->setVlanOnTrunk($vlan_number,
-		$modport,$value));
+	    $errors += !($self->{DEVICES}{$dst}->setVlanOnTrunk($modport,
+		    $value,$vlan_number));
 	}
     }
 
