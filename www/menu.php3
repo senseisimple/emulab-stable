@@ -456,6 +456,7 @@ function WRITESIDEBAR() {
 		        WRITESIDEBARBUTTON("Add Testbed Nodes",
 				           $TBBASE, "newnodes_list.php3");
 		    }
+
 		}
 
 	    }
@@ -559,6 +560,7 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
     global $BASEPATH, $TBMAINSITE, $THISHOMEBASE;
     global $TBDIR, $WWW;
     global $MAINPAGE;
+    global $TBDOCBASE;
 
     $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/"); 
   
@@ -600,9 +602,10 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
             <tr>
               <td valign='top' class='bannercell' 
               background='$BASEPATH/headerbgbb.jpg'
-              bgcolor=#3D627F ><img width=369 height=100 
+              bgcolor=#3D627F ><a href='$TBDOCBASE/index.php3'><img width=369
+	      height=100 border=0
               src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' 
-              alt='$THISHOMEBASE - the network testbed' />";
+              alt='$THISHOMEBASE - the network testbed' /></a>";
 	      if (!$MAINPAGE) {
 		  echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
 	      }
