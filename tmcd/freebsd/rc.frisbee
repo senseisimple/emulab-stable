@@ -2,25 +2,25 @@
 TMCC=/etc/testbed/tmcc
 DISKDEV=/dev/rad0
 
-# For testing on boss
-#LOADINFO='ADDR=1.2.3.4:666 PART=42'
-
 LOADINFO=`$TMCC loadinfo`
+
+# For testing purposes.
+#LOADINFO='ADDR=234.5.6.69:4444 PART=0'
+
 ADDRESS=`echo $LOADINFO | awk -F= '{ printf $2 }' | awk -F' ' '{ print $1 }'`
 PARTITION=`echo $LOADINFO | awk -F= '{ printf $3 }'`
-
-# The address returned by 'loadinfo' has a colon seperating the multicast
-# address and the port number, but frisbee needs them space-seperated
-ADDRESS=`echo $ADDRESS | sed 's/:/ /g'`
-
 
 if [ x"$PARTITION" != x ] && [ "$PARTITION" != 0 ]; then
 	SLICE="-s $PARTITION";
 fi
 
 if [ x"$ADDRESS" != x ]; then
-	/bin/echo "Running Frisbee: /etc/testbed/userfrisbee $SLICE $ADDRESS $DISKDEV ";
-	/etc/testbed/userfrisbee $SLICE $ADDRESS $DISKDEV;
+        PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`;
+	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`;
+	MCASTADDR="-m $MCAST -p $PORT";
+
+	/bin/echo "Running /etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV ";
+	/etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV;
 	/bin/echo "Frisbee run finished";
 	$TMCC reset;
 	/sbin/reboot &
