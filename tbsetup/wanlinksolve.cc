@@ -620,9 +620,12 @@ int main( int argc, char ** argv )
   {
     if (verbose) { printf("\nYour solution is as follows:\n"); }
     for (int x = 0; x < vnodes; x++) {
-	printf("%s mapsTo %s\n", 
-	       vnodeNames[x].c_str(),
-	       pnodeNames[pool[0].vnode_mapping[x]].c_str() );
+      if (pnodeNames.find( pool[0].vnode_mapping[x] ) == pnodeNames.end()) {
+	pnodeNames[ pool[0].vnode_mapping[x] ] = "CRAP";
+      }
+      printf("%s mapsTo %s\n", 
+	     vnodeNames[x].c_str(),
+	     pnodeNames[pool[0].vnode_mapping[x]].c_str() );
     }
 
     printf("\n");
