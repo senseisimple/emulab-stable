@@ -27,7 +27,7 @@ my $lockfile    = "/var/tmp/testbed_exports_lockfile";
 my $projdir     = "/q/proj";
 my $usersdir    = "/users";
 my $dbg		= 1;
-my @row;
+my @row; 
 
 #
 # We don't want to run this script unless its the real version.
