@@ -40,5 +40,5 @@ between them.
 #TB set-hardware <node> <type> [<args>]
 
 This commands is used to set hardware specs.  Currently only one
-format is supported: <type> = dnard-shelf.  This indicates that <node>
-should be a shelf (unswitches LAN) of 8 dnards.
+format is supported: <type> = shark-shelf.  This indicates that <node>
+should be a shelf (unswitches LAN) of 8 sharks.
