@@ -1822,10 +1822,9 @@ COMMAND_PROTOTYPE(doreadycount)
 	 * keep asking until N and M are equal. Can only be used once
 	 * of course, after experiment creation.
 	 */
-	res = mydb_query("SELECT ready FROM nodes "
-			 "LEFT JOIN reserved "
-			 "ON nodes.node_id=reserved.node_id "
-			 "WHERE reserved.eid='%s' and reserved.pid='%s'",
+	res = mydb_query("select ready from reserved "
+			 "left join nodes on nodes.node_id=reserved.node_id "
+			 "where reserved.eid='%s' and reserved.pid='%s'",
 			 1, eid, pid);
 
 	if (!res) {
@@ -2647,14 +2646,14 @@ iptonodeid(struct in_addr ipaddr, char *vnodeid,
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
 
-	res = mydb_query("select t.class,t.type,n.node_id "
-			 " from node_types as t "
-			 "left join nodes as n on t.type=n.type "
-			 "left join interfaces as i on n.node_id=i.node_id "
-			 "and i.card=t.control_net "
+	res = mydb_query("select t.class,t.type,n.node_id  "
+			 " from interfaces as i "
+			 "left join nodes as n on n.node_id=i.node_id "
+			 "left join node_types as t on "
+			 "  t.type=n.type and i.card=t.control_net "
 			 "where i.IP='%s'",
 			 3, inet_ntoa(ipaddr));
-			 
+
 	if (!res) {
 		error("iptonodeid: %s: DB Error getting interfaces!\n",
 		      inet_ntoa(ipaddr));
