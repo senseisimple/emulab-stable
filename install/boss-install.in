@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -316,10 +316,11 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
 	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
 	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
-	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
-	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log",
+	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
+	    "!genlastlog","*.*\t\t\t\t\t\t$LOGDIR/genlastlog.log",
 	    "!sdcollectd","*.*\t\t\t\t\t\t$LOGDIR/sdcollectd.log",
-	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log");
+	    "!plabgetfree","*.*\t\t\t\t\t\t$LOGDIR/plabgetfree.log",
+	    "!plabrenew", "*.*\t\t\t\t\t\t$LOGDIR/plabrenew.log");
     };
 
     Phase "logdir", "Creating log directory", sub {
@@ -363,8 +364,11 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/elvind.log             640  5     1000 *     Z",
 	    "$LOGDIR/tevd.log               640  3     200  *     Z",
 	    "$LOGDIR/suexec.log             640  3     200  *     Z",
+	    "$LOGDIR/genlastlog.log         640  3     200  *     Z",
 	    "$LOGDIR/genlastlog             640  3     200  *     Z " .
-	        "/var/run/lastlog_daemon.pid");
+	        "/var/run/lastlog_daemon.pid",
+	    "$LOGDIR/plabmetrics.log        640  7     1000 *     Z",
+	    "$LOGDIR/plablinkdata.log       640  7     1000 *     Z");
     };
 };
 
