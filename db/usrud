@@ -4,10 +4,12 @@ use DBI;
 $driver = "mysql";
 $dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost")
     || die "Could not connect.\n";
-
+#A program to delete or add users to the tesbed database.
+#"usrud -d UID" deletes that user from users, grp_memb and proj_memb.
+#"usrud -a UID ..." adds a user to users along with information supplied on the command line
 if ($#ARGV >= 1) {
     ($oper, @usrs) = @ARGV;
-    if ($oper eq '-r') {
+    if ($oper eq '-d') {
 	foreach $n (@usrs) {
 	    chomp($n);
 	    $sth = $dbh->prepare("DELETE FROM users WHERE uid = \"$n\"");
@@ -20,25 +22,13 @@ if ($#ARGV >= 1) {
 	    print "User $n removed.\n"; 
 	}
     } elsif ($oper eq '-a') { 
-	foreach (@usrs) {
-	    print "User expires: ";
-	    chomp($usr_expires = <STDIN>);
-	    print "User name: ";
-	    chomp($usr_name = <STDIN>);
-	    print "User email: ";
-	    chomp($usr_email = <STDIN>);
-	    print "User address: ";
-	    chomp($usr_addr = <STDIN>);
-	    print "User phone number: ";
-	    chomp($usr_phones = <STDIN>); 
-	    print "Trust level: ";
-	    chomp($trust_level = <STDIN>);
-	    $sth = $dbh->prepare("INSERT INTO users VALUES ('$_', now(), '$usr_expires', '$usr_name', '$usr_email', '$usr_addr', '$usr_phones', '$trust_level')");
-	    $ra = $sth->execute;
-	    $ra == 0 || print "User $usr_name added.\n";
-	}
+	chomp(@usrs);
+	$#usrs = 6;
+	$sth = $dbh->prepare("INSERT INTO users VALUES ('$usrs[0]', now(), '$usrs[1]', '$usrs[2]', '$usrs[3]', '$usrs[4]', '$usrs[5]', '$usrs[6]')");
+	$ra = $sth->execute;
+	$ra == 0 || print "User added.\n";
     } else {
-	print "Incorrect command: \"-r\" or \"-a\" expected.\n";
+	print "Incorrect command: \"-d\" or \"-a\" expected.\n";
     }
 } else {
     print "Type the command \"-r\" and a username to remove an user from the database or \"-a\" and a user ID to add a new user to the database.\n";
