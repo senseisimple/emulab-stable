@@ -25,6 +25,7 @@
 #ifdef USE_MYSQL_DB
 
 static int parse_multiboot_path(char *path, boot_what_t *info);
+static void parse_mfs_path(char *path, boot_what_t *info);
 static int boot_newnode_mfs(struct in_addr, int, boot_what_t *);
 
 int
@@ -138,7 +139,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 		if (DEFINED(NEXT_BOOT_PATH)) {
 			if (DEFINED(NEXT_BOOT_MFS) && TOINT(NEXT_BOOT_MFS) == 1){
 				info->type = BIBOOTWHAT_TYPE_MFS;
-				strcpy(info->what.mfs, row[NEXT_BOOT_PATH]);
+				parse_mfs_path(row[NEXT_BOOT_PATH], info);
 			}
 			else {
 				info->type = BIBOOTWHAT_TYPE_MB;
@@ -167,7 +168,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 		if (DEFINED(TEMP_BOOT_PATH)) {
 			if (DEFINED(TEMP_BOOT_MFS) && TOINT(TEMP_BOOT_MFS) == 1){
 				info->type = BIBOOTWHAT_TYPE_MFS;
-				strcpy(info->what.mfs, row[TEMP_BOOT_PATH]);
+				parse_mfs_path(row[TEMP_BOOT_PATH], info);
 			}
 			else {
 				info->type = BIBOOTWHAT_TYPE_MB;
@@ -192,7 +193,7 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 		if (DEFINED(DEF_BOOT_PATH)) {
 			if (DEFINED(DEF_BOOT_MFS) && TOINT(DEF_BOOT_MFS) == 1) {
 				info->type = BIBOOTWHAT_TYPE_MFS;
-				strcpy(info->what.mfs, row[DEF_BOOT_PATH]);
+				parse_mfs_path(row[DEF_BOOT_PATH], info);
 			}
 			else {
 				info->type = BIBOOTWHAT_TYPE_MB;
@@ -305,7 +306,7 @@ boot_newnode_mfs(struct in_addr ipaddr, int version, boot_what_t *info)
 
 	if (row[MFS_PATH] != 0 && row[MFS_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MFS;
-		strcpy(info->what.mfs, row[MFS_PATH]);
+		parse_mfs_path(row[MFS_PATH], info);
 		mysql_free_result(res);
 		return 0;
 	}
@@ -314,6 +315,45 @@ boot_newnode_mfs(struct in_addr ipaddr, int version, boot_what_t *info)
 #undef  MFS_PATH
 }
 
+void
+parse_mfs_path(char *str, boot_what_t *info)
+{
+	struct hostent *he;
+	struct in_addr hip;
+	char *path;
+
+	/* no hostname, just copy string as is */
+	path = strchr(str, ':');
+	if (path == NULL) {
+		strncpy(info->what.mfs, str, sizeof(info->what.mfs));
+		return;
+	}
+	*path = '\0';
+
+	/* hostname is a valid IP addr, copy as is */
+	if (inet_addr(str) != INADDR_NONE) {
+		*path = ':';
+		strncpy(info->what.mfs, str, sizeof(info->what.mfs));
+		return;
+	}
+
+	/* not a valid hostname, whine and copy it as is */
+	he = gethostbyname(str);
+	if (he == NULL) {
+		*path = ':';
+		error("Invalid hostname in MFS path '%s', passing anyway\n",
+		      str);
+		strncpy(info->what.mfs, str, sizeof(info->what.mfs));
+		return;
+	}
+	*path = ':';
+
+	/* valid hostname, translate to IP and replace in string */
+	memcpy((char *)&hip, he->h_addr, he->h_length);
+	strcpy(info->what.mfs, inet_ntoa(hip));
+	strncat(info->what.mfs, path,
+		sizeof(info->what.mfs)-strlen(info->what.mfs));
+}
 
 #ifdef TEST
 #include <stdarg.h>
