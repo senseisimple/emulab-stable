@@ -78,7 +78,7 @@ echo "<form action=\"modusr_process.php3\" method=\"post\">\n";
 echo "<tr>
           <td>Username:</td>
           <td class=\"left\"> 
-              <input type=\"readonly\" name=\"target_uid\"
+              <input readonly type=readonly name=target_uid
                      value=\"$target_uid\"></td>
       </tr>\n";
 
@@ -99,7 +99,7 @@ if ($isadmin) {
     echo "<input type=text ";
 }
 else {
-    echo "<input type=readonly ";
+    echo "<input readonly type=readonly ";
 }
 echo "		 name='usr_email' size=30 value='$usr_email'></td>
       </tr>\n";
