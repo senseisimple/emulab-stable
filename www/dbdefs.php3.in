@@ -307,6 +307,9 @@ function TBProjAccessCheck($uid, $pid, $gid, $access_type)
 	    $mintrust = $TBDB_TRUST_GROUPROOT;
 	}
     }
+    elseif ($access_type == $TB_PROJECT_DELUSER) {
+	$mintrust = $TBDB_TRUST_PROJROOT;
+    }
     else {
 	TBERROR("Unexpected access type: $access_type!", 1);
     }
@@ -665,6 +668,25 @@ function TBCurrentUser($uid)
 }
 
 #
+# Get user status,
+#
+# usage TBUserStatus($uid)
+#       returns status if a valid user.
+#       returns 0 if not a valid user.
+#
+function TBUserStatus($uid)
+{
+    $query_result =
+	DBQueryFatal("SELECT status FROM users WHERE uid='$uid'");
+
+    if (! mysql_num_rows($query_result)) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
+}
+
+#
 # Confirm a valid pid/gid
 #
 # usage TBValidGroup($pid, $gid)
@@ -960,7 +982,7 @@ function TBGroupLeader($pid, $gid, &$groupleader)
 #
 # Return Experiment Leader.
 #
-# usage TBExpLeader($pid, &$expleader)
+# usage TBExpLeader($pid, $eid, &$expleader)
 #       returns 1 if valid
 #       returns 0 if not valid
 #
