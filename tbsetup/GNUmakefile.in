@@ -33,6 +33,7 @@ LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webstartexp webendexp webbatchexp \
 		  assign_wrapper ptopgen webnodeupdate \
+		  webdelay_config \
 		  webrmgroup webswapexp webnodecontrol \
 		  webmkgroup webmkacct websetgroups webmkproj \
 		  spewlogfile staticroutes routecalc wanassign \
