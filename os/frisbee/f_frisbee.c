@@ -91,7 +91,8 @@ int frisbeeInit( const char * imageName,
 }
 
 int frisbeeInit2( const char * imageName,
-		  const char * broadcastAddr )
+		  const char * broadcastAddr,
+                  int port )
 {
 #ifdef OSKIT
   /* redundant calls removed.
@@ -111,7 +112,7 @@ int frisbeeInit2( const char * imageName,
   packetsReceivedSoFar = 0;
 
   printf("frisbeeInit: calling n_init.\n");
-  n_initLookup( FRISBEE_PORT, FRISBEE_PORT, broadcastAddr );
+  n_initLookup( port, port, broadcastAddr );
 
   printf("frisbeeInit: calling t_init.\n");
   t_init();

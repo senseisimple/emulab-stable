@@ -21,7 +21,8 @@ int frisbeeInit( const char *   imageName,
 		 unsigned int broadcastAddr );
 
 int frisbeeInit2( const char * imageName,
-		  const char * broadcastAddr );
+		  const char * broadcastAddr,
+		  int port);
 
 /* frisbeeLockReadyChunk
  *

@@ -63,6 +63,7 @@ static int frisbee_done = 0;
 static char * frisbee_data = 0;
 static unsigned int ipaddr;
 static const char * frisbee_addr;
+static int frisbee_port;
 
 void frisbeeEndChunk()
 {
@@ -97,9 +98,10 @@ int frisbeeRead( char * inbuf, int amt )
 
 void * frisbee_thread( void *arg );
 
-void frisbeeBridgeInit( const char * address )
+void frisbeeBridgeInit( const char * address, const char * port )
 {
   frisbee_addr = address;
+  frisbee_port = atoi( port );
   frisbee_done = 0;
   frisbee_data = NULL;
   frisbeeIndexIntoCurrentChunk = 0;
@@ -130,7 +132,7 @@ void * frisbee_thread( void *arg )
   static unsigned int doneGetting = 0; 
 
   printf("Frisbee starting, netaddr = 0x%08x\n", ipaddr ); 
-  frisbeeInit2( "ignored.image", frisbee_addr );
+  frisbeeInit2( "ignored.image", frisbee_addr, frisbee_port );
 
   printf("frisbee_thread: entering mainloop 'while(!frisbee_done)'\n");
   while(!frisbee_done) {
@@ -182,14 +184,14 @@ main(int argc, char **argv)
 {
 	struct timeval  stamp, estamp;
 
-	if (argc < 2 || argc > 3) {
+	if (argc < 3 || argc > 4) {
 		fprintf(stderr, "usage: "
-		       "%s <network address> [output filename]\n", argv[0]);
+		       "%s <network address> <port> [output filename]\n", argv[0]);
 		exit(1);
 	}
 
         printf("calling frisbeebridgeinit...\n");
-	frisbeeBridgeInit( argv[1] );
+	frisbeeBridgeInit( argv[1], argv[2] );
 	/*
 	if ((infd = open(argv[1], O_RDONLY, 0666)) < 0) {
 		perror("opening input file");
@@ -199,9 +201,9 @@ main(int argc, char **argv)
 	
 
         printf("opening outfile...\n");
-	if (argc == 3) {
+	if (argc == 4) {
 		if ((outfd =
-		     open(argv[2], O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
+		     open(argv[3], O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
 			perror("opening output file");
 			exit(1);
 		}

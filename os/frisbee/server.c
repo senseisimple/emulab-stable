@@ -9,7 +9,8 @@
 #include "f_timer.h"
 #include "f_network.h"
 
-#define POLL_WAIT 50
+#define POLL_WAIT 100 
+/* was 50 */
 
 #define PACKETS_PER_CHUNK 16
 
@@ -29,6 +30,7 @@ uint clientNaughtiness[ MAX_CLIENTS ];
 /* list of client ids */
 uint clientList[ MAX_CLIENTS ];
 uint clientListPos;
+uint clientCount;
 
 /* id kept of the last client we polled..
    so if the poll times out, we know who to blame. */
@@ -82,6 +84,7 @@ void removeClient( uint id )
     if (clientList[i] == id ) {
       syslog( LOG_INFO, "Removing client (id=0x%08x)\n", id );
       clientList[i] = 0;
+      clientCount++;
       return;
     }
   }
@@ -99,6 +102,7 @@ void addClient( uint id )
     }
     if ((place == -1) && (clientList[i] == 0)) {
       place = i;
+      clientCount++;
     }
   }
 
@@ -151,6 +155,8 @@ int main( int argc, char ** argv )
 {
   int gotNonRequestYet;
 
+  clientCount = 0;
+
   openlog("frisbeed", LOG_PERROR | LOG_PID, LOG_USER );
   atexit( closelog );
 
@@ -185,6 +191,7 @@ int main( int argc, char ** argv )
   gotNonRequestYet = 0;
 
   while (1) {
+    uint puntCount = 0;
     Packet p;
 
     if ((!gotNonRequestYet || !t_getWentOff()) && 
@@ -206,6 +213,7 @@ int main( int argc, char ** argv )
 	    ((pr->packetId < packetTotal) || (pr->packetId == MAXUINT))) {
 	  if (pr->packetId != MAXUINT) {
 	    int i;
+	    puntCount = 0;
 	    /* 
 	     * only actually do anything if this is a real request.
 	     * if this is a punt (pr->packetId == MAXUINT) then
@@ -217,9 +225,23 @@ int main( int argc, char ** argv )
 	    for( i = 0; i < PACKETS_PER_CHUNK; i++ ) {
 	      PacketData pd;
 	      pd.type = NPT_DATA;
-	      pd.packetId = (i + pr->packetId) % packetTotal;
-	      read( inFile, &(pd.data), 1024 );
-	      n_packetSend( (Packet *)&pd );
+	      pd.packetId = i + pr->packetId;
+              if (pd.packetId < packetTotal) {
+                int tries = 8;
+                while (--tries && (1024 != read( inFile, &(pd.data), 1024))) ;
+		if (tries) { 
+		  n_packetSend( (Packet *)&pd );
+		} else {
+		  perror("read call [non-fatal]");
+		}
+	      }
+	    }
+	  } else {
+	    /* was a punt */
+	    puntCount++;
+	    if (puntCount > clientCount) {
+	      usleep( 1000 * 333 ); /* sleep a third of a second. */
+	      puntCount = 0;
 	    }
 	  }
 	  /* "fall through" to polling code */
