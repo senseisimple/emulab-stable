@@ -29,8 +29,10 @@ LIBS	 += -lmtp -ltb -lm
 
 test_rmcd.sh: rmcd
 
-rmcd: rmcd.o ../mtp/libmtp.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ rmcd.o $(LIBS)
+OBJS = rclip.o obstacles.o pilotConnection.o rmcd.o
+
+rmcd: $(OBJS) ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin

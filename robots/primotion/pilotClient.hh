@@ -21,6 +21,7 @@
 
 #include "mtp.h"
 
+#include "dashboard.hh"
 #include "wheelManager.hh"
 
 /**
@@ -55,7 +56,7 @@ public:
      * @param wm The reference to the wheelManager that should be used to drive
      * the robot.
      */
-    pilotClient(int fd, wheelManager &wm);
+    pilotClient(int fd, wheelManager &wm, dashboard &db);
 
     /**
      * Destruct a pilotClient object.  This method will close the client
@@ -127,7 +128,8 @@ private:
      * The wheelManager the RMC client will use to drive the robot.
      */
     wheelManager &pc_wheel_manager;
-    
+
+    dashboard &pc_dashboard;
 };
 
 #endif

@@ -573,10 +573,10 @@ void parse_config_file(char *config_file) {
       }
       else {
 	oc[oc_size].id = id;
-	oc[oc_size].x1 = x1;
-	oc[oc_size].y1 = y1;
-	oc[oc_size].x2 = x2;
-	oc[oc_size].y2 = y2;
+	oc[oc_size].xmin = x1;
+	oc[oc_size].ymin = y1;
+	oc[oc_size].xmax = x2;
+	oc[oc_size].ymax = y2;
 	oc_size += 1;
       }
     }
@@ -726,7 +726,8 @@ void ev_callback(event_handle_t handle,
     struct mtp_packet mp;
     
     event_notification_get_arguments(handle, notification, args, sizeof(args));
-    
+
+    /* XXX copy the current X, Y, and orientation! */
     if (event_arg_get(args, "X", &value) > 0) {
       if (sscanf(value, "%f", &x) != 1) {
 	error("X argument in event is not a float: %s\n", value);
@@ -1299,7 +1300,7 @@ int vmc_callback(elvin_io_handler_t handler,
         struct mtp_update_position *up_copy, *up_in;
 
 	up_in = &mp->data.mtp_payload_u.update_position;
-	if ((up->status == MTP_POSITION_STATUS_ERROR) &&
+	if (up && (up->status == MTP_POSITION_STATUS_ERROR) &&
 	    (up_in->status != MTP_POSITION_STATUS_ERROR)) {
 	  struct mtp_packet mp_reply;
 	  

@@ -12,6 +12,8 @@
 
 #include "config.h"
 
+#include <math.h>
+
 #include "pilotClient.hh"
 
 /**
@@ -59,6 +61,15 @@ void pilotMoveCallback::call(int status)
     case aGARCIA_ERRFLAG_WONTEXECUTE:
 	ms = MTP_POSITION_STATUS_ABORTED;
 	break;
+    case aGARCIA_ERRFLAG_STALL:
+    case aGARCIA_ERRFLAG_FRONTR_LEFT:
+    case aGARCIA_ERRFLAG_FRONTR_RIGHT:
+    case aGARCIA_ERRFLAG_REARR_LEFT:
+    case aGARCIA_ERRFLAG_REARR_RIGHT:
+    case aGARCIA_ERRFLAG_SIDER_LEFT:
+    case aGARCIA_ERRFLAG_SIDER_RIGHT:
+	ms = MTP_POSITION_STATUS_CONTACT;
+	break;
     default:
 	fprintf(stderr, "error: couldn't complete move %d\n", status);
 	ms = MTP_POSITION_STATUS_ERROR;
@@ -81,8 +92,8 @@ void pilotMoveCallback::call(int status)
 
 pilotClient *pilotClient::pc_rmc_client = NULL;
 
-pilotClient::pilotClient(int fd, wheelManager &wm)
-    : pc_wheel_manager(wm)
+pilotClient::pilotClient(int fd, wheelManager &wm, dashboard &db)
+    : pc_wheel_manager(wm), pc_dashboard(db)
 {
     assert(fd > 0);
 
@@ -233,6 +244,85 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		mtp_send_packet(pc->getHandle(), &rmp);
 	    }
 	    
+	    retval = true;
+	}
+	break;
+
+    case MTP_REQUEST_REPORT:
+	{
+	    struct mtp_garcia_telemetry *mgt;
+	    struct contact_point points[8];
+	    struct mtp_packet cmp;
+	    int count = 0;
+	    
+	    mgt = this->pc_dashboard.getTelemetry();
+
+	    if ((mgt->front_ranger_left != 0.0) &&
+		(mgt->front_ranger_right != 0.0)) {
+		float min_range;
+
+		if (mgt->front_ranger_left < mgt->front_ranger_right)
+		    min_range = mgt->front_ranger_left;
+		else
+		    min_range = mgt->front_ranger_right;
+		points[count].x = cos(0.0) * min_range;
+		points[count].y = sin(0.0) * min_range;
+		count += 1;
+	    }
+	    else if (mgt->front_ranger_left != 0.0) {
+		points[count].x = cos(0.40) * mgt->front_ranger_left;
+		points[count].y = sin(0.40) * mgt->front_ranger_left;
+		count += 1;
+	    }
+	    else if (mgt->front_ranger_right != 0.0) {
+		points[count].x = cos(-0.40) * mgt->front_ranger_right;
+		points[count].y = sin(-0.40) * mgt->front_ranger_right;
+		count += 1;
+	    }
+
+	    if (mgt->side_ranger_left != 0.0) {
+		points[count].x = cos(M_PI_2) * mgt->side_ranger_left;
+		points[count].y = sin(M_PI_2) * mgt->side_ranger_left;
+		count += 1;
+	    }
+	    
+	    if (mgt->side_ranger_right != 0.0) {
+		points[count].x = cos(-M_PI_2) * mgt->side_ranger_right;
+		points[count].y = sin(-M_PI_2) * mgt->side_ranger_right;
+		count += 1;
+	    }
+	    
+	    if ((mgt->rear_ranger_left != 0.0) &&
+		(mgt->rear_ranger_right != 0.0)) {
+		float min_range;
+
+		if (mgt->rear_ranger_left < mgt->rear_ranger_right)
+		    min_range = mgt->rear_ranger_left;
+		else
+		    min_range = mgt->rear_ranger_right;
+		points[count].x = cos(M_PI) * min_range;
+		points[count].y = sin(M_PI) * min_range;
+		count += 1;
+	    }
+	    else if (mgt->rear_ranger_left != 0.0) {
+		points[count].x = cos(M_PI - 0.40) * mgt->rear_ranger_left;
+		points[count].y = sin(M_PI - 0.40) * mgt->rear_ranger_left;
+		count += 1;
+	    }
+	    else if (mgt->rear_ranger_right != 0.0) {
+		points[count].x = cos(-M_PI + 0.40) * mgt->rear_ranger_right;
+		points[count].y = sin(-M_PI + 0.40) * mgt->rear_ranger_right;
+		count += 1;
+	    }
+
+	    mtp_init_packet(&cmp,
+			    MA_Opcode, MTP_CONTACT_REPORT,
+			    MA_Role, MTP_ROLE_ROBOT,
+			    MA_ContactPointCount, count,
+			    MA_ContactPoints, points,
+			    MA_TAG_DONE);
+	    mtp_send_packet(this->getHandle(), &cmp);
+
 	    retval = true;
 	}
 	break;

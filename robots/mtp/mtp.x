@@ -114,6 +114,10 @@ enum mtp_opcode_t {
      * the result of a wiggle.
      */
     MTP_WIGGLE_STATUS		= 71,
+
+    MTP_REQUEST_REPORT		= 80,
+    
+    MTP_CONTACT_REPORT		= 81,
     
 
     MTP_OPCODE_MAX
@@ -145,7 +149,7 @@ enum mtp_status_t {
     MTP_POSITION_STATUS_MOVING		= 2,
     MTP_POSITION_STATUS_ERROR		= 3,
     MTP_POSITION_STATUS_COMPLETE	= 4,
-    MTP_POSITION_STATUS_OBSTRUCTED	= 5,
+    MTP_POSITION_STATUS_CONTACT		= 5,
     MTP_POSITION_STATUS_ABORTED		= 6,
     MTP_POSITION_STATUS_CYCLE_COMPLETE	= 32
 };
@@ -172,12 +176,12 @@ struct camera_config {
 
 struct obstacle_config {
     int id;
-    float x1;
-    float y1;
-    float z1;
-    float x2;
-    float y2;
-    float z2;
+    float xmin;
+    float ymin;
+    float zmin;
+    float xmax;
+    float ymax;
+    float zmax;
 };
 
 struct global_bound {
@@ -295,6 +299,16 @@ struct mtp_wiggle_status {
     mtp_status_t status;
 };
 
+struct contact_point {
+    float x;
+    float y;
+};
+
+struct mtp_contact_report {
+    int count;
+    contact_point points[8];
+};
+
 union mtp_telemetry switch (mtp_robot_type_t type) {
  case MTP_ROBOT_GARCIA:		mtp_garcia_telemetry	garcia;
 };
@@ -315,6 +329,8 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_TELEMETRY:		mtp_telemetry		telemetry;
  case MTP_WIGGLE_REQUEST:	mtp_wiggle_request	wiggle_request;
  case MTP_WIGGLE_STATUS:	mtp_wiggle_status	wiggle_status;
+ case MTP_REQUEST_REPORT:	mtp_request_position	request_report;
+ case MTP_CONTACT_REPORT:	mtp_contact_report	contact_report;
 };
 
 /**

@@ -301,7 +301,7 @@ int main(int argc, char *argv[])
 			    perror("accept");
 			}
 			else {
-			    pilotClient *pc = new pilotClient(cfd, wm);
+			    pilotClient *pc = new pilotClient(cfd, wm, db);
 			    
 			    if (debug) {
 				fprintf(stderr,

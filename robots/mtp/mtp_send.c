@@ -380,9 +380,11 @@ static int interpret_options(int *argcp, char ***argvp)
     else if (strcasecmp(argv[0], "command-stop") == 0)
 	opcode = MTP_COMMAND_STOP;
     else if (strcasecmp(argv[0], "wiggle-request") == 0)
-      opcode = MTP_WIGGLE_REQUEST;
+	opcode = MTP_WIGGLE_REQUEST;
     else if (strcasecmp(argv[0], "wiggle-status") == 0)
-      opcode = MTP_WIGGLE_STATUS;
+	opcode = MTP_WIGGLE_STATUS;
+    else if (strcasecmp(argv[0], "request-report") == 0)
+	opcode = MTP_REQUEST_REPORT;
     else {
 	fprintf(stderr, "error: unknown command: %s\n", argv[0]);
 	usage();
@@ -550,37 +552,45 @@ static int interpret_options(int *argcp, char ***argvp)
 			MA_RobotID, args.id,
 			MA_TAG_DONE);
 	break;
-
+	
     case MTP_WIGGLE_REQUEST:
-      if (args.wiggle_type == -1)
+	if (args.wiggle_type == -1)
 	    required_option("W");
-      if (args.id == -1)
-        required_option("i");
-
-      mtp_init_packet(&mp,
-                      MA_Opcode, opcode,
-                      MA_Role, args.role,
-                      MA_RobotID, args.id,
-                      MA_WiggleType, args.wiggle_type,
-                      MA_TAG_DONE
-                      );
-      break;
-
+	if (args.id == -1)
+	    required_option("i");
+	
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_WiggleType, args.wiggle_type,
+			MA_TAG_DONE
+			);
+	break;
+	
     case MTP_WIGGLE_STATUS:
-      if (args.status == -1)
-        required_option("s");
-      if (args.id == -1)
-        required_option("i");
+	if (args.status == -1)
+	    required_option("s");
+	if (args.id == -1)
+	    required_option("i");
+	
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_Status, args.status,
+			MA_TAG_DONE
+			);
+	break;
 
-      mtp_init_packet(&mp,
-                      MA_Opcode, opcode,
-                      MA_Role, args.role,
-                      MA_RobotID, args.id,
-                      MA_Status, args.status,
-                      MA_TAG_DONE
-                      );
-      break;
-
+    case MTP_REQUEST_REPORT:
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_TAG_DONE);
+	break;
+	
     default:
 	fprintf(stderr,
 		"internal error: command %s not supported at the moment...\n",

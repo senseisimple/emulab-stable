@@ -314,6 +314,9 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
     mp->vers = MTP_VERSION;
     
     while (tag != MA_TAG_DONE) {
+	struct contact_point *cp;
+	int lpc;
+	
 	assert(tag >= MA_TAG_DONE);
 	assert(tag < MA_TAG_MAX);
 	
@@ -397,6 +400,10 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 		break;
 	    case MTP_WIGGLE_STATUS:
 		mp->data.mtp_payload_u.wiggle_status.robot_id = 
+		    va_arg(args, int);
+		break;
+	    case MTP_REQUEST_REPORT:
+		mp->data.mtp_payload_u.request_report.robot_id = 
 		    va_arg(args, int);
 		break;
 	    default:
@@ -543,6 +550,17 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	    mp->data.mtp_payload_u.wiggle_request.wiggle_type =
 		va_arg(args, mtp_wiggle_t);
 	    break;
+	case MA_ContactPointCount:
+	    mp->data.mtp_payload_u.contact_report.count = va_arg(args, int);
+	    break;
+	case MA_ContactPoints:
+	    cp = va_arg(args, struct contact_point *);
+	    for (lpc = 0;
+		 lpc < mp->data.mtp_payload_u.contact_report.count;
+		 lpc++) {
+		mp->data.mtp_payload_u.contact_report.points[lpc] = cp[lpc];
+	    }
+	    break;
 	}
 	
 	tag = va_arg(args, mtp_tag_t);
@@ -581,6 +599,7 @@ float mtp_theta(float theta)
 void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 {
     struct mtp_garcia_telemetry *mgt;
+    struct mtp_contact_report *mcr;
     int lpc;
 
     assert(mp != NULL);
@@ -680,10 +699,10 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    "  obstacle[%d]:\t%d %f/%f x %f/%f\n",
 		    lpc,
 		    mcr->obstacles.obstacles_val[lpc].id,
-		    mcr->obstacles.obstacles_val[lpc].x1,
-		    mcr->obstacles.obstacles_val[lpc].y1,
-		    mcr->obstacles.obstacles_val[lpc].x2,
-		    mcr->obstacles.obstacles_val[lpc].y2);
+		    mcr->obstacles.obstacles_val[lpc].xmin,
+		    mcr->obstacles.obstacles_val[lpc].ymin,
+		    mcr->obstacles.obstacles_val[lpc].xmax,
+		    mcr->obstacles.obstacles_val[lpc].ymax);
 	}
 	break;
     
@@ -717,13 +736,15 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		"  y:\t\t%f\n"
 		"  theta:\t%f\n"
 		"  status:\t%d\n"
-		"  timestamp:\t%f\n",
+		"  timestamp:\t%f\n"
+		"  command_id:\t%d\n",
 		mp->data.mtp_payload_u.update_position.robot_id,
 		mp->data.mtp_payload_u.update_position.position.x,
 		mp->data.mtp_payload_u.update_position.position.y,
 		mp->data.mtp_payload_u.update_position.position.theta,
 		mp->data.mtp_payload_u.update_position.status,
-		mp->data.mtp_payload_u.update_position.position.timestamp);
+		mp->data.mtp_payload_u.update_position.position.timestamp,
+		mp->data.mtp_payload_u.update_position.command_id);
 	break;
     
     case MTP_UPDATE_ID:
@@ -824,54 +845,76 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	    break;
 	}
 	break;
-
+	
     case MTP_WIGGLE_REQUEST:
-      fprintf(file,
-              " opcode:\twiggle-request\n"
-              "  id:\t%d\n",
-              mp->data.mtp_payload_u.wiggle_request.robot_id
-              );
-      switch (mp->data.mtp_payload_u.wiggle_request.wiggle_type) {
-      case MTP_WIGGLE_START:
-        fprintf(file,
-                "  wiggle_type:\tstart\n"
-                );
-        break;
-      case MTP_WIGGLE_180_R:
-        fprintf(file,
-                "  wiggle_type:\t180deg right\n"
-                );
-        break;
-      case MTP_WIGGLE_180_R_L:
-        fprintf(file,
-                "  wiggle_type:\t180deg right, 180deg left\n"
-                );
-        break;
-      case MTP_WIGGLE_360_R:
-        fprintf(file,
-                "  wiggle_type:\t360deg right\n"
-                );
-        break;
-      case MTP_WIGGLE_360_R_L:
-        fprintf(file,
-                "  wiggle_type:\t360deg right, 360deg left\n"
-                );
-        break;
-      default:
-        assert(0);
+	fprintf(file,
+		" opcode:\twiggle-request\n"
+		"  id:\t%d\n",
+		mp->data.mtp_payload_u.wiggle_request.robot_id
+		);
+	switch (mp->data.mtp_payload_u.wiggle_request.wiggle_type) {
+	case MTP_WIGGLE_START:
+	    fprintf(file,
+		    "  wiggle_type:\tstart\n"
+		    );
 	    break;
-      }
-      break;
+	case MTP_WIGGLE_180_R:
+	    fprintf(file,
+		    "  wiggle_type:\t180deg right\n"
+		    );
+	    break;
+	case MTP_WIGGLE_180_R_L:
+	    fprintf(file,
+		    "  wiggle_type:\t180deg right, 180deg left\n"
+		    );
+	    break;
+	case MTP_WIGGLE_360_R:
+	    fprintf(file,
+		    "  wiggle_type:\t360deg right\n"
+		    );
+	    break;
+	case MTP_WIGGLE_360_R_L:
+	    fprintf(file,
+		    "  wiggle_type:\t360deg right, 360deg left\n"
+		    );
+	    break;
+	default:
+	    assert(0);
+	    break;
+	}
+	break;
     case MTP_WIGGLE_STATUS:
-      fprintf(file,
-              " opcode:\twiggle-status\n"
-              "  id:\t%d\n"
-              "  status:\t%d\n",
-              mp->data.mtp_payload_u.wiggle_status.robot_id,
-              mp->data.mtp_payload_u.wiggle_status.status
-              );
-      break;
+	fprintf(file,
+		" opcode:\twiggle-status\n"
+		"  id:\t%d\n"
+		"  status:\t%d\n",
+		mp->data.mtp_payload_u.wiggle_status.robot_id,
+		mp->data.mtp_payload_u.wiggle_status.status
+		);
+	break;
+	
+    case MTP_REQUEST_REPORT:
+	fprintf(file,
+		" opcode:\trequest-report\n"
+		"  id:\t%d\n",
+		mp->data.mtp_payload_u.request_report.robot_id);
+	break;
 
+    case MTP_CONTACT_REPORT:
+	mcr = &mp->data.mtp_payload_u.contact_report;
+	fprintf(file,
+		" opcode:\tcontact-report\n"
+		"  count:\t%d\n",
+		mcr->count);
+	for (lpc = 0; lpc < mcr->count; lpc++) {
+	    fprintf(file,
+		    "  contact[%d]:\t%f %f\n",
+		    lpc,
+		    mcr->points[lpc].x,
+		    mcr->points[lpc].y);
+	}
+	break;
+	
     default:
 	printf("%p %d\n", &mp->data.opcode, mp->data.opcode);
 	fprintf(stderr, "error: unknown opcode %d\n", mp->data.opcode);
