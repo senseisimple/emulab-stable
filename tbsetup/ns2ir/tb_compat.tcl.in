@@ -79,6 +79,12 @@ namespace eval TBCOMPAT {
     # A mapping of event objects and types.
     variable objtypes
     variable eventtypes
+
+    # Existing (reserved nodes).
+    variable reserved_list
+    variable reserved_type
+    variable reserved_node
+    set reserved_list {}
 }
 
 # IP addresses routines.  These all do some checks and convert into set-ip

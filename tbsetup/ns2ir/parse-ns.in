@@ -400,6 +400,21 @@ sub GenDefsFile($)
 	print TCL "\n";
     }
 
+    if (defined($pid)) {
+	# Load reserved nodes, for swapmodify.
+	$query_result = 
+	    DBQueryFatal("select r.vname,r.node_id,n.type from reserved as r ".
+			 "left join nodes as n on n.node_id=r.node_id ".
+			 "where r.pid='$pid' and r.eid='$eid'");
+
+	print TCL "# Reserved Nodes\n";
+	while (($vname,$reserved,$type) = $query_result->fetchrow_array()) {
+	    print TCL "lappend reserved_list \"$vname\"\n";
+	    print TCL "set reserved_type($vname) \"$type\"\n";
+	    print TCL "set reserved_node($vname) \"$reserved\"\n";
+	}
+    }
+
     print TCL "}\n";
     close(TCL);
 }
