@@ -1,19 +1,25 @@
-<?php header("Pragma: no-cache");?>
-
-<html>
-  <head>
-
 <?php
-  if (getenv("HTTPS") != "on") {
-    $title_header = "Redirecting to HTTPS";
-    $body_header  = $title_header;
-    $to_where     = "https://$SERVER_NAME$PHP_SELF";
-    echo "<META HTTP-EQUIV=Refresh CONTENT='0; URL=$to_where'>";
-  } else {
-    include "webdb_backend.php3";
-  }
-?>    
+chdir("..");
+require("defs.php3");
 
+#
+# Only known and logged in users can do this.
+#
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
+
+if (! TBWebdbAllowed($uid)) {
+    USERERROR("You do not have permission to use WEBDB!", 1);
+}
+
+header("Pragma: no-cache");
+echo "<html>
+      <head>\n";
+
+chdir("webdb");
+include "webdb_backend.php3";
+
+?>    
     <title>WebDb - <?php echo $title_header ?></title>
 
     <style type="text/css"><!--
@@ -61,21 +67,3 @@
     <hr><p>based on mysql.php3 by SooMin Kim.</p>
   </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
