@@ -14,12 +14,12 @@ SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd utils www tip captur
 all:		all-subdirs
 
 install:	
-	@echo "Choose either ops-install (paper) or control-install (plastic)"
+	@echo "Choose either boss-install (paper) or ops-install (plastic)"
 
 #
-# For installation on ops node (okay, paper).
+# For installation on boss node (okay, paper).
 # 
-ops-install:	install-subdirs install-mkdirs 
+boss-install:	install-subdirs install-mkdirs 
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 post-install:
@@ -28,9 +28,9 @@ post-install:
 	@$(MAKE) -C security post-install
 
 #
-# For installation on the control node (okay, plastic)
+# For installation on the 'ops' or 'users' node (okay, plastic)
 # 
-control-install:
+ops-install:
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C security control-install
 	@$(MAKE) -C tip control-install
