@@ -6,3 +6,20 @@ Syntax:
 tbsetup does all tasks necessary to setup up for an experiment on the
 testbed.  It generates an IR file that can be used with 'tbrun' to
 actually configure the testbed.
+
+
+tbrun
+
+Syntax:
+	tbrun <ir-file>
+
+tbrun setups up the testbed for the experiment.
+
+
+tbreport
+
+Syntax:
+	tbreport <ir-file>
+
+tbreport parses the IR file and produces a human readible report on
+the contents.
