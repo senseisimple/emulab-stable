@@ -100,6 +100,7 @@ static int	 seekable;
 static off_t	 nextwriteoffset;
 
 static int	writeinprogress; /* XXX */
+static int	imagetoobigwarned;
 
 #ifdef FAKEFRISBEE
 #include <sys/stat.h>
@@ -140,8 +141,6 @@ dowrite_request(off_t offset, off_t size, void *buf)
 {
 	readyhdr_t *hdr;
 	
-	totaledata += size;
-
 	/*
 	 * Adjust for partition start and ensure data fits
 	 * within partition boundaries.
@@ -149,9 +148,17 @@ dowrite_request(off_t offset, off_t size, void *buf)
 	offset += sectobytes(outputminsec);
 	assert((offset & (SECSIZE-1)) == 0);
 	if (outputmaxsec > 0 && offset + size > sectobytes(outputmaxsec)) {
-		fprintf(stderr, "Image too large for target slice\n");
-		exit(1);
+		if (!imagetoobigwarned) {
+			fprintf(stderr, "WARNING: image too large "
+				"for target slice, truncating\n");
+			imagetoobigwarned = 1;
+		}
+		if (offset > sectobytes(outputmaxsec))
+			return;
+		size = sectobytes(outputmaxsec) - offset;
 	}
+
+	totaledata += size;
 
 	/*
 	 * Null buf means its a request to zero.
@@ -479,8 +486,9 @@ ImageUnzipInit(char *filename, int _slice, int _debug, int _fill,
 		perror("opening output file");
 		exit(1);
 	}
-	dofill    = _fill;
+	slice     = _slice;
 	debug     = _debug;
+	dofill    = _fill;
 	nothreads = _nothreads;
 	dostype   = _dostype;
 
@@ -563,6 +571,7 @@ threadinit(void)
 		return;
 
 	decompidles = writeridles = 0;
+	imagetoobigwarned = 0;
 
 	/*
 	 * Allocate blocks for the ready queue.
@@ -1135,36 +1144,41 @@ reloc_bsdlabel(struct disklabel *label)
 		exit(1);
 	}
 
-	/*
-	 * Verify that the slice image being installed is no larger
-	 * than the slice it is going into.
-	 */
 	assert(outputmaxsize > 0);
 	slicesize = bytestosec(outputmaxsize);
-	for (i = 0; i < MAXPARTITIONS; i++)
-		if (label->d_partitions[i].p_size > slicesize) {
-			fprintf(stderr, "Slice image too big for partition\n");
-			exit(1);
-		}
 
 	/*
-	 * Fixup the partition offsets so they are absolute.
+	 * Fixup the partition table.
 	 */
 	for (i = 0; i < MAXPARTITIONS; i++) {
+		uint32_t poffset, psize;
+
 		if (label->d_partitions[i].p_size == 0)
 			continue;
 
+		/*
+		 * Perform the relocation, making offsets absolute
+		 */
 		label->d_partitions[i].p_offset += outputminsec;
 
-#if 0 /* let them do this manually, not our job */
+		poffset = label->d_partitions[i].p_offset;
+		psize = label->d_partitions[i].p_size;
+
 		/*
-		 * Also change RAW ('c') partition to match slice size.
+		 * Tweak sizes so BSD doesn't whine:
+		 *  - truncate any partitions that exceed the slice size
+		 *  - change RAW ('c') partition to match slice size
 		 */
-		if (i == RAW_PART) {
+		if (poffset + psize > outputmaxsec) {
+			fprintf(stderr, "WARNING: partition '%c' "
+				"too large for slice, truncating\n", 'a' + i);
+			label->d_partitions[i].p_size = outputmaxsec - poffset;
+		} else if (i == RAW_PART && psize != slicesize) {
 			assert(label->d_partitions[i].p_offset == outputminsec);
+			fprintf(stderr, "WARNING: raw partition '%c' "
+				"too small for slice, growing\n", 'a' + i);
 			label->d_partitions[i].p_size = slicesize;
 		}
-#endif
 	}
 	label->d_checksum = 0;
 	label->d_checksum = dkcksum(label);
