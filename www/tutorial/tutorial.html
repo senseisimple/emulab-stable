@@ -19,6 +19,7 @@
     <li> <a href="#Wedged">My node is wedged!</a>
     <li> <a href="#Scrogged">I've scrogged my disk!</a>
     <li> <a href="#Finished">I've finished my experiment</a>
+    <li> <a href="#Halting">Scheduling experiment swapout/termination</a>
     <li> <a href="#Help">Getting Help!</a>
     </ul>
 <li> <a href="#Advanced">Advanced Topics</a>
@@ -442,6 +443,30 @@ The Testbed configuration system will then tear down your experiment,
 and send you an email message when the process is complete. At this
 point you are allowed to reuse the experiment name (say, if you wanted
 to create a similar experiment with different parameters).
+
+<p>
+<li> <a NAME="Halting"></a>
+     <h3>Scheduling experiment swapout/termination</h3>
+
+If you expect that your experiment should run for a set period of
+time, but you will not be around to terminate or swap the experiment
+out, then you should use the scheduled swapout/termination feature.
+This allows you to specify a maximum running time in your NS file so
+that you will not hold scarce resources when you are offline. This can
+also be used in conjunction with <a href="#BatchMode"><i>batch
+mode</i></a> experiments to ensure that they do not run longer than is
+reasonably expected. To schedule a swapout or termination in your NS
+file:
+  <code><pre><xmp>
+        $ns at 2000.0 "$ns terminate"
+  or
+  	$ns at 2000.0 "$ns swapout"		</xmp></code></pre>
+
+This will cause your experiment to either be terminated or swapped out
+after 2000 seconds of wallclock time. <b> NOTE:</b> For batch mode
+experiments, you can use the <em>terminate</em> option, but not the
+<em>swapout</em> option.
+</p>
 
 <p>
 <li> <a NAME="Help"></a>
