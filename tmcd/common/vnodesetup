@@ -129,6 +129,9 @@ if ($dojail && $doplab) {
     die("Can't do both jail and Plab");
 }
 
+# Tell the library what vnode we are messing with.
+libsetup_setvnodeid($vnodeid);
+
 #
 # Hacky. All this path stuff is hacky.
 # 
