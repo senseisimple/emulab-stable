@@ -2,6 +2,11 @@
 #
 # Utah Network Testbed local startup
 #
+if [ -x @prefix@/sbin/dbboot ]; then
+        echo -n " dbboot"
+        @prefix@/sbin/dbboot
+fi
+
 if [ -x @prefix@/sbin/bootinfo.restart  ]; then
         echo -n " bootinfo"
         @prefix@/sbin/bootinfo.restart

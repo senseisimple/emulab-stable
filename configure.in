@@ -204,7 +204,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	discvr/GNUmakefile \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
-	db/dbcheck db/interswitch\
+	db/dbcheck db/interswitch db/dbboot \
 	ipod/GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
