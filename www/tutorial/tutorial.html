@@ -29,7 +29,7 @@
     <li> <a href="#TARBALLS">Installing Tar files automatically</a>
     <li> <a href="#Startupcmd">
             Starting your application automatically</a>
-    <li> <a href="#ReadyBits">
+    <li> <a href="#SyncServer">
             How do I know when all my nodes are ready?</a>
     <li> <a href="#Routing">
             Setting up IP routing between nodes</a>
@@ -553,7 +553,7 @@ Again, please feel free to contact us.
 <li> <a href="#RPMS">Installing RPMS automatically</a>
 <li> <a href="#TARBALLS">Installing Tar files automatically</a>
 <li> <a href="#Startupcmd">Starting your application automatically</a>
-<li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
+<li> <a href="#SyncServer">How do I know when all my nodes are ready?</a>
 <li> <a href="#Routing">Setting up IP routing between nodes</a>
 <li> <a href="#Simem">Hybrid Experiments with Simulation and Emulation</a> 
      <img src="../new.gif" alt="&lt;NEW&gt;">
@@ -627,15 +627,15 @@ be unpacked in, all separated by spaces.
 <p>
 
 You can start your application automatically when your nodes boot by
-using the <tt>tb-set-node-startup</tt> NS extension. The argument is
+using the <tt>tb-set-node-startcmd</tt> NS extension. The argument is
 the pathname of a script or program that is run as the <tt>UID</tt> of
 the experiment creator, after the node has reached multiuser mode. You
 can specify the same program for each node, or a different program.
 For example:
 
 <code><pre>
-tb-set-node-startup $nodeA /proj/pid/runme.nodeA
-tb-set-node-startup $nodeB /proj/pid/runme.nodeB	</code></pre>
+tb-set-node-startcmd $nodeA /proj/pid/runme.nodeA
+tb-set-node-startcmd $nodeB /proj/pid/runme.nodeB	</code></pre>
 
 will run <tt>/proj/pid/runme.nodeA</tt> on nodeA and
 <tt>/proj/pid/runme.nodeA</tt> on nodeB. The programs must reside on
@@ -643,82 +643,87 @@ the node's local filesystem, or in a directory that can be reached via
 NFS. This is either the project's <tt>/proj</tt> directory, in the
 <tt>/group</tt> directory if the experiment has been created in a
 subgroup, or a project member's home directory in <tt>/users</tt>.
+If you need to see the output of your command, be sure to redirect the
+output into a file. You can place the file on the local node, or in
+one of the NFS mounted directories mentioned above. For example:
 
-<p>
-The exit value of the startup command is reported back to the Web
+<code><pre>
+tb-set-node-startcmd $nodeB /proj/pid/runme >& /tmp/foo.log </code></pre>
+
+The exit value of the start command is reported back to the Web
 Interface, and is made available to you via the "Experiment
 Information" link. There is a listing for all of the nodes in the
 experiment, and the exit value is recorded in this listing. The
 special symbol <tt>none</tt> indicates that the node is still running
-the startup command. A log file containing the output of the startup
-command is created in the project's <tt>logs</tt> directory
-(<tt>/proj/pid/logs</tt>).
+the start command. 
 
 <p>
-The startup command is especially useful when
+The start command is especially useful when
 combined with <a href="#BatchMode"><i>batch mode</i></a> experiments.
 
 <p>
-<li> <a NAME="ReadyBits"></a>
+The start command is implemented using
+<a href="docwrapper.php3?docname=advanced.html#ProgramObjects">
+Program Objects</a>, which are described in more detail in the
+<a href="docwrapper.php3?docname=advanced.html">
+Advanced Tutorial.</a>
+
+<p>
+<li> <a NAME="SyncServer"></a>
      <h3>How do I know when all my nodes are ready?</h3>
 <p>
 
-It is often necessary for your startup program to determine when all
+It is often necessary for your start program to determine when all
 of the other nodes in the experiment have started, and are ready to
 proceed. Sometimes called a <i>barrier</i>, this allows programs to
 wait at a specific point, and then all proceed at once. Emulab
-provides a primitive form of this mechanism using experiment <i>ready
-bits</i>, which are set and read using the
-<a href="../doc/docwrapper.php3?docname=tmcd.html">
-TMCD/TMCC</a>. When an experiment is first configured, the ready bit
-for each node is cleared. As each node starts its application and
-reaches the point where it must be sure that all other nodes have
-started up, it issues a TMCC <tt>ready</tt> command:
+provides a simple form of this mechanism using a synchronization server
+that runs on a node of your choice. You specify the node in your NS
+file: 
 
 <code><pre>
-tmcc ready				</code></pre>
+tb-set-sync-server $nodeB </code></pre>
 
-which tells Emulab's configuration system that the node is ready to
-proceed. The node can then poll for the <i>ready count</i> to
-determine how many nodes are ready (have issued a tmcc ready command):
-
-<code><pre>
-tmcc readycount				</code></pre>
-
-which will return the ready count as a string:
+When nodeB boots, the synchronization server will automatically start.
+Your software can then synchronize using the <tt>emulab-sync</tt>
+program that is installed on your nodes. For example, your node start
+command might look like this:
 
 <code><pre>
-READY=N TOTAL=M				</code></pre>
+#!/bin/sh
+if [ "$1" = "master" ]; then
+	/usr/testbed/bin/emulab-sync -i 4
+else
+	/usr/testbed/bin/emulab-sync
+fi
+/usr/site/bin/dosilly			</code></pre>
 
-where <tt>N</tt> is the number of nodes that are ready, and <tt>M</tt>
-is the total number of nodes in the experiment. An application can
-poll the ready count with a simple script, or it can encode the ready
-bits check directly into its program. For example, here is a simple
-Perl fragment that issues the ready command, and then polls for the
-ready count, being sure to delay a small amount between each poll.
+As you can see, one of the nodes must be configured to operate as the
+master, initializing the barrier to the number of clients that are
+expected to rendezvous at the barrier. The master will by default wait
+for all of the clients to reach the barrier. Each client of the
+barrier also waits until all of the clients have reached the barrier
+(and of course, until the master initializes the barrier to the proper
+count). Any number of clients may be specified (any subset of nodes in
+your experiment can wait). If the master does not need to wait for the
+clients, you may use the <em>async</em> option which releases the
+master immediately:
 
 <code><pre>
-system("tmcc ready");
-while (1) {
-    my $bits = `tmcc readycount`;
-    if ($bits =~ /READY=(\d*) TOTAL=(\d*)/) {
-        if ($1 == $2) {
-            last;
-	}
-    }
-    #
-    # Please sleep to avoid swamping the TMCD!
-    # 
-    sleep(5);
-}					</code></pre>
+/usr/testbed/bin/emulab-sync -a -i 4	</code></pre>
 
-<i>Note that the ready count is essentially a use-once feature; The
-ready count cannot be reinitialized to zero since there is no actual
-synchronization happening.  If in the future it appears that a
-generalized barrier synchronization would be more useful, we will
-investigate the implementation of such a feature.</i>
+You may also specify the <em>name</em> of the barrier. 
 
-</p>
+<code><pre>
+/usr/testbed/bin/emulab-sync -a -i 4 -n mybarrier
+/usr/testbed/bin/emulab-sync -n mybarrier		</code></pre>
+
+This allows multiple barriers to be in use at the same time. Scripts
+on NodeA and NodeB can be waiting on a barrier named "foo" while
+(other) scripts on NodeA and NodeC can be waiting on a barrier named
+"bar."  You may reuse an existing barrier (including the default
+barrier) once it has been released (all clients arrived and woken up).
+<p>
 
 <li> <a NAME="Routing"></a>
      <h3>Setting up IP routing between nodes</h3>
@@ -966,14 +971,13 @@ regular experiment and a batch mode experiment:
      notifying you when the experiment has been scheduled and when it
      has been terminated.
      <p>
-<li> Your NS file must define a <i>startup</i> command to run on each
-     node using the <a href="#Startupcmd"><tt>tb-set-node-startup</tt></a>
-     NS extension. It is the exit value(s) of the startup command(s) that
+<li> Your NS file must define a <i>start</i> command to run on each
+     node using the <a href="#Startupcmd"><tt>tb-set-node-startcmd</tt></a>
+     NS extension. It is the exit value(s) of the start command(s) that
      indicates that the experiment is completed; when all of the
-     nodes have run their respective startup commands and exited, the
-     batch system will then tear down the experiment. The output of
-     the startup command is stored in the project <tt>logs</tt> directory
-     (<tt>/proj/pid/logs</tt>) so you can follow what has happened.
+     nodes have run their respective start commands and reported
+     their exit values, the batch system will then tear down the
+     experiment. 
 </ul>
 <p>
 
@@ -983,63 +987,58 @@ regular experiment and a batch mode experiment:
 Consider example NS file <a href="batch.ns" target=stuff>batch.ns</a>.
 First off, we have to arrange for the experimental software to be
 automatically installed when the nodes boot. This is done with the <a
-href="#RPMS"><tt>tb-set-node-rpms</tt></a> NS extension:
+href="#TARBALLS"><tt>tb-set-node-tarfiles</tt></a> NS extension:
 
 <code><pre>
-tb-set-node-rpms $nodeA /proj/testbed/rpms/silly-1.0-1.i386-freebsd.rpm
-tb-set-node-rpms $nodeB /proj/testbed/rpms/silly-1.0-1.i386-freebsd.rpm
+tb-set-node-tarfiles $nodeA /usr/site /proj/testbed/tarfiles/silly.tar.gz
+tb-set-node-tarfiles $nodeB /usr/site /proj/testbed/tarfiles/silly.tar.gz
 </code></pre>
 
 The next two lines of the NS file specify what program should be run
 on each of the nodes. Using the <a href="#Startupcmd">
-<tt>tb-set-node-startup</tt></a> NS extension, we say that the program
-<tt>run-silly</tt> (installed by the <tt>silly-1.0</tt> RPM) is to be
-run on both nodes:
+<tt>tb-set-node-startcmd</tt></a> NS extension, we specify the
+name of the program to run once all the nodes have booted and are
+ready to proceed:
 
 <code><pre>
-tb-set-node-startup $nodeA /usr/site/bin/run-silly
-tb-set-node-startup $nodeB /usr/site/bin/run-silly
+tb-set-node-startcmd $nodeA "/usr/site/bin/run-silly >& /tmp/foo.log"
+tb-set-node-startcmd $nodeB "/usr/site/bin/run-silly >& /tmp/foo.log"
 </code></pre>
 
 After you have been notified via email that the batch experiment is
 running, you can track the progress of your experiment by looking in
-the "Experiment Information" page. As each node completes the startup
+the "Experiment Information" page. As each node completes the start
 command, the listing for that node will be updated to reflect the exit
 status of the command (you may need to hit the Reload button to see
 the changes). Once all of the nodes hare reported in an exit status,
 the batch system will tear down the experiment and send you email.  If
 your experiment is such that one node is the controller, and runs
-commands on all the other nodes, then simply run a dummy startup
+commands on all the other nodes, then simply run a dummy start
 command on the other nodes so that the batch system will receive an
 exit value for that node. Since the batch is not terminated until
 <em>all</em> nodes have reported in, be sure that the controlling node
-does not exit from its startup command until all of the nodes have
-finished. A dummy startup command can be setup like this:
+does not exit from its start command until all of the nodes have
+finished. A dummy start command can be setup like this:
 
 <code><pre>
-tb-set-node-startup $nodeC /bin/echo
-</code></pre>
+tb-set-node-startcmd $nodeC /bin/echo </code></pre>
 
 <p>
 The status of your batch experiment can be viewed via the "Experiment
 Information" link in the Web Interface Options menu. You may also
 cancel a batch after you have submitted it using the "Terminate"
-option in the information display. As noted in the section on the <a
-href="#Startupcmd">Startupcmd</a>, the output of the startup command
-on each node is written to separate files in your project log
-directory. You can use these log files to debug your batch experiment.
+option in the information display. You may also stop a batch job,
+causing it to swap out by using the "Stop" option. The batch may be
+reposted at any time. 
 
 <p>
 <i>
-The batch system is still under development. It appears to be
-functional, but there are bound to be kinks in the system. Please help
-us debug and improve it by letting us know what you think and if you
-have problems with it. Currently, the batch system tries every 10
-minutes to run your batch. It will send you email every 5 or so
-attempts to let you know that it is trying, but that resources are not
-available. It is a good idea to glance at the message to make sure
-that the problem is lack of resources and not an error in your NS
-file.</i>
+The batch system is still under development. Currently, the batch
+system tries every 10 minutes to run your batch. It will send you
+email every 5 or so attempts to let you know that it is trying, but
+that resources are not available. It is a good idea to glance at the
+message to make sure that the problem is lack of resources and not an
+error in your NS file.</i>
 
 <!-- This ends the Basic Tutorial Section -->
 </ul>

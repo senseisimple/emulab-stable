@@ -323,12 +323,12 @@ tb-set-node-rpms $node0 rpm1 rpm2 rpm3
 </ul>
 
 
-<h4>tb-set-node-startup</h4>
+<h4>tb-set-node-startcmd</h4>
 
 <pre>
-tb-set-node-startup <i>node</i> <i>startupcmd</i>
+tb-set-node-startcmd <i>node</i> <i>startupcmd</i>
 
-tb-set-node-startup $node0 {mystart.sh -a}
+tb-set-node-startcmd $node0 {mystart.sh -a >& /tmp/node0.log}
 </pre>
 
 <p>Notes:

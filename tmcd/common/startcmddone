@@ -7,11 +7,11 @@
 use English;
 
 #
-# Report that batch command for this node is done. Report status.
+# Report that start command for this node is done. Report status.
 #
 sub usage()
 {
-    print "Usage: batchcmddone <status>\n";
+    print "Usage: startcmddone <status>\n";
     exit(1);
 }
 my $stat;

@@ -1014,7 +1014,6 @@ function SHOWNODES($pid, $eid) {
                 <th>Node<br>Status</th>
                 <th>Hours<br>Idle[<b>1</b>]</th>
                 <th>Startup<br>Status[<b>2</b>]</th>
-                <th>Ready<br>Status[<b>3</b>]</th>
               </tr>\n";
 
 	$sort = "type,priority";
@@ -1043,7 +1042,6 @@ function SHOWNODES($pid, $eid) {
 	    $type    = $row[type];
 	    $def_boot_osid = $row[def_boot_osid];
 	    $startstatus   = $row[startstatus];
-	    $readystatus   = $row[ready];
 	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
 	    $idlehours = TBGetNodeIdleTime($node_id);
@@ -1057,10 +1055,6 @@ function SHOWNODES($pid, $eid) {
 
 	    if (!$vname)
 		$vname = "--";
-	    if ($readystatus)
-		$readylabel = "Yes";
-	    else
-		$readylabel = "No";
 
 	    echo "<tr>
                     <td><A href='shownode.php3?node_id=$node_id'>$node_id</a>
@@ -1083,7 +1077,6 @@ function SHOWNODES($pid, $eid) {
 	    
 	    echo "  <td>$idlestr</td>
                     <td align=center>$startstatus</td>
-                    <td align=center>$readylabel</td>
                    </tr>\n";
 	}
 	echo "</table>\n";
@@ -1093,7 +1086,6 @@ function SHOWNODES($pid, $eid) {
 	            the node has not reported on its proper schedule. 
                 <li>Exit value of the node startup command. A value of
                         666 indicates a testbed internal error.
-                <li>User application ready status, reported via TMCC.
               </ol>
               </blockquote></blockquote></blockquote></h4>\n";
     }

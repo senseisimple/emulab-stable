@@ -730,10 +730,8 @@
     rerun your experiment from scratch, but without the added expense
     of a swapin and swapout. In other words, the nodes that are
     currently allocated to your experiment are all rebooted, and the
-    experiment startup state is cleared. This includes the
-    <a href="#SWS-6">ready bits</a>, the boot status in the web page,
-    and the <a href="#SWS-4">startup command status</a>. In addition,
-    the event scheduler for the experiment is restarted, and your event
+    experiment startup state is cleared. 
+    The event scheduler for the experiment is restarted, and your event
     sequence is replayed again. Note that your rpms and tarfiles are
     <b>not</b> installed again. Replay is obviously faster than
     swapout/swapin, and has the added benefit that you will not run
@@ -1062,7 +1060,7 @@
     RPM installation) has completed. The exit status of the script (or
     program) is reported back and is made available for you to view in
     Experiment Information link in the menu at your left. The Emulab
-    NS extension <tt>tb-set-node-startup</tt> is used in the NS file
+    NS extension <tt>tb-set-node-startcmd</tt> is used in the NS file
     to specify the path of the script (or program) to run. You may
     specify a different program for each node in the experiment.
     </p>
@@ -1090,22 +1088,11 @@
     <font size='+1'><b>How does my software determine when other nodes in my
     experiment are ready?</b></font>
     <p>
-    If your application requires synchronization to determine when all
-    of the nodes in your experiment have started up and are ready to
-    proceed, then you can use the Testbed's <i>ready bits</i>
-    mechanism. The ready bits are really just a way of determining how
-    many nodes have issued the <b>ready</b> command, and is returned
-    to the application as a simple N of M string, where N is the
-    number that have reported in, and M is the total number of nodes
-    in the experiment. Applications can use this as a very simplistic
-    form of barrier synchronization, albeit one that can be used just
-    once and one that does not actually block!
-    </p>
-    <p>
-    Use of the ready bits is described in more detail in the <a href =
-    "tutorial/tutorial.php3">Emulab Tutorial</a> and in the <a href =
-    "doc/docwrapper.php3?docname=tmcd.html"> Testbed Master Control
-    Daemon</a> documentation.
+    If your application requires synchronization amongst your nodes,
+    you may use the Emulab provided synchronization server, which
+    provides a very simple form of barrier synchronization. Use of the
+    synchronization server is described in more detail in the <a href =
+    "tutorial/tutorial.php3#SyncServer">Emulab Tutorial</a>.
     </p>
     
 <li><a NAME="SWS-7"></a>

@@ -28,6 +28,7 @@ ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
 BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
 VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
 RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+TBBINDIR	= $(DESTDIR)/usr/testbed/bin
 INSTALL		= /usr/bin/install -c
 
 install:
@@ -36,7 +37,7 @@ install:
 	@echo "directory afterwards."
 
 
-local-install:		path-install local-script-install
+local-install:		path-install local-script-install symlinks
 remote-install:		path-install remote-script-install
 control-install:	path-install control-script-install
 
@@ -55,6 +56,7 @@ dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
 	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
 	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/lock
+	$(INSTALL) -m 755 -o root -g wheel -d $(TBBINDIR)
 
 path-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/paths.pm $(ETCDIR)/paths.pm
@@ -69,7 +71,13 @@ common-script-install:	dir-install vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
 	$(INSTALL) -m 755 vnodesetup $(BINDIR)/vnodesetup
 	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
-	$(INSTALL) -m 755 $(SRCDIR)/batchcmddone $(BINDIR)/batchcmddone
+	$(INSTALL) -m 755 $(SRCDIR)/startcmddone $(BINDIR)/startcmddone
+
+symlinks:	dir-install
+	rm -f $(TBBINDIR)/tevc
+	ln -s $(BINDIR)/tevc $(TBBINDIR)/tevc
+	rm -f $(TBBINDIR)/emulab-sync
+	ln -s $(BINDIR)/emulab-sync $(TBBINDIR)/emulab-sync
 
 local-script-install:	common-script-install
 	$(INSTALL) -m 755 $(SRCDIR)/bootsetup $(BINDIR)/bootsetup

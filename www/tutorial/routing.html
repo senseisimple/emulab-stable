@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -8,7 +8,7 @@
 </center>
 
 If you <em>really</em> want to setup and manage routing entirely by
-yourself, you can use the <tt>tb-set-node-startup</tt> command in your
+yourself, you can use the <tt>tb-set-node-startcmd</tt> command in your
 NS file to specify a per-node script in your home directory to set up
 routing at boot time. You can use this startup script to setup either
 static routes or to fire up a routing daemon. We do not recommend this
@@ -23,7 +23,7 @@ to <i>router</i>.  In order to get router to correctly forward packets
 between client and server, you would add this line to your NS file:
 
 <code><pre>
-tb-set-node-startup $router /proj/pid/router-startup
+tb-set-node-startcmd $router /proj/pid/router-startup
 </pre></code>
 
 This will make router run the <code>router-startup</code> script
@@ -49,8 +49,8 @@ Now to get client and server to talk to each other through this router,
 you would add these lines to your NS file:
 
 <code><pre>
-tb-set-node-startup $client /proj/pid/clientroutecmd
-tb-set-node-startup $server /proj/pid/serverroutecmd
+tb-set-node-startcmd $client /proj/pid/clientroutecmd
+tb-set-node-startcmd $server /proj/pid/serverroutecmd
 </pre></code>
 
 This will have the client and the server each call a small script
@@ -119,8 +119,8 @@ You can make a single script that will handle all end nodes, by replacing
 and specifying the router in your NS file:
 
 <code><pre>
-tb-set-node-startup $clientA {/proj/pid/router-startup router0}
-tb-set-node-startup $clientB {/proj/pid/router-startup router1}
+tb-set-node-startcmd $clientA {/proj/pid/router-startup router0}
+tb-set-node-startcmd $clientB {/proj/pid/router-startup router1}
 </pre></code>
 
 For multiple routers, the startup script for each router will need to

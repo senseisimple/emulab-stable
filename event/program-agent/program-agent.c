@@ -5,7 +5,7 @@
  */
 
 /*
- * This ia program agent to manage programs from the event system.
+ * This is a program agent to manage programs from the event system.
  *
  * You can start, stop, and kill (signal) programs. 
  */
