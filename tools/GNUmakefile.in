@@ -11,7 +11,7 @@ SUBDIR		= tools
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = pcapper teachswitch webcamapplet
+SUBDIRS = pcapper teachswitch webcamapplet whol
 
 all:	all-subdirs
 
