@@ -1,3 +1,158 @@
+stoller     2003/11/05 10:53:00 MST
+
+  Modified files:
+    db                   libdb.pm.in xmlconvert.in 
+    tbsetup              batchexp.in eventsys_control.in 
+    tbsetup/ns2ir        program.tcl sim.tcl.in 
+  Log:
+  Frontend and parser portion of two event system changes:
+  
+  * Generate a shared secret key for the event system. This key is
+    stored into the DB, and passed to the node via tmcd. It is also
+    stashed into a file in the experiment directory (can be accessed
+    only by the project/group members). The key is used to attach a
+    HMAC (hashed message authentication) to each event, which is checked
+    by the receivers to ensure that the event is not bogus. More details
+    on this later when I commit the event library/client changes.
+  
+  * Added "virt_programs" table to store info about each program object
+    defined by the user. The intent is to no longer send the command
+    string in the event, but to fix it in the DB, and transfer it via
+    tmcd. This removes our "remote execution facility" which was always
+    a bad idea (we have ssh for that, and that is a lot more secure then
+    the event system!).
+  
+    Note that for the time being we need to continue send the command in
+    the event because of old images, but the new images will now ignore
+    that part of the event.
+  
+  Revision  Changes    Path
+  1.137     +5 -1      testbed/db/libdb.pm.in
+  1.8       +1 -0      testbed/db/xmlconvert.in
+  1.40      +19 -6     testbed/tbsetup/batchexp.in
+  1.11      +11 -13    testbed/tbsetup/eventsys_control.in
+  1.7       +3 -0      testbed/tbsetup/ns2ir/program.tcl
+  1.54      +2 -0      testbed/tbsetup/ns2ir/sim.tcl.in
+
+
+stoller     2003/11/05 11:37:44 MST
+
+  Modified files:
+    event                GNUmakefile.in 
+    event/delay-agent    GNUmakefile.in main.c 
+    event/example        GNUmakefile.in tbrecv.c tbsend.c 
+    event/lib            GNUmakefile.in event.c event.h 
+    event/linktest       GNUmakefile.in 
+    event/program-agent  GNUmakefile.in program-agent.c 
+    event/proxy          GNUmakefile.in 
+    event/sched          event-sched.c 
+    event/tbgen          GNUmakefile.in tevc.c 
+    event/trafgen        GNUmakefile.in event.c 
+  Added files:
+    event/lib            README 
+  Log:
+  Middle part of the event system changes. The main part of this change
+  is to add HMACs to events to ensure they that events cannot be
+  injected into an experiment by an unauthorized client.
+  
+  * The frontend now generates a secret key for each experiment and
+    stores that into a file and in the DB.
+  
+  * Each of the event clients, as well as the event producers
+    (scheduler, tevc) have a new -k option to specify the name of the
+    file. Two new event library functions were added for clients to give
+    the key:
+  
+      event_handle_t
+      event_register_withkeyfile(char *name, int threaded, char *keyfile);
+  
+      event_handle_t
+      event_register_withkeydata(char *name, int threaded,
+  	   		       unsigned char *keydata, int keylen);
+  
+  * When the library is in possesion of a key, it will generate an HMAC
+    and attach it to outgoing notifications. A client receiving a
+    notification will compute an HMAC and compare it against the HMAC in
+    the notification. If they do not compare, the notification is
+    dropped with a warning message printed (the client callback never
+    gets the notification). If the client has not provided a key, then
+    the HMAC in the incoming notification is ignored.
+  
+  * The scheduler also takes a -k option, and will compute HMACs for all
+    of the static events ahead of time. That keeps it off the critical
+    path.
+  
+  * The tevc client also takes a -k option. However, tevc will always
+    try to find the keyfile (default path) so that it can attach the
+    HMAC to dynamic events before sending them to the scheduler (which
+    will check to make sure it matches). The scheduler will not accept
+    dynamic events without unless the HMAC is present and matches.
+  
+  * I have rebuilt the elvin librarys, removing all of the X goop and
+    the SSL goop. Smaller binaries. So, I had to add -lcrypto to all of
+    the client makefiles to that programs link.
+  
+  * The program-agent got a few more changes. The command string is no
+    longer passed inside the event; it comes in when the program agent
+    is started, via a config file generated from tmcd data. This gets
+    rid of our mostly insecure remote execution facility.
+  
+  Revision  Changes    Path
+  1.17      +5 -8      testbed/event/GNUmakefile.in
+  1.7       +2 -2      testbed/event/delay-agent/GNUmakefile.in
+  1.10      +8 -3      testbed/event/delay-agent/main.c
+  1.5       +5 -1      testbed/event/example/GNUmakefile.in
+  1.3       +7 -3      testbed/event/example/tbrecv.c
+  1.2       +7 -3      testbed/event/example/tbsend.c
+  1.12      +14 -8     testbed/event/lib/GNUmakefile.in
+  1.24      +308 -48   testbed/event/lib/event.c
+  1.17      +14 -1     testbed/event/lib/event.h
+  1.2       +1 -1      testbed/event/linktest/GNUmakefile.in
+  1.5       +1 -1      testbed/event/program-agent/GNUmakefile.in
+  1.7       +141 -92   testbed/event/program-agent/program-agent.c
+  1.2       +29 -8     testbed/event/proxy/GNUmakefile.in
+  1.25      +22 -8     testbed/event/sched/event-sched.c
+  1.15      +1 -1      testbed/event/tbgen/GNUmakefile.in
+  1.6       +48 -13    testbed/event/tbgen/tevc.c
+  1.8       +1 -1      testbed/event/trafgen/GNUmakefile.in
+  1.18      +7 -3      testbed/event/trafgen/event.c
+
+stoller     2003/11/05 12:00:51 MST
+
+  Modified files:
+    tmcd                 decls.h libsetup.pm tmcd.c 
+    tmcd/common          libtmcc.pm rc.progagent 
+    tmcd/freebsd         rc.delayagent 
+    tmcd/linux           GNUmakefile.in testbed 
+  Added files:
+    tmcd/linux           elvin.sh 
+  Log:
+  Client side of the event system changes.
+  
+  * Download the eventkey with new tmcd call.
+  
+  * Pass -k option to various agents so that they can verify the HMACs
+    in the incoming notifications.
+  
+  * Change program agent; The list of agents from tmcd now includes the
+    command, which is written to a config file for the program-agent to
+    read in. The command string in the event is now ignored.
+  
+  * Build the local proxy for linux, and add the goo to start the local
+    elvind and use the proxy. It has been this way on FreeBSD for a
+    while, but I never got it installed for Linux before now.
+  
+  Revision  Changes    Path
+  1.20      +1 -1      testbed/tmcd/decls.h
+  1.88      +14 -13    testbed/tmcd/libsetup.pm
+  1.193     +7 -7      testbed/tmcd/tmcd.c
+  1.5       +4 -0      testbed/tmcd/common/libtmcc.pm
+  1.5       +7 -36     testbed/tmcd/common/rc.progagent
+  1.8       +5 -10     testbed/tmcd/freebsd/rc.delayagent
+  1.37      +4 -0      testbed/tmcd/linux/GNUmakefile.in
+  1.4       +2 -1      testbed/tmcd/linux/testbed
+
+	
 mike        2003/10/24 10:24:08 MDT
 
   Modified files:
