@@ -13,7 +13,7 @@ all:	tmcd tmcc tmcd.restart findif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS	+= -O -g -DUDP -I${OBJDIR} -I/usr/local/include
+CFLAGS	+= -O -g -Wall -DUDP -I${OBJDIR} -I/usr/local/include
 
 ifeq ($(EVENTSYS),1)
 	TMCDCFLAGS = `elvin-config --cflags vin4c` \
