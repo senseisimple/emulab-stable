@@ -10,18 +10,25 @@ Follow the instructions in the setup-ops.txt file before the ones in this file!
 ##### Step 0 - OS installation and setup
 
 Install FreeBSD on the machine you'll be using for your boss node, using the
-standard FreeBSD installation process. You don't need to worry about which ports
-to install, etc., as the ones required by this software will be installed
-automatically. You, will, however, have to make sure that you create a
-partition large enough to hold /usr/testbed - in addition to the testbed
-software, this is where many disk images will get stored.
+standard FreeBSD installation process.  When asked by the installer, it's best
+to choose the 'Developer' distribution set - this gets you full sources. The
+'X-Developer' distribution set would be fine too, if you want to be able to run
+X clients from the boss node.  When it asks if you want to install the ports
+collection, answer yes.  You don't need to worry about which packages to
+install (of course, grab your favorite editors, etc.) - the ones our software
+needs will be installed automatically later.  You, will, however, have to make
+sure that you create a partition large enough to hold /usr/testbed - in
+addition to the testbed software, this is where many disk images will get
+stored. Also, the /var partition will need to be large enough to hold the
+database - 100MB extra for the database should be sufficient.
 
 Make sure that you have the network correctly configured, and make sure that it
 has a hostname that resolves. The silly mysql-server port requires this.
 
-Go ahead and create an account for yourself on boss. For now, just stick the
-home directory somewhere local, and move it to /users/ once you've got it
-mounted from ops (the boss-install script will set this up).
+If you want, you can go ahead and create an account for yourself on boss. For
+now, just stick the home directory somewhere local, and move it to /users/ once
+you've got it mounted from ops (the boss-install script will set this up). In
+general, it's probably simpler to just use 'root' for now.
 
 ##### Step 1 - Create a defs file
 
@@ -66,10 +73,19 @@ When you're done, re-run the boss-install script.
 Like the ops-install script, boss-install sets up paswordless sudo for anyone
 in the wheel group.
 
+There is one bootstrapping problem we have that needs to be worked around - we
+put fully-qualified names for the ops/users node into /etc/fstab on boss. But,
+if you're running the nameserver for this domain on boss, those names won't be
+resolvable yet. Since we don't yet have a way to auto-generate DNS
+configuration files, the suggested work-around is to add addresses for the
+FSNODE and USERNODE that you specified in your defs file (which may be the same
+thing), to /etc/hosts on boss. Remebember to remove them once you really have
+DNS set up.
+
 ##### Step 4 - Installing from source.
 
-In your object directory, do a 'gmake boss-install'. Then, as root, do a
-'gmake post-install'. The post-install target needs to run as root, so that
+In your object directory, do a 'gmake && gmake boss-install'. Then, as root, do
+a 'gmake post-install'. The post-install target needs to run as root, so that
 it can make certain scripts setuid, etc.
 
 ##### Step 5 - Setting up root ssh from boss to ops
@@ -93,7 +109,12 @@ DNS configuration - boss-install enables bind on your boss node, but does not
 set it up as a server for your domain. We don't have documentation for creating
 the zone files, etc yet. Best bet right now is to ask Utah for a copy of
 theirs.  Hopefully, there will be a script to auto-generate large portions of
-them from the database.
+them from the database. Once done, add 127.0.0.1 as the first nameserver in
+/etc/resolv.conf . Also, add boss as the first nameserver on ops, too. If
+you're running under the .emulab.net domain, too, make sure to get Utah to
+delegate the subdomain to you. If you have any hardware (eg. switches or power
+controllers) on a private subnet, add them to /etc/hosts, with the same name
+they've been give in the database.
 
 SSL certificates - Our apache config file expects to find SSL certificates in:
 /usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
@@ -107,12 +128,20 @@ cvsupd - Minor changes to images can be distributed at boot time with cvsup.
 See doc/newimage.txt for an overview of setting up a sup tree. Make sure to
 copy over the old one (if it exists).
 
-dhcpd - Once you've filled out the nodes  interfaces tables (instructions in
+dhcpd - Once you've filled out the nodes and interfaces tables (instructions in
 setup-db.txt), you need to generate a config file for dhcpd. For this, you use
 the dhcpd_makeconf script (installed into /usr/testbed/sbin), which uses the
 template file in the dhcpd directory of the source distribution. Make sure to
 edit the template file to reflect your local IP addresses, and include all node
 types. Place the resulting config file (which dhcpd_makeconf spits to the
-standard output), in /usr/local/etc/dhcpd.conf .
-NOTE: This template file is for isc-dhcpd 2.x . It needs to be updated to work
-with isc-dhcpd 3.x .
+standard output), in /usr/local/etc/dhcpd.conf .  NOTE: This template file is
+for isc-dhcpd 2.x . It needs to be updated to work with isc-dhcpd 3.x .
+
+tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
+to boot, reload, etc. testbed machines, which live in /tftpboot . For the time
+being, these are not distributed with our source, and require some site
+customizations, so ask Utah for the boot loaders, etc.
+
+disk images - You'll also, of course, need disk iamges to go on your nodes.
+Right now, we have no automatic way of generating these, so you'll have to ask
+Utah for some.
