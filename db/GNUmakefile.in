@@ -19,7 +19,7 @@ LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode
 LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic.
-USERBINS	= nalloc nfree
+USERBINS	= nalloc nfree readycount
 USERSBINS	= genelists.proxy
 
 #
