@@ -104,7 +104,7 @@ while (my ($uid,$admin) = $users_result->fetchrow_array()) {
     next
 	if ($uid eq "elabman");
     
-    mysystem("$TB/sbin/tbacct add $uid");
+    mysystem("$TB/sbin/tbacct -b add $uid");
     if ($admin) {
 	# Add admin users to group wheel for convenience.
 	DBQueryFatal("replace into unixgroup_membership ".
@@ -137,6 +137,13 @@ while (my ($uid,$admin) = $users_result->fetchrow_array()) {
     
     mysystem("$TB/sbin/setgroups $uid");
 }
+
+#
+# Do the exports setup and the genelists all at once now that all the above
+# stuff happened.
+#
+mysystem("$TB/sbin/genelists -a");
+mysystem("$TB/sbin/exports_setup");
 
 #
 # Run a command string.
