@@ -37,7 +37,7 @@ space to hold them:
 			experimenters.
 			
 You may want to enforce quotas on the user-writable filesystems. This is the
-main reason you'd want to keep them in seperate filesystems (ie. so people can
+main reason you'd want to keep them in separate filesystems (ie. so people can
 have different /users/ and /proj/ quotas.)
 
 Make sure that, no matter how you decide to partition things up, you make
