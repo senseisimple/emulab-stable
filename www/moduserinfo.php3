@@ -23,7 +23,12 @@ LOGGEDINORDIE($uid,
 $isadmin = ISADMIN($uid);
 
 
-$shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
+# temporarily make tcsh the only option until backend stuff
+# gets put into place.
+$shelllist = array( 'tcsh' );
+# $shelllist = array( 'tcsh', 'bash', 'csh', 'sh' );
+
+# used if db is NULL (shouldn't happen.)
 $defaultshell = 'tcsh';
 
 #
