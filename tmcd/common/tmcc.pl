@@ -27,9 +27,10 @@ sub usage()
     print STDERR " -x path	Be a proxy using the unix domain socket\n";
     print STDERR " -o path	Specify log file name for -x option\n";
     print STDERR " -c   	Clear tmcc cache first (must be root)\n";
+    print STDERR " -D   	Force command to use a direct, UDP request\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:bc";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:bcD";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -124,6 +125,9 @@ sub ParseOptions()
     }
     if (defined($options{"o"})) {
         libtmcc::configtmcc("logfile" , $options{"o"});
+    }
+    if (defined($options{"D"})) {
+        libtmcc::configtmcc("noproxy", 1);
     }
     
     $CMD  = "";

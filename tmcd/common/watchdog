@@ -15,10 +15,10 @@ use POSIX qw(strftime);
 #
 sub usage()
 {
-    print "Usage: watchdog [-dv] [start | stop]\n";
+    print "Usage: watchdog [-dvn] [start | stop]\n";
     exit(1);
 }
-my $optlist = "Fdv";
+my $optlist = "Fdvn";
 
 #
 # Turn off line buffering on output
@@ -53,6 +53,7 @@ my @keylist     = ("ssh_host_key", "ssh_host_dsa_key", "ssh_host_rsa_key");
 my $debug	= 0;
 my $verbose     = 0;
 my $updatefailed= 0;
+my $noproxy     = 0;
 my $driftfile;
 my $lastdrift;
 my $rusagestr;
@@ -130,6 +131,9 @@ if (defined($options{"d"})) {
 if (defined($options{"v"})) {
     $verbose = 1;
 }
+if (defined($options{"n"})) {
+    $noproxy = 1;
+}
 if (defined($options{"F"})) {
     $fakeit = 1;
 }
@@ -202,9 +206,14 @@ $SIG{INT}  = \&handler;
 #
 if (JAILED() || PLAB()) {
     my $vnodeid = libsetup_getvnodeid();
+
     # Tell the tmcc library. Note that its actually been done via libsetup
     # but I duplicate it here to make it explicit.
     configtmcc("subnode", $vnodeid);
+
+    # This doesn't work yet, at least for jails since tmcd
+    # doesn't accept requests from them
+    #configtmcc("noproxy", $noproxy);
 }
 
 #
@@ -308,6 +317,7 @@ sub sendisalive($)
     }
 
     my %tmccargs = ();
+    $tmccargs{nocache} = 1;
     $tmccargs{timeout} = 3;
     $tmccargs{useudp} = 1
 	if (!$trytcp || $retry{isalive} != $maxretries);
@@ -381,16 +391,14 @@ sub setintervals($)
 	logmsg("setintervals: refetching intervals, retry=$retry{check}\n", 1);
     }
 
-    # XXX fake an argument to force request to TMCD and avoid the cache
-    my $arg = "foo";
-
     my %tmccargs = ();
+    $tmccargs{nocache} = 1;
     $tmccargs{timeout} = 3;
     $tmccargs{useudp} = 1
 	if (!$trytcp || $retry{check} != $maxretries);
 
     my @tmccresults;
-    if (tmcc(TMCCCMD_WATCHDOGINFO, $arg, \@tmccresults, %tmccargs) != 0 ||
+    if (tmcc(TMCCCMD_WATCHDOGINFO, undef, \@tmccresults, %tmccargs) != 0 ||
 	scalar(@tmccresults) == 0) {
 	#
 	# Failed, schedule a retry using a backoff.
@@ -621,6 +629,7 @@ sub sendrusage($)
     logmsg("rusage: sending: $rusagestr\n", 1);
 
     my %tmccargs = ();
+    $tmccargs{nocache} = 1;
     $tmccargs{timeout} = 3;
     $tmccargs{useudp} = 1
 	if (!$trytcp || $retry{rusage} != $maxretries);

@@ -73,6 +73,7 @@ my $beproxy     = 0;
       "logfile"		=> undef,
       "nocache"         => 0,
       "clrcache"        => 0,
+      "noproxy"         => 0,
     );
 
 # The cache directory is named by the vnodeid. This avoids some confusion.
@@ -331,9 +332,25 @@ sub tmcc ($;$$%)
     }
 
     #
+    # Allow per-command setting of nocache and noproxy
+    #
+    my $nocache;
+    if (defined($opthash{"nocache"})) {
+	$nocache = $opthash{"nocache"};
+    } else {
+	$nocache = $config{"nocache"};
+    }
+    my $noproxy;
+    if (defined($opthash{"noproxy"})) {
+	$noproxy = $opthash{"noproxy"};
+    } else {
+	$noproxy = $config{"noproxy"};
+    }
+
+    #
     # See if this is a cmd we can get from the local config stash. 
     #
-    if (!$config{"nocache"} && (!defined($args) || $args eq "")) {
+    if (!$nocache && (!defined($args) || $args eq "")) {
 	foreach my $key (keys(%commandset)) {
 	    my $tag = $commandset{$key}->{TAG};
 
@@ -367,9 +384,10 @@ sub tmcc ($;$$%)
     }
 
     #
-    # Check for proxypath file, but do not override config option. 
+    # If proxypath was not specified, check for a proxypath file,
+    # unless they explicilty specified not to use a proxy.
     #
-    if (!$config{"dounix"} && -e $PROXYDEF) {
+    if (!$config{"dounix"} && !$noproxy && -e $PROXYDEF) {
 	#
 	# Suck out the path and untaint. 
 	# 
