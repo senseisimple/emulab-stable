@@ -56,6 +56,7 @@ install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/log/exports
 	-mkdir -p $(INSTALL_TOPDIR)/lists
 	-mkdir -p $(INSTALL_TOPDIR)/backup
+	-mkdir -p $(INSTALL_TOPDIR)/etc
 	-mkdir -p $(INSTALL_TOPDIR)/batch
 	-chmod 777 $(INSTALL_TOPDIR)/batch
 	-mkdir -p $(INSTALL_TOPDIR)/expinfo
@@ -64,6 +65,7 @@ install-mkdirs:
 
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
+	-mkdir -p $(INSTALL_TOPDIR)/etc
 	@$(MAKE) -C tip tipserv-install
 	@$(MAKE) -C capture tipserv-install
 	@$(MAKE) -C tbsetup tipserv-install
