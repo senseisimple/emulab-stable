@@ -568,6 +568,7 @@ elseif (isset($nsdata) && strcmp($nsdata, "")) {
     }
     fwrite($fp, urldecode($nsdata));
     fclose($fp);
+    chmod($nsfile, 0666);
 }
 else {
     #
