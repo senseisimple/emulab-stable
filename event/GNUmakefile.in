@@ -62,7 +62,6 @@ install:
 client-install:
 ifeq ($(SYSTEM),FreeBSD)
 	@$(MAKE) -C delay-agent client-install
-	@$(MAKE) -C lib client-install
 endif
 	@$(MAKE) -C tbgen client-install
 	@$(MAKE) -C program-agent client-install
