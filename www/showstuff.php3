@@ -679,16 +679,19 @@ function SHOWEXP($pid, $eid) {
 
     $lastact = TBGetExptLastAct($pid,$eid);
     $idletime = TBGetExptIdleTime($pid,$eid);
-
+    $stale = TBGetExptIdleStale($pid,$eid);
+    
     if ($lastact != -1) {
 	echo "<tr>
             <td>Last Activity: </td>
             <td class=\"left\">$lastact</td>
           </tr>\n";
 
+	if ($stale) { $str = "(stale)"; } else { $str = ""; }
+	
 	echo "<tr>
             <td>Idle Time: </td>
-            <td class=\"left\">$idletime hours</td>
+            <td class=\"left\">$idletime hours $str</td>
           </tr>\n";
     }
 
@@ -767,11 +770,14 @@ function SHOWEXPLIST($type,$id) {
 	echo "<tr>$pidrow
               <th>EID</th>
               <th>State</th>
-              <th align=center>Nodes*</th>
-              <th align=center>Hours Idle</th>
+              <th align=center>Nodes [1]</th>
+              <th align=center>Hours Idle [2]</th>
               <th>Description</th>
           </tr>\n";
 
+	$idlemark = "<b>*</b>";
+	$stalemark = "<b>?</b>";
+	
 	while ($row = mysql_fetch_array($query_result)) {
 	    $pid  = $row[pid];
 	    $eid  = $row[eid];
@@ -779,13 +785,13 @@ function SHOWEXPLIST($type,$id) {
 	    $nodes= $row["nodes"];
 	    $minnodes = $row["min_nodes"];
 	    $idlehours = TBGetExptIdleTime($pid,$eid);
-	    if ($idlehours == -1) { $idlehours = "&nbsp;"; }
+	    $stale = TBGetExptIdleStale($pid,$eid);
+	    $ignore = $row["idle_ignore"];
 	    $name = stripslashes($row[expt_name]);
-	    if ($row[swap_requests] > 0) {
-		$state .= "&nbsp;(idle)";
-	    }
 	    if ($nodes==0) {
 		$nodes = "<font color=green>$minnodes</font>";
+	    } elseif ($row[swap_requests] > 0) {
+		$nodes .= $idlemark;
 	    }
 
 	    if ($nopid) {
@@ -794,22 +800,38 @@ function SHOWEXPLIST($type,$id) {
 		$pidrow="\n<td>".
 		    "<A href='showproject.php3?pid=$pid'>$pid</A></td>";
 	    }
+
+	    $idlestr = $idlehours;
+	    if ($idlehours > 0) {
+		if ($stale) { $idlestr .= $stalemark; }
+		if ($ignore) { $idlestr = "($idlestr)"; $parens=1; }
+	    } elseif ($idlehours == -1) { $idlestr = "&nbsp;"; }
 	    
 	    echo "<tr>$pidrow
                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
 		 <td>$state</td>
                  <td align=center>$nodes</td>
-                 <td align=center>$idlehours</td>
+                 <td align=center>$idlestr</td>
                  <td>$name</td>
              </tr>\n";
 	}
 	echo "</table>\n";
-	echo "<center><font size=-1><b>*</b> Node counts in \n".
-	    "<font color=green><b>green</b></font>\n".
+	echo "<table align=center cellpadding=0 class=stealth><tr>\n".
+	    "<td class=stealth align=left><font size=-1><ol>\n".
+	    "<li>Node counts in <font color=green><b>green</b></font>\n".
 	    "show a rough estimate of the minimum number of \n".
-	    "nodes required to swap in.\n".
-	    "<br>They account for delay nodes, but not for node \n".
-	    "types, etc.</font></center>\n";
+	    "nodes <br>required to swap in.\n".
+	    "They account for delay nodes, but not for node types, etc.\n".
+	    "<li>A $stalemark indicates that the data is stale, and ".
+	    "at least one node in the experiment has not <br>reported ".
+	    "on its proper schedule.\n"; 
+	if ($parens) {
+            # don't show this unless we did it... most users shouldn't ever
+	    # need to know that some expts have their idleness ignored
+	    echo "Values are in parenthesis for idle-ignore experiments.\n";
+	}
+	echo "</ol></font></td></tr></table>\n";
+
     }   
 }
 

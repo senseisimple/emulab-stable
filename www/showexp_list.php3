@@ -299,6 +299,9 @@ Include idle-ignore experiments</a></center></p><br />\n";
     }
     
     $idlemark = "<b>*</b>";
+    $stalemark = "<b>?</b>";
+    $parens = 0;
+    
     #
     # Okay, I decided to do this as one big query instead of a zillion
     # per-exp queries in the loop below. No real reason, except my personal
@@ -478,16 +481,16 @@ if ($thumb && !$idle) {
                   EID</a></th>
               <th align=center width=3%>
                <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=pcs$ni'>
-                  PCs</a><br>[<b>1</b>]</th>
+                  PCs</a> [1]</th>
               <th align=center width=3%>
                <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=idle$ni'>
-               Hours Idle</th>\n";
+               Hours Idle</a> [2]</th>\n";
     
     if ($showlastlogin)
         echo "<th width=17% align=center>Last Login</th>\n";
     if ($idle) {
-        #      "<th width=4% align=center>Days Idle</th>\n";
-	echo "<th width=4% align=center colspan=2>Swap Request</th>\n";
+	#echo "<th width=4% align=center colspan=2>Swap Requests</th>\n";
+	echo "<th width=4% align=center>Swap Requests</th>\n";
     }
 
     echo "    <th width=60%>
@@ -509,8 +512,11 @@ if ($thumb && !$idle) {
 	$idlesec= $row["idlesec"];
 	$swapreqs = $row["swap_requests"];
 	$isidle = ($idlesec >= 3600*$idlehours);
+	$stale = TBGetExptIdleStale($pid,$eid);
 	$daysidle=0;
 	$idletime = ($idlesec > 300 ? round($idlesec/3600,1) : 0);
+	# reset pcs
+	$pcs=0;
 	
 	if ($swapreqs && !$isidle) {
 	    $swapreqs = "";
@@ -518,8 +524,6 @@ if ($thumb && !$idle) {
 			"where pid='$pid' and eid='$eid'");
 	}
 
-	if ($ignore) { $isidle=0; }
-	
 	if ($isadmin) {
 	    $swappable= $row["swappable"];
 	    $swapreq=$row["swap_requests"];
@@ -547,39 +551,42 @@ if ($thumb && !$idle) {
 	    $lastlogin.="</td>\n";
 	    if ($lastlogin=="<td></td>\n") { $lastlogin="<td>&nbsp;</td>\n"; }
 	}
-
+	
 	if ($idle) {
-	    $stale = TBGetExptIdleStale($pid,$eid);
 	    # If it is ignored, skip it now.
 	    if ($ignore && !$noignore) { continue; }
 	    #$lastlogin .= "<td align=center>$daysidle</td>\n";
 	    if (isset($perexp_usage["$pid:$eid"]) &&
 		isset($perexp_usage["$pid:$eid"]["pc"])) {
 	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
-	    } else { $pcs=0; }
-	    $foo = "<td align=center valign=center>\n";
-	    $label = "";
-	    if ($stale) { $label .= "stale "; }
-	    if ($ignore) { $label .= "ignore "; }
-	    if (!$swappable) { $label .= "unswap. "; }
-	    if ($label == "") { $label = "&nbsp;"; }
- 	    if ($isidle && !$stale && !$ignore && !$toosoon && $pcs) {
-		$fooswap = "<td><a ".
-		    "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
-		    "<img border=0 src=\"redball.gif\"></a> $label</td>\n" ;
-	    } else {
-		$fooswap = "<td>$label</td>";
-		if (!$pcs) { $foo .= "(no PCs)\n"; }
-		else { $foo .="&nbsp;"; }
 	    }
+	    $foo = "<td align=center valign=center>\n";
+	    #$label = "";
+	    # Probably don't need this when we're using stalemark
+	    #if ($stale) { $label .= "stale "; }
+	    # Don't really need this if we're marking ignore with ()
+	    #if ($ignore) { $label .= "ignore "; }
+	    #if (!$swappable) { $label .= "unswap. "; }
+ 	    #if ($isidle && !$stale && !$ignore && !$toosoon && $pcs) {
+	    #    $fooswap = "<td><a ".
+	    #       "href=\"request_swapexp.php3?pid=$pid&eid=$eid\">".
+	    #       "<img border=0 src=\"redball.gif\"></a> $label</td>\n" ;
+	    #} else {
+	    #   if ($label == "") { $label = "&nbsp;"; }
+	    #   $fooswap = "<td>$label</td>";
+	    #   if (!$pcs) { $foo .= "(no PCs)\n"; }
+	    #   else { $foo .="&nbsp;"; }
+	    #}
 	    if ($swapreq > 0) {
-	      $foo .= "&nbsp;$swapreq&nbsp;sent<br />".
+	      $foo .= "$swapreq&nbsp;sent<br>".
 	              "<font size=-2>(${lastswapreq}&nbsp;hrs&nbsp;ago)</font>\n";
 	    }
-	    $foo .= "</td>" . $fooswap . "\n"; 
+	    #$foo .= "</td>".$fooswap."\n"; 
+	    if (!$swappable) { $foo .= "unswap.\n"; }
+	    
 	}
 
-	if ($idle && ($str=="&nbsp;" || !$pcs || !$isidle)) { continue; }
+	if ($idle && (!$pcs || !$isidle)) { continue; }
 
 	$nodes   = 0;
 	$special = 0;
@@ -612,22 +619,29 @@ if ($thumb && !$idle) {
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>\n";
 	
-	if ($isidle) { $nodes = $nodes.$idlemark; }
+	if ($isidle && !$ignore) { $nodes = $nodes.$idlemark; }
 	# If multiple classes, then hightlight the number.
 	if ($special)
-            echo "<td><font color=red>$nodes</font></td>\n";
+	    if ($idle)
+		echo "<td><font color=red>$nodes</font> ($pcs)</td>\n";
+	    else
+                echo "<td><font color=red>$nodes</font></td>\n";
 	else
             echo "<td>$nodes</td>\n";
 
 	if ($idletime == -1) {
-	    echo "<td>&nbsp;</td>\n";
+	    $idlestr = "&nbsp;";
 	} else {
+	    $idlestr = "$idletime";
+	    # Order between the next two lines determines if the
+	    # stalemark goes inside or outside the parens
+	    if ($stale && $pcs > 0) { $idlestr .= $stalemark; }
 	    if ($ignore && $idletime !=0) {
-		echo "<td>($idletime)</td>\n";
-	    } else {
-		echo "<td>$idletime</td>\n";
+		$idlestr = "($idlestr)";
+		$parens = 1;
 	    }
 	}
+	echo "<td>$idlestr</td>";
 	
 	if ($showlastlogin) echo "$lastlogin\n";
 	if ($idle) echo "$foo\n";
@@ -639,11 +653,20 @@ if ($thumb && !$idle) {
     }
     echo "</table>\n";
 
-    echo "<ol>
+    
+    echo "<font size=-1><ol>
              <li><font color=red>Red</font> indicates nodes other than PCs.
                  A $idlemark mark by the node count indicates that the
                  experiment is currently considered idle.
-          </ol>\n";
+             <li>A $stalemark indicates that the data is stale, and
+		 at least one node in the experiment has not reported
+		 on its proper schedule.\n";
+    if ($parens) {
+	# don't show this unless we did it... most users shouldn't ever
+	# need to know that you can set expts to have their idleness ignored
+	echo "Values are in parenthesis for idle-ignore experiments.\n";
+    }
+    echo "</ol></font>\n";
     
     echo "<center><b>Node Totals</b></center>\n";
     echo "<table border=0
