@@ -247,10 +247,12 @@ else {
 		 "(node_id, status, status_timestamp) ".
 		 "values ('$nodename', 'down', now()) ");
 
+    my $ifacerole = TBDB_IFACEROLE_CONTROL();
+    
     DBQueryFatal("insert into interfaces ".
-		 "(node_id, card, port, IP, interface_type, iface) ".
+		 "(node_id, card, port, IP, interface_type, iface, role) ".
 		 "values ('$nodename', $control_net, 1, '$nodeip', ".
-		 "        'fxp', 'eth0')");
+		 "        'fxp', 'eth0', '$ifacerole')");
 
     DBQueryFatal("insert into reserved ".
 		 "(node_id, pid, eid, rsrv_time, vname) ".

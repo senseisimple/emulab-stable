@@ -162,6 +162,9 @@ use Exporter;
 
 	 TBActivityReport GatherSwapStats GatherAssignStats
 
+	 TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT
+	 TBDB_IFACEROLE_JAIL TBDB_IFACEROLE_FAKE TBDB_IFACEROLE_OTHER
+
          max min
 	 );
 
@@ -506,6 +509,13 @@ sub TBDB_RSRVROLE_NODE()	{ "node"; }
 sub TBDB_RSRVROLE_VIRTHOST()	{ "virthost"; }
 sub TBDB_RSRVROLE_DELAYNODE()	{ "delaynode"; }
 sub TBDB_RSRVROLE_SIMNODE()	{ "simnode"; }
+
+# Interfaces roles.
+sub TBDB_IFACEROLE_CONTROL()	{ "ctrl"; }
+sub TBDB_IFACEROLE_EXPERIMENT()	{ "expt"; }
+sub TBDB_IFACEROLE_JAIL()	{ "jail"; }
+sub TBDB_IFACEROLE_FAKE()	{ "fake"; }
+sub TBDB_IFACEROLE_OTHER()	{ "other"; }
 
 #
 # Auth stuff.
