@@ -560,7 +560,9 @@ tb-fix-node $transmitter $node(1)
 
 This code creates two mote nodes and "attaches" each of them to one of the
 mobile nodes.  The OSs to be loaded on the mote nodes are the receiver,
-TinyOS-RfmLed, and the transmitter, TinyOS-CntRfm.  The receiver kernel will
+TinyOS-RfmLed, and the transmitter, TinyOS-CntRfm.  These are standard
+TinyOS kernels supplied by Emulab - uploading your own is covered below.
+The receiver kernel will
 listen for packets containing a number from the transmitter and display the
 number, in binary, on the mote's builtin LEDs.  The transmitter kernel will
 then send packets every second containing the value of a counter that goes from
@@ -575,6 +577,48 @@ After the modify completes, try moving the nodes close to one another and far
 away, to see the lights updating, or not.  You should also try running the
 nodes through the random motion created earlier and watching for the same
 effect on the lights.
+
+<p>
+Uploading your own code to run on the motes is easy. Just build your TinyOS app
+normally (ie. '<code>make mica2</code>').  Then, upload the binary that gets
+placed in <code>build/mica2/main.srec</code> to our
+<a href="<?php echo $TBBASE ?>/newimageid_ez.php3?nodetype=mote">mote image
+    creation page</a>.  This page will ask you for a 'descriptor'.  This
+discriptor can then be used in <code>tb-set-node-hardware</code> lines in your
+NS files, and your app will be automatically loaded on the appropriate mote(s).
+
+<p>
+At this time, we don't have a TinyOS installation on the Emulab servers, so
+you'll need to have a TinyOS installation to build from on your desktop
+machine, or some other machine you control.  We hope to provide a way for you
+build TinyOS apps on Emulab in the near future.  Also, at the current time, all
+of our motes have radios in the 900HMz band, so see the TinyOS
+<a href="http://www.tinyos.net/tinyos-1.x/doc/mica2radio/CC1000.html">CC1000
+radio document</a> to make sure you're tuning the radios to the right band.
+
+<p>
+When you inevitably make changes to your code, you can simply place the new
+kernel in the path that was automatically constucted for you by the image
+creation page; the next time you use that OS in an NS file, the new version
+will be loaded. If you'd like to load your node code onto your motes without
+starting a new experiment, you have two options:
+<ul>
+  <li> <code>os_load</code> allows you to load an kernel that has already been
+     defined as an image, as above. You give it the image descriptor with its
+     <code>-i</code> argument, and you can either give the phyiscal names of all
+     motes you want to reload, or a <code>-e pid,eid</code> argument to reload
+     all nodes in the given experiment.
+  <li> <code>tbuisp</code> allows you to load a file directly onto your motes
+     without having to register it as an image. This can be a quick way to do
+     development/debugging. Just pass it the operation <code>upload</code>, the
+     path to the file you wish to load, and the phyical names of your motes.
+</ul>
+Both of these are commands in /usr/testbed/bin on ops.emulab.net.   They are
+also available through our
+<a href="<?php echo $TBBASE ?>/xmlrpcapi.php3">XML-RPC interface</a>, so you
+can run them from your desktop machine to save time - the file given as an
+argument to tbuisp is sent with the XML-RPC, so you don't need to copy it onto
+our servers.
 
 <?php NLCBODYEND() ?>
 
