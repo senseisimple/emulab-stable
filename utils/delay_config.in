@@ -8,7 +8,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDERR
-	"Usage: delay_config [-d delay] [-b bw] [-l plr] [-p 0|1] ",
+	"Usage: delay_config [-m] [-d delay] [-b bw] [-l plr] [-p 0|1] ",
 	"<pid> <eid> <link>\n",
 	"Required: pid, eid, link, and at least one of -d, -b, or -l\n",
 	"  pid = Project ID\n",
@@ -18,17 +18,19 @@ sub usage()
 	"   -d = one-way link delay in milliseconds greater than 1\n",
 	"   -b = <NNN> N=bandwidth (10-100000 Kbits per second)\n",
 	"   -l = packet loss rate (0 <= plr < 1)\n",
-	"   -p = Select one of the pipes. 0 - packets received on iface0\n";
+	"   -p = Select one of the pipes. 0 - packets received on iface0\n".
+	"   -m = Modify the base experiment in addition to current state.\n";
 
     exit(-1);
 }
-my  $optlist = "gd:b:l:p:";
+my  $optlist = "gd:b:l:p:m";
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $TEVC        = "$TB/bin/tevc";
 my $debug	= 0;
 
 #
@@ -67,10 +69,16 @@ if (defined($options{"g"})) {
     $debug = 1;
 }
 
-my $pid  = $ARGV[0];
-my $eid  = $ARGV[1];
-my $link = $ARGV[2];
+my $pid    = $ARGV[0];
+my $eid    = $ARGV[1];
+my $link   = $ARGV[2];
+my $modify = 0;
+my $islink = 0;
 my $pipe;
+
+if (defined($options{"m"})) {
+    $modify = 1;
+}
 
 if (defined($options{"p"})) {
     $pipe = $options{"p"};
@@ -107,11 +115,12 @@ if (! $query_result->numrows) {
     die("*** $0:\n".
 	"    No such delay link $link in $pid/$eid!\n");
 }
+if ($query_result->numrows > 1) {
+    die("*** $0:\n".
+	"    Cannot modify delay parameters for Lans. Duplex Links Only!\n");
+}
 
 my %row    = $query_result->fetchhash();
-my $node   = $row{'node_id'};
-my $iface0 = $row{'iface0'};
-my $iface1 = $row{'iface1'};
 my %bw;
 my %delay;
 my %plr;
@@ -137,7 +146,7 @@ if (defined($options{"d"})) {
 	die("Illegal delay spec: $newdelay\n");
     }
 
-    if ($newdelay < 1) {
+    if ($newdelay < 0) {
 	usage();
     }
     if ($debug) {
@@ -188,34 +197,52 @@ if (defined($pipe)) {
     }
 }
 else {
-    my @joinlist;
-    my $joinstr  = "";
-    
     if (defined($newbw)) {
 	$bw[0] = $newbw;
 	$bw[1] = $newbw;
-	push(@joinlist, "bandwidth=$newbw");
     }
     if (defined($newplr)) {
 	$plr[0] = $newplr;
 	$plr[1] = $newplr;
-	push(@joinlist, "lossrate=$newplr");
     }
     if (defined($newdelay)) {
 	$delay[0] = $newdelay;
 	$delay[1] = $newdelay;
-	push(@joinlist, "delay=$newdelay");
     }
-    if (@joinlist) {
-	$joinstr = join(',', @joinlist);
-    }
+}
+
+if ($modify) {
+    my $d0 = $delay[0] / 2.0;
+    my $d1 = $delay[1] / 2.0;
+    my $l0 = 1-sqrt(1-$plr[0]);
+    my $l1 = 1-sqrt(1-$plr[1]);
+    my $b0 = $bw[0];
+    my $b1 = $bw[1];
 
     #
-    # This happens only when no pipe is specified, since we do not
-    # support changing the pipes at that level yet.
-    # 
-    DBQueryWarn("update virt_lans set $joinstr ".
-		"where pid='$pid' and eid='$eid' and vname='$link'");
+    # Need to get each of the virt_lan entries. Remember, just links! No lans!
+    #
+    # XXX We don't actually know which entry is which, but depend on their
+    # order in the DB. Rather bogus. Needs fixing.
+    #
+    $query_result =
+	DBQueryFatal("select member from virt_lans ".
+		     "where pid='$pid' and eid='$eid' and vname='$link'");
+
+    my ($member1) = $query_result->fetchrow_array();
+    my ($member2) = $query_result->fetchrow_array();
+    
+    DBQueryWarn("update virt_lans set ".
+		" delay=$d1, bandwidth=$b1, lossrate=$l1, ".
+		"rdelay=$d0,rbandwidth=$b0,rlossrate=$l0  ".
+		"where pid='$pid' and eid='$eid' and ".
+		"vname='$link' and member='$member1'");
+
+    DBQueryWarn("update virt_lans set ".
+		" delay=$d0, bandwidth=$b0, lossrate=$l0, ".
+		"rdelay=$d1,rbandwidth=$b1,rlossrate=$l1  ".
+		"where pid='$pid' and eid='$eid' and ".
+		"vname='$link' and member='$member2'");
 }
 
 #
@@ -227,11 +254,20 @@ DBQueryWarn("update delays set ".
 	    "where pid='$pid' and eid='$eid' and vname='$link'");
 
 #
-# Now ssh over to the node and have it update its delay params.
+# Inject an event. 
 #
-system("ssh -f -n $node 'sudo /etc/testbed/update_delays'") &&
+my $pipearg = "";
+if (defined($pipe)) {
+    $pipearg = "PIPE=pipe${pipe}";
+}
+else {
+    $pipe = 0;
+}
+    
+system("$TEVC -e $pid/$eid now $link modify $pipearg ".
+       "BANDWIDTH=$bw[$pipe] DELAY=$delay[$pipe] PLR=$plr[$pipe]") &&
     die("*** $0:\n".
-	"    Failed to update delays on $node!\n");
+	"    Failed to inject delay update event!\n");
     
 exit(0);
 
