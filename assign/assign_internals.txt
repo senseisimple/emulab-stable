@@ -107,6 +107,74 @@ bandwidth calculating purposes multiple links between switches should
 be collated into a single link.
 
 
+PClasses
+--------
+
+Assign defines an equivalence relation of physical nodes and uses this
+relation to partition the physical space into equivalence classes.
+Simulated annealing is then done on the classes rather than the
+individual nodes.  In addition a cost is imposed on each pclass used,
+causing assign to prefer solutions with similar nodes.
+
+Two pnodes are equivalent if they have identical type information,
+identical feature information, and a bijection of links exists which
+preserves destination and bandwidth.  I.e. every link on one node can
+be matched to a link on the other node such that they have the same
+destination and bandwidth.
+
+The equivalence classes are automatically generated during the
+initialization step and stored in a dictionary of arrays, with keys as
+types.  During annealing a starting pclass is randomly chosen and then
+the pclasses are rotated through until a valid class is found.  As the
+list of pclasses is chosen by type assign will never look at pclasses
+that can not support the type of the node.
+
+A complication arises in pnodes that can contain multiple vnodes.  To
+handle this each pclass has a list of all nodes of a given type.  Say
+a node of type T is requested from pclass P.  Assign looks at the list
+of T nodes in P and chooses the first one.  It then removes that node
+from all other type lists in P.  In addition, if the node is now full
+it is removed from the T list in P, otherwise it is left at the front.
+When a node is unassigned, if it is now empty it is added to the end
+of all type lists in its class.  Otherwise, if it still has a vnode
+and hence a type, it is only added to the beginning of the list of its
+current type.  By this method assign tends to fill nodes completely
+before moving on to a new node.
+
+
+VClasses
+--------
+
+VClasses allow the user to specify a class of virtual nodes and then
+have the vnodes be of that class.  Each vclass has a weight and a list
+of allowable types.  Assign attempts to map nodes such that all nodes
+of the same vclass have the same type.
+
+To do this, assign keeps track of the dominant type of a vclass.  This
+is the type that the majority of members are.  Every time a member of
+a vclass is assigned or unassigned the dominant type and score from
+that vclass are recalculated.  The score of a vclass (not the member
+nodes) is 0 if all members are of the dominant type, and the weight
+otherwise.  A weight of 1 or more also generates a vclass violation.
+
+Due to the nature of assign when a member of a vclass is to be mapped
+its type must be chosen before it is fitted.  It would be nice if
+assign computed all possible pclasses that could satisfy the member,
+based on its possible types, and then loop through that list.  This is
+future work.  For the moment, when assign sees a member of a vclass it
+chooses a type for it.  A little over half the time it will choose the
+dominant class, otherwise it chooses randomly.
+
+Fixed Nodes
+-----------
+
+Fixed nodes are a mechanism by which a user can manually specify part
+of the mapping themselves.  Fixed nodes show up in assign as a special
+case.  If a node is fixed it is marked as such and mapped to the
+correct pnode during initialization.  From then on it can never be
+unmapped.
+
+
 LEDA
 ----
 
@@ -132,6 +200,11 @@ topology.
 parse_ptop.cc - Contains parse_ptop which parses and sets up the
 physical topology.
 
+pclass.cc - Contains the equivalence relation, the code to generate
+the pclasses, and the code to maintain the pclasses.
+
+vclass.cc - Contains the code to setup vclasses and calculate score
+deltas when nodes are mapped and unmapped..
 
 Header Files:
 
@@ -145,6 +218,10 @@ physical.h - Defines the physical elements: pnodes, plinks, and switch
 fabric structures.
 
 virtual.h - Defines the virtual elements: vnodes and vlinks.
+
+pclass.h - Defines the pclass class.
+
+vclass.h - Defines the vclass class.
 
 
 Important Globals
@@ -160,11 +237,15 @@ G - The virtual topology.
 bestscore, absbest - The bestscore this iteration and the absolute
 best score.
 
-bestnodes, absnodes - Contains the actual best and absolute best
-solution.
+absnodes - Contains the absolute best solution.
 
 unassigned_nodes - Priority queue of nodes to be assigned.
 
+type_table - Indexed by type, contains a list of pclasses that can
+satisfy that type.
+
+fixed_nodes - Indexed by vname, contains the pname the node is fixed
+to.
 
 Initialization
 --------------
@@ -173,7 +254,7 @@ During the initialization process assign reads in the top and ptop
 files, initializes the random number generator, and calculates the
 shortest paths between any two switches.  
 
-This last step deserves some comments.  parse_ptop will fill out both
+This next step deserves some comments.  parse_ptop will fill out both
 the PG, the completely physical topology, and SG, the switch fabric.
 The SG graph contains slinks and snodes which exists in one-to-one
 correspondence to the switches and interswitch links in PG.  Each
@@ -187,6 +268,7 @@ the predecessor node.  This is used by the scoring code to calculate
 interswitch paths.  If SCORE_DEBUG is defined the both edge costs and
 predecessors are output.
 
+Finally assign computes all physical equivalence classes.
 
 The Main Loop
 -------------
@@ -195,12 +277,12 @@ A strange sequence of calls that exist for historical reasons
 ultimately end up with assign() which is the main simulated annealing
 loop.  This particularly code has had at least three and possibly as
 many as five different authors and none of them quite understand it.
-In essence it randomly chooses an unassigned vnode and then a pnode
-and calls add_node to attempt to map them.  If add_node succeeds it
-then compares scores and decides whether to accept the mapping.  If no
-vnodes are unassigned then it randomly chooses an assign vnode,
-removes it via remove_node and then randomly maps it to a pnode via
-add_node.
+In essence it randomly chooses an unassigned vnode and then a pclass
+that can satisfy the vnode and calls add_node to attempt to map
+them.  If add_node succeeds it then compares scores and decides
+whether to accept the mapping.  If no vnodes are unassigned then it
+randomly chooses an assign vnode, removes it via remove_node and then
+randomly maps it to a pnode via add_node.
 
 
 The Scoring Code
