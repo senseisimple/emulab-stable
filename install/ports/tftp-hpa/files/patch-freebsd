@@ -1,6 +1,6 @@
 diff -rcN tftp-hpa-0.33.orig/MCONFIG.in tftp-hpa-0.33/MCONFIG.in
 *** tftp-hpa-0.33.orig/MCONFIG.in	Tue Nov 27 03:18:11 2001
---- tftp-hpa-0.33/MCONFIG.in	Wed Feb  5 14:03:10 2003
+--- tftp-hpa-0.33/MCONFIG.in	Thu Feb  6 13:07:09 2003
 ***************
 *** 27,32 ****
 --- 27,36 ----
@@ -14,6 +14,16 @@ diff -rcN tftp-hpa-0.33.orig/MCONFIG.in tftp-hpa-0.33/MCONFIG.in
   
   # Binary suffixes
   O = @OBJEXT@
+***************
+*** 42,47 ****
+--- 46,52 ----
+  INSTALL         = @INSTALL@
+  INSTALL_PROGRAM = @INSTALL_PROGRAM@
+  INSTALL_DATA    = @INSTALL_DATA@
++ INSTALL_SCRIPT  = @INSTALL_SCRIPT@
+  
+  # Compiler and compiler flags
+  CC      = @CC@
 diff -rcN tftp-hpa-0.33.orig/configure tftp-hpa-0.33/configure
 *** tftp-hpa-0.33.orig/configure	Sun Feb  2 18:33:26 2003
 --- tftp-hpa-0.33/configure	Wed Feb  5 14:03:10 2003
@@ -124,7 +134,7 @@ diff -rcN tftp-hpa-0.33.orig/configure.in tftp-hpa-0.33/configure.in
   AC_SUBST(TFTP_LIBS)
 diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
 *** tftp-hpa-0.33.orig/tftpd/Makefile	Tue Nov 27 03:18:11 2001
---- tftp-hpa-0.33/tftpd/Makefile	Wed Feb  5 14:34:52 2003
+--- tftp-hpa-0.33/tftpd/Makefile	Thu Feb  6 13:08:32 2003
 ***************
 *** 23,32 ****
   	sed -e 's/@@VERSION@@/$(VERSION)/g' < $< > $@
@@ -144,7 +154,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
 ! 	mkdir -p $(INSTALLROOT)$(LIBEXECDIR) $(INSTALLROOT)$(MANDIR)/man8
 ! 	$(INSTALL_PROGRAM) tftpd$(X) $(INSTALLROOT)$(LIBEXECDIR)/tftpd
 ! 	$(INSTALL_DATA)    tftpd.8 $(INSTALLROOT)$(MANDIR)/man8/tftpd.8
-! 	$(INSTALL_PROGRAM) tftpd-hpa.sh $(INSTALLROOT)$(ETCDIR)/rc.d/
+! 	$(INSTALL_SCRIPT) -m 555 tftpd-hpa.sh $(INSTALLROOT)$(ETCDIR)/rc.d/
 ! 	$(INSTALL_DATA)    tftpd.rules $(INSTALLROOT)$(ETCDIR)/
   
   clean:
