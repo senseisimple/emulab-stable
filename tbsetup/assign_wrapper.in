@@ -192,17 +192,24 @@ my @simnodelist;
 my %simnode_iplist = ();
 my %iptonodemap = ();
 
+# XXX Remote/Virt node hacks. Turns out to be similar to NSE.
+my %isremotenode = ();
+my %isvirtnode   = ();
+
 printdb "Loading virt_nodes.\n";
 $result =
-    DBQueryFatal("select distinct vname,ips,vn.type,fixed,nt.isremotenode ".
+    DBQueryFatal("select distinct vname,ips,vn.type,fixed, ".
+		 " nt.isremotenode,nt.isvirtnode ".
 		 " from virt_nodes as vn ".
 		 "left join node_types as nt on ".
 		 " nt.type=vn.type or nt.class=vn.type ".
 		 "where pid='$pid' and eid='$eid'");
 
-while (($vname,$ips,$type,$fixed,$isremote) = $result->fetchrow_array) {
-    if (! defined($fixed))  {$fixed  = "";}
-
+while (($vname,$ips,$type,$fixed,$isremote,$isvirt) = $result->fetchrow_array){
+    if (defined($fixed) && $fixed eq "") {
+	undef($fixed);
+    }
+    
     # REMOTENODE HACK
     #
     # if its a vtype, no entry in node_types. vtypes break remote nodes.
@@ -210,8 +217,11 @@ while (($vname,$ips,$type,$fixed,$isremote) = $result->fetchrow_array) {
     # physnodes. Later ...
     #
     if (! defined($isremote)) {$isremote = 0;}
+    if (! defined($isvirt)) {$isvirt = 0;}
     
-    printdb "  $vname $type $ips $fixed $isremote\n";
+    printdb "  $vname $type $ips";
+    printdb " " . (defined($fixed) ? $fixed : "") . " $isremote\n";
+    
     # We need to check the names to make sure they won't clash with
     # our internal delay node names.
     if (($vname =~ /^tbdelay\d+/) ||
@@ -238,11 +248,43 @@ while (($vname,$ips,$type,$fixed,$isremote) = $result->fetchrow_array) {
 	}
 	$iptonodemap{$ip} = $vname;
     }
-    if ($fixed ne "") {
+    $isvirtnode{$vname} = $isvirt;
+    if (defined($fixed)) {
 	$fixed_nodes{$vname} = $fixed;
     }
 }
 $result->finish;
+
+#
+# VIRTNODES HACK: Sanity check. Local virtnodes have to be assigned to
+# another node. Remote virtnodes can also be fixed, and they are done
+# specially too! See below.
+# Note, node it is fixed to is a physnode (not another virtnode). Once
+# we assign the physnode, we assign the virtnodes to that physnode later
+# on. Yep, its confusing and overlaps with simnodes.
+#
+foreach my $vname (keys(%isvirtnode)) {
+    next
+	if (! $isvirtnode{$vname});
+    
+    #
+    # Mixing local and remote virtnodes is actually broken right now. 
+    #
+    next
+	if ($isremotenode{$vname});
+
+    if (! defined($fixed_nodes{$vname})) {
+	die("*** $0:\n".
+	    "    Local virtnode $vname must be fixed to a real node!\n");
+    }
+    #
+    # The node it is fixed to must not be another virtnode!
+    #
+    if ($isvirtnode{$fixed_nodes{$vname}}) {
+	die("*** $0:\n".
+	    "    Local virtnode $vname is fixed to another virt node!\n");
+    }
+}
 
 printdb "Loading virt_lans.\n";
 $result =
@@ -413,7 +455,8 @@ $delaynodes=0;
 foreach $node (keys(%nodes)) {
     # Shark hack
     if (($nodes{$node} ne "shark") &&
-	($nodes{$node} ne "dnard") && !$isremotenode{$node}) {
+	($nodes{$node} ne "dnard") &&
+	!$isremotenode{$node} && !$isvirtnode{$node}) {
 	print TOPFILE "node $node $nodes{$node}\n";
 	if ($nodes{$node} ne "shark-shelf") {
 	    $nodes++;
@@ -594,7 +637,7 @@ if( scalar(@simnodelist) > 0 ) {
   close(AVAIL);
   
   if( $num == 0 ) {
-    print STDERR "$): *** Insufficient PCs available.\n";
+    print STDERR "$0: *** Insufficient PCs available.\n";
     exit(2);
   }
 
@@ -605,7 +648,7 @@ if( scalar(@simnodelist) > 0 ) {
 
 # Print out fixed nodes
 foreach $fixed (keys(%fixed_nodes)) {
-    if (! $isremotenode{$fixed}) {
+    if (!$isremotenode{$fixed} && !$isvirtnode{$fixed}) {
 	print TOPFILE "fix-node $fixed $fixed_nodes{$fixed}\n";
     }
 }
@@ -883,16 +926,85 @@ if (scalar(keys(%isremotenode))) {
 }
 
 #
+# VIRTNODES HACK: Local virtnodes have to be mapped now. As mentioned
+# above, local virtnodes are "fixed" to a local real node. Now that the
+# real nodes have been allocated, fix the requested virtnodes to them.
+#
+foreach my $vname (keys(%isvirtnode)) {
+    next
+	if (! $isvirtnode{$vname});
+    
+    #
+    # Mixing local and remote virtnodes is actually broken right now. 
+    #
+    next
+	if ($isremotenode{$vname});
+
+    my $fixed = $fixed_nodes{$vname};
+    my $pnode;
+    my $type;
+
+    #
+    # Run avail to see if there are any virtnodes free on the (phys) node 
+    # that its being fixed to. 
+    # 
+    open(AVAIL,"$TBROOT/sbin/avail virtonly=$v2pmap{$fixed} rand |")
+	or die("*** $0:\n".
+	       "    avail failed\n");
+
+    my $num = 0;
+    while (<AVAIL>) {
+	next
+	    if (! /^\|/);
+	next
+	    if (/node_id/);
+	
+	($pnode) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|(\w+)\s*\|$/;
+	last;
+    }
+    close(AVAIL);
+
+    if (!defined($pnode)) {
+	print STDERR "*** $0:\n".
+	    "Could not map $vname to a virtual node on $fixed\n";
+	exit(2);
+    }
+
+    #
+    # Try to allocate. Note, if this fails we are done for. Okay for now
+    # since it is never the case that it should fail given the current
+    # requirement that all local vnodes are "fixed" to a real node.
+    # 
+    if (system("nalloc $pid $eid $pnode")) {
+	die("*** $0:\n".
+	    "Failed to reserve $pnode (on $fixed)\n");
+    }
+
+    $v2pmap{$vname} = $pnode;
+    push(@{$p2vmap{$pnode}}, $vname);
+    printdb "  Mapping $vname to $pnode on $fixed\n";
+}
+
+#
 # VIRTNODES HACK: physical nodes (from the nodes table) might really
 # be a virtual node :-) Must get the underlying phys_nodeid.
 #
 my %p2pmap = ();
+my %jailed = ();
 
 foreach my $pnode (keys(%p2vmap)) {
     my $phys_nodeid;
+    my $jailflag;
 
     # Skip special LAN nodes.
-    if ( scalar(@{$p2vmap{$pnode}}) == 1 && defined($lannodes{$p2vmap{$pnode}[0]})) {
+    if ( scalar(@{$p2vmap{$pnode}}) == 1 &&
+	 defined($lannodes{$p2vmap{$pnode}[0]})) {
+	next;
+    }
+
+    if (! TBIsNodeVirtual($pnode, \$jailflag)) {
+	$jailed{$pnode} = 0;
+	$p2pmap{$pnode} = $pnode;
 	next;
     }
 
@@ -900,9 +1012,11 @@ foreach my $pnode (keys(%p2vmap)) {
 	die("*** $0:\n".
 	    "    Cannot determine phys_nodeid for $pnode!\n");
     }
+    
+    $jailed{$pnode} = $jailflag;
     $p2pmap{$pnode} = $phys_nodeid;
 }
-
+TBExptSetPortRange();
 
 ######################################################################
 # Step 3 - Convert to vlans, delays, and portmap
@@ -1666,7 +1780,11 @@ if ($query_result->numrows) {
 	   $query_result->fetchrow_array()) {
 
 	my $pnode    = $v2pmap{$vnode};
-	my $ipport   = nextipportnum($p2pmap{$pnode});
+
+	if (! $jailed{$pnode}) {
+	    $pnode = $p2pmap{$pnode};
+	}
+	my $ipport   = nextipportnum($pnode);
 
 	DBQueryFatal("update virt_trafgens set port=$ipport ".
 		     "where pid='$pid' and eid='$eid' and ".
@@ -1691,6 +1809,7 @@ foreach my $vnode (keys(%v2pmap)) {
 TBDebugTimeStamp("uploading finished");
 
 TBDebugTimeStamp("assign_wrapper finished");
+exit 0;
 
 ######################################################################
 # Subroutines
@@ -1768,37 +1887,116 @@ sub find_vport {
 };
 
 #
-# Bump and return the IP port number for a physical node. This is
+# Bump and return the IP port number for a node. This is
 # required for multiplexing virtual nodes on a physical node. It has
 # to be done after node assignment of course.
 #
-# port,-1 on success/failure.
+# returns port on success, dies if no more ports.
 # 
 sub nextipportnum($) {
     my ($node) = @_;
+    my $port;
 
-    DBQueryFatal("lock tables nodeipportnum write");
+    DBQueryFatal("lock tables nodes write");
 
     my $query_result =
-	DBQueryFatal("select port from nodeipportnum where node_id='$node'");
-    
-    if (! $query_result->numrows) {
-	DBQueryFatal("insert into nodeipportnum (node_id) values ('$node')");
-	DBQueryFatal("unlock tables");
-	return nextipportnum($node, $pport);
-    }
-    my ($port) = $query_result->fetchrow_array;
+	DBQueryFatal("select ipport_low,ipport_next,ipport_high from nodes ".
+		     "where node_id='$node'");
 
-    if ($port < 1024 || $port > 60000) {
-	DBQueryFatal("replace into nodeipportnum (node_id) values ('$node')");
+    my ($portlow,$portnext,$porthigh) =	$query_result->fetchrow_array();
+
+    $port = $portnext++;
+
+    if ($port < $portlow || $port > $porthigh) {
 	DBQueryFatal("unlock tables");
-	return nextipportnum($node, $pport);
+	die("*** $0:\n".
+	    "    No more dynamic ports available for $node!\n");
     }
-    
-    DBQueryFatal("update nodeipportnum set port=${port}+1 ".
+
+    DBQueryFatal("update nodes set ipport_next=$portnext ".
 		 "where node_id='$node'");
     DBQueryFatal("unlock tables");
-    
+
     return $port;
+}
+
+sub TBExptSetPortRange {
+    my @nodelist = ();
+    
+    #
+    # See if any virtual nodes. If not, no need to do anything since
+    # all port allocations will come from physical node. 
+    #
+    foreach my $vnode (keys(%v2pmap)) {
+	my $pnode = $v2pmap{$vnode};
+
+	if ($isvirtnode{$vnode}) {
+	    push(@nodelist, $pnode);
+	}
+    }
+    if (! @nodelist) {
+	return 0;
+    }
+
+    #
+    # Otherwise find a free slot in the table.
+    #
+    DBQueryFatal("lock tables ipport_ranges write");
+
+    my $range_result =
+	DBQueryFatal("select low,high from ipport_ranges order by low");
+
+    my $newlow;
+    my $newhigh;
+    my $lastlow;
+    my $lasthigh;
+    
+    if (!$range_result->num_rows) {
+	$newlow = TBDB_LOWVPORT;
+    }
+    else {
+	($lastlow, $lasthigh) = $range_result->fetchrow_array();
+
+	# A hole at the bottom of the range ...
+	if ($lastlow >= TBDB_LOWVPORT + TBDB_PORTRANGE) {
+	    $newlow = TBDB_LOWVPORT;
+	}
+	# Else, find a free hole. 
+	else {
+	    while (my ($thislow,$thishigh) = $range_result->fetchrow_array()) {
+		if ($thislow != $lasthigh + 1 &&
+		    $thislow - $lasthigh > TBDB_PORTRANGE) {
+		    $newlow = $lasthigh + 1;
+		    last;
+		}
+		$lasthigh = $thishigh;
+	    }
+	}
+    }
+    if (!defined($newlow)) {
+	# No holes, tack onto the end. 
+	$newlow = $lasthigh + 1;
+    }
+    if ($newlow >= TBDB_MAXVPORT) {
+	DBQueryFatal("unlock tables");
+	return -1;
+    }
+    $newhigh = $newlow + TBDB_PORTRANGE - 1;
+	
+    DBQueryFatal("insert into ipport_ranges ".
+		 " (pid, eid, low, high) ".
+		 "values ('$pid', '$eid', $newlow, $newhigh)");
+    DBQueryFatal("unlock tables");
+    printdb "Setting ipport range to $newlow,$newhigh\n";
+
+    #
+    # Update virtnodes with new range.
+    #
+    foreach $node (@nodelist) {
+	DBQueryFatal("update nodes set ipport_low=$newlow, ".
+		     " ipport_next=ipport_low+1, ipport_high=$newhigh ".
+		     "where node_id='$node'");
+    }
+    return 0;
 }
 
