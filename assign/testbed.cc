@@ -26,7 +26,12 @@ void testnode::name(char *newname)
 
 testedge::testedge()
 {
-	capacity_ = 0;
+	capacity_ = 100;  /* XXX:  Jay would like us to eventually change
+			   * this based upon feedback, etc.
+			   * We also should deal specially with < 10Mb
+			   * links so we can ifconfig the interface
+			   * to 10Mb and need worry less about congestion
+			   */
 }
 
 testedge::~testedge()
