@@ -1,18 +1,18 @@
 # $FreeBSD: src/etc/group,v 1.19 1999/08/27 23:23:41 peter Exp $
 #
-wheel:*:0:root,mike,sclawson,lepreau,stoller,forys,kwright,danderse,newbold,calfeld
+wheel:*:0:root,toor
 daemon:*:1:daemon
-kmem:*:2:root
-sys:*:3:root
-tty:*:4:root
-operator:*:5:root,mike
+kmem:*:2:root,toor
+sys:*:3:root,toor
+tty:*:4:root,toor
+operator:*:5:root,toor
 mail:*:6:
 bin:*:7:
 news:*:8:
 man:*:9:
 games:*:13:
-staff:*:20:root,mike,stoller,lepreau
-guest:*:31:root
+staff:*:20:root,toor
+guest:*:31:root,toor
 bind:*:53:
 uucp:*:66:
 xten:*:67:xten
