@@ -13,5 +13,9 @@ include $(OBJDIR)/Makeconf
 
 all:	
 
+client-install:
+	$(MAKE) -C groklilo client-install
+	$(MAKE) -C tbbootconfig client-install
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 

@@ -1,0 +1,25 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+EVENTSYS	= @EVENTSYS@
+OBJDIR		= ../..
+SUBDIR		= cdrom/groklilo
+
+include $(OBJDIR)/Makeconf
+
+all:	groklilo
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	+= -O -g -Wall -I${OBJDIR} -UINBOOTLOADER
+
+groklilo: groklilo.c
+	$(CC) $(CFLAGS) -static -g -o groklilo $< $(LFLAGS)
+
+client-install: groklilo
+	$(INSTALL_PROGRAM) groklilo $(DESTDIR)$(CLIENT_BINDIR)
+
+clean:
+	rm -f *.o core groklilo
