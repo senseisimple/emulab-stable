@@ -22,7 +22,7 @@ SCRIPTS		= $(addprefix $(SRCDIR)/, \
 		    rc.tunnels rc.ifconfig rc.delays rc.hostnames \
 		    rc.syncserver rc.linkagent \
 		    rc.keys rc.trafgen rc.tarfiles rc.rpms rc.progagent \
-		    rc.startcmd rc.simulator)
+		    rc.startcmd rc.simulator rc.topomap)
 
 include $(OBJDIR)/Makeconf
 

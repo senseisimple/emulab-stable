@@ -84,7 +84,7 @@ SWITCH: for ($action) {
 exit(0);
 
 # More protos
-sub donodeid();
+sub dotopomap();
 
 #
 # Boot Action.
@@ -92,7 +92,7 @@ sub donodeid();
 sub doboot()
 {
     # Handled elsewhere for other node types.
-    donodeid()
+    dotopomap()
 	if (!PLAB() && !JAILED() && !IXP());
 }
 
@@ -118,34 +118,27 @@ sub doreconfig()
 #
 sub docleanup()
 {
-    unlink TMNODEID();
+    unlink TMTOPOMAP();
 }
 
 #
-# Get the nodeid
-# 
-sub donodeid()
+# Get topomap
+#
+sub dotopomap()
 {
-    my $nodeid;
-    my @tmccresults;
-
-    if (tmcc(TMCCCMD_NODEID, undef, \@tmccresults) < 0) {
-	fatal("Could not get nodeid from server!");
-    }
-    return 0
-	if (! @tmccresults);
+    my ($pid, $eid, $vname) = check_nickname();
     
     #
-    # There should be just one string. Ignore anything else.
+    # Copy over the topomap so that it is locally resident. We will eventually
+    # get this via a tarfile instead of NFS.
     #
-    if ($tmccresults[0] =~ /([-\w]*)/) {
-	$nodeid = $1;
-    }
-    else {
-	fatal("Bad nodeid line: $tmccresults[0]");
-    }
+    my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap";
     
-    system("echo '$nodeid' > ". TMNODEID);
-    return 0;
+    if (-e "${topomap}.gz") {
+	system("cat ${topomap}.gz | gunzip > " . TMTOPOMAP());
+    }
+    elsif (-e $topomap) {
+	system("cp -fp $topomap ". TMTOPOMAP());
+    }
+   
 }
-

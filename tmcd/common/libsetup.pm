@@ -166,6 +166,7 @@ sub FINDIF()		{ "$BINDIR/findif"; }
 sub TMUSESFS()		{ "$BOOTDIR/usesfs"; }
 sub ISSIMTRAFGEN()	{ "$BOOTDIR/simtrafgen"; }
 sub ISDELAYNODE()	{ "$BOOTDIR/isdelaynode"; }
+sub TMTOPOMAP()		{ "$BOOTDIR/topomap";}
 
 #
 # This path is valid only *outside* the jail when its setup.
@@ -214,7 +215,6 @@ sub TMEVENTKEY()	{ CONFDIR() . "/eventkey";}
 sub TMNODEID()		{ CONFDIR() . "/nodeid";}
 sub TMROLE()		{ CONFDIR() . "/role";}
 sub TMSIMRC()		{ CONFDIR() . "/rc.simulator";}
-sub TMTOPOMAP()		{ CONFDIR() . "/topomap";}
 
 #
 # This is a debugging thing for my home network.
