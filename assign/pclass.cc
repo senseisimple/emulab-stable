@@ -115,6 +115,20 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
       return 0;
   }
 
+  // have to go both ways in case the second node has a feature the first
+  // doesn't
+  for (tb_pnode::features_map::iterator it=b->features.begin();
+       it != b->features.end();++it) {
+    const crope &b_feature = (*it).first;
+    const double b_weight = (*it).second;
+    
+    tb_pnode::features_map::iterator ait;
+    ait = a->features.find(b_feature);
+    if (ait == a->features.end()) {
+      return 0;
+    }
+  }
+
   // check links - to do this we first create sets of every link in b.
   // we then loop through every link in a, find a match in the set, and
   // remove it from the set.
