@@ -25,12 +25,6 @@ http://www.amazon.com/exec/obidos/ASIN/0387001638/thealgorithmrepo/
 
 */
 
-#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
-#include <string>
-#include<backward/pair.h>
-using namespace std;
-#endif
-
 #define MAXV            20000           /* maximum number of vertices */
 #define MAXDEGREE       50              /* maximum outdegree of a vertex */
 
@@ -45,7 +39,7 @@ typedef struct {
         int nvertices;                  /* number of vertices in the graph */
         int nedges;                     /* number of edges in the graph */
     // map from dest edge to (source ip, dest ip)
-    std::multimap< int, pair<string, string> > ip[MAXV + 1];
+    std::multimap< int, std::pair<std::string, std::string> > ip[MAXV + 1];
 } graph;
 
 void initialize_graph(graph * g);
