@@ -3075,6 +3075,7 @@ sub GatherSwapStats($$$$;$$)
 	#
 	if ($mode eq TBDB_STATS_SWAPOUT ||
 	    $mode eq TBDB_STATS_SWAPIN ||
+	    $mode eq TBDB_STATS_START ||
 	    $mode eq TBDB_STATS_SWAPMODIFY) {
 	    my $tmp = $mode;
 	    if ($mode eq TBDB_STATS_START) {
