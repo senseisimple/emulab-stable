@@ -284,6 +284,32 @@ proc tb-set-link-loss {srclink args} {
     }
 }
 
+# This takes two possible formats:
+# tb-set-link-est-bandwidth <link> <loss>
+# tb-set-link-est-bandwidth <src> <dst> <loss>
+proc tb-set-link-est-bandwidth {srclink args} {
+    if {[llength $args] == 2} {
+	set dst [lindex $args 0]
+	set bw [lindex $args 1]
+	set sim [$srclink set sim]
+	set reallink [$sim find_link $srclink $dst]
+	if {$reallink == {}} {
+	    perror "\[tb-set-link-est-bandwidth] No link between $srclink and $dst."
+	    return
+	}
+    } else {
+	set reallink $srclink
+	set bw [lindex $args 0]
+    }
+    $reallink instvar bandwidth
+    $reallink instvar ebandwidth 
+    $reallink instvar rebandwidth
+    foreach pair [array names bandwidth] {
+	set ebandwidth($pair) [parse_bw $bw]
+	set rebandwidth($pair) [parse_bw $bw]
+    }
+}
+
 proc tb-set-lan-loss {lan lossrate} {
     var_import ::TBCOMPAT::FLOAT
     if {[$lan info class] != "Lan"} {
@@ -300,6 +326,21 @@ proc tb-set-lan-loss {lan lossrate} {
     foreach pair [array names loss] {
 	set loss($pair) $adjloss
 	set rloss($pair) $adjloss
+    }
+}
+
+proc tb-set-lan-est-bandwidth {lan bw} {
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-lan-est-bandwidth] $lan is not a lan."
+	return
+    }
+
+    $lan instvar bandwidth
+    $lan instvar ebandwidth 
+    $lan instvar rebandwidth
+    foreach pair [array names bandwidth] {
+	set ebandwidth($pair) [parse_bw $bw]
+	set rebandwidth($pair) [parse_bw $bw]
     }
 }
 
@@ -320,22 +361,41 @@ proc tb-set-node-lan-delay {node lan delay} {
     $lan set delay([list $node $port]) [parse_delay $delay]
     $lan set rdelay([list $node $port]) [parse_delay $delay]
 }
+
+
 proc tb-set-node-lan-bandwidth {node lan bw} {
     if {[$node info class] != "Node"} {
-	perror "\[tb-set-node-lan-delay] $node is not a node."
+	perror "\[tb-set-node-lan-bandwidth] $node is not a node."
 	return
     }
     if {[$lan info class] != "Lan"} {
-	perror "\[tb-set-node-lan-delay] $lan is not a lan."
+	perror "\[tb-set-node-lan-bandwidth] $lan is not a lan."
 	return
     }
     set port [$lan get_port $node]
     if {$port == {}} {
-	perror "\[tb-set-node-lan-delay] $node is not in $lan."
+	perror "\[tb-set-node-lan-bandwidth] $node is not in $lan."
 	return
     }
     $lan set bandwidth([list $node $port]) [parse_bw $bw]
     $lan set rbandwidth([list $node $port]) [parse_bw $bw]
+}
+proc tb-set-node-lan-est-bandwidth {node lan bw} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-lan-est-bandwidth] $node is not a node."
+	return
+    }
+    if {[$lan info class] != "Lan"} {
+	perror "\[tb-set-node-lan-est-bandwidth] $lan is not a lan."
+	return
+    }
+    set port [$lan get_port $node]
+    if {$port == {}} {
+	perror "\[tb-set-node-lan-est-bandwidth] $node is not in $lan."
+	return
+    }
+    $lan set ebandwidth([list $node $port]) [parse_bw $bw]
+    $lan set rebandwidth([list $node $port]) [parse_bw $bw]
 }
 proc tb-set-node-lan-loss {node lan loss} {
     var_import ::TBCOMPAT::FLOAT

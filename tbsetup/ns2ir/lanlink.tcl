@@ -218,6 +218,8 @@ LanLink instproc init {s nodes bw d type} {
     # r* indicates the switch->node chars, others are node->switch
     $self instvar bandwidth
     $self instvar rbandwidth
+    $self instvar ebandwidth
+    $self instvar rebandwidth
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -229,6 +231,9 @@ LanLink instproc init {s nodes bw d type} {
 	set nodepair [list $node [$node add_lanlink $self]]
 	set bandwidth($nodepair) $bw
 	set rbandwidth($nodepair) $bw
+	# Note - we don't set defaults for ebandwidth and rebandwidth - lack
+	# of an entry for a nodepair indicates that they should be left NULL
+	# in the output.
 	set delay($nodepair) [expr $d / 2.0]
 	set rdelay($nodepair) [expr $d / 2.0]
 	set loss($nodepair) 0
@@ -487,6 +492,8 @@ Link instproc updatedb {DB} {
     var_import ::GLOBALS::eid
     $self instvar bandwidth
     $self instvar rbandwidth
+    $self instvar ebandwidth
+    $self instvar rebandwidth
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -550,8 +557,27 @@ Link instproc updatedb {DB} {
 	set nodeportraw [join $nodeport ":"]
 
 	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok"]
+
+	# Treat estimated bandwidths differently - leave them out of the lists
+	# unless the user gave a value - this way, they get the defaults if not
+	# specified
+	if { [info exists ebandwidth($nodeport)] } {
+	    lappend fields "est_bandwidth"
+	}
+
+	if { [info exists rebandwidth($nodeport)] } {
+	    lappend fields "rest_bandwidth"
+	}
 	
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok]
+
+	if { [info exists ebandwidth($nodeport)] } {
+	    lappend values $ebandwidth($nodeport)
+	}
+
+	if { [info exists rebandwidth($nodeport)] } {
+	    lappend values $rebandwidth($nodeport)
+	}
 
 	$sim spitxml_data "virt_lans" $fields $values
     }
@@ -565,6 +591,8 @@ Lan instproc updatedb {DB} {
     var_import ::GLOBALS::eid
     $self instvar bandwidth
     $self instvar rbandwidth
+    $self instvar ebandwidth
+    $self instvar rebandwidth
     $self instvar delay
     $self instvar rdelay
     $self instvar loss
@@ -638,8 +666,27 @@ Lan instproc updatedb {DB} {
 	}
 
 	set fields [list "vname" "member" "mask" "delay" "rdelay" "bandwidth" "rbandwidth" "lossrate" "rlossrate" "cost" "widearea" "emulated" "uselinkdelay" "nobwshaping" "usevethiface" "q_limit" "q_maxthresh" "q_minthresh" "q_weight" "q_linterm" "q_qinbytes" "q_bytes" "q_meanpsize" "q_wait" "q_setbit" "q_droptail" "q_red" "q_gentle" "trivial_ok" "protocol" "is_accesspoint"]
+
+	# Treat estimated bandwidths differently - leave them out of the lists
+	# unless the user gave a value - this way, they get the defaults if not
+	# specified
+	if { [info exists ebandwidth($nodeport)] } {
+	    lappend fields "est_bandwidth"
+	}
+
+	if { [info exists rebandwidth($nodeport)] } {
+	    lappend fields "rest_bandwidth"
+	}
 	
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint]
+
+	if { [info exists ebandwidth($nodeport)] } {
+	    lappend values $ebandwidth($nodeport)
+	}
+
+	if { [info exists rebandwidth($nodeport)] } {
+	    lappend values $rebandwidth($nodeport)
+	}
 
 	$sim spitxml_data "virt_lans" $fields $values
 

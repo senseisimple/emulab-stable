@@ -3373,19 +3373,21 @@ sub LoadVirtLans()
 	$memberof{$member} = $vname;
 
 	# Other fields we need below
-	my $delay        = $rowref->{"delay"};
-	my $bandwidth    = $rowref->{"bandwidth"};
-	my $lossrate     = $rowref->{"lossrate"};
-	my $rdelay       = $rowref->{"rdelay"};
-	my $rbandwidth   = $rowref->{"rbandwidth"};
-	my $rlossrate    = $rowref->{"rlossrate"};
-	my $widearea     = $rowref->{"widearea"};
-	my $isemulated   = $rowref->{"emulated"};
-	my $uselinkdelay = $rowref->{"uselinkdelay"};
-	my $nobwshaping  = $rowref->{"nobwshaping"};
-	my $useveth      = $rowref->{"usevethiface"};
-	my $trivial_ok   = $rowref->{"trivial_ok"};
-	my $protocol     = $rowref->{"protocol"};
+	my $delay          = $rowref->{"delay"};
+	my $bandwidth      = $rowref->{"bandwidth"};
+	my $est_bandwidth  = $rowref->{"est_bandwidth"};
+	my $lossrate       = $rowref->{"lossrate"};
+	my $rdelay         = $rowref->{"rdelay"};
+	my $rbandwidth     = $rowref->{"rbandwidth"};
+	my $rest_bandwidth = $rowref->{"rest_bandwidth"};
+	my $rlossrate      = $rowref->{"rlossrate"};
+	my $widearea       = $rowref->{"widearea"};
+	my $isemulated     = $rowref->{"emulated"};
+	my $uselinkdelay   = $rowref->{"uselinkdelay"};
+	my $nobwshaping    = $rowref->{"nobwshaping"};
+	my $useveth        = $rowref->{"usevethiface"};
+	my $trivial_ok     = $rowref->{"trivial_ok"};
+	my $protocol       = $rowref->{"protocol"};
 
 	# Extend the DB info with this stuff:
 	#
@@ -3451,9 +3453,11 @@ sub LoadVirtLans()
 	$virt_lans{$vname}->{"DELAYINFO"}->{$member} =
 	    [ $delay,
 	      $bandwidth,
+	      $est_bandwidth,
 	      $lossrate,
 	      $rdelay,
 	      $rbandwidth,
+	      $rest_bandwidth,
 	      $rlossrate ];
 
 	#
@@ -3543,7 +3547,35 @@ sub virtlanAP($)        {
     return $virt_lans{$_[0]}->{"ACCESSPOINT"}
         if (defined($virt_lans{$_[0]}->{"ACCESSPOINT"}));
     return undef;
-};
+}
+
+# Return the (bandwidth, rbandwidth) to put into a top file for this link -
+# this is _NOT_ the hard limit on bandwidth that the user asked for us to
+# set up traffic shaping for.
+sub virtlantopbw($$) {
+    my ($virtlan, $member) = @_;
+    my $node = (split(":",$member))[0];
+
+    my ($delay,$bw,$ebw,$loss,
+	$rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($virtlan,$member);
+
+    # Return the estimated bw if it was given; otherwise, return the normal
+    # bandwidth, 
+    my ($return_bw, $return_rbw);
+    if (defined($ebw)) {
+	$return_bw = $ebw;
+    } else {
+	$return_bw = &getbandwidth($node, $virtlan, $bw);
+    }
+
+    if (defined($rebw)) {
+	$return_rbw = $rebw;
+    } else {
+	$return_rbw = &getbandwidth($node, $virtlan, $rbw);
+    }
+
+    return ($return_bw, $return_rbw);
+}
 
 #
 # Ditto for virt_vtypes.
@@ -3740,6 +3772,11 @@ sub CreateTopFile()
 	my $mustdelay = virtlanmustdelay($lan);
 	my $nobwshaping = virtlannobwshape($lan);
 	my $protocol = virtlanprotocol($lan);
+
+	#
+	# Count the types of nodes (simulated, virtual, real, etc.) in this
+	# LAN
+	#
 	foreach $member (@members) {
 	    ($node) = (split(":",$member))[0];
 	    if (virtnodeissim($node)) {
@@ -3771,6 +3808,7 @@ sub CreateTopFile()
 		$realnodes++;
 	    }
 	}
+
 	if ($virtnodes > 0) {
 	    $trivial_ok = virtlantrivok($lan);
 	    if ($nonvirtnodes == 0 || $nonbsdnodes == 0) {
@@ -3813,6 +3851,7 @@ sub CreateTopFile()
 	        $virt_lans{$lan}->{"USEVETH"} = 0;
 	    }
 	}
+
 	#
 	# If all nodes in a lan/link are simulated, the lan/link could certainly
 	# be hosted on the same physical node. Also, if the lan/link is cut and
@@ -3826,6 +3865,7 @@ sub CreateTopFile()
 	    $virt_lans{$lan}->{"USEVETH"} = 1;
 	    $virt_lans{$lan}->{"ALLSIM"} = 1;
 	}
+
 	if ($protocol ne "ethernet") {
 	    #
 	    # This arrangement is temporary. For now, if its not a regular
@@ -3839,24 +3879,33 @@ sub CreateTopFile()
 	    $lannodes{"fakelan/$lan"} = 1;
 	    foreach $member (@members) {
 		my $plink = "fakelan/$lan/$member";
-		my ($delay,$bw,$loss,
-		    $rdelay,$rbw,$rloss) = virtlandelayinfo($lan, $member);
+		my ($delay,$bw,$ebw,$loss,
+		    $rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($lan,$member);
+		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
+	
 		my ($node) = (split(":",$member))[0];
-		my $bandwidth = &getbandwidth($node, $lan, $bw);
 		    
-		print TOPFILE "link $plink $node fakelan/$lan $bandwidth " .
+		print TOPFILE "link $plink $node fakelan/$lan $top_bw " .
 		    "0 0 $protocol\n";
 	    }
 	}
-	elsif ($#members == 1) {
+	elsif (@members == 2) {
+	    #
+	    # We treat LANs with two members specially - they are just links
+	    #
 	    $expt_stats{"links"} += 1;
+
 	    ($nodeport0,$nodeport1) = @members;
 	    $node0 = (split(":",$nodeport0))[0];
 	    $node1 = (split(":",$nodeport1))[0];
-	    ($delay0,$bw0,$loss0,
-	     $rdelay0,$rbw0,$rloss0) = virtlandelayinfo($lan, $nodeport0);
-	    ($delay1,$bw1,$loss1,
-	     $rdelay1,$rbw1,$rloss1) = virtlandelayinfo($lan, $nodeport1);
+
+	    my ($delay0,$bw0,$ebw0,$loss0,
+	     $rdelay0,$rbw0,$rebw0,$rloss0)
+	     = virtlandelayinfo($lan, $nodeport0);
+	    my ($delay1,$bw1,$ebw1,$loss1,
+	     $rdelay1,$rbw1,$rebw1,$rloss1)
+	     = virtlandelayinfo($lan, $nodeport1);
+
 	    # Here the r's aregoing to be 1->0 and the others 0->1
 	    $delay = $delay0+$rdelay1;
 	    $loss = 1-(1-$loss0)*(1-$rloss1);
@@ -3864,8 +3913,19 @@ sub CreateTopFile()
 	    $rdelay = $rdelay0+$delay1;
 	    $rloss = 1-(1-$rloss0)*(1-$loss1);
 	    $rbw = &min($rbw0,$bw1);
-	    $bandwidth = &getbandwidth($node0,$lan,&min($bw0,$rbw1));
-	    $rbandwidth = &getbandwidth($node1,$lan,&min($rbw0,$bw1));
+	    $bandwidth = &getbandwidth($node0,$lan,$bw);
+	    $rbandwidth = &getbandwidth($node1,$lan,$rbw);
+
+	    #
+	    # Get the bandwidth we're supposed to put into the top file, which
+	    # may be different that what we're limiting the link to
+	    #
+	    my ($top_bw0, $top_rbw0) = virtlantopbw($lan,$nodeport0);
+	    my ($top_bw1, $top_rbw1) = virtlantopbw($lan,$nodeport1);
+
+	    $top_bw  = &min($top_bw0,$top_rbw1);
+	    $top_rbw = &min($top_rbw0, $top_bw1);
+
 	    if (((($delay >= $delaythresh) ||
 		  (!$nobwshaping && (requires_delay($node0, $lan, $bw) ||
 				     requires_delay($node1, $lan, $bw))) ||
@@ -3883,6 +3943,7 @@ sub CreateTopFile()
 		# simulated and a real node, we might need to put in delay
 		# nodes
 		($realnodes != 0)) {
+
 		$expt_stats{"shapedlinks"} += 1;
 		#
 		# We use a linkdelay if the link is emulated, globally forced,
@@ -3893,9 +3954,9 @@ sub CreateTopFile()
 		if ($emulated ||
 		    $forcelinkdelays || $uselinkdelays || $uselinkdelay) {
 		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
-		    
+
 		    print(TOPFILE "link $plink $node0 $node1 ".
-			  max($bw,$rbw) . " 0 0 ethernet " .
+			  max($top_bw,$top_rbw) . " 0 0 ethernet " .
 			  ($emulated ? " emulated" : "") .
 			  ($trivial_ok ? " trivial_ok\n" : "\n"));
 
@@ -3919,16 +3980,17 @@ sub CreateTopFile()
 		    my $delayname = "tbsdelay" . $delayid++;
 		    my $plink     = "linksdelaysrc/$lan/$nodeport0,$nodeport1";
 		    
-		    $delaylinks{$plink} = [$nodeport0,$delay,$bw,$loss,
-					   $nodeport1,$rdelay,$rbw,$rloss, 0];
+		    $delaylinks{$plink} = [$nodeport0,$delay,$top_bw,$loss,
+					   $nodeport1,$rdelay,$top_rbw,$rloss,
+					   0];
 
 		    print TOPFILE "node $delayname delay\n";
 		    print TOPFILE
 			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
-			"$node0 $delayname $bandwidth 0 0 ethernet\n";
+			"$node0 $delayname $top_bw 0 0 ethernet\n";
 		    print TOPFILE
 			"link linksdelaydst/$lan/$nodeport1,$nodeport0 ".
-			"$node1 $delayname $bandwidth 0 0 ethernet\n";
+			"$node1 $delayname $top_bw 0 0 ethernet\n";
 
 		    $delaynodes{$delayname} = $delayname;
 		    
@@ -3948,11 +4010,13 @@ sub CreateTopFile()
 		my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 		
 		print TOPFILE "link $plink $node0 $node1";
+
 		if ($emulated) {
-		    print TOPFILE " " . max($bw,$rbw) . " 0 0 ethernet emulated";
+		    print TOPFILE " " . max($top_bw,$top_rbw) .
+				  " 0 0 ethernet emulated";
 		}
 		else {
-		    print TOPFILE " $bandwidth 0 0 ethernet";
+		    print TOPFILE " $top_bw 0 0 ethernet";
 		}
 		if ($trivial_ok) {
 		    print TOPFILE " trivial_ok";
@@ -3978,11 +4042,16 @@ sub CreateTopFile()
 	    $expt_stats{"lans"} += 1;
 	    $lannodes{"lan/$lan"} = 1;
 	    foreach $member (@members) {
-		($delay,$bw,$loss,
-		 $rdelay,$rbw,$rloss) = virtlandelayinfo($lan, $member);
+		my ($delay,$bw,$ebw,$loss,
+		 $rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($lan, $member);
 		($node) = (split(":",$member))[0];
+
+		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
+
 		$bandwidth = &getbandwidth($node,$lan,$bw);
 		$rbandwidth = &getbandwidth($node,$lan,$rbw);
+
+
                 # XXX The expression below should be modified for
                 # better bandwidth support.  Probably needs to happen
                 # post assign somehow.
@@ -4014,9 +4083,9 @@ sub CreateTopFile()
 			$delaylinks{$plink} =
 			    [$member,$delay,$bw,$loss,
 			     $member,$rdelay,$rbw,$rloss,0];
-
+			     
 			print(TOPFILE "link $plink $node lan/$lan " .
-			      max($bw,$rbw) . " 0 0 ethernet" .
+			      max($top_bw,$top_rbw) . " 0 0 ethernet" .
 			      ($emulated ? " emulated" : "") .
 			      ($trivial_ok ? " trivial_ok\n" : "\n"));
 
@@ -4033,9 +4102,9 @@ sub CreateTopFile()
 			
 			print TOPFILE "node $delayname delay\n";
 			print TOPFILE "link linkdelaysrc/$lan/$member" .
-			    " $node $delayname $bandwidth 0 0 ethernet\n";
+			    " $node $delayname $top_bw 0 0 ethernet\n";
 			print TOPFILE "link linkdelaydst/$lan/$member" .
-			    " lan/$lan $delayname $bandwidth 0 0 ethernet\n";
+			    " lan/$lan $delayname $top_bw 0 0 ethernet\n";
 			
 			$delaynodes{$delayname} = $delayname;
 
@@ -4052,8 +4121,8 @@ sub CreateTopFile()
 		}
 		else {
 		    my $plink = "linklan/$lan/$member";
-		    
-		    print TOPFILE "link $plink $node lan/$lan $bandwidth " .
+
+		    print TOPFILE "link $plink $node lan/$lan $top_bw " .
 			"0 0 ethernet";
 		    if ($emulated) {
 			print TOPFILE " emulated";
