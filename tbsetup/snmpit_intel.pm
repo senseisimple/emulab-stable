@@ -2,20 +2,6 @@
 #
 # snmpit module for Intel EtherExpress 510T switches
 #
-# Supported methods:
-#
-# new		Needs to take IP, and initialize snmp session
-# portControl	(cmd,ports)
-# 		cmd = {enable, disable, 10mbit, 100mbit, full, half, auto}
-# 		ports = list of "pcX:Y"
-# showPorts	print settings of all ports
-# getStats	print various stats
-# vlanLock	Get a vlan editing lock/token/buffer, and
-# vlanUnlock	Release it when done
-# setupVlan	(name,ports) - take name and list of "pcX:Y", and vlan them
-# removeVlan	(vlan) - takes a vlan number
-# listVlans	returns a list of entries, with each entry having an
-# 		ID, a name, and a list of members (pcX:Y)
 
 package snmpit_intel;
 

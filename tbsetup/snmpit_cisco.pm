@@ -2,31 +2,18 @@
 #
 # snmpit module for Cisco Catalyst 6509 switches
 #
-# Supported methods:
-#
-# new		Needs to take IP, and initialize snmp session
-# portControl	(cmd,ports)
-# 		cmd = {enable, disable, 10mbit, 100mbit, full, half, auto}
-# 		ports = list of "pcX:Y"
-# showPorts	print settings of all ports
-# getStats	print various stats
-# vlanLock	Get a vlan editing lock/token/buffer, and
-# vlanUnlock	Release it when done
-# setupVlan	(name,ports) - take name and list of "pcX:Y", and vlan them
-# removeVlan	(vlan) - takes a vlan number
-# listVlans	returns a list of entries, with each entry having an
-# 		ID, a name, and a list of members (pcX:Y)
 
 package snmpit_cisco;
 
 $| = 1; # Turn off line buffering on output
 
-my $debug = 1;
-my $block = 1;
-my $verbose = 0 + $debug;
+local $debug = 0;
+local $block = 1;
+local $verbose = 0 + $debug;
 
 use SNMP;
 use snmpit_lib;
+use English;
 
 my $sess;                     # My snmp session - initialized in new()
 my $ip;
@@ -38,6 +25,17 @@ sub new {
   my $classname = shift;
   $ip = shift;
 
+  while ($arg = shift ) {
+    my ($var,$val) = split("=",$arg);
+    ${$var} = $val;
+    print "$var=${$var}\n" if $debug || $verbose;
+  }
+
+  if ($debug) {
+    print "snmpit_cisco module initializing... debug level $debug\n";
+  }
+
+  #die("\n");
   $SNMP::debugging = ($debug - 2) if $debug > 2;
   my $mibpath = '/usr/local/share/snmp/mibs';
   &SNMP::addMibDirs($mibpath);
@@ -157,15 +155,14 @@ sub setupVlan {
   # This is to be called ONLY after vlanLock has been called successfully!
   shift;
   my $name = shift;
+  my $origname = $name;
   my @vlan = @_;
-  foreach $mac (@vlan) {
-    my $node = $Interfaces{$mac};
+  foreach $node (@vlan) {
     if (! NodeCheck($node)) { 
       print STDERR "You are not authorized to control $node.\n";
       return 1;
     }
   }
-
   my $okay = 0;
   my $attempts = 0;
   my $VlanType = '.1.3.6.1.4.1.9.9.46.1.4.2.1.3.1'; # vlan # is index
@@ -174,6 +171,7 @@ sub setupVlan {
   my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
   while (($okay == 0) && ($attempts <3)) {
     $attempts++;
+    $name = $origname;
     print "***Okay=$okay, Attempts=$attempts (limit of 3)\n" if $debug;
     my $N = 2;
     my $RetVal = $sess->get([[$VlanRowStatus,$N]]);
@@ -193,11 +191,11 @@ sub setupVlan {
 			  [$VlanName,$N,$name,"OCTETSTR"],
 			  [$VlanSAID,$N,$SAID,"OCTETSTR"]]);
     print "",($RetVal? "Succeeded":"Failed"), ".\n";
-    if (!$RetVal) { 
-      print STDERR "VLAN Create '$name' as VLAN $N failed.\n"; 
+    if (!$RetVal) {
+      print STDERR "VLAN Create '$name' as VLAN $N failed.\n";
     } else {
       $RetVal = &vlanUnlock(*sess,$verbose,1); #send last as 1 to get result
-      print "Got $RetVal from Release Token\n" if $debug;
+      print "Got $RetVal from vlanUnlock\n" if $debug;
       # If RetVal isn't succeeded, then I can try and fix it
       my $tries = 0;
       &vlanLock(\$sess,\$v);
@@ -206,17 +204,22 @@ sub setupVlan {
 	$tries += 1;
 	if ($RetVal eq "someOtherError" && $tries <= 2) {
 	  #Duplicate name... correct and try again..
-	  my $name = $sess->get([[$VlanName,$N]]);
-	  print STDERR "VLAN name '$name' might already be in use. ".
-	    "Renaming to '_$name'.\n";
-	  $name = $sess->set([[$VlanName,$N,"_$name","OCTETSTR"]]);
-	  $RetVal = &vlanUnlock(*sess,$verbose,1); #send last as 1 to get result
-	  print "Got $RetVal from Release Token\n" if $debug;
-	  &vlanLock(\$sess,\$verbose); 
+	  print STDERR "VLAN name '$name' might already be in use.\n".
+	    "Renaming to '_$name'...";
+	  $name = "_$name";
+	  #$RetVal = $sess->set([[$VlanName,$N,"$name","OCTETSTR"]]);
+	  $RetVal = $sess->set([[$VlanRowStatus,$N,"createAndGo","INTEGER"],
+				[$VlanType,$N,"ethernet","INTEGER"],
+				[$VlanName,$N,$name,"OCTETSTR"],
+				[$VlanSAID,$N,$SAID,"OCTETSTR"]]);
+	  print "",($RetVal? "Succeeded":"Failed"), ".\n";
+	  $RetVal = &vlanUnlock(*sess,$verbose,1); #send last 1 to get result
+	  print "Got $RetVal from vlanUnlock\n" if $debug;
+	  &vlanLock(\$sess,\$verbose);
 	} else {
 	  # Try again from the beginning... maybe we're using a bad VLAN #
 	  print STDERR "VLAN creation failed.".
-	    ($attempts<3 ?" Trying again...\n":
+	    ($attempts<3 ?" Making attempt number $attempts...\n":
 	     " Third failure, giving up.\n");
 	  $okay=0;
 	  last;
@@ -228,17 +231,17 @@ sub setupVlan {
       # VLAN exists now - Add the ports:
       # @vlan is a list of MACs, so I need to find out what they are...
       my $PortVlanMemb = ".1.3.6.1.4.1.9.9.68.1.2.2.1.2"; #index is ifIndex
-      foreach $mac (@vlan) {
-	my $if = $mac;
+      foreach $node (@vlan) {
+	my $if = $node;
 	if ($if =~ /(sh\d+)-\d(:\d)/) { $if = "$1$2"; }
 	my $port = (split(":",portnum($if)))[1];
 	my $IF = $ifIndex{$port};
-	print "Found $mac -> $if -> $port -> $IF\n" if $debug;
-	if (!defined $IF) {
-	  print "    Addding MAC address $mac - port not found ... Failed\n";
+	print "Found $node -> $if -> $port -> $IF\n" if $debug;
+	if (!defined $port) {
+	  print "    Addding $node - port not found ... Failed\n";
 	  next;
 	}
-	print "    Adding MAC Address $mac (ifIndex $IF) ... ";
+	print "    Adding $node (port $port) ... ";
 	$RetVal = $sess->set([[$PortVlanMemb,$IF,$N,'INTEGER']]);
 	print "",($RetVal? "Succeeded":"Failed"), ".\n";
 	my $Admin = ".1.3.6.1.2.1.2.2.1.7";
@@ -250,6 +253,7 @@ sub setupVlan {
       #If everything went okay, break out of the loop
       $okay = 1;
     }
+    print "Currently $attempts attempts.\n" if $debug;
   }
 }
 
@@ -461,41 +465,19 @@ sub listVlans {
   my $id;
   my $memberstr;
   # I'm trying out using formats. See perldoc perlform for details.
-  format = 
+  format vlan = 
 @<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 ($id),($Names{$id}),                $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
-~                                   ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+~~                                  ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
                                     $memberstr
 .
+  $FORMAT_NAME = "vlan";
   foreach $id ( sort num keys (%Names) ) {
     $memberstr = (defined(@{$Members{$id}}) ?
                   join("  ",sort alphanum(@{$Members{$id}})) : "");
     write;
   }
+  $FORMAT_NAME = "STDOUT"; # Go back to the normal format
 }
 
 sub showPorts {
@@ -588,15 +570,17 @@ sub getStats {
   print "Port Statistics, Testbed Switch $ip\n";
   print "                        InUcast    InNUcast  In       In     Unknown              OutUcast   OutNUcast Out      Out    OutQueue\n";
   print "Interface  InOctets     Packets    Packets   Discards Errors Proto.  OutOctets    Packets    Packets   Discards Errors Length\n";
-  print "------------------------------------------------------------------------------------------------------------------------------------\n";
-  format =
+  print "------------------------------------------------------------------------------------------------------------------------------------\n"; 
+  format stats =
 #nterface  InOctets     Packets    Packets   Discards Errors Proto.  Out Octets   Packets    Packets   Discards Errors Length
 @<<<<<<<<  @<<<<<<<<<<< @<<<<<<<<< @<<<<<<<< @<<<<<<< @<<<<< @<<<<<< @<<<<<<<<<<< @<<<<<<<<< @<<<<<<<< @<<<<<<< @<<<<< @<<<<<<<
 $port,$inOctets{$port},$inUcast{$port},$inNUcast{$port},$inDiscard{$port},$inErr{$port},$inUnkProt{$port},$outOctets{$port},$outUcast{$port},$outNUcast{$port},$outDiscard{$port},$outErr{$port},$outQLen{$port}
 .
+  $FORMAT_NAME = "stats";
   foreach $port ( sort alphanum2 keys (%inOctets) ) {
     write;
   }
+  $FORMAT_NAME = "STDOUT"; # Go back to normal format
 }
 
 sub readifIndex {

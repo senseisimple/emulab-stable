@@ -2,12 +2,7 @@
 #
 # Testbed Power Control script
 #
-# Mac Newbold, Flux Research Group, Univ. of Utah Computer Science Dept.
-# Created: April 18, 2000
-# Last Changed: April 18, 2000
-# 
 # Syntax:
-#
 # power on <machine> <machine> ...
 # power off <machine> <machine> ...
 # power cycle <machine> <machine> ...
@@ -16,6 +11,13 @@
 
 # useful values are 0, 1, 2 and 3
 my $verbose = 0;
+#If there is -d or -v, turn it on right now...
+if ( join(" ",@ARGV) =~ /^-[d|v](\s*)(\d*)\s[oc]/ ) {
+  shift;
+  if (defined $1 && $1 ne "") { shift; }
+  if (defined $2 && $2 ne "") { $verbose = $2; } else { $verbose = 1; }
+}
+print "VERBOSE ON: Set to level $verbose\n" if $verbose;
 
 #
 # Configure variables
@@ -40,9 +42,9 @@ my $exitval = 0;
 my $snmpit="$TB/bin/snmpit";
 
 #Must have at least an op and a machine, so at least 2 ARGV
-die("Usage:\npower on <machine> <machine> ...\n",
-    "power off <machine> <machine> ...\n",
-    "power cycle <machine> <machine> ...\n") 
+die("Usage:\npower [-v[n]] on <machine> <machine> ...\n",
+    "power [-v[n]] off <machine> <machine> ...\n",
+    "power [-v[n]] cycle <machine> <machine> ...\n") 
   if ( @ARGV < 2 );
 
 #Read in ARGV
@@ -211,11 +213,14 @@ foreach $node ( sort @machines) {
       print "Power controller for $node not found. Skipping...\n";
       $exitval++;
     } else {
-      my $cmd=join(" ",
-		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
-      print "Calling snmptit: '$cmd'\n" if $verbose > 1;
+      my $cmd = ( $verbose > 1 ? "-debug $verbose " : "");
+      $cmd .= join(" ",
+		   ('-v','-i',$IPList{$node},$op,$OutletList{$node}));
+      $cmd = "$snmpit ".$cmd;
+      print "Calling snmpit: '$cmd'\n" if $verbose > 1;
       open(OUT,$cmd." |");
       while (<OUT>) {
+	if ($verbose) { print $_; }
 	if (/was outlet([OnfRebot]+)/) {
 	  print "$node was $1";
 	}

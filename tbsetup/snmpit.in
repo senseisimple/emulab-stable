@@ -39,6 +39,9 @@ if ( join(" ",@ARGV) =~ /-debug\s*(\d*)/ ) {
 }
 
 my $device;
+my $pid;
+my $eid;
+my $t = 0;
 
 &myMain;
 
@@ -81,6 +84,20 @@ sub myMain {
 #  print "\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup spd=$spd s=$s f=$f l=$l",
 #  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g on=$on ",
 #  "off=$off cyc=$cyc all=$all device=$device\n" if $debug;
+
+  my $sess2;
+  if ($device eq "APC") {
+    use SNMP;
+    $SNMP::debugging = ($debug - 5) if $debug > 5;
+    &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
+    &SNMP::addMibFiles('/usr/local/share/snmp/mibs/PowerNet-MIB.txt');
+    $SNMP::save_descriptions = 1; # must be set prior to mib initialization
+    SNMP::initMib();              # parses default list of Mib modules
+    $SNMP::use_enums = 1;         #use enum values instead of only ints
+    print "Opening SNMP session to $i..." if $debug;
+    $sess2 =new SNMP::Session(DestHost => $i, Community => 'private');
+    print "".(defined $sess2 ? "Succeeded" : "Failed")."\n" if $debug;
+  }
 
   #
   # Port Level Control
@@ -187,7 +204,7 @@ sub AutoVLANConfig {
   local(*f) = @_;
   my @VLANS= ();
   my @names= ();
-  &ReadIRFile(*f,\@names,\@VLANS,\%Interfaces);
+  &ReadIRFile(*f,\@names,\@VLANS);
   print "AutoVLAN got VLANs named: ",join (" ",@names),"\n" if $debug;
   $device->vlanLock;
   my $m="";
@@ -199,6 +216,30 @@ sub AutoVLANConfig {
     $device->setupVlan($m,@vlan);
   }
   $device->vlanUnlock;
+}
+
+
+sub UpdateField {
+  local(*session,*OID,*ports,*val,*b,*c,*v)= @_;
+  print "sess=$session $OID '",join(" ",@ports),"' $val $b $c $v\n" if $debug;
+  my $Status = 0;
+  my $retval;
+  my $i = $session->{DestHost};
+  foreach my $port (@ports) {
+    print "Checking port $port of $i for $val..." if $v;
+    $Status = $session->get([[$OID,$port]]);
+    if (!defined $Status) {
+      print STDERR "Port $port, change to $val: No answer from device\n";
+    } else {
+      print "Okay.\nPort $port was $Status\n" if $v;
+      if ($Status ne $val) {
+	print "Setting $port to $val..." if $v;
+	$retval = $session->set([[$OID,$port,$val,"INTEGER"]]);
+	print "Set returned '$retval'" if $v;
+      }
+    }
+  }
+  1;
 }
 
 
@@ -250,6 +291,8 @@ sub ParseArgs {
     elsif (/^-l(.*)/) {$l = 1;}
     elsif (/^-u(.*)/) {$u = 1;}
     elsif (/^-f(.*)/) {$f = ($1 ? $1 : shift(@CMDS));}
+    elsif (/^-t(.*)/) {$pid = ($1 ? $1 : shift(@CMDS));
+		       $eid = shift(@CMDS); }
     elsif (/^-m(.*)/) {$m = ( !(@CMDS==0 || $CMDS[0] =~ /^(-|\+)(.*)/) ? 
 			      ($1 ? $1 : shift(@CMDS)) : "");}
     elsif (/^-vlan(.*)/) {
@@ -280,15 +323,13 @@ sub ParseArgs {
       "snmpit - A general purpose SNMP Tool - Version 1.1\n",
       "Syntax:\n",
       " snmpit [-h] [-v] -i<ip>\n",
-      "\t[-u] [-l] [-t <pid>/<eid>] [-m<vlan name>] [-vlan<port>]\n",
+      "\t[-u] [-l] [-t <pid> <eid>] [-m<vlan name>] [-vlan<port>]\n",
       "\t[-f<filename>] [-r<vlan #> <vlan #> ... ]\n",
       "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
       "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>]\n";
-    
     # Hidden Power control functionality
     #,
     #	    "\t[ [-on|-off|-cyc] [-all] | [-<n>] ]\n";
-    
   }
   if ($help > 1) {
     print
@@ -315,7 +356,6 @@ sub ParseArgs {
       "  +a/-a Enable/Disable Port Auto-Negotiation of speed/duplex\n",
       "  -spd  Port Speed (10 or 100 Mbits)\n",
       "  -dup  Port Duplex (half or full)\n";
-    
     # Hidden Power control functionality
     #,
     #	    "  -on   Turn on outlets\n",
@@ -324,7 +364,6 @@ sub ParseArgs {
     #	    "  -all  All outlets\n",
     #	    "  -(n)  Outlet #(n) (n=1-8)\n";
   }
-  
   #Unused letters of the alphabet:
   #
   # j, k, n, q, w, x, y, z
@@ -333,15 +372,17 @@ sub ParseArgs {
   die("\b\n") if ($help);
   #Now die on any combinations that don't make sense...
   die("What shall I do?\n")
-    if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
+    if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||$t||@r||$l
 	  ||$on||$off||$cyc));
 
   if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
   if ( defined Dev($i) ) {
     if (Dev($i) =~ /cisco/i) {
-      $device = new snmpit_cisco($i);
+      $device = new snmpit_cisco
+	($i,"debug=$debug","block=$b","confirm=$c","verbose=$v");
     } elsif ($i =~ /cisco/i) {
-      $device = new snmpit_cisco(Dev($i));
+      $device = new snmpit_cisco
+	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
 #    } elsif ($i =~ /intel/ || Dev($i) =~ /intel/) {
 #      $device = new snmpit_intel;
     } else { $device="APC"; }
@@ -494,5 +535,3 @@ sub ReadIRFile {
   }
   close (IR);
 }
-
-##### EOF #####
