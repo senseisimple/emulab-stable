@@ -77,10 +77,10 @@ crope tb_vclass::choose_type()
 {
   // This may take some tweaking - i.e. might want to make more
   // efficient, although members is usually a very small hash.
-  if (random()%2 == 0) {
+  if (RANDOM()%2 == 0) {
     return dominant;
   }
-  int r = random()%members.size();
+  int r = RANDOM()%members.size();
   members_map::iterator dit;
   for (dit=members.begin();dit != members.end();++dit) {
     if (r == 0) break;

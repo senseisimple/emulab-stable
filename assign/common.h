@@ -14,8 +14,10 @@
 #if __GNUC__ == 3 && __GNUC_MINOR__ > 0
 #include <ext/hash_map>
 using namespace __gnu_cxx;
+#define RANDOM() random()
 #else
 #include <hash_map>
+#define RANDOM() std::random()
 #endif
 
 #include "config.h"

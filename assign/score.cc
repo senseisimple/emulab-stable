@@ -1067,7 +1067,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	  int index;
 	  if (!deterministic && !greedy_link_assignment) {
 	    float choice;
-	    choice = random()%(int)total_weight;
+	    choice = RANDOM()%(int)total_weight;
 	    for (index = 0;index < resolution_index;++index) {
 	      switch (resolutions[index].type_used) {
 	      case tb_link_info::LINK_DIRECT:
