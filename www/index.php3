@@ -14,8 +14,10 @@ PAGEHEADER("Home");
 # Get some stats about current experiments
 
 $query_result =
-    DBQueryFatal("select count(*) from experiments where ".
-		 "state='active' and pid!='emulab-ops'");
+    DBQueryFatal("select count(*) from experiments as e " .
+	"left join experiment_stats as s on s.exptidx=e.idx " .
+	"left join experiment_resources as rs on rs.idx=s.rsrcidx ".
+	"where state='active' and rs.pnodes > 0 and e.pid != 'emulab-ops'");
 if (mysql_num_rows($query_result) != 1) {
     $active_expts = "ERR";
 } else {
