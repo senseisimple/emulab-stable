@@ -1,0 +1,234 @@
+**** The Emulab-Planetlab interface: yesterday, today, and tomorrow.
+
+Emulab constantly grapples with the changing face of Planetlab.  The
+method for creating experiments containing planetlab nodes (vservers
+on physical nodes) has gone from a mostly decentralized, high speed
+interface, to a monolithic central one, and now appears to be moving
+back to a more distributed arrangement.
+
+The original dslice interface was closer to ideal, and they may get
+back there eventually (we hope).  In this interface, a central broker
+dealt out tickets for lease redemption at individual node managers.
+Querying node availability and obtaining tickets were the only
+centralized operations, and they were quick to execute.  A "slice" was
+only logically represented, comprised of the constituent nodes where
+tickets were traded for vserver leases; there was no central notion of
+the slice at planetlab.  setup, manipulation, and renewal were all
+negotiated with individual node managers.
+
+The worst of the interfaces, perhaps as bad as could be imagined, was
+the original centralized PLC API.  It was completely asynchronous with
+horrible execution time (1 hr. sliver instantiation), no remote setup
+failure indicators, and no (non ad hoc) way of querying the readiness
+or status of a particular sliver.  This prompted Emulab to push for a
+synchronous call that would return upon sliver instantiation.  While
+this was implemented, it was far from perfect with numerous failure
+modes and a high failure rate.
+
+The new API decouples the portion of monolithic PLC that actually
+creates the slivers and gives it back to the individual node managers.
+It can, optionally, do all the work w/o requiring the user to go to
+the node managers though.
+
+**** Differences in Planetlab APIs:
+
+** Calls used in dslice:
+
+getads():
+
+Get dslice advertisements (central agent).  Used to find out which
+nodes were currently up and running dslice.  Returned a list of IP
+addresses.
+
+newtickets(slice, ntickets, leaselen, ips):
+
+Grab tickets from central dslice agent to redeem for sliver leases via
+particular dslice node managers.  Arguments are: slice to perform action for;
+number of tickets; lease length; and ip addresses of the recipient nodes.
+Returned a structure representing a dslice ticket.
+
+newleasevm(ticketdata, privatekey, publickey):
+
+Redeem ticket(s) in exchange for a lease on a particular node.  This RPC is
+issued to each node's dslice nodemanager for which we have a ticket we wish
+to redeem for a lease.  A new vserver was created for the specified slice if
+it did not already exist.  It was also a convenience function, wrapping the
+newlease() and newvm() calls.  Returned a dslice lease structure.
+
+deletelease(slice):
+
+Revoke the lease for a slice on a particular node.  This releases the vserver
+allocated on the node for this slice (the sliver).  This RPC is issued to the
+individual dslice node managers when tearing down a plab vserver setup by
+Emulab.  Succeeded or threw an exception.
+
+addkey(slice, key):
+
+Add the public portion of an ssh keypair to the slice account on a particular
+node.  We called this when creating new Plab vservers to put boss' public
+key into the authorized_keys file for the slice user inside the vserver.
+Succeeded or threw an exception.
+
+renewlease(slice):
+
+Renew existing dslice leases on individual nodes.  As no formal credit tracking
+system was ever put into place in dslice, new tickets did not have to be
+presented in order to renew.  Renewal was assumed to have a time span of the
+same length as the original lease length requested.  Returned a new lease
+structure for the renewed lease.
+
+
+** Calls used in PLC:
+
+Unless otherwise stated, calls to PLC did not immediately affect plab nodes.
+Instead, the central DB was updated, and the nodes would notice the change the
+next time they checked in (up to an hour later).
+
+createSlice():
+
+Created a new PLC slice; no nodes were affected at this point.
+
+deleteSlice():
+
+Removed a previously created PLC slice.  If any nodes were participating in
+the slice, the vservers they hosted for it would eventually get reclaimed.
+
+AssignNodes():
+
+Assigned a set of nodes to the slice.  Slivers would eventually get setup
+on them.
+
+UnAssignNodes():
+
+Removed a set of nodes from the slice.  Slivers on participating nodes would
+eventually get removed.
+
+AssignUsers():
+
+Added a set of (PLC registered) users to the slice.  This allowed those uses
+to log into the slice as the slice user using the ssh keypair they have
+registered with Plab.  We only added the fake boss server account which was
+used to bootstrap the Emulab vserver environment.
+
+AssignShares():
+
+Add shares (and a lease length) to the slice.  Had to be done before any nodes
+could be added to the slice.  Note that we really only used this to set the
+lease length.  The shares were ill defined and unused in this API; we just
+added an arbitrary amount to the slice (and we essentially had an infinite
+pool of them to use).
+
+InstantiateSliver():
+
+A special call added by PLC just for Elab to eliminate the long wait necessary
+to ensure a vserver had been setup for a slice (node checked into PLC) before
+trying to use it.  It effectively "pushed" the setup out from PLC, but failed
+a good part of the time and took an unreasonable amount of time in many cases.
+It did provide us with a synchronous interface for creating plab vnodes though.
+
+listSlice():
+
+A call who's semantics changed several times.  It was able to list all slices
+belonging to a particular site (and the participating plab nodes) or list
+the nodes participating in a particular slice.  It also provided other info
+on the slices, such as their recorded expiration time.  We used this last
+bit of info to sync our notion of expiration for Elab created slices w/ PLC's.
+
+** Calls potentially used in PLC/NM hybrid API:
+
+Shares will (alegedly) become first class citizens in this newest incarnation
+of the PLC API.  Part of the interface to the local Nodemanager has also been
+exposed, but the details are sketchy at this point.
+
+The API presented on the PLC wiki at 
+https://www.planet-lab.org/Wiki/bin/view/Planetlab/PlcAPI
+doesn't make it clear how shares are presented/acquired.  They may be part of
+the 'auth' parameter required by most calls.
+
+SliceCreate():
+
+Register the slice with PLC database.
+
+SliceDelete():
+
+Remove the slice from PLC db.
+
+SliceRenew():
+
+Extend lease for slice.  The affect this call has is unclear if the
+slice is not 'instantiated'.  Its also not clear how share are recycled
+and reapplied (if necessary at all).
+
+SliceUsersAdd():
+
+Probably identical to AssignUsers() in PLC v2 above.
+
+SliceNodesAdd():
+
+Probably identical to AssignNodes() in PLC v2.
+
+SliceNodesDel():
+
+Probably identical to UnAssignNodes() in PLC v2.
+
+SliceNodesList() and SliceInfo():
+
+Will be used to verify integrity/status of slices.
+
+*Attr*():
+
+No idea what the planned/envisioned use for these slice attribute manipulation
+functions are on PLC's end, so not sure we will need to use them.
+
+SliceInstanceStart():
+
+Not sure we will use this.  We may go straight to the individual node managers
+and invoke create_sliver() (or whatever they end up calling it).  Depends
+on the semantics of this call; may have to call it to "activate" the slice.
+
+SliceInstanceUpdate():
+
+No idea.  May have to use this to manage shares.  May push out changes w.r.t.
+node membership for a slice.
+
+SliceTicketGet():
+
+The is presumably where we will present shares to obtain tickets for use with
+the node manager.
+
+SliceTicketAuthorize():
+
+The description for this function is confusing.  It claims to create the slice,
+but other calls say they do the same thing.  May be the mechanism for
+presenting tickets obtained with the former call to PLC (if you want to use it
+rather than the node manager to create the slivers).
+
+**** Rough translation of API functionality (needed by Elab):
+
+dslice             PLC                              PLC/NM hybrid
+-----------------------------------------------------------------------------
+
+getads()           <parse static XML file>          <parse static XML file?>
+
+newtickets()       <N/A>                            SliceTicketGet()?
+
+newleasevm()       AssignShares()                   SliceTicketAuthorize()?
+                   AssignNodes()                    SliceNodesAdd()
+                   InstantiateSliver()              create_sliver()
+
+deletelease()      UnAssignNodes()                  SliceNodesDel()
+
+addkey()           AssignUsers()                    SliceUsersAdd()
+
+renewlease()       AssignShares()                   SliceTicketGet()?
+                                                    SliceRenew()
+
+<N/A>              createSlice()                    SliceCreate()
+                                                    SliceInstanceStart()?
+
+<N/A>              deleteSlice()                    SliceDelete()
+
+<N/A>              listSlice()                      SliceInfo()
+                                                    SliceNodesList()
+
+
