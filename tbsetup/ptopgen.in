@@ -116,7 +116,7 @@ sub get_ifacebw {
 };
 
 $sth = $dbh->prepare("SELECT node_id1,card1,port1,node_id2,card2,port2" .
- 		    " from wires where type=\"Node\"");
+ 		    " from wires where type=\"Node\" or type=\"Trunk\"");
 $sth->execute;
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $sth->fetchrow_array) {
