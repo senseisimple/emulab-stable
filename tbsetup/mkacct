@@ -8,7 +8,23 @@
 
 use Mysql;
 
-my $d = 0;			#debug flag
+##
+## Should expand to all allowable characters. -lkw
+##
+sub check_user_data {
+    my @row = @_;
+    if ( @row > 0 &&
+	 $row[0] =~ /([A-Z]|[a-z]|[0-9]|)+/ &&    # user
+	 $row[1] =~ /[0-9]+/ &&                   # unix UID   
+	 $row[2] =~ /([A-Z]|[a-z]|[0-9]|)+/ &&    # encrypted passwd
+	 $row[3] =~ /([A-Z]|[a-z]|[0-9]|\w)+/ ) { # comment
+	return 1;
+    } else {
+	return 0;
+    }
+}
+
+my $d = 1;			#debug flag
 if ($#ARGV < 0) { 
     die("Usage: mkacct <eid>\n".
 	"Makes accounts for all users in an experiment's project.\n");
@@ -21,11 +37,10 @@ if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) {
 ##
 ## Check for valid user
 ##
-print "Checking for valid user.\n";
 open(WHO,"/usr/bin/whoami 2>&1 |");
 chop($_ = <WHO>);
 close(WHO);
-if ($_ ne "root") { die("This won't work unless you're root.\n"); }
+if ($_ ne "root") { die("Must be root.\n"); }
 
 ##
 ## Open database
@@ -33,26 +48,28 @@ if ($_ ne "root") { die("This won't work unless you're root.\n"); }
 my $dbh = Mysql->connect("localhost","tbdb","script","none");
 
 ##
-## Check that we have a valid EID. If the EID
-## doesn't exist, it's invalid.
+## If the EID doesn't exist, it's invalid.
 ##
-print "Checking that $eid is a valid EID\n";
+print "Checking that $eid is a valid EID...";
 my $cmd = "select eid from experiments where eid='$eid'";
 my $sth = $dbh->query($cmd);
 my $rows =0;
 ## Must put in check that $sth defined. May be undefined if
-## command above is syntactically incorrect.
+## query command above is syntactically incorrect. -kw
 while ($sth->fetchrow_array) {
     $rows += 1;
 }
-if ( $rows != 1 ) { die("Invalid eid '$eid' (not in database).\n"); }
-
+if ( $rows != 1 ) { 
+    die("Invalid eid '$eid' (not in database).\n"); 
+} else {
+    print "ok.\n";
+}
 
 ##
 ## Select user parameters for users in given experiment.
 ## Join: exp.pid -> p.pid
 ##
-print "Selecting users.\n";
+print "Selecting users...\n";
 $cmd = 
   "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
   "from experiments as e ".
@@ -65,15 +82,20 @@ my %passwd = ();
 my %unix_uid = ();
 my %fullname = ();
 while (@row = $sth->fetchrow_array) {
-    $passwd{$row[0]} = $row[1];
-    $unix_uid{$row[0]} = $row[2];
-    $fullname{$row[0]} = $row[3];
+    if ( check_user_data(@row) == 1 ) {
+	$passwd{$row[0]}   = $row[1];
+	$unix_uid{$row[0]} = $row[2];
+	$fullname{$row[0]} = $row[3];
+	print "\t$row[0]\n";
+    } else {
+	print "Invalid user data. Row skipped.\n";
+    }
 }
 
 ##
 ## Select group ID for experiment.
 ##
-print "Selecting group ID for experiment.\n";
+print "Selecting group ID for experiment...";
 $cmd = 
   "select unix_gid from groups as g ".
   "left join proj_grps as pg on g.gid = pg.gid ".
@@ -84,8 +106,12 @@ $sth = $dbh->query($cmd);
 my $unix_gid = 65533;		# "nogroup"...
 if (@row = $sth->fetchrow_array) {
     $unix_gid = $row[0];
+    print "$unix_gid\n";
+} else {
+    die("Invalid group ID.\n"); 
 }
 
+ 
 ##
 ## Select machines.
 ##
@@ -117,7 +143,7 @@ foreach $IP (@nodes) {
     ## is not the same node as in last iteration? -lkw
     if ( $IP ne $last && $IP =~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {
         $last = $IP;
-        if (-e "/bin/ping") {
+         if (-e "/bin/ping") {
             open(PING,"/bin/ping -c 1 $IP 2>&1 |");
         } else {
             open(PING,"/sbin/ping -c 1 $IP 2>&1 |");
@@ -126,29 +152,30 @@ foreach $IP (@nodes) {
 	close(PING); 
 
         if ( $1 > 0 ) {
-            open(UNAME,"su1 ssh $IP uname -a 2>&1 |");
+
+            open(UNAME,"su1 ssh $IP uname 2>&1 |");
             $_ = <UNAME>;
 	    close(UNAME);
+
 	    ## FreeBSD says "155.99.214.129: Connection refused"
 	    ##    and can also say "Host key doesn't match..."  
             if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) ) { 
 		die("Uname failed on $IP:$_\n"); 
 	    } else { 
-		@temp = split(" ",$_); 
-		$OS = $temp[0]; 
+		$OS = $_;
 	    }
+
         } else {
 	    print "Couldn't ping machine $IP\n";
 	}
 
-        print "OS for $IP is $OS\n" if $d;
-        if ($OS eq "Linux") {  
+        if ( $OS =~ /Linux/ ) {  
 	    
 	    ## 1) Use groupadd to add group
 	    ## 2) Use useradd to add users
 	    ##
-	    ## Rather than use useradd's defaults (which are normally)
-	    ## fine, we're explicit.
+	    ## Rather than use useradd's defaults (which are normally
+	    ## fine), we're explicit.
 
 	    print "Creating group $unix_gid on $IP.\n";
 	    open(GROUPADD, "ssh $IP /usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
@@ -157,13 +184,13 @@ foreach $IP (@nodes) {
 	    my $i = 1;
 	    foreach my $user (keys %passwd) {
 
-		print "Creating user $ser on $IP.\n";
-		open(USERADD, "ssh $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /home/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
+		print "Creating user $user on $IP.\n";
+		open(USERADD, "ssh $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $unix_gid -m -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user}  $user 2>&1 |");
 		while (<USERADD>) { print "$_"; }
 		close(USERADD);
 	    }
 
-	} elsif ($OS eq "FreeBSD") { 
+	} elsif ($OS =~ /FreeBSD/) { 
 
 	    ## 1) Append new account info to master.passwd
 	    ## 2) Create secure (spwd.db) and insecure (pwd.db) password 
@@ -172,29 +199,57 @@ foreach $IP (@nodes) {
 	    ## 4) Create home directories
 
 	    my $addon = "";
-	    foreach my $name (keys %passwd) {
-		$addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:$unix_gid:$fullname{$user}:/home/$user:/bin/tcsh\n";
-
+	    foreach my $user (keys %passwd) {
+		print "user:$user\n";
+		print "unix_gid:$unix_gid\n";
+		$addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:" .
+		         "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
+			 "/bin/tcsh\n";
 		print $addon;
+
+		## Create home directory
+		if ( !(-e "/users/$user") ) {
+		    open(MKDIR, "/bin/mkdir /users/$user 2>&1 |");
+		    while ( <MKDIR> ) { print "$_"; }
+		    close(MKDIR); 
+		    
+		    ## If created, chown and chgrp
+		    if (!(-e "/users/$user") ) {
+			open(CHOWN, "/usr/sbin/chown $user /users/$user 2>&1 |" );
+			while ( <CHOWN> ) {print "$_"; }
+			close(CHOWN); 
+
+			open(CHGRP, "/usr/sbin/chgrp $unix_gid /users/$user 2>&1 |" );
+			while ( <CHGRP> ) {print "$_"; }
+			close(CHGRP); 
+		    }
+		}
 	    }
 
-	    open(SCP, "scp -p $IP:/etc/master.passwd /tmp/master.passwd.$IP");
-	    open(OUT, ">>/etc/master.passwd");
+	    ## Append login info to master.passwd
+	    open(SCP, "scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
+	    while ( <SCP> ) { print $_; }
+	    open(OUT, ">>/tmp/master.passwd.$IP");
 	    print OUT $addon;
 	    close(OUT);
-	    open(SCP, "scp -p /tmp/master.passwd.$IP $IP:/etc/master.passwd");
-	    close(SCP); # this closes above SCP
+	    open(SCP, "scp -pq /tmp/master.passwd.$IP $IP:/etc/master.passwd |");
+	    while ( <SCP> ) { print $_; }
+	    close(SCP);
  
-	    ## Create secure and insecure databases (/etc/[s]*pwd.db)
-#	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
-	    ## Update /etc/passwd (this closes above MKDB)
-#	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
-#	    close(MKDB); 
+	    ## Create secure and insecure databases (/etc/s?pwd.db)
+	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
+	    while ( <MKDB> ) { print $_; }
+	    close(MKDB);
 
+	    ## Update /etc/passwd (this closes above MKDB)
+	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
+	    while ( <MKDB> ) { print $_; }
+	    close(MKDB);
+	    
 #/usr/sbin/pwd_mkdb: corrupted entry
 #/usr/sbin/pwd_mkdb: at line #14
 #/usr/sbin/pwd_mkdb: /etc/master.passwd: Inappropriate file type or format
-		
+
 	} else {  
 	    print "$IP is unreachable or has an unknown OS ($OS).\n";
 	}
