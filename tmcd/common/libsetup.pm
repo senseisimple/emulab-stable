@@ -1235,8 +1235,6 @@ sub dotunnels()
     }
 
     close(RC);
-    close(SERVER);
-    close(CLIENT);
     chmod(0755, TMTUNNELCONFIG);
     return 0;
 }
