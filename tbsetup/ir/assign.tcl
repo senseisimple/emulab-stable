@@ -313,7 +313,7 @@ puts $fp "END vlan"
 # add delay seciton
 puts $fp "START delay"
 foreach line $delayinfo {
-    puts $fp $line
+    puts $fp [lrange $line 0 3]
 }
 puts $fp "END delay"
 
