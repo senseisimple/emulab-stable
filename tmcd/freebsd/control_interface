@@ -7,7 +7,7 @@
 
 . /etc/emulab/paths.sh
 
-NODETYPE=`nodetype`
+NODETYPE=`$BINDIR/nodetype`
 case $NODETYPE in
 pc300|pc850|i2|pc1800)
     echo 'fxp0'
@@ -15,7 +15,7 @@ pc300|pc850|i2|pc1800)
 pcL440GX)
     echo 'fxp1'
     ;;
-pc600)
+pc600|pc850a)
     echo 'fxp4'
     ;;
 pc1500|pc2000)
