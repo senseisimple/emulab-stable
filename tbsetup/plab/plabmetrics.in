@@ -9,40 +9,6 @@ use Getopt::Std;
 use XML::Parser;
 
 #
-# Load average metric to use
-#
-my $LOADMETRIC;
-if (TBSiteVarExists("plab/load_metric")) {
-    $LOADMETRIC = TBGetSiteVar("plab/load_metric");
-    if ($LOADMETRIC !~ /^load_(one|five}fifteen)$/) {
-	undef $LOADMETRIC;
-    }
-}
-if (!defined($LOADMETRIC)) {
-    $LOADMETRIC = "load_fifteen";
-}
-
-#
-# Load average at which we stop considering a node available
-#
-my $MAXLOAD = 5.0;
-if (TBSiteVarExists("plab/max_load")) {
-    $MAXLOAD = TBGetSiteVar("plab/max_load");
-}
-$MAXLOAD = 0.0 if $MAXLOAD <= 0.0;
-$MAXLOAD = 1000.0 if $MAXLOAD > 1000.0;
-
-#
-# Minimum percentage of free space on disk below which we will not allocate
-#
-my $MINDISK = 10;
-if (TBSiteVarExists("plab/min_disk")) {
-    $MINDISK = TBGetSiteVar("plab/min_disk");
-}
-$MINDISK = 0 if $MINDISK < 0;
-$MINDISK = 100 if $MINDISK > 100;
-
-#
 # Drift to allow between our clock and the gmond nodes
 #
 my $STALESLOP = 1 * 60;
@@ -99,6 +65,9 @@ use libtestbed;
 # Locals
 my $tempfile	= "/tmp/plabxml.$$";
 my %nodemap     = ();
+my $LOADMETRIC;
+my $MAXLOAD;
+my $MINDISK;
 
 # Current cluster and host.
 my $cluster;
@@ -122,7 +91,7 @@ if (@ARGV) {
     usage();
 }
 if (defined($options{"d"})) {
-    $debug   = 1;
+    $debug = 1;
 }
 if (defined($options{"n"})) {
     $impotent = 1;
@@ -139,27 +108,43 @@ if (defined($options{"f"})) {
     }
 }
 
+#
+# Set default values
+#
+if (TBSiteVarExists("plab/load_metric")) {
+    $LOADMETRIC = TBGetSiteVar("plab/load_metric");
+    if ($LOADMETRIC !~ /^load_(one|five}fifteen)$/) {
+	undef $LOADMETRIC;
+    }
+}
+if (!defined($LOADMETRIC)) {
+    $LOADMETRIC = "load_fifteen";
+}
+
+if (TBSiteVarExists("plab/max_load")) {
+    $MAXLOAD = TBGetSiteVar("plab/max_load");
+    $MAXLOAD = 0.0 if $MAXLOAD <= 0.0;
+    $MAXLOAD = 1000.0 if $MAXLOAD > 1000.0;
+} else {
+    $MAXLOAD = 5.0;
+}
+
+if (TBSiteVarExists("plab/min_disk")) {
+    $MINDISK = TBGetSiteVar("plab/min_disk");
+    $MINDISK = 0 if $MINDISK < 0;
+    $MINDISK = 100 if $MINDISK > 100;
+} else {
+    $MINDISK = 10;
+}
+
 print "\n=== plabmetrics ".
     "(metric=$LOADMETRIC, maxload=$MAXLOAD, mindisk=$MINDISK) ".
     "running at " . `date`
     if $debug;
 
 #
-# Grab the node list from the DB in one query, which we use later to
-# map from the IP we get from the XML output, to our node_id. 
-#
-my $query_result =
-    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
-		 "left join node_types as nt on n.type=nt.type ".
-		 "left join interfaces as i on i.node_id=n.node_id ".
-		 "where nt.isremotenode=1 and nt.isvirtnode=0");
-
-while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
-    $nodemap{$IP} = $nodeid;
-}
-
-#
 # Download the metrics from the plab site.
+# Do this before hitting the DB in case it fails.
 #
 if (defined($xmlfile)) {
     fatal("Could not copy $xmlfile to $tempfile!")
@@ -191,6 +176,21 @@ else {
 }
 
 #
+# Grab the node list from the DB in one query, which we use later to
+# map from the IP we get from the XML output, to our node_id. 
+#
+my $query_result =
+    DBQueryFatal("select i.node_id,i.IP from nodes as n ".
+		 "left join node_types as nt on n.type=nt.type ".
+		 "left join interfaces as i on i.node_id=n.node_id ".
+		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
+    		 "and nt.type like 'pcplab%'");
+
+while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
+    $nodemap{$IP} = $nodeid;
+}
+
+#
 # Finally, run the parser.
 #
 $p1 = new XML::Parser(Style => 'Tree');
@@ -200,24 +200,46 @@ $p1->setHandlers('Start'   => \&StartElement,
 fatal($@)
     if (eval { $p1->parsefile($tempfile); return 1; } != 1);
 
+#
+# Loop thru the IP map looking for any nodes that we have listed in the DB
+# but for which we got no metrics.  We will insert default values.
+#
+foreach my $arg (keys(%nodemap)) {
+    $IP = $arg;
+    if (defined($nodemap{$IP})) {
+	$host = $nodemap{$IP} . " ($IP)";
+	InsertMetrics();
+	undef($host);
+	undef($metricsage);
+	%metrics = ();
+    }
+}
+
 unlink($tempfile)
     if (-e $tempfile);
 exit(0);
 
 sub CheckMetrics()
 {
+    my $localdebug = $debug;
+
     #
-    # Check for stale data.
+    # See if we got any metric data.  If so, then check for stale data.
     # In the case where metric data appears to be in the future,
     # it may be clock skew, so allow a little slop.
     #
-    if ($metricsage < 0) {
+    if (!defined($metricsage)) {
+	print "WARNING: $host: no metric data, ignoring\n"
+	    if $localdebug;
+	$metrics{$LOADMETRIC} = 999;
+	$localdebug = 0;
+    } elsif ($metricsage < 0) {
 	if (-$metricsage > $STALESLOP) {
 	    $metrics{$LOADMETRIC} = 999;
 	}
     } elsif ($metricsage > $STALEAGE) {
 	print "WARNING: $host: stale metric data, ignoring\n"
-	    if $debug;
+	    if $localdebug;
 	$metrics{$LOADMETRIC} = 999;
     }
 
@@ -226,19 +248,21 @@ sub CheckMetrics()
     #
     if (!defined($metrics{$LOADMETRIC})) {
 	print "WARNING: $host: no $LOADMETRIC metric\n"
-	    if $debug;
+	    if $localdebug;
 	$metrics{$LOADMETRIC} = 999;
     }
     if (!defined($metrics{disk_free})) {
 	print "WARNING: $host: no disk_free metric\n"
-	    if $debug;
-	$metrics{disk_free} = 1;
+	    if $localdebug;
+	$metrics{disk_free} = 0;
     }
     if (!defined($metrics{disk_total})) {
 	print "WARNING: $host: no disk_total metric\n"
-	    if $debug;
+	    if $localdebug;
 	$metrics{disk_total} = $metrics{disk_free};
     }
+    $metrics{disk_total} = 1
+	if $metrics{disk_total} == 0;
 }
 
 #
@@ -286,6 +310,9 @@ sub InsertMetrics()
 			" (node_id, feature, weight) ".
 			" values ('$nodeid', '+disk', $disk)");
 	}
+
+	# XXX so we can detect nodes in the DB for which we got no status
+	undef($nodemap{$IP});
     }
 }
 
@@ -316,6 +343,7 @@ sub StartElement ($$$)
 	    
 	    $host = $attrs{"NAME"};
 	    $IP   = $attrs{"IP"};
+
 	    $metricsage = $now - $attrs{"REPORTED"};
 	    last SWITCH;
 	};
@@ -356,6 +384,7 @@ sub EndElement ($$)
 
 	    undef($host);
 	    undef($IP);
+	    undef($metricsage);
 	    %metrics = ();
 	    last SWITCH;
 	};
