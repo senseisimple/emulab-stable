@@ -25,6 +25,8 @@ $isadmin = ISADMIN($uid);
 $featurelist         = array();
 $featurelist["ping"] = "ping";
 $featurelist["ssh"]  = "ssh";
+$featurelist["ipod"]  = "ipod";
+$featurelist["isup"]  = "isup";
 
 #
 # Default OS strings. Needs to move someplace else!
@@ -34,6 +36,14 @@ $oslist["Linux"]   = "Linux";
 $oslist["FreeBSD"] = "FreeBSD";
 $oslist["NetBSD"]  = "NetBSD";
 $oslist["Other"]   = "Other";
+
+#
+# Default OS strings. Needs to move someplace else!
+#
+$opmodes             = array();
+$opmodes["NORMAL"]   = "NORMAL";
+$opmodes["NORMALv1"] = "NORMALv1";
+$opmodes["MINIMAL"]  = "MINIMAL";
 
 #
 # See what projects the uid can do this in.
@@ -60,9 +70,10 @@ $types_result =
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $uid, $projlist, $isadmin, $types_result, $oslist, $featurelist;
+    global $uid, $projlist, $isadmin, $types_result, $oslist, $opmodes,
+      $featurelist;
     global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
-    global $TBDB_OSID_VERSLEN;
+    global $TBDB_OSID_VERSLEN, $TBBASE;
     
     if ($errors) {
 	echo "<table class=nogrid
@@ -242,7 +253,7 @@ function SPITFORM($formfields, $errors)
     # OS Features.
     # 
     echo "<tr>
-              <td>OS Features:</td>
+              <td>OS Features[<b>2</b>]:</td>
               <td>";
 
     reset($featurelist);
@@ -261,10 +272,31 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     #
+    # Operational Mode
+    # 
+    echo "<tr>
+             <td>*Operational Mode[<b>3</b>]:</td>
+             <td><select name=\"formfields[op_mode]\">
+                   <option value=none>Please Select </option>\n";
+
+    while (list ($mode, $value) = each($opmodes)) {
+	$selected = "";
+
+	if (isset($formfields[op_mode]) &&
+	    strcmp($formfields[op_mode], $mode) == 0)
+	    $selected = "selected";
+
+	echo "<option $selected value=$mode>$mode &nbsp </option>\n";
+    }
+    echo "       </select>
+             </td>
+          </tr>\n";
+
+    #
     # Node Types.
     #
     echo "<tr>
-              <td>Node Types[<b>2</b>]:</td>
+              <td>Node Types[<b>4</b>]:</td>
               <td>\n";
 
     mysql_data_seek($types_result, 0);
@@ -287,7 +319,7 @@ function SPITFORM($formfields, $errors)
     # Node to Create image from.
     #
     echo "<tr>
-              <td>Node to Create Image from[<b>3</b>]:</td>
+              <td>Node to Create Image from[<b>5</b>]:</td>
               <td class=left>
                   <input type=text
                          name=\"formfields[node]\"
@@ -327,7 +359,7 @@ function SPITFORM($formfields, $errors)
     echo "</form>
           </table>\n";
 
-    echo "<h4><blockquote><blockquote><blockquote>
+    echo "<h4><blockquote>
           <ol type=1 start=1>
              <li> If you don't know what partition you have customized,
     	          here are some guidelines:
@@ -340,6 +372,23 @@ function SPITFORM($formfields, $errors)
 
                     <li> otherwise, feel free to ask us!
                  </ul>
+             <li> Guidelines for setting OS features for your OS:
+                <ol type=a>
+                  <li> Mark ping and/or ssh if they are supported.
+                  <li> If you use one of our standard kernels, or
+                       are based on a testbed kernel config, mark ipod.
+                  <li> If it is based on one of our standard images or
+                       sends its own ISUP notification, mark isup.
+                </ol>
+             <li> Guidelines for setting Operational Mode for your OS:
+                <ol type=a>
+                  <li> If it is based on one of our standard images,
+                       use the same Op. Mode as that image (should be
+                       NORMAL or NORMALv1; select it from the
+                       <a href=\"$TBBASE/showosid_list.php3\"
+                       >OS Descriptor List</a> to find out).
+                  <li> If not, use MINIMAL.
+                </ol>
              <li> Specify the node types that this image will be able
                   to work on (can be loaded on and expected to work).
                   Typically, images will work on all of the \"pc\" types when
@@ -351,7 +400,7 @@ function SPITFORM($formfields, $errors)
                   name (pcXXX) and the image will be auto created for you.
                   Notification of completion will be sent to you via email. 
           </ol>
-          </blockquote></blockquote></blockquote></h4>\n";
+          </blockquote></h4>\n";
 }
 
 #
@@ -491,6 +540,18 @@ while (list ($feature, $value) = each($featurelist)) {
 $os_features = join(",", $os_features_array);
 
 #
+# Operational Mode
+# 
+if (!isset($formfields[op_mode]) ||
+    strcmp($formfields[op_mode], "") == 0 ||
+    strcmp($formfields[op_mode], "none") == 0) {
+    $errors["Op. Mode"] = "Not Selected";
+}
+elseif (! isset($opmodes[$formfields[op_mode]])) {
+    $errors["Op. Mode"] = "Invalid Op. Mode";
+}
+
+#
 # Node Types:
 # See what node types this image will work on. Must be at least one!
 # Store the valid types in a new array for simplicity.
@@ -561,6 +622,7 @@ $loadpart    = $formfields[loadpart];
 $path        = $formfields[path];
 $os_name     = $formfields[os_name];
 $os_version  = $formfields[os_version];
+$op_mode     = $formfields[op_mode];
 
 DBQueryFatal("lock tables images write, os_info write, osidtoimageid write");
 
@@ -596,11 +658,11 @@ DBQueryFatal("INSERT INTO images ".
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
-	     " osfeatures, pid, creator, shared, created) ".
+	     " osfeatures, pid, creator, shared, created, op_mode) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', $shared, now())");
+             "   '$uid', $shared, now(), '$op_mode')");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".
