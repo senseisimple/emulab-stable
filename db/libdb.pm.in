@@ -154,6 +154,72 @@ sub ProjMember($;$)
 }
 
 #
+# Return Experiment leader. First argument pid. Second argument is eid.
+#
+# usage: ExpLeader(char *pid, char *eid)
+#        returns char *leader if a valid pid/eid.
+#        returns 0 if an invalid pid/eid.
+# 
+sub ExpLeader($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryFatal("select expt_head_uid from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Mark a node as down, moving it to special pid/eid. First argument is nodeid.
+#
+# usage: MarkNodeDown(char *nodeid)
+#
+sub MarkNodeDown($)
+{
+    my($node) = $_[0];
+
+    my $query_result =
+	DBQueryFatal("update reserved set pid='emulab-ops', eid='hwdown' ".
+		     "where node_id='$node'");
+
+    if ($query_result->num_rows < 1) {
+	DBWarn("WARNING: Could not mark $node down");
+    }
+}
+
+#
+# Check if a particular feature is supported by an OSID. 
+#
+# usage: OSFeatureSupported(char *osid, char *feature)
+#        returns 1 if supported, 0 if not.
+#
+sub OSFeatureSupported {
+    my($osid, $feature) = @_;
+
+    my $query_result =
+	DBQueryFatal("select osfeatures from os_info where osid='$osid'");
+
+    # Invalid OSID?
+    if ($query_result->numrows < 1) {
+	return 0;
+    }
+    
+    foreach my $osfeature (split(',', $query_result->fetchrow_array())) {
+	if ($feature eq $osfeature) {
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+#
 # Issue a DB query. Argument is a string. Returns the actual query object, so
 # it is up to the caller to test it. I would not for one moment view this
 # as encapsulation of the DB interface. I'm just tired of typing the same
