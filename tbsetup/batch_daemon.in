@@ -367,15 +367,37 @@ sub dosomething($$)
 	fatal("No such group $pid/$gid");
 
     #
+    # Need the entire group list for the user, cause of subgroups, and cause
+    # thats the correct thing to do. Too bad perl does not have a getgrouplist
+    # function like the C library.
+    #
+    my $glist = `id -G $creator`;
+    if ($glist =~ /^([\d ]*)$/) {
+	$glist = $1;
+    }
+    else {
+	fatal("Unexpected results from 'id -G $creator': $glist");
+    }
+    #
+    # Remove current group from glist, then add gid twice at the front
+    # of the list. Order matters here, or we won't pick up all the
+    # groups we need.
+    #
+    $glist =~ s/ ?\b$unix_gid\b ?//;
+    $glist = $unix_gid . " " . $unix_gid . " " . $glist;
+
+    #
     # Change the ownership of the log file before we flip.
     #
     chown($unix_uid, $unix_gid, $logname) or
 	fatal("Could not chown $logname to $unix_uid/$unix_gid!");
 
     # Flip to the user. We never flip back.
-    $EGID = $GID = $unix_gid;
-    $EUID = $UID = $unix_uid;
-    $ENV{'USER'} = $creator;
+    $GID            = $unix_gid;
+    $EGID           = $glist;
+    $EUID = $UID    = $unix_uid;
+    $ENV{'USER'}    = $creator;
+    $ENV{'LOGNAME'} = $creator;
     
     if ($dowhat eq "start") {
 	startexp(%exphash);
