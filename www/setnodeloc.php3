@@ -1,0 +1,339 @@
+<?php
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+include("defs.php3");
+
+#
+# Only admins.
+#
+$uid = GETLOGIN();
+LOGGEDINORDIE($uid);
+$isadmin = ISADMIN($uid);
+
+#
+# This is a multistep process.
+#
+# * Initially we come in with just a nodeid. Display a page of little maps
+#   and titles the user must select (a floor in a building) from. User clicks.
+# * Next time through we have a building and floor defined in addition to the
+#   the nodeid. We put up that big image with the current nodes on that floor.
+#   We use the external floormap program to generate that image, but without
+#   an imagemap. Instead, we use a form with an input type=image, which acts
+#   as a big submit button; when the user clicks in the image, the browser
+#   submits the form, but with the x,y coords added as form arguments. 
+# * We get all of the above arguments on the final click, including x,y. Verify
+#   all the aguments, and then do the insert.
+# * If user goes to reset the node location, form includes an additional submit
+#   button that says to use the old coords. This allows us to change the contact
+#   info for a node without actually changing the location. 
+#
+
+# Only admins cat set node location
+if (!$isadmin) {
+    USERERROR("You do not have permission to access this page!", 1);
+}
+
+#
+# Check page args. Must always supply a nodeid.
+# 
+if (!isset($node_id) || $node_id == "" || !TBvalid_node_id($node_id)) {
+    PAGEARGERROR("Invalid node_id");
+}
+
+#
+# If no building/floor specified, throw up a page of images of all the
+# buildings and floors
+#
+if (!isset($building) || $building == "" || !isset($floor) || $floor == "") {
+    PAGEHEADER("Set Node Location");
+    
+    echo "<center>
+           <font size=+2>Pick a floor, any floor</font><br><br>\n";
+
+    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=3'>
+             <img src=meb3fl-thumb.png></a>";
+
+    echo "<a href='setnodeloc.php3?node_id=$node_id&building=MEB&floor=4'>
+             <img src=meb4fl-thumb.png></a>";
+
+    echo "</center>\n";
+
+    PAGEFOOTER();
+    exit(0);
+}
+
+#
+# At this point both building and floor are specified. Sanitize for shell.
+#
+if (!preg_match("/^[-\w]+$/", $building)) {
+    PAGEARGERROR("Invalid characters in building");
+}
+if (!preg_match("/^[-\w]+$/", $floor)) {
+    PAGEARGERROR("Invalid characters in floor");
+}
+
+#
+# This routine spits out the selectable image for getting x,y coords plus
+# contact info. We use a form and an input type=image, which acts as a submit
+# button; the browser sends x,y coords when the user clicks in the image. 
+#
+function SPITFORM($errors, $node_id, $building, $floor,
+		  $room, $contact, $phone, $old_x, $old_y)
+{
+    # Careful with this local variable
+    unset($prefix);
+
+    if ($errors) {
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
+              <tr>
+                 <th align=center colspan=2>
+                   <font size=+1 color=red>
+                      &nbsp;Oops, please fix the following errors!&nbsp;
+                   </font>
+                 </td>
+              </tr>\n";
+
+	while (list ($name, $message) = each ($errors)) {
+	    echo "<tr>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
+                  </tr>\n";
+	}
+	echo "</table><br>\n";
+    }
+    
+    #
+    # Create a tempfile to use as a unique prefix; it is not actually used but
+    # serves the same purpose (the script uses ${prefix}.png and ${prefix}.map)
+    # 
+    $prefix = tempnam("/tmp", "floormap");
+
+    #
+    # Get the unique part to send back.
+    #
+    if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
+	TBERROR("Bad tempnam: $prefix", 1);
+    }
+    $uniqueid = $matches[1];
+
+    $retval = SUEXEC("nobody", "nobody",
+		     "webfloormap -o $prefix -f $floor $building",
+		     SUEXEC_ACTION_IGNORE);
+
+    if ($retval) {
+	SUEXECERROR(SUEXEC_ACTION_USERERROR);
+	die("");
+    }
+    
+    echo "<script language=JavaScript>
+          <!--
+          function foo(target, event) {
+              target.href='https://www.foo.edu/bar'
+              msgWindow=window.open('','msg','width=400,height=400')
+	      msgWindow.document.write(target.href + '<br>')
+	      msgWindow.document.write(event.pageX + '<br>')
+	      return false;
+          }
+          //-->
+          </script>\n";
+
+    echo "<center>
+          <font size=+2>Enter contact info, then click on location</font><br>
+          <form action=setnodeloc.php3 method=get>
+          <table class=nogrid
+                 align=center border=0 cellpadding=6 cellspacing=0>
+          <tr>
+             <td>Contact Name:</td>
+             <td><input type=text name=contact value=\"" . $contact . "\"
+                        size=30>
+              </td>
+          </tr>
+          <tr>
+             <td>Phone Number:</td>
+             <td><input type=text name=phone value=\"" . $phone . "\"
+                        size=30>
+              </td>
+          </tr>
+          <tr>
+             <td>Room Number:</td>
+             <td><input type=text name=room value=\"" . $room . "\"
+                        size=30>
+              </td>
+          </tr>\n";
+    if (isset($old_x) and isset($old_y)) {
+	echo "<tr>
+                 <td colspan=2 align=center>
+                     <b><input type=submit name=submit
+	                       value='Use Existing Location'></b>
+                 </td>
+             </tr>\n";
+    }
+    echo "</table>
+	  <input type=hidden name=node_id value=$node_id>
+	  <input type=hidden name=building value=$building>
+	  <input type=hidden name=floor value=$floor>
+          <input type=image
+                 src=\"floormap_aux.php3?prefix=$uniqueid\">
+          </form>
+          </center>\n";
+}
+
+#
+# Get default values from location info.
+#
+$query_result =
+    DBQueryFatal("select contact,room,phone,loc_x,loc_y from location_info ".
+		 "where node_id='$node_id'");
+if (mysql_num_rows($query_result)) {
+    $row = mysql_fetch_array($query_result);
+    
+    if (! isset($contact))
+	$contact = $row["contact"];
+    if (! isset($room))
+	$room = $row["room"];
+    if (! isset($phone))
+	$phone = $row["phone"];
+    $old_x = $row["loc_x"];
+    $old_y = $row["loc_y"];
+}
+else {
+    if (! isset($contact))
+	$contact = "";
+    if (! isset($room))
+	$room = "";
+    if (! isset($phone))
+	$phone = "";
+}
+
+#
+# If no x,y yet, then we must have a building/floor and we put up that image.
+# If there were existing coords, then the user got a submit box. When that is
+# clicked, we use those old coords (we will not get x,y from the image submit). 
+#
+if (!isset($submit) && (!isset($x) || $x == "" || !isset($y) || $y == "")) {
+    PAGEHEADER("Set Node Location");
+
+    SPITFORM(0, $node_id, $building, $floor, $room, $contact, $phone,
+	     $old_x, $old_y);
+    PAGEFOOTER();
+    exit(0);
+}
+elseif (isset($submit)) {
+    #
+    # Lets make sure that the node really does have an existing location.
+    #
+    if (!isset($old_x) || !isset($old_y)) {
+	PAGEHEADER("Set Node Location");
+	PAGEARGERROR("Need location coordinates");
+    }
+    $x = $old_x;
+    $y = $old_y;
+}
+
+#
+# Okay, make sure the x and y coords are numbers, and verify all input data.
+#
+$errors  = array();
+$inserts = array();
+
+# x,y
+if (! TBvalid_slot($x, "location_info", "loc_x")) {
+    $errors["X"] = TBFieldErrorString();
+}
+elseif ($x <= 0) {
+    $errors["X"] = "Must be greater then zero";
+}
+else {
+    $inserts["loc_x"] = $x;
+}
+if (! TBvalid_slot($y, "location_info", "loc_y")) {
+    $errors["Y"] = TBFieldErrorString();
+}
+elseif ($x <= 0) {
+    $errors["Y"] = "Must be greater then zero";
+}
+else {
+    $inserts["loc_y"] = $y;
+}
+
+# Building
+if (! TBvalid_slot($building, "location_info", "building")) {
+    $errors["Building"] = TBFieldErrorString();
+}
+else {
+    $inserts["building"] = $building;
+}
+
+# Floor
+if (! TBvalid_slot($floor, "location_info", "floor")) {
+    $errors["Floor"] = TBFieldErrorString();
+}
+else {
+    $inserts["floor"] = $floor;
+}
+
+# Contact
+if (isset($contact) && $contact != "" &&
+    !TBvalid_slot($contact, "location_info", "contact")) {
+    $errors["Contact"] = TBFieldErrorString();
+}
+else {
+    $inserts["contact"] = $contact;
+}
+
+# Phone
+if (isset($phone) && $phone != "" &&
+    !TBvalid_slot($phone, "location_info", "phone")) {
+    $errors["Phone"] = TBFieldErrorString();
+}
+else {
+    $inserts["phone"] = $phone;
+}
+
+# Room
+if (isset($room) && $room != "" &&
+    !TBvalid_slot($room, "location_info", "room")) {
+    $errors["Room"] = TBFieldErrorString();
+}
+else {
+    $inserts["room"] = $room;
+}
+
+#
+# Spit any errors now.
+#
+if (count($errors)) {
+    PAGEHEADER("Set Node Location");
+    SPITFORM($errors, $node_id, $building, $floor, $room, $contact,
+	     $phone, $old_x, $old_y);
+    PAGEFOOTER();
+    return;
+}
+
+#
+# Otherwise, do the inserts.
+#
+$inserts["node_id"] = $node_id;
+
+$insert_data = array();
+foreach ($inserts as $name => $value) {
+    $insert_data[] = "$name='$value'";
+}
+DBQueryFatal("replace into location_info set " . implode(",", $insert_data));
+
+#
+# Zap back to floormap for this building/floor.
+# 
+header("Location: floormap.php3?building=$building&floor=$floor");
+
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
+?>
