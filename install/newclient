@@ -29,7 +29,7 @@ else {
 
 my $FETCH = "/usr/bin/fetch";
 
-my $FORMURL = "dev/ricci/newnodecheckin.php";
+my $FORMURL = "newnodecheckin.php";
 
 my $IFCONFIG = "/sbin/ifconfig";
 my $DMESG = "/var/run/dmesg.boot";
