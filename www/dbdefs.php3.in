@@ -1849,4 +1849,16 @@ function DBFatal($message)
 	      "Unexpected Error. Could not continue. ".
               "Please contact $TBMAILADDR\n");
 }
+
+#
+# Return the number of affected rows, for the last query. Why is this
+# not stored in the query result?
+# 
+function DBAffectedRows()
+{
+    global      $DBlinkid;
+
+    return mysql_affected_rows($DBlinkid);
+}
+
 ?>

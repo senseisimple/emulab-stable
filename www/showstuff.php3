@@ -537,7 +537,7 @@ function SHOWUSER($uid) {
 #
 # Show an experiment.
 #
-function SHOWEXP($pid, $eid, $edit=0) {
+function SHOWEXP($pid, $eid) {
     global $TBDBNAME, $TBDOCBASE;
     $nodecounts  = array();
 
@@ -565,10 +565,7 @@ function SHOWEXP($pid, $eid, $edit=0) {
     }
 
     $exp_gid     = $exprow[gid];
-    #$exp_expires = $exprow[expt_expires];
-    $exp_name_safe= htmlspecialchars(stripslashes($exprow[expt_name]));
     $exp_name    = stripslashes($exprow[expt_name]);
-    $exp_created = $exprow[expt_created];
     $exp_swapped = $exprow[expt_swapped];
     $exp_swapuid = $exprow[expt_swap_uid];
     $exp_end     = $exprow[expt_end];
@@ -582,16 +579,12 @@ function SHOWEXP($pid, $eid, $edit=0) {
     $batchstate  = $exprow[batchstate];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
-    $noswap_reason_safe =
-	htmlspecialchars(stripslashes($exprow[noswap_reason]));
     $noswap_reason = stripslashes($exprow[noswap_reason]);
     $idleswap    = $exprow[idleswap];
-    $idleswap_timeout = $exprow[idleswap_timeout];
-    $noidleswap_reason_safe =
-	htmlspecialchars(stripslashes($exprow[noidleswap_reason]));
+    $idleswap_timeout  = $exprow[idleswap_timeout];
     $noidleswap_reason = stripslashes($exprow[noidleswap_reason]);
     $autoswap    = $exprow[autoswap];
-    $autoswap_timeout = $exprow[autoswap_timeout];
+    $autoswap_timeout  = $exprow[autoswap_timeout];
     $idle_ignore = $exprow[idle_ignore];
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
@@ -602,84 +595,31 @@ function SHOWEXP($pid, $eid, $edit=0) {
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
-    if ($edit) {
-	# make this a form too
-	echo "<form action=\"showexp.php3?pid=$pid&eid=$eid\" method=POST>\n";
+    $noswap = "($noswap_reason)";
+    $noidleswap = "($noidleswap_reason)";
+    $autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
+    $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "":"s");
 
-	$noswap_form = "Why: <input type=text ".
-	    "name=noswap value=\"$noswap_reason\" size=30>";
-	$noidleswap_form = "Why: <input type=text ".
-	    "name=noidleswap value=\"$noidleswap_reason\" size=30>";
-	$autoswap_form= "<input type=text size=3 name=autoswap ".
-	    "value=\"$autoswap_hrs\"> hour".($autoswap_hrs==1 ? "" : "s");
-	$toggle = "<font size=-2 face=\"Verdana,Arial,sans-serif\">Toggle</font>";
-	$expttag = "pid=$pid&eid=$eid&edit=1";
+    if ($swappable)
+	$swappable = "Yes";
+    else
+	$swappable = "<b>No</b> $noswap";
 
-	if ($swappable)
-	    $swappable = "Yes
-<a href=\"toggle.php?type=swappable&value=0&$expttag\">$toggle</a>
-$noswap_form";
-	else
-	    $swappable = "<b>No</b>
-<a href=\"toggle.php?type=swappable&value=1&$expttag\">$toggle</a>
-$noswap_form";
-	
-	$idleswap_form= "<input type=text size=3 name=idleswap ".
-	    "value=\"$idleswap_hrs\"> hour".($idleswap_hrs==1 ? "" : "s");
-	
-	if ($idleswap)
-	    $idleswap = "Yes
-<a href=\"toggle.php?type=idleswap&value=0&$expttag\">$toggle</a>
-(after $idleswap_form) <br> $noidleswap_form";
-	else
-	    $idleswap = "<b>No</b>
-<a href=\"toggle.php?type=idleswap&value=1&$expttag\">$toggle</a>
-(after $idleswap_form) <br> $noidleswap_form";
-	
-	if ($autoswap)
-	    $autoswap = "<b>Yes</b>
-<a href=\"toggle.php?type=autoswap&value=0&$expttag\">$toggle</a>
-(after $autoswap_form)";
-	else
-	    $autoswap = "No
-<a href=\"toggle.php?type=autoswap&value=1&$expttag\">$toggle</a>
-(after $autoswap_form)";
+    if ($idleswap)
+	$idleswap = "Yes (after $idleswap_str)";
+    else
+	$idleswap = "<b>No</b> $noidleswap";
 
-        if ($idle_ignore)
-	    $idle_ignore = "<b>Yes</b>
-<a href=\"toggle.php?type=idle_ignore&value=0&$expttag\">$toggle</a>";
-        else
-	    $idle_ignore = "No
-<a href=\"toggle.php?type=idle_ignore&value=1&$expttag\">$toggle</a>";
+    if ($autoswap)
+	$autoswap = "<b>Yes</b> (after $autoswap_str)";
+    else
+	$autoswap = "No";
 
-    } else {
-	$noswap = "($noswap_reason)";
-	$noidleswap = "($noidleswap_reason)";
-	$autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
-        $idleswap_str= $idleswap_hrs." hour".($idleswap_hrs==1 ? "":"s");
+    if ($idle_ignore)
+	$idle_ignore = "<b>Yes</b>";
+    else
+	$idle_ignore = "No";
 
-	if ($swappable)
-	    $swappable = "Yes";
-	else
-	    $swappable = "<b>No</b> $noswap";
-
-	if ($idleswap)
-	    $idleswap = "Yes (after $idleswap_str)";
-	else
-	    $idleswap = "<b>No</b> $noidleswap";
-
-	if ($autoswap)
-	    $autoswap = "<b>Yes</b> (after $autoswap_str)";
-	else
-	    $autoswap = "No";
-
-        if ($idle_ignore)
-	    $idle_ignore = "<b>Yes</b>";
-        else
-	    $idle_ignore = "No";
-
-    }
-    
     #
     # Generate the table.
     #
@@ -690,15 +630,9 @@ $noswap_form";
             <td class=left>$eid</td>
           </tr>\n";
 
-    if ($edit) {
-	$exp_name_str =
-	    "<input type=text name=exp_name size=30 value=\"$exp_name_safe\">";
-    } else {
-	$exp_name_str = $exp_name;
-    }
     echo "<tr>
             <td>Long Name: </td>
-            <td class=\"left\">$exp_name_str</td>
+            <td class=\"left\">$exp_name</td>
           </tr>\n";
 
     echo "<tr>
@@ -873,16 +807,7 @@ $noswap_form";
               </tr>\n";
     }
 
-    if ($edit) {
-	echo "<tr><td colspan=2 align=center>
-		<input type=submit name=submit value=\"Submit Changes\">
-		<input type=submit name=reset value=\"Reset\">
-	      </td></tr>\n";
-    }
-
     echo "</table>\n";
-
-    if ($edit) { echo "</form>\n"; }
 }
 
 #

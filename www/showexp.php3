@@ -122,9 +122,8 @@ if ($expstate) {
     }
 }
 
-$editflip = ($edit ? 0 : 1);
 WRITESUBMENUBUTTON("Edit Experiment Metadata",
-		   "showexp.php3?pid=$exp_pid&eid=$exp_eid&edit=$editflip");
+		   "editexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 #
 # Admin and project/experiment leader get this option.
@@ -179,135 +178,7 @@ echo "<br>
 
 SUBMENUEND_2B();
 
-# if we got a submission of changes, update the db now...
-if ($submit) {
-    # Find out our limit
-    $idlethresh = TBGetSiteVar("idle/threshold");
-    $exp_name = addslashes(str_replace('"',"",$exp_name));
-    $noswap = addslashes(str_replace('"',"",$noswap));
-    $noidleswap = addslashes(str_replace('"',"",$noidleswap));
-    $mail=0;
-    $strs = array();
-    $errors = array();
-    if (isset($exp_name)) {
-	if ($exp_name!="") {
-	    $strs[] = "expt_name=\"$exp_name\"";
-	} else {
-	    $errors['Expt. Name'] = "Missing/Blank Field";
-	}
-    }
-    if (isset($noswap)) {
-	$strs[] = "noswap_reason=\"$noswap\"";
-	$mail=1;
-    }
-    if (isset($noidleswap)) {
-	$strs[].= "noidleswap_reason=\"$noidleswap\"";
-	$mail=1;
-    }
-    if (isset($idleswap)) {
-	if ($idleswap>0 && $idleswap <= $idlethresh && $idleswap !="") {
-	    $strs[] = "idleswap_timeout=\"".(60*$idleswap)."\"";
-	    $mail=1;
-	} else {
-	    $errors['Idle-Swap'] ="Time must be non-zero and <= $idlethresh";
-	}
-    }
-    if (isset($autoswap)) {
-	if ($autoswap>=0 && $autoswap !="") {
-	    $strs[] = "autoswap_timeout=\"".(60*$autoswap)."\"";
-	    $mail=1;
-	} else {
-	    $errors['Max Duration'] = "Time must be non-zero";
-	}
-    }
-    if ($errors) {
-	echo "<table class=nogrid
-                     align=center border=0 cellpadding=6 cellspacing=0>
-              <tr>
-                 <th align=center colspan=2>
-                   <font size=+1 color=red>
-                      &nbsp;Oops, please fix the following errors!&nbsp;
-                   </font>
-                 </td>
-              </tr>\n";
-
-	while (list ($name, $message) = each ($errors)) {
-	    echo "<tr>
-                     <td align=right>
-                       <font color=red>$name:&nbsp;</font></td>
-                     <td align=left>
-                       <font color=red>$message</font></td>
-                  </tr>\n";
-	}
-	echo "</table><br>\n";
-	# Jump back into edit mode
-	$edit=1;
-	$mail=0;
-    } else {
-	$q = DBQueryFatal("select * from experiments ".
-			  "where pid='$pid' and eid='$eid'");
-	$r = mysql_fetch_array($q);
-	$olds = ($r[swappable] ? "Yes" : "No");
-	$oldsr= $r[noswap_reason];
-	$oldi = ($r[idleswap] ? "Yes" : "No");
-	$oldit= $r[idleswap_timeout] / 60.0;
-	$oldir= $r[noidleswap_reason];
-	$olda = ($r[autoswap] ? "Yes" : "No");
-	$oldat= $r[autoswap_timeout] / 60.0;
-	if (count($strs)>0) {
-	    $str = implode(",",$strs);
-	    DBQueryWarn("update experiments set $str ".
-			"where pid='$pid' and eid='$eid'");
-	}
-    }
-    if ($mail) {
-	$q = DBQueryFatal("select * from experiments ".
-			  "where pid='$pid' and eid='$eid'");
-	$r = mysql_fetch_array($q);
-	$s = ($r[swappable] ? "Yes" : "No");
-	$sr= $r[noswap_reason];
-	$i = ($r[idleswap] ? "Yes" : "No");
-	$it= $r[idleswap_timeout] / 60.0;
-	$ir= $r[noidleswap_reason];
-	$a = ($r[autoswap] ? "Yes" : "No");
-	$at= $r[autoswap_timeout] / 60.0;
-	$cuid = $r[expt_head_uid];
-	$suid= $r[expt_swap_uid];
-	TBUserInfo($uid, $user_name, $user_email);
-	TBUserInfo($cuid, $cname, $cemail);
-	TBUserInfo($suid, $sname, $semail);
-	# Do not send this email if the user is an administrator
-	# (adminmode does not matter), and is changing an expt
-	# he created or swapped in. Pointless email.
-	if (! (ISADMINISTRATOR() &&
-	       (!strcmp($uid, $cuid) || !strcmp($uid, $suid)))) {
-	    TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
-		   "\nThe swap settings for $pid/$eid have changed.\n".
-		   "\nThe reasons and/or timeouts have changed.\n".
-		   "\nThe old settings were:\n".
-		  #"Swappable:\t$olds\t($oldsr)\n".
-		   "Idleswap:\t$oldi\t(after $oldit hrs)\t($oldir)\n".
-		   "MaxDuration:\t$olda\t(after $oldat hrs)\n".
-		   "\nThe new settings are:\n".
-		  #"Swappable:\t$s\t($sr)\n".
-		   "Idleswap:\t$i\t(after $it hrs)\t($ir)\n".
-		   "MaxDuration:\t$a\t(after $at hrs)\n".
-		   "\nCreator:\t$cuid ($cname <$cemail>)\n".
-		   "Swapper:\t$suid ($sname <$semail>)\n".
-		   "\nIf it is necessary to change these settings, ".
-		   "please reply to this message \nto notify the user, ".
-		   "then change the settings here:\n\n".
-		   "$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n".
-		   "Thanks,\nTestbed WWW\n",
-		   "From: $user_name <$user_email>\n".
-		   "Errors-To: $TBMAIL_WWW");
-	}
-    }
-}
-
-# Dump (possibly updated) experiment record.
-if (!isset($edit)) { $edit=0; }
-SHOWEXP($exp_pid, $exp_eid, $edit);
+SHOWEXP($exp_pid, $exp_eid);
 
 SUBPAGEEND();
 
