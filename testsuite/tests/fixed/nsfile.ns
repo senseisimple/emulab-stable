@@ -1,0 +1,18 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set node1 [$ns node]
+set node2 [$ns node]
+set node3 [$ns node]
+set node4 [$ns node]
+
+set lan1 [$ns make-lan "$node1 $node2 $node3" 100Mb 0ms]
+set link1 [$ns duplex-link $node4 $node1 100Mb 50ms DropTail]
+set link2 [$ns duplex-link $node4 $node3 10Mb 100ms DropTail]
+
+tb-fix-node $node1 pc14
+tb-fix-node $node3 pc102
+
+$ns run
+
