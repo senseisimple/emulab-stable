@@ -1,8 +1,23 @@
+The current traffic generation application is based on the TG traffic
+generator distributed by postel.org (http://www.postel.org/services.html).
+We have made modifications to interface it with our event system which
+is based on Elvin (http://elvin.dstc.edu.au/).
+
 To build the trafgen application.
 
-1. Download tg2.0 and unpack in tg2.0 subdirctory.
+0. Note: you must first have installed and built the elvin library
+   and you must configure the testbed with --enable-events.
+
+1. Download tg2.0:
+
+	http://www.postel.org/tg/tg2.0.tar.gz
+
+2. Unpack in tg2.0 subdirctory:
+
+	cd <testbed-srcdir>/event/trafgen
+	tar xzf tg2.0.tar.gz
 
 2. Apply the patch:
-	patch -P0 < tg.patch
+	patch -p0 < tg.patch
 
-3. Thats it!
+3. Thats it!  You should now be able to make trafgen.
