@@ -6,7 +6,7 @@ include("defs.php3");
 #
 PAGEHEADER("Begin an Experiment");
 
-$mydebug = 0;
+$mydebug = 1;
 
 #
 # First off, sanity check the form to make sure all the required fields
@@ -100,6 +100,16 @@ if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
 }
 
 #
+# We need the unix gid for the project for running the scripts below.
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT unix_gid from projects where pid=\"$exp_pid\"");
+if (($row = mysql_fetch_row($query_result)) == 0) {
+    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
+}
+$gid = $row[0];
+
+#
 # At this point enter the exp_id into the database so that it shows up as
 # valid when the tb scripts run. We need to remove the entry if any of
 # this fails!
@@ -116,18 +126,26 @@ if (! $query_result) {
 }
 
 #
+# This is where the experiment hierarchy is going to be created.
+#
+$dirname = "$TBPROJ_DIR/$exp_pid/exp/$exp_id";
+
+#
 # If an experiment "shell" give some warm fuzzies and be done with it.
 # The user is responsible for running the tb scripts on his/her own!
 # The user will need to come back and terminate the experiment though
 # to clear it out of the database.
 #
 if ($nonsfile) {
+    $retval = SUEXEC($uid, $gid, "mkexpdir $exp_pid $exp_id", 0);
+
     echo "<center><br>
           <h2>Experiment Configured!<br>
           The ID for your experiment in project $exp_pid is $exp_id<br>
           Since you did not provide an NS script, no nodes have been
           allocated.<br> You must log in and run the tbsetup scripts
-          yourself.
+          yourself. For your convenience, we have created a directory
+          hierarchy on the control node:<br>$dirname
           </h2></center><br>\n";
 
     if (1) {
@@ -149,34 +167,18 @@ if ($nonsfile) {
 }
 
 #
-# We are going to write out the NS file to a subdir of the testbed
-# directory. The name of this directory is <pid>-<eid>, and we stash
-# the <eid>.ns file in there. We then run a wrapper script as:
+# We run a wrapper script that does all the work of creating the directory
+# and running the tb scripts. If it fails, we get back all the output and
+# give that to the user. If it succeeds, we go and find the report file
+# and give that to the user.
 #
-#   tbdoit <path to directory> <pid> <eid> <eid>.ns
+#   tbdoit <pid> <eid> <temp_nsfile>
 #
 # Later, when the experiment is ended, the directory will be deleted.
 #
 # There is similar path stuff in endexp.php3.  Be sure to sync that up
 # if you change things here.
 #
-# No need to tell me how bogus this is.
-#
-$dirname = "$TBWWW_DIR"."$TBNSSUBDIR" . "/" . "$exp_pid" . "-" . "$exp_id";
-$nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
-$irname  = "$dirname" . "/" . "$exp_id"  . ".ir";
-$repname = "$dirname" . "/" . "$exp_id"  . ".report";
-$logname = "$dirname" . "/" . "$exp_id"  . ".log";
-$assname = "$dirname" . "/" . "assign"   . ".log";
-
-if (! mkdir($dirname, 0777)) {
-    TBERROR("Making directory for experiment: $dirname.", 1);
-}
-if (! copy($exp_nsfile, "$nsname")) {
-    rmdir($dirname);
-    TBERROR("Copying NS file for experiment into $dirname.", 1);
-}
-
 echo "<center><br>";
 echo "<h3>Setting up experiment. This may take a few minutes ...</h3>";
 echo "</center>";
@@ -190,8 +192,10 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbdoit $dirname $exp_pid $exp_id $exp_id.ns",
-               $output, $retval);
+$result = exec("$TBSUEXEC_PATH $uid $gid ".
+               "tbdoit $exp_pid $exp_id $exp_nsfile",
+ 	       $output, $retval);
+
 if ($retval) {
     echo "<br><br><h2>
           Setup Failure($retval): Output as follows:
@@ -203,40 +207,9 @@ if ($retval) {
           }
     echo "</XMP>\n";
 
-    #
-    # Lets dump the log file also.
-    #
-    $fp = fopen($logname, "r");
-    if ($fp) {
-        echo "<br><h2>
-              Logfile as follows:
-              </h2>
-              <br>\n";
-
-        echo "<XMP>\n";
-        while ($line = fgets($fp, 1024)) {
-            echo "$line";
-        }
-        echo "</XMP>\n";
-        fclose($fp);
-    }
-
     $query_result = mysql_db_query($TBDBNAME,
 	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
 
-    if (! $mydebug) {
-        unlink("$nsname");
-        if (file_exists($irname))
-            unlink("$irname");
-        if (file_exists($repname))
-            unlink("$repname");
-        if (file_exists($logname))
-            unlink("$logname");
-        if (file_exists($assname))
-            unlink("$assname");
-        if (file_exists($dirname))
-            rmdir("$dirname");
-    }
     die("");
 }
 
@@ -251,28 +224,6 @@ if ($mydebug) {
     echo "</XMP>\n";
 }
 
-#
-# Make sure the report file exists, just to be safe!
-# 
-if (! file_exists($repname)) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_id' and pid=\"$exp_pid\"");
-
-    if (! $mydebug) {
-        if (file_exists($nsname))
-            unlink("$nsname");
-        if (file_exists($irname))
-            unlink("$irname");
-        if (file_exists($logname))
-            unlink("$logname");
-        if (file_exists($assname))
-            unlink("$assname");
-        if (file_exists($dirname))
-            rmdir("$dirname");
-    }
-    TBERROR("Report file for new experiment does not exist!\n", 1);
-}
-
 echo "<center><br>";
 echo "<h2>Experiment Configured!<br>";
 echo "The ID for your experiment in project $exp_pid is $exp_id<br>";
@@ -280,17 +231,17 @@ echo "Here is a summary of the nodes that were allocated<br>";
 echo "</h2></center><br>";
 
 #
-# Lets dump the report file to the user.
+# The tbdoit scripts dumps report output to stdout. Look for it in the
+# output and send that out to the user. We cannot open the actual file
+# because the project directory is not readable by world.
 #
-$fp = fopen($repname, "r");
-if (! $fp) {
-    TBERROR("Error opening report file for experiment: $exp_id\n", 1);
+for ($i = 0; $i < count($output); $i++) {
+    if (strcmp($output[$i], "Dumping $exp_id.report") == 0)
+        break;
 }
-$summary = "";
-echo "<XMP>";
-while ($line = fgets($fp, 1024)) {
-    echo "$line";
-    $summary = "$summary" . "$line";
+echo "<XMP>\n";
+for ($i = $i + 1; $i < count($output); $i++) {
+    echo "$output[$i]\n";
 }
 echo "</XMP>\n";
 

@@ -1,62 +1,145 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -wT
+use English;
+
+#
+# For debugging all this goo. Leaves the experiment directory intact,
+# and placed in a subdir of the project directory.
+# 
+my $debug    = 1;
 
 #
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
-# usage: tbdoit <path to working directory> <pid> <eid> <nsfile>
+# usage: tbdoit <pid> <eid> <temp_nsfile>
 #
-my $tbdir = "/usr/testbed/bin/";
+my $tbdir    = "/usr/testbed/bin/";
+my $projroot = "/proj";
+my $tbdata   = "tbdata";
 
-if (@ARGV != 4) {
-    print STDOUT "Usage: tbdoit <working dir> <pid> <eid> <nsfile>\n";
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Check args.
+# 
+if (@ARGV != 3) {
+    print STDOUT "Usage: tbdoit <pid> <eid> <temp_nsfile>\n";
     exit(-1);
 }
-my $workdir = $ARGV[0];
-my $project = $ARGV[1];
-my $eid     = $ARGV[2];
-my $nsfile  = $ARGV[3];
-my $base    = "$nsfile";
-$_ = $base;
-s/\.ns//g;
-$base = $_;
-my $irfile  = "$base.ir";
-my $repfile = "$base.report";
+my $project = $ARGV[0];
+my $eid     = $ARGV[1];
+my $tempfile= $ARGV[2];
 
 #
-# We run the TB stuff in the given directory.
+# Untaint the arguments.
 #
-if (! chdir($workdir)) {
-    print STDOUT "Could not chdir to $workdir\n";
-    exit(-1);
+if ($project =~ /^([-\@\w.]+)$/) {
+    $project = $1;
+}
+if ($eid =~ /^([-\@\w.]+)$/) {
+    $eid = $1;
+}
+if ($tempfile =~ /^([-\@\w.]+)$/) {
+    $tempfile = $1;
 }
 
+my $piddir  = "$projroot/$project";
+my $expdir  = "$piddir/exp";
+my $eiddir  = "$expdir/$eid";
+my $nsfile  = "$eid.ns";
+my $irfile  = "$eid.ir";
+my $repfile = "$eid.report";
+
+#
+# Create a directory structure for the experiment in the project directory.
+#
+if (system("$tbdir/mkexpdir $project $eid") != 0) {
+    print STDOUT "$tbdir/mkexpdir failed\n";
+    exit(1);
+}
+
+#
+# Copy the nsfile from wherever the web server stuffed it, into the
+# experiment directory.
+#
+if (! chdir("$eiddir/$tbdata")) {
+    print STDOUT "Could not chdir to $tbdata in $eiddir: $!\n";
+    fatal();
+}
+
+if (system("/bin/cp", "$tempfile", "$nsfile") != 0) {
+    print STDOUT
+	  "Could not copy $tempfile to $eiddir/$tbdata/$nsfile: $!\n";
+    fatal();
+}
+
+#
+# Run the various scripts.
+#
 print STDOUT "Running $tbdir/tbprerun with arguments: $project $eid $nsfile\n";
 if (system("$tbdir/tbprerun $project $eid $nsfile") != 0) {
     print STDOUT "tbprerun failed!\n";
-    exit(-1);
+    dumplog();
+    fatal();
 }
 
 print STDOUT "Running $tbdir/tbrun with arguments: $project $eid $irfile\n";
 if (system("$tbdir/tbrun $project $eid $irfile") != 0) {
     print STDOUT "tbrun failed!\n";
-    exit(-1);
+    dumplog();
+    fatal();
 }
 
 print STDOUT "Running tbreport with arguments: -v $irfile 2>&1 > $repfile\n";
 if (system("$tbdir/tbreport -v $irfile 2>&1 > $repfile") != 0) {
     print STDOUT "tbreport failed!\n";
-    exit(-1);
+    dumplog();
+    fatal();
 }
 
-#print STDOUT "Running mkacct with argument: $eid";
+print STDOUT "Running mkacct with argument: $eid\n";
 #if (system("$tbdir/mkacct $eid") != 0) {
 #    print STDOUT "mkacct failed!\n";
-#    exit(-1); 
+#    fatal();
 #}
 
+#
+# The web server will not be able to access the report file, so just
+# dump it STDOUT and let the php script do something with it.
+#
+dumplog();
 
 print STDOUT "Setup Success\n";
 exit 0;
 
+sub fatal()
+{
+    if (! chdir($expdir)) {
+	print STDOUT "In Fatal: Could not chdir to $expdir!\n";
+	exit(-1);
+    }
+    if ($debug) {
+	$save = "$eid-$PID";
+	system("mv $eid $save");
+    }
+    else {
+	system("rm -r $eid");
+    }
+    
+    exit(-1);
+}
 
+sub dumplog()
+{
+    if (open(IN, "$eid.report")) {
+	print STDOUT "Dumping $eid.report\n";
+	while (<IN>) {
+	    print STDOUT "$_";
+	}
+	close(IN);
+    }
+}

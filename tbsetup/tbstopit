@@ -1,35 +1,68 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -wT
 
 #
 # This gets invoked from the Web interface. CD into the proper directory
 # and do the tb stuff.
 #
-# usage: tbstopit <path to working directory> <project> <eid> <irfile>
+# usage: tbstopit <pid> <eid>
 #
-my $tbdir = "/usr/testbed/bin/";
+my $tbdir    = "/usr/testbed/bin/";
+my $projroot = "/proj";
+my $tbdata   = "tbdata";
 
-if (@ARGV != 4) {
-    print STDOUT "Usage: tbstopit <working dir> <project> <eid> <irfile>\n";
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Check args.
+# 
+if (@ARGV != 2) {
+    print STDOUT "Usage: tbstopit <pid> <eid>\n";
     exit(-1);
 }
-my $workdir = $ARGV[0];
-my $project = $ARGV[1];
-my $eid     = $ARGV[2];
-my $irfile  = $ARGV[3];
+my $project = $ARGV[0];
+my $eid     = $ARGV[1];
 
 #
-# We run the TB stuff in the given directory.
+# Untaint the arguments.
 #
-if (! chdir($workdir)) {
-    print STDOUT "Could not chdir to $workdir\n";
-    exit(-1);
+if ($project =~ /^([-\@\w.]+)$/) {
+    $project = $1;
+}
+if ($eid =~ /^([-\@\w.]+)$/) {
+    $eid = $1;
 }
 
-print STDOUT "Running tbend with arguments: $project $eid $irfile\n";
-if (system("$tbdir/tbend $project $eid $irfile") != 0) {
+my $piddir  = "$projroot/$project";
+my $expdir  = "$piddir/exp";
+my $eiddir  = "$expdir/$eid";
+
+#
+# CD to the proper experiment directory.
+#
+if (! chdir($eiddir)) {
+    print STDOUT "Could not chdir to $eiddir: $!\n";
+    #
+    # This exit code matters. The web script uses it.
+    # 
+    exit(69);
+}
+
+print STDOUT "Running tbend with arguments: $project $eid\n";
+if (system("$tbdir/tbend $project $eid") != 0) {
     print STDOUT "tbend failed!\n";
     exit(-1);
 }
+
+print STDOUT "Removing experiment directory: $eiddir\n";
+if (! chdir($expdir)) {
+    print STDOUT "In Fatal: Could not chdir to $expdir: $!!\n";
+    exit(-1);
+}
+system("rm -r $eid");
 
 #print STDOUT "Running rmacct with argument: $eid\n";
 #if (system("$tbdir/rmacct $eid") != 0) {
@@ -39,5 +72,4 @@ if (system("$tbdir/tbend $project $eid $irfile") != 0) {
 
 print STDOUT "Termination Success\n";
 exit 0;
-
 

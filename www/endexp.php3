@@ -67,55 +67,21 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 #
-# As per what happened when the experiment was created, we need to
-# go back to that directory and use the .ir file to terminate the
-# experiment, and then delete the files and the directory.
+# We need the unix gid for the project for running the scripts below.
 #
-# XXX These paths/filenames are setup in beginexp_process.php3.
-#
-# No need to tell me how bogus this is.
-#
-$dirname = "$TBWWW_DIR"."$TBNSSUBDIR" . "/" . "$exp_pid" . "-" . "$exp_eid";
-$nsname  = "$dirname" . "/" . "$exp_eid" . ".ns";
-$irname  = "$dirname" . "/" . "$exp_eid" . ".ir";
-$repname = "$dirname" . "/" . "$exp_eid" . ".report";
-$logname = "$dirname" . "/" . "$exp_eid" . ".log";
-$elogname = "$dirname" . "/" . "$exp_eid" . "_end.log";
-$assname = "$dirname" . "/" . "assign"   . ".log";
-
-#
-# Check to see if the experiment directory exists before continuing.
-# We will allow experiments to be deleted even without the files
-# describing it, since in some cases the user is handling that part on
-# his/her own.
-# 
-if (! file_exists($dirname)) {
-    $query_result = mysql_db_query($TBDBNAME,
-	"DELETE FROM experiments WHERE eid='$exp_eid' and pid=\"$exp_pid\"");
-    if (! $query_result) {
-        $err = mysql_error();
-        TBERROR("Database Error deleting experiment $exp_eid ".
-                "in project $exp_pid: $err\n", 1);
-    }
-
-    echo "<center><br><h2>
-          Experiment '$exp_eid' in project '$exp_pid' Terminated!<br>
-          Since there was no IR file to work from, the EID has been removed,
-          <br>but you will need to make sure the nodes are released yourself.
-          </h2></center><br>";
-
-    echo "</body>
-          </html>\n";
-    die("");
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT unix_gid from projects where pid=\"$exp_pid\"");
+if (($row = mysql_fetch_row($query_result)) == 0) {
+    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
 }
+$gid = $row[0];
 
 #
-# By this point, the IR file must exist to go on.
-# 
-if (! file_exists($irname)) {
-    TBERROR("IR file $irname for experiment $exp_eid does not exist!\n", 1);
-}
-
+# We run a wrapper script that does all the work of terminating the
+# experiment. 
+#
+#   tbstopit <pid> <eid>
+#
 echo "<center><br>";
 echo "<h3>Terminating the experiment. This may take a few minutes ...</h3>";
 echo "</center>";
@@ -127,39 +93,22 @@ echo "</center>";
 #
 $output = array();
 $retval = 0;
-$result = exec("$TBBIN_DIR/tbstopit $dirname $exp_pid $exp_eid $exp_eid.ir",
-               $output, $retval);
-if ($retval) {
+$result = exec("$TBSUEXEC_PATH $uid $gid tbstopit $exp_pid $exp_eid",
+ 	       $output, $retval);
+
+if ($retval && $retval != 69) {
     echo "<br><br><h2>
           Termination Failure($retval): Output as follows:
           </h2>
           <br>
           <XMP>\n";
           for ($i = 0; $i < count($output); $i++) {
-	      echo "$output[$i]\n";
+              echo "$output[$i]\n";
           }
     echo "</XMP>\n";
 
     die("");
 }
-
-#
-# Remove all trace! 
-#
-if (file_exists($nsname))
-    unlink("$nsname");
-if (file_exists($irname))
-    unlink("$irname");
-if (file_exists($repname))
-    unlink("$repname");
-if (file_exists($logname))
-    unlink("$logname");
-if (file_exists($elogname))
-    unlink("$elogname");
-if (file_exists($assname))
-    unlink("$assname");
-if (file_exists($dirname))
-     rmdir("$dirname");
 
 #
 # From the database too!
@@ -174,6 +123,12 @@ if (! $query_result) {
 
 echo "<center><br>";
 echo "<h2>Experiment '$exp_eid' in project '$exp_pid' Terminated!<br>";
+if ($retval == 69) {
+    echo "Since there was no experiment directory to work from, the EID has
+          been removed<br>
+          but you will need to make sure the nodes/vlans are released
+          yourself.\n";
+}
 echo "</h2>";
 echo "</center>\n";
 
