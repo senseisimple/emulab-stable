@@ -96,6 +96,7 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+use File::Basename;
 use POSIX qw(strftime);
 require Mysql;
 
@@ -121,9 +122,27 @@ my $DB;
 sub TBDBConnect()
 {
     my $maxtries = 5;
+
+    #
+    # Construct a 'username' from the name of this script and the user who
+    # ran it. This is for accounting purposes.
+    #
+    my $scriptname;
+    if ($0) {
+	$scriptname = basename($0);
+    }
+    if (!$scriptname) {
+	$scriptname = "unknown";
+    }
+    my $name = getpwuid($UID);
+    if (!$name) {
+	$name = "uid$UID";
+    }
+    my $dbuser = "$scriptname:$name";
+
     
     while ($maxtries && !defined($DB)) {
-	$DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+	$DB = Mysql->connect("localhost", $DBNAME, $dbuser, "none");
 	$maxtries--;
 	sleep(1);
     }
