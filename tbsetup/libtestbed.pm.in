@@ -43,6 +43,12 @@ else {
     $SCRIPTNAME = "Tainted";
 }
 
+#
+# Turn off line buffering on output
+#
+STDOUT->autoflush(1);
+STDERR->autoflush(1);
+
 # A library of useful stuff.
 
 # Send an email message via sendmail -t.
