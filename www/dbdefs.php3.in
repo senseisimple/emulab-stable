@@ -160,6 +160,12 @@ function TBvalid_gid($gid) {
     return (strlen($gid) <= $TBDB_GIDLEN) && (strlen($gid) >= $TBDB_MINLEN) &&
 	preg_match("/^[a-zA-Z][-\w]+$/", $gid);
 }
+function TBvalid_eid($eid) {
+    global $TBDB_EIDLEN, $TBDB_MINLEN;
+    
+    return (strlen($eid) <= $TBDB_EIDLEN) && (strlen($eid) >= $TBDB_MINLEN) &&
+	preg_match("/^[a-zA-Z][-\w]+$/", $eid);
+}
 function TBvalid_phone($phone) {
     global $TBDB_PHONELEN;
     
@@ -171,6 +177,10 @@ function TBvalid_usrname($name) {
 
     return (strlen($name) <= $TBDB_USRNAMELEN) &&
 	preg_match("/^[-\w\. ]+$/", $name);
+}
+function TBvalid_description($token) {
+    return (strlen($token) <= 256) &&
+	preg_match("/^[\\040-\\176]*$/", $token);
 }
 function TBvalid_email($email)
 {
