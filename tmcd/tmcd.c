@@ -1668,6 +1668,7 @@ doreadycount(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 				ready++;
 		}
 	}
+	mysql_free_result(res);
 
 	sprintf(buf, "READY=%d TOTAL=%d\n", ready, total);
 	client_writeback(sock, buf, strlen(buf), tcp);
