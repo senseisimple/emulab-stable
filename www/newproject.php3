@@ -346,6 +346,7 @@ mail($TBMAIL_APPROVAL,
      "select the 'Project Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
      "From: $usr_name '$proj_head_uid' <$usr_email>\n".
+     "Reply-To: $TBMAIL_APPROVAL\n".
      "Errors-To: $TBMAIL_WWW");
 
 #

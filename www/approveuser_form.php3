@@ -13,18 +13,66 @@ $auth_usr = GETLOGIN();
 LOGGEDINORDIE($auth_usr);
 
 echo "
-      <h1>Approve new users in your Project</h1>
+      <h2>Approve new users in your Project</h2>
       Use this page to approve new members of your Project.  Once
       approved, they will be able to log into machines in your Project's
-      experiments.
-      <p> If you desire, you may set their trust/privilege
-      levels to give them more or less access to your nodes:
-      <ul>
-        <li>Deny - Deny access to your project.
-	<li>User - Can log into machines in your experiments.
-	<li>Root - Granted root access on your project's machines;
-                   can create new experiments.
-      </ul>\n";
+      experiments. Be sure to toggle the menu options appropriately for
+      each pending user. 
+
+      <p>
+      <table cellspacing=2 border=0>
+        <tr>
+            <td colspan=4>
+                <h4>You have the following choices for <b>Action</b>:</td>
+        <tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>Postpone</td>
+            <td>-</td>
+            <td>Do nothing; user remains pending decision</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>Deny</td>
+            <td>-</td>
+            <td>Deny user application</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>Nuke</td>
+            <td>-</td>
+            <td>Nuke user application. Kills user account. Useful for
+                bogus project applications.</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>Approve</td>
+            <td>-</td>
+            <td>Approve the user</td>
+        </tr>
+      </table>
+      </center>
+      <p>
+      <table cellspacing=2 border=0>
+        <tr>
+            <td colspan=4>
+                <h4>You have the following choices for <b>Trust</b>:</td>
+        <tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>User</td>
+            <td>-</td>
+            <td>User may log into machines in your experiments</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>Root</td>
+            <td>-</td>
+            <td>User may create/destroy experiments in your project and
+                has root privledges on machines in your experiments</td>
+        </tr>
+      </table>
+      \n";
 
 #
 # Find all of the groups that this person has group_root in, and then in
@@ -74,14 +122,15 @@ if (mysql_num_rows($query_result) == 0) {
 #	name=stoller$$trust-testbed value=user,local_root
 #
 # so that we can go through the entire list of post variables, looking
-# for these. The alternative is to work backwards, and I don't like that.
+# for these. The alternative is to work backwards, and I do not like that.
 # 
-echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
-       align='center'>\n";
+echo "<table width=\"100%\" border=2 cellpadding=2 cellspacing=2
+       align=\"center\">\n";
 
 echo "<tr>
           <td rowspan=2>User</td>
           <td rowspan=2>Project</td>
+          <td rowspan=2>Date<br>Applied</td>
           <td rowspan=2>Action</td>
           <td rowspan=2>Trust</td>
           <td>Name</td>
@@ -101,8 +150,16 @@ echo "<tr>
 echo "<form action='approveuser.php3' method='post'>\n";
 
 while ($usersrow = mysql_fetch_array($query_result)) {
-    $newuid = $usersrow[uid];
-    $pid    = $usersrow[pid];
+    $newuid        = $usersrow[uid];
+    $pid           = $usersrow[pid];
+    $date_applied  = $usersrow[date_applied];
+
+    #
+    # Cause this field was added late and might be null.
+    # 
+    if (! $date_applied) {
+	$date_applied = "--";
+    }
 
     $userinfo_result = mysql_db_query($TBDBNAME,
 	"SELECT * from users where uid=\"$newuid\"");
@@ -120,16 +177,18 @@ while ($usersrow = mysql_fetch_array($query_result)) {
     $phone	= $row[usr_phone];
 
     echo "<tr>
-              <td colspan=9> </td>
+              <td colspan=10> </td>
           </tr>
           <tr>
               <td rowspan=2>$newuid</td>
               <td rowspan=2>$pid</td>
+              <td rowspan=2>$date_applied</td>
               <td rowspan=2>
                   <select name=\"$newuid\$\$approval-$pid\">
                           <option value='postpone'>Postpone</option>
                           <option value='approve'>Approve</option>
                           <option value='deny'>Deny</option>
+                          <option value='nuke'>Nuke</option>
                   </select>
               </td>
               <td rowspan=2>
@@ -154,7 +213,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
           </tr>\n";
 }
 echo "<tr>
-          <td align=center colspan=9>
+          <td align=center colspan=10>
               <b><input type='submit' value='Submit' name='OK'></td>
       </tr>
       </form>

@@ -259,9 +259,11 @@ if (mysql_num_rows($query_result) > 0) {
 # Add to the project, but with trust=none. The project leader will have
 # to upgrade the trust level, making the new user real.
 #
+$date_applied = date("Y:m:d", time());
+		     
 $query_result = mysql_db_query($TBDBNAME,
-	"insert into proj_memb (uid,pid,trust) ".
-        "values ('$joining_uid','$pid','none');");
+	"insert into proj_memb (uid,pid,trust,date_applied) ".
+        "values ('$joining_uid','$pid','none','$date_applied');");
 if (! $query_result) {
     $err = mysql_error();
     TBERROR("Database Error adding adding user $joining_uid to ".

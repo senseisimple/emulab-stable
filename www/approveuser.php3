@@ -124,7 +124,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     $query_result = mysql_db_query($TBDBNAME,
 	"SELECT usr_email,usr_name from users where uid='$uid'");
     if (! $query_result) {
-	TBERROR("Database Error restrieving user status for $uid", 1);
+	TBERROR("Database Error retrieving user info for $uid", 1);
     }
     if (mysql_num_rows($query_result) == 0) {
 	TBERROR("Unknown user $uid", 1);
@@ -133,6 +133,24 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     $uid_email = $row[0];
     $uid_name  = $row[1];
 
+    #
+    # Lets get project head email, just in case the person doing the approval
+    # is not the head of the project. This is polite to do.
+    #
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT usr_email,usr_name from users as u ".
+	"left join projects as p on p.head_uid=u.uid where p.pid='$project'");
+    if (! $query_result) {
+	TBERROR("Database Error retrieving user info for project $project ".
+		"leader", 1);
+    }
+    if (mysql_num_rows($query_result) == 0) {
+	TBERROR("Retrieving user info for project $project leader", 1);
+    }
+    $row = mysql_fetch_row($query_result);
+    $phead_email = $row[0];
+    $phead_name  = $row[1];
+   
     #
     # Well, looks like everything is okay. Change the project membership
     # value appropriately.
@@ -165,6 +183,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Testbed Ops\n".
              "Utah Network Testbed\n",
              "From: $uid_name <$uid_email>\n".
+             "Cc:  $phead_name <$phead_email>\n".
              "Bcc: $TBMAIL_APPROVAL\n".
              "Errors-To: $TBMAIL_WWW");
 
@@ -175,13 +194,80 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 
 	continue;
     }
+    if (strcmp($approval, "nuke") == 0) {
+        #
+        # Delete the proj_memb record.
+        #
+        $query_result = mysql_db_query($TBDBNAME,
+	    "delete from proj_memb where uid='$user' and pid='$project'");
+        if (! $query_result) {
+	    TBERROR("Database Error removing $user from project membership ".
+                    "after being denied.", 1);
+        }
+
+	#
+	# See if user is in any other projects (even unapproved).
+	# 
+        $query_result = mysql_db_query($TBDBNAME,
+	    "select * from proj_memb where uid='$user'");
+        if (! $query_result) {
+	    TBERROR("Database Error getting $user from project membership ".
+                    "after being nuked", 1);
+        }
+
+	#
+	# If yes, then we cannot safely delete the user account.
+	#
+	if (mysql_num_rows($query_result)) {
+	    echo "<h3><p>
+                  User $user was denied membership in project $project.<br>
+                  Since the user is a member (or requesting membership)
+		  in other projects, the account cannot be safely removed.
+              </h3>\n";
+	    
+	    continue;
+	}
+
+	#
+	# No other project membership. If the user is unapproved/newuser, 
+	# it means he was never approved in any project, and so will
+	# likely not be missed. He will be unapproved if he did his
+	# verification.
+	#
+	if (strcmp($curstatus, "newuser") &&
+	    strcmp($curstatus, "unapproved")) {
+	    echo "<h3><p>
+                  User $user was denied membership in project $project.<br>
+                  Since the user has been approved by, or was active in other
+		  projects in the past, the account cannot be safely removed.
+              </h3>\n";
+	    continue;
+	}
+	
+	$query_result = mysql_db_query($TBDBNAME,
+		"delete FROM users where uid='$user'");
+	if (! $query_result) {
+	    TBERROR("Database Error removing $user from users table ".
+                    "after being nuked", 1);
+	}
+	
+	echo "<h3><p>
+                  User $user was denied membership in project $project.<br>
+		  The account has also be terminated with prejudice!
+              </h3>\n";
+
+	continue;
+    }
     if (strcmp($approval, "approve") == 0) {
         #
         # Change the trust value in proj_memb accordingly.
         #
+	$date_approved = date("Y:m:d", time());
+	
         $query_result = mysql_db_query($TBDBNAME,
-	    "UPDATE proj_memb set trust='$newtrust' ".
-            "WHERE uid='$user' and pid='$project'");
+	    "UPDATE proj_memb set trust='$newtrust', ".
+            "date_approved='$date_approved' ".
+	    "WHERE uid='$user' and pid='$project'");
         if (! $query_result) {
 	    TBERROR("Database Error adding $user to project $project.", 1);
         }
@@ -220,6 +306,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Testbed Ops\n".
              "Utah Network Testbed\n",
              "From: $uid_name <$uid_email>\n".
+             "Cc:  $phead_name <$phead_email>\n".
              "Bcc: $TBMAIL_APPROVAL\n".
              "Errors-To: $TBMAIL_WWW");
 
