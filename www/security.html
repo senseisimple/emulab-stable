@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -62,6 +62,13 @@ which we will pass on to you at no extra charge:
      sites. This prevents easy logins from Emulab to your remote sites
      in case your Emulab account is ever compromised (since the Emulab
      generated private key is not protected by a passphrase).
+
+<li> You should <b>not</b> mess with the Emulab generated key in your
+     .ssh directory (.ssh/identity). This is an unencrypted key (see
+     above) that is used by Emulab when setting up experiments. You
+     should not delete the public part of the key from the web
+     interface either. Failure to heed this warning will result in
+     experiments not setting up properly!
 
 <li> We recommend that you use ssh's RSA authentication to login to
      Emulab so that you do not have to type your password. The less
