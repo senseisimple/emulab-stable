@@ -91,7 +91,7 @@ function CHECKFORM(&$formfields, $projlist)
     $formfields[exp_nsfile] = "";
     
     if (isset($_FILES['exp_nsfile']) && $_FILES['exp_nsfile']['size'] != 0) {
-	if ($_FILES['exp_nsfile']['size'] > (1024 * 128)) {
+	if ($_FILES['exp_nsfile']['size'] > (1024 * 500)) {
 	    $errors["Local NS File"] = "Too big!";
 	}
 	elseif ($_FILES['exp_nsfile']['name'] == "") {
@@ -375,7 +375,7 @@ function SPITFORM($formfields, $errors)
                   <td><table cellspacing=0 cellpadding=0 border=0>
                     <tr>
                       <td class='pad4'>Upload<br>
-			<font size='-1'>(50k&nbsp;max)</font></td>
+			<font size='-1'>(500k&nbsp;max)</font></td>
                       <td class='pad4'>
                         <input type=hidden name=MAX_FILE_SIZE value=512000>
 	                <input type=file

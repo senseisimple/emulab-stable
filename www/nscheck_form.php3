@@ -39,7 +39,7 @@ echo "<form enctype=\"multipart/form-data\"
 echo "<tr>
           <td rowspan>*Your NS file: &nbsp</td>
 
-          <td rowspan><center>Upload (50K max)<br>
+          <td rowspan><center>Upload (500K max)<br>
                                    <br>
                                    Or<br>
                                    <br>
