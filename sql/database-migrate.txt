@@ -1432,3 +1432,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	insert into interface_capabilities (type, capkey, capval) \
 	    select type,"ethernet_defspeed",max_speed from interface_types;
 
+1.236: Add linktest_level to experiments table. Integer value 0-4
+       where 0 means not to run linktest.
+
+       alter table experiments add column linktest_level tinyint(4) \
+	   not null default 0 after ipassign_args;

@@ -289,6 +289,7 @@ CREATE TABLE experiments (
   delay_osname varchar(20) default NULL,
   use_ipassign tinyint(1) NOT NULL default '0',
   ipassign_args varchar(255) default NULL,
+  linktest_level tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)
