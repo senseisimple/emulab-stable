@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -10,11 +10,34 @@ use English;
 
 #
 # Remove a group. We delete the group directory and the we remove the
-# group from /etc/group. Actually, the project directory is *renamed*
-# since we do not want to be so destructive.
+# group from /etc/group. Actually, the group directory is *renamed*
+# since we do not want to be so destructive. This scrip can be called
+# with pid=gid, but in that case it has to be a tbadmin, and the
+# directory is not renamed. The caller (rmproj) is responsible for that.
 #
-# usage: rmgroup <pid> <gid>
+sub usage()
+{
+    print STDOUT "Usage: rmgroup <pid> <gid>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
 #
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
 
 #
 # Configure variables
@@ -22,12 +45,12 @@ use English;
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
+my $BOSSNODE = "@BOSSNODE@";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
 my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
-my $errors   = 0;
 
 #
 # Untaint the path
@@ -44,6 +67,7 @@ $| = 1;
 # Load the Testbed support stuff. 
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
 
@@ -51,7 +75,7 @@ use libtestbed;
 # Check args.
 #
 if (@ARGV != 2) {
-    die("Usage: rmgroup <pid> <gid>\n");
+    usage();
 }
 my $pid = $ARGV[0];
 my $gid = $ARGV[1];
@@ -74,18 +98,28 @@ else {
 }
 
 #
-# Figure out who called us. Only root or people with admin status, or
-# project root people, can do this.
+# Figure out who called us. 
 #
-if ($UID && !TBAdmin($UID)) {
+if (!TBAdmin($UID)) {
+    #
+    # Only admin types can remove the project group. Typically, you won't
+    # do this directly, but use rmproj instead.
+    #
+    if ($pid eq $gid) {
+	die("*** $0:\n".
+	    "    You do not have permission to remove a project group!\n");
+    }
+    
     my $dbuid;
 
     if (! UNIX2DBUID($UID, \$dbuid)) {
-	die("*** You are not a valid emulab user!\n");
+	die("*** $0:\n".
+	    "    You are not a valid emulab user!\n");
     }
 
     if (! TBMinTrust(TBProjTrust($dbuid, $pid), PROJMEMBERTRUST_PROJROOT)) {
-        die("*** Yo do not have permission to remove a group directory\n");
+	die("*** $0:\n".
+	    "    Yoo do not have permission to remove a group directory\n");
     }
 }
 
@@ -100,34 +134,46 @@ if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
 }
 
 #
-# Rename the group directory.
-# 
-my $groupdir  = "$GRPROOT/$pid";
-my $oldname   = "$groupdir/$gid";
-my $newname   = "$oldname-" . TBDateTimeFSSafe();
-my $grouplink = "$PROJROOT/$pid/groups/$gid";
-
-if (-e $grouplink) {
-    unlink($grouplink) or
-	die("*** Could not unlink $grouplink: $!\n");
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
 }
 
-if (-e $oldname) {
-    print "Renaming $oldname to $newname.\n";
-    
-    if (! rename($oldname, $newname)) {
-	die("*** Could not rename $oldname to $newname: $!\n");
+#
+# Rename the group directory as long as its not the proj directory!
+#
+if ($pid ne $gid) {
+    my $groupdir  = "$GRPROOT/$pid";
+    my $oldname   = "$groupdir/$gid";
+    my $newname   = "$oldname-" . TBDateTimeFSSafe();
+    my $grouplink = "$PROJROOT/$pid/groups/$gid";
+
+    if (-e $grouplink && !unlink($grouplink)) {
+	fatal("Could not unlink $grouplink: $!");
     }
 
-    #
-    # Chown the owner/group to root and set the permissions so no one is
-    # allowed to look inside.
-    #
-    if (! chmod(0700, $newname)) {
-	die("*** Could not chmod directory $newname to 0700: $!\n");
-    }
-    if (! chown(0, 0, $newname)) {
-	die("*** Could not chown directory $newname to 0/0: $!\n");
+    if (-e $oldname) {
+	print "Renaming $oldname to $newname.\n";
+    
+	if (rename($oldname, $newname)) {
+	    #
+	    # Chown the owner/group to root and set the permissions so no
+	    # one is allowed to look inside.
+	    #
+	    if (! chmod(0700, $newname)) {
+		fatal("Could not chmod directory $newname to 0700: $!");
+	    }
+	    if (! chown(0, 0, $newname)) {
+		fatal("Could not chown directory $newname to 0/0: $!");
+	    }
+	}
+	else {
+	    fatal("Could not rename $oldname to $newname: $!");
+	}
     }
 }
 
@@ -137,9 +183,9 @@ if (-e $oldname) {
 print "Removing group $unix_name ($unix_gid) on local node.\n";
 
 if (system("$GROUPDEL $unix_name")) {
-    warn("*** WARNING: ".
-	 "Could not remove group $unix_name from operations node\n");
-    $errors++;
+    if (($? >> 8) != 65) {
+	fatal("Could not remove group $unix_name from local node!");
+    }
 }
 
 #
@@ -147,34 +193,46 @@ if (system("$GROUPDEL $unix_name")) {
 # 
 $UID = 0;
 
-print "Removing group $unix_name ($unix_gid) on $CONTROL.\n";
+if ($CONTROL ne $BOSSNODE) {
+    print "Removing group $unix_name ($unix_gid) on $CONTROL.\n";
 
-if (system("$SSH -host $CONTROL $GROUPDEL $unix_name")) {
-    warn("*** WARNING: Could not remove group $unix_name from $CONTROL\n");
-    $errors++;
+    if (system("$SSH -host $CONTROL $GROUPDEL $unix_name")) {
+	if (($? >> 8) != 65) {
+	    fatal("Could not remove group $unix_name from $CONTROL!");
+	}
+    }
 }
 
 #
 # Remove group on the tip servers. 
 #
-my @tipservers;
-
-$query_result =
-    DBQueryFatal("select * from tipservers");
-
-while (@db_row = $query_result->fetchrow_array() ) {
-    push(@tipservers, $db_row[0]);
-}
-
-foreach my $tipserver ( @tipservers ) {
+foreach my $tipserver ( TBTipServers() ) {
     print "Removing group $unix_name ($unix_gid) on $tipserver.\n";
 
     if (system("$SSH -host $tipserver $GROUPDEL $unix_name")) {
-	warn("*** WARNING: ".
-	     "Could not remove group $unix_name from $tipserver!\n");
-	$errors++;
+	if (($? >> 8) != 65) {
+	    fatal("Could not remove group $unix_name from $tipserver!");
+	}
     }
 }
 
-exit($errors);
+#
+# Now safe to delete all members of the group, then delete the group.
+# If there was an error, the DB state is left so that this script can
+# be run again!
+#
+DBQueryFatal("delete from group_membership ".
+	     "where pid='$pid' and gid='$gid'");
+    
+DBQueryFatal("delete from groups ".
+	     "where pid='$pid' and gid='$gid'");
 
+print "Group $pid/$gid has been removed!\n";
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
