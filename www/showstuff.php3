@@ -1061,6 +1061,10 @@ function SHOWNODE($node_id) {
     $tarballs           = $row[tarballs];
     $startupcmd         = $row[startupcmd];
     $routertype         = $row[routertype];
+    $eventstate         = $row[eventstate];
+    $state_timestamp    = $row[state_timestamp];
+    $op_mode            = $row[op_mode];
+    $op_mode_timestamp  = $row[op_mode_timestamp];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -1184,6 +1188,22 @@ function SHOWNODE($node_id) {
               <td>Router Type:</td>
               <td class=left>$routertype</td>
       </tr>\n";
+
+    if ($eventstate) {
+	$when = strftime("20%y-%m-%d %H:%M:%S", $state_timestamp);
+	echo "<tr>
+                 <td>EventState:</td>
+                 <td class=left>$eventstate ($when)</td>
+              </tr>\n";
+    }
+
+    if ($op_mode) {
+	$when = strftime("20%y%m%d-%H:%M:%S", $op_mode_timestamp);
+	echo "<tr>
+                 <td>Operating Mode:</td>
+                 <td class=left>$op_mode ($when)</td>
+              </tr>\n";
+    }
 
     #
     # We want the last login for this node, but only if its *after* the
