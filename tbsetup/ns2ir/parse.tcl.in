@@ -232,6 +232,10 @@ namespace eval GLOBALS {
 
     # Control veth encapsulation
     variable veth_encapsulate 1
+
+    # Allow override of jail and delay osids.
+    variable jail_osname {}
+    variable delay_osname {}
 }
 
 # Load all our classes

@@ -712,3 +712,31 @@ proc tb-set-encapsulate {onoff} {
     set veth_encapsulate $onoff
 }
 
+#
+# Control jail and delay nodes osnames. 
+# 
+proc tb-set-jail-os {os} {
+    var_import ::GLOBALS::jail_osname
+    
+    if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
+	var_import ::TBCOMPAT::osids
+	if {! [info exists osids($os)]} {
+	    perror "\[tb-set-jail-os] Invalid osid $os."
+	    return
+	}
+    }
+    set jail_osname $os
+}
+proc tb-set-delay-os {os} {
+    var_import ::GLOBALS::delay_osname
+    
+    if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
+	var_import ::TBCOMPAT::osids
+	if {! [info exists osids($os)]} {
+	    perror "\[tb-set-delay-os] Invalid osid $os."
+	    return
+	}
+    }
+    set delay_osname $os
+}
+

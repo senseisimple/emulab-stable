@@ -44,6 +44,9 @@ proc tb-set-useveth {link onoff} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
 proc tb-set-node-startcmd {node cmd} {}
+proc tb-set-encapsulate {onoff} {}
+proc tb-set-jail-os {os} {}
+proc tb-set-delay-os {os} {}
 
 Class Program
 

@@ -248,6 +248,8 @@ Simulator instproc run {} {
     var_import ::GLOBALS::cpu_usage
     var_import ::GLOBALS::mem_usage
     var_import ::GLOBALS::veth_encapsulate
+    var_import ::GLOBALS::jail_osname
+    var_import ::GLOBALS::delay_osname
     var_import ::TBCOMPAT::objtypes
     var_import ::TBCOMPAT::eventtypes
     
@@ -348,6 +350,15 @@ Simulator instproc run {} {
     } elseif { $default_sync_server != {} } {
 	lappend fields "sync_server"
 	lappend values $default_sync_server
+    }
+
+    if { $jail_osname != {} } {
+	lappend fields "jail_osname"
+	lappend values $jail_osname
+    }
+    if { $delay_osname != {} } {
+	lappend fields "delay_osname"
+	lappend values $delay_osname
     }
     
     $self spitxml_data "experiments" $fields $values
