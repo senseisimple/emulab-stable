@@ -85,9 +85,12 @@ echo "<br><center>
        <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
       </center>\n";
 
-echo "<br>
-      <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
-      <table align=center border=1>\n";
+if (mysql_num_rows($curmembers_result) ||
+    mysql_num_rows($nonmembers_result)) {
+    echo "<br>
+          <form action='editgroup.php3?pid=$pid&gid=$gid' method=post>
+          <table align=center border=1>\n";
+}
 
 if (mysql_num_rows($curmembers_result)) {
     if ($defaultgroup) {
@@ -186,14 +189,23 @@ if (mysql_num_rows($nonmembers_result)) {
     echo "</tr>\n";
 }
 
-echo "<tr>
-         <td align=center colspan=2>
-             <b><input type=submit value=Submit></b>
-         </td>
-      </tr>\n";
+if (mysql_num_rows($curmembers_result) ||
+    mysql_num_rows($nonmembers_result)) {
+    echo "<tr>
+             <td align=center colspan=2>
+                 <b><input type=submit value=Submit></b>
+             </td>
+          </tr>\n";
 
-echo "</table>
-      </form>\n";
+    echo "</table>
+          </form>\n";
+}
+else {
+    echo "<br><center>
+           <em>There are no project members who are eligible to be added
+               or removed from this group[<b>1</b>].</em>
+             </center>\n";
+}
 
 echo "<h4><blockquote><blockquote><blockquote>
       <ol>
