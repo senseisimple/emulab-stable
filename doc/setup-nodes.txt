@@ -65,7 +65,7 @@ Delay Capacity: How many delay nodes this node can be. For example, nodes with
 Disk Type: FreeBSD-style disk name for the primary hard drive.
 	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
 
-You'll also need to add entries to the interface_types table (using the web web
+You'll also need to add entries to the interface_types table (using the web
 SQL editor, or SQL directly) for each type of network card you are using. Notes
 on the columns:
 
