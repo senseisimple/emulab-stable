@@ -278,6 +278,10 @@ if ($thumb && !$idle) {
 	    }
 	}	
 
+	echo "<font size=-2><b>Created by:</b> ".
+             "<a href='showuser.php3?target_uid=$huid'>$huid</a>".
+	     "</font><br />\n";
+
 	echo "</td></tr></table> \n";
 	echo "</td>";
 
