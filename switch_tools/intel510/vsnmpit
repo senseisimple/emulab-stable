@@ -85,8 +85,8 @@ my $exit_btn=
 
 #set up the status bar
 $status = 
-    $stat_bar->Label(-bg=>$stat_bg,-fg=>$stat_fg,
-		     -anchor=>'nw',-justify=>'left'
+    $stat_bar->Label(-bg=>$stat_bg,-fg=>$stat_fg,-anchor=>'nw',
+		     -justify=>'left',-wraplength=>'900'
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'both');
 
 
@@ -191,7 +191,7 @@ sub vlanSetup {
 		    )->pack(-side=>'left');
 	$row->Label(-relief=>'sunken',-text=>$members{$ID},
 		    -bg=>$main_bg,-fg=>$main_fg,-anchor=>'w',
-		    -borderwidth=>3
+		    -borderwidth=>3,-wraplength=>'750',-justify=>'left'
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
     }
     my $row = 
@@ -245,14 +245,15 @@ sub vlanSetup {
     $name_field = 
 	$row->Entry(-relief=>'sunken',-width=>12,
 		    -bg=>$main_bg,-fg=>$main_fg,
+		    -cursor=>['xterm',$main_fg,$main_bg],
 		    -borderwidth=>3
 		    )->pack(-side=>'left');
     $memb_field = 
 	$row->Entry(-relief=>'sunken',
 		    -bg=>$main_bg,-fg=>$main_fg,
+		    -cursor=>['xterm',$main_fg,$main_bg],
 		    -borderwidth=>3
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
-
     $row = 
 	$table->Frame(-relief=>'flat',-borderwidth=>2,
 		      -bg=>$main_bg,-fg=>$main_fg
@@ -282,6 +283,7 @@ sub vlanSetup {
     $file_field = 
 	$row->Entry(-relief=>'sunken',
 		    -bg=>$main_bg,-fg=>$main_fg,
+		    -cursor=>['xterm',$main_fg,$main_bg],
 		    -borderwidth=>3
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
 
