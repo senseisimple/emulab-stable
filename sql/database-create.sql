@@ -501,6 +501,7 @@ CREATE TABLE nodes (
   state_timestamp int(10) unsigned default NULL,
   op_mode varchar(10) default NULL,
   op_mode_timestamp int(10) unsigned default NULL,
+  update_accounts smallint(6) default '0',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
