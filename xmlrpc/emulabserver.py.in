@@ -2673,7 +2673,7 @@ class experiment:
                       " ex.eventtype=et.idx "
                       "left join event_objecttypes as ot on "
                       " ex.objecttype=ot.idx "
-                      "where ex.pid=%s and ex.eid=%s "
+                      "where ex.pid=%s and ex.eid=%s and ot.type!='TIME' "
                       "order by ex.time ASC",
                       (argdict["proj"], argdict["exp"]))
 
