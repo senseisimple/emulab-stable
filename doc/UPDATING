@@ -67,6 +67,33 @@ earliest time one of the steps needs to occur.
 	however, it can save you from greedy users that consume too
 	much CPU and cause experiment swapin to fail.
 
+20040930: Before build
+
+	You need to update your defs-* file to include some new configure
+	time variables.  These are:
+
+	SSLCERT_COUNTRY
+	SSLCERT_STATE
+	SSLCERT_LOCALITY
+	SSLCERT_ORGNAME
+	TESTBED_NETWORK
+	TESTBED_NETMASK
+	BOSSNODE_IP
+	USERNODE_IP
+	CONTROL_ROUTER_IP
+	CONTROL_NETWORK
+	CONTROL_NETMASK
+	PRIVATE_NETWORK
+	PRIVATE_ROUTER
+	PRIVATE_NETMASK
+	PUBLIC_NETWORK
+	PUBLIC_ROUTER
+	PUBLIC_NETMASK
+	DHCPD_DYNRANGE
+
+	See defs-example for details.
+	YOU MUST RERUN configure AFTER SETTING THESE!
+
 20040901: Before build
 	New SSL version of the XMLRPC server.
 
