@@ -11,8 +11,7 @@ SUBDIR		= os
 
 include $(OBJDIR)/Makeconf
 
-#SUBDIRS	= imagezip frisbee.redux growdisk
-SUBDIRS	= imagezip growdisk
+SUBDIRS	= imagezip frisbee.redux growdisk
 
 all:	$(SUBDIRS) split-image.sh
 
