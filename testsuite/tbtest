@@ -281,7 +281,7 @@ sub step_init {
 	    doexit(1);
 	} 
 	print CLEARLOG "tbend -nologfile $pid $eid\n";
-	open(EXEC,"tbend $pid $eid 2>&1 |");
+	open(EXEC,"tbend -nologfile $pid $eid 2>&1 |");
 	while (<EXEC>) {
 	    print CLEARLOG $_;
 	}
