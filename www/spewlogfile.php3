@@ -70,22 +70,18 @@ function SPEWCLEANUP()
     pclose($fp);
     exit();
 }
-ignore_user_abort(0);
+ignore_user_abort(1);
 register_shutdown_function("SPEWCLEANUP");
 
-header("Content-Type: text/plain");
-header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
-header("Cache-Control: no-cache, must-revalidate");
-header("Pragma: no-cache");
-flush();
-
 if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile $pid $eid", "r")) {
-    # Since there is no nonblocking mode, read in fairly small
-    # chunks to avoid many lines (since lines are short) from being
-    # buffered up. Its annoying when watching the web page.
-    set_file_buffer($fp, 0);
-    
-    while ($string = fread($fp, 32)) {
+    header("Content-Type: text/plain");
+    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+    header("Cache-Control: no-cache, must-revalidate");
+    header("Pragma: no-cache");
+    flush();
+
+    while (!feof($fp)) {
+	$string = fgets($fp, 1024);
 	echo "$string";
 	flush();
     }
