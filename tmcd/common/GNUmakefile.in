@@ -1,0 +1,75 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# XXX ONLY RUN THIS INSTALL ON A TESTBED NODE!
+#
+# These things need to be installed into the right place on a testbed
+# node before cutting an image. This directory is installed first,
+# followed by the system-specific directory.
+#
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tmcd/common
+
+include $(OBJDIR)/Makeconf
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+DESTDIR		=
+ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
+BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
+VARDIR		= $(DESTDIR)$(CLIENT_VARDIR)
+RCDIR		= $(DESTDIR)/usr/local/etc/rc.d
+INSTALL		= /usr/bin/install -c
+
+install:
+	@echo "You should probably not run this install directly!"
+	@echo -n "If you do, be sure to install from the system specific "
+	@echo "directory afterwards."
+
+
+local-install:	path-install script-install other-install
+	$(INSTALL) -m 755 $(SRCDIR)/../freebsd/liblocsetup.pm \
+			$(BINDIR)/liblocsetup.pm
+
+other-install:
+	(cd ../../os; $(MAKE) client-install)
+
+dir-install:
+	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(BINDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(RCDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/db
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/jails
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/logs
+	$(INSTALL) -m 755 -o root -g wheel -d $(VARDIR)/boot
+
+path-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/paths.pm $(ETCDIR)/paths.pm
+	$(INSTALL) -m 755 $(SRCDIR)/paths.sh $(ETCDIR)/paths.sh
+
+script-install:	dir-install
+	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
+	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup
+	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
+	$(INSTALL) -m 755 $(SRCDIR)/bootsetup $(BINDIR)/bootsetup
+	$(INSTALL) -m 755 $(SRCDIR)/sendevent $(BINDIR)/sendevent
+	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(BINDIR)/rc.testbed
+	$(INSTALL) -m 755 $(SRCDIR)/rc.agents $(BINDIR)/rc.agents
+	$(INSTALL) -m 755 $(SRCDIR)/rc.delta $(BINDIR)/rc.delta
+	$(INSTALL) -m 755 $(SRCDIR)/rc.progagent $(BINDIR)/rc.progagent
+	$(INSTALL) -m 755 $(SRCDIR)/rc.setup $(BINDIR)/rc.setup
+	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
+	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
+	chown root $(BINDIR)/vnodesetup
+	chmod u+s $(BINDIR)/vnodesetup
