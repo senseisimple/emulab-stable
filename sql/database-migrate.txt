@@ -1297,3 +1297,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table os_info change osfeatures osfeatures \
 	set('ping','ssh','ipod','isup','veths','mlinks') default NULL;
+
+1.126: Add a use_ipassign column to the experiments table, to enable and
+       disable the use of Jon's ipassign program. Also add a column to
+       specify arguments for it.
+
+       alter table experiments add column use_ipassign tinyint(1) \
+	   not null default 0;
+       alter table experiments add column ipassign_args varchar(255) \
+	   default NULL;
