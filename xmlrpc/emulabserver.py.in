@@ -20,7 +20,6 @@ import errno
 import exceptions
 import xmlrpclib
 import signal
-import syslog
 import types
 sys.path.append("@prefix@/lib")
 from libdb        import *
@@ -1199,11 +1198,11 @@ class experiment:
             return EmulabResponse(RESPONSE_FORBIDDEN,
                               output="Insufficient privledge to invoke method")
         
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+#        try:
+#            checknologins()
+#            pass
+#        except NoLoginsError, e:
+#            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
@@ -1243,11 +1242,11 @@ class experiment:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
 
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+#        try:
+#            checknologins()
+#            pass
+#        except NoLoginsError, e:
+#            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         argerror = CheckRequiredArgs(argdict, ("proj", "exp", "state"))
         if (argerror):
@@ -1344,11 +1343,6 @@ class experiment:
                 if ev == None:
                     time.sleep(1) # Slow down the polling.
                     continue
-
-                # Got an event, log it, and
-                syslog.syslog(syslog.LOG_INFO,
-                              "statewait: " + ev.getObjType() + ", " +
-                              ev.getEventType());
 
                 # ... check if it is one the user cares about.
                 if ((argdict["state"] == []) or
