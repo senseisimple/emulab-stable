@@ -2,17 +2,38 @@
 use English;
 use Getopt::Std;
 
-# Settings - Change these to your particular network.
-
-# Switch interface speed - In Mbps
-$switch_speed = 100;
-
 sub usage()
 {
     print STDOUT "Usage: ptopgen [-s switch]\n";
     exit(-1);
 }
 my  $optlist = "s:";
+
+
+# Settings - Change these to your particular network.
+#
+# Explanation from Mac:
+#
+# These are for the imaginary "lan nodes". Internally the way we map
+# lans is as a bunch of machines connected in a star to a "lan node"
+# that has infinite bw basically, and an infinite number of connections
+# available to it. So the first big number is BW (100Gbps), and the
+# 1000 means it has 1000 connections to the switch. That number is
+# plenty high as it is, since our limit on one switch is under 400.
+#
+# Speed in in Kbs!
+#
+my $lannode_switch2switch_speed = 100000000;
+my $lannode_switch2switch_links = 1000;
+
+#
+# Also bogus. The interfaces table does not hold entries for the switch
+# side of each link. It will have to at some point, when we have something
+# other than 100Mbs ports (say, gbit ports).
+#
+# Speed in in Kbs!
+#
+my $default_switchport_speed    = 100000;
 
 ######################################################################
 
@@ -165,8 +186,9 @@ print $sharklinks;
 foreach $switch (keys(%used_switches)) {
     for ($i = 0;$i <= 20;$i++) {
 	print "node lan-$switch-$i lan:1\n";
-	print "link link-lan-$switch-$i lan-$switch-${i}:lan-$switch-$i" .
-	    " $switch 100000 1000\n";
+	print "link link-lan-$switch-$i lan-$switch-${i}:lan-$switch-$i " .
+	    "$switch ".
+	    "$lannode_switch2switch_speed $lannode_switch2switch_links\n";
     }
 }
 
@@ -192,7 +214,8 @@ sub get_ifacebw {
     ($node,$card,$port) = @_;
     if (defined($interfacetypes{"$node:$card:$port"})) {
 	return $interfacespeeds{$interfacetypes{"$node:$card:$port"}};
-    } else {
-	return $switch_speed;
+    }
+    else {
+	return $default_switchport_speed;
     }
 }

@@ -17,9 +17,34 @@
 # maxrun is maximum number of times we run assign.
 # delaywithswitch if 1 will use the switch to delay when possible.  Currently
 #  this only works for 10mbit links.
-$delaythresh = 3;
+$delaythresh = 2;
 $maxrun = 20;
 $delaywithswitch=0;
+
+#
+# Some handy constants. Speed in Mbits/sec and Kbits/sec units.
+# The conversion routine is to make explicit that we operate with two
+# different sets of units. One is the topology, which is in Kbps now.
+# The second is the physical description, which has been changed to
+# Kbps in the DB (and in ptopgen).
+#
+# Its probably a good idea to leave portbw (current_speed) in Mbs, since
+# those numbers are used at the switch and the interfaces, which really
+# only think in Mbps.
+#
+my $S10Mbs  = 10;
+my $S100Mbs = 100;
+my $S10Kbs  = 10000;
+my $S100Kbs = 100000;
+sub BWConvert($) {
+    #
+    # Use this if physical units are in Mbs (used to be).
+    #
+    #my $bw = $_[0] / 1000;
+    
+    my $bw = $_[0];
+    return $bw;
+}
 
 $DELAYCAPACITY = @DELAYCAPACITY@;
 $TBROOT = "@prefix@";
@@ -105,9 +130,10 @@ sub printdb {
 #  interfacespeed is indexed by type and contains the bandwidth.
 #  delaynodes is indexed by link name and contains [delay,bw,loss]
 #  portbw is indexed by virtual nodeport and contains the bandwidth
-#    of that port.  Note that the bandwidth of a port is one of 100000 (100Mbs)
-#    or 10000 (10 Mbs).  For LANs with other bandwidths the port speed will be
-#    100 and a delay node will be inserted.
+#    of that port. Note that port bandwidth in the interfaces table is
+#    left in Mbps units for now. Thats inconsistent, I know. For LANs with
+#    other bandwidths the port speed will be 100 and a delay node will
+#    be inserted.
 #
 # Delay node names:
 #  delay nodes are named tbdelayXX N > 2
@@ -175,10 +201,20 @@ while (($vname,$member,$delay,$bandwidth,$lossrate) = $result->fetchrow_array) {
     push(@{$lans{$vname}},$member);
     $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate];
     ($node,$port) = split(":",$member);
-    if ($bandwidth == 10000) {
-	$portbw{$member} = 10;
+    #
+    # XXX - Whenever a delay node is inserted, port speeds are set to
+    #       100Mbs, even if they requested exactly 10Mbs. This is a
+    #       simplification. At some point we might want to force all the
+    #       ports along the way to 10Mbs, and have the delay node worry
+    #       about delay only, and not bandwidth. That will be harder to
+    #       to do in this mess. See companion XXX below where the delays
+    #       table is initialized. Initially, we set the speed to 10Mbs,
+    #       if a delay node is insterted below, it resets this to 100Mbs.
+    # 
+    if ($bandwidth == $S10Kbs && $delaywithswitch) {
+	$portbw{$member} = $S10Mbs;
     } else {
-	$portbw{$member} = 100;
+	$portbw{$member} = $S100Mbs;
     }
     push(@{$nodelans{$node}},"$port:$vname");
     printdb "  portbw of $member = $portbw{$member}\n";
@@ -207,7 +243,7 @@ foreach $lan (keys(%lans)) {
 	    join(" ",@$sharks) . ")\n";
 	$sharkshelfid++;
 	$sharkshelves{$shelfid} = $sharks;
-	$delayinfo{"$lan:$shelfid:uplink"} = [0,100000,0.0];
+	$delayinfo{"$lan:$shelfid:uplink"} = [0,$S100Kbs,0.0];
 	push(@$realmembers,"$shelfid:uplink");
 	$nodes{$shelfid} = "shark-shelf";
     }
@@ -216,7 +252,7 @@ foreach $lan (keys(%lans)) {
 # End shark hack
 
 # Open the TOP file
-$topfile = "$pid-$eid-$$.top";
+$topfile = "$eid.top";
 open(TOPFILE,"> $topfile") || do {
     print STDERR "$0: *** Could not open $topfile.\n";
     exit(1);
@@ -261,10 +297,10 @@ foreach $lan (keys(%lans)) {
 	$loss = 1-(1-$loss0)*(1-$loss1);
 	$bw = &min($bw0,$bw1);
 	$bandwidth = &getbandwidth(&min($bw0,$bw1));
-	if (($delay > $delaythresh) ||
-	    (($bw != 100000) && ($bw != 10000)) ||
+	if (($delay >= $delaythresh) ||
+	    (($bw != $S100Kbs) && ($bw != $S10Kbs)) ||
 	    (($delaywithswitch == 0) && 
-	     (($bw != 100000) && (($sharks == 0) || ($nonsharks > 1)))) || 
+	     (($bw != $S100Kbs) && (($sharks == 0) || ($nonsharks > 1)))) || 
 	    ($loss != 0)) {
 	    $delayname = "tbsdelay$delayid";
 	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss];
@@ -277,6 +313,14 @@ foreach $lan (keys(%lans)) {
 		. " $bandwidth\n";
 	    print TOPFILE "link linksdelaydst/$lan $node1 $delayname"
 		. " $bandwidth\n";
+	    #
+	    # Ports are set to 100Mbs when a link gets a delay node.
+	    # This can override initialization above cause we could not
+	    # tell earlier if the link was going to get a real delay node
+	    # or just a delaywithswitch.
+	    #
+	    $portbw{$nodeport0} = $S100Mbs;	    
+	    $portbw{$nodeport1} = $S100Mbs;	    
 	} else {
 	    print TOPFILE "link linksimple/$lan $node0 $node1 $bandwidth\n";
 	}
@@ -289,10 +333,11 @@ foreach $lan (keys(%lans)) {
 	    ($node) = (split(":",$member))[0];
 # XXX The expression below should be modified for better bandwidth support.
 # Probably needs to happen post assign somehow.
-	    if (($delay > $delaythresh) ||
-		(($bw != 100000) && ($bw != 10000))  ||
+	    if (($delay >= $delaythresh) ||
+		(($bw != $S100Kbs) && ($bw != $S10Kbs))  ||
 		(($delaywithswitch == 0) && 
-		 (($bw != 100000) && (($sharks == 0) || ($nonsharks > 1)))) || 
+		 (($bw != $S100Kbs) && (($sharks == 0) ||
+					($nonsharks > 1)))) ||
 		($loss != 0)) {
 		$delayname = "tbdelay$delayid";
 		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss];
@@ -305,6 +350,13 @@ foreach $lan (keys(%lans)) {
 		    " $node $delayname $bandwidth\n";
 		print TOPFILE "link linkdelaydst/$lan/$member" .
 		    " lan/$lan $delayname $bandwidth\n";
+		#
+		# Port is set to 100Mbs when the link gets a delay node.
+		# This can override initialization above cause we could not
+		# tell earlier if the link was going to get a real delay node
+		# or just a delaywithswitch.
+		#
+		$portbw{$member} = $S100Mbs;	    
 	    } else {
 		print TOPFILE "link linklan/$lan/$member $node lan/$lan" .
 		    " $bandwidth\n";
@@ -759,7 +811,23 @@ foreach $delay (keys(%delays)) {
 	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
 	     ",$pipe0,$delay,$bandwidth,$lossrate".
 	     ",$pipe1,$delay,$bandwidth,$lossrate)");
+    #
+    # XXX - Whenever a delay node is inserted, port speeds are set to
+    #       100Mbs on the delay node ports. This is to ensure that
+    #       they get a valid number instead of something left over, but
+    #       also because this is a simplification.
+    #       At some point we might want to force all the
+    #       ports along the way to 10Mbs, and have the delay node worry
+    #       about delay only, and not bandwidth. That will be harder to
+    #       to do in this mess. See companion XXX above where portbw hash
+    #       is set.
+    #
+    DBQueryFatal("update interfaces set " .
+		 "current_speed='$S100Mbs' " .
+		 "where node_id='$pnode' and ".
+		 "(iface='$int0' or iface='$int1')");
 }
+
 DBQueryFatal("delete from portmap where pid=\"$pid\" and eid=\"$eid\"");
 foreach $vnodeport (keys(%portmap)) {
     ($vnode,$vport) = split(":",$vnodeport);
@@ -886,11 +954,8 @@ sub min {
 # getbandwidth(bw)
 # Returns the lowest ok bandwidth that is greater than or equal to
 # the one passed.
-#
-# XXX The targetbandwidth is in Kbs, but interface types in Mbs.
-# 
 sub getbandwidth {
-    my $targetbandwidth= $_[0] / 1000;
+    my $targetbandwidth= BWConvert($_[0]);
     my $bandwidth;
     my $best = 10000000000;
     foreach $bandwidth (keys(%okbandwidths)) {
