@@ -263,7 +263,7 @@ sched_event_queue_dump_node_and_descendents(FILE *fp, int index, int level)
 static void
 sched_event_queue_verify(void)
 {
-    int error, i;
+    int err, i;
 
     /* Slot 0 should never be used. */
     assert(event_queue[0].time.tv_sec == 0 &&
@@ -271,17 +271,17 @@ sched_event_queue_verify(void)
 
     /* Verify the heap property: The firing time of each node N should
        be more recent than the firing time of its children 2N and 2N+1. */
-    error = 0;
+    err = 0;
     for (i = EVENT_QUEUE_HEAD; i <= event_queue_tail; i++) {
         if (2 * i <= event_queue_tail) {
             if (!event_is_more_recent(event_queue[i], event_queue[2 * i]))
-                error = 1;
+                err = 1;
         }
         if (2 * i + 1 <= event_queue_tail) {
             if (!event_is_more_recent(event_queue[i], event_queue[2 * i + 1]))
-                error = 1;
+                err = 1;
         }
-        if (error) {
+        if (err) {
             ERROR("node %d violates the heap property:\n", i);
             sched_event_queue_dump_node_and_descendents(stderr, i, 2);
             abort();

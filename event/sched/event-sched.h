@@ -6,7 +6,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event-sched.h,v 1.3 2002-02-19 17:12:52 stoller Exp $
+ * $Id: event-sched.h,v 1.4 2002-03-05 16:21:24 stoller Exp $
  */
 
 #ifndef __SCHED_H__
@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include "event.h"
+#include "log.h"
 
 #ifndef MAXHOSTNAMELEN
 #define MAXHOSTNAMELEN 64
@@ -25,6 +26,16 @@ typedef struct sched_event {
     event_notification_t notification; /* event notification */
     struct timeval time;        /* event firing time */
 } sched_event_t;
+
+/*
+ * Debugging and tracing definitions:
+ */
+#define ERROR(fmt,...) error(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#ifdef DEBUG
+#define TRACE(fmt,...) info(__FUNCTION__ ": " fmt, ## __VA_ARGS__)
+#else
+#define TRACE(fmt,...)
+#endif /* DEBUG */
 
 /*
  * Function prototypes:

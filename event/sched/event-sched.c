@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <time.h>
 #include <unistd.h>
 #include <math.h>
@@ -32,6 +33,7 @@ static char	*pid, *eid;
 static int	get_static_events(event_handle_t handle);
 static int	debug;
 static void	cleanup(void);
+static void	quit(int);
 
 void
 usage()
@@ -84,6 +86,10 @@ main(int argc, char **argv)
 	pid = argv[0];
 	eid = argv[1];
 
+	signal(SIGINT, quit);
+	signal(SIGTERM, quit);
+	signal(SIGHUP, quit);
+
 	if (debug)
 		loginit(0, log);
 	else
@@ -96,11 +102,13 @@ main(int argc, char **argv)
 		return 1;
 
 	/*
-	 * Set our pid in the DB.
+	 * Set our pid in the DB. This will fail if there is already
+	 * a non-zero value in the DB (although its okay to set it to
+	 * zero no matter what). 
 	 */
-	atexit(cleanup);
 	if (! mydb_seteventschedulerpid(pid, eid, getpid()))
 		fatal("Could not update DB with process id!");
+	atexit(cleanup);
 
 	/*
 	 * Convert server/port to elvin thing.
@@ -304,18 +312,19 @@ get_static_events(event_handle_t handle)
 	char		pideid[BUFSIZ];
 
 	res = mydb_query("select ex.time,ex.vnode,ex.vname,ex.arguments,"
-			 " ot.type,et.type,i.IP from %s_%s_events as ex "
+			 " ot.type,et.type,i.IP from eventlist as ex "
 			 "left join event_eventtypes as et on "
 			 " ex.eventtype=et.idx "
 			 "left join event_objecttypes as ot on "
 			 " ex.objecttype=ot.idx "
 			 "left join reserved as r on "
-			 " ex.vnode=r.vname and r.pid='%s' and r.eid='%s' "
+			 " ex.vnode=r.vname and ex.pid=r.pid and ex.eid=r.eid "
 			 "left join nodes as n on r.node_id=n.node_id "
 			 "left join node_types as nt on nt.type=n.type "
 			 "left join interfaces as i on "
-			 " i.node_id=r.node_id and i.iface=nt.control_iface",
-			 7, pid, eid, pid, eid);
+			 " i.node_id=r.node_id and i.iface=nt.control_iface "
+			 "where ex.pid='%s' and ex.eid='%s'",
+			 7, pid, eid);
 #define EXTIME	row[0]
 #define EXVNODE	row[1]
 #define EXVNAME	row[2]
@@ -398,4 +407,13 @@ cleanup(void)
 {
 	if (pid) 
 		mydb_seteventschedulerpid(pid, eid, 0);
+	pid = NULL;
+	eid = NULL;
+}
+
+static void
+quit(int sig)
+{
+	/* cleanup() will be called from atexit() */
+	exit(0);
 }
