@@ -258,7 +258,7 @@ if ( (@reloads > 0) || (@frisbee_reloads > 0) || (keys %reserves > 0) ) {
     # Call os_load for the machine, since the reload daemon doesn't handle
 	# frisbee reloads
 	print "Running os_load for $n\n";
-	system "$os_load $image $n"
+	system "$os_load -i $image $n"
 	  || (print "Failed to run '$os_load $image $n': $!\n"
 	  && $error++ && next);
   }
