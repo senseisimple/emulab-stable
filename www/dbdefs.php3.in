@@ -139,6 +139,9 @@ define("TBDB_IFACEROLE_FAKE",		"fake");
 define("TBDB_IFACEROLE_GW",		"gw");
 define("TBDB_IFACEROLE_OTHER",		"other");
 
+# Some regex functions to check various arguments
+function TBvalid_uid($uid)	{ return preg_match("/^[a-zA-Z][-\w]+$/", $uid);}
+
 #
 # Convert a trust string to the above numeric values.
 #

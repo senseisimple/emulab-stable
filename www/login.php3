@@ -6,28 +6,24 @@
 #
 require("defs.php3");
 
-#
-# These two for verification.
-# 
-if (!isset($key) || !strcmp($key, "")) {
-    $key = 0;
-}
-if (!isset($vuid) || !strcmp($vuid, "")) {
-    $vuid = 0;
-}
-# Allow adminmode to be passed along.
-if (!isset($adminmode)) {
-    $adminmode = 0;
-}
-# Allow referrer to be passed along.
-if (!isset($referrer) || !strcmp($referrer, "")) {
-    $referrer = 0;
-}
-# Referrer page requested that it be passed along so that it can be
+# Page arguments. First two are for verification passthru.
+$key	   = $_GET['key'];
+$vuid      = $_GET['vuid'];
+# Allow adminmode to be passed along to new login. Handy for letting admins
+# log in when NOLOGINS() is on. 
+$adminmode = $_GET['adminmode'];
+# Form arguments.
+$login     = $_POST['login'];
+$uid       = $_POST['uid'];
+$password  = $_POST['password'];
+# Allow referrer to be passed along to new login.
+$referrer  = $_POST['referrer'];
+
+# See if referrer page requested that it be passed along so that it can be
 # redisplayed after login. Save the referrer for form below.
-if (isset($refer) && $refer &&
-    isset($HTTP_REFERER) && strcmp($HTTP_REFERER, "")) {
-    $referrer = $HTTP_REFERER;
+if (isset($_GET['refer']) && $_GET['refer'] &&
+    isset($_SERVER['HTTP_REFERER']) && $_SERVER['HTTP_REFERER'] != "") {
+    $referrer = $_SERVER['HTTP_REFERER'];
 }
 
 #
@@ -36,9 +32,10 @@ if (isset($refer) && $refer &&
 if (($known_uid = GETUID()) != FALSE) {
     if (CHECKLOGIN($known_uid) & CHECKLOGIN_LOGGEDIN) {
 	#
-	# If doing a verification, zap to that page.
+	# If doing a verification for the logged in user, zap to that page.
+	# If doing a verification for another user, then must login in again.
 	#
-	if ($key && (!$vuid || !strcmp($vuid, $known_uid))) {
+	if (isset($key) && (!isset($vuid) || $vuid == $known_uid)) {
 	    header("Location: $TBBASE/verifyusr.php3?key=$key");
 	    return;
 	}
@@ -79,12 +76,14 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
           </font>
           </center>\n";
 
-    $keyarg = "";
+    $pagearg = "";
+    if ($adminmode == 1)
+	$pagearg  = "?adminmode=1";
     if ($key)
-	$keyarg = "?key=$key";
+	$pagearg .= "&key=$key";
 
     echo "<table align=center border=1>
-          <form action='${TBBASE}/login.php3${keyarg}' method=post>
+          <form action='${TBBASE}/login.php3${pagearg}' method=post>
           <tr>
               <td>Username:</td>
               <td><input type=text
@@ -103,9 +102,6 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
     if ($referrer) {
 	echo "<input type=hidden name=referrer value=$referrer>\n";
     }
-    if ($adminmode) {
-	echo "<input type=hidden name=adminmode value=1>\n";
-    }
 
     echo "</form>
           </table>\n";
@@ -116,28 +112,12 @@ function SPITFORM($uid, $key, $referrer, $failed, $adminmode)
 }
 
 #
-# Do not bother if NOLOGINS!
-#
-if (0 && NOLOGINS()) {
-    PAGEHEADER("Login");
-	    
-    echo "<center>
-          <font size=+1 color=red>
-	   Logins are temporarily disabled. Please try again later.
-          </font>
-          </center><br>\n";
-
-    PAGEFOOTER();
-    die("");
-}
-
-#
 # If not clicked, then put up a form.
 #
 if (! isset($login)) {
-    if ($vuid)
-	$known_uid = $vuid;
-    SPITFORM($known_uid, $key, $referrer, 0, $adminmode);
+    # Allow page arg to override what we think is the UID to log in as. 
+    SPITFORM((isset($vuid) ? $vuid : $known_uid),
+	     $key, $referrer, 0, $adminmode);
     PAGEFOOTER();
     return;
 }
@@ -148,9 +128,9 @@ if (! isset($login)) {
 $STATUS_LOGGEDIN  = 1;
 $STATUS_LOGINFAIL = 2;
 $login_status     = 0;
+$adminmode        = (isset($adminmode) && $adminmode == 1);
 
-if (!isset($uid) ||
-    strcmp($uid, "") == 0) {
+if (!isset($uid) || $uid == "" || !isset($password) || $password == "") {
     $login_status = $STATUS_LOGINFAIL;
 }
 else {
@@ -171,13 +151,13 @@ if ($login_status == $STATUS_LOGINFAIL) {
     return;
 }
 
-if ($key) {
+if (isset($key)) {
     #
     # If doing a verification, zap to that page.
     #
     header("Location: $TBBASE/verifyusr.php3?key=$key");
 }
-elseif ($referrer) {
+elseif (isset($referrer)) {
     #
     # Zap back to page that started the login request.
     #

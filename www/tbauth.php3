@@ -51,7 +51,7 @@ function GENHASH() {
     if (! $fp) {
         TBERROR("Error opening /dev/urandom", 1);
     }
-    $random_bytes = fread($fp, 64);
+    $random_bytes = fread($fp, 128);
     fclose($fp);
 
     $hash  = mhash (MHASH_MD5, bin2hex($retval) . " " . microtime());
@@ -82,19 +82,25 @@ function GETLOGIN() {
 # browser thinks, if anything.
 # 
 function GETUID() {
-    global $TBNAMECOOKIE, $HTTP_COOKIE_VARS;
+    global $TBNAMECOOKIE;
     global $nocookieuid;
 
-    $curname = $nocookieuid;
+    $curname = FALSE;
 
-    if ($curname == NULL) {    
-	$curname = $HTTP_COOKIE_VARS[$TBNAMECOOKIE];
+    # XXX - nocookieuid is sent by netbuild applet in URL.
+    if (isset($_GET['nocookieuid'])) {
+	$curname = $_GET['nocookieuid'];
     }
+    elseif (isset($_COOKIE[$TBNAMECOOKIE])) {
+	$curname = $_COOKIE[$TBNAMECOOKIE];
+    }
+    else
+	return FALSE;
 
-    if ($curname == NULL) {
+    # Verify valid string (no special chars like single/double quotes!).
+    if (!TBvalid_uid($curname)) {
 	return FALSE;
     }
-
     return $curname;
 }
 
@@ -264,7 +270,7 @@ function CHECKLOGIN($uid) {
 function LOGGEDINORDIE($uid, $modifier = 0) {
     global $TBBASE, $BASEPATH, $HTTP_COOKIE_VARS, $TBNAMECOOKIE;
 
-    # If our login isn't valid, then the uid is already set to "",
+    # If our login is not valid, then the uid is already set to "",
     # so refresh it to the cookie value. Then we can pass the right
     # uid to hcecklogin, so we can give the right error message.
     if ($uid=="") { $uid=$HTTP_COOKIE_VARS[$TBNAMECOOKIE]; }
@@ -357,12 +363,12 @@ function ISADMINISTRATOR() {
 #
 # Attempt a login.
 # 
-function DOLOGIN($uid, $password, $adminmode) {
+function DOLOGIN($uid, $password, $adminmode = 0) {
     global $TBDBNAME, $TBAUTHCOOKIE, $TBAUTHDOMAIN, $TBAUTHTIMEOUT;
     global $TBNAMECOOKIE, $TBSECURECOOKIES;
-
-    if (! isset($password) ||
-	strcmp($password, "") == 0) {
+    
+    # Caller makes these checks too.
+    if (!TBvalid_uid($uid) || !isset($password) || $password == "") {
 	return -1;
     }
 
