@@ -95,11 +95,15 @@ void n_initLookup( ushort receivePort, ushort sendPort, const char * sendName )
 
 static uint gSendAddress;
 
+static void initChk();
+
 /* same initialize, only no lookup */
 void n_init( ushort receivePort, ushort sendPort, uint sendAddress )
 {
   struct sockaddr_in name;
   /*  int result; */
+
+  initChk();
 
   gSendAddress = sendAddress;
 
@@ -204,13 +208,57 @@ void n_finish()
   close( sock );
 } 
 
+/* crc code from http://www.createwindow.com/programming/crc32/ */ 
+
+static unsigned long crc32_table[256];
+
+static unsigned long Reflect( unsigned long ref, char ch )
+{
+  int i;
+  unsigned long value = 0;
+
+  for (i = 1; i < (ch + 1); i++) {
+    if (ref & 1) {
+      value |= 1 << (ch - i);
+    }
+    ref >>= 1;
+  }
+
+  return value; 
+}
+
+static void initChk()
+{
+  int i,j;
+  unsigned long ulPolynomial = 0x04c11db7;
+
+  for (i = 0; i < 0xff; i++) {
+    crc32_table[i] = Reflect(i, 8) << 24;
+    for (j = 0; j < 8; j++) {
+      crc32_table[i] = (crc32_table[i] << 1) ^ 
+        (crc32_table[i] & (1 << 31) ? ulPolynomial : 0);
+    }
+    crc32_table[i] = Reflect( crc32_table[i], 32 );
+  }
+}
+
 static unsigned int doChk( unsigned char * data, int len )
 {
+  unsigned long ulCRC = 0xFFffFFff;
+
+  while( len-- ) {
+    ulCRC = (ulCRC >> 8) ^ crc32_table[(ulCRC & 0xFF) ^ *data++];
+  }
+
+  return ulCRC ^ 0xFFffFFff;
+
+  /*
   unsigned int accum = 0;
   unsigned int i;
   for (i = 0; i < len; i++) {
     accum += data[i];
   }
+  */
 }
 
 static int verifyChk( PacketData * pd )
