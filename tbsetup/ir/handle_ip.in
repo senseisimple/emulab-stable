@@ -132,7 +132,7 @@ foreach (split("\n",&ir_get("/topology/lans"))) {
     my(@nodes) = split(" ",$nodesraw);
     $lans{$lan} = [$lan,\@nodes];
     # Check for sharkshelf
-    if ($nodetypes{$nodes[0]} == "shark") {
+    if ($nodetypes{$nodes[0]} eq "shark") {
 	# We need to fill in the MACs for the vlan map for this lan
 	# since there is no actual VLAN for it.
 	$vlanmap{$lan} = [];

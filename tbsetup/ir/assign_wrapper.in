@@ -226,10 +226,10 @@ foreach $lan (keys(%lans)) {
 	} else {
 	    $rdst = $src;
 	}
-	$nodes{$ssnode} = ["$ssnode-$extlink"];
-	printdb "  nodes{$ssnode} = $ssnode-$extlink\n";
-	$links{"$ssnode-$extlink"} = [$ssnode,$rdst,$bw,$delay,$loss];
-	printdb "  links{$ssnode-$extlink} = [$ssnode,$rdst,$bw,$delay,$loss]\n";
+	$nodes{$ssnode} = ["ext-$ssnode"];
+	printdb "  nodes{$ssnode} = ext-$ssnode\n";
+	$links{"ext-$ssnode"} = [$ssnode,$rdst,$bw,$delay,$loss];
+	printdb "  links{ext-$ssnode} = [$ssnode,$rdst,$bw,$delay,$loss]\n";
 	delete $links{$extlink};
     } else {
 	$nodes{$ssnode} = [];
@@ -748,10 +748,10 @@ print IRFILE "START virtual\n";
 print IRFILE "START nodes\n";
 foreach $vnode (keys(%v2pmap)) {
     if (defined($sharkshelves{$vnode})) {
-	$i = 1;
+	$i = 8;
 	foreach $vshark (@{$sharkshelves{$vnode}}) {
 	    print IRFILE "$vshark $v2pmap{$vnode}-$i\n";
-	    $i++;
+	    $i--;
 	}
     } elsif (! defined($lans{$vnode})) {
 	print IRFILE "$vnode $v2pmap{$vnode}\n";
