@@ -31,7 +31,7 @@ my $stat_fg = 'white';
 
 #set up main
 my $main = MainWindow->new();
-$main->title("SnmpIt!");
+$main->title("vsnmpit - Visual SnmpIt!");
 $main->configure(-bg => $main_bg );
 
 #set up the frames
@@ -60,33 +60,33 @@ my $VLAN_btn =
 		     -width=>9, -anchor=>'center',-text=>"VLAN Setup",
 		     -activeforeground=>$btn_afg,
 		     -command=> sub { &msg($status,""); &vlanSetup}
-		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
 my $port_btn =
     $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-bg=>$btn_bg,
 		     -activebackground=>$btn_abg,-fg=>$btn_fg,
 		     -width=>8, -anchor=>'center',-text=>"Port Setup",
 		     -activeforeground=>$btn_afg,
 		     -command=> sub { &msg($status,""); &portSetup}
-		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
 my $opt_btn =
     $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-bg=>$btn_bg,
 		     -activebackground=>$btn_abg,-fg=>$btn_fg,
 		     -width=>7, -anchor=>'center',-text=>"Options",
 		     -activeforeground=>$btn_afg,
 		     -command=> sub { &msg($status,""); &optSetup}
-		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
 my $exit_btn= 
     $btn_bar->Button(-relief=>'raised',-borderwidth=>2,-bg => $btn_bg,
 		     -activebackground=>$btn_abg,-fg=>$btn_fg,
 		     -width=>2,-anchor=>'center',-text=>'Exit', 
 		     -activeforeground=>$btn_afg,
 		     -command=>sub{$main->destroy}
-		     )->pack(-side=>'left',-expand=>"1",-padx=>'2',-pady=>'2');
+		     )->pack(-side=>'left',-padx=>'2',-pady=>'2');
 
 #set up the status bar
 $status = 
     $stat_bar->Label(-bg=>$stat_bg,-fg=>$stat_fg,-anchor=>'nw',
-		     -justify=>'left',-wraplength=>'900'
+		     -justify=>'left',-wraplength=>'550'
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'both');
 
 
@@ -101,6 +101,9 @@ sub msg {
     $area->configure(-text=>$text);
     $area->update();
 }
+
+#used in numerical sorts
+sub num { $a <=> $b; }
 
 #################################################################
 #
@@ -160,7 +163,7 @@ sub vlanSetup {
     }
     close (DATA);
     my %vlans = ();
-    foreach $ID ( sort keys(%names)) {
+    foreach $ID ( sort num keys(%names)) {
 	my $row = 
 	    $table->Frame(-relief=>'flat',
 			 -bg=>$main_bg,-fg=>$main_fg
@@ -191,7 +194,7 @@ sub vlanSetup {
 		    )->pack(-side=>'left');
 	$row->Label(-relief=>'sunken',-text=>$members{$ID},
 		    -bg=>$main_bg,-fg=>$main_fg,-anchor=>'w',
-		    -borderwidth=>3,-wraplength=>'750',-justify=>'left'
+		    -borderwidth=>3,-wraplength=>'350',-justify=>'left'
 		     )->pack(-side=>'left',-expand=>"1",-fill=>'x');
     }
     my $row = 
