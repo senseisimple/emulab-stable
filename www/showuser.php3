@@ -56,49 +56,18 @@ if (!$isadmin &&
 $yourpcs = TBUserPCs($target_uid);
 
 if ($yourpcs) {
-    echo "<center><h2><font color=Red>\n";
+    echo "<center><font color=Red size=+1>\n";
     
     if (strcmp($uid, $target_uid))
-	echo "$uid is using $yourpcs PCs!\n";
+	echo "$target_uid is using $yourpcs PCs!\n";
     else
 	echo "You are using $yourpcs PCs!\n";
     
-    echo "</font></h2></center>\n";
+    echo "</font></center>\n";
 }
 
 #
-# Lets show projects.
-#
-$query_result =
-    DBQueryFatal("select distinct g.pid,p.name from group_membership as g ".
-		 "left join projects as p on p.pid=g.pid ".
-		 "where uid='$target_uid' order by pid");
-
-if (mysql_num_rows($query_result)) {
-    echo "<center>
-          <h3>Project Membership</h3>
-          </center>
-          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
-
-    echo "<tr>
-              <td align=center>PID</td>
-              <td align=center>Name</td>
-          </tr>\n";
-
-    while ($projrow = mysql_fetch_array($query_result)) {
-	$pid  = $projrow[pid];
-	$name = $projrow[name];
-
-        echo "<tr>
-                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                 <td>$name</td>
-             </tr>\n";
-    }
-    echo "</table>\n";
-}
-
-#
-# And Experiments.
+# Lets show Experiments.
 #
 $query_result =
     DBQueryFatal("select * from experiments  ".
@@ -133,7 +102,43 @@ if (mysql_num_rows($query_result)) {
 echo "</center>\n";
 
 #
-# Show user info.
+# Lets show projects.
+#
+$query_result =
+    DBQueryFatal("select distinct g.pid,p.name from group_membership as g ".
+		 "left join projects as p on p.pid=g.pid ".
+		 "where uid='$target_uid' order by pid");
+
+if (mysql_num_rows($query_result)) {
+    echo "<center>
+          <h3>Project Membership</h3>
+          </center>
+          <table align=center border=1 cellpadding=1 cellspacing=2>\n";
+
+    echo "<tr>
+              <td align=center>PID</td>
+              <td align=center>Name</td>
+          </tr>\n";
+
+    while ($projrow = mysql_fetch_array($query_result)) {
+	$pid  = $projrow[pid];
+	$name = $projrow[name];
+
+        echo "<tr>
+                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
+                 <td>$name</td>
+             </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+#
+# Sub group membership too.
+# 
+SHOWGROUPMEMBERSHIP($target_uid);
+
+#
+# User Profile.
 #
 echo "<center>
       <h3>Profile</h3>
