@@ -66,6 +66,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("People", $TBDOCBASE, "people.php3");
+    WRITESIDEBARBUTTON("The Gallery", $TBDOCBASE, "gallery/gallery.php3");
     WRITESIDEBARBUTTON("Projects Using Emulab.Net", $TBDOCBASE,
 		       "projectlist.php3");
 
