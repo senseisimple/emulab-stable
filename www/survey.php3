@@ -49,13 +49,13 @@ $questions = array(
   'More nodes',
     '"To run experiments with more nodes than Emulab has (170)."',
   'More powerful nodes',
-    'Faster, more RAM, bigger disks, etc (add specifics in a text box below).',
+    'Faster, more RAM, bigger disks, etc (add specifics in text box below)',
   'Gigabit Ethernet links',
-    'If you want faster than Gbit, say so in a text box below.',
+    'If you want faster than Gbit, say so in text box below.',
   'Nodes with more physical network interfaces',
     '',
-  'Virtual links/nodes <i>instead of<i> more physical resources."
-    'Approx 10 virtual per each physical link/node, w/o performance guarantees.'
+  'Virtual links/nodes <i>instead of<i> more physical resources',
+    'Approx 10 virtual per each physical link/node, w/o performance guarantees',
   '"Real" commercial routers instead of just PCs',
     '',
   'Better user support',
@@ -65,12 +65,12 @@ $questions = array(
 );
 
 $followups = array(
-'Any elaborations or comments on your responses above?',
+'Any elaborations on your responses above, or other comments?',
 
 'If we were to expand as you suggested above, what kinds
  of qualitatively new experiments could you perform, if any?',
 
-'Are there any Emulab characteristics you were forced to "work around", or
+'Are there any Emulab characteristics you were forced to "work around," or
  that prevented you from being able to perform an experiment you wanted to?',
 
 'What are we doing right?<br />Are there things we do well that you
