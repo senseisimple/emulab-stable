@@ -519,7 +519,7 @@ void remove_node(vvertex vv)
    * Scoring for features and desires
    */
   int fd_violated;
-  double fds=fd_score(vnode,pnode,fd_violated,true);
+  double fds=fd_score(vnode,pnode,fd_violated,false);
   SSUB(fds);
   remove_global_fds(vnode,pnode);
   double sfds=remove_stateful_fds(vnode,pnode,fd_violated);
