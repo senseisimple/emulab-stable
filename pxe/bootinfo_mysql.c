@@ -27,11 +27,13 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	MYSQL_ROW row;
 	char dbquery[] =
 		"select n.next_boot_path, n.next_boot_cmd_line, "
-		"n.def_boot_osid, "
-		"p.partition, n.def_boot_cmd_line, n.def_boot_path from nodes "
+		"n.def_boot_osid, p.partition, n.def_boot_cmd_line, "
+	        "n.def_boot_path, o.path from nodes "
 		"as n left join partitions as p on n.node_id=p.node_id and "
 		"n.def_boot_osid=p.osid left join interfaces as i on "
-		"i.node_id=n.node_id where i.IP = '%s'";
+		"i.node_id=n.node_id "
+    	        "left join os_info as o on o.osid=n.def_boot_osid "
+	        "where i.IP = '%s'";
 
 #define NEXT_BOOT_PATH		0
 #define NEXT_BOOT_CMD_LINE	1
@@ -39,6 +41,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 #define PARTITION		3
 #define DEF_BOOT_CMD_LINE	4
 #define DEF_BOOT_PATH		5
+#define OSID_PATH		6
 
 	n = snprintf(querybuf, sizeof querybuf, dbquery, inet_ntoa(ipaddr));
 	if (n > sizeof querybuf) {
@@ -91,7 +94,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	ncols = (int)mysql_num_fields(res);
 	switch (ncols) {
-	case 6: /* Should have 6 fields */
+	case 7: /* Should have 7 fields */
 		break;
 	default:
 		syslog(LOG_ERR, "%s: %d fields in query for IP %s!",
@@ -130,6 +133,12 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		strncpy(info->what.mb.filename, row[DEF_BOOT_PATH],
 			MAX_BOOT_PATH-1);
 	}
+	else if (row[OSID_PATH] != 0 && row[OSID_PATH][0] != '\0') {
+		info->type = BIBOOTWHAT_TYPE_MB;
+		info->what.mb.tftp_ip.s_addr = 0;
+		strncpy(info->what.mb.filename, row[OSID_PATH],
+			MAX_BOOT_PATH-1);
+	}
 	else if (row[PARTITION] != 0 && row[PARTITION][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_PART;
 		info->what.partition = atoi(row[PARTITION]);
@@ -158,6 +167,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 #undef PARTITION
 #undef DEF_BOOT_CMD_LINE
 #undef DEF_BOOT_PATH
+#undef OSID_PATH
 }
 
 int
