@@ -423,7 +423,9 @@ int main(int argc, char **argv)
   argc -= optind;
   argv += optind;
 
-  srandom(time(NULL) + getpid());
+  int seed = time(NULL)+getpid();
+  printf("seed = %d\n",seed);
+  srandom(seed);
 
   /*
    * Set up the LEDA graph window environment.  Whenever

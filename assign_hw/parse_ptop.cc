@@ -4,7 +4,9 @@
  *
  * format:
  * node <name> <type> [<type2> ...]
- *   <type> = pc | switch | dnard
+ *   <type> = <t>[:<max>]
+ *   <t>    = pc | switch | dnard
+ *   <max>  = how many virtual entities of that type per physical entity.
  * link <src> <dst> <size> <number>
  */
 
@@ -70,18 +72,29 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	  PG[no1].types[j].max = 0;
 	}
 	while ((scur = strsep(&snext," ")) != NULL) {
-	  if (strcmp(scur,"pc") == 0) {
+	  char *t,*load=scur;
+	  int iload;
+	  t = strsep(&load,":");
+	  if (load) {
+	    if (sscanf(load,"%d",&iload) != 1) {
+	      fprintf(stderr,"Bad load specifier: %s\n",load);
+	      iload=1;
+	    }
+	  } else {
+	    iload=1;
+	  }
+	  if (strcmp(t,"pc") == 0) {
 	    PG[no1].types[TYPE_PC].name = "pc";
-	    PG[no1].types[TYPE_PC].max = 1;
-	  } else if (strcmp(scur,"dnard") == 0) {
+	    PG[no1].types[TYPE_PC].max = iload;
+	  } else if (strcmp(t,"dnard") == 0) {
 	    // XXX
 	    PG[no1].types[TYPE_DNARD].name = "dnard";
-	    PG[no1].types[TYPE_DNARD].max = 0;
-	  } else if (strcmp(scur,"delay") == 0) {
+	    PG[no1].types[TYPE_DNARD].max = iload;
+	  } else if (strcmp(t,"delay") == 0) {
 	    // XXX - add detection of max based on # of links
-	    PG[no1].types[TYPE_DELAY].name = "pc";
-	    PG[no1].types[TYPE_DELAY].max = 2;
-	  } else if (strcmp(scur,"delay_pc") == 0) {
+	    PG[no1].types[TYPE_DELAY].name = "delay";
+	    PG[no1].types[TYPE_DELAY].max = iload;
+	  } else if (strcmp(t,"delay_pc") == 0) {
 	    // this is an unsuported type.  Have types of both
 	    // delay and pc.
 	    fprintf(stderr,"Unsupported type: delay_pc\n");

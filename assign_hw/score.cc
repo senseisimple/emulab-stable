@@ -258,30 +258,45 @@ int add_node(node n,int ploc)
   
   // set up pnode
   // figure out type
-  if (pnoder.current_type != TYPE_UNKNOWN) {
+  if (pnoder.current_type == TYPE_UNKNOWN) {
 #ifdef SCORE_DEBUG
-    fprintf(stderr,"  already assigned\n");
+    fprintf(stderr,"  virgin pnode\n");
 #endif
-    return 1;
+    
+    // Remove check assuming at higher level?
+    // Remove higher level checks?
+    pnoder.max_load=0;
+    pnoder.current_type=vnoder.type;
+    pnoder.max_load = pnoder.types[vnoder.type].max;
+    
+    if (pnoder.max_load == 0) {
+      // didn't find a type
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"  no matching type\n");
+#endif
+      return 1;
+    }
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  matching type found (%d, max = %d)\n",
+	    pnoder.current_type,pnoder.max_load);
+#endif
+  } else {
+#ifdef SCORE_DEBUG
+    fprintf(stderr,"  pnode already has type\n");
+#endif
+    if (pnoder.current_type != vnoder.type) {
+#ifdef SCORE_DEBUG      
+      fprintf(stderr,"  incompatible types\n");
+#endif
+      return 1;
+    } else {
+#ifdef SCORE_DEBUG
+      fprintf(stderr,"  comaptible types\n");
+#endif
+      ; 
+      
+    }
   }
-  
-  // Remove check assuming at higher level?
-  // Remove higher level checks?
-  pnoder.max_load=0;
-  pnoder.current_type=vnoder.type;
-  pnoder.max_load = pnoder.types[vnoder.type].max;
-
-  if (pnoder.max_load == 0) {
-    // didn't find a type
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  no matching type\n");
-#endif
-    return 1;
-  }
-#ifdef SCORE_DEBUG
-  fprintf(stderr,"  matching type found (%d, max = %d)\n",
-	  pnoder.current_type,pnoder.max_load);
-#endif
 
   // set up links
   vnoder.no_connections=0;
