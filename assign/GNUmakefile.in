@@ -45,6 +45,10 @@ CXXFLAGS += -DFIND_PNODE_SEARCH -DNO_REVERT
 # for now because it breaks vclasses
 #CXXFLAGS += -DPER_VNODE_TT -DSMART_UNMAP
 
+# Temporary, until assign_wrapper is changed to mark simulated links as
+# trivial_ok
+CXXFLAGS += -DALLOW_TRIVIAL_DEFAULT
+
 # If you're looking to turn on or off USE_OPTIMAL, its now a cmdline
 # option. Use OP={0,1} on the command line at run time... :)
 

@@ -538,7 +538,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 
       if (dest_pv == pv) {
 	SDEBUG(cerr << "  trivial link" << endl);
-	if (allow_trivial_links) {
+	if (allow_trivial_links && vlink->allow_trivial) {
 	    vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
 	} else {
 	    SADD(SCORE_NO_CONNECTION);

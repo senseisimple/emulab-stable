@@ -115,6 +115,7 @@ public:
   bool no_connection;		// true if this link should be satisfied
 				// but isn't.
   bool allow_delayed;		// can this vlink by a delayed link
+  bool allow_trivial;           // can this vlink be a trivial link?
   vvertex src, dst;		// Source and destination for this link
 };
 

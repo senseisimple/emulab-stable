@@ -182,6 +182,11 @@ int parse_top(tb_vgraph &VG, istream& i)
 	l->no_connection = false;
 	l->name = name;
 	l->allow_delayed = true;
+#ifdef ALLOW_TRIVIAL_DEFAULT
+	l->allow_trivial = true;
+#else
+	l->allow_trivial = false;
+#endif
 	l->emulated = false;
 	
 	for (unsigned int i = 7;i < parsed_line.size();++i) {
@@ -189,6 +194,8 @@ int parse_top(tb_vgraph &VG, istream& i)
 	    l->allow_delayed = false;
 	  } else if (parsed_line[i].compare("emulated") == 0) {
 	    l->emulated = true;
+	  } else if (parsed_line[i].compare("trivial_ok") == 0) {
+	    l->allow_trivial = true;
 	  } else {
 	    top_error("bad link line, unknown tag: " <<
 		      parsed_line[i] << ".");
