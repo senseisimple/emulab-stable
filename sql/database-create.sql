@@ -677,9 +677,9 @@ CREATE TABLE os_info (
 #
 
 CREATE TABLE osidtoimageid (
-  osid varchar(30) NOT NULL default '',
+  osid varchar(35) NOT NULL default '',
   type varchar(30) NOT NULL default '',
-  imageid varchar(30) NOT NULL default '',
+  imageid varchar(45) NOT NULL default '',
   PRIMARY KEY  (osid,type)
 ) TYPE=MyISAM;
 
