@@ -23,7 +23,7 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
 		  console_reset db2ns bwconfig frisbeelauncher \
 		  rmgroup mkgroup mkacct setgroups mkproj eventsys_control \
-		  exports_setup.proxy
+		  exports_setup.proxy vnode_setup
 
 LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -103,6 +103,8 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/node_reboot
 	chown root $(INSTALL_BINDIR)/node_update
 	chmod u+s $(INSTALL_BINDIR)/node_update
+	chown root $(INSTALL_SBINDIR)/vnode_setup
+	chmod u+s $(INSTALL_SBINDIR)/vnode_setup
 	chown root $(INSTALL_SBINDIR)/eventsys_control
 	chmod u+s $(INSTALL_SBINDIR)/eventsys_control
 

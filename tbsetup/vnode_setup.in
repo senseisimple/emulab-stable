@@ -1,0 +1,237 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Set up the vnode state on a virtual (multiplexed) node.
+#
+# XXX - This script should only be run from os_setup!
+#
+# The output is all jumbled together since the updates are issued in parallel.
+# Might be a pain when debugging. 
+# 
+sub usage()
+{
+    print STDOUT "Usage: vnode_setup [-f] [-k] <pid> <eid>\n";
+    exit(-1);
+}
+my  $optlist = "fdk";
+  
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TESTMODE    = @TESTMODE@;
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBLOGS      = "@TBLOGSEMAIL@";
+
+my $ssh		= "$TB/bin/sshtb -n";
+my $sshremote	= "$TB/bin/sshremote -n";
+my $debug       = 0;
+my $force       = 0;
+my $failed      = 0;
+my $killmode    = 0;
+my $mode        = "setup";
+my $dbuid;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
+    $mode = "teardown";
+}
+my $pid   = $ARGV[0];
+my $eid   = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid\n");
+}	
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid\n");
+}	
+
+#
+# We don't want to run this script unless its the real version.
+# That is, it must be setuid root. 
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+#
+# Verify actual user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Verify permission to muck with this experiment.
+#
+if ($UID && !TBAdmin($UID)) {
+    if (!$killmode) {
+	#
+	# Only leader can setup experiments.
+	#
+	my $leader = ExpLeader($pid, $eid);
+
+	if ($dbuid ne $leader) {
+	    die("*** $0:\n".
+		"    You do not have permission for $pid/$eid!\n");
+	}
+    }
+    else {
+	if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
+	    die("*** $0:\n".
+		"    You do not have permission to destroy $pid/$eid!\n");
+	}
+    }
+}
+
+#
+# A sanity check. Lets make sure the experiment is in the proper state.
+#
+if (!$force) {
+    if (($killmode  && ExpState($pid, $eid) ne EXPTSTATE_SWAPPING) ||
+	(!$killmode && ExpState($pid, $eid) ne EXPTSTATE_ACTIVATING)) {
+	die("*** $0:\n".
+	    "    The experiment $pid/$eid is not in the proper state!\n");
+    }
+}
+
+#
+# Get the list of nodes.
+# 
+my @nodes = ExpNodes($pid, $eid);
+if (! @nodes) {
+    warn("*** $0:\n".
+	 "    No allocated nodes in experiment $pid/$eid!\n");
+    exit(0);
+}
+
+# Just the vnodes mam.
+foreach my $node (@nodes) {
+    my $pnode;
+    
+    if (! TBIsNodeVirtual($node)) {
+	next;
+    }
+
+    if (! TBPhysNodeID($node, \$pnode)) {
+	die("*** $0:\n".
+	    "    No physical node for $node!\n");
+    }
+    TBSetNodeEventState($node, TBDB_NODESTATE_REBOOTING);
+    
+    print STDOUT "Doing $mode of vnode $node on $pnode ...\n";
+
+    #
+    # We need to know if its a remote or local node, so we know how
+    # to update it. This info needs to be in the DB at some point. 
+    #
+    my $isremote = TBIsNodeRemote($pnode);
+
+    #
+    # Run an ssh command in a child process, protected by an alarm to
+    # ensure that the ssh is not hung up forever if the machine is in
+    # some funky state.
+    # 
+    my $syspid = fork();
+
+    if ($syspid) {
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	alarm 10;
+	waitpid($syspid, 0);
+	alarm 0;
+
+	print STDERR "vnode $mode on $pnode returned $?.\n" if $debug;
+    
+	#
+	# If either ssh is not running or it timed out,
+	# send it a ping of death.
+	# 
+	if ($? == 256 || $? == 15) {
+	    if ($? == 256) {
+		print STDERR "$node is not running sshd.\n" if $debug;
+	    } else {
+		print STDERR "$node is wedged.\n" if $debug;
+	    }
+	    
+	    # Send mail to testbed-ops about it
+	    SENDMAIL($TBOPS, "Virtual Node $node $mode failure",
+	     "Virtual node $node $mode (on physical node $pnode) in pid/eid\n".
+	     "$pid/$eid has failed!\n");
+
+	    if (!$killmode) {
+		die("*** $0:\n".
+		    "    Virtual node $node setup failure!\n");
+	    }
+	    else {
+		warn("*** $0:\n".
+		    "    Virtual node $node teardown failure!\n");
+	    }
+	}
+    }
+    else {
+	my $args = ($killmode ? "-k" : "");
+	$args    = "$args $node";
+	
+	# Must change our real UID to root so that ssh will work.
+	$UID = 0;
+    
+	if ($isremote) {
+	    exec("$sshremote $pnode /usr/local/etc/testbed/vnodesetup $args");
+	}
+	else {
+	    exec("$ssh $pnode /etc/testbed/vnodesetup $args");
+	}
+	die("*** $0:\n".
+	    "    exec failed!\n");
+    }
+}
+
+#
+# Only if all nodes setup okay.
+# 
+print STDOUT "Vnode Setup Done!\n";
+exit 0;
