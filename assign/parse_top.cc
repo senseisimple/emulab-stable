@@ -17,6 +17,7 @@
 #include "common.h"
 #include "virtual.h"
 
+extern list<string> vtypes;
 extern tb_vgraph G;
 
 extern node_pq<int> unassigned_nodes;
@@ -60,6 +61,8 @@ int parse_top(tb_vgraph &G, istream& i)
 	nmap.insert(s1, no1);
 	scur=strsep(&snext," ");
 	G[no1].type=string(scur);
+	vtypes.push(G[no1].type);
+	
 	/* Read in desires */
 	while ((scur=strsep(&snext," ")) != NULL) {
 	  char *desire = scur;

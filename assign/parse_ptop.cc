@@ -26,6 +26,7 @@
 
 extern node pnodes[MAX_PNODES];	// int -> node map
 node_array<int> switch_index;
+extern list<string> ptypes;
 
 int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 {
@@ -86,6 +87,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  } else {
 	    iload=1;
 	  }
+	  ptypes.push(stype);
 	  if (strcmp(t,"switch") == 0) {
 	    isswitch = 1;
 	    PG[no1].types.insert(stype,1);

@@ -170,7 +170,7 @@ foreach $lan (keys(%lans)) {
     $hassharks = 0;
     foreach $member (@{$lans{$lan}}) {
 	($node) = (split(":",$member))[0];
-	if ($nodes{$node} eq "shark") {
+	if (($nodes{$node} eq "shark") || ($nodes{$node} eq "dnard")) {
 	    push(@$sharks,$member);
 	    $hassharks = 1;
 	} else {
@@ -226,7 +226,7 @@ $delaynodes=0;
 
 foreach $node (keys(%nodes)) {
     # Shark hack
-    if ($nodes{$node} ne "shark") {
+    if (($nodes{$node} ne "shark") && ($nodes{$node} ne "dnard")) {
 	print TOPFILE "node $node $nodes{$node}\n";
 	if ($nodes{$node} ne "shark-shelf") {
 	    $nodes++;
@@ -402,11 +402,20 @@ while (1) {
     printdb "Reading assign results.\n";
     while (<ASSIGNFP>) {
 	chop;
+	/No physical nodes of type (.+)$/ && do {
+	    $score=-2;
+	    print $_ . "\n";
+	};
 	/^With ([0-9]+) violations$/ && do {
 	    $violations = $1;
 	    last;
 	};
 	/^[ \t]+BEST SCORE: [ \t]+([0-9]+\.[0-9]+)/ && ($score=$1);
+    }
+    if ($score == -2) {
+	# Type error
+	print "Giving up.\n";
+	exit(2);
     }
     printdb "Found score $score, violations $violations.\n";
 

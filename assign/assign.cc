@@ -72,6 +72,18 @@ node_pq<int> unassigned_nodes(G);
 int parse_top(tb_vgraph &G, istream& i);
 int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
 
+/* The following two sets hold all the virtual and physical types.  These
+ * are compared to make sure that every member of vtypes is in ptypes.
+ * Both are filled by the parse_* routines.  I'd love to use LEDA sets
+ * to implement this but LEDA, an otherwise profession work, did a lousy
+ * job when it came to sets.  They clash with graph iterators!  Since
+ * we only use these once we'll use a much less efficient linked list
+ * <shudder>
+ */
+list<string> vtypes;
+list<string> ptypes;
+
+
 /*
  * Basic simulated annealing parameters:
  *
@@ -510,6 +522,18 @@ int main(int argc, char **argv)
     }
     nparts = parse_ptop(PG,SG,ptopfile);
     cout << "Nparts: " << nparts << endl;
+
+    cout << "Type Precheck" << endl;
+    string curtype;
+    int ok=1;
+    forall (curtype,vtypes) {
+      if (ptypes.search(curtype) == nil) {
+	cout << "  No physical nodes of type " << curtype << endl;
+	ok=0;
+      }
+    }
+    if (! ok) exit(-1);
+    
     cout << "Initializing data structures." << endl;
     edge_costs.init(SG);
     switch_distances.init(SG);

@@ -347,6 +347,9 @@ int add_node(node n,int ploc)
       fprintf(stderr,"  comaptible types\n");
 #endif
       if (pnoder.current_load == pnoder.max_load) {
+	/* XXX - We could ignore this check and let the code
+	   at the end of the routine penalize for going over
+	   load.  Failing here seems to work better though. */
 #ifdef SCORE_DEBUG
 	fprintf(stderr,"  node is full\n");
 #endif

@@ -75,8 +75,14 @@ mapping is made any unused features add their cost to the score and
 any unfulfilled desires add their weight to the score.  Fulfilled
 desires/used features add nothing to the score.
 
+environmental variables
+-----------------------
 
-compile type options
+ASSIGN_SEED - If present will cause assign to use the value as its
+random number seed.  Otherwise the seed is taken from the current
+time.
+
+compile time options
 --------------------
 
 -DVERBOSE adds temperature output and functions as a crude progress meter.
