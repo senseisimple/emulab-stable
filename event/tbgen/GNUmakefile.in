@@ -21,6 +21,17 @@ all:	$(PROGRAMS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+LIBTBDIR    = $(OBJDIR)/lib/libtb
+LIBEVENTDIR = ../lib
+
+# Rules to make sure that some libraries we need from other directories get
+# built first
+$(LIBTBDIR)/%.o:
+	@$(MAKE) -C $(LIBTBDIR) $(@F)
+
+$(LIBEVENTDIR)/%.a:
+	@$(MAKE) -C $(LIBEVENTDIR) $(@F)
+
 CFLAGS   += -DDEBUG
 CFLAGS	 += -O -g -static -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
@@ -30,11 +41,11 @@ LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent
 LIBS     += `elvin-config --libs vin4c`
 
-tevc:	tevc.o
+tevc:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
 	# Link against some of the object files from libtb, instead of the
 	# whole library, since the latter cannot be built on ops
-	$(CC) $(LDFLAGS) -static -o $@ tevc.o ../../lib/libtb/log.o \
-		../../lib/libtb/tbdefs.o $(LIBS)
+	$(CC) $(LDFLAGS) -static -o $@ tevc.o $(LIBTBDIR)/log.o \
+		$(LIBTBDIR)/tbdefs.o $(LIBS)
 
 tevd:	tevd.o
 	$(CC) $(LDFLAGS) -o $@ tevd.o \
