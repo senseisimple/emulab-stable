@@ -68,7 +68,7 @@ $find = "SELECT";
 while ($row = mysql_fetch_row($selected)) {
   $uid = $row[0];
   if ($find == "SELECT") {
-    $find .= " DISTINCT uid,usr_name,usr_email,usr_addr,usr_phone FROM users WHERE (status='newuser' OR status='unapproved') AND (uid='$uid'";
+    $find .= " DISTINCT uid,usr_name,usr_email,usr_title,usr_affil,usr_addr,usr_addr2,usr_city,usr_state,usr_zip,usr_phone FROM users WHERE (status='newuser' OR status='unapproved') AND (uid='$uid'";
   } else {
     $find .= " OR uid='$uid'";
   }
@@ -80,36 +80,51 @@ if ( mysql_num_rows($found) == 0 ) {
 } else {
   echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2 align='center'>
 <tr>
-<td>Action</td>
-<td>Trust Level</td>
-<td>User</td>
+<td rowspan=2>Action</td>
+<td rowspan=2>Trust Level</td>
+<td rowspan=2>User</td>
 <td>Name</td>
+<td>Title</td>
+<td>Affil.</td>
 <td>E-mail</td>
+<td>Phone</td>
+</tr><tr>
 <td>Addr</td>
-<td>Ph&nbsp;#</td>
+<td>Addr2</td>
+<td>City</td>
+<td>State</td>
+<td>Zip</td>
 </tr>
 <form action='approved.php3?$auth_usr' method='post'>\n";
   while ($row = mysql_fetch_row($found)) {
     $uid = $row[0];
     $name= $row[1];
     $email=$row[2];
-    $addr= $row[3];
-    $phone=$row[4];
-    echo "<tr><td><select name=\"$uid\">
+    $title=$row[3];
+    $affil=$row[4];
+    $addr= $row[5];
+    $addr2=$row[6];
+    $city= $row[7];
+    $state=$row[8];
+    $zip=  $row[9];
+    $phone=$row[10];
+    echo "
+<tr><td colspan=8>&nbsp;</td></tr>
+<tr><td rowspan=2><select name=\"$uid\">
 <option value='approve'>Approve</option>
 <option value='deny'>Deny</option>
 <option value='later'>Postpone</option></select></td>
-<td><select name=\"$uid-trust\">
+<td rowspan=2><select name=\"$uid-trust\">
 <option value='user'>User</option>
 <option value='local_root'>Local Root</option>";    
     #echo "<option value='group_root'>Group Root</option>";
     echo "</select></td>
-<td>&nbsp;$uid&nbsp;</td><td>&nbsp;$name&nbsp;</td><td>&nbsp;$email&nbsp;</td>
-<td>&nbsp;$addr&nbsp;</td><td>&nbsp;$phone&nbsp;</td>
+<td rowspan=2>&nbsp;$uid&nbsp;</td><td>&nbsp;$name&nbsp;</td><td>&nbsp;$title&nbsp;</td><td>&nbsp;$affil&nbsp;</td><td>&nbsp;$email&nbsp;</td><td>&nbsp;$phone&nbsp;</td></tr>
+<tr><td>&nbsp;$addr&nbsp;</td><td>&nbsp;$addr2&nbsp;</td><td>&nbsp;city&nbsp;</td><td>&nbsp;$state&nbsp;</td><td>&nbsp;$zip&nbsp;</td>
 </tr>\n";
   }
   echo "
-<tr><td colspan=7><b><input type='submit' value='Submit' name='OK'></td></tr>
+<tr><td align=center colspan=8><b><input type='submit' value='Submit' name='OK'></td></tr>
 </form>
 </table>\n";
 }
