@@ -459,7 +459,7 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
 	if (getsockname(tcpsock, (struct sockaddr *) &name, &length)) {
 		pfatal("getsockname");
 	}
-	if (listen(tcpsock, 20) < 0) {
+	if (listen(tcpsock, 128) < 0) {
 		pfatal("listen");
 	}
 	info("listening on TCP port %d\n", ntohs(name.sin_port));
