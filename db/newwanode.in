@@ -237,7 +237,11 @@ else {
 
     DBQueryFatal("insert into node_auxtypes ".
 		 "(node_id, type, count) ".
-		 "values ('$nodename', '$nodeauxtype', 1)");
+		 "values ('$nodename', '$nodeauxtype', 20)");
+
+    DBQueryFatal("insert into node_auxtypes ".
+		 "(node_id, type, count) ".
+		 "values ('$nodename', '$nodevtype', 20)");
 
     DBQueryFatal("replace into node_status ".
 		 "(node_id, status, status_timestamp) ".
