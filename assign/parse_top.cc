@@ -50,6 +50,9 @@ int parse_top(tb_vgraph &G, istream& i)
 	string s1(scur);
 	no1 = G.new_node();
 	unassigned_nodes.insert(no1,random());
+#ifdef GRAPH_DEBUG
+	cout << "Found virt. node '"<<scur<<"'\n";
+#endif
 	G[no1].name=strdup(scur);
 	G[no1].posistion = 0;
 	G[no1].no_connections=0;

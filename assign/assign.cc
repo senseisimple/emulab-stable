@@ -134,12 +134,22 @@ int assign()
   int absbestv;
   
   float temp = init_temp;
+
+#ifdef VERBOSE
+  cout << "Initialized to cycles="<<cycles<<" optimal="<<optimal<<" mintrans="
+       << mintrans<<" naccepts="<<naccepts<<" nnodes="<<nnodes<<"\n";
+#endif
+  
   
   /* Set up the initial counts */
   init_score();
 
   bestscore = get_score();
   bestviolated = violated;
+#ifdef VERBOSE
+  cout << "Problem started with score "<<bestscore<<" and "<< violated
+       << " violations.\n";
+#endif
   absbest = bestscore;
   absbestv = bestviolated;
   node n3;
@@ -248,7 +258,8 @@ int assign()
       
     temp *= temp_rate;
   }
-
+  cout << "Done.\n";
+  
  DONE:
   forall_nodes(n, G) {
     bestnodes[n] = absnodes[n];
@@ -442,7 +453,7 @@ int main(int argc, char **argv)
   */
   parse_options(argv, options, noptions);
 #ifdef SCORE_DEBUG
-  dump_options("Send options", options, noptions);
+  dump_options("Configuration options:", options, noptions);
 #endif
 
   int seed = time(NULL)+getpid();
@@ -456,13 +467,14 @@ int main(int argc, char **argv)
    * Allow the user to specify a topology in ".top" format.
    */
 
-  if (argc == 1) {
+  if (argc >= 1) {
     ifstream infile;
     infile.open(argv[0]);
     if (!infile || !infile.good()) {
       cerr << "Error opening file: " << argv[0] << endl;
       exit(-11);
     }
+    cout << "Parsing top\n";
     parse_top(G, infile);
   }
 

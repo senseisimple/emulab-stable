@@ -63,6 +63,9 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	snode = scur;
 	string s(snode);
 	no1 = PG.new_node();
+#ifdef GRAPH_DEBUG
+	cout << "Found phys. node '"<<snode<<"'\n";
+#endif
 	PG[no1].name=strdup(snode);
 	PG[no1].typed = false;
 	PG[no1].max_load = 0;
