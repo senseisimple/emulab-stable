@@ -24,6 +24,8 @@ my $v = 0; # Verbose
 my $help=0;
 my $allmodes=1;
 my $x=0;
+my $g=0;
+my $t=0;
 my %modes=();
 my $dot=0;
 my $vcg=0;
@@ -33,6 +35,8 @@ my $png=0;
 
 while ($_ = shift) {
     print "arg: '$_'\n" if ($v);
+    # Ordering: Make sure longer options are first where the first char is
+    # ambiguous.
     /^-h/ && do { $help=1; next; };
     /^-dot/ && do { $dot=1; next; };
     /^-vcg/ && do { $vcg=1; next; };
@@ -41,6 +45,8 @@ while ($_ = shift) {
     /^-png/ && do { $png=1; next; };
     /^-[dv]/ && do { $v++; next; };
     /^-x/ && do { $x=1; next; };
+    /^-g/ && do { $g=1; next; };
+    /^-t/ && do { $t=1; next; };
     /^-o/ && do { $prefix=shift || $defprefix; next; };
     # if it is all lowercase, caps it, otherwise leave it alone
     if ("\L$_" eq "$_") { $_ = "\U$_"; }
@@ -54,18 +60,20 @@ if ($allmodes && $x) { $x=0; }
 if ($help) {
     #Help mode
     print <<EOF;
-Usage: stategraph [-h] [-v] [-d] [-dot] [-vcg] 
+Usage: stategraph [-h] [-v] [-d] [-dot] [-vcg] [-x] [-g] [-t]
                   [-ps] [-gif] [-png] [-o <out>] [op_mode1] ...
   -h       This help message
   -v       Verbose mode. Multiple -v options cause more verbosity.
   -d       Debug mode. Alias for -v.
   -dot     Generate output using 'dot' graph layout tool.
   -vcg     Generate output using 'vcg' graph layout tool.
+  -x       Exclude all op_modes not explicitly included
+  -g       Use global layout instead of clustered
+  -t       Supress transition labels
   -ps      Generate PostScript format output.
   -gif     Generate GIF format output.
   -png     Generate PNG format output.
   -o <out> Prefix for output filenames.
-  -x       Exclude all op_modes not explicitly included
 
 This program generates a graph of the state machines as defined in the
 state_transitions and mode_transitions tables in the database. This
@@ -89,7 +97,7 @@ EOF
 my $vcgtag="-vcg";
 my $dottag="-dot";
 my $cleanup=1;
-my $nocluster=1;
+my $nocluster=$g;
 if (!$dot && !$vcg) { $dot=1; }
 if (!$ps && !$gif && !$png) { $ps=1; }
 if (!($dot && $vcg)) { $vcgtag=""; $dottag=""; }
@@ -156,8 +164,11 @@ while(@r=$result->fetchrow()) {
 	#print TMPN "    $n1 -> $n2 [samehead=\"$n1\"];\n" if $dot;
 	#print TMPN "    $n1 -> $n2 [samehead=\"$n2\"];\n" if $dot;
     #} else {
-	#print TMPN "    $n1 -> $n2;\n" if $dot;
-	print TMPN "    $n1 -> $n2 [label=\"$l\"];\n" if $dot;
+        if ($t) {
+	    print TMPN "    $n1 -> $n2;\n" if $dot;
+	} else {
+	    print TMPN "    $n1 -> $n2 [label=\"$l\"];\n" if $dot;
+	}
     #}
     print TMP "  edge: { sourcename: \"$n1\" targetname: \"$n2\" }\n" if $vcg;
 }
