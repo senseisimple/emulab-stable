@@ -1,9 +1,9 @@
 diff -rcN tftp-hpa-0.33.orig/MCONFIG.in tftp-hpa-0.33/MCONFIG.in
 *** tftp-hpa-0.33.orig/MCONFIG.in	Tue Nov 27 03:18:11 2001
---- tftp-hpa-0.33/MCONFIG.in	Thu Feb  6 13:07:09 2003
+--- tftp-hpa-0.33/MCONFIG.in	Wed Oct 15 10:30:35 2003
 ***************
 *** 27,32 ****
---- 27,36 ----
+--- 27,39 ----
   
   # System binaries
   SBINDIR = @sbindir@
@@ -11,12 +11,25 @@ diff -rcN tftp-hpa-0.33.orig/MCONFIG.in tftp-hpa-0.33/MCONFIG.in
 + 
 + # Config info
 + ETCDIR = @sysconfdir@
++ 
++ # Facility for logging
++ LOGFACIL = LOG_LOCAL5
   
   # Binary suffixes
   O = @OBJEXT@
 ***************
-*** 42,47 ****
---- 46,52 ----
+*** 42,51 ****
+  INSTALL         = @INSTALL@
+  INSTALL_PROGRAM = @INSTALL_PROGRAM@
+  INSTALL_DATA    = @INSTALL_DATA@
+  
+  # Compiler and compiler flags
+  CC      = @CC@
+! CFLAGS  = @CFLAGS@ -I$(SRCROOT)
+  
+  # Link flags
+  LDFLAGS = @LDFLAGS@
+--- 49,59 ----
   INSTALL         = @INSTALL@
   INSTALL_PROGRAM = @INSTALL_PROGRAM@
   INSTALL_DATA    = @INSTALL_DATA@
@@ -24,9 +37,13 @@ diff -rcN tftp-hpa-0.33.orig/MCONFIG.in tftp-hpa-0.33/MCONFIG.in
   
   # Compiler and compiler flags
   CC      = @CC@
+! CFLAGS  = @CFLAGS@ -I$(SRCROOT) -DLOGFACIL=$(LOGFACIL)
+  
+  # Link flags
+  LDFLAGS = @LDFLAGS@
 diff -rcN tftp-hpa-0.33.orig/configure tftp-hpa-0.33/configure
 *** tftp-hpa-0.33.orig/configure	Sun Feb  2 18:33:26 2003
---- tftp-hpa-0.33/configure	Wed Feb  5 14:03:10 2003
+--- tftp-hpa-0.33/configure	Wed Oct 15 10:18:00 2003
 ***************
 *** 9652,9658 ****
   fi
@@ -80,7 +97,7 @@ diff -rcN tftp-hpa-0.33.orig/configure tftp-hpa-0.33/configure
   
 diff -rcN tftp-hpa-0.33.orig/configure.in tftp-hpa-0.33/configure.in
 *** tftp-hpa-0.33.orig/configure.in	Thu Jan 30 19:17:01 2003
---- tftp-hpa-0.33/configure.in	Wed Feb  5 14:03:10 2003
+--- tftp-hpa-0.33/configure.in	Wed Oct 15 10:18:00 2003
 ***************
 *** 124,130 ****
   AC_SEARCH_LIBS(xstrdup, iberty, , LIBXTRA=true AC_LIBOBJ(xstrdup))
@@ -134,7 +151,7 @@ diff -rcN tftp-hpa-0.33.orig/configure.in tftp-hpa-0.33/configure.in
   AC_SUBST(TFTP_LIBS)
 diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
 *** tftp-hpa-0.33.orig/tftpd/Makefile	Tue Nov 27 03:18:11 2001
---- tftp-hpa-0.33/tftpd/Makefile	Wed Feb 12 11:25:15 2003
+--- tftp-hpa-0.33/tftpd/Makefile	Wed Oct 15 10:18:00 2003
 ***************
 *** 23,32 ****
   	sed -e 's/@@VERSION@@/$(VERSION)/g' < $< > $@
@@ -161,7 +178,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/Makefile tftp-hpa-0.33/tftpd/Makefile
   	rm -f *.o *.obj *.exe tftpd tftpsubs.c tftpsubs.h tftpd.8
 diff -rcN tftp-hpa-0.33.orig/tftpd/remap.c tftp-hpa-0.33/tftpd/remap.c
 *** tftp-hpa-0.33.orig/tftpd/remap.c	Thu Nov  7 18:10:09 2002
---- tftp-hpa-0.33/tftpd/remap.c	Wed Feb 12 11:04:49 2003
+--- tftp-hpa-0.33/tftpd/remap.c	Wed Oct 15 10:18:00 2003
 ***************
 *** 285,291 ****
     /* Default error */
@@ -258,7 +275,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/remap.c tftp-hpa-0.33/tftpd/remap.c
     return current;
 diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh tftp-hpa-0.33/tftpd/tftpd-hpa.sh
 *** tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh	Wed Dec 31 17:00:00 1969
---- tftp-hpa-0.33/tftpd/tftpd-hpa.sh	Wed Feb  5 14:28:33 2003
+--- tftp-hpa-0.33/tftpd/tftpd-hpa.sh	Wed Oct 15 10:18:00 2003
 ***************
 *** 0 ****
 --- 1,43 ----
@@ -307,7 +324,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd-hpa.sh tftp-hpa-0.33/tftpd/tftpd-hpa.sh
 + exit 0
 diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
 *** tftp-hpa-0.33.orig/tftpd/tftpd.c	Thu Jan 30 19:22:33 2003
---- tftp-hpa-0.33/tftpd/tftpd.c	Wed Feb 12 11:04:48 2003
+--- tftp-hpa-0.33/tftpd/tftpd.c	Wed Oct 15 10:24:38 2003
 ***************
 *** 61,66 ****
 --- 61,67 ----
@@ -391,8 +408,23 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   main(int argc, char **argv)
   {
 ***************
-*** 270,275 ****
---- 297,303 ----
+*** 270,284 ****
+  #ifdef WITH_REGEX
+    char *rewrite_file = NULL;
+  #endif
+  
+    /* basename() is way too much of a pain from a portability standpoint */
+  
+    p = strrchr(argv[0], '/');
+    __progname = (p && p[1]) ? p+1 : argv[0];
+    
+!   openlog(__progname, LOG_PID|LOG_NDELAY, LOG_DAEMON);
+    
+!   while ((c = getopt(argc, argv, "cspvVla:u:U:r:t:T:m:")) != -1)
+      switch (c) {
+      case 'c':
+        cancreate = 1;
+--- 297,312 ----
   #ifdef WITH_REGEX
     char *rewrite_file = NULL;
   #endif
@@ -400,18 +432,10 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
   
     /* basename() is way too much of a pain from a portability standpoint */
   
-***************
-*** 278,284 ****
+    p = strrchr(argv[0], '/');
+    __progname = (p && p[1]) ? p+1 : argv[0];
     
-    openlog(__progname, LOG_PID|LOG_NDELAY, LOG_DAEMON);
-    
-!   while ((c = getopt(argc, argv, "cspvVla:u:U:r:t:T:m:")) != -1)
-      switch (c) {
-      case 'c':
-        cancreate = 1;
---- 306,312 ----
-    
-    openlog(__progname, LOG_PID|LOG_NDELAY, LOG_DAEMON);
+!   openlog(__progname, LOG_PID|LOG_NDELAY, LOGFACIL);
     
 !   while ((c = getopt(argc, argv, "cC:spvVla:u:U:r:t:T:m:")) != -1)
       switch (c) {
@@ -661,7 +685,7 @@ diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.c tftp-hpa-0.33/tftpd/tftpd.c
     if (send(peer, buf, length, 0) != length)
 diff -rcN tftp-hpa-0.33.orig/tftpd/tftpd.rules tftp-hpa-0.33/tftpd/tftpd.rules
 *** tftp-hpa-0.33.orig/tftpd/tftpd.rules	Wed Dec 31 17:00:00 1969
---- tftp-hpa-0.33/tftpd/tftpd.rules	Wed Feb  5 14:03:10 2003
+--- tftp-hpa-0.33/tftpd/tftpd.rules	Wed Oct 15 10:18:00 2003
 ***************
 *** 0 ****
 --- 1,27 ----
