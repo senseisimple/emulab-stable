@@ -29,7 +29,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
 # Handle command-line arguments
-# TODO: Allow a user to specify some of their own arguments to uisp
 #
 sub usage() {
     warn "Usage: $0 <src> <dst>\n";
@@ -55,9 +54,9 @@ if ($dst =~ /^([-\w\/.]+)$/) {
 }
 
 my $tmpdir = $ENV{'TMPDIR'};
-$tmpdir = "/tmp"
+$tmpdir = "/var/tmp"
     if (!defined($tmpdir));
-if ($src =~ /^($tmpdir\/[-\w\/.]+)$/) {
+if ($src =~ /^($tmpdir\/php[\w]+)$/) {
     $src = $1;
 } else {
     die("*** Source isn't a php temp file.\n");
