@@ -24,6 +24,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 DESTDIR		=
 ETCDIR		= $(DESTDIR)/etc
+JAILDIR		= $(ETCDIR)/jail
 INSTALL_DIR	= $(ETCDIR)/testbed
 RC_DIR		= $(INSTALL_DIR)/rc.d
 RRC_DIR		= $(DESTDIR)/usr/local/etc/rc.d
@@ -38,6 +39,10 @@ mfs-install:	script-install bin-install
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)
 	$(INSTALL) -m 755 -o root -g wheel -d $(RC_DIR)
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/db
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/jails
+	$(INSTALL) -m 755 -o root -g wheel -d /var/emulab/logs
 
 misc-install:	dir-install
 	$(INSTALL) -m 755 -o root -g wheel -d $(INSTALL_DIR)/sup
@@ -101,3 +106,14 @@ sfs-install:
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/var
 	$(INSTALL) -m 775 -o sfs -g sfs -d $(DESTDIR)/var/sfs/root/usr
+
+jail-install:	dir-install
+	$(INSTALL) -m 755 -o root -g wheel -d $(JAILDIR)
+	$(INSTALL) -m 644 $(SRCDIR)/jail/group $(JAILDIR)/group
+	$(INSTALL) -m 640 $(SRCDIR)/jail/master.passwd $(JAILDIR)/master.passwd
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.conf $(JAILDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/jail/rc.local $(JAILDIR)/rc.local
+	$(INSTALL) -m 755 $(SRCDIR)/jail/injail.pl $(JAILDIR)/injail.pl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/jaildog.pl $(INSTALL_DIR)/jaildog.pl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/jailctl $(INSTALL_DIR)/jailctl
+	$(INSTALL) -m 755 $(SRCDIR)/jail/mkjail.pl $(INSTALL_DIR)/mkjail.pl

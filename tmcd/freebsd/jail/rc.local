@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# The point of this is to startup testbed stuff inside the jail.
+#
+if [ -f /usr/local/etc/emulab/jailctl ]; then
+    /usr/local/etc/emulab/jailctl start
+elif [ -f /etc/testbed/jailctl ]; then
+    /etc/testbed/jailctl start
+fi
+
+exit 0
+
