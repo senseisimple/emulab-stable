@@ -2070,10 +2070,23 @@ if ($query_result->numrows) {
 # Adding to the v2pmap table
 #
 foreach my $vnode (keys(%v2pmap)) {
-  my $pnode = $v2pmap{$vnode};
+    my $pnode;
 
-  DBQueryFatal("insert into v2pmap (pid,eid,vname,node_id) values " .
-	       "('$pid','$eid','$vnode','$pnode')");
+    #
+    # If a virtual node, the pnode is the virtual node, not the underlying
+    # physical node. The only place I know that cares about this table is
+    # dohosts() in tmcd.c, which gets the host table wrong inside a jail
+    # cause the pnode is not set properly.
+    #
+    if ($isvirtnode{$vnode}) {
+	$pnode = $v2vmap{$vnode};
+    }
+    else {
+	$pnode = $v2pmap{$vnode};
+    }
+
+    DBQueryFatal("insert into v2pmap (pid,eid,vname,node_id) values " .
+		 "('$pid','$eid','$vnode','$pnode')");
 }
 
 TBDebugTimeStamp("uploading finished");
