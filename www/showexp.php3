@@ -111,17 +111,22 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 }
 
 if (ISADMIN($uid)) {
-    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0 ||
+	strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
 
 	SUBMENUSECTION("Beta-Test Options");
-	    
-	WRITESUBMENUBUTTON("Restart this Experiment",
-			   "swapexp.php3?inout=restart&pid=$exp_pid".
-			   "&eid=$exp_eid");
+	
+	if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {		
+	    WRITESUBMENUBUTTON("Restart this Experiment",
+			       "swapexp.php3?inout=restart&pid=$exp_pid".
+			       "&eid=$exp_eid");
+	}              
 	
 	WRITESUBMENUBUTTON("Modify this Experiment",
 			   "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
-
+    }
+    
+    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {	
 	SUBMENUSECTION("Admin Options");
 	
 	WRITESUBMENUBUTTON("Send a Swap Request",
@@ -131,7 +136,7 @@ if (ISADMIN($uid)) {
 	WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
 			   "swapexp.php3?inout=out&force=1".
 			   "&pid=$exp_pid&eid=$exp_eid");
-
+	
 	SUBMENUSECTIONEND();
     }
 }

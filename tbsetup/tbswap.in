@@ -13,10 +13,13 @@ use English;
 # XXX: repush/calc routing for update??? (tbprerun)
 # XXX: previz for update???              (tbprerun)
 # XXX: make snmpit faster for update.
+#
+# XXX: for update, expt is swapped out on os_setup fail.
+#      (we only recover if assign fails)
 
 sub usage()
 {
-    print STDERR "Usage: $0 { in | out [-force] | update [-restart] } pid eid\n";
+    print STDERR "Usage: $0 { in | out [-force] | update [-reboot] } pid eid\n";
     exit(-1);
 }
 
@@ -49,6 +52,7 @@ sub REAL()    { return 4; }
 sub CLEANUP() { return 3; }
 sub RETRY()   { return 2; }
 sub UPDATE()  { return 1; }
+sub UPDATE_RECOVER()  { return 0; }
 
 #
 # Turn off line buffering on output
@@ -56,11 +60,10 @@ sub UPDATE()  { return 1; }
 
 $| = 1;
 
-my $restart = 0;
+my $updateReboot = 0;
 my $force  = 0;
 my $errors = 0;
-
-my $retry  = 0;
+my $assignWrapperErrorCode = 0;
 
 my $state;
 
@@ -89,8 +92,8 @@ while ($#ARGV > 1) {
     $arg = shift;
     if ($arg eq "-force") {
 	$force = 1;
-    } elsif ($arg eq "-restart") {
-	$restart = 1;
+    } elsif ($arg eq "-reboot") {
+	$updateReboot = 1;
     } else {
 	usage();
     }
@@ -212,8 +215,14 @@ if (! $errors) {
     }
 }
 
+#
+# Update, Phase One -- swap experiment partially out.
+#
 if (! $errors) {
     if ($swapop eq "update") {
+	print STDERR "Backing up physical state...\n";
+	TBExptBackupPhysicalState($pid,$eid,$$);
+
 	$errors = doSwapout(UPDATE);
 	if (! $errors) {
 	    # leave $nextState undefined. 
@@ -232,40 +241,16 @@ if (! $errors) {
     }
 }
 
-if (! $errors) {
-    if ($swapop eq "in" || $swapop eq "update") {
+#
+# Update, Phase Two -- swap experiment back in.
+#
+if (! $errors) { 
+    if ($swapop eq "update") {
 	#
-	# Swap in
+	# Update
 	#
+	$errors = doSwapin(UPDATE);
 
-	if ($swapop eq "in") {
-	    $errors = doSwapin(REAL);
-	} else {
-	    $errors = doSwapin(UPDATE);
-	}
-
-	my $retries = 2;
-
-	#
-	# Attempt a retry if: 
-	#   a) there were errors, 
-	#   b) doswapin() indicated (via $retry) a retry is appropriate,
-	#   c) we haven't tried too many times already.
-	#   d) (XXX temporary) We're not doing an update.
-	#
-	# NOTE that if $TESTMODE == 1, retries are impossible, since
-        # $retry will never get set to 1.
-	#
-	while ($errors && $retry && $retries && $swapop eq "in") {
-	    $retries--;
-
-	    print STDERR "Cleaning up after errors; will try again.\n";
-	    doSwapout(RETRY);
-
-	    print STDERR "Trying again...\n";
-	    $errors = doSwapin(RETRY);
-	}
-	
 	if (! $errors) {
 	    #
 	    # Update Accounting Information
@@ -281,13 +266,98 @@ if (! $errors) {
 	    } else {
 		$nextState = EXPTSTATE_ACTIVE;
 	    }
-	} else {	    
-	    print STDERR "Cleaning up after errors.\n";
+	} else {
+	    #
+	    # There were errors; see if we can recover.
+	    #
+	    my $canStillRecover = 1;
 
+	    if ($errors != 7) {
+		print STDERR "Update failure occurred _after_ assign phase; ";
+		$canStillRecover = 0;
+	    }
+
+	    if ($canStillRecover) {
+		print STDERR "Recovering physical state...\n";
+		my $recoverErrors = TBExptRestorePhysicalState($pid,$eid,$$);
+		if ($recoverErrors) {
+		    print STDERR "Could not restore backed-up physical state; ";
+		    $canStillRecover = 0;
+		}
+	    }
+
+	    if ($canStillRecover) {
+		print STDERR "Doing a recovery swap-in of old state...\n";
+		$recoverErrors = doSwapin(UPDATE_RECOVER);
+		if ($recoverErrors) {
+		    print STDERR "Could not swap in old physical state; ";
+		    $canStillRecover = 0;
+		}
+	    }
+
+	    if ($canStillRecover) {
+		print STDERR "Update recovery successful.\n";
+		$nextState = EXPTSTATE_ACTIVE;
+	    } else {
+		print STDERR "update recovery aborted!\n".
+		             "Swapping experiment out...\n";
+		doSwapout(CLEANUP);
+
+		$nextState = EXPTSTATE_SWAPPED;
+	    }
+	}
+    }
+}
+
+if (! $errors) {
+    if ($swapop eq "in") {
+	#
+	# Swap in
+	#
+	$errors = doSwapin(REAL);
+
+	my $retries = 2;
+
+	#
+	# Attempt a retry if: 
+	#   a) there were errors, 
+	#   b) doswapin() indicated (via return code 3) a retry is appropriate,
+	#   c) we haven't tried too many times already.
+	#
+	# NOTE that if $TESTMODE == 1, retries are impossible, since
+        # $retry will never get set to 1.
+	#
+	while ($errors == 3 && $retries ) {
+	    $retries--;
+
+	    print STDERR "Cleaning up after errors; will try again.\n";
+	    doSwapout(RETRY);
+
+	    print STDERR "Trying again...\n";
+	    $errors = doSwapin(RETRY);
+	}
+
+	if (! $errors) {
+	    #
+	    # Update Accounting Information
+	    #
+	    TBSetExpSwapTime($pid, $eid);
+
+	    #
+	    # Swapin worked; exp is now ACTIVE.
+	    # (or TESTING)
+	    #
+	    if ($TESTMODE) {
+		$nextState = EXPTSTATE_TESTING;
+	    } else {
+		$nextState = EXPTSTATE_ACTIVE;
+	    }
+	} else {
+	    print STDERR "Cleaning up after errors.\n";
 	    doSwapout(CLEANUP);
 
 	    #
-	    # Regardless of how well cleanup swapout worked, 
+	    # Regardless of how well cleanup swapout worked,
 	    # send exp to SWAPPED.
 	    #
 	    $nextState = EXPTSTATE_SWAPPED; 
@@ -312,6 +382,9 @@ if (defined $nextState) {
 if ($errors) {
     print "Failingly finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("tbswap $swapop finished (failed)");
+
+    # pass this info along.
+    $errors |= $assignWrapperErrorCode;
 } else {
     print "Successfully finished swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
     TBDebugTimeStamp("tbswap $swapop finished (succeeded)");
@@ -322,14 +395,14 @@ exit($errors);
 #################################
 
 ##
-# 
+#
 # doSwapout - Swaps experiment out.
 #
-#             If the global $retry flag is 0,
+#             If in REAL or CLEANUP,
 #             this function will free all nodes for the 
 #             experiment.
 #
-#             If the global $retry flag is 1,
+#             If in RETRY or UDPATE,
 #             only nodes not in RES_READY will be freed.
 #
 #             Returns 0 on success, >0 on failure.
@@ -349,7 +422,7 @@ sub doSwapout($) {
 	waitpid($os_setup_pid, 0);
 	undef $os_setup_pid;
     }
-    
+
     if (! $TESTMODE) { 
 	if (! $DISABLE_EVENTS) {
 	    if ($type >= RETRY) {
@@ -360,24 +433,20 @@ sub doSwapout($) {
 		}
 	    }
 	}
-	
+
 	#
-	# If this is an actual swapout, or an update/retry, always clean up VLANs
-	# Otherwise, only do it if swapin previously messed them up.
+	# Clean up any VLANs in experiment.
 	#
-	# XXX Is doing this all the time cromulent?
-	if ($type != CLEANUP || $cleanvlans) {
-	    TBDebugTimeStamp("snmpit started");
-	    print STDERR "Removing VLANs.\n";
-	    if (system("snmpit -r $pid $eid")) {
-		print STDERR "*** Failed to reset VLANs\n";
-		$swapout_errors = 1;
-	    } else {
-		$cleanvlans = 0;
-	    }
-	    TBDebugTimeStamp("snmpit finished");
+	TBDebugTimeStamp("snmpit started");
+	print STDERR "Removing VLANs.\n";
+	if (system("snmpit -r $pid $eid")) {
+	    print STDERR "*** Failed to reset VLANs\n";
+	    $swapout_errors = 1;
+	} else {
+	    $cleanvlans = 0;
 	}
-	
+	TBDebugTimeStamp("snmpit finished");
+
 	#
 	# This is a hack. We need a more general os_teardown, but for now
 	# we just kill off the vnode stuff. 
@@ -473,7 +542,7 @@ sub doSwapout($) {
 	    }
 	    TBDebugTimeStamp("exports finished");
 	}
-	
+
 	#
 	# Resetting named maps and email lists is fast and idempotent,
 	# so whatever.
@@ -484,7 +553,7 @@ sub doSwapout($) {
 	    print "*** WARNING: Failed to reset named map.\n";
 	}
 	TBDebugTimeStamp("named finished");
-	
+
 	print "Resetting email lists.\n";
 	TBDebugTimeStamp("genelists started");
 	if (system("genelists")) {
@@ -496,7 +565,7 @@ sub doSwapout($) {
     #
     # Wipe the DB clean.
     #
-    
+
     print STDERR "Resetting DB.\n";
     TBExptRemovePhysicalState( $pid, $eid );
 
@@ -504,44 +573,54 @@ sub doSwapout($) {
 }
 
 ##
-# 
+#
 # doSwapin - Swaps experiment in.
 #
-#            Returns 0 on success, 1 on failure,
-#            assign_wrapper's exitcode if that failed.
+#            Returns:
+#              0 - successful swapin
+#              1 - failed swapin; cleanup required.
+#              3 - failed swapin; cleanup required; can retry.
+#              7 - failed swapin; assign failed; no cleanup.
 #
 #            Will set $retry = 1 if os_setup failed.
 #
 ##
 
 sub doSwapin($) {
-    my $type = shift; # REAL==4, RETRY==2, UPDATE==1. (CLEANUP is nonsense.)
-    #
-    # By default, errors are not tagged as 'retry-suitable.'
-    #
-    $retry = 0;
+    my $type = shift; # REAL==4, RETRY==2, UPDATE==1, UPDATE_RECOVER=0. 
 
     #
     # assign_wrapper does all the virtual to physical mapping 
     # and updating the DB state.
     #
-    print "Mapping to physical reality ...\n";
-    TBDebugTimeStamp("assign_wrapper started");
 
-    #
-    # Pass the -u (update) switch into assign_wrapper,
-    # So any nodes already in the experiment are
-    # fixed.
-    #
-    my $exitcode;
-    if ($exitcode = system("assign_wrapper -u $pid $eid")) {
-	print STDERR "*** Failed to map to reality.\n";
-	# Pass exit code through
-	return $exitcode >> 8;
+    if ($type > UPDATE_RECOVER) {
+	print "Mapping to physical reality ...\n";
+	TBDebugTimeStamp("assign_wrapper started");
+
+	#
+	# Pass the -u (update) switch into assign_wrapper,
+	# So any nodes already in the experiment are
+	# fixed.
+	#
+	my $exitcode;
+	if ($exitcode = system("assign_wrapper -u $pid $eid")) {
+	    print STDERR "*** Failed to map to reality.\n";
+
+	    #
+	    # save this off so it will get passed back later.
+	    #
+	    $assignWrapperErrorCode = $exitcode;
+	    if ((($exitcode >> 8) & 64) != 0) {
+		return 7;
+	    } else {
+		return 1;
+	    }
+	}
+	TBDebugTimeStamp("assign_wrapper finished");
+
+	print "Mapped to physical reality!\n";
     }
-    TBDebugTimeStamp("assign_wrapper finished");
-
-    print "Mapped to physical reality!\n";
 
     # Exit here if we are testing.
     if ($TESTMODE) {
@@ -562,17 +641,38 @@ sub doSwapin($) {
 	return 1;
     }
     TBDebugTimeStamp("mountpoints finished");
-    
+
     TBDebugTimeStamp("named started");
     print "Setting up named maps.\n";
     if (system("named_setup")) {
 	print STDERR "*** WARNING: Failed to add node names to named map.\n";
 	#
 	# This is a non-fatal error.
-	# 
+	#
     }
     TBDebugTimeStamp("named finished");
-    
+
+
+    #
+    # If user specified -reboot to update,
+    # then mark all nodes in experiment
+    # so os_setup will reboot them.
+    #
+    if (($type == UPDATE ||
+         $type == UPDATE_RECOVER) && $updateReboot) {
+	print STDERR "Marking nodes for reboot.\n";
+	$db_result =
+	    DBQueryFatal("select rv.node_id ".
+                         "from reserved as rv ".
+			 "left join nodes as n on ".
+			 "n.node_id = rv.node_id ".
+			 "where rv.pid='$pid' and rv.eid='$eid'");
+
+	while (($node) = $db_result->fetchrow_array) {
+	    TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_INIT_DIRTY() );
+	}
+    }
+
     #
     # Since it'll take a while for the nodes to reboot, we'll start now, and
     # wait for the os_setup to finish, down below
@@ -585,7 +685,7 @@ sub doSwapin($) {
 	print STDERR "*** Fork failed.\n";
 	return 1;
     }
-    
+
     #
     # XXX: Don't add any steps between here and the waitpid() call below without
     # verifying that 1) It's OK for nodes to come up before the step has
@@ -600,12 +700,12 @@ sub doSwapin($) {
 	return 1;
     }
     TBDebugTimeStamp("snmpit finished");
-    
+
     #
     # An error now means that the VLANS need to be cleaned up.
     #
     $cleanvlans = 1;
-    
+
     print "Setting up email lists.\n";
     TBDebugTimeStamp("genelists started");
     if (system("genelists")) {
@@ -615,7 +715,7 @@ sub doSwapin($) {
 	# 
     }
     TBDebugTimeStamp("genelists finished");
-    
+
     #
     # Don't clear port counters on UPDATE.
     # (XXX should clear new nodes' port counters.)
@@ -631,7 +731,7 @@ sub doSwapin($) {
 	}
 	TBDebugTimeStamp("portstats finished");
     }
-    
+
     #
     # OK, let's see how that os_setup did
     #
@@ -647,13 +747,11 @@ sub doSwapin($) {
 	    # a doSwapin() again.
 	    #
             if (($CHILD_ERROR >> 8) == 1) {
-		$retry = 1;
+		return 3;
 	    } else {
 		print STDERR "Not retrying due to error type.\n";
-		# leave $retry == 0.
+		return 1;
 	    }
-
-	    return 1;
 	}
     } else {
 	undef $os_setup_pid;
@@ -661,7 +759,7 @@ sub doSwapin($) {
 	return 1;
     }
     TBDebugTimeStamp("os_setup finished");
-    
+
     #
     # Okay, start the event system now that we know all the nodes have
     # rebooted (os_setup is done). This only takes a moment (puts itself
@@ -670,7 +768,7 @@ sub doSwapin($) {
     # event system previously, so starting it again will fail!
     # 
     if (! $DISABLE_EVENTS) {
-	if ($type != UPDATE) {
+	if ($type != UPDATE && $type != UPDATE_RECOVER) {
 	    print "Starting the event system.\n";
 	    TBDebugTimeStamp("eventsys_control started");
 	    if (system("eventsys_control start $pid $eid")) {
@@ -680,7 +778,6 @@ sub doSwapin($) {
 	    TBDebugTimeStamp("eventsys_control finished");
 	}
     }
-    
+
     return 0;
 }
-

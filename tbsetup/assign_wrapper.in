@@ -15,8 +15,22 @@
 
 # Syntax: assign_wrapper <pid> <eid>
 
+#
+# Return code:
+#
+# 0  - success
+# 1+ - error (Add other values:)
+# 4  - bandwidth violation
+# 8  - linkusers violation
+# 16 - desires violation
+# 32 - unassigned
+# 64 - Set to indicate 'recoverability'
+#      (E.g., no db or physical state was modified
+#       by the time the error occurred.)
+#
+
 # Caveats:
-#  The support for direct and interswitch links has not been testbed much.
+#  The support for direct and interswitch links has not been tested much.
 
 # Settings
 # delaythresh is the maximum delay in ms above which a delay node is needed.
@@ -76,6 +90,14 @@ sub usage {
 	print "		-v enables verbose output\n";
 	print "         -u enables update functionality\n";
 	exit(-1);
+}
+
+sub fatal($$) {
+    my $exitcode = shift;
+    my $message  = shift;
+    $message =~ s/\n$//;
+    print STDERR "$message\n";
+    exit($exitcode);
 }
 
 my $verbose = 0;
@@ -549,8 +571,8 @@ while (($name,$weight,$types) = $result->fetchrow_array) {
 # Open the TOP file
 $topfile = "$eid.top";
 open(TOPFILE,"> $topfile") || do {
-    die("*** $0:\n".
-	"    Could not open $topfile.\n");
+    fatal(65,"*** $0:\n".
+	    "    Could not open $topfile.\n");
 };
 
 # Print out vtypes
@@ -611,8 +633,8 @@ foreach $lan (keys(%lans)) {
     # Hmm, no emulated lans for now. 
     #
     if ($emulated && @members > 2) {
-	die("*** $0:\n".
-	    "    Emulated lans ($lan) not allowed yet! Only links.\n");
+	fatal(65,"*** $0:\n".
+	        "    Emulated lans ($lan) not allowed yet! Only links.\n");
     }
     if ($simnodes > 0 && $realnodes == 0 && $sharks == 0) {
 	$trivial_ok = 1;
@@ -846,8 +868,8 @@ foreach $lan (keys(%lans)) {
 #	   "        m.pid!='$DEADPID' or m.eid!='$DEADEID'))");
 if( scalar(@simnodelist) > 0 ) {
   open(AVAIL,"$TBROOT/sbin/avail type=pc rand |")
-    or die "*** $0:\n".
-           "    avail failed\n";
+    or fatal(65, "*** $0:\n".
+                "    avail failed\n");
 
   my $num = 0;
   while (<AVAIL>) {
@@ -860,8 +882,7 @@ if( scalar(@simnodelist) > 0 ) {
   close(AVAIL);
   
   if( $num == 0 ) {
-    print STDERR "$0: *** Insufficient PCs available.\n";
-    exit(2);
+    fatal(65, "$0: *** Insufficient PCs available.\n");
   }
 
   foreach $simnode (@simnodelist) {
@@ -951,8 +972,7 @@ while (1) {
     $numnodes = $numnodes_result->numrows;
     
     if ($numnodes < $minimum_nodes) {
-	print STDERR "$0: *** Insufficient nodes available.\n";
-	exit(2);
+	fatal(65, "$0: *** Insufficient nodes available.\n");
     }
 
     TBDebugTimeStamp("assign started");
@@ -962,31 +982,40 @@ while (1) {
     $cmdargs = "-p $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
-    open(ASSIGNFP,"assign $cmdargs | tee assign.log |");
+    if (-1 == system "assign $cmdargs > assign.log") {
+	fatal(65, "*** Couldn't run assign!");
+    }
+    
     $violations = 0;
     $score = -1;
+    $assignexitcode = $? >> 8;
 
-    # read output
-    # Header
-    printdb "Reading assign results.\n";
-    while (<ASSIGNFP>) {
-	chop;
-	/No physical nodes of type (.+)$/ && do {
-	    $score=-2;
-	    print $_ . "\n";
-	};
-	/^With ([0-9]+) violations$/ && do {
-	    $violations = $1;
-	    last;
-	};
- 	/^[ \t]+BEST SCORE: [ \t]+([0-9]+(\.[0-9]+)?)/ && ($score=$1);
+    open(ASSIGNFP, "assign.log")
+	or fatal(65, "*** Couldn't open assign logfile!");
+
+    if ($assignexitcode == 0)
+    {
+	# read output
+	# Header
+	printdb "Reading assign results.\n";
+	while (<ASSIGNFP>) {
+	    chop;
+	    /No physical nodes of type (.+)$/ && do {
+		$score=-2;
+		print $_ . "\n";
+	    };
+	    /^With ([0-9]+) violations$/ && do {
+		$violations = $1;
+		last;
+	    };
+	    /^[ \t]+BEST SCORE: [ \t]+([0-9]+(\.[0-9]+)?)/ && ($score=$1);
+	}
+	if ($score == -2) {
+	    # Type error
+	    fatal(65, "Giving up.\n" );
+	}
+	printdb "Found score $score, violations $violations.\n";
     }
-    if ($score == -2) {
-	# Type error
-	print "Giving up.\n";
-	exit(2);
-    }
-    printdb "Found score $score, violations $violations.\n";
 
     # We don't bother reading anything else if violations occured.
     if (($violations == 0) && ($score != -1)) {
@@ -1046,7 +1075,7 @@ while (1) {
 	# read Edges
 	# By convention, in plinks, the delay node is always the second
 	# entry.
-	while (<ASSIGNFP> !~ /^Edges:/) {}
+	while (<ASSIGNFP> !~ /^Edges:/) { }
 	printdb "Edges:\n";
 	EDGEWHILE: while (<ASSIGNFP>) {
 	    /^End Edges$/ && last EDGEWHILE;
@@ -1063,8 +1092,8 @@ while (1) {
 		  last SWITCH1;
 	      };
 	      /^direct$/ && do {
-		  die("*** $0:\n".
-		      "    Unsupported link type: direct.\n");
+		  fatal(65, "*** $0:\n".
+			   "    Unsupported link type: direct.\n");
 	      };
 	      /^trivial$/ && do {
 		  # we don't have plinks for trivial links
@@ -1083,7 +1112,7 @@ while (1) {
 	}
     } else {
 	# spit out up to nodes
-	print "ASSIGN FAILED:\n";       
+	print "ASSIGN FAILED: \n";       
 	while (<ASSIGNFP>) {
 	    if (/link_users:\s*(\d+)$/) {
 		$linkusers = $1;
@@ -1103,9 +1132,10 @@ while (1) {
     close(ASSIGNFP);
     TBDebugTimeStamp("assign finished");
 
-    TBDebugTimeStamp("reserving started");
     # Reserve resources
     if (!$fail) {
+	TBDebugTimeStamp("reserving started");
+
 	if (system("nalloc $pid $eid " . join(" ", keys(%toreserve)))) {
 	    print "Failed to reserve nodes. Trying again.\n";
 	} else {
@@ -1145,11 +1175,11 @@ while (1) {
     }
 
     # Check for exit
-    if ($currentrun >= $maxrun) {
-	$exitcode = 1;
+    if ($assignexitcode == 2 || $currentrun >= $maxrun) {
+	$exitcode = 65;
 	if ($bandwidth > 0) {
 	    $exitcode += 4;
-	} 
+	}
 	if ($linkusers > 0) {
 	    $exitcode += 8;
 	}
@@ -1159,10 +1189,18 @@ while (1) {
 	if ($unassigned > 0) {
 	    $exitcode += 32;
 	}
-	print "*** $0:\n".
-	      "    Reached run limit. Giving up. Exitcode: $exitcode.\n";
-	exit($exitcode);
+
+	if ($assignexitcode == 2) {
+	    fatal($exitcode, "*** $0:\n".
+		     "    Unretriable error. Giving up.\n");
+	} else {
+	    fatal($exitcode, "*** $0:\n".
+		     "    Reached run limit. Giving up.\n");
+	}
     }
+    print "Waiting 5 seconds and trying again...\n";
+    sleep(5);
+
     $currentrun++;
 }
 
@@ -1199,8 +1237,8 @@ if (scalar(keys(%isremotenode))) {
     if ($doremote) {
 	print "Running 'wanassign -d $pid $eid'\n";
 	open(WANFP,"wanassign -d $pid $eid 2>&1 | tee wanassign.log |") or
-	    die("*** $0:\n".
-		"    Failed to start wanassign: $!\n");
+	    fatal(65, "*** $0:\n".
+		     "    Failed to start wanassign: $!\n");
 
 	printdb "Reading wanassign results.\n";
 	while (<WANFP>) {
@@ -1215,13 +1253,13 @@ if (scalar(keys(%isremotenode))) {
 	    # Skip other output. Usually its debugging output.
 	}
 	close(WANFP) or
-	    die("*** $0:\n".
-		"    wanassign: " . $? ? "exited with status: $?.\n" :
+	    fatal(65, "*** $0:\n".
+		     "    wanassign: " . $? ? "exited with status: $?.\n" :
 		                         "error closing pipe: $!\n");
 
 	if (!$success) {
-	    die("*** $0:\n".
-		"    wanassign could not find a solution!\n");
+	    fatal(65,"*** $0:\n".
+		    "    wanassign could not find a solution!\n");
 	}
 	foreach my $virtual (keys(%v2vmap)) {
 	    my $physical = $v2vmap{$virtual};
@@ -1244,6 +1282,38 @@ if (scalar(keys(%isremotenode))) {
 }
 
 #
+# Recoverability ends.
+# (All fatal() calls from this point do not have
+# the recoverable '64' bit set.)
+#
+
+#
+# For update, wipe old interfaces in DB (normally done by nfree.)
+# These will get rebuilt soon.
+#
+if ($updating) {
+    foreach $node (keys(%alreadyAllocated)) {
+	my $result = DBQueryFatal("select nt.control_net ".
+				  "from nodes as n ".
+				  "left join node_types as nt ".
+				  "on nt.type=n.type ".
+				  "where n.node_id='$node'");
+
+	my ($control) = $result->fetchrow_array();
+
+	my $pred = "1";
+
+	if (defined $control) {
+	    $pred = "(card != '$control')";
+	}
+
+	DBQueryFatal("update interfaces set IP='' " .
+		     "where node_id='$node' and $pred");
+    }
+}
+
+
+#
 # VIRTNODES HACK: Local virtnodes have to be mapped now. This is a little
 # hokey in that the virtnodes just need to be allocated from the pool that
 # is on the real node. We know they are free, but we should go through
@@ -1260,8 +1330,8 @@ foreach my $pnode (keys(%virtnodes)) {
     my $num  = @vlist;
     
     open(AVAIL,"$TBROOT/sbin/avail virtonly=$pnode rand limit=$num |")
-	or die("*** $0:\n".
-	       "    avail failed\n");
+	or fatal(1, "*** $0:\n".
+		    "    avail failed\n");
 
     while (<AVAIL>) {
 	next
@@ -1275,9 +1345,8 @@ foreach my $pnode (keys(%virtnodes)) {
     close(AVAIL);
 
     if (scalar(@vlist) != scalar(@plist)) {
-	print STDERR "*** $0:\n".
-	    "Could not map some virtual nodes on $pnode\n";
-	exit(2);
+	fatal(1, "*** $0:\n".
+	         "Could not map some virtual nodes on $pnode\n");
     }
 
     #
@@ -1286,8 +1355,8 @@ foreach my $pnode (keys(%virtnodes)) {
     #
     print "Reserving @plist ...\n";
     if (system("nalloc $pid $eid @plist")) {
-	die("*** $0:\n".
-	    "Failed to reserve @plist (on $pnode)\n");
+	fatal(1, "*** $0:\n".
+	         "Failed to reserve @plist (on $pnode)\n");
     }
     while (@plist) {
 	my $physical = pop(@plist);
@@ -2030,8 +2099,8 @@ foreach $lan (keys(%rnodelans)) {
 
     my @members = @{$tunnels{$lan}};
     if (@members != 2) {
-	die("*** $0:\n".
-	    "    Too many members for a tunnel!\n");
+	fatal(1, "*** $0:\n".
+	         "    Too many members for a tunnel!\n");
     }
     my $server = $lantotunnelserver{$lan};
     my $ipport = $rnodetotunnelport{$server};
@@ -2073,8 +2142,8 @@ foreach $lan (keys(%rnodelans)) {
 	# physical node.
 	#
 	if (! TBControlNetIP($peervvnode, \$ip)) {
-	    die("*** $0:\n".
-		"    No Control Network IP for $peervvnode!\n");
+	    fatal(1, "*** $0:\n".
+		     "    No Control Network IP for $peervvnode!\n");
 	}
 	
         printdb "  vnode:$vnode port:$ipport isserver:$isserver peer_ip:$ip ".
@@ -2288,8 +2357,8 @@ sub InitPnode($pnode, $vnode)
 	    # 
 	    elsif (! ($osid = TBOSID($pid, $osname)) &&
 		   ! ($osid = TBOSID(TB_OPSPID, $osname))) {
-		die("*** $0:\n".
-		    "    Invalid OS $osname in project $pid!\n");
+		fatal(1, "*** $0:\n".
+		         "    Invalid OS $osname in project $pid!\n");
 	    }
 	    DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
 			 " startstatus='none'," .
@@ -2449,8 +2518,8 @@ sub nextipportnum($) {
     my $port     = $portnext{$pnode};
 
     if ($port >= $porthigh{$pnode}) {
-	die("*** $0:\n".
-	    "    No more dynamic ports available for $pnode!\n");
+	fatal(1, "*** $0:\n".
+	         "    No more dynamic ports available for $pnode!\n");
     }
     $portnext{$pnode}++;
     return $port;

@@ -403,7 +403,7 @@ sub fatal()
 
     # Clear the logfile so the webpage stops. 
     TBExptClearLogFile($pid, $eid);
-    
+
     #
     # Send a message to the testbed list. 
     #

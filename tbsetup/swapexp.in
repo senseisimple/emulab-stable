@@ -10,12 +10,13 @@ use English;
 use Getopt::Std;
 
 #
-# This gets invoked from the Web interface. 
+# This gets invoked from the Web interface.
 # Swap an experiment in, swap it out, restart or modify.
 #
+
 sub usage()
 {
-    print STDOUT "Usage: swapexp [-i] [-r] <-s in | out | restart | modify> ". 
+    print STDOUT "Usage: swapexp [-i] [-r] <-s in | out | restart | modify> " .
 	         "<pid> <eid> [<nsfile>]\n";
     exit(-1);
 }
@@ -40,7 +41,7 @@ my $tbdir    = "$TB/bin/";
 my $tbdata   = "tbdata";
 my $batch    = 0;
 my $idleswap = 0;
-my $reboot   = 0;    
+my $reboot   = 0;
 my $errorstat= -1;
 
 my $inout;
@@ -87,9 +88,9 @@ if (defined($options{"r"})) {
 if (defined($options{"s"})) {
     $inout = $options{"s"};
 
-    if ($inout ne "out" && 
-	$inout ne "in" && 
-	$inout ne "restart" && 
+    if ($inout ne "out"     &&
+	$inout ne "in"      &&
+	$inout ne "restart" &&
 	$inout ne "modify") {
 	usage();
     }
@@ -106,7 +107,7 @@ my $eid   = $ARGV[1];
 
 my $nsfile;
 
-if ($inout eq "modify") { 
+if ($inout eq "modify") {
     $nsfile = $ARGV[2];
 
     #
@@ -169,7 +170,7 @@ if ($UID && !TBAdmin($UID) &&
 # in the process of being terminated. We use a "wrapper" state (actually
 # a timestamp so we can say when termination was requested) since
 # terminating consists of a couple of different experiment states down inside
-# the tb scripts. 
+# the tb scripts.
 #
 DBQueryFatal("lock tables experiments write");
 
@@ -194,7 +195,7 @@ if (! chdir($workdir)) {
 
 if (defined($hashrow{'expt_locked'})) {
     $val = $hashrow{'expt_locked'};
-    
+
     die("*** $0:\n".
 	"    It appears that $pid/$eid went into transition at $val.\n".
 	"    You will be notified via email when experiment transition ".
@@ -286,7 +287,7 @@ if (! $batch) {
     $logname = TBExptCreateLogFile($pid, $eid, "swapexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
-    
+
     if (TBBackGround($logname)) {
 	#
 	# Parent exits normally
@@ -305,15 +306,6 @@ if ($inout ne "restart" && -e $repfile) {
 }
 
 #
-# Rerun tbprerun if modifying.
-#
-if ($inout eq "modify") {
-    if (system("$tbdir/tbprerun -m $pid $eid $nsfile") != 0) {
-	fatal("tbprerun failed!\n"); 
-    }
-}
-
-#
 # Sanity check states in case someone changes something.
 #
 if ($inout eq "out") {
@@ -322,7 +314,7 @@ if ($inout eq "out") {
 	$errorstat = $? >> 8;
 	fatal("tbswap out failed!\n");
     }
-    
+
     $estate = ExpState($pid,$eid);
     if ($estate ne EXPTSTATE_SWAPPED) {
 	fatal("Experiment is in the wrong state: $estate\n");
@@ -334,37 +326,71 @@ elsif ($inout eq "in") {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!\n");
     }
-    
+
     $estate = ExpState($pid,$eid);
     if ($estate ne EXPTSTATE_ACTIVE) {
 	fatal("Experiment is in the wrong state: $estate\n");
     }
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
-} 
+}
 elsif ($inout eq "modify") {
+    my $modifyError = "";
+
+    print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
+    if (TBExptBackupVirtualState($pid, $eid, $$)) {
+	fatal("*** $0:\n".
+	      "    Could not backup experiment state; cannot safely continue!\n");
+    }
+    TBExptRemoveVirtualState($pid, $eid);
+
+    #
+    # Rerun tbprerun if modifying.
+    #
+    if (system("$tbdir/tbprerun -m $pid $eid $nsfile") != 0) {
+	$modifyError = "tbprerun failed!";
+    }
+
     #
     # If experiment is currently swapped out, no need to do an update 
     # after modifying it.
     #
-    if ($estate eq EXPTSTATE_ACTIVE) {
+    if (! $modifyError && $estate eq EXPTSTATE_ACTIVE) {
 	print STDOUT "Running 'tbswap update' with arguments: $pid $eid\n";
-	if (system("$tbdir/tbswap update $pid $eid") != 0) {
-	    $errorstat = $? >> 8;
-	    fatal("tbswap update failed!\n");
-	}
 
-	$estate = ExpState($pid, $eid);
-	if ($estate ne EXPTSTATE_ACTIVE) {
-	    fatal("Experiment is in the wrong state: $estate\n");
-	}
-	
-	system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
-
+	my $rebootSwitch = "";
 	if ($reboot) {
-	    if (system("$tbdir/node_reboot -e $pid,$eid") != 0) {
-		fatal("node reboot failed!\n");
+	    $rebootSwitch = "-reboot";
+	}
+
+	if (system("$tbdir/tbswap update $rebootSwitch $pid $eid") != 0) {
+	    $errorstat = $? >> 8;
+	    $modifyError = "tbswap update failed!";
+	}
+
+	if (! $modifyError) {
+	    $estate = ExpState($pid, $eid);
+	    if ($estate ne EXPTSTATE_ACTIVE) {
+		fatal("Experiment is in the wrong state: $estate!");
 	    }
+	}
+
+	if (! $modifyError) {
+	    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+	}
+    }
+
+    if ($modifyError) {
+	print STDERR "*** $0:\n".
+	             "    $modifyError\n";
+	print STDOUT "Recovering experiment state...\n";
+	TBExptRemoveVirtualState($pid, $eid );
+	if (0 == TBExptRestoreVirtualState($pid, $eid, $$)) {
+	    fatal("*** Update aborted; old state restored.\n");
+	} else {
+	    # Set state to NEW so experiment will get wiped.
+	    SetExpState($pid, $eid, EXPTSTATE_NEW);
+	    fatal("*** Experiment state could not be restored!\n");
 	}
     }
 }
@@ -471,7 +497,7 @@ exit 0;
 sub fatal($)
 {
     my($mesg) = $_[0];
-    
+
     print STDOUT $mesg;
 
     #
@@ -499,7 +525,7 @@ sub fatal($)
 	$hosed = 1;
     }
 
-    if ($hosed) { 
+    if ($hosed) {
 	#
 	# Note: $estate is still set to the state which the experiment was in
 	# when we began.
@@ -510,7 +536,7 @@ sub fatal($)
 		print "tbswap out failed!\n";
 	    }
 	}
-	
+
 	print "Running tbend with arguments: -force $pid $eid\n";
 	if (system("$tbdir/tbend -force $pid $eid") != 0) {
 	    print "tbend failed!\n";
@@ -527,7 +553,7 @@ sub fatal($)
     system("/bin/cp -Rfp $workdir/ $userdir/tbdata");
 
     #
-    # In batch mode, exit without sending the email. 
+    # In batch mode, exit without sending the email.
     #
     if ($batch) {
 	TBUnLockExp($pid, $eid);
@@ -535,7 +561,7 @@ sub fatal($)
     }
 
     #
-    # Clear the log file so the web page stops spewing. 
+    # Clear the log file so the web page stops spewing.
     #
     if (defined($logname)) {
 	TBExptCloseLogFile($pid, $eid);
@@ -562,9 +588,11 @@ sub fatal($)
 	system("/bin/mv -f   $workdir ${workdir}-failed");
 	system("/bin/rm -rf  ${userdir}-failed");
 	system("/bin/mv -f   $userdir ${userdir}-failed");
-	TBExptDestroy($pid, $eid);        
+	TBExptDestroy($pid, $eid);
     }
 
     exit(-1);
 }
+
+
 
