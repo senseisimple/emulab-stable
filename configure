@@ -1213,6 +1213,7 @@ else
                     event/tbgen/GNUmakefile event/tbgen/tevd.restart \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
+		    event/example/eventdebug.pl \
 		    event/trafgen/GNUmakefile \
 		    event/proxy/GNUmakefile \
 		    event/nsetrafgen/GNUmakefile \
@@ -1286,7 +1287,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1290: checking for a BSD compatible install" >&5
+echo "configure:1291: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
