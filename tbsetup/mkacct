@@ -1,6 +1,5 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl -wT
 
-### Really run with -T
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
 ### need some of the same things for the removal script.
@@ -10,6 +9,10 @@
 ###
 
 use Mysql;
+
+## un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 ##
 ## Should expand to all allowable characters. -lkw
@@ -145,8 +148,11 @@ foreach $IP (@nodes) {
     ## If this machine is not the same as the last one, get the OS
     ## Check also that the IP address is valid (some interfaces might
     ## not have an IP address). 
-    if ( $IP ne $last && $IP =~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {
+
+    if ( $IP ne $last && $IP =~ /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/) {
+	$IP = $1;
         $last = $IP;
+	
          if (-e "/bin/ping") {
             open(PING,"/bin/ping -c 1 $IP 2>&1 |");
         } else {
@@ -158,7 +164,7 @@ foreach $IP (@nodes) {
         if ( $1 > 0 ) {
 
 	    print "Checking OS on $IP...";
-            open(UNAME,"su1 ssh $IP uname 2>&1 |");
+            open(UNAME,"/usr/local/bin/ssh $IP uname 2>&1 |");
             $_ = <UNAME>;
 	    print $_;
 	    close(UNAME);
@@ -210,7 +216,7 @@ foreach $IP (@nodes) {
 	    ## 4) Create home directories
 
  	    ## Fetch remote login information
-	    open(SCP, "scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
+	    open(SCP, "/usr/local/bin/scp -pq $IP:/etc/master.passwd /tmp/master.passwd.$IP |");
 	    while ( <SCP> ) { print $_; }
 	    close SCP;
 
@@ -259,7 +265,7 @@ foreach $IP (@nodes) {
 		open(OUT, ">>/tmp/master.passwd.$IP");		
 		print OUT $addon;
 		close OUT;
-		open(SCP, "scp -pq /tmp/master.passwd.$IP $IP:/etc/master.passwd |");
+		open(SCP, "/usr/local/bin/scp -pq /tmp/master.passwd.$IP $IP:/etc/master.passwd |");
 		while ( <SCP> ) { print $_; }
 		close(SCP);
  
