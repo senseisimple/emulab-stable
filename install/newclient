@@ -16,7 +16,7 @@ my $tmcc = "$prefix/tmcc";
 my $cpuspeed = "$prefix/cpuspeed.awk";
 my $fetch = "/usr/bin/fetch";
 
-my $formURL = "~ricci/www/newnodecheckin.php";
+my $formURL = "newnodecheckin.php";
 
 my $ifconfig = "/sbin/ifconfig";
 my $dmesg = "/var/run/dmesg.boot";
