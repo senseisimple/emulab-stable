@@ -987,6 +987,19 @@ sub swapok {
     my ($Btype) = $result->fetchrow_array;
     $result->finish;
 
-    return ($interfacespeed{$Atype} == $interfacespeed{$Btype});
+    if ($interfacespeed{$Atype} != $interfacespeed{$Btype}) {
+	return 0;
+    }
+
+    # It is illegal to swap ports if either is a control interface
+    $result = DBQueryFatal("SELECT control_iface FROM nodes" .
+    			     " LEFT JOIN node_types ON " .
+			     " nodes.type = node_types.type " .
+			     " WHERE node_id=\"$pnode\"");
+    my ($control_iface) = $result->fetchrow_array;
+    $result->finish;
+
+    return (($portA != $control_iface) && ($portB != $control_iface));
+	
 };
 
