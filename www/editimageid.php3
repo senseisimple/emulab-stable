@@ -78,9 +78,12 @@ function SPITFORM($imageid, $formfields, $errors)
 	echo "</table><br>\n";
     }
 
+    # Must encode the imageid since Rob started using plus signs in
+    # the names.
+    $url = rawurlencode($imageid);
     echo "<br>
           <table align=center border=1> 
-          <form action='editimageid.php3?imageid=$imageid'
+          <form action='editimageid.php3?imageid=$url'
                 method=post name=idform>\n";
 
     #
