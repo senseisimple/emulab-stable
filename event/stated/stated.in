@@ -191,6 +191,8 @@ if ($debug) { qshow(); }
 
 # Gets set if a reload of state from the database should happen.
 my $do_reload = 0;
+my $sigrestart= 0;
+my $sigcleanup= 0;
 
 # Make the daemon reload database state on a sighup - but I'm worried
 # about what would happen if we tried to do this mid-loop. So, we'll
@@ -198,13 +200,13 @@ my $do_reload = 0;
 $SIG{HUP}  = sub { info("SIGHUP - Reloading DB state\n"); $do_reload = 1; };
 
 # Set up other signals.
-$SIG{USR1} = \&restart;
-$SIG{USR2} = \&cleanup;
-$SIG{INT}  = \&cleanup;
-$SIG{QUIT} = \&cleanup;
-$SIG{ABRT} = \&cleanup;
-$SIG{TERM} = \&cleanup;
-$SIG{KILL} = \&cleanup;
+$SIG{USR1} = \&restart_wrap;
+$SIG{USR2} = \&cleanup_wrap;
+$SIG{INT}  = \&cleanup_wrap;
+$SIG{QUIT} = \&cleanup_wrap;
+$SIG{ABRT} = \&cleanup_wrap;
+$SIG{TERM} = \&cleanup_wrap;
+$SIG{KILL} = \&cleanup_wrap;
 
 # Track if I handled an event or not
 my $event_count = 0;
@@ -311,6 +313,9 @@ while (1) {
 
     # Send any messages in the queue if it is time
     notify("",1);
+
+    if ($sigrestart) { restart(); }
+    if ($sigcleanup) { cleanup(); }
 
     #sleep(1);
 }
@@ -1084,10 +1089,10 @@ sub info($;$) {
     syslog($prio,$message) || notify("syslog failed: $? $!\n");
 }
 
+sub restart_wrap { $sigrestart=1; }
+
 # This gets called if we catch a signal USR1
 sub restart {
-    info("SIGUSER1 received: Performing final event poll before restarting\n");
-    process_event_queue;
     my $params = join(" ",@args);
     my $prog = "";
     # If we're started from an abosolute path, use that.
@@ -1096,6 +1101,9 @@ sub restart {
     } else {
 	$prog = "$TB/sbin/stated";
     }
+    info("SIGUSER1 received: Performing final event poll before restarting\n");
+    $blockwait=0;
+    process_event_queue;
     info("Restarting from '$prog".($params ne "" ? " $params" : "")."'\n");
     if ($handle && event_unregister($handle) == 0) {
 	warn "Unable to unregister with event system\n";
@@ -1116,6 +1124,8 @@ sub restart {
 	  die($msg);
       };
 }
+
+sub cleanup_wrap { $sigcleanup=1; }
 
 # This gets called if we catch a signal (TERM, etc.)
 sub cleanup {
