@@ -236,11 +236,6 @@ foreach my $node (@nodes) {
         system("$osselect $defosid $node");
     }
 
-    # Put it in the current_reloads table so that nodes can find out which
-    # OS to load
-    DBQueryFatal("replace into current_reloads ".
-		 "(node_id, image_id) values ('$node', '$imageid')");
-
     # If loading an image (which is not the default) then
     # schedule a reload for it so that when the experiment is terminated
     # it will get a fresh default image before getting reallocated to
@@ -360,14 +355,13 @@ sub WaitTillReloadDone {
 	    if (! $done{$node}) {
 		my ($query_result, @row);
 		$query_result =
-		    DBQueryFatal("SELECT eventstate FROM nodes ".
+		    DBQueryFatal("SELECT op_mode FROM nodes ".
 				 "where node_id='$node'");
 		@row = $query_result->fetchrow_array();
 
-		# We wait for it to hit ISUP, since every op_mode except
-		# for RELOAD has one.
-		if ($row[0] eq TBDB_NODESTATE_ISUP ) {
-		    print STDERR "$node alive and well\n".`date` if $dbg;
+		# We simply wait for the node to leave the reloading opmode
+		if ($row[0] ne TBDB_NODEOPMODE_RELOAD) {
+		    print STDERR "$node has left reloading mode\n".`date` if $dbg;
 		    $count--;
 		    $done{$node} = 1;
 		    next;
@@ -401,6 +395,11 @@ sub WaitTillReloadDone {
 # Setup a reload. Note that imageid is global.
 sub SetupReload($) {
     my ($node) = @_;
+
+    # Put it in the current_reloads table so that nodes can find out which
+    # OS to load
+    DBQueryFatal("replace into current_reloads ".
+		 "(node_id, image_id) values ('$node', '$imageid')");
 
     system "$osselect -1 -m PXEFRISBEE $node" and
       die "*** Unable to select frisbee OS\n";
