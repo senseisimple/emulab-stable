@@ -40,19 +40,36 @@ class Thingee {
 
     static private Dictionary names;
     
-    private Dictionary properties;
+    protected Dictionary properties;
+
+    public void copyProps( Thingee t ) {
+	Enumeration e = t.properties.keys();
+
+	while (e.hasMoreElements()) {
+	    String s = (String)e.nextElement();
+
+	    properties.put( new String(s), t.properties.get( s ) );
+	}
+
+    }
 
     static public String genName( String name ) {
+	/*
+	if (names.get( name ) == null) {
+	    return name;
+	}
+	*/
+
 	int num = 0;
-	String n;
+	String n = new String();
 	do {
 	    n = name + NumberFormat.getInstance().format(num); 
 	    num++;
 	} while(names.get( n ) != null);
-	return n;
+	return new String(n);
     }
 
-    public String getProperty( String name, String def ) {
+    public synchronized String getProperty( String name, String def ) {
 	if (0 == name.compareTo("name")) {
 	    // note that the name _can_ be blank.
 	    return this.name;
@@ -65,11 +82,11 @@ class Thingee {
 	}
     }
 
-    public void setProperty( String name, String value ) {
+    public synchronized void setProperty( String name, String value ) {
 	if (0 == name.compareTo("name")) {
-	    setName( value );
+	    setName( new String(value) );
 	} else {
-	    properties.put( name, value );
+	    properties.put( new String(name), new String(value) );
 	}
     }
 
@@ -102,15 +119,17 @@ class Thingee {
     }
     
     public void setName( String newName ) {
+	System.out.println("Thingee.setName(): Renamed from \"" + name + 
+			   "\" to \"" + newName + "\"" );
 	names.remove( name );
-	names.put( newName, new Integer(1) );
 	name = new String( newName );
+	names.put( name, new Integer(1) );
 	stringWidthValid = false;
     }
 	
     public Thingee(String newName) {
 	name = new String( newName );
-	names.put( newName, new Integer(1) );
+	names.put( name, new Integer(1) );
 	properties = new Hashtable();
 	stringWidth = 128;
 	stringWidthValid = false;

@@ -18,11 +18,14 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
     private Vector currentThingees;
 
     private static Color darkBlue;
+    private static Color disabledBox;
 
     public boolean isStarted() { return started; }
 
     static {
 	darkBlue  = new Color( 0.3f, 0.3f, 0.5f );
+	//	disabledBox = new Color( 0.5f, 0.5f, 0.65f );
+	disabledBox = new Color( 0.7f, 0.7f, 0.85f );
     }
 
     private void setVisibleAll( boolean b ) {
@@ -53,9 +56,10 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	}
     }
 
-    private MagicTextField addField( String name ) {
-	MagicTextField tf = new MagicTextField();
+    private MagicTextField addField( String name, boolean alphic, boolean special, final String def ) {
+	final MagicTextField tf = new MagicTextField( alphic, !alphic, special );
 	Label l = new Label(name);
+
 	l.setForeground( Color.white );
 	tf.tf.setBackground( Color.white );
 
@@ -65,9 +69,35 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	child.add( tf.tf );
 	tf.tf.addTextListener( this );
 
+	if (name.compareTo("name:") != 0) {
+	    final PropertiesArea propertiesArea = this;
+	    FlatButton fb = new FlatButton("default") {
+		    public Dimension getPreferredSize() {
+			return new Dimension( 72, 18 );
+		    }
+		    
+		    protected void clicked() {
+			boolean wasDis = !tf.tf.isEditable();
+			if (wasDis) { tf.tf.setEditable( true ); }
+			tf.tf.setText( def );
+			propertiesArea.upload();
+			if (wasDis) { tf.tf.setEditable( false ); }
+		    }
+		};
+	
+	    Panel p = new Panel();
+	    p.setLayout( new FlowLayout( FlowLayout.RIGHT, 0, 0) );
+	    p.add( fb );
+
+	    childLayout.setConstraints( p, gbc );
+	    child.add( p );
+	    
+	    fb.setVisible( true );
+	}
+
         tf.tf.setVisible( true );
 	l.setVisible( true );
-
+	
 	return tf;
     }
     
@@ -77,21 +107,26 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	public String name;
 	public String def;
 	public MagicTextField textField;
+	public boolean alphic;
     }
 
     public void textValueChanged( TextEvent e ) {
 	upload();
-	if (nameEdit != null 
+	if (nameEdit != null && e.getSource() != null  
 	    && e.getSource() == nameEdit.tf) { // hack.
-	    getParent().repaint();
+	    Component parent = getParent();
+	    if (parent != null) {
+		parent.repaint();
+	    }
 	}
     }
 
-    public void addProperty( String name, String desc, String def ) {
+    public void addProperty( String name, String desc, String def, boolean alphic, boolean special ) {
 	Property p = new Property();
 	p.name = name;
 	p.def = def;
-	p.textField = addField( desc );
+	p.alphic = alphic;
+	p.textField = addField( desc, alphic, special, def );
 	if (0 == name.compareTo("name")) { nameEdit = p.textField; }
 	propertyList.addElement( p );
     }
@@ -169,12 +204,17 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
     public abstract boolean iCare( Thingee t );
     public abstract String getName();
 
-    private void download() {
+    private synchronized void download() {
+	System.out.println( "PropertiesArea.download(): Beginning");
 	Enumeration et = Thingee.selectedElements();
 	
-	currentThingees = new Vector();
+	//currentThingees = new Vector();
+	currentThingees = null;
+	Vector cThingees = new Vector();
 
 	int thingsICareAbout = 0;
+
+	MagicTextField ipEdit = null;
 
 	boolean first = true;
 	while (et.hasMoreElements()) {
@@ -184,10 +224,15 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 		Enumeration e = propertyList.elements();
 
 		thingsICareAbout++;
-		currentThingees.addElement( t );
+		cThingees.addElement( t );
 
 		while (e.hasMoreElements()) {
 		    Property p = (Property)e.nextElement();
+
+		    if (p.name.compareTo("ip") == 0) {
+			ipEdit = p.textField;
+		    }
+
 		    String value = t.getProperty( p.name, p.def );
 		    
 		    if (first) {
@@ -200,23 +245,42 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 	    }
 	}
 
-	if (nameEdit != null) {
-	    if (thingsICareAbout > 1) {
+
+	if (thingsICareAbout > 1) {
+	    if (nameEdit != null) {
 		nameEdit.tf.setEditable( false );
-		nameEdit.tf.setBackground( darkBlue );
-	    } else {
+		nameEdit.tf.setBackground( disabledBox );
+	    }
+	    
+	    if (ipEdit != null) {
+		ipEdit.tf.setEditable( false );
+		ipEdit.tf.setBackground( disabledBox );
+	    }
+	} else {
+	    if (nameEdit != null) {
 		nameEdit.tf.setEditable( true );
 		nameEdit.tf.setBackground( Color.white );
 	    }
+	    
+	    if (ipEdit != null) {
+		ipEdit.tf.setEditable( true );
+		ipEdit.tf.setBackground( Color.white );
+	    }
 	}
+
+	currentThingees = cThingees;
+	System.out.println( "PropertiesArea.download(): Ending");
     }
 
-    private void upload() {
+    private synchronized void upload() {
+	System.out.println("Upload begins..");
 	if (currentThingees == null) { return; }
 
 	Enumeration et = currentThingees.elements();
-
+	
+	boolean needRedraw = false;
 	while (et.hasMoreElements()) {
+	    System.out.println( "PropertiesArea.upload(): Regarding a thingee.");
 	    Thingee t = (Thingee)et.nextElement();
 
 	    //if (iCare(t)) {
@@ -227,12 +291,24 @@ abstract synchronized class PropertiesArea extends Panel implements TextListener
 		    if (p.textField.tf.isEditable()) {
 			String s = p.textField.tf.getText();
 			if (0 != s.compareTo("<multiple>")) {
+			    if (p.name.compareTo("name") == 0 &&
+				t.getName().compareTo( s ) != 0) {
+				needRedraw = true;				
+			    }
+			    System.out.println( 
+			      "PA.upload(): Setting prop \"" + 
+			      p.name + 
+			      "\" to \"" + s + "\"." );
 			    t.setProperty(p.name, s);
 			}
 		    }
 		}
 		//}
 	}
+	if (needRedraw) {
+	    Netbuild.redrawAll();
+	}
+	System.out.println("Upload ends..");
     }
 
     public void refresh() {

@@ -7,6 +7,7 @@ public class WorkArea {
     private Vector iFaceThingees;
 
     public WorkArea() {
+	super();
 	thingees = new Vector();
 	linkThingees = new Vector();
 	iFaceThingees = new Vector();
@@ -29,6 +30,32 @@ public class WorkArea {
 	String s;
 	String n;
 
+	Dictionary names;
+
+	boolean good = false;
+	while (!good) {
+	    names = new Hashtable();
+	    good = true;
+	    e = thingees.elements();
+	    while (good && e.hasMoreElements()) {
+		Thingee t = (Thingee)e.nextElement();
+		if (t.getName().compareTo("") == 0) {
+		    good = false;
+		    // t += "# WARNING! Changed name for 
+		    t.setName( t.genName( "gen_name_" ) );
+		    Netbuild.setStatus("!Duplicate and/or blank names were changed.");
+		} else if (names.get(t.getName()) != null) {
+		    good = false;
+		    t.setName( t.genName( t.getName() ) );
+		    Netbuild.redrawAll();
+		    Netbuild.setStatus("!Duplicate and/or blank names were changed.");
+		} else {
+		    names.put(t.getName(), t );
+		}
+	    }
+	}
+
+
 	e = thingees.elements();
 	while ( e.hasMoreElements()) {
 	    Thingee t = (Thingee)e.nextElement();
@@ -40,6 +67,11 @@ public class WorkArea {
 		    0 != s.compareTo("")) {
 		    r += "tb-set-node-os $" + n + " " + s + "\n";
 		}
+		s = t.getProperty( "hardware", "" );
+		if (0 != s.compareTo("<auto>") &&
+		    0 != s.compareTo("")) {
+		    r += "tb-set-hardware $" + n + " " + s + "\n";
+		}
 	    }
 	}	
 
@@ -49,6 +81,7 @@ public class WorkArea {
 	while (e.hasMoreElements()) {
 	    Thingee t1 = (Thingee)e.nextElement();
 	    if (!(t1 instanceof LanLinkThingee)) {
+		// it's a node link
 		LinkThingee t = (LinkThingee)t1;
 		n = t.getName();
 		String a = t.getA().getName();
@@ -57,6 +90,14 @@ public class WorkArea {
 		String latency = t.getProperty( "latency", "0" ) + "ms";
 		r += "set " + n + " [$ns duplex-link $" + a + " $" + b +
 		    " " + bandwidth + " " + latency + " DropTail]\n";
+		try {
+		    Float loss = new Float(t.getProperty( "loss", "0.0" ));
+		    float l = loss.floatValue();
+		    if (l > 1.0f) { l = 1.0f; }
+		    if (l > 0.0f) {
+			r += "tb-set-link-loss $" + n + " " + String.valueOf(l) + "\n" ; // XXX
+		    }
+		} catch (Exception ex) {} 
 	    } else {
 		// it's a lan link
 		LinkThingee t = (LanLinkThingee)t1;
@@ -74,6 +115,7 @@ public class WorkArea {
 		    lanConnections.put( lan.getName(), v );
 		}
 		v.addElement( node );
+		//tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
 	    }
 	}
 	
@@ -124,7 +166,46 @@ public class WorkArea {
 			+ "Mb";
 		    String latency = t.getProperty( "latency", "0" ) + "ms";
 		    r += "\" " + bandwidth + " " + latency + "]\n";
+
+		    try {
+			Float loss = new Float(t.getProperty( "loss", "0.0" ));
+			float l = loss.floatValue();
+			if (l > 1.0f) { l = 1.0f; }
+			if (l > 0.0f) {
+			    r += "tb-set-lan-loss $" + t.getName() + " " + String.valueOf(l) + "\n";
+			}
+		    } catch (Exception ex) {} 
 		}
+	    }
+	}
+
+	r += "\n";
+
+	e = linkThingees.elements();
+	while (e.hasMoreElements()) {
+	    Thingee t1 = (Thingee)e.nextElement();
+	    if (t1 instanceof LanLinkThingee) {
+		// it's a lan link
+		LanLinkThingee t = (LanLinkThingee)t1;
+		Thingee node,lan;
+		if (t.getA() instanceof LanThingee) {
+		    lan = t.getA();
+		    node = t.getB();
+		} else {
+		    lan = t.getB();
+		    node = t.getA();
+		}
+		//tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
+		String bandwidth = t.getProperty( "bandwidth", "100" ) + "Mb";
+		String latency = t.getProperty( "latency", "0" ) + "ms";
+		float l = 0.0f;
+		try {
+		    Float loss = new Float(t.getProperty( "loss", "0.0" ));
+		    l = loss.floatValue();
+		    if (l > 1.0f) { l = 1.0f; }
+		} catch (Exception ex) {} 
+		r += "tb-set-node-lan-params $" + node.getName() + " $" +
+		    lan.getName() + " " + latency + " " + bandwidth + " " + String.valueOf(l) + "\n";
 	    }
 	}
 
@@ -194,6 +275,95 @@ public class WorkArea {
 	
     }
 
+    public void copySelected() {
+	Dictionary map = new Hashtable();
+	Vector newIFaces = new Vector();
+	Enumeration e = Thingee.selectedElements();
+	
+	// copy selected nodes
+	while (e.hasMoreElements()) {
+	    Thingee t = (Thingee)e.nextElement();
+	    
+	    if (t instanceof NodeThingee) {
+		NodeThingee nt = new NodeThingee( Thingee.genName( t.getName() ));
+		nt.move( t.getX() + 16, t.getY() + 16 );
+		nt.copyProps( t );
+		add( nt );
+		map.put( t, nt );
+	    } else if (t instanceof LanThingee) {
+		LanThingee nt = new LanThingee( Thingee.genName( t.getName() ));
+		nt.move( t.getX() + 16, t.getY() + 16 );
+		nt.copyProps( t );
+		add( nt );
+		map.put( t, nt );
+	    }
+	}	
+
+	e = Thingee.selectedElements();
+	
+	// now copy selected links
+	while (e.hasMoreElements()) {
+	    Thingee t = (Thingee)e.nextElement();
+	    
+	    if ((t instanceof LinkThingee) && !(t instanceof LanLinkThingee))  {
+		LinkThingee lt = (LinkThingee)t;
+		Thingee a = (Thingee)map.get( lt.getA() );
+		Thingee b = (Thingee)map.get( lt.getB() );
+		String name = lt.getName();
+		if (0 != name.compareTo("")) {
+		    name = Thingee.genName( name );
+		}
+		if (a != null && b != null) {
+		    LinkThingee nt = new LinkThingee( name, a, b );
+		    nt.copyProps( t );
+		    add( nt );
+		    map.put( t, nt );
+
+		    IFaceThingee i  = new IFaceThingee( "", a, nt );
+		    IFaceThingee i2 = new IFaceThingee( "", b, nt );
+
+		    add(i);
+		    add(i2);
+		    newIFaces.addElement( i  );
+		    newIFaces.addElement( i2 );
+		}
+	    } else if (t instanceof LanLinkThingee) {
+		LanLinkThingee lt = (LanLinkThingee)t;
+		Thingee a = (Thingee)map.get( lt.getA() );
+		Thingee b = (Thingee)map.get( lt.getB() );
+		if (a != null && b != null) {
+		    LanLinkThingee nt = new LanLinkThingee( "", a, b );
+		    nt.copyProps( t );
+		    add( nt );
+		    map.put( t, nt );
+
+		    Thingee node;
+		    if (a instanceof NodeThingee) { node = a; } else { node = b; }
+		    IFaceThingee i  = new IFaceThingee( "", node, nt );
+		    add(i);
+		    newIFaces.addElement( i  );
+		}
+	    }
+	}	
+
+
+	Thingee.deselectAll();
+	
+	e = map.elements();
+	while (e.hasMoreElements()) {
+	    Thingee t = (Thingee)e.nextElement();
+	    t.select();
+	}
+
+	e = newIFaces.elements();
+	while (e.hasMoreElements()) {
+	    Thingee t = (Thingee)e.nextElement();
+	    t.select();
+	}
+
+    }
+
+
     private void selectOneInRectangle( Rectangle r, Thingee t, boolean xor ) {
 	int xDiff = t.getX() - r.x;
 	int yDiff = t.getY() - r.y;
@@ -206,6 +376,9 @@ public class WorkArea {
 	    }
 	}
     }
+
+
+
 
     public void selectRectangle( Rectangle r, boolean xor ) {
 	Enumeration linkThingeeEnum = linkThingees.elements();
@@ -228,6 +401,10 @@ public class WorkArea {
 	    Thingee t = (Thingee)iFaceThingeeEnum.nextElement();
 	    selectOneInRectangle( r, t, xor );
         }
+    }
+
+    public int getThingeeCount() {
+	return linkThingees.size() + thingees.size() + iFaceThingees.size();
     }
 
     public void paint( Graphics g ) {
@@ -254,27 +431,32 @@ public class WorkArea {
     }
 
     public Thingee clicked( int x, int y ) {
-      	Enumeration thingeeEnum = iFaceThingees.elements();
+      	Enumeration thingeeEnum;
+
+	Thingee got = null;
+
+      	thingeeEnum = linkThingees.elements();
 
 	while ( thingeeEnum.hasMoreElements()) {
 	    Thingee t = (Thingee)thingeeEnum.nextElement();
-	    if (t.clicked(x, y)) { return t; }
+	    if (t.clicked(x, y)) { got = t; }
 	}
 
       	thingeeEnum = thingees.elements();
 
 	while ( thingeeEnum.hasMoreElements()) {
 	    Thingee t = (Thingee)thingeeEnum.nextElement();
-	    if (t.clicked(x, y)) { return t; }
+	    if (t.clicked(x, y)) { got = t; }
 	}
 
-      	thingeeEnum = linkThingees.elements();
+	thingeeEnum = iFaceThingees.elements();
 
 	while ( thingeeEnum.hasMoreElements()) {
 	    Thingee t = (Thingee)thingeeEnum.nextElement();
-	    if (t.clicked(x, y)) { return t; }
+	    if (t.clicked(x, y)) { got = t; }
 	}
-	return null;
+
+	return got;
     }
 
     public void remove( Thingee t ) {

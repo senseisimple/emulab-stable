@@ -9,7 +9,7 @@ public class IFacePropertiesArea extends PropertiesArea
     public IFacePropertiesArea() 
     {
 	super();
-	addProperty("ip", "IP address:","<auto>");
+	addProperty("ip", "IP address:","<auto>", false, false);
     }
 };
 

@@ -10,8 +10,8 @@ public class NodePropertiesArea extends PropertiesArea
     public NodePropertiesArea() 
     {
 	super();
-	addProperty("name", "name:","");
-	addProperty("hardware", "hardware:","<auto>");
-	addProperty("osid", "os id:","<auto>");
+	addProperty("name", "name:","", true, false);
+	addProperty("hardware", "hardware:","<auto>", true, false );
+	addProperty("osid", "os id:","<auto>", true, true );
     }
 };

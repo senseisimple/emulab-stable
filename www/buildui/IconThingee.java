@@ -6,7 +6,16 @@ implements ImageObserver {
     abstract public String getIconName();
 
     protected Image loadIcon() {
-	return Netbuild.getImage( getIconName() );
+	Image i = Netbuild.getImage( getIconName() );
+	/*
+	if (i != null) {
+       	    System.out.println("loadIcon(): " + i.toString() );
+	} else {
+	    System.out.println("loadIcon(): NULL" );
+	}
+	*/
+	return i; 
+	//return null;
     }
 
     public void drawIcon( Graphics g, Image icon ) {

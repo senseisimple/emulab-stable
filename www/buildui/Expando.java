@@ -21,6 +21,8 @@ class Expando extends Component
 	text = t;
 	expanded = true;
 
+	setCursor( Cursor.getPredefinedCursor( Cursor.HAND_CURSOR ) );
+
 	enableEvents( AWTEvent.MOUSE_EVENT_MASK );
 	enableEvents( AWTEvent.MOUSE_MOTION_EVENT_MASK );
     }
@@ -57,6 +59,7 @@ class Expando extends Component
 		int stringWidth = fm.stringWidth(text);
 		return new Dimension(16 + 4 + stringWidth, 16);
 	    }
+	    g.dispose();
 	} 
 	
 	return new Dimension(32, 32);

@@ -9,8 +9,8 @@ public class LanLinkPropertiesArea extends PropertiesArea
     public LanLinkPropertiesArea() 
     {
 	super();
-	addProperty("bandwidth", "bandwidth(Mb/s):", "100");
-	addProperty("latency", "latency(ms):", "0");
-	addProperty("loss", "loss rate(0.0-1.0):", "0.0");
+	addProperty("bandwidth", "bandwidth(Mb/s):", "100", false, false);
+	addProperty("latency", "latency(ms):", "0", false, false);
+	addProperty("loss", "loss rate(0.0-1.0):", "0.0", false, false);
     }
 };

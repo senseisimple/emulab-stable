@@ -7,6 +7,7 @@ import java.util.Enumeration;
 public class Palette {
     private Thingee newNode;
     private Thingee newLAN;
+    private Thingee copier;
     private Thingee trash;
 
     public Palette() {
@@ -29,16 +30,29 @@ public class Palette {
 	trash.trashable = false; // very zen.
 	trash.moveable = false;
 	trash.propertyEditable = false;
+
+	copier = new Thingee( "copier" );
+	copier.move( 40, 340 );
+	copier.linkable = false;
+	copier.trashable = false;
+	copier.moveable = false;
+	copier.propertyEditable = false;
     }
 
     public void paint( Graphics g ) {
 	newNode.draw( g );
 	newLAN.draw( g );
+	//copier.draw( g );
 	trash.draw( g );
     }
 
     public boolean hitTrash( int x, int y ) {
 	return trash.clicked(x, y);
+    }
+
+    public boolean hitCopier( int x, int y ) {
+	return false;
+	//return copier.clicked(x, y);
     }
 
     public Thingee clicked( int x, int y ) {
