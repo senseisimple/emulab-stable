@@ -62,32 +62,13 @@ typedef struct {
 BOOTPH dhcppak;
 
 /*
- * Trivial config file format.
+ * DB interface
  */
-struct config {
-	struct in_addr	cip;
-	struct in_addr	sip;
-	char		bootprog[256];
-};
-#define MAX_CONFIGS	256
-struct config		*configurations[MAX_CONFIGS];
-struct config		*find_config(struct in_addr *addr);
-int			parse_configs(char *filename);
+int	open_db(void);
+int	query_db(struct in_addr, struct in_addr *, char *, int);
+int	close_db(void);
 
 int	binlmode = 0;
-
-int parsehost(char *hostname) {
-	struct hostent *he;
-	if (!isdigit(hostname[0])) {
-		he = gethostbyname(hostname);
-		if (he == NULL) {
-			fprintf(stderr,"Unknown host %s\n",hostname);
-			exit(1);
-		}
-		return *(int *)he->h_addr;
-	} else
-		return inet_addr(hostname);
-}
 
 int gettag(uchar *p, uchar tag, uchar *data, uchar *pend) {
 	uchar t;
@@ -155,18 +136,15 @@ void main(int argc, char *argv[])
 {
 	int servsock;
 	struct sockaddr_in server, client;
+	struct in_addr sip;
 	int clientlength;
-	int i, sip, gip, argn=1;
-	char *p, filename[128], ifname[IFNAMSIZ+1];
+	int i, argn=1;
+	char *p, bootprog[256], ifname[IFNAMSIZ+1];
 	char arguments[256];
 
-	if(argc < 2) {
-		fprintf(stderr, "usage : "
-			"proxydhcp [-ifname] config_filename\n");
-		exit(1);
-	}
 	memset(ifname,0,sizeof(ifname));
-	if (argv[1][0]=='-')
+	
+	if (argc == 2 && argv[1][0]=='-')
 	{
 		/* Bind to a specific interface */
 #ifdef SOLARIS
@@ -178,9 +156,8 @@ void main(int argc, char *argv[])
 		argn=2;
 	}
 	
-	gip = 0;
-	if (parse_configs(argv[argn])) {
-		fprintf(stderr, "Error on config file\n");
+	if (open_db()) {
+		fprintf(stderr, "Error opening database\n");
 		exit(1);
 	}
 	
@@ -294,15 +271,16 @@ void main(int argc, char *argv[])
 			continue;
 		}
 
-		if ((configp = find_config(&client.sin_addr)) == NULL) {
+		if (query_db(client.sin_addr,
+			     &sip, bootprog, sizeof(bootprog))) {
 			fprintf(stderr, "No matching record!\n");
 			continue;
 		}
 		
 		dhcppak.op=BOOTP_REPLY;
-		*((int *)dhcppak.sip)=configp->sip.s_addr;
+		*((int *)dhcppak.sip)=sip.s_addr;
 		*((int *)dhcppak.gip)=0;
-		strcpy(dhcppak.bootfile,configp->bootprog);
+		strcpy(dhcppak.bootfile, bootprog);
 
 		/* Add DHCP message type optopn (53) */
 		data[0]=(binlmode ? DHCPACK : DHCPOFFER);
@@ -364,70 +342,4 @@ void main(int argc, char *argv[])
 			sizeof(optval));
 		}
 	}
-}
-
-int
-parse_configs(char *filename)
-{
-	FILE	*fp;
-	int	i, count = 0;
-	char	buf[BUFSIZ], *bp, client[256], server[256], bootprog[256];
-	struct  config *configp;
-
-	if ((fp = fopen(filename, "r")) == NULL)
-		return 1;
-
-	while (1) {
-		if ((bp = fgets(buf, BUFSIZ, fp)) == NULL)
-			break;
-
-		if (*bp == '\n' || *bp == '#')
-			continue;
-
-		if (count >= MAX_CONFIGS) {
-			fclose(fp);
-			return 1;
-		}
-
-		sscanf(bp, "%s %s %s\n", &client, &server, &bootprog);
-
-		configp = (struct config *) calloc(sizeof(*configp), 1);
-		if (!configp) {
-			fclose(fp);
-			return 1;
-		}
-		configurations[count++] = configp;
-		configp->cip.s_addr = parsehost(client);
-		configp->sip.s_addr = parsehost(server);
-		strcpy(configp->bootprog, bootprog);
-	}
-
-	for (i = 0; i < count; i++) {
-		char		c[256], s[256];
-
-		configp = configurations[i];
-		strcpy(c, inet_ntoa(configp->cip));
-		strcpy(s, inet_ntoa(configp->sip));
-		
-		printf("%s %s %s\n", c, s, configp->bootprog);
-	}
-
-	fclose(fp);
-	return 0;
-}
-
-struct config *
-find_config(struct in_addr *addr)
-{
-	int		i;
-	struct config	*configp;
-	
-	for (i = 0; i < MAX_CONFIGS; i++) {
-		if ((configp = configurations[i]) == NULL)
-			return 0;
-
-		if (addr->s_addr == configp->cip.s_addr)
-			return configp;
-	}
-	return 0;
 }

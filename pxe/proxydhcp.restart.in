@@ -4,4 +4,4 @@ IDIR=@prefix@/sbin
 EDIR=@prefix@/etc
 
 killall proxydhcp
-${IDIR}/proxydhcp ${EDIR}/proxydhcp.conf > /dev/null 2>&1 &
+${IDIR}/proxydhcp > /dev/null 2>&1 &

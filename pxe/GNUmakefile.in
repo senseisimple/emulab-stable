@@ -19,8 +19,10 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 DBFLAG	= -DUSE_MYSQL_DB
 #DBFLAG = -DUSE_CFILE_DB
 #DBFLAG = -DUSE_NULL_DB
-DBSRC	= bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
-DBOBJ   = bootinfo_null.o bootinfo_cfile.o bootinfo_mysql.o
+BI_DBSRC   = bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
+BI_DBOBJ   = bootinfo_null.o bootinfo_cfile.o bootinfo_mysql.o
+PR_DBSRC   = proxydhcp_cfile.c proxydhcp_mysql.c 
+PR_DBOBJ   = proxydhcp_cfile.o proxydhcp_mysql.o 
 
 INCS    = -I/usr/local/include
 
@@ -33,20 +35,30 @@ INCS    = -I/usr/local/include
 CFLAGS	+= $(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
 		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"'
 
-proxydhcp: proxydhcp.o
-	cc $(CFLAGS) -o proxydhcp proxydhcp.o $(LFLAGS)
-
-bootinfo: bootinfo.o $(DBOBJ)
+proxydhcp: proxydhcp.o $(PR_DBOBJ)
 	cc $(CFLAGS) $(DBFLAG) $(INCS) \
-		-o bootinfo bootinfo.o $(DBOBJ) \
+		-o proxydhcp proxydhcp.o $(PR_DBOBJ) \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
-testmysql: bootinfo_mysql.c
+bootinfo: bootinfo.o $(BI_DBOBJ)
+	cc $(CFLAGS) $(DBFLAG) $(INCS) \
+		-o bootinfo bootinfo.o $(BI_DBOBJ) \
+		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
+
+testbootinfo_mysql: bootinfo_mysql.c
 	cc $(CFLAGS) -DUSE_MYSQL_DB -DTEST $(INCS) \
 		-o testmysql $< \
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
-testcfile: bootinfo_cfile.c
+testbootinfo_cfile: bootinfo_cfile.c
+	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile $< $(LFLAGS)
+
+testproxydhcp_mysql: proxydhcp_mysql.c
+	cc $(CFLAGS) -DUSE_MYSQL_DB -DTEST $(INCS) \
+		-o testmysql $< \
+		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
+
+testproxydhcp_cfile: proxydhcp_cfile.c
 	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile $< $(LFLAGS)
 
 install:	all
