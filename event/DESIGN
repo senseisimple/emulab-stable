@@ -47,7 +47,7 @@ system defined fields: (1) "time", which specifies the time at which
 the event should be/was fired; (2) "host", which specifies the
 hostname of the testbed node that should receive the event
 notification, or "*" if the event notification should be sent to all
-nodes; and (3) "type", which specifics the event type (see "EVENT
+nodes; and (3) "type", which specifies the event type (see "EVENT
 TYPES" for a description of supported event types).  In addition to
 the system defined fields, event notifications may contain additional
 attributes (in the form of name/value pairs) that may be used to
