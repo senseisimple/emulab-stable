@@ -94,6 +94,7 @@ elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
     #$having = "having (lastswap>=1)"; # At least one day since swapin
     $having = "having (lastswap>=0)";
     $idle = 1;
+    $idlehours = 6;
 }
 else {
     # See active above
@@ -235,7 +236,8 @@ if ($isadmin) {
     if ($idle) {
       # Run idlecheck and get the info
       #print "<pre>Running idlecheck\n";
-      $x=exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webidlecheck -s -u",
+      $x=exec("$TBSUEXEC_PATH $uid $TBADMINGROUP ".
+	      "webidlecheck -s -u -t $idlehours",
 	      $l, $rv);
       reset($l);
       while(list($index,$i) = each ($l)) {
@@ -295,7 +297,7 @@ if (mysql_num_rows($experiments_result)) {
           </center>\n";
 
     if ($idle) {
-      echo "<p><center><b>Experiments that have been idle at least 12 hours</b></center></p><br />\n";
+      echo "<p><center><b>Experiments that have been idle at least $idlehours hours</b></center></p><br />\n";
     }
     
     $idlemark = "<b>*</b>";
