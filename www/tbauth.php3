@@ -416,6 +416,19 @@ function ISADMIN($uid = 1) {
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_ISADMIN));
 }
 
+function STUDLY() {
+    global $CHECKLOGIN_STATUS;
+    
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
+	$uid=GETUID();
+	TBERROR("STUDLY: $uid is not logged in!", 1);
+    }
+
+    return (($CHECKLOGIN_STATUS &
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_STUDLY)) ==
+	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_STUDLY));
+}
+
 # Is this user a real administrator (ignore onoff bit).
 function ISADMINISTRATOR() {
     global $CHECKLOGIN_STATUS;

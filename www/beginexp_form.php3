@@ -62,6 +62,7 @@ function INITFORM($formfields, $projlist)
     $defaults[exp_nsfile]            = ""; # Multipart data.
     $defaults[exp_preload]           = "no";
     $defaults[exp_batched]           = "no";
+    $defaults[exp_linktest]          = 0;
 
     #
     # Allow formfields that are already set to override defaults
@@ -140,7 +141,7 @@ function CHECKFORM(&$formfields, $projlist)
 function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
-    global $view, $view_style, $projlist;
+    global $view, $view_style, $projlist, $linktest_levels;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -467,6 +468,31 @@ function SPITFORM($formfields, $errors)
 		  </td>
 	       </tr>";
     }
+
+    #
+    # Run linktest, and level. 
+    #
+   if (STUDLY()) {
+    echo "<tr>
+              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
+	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><select name=\"formfields[exp_linktest]\">
+                          <option value=0>Skip Linktest </option>\n";
+
+    for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
+	$selected = "";
+
+	if (strcmp($formfields[exp_linktest], "$i") == 0)
+	    $selected = "selected";
+	
+	echo "        <option $selected value=$i>Level $i - " .
+	    $linktest_levels[$i] . "</option>\n";
+    }
+    echo "       </select>";
+    echo "    (Experimental; will not affect swapin)";
+    echo "    </td>
+          </tr>\n";
+   }
 
     #
     # Batch Experiment?

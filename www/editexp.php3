@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -50,7 +50,7 @@ if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
 #
 function SPITFORM($formfields, $errors)
 {
-    global $eid, $pid, $TBDOCBASE;
+    global $eid, $pid, $TBDOCBASE, $linktest_levels;
 
     #
     # Standard Testbed Header
@@ -260,6 +260,31 @@ function SPITFORM($formfields, $errors)
           </td>
           </tr>\n";
 
+    #
+    # Run linktest, and level. 
+    # 
+   if (STUDLY()) {
+    echo "<tr>
+              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
+	                  "docname=linktest.html'>Linktest</a> Option:</td>
+              <td><select name=\"formfields[linktest_level]\">
+                          <option value=0>Skip Linktest </option>\n";
+
+    for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
+	$selected = "";
+
+	if (strcmp($formfields[linktest_level], "$i") == 0)
+	    $selected = "selected";
+	
+	echo "        <option $selected value=$i>Level $i - " .
+	    $linktest_levels[$i] . "</option>\n";
+    }
+    echo "       </select>";
+    echo "    (Experimental; will not affect swapin)";
+    echo "    </td>
+          </tr>\n";
+   }
+
     echo "<tr>
               <td colspan=2 align=center>
                  <b><input type=submit name=submit value=Submit></b>
@@ -304,6 +329,7 @@ $defaults[autoswap_timeout]  = $row[autoswap_timeout] / 60.0;
 $defaults[idle_ignore]       = $row[idle_ignore];
 $defaults[mem_usage]         = $row["mem_usage"];
 $defaults[cpu_usage]         = $row["cpu_usage"];
+$defaults[linktest_level]    = $row["linktest_level"];
 
 #
 # A couple of defaults for turning things on.
@@ -476,6 +502,24 @@ if (isset($formfields[mem_usage]) &&
 }
 else {
     $inserts[] = "mem_usage=0";
+}
+
+#
+# Linktest level
+#
+if (isset($formfields[linktest_level]) &&
+    strcmp($formfields[linktest_level], "")) {
+
+    if (($formfields[linktest_level] + 0) < 0 ||
+	($formfields[linktest_level] + 0) > 4) {
+	$errors["Linktest Level"] = "Invalid linktest level";
+    }
+    else {
+	$inserts[] = "linktest_level=$formfields[linktest_level]";
+    }
+}
+else {
+    $inserts[] = "linktest_level=0";
 }
 
 #

@@ -172,6 +172,11 @@ if ($wireless) {
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
+if (STUDLY()) {
+    WRITESUBMENUBUTTON("Run Linktest",
+		       "linktest.php3?pid=$exp_pid&eid=$exp_eid");
+}
+
 if (ISADMIN($uid)) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	SUBMENUSECTION("Beta-Test Options");

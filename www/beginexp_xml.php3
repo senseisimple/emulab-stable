@@ -257,9 +257,19 @@ else {
     $formfields[exp_autoswap] = 1;
     
     if (!isset($formfields[exp_autoswap_timeout]) ||
-	!preg_match("/[\d]+/", $formfields[exp_idleswap_timeout]) ||
+	!preg_match("/^[\d]+$/", $formfields[exp_idleswap_timeout]) ||
 	($formfields[exp_autoswap_timeout] + 0) <= 0) {
 	$errors["Max. Duration"] = "No or invalid time provided";
+    }
+}
+
+#
+# Linktest option
+# 
+if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
+    if (!preg_match("/^[\d]+$/", $formfields[exp_linktest]) ||
+	$formfields[exp_linktest] < 0 || $formfields[exp_linktest] > 4) {
+	$errors["Linktest Option"] = "Invalid level selection";
     }
 }
 
@@ -306,6 +316,10 @@ elseif ($nsfilelocale == "nsref") {
     }
     else {
 	$thensfile = "/tmp/$uid-$nsref.nsfile";
+    }
+    if (! file_exists($thensfile)) {
+	$errors["NS File"] = "Temp file no longer exists on server";
+	XMLERROR();
     }
     $deletensfile = 1;
 }
@@ -360,6 +374,7 @@ else {
 $exp_batched   = 0;
 $exp_preload   = 0;
 $batcharg      = "-i";
+$linktestarg   = "";
 
 if (isset($formfields[exp_batched]) &&
     strcmp($formfields[exp_batched], "Yep") == 0) {
@@ -370,6 +385,9 @@ if (isset($formfields[exp_preload]) &&
     strcmp($formfields[exp_preload], "Yep") == 0) {
     $exp_preload   = 1;
     $batcharg     .= " -f";
+}
+if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
+    $linktestarg   = "-t " . $formfields[exp_linktest];
 }
 
 #
@@ -391,7 +409,7 @@ set_time_limit(0);
 
 $retval = SUEXEC($uid, $unix_gid,
 		 "webbatchexp $batcharg -E $exp_desc $exp_swappable ".
-		 "-p $exp_pid -g $exp_gid -e $exp_id ".
+		 "$linktestarg -p $exp_pid -g $exp_gid -e $exp_id ".
 		 ($nonsfile ? "" : "$thensfile"),
 		 SUEXEC_ACTION_IGNORE);
 

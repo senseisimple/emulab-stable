@@ -149,6 +149,15 @@ define("TBDB_USER_INTERFACE_PLAB",	"plab");
 $TBDB_USER_INTERFACE_LIST = array(TBDB_USER_INTERFACE_EMULAB,
 				  TBDB_USER_INTERFACE_PLAB);
 
+# Lintest levels.
+$linktest_levels	= array();
+$linktest_levels[0]	= "Skip Linktest";
+$linktest_levels[1]	= "Connectivity and Latency";
+$linktest_levels[2]	= "Static Routing";
+$linktest_levels[3]	= "Loss";
+$linktest_levels[4]	= "Bandwidth";
+define("TBDB_LINKTEST_MAX", 4);
+
 #
 # Convert a trust string to the above numeric values.
 #
