@@ -38,8 +38,9 @@ if ($isadmin) {
 	$altclause = "where ($altclause)";
     
     $experiments_result =
-	DBQueryFatal("select pid,eid,expt_head_uid,expt_name from ".
-		     "experiments as e $altclause ".
+	DBQueryFatal("select pid,eid,expt_head_uid,expt_name, ".
+		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
+		     "from experiments as e $altclause ".
 		     "order by pid,eid,expt_name");
 }
 else {
@@ -47,8 +48,9 @@ else {
 	$altclause = "and ($altclause)";
     
     $experiments_result =
-	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name from ".
-		     "experiments as e ".
+	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name, ".
+		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
+		     "from experiments as e ".
 		     "left join group_membership as g on g.pid=e.pid ".
 		     "where g.uid='$uid' $altclause ".
 		     "order by e.pid,eid,expt_name");
@@ -84,6 +86,7 @@ if (mysql_num_rows($experiments_result)) {
 	$eid  = $row[eid];
 	$huid = $row[expt_head_uid];
 	$name = $row[expt_name];
+	$date = $row[d];
 
 	$usage_query =
 	    DBQueryFatal("select nt.class, count(*) from reserved as r ".
@@ -107,16 +110,18 @@ if (mysql_num_rows($experiments_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>
-                <td>".$usage["pc"]." &nbsp</td>\n";
+                <td>".$usage["pc"]." &nbsp;</td>\n";
 
 	if ($isadmin) {
-	    $foo = "&nbsp";
+	    $foo = "&nbsp;";
 
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 		$foo = $lastexpnodelogins["date"] . " " .
 		 "(" . $lastexpnodelogins["uid"] . ")";
+	    } elseif (TBExptState($pid,$eid)=="active" && $usage["pc"]>0) {
+	        $foo = "$date Swapped In";
 	    }
-
+	    
 	    echo "<td>$foo</td>\n";
 	}
 
