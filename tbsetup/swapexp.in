@@ -286,12 +286,23 @@ if ($isbatchexpt) {
 	    DBQueryFatal("UPDATE experiments set canceled=$flag ".
 			 "WHERE eid='$eid' and pid='$pid'");
 	}
+	elsif ($inout eq "modify") {
+	    die("*** $0:\n".
+		"    Batch experiment $pid/$eid is not in the proper state!\n".
+		"    Currently $ebatchstate. Must be PAUSED to modify.\n")
+		if ($ebatchstate ne BATCHSTATE_PAUSED);
+	    # Otherwise, proceed with the modify. The experiment will be
+	    # locked below, and so it cannot be injected (posted) until
+	    # that is finished cause of the expt_locked test above.
+	    goto doit;
+	}
 	else {
 	    die("*** $0:\n",
 		"    Batch experiments can only be swapped in or out!\n");
 	}
 	exit(0);
     }
+  doit:
 }
 
 #
