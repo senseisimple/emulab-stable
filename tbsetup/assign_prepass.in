@@ -182,6 +182,7 @@ sub parse_top($) {
 		    'plr'      => $plr,
 		    'flags'    => \@tokens,
 		    'emulated' => $emulated,
+		    'reversed' => 0,
 		    'links'    => []
 		};
 		push @{$nodes{$src}{'slinks'}}, $links{$name};
@@ -337,15 +338,25 @@ sub parse_solution($) {
     }
 
     #
-    # Find the edges - all we need to understand is the name.
+    # Find the edges
     #
     my @edges;
     while (<SOL> !~ /^Edges:/) { }
     while (<SOL>) {
 	chomp;
 	/^End Edges$/ && last;
-	my ($name, $rest) = split /\s+/,$_,2;
-	push @edges, [$name, $rest];
+	my ($name, $type, @plinks) = split /\s+/,$_,2;
+	
+	#
+	# Phsical links are linksted as 'link interface', so part them up as
+	# such
+	#
+	my @pairs;
+	while (@plinks) {
+	    my ($link, $interface) = (shift @plinks, shift @plinks);
+	    push @pairs, [$link, $interface];
+	}
+	push @edges, [$name, $type, \@pairs];
     }
     close(SOL);
 
@@ -384,10 +395,29 @@ sub write_solution($$$) {
 
     print "Edges:\n";
     foreach my $edge (@$edges) {
-	my ($name, $rest) = @$edge;
+	my ($name, $type, $pairs) = @$edge;
+	my @pairs = @$pairs;
 	my @real_virtlinks = list_links($links{$name});
 	foreach my $real_virtlink (@real_virtlinks) {
-	    print "$real_virtlink $rest\n";
+	    print "$real_virtlink $type ";
+
+	    my @ordered_pairs;
+	    if (!$links{$name}->{'reversed'}) {
+		@ordered_pairs = @pairs;
+	    } else {
+		# The direction of this link is reversed wrt the conglomerated
+		# link it got shoved into - reverse the order of the pairs.
+		foreach my $pair (@pairs) {
+		    unshift @ordered_pairs, $pair;
+		}
+	    }
+
+	    foreach my $pair (@ordered_pairs) {
+		my ($link, $iface) = @$pair;
+		print "$link $iface ";
+	    }
+
+	    print "\n";
 	}
     }
     print "End Edges\n";
@@ -914,6 +944,9 @@ sub combine_links($) {
 
 	    # We do this to get a canonical src, dst ordering
 	    my ($csrc, $cdst) = sort { $a cmp $b } ($src, $dst);
+	    if ($src != $csrc) {
+		$link->{'reversed'} = 1;
+	    }
 	    push @{$links{$csrc}{$cdst}}, $link;
 	    $totallinks++;
 	}
