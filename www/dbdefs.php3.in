@@ -1234,6 +1234,20 @@ function TBExptState($pid, $eid)
     return $state;
 }
 
+function TBExptIndex($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select idx from experiments ".
+		     "where eid='$eid' and pid='$pid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return -1;
+    }
+    $row   = mysql_fetch_array($query_result);
+    $idx   = $row[idx];
+    return $idx;
+}
+
 function TBUidNodeLastLogin($uid)
 {
     $query_result =

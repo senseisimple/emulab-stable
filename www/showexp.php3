@@ -48,8 +48,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
     USERERROR("You do not have permission to view experiment $exp_eid!", 1);
 }
 
-
-
+$expindex = TBExptIndex($exp_pid, $exp_eid);
 $expstate = TBExptState($exp_pid, $exp_eid);
 
 echo "<font size=+2>Experiment <b>".
@@ -112,6 +111,10 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 		       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 }
+
+# History
+WRITESUBMENUBUTTON("Show History",
+		   "showstats.php3?showby=expt&which=$expindex");
 
 if (ISADMIN($uid)) {
     if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {		

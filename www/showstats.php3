@@ -90,6 +90,35 @@ elseif ($showby == "project") {
     $wclause = "where s.pid='$which'";
     $records = 400;
 }
+elseif ($showby == "expt") {
+    if (!$which) {
+	USERERROR("Must supply an experiment to view!", 1);
+    }
+
+    #
+    # We get an index. Must map that to a pid/eid to do the permission
+    # check, and note that it might not be an current experiment. Not
+    # sure I like this so I am not going to permit it for mere users
+    # just yet.
+    #
+    if (!$isadmin) {
+	$query_result =
+	    DBQueryFatal("select pid,eid from experiments where idx='$which'");
+	if (mysql_num_rows($query_result) == 0) {
+	    USERERROR("No such experiment index $which!", 1);
+	}
+	$row   = mysql_fetch_array($query_result);
+	$pid   = $row[pid];
+	$eid   = $row[eid];
+	
+	if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	    USERERROR("You do not have permission to view stats for ".
+		      "experiment $which!", 1);
+	}
+    }
+    $wclause = "where t.exptidx='$which'";
+    $records = 100;
+}
 elseif ($showby == "all") {
     if ($which) {
 	if (! TBProjAccessCheck($uid, $which, $which, $TB_PROJECT_READINFO)) {
