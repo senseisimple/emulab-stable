@@ -1,0 +1,174 @@
+\section{Implementation}
+
+\subsection{Planetlab in the Emulab Framework}
+
+* Emulab has an experiment life cycle
+  - swapin, swapout, terminate
+
+* Plab specific functions happen at alloc, setup, and swapout/teardown.
+
+\subsection{Emulab's Modular Planetlab Backend}
+
+As \plab is an evolving system, its interfaces often undergo radical
+change.  To cope with this variability, Emulab's \plab backend is
+modular, supporting two different \plab API frontends, with a third on
+the horizon.  While the mechanisms to carry out slice creation and
+vnode allocation have changed over time, the overall process and
+abstractions have maintained enough consistency to make different
+backend modules with a common management core possible.  Each module
+is expected to implement a set of functions callable by the core logic
+that follow defined semantics for operations such as slice
+creation/deletion, key management, and node allocation/deallocation.
+
+\xxx{probably merge with Node Alloc section}
+\subsection{Slice Creation}
+
+When an experimental specification includes Planetlab vserver nodes, a
+slice is created during experiment setup.  The mechanism by which this
+happens is selectable; PLC and dslice are currently supported.  Direct
+Node Manager creation will be implemented when this interface stabalizes.  
+The process is synchronous and must succeed for experiment creation to
+continue.  On failure, experimental setup is terminated.  Details related 
+to the slice are stored in the Emulab database (e.g., when it
+expires).
+
+\subsection{Node Allocation and Setup}
+
+As experiment creation (swapin) procedes from slice creation, virtual
+nodes are created and setup.  On local Emulab physical nodes, these
+virtual nodes are created as part of the boot time setup sequence on
+the physical node itself.  Callbacks are made to the Emulab central
+server (the boss node) to determine whether virtual machine resources
+need to be allocated on the physical host node.
+
+The Planetlab backend differs in an important way; we don't have
+direct control over the physical machine, and must therefore take an
+additional step to allocate a virtual machine on a particular node.
+These physical nodes do not boot up as part of an Emulab experiment
+swapin, rather, they are run independently and may house other,
+unrelated virtual machines for slices created both outside of Emulab,
+and through Emulab.  Emulab's Planetlab backend coordinates with
+Planetlab to allocate a new virtual machine on each \plab physical
+node assigned to the Emulab experiment.  As mentioned, the \plab
+backend is structured in a modular fashion to allow communication with
+current and future \plab frontends.  As some \plab frontends have high
+latency characteristics (order of minutes), Emulab attempts to speed up
+the allocation process by performing several allocation calls in
+parallel.  The software keeps a parallelism window as full as possible
+until all allocation RPCs have been made to \plab.  The size of this
+window has been empircally tuned using RPC failure rates and
+anticipated load on the Emulab side (e.g. expected maximum number of
+simultaneous \plab experimental swapin attempts).
+
+After \plab vnode allocation, Emulab's \plab backend prepares the
+vnode for setup by doing two things.  First, it transfers and overlays
+a package containing a set of files needed for Emulab setup, including
+the Emulab vnode startup scripts, configuration files, and other
+supporting binaries.  The vnode specific ssh daemon is then started.
+
+After vnode resources are successfully secured, Emulab proceeds to
+with vnode startup.  This process is invoked in the same way for both
+\plab vnodes, and for local Emulab vnodes; the Emulab boss node
+contacts the vnodes via ssh and executes the startup script.  Once the
+top-level vnode setup script has activated, it sends a state change
+message (BOOTING) back to the Emulab boss node.  On \plab vnodes, this
+script has additional responsibilities.  It starts logging daemons,
+creates Emulab-specific directories, and ultimately stays active in
+order to coordinate node reboot requests.  Vnode-agnostic services
+such as a node watchdog are also started, user packages are installed
+(rpms and tarballs), and startup commands are executed if applicable.
+Once all daemons and configuration activity have completed, it sends
+another state change message to let Emulab know that the vnode is
+ready (ISUP).
+
+\subsection{Node and Slice Deallocation}
+
+When an Emulab experiment containing \plab nodes is swapped out or
+torn down, part of the process includes releasing the \plab vnode
+resources allocated to that experiment.  First Emulab contacts each
+vnode and signals a waiting script that the node needs to be halted.
+When this has been completed on a vnode, the Emulab boss node will
+receive a state change message from the script just before it exits
+indicating that the shutdown process is complete (SHUTDOWN).  Next,
+the Emulab \plab backend frees \plab node.  After all nodes have been
+shutdown and freed, the backend frees the slice.
+
+\subsection{Dslice Semantics}
+
+The original \plab resource allocation and management API and
+framework created by Brent Chun was known as \dslice.  Its model was
+mainly decentralized, only involving a central ticket broker for
+obtaining allocation rights for individual nodes.  Slice creation was
+implicit; there was no central notion of a slice although tickets were
+marked with a slicename and node identifier.
+
+The Emulab \dslice \plab backend module made XMLRPC calls to the
+central \dslice ticket agent for each \plab node in the Emulab
+experiment, asking for a maximum resource lease.  After obtaining a
+ticket, the \dslice backend then spoke with a node manager running on
+the corresponding physical \plab node, also via XMLRPC calls.  It
+would present the node manager with a ticket and obtain a lease in
+response.  The node manager would also create a Linux vserver as the
+virtual machine resource; this process normally pulled the vserver
+from a preallocated pool, making it quite fast.  Once the lease
+requisition RPC completed, Emulab was free to interact with the
+vserver as available through \plab's slice demultiplexing ssh (keyed
+on slice name).  Before proceeding with setup, however, Emulab would
+use the \dslice node manager API to add the ssh public key for the
+Emulab management user.  This would allow the programmatic interaction
+of the Emulab boss node with the \plab vnode for final setup, and
+later vnode interaction and teardown.
+
+When the \plab experiment came to completion, and the experimenter
+requested swapout or termination via Emulab, the Emulab \dslice module
+would simply revoke the lease for each \plab vnode sliver by
+communicating with the individual \dslice node managers.
+
+By design principles, the lease allocation would fail if the
+node was oversubscribed, and tickets would require payment via shares
+delegated to the experimenter from \plab.  However, the \dslice
+implementation did not track shares, and did not enforce or track
+resource usage.
+
+\subsection{PLC Semantics}
+
+When \plab transitioned to their 2.0 platform, they deprecated dslice
+in favor of their new centralized management API dubbed PLC (PlanetLab
+Central).  With PLC, all operations/RPCs are coordinated with a
+central server.  The server then coordinates resource allocation on
+the physical nodes in the background.  Most PLC API calls do not
+effect immediate updates on the \plab nodes, but rather queue the
+operations and let a PLC node manager running on each \plab node pull
+them periodically (originally every half hour).  In PLC, a slice is a
+concrete entity that must be created with an API call.  The Emulab PLC
+\plab backend module does this, and also attaches shares to the slice
+via the XMLRPC PLC API frontend.  Additional \plab users can also be
+granted permission to the slice, and the Emulab PLC module uses this
+feature to add the Emulab management user to the slice.  This, as in
+\dslice, allows for future automated access to the virtual machines in
+the slice via ssh.
+
+Also in contrast to \dslice, allocating the virtual machine resources
+is accomplished through the PLC central server.  Originally, there was
+no programmatic way to determine when a particular vnode allocated
+through PLC was ready.  The Emulab PLC module was forced to either
+wait the predefined maximum polling interval to allow the \plab nodes
+to pull their latest vnode resource allocations from PLC, or poll for
+readiness by trying periodically to ssh to them.  The PLC API was
+subsequently extended to include a call (InstantiateSliver) that would
+block until the a specified vnode was ready.  It would further call
+out to the PLC node manager on the physical \plab node to elicit an
+immediate poll.  The Emulab PLC module was changed to use this call to
+programmatically determine when the \plab vnodes were ready during
+experiment swapin.
+
+At experiment swapout or teardown time, the Emulab PLC module makes a
+call to the PLC central server to remove the slice.  This effectively
+releases all the resources, and eventually causes the PLC node manager
+on each node participating in the slice to reclaim the virtual machine
+used for the corresponding slice.
+
+\subsection{Failure Handling and Recovery}
+
+Given two large distributed systems such as Emulab and \plab, failures
+are a given and have many possible modes.  We approach this by ...
