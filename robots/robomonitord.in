@@ -252,32 +252,9 @@ while (1) {
     }
 
   skip:
-    sleep(10);
+    sleep(60);
 }
 exit(0);
-
-#
-# Get pid,eid of current experiment using the robot lab. This is just
-# plain silly for now.
-#
-sub TBRobotLabExpt($$)
-{
-    my ($ppid, $peid) = @_;
-    
-    my $query_result =
-	DBQueryWarn("select r.pid,r.eid from reserved as r ".
-		    "left join nodes as n on n.node_id=r.node_id ".
-		    "left join node_types as nt on nt.type=n.type ".
-		    "where nt.class='robot' and r.pid!='$TBOPSPID'");
-
-    return 0
-	if (!$query_result || !$query_result->numrows);
-
-    my ($pid, $eid) = $query_result->fetchrow_array();
-    $$ppid = $pid;
-    $$peid = $eid;
-    return 1;
-}
 
 #
 # Notify current user of the robot lab that they are going to get swapped.
@@ -301,14 +278,19 @@ sub SwapWarn($$$)
     print "Sending swap warning email to $swapper at ".
 	TBDateTimeFSSafe() . "\n";
 
-    SENDMAIL("$user_name <stoller>",
+    SENDMAIL("$user_name <$user_email>",
 	     "Robot Lab Monitor Daemon Message",
 	     "Your experiment running on the robot testbed, $pid/$eid, \n".
 	     "will soon be swapped out when the robot testbed closes for \n".
 	     "for the night.\n".
 	     "\n".
-	     "You have " . $timeleft / 60 . " minutes befor that happens!\n".
-	     "\n",
+	     "You have " . int($timeleft / 60) .
+	         " minutes before that happens!\n".
+	     "\n".
+	     "Please save your data and swap your experiment out to avoid\n".
+	     "losing any work.\n".
+	     "\n".
+	     "Thanks!\n",
 	     $TBOPS,
 	     "Cc: $TBOPS");
 

@@ -44,3 +44,8 @@ INSERT INTO sitevariables VALUES ('general/autoswap_mode',NULL,'0','Control whet
 INSERT INTO sitevariables VALUES ('webcam/anyone_can_view',NULL,'0','Turn webcam viewing on/off for mere users; default is off');
 INSERT INTO sitevariables VALUES ('webcam/admins_can_view',NULL,'1','Turn webcam viewing on/off for admin users; default is on');
 INSERT INTO sitevariables VALUES ('swap/use_admission_control',NULL,'1','Use admission control when swapping in experiments');
+INSERT INTO sitevariables VALUES ('robotlab/override',NULL,'','Turn the Robot Lab on/off (open/close). This is an override over other settings');
+INSERT INTO sitevariables VALUES ('robotlab/exclusive',NULL,'1','Only one experiment at a time; do not turn this off!');
+INSERT INTO sitevariables VALUES ('robotlab/opentime',NULL,'07:00','Time the Robot lab opens for use.');
+INSERT INTO sitevariables VALUES ('robotlab/closetime',NULL,'18:00','Time the Robot lab closes down for the night.');
+INSERT INTO sitevariables VALUES ('robotlab/open',NULL,'0','Turn the Robot Lab on/off for weekends and holidays. Overrides the open/close times.');

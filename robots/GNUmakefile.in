@@ -25,15 +25,18 @@ endif
 
 SUBDIRS	= tbsetdest $(MEZZDIR) mtp $(EMCDIR) vmcd primotion rmcd
 
-all:		all-subdirs
+all:		robomonitord all-subdirs 
 client:		client-subdirs
 client-install:	client-install-subdirs
 check:		check-subdirs
-install:	install-subdirs
+install:	install-subdirs install-scripts
+boss-install:   install
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 clean:		clean-subdirs
+
+install-scripts:	$(addprefix $(INSTALL_SBINDIR)/, robomonitord)
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
