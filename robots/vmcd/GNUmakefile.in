@@ -25,7 +25,7 @@ CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib
 
-LIBS	 += -lmtp -ltb
+LIBS	 += -lmtp -ltb -lm
 
 test_vmc-client.sh: vmc-client
 

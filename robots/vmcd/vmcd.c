@@ -609,7 +609,7 @@ int find_real_robot_id(struct position *p) {
             float my_dist_delta;
             float my_pose_delta;
 
-            dx = p->.x - real_robots[i].position.x;
+            dx = p->x - real_robots[i].position.x;
             dy = p->y - real_robots[i].position.y;
             my_dist_delta = sqrt(dx*dx + dy*dy);
             my_pose_delta = p->theta - real_robots[i].position.theta;
