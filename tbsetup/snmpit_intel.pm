@@ -411,7 +411,7 @@ sub findVlan($$;$) {
 sub createVlan($$;@) {
     my $self = shift;
     my $vlan_id = shift;
-    my @ports = shift;
+    my @ports = @_;
 
     my $okay = 0;
 
