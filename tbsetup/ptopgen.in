@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -415,7 +415,7 @@ foreach $node (keys(%nodes)) {
 if ($widearea) {
     $result =
 	DBQueryFatal("select count(a.node_id),a.phys_nodeid,aa.type, ".
-		     "  ns.status, wn.site ".
+		     "  ns.status,m.pid,m.eid,wn.site ".
 		     "  from nodes as a ".
  		     "left join reserved as b on a.node_id=b.node_id ".
 		     "left join nodes as aa on aa.node_id=a.phys_nodeid ".
@@ -426,11 +426,10 @@ if ($widearea) {
 		     "left join widearea_nodeinfo as wn on ".
 		     "     wn.node_id=a.phys_nodeid ".
 		     "where  (a.role='virtnode' and t.isremotenode=1 and ".
-		     "        (b.node_id is null and ".
-		     "         !(m.pid='$DEADPID' and m.eid='$DEADEID'))) ".
+		     "        b.node_id is null) ".
 		     "group by a.phys_nodeid");
     
-    while (($count,$physnode,$ptype,$status,$site)
+    while (($count,$physnode,$ptype,$status,$mpid,$meid,$site)
 	    = $result->fetchrow_array) {
 	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
@@ -449,7 +448,8 @@ if ($widearea) {
 	# normally get assigned. We want to include them, though, because we
 	# allow people to do fix-node to down nodes
 	#
-	if ($status && ($status ne 'up')) {
+	if (($status && ($status ne 'up')) ||
+	    ($mpid eq $DEADPID && $meid eq $DEADEID)) {
 	    push @features, "down:1";
 	}
 
