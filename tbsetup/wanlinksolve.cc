@@ -36,7 +36,7 @@
    -r <minrounds>
        Specify the minimum number of rounds to go before stopping.
        Note that the algorithm won't actually stop until
-       round 3n, where "n" is the round which found the best solution so far,
+       round 2n, where "n" is the round which found the best solution so far,
        or if it hits maxrounds.
        default: DEFAULT_ROUNDS
 
@@ -92,22 +92,25 @@
 #define MAX_NODES 20
 #define MAX_DIMENSIONS 2
 
-#define DEFAULT_ROUNDS 160
+#define DEFAULT_ROUNDS 512
 
 // The size of our "population."
 // (100,000 seems to work well.)
-#define SOLUTIONS 100000
+//#define SOLUTIONS 100000
+#define SOLUTIONS 500
 
 // The number of new children to produce each round.
 // (20,000 seems to work well.)
-#define CHILDREN_PER_ROUND 20000
+//define CHILDREN_PER_ROUND 20000
 
 // The probability a given child will NOT have a mutation.
 // (out of 1000). 990 means 1% of children will mutate.
 // (.01% will mutate twice, .0001% three times, etc.)
 // 500 means 50% of children will mutate (25% twice, 12% three times, etc.)
 // 500, incidentally, seems to be optimal.
-#define MUTATE_PROB 500
+//#define MUTATE_PROB 500
+//#define MUTATE_PROB 700
+#define MUTATE_PROB 950
 
 // A score below Epsilon means we've found a perfect solution,
 // so stop immediately.
@@ -176,20 +179,49 @@ public:
   unsigned char pnode_uses[MAX_NODES];
 
   float error;
+  float prob;
 };
 
 static Solution pool[SOLUTIONS];
+static Solution pool2[SOLUTIONS];
 
-static inline int pickABest()
+static inline void prepick( Solution * currentPool )
 {
+  float totalFitness = 0.0f;
+  int i;
+
+  for (i = 0; i < SOLUTIONS; i++) {
+    totalFitness += 1.0f / currentPool[i].error;
+  }
+
+  for (i = 0; i < SOLUTIONS; i++) {
+    currentPool[i].prob = (1.0f / currentPool[i].error) / totalFitness;
+  }
+}
+
+static inline int pickABest( Solution * currentPool )
+{
+  float x = (float)rand() / (float)RAND_MAX;
+
+  int i = 0;
+  while (1) { 
+    x -= currentPool[i].prob; 
+    if (x < 0.0f) break;
+    i++;
+    if (i == SOLUTIONS) { i = 0; }
+  }
+  return i - 1;
+}
+
+/*
   // a hacky (but damn fast) probibility curve to
   // favor mating better solutions.
 
   switch (rand() % 4) {
-  case 0: return rand() % (SOLUTIONS / 32);
-  case 1: return rand() % (SOLUTIONS / 16);
-  case 2: return rand() % (SOLUTIONS / 4);
-  case 3: return rand() % (SOLUTIONS / 2);
+  case 0: return rand() % SOLUTIONS / 32;
+  case 1: return rand() % SOLUTIONS / 16;
+  case 2: return rand() % SOLUTIONS / 4;
+  case 3: return rand() % SOLUTIONS;
   default: return 0; // can't happen, but -Wall doesn't realize this.
   }
 }
@@ -198,7 +230,7 @@ static inline int pickAWorst()
 {
   return SOLUTIONS - pickABest();
 }
-
+*/
 // uses a template to avoid massive numbers
 // of "if" choices.. compiler should generate two versions,
 // one with dump and one without.
@@ -279,10 +311,10 @@ static int compar( const void * a , const void * b )
   { return 0; }
 }
 
-static inline void sortByError()
+static inline void sortByError( Solution * t )
 {
   // Ahh.. sweet, sweet qsort.
-  qsort( pool, SOLUTIONS, sizeof( Solution ), compar );
+  qsort( t, SOLUTIONS, sizeof( Solution ), compar );
 }
 
 // "Mutating" is swapping what vnode a pnode maps to in
@@ -394,8 +426,14 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
 	  vnode_mapping_t[pos] = b->vnode_mapping[pos];
 	  ++pnode_uses_t[ b->vnode_mapping[pos] ];
 	} else {
-	  // failed mating.
-	  return;
+	  // failed mating (clone a parent)
+	  for (int x = 0; x < vnodes; x++) {
+	    vnode_mapping_t[x] = a->vnode_mapping[x];
+	  }
+	  for (int y = 0; y < vnodes; y++) {
+	    pnode_uses_t[y] = a->pnode_uses[y];
+	  }
+	  break;
 	}
       }
     } else {
@@ -407,14 +445,19 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
 	  vnode_mapping_t[pos] = a->vnode_mapping[pos];
 	  ++pnode_uses_t[ a->vnode_mapping[pos] ];
 	} else {
-	  // failed mating.
-	  return;
+	  // failed mating (clone a parent)
+	  for (int x = 0; x < vnodes; x++) {
+	    vnode_mapping_t[x] = b->vnode_mapping[x];
+	  }
+	  for (int y = 0; y < vnodes; y++) {
+	    pnode_uses_t[y] = b->pnode_uses[y];
+	  }
+	  break;
 	}
       }
     }
   }
 
-  // ok.. good one..
   // since we have a cromulent child, we now clobber t.
   for(int d = 0; d < vnodes; d++) {
     t->vnode_mapping[d] = vnode_mapping_t[d];
@@ -631,40 +674,73 @@ int main( int argc, char ** argv )
     } 
   }
 
+  Solution * currentPool = pool;
+  Solution * nextPool = pool2;
+
   if (fixedNodeCount < vnodes) {
     if (verbose) { printf("Now running...\n"); }
 
     {
       for (int i = 0; i < SOLUTIONS; i++) {
-	generateRandomSolution( &(pool[i]) );
+	generateRandomSolution( &(currentPool[i]) );
       }
-      sortByError();
+      sortByError( currentPool );
     }
 
     int highestFoundRound = 0;
-    float last = pool[0].error;
-    for (int i = 0; i != maxrounds && (i < minrounds || i < highestFoundRound * 3); i++) {
-      if (verbose && !(i % (minrounds / 10))) {
-	printf("Round %i. (best %4.3f)\n", i, pool[0].error);
+    float last = currentPool[0].error;
+
+    for (int i = 0; i != maxrounds && (i < minrounds || i < highestFoundRound * 2); i++) {
+      /*
+      {
+	float blah = 0.0f;
+	for (int xy = 0; xy < SOLUTIONS; xy++) { blah += currentPool[xy].error; }
+	printf("Avg = %7.2f\n", (blah / (float)SOLUTIONS) );
+      }
+      */
+      
+      if (verbose && !(i % (minrounds / 8))) {
+	printf("Round %i. (best %4.3f)\n", i, currentPool[0].error);
       }
       
-      if (pool[0].error < last) {
+      if (currentPool[0].error < last) {
 	if (verbose) {
 	  printf("Better solution found in round %i (error %4.3f)\n", 
-		 i, pool[0].error);
+		 i, currentPool[0].error);
 	}
-	last = pool[0].error;
+	last = currentPool[0].error;
 	highestFoundRound = i;
       }
-      
+
+      memcpy( &(nextPool[0]), &(currentPool[0]), sizeof( Solution ) );
+      prepick( currentPool );
+
+      int j;
+
+      for (j = 1; j < SOLUTIONS - 10; j++) {
+	splice( &(nextPool[j]),
+		&(currentPool[pickABest( currentPool )]),
+		&(currentPool[pickABest( currentPool )]) );
+      }
+
+      for (;j != SOLUTIONS; j++) {
+	generateRandomSolution( &(nextPool[j]) );	
+      }
+      /*      
       for (int j = 0; j < CHILDREN_PER_ROUND; j++) {
 	// Overwrite a "bad" solution with the child of two "good" ones.
 	splice( &(pool[pickAWorst()]), 
 		&(pool[pickABest()]), 
 		&(pool[pickABest()]) ); 
       }
-      sortByError();
-      if (pool[0].error < EPSILON) { 
+      */
+      sortByError( nextPool );
+
+      Solution * temp = currentPool;
+      currentPool = nextPool;
+      nextPool = temp;
+
+      if (currentPool[0].error < EPSILON) { 
 	if (verbose > 1) { printf("Found perfect solution.\n"); }
 	break;
       }
@@ -676,18 +752,18 @@ int main( int argc, char ** argv )
   {
     if (verbose) { printf("\nYour solution is as follows:\n"); }
     for (int x = 0; x < vnodes; x++) {
-      if (pnodeNames.find( pool[0].vnode_mapping[x] ) == pnodeNames.end()) {
-	pnodeNames[ pool[0].vnode_mapping[x] ] = "CRAP";
+      if (pnodeNames.find( currentPool[0].vnode_mapping[x] ) == pnodeNames.end()) {
+	pnodeNames[ currentPool[0].vnode_mapping[x] ] = "CRAP";
       }
       printf("%s mapsTo %s\n", 
 	     vnodeNames[x].c_str(),
-	     pnodeNames[pool[0].vnode_mapping[x]].c_str() );
+	     pnodeNames[currentPool[0].vnode_mapping[x]].c_str() );
     }
 
     printf("\n");
 
     // dump a detailed report of the returned solution's errors.
-    if (verbose > 1) { calcError<true>( &(pool[0]) ); }
+    if (verbose > 1) { calcError<true>( &(currentPool[0]) ); }
   }
 
   if (verbose > 1) { printf("Bye now.\n"); }
