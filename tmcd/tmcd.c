@@ -73,7 +73,6 @@ static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
-static int	vnodetophysnode(char *nodeid, char *physnode);
 static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock);
 static void	udpserver(int sock);
@@ -3490,9 +3489,12 @@ nodeidtocontrolnet(char *nodeid, int *net)
 	return 0;
 }
 
+#if 0
 /*
  * Map vnode to its phys node.
  */
+static int	vnodetophysnode(char *nodeid, char *physnode);
+
 static int
 vnodetophysnode(char *nodeid, char *physnode)
 {
@@ -3517,6 +3519,7 @@ vnodetophysnode(char *nodeid, char *physnode)
 
 	return 0;
 }
+#endif
 
 /*
  * Check for DBname redirection.
@@ -4196,9 +4199,8 @@ COMMAND_PROTOTYPE(dojailconfig)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		physnode[TBDB_FLEN_NODEID];
 	char		buf[MYBUFSIZE];
-	int		nrows, control_net, ipcount = 0, low, high, sport;
+	int		low, high, sport;
 
 	/*
 	 * Only vnodes get a jailconfig of course, and only allocated ones.
@@ -4270,88 +4272,44 @@ COMMAND_PROTOTYPE(dojailconfig)
 
 	/*
 	 * Now return the IP interface list that this jail has access to.
-	 * Two kinds: Tunnels on the physnode for that experiment, and if
-	 * its a local node then the normal interfaces. Eventually local
-	 * nodes will be shared too, and then I'm not sure how it will be
-	 * done. Perhaps tunnels on local nodes too.
-	 *
-	 * So, first grab the physnodeid.
+	 * These are tunnels or ip aliases on the real interfaces, but
+	 * its easier just to consult the virt_nodes table. That table has
+	 * a funky format, but thats okay.
 	 */
 	strcpy(buf, "IPADDRS=\"");
-	
-	if (vnodetophysnode(reqp->nodeid, physnode)) {
-		error("JAILCONFIG: %s: Error getting physnodeid!\n",
+
+	res = mydb_query("select ips from virt_nodes "
+			 "where vname='%s' and pid='%s' and eid='%s'",
+			 1, reqp->nickname, reqp->pid, reqp->eid);
+
+	if (!res) {
+		error("JAILCONFIG: %s: DB Error getting virt_nodes table\n",
 		      reqp->nodeid);
 		return 1;
 	}
-	
-	res = mydb_query("select assigned_ip from tunnels "
-			 "where node_id='%s' and pid='%s' and eid='%s'",
-			 1, physnode, reqp->pid, reqp->eid);
+	if (mysql_num_rows(res)) {
+		char *bp, *cp, *ip;
+			
+		row = mysql_fetch_row(res);
 
-	if (!res) {
-		error("JAILCONFIG: %s: DB Error getting tunnels\n", physnode);
-		return 1;
-	}
-	if ((nrows = (int)mysql_num_rows(res))) {
-		while (nrows) {
-			row = mysql_fetch_row(res);
-			
-			strcat(buf, row[0]);
-			nrows--;
-			ipcount++;
-			
-			if (nrows)
+		bp = row[0];
+		while (bp) {
+			/*
+			 * Note that the ips column is a space separated
+			 * list of X:IP where X is a logical interface number.
+			 */
+			cp = strsep(&bp, ":");
+			ip = strsep(&bp, " ");
+
+			strcat(buf, ip);
+			if (bp)
 				strcat(buf, ",");
+				
 		}
 	}
 	mysql_free_result(res);
 
-	/*
-	 * Okay, now do equiv an doifconfig and find real interfaces.
-	 * As mentioned, since local nodes are not currently shared, just
-	 * return the entire set. 
-	 *
-	 * Need to know the control network for the machine since
-	 * we don't want to mess with that.
-	 */
-	if (nodeidtocontrolnet(physnode, &control_net)) {
-		error("JAILCONFIG: %s: No Control Network\n", physnode);
-		return 1;
-	}
-
-	/*
-	 * Find all the interfaces.
-	 */
-	res = mydb_query("select IP from interfaces "
-			 "where node_id='%s' and card!=%d "
-			 " and IP is not null and IP!=''",
-			 1, physnode, control_net);
-	if (!res) {
-		error("JAILCONFIG: %s: DB Error getting local IPs!\n",
-		      physnode);
-		return 1;
-	}
-	if ((nrows = (int)mysql_num_rows(res))) {
-		if (ipcount)
-			strcat(buf, ",");
-		
-		while (nrows) {
-			row = mysql_fetch_row(res);
-
-			strcat(buf, row[0]);
-			nrows--;
-			ipcount++;
-			
-			if (nrows)
-				strcat(buf, ",");
-		}
-	}
-	mysql_free_result(res);
-
-	if (ipcount) {
-		strcat(buf, "\"\n");
-		client_writeback(sock, buf, strlen(buf), tcp);
-	}
+	strcat(buf, "\"\n");
+	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
