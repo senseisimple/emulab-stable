@@ -1,0 +1,75 @@
+#!/usr/bin/perl -w
+
+############################## Defines and includes
+my $fping = "/usr/local/sbin/fping"; # Path to fping
+my $tbdb = "@TBDBNAME@";
+
+use strict;
+use Mysql;
+use IPC::Open2;
+
+############################## Connect to databse
+my $dbh = Mysql->connect("localhost",$tbdb,"script","none");
+if (!$dbh) { die ("Unable to connect to database $tbdb\n"); }
+
+############################## Get node list
+my $query = "SELECT nodes.node_id, nodes.status, os_info.osfeatures " .
+            "FROM nodes LEFT JOIN os_info ON nodes.def_boot_osid = os_info.osid ";
+my $sth = $dbh->query($query);
+if (!$sth) { die "Unable to get node list: " . $dbh->errmsg . "\n" };
+
+############################## Determine pingable/unpingable nodes
+my (@newlyUp, @newlyDown, @newlyPD, @newlyUnpingable) = ();
+
+my $fpingPID = &open2("FOUT","FIN","$fping"); # Throws an exception on failure
+
+my %oldStatus = (); # Status of node from the DB, so we can tell if it changed
+
+while (my %row = $sth->fetchhash) {
+	my $node = $row{node_id};
+	if ($row{osfeatures} && ($row{osfeatures} =~ /ping/)) {
+		# We have a node that should be capable of returning pings
+		$oldStatus{$node} = $row{status};
+		print FIN $node,"\n"; # Give fping another node to ping
+	} else {
+		# This node can't return pings
+		if ((!$row{status}) || ($row{status} ne 'unpingable')) {
+			push @newlyUnpingable, $node;
+		}
+	}
+}
+close(FIN); # Tell fping we're done giving it nodes
+
+############################## Determine status changes
+while (<FOUT>) { # Read fping results
+	chomp;
+	my ($node,$status) = split /\s+/,$_,2;
+	
+	if ($status eq "is alive") {
+		if ($oldStatus{$node} ne "up") {
+			push @newlyUp,$node;
+		}
+	} else { # Node must not have returned a ping
+		if ($oldStatus{$node} eq "possibly down") {
+			push @newlyDown, $node;
+		} elsif ($oldStatus{$node} ne "down") {
+			push @newlyPD, $node;
+		}
+	}
+}
+close(FOUT);
+
+############################## Write back changes
+# When I started this section, it seemed a clever way to avoid code
+# duplication. Now, I'm not so sure :)
+foreach (['down', @newlyDown], ['up', @newlyUp],
+		['possibly down', @newlyPD], ['unpingable', @newlyUnpingable]) {
+	my $status = shift @$_;
+	my @nodes = @$_;
+	if (@nodes) {
+		my $query = "UPDATE nodes SET status='$status' WHERE " .
+			join " OR ", map("node_id='$_'",@nodes);
+		my $sth = $dbh->query($query); 
+		if (!$sth) { die "Unable to update node status: " . $dbh->errmsg . "\n" };
+	}
+}
