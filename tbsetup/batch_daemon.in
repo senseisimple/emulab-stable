@@ -114,7 +114,9 @@ while (1) {
     
     $pending_result =
 	DBquery("SELECT * FROM batch_experiments ".
-		"WHERE status='new' and canceled=0 ORDER BY started LIMIT 1");
+		"WHERE status='new' and canceled=0 and (attempts=0 or ".
+		"((UNIX_TIMESTAMP() - UNIX_TIMESTAMP(started) > (60 * 10)))) ".
+		"ORDER BY started LIMIT 1");
 
     $running_result =
 	DBquery("SELECT * FROM batch_experiments ".
@@ -192,7 +194,7 @@ while (1) {
     if ($pending_result->numrows) {
 	dosomething("start", %pending_row);
     }
-    sleep(60);
+    sleep(15);
 }
 
 #
@@ -315,29 +317,7 @@ sub startexp($)
 
     my $creator   = $exphash{'creator_uid'};
     my $longname  = $exphash{'name'};
-    my $numpcs    = $exphash{'numpcs'};
-    my $numsharks = $exphash{'numsharks'};
     my $attempts  = $exphash{'attempts'};
-
-    #
-    # Lets see if there are enough nodes. This is a really hacky test,
-    # especially for the sharks since they are allocated by shelf. 
-    #
-    system("$avail type=pc > /dev/null");
-    my $availpcs = $? >> 8;
-    system("$avail type=shark > /dev/null");
-    my $availsharks = $? >> 8;
-
-    if ($availpcs < $numpcs || $availsharks < $numsharks) {
-	#
-	# XXX - What if this update fails?
-	# 
-	$query_result = 
-	    DBquery("update batch_experiments set status='new' ".
-		    "where eid='$eid' and pid='$pid'");
-	
-	exit(69);
-    }
 
     #
     # Insert an experiment record for startexp.
@@ -382,11 +362,14 @@ sub startexp($)
 	    exit(0);
 	}
     }
-			    
+
     #
-    # If the configuration failed, then send email for now. This
-    # part needs work. We have to reset the state to "new" so that
-    # it will be retried again later. 
+    # If the configuration failed for lack of nodes, then don't send
+    # email unless the number of attempts starts to get big.
+    #
+    # If the configuration failed for some other reason, then send email.
+    # We have to reset the state to "new" so that it will be retried again
+    # later. 
     #
     if (! $running) {
 	#
@@ -395,15 +378,17 @@ sub startexp($)
 	$query_result = 
 	    DBquery("update batch_experiments set status='new', ".
 		    "attempts=attempts+1 where eid='$eid' and pid='$pid'");
+	$attempts++;
 
-	if (($attempts % 5) == 0) {
-	    $attempts++;
+	if (($exit_status == 77 && $attempts >= 9 && (($attempts % 9) == 0)) ||
+	    (($exit_status != 77) && ($attempts % 5) == 0) ||
+	    ($attempts == 0)) {
 	    
 	    fatal("Could not configure Batch Mode experiment $pid/$eid\n".
 		  "There have been $attempts attempts made to start this ".
 		  "batch\n");
 	}
-	exit(45);
+	exit($exit_status);
     }
 
     #
