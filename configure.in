@@ -260,7 +260,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \
-	db/grabron db/idlecheck discvr/GNUmakefile \
+	db/grabron db/idlecheck db/webnfree discvr/GNUmakefile \
 	ipod/GNUmakefile \
 	lib/GNUmakefile lib/libtb/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \

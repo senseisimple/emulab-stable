@@ -12,7 +12,7 @@ BIN_SCRIPTS	= nalloc nfree nodeip idlecheck
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron
-LIBEXEC_SCRIPTS = webnodelog
+LIBEXEC_SCRIPTS = webnodelog webnfree
 LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic.
