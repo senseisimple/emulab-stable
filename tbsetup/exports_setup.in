@@ -346,7 +346,12 @@ sub fatal {
 sub fsinit() {
     my @rawmounts;
 
-    foreach my $mount (split('\n', `$SSH $MOUNTPROG`)) {
+    my $saveuid = $UID;
+    $UID = 0;
+    my $mountinfo = `$SSH $MOUNTPROG`;
+    $UID = $saveuid;
+
+    foreach my $mount (split('\n', $mountinfo)) {
 	if ($mount =~ /$EXPORT_PAT/) {
 	    push(@rawmounts, $1);
 	}
