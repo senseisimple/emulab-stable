@@ -157,6 +157,22 @@ else {
     fatal("Tainted hostname $hostname!");
 }
 
+#
+# If our IP came via DHCP, we need to figure out what it is. 
+#
+if ($IP eq "DHCP") {
+    my @ipaddrs;
+    if ($hostname) {
+	(undef, undef, undef, undef, @ipaddrs) = gethostbyname($hostname);
+    }
+    if (scalar @ipaddrs) {
+	$IP = inet_ntoa($ipaddrs[0]);
+    }
+    else {
+	fatal("Invalid hostname: $hostname");
+    }
+}
+
 if ($IP =~ /^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/) {
     $IP = $1;
 }
