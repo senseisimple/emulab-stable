@@ -351,7 +351,7 @@ if ($pid && $eid) {
     if (!ExpState($pid,$eid)) {
 	die "There is no experiment $eid in project $pid\n";
     }
-    if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
+    if ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
 	die "You do not have permission to modify experiment $pid/$eid\n";
     }
 }
@@ -385,7 +385,7 @@ if (@ports) {
 	}
     }
 
-    if (!TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
+    if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
 	die "You do not have permission to modify some or all of the nodes\n" .
 		"that will be affected by the operation you requested\n";
     }
@@ -776,7 +776,7 @@ $vlan_id,$ddep, $pideid,           $vname,   $members
 		&debug("Failed TBAdmin check\n");
 		next;
 	    }
-	} elsif (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
+	} elsif ($UID && !TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_READINFO)) {
 	    &debug("Failed TBExptAccessCheck($UID,$pid,$eid)\n");
 	    next;
 	}
@@ -852,7 +852,7 @@ $port,    $enabled,$up,$speed,$duplex
 	    if (!TBAdmin($UID)) {
 		next;
 	    }
-	} elsif (!TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,$node)) {
+	} elsif ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_READINFO,$node)) {
 	    next;
 	}
 	write;
