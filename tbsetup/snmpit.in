@@ -300,7 +300,7 @@ foreach my $stack_id (keys %stacks) {
 	}; # /cisco/
 	/intel/ && do {
 	    require snmpit_intel_stack;
-	    $stack = new snmpit_cisco_stack($stack_id,$debug,
+	    $stack = new snmpit_intel_stack($stack_id,$debug,
 		@{$stacks{$stack_id}});
 	    last;
 	};
