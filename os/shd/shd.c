@@ -94,6 +94,11 @@ static	void shdmakedisklabel __P((struct shd_softc *));
 static	int shdlock __P((struct shd_softc *));
 static	void shdunlock __P((struct shd_softc *));
 
+extern void (*shdinitp) (void);
+void root_init (void);
+extern void (*shdrebootp) (void); 
+void reboot_to_checkpoint (void);
+
 extern	struct shdmapops onetooneops, compactops;
 
 /* Non-private for the benefit of libkvm. */
@@ -111,6 +116,7 @@ long shadow_size; /* in BLOCK_SIZE byte blocks */
 
 Trie * latest_trie;
 int latest_version;
+int reboot_version;
 long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest_block, long size, int direction);
 struct TrieList
 {
@@ -270,11 +276,15 @@ shd_attach()
 {
 	int i;
 	int num = NSHD;
+        struct shd_softc *ss;
+        struct shddevice shd;
+        int error;
 
 	/* XXX */
 	if (num == 1)
 		num = 16;
 
+        printf ("\n\nInside shd_attach\n\n");
 	/*printf("shd[0-%d]: Shadow disk devices\n", num-1);*/
 
 	shd_softc = (struct shd_softc *)malloc(num * sizeof(struct shd_softc),
@@ -294,6 +304,7 @@ shd_attach()
 	bzero(shddevs, num * sizeof(struct shddevice));
 
 	cdevsw_add(&shd_cdevsw);
+
 	/* XXX: is this necessary? */
 	for (i = 0; i < numshd; ++i)
 		shddevs[i].shd_dk = -1;
@@ -309,6 +320,8 @@ shd_modevent(mod, type, data)
 
 	switch (type) {
 	case MOD_LOAD:
+                shdrebootp = reboot_to_checkpoint;
+                shdinitp = root_init; 
 		shd_attach();
 		break;
 
@@ -324,6 +337,18 @@ shd_modevent(mod, type, data)
 }
 
 DEV_MODULE(shd, shd_modevent, NULL);
+
+void shd_refresh_devices (struct shddevice *shd, struct proc *p)
+{
+    struct shd_softc *ss = &shd_softc[shd->shd_unit];
+    size_t size;
+    ss->sc_srcdisk.ci_dev = makedev (116, 131074);
+    ss->sc_copydisk.ci_dev = makedev (116, 327682);
+    if (devsw(ss->sc_copydisk.ci_dev)->d_psize != NULL)
+                size = (*devsw(ss->sc_copydisk.ci_dev)->d_psize)(ss->sc_copydisk.ci_dev);
+    printf ("shadow size returned = %ld\n", size); 
+    printf ("src dev = %x, copy dev = %x\n", ss->sc_srcdisk.ci_dev, ss->sc_copydisk.ci_dev);
+}
 
 static int
 shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
@@ -356,8 +381,9 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 		reqsize = shd->shd_copysize;
 	}
 	ci->ci_vp = vp;
+        /* reqsize = 1024 * 1024; hardcoded value */ 
 
-	bzero(tmppath, sizeof(tmppath));
+	/*bzero(tmppath, sizeof(tmppath));
 	error = copyinstr(pp, tmppath, MAXPATHLEN, &ci->ci_pathlen);
 	if (error) {
 #ifdef SHDDEBUG
@@ -368,9 +394,21 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 		return (error);
 	}
 	ci->ci_path = malloc(ci->ci_pathlen, M_DEVBUF, M_WAITOK);
-	bcopy(tmppath, ci->ci_path, ci->ci_pathlen);
+	bcopy(tmppath, ci->ci_path, ci->ci_pathlen);*/
 
-	ci->ci_dev = vn_todev(vp);
+	/*ci->ci_dev = vn_todev(vp); */
+	ci->ci_path = malloc(11, M_DEVBUF, M_WAITOK);
+        ci->ci_pathlen = 11;
+        if (issrc)
+        { 
+            ci->ci_dev = makedev (116, 131074);
+            bcopy ("/dev/ad0s1", ci->ci_path, 11);
+        }
+        else
+        {
+            ci->ci_dev = makedev (116, 327682); 	
+            bcopy ("/dev/ad0s4", ci->ci_path, 11);
+        }
 
 	/*
 	 * Determine the size of the disk.
@@ -379,13 +417,13 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 	 */
 	size = 0;
 	secsize = DEV_BSIZE;
-	if (vn_isdisk(vp, &error)) {
+	/*if (vn_isdisk(vp, &error)) {*/
 		if (devsw(ci->ci_dev)->d_psize != NULL)
 			size = (*devsw(ci->ci_dev)->d_psize)(ci->ci_dev);
 		if (reqsize > 0 && reqsize < size)
 			size = reqsize;
-		secsize = ci->ci_dev->si_bsize_phys;
-	} else if (vp->v_type == VREG) {
+		secsize = ci->ci_dev->si_bsize_phys; 
+	/*} else if (vp->v_type == VREG) {
 		struct vattr vattr;
 
 		error = VOP_GETATTR(vp, &vattr, p->p_ucred, p);
@@ -393,7 +431,7 @@ shd_getcinfo(struct shddevice *shd, struct proc *p, int issrc)
 			size = vattr.va_size / secsize;
 		if (reqsize > 0)
 			size = reqsize;
-	}
+	}*/
 
 	if (size == 0) {
 		free(ci->ci_path, M_DEVBUF);
@@ -432,6 +470,86 @@ shd_timeout(void *notused)
 	}
 	timeout((timeout_t *)shd_timeout, 0, SHD_TIMEOUT * hz);
 }
+int bInit;
+void root_init (void)
+{
+        int error;
+        int unit = 0;
+        struct shd_softc *ss;
+        struct shddevice shd;
+        static char *srcpath = "/dev/ad0s1";
+        static char *copypath = "/dev/ad0s4";
+         
+        ss = &shd_softc[unit];
+        bInit = 0;
+        bzero(&shd, sizeof(shd));
+        shd.shd_unit = unit;
+
+        if ((error = shdlock(ss)) != 0)
+        {
+            printf ("Error shdlock(ss)\n");
+            return;
+        }
+
+        /*error = shd_lookup("/dev/ad0s1", curproc, FREAD,
+                                 &shd.shd_srcvp);
+        if (error) {
+            printf ("shd_lookup for /dev/ad0s1 failed\n");
+            shdunlock(ss);
+            return;
+        }*/
+        shd.shd_srcpath = srcpath;
+
+        /*error = shd_lookup("/dev/ad0s4", curproc, FREAD,
+                                 &shd.shd_copyvp);
+        if (error) {
+            printf ("shd_lookup for /dev/ad0s4 failed\n");
+            (void)vn_close(shd.shd_srcvp, FREAD, curproc->p_ucred, curproc);
+            shdunlock(ss);
+            return;
+        }*/
+        shd.shd_copypath = copypath;
+
+        error = shd_init(&shd, curproc);
+        if (error) {
+                printf ("shd_init failed\n");
+                bzero(&shd_softc[unit], sizeof(struct shd_softc));
+                shdunlock(ss);
+                return (error);
+        }
+        bcopy(&shd, &shddevs[unit], sizeof(shd));
+
+         /* Put the vp pointers here 
+        if (0 == bInit) {
+            bcopy(&shddevs[unit], &shd, sizeof(shd));
+            bInit = 1;
+            printf ("Before lookup on source\n");
+            error = shd_lookup("/dev/ad0s1", curproc, FREAD,
+                             &shd.shd_srcvp);
+            printf ("After lookup on source\n");
+            if (error) {
+                        shdunlock(ss);
+                        return;
+                }
+
+            printf ("Before lookup on copy\n");
+            error = shd_lookup("/dev/ad0s4", curproc, FREAD|FWRITE,
+                           &shd.shd_copyvp);
+            printf ("After lookup on copy\n");
+            if (error) {
+                (void)vn_close(shd.shd_srcvp, FREAD, curproc->p_ucred, curproc);
+                shdunlock(ss);
+                return; 
+            }
+            bcopy(&shd, &shddevs[unit], sizeof(shd));
+            ss->sc_srcdisk.ci_vp = shd.shd_srcvp;
+            ss->sc_copydisk.ci_vp = shd.shd_copyvp;
+            printf ("Src vp = %x, Copy vp = %x\n", ss->sc_srcdisk.ci_vp, ss->sc_copydisk.ci_vp);
+        }
+        */
+
+        shdunlock(ss);
+}
 
 static int
 shd_init(shd, p)
@@ -456,7 +574,7 @@ shd_init(shd, p)
 	error = shd_getcinfo(shd, p, 0);
 	if (error)
 		goto bad;
-        /*printf ("shadow size = %ld\n", shadow_size);*/
+        printf ("shadow size = %ld\n", shadow_size);
 
 	/*
 	 * Source sector size must be at least as large as the copy
@@ -484,10 +602,13 @@ shd_init(shd, p)
 
 	/*
 	 * Initialize the copy block map
-	 */
+	 
 	error = (*ss->sc_mapops->init)(ss, p);
 	if (error)
-		goto bad;
+        {
+                printf ("ss->sc_mapops->init failed \n");
+		goto bad; 
+        } */ 
 
 	/*
 	 * Add an devstat entry for this device.
@@ -579,6 +700,7 @@ shdopen(dev, flags, fmt, p)
 	}
 
 	ss->sc_openmask |= pmask;
+
  done:
 	shdunlock(ss);
 	return (0);
@@ -614,7 +736,6 @@ shdclose(dev, flags, fmt, p)
 	shdunlock(ss);
 	return (0);
 }
-
 static void
 shdstrategy(bp)
 	struct buf *bp;
@@ -623,6 +744,7 @@ shdstrategy(bp)
 	struct shd_softc *ss = &shd_softc[unit];
 	int wlabel;
 	struct disklabel *lp;
+        int error;
 
 /*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
@@ -668,7 +790,7 @@ shdstrategy(bp)
 		if (bounds_check_with_label(bp, lp, wlabel) <= 0) {
 			biodone(bp);
                         printf ("Error! Bounds checking and transfer adjust failed\n");
-			return;
+			/*return;*/
 		}
 	} else {
 		int pbn;        /* in sc_secsize chunks */
@@ -792,32 +914,42 @@ void rollback_to_checkpoint (int version, struct shd_softc *ss, struct proc *p)
     TrieIterator pos;
     int ix;
     int ok; 
+    /*printf ("Initializing merged trie\n");*/
     TrieInit (&merged_trie, BlockAlloc, BlockFree, block_copy);
 
     for (ix = latest_version; ix >= version; ix--)
     {
         merge (merged_trie, get_trie_for_version (ix), DEFAULT_OVERLAP);
+        /*printf ("Merged trie for version %d\n", ix);   */
     }
+    /*printf ("Initializing trie iterator\n");*/
     ok = TrieIteratorInit(merged_trie, &pos);
     if (ok) 
     {
         for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
         {
+             printf ("Copying %d blocks from %ld to %ld\n", depthToSize(pos->maxDepth), pos->value, pos->key);
              block_copy (ss, p, pos->value, pos->key, depthToSize(pos->maxDepth), SHADOW_TO_SRC);    
         }
+        /*printf ("Cleaning up iterator\n");*/
         TrieIteratorCleanup(&pos);
     }
+    /*printf ("Cleaning up merged trie\n");
     TrieCleanup(merged_trie);
     for (ix = latest_version; ix >= version; ix--)
     {
         delete_version_trie (ix);
+        printf ("Deleted trie for version %d\n", ix);
     }
     reorder_trie_versions ();
+    printf ("Reordered trie versions\n");
     if (1 != latest_version)
     {
         if (0 != create_new_trie (latest_version + 1))
             latest_version++;
+        printf ("Created new trie for version 1\n"); 
     }
+    printf ("Returning from rollback_to_checkpoint\n");*/
 }
 
 void print_checkpoint_map (int version)
@@ -979,9 +1111,11 @@ int read_block (struct shd_softc *ss, struct proc *p, char block[512], long int 
     auio.uio_rw = UIO_READ;
     auio.uio_resid = 512;
     auio.uio_procp = p;
-    vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+
+    error = (*devsw(ss->sc_copydisk.ci_dev)->d_read) (ss->sc_copydisk.ci_dev, &auio, IO_DIRECT);
+    /*vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
     error = VOP_READ(vp, &auio, IO_DIRECT, ss->sc_cred);
-    VOP_UNLOCK(vp, 0, p);
+    VOP_UNLOCK(vp, 0, p);*/
     if (error) {
        printf("shd%d: error %d \n",
        ss->sc_unit, error);
@@ -1007,9 +1141,12 @@ int write_block (struct shd_softc *ss, struct proc *p, char block[512], long int
     auio.uio_rw = UIO_WRITE;
     auio.uio_resid = 512;
     auio.uio_procp = p;
-    vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+
+    error = (*devsw(ss->sc_copydisk.ci_dev)->d_write) (ss->sc_copydisk.ci_dev, &auio, IO_NOWDRAIN);
+
+/*    vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
     error = VOP_WRITE(vp, &auio, IO_NOWDRAIN, ss->sc_cred);
-    VOP_UNLOCK(vp, 0, p);
+    VOP_UNLOCK(vp, 0, p); */
     if (error) {
        printf("shd%d: error %d \n",
        ss->sc_unit, error);
@@ -1048,9 +1185,18 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
         auio.uio_rw = UIO_READ;
         auio.uio_resid = size;
         auio.uio_procp = p;
-        vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+
+        if (SRC_TO_SHADOW == direction)
+        {
+            error = (*devsw(ss->sc_srcdisk.ci_dev)->d_read) (ss->sc_srcdisk.ci_dev, &auio, IO_DIRECT);
+        }
+        else
+        {
+            error = (*devsw(ss->sc_copydisk.ci_dev)->d_read) (ss->sc_copydisk.ci_dev, &auio, IO_DIRECT);
+        }
+        /*vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
         error = VOP_READ(vp, &auio, IO_DIRECT, ss->sc_cred);
-        VOP_UNLOCK(vp, 0, p);
+        VOP_UNLOCK(vp, 0, p); */
         if (error) {
             printf("shd%d: error %d on %s block %d \n",
                     ss->sc_unit, error,
@@ -1078,9 +1224,20 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
          auio.uio_rw = UIO_WRITE;
          auio.uio_resid = size;
          auio.uio_procp = p;
-         vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+
+        if (SRC_TO_SHADOW == direction)
+        {
+         error = (*devsw(ss->sc_copydisk.ci_dev)->d_write) (ss->sc_copydisk.ci_dev, &auio, IO_NOWDRAIN);
+         /*printf ("Copied %ld bytes from bn %ld device %x to bn %ld device %x \n", size, src_block, ss->sc_srcdisk.ci_dev, dest_block, ss->sc_copydisk.ci_dev);*/
+        }
+        else
+        {
+         error = (*devsw(ss->sc_srcdisk.ci_dev)->d_write) (ss->sc_srcdisk.ci_dev, &auio, IO_NOWDRAIN);
+         /*printf ("Copied %ld bytes from bn %ld device %x to bn %ld device %x \n", size, src_block, ss->sc_copydisk.ci_dev, dest_block, ss->sc_srcdisk.ci_dev);*/
+        }
+/*       vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
          error = VOP_WRITE(vp, &auio, IO_NOWDRAIN, ss->sc_cred);
-         VOP_UNLOCK(vp, 0, p);
+         VOP_UNLOCK(vp, 0, p); */
          if (error) {
              printf("shd%d: error %d on %s block %d \n",
                                ss->sc_unit, error,
@@ -1121,7 +1278,6 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	bn = bp->b_blkno;
 	if (shdpart(bp->b_dev) != RAW_PART)
 		bn += ss->sc_label.d_partitions[shdpart(bp->b_dev)].p_offset;
-
 	/* Record the transaction start  */
 
 	devstat_start_transaction(&ss->device_stats);
@@ -1139,6 +1295,11 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
             if (failed < 0)
             {
                 printf ("No more space on disk! Copy on write failed\n");
+                bp->b_error = EACCES;
+                bp->b_flags |= B_ERROR;
+                bp->b_resid = 0;
+                devstat_end_transaction_buf(&ss->device_stats, bp);
+                biodone(bp);
                 return;
             }
 
@@ -1167,13 +1328,19 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	auio.uio_resid = rcount;
 	auio.uio_procp = p;
 
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+	/*vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);*/
 	if (bp->b_flags & B_READ)
-    	    error = VOP_READ(vp, &auio, IO_DIRECT, ss->sc_cred);
+        {
+    	    /*error = VOP_READ(vp, &auio, IO_DIRECT, ss->sc_cred);*/
+            error = (*devsw(ss->sc_srcdisk.ci_dev)->d_read) (ss->sc_srcdisk.ci_dev, &auio, IO_DIRECT);
+        }
 	else
-  	    error = VOP_WRITE(vp, &auio, IO_NOWDRAIN, ss->sc_cred);
-	VOP_UNLOCK(vp, 0, p);
+        {
+  	    /*error = VOP_WRITE(vp, &auio, IO_NOWDRAIN, ss->sc_cred); */
+            error = (*devsw(ss->sc_srcdisk.ci_dev)->d_write) (ss->sc_srcdisk.ci_dev, &auio, IO_NOWDRAIN);
+        }
 
+	/*VOP_UNLOCK(vp, 0, p); */
         if (auio.uio_resid) {
                         rcount -= auio.uio_resid;
                         cbsize -= auio.uio_resid / ss->sc_secsize;
@@ -1200,6 +1367,55 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	biodone(bp);
 }
 
+void reboot_to_checkpoint (void)
+{
+     struct shd_softc *ss;
+     struct vnode *vp;
+     int unit = 0;
+     ss = &shd_softc[unit];
+     bCheckpoint = 0;
+     if (reboot_version > latest_version)
+     { 
+        printf ("Error! Cannot rollback to version %d because you have only %d previous checkpoints so far\n", reboot_version, latest_version);
+        return (EINVAL);
+     }
+     if (reboot_version != 0 && latest_version != 0) 
+     {
+         printf ("Rolling back disk state from checkpoint version %d to version %d\n\n", latest_version, reboot_version); 
+         rollback_to_checkpoint (reboot_version, ss, curproc);
+         sync(curproc, 0);
+         /*save_checkpoint_map (ss, curproc);*/
+         printf ("Disk state completely restored\n\n");
+     }
+}
+
+extern void sync_before_checkpoint (void);
+
+struct vnode * lock_filesystem()
+{
+    struct nameidata nd;
+    struct vnode *vp = 0;
+    int error;
+    printf ("Inside lock_filesystem\n");
+    NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
+    printf ("After NDINIT\n");
+    if ((error = vn_open(&nd, FREAD, 0)) != 0) {
+        printf ("Error opening filesystem \n");
+        return 0;
+    }
+    vp = nd.ni_vp;
+    vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, curproc);
+    printf ("After vn_lock\n");
+    NDFREE(&nd, NDF_ONLY_PNBUF);
+    printf ("After NDFREE\n");  
+    return vp;
+}
+
+unlock_filesystem(struct vnode * vp)
+{
+    VOP_UNLOCK(vp, 0, curproc);
+}
+
 static int
 shdioctl(dev, cmd, data, flag, p)
 	dev_t dev;
@@ -1216,7 +1432,8 @@ shdioctl(dev, cmd, data, flag, p)
 	struct shd_ioctl *shio = (struct shd_ioctl *)data;
         struct shd_readbuf *shread; 
 	struct shddevice shd;
-       
+
+        struct vnode * vp;        
 /*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
 		printf("shd%d: shioctl\n", unit);
@@ -1233,6 +1450,9 @@ shdioctl(dev, cmd, data, flag, p)
         case SHDREADBLOCK:
                 shread = (struct shd_readbuf *) data;
                 read_block (ss, p, shread->buf, shread->block_num);
+                break;
+        case SHDSETREBOOTVERSION:
+                reboot_version = shio->version;
                 break;
         case SHDROLLBACK:
                 /*printf ("Attempting to rollback from version %d to version %d\n", latest_version, (int )shio->version);*/
@@ -1256,7 +1476,9 @@ shdioctl(dev, cmd, data, flag, p)
                 bCheckpoint = 0;
                 break;
         case SHDCHECKPOINT:
-                printf ("[SHDCHECKPOINT] Received checkpoint command\n");
+                printf ("[SHDCHECKPOINT] Received checkpoint command!\n");
+                /*vp = lock_filesystem();*/
+                sync_before_checkpoint (); /*Uncomment this*/
                 if (MAX_CHECKPOINTS <= latest_version)
                 {
                     printf ("Error! Cannot take more checkpoints because you have reached the limit of %d checkpoints\n", latest_version);
@@ -1265,7 +1487,13 @@ shdioctl(dev, cmd, data, flag, p)
                 if (0 != create_new_trie (latest_version + 1))
                     latest_version++;
                 else
+                {
+                    /*if (vp != 0)
+                        unlock_filesystem(vp);*/
                     return (EINVAL);
+                } 
+                /*if (vp != 0)
+                    unlock_filesystem(vp); */
                 break;
         case SHDGETCHECKPOINTS:
                 if (latest_version < 1)
@@ -1286,14 +1514,16 @@ shdioctl(dev, cmd, data, flag, p)
                 delete_checkpoints (shio->delete_start, shio->delete_end); 
                 break;
 	case SHDIOCSET:
+                bcopy(&shddevs[unit], &shd, sizeof(shd));
                 latest_version = 1;
                 bCheckpoint = 0;
                 init_trie_list ();
+                printf ("unit = %d, curproc = %x\n", unit, curproc);
                 if (0 == create_new_trie (1))
                     return (EINVAL);
  
-		if (ss->sc_flags & SHDF_INITED)
-			return (EBUSY);
+		/*if (ss->sc_flags & SHDF_INITED)
+			return (EBUSY);*/
 
 		if ((flag & FWRITE) == 0)
 			return (EBADF);
@@ -1331,36 +1561,40 @@ shdioctl(dev, cmd, data, flag, p)
 			return (EINVAL);
 		}
 
+                /*printf ("Before lookup on source\n");
 		error = shd_lookup(shio->shio_srcdisk, p, FREAD,
 				 &shd.shd_srcvp);
+                printf ("After lookup on source\n");
 		if (error) {
 			shdunlock(ss);
 			return (error);
-		}
+		}*/
 		shd.shd_srcpath = shio->shio_srcdisk;
 		shd.shd_srcsize = shio->shio_srcsize;
 
+                /*printf ("Before lookup on copy\n");
 		error = shd_lookup(shio->shio_copydisk, p, FREAD|FWRITE,
 				   &shd.shd_copyvp);
+                printf ("After lookup on copy\n");
 		if (error) {
 			(void)vn_close(shd.shd_srcvp, FREAD, p->p_ucred, p);
 			shdunlock(ss);
 			return (error);
-		}
+		}*/
 		shd.shd_copypath = shio->shio_copydisk;
 		shd.shd_copysize = shio->shio_copysize;
 
 		/*
 		 * Initialize the shd.  Fills in the softc for us.
 		 */
-		error = shd_init(&shd, p);
+		/*error = shd_init(&shd, p);
 		if (error) {
-                        printf ("shd_init failed\n");
+                        printf ("shd_init failed\n");*/
 			/* vnodes closed by shd_init */
-			bzero(&shd_softc[unit], sizeof(struct shd_softc));
+/*			bzero(&shd_softc[unit], sizeof(struct shd_softc));
 			shdunlock(ss);
 			return (error);
-		}
+		}*/
                 InitBlockAllocator (EXPLICIT_CKPT_DELETE, 3, shadow_size);
 		/*
 		 * The shd has been successfully initialized, so
@@ -1370,7 +1604,7 @@ shdioctl(dev, cmd, data, flag, p)
 		shio->shio_unit = unit;
 		shio->shio_size = ss->sc_size;
 		shdgetdisklabel(dev);
-
+                shd_refresh_devices (&shd, p);
 		shdunlock(ss);
 
 		break;
@@ -1546,7 +1780,9 @@ shd_lookup(path, p, mode, vpp)
 	struct vnode *vp;
 	int error;
 
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, path, p);
+        printf ("Before NDINIT\n");
+	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, path, p);
+        printf ("vn_open on %s\n", path);
 	if ((error = vn_open(&nd, mode, 0)) != 0) {
 #ifdef SHDDEBUG
 		if (shddebug & SHDB_INIT)
@@ -1554,6 +1790,7 @@ shd_lookup(path, p, mode, vpp)
 #endif
 		return (error);
 	}
+        printf ("After vn_open\n");  
 	vp = nd.ni_vp;
 
 	/*
@@ -1814,9 +2051,10 @@ shd_validate(struct shd_softc *ss, struct shd_id *id, int initialize,
 		auio.uio_resid = isize;
 		auio.uio_procp = p;
 
-		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+		/*vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 		error = VOP_READ(vp, &auio, IO_DIRECT, ss->sc_cred);
-		VOP_UNLOCK(vp, 0, p);
+		VOP_UNLOCK(vp, 0, p); */
+                error = (*devsw(ss->sc_srcdisk.ci_dev)->d_read) (ss->sc_srcdisk.ci_dev, &auio, IO_DIRECT);
 
 		if (error)
 			break;

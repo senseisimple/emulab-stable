@@ -10,6 +10,7 @@ void InitBlockAllocator (int method, long range_start, long range_size)
 {
     reclaim_method = method;
     block_range.start = range_start;
+    range_size = 200;
     block_range.end = range_start + range_size;
     block_range.ptr = range_start;
     printf ("Initialized block allocator to start = %ld, end = %ld\n", block_range.ptr, block_range.end);
@@ -57,16 +58,20 @@ int BlockFree (long start, long size)
 
     struct FreeSpaceQueue* temp = head;
     long end = (start + size) % shadow_size;
-    /*printf ("Freeing blocks %ld to %ld\n", start, end);*/
+    printf ("Free space queue before deleting block = \n");
+    PrintFreeSpaceQueue ();  
+    printf ("Freeing blocks %ld to %ld\n", start, end);
     while (temp != 0)
     {
-        if (temp->start == (end + 1) % shadow_size)
+        if ((temp->start == (end + 1) % shadow_size)
+            || (temp->start == end)) 
         {
             temp->start = start;
             return 0;
         }
         else 
-        if ((temp->end + 1) % shadow_size == start)
+        if (((temp->end + 1) % shadow_size == start)
+            || (temp->end == start))
         {
             temp->end = end;
             return 0;
@@ -74,6 +79,8 @@ int BlockFree (long start, long size)
         temp = temp->next;
     }
     AddFreeSpaceToQueue (start, end);
+    printf ("Free space queue after deleting block = \n");
+    PrintFreeSpaceQueue ();
     return 0;
 }
 
@@ -81,6 +88,8 @@ long BlockAlloc (int size)
 {
     struct FreeSpaceQueue* temp = 0;
     long retVal;
+    printf ("Free space queue before allocating block = \n");
+    PrintFreeSpaceQueue ();
     switch (reclaim_method)
     {
      case LAST_CKPT_AUTO_DELETE:
@@ -96,8 +105,6 @@ long BlockAlloc (int size)
      case EXPLICIT_CKPT_DELETE:
          while (CurrentFreeBlockSize () < size)
          {
-             /*printf ("size = %d, free_block_size = %d\n", size, CurrentFreeBlockSize());
-             printf ("end = %ld, ptr = %ld\n", block_range.end, block_range.ptr);*/
              if (-1 == MergeWithNextFreeBlockRange ( CurrentFreeBlockSize() ))
              {
                  printf ("Error! No more free space on disk\n");     
@@ -108,7 +115,9 @@ long BlockAlloc (int size)
     }
     retVal = block_range.ptr;
     block_range.ptr += size;
-    /*printf ("Allocating %d blocks starting %d\n", size, retVal);*/
+    printf ("Allocating %d blocks starting %d\n", size, retVal);
+    printf ("Free space queue after allocating block = \n");
+    PrintFreeSpaceQueue ();
     return retVal;
 }
 
@@ -172,9 +181,10 @@ int PrintFreeSpaceQueue()
     struct FreeSpaceQueue* current = head;
     while (current != 0)
     {
-        printf ("%ld %ld\n", current->start, current->end);
+        printf ("%ld<->%ld  ", current->start, current->end);
         current = current->next;
     } 
+    printf ("\n");
     return 0;
 }
 

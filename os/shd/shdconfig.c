@@ -26,6 +26,8 @@ static const char rcsid[] =
 #include "pathnames.h"
 #include "trie.h"
 
+extern struct proc *curproc;
+
 #define MAXBUF 65316
 #define BLOCKSIZE 512
 
@@ -152,7 +154,9 @@ do_single(argc, argv, action, flags)
         if (strcmp (cp, "-c") == 0)
         {
             if (do_io(shd, SHDCHECKPOINT, &shio))
+            {
                 return (1);
+            }
         }
         else
         if (strcmp (cp, "-g") == 0)
@@ -191,6 +195,15 @@ do_single(argc, argv, action, flags)
                 return (1);
         }
         else
+        if (strcmp (cp, "-rv") == 0)
+        {   
+            version = atoi(*argv++); --argc;
+            printf ("Reboot version set to %d\n", version);
+            shio.version = version;
+            if (do_io(shd, SHDSETREBOOTVERSION, &shio))
+                return (1);
+        }
+        else
         if (strcmp (cp, "-sm") == 0)
         {
             if (do_io(shd, SHDSAVECHECKPOINTMAP, &shio))
@@ -200,8 +213,12 @@ do_single(argc, argv, action, flags)
         if (strcmp (cp, "-sv") == 0)
         {       
             version = atoi(*argv++); --argc;
-            printf ("Saving version %d\n", version);
-            save_checkpoint (shd, version);
+            maxversion = atoi(*argv++); --argc;
+            for (old_ver = version; old_ver <= maxversion; old_ver++)
+            {
+                printf ("Saving version %d\n", old_ver);
+                save_checkpoint (shd, old_ver);
+            }
         }               
         else
         if (strcmp (cp, "-l") == 0)
@@ -214,7 +231,6 @@ do_single(argc, argv, action, flags)
                 perror ("error");
                 return;
             }
-
             version = atoi(*argv++); --argc;
             maxversion = atoi(*argv++); --argc;
             off = lseek (fd_write_mdata, 2 * BLOCKSIZE, SEEK_SET);
@@ -655,6 +671,16 @@ usage()
 	exit(1);
 }
 
+char *
+itoa(int value)
+{
+    static char buf[13];
+
+    snprintf(buf, 12, "%d", value);
+    return buf;
+}
+
+
 int save_checkpoint (char * shd, int version)
 {
     struct shd_readbuf shread;
@@ -670,9 +696,9 @@ int save_checkpoint (char * shd, int version)
     int read_start;
     int num_blocks;
     char path[256];
-    char ver[2]; 
-    ver[0] = (char *) version;
-    ver[1] = 0;
+    char ver_buf[2]; 
+    char *ver = &ver_buf; 
+    ver = itoa (version);
     strcpy (path, "/users/saggarwa/image");
     strcat (path, ver);
     strcat (path, ".data");
@@ -783,9 +809,9 @@ int load_checkpoint (char * shd, int version, int newversion)
     long key;
     long value;
     char path[256];
-    char ver[2];
-    ver[0] = (char *) version;
-    ver[1] = 0;
+    char ver_buf[2];
+    char *ver = &ver_buf;
+    ver = itoa (version); 
     strcpy (path, "/users/saggarwa/image");
     strcat (path, ver);
     strcat (path, ".data");
