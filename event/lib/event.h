@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.7 2002-02-21 17:49:38 stoller Exp $
+ * $Id: event.h,v 1.8 2002-02-26 21:59:00 stoller Exp $
  */
 
 #ifndef __EVENT_H__
@@ -79,6 +79,10 @@ int		address_tuple_free(address_tuple_t);
         event_notification_get_string(handle, note, "OBJNAME", buf, len)
 #define event_notification_get_eventtype(handle, note, buf, len) \
         event_notification_get_string(handle, note, "EVENTTYPE", buf, len)
+#define event_notification_get_arguments(handle, note, buf, len) \
+        event_notification_get_string(handle, note, "ARGS", buf, len)
+#define event_notification_set_arguments(handle, note, buf) \
+        event_notification_put_string(handle, note, "ARGS", buf)
 
 
 /* The "any host" string: */
