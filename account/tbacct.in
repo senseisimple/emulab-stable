@@ -52,6 +52,7 @@ my $SETGROUPS	= "$TB/sbin/setgroups";
 my $GENELISTS	= "$TB/sbin/genelists";
 my $SFSUPDATE	= "$TB/sbin/sfskey_update";
 my $PBAG	= "$TB/sbin/paperbag";
+my $EXPORTSSETUP= "$TB/sbin/exports_setup";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -303,6 +304,18 @@ sub AddUser()
     }
     # Add to elists.
     system("$GENELISTS -n $user");
+
+    #
+    # Must update the exports file or else nodes will complain.  There
+    # is a bit of race in here since this update happens after the
+    # user is marked "active", and in that time a node could suck over
+    # the account info, but not be able to mount the directory. Short
+    # window though. Do not worry about the exit value. Note that this
+    # could hang for a while if another update is in progress. Hmm, I
+    # do not like this.
+    #
+    print "Updating exports file.\n";
+    system("$EXPORTSSETUP");
     $EUID = 0;
 
     # SFS key.
@@ -353,6 +366,13 @@ sub DelUser()
     $UID = $SAVEUID;
 
     $EUID = $UID;
+    #
+    # Must update the exports file or else nodes will complain.  Note
+    # that this could hang for a while if another update is in progress. 
+    #
+    print "Updating exports file.\n";
+    system("$EXPORTSSETUP");
+
     # Remove from elists.
     system("$GENELISTS -n $user");
     $EUID = 0;
