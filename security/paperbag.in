@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -36,7 +36,8 @@ my $TB		= "@prefix@";
 		"savelogs"	=> "$TB/bin/savelogs",
 		"portstats"	=> "$TB/bin/portstats",
 		"readycount"	=> "$TB/bin/readycount",
-		"eventsys_control" => "$TB/bin/eventsys_control"
+		"eventsys_control" => "$TB/bin/eventsys_control",
+		"tbresize"	=> "$TB/bin/tbresize"
 	   );
 
 # Need to provide a simple path, because some scripts we call need one
