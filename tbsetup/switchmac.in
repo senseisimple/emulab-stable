@@ -97,7 +97,7 @@ foreach my $switchref (@switches) {
     my ($snmpversion, $useindexing, $switchtype);
 SWITCH:
     for ($type) {
-	(/^cisco/) && do { $snmpversion = "2c"; $useindexing = 1;
+	(/^cisco/ || /^catalyst/) && do { $snmpversion = "2c"; $useindexing = 1;
 	    $switchtype = "cisco"; last;};
 	(/^intel/) && do { $snmpversion = "1"; $useindexing = 0;
 	    $switchtype = "intel"; last;};
@@ -300,7 +300,7 @@ SWITCH:
 		#
 		my $modport;
 		if ($switchtype eq "cisco") {
-		    my ($modport) = $device->convertPortFormat(2, $ifIndex);
+		    ($modport) = $device->convertPortFormat(2, $ifIndex);
 		} else {
 		    $modport = "1.$ifIndex";
 		}
