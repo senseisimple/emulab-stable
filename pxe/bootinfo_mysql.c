@@ -213,6 +213,16 @@ query_bootinfo_db(struct in_addr ipaddr, int version, boot_what_t *info)
 		}
 		goto done;
 	}
+	/*
+	 * If we get here, there is no bootinfo to give the client.
+	 * New PXE boot clients get PXEWAIT, but older ones get an error.
+	 */
+	error("No OSIDs set for host %s\n", ipstr);
+	if (version >= 1) {
+		info->type = BIBOOTWHAT_TYPE_WAIT;
+		goto done;
+	}
+	rval = 1;
  done:
 	mysql_free_result(res);
 	return rval;
