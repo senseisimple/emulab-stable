@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -79,6 +79,9 @@ if ($isvirt) {
 	#
 	echo "gateway: $USERNODE\n";
     }
+}
+elseif ($ELABINELAB) {
+    echo "gateway: $USERNODE\n";
 }
 
 ?>
