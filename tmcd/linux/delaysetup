@@ -54,8 +54,7 @@ if (@ARGV) {
 #
 my $KERNEL100	= "2.4.18-27.7.x";
 my $KERNELJAIL  = "";
-#XXX: change to correct kernel after building it w/ right vers string
-my $KERNELLDELAY= "2.4.18-27.7.x";	# Link delay kernel. 
+my $KERNELLDELAY= "2.4.18-LINKDELAY";	# Link delay kernel. 
 my $TMDELMAP	= TMDELMAP;	# Really comes from libloc.
 my $TC          = "/usr/local/bin/tc";
 my $IPTABLES    = "/usr/local/bin/iptables";
