@@ -350,7 +350,6 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/ron/GNUmakefile \
-	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
