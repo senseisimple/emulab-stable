@@ -96,8 +96,6 @@ if {[catch "exec $postparse $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
     exit 1
 }
 
-exit 1
-
 outs "Locking the world!"
 set wait {15 30 60 600 600}
 set waiti 0
@@ -114,7 +112,7 @@ while {[catch "open $lockfile {WRONLY CREAT EXCL}" lockfp]} {
 close $lockfp
 
 outs "Determining available resources."
-if {[catch "exec $avail type=pc ver extras | $ptopgen > $ptopfile 2>@ $logFp" err]} {
+if {[catch "exec $avail | $ptopgen > $ptopfile 2>@ $logFp" err]} {
     outs stderr "Error determining available resources. ($err)"
     unlock
     exit 1
@@ -143,11 +141,11 @@ if {[catch "exec $reserve $prefix $machines >@ $logFp 2>@ $logFp" err]} {
 
 unlock
 
-outs "Allocating IP addresses."
-if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
-    outs stderr "Error allocating IP addresses. ($err)"
-    exit 1
-}
+outs "PLACEHOLDER - Allocating IP addresses."
+#if {[catch "exec $handle_ip $irFile $nsFile >@ $logFp 2>@ $logFp" err]} {
+#    outs stderr "Error allocating IP addresses. ($err)"
+#    exit 1
+#}
 
 outs "Setup finished - $irFile generated."
 
