@@ -18,6 +18,12 @@ if [ -x /etc/testbed/setup ]; then
         /etc/testbed/setup
 fi
 
+if [ -x /etc/testbed/slothd ]; then
+        echo "Starting usage detector ..."
+        rm -f /var/run/slothd
+        /etc/testbed/slothd
+fi
+
 /bin/rm -f /var/at/jobs/S*
 if [ -s /etc/testbed/startupcmd  ]; then
         echo "Scheduling startup command to run in a little bit ..."
