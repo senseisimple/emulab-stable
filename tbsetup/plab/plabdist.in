@@ -60,7 +60,7 @@ $ENV{'RSYNC_RSH'} = "ssh -q -oBatchMode=yes -oStrictHostKeyChecking=no " .
 
 my $RSYNC = "/usr/local/bin/rsync";
 
-if (!TBAdmin()) {
+if (!(($> == 0) || TBAdmin())) {
     die "Sorry, only admins can use this script!\n";
 }
 
