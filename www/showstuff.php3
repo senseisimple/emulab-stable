@@ -278,7 +278,7 @@ function SHOWGROUPMEMBERS($pid, $gid) {
 function SHOWGROUPMEMBERSHIP($uid) {
     $query_result =
 	DBQueryFatal("SELECT * FROM group_membership ".
-		     "WHERE uid='$uid'");
+		     "WHERE uid='$uid' order by pid");
     
     if (! mysql_num_rows($query_result)) {
 	return;
@@ -300,12 +300,13 @@ function SHOWGROUPMEMBERSHIP($uid) {
 	$gid   = $row[gid];
 	$trust = $row[trust];
 
-        echo "<tr>
-                  <td>$pid</td>
-                  <td>$gid</td>
-                  <td>$trust</td>\n";
-	    
-	echo "</tr>\n";
+	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
+	    echo "<tr>
+                      <td>$pid</td>
+                      <td>$gid</td>
+                      <td>$trust</td>\n";
+	    echo "</tr>\n";
+	}
     }
     echo "</table>\n";
 }

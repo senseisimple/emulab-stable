@@ -113,9 +113,10 @@ echo "</center>\n";
 # Lets show projects.
 #
 $query_result =
-    DBQueryFatal("select distinct g.pid,p.name from group_membership as g ".
+    DBQueryFatal("select distinct g.pid,g.trust,p.name ".
+		 " from group_membership as g ".
 		 "left join projects as p on p.pid=g.pid ".
-		 "where uid='$target_uid' order by pid");
+		 "where uid='$target_uid' and g.pid=g.gid order by pid");
 
 if (mysql_num_rows($query_result)) {
     echo "<center>
@@ -129,13 +130,16 @@ if (mysql_num_rows($query_result)) {
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
-	$pid  = $projrow[pid];
-	$name = $projrow[name];
+	$pid   = $projrow[pid];
+	$name  = $projrow[name];
+	$trust = $projrow[trust];
 
-        echo "<tr>
-                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
-                 <td>$name</td>
-             </tr>\n";
+	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
+	    echo "<tr>
+                     <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
+                     <td>$name</td>
+                 </tr>\n";
+        }
     }
     echo "</table>\n";
 }

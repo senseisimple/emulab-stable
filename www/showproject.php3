@@ -72,7 +72,6 @@ if (mysql_num_rows($query_result)) {
     while ($row = mysql_fetch_array($query_result)) {
         $target_uid = $row[uid];
 	$usr_name   = $row[usr_name];
-	$status     = $row[status];
 	$trust      = $row[trust];
 
         echo "<tr>
@@ -82,9 +81,8 @@ if (mysql_num_rows($query_result)) {
                        $target_uid</A>
                   </td>
                   <td>$trust</td>\n";
-	    
-	if (strcmp($status, "active") == 0 ||
-	    strcmp($status, "unverified") == 0) {
+
+	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
 	    echo "<td align=center>
                       <img alt=\"Y\" src=\"greenball.gif\"></td>\n";
 	}

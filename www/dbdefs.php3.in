@@ -952,7 +952,7 @@ function TBProjList($uid, $access_type)
     
     $query_result =
 	DBQueryFatal("SELECT distinct pid,gid FROM group_membership ".
-		     "WHERE uid='$uid' and $trust_clause");
+		     "WHERE uid='$uid' and $trust_clause order by pid");
 
     if (mysql_num_rows($query_result) == 0) {
 	return $result;
