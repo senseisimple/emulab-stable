@@ -1,6 +1,0 @@
-node A pc
-node B pc
-node C pc
-link A B 100
-link A C 100
-link B C 100
