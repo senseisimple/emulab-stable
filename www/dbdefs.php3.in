@@ -138,6 +138,10 @@ define("TBDB_IFACEROLE_FAKE",		"fake");
 define("TBDB_IFACEROLE_GW",		"gw");
 define("TBDB_IFACEROLE_OTHER",		"other");
 
+# Node states that the web page cares about.
+define("TBDB_NODESTATE_ISUP",		"ISUP");
+define("TBDB_NODESTATE_PXEWAIT",	"PXEWAIT");
+
 # User Interface types
 define("TBDB_USER_INTERFACE_EMULAB",	"emulab");
 define("TBDB_USER_INTERFACE_PLAB",	"plab");
@@ -1409,22 +1413,34 @@ function TBExpUidLastLogins($pid, $eid)
 }
 
 #
-# Number of globally free PCs.
+# Number of globally free PCs. See ptopgen and libdb for corresponding
+# usage of the eventstate. A node is not really considered free for use
+# unless it is also in the ISUP/PXEWAIT state.
 #
 function TBFreePCs()
 {
     $query_result =
-	DBQueryFatal("select a.node_id from nodes as a ".
+	DBQueryFatal("select count(a.node_id) from nodes as a ".
 		     "left join reserved as b on a.node_id=b.node_id ".
 		     "left join node_types as nt on a.type=nt.type ".
 		     "left join nodetypeXpid_permissions as p ".
 		     "  on a.type=p.type ".
 		     "where b.node_id is null and a.role='testnode' ".
-		     "  and nt.class = 'pc' and p.pid is null");
-
-    return mysql_num_rows($query_result);
+		     "  and nt.class = 'pc' and p.pid is null and ".
+                     "      (a.eventstate='" . TBDB_NODESTATE_ISUP . "' or ".
+                     "       a.eventstate='" . TBDB_NODESTATE_PXEWAIT . "') and".
+		     "      (p.pid is null)");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
 }
 
+#
+# Number of PCs a user has reserved to his experiments.
+#
 function TBUserPCs($uid)
 {
     $query_result =

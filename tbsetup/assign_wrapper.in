@@ -519,13 +519,7 @@ sub RunAssign ($)
     TBDebugTimeStamp("ptopgen finished");
 
     # Get number of nodes
-    my $numnodes_result = 
-	DBQueryFatal("select a.node_id,a.type from" .
-		     " nodes as a left join reserved as b" .
-		     " on a.node_id=b.node_id" .
-		     " where b.node_id is null" .
-		     " and a.role='testnode' and a.type!='dnard'");
-    $numnodes = $numnodes_result->numrows;
+    my $numnodes = TBAvailablePCs($pid);
     
     if ($numnodes < ($minimum_nodes - $reserved_pcount)) {
 	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,

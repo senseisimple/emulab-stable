@@ -87,7 +87,7 @@ use Exporter;
 	 TBDB_NODESTATE_ISUP TBDB_NODESTATE_REBOOTING TBDB_NODESTATE_REBOOTED
 	 TBDB_NODESTATE_SHUTDOWN TBDB_NODESTATE_BOOTING TBDB_NODESTATE_TBSETUP
 	 TBDB_NODESTATE_RELOADSETUP TBDB_NODESTATE_RELOADING
-	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_UNKNOWN
+	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_UNKNOWN TBDB_NODESTATE_PXEWAIT
 
 	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
 	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
@@ -167,6 +167,7 @@ use Exporter;
 	 TBSiteVarExists TBGetSiteVar
 
 	 TBActivityReport GatherSwapStats GatherAssignStats
+	 TBAvailablePCs
 
 	 TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT
 	 TBDB_IFACEROLE_JAIL TBDB_IFACEROLE_FAKE TBDB_IFACEROLE_OTHER
@@ -448,6 +449,7 @@ sub TBDB_NODESTATE_RELOADSETUP() { "RELOADSETUP"; }
 sub TBDB_NODESTATE_RELOADING()	{ "RELOADING"; }
 sub TBDB_NODESTATE_RELOADDONE()	{ "RELOADDONE"; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
+sub TBDB_NODESTATE_PXEWAIT()	{ "PXEWAIT"; }
 
 sub TBDB_NODEOPMODE_ANY		{ "*"; } # A wildcard opmode
 sub TBDB_NODEOPMODE_NORMAL	{ "NORMAL"; }
@@ -3428,6 +3430,35 @@ sub TBActivityReport($)
     # Set last_ext_act to now(), but don't update the last_report
     return DBQueryFatal("update node_activity set last_ext_act= now() " .
 			"where node_id='$node'");
+}
+
+#
+# Return the number of *available* nodes. These are nodes that are not
+# reserved and in the proper state. See corresponding code in ptopgen
+# and in the web server which reports the free node counts to users.
+#
+# usage: TBAvailablePCs(char *pid)
+#        Returns count.
+#
+sub TBAvailablePCs(;$)
+{
+    my ($pid) = @_;
+    my $clause = (defined($pid) ? "or p.pid='$pid'" : "");
+
+    my $query_result =
+	DBQueryFatal("select count(a.node_id) from nodes as a ".
+		     "left join reserved as b on a.node_id=b.node_id ".
+		     "left join node_types as nt on a.type=nt.type ".
+		     "left join nodetypeXpid_permissions as p ".
+		     "  on a.type=p.type ".
+		     "where b.node_id is null and a.role='testnode' and ".
+		     "      nt.class='pc' and ".
+                     "      (a.eventstate='" . TBDB_NODESTATE_ISUP . "' or ".
+                     "       a.eventstate='" . TBDB_NODESTATE_PXEWAIT . "') and".
+		     "      (p.pid is null $clause)");
+
+    my ($count) = $query_result->fetchrow_array();
+    return $count;
 }
 
 #

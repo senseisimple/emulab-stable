@@ -212,7 +212,9 @@ else {
 #
 
 # the ordinary free condition for a local node.
-my $free_condition = "(b.node_id is null)";
+my $free_condition = "(b.node_id is null and ".
+                     " (np.eventstate='" . TBDB_NODESTATE_ISUP . "' or ".
+                     "  np.eventstate='" . TBDB_NODESTATE_PXEWAIT . "')) ";
 
 # if the user has specified an exempt pid/eid, 
 # then view any node which is reserved to that experiment as available.
@@ -226,6 +228,7 @@ $result =
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
+		 "left join nodes as np on a.phys_nodeid=np.node_id ".
 		 "left join node_types as t on t.type=a.type ".
 		 "where $free_condition and ".
 		 "      (a.role='testnode' and t.isremotenode=0)");
