@@ -24,12 +24,15 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $USERS	= "@USERNODE@";
 my $DISABLED    = "@DISABLE_NAMED_SETUP@";
+my $OURDOMAIN   = "@OURDOMAIN@";
 
 my $mapdir      = "/etc/namedb";
-my $mapfile	= "$mapdir/@OURDOMAIN@.db";
+my $mapfile	= "$mapdir/${OURDOMAIN}.db";
 my $mapfileback	= "$mapfile.backup";
 my $mapfilehead = "$mapfile.head";
 my $mapfiletail = "$mapfile.tail";
+my $vnodesfile  = "$mapdir/vnodes.${OURDOMAIN}.db";
+my $vnodesback  = "$mapdir/vnodes.${OURDOMAIN}.db.backup";
 my $lockfile    = "/var/tmp/testbed_named_lockfile";
 my $dbg		= 0;
 my @row;
@@ -45,7 +48,7 @@ if ($EUID != 0) {
 	"    Must be root! Maybe its a development version?\n");
 }
 # XXX Hacky!
-if (1 && $TB ne "/usr/testbed") {
+if (0 && $TB ne "/usr/testbed") {
     die("*** $0:\n".
 	"    Wrong version. Maybe its a development version?\n");
 }
@@ -271,6 +274,58 @@ close(MAP);
 # 
 system("cat $mapfiletail >> $mapfile") == 0 or
     fatal("Failed to concat $mapfiletail to $mapfile\n");
+
+#
+# Now we tack on the virtual node, but that has to go onto the end
+# of a *copy* of the file we just created.
+#
+if (-e $vnodesfile) {
+    system("mv -f $vnodesfile $vnodesback") == 0 or
+	fatal("Could not back up $vnodesfile to $vnodesback\n");
+}
+
+system("cp $mapfile $vnodesfile") == 0 or
+    fatal("Could not copy $mapfile to $vnodesfile\n");
+
+#
+# Open up the file and append the jail ips.
+# 
+open(MAP, ">>$vnodesfile") || fatal("Couldn't open $vnodesfile\n");
+print MAP
+    ";\n".
+    "; Jail IPs (allocated nodes only).\n" .
+    ";\n";
+    
+$db_result =
+    DBQueryFatal("select r.*,n.jailip from reserved as r ".
+		 "left join nodes as n on n.node_id=r.node_id ".
+		 "left join node_types as nt on nt.type=n.type ".
+		 "where nt.isvirtnode=1 and nt.isremotenode=0");
+
+if ($db_result->numrows > 0) {
+    #
+    # Create a CNAME for each reserved node.
+    #
+    while (my %row = $db_result->fetchhash) {
+	my $node_id = $row{"node_id"};
+	my $pid     = $row{"pid"};
+	my $eid     = $row{"eid"};
+	my $IP      = $row{"jailip"};
+	my $vname   = $node_id;
+
+	if (defined($row{"vname"})) {
+	    $vname = $row{"vname"};
+	}
+
+	# Spit an A record for the node.
+	print MAP "$node_id\tIN\tA\t$IP\n";
+
+	# Then a CNAME.
+	my $cname = sprintf("%-40s", "$vname.$eid.$pid");
+	printf MAP "$cname IN\tCNAME\t$node_id\n";
+    }
+}
+close(MAP);
 
 #
 # This is better than HUPing the nameserver.
