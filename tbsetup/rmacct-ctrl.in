@@ -17,7 +17,7 @@ my $TB      = "@prefix@";
 my $TBOPS   = "@TBOPSEMAIL@";
 
 my $HOMEDIR = "/users";
-my $SSH     = "ssh";
+my $SSH     = "$TB/bin/sshtb";
 my $CONTROL = "users.emulab.net";
 my $USERDEL = "/usr/sbin/pw userdel";
 

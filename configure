@@ -17,6 +17,8 @@ ac_help="$ac_help
 ac_help="$ac_help
   --with-LEDA		Specify LEDA path (/usr/testbed default)"
 ac_help="$ac_help
+  --with-ssh-args	Specify ssh arguments when running from testbed scripts "
+ac_help="$ac_help
   --enable-debug        Build with debug flags (-g -DDEBUG)
   --disable-debug       Build with optimization flags (-O2 -DNDEBUG -UDEBUG)"
 
@@ -557,7 +559,7 @@ else { echo "configure: error: can not run $ac_config_sub" 1>&2; exit 1; }
 fi
 
 echo $ac_n "checking host system type""... $ac_c" 1>&6
-echo "configure:561: checking host system type" >&5
+echo "configure:563: checking host system type" >&5
 
 host_alias=$host
 case "$host_alias" in
@@ -578,7 +580,7 @@ host_os=`echo $host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 echo "$ac_t""$host" 1>&6
 
 echo $ac_n "checking build system type""... $ac_c" 1>&6
-echo "configure:582: checking build system type" >&5
+echo "configure:584: checking build system type" >&5
 
 build_alias=$build
 case "$build_alias" in
@@ -604,7 +606,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}gcc", so it can be a program name with args.
 set dummy ${ac_tool_prefix}gcc; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:608: checking for $ac_word" >&5
+echo "configure:610: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -636,7 +638,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}g++", so it can be a program name with args.
 set dummy ${ac_tool_prefix}g++; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:640: checking for $ac_word" >&5
+echo "configure:642: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_CXX'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -668,7 +670,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ar", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ar; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:672: checking for $ac_word" >&5
+echo "configure:674: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_AR'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -700,7 +702,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}ranlib", so it can be a program name with args.
 set dummy ${ac_tool_prefix}ranlib; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:704: checking for $ac_word" >&5
+echo "configure:706: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_RANLIB'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -732,7 +734,7 @@ fi
 # Extract the first word of "${ac_tool_prefix}strip", so it can be a program name with args.
 set dummy ${ac_tool_prefix}strip; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:736: checking for $ac_word" >&5
+echo "configure:738: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_STRIP'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -755,6 +757,38 @@ fi
 STRIP="$ac_cv_prog_STRIP"
 if test -n "$STRIP"; then
   echo "$ac_t""$STRIP" 1>&6
+else
+  echo "$ac_t""no" 1>&6
+fi
+
+
+
+# Extract the first word of "${ac_tool_prefix}ssh", so it can be a program name with args.
+set dummy ${ac_tool_prefix}ssh; ac_word=$2
+echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
+echo "configure:770: checking for $ac_word" >&5
+if eval "test \"`echo '$''{'ac_cv_prog_SSH'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  if test -n "$SSH"; then
+  ac_cv_prog_SSH="$SSH" # Let the user override the test.
+else
+  IFS="${IFS= 	}"; ac_save_ifs="$IFS"; IFS=":"
+  ac_dummy="$PATH"
+  for ac_dir in $ac_dummy; do
+    test -z "$ac_dir" && ac_dir=.
+    if test -f $ac_dir/$ac_word; then
+      ac_cv_prog_SSH="${ac_tool_prefix}ssh"
+      break
+    fi
+  done
+  IFS="$ac_save_ifs"
+  test -z "$ac_cv_prog_SSH" && ac_cv_prog_SSH="ssh"
+fi
+fi
+SSH="$ac_cv_prog_SSH"
+if test -n "$SSH"; then
+  echo "$ac_t""$SSH" 1>&6
 else
   echo "$ac_t""no" 1>&6
 fi
@@ -828,6 +862,23 @@ fi
 
 
 #
+# Arguments to ssh to disable strict host key checking, etc
+#
+# Check whether --with-SSH_ARGS or --without-SSH_ARGS was given.
+if test "${with_SSH_ARGS+set}" = set; then
+  withval="$with_SSH_ARGS"
+  
+    SSH_ARGS="$withval"
+
+else
+  
+    SSH_ARGS="-q -o \"BatchMode yes\" -o \"StrictHostKeyChecking no\""
+
+fi
+
+
+
+#
 # Optionally build with optimization or aggressive non-optimization
 # (Actually three options: on, off or default.)
 #
@@ -864,7 +915,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:868: checking for a BSD compatible install" >&5
+echo "configure:919: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -952,7 +1003,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
-	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
+	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config utils/sshtb \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
 
 #
@@ -1121,6 +1172,7 @@ s%@CXX@%$CXX%g
 s%@AR@%$AR%g
 s%@RANLIB@%$RANLIB%g
 s%@STRIP@%$STRIP%g
+s%@SSH@%$SSH%g
 s%@TBDBNAME@%$TBDBNAME%g
 s%@WWWDEFS@%$WWWDEFS%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
@@ -1128,6 +1180,7 @@ s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
 s%@DELAYCAPACITY@%$DELAYCAPACITY%g
 s%@IPBASE@%$IPBASE%g
 s%@LEDA@%$LEDA%g
+s%@SSH_ARGS@%$SSH_ARGS%g
 s%@OPT_CFLAGS@%$OPT_CFLAGS%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g

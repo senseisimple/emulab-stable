@@ -29,7 +29,7 @@ my $TB		= "@prefix@";
 push(@INC, "$TB/lib");
 require libdb;
 
-my $ssh		= "ssh -n -q";
+my $ssh		= "$TB/bin/sshtb -n";
 my $power	= "$TB/bin/power";
 my $ipod	= "$TB/sbin/ipod";
 my $ping	= "/sbin/ping";

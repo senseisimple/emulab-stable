@@ -10,6 +10,7 @@ AC_CHECK_TOOL(CXX,g++)
 AC_CHECK_TOOL(AR,ar)
 AC_CHECK_TOOL(RANLIB,ranlib)
 AC_CHECK_TOOL(STRIP,strip)
+AC_CHECK_TOOL(SSH,ssh)
 
 #
 # These get defined in the definitions file (--with-TBDEFS).
@@ -65,6 +66,18 @@ AC_ARG_WITH(LEDA,
     LEDA="$ac_default_prefix/LEDA/LEDA-4.0"
 ])
 AC_SUBST(LEDA)
+
+#
+# Arguments to ssh to disable strict host key checking, etc
+#
+AC_ARG_WITH(SSH_ARGS,
+[  --with-ssh-args	Specify ssh arguments when running from testbed scripts ],
+[
+    SSH_ARGS="$withval"
+],[
+    SSH_ARGS="-q -o \"BatchMode yes\" -o \"StrictHostKeyChecking no\""
+])
+AC_SUBST(SSH_ARGS)
 
 #
 # Optionally build with optimization or aggressive non-optimization
@@ -125,7 +138,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
-	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
+	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config utils/sshtb \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
 
 #

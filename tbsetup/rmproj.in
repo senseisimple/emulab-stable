@@ -18,6 +18,7 @@ use English;
 #
 my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
+my $SSH    = "$TB/bin/sshtb";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin';
@@ -124,7 +125,7 @@ if (system("/usr/sbin/pw groupdel $pid")) {
 # 
 $UID = 0;
 
-if (system("/usr/local/bin/sshtb $control_node /usr/sbin/pw groupdel $pid")) {
+if (system("$SSH $control_node /usr/sbin/pw groupdel $pid")) {
     print STDOUT "Could not remove group $pid fron control node (plastic)\n";
     exit(-1);
 }

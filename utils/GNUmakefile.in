@@ -8,7 +8,7 @@ SUBDIR		= utils
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= delay_config
+BIN_SCRIPTS	= delay_config sshtb
 SBIN_SCRIPTS	= vlandiff vlansync
 
 #
