@@ -99,7 +99,7 @@ if (! file_exists($dirname)) {
     }
 
     echo "<center><br><h2>
-          Experiment $exp_pid Terminated!<br>
+          Experiment '$exp_eid' in project '$exp_pid' Terminated!<br>
           Since there was no IR file to work from, the EID has been removed,
           <br>but you will need to make sure the nodes are released yourself.
           </h2></center><br>";
@@ -171,7 +171,7 @@ if (! $query_result) {
 }
 
 echo "<center><br>";
-echo "<h2>Experiment $exp_pid Terminated!<br>";
+echo "<h2>Experiment '$exp_eid' in project '$exp_pid' Terminated!<br>";
 echo "</h2></center><br>";
 
 ?>
