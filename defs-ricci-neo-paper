@@ -7,4 +7,5 @@ TBOPSEMAIL=ricci@cs.utah.edu
 TBLOGSEMAIL=ricci@cs.utah.edu
 BOSSNODE=boss.emulab.net
 USERNODE=users.emulab.net
+FSNODE=fs.emulab.net
 OURDOMAIN=emulab.net

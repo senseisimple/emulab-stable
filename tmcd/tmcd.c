@@ -17,9 +17,9 @@
 /*
  * XXX This needs to be localized!
  */
-#define FSPROJDIR	"fs.emulab.net:/q/proj"
-#define FSGROUPDIR	"fs.emulab.net:/q/groups"
-#define FSUSERDIR	"fs.emulab.net:/users"
+#define FSPROJDIR	FSNODE ":/q/proj"
+#define FSGROUPDIR	FSNODE ":/q/groups"
+#define FSUSERDIR	FSNODE ":/users"
 #define PROJDIR		"/proj"
 #define GROUPDIR	"/groups"
 #define USERDIR		"/users"

@@ -18,9 +18,10 @@ use Fcntl ':flock';
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TESTMODE    = @TESTMODE@;
+my $FSNODE      = "@FSNODE@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
-my $SSH		= "$TB/bin/sshtb -l root fs.emulab.net";
+my $SSH		= "$TB/bin/sshtb -l root $FSNODE";
 my $PROG	= "/usr/testbed/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $lockfile    = "/var/tmp/testbed_exports_lockfile";

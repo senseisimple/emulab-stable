@@ -9,5 +9,6 @@ IPBASE=192.168
 DELAYCAPACITY=2
 BOSSNODE=stoller.casco.net
 USERNODE=stoller.casco.net
+FSNODE=fs.casco.net
 MYDOMAIN=casco.net
 
