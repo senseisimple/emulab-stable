@@ -1,0 +1,10 @@
+#!/usr/local/bin/perl -w
+use Mysql;
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+my $sth = $dbh->
+    query("select * from reserved");
+
+print $sth->as_string();
+

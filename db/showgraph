@@ -1,0 +1,127 @@
+#!/usr/local/bin/perl -w
+
+if ($#ARGV >= 0) {
+    #Help mode
+    print "Usage: showgraph\n";
+    print "\n";
+    print "This shows a graph of the relations in the Testbed Database.\n";
+    print "Fields or columns are shown as ellipses, and entities or tables\n";
+    print "are shown as boxes. Direction of arrows is insignificant.\n";
+    print "\n";
+    print "Fields that connect to only one table are only found in that\n";
+    print "table. Fields that connect to two or more tables can be used\n";
+    print "to use information from both tables. By making a chain from one\n";
+    print "field to a field in another table, you can relate the two\n";
+    print "fields together.\n";
+    print "\n";
+    print "This graph is generated from the current table and column setup\n";
+    print "in the actual database, and is always current.\n";
+    print "\n";
+    print "(If you keep getting errors, log into plastic.cs to run it.)";
+    die("\n");
+} else  {
+
+    use Mysql;
+    require "ctime.pl";
+}
+
+my $v = 0; # Verbose
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+my @tbls = $dbh->listtables;
+
+my $date = &ctime(time);
+
+$date =~ s/[ \t]+/ /;
+$date =~ s/\n//;
+
+my $filename="mygraph";
+open(TMP,">$filename");
+
+print TMP "graph: {\n  orientation: left_to_right\n".
+    "  title: \"Testbed Database Relational Graph - ".$date."\"\n";
+print TMP "  display_edge_labels: yes\n  scaling: 0.6\n";
+print TMP "  height: 1000\n width: 500\n";
+print TMP "  priority_phase: yes\n  straight_phase: yes\n";
+print TMP "  crossingweight: medianbary\n  splines: yes\n";
+print TMP "  layoutalgorithm: minbackward\n  arrowmode: fixed\n";
+
+my $sth ="";
+my $cmd ="";
+my @data=();
+my $tbl ="";
+my $dest="";
+my $col ="";
+my @tables=();
+my %tablecols=();
+my @tablelist =();
+
+foreach $tbl ( @tbls ) {
+    push(@tablelist,$tbl);
+    print "Found $tbl:\n" if $v;
+    if ($sth = $dbh->query("describe $tbl") ) {
+	while ( @data = $sth->fetchrow()) {
+	    $col = $data[0];
+	    $col =~ s/[0-9\-]+$//;
+	    if (!defined($tablecols{$col})) {
+		$tablecols{$col}=$tbl;
+		print TMP "  node: { title: \"$col\" shape: ellipse }\n";
+		print "  Found $col\n" if $v;
+	    } else {
+		if (!($tablecols{$col} =~ /^$tbl\b|\.$tbl\.|\.$tbl$/) ) {
+		    $tablecols{$col}.=".".$tbl;
+		    print "  Linked $col\n" if $v;
+		} #else { print STDERR "It was in there"; }
+	    }
+	}
+    }
+}
+
+my %sortlist = ("nodes",2,"interfaces",10,"ip_list",14,"node_types",4,
+		"wires",13,"reserved",16,"node_id",1,"ifc",11,"ip",15,
+		"mac",12,"type",3,"proc",5,"speed",6,"ifcs",7,"ram",8,
+		"hd",9,"eid",17,"sw_table",18,"fixed_list",20,"fixes_table",21,
+		"fix_compat",22,"disk_images",19,"image_id",23,"fix_id",24,
+		"img_desc",25,"os",26,"ver",27,"extras",28,"free_space",29,
+		"free_space_type",30,"time_install_exp",31,
+		"time_install_node",32,"time_boot_exp",33,"time_boot_node",34,
+		"img_path",35,"fix_name",36,"fix_desc",37,"fix_path",38,
+		"quick_clean",39,"trusted",40,"users",41,"grp_memb",45,
+		"groups",42,"proj_memb",46,"projects",43,"proj_grps",47,
+		"experiments",44,"log",48
+		);
+sub mysort {
+    if(!defined $sortlist{"\L$a"}) {
+	print "No sort key for \L$a.\n";
+    } elsif(!defined $sortlist{"\L$b"}) {
+	print "No sort key for \L$b.\n";
+    } else {
+	return $sortlist{"\L$a"} <=> $sortlist{"\L$b"};
+    }
+    return "\L$a" cmp "\L$b";
+}
+
+foreach $tbl ( sort mysort @tablelist) {
+    print TMP "  node: { title: \"$tbl\" }\n";
+}
+
+foreach $col ( sort keys %tablecols) {
+    @tables= sort mysort split('\.',$tablecols{$col});
+    foreach $tbl (sort mysort @tables) {
+	if (@tables < 2 || $tbl=~/disk|memb|grp|fix_c|reserv|fixed|inter|nodes|
+	    |log|proje|IP|wires/i ) {
+	    print TMP "  edge: { sourcename: \"$col\" ".
+		"targetname: \"$tbl\" }\n";
+	} else {
+	    print TMP "  edge: { sourcename: \"$tbl\" ".
+		"targetname: \"$col\" }\n";
+	}
+    }
+}
+
+print TMP "}\n";
+close TMP;
+system( "/home/reid/X11R6/bin/xvcg -silent $filename");
+
+exec "/bin/rm $filename";

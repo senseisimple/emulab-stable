@@ -1,0 +1,10 @@
+#!/usr/local/bin/perl -w
+
+my $user = (getpwuid($<))[0]
+    || die "Cannot figure out who you are!\n";
+
+print "You are: ",join(":",getpwuid($<)),"\n";
+
+# When run through a root setuid program, $< is the user, $> is the
+#    acquired personality
+print "I am $user, $<, $>\n";

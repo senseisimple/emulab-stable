@@ -1,0 +1,84 @@
+#!/usr/local/bin/perl -w
+use Mysql;
+
+my $d = 0; #debug mode
+
+if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
+  die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
+      "\t[extras=<extra[,extra,...]>]".
+      #	" [fixes=<fix_name[,fix_name,...]>]".
+      "\n".
+      "Type \t\t= pc | shark\n"."OS \t\t= Linux | FreeBSD | NetBSD | ...\n".
+      "ver \t\t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n"."extras \t\t= anetd | ...\n".
+      #	"fixes \t\t= cron_off | sendmail_off | ...\n"
+      "A field name alone will show that field in the display of available\n".
+      "nodes. A field name with '=' will match nodes that have that field\n".
+      "empty. A field name with '=' followed by a string will match nodes\n".
+      "that have that string in that field.\n"
+     );
+}
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+print "Got ARGS = ",join(" ",@ARGV),"\n" if $d;
+
+my %args = ();
+while ($#ARGV >= 0) {
+  $_ = shift;
+  if ( ! grep '=' ) {
+    $args{$_}='=';
+  }
+  @_ = split('=',$_);
+  my ($opt,$val) = @_ if ($#_ >= 0);
+  if (!defined($val)) { $val=""; }
+  $args{$opt}=$val if (defined($opt));
+}
+
+if ( $d ) {
+  print "Parsed args to:\n";
+  foreach my $opt (keys %args) {
+    print "$opt:\t$args{$opt}\n";
+  }
+}
+
+my $join= "nodes as a left join reserved as b on a.node_id=b.node_id";
+my $cols= "a.node_id,a.type";
+my $cond= "b.node_id is null and a.type!='switch'";
+my $img = 0;
+
+if (defined($args{"type"})) { $cond .= " and a.type='".$args{"type"}."'"; }
+if (defined($args{"OS"})) { 
+  $img = 1;
+  $cols .= ",d.OS";
+  $cond .= " and d.OS='".$args{"OS"}."'"; 
+}
+if (defined($args{"ver"})) { 
+  $img = 1;
+  $cols .= ",d.ver";
+  $cond .= " and d.ver='".$args{"ver"}."'"; 
+}
+if (defined($args{"extras"})) { 
+  $img = 1;
+  $cols .= ",d.extras";
+  $cond .= " and d.extras='".$args{"extras"}."'"; 
+}
+#if (defined($args{"fixes"})) {
+#  $join .= "";
+#  $cols .= ",d.fix_name";
+#  $cond .= " and fix_name=";
+#}
+
+if ($img) {
+  $join .= " left join SW_Table as c on a.node_id=c.node_id";
+  $join .= " left join disk_images as d on c.image_id=d.image_id";
+}
+
+my $cmd = "select $cols from $join where $cond";
+
+print "Sending cmd:\n$cmd\n" if $d;
+
+my $sth = $dbh->
+    query($cmd);
+
+print $sth->as_string();
+

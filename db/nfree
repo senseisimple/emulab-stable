@@ -1,0 +1,29 @@
+#!/usr/local/bin/perl -w
+use Mysql;
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+if ($#ARGV < 1) {die("Usage: nfree <eid> <node> <node> <...>\n");}
+
+my $eid = shift;
+my @node_names=@ARGV;
+my @machines = @node_names;
+foreach my $m (@machines) { $m = "node_id='".$m."'"; }
+my $list= join(" or ",@machines);
+
+my $cmd = "";
+my $sth = "";
+ 
+foreach my $n (@node_names) { 
+    $sth = $dbh->query("select * from reserved where node_id='$n' ".
+		       "and eid='$eid'");
+    if ($sth->numrows == 0) {
+	print "Node '$n' is not reserved by you.\n";
+	next;
+    } 
+    print "Releasing node '$n'...";
+    $cmd = "delete from reserved where node_id='$n' and eid='$eid'";
+    $sth = $dbh->query($cmd) && print "Succeeded.\n"
+	|| print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"; 
+}
+
