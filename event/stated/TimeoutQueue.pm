@@ -141,6 +141,7 @@ sub qpop {
     $_[0] = ${$q[0]}[0];
     $_[1] = ${$q[0]}[1];
     shift(@q);
+    delete $i{$_[1]};
     return 0;
 }
 
@@ -161,7 +162,7 @@ sub qsize {
 # qshow([$timeout])	 - returns 0
 #   Print out the contents of the queue, or for a given timeout
 sub qshow {
-    print "The TimeoutQueue:\n";
+    print "The TimeoutQueue:\t".qsize()." items (".scalar(keys %i). ")\n";
     if (@_ > 0) {
 	my ($timeout) = @_;
 	# print just one level
