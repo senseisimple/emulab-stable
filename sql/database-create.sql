@@ -410,7 +410,7 @@ CREATE TABLE linkdelays (
   node_id varchar(10) NOT NULL default '',
   iface varchar(8) NOT NULL default '',
   ip varchar(15) NOT NULL default '',
-  netmask varchar(15) NOT NULL default '255.255.255.255',
+  netmask varchar(15) NOT NULL default '255.255.255.0',
   dir enum('xmit','recv') NOT NULL default 'xmit',
   eid varchar(32) default NULL,
   pid varchar(32) default NULL,
