@@ -47,7 +47,8 @@ function SPITFORM($formfields, $errors)
     #
     if ($view_style == "plab") {
 	$view['hide_proj'] = $view['hide_group'] = $view['hide_swap'] =
-	    $view['hide_preload'] = $view['hide_batch'] = $view['quiet'] = 1;
+	    $view['hide_preload'] = $view['hide_batch'] = $view['quiet'] =
+	    $view['plab_ns_message'] = 1;
     }
 
     PAGEHEADER("Begin a Testbed Experiment");
@@ -87,9 +88,14 @@ function SPITFORM($formfields, $errors)
 		information</a>)</font>
 	     </ul></p><br>";
 	} else {
-	echo "<p><b>Your automatically generated NS file has been uploaded.</b> " .
-             "To finish creating your experiment, " .
-             "please fill out the following information:</p>";
+	    if (isset($view['plab_ns_message'])) {
+		echo "<p>To finish creating your slice, edit the following " .
+		     "information if you wish, and click Submit.</p>\n";
+	    } else {
+		echo "<p><b>Your automatically generated NS file has been " .
+		     "uploaded.</b> To finish creating your experiment, " .
+		     "please fill out the following information:</p>";
+	    }
         }
     }
 
