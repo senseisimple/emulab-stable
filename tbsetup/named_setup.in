@@ -188,7 +188,7 @@ print MAP "\n";
 # nodes that have a vname in the reserved table. 
 #
 $db_result =
-    DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid ".
+    DBQueryFatal("select r.node_id,pid,eid,vname,n.phys_nodeid,n.jailip ".
 		 " from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id");
 
@@ -196,16 +196,17 @@ if ($db_result->numrows > 0) {
     #
     # Create a CNAME for each reserved node.
     #
-    while (@row = $db_result->fetchrow_array) {
-	my $node_id = $row[0];
-	my $pid     = $row[1];
-	my $eid     = $row[2];
+    while (my %row = $db_result->fetchhash) {
+	my $node_id = $row{"node_id"};
+	my $pid     = $row{"pid"};
+	my $eid     = $row{"eid"};
+	my $physid  = $row{"phys_nodeid"};
+	my $jailip  = $row{"jailip"};
 	my $vname   = $node_id;
-	my $physid  = $row[4];
 	my $cname;
 
-	if (defined($row[3])) {
-	    $vname = $row[3];
+	if (defined($row{"vname"})) {
+	    $vname = $row{"vname"};
 	}
 
         #
@@ -214,7 +215,15 @@ if ($db_result->numrows > 0) {
 	# the map with a zillion cnames for nodes that do not actually
 	# exist until they are allocated).
         #
-	if (defined($row[4]) && $row[4] ne $node_id) {
+	if (defined($physid) && $physid ne $node_id) {
+	    if (defined($jailip)) {
+		#
+		# If the vnode has its own jailip, then skip this completely
+		# since both the name and the cname will be entered into
+		# the "private" vnodes map below. 
+		# 
+		next;
+	    }
 	    $cname   = sprintf("%-40s", "$node_id");
 	    printf MAP "$cname IN\tCNAME\t$physid\n";
 	    
@@ -300,7 +309,8 @@ $db_result =
     DBQueryFatal("select r.*,n.jailip from reserved as r ".
 		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join node_types as nt on nt.type=n.type ".
-		 "where nt.isvirtnode=1 and nt.isremotenode=0");
+		 "where nt.isvirtnode=1 and nt.isremotenode=0 and ".
+		 "      n.jailip is not null");
 
 if ($db_result->numrows > 0) {
     #
