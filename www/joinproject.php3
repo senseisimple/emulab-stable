@@ -347,20 +347,23 @@ if (isset($_GET['finished'])) {
     #
     # Generate some warm fuzzies.
     #
-    echo "<p>
-          The project leader has been notified of your application.
-          He/She will make a decision and either approve or deny your
-          application, and you will be notified via email as soon as a
-          decision has been made.";
-
     if (! $returning) {
-	echo "<br>
-              <p>
-              In the meantime, as a pending user of the Testbed you will receive
-              a key via email.
+	echo "<p>
+              As a pending user of the Testbed you will receive a key via email.
               When you receive the message, please follow the instructions
-              contained in the message on how to verify your account.\n";
+              contained in the message, which will verify your identity.
+	      <br>
+	      <p>
+	      When you have done that, the project leader will be
+	      notified of your application. ";
+    } else {
+          echo "<p>
+	  	The project leader has been notified of your application. ";
     }
+
+    echo "He/She will make a decision and either approve or deny your
+          application, and you will be notified via email as soon as
+	  that happens.\n";
 
     PAGEFOOTER();
     return;
