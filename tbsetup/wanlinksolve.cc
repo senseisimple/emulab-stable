@@ -3,7 +3,7 @@
  A Reasonably Effective Algorithm for Genetically Assigning Nodes.
  Chad Barb, May 3, 2002
 
- Applies a standard genetic algorithm (with crossover)
+ Applies a standard genetic algorithm (with crossover and elitism)
  to solve the problem of mapping a smaller "virtual" graph
  into a larger "physical" graph, such that the actual 
  weights between acquired nodes are similar to desired weights.
@@ -33,11 +33,8 @@
    -s <seed>
        Use a specific random seed.
 
-   -r <minrounds>
-       Specify the minimum number of rounds to go before stopping.
-       Note that the algorithm won't actually stop until
-       round 2n, where "n" is the round which found the best solution so far,
-       or if it hits maxrounds.
+   -r <roundswobetter>
+       Specify the number of rounds to continue going without a better solution.
        default: DEFAULT_ROUNDS
 
    -R <maxrounds>
@@ -75,6 +72,17 @@
  Easily inferred. Note that the perl regexp:
  /(\S+)\smapsTo\s(\S+)/
  will grab vnode to pnode mappings (in $1 and $2, respectively.)
+
+
+ Some references on GA's:
+
+ Goldberg 89
+    D. E. Goldberg. Genetic Algorithms in Search, Optimization, and Machine Learning. Addison-Wesley, Reading, MA, 1989.
+
+ Holland 75
+    J. Holland. Adaptation In Natural and Artificial Systems. The University of Michigan Press, Ann Arbour, 1975.
+
+
  
 ****/
 
@@ -92,25 +100,17 @@
 #define MAX_NODES 20
 #define MAX_DIMENSIONS 2
 
-#define DEFAULT_ROUNDS 512
+#define DEFAULT_ROUNDS 256
 
 // The size of our "population."
-// (100,000 seems to work well.)
-//#define SOLUTIONS 100000
+// (number of phenotypes)
 #define SOLUTIONS 500
 
-// The number of new children to produce each round.
-// (20,000 seems to work well.)
-//define CHILDREN_PER_ROUND 20000
+// The probability a given child will mutate (out of 1000)
+#define MUTATE_PROB 40
 
-// The probability a given child will NOT have a mutation.
-// (out of 1000). 990 means 1% of children will mutate.
-// (.01% will mutate twice, .0001% three times, etc.)
-// 500 means 50% of children will mutate (25% twice, 12% three times, etc.)
-// 500, incidentally, seems to be optimal.
-//#define MUTATE_PROB 500
-//#define MUTATE_PROB 700
-#define MUTATE_PROB 950
+// probability crossover will happen (out of 1000)
+#define CROSSOVER_PROB 700
 
 // A score below Epsilon means we've found a perfect solution,
 // so stop immediately.
@@ -126,6 +126,7 @@ using namespace std;
 // keep freebsd from mumbling about gets(3) being unsafe.
 #define gets( x ) fgets( x, sizeof( x ), stdin  )
 
+// some code to enable when the solver wedges and we don't know why.
 #ifdef DEBUG
 int wedgecount;
 static inline void BEGIN_LOOP() { wedgecount = 0; } 
@@ -182,9 +183,13 @@ public:
   float prob;
 };
 
+// the population pool.
+// at any one time, one of these is the "current" pool (where the parents come from)
+// and one is the "next" pool (where the children go)
 static Solution pool[SOLUTIONS];
 static Solution pool2[SOLUTIONS];
 
+// determines probabilities of selecting each solution.
 static inline void prepick( Solution * currentPool )
 {
   float totalFitness = 0.0f;
@@ -213,24 +218,6 @@ static inline int pickABest( Solution * currentPool )
   return i - 1;
 }
 
-/*
-  // a hacky (but damn fast) probibility curve to
-  // favor mating better solutions.
-
-  switch (rand() % 4) {
-  case 0: return rand() % SOLUTIONS / 32;
-  case 1: return rand() % SOLUTIONS / 16;
-  case 2: return rand() % SOLUTIONS / 4;
-  case 3: return rand() % SOLUTIONS;
-  default: return 0; // can't happen, but -Wall doesn't realize this.
-  }
-}
-
-static inline int pickAWorst()
-{
-  return SOLUTIONS - pickABest();
-}
-*/
 // uses a template to avoid massive numbers
 // of "if" choices.. compiler should generate two versions,
 // one with dump and one without.
@@ -326,7 +313,7 @@ static inline void mutate( Solution * t )
   while(1) {
     IN_LOOP();
     // forecast calls for a 1% chance of mutation...
-    if ((rand() % 1000) < MUTATE_PROB) { break; }
+    if ((rand() % 1000) > MUTATE_PROB) { break; }
     
     if ((rand() % 3)) {
       // swap mutation. 
@@ -391,83 +378,86 @@ static inline void mutate( Solution * t )
 // (perhaps have a limited retry)
 static inline void splice( Solution * t, Solution * a, Solution * b)
 {
-  // temp storage so we don't clobber t unless the child turns out to be
-  // cromulent.
-  int vnode_mapping_t[MAX_NODES]; 
-  int pnode_uses_t[MAX_NODES];
-
-  bzero( pnode_uses_t, sizeof( pnode_uses_t ) );
-
-  for (int i = 0; i < vnodes; i++) {
-    if (fixed[i] != -1) {
-      vnode_mapping_t[i] = fixed[i];
-      ++pnode_uses_t[ fixed[i] ];
-    }
-  }
-
-  // go through each mapping, and pick randomly
-  // which one of the two parents' mappings the child
-  // will inherit.
-  // Inherit the one that makes sense if the other would
-  // conflict with a previously chosen mapping.
-  // If both would conflict with a previously chosen mapping.
-  // its a failed mating, and we return.
-
-  int pos = rand() % vnodes;
-  for (int i = 0; i < vnodes; i++) {
-    pos = (pos + 1) % vnodes;
-    if (fixed[pos] != -1) continue;
+  if ((rand() % 1000) > CROSSOVER_PROB) {
     if (rand() % 2) {
-      if (pnode_uses_t[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
-	vnode_mapping_t[pos] = a->vnode_mapping[pos];
-	++pnode_uses_t[ a->vnode_mapping[pos] ];
-      } else {
-	if (pnode_uses_t[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
-	  vnode_mapping_t[pos] = b->vnode_mapping[pos];
-	  ++pnode_uses_t[ b->vnode_mapping[pos] ];
-	} else {
-	  // failed mating (clone a parent)
-	  for (int x = 0; x < vnodes; x++) {
-	    vnode_mapping_t[x] = a->vnode_mapping[x];
-	  }
-	  for (int y = 0; y < vnodes; y++) {
-	    pnode_uses_t[y] = a->pnode_uses[y];
-	  }
-	  break;
-	}
+      for (int x = 0; x < vnodes; x++) {
+	t->vnode_mapping[x] = a->vnode_mapping[x];
+      }
+      for (int y = 0; y < vnodes; y++) {
+	t->pnode_uses[y] = a->pnode_uses[y];
       }
     } else {
-      if (pnode_uses_t[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
-	vnode_mapping_t[pos] = b->vnode_mapping[pos];
-	++pnode_uses_t[ b->vnode_mapping[pos] ];
-      } else {
-	if (pnode_uses_t[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
-	  vnode_mapping_t[pos] = a->vnode_mapping[pos];
-	  ++pnode_uses_t[ a->vnode_mapping[pos] ];
+      for (int x = 0; x < vnodes; x++) {
+	t->vnode_mapping[x] = b->vnode_mapping[x];
+      }
+      for (int y = 0; y < vnodes; y++) {
+	t->pnode_uses[y] = b->pnode_uses[y];
+      }
+    }
+  } else {
+
+    bzero( t->pnode_uses, sizeof( t->pnode_uses ) );
+    
+    for (int i = 0; i < vnodes; i++) {
+      if (fixed[i] != -1) {
+	t->vnode_mapping[i] = fixed[i];
+	++t->pnode_uses[ fixed[i] ];
+      }
+    }
+    
+    // go through each mapping, and pick randomly
+    // which one of the two parents' mappings the child
+    // will inherit.
+    // Inherit the one that makes sense if the other would
+    // conflict with a previously chosen mapping.
+    // If both would conflict with a previously chosen mapping.
+    // its a failed mating, and we return.
+    
+    int pos = rand() % vnodes;
+    for (int i = 0; i < vnodes; i++) {
+      pos = (pos + 1) % vnodes;
+      if (fixed[pos] != -1) continue;
+      if (rand() % 2) {
+	if (t->pnode_uses[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
+	  t->vnode_mapping[pos] = a->vnode_mapping[pos];
+	  ++t->pnode_uses[ a->vnode_mapping[pos] ];
 	} else {
-	  // failed mating (clone a parent)
-	  for (int x = 0; x < vnodes; x++) {
-	    vnode_mapping_t[x] = b->vnode_mapping[x];
+	  if (t->pnode_uses[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
+	    t->vnode_mapping[pos] = b->vnode_mapping[pos];
+	    ++t->pnode_uses[ b->vnode_mapping[pos] ];
+	  } else {
+	    // failed mating (asexually clone a parent)
+	    for (int x = 0; x < vnodes; x++) {
+	      t->vnode_mapping[x] = a->vnode_mapping[x];
+	    }
+	    for (int y = 0; y < vnodes; y++) {
+	      t->pnode_uses[y] = a->pnode_uses[y];
+	    }
+	    break;
 	  }
-	  for (int y = 0; y < vnodes; y++) {
-	    pnode_uses_t[y] = b->pnode_uses[y];
+	}
+      } else {
+	if (t->pnode_uses[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
+	  t->vnode_mapping[pos] = b->vnode_mapping[pos];
+	  ++t->pnode_uses[ b->vnode_mapping[pos] ];
+	} else {
+	  if (t->pnode_uses[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
+	    t->vnode_mapping[pos] = a->vnode_mapping[pos];
+	    ++t->pnode_uses[ a->vnode_mapping[pos] ];
+	  } else {
+	    // failed mating (asexually clone a parent)
+	    for (int x = 0; x < vnodes; x++) {
+	      t->vnode_mapping[x] = b->vnode_mapping[x];
+	    }
+	    for (int y = 0; y < vnodes; y++) {
+	      t->pnode_uses[y] = b->pnode_uses[y];
+	    }
+	    break;
 	  }
-	  break;
 	}
       }
     }
   }
-
-  // since we have a cromulent child, we now clobber t.
-  for(int d = 0; d < vnodes; d++) {
-    t->vnode_mapping[d] = vnode_mapping_t[d];
-  }
-
-  for(int e = 0; e < pnodes; e++) {
-    t->pnode_uses[e] = pnode_uses_t[e];
-  }
-
-  // Mazeltov!
 
   mutate( t );
   calcError<false>( t );  
@@ -514,7 +504,7 @@ void usage( char * appname )
 	  "  -s <seed>       seed the random number generator with a specific value\n"
 	  "  -2 <weight>     enable solving for bandwidth;\n"
 	  "                  multiply bandwidth penalties by <weight>.\n"
-	  "  -r <minrounds>  set minimum rounds (a.k.a. generations)\n"
+	  "  -r <minrounds>  number of rounds to go without a solution before stopping\n"
 	  "                  default: %i\n"
 	  "  -R <maxrounds>  set maximum rounds\n"
 	  "                  default: infinite (-1)\n\n", appname, DEFAULT_ROUNDS );
@@ -690,7 +680,7 @@ int main( int argc, char ** argv )
     int highestFoundRound = 0;
     float last = currentPool[0].error;
 
-    for (int i = 0; i != maxrounds && (i < minrounds || i < highestFoundRound * 2); i++) {
+    for (int i = 0; i != maxrounds && i < (highestFoundRound + minrounds); i++) {
       /*
       {
 	float blah = 0.0f;
@@ -712,6 +702,8 @@ int main( int argc, char ** argv )
 	highestFoundRound = i;
       }
 
+      // this is "elitism" -- the best solution is guaranteed to survive.
+      // (otherwise, a good solution may be found, but may be lost by the next generation.)
       memcpy( &(nextPool[0]), &(currentPool[0]), sizeof( Solution ) );
       prepick( currentPool );
 
@@ -769,17 +761,3 @@ int main( int argc, char ** argv )
   if (verbose > 1) { printf("Bye now.\n"); }
   return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
