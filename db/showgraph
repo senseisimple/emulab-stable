@@ -90,7 +90,7 @@ my %sortlist = ("nodes",2,"interfaces",10,"ip_list",14,"node_types",4,
 		"quick_clean",39,"trusted",40,"users",41,"grp_memb",45,
 		"groups",42,"proj_memb",46,"projects",43,"proj_grps",47,
 		"experiments",44,"log",48,"login",49,"ssh_host_keys",50,
-		"outlets",31,"partitions",52
+		"outlets",31,"partitions",55
 		);
 sub mysort {
     if(!defined $sortlist{"\L$a"}) {
@@ -123,6 +123,6 @@ foreach $col ( sort keys %tablecols) {
 
 print TMP "}\n";
 close TMP;
-system( "/home/reid/X11R6/bin/xvcg -silent $filename");
+system("/home/reid/X11R6/bin/xvcg -silent $filename");
 
 exec "/bin/rm $filename";
