@@ -2360,8 +2360,9 @@ sub DBQuery($)
 	if (defined($result) || $DB->err != 2006) {
 	    last;
 	}
+	my $err = $DB->err;
 
-	DBWarn("mysqld went away. $maxtries tries left", 0);
+	DBWarn("mysqld went away ($err). $maxtries tries left", 0);
 	$maxtries--;
 	sleep(1);
     }
