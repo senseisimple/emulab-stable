@@ -14,23 +14,11 @@ SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= imagezip frisbee.redux growdisk syncd dijkstra
+SUBDIRS	= imagezip frisbee.redux growdisk syncd dijkstra genhostsfile
 
-all:	$(SUBDIRS) split-image.sh
+all:	all-subdirs split-image.sh
 
 include $(TESTBED_SRCDIR)/GNUmakerules
-
-imagezip:
-	@$(MAKE) -C imagezip all
-
-frisbee.redux:
-	@$(MAKE) -C frisbee.redux all
-
-syncd:
-	@$(MAKE) -C syncd all
-
-dijkstra:
-	@$(MAKE) -C dijkstra all
 
 install: $(INSTALL_SBINDIR)/split-image.sh
 	@$(MAKE) -C imagezip install
@@ -50,24 +38,24 @@ endif
 	$(MAKE) -C syncd client-install
 	$(MAKE) -C growdisk client-install
 	$(MAKE) -C dijkstra client-install
+	$(MAKE) -C genhostsfile client-install
 
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 
-clean:		subdir-clean
-
-subdir-clean:
-	@$(MAKE) -C imagezip clean
-	@$(MAKE) -C frisbee.redux clean
-	@$(MAKE) -C growdisk clean
-	@$(MAKE) -C syncd clean
-
+clean:		clean-subdirs
 distclean:	subdir-distclean
 
 subdir-distclean:
 	@$(MAKE) -C imagezip distclean
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
 
 .PHONY:	$(SUBDIRS)
 
