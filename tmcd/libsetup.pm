@@ -78,14 +78,22 @@ sub TMHOSTS()		{ "$SETUPDIR/hosts"; }
 sub TMNICKNAME()	{ "$SETUPDIR/nickname"; }
 sub FINDIF()		{ "$SETUPDIR/findif"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
-sub TMMOUNTDB()		{ "$SETUPDIR/mountdb"; }
-sub TMSFSMOUNTDB()	{ "$SETUPDIR/sfsmountdb"; }
 sub TMROUTECONFIG()     { ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.route";}
 sub TMTRAFFICCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.traffic";}
 sub TMTUNNELCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/rc.tunnel";}
 sub TMVTUNDCONFIG()	{ ($vnodedir ? $vnodedir : $SETUPDIR) . "/vtund.conf";}
-sub TMPASSDB()		{ "$SETUPDIR/passdb"; }
-sub TMGROUPDB()		{ "$SETUPDIR/groupdb"; }
+#
+# These go in /var/db/emulab. Good for jails!
+# 
+sub TMMOUNTDB()		{ "/var/db/emulab/mountdb"; }
+sub TMSFSMOUNTDB()	{ "/var/db/emulab/sfsmountdb"; }
+sub TMPASSDB()		{ "/var/db/emulab/passdb"; }
+sub TMGROUPDB()		{ "/var/db/emulab/groupdb"; }
+
+# Make sure this exists!
+if (! -e "/var/db/emulab") {
+    mkdir("/var/db/emulab", 0775);
+}
 
 #
 # Whether or not to use SFS (the self-certifying file system).  If this
@@ -553,11 +561,8 @@ sub dosfshostid ()
     }
 
     # Give hostid to TMCD
-    open(SFSKEY, "sfskey hostid - |")
-	or die "Cannot start sfskey";
-    $myhostid = <SFSKEY>;
-    close(SFSKEY);
-    if (defined($myhostid)) {
+    $myhostid = `sfskey hostid - 2>/dev/null`;
+    if (! $?) {
 	if ( $myhostid =~ /^([-\.\w_]*:[a-z0-9]*)$/ ) {
 	    $myhostid = $1;
 	    print STDOUT "  Hostid: $myhostid\n";
@@ -1829,6 +1834,48 @@ sub remotenodeupdate()
 
 	print STDOUT "Mounting project and home directories ... \n";
 	domounts();
+    }
+
+    return 0;
+}
+
+#
+# This happens inside a jail. We have to pass the vnode, which is actually
+# the hostname for the jailed environment. 
+#
+sub jailedsetup()
+{
+    my $hostname = `hostname`;
+    
+    # Untaint and strip newline.
+    if ($hostname =~ /^([-\w\.]+)$/) {
+	$hostname = $1;
+    }
+    else {
+	die("Tainted hostname $hostname!\n");
+    }
+    
+    #
+    # Set global vnodeid for tmcc commands.
+    #
+    $vnodeid  = $hostname;
+
+    #
+    # Do account stuff.
+    #
+    {
+	local $tmcctimeout = 10;
+    
+	if ($USESFS) {
+	    #
+	    # Setup SFS hostid.
+	    #
+	    print STDOUT "Setting up for SFS ... \n";
+	    dosfshostid();
+	}
+
+	print STDOUT "Checking Testbed group/user configuration ... \n";
+	doaccounts();
     }
 
     return 0;
