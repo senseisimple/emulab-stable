@@ -165,6 +165,20 @@ START delay
 # <node> is a virtual node name, <bw> is ###Mb, and <delay> is ###ms
 END delay
 
+START os
+START images
+# Records of the form
+# <label> <path> <partition>
+# These are the entries made to the disk_images table by create-os commands
+END images
+START nodes
+# Records of the form
+# <node> <label>
+# One entry for every <node>.  What image they should boot.
+# <node> is a physical node and includes dnard number for dnards.
+END nodes
+END os
+
 ----------------------------------------------------------------------
 
 Other possible sections:
