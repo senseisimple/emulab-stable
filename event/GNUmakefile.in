@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,8 +11,12 @@ SUBDIR		= event
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= lib sched tbgen example trafgen delay-agent nsetrafgen stated \
-		program-agent
+SYSTEM	       := $(shell uname -s)
+
+SUBDIRS		= lib tbgen trafgen program-agent
+ifeq ($(SYSTEM),FreeBSD)
+SUBDIRS	       += sched example delay-agent nsetrafgen stated
+endif
 
 all:	$(SUBDIRS)
 
@@ -61,6 +65,11 @@ client-install:
 
 control-install: 
 	@$(MAKE) -C tbgen control-install
+
+linux-install:
+	@$(MAKE) -C program-agent client-install
+	@$(MAKE) -C tbgen client-install
+	@$(MAKE) -C trafgen client-install
 
 clean:		subdir-clean
 
