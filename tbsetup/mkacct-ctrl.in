@@ -235,15 +235,18 @@ my $project       = shift @groupnames;
 my $grouplist     = join(",",@groupnames);
 
 #
-# Add some special cases for admin types. Groups must exist already, and
-# probably will. flux is bad ...
+# Add special groups. These are listed in the DB so that special local
+# users can have more unix groups than just the projects/groups they are
+# in. These groups must already exist. 
 #
-if (TBAdmin($user)) {
+if ((my @extragrouplist = TBUnixGroupList($user))) {
+    print "Adding extra groups to list: @extragrouplist\n";
+    
     if ($grouplist) {
-	$grouplist = "$grouplist,wheel,flux";
+	$grouplist = "$grouplist," . join(",", @extragrouplist);
     }
     else {
-	$grouplist = "wheel,flux";
+	$grouplist = join(",", @extragrouplist);
     }
 }
 

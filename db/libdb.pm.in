@@ -72,6 +72,7 @@ use Exporter;
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
+	 TBUnixGroupList
 	 );
 
 # Must come after package declaration!
@@ -1091,6 +1092,31 @@ sub TBGroupUnixInfo ($$$$) {
     $$unix_gid  = $row[0];
     $$unix_name = $row[1];
     return 1;
+}
+
+#
+# Return a list of the additional Unix groups a user is in.
+#
+# usage: TBUnixGroupList(char $dbuid)
+#        returns list if there is one.
+#        returns () if failed or no list.
+#
+sub TBUnixGroupList ($) {
+    my($dbuid) = @_;
+    my @glist = ();
+
+    my $query_result =
+	DBQueryFatal("select gid from unixgroup_membership ".
+		     "where uid='$dbuid'");
+
+    if ($query_result->num_rows == 0) {
+	return ();
+    }
+    
+    while (@row = $query_result->fetchrow_array()) {
+	push(@glist, $row[0]);
+    }
+    return @glist;
 }
 
 #
