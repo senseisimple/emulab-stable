@@ -34,7 +34,10 @@ A. FreeBSD (while running single user):
   Generate new host keys.  Actually, copy from an existing image.
 
 * /etc/testbed/{client,emulab}.pem
-  Generate a new one.
+  Generate a new one.  From Leigh:
+      Just need to cd into the ssl directory and do a gmake
+      (on their boss of course!) then a gmake boss-installX.
+      The images need emulab.pem and client.pem from that directory.
 
 * /etc/testbed/supfile
   Fix release tag (FBSD*) if necessary and host=
@@ -82,7 +85,10 @@ B. While running Linux (single user):
   Change the root password, this file will get installed by prepare.
 
 * /etc/testbed/{client,emulab}.pem
-  Generate a new one.
+  Generate a new one.  From Leigh:
+      Just need to cd into the ssl directory and do a gmake
+      (on their boss of course!) then a gmake boss-installX.
+      The images need emulab.pem and client.pem from that directory.
 
 * /etc/testbed/supfile
   Fix release tag (RHL*) if necessary and host=
