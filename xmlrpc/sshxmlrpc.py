@@ -48,6 +48,10 @@ import urllib
 import popen2
 import rfc822
 import xmlrpclib
+import syslog
+
+# XXX This should come from configure.
+LOG_TESTBED = syslog.LOG_LOCAL5;
 
 ##
 # Base class for exceptions in this module.
@@ -292,6 +296,15 @@ class SSHServerWrapper:
     def __init__(self, object):
         self.ssh_connection = os.environ['SSH_CONNECTION'].split()
         self.myObject = object
+
+        #
+        # Init syslog
+        #
+        syslog.openlog("sshxmlrpc", syslog.LOG_PID, LOG_TESTBED);
+        syslog.syslog(syslog.LOG_INFO,
+                      "Connect by " + os.environ['USER'] + " from " +
+                      self.ssh_connection[0]);
+                      
         return
 
     ##
@@ -308,6 +321,7 @@ class SSHServerWrapper:
             hdrs = SSHMessage(connection, False)
             length = int(hdrs['content-length'])
             params, method = xmlrpclib.loads(connection.read(length))
+            syslog.syslog(syslog.LOG_INFO, "Calling method '" + method + "'");
             try:
                 # ... find the corresponding method in the wrapped object,
                 meth = getattr(self.myObject, method)
@@ -371,6 +385,8 @@ class SSHServerWrapper:
             pass
         finally:
             connection.close()
+            syslog.syslog(syslog.LOG_INFO, "Connection closed");
+            syslog.closelog()
             pass
         return
     
