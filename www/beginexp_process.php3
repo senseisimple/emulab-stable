@@ -126,8 +126,12 @@ elseif ($specupload) {
 }
 else {
     #
-    # I am going to allow shell experiments to be created (No NS file).
-    # 
+    # I am going to allow shell experiments to be created (No NS file),
+    # but only by admin types.
+    #
+    if (! ISADMIN($uid)) {
+	FORMERROR("Your NS File");
+    }
     $nonsfile = 1;
 }
 
