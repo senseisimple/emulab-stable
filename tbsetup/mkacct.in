@@ -340,7 +340,7 @@ if (open(AKEYS, "> $SSHDIR/authorized_keys.new")) {
 	fatal("Could not chown authorized_keys.new for $user: $!");
 	    
     if (-e "$SSHDIR/authorized_keys") {
-	if (system("cp -f $SSHDIR/authorized_keys ".
+	if (system("cp -f -p $SSHDIR/authorized_keys ".
 		   "$SSHDIR/authorized_keys.old")) {
 	    fatal("Could not save authorized_keys for $user: $!");
 	}
