@@ -161,8 +161,8 @@ $SIG{TERM} = \&cleanup;
 $SIG{KILL} = \&cleanup;
 
 # Set up some notification throttling
-my $mailgap = 5; # in seconds
-my $lastmail = time - $mailgap; # Allow for immediate send on startup.
+my $mailgap = 15; # in seconds
+my $lastmail = time - $mailgap + 1; # Send a digest of startup msgs after 1s.
 my %msgs = ();
 
 info("stated starting up\n");
@@ -587,6 +587,7 @@ sub checkGenISUP($) {
       return 0;
     } else {
       info("Forked process $$ to ping $node\n");
+      $lockfile = ""; # Don't clean up my pidfile, since I'm a child
 
       my $wait=5;		# 5 seconds between ping attempts
       my $maxtime=600;		# Set the timer for 10 minutes
