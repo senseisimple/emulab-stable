@@ -511,7 +511,7 @@ sub mkrootfs($)
 	}
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
 
-	mysystem("ln -s $LOCALMNTPNT/$PID/$EID/$vnodeid $path/root/opt");
+	mysystem("ln -s $LOCALMNTPNT/$PID/$vnodeid $path/root/opt");
     }
     else {
 	mkdir("$path/root/opt", 0775);

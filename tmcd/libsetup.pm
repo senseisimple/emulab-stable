@@ -2504,7 +2504,7 @@ sub vnodejailsetup($)
     if (-e LOCALROOTFS()) {
 	my $piddir = LOCALROOTFS() . "/$pid";
 	my $eiddir = LOCALROOTFS() . "/$pid/$eid";
-	my $viddir = LOCALROOTFS() . "/$pid/$eid/$vid";
+	my $viddir = LOCALROOTFS() . "/$pid/$vid";
 
 	if (! -e $piddir) {
 	    mkdir($piddir, 0777) or
