@@ -1,13 +1,27 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
+use Getopt::Std;
+
+sub usage()
+{
+    print "Usage: rc.progagent start | stop\n";
+    exit(1);
+}
+my $optlist	= "";
+my $action      = "start";
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Prototypes.
+#
+sub fatal($);
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -15,37 +29,94 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # 
 use libsetup;
 
-print "Starting Program Agent ...\n";
-
 #
-# We use the tmcc to figure out where the Testbed Event Daemon is running.
-# Don't worry about the port for now.
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
 #
-my ($bossname) = split(" ", `tmcc bossinfo`);
-
-#
-# We have to run the program agent as the user that created the experiment.
-# Might change at some point with multiuser nodes.
-#
-my (undef,$creator) = split("=", `tmcc creator`);
-
-if (!defined($creator)) {
-    print STDERR "Could not determine experiment creator!\n";
-    exit(1);
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
 }
-chop($creator);
-(undef,undef,$uid,$gid,undef,undef,undef,undef) = getpwnam($creator);
+if (@ARGV) {
+    $action = $ARGV[0];
 
-if (!defined($uid)) {
-    print STDERR "Could not determine experiment creator UID!\n";
-    exit(1);
+    usage()
+	if ($action ne "start" and $action ne "stop");
 }
 
-#
-# Become the creator and run the agent.
-#
-$EGID = $GID = $gid;
-$EUID = $UID = $uid;
+my $logfile = "$LOGDIR/progagent.debug";
+my $pidfile = "/var/run/progagent.pid";
 
-system("program-agent -s $bossname -l /tmp/progagent.debug &");
+# Stop.
+if ($action eq "stop") {
+    if (-e $pidfile) {
+	system("kill `cat $pidfile`");
+	unlink($pidfile);
+    }
+    exit(0);
+}
+
+# Start.
+if (! -s TMPROGAGENTS) {
+    exit(0);
+}
+
+#
+# The progagent always talks to the local elvind on FreeBSD, which
+# talks to boss. Otherwise, it talks to boss directly. 
+#
+my $bossname;
+if ($OSNAME eq "freebsd") {
+    $bossname = "localhost";    
+}
+else {
+    ($bossname) = split(" ", `tmcc bossinfo`);
+}
+
+#
+# Open up the command file, which tells us what to do.
+#
+open(CMD, TMPROGAGENTS) or
+    fatal("Could not open " . TMPROGAGENTS . ": $!");
+
+my @agents;
+my $login;
+
+while (<CMD>) {
+    if ($_ =~ /^UID=([-\w]+)$/) {
+	$login  = $1;
+    }
+    elsif ($_ =~ /^AGENT=([-\w]+)$/) {
+	push (@agents, $1);
+    }
+}
+
+if (!defined(@agents) || !defined($login)) {
+    fatal(TMPROGAGENTS . " not in proper format!");
+}
+
+#
+# Need the pid/eid. 
+# 
+my ($pid, $eid, $vname) = check_nickname();
+
+#
+# Start the program agent. It will become the user. It must be started
+# as root of course to do this. 
+#
+my $agentlist = join(" -a ", @agents);
+
+print "Starting Program Agent ($login, @agents) ...\n";
+
+system("program-agent -e $pid/$eid -s $bossname -u $login -l $logfile ".
+       "-a $agentlist -i $pidfile &");
 exit($? >> 0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+
