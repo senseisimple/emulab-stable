@@ -155,7 +155,7 @@ foreach my $node (@nodes) {
 
 	if ($exptstate eq EXPTSTATE_SWAPPING ||
 	    $exptstate eq EXPTSTATE_ACTIVATING) {
-	    print STDOUT "Skipping $mode of vnode $node on local $pnode ...\n";
+	    print "$node will automatically $mode with local node $pnode\n";
 	    next;
 	}
     }
