@@ -3259,17 +3259,17 @@ COMMAND_PROTOTYPE(doloadinfo)
 	char		buf[MYBUFSIZE];
 	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	char		*disktype;
-	int		disknum;
+	int		disknum, zfill;
 
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS,frisbee_pid "
+	res = mydb_query("select load_address,loadpart,OS,frisbee_pid,mustwipe "
 			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
 			 "where node_id='%s'",
-			 4, reqp->nodeid);
+			 5, reqp->nodeid);
 
 	if (!res) {
 		error("doloadinfo: %s: DB Error getting loading address!\n",
@@ -3302,6 +3302,14 @@ COMMAND_PROTOTYPE(doloadinfo)
 
 	bufp += OUTPUT(bufp, ebufp - bufp,
 		       "ADDR=%s PART=%s PARTOS=%s", row[0], row[1], row[2]);
+
+	/*
+	 * Remember zero-fill free space indicator
+	 */
+	zfill = 0;
+	if (row[4] && row[4][0])
+		zfill = atoi(row[4]);
+
 	mysql_free_result(res);
 
 	/*
@@ -3326,9 +3334,10 @@ COMMAND_PROTOTYPE(doloadinfo)
 		if (row[1] && row[1][0])
 			disknum = atoi(row[1]);
 	}
-	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d\n", disktype, disknum);
+	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d ZFILL=%d\n",
+	       disktype, disknum, zfill);
 	mysql_free_result(res);
-	
+
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("doloadinfo: %s", buf);

@@ -67,6 +67,7 @@ CREATE TABLE comments (
 CREATE TABLE current_reloads (
   node_id varchar(32) NOT NULL default '',
   image_id varchar(45) NOT NULL default '',
+  mustwipe tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -1490,6 +1491,7 @@ CREATE TABLE reserved (
   old_eid varchar(32) NOT NULL default '',
   cnet_vlan int(11) default NULL,
   inner_elab_role enum('boss','ops','node') default NULL,
+  mustwipe tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname),
   KEY old_pid (old_pid,old_eid)

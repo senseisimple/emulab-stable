@@ -2518,3 +2518,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table users add wikiname tinytext;
         alter table groups add wikiname tinytext;
+
+1.321: DB support for disk wipe-age.  If 'mustwipe' is set in the reserved
+       table entry for a node, then when nfree'd, the disk must be reloaded
+       and all free blocks zeroed to prevent information leakage.
+
+	alter table reserved add mustwipe tinyint(4) NOT NULL default '0';
+	alter table current_reloads add mustwipe \
+	    tinyint(4) NOT NULL default '0';
+      

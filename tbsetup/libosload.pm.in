@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -54,6 +54,7 @@ sub osload ($$) {
     my @nodes       = ();
     my $noreboot    = 0;
     my $asyncmode   = 0;
+    my $zerofree    = 0;
 
     # Locals
     my %retries	    = ();
@@ -83,6 +84,9 @@ sub osload ($$) {
     }
     if (defined($args->{'asyncmode'})) {
 	$asyncmode = $args->{'asyncmode'};
+    }
+    if (defined($args->{'zerofree'})) {
+	$zerofree = $args->{'zerofree'};
     }
     
     #
@@ -197,6 +201,7 @@ sub osload ($$) {
 		"*** osload ($node): No filename associated with $imageid!\n";
 	    goto failednode;
 	}
+
 	if (! -R $imagepath) {
 	    if ($ELABINELAB) {
 		#
@@ -208,6 +213,12 @@ sub osload ($$) {
 		    print STDERR
 			"*** osload ($node): ".
 			    "Frisbee Launcher ($imageid) failed!\n";
+		    goto failednode;
+		}
+		if (! -R $imagepath) {
+		    print STDERR
+			"*** osload ($node): ".
+			    "Frisbee Launcher get not fetch $imagepath ($imageid)!\n";
 		    goto failednode;
 		}
 	    }
@@ -324,6 +335,7 @@ sub osload ($$) {
 	    $reload_mode = "UISP";
 	    $reload_func = \&SetupReloadUISP;
 	    $reboot_required = 0; # We don't reboot motes to reload them
+	    $zerofree = 0; # and we don't zero "the disk"
 	} else {
 	    $reload_mode = "Frisbee";
 	    $reload_func = \&SetupReloadFrisbee;
@@ -339,13 +351,14 @@ sub osload ($$) {
 	    'func'    => $reload_func,
 	    'imageid' => $imageid,
 	    'osid'    => $defosid,
-	    'reboot'  => $reboot_required
+	    'reboot'  => $reboot_required,
+	    'zerofree'=> $zerofree
 	};
 
 	print "Setting up reload for $node (mode: $reload_mode)\n";
 
 	if (!$TESTMODE) {
-	    if (&$reload_func($node, $imageid,$defosid) < 0) {
+	    if (&$reload_func($node, $imageid, $defosid, $zerofree) < 0) {
 		print STDERR
 		"*** osload ($node): Could not set up reload. Skipping.\n";
 		goto failednode;
@@ -465,7 +478,7 @@ sub osload ($$) {
 
 		# Possible race with reboot?
 		if (&{$reload_info->{'func'}}($node, $reload_info->{'imageid'},
-		    $reload_info->{'osid'}) < 0) {
+		    $reload_info->{'osid'}, $reload_info->{'zerofree'}) < 0) {
 		    print(STDERR
 			  "*** osload ($node): ".
 			  "Could not set up reload. Skipping.\n");
@@ -529,7 +542,32 @@ sub WaitTillReloadDone($$$@)
 	sleep(5);
 	foreach my $node (@nodes) {
 	    if (! $done{$node}) {
-		my $maxwait = $maxwaits{$reload_info->{$node}{'imageid'}};
+		my $maxwait;
+
+		#
+		# If we have to zero fill free space, then the
+		# wait time has to be proportional to the disk
+		# size.  In other words, a really, really, really
+		# long time.  Lets assume 20MB/sec to blast zeros,
+		# so 50 seconds/GB.  What the heck, lets call it
+		# 1GB/minute.  Did I mention how this would take
+		# a really long time?
+		#
+		if ($reload_info->{$node}{'zerofree'}) {
+		    my $disksize;
+		    my $query_result =
+			DBQueryWarn("select HD from node_types,nodes ".
+				    "where nodes.type=node_types.type".
+				    " and node_id='$node'");
+		    if ($query_result && $query_result->numrows) {
+			($disksize) = $query_result->fetchrow_array();
+		    }
+		    $disksize = 20
+			if (!$disksize);
+		    $maxwait = ($disksize * 60);
+		} else {
+		    $maxwait = $maxwaits{$reload_info->{$node}{'imageid'}};
+		}
 		
 		my $query_result =
 		    DBQueryWarn("select * from current_reloads ".
@@ -604,9 +642,9 @@ sub WaitTillReloadDone($$$@)
 }
 
 # Setup a reload. 
-sub SetupReloadFrisbee($$$)
+sub SetupReloadFrisbee($$$$)
 {
-    my ($node, $imageid, $osid_notused) = @_;
+    my ($node, $imageid, $osid_notused, $zerofree) = @_;
     my $osid = $FRISBEEOSID;
 
     #
@@ -628,7 +666,8 @@ sub SetupReloadFrisbee($$$)
     #
     $query_result = 
 	DBQueryWarn("replace into current_reloads ".
-		    "(node_id, image_id) values ('$node', '$imageid')");
+		    "(node_id, image_id, mustwipe) values ".
+		    "('$node', '$imageid', $zerofree)");
     return -1
 	if (!$query_result);
 
@@ -650,9 +689,9 @@ sub SetupReloadFrisbee($$$)
 # this differs from a Frisbee reload in one key way - it does the reload
 # right here in this code, rather than setting up a reload for later.
 #
-sub SetupReloadUISP($$$)
+sub SetupReloadUISP($$$$)
 {
-    my ($node, $imageid, $osid) = @_;
+    my ($node, $imageid, $osid, $zerofree_unused) = @_;
 
     #
     # Get the path to the image

@@ -50,6 +50,7 @@ my @nodes;
 my @freed_nodes=();
 my @dynanodes=();
 my $error = 0;
+my %mustzero=();
 
 $| = 1;  # Turn off line buffering on output
 
@@ -110,34 +111,20 @@ if (@ARGV) {
 	if ($n =~ /^([-\w]+)$/) { $n = $1; }
 	else { die("*** $0:\n    Bad node name: $n.\n"); }
 
-	# Shark hack
-	if ($n =~ /(sh\d+)/ ) {
-	    # It's a shark - do the whole shelf if its not done already.
-	    my $shelf = $1;
-	    if ( ! (join(",", @nodes) =~ /,$shelf-\d,/)) {
-		# Shelf hasn't been done yet...
-		foreach my $n ( 1 .. 8 ) {
-		    push(@nodes, "$shelf-$n");
-		}
-	    }
-	    # End shark hack
-	} else {
-	    # its not a shark - just add it in...
-	    push(@nodes, $n);
+	push(@nodes, $n);
 
-	    # if -x was specified, remove any 
-	    # mapping to a node which has a phys_nodeid of $n.
-	    if ($freeDependantVirtuals) {
-		my $result = 
-		    DBQueryFatal("SELECT r.node_id FROM reserved AS r ".
-				 "LEFT JOIN nodes AS n ".
-				 "ON r.node_id=n.node_id ".
-				 "WHERE n.phys_nodeid='$n' AND ".
-				 "r.eid='$eid' AND r.pid='$pid'");
-		while (my ($dependantVirtual) = $result->fetchrow_array()) {
-		    if (defined $dependantVirtual && $dependantVirtual ne $n) {
-			push(@nodes, $dependantVirtual);
-		    }
+	# if -x was specified, remove any 
+	# mapping to a node which has a phys_nodeid of $n.
+	if ($freeDependantVirtuals) {
+	    my $result = 
+		DBQueryFatal("SELECT r.node_id FROM reserved AS r ".
+			     "LEFT JOIN nodes AS n ".
+			     "ON r.node_id=n.node_id ".
+			     "WHERE n.phys_nodeid='$n' AND ".
+			     "r.eid='$eid' AND r.pid='$pid'");
+	    while (my ($dependantVirtual) = $result->fetchrow_array()) {
+		if (defined $dependantVirtual && $dependantVirtual ne $n) {
+		    push(@nodes, $dependantVirtual);
 		}
 	    }
 	}
@@ -181,6 +168,16 @@ foreach my $n (@nodes) {
 	print "Node '$n' is not reserved by your experiment.\n";
 	$error++;
 	next;
+    }
+
+    #
+    # Remember if the node's disk must be zeroed
+    #
+    my $rowref = $result->fetchrow_hashref();
+    if ($rowref->{'mustwipe'}) {
+	$mustzero{$n} = $rowref->{'mustwipe'};
+    } else {
+	$mustzero{$n} = 0;
     }
 
     if ( $moveToOldReserved ) {
@@ -251,6 +248,7 @@ foreach my $n (@freed_nodes) {
     if ($isvirt || !$imageable) {
 	# VIRTNODE HACK: Virtual nodes are special. Do not clean or reload.
 	$mustclean = 0;
+	$mustzero{$n} = 0;
     }
     elsif (defined($clean)) {
 	# If def_boot_osid set, then $clean is defined. Otherwise not set
@@ -354,9 +352,10 @@ foreach my $n (@freed_nodes) {
 	DBQueryFatal("select node_id,image_id from scheduled_reloads " .
 		     "where node_id='$n'");
 
-    # XXX force reload hack!
-    if ( !$TESTMODE && ((!$isvirt && $imageable) || $result->numrows() ||
-                        TBNodeType($n) eq "garcia")) { # XXX Garcia hack
+    if (!$TESTMODE &&
+	((!$isvirt && $imageable) || # XXX force reload hack!
+	 $result->numrows() || $mustzero{$n} ||
+	 TBNodeType($n) eq "garcia")) { # XXX Garcia hack
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
 	DBQueryWarn("update reserved set pid='$reloadpid',eid='$pendingeid',".

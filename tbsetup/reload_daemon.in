@@ -64,8 +64,8 @@ my $reboot	= "$TB/bin/node_reboot";
 my $tbrsync     = "$TB/bin/tbrsync";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
-my $retry_time  = 15; # in minutes
-my $warn_time   = 30; # in minutes
+my $retry_time  = 20;              # in minutes
+my $warn_time   = $retry_time * 2; # in minutes
 my %retried     = ();
 my %warned	= ();
 my %failed	= ();
@@ -131,10 +131,14 @@ while (1) {
     # First, look for nodes that have been in the reloading experiment for
     # longer than $retry_time, and try rebooting them
     #
+    # XXX we count on mustwipe having the value 0, 1, 2 to represent
+    # ever slower forms of wipeage.  For retry_time of 20 minutes that
+    # yields waits of 20, 40 and 60 minutes.
+    #
     $query_result =
-	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
-		    "and eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time MINUTE) ".
+	DBQueryWarn("select node_id,mustwipe from reserved " .
+		    "where pid='$RELOADPID' and eid='$RELOADEID' and " .
+		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time * (mustwipe + 1) MINUTE)".
 		    "  > rsrv_time");
 
     if (! $query_result) {
@@ -142,7 +146,7 @@ while (1) {
 	next;
     }
 
-    while (($node) = $query_result->fetchrow){ 
+    while (($node, $mustwipe) = $query_result->fetchrow) {
 	$idle=0;
 	#
 	# If this was a node that failed os_load, then instead of rebooting,
@@ -150,7 +154,7 @@ while (1) {
 	# 
 	if ($failed{$node}) {
 	    print "$node failed an earlier os_load. Trying again\n";
-	    push(@retry_list, $node);
+	    push(@retry_list, [$node, $mustwipe]);
 	    delete $failed{$node};
 	    # Skip any reboots. 
 	    $retried{$node} = $time;
@@ -187,22 +191,25 @@ while (1) {
     # Next, we do the same thing for nodes in the reloading experiment for
     # longer than $warn_time, and warn the admins.
     #
+    # XXX again, we scale by the value of mustwipe.
+    #
     $query_result =
-	DBQueryWarn("select node_id from reserved where pid='$RELOADPID' " .
-		    "and eid='$RELOADEID' and " .
-		    "(CURRENT_TIMESTAMP - INTERVAL $warn_time MINUTE) > ".
-		    "   rsrv_time");
+	DBQueryWarn("select node_id,mustwipe from reserved " .
+		    "where pid='$RELOADPID' and eid='$RELOADEID' and " .
+		    "(CURRENT_TIMESTAMP - INTERVAL $warn_time * (mustwipe + 1) MINUTE)".
+		    "  > rsrv_time");
     
     if (! $query_result) {
 	print "DB Error. Waiting a bit.\n";
 	next;
     }
 
-    while (($node) = $query_result->fetchrow){ 
+    while (($node, $mustwipe) = $query_result->fetchrow) {
 	$idle=0;
 	if (!$warned{$node}) {
+	    my $toolong = $warn_time * ($mustwipe + 1);
 	    notify("Node $node has been in $RELOADPID/$RELOADEID for " .
-	    "more than $warn_time minutes");
+		   "more than $toolong minutes");
 	}
 	$warned{$node} = $time;
     }
@@ -227,7 +234,8 @@ while (1) {
     my $CLASSCLAUSE = "(n.class='pc' or n.class='pct')";
     
     $query_result =
-	DBQueryWarn("select a.node_id,b.pid,b.eid from reserved as b ".
+	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe ".
+		    "from reserved as b ".
 		    "left join nodes as a on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
 		    "left join node_types as n on n.type=a.type where ".
@@ -249,18 +257,19 @@ while (1) {
 
     # Grab all the nodes that match
     my @pending_list = @retry_list;
-    while (%hrow  = $query_result->fetchhash()) {
+    while (%hrow = $query_result->fetchhash()) {
 	$node = $hrow{'node_id'};
 	$pid  = $hrow{'pid'};
 	$eid  = $hrow{'eid'};
+	$mustwipe = $hrow{'mustwipe'};
 	if ($pid eq $RELOADPID && $eid eq $PENDINGEID) {
-	    push(@pending_list,$node);
+	    push(@pending_list, [$node,$mustwipe]);
 	} else {
-	    push(@other_list,$node);
+	    push(@other_list, [$node,$mustwipe]);
 	}
     }
 
-    my $nodes = join(" ", (@pending_list, @other_list));
+    my $nodes = join(" ", map { $_->[0] } @pending_list, @other_list);
     print "Trying to reload $nodes at ".`date`;
 
     #
@@ -273,7 +282,9 @@ while (1) {
 	#
 	my %images = ();
 	my %imagenodes = ();
-	foreach $node (@pending_list) {
+	foreach $ref (@pending_list) {
+	    ($node, $mustwipe) = @{$ref};
+
 	    $query_result =
 	      DBQueryWarn("select image_id from scheduled_reloads " .
 			  "where node_id='$node'");
@@ -297,15 +308,26 @@ while (1) {
             }
             # XXX End Garcia Hack
 
+	    #
+	    # We need to divide up nodes not only by the image they are
+	    # to load (imageid) but also by if and how the disk should be
+	    # zeroed (mustzero).  So we really have a hash of hashes each
+	    # of which is an array of nodes.  However, my perl skilz are
+	    # not up to that so just combine the imageid and mustwipe into
+	    # a single hash key ('/' is illegal in both, so we use it as
+	    # the separator).
+	    #
+	    my $idid = "$imageid/$mustwipe";
+
 	    $images{$node} = $imageid;
-	    if (defined(@{$imagenodes{$imageid}})) {
-		push(@{$imagenodes{$imageid}},$node);
+	    if (defined(@{$imagenodes{$idid}})) {
+		push(@{$imagenodes{$idid}},$node);
 	    } else {
-		$imagenodes{$imageid} = [$node];
+		$imagenodes{$idid} = [$node];
 	    }
 	    if ($debug) {
-		print "$node => $images{$node} == $imageid (".
-		  join(",",@{$imagenodes{$imageid}}).")\n";
+		print "$node ($mustwipe) => $images{$node} == $imageid (".
+		  join(",",@{$imagenodes{$idid}}).")\n";
 	    }
 	}
 	
@@ -315,17 +337,19 @@ while (1) {
 	# We change the reservation EID over and fire up an os_load
 	# directly.
 	#
-	my $cond = join(" or ",map("node_id='$_'",@pending_list));
+	my $cond = "node_id in (" .
+	    join(",", map("'$_->[0]'", @pending_list)) . ")";
 	if (! DBQueryWarn("update reserved set ".
 			  "rsrv_time=now(),eid='$RELOADEID' ".
 			  "where $cond")) {
-	    print "Could not update EID for ".join(" ",@pending_list).
-	      ". Waiting a bit.\n";
+	    print "Could not update EID for " .
+		join(" ", map("$_->[0]", @pending_list)) .
+		    ". Waiting a bit.\n";
 	    next;
 	} else {
 	    print "Pending nodes moved to $RELOADEID at ".`date`;
 
-	    foreach my $n (@pending_list) {
+	    foreach my $n (map("$_->[0]", @pending_list)) {
 		TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
 				 $RELOADPID, $RELOADEID);
 	    }
@@ -335,10 +359,12 @@ while (1) {
 
 	# Now run an os_load for each image
 	
-	foreach $imageid (keys %imagenodes) {
+	foreach my $idid (keys %imagenodes) {
 
-	    my $nodelist = join(" ",@{$imagenodes{$imageid}});
+	    my $nodelist = join(" ",@{$imagenodes{$idid}});
 	    my $os_load_flags = "";
+
+	    ($imageid, $mustzero) = split("/", $idid);
 
             # XXX Garcia Hack - gross..
             # We special-case garcia loading for now until the subnode->node
@@ -351,7 +377,7 @@ while (1) {
                 if (system("$tbrsync upload $gimagepath $nodelist") == 0) {
                     if (system("$reboot $nodelist") == 0) {
                         # rsync and reboot succeeded, so free 'em up.
-                        foreach my $gnode (@{$imagenodes{$imageid}}) {
+                        foreach my $gnode (@{$imagenodes{$idid}}) {
                             freefromreloading($gnode);
                         }
                         print "garcia reload done at ".`date`;
@@ -380,7 +406,14 @@ while (1) {
 	    # the node's type
 	    #
 	    if ($imageid) {
-		$os_load_flags .= " -m $imageid ";
+		$os_load_flags .= " -m $imageid";
+	    }
+
+	    #
+	    # Handle optional zeroing of the disk
+	    #
+	    if ($mustzero) {
+		$os_load_flags .= " -z $mustzero";
 	    }
 
 	    print "Running '$os_load $os_load_flags $nodelist' at ".`date`;
@@ -396,7 +429,7 @@ while (1) {
 
 		# Record the failure list. If we get to the 15 minute
 		# retry, call os_load again instead of rebooting.
-		foreach my $node (@{$imagenodes{$imageid}}) {
+		foreach my $node (@{$imagenodes{$idid}}) {
 		    $failed{$node} = $time;		    
 		}
 	    }
@@ -407,6 +440,8 @@ while (1) {
     }
 	
     if (@other_list > 0 ) {
+	my $nodes = join(" ", map { $_->[0] } @other_list);
+
 	#
 	# Call sched_reload with the "force" option, which says that if
 	# sched_reload cannot reserve the node (cause someone just got it)
@@ -417,11 +452,11 @@ while (1) {
 	# default, and sched_reload will pick that up from the database
 	# in the absence of a -i option. 
 	#
-	if (system("$sched_reload -f @other_list")) {
+	if (system("$sched_reload -f $nodes")) {
 	    #
 	    # Could not get it. Wait and go around again.
 	    #
-	    print "$sched_reload failed on @other_list. Waiting a bit.\n";
+	    print "$sched_reload failed on $nodes. Waiting a bit.\n";
 	    next;
 	}
 
