@@ -1,0 +1,211 @@
+#!/usr/bin/perl -w
+#
+# grabron - Grab data from Dave Andersen's DBSYNC program, and upload it into
+# the testbed database
+#
+
+use strict;
+
+use IO::Socket;
+use Net::hostent;
+
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+
+my $TB = '@prefix@';
+
+my $logfile = "$TB/log/grabron";
+
+if (@ARGV != 2) {
+    die "Usage: $0 <host> <port>\n";
+}
+my ($host, $port) = @ARGV;
+
+$| = 1;
+
+#
+# Time in beteen polls
+#
+my $interval = 8 * 60 *60; # 8 hours
+
+if (TBBackGround($logfile)) {
+    exit(0);
+}
+
+#
+# Start out with the the last $interval seconds
+#
+my $last_time = time - $interval;
+
+while (1) {
+    my @times = get_times($last_time);
+    $last_time = time;
+    if (@times) {
+    	my %ipmap = get_ipmap();
+    	my %bandwidths = get_bandwidths();
+    	upload_times(\@times,\%ipmap,\%bandwidths);
+    }
+
+    sleep($interval);
+}
+
+sub get_ipmap() {
+    my $result = DBQueryFatal("select node_id,iface,IP from interfaces");
+    my %map = ();
+    while (my ($node_id,$iface,$IP) = $result->fetchrow()) {
+	$map{$IP} = [$node_id, $iface];
+    }
+    return %map;
+}
+
+sub get_bandwidths() {
+    my $result = DBQueryFatal("select IP1,IP2,bandwidth from widearea_delays");
+    my %map = ();
+    while (my ($IP1,$IP2,$bandwidth) = $result->fetchrow()) {
+	$map{"$IP1:$IP2"} = $bandwidth;
+    }
+    return %map;
+}
+
+sub upload_times($$$) {
+    my ($rTimes,$rIPmap,$rBandwidths) = @_;
+    my @times = @$rTimes;
+    my %ipmap = %$rIPmap;
+    my %bandwidths = %$rBandwidths;
+    my $suceeded = 0;
+    my $failed = 0;
+    foreach my $time (@times) {
+	my ($src,$dst,$latency) = @$time;
+	if (!$ipmap{$src}) {
+	    warn "Got an IP ($src) that's not in the interfaces table\n";
+	    $failed++;
+	    next;
+	}
+	my ($node_id1, $iface1) = @{$ipmap{$src}};
+	if (!$ipmap{$dst}) {
+	    warn "Got an IP ($dst) that's not in the interfaces table\n";
+	    $failed++;
+	    next;
+	}
+	my ($node_id2, $iface2) = @{$ipmap{$dst}};
+	if (!$bandwidths{"$src:$dst"}) {
+	    warn "Got a pair ($src:$dst) that has no bandwidth\n";
+	    $failed++;
+	    next;
+	}
+	my $bandwidth = $bandwidths{"$src:$dst"};
+	if (!defined($latency)) {
+	    #
+	    # If no latency, that means we can't get there from here, so
+	    # we provide -1s in bandwidth and latency, to specify that
+	    #
+	    $latency = -1;
+	    $bandwidth = -1;
+	}
+	$suceeded++;
+	DBQueryFatal("replace into widearea_recent set IP1='$src'," .
+		" IP2='$dst', time=$latency, node_id1='$node_id1', " .
+		" iface1='$iface1', node_id2='$node_id2', iface2='$iface2', " .
+		" bandwidth=$bandwidth");
+
+    }
+
+    print "Database upload done: $suceeded suceeded, $failed failed\n";
+}
+
+sub get_times($) {
+    my ($last_time) = (@_);
+    print "Connecting to $host:$port\n";
+
+    my $remote = IO::Socket::INET->new ( Proto => "tcp",
+    					 PeerAddr => $host,
+					 PeerPort => $port );
+    if (!$remote) {
+	warn "Unable to connect to to $host:$port\n";
+	return ();
+    }
+
+    $remote->autoflush(1); # Equivalent of $| = 1
+
+    my ($version, $start, $end, $ent);
+    $version = <$remote>;
+    $start = <$remote>;
+    $end = <$remote>;
+    $ent = <$remote>;
+
+    if (!$version || !$start || !$end || !$ent) {
+    	warn "Unable to read data from network\n";
+    	undef $remote;
+    	return ();
+    }
+
+    $version =~ /DBSYNC (\d+\.\d+)/;
+    if (!$1 || ($1 != "1.0")) {
+	warn "Wrong version reported\n";
+	undef $remote;
+	return ();
+    }
+
+    #
+    # We don't currently care about these
+    #
+    $start =~ /DBSTART (\d+)/;
+    $ent =~ /DBENT (\d+)/;
+
+    $end =~ /DBEND (\d+\.?\d+)/;
+    if (!$1) {
+	warn "No end time reported\n";
+	undef $remote;
+	return ();
+    }
+
+    my $end_time = sprintf("%i",$1);
+    if ($last_time > $end_time) {
+	warn "No new data available\n";
+	undef $remote;
+	return ();
+    }
+
+    print "Giving: $last_time $end_time\n";
+    print $remote "$last_time $end_time\n";
+
+    #
+    # XXX: Timeout waiting for data
+    #
+    my @data = <$remote>;
+    if (!@data) {
+	warn "No data returned\n";
+	undef $remote;
+	return ();
+    }
+
+    if ($data[0] !~ /^\d/) {
+    	warn "An error was reported: \n", @data, "\n";
+    	undef $remote;
+    	return ();
+    }
+
+    my @return;
+    foreach my $line (@data) {
+	chomp $line;
+	if (! ($line =~ /(\d+\.\d+.\d+\.\d+)\s+(\d+\.\d+.\d+\.\d+)\s+(\d+.\d+)\s+(\d+)\s+(\d+)/) ) {
+	    warn "Bad data line: $line\n";
+	    next;
+	}
+
+	my ($src,$dst,$avg,$successful,$unsuccessful) = ($1,$2,$3,$4,$5);
+	if ($successful > 0) {
+	    push @return, [$src,$dst,$avg];
+	} elsif ($unsuccessful > 0) {
+	    push @return, [$src,$dst,undef];
+	}
+    }
+
+    print "Got " . scalar(@return) . " lines of new data\n";
+
+    undef $remote;
+
+    return @return;
+
+}

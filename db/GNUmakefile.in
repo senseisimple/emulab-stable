@@ -11,7 +11,7 @@ include $(OBJDIR)/Makeconf
 BIN_SCRIPTS	= nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
-		  dbcheck interswitch dbboot
+		  dbcheck interswitch dbboot grabron
 LIBEXEC_SCRIPTS = webnodelog
 LIB_SCRIPTS     = libdb.pm
 
