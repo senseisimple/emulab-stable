@@ -12,6 +12,96 @@ ricci       2004/03/23 15:56:53 MST
   Allows the user to give a set of criteria (such as node, bandwidth,
   latency, and packet loss), and grabs links that match those criteria.
 
+mike        2004/03/23 10:51:55 MST
+
+  Modified files:
+    tmcd                 tmcd.c 
+  Log:
+  Move some of our "policy" about watchdog intervals from the watchdog
+  client to here.  Policies are things like only plab service slices do
+  rusage reports and local nodes don't check for cvsup updates, etc.
+  Maybe these should all be sitevars, but I didn't really want to have
+  20 different watchdog-related timeout values.
+  
+  Note: the detection of what is a plab service slice is a hack right
+  now (string ends in "-20").  Kirk will be giving me a better way RSN.
+  
+  Revision  Changes    Path
+  1.220     +40 -8     testbed/tmcd/tmcd.c
+
+mike        2004/03/20 19:43:53 MST
+
+  Modified files:
+    tmcd                 tmcd.c 
+  Log:
+  Use setproctitle to report what we are up to.
+  Now ps will show info about the request being processed,
+  or the total number of requests processed when idle.
+  
+  Revision  Changes    Path
+  1.219     +22 -13    testbed/tmcd/tmcd.c
+
+mike        2004/03/20 01:14:07 MST
+
+  Modified files:
+    tmcd/common          watchdog 
+  Log:
+  Two fubars:
+  1. make sure we send an immediate isalive on startup rather than waiting
+     for the first interval to pass
+  2. don't fall back on a tcp call on plab nodes, this just eventually hangs
+     all our tmcds on flaky plab machines
+  
+  Revision  Changes    Path
+  1.15      +13 -3     testbed/tmcd/common/watchdog
+
+mike        2004/03/18 23:03:19 MST
+
+  Modified files:
+    tmcd/common          libtmcc.pm watchdog 
+  Log:
+  The new watchdog:
+  	- check intervals driven by sitevars delivered by TMCD command
+  	- handles rusage stats return on plab nodes
+  It is now a single process and executes any auxilliary scripts synchronously.
+  This may prove to be unwieldy in the face of long running scripts like
+  update.  If so, we'll have to add all that fork/exec/waitpid mucky-muck.
+  
+  Revision  Changes    Path
+  1.11      +3 -1      testbed/tmcd/common/libtmcc.pm
+  1.14      +578 -83   testbed/tmcd/common/watchdog
+
+mike        2004/03/17 14:53:46 MST
+
+  Modified files:
+    tmcd                 tmcd.c 
+  Log:
+  Fix problem with large ssh pubkeys.  We now malloc a special buffer
+  if the pubkey is too large to fit in the default buffer.
+  
+  Also added a F_MAXLOG value that you can set to force maximum logging
+  for a particular command.
+  
+  Fix an off-by-one in the OUTPUT macro
+  
+  Revision  Changes    Path
+  1.215     +40 -7     testbed/tmcd/tmcd.c
+
+mike        2004/03/17 09:41:59 MST
+
+  Modified files:
+    tmcd                 tmcd.c 
+  Log:
+  Add the "watchdog" info command to configure timeouts for the client
+  watchdog process based on sitevars.
+  
+  Also added a command flags field to take care of a couple of misc. attributes
+  like whether a command can be allowed from a remote site via UDP or whether
+  we should not perform as much logging.
+  
+  Revision  Changes    Path
+  1.214     +142 -57   testbed/tmcd/tmcd.c
+
 ricci       2004/03/16 15:38:16 MST
 
   Modified files:
@@ -32,6 +122,69 @@ ricci       2004/03/16 14:48:45 MST
 
   Adding another query to do this was much simpler than trying to make the one
   monster query already in this script get what we wanted.
+
+mike        2004/03/15 22:55:36 MST
+
+  Modified files:
+    tmcd/linux           GNUmakefile.in 
+  Added files:
+    tmcd/linux           mkextrafs.pl 
+  Log:
+  Linux version of script to make the "extra" filesystem in the 4th partition.
+  Sometime we might want to offer an option on the experiment create page to
+  automatically setup the 4th partition for people.
+  
+  For now they can run it as /usr/testbed/bin/mkextrafs
+  
+  Revision  Changes    Path
+  1.40      +1 -0      testbed/tmcd/linux/GNUmakefile.in
+
+mike        2004/03/12 16:10:59 MST
+
+  Modified files:
+    os/imagezip          Makefile-linux.sa Makefile.sa global.h 
+                         imagedump.c imagehdr.h imageunzip.c 
+                         imagezip.8 imagezip.c 
+    os/imagezip/extfs    GNUmakefile.in extfs.c 
+    os/imagezip/ffs      ffs.c 
+  Added files:
+    os/imagezip/extfs    lilo.h reloc_lilo.c 
+  Log:
+  Random imagezip hacking:
+  
+  1. Make imagezip (and imageunzip) understand LILO bootblocks.
+     Imagezip will create relocation information for all the absolute
+     blocks that LILO embeds in the partition.  Imageunzip will correctly
+     relocate those locations when laying down the new image.  Thus
+     Linux slice images can be layed down anywhere on the disk (as can
+     BSD images).
+  
+  2. Because #1 is incompatible with the old imageunzip, I bumped the
+     imagezip format version number (to 3) on images that contain relocations
+     (i.e., slice images).  Make sure you have a new imageunzip to unzip
+     new slice images.  Whole disk images are still created as version 2
+     since they contain no relocs and thus are no different than before.
+  
+  3. Added -N option to imagezip to create slice images without any
+     relocations.  [ We could create our Emulab images this way, since we
+     don't have any mechanism for, or reason to, let the user choose which
+     partition to load an image in.  Hence our slice images always wind up
+     at the same offset on the disk and relocations are unnecessary. ]
+     Note that there is no significant expense in either time or space for
+     relocations, this option was more of a debugging thing.
+  
+  Revision  Changes    Path
+  1.3       +1 -1      testbed/os/imagezip/Makefile-linux.sa
+  1.4       +1 -1      testbed/os/imagezip/Makefile.sa
+  1.2       +2 -1      testbed/os/imagezip/global.h
+  1.9       +40 -10    testbed/os/imagezip/imagedump.c
+  1.7       +13 -2     testbed/os/imagezip/imagehdr.h
+  1.27      +61 -5     testbed/os/imagezip/imageunzip.c
+  1.10      +36 -12    testbed/os/imagezip/imagezip.8
+  1.44      +43 -17    testbed/os/imagezip/imagezip.c
+  1.3       +3 -2      testbed/os/imagezip/extfs/GNUmakefile.in
+  1.2       +16 -2     testbed/os/imagezip/extfs/extfs.c
+  1.2       +5 -3      testbed/os/imagezip/ffs/ffs.c
 
 ricci       2004/03/11 17:44:45 MST
 
