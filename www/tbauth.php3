@@ -687,6 +687,17 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	setcookie($TBNAMECOOKIE, $uid, $timeout, "/", $TBAUTHDOMAIN, 0);
 
 	#
+	# Clear the existing Wiki cookie so that there is not an old one
+	# for a different user, sitting in the brower. 
+	# 
+	if ($WIKISUPPORT) {
+	    $flushtime = time() - 1000000;
+	    
+	    setcookie($WIKICOOKIENAME, "", $flushtime, "/",
+		      $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	}
+	
+	#
 	# Set adminoff on new logins, unless user requested to be
 	# logged in as admin (and is an admin of course!). This is
 	# primarily to bypass the nologins directive which makes it
