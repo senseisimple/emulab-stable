@@ -222,7 +222,7 @@ Simulator instproc make-lan {nodelist bw delay args} {
 	    append modified_nodelist [$node set nsenode]
 	    append simnode_list $node
 	} else {
-	    append modified_nodelist $node
+	    append modified_nodelist "$node "
 	    set realnode_present 1
 	}
     }
