@@ -57,20 +57,22 @@ echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
 echo "<tr>
           <td>UID</td>
           <td>Name</td>
-          <td>Projects</td>\n";
+          <td>Projects</td>
+	  <td align=center>Approved?</td>\n";
 
 #
 # Admin users get a "delete" and a "modify" option.
 # 
 if ($isadmin) {
-    echo "<td align=center>Modify?</td>\n";
-    echo "<td align=center>Delete?</td>\n";
+    echo "<td align=center>Modify</td>\n";
+    echo "<td align=center>Delete</td>\n";
 }
 echo "</tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
     $thisuid  = $row[uid];
     $name     = $row[usr_name];
+    $status   = $row[status];
 
     #
     # Suck out a list of projects too.
@@ -95,6 +97,14 @@ while ($row = mysql_fetch_array($query_result)) {
     }
     else {
 	    echo "<td>--</td>\n";
+    }
+
+    if (strcmp($status, "active") == 0 ||
+	strcmp($status, "unverified") == 0) {
+	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+    }
+    else {
+	echo "<td align=center><img alt=\"N\" src=\"redball.gif\"></td>\n";
     }
 
     if ($isadmin) {

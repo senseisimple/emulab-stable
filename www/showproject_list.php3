@@ -58,13 +58,14 @@ echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
 echo "<tr>
           <td>Project Info</td>
           <td>Name</td>
-          <td>Leader</td>\n";
+          <td>Leader</td>
+	  <td align=center>Approved?</td>\n";
 
 #
 # Admin users get a "delete" option.
 # 
 if ($isadmin) {
-    echo "<td align=center>Delete?</td>\n";
+    echo "<td align=center>Delete</td>\n";
 }
 echo "</tr>\n";
 
@@ -72,12 +73,21 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $pid      = $projectrow[pid];
     $headuid  = $projectrow[head_uid];
     $Pname    = $projectrow[name];
+    $approved = $projectrow[approved];
 
     echo "<tr>
               <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
               <td>$Pname</td>
               <td><A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>\n";
+
+    if ($approved) {
+	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+    }
+    else {
+	echo "<td align=center><img alt=\"N\" src=\"redball.gif\"></td>\n";
+    }
+
     if ($isadmin) {
 	echo "<td align=center><A href='deleteproject.php3?pid=$pid'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>\n";
