@@ -1,11 +1,21 @@
 #!/usr/bin/perl -wT
+use Getopt::Std;
 use English;
 use Fcntl ':flock';
 use POSIX qw(strftime);
 
 #
-# Update the system with new accounts/mounts/etc.
+# Update the system with new accounts/mounts/etc. Use -i for immediate
+# (no waiting if it cannot get the lock).
 #
+sub usage()
+{
+    print "Usage: update [-i]\n";
+    exit(1);
+}
+my $optlist   = "i";
+my $batchmode = 1;
+my $immediate = 0;
 
 #
 # Untaint path
@@ -34,6 +44,22 @@ if ($EUID != 0) {
 }
 
 #
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"i"})) {
+    $batchmode = 0;
+    $immediate = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
 # If not invoked as real root, then must be invoked as emulabman.
 #
 if ($UID) {
@@ -56,7 +82,6 @@ if ($UID) {
 # Local config.
 #
 my $lockfile  = "/var/tmp/node_update_lockfile";
-my $batchmode = 1;
 
 #
 # Reuse the same log file so we can track errors.
@@ -90,9 +115,14 @@ open(LOCK, ">>$lockfile") ||
 
 my $count = 0;
 while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+    if ($immediate) {
+	print "Another update in progress. Exiting ...\n";
+	close(LOCK);
+	exit(1);
+    }
     print "Another update in progress. Waiting a moment ...\n";
-    
-    if ($count++ > 100) {
+   
+    if ($count++ > 20) {
 	die("Could not get the lock after a long time!\n");
     }
     sleep(5);
