@@ -153,8 +153,6 @@ if ($row[0] ne EXPTSTATE_NEW) {
 #
 # Get email info for user.
 #
-my $user_name;
-my $user_email;
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
     print STDOUT "Cannot determine your name and email address.\n";
     exit(1);
