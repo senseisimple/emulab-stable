@@ -1,6 +1,7 @@
 
 #include "config.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -23,6 +24,10 @@ static int readall(int fd,char *buffer,unsigned int len)
   if (rc < 0) {
     retval = rc;
   }
+  else if (off != len) {
+    errno = EIO;
+    retval = -1;
+  }
   else {
     retval = off;
   }
@@ -40,7 +45,7 @@ int mtp_receive_packet(int fd,struct mtp_packet **packet) {
     return MTP_PP_ERROR_ARGS;
   }
 
-  retval = readall(fd,&clength,4);
+  retval = readall(fd,(char *)&clength,4);
 
   if (retval == -1) {
     return MTP_PP_ERROR_READ;
@@ -551,6 +556,10 @@ int mtp_send_packet(int fd,struct mtp_packet *packet) {
 
   // now we can write the buffer out the socket.
   retval = write(fd,buf,retval);
+
+  free(buf);
+  buf = NULL;
+  
   if (retval != -1) {
     return MTP_PP_SUCCESS;
   }
@@ -623,6 +632,37 @@ struct mtp_packet *mtp_make_packet( unsigned char opcode,
   return retval;
 }
 
+void mtp_free_packet(struct mtp_packet *mp) {
+  if (mp != NULL) {
+    int lpc;
+    
+    switch (mp->opcode) {
+    case MTP_CONTROL_ERROR:
+    case MTP_CONTROL_NOTIFY:
+    case MTP_CONTROL_INIT:
+    case MTP_CONTROL_CLOSE:
+      free(mp->data.control->msg);
+      break;
+
+    case MTP_CONFIG_VMC:
+      for (lpc = 0; lpc < mp->data.config_vmc->num_robots; lpc++) {
+	free(mp->data.config_vmc->robots[lpc].hostname);
+      }
+      free(mp->data.config_vmc->robots);
+      break;
+      
+    case MTP_CONFIG_RMC:
+      for (lpc = 0; lpc < mp->data.config_rmc->num_robots; lpc++) {
+	free(mp->data.config_rmc->robots[lpc].hostname);
+      }
+      free(mp->data.config_rmc->robots);
+      break;
+    }
+    
+    free(mp);
+    mp = NULL;
+  }
+}
 
 int mtp_calc_size(int opcode,void *data) {
   int retval = -1;

@@ -581,6 +581,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux/sethostname.dhclient \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
+	tmcd/cygwinxp/GNUmakefile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
@@ -611,7 +612,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile \
-	mote/GNUmakefile mote/tbuisp "
+	mote/GNUmakefile mote/tbuisp \
+	robots/GNUmakefile robots/mtp/GNUmakefile "
 
 #
 # Do this for easy distclean.

@@ -1582,7 +1582,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile \
-	mote/GNUmakefile mote/tbuisp "
+	mote/GNUmakefile mote/tbuisp \
+	robots/GNUmakefile robots/mtp/GNUmakefile "
 
 #
 # Do this for easy distclean.
