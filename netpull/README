@@ -40,6 +40,24 @@ Options:
    -v     - If present progress information will be sent to stderr.
 
 ----------------------------------------------------------------------
+npdiff.tcl
+
+	This is a script to compare two reports from npdiff.  It takes
+two files as arguments and produces the following output:
+
+NodeAppear <ip>			<ip> is in B but not A.
+NodeVanish <ip>			<ip> is in A but not B.
+NodeChange <ip> <old> <new>	<ip> changed from <old> to <new>
+LinkAppear <src> <dst>		In B but not A.
+LinkVanish <src> <dst>		In A but not B.
+LinkChange <src> <dst> <old> <new>
+				Link changed state.
+LinkRtt <src> <dst> <diff>	RTT is <diff> off.  This is only
+  displayed if the means are father apart then the variance times
+  some multiple (default 4, can be changed with '-v #').  I.e. if 
+  diff < A.var * mult || diff < B.var * mult
+
+----------------------------------------------------------------------
 
 dnsconv.tcl
 	This is a quick script to change large numbers of hostnames to
