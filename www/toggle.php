@@ -76,14 +76,36 @@ if ($type=="adminoff") {
 
     # Send mail on these changes...
     if ($type!="autoswap" && $value=="0") {
+	$q = DBQueryFatal("select * from experiments ".
+			  "where pid='$pid' and eid='$eid'");
+	$r = mysql_fetch_array($q);
+	$s = ($r[swappable] ? "Yes" : "No");
+	$sr= $r[noswap_reason];
+	$i = ($r[idleswap] ? "Yes" : "No");
+	$it= $r[idleswap_timeout] / 60.0;
+	$ir= $r[noidleswap_reason];
+	$a = ($r[autoswap] ? "Yes" : "No");
+	$at= $r[autoswap_timeout] / 60.0;
+	$cuid = $r[expt_head_uid];
+	$suid= $r[expt_swap_uid];
+	TBUserInfo($uid, $user_name, $user_email);
+	TBUserInfo($cuid, $cname, $cemail);
+	TBUserInfo($suid, $sname, $semail);
 	TBMAIL($TBMAIL_OPS,"$pid/$eid swap settings changed",
 	       "\nThe swap settings for $pid/$eid have changed.\n".
 	       "\nThe $type bit has been cleared.\n".
-	       "\nPlease check the reason they give, and change it ".
-	       "if needed, by going to:\n\n".
+	       "\nThe new settings are:\n".
+	       "Swappable:\t$s\t('$sr')\n".
+	       "Idleswap:\t$i\t(after $it hrs)\t('$ir')\n".
+	       "Autoswap:\t$a\t(after $at hrs)\n".
+	       "\nCreator:\t$cuid ($cname <$cemail>)\n".
+	       "Swapper:\t$suid ($sname <$semail>)\n".
+	       "\nIf it is necessary to change these settings, ".
+	       "please reply to this message \nto notify the user, ".
+	       "then change the settings here:\n\n".
 	       "$TBBASE/showexp.php3?pid=$pid&eid=$eid\n\n".
 	       "Thanks,\nTestbed WWW\n",
-	       "From: $TBMAIL_OPS\n".
+	       "From: $user_name <$user_email>\n".
 	       "Errors-To: $TBMAIL_WWW");
     }
 	
