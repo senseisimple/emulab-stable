@@ -261,7 +261,7 @@ sub parse_batchfile()
 	    $pid = $1;
 	    next;
 	}
-	if ($_ =~ /^name:\s+([-\@\w.]*)/) {
+	if ($_ =~ /^name:\s+([-\@\w. ]*)/) {
 	    $longname = $1;
 	    next;
 	}
@@ -281,12 +281,13 @@ sub parse_batchfile()
 sub DBquery()
 {
     my($query) = $_[0];
+    my($result);
 
-    $query_result = $DB->query($query);
+    $result = $DB->query($query);
 
-    if (! $query_result) {
+    if (! $result) {
 	fatal("DB Error: $query");
     }
 
-    return $query_result;
+    return $result;
 }

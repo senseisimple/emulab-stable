@@ -12,10 +12,11 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: batch_daemon\n";
+    print STDOUT "Usage: batch_daemon [-d]\n" .
+	"Use the -d option to prevent daemonization\n";
     exit(-1);
 }
-my  $optlist = "";
+my  $optlist = "d";
 
 #
 # Configure variables
@@ -28,8 +29,10 @@ my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
 my $startexp = "$TB/bin/startexp";
 my $endexp   = "$TB/bin/endexp";
+my $avail    = "$TB/sbin/avail";
 my $batchlog = "$TB/log/batchlog";
 my $projroot = "/proj";
+my $debug    = 0;
 my $dirname;
 
 #
@@ -65,9 +68,14 @@ if (! getopts($optlist, \%options)) {
 if (@ARGV != 0) {
     usage();
 }
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
 
 # Go to ground.
-daemonize();
+if (! $debug) {
+    daemonize();
+}
 
 #
 # Set up for querying the database.
@@ -79,6 +87,9 @@ my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
 # Loop, looking for batch experiments that want to run.
 # 
 while (1) {
+    my($count);
+    my(%row, %pending_row);
+    
     #
     # Need to lock the table here because of cancelation in killbatchexp.
     # See the comments in there. We need to atomically grab the next
@@ -89,77 +100,162 @@ while (1) {
     # to cancel a batch experiment that hasn't really tried to start yet!
     # Thats would ne annoying to users, and we love our users, right?
     #
-    # So, now your'e wondering what my selection criteria is? Well, its
+    # So, now you're wondering what my selection criteria is? Well, its
     # damn simplistic. I set the "started" datetime field each attempt,
     # and I pick the batch_experiment with the oldest time, thereby cycling
     # through in a "least recently attempted" manner. 
     #
-    DBquery("lock tables batch_experiments write");
-    
     $query_result =
+	DBquery("lock tables batch_experiments write");
+    if (! $query_result) {
+	print "DB Error locking tables. Waiting a bit ...\n";
+	sleep(10);
+	next;
+    }
+    
+    $pending_result =
 	DBquery("SELECT * FROM batch_experiments ".
 		"WHERE status='new' and canceled=0 ORDER BY started LIMIT 1");
 
-    if (! $query_result->numrows) {
+    $running_result =
+	DBquery("SELECT * FROM batch_experiments ".
+		"WHERE status='running' ORDER BY started");
+
+    if (!$pending_result || !$running_result) {
+	print "DB Error getting batch info. Waiting a bit ...\n";
+	DBquery("unlock tables");
+	sleep(10);
+	next;
+
+    }
+
+    if (!$pending_result->numrows && !$running_result->numrows) {
 	DBquery("unlock tables");
 	sleep(10);
 	next;
     }
-    my %row = $query_result->fetchhash();
 
     #
-    # Set the configuring flag right away so killbatchexp won't see them
-    # in a "new" state. Might as well set the started time to ensure that
-    # it goes to the end of the line.
+    # If we have a pending experiment to run, set its state to configuring
+    # right away, while we have the tables locked. This prevents killbatchexp
+    # from seeing it as something it can cancel.
     #
-    # Local vars!
-    my $eid = $row{'eid'};
-    my $pid = $row{'pid'};
-    my $now = `date '+20%y-%m-%d %H:%M:%S'`;
-    
-    DBquery("update batch_experiments set status='configuring', ".
-	    "started='$now' where eid='$eid' and pid='$pid'");
-    
+    if ($pending_result->numrows) {
+	%pending_row = $pending_result->fetchhash();
+
+	# Local vars!
+	my $eid = $pending_row{'eid'};
+	my $pid = $pending_row{'pid'};
+	my $now = `date '+20%y-%m-%d %H:%M:%S'`;
+
+	$query_result = 
+	    DBquery("update batch_experiments set status='configuring', ".
+		    "started='$now' where eid='$eid' and pid='$pid'");
+
+	if (! $query_result) {
+	    print "DB error setting batch $pid/$eid to configuring.\n";
+	    DBquery("unlock tables");
+	    sleep(10);
+	    next;
+	}
+    }
     DBquery("unlock tables");
 
-    runexp(%row);
-    sleep(300);
+    #
+    # Okay, first we check the status of running batch mode experiments
+    # since we want to end those before trying to start any new ones, cause
+    # it would be nice to have as many nodes available as possible before
+    # trying to add a new one. This can potentially delay startup, but thats
+    # okay. Its a batch system.
+    #
+    # If you are wondering why I check for finished experiments in the main
+    # loop instead of in the child that started the experiment, its so that
+    # we fire up again and look for them in the event that paper goes down.
+    #
+    $count = $running_result->numrows;
+    for ($i = 0; $i < $count; $i++) {
+	%row = $running_result->fetchhash();
+
+	my $canceled = $row{'canceled'};
+	if ($canceled) {
+	    dosomething("cancel", %row);
+	    next;
+	}
+	if (isexpdone(%row)) {
+	    dosomething("end", %row);
+	    next;
+	}
+    }
+
+    #
+    # Finally start an actual experiment!
+    #
+    if ($pending_result->numrows) {
+	dosomething("start", %pending_row);
+    }
+    sleep(60);
 }
 
 #
-# The guts of running a single experiment.
+# Do something as the user. Either, start, end, or cancel an experiment.
 #
-sub runexp($)
+sub dosomething($$)
 {
-    my(%exphash) = @_;
+    my($dowhat)   = shift;
+    my(%exphash)  = @_;
     my($uid, $gid, $row);
 
     # Global vars
     $eid = $exphash{'eid'};
     $pid = $exphash{'pid'};
 
-    my $creator  = $exphash{'creator_uid'};
-    my $longname = $exphash{'name'};
-    
+    print "Doing a '$dowhat' to batch experiment $pid/$eid\n";
+
+    #
+    # Create a temporary name for a log file. We do this in the parent so
+    # we can remove it when the child ends. The child could remove it, but
+    # since it is open in the child, it has the tendency to stick around.
+    #
+    $logname = `mktemp /tmp/$dowhat-batch-$pid-$eid.XXXXXX`;
+
+    # Note different taint check (allow /).
+    if ($logname =~ /^([-\@\w.\/]+)$/) {
+	$logname = $1;
+    } else {
+	die "Bad data in $logname";
+    }
+
     #
     # Start up a child to run the guts. The parent waits. If the
     # experiment configures okay, the parent can return to try something
-    # new, while the child is going to hang out and wait for all the nodes
-    # to report exit status, or for the cancel bit to get set. 
+    # else.
     #
     $childpid = fork();
     if ($childpid) {
-	print "Trying to start experiment $eid in project $pid. ".
-	      "Child PID is $childpid\n";
+	print "Child PID $childpid started to $dowhat $pid/$eid\n";
+
 	waitpid($childpid, 0);
 	my $status = $? >> 8;
 
 	print "Child PID $childpid exited with exit status $status\n";
+
+	unlink($logname);
 	return $status;
     }
+    openlog($logname);
 
-    # global var
-    $dirname = "$batchdir/$pid-$eid";
+    #
+    # Form a new connection to the DB since we are in the child. Not sure
+    # if this happens as a result of the fork, but lets be sure.
+    #
+    undef($DB);
+    $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+    my $creator  = $exphash{'creator_uid'};
+    my $longname = $exphash{'name'};
+    
+    # Global var
+    $dirname  = "$batchdir/$pid-$eid";
     $nsfile  = "$dirname/$eid.ns";
 
     #
@@ -186,149 +282,158 @@ sub runexp($)
     (undef,undef,$gid) = getgrnam($pid) or
 	fatal("No such group $pid");
 
+    #
+    # Change the ownership of the log file before we flip.
+    #
+    chown($uid, $gid, $logname);
+
+    # Flip to the user. We never flip back.
     $EGID = $GID = $gid;
     $EUID = $UID = $uid;
+    $ENV{'USER'} = $creator;
     
-    #
-    # Create a temporary name for a log file and open it up.
-    #
-    $logname = `mktemp /tmp/start-batch-$pid-$eid.XXXXXX`;
-
-    # Note different taint check (allow /).
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    } else {
-	die "Bad data in $logname";
+    if ($dowhat eq "start") {
+	startexp(%exphash);
     }
-    openlog($logname);
+    elsif ($dowhat eq "end") {
+	endexp(%exphash);
+    }
+    elsif ($dowhat eq "cancel") {
+	cancelexp(1, %exphash);
+    }
+    exit(0);
+}
+
+#
+# Try to start an experiment. Never returns.
+# 
+sub startexp($)
+{
+    my(%exphash)  = @_;
+    my($exit_status, $running);
+
+    my $creator   = $exphash{'creator_uid'};
+    my $longname  = $exphash{'name'};
+    my $numpcs    = $exphash{'numpcs'};
+    my $numsharks = $exphash{'numsharks'};
+    my $attempts  = $exphash{'attempts'};
+
+    #
+    # Lets see if there are enough nodes. This is a really hacky test,
+    # especially for the sharks since they are allocated by shelf. 
+    #
+    system("$avail type=pc > /dev/null");
+    my $availpcs = $? >> 8;
+    system("$avail type=shark > /dev/null");
+    my $availsharks = $? >> 8;
+
+    if ($availpcs < $numpcs || $availsharks < $numsharks) {
+	#
+	# XXX - What if this update fails?
+	# 
+	$query_result = 
+	    DBquery("update batch_experiments set status='new' ".
+		    "where eid='$eid' and pid='$pid'");
+	
+	exit(69);
+    }
 
     #
     # Insert an experiment record for startexp.
     #
     my $rightnow = `date '+20%y-%m-%d %H:%M:%S'`;
-    DBquery("insert into experiments ".
-	    "(eid, pid, expt_created, expt_name, ".
-	    "expt_head_uid, expt_start, expt_ready, batchmode) ".
-	    "VALUES ('$eid', '$pid', '$rightnow', '$longname', ".
-	    "'$creator', '$rightnow', 0, 1)");
+    $query_result =
+	DBquery("insert into experiments ".
+		"(eid, pid, expt_created, expt_name, ".
+		"expt_head_uid, expt_start, expt_ready, batchmode) ".
+		"VALUES ('$eid', '$pid', '$rightnow', '$longname', ".
+		"'$creator', '$rightnow', 0, 1)");
+    if (! $query_result) {
+	fatal("DB error inserting experiment record. Quitting ...\n");
+    }
 
     #
     # Try to start the experiment. If it fails, the experiment is gone.
     #
     system("$startexp -b $pid $eid $nsfile");
-    my $exit_status = $? >> 8;
-    my $running     = 1;
+    $exit_status = $? >> 8;
+    $running     = 1;
     if ($exit_status) {
 	$running = 0;
     }
     
     #
-    # Look for cancelation.
+    # Look for cancelation. If we get a DB error on this, just continue cause
+    # we can pick up the cancelation later.
     #
     $query_result =
 	DBquery("select canceled from batch_experiments ".
 		"where eid='$eid' and pid='$pid'");
-			    
-    @row = $query_result->fetchrow_array();
-    my $canceled = $row[0];
 
-    #
-    # If canceled and the experiment got running, need to tear it down
-    # and tell the owner about it.
-    # 
-    if ($canceled) {
-	cancel_batch($running);
-	exit(0);
+    if ($query_result) {
+	@row = $query_result->fetchrow_array();
+
+	if ($row[0]) {
+	    cancelexp($running);
+	    #
+	    # Never returns, but just to be safe ...
+	    #
+	    exit(0);
+	}
     }
-
+			    
     #
     # If the configuration failed, then send email for now. This
     # part needs work. We have to reset the state to "new" so that
     # it will be retried again later. 
     #
     if (! $running) {
-	DBquery("update batch_experiments set status='new' ".
-		"where eid='$eid' and pid='$pid'");
+	#
+	# XXX - What if this update fails?
+	# 
+	$query_result = 
+	    DBquery("update batch_experiments set status='new', ".
+		    "attempts=attempts+1 where eid='$eid' and pid='$pid'");
 
-	fatal("Could not configure Batch Mode experiment $pid/$eid");
+	if (($attempts % 5) == 0) {
+	    $attempts++;
+	    
+	    fatal("Could not configure Batch Mode experiment $pid/$eid\n".
+		  "There have been $attempts attempts made to start this ".
+		  "batch\n");
+	}
+	exit(45);
     }
 
     #
     # Well, it configured! Lets set it state to running.
     #
-    DBquery("update batch_experiments set status='running' ".
-	    "where eid='$eid' and pid='$pid'");
+    # XXX - What if this update fails?
+    #
+    $query_result = 
+	DBquery("update batch_experiments set status='running' ".
+		"where eid='$eid' and pid='$pid'");
 
     email_status("Batch Mode experiment $pid/$eid is now running!\n".
-		 "Please consult the Web interface to see how its doing\n");
+		 "Please consult the Web interface to see how it is doing\n");
 
     #
-    # We want to disconnect from the parent so that it can return and
-    # look for another batch experiment to work on. The child will then
-    # continue on, waiting for the batch experiment to end by looking at
-    # status of the nodes.
-    # 
-    $childpid = fork();
-    if ($childpid) {
-	print "$eid/$pid configured okay. Child process $childpid ".
-	    "waiting for it to end.\n";
-
-	exit(0);
-    }
-
+    # Done with this phase. Must exit.
     #
-    # Now loop, periodically looking for a change in the status of the
-    # nodes, or for a cancelation request. 
-    #
-    while (1) {
-	$query_result =
-	    DBquery("select canceled from batch_experiments ".
-		    "where eid='$eid' and pid='$pid'");
+    exit(0);
+}
 
-	if ($query_result->numrows != 1) {
-	    #
-	    # Jeez, something really went wrong!
-	    #
-	    fatal("Batch Mode record for $pid/$eid is gone! HELP ME!");
-	}
-			    
-	@row = $query_result->fetchrow_array();
-	if ($row[0]) {
-	    cancel_batch(1);
-	    exit(0);
-	}
-
-	#
-	# Look to see if any nodes yet to report status. If so, spin again.
-	#
-	$query_result =
-	    DBquery("SELECT startstatus FROM nodes LEFT JOIN reserved ".
-		    "ON nodes.node_id=reserved.node_id ".
-		    "WHERE reserved.eid='$eid' and reserved.pid='$pid'");
-
-	my $done = 1;
-	for ($i = 0; $i < $query_result->numrows; $i++) {
-	    @row = $query_result->fetchrow_array();
-	
-	    if ($row[0] eq "none") {
-		$done = 0;
-	    }
-	}
-	if ($done) {
-	    last;
-	}
-
-	sleep(15);
-    }
+#
+# End an experiment. Never returns.
+#
+sub endexp($)
+{
+    my(%exphash)  = @_;
     
-    #
-    # Yippie! Tear it down and send email. Need to look for failures
-    # in the teardown!
-    #
     system("$endexp -b $pid $eid");
     DBquery("DELETE from batch_experiments WHERE eid='$eid' and pid='$pid'");
-    system("rm -rf $dirname");
     email_status("Batch Mode experiment $pid/$eid has finished!\n");
+    system("rm -rf $dirname");
    
     #
     # Child must exit!
@@ -336,17 +441,79 @@ sub runexp($)
     exit(0);
 }
 
+#
+# Cancel an experiment. Never returns.
+#
+sub cancelexp($$)
+{
+    my($running) = shift;
+    my(%exphash) = @_;
+    
+    if ($running) {
+	system("$endexp -b $pid $eid");
+    }
+
+    DBquery("DELETE from batch_experiments WHERE eid='$eid' and pid='$pid'");
+    notify_user("Your Batch Mode experiment has been canceled. You may now\n".
+		"reuse the experiment name\n", "Canceled", 0);
+    system("rm -rf $dirname");
+   
+    #
+    # Child must exit!
+    #
+    exit(0);
+}
+
+#
+# Check experiment status. Looks to see if all of the nodes in an
+# experiment have reported in.
+#
+sub isexpdone($)
+{
+    my(%exphash)  = @_;
+    my($row, $done);
+    
+    # Global vars
+    $eid = $exphash{'eid'};
+    $pid = $exphash{'pid'};
+
+    print "Checking to see if $pid/$eid has finished up yet\n";
+
+    #
+    # Look to see if any nodes yet to report status. If so, spin again.
+    #
+    $query_result =
+	DBquery("SELECT startstatus FROM nodes LEFT JOIN reserved ".
+		"ON nodes.node_id=reserved.node_id ".
+		"WHERE reserved.eid='$eid' and reserved.pid='$pid'");
+
+    if (! $query_result) {
+	return 0;
+    }
+
+    $done = 1;
+    for ($i = 0; $i < $query_result->numrows; $i++) {
+	@row = $query_result->fetchrow_array();
+	
+	if ($row[0] eq "none") {
+	    $done = 0;
+	}
+    }
+    return $done;
+}
+
 sub DBquery($)
 {
     my($query) = $_[0];
+    my($result);
 
-    $query_result = $DB->query($query);
+    $result = $DB->query($query);
 
-    if (! $query_result) {
-	fatal("DB Error: $query");
+    if (! $result) {
+	print "DB Query failed: $query\n";
     }
 
-    return $query_result;
+    return $result;
 }
 
 #
@@ -363,7 +530,7 @@ sub openlog($)
     # even though the parent has exited. 
     #
     open(STDIN, "< /dev/null") or
-	die("opening /dev/null for STDIN: $!");
+	fatal("opening /dev/null for STDIN: $!");
 
     open(STDERR, ">> $logname") or
 	fatal("opening $logname for STDERR: $!");
@@ -373,91 +540,45 @@ sub openlog($)
     return 0;
 }
 
-sub fatal()
+sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print STDOUT "$mesg\n";
+    notify_user($mesg, "Failure", 1);
 
-    #
-    # Send a message to the testbed list. Append the logfile if it got
-    # that far.
-    # 
-    open(MAIL, "| /usr/bin/mail ".
-	 "-s \"TESTBED: Batch Mode Failure $pid/$eid\" ".
-	 "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
-	or die "Cannot start mail program: $!";
-
-    print MAIL $mesg;
-
-    if (defined($logname) && open(IN, "$logname")) {
-	print MAIL "\n\n---------\n\n";
-	
-	while (<IN>) {
-	    print MAIL "$_";
-	}
-	close(IN);
-	unlink("$logname");
-    }
-
-    if (defined($nsfile) && open(IN, "$nsfile")) {
-	print MAIL "\n\n---------\n\n";
-	
-	while (<IN>) {
-	    print MAIL "$_";
-	}
-	close(IN);
-    }
-    close(MAIL);
-   
     exit(-1);
-}
-
-sub cancel_batch($)
-{
-    my($running) = $_[0];
-    
-    if ($running) {
-	system("$endexp -b $pid $eid");
-    }
-	
-    DBquery("DELETE from batch_experiments WHERE eid='$eid' and pid='$pid'");
-	
-    open(MAIL, "| /usr/bin/mail ".
-	 "-s \"TESTBED: Batch Mode Cancelation $pid/$eid\" ".
-	 "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
-	or die "Cannot start mail program: $!";
-	
-    print MAIL
-	"Your Batch Mode experiment has been canceled. You may now\n".
-	"reuse the experiment name\n\n";
-
-    if (defined($logname) && open(IN, "$logname")) {
-	print MAIL "\n\n---------\n\n";
-	
-	while (<IN>) {
-	    print MAIL "$_";
-	}
-	close(IN);
-	unlink("$logname");
-    }
-    close(MAIL);
-
-    #
-    # And kill the batch directory.
-    #
-    system("rm -rf $dirname");
 }
 
 sub email_status($)
 {
     my($mesg) = $_[0];
 
+    notify_user($mesg, "Status", 0);
+}
+
+sub notify_user($$$)
+{
+    my($mesg, $subline, $iserr) = @_;
+    my($to,$cc);
+
     print STDOUT "$mesg\n";
 
+    #
+    # If an error, goes to TBOPS and is CC'ed to user.
+    # Otherwise goes to user and is CC'ed to TBOPS
+    #
+    if ($iserr) {
+	$to = $TBOPS;
+	$cc = "$user_name <$user_email>";
+    }
+    else {
+	$to = "$user_name <$user_email>";
+	$cc = $TBOPS;
+    }
+
     open(MAIL, "| /usr/bin/mail ".
-	 "-s \"TESTBED: Batch Mode Experiment Status $pid/$eid\" ".
-	 "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
+	 "-s \"TESTBED: Batch Mode Experiment $subline $pid/$eid\" ".
+	 "-c $cc \"$to\" >/dev/null 2>&1")
 	or die "Cannot start mail program: $!";
 
     print MAIL $mesg;
