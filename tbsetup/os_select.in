@@ -61,6 +61,8 @@ my $cmd = "select path from os_info where osid='".TB_OSID_PXEBOOT."'";
 my $q = DBQueryFatal($cmd);
 my @r = $q->fetchrow_array();
 my $pxebootpath = $r[0];
+my $cmdline = join(" ",$0,@ARGV);
+debug("ARGV= ".join(" ",@ARGV)."\n");
 
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -75,7 +77,6 @@ if (defined($options{"1"})) { $oneshot=1; }
 if (defined($options{"m"})) { $mfs=1; }
 #debug("DEBUG LEVEL $d\n");
 
-debug("ARGV= ".join(" ",@ARGV)."\n");
 if (@ARGV < 2) { warning("An osid and a node list are required.\n"); usage(); }
 
 my $osid = shift;
@@ -86,7 +87,7 @@ if ($osid =~ /^([-\@\w\/]+)$/) { $osid = $1; }
 elsif (!$mfs) { fatal("Bad data in osid: '$osid'\n"); }
 
 if ($mfs) {
-    if ($osid =~ /^[-0-9a-z\.]+:\/tftpboot\/[-0-9a-z\.]+$/) {
+    if ($osid =~ /^[-0-9a-z\.]+:\/tftpboot\/[-0-9a-z\.\/]+$/) {
 	debug("MFS osid '$osid' is a PXE path\n");
 	$pxebootpath=$osid;
 	my $cmd = "select osid from os_info where path='$osid';";
@@ -99,7 +100,7 @@ if ($mfs) {
 	my $cmd = "select path from os_info where osid='$osid';";
 	my $q = DBQueryFatal($cmd);
 	if ($q->numrows() < 1) {
-	    fatal("Invalid osid '$osid' is non-existent.\n");
+	    fatal("Invalid osid '$osid' does not exist.\n");
 	}
 	my @r = $q->fetchrow_array();
 	my $path=$r[0];
@@ -248,7 +249,8 @@ sub debug ( $;$ ) {
 
 sub notify ( $ ) {
   my $msg = shift;
-  if (!$debug) {
+  $msg .= "\ndate=".`date`."\ncmdline=\n$cmdline\n\npid=$$\n";
+  if (!$d) {
     SENDMAIL($TBOPS,"os_select error",$msg,$TBOPS);
   } else {
     debug("notify: Not sending mail in debug mode\n");
@@ -269,7 +271,7 @@ sub fatal ( $ ) {
 
 sub warning ( $ ) {
   my $msg = shift;
-  notify("WARNING: ".$msg);
+  info("WARNING: ".$msg);
   warn($msg);
 }
 

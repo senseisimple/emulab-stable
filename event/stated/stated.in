@@ -480,6 +480,8 @@ sub handleCtrlEvent($$) {
 				      "FROM nodes where node_id='$node'");
 	    my ($pxepath,$osid) = $result->fetchrow();
 
+	    $pxepath = "-p ".$pxepath;
+	    if ($pxepath eq "-p ") { $pxepath="PXEBOOT"; };
 	    my $cmd = "$osselect -m $pxepath $node";
 	    system($cmd) and
 		notify("$node/$event: Couldn't clear next_pxe_boot_path\n".
