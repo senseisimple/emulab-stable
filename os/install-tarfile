@@ -25,10 +25,10 @@ use POSIX 'setsid';
 #
 sub usage()
 {
-    print STDOUT "Usage: install-tarfile [-ct] <installdir> <filename>\n";
+    print STDOUT "Usage: install-tarfile [-ct] [-n nodeid] <installdir> <filename>\n";
     exit(-1);
 }
-my $optlist  = "ct";
+my $optlist  = "ctn:";
 
 #
 # Turn off line buffering on output
@@ -51,6 +51,7 @@ my $installdir     = "/";
 my $usetmcc	   = 0;
 my $copymode	   = 0;
 my $copyfile       = "";
+my $vnodeid;
 
 # Protos
 sub GetTarFile($$$);
@@ -76,6 +77,12 @@ if (defined($options{"c"})) {
 if (defined($options{"t"})) {
     $usetmcc = 1;
     $copymode = 1;
+}
+if (defined($options{"n"})) {
+    $vnodeid = $options{"n"};
+    if ($vnodeid =~ /^([-\w]+)$/) {
+	$vnodeid = $1;
+    }
 }
 # XXX compat
 if (defined($options{"j"})) {
@@ -218,6 +225,11 @@ sub GetTarFile($$$)
 	    or fatal("Could not open tarfile on server!");
 	$bytelen = (stat($tarfile))[7];
     } else {
+	my $tmccopt = "-t 300";
+	if (defined($vnodeid)) {
+	    $tmccopt .= " -n $vnodeid";
+	}
+
 	#
 	# Protocol is a little odd. First word is the number of bytes
 	# (yes, limited to 31 bits of length!), then the data. If we do
@@ -225,7 +237,7 @@ sub GetTarFile($$$)
 	# Could take a while to get the entire file, but instead of a
 	# timeout let Emulab decide when its too long.
 	#
-	open(TMCC, "tmcc -t 300 tarball $tarfile |")
+	open(TMCC, "tmcc $tmccopt tarball $tarfile |")
 	    or fatal("Could not download tarfile from server!");
 
 	# Hokey C struct stuff
