@@ -87,9 +87,9 @@ if (!defined($hostname)) {
 # Exec an ssh.
 #
 if (!defined($gateway)) {
-    exec "xterm -T $hostname -e 'ssh $port $login $hostname || read userinput'";
+    exec "xterm -T $hostname -e ssh $port $login $hostname \|\| read userinput";
 }
 else {
-    exec "xterm -T $hostname -e 'ssh $login -tt $gateway ".
-	 "ssh -o StrictHostKeyChecking=no $port $hostname || read userinput'";
+    exec "xterm -T $hostname -e ssh $login -tt $gateway ".
+	 "ssh -o StrictHostKeyChecking=no $port $hostname \|\| read userinput";
 }
