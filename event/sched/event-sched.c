@@ -38,6 +38,7 @@
 #include "log.h"
 #include "tbdefs.h"
 #include "rpc.h"
+#include "popenf.h"
 #include "systemf.h"
 
 #include "simulator-agent.h"
@@ -201,6 +202,11 @@ main(int argc, char *argv[])
 	if (chdir(buf) < 0) {
 		fatal("could not chdir to experiment directory: %s", buf);
 	}
+
+	setenv("EXPDIR", buf, 1);
+	setenv("LOGDIR", LOGDIR, 1);
+	setenv("PID", pid, 1);
+	setenv("EID", eid, 1);
 
 	/*
 	 * Okay this is more complicated than it probably needs to be. We do
@@ -403,10 +409,8 @@ main(int argc, char *argv[])
 int agent_invariant(struct agent *agent)
 {
 	assert(strlen(agent->name) > 0);
-	assert(strlen(agent->nodeid) > 0);
 	assert(strlen(agent->vnode) > 0);
 	assert(strlen(agent->objtype) > 0);
-	assert(strlen(agent->ipaddr) > 0);
 	if (agent->handler != NULL) // Don't know about this.
 		assert(local_agent_invariant(agent->handler));
 	
@@ -422,6 +426,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 
 	static char *simulator_completes[] = {
 		TBDB_EVENTTYPE_REPORT,
+		TBDB_EVENTTYPE_MODIFY,
 		NULL
 	};
 
@@ -444,6 +449,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_LINKTEST, NULL },
 		{ TBDB_OBJECTTYPE_NSE, NULL },
 		{ TBDB_OBJECTTYPE_CANARYD, NULL },
+		{ "SLOTHD", NULL }, // XXX
 		{ TBDB_OBJECTTYPE_NODE, node_completes },
 		{ TBDB_OBJECTTYPE_TIMELINE, run_completes },
 		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
@@ -501,8 +507,12 @@ sched_event_prepare(event_handle_t handle, sched_event_t *se)
 {
 	int retval;
 
+	if (se->agent.s == NULL) {
+		event_notification_insert_hmac(handle, se->notification);
+		return 0;
+	}
+	
 	assert(se != NULL);
-	assert(se->agent.s != NULL);
 	assert(se->length == 1);
 
 	if ((se->agent.s->handler != NULL) &&
@@ -668,8 +678,12 @@ handle_event(event_handle_t handle, sched_event_t *se)
 		return;
 	}
 	else if (se->flags & SEF_TIME_START) {
-		RPC_notifystart(pid, eid, "", 1);
-		RPC_drop();
+		static int did_start = 0;
+
+		if (!did_start) {
+			RPC_notifystart(pid, eid, "", 1);
+			RPC_drop();
+		}
 	}
 }
 
@@ -908,8 +922,12 @@ AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 	timeline_agent_t     ta = NULL;
 	sched_event_t	     event;
 	double		     firetime = atof(ftime);
-	struct agent	    *agentp;
+	struct agent	    *agentp = NULL;
 	struct timeval	     time;
+
+	if (strcmp(objtype, TBDB_OBJECTTYPE_TIME) == 0) {
+		return 0;
+	}
 
 	if ((agentp = (struct agent *)lnFindName(&agents, objname)) == NULL) {
 		error("AddEvent: Could not map event index %s\n", exidx);
@@ -942,7 +960,7 @@ AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 	}
 	event_notification_set_arguments(handle, event.notification, exargs);
 
-	if (debug) 
+	if (debug)
 		info("%8s %10s %10s %10s %10s %10s %s %p\n",
 		     ftime, objname, objtype,
 		     evttype, agentp->ipaddr, 
@@ -1031,7 +1049,6 @@ get_static_events(event_handle_t handle)
 	struct timeval	now;
 	long            basetime;
 	address_tuple_t tuple;
-	char		pideid[BUFSIZ];
 	event_notification_t notification;
 	sched_event_t	event;
 
@@ -1074,7 +1091,7 @@ get_static_events(event_handle_t handle)
 		handle,
 		EA_Experiment, pideid,
 		EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
-		EA_Event, TBDB_EVENTTYPE_LOG,
+		EA_Event, TBDB_EVENTTYPE_DEBUG,
 		EA_Name, event.agent.s->name,
 		EA_Arguments, "Time started",
 		EA_TAG_DONE);

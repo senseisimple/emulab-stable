@@ -27,6 +27,8 @@
 #define MAXHOSTNAMELEN 64
 #endif /* MAXHOSTNAMELEN */
 
+#define LOGDIR		"/local/logs"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
