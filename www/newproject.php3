@@ -532,6 +532,9 @@ if (! $returning) {
 	strcmp($formfields[usr_name], "") == 0) {
 	$errors["Full Name"] = "Missing Field";
     }
+    elseif (! preg_match("/^[-\w\. ]*$/", $formfields[usr_name])) {
+	$errors["Full Name"] = "Invalid characters";
+    }
     if (!isset($formfields[usr_affil]) ||
 	strcmp($formfields[usr_affil], "") == 0) {
 	$errors["Affiliation"] = "Missing Field";
