@@ -2439,12 +2439,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 1.311: Fix mistake in last revision. Skip to next entry.
 
-1.322: Add TinyOS as a supported OS in the os_info table:
 
-        alter table os_info change column OS OS enum('Unknown','Linux', \
-          'FreeBSD','NetBSD','OSKit','Windows','TinyOS','Other');
-
-1.323: Add delay capacity override so that users can alter the packing
+1.312: Add delay capacity override so that users can alter the packing
        factor.
 
         alter table experiments add delay_capacity tinyint(3) \
@@ -2452,6 +2448,8 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table experiment_resources add delay_capacity tinyint(3) \
 		unsigned default NULL after maxlinks;
 
-1.324: Change the default for os_info.OS back to 'Unknown' instead of NULL:
+1.313: Add TinyOS as a supported OS in the os_info table:
 
-         alter table os_info alter column OS set default 'Unknown';
+        alter table os_info change column OS OS enum('Unknown','Linux', \
+          'FreeBSD','NetBSD','OSKit','Windows','TinyOS','Other');
+        alter table os_info alter column OS set default 'Unknown';
