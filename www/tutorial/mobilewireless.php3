@@ -176,7 +176,10 @@ Due to the "brand-new" nature of this part of Emulab, there are some
 limitations you should be aware of:
 
 <ul>
-<li>Availability is reduced to weekdays between 9am and 5pm mountain time,
+<li>Before you can use the mobile testbed, your project must be granted the
+appropriate privileges.  You can request access by sending mail to <a
+href="mailto:testbed-ops@flux.utah.edu">Testbed Operations</a>.
+<li>Availability is reduced to weekdays between 8am and 6pm mountain time,
 so there is staff available to assist with problems.
 <li>There is no space sharing, only one mobile experiment can be swapped-in at
 a time.
@@ -345,7 +348,8 @@ Once the robot has reached its initial position, lets move it up a meter.  To
 do this, you will need to log in to ops.emulab.net and run:
 
 <blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>1 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> now node-0 SETDEST X=3.0 Y=1.5</pre>
+<pre>1 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> \
+             now node-0 SETDEST X=3.0 Y=1.5</pre>
 </blockquote>
 <blockquote>
 <center>
