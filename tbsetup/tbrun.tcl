@@ -48,7 +48,7 @@ set delay_setup "$scriptdir/delay_setup"
 source $libir
 namespace import TB_LIBIR::ir
 
-if {$argc != 1} {
+if {$argc != 3} {
     puts stderr "Syntax: $argv0 <pid> <eid> <ir-file>"
     exit 1
 }
