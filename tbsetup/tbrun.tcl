@@ -44,6 +44,7 @@ set libir "$scriptdir/ir/libir.tcl"
 set ir2ifc "$scriptdir/ir2ifc"
 set ifcboot "$scriptdir/ifc_setup"
 set delay_setup "$scriptdir/delay_setup"
+set os_setup "$scriptdir/os_setup"
 
 source $libir
 namespace import TB_LIBIR::ir
@@ -54,6 +55,8 @@ if {$argc != 3} {
 }
 
 # ignore pid and eid for the moment.
+set pid [lindex $argv 0]
+set eid [lindex $argv 1]
 set irFile [lindex $argv 2]
 set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
@@ -113,7 +116,13 @@ readfifo $tmpioFP "SNMPIT: "
 #}
 
 outs "PLACEHOLDER - Copying disk images."
-outs "PLACEHOLDER - Booting for the first time."
+
+outs "Resetting OS and rebooting."
+if {[catch "exec $os_setup $pid $eid $irFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error running $os_setup. ($err)"
+    exit 1
+}
+
 outs "PLACEHOLDER - Verifying OS functionality."
 
 # XXX - This should only be done for linux/freebsd OSs
