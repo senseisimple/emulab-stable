@@ -230,7 +230,7 @@ sub doboot()
     # XXX We do not want to run this on delay nodes so must do this after
     # we have run the config scripts. 
     #
-    if (-x "$RCDIR/rc.linktest" && ! -e "$BOOTDIR/rc.delay") {
+    if (-x "$RCDIR/rc.linktest" && ! -e ISDELAYNODE()) {
 	print("Starting linktest daemon\n");
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
