@@ -356,6 +356,9 @@ sub InitUser()
     if (! -f "$sshdir/identity" || $force) {
 	print "Setting up ssh configuration for $user.\n";
 
+	unlink("$sshdir/identity")
+	    if (-f "$sshdir/identity");
+
 	# Hmm, need to use -C option so comment field makes sense.
     
 	if (system("$KEYGEN -t rsa1 -P '' ".
