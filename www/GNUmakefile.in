@@ -37,6 +37,7 @@ DOCFILES += $(wildcard $(SRCDIR)/doc/*.gif)
 TUTFILES  = $(wildcard $(SRCDIR)/tutorial/*.html)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.jpg)
 TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.gif)
+TUTFILES += $(wildcard $(SRCDIR)/tutorial/*.ns)
 
 #
 # Kill the directory part of the names. The vpath rule will do the rest.
