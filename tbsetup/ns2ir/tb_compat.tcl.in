@@ -78,10 +78,18 @@ proc tb-set-lan-loss {lan rate} {
     global TBCMD nodeid_map prefix
     puts $TBCMD "tb-set-lan-loss $prefix-$nodeid_map($lan) $rate"
 }
-
-# The following commands are not clearly defined and probably will be
-# changed or removed
-proc tb-set-node-deltas {node deltas} {}
+proc tb-set-node-cmdline {node cmdline} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-node-cmdline $nodeid_map($node) $cmdline"
+}
+proc tb-set-node-rpms {node args} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-node-rpms $nodeid_map($node) $args"
+}
+proc tb-set-node-startup {node cmd} {
+    global TBCMD nodeid_map
+    puts $TBCMD "tb-set-node-startup $nodeid_map($node) $cmd"
+}
 
 # Show that we have loaded
 set TB_COMPACT 1

@@ -5,6 +5,9 @@
 # TB commands handled:
 # set-hardware
 # set-link-loss
+# set-node-cmdline
+# set-node-rpms
+# set-node-startup
 
 #
 # Configure variables
@@ -91,6 +94,9 @@ open(TBCMD,$tbcmdfile) || do {
 
 # hwtype is indexed by node and contains the type
 # linkloss is indexed by src:dst and contains the loss rate
+$cmdlines = ();
+$startups = ();
+$rpms = ();
 while (<TBCMD>) {
     chop;
     @line = split;
@@ -127,7 +133,7 @@ while (<TBCMD>) {
 	}
 	# linkloss(src:dst) = loss
 	$linkloss{$line[1]} = $line[2];
-    } elsif ($line[1] eq "tb-set-lan-loss") {
+    } elsif ($line[0] eq "tb-set-lan-loss") {
 	if ($#line != 2) {
 	    push(@ERRORS,"Syntax: tb-set-lan-loss lan loss_rate");
 	} else {
@@ -144,7 +150,38 @@ while (<TBCMD>) {
 	    # lanloss(lan) = loss
 	    $lanloss{$line[1]} = $line[2];
 	}
+    } elsif ($line[0] eq "tb-set-node-cmdline") {
+	if ($#line < 2) {
+	    push(@ERRORS,"Syntax: tb-set-node-cmdline node cmdline");
+	    next;
+	} 
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
+	    next;
+	}
+	$cmdlines{$line[1]} = join(" ",@line[2..$#line]);
+    } elsif ($line[0] eq "tb-set-node-rpms") {
+	if ($#line < 2) {
+	    push(@ERRORS,"Syntax: tb-set-node-rpms node rpms...");
+	    next;
+	} 
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
+	    next;
+	}
+	$rpms{$line[1]} = join(" ",@line[2..$#line]);
+    } elsif ($line[0] eq "tb-set-node-startup") {
+	if ($#line < 2) {
+	    push(@ERRORS,"Syntax: tb-set-node-startup node startup");
+	    next;
+	} 
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
+	    next;
+	}
+	$startups{$line[1]} = join(" ",@line[2..$#line]);	
     }
+
 }
 
 close(TBCMD);
@@ -211,3 +248,39 @@ if ($#newlans != -1) {
 }
 
 &ir_write($irfile);
+
+# Add new sections
+open(IRFILE,">> $irfile") || do {
+    print STDERR "Could not open $irfile\n";
+    exit(1);
+};
+
+print IRFILE "START rpms\n";
+foreach $node (keys(%nodes)) {
+    if (defined($rpms{$node})) {
+	print IRFILE "$node $rpms{$node}\n";
+    } else {
+	print IRFILE "$node\n";
+    }
+}
+print IRFILE "END rpms\n";
+print IRFILE "START startup\n";
+foreach $node (keys(%nodes)) {
+    if (defined($startups{$node})) {
+	print IRFILE "$node $startups{$node}\n";
+    } else {
+	print IRFILE "$node\n";
+    }
+}
+print IRFILE "END startup\n";
+print IRFILE "START cmdline\n";
+foreach $node (keys(%nodes)) {
+    if (defined($cmdlines{$node})) {
+	print IRFILE "$node $cmdlines{$node}\n";
+    } else {
+	print IRFILE "$node\n";
+    }
+}
+print IRFILE "END cmdline\n";
+close IRFILE;
+

@@ -168,6 +168,42 @@ if ($#ERRORS != -1) {
     exit(1);
 }
 
+## Handle cmdline/startup/etc.
+if (! &ir_exists("/cmdline")) {
+    print STDERR "IR incomplete: No /cmdline.\n";
+    exit(1);
+}
+foreach (split("\n",&ir_get("/cmdline"))) {
+    ($node,$cmdline) = /^([^ ]+)(.*)$/;
+    $cmdline =~ s/^ //;
+    $sth = $dbh->prepare("UPDATE nodes set def_boot_cmd_line = \"$cmdline\"");
+    $sth->execute;
+    $sth->finish;
+}
+if (! &ir_exists("/startup")) {
+    print STDERR "IR incomplete: No /startup.\n";
+    exit(1);
+}
+foreach (split("\n",&ir_get("/startup"))) {
+    ($node,$cmdline) = /^([^ ]+)(.*)$/;
+    $cmdline =~ s/^ //;
+    $sth = $dbh->prepare("UPDATE nodes set startupcmd = \"$cmdline\"");
+    $sth->execute;
+    $sth->finish;
+}
+if (! &ir_exists("/rpms")) {
+    print STDERR "IR incomplete: No /rpms.\n";
+    exit(1);
+}
+foreach (split("\n",&ir_get("/rpms"))) {
+    ($node,$rpms) = /^([^ ]+)(.*)$/;
+    $rpms =~ s/^ //;
+    $rpms =~ s/ /:/g;
+    $sth = $dbh->prepare("UPDATE nodes set rpms = \"$rpms\"");
+    $sth->execute;
+    $sth->finish;
+}
+
 # Let's do some output
 # We allow running this on an IR file that has already been handle_os'ed
 # it simply overwrites in that case.

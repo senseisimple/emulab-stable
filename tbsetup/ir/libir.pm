@@ -105,7 +105,7 @@ sub ir_read {
 	} else {
 	    if ($contents{$cursec . '_'} eq 'dir') {
 		close FILE;
-		die "ERROR: (ir_read) Found data outside of section ($line)";
+		die "ERROR: (ir_read) Found data outside of section ($_)";
 	    }
 	    $curcontents .= join(' ',@line) . "\n";
 	}
