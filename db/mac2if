@@ -1,0 +1,21 @@
+#!/usr/local/bin/perl -w
+
+if ($#ARGV < 0) {die("Usage: mac2if <mac> <mac> <...>\n");}
+
+use Mysql;
+
+my $dbh = Mysql->connect("localhost","tbdb","script","none");
+
+my @list = "";
+my $n=0;
+foreach my $mac ( @ARGV ) { 
+  $list[$n] ="MAC='\L$mac'";
+  $n++;
+}
+
+my $cond = join(" or ",@list);
+
+my $sth = $dbh->
+    query("select * from interfaces where $cond");
+
+print $sth->as_string();
