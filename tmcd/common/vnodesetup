@@ -83,7 +83,7 @@ if ($UID) {
 	die("*** $0:\n".
 	    "    $UID is not in the password file!\n");
 
-    if ($pwname ne "emulabman" && !($pwname =~ /emulab_[-\@\w]*_[-\@\w]*/)) {
+    if ($pwname ne "emulabman" && !($pwname =~ /emulab_[-\@\w]*/)) {
 	die("*** $0:\n".
 	    "    You do not have permission to run this script!\n");
     }
