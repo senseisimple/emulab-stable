@@ -627,6 +627,7 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 		break;
 
 	case COMPRESSED_V2:
+	case COMPRESSED_V3:
 		regp = (struct region *)((struct blockhdr_V2 *)blockhdr + 1);
 		break;
 
