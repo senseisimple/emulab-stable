@@ -15,7 +15,8 @@ $query_result =
 		 " nt.isvirtnode, j.pid, j.eid, j.vname from nodes AS n ".
 		 "LEFT JOIN reserved AS j ON n.node_id = j.node_id ".
 		 "LEFT JOIN node_types AS nt ON n.type=nt.type ".
-		 "WHERE role='testnode' or role='virtnode' ".
+		 "WHERE (role='testnode' or role='virtnode') and ".
+		 "      nt.class!='shark' " .
 		 "ORDER BY priority,type");
 
 #
