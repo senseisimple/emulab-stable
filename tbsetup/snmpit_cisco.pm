@@ -457,62 +457,99 @@ sub createVlan($$) {
     my $VlanSAID = '.1.3.6.1.4.1.9.9.46.1.4.2.1.6.1'; # vlan # is index
     my $VlanRowStatus = '.1.3.6.1.4.1.9.9.46.1.4.2.1.11.1'; # vlan # is index
 
-    if (!$self->vlanLock()) {
-	return 0;
-    }
+    #
+    # We may have to do this multiple times - a few times, we've had the
+    # Cisco give no errors, but fail to actually create the VLAN. So, we'll
+    # make sure it gets created, and retry if it did not. Of course, we don't
+    # want to try forever, though....
+    #
+    my $max_tries = 3;
+    my $tries_remaining = $max_tries;
+    while ($tries_remaining) {
+	#
+	# Try to wait out transient failures
+	#
+	if ($tries_remaining != $max_tries) {
+	    print STDERR "VLAN creation failed, trying again " .
+		"($tries_remaining tries left)\n";
+	    sleep 5;
+	}
+	$tries_remaining--;
 
-    #
-    # Find a free VLAN number to use. Since 1 is the default VLAN on
-    # Ciscos, we start with number 2.
-    # XXX: The maximum VLAN number is hardcoded at 1000
-    #
-    my $vlan_number = 2; # We need to start at 2
-    my $RetVal = $self->{SESS}->get([$VlanRowStatus,$vlan_number]);
-    $self->debug("Row $vlan_number got '$RetVal'\n",2);
-    while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
-	$vlan_number += 1;
-	$RetVal = $self->{SESS}->get([[$VlanRowStatus,$vlan_number]]);
+	if (!$self->vlanLock()) {
+	    next;
+	}
+
+	#
+	# Find a free VLAN number to use. Since 1 is the default VLAN on
+	# Ciscos, we start with number 2.
+	# XXX: The maximum VLAN number is hardcoded at 1000
+	#
+	my $vlan_number = 2; # We need to start at 2
+	my $RetVal = $self->{SESS}->get([$VlanRowStatus,$vlan_number]);
 	$self->debug("Row $vlan_number got '$RetVal'\n",2);
-    }
-    if ($vlan_number > 1000) {
+	while (($RetVal ne 'NOSUCHINSTANCE') && ($vlan_number <= 1000)) {
+	    $vlan_number += 1;
+	    $RetVal = $self->{SESS}->get([[$VlanRowStatus,$vlan_number]]);
+	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
+	}
+	if ($vlan_number > 1000) {
+	    #
+	    # We must have failed to find one
+	    #
+	    print STDERR "ERROR: Failed to find a free VLAN number\n";
+	    next;
+	}
+
+	$self->debug("Using Row $vlan_number\n");
+
 	#
-	# We must have failed to find one
+	# SAID is a funky security identifier that _must_ be set for VLAN
+	# creation to suceeed.
 	#
-	print STDERR "ERROR: Failed to find a free VLAN number\n";
-	return 0;
+	my $SAID = pack("H*",sprintf("%08x",$vlan_number + 100000));
+
+	print "  Creating VLAN $vlan_id as VLAN #$vlan_number ... ";
+
+	#
+	# Perform the actual creation. Yes, this next line MUST happen all in
+	# one set command....
+	#
+	$RetVal = $self->{SESS}->set([[$VlanRowStatus,$vlan_number,
+			"createAndGo","INTEGER"],
+		[$VlanType,$vlan_number,"ethernet","INTEGER"],
+		[$VlanName,$vlan_number,$vlan_id,"OCTETSTR"],
+		[$VlanSAID,$vlan_number,$SAID,"OCTETSTR"]]);
+	print "",($RetVal? "Succeeded":"Failed"), ".\n";
+
+	#
+	# Check for success
+	#
+	if (!$RetVal) {
+	    print STDERR "VLAN Create '$vlan_id' as VLAN $vlan_number " .
+		    "failed.\n";
+	    next;
+	} else {
+	    $RetVal = $self->vlanUnlock();
+	    $self->debug("Got $RetVal from vlanUnlock\n");
+
+	    #
+	    # Unfortunately, there are some rare circumstances in which it
+	    # seems that we can't trust the switch to tell us the truth.
+	    # So, let's use findVlan to see if it really got created.
+	    #
+	    if (!$self->findVlan($vlan_id)) {
+		print STDERR "*** Switch reported success, but VLAN did not " .
+			     "get created - trying again\n";
+		next;	     
+	    }
+	    return 1;
+	}
     }
 
-    $self->debug("Using Row $vlan_number\n");
-
-    #
-    # SAID is a funky security identifier that _must_ be set for VLAN
-    # creation to suceeed.
-    #
-    my $SAID = pack("H*",sprintf("%08x",$vlan_number + 100000));
-
-    print "  Creating VLAN $vlan_id as VLAN #$vlan_number ... ";
-
-    #
-    # Perform the actual creation. Yes, this next line MUST happen all in
-    # one set command....
-    #
-    $RetVal = $self->{SESS}->set([[$VlanRowStatus,$vlan_number,"createAndGo","INTEGER"],
-	    [$VlanType,$vlan_number,"ethernet","INTEGER"],
-	    [$VlanName,$vlan_number,$vlan_id,"OCTETSTR"],
-	    [$VlanSAID,$vlan_number,$SAID,"OCTETSTR"]]);
-    print "",($RetVal? "Succeeded":"Failed"), ".\n";
-
-    #
-    # Check for success
-    #
-    if (!$RetVal) {
-	print STDERR "VLAN Create '$vlan_id' as VLAN $vlan_number failed.\n";
-	return 0;
-    } else {
-	$RetVal = $self->vlanUnlock();
-	$self->debug("Got $RetVal from vlanUnlock\n");
-	return 1;
-    }
+    print STDERR "*** Failed to create VLAN $vlan_id after $max_tries tries " .
+		 "- giving up\n";
+    return 0;
 }
 
 #
