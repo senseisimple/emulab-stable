@@ -507,6 +507,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	apache/GNUmakefile apache/httpd.conf \
+        xmlrpc/GNUmakefile \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 

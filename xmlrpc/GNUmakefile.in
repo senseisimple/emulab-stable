@@ -1,0 +1,51 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= xmlrpc
+UNIFIED         = @UNIFIED_BOSS_AND_OPS@
+
+include $(OBJDIR)/Makeconf
+
+BIN_SCRIPTS	= sshxmlrpc_client.py
+SBIN_SCRIPTS	= sshxmlrpc_server.py
+LIB_STUFF	= sshxmlrpc.py emulabserver.py
+
+#
+# These are the ones installed on plastic (users, control, etc). 
+# 
+USERBINS        = sshxmlrpc_client.py
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIB_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+
+#
+# Control node installation (okay, plastic)
+#
+ifneq ($(UNIFIED),1)
+LINKS=	cd $(INSTALL_BINDIR) && \
+		list='$(USERBINS)'; for file in $$list; do \
+			rm -f $$file; \
+			ln -s plasticwrap $$file; \
+		done;
+
+
+endif
+control-install:
+	$(LINKS)
+
+clean:
