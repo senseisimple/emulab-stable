@@ -48,7 +48,7 @@ Topology: describes the base physical topology of the network.
 
 START topology
 START nodes
-# <node> <type> <links> [<bandwidth> <delay>]
+# <node> <type> <links> [. <bandwidth> <delay>] 
 # <node> refers to a string name that should be easily mappable
 # to a physical machine (IP address, hostname, etc.)
 # <type> is usually "pc", "dnard", or "delay"
