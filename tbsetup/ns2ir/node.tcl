@@ -179,7 +179,12 @@ Node instproc updatedb {DB} {
     # create one on the fly and set the type properly. 
     # 
     if {$issubnode && $fixed == ""} {
-	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" ]
+        # XXX - hack for motes, to make Jay happy
+        set hosttype "pc"
+        if {$type == "mica2" || $type == "mica"} {
+            set hosttype "mote-host"
+        }
+	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "$hosttype" "" "" "" "" "" "" "" ]
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list "host-$self" "hosts-$type" 1.0]
 	set fixed "host-$self"
     }
