@@ -68,6 +68,24 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    ptop_error("Bad node line, no load for type: " << type << ".");
 	  }
 
+	  // First, check to see if it's not actually a type, but a subnode
+	  // relationship
+	  if (type.compare("subnode_of") == 0) {
+	      if (p->subnode_of) {
+		  ptop_error("Can't be a subnode of two nodes");
+		  continue;
+	      }
+	      if (pname2vertex.find(load) == pname2vertex.end()) {
+		  ptop_error("Subnode of a non-existent node.");
+	      }
+	      pvertex parent_pv = pname2vertex[load];
+	      p->subnode_of = get(pvertex_pmap,parent_pv);
+	      p->subnode_of->has_subnode = true;
+
+	      // Don't keep processing as if it were a type
+	      continue;
+	  }
+
 	  // Check to see if this is a static type
 	  bool is_static = false;
 	  if (type[0] == '*') {

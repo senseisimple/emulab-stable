@@ -66,7 +66,7 @@ public:
 
 class tb_vnode {
 public:
-  tb_vnode() {;}
+  tb_vnode(): vclass(NULL), fixed(false), assigned(false), subnode_of(NULL) {;}
 
   friend ostream &operator<<(ostream &o, const tb_vnode& node)
   {
@@ -104,6 +104,13 @@ public:
   bool disallow_trivial_mix;
   int nontrivial_links;
   int trivial_links;
+
+  // For the subnode-of relationship - we need to keep track of not only our
+  // own parent (if any), but any children we have, since our being assigned
+  // will mean that we have to check them as well
+  tb_vnode *subnode_of;
+  typedef list<tb_vnode*> subnode_list;
+  subnode_list subnodes;
 
 };
 

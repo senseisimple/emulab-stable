@@ -78,7 +78,6 @@ int parse_top(tb_vgraph &VG, istream& i)
 	      vtypes[v->type]++;
 	  }
 	}
-	v->fixed = false;	// this may get set to true later
 #ifdef PER_VNODE_TT
 	v->num_links = 0;
 	v->total_bandwidth = 0;
@@ -96,12 +95,27 @@ int parse_top(tb_vgraph &VG, istream& i)
 		  top_error("Unknown flag or bad desire (missing weight)");
 	      }
 	  } else {
-	      double gweight;
-	      if (sscanf(desireweight.c_str(),"%lg",&gweight) != 1) {
-		  top_error("Bad desire, bad weight.");
-		  gweight = 0;
+	      if (desirename.compare("subnode_of") == 0) {
+		  // Okay, it's not a desire, it's a subnode declaration
+		  if (v->subnode_of) {
+		      top_error("Can only be a subnode of one node");
+		  }
+		  if (vname2vertex.find(desireweight) == vname2vertex.end()) {
+		      top_error("Bad link line, non-existent node.");
+		      continue;
+		  }
+		  vvertex parent_vv = vname2vertex[desireweight];
+		  v->subnode_of = get(vvertex_pmap,parent_vv);
+		  v->subnode_of->subnodes.push_back(v);
+
+	      } else {
+		  double gweight;
+		  if (sscanf(desireweight.c_str(),"%lg",&gweight) != 1) {
+		      top_error("Bad desire, bad weight.");
+		      gweight = 0;
+		  }
+		  v->desires[desirename] = gweight;
 	      }
-	      v->desires[desirename] = gweight;
 	  }
 	}
       }

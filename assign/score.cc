@@ -148,7 +148,6 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	tb_vnode *dst_vnode)
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
-  cerr << "Unscore " << vlink->name << endl;
 
   // Handle vnodes that are not allowed to have a mix of trivial and
   // non-trivial links
@@ -159,6 +158,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	      (src_vnode->trivial_links == 0) &&
 	      (src_vnode->nontrivial_links != 0)) {
 	  // We just removed the last trivial link
+	  SSUB(SCORE_TRIVIAL_MIX);
 	  violated--;
 	  vinfo.trivial_mix--;
       }
@@ -166,6 +166,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	      (dst_vnode->trivial_links == 0) &&
 	      (dst_vnode->nontrivial_links != 0)) {
 	  // We just removed the last trivial link
+	  SSUB(SCORE_TRIVIAL_MIX);
 	  violated--;
 	  vinfo.trivial_mix--;
       }
@@ -176,6 +177,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	      (src_vnode->nontrivial_links == 0) &&
 	      (src_vnode->trivial_links != 0)) {
 	  // We just removed the last nontrivial link
+	  SSUB(SCORE_TRIVIAL_MIX);
 	  violated--;
 	  vinfo.trivial_mix--;
       }
@@ -183,6 +185,7 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 	      (dst_vnode->nontrivial_links == 0) &&
 	      (dst_vnode->trivial_links != 0)) {
 	  // We just removed the last nontrivial link
+	  SSUB(SCORE_TRIVIAL_MIX);
 	  violated--;
 	  vinfo.trivial_mix--;
       }
@@ -332,6 +335,40 @@ void remove_node(vvertex vv)
     }
     SSUB(-score_delta*SCORE_VCLASS);
   }
+
+  /*
+   * Handle subnodes
+   */
+  if (vnode->subnode_of) {
+      // First handle our parent
+      if (vnode->subnode_of->assigned) {
+	  tb_pnode *assignment = get(pvertex_pmap,
+		  vnode->subnode_of->assignment);
+	  if ((!pnode->subnode_of) ||
+		 (pnode->subnode_of != assignment)) {
+	      SSUB(SCORE_SUBNODE);
+	      violated--;
+	      vinfo.subnodes--;
+	  }
+      }
+  }
+  if (!vnode->subnodes.empty()) {
+      // Then any children we might have
+      tb_vnode::subnode_list::iterator sit;
+      for (sit = vnode->subnodes.begin(); sit != vnode->subnodes.end(); sit++) {
+	  if ((*sit)->assigned) {
+	      tb_pnode *assignment = get(pvertex_pmap,(*sit)->assignment);
+	  if ((!assignment->subnode_of) ||
+		 (assignment->subnode_of != pnode)) {
+		  SSUB(SCORE_SUBNODE);
+		  violated--;
+		  vinfo.subnodes--;
+	      }
+	  }
+      }
+  }
+
+
   
   /*
    * Now, take care of the virtual links that are attached to the vnode
@@ -433,7 +470,6 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	tb_vnode *dst_vnode)
 {
   tb_vlink *vlink = get(vedge_pmap,ve);
-  cerr << "Score " << vlink->name << endl;
   tb_pnode *the_switch;
   switch (vlink->link_info.type) {
   case tb_link_info::LINK_DIRECT:
@@ -506,6 +542,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	      (src_vnode->trivial_links == 1) &&
 	      (src_vnode->nontrivial_links != 0)) {
 	  // We just added the first trivial link
+	  SADD(SCORE_TRIVIAL_MIX);
 	  violated++;
 	  vinfo.trivial_mix++;
       }
@@ -513,6 +550,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	      (dst_vnode->trivial_links == 1) &&
 	      (dst_vnode->nontrivial_links != 0)) {
 	  // We just added the first trivial link
+	  SADD(SCORE_TRIVIAL_MIX);
 	  violated++;
 	  vinfo.trivial_mix++;
       }
@@ -523,6 +561,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	      (src_vnode->nontrivial_links == 1) &&
 	      (src_vnode->trivial_links != 0)) {
 	  // We just added the first trivial link
+	  SADD(SCORE_TRIVIAL_MIX);
 	  violated++;
 	  vinfo.trivial_mix++;
       }
@@ -530,6 +569,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
 	      (dst_vnode->nontrivial_links == 1) &&
 	      (dst_vnode->trivial_links != 0)) {
 	  // We just added the first trivial link
+	  SADD(SCORE_TRIVIAL_MIX);
 	  violated++;
 	  vinfo.trivial_mix++;
       }
@@ -575,6 +615,9 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
     return 1;
   }
 
+  /*
+   * Handle types
+   */
   tr = mit->second;
   if (tr->is_static) {
     // XXX: Scoring???
@@ -611,6 +654,38 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	}
       }
     }
+
+  /*
+   * Handle subnodes
+   */
+  if (vnode->subnode_of) {
+      // First handle our parent
+      if (vnode->subnode_of->assigned) {
+	  tb_pnode *assignment = get(pvertex_pmap,
+		  vnode->subnode_of->assignment);
+	  if ((!pnode->subnode_of) ||
+		 (pnode->subnode_of != assignment)) {
+	      SADD(SCORE_SUBNODE);
+	      violated++;
+	      vinfo.subnodes++;
+	  }
+      }
+  }
+  if (!vnode->subnodes.empty()) {
+      // Then any children we might have
+      tb_vnode::subnode_list::iterator sit;
+      for (sit = vnode->subnodes.begin(); sit != vnode->subnodes.end(); sit++) {
+	  if ((*sit)->assigned) {
+	      tb_pnode *assignment = get(pvertex_pmap,(*sit)->assignment);
+	  if ((!assignment->subnode_of) ||
+		 (assignment->subnode_of != pnode)) {
+		  SADD(SCORE_SUBNODE);
+		  violated++;
+		  vinfo.subnodes++;
+	      }
+	  }
+      }
+  }
 
 #ifdef PENALIZE_UNUSED_INTERFACES
   pnode->used_interfaces = 0;

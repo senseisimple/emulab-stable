@@ -77,7 +77,8 @@ public:
 			  total_interfaces(0), used_interfaces(0),
 			  total_bandwidth(0), my_class(NULL),
 			  my_own_class(NULL), assigned_nodes(),
-			  trivial_bw(0), trivial_bw_used(0) {;}
+			  trivial_bw(0), trivial_bw_used(0), subnode_of(NULL),
+			  has_subnode(false) {;}
 
   class type_record {
       public:
@@ -138,6 +139,11 @@ public:
   				// available
   int trivial_bw_used;		// the amount of bandwidth currently used by
   				// trivial links
+
+  tb_pnode *subnode_of;		// the pnode, if any, that this node is a
+  				// subnode of
+
+  bool has_subnode;		// whether or not this node has any subnodes
 	
   bool set_current_type(crope type) {
       if (types.find(type) == types.end()) {

@@ -37,7 +37,8 @@ class violated_info {
 	o << "  desires:     " << vinfo.desires << endl;
 	o << "  vclass:      " << vinfo.vclass << endl;
 	o << "  delay:       " << vinfo.delay << endl;
-	o << "  trivial mix: " << vinfo.delay << endl;
+	o << "  trivial mix: " << vinfo.trivial_mix << endl;
+	o << "  subnodes:    " << vinfo.subnodes << endl;
 #ifdef FIX_PLINK_ENDPOINTS
 	o << "  endpoints:   " << vinfo.incorrect_endpoints << endl;
 #endif
@@ -48,7 +49,7 @@ class violated_info {
 	violated_info():
 	    unassigned(0), pnode_load(0), no_connection(0), link_users(0),
 	    bandwidth(0), desires(0), vclass(0), delay(0),
-	    incorrect_endpoints(0) { }
+	    incorrect_endpoints(0), trivial_mix(0), subnodes(0) { }
 
 	int unassigned;
 	int pnode_load;
@@ -60,6 +61,7 @@ class violated_info {
 	int delay;
 	int incorrect_endpoints;
 	int trivial_mix;
+	int subnodes;
 };
 
 extern double score;

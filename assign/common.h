@@ -87,6 +87,11 @@ static float SCORE_UNUSED_INTERFACE = 0.04;
 #endif
 static float SCORE_TRIVIAL_PENALTY = 0.5; /* Cost of over-using a trivial link */
 
+static float SCORE_TRIVIAL_MIX = 0.5; /* Cost of mixing trivial and non-trivial
+					 links */
+
+static float SCORE_SUBNODE = 0.5; /* Cost of not properly assigning subnodes */
+
 // The following are used to weight possible link resolutions.  Higher
 // numbers mean a more likely resolution.  Trivial resolutions are always
 // used if possible.

@@ -52,7 +52,7 @@ inline int accept(double change, double temperature)
  * This overly-verbose function returns true if it's okay to map vn to pn,
  * false otherwise
  */
-bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
+inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
   // Find the type record for this type
   tb_pnode::types_map::iterator mit = pn->types.find(vn->type);
   if (mit == pn->types.end()) {

@@ -75,6 +75,14 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
       return 0;
   }
 
+  // check subnode information
+  if (a->subnode_of != b->subnode_of) {
+      return 0;
+  }
+  if (a->has_subnode || b->has_subnode) {
+      return 0;
+  }
+
   // check features
   for (tb_pnode::features_map::iterator it=a->features.begin();
        it != a->features.end();++it) {
