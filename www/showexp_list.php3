@@ -12,23 +12,45 @@ PAGEHEADER("Experiment Information Listing");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-$isadmin = ISADMIN($uid);
+$isadmin     = ISADMIN($uid);
+$altclause   = "";
+$altview     = 0;
+
+if (isset($alternate_view) && $alternate_view) {
+    echo "<b><a href='showexp_list.php3'>
+                Show All Experiments</a>
+          </b><br><br>\n";
+    $altclause = "e.state='$TB_EXPTSTATE_ACTIVE'";
+    $altview   = 1;
+}
+else {
+    echo "<b><a href='showexp_list.php3?alternate_view=1'>
+                Show Active Experiments Only</a>
+          </b><br><br>\n";
+}
 
 #
 # Show a menu of all experiments for all projects that this uid
 # is a member of. Or, if an admin type person, show them all!
 #
 if ($isadmin) {
+    if ($altview)
+	$altclause = "where ($altclause)";
+    
     $experiments_result =
 	DBQueryFatal("select pid,eid,expt_head_uid,expt_name from ".
-		     "experiments order by pid,eid,expt_name");
+		     "experiments as e $altclause ".
+		     "order by pid,eid,expt_name");
 }
 else {
+    if ($altview)
+	$altclause = "and ($altclause)";
+    
     $experiments_result =
 	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name from ".
 		     "experiments as e ".
 		     "left join group_membership as g on g.pid=e.pid ".
-		     "where g.uid='$uid' ".
+		     "where g.uid='$uid' $altclause ".
 		     "order by e.pid,eid,expt_name");
 }
 if (! mysql_num_rows($experiments_result)) {
