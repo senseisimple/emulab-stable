@@ -203,6 +203,8 @@ int assign()
   int bestviolated;
   int absbestv;
   
+  int num_fixed=0;
+
   float temp = init_temp;
 
 #ifdef VERBOSE
@@ -242,6 +244,7 @@ int assign()
     }
     unassigned_nodes.del(vn);
     G[vn].fixed=true;
+    num_fixed++;
   }
   
   bestscore = get_score();
@@ -255,6 +258,13 @@ int assign()
   node n3;
   forall_nodes(n3, G) {
     absnodes[n3] = G[n3].posistion;
+    abstypes[n3] = G[n3].type;
+  }
+
+
+  if (num_fixed == nnodes) {
+    cout << "All nodes are fixed.  No annealing." << endl;
+    goto DONE;
   }
 
   while (temp >= temp_stop) {
