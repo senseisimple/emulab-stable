@@ -8,6 +8,7 @@
 
 use English;
 use Getopt::Std;
+use POSIX qw(setsid);
 
 #
 # Create a disk image.
@@ -17,13 +18,17 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT
-	"Usage: create_image [-p <pid>] <image descriptor> <node>\n" .
-	"Use -p to specify the project ID of the image descriptor.\n" .
-	"  Defaults to system project.\n";
+    print(STDERR
+	  "Usage: create_image [-w] [-p <pid>] <imageid> <node>\n" .
+	  "switches and arguments:\n".
+	  "-w        - wait for non-batchmode experiment terminate\n".
+	  "-p <pid>  - project ID of the imageid; defaults to system project\n".
+	  "<imageid> - imageid to use\n".
+	  "<node>    - nodeid to create the image from\n");
     exit(-1);
 }
-my  $optlist = "p:";
+my $optlist  = "p:w";
+my $waitmode = 0;
 
 #
 # Configure variables
@@ -76,6 +81,9 @@ my $needcleanup = 0;
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
+}
+if (defined($options{"w"})) {
+    $waitmode = 1;
 }
 if (@ARGV != 2) {
     usage();
@@ -267,16 +275,47 @@ else {
 if (!$debug) {
     $logname = TBMakeLogname("create-image-$pid-$eid");
 
-    if (TBBackGround($logname)) {
+    if (my $childpid = TBBackGround($logname)) {
 	#
-	# Parent exits normally
+	# Parent exits normally, except if in waitmode. 
 	#
-	print STDOUT
-	    "Your image from $node is being created\n".
-	    "You will be notified via email when the image has been\n".
-	    "completed, and you can load the image on another node.\n";
-	exit(0);
+	if (!$waitmode) {
+	    print("Your image from $node is being created\n".
+		  "You will be notified via email when the image has been\n".
+		  "completed, and you can load the image on another node.\n");
+	    exit(0);
+	}
+	print("Waiting for image creation to complete\n");
+	print("You may type ^C at anytime; you will be notified via email;\n".
+	      "later; you will not actually interrupt image creation.\n");
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n");
+	exit($? >> 8);
     }
+}
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
 }
 
 #
