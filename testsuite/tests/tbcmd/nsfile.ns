@@ -44,5 +44,6 @@ tb-set-node-rpms $node4 "my node rpms"
 tb-set-node-startup $node4 "my node startup"
 tb-set-node-tarfiles $node4 dira tara dirb tarb dirc tarc
 tb-set-node-deltas $node4 "deltas!"
+tb-set-node-failure-action $node4 nonfatal
 
 $ns run
