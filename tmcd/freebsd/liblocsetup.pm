@@ -157,7 +157,17 @@ sub os_ifconfig_line($$$$$$;$)
 	$mediaopt = $IFC_FDUPLEX;
     }
 
-    $uplines   = sprintf($IFCONFIG, $iface, $inet, $mask, $media, $mediaopt);
+    $uplines = "";
+    
+    #
+    # Must set route table id before assigning IP address so that interface
+    # route winds up in the correct table.
+    #
+    if (defined($rtabid)) {
+	$uplines .= "$IFCONFIGBIN $iface rtabid $rtabid\n    ";
+    }
+
+    $uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask, $media, $mediaopt);
     $downlines = "$IFCONFIGBIN $iface down\n";
 
     if ($aliases ne "") {
