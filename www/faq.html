@@ -55,6 +55,8 @@
 			   nodes in my experiment?</a>
      <li> <a href="#UTT-Modify">Can I modify my experiment 
                            after creating it?</a> 
+     <li> <a href="#UTT-SWPaths">Are there FreeBSD and/or Linux sources and 
+                           packages available locally?</a>
      </ul>
 
 <li> <a href="#HDS">Hardware setup</a>
@@ -861,6 +863,57 @@
 	 </li>
        </ul>
     </p>
+
+<li><a NAME="UTT-SWPaths"></a>
+    <font size='+1'><b> 
+    Are there Linux and/or FreeBSD sources and packages available locally?
+    </b></font>
+    <p>
+    Yes.  We provide sources and packages for a few versions of
+    FreeBSD and RedHat Linux.  The place to look for available
+    software is under <b>/share</b> on either <b>users.emulab.net</b>
+    or your experimental nodes.  This path is readonly (and NFS
+    mounted on the nodes), so you'll need to make a copy of the
+    contents found there if you need to do more than reference them
+    for information or installation.
+    </p>
+
+    <ul>
+        <li><b>FreeBSD Paths:</b>
+        The FreeBSD kernel, and userland sources are available under
+        <b>/share/freebsd</b>.  Look there to see if the version you are
+        seeking is available.  You can also find Emulab additions and
+        modifications to FreeBSD here.  Emulab kernel configurations are
+        called TESTBED and located in <b>sys/i386/conf</b> relative to the
+        FreeBSD source trees.  The README file in this directory has more
+        information on the contents.
+        </li>
+
+        <br>
+        <li><b>Linux Paths:</b>
+        Linux kernel sources and RPMs for various versions of Redhat can
+        be found under <b>/share/redhat</b>.  Look there to see if the
+        version you are seeking is available.  You can also find Emulab
+        additions and modifications to Linux here.  Emulab kernel
+        configurations are called <b>config-emulab</b> and exist in the
+        root of the kernel source trees.  The README file in this
+        directory has more information on the contents.
+        </li>
+        
+        <br>
+        <li><b>Other Software:</b>
+        We provide a few other generally useful software packages and
+        sources under <b>/share</b> as well.  Have a look around.
+        </li>
+
+        <br>
+        <li><b>Something Missing?</b> 
+        If you think something should be added to <b>/share</b>, feel
+        free to send your suggestion(s) to us via 
+        <a href="emailus.php3">email</a>.  Note that we may retire some
+        offerings if we determine them to be of little value.
+        </li>
+    </ul>
 </ul>
 
 <hr>
