@@ -1,0 +1,223 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+package libaudit;
+use Exporter;
+
+@ISA = "Exporter";
+@EXPORT =
+    qw ( AuditStart AuditEnd );
+
+# After package decl.
+use English;
+use POSIX qw(isatty setsid);
+use File::Basename;
+use IO::Handle;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $SCRIPTNAME	= "Unknown";
+my $USERNAME    = "Unknown";
+my @SAVEARGV	= @ARGV;
+my $SAVEPID	= $PID;
+
+# Indicates, this script is being audited.
+my $auditing	= 0;
+
+# Where the log is going. When not defined, do not send it in email!
+my $logfile;
+
+# Untainted scriptname for email below.
+if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
+    $SCRIPTNAME = basename($1);
+}
+else {
+    $SCRIPTNAME = "Tainted";
+}
+
+# The user running the script.
+if (my ($name) = getpwuid($UID)) {
+    $USERNAME = $name;
+}
+
+#
+# Start an audit (or log) of a script. First arg is a flag indicating if
+# the script should fork/detach. The second (optional) arg is a file name
+# into which the log should be written. The return value is non-zero in the
+# parent, and zero in the child (if detaching).
+# 
+sub AuditStart($;$)
+{
+    my($daemon, $logname) = @_;
+
+    #
+    # If we are already auditing, then do not audit a child script. This
+    # would result in a blizzard of email! We wrote the scripts, so we
+    # should now what they do!
+    #
+    if (defined($ENV{'TBAUDITON'})) {
+	return;
+    }
+
+    #
+    # If this is an interactive session, then do not bother with a log
+    # file. Just send it to the output and hope the user is smart enough to
+    # save it off. We still want to audit the operation though, sending a
+    # "what was done" message to the audit list, and CC it to tbops if it
+    # exits with an error. But the log is the responsibility of the user.
+    #
+    if (!$daemon && isatty(STDIN)) {
+	$auditing = 1;
+	$ENV{'TBAUDITON'} = "$SCRIPTNAME:$USERNAME";
+	return;
+    }
+
+    if (!defined($logname)) {
+	$logfile = TBMakeLogname("$SCRIPTNAME");
+    }
+    else {
+	$logfile = $logname;
+    }
+    $ENV{'TBAUDITLOG'} = $logfile;
+    $ENV{'TBAUDITON'}  = "$SCRIPTNAME:$USERNAME";
+
+    #
+    # Okay, daemonize.
+    #
+    if ($daemon) {
+	my $mypid = fork();
+	if ($mypid) {
+	    select(undef, undef, undef, 0.2);
+	    return $mypid;
+	}
+
+	#
+	# Create a new session to ensure we are clear of any process group
+	#
+        setsid() or
+	    die("setsid failed: $!");
+    
+	#
+	# We have to disconnect from the caller by redirecting both STDIN
+	# and STDOUT away from the pipe. Otherwise the caller (the web
+	# server) will continue to wait even though the parent has exited.
+	#
+	open(STDIN, "< /dev/null") or
+	    die("opening /dev/null for STDIN: $!");
+    }
+    $auditing = 1;
+
+    #
+    # If setuid, lets reset the owner/mode of the log file. Otherwise its
+    # owned by root, mode 600 and a pain to deal with later, especially if
+    # the script drops its privs!
+    #
+    if ($UID != $EUID) {
+	chown($UID, $EUID, $logfile);
+	chmod(0664, $logfile);
+    }
+
+    open(STDOUT, ">> $logfile") or
+	die("opening $logfile for STDOUT: $!");
+    open(STDERR, ">> $logfile") or
+	die("opening $logfile for STDERR: $!");
+
+    #
+    # Turn off line buffering on output
+    #
+    STDOUT->autoflush(1);
+    STDERR->autoflush(1);
+
+    return 0;
+}
+
+#
+# Finish an Audit. 
+#
+sub AuditEnd()
+{
+    SendAuditMail(0);
+}
+
+#
+# Internal function to send the email. First argument is exit status.
+#
+# Two messages are sent. A topical message is sent to the audit list. This
+# is a short message that says what was done and by who. The actual log of
+# what happened is sent to the logs list so that we can go back and see the
+# details if needed.
+# 
+sub SendAuditMail($)
+{
+    my($exitstatus) = @_;
+    
+    if ($auditing) {
+	# Avoid duplicate messages.
+	$auditing = 0;
+
+	my $subject  = "$SCRIPTNAME @SAVEARGV";
+	if ($?) {
+	    $subject = "Failed: $subject";
+	}
+
+	my $body     = "$SCRIPTNAME @SAVEARGV\n" . "Invoked by $USERNAME";
+	if ($?) {
+	    $body   .= "\nExited with status: $?";
+	}
+
+	SENDMAIL($TBAUDIT, $subject, $body, $USERNAME, undef, ());
+
+	# Success and no log ...
+	if ($exitstatus == 0 && !defined($logfile)) {
+	    return;
+	}
+
+	#
+	# Send logfile to tblogs. Carbon to tbops if it failed. If no logfile
+	# then no point in sending to tblogs, obviously.
+	#
+	my $TO;
+	my $HDRS  = "Reply-To: $TBOPS";
+	my @FILES = ();
+	
+	if (defined($logfile)) {
+	    $TO    = $TBLOGS;
+	    @FILES = ($logfile);
+	    $HDRS .= "\nCC: $TBOPS" if ($?);
+	}
+	else {
+	    $TO    = $TBOPS;
+	}
+	SENDMAIL($TO, $subject, $body, $USERNAME, $HDRS, @FILES);
+
+	if (defined($logfile)) {
+	    unlink($logfile);
+	}
+    }
+}
+
+#
+# When the script ends, if the audit has not been sent, send it. 
+# 
+END {
+    # Save, since shell commands will alter it.
+    my $exitstatus = $?;
+    
+    SendAuditMail($exitstatus);
+
+    $? = $exitstatus;
+}
+
+1;
