@@ -28,6 +28,7 @@ my $TB		= "@prefix@";
 		"nfree"		=> "$TB/bin/nfree",
 		"node_reboot"	=> "$TB/bin/node_reboot",
 		"node_update"	=> "$TB/bin/node_update",
+		"node_control"	=> "$TB/bin/node_control",
 		"os_load"	=> "$TB/bin/os_load",
 		"create_image"	=> "$TB/bin/create_image",
 		"node_admin"	=> "$TB/bin/node_admin",
