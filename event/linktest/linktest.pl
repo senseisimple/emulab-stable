@@ -3,9 +3,10 @@
 # The linktest script.
 # -- if there is a problem, write a file to /proj/<exp directory>/tbdata/linktest
 #
-# Assumption: all nodes came up already (part of swapin). We're just checking the 
-# test network.
+# Assumption: all nodes came up already (part of swapin).
 #
+# @author: davidand
+# @created: 10/13/03
 use strict;
 use lib qw (/proj/utahstud/users/davidand/lib);
 use Statistics::Descriptive qw(:all);
@@ -17,7 +18,6 @@ use constant PATH_RUDE_CFG => "/tmp/linktest.rude";
 use constant PATH_RATE_LOG => "/tmp/linktest.pathrate";
 
 #### globals ####################################
-my $uname;    # result of "uname -s".
 my $synch;    # node having synch server
 
 # programs used by the tests not on the path by default
@@ -61,14 +61,14 @@ my $problem_path;
 &routing_test;
 &link_test;
 &latloss_test;
-#&bw_test;
+#&bw_test;        # works but analysis not done yet
 
 #### procs   ####################################
 
 # initialize paths, etc.
 sub init {
     # temporarily hardcoded for linux
-    $ns_cmd = "/users/davidand/p/linux/ns-2.26/ns";
+    $ns_cmd = "/proj/utahstud/users/davidand/linux/ns-2.26/ns";
     $crude_cmd = "/proj/utahstud/users/davidand/bin_rhl/crude";
     $rude_cmd =  "/proj/utahstud/users/davidand/bin_rhl/rude";
     $pathrate_snd_cmd = "/proj/utahstud/users/davidand/bin_rhl/pathrate_snd";
@@ -445,9 +445,7 @@ sub bw_test {
 
     unlink PATH_RATE_LOG || die ("could not delete existing logfile");
 
-    # wait for a second to give pathrate time to startup.
-    # TODO: this could be done better with an iterative wait, checking each second
-    # to see if it's started up yet. it's a minor race condition.
+    # wait for a second to give pathrate time to startup. (race?)
     sleep(1);
 
     # wait for all nodes to get pathrate_snd started up
