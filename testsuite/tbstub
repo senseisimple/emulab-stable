@@ -62,8 +62,9 @@ sub tb_prerun {
 	print $_;
     }
     close(TBEXEC);
-    if (($? >> 8) != $exitcode) {
-	tb_fail($cmd);
+    $ecode = ($? >> 8);
+    if ($ecode != $exitcode) {
+	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
     }
 };
 sub tb_compare {
@@ -100,8 +101,9 @@ sub tb_run {
 	print $_;
     }
     close(TBEXEC);
-    if (($? >> 8) != $exitcode) {
-	tb_fail($cmd);
+    $ecode = ($? >> 8);
+    if ($ecode != $exitcode) {
+	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
     }
 };
 sub tb_fail {

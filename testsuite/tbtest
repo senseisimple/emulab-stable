@@ -17,6 +17,7 @@
 #   -frontend - Do frontend only testing.#
 #   -leavedb - Avoids removing the DB on exit.
 #   -exitonfail - Exit on the first failure.
+#   -session <sessionid> - Specify an alternate session id.
 #
 # <mode> is one of:
 #    run <db> <testdir> [<pid> <eid> <num>] - Do everything.
@@ -70,6 +71,7 @@ sub show_help {
     print STDERR "  -frontend - Run in frontend mode.\n";
     print STDERR "  -full - Run in full mode.\n";
     print STDERR "  -exitonfail - Exit on any failure.\n";
+    print STDERR "  -session <sessionid> - Specify an alternate session id.\n";
     print STDERR "Mode:\n";
     print STDERR "  run <db> <testdir> [<pid> <eid> <num>]\n";
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
@@ -88,6 +90,8 @@ sub show_help {
 $mode = "";
 $leavedb = 0;
 $exitonfail = 0;
+$user=`whoami`;
+chop $user;
 
 while (($#ARGV > -1) && ($mode eq "")) {
     $arg = shift;
@@ -102,14 +106,15 @@ while (($#ARGV > -1) && ($mode eq "")) {
 	$leavedb = 1;
     } elsif ($arg eq "-exitonfail") {
 	$exitonfail = 1;
+    } elsif ($arg eq "-session") {
+	if ($#ARGV == -1) {show_help;}
+	$user = shift;
     } else {
 	$mode = $arg;
     }
 }
 
 chdir $path;
-$user=`whoami`;
-chop $user;
 $logfile = "test.log";
 $statefile = "state";
 
@@ -156,7 +161,11 @@ if (($mode ne "run") && ($mode ne "init")) {
 
 if (($mode eq "run") || ($mode eq "test") || ($mode eq "single")) {
     if (! ($testdir =~ m|^/|)) {
+	$testdirshort = $testdir;
 	$testdir = "$basedir/tests/$testdir";
+    } else {
+	@t = split("/",$testdir);
+	$testdirshort = $t[$#t];
     }
 }
 if (($type eq "full") && (($mode eq "init") || ($mode eq "run"))) {
@@ -233,7 +242,7 @@ sub step_init {
     open(LOG,"> $logfile");
 
     prints "START INIT\n";
-    prints "User:     $user\n";
+    prints "Session:  $user\n";
     prints "Logfile:  $logfile\n";
     prints "Database: $TBDB\n";
     prints "Type:     $type\n";
@@ -491,14 +500,15 @@ sub step_test {
     }
 
     mkdir "tests",0755;
+    mkdir "tests/$testdirshort",0755;
     foreach $test (@tests) {
 	if (($test eq ".") || ($test eq "..") || ($test eq "CVS")) {
 	    next;
 	}
 	prints "  $test ";
 	
-	mkdir "tests/$test",0755;
-	chdir "tests/$test";
+	mkdir "tests/$testdirshort/$test",0755;
+	chdir "tests/$testdirshort/$test";
 	open(TESTLOG,"> test.log");
 	
 	# Set up DB state
@@ -556,7 +566,7 @@ sub step_test {
 		    prints "ERROR: Could not grab copy of database.\n";
 		    doexit(1);
 		}
-		if ($exitonfail) {doexit(1);}
+		if ($exitonfail) {prints "FAIL\n"; doexit(1);}
 	    } else {
 		$unknown++;
 		$status = "UKNONW";

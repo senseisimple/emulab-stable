@@ -153,6 +153,7 @@ Options:
   -frontend - Run in frontend mode.
   -full - Run in full mode.
   -exitonfail - Exit on any failure.
+  -session <sessionid> - Specify alternate session ID.
 Mode:
   run <db> <testdir> [<pid> <eid> <num>]
   init <db> [<pid> <eid> <num>]
@@ -198,6 +199,9 @@ tbtest to exit on the first test failure, thus no later tests will
 corrupt the DB.  The user of this option is a matter of taste, as you
 can always use tests/<test>/db.txt to restore the database state.
 
+-session specifies an alternate session id.  The test DB will be named
+tbdb_<session>.  Usually the session id is taken from the username.
+Unfortunately the session ID must be globally unique.
 
 dbdump
 ------
