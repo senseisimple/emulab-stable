@@ -1920,15 +1920,16 @@ sub TBExptSetPortRange {
     #
     foreach my $vnode (keys(%v2pmap)) {
 	my $pnode  = $v2pmap{$vnode};
-	my $ppnode = $p2pmap{$pnode};
 
 	if ($isvirtnode{$vnode}) {
+	    my $ppnode = $p2pmap{$pnode};
+	    
 	    push(@nodelist, $ppnode);
 	}
 	else {
 	    # Same big port range for all phys nodes. 
-	    $portnext{$ppnode} = TBDB_LOWVPORT;
-	    $porthigh{$ppnode} = TBDB_MAXVPORT;
+	    $portnext{$pnode} = TBDB_LOWVPORT;
+	    $porthigh{$pnode} = TBDB_MAXVPORT;
 	}
     }
     if (! @nodelist) {
