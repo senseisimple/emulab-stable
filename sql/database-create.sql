@@ -25,8 +25,8 @@ CREATE TABLE cdroms (
 
 CREATE TABLE comments (
   table_name varchar(64) NOT NULL default '',
-  column_name varchar(64) default NULL,
-  description text,
+  column_name varchar(64) NOT NULL default '',
+  description text NOT NULL,
   UNIQUE KEY table_name (table_name,column_name)
 ) TYPE=MyISAM;
 

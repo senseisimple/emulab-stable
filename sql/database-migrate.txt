@@ -686,3 +686,10 @@ last_net_act,last_cpu_act,last_ext_act);
 	while (($idx,$creator) = $query_result->fetchrow_array()) {
 	    print "update testbed_stats set uid='$creator' where idx=$idx;\n";
 	}
+
+1.157	Take nulls out of comments table, so primary key works right.
+
+	alter ignore table comments modify description text not null;
+	alter ignore table comments modify 
+		column_name varchar(64) not null default "";
+
