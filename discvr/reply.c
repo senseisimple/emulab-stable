@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: reply.c,v 1.4 2000-07-18 17:13:44 kwright Exp $
+ * $Id: reply.c,v 1.5 2000-07-18 19:19:28 kwright Exp $
  */
 
 
@@ -34,7 +34,7 @@ extern topd_inqid_t inqid_current;
  * one long neighbor list.
  */
 u_int32_t
-compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen) 
+compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors) 
 {
         struct topd_nborlist *nborl;
 	struct ifi_info      *ifihead;
@@ -74,16 +74,18 @@ compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen)
 		nid += ETHADDRSIZ;
 		bzero(nid, ETHADDRSIZ << 1);
 
-		while ( nborl != NULL ) {
-		        nbor = (struct topd_nbor *)nw;
-		        nw += nborl->tdnbl_n * sizeof(struct topd_nbor);
-			if ((char *)nw > mesg + mesglen ) {
-			        fprintf(stderr, "ran out of room and you didn't do anything reasonable.\n");
-				return 0;
-			}
-			memcpy(nbor, nborl->tdnbl_nbors, nborl->tdnbl_n * sizeof(struct topd_nbor));
-			nborl = nborl->tdnbl_next;
-		} 
+		if ( sendnbors != 0 ) {
+		        while ( nborl != NULL ) {
+		              nbor = (struct topd_nbor *)nw;
+		              nw += nborl->tdnbl_n * sizeof(struct topd_nbor);
+			      if ((char *)nw > mesg + mesglen ) {
+			              fprintf(stderr, "ran out of room and you didn't do anything reasonable.\n");
+				      return 0;
+			      }
+			      memcpy(nbor, nborl->tdnbl_nbors, nborl->tdnbl_n * sizeof(struct topd_nbor));
+			      nborl = nborl->tdnbl_next;
+			} 
+		}
 	}
 
 	return (nw - mesg);

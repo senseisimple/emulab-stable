@@ -18,7 +18,7 @@
  *
  * ---------------------------
  *
- * $Id: packet.h,v 1.2 2000-07-13 19:04:28 kwright Exp $
+ * $Id: packet.h,v 1.3 2000-07-18 19:19:28 kwright Exp $
  */
 
 #ifndef _TOPD_PACKET_H_
@@ -49,6 +49,11 @@ typedef struct topd_inqid {
 } topd_inqid_t;
 
 #define TOPD_INQ_SIZ ALIGN(sizeof(struct topd_inqid))
+
+struct topd_inqnode {
+        struct topd_inqnode *inqn_next;
+        struct topd_inqid   *inqn_inq;
+};
 
 /*
  * Neighbor (reply) packets consist of 

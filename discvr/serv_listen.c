@@ -18,13 +18,18 @@
  *
  * ---------------------------
  *
- * $Id: serv_listen.c,v 1.4 2000-07-18 17:13:44 kwright Exp $
+ * $Id: serv_listen.c,v 1.5 2000-07-18 19:19:28 kwright Exp $
  */
 
 #include "discvr.h"
 #include "packet.h"
 #include "util.h"
 
+enum {DUP, DUP_NBOR, NEW};
+
+/*
+ * Is this used anymore?
+ */
 extern topd_inqid_t inqid_current;
 
 /*
@@ -36,6 +41,32 @@ extern topd_inqid_t inqid_current;
  * as the nodeID. 
  */
 u_char myNodeID[ETHADDRSIZ];
+
+/*
+ * Return 0 if the inquiry is not from us, 1 if it is.
+ */
+int
+from_us(struct in_pktinfo *pktinfo, struct ifi_info *ifihead) 
+{
+        struct ifi_info *ifi;
+        for( ifi = ifihead; ifi != NULL; ifi = ifi->ifi_next) {
+	        if ( bcmp(&ifi->ifi_addr->sa_data, &pktinfo->ipi_addr.s_addr,
+			  sizeof(pktinfo->ipi_addr.s_addr)) == 0 ) {
+	                return 1;
+		}
+	}
+	return 0;
+}
+
+/*
+ * Return 0 if the two inquiries are identical, non-zero if not.
+ */
+int 
+inqid_cmp(struct topd_inqid *tid1, struct topd_inqid *tid2)
+{
+        return( bcmp((void *)tid1, (void*)tid2, sizeof(struct topd_inqid)));
+}
+
 
 void
 print_ifi_info(struct ifi_info *ifihead)
@@ -67,7 +98,7 @@ print_ifi_info(struct ifi_info *ifihead)
 void
 serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 {
-	int			flags;
+	int			flags, class;
 	const int		on = 1;
    	socklen_t		len;
 	ssize_t			n;
@@ -77,6 +108,7 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 	struct in_addr		in_zero;
 	struct ifi_info         *ifi, *ifihead;
 	struct in_pktinfo	pktinfo;
+	struct topd_inqnode     *inqn, *inqhead = 0;
 
 	/* 
 	 * Use this option to specify that the receiving interface
@@ -138,12 +170,30 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		 * There are 3 possible classifications for this inquiry.
 		 * Our response to the inquiry depends upon its classification:
 		 * 
-		 * - New inquiry -> forward and reply
+		 * - New inquiry -> forward and reply (NEW)
 		 * - Duplicate inquiry
-		 *       - From us -> ignore
-		 *       - From another -> reply with interface list. 
+		 *       - From us -> ignore (DUP)
+		 *       - From another -> reply with interface list. (DUP_NBOR)
+		 * 
+		 * We now classify each inquiry.
 		 */ 
 		
+		for ( inqn = inqhead; inqn != NULL; inqn = inqn->inqn_next ) {
+		          if (inqid_cmp(inqn->inqn_inq, (struct topd_inqid *)mesg) == NULL) {
+		                  /* Duplicate inquiry */
+		                  if (from_us(&pktinfo, ifihead)) {
+			                  class = DUP;
+				  } else {
+				          class = DUP_NBOR;
+				  }
+			  } else {
+		                  /* New inquiry */
+			          class = NEW;
+			  }
+		}
+
+		if (class == DUP) continue;
+
 		/* 
 		 * Save the inquiry ID into inqid_current.
 		 */
@@ -154,13 +204,24 @@ serv_listen(int sockfd, struct sockaddr *pcliaddr, socklen_t clilen)
 		 */
  
 		ifihead = get_ifi_info(AF_INET, 0); 
-	        forward_request(ifihead, &pktinfo, mesg, n );
+		if (class == NEW) {
+		        struct topd_inqnode *save = inqhead;
+		        inqhead = (struct topd_inqnode *)malloc(sizeof(struct topd_inqnode));
+		        inqhead->inqn_inq = (struct topd_inqid *)malloc(sizeof(struct topd_inqid));
+			if (inqhead == NULL || inqhead->inqn_inq == NULL ) {
+			        fprintf(stderr, "Ran out of room while expanding inquiry list.\n");
+				exit(1);
+			}
+			memcpy(inqhead->inqn_inq, mesg, sizeof(struct topd_inqid));
+			inqhead->inqn_next = save;
+		        forward_request(ifihead, &pktinfo, mesg, n );
+		}
 
 		if ( (reply=(char *)malloc(BUFSIZ)) == NULL) {
 		        fprintf(stderr, "Ran out of memory for reply mesg.\n");
 			exit(1);
 		}
-		n = compose_reply(ifihead, reply, BUFSIZ);
+		n = compose_reply(ifihead, reply, BUFSIZ, class == NEW);
 		fprintf(stderr, "replying: ");
 		print_tdreply(reply, n);
 		free_ifi_info(ifihead);

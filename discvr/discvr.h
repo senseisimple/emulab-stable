@@ -1,4 +1,4 @@
-/*$Id: discvr.h,v 1.2 2000-07-06 22:50:59 kwright Exp $*/
+/*$Id: discvr.h,v 1.3 2000-07-18 19:19:27 kwright Exp $*/
 
 #ifndef _TOPD_DISCVR_H_
 #define _TOPD_DISCVR_H_
@@ -88,7 +88,7 @@ void
 get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
 u_int32_t
-compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen);
+compose_reply(struct ifi_info *ifi, char *mesg, const int mesglen, int sendnbors);
 
 
 #endif /* _TOPD_DISCVR_H_ */
