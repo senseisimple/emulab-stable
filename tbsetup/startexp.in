@@ -15,12 +15,12 @@ use Getopt::Std;
 #       save off the file in the expinfo directory. The caller (batch daemon) 
 #       opens the file and just passes the name in. I do not like this!
 #
-# usage: startexp [-b logfile] [-g gid] <pid> <eid> <nsfile>
+# usage: startexp [-l] [-b logfile] [-g gid] <pid> <eid> <nsfile>
 #
 sub usage()
 {
     print STDOUT
-	"Usage: startexp [-b logfile] [-g gid] <pid> <eid> <nsfile>\n";
+	"Usage: startexp [-l] [-b logfile] [-g gid] <pid> <eid> <nsfile>\n";
     exit(-1);
 }
 my  $optlist = "b:g:";
@@ -295,7 +295,7 @@ my $infodir = "$pid-$eid-" . TBDateTimeFSSafe();
 if (mkdir("$TBINFO/$infodir", 0770)) {
     system("cp $nsfile $TBINFO/$infodir");
     system("cp *.ptop *.top $TBINFO/$infodir");
-    system("cp assign.log $TBINFO/$infodir");
+    system("cp  assign.log wanassign.log $TBINFO/$infodir");
     system("cp $logname $TBINFO/$infodir/$eid.log");
 }
 
@@ -374,7 +374,7 @@ sub fatal()
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",
-	     ($logname, "assign.log", $nsfile));
+	     ($logname, "assign.log", "wanassign.log", $nsfile));
 
     #
     # We have to cleanup the DB since we are disconnected from the
