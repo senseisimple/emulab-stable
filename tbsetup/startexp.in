@@ -224,6 +224,13 @@ if (system("$tbdir/tbreport -v $pid $eid $irfile 2>&1 > $repfile") != 0) {
 }
 
 #
+# In batchmode, send the report to stdout for the batch daemon.
+#
+if ($batch) {
+    system("$tbdir/tbreport -v $pid $eid $irfile");
+}
+
+#
 # Done! Set the ready bit in the experiment record.
 # 
 $query_result = $DB->query("UPDATE experiments SET expt_ready=1 ".
