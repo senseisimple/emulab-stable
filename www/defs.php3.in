@@ -137,9 +137,8 @@ function USERERROR($message, $death) {
 
     $msg = "<font size=+1><br>
             $message
-            <br>	
       	    </font>
-            <br><br><br><br>
+            <br><br><br>
             <font size=-1>
             Please contact $TBMAILADDR if you feel this message is an error.
             </font>\n";
@@ -160,32 +159,78 @@ function FORMERROR($field) {
 }
 
 #
+# SUEXEC stuff.
+#
+# Save this stuff so we can generate better error messages and such.
+# 
+$suexec_cmdandargs = "";
+$suexec_retval     = 0;
+$suexec_output;
+
+#
+# Actions for suexec. 
+#
+define("SUEXEC_ACTION_CONTINUE",	0);
+define("SUEXEC_ACTION_DIE",		1);
+define("SUEXEC_ACTION_USERERROR",	2);
+define("SUEXEC_ACTION_IGNORE",		3);
+
+#
+# An suexec error.
+#
+function SUEXECERROR($action)
+{
+    global $suexec_cmdandargs, $suexec_retval, $suexec_output;
+
+    $foo  = "Shell Program Error. Exit status: $suexec_retval\n";
+    $foo .= "  '$suexec_cmdandargs'\n";
+	    
+    if (count($suexec_output)) {
+	$foo .= "\n";
+	    
+	for ($i = 0; $i < count($suexec_output); $i++) {
+	    $foo .= "$suexec_output[$i]\n";
+	}
+    }
+    switch ($action) {
+    case SUEXEC_ACTION_CONTINUE:
+	TBERROR($foo, 1, 0);
+        break;
+    case SUEXEC_ACTION_DIE:
+	TBERROR($foo, 1, 1);
+        break;
+    case SUEXEC_ACTION_USERERROR:
+	USERERROR("<XMP>$foo</XMP>", 1);
+        break;
+    case SUEXEC_ACTION_IGNORE:
+	break;
+    default:
+	TBERROR($foo, 1, 1);
+    }
+}
+
+#
 # Run a program as a user.
 #
-function SUEXEC($uid, $gid, $cmdandargs, $die) {
+function SUEXEC($uid, $gid, $cmdandargs, $action) {
     global $TBSUEXEC_PATH;
+    global $suexec_cmdandargs, $suexec_retval, $suexec_output;
 
     ignore_user_abort(1);
 
-    $output = array();
-    $retval = 0;
-    $result = exec("$TBSUEXEC_PATH $uid $gid $cmdandargs",
-		   $output, $retval);
+    $suexec_cmdandargs = "$uid $gid $cmdandargs";
+    $suexec_output     = array();
+    $suexec_retval     = 0;
+    
+    exec("$TBSUEXEC_PATH $suexec_cmdandargs", $suexec_output, $suexec_retval);
 
-    if ($retval) {
-	$foo = "SUEXEC failure: '$uid/$gid $cmdandargs'";
-	    
-	if (count($output)) {
-	    $foo = "$foo\nError output:\n\n";
-	    
-	    for ($i = 0; $i < count($output); $i++) {
-		$foo .= "$output[$i]\n";
-	    }
-	}
-	
-	TBERROR($foo, $die, 1);
+    #
+    # The output is still available of course, via $suexec_output.
+    # 
+    if ($suexec_retval == 0 || $action == SUEXEC_ACTION_IGNORE) {
+	return $suexec_retval;
     }
-    return $retval;
+    SUEXECERROR($action);
 }
 
 function ADDPUBKEY($uid, $cmdandargs) {
