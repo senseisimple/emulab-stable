@@ -26,6 +26,10 @@ struct in_addr	mcastif;
 char	       *filename;
 struct timeval  IdleTimeStamp;
 
+/* Forward decls */
+void		quit(int);
+void		reinit(int);
+
 /*
  * This structure defines the file we are spitting back.
  */
@@ -379,10 +383,14 @@ main(int argc, char **argv)
 	if (!portnum || ! mcastaddr.s_addr)
 		usage();
 
+	signal(SIGINT, quit);
+	signal(SIGTERM, quit);
+	signal(SIGHUP, reinit);
+
 	ServerLogInit();
 	WorkQueueInit();
 	ServerNetInit();
-
+	
 	filename = argv[0];
 	if (access(filename, R_OK) < 0)
 		pfatal("Cannot read %s", filename);
@@ -417,5 +425,26 @@ main(int argc, char **argv)
 	 */
 	log("Exiting!");
 	exit(0);
+}
+
+/*
+ * We catch the signals, but do not do anything. We exit with 0 status
+ * for these, since it indicates a desired shutdown.
+ */
+void
+quit(int sig)
+{
+	log("Caught signal %d. Exiting ...", sig);
+	exit(0);
+}
+
+/*
+ * We cannot reinit, so exit with non-zero to indicate it was unexpected.
+ */
+void
+reinit(int sig)
+{
+	log("Caught signal %d. Exiting ...", sig);
+	exit(1);
 }
 
