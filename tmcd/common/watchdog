@@ -42,6 +42,7 @@ my $pidfile	= "/var/run/emulab-watchdog.pid";
 my $debug	= 0;
 my $isalivewait = ((REMOTE() == 1) ? 60 : 180);	# Seconds to wait.
 my $driftfile;
+my $vnodeid;
 
 #
 # Forward declarations for prototype checking
@@ -126,6 +127,13 @@ $SIG{TERM} = \&handler;
 $SIG{INT}  = \&handler;
 
 #
+# If jailed, get our jailname. 
+#
+if (JAILED()) {
+    $vnodeid = libsetup_getvnodeid();
+}
+
+#
 # Start isalive daemon.
 #
 startisalive();
@@ -156,6 +164,10 @@ while (1) {
     #
     print "Looking for new Emulab accounts ...\n";
     system("update -i");
+
+    # Skip all this stuff in jail. 
+    next
+	if (JAILED());
 
     #
     # Send back ntpdrift info. Should move elsewhere.
@@ -198,8 +210,10 @@ sub startisalive()
 	my $retries = 3;
 
 	while ($retries) {
-#	    my $options = "-p 7778 REDIRECT=192.168.100.1";
 	    my $options = "-u -t 3";
+	    if (defined($vnodeid)) {
+		$options .= " -n $vnodeid";
+	    }
 	    my $result = `tmcc $options isalive`;
 	    if (! $?) {
 		my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
