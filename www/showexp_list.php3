@@ -14,6 +14,8 @@ LOGGEDINORDIE($uid);
 
 $isadmin     = ISADMIN($uid);
 $altclause   = "";
+$active      = 0;
+$idle        = 0;
 
 if (! isset($showtype))
     $showtype="active";
@@ -115,7 +117,7 @@ if (mysql_num_rows($experiments_result)) {
            <h2>$title Experiments</h2>
           </center>\n";
 
-    if ($idle)
+    if ($idle) {
       echo "<center><b>Experiments that have been idle at least $minidledays days</b></center>\n";
       echo "<center><h3>This will change soon - Slothd is on the way</h3></center>\n";
       echo "<b>\"Days idle\" is defined as:<br>
@@ -124,7 +126,7 @@ b) number of days it has been swapped in (if nobody has logged in)<br>
 </b><br>
 Note that it is not reliable in the case where they're using a special
 kernel or logging into the nodes in a way that lastlogins can't detect.<p>\n";
-
+    }
     
     echo "<table border=2 cols=0
                  cellpadding=0 cellspacing=2 align=center>
