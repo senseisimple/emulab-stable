@@ -760,6 +760,7 @@ CREATE TABLE node_types (
   isremotenode tinyint(4) NOT NULL default '0',
   issubnode tinyint(4) NOT NULL default '0',
   isplabdslice tinyint(4) NOT NULL default '0',
+  issimnode tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 

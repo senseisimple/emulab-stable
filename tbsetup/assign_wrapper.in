@@ -298,6 +298,7 @@ my $remotecount      = 0;
 my $virtcount        = 0;
 my $plabcount        = 0;
 my $needwanassign    = 0;
+my $simcount         = 0;
 
 #
 # This is for stats gathering. It might duplicate other stuff, but
@@ -1342,12 +1343,19 @@ foreach $plink (keys(%plinks)) {
 	    }
 	}
 	else {
-	    # No phys mapping. We create a veth, but there is no phys mapping
-	    # for the port.
-	    $nodeA = $v2pmap{(split(":", $virtA))[0]};
-	    $nodeB = $v2pmap{(split(":", $virtB))[0]};
-	    $portA = NewVethIface($lan, $virtA, $nodeA);
-	    $portB = NewVethIface($lan, $virtB, $nodeB);
+	    # If the trivial link has all simulated members, we
+	    # don't want a veth interface
+	    if (! virtlanallsim($lan) ) {
+		# No phys mapping. We create a veth, but there is no phys mapping
+		# for the port.
+		$nodeA = $v2pmap{(split(":", $virtA))[0]};
+		$nodeB = $v2pmap{(split(":", $virtB))[0]};
+		$portA = NewVethIface($lan, $virtA, $nodeA);
+		$portB = NewVethIface($lan, $virtB, $nodeB);
+	    } else {
+		# next plink
+		next;
+	    }
 	}
 	#
 	# Setup portmap using virt members in plink name.
@@ -1411,9 +1419,16 @@ foreach $plink (keys(%plinks)) {
 	    }
 	}
 	else {
-	    # No phys mapping. We create a veth, but there is no phys port.
-	    $nodeA = $v2pmap{(split(":", $virtA))[0]};
-	    $portA = NewVethIface($lan, $virtA, $nodeA);
+	    # If the trivial lan has all simulated members, we
+	    # don't want a veth interface
+	    if (! virtlanallsim($lan) ) {
+		# No phys mapping. We create a veth, but there is no phys port.
+		$nodeA = $v2pmap{(split(":", $virtA))[0]};
+		$portA = NewVethIface($lan, $virtA, $nodeA);
+	    } else {
+		# next plink
+		next;
+	    }
 	}
 	$portmap{$virtA} = $portA;
 	printdb "  Portmap:\n";
@@ -1754,7 +1769,7 @@ foreach $vnodeport (keys(%portmap)) {
 	    # XXX This appears to mean that in a sim node, the IP
 	    # address in the interface table is constantly overwritten?
 	    #
-	    if (virtnodetype($vnode) eq "sim") {
+	    if (virtnodeissim($vnode)) {
 		if (! defined( $simnode_extips{$vnode})) {
 		    $simnode_extips{$vnode} = [];
 		}
@@ -1812,7 +1827,7 @@ foreach $simnode (keys(%simnode_extips)) {
     my $nhopnode = $iptonodemap{$nhopip};
     while( 1 ) {
 
-      if (virtnodetype($nhopnode) ne "sim") {
+      if (! virtnodeissim($nhopnode)) {
 	  push(@{$modified_simroutes{$simnode}}, [$dstip, $dst_mask, $nhopip]);
 	  last;
       }
@@ -1843,7 +1858,7 @@ foreach $simnode (keys(%simnode_extips)) {
 my $nseconfigs = "";
 
 foreach $simnode (keys(%simnode_iplist)) {
-  $nseconfigs .= "\$$simnode set ipaddrlist_ \[list ";
+  $nseconfigs .= "\n\$$simnode set ipaddrlist_ \[list ";
   foreach $ipaddr (@{$simnode_iplist{$simnode}}) {
     $nseconfigs .= "$ipaddr ";
   }
@@ -2154,8 +2169,8 @@ sub InitPnode($pnode, $vnode)
     my $role;
 
     # XXX NSE hack: if the vnode is simulated, we just
-    # choose FBSD-STD and static routing
-    if (virtnodeisvnode($vnode) && virtnodetype($vnode) eq "sim") {
+    # choose FBSD-NSE and static routing
+    if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
 	$osid = TBOSID("emulab-ops", "FBSD-NSE" );
 	
 	DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
@@ -2765,6 +2780,7 @@ sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
 sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
 sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
 sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
+sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
 
 #
 # Load up the virt_nodes info, which includes the type info for each
@@ -2810,6 +2826,7 @@ sub LoadVirtNodes()
 	my $isvirt  = 0;
 	my $issub   = 0;
 	my $isplab  = 0;
+	my $issim   = 0;
 
 	# If we have a real type or auxtype ...
 	if (nodetypeistype($type)) {
@@ -2817,6 +2834,7 @@ sub LoadVirtNodes()
 	    $isvirt   = nodetypeisvirt($type);
 	    $issub    = nodetypeissub($type);
 	    $isplab   = nodetypeisplab($type);
+	    $issim    = nodetypeissim($type);
 	}
 	elsif (virttypeisvtype($type)) {
 	    #
@@ -2829,6 +2847,7 @@ sub LoadVirtNodes()
 	    $isvirt   = nodetypeisvirt($vtype);
 	    $issub    = nodetypeissub($vtype);
 	    $isplab   = nodetypeisplab($vtype);
+	    $issim    = nodetypeissim($vtype);
 	}
 	else {
 	    fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
@@ -2841,6 +2860,7 @@ sub LoadVirtNodes()
 	$rowref->{"__isvirtnode"}   = $isvirt;
 	$rowref->{"__issubnode"}    = $issub;
 	$rowref->{"__isplabnode"}   = $isplab;
+	$rowref->{"__issimnode"}   = $issim;
 	$rowref->{"__usewanassign"} = 0;
 	# The mapped osname to actual osid. 
 	$rowref->{"__osid"} = undef;
@@ -2892,7 +2912,8 @@ sub LoadVirtNodes()
 	}
 
 	# SIM HACK
-	if ($type eq "sim") {
+	if ($issim) {
+	    $simcount++;
 	    push(@simnodelist, $vname);
 	    $simnode_iplist{$vname} = [];
 	}
@@ -2922,7 +2943,7 @@ sub LoadVirtNodes()
 	    
 	    $ips{"$vname:$port"} = $ip;
 	    
-	    if ($type eq "sim") {
+	    if ($issim) {
 		push(@{$simnode_iplist{$vname}}, $ip);
 	    }
 	    $iptonodemap{$ip} = $vname;
@@ -3005,6 +3026,9 @@ sub virtnodeisvirt($)   {
 }
 sub virtnodeissubnode($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issubnode"};
+}
+sub virtnodeissim($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issimnode"};
 }
 sub virtnodeisplabnode($)   {
     return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isplabnode"};
@@ -3091,6 +3115,7 @@ sub LoadVirtLans()
 	# Netmask for the entire lan.
 	$virt_lans{$vname}->{"MASK"}         = $rowref->{"mask"};
 	$virt_lans{$vname}->{"WIDEAREA"}     = $widearea;
+	$virt_lans{$vname}->{"ALLSIM"}       = 0;
 
 	#
 	# REMOTE VIRTNODE HACK: 
@@ -3202,6 +3227,7 @@ sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
 sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
 sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
 sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
+sub virtlanallsim($)    { return $virt_lans{$_[0]}->{"ALLSIM"}; }
 
 #
 # Ditto for virt_vtypes.
@@ -3276,6 +3302,7 @@ sub CreateTopFile()
 {
     my $physnode_count = 0;
     my $virtnode_count = 0;
+    my $simnode_count = 0;
     
     # Open the TOP file
     open(TOPFILE,"> $topfile") or
@@ -3310,6 +3337,9 @@ sub CreateTopFile()
 	    print TOPFILE "node $vname $type $subnodestr $desirestr\n";
 	    if (virtnodeisvirt($vname)) {
 		$virtnode_count++;
+	    }
+	    elsif (virtnodeissim($vname)) {
+		$simnode_count++;
 	    }
 	    else {
 		$physnode_count++;
@@ -3374,6 +3404,13 @@ sub CreateTopFile()
 	}
 	if ($simnodes > 0 && $realnodes == 0) {
 	    $trivial_ok = 1;
+	    # The current support where all simulated nodes
+	    # are put on one PC does not support EMULATED links
+	    # or use veth devices
+	    $emulated = 0;
+	    $virt_lans{$lan}->{"EMULATED"} = 0;
+	    $virt_lans{$lan}->{"USEVETH"} = 0;
+	    $virt_lans{$lan}->{"ALLSIM"} = 1;
 	}
 	if ($#members == 1) {
 	    $expt_stats{"links"} += 1;
@@ -3652,6 +3689,9 @@ sub CreateTopFile()
     print "Maximum nodes   = $maximum_nodes\n";
     if ($virtnode_count) {
 	print "Virtual nodes   = $virtnode_count\n";
+    }
+    if ($simnode_count) {
+	print "Simulated nodes   = $simnode_count\n";
     }
 }
 
