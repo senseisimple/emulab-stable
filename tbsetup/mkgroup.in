@@ -215,10 +215,19 @@ foreach my $tipserver ( TBTipServers() ) {
 }
 
 #
-# Create the group directory if it does not already exist, but not for
-# the default group of the project.
+# Create the group directory if it does not already exist - for default groups,
+# though, we just link to the /proj drectory
 #
-if ($pid ne $gid) {
+if ($pid eq $gid) {
+    if (! -e $groupdir) {
+	print "Linking default group directory: $groupdir.\n";
+
+	my $projdir = "$PROJROOT/$pid";
+	if (system("ln -s $projdir $groupdir")) {
+	    fatal("Could not link group directory $projdir to  $groupdir");
+	}
+    }
+} else {
     if (! -e $groupdir) {
 	print "Creating group directory: $groupdir.\n";
     
