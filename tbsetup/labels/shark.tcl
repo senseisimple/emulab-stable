@@ -67,6 +67,7 @@ set newlabels {3 7 8 14 15 21 22 26 27 31 33 28 34 36 37 38 39 40}
 
 foreach label $newlabels {
     LABEL::label $lables($label) -font $wirefont
+    LABEL::label $lables($label) -font $wirefont
 }
 
 LABEL::print "dnard"
