@@ -19,7 +19,10 @@ The following directories will need to exist on partitions that have enough
 space to hold them:
 
 /usr/testbed/ - Needs space for testbed software and logs. A few gig should be
-					plenty
+					plenty. Make sure that you (and anyone
+					else who will be installing software)
+					have permission to write to this
+					directory.
 /users/       - Needs space for user home directories. Amount of space required
 /proj/        - Needs space for project files. We recommend that this be larger
 					than /users, to encourage people to store files there, which
