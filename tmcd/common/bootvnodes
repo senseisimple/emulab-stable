@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -119,6 +119,12 @@ if (! @vnodes) {
     exit(0);
 }
 print "Vnodelist is @vnodes.\n";
+
+#
+# If booting with vnodes, then see about creating the extra FS.
+# This will fail if it already exists. Keep going on any failure though.
+#
+system("mkextrafs.pl $vndir");
 
 foreach my $vnode (keys(%curvnodelist)) {
     my $jailflag = "";
