@@ -280,6 +280,7 @@ CREATE TABLE experiments (
   cpu_usage tinyint(4) unsigned NOT NULL default '0',
   mem_usage tinyint(4) unsigned NOT NULL default '0',
   keyhash varchar(64) default NULL,
+  eventkey varchar(64) default NULL,
   idx int(10) unsigned NOT NULL auto_increment,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
