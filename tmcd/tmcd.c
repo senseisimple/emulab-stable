@@ -4386,6 +4386,7 @@ COMMAND_PROTOTYPE(dojailconfig)
 		       "INETRAW=1\n"
 		       "BPFRO=1\n"
 		       "INADDRANY=1\n"
+		       "IPFW=1\n"
 		       "ROUTING=%d\n"
 		       "DEVMEM=%d\n",
 		       low, high, atoi(row[0]), reqp->islocal, reqp->islocal);
