@@ -324,14 +324,16 @@ sub ParseArgs {
     die("What shall I do?\n")
 	if (!($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l
 	      ||$on||$off||$cyc));
-    if (@vlan||$f||@r||$l) { $i = "Gamma"; }
+    if (@vlan||$f||@r||$l && (!defined($i)||!$i)) { $i = "Gamma"; }
     if ($i =~ /Alpha/i) { $i = "155.99.214.170"; }
     if ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
     if ($i =~ /Gamma/i)  { $i = "155.99.214.172"; }
     if ($i =~ /Delta/i)  { $i = "155.99.214.173"; }
+    if ($i =~ /Eta/i)  { $i = "155.99.214.174"; }
     die("\"$i\" is not an Intel 510 Switch:\nPossible completions are:\n",
-	"Alpha/155.99.214.170\n Beta/155.99.214.171\n",
-	"Gamma/155.99.214.172\n Delta/155.99.214.173\n") 
+	"Alpha/155.99.214.170\nBeta /155.99.214.171\n",
+	"Gamma/155.99.214.172\nDelta/155.99.214.173\n", 
+	"Eta  /155.99.214.174\n") 
 	if ( (!(($i=~/155\.99\.214\.17(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/))) && 
 	     ($d||$e||$a||$spd||$dup||$s||$g||@vlan||$f||@r||$l));
     die("$i is not a power controller.\n") 
