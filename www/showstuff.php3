@@ -336,12 +336,11 @@ function SHOWUSER($uid) {
     #
     if (($lastweblogin = LASTWEBLOGIN($uid)) == 0)
 	$lastweblogin = "&nbsp";
-    if (($lastuserslogininfo = LASTUSERSLOGIN($uid)) == 0)
+    if (($lastuserslogininfo = TBUsersLastLogin($uid)) == 0)
 	$lastuserslogin = "N/A";
     else {
 	$lastuserslogin = $lastuserslogininfo["date"] . " " .
-	                  $lastuserslogininfo["time"] . " " .
-                          "(" . $lastuserslogininfo["node_id"] . ")";
+		          $lastuserslogininfo["time"];
     }
     
     if (($lastnodelogininfo = TBUidNodeLastLogin($uid)) == 0)

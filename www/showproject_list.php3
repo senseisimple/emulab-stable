@@ -44,12 +44,20 @@ elseif (! strcmp($sortby, "pid"))
     $order = "p.pid";
 elseif (! strcmp($sortby, "uid"))
     $order = "p.head_uid";
+elseif (! strcmp($sortby, "idle"))
+    $order = "idle";
+elseif (! strcmp($sortby, "created"))
+    $order = "p.expt_count DESC";
+elseif (! strcmp($sortby, "running"))
+    $order = "ecount DESC";
+elseif (! strcmp($sortby, "nodes"))
+    $order = "ncount DESC";
 else 
     $order = "p.name";
 
 if ($isadmin) {
     $query_result =
-	DBQueryFatal("SELECT * FROM projects as p order by $order");
+	DBQueryFatal("SELECT pid,expt_count FROM projects as p");
     
     #
     # Process the query results for active projects so I can generate a
@@ -90,17 +98,31 @@ function GENPLIST ($query_result)
 
     echo "<table width='100%' border=2
                  cellpadding=2 cellspacing=0 align=center>
-          <tr>
-           <td><a href='showproject_list.php3?splitview=$splitview&sortby=pid'>
-               PID</td>
-           <td>(Approved?)
+          <tr>\n";
+
+    echo "<td><a href='showproject_list.php3?splitview=$splitview&sortby=pid'>
+               PID</a></td>\n";
+    
+    echo "<td>(Approved?)
               <a href='showproject_list.php3?splitview=$splitview&sortby=name'>
-               Description</td>
-           <td><a href='showproject_list.php3?splitview=$splitview&sortby=uid'>
-               Leader</td>
-           <td align=center>Days<br>Idle</td>
-           <td align=center colspan=2>Expts<br>Cr, Run</td>
-           <td align=center>Nodes</td>\n";
+               Description</a></td>\n";
+
+    echo "<td><a href='showproject_list.php3?splitview=$splitview&sortby=uid'>
+               Leader</a></td>\n";
+
+    echo "<td align=center>
+              <a href='showproject_list.php3?splitview=$splitview&sortby=idle'>
+              Days<br>Idle</a></td>\n";
+
+    echo "<td align=center colspan=2>Expts<br>
+           <a href='showproject_list.php3?splitview=$splitview&sortby=created'>
+              Cr</a>,
+           <a href='showproject_list.php3?splitview=$splitview&sortby=running'>
+              Run</a></td>\n";
+
+    echo "<td align=center>
+             <a href='showproject_list.php3?splitview=$splitview&sortby=nodes'>
+             Nodes</a></td>\n";
 
     #
     # Admin users get other fields.
@@ -115,10 +137,11 @@ function GENPLIST ($query_result)
 	$headuid    = $projectrow[head_uid];
 	$Pname      = $projectrow[name];
 	$approved   = $projectrow[approved];
-	$created    = $projectrow[created];
 	$expt_count = $projectrow[expt_count];
-	$expt_last  = $projectrow[expt_last];
 	$public     = $projectrow[public];
+	$ecount     = $projectrow[ecount];
+	$ncount     = $projectrow[ncount];
+	$idle       = $projectrow[idle];
 
 	echo "<tr>
                   <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -133,37 +156,10 @@ function GENPLIST ($query_result)
                   <td><A href='showuser.php3?target_uid=$headuid'>
                          $headuid</A></td>\n";
 
-        #
-        # Sleazy! Use mysql query to convert dates to days and subtract!
-        #
-	if (isset($expt_last)) {
-	    $idle_query =
-		DBQueryFatal("select TO_DAYS(CURDATE()) - ".
-			     "                    TO_DAYS('$expt_last')");
-	    $idle_row   = mysql_fetch_row($idle_query);
-	    echo "<td>$idle_row[0]</td>\n";
-	}
-	else {
-	    $idle_query =
-		DBQueryFatal("select TO_DAYS(CURDATE()) - ".
-			     "              TO_DAYS('$created')");
-	    $idle_row   = mysql_fetch_row($idle_query);
-	    echo "<td>$idle_row[0]</td>\n";
-	}
-
-	# Number of Current Experiments.
-	$query_cur_expts =
-	    DBQueryFatal("SELECT count(*) FROM experiments where pid='$pid'");
-	$cur_expts_row = mysql_fetch_array($query_cur_expts);
-
-	# Number of nodes reserved.
-	$query_nodes_reserved =
-	    DBQueryFatal("SELECT count(*) FROM reserved where pid='$pid'");
-	$nodes_reserved_row = mysql_fetch_array($query_nodes_reserved);
-
+	echo "<td>$idle</td>\n";
 	echo "<td>$expt_count</td>\n";
-	echo "<td>$cur_expts_row[0]</td>\n";
-	echo "<td>$nodes_reserved_row[0]</td>\n";
+	echo "<td>$ecount</td>\n";
+	echo "<td>$ncount</td>\n";
 
 	if ($isadmin) {
 	    if ($public) {
@@ -183,10 +179,18 @@ function GENPLIST ($query_result)
 #
 if (! $isadmin) {
     $query_result =
-	DBQueryFatal("SELECT * FROM projects as p ".
+	DBQueryFatal("SELECT p.pid,count(distinct r.node_id) as ncount, ".
+		     "count(distinct e.eid) as ecount, ".
+		     "IF(p.expt_last, ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+		     "FROM projects as p ".
 		     "left join group_membership as g on ".
-		     "     p.pid=g.pid and g.pid=g.gid ".
-		     "where g.uid='$uid' and g.trust!='none' order by $order");
+		     " p.pid=g.pid and g.pid=g.gid ".
+		     "left join experiments as e on e.pid=p.pid ".
+		     "left join reserved as r on r.pid=p.pid ".
+		     "where g.uid='$uid' and g.trust!='none' ".
+		     "group by p.pid order by $order");
 				   
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("You are not a member of any projects!", 1);
@@ -197,8 +201,16 @@ if (! $isadmin) {
 else {
     if ($splitview) {
 	$query_result =
-	    DBQueryFatal("select * FROM projects as p ".
-			 "where expt_count>0 order by $order");
+	    DBQueryFatal("SELECT p.pid,count(distinct r.node_id) as ncount, ".
+		     "count(distinct e.eid) as ecount, ".
+		     "IF(p.expt_last, ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+		     "FROM projects as p ".
+		     "left join experiments as e on e.pid=p.pid ".
+		     "left join reserved as r on r.pid=p.pid ".
+		     "where expt_count>0 ".
+		     "group by p.pid order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<center>
@@ -208,8 +220,16 @@ else {
 	}
 
 	$query_result =
-	    DBQueryFatal("select * FROM projects as p ".
-			 "where expt_count=0 order by $order");
+	    DBQueryFatal("SELECT p.pid,count(distinct r.node_id) as ncount, ".
+		     "count(distinct e.eid) as ecount, ".
+		     "IF(p.expt_last, ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+		     "FROM projects as p ".
+		     "left join experiments as e on e.pid=p.pid ".
+		     "left join reserved as r on r.pid=p.pid ".
+		     "where expt_count=0 ".
+		     "group by p.pid order by $order");
 
 	if (mysql_num_rows($query_result)) {
 	    echo "<br><center>
@@ -220,7 +240,20 @@ else {
 
     }
     else {
-	GENPLIST($query_result);
+	$query_result =
+	    DBQueryFatal("SELECT p.*,count(distinct r.node_id) as ncount, ".
+		     "count(distinct e.eid) as ecount, ".
+		     "IF(p.expt_last, ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.expt_last), ".
+		     "  TO_DAYS(CURDATE()) - TO_DAYS(p.created)) as idle ".
+		     " FROM projects as p ".
+		     "left join experiments as e on e.pid=p.pid ".
+		     "left join reserved as r on r.pid=p.pid ".
+		     "group by p.pid order by $order");
+
+	if (mysql_num_rows($query_result)) {
+	    GENPLIST($query_result);
+	}
     }
 }
 

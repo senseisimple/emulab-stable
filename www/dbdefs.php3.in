@@ -1019,6 +1019,21 @@ function TBNodeUidLastLogin($node_id)
 }
 
 #
+# Return the last login for the users node.
+# 
+function TBUsersLastLogin($uid)
+{
+    $query_result =
+	DBQueryFatal("select * from userslastlogin where uid='$uid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row;
+}
+
+#
 # Return number of events in an experiment.
 #
 function TBEventCount($pid, $eid)

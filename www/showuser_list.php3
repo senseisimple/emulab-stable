@@ -24,61 +24,79 @@ if (! $isadmin) {
 }
 if (!isset($showactive))
     $showactive = 0;
-if (!isset($sortbyname))
-    $sortbyname = 0;
+if (!isset($sortby))
+    $sortby = "name";
     
 if (!$showactive) {
-    echo "<b><a href='showuser_list.php3?showactive=1&sortbyname=$sortbyname'>
+    echo "<b><a href='showuser_list.php3?showactive=1&sortby=$sortby'>
                 Show Logged in Users</a>
           </b><br><br>\n";
 }
 else {
-    echo "<b><a href='showuser_list.php3?showactive=0&sortbyname=$sortbyname'>
+    echo "<b><a href='showuser_list.php3?showactive=0&sortby=$sortby'>
                 Show All Users</a>
           </b><br><br>\n";
 }
-if (!$sortbyname) {
+
+if (! strcmp($sortby, "name"))
+    $order = "u.usr_name";
+elseif (! strcmp($sortby, "uid"))
     $order = "u.uid";
-    $sortbyname = 0;
-}
+elseif (! strcmp($sortby, "widle"))
+    $order = "webidle DESC";
+elseif (! strcmp($sortby, "uidle"))
+    $order = "usersidle DESC";
 else {
     $order = "u.usr_name";
 }
 
 if ($showactive) {
     $query_result =
-	DBQueryFatal("select u.* from login as l ".
-		     "left join users as u on u.uid=l.uid ".
-		     "where timeout>=unix_timestamp() ".
+	DBQueryFatal("SELECT u.*, ".
+		     " IF(ll.time, ".
+		     "    TO_DAYS(CURDATE()) - TO_DAYS(ll.time), ".
+		     "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
+		     "   as webidle, ".
+		     " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
+		     "FROM users as u ".
+		     "left join login as l on u.uid=l.uid ".
+		     "left join userslastlogin as ull on u.uid=ull.uid ".
+		     "left join lastlogin as ll on u.uid=ll.uid ".
+		     "where l.timeout>=unix_timestamp() ".
 		     "order by $order");
 }
 else {
     $query_result =
-	DBQueryFatal("SELECT u.* FROM users as u order by $order");
+	DBQueryFatal("SELECT u.*, ".
+		     " IF(ll.time, ".
+		     "    TO_DAYS(CURDATE()) - TO_DAYS(ll.time), ".
+		     "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
+		     "   as webidle, ".
+		     " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
+		     "FROM users as u ".
+		     "left join userslastlogin as ull on u.uid=ull.uid ".
+		     "left join lastlogin as ll on u.uid=ll.uid ".
+		     "order by $order");
 }
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no users!", 1);
 }
 
-#
-# Grab the login info. If we cannot get the login info, then just
-# proceed without it. 
-#
-$loginarray = LASTUSERSLOGIN(0);
-
 echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=0
        align='center'>\n";
 
 echo "<tr>
           <td>&nbsp</td>
-          <td><a href='showuser_list.php3?showactive=$showactive&sortbyname=0'>
-                 UID</td>
-          <td><a href='showuser_list.php3?showactive=$showactive&sortbyname=1'>
-                 Name</td>
+          <td><a href='showuser_list.php3?showactive=$showactive&sortby=uid'>
+                 UID</a></td>
+          <td><a href='showuser_list.php3?showactive=$showactive&sortby=name'>
+                 Name</a></td>
           <td>Projects</td>
-          <td>Web<br>Idle</td>
-          <td>Users<br>Idle</td>\n";
+          <td><a href='showuser_list.php3?showactive=$showactive&sortby=widle'>
+                 Web<br>Idle</a></td>
+          <td><a href='showuser_list.php3?showactive=$showactive&sortby=uidle'>
+                 Users<br>Idle</a></td>\n";
 
 #
 # Admin users get a "delete" and a "modify" option.
@@ -95,7 +113,8 @@ while ($row = mysql_fetch_array($query_result)) {
     $name     = $row[usr_name];
     $status   = $row[status];
     $unix_uid = $row[unix_uid];
-    $lastweblogin   = LASTWEBLOGIN($thisuid);
+    $webidle  = $row[webidle];
+    $usersidle= $row[usersidle];
 
     #
     # Suck out a list of projects too.
@@ -132,30 +151,12 @@ while ($row = mysql_fetch_array($query_result)) {
 	    echo "<td>--</td>\n";
     }
 
-    #
-    # Sleazy! Use mysql query to convert dates to days and subtract!
-    #
-    if ($lastweblogin) {
-	$idle_query = mysql_db_query($TBDBNAME,
-		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$lastweblogin\")");
-	$idle_row   = mysql_fetch_row($idle_query);
-	echo "<td>$idle_row[0]</td>\n";
-    }
-    else {
-	echo "<td>&nbsp</td>\n";
-    }
+    echo "<td>$webidle</td>\n";
 
-    if ($loginarray && isset($loginarray["$unix_uid"])) {
-	$userslogininfo = $loginarray["$unix_uid"];
-	$lastuserslogin = $userslogininfo["date"];
-
-	$idle_query = mysql_db_query($TBDBNAME,
-		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$lastuserslogin\")");
-	$idle_row   = mysql_fetch_row($idle_query);
-	echo "<td>$idle_row[0]</td>\n";
-    }
-    else {
+    if (! $usersidle)
 	echo "<td>&nbsp</td>\n";
+    else {
+	echo "<td>$usersidle</td>\n";
     }
 
     if ($isadmin) {
