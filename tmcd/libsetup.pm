@@ -853,6 +853,7 @@ sub dotrafficconfig()
     
     close($TM);
     if ($didopen) {
+	printf RC "%s %s\n", TMCC(), TMCCCMD_READY();
 	close(RC);
 	chmod(0755, TMTRAFFICCONFIG);
     }
