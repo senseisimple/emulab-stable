@@ -62,7 +62,7 @@ if (! $pid) {
     sleep(1);
 
     system("nice parse.tcl @ARGV");
-    exit($? >> 0);
+    exit($? >> 8);
 }
 
 #
