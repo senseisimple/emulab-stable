@@ -12,12 +12,13 @@ LIBTBDIR    = $(OBJDIR)/lib/libtb
 LIBEVENTDIR = ../lib
 DAEMON	        = linktest
 SCRIPT		= linktest.pl
+SCRIPT_RUN	= run_linktest.pl
 
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	$(DAEMON) $(SCRIPT)
+all:	$(DAEMON) $(SCRIPT) $(SCRIPT_RUN)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -64,6 +65,8 @@ client-install:
 			$(DESTDIR)$(CLIENT_BINDIR)/$(DAEMON)
 	$(INSTALL_PROGRAM) $(SCRIPT) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
+	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
 
 clean:
 	/bin/rm -f *.o $(TESTS)

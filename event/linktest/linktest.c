@@ -102,7 +102,7 @@ main(int argc, char **argv) {
 		fatal("could not allocate an address tuple");
 	}
 	/*
-	 * Ask for just the program agents we care about. 
+	 * Ask for just the events we care about. 
 	 */
 	tuple->expt      = pideid;
 	tuple->objtype   = TBDB_OBJECTTYPE_LINKTEST;
@@ -193,6 +193,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
 /* start one linktest at a time.
  */
+/* todo, move this to proper place */
 #define MAX_ARGS 10
 static void
 start_linktest(char *args, int buflen) {
@@ -201,11 +202,13 @@ start_linktest(char *args, int buflen) {
   int status;
   char *word;
   char *argv[MAX_ARGS];
-  int i=0;
-
+  int i=1;
+  
+  
   if(running) return;
   running = 1;
 
+  info("raw args: %s\n",args);
 
   word = strtok(args," \t");
   do {
@@ -213,7 +216,7 @@ start_linktest(char *args, int buflen) {
   } while ((word = strtok(NULL," \t"))
            && (i<MAX_ARGS));
   argv[i] = NULL;
-
+  argv[0] = LINKTEST_SCRIPT;
   info("starting linktest.\n");
   
   lt_pid = fork();
@@ -222,5 +225,8 @@ start_linktest(char *args, int buflen) {
   }
   waitpid(lt_pid, &status, 0);
   running = 0;
-
+  info("linktest completed.\n");
 }
+
+
+

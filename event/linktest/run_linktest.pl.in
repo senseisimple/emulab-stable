@@ -1,0 +1,125 @@
+#!/usr/bin/perl -w
+#
+# wrapper for running linktest that includes
+# an extra event for reporting completion.
+#
+# TODO: consider timeout overall
+
+use strict;
+use lib '@prefix@/lib';
+use event;
+use Getopt::Std;
+
+sub usage {
+    warn "Usage: $0 -p pid -e eid -s server\n";
+    return 1;
+}
+
+my $server; # event server
+my %opt = ();
+getopts("s:p:e:",\%opt);
+if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+exit &usage unless ($opt{p} && $opt{e});
+
+my $pid = $opt{p};
+my $eid = $opt{e};
+
+
+my $linktest_path; # path to linktest data.
+$linktest_path = "/proj/" . $opt{p} . "/exp/" . $opt{e} . "/tbdata/linktest";
+
+
+my $URL = "elvin://$server";
+my $handle = event_register($URL,0);
+if (!$handle) { die "Unable to register with event system\n"; }
+
+# send the startup event.
+{
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+    %$tuple = ( objtype => "LINKTEST",
+		objname => "linktest",
+		eventtype => "START",
+		expt => "$pid/$eid",
+		host => "*");
+
+    my $notification = event_notification_alloc($handle,$tuple);
+    if (!$notification) { die "Could not allocate notification\n"; }
+
+    event_notification_put_string($handle,$notification,"VERBOSE","1");
+
+    print "Sent at time " . time() . "\n";
+
+    if (!event_notify($handle, $notification)) {
+	die("could not send test event notification");
+    }
+
+    event_notification_free($handle, $notification);
+
+}
+
+# wait for the shutdown event.
+{
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) { die "Could not allocate an address tuple\n"; }
+
+    %$tuple = ( host      => $event::ADDRESSTUPLE_ALL,
+		objtype   => 'LINKTEST' );
+
+    if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
+	die "Could not subscribe to event\n";
+    }
+    while (1) {
+	event_poll($handle);
+	select(undef, undef, undef, 0.25);
+    }
+}
+
+if (event_unregister($handle) == 0) {
+	die "Unable to unregister with event system\n";
+}
+
+exit(0);
+sub callbackFunc($$$) {
+	my ($handle,$notification,$data) = @_;
+
+	my $eventtype = event_notification_get_eventtype($handle,
+		$notification);
+	my $time      = time();
+
+	# Got completion event. Now check what happened on Linktest.
+	print "Linktest completed at $time\n";
+
+	exit &analyze;
+}
+
+# purpose, scan the linktest directory and output nicely formatted 
+# description  of problems found. If problems found, return 1, else 0.
+sub analyze {
+    my @dir_contents;
+    opendir (DIR,$linktest_path) || die "cannot open Linktest directory.";
+    @dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
+    closedir(DIR);
+
+    foreach my $file (@dir_contents)
+    {
+	system "cat $linktest_path/$file";
+
+    }
+    if(@dir_contents) {
+	return 1;
+    } else {
+	print "No errors\n";
+	return 0;
+    }
+
+}
+
+
+
+
+
+
+
+
