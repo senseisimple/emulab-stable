@@ -41,7 +41,7 @@ between them.
 
 This commands is used to set hardware specs.  Currently only one
 format is supported: <type> = shark-shelf.  This indicates that <node>
-should be a shelf (unswitches LAN) of 8 sharks.
+should be a shelf (unswitched LAN) of 8 sharks.
 
 
 #TB set-dnard-ip <shelf> <number> <ip>
@@ -55,10 +55,13 @@ Node, it all cases <node> can include * and ? as wild cards and
 
 #TB create-os <label> <image_path> <partition>
 
+Creates a custom OS.  Any <os> argument can then refer to it by <label>.
+
+
 #TB set-link-loss <src> <dst> <rate>
 
-Set the loss rate of a link.
+Set the loss rate of a link.  <rate> is between 0.0 and 1.0.
 
 #TB set-lan-loss <lan> <rate>
 
-Set the loss rate of a lan.
+Set the loss rate of a lan.  <rate> is between 0.0 and 1.0.

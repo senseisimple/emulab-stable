@@ -79,7 +79,7 @@ START links
 # up the virtual link.
 END links
 START lans
-# <virtual lan> <physical lan>
+# <virtual lan> <physical nodes>
 END lans
 END virtual
 
@@ -163,8 +163,10 @@ END ip
 
 START delay
 # Records of the form
-# <node> <bw> <delay>
-# <node> is a virtual node name, <bw> is ###Mb, and <delay> is ###ms
+# <node> <bw> <delay> <loss> <macA> <macB>
+# <node> is a virtual node name, <bw> is in MB, and <delay> is in ms.
+# <loss> is the loss rate between 0.0 and 1.0
+# <macA> and <macB> are the macs to delay between
 END delay
 
 START os
@@ -181,13 +183,3 @@ START nodes
 END nodes
 END os
 
-----------------------------------------------------------------------
-
-Other possible sections:
-
-software - describes what software to install on what nodes
-data - describes data collection
-control - describes control
-user - describes basic information of user (contact, etc.)
-traffic - describes traffic generation
-agents - describes agents
