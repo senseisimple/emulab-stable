@@ -15,10 +15,8 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: os_load [-s] [[-p <pid>] -i <imagename>] [-m <imageid>] ".
-        "<node> [node ...]\n".
-	"       os_load [-s] [[-p <pid>] -i <imagename>] [-m <imageid>] ".
-        "-e pid,eid\n".
+	"Usage: os_load [-s] [[-p <pid>] -i <imagename>] <node> [node ...]\n".
+	"       os_load [-s] [[-p <pid>] -i <imagename>] -e pid,eid\n".
 	"       os_load -l\n".
 	"Use -i to specify an image name. Use node default otherwise.\n".
 	"Use -m to specify an image ID (internal name, TB admins only!).\n".
@@ -558,12 +556,19 @@ sub dolisting()
 	$query_result =
 	    DBQueryFatal("SELECT * FROM images order by imageid");
     }
-    
-    for ($i = 0; $i < $query_result->numrows; $i++) {
-	my %row  = $query_result->fetchhash();
-	my $id   = $row{'imageid'};
-	my $desc = $row{'description'};
 
-	printf "%-20s %s\n", $id, $desc;
+    if ($query_result->numrows) {
+	printf "%-12s %-20s %s\n", "Pid", "Imagename", "Description";
+	printf "------------ -------------------- -------------------------\n";
+    
+	for ($i = 0; $i < $query_result->numrows; $i++) {
+	    my %row  = $query_result->fetchhash();
+	    my $id   = $row{'imageid'};
+	    my $pid  = $row{'pid'};
+	    my $name = $row{'imagename'};
+	    my $desc = $row{'description'};
+
+	    printf "%-12s %-20s %s\n", $pid, $name, $desc;
+	}
     }
 }
