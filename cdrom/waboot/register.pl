@@ -58,6 +58,8 @@ my $cdkeyfile	= "$etcdir/emulab.cdkey";
 my $setupconfig	= "$etcdir/emulab-setup.txt";
 my $softconfig	= "$etcdir/emulab-soft.txt";
 my $privkeyfile = "$etcdir/emulab.pkey";
+# Good for onetime install without being prompted! See note below.
+my $installkey  = "$etcdir/emulab.ikey";
 my $tbboot	= "tbbootconfig";
 my $wget	= "wget";
 my $tempdevice  = "s2c";
@@ -524,9 +526,24 @@ sub GetInstructions()
 	    chomp($privkey);
 	}
 	else {
-	    while (!defined($privkey)) {
-		$privkey = Prompt("Please enter your 16 character CD password".
-				  " (no spaces)", undef);
+	    #
+	    # We allow for the initial install key to be on the CDROM.
+	    # Its only good for one install though! It will be rejected
+	    # if its tried again. Thats not so bad though; it just means
+	    # that if the disk gets totally scrogged we need to edit the
+	    # DB state slightly to allow the key to be used. That would
+	    # be on demand!
+	    #
+	    if (-s $installkey) {
+		$privkey = `cat $installkey`;
+		chomp($privkey);
+	    }
+	    else {
+		while (!defined($privkey)) {
+		    $privkey =
+			Prompt("Please enter your 16 character CD password".
+			       " (no spaces)", undef);
+		}
 	    }
 	}
 
@@ -869,7 +886,7 @@ sub LocalizeRoot()
 	print $ED "\$\n";
 	print $ED "a\n";
 	print $ED "/dev/${blockdevice}${slicexdev}\t\t$slicex_mount\t\t".
-	    "ufs\trw\t0\t2\n";
+	    "ufs\trw,nosuid\t0\t2\n";
 	print $ED ".\n";
     }
     
