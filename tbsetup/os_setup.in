@@ -420,7 +420,18 @@ foreach my $vnode (keys(%vnodes)) {
 	die_noretry("*** $0:\n".
 	    "    Cannot determine phys_nodeid for $vnode!");
     }
-    my $n_osid = $osids{$pnode};
+    my $n_osid;
+    
+    if (!defined($nodes{$pnode})) {
+	#
+	# Typical on remote nodes; we do not allocate the underlying
+	# phys node to the experiment.
+	#
+	next;
+    }
+    else {
+	$n_osid = $osids{$pnode};
+    }
     
     system("$osselect $n_osid $vnode") and
 	die_noretry("*** Could not set boot OS to $n_osid for $vnode");
@@ -629,7 +640,7 @@ elsif (@vnodelist) {
 	my $node   = shift(@vnodelist);
 	my $wstart = $waitstart{$node};
 
-	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*10))) {
+	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*3))) {
 	    print "$node is alive and well\n";
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;
@@ -676,7 +687,7 @@ elsif (@vnodelist) {
     TBDebugTimeStamp("Virtual node waiting finished");
 }
 
-print "OS Setup Done!\n";
+print "OS Setup Done. There were $failed nodes.\n";
 TBDebugTimeStamp("os_setup finished");
 
 if ($failed > 0) {
