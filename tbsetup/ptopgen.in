@@ -109,21 +109,6 @@ sub get_ifacebw {
     }
 };
 
-# SHARK
-$sth = $dbh->prepare("SELECT node_id1,node_id2 from wires" .
-		     " where type=\"Dnard\"");
-$sth->execute;
-while (($node1,$node2) = $sth->fetchrow_array) {
-    if (defined($nodes{$node1}) && 
-	(defined($nodes{$node2}) || defined($switches{$node2}))) {
-	# Hack until the DB makes sense
-	if ($node2 ne "cisco1") {next;}
-	print "link link-$node1 $node1:$node1/eth0 $node2 100 1\n";
-    }
-}
-$sth->finish;
-# END SHARK
-
 $sth = $dbh->prepare("SELECT node_id1,card1,port1,node_id2,card2,port2" .
  		    " from wires where type=\"Node\"");
 $sth->execute;
