@@ -526,14 +526,28 @@ if test "$enable_windows" = "yes"; then
 		  os/imagezip/ntfs/libntfs/GNUmakefile \
 		  os/imagezip/fat/GNUmakefile"
 	optional_subdirs="$optional_subdirs";
-	EXE_SUFFIX=".exe";
 	WINSUPPORT=1;
 else
 	winfiles="";
-	EXE_SUFFIX="";
 	WINSUPPORT=0;
 fi
 AC_SUBST(WINSUPPORT)
+
+#
+# Enable Windows Client support.
+# Right now this means we are building the client software under CygWin.
+# You should also turn on --enable-windows.
+# Off by default.
+# 
+AC_ARG_ENABLE(windowsclient,
+[  --enable-windowsclient      Enable Windows XP client support (requires third-party software)])
+
+if test "$enable_windowsclient" = "yes"; then
+	# This is needed in strip and install actions.
+	EXE_SUFFIX=".exe";
+else
+	EXE_SUFFIX="";
+fi
 AC_SUBST(EXE_SUFFIX)
 
 #
