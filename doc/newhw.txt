@@ -12,13 +12,13 @@ Temp. worker co-ordination: Mac
 **********************************************************************
 ISP110s:
 	Status: Ordered, 44 recived
-	Next shipment: ??
+	Next shipment: 25-30, Aug 14 between 10:00AM and 11:00AM
 	Responsible: Rob
-	Note: Rails are currently backordered, should be in next week 
+	Note: Rails are currently backordered, should be in 8/14 or 8/15
 
 Network cables:
 	Status: Ordered
-	First shipment: Most should come Monday, 8/13
+	First shipment: Most should come Tuesday, 8/14
 	Responsible: Mac
 
 Rackmount nuts/screws:
@@ -27,8 +27,7 @@ Rackmount nuts/screws:
 	Responsible: Mac
 
 3ft Power cables from ValCom:
-	Status: Ordered
-	Shipped: By Monday (8/13)
+	Status: Recieved
 	Responsible: Rob
 
 Short power cables from Standard:
@@ -57,9 +56,11 @@ Labels:
 	 
 Cable ties:
 	Pick them up at Home Depot
+	Status: Arrived
 	Responsible: Mike
 
 Cable management bars:
+	Status: Cancelled - we're using cable ties instead
 	Simple horizontal metal bars to tie cables to
 	Responsible: Mac
 	Note: Corey suggests that the metal shop is the simplest way to go,
@@ -94,27 +95,32 @@ Pick control net ineterface:
 
 Decide on machine numbering scheme:
 	Responsible: ??
-	Start at pc42?
+	Status: Done
+	Start at pc42
 
 Serial server:
 	What machines can we use the Cyclades card in?
-	Responsible: ??
+	Responsible: Rob/Leigh/Mike
+	Status: Done
+	ASA box has become tipserv1
 
 **********************************************************************
 ***** Misc
 **********************************************************************
 Cable labels:
 	Responsible: Rob
-	Note:
+	Status: .ps file generated, need to be printed
 
 PC labels:
 	Responsible: Rob
-	Note: Will depend somewhat on our chosen numbering scheme
+	Status: Printed
+	Note: We won't label machines until we know they work
 
 Power outlets:
 	We need 2 outlets of at least 15 amps per rack
 	Responsible: Rob
-	Note: Talk to Corey Hatch
+	Status: Found 2, need 4 more
+	Note: Any outlets we find under the floor are fair game
 
 **********************************************************************
 ***** Testbed state to update
@@ -126,6 +132,7 @@ New machine type:
 Wires table:
 	Using a consistent wiring scheme, this can be filled by a script
 	Responsible: Rob
+	Status: Script created/checked in
 
 Interfaces table:
 	Toughest part here is the MAC addresses - See "MAC Address gathering"
@@ -225,7 +232,7 @@ Wiring: (Note: Mac has a file with some additional tips)
 ***** Schedule
 **********************************************************************
 To get the first rack set up, we need:
-	44 ISPs w/ rails (arrived, not yet installed)
+	44 ISPs w/ rails (arrived, installed)
 	At least 1/3 of the network/serial cables
 	At least 1/3 of the power cables (enough have arrived)
 	'power' that can talk to RPCs
