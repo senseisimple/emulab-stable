@@ -50,6 +50,7 @@ my %virtual_tables = ("experiments"		=> undef,
 		      "virt_node_desires"	=> undef,
 		      "virt_routes"		=> undef,
 		      "virt_vtypes"		=> undef,
+		      "virt_programs"		=> undef,
 		      "nseconfigs"		=> undef,
 		      "eventlist"		=> undef);
 

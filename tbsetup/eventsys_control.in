@@ -118,25 +118,23 @@ if (! ($expstate = ExpState($pid, $eid))) {
 }
 
 #
+# Check permission. Only people with permission to destroy the experiment
+# can do this.
+#
+if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
+    die("*** $0:\n".
+	"    You do not have permission to control the event system!\n");
+}
+
+#
 # Do not allow an event system to be controlled if the experiment is not
-# active (or swapping). We will eventually give the user the ability
-# to control the event system directly.
+# active (or swapping).
 #
 if ($expstate ne EXPTSTATE_ACTIVE &&
     $expstate ne EXPTSTATE_ACTIVATING &&
     $expstate ne EXPTSTATE_SWAPPING) {
     die("*** $0:\n".
 	"    Experiment $pid/$eid must active (or swapping)!\n");
-}
-
-#
-# Check permission. Only people with permission to destroy the experiment
-# can do this.
-#
-if ($UID &&
-    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
-    die("*** $0:\n".
-	"    You do not have permission to control the event system!\n");
 }
 
 #
@@ -262,5 +260,5 @@ if (my $childpid = TBBackGround("$path/logs/event-sched.log")) {
     }
     exit(0);
 }
-system("$evsched -dd -s $BOSSADDR $pid $eid");
+system("$evsched -dd -s $BOSSADDR -k ".TBDB_EVENTKEY($pid,$eid)." $pid $eid");
 exit($? >> 0);

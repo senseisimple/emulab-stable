@@ -602,6 +602,8 @@ Simulator instproc at {time eventstring} {
 	    switch -- $cmd {
 		"start" {
 		    set etype START
+		    # Must leave this here for the benefit of old
+		    # images that expect the command line in the event. 
 		    set arg  [$obj set command]
 		    set args "COMMAND=$arg"
 		}

@@ -63,6 +63,9 @@ Program instproc updatedb {DB} {
 	set progvnode [$node set nsenode]
     }
 
+    # Update the DB
+    spitxml_data "virt_programs" [list "vnode" "vname" "command"] [list $progvnode $self $command ]
+
     $sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] [list $progvnode $self $objtypes(PROGRAM) ]
 }
 

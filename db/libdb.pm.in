@@ -173,7 +173,7 @@ use Exporter;
 
 	 TBDB_ROUTERTYPE_NONE	TBDB_ROUTERTYPE_OSPF
 	 TBDB_ROUTERTYPE_STATIC TBDB_ROUTERTYPE_MANUAL
-
+	 TBDB_EVENTKEY
          max min
 	 );
 
@@ -545,6 +545,9 @@ sub TBDB_ROUTERTYPE_NONE()	{ "none"; }
 sub TBDB_ROUTERTYPE_OSPF()	{ "ospf"; }
 sub TBDB_ROUTERTYPE_STATIC()	{ "static"; }
 sub TBDB_ROUTERTYPE_MANUAL()	{ "manual"; }
+
+# Event Stuff
+sub TBDB_EVENTKEY($$)	{ TBExptUserDir($_[0],$_[1]) . "/tbdata/eventkey"; }
 
 #
 # Auth stuff.
@@ -2667,6 +2670,7 @@ sub TBGetSiteVar($)
 		   "virt_agents",
 		   "virt_routes",
 		   "virt_vtypes",
+		   "virt_programs",
 		   "virt_node_desires",
 		   "nseconfigs",
 		   "eventlist",

@@ -39,6 +39,7 @@ my  $optlist = "iE:d:g:x:e:p:sa:l:n:fq";
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $PROJROOT = "/proj";
+my $EVENTSYS = @EVENTSYS@;
 
 #
 # Testbed Support libraries
@@ -159,9 +160,11 @@ if (!$immediate && TBSiteVarExists("idle/batch_threshold")) {
 }
 
 #
-# Grab me a secret key!
+# Grab me a secret key for accessing tar/rpm files via the web interface.
+# Grab another secret key for the event system HMACs.
 #
-my $secretkey = TBGenSecretKey();
+my $webkey   = TBGenSecretKey();
+my $eventkey = TBGenSecretKey();
 
 #
 # Create an experiment record. The pid/eid has to be unique, so lock the
@@ -189,12 +192,12 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
-		  " idle_ignore, keyhash, batchstate, expt_locked) ".
+		  " idle_ignore, keyhash, batchstate, expt_locked, eventkey) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
-		  "'$autoswaptime', $idleignore, '$secretkey', ".
-		  "'$swapstate', now())")) {
+		  "'$autoswaptime', $idleignore, '$webkey', ".
+		  "'$swapstate', now(), '$eventkey')")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -233,6 +236,16 @@ if (! DBQueryWarn("insert into experiment_stats ".
 #
 if (system("$mkexpdir $pid $gid $eid") != 0) {
     fatal("$mkexpdir failed");
+}
+
+#
+# Dump the eventkey into a file in the experiment directory. 
+#
+if ($EVENTSYS) {
+    open(KEY, ">" . TBDB_EVENTKEY($pid, $eid)) or
+	fatal("Could not create eventkey file: $!");
+    print KEY $eventkey;
+    close(KEY);
 }
 
 #
@@ -385,7 +398,7 @@ sub ParseArgs()
 	$tempnsfile = $ARGV[0];
 
 	# Note different taint check (allow /).
-	if ($tempnsfile =~ /^([-\@\w.\/]+)$/) {
+	if ($tempnsfile =~ /^([-\@\w\.\/]+)$/) {
 	    $tempnsfile = $1;
 	}
 	else {
