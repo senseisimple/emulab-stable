@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -77,6 +77,7 @@ my %experiment_fields = ("multiplex_factor"		=> 1,
 			 "wa_plr_solverweight"		=> 1,
 			 "cpu_usage"			=> 1,
 			 "mem_usage"			=> 1,
+			 "veth_encapsulate"		=> 1,
 			 "sync_server"			=> 1);
 
 #

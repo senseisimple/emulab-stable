@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -229,6 +229,9 @@ namespace eval GLOBALS {
     # it an integer, 1 <= x <= 5.
     variable cpu_usage 3
     variable mem_usage 0
+
+    # Control veth encapsulation
+    variable veth_encapsulate 1
 }
 
 # Load all our classes

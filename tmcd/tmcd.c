@@ -157,6 +157,7 @@ typedef struct {
 	char		eventkey[TBDB_FLEN_PRIVKEY];
 	char		sfshostid[TBDB_FLEN_SFSHOSTID];
 	char		testdb[256];
+	int		veth_encapsulate;
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
 static int	checkdbredirect(tmcdreq_t *);
@@ -1209,6 +1210,10 @@ COMMAND_PROTOTYPE(doifconfig)
 		if (vers >= 14) {
 		    bufp += OUTPUT( bufp, ebufp - bufp,
 				    " RTABID=%s", row[5] );
+		}
+		if (vers >= 15) {
+		    bufp += OUTPUT(bufp, ebufp - bufp,
+				   " ENCAPSULATE=%d", reqp->veth_encapsulate);
 		}
 
 		OUTPUT(bufp, ebufp - bufp, "\n");
@@ -3647,7 +3652,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,pt.class,pt.type, "
 				 " pt.isremotenode,vt.issubnode,e.keyhash, "
-				 " nv.sfshostid,e.eventkey,vt.isplabdslice "
+				 " nv.sfshostid,e.eventkey,vt.isplabdslice, "
+				 " e.veth_encapsulate "
 				 "from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
@@ -3663,7 +3669,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as vt on "
 				 " vt.type=nv.type "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 22, reqp->vnodeid, inet_ntoa(ipaddr));
+				 23, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
@@ -3672,7 +3678,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " e.expt_head_uid,e.expt_swap_uid, "
 				 " e.sync_server,t.class,t.type, "
 				 " t.isremotenode,t.issubnode,e.keyhash, "
-				 " n.sfshostid,e.eventkey,0 "
+				 " n.sfshostid,e.eventkey,0, "
+				 " e.veth_encapsulate "
 				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
@@ -3682,7 +3689,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 "left join node_types as t on "
 				 " t.type=n.type and i.iface=t.control_iface "
 				 "where i.IP='%s'",
-				 22, inet_ntoa(ipaddr));
+				 23, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3751,6 +3758,8 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		if (row[20]) 
 			strcpy(reqp->eventkey, row[20]);
 	}
+	reqp->veth_encapsulate = (! strcasecmp(row[22], "0") ? 0 : 1);
+	
 	if (row[9])
 		reqp->update_accounts = atoi(row[9]);
 	else

@@ -698,3 +698,17 @@ proc tb-set-cpu-usage {usage} {
 proc tb-bind-parent {sub phys} {
     tb-fix-node $sub $phys
 }
+
+#
+# Control veth encapsulation. 
+# 
+proc tb-set-encapsulate {onoff} {
+    var_import ::GLOBALS::veth_encapsulate
+
+    if {$onoff < 0 || $onoff > 1} {
+	perror "\[tb-set-encapsulate] must be 0 or 1."
+	return
+    }
+    set veth_encapsulate $onoff
+}
+
