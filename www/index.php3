@@ -80,6 +80,7 @@ echo "<base href=\"$TBBASE\" target=\"dynamic\">\n";
 <body>
 <basefont size=5>
 <a href="welcome.html"><b>Emulab.Net Home</b></a>
+<basefont size=4>
 
 <?php
 if (isset($uid)) {
