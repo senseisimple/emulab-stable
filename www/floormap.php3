@@ -71,6 +71,7 @@ else {
 #
 $channels   = array();
 $nodecounts = array();
+$nodes      = array();
 
 $nodecounts["free"]     = 0;
 $nodecounts["reserved"] = 0;
@@ -89,15 +90,24 @@ while ($row = mysql_fetch_array($query_result)) {
     $rpid      = $row["pid"];
     $reid      = $row["eid"];
 
-    if ((!isset($pid) && !(isset($rpid))) ||
-	(isset($pid) && isset($rpid) && $pid == $rpid)) {
-	$nodecounts["free"]++;
-    }
-    elseif ($rpid == $NODEDEAD_PID && $reid == $NODEDEAD_EID) {
-	$nodecounts["dead"]++;
-    }
-    else {
-	$nodecounts["reserved"]++;
+    #
+    # The above query to get the channels will give us multiple rows
+    # if there are multiple interface cards in use; do not want to
+    # count those twice.
+    # 
+    if (!isset($nodes[$node_id])) {
+	$nodes[$node_id] = 1;
+	
+	if ((!isset($pid) && !(isset($rpid))) ||
+	    (isset($pid) && isset($rpid) && $pid == $rpid)) {
+	    $nodecounts["free"]++;
+	}
+	elseif ($rpid == $NODEDEAD_PID && $reid == $NODEDEAD_EID) {
+	    $nodecounts["dead"]++;
+	}
+	else {
+	    $nodecounts["reserved"]++;
+	}
     }
 
     # Make sure an empty list is displayed if nothing allocated on a floor.
