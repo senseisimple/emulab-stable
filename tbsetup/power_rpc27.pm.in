@@ -17,6 +17,7 @@ use Socket;
 use IO::Handle;
 use lib "@prefix@/lib";
 use libdb;
+use POSIX qw(strftime);
 
 # A little perl module to power cycle something attached to an RPC27.
 # Thats a serially controlled, power controller.
@@ -53,6 +54,13 @@ sub rpc27ctrl {
     my($cmd, $controller, @outlets) = @_;
     my($TIP, $i, $insync);
 
+    #
+    # Check parameters
+    #
+    if (!defined($RPC27_CMD{$cmd})) {
+	print STDERR "*** Undefined command: '$cmd'\n";
+	return 1;
+    }
     if (grep {$_ < 1 || $_ > 20} @outlets) {
 	print STDERR "*** Invalid outlet '$outlet': Must be 1-20\n";
 	return 1;
@@ -156,6 +164,17 @@ sub syncandsend($$) {
 	close($TIP);
 	return 1;
     }
+
+    #
+    # These things have an annoying tendency to fail sometimes by losing
+    # the command part of the string (e.g., "6" instead of "reboot 6").
+    # I think we are overrunning the UART with "\r\n" since we put out
+    # a pair after every line we read that is not a prompt and when the
+    # RPC puts out its banner, it is a good 10 lines before we see the
+    # prompt.  So allow some time for the RPC to digest everything before
+    # we feed it the command.
+    #
+    sleep(1);
 
     if ($debug) {
 	print "Sending '$cmd' to $controller\n";
