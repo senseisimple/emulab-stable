@@ -6,7 +6,6 @@
 # All rights reserved.
 #
 
-
 #
 # FreeBSD specific routines and constants for the client bootime setup stuff.
 #
@@ -14,7 +13,7 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
+    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $TMDELMAP
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line update_delays
@@ -26,11 +25,21 @@ use Exporter;
 # Must come after package declaration!
 use English;
 
-#
-# This is the FreeBSD dependent part of the setup library. 
-# 
-my $SETUPDIR = "/etc/testbed";
-libsetup::libsetup_init($SETUPDIR);
+# Load up the paths. Its conditionalized to be compatabile with older images.
+# Note this file has probably already been loaded by the caller.
+BEGIN
+{
+    if (-e "/etc/emulab/paths.pm") {
+	require "/etc/emulab/paths.pm";
+	import emulabpaths;
+    }
+    else {
+	my $ETCDIR  = "/etc/testbed";
+	my $BINDIR  = "/etc/testbed";
+	my $VARDIR  = "/etc/testbed";
+	my $BOOTDIR = "/etc/testbed";
+    }
+}
 
 #
 # Various programs and things specific to FreeBSD and that we want to export.
@@ -39,14 +48,15 @@ $CP		= "/bin/cp";
 $EGREP		= "/usr/bin/egrep -s -q";
 $MOUNT		= "/sbin/mount";
 $UMOUNT		= "/sbin/umount";
-$TMGROUP	= "$SETUPDIR/group";
-$TMPASSWD	= "$SETUPDIR/master.passwd";
+$TMPASSWD	= "$ETCDIR/master.passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
+$TMDELMAP	= "$BOOTDIR/delay_mapping";
 
 #
 # These are not exported
 #
+my $TMGROUP	= "$ETCDIR/group";
 my $USERADD     = "/usr/sbin/pw useradd";
 my $USERDEL     = "/usr/sbin/pw userdel";
 my $USERMOD     = "/usr/sbin/pw usermod";
@@ -69,10 +79,10 @@ my $ROUTE	= "/sbin/route";
 my $KERNEL100   = "/kernel.100HZ";
 my $KERNEL1000  = "/kernel.1000HZ";
 my $KERNEL10000 = "/kernel.10000HZ";
-my @KERNELS     = ($KERNEL100, $KERNEL1000, $KERNEL10000); 
+my $KERNELDELAY = "/kernel.delay";	# New images. Linked to kernel.10000HZ
+my @KERNELS     = ($KERNEL100, $KERNEL1000, $KERNEL10000, $KERNELDELAY); 
 my $kernel      = $KERNEL100;
-my $TMDELAY	= "$SETUPDIR/rc.delay";
-my $TMDELMAP	= "$SETUPDIR/delay_mapping";
+my $TMDELAY	= "$BOOTDIR/rc.delay";
 my $TMCCCMD_DELAY = "delay";
 
 #
@@ -331,6 +341,14 @@ sub dodelays ()
 	print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
 	print DEL "ipfw -f flush\n";
 
+ 	#
+ 	# If we are in a new-style image that uses a polling-based kernel
+ 	# turn on polling.
+ 	#
+ 	if (-e $KERNELDELAY) {
+ 	    print DEL "sysctl -w kern.polling.enable=1\n";
+ 	}
+
 	$count = 69;
 	foreach $delay (@delays) {
 	    $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
@@ -506,23 +524,26 @@ sub dodelays ()
 	close(MAP);
     
 	#
-	# Now do kernel configuration. All of the above work is wasted, but
-	# we needed to know the minimum delay. Eventually we will boot the
-	# correct kernel to start with via PXE. 
+	# Now do kernel configuration. All of the above work is wasted,
+	# but such is life.
 	#
-	$kernel = $KERNEL1000;
+ 	if (-e $KERNELDELAY) {
+ 	    $kernel = $KERNELDELAY;
+ 	} else {
+ 	    $kernel = $KERNEL1000;
+ 	}
 	$checkreplace = 1;
     }
     else {
 	#
-	# Make sure we are running the correct non delay kernel. This
+	# Make sure we are running the correct non delay kernel. Thi
 	# is really only necessary in the absence of disk reloading.
 	# Further, we don't want to replace a user supplied kernel.
 	#
 	$kernel = $KERNEL100;
 	$checkreplace = 0;
 	foreach $kern (@KERNELS) {
-	    if (system("cmp -s /kernel $kern") == 0) {
+	    if (-e $kern && system("cmp -s /kernel $kern") == 0) {
 		$checkreplace = 1;
 	    }
 	}
@@ -582,7 +603,7 @@ sub os_routing_enable_gated()
 {
     my $cmd;
 
-    $cmd = "$GATED -f $SETUPDIR/gated_`$SETUPDIR/control_interface`.conf";
+    $cmd = "$GATED -f $BINDIR/gated_`$BINDIR/control_interface`.conf";
     return $cmd;
 }
 
