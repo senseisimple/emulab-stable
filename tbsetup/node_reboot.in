@@ -436,14 +436,7 @@ sub RebootNode {
     # punch the power button.
     #
     if (WaitTillDead($pc) == 0) {
-	my $query_result =
-	    DBQueryFatal("select op_mode from nodes where node_id='$pc'");
-	my @row = $query_result->fetchrow_array();
-	my $opmode = $row[0];
 	my $state = TBDB_NODESTATE_SHUTDOWN;
-	if ($opmode eq "NORMAL") {
-	    $state = TBDB_NODESTATE_REBOOTING;
-	}
 	TBSetNodeEventState($pc,$state);
 	exit(0);
     }

@@ -1,12 +1,13 @@
-# MySQL dump 8.13
-#
-# Host: localhost    Database: tbdb
-#--------------------------------------------------------
-# Server version	3.23.47-log
+-- MySQL dump 8.22
+--
+-- Host: localhost    Database: tbdb
+---------------------------------------------------------
+-- Server version	3.23.54-log
 
-#
-# Dumping data for table 'comments'
-#
+--
+-- Dumping data for table 'comments'
+--
+
 
 REPLACE INTO comments VALUES ('users',NULL,'testbed user accounts');
 REPLACE INTO comments VALUES ('experiments',NULL,'user experiments');
@@ -106,9 +107,10 @@ REPLACE INTO comments VALUES ('nseconfigs',NULL,'Table for storing NSE configura
 REPLACE INTO comments VALUES ('widearea_delays',NULL,'Delay and bandwidth metrics between WAN nodes');
 REPLACE INTO comments VALUES ('virt_nodes',NULL,'Experiment virtual nodes');
 
-#
-# Dumping data for table 'event_eventtypes'
-#
+--
+-- Dumping data for table 'event_eventtypes'
+--
+
 
 REPLACE INTO event_eventtypes VALUES (0,'REBOOT');
 REPLACE INTO event_eventtypes VALUES (1,'START');
@@ -121,9 +123,10 @@ REPLACE INTO event_eventtypes VALUES (7,'SET');
 REPLACE INTO event_eventtypes VALUES (8,'TIME');
 REPLACE INTO event_eventtypes VALUES (9,'RESET');
 
-#
-# Dumping data for table 'event_objecttypes'
-#
+--
+-- Dumping data for table 'event_objecttypes'
+--
+
 
 REPLACE INTO event_objecttypes VALUES (0,'TBCONTROL');
 REPLACE INTO event_objecttypes VALUES (1,'LINK');
@@ -132,9 +135,10 @@ REPLACE INTO event_objecttypes VALUES (3,'TIME');
 REPLACE INTO event_objecttypes VALUES (4,'PROGRAM');
 REPLACE INTO event_objecttypes VALUES (5,'FRISBEE');
 
-#
-# Dumping data for table 'exported_tables'
-#
+--
+-- Dumping data for table 'exported_tables'
+--
+
 
 REPLACE INTO exported_tables VALUES ('comments');
 REPLACE INTO exported_tables VALUES ('event_eventtypes');
@@ -148,9 +152,10 @@ REPLACE INTO exported_tables VALUES ('state_triggers');
 REPLACE INTO exported_tables VALUES ('testsuite_preentables');
 REPLACE INTO exported_tables VALUES ('webdb_table_permissions');
 
-#
-# Dumping data for table 'foreign_keys'
-#
+--
+-- Dumping data for table 'foreign_keys'
+--
+
 
 REPLACE INTO foreign_keys VALUES ('projects','head_uid','users','uid');
 REPLACE INTO foreign_keys VALUES ('groups','pid','projects','pid');
@@ -208,9 +213,10 @@ REPLACE INTO foreign_keys VALUES ('vlans','pid,eid','experiments','pid,eid');
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid,vname','virt_nodes','eid,pid,vname');
 REPLACE INTO foreign_keys VALUES ('nseconfigs','eid,pid','experiments','eid,pid');
 
-#
-# Dumping data for table 'mode_transitions'
-#
+--
+-- Dumping data for table 'mode_transitions'
+--
+
 
 REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NETBOOT','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('MINIMAL','SHUTDOWN','NORMAL','REBOOTING');
@@ -224,6 +230,10 @@ REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','MINIMAL','SHUTDOWN')
 REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NETBOOT','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','NORMALv1','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('NORMAL','REBOOTING','RELOAD','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','MINIMAL','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','NETBOOT','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','NORMALv1','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('NORMAL','SHUTDOWN','RELOAD','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','MINIMAL','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NETBOOT','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('NORMALv1','SHUTDOWN','NORMAL','REBOOTING');
@@ -232,13 +242,18 @@ REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','MINIMAL','SHUTDOWN'
 REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NETBOOT','SHUTDOWN');
 REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMAL','REBOOTING');
 REPLACE INTO mode_transitions VALUES ('RELOAD','RELOADDONE','NORMALv1','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','MINIMAL','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NETBOOT','SHUTDOWN');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMAL','REBOOTING');
+REPLACE INTO mode_transitions VALUES ('RELOAD','SHUTDOWN','NORMALv1','SHUTDOWN');
 
-#
-# Dumping data for table 'state_timeouts'
-#
+--
+-- Dumping data for table 'state_timeouts'
+--
 
-REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTING',180,'REBOOT');
-REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTED',180,'NOTIFY');
+
+REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTING',120,'REBOOT');
+REPLACE INTO state_timeouts VALUES ('NORMAL','REBOOTED',60,'NOTIFY');
 REPLACE INTO state_timeouts VALUES ('NORMAL','ISUP',0,NULL);
 REPLACE INTO state_timeouts VALUES ('MINIMAL','SHUTDOWN',120,'REBOOT');
 REPLACE INTO state_timeouts VALUES ('NORMALv1','SHUTDOWN',120,'REBOOT');
@@ -271,9 +286,10 @@ REPLACE INTO state_timeouts VALUES ('USERSTATUS','FROZEN',0,NULL);
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','NEWUSER',0,NULL);
 REPLACE INTO state_timeouts VALUES ('USERSTATUS','UNAPPROVED',0,NULL);
 
-#
-# Dumping data for table 'state_transitions'
-#
+--
+-- Dumping data for table 'state_transitions'
+--
+
 
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','ACTIVE');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','ACTIVATING','SWAPPED');
@@ -286,6 +302,7 @@ REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPED','TERMINATING');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','SWAPPING','SWAPPED');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TERMINATING','TERMINATED');
 REPLACE INTO state_transitions VALUES ('EXPTSTATUS','TESTING','SWAPPING');
+REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','ISUP');
 REPLACE INTO state_transitions VALUES ('MINIMAL','BOOTING','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('MINIMAL','ISUP','SHUTDOWN');
@@ -305,14 +322,23 @@ REPLACE INTO state_transitions VALUES ('NODEALLOC','REBOOT','FREE_DIRTY');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD','FREE_CLEAN');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','REBOOT');
 REPLACE INTO state_transitions VALUES ('NODEALLOC','RESERVED','RELOAD');
+REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTED');
 REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','REBOOTING');
+REPLACE INTO state_transitions VALUES ('NORMAL','BOOTING','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','REBOOTING');
+REPLACE INTO state_transitions VALUES ('NORMAL','ISUP','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','ISUP');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','REBOOTING');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTED','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','REBOOTING');
+REPLACE INTO state_transitions VALUES ('NORMAL','REBOOTING','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','BOOTING');
+REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','REBOOTING');
+REPLACE INTO state_transitions VALUES ('NORMAL','SHUTDOWN','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMALv1','BOOTING','TBSETUP');
 REPLACE INTO state_transitions VALUES ('NORMALv1','ISUP','SHUTDOWN');
@@ -320,6 +346,7 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','RELOADSETUP');
 REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('RELOAD','RELOADING','RELOADDONE');
@@ -343,18 +370,20 @@ REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','REBOOTED');
 REPLACE INTO state_transitions VALUES ('WIDEAREA','REBOOTING','REBOOTING');
 
-#
-# Dumping data for table 'state_triggers'
-#
+--
+-- Dumping data for table 'state_triggers'
+--
+
 
 REPLACE INTO state_triggers VALUES ('NORMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('NORMALv1','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('RELOAD','RELOADDONE','RESET, RELOADDONE');
 
-#
-# Dumping data for table 'testsuite_preentables'
-#
+--
+-- Dumping data for table 'testsuite_preentables'
+--
+
 
 REPLACE INTO testsuite_preentables VALUES ('comments','drop');
 REPLACE INTO testsuite_preentables VALUES ('iface_counters','drop');
@@ -375,9 +404,10 @@ REPLACE INTO testsuite_preentables VALUES ('projects','prune');
 REPLACE INTO testsuite_preentables VALUES ('group_membership','prune');
 REPLACE INTO testsuite_preentables VALUES ('groups','prune');
 
-#
-# Dumping data for table 'webdb_table_permissions'
-#
+--
+-- Dumping data for table 'webdb_table_permissions'
+--
+
 
 REPLACE INTO webdb_table_permissions VALUES ('comments',1,1,1);
 REPLACE INTO webdb_table_permissions VALUES ('foreign_keys',1,1,1);

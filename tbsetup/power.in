@@ -235,15 +235,7 @@ foreach my $power_id (keys %outlets) {
 	foreach my $node (@nodes) {
 	    print "$node now ",($op eq "cycle" ? "rebooting" : $op),"\n";
 	    if ($sendevent) {
-		my $query_result =
-		    DBQueryFatal("select op_mode from nodes ".
-				 "where node_id='$node'");
-		my @row = $query_result->fetchrow_array();
-		my $osid = $row[0];
 		my $state = TBDB_NODESTATE_SHUTDOWN;
-		if ($osid eq "NORMAL") {
-		    $state = TBDB_NODESTATE_REBOOTING;
-		}
 		TBSetNodeEventState($node,$state);
 	    }
 	}
