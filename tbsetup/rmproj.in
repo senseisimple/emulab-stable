@@ -2,10 +2,9 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 
 #
@@ -14,8 +13,6 @@ use English;
 # is *renamed* since we do not want to be so destructive.
 #
 # usage: rmprojdir <pid>
-#
-# TODO: Allow for the head of a project to delete it.
 #
 
 #
@@ -26,9 +23,8 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
 
 my $PROJROOT = "/proj";
-my $SSH      = "$TB/bin/sshtb";
-my $GROUPDEL = "/usr/sbin/pw groupdel";
-my $errors   = 0;
+my $RMGROUP  = "$TB/sbin/rmgroup";
+my $SETGROUPS= "$TB/sbin/setgroups";
 
 #
 # Untaint the path
@@ -45,8 +41,26 @@ $| = 1;
 # Load the Testbed support stuff. 
 #
 use lib "@prefix@/lib";
+use libaudit;
 use libdb;
 use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
 
 #
 # Check args.
@@ -70,8 +84,9 @@ else {
 # Figure out who called us. Only root or people with admin status
 # can run this script.
 #
-if ($UID && !TBAdmin($UID)) {
-    die("*** You must be root or TB admin to remove a project directory\n");
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You must be root or TB admin to remove a project!\n");
 }
 
 #
@@ -81,99 +96,123 @@ my $unix_gid;
 my $unix_name;
 
 if (! TBGroupUnixInfo($pid, $pid, \$unix_gid, \$unix_name)) {
-    die("*** No info for project $pid!");
+    die("*** $0:\n".
+	"    No info for project $pid!\n");
 }
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+my $savename = "$pid-" . TBDateTimeFSSafe();
 
 #
 # Rename the project directory.
-# 
-my $newname = "$pid-" . TBDateTimeFSSafe();
-
-if (! chdir($PROJROOT)) {
-    die("*** Could not chdir to $PROJROOT: $!\n");
-}
-
-if (! -e $pid) {
-    die("*** Project directory '$pid' does not exist!\n");
-}
-
-if (! rename($pid, $newname)) {
-    die("*** Could not rename project directory $pid to $newname: $!\n");
-}
-
 #
-# Chown the owner/group to root and set the permissions so no one is
-# allowed to look inside.
-#
-if (! chmod(0700, $newname)) {
-    die("*** Could not chmod directory $newname to 0700: $!\n");
-}
-if (! chown(0, 0, $newname)) {
-    die("*** Could not chown directory $newname to 0/0: $!\n");
-}
+if (-e "$PROJROOT/$pid") {
+    my $oldname = "$PROJROOT/$pid";
+    my $newname = "$PROJROOT/$savename";
 
+    if (rename($oldname, $newname)) {
+	#
+	# Chown the owner/group to root and set the permissions so no
+	# one is allowed to look inside.
+	#
+	if (! chmod(0700, $newname)) {
+	    fatal("Could not chmod directory $newname to 0700: $!");
+	}
+	if (! chown(0, 0, $newname)) {
+	    fatal("Could not chown directory $newname to 0/0: $!");
+	}
+    }
+    else {
+	fatal("Could not rename proj directory to $newname: $!");
+    }
+}
+    
 #
 # Ditto for the experiment working directory.
 #
-my $workdir = TBDB_EXPT_WORKDIR();
+my $workdir = TBDB_EXPT_WORKDIR() . "/$pid";
 
-if (! chdir($workdir)) {
-    die("*** Could not chdir to $workdir: $!\n");
-}
+if (-d $workdir) {
+    my $newname = TBDB_EXPT_WORKDIR() . "/$savename";
 
-if (! -e $pid) {
-    die("*** Project directory '$pid' does not exist in $workdir!\n");
-}
-
-if (! rename($pid, $newname)) {
-    die("*** Could not rename $pid to $newname in $workdir: $!\n");
-}
-
-if (! chmod(0700, $newname)) {
-    die("*** Could not chmod directory $newname to 0700: $!\n");
-}
-if (! chown(0, 0, $newname)) {
-    die("*** Could not chown directory $newname to 0/0: $!\n");
-}
-
-#
-# Now remove the group from the group file on both plastic and paper.
-#
-if (system("$GROUPDEL $unix_name")) {
-    warn("*** WARNING: ".
-	 "Could not remove group $pid from operations node!\n");
-    $errors++;
-}
-
-#
-# Be real root for ssh.
-# 
-$UID = 0;
-
-if (system("$SSH -host $CONTROL $GROUPDEL $unix_name")) {
-    warn("*** WARNING: ".
-	 "Could not remove group $pid from from $CONTROL!\n");
-}
-
-#
-# Remove group on the tip servers. 
-#
-my @tipservers;
-
-$query_result =
-    DBQueryFatal("select * from tipservers");
-
-while (@db_row = $query_result->fetchrow_array() ) {
-    push(@tipservers, $db_row[0]);
-}
-
-foreach my $tipserver ( @tipservers ) {
-    if (system("$SSH -host $tipserver $GROUPDEL $unix_name")) {
-	warn("*** WARNING: ".
-	     "Could not remove group $pid from $tipserver!\n");
-	$errors++;
+    if (rename($workdir, $newname)) {
+	#
+	# Chown the owner/group to root. There is no need to modify
+	# the permissions since its on boss.
+	#
+	if (! chown(0, 0, $newname)) {
+	    fatal("Could not chown directory $newname to 0/0: $!");
+	}
+    }
+    else {
+	fatal("Could not rename proj work directory to $newname: $!");
     }
 }
 
-exit($errors);
+#
+# Grab the group list. We need to delete all of the unix groups for the
+# project. We do this with a subscript, so need to flip UID for perl.
+#
+my $query_result =
+    DBQueryFatal("select gid from groups where pid='$pid' and pid!=gid");
 
+$EUID = $UID;
+while (my ($gid) = $query_result->fetchrow_array()) {
+    print "Removing project group $gid ...\n";
+
+    if (system("$RMGROUP $pid $gid")) {
+	fatal("Could not remove subgroup $gid in project $pid!");
+    }
+}
+
+#
+# Grab the member list for the project before we kill it. We want to
+# run setgroups for them.
+# 
+$query_result =
+    DBQueryFatal("select uid from group_membership ".
+		 "where pid='$pid' and gid='$pid'");
+
+#
+# Now remove the main project group.
+#
+if (system("$RMGROUP $pid $pid")) {
+    fatal("Could not remove main project group $pid!");
+}
+
+#
+# Now force a setgroups on all of the members. 
+#
+while (my ($uid) = $query_result->fetchrow_array()) {
+    if (system("$SETGROUPS $uid")) {
+	fatal("setgroups $uid failed!");
+    }
+}
+$EUID = 0;
+
+#
+# Then the project table itself, plus a few other bits and pieces
+# 
+DBQueryFatal("delete FROM projects where pid='$pid'");
+DBQueryFatal("delete FROM images where pid='$pid'");
+DBQueryFatal("delete FROM os_info where pid='$pid'");
+DBQueryFatal("delete FROM nodetypeXpid_permissions where pid='$pid'");
+
+print "Project $pid has been removed!\n";
+exit(0);
+
+sub fatal($) {
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
