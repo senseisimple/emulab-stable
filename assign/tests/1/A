@@ -5,10 +5,9 @@ node D
 node E
 node F
 node delay delay
-link A B
 link A C
+link B C
 link C delay
 link delay D
-link C D
 link D E
 link D F
