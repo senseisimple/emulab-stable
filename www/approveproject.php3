@@ -48,7 +48,7 @@ $headuid = $row[0];
 # If the status is "active", we leave it alone. 
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT status,usr_email from users where uid='$headuid'");
+	"SELECT status,usr_email,usr_name from users where uid='$headuid'");
 if (! $query_result) {
     TBERROR("Database Error restrieving user status for $headuid", 1);
 }
@@ -58,6 +58,7 @@ if (mysql_num_rows($query_result) == 0) {
 $row = mysql_fetch_row($query_result);
 $curstatus     = $row[0];
 $headuid_email = $row[1];
+$headname      = $row[2];
 #echo "Status = $curstatus, Email = $headuid_email<br>\n";
 
 #
@@ -84,12 +85,12 @@ if (strcmp($approval, "postpone") == 0) {
           </h3>\n";
 }
 elseif (strcmp($approval, "moreinfo") == 0) {
-    mail("$headuid_email",
-         "TESTBED: Project Approval Postponed",
+    mail("$headname '$headuid' <$headuid_email>",
+         "TESTBED: Project '$pid' Approval Postponed",
          "\n".
          "This message is to notify you that your project application\n".
-         "for $pid has been postponed until we have more information\n".
-         "You can just reply to this message to provide more information\n".
+         "for $pid has been postponed until we have more information.\n".
+         "You can just reply to this message to provide more information.\n".
          "\n$message".
          "\n\n".
          "Thanks,\n".
@@ -125,11 +126,11 @@ elseif ((strcmp($approval, "deny") == 0) ||
                 1);
     }
 
-    mail("$headuid_email",
-         "TESTBED: Project Denied",
+    mail("$headname '$headuid' <$headuid_email>",
+         "TESTBED: Project '$pid' Denied",
          "\n".
          "This message is to notify you that your project application\n".
-         "for $pid has been denied\n".
+         "for $pid has been denied.\n".
          "\n$message".
          "\n\n".
          "Thanks,\n".
@@ -152,11 +153,11 @@ elseif ((strcmp($approval, "deny") == 0) ||
                     1);
         }
 
-        mail("$headuid_email",
-             "TESTBED: Account Terminated",
+        mail("$headname '$headuid' <$headuid_email>",
+             "TESTBED: Account '$headuid' Terminated",
     	     "\n".
              "This message is to notify you that your account has been \n".
-             "terminated because your project $pid was denied\n".
+             "terminated because your project $pid was denied.\n".
              "\n\n".
              "Thanks,\n".
              "Testbed Ops\n".
@@ -238,8 +239,8 @@ elseif (strcmp($approval, "approve") == 0) {
         }
     }
 
-    mail("$headuid_email",
-         "TESTBED: Project Approval",
+    mail("$headname '$headuid' <$headuid_email>",
+         "TESTBED: Project '$pid' Approval",
          "\n".
 	 "This message is to notify you that your project $pid\n".
 	 "has been approved.\n".

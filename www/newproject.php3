@@ -179,7 +179,7 @@ if (! $returning) {
     }
     $key = GENKEY($proj_head_uid);
 
-    mail("$usr_email", "TESTBED: Your New User Key",
+    mail("$usr_name '$proj_head_uid' <$usr_email>", "TESTBED: Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
          "    Here is your key to verify your account on the ".
@@ -239,7 +239,7 @@ $unix_gid = $row[0];
 # The mail message to the approval list.
 # 
 mail($TBMAIL_APPROVAL,
-     "TESTBED: New Project", "'$usr_name' wants to start project '$pid'.\n".
+     "TESTBED: New Project '$pid' ($proj_head_uid)", "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
      "Name:          $usr_name ($proj_head_uid)\n".
      "Email:         $usr_email\n".
@@ -260,7 +260,7 @@ mail($TBMAIL_APPROVAL,
      "made a decision, go to $TBWWW and\n".
      "select the 'Project Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
-     "From: $usr_name <$usr_email>\n".
+     "From: $usr_name '$proj_head_uid' <$usr_email>\n".
      "Cc: $TBMAIL_CONTROL\n".
      "Errors-To: $TBMAIL_WWW");
 

@@ -72,7 +72,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     # If the status is "active", we leave it alone. 
     #
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT status,usr_email from users where uid='$user'");
+	"SELECT status,usr_email,usr_name from users where uid='$user'");
     if (! $query_result) {
 	TBERROR("Database Error restrieving user status for $user", 1);
     }
@@ -82,6 +82,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     $row = mysql_fetch_row($query_result);
     $curstatus  = $row[0];
     $user_email = $row[1];
+    $user_name  = $row[2];
     #echo "Status = $curstatus, Email = $user_email<br>\n";
 
     #
@@ -142,8 +143,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	    TBERROR("Database Error removing $user from project membership ".
                     "after being denied.", 1);
         }
-        mail("$user_email",
-             "TESTBED: Project Membership Denied",
+        mail("$user_name '$user' <$user_email>",
+             "TESTBED: Project '$project' Membership Denied",
 	     "\n".
              "This message is to notify you that you have been denied\n".
 	     "membership in project $project\n".
@@ -210,8 +211,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	    }
 	}
 
-        mail("$user_email",
-             "TESTBED: Project Membership Approval",
+        mail("$user_name '$user' <$user_email>",
+             "TESTBED: Project '$project' Membership Approval",
 	     "\n".
 	     "This message is to notify you that you have been approved\n".
 	     "as a member of project $project with $newtrust permissions.\n".

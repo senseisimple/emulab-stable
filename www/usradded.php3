@@ -140,9 +140,9 @@ if (! $returning) {
 
     $key = GENKEY($uid);
 
-    mail("$usr_email", "TESTBED: Your New User Key",
+    mail("$usr_name '$uid' <$usr_email>", "TESTBED: Your New User Key",
 	 "\n".
-         "Dear $usr_name:\n\n".
+         "Dear $usr_name ($uid):\n\n".
          "\tHere is your key to verify your account on the ".
          "Utah Network Testbed:\n\n".
          "\t\t$key\n\n".
@@ -213,19 +213,20 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
     TBERROR("Database Error getting project leader for project $pid: $err\n",
              1);
 }
-$project_leader_uid = $row[0];
+$leader_uid = $row[0];
 
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_email FROM users WHERE uid='$project_leader_uid'");
+	"SELECT usr_name,usr_email FROM users WHERE uid='$leader_uid'");
 if (($row = mysql_fetch_row($query_result)) == 0) {
     $err = mysql_error();
     TBERROR("Database Error getting email address for project leader ".
-            "$project_leader_uid: $err\n", 1);
+            "$leader_uid: $err\n", 1);
 }
-$project_leader_email = $row[0];
+$leader_name = $row[0];
+$leader_email = $row[1];
 
-mail("$project_leader_email",
-     "TESTBED: New Project Member",
+mail("$leader_name '$leader_uid' <$leader_email>",
+     "TESTBED: $uid $pid Project Join Request",
      "\n$usr_name ($uid) is trying to join your project ($pid).\n".
      "$usr_name has the\n".
      "Testbed username $uid and email address $usr_email.\n$usr_name's ".

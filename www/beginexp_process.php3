@@ -111,6 +111,17 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 $gid = $row[0];
 
 #
+# We need the user's name and email.
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT usr_name,usr_email from users where uid=\"$uid\"");
+if (($row = mysql_fetch_row($query_result)) == 0) {
+    TBERROR("Database Error: Getting GID for project $exp_pid.", 1);
+}
+$user_name = $row[0];
+$user_email = $row[1];
+
+#
 # At this point enter the exp_id into the database so that it shows up as
 # valid when the tb scripts run. We need to remove the entry if any of
 # this fails!
@@ -151,7 +162,8 @@ if ($nonsfile) {
           </h2>\n";
 
     if (1) {
-	mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
+	mail("$user_name '$uid' <$user_email>", 
+	     "TESTBED: '$exp_pid' '$exp_id' New Experiment Created",
 	     "User:        $uid\n".
              "EID:         $exp_id\n".
              "PID:         $exp_pid\n".
@@ -161,6 +173,7 @@ if ($nonsfile) {
              "Start:       $exp_start\n".
              "End:         $exp_end\n",
              "From: $TBMAIL_WWW\n".
+	     "Cc: $TBMAIL_WWW\n".
              "Errors-To: $TBMAIL_WWW");
     }
     echo "</body>
@@ -288,12 +301,13 @@ echo "</XMP>\n";
 # Lets generate a mail message for now so that we can see whats happening.
 #
 if (1) {
-mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
+mail("$user_name '$uid' <$user_email>", 
+     "TESTBED: '$exp_pid' '$exp_id' New Experiment Created",
      "User:        $uid\n".
      "EID:         $exp_id\n".
      "PID:         $exp_pid\n".
      "Name:        $exp_name\n".
-     "Created:     $exp_created\n".
+     "Created:     $exp_created\n". 
      "Expires:     $exp_expires\n".
      "Start:       $exp_start\n".
      "End:         $exp_end\n".
@@ -301,6 +315,7 @@ mail($TBMAIL_WWW, "TESTBED: New Experiment Created",
      "Summary:\n\n".
      "$summary\n",
      "From: $TBMAIL_WWW\n".
+     "Cc: $TBMAIL_WWW\n".
      "Errors-To: $TBMAIL_WWW");
 }
 
