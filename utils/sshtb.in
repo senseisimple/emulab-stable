@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -78,11 +78,11 @@ if (!defined($hostname)) {
 #
 # Different stuff for remote nodes.
 #
-my $cmd;
+my @cmdargs;
 
 if ($UNIFIED && ($hostname eq $BOSSNODE || $hostname eq $USERNODE ||
 		 $hostname eq $FSNODE)) {
-    $cmd = "@ARGV";
+    @cmdargs = "@ARGV";
 }
 else {
     my $user;
@@ -101,14 +101,39 @@ else {
 	}
     }
 
-    $cmd = "$SSH $SSH_ARGS @args ";
-    if (defined($user)) {
-	$cmd .= "-l $user ";
+    #
+    # Yuck, the point is to turn the above string into a proper list for
+    # exec so that we do not get a shell to interpret the arguments cause
+    # there are quotes embedded. I am sure there is a regex that will do this
+    # for me, but hell if I know what it is.
+    #
+    my @sshargs = ();
+    my $tmp;
+    foreach my $f (split('\s+', $SSH_ARGS)) {
+	if (defined($tmp)) {
+	    if ($f =~ /(.*)\"$/) {
+		$tmp = "$tmp $1";
+		push(@sshargs, $tmp);
+		undef($tmp);
+	    }
+	    else {
+		$tmp = "$tmp $1";
+	    }
+	    next;
+	}
+	elsif ($f =~ /^\"(.*)$/) {
+	    $tmp = $1;
+	    next;
+	}
+	push(@sshargs, $f);
     }
-    $cmd .= "$hostname @ARGV";
+
+    @cmdargs = ($SSH, @sshargs, @args,
+		(defined($user) ? ("-l", "$user") : ()),
+		$hostname, @ARGV);
 }
 
 if ($debug) {
-    print "$cmd\n";
+    print "@cmdargs\n";
 }
-exec("$cmd");
+exec(@cmdargs);
