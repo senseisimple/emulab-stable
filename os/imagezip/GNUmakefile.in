@@ -15,6 +15,7 @@ DISTFILES	= ext2_fs.h imagehdr.h linux_types.h queue.h \
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 WITH_NTFS	= @WINSUPPORT@
+WITH_FAT	= @WINSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
@@ -44,12 +45,19 @@ LIBS		+= -Lntfs -lntfs -llocale
 NTFSDIR		= ntfs
 endif
 
+# with FAT
+ifeq ($(WITH_FAT),1)
+CFLAGS		+= -DWITH_FAT
+FSOBJS		+= fat_boot.o fat_fat.o fat_glue.o
+MOSTLY_SRCDIRS	+= $(SRCDIR)/fat
+endif
+
 all:	imagezip imageunzip imagedump
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-imagezip: $(NTFSDIR) imagezip.o version.o 
-	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) -o imagezip
+imagezip: $(NTFSDIR) imagezip.o version.o $(FSOBJS)
+	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(LIBS) -o imagezip
 
 imageunzip: imageunzip.o crc.o version.o 
 	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
@@ -59,6 +67,8 @@ imageunzip.o:	imageunzip.c
 
 imagedump: imagedump.o version.o
 	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
+
+fat_boot.o fat_fat.o fat_glue.o: $(SRCDIR)/fat/fat_glue.h
 
 ntfs:
 	@$(MAKE) -C ntfs all

@@ -51,30 +51,51 @@
 /* Why is this not defined in a public header file? */
 #define ACTIVE		0x80
 #define BOOT_MAGIC	0xAA55
-#define DOSPTYP_UNUSED	0	/* Unused */
+#define DOSPTYP_UNUSED		0	/* Unused */
+#ifndef DOSPTYP_FAT12
+#define	DOSPTYP_FAT12		1	/* FAT12 */
+#endif
+#ifndef DOSPTYP_FAT16
+#define	DOSPTYP_FAT16		4	/* FAT16 */
+#endif
+#ifndef DOSPTYP_FAT16L
+#define	DOSPTYP_FAT16L		6	/* FAT16, part >= 32MB */
+#endif
 #ifndef DOSPTYP_EXT
-#define	DOSPTYP_EXT	5	/* DOS extended partition */
+#define	DOSPTYP_EXT		5	/* DOS extended partition */
 #endif
 #ifndef DOSPTYPE_NTFS
-#define DOSPTYP_NTFS    7       /* Windows NTFS partition */
+#define DOSPTYP_NTFS    	7       /* Windows NTFS partition */
+#endif
+#ifndef DOSPTYP_FAT32
+#define	DOSPTYP_FAT32		11	/* FAT32 */
+#endif
+#ifndef DOSPTYP_FAT32_LBA
+#define	DOSPTYP_FAT32_LBA	12	/* FAT32, LBA */
+#endif
+#ifndef DOSPTYP_FAT16L_LBA
+#define	DOSPTYP_FAT16L_LBA	14	/* FAT16, part >= 32MB, LBA */
 #endif
 #ifndef DOSPTYPE_EXT_LBA
-#define	DOSPTYP_EXT_LBA	15	/* DOS extended, LBA partition */
+#define	DOSPTYP_EXT_LBA		15	/* DOS extended, LBA partition */
 #endif
-
 #ifndef DOSPTYP_LINSWP
-#define	DOSPTYP_LINSWP	0x82	/* Linux swap partition */
+#define	DOSPTYP_LINSWP		0x82	/* Linux swap partition */
 #endif
 #ifndef DOSPTYP_LINUX
-#define	DOSPTYP_LINUX	0x83	/* Linux partition */
+#define	DOSPTYP_LINUX		0x83	/* Linux partition */
 #endif
 #ifndef DOSPTYP_OPENBSD
-#define DOSPTYP_OPENBSD 0xa6	/* OpenBSD */
+#define DOSPTYP_OPENBSD 	0xa6	/* OpenBSD */
 #endif
 
 
 #define ISBSD(t)	((t) == DOSPTYP_386BSD || (t) == DOSPTYP_OPENBSD)
 #define ISEXT(t)	((t) == DOSPTYP_EXT || (t) == DOSPTYP_EXT_LBA)
+#define ISFAT(t)	\
+	((t) == DOSPTYP_FAT12 || (t) == DOSPTYP_FAT16 || \
+	 (t) == DOSPTYP_FAT16L || (t) == DOSPTYP_FAT32 || \
+	 (t) == DOSPTYP_FAT32_LBA || (t) == DOSPTYP_FAT16L_LBA)
 
 #ifndef NDOSPART
 #define NDOSPART	4
@@ -152,6 +173,9 @@ int	read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dboff);
 #ifdef WITH_NTFS
 int     read_ntfsslice(int slice, u_int32_t start, u_int32_t size,
 		       char *openname);
+#endif
+#ifdef WITH_FAT
+int	read_fatslice(int slice, u_int32_t start, u_int32_t size, int infd);
 #endif
 #endif
 int	read_linuxslice(int slice, u_int32_t start, u_int32_t size);
@@ -345,10 +369,11 @@ main(argc, argv)
 	int	linuxfs	  = 0;
 	int	bsdfs     = 0;
 	int	ntfs	  = 0;
+	int	fatfs	  = 0;
 	int	rawmode	  = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbndihrs:c:z:oI:1F:DR:X")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnfdihrs:c:z:oI:1F:DR:X")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -370,6 +395,9 @@ main(argc, argv)
 			break;
 		case 'n':
 			ntfs++;
+			break;
+		case 'f':
+			fatfs++;
 			break;
 		case 'o':
 			dots++;
@@ -436,8 +464,9 @@ main(argc, argv)
 			"the slice (-s) option\n\n");
 		usage();
 	}
-	if (linuxfs + bsdfs + ntfs > 1) {
-		fprintf(stderr, "-b, -l, and -n are mutually exclusive!\n\n");
+	if (linuxfs + bsdfs + ntfs + fatfs > 1) {
+		fprintf(stderr,
+			"-b, -l, -n, and -f are mutually exclusive!\n\n");
 		usage();
 	}
 	if (!info && argc != 2) {
@@ -465,6 +494,10 @@ main(argc, argv)
 #ifdef WITH_NTFS
 	else if (ntfs)
 		rval = read_ntfsslice(-1, 0, 0, infilename);
+#endif
+#ifdef WITH_FAT
+	else if (fatfs)
+		rval = read_fatslice(-1, 0, 0, infd);
 #endif
 	else if (rawmode)
 		rval = read_raw();
@@ -580,6 +613,20 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 			case DOSPTYP_EXT_LBA:
 				fprintf(stderr, "  EXTDOS");
 				break;
+#ifdef WITH_FAT
+			case DOSPTYP_FAT12:
+				fprintf(stderr, "  FAT12 ");
+				break;
+			case DOSPTYP_FAT16:
+			case DOSPTYP_FAT16L:
+			case DOSPTYP_FAT16L_LBA:
+				fprintf(stderr, "  FAT16 ");
+				break;
+			case DOSPTYP_FAT32:
+			case DOSPTYP_FAT32_LBA:
+				fprintf(stderr, "  FAT32 ");
+				break;
+#endif
 #ifdef WITH_NTFS
 			case DOSPTYP_NTFS:
 				fprintf(stderr, "  NTFS  ");
@@ -655,6 +702,16 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 		case DOSPTYP_LINUX:
 			rval = read_linuxslice(bsdix, start, size);
 			break;
+#ifdef WITH_FAT
+		case DOSPTYP_FAT12:
+		case DOSPTYP_FAT16:
+		case DOSPTYP_FAT16L:
+		case DOSPTYP_FAT16L_LBA:
+		case DOSPTYP_FAT32:
+		case DOSPTYP_FAT32_LBA:
+			rval = read_fatslice(bsdix, start, size, infd);
+			break;
+#endif
 #ifdef WITH_NTFS
 		case DOSPTYP_NTFS:
 			rval = read_ntfsslice(bsdix, start, size, infilename);

@@ -3,7 +3,7 @@
 .\" Copyright (c) 2000-2003 University of Utah and the Flux Group.
 .\" All rights reserved.
 .\"
-.Dd January 9, 2003
+.Dd October 3, 2003
 .Dt IMAGEZIP 8
 .Os
 .Sh NAME
@@ -33,7 +33,7 @@ This image can later be uncompressed and installed using the companion
 utility.
 .Nm 
 understands the format of several of the more popular filesystem types
-(BSD FFS, Linux EXT2FS, NTFS) and uses that knowledge to
+(BSD FFS, Linux EXT2FS, FAT, NTFS) and uses that knowledge to
 .Dq smartly compress
 the data, ensuring that only allocated blocks in a filesystem are
 compressed and saved in the image.  Free blocks within a filesystem are
@@ -101,6 +101,31 @@ fails.
 (130).
 The first 8KB (the bitmap) is compressed conventionally, the remainder
 of the slice is skipped.
+.It Sy NTFS
+(7).
+If the slice contains a Windows NTFS, it will be smartly compressed.
+The contents of the swap (pagefile.sys) and hibernate (hiberfil.sys) files
+are not saved.
+.It Sy FAT
+(1, 4, 6, 11, 12, 14).
+In theory,
+.Nm
+understands FAT12, FAT16, and FAT32 filesystems in their various
+incarnations.  Smart compression here means not saving free clusters.
+.It Sy Extended
+(5, 15).
+.Nm
+understands DOS extended partition tables and will hunt them down and process
+them as it does the primary partition table.
+For the benefit of the
+.Fl I
+and
+.Fl R
+options,
+.Nm
+names the partitions in a straight forward manner.  The primary partition
+table is slices 1 to 4, the first extended table is 5 to 8, and so on with
+each successive table receiving the next 4 slice numbers.
 .El
 .Pp
 All unrecognized slice types are compressed conventionally.
@@ -148,6 +173,7 @@ This option is incompatible with
 Prints a variety of diagnostic information about what
 .Nm
 would do, but doesn't create an image file.
+No output file specification is needed.
 .It Fl o
 Indicate the progress of image creation by printing a dot ('.') to
 .Dv stderr
@@ -201,6 +227,7 @@ that
 is a BSD slice.  Should be used only when the device does not contain
 a DOS partition table and really does contains a BSD filesystem.
 Incompatible with
+.Fl f ,
 .Fl l
 and
 .Fl n .
@@ -233,6 +260,18 @@ longer range resulting in more efficient disk writes in
 .Xr imageunzip .
 A value of zero will cause all free blocks to be recorded accurately
 in the resulting image.  The default value is 64 (32KB).
+.It Fl f
+Tells
+.Nm
+that
+.Ar device
+is a FAT12/16/32 slice.  Should be used only when the device does not contain
+a DOS partition table and really does contains a FAT filesystem.
+Incompatible with
+.Fl b ,
+.Fl l
+and
+.Fl n .
 .It Fl l
 Tells
 .Nm
@@ -241,7 +280,8 @@ that
 is a Linux filesystem slice.  Should be used only when the device does
 not contain a DOS partition table and really does contains a Linux filesystem.
 Incompatible with
-.Fl b 
+.Fl b ,
+.Fl f 
 and
 .Fl n .
 .It Fl n
@@ -252,7 +292,8 @@ that
 is an NTFS slice.  Should be used only when the device does not contain
 a DOS partition table and really does contains an NT filesystem.
 Incompatible with
-.Fl b
+.Fl b ,
+.Fl f
 and
 .Fl l .
 .It Fl X
@@ -279,9 +320,11 @@ If
 is a device special file, it should always be the special file for
 an entire disk even when creating slice images.  The only exception is
 when using the
-.Fl b
-and
+.Fl b ,
+.Fl f ,
 .Fl l
+and
+.Fl n
 options.
 If
 .Ar device
@@ -319,8 +362,33 @@ absolute block numbers.  In theory, the
 .Nm
 relocation mechanism could handle this, but no one I know groks LILO.
 .Pp
-NTFS (Windows NT/2000/XP filesystem) can be handled but isn't in this
-release.
+NTFS support is implemented using the library that is part of the Linux-NTFS
+project (http://linux-ntfs.sourceforge.net/).  As structured, it requires
+opening a device special file for the particular partition the filesystem is
+in.  For this reason,
+.Nm
+may need to open device files other than the one specified on the command
+line.  These device files must be present or
+.Nm
+will fail.
+.Pp
+The naming convention used for slices found in extended partition tables
+differs from that used by FreeBSD.  If you have doubts about which slice
+to specify to the
+.Fl I
+and
+.Fl R
+options, run
+.Nm
+first with the
+.Fl i
+option to show how it maps the partition table entries.
+.Pp
+Also, because of the slice naming convention and because each partition
+table is processed as it is encountered, you may see diagnostic messages
+seemingly out of order (e.g., a message about slice 7 before one about
+slice 3).  This only affects the building of the free block list however,
+the disk data are still saved in the image in order.
 .Sh EXAMPLES
 .Dl imagezip /dev/ad0 /nfs/backup/images/myimage.ndz
 .Pp
