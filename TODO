@@ -1,5 +1,94 @@
 [This file is not kept entirely up to date.]
 
+*  From: Jay Lepreau <lepreau@cs.utah.edu>
+   Date: Thu, 10 Jul 2003 10:56:37 MDT
+
+   1. I think most of us are in agreement that in the big visualizer the
+   host/lan icons should be replaced by plain boxes and circles.  I
+   think Chad might have even been convinced before he left, after
+   seeing how nice the little ones looked.
+
+   2. We definitely need some smaller scale options for the big topos
+   arising from vnodes, the ones that Mike was playing with.  There
+   should be some heuristic to decide what the default should be when the
+   big viz page is first displayed.  Ie,  doing the really big one
+   first (100%) is often just a waste of time and annoys the user
+   while it loads.
+
+   3. Non-tweaks (ie, significant work, but maybe not hard): Really big
+   topos need something better.  The Tamara Munzner/then-CAIDA tool
+   that lets you zoom in on an area would have been just the thing for
+   that really dense/overlapping one that was out there a week ago.
+   To support that we need some kind of export and viewer
+   configuration capability.
+
+   (This fits into my vision for a one-stop shop for network expts, where
+   people will use Elab even for big pure simuations, because it will be
+   linked in to great computational resources and have all sorts of handy
+   tools.)
+
+*  From: Eric Eide <eeide@cs.utah.edu>
+   Date: Thu, 10 Jul 2003 11:12:19 -0600
+
+   Something that I would like to be able to do is to run a batch
+   experiment that builds a disk image, and and at the end of the
+   batch script, have the disk image dumped.  Any clever ideas about
+   how one might go about doing this?
+
+*  Fix /etc/named.conf problem on RON image and build new image.
+
+*  Run neato and the visualization code on ops cause of CPU load on
+   big experiments.
+
+*  Change ISO version number.
+
+*  Adjust web page width to actual display width the user is using. 
+
+*  From: Mike Hibler <mike@flux.utah.edu>
+   Date: Tue, 8 Jul 2003 11:01:00 -0600 (MDT)
+    
+   BTW: shouldn't we have a "node types" page where people can find out info
+   about the various machine types (CPU, memory, etc.)?
+    
+*  From: Mac Newbold <newbold@flux.utah.edu>
+   Date: Tue, 8 Jul 2003 10:57:22 -0600 (MDT)
+    
+   >> mangled because the regular output goes to stdout and the error
+   >> messages go to stderr. I've fixed that problem.
+   >
+   >Well, we list them in the up/down and reservation page, so people probably
+   >see the faster ID and try to get them. Maybe they should not be public
+   >(add a "public" bit to the nodes table?).
+    
+   If you're going to add one, I'd probably vote for doing it per-type
+   instead of per-node. So in node_types you could set what things are public
+   and what aren't. Then we also wouldn't need holding expts for nodes of odd
+   types, and it would be okay to have some of them sitting around free.
+    
+*  From: Timothy Stack <stack@cs.utah.edu>
+   Subject: shell env for startup scripts
+   Date: Mon, 7 Jul 2003 10:43:38 -0600 (MDT)
+    
+   The shell environment that the tb-set-node-startup script uses can be
+   quite a bit different from the one you get when logged in remotely.  This
+   can make things kinda complicated when trying to automate things, since
+   you don't quite know what you gonna get.  I'm particularly interested in
+   the ACE_ROOT/TAO_ROOT variables that are set by the scripts in
+   /etc/profile.d/.
+    
+* The routes table is a problem. Currently 129000 rows, averaging 86 bytes,
+  for a total of almost 12megs. That on main, with no virtnodes (1000 node
+  experiments!). The representation is also grossly inefficient (like,
+  pid/eid in every one of those rows!), and using text representation of the
+  IP addresses (src,dst,nexthop,mask). We could probably cut that back by
+  60%, but its still too much stuff to keep around for every swapped out
+  experiment. We should run the route setup at swapin, and if the user
+  wants to see them when its swapped out, we can run the route
+  calculator on the fly and dump the output to the web page.
+
+* Add routes/events option to web page, since those are not in the
+  email any longer.
+
 * Other items. We better start saving the thumbnails in the experiment
   archive directory too (expinfo). We should also be re-rendering after a
   modify. We should also save the XML representation to avoid having to
