@@ -152,6 +152,16 @@ Node instproc updatedb {DB} {
 Node instproc add_lanlink {lanlink} {
     $self instvar portlist
     $self instvar iplist
+
+    # Check if we're making too many lanlinks to this node
+    # XXX Could come from db from node_types if necessary
+    # For now, no more than 4 links or interfaces per node
+    set maxlanlinks 4
+    if { $maxlanlinks == [llength $portlist] } {
+	# adding this one would put us over
+	perror "Too many links/LANs to node $self! Maximum is $maxlanlinks."
+    }
+
     lappend portlist $lanlink
     lappend iplist ""
     return [expr [llength $portlist] - 1]
