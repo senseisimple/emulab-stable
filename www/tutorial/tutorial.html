@@ -707,25 +707,23 @@ provided FreeBSD or Linux disk images.
 
 <p>
 You can use the NS <tt>rtproto</tt> syntax in your NS file to enable
-automatic routing:
+routing:
 <code><pre>
 $ns rtproto <i>protocol</i>
 </pre></code>
-where the <i>protocol</i> option for automated routing is currently
-limited to <code>Session</code>.  The current implementation of
-<code>Session</code> routing is to enable <code>gated</code> running
-the OSPF protocol on all nodes in the experiment.
-In the future we may add support for other routing protocols as well
-as the ability to have Emulab automatic pre-compute static routes based
-on an experiment's topology.
+where the <i>protocol</i> option is limited to one of
+<code>Session</code>, <code>Static</code>, or <code>Manual</code>.
+<code>Session</code> routing provides fully automated routing support, 
+and is implemented by enabling <code>gated</code> running the OSPF protocol
+on all nodes in the experiment. <code>Static</code> routing also
+provides automatic routing support, but rather than computing the
+routes dynamically, the routes are precomputed when the experiment is
+created, and then loaded on each node when it boots.
 
 <p>
-We also support a facility allowing you to explicitly specify per-node
-routing information in the NS file.  To do this,
-use the <tt>Manual</tt> routing option to <tt>rtproto<tt>:
-<code><pre>
-$ns rtproto Manual
-</pre></code>
+<code>Manual</code> routing allows you to explicitly specify per-node
+routing information in the NS file. To do this, use the
+<tt>Manual</tt> routing option to <tt>rtproto<tt>, 
 followed by a list of routes using the <tt>add-route</tt> command:
 <code><pre>
 $node add-route $dst $nexthop
@@ -737,7 +735,6 @@ $client add-route $server $router
 $client add-route [$ns link $server $router] $router
 $client add-route $serverlan $router
 </pre></code>
-
 Note that you would need a separate <code>add-route</code> command to
 establish a route for the reverse direction; thus allowing you to
 specify differing forward and reverse routes if so desired.
