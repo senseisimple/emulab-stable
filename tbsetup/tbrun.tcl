@@ -62,6 +62,7 @@ set irFile [lindex $argv 2]
 set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set logFile "$prefix.log"
+set ifcfile "$prefix.ifc"
 
 if {[catch "open $logFile a+" logFp]} {
     puts stderr "Could not open $logFile for writing."
@@ -127,19 +128,24 @@ if {[catch "exec $os_setup $pid $eid $irFile >@ $logFp 2>@ $logFp" err]} {
 outs "PLACEHOLDER - Verifying OS functionality."
 
 # XXX - This should only be done for linux/freebsd OSs
-#outs "Setting up interfaces."
-#if {[catch "exec cat $irFile | $ir2ifc | $ifcboot >@ $logFp 2>@ $logFp" err]} {
-#    outs stderr "Error setting interfaces ($err)"
-#    exit 1
-#}
+outs "Setting up interfaces."
+if {[catch "exec cat $irFile | $ir2ifc | sort > $ifcfile 2>@ $logFp" err]} {
+    outs stderr "Error generating $ifcfile ($err)"
+    exit 1
+}
+
+if {[catch "exec $ifcboot $pid $eid $ifcfile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error setting interfaces ($err)"
+    exit 1
+}
 
 outs "PLACEHOLDER - Installing secondary packages."
 
-outs "Creating user accounts."
-if {[catch "exec $mkacct $eid >@ $logFP 2>@ $logFP" err]} {
-    outs stderr "Error running $mkacct. ($err)"
-    exit 1
-}
+#outs "Creating user accounts."
+#if {[catch "exec $mkacct $eid >@ $logFP 2>@ $logFP" err]} {
+#    outs stderr "Error running $mkacct. ($err)"
+#    exit 1
+#}
 
 outs "PLACEHOLDER - Rebooting."
 outs "Testbed ready for use."
