@@ -196,6 +196,17 @@ else
     TBUSERSARCHIVE="$TBOPSEMAIL"
 fi
 
+# Default OURDOMAIN to the domain name of the boss node
+# This is gross beyond all description - autoconf changes m4's quote characters
+# to '[' and ']', which prevents them from working in the sed expression below.
+# So, we temporarily change them to something else then change them back.
+# Note: In newer versions of autoconf, this can be done with 'quadrigraphs'
+changequote(START, END)dnl
+if test -z "$OURDOMAIN"; then
+    OURDOMAIN="`echo $BOSSNODE | sed -E -e 's/^[a-zA-Z0-9\-]+\.//'`"
+fi
+changequote([, ])dnl
+
 if test -z "$TBAUTHDOMAIN"; then
     TBAUTHDOMAIN=".$OURDOMAIN"
 fi

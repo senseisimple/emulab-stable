@@ -119,7 +119,8 @@ and is generally helpful if things go wrong with the nameserver.
 SSL certificates - Our apache config file expects to find SSL certificates in:
 /usr/local/etc/apache/ssl.crt/www.<sitename>.crt and
 /usr/local/etc/apache/ssl.key/www.<sitename>.key
-(where <sitename> is OURDOMAIN from the configure defs file.) 
+(where <sitename> is OURDOMAIN from the configure defs file, which defaults to
+boss's domain name.) 
 Generate a passwordless certificate (up to you if you want to get a 'real' one
 from Verisign, etc., or sign your own), and place the files from it in the
 above locations.

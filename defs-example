@@ -12,9 +12,6 @@ THISHOMEBASE=Example.Emulab.Net
 # Various domain and host names
 #
 
-# Domain this testbed resides in
-OURDOMAIN=example.emulab.net
-
 # Host name of our web server (or host:port)
 WWWHOST=www.example.emulab.net
 

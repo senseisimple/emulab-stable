@@ -1051,6 +1051,15 @@ else
     TBUSERSARCHIVE="$TBOPSEMAIL"
 fi
 
+# Default OURDOMAIN to the domain name of the boss node
+# This is gross beyond all description - autoconf changes m4's quote characters
+# to '[' and ']', which prevents them from working in the sed expression below.
+# So, we temporarily change them to something else then change them back.
+# Note: In newer versions of autoconf, this can be done with 'quadrigraphs'
+if test -z "$OURDOMAIN"; then
+    OURDOMAIN="`echo $BOSSNODE | sed -E -e 's/^[a-zA-Z0-9\-]+\.//'`"
+fi
+
 if test -z "$TBAUTHDOMAIN"; then
     TBAUTHDOMAIN=".$OURDOMAIN"
 fi
@@ -1298,7 +1307,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1302: checking for a BSD compatible install" >&5
+echo "configure:1311: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
