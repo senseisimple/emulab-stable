@@ -2851,7 +2851,7 @@ client_writeback_done(int sock, struct sockaddr_in *client)
 
 	if (sock != udpfd)
 		error("UDP reply out of sync!");
-	else {
+	else if (udpix != 0) {
 		err = sendto(udpfd, udpbuf, udpix, 0,
 			     (struct sockaddr *)client, sizeof(*client));
 		if (err < 0)
