@@ -226,43 +226,23 @@ $result->finish;
 printdb "Loading virt_lans.\n";
 $result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
-		 "rdelay,rbandwidth,rlossrate " .
+		 "rdelay,rbandwidth,rlossrate,widearea " .
 		 "from virt_lans where pid='$pid' and eid='$eid'");
 
 #
 # REMOTENODE HACK: Remote nodes are special.
 #
-# Prepass the table looking for those virt_lans that have a remote node
-# as a member. We want to ignore those (both sides) if its a duplex
-# link, but if its in a lan then we barf since we cannot support putting
-# a remote into a lan.
-#
+# A list of all lans that have remote nodes as members,
 my %rnodelans = ();
-my %lancount = ();
-my %tunnels  = ();
-
-while (($vname,$member) = $result->fetchrow_array) {
-    ($node,$port) = split(":",$member);
-
-    if ($isremotenode{$node}) {
-	$rnodelans{$vname} = 1;
-    }
-    if (!defined($lancount{$vname})) {
-	$lancount{$vname} = 0;
-    }
-    $lancount{$vname} += 1;
-    if ($lancount{$vname} > 2 && defined($rnodelans{$vname})) {
-	die("*** $0:\n".
-	    "    Remote node $node in lan $vname not allowed!\n");
-    }
-}
-$result->dataseek(0);
+# A list of all the tunnels we need to build. Each list member is a list
+# of the nodes in the tunnel.
+my %tunnels   = ();
 
 #
 # Now do the real pass.
 # 
 while (($vname,$member,$delay,$bandwidth,$lossrate,
-	$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array) {
+	$rdelay,$rbandwidth,$rlossrate,$widearea) = $result->fetchrow_array) {
     ($node,$port) = split(":",$member);
 
     #
@@ -273,11 +253,12 @@ while (($vname,$member,$delay,$bandwidth,$lossrate,
     # allocated as unconnected by another program, and we deal with
     # it later by creating tunnels.
     # 
-    if ($rnodelans{$vname}) {
+    if ($widearea) {
 	if (! defined($tunnels{$vname})) {
 	    $tunnels{$vname} = [];
 	}
 	push(@{$tunnels{$vname}},$member);
+	$rnodelans{$vname} = 1;
 	printdb "    Added $member to tunnels of $vname\n";
 	next;
     }
