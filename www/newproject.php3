@@ -142,6 +142,7 @@ $proj_whynotpublic = addslashes($proj_whynotpublic);
 $usr_affil    = addslashes($usr_affil);
 $usr_title    = addslashes($usr_title);
 $usr_addr     = addslashes($usr_addr);
+$usr_phones   = addslashes($usr_phones);
 
 #
 # Convert project visibility to boolean value. Tested above for yes/no.

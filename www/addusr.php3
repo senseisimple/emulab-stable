@@ -95,14 +95,14 @@ if ($returning) {
           </tr>\n";
 
     echo "<tr>
-              <td>Mailing Address:</td>
+              <td>*Mailing Address:</td>
               <td class=\"left\">
                   <input type=\"readonly\" name=\"usr_addr\"
                          value=\"$usr_addr\"></td>
           </tr>\n";
 
     echo "<tr>
-              <td>Phone #:</td>
+              <td>*Phone #:</td>
               <td class=\"left\">
                   <input type=\"readonly\" name=\"usr_phone\"
                          value=\"$usr_phone\"></td>
@@ -155,13 +155,13 @@ else {
           </tr>\n";
 
     echo "<tr>
-              <td>Mailing Address:</td>
+              <td>*Mailing Address:</td>
               <td class=\"left\">
                   <input type\"text\" name=\"usr_addr\" size=40></td>
           </tr>\n";
 
     echo "<tr>
-              <td>Phone #:</td>
+              <td>*Phone #:</td>
               <td class=\"left\">
                   <input type=\"text\" name=\"usr_phone\" size=16></td>
           </tr>\n";

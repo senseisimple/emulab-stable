@@ -40,6 +40,14 @@ if (!isset($usr_title) ||
     strcmp($usr_title, "") == 0) {
   FORMERROR("Title/Position");
 }
+if (!isset($usr_addr) ||
+    strcmp($usr_addr, "") == 0) {
+  FORMERROR("Mailing Address");
+}
+if (!isset($usr_phone) ||
+    strcmp($usr_phone, "") == 0) {
+  FORMERROR("Phone #");
+}
 
 #
 # Check joining_uid for sillyness.
@@ -88,6 +96,7 @@ $usr_name  = addslashes($usr_name);
 $usr_affil = addslashes($usr_affil);
 $usr_title = addslashes($usr_title);
 $usr_addr  = addslashes($usr_addr);
+$usr_phone = addslashes($usr_phone);
 
 #
 # See if this is a new user or one returning.

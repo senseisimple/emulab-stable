@@ -117,14 +117,14 @@ echo "<tr>
 #      </tr>\n";
 
 echo "<tr>
-          <td>*Mailing Address:</td>
+          <td>Mailing Address:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"usr_addr\" size=\"40\"
                      value=\"$usr_addr\"></td>
       </tr>\n";
 
 echo "<tr>
-          <td>*Phone #:</td>
+          <td>Phone #:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"usr_phone\" size=\"15\"
                      value=\"$usr_phone\"></td>
