@@ -8,16 +8,16 @@ PAGEHEADER("Documentation");
 ?>
 
 <ul>
-<li> <a href="docwrapper.php3?docname=tutorial/tutorial.html">
-        Emulab `Getting Started' Tutorial</a>.
+<li><b><a href="docwrapper.php3?docname=tutorial/tutorial.html">
+        Emulab "Getting Started" Tutorial</a></b>
      <p>
 
-<li> <a href="docwrapper.php3?docname=faq.html">
-              Emulab Frequently Asked Questions (FAQ)</a>.
+<li><b><a href="docwrapper.php3?docname=faq.html">
+              Emulab Frequently Asked Questions (FAQ)</a></b>
      <p>
 
-<li> <a href="docwrapper.php3?docname=doc/tmcd.html">
-              Testbed Master Control Daemon (TMCD) Reference Manual</a>
+<li><b><a href="docwrapper.php3?docname=doc/tmcd.html">
+              Testbed Master Control Daemon (TMCD) Reference Manual</a></b>
      <p>
 
 <li><b><a href = "docwrapper.php3?docname=auth.html">
