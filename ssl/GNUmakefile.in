@@ -149,6 +149,7 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/pcplab.pem \
 		$(INSTALL_ETCDIR)/pcwa.pem \
 		$(INSTALL_ETCDIR)/ronnode.pem \
+		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/capture.pem \
 		$(INSTALL_ETCDIR)/emulab_privkey.pem \
 		$(INSTALL_ETCDIR)/emulab_pubkey.pem
@@ -158,6 +159,7 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcplab.pem
 	chmod 640 $(INSTALL_ETCDIR)/ronnode.pem
+	chmod 640 $(INSTALL_ETCDIR)/ctrlnode.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcwa.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab_privkey.pem
 
@@ -165,6 +167,7 @@ remote-site-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/capture.pem \
 		$(INSTALL_ETCDIR)/capture.fingerprint \
 		$(INSTALL_ETCDIR)/capture.sha1fingerprint \
+		$(INSTALL_ETCDIR)/ctrlnode.pem \
 		$(INSTALL_ETCDIR)/server.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
@@ -173,12 +176,20 @@ remote-site-boss-install:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 644 $(INSTALL_ETCDIR)/capture.sha1fingerprint
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
 	chmod 640 $(INSTALL_ETCDIR)/client.pem
+	chmod 640 $(INSTALL_ETCDIR)/ctrlnode.pem
 
 client-install:
 	$(INSTALL_DATA) localnode.pem $(DESTDIR)$(CLIENT_ETCDIR)/client.pem
 	$(INSTALL_DATA) emulab.pem $(DESTDIR)$(CLIENT_ETCDIR)/emulab.pem
 	$(INSTALL_DATA) emulab_pubkey.pem \
 			$(DESTDIR)$(CLIENT_ETCDIR)/emulab_pubkey.pem
+
+control-install:	$(INSTALL_SBINDIR)/capture.pem \
+			$(INSTALL_ETCDIR)/emulab.pem
+	$(INSTALL_DATA) ctrlnode.pem $(INSTALL_ETCDIR)/client.pem
+	chmod 640 $(INSTALL_SBINDIR)/capture.pem
+	chmod 640 $(INSTALL_ETCDIR)/client.pem
+	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 
 tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 	chmod 640 $(INSTALL_SBINDIR)/capture.pem
