@@ -225,7 +225,7 @@ foreach left [array names to_assign] {
     set both [lindex $to_assign($left) 2]
 
     if {$both == 1} {
-	set subnet [find_free_subnet $node $dst]
+	set subnet [find_free_common_subnet $node $dst]
 	set ipA [find_free_ip $subnet]
 	set ipB [find_free_ip $subnet]
 	lappend ip_section [list $node $dst $ipA]
