@@ -62,13 +62,8 @@ Create the /etc/mail/lists directory, which will be used to store mailing lists
 for testbed-users and testbed-activeusers, which can be used to conveniently
 send mail to all and all active users, respectively.
 
-Add the following entries to your /etc/mail/aliases file:
-testbed-activeusers:    :include:/etc/mail/lists/testbed-active-users
-testbed-active-users:   :include:/etc/mail/lists/testbed-active-users
-testbed-users:          :include:/etc/mail/lists/testbed-users
-
 If you're running your testbed-ops list off a different mailserver, you
-might want to add something like:
+might want to add something to your /etc/mail/aliases file like:
 testbed-ops:            testbed-ops@fast.cs.utah.edu
 
 Or, you can make a file containing all the people on the testbed-ops list
