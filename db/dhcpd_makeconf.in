@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+use Mysql;
+use Getopt::Long;
+
+#
+# Configure variables
+#
+my $DBNAME  = "@TBDBNAME@";
+
+my %opt = ();
+GetOptions(\%opt,"h","v");
+if ($opt{h}) { exit &usage; }
+
+my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
+
+$infile = shift @ARGV; # || exit &usage;
+
+open(IF,"<$infile") or die "Unable to open $infile for reading\n";
+while (<IF>) {
+	if (/^(\s*)\%\%nodetype=(\w+)/) {
+		my $spaces = $1;
+		my $nodetype = $2;
+		my $query = "SELECT n.node_id, i.IP, i.MAC ";
+		if ($opt{v}) {
+			$query .= ", r.vname ";
+		}
+		$query .= "FROM nodes AS n LEFT JOIN interfaces AS i ON n.node_id = i.node_id ";
+		$query .= "LEFT JOIN node_types AS t ON n.type = t.type ";
+		if ($opt{v}) {
+			$query .= "LEFT JOIN reserved AS r ON n.node_id = r.node_id ";
+		}
+		$query .= "WHERE n.type='$nodetype' AND i.card = t.control_net ";
+		$query .= "ORDER BY n.priority";
+		my $sth = $dbh->query($query);
+		while (@row = $sth->fetchrow) {
+			my $ip = $row[1];
+			my $mac = $row[2];
+			my $node_id;
+			if ($opt{v} && $row[3]) {
+				$node_id = $row[3];
+			} else {
+				$node_id = $row[0];
+			}
+				
+			# Need to make MAC look right..
+			$mac =~ s/(..)\B/$1:/g;
+
+			print "${spaces}host $ip {\n";
+			print "${spaces}\thardware ethernet $mac;\n";
+			print "${spaces}\toption host-name \"$node_id\";\n";
+			print "${spaces}\tfixed-address $ip;\n";
+			print "${spaces}}\n\n";
+		}
+	} else {
+		# It's a regular line
+		print;
+	}
+}
+
+sub usage {
+	print "Usage: $0 [-h] [-v] <templatefile>\n";
+	print "-h		Show this message\n";
+	print "-v		Use virtual names, when possible, for hostnames\n";
+}
