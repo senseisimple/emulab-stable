@@ -753,6 +753,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	        prerender_all -t
 
+       (You can run prerender_all _after_ doing a boss-install).
+
        Also remove the vis_experiments table, since no longer needed.
 
         drop table vis_experiments;
