@@ -323,10 +323,10 @@ main(int argc, char **argv)
 			int which = 0;
 			if (!foo[1])
 				which = 1;
-		//	else if (! foo[2])
-		//		which = 2;
-		//	else if (! foo[3])
-		//		which = 3;
+			else if (! foo[2])
+				which = 2;
+			else if (! foo[3])
+				which = 3;
 			
 			if ((pid = fork()) < 0) {
 				errorc("forking server");
