@@ -494,7 +494,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	#
         # Create user account on control node.
         #
-	SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $user", 0);
+	MKACCT($uid, "webmkacct -a $user");
 	SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 0);
 		
 	continue;

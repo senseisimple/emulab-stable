@@ -139,7 +139,7 @@ DBQueryFatal("update users set usr_modified=now() ".
 #
 # mkacct updates the keys.
 # 
-SUEXEC($uid, $TBADMINGROUP, "webmkacct -a -f $target_uid", 0);
+MKACCT($uid, "webmkacct -a -f $target_uid");
 
 header("Location: showsfskeys.php3?target_uid=$target_uid");
 

@@ -26,7 +26,7 @@ $TBCSLOGINS     = "$TBETC_DIR/cslogins";
 
 #
 # Hardcoded check against $WWWHOST, to prevent anyone from accidentally setting
-# $TBMAINSITE when it shouldn't be
+# $TBMAINSITE when it should not be
 #
 if ($WWWHOST != "www.emulab.net") {
     $TBMAINSITE = 0;
@@ -89,10 +89,10 @@ function TBERROR ($message, $death, $xmp = 0) {
          "From: $TBMAIL_OPS\n".
          "Errors-To: $TBMAIL_WWW");
 
-    # Allow sendmail to run.
-    sleep(1);
-    
     if ($death) {
+	# Allow sendmail to run.
+	sleep(1);
+    
 	if ($xmp)
 	    $message = "<XMP>$message</XMP>\n";
 	
@@ -152,7 +152,7 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
     if ($retval) {
 	$foo = "";
         for ($i = 0; $i < count($output); $i++) {
-	      $foo = "$foo $output[$i]";
+	    $foo .= "$output[$i]\n";
 	}
 	
 	TBERROR("SUEXEC failure: '$cmdandargs'\n".
@@ -165,14 +165,33 @@ function SUEXEC($uid, $gid, $cmdandargs, $die) {
 function ADDPUBKEY($uid, $cmdandargs) {
     global $TBSUEXEC_PATH;
 
-    ignore_user_abort(1);
+    #
+    # Complication. User might not have an actual account if setting or
+    # changing his own pubkeys. webonly, unapproved, and unverified users
+    # can still muck with their personal info. So, just invoke as user
+    # nobody. We will get audit email in case we need to track what has
+    # happened. 
+    #
+    if (! HASREALACCOUNT($uid)) {
+	$uid = "nobody";
+    }
+    return SUEXEC($uid, nobody, $cmdandargs, 0);
+}
 
-    $output = array();
-    $retval = 0;
-    $result = exec("$TBSUEXEC_PATH $uid nobody $cmdandargs",
-		   $output, $retval);
+function MKACCT($uid, $cmdandargs) {
+    global $TBSUEXEC_PATH;
 
-    return $retval;
+    #
+    # Complication. User might not have an actual account if operating on
+    # his own personal info. webonly, unapproved, and unverified users
+    # can still muck with their personal info. But, no point in running
+    # mkacct since by definition there is no real accounts locally to
+    # mess with. Just silently do nothing.
+    #
+    if (! HASREALACCOUNT($uid)) {
+	return 0;
+    }
+    return SUEXEC($uid, nobody, $cmdandargs, 0);
 }
 
 #
@@ -194,7 +213,7 @@ function CHECKURL($url, &$error) {
 
 	$fp = @fopen($url, "r");
 	if (! $fp) {
-	    # Check to see if it was a redirect, in which case it's OK
+	    # Check to see if it was a redirect, in which case its OK
 	    for ($i = 0; $i < count($http_response_header); $i++) {
 		if (!strcmp("Location:", substr($http_response_header[$i],0,9))) {
 		    $is_redirect = 1;

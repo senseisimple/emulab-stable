@@ -301,7 +301,7 @@ TBMAIL("$targuid_name <$targuid_email>",
 #
 # mkacct arranges for nodes to be updated.
 #
-SUEXEC($uid, $TBADMINGROUP, "webmkacct -a -f $target_uid", 0);
+MKACCT($uid, "webmkacct -a -f $target_uid");
 
 header("Location: showsfskeys.php3?target_uid=$target_uid&finished=1");
 ?>

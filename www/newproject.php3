@@ -745,7 +745,7 @@ if (!$returning) {
     # Verify key format.
     #
     if (isset($addpubkeyargs) &&
-	ADDPUBKEY("nobody", "webaddpubkey -n $addpubkeyargs")) {
+	ADDPUBKEY($proj_head_uid, "webaddpubkey -n $addpubkeyargs")) {
 	$errors["Pubkey Format"] = "Could not be parsed. Is it a public key?";
     }
 
@@ -826,7 +826,7 @@ if (! $returning) {
     # XXX Since, user does not exist, must run as nobody. Script checks. 
     # 
     if (isset($addpubkeyargs)) {
-	ADDPUBKEY("nobody", "webaddpubkey $addpubkeyargs");
+	ADDPUBKEY($proj_head_uid, "webaddpubkey $addpubkeyargs");
     }
 
     DBQueryFatal("INSERT INTO users ".

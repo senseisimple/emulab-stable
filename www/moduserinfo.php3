@@ -495,7 +495,7 @@ TBMAIL("$usr_name <$usr_email>",
 #
 # mkacct updates the user gecos and password.
 # 
-SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $target_uid", 0);
+MKACCT($uid, "webmkacct -a $target_uid");
 
 #
 # Spit out a redirect so that the history does not include a post

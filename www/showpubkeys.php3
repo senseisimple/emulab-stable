@@ -11,7 +11,7 @@ include("showstuff.php3");
 # Only known and logged in users can do this.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS);
 $isadmin = ISADMIN($uid);
 
 #
@@ -302,8 +302,8 @@ ADDPUBKEY($uid, "webaddpubkey -a $addpubkeyargs");
 
 #
 # mkacct updates the user pubkeys in ~ssh/authorized_keys.
-# 
-SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $target_uid", 0);
+#
+MKACCT($uid, "webmkacct -a $target_uid");
 
 header("Location: showpubkeys.php3?target_uid=$target_uid&finished=1");
 ?>
