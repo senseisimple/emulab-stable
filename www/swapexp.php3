@@ -160,7 +160,7 @@ if ($retval < 0) {
 echo "<br><br><h3>\n";
 if ($retval == 0) {
     if (strcmp($inout, "in") == 0)
-	$howlong = "five to ten";
+	$howlong = "two to ten";
     else
 	$howlong = "less than two";
     
