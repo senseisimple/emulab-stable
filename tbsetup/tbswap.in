@@ -612,6 +612,8 @@ sub doSwapin($) {
 	    #
 	    $assignWrapperErrorCode = $exitcode;
 	    if ((($exitcode >> 8) & 64) != 0) {
+		# so batchexp doesn't choke.
+		$assignWrapperErrorCode -= 64;
 		return 7;
 	    } else {
 		return 1;
