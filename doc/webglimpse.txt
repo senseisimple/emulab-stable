@@ -1,0 +1,56 @@
+This describes my webglimpse experience. What a mess!
+
+First off, install the /usr/ports/www/webglimpse package. I came up
+two problems with this. First off is the cgi setup in the httpd.conf
+file was pointing at /usr/local/share instead of /usr/local/www.
+After I fixed that, I went to /usr/local/www and cleaned it out a bit
+(remove cgi-bin stuff and data links).
+
+Next, the webglimpse/wginstall perl program is broken. Some mkdir had
+to be commnented out. It also crapped out chmoding the stuff it
+installed into /usr/local/www/cgi-bin to 755. I just did it by hand
+cause I don't want to mess with it.
+
+Okay, so now its installed:
+
+	cd /usr/testbed
+	mkdir webglimpse
+	cd webglimpse
+	/usr/local/www/webglimpse/confarc
+
+Answer the questions. Pretty obvious, although you want D(directory)
+searching, and you want to store the files in /usr/testbed/webglimpse,
+but you want to *search* /usr/testbed/www.
+
+Next edit .wgfilter-inde and add these lines at the top to keep
+from indexing the source code and other stuff we do not want to leak out.
+
+	Deny  (^|/)webglimpse
+	Allow \.html?$
+	Deny .*
+
+Now run wgreindex in that directory again.
+
+Next edit archive.cfg and change the urlpath line:
+
+	urlpath http://www.emulab.net
+
+Now for the really ugly one. We need to arrange for the files to go
+through the doc wrappers! That means editing the webglimpse perl code
+in one spot. In /usr/local/www/webglimpse/lib/OutputTool.pm, change
+the makeLinkOutput function to this:
+
+    sub makeLinkOutput {
+    	my $self = shift;
+    	my($link, $title, $date) = @_;
+    
+    	if ($link =~ /^(.*)\/(.*\..*)$/) {
+    	    $link = "$main::urlpath/$1/docwrapper.php3?docname=$2\n";
+    	}
+    	
+    	my $retstring =	"<hr><b><A HREF=\"".$link."\">";
+    	$retstring .= $title."</A></b>, $date<br>\n";
+    
+    	return $retstring;
+    }
+
