@@ -22,22 +22,10 @@ $isadmin = ISADMIN($uid);
 unset($prefix);
 
 #
-# Verify page arguments. First allow user to optionally specify building/floor.
-#
-if (isset($building) && $building != "") {
-    # Sanitize for the shell.
-    if (!preg_match("/^[-\w]+$/", $building)) {
-	PAGEARGERROR("Invalid building argument.");
-    }
-    # Optional floor argument. Sanitize for the shell.
-    if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
-	PAGEARGERROR("Invalid floor argument.");
-    }
-}
-else {
-    $building = "MEB-ROBOTS";
-    unset($floor);
-}
+# One robot map right now ...
+# 
+$building = "MEB-ROBOTS";
+$floor    = 3;
 
 #
 # Optional pid,eid. Without a building/floor, show all the nodes for the
@@ -65,65 +53,68 @@ else {
 }
 
 #
-# Figure out what channels are in use for the current building. We only
-# have one building (MEB) at the moment, so this is quite easy.
-# Also determine what the free,reserved,dead counts are. 
+# map_x and map_y are the map.x and map.y coordinates from clicking on the map.
 #
-$channels   = array();
-$nodecounts = array();
-$nodes      = array();
-
-$nodecounts["free"]     = 0;
-$nodecounts["reserved"] = 0;
-$nodecounts["dead"]     = 0;
-
-$query_result =
-    DBQueryFatal("select loc.*,s.capval,r.pid,r.eid from location_info as loc ".
-		 "left join interface_settings as s on ".
-		 "     s.node_id=loc.node_id and s.capkey='channel' ".
-		 "left join reserved as r on r.node_id=loc.node_id");
-
-while ($row = mysql_fetch_array($query_result)) {
-    $channel   = $row["capval"];
-    $node_id   = $row["node_id"];
-    $locfloor  = $row["floor"];
-    $rpid      = $row["pid"];
-    $reid      = $row["eid"];
-
-    #
-    # The above query to get the channels will give us multiple rows
-    # if there are multiple interface cards in use; do not want to
-    # count those twice.
-    # 
-    if (!isset($nodes[$node_id])) {
-	$nodes[$node_id] = 1;
-	
-	if ((!isset($pid) && !(isset($rpid))) ||
-	    (isset($pid) && isset($rpid) && $pid == $rpid)) {
-	    $nodecounts["free"]++;
-	}
-	elseif ($rpid == $NODEDEAD_PID && $reid == $NODEDEAD_EID) {
-	    $nodecounts["dead"]++;
-	}
-	else {
-	    $nodecounts["reserved"]++;
-	}
+if (isset($map_x) && $map_x != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $map_x)) {
+	PAGEARGERROR("Invalid map_x argument.");
     }
-
-    # Make sure an empty list is displayed if nothing allocated on a floor.
-    if (!isset($channels[$locfloor])) {
-	$channels[$locfloor] = array();
+}
+else {
+    unset($map_x);
+}
+if (isset($map_y) && $map_y != "") {
+    # Sanitize for the shell.
+    if (!preg_match("/^[0-9]+$/", $map_y)) {
+	PAGEARGERROR("Invalid map_y argument.");
     }
-
-    if (!isset($channel))
-	continue;
-
-    $channels[$locfloor][$channel] = $channel;
+}
+else {
+    unset($map_y);
 }
 
 #
-# Run the Perl script. It will produce three output files; image, areamap, and state.
-# We want to embed all of these images into the page we send back. This is painful!
+# Assume a single image for the robot map. When user clicks, pixel
+# coords correspond to building and floor.
+#
+$query_result =
+    DBQueryFatal("select * from floorimages where ".
+		 "building='$building' and floor='$floor'");
+if (mysql_num_rows($query_result)) {
+    $row = mysql_fetch_array($query_result);
+    $pixels_per_meter = $row["pixels_per_meter"];
+}
+
+#
+# Build a table of location info to print in table below image.
+#
+$locations = array();
+
+$query_result =
+    DBQueryFatal("select loc.* from location_info as loc ".
+		 "where loc.floor='$floor' and loc.building='$building'");
+
+while ($row = mysql_fetch_array($query_result)) {
+    $node_id   = $row["node_id"];
+    $loc_x     = $row["loc_x"];
+    $loc_y     = $row["loc_y"];
+
+    if (isset($pixels_per_meter) && $pixels_per_meter) {
+	$meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
+	$meters_y = sprintf("%.3f", $loc_y / $pixels_per_meter);
+
+	$locations[$node_id] = "x=$meters_x, y=$meters_y meters";
+    }
+    else {
+	$locations[$node_id] = "x=$loc_x, y=$loc_y pixels";
+    }
+}
+
+#
+# Run the Perl script. It will produce three output files; image, areamap,
+# and state. We want to embed all of these images into the page we
+# send back. This is painful!  
 #
 # Need cleanup "handler" to make sure temp files get deleted! 
 #
@@ -156,6 +147,8 @@ if (!preg_match("/^\/tmp\/([-\w]+)$/", $prefix, $matches)) {
 $uniqueid = $matches[1];
 
 $perl_args = "-o $prefix " .
+	     # From clicking on a map image.
+	     (isset($map_x) ? "-c $map_x,$map_y " : "") .
 	     (isset($floor) ? "-f $floor " : "") .
 	     (isset($building) ? "$building" : "");  # Building arg must be last!
 
@@ -180,9 +173,27 @@ if (! readfile("${prefix}.map")) {
 
 echo "<center>\n";
 
+# Wrap the image and zoom controls together in an input form.
+echo "<form method=\"get\" action=\"robotmap.php3\">\n";
+
 # The image may be clicked to get node info or set a new center-point.
 echo "  Click on the dots below to see information about the robot\n";
 echo "  <br>\n";
+echo "  Click elsewhere to get its x,y location.\n";
+echo "  <br>\n";
+
+if (isset($map_x) && isset($map_y)) {
+    if (isset($pixels_per_meter) && $pixels_per_meter) {
+	$meters_x = sprintf("%.3f", $map_x / $pixels_per_meter);
+	$meters_y = sprintf("%.3f", $map_y / $pixels_per_meter);
+    
+	echo "Last click location was x=$meters_x, y=$meters_y meters.\n";
+    }
+    else {
+	echo "Last click location was x=$map_x, y=$map_y pixels\n";
+    }
+    echo "<br>\n";
+}
 
 echo "  <input name=map type=image style=\"border: 2px solid\" ";
 echo          "src=\"floormap_aux.php3?prefix=$uniqueid\" ".
@@ -194,6 +205,17 @@ echo "  <br>\n";
 echo "  <input type=\"hidden\" name=\"prefix\" value=\"$uniqueid\">\n";
 
 echo "</form>\n";
+
+if (count($locations)) {
+    echo "<table align=center border=2 cellpadding=0 cellspacing=2>
+ 	  <tr><th>Node</th><th>Location</th></tr>\n";
+    
+    while (list($node_id, $location) = each($locations)) {
+	echo "<tr><td>$node_id</td> <td>$location</td> </tr>\n";
+    }
+    echo "</table>\n";
+}
+
 echo "</center>\n";
 
 #

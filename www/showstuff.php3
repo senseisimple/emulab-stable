@@ -1750,7 +1750,7 @@ function SHOWNODE($node_id, $flags = 0) {
 		     "greatest(last_tty_act,last_net_act,last_cpu_act,".
 		     "last_ext_act) as last_act, ".
 		     " t.isvirtnode,t.isremotenode,t.isplabdslice, ".
-		     " r.erole as rsrvrole, pi.IP as phys_IP ".
+		     " r.erole as rsrvrole, pi.IP as phys_IP, loc.* ".
 		     " from nodes as n ".
 		     "left join reserved as r on n.node_id=r.node_id ".
 		     "left join node_activity as na on n.node_id=na.node_id ".
@@ -1759,6 +1759,7 @@ function SHOWNODE($node_id, $flags = 0) {
 		     " and i.node_id=n.node_id ".
 		     "left join interfaces as pi on pi.iface=t.control_iface ".
 		     " and pi.node_id=n.phys_nodeid ".
+		     "left join location_info as loc on loc.node_id=n.node_id ".
 		     "where n.node_id='$node_id'");
     
     if (mysql_num_rows($query_result) == 0) {
@@ -1815,6 +1816,35 @@ function SHOWNODE($node_id, $flags = 0) {
 	$tarballs = "&nbsp";
     if (!$startupcmd)
 	$startupcmd = "&nbsp";
+
+    if (!$short) {
+	#
+	# Location info.
+	# 
+	if (isset($row["loc_x"]) && isset($row["loc_y"]) &&
+	    isset($row["floor"]) && isset($row["building"])) {
+	    $floor    = $row["floor"];
+	    $building = $row["building"];
+	    $loc_x    = $row["loc_x"];
+	    $loc_y    = $row["loc_y"];
+	
+	    $query_result =
+		DBQueryFatal("select * from floorimages ".
+			     "where scale=1 and ".
+			     "      floor='$floor' and building='$building'");
+
+	    if (mysql_num_rows($query_result)) {
+		$row = mysql_fetch_array($query_result);
+	    
+		if (isset($row["pixels_per_meter"]) &&
+		    ($pixels_per_meter = $row["pixels_per_meter"])) {
+		
+		    $meters_x = sprintf("%.3f", $loc_x / $pixels_per_meter);
+		    $meters_y = sprintf("%.3f", $loc_y / $pixels_per_meter);
+		}
+	    }
+	}
+    }
 
     echo "<table border=2 cellpadding=0 cellspacing=2
                  align=center>\n";
@@ -1895,7 +1925,20 @@ function SHOWNODE($node_id, $flags = 0) {
                      <td class=left>$allocstate ($when)</td>
                   </tr>\n";
 	}
-
+    }
+    if (!$short) {
+	#
+	# Location info.
+	# 
+	if (isset($meters_x) && isset($meters_y)) {
+	    echo "<tr>
+                      <td>Location:</td>
+                      <td class=left>x=$meters_x, y=$meters_y meters</td>
+                  </tr>\n";
+	}
+    }
+	
+    if (!$short && !$noperm) {
         #
         # We want the last login for this node, but only if its *after* the
         # experiment was created (or swapped in).
