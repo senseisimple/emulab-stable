@@ -46,7 +46,7 @@ control-install:
 	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
 	@$(MAKE) -C sched control-install
-	@$(MAKE) -C linktest install
+	@$(MAKE) -C linktest control-install
 
 post-install: 
 	@$(MAKE) -C linktest post-install
