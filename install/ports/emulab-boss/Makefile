@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-boss
-PORTVERSION=	1.3
+PORTVERSION=	1.4
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -45,14 +45,15 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	elvind:${PORTSDIR}/misc/elvind \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
 	sudo:${PORTSDIR}/security/sudo \
-	${LOCALBASE}/sbin/named:${PORTSDIR}/net/bind9
+	${LOCALBASE}/sbin/named:${PORTSDIR}/net/bind9 \
+	wget:${PORTSDIR}/ftp/wget
 
 BUILD_DEPENDS=	 ${X11BASE}/include/X11/xpm.h:${PORTSDIR}/graphics/xpm \
 	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
-	swig1.1:${PORTSDIR}/devel/SWIG
+	swig1.1:${PORTSDIR}/devel/swig11
 
 
 USE_PERL5=	yes
