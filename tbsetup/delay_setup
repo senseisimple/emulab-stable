@@ -2,7 +2,7 @@
 
 my $rsh		= "su1 ssh";
 my $ssh		= "su1 ssh";
-my $rcp		= "su1 scp";
+my $rcp		= "su1 scp -q";
 my $ping	= "/sbin/ping";
 my $TB		= "/usr/testbed/bin";
 my $power	= "$TB/power";
@@ -213,7 +213,6 @@ foreach my $link ( keys %delayparams ) {
     open(UNAME, "$rsh $pc uname -a 2>&1 |");
     $_ = <UNAME>;
     close(UNAME);
-    print STDERR "$_\n";
     my $OS = "Unknown";    
     if ( $_ ) {
 	@temp = split(" ",$_);
@@ -298,17 +297,26 @@ foreach my $link ( keys %delayparams ) {
     # The most you want to wait is 60 seconds, I think, before throwing
     # in the towl.
     #
+    # Sigh, a 60 second ping results in the script waiting until all the
+    # packets are sent from all the pings, before it will exit. So,
+    # loop doing a bunch of shorter pings
+    #
     print STDERR "Checking $pc to make sure it is alive ... " if $dbg;
-    open(PING, "$ping -c 60 $pc 2>&1 |");
-    do {
-	$_ = <PING>;
-	if ( $_ =~ /bytes from/ ) {
-	    close(PING);
-	    print STDERR "Yep, alive and well\n" if $dbg;
-	    goto ALIVE;
+    for ($i = 0; $i < 30; $i++) {
+	open(PING, "$ping -c 2 $pc 2>&1 |");
+	do {
+	    $_ = <PING>;
+	    if ( $_ =~ /bytes from/ ) {
+		#
+		# Do not close PING, cause we end up waiting for all the
+		# packets to be sent.
+		close(PING);
+		print STDERR "Yep, alive and well\n" if $dbg;
+		goto ALIVE;
+	    }
 	}
+	until ( $_ =~ /transmitted, (\d*) packets received/ );
     }
-    until ( $_ =~ /transmitted, (\d*) packets received/ );
     close(PING);
     die("$pc is not responding. Better check into it\n");
  ALIVE:
