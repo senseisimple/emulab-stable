@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -40,10 +40,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <err.h>
+#ifdef __FreeBSD__
+#define DEFDISK "/dev/ad0"
 #if __FreeBSD__ >= 5
 #include <sys/disk.h>
 #else
 #include <sys/disklabel.h>
+#endif
+#else
+#ifdef __linux__
+#define DEFDISK "/dev/hda"
+#include <linux/fs.h>
+#endif
 #endif
 #include "sliceinfo.h"
 
@@ -66,10 +74,10 @@ char optionstr[] =
 "	   (default is to just show what would be done)\n"
 "	-X extend the final partition to include the extra space\n"
 "	   (alternative to -N)\n"
-"	[disk] is the disk special file to operate on\n"
-"	   (default is /dev/ad0)";
+"	[disk] is the disk special file to operate on";
 
-#define usage()	errx(1, "Usage: %s %s\n", progname, optionstr);
+#define usage()	errx(1, "Usage: %s %s\nDefault disk is %s", \
+		     progname, optionstr, DEFDISK);
 
 void getdiskinfo(char *disk);
 int setdiskinfo(char *disk);
@@ -82,7 +90,7 @@ int list = 1, verbose, fdisk, usenewpart = 1;
 main(int argc, char *argv[])
 {
 	int ch;
-	char *disk = "/dev/ad0";
+	char *disk = DEFDISK;
 
 	progname = argv[0];
 	while ((ch = getopt(argc, argv, "fvhNWX")) != -1)
@@ -127,11 +135,15 @@ getdiskinfo(char *disk)
 		unsigned short magic;
 	} *s0;
 
-
 	memset(&diskinfo, 0, sizeof(diskinfo));
 	fd = open(disk, O_RDONLY);
 	if (fd < 0)
 		err(1, "%s: opening for read", disk);
+#ifdef __linux__
+	if (ioctl(fd, BLKGETSIZE, &diskinfo.disksize) < 0)
+		err(1, "%s: BLKGETSIZE", disk);
+	diskinfo.cpu = diskinfo.tpc = diskinfo.spt = 0;
+#else
 #ifdef DIOCGMEDIASIZE
 	{
 		unsigned ssize;
@@ -145,6 +157,7 @@ getdiskinfo(char *disk)
 		diskinfo.cpu = diskinfo.tpc = diskinfo.spt = 0;
 	}
 #else
+#ifdef GIOCGDINFO
 	{
 		struct disklabel label;
 
@@ -167,6 +180,8 @@ getdiskinfo(char *disk)
 			diskinfo.disksize = chs;
 		}
 	}
+#endif
+#endif
 #endif
 	if (read(fd, diskinfo.bootblock, sizeof(diskinfo.bootblock)) < 0)
 		err(1, "%s: error reading bootblock", disk);
