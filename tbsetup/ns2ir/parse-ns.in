@@ -30,7 +30,7 @@ $| = 1;
 #
 # Untaint the path
 # 
-$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/libexec/ir".
+$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec:$TB/lib/ns2ir".
     ":$TB/libexec/ns2ir:$TB/sbin:$TB/bin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
