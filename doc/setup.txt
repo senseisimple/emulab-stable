@@ -1,5 +1,5 @@
 ##### Setting up the Utah Network Testbed software on a boss node
-##### Last updated  February 12, 2001
+##### Last updated  February 27, 2002
 ##### Tested on FreeBSD 4.3
 
 ##### Step 0
@@ -9,8 +9,8 @@ on, have the root password set, etc.
 
 ##### Step 1 - Package installation
 
-Install the necessary packages. The following are necessary, and available as
-FreeBSD ports:
+Install the necessary packages. The following are necessary, and are
+the default versions in the FreeBSD 4.3 "ports" collection:
 
 apache+mod_ssl-1.3.19+2.8.2 The Apache 1.3 webserver with SSL/TLS functionality
 cvsupd-bin-16.1     A general network file distribution system optimized for CV
@@ -36,7 +36,7 @@ tcl-8.2.3           Tool Command Language
 tcl-sql-20000114_1  TCL module for accessing MySQL databases
 ucd-snmp-4.2        An extendable SNMP implimentation
 
-Note on TCL: Do NOT install tcl83 - otcl, which is used by some testbed
+Note on TCL: Do NOT install tcl83; otcl, which is used by some testbed
 scripts, requires tcl82. When you install the tcl-sql package, it will be put
 in the library directory for the latest version of tcl you have installed, so
 if you have tcl83 installed at the time, you will have tcl-sql support under
@@ -45,7 +45,7 @@ if you have tcl83 installed at the time, you will have tcl-sql support under
 For the most part, subsitituting newer versions of the packages should be OK,
 but know that we haven't tested them... The one exception is version 3.23.47 
 of the mysql packages. In fact, we recommend 3.23.47, as it fixes some
-boot-time problems that we've had with 3.23.36 .
+boot-time problems that we've had with 3.23.36.
 
 ##### Step 2 - LEDA
 
