@@ -41,7 +41,7 @@ proc getif {ipaddr} {
     close $tmccifconfig
     set ifconfiglist [split $ifconf "\n"]
     foreach ifconfig $ifconfiglist {
-	scan $ifconfig "INTERFACE=%s INET=%s MASK=%s MAC=%s " iface inet mask mac
+	scan $ifconfig "%*s INET=%s MASK=%s MAC=%s " inet mask mac
 	if { $inet == $ipaddr } {
 	    return [exec findif $mac]
 	}
@@ -58,7 +58,7 @@ proc getmac {ipaddr} {
     close $tmccifconfig
     set ifconfiglist [split $ifconf "\n"]
     foreach ifconfig $ifconfiglist {
-	scan $ifconfig "INTERFACE=%s INET=%s MASK=%s MAC=%s " iface inet mask mac
+	scan $ifconfig "%*s INET=%s MASK=%s MAC=%s " inet mask mac
 	if { $inet == $ipaddr } {
 	    set macaddrchars [split $mac ""]
 	    set i 0
@@ -95,13 +95,19 @@ proc installipfwfwd {} {
 }
 
 proc findcpuspeed {} {
+    if { [catch {set speed [exec sysctl -n machdep.tsc_freq]}] == 0 } {
+         return $speed
+    }
     set dmesgfd [open /var/run/dmesg.boot r]
     set dmesg [read $dmesgfd]
     close $dmesgfd
 
+    set tscregret [regexp {TSC[\" \t]*frequency[ \t]*(\d+)[ \t]*Hz} $speed]
     set regret [regexp {CPU:\D*(\d+\.?\d*)-([MmGg][Hh][zZ])} $dmesg matchstr speed mghz]
 
-    if { $regret == 1 } {
+    if { $tscregret == 1 } {
+         return $speed
+    } elseif { $regret == 1 } {
 	
 	if { [regexp -nocase {mhz} $mghz] == 1 } {
 	    return [expr $speed * 1000000]
@@ -283,57 +289,100 @@ if { $simcode_present == 1 } {
     
     # Now, we configure IPTaps for links between real and simulated nodes
     set i 0    
+    # Routing table id. 0 is the main table, so we skip that
+    set rtabid 1
     
     foreach nodeinst [concat [Node info instances] [Node/MobileNode info instances]] {
-	if { [$nodeinst info vars nsenode_ipaddrlist] == {} } {
-	    continue
-	}
+	if { [$nodeinst info vars nsenode_ipaddrlist] != {} } {
 
-	set nodeinst_ipaddrlist [$nodeinst set nsenode_ipaddrlist]
-	foreach nodeinst_ipaddr $nodeinst_ipaddrlist {
-	    set iface [getif $nodeinst_ipaddr]
-	    
-	    # one iptap per node that has real - simulated link
-	    set iptap($i) [new Agent/IPTap]
-	    
-	    # open the bpf, set the filter for capturing incoming ip packets
-	    # except for the current host itself
-	    set bpf_ip($i) [new Network/Pcap/Live]
-	    set dev_ip($i) [$bpf_ip($i) open readonly $iface]
-	    set nodeinst_mac [getmac $nodeinst_ipaddr]
-	    if { $nodeinst_mac != {} } {
-		$bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr and not ether src $nodeinst_mac"
-	    } else {
-		$bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr"
-	    }
-	    
-	    # associate the 2 network objects in the IPTap object
-	    $iptap($i) network-outgoing $ipnet
-	    $iptap($i) network-incoming $bpf_ip($i)
-
-	    if { [$nodeinst info vars routes] != {} } {
-		set routelist [split [$nodeinst set routes] "\n"]
-		foreach route $routelist {
-		    scan $route "DST=%s DST_MASK=%s NEXTHOP=%s" dstip dstmask nexthop
-		    $iptap($i) addroute $dstip $nexthop
-		    # We dont really consider the case where different routes
-		    # have different masks. A complete longest prefix match
-		    # implementation that is also efficient for nse may
-		    # have to be done in the future
+	    set nodeinst_ipaddrlist [$nodeinst set nsenode_ipaddrlist]
+	    foreach nodeinst_ipaddr $nodeinst_ipaddrlist {
+		set iface [getif $nodeinst_ipaddr]
+		
+		# one iptap per node that has real - simulated link
+		set iptap($i) [new Agent/IPTap]
+		
+		# open the bpf, set the filter for capturing incoming ip packets
+		# except for the current host itself
+		set bpf_ip($i) [new Network/Pcap/Live]
+		set dev_ip($i) [$bpf_ip($i) open readonly $iface]
+		set nodeinst_mac [getmac $nodeinst_ipaddr]
+		if { $nodeinst_mac != {} } {
+		    $bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr and not ether src $nodeinst_mac"
+		} else {
+		    $bpf_ip($i) filter "ip and not dst host $nodeinst_ipaddr"
 		}
+		
+				
+		# associate the 2 network objects in the IPTap object
+		$iptap($i) network-outgoing $ipnet
+		$iptap($i) network-incoming $bpf_ip($i)
+		
+		# The emulab default netmask
+		set ipmask 255.255.255.0
+		$iptap($i) ipmask $ipmask
+		
+		
+		$ns attach-agent $nodeinst $iptap($i)
+		
+		# Need to figure out the correct way to do this i.e. I need the
+		# nexthop ip here. Workaround hack is to add the net route
+		$ns add-ip-mask-target $nodeinst_ipaddr $ipmask $iptap($i)
+		set ipmasked [expr [$ns inet-aton $nodeinst_ipaddr] & [$ns inet-aton $ipmask]]
+		$nodeinst add-route $ipmasked $iptap($i)
+		
+		# We do not connect iptaps coz they figure out their
+		# destination node address dynamically using routing tables
+		
+		incr i
 	    }
-
-	    # The emulab default netmask
-	    $iptap($i) ipmask "255.255.255.0"
-
-	    
-	    $ns attach-agent $nodeinst $iptap($i)
-	    
-	    # We do not connect iptaps coz they figure out their
-	    # destination node address dynamically using routing tables
-	    
-	    incr i
 	}
+
+	if { [$nodeinst info vars routes] != {} } {
+	    set routelist [split [$nodeinst set routes] "\n"]
+	    foreach route $routelist {
+		scan $route "DST=%s DST_MASK=%s NEXTHOP=%s" dstip dstmask nexthop
+		$nodeinst add-route-to-ip $dstip $nexthop $dstmask
+		# We dont really consider the case where different routes
+		# have different masks. A complete longest prefix match
+		# implementation that is also efficient for nse may
+		# have to be done in the future
+	    }
+	}
+    }
+
+    # Perhaps create the veths right here
+    foreach rlink [Rlink info instances] {
+	set iptap [$rlink target]
+	set ip [$rlink srcipaddr]
+	set iface [getif $ip] 
+
+	# except for the current host itself
+	set bpf_ip [new Network/Pcap/Live]
+	set dev_ip [$bpf_ip open readonly $iface]
+	set mac [getmac $ip]
+	if { $mac != {} } {
+	    $bpf_ip filter "ip and not ether src $mac"
+	} else {
+	    $bpf_ip filter "ip"
+	}
+
+	set srcnode [$rlink src]
+	if { [info exists $ipnet($srcnode)] } {
+	    $iptap network-outgoing $ipnet($srcnode)
+	} else {
+	    set ipnet($srcnode) [new Network/IP]
+	    $ipnet($srcnode) open writeonly	    
+	    $ipnet($srcnode) rtabid $rtabid
+	    $iptap network-outgoing $ipnet($srcnode)
+	    incr rtabid
+	}
+
+	# associate the 2 network objects in the IPTap object
+	$iptap network-incoming $bpf_ip
+
+	# No need to attach the iptap to the node coz it was
+	# done when an rlink got created
     }
 }
 
@@ -350,7 +399,7 @@ if { $objnamelist != {} } {
     set pid [lindex $pideidlist 2]
     set logpath "/proj/$pid/exp/$eid/logs/nse-$vnode.log"
 
-   # Configuring the Scheduler to monitor the event system
+    # Configuring the Scheduler to monitor the event system
     set evsink [new TbEventSink]
     $evsink event-server "elvin://$boss"
     $evsink objnamelist [join $objnamelist ","]

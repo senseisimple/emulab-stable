@@ -1,5 +1,5 @@
---- dist-ns-allinone-2.26/install	Wed Feb 26 16:07:51 2003
-+++ ns-allinone-2.26/install	Thu Jun  5 16:55:16 2003
+--- dist/ns-allinone-2.26/install	Wed Feb 26 16:07:51 2003
++++ ns-allinone-2.26/install	Thu Oct 16 13:21:14 2003
 @@ -41,301 +41,47 @@
  # Get current path
  CUR_PATH=`pwd`
@@ -506,15 +506,17 @@
  
  echo ""
  echo "----------------------------------------------------------------------------------"
---- dist-ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
-+++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Jun  5 17:10:45 2003
-@@ -79,6 +79,14 @@
+--- dist/ns-allinone-2.26/ns-2.26/Makefile.in	Thu Feb 27 17:51:25 2003
++++ ns-allinone-2.26/ns-2.26/Makefile.in	Thu Oct  2 12:34:21 2003
+@@ -79,6 +79,16 @@
  
  CFLAGS	= $(CCOPT) $(DEFINE)
  
 +#### with event system
 +INCLUDES += -I../.. -I../../../lib -I../../../../lib/libtb `elvin-config --cflags vin4c`
-+CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD -DGETTIME_TSC
++#CFLAGS += -DUSEEVENTS -DUSEROUTES -DADD_ETHER_OVERHEAD -DGETTIME_TSC
++# USEROUTES is disabled now that we add IP address based classification rules
++CFLAGS += -DUSEEVENTS -DADD_ETHER_OVERHEAD -DGETTIME_TSC
 +LIB += -L../../../lib -L../../../../lib/libtb -levent -ltb
 +LIB += `elvin-config --libs vin4c`
 +STATIC += -static
@@ -523,7 +525,7 @@
  # Explicitly define compilation rules since SunOS 4's make doesn't like gcc.
  # Also, gcc does not remove the .o before forking 'as', which can be a
  # problem if you don't own the file but can write to the directory.
-@@ -276,6 +284,7 @@
+@@ -276,6 +286,7 @@
  	mcast/lms-sender.o \
  	@V_STLOBJ@
  
@@ -531,7 +533,7 @@
  
  # don't allow comments to follow continuation lines
  
-@@ -303,6 +312,10 @@
+@@ -303,6 +314,10 @@
  	emulate/nat.o  \
  	emulate/iptap.o \
  	emulate/tcptap.o
@@ -542,8 +544,8 @@
  
  OBJ_EMULATE_C = \
  	emulate/inet.o
---- dist-ns-allinone-2.26/ns-2.26/apps/telnet.cc	Wed Feb 26 15:07:16 2003
-+++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Thu Jun  5 17:12:02 2003
+--- dist/ns-allinone-2.26/ns-2.26/apps/telnet.cc	Wed Feb 26 15:07:16 2003
++++ ns-allinone-2.26/ns-2.26/apps/telnet.cc	Tue Aug 12 16:16:16 2003
 @@ -77,7 +77,7 @@
  {
          if (running_) {
@@ -553,8 +555,91 @@
  		/* reschedule the timer */
  		double t = next();
  		timer_.resched(t);
---- dist-ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Fri Jun  6 18:19:59 2003
+--- dist/ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Wed Feb 26 15:07:30 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier-hash.h	Thu Oct  2 14:56:34 2003
+@@ -177,5 +177,17 @@
+ 	const char* hashkey(nsaddr_t, nsaddr_t dst, int) {
+ 		return (const char*) mshift(dst);
+ 	}
++	/* Since our address classifier (in flat 32 bit addressing) is
++	   a dest hash classifier, we do a naive longer prefix matching
++	   of the full IP address and then use ipmask_ to do a shorter
++	   prefix matching */
++	virtual int lookup(Packet* p) {
++		hdr_ip* h = hdr_ip::access(p);
++		int sl = get_hash(h->saddr(), h->daddr(), h->flowid());
++		if (sl >= 0 && sl <=maxslot_)
++		  return (sl);
++		return get_hash(h->saddr(), h->daddr() & ipmask_,
++				h->flowid());
++	}
+ };
+ 
+--- dist/ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Wed Feb 26 15:07:34 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier.cc	Thu Oct  2 12:43:25 2003
+@@ -52,13 +52,14 @@
+ 
+ 
+ Classifier::Classifier() : 
+-	slot_(0), nslot_(0), maxslot_(-1), shift_(0), mask_(0xffffffff), nsize_(0)
++	slot_(0), nslot_(0), maxslot_(-1), shift_(0), mask_(0xffffffff), nsize_(0), ipmask_(0xffffff00)
+ {
+ 	default_target_ = 0;
+ 
+ 	bind("offset_", &offset_);
+ 	bind("shift_", &shift_);
+ 	bind("mask_", &mask_);
++	bind("ipmask_", &ipmask_);
+ }
+ 
+ int Classifier::classify(Packet *p)
+--- dist/ns-allinone-2.26/ns-2.26/classifier/classifier.h	Wed Feb 26 15:07:34 2003
++++ ns-allinone-2.26/ns-2.26/classifier/classifier.h	Thu Oct  2 12:42:06 2003
+@@ -82,10 +82,11 @@
+ 	int nslot_;
+ 	int maxslot_;
+ 	int offset_;		// offset for Packet::access()
+-	int shift_;
+-	int mask_;
++	u_int32_t shift_;
++	u_int32_t mask_;
+ 	NsObject *default_target_;
+ 	int nsize_;       //what size of nslot_ should be
++	u_int32_t ipmask_;
+ };
+ 
+ #endif
+--- dist/ns-allinone-2.26/ns-2.26/common/ip.h	Wed Feb 26 15:07:39 2003
++++ ns-allinone-2.26/ns-2.26/common/ip.h	Thu Sep 25 17:11:07 2003
+@@ -76,11 +76,11 @@
+ 	/* per-field member acces functions */
+ 	ns_addr_t& src() { return (src_); }
+ 	nsaddr_t& saddr() { return (src_.addr_); }
+-        int32_t& sport() { return src_.port_;}
++        u_int32_t& sport() { return src_.port_;}
+ 
+ 	ns_addr_t& dst() { return (dst_); }
+ 	nsaddr_t& daddr() { return (dst_.addr_); }
+-        int32_t& dport() { return dst_.port_;}
++        u_int32_t& dport() { return dst_.port_;}
+ 	int& ttl() { return (ttl_); }
+ 	/* ipv6 fields */
+ 	int& flowid() { return (fid_); }
+--- dist/ns-allinone-2.26/ns-2.26/common/packet.h	Wed Feb 26 15:07:40 2003
++++ ns-allinone-2.26/ns-2.26/common/packet.h	Thu Sep 25 17:06:35 2003
+@@ -519,8 +519,8 @@
+ 			abort();
+ 	}
+ 	init(p); // Initialize bits_[]
+-	(HDR_CMN(p))->next_hop_ = -2; // -1 reserved for IP_BROADCAST
+-	(HDR_CMN(p))->last_hop_ = -2; // -1 reserved for IP_BROADCAST
++	(HDR_CMN(p))->next_hop_ = (nsaddr_t)-2; // -1 reserved for IP_BROADCAST
++	(HDR_CMN(p))->last_hop_ = (nsaddr_t)-2; // -1 reserved for IP_BROADCAST
+ 	p->fflag_ = TRUE;
+ 	(HDR_CMN(p))->direction() = hdr_cmn::DOWN;
+ 	/* setting all direction of pkts to be downward as default; 
+--- dist/ns-allinone-2.26/ns-2.26/common/scheduler.cc	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.cc	Tue Aug 12 16:16:17 2003
 @@ -46,12 +46,42 @@
  #include "config.h"
  #include "scheduler.h"
@@ -885,8 +970,8 @@
  	}
  	// we reach here only if halted
  }
---- dist-ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
-+++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Thu Jun  5 18:17:20 2003
+--- dist/ns-allinone-2.26/ns-2.26/common/scheduler.h	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/scheduler.h	Tue Aug 12 16:16:17 2003
 @@ -98,7 +98,7 @@
  protected:
  	void dumpq();	// for debug: remove + print remaining events
@@ -904,8 +989,98 @@
  
  };
  
---- dist-ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Thu Jun  5 18:18:08 2003
+--- dist/ns-allinone-2.26/ns-2.26/common/simulator.cc	Wed Feb 26 15:07:41 2003
++++ ns-allinone-2.26/ns-2.26/common/simulator.cc	Fri Oct  3 15:28:17 2003
+@@ -23,6 +23,7 @@
+ #include "object.h"
+ 
+ //class ParentNode;
++Simulator* Simulator::instance_;
+ 
+ static class SimulatorClass : public TclClass {
+ public:
+@@ -92,6 +93,25 @@
+ 			int id = atoi(argv[3]);
+ 			add_node(node, id);
+ 			return TCL_OK;
++		} else if (strcmp(argv[1], "add-ip") == 0) {
++			Node *node = (Node *)(TclObject::lookup(argv[2]));
++			if (node == NULL) {
++				tcl.add_errorf("Wrong object name %s",argv[2]);
++				return TCL_ERROR;
++			}
++			in_addr_t ip = inet_addr(argv[3]);
++			int newentry = 0;
++			Tcl_HashEntry *he = Tcl_CreateHashEntry( &iptonode,
++								 (char *)(ip),
++								 &newentry );
++			if ( newentry == 0 ) {
++				Node *n = (Node *)Tcl_GetHashValue( he );
++				tcl.add_errorf("IP address %s already belongs to node %s\n",
++					       argv[3], n->name() );
++				return TCL_ERROR;
++			}
++			Tcl_SetHashValue( he, (char *)node);	
++			return TCL_OK;
+ 		} 
+ 	}
+ 	return (TclObject::command(argc, argv));
+@@ -250,3 +270,11 @@
+ 	return l_head;
+ }
+ 
++Node * Simulator::ip_to_node(in_addr_t ip) {
++
++	Tcl_HashEntry *he = Tcl_FindHashEntry( &iptonode, (char *)ip );
++	if( he == 0 ) 
++		return 0;
++	else
++		return (Node *)Tcl_GetHashValue(he);
++}
+--- dist/ns-allinone-2.26/ns-2.26/common/simulator.h	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/simulator.h	Fri Oct  3 15:27:55 2003
+@@ -25,17 +25,21 @@
+ 
+ #include <tclcl.h>
+ #include "object.h"
++#include <sys/types.h>
+ 
+ class ParentNode;
+ class RouteLogic;
++class Node;
+ 
+ class Simulator : public TclObject {
+ public:
+       Simulator() : nodelist_(NULL), rtobject_(NULL), nn_(0), \
+-	size_(0) {}
++	size_(0) { Tcl_InitHashTable( &iptonode, TCL_ONE_WORD_KEYS ); instance_ = this; }
+       ~Simulator() {
+-	    delete []nodelist_; 
++	    delete []nodelist_;
++	    instance_ = 0;
+       }
++      static Simulator &instance() { return (*instance_); }
+ 	int command(int argc, const char*const* argv);
+ 	void populate_flat_classifiers();
+ 	void populate_hier_classifiers();
+@@ -45,12 +49,15 @@
+ 	char *append_addr(int level, int *addr);
+ 	void alloc(int n);
+ 	void check(int n);
++	Node *ip_to_node(in_addr_t);
+ 	
+ private:
+         ParentNode **nodelist_;
+ 	RouteLogic *rtobject_;
+ 	int nn_;
+ 	int size_;
++	Tcl_HashTable iptonode;
++	static Simulator *instance_;
+ };
+ 
+ #endif /* ns_simulator_h */
+--- dist/ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/tclAppInit.cc	Tue Aug 12 16:16:17 2003
 @@ -186,6 +186,7 @@
  	return TCL_OK;
  }
@@ -922,8 +1097,8 @@
  #endif
  
  }
---- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Thu Jun  5 18:21:36 2003
+--- dist/ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.cc	Tue Aug 12 16:16:17 2003
 @@ -76,3 +76,40 @@
  	if (status_ == TIMER_HANDLING)
  		status_ = TIMER_IDLE;
@@ -965,8 +1140,8 @@
 +}
 +
 +#endif
---- dist-ns-allinone-2.26/ns-2.26/common/timer-handler.h	Wed Feb 26 15:07:42 2003
-+++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Thu Jun  5 18:22:38 2003
+--- dist/ns-allinone-2.26/ns-2.26/common/timer-handler.h	Wed Feb 26 15:07:42 2003
++++ ns-allinone-2.26/ns-2.26/common/timer-handler.h	Tue Aug 12 16:16:17 2003
 @@ -88,4 +88,15 @@
  // mode:c++
  // End:
@@ -983,12 +1158,34 @@
 +#endif
 +
  #endif /* timer_handler_h */
---- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Fri Jun  6 19:08:41 2003
-@@ -37,21 +37,82 @@
+--- dist/ns-allinone-2.26/ns-2.26/config.h	Wed Feb 26 15:07:55 2003
++++ ns-allinone-2.26/ns-2.26/config.h	Thu Sep 25 17:11:15 2003
+@@ -73,13 +73,13 @@
+  typedef unsigned char u_char;
+ typedef unsigned int u_int;
+ */
+-typedef int32_t nsaddr_t; 
+-typedef int32_t nsmask_t; 
++typedef u_int32_t nsaddr_t; 
++typedef u_int32_t nsmask_t; 
+ 
+ // 32-bit addressing support
+ struct ns_addr_t {
+-	int32_t addr_;
+-	int32_t port_;
++	u_int32_t addr_;
++	u_int32_t port_;
+ #ifdef __cplusplus
+ 	ns_addr_t& operator= (const ns_addr_t& n) {
+ 		addr_ = n.addr_;
+--- dist/ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Sun Oct 12 16:42:40 2003
+@@ -37,28 +37,100 @@
  #endif
  
  #include "iptap.h"
++#include "node.h"
++#include "simulator.h"
 +#include <sys/time.h>
 +#include <netinet/in.h>
 +
@@ -1069,7 +1266,23 @@
    for (; i < MAX_PACKETS ; i++) {
      ident[i] = -1;
      offset[i] = -1;
-@@ -141,6 +202,52 @@
+   }
+ 
++  sbuflen = rbuflen = ROUNDUP(sizeof(struct ip) + Packet::hdrlen_, sizeof(unsigned long) )
++                      + sizeof(unsigned long);
++  sendbuf = new unsigned char[sbuflen];
++  recvbuf = new unsigned char[rbuflen];
+ }
+ 
++IPTapAgent::~IPTapAgent()
++{
++  delete[] sendbuf;
++  delete[] recvbuf;
++}
+ 
+ /*
+  * Checking for duplicate packets.  Need to do this, if running
+@@ -141,7 +213,57 @@
    
    /* TCP header info from the grabbed packet. */
    unsigned char tcphlen;
@@ -1109,7 +1322,7 @@
 +
 +  Packet::free(p);
 +  return;
-+  
+   
 +#endif
 +
 +#if 0 //MEASURE_EVENT_RATE
@@ -1119,13 +1332,25 @@
 +    firstpacket++;
 +  }
 +#endif
-   
++  
++  /* PcapNetwork created this packet and does not know how
++     to initialize it. So, we need to do that here by calling
++     the base Agent class's initpkt method */
++  initpkt(p);
    /* 
       At this point, all I have to do is to grab the ttl value 
-@@ -180,15 +287,116 @@
+      from the received packet and put it in p's ttl field after
+@@ -180,15 +302,154 @@
    hdr_ip *ih = HDR_IP(p);
    ih->ttl() = ttl;
  
++  /* Route lookups need not be performed here in the new code.
++     The classifier has the correct rules. Just need to make sure
++     that destination IP address and port are stored in the header
++     of the ns packet. Need to decapsulate the payload into ns
++     bag of bits of a) it was encapsulated before and b) the dest
++     IP address is local in this simulator */
++  
 +#ifdef USEROUTES
 +  /* code to look up the interface index
 +     over which we should spit out the
@@ -1221,6 +1446,37 @@
 +  return;
 +  
 + injectsim:  
++#else
++
++  if( ipheader->ip_p == IPPROTO_ENCAP ) {
++
++    /* The IP address based classifier entries should route the packet
++       correctly to the final destination. However, if the packet is
++       destinated to a node in this instance of the simulator and it was
++       encapsulated, we need to decapsulate it here
++    */
++    //in_addr_t ip = ntohl( ipheader->ip_dst.s_addr );
++    in_addr_t ip = ipheader->ip_dst.s_addr;
++    Node *n = Simulator::instance().ip_to_node( ip );
++    if( n != 0 ) {
++      unsigned long *hdrbits = (unsigned long *)(ipheader + 1);
++
++      /* This should take care of copying all the header bits to this packet.
++	 The simulator instance from where this packet originated from should
++	 have filled the correct IP address and port numbers so that the packet
++	 can be routed correctly */
++      int lastnonzerobyte = uncompress( (unsigned long *)p->bits(), hdrbits,
++					(datagramlen - iphlen)/4 );
++      /* If there is an error in uncompress, we won't really know other than the
++	 fact that we copied junk into the packet. Something to worry about later
++      */
++    }
++  } else {
++    ih->daddr() = ipheader->ip_dst.s_addr;
++    /* Dunno how to take care of ports yet */  
++  }
++
++
 +#endif
 +
 +#ifdef MEASURE_DELAYS
@@ -1240,7 +1496,7 @@
   * as there are from the packet capture facility.
   * For every packet received through the callback, it populates the ns packet
   * ttl value and inject it into the simulator by calling target_->recv
-@@ -197,14 +405,17 @@
+@@ -197,14 +458,17 @@
  void
  IPTapAgent::recvpkt()
  {
@@ -1260,7 +1516,7 @@
    if (cc <= 0) {
      if (cc < 0) {
        perror("recv");
-@@ -219,13 +430,100 @@
+@@ -219,13 +483,100 @@
  }
  
  
@@ -1362,8 +1618,12 @@
   */
  int
  IPTapAgent::sendpkt(Packet* p)
-@@ -236,7 +534,7 @@
-   unsigned short dglen;
+@@ -233,10 +584,10 @@
+   int byteswritten;
+   unsigned char *packet;
+   unsigned char received_ttl;
+-  unsigned short dglen;
++  unsigned short sendlen;
    struct ip *ipheader;
  
 -  if (net_->mode() != O_RDWR && net_->mode() != O_WRONLY) {
@@ -1371,7 +1631,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt called while in read-only mode!\n",
  	    name());
-@@ -245,7 +543,7 @@
+@@ -245,7 +596,7 @@
    
    // send packet into the live network
    hdr_cmn* hc = HDR_CMN(p);
@@ -1380,36 +1640,196 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -282,7 +580,7 @@
-   ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
- 						sizeof(struct ip));
- 
--  if (net_->send(p->accessdata(), hc->size()) < 0) {
-+  if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
-     fprintf(stderr,
- 	    "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
- 	    name(), p->accessdata(), hc->size(), strerror(errno));
-@@ -290,6 +588,11 @@
-     return (-1);
-     
+@@ -273,27 +624,161 @@
+     return(-1);
    }
+ 
++  /* Check what type of packet it is and if it is a normal
++     simulator packet as opposed to PT_LIVE, we need to
++     perform encapsulation */
+ 
+-  /* Modify the original packet with the new info. */
+-  packet = p->accessdata();
+-  ipheader = (struct ip *) packet;
+-  ipheader->ip_ttl = received_ttl;
+-  ipheader->ip_sum = 0;
+-  ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
+-						sizeof(struct ip));
+-
+-  if (net_->send(p->accessdata(), hc->size()) < 0) {
+-    fprintf(stderr,
+-	    "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
+-	    name(), p->accessdata(), hc->size(), strerror(errno));
++  if (hc->ptype_ == PT_LIVE) {
++    
++    /* Modify the original packet with the new info. */
++    packet = p->accessdata();
++    ipheader = (struct ip *) packet;
++    ipheader->ip_ttl = received_ttl;
++    ipheader->ip_sum = 0;
++    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
++						 sizeof(struct ip));
++
++    if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
++      fprintf(stderr,
++	      "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
++	      name(), p->accessdata(), hc->size(), strerror(errno));
++      Packet::free(p);
++      return (-1);
++    
++    }
 +#if 0
-+  if( hc->size() < 50 ) {
-+    fprintf( stderr, "sent pkt %d\n", hc->size());
-+  }
++    if( hc->size() < 50 ) {
++      fprintf( stderr, "sent pkt %d\n", hc->size());
++    }
 +#endif
-   Packet::free(p);
-   TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
- 	  name(), hc->size());
---- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Fri Jun  6 18:30:53 2003
-@@ -46,18 +46,45 @@
+     Packet::free(p);
+-    return (-1);
++    TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
++	    name(), hc->size());
++  } else {
+     
++    unsigned long *hdrbits = 0;
++    memset( sendbuf, 0, sbuflen * sizeof(unsigned char) );
++    ipheader = (struct ip *)sendbuf;
++  
++    ipheader->ip_hl = (IP_HEADER_LEN / 4);
++    ipheader->ip_v = IPVERSION;
++    
++    ipheader->ip_id = 0;
++    ipheader->ip_ttl = received_ttl;
++    ipheader->ip_p = IPPROTO_ENCAP;
++    
++    ipheader->ip_src.s_addr = htonl(ih->saddr());
++    ipheader->ip_dst.s_addr = htonl(ih->daddr());
++
++    hdrbits = (unsigned long *)(ipheader + 1);
++    int size = compress( hdrbits, (unsigned long *)p->bits(), (Packet::hdrlen_+3)/4);
++
++    /* ip_len field should be in host byte order which the kernel will later
++       change to network byte order */
++    ipheader->ip_len = sendlen = size * sizeof(unsigned long) + sizeof(struct ip);
++
++    /* Converting values to network order since the class Network/IP will
++       convert it back to host order coz the kernel expects it that way */
++    ipheader->ip_len = htons(ipheader->ip_len);
++    ipheader->ip_off = htons(ipheader->ip_off);
++
++    ipheader->ip_sum = (unsigned short) in_cksum((unsigned short *) ipheader,
++						 sizeof(struct ip));
++    
++
++    if (net_outgoing_->send(sendbuf, sendlen) < 0) {
++      fprintf(stderr,
++	      "IPTapAgent(%s): sendpkt compressed(%p, %d) error: %s\n",
++	      name(), sendbuf, size, strerror(errno));
++      Packet::free(p);
++      return (-1);    
++    }
++    Packet::free(p);
++    TDEBUG3("IPTapAgent(%s): sent compressed packet (sz: %d)\n",
++	    name(), size);
+   }
+-  Packet::free(p);
+-  TDEBUG3("IPTapAgent(%s): sent packet (sz: %d)\n",
+-	  name(), hc->size());
+-  return 0;
++    return 0;
+ }
+ 
+ 
++int IPTapAgent::compress(unsigned long* pTarget, unsigned long* pSource, int Count)
++{ // Returns total size of target buffer
++  // This code works only on buffers <= 0x10000 words long (about 250k bytes)
++  // Target buffer must be 1 word longer than source, to allow for the
++  // case where no zeros at all occur.
++ int offset = 0;
++ int skipping = 1;
++ int targoffset = 0;
++ int lth;
++
++ unsigned long* pCW = pTarget; // Control word pointer
++ // Format of control word is 16 bits of length, 16 bits of starting offset
++ *pCW = 0;  // All zero CW means done
++ while(offset < Count)
++   {
++     if (skipping)
++       {
++         if (pSource[offset] |= 0)
++           { // Time to stop skipping
++             skipping = 0;
++             pCW = &pTarget[targoffset];
++             *pCW = offset; // Set source offset, leave lth zero for now
++             targoffset++;  // Leave room for CW
++             lth = 0;       // Counts how many non-zero
++           }
++         else
++           { // Still zero, just skip it
++             offset++;
++           }
++       }
++     if (!skipping)
++       {
++         // First see if we found a zero
++         if (pSource[offset] == 0)
++           { // Found a zero, but just use it unless two in a row
++             if ((offset+1) < Count)
++               {
++                 if (pSource[offset+1] == 0)
++                   {
++                     skipping = 1; // Found two in a row, resume skipping
++                     *pCW |= (lth << 16);
++                     //*pCW |= (0x1L << 31); // just for debugging, mark cw
++                     offset++; // And skip this one
++                   }
++               }
++           }
++       }
++     if (!skipping)
++       {
++         pTarget[targoffset++] = pSource[offset++];
++         lth++;
++       }
++   }
++ if (!skipping)
++   { // Need to update last CW
++     *pCW |= (lth << 16);
++     //*pCW |= (0x1L << 31); // just for debugging, mark cw
++   }
++ return(targoffset);
++}
++
++int IPTapAgent::uncompress(unsigned long* pTarget, unsigned long* pSource, int Count)
++{ // Reverse above compression
++  // Target buffer MUST BE ZERO on entry!
++int offset = 0;
++int targoffset = 0;
++int lth;
++
++  while(offset < Count)
++    {
++      // Get next control word
++      targoffset = pSource[offset] & 0xffff;
++      lth = pSource[offset] >> 16;
++      offset++;
++      for (int i = 0; i < lth; i++)
++        { // Copy to target
++          pTarget[targoffset++] = pSource[offset++];
++        }
++    }
++  return(targoffset); // Last non-zero entry
++}
+--- dist/ns-allinone-2.26/ns-2.26/emulate/iptap.h	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.h	Thu Sep 25 17:21:04 2003
+@@ -46,18 +46,52 @@
  #include "tcp.h"
  #include "ip.h"
  
 +#ifdef USEROUTES
 +#include <net/if.h>
 +#endif
++
++#define ROUNDUP(a, size) (((a) & ((size)-1)) ? (1 + ((a) | ((size)-1))) : (a))
 +
  #define MAX_PACKETS 640
  
@@ -1423,14 +1843,19 @@
 +};
 +
 +#endif
++
++#define IP_HEADER_LEN         (sizeof(struct ip))
  
  class IPTapAgent : public TapAgent {
  
   public:
    IPTapAgent();
++  ~IPTapAgent();
 +#ifdef USEROUTES
 +  int command(int, const char*const*);
 +#endif
++  int compress(long unsigned int *, long unsigned int *, int);
++  int uncompress(long unsigned int *, long unsigned int *, int);
  
   private:
    int ident[MAX_PACKETS];      /* All three used for duplicate */
@@ -1449,7 +1874,7 @@
  
    unsigned short in_cksum(unsigned short *,int);
    void recvpkt();
-@@ -66,6 +93,13 @@
+@@ -66,6 +100,17 @@
    void processpkt(Packet *, const struct timeval &);
    static void pkt_handler(void *, Packet *, const struct timeval &);
  
@@ -1459,12 +1884,39 @@
 +  double bpf_ts_to_iptap_min_delay;
 +  int data_idx;
 +  double bpf_ts_to_iptap[80000];
-+#endif  
++#endif
++  unsigned char *sendbuf;
++  unsigned int sbuflen;
++  unsigned char *recvbuf;
++  unsigned int rbuflen;
  };
  
  #endif /* iptap_h */
---- dist-ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Fri Jun  6 14:16:06 2003
+--- dist/ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-ip.cc	Thu Oct 16 13:44:08 2003
+@@ -668,6 +668,20 @@
+ 				tcl.result("1");
+ 			return (TCL_OK);
+ 		}
++/* This may not be defined since it is a custom socket option that
++   was added. Look in <sys/socket.h> */
++#ifndef SO_RTABID
++#define SO_RTABID 0x1010
++#endif
++		if (strcmp(argv[1], "setrtabid") == 0) {
++			unsigned int rtabid = atoi(argv[2]);
++			if( ::setsockopt(ssock_, SOL_SOCKET, SO_RTABID,
++					 &rtabid, sizeof(rtabid)) < 0 ) {
++			  tcl.result(strerror(errno));
++			  return (TCL_ERROR);
++			}
++			return (TCL_OK);
++		}
+ 	}
+ 	return (Network::command(argc, argv));
+ }
+--- dist/ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net-pcap.cc	Tue Aug 12 16:16:17 2003
 @@ -69,83 +69,6 @@
  #include "tclcl.h"
  #include "packet.h"
@@ -1569,8 +2021,8 @@
  		}
  	}
  #endif
---- dist-ns-allinone-2.26/ns-2.26/emulate/net.h	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/net.h	Fri Jun  6 13:59:46 2003
+--- dist/ns-allinone-2.26/ns-2.26/emulate/net.h	Wed Feb 26 15:08:40 2003
++++ ns-allinone-2.26/ns-2.26/emulate/net.h	Tue Aug 12 16:16:17 2003
 @@ -75,4 +75,97 @@
  protected:
  	int mode_;	// read/write bits (from fcntl.h)
@@ -1669,8 +2121,8 @@
 +};
 +
  #endif
---- dist-ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Fri Jun  6 16:42:44 2003
+--- dist/ns-allinone-2.26/ns-2.26/emulate/tap.cc	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.cc	Tue Aug 12 16:16:17 2003
 @@ -46,7 +46,7 @@
  	}
  } class_tap_agent;
@@ -1804,8 +2256,17 @@
  		fprintf(stderr,
  		    "TapAgent(%s): sendpkt (%p, %d): %s\n",
  		    name(), p->accessdata(), hc->size(), strerror(errno));
---- dist-ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Fri Jun  6 16:44:51 2003
+--- dist/ns-allinone-2.26/ns-2.26/emulate/tap.h	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tap.h	Sun Oct 12 16:44:41 2003
+@@ -43,7 +43,7 @@
+ #include "agent.h"
+ 
+ 
+-#define TAPDEBUG 1 
++#define TAPDEBUG 0
+ #ifdef TAPDEBUG
+ #define	TDEBUG(x) { if (TAPDEBUG) fprintf(stderr, (x)); }
+ #define	TDEBUG2(x,y) { if (TAPDEBUG) fprintf(stderr, (x), (y)); }
 @@ -71,8 +71,9 @@
  protected:
  	int maxpkt_;		/* max size allocated to recv a pkt */
@@ -1818,8 +2279,8 @@
  	double now() { return Scheduler::instance().clock(); }
  };
  
---- dist-ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Fri Jun  6 19:17:24 2003
+--- dist/ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Wed Feb 26 15:08:42 2003
++++ ns-allinone-2.26/ns-2.26/emulate/tcptap.cc	Tue Aug 12 16:16:17 2003
 @@ -97,6 +97,11 @@
        return (TCL_OK);
      }
@@ -1894,8 +2355,8 @@
    if (byteswritten < 0) {
      fprintf(stderr,"TCPTapAgent(%s): sendpkt (%p, %d): %s\n",
  	    name(), p->accessdata(), ns_cmnhdr->size(), strerror(errno));
---- dist-ns-allinone-2.26/ns-2.26/link/delay.h	Wed Feb 26 15:08:54 2003
-+++ ns-allinone-2.26/ns-2.26/link/delay.h	Fri Jun  6 16:54:24 2003
+--- dist/ns-allinone-2.26/ns-2.26/link/delay.h	Wed Feb 26 15:08:54 2003
++++ ns-allinone-2.26/ns-2.26/link/delay.h	Tue Aug 12 16:16:17 2003
 @@ -44,6 +44,10 @@
  #include "ip.h"
  #include "connector.h"
@@ -1919,8 +2380,498 @@
  	}
  	double bandwidth() const { return bandwidth_; }
  	void pktintran(int src, int group);
---- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Wed Feb 26 15:11:24 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Fri Jun  6 17:14:57 2003
+--- dist/ns-allinone-2.26/ns-2.26/mcast/lms.h	Wed Feb 26 15:08:58 2003
++++ ns-allinone-2.26/ns-2.26/mcast/lms.h	Thu Sep 25 17:12:00 2003
+@@ -64,7 +64,7 @@
+     nsaddr_t    src_;		// original source of mcast packet
+     nsaddr_t    group_;		// mcast group
+     nsaddr_t    tp_addr_;	// turning point address
+-    int	       	tp_port_;	// turning point port id 
++    u_int      	tp_port_;	// turning point port id 
+     int	       	tp_iface_;	// turning point interface
+     int	       	lo_, hi_;	// range of lost packets
+     double     	ts_;		// timestamp for RTT estimation
+--- dist/ns-allinone-2.26/ns-2.26/routing/address.cc	Wed Feb 26 15:09:15 2003
++++ ns-allinone-2.26/ns-2.26/routing/address.cc	Thu Oct  2 14:58:16 2003
+@@ -120,7 +120,7 @@
+ 			}
+ 			else 
+ 				levels_ = temp;
+-			NodeShift_ = new int[levels_ + 1];
++			NodeShift_ = new u_int32_t[levels_ + 1];
+ 			for (i = 3, c = 1; c <= levels_; c++, i+=2)
+ 				NodeShift_[c] = atoi(argv[i]);
+ 			return (TCL_OK); 
+@@ -136,7 +136,7 @@
+ 			}
+ 			else 
+ 				levels_ = temp;
+-			NodeMask_ = new int[levels_ + 1];
++			NodeMask_ = new u_int32_t[levels_ + 1];
+ 			for (i = 3, c = 1; c <= levels_; c++, i+=2) 
+ 				NodeMask_[c] = atoi(argv[i]);
+ 			return (TCL_OK);
+--- dist/ns-allinone-2.26/ns-2.26/routing/address.h	Wed Feb 26 15:09:15 2003
++++ ns-allinone-2.26/ns-2.26/routing/address.h	Thu Oct  2 13:40:05 2003
+@@ -61,10 +61,10 @@
+ 	// e.g 32 for level=1, 10/11/11 for level=3.
+ 	// used to check validity of address-str.
+ 	int *bpl_;
+-	int *NodeShift_;
+-	int *NodeMask_;
+-	int McastShift_;
+-	int McastMask_;
++	u_int32_t *NodeShift_;
++	u_int32_t *NodeMask_;
++	u_int32_t McastShift_;
++	u_int32_t McastMask_;
+ 	int levels_;
+  protected:
+ 	int command(int argc, const char*const* argv);
+--- dist/ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-address.tcl	Thu Oct  2 14:12:21 2003
+@@ -162,7 +162,7 @@
+ 	Simulator set AddressFormat_ HIER
+ 	Node enable-module "Hier"
+ 	if [$self multicast?] {
+-		$a set-mcastbits 1
++		$a set-mcastbits 3
+ 	}
+ 	eval $a set-idbits $hlevel $args
+ }
+@@ -184,7 +184,7 @@
+ 	# One bit is set aside for mcast as default :: this waste of 1 bit 
+ 	# may be avoided, if mcast option is enabled before the initialization
+ 	# of Simulator.
+-	$a set-mcastbits 1
++	$a set-mcastbits 3
+ 	set lastbit [expr $node - [$a set mcastsize_]]
+ 	$a set-idbits 1 $lastbit
+ }
+@@ -269,9 +269,9 @@
+ 
+ AllocAddrBits instproc set-mcastbits {bit_num} {
+ 	$self instvar size_ mcastsize_
+-	if {$bit_num != 1} {
+-		error "setmcast : mcastbit > 1"
+-	}
++	#if {$bit_num != 1} {
++		#error "setmcast : mcastbit > 1"
++	#}
+ 	set mcastsize_ $bit_num
+ 
+ 	#chk to ensure there;s no change in size
+--- dist/ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-default.tcl	Thu Oct  2 12:44:14 2003
+@@ -347,6 +347,8 @@
+ Classifier set offset_ 0
+ Classifier set shift_ 0
+ Classifier set mask_ 0xffffffff
++# default IP mask is 255.255.255.0
++Classifier set ipmask_ 0xffffff00
+ Classifier set debug_ false
+ 
+ Classifier/Hash set default_ -1; # none
+--- dist/ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-lib.tcl	Wed Oct 15 13:02:03 2003
+@@ -882,6 +882,9 @@
+ 	# Do all nam-related initialization here
+ 	$self init-nam
+ 
++	# XXX netbed specific 
++	#$self add-routes-to-neighbour-ips
++
+ 	# NIXVECTOR xxx?
+ 	# global simstart
+ 	# set simstart [clock seconds]
+@@ -1372,8 +1375,8 @@
+ 	$link_([$n1 id]:[$n2 id]) cost $c
+ }
+ 
+-Simulator instproc attach-agent { node agent } {
+-	$node attach $agent
++Simulator instproc attach-agent { node agent {port ""} } {
++	$node attach $agent $port
+ 	# $agent set nodeid_ [$node id]
+ }
+ 
+@@ -2045,3 +2048,167 @@
+ 	}
+ }
+     
++# XXX netbed changes
++Simulator instproc inet-aton ipaddr {
++    set c [regsub -all \\. $ipaddr " " addrlist]
++    if { $c == 0} { 
++        return [expr $ipaddr]
++    }
++    if { [llength $addrlist] != 4} {
++        error "Ill-formatted ip address $ipaddr, addrlistlth = [llength $addrlist]"
++    }
++    if { $c == 3 } {
++        set r 0
++        foreach a $addrlist {
++            if { $a < 0 || $a > 255 } {
++                error "Ill-formatted ip address $ipaddr, a = $a"
++            }
++            set r [expr ($r << 8) + $a]     
++        }
++        return $r
++    } else {
++        error "Ill-formatted ip address $ipaddr, c = $c"
++    }
++}
++
++# XXX netbed changes
++Simulator instproc inet-ntoa ipaddr {
++    set p1 [expr ($ipaddr >> 24) & 0xff]
++    set p2 [expr ($ipaddr >> 16) & 0xff]
++    set p3 [expr ($ipaddr >>  8) & 0xff]
++    set p4 [expr ($ipaddr >>  0) & 0xff]
++    return [format "%d\.%d\.%d\.%d" $p1 $p2 $p3 $p4]
++}
++
++# XXX netbed changes
++Simulator instproc add-ip { node ip } {
++
++    $self instvar iptonode_
++    $self instvar ipsubnetlist_
++
++    set iptonode_($ip) $node
++    $self cmd add-ip $node $ip
++    
++    set ip_masked [expr [$self inet-aton $ip] & [$self inet-aton "255.255.255.0"]]
++    lappend ipsubnetlist_($ip_masked) $ip
++}
++
++Simulator instproc add-ip-mask-target { ip mask target } {
++    $self instvar iptotarget_
++
++    set ipaton [$self inet-aton $ip]
++    set maskaton [$self inet-aton $mask]
++    set ipmask [$self inet-ntoa [expr $ipaton & $maskaton]]
++    
++    set iptotarget_($ipmask) $target
++}
++
++# XXX netbed changes
++Simulator instproc ip-to-node {ip} {
++    $self instvar iptonode_
++
++    if { [info exists iptonode_($ip)] } {
++	return $iptonode_($ip)
++    } else {
++	    return {}
++    }
++}
++
++# XXX netbed changes
++Simulator instproc ip-to-target {ip} {
++    $self instvar iptotarget_
++
++    if { [info exists iptotarget_($ip)] } {
++	return $iptotarget_($ip)
++    } else {
++	    return {}
++    }
++}
++
++## Should be called only after routing is computed
++## A good place is the run method
++## XXX netbed specific
++Simulator instproc add-routes-to-neighbour-ips {} {
++    $self instvar ipsubnetlist_
++    $self instvar iptotarget_
++    $self instvar link_
++
++    set rtlogic [$self get-routelogic]
++
++    foreach subnet [array names ipsubnetlist_] {
++	set subnet_aton [$self inet-aton $subnet]
++	foreach ip1 $ipsubnetlist_($subnet) {
++	    foreach ip2 $ipsubnetlist_($subnet) {
++		if( $ip1 == $ip2 ) {
++		    continue
++		}
++		set node1 $iptotarget_($ip1)
++		set node2 $iptotarget_($ip2)
++		set rt1id [$rtlogic lookup [$node1 id] [$node2 id]]
++		set rt2id [$rtlogic lookup [$node2 id] [$node1 id]]
++		$node1 add-route $subnet-aton $link_([$node1 id]:$rt1id)
++		$node2 add-route $subnet-aton $link_([$node2 id]:$rt2id)
++	    }
++	}
++    }
++}
++
++# XXX netbed changes
++Simulator instproc rlink { n1 n2ip bw delay qtype args } {
++    $self instvar rlink_ queueMap_ 
++
++    set sid [$n1 id]
++    set did [$self inet-aton $n2ip]
++    
++    if [info exists queueMap_($qtype)] {
++	set qtype $queueMap_($qtype)
++    }
++    # construct the queue
++    set qtypeOrig $qtype
++    switch -exact $qtype {
++	ErrorModule {
++	    if { [llength $args] > 0 } {
++		set q [eval new $qtype $args]
++	    } else {
++		set q [new $qtype Fid]
++	    }
++	}
++	intserv {
++	    set qtype [lindex $args 0]
++	    set q [new Queue/$qtype]
++	}
++	default {
++	    if { [llength $args] == 0} {
++		set q [new Queue/$qtype]
++	    } else {
++		set q [new Queue/$qtype $args]
++	    }
++	}
++    }	
++    set rlink_($sid:$did) [new Rlink $n1 $n2ip $bw $delay $q]
++    $self add-ip-mask-target $n2ip 255.255.255.255 [$rlink_($sid:$did) head]
++    return $rlink_($sid:$did)
++}
++
++Simulator instproc ip-connect { agent ip port } {
++    set localnode [$self ip-to-node $ip]
++    if { $localnode != {} } {
++	set localagent [$localnode agent $port]
++	if { $localagent != {} } {
++	    $self connect $agent $localagent
++	} else {
++	    
++	}
++    } else {
++	set ipaton [$self inet-aton $ip]
++	$agent set dst_addr_ $ipaton
++	$agent set dst_port_ $port
++
++	$agent instvar node_
++	$node_ instvar nodeiplist_
++	# We just use one of the IP addresses of src node
++	# as the agent's src address
++	set srcipaton [$self inet-aton [lindex $nodeiplist_ 0]]
++	$agent set agent_addr_ $srcipaton
++    }
++}
+--- dist/ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-link.tcl	Fri Oct  3 15:01:38 2003
+@@ -63,6 +63,14 @@
+ 	return $head_
+ }
+ 
++# XXX netbed specific
++# Want to have the same method for both
++# node and link
++Link instproc entry {} {
++    $self instvar head_
++    return $head_
++}
++
+ Link instproc add-to-head { connector } {
+ 	$self instvar head_
+ 	$connector target [$head_ target]
+@@ -164,6 +172,113 @@
+ 	$self instvar link_
+ 	$em target [$link_ target]
+ 	$link_ target $em
++}
++
++# XXX netbed specific
++Link instproc set-ip {ip} {
++    $self instvar srcipaddr_ fromNode_
++
++    set srcipaddr_ $ip
++    $fromNode_ add-ip $ip
++
++    # Besides that, adding a route for
++    # the subnet with this link as the target
++    # will ensure that packets destined to the 
++    # neighbors will be routed to us
++    set ns_ [Simulator instance]
++    
++    set ipmasked [expr [$ns_ inet-aton $ip] & [$ns_ inet-aton 255.255.255.0]]
++    $fromNode_ add-route $ipmasked [$self head]
++
++    # Need to add mapping from subnet mask to link so that new routes being
++    # added can use this
++    $ns_ add-ip-mask-target $ip 255.255.255.0 [$self head]
++}
++
++# XXX netbed specific
++Class Rlink -superclass Link
++
++Rlink instproc init { src dstip bw delay q {lltype "DelayLink"} } {
++        $self next $src $dstip
++	$self instvar link_ queue_ head_ toNode_ ttl_
++	$self instvar drophead_ dstipaddr_ srcipaddr_ target_
++
++        set dstipaddr_ $dstip
++	set ns [Simulator instance]
++	set drophead_ [new Connector]
++	$drophead_ target [$ns set nullAgent_]
++
++	set head_ [new Connector]
++	$head_ set link_ $self
++
++	#set head_ $queue_ -> replace by the following
++	# xxx this is hacky
++	if { [[$q info class] info heritage ErrModule] == "ErrorModule" } {
++		$head_ target [$q classifier]
++        } else {
++                $head_ target $q
++
++        }
++
++	set queue_ $q
++	set link_ [new $lltype]
++	$link_ set bandwidth_ $bw
++	$link_ set delay_ $delay
++
++	$queue_ target $link_
++	set target_ [new Agent/IPTap]
++
++	# put the ttl checker after the delay
++	# so we don't have to worry about accounting
++	# for ttl-drops within the trace and/or monitor
++	# fabric
++	#
++	set ttl_ [new TTLChecker]
++	$ttl_ target $target_
++	$self ttl-drop-trace
++	$link_ target $ttl_
++
++	$ns attach-agent $src $target_
++	$queue_ drop-target $drophead_
++
++	return $self
++	# Finally, if running a multicast simulation,
++	# put the iif for the neighbor node...
++#	if { [$ns multicast?] } {
++#		$self enable-mcast $src $dst
++#	}
++#        $ns instvar srcRt_
++#	if [info exists srcRt_] {
++#        	if { $srcRt_ == 1 } {
++#            	$self enable-src-rt $src $dst $head_
++#        	}
++#	}    
++}
++
++Rlink instproc ttl-drop-trace args {
++	$self instvar ttl_
++	if ![info exists ttl_] return
++	if {[llength $args] != 0} {
++		$ttl_ drop-target [lindex $args 0]
++	} else {
++		$self instvar drophead_
++		$ttl_ drop-target $drophead_
++	}
++}
++
++Rlink instproc srcipaddr {} {
++    $self instvar srcipaddr_
++    return $srcipaddr_
++}
++
++Rlink instproc dstipaddr {} {
++    $self instvar dstipaddr_
++    return $dstipaddr_
++}
++
++Rlink instproc target {} {
++    $self instvar target_
++    return $target_
+ }
+ 
+ Class SimpleLink -superclass Link
+--- dist/ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Wed Feb 26 15:09:37 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-node.tcl	Wed Oct 15 15:50:41 2003
+@@ -492,6 +492,13 @@
+ 		# at the port demuxer (if there is one)
+ 		$self add-route $address_ $dmux_
+ 	}
++	# XXX netbed specific
++	$self instvar nodeiplist_
++	set ns_ [Simulator instance]
++	foreach ip $nodeiplist_ {
++	    set ipaton [$ns_ inet-aton $ip]
++	    $self add-route $ipaton $dmux_
++	}
+ 	if { $port == "" } {
+ 		set port [$dmux_ alloc-port [[Simulator instance] nullagent]]
+ 	}
+@@ -569,3 +576,49 @@
+ 	$self instvar neighbor_
+ 	return [expr [lsearch $neighbor_ $node] != -1]
+ }
++
++# XXX netbed specific
++Node instproc add-ip { ip } {
++    set ns_ [Simulator instance]
++    $ns_ instvar iplist_
++    lappend iplist_ $ip
++
++    $self instvar nodeiplist_ dmux_
++    lappend nodeiplist_ $ip
++
++    set ip_aton [$ns_ inet-aton $ip]
++
++    if { $dmux_ != "" } {
++	# By adding the IP of this link to the node, we
++	# make sure that packets with the dstaddr == ip
++	# will be given to the port classifier
++	$self add-route $ip_aton $dmux_
++    }
++    $ns_ add-ip $self $ip
++}
++
++# XXX netbed specific
++Node instproc add-route-to-ip { ip nhopip {mask 255.255.255.255} } {
++    set ns_ [Simulator instance]
++
++    set ip_aton [$ns_ inet-aton $ip]
++    set mask_aton [$ns_ inet-aton $mask]
++    set ip_masked [expr $ip_aton & $mask_aton]
++    set node [$ns_ ip-to-node $nhopip]
++    if { $node != {} } {
++        $self add-route $ip_masked [[$ns_ link $self $node] head]
++	return
++    }
++
++    set target [$ns_ ip-to-target $nhopip]
++    if { $target == {} } {
++	set nhop_aton [$ns_ inet-aton $nhopip]
++	set target [$ns_ ip-to-target [$ns_ inet-ntoa \
++	    [expr $nhop_aton & [$ns_ inet-aton 255.255.255.0]]]]
++    }
++
++    if { $target != {} } {
++	$self add-route $ip_masked $target
++    }
++}
++
+--- dist/ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Fri Feb 28 10:50:56 2003
++++ ns-allinone-2.26/ns-2.26/tcl/lib/ns-rtmodule.tcl	Thu Oct  2 13:57:08 2003
+@@ -125,6 +125,7 @@
+ 	$classifier_ set mask_ [AddrParams NodeMask 1]
+ 	$classifier_ set shift_ [AddrParams NodeShift 1]
+ 	# XXX Base should ALWAYS be the first module to be installed.
++        $classifier_ set ipmask_ [[Simulator instance] inet-aton 255.255.255.0]
+ 
+ 	$node install-entry $self $classifier_
+ }
+--- dist/ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Wed Feb 26 15:11:24 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.cc	Tue Aug 12 16:16:17 2003
 @@ -76,7 +76,7 @@
   *
   * Some warnings and comments:
@@ -2395,8 +3346,8 @@
  		}
  	}
  //if (int(t_seqno_) > 1)
---- dist-ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Wed Feb 26 15:11:24 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Fri Jun  6 17:18:37 2003
+--- dist/ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Wed Feb 26 15:11:24 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp-full.h	Tue Aug 12 16:16:17 2003
 @@ -104,6 +104,20 @@
  #define PF_TIMEOUT 0x04	    /* protocol defined */
  #define	TCP_PAWS_IDLE	(24 * 24 * 60 * 60)	/* 24 days in secs */
@@ -2430,8 +3381,8 @@
  			rtxbytes_ += amt;
  	}
  	virtual void oldack() {			// what to do on old ack
---- dist-ns-allinone-2.26/ns-2.26/tcp/tcp.h	Wed Feb 26 15:11:25 2003
-+++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Fri Jun  6 17:22:30 2003
+--- dist/ns-allinone-2.26/ns-2.26/tcp/tcp.h	Wed Feb 26 15:11:25 2003
++++ ns-allinone-2.26/ns-2.26/tcp/tcp.h	Tue Aug 12 16:16:17 2003
 @@ -56,6 +56,8 @@
  	int tcp_flags_;         /* TCP flags for FullTcp */
  	int last_rtt_;		/* more recent RTT measurement in ms, */
@@ -2449,8 +3400,8 @@
  };
  
  /* these are used to mark packets as to why we xmitted them */
---- dist-ns-allinone-2.26/ns-2.26/tools/random.cc	Wed Feb 26 15:11:28 2003
-+++ ns-allinone-2.26/ns-2.26/tools/random.cc	Fri Jun  6 17:23:54 2003
+--- dist/ns-allinone-2.26/ns-2.26/tools/random.cc	Wed Feb 26 15:11:28 2003
++++ ns-allinone-2.26/ns-2.26/tools/random.cc	Tue Aug 12 16:16:17 2003
 @@ -47,11 +47,13 @@
  #define GCC_THROW
  #endif
@@ -2465,8 +3416,8 @@
 +#endif
  
  #endif /* !WIN32 */
---- dist-ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Wed Feb 26 15:11:29 2003
-+++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Fri Jun  6 17:24:39 2003
+--- dist/ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Wed Feb 26 15:11:29 2003
++++ ns-allinone-2.26/ns-2.26/trace/cmu-trace.cc	Tue Aug 12 16:16:17 2003
 @@ -941,6 +941,8 @@
  		case PT_GAF:
  		case PT_PING:
