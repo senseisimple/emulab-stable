@@ -1029,18 +1029,22 @@ sub fatal($)
     # Send a message to the testbed list. Append the logfile.
     #
     SENDMAIL("$user_name <$user_email>",
-	     "Swap ${inout} Failure: $pid/$eid",
-	     $mesg . "\n\n" .
-	     "Please look at the log below to see what happened. If the error\n".
-	     "resulted from a lack of resources (not enough nodes), you can\n".
-	     "use this web page to get a summary of free nodes:\n\n".
-	     "  ${TBBASE}/nodecontrol_list.php3\n".
-	     "\n".
-	     "Please do not try again until you see enough nodes free.",
-	     ($idleswap ? $TBOPS : "$user_name <$user_email>"),
-	     "Cc:  $expt_head_name <$expt_head_email>\n".
-	     "Cc:  $TBOPS",
-	     (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
+	 "Swap ${inout} Failure: $pid/$eid",
+	 $mesg . "\n\n" .
+	 "Please look at the log below to see what happened. If the error\n".
+	 "resulted from a lack of free nodes, you can use this web page to\n".
+	 "get a summary of free nodes:\n\n".
+	 "  ${TBBASE}/nodecontrol_list.php3\n".
+	 "\n".
+	 "Please do not try again until you see enough nodes free. Or, you\n".
+	 "can use the batch system to swap your experiment in when enough\n".
+	 "nodes are free:\n\n".
+	 "  ${TBDOCBASE}/tutorial/docwrapper.php3?docname=tutorial.html".
+	     "#BatchMode\n",
+	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
+	 "Cc:  $expt_head_name <$expt_head_email>\n".
+	 "Cc:  $TBOPS",
+	 (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
 
     if ($modifyHosed) {
 	#

@@ -65,6 +65,8 @@ my $PROJROOT = "/proj";
 my $EVENTSYS = @EVENTSYS@;
 my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
+my $TBDOCBASE = "@TBDOCBASE@";
+my $TBBASE   = "@TBBASE@";
 
 #
 # Testbed Support libraries
@@ -274,7 +276,7 @@ if (! DBQueryWarn("insert into experiment_resources (idx, tstamp, exptidx) ".
 		  "select 0, now(), idx from experiments ".
 		  "where pid='$pid' and eid='$eid'")) {
     DBQueryWarn("unlock tables");
-    fatal("DB error inserting experiment resources record for $pid/$eid!\n");
+    fatal("DB error inserting experiment resources record for $pid/$eid!");
 }
 
 #
@@ -287,7 +289,7 @@ if (! DBQueryWarn("insert into experiment_stats ".
 		  "left join experiment_resources as r on e.idx=r.exptidx ".
 		  "where pid='$pid' and eid='$eid'")) {
     DBQueryWarn("unlock tables");
-    fatal("DB error inserting experiment stats record for $pid/$eid!\n");
+    fatal("DB error inserting experiment stats record for $pid/$eid!");
 }
 
 #
@@ -440,7 +442,7 @@ SetExpState($pid, $eid, EXPTSTATE_PRERUN);
 print "Running 'tbprerun $pid $eid $nsfile'\n";
 if (system("$tbbindir/tbprerun $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
-    fatal("tbprerun failed!\n");
+    fatal("tbprerun failed!");
 }
 SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 
@@ -453,7 +455,7 @@ if (! ($frontend || $batchmode)) {
     print "Running 'tbswap in $pid $eid'\n";
     if (system("$tbbindir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswap in failed!\n");
+	fatal("tbswap in failed!");
     }
     SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 
@@ -482,7 +484,7 @@ if (! ($frontend || $batchmode)) {
 
 # We append this report in the email message below.
 if (system("$tbbindir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
-    fatal("tbreport failed!\n");
+    fatal("tbreport failed!");
 }
 
 #
@@ -701,11 +703,21 @@ sub fatal($)
     # Send a message to the testbed list. 
     #
     SENDMAIL("$user_name <$user_email>",
-	     "Experiment Configure Failure: $pid/$eid",
-	     $mesg,
-	     "$user_name <$user_email>",
-	     "Cc: $TBOPS",
-	     ($logname, "assign.log", "wanassign.log", $nsfile));
+	 "Experiment Configure Failure: $pid/$eid",
+	 $mesg . "\n\n" .
+	 "Please look at the log below to see what happened. If the error\n".
+	 "resulted from a lack of free nodes, you can use this web page to\n".
+	 "get a summary of free nodes:\n\n".
+	 "  ${TBBASE}/nodecontrol_list.php3\n".
+	 "\n".
+	 "Please do not try again until you see enough nodes free. Or, you\n".
+	 "can use the batch system to swap your experiment in when enough\n".
+	 "nodes are free:\n\n".
+	 "  ${TBDOCBASE}/tutorial/docwrapper.php3?docname=tutorial.html".
+	     "#BatchMode\n",
+	 "$user_name <$user_email>",
+	 "Cc: $TBOPS",
+	 ($logname, "assign.log", "wanassign.log", $nsfile));
 
     #
     # Back up the work dir for post-mortem debugging. 
