@@ -3,7 +3,7 @@
 # This file contains the standard elvind settings specified in the form
 # attribute	value
 #
-# "@(#)$RCSfile: elvind-boss.conf.in,v $ $Revision: 1.3 $"
+# "@(#)$RCSfile: elvind-ops.conf.in,v $ $Revision: 1.1 $"
 
 
 ################################################################
@@ -20,7 +20,7 @@
 # 
 # Keep adding the urls for which you are going to listen to
 
-protocol elvin:/tcp,none,xdr/localhost:@BOSSEVENTPORT@
+protocol elvin:/tcp,none,xdr/0.0.0.0:2917
 # protocol elvin:/udp,none,xdr/0.0.0.0:12301
 # protocol elvin:/ssl,none,xdr/0.0.0.0:12302
 # protocol elvin:/http,none,xdr/0.0.0.0:12303
