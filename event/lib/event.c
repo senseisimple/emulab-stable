@@ -435,6 +435,33 @@ event_notification_free(event_handle_t handle,
     return 1;
 }
 
+/*
+ * Clones (copies) the event notificaion. Returns the copy if successful,
+ * or NULL if it is not.
+ */
+event_notification_t
+event_notification_clone(event_handle_t handle,
+			 event_notification_t notification)
+{
+    event_notification_t clone;
+
+    if (!handle || !notification) {
+        ERROR("invalid parameter\n");
+        return 0;
+    }
+
+    TRACE("cloning notification %p\n", notification);
+
+    if (! (clone = elvin_notification_clone(notification, handle->status)) ) {
+        ERROR("elvin_notification_clone failed: ");
+        elvin_error_fprintf(stderr, handle->status);
+        return 0;
+    }
+
+    return clone;
+
+}
+
 
 struct attr_traverse_arg {
     char *name;

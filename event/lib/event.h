@@ -5,7 +5,7 @@
  *
  * @COPYRIGHT@
  *
- * $Id: event.h,v 1.11 2002-03-18 18:55:21 stoller Exp $
+ * $Id: event.h,v 1.12 2002-03-25 21:24:45 ricci Exp $
  */
 
 #ifndef __EVENT_H__
@@ -145,6 +145,8 @@ event_notification_t event_notification_alloc(event_handle_t handle,
                                               address_tuple_t tuple);
 int event_notification_free(event_handle_t handle,
                             event_notification_t notification);
+event_notification_t event_notification_clone(event_handle_t handle,
+					event_notification_t notification);
 int event_notification_get_double(event_handle_t handle,
                                   event_notification_t notification,
                                   char *name, double *value);
