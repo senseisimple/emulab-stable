@@ -1,0 +1,83 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Boottime cleanup of the DB. A series of specialize commands that are
+# likely yo get out of synch with reality!
+# 
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+#
+# Create a temporary name for a log file and untaint it.
+#
+#
+# Form a temp name.
+#
+my $logname = `mktemp /tmp/dbboot.XXXXXX`;
+
+if ($logname =~ /^([-\@\w.\/]+)$/) {
+    $logname = $1;
+} else {
+    die "Bad data in $logname";
+}
+
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+# 
+open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+
+#
+# Clear the load_address field of the images table since any frisbee's
+# that were running are obviously not running anymore! 
+#
+DBQueryFatal("update images set load_address=''");
+
+#
+# Clear old logins. 
+#
+DBQueryFatal("delete from login");
+
+system("cat $logname | /usr/bin/mail -s '\"DB Boot Finished\"' stoller");
+unlink("$logname");
+exit 0;
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    print STDERR "$msg\n";
+    
+    system("cat $logname | /usr/bin/mail ".
+	   "-s '\"DB Boot Failed\"' \"$TBOPS\"");
+    unlink("$logname");
+    exit(1);
+}
