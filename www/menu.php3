@@ -420,10 +420,16 @@ function PAGEHEADER($title) {
 	$login_status = $STATUS_NOLOGINS;
     }
 
-    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
-    header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT"); 
-    header("Cache-Control: no-cache, must-revalidate");
-    header("Pragma: no-cache");
+    header("Last-Modified: " . gmdate("D, d M Y H:i:s") . " GMT");
+    
+    if (isset($SSL_PROTOCOL)) {
+	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+	header("Cache-Control: no-cache, must-revalidate");
+	header("Pragma: no-cache");
+    }
+    else {
+	header("Expires: " . gmdate("D, d M Y H:i:s", time() + 300) . " GMT"); 
+    }
 
     echo "<html>
           <head>
@@ -461,11 +467,6 @@ function PAGEHEADER($title) {
                 <meta NAME=\"ROBOTS\" CONTENT=\"NOARCHIVE\">\n";
     }
     
-    echo " <meta HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">
-           <meta HTTP-EQUIV=\"Cache-Control\" CONTENT=\"no-cache\">
-           <meta HTTP-EQUIV=\"Expires\"
-                 CONTENT=\"Thu, 01 Dec 1994 16:00:00 GMT\">\n";
-
 #    echo " <meta HTTP-EQUIV=\"Cache-Control\"
 #                 CONTENT=\"post-check=30,pre-check=60\">\n";
 
