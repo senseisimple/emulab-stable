@@ -9,22 +9,6 @@ post-install:
 	@$(MAKE) -C tbsetup post-install
 	@$(MAKE) -C security post-install
 
-install-ifyoudare: all 
-	# XXXThese don't work anymore
-	#install -c os/gethostkey.tcl /usr/testbed/bin/gethostkey
-	#install -c os/hostkey.tcl /usr/testbed/bin/hostkey
-	#install -c os/instimage.exp /usr/testbed/bin/instimage
-	#install -c os/key7 /usr/testbed/bin
-	#install -c os/key8 /usr/testbed/bin
-	#install -c os/oslist.tcl /usr/testbed/bin/oslist
-	#install -c os/osnode2db.tcl /usr/testbed/bin/osnode2db
-	#install -c os/osnodestatus.tcl /usr/testbed/bin/osnodestatus
-	#install -c os/ossane.tcl /usr/testbed/bin/ossane
-	#install -c os/osset.tcl /usr/testbed/bin/osset
-	#install -c os/osstatus.tcl /usr/testbed/bin/osstatus
-	#install -c os/setupmachine.sh /usr/testbed/bin/setupmachine
-	#install -c os/imagezip/imagezip /usr/testbed/bin/imagezip
-
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
 %.MAKE:

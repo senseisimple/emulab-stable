@@ -4,15 +4,15 @@
 $(INSTALL_BINDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)
-	$(INSTALL) $< $@
+	$(INSTALL_PROGRAM) $< $@
 
 $(INSTALL_BINDIR)/%: %.tcl
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_BINDIR)
-	$(INSTALL) $< $@
+	$(INSTALL_PROGRAM) $< $@
 
 $(INSTALL_LIBDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_LIBDIR)
-	$(INSTALL) $< $@
+	$(INSTALL_PROGRAM) $< $@
 
