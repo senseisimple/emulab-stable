@@ -609,7 +609,7 @@ sub getTrunksFromSwitches($@) {
 #
 sub snmpitDoIt($$$;$) {
 
-    my ($getOrSet, $sess,$var,$retries) = @_;
+    my ($getOrSet,$sess,$var,$retries) = @_;
 
     if (! defined($retries) ) {
 	$retries = $DEFAULT_RETRIES;
@@ -623,9 +623,16 @@ sub snmpitDoIt($$$;$) {
 	return undef;
     }
 
+    my $array_size;
+    if ($getOrSet == $SNMPIT_GET) {
+	$array_size = 2;
+    } else {
+	$array_size = 4;
+    }
+
     if ((ref($var) ne "SNMP::Varbind") &&
-	    ((ref($var) ne "ARRAY") || (@$var != 2))) {
-	$snmpitErrorString = "Invalid SNMP variable given!\n";
+	    ((ref($var) ne "ARRAY") || ((@$var != $array_size) && (@$var != 4)))) {
+	$snmpitErrorString = "Invalid SNMP variable given ($var)!\n";
 	return undef;
     }
 
@@ -652,7 +659,15 @@ sub snmpitDoIt($$$;$) {
 	# session
 	#
 	if ($sess->{ErrorNum}) {
-	   $snmpitErrorString = "Returned $status, ErrorNum was " .
+	    my $type;
+	    if ($getOrSet == $SNMPIT_GET) {
+		$type = "get";
+	    } else {
+		$type = "set";
+	    }
+	    $snmpitErrorString  = "SNMPIT $type failed - variable was " .
+				    printVars($var) . "\n";
+	    $snmpitErrorString .= "Returned $status, ErrorNum was " .
 		   "$sess->{ErrorNum}\n";
 	    if ($sess->{ErrorStr}) {
 		$snmpitErrorString .= "Error string is: $sess->{ErrorStr}\n";
@@ -783,11 +798,13 @@ sub snmpitSetFatal($$;$) {
 sub printVars($) {
     my ($vars) = @_;
     if (ref($vars) eq "SNMP::VarList") {
-	print "[", join(", ",map( {"[".join(",",@$_)."\]";}  @$vars)), "]";
+	return "[" . join(", ",map( {"[".join(",",@$_)."\]";}  @$vars)) . "]";
     } elsif (ref($vars) eq "SNMP::Varbind") {
-	print "[", join(",",@$vars), "]";
+	return "[" . join(",",@$vars) . "]";
+    } elsif (ref($vars) eq "ARRAY") {
+	return "[" . join(",",@$vars) . "]";
     } else {
-	print STDERR "printVars: Unknown type " . ref($vars) . " given\n";
+	return "[unknown value]";
     }
 }
 
