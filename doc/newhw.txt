@@ -11,9 +11,9 @@ Temp. worker co-ordination: Mac
 ***** Hardware
 **********************************************************************
 ISP110s:
-	Status: Ordered, 116 received, 1 returned
-	Next shipment: ??
+	Status: Received
 	Responsible: Rob
+	RMAs: 1 returned, replacement recieved
 
 Network cables:
 	Status: Received
@@ -64,7 +64,7 @@ Cable management bars:
 		but they may take a week to deiver
 
 Fiber cables:
-	Status: Ordered (4 2m SC->MTRJ, 4 3m SC->SC)
+	Status: Recieved
 	Responsible: Leigh
 
 **********************************************************************
@@ -73,19 +73,22 @@ Fiber cables:
 snmpit:
 	Correctly handle multiple switches
 	Responsible: Mac
+	Status: ??
 
 tip/capture:
 	Get it working over the network and on multiple serial servers
 	Responsible: Leigh
+	Status: Done?
 
 power:
 	Extend it to talk to RPC (serial) power controllers
 	Responsible: Mac
+	Status: Done?
 	
 Disk image:
 	Build a disk image that has any changes required for ISPs
 	Responsible: Rob
-	Note: Control interface may be differnt - anything else?
+	Status: Nearly done (waiting for imagezip fixes)
 
 **********************************************************************
 ***** Problems to resolve
@@ -109,7 +112,8 @@ Serial server:
 NIC probe order:
 	We need to determine if FreeBSD and Linux probe the NIC cards in the
 		same order, and if not, make the order consistent
-	Responsible: Rob
+	Responsible: Leigh
+	Status: Done
 
 **********************************************************************
 ***** Misc
@@ -126,8 +130,9 @@ PC labels:
 Power outlets:
 	We need 2 outlets of at least 15 amps per rack
 	Responsible: Rob
-	Status: Found 2, need 4 more
+	Status: Found 3, need 3 more
 	Note: Any outlets we find under the floor are fair game
+	Note: We should wait until _after_ September 9th to pursue this
 
 Label power cables:
 	Responsible: Rob
@@ -142,38 +147,45 @@ New machine type:
 Wires table:
 	Using a consistent wiring scheme, this can be filled by a script
 	Responsible: Rob
-	Status: Script created/checked in
+	Status: Script created/checked in, first rack done
 
 Interfaces table:
 	Toughest part here is the MAC addresses - See "MAC Address gathering"
 		procedure below
 	Responsible: Rob
+	Status: First rack done
 
 Nodes table:
 	The only information in this table this is unique per-node is node_id,
 		ip, and precedence - should be easy to populate with a script
-	Responsible: Mac
+	Responsible: Rob
+	Status: First rack done
 
 dhcpd.conf:
 	There's already a script (db/dhcpd_makeconf) to generate this once
 		the nodes and interfaces tables are populated
 	Responsible: Rob
+	Status: First rack done
 
 Outlets table:
 	Using a consistent wiring scheme, this can be filled by a script
 	Responsible: Rob
+	Status: First rack done
 
 DNS zone files on paper:
 	Need to add DNS entries for all new nodes
 	Responsible: Mac/Rob
+	Status: First rack done
 
 Information about the RPCs:
 	Will probably need entires in the nodes table
 	Responsible: Mac
+	Status: First rack done
 	
 tip/capture state:
 	Not sure what needs to be done for the new tip/capture
 	Responsible: Leigh
+	Status: First rack done
 	
 **********************************************************************
 ***** Procedures
