@@ -16,6 +16,8 @@ OURDOMAIN       = @OURDOMAIN@
 # This is silly. Needs to be done properly.
 TESTBED_NETWORK = @TESTBED_NETWORK@
 REVERSE_MAPNAME = $(subst .0,,$(TESTBED_NETWORK))
+BOSSTOKEN       = $(shell echo @BOSSNODE@ | sed -e 's/\..*//')
+USERTOKEN       = $(shell echo @USERNODE@ | sed -e 's/\..*//')
 
 NAMED_FILES	= named.conf.template named_makeconf \
 		  reverse.head resolv.conf localhost.rev forward.head \
@@ -37,7 +39,7 @@ $(REVERSE_MAPNAME).db.head:	reverse.head
 	cat reverse.head | sed -e 's/$(REVERSE_MAPNAME)\.//' > $(REVERSE_MAPNAME).db.head
 
 $(OURDOMAIN).db.head:		forward.head
-	cp forward.head $(OURDOMAIN).db.head
+	cat forward.head | sed -e 's/BOSSTOKEN/$(BOSSTOKEN)/' -e 's/USERTOKEN/$(USERTOKEN)/' > $(OURDOMAIN).db.head
 
 named.conf:	named.conf.template named_makeconf
 	perl named_makeconf named.conf.template > named.conf

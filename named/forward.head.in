@@ -23,6 +23,7 @@ $TTL	30
 ; and boss are both A records
 ns		IN	A		@BOSSNODE_IP@
 boss		IN	A		@BOSSNODE_IP@
+BOSSTOKEN	IN	A		@BOSSNODE_IP@
 		IN	MX 10	ops
 
 ; CNAMEs for boss
@@ -32,6 +33,7 @@ cvsup		IN	CNAME	boss
 
 ; Plastic and names it is otherwise known as...
 ops		IN	A		@USERNODE_IP@
+USERTOKEN	IN	A		@USERNODE_IP@
 		IN	MX 10	ops
 users		IN	CNAME	ops
 fs		IN	CNAME	ops
