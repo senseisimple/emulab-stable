@@ -766,7 +766,7 @@ else {
           <br>
           While you are waiting, you can watch the log of experiment creation
           in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
-           realtime</a>.\n";
+          realtime</a>.\n";
 }
 echo "<br>
       </font>\n";
