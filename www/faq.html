@@ -82,6 +82,7 @@
      <li> <a href="#SWS-8">What if I need more disk space on my nodes?</a>
      <li> <a href="#SWS-9">Are there testbed-specific daemons that could
                            interfere with my experiment?</a>
+     <li> <a href="#SWS-10">Does Emulab support IP Multicast?</a>
      </ul>
 
 <li> <a href="#SEC">Security Issues</a>
@@ -1087,6 +1088,19 @@
     look at them if you are concered about running processes affecting
     your experiment.
     </p>
+
+<li><a NAME="SWS-10"></a>
+    <h3>Does Emulab support IP Multicast?</h3>
+    <p>
+      In short, yes, the local nodes in Emulab (but not all remote
+      Netbed nodes) support IP Multicast on the experimental
+      network. In order to use it, you must have a kernel that
+      supports it, and if you want multicast routing, you'll need to
+      enable <code>mrouted</code>. (You can do it manually, or
+      automatically via program objects or startup commands, but the
+      rtproto commands will not do it.)
+    </p>
+
 </ul>
 
 <hr>
