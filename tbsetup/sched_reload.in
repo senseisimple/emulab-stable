@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,14 +20,16 @@ sub usage()
     print STDOUT "Usage: sched_reload [-f | -n] [-m <imageid>] ".
 	         "[[-p <pid>] -i <imagename>] <node> [node ...]\n".
 		 "       sched_reload <options> -e pid,eid\n".
+		 "       sched_reload <options> -t type [type ...]\n".
 	"Use -i to specify an image name. Use node default otherwise.\n".
 	"Use -m to specify an image ID (internal name, TB admins only!).\n".
 	"Use -f to force reload. Fail if node cannot be reserved.\n".
 	"Use -n to pend reload for the reload daemon.\n".
-        "Use -e to schedule a reload for all nodes in an experiment.\n";
+        "Use -e to schedule a reload for all nodes in an experiment.\n".
+        "Use -t to schedule a reload for all nodes of a particular type.\n";
     exit(-1);
 }
-my  $optlist = "fnp:i:e:m:";
+my  $optlist = "fnp:i:e:m:t";
 
 #
 # Configure variables
@@ -63,6 +65,8 @@ my $imagepid    = TB_OPSPID;
 my %imagenodes  = ();
 my @row;
 my $eidmode     = 0;
+my $typemode    = 0;
+my @types	= ();
 my $pid;
 my $eid;
 
@@ -140,6 +144,27 @@ if (defined($options{"e"})) {
 	usage();
     }
 }
+elsif (defined($options{"t"})) {
+    if (!@ARGV) {
+	usage();
+    }
+    
+    $typemode = 1;
+
+    #
+    # Untaint types,
+    #
+    foreach my $type ( @ARGV ) {
+	if ($type =~ /^([-\w]+)$/) {
+	    $type = $1;
+	}
+	else {
+	    die("Bad type name: $type.");
+	}
+    
+	push(@types, $type);
+    }
+}
 else {
     if (@ARGV < 1) {
 	usage();
@@ -150,6 +175,17 @@ if ($eidmode) {
     if (! (@nodes = ExpNodes($pid, $eid))) {
 	die("*** $0:\n".
 	    "    There are no nodes allocated to experiment $pid/$eid!");
+    }
+}
+elsif ($typemode) {
+    foreach my $type ( @types ) {
+	my $query_result =
+	    DBQueryFatal("select node_id from nodes ".
+			 "where type='$type' and role='testnode'");
+
+	while (my ($node) = $query_result->fetchrow_array()) {
+	    push(@nodes, $node);
+	}
     }
 }
 else {
@@ -213,7 +249,7 @@ foreach my $node (@nodes) {
     my $pc = $node;
     my $allocated = 0;
 
-    $sth = DBQueryFatal("select * from nodes where node_id='$pc'");
+    $sth = DBQueryFatal("select node_id from nodes where node_id='$pc'");
     if ($sth->num_rows() != 1) {
       print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
       next;
@@ -230,7 +266,7 @@ foreach my $node (@nodes) {
     }
     
     print STDERR "Checking if $pc is reserved...";
-    $sth = DBQueryFatal("select * from reserved where node_id='$pc'");
+    $sth = DBQueryFatal("select node_id from reserved where node_id='$pc'");
    
     if ( ($sth->num_rows()) < 1) {
         print STDERR "Available.\nReserving and adding to list.\n";
