@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -222,7 +222,7 @@ sub os_useradd($$$$$$$$)
 	$glist = "-G $glist";
     }
 
-    if (system("$USERADD -M -u $uid -g $gid $glist -p $pswd ".
+    if (system("$USERADD -M -u $uid -g $gid $glist -p '$pswd' ".
 	       "-d $homedir -s /bin/tcsh -c \"$gcos\" $login") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
