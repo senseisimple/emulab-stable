@@ -316,7 +316,18 @@ sub DumpDBGoo()
 
     foreach my $table (@FULLTABLES) {
 	unlink("$statedir/$table");
-	DBQueryWarn("select * from $table ".
+	DBQueryWarn("create temporary table temp_${table} ".
+		    "select t.* from $table as t")
+	    or die("*** $0:\n".
+		   "    Could not dump table $table\n");
+
+	if ($table eq "node_types") {
+	    DBQueryFatal("update temp_${table} set ".
+			 "delay_capacity=delay_capacity-1 ".
+			 "where delay_capacity>0");
+	}
+
+	DBQueryWarn("select * from temp_$table ".
 		    "into outfile '$statedir/$table'")
 	    or die("*** $0:\n".
 		   "    Could not dump table $table\n");
