@@ -45,4 +45,16 @@ needs conflict.
 
 <li> No sending mail from the wide-area nodes.
 
+<li> No processes may run with elevated priority without prior
+     permission.  If permission is granted, nodes may run at up
+     to nice -3.  In no event may users processes use realtime
+     scheduling, or any other scheduling mechanism that can block
+     the system for an extensive amount of time.
+
+<li> Remember, the nodes are a shared resource.  Please do not
+     spin-wait for extended periods of time.  (If possible, do not
+     spin-wait at all!).  The testbed nodes run with a 1ms scheduling
+     granularity, so operations such as <tt>nanosleep</tt> are
+     surprisingly effective.
+
 </ul>
