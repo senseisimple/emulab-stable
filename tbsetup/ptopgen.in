@@ -5,18 +5,13 @@
 # Switch interface speed - In Mbps
 $switch_speed = 100;
 
-# Omit types - Include all types of node that will never be used.
-%omit_types = (
-	       'APC', 1,
-	       );
-
 ######################################################################
 
 use DBI;
 my $TBDB = "@TBDBNAME@";
 my $dbh = DBI->connect("DBI:mysql:database=$TBDB;host=localhost");
 
-@switches=();
+%switches=();
 %used_switches=();
 
 # Read class/type maps
@@ -24,32 +19,35 @@ $sth = $dbh->prepare("select class,type,delay_capacity from node_types");
 $sth->execute;
 while (($class,$type,$delaycapacity) = $sth->fetchrow_array) {
     $classes{$type} = $class;
-    $nodetypes{$type} = $delaycapacity
+    $nodetypes{$type} = $delaycapacity;
 }
 $sth->finish;
 
 # switches can't delay
 $nodetypes{"switch"} = 0;
 
+# Print switches
+$sth = $dbh->prepare("select node_id from nodes where role = \"testswitch\"");
+$sth->execute;
+while (($switch) = $sth->fetchrow_array) {
+    print "node $switch switch:1\n";
+    $switches{$switch} = 1;
+}
+$sth->finish;
 
 # Find available nodes
 $sth = $dbh->prepare("select a.node_id,a.type from" .
 		     " nodes as a left join reserved as b" .
 		     " on a.node_id=b.node_id" .
-		     " where b.node_id is null");
+		     " where b.node_id is null and a.role = \"testnode\"");
 $sth->execute;		
 while (($node,$type) = $sth->fetchrow_array) {
-    if (defined($omit_types{$type})) {next;}
-
     # Shark hack
     if (($shelf,$number) = ($node =~ /^sh(\d+)-(\d+)/)) {
 	if ($number == 1) {
 	    $nodes{"sh$shelf"} = "shark-shelf";
 	}
     } else {
-	if ($classes{$type} eq "switch") {
-	    push(@switches,$node);
-	}
 	$nodes{$node} = $type;
     }
 }
@@ -62,14 +60,10 @@ foreach $node (keys(%nodes)) {
 	print "node $node shark-shelf:1\n";
 	$sharklinks .= "link link-$node $node:$node/eth0 cisco 100 1\n";
     } else {
-	if ($classes{$nodes{$node}} eq "switch") {
-	    $text = "node $node switch:1";
-	} else {
-	    $text = "node $node $nodes{$node}:1 $classes{$nodes{$node}}:1";
-	    $delay_capacity = $nodetypes{$nodes{$node}};
-	    if ($delay_capacity > 0) {
-		$text .= " delay:$delay_capacity";
-	    }
+	$text = "node $node $nodes{$node}:1 $classes{$nodes{$node}}:1";
+	$delay_capacity = $nodetypes{$nodes{$node}};
+	if ($delay_capacity > 0) {
+	    $text .= " delay:$delay_capacity";
 	}
 	print "$text\n";
     }
@@ -118,7 +112,8 @@ $sth = $dbh->prepare("SELECT node_id1,card1,port1,node_id2,card2,port2" .
 $sth->execute;
 while (($node1,$card1,$port1,$node2,$card2,$port2) = 
        $sth->fetchrow_array) {
-    if (defined($nodes{$node1}) && defined($nodes{$node2})) {
+    if (defined($nodes{$node1}) && 
+	(defined($nodes{$node2}) || defined($switches{$node2}))) {
 	$iface1 = get_iface($node1,$card1,$port1);
 	$iface2 = get_iface($node2,$card2,$port2);
 	$iface1bw = get_ifacebw($node1,$card1,$port1);
@@ -128,7 +123,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	} else {
 	    $bw = $iface2bw;
 	}
-	if ($classes{$nodes{$node2}} eq "switch") {
+	if (defined($switches{$node2})) {
 	    $used_switches{$node2} = 1;
 	}
 	# !!! - Here we use our knowledge that in the wires table links
@@ -149,4 +144,3 @@ foreach $switch (keys(%used_switches)) {
 	    " $switch 100000 1000\n";
     }
 }
-
