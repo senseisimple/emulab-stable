@@ -251,6 +251,7 @@ void pc_plot_waypoint(struct pilot_connection *pc)
 			&pc->pc_obstacles[lpc + 1],
 			sizeof(struct obstacle_config) * (32 - lpc));
 		pc->pc_obstacle_count -= 1;
+		lpc -= 1;
 	    }
 	    else {
 		float bearing;
@@ -573,14 +574,35 @@ void pc_change_state(struct pilot_connection *pc, pilot_state_t ps)
 	break;
 	
     case PS_WIGGLING:
-	mtp_init_packet(&pmp,
-			MA_Opcode, MTP_COMMAND_GOTO,
-			MA_Role, MTP_ROLE_RMC,
-			MA_RobotID, pc->pc_robot->id,
-			MA_CommandID, 2,
-			MA_Theta, M_PI,
-			MA_TAG_DONE);
-	send_pmp = 1;
+	printf("try wiggle %d\n", pc->pc_flags);
+	if (pc->pc_flags & PCF_WIGGLE_REVERSE) {
+	    mtp_init_packet(&mp,
+			    MA_Opcode, MTP_WIGGLE_STATUS,
+			    MA_Role, MTP_ROLE_RMC,
+			    MA_RobotID, pc->pc_robot->id,
+			    MA_Status, MTP_POSITION_STATUS_ERROR,
+			    MA_TAG_DONE);
+	    send_mp = 1;
+
+	    pc->pc_flags &= ~(PCF_CONTACT|PCF_WIGGLE_REVERSE);
+	    ps = PS_ARRIVED;
+	}
+	else {
+	    printf("** REVERSE %d\n", pc->pc_flags & PCF_CONTACT);
+	    mtp_init_packet(&pmp,
+			    MA_Opcode, MTP_COMMAND_GOTO,
+			    MA_Role, MTP_ROLE_RMC,
+			    MA_RobotID, pc->pc_robot->id,
+			    MA_CommandID, 2,
+			    MA_Theta, pc->pc_flags & PCF_CONTACT ? -M_PI : M_PI,
+			    MA_TAG_DONE);
+	    send_pmp = 1;
+
+	    if (pc->pc_flags & PCF_CONTACT) {
+		pc->pc_flags &= ~PCF_CONTACT;
+		pc->pc_flags |= PCF_WIGGLE_REVERSE;
+	    }
+	}
 	break;
 	
     default:
@@ -636,7 +658,9 @@ static void pc_handle_update(struct pilot_connection *pc,
 
     if (((pc->pc_state == PS_START_WIGGLING) ||
 	 (pc->pc_state == PS_WIGGLING)) &&
-	(mup->command_id == 2)) {
+	(mup->command_id == 2) &&
+	((mup->status == MTP_POSITION_STATUS_IDLE) ||
+	 (mup->status == MTP_POSITION_STATUS_COMPLETE))) {
 	struct mtp_packet vsn;
 
 	if (debug) {
@@ -704,6 +728,7 @@ static void pc_handle_update(struct pilot_connection *pc,
     case MTP_POSITION_STATUS_CONTACT:
 	pc->pc_flags &= ~PCF_VISION_POSITION;
 	pc->pc_flags |= PCF_CONTACT;
+	printf(" %d\n", pc->pc_flags);
 	pc_change_state(pc, pc->pc_state);
 	break;
     case MTP_POSITION_STATUS_COMPLETE:
