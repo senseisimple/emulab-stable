@@ -74,8 +74,8 @@ then
 
           if [ $COUNT -eq 0 ]
           then
-              echo "Tired of waiting for file to become free"
-              exit 1
+              echo "Tired of waiting for $CURLOG to become free .. skipping."
+              continue 2
           fi
           COUNT=$(($COUNT-1))
         done
@@ -84,7 +84,7 @@ then
         gzip -9 $CURLOG && cp $CURLOG.gz $DESTDIR && rm $CURLOG.gz
         if [ $? -ne 0 ]
         then
-          echo "Error trying to zip and move log."
+          echo "Error trying to zip and move $CURLOG."
           exit 1
         fi
       done
