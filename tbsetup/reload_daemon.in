@@ -134,22 +134,26 @@ while (1) {
     if ((defined($pid) && $pid eq $RELOADPID) &&
 	(defined($eid) && $eid eq $PENDINGEID)) {
 	#
-	# Query for the imageid from the reloads table. Note that there
-	# has to be one since the only way this node got into the pending
-	# EID was when nfree noticed an entry in the table.
+	# Query for the imageid from the reloads table.
 	#
 	$query_result =
 	    DBQueryWarn("select image_id, reload_type from scheduled_reloads " .
 			"where node_id='$node'");
     
-	if (! $query_result) {
-	    print "DB Error getting imageid from scheduled_reloads. ".
-		"Waiting a bit.\n";
-	    next;
+	if ((! $query_result) || (!$query_result->numrows())) {
+	    #
+	    # If this node didn't make it into the scheduled_reloads table
+	    # for some reason, then we load it with the default image and
+	    # type
+	    #
+	    $imageid = "";
+	    $reload_type = TB_DEFAULT_RELOADTYPE;
+
+	} else {
+	    @row     = $query_result->fetchrow_array();
+	    $imageid = $row[0];
+	    $reload_type= $row[1];
 	}
-	@row     = $query_result->fetchrow_array();
-	$imageid = $row[0];
-	$reload_type= $row[1];
 	
 	#
 	# The node is reserved into the special pid/eid, as the result
@@ -168,15 +172,24 @@ while (1) {
 	# the user asked for. We basically need a case for each type.
 	#
 	my $os_load_flags = "";
-	if ($reload_type eq 'frisbee') {
+	if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
 	    $os_load_flags .= " -r";
-	} elsif ($reload_type eq 'netdisk') {
+	} elsif ($reload_type eq TB_RELOADTYPE_NETDISK) {
 	    # Nothing special to do
 	} else {
 	    fatal("Found a reload type I don't know how to handle: $reload_type");
 	}
 
-	if (system("$os_load $os_load_flags -i $imageid $node")) {
+	#
+	# We only add the -i flag to os_load if we found a specific image
+	# above. Omitting it causes os_load to pick the default image for
+	# the node's type
+	#
+	if ($imageid) {
+	    $os_load_flags .= " -i $imageid ";
+	}
+
+	if (system("$os_load $os_load_flags $node")) {
 	    #
 	    # This should not fail! 
 	    #
@@ -203,11 +216,7 @@ while (1) {
 	    next;
 	}
 
-	#
-	# XXX: Hardcoded the default reload type. Will need to
-	# be changed if/when this type changes.
-	#
-	$reload_type = "netdisk";
+	$reload_type = TB_DEFAULT_RELOADTYPE;
     }
     $stamp = DBDateTime();
 	
@@ -217,7 +226,7 @@ while (1) {
     # For Frisbee reloads, we don't wait for the node to finish reloading,
     # since the whole point is to let many nodes load at once.
     #
-    if ($reload_type eq "frisbee") {
+    if ($reload_type eq TB_RELOADTYPE_FRISBEE) {
 	print "Not waiting for frisbee reload of $node.\n";
 	next;
     }
