@@ -250,7 +250,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
      * Check if we can make the move by backing up instead of turning all the
      * way around and moving forward.
      */
-    if (fabsf(angle) > M_PI_2) {
+    if ((distance <= 0.25) && (fabsf(angle) > M_PI_2)) {
 	if (angle >= 0.0)
 	    angle -= M_PI;
 	else
