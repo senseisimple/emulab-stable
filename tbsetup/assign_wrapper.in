@@ -796,7 +796,7 @@ while (1) {
     TBDebugTimeStamp("assign started");
     # Run assign
     $fail = 0;
-    my $cmdargs = "-r -p $ptopfile $topfile";
+    my $cmdargs = "$ptopfile $topfile";
     $cmdargs = "-r -p $cmdargs"
 	if ($virtcount);
     print "assign $cmdargs\n";
