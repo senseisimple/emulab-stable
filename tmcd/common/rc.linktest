@@ -32,7 +32,7 @@ use libtmcc;
 # Exit if not a valid node to run linktest on.
 # 
 exit(0)
-    if (MFS() || REMOTE() || SIMHOST() || JAILHOST());
+    if (MFS() || REMOTE() || SIMHOST() || JAILHOST() || ISDELAYNODE());
 
 #
 # Parse command arguments. Once we return from getopts, all that should be

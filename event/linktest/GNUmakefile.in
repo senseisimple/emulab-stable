@@ -79,11 +79,13 @@ $(LTEVENT_OBJS): ../lib/libevent.a ../lib/event.h
 
 # We install just enough to fire off the test from boss and wait. 
 install:
-	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
-	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(INSTALL_BINDIR)
 	$(INSTALL_PROGRAM) $(SCRIPT_CONTROL) $(INSTALL_SBINDIR)
 	$(INSTALL_DATA) $(SRCDIR)/linktest.html $(INSTALL_WWWDIR)/doc
+	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
+			$(INSTALL_DIR)/opsdir/bin/$(SCRIPT_RUN)
+	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) \
+			$(INSTALL_DIR)/opsdir/libexec/$(LTEVENT)
 
 control-install:
 	$(INSTALL_PROGRAM) $(LOCAL_BINDIR)/$(LTEVENT) $(INSTALL_LIBEXECDIR)
@@ -102,5 +104,5 @@ lt-install:
 	$(INSTALL_PROGRAM) $(SCRIPT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 
 clean:
-	rm -f *.o $(TESTS)
+	rm -f *.o $(TESTS) $(SCRIPT) $(SCRIPT_RUN) weblinktest linktest_control
 	rm -rf $(LOCAL_BINDIR)

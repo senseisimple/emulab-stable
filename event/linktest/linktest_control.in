@@ -227,7 +227,8 @@ if ($child_pid) {
 # We tell ssh to allocate a tty so that we can kill it with TERM and have
 # everything die off properly.
 #
-my $cmd = "$SSH -t -host $CONTROL $TB/bin/run_linktest.pl -v";
+my $cmd = "$SSH -t -t -1 -F /dev/null " .
+    "-host $CONTROL $TB/bin/run_linktest.pl -v";
 $cmd .= " -d $debug"
     if ($debug);
 $cmd .= " -t $timeout"
