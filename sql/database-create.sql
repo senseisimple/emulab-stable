@@ -85,6 +85,8 @@ CREATE TABLE delays (
   eid varchar(32) default NULL,
   pid varchar(32) default NULL,
   vname varchar(32) default NULL,
+  vnode0 varchar(32) default NULL,
+  vnode1 varchar(32) default NULL,
   card0 tinyint(3) unsigned default NULL,
   card1 tinyint(3) unsigned default NULL,
   PRIMARY KEY  (node_id,iface0,iface1),
@@ -347,6 +349,7 @@ CREATE TABLE interfaces (
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
   IPalias varchar(15) default NULL,
+  IPaliases text default NULL,
   interface_type varchar(30) default NULL,
   iface text,
   current_speed enum('100','10','1000') NOT NULL default '100',
@@ -397,6 +400,40 @@ CREATE TABLE lastlogin (
   uid varchar(10) NOT NULL default '',
   time datetime default NULL,
   PRIMARY KEY  (uid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'linkdelays'
+--
+
+CREATE TABLE linkdelays (
+  node_id varchar(10) NOT NULL default '',
+  iface varchar(8) NOT NULL default '',
+  ip varchar(15) NOT NULL default '',
+  netmask varchar(15) NOT NULL default '255.255.255.255',
+  dir enum('xmit','recv') NOT NULL default 'xmit',
+  eid varchar(32) default NULL,
+  pid varchar(32) default NULL,
+  vlan varchar(32) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  pipe smallint(5) unsigned NOT NULL default '0',
+  delay float(10,2) NOT NULL default '0.00',
+  bandwidth int(10) unsigned NOT NULL default '100',
+  lossrate float(10,3) NOT NULL default '0.000',
+  q_limit int(11) default '0',
+  q_maxthresh int(11) default '0',
+  q_minthresh int(11) default '0',
+  q_weight float default '0',
+  q_linterm int(11) default '0',
+  q_qinbytes tinyint(4) default '0',
+  q_bytes tinyint(4) default '0',
+  q_meanpsize int(11) default '0',
+  q_wait int(11) default '0',
+  q_setbit int(11) default '0',
+  q_droptail int(11) default '0',
+  q_red tinyint(4) default '0',
+  q_gentle tinyint(4) default '0',
+  PRIMARY KEY  (node_id,vlan,vnode,dir)
 ) TYPE=MyISAM;
 
 --
@@ -524,6 +561,7 @@ CREATE TABLE node_types (
   imageid varchar(45) NOT NULL default '',
   imageable tinyint(4) default '0',
   delay_capacity tinyint(4) NOT NULL default '0',
+  virtnode_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
   delay_osid varchar(35) default NULL,
   pxe_boot_path text,
