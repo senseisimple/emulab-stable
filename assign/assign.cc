@@ -414,11 +414,11 @@ int assign()
 		absphys[n3] = physnodes[n3];
 	}
 
-	if (bestscore == 0) {
+	if (bestscore < 0.11f) {
 #ifdef VERBOSE
 		cout << "Problem started optimal\n";
 #endif
-		return 1;
+		goto DONE;
 	}
   
 	while (temp >= 2) {
@@ -441,12 +441,12 @@ int assign()
 				newpos = random() % nparts;
 			scupdate(n, newpos);
 			newscore = score();
-			if (newscore < 0.1f) {
+			if (newscore < 0.11f) {
 				timeend = used_time(timestart);
 				cout << "OPTIMAL (0.0) in "
 				     << iters << " iters, "
 				     << timeend << " seconds" << endl;
-				return 1;
+				goto DONE;
 			}
 			/* So it's negative if bad */
 			scorediff = bestscore - newscore;
@@ -471,6 +471,8 @@ int assign()
       
 		temp *= .9;
 	}
+
+ DONE:
 	forall_nodes(n, G) {
 		bestnodes[n] = absnodes[n];
 	}
