@@ -28,6 +28,18 @@ namespace eval TBCOMPAT {
     # This is the default weight for a hard vtype.
     variable default_hard_vtype_weight 1.0
 
+    # Substitutions for "/proj",
+    variable FSDIR_PROJ "@FSDIR_PROJ@"
+
+    # ... "/groups",
+    variable FSDIR_GROUPS "@FSDIR_GROUPS@"
+
+    # ... "/users", and
+    variable FSDIR_USERS "@FSDIR_USERS@"
+
+    # ... "/share".
+    variable FSDIR_SHARE "@FSDIR_SHARE@"
+
     # This is a general procedure that takes a node, an object (lan or link)
     # it is connected to, and an IP address, and sets the IP address
     # for the node on that object.  It checks both the validity of the
@@ -144,7 +156,7 @@ namespace eval TBCOMPAT {
 
     # The experiment directory, this is where the feedback related files will
     # be read from and dumped to.  XXX Hacky
-    set expdir "/proj/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
+    set expdir "${FSDIR_PROJ}/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
 
     # XXX Just for now...
     global tbxlogfile
@@ -250,6 +262,23 @@ namespace eval TBCOMPAT {
 		# this rclass/rtype or the new value is greater than the old.
 		set BootstrapReservations($rclass,$rtype) $res
 	}
+    }
+
+    #
+    # Verify that the argument is an http, https, or ftp URL.
+    #
+    # @param url The URL to check.
+    # @return True if "url" looks like a URL.
+    #
+    proc verify-url {url} {
+	if {[string match "http://*" $url] ||
+	    [string match "https://*" $url] ||
+	    [string match "ftp://*" $url]} {
+	    set retval 1
+	} else {
+	    set retval 0
+	}
+	return $retval
     }
 }
 
@@ -392,7 +421,57 @@ proc tb-set-node-tarfiles {node args} {
     }
     set tarfiles {}
     while {$args != {}} {
-	lappend tarfiles [join [lrange $args 0 1]]
+	set dir [lindex $args 0]
+	set tarfile [lindex $args 1]
+	
+	# Check the install directory to make sure it is not an NFS mount.
+	# This check can also act as an alert to the user that the arguments
+	# are wrong.  For example, the following line will pass the above
+	# checks, but fail this one:
+	#
+	#   tb-set-node-tarfiles $node /proj/foo/bar.tgz /proj/foo/baz.tgz
+	#
+	# XXX /proj is hardcoded since the subst is /q/proj.
+	if {[string match "/proj/*" $dir] ||
+	    [string match "${::TBCOMPAT::FSDIR_GROUPS}/*" $dir] ||
+	    [string match "${::TBCOMPAT::FSDIR_USERS}/*" $dir] ||
+	    [string match "${::TBCOMPAT::FSDIR_SHARE}/*" $dir]} {
+	    perror "\[tb-set-node-tarfiles] '$dir' refers to an NFS directory instead of the node's local disk."
+	    return
+	}
+
+	# Check the tar file to make sure it exists, is readable, etc...
+	if {[string match "*://*" $tarfile]} {
+	    # It is a URL, check for a valid protocol.
+	    if {![::TBCOMPAT::verify-url $tarfile]} {
+		perror "\[tb-set-node-tarfiles] '$tarfile' is not an http, https, or ftp URL."
+		return
+	    }
+	} elseif {![string match "/proj/*" $tarfile] &&
+	          ![string match "/groups/*" $tarfile]} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' is not in '/proj' or '/groups'"
+	    return
+	} elseif {![file exists $tarfile]} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' does not exist."
+	    return
+	} elseif {![file isfile $tarfile]} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' is not a file."
+	    return
+	} elseif {![file readable $tarfile]} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' is not readable."
+	    return
+	}
+
+	# Make sure the tarfile has a valid extension.
+	if {![string match "*.tar" $tarfile] &&
+	    ![string match "*.tar.Z" $tarfile] &&
+	    ![string match "*.tar.gz" $tarfile] &&
+	    ![string match "*.tgz" $tarfile] &&
+	    ![string match "*.tar.bz2" $tarfile]} {
+	    perror "\[tb-set-node-tarfiles] '$tarfile' does not have a valid extension (e.g. *.tar, *.tar.Z, *.tar.gz, *.tgz)."
+	    return
+	}
+	lappend tarfiles "$dir $tarfile"
 	set args [lrange $args 2 end]
     }
     $node set tarfiles [join $tarfiles ";"]

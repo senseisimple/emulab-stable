@@ -1087,18 +1087,19 @@
     <font size='+1'><b>Can I load my own software (RPMs/Tarballs) on
                        my nodes?</b></font>
     <p>
-    Yes! If have an RPM or Tarball (or more than one) that is appropriate for
+    Yes! If you have an RPM or Tarball (or more than one) that is appropriate for
     loading on the OS you have selected, you can arrange to have them
     loaded automatically when your experiment is configured. The
-    Emulab NS extension <tt>tb-set-node-rpms</tt> is used in the NS
+    Emulab NS extension, <a href="tutorial/docwrapper.php3?docname=nscommands.html#tb-set-node-rpms"><tt>tb-set-node-rpms</tt></a>, is used in the NS
     file to specify a list of RPMS to install.
-    The <tt>tb-set-node-tarfiles</tt> is used to specify a list of Tar
-    files to install (as well as the directories in which the tar
-    should be unpacked). You may specify a
-    different list for each node in the experiment. When the node
-    first boots after the experiment is configured, each of the RPMs/Tarballs
-    will be installed (but only those which have not already been
-    installed).
+    The <a
+    href="tutorial/docwrapper.php3?docname=nscommands.html#tb-set-node-tarfiles"><tt>tb-set-node-tarfiles</tt></a>
+    command is used to specify a list of Tar
+    files to install, as well as the directories in which the tars
+    should be unpacked. You may specify a
+    different list for each node in the experiment. The RPMs/Tarballs
+    will be installed when the nodes first boot after the experiment is
+    swapped in or if the nodes detect a changed RPM/Tarball during a reboot.
     </p>
     <p>
     Please see the

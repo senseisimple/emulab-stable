@@ -129,7 +129,7 @@ commands must be issued after the links or lans are created.
 
 <a name="HARD"></a><h3>Hardware Commands</h3>
 
-<h4>tb-set-hardware</h4>
+<a name="tb-set-hardware"></a><h4>tb-set-hardware</h4>
 
 <pre>
 tb-set-hardware <i>node</i> <i>type</i> [<i>args</i>].
@@ -175,7 +175,7 @@ first, starting at 2.  Except in the partial specification case (see
 above), all automatic IP addresses are in the network
 <code>10</code>.
 
-<h4>tb-set-ip</h4>
+<a name="tb-set-ip"></a><h4>tb-set-ip</h4>
 
 <pre>
 tb-set-ip <i>node</i> <i>ip</i>
@@ -198,7 +198,7 @@ tb-set-ip $node1 142.3.4.5
 </ul>
 
 
-<h4>tb-set-ip-link</h4>
+<a name="tb-set-ip-link"></a><h4>tb-set-ip-link</h4>
 
 <pre>
 tb-set-ip-link <i>node</i> <i>link</i> <i>ip</i>
@@ -221,7 +221,7 @@ tb-set-ip-link $node0 $link0 142.3.4.6
 </ul>
 
 
-<h4>tb-set-ip-lan</h4>
+<a name="tb-set-ip-lan"></a><h4>tb-set-ip-lan</h4>
 
 <pre>
 tb-set-ip-lan <i>node</i> <i>lan</i> <i>ip</i>
@@ -244,7 +244,7 @@ same node.
 </ul>
 
 
-<h4>tb-set-ip-interface</h4>
+<a name="tb-set-ip-interface"></a><h4>tb-set-ip-interface</h4>
 
 <pre>
 tb-set-ip-interface <i>node</i> <i>dst</i> <i>ip</i>
@@ -271,7 +271,7 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
 </ul>
 
 
-<h4>tb-set-netmask</h4>
+<a name="tb-set-netmask"></a><h4>tb-set-netmask</h4>
 
 <pre>
 tb-set-netmask <i>lanlink</i> <i>netmask</i>
@@ -297,7 +297,7 @@ tb-set-netmask $link0 "255.255.255.248"
 
 <a name="OS"></a><h3>OS Commands</h3>
 
-<h4>tb-set-node-os</h4>
+<a name="tb-set-netmask"></a><h4>tb-set-node-os</h4>
 
 <pre>
 tb-set-node-os <i>node</i> <i>os</i>
@@ -325,7 +325,7 @@ tb-set-node-os $node1 MY_OS
 </ul>
 
 
-<h4>tb-set-node-rpms</h4>
+<a name="tb-set-node-rpms"></a><h4>tb-set-node-rpms</h4>
 
 <pre>
 tb-set-node-rpms <i>node</i> <i>rpms...</i>
@@ -340,14 +340,14 @@ tb-set-node-rpms $node0 rpm1 rpm2 rpm3
   when it first boots after being assigned to an experiment.
   <li>Each rpm can be either a path to a file or a URL. Paths must be to files
   that reside in /proj or /groups. You are not allowed to place your rpms in
-  your home directory. <code>http://</code> and <code>ftp://</code> URLs will
+  your home directory. <code>http(s)://</code> and <code>ftp://</code> URLs will
   be fetched into the experiment's directory, and re-distributed from there.
   <li>See the <a href="docwrapper.php3?docname=tutorial.html#RPMS">
   tutorial</a> for more information.
 </ul>
 
 
-<h4>tb-set-node-startcmd</h4>
+<a name="tb-set-node-startcmd"></a><h4>tb-set-node-startcmd</h4>
 
 <pre>
 tb-set-node-startcmd <i>node</i> <i>startupcmd</i>
@@ -364,7 +364,7 @@ tb-set-node-startcmd $node0 "mystart.sh -a >& /tmp/node0.log"
 </ul>
 
 
-<h4>tb-set-node-cmdline</h4>
+<a name="tb-set-node-cmdline"></a><h4>tb-set-node-cmdline</h4>
 
 <pre>
 tb-set-node-cmdline <i>node</i> <i>cmdline</i>
@@ -380,27 +380,102 @@ tb-set-node-cmdline $node0 {???}
 </ul>
 
 
-<h4>tb-set-node-tarfiles</h4>
+<a name="tb-set-node-tarfiles"></a><h4>tb-set-node-tarfiles</h4>
+
+<pre>tb-set-node-tarfiles <i>node</i> <i>install-dir1</i> <i>tarfile1</i> ...</pre>
+
+The <tt>tb-set-node-tarfiles</tt> command is used to install one or more tar
+files onto a node's local disk.  This command is useful for installing files
+that are used frequently, but will change very little during the course of your
+experiments.  For example, if your software depends on a third-party library
+not provided in the standard disk images, you can produce a tarball and have
+the library ready for use on all the experimental nodes.  Another example would
+be the data sets for your software.  The benefit of installing files using this
+method is that they will reside on the node's local disk, so your experimental
+runs will not be disrupted by NFS traffic.  Finally, you will want to avoid
+using this command if the files are changing frequently because the tars are
+only (re)installed when the nodes boot.
+
+<p>
+Installing individual tar files or RPMs is a midpoint in the spectrum of
+getting software onto the experimental nodes.  At one extreme, you can read
+everything over NFS, which works well if the files are changing constantly, but
+can generate a great deal of strain on the control network and disrupt your
+experiment.  The tar files and RPMs are also read over NFS when the nodes
+initially boot, however, there won't be any extra NFS traffic while you are
+running your experiment.  Finally, if you need a lot of software installed on a
+large number of nodes, say greater than 20, it might be best to create a <a
+href="docwrapper.php3?docname=tutorial.html#CustomOS">custom disk image</a>.
+Using a disk image is easier on the control network since it is transferred
+using multicast, thus greatly reducing the amount of NFS traffic when the
+experiment is swapped in.
+
+<br><br>
+
+<i>Required Parameters:</i>
+
+<ul>
+  <li><i>node</i> - The node where the files should be installed.  Each node
+  has its own tar file list, which may or may not be different from the
+  others.
+  <li>One or more <i>install-dir</i> and <i>tarfile</i> pairs are then listed
+  in the order you wish them to be installed:
+  <ul>
+    <li><i>install-dir</i> - An existing directory on the node where the tar
+    file should be unarchived (e.g. '/', '/usr', '/usr/local').  The "tar"
+    command will be run as "root"<a href="#tb-set-node-tarfilesNOTE1">[1]</a>,
+    so all of the node's directories will be accessible to you.  If the
+    directory does not exist on the image or was not created by the unarchiving
+    of a previous tar file, the installation will fail<a
+    href="#tb-set-node-tarfilesNOTE2">[2]</a>.
+
+    <li><i>tarfile</i> - An existing tar file located in a project directory
+    (e.g. '/proj' or '/groups') or an http, https, or ftp URL.  In the case of
+    URLs, they are downloaded when the experiment is swapped in and cached in
+    the experiment's directory for future use.  In either case, the tar file
+    name is <i>required</i> to have one of the following extensions: .tar,
+    .tar.Z, .tar.gz, or .tgz.  Note that the tar file could have been created
+    anywhere, however, if you want the unarchived files to have valid Emulab
+    user and group id's, you should create the tar file on ops or an
+    experimental node.
+  </ul>
+</ul>
+
+<i>Example usage:</i>
 
 <pre>
-tb-set-node-tarfiles <i>node</i> <i>dir</i> <i>tarfile</i>
+  <font color="green"># Overwrite files in /bin and /sbin.</font>
+  <font color="#4699CD">tb-set-node-tarfiles</font> $node0 /bin /proj/foo/mybinmods.tar /sbin /proj/foo/mysbinmods.tar
 
-tb-set-node-tarfiles $node0 /bin mybinmods.tar /sbin mysbinmods.tar
+  <font color="green"># Programmatically generate the list of tarballs.</font>
+  <font color="#4699CD">set</font> tb [<font color="#4699CD">list</font>]
+  <font color="green"># Add a tarball located on a web site.</font>
+  <font color="#4699CD">lappend</font> tb / http://foo.bar/bazzer.tgz
+  <font color="green"># Add a tarball located in the Emulab NFS space.</font>
+  <font color="#4699CD">lappend</font> tb /usr/local /proj/foo/tarfiles/bar.tar.gz
+  <font color="green"># Use 'eval' to expand the 'tb' list into individual</font>
+  <font color="green"># arguments to the tb-set-node-tarfiles command.</font>
+  <font color="#4699CD">eval tb-set-node-tarfiles</font> $node1 $tb
 </pre>
 
-<p>Notes:
+<i>See also:</i>
 <ul>
-  <li>This installs tarfiles in specified directories when the node
-  first boots after being assigned to an experiment. 
-  <li>Each tar file is installed just one. Tarfiles that have been
-  loaded, are not reloaded after subsequent reboots.
-  <li>Each tarfile can be either a path to a file or a URL. Paths must be to
-  files that reside in /proj or /groups. You are not allowed to place your tarfiles
-  in your home directory. <code>http://</code> and <code>ftp://</code> URLs
-  will be fetched into the experiment's directory, and re-distributed from
-  there. 
+<li><a href="#tb-set-node-rpms"><tt>tb-set-node-rpms</tt></a>
+<li><a href="docwrapper.php3?docname=tutorial.html#CustomOS">Custom disk
+images</a>
 </ul>
-	
+
+<i>Notes:</i>
+
+<ol>
+<a name="tb-set-node-tarfilesNOTE1"></a><li>Because the files are installed as
+root, care must be taken to protect the tar file so it cannot be replaced with
+a trojan that allowed less privileged users to become root.
+
+<a name="tb-set-node-tarfilesNOTE2"></a><li>Currently, you can only tell
+how/why an installation failed by examining the node's console log on bootup.
+</ol>
+
 <hr>
 
 <a name="LOSS"></a><h3>Link Loss Commands</h3>
@@ -415,7 +490,7 @@ $ns duplex-link $node1 $node2 100Mb 150ms DropTail
 does, however, support link loss.  The following commands can be used
 to specify link loss rates.
 
-<h4>tb-set-link-loss</h4>
+<a name="tb-set-link-loss"></a><h4>tb-set-link-loss</h4>
 
 <pre>
 tb-set-link-loss <i>src</i> <i>dst</i> <i>loss</i>
@@ -442,7 +517,7 @@ tb-set-link-loss $link1 0.02
 </ul>
 
 
-<h4>tb-set-lan-loss</h4>
+<a name="tb-set-lan-loss"></a><h4>tb-set-lan-loss</h4>
 
 <pre>
 tb-set-lan-loss <i>lan</i> <i>loss</i>
@@ -460,7 +535,7 @@ tb-set-lan-loss $lan1 0.3
   <li>This command sets the loss rate for the entire LAN.
 </ul>
 
-<h4>tb-set-node-lan-delay</h4>
+<a name="tb-set-node-lan-delay"></a><h4>tb-set-node-lan-delay</h4>
 
 <pre>
 tb-set-node-lan-delay <i>node</i> <i>lan</i> <i>delay</i>
@@ -496,7 +571,7 @@ tb-set-node-lan-delay $node0 $lan0 40ms
       "directly" connected to each other.
 </ul>
 
-<h4>tb-set-node-lan-bandwidth</h4>
+<a name="tb-set-node-lan-bandwidth"></a><h4>tb-set-node-lan-bandwidth</h4>
 
 <pre>
 tb-set-node-lan-bandwidth <i>node</i> <i>lan</i> <i>bandwidth</i>
@@ -523,7 +598,7 @@ tb-set-node-lan-bandwidth $node0 $lan0 20Mb
       that are in the same LAN multiple times.
 </ul>
 
-<h4>tb-set-node-lan-loss</h4>
+<a name="tb-set-node-lan-loss"></a><h4>tb-set-node-lan-loss</h4>
 
 <pre>
 tb-set-node-lan-loss <i>node</i> <i>lan</i> <i>loss</i>
@@ -559,7 +634,7 @@ tb-set-node-lan-loss $node0 $lan0 0.05
       that are in the same LAN multiple times.
 </ul>
 
-<h4>tb-set-node-lan-params</h4>
+<a name="tb-set-node-lan-params"></a><h4>tb-set-node-lan-params</h4>
 
 <pre>
 tb-set-node-lan-params <i>node</i> <i>lan</i> <i>delay</i> <i>bandwidth</i> <i>loss</i>
@@ -582,7 +657,7 @@ tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
   </li>
 </ul>
 
-<h4>tb-set-link-simplex-params</h4>
+<a name="tb-set-link-simplex-params"></a><h4>tb-set-link-simplex-params</h4>
 
 <pre>
 tb-set-link-simplex-params <i>link</i> <i>src</i> <i>delay</i> <i>bw</i> <i>loss</i>
@@ -608,7 +683,7 @@ tb-set-link-simplex-params $link1 $srcnode 100ms 50Mb 0.2
       <code>tb-set-lan-simplex-params</code> below for LANs.
 </ul>
 
-<h4>tb-set-lan-simplex-params</h4>
+<a name="tb-set-lan-simplex-params"></a><h4>tb-set-lan-simplex-params</h4>
 
 <pre>
 tb-set-lan-simplex-params <i>lan</i> <i>node</i> <i>todelay</i> <i>tobw</i> <i>toloss</i> <i>fromdelay</i> <i>frombw</i> <i>fromloss</i>
@@ -635,7 +710,7 @@ tb-set-lan-simplex-params $lan1 $node1 100ms 10Mb 0.1 5ms 100Mb 0
     <code>tb-set-node-lan-params</code>.
 </ul>
 
-<h4>tb-set-endnodeshaping</h4>
+<a name="tb-set-endnodeshaping"></a><h4>tb-set-endnodeshaping</h4>
 
 <pre>
 tb-set-endnodeshaping <i>link-or-lan</i> <i>enable</i>
@@ -662,7 +737,7 @@ tb-set-endnodeshaping $lan1 1
     Node Traffic Shaping</a> for more details.
 </ul>
 
-<h4>tb-set-noshaping</h4>
+<a name="tb-set-noshaping"></a><h4>tb-set-noshaping</h4>
 
 <pre>
 tb-set-noshaping <i>link-or-lan</i> <i>enable</i>
@@ -692,7 +767,7 @@ tb-set-noshaping $lan1 1
     but then not actually have the links shaped.
 </ul>
 
-<h4>tb-use-endnodeshaping</h4>
+<a name="tb-use-endnodeshaping"></a><h4>tb-use-endnodeshaping</h4>
 
 <pre>
 tb-use-endnodeshaping <i>enable</i>
@@ -715,7 +790,7 @@ tb-use-endnodeshaping 1
     Node Traffic Shaping</a> for more details.
 </ul>
 
-<h4>tb-force-endnodeshaping</h4>
+<a name="tb-force-endnodeshaping"></a><h4>tb-force-endnodeshaping</h4>
 
 <pre>
 tb-force-endnodeshaping <i>enable</i>
@@ -741,7 +816,7 @@ tb-force-endnodeshaping 1
     Node Traffic Shaping</a> for more details.
 </ul>
 
-<h4>tb-set-multiplexed</h4>
+<a name="tb-set-multiplexed"></a><h4>tb-set-multiplexed</h4>
 
 <pre>
 tb-set-multiplexed <i>link</i> <i>allow</i>
@@ -835,7 +910,7 @@ pc600}, is not very useful, as pc600 is a sub type of pc.  You may
 very well end up with two routers as type pc with different hardware,
 as pc covers multiple types of hardware.
 
-<h4>tb-make-soft-vtype</h4>
+<a name="tb-make-soft-vtype"></a><h4>tb-make-soft-vtype</h4>
 
 <pre>
 tb-make-soft-vtype <i>vtype</i> {<i>types</i>}
@@ -865,7 +940,7 @@ tb-make-weighted-vtype A 0.1 {pc600 pc850}
 
 <a name="MISC"></a><h3>Misc. Commands</h3>
 
-<h4>tb-fix-node</h4>
+<a name="tb-fix-node"></a><h4>tb-fix-node</h4>
 
 <pre>
 tb-fix-node <i>vnode</i> <i>pnode</i>
@@ -887,7 +962,7 @@ tb-fix-node $node0 pc42
 </ul>
 
 
-<h4>tb-set-uselatestwadata</h4>
+<a name="tb-set-uselatestwadata"></a><h4>tb-set-uselatestwadata</h4>
 
 <pre>
 tb-set-uselatestwadata 0
@@ -902,7 +977,7 @@ tb-set-uselatestwadata 1
 </ul>
 
 
-<h4>tb-set-wasolver-weights</h4>
+<a name="tb-set-wasolver-weights"></a><h4>tb-set-wasolver-weights</h4>
 
 <pre>
 tb-set-wasolver-weights <i>delay bw plr</i>
@@ -924,7 +999,7 @@ tb-set-wasolver-weights 1 10 500
   in an essentially random selection.
 </ul>
 
-<h4>tb-set-node-failure-action</h4>
+<a name="tb-set-node-failure-action"></a><h4>tb-set-node-failure-action</h4>
 
 <pre>
 tb-set-node-failure-action <i>node action</i>

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -102,7 +102,7 @@ if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
 }
 
 #
-# Get the experiment's directoty - that's where we'll stash any files we
+# Get the experiment's directory - that's where we'll stash any files we
 # fetch
 #
 my $expdir = TBExptUserDir($pid,$eid);
@@ -139,7 +139,7 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     # Go through the list of RPMs looking for files to fetch
     #
     foreach my $rpm (split(";", $rpms)) {
-	if ($rpm =~ /^(http|ftp)/) {
+	if ($rpm =~ /^(http|https|ftp)/) {
 	    #
 	    # Veryify that they gave us a legal URL
 	    #
@@ -174,7 +174,7 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
     #
     foreach my $tar (split(";", $tarfiles)) {
 	my ($dir,$tarfile) = split(" ",$tar);
-	if ($tarfile =~ /^(http|ftp)/) {
+	if ($tarfile =~ /^(http|https|ftp)/) {
 	    my $URL = verifyURL($tarfile);
 	    if (!$URL) {
 		die("*** Invalid tarball URL given: $tarfile\n");
@@ -183,7 +183,12 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    chomp $md5;
 	    $md5 =~ /^(\w+)$/;
 	    $md5 = $1;
-	    my $localfile = $expdir . "/" . $md5 . ".tar.gz";
+	    my $ext = $tarfile;
+	    # Need to copy the extension from the URL to the file name so
+	    # install-tarfile can figure out how to decompress it.
+	    $ext =~ /(\.tar|\.tar\.Z|\.tar\.gz|\.tgz|\.tar\.bz2)$/;
+	    $ext = $1;
+	    my $localfile = $expdir . "/" . $md5 . $ext;
 	    $tofetch{$URL} = $localfile;
 	    $tarfiles =~ s/$URL/$localfile/g;
 	}
@@ -243,7 +248,7 @@ while (my ($URL, $localfile) = each %tofetch) {
 sub verifyURL($) {
     my ($URL) = @_;
     if ($URL =~
-	    /^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar|\.tar\.gz|\.tgz|\.rpm))$/) {
+	    /^((http|https|ftp):\/\/[\w.\-\/\@:~]+(\.tar|\.tar\.Z|\.tar\.gz|\.tgz|\.bz2|\.rpm))$/) {
 	return $1;
     } else {
 	return undef;

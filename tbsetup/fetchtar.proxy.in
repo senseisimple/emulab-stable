@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -86,7 +86,7 @@ if (!($user =~ /^([\w-]+)$/)) {
 	"    No such user $user\n");
 
 if (!($URL =~
-	/^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar|\.tar\.gz|\.tgz|\.rpm))$/)) {
+	/^((http|https|ftp):\/\/[\w.\-\/\@:~]+(\.tar|\.tar\.Z|\.tar\.gz|\.tgz|\.bz2|\.rpm))$/)) {
     die("*** $0:\n".
 	"    Illegal URL given: $URL\n");
 } else {
@@ -154,7 +154,7 @@ if (! $pid) {
     # Give parent a chance to react.
     sleep(1);
 
-    exec("nice -15 $WGET -nv -O $localfile $URL");
+    exec("nice -15 $WGET --timestamping --non-verbose -O $localfile $URL");
     die("Could not exec wget!\n");
 }
 

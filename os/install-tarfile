@@ -21,9 +21,6 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 #                      1 if already installed
 #                     -1 if something goes wrong.
 #
-# To ensure safety, the tar filename must start with /proj, except if
-# running with jail option. Must be run as root.
-#
 sub usage()
 {
     print STDOUT "Usage: install-tarfile [-d] [-ct] [-n nodeid] <installdir> ".
@@ -251,7 +248,8 @@ push(@identlines, "$tarfile $filestamp $filemd5");
 SWITCH: for ($tarfile) {
     /^.*\.tar\.Z$/   && do {$decompressflag = "-Z"; last SWITCH; } ;
     /^.*\.tar\.gz$/  && do {$decompressflag = "-z"; last SWITCH; } ;
-    /^.*\.tar\.tgz$/ && do {$decompressflag = "-y"; last SWITCH; } ;
+    /^.*\.tgz$/ && do {$decompressflag = "-z"; last SWITCH; } ;
+    /^.*\.tar\.bz2$/ && do {$decompressflag = "-j"; last SWITCH; } ;
     /^.*\.tar$/      && do {last SWITCH; } ;
 }
 
@@ -323,11 +321,15 @@ sub GetTarFile($$$$$$$)
 	open(TMCC, "< $tarfile")
 	    or fatal("Could not open tarfile on server!");
 
+	binmode TMCC;
+
 	#
 	# Open the target file and start dumping the data in.
 	#
 	open(JFILE, "> $copyfile")
 	    or fatal("Could not open local file $copyfile: $!");
+
+	binmode JFILE;
 
 	#
 	# Deal with NFS read failures

@@ -717,7 +717,7 @@ The above NS code says to install the <tt>silly-freebsd.rpm</tt> file
 on <tt>nodeA</tt>, and the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>.
 RPMs are installed as root, must reside in either the project's
 <tt>/proj</tt> directory, or if the experiment has been created in a
-subgroup, in the <tt>/group</tt> directory. You may not place your
+subgroup, in the <tt>/groups</tt> directory. You may not place your
 rpms in your home directory.
 
 </p>
@@ -726,24 +726,25 @@ rpms in your home directory.
      <h3>Installing TAR files automatically</h3>
 <p>
 
-The Emulab NS extension <tt>tb-set-node-tarfiles</tt> allows you to
+The Emulab NS extension <a href="docwrapper.php3?docname=nscommands.html#tb-set-node-tarfiles"><tt>tb-set-node-tarfiles</tt></a> allows you to
 specify a set of tarfiles to install on each of your nodes when it
-boots. This command is similar to the <a href="#RPMS">tb-set-node-rpms</a>
-above, and is provided for those people who do not want to spend a month
-trying to figure out how to build an RPM! The format of this command
-is slightly different though in that you must specify a directory in
+boots.  While similar to the <a
+href="docwrapper.php3?docname=nscommands.html#tb-set-node-rpms"><tt>tb-set-node-rpms</tt></a>
+command, the format of this command
+is slightly different in that you must specify a directory in
 which to unpack the tar file. This avoids problems with having to
 specify absolute pathnames in your tarfile, which many modern tar
-programs balk at. 
+programs balk at.
 
 <code><pre>
-tb-set-node-tarfiles $nodeA /usr/site /proj/myproj/tarfiles/silly.tar.gz </code></pre>
+tb-set-node-tarfiles $nodeA /usr/site /proj/myproj/tarfiles/silly.tar.gz
+</code></pre>
 
 The above NS code says to install the <tt>silly.tar.gz</tt> tar file
 on <tt>nodeA</tt> from the working directory <tt>/usr/site</tt> when
 the node first boots. The tarfile must reside in either the project's
 <tt>/proj</tt> directory, or if the experiment has been created in a
-subgroup, in the <tt>/group</tt> directory. You may not place your
+subgroup, in the <tt>/groups</tt> directory. You may not place your
 tarfiles in your home directory. You may specify as many tarfiles as
 you wish, as long as each one is preceded by the directory it should
 be unpacked in, all separated by spaces.
@@ -772,7 +773,7 @@ will run <tt>/proj/myproj/runme.nodeA</tt> on nodeA and
 <tt>/proj/myproj/runme.nodeB</tt> on nodeB. The programs must reside on
 the node's local filesystem, or in a directory that can be reached via
 NFS. This is either the project's <tt>/proj</tt> directory, in the
-<tt>/group</tt> directory if the experiment has been created in a
+<tt>/groups</tt> directory if the experiment has been created in a
 subgroup, or a project member's home directory in <tt>/users</tt>.
 If you need to see the output of your command, be sure to redirect the
 output into a file. You can place the file on the local node, or in
