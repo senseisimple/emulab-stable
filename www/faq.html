@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -1230,8 +1230,19 @@
     you wish. In Linux, the partition is <code>/dev/hda4</code> ; in FreeBSD,
     it's </code>/dev/ad0s4</code> . There is no filesystem on this partition,
     so you'll need to create it yourself. 
-    </p>
-    For example, in Linux:
+    </p><p>
+    Recent versions of our standard FreeBSD and Linux images include a
+    script, <code>/usr/testbed/bin/mkextrafs</code> for this purpose.
+    Just do the following <a href="#UTT-2">as root</a>:
+    <blockquote>
+    <code>/usr/testbed/bin/mkextrafs /mnt</code>
+    </blockquote>
+    and it will create the filesystem, mount it on <code>/mnt</code>
+    and make an entry in <code>/etc/fstab</code> so that the filesystem
+    will be mounted on future reboots.
+    </p><p>
+    If that script does not exist, you can perform the steps by hand.
+    For example, in Linux do the following <a href="#UTT-2">as root</a>:
     <ul>
         <p>
         <li>Set the correct partition type (type 83 - ext2fs):</li>
@@ -1244,31 +1255,35 @@
             <li>Enter '83' to specify ext2fs.</li>
             <li>Type 'w' to save and exit.</li>
         </ul>
-        </p>
-        <p>
+        </p><p>
         <li>Create the filesystem:</li>
         <blockquote>
 	<code>mkfs /dev/hda4</code>
         </blockquote>
-        </p>
-        <p>
+        </p><p>
         <li>Mount the filesystem:</li>
         <blockquote>
         <code>mount /dev/hda4 /mnt</code>
         </blockquote>
         </p>
+	<p>
+	You may want to add the filesystem to <code>/etc/fstab</code>
+	so that it will be automatically mounted on future reboots.
+	</p>
     </ul>
-    In FreeBSD, follow these steps:
+    In FreeBSD, do the following <a href="#UTT-2">as root</a>:
     <ul>
         <p>
         <li>First, you need to set the correct partition type:</li>
         <blockquote>
-        <code>fdisk -e /dev/ad0</code>
+        <code>fdisk -i4 /dev/ad0</code>
         </blockquote>
         <ul>
-            <li>Skip changes to partitions 1-3.</li>
-            <li>Edit partition four, and set the sysid to 165; leave other 
+            <li>Do <em>not</em> change what the BIOS thinks.</li>
+            <li>Edit the partition info, setting the sysid to 165; leave other
             metrics alone.</li>
+            <li>Do <em>not</em> change the active partition</li>
+            <li>Write out the new partition table</li>
         </ul>
         </p>
         <p>
@@ -1289,12 +1304,13 @@
         <code>mount /dev/ad0s4c /some/where</code>
         </blockquote>
         </p>
+	<p>
+	You may want to add the filesystem to <code>/etc/fstab</code>
+	so that it will be automatically mounted on future reboots.
+	</p>
     </ul>
     <p>
-    This partition is only 6 Gigs, the size of the leftover space on our
-    smallest drives. If you need more space than this, it would be possible
-    to enlarge this partition on some machines (for example, our pc850s
-    have 40 GB disks), but that is outside the scope of this FAQ.
+    The available space ranges from 6-33GB depending on the disk type.
     </p>
 
 <li><a NAME="SWS-9"></a>
