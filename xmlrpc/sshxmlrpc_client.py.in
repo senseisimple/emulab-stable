@@ -157,6 +157,11 @@ def do_method(server, method_and_args):
             rval = response["value"]
             pass
         pass
+
+    if debug and response["value"]:
+        print str(response["value"])
+        pass
+        
     return rval
 
 #
