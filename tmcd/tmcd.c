@@ -5495,7 +5495,9 @@ COMMAND_PROTOTYPE(dolocalize)
 	*bufp = (char) NULL;
 
 	/*
-	 * XXX sitevar fetching should be a library function
+	 * XXX sitevar fetching should be a library function.
+	 * WARNING: This sitevar (node/ssh_pubkey) is referenced in
+	 *          install/boss-install during initial setup.
 	 */
 	res = mydb_query("select name,value "
 			 "from sitevariables where name='node/ssh_pubkey'",
