@@ -91,23 +91,19 @@ echo "<table width=\"100%\" border=2 cellpadding=2 cellspacing=2
        align=\"center\">\n";
 
 echo "<tr>
-          <td rowspan=2>User</td>
-          <td rowspan=2>Node ID</td>
-          <td rowspan=2>Date<br>Applied</td>
-          <td rowspan=2>Action</td>
-          <td rowspan=2>Trust</td>
-          <td>Name</td>
-          <td>Title</td>
-          <td>Affil</td>
-          <td>E-mail</td>
-          <td>Phone</td>
+          <th rowspan=2>User</th>
+          <th rowspan=2>Node ID</th>
+          <th rowspan=2>Date<br>Applied</th>
+          <th rowspan=2>Action</th>
+          <th rowspan=2>Trust</th>
+          <th>Name</th>
+          <th>Title</th>
+          <th>Affil</th>
+          <th>E-mail</th>
+          <th>Phone</th>
       </tr>
       <tr>
-          <td>Addr</td>
-          <td>Addr2</td>
-          <td>City</td>
-          <td>State</td>
-          <td>Zip</td>
+          <th colspan=5>Addr</th>
       </tr>\n";
 
 echo "<form action='approvewauser.php3' method='post'>\n";
@@ -169,11 +165,7 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td>&nbsp;$phone&nbsp;</td>
           </tr>\n";
     echo "<tr>
-              <td>&nbsp;$addr&nbsp;</td>
-              <td>&nbsp;$addr2&nbsp;</td>
-              <td>&nbsp;$city&nbsp;</td>
-              <td>&nbsp;$state&nbsp;</td>
-              <td>&nbsp;$zip&nbsp;</td>
+              <td colspan=5>&nbsp;$addr&nbsp;</td>
           </tr>\n";
 }
 echo "<tr>
