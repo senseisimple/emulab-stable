@@ -40,6 +40,7 @@ my $failed      = 0;
 my $killmode    = 0;
 my $mode        = "setup";
 my $dbuid;
+my $exptstate;
 
 #
 # Load the Testbed support stuff. 
@@ -115,36 +116,14 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 #
 # Verify permission to muck with this experiment.
 #
-if ($UID && !TBAdmin($UID)) {
-    if (!$killmode) {
-	#
-	# Only leader can setup experiments.
-	#
-	my $leader = ExpLeader($pid, $eid);
-
-	if ($dbuid ne $leader) {
-	    die("*** $0:\n".
-		"    You do not have permission for $pid/$eid!\n");
-	}
-    }
-    else {
-	if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
-	    die("*** $0:\n".
-		"    You do not have permission to destroy $pid/$eid!\n");
-	}
-    }
+if (!TBAdmin($UID) &&
+    !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_DESTROY)) {
+    die("*** $0:\n".
+	"    You do not have permission to mess with $pid/$eid!\n");
 }
 
-#
-# A sanity check. Lets make sure the experiment is in the proper state.
-#
-if (!$force) {
-    if (($killmode  && ExpState($pid, $eid) ne EXPTSTATE_SWAPPING) ||
-	(!$killmode && ExpState($pid, $eid) ne EXPTSTATE_ACTIVATING)) {
-	die("*** $0:\n".
-	    "    The experiment $pid/$eid is not in the proper state!\n");
-    }
-}
+# Need the state.
+$exptstate = ExpState($pid, $eid);
 
 #
 # Get the list of nodes.
@@ -164,12 +143,31 @@ foreach my $node (@nodes) {
     if (! TBIsNodeVirtual($node, \$jailed)) {
 	next;
     }
-
+    if (!TBIsNodeRemote($node) && !$force) {
+	#
+	# A local vnode. If the experiment is activating, then the
+	# underlying physnode will setup the vnode as it boots, so
+	# no need to do anything. Ditto for swapping out; the vnode
+	# will get torn down when the node goes down, obviously. 
+	#
+	if (($killmode  && ExpState($pid, $eid) eq EXPTSTATE_SWAPPING) ||
+	    (!$killmode && ExpState($pid, $eid) eq EXPTSTATE_ACTIVATING)) {
+	    print STDOUT "Skipping $mode of vnode $node on local $pnode ...\n";
+	    next;
+	}
+    }
     if (! TBPhysNodeID($node, \$pnode)) {
 	die("*** $0:\n".
 	    "    No physical node for $node!\n");
     }
-    TBSetNodeEventState($node, TBDB_NODESTATE_REBOOTING);
+
+    #
+    # When setting up a vnode, force its event state into SHUTDOWN since
+    # no telling what its initial state is. 
+    # 
+    if (!$killmode) {
+	TBSetNodeEventState($node, TBDB_NODESTATE_SHUTDOWN);
+    }
     
     print STDOUT "Doing $mode of vnode $node on $pnode ...\n";
 
