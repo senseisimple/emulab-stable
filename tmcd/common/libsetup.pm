@@ -13,7 +13,7 @@ use Exporter;
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd remotenodeupdate remotenodevnodesetup
 
-	 OPENTMCC CLOSETMCC RUNTMCC MFS
+	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE
 
 	 TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
@@ -22,7 +22,7 @@ use Exporter;
 	 TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_IFC TMCCCMD_ACCT TMCCCMD_DELAY
 	 TMCCCMD_HOSTS TMCCCMD_RPM TMCCCMD_TARBALL TMCCCMD_STARTUP
 	 TMCCCMD_DELTA TMCCCMD_STARTSTAT TMCCCMD_READY TMCCCMD_TRAFFIC
-	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST
+	 TMCCCMD_BOSSINFO TMCCCMD_VNODELIST TMCCCMD_ISALIVE
 
        );
 
@@ -86,7 +86,7 @@ sub TMGROUPDB()		{ "$SETUPDIR/groupdb"; }
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 4; };
+sub TMCD_VERSION()	{ 5; };
 
 #
 # These are the TMCC commands. 
@@ -110,6 +110,7 @@ sub TMCCCMD_BOSSINFO()	{ "bossinfo"; }
 sub TMCCCMD_TUNNEL()	{ "tunnels"; }
 sub TMCCCMD_NSECONFIGS(){ "nseconfigs"; }
 sub TMCCCMD_VNODELIST() { "vnodelist"; }
+sub TMCCCMD_ISALIVE()   { "isalive"; }
 
 #
 # Some things never change.
@@ -129,6 +130,10 @@ my $pid		= "";
 my $eid		= "";
 my $vname	= "";
 
+# Control tmcc error condition and timeout. Dynamic, not lexical!
+$tmccdie        = 1; 
+$tmcctimeout    = 0;
+
 # When on the MFS, we do a much smaller set of stuff.
 # Cause of the way the packages are loaded (which I do not understand),
 # this is computed on the fly instead of once.
@@ -143,27 +148,35 @@ sub REMOTE()	{ if (-e "$SETUPDIR/isrem") { return 1; } else { return 0; } }
 # Open a TMCC connection and return the "stream pointer". Caller is
 # responsible for closing the stream and checking return value.
 #
-# usage: OPENTMCC(char *command, char *args)
+# usage: OPENTMCC(char *command, char *args, char *options)
 #
-sub OPENTMCC($;$)
+sub OPENTMCC($;$$)
 {
-    my($cmd, $args) = @_;
+    my($cmd, $args, $options) = @_;
     my $vn = "";
     local *TM;
 
     if (!defined($args)) {
 	$args = "";
     }
+    if (!defined($options)) {
+	$options = "";
+    }
     if ($vnodeid ne "") {
 	$vn = "-n $vnodeid";
     }
-    
-    my $foo = sprintf("%s -v %d %s $vn %s %s |",
-		      TMCC, TMCD_VERSION, $NODE, $cmd, $args);
+    if ($tmcctimeout) {
+	$options .= " -t $tmcctimeout";
+    }
 
-    open(TM, $foo)
-	or die "Cannot start $TMCC: $!";
+    my $foo = sprintf("%s -v %d $options $NODE $vn $cmd $args |",
+		      TMCC, TMCD_VERSION);
 
+    if (!open(TM, $foo)) {
+	print STDERR "Cannot start TMCC: $!\n";
+	die("\n") if $tmccdie;
+	return undef;
+    }
     return (*TM);
 }
 
@@ -173,26 +186,37 @@ sub OPENTMCC($;$)
 sub CLOSETMCC($) {
     my($TM) = @_;
     
-    close($TM)
-	or die $? ? "$TMCC exited with status $?.\n" :
-	            "Error closing pipe: $!\n";
+    if (! close($TM)) {
+	if ($?) {
+	    print STDERR "TMCC exited with status $?!\n";
+	}
+	else {
+	    print STDERR "Error closing TMCC pipe: $!\n";
+	}
+	die("\n") if $tmccdie;
+	return 0;
+    }
+    return 1;
 }
 
 #
 # Run a TMCC command with the provided arguments.
 #
-# usage: RUNTMCC(char *command, char *args)
+# usage: RUNTMCC(char *command, char *args, char *options)
 #
-sub RUNTMCC($;$)
+sub RUNTMCC($;$$)
 {
-    my($cmd, $args) = @_;
+    my($cmd, $args, $options) = @_;
     my($TM);
 
     if (!defined($args)) {
 	$args = "";
     }
+    if (!defined($options)) {
+	$options = "";
+    }
     
-    $TM = OPENTMCC($cmd, $args);
+    $TM = OPENTMCC($cmd, $args, $options);
 
     close($TM)
 	or die $? ? "TMCC exited with status $?" : "Error closing pipe: $!";
@@ -661,11 +685,13 @@ sub dohostnames ()
     return 0;
 }
 
-sub doaccounts ()
+sub doaccounts()
 {
     my %newaccounts = ();
     my %newgroups   = ();
+    my %pubkeys     = ();
     my %deletes     = ();
+    my %lastmod     = ();
     my %PWDDB;
     my %GRPDB;
 
@@ -696,6 +722,16 @@ sub doaccounts ()
 	    # Account info goes in the hash table.
 	    # 
 	    $newaccounts{$1} = $_;
+	    next;
+	}
+	elsif ($_ =~ /^PUBKEY LOGIN=([0-9a-z]+) KEY="(.*)"/) {
+	    #
+	    # Keys go into hash as a list of keys.
+	    #
+	    if (! defined($pubkeys{$1})) {
+		$pubkeys{$1} = [];
+	    }
+	    push(@{$pubkeys{$1}}, $2);
 	    next;
 	}
 	else {
@@ -766,7 +802,19 @@ sub doaccounts ()
     # Repeat the same sequence for accounts, except we remove old accounts
     # first. 
     # 
-    while (($login, $uid) = each %PWDDB) {
+    while (($login, $info) = each %PWDDB) {
+	my $uid = $info;
+	
+	#
+	# Split out the uid from the serial. Note that this was added later
+	# so existing DBs might not have a serial yet. We save the serial
+	# for later. 
+	#
+	if ($info =~ /(\d*):(\d*)/) {
+	    $uid = $1;
+	    $lastmod{$login} = $2;
+	}
+	
 	if (defined($newaccounts{$login})) {
 	    next;
 	}
@@ -824,7 +872,7 @@ sub doaccounts ()
 
     my $pat = q(ADDUSER LOGIN=([0-9a-z]+) PSWD=([^:]+) UID=(\d+) GID=(.*) );
     $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
-    $pat   .= q(EMULABPUBKEY="(.*)" HOMEPUBKEY="(.*)");
+    $pat   .= q(SERIAL=(\d+));
 
     while (($login, $info) = each %newaccounts) {
 	if ($info =~ /$pat/) {
@@ -835,13 +883,20 @@ sub doaccounts ()
 	    $name  = $6;
 	    $hdir  = $7;
 	    $glist = $8;
-	    $ekey  = $9;
-	    $hkey  = $10;
+	    $serial= $9;
 	    if ( $name =~ /^(([^:]+$|^))$/ ) {
 		$name = $1;
 	    }
-	    print "User: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
 
+	    #
+	    # See if update needed, based on the serial number we get.
+	    # If its different, the account info has changed.
+	    # 
+	    my $doupdate = 0;
+	    if (!defined($lastmod{$login}) || $lastmod{$login} != $serial) {
+		$doupdate = 1;
+	    }
+	    
 	    my ($exists,undef,$curuid) = getpwnam($login);
 
 	    if ($exists) {
@@ -855,19 +910,37 @@ sub doaccounts ()
 			 "$login/$uid uid mismatch with existing login.\n";
 		    next;
 		}
-		print "Updating $login login info.\n";
-		os_usermod($login, $gid, "$glist", $root);
-		next;
-	    }
-	    print "Adding $login account.\n";
+		if ($doupdate) {
+		    print "Updating: ".
+			"$login/$uid/$gid/$root/$name/$hdir/$glist\n";
+		    
+		    os_usermod($login, $gid, "$glist", $pswd, $root);
 
-	    if (os_useradd($login, $uid, $gid, $pswd, 
-			   "$glist", $hdir, $name, $root)) {
-		warn "*** WARNING: Error adding new user $login\n";
+		    #
+		    # Note that we changed the info for next time.
+		    # 
+		    $PWDDB{$login} = "$uid:$serial";
+		}
+	    }
+	    else {
+		print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
+
+		if (os_useradd($login, $uid, $gid, $pswd, 
+			       "$glist", $hdir, $name, $root)) {
+		    warn "*** WARNING: Error adding new user $login\n";
+		    next;
+		}
+		# Add to DB only if successful. 
+		$PWDDB{$login} = "$uid:$serial";
+	    }
+
+	    #
+	    # Skip ssh stuff if a local node or not updating (if the
+	    # user did not exist, $doupdate will be true).
+	    # 
+	    if (!REMOTE() || !$doupdate) {
 		next;
 	    }
-	    # Add to DB only if successful. 
-	    $PWDDB{$login} = $uid;
 
 	    #
 	    # Create .ssh dir and populate it with an authkeys file.
@@ -877,7 +950,7 @@ sub doaccounts ()
 		undef,undef,undef,$homedir) = getpwuid($uid);
 	    my $sshdir = "$homedir/.ssh";
 	    
-	    if (! -e $sshdir && ($ekey ne "" || $hkey ne "")) {
+	    if (! -e $sshdir) {
 		if (! mkdir($sshdir, 0700)) {
 		    warn("*** WARNING: Could not mkdir $sshdir: $!\n");
 		    next;
@@ -886,26 +959,48 @@ sub doaccounts ()
 		    warn("*** WARNING: Could not chown $sshdir: $!\n");
 		    next;
 		}
-		if (!open(AUTHKEYS, "> $sshdir/authorized_keys")) {
-		    warn("*** WARNING: Could not open $sshdir/keys: $!\n");
-		    next;
-		}
-		if ($ekey ne "") {
-		    print AUTHKEYS "$ekey\n";
-		}
-		if ($hkey ne "") {
-		    print AUTHKEYS "$hkey\n";
-		}
-		close(AUTHKEYS);
+	    }
+		
+	    if (!open(AUTHKEYS, "> $sshdir/authorized_keys.new")) {
+		warn("*** WARNING: Could not open $sshdir/keys.new: $!\n");
+		next;
+	    }
+	    print AUTHKEYS "#\n";
+	    print AUTHKEYS "# DO NOT EDIT! This file auto generated by ".
+		"Emulab.Net account software.\n";
+	    print AUTHKEYS "#\n";
+	    print AUTHKEYS "# Please use the web interface to edit your ".
+		"public key list.\n";
+	    print AUTHKEYS "#\n";
+	    foreach my $key (@{$pubkeys{$login}}) {
+		print AUTHKEYS "$key\n";
+	    }
+	    close(AUTHKEYS);
 
-		if (!chown($uid, $gid, "$sshdir/authorized_keys")) {
-		    warn("*** WARNING: Could not chown $sshdir/keys: $!\n");
+	    if (!chown($uid, $gid, "$sshdir/authorized_keys.new")) {
+		warn("*** WARNING: Could not chown $sshdir/keys: $!\n");
+		next;
+	    }
+	    if (!chmod(0600, "$sshdir/authorized_keys.new")) {
+		warn("*** WARNING: Could not chmod $sshdir/keys: $!\n");
+		next;
+	    }
+	    if (-e "$sshdir/authorized_keys") {
+		if (system("cp -p -f $sshdir/authorized_keys ".
+			   "$sshdir/authorized_keys.old")) {
+		    warn("*** Could not save off $sshdir/keys: $!\n");
 		    next;
 		}
-		if (!chmod(0600, "$sshdir/authorized_keys")) {
-		    warn("*** WARNING: Could not chmod $sshdir/keys: $!\n");
-		    next;
+		if (!chown($uid, $gid, "$sshdir/authorized_keys.old")) {
+		    warn("*** Could not chown $sshdir/oldkeys: $!\n");
 		}
+		if (!chmod(0600, "$sshdir/authorized_keys.old")) {
+		    warn("*** Could not chmod $sshdir/oldkeys: $!\n");
+		}
+	    }
+	    if (system("mv -f $sshdir/authorized_keys.new ".
+		       "$sshdir/authorized_keys")) {
+		warn("*** Could not mv $sshdir/keys: $!\n");
 	    }
 	}
 	else {
@@ -1057,10 +1152,13 @@ sub dotrafficconfig()
     # XXX hack: workaround for tmcc cmd failure inside TCL
     #     storing the output of a few tmcc commands in
     #     $SETUPDIR files for use by NSE
-    #    
-    open( BOSSINFCFG, ">$SETUPDIR/tmcc.bossinfo"  ) or die "Cannot open file $SETUPDIR/tmcc.bossinfo: $!";
-    print BOSSINFCFG "$bossinfo";
-    close(BOSSINFCFG);
+    #
+    if (! REMOTE()) {
+	open(BOSSINFCFG, ">$SETUPDIR/tmcc.bossinfo") or
+	    die "Cannot open file $SETUPDIR/tmcc.bossinfo: $!";
+	print BOSSINFCFG "$bossinfo";
+	close(BOSSINFCFG);
+    }
 
     CLOSETMCC($TM);
     my ($pid, $eid, $vname) = check_status();
@@ -1075,28 +1173,34 @@ sub dotrafficconfig()
     #     storing the output of a few tmcc commands in
     #     $SETUPDIR files for use by NSE
     #
-    my $record_sep;
+    if (! REMOTE()) {
+	my $record_sep;
 
-    $record_sep = $/;
-    undef($/);
-    $TM = OPENTMCC(TMCCCMD_IFC);
-    open( IFCFG, ">$SETUPDIR/tmcc.ifconfig"  ) or die "Cannot open file $SETUPDIR/tmcc.ifconfig: $!";
-    print IFCFG <$TM>;
-    close(IFCFG);
-    CLOSETMCC($TM);
-    $/ = $record_sep;
+	$record_sep = $/;
+	undef($/);
+	$TM = OPENTMCC(TMCCCMD_IFC);
+	open(IFCFG, ">$SETUPDIR/tmcc.ifconfig") or
+	    die "Cannot open file $SETUPDIR/tmcc.ifconfig: $!";
+	print IFCFG <$TM>;
+	close(IFCFG);
+	CLOSETMCC($TM);
+	$/ = $record_sep;
+	
+	open(TRAFCFG, ">$SETUPDIR/tmcc.trafgens") or
+	    die "Cannot open file $SETUPDIR/tmcc.trafgens: $!";    
+    }
 
     $TM = OPENTMCC(TMCCCMD_TRAFFIC);
 
-    open( TRAFCFG, ">$SETUPDIR/tmcc.trafgens"  ) or die "Cannot open file $SETUPDIR/tmcc.trafgens: $!";    
-    
     $pat  = q(TRAFGEN=([-\w.]+) MYNAME=([-\w.]+) MYPORT=(\d+) );
     $pat .= q(PEERNAME=([-\w.]+) PEERPORT=(\d+) );
     $pat .= q(PROTO=(\w+) ROLE=(\w+) GENERATOR=(\w+));
 
     while (<$TM>) {
 
-	print TRAFCFG "$_";
+	if (! REMOTE()) {
+	    print TRAFCFG "$_";
+	}
 	if ($_ =~ /$pat/) {
 	    #
 	    # The following is specific to the modified TG traffic generator:
@@ -1146,13 +1250,16 @@ sub dotrafficconfig()
 		print RC "#!/bin/sh\n";
 		$didopen = 1;
 	    }
-	    print RC "$cmdline -N $name -S $source -T $target -P $proto -R $role >/tmp/${name}-${pid}-${eid}.debug 2>&1 &\n";
+	    print RC "$cmdline -N $name -S $source -T $target -P $proto ".
+		"-R $role >/tmp/${name}-${pid}-${eid}.debug 2>&1 &\n";
 	}
 	else {
 	    warn "*** WARNING: Bad traffic line: $_";
 	}
     }
-    close(TRAFCFG);
+    if (! REMOTE()) {
+	close(TRAFCFG);
+    }
 
     if( $startnse ) {
 	print RC "$SETUPDIR/startnse &\n";
@@ -1163,16 +1270,19 @@ sub dotrafficconfig()
     # XXX hack: workaround for tmcc cmd failure inside TCL
     #     storing the output of a few tmcc commands in
     #     $SETUPDIR files for use by NSE
-    #    
-    open( NSECFG, ">$SETUPDIR/tmcc.nseconfigs" ) or die "Cannot open file $SETUPDIR/tmcc.nseconfigs: $!";
-    $TM = OPENTMCC(TMCCCMD_NSECONFIGS);
-    $record_sep = $/;
-    undef($/);
-    my $nseconfig = <$TM>;
-    $/ = $record_sep;
-    print NSECFG $nseconfig;
-    CLOSETMCC($TM);
-    close(NSECFG);
+    #
+    if (! REMOTE()) {
+	open(NSECFG, ">$SETUPDIR/tmcc.nseconfigs") or
+	    die "Cannot open file $SETUPDIR/tmcc.nseconfigs: $!";
+	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
+	$record_sep = $/;
+	undef($/);
+	my $nseconfig = <$TM>;
+	$/ = $record_sep;
+	print NSECFG $nseconfig;
+	CLOSETMCC($TM);
+	close(NSECFG);
+    }
 	    
     # XXX hack: need a separate section for starting up NSE when we
     #           support simulated nodes
@@ -1475,9 +1585,13 @@ sub remotenodeupdate()
 {
     #
     # Do account stuff.
-    # 
-    print STDOUT "Checking Testbed group/user configuration ... \n";
-    doaccounts();
+    #
+    {
+	local $tmcctimeout = 5;
+    
+	print STDOUT "Checking Testbed group/user configuration ... \n";
+	doaccounts();
+    }
 
     return 0;
 }
