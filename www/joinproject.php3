@@ -474,7 +474,7 @@ if (!$returning) {
 	if (! ereg("^[0-9a-zA-Z\@\. ]*$", $buffer)) {
 	    $errors["PubKey File Contents"] = "Invalid characters";
 
-	    SPITFORM($formfields, $returning $errors);
+	    SPITFORM($formfields, $returning, $errors);
 	    PAGEFOOTER();
 	    return;
 	}
