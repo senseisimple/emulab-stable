@@ -628,6 +628,9 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $cpu_usage   = $exprow["cpu_usage"];
     $exp_slice   = $exprow[slicename];
     $linktest    = $exprow["linktest_level"];
+    $usemodelnet = $exprow["usemodelnet"];
+    $mnet_cores  = $exprow["modelnet_cores"];
+    $mnet_edges  = $exprow["modelnet_edges"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -844,6 +847,21 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     }
 
     if (!$short) {
+	if ($usemodelnet) {
+	    echo "<tr>
+                      <td>Use Modelnet: </td>
+                      <td class=\"left\">Yes</td>
+                  </tr>\n";
+	    echo "<tr>
+                      <td>Modelnet Phys Core Nodes: </td>
+                      <td class=\"left\">$mnet_cores</td>
+                  </tr>\n";
+	    echo "<tr>
+                      <td>Modelnet Phys Edge Nodes: </td>
+                      <td class=\"left\">$mnet_edges</td>
+                  </tr>\n";
+
+	}
 	if (isset($syncserver)) {
 	    echo "<tr>
                       <td>Sync Server: </td>
