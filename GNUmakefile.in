@@ -60,6 +60,7 @@ install-mkdirs:
 	-chmod 777 $(INSTALL_TOPDIR)/batch
 	-mkdir -p $(INSTALL_TOPDIR)/expinfo
 	-chmod 777 $(INSTALL_TOPDIR)/expinfo
+	-ln -s /usr/testbed/bin/nse $(INSTALL_TOPDIR)/bin
 
 tipserv-install:
 	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
