@@ -66,6 +66,14 @@ if (! -d $mountpoint) {
 	"    $mountpoint does not exist!\n");
 }
 
+#
+# XXX determine the disk based on the root fs
+#
+my $rootdev = `df | egrep '/\$'`;
+if ($rootdev =~ /^\/dev\/([a-z]+\d+)s[1-4][a-h]/) {
+    $disk = $1;
+}
+
 my $slicedev   = "${disk}s${slice}";
 my $fsdevice   = "/dev/${slicedev}${partition}";
 
