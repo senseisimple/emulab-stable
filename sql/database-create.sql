@@ -2078,6 +2078,7 @@ CREATE TABLE virt_nodes (
   routertype enum('none','ospf','static','manual','static-ddijk','static-old') NOT NULL default 'none',
   fixed text NOT NULL,
   inner_elab_role enum('boss','ops','node') default NULL,
+  numeric_id int(11) default NULL,
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
 
