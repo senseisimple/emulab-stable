@@ -11,10 +11,14 @@ SUBDIR		= event/stated
 
 include $(OBJDIR)/Makeconf
 
-all:
+SBIN_STUFF	= stated waitForState
+
+LIB_STUFF	= TimeoutQueue.pm StateWait.pm
+
+all:	$(SBIN_STUFF) $(LIB_STUFF)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install:	$(addprefix $(INSTALL_SBINDIR)/, stated) \
-		$(addprefix $(INSTALL_LIBDIR)/, TimeoutQueue.pm) \
-		$(addprefix $(INSTALL_LIBDIR)/, StateWait.pm) 
+install:	 all \
+	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	$(addprefix $(INSTALL_LIBDIR)/,  $(LIB_STUFF)) 
