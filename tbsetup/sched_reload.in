@@ -20,7 +20,7 @@ use English;
 #
 # Configure variables
 #
-my $TB     = "@prefix@";
+my $TB     = "@prefix@/bin";
 my $DBNAME = "@TBDBNAME@";
 
 my $rsh		= "sshtb -q";
@@ -66,7 +66,7 @@ my @nodes     = @ARGV;
 #
 if ($UID != 0) {
     ($name) = getpwuid($UID)
-	or die "$UID not in passwd file";
+	or die "$UID not in passwd file\n";
 
     $db_result = $DB->query("select admin from users where uid='$name'");
     @row = $db_result->fetchrow_array();
@@ -102,17 +102,17 @@ if ($mereuser) {
 # We only support 0 or 4 right now.
 #
 if ($imagepart != 0 && $imagepart != 4) {
-    die("Only the entire disk or partition 4 can be loaded.");
+    die("Only the entire disk or partition 4 can be loaded.\n");
 }
 
 #
 # The image has to be accessible, and it must reside in the right places.
 #
 if (! -e $imagepath) {
-    die("Cannot access $imagepath.");
+    die("Cannot access $imagepath.\n");
 }
 if (! -f $imagepath) {
-    die("$imagepath is not a plain file.");
+    die("$imagepath is not a plain file.\n");
 }
 
 #
@@ -157,6 +157,16 @@ foreach my $node (@nodes) {
 	next;
     }
 
+    $sth = $DB->query("select * from nodes where node_id='$pc'");
+    if ($sth == 0) {
+	die("Database lookup failed (reserved). Aborted...\n");
+    }
+    if ($sth->num_rows() != 1) {
+      print STDERR "Node $pc doesn't exist. Skipping $pc.\n";
+      next;
+    }
+    
+
     # Always put it in the reloads table so TMCD knows to free it.
     print STDERR "Scheduling reload for $pc:\n".
       "Load OS $imageid to partition $imagepart from $imagepath\n";
@@ -169,8 +179,7 @@ foreach my $node (@nodes) {
     }
 
     print STDERR "Checking if $pc is reserved...";
-    $sth = $DB->query("select * from reserved ".
-		      "where node_id='$pc'");
+    $sth = $DB->query("select * from reserved where node_id='$pc'");
     if ($sth == 0) {
 	die("Database lookup failed (reserved). Aborted...\n");
     }

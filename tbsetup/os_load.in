@@ -74,20 +74,13 @@ my @nodes     = @ARGV;
 #
 if ($UID != 0) {
     ($name) = getpwuid($UID)
-	or die "$UID not in passwd file";
+	or die "$UID not in passwd file\n";
 
     $db_result = $DB->query("select admin from users where uid='$name'");
     @row = $db_result->fetchrow_array();
     if ($row[0] != 1) {
 	$mereuser = 1;
     }
-}
-
-#
-# Mere Users cannot load the entire disk.
-#
-if ($mereuser && !$imagepart) {
-    die("Only can root or TB administrators can reload the entire disk");
 }
 
 #
@@ -101,7 +94,7 @@ if ($mereuser) {
 				"reserved.node_id='$node' ".
 				"where proj_memb.uid='$name'");
 	if ($db_result->numrows < 1) {
-	    die("You do not have permission to load images on $node");
+	    die("You do not have permission to load images on $node\n");
 	}
     }
 }
@@ -110,17 +103,17 @@ if ($mereuser) {
 # We only support 0 or 4 right now.
 #
 if ($imagepart != 0 && $imagepart != 4) {
-    die("Only the entire disk or partition 4 can be loaded.");
+    die("Only the entire disk or partition 4 can be loaded.\n");
 }
 
 #
 # The image has to be accessible, and it must reside in the right places.
 #
 if (! -e $imagepath) {
-    die("Cannot access $imagepath.");
+    die("Cannot access $imagepath.\n");
 }
 if (! -f $imagepath) {
-    die("$imagepath is not a plain file.");
+    die("$imagepath is not a plain file.\n");
 }
 
 #
@@ -145,7 +138,7 @@ elsif (index($imagepath, "/proj/") >= 0) {
     $cmdline = "${PLASTICADDR}:$imagepath $diskpart";
 }
 else {
-    die("Your image must reside in $TB/images or /proj");
+    die("Your image must reside in $TB/images or /proj\n");
 }
 
 #
