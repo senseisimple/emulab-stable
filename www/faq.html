@@ -48,9 +48,9 @@
      <li> <a href="#HDS-3">How many ethernet cards are on each node?</a>
      <li> <a href="#HDS-4">How many nodes are currently available (free)?</a>
      <li> <a href="#HDS-5">Can I do traffic shaping on my links?</a>
-     <li> <a href="#HDS-6">Can I modify the traffic shapping
+     <li> <a href="#HDS-6">Can I modify the traffic shaping
                            parameters on my links?</a>
-     <li> <a href="#HDS-7">Are there other traffic shapping parameters
+     <li> <a href="#HDS-7">Are there other traffic shaping parameters
                            besides latency, bandwidth, and PLR?</a>
      </ul>
 
@@ -227,7 +227,7 @@
     click on the "Node Reservation Status" link at your left to see
     how many nodes are currently free. If you ask for more than are
     currently available, your experiment will be rejected (you
-    will receive email noification shortly after you submit your NS
+    will receive email notification shortly after you submit your NS
     file to the web interface).
     </p>
 
@@ -648,7 +648,7 @@ tb-set-node-startup $clientB {/users/myname/router-startup router1}
     <p>
     For multiple routers, the startup script for each router will need to
     contain a set of routes for all subnets it is not directly connected
-    to. This will differ, depending on the toplogy you are using. To make
+    to. This will differ, depending on the topology you are using. To make
     this task easier, you can use the <tt>tb-set-ip</tt> command in your NS
     file, so that you know which subnets will be assigned to which nodes.
     </p>
@@ -712,7 +712,7 @@ tb-set-node-startup $clientB {/users/myname/router-startup router1}
     <p>
     Yes. Emulab blocks all of the <i>low numbered</i> ports (ports below 1024),
     with the exception of ports 20 and 21 (FTP), 22 (Secure Shell), and 80
-    (HTTP). This is for the protection of experimentors, as well as to ensure
+    (HTTP). This is for the protection of experimenters, as well as to ensure
     that an errant application cannot become the source of a Denial of Service
     attack to sites outside of Emulab. If your application requires external
     access to other low numbered ports, please contact us to make special
