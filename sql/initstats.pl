@@ -16,12 +16,6 @@ use libtestbed;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-die("This script hasn't been updated to match schema changes yet!\n".
-    "It still uses the lastlogin table, which was replaced by three\n".
-    "different tables:\n".
-    "nodeuidlastlogin, uidnodelastlogin, and userslastlogin\n".
-    "Please fix this before trying to use it!\n");
-
 $query_result =
     DBQueryFatal("select pid,gid from groups");
 
@@ -33,96 +27,26 @@ while (($pid,$gid) = $query_result->fetchrow_array()) {
 }
 
 $query_result =
-    DBQueryFatal("select u.uid,time from users as u ".
-		 "left join lastlogin as l on u.uid=l.uid");
+    DBQueryFatal("select uid from users");
 
-while (($uid,$stamp) = $query_result->fetchrow_array()) {
-    my $count;
-    if (defined($stamp)) {
-	$stamp = "'$stamp'";
-	$count = 1;
-    }
-    else {
-	$stamp = "NULL";
-	$count = 0;
-    }
-
-    print "insert into user_stats (uid, weblogin_last, weblogin_count) ".
-	"values ('$uid', $stamp, $count);\n";
+while (($uid) = $query_result->fetchrow_array()) {
+    print "insert into user_stats (uid) values ('$uid');\n";
 }
 
 $query_result =
-    DBQueryFatal("select state,eid,pid,expt_head_uid,idx,gid,expt_created, ".
-		 "       expt_swapped ".
+    DBQueryFatal("select eid,pid,expt_head_uid,gid,expt_created,batchmode,idx ".
 		 "from experiments order by expt_swapped");
 
-while (($state,$eid,$pid,$creator,$idx,$gid,$created,$swapped) =
+while (($eid,$pid,$creator,$gid,$created,$batchmode,$exptidx) =
        $query_result->fetchrow_array()) {
+
+    print "insert into experiment_resources (idx, tstamp, exptidx) ".
+	"values (0, '$created', $exptidx);\n";
+    
     print "insert into experiment_stats ".
-	"(eid, pid, creator, idx, gid, created) ".
-        "VALUES ('$eid', '$pid', '$creator', $idx, '$gid', '$created');\n";
-
-    if ($state eq EXPTSTATE_NEW ||
-	($state eq EXPTSTATE_SWAPPED && !defined($swapped))) {
-	print("update group_stats set ".
-	      "  exptpreload_count=exptpreload_count+1, ".
-	      "  exptpreload_last='$created' ".
-	      "where pid='$pid' and gid='$gid';\n");
-	print("update project_stats set ".
-	      "  exptpreload_count=exptpreload_count+1, ".
-	      "  exptpreload_last='$created' ".
-	      "where pid='$pid';\n");
-	print("update user_stats set ".
-	      "  exptpreload_count=exptpreload_count+1, ".
-	      "  exptpreload_last='$created' ".
-	      "where uid='$creator';\n");
-    }
-    if ($state eq EXPTSTATE_ACTIVE && defined($swapped)) {
-	my $pnodes = 0;
-	my $pnodes_result =
-	    DBQueryWarn("select r.node_id from reserved as r ".
-			"left join nodes as n on r.node_id=n.node_id ".
-			"where r.pid='$pid' and r.eid='$eid' and ".
-			"      n.role='testnode'");
-	$pnodes = $pnodes_result->numrows
-	    if ($pnodes_result);
-	
-	print("update experiment_stats set ".
-	      "  swapin_count=swapin_count+1, ".
-	      "  swapin_last='$swapped', ".
-	      "  pnodes=$pnodes ".
-	      "where pid='$pid' and eid='$eid' and idx=$idx;\n");
-	print("update group_stats set ".
-	      "  exptswapin_count=exptswapin_count+1, ".
-	      "  exptswapin_last='$swapped' ".
-	      "where pid='$pid' and gid='$gid';\n");
-	print("update project_stats set ".
-	      "  exptswapin_count=exptswapin_count+1, ".
-	      "  exptswapin_last='$swapped' ".
-	      "where pid='$pid';\n");
-	print("update user_stats set ".
-	      "  exptswapin_count=exptswapin_count+1, ".
-	      "  exptswapin_last='$swapped' ".
-	      "where uid='$creator';\n");
-    }
-    if ($state eq EXPTSTATE_SWAPPED && defined($swapped)) {
-	print("update experiment_stats set ".
-	      "  swapout_count=swapout_count+1, ".
-	      "  swapout_last='$swapped' ".
-	      "where pid='$pid' and eid='$eid' and idx=$idx;\n");
-	print("update group_stats set ".
-	      "  exptswapout_count=exptswapout_count+1, ".
-	      "  exptswapout_last='$swapped' ".
-	      "where pid='$pid' and gid='$gid';\n");
-	print("update project_stats set ".
-	      "  exptswapout_count=exptswapout_count+1, ".
-	      "  exptswapout_last='$swapped' ".
-	      "where pid='$pid';\n");
-	print("update user_stats set ".
-	      "  exptswapout_count=exptswapout_count+1, ".
-	      "  exptswapout_last='$swapped' ".
-	      "where uid='$creator';\n");
-    }
+	"(eid, pid, creator, gid, created, batch, exptidx, rsrcidx) ".
+        "select '$eid', '$pid', '$creator', '$gid', '$created', $batchmode,".
+	"$exptidx,r.idx from experiments as e ".
+	"left join experiment_resources as r on e.idx=r.exptidx ".
+	"where pid='$pid' and eid='$eid';\n";
 }
-
-
