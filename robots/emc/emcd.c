@@ -37,6 +37,7 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <math.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -1127,6 +1128,11 @@ int vmc_callback(elvin_io_handler_t handler,
 
         double dx,dy,dtheta,ddist;
 
+        struct mtp_packet *mp;
+        struct mtp_update_id uid;
+
+	int my_retval;
+
         int id = -1;
         struct position *p;
         struct robot_list_item *i = rmc_data.position_list->head;
@@ -1192,15 +1198,13 @@ int vmc_callback(elvin_io_handler_t handler,
         }
         
         // we want to return whichever robot id immediately to the caller:
-        struct mtp_packet *mp;
-        struct mtp_update_id uid;
         
         uid.request_id = rid->request_id;
         uid.robot_id = robot_id;
         
         mp = mtp_make_packet(MTP_UPDATE_ID,MTP_ROLE_EMC,&uid);
-        int my_retval = mtp_send_packet(fd,mp);
-        mtp_free_packet(mtp);
+        my_retval = mtp_send_packet(fd,mp);
+        mtp_free_packet(mp);
         if (my_retval != MTP_PP_SUCCESS) {
           fprintf(stdout,"Could not send update_id packet!\n");
         }
