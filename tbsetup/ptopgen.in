@@ -18,14 +18,16 @@ sub usage()
 	  "       -v Include stuff for topologies with virtual nodes\n".
 	  "       -r Include stuff for topologies with widearea nodes\n".
 	  "       -s Include stuff for topologies with simulated nodes\n".
+	  "       -a Include even reserved nodes\n".
 	  "       -m Override multiplex_factor\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:rS";
+my $optlist = "s:e:m:vp:rSa";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
 my $simstuff  = 0;
+my $allnodes  = 0;
 
 #
 # Turn off line buffering on output
@@ -99,6 +101,9 @@ if (defined($options{"S"})) {
 }
 if (defined($options{"p"})) {
     $pid = $options{"p"};
+}
+if (defined($options{"a"})) {
+    $allnodes = 1;
 }
 if (defined($options{"e"})) {
     $exempt_eid = $options{"e"};
@@ -225,6 +230,12 @@ my $free_condition = "(b.node_id is null and ".
 if (defined($exempt_eid)) {
     $free_condition = "($free_condition or ".
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
+}
+
+# If the user wants all nodes, we consider everything to be free (this
+# overrides the other possible free conditions
+if ($allnodes) {
+    $free_condition = "1";
 }
 
 $result =
@@ -370,7 +381,7 @@ foreach $node (keys(%nodes)) {
 
     # This is for the case that we are modifying an existing experiment - tell
     # assign to prefer nodes the user has already allocated
-    if ($exempt_eid && $is_reserved{$node}) {
+    if ($exempt_eid && !$allnodes && $is_reserved{$node}) {
 	push(@features,"already_reserved:0");
     }
 
@@ -413,14 +424,9 @@ foreach $node (keys(%nodes)) {
 # physnode. 
 #
 if ($widearea) {
-    #
-    # If we are spposed to exempt a certain eid from being considered down,
-    # build up a clause to do that - we consider all nodes already used by that
-    # experiment to be available
-    #
-    my $exempt_condition = "0";
-    if (defined($exempt_eid)) {
-	$free_condition = "(r.pid='$pid' and r.eid='$exempt_eid')"; 
+    my $free_condition = "b.node_id is null";
+    if ($allnodes) {
+	$free_condition = "1";
     }
     $result =
 	DBQueryFatal("select count(a.node_id),a.phys_nodeid,aa.type, ".
@@ -435,7 +441,7 @@ if ($widearea) {
 		     "left join widearea_nodeinfo as wn on ".
 		     "     wn.node_id=a.phys_nodeid ".
 		     "where  (a.role='virtnode' and t.isremotenode=1 and ".
-		     "        b.node_id is null) ".
+		     "        $free_condition) ".
 		     "group by a.phys_nodeid");
     
     while (($count,$physnode,$ptype,$status,$mpid,$meid,$site)
