@@ -8,6 +8,12 @@
 
 #define BufferSlotCount 32
 
+/* the number of empty bufferslots there must be
+   for the system to request more data. 
+   Originally, this was 1 (any slots), but
+   having more means potentially better synchronization. */ 
+#define BUFFER_HEADROOM 7
+
 typedef struct {
   int mb; /* -1 = none. */
   int gotCount;
@@ -133,8 +139,9 @@ int c_suggestK()
 {
   static int lastMessage = 0;
   static int lastMessageCount = 0;
-  int i, j;
-  int wasAtLeastOneFree = 0;
+  int i, j, ei;
+  int freeCount = 0;
+  int highestWeHave;
 
   for (i = 0; i < BufferSlotCount; i++) {
     if (slots[i].mb != -1) {
@@ -159,13 +166,24 @@ int c_suggestK()
       }
     } else {
       /* slots[i].mb == -1, ergo it's free. */
-      wasAtLeastOneFree = 1;
+      freeCount++;
     }
   }  
 
-  for (i = 0; i < totalMB; i++) {
+  highestWeHave = 0;
+  
+  for (i = 1; i < totalMB; i++) {
+    if (finishedMBBitmap[i]) {
+      highestWeHave = i;
+    }
+  }
+
+  for (ei = 0; ei < totalMB; ei++) {
+    /* kind of a hack, so we start at the highest mb we have and
+       swing around. */ 
+    i = (highestWeHave + ei) % totalMB;
     if (!finishedMBBitmap[i] && !inProgressMB(i)) {
-      if (wasAtLeastOneFree) {
+      if (freeCount >= BUFFER_HEADROOM ) {
 	if (lastMessage != 2) {
 	  if (lastMessageCount) {
 	    printf("ChunkerSK: Last chunkerSK message repeated %i times.\n", 
@@ -187,7 +205,7 @@ int c_suggestK()
 		   lastMessageCount );
 	    lastMessageCount = 0;
 	  }
-	  printf("ChunkerSK: Buffer full.\n", i);
+	  printf("ChunkerSK: Buffer too full to recommend chunks.\n", i);
 	  lastMessage = 3;
 	} else {
 	  lastMessageCount++;
