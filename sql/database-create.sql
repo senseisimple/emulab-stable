@@ -2128,6 +2128,18 @@ CREATE TABLE virt_simnode_attributes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `virt_tiptunnels`
+--
+
+CREATE TABLE virt_tiptunnels (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  host varchar(32) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,host,vnode)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `virt_trafgens`
 --
 

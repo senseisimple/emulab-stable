@@ -716,6 +716,10 @@ REPLACE INTO table_regex VALUES ('virt_programs','dir','text','redirect','defaul
 REPLACE INTO table_regex VALUES ('virt_programs','timeout','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','expected_exit_code','int','redirect','default:tinyint',0,0,NULL);
 REPLACE INTO table_regex VALUES ('users','wikiname','text','regex','^[A-Z]+[a-z]+[A-Z]+[A-Za-z0-9]*$',4,64,NULL);
+REPLACE INTO table_regex VALUES ('virt_tiptunnels','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_tiptunnels','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_tiptunnels','host','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_tiptunnels','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`

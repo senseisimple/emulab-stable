@@ -2573,3 +2573,14 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table cameras add fixed_x float NOT NULL default '0';
 	alter table cameras add fixed_y float NOT NULL default '0';
+
+1.328: Add a table for vnodes whose serial consoles should be
+       "mounted" on another node.
+
+	CREATE TABLE virt_tiptunnels (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  host varchar(32) NOT NULL default '',
+	  vnode varchar(32) NOT NULL default '',
+	  PRIMARY KEY  (pid,eid,host,vnode)
+	) TYPE=MyISAM;
