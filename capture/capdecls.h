@@ -38,3 +38,15 @@ typedef struct {
 	int		portnum;
 	secretkey_t	key;
 } whoami_t;
+
+/*
+ * Return Status. Define a constant size return to ensure that the
+ * status is read as an independent block, distinct from any output
+ * that might be sent. An int is a reasonable thing to use.
+ *
+ * XXX: If you change this, be sure to change the PERL code!
+ */
+#define CAPOK		0
+#define CAPBUSY		1
+#define CAPNOPERM	2
+typedef int		capret_t;

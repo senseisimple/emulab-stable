@@ -946,6 +946,7 @@ clientconnect()
 	int		cc, length = sizeof(tipclient);
 	int		newfd;
 	secretkey_t     key;
+	capret_t	capret;
 
 	newfd = accept(sockfd, (struct sockaddr *)&tipclient, &length);
 	if (newfd < 0)
@@ -958,9 +959,15 @@ clientconnect()
 	 * sounds horribly brutish!
 	 */
 	if (tipactive) {
-		close(newfd);
+		capret = CAPBUSY;
+		if ((cc = write(newfd, &capret, sizeof(capret))) <= 0) {
+			dolog(LOG_NOTICE, "%s refusing. error writing status",
+			      inet_ntoa(tipclient.sin_addr));
+		}
 		dolog(LOG_NOTICE, "%s connecting, but tip is active",
 		      inet_ntoa(tipclient.sin_addr));
+		
+		close(newfd);
 		return 1;
 	}
 	ptyfd = newfd;
@@ -979,6 +986,14 @@ clientconnect()
 	if (cc != sizeof(key) ||
 	    key.keylen != strlen(key.key) ||
 	    strncmp(secretkey.key, key.key, key.keylen)) {
+		/*
+		 * Tell the other side that all is okay.
+		 */
+		capret = CAPNOPERM;
+		if ((cc = write(ptyfd, &capret, sizeof(capret))) <= 0) {
+			dolog(LOG_NOTICE, "%s connecting, error perm status",
+			      inet_ntoa(tipclient.sin_addr));
+		}
 		close(ptyfd);
 		dolog(LOG_NOTICE,
 		      "%s connecting, secret key does not match",
@@ -990,6 +1005,16 @@ clientconnect()
 	dolog(LOG_INFO, "Key: %d: %s",
 	      secretkey.keylen, secretkey.key);
 #endif
+	/*
+	 * Tell the other side that all is okay.
+	 */
+	capret = CAPOK;
+	if ((cc = write(ptyfd, &capret, sizeof(capret))) <= 0) {
+		close(ptyfd);
+		dolog(LOG_NOTICE, "%s connecting, error writing status",
+		      inet_ntoa(tipclient.sin_addr));
+		return 1;
+	}
 	
 	/*
 	 * See Mike comments (use threads) above.

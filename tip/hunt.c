@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.9 2001-08-20 15:26:06 stoller Exp $";
+	"$Id: hunt.c,v 1.10 2001-08-29 19:36:09 stoller Exp $";
 #endif /* not lint */
 
 #ifdef USESOCKETS
@@ -153,7 +153,8 @@ socket_open(char *tipname)
 	char			aclname[BUFSIZ];
 	char			b1[256], b2[256];
 	secretkey_t		key;
-	int			port;
+	capret_t		capret;
+	int			port, cc;
 	char			hostname[MAXHOSTNAMELEN];
 	FILE		       *fp;
 	struct hostent	       *he;
@@ -226,11 +227,27 @@ socket_open(char *tipname)
 	/*
 	 * Send the secretkey.
 	 */
-	if (write(sock, &key, sizeof(key)) != sizeof(key)) {
-		close(sock);
-		return -1;
-	}
+	if (write(sock, &key, sizeof(key)) != sizeof(key))
+		goto screwed;
 
+	/*
+	 * Wait for the response.
+	 */
+	if ((cc = read(sock, &capret, sizeof(capret))) <= 0)
+		goto screwed;
+
+	if (capret != CAPOK) {
+		if (capret == CAPBUSY)
+			fprintf(stderr, "Tip line busy. Try again later?\n");
+		if (capret == CAPNOPERM)
+			fprintf(stderr, "You do not have permission!\n");
+		goto screwed;
+	}
 	return sock;
+
+ screwed:
+	close(sock);
+	deadfl = 1;
+	longjmp(deadline, 1);
 }
 #endif

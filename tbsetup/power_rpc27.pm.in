@@ -69,18 +69,21 @@ sub rpc27ctrl {
     #
     $insync = 0;
 
-    for ($i = 0; $i < 10; $i++) {
+    for ($i = 0; $i < 20; $i++) {
 	my $line;
 
 	if (syswrite($TIP, "\r\n") == 0) {
 	    print STDERR
-		"*** Power control sync failed ($controller/$outlet)\n";
+		"*** Power control sync write failed ($controller/$outlet)\n";
 	    close($TIP);
 	    return 1;
 	}
 
 	if (sysread($TIP, $line, 1024) == 0) {
-	    last;
+	    print STDERR
+		"*** Power control sync read failed ($controller/$outlet)\n";
+	    close($TIP);
+	    return 1;
 	}
 	if ($debug) {
 	    print "Read: $line";
@@ -121,7 +124,7 @@ sub rpc27ctrl {
 #
 sub tipconnect($) {
     my($controller) = $_[0];
-    my($server, $portnum, $keylen, $keydata);
+    my($server, $portnum, $keylen, $keydata, $capreturn);
     my($inetaddr, $paddr, $proto);
     my(%powerid_row);
     local *TIP;
@@ -149,6 +152,7 @@ sub tipconnect($) {
     # to make it look like the C struct.
     #
     my $secretkey = pack("iZ256", $keylen, $keydata);
+    my $capret    = pack("i", 0);
 
     #
     # This stuff from the PERLIPC manpage.
@@ -160,11 +164,7 @@ sub tipconnect($) {
     $paddr    = sockaddr_in($portnum, $inetaddr);
     $proto    = getprotobyname('tcp');
 
-    #
-    # We have no locking protocol in place for the tiplines. So, loop
-    # a small number of time, trying to form a proper connection. 
-    #
-    for ($i = 0; $i < 10; $i++) {
+    for ($i = 0; $i < 20; $i++) {
 	if (! socket(TIP, PF_INET, SOCK_STREAM, $proto)) {
 	    print STDERR "*** Cannot create socket.\n";
 	    return 0;
@@ -173,29 +173,42 @@ sub tipconnect($) {
 	if (! connect(TIP, $paddr)) {
 	    print STDERR
 		"*** Cannot connect to $controller on $server($portnum)\n";
+	    close(TIP);
 	    return 0;
 	}
 	TIP->autoflush(1);
 
-	#
-	# If the connect succeeds, but the write fails, it means that the
-	# other end dropped the connection cause there was already a tip
-	# active (either a person on the tip line, or another power control).
-	#
-	# I'm not happy about this. We need a more positive action protocol.
-	#
-	if (syswrite(TIP, $secretkey) > 0) {
+	if (! syswrite(TIP, $secretkey)) {
+	    print STDERR
+		"*** Cannot write to $controller on $server($portnum)\n";
+	    close(TIP);
+	    return 0;
+	}
+	if (! sysread(TIP, $capret, length($capret))) {
+	    print STDERR
+		"*** Cannot read from $controller on $server($portnum)\n";
+	    close(TIP);
+	    return 0;
+	}
+
+	my $foo = unpack("i", $capret);
+	if ($debug) {
+	    print "Capture returned $foo\n";
+	}
+	if ($foo == 0) {
 	    return(*TIP);
 	}
-	
-	print STDERR
-	    "*** WARNING: Cannot write to $controller on $server($portnum)" .
-	    "    Power controller might be busy. Waiting a bit ...\n";
-	
-	close(TIP);
+	if ($i > 5) {
+	    printf STDERR
+		"*** WARNING: $controller on $server($portnum) is busy\n".
+		"    Waiting a bit before trying again.\n";
+	}
+
+	sleep(5);
     }
+    
     print STDERR
-	"*** Cannot connect to $controller on $server($portnum)\n";
+	"*** $controller on $server($portnum) was busy for too long\n";
     return 0;
 }
 
