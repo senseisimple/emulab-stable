@@ -1237,6 +1237,7 @@ else
                     event/tbgen/GNUmakefile event/tbgen/tevd.restart \
                     event/example/GNUmakefile event/example/tbsend.pl \
 		    event/example/tbrecv.pl event/example/tbsend-short.pl \
+                    event/example/tbsend.py event/example/tbrecv.py \
 		    event/example/eventdebug.pl \
 		    event/trafgen/GNUmakefile \
 		    event/proxy/GNUmakefile \

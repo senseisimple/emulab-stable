@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 SYSTEM	       := $(shell uname -s)
 PROGRAMS	= libevent.a
 ifneq ($(SYSTEM),Linux)
-PROGRAMS       += libevent_r.a event.so
+PROGRAMS       += libevent_r.a event.so _tbevent.so
 endif
 
 all:		$(PROGRAMS)
@@ -32,6 +32,7 @@ ifeq ($(SYSTEM),Linux)
 PCORE  = -I/usr/lib/perl5/5.6.1/i386-linux/CORE
 else
 PCORE  = -I/usr/libdata/perl/5.00503/mach/CORE
+PYCORE = -I/usr/local/include/python2.3
 endif
 
 OBJS	= event.o util.o
@@ -61,7 +62,7 @@ util.o:		util.c
 # 
 
 #
-# SWIG has some horribly annyonying behavior and bugs that we have to work
+# SWIG has some horribly annoying behavior and bugs that we have to work
 # around, so we normally check the SWIG-generated code into CVS. This is a
 # maintainer target for regenerating the SWIG wrappers - see README for full
 # instructions
@@ -74,18 +75,42 @@ swig-wrappers:	event.i	event.c event.pm.tail
 event_wrap.o:	$(SRCDIR)/event_wrap.c
 	$(CC) -c $(CFLAGS_NOWARN) $(PCORE) $<
 
+#
+# Note: The python version of the wrappers do not seem to be afflicted by the
+# same problems as the perl one.
+#
+swig-pywrappers: event.i event.c tbevent.py.tail
+	swig -python -I$(SRCDIR) -o $(SRCDIR)/event_wrap_py.c -module tbevent \
+		$(SRCDIR)/event.i
+	cat $(SRCDIR)/tbevent.py.tail >> $(SRCDIR)/tbevent.py
+	touch $@
+
+$(SRCDIR)/event_wrap_py.c: swig-pywrappers
+
+event_wrap_py.o: $(SRCDIR)/event_wrap_py.c
+	$(CC) -c $(CFLAGS_NOWARN) $(PYCORE) $<
+
 event.so:	event.o event_wrap.o util.o
 	ld -shared $^ `elvin-config --libs vin4c` -lcrypto -o event.so
 
-LIB_STUFF       = event.pm event.so
+_tbevent.so:	event.o event_wrap_py.o util.o
+	ld -shared $^ `elvin-config --libs vin4c` -lcrypto -o $@
+
+LIB_STUFF       = event.pm event.so tbevent.py _tbevent.so
 
 install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 control-install:	install
 
-client-install: 
+#
+# XXX Fix the python install location.
+#
+client-install:
 	$(INSTALL_PROGRAM) $(SRCDIR)/event.pm $(DESTDIR)$(CLIENT_BINDIR)/event.pm
 	$(INSTALL_PROGRAM) event.so $(DESTDIR)$(CLIENT_BINDIR)/event.so
+	$(INSTALL_PROGRAM) $(SRCDIR)/tbevent.py \
+		$(DESTDIR)$(CLIENT_BINDIR)/tbevent.py
+	$(INSTALL_PROGRAM) _tbevent.so $(DESTDIR)$(CLIENT_BINDIR)/_tbevent.so
 
 clean:
-	/bin/rm -f *.o libevent.a libevent_r.a *.so
+	/bin/rm -f *.o libevent.a libevent_r.a *.so *.py swig-pywrappers

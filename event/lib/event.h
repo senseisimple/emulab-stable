@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -58,7 +58,7 @@ typedef elvin_subscription_t event_subscription_t;
  * A tuple defines the target of the event, or if you are a subscriber,
  * what events you want to subscribe to.
  */
-typedef struct {
+typedef struct _address_tuple {
 	char		*site;		/* Which Emulab site. God only */
 	char		*expt;		/* Project and experiment IDs */
 	char		*group;		/* User defined group of nodes */

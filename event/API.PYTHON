@@ -1,0 +1,34 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+This is the documentation for the Python API to the event system...
+
+The Python version of the API is related to the Perl version in that
+they both use the same SWIG infrastructure.  The difference is in the
+presentations, where the Perl API is basically the same as the C
+version, the Python API provides a couple of wrapper classes to make
+things easier.
+
+CLASS OVERVIEW
+
+The classes are contained in the "tbevent" module, currently, there
+are two that are of any consequence.  A brief overview of the classes
+follows, consult the tbevent.py.tail source for more information.
+
+  EventClient - The base class for event system clients.  Subscribers
+    should create a subclass and override the "handle_event" method to
+    process incoming events.  Publishers do not need to create a
+    subclass, the base class already provides the necessary
+    functionality.
+
+  NotificationWrapper - A wrapper for event_notification structures,
+    contains common setter and getter methods for accessing the
+    structure.
+
+
+EXAMPLES
+
+See the tbsend.py and tbrecv.py files in the examples directory.
