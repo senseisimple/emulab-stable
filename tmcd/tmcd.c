@@ -1011,12 +1011,25 @@ COMMAND_PROTOTYPE(doaccounts)
 		if (shared && !tbadmin)
 			root = 0;
 
-		sprintf(buf,
-			"ADDUSER LOGIN=%s "
-			"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
-			"HOMEDIR=%s/%s GLIST=%s\n",
-			row[0], row[1], row[2], gidint, root, row[3],
-			USERDIR, row[0], glist);
+		if (vers < 4) {
+			sprintf(buf,
+				"ADDUSER LOGIN=%s "
+				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
+				"HOMEDIR=%s/%s GLIST=%s\n",
+				row[0], row[1], row[2], gidint, root, row[3],
+				USERDIR, row[0], glist);
+		}
+		else {
+			sprintf(buf,
+				"ADDUSER LOGIN=%s "
+				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
+				"HOMEDIR=%s/%s GLIST=\"%s\" "
+				"EMULABPUBKEY=\"%s\" HOMEPUBKEY=\"%s\"\n",
+				row[0], row[1], row[2], gidint, root, row[3],
+				USERDIR, row[0], glist,
+				row[9] ? row[9] : "",
+				row[10] ? row[10] : "");
+		}
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 
