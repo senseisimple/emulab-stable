@@ -341,7 +341,7 @@ Once the robot has reached its initial position, lets move it up a meter.  To
 do this, you will need to log in to ops.emulab.net and run:
 
 <blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>1 ops:~> tevc -e <b>proj</b>/<b>exp</b> now node-0 SETDEST X=3.0 Y=1.5</pre>
+<pre>1 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> now node-0 SETDEST X=3.0 Y=1.5</pre>
 </blockquote>
 <blockquote>
 <center>
@@ -482,7 +482,7 @@ Once the modify completes, wait for the robots to reach their initial position
 and then start the robots on their way by running the following on ops:
 
 <blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>3 ops:~> tevc -e <b>proj</b>/<b>exp</b> now rtl START</pre>
+<pre>3 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> now rtl START</pre>
 </blockquote>
 <blockquote>
 <center>
