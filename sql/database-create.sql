@@ -1,8 +1,8 @@
-# MySQL dump 8.16
+# MySQL dump 8.13
 #
 # Host: localhost    Database: tbdb
 #--------------------------------------------------------
-# Server version	3.23.49-log
+# Server version	3.23.47-log
 
 #
 # Table structure for table 'cdroms'
@@ -1029,6 +1029,18 @@ CREATE TABLE userslastlogin (
   date date default NULL,
   time time default NULL,
   PRIMARY KEY  (uid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'v2pmap'
+#
+
+CREATE TABLE v2pmap (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  node_id varchar(10) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
 #
