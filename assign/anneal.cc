@@ -1015,3 +1015,43 @@ NOTQUITEDONE:
  DONE:
   cout << "Done" << endl;
 }
+
+// Combine members of LANs into a single 'logical' node to improve performance
+// and solution quality
+void combine_LANs() {
+  // Walk through the graph looking for nodes that are members of exactly one
+  // LAN
+  vvertex_iterator vvertex_it,end_vvertex_it;
+  tie(vvertex_it,end_vvertex_it) = vertices(VG);
+  for (;vvertex_it!=end_vvertex_it;++vvertex_it) {
+    vvertex vv = *vvertex_it;
+
+    // Make sure there is exactly one link, and it is to a LAN
+    int link_count = 0;
+    bool has_lan_link = false;
+    vedge lan_vedge;
+    tb_vlink *lan_vlink;
+    tb_vnode *lan_vnode;
+    voedge_iterator vedge_it,end_vedge_it;
+    tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
+    for (;vedge_it!=end_vedge_it;++vedge_it) {
+      link_count++;
+      tb_vlink *vlink = get(vedge_pmap,*vedge_it);
+      vvertex dest_vv = target(*vedge_it,VG);
+      if (dest_vv == vv) {
+	dest_vv = source(*vedge_it,VG);
+      }
+      tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
+      if (dest_vnode->type.compare("lan")) {
+	has_lan_link = true;
+	lan_vnode = dest_vnode;
+	lan_vlink = vlink;
+	lan_vedge = *vedge_it;
+      }
+    }
+    if (has_lan_link && (link_count == 1)) {
+      // XXX Do some stuff here
+    }
+  }
+
+}
