@@ -3,6 +3,9 @@
 # This program takes a list of machines and removes all the VLANs
 # whose every member is an argument.
 
+#debug
+my $d = 0;
+
 #
 # Configure variables
 #
@@ -11,48 +14,92 @@ my $TB	= "@prefix@";
 $snmpit = "$TB/bin/snmpit";
 
 if ($#ARGV < 0) {
-  #  die "Syntax: $0 machines\n";
-	exit(0);
+  die "Syntax: $0 <node> [<node>] ...\n";
 }
 open(SNMPIT,"$snmpit -l |") || die "Error running $snmpit -l\n";
 
-%machines = {};
+%machines = ();
 
 while ($#ARGV >= 0) {
-    $machines{pop(@ARGV)} = "";
+  $node = pop(@ARGV);
+  print "Found node $node\n" if $d;
+  $machines{$node} = "";
 }
+
+print "Resetting VLANs for: ",join(" ",keys %machines),"\n";
 
 @toremove = ();
 
 while (<SNMPIT>) {
+  chop;
+  @line = split;
+  $id = $line[0];
+  if (! ($id =~ /[0-9]+/)) {
+    next;
+  }
+  if ($id == 1) {
+    next;
+  }
+  # Skip VLANs with no members, which tries to delete VLAN 1,
+  # as well as private VLANs
+  if (@line < 2) {
+    next;
+  }
+  $remove = 1;
+  foreach $member (@line[2..$#line]) {
+    @elements = split(":",$member);
+    if (! defined($machines{$elements[0]})) {
+      $remove = 0;
+      last;
+    }
+  }
+  if ($remove == 1) {
+    push(@toremove,$id);
+  }
+}
+
+close(SNMPIT);
+
+$vlans = join(" ",@toremove);
+print "Removing VLANs: $vlans\n";
+
+my @success=();
+my @fail=();
+my $error = 0;
+
+if (@toremove > 0) {
+  #system("$snmpit -u -r $toremove");
+  open(RM,"$snmpit -r $vlans 2>&1 |") ||
+    die "Error running $snmpit -r $toremove\n";
+  while(<RM>) {
+    print "snmpit:$_" if $d;
     chop;
-    @line = split;
-    $id = $line[0];
-    if (! ($id =~ /[0-9]+/)) {next;}
-    if ($id == 1) {next;}
-    # Skip VLANs with no members, which tries to delete VLAN 1,
-    # as well as private VLANs
-    if (@line < 2) {next;}
-    $remove = 1;
-    foreach $member (@line[2..$#line]) {
-	@elements = split(":",$member);
-	if (! defined($machines{$elements[0]})) {
-	    $remove = 0;
-	    last;
-	}
+    if ( /^[ \t]*$/ ) { next; }
+    if ( /Removing VLAN \#(\d+) ... (.*)/ ) {
+      my $num = $1;
+      my $result = $2;
+      if ( $result =~ /Succeeded/) {
+	push(@success,$num);
+      } else {
+	print "$_\n";
+	if (<RM>) { print "$_\n"; }
+	push(@fail,$num);
+	$error++;
+      }
+    } else {
+      print "$_\n";
+      $error++;
     }
-    if ($remove == 1) {
-	push(@toremove,$id);
-    }
+  }
+  close(RM);
 }
 
-$toremove = join(" ",@toremove);
-print "Removing VLANs: $toremove\n";
-
-if ($#toremove > 0) {
-    system("$snmpit -u -r $toremove");
+if ($error || @fail ) {
+  print "VLAN removal had $error error(s).\n";
+  print "Removal failed for VLANs: @fail\n";
+  print "Removal succeeded for VLANs: @success\n";
+} else {
+  print "Removal succeeded for VLANs: @success\n";
 }
 
-print "VLANs removed\n";
-
-0;
+$error;
