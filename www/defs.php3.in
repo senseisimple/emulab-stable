@@ -6,6 +6,7 @@ $TBDIR          = "@prefix@/";
 $WWWDEFS        = "@WWWDEFS@";
 $OURDOMAIN      = "@OURDOMAIN@";
 $BOSSNODE       = "@BOSSNODE@";
+$TBADMINGROUP   = "@TBADMINGROUP@";
 
 # Overridden by the defs file!
 $TBMAINSITE     = 0;

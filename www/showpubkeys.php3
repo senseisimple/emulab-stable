@@ -337,7 +337,7 @@ if (isset($usr_key)) {
     #
     # mkacct updates the user pubkeys.
     # 
-    SUEXEC($uid, "flux", "webmkacct -a $target_uid", 0);
+    SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $target_uid", 0);
 }
 
 header("Location: showpubkeys.php3?target_uid=$target_uid&finished=1");

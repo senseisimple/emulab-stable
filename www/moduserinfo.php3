@@ -492,7 +492,7 @@ TBMAIL("$usr_name <$usr_email>",
 #
 # mkacct updates the user gecos and password.
 # 
-SUEXEC($uid, "flux", "webmkacct -a $target_uid", 0);
+SUEXEC($uid, $TBADMINGROUP, "webmkacct -a $target_uid", 0);
 
 #
 # Spit out a redirect so that the history does not include a post

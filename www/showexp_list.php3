@@ -111,7 +111,7 @@ if ($isadmin) {
     if ($idle) {
       # Run idlecheck and get the info
       #print "<pre>Running idlecheck\n";
-      $x=exec("$TBSUEXEC_PATH $uid flux webidlecheck -s -u",
+      $x=exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webidlecheck -s -u",
 	      $l, $rv);
       reset($l);
       while(list($index,$i) = each ($l)) {

@@ -64,7 +64,7 @@ $log_entry = addslashes($log_entry);
 #
 # Run the external script. 
 #
-SUEXEC($uid, "flux", "webnodelog -t $log_type -m \"$log_entry\" $node_id", 1);
+SUEXEC($uid, $TBADMINGROUP, "webnodelog -t $log_type -m \"$log_entry\" $node_id", 1);
 
 #
 # Show result.

@@ -208,7 +208,7 @@ elseif (strcmp($approval, "approve") == 0) {
     # Invoke the script. This does it all. If it fails, we will find out
     # about it.
     #
-    SUEXEC($uid, "flux", "webmkproj $pid", 0); 
+    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", 0); 
 
     echo "<h3><p>
               Project $pid (User: $headuid) has been approved.

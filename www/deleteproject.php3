@@ -124,7 +124,7 @@ $query_result =
 #
 # Remove the project directory and the group.
 #
-SUEXEC($uid, "flux", "rmproj $pid", 0);
+SUEXEC($uid, $TBADMINGROUP, "rmproj $pid", 0);
 
 #
 # Then the project table itself.

@@ -102,7 +102,7 @@ $query_result =
 #
 # Remove the user account before killing the user entry.
 #
-SUEXEC($uid, "flux", "rmacct-ctrl $target_uid", 0);
+SUEXEC($uid, $TBADMINGROUP, "rmacct-ctrl $target_uid", 0);
 
 #
 # Then the users table,

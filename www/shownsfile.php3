@@ -139,7 +139,7 @@ else {
     $flags = "-b";
 }
 
-$result = exec("$TBSUEXEC_PATH $uid flux webreport $flags $pid $eid",
+$result = exec("$TBSUEXEC_PATH $uid $TBADMINGROUP webreport $flags $pid $eid",
  	       $output, $retval);
 
 echo "<XMP>\n";
