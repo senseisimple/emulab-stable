@@ -92,7 +92,7 @@ echo "<tr>
       </tr>\n";
 
 echo "<tr>
-          <td>Project Head: </td>
+          <td>Experiment Head: </td>
           <td class=\"left\">$exp_head</td>
       </tr>\n";
 
@@ -133,26 +133,86 @@ if (mysql_num_rows($reserved_result)) {
           <tr>
               <td>Node ID</td>
               <td>Node Type</td>
+              <td>Default Image</td>
           </tr>\n";
 
     #
     # I'm so proud!
     #
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT nodes.node_id, nodes.type FROM nodes LEFT JOIN reserved ".
+	"SELECT nodes.node_id, nodes.type, nodes.def_boot_image_id ".
+        "FROM nodes LEFT JOIN reserved ".
         "ON nodes.node_id=reserved.node_id ".
         "WHERE reserved.eid=\"$exp_eid\" and reserved.pid=\"$exp_pid\"");
 
     while ($row = mysql_fetch_array($query_result)) {
         $node_id = $row[node_id];
         $type    = $row[type];
+        $defid   = $row[def_boot_image_id];
         echo "<tr>
                   <td>$node_id</td>
                   <td>$type</td>
+                  <td>$defid</td>
               </tr>\n";
     }
     echo "</table>\n";
 }
+
+#
+# Lets dump the project information too.
+# 
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT * FROM groups WHERE gid=\"$exp_pid\"");
+if (! $query_result) {
+    $err = mysql_error();
+    TBERROR("Database Error getting info for project $exp_pid: $err\n", 1);
+}
+$row = mysql_fetch_array($query_result);
+
+echo "<center>
+      <h3>Project Information</h3>
+      </center>
+      <table align=center border=1>\n";
+
+$gid		= $row[gid];
+$grp_created	= $row[grp_created];
+$grp_expires	= $row[grp_expires];
+$grp_name	= $row[grp_name];
+$grp_URL	= $row[grp_URL];
+$grp_affil	= $row[grp_affil];
+$grp_addr	= $row[grp_addr];
+$grp_head_uid	= $row[grp_head_uid];
+$cntrl_node	= $row[cntrl_node];
+
+#
+# Generate the table.
+# 
+echo "<tr>
+          <td>Name: </td>
+          <td class=\"left\">$gid</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Long Name: </td>
+          <td class=\"left\">$grp_name</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Project Head: </td>
+          <td class=\"left\">$grp_head_uid</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Created: </td>
+          <td class=\"left\">$grp_created</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Expires: </td>
+          <td class=\"left\">$grp_expires</td>
+      </tr>\n";
+
+echo "</table>\n";
 
 ?>
 </center>
