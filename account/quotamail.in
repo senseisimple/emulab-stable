@@ -35,8 +35,10 @@ you could clean up your directory it would be appreciated.
 
 You can check your usage with the 'quota' command on @USERNODE@:
 
-> quota -v -l
+@USERNODE@> quota -v -l
 `quota -v -l $i`
+
+(Note: This will not work from nodes in an experiment.)
 
 The directory trees where you most likely have files are:
 Project directory:    @FSDIR_PROJ@
