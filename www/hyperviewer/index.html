@@ -12,17 +12,25 @@
   <li><a href="#intro">Introduction</a></li>
   <li><a href="#install">Installing hypview</a></li>
   <ol style="list-style-type: lower-alpha;">
-    <li><a href="#getting">Getting and unpacking the Emulab HyperViewer
-client program</a></li>
-    <li><a href="building">Building the Emulab HyperViewer client
-program from sources</a></li>
-    <li><a href="platforms">Supported platforms</a></li>
+    <li><a href="#getting_unix">Getting and unpacking the Emulab
+HyperViewer
+client program (Unix/Linux)</a></li>
+    <li><a href="#getting_windows">Getting and unpacking the Emulab
+HyperViewer
+client program (Windows)</a><br>
+    </li>
+    <li><a href="#building_unix">Building the Emulab HyperViewer client
+program from sources (Unix/Linux)</a></li>
+    <li><a href="#building_windows">Building the Emulab HyperViewer
+client
+program from sources (Windows)</a></li>
+    <li><a href="#platforms">Supported platforms</a></li>
     <li><a href="#dependencies">Package dependencies</a></li>
   </ol>
   <li><a href="#run">Running hypview as a script</a></li>
-  <li><a href="#gui">The hypview Graphical User Interface</a><br>
-  </li>
+  <li><a href="#gui">The hypview Graphical User Interface</a></li>
 </ol>
+<hr style="width: 100%; height: 2px;">
 <h3><a name="intro"></a>Introduction</h3>
 <span style="font-style: italic; font-weight: bold;">hypview</span> is
 a client program which runs on your computer, and shows a 3D
@@ -62,9 +70,12 @@ tilings</a>.<br>
 <a href="http://www.mcescher.com/Gallery/recogn-bmp/LW436.jpg"><img
  style="border: 2px solid ; width: 106px; height: 106px;" alt=""
  title="Click for full-size image" src="LW436-thumb.jpg"></a><br>
+<br>
+<hr style="width: 100%; height: 2px;"><br>
 <h3><a name="install"></a>Installing hypview</h3>
-<h4><a name="getting"></a>Getting and unpacking the Emulab HyperViewer
-client program:</h4>
+<h4><a name="getting_unix"></a>Getting and unpacking the Emulab
+HyperViewer
+client program (Unix/Linux):</h4>
 <ul>
   <li>There are binary tarballs for <a
  href="http://www.emulab.net/downloads/hyperviewer-FreeBSD.tgz">FreeBSD</a>
@@ -126,8 +137,57 @@ to the
 next section on rebuilding hypview from sources.<br>
 </div>
 <br>
-<h4><a name="building"></a>Building the Emulab HyperViewer client
-program from sources</h4>
+<h4><a name="getting_windows"></a>Getting and unpacking the Emulab
+HyperViewer
+client program (Windows):<br>
+</h4>
+<ul>
+  <li>You first need to download and install the Windows versions of
+the following :</li>
+  <ul>
+    <li><a
+ href="http://www.python.org/ftp/python/2.2.3/Python-2.2.3.exe">Python
+2.2</a>, <a href="http://www.python.org/">(Python home page)</a><br>
+    </li>
+    <li><a
+ href="http://prdownloads.sourceforge.net/wxpython/wxPythonWIN32-2.4.2.4u-Py22.exe">wxWindows
+2.4.2</a>, <a href="http://www.wxpython.org/">(wxWindows home page)</a><br>
+    </li>
+    <li><a
+ href="http://prdownloads.sourceforge.net/pyopengl/PyOpenGL-2.0.0.44.win32-py2.2.exe?download">PyOpenGL
+2.0.0.44</a>, <a href="http://pyopengl.sourceforge.net/">(PyOpenGL
+home page)</a></li>
+  </ul>
+</ul>
+<div style="margin-left: 40px;">Verify that it's all working by running
+Start/Programs/wxPython 2.4/wxPython DEMO.&nbsp; Click the [+] to open
+the "Objects using an external library" branch, click wxGLCanvas, then
+the Cube and/or Cone buttons on the Demo tab.&nbsp; An OpenGL canvas
+window should pop up.&nbsp; Moving <br>
+</div>
+<ul>
+  <li>There is a self-extracting WinZip exe for <a
+ href="http://www.emulab.net/downloads/hyperviewer-Win32.exe">Windows
+2000 and XP</a>
+now.&nbsp; There is a top-level hyperviewer directory in the exe, so
+just unpack into the directory of your choice.<br>
+  </li>
+</ul>
+<ul>
+  <li>Test by running hypview.bat in the hyperviewer directory and
+feeding it BigLan.hyp or ts600.hyp.&nbsp; You can double-click it and
+use the File/Open menu command, or in a command shell, do this:<br>
+    <pre style="margin-left: 40px;"><big>cd hyperviewer</big></pre>
+  </li>
+</ul>
+<pre style="margin-left: 80px;"><big>hypview.bat ts600.hyp<span
+ style="font-weight: bold;"></span></big></pre>
+<div style="margin-left: 40px;">Notice that hypview runs <span
+ style="font-weight: bold;">only</span> in the hyperviewer directory
+for now.<br>
+</div>
+<h4><a name="building_unix"></a>Building the Emulab HyperViewer client
+program from sources (Unix/Linux)</h4>
 Full sources for hypview and a version of the hyperviewer library are
 included in the tarball.<br>
 <br>
@@ -137,8 +197,15 @@ installed on your machine first.<br>
 <ul>
   <li>To build the hypviewer C++ library and the _hv.so that is loaded
 into Python:</li>
+  <ul>
+    <li>Edit the path to the ROOTDIR in
+hyperviewer/hypviewer/Makefile.main to the absolute path to the
+hyperviewer/hypviewer directory.&nbsp; (I'll find a way around that...)</li>
+    <li>Then use GNU make in the hyperviewer directory:<br>
+    </li>
+  </ul>
 </ul>
-<pre style="margin-left: 80px;"><big>cd hyperviewer<br>gmake -f GNUMakefile</big></pre>
+<pre style="margin-left: 120px;"><big>cd hyperviewer<br>gmake -f GNUMakefile</big></pre>
 <ul>
   <li>See
 the ROADMAP file if you want to know more about internals.</li>
@@ -147,13 +214,47 @@ There are a couple of example files included:
 <ul>
 </ul>
 <div style="margin-left: 80px;">
-<pre><big>cd hyperviewer<br>./hypview BigLan.hyp</big><big><br>./hypview ts600.hyp</big>
-</pre>
+<pre><big>cd hyperviewer<br>./hypview BigLan.hyp</big><big><br>./hypview ts600.hyp<br></big></pre>
+</div>
+&nbsp;<br>
+<h4><a name="building_windows"></a>Building the Emulab HyperViewer
+client
+program from sources (Windows)<br>
+</h4>
+Full sources for hypview and a version of the hyperviewer library are
+included in the WinZip self-extracting exe file.&nbsp; You will need to
+install Developer Studio 6 with Visual C++ and the Platform SDK (which
+includes OpenGL.)&nbsp; VC++ and OpenGL documentation is on the MSDN
+library disks.
+<ul>
+  <li>To rebuild the hypviewer C++ library and the _hv.dll that gets
+loaded
+into Python, open the hv.dsw workspace in Developer Studio and hit F7.<br>
+  </li>
+</ul>
+<ul>
+  <li>In the hv.dsp project file, there's a custom build option on hv.i
+that calls SWIG to generate _hv.cpp and hv.py.&nbsp; Files should be
+up-to-date so you don't need SWIG unless you want to change
+things.&nbsp; You can get it from <a
+ href="http://prdownloads.sourceforge.net/swig/swigwin-1.3.21.zip">swigwin-1.3.21</a>,
+    <a href="http://www.swig.org/">(SWIG home page)</a>, and will need <a
+ href="http://www.winzip.com/">WinZip</a> to unpack it.<br>
+  </li>
+</ul>
+<ul>
+  <li>See
+the ROADMAP file if you want to know more about internals.</li>
+</ul>
+There are a couple of example files included:
+<pre><big>cd hyperviewer<br>hypview.bat BigLan.hyp</big><big><br>hypview.bat ts600.hyp</big></pre>
+<div style="margin-left: 80px;">
 </div>
 <h4><a name="platforms"></a>Supported platforms:</h4>
 <ul>
-  <li>FreeBSD - The first target system.<br>
-  </li>
+  <li>FreeBSD - The first target system.</li>
+</ul>
+<ul>
   <ul>
     <li>There is a bug in the <span style="font-weight: bold;">ATI
 Radeon</span> DRI graphics card driver which "tatters" bitmap
@@ -185,31 +286,95 @@ cards.&nbsp; You will get a normal warning message:<br>
       <pre>&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; Xlib:&nbsp; extension "XFree86-DRI" missing on display ":0.0".</pre>
     </li>
   </ul>
+  <li>Windows - The initial version is out.</li>
 </ul>
 <ul>
-  <li>Linux - Pretty much untested.</li>
+  <ul>
+    <li>Picking of graph nodes is not working yet due to a PyOpenGL
+bug.&nbsp; However, you can pick graph edges. which is equivalent to
+picking the node the edge leads to.</li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>It busy-loops too much on Windows.&nbsp; I'll try to tame that.<br>
+    </li>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <li>You connect to XMLRPC on boss.emulab.net via SSH to retrieve
+experiments from the database.&nbsp; On Windows, you can use either the
+      <a href="http://www.chiark.greenend.org.uk/%7Esgtatham/putty/">PuTTY</a>
+"plink" command line program or the <a href="http://www.cygwin.com/">Cygwin</a>
+OpenSSH "ssh" program. <br>
+    </li>
+  </ul>
+</ul>
+<div style="margin-left: 80px;">In either case, the proper directory
+has to be on your PATH environment variable, and you have to have an
+SSH key generated and loaded:</div>
+<ul>
+  <ul>
+    <ul>
+      <li>For PuTTY: generate a dsa key for SSH 2 in putty-keygen; load
+it into pageant; and paste the ssh-dss string into Insert Key under
+Edit SSH Keys on your "My Emulab" page after logging in at <a
+ href="https://www.emulab.net">https://www.emulab.net</a>.&nbsp; (PuTTY
+includes a good online manual.)</li>
+    </ul>
+  </ul>
+</ul>
+<ul>
+  <ul>
+    <ul>
+      <li>For OpenSSH: use ssh-keygen if necessary; start an ssh-agent
+and load the key with:</li>
+    </ul>
+  </ul>
+</ul>
+<pre style="margin-left: 160px;">eval `ssh-agent -s`<br>ssh-add .ssh/id_dsa<br></pre>
+<div style="margin-left: 120px;">Paste the id_dsa.pub into the Emulab
+page as above, and do the following once to get boss.emulab.net put
+into your .ssh/known_hosts file:<br>
+</div>
+<pre style="margin-left: 160px;">ssh boss.emulab.net</pre>
+<ul>
+</ul>
+<ul>
+  <li>Linux - Pretty much untested.<br>
+  </li>
   <ul>
     <li>Edit the GNUMakefile to select CPU=linux before building,</li>
-    <li>and also select the include of Makefile.linuxglut in
+    <li>and also select the include of Makefile.linuxwxpy in
 hypviewer/Makefile.main .<br>
     </li>
   </ul>
-  <li>Windows - Coming soon.</li>
+</ul>
+<ul>
   <li>Please send problem reports to <a href="mailto:fish@cs.utah.edu">Russ
 Fish</a>.<br>
   </li>
 </ul>
 <h4><a name="dependencies"></a>Package dependencies: </h4>
-<div style="margin-left: 40px;">It needs wxPython, which requires
-wx_GTK2, GTK-x11, Pango, and glib, as well as glX and
-OpenGL.<br>
+<div style="margin-left: 40px;">It needs wxPython, which on Unix
+requires Python 2.3, wx_GTK2, GTK-x11, Pango, and glib, as well as glX
+and
+OpenGL.&nbsp; On Windows, Python, wxPython, and PyOpenGL are
+self-contained.<br>
+<br>
 Plus wxGlade on top if you want to modify the GUI.<br>
 </div>
+<br>
+<hr style="width: 100%; height: 2px;">
+<div style="margin-left: 40px;"></div>
 <h3><a name="run"></a>Running hypview as a script<br>
 </h3>
 Running hypview with any dash argument such as -h produces the
 following usage
-summary:<br>
+summary: <br>
+(Use the hypview script on Unix/Linux or Cygwin/BASH;&nbsp; hypview.bat
+on Windows.)<br>
 <pre style="margin-left: 40px;"><big>Hyperviewer usage:</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; No args - Starts up the GUI.&nbsp; Use the File/Open menu item to read a topology.</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; One arg - A .hyp file name.&nbsp; Read it in and start the GUI, e.g.:</big></pre>
@@ -218,7 +383,9 @@ summary:<br>
 <pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Get the topology from XMLRPC, make a .hyp file, start as above.</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview testbed BigLan</big></pre>
 <pre style="margin-left: 40px;"><big>&nbsp; Three args - Project and experiment names, plus an optional root node name.</big></pre>
-<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview testbed BigLan clan</big></pre>
+<pre style="margin-left: 40px;"><big>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ./hypview testbed BigLan clan<br><br></big></pre>
+<br>
+<hr style="width: 100%; height: 2px;">
 <h3><a name="gui"></a>The hypview Graphical User Interface</h3>
 Getting out: pick the File/Exit menu item, or type Ctrl-Q, or just
 close the
