@@ -421,6 +421,7 @@ CREATE TABLE node_types (
   delay_osid varchar(35) default NULL,
   pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
+  isremotenode tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
