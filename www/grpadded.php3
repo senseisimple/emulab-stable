@@ -53,21 +53,17 @@ if (!isset($usr_phones) ||
   $formerror = "Phone #";
 }
 #
-# Not sure about the passwd. If the user is already known, then is he
-# supposed to plug his passwd in?
+# The first password field must always be filled in. The second only
+# if a new user, and we will catch that later.
 #
-if ((!isset($password1) || strcmp($password1, "") == 0) ||
-    (!isset($password2) || strcmp($password2, "") == 0)) {
+if (!isset($password1) ||
+    strcmp($password1, "") == 0)
   $formerror = "Password";
 }
 
 if ($formerror != "No Error") {
-  echo "<h3><br><br>
-        Missing field; Please go back and fill out the \"$formerror\" field!\n
-        </h3>
-        </body>
-        </html>";
-  die("");
+  USERERROR("Missing field; ".
+            "Please go back and fill out the \"$formerror\" field!", 1);
 }
 
 #
@@ -77,10 +73,8 @@ $project_query  = "SELECT gid FROM groups WHERE gid=\"$gid\"";
 $project_result = mysql_db_query($TBDBNAME, $project_query);
 
 if ($row = mysql_fetch_row($project_result)) {
-  die("<h3><br><br>".
-      "The project name \"$gid\" you have chosen is already in use. ".
-      "Please select another.\n".
-      "</h3>");
+  USERERROR("The project name \"$gid\" you have chosen is already in use. ".
+            "Please select another.", 1);
 }
 
 #
@@ -100,19 +94,16 @@ if ($row = mysql_fetch_row($pswd_result)) {
     if ($salt[0] == $salt[1]) { $salt = $salt[0]; }
     $encoding = crypt("$password1", $salt);
     if (strcmp($encoding, $db_encoding)) {
-        die("<h3><br><br>".
-            "The password provided was incorrect. ".
-            "Please go back and retype the password.\n".
-            "</h3>");
+        USERERROR("The password provided was incorrect. ".
+                  "Please go back and retype the password.", 1);
     }
     $returning = 1;
 }
 else {
     if (strcmp($password1, $password2)) {
-        die("<h3><br><br>".
-            "You typed different passwords in each of the two password ".
-            "entry fields. <br> Please go back and correct them.\n".
-            "</h3>");
+        USERERROR("You typed different passwords in each of the two password ".
+                  "entry fields. <br> Please go back and correct them.",
+                  1);
     }
     $mypipe = popen(escapeshellcmd(
     "/usr/testbed/bin/checkpass $password1 $grp_head_uid '$usr_name:$email'"),
@@ -120,18 +111,15 @@ else {
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);
         if (strcmp($retval,"ok\n") != 0) {
-            die("<h3><br><br>".
-                "The password you have chosen will not work: ".
-                "<br><br>$retval<br>".
-                "</h3>");
+            USERERROR("The password you have chosen will not work: ".
+                      "<br><br>$retval<br>", 1);
         } 
     }
     else {
-        mail($TBMAIL_WWW, "TESTBED: checkpass failure",
-             "\n$usr_name ($grp_head_uid) just tried to set up a testbed ".
-             "account,\n".
-             "but checkpass pipe did not open (returned '$mypipe').\n".
-             "\nThanks\n");
+        TBERROR("TESTBED: checkpass failure\n".
+                "\n$usr_name ($grp_head_uid) just tried to set up a testbed ".
+                "account,\n".
+                "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
     $returning = 0;
 }
