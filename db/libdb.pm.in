@@ -95,6 +95,7 @@ use Exporter;
 	 );
 
 # Must come after package declaration!
+use lib '@prefix@/lib';
 use English;
 use File::Basename;
 use POSIX qw(strftime);
@@ -128,9 +129,11 @@ sub TBDBConnect()
     # ran it. This is for accounting purposes.
     #
     my $scriptname;
-#    if ($0) {
-#	$scriptname = basename($0);
-#    }
+    my $prog="";
+    if ($0 =~ /^([a-z0-9\-\/\.\_]*)$/) { $prog = $1; }
+    if ($prog) {
+	$scriptname = basename($prog);
+    }
     if (!$scriptname) {
 	$scriptname = "unknown";
     }
