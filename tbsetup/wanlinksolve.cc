@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -119,7 +119,8 @@
 // structures are statically sized to
 // accommodate up to MAX_NODES nodes.
 // These could be changed to STL vectors in the future.
-#define MAX_NODES 32
+#define MAX_PNODES 256
+#define MAX_VNODES 64
 #define MAX_DIMENSIONS 3
 
 // default rounds to keep going without finding a better solution.
@@ -174,14 +175,14 @@ static map< int, string > vnodeNames;
 
 static int pnodes, vnodes;
 
-static int pLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
-static int vDesiredLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
+static int pLatency[MAX_DIMENSIONS][MAX_PNODES][MAX_PNODES];
+static int vDesiredLatency[MAX_DIMENSIONS][MAX_VNODES][MAX_VNODES];
 
 static float plexPenalty = 0.0f;
-static int maxplex[MAX_NODES];
+static int maxplex[MAX_PNODES];
 static int userSpecifiedMultiplex = 0;
 
-static int fixed[MAX_NODES];
+static int fixed[MAX_VNODES];
 
 static int dimensions;
 static float d1weight, d2weight, d3weight;
@@ -196,12 +197,12 @@ class Solution
 {
 public:
   // the beef, as it were.
-  int vnode_mapping[MAX_NODES];
+  int vnode_mapping[MAX_VNODES];
 
   // Keep around a list of how many times each physical node is used
   // in this solution, rather than recomputing it each time it is needed
   // (which is often.)
-  unsigned char pnode_uses[MAX_NODES];
+  unsigned char pnode_uses[MAX_PNODES];
 
   // calculated penalty
   float error;
@@ -532,7 +533,6 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
 // for the initial population.
 static inline void generateRandomSolution( Solution * t )
 {
-  //int pnode_uses[MAX_NODES];
   bzero( t->pnode_uses, sizeof( t->pnode_uses ) );
 
   for (int i = 0; i < vnodes; i++) {
@@ -676,6 +676,11 @@ int main( int argc, char ** argv )
     fgets( line, sizeof( line ), stdin );
     sscanf( line, "%i", &pnodes );
 
+    if (pnodes > MAX_PNODES) {
+      fprintf(stderr, "Too many nodes. Increase MAX_PNODES!\n");
+      exit(1);
+    }
+
     if (verbose > 1) { printf("Okay, enter %i names for the physical nodes, one per line.\n", pnodes ); }
     for (int i = 0; i < pnodes; i++) {
       char name[1024];
@@ -731,6 +736,11 @@ int main( int argc, char ** argv )
     if (verbose > 1) { printf("How many virtual nodes?\n"); }
     fgets( line, sizeof( line ), stdin );
     sscanf( line, "%i", &vnodes );
+
+    if (vnodes > MAX_VNODES) {
+      fprintf(stderr, "Too many vnodes. Increase MAX_VNODES!\n");
+      exit(1);
+    }
 
     if (vnodes > available) {
       fprintf(stderr, 
