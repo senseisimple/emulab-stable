@@ -146,11 +146,11 @@ if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
 #
 # No need to tell me how bogus this is.
 #
-$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_id";
+$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_eid";
 $nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
-$irname  = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".ir";
+$irname  = "$dirname" . "/" . "$exp_eid" . ".ir";
 $repname = "$dirname" . "/" . "$exp_id"  . ".report";
-$logname = "$dirname" . "/" . "$exp_pid" . "$exp_id" . ".log";
+$logname = "$dirname" . "/" . "$exp_eid" . ".log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
 if (! mkdir($dirname, 0777)) {

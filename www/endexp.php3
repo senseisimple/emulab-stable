@@ -25,8 +25,8 @@ if (!isset($uid)) {
 #
 # Must provide the EID!
 # 
-if (!isset($exp_id) ||
-    strcmp($exp_id, "") == 0) {
+if (!isset($exp_eid) ||
+    strcmp($exp_eid, "") == 0) {
   USERERROR("The experiment ID was not provided!", 1);
 }
 
@@ -50,16 +50,17 @@ if (($row = mysql_fetch_row($query_result)) == 0) {
 # Then check to see if the user (UID) is a member of that PID.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM experiments WHERE eid=\"$exp_id\"");
+	"SELECT * FROM experiments WHERE eid=\"$exp_eid\"");
 if (($exprow = mysql_fetch_array($query_result)) == 0) {
-  USERERROR("The experiment $exp_id is not a valid experiment.", 1);
+  USERERROR("The experiment $exp_eid is not a valid experiment.", 1);
 }
 $pid = $exprow[pid];
 
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT pid FROM proj_memb WHERE uid=\"$uid\" and pid=\"$pid\"");
 if (mysql_num_rows($query_result) == 0) {
-  USERERROR("You are not a member of the Project for Experiment: $exp_id.", 1);
+  USERERROR("You are not a member of the Project for Experiment: $exp_eid.",
+            1);
 }
 
 #
@@ -71,11 +72,12 @@ if (mysql_num_rows($query_result) == 0) {
 #
 # No need to tell me how bogus this is.
 #
-$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_id";
+$exp_id  = substr($exp_eid, strlen($pid));
+$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_eid";
 $nsname  = "$dirname" . "/" . "$exp_id"  . ".ns";
-$irname  = "$dirname" . "/" . "$exp_id"  . ".ir";
+$irname  = "$dirname" . "/" . "$exp_eid" . ".ir";
 $repname = "$dirname" . "/" . "$exp_id"  . ".report";
-$logname = "$dirname" . "/" . "$exp_id"  . ".log";
+$logname = "$dirname" . "/" . "$exp_eid" . ".log";
 $assname = "$dirname" . "/" . "assign"   . ".log";
 
 #
