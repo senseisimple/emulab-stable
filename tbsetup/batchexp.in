@@ -146,6 +146,12 @@ if (!defined($tempnsfile)) {
     $swappable     = 0;
     $idleswap      = 0;
 }
+elsif (! -f $tempnsfile || ! -r $tempnsfile) {
+    # Exit so that user sees the error, not us.
+    print STDERR "*** $0:\n".
+	         "    $tempnsfile does not exist or is not a readable file!\n";
+    exit(1);
+}
 
 #
 # Batch jobs get a shorter idle time
