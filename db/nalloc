@@ -29,7 +29,7 @@ foreach my $n (@node_names) {
     $sth = $dbh->query($cmd);
     if ($sth->numrows > 0) {	
       print "You have already reserved node '$n'.\n";
-      $error++;
+      # Do not increment error code since that throws off tbprerun.
     } else {
       print "Someone else has already reserved node '$n'.\n";
       $error++;
