@@ -7,41 +7,23 @@
 #                                                                       #
 #########################################################################
 
+my $TB;
+my $DBNAME = "@TBDBNAME@";
+
 BEGIN { 
   #
   # Configure variables
   #
-  my $TB     = "@prefix@";
+  $TB     = "@prefix@";
 
   # This needs to go in BEGIN so it happens before the use clauses...
   push(@INC,$TB."/lib");
 }
 
-my $DBNAME = "@TBDBNAME@";
-
-# snmpit uses modules that implement the interface to a given switch
-# model. These modules should support these actions:
-#
-# new		Needs to take IP, and initialize snmp session
-# portControl	(cmd,ports)
-# 		cmd = {enable, disable, 10mbit, 100mbit, full, half,
-#                      auto, manual}
-# 		ports = list of "pcX:Y"
-# showPorts	print settings of all ports
-# getStats	print various stats
-# vlanLock	Get a vlan editing lock/token/buffer, and
-# vlanUnlock	Release it when done
-# setupVlan	(name,ports) - takes a list of ports, and vlans them
-# removeVlan	(vlan) - takes vlan number
-# listVlans	returns a list of entries, with each entry having an
-# 		ID, a name, and a list of members (pcX:Y)
-
 use English;
-use Mysql;
 
 #Uncomment this when we really need to be able to handle intel switches
 #use snmpit_intel;
-
 use snmpit_cisco;
 use snmpit_lib;
 
@@ -57,8 +39,6 @@ if ( join(" ",@ARGV) =~ /-debug\s*(\d*)/ ) {
 }
 
 my $device;
-my $dbh = Mysql->connect("localhost",$DBNAME,"script","none");
-my $sth ="";
 
 &myMain;
 
@@ -66,7 +46,7 @@ my $sth ="";
 sub num { $a <=> $b; }
 
 sub myMain {
-  
+
   my $i = "";	#IP addr.
   my @p = ();	#Port numbers
   my $d = 0;    #Disable (bool)
@@ -77,6 +57,7 @@ sub myMain {
   my $s = 0;	#Show port configs
   my $g = 0;	#Get Statistics
   my $f = "";	#AutoVLAN filename
+  my $t = "";   #VLANs from db table - "pid/eid"
   my $l = 0;	#List all VLANs on switch
   my $m = "";	#Create VLAN - name
   my @vlan =();	#VLAN Members - list of MAC Addresses
@@ -85,7 +66,7 @@ sub myMain {
   my $b = 0;	#Block (bool) (two-way switch)
   my $c = 1;	#Confirm Changes (bool) (two-way switch)
   my $v = 0;	#Verbose (bool) !Must default quiet; switch only turns on!
-  
+
   #power control
   my $on=0;
   my $off=0;
@@ -299,7 +280,7 @@ sub ParseArgs {
       "snmpit - A general purpose SNMP Tool - Version 1.1\n",
       "Syntax:\n",
       " snmpit [-h] [-v] -i<ip>\n",
-      "\t[-u] [-l] [-m<vlan name>] [-vlan<port>]\n",
+      "\t[-u] [-l] [-t <pid>/<eid>] [-m<vlan name>] [-vlan<port>]\n",
       "\t[-f<filename>] [-r<vlan #> <vlan #> ... ]\n",
       "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
       "\t[-d|-e] [+a|-a] [-spd<speed>] [-dup<duplex>]\n";
@@ -318,9 +299,10 @@ sub ParseArgs {
       "\nVLAN Control:\n",
       "  -u    Wait for Update of VLAN tables (takes ~10 seconds)\n",
       "  -l    List all VLANs on switch (ell, not #1)\n",
+      "  -t    Use Table in database to set up VLANs\n",
       "  -m    Make a VLAN called <name> (optional)\n",
       "  -vlan Add port to VLAN (may be <node>:<if> or MAC)\n",
-      "  -f    File mode - Automatically set up set of VLANs\n",
+      "  -f    File mode - Automatically set up group of VLANs\n",
       "  -r    Remove VLAN(s) (specify VLAN number)\n",
       "\nPort Control:\n",
       "  +b/-b Blocking mode (now ",($b?"on":"off"),")\n",
@@ -345,7 +327,7 @@ sub ParseArgs {
   
   #Unused letters of the alphabet:
   #
-  # j, k, n, q, t, w, x, y, z
+  # j, k, n, q, w, x, y, z
   #
   #If help only, end here...
   die("\b\n") if ($help);
@@ -454,16 +436,11 @@ sub ParseArgs {
   }
 }
 
-#
-# SUB ReadIRFile ----------------------
-#
-
 sub ReadIRFile {
   local(*f,*names,*VLANS) = @_;
   my %exists = ();
   my $skip = 1;
   my $name = "";
-  my $section = "";
   if ( -e "$TB/etc/$f") {
     open(IR,"$TB/etc/$f") 
       || die("Couldn't open $TB/etc/$f\n");
@@ -475,8 +452,8 @@ sub ReadIRFile {
   }
   print "Opened $f for reading...\n" if $debug;
   while (<IR>) {
-    chop;
-    if ( /^\#/ ) {  next; } 	 #skip comments
+    chomp;
+    if ( /^\#/ ) { next; }	 #skip comments
     if ( /^start vlan/i ) { $skip = 0 ; next; }
     if ($skip) { next; }
     if ( /^end vlan/i ) { $skip = 1 ; next; }
@@ -484,18 +461,27 @@ sub ReadIRFile {
     my @v= split;
     $name = shift @v;
     my $n=0;
-    while(@v != 0 && $n < @v) {
-      #Lowercase it all, but leave in : for tbpcx:y syntax
-      $v[$n] = "\L$v[$n]\E";
-      if ($v[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) { $v[$n] = "$1-1:0"; }
-      if ((!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)))
-	  && (defined $Interfaces{$v[$n]})) {
-	$v[$n] = $Interfaces{$v[$n]};
+    while (@v != 0 && $n < @v) {
+      $v[$n] = lc $v[$n];
+      print "Checking node $v[$n] for validity...\n" if $debug;
+      if ($v[$n] =~ /(sh\d+)(-\d)?(:\d)?/ ) {
+	$v[$n] = "$1-1:0";
       }
-      # Allow people to specify addresses with colons or dots
-      $v[$n] =~ s/[:\.]//g;
-      die("Invalid MAC Address '",$v[$n],"'. Must be 6 byte Hex value.\n")
-	if (!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)));
+      if (defined macport($v[$n])) { 
+	if ($v[$n]=~/^([a-f]|\d)*$/i) {
+	  $v[$n]=macport($v[$n]);
+	  print "Found node $v[$n]\n";
+	}
+      } else {
+	# Allow people to specify addresses with colons or dots
+	$v[$n] =~ s/[:\.]//g;
+	if (defined macport($v[$n])) {
+	  $v[$n]=macport($v[$n]);
+	  print "Found node $v[$n]\n";
+	} else {
+	  die("Invalid VLAN member '$v[$n]': must be 'pcX:Y' or MAC.\n");
+	}
+      }
       $n++;
     }
     @v = sort @v;
@@ -505,7 +491,7 @@ sub ReadIRFile {
       push(@names, $name);
       $exists{join(' ',@v)} = 1;
     }
-  }   
+  }
   close (IR);
 }
 

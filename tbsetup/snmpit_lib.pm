@@ -35,6 +35,8 @@ my $self = (getpwuid($UID))[0]
   || die "Cannot figure out who you are!\n";
 print "User is '$self' (UID $UID)\n" if $debug;
 
+my $admin=0;
+
 my $init = 0 ; # Start out uninitialized
 
 sub init {
@@ -56,7 +58,7 @@ sub portnum {
 }
 
 sub Dev {
-  my $val = shift;
+  my $val = shift || "";
   return $Devices{$val};
 }
 
@@ -115,11 +117,14 @@ sub ReadTranslationTable {
 sub NodeCheck {
   local($node) = @_;
 
+  if ($admin) { return 1; }
+
   print "Checking authorization for $node..." if $debug;
 
   # If my uid or my euid are root, its okay
-  if ( ($UID == 0) || ($EUID == 0) ) { 
-    print "(Root!) Okay.\n" if $debug;
+  if ( ($UID == 0) || ($EUID == 0) ) {
+    $admin = 1;
+    print "(Root!) Okay from now on.\n" if $debug;
     return 1;
   }
 
@@ -129,7 +134,8 @@ sub NodeCheck {
   $sth = $dbh->query($cmd);
 
   if ($sth->numrows > 0) {
-    print "(Admin!) Okay.\n" if $debug;
+    $admin = 1;
+    print "(Admin!) Okay from now on.\n" if $debug;
     return 1;
   }
 
