@@ -51,7 +51,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Home", $TBDOCBASE, "index.php3");
     WRITESIDEBARBUTTON("Tutorial at SIGCOMM'02 <img src=/new.gif>",
 		       $TBDOCBASE, "sc2002tut.php3");
-    WRITESIDEBARBUTTON("News (<img src=/new.gif> Apr 19)", $TBDOCBASE,
+    WRITESIDEBARBUTTON("News (Updated Apr 19)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Tutorial", $TBDOCBASE, "tutorial/tutorial.php3");
     WRITESIDEBARBUTTON("FAQ", $TBDOCBASE, "faq.php3");
@@ -102,7 +102,7 @@ function WRITESIDEBAR() {
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
 	if ($login_status & CHECKLOGIN_ACTIVE) {
 	    if ($login_status & CHECKLOGIN_PSWDEXPIRED) {
-		WRITESIDEBARBUTTON("Change your Password",
+		WRITESIDEBARBUTTON("Change Your Password",
 				   $TBBASE, "moduserinfo.php3");
 	    }
 	    else {
@@ -137,7 +137,7 @@ function WRITESIDEBAR() {
 				   $TBBASE, "showexp_list.php3");
 		WRITESIDEBARBUTTON("Begin an Experiment",
 				   $TBBASE, "beginexp.php3");
-		WRITESIDEBARBUTTON("Update user information",
+		WRITESIDEBARBUTTON("Update User Information",
 				   $TBBASE, "moduserinfo.php3");
 		WRITESIDEBARBUTTON("Node Reservation Status",
 				   $TBBASE, "nodecontrol_list.php3");
@@ -153,11 +153,11 @@ function WRITESIDEBAR() {
 	elseif ($login_status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER)) {
 	    WRITESIDEBARBUTTON("New User Verification",
 			       $TBBASE, "verifyusr_form.php3");
-	    WRITESIDEBARBUTTON("Update user information",
+	    WRITESIDEBARBUTTON("Update User Information",
 			       $TBBASE, "moduserinfo.php3");
 	}
 	elseif ($login_status & (CHECKLOGIN_UNAPPROVED)) {
-	    WRITESIDEBARBUTTON("Update user information",
+	    WRITESIDEBARBUTTON("Update User Information",
 			       $TBBASE, "moduserinfo.php3");
 	}
     }
