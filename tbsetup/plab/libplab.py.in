@@ -46,6 +46,12 @@ verbose = 0
 debug = 0
 
 #
+# Disable line buffering
+#
+
+sys.stdout = os.fdopen(sys.stdout.fileno(), sys.stdout.mode, 0)
+
+#
 # Database functions
 #
 
@@ -320,20 +326,6 @@ class Plab:
         This can't detect DSL links, but those are probably rare for
         Plab nodes.
         """
-        # Is host on I2?
-        traceroute = os.popen("traceroute -nm 10 -q 1 %s" % ip)
-        trace = traceroute.read()
-        traceroute.close()
-
-        for gw in MAGIC_INET2_GATEWAYS:
-            if trace.find(gw) != -1:
-                return "inet2"
-        for gw in MAGIC_INET_GATEWAYS:
-            if trace.find(gw) != -1:
-                break
-        else:
-            print "WARNING: Unknown gateway for host %s" % ip
-
         # Is host international?
         from socket import gethostbyaddr, getfqdn, herror
         try:
@@ -350,6 +342,20 @@ class Plab:
         # Is it us?
         if hostname.endswith(LOCAL_PLAB_DOMAIN):
             return LOCAL_PLAB_LINKTYPE
+
+        # Is host on I2?
+        traceroute = os.popen("traceroute -nm 10 -q 1 %s" % ip)
+        trace = traceroute.read()
+        traceroute.close()
+
+        for gw in MAGIC_INET2_GATEWAYS:
+            if trace.find(gw) != -1:
+                return "inet2"
+        for gw in MAGIC_INET_GATEWAYS:
+            if trace.find(gw) != -1:
+                break
+        else:
+            print "WARNING: Unknown gateway for host %s" % ip
 
         # Must be plain 'ole Internet
         return "inet"
@@ -401,7 +407,7 @@ class Plab:
         vnodetype = "pcplab%s" % linktype
         for n in range(numvnodes):
             vprio = (priority * 100) + (n+1)
-            sshdport = 38000+n
+            sshdport = 38000+(n+1)
             vnodeid = "%s-%d" % (nodeid, n+1)
             if verbose:
                 print "Creating vnode %s, priority %d" % (vnodeid, vprio)
