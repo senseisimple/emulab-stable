@@ -58,7 +58,7 @@ sub new {
   return $obj;
 }
 
-my %cmdOIDs = 
+my %cmdOIDs =
   (
    "enable" => [".1.3.6.1.2.1.2.2.1.7","up"],
    "disable"=> [".1.3.6.1.2.1.2.2.1.7","down"],
@@ -144,6 +144,9 @@ sub vlanLock {
   $RetVal = $sess->set([[$EditOp,1,"copy","INTEGER"]]);
   print "Buffer Request Set gave ",(defined($RetVal)?$RetVal:"undef."),
     "\n" if $verbose;
+  if (!defined($RetVal) || ! $RetVal) {
+      die("VLAN edit buffer request failed.\n");
+  }
   $RetVal = 
     $sess->set([[$BufferOwner,1,substr(`/usr/bin/uname -n`,0,-1),"OCTETSTR"]]);
   $RetVal = $sess->get([[$BufferOwner,1]]);
