@@ -230,6 +230,25 @@ fi
 AC_SUBST(EVENTSYS)
 
 #
+# Enable Windows support.
+# Right now this means NTFS support in imagezip, maybe more things later.
+# Relies on Linux NTFS library.
+# Off by default.
+# 
+AC_ARG_ENABLE(windows,
+[  --enable-windows       Enable Windows XP support (requires third-party software)])
+
+if test "$enable_windows" = "yes"; then
+	winfiles="os/imagezip/ntfs/GNUmakefile";
+	optional_subdirs="$optional_subdirs";
+        WINSUPPORT=1;
+else
+	winfiles="";
+        WINSUPPORT=0;
+fi
+AC_SUBST(WINSUPPORT)
+
+#
 # Testing mode.  In testing mode scripts should not effect hardware state.
 # This is designed to be used with the testsuite software which operates
 # on a test copy of the DB.
@@ -317,10 +336,11 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/dbvistopology vis/dbtopper \
 	vis/top2png vis/render \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
-	rc.d/cvsupd.sh rc.d/2.elvind.sh \
+	rc.d/2.elvind.sh \
 	tools/GNUmakefile \
 	tools/pcapper/GNUmakefile \
 	$eventfiles \
+	$winfiles \
 	apache/GNUmakefile apache/apache.conf "
 
 #
