@@ -107,9 +107,23 @@ if (!$forceit) {
 }
 
 #
-# Set the partition type to Linux
+# Set the partition type to Linux if not already set.
 #
-mysystem("sfdisk $diskdev -c $slice 83");
+# XXX sfdisk appears to stomp on partition one's bootblock, at least if it
+# is BSD.  It zeros bytes in the block 0x200-0x400, I suspect it is attempting
+# to invalidate any BSD disklabel.  While we could just use a scripted fdisk
+# sequence here instead, sfdisk is so much more to-the-point.  So, we just
+# save off the bootblock, run sfdisk and put the bootblock back.
+#
+# Would it seek out and destroy other BSD partitions?  Don't know.
+# I cannot find the source for sfdisk.
+#
+if ($stype != 131) {
+    mysystem("dd if=/dev/hda1 of=/var/tmp/part1.bb bs=8192 count=1");
+    mysystem("sfdisk --change-id $diskdev $slice 83");
+    mysystem("dd if=/var/tmp/part1.bb of=/dev/hda1 bs=8192 count=1");
+    mysystem("rm -f /var/tmp/part1.bb");
+}
 
 mysystem("mkfs $fsdevice");
 mysystem("echo \"$fsdevice $mountpoint ext2 defaults 0 0\" >> /etc/fstab");
