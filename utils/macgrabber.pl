@@ -17,8 +17,10 @@ my $IPalias = "NULL";
 my $currentSpeed = 100;
 my $duplex = "full";
 
-my $controlInterface = 4;
+my $controlInterface = 0;
 my $subnet = "155.101.132.";
+
+my %cardmap = ( 0 => 2, 1 => 3, 2 => 4, 3 => 0, 4 => 1);
 
 $startNode =~ /^(\D+)(\d+)$/;
 my ($nodeType,$startNum) = ($1,$2);
@@ -43,9 +45,10 @@ if (!defined $fileNum) {
 }
 
 for (my $i = $startNum; $i <= $endNum; $i++) {
-	my @MACs = parseMac($filePrefix . $fileNum++ . $fileSuffix);
+	my $filename = $filePrefix . $fileNum-- . $fileSuffix;
+	my @MACs = parseMac($filename);
 	if (!@MACs) {
-		warn "No MACs found for ${nodeType}${i}\n";
+		warn "No MACs found for ${nodeType}${i} in file $filename\n";
 	} else {
 		for (my $j = 0; $j < @MACs; $j++) {
 			my $IP;
@@ -54,9 +57,9 @@ for (my $i = $startNum; $i <= $endNum; $i++) {
 			} else {
 				$IP = "";
 			}
-			print qq|INSERT INTO interfaces VALUES ("${nodeType}${i}",$j, | .
+			print qq|INSERT INTO interfaces VALUES ("${nodeType}${i}",$cardmap{$j}, | .
 				qq|$port,"$MACs[$j]","$IP",$IPalias,"$interfaceType", | .
-				qq|"${iface}${j}",$currentSpeed,"$duplex");\n|;
+				qq|"${iface}$cardmap{$j}",$currentSpeed,"$duplex");\n|;
 		}
 	}
 }
@@ -74,15 +77,17 @@ sub parseMac {
 	while (<LOG>) {
 		chomp;
 		if (/^\s*eth0\s+[\dabcdef]{12}?\s*$/) {
-			@MACs = ();
+			my @tmpMACs = ();
 			for (my $i = 0; $i < $numCards; $i++) {
 				if (/^\s*eth\d\s+([\dabcdef]{12}?)\s*$/) {
-					push @MACs, $1;
+					push @tmpMACs, $1;
 					$_ = <LOG>;
 				} else {
 					warn "Incorrect or missing card MAC in file $filename\n";
-					@MACs = ();
 					last;
+				}
+				if ($i == ($numCards -1)) {
+					@MACs = @tmpMACs;
 				}
 			}
 		}
