@@ -101,6 +101,10 @@ certainly do things very differently.
 	cd /usr/testbed/devel/USER
 	ln -s /usr/testbed/opsdir/devel/USER opsdir
 
+* You should join the testbed/emulab-ops projects.
+
+* You need to be in the wheel/flux groups. Ask tbops to do this.
+
 * You need to have a "defs" file for configure to run. Each developer has
   their own defs file. Take a look at defs-stoller-emulab. It should be
   obvious what needs to change; search for stoller. Go ahead and check in
