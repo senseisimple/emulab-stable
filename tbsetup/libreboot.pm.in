@@ -93,6 +93,7 @@ sub nodereboot($$)
     }
     my @nodes       = @{ $args->{'nodelist'}};
     my $powercycle  = 0;
+    my $rebootmode  = 0;
     my $waitmode    = 0;
     my $realmode    = 1;
     my $killmode    = 0;
@@ -102,6 +103,7 @@ sub nodereboot($$)
     my $pipemode    = 0;
 
     $powercycle  = $args->{'powercycle'} if (exists($args->{'powercycle'}));
+    $rebootmode  = $args->{'rebootmode'} if (exists($args->{'rebootmode'}));
     $waitmode    = $args->{'waitmode'}   if (exists($args->{'waitmode'}));
     $realmode    = $args->{'realmode'}   if (exists($args->{'realmode'}));
     $killmode    = $args->{'killmode'}   if (exists($args->{'killmode'}));
@@ -307,7 +309,8 @@ sub nodereboot($$)
 	    # We need the pid so we can wait for them all before preceeding.
 	    #
 	    foreach my $node ( @batch ) {
-		$pids{$node} = RebootNode($node, $reconfig, $killmode);
+		$pids{$node} = RebootNode($node, $reconfig,
+					  $killmode, $rebootmode);
 	    }
 	}
 
@@ -450,7 +453,7 @@ sub nodereboot($$)
 # that it can wait on all the children later.
 #
 sub RebootNode {
-    my ($pc, $reconfig, $killmode) = @_;
+    my ($pc, $reconfig, $killmode, $rebootmode) = @_;
     my ($status, $syspid, $mypid, $didipod, $nodestate);
 
     if ($reconfig) {
@@ -499,11 +502,12 @@ sub RebootNode {
 	#
 	# The aux program sends the event to stated ...
 	#
+	my $reqarg = ($rebootmode ? "-r" : "-q");
 	my $optarg = ($debug ? "-dd" : "");
-
+	
 	print STDERR "reboot ($pc): in $nodestate: sending wakeup command.\n"
 	    if $debug;
-	system("$bisend $optarg -q $pc");
+	system("$bisend $optarg $reqarg $pc");
 	if ($?) {
 	    info("$pc: PXEWAKEUP failed ... power cycle");
 	    print STDERR
@@ -855,6 +859,8 @@ sub nodereboot_exec($$)
 	if (exists($args->{'debug'}) && $args->{'debug'});
     $cmdline .= " -f"
 	if (exists($args->{'powercycle'}) && $args->{'powercycle'});
+    $cmdline .= " -b"
+	if (exists($args->{'rebootmode'}) && $args->{'rebootmode'});
     $cmdline .= " -w"
 	if (exists($args->{'waitmode'}) && $args->{'waitmode'});
     $cmdline .= " -r"
