@@ -55,11 +55,13 @@ START nodes
 # <links> is a space separated list of link ids
 END nodes
 START links
-# <link> <src> <srcport> <dst> <dstport>
+# <link> <src> <srcport> <dst> <dstport> [<bandwidth> <delay>]
 # <link> is a unique link identifier.
 # <src> and <dst> are node identifiers (or lans).
 # <srcport> and <dstport> are integers.  A port of -1 indicates that
 # this information is N/A or unknown.
+# <delay> and <bandwidth> are optional.  <delay> is in ms and 
+#   <bandwidth> is in Mbs.
 END links
 START lans
 # <lan> <switch> <links>
