@@ -573,14 +573,15 @@ if ($speclocal) {
     # for the file before going to ground, so the user will get immediate
     # feedback if the filename is bogus.
     #
-    # Do not allow anything outside of /users or /proj. I do not think there
+    # Do not allow anything outside of special dirs. I do not think there
     # is a security worry, but good to enforce it anyway.
     #
     if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
-        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile)) {
+        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
+        ! ereg("^$TBGROUP_DIR/.*" ,$exp_localnsfile)) {
 	RESPIT("NS File",
 	       "Server resident file must be in either ".
-	       "$TBUSER_DIR/ or $TBPROJ_DIR/");
+	       "$TBUSER_DIR/, $TBPROJ_DIR/, or $TBGROUP_DIR/");
     }
     
     $nsfile = $exp_localnsfile;
