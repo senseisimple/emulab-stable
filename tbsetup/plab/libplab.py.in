@@ -45,7 +45,7 @@ MAILTAG = "@THISHOMEBASE@"
 SCRIPTNAME = "Unknown" # should see if we can get the toplevel script name
 
 RESERVED_PID = "emulab-ops"
-RESERVED_EID = "plabnodes"
+RESERVED_EID = "hwdown"       # start life in hwdown
 MONITOR_PID  = "emulab-ops"
 MONITOR_EID  = "plab-monitor"
 
@@ -53,8 +53,12 @@ MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
 MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
 LOCAL_PLAB_LINKTYPE = "pcplabinet2"
-#ALLOWED_NODES = ("155.98.35.3", "12.46.129.22")
-ALLOWED_NODES = ()
+# right now these are the only 2.0 machines running the new slice interface:
+ALLOWED_NODES = ('198.78.49.59', '18.31.0.213', '169.229.50.85',
+                 '169.229.50.89', '128.112.152.124', '12.46.129.23',
+                 '64.41.221.196', '132.239.17.226', '128.223.6.113',
+                 '128.208.4.199', '128.2.198.199', '155.98.35.2',
+                 '155.98.35.3')
 NUMVNODES = 20
 
 PLABNODE = "@prefix@/sbin/plabnode"
@@ -79,6 +83,8 @@ DEF_PLC_PASS = "phurds"
 DEF_PLC_LEASELEN = 1*30*24*60*60   # add one month (XXX: for now)
 DEF_PLC_SHARES = 30
 EMULABMAN_EMAIL = "emulabman@emulab.net"
+DEF_PLAB_URL = "www.planet-lab.org"
+PLAB_LIST_URIS = ("/db/nodes/all_ips.php",)
 
 #
 # How many seconds to sleep between failures and how many times to try
@@ -95,6 +101,8 @@ debug = 0
 
 #
 # Method of operation
+#
+# current choices are: PLC or dslice
 #
 method = "PLC"
 
@@ -679,12 +687,26 @@ class Plab:
         it's a list of the nodes reporting to ganglia that they support
         dslices)
         """
+        import httplib
+        
         print "Getting free Plab nodes ..."
         try:
-#            agent = self._createAgentProxy(insecure = True)
-#            avail = tryXmlrpcCmd(agent.getads)
-# right now these are the only 2.0 machines running the new slice interface:
-	     avail = [ '198.78.49.59', '18.31.0.213', '169.229.50.85', '169.229.50.89', '128.112.152.124', '12.46.129.23', '64.41.221.196', '132.239.17.226', '128.223.6.113', '128.208.4.199', '128.2.198.199', '155.98.35.2' ]
+            if method == "dslice":
+                agent = self._createAgentProxy(insecure = True)
+                avail = tryXmlrpcCmd(agent.getads)
+                
+            elif method == "PLC":
+                avail = []
+                conn = httplib.HTTPSConnection(DEF_PLAB_URL)
+                for ipuri in PLAB_LIST_URIS:
+                    conn.request("GET", ipuri)
+                    res = conn.getresponse()
+                    if res.status != 200:
+                        raise RuntimeError, "HTTP Error getting IPLIST: %s\n" \
+                              "Code: %d Reason: %s" % \
+                              (ipuri, res.status, res.reason)
+                    avail += res.read().split()
+                    
         except:
             extype, exval, extrace = sys.exc_info()
             print "Error talking to dslice agent: %s: %s" % (extype, exval)
@@ -705,6 +727,13 @@ class Plab:
 #            print "Refined node list after ping verification:"
 #            print avail
 
+        # Enforce allowed nodes limitation, if any.
+        if len(ALLOWED_NODES):
+            for ip in avail:
+                if ip not in ALLOWED_NODES:
+                    avail.remove(ip)
+            print "Advertisements in allowed nodes list:\n%s" % avail
+            
         known = self.__getKnownPnodes()
         if debug:
             print "Got known pnodes:"
@@ -731,12 +760,8 @@ class Plab:
         toadd = []  # List of IP's
         for ip in avail:
             if not known.has_key(ip) and ip not in toadd:
-                if len(ALLOWED_NODES) and not ip in ALLOWED_NODES:
-                    if verbose:
-                        print "Skipping %s because it's not in the allowed" \
-                              " list" % ip
-                    continue
                 toadd.append(ip)
+                
         if len(toadd):
             if ignorenew:
                 if verbose:
@@ -1557,6 +1582,9 @@ class Node:
         should be one of the keys that ssh naturally knows about, or
         those commands will fail.
         """
+        if method == "PLC":
+            return
+        
         if verbose:
             print "Adding pubkey to node %s" % self.nodeid
         if not identityfile.endswith(".pub"):
