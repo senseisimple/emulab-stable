@@ -318,9 +318,9 @@ doifconfig(int sock, struct in_addr ipaddr, char *request)
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select card,IP from interfaces "
-			 "where node_id='%s' and card!='%d'",
-			 2, nodeid, control_net);
+	res = mydb_query("select card,IP,IPalias from interfaces "
+			 "where node_id='%s'",
+			 3, nodeid);
 	if (!res) {
 		syslog(LOG_ERR, "IFCONFIG: %s: DB Error getting interfaces!",
 		       nodeid);
@@ -335,12 +335,33 @@ doifconfig(int sock, struct in_addr ipaddr, char *request)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 		if (row[1] && row[1][0]) {
-			sprintf(buf, "INTERFACE=%d INET=%s MASK=%s\n",
-				atoi(row[0]), row[1], NETMASK);
-			
+			int card = atoi(row[0]);
+
+			sprintf(buf, "INTERFACE=%d INET=%s MASK=%s",
+				card, row[1], NETMASK);
+
+			/*
+			 * The point of this sillyness is to look for the
+			 * special Shark case. The sharks have only one
+			 * interface, so we use an IPalias on what we call
+			 * the "control" interface. This test prevents us
+			 * from returning an ifconfig line for the control
+			 * interface, unless it has an IP alias. I could
+			 * change the setup scripts to ignore this case on
+			 * the PCs. Might end up doing that at some point. 
+			 */
+			if (row[2] && row[2][0]) {
+				strcat(buf, " IPALIAS=");
+				strcat(buf, row[2]);
+			}
+			else if (card == control_net)
+				goto skipit;
+
+			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf));
 			syslog(LOG_INFO, "IFCONFIG: %s", buf);
 		}
+	skipit:
 		nrows--;
 	}
 	mysql_free_result(res);
