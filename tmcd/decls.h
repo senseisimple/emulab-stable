@@ -25,4 +25,4 @@
  * NB: See ron/libsetup.pm. That is version 4! I'll merge that in. 
  */
 #define DEFAULT_VERSION		2
-#define CURRENT_VERSION		9
+#define CURRENT_VERSION		10
