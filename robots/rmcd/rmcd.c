@@ -199,8 +199,10 @@ static void conv_a2r(struct position *rel,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    float ct = cos(abs_start->theta);
-    float st = sin(abs_start->theta);
+    float ct, st;
+    
+    ct = cos(abs_start->theta);
+    st = sin(abs_start->theta);
     
     rel->x = ct*(abs_finish->x - abs_start->x) +
              st*(abs_finish->y - abs_start->y);
@@ -228,8 +230,10 @@ static void conv_r2a(struct position *abs_finish,
     assert(abs_start != NULL);
     assert(abs_finish != NULL);
     
-    float ct = cos(abs_start->theta);
-    float st = sin(abs_start->theta);
+    float ct, st;
+    
+    ct = cos(abs_start->theta);
+    st = sin(abs_start->theta);
     
     abs_finish->x = ct*rel->x - st*rel->y + abs_start->x;
     abs_finish->y = ct*rel->y + st*rel->x + abs_start->y;
