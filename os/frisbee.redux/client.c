@@ -24,8 +24,10 @@
 #include <stdarg.h>
 #include <pthread.h>
 #include "decls.h"
+#include "trace.h"
 
 int		debug = 0;
+int		tracing = 0;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
@@ -102,7 +104,7 @@ main(int argc, char **argv)
 	int	ch, slice = 0;
 	char   *filename;
 
-	while ((ch = getopt(argc, argv, "dhp:m:s:i:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:s:i:t")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -124,6 +126,10 @@ main(int argc, char **argv)
 			slice = atoi(optarg);
 			break;
 
+		case 't':
+			tracing++;
+			break;
+
 		case 'h':
 		case '?':
 		default:
@@ -142,7 +148,19 @@ main(int argc, char **argv)
 	ClientLogInit();
 	ImageUnzipInit(filename, slice, debug);
 	ClientNetInit();
+
+	if (tracing) {
+		ClientTraceInit("frisbee");
+		TraceStart(tracing);
+	}
+
 	PlayFrisbee();
+
+	if (tracing) {
+		TraceStop();
+		TraceDump();
+	}
+
 	exit(0);
 }
 
@@ -210,6 +228,8 @@ ClientRecvThread(void *arg)
 		 case PKTSUBTYPE_LEAVE:
 		 case PKTSUBTYPE_REQUEST:
 			 /* Ignore these. They are from other clients. */
+			 CLEVENT(3, EV_OCLIMSG,
+				 p->hdr.srcip, p->hdr.subtype, 0, 0);
 			 break;
 
 		 default:
@@ -361,6 +381,7 @@ GotBlock(Packet_t *p)
 		 * packet if there is no free chunk.
 		 */
 		if (free == -1) {
+			CLEVENT(2, EV_CLINOROOM, chunk, block, 0, 0);
 			DOSTAT(nofreechunks++);
 			if (debug)
 				log("No more free buffer slots for chunk %d!",
@@ -372,6 +393,7 @@ GotBlock(Packet_t *p)
 		 * Was this chunk already processed? 
 		 */
 		if (ChunkBitmap[chunk]) {
+			CLEVENT(2, EV_CLIDUPCHUNK, chunk, block, 0, 0);
 			DOSTAT(dupchunk++);
 			if (0)
 				log("Duplicate chunk %d ignored!", chunk);
@@ -398,6 +420,7 @@ GotBlock(Packet_t *p)
 	 * we do not need it (cause of broadcast/multicast).
 	 */
 	if (ChunkBuffer[i].bitmap[block]) {
+		CLEVENT(2, EV_CLIDUPBLOCK, chunk, block, 0, 0);
 		DOSTAT(dupblock++);
 		if (0)
 			log("Duplicate block %d in chunk %d", block, chunk);
@@ -407,6 +430,7 @@ GotBlock(Packet_t *p)
 	ChunkBuffer[i].blockcount--;
 	memcpy(ChunkBuffer[i].blocks[block].data, p->msg.block.buf, BLOCKSIZE);
 	LastReceiveChunk = chunk;
+	CLEVENT(2, EV_CLIBLOCK, chunk, block, ChunkBuffer[i].blockcount, 0);
 
 	/*
 	 * Anytime we receive a packet thats needed, reset the idle counter.
@@ -418,6 +442,7 @@ GotBlock(Packet_t *p)
 	 * Is the chunk complete? If so, then release it to the main thread.
 	 */
 	if (ChunkBuffer[i].blockcount == 0) {
+		CLEVENT(1, EV_CLICHUNK, chunk, 0, 0, 0);
 		if (debug)
 			log("Releasing chunk %d to main thread", chunk);
 		ChunkBuffer[i].ready = 1;
@@ -451,12 +476,15 @@ RequestRange(int chunk, int block, int count)
 	p->msg.request.block = block;
 	p->msg.request.count = count;
 	PacketSend(p);
+	CLEVENT(1, EV_CLIREQ, chunk, block, count, 0);
 }
 
 static void
 RequestChunk(int timedout)
 {
 	int		i, j, k;
+
+	CLEVENT(1, EV_CLIREQCHUNK, timedout, 0, 0, 0);
 
 	/*
 	 * Look for unfinished chunks.

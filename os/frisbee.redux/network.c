@@ -28,7 +28,7 @@
 #define MCAST_TTL		5
 
 static int		sock;
-static struct in_addr	ipaddr;
+struct in_addr		myipaddr;
 
 static void
 CommonInit(void)
@@ -131,7 +131,7 @@ CommonInit(void)
 	if ((he = gethostbyname(buf)) == 0)
 		fatal("gethostbyname: %s", hstrerror(h_errno));
 
-	memcpy((char *)&ipaddr, he->h_addr, sizeof(ipaddr));
+	memcpy((char *)&myipaddr, he->h_addr, sizeof(myipaddr));
 }
 
 int
@@ -193,7 +193,7 @@ PacketSend(Packet_t *p)
 	int		   len;
 
 	len = sizeof(p->hdr) + p->hdr.datalen;
-	p->hdr.srcip = ipaddr.s_addr;
+	p->hdr.srcip = myipaddr.s_addr;
 
 	to.sin_family      = AF_INET;
 	to.sin_port        = htons(portnum);
@@ -231,7 +231,7 @@ PacketReply(Packet_t *p)
 	to.sin_family      = AF_INET;
 	to.sin_port        = htons(portnum);
 	to.sin_addr.s_addr = p->hdr.srcip;
-	p->hdr.srcip       = ipaddr.s_addr;
+	p->hdr.srcip       = myipaddr.s_addr;
 
 	while (sendto(sock, (void *)p, len, 0, 
 		      (struct sockaddr *)&to, sizeof(to)) < 0) {

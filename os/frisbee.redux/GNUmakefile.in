@@ -15,7 +15,7 @@ all:	frisbee frisbeed
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-SHAREDOBJS	= log.o network.o utils.o
+SHAREDOBJS	= log.o network.o trace.o utils.o
 PTHREADCFLAGS	= -D_THREAD_SAFE \
 		  -I/usr/local/include/pthread/linuxthreads
 PTHREADLIBS	= -L/usr/local/lib -llthread -llgcc_r
@@ -41,9 +41,10 @@ frisbeed: $(SERVEROBJS)
 	cp frisbeed frisbeed.debug
 	strip frisbeed
 
-client.o:	decls.h log.h
-server.o:	decls.h log.h
+client.o:	decls.h log.h trace.h
+server.o:	decls.h log.h trace.h
 log.o:		decls.h log.h
+trace.o:	decls.h trace.h log.h
 
 install:	$(INSTALL_SBINDIR)/frisbeed
 

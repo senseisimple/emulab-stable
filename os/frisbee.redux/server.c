@@ -24,8 +24,11 @@
 #include "decls.h"
 #include "queue.h"
 
+#include "trace.h"
+
 /* Globals */
 int		debug = 0;
+int		tracing = 0;
 int		portnum;
 struct in_addr	mcastaddr;
 struct in_addr	mcastif;
@@ -107,6 +110,8 @@ WorkQueueEnqueue(int chunk, int block, int blockcount)
 	queue_enter(&WorkQ, wqel, WQelem_t *, chain);
 
 	pthread_mutex_unlock(&WorkQLock);
+
+	EVENT(1, EV_WORKENQ, mcastaddr, chunk, block, blockcount, 0);
 	return 1;
 }
 
@@ -134,6 +139,8 @@ WorkQueueDequeue(int *chunk, int *block, int *blockcount)
 	free(wqel);
 
 	pthread_mutex_unlock(&WorkQLock);
+
+	EVENT(1, EV_WORKDEQ, mcastaddr, *chunk, *block, *blockcount, 0);
 	return 1;
 }
 
@@ -156,10 +163,12 @@ ClientJoin(Packet_t *p)
 	/*
 	 * Return fileinfo. Duplicates are harmless.
 	 */
+	EVENT(1, EV_JOINREQ, ipaddr, clientid, 0, 0, 0);
 	p->hdr.type            = PKTTYPE_REPLY;
 	p->hdr.datalen         = sizeof(p->msg.join);
 	p->msg.join.blockcount = FileInfo.blocks;
 	PacketReply(p);
+	EVENT(1, EV_JOINREP, ipaddr, FileInfo.blocks, 0, 0, 0);
 
 	/*
 	 * Log after we send reply so that we get the packet off as
@@ -177,6 +186,9 @@ static void
 ClientLeave(Packet_t *p)
 {
 	struct in_addr	ipaddr = { p->hdr.srcip };
+
+	EVENT(1, EV_LEAVEMSG, ipaddr,
+	      p->msg.leave.clientid, p->msg.leave.elapsed, 0, 0);
 
 	log("%s (id %u) leaves at %s! Reports %d elapsed seconds.",
 	    inet_ntoa(ipaddr), p->msg.leave.clientid, CurrentTimeString(),
@@ -197,6 +209,7 @@ ClientRequest(Packet_t *p)
 	int		count = p->msg.request.count;
 	int		enqueued;
 
+	EVENT(1, EV_REQMSG, ipaddr, chunk, block, count, 0);
 	if (block + count > CHUNKSIZE)
 		fatal("Bad request from %s - chunk:%d block:%d size:%d", 
 		      inet_ntoa(ipaddr), chunk, block, count);
@@ -315,6 +328,8 @@ PlayFrisbee(void)
 					pfatal("Reading File");
 				fatal("EOF on file");
 			}
+			EVENT(2, EV_READFILE, mcastaddr,
+			      offset, readsize, cc, 0);
 			if (cc != readsize)
 				fatal("Short read: %d!=%d", cc, readsize);
 
@@ -329,6 +344,8 @@ PlayFrisbee(void)
 				       BLOCKSIZE);
 
 				PacketSend(p);
+				EVENT(3, EV_BLOCKMSG, mcastaddr,
+				      chunk, block+j, 0, 0);
 			}
 			offset   += readsize;
 			block    += readcount;
@@ -364,7 +381,7 @@ main(int argc, char **argv)
 	pthread_t	child_pid;
 	off_t		fsize;
 
-	while ((ch = getopt(argc, argv, "dhp:m:i:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:i:t")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -380,6 +397,9 @@ main(int argc, char **argv)
 
 		case 'i':
 			inet_aton(optarg, &mcastif);
+			break;
+		case 't':
+			tracing++;
 			break;
 		case 'h':
 		case '?':
@@ -426,6 +446,11 @@ main(int argc, char **argv)
 	 */
 	ServerNetInit();
 
+	if (tracing) {
+		ServerTraceInit("frisbeed");
+		TraceStart(tracing);
+	}
+
 	/*
 	 * Create the subthread to listen for packets.
 	 */
@@ -435,6 +460,11 @@ main(int argc, char **argv)
 	gettimeofday(&IdleTimeStamp, 0);
 	
 	PlayFrisbee();
+
+	if (tracing) {
+		TraceStop();
+		TraceDump();
+	}
 
 	/*
 	 * Exit from main thread will kill all the children.
@@ -450,6 +480,11 @@ main(int argc, char **argv)
 void
 quit(int sig)
 {
+	if (tracing) {
+		TraceStop();
+		TraceDump();
+	}
+
 	log("Caught signal %d. Exiting ...", sig);
 	exit(0);
 }
@@ -460,6 +495,11 @@ quit(int sig)
 void
 reinit(int sig)
 {
+	if (tracing) {
+		TraceStop();
+		TraceDump();
+	}
+
 	log("Caught signal %d. Exiting ...", sig);
 	exit(1);
 }
