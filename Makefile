@@ -4,6 +4,7 @@
 
 install: all 
 	install -c assign/assign /usr/testbed/bin
+
 	install -c db/avail /usr/testbed/bin
 	install -c db/inuse /usr/testbed/bin
 	install -c db/mac2if /usr/testbed/bin
@@ -13,21 +14,26 @@ install: all
 	install -c db/ptopgen /usr/testbed/bin
 	install -c db/showgraph /usr/testbed/bin
 	install -c db/tblog /usr/testbed/bin
+
 	install -c discvr/cli /usr/testbed/bin
 	install -c discvr/serv /usr/testbed/bin
-	install -c os/gethostkey.tcl /usr/testbed/bin
-	install -c os/hostkey.tcl /usr/testbed/bin
-	install -c os/instimage.exp /usr/testbed/bin
+
+	install -c os/gethostkey.tcl /usr/testbed/bin/gethostkey
+	install -c os/hostkey.tcl /usr/testbed/bin/hostkey
+	install -c os/instimage.exp /usr/testbed/bin/instimage
 	install -c os/key7 /usr/testbed/bin
 	install -c os/key8 /usr/testbed/bin
-	install -c os/oslist.tcl /usr/testbed/bin
-	install -c os/osnode2db.tcl /usr/testbed/bin
-	install -c os/osnodestatus.tcl /usr/testbed/bin
-	install -c os/ossane.tcl /usr/testbed/bin
-	install -c os/osset.tcl /usr/testbed/bin
-	install -c os/osstatus.tcl /usr/testbed/bin
-	install -c os/setupmachine.sh /usr/testbed/bin
-	install -c os/imagezip/imagezip /usr/testbed/bin
+	install -c os/oslist.tcl /usr/testbed/bin/oslist
+	install -c os/osnode2db.tcl /usr/testbed/bin/osnode2db
+	install -c os/osnodestatus.tcl /usr/testbed/bin/osnodestatus
+	install -c os/ossane.tcl /usr/testbed/bin/ossane
+	install -c os/osset.tcl /usr/testbed/bin/osset
+	install -c os/osstatus.tcl /usr/testbed/bin/osstatus
+	install -c os/setupmachine.sh /usr/testbed/bin/setupmachine
+	install -c os/imagezip/imagezip /usr/testbed/bin/imagezip
+	# XXX
+	install -c os/oslib.tcl /usr/testbed/bin
+
 	install -c tbsetup/exp_accts /usr/testbed/bin
 	install -c tbsetup/genptop /usr/testbed/bin
 	install -c tbsetup/ifc_setup /usr/testbed/bin
@@ -37,16 +43,16 @@ install: all
 	install -c tbsetup/resetvlans.tcl /usr/testbed/bin
 	install -c tbsetup/savevlans /usr/testbed/bin
 	install -c tbsetup/snmpit /usr/testbed/bin
-	install -c tbsetup/tbend.tcl /usr/testbed/bin
-	install -c tbsetup/tbprerun.tcl /usr/testbed/bin
-	install -c tbsetup/tbreport.tcl /usr/testbed/bin
-	install -c tbsetup/tbrun.tcl /usr/testbed/bin
+	install -c tbsetup/tbend.tcl /usr/testbed/bin/tbend
+	install -c tbsetup/tbprerun.tcl /usr/testbed/bin/tbprerun
+	install -c tbsetup/tbreport.tcl /usr/testbed/bin/tbreport
+	install -c tbsetup/tbrun.tcl /usr/testbed/bin/tbrun
 	install -c tbsetup/vpower /usr/testbed/bin
 	install -c tbsetup/vsnmpit /usr/testbed/bin
-	install -c tbsetup/ir/assign.tcl /usr/testbed/bin
-	install -c tbsetup/ir/extract_tb.tcl /usr/testbed/bin
-	install -c tbsetup/ir/handle_ip.tcl /usr/testbed/bin
-	install -c tbsetup/ns2ir/parse.tcl /usr/testbed/bin
+	install -c tbsetup/ir/assign.tcl /usr/testbed/bin/assign
+	install -c tbsetup/ir/extract_tb.tcl /usr/testbed/bin/extract_tb
+	install -c tbsetup/ir/handle_ip.tcl /usr/testbed/bin/handle_ip
+	install -c tbsetup/ns2ir/parse.tcl /usr/testbed/bin/parse
 	@$(MAKE) -C tbsetup/checkpass install
 
 
@@ -82,6 +88,3 @@ clean:
 	@$(MAKE) -C os  clean
 	@$(MAKE) -C os/imagezip clean
 	@$(MAKE) -C tbsetup/checkpass clean
-	
-
-
