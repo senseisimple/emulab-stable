@@ -842,6 +842,18 @@ CREATE TABLE unixgroup_membership (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'user_pubkeys'
+#
+
+CREATE TABLE user_pubkeys (
+  uid varchar(8) NOT NULL default '',
+  comment varchar(128) NOT NULL default '',
+  pubkey text,
+  stamp datetime default NULL,
+  PRIMARY KEY  (uid,comment)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'users'
 #
 
@@ -869,7 +881,6 @@ CREATE TABLE users (
   pswd_expires date default NULL,
   cvsweb tinyint(4) NOT NULL default '0',
   emulab_pubkey text,
-  home_pubkey text,
   adminoff tinyint(4) default '0',
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid)
