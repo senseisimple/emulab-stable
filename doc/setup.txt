@@ -159,6 +159,11 @@ run out of /etc/crontab
 user that has read/write access to the database.)
 Don't forget to HUP cron!
 
+ntpd: The boss node should be running ntpd. In FreeBSD, you can enable this with
+the line
+xntpd_enable="YES"
+in /etc/rc.conf. Check out the ntpd man page for configuration information.
+
 ##### Last-minute synching
 Right before bringing the new boss node online (if copying from an old boss node),
 make sure to have copy over the latest versions of:
