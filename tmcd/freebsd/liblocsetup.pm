@@ -13,10 +13,10 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD $TMDELMAP
+    qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line 
+	 os_rpminstall_line os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel
@@ -43,6 +43,7 @@ BEGIN
 # Convenience.
 sub REMOTE()	{ return libsetup::REMOTE(); }
 sub MFS()	{ return libsetup::MFS(); }
+sub JAILED()	{ return libsetup::JAILED(); }
 
 #
 # Various programs and things specific to FreeBSD and that we want to export.
@@ -54,7 +55,6 @@ $UMOUNT		= "/sbin/umount";
 $TMPASSWD	= "$ETCDIR/master.passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
 $SFSCD		= "/usr/local/sbin/sfscd";
-$TMDELMAP	= "$BOOTDIR/delay_mapping";
 
 #
 # These are not exported
@@ -67,8 +67,9 @@ my $GROUPADD	= "/usr/sbin/pw groupadd";
 my $GROUPDEL	= "/usr/sbin/pw groupdel";
 my $CHPASS	= "/usr/bin/chpass -p";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
-my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s %s %s";
-my $IFALIAS     = "/sbin/ifconfig %s alias %s netmask 0xffffff00";
+my $IFCONFIGBIN = "/sbin/ifconfig";
+my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s %s %s";
+my $IFALIAS     = "$IFCONFIGBIN %s alias %s netmask 0xffffff00";
 my $IFC_1000MBS = "media 1000baseSX";
 my $IFC_100MBS  = "media 100baseTX";
 my $IFC_10MBS   = "media 10baseT/UTP";
@@ -77,6 +78,8 @@ my $RPMINSTALL  = "/usr/local/bin/rpm -i %s";
 my $MKDIR	= "/bin/mkdir";
 my $GATED	= "/usr/local/sbin/gated";
 my $ROUTE	= "/sbin/route";
+my $SHELLS	= "/etc/shells";
+my $DEFSHELL	= "/bin/tcsh";
 
 #
 # OS dependent part of cleanup node state.
@@ -84,7 +87,7 @@ my $ROUTE	= "/sbin/route";
 sub os_cleanup_node ($) {
     my ($scrub) = @_;
 
-    if (REMOTE()) {
+    if (REMOTE() && !JAILED()) {
 	return 0;
     }
 
@@ -115,11 +118,12 @@ sub os_cleanup_node ($) {
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$)
+sub os_ifconfig_line($$$$$$;$)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $rtabid) = @_;
     my $media    = "";
     my $mediaopt = "";
+    my ($uplines, $downlines);
 
     #
     # Need to check units on the speed. Just in case.
@@ -154,20 +158,66 @@ sub os_ifconfig_line($$$$$$)
 	$mediaopt = $IFC_FDUPLEX;
     }
 
-    my $ifline = sprintf($IFCONFIG, $iface, $inet, $mask, $media, $mediaopt);
+    $uplines   = sprintf($IFCONFIG, $iface, $inet, $mask, $media, $mediaopt);
+    $downlines = "$IFCONFIGBIN $iface down\n";
 
     if ($aliases ne "") {
 	# Must do this first to avoid lo0 routes.
-	$ifline = "$ifline\n" .
-	    "sysctl -w net.link.ether.inet.useloopback=0";
+	$uplines .= "\n".
+	            "sysctl -w net.link.ether.inet.useloopback=0\n";
 
 	foreach my $alias (split(',', $aliases)) {
 	    my $ifalias = sprintf($IFALIAS, $iface, $alias);
 
-	    $ifline = "$ifline\n$ifalias";
+	    $uplines   .= "$ifalias\n";
+	    $downlines .= "$IFCONFIGBIN $iface -alias $alias\n";
 	}
     }
-    return $ifline;
+    return ($uplines, $downlines);
+}
+
+#
+# Specialized function for configing locally hacked veth devices.
+#
+sub os_ifconfig_veth($$$$$;$)
+{
+    my ($iface, $inet, $mask, $id, $vmac, $rtabid) = @_;
+    my ($uplines, $downlines);
+
+    #
+    # Do not try this on the MFS!
+    #
+    return ""
+	if (MFS());
+
+    require Socket;
+    import Socket;
+
+    # Need to derive a vlan tag. Just use the middle two octets.
+    my $vtag = (unpack("I", inet_aton($inet)) >> 8) & 0xffff;
+
+    if ($vmac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	$vmac = "$1:$2:$3:$4:$5:$6";
+    }
+    else {
+	warn("Bad vmac in veth config: $vmac\n");
+	return "";
+    }
+    $uplines = "";
+    if (defined($iface)) {
+	$uplines .= "$IFCONFIGBIN $iface up\n";
+    }
+    $uplines .= "$IFCONFIGBIN veth${id} create\n" .
+	        "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
+		(defined($iface) ? " vethdev $iface\n" : "\n");
+
+    if (defined($rtabid)) {
+	$uplines .= "$IFCONFIGBIN veth${id} rtabid $rtabid\n";
+    }
+    $uplines  .= "$IFCONFIGBIN veth${id} inet $inet netmask $mask\n";
+    $downlines = "$IFCONFIGBIN veth${id} down\n".
+	         "$IFCONFIGBIN veth${id} destroy\n";
+    return ($uplines, $downlines);
 }
 
 #
@@ -214,9 +264,9 @@ sub os_userdel($)
 #
 # Modify user group membership.
 # 
-sub os_usermod($$$$$)
+sub os_usermod($$$$$$)
 {
-    my($login, $gid, $glist, $pswd, $root) = @_;
+    my($login, $gid, $glist, $pswd, $root, $shell) = @_;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "wheel");
@@ -224,20 +274,22 @@ sub os_usermod($$$$$)
     if ($glist ne "") {
 	$glist = "-G $glist";
     }
+    # Map the shell into a full path.
+    $shell = MapShell($shell);
 
     if (system("$CHPASS '$pswd' $login") != 0) {
 	warn "*** WARNING: $CHPASS $login error.\n";
 	return -1;
     }
-    return system("$USERMOD $login -g $gid $glist");
+    return system("$USERMOD $login -s $shell -g $gid $glist");
 }
 
 #
 # Add a user.
 # 
-sub os_useradd($$$$$$$$)
+sub os_useradd($$$$$$$$$)
 {
-    my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root) = @_;
+    my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root, $shell) = @_;
     my $args = "";
 
     if ($root) {
@@ -249,10 +301,22 @@ sub os_useradd($$$$$$$$)
     # If remote, let it decide where to put the homedir.
     if (!REMOTE()) {
 	$args .= "-d $homedir ";
+
+	# Locally, if directory exists and is populated, skip -m
+	# cause FreeBSD copies files in anyway!
+	$args .= "-m "
+	    if (! -e "$homedir/.cshrc");
+    }
+    else {
+	# populate on remote nodes. At some point will tar files over.
+	$args .= "-m ";
     }
 
+    # Map the shell into a full path.
+    $shell = MapShell($shell);
+
     if (system("$USERADD $login -u $uid -g $gid $args ".
-	       "-m -s /bin/tcsh -c \"$gcos\"") != 0) {
+	       "-s $shell -c \"$gcos\"") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
     }
@@ -319,8 +383,11 @@ sub os_routing_enable_forward()
 	$cmd = "echo 'IP forwarding not turned on!'";
     }
     else {
-	$cmd = "sysctl -w net.inet.ip.forwarding=1\n";
-	$cmd .= "sysctl -w net.inet.ip.fastforwarding=1";
+	# No Fast Forwarding when operating with linkdelays. 
+	$cmd  = "sysctl -w net.inet.ip.forwarding=1\n" .
+	        "    if [ ! -e $BOOTDIR/rc.linkdelay ]; then\n" .
+	        "        sysctl -w net.inet.ip.fastforwarding=1\n" .
+		"    fi\n";
     }
     return $cmd;
 }
@@ -338,15 +405,16 @@ sub os_routing_enable_gated()
     return $cmd;
 }
 
-sub os_routing_add_manual($$$$$)
+sub os_routing_add_manual($$$$$;$)
 {
-    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my ($routetype, $destip, $destmask, $gate, $cost, $rtabid) = @_;
     my $cmd;
+    my $rtabopt = (defined($rtabid) ? "-rtabid $rtabid" : "");
 
     if ($routetype eq "host") {
-	$cmd = "$ROUTE add -host $destip $gate";
+	$cmd = "$ROUTE add $rtabopt -host $destip $gate";
     } elsif ($routetype eq "net") {
-	$cmd = "$ROUTE add -net $destip $gate $destmask";
+	$cmd = "$ROUTE add $rtabopt -net $destip $gate $destmask";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
 	$cmd = "";
@@ -355,21 +423,47 @@ sub os_routing_add_manual($$$$$)
     return $cmd;
 }
 
-sub os_routing_del_manual($$$$$)
+sub os_routing_del_manual($$$$$;$)
 {
-    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my ($routetype, $destip, $destmask, $gate, $cost, $rtabid) = @_;
     my $cmd;
+    my $rtabopt = (defined($rtabid) ? "-rtabid $rtabid" : "");
 
     if ($routetype eq "host") {
-	$cmd = "$ROUTE delete -host $destip";
+	$cmd = "$ROUTE delete $rtabopt -host $destip";
     } elsif ($routetype eq "net") {
-	$cmd = "$ROUTE delete -net $destip $gate $destmask";
+	$cmd = "$ROUTE delete $rtabopt -net $destip $gate $destmask";
     } else {
 	warn "*** WARNING: bad routing entry type: $routetype\n";
 	$cmd = "";
     }
 
     return $cmd;
+}
+
+# Map a shell name to a full path using /etc/shells
+sub MapShell($)
+{
+   my ($shell) = @_;
+
+   if ($shell eq "") {
+       return $DEFSHELL;
+   }
+
+   my $fullpath = `grep '/${shell}\$' $SHELLS`;
+   
+   if ($?) {
+       return $DEFSHELL;
+   }
+
+   # Sanity Check
+   if ($fullpath =~ /^([-\w\/]*)$/) {
+       $fullpath = $1;
+   }
+   else {
+       $fullpath = $DEFSHELL;
+   }
+   return $fullpath;
 }
 
 1;

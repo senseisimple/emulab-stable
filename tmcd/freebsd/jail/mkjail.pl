@@ -4,6 +4,8 @@
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
+# Kernel, jail, netstat, route, ifconfig, ipfw, header files.
+# 
 use English;
 use Getopt::Std;
 use Fcntl;
@@ -85,9 +87,11 @@ my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", "opt",
 		   "bin", "sbin", "home", $LOCALMNTPNT);
 my @ROOTMNTDIRS = ("bin", "sbin", "usr");
 my @EMUVARDIRS	= ("logs", "db", "jails", "boot", "lock");
-my $VNFILEMBS   = 64;
+my $VNFILESECT  = 64 * ((1024 * 1024) / 512); # 64MB in 512b sectors.
 my $MAXVNDEVS	= 10;
 my $IP;
+my $IPALIAS;
+my $IPMASK;
 my $PID;
 my $jailhostname;
 my $debug	= 1;
@@ -103,10 +107,9 @@ my $interactive = 0;
 my %jailconfig  = ();
 my $jailoptions = "";
 my $sshdport    = 50000;	# Bogus default, good for testing.
-my $routetabid  = 0;		# Default to main routing table.
+my $routetabid;			# Default to main routing table.
 my $jailflags   = 0;
 my @jailips     = ();		# List of jail IPs (for routing table).
-my $ipfwrules	= ();		# List of IPFW rules to clean.
 my $JAIL_DEVMEM = 0x01;		# We need to know if these options given.
 my $JAIL_ROUTING= 0x02;
 
@@ -153,7 +156,8 @@ if ($hostname =~ /^([-\w\.]+)$/) {
 }
 
 #
-# If no IP, then it defaults to our hostname's IP.
+# If no IP, then it defaults to our hostname's IP, *if* none is provided
+# by the jail configuration file. That check is later. 
 # 
 if (defined($options{'i'})) {
     $IP = $options{'i'};
@@ -164,12 +168,6 @@ if (defined($options{'i'})) {
     else {
 	die("Tainted argument $IP!\n");
     }
-}
-else {
-    $IP = $hostip;
-}
-if (!defined($IP)) {
-    usage();
 }
 
 if (defined($options{'p'})) {
@@ -194,9 +192,6 @@ if (defined($options{'h'})) {
     }
 }
 
-print("Setting up jail for $vnodeid using $IP\n")
-    if ($debug);
-
 #
 # In most cases, the $vnodeid directory will have been created by the caller,
 # and a config file possibly dropped in.
@@ -219,6 +214,16 @@ else {
 setjailoptions();
 
 #
+# If no IP set in the jail config, then use hostip.
+#
+if (!defined($IP)) {
+    $IP = $hostip;
+}
+
+print("Setting up jail for $vnodeid using $IP\n")
+    if ($debug);
+
+#
 # Create the "disk";
 #
 if (-e "$vnodeid/root") {
@@ -233,6 +238,20 @@ else {
     #
     mkrootfs("$JAILPATH/$vnodeid");
 }
+
+#
+# If the jail has its own IP, must insert the control network alias.
+#
+if (defined($IPALIAS)) {
+    mysystem("ifconfig `control_interface` alias $IPALIAS netmask $IPMASK");
+}
+
+#
+# Set up jail interfaces. We pass it the rtabid as well, and the script
+# does all the right stuff. 
+#
+mysystem("ifsetup -i -j $vnodeid ".
+	 (($jailflags & $JAIL_ROUTING) ? "-r $routetabid" : ""));
 
 #
 # Start the tmcc proxy. This path will be valid in both the outer
@@ -278,7 +297,7 @@ exit(0);
 sub mkrootfs($)
 {
     my ($path) = @_;
-    my $vnsize = $VNFILEMBS;
+    my $vnsize = $VNFILESECT;
 
     chdir($path) or
 	fatal("Could not chdir to $path: $!");
@@ -287,9 +306,9 @@ sub mkrootfs($)
 	fatal("Could not mkdir 'root' in $path: $!");
     
     #
-    # Big file of zeros.
+    # Lots of zeros. Note we oseek to create a big hole.
     # 
-    mysystem("dd if=/dev/zero of=root.vnode bs=1m count=$vnsize");
+    mysystem("dd if=/dev/zero of=root.vnode bs=512 oseek=$vnsize count=1");
 
     #
     # Find a free vndevice.
@@ -410,14 +429,22 @@ sub mkrootfs($)
     mysystem("cp -p $ETCJAIL/master.passwd $path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
     mysystem("pwd_mkdb -p -d $path/root/etc $path/root/etc/master.passwd");
-    mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
-	     " $path/root/etc/rc.conf");
 
     # No X11 forwarding. 
     mysystem("cat $path/root/etc/ssh/sshd_config | ".
 	     "sed -e 's/^X11Forwarding.*yes/X11Forwarding no/' > ".
 	     "$path/root/tmp/sshd_foo");
     mysystem("cp -f $path/root/tmp/sshd_foo $path/root/etc/ssh/sshd_config");
+    
+    # Port/Address for sshd.
+    if ($IP ne $hostip) {
+	mysystem("echo 'ListenAddress $IP' >> ".
+		 "$path/root/etc/ssh/sshd_config");
+    }
+    else {
+	mysystem("echo 'sshd_flags=\"\$sshd_flags -p $sshdport\"' >> ".
+		 "$path/root/etc/rc.conf");
+    }
 
     # In the jail, 127.0.0.1 refers to the jail, but we want to use the
     # nameserver running *outside* the jail.
@@ -427,12 +454,12 @@ sub mkrootfs($)
 
     #
     # If the jail gets its own routing table, must arrange for it to
-    # be populated when the jail starts up.
+    # be populated with some extras when it boots up.
     # 
     if ($jailflags & $JAIL_ROUTING) {
 	addroutestorc("$path/root/etc/rc.conf");
     }
-	
+
     #
     # Give the jail an NFS mount of the local project directory. This one
     # is read-write.
@@ -546,6 +573,7 @@ sub cleanmess($) {
     mysystem("rm -f  $path/root/$ETCDIR/cvsup.auth");
     mysystem("rm -rf $path/root/$ETCDIR/.cvsup");
     mysystem("rm -f  $path/root/$ETCDIR/master.passwd");
+    mysystem("rm -f  $path/root/$ETCDIR/bossnode");
 
     #
     # Copy in emulabman if it exists.
@@ -616,8 +644,12 @@ sub cleanup()
 	waitpid($jailpid, 0);
     }
 
-    foreach my $ruleno (keys(%ipfwrules)) {
-	system("ipfw delete $ruleno");
+    # Clean up interfaces we might have setup
+    system("ifsetup -u -j $vnodeid");
+
+    # If the jail has its own IP, clean the alias.
+    if (defined($IPALIAS)) {
+	system("ifconfig `control_interface` -alias $IPALIAS");
     }
 
     while (@mntpoints) {
@@ -703,6 +735,8 @@ sub getjailconfig($)
 # See if special jail opts supported.
 #
 sub setjailoptions() {
+    my $portrange;
+    
     #
     # Do this all the time, so that we can figure out the sshd port.
     # 
@@ -710,9 +744,21 @@ sub setjailoptions() {
 	my $val = $jailconfig{$key};
 
         SWITCH: for ($key) {
+	    /^JAILIP$/ && do {
+		if ($val =~ /([\d\.]+),([\d\.]+)/) {
+		    # Set the jail IP, but do not override one on the 
+		    # command line.
+		    if (!defined($IP)) {
+			$IP      = $1;
+			$IPALIAS = $1;
+			$IPMASK  = $2;
+		    }
+		}
+		last SWITCH;
+	    };
 	    /^PORTRANGE$/ && do {
 		if ($val =~ /(\d+),(\d+)/) {
-		    $jailoptions .= " -p $1:$2";
+		    $portrange = "$1:$2";
 		}
 		last SWITCH;
 	    };
@@ -759,15 +805,13 @@ sub setjailoptions() {
 		last SWITCH;
 	    };
 	    /^ROUTING$/ && do {
-	       if (0) {
 		if ($val) {
-		    $jailoptions .= " -o routing";
+		    $jailoptions .= " -o routing -i 127.0.0.1 ";
 
 		    $jailflags |= $JAIL_ROUTING;
 		    #
 		    # If the jail gets routing privs, then it must get
-		    # its own routing table. We need to know this number
-		    # so we can enter an ipfw rule for it.
+		    # its own routing table. 
 		    #
 		    $routetabid   = getnextrtabid();
 		    $jailoptions .= " -r $routetabid";
@@ -775,7 +819,6 @@ sub setjailoptions() {
 		else {
 		    $jailoptions .= " -o norouting";
 		}
-  	       }
 		last SWITCH;
 	    };
 	    /^DEVMEM$/ && do {
@@ -796,7 +839,15 @@ sub setjailoptions() {
  	    };
 	}
     }
-    print("SSHD port is $sshdport\n");
+    if (! defined($IPALIAS)) {
+	if (defined($portrange)) {
+	    $jailoptions .= " -p $portrange";
+	}
+	else {
+	    fatal("Must have a port range if jail ip equals host ip!");
+	}
+	print("SSHD port is $sshdport\n");
+    }
 
     system("sysctl jail.inetraw_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.bpf_allowed=1 >/dev/null 2>&1");
@@ -812,59 +863,48 @@ sub setjailoptions() {
     }
     print("Special jail options are supported: '$jailoptions'\n");
 
-    if (@jailips && ($jailflags & $JAIL_ROUTING)) {
-	genipfwrules();
-    }
     return 0;
 }
 
 #
-# Append a list of static routes to the rc.conf file.
+# Append a list of static routes to the rc.conf file. This basically
+# augments the list of static routes that tmcd tells us to install. 
 #
 sub addroutestorc($rc)
 {
     my ($rc)   = @_;
     my $count  = 0;
 
-    #
-    # Need the IP of the default router, which we got from DHCP but
-    # is not stashed anyplace easy to get at. 
-    # 
-    my $router_name = `route get default | awk '/gateway:/ {print \$2}'`;
-    chomp($router_name);
-    my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($router_name);
-    my $router_ip = inet_ntoa($ipaddrs[0]);
-    fatal("Could not determine IP of the default router!")
-	if (!defined($router_ip));
-
     open(RC, ">>$rc") or
 	fatal("Could not open $rc to append static routes");
+
+    my $routerip = `cat $BOOTDIR/routerip`;
+    chomp($routerip);
+    my $hostip   = `cat $BOOTDIR/myip`;
+    chomp($hostip);
 
     #
     # First the set of routes that all jails get. 
     # 
     print RC "static_routes=\"default lo0 host\"\n";
-    print RC "route_default=\"default $router_ip\"\n";
+    print RC "route_default=\"default $routerip\"\n";
     print RC "route_lo0=\"localhost -interface lo0\"\n";
     print RC "route_host=\"$hostip localhost\"\n";
+    if ($IP ne $hostip) {
+	print RC "static_routes=\"\$static_routes jailip\"\n";
+	print RC "route_jailip=\"$IP localhost\"\n";
+    }
 
     #
     # Now a list of routes for each of the IPs the jail has access
-    # to. Of course, we need to know the interface name, so use the
-    # route command again.
+    # to. The idea here is to override the interface route such that
+    # traffic to the local interface goes through lo0 instead. This
+    # avoids going through traffic shaping when, say, pinging your own
+    # interface!
     # 
     foreach my $ip (@jailips) {
-	my $interface = `route get $ip | awk '/interface:/ {print \$2}'`;
-	my $netmask   = `route get $ip | awk '/mask:/ {print \$2}'`;
-	chomp($interface);
-	chomp($netmask);
-	fatal("Could not find interface for $ip")
-	    if (!defined($interface));
-
 	print RC "static_routes=\"ip${count} \$static_routes\"\n";
-	print RC "route_ip${count}=\"-net $ip -interface $interface " .
-	    "-netmask $netmask\"\n";
-
+	print RC "route_ip${count}=\"$ip -interface lo0\"\n";
 	$count++;
     }
     close(RC);
@@ -918,34 +958,11 @@ sub getnextrtabid()
     }
     system("echo $nextrtabid > $rtabidfile");
     close(LOCK);
+    #
+    # Flush that routing table so its pristine. Again, this should be
+    # handled in the kernel.
+    #
+    system("route flush -rtabid $nextrtabid");
+    
     return $nextrtabid;
-}
-
-#
-# Generate the list of ipfw rules for setting the rtabid. This should
-# eventually go away when we have better support in the kernel for
-# figuring this out.
-#
-sub genipfwrules()
-{
-    my $index = $routetabid * 100;
-
-    if (scalar(@jailips) > 100) {
-	fatal("Too many ipfw rules (too many IPs)!");
-    }
-
-    foreach my $ip (@jailips) {
-	my $rule = "ipfw add $index rtabid $routetabid ip from any to $ip";
-
-	#
-	# Install rule. If any fail, we are doomed.
-	#
-	system($rule) == 0
-	    or fatal("ipfw failed: $rule");
-	
-	#
-	# Save for cleanup().
-	# 
-	$ipfwrules{$index++} = $rule;
-    }
 }

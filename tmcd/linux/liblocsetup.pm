@@ -15,7 +15,7 @@ use Exporter;
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD $SFSSD $SFSCD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
 	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
-	 os_rpminstall_line
+	 os_rpminstall_line os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
 	 os_groupdel
@@ -72,6 +72,8 @@ my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $MKDIR	= "/bin/mkdir";
 my $GATED	= "/usr/sbin/gated";
 my $ROUTE	= "/sbin/route";
+my $SHELLS	= "/etc/shells";
+my $DEFSHELL	= "/bin/tcsh";
 
 #
 # OS dependent part of cleanup node state.
@@ -103,9 +105,9 @@ sub os_cleanup_node ($) {
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$$$$)
+sub os_ifconfig_line($$$$$$;$)
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases, $rtabid) = @_;
     my ($ifc, $miirest, $miisleep, $miisetspd, $media);
 
     #
@@ -148,6 +150,14 @@ sub os_ifconfig_line($$$$$$)
 	   sprintf($IFCONFIG, $iface, $inet, $mask);
     
     return "$ifc";
+}
+
+#
+# Specialized function for configing locally hacked veth devices.
+#
+sub os_ifconfig_veth($$$$$;$)
+{
+    return "";
 }
 
 #
@@ -194,9 +204,9 @@ sub os_userdel($)
 #
 # Modify user group membership.
 # 
-sub os_usermod($$$$$)
+sub os_usermod($$$$$$)
 {
-    my($login, $gid, $glist, $pswd, $root) = @_;
+    my($login, $gid, $glist, $pswd, $root, $shell) = @_;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "root");
@@ -204,16 +214,18 @@ sub os_usermod($$$$$)
     if ($glist ne "") {
 	$glist = "-G $glist";
     }
+    # Map the shell into a full path.
+    $shell = MapShell($shell);
 
-    return system("$USERMOD -g $gid $glist -p '$pswd' $login");
+    return system("$USERMOD -s $shell -g $gid $glist -p '$pswd' $login");
 }
 
 #
 # Add a user.
 # 
-sub os_useradd($$$$$$$$)
+sub os_useradd($$$$$$$$$)
 {
-    my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root) = @_;
+    my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root, $shell) = @_;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "root");
@@ -221,9 +233,11 @@ sub os_useradd($$$$$$$$)
     if ($glist ne "") {
 	$glist = "-G $glist";
     }
+    # Map the shell into a full path.
+    $shell = MapShell($shell);
 
     if (system("$USERADD -M -u $uid -g $gid $glist -p '$pswd' ".
-	       "-d $homedir -s /bin/tcsh -c \"$gcos\" $login") != 0) {
+	       "-d $homedir -s $shell -c \"$gcos\" $login") != 0) {
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
     }
@@ -292,9 +306,9 @@ sub os_routing_enable_gated()
     return $cmd;
 }
 
-sub os_routing_add_manual($$$$$)
+sub os_routing_add_manual($$$$$;$)
 {
-    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my ($routetype, $destip, $destmask, $gate, $cost, $rtabid) = @_;
     my $cmd;
 
     if ($routetype eq "host") {
@@ -309,9 +323,9 @@ sub os_routing_add_manual($$$$$)
     return $cmd;
 }
 
-sub os_routing_del_manual($$$$$)
+sub os_routing_del_manual($$$$$;$)
 {
-    my ($routetype, $destip, $destmask, $gate, $cost) = @_;
+    my ($routetype, $destip, $destmask, $gate, $cost, $rtabid) = @_;
     my $cmd;
 
     if ($routetype eq "host") {
@@ -324,6 +338,31 @@ sub os_routing_del_manual($$$$$)
     }
 
     return $cmd;
+}
+
+# Map a shell name to a full path using /etc/shells
+sub MapShell($)
+{
+   my ($shell) = @_;
+
+   if ($shell eq "") {
+       return $DEFSHELL;
+   }
+
+   my $fullpath = `grep '/${shell}\$' $SHELLS`;
+
+   if ($?) {
+       return $DEFSHELL;
+   }
+
+   # Sanity Check
+   if ($fullpath =~ /^([-\w\/]*)$/) {
+       $fullpath = $1;
+   }
+   else {
+       $fullpath = $DEFSHELL;
+   }
+   return $fullpath;
 }
 
 1;
