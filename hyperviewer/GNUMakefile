@@ -33,6 +33,7 @@ LDLIBS  = ${HVLIB} ${STATIC} -L/usr/X11R6/lib ${WXLIBS} -lGLU -lGL -lXmu -lXext 
 # Distribute the Python scripts, sources, shared library, sample input files, and user doc.
 PYFILES = hypview.py exptToHv.py sshxmlrpc.py emulabclient.py hvFrameUI.py hv.py win32/hv.py
 SRCFILES = README ROADMAP GNUMakefile hvgui.wxg hvmain.cpp hv.i hv.mod _hv.cpp win32/_hv.cpp
+HVSWIG = hv.py win32/hv.py _hv.cpp win32/_hv.cpp
 BINFILES = _hv.so 
 DATAFILES = BigLan.hyp ts600.hyp 1088.hyp 1088-interior.hyp 2440.hyp 2440-interior.hyp
 SCRIPTFILES = hypview pangorc.local pango.modules.local
@@ -61,7 +62,7 @@ _hv.cpp hv.py win32/_hv.cpp win32/hv.py: hv.i
 	swig -c++ -python -DHYPGLUT -DHYPFREE -module hv -o _hv.cpp hv.i
 
 # Put the wrappers in a shared library for import by hv.py .
-_hv.o: _hv.cpp
+_hv.o: ${HVSWIG}
 	g++ -fpic -c ${CFLAGS} ${INCDIRS} _hv.cpp
 _hv.so: hvmain.o _hv.o ${HVLIB}
 	gcc -g -shared hvmain.o _hv.o ${LDLIBS} -o _hv.so
