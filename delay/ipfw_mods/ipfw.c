@@ -18,6 +18,12 @@
  *
  */
 
+/*
+ * Copyright (C) 1989, 1995, 1998: R B Davies
+ *
+ * Permission is granted to use or distribute but not to sell
+ */
+
 #ifndef lint
 static const char rcsid[] =
   "$FreeBSD$";
@@ -45,6 +51,7 @@ static const char rcsid[] =
 #include <string.h>
 #include <unistd.h>
 #include <sysexits.h>
+#include <math.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -573,9 +580,24 @@ list(ac, av)
 		    sprintf(plr,"plr %f", 1.0*p->plr/(double)(0x7fffffff));
 		else
 		    plr[0]='\0';
-
-		printf("%05d: %s %4d ms %s%s %d queues (%d buckets)\n",
-		    p->pipe_nr, buf, p->delay, qs, plr,
+		printf("%05d: %s\n",p->pipe_nr, buf);
+		if (p->delaydist & DN_DIST_CONST_TIME)
+		    printf("constant delay %4d ms",p->delay);
+		else
+		if (p->delaydist & DN_DIST_UNIFORM)
+		    printf("uniform delay var %4d mean %4d ms",
+			p->delayvar,p->delaymean);
+		else
+		if (p->delaydist & DN_DIST_POISSON)
+		    printf("Poisson delay mean %4d ms",p->delaymean);
+		else
+		if (p->delaydist & DN_DIST_TABLE_RANDOM)
+		    printf("random delay table");
+		else
+		if (p->delaydist & DN_DIST_TABLE_DETERM)
+		     printf("deterministic delay table");
+		printf(" %s%s %d queues (%d buckets)\n",
+		    qs, plr,
 		    p->rq_elements, p->rq_size);
 		printf("    mask: 0x%02x 0x%08x/0x%04x -> 0x%08x/0x%04x\n",
 		    p->flow_mask.proto,
@@ -760,7 +782,9 @@ show_usage(const char *fmt, ...)
 "    icmptypes {type[,type]}...\n"
 "  pipeconfig:\n"
 "    {bw|bandwidth} <number>{bit/s|Kbit/s|Mbit/s|Bytes/s|KBytes/s|MBytes/s}\n"
-"    delay <milliseconds>\n"
+"    [delaydist constant] delay <milliseconds>\n"
+"    delaydist uniform delaymean <ms> delayvar <ms>\n"
+"    delaydist custom delayentries <entry_count> <entry> <entry> <entry> ...\n"
 "    queue <size>{packets|Bytes|KBytes}\n"
 "    plr <fraction>\n"
 "    mask {all| [dst-ip|src-ip|dst-port|src-port|proto] <number>}\n"
@@ -1138,11 +1162,93 @@ fill_iface(char *which, union ip_fw_if *ifu, int *byname, int ac, char *arg)
 		*byname = 0;
 }
 
+
+static double
+ln_gamma(double xx)
+{
+   /* log gamma function adapted from numerical recipes in C */
+
+   if (xx<1.0)                           /* Use reflection formula */
+   {
+      double piz = 3.14159265359 * (1.0-xx);
+      return log(piz/sin(piz))-ln_gamma(2.0-xx);
+   }
+   else
+   {
+      static double cof[6]={76.18009173,-86.50532033,24.01409822,
+         -1.231739516,0.120858003e-2,-0.536382e-5};
+      double x,tmp,ser;
+      int j;
+
+      x=xx-1.0; tmp=x+5.5;
+      tmp -= (x+0.5)*log(tmp);  ser=1.0;
+      for (j=0;j<=5;j++) { x += 1.0; ser += cof[j]/x; }
+      return -tmp+log(2.50662827465*ser);
+   }
+}
+
+/*
+ * build_poisson()
+ * given a mean, which we grab from the supplied pipe, build a table for
+ * poisson distribution.
+ *
+ * remember calculus long, long ago, estimating the area under the function by 
+ * calculating f(1) + f(2) + f(3) + ... ? Well, that is sort of what we are
+ * doing here. if f(1)=1, we put one 1 in the table. if f(7)=3, we put three 
+ * 7's in the table.  When the table is complete, one can randomly choose
+ * values from this table, with the results following a poisson distribution.
+ */
+static void
+build_poisson(struct dn_pipe *pipe)
+{
+	int p, x;
+	double probability;
+
+	if (pipe->delaymean <= 0)
+		show_usage("invalid delaymean %d\n",pipe->delaymean);
+
+	x = pipe->delayentries = 0;
+
+	if ( ! ( pipe->delaytable = malloc(sizeof(int)*0x8200)))
+	        err(1,"poisson table ate all of the memory\n");
+
+	do {
+	    /* P(x) =  e^-mean * mean^x
+	     *         ----------------
+	     *              x!
+	     *
+	     * we will have approximately 0x8000 entries in our table.
+	     * there is no deep meaning to 0x8000. arbitrary.
+	     *
+	     * note that we make use of P(x-1) to calculate P(x).
+	     */
+probability = log(pipe->delaymean) * x - pipe->delaymean - ln_gamma(1.0 + x);
+probability = (probability < -40.0) ? 0.0 : exp(probability);
+probability *= 0x8000;
+/*	    if (!probability)
+		probability = exp(-pipe->delaymean);
+	    else
+		probability = probability * pipe->delaymean / x;
+*/	    for(p= (int)probability ;p;p--) {
+		pipe->delaytable[pipe->delayentries++]=x;
+printf("there's a %d\n",x);
+		/* since we truncate when casting to int, I don't even think
+		 * we need any more than 0x8000 entries. However, I do not
+		 * feel confident enough to chance it.
+		 */
+		if (pipe->delayentries == 0x8200)
+		    return;
+	    }
+	    x++;
+	} while(x < pipe->delaymean || probability >= 1);
+
+}
 static void
 config_pipe(int ac, char **av)
 {
        struct dn_pipe pipe;
         int i ;
+	int arglen;
         char *end ;
  
         memset(&pipe, 0, sizeof pipe);
@@ -1153,8 +1259,9 @@ config_pipe(int ac, char **av)
                 pipe.pipe_nr = atoi(*av); av++; ac--;
         }
         while (ac > 1) {
-            if (!strncmp(*av,"bw",strlen(*av)) ||
-                ! strncmp(*av,"bandwidth",strlen(*av))) {
+	    arglen = strlen(*av);
+            if (!strncmp(*av,"bw",arglen) ||
+                ! strncmp(*av,"bandwidth",arglen)) {
                 pipe.bandwidth = strtoul(av[1], &end, 0);
                 if (*end == 'K' || *end == 'k' )
                         end++, pipe.bandwidth *= 1000 ;
@@ -1163,10 +1270,45 @@ config_pipe(int ac, char **av)
                 if ( *end == 'B' || !strncmp(end, "by", 2) )
                         pipe.bandwidth *= 8 ;
                 av+=2; ac-=2;
-            } else if (!strncmp(*av,"delay",strlen(*av)) ) {
+            } else if (!strcmp(*av,"delay") ) {
+		pipe.delaydist = DN_DIST_CONST_TIME;
                 pipe.delay = strtoul(av[1], NULL, 0);
                 av+=2; ac-=2;
-            } else if (!strncmp(*av,"plr",strlen(*av)) ) {
+            } else if (!strncmp(*av,"delaydist",arglen) ) {
+                av++; ac--;
+		arglen = strlen(*av);
+                if (!strncmp(*av,"constant",arglen) ) {
+                    pipe.delaydist=DN_DIST_CONST_TIME;
+                } else if (!strncmp(*av,"uniform",arglen) ) {
+                    pipe.delaydist=DN_DIST_UNIFORM;
+                } else if (!strncmp(*av,"poisson",arglen) ) {
+                    pipe.delaydist=DN_DIST_POISSON;
+                } else if (!strncmp(*av,"random",arglen) ) {
+                    pipe.delaydist=DN_DIST_TABLE_RANDOM;
+		} else if (!strncmp(*av,"determ",arglen) ) {
+		    pipe.delaydist=DN_DIST_TABLE_DETERM;
+                } else show_usage("invalid delay distribution ``%s''", *av);
+                av++; ac--;
+            } else if (!strncmp(*av,"delaymean",arglen) ) {
+                /* used for all delay types except custom */
+                pipe.delaymean = strtoul(av[1], NULL, 0);
+                av+=2; ac-=2;
+            } else if (!strncmp(*av,"delayvar",arglen) ) {
+                /* used for uniform delay */
+                pipe.delayvar = strtoul(av[1], NULL, 0);
+                av+=2; ac-=2;
+	    } else if (!strncmp(*av,"delayentries",arglen) ) {
+		/* delay table. first, the number of entries. next, the entries themselves */
+		pipe.delayentries = strtol(av[1], NULL, 0);
+		if (pipe.delayentries <= 0)
+		    show_usage("%d entries in your custom delay table?", av[1]);
+		av+=2; ac-=2;
+		pipe.delaytable = malloc(pipe.delayentries*sizeof(int));
+		for(i=0;i<pipe.delayentries;i++)
+		    pipe.delaytable[i] = strtol(av[i], NULL, 0);
+		av+=pipe.delayentries;
+		ac-=pipe.delayentries;
+            } else if (!strncmp(*av,"plr",arglen) ) {
                 
                 double d = strtod(av[1], NULL);
 		if (d > 1)
@@ -1174,8 +1316,46 @@ config_pipe(int ac, char **av)
 		else if (d < 0)
 		    d = 0 ;
                 pipe.plr = (int)(d*0x7fffffff) ;
+		pipe.lossdist = DN_DIST_CONST_RATE;
                 av+=2; ac-=2;
-            } else if (!strncmp(*av,"queue",strlen(*av)) ) {
+            } else if (!strncmp(*av,"lossdist",arglen) ) {
+		av++; ac--;
+		arglen = strlen(*av);
+		if (!strncmp(*av,"consttime",arglen) ) {
+		    pipe.lossdist=DN_DIST_CONST_TIME;
+		} else if (!strncmp(*av,"constrate",arglen) ) { 
+                    pipe.lossdist=DN_DIST_CONST_RATE;
+		} else if (!strncmp(*av,"determ",arglen) ) {
+		    pipe.lossdist=DN_DIST_TABLE_DETERM;
+		} else if (!strncmp(*av,"uniform",arglen) ) {
+		    pipe.lossdist=DN_DIST_UNIFORM;
+		} else show_usage("invalid loss distribution ``%s''", *av);
+                av++; ac--;
+	    } else if (!strcmp(*av,"loss") ) {
+		pipe.lossdist = DN_DIST_CONST_TIME;
+		pipe.lossmean = strtoul(av[1], NULL, 0);
+		av+=2; ac-=2;
+	    } else if (!strncmp(*av,"lossmean",arglen) ) {
+		/* if mean is rate-based, convert it */
+		if (pipe.lossdist & DN_DIST_UNIFORM) {
+		    double d = strtod(av[1], NULL);
+		    if ((d > 1) | (d < 0))
+			show_usage("invalid lossmean %s\n",av[1]);
+		    pipe.lossmean = (int)(d*0x7fffffff) ;
+		}
+		else
+		    pipe.lossmean = strtoul(av[1], NULL, 0);
+		av+=2; ac-=2;
+	    } else if (!strncmp(*av,"lossvar",arglen) ) {
+		double d = strtod(av[1], NULL);
+		if ((d > 1) | (d < 0))
+		    show_usage("invalid lossvar %s\n",av[1]);
+		pipe.lossvar = (int)(d*0x7fffffff) ;
+		av+=2; ac-=2;
+	    } else if (!strncmp(*av,"lossquantum",arglen) ) {
+		pipe.lossquantum = strtol(av[1], NULL, 0);
+		av+=2; ac-=2;
+	    } else if (!strncmp(*av,"queue",arglen) ) {
                 end = NULL ;
                 pipe.queue_size = strtoul(av[1], &end, 0);
                 if (*end == 'K' || *end == 'k') {
@@ -1186,10 +1366,22 @@ config_pipe(int ac, char **av)
                     pipe.queue_size = 0 ;
                 }
                 av+=2; ac-=2;
-            } else if (!strncmp(*av,"buckets",strlen(*av)) ) {
+            } else if (!strncmp(*av,"lossentries",arglen) ) {
+                /* loss table. first, the number of entries. next, the entries themselves */
+                pipe.lossentries = strtol(av[1], NULL, 0);
+                if (pipe.lossentries <= 0)
+                    show_usage("%d entries in your custom loss table?", av[1]);
+                av+=2; ac-=2;
+                pipe.losstable = malloc(pipe.lossentries*sizeof(int));
+                for(i=0;i<pipe.lossentries;i++)
+                    pipe.losstable[i] = strtol(av[i], NULL, 0);
+                av+=pipe.lossentries;
+                ac-=pipe.lossentries;
+
+            } else if (!strncmp(*av,"buckets",arglen) ) {
                 pipe.rq_size = strtoul(av[1], NULL, 0);
                 av+=2; ac-=2;
-	    } else if (!strncmp(*av,"mask",strlen(*av)) ) {
+	    } else if (!strncmp(*av,"mask",arglen) ) {
 		/* per-flow queue, mask is dst_ip, dst_port,
 		 * src_ip, src_port, proto measured in bits
 		 */
@@ -1203,7 +1395,8 @@ config_pipe(int ac, char **av)
 		pipe.flow_mask.proto = 0 ;
 		end = NULL ;
 		av++ ; ac-- ;
-		if (ac >= 1 && !strncmp(*av,"all", strlen(*av)) ) {
+		arglen = strlen(*av);
+		if (ac >= 1 && !strncmp(*av,"all", arglen) ) {
 		    /* special case -- all bits are significant */
 		    pipe.flow_mask.dst_ip = ~0 ;
 		    pipe.flow_mask.src_ip = ~0 ;
@@ -1216,15 +1409,15 @@ config_pipe(int ac, char **av)
 		  for (;;) {
 		    if (ac < 1)
 			break ;
-		    if (!strncmp(*av,"dst-ip", strlen(*av)))
+		    if (!strncmp(*av,"dst-ip", arglen))
 			par = &(pipe.flow_mask.dst_ip) ;
-		    else if (!strncmp(*av,"src-ip", strlen(*av)))
+		    else if (!strncmp(*av,"src-ip", arglen))
 			par = &(pipe.flow_mask.src_ip) ;
-		    else if (!strncmp(*av,"dst-port", strlen(*av)))
+		    else if (!strncmp(*av,"dst-port", arglen))
 			(u_int16_t *)par = &(pipe.flow_mask.dst_port) ;
-		    else if (!strncmp(*av,"src-port", strlen(*av)))
+		    else if (!strncmp(*av,"src-port", arglen))
 			(u_int16_t *)par = &(pipe.flow_mask.src_port) ;
-		    else if (!strncmp(*av,"proto", strlen(*av)))
+		    else if (!strncmp(*av,"proto", arglen))
 			(u_int8_t *)par = &(pipe.flow_mask.proto) ;
 		    else
 			break ;
@@ -1260,6 +1453,10 @@ config_pipe(int ac, char **av)
             } else
                 show_usage("unrecognised option ``%s''", *av);
         }
+
+	if (pipe.delaydist == DN_DIST_POISSON)
+	    build_poisson(&pipe);
+
         if (pipe.pipe_nr == 0 )
             show_usage("pipe_nr %d be > 0", pipe.pipe_nr);
         if (pipe.queue_size > 100 )
@@ -1273,6 +1470,8 @@ config_pipe(int ac, char **av)
         i = setsockopt(s,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe);
         if (i)
                 err(1, "setsockopt(%s)", "IP_DUMMYNET_CONFIGURE");
+	if (pipe.delaytable)
+	    free(pipe.delaytable);
                 
 }
 
