@@ -25,7 +25,8 @@ be done to enhance it:
   3.2) Home directories on Plastic should be mounted with the 'nosuid'
     and 'nodev' options on plastic and paper - users could, on their
     test nodes, create set-uid root programs, or make device nodes
-    that they are allowed to read an write to.
+    that they are allowed to read an write to. The same is true for
+    whatever filesystem you place /proj on; it should be mounted nosuid.
   3.3) Remove suidperl binary on plastic (doesn't get installed on
     latest FreeBSD versions anyway) - See FreeBSD mount manpage for
     reason. Related to item 3.2
