@@ -19,6 +19,7 @@ my $DELAYCMD    = "delay";
 my $IFCONFIG    = "/sbin/ifconfig eth%d inet %s netmask %s\n";
 my $CP		= "/bin/cp -f";
 my $USERADD	= "/usr/sbin/useradd";
+my $USERMOD	= "/usr/sbin/usermod";
 my $GROUPADD	= "/usr/sbin/groupadd";
 my $IFACE	= "eth";
 my $CTLIFACE    = "eth4";
@@ -66,7 +67,7 @@ if ($_ =~ /^FREE/) {
     print STDOUT "  Free!\n";
     exit(0);
 }
-if ($_ =~ /ALLOCATED=(\w*)\/(\w*)/) {
+if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*)/) {
     print STDOUT "  Allocated: $1/$2!\n";
     $project = $1;
 }
@@ -122,7 +123,7 @@ open(TM, "$TMCC $NODE $ACCTCMD |")
     or die "Cannot start $TMCC: $!";
 
 while (<TM>) {
-    if ($_ =~ /^ADDGROUP NAME=([0-9a-zA-Z]+) GID=([0-9]+)/) {
+    if ($_ =~ /^ADDGROUP NAME=([-\@\w.]+) GID=([0-9]+)/) {
 	print STDOUT "  Group: $1/$2\n";
 
 	$group = $1;
@@ -151,8 +152,16 @@ while (<TM>) {
 	    $name = $1;
 	}
  	print STDOUT "  User: $login/$uid/$gid/$root/$name\n";
+	
 	($exists) = getpwuid($uid);
 	if ($exists) {
+	    if ($root) {
+		$GLIST = "-G root,$gid";
+	    }
+	    else {
+		$GLIST = "-G $gid";
+	    }
+	    system("$USERMOD $GLIST $login");
 	    next;
 	}
 	

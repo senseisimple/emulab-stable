@@ -66,7 +66,7 @@ if ($_ =~ /^FREE/) {
     print STDOUT "  Free!\n";
     exit(0);
 }
-if ($_ =~ /ALLOCATED=(\w*)\/(\w*)/) {
+if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*)/) {
     print STDOUT "  Allocated: $1/$2!\n";
     $project = $1;
 }
@@ -190,7 +190,7 @@ open(TM, "$TMCC $NODE $ACCTCMD |")
     or die "Cannot start $TMCC: $!";
 
 while (<TM>) {
-    if ($_ =~ /^ADDGROUP NAME=([0-9a-zA-Z]+) GID=([0-9]+)/) {
+    if ($_ =~ /^ADDGROUP NAME=([-\@\w.]+) GID=([0-9]+)/) {
 	print STDOUT "  Group: $1/$2\n";
 
 	$group = $1;
@@ -219,16 +219,24 @@ while (<TM>) {
 	    $name = $1;
 	}
  	print STDOUT "  User: $login/$uid/$gid/$root/$name\n";
+
 	($exists) = getpwuid($uid);
 	if ($exists) {
+	    if ($root) {
+		$GLIST = "-G wheel,$gid";
+	    }
+	    else {
+		$GLIST = "-G $gid";
+	    }
+	    system("$PW usermod $login $GLIST");
 	    next;
 	}
 
 	$GLIST = " ";
 	if ($root) {
-	    $GLIST = "-G wheel ";
+	    $GLIST = "-G wheel";
 	}
-	
+
 	if (system("$PW useradd $login -u $uid -g $gid $GLIST ".
 	           "-d /users/$login -s /bin/tcsh -c \"$name\"") != 0) {
 	    print STDERR "Error adding new user $login\n";
