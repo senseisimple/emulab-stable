@@ -125,9 +125,9 @@ if (! $returning) {
 
     $newuser_command = "INSERT INTO users ".
 	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-	"usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,status) ".
+	"usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,status) ".
 	"VALUES ('$uid',now(),'$usr_expires','$usr_name','$usr_email',".
-	"'$usr_addr','$usr_phone','$usr_title','$usr_affil',".
+	"'$usr_addr', '$usr_url', '$usr_phone','$usr_title','$usr_affil',".
         "'$encoding','$unix_uid','newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {

@@ -50,7 +50,7 @@ if (!isset($usr_name) ||
 }
 if (!isset($proj_URL) ||
     strcmp($proj_URL, "http://www.cs.berkeley.edu/netgrp/omcast/") == 0) {
-  $proj_URL = "";
+  $formerror = Project URL";
 }
 if (!isset($usr_email) ||
     strcmp($usr_email, "") == 0) {
@@ -169,9 +169,9 @@ if (! $returning) {
     $encoding = crypt("$password1");
     $newuser_command = "INSERT INTO users ".
         "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
-        "usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,status) ".
+        "usr_URL,usr_title,usr_affil,usr_phone,usr_pswd,unix_uid,status) ".
         "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
-        "'$usr_email', '$usr_addr', '$usr_title', '$usr_affil', ".
+        "'$usr_email', '$usr_addr', '$usr_url', '$usr_title', '$usr_affil', ".
         "'$usr_phones', '$encoding', ".
         "'$unix_uid', 'newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
@@ -242,9 +242,10 @@ mail($TBMAIL_APPROVAL,
      "Contact Info:\n".
      "Name:          $usr_name ($proj_head_uid)\n".
      "Email:         $usr_email\n".
+     "User URL:      $usr_url\n".
      "Project:       $proj_name\n".
      "Expires:	     $proj_expires\n".
-     "URL:           $proj_URL\n".
+     "Project URL:   $proj_URL\n".
      "Title:         $usr_title\n".
      "Affiliation:   $usr_affil\n".
      "Address:       $usr_addr\n".

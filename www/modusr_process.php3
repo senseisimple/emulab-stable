@@ -104,6 +104,7 @@ $insert_result = mysql_db_query($TBDBNAME,
 	"UPDATE users SET ".
 	"usr_name=\"$usr_name\",       ".
 	"usr_email=\"$usr_email\",     ".
+	"usr_URL=\"$usr_url\",         ".
 	"usr_addr=\"$usr_addr\",       ".
 	"usr_phone=\"$usr_phone\",     ".
 	"usr_expires=\"$usr_expires\", ".

@@ -35,6 +35,7 @@ if (isset($uid)) {
     }
     $usr_expires = $row[usr_expires];
     $usr_email   = $row[usr_email];
+    $usr_URL     = $row[usr_URL];
     $usr_addr    = $row[usr_addr];
     $usr_name    = $row[usr_name];
     $usr_phone   = $row[usr_phone];
@@ -98,6 +99,13 @@ if ($returning) {
           </tr>\n";
 
     echo "<tr>
+              <td>Home Page URL:</td>
+              <td class=\"left\">
+                  <input type=\"readonly\" name=\"usr_url\"
+                         value=\"$usr_URL\"></td>
+          </tr>\n";
+
+    echo "<tr>
               <td>Mailing Address:</td>
               <td class=\"left\">
                   <input type=\"readonly\" name=\"usr_addr\"
@@ -147,6 +155,12 @@ else {
               <td>*Email Address:</td>
               <td class=\"left\">
                   <input type=\"text\" name=\"usr_email\" size=30></td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Home Page URL:</td>
+              <td class=\"left\">
+                  <input type=\"text\" name=\"usr_url\" size=45></td>
           </tr>\n";
 
     echo "<tr>

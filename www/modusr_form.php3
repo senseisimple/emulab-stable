@@ -45,6 +45,7 @@ if (! $info_result) {
 $row = mysql_fetch_array($info_result);
 $usr_expires = $row[usr_expires];
 $usr_email   = $row[usr_email];
+$usr_URL     = $row[usr_URL];
 $usr_addr    = $row[usr_addr];
 $usr_name    = $row[usr_name];
 $usr_phone   = $row[usr_phone];
@@ -74,6 +75,13 @@ echo "<tr>
           <td class=\"left\">
               <input type=\"text\" name=\"usr_email\" size=\"30\"
                      value=\"$usr_email\"></td>
+      </tr>\n";
+
+echo "<tr>
+         <td>Home Page URL:</td>
+         <td class=\"left\">
+             <input type=\"text\" name=\"usr_url\" size=\"45\"
+                    value=\"$usr_URL\"></td>
       </tr>\n";
 
 echo "<tr>

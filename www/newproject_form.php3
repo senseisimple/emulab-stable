@@ -133,6 +133,23 @@ if ($row) {
 echo "     </td>
       </tr>\n";
 
+#
+# User URL
+#
+echo "<tr>
+         <td>Home Page URL:</td>
+         <td class=\"left\">
+             <input name=\"usr_url\"";
+if ($row) {
+    echo "          type=\"readonly\" value=\"$row[usr_URL]\">";
+} else {
+    echo "          type=\"text\"
+                    value=\"http://www.cs.berkeley.edu/~jml/\"
+                    size=\"45\">";
+}
+
+echo "     </td>
+      </tr>\n";
 
 #
 # Email:

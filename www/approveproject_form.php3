@@ -148,6 +148,7 @@ $userinfo_result = mysql_db_query($TBDBNAME,
 $row	= mysql_fetch_array($userinfo_result);
 $usr_expires = $row[usr_expires];
 $usr_email   = $row[usr_email];
+$usr_URL     = $row[usr_URL];
 $usr_addr    = $row[usr_addr];
 $usr_name    = $row[usr_name];
 $usr_phone   = $row[usr_phone];
@@ -173,6 +174,11 @@ echo "<tr>
 echo "<tr>
           <td>Email Address:</td>
           <td>$usr_email</td>
+      </tr>\n";
+
+echo "<tr>
+          <td>Home Page URL:</td>
+          <td><A href='$usr_URL'>$usr_URL</A></td>
       </tr>\n";
 
 echo "<tr>
