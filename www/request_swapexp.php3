@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -32,18 +32,18 @@ if (!isset($eid) ||
 }
 
 #
+# Only admins can do this!
+#
+if (! ISADMIN($uid)) {
+    USERERROR("Only TB admins can do this!", 1);
+}
+
+#
 # Check to make sure this is a valid PID/EID tuple.
 #
 if (! TBValidExperiment($pid, $eid)) {
   USERERROR("The experiment $eid is not a valid experiment ".
             "in project $pid.", 1);
-}
-
-#
-# Only admins can do this!
-#
-if (! ISADMIN($uid)) {
-    USERERROR("Only TB admins can do this!", 1);
 }
 
 #
