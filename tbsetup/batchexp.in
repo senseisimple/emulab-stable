@@ -236,7 +236,7 @@ sub fatal($)
     print STDOUT "$mesg\n";
     print STDOUT "Cleaning up ...\n";
 
-#    system("/bin/rm", "-rf", "$dirname");
+    system("/bin/rm", "-rf", "$dirname");
     exit(-1);
 }
 
