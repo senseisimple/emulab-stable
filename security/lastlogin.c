@@ -120,11 +120,14 @@ main(int argc, char **argv)
 			warn("Seeking to %ld", seekoff);
 			exit(-1);
 		}
-		rval = doentry(fp, uid, 1);
+		rval = 0;
+		if (doentry(fp, uid, 1) <= 0)
+		    rval = -1;
 	}
 	else {
+		rval = 0;
 		for (uid = 0; ; uid++) {
-			if (rval = doentry(fp, uid, 0))
+			if ((rval = doentry(fp, uid, 0)) <= 0)
 				break;
 		}
 	}
@@ -143,7 +146,7 @@ doentry(FILE *fp, uid_t uid, int umode)
 			fprintf(stderr, "Error reading entry %u\n", uid);
 			return -1;
 		}
-		return 1;
+		return 0;
 	}
 
 	if (ll.ll_time) {
@@ -153,8 +156,8 @@ doentry(FILE *fp, uid_t uid, int umode)
 		if (umode)
 		    printf("%s\n", buf);
 		else
-		    printf("%u   %s\n", uid, buf);
+		    printf("%u %s\n", uid, buf);
 	}
-	return 0;
+	return 1;
 }
 

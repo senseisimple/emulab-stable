@@ -47,14 +47,22 @@ if (mysql_num_rows($query_result) == 0) {
 	}
 }
 
-echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
+#
+# Grab the login info. If we cannot get the login info, then just
+# proceed without it. 
+#
+$loginarray = LASTUSERSLOGIN(0);
+
+echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=0
        align='center'>\n";
 
 echo "<tr>
+          <td>&nbsp</td>
           <td>UID</td>
           <td>Name</td>
           <td>Projects</td>
-	  <td align=center>Approved?</td>\n";
+          <td>Web<br>Idle</td>
+          <td>Users<br>Idle</td>\n";
 
 #
 # Admin users get a "delete" and a "modify" option.
@@ -69,6 +77,8 @@ while ($row = mysql_fetch_array($query_result)) {
     $thisuid  = $row[uid];
     $name     = $row[usr_name];
     $status   = $row[status];
+    $unix_uid = $row[unix_uid];
+    $lastweblogin   = LASTWEBLOGIN($thisuid);
 
     #
     # Suck out a list of projects too.
@@ -76,8 +86,17 @@ while ($row = mysql_fetch_array($query_result)) {
     $projmemb_result = mysql_db_query($TBDBNAME,
 	"SELECT pid FROM proj_memb where uid='$thisuid' order by pid");
 
-    echo "<tr>
-              <td><A href='showuser.php3?target_uid=$thisuid'>$thisuid</A></td>
+    echo "<tr>\n";
+
+    if (strcmp($status, "active") == 0 ||
+	strcmp($status, "unverified") == 0) {
+	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+    }
+    else {
+	echo "<td align=center><img alt=\"N\" src=\"redball.gif\"></td>\n";
+    }
+
+    echo "<td><A href='showuser.php3?target_uid=$thisuid'>$thisuid</A></td>
               <td>$name</td>\n";
 
     if ($count = mysql_num_rows($projmemb_result)) {
@@ -95,12 +114,29 @@ while ($row = mysql_fetch_array($query_result)) {
 	    echo "<td>--</td>\n";
     }
 
-    if (strcmp($status, "active") == 0 ||
-	strcmp($status, "unverified") == 0) {
-	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
+    #
+    # Sleazy! Use mysql query to convert dates to days and subtract!
+    #
+    if ($lastweblogin) {
+	$idle_query = mysql_db_query($TBDBNAME,
+		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$lastweblogin\")");
+	$idle_row   = mysql_fetch_row($idle_query);
+	echo "<td>$idle_row[0]</td>\n";
     }
     else {
-	echo "<td align=center><img alt=\"N\" src=\"redball.gif\"></td>\n";
+	echo "<td>N/A</td>\n";
+    }
+
+    if ($loginarray && isset($loginarray["$unix_uid"])) {
+	$lastuserslogin = $loginarray["$unix_uid"];
+
+	$idle_query = mysql_db_query($TBDBNAME,
+		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$lastuserslogin\")");
+	$idle_row   = mysql_fetch_row($idle_query);
+	echo "<td>$idle_row[0]</td>\n";
+    }
+    else {
+	echo "<td>N/A</td>\n";
     }
 
     if ($isadmin) {
