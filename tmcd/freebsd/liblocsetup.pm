@@ -133,11 +133,11 @@ sub os_ifconfig_line($$$$$)
 # Generate and return an string that is approriate for putting
 # into /etc/hosts.
 #
-sub os_etchosts_line($$$$)
+sub os_etchosts_line($$$)
 {
-    my ($name, $link, $ip, $alias) = @_;
+    my ($name, $ip, $aliases) = @_;
     
-    return sprintf("%s\t%s-%s %s", $ip, $name, $link, $alias);
+    return sprintf("%s\t%s %s", $ip, $name, $aliases);
 }
 
 #

@@ -114,15 +114,8 @@ sub os_ifconfig_line($$$$$)
 	$media = "$media-$IFC_FDUPLEX";
     }
 
-    $ifc = sprintf($IFCONFIG, $iface, $inet, $mask);
-
-    if ($speed != 100 || $duplex ne "full") {
-	$mii = "sleep 2\n".
-  	       "/sbin/mii-tool --reset $iface\n".
-	       "sleep 2\n".
-	       "/sbin/mii-tool --force=$media $iface";
-	$ifc = "$ifc\n$mii";
-    }
+    $ifc = "/sbin/mii-tool --force=$media $iface\n" .
+	   sprintf($IFCONFIG, $iface, $inet, $mask);
     
     return "$ifc";
 }
@@ -131,11 +124,11 @@ sub os_ifconfig_line($$$$$)
 # Generate and return an string that is approriate for putting
 # into /etc/hosts.
 #
-sub os_etchosts_line($$$$)
+sub os_etchosts_line($$$)
 {
-    my ($name, $link, $ip, $alias) = @_;
+    my ($name, $ip, $aliases) = @_;
     
-    return sprintf("%s\t%s-%s %s", $ip, $name, $link, $alias);
+    return sprintf("%s\t%s %s", $ip, $name, $aliases);
 }
 
 #

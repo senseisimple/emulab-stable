@@ -53,7 +53,8 @@ static int dostatus(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int doifconfig(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int doaccounts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp);
-static int dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int dooldhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
+static int donewhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp);
 static int dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp);
@@ -65,6 +66,7 @@ static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doloadinfo(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int dorouting(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -75,7 +77,8 @@ struct command {
 	{ "ifconfig",	doifconfig },
 	{ "accounts",	doaccounts },
 	{ "delay",	dodelay },
-	{ "hostnames",	dohosts },
+	{ "hostnamesV2",donewhosts },
+	{ "hostnames",	dooldhosts },
 	{ "rpms",	dorpms },
 	{ "deltas",	dodeltas },
 	{ "tarballs",	dotarballs },
@@ -88,6 +91,7 @@ struct command {
 	{ "mounts",	domounts },
 	{ "loadinfo",	doloadinfo},
 	{ "reset",	doreset},
+	{ "routing",	dorouting},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -99,7 +103,7 @@ struct node_interface {
 	struct node_interface *next;
 };
 
-int		directly_connected(struct node_interface *interfaces, char *iface);
+int	directly_connected(struct node_interface *interfaces, char *iface);
 
 char *usagestr = 
  "usage: tmcd [-d] [-p #]\n"
@@ -128,7 +132,7 @@ main(int argc, char **argv)
 			break;
 		case 'd':
 			debug++;
-
+			break;
 		case 'h':
 		case '?':
 		default:
@@ -144,8 +148,9 @@ main(int argc, char **argv)
 	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
 
 #ifndef LBS
-	(void)daemon(0, 0);
+	if (! debug)
 #endif
+		(void)daemon(0, 0);
 
 	/*
 	 * Setup TCP socket
@@ -978,16 +983,33 @@ dodelay(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 /*
  * Return host table information.
  */
+static int dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int);
+
 static int
-dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+dooldhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	return(dohosts(sock, ipaddr, rdata, tcp, 1));
+}
+
+static int
+donewhosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	return(dohosts(sock, ipaddr, rdata, tcp, 2));
+}
+
+/*
+ * Return host table information.
+ */
+static int
+dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 {
 
 	char *tmp, buf[MYBUFSIZE], *vname_list;
 	char pid[64], eid[64];
 	char		gid[64];
-	char nickname[128]; /* XXX: Shouldn't be statically sized, potential buffer
-						 * overflow
-						 */ 
+	char nickname[128]; /* XXX: Shouldn't be statically sized, potential
+			     *   buffer overflow
+			     */ 
 
 	char nodeid[32]; /* Testbed ID of the node */
 	int control_net; /* Control network interface on this host */
@@ -1134,18 +1156,26 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	mysql_free_result(vlan_result);
 
 	/*
-	 * Grab a list of all other hosts in this experiment - we'll sort out the
-	 * directly connected ones while looping through them.
+	 * Grab a list of all other hosts in this experiment - we'll sort
+	 * out the directly connected ones while looping through them.
 	 */
 	nodes_result = 
-		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, r.vname, CONCAT(r.vname,':',p.vport), i.card = t.control_net "
-				"FROM interfaces AS i LEFT JOIN reserved AS r ON i.node_id = r.node_id "
-				"LEFT JOIN nodes AS n ON i.node_id = n.node_id "
-				"LEFT JOIN node_types AS t ON n.type = t.type "
-				"LEFT JOIN portmap AS p ON i.iface = p.pport AND p.vnode=r.vname AND p.pid=r.pid AND p.eid=r.eid "
-				"WHERE IP IS NOT NULL AND IP != '' AND r.pid='%s' AND r.eid='%s'"
-				"ORDER BY node_id DESC, IP",
-				6,pid,eid);
+		mydb_query("SELECT DISTINCT i.node_id, i.IP, i.IPalias, "
+			   "  r.vname, CONCAT(r.vname,':',p.vport), "
+			   "  i.card = t.control_net, v.vname "
+			   "FROM interfaces AS i "
+			   "LEFT JOIN reserved AS r ON i.node_id = r.node_id "
+			   "LEFT JOIN nodes AS n ON i.node_id = n.node_id "
+			   "LEFT JOIN node_types AS t ON n.type = t.type "
+			   "LEFT JOIN portmap AS p ON i.iface = p.pport AND "
+			   "  p.vnode=r.vname AND p.pid=r.pid AND p.eid=r.eid "
+			   "LEFT JOIN virt_lans as v on "
+			   " member=CONCAT(r.vname,':',p.vport) AND "
+			   " v.pid=r.pid AND v.eid=r.eid "
+			   "WHERE IP IS NOT NULL AND IP != '' AND "
+			   " r.pid='%s' AND r.eid='%s'"
+			   " ORDER BY node_id DESC, IP",
+			   7,pid,eid);
 
 	if (!nodes_result) {
 		syslog(LOG_ERR, "dohosts: %s: DB Error getting other nodes "
@@ -1189,12 +1219,24 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		/*
 		 * Let's take care of the IP first!
 		 */
-
+#define P(vers, vname, linknum, linkname, ip, alias) \
+	if (vers == 1) { \
+		sprintf(buf, \
+			"NAME=%s LINK=%i IP=%s ALIAS=%s\n", \
+			(vname), (linknum), (ip), (alias));  \
+	} \
+	else { \
+		sprintf(buf, \
+			"NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n", \
+			(vname), (linkname), (ip), (vname), \
+			(linknum), (alias));  \
+	}
 		/* Skip the control network interface */
 		if (!(node_row[5] && atoi(node_row[5]))) {
 
 			/*
-			 * Keep track of node_ids, so we can get the LINK number right
+			 * Keep track of node_ids, so we can get the LINK
+			 * number right
 			 */
 			if (!strcmp(node_row[0],last_id)) {
 				link++;
@@ -1204,14 +1246,15 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 			}
 
 
-			if (directly_connected(connected_interfaces,node_row[4])) {
-				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-						vname, link, node_row[1],
-						(!seen_direct) ? vname : " ");
+			if (directly_connected(connected_interfaces,
+					       node_row[4])) {
+				P(vers, vname, link, node_row[6],
+				  node_row[1], (!seen_direct) ? vname : " ");
+
 				seen_direct = 1;
 			} else {
-				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
-					vname, link, node_row[1]);
+				P(vers, vname, link, node_row[6],
+				  node_row[1], " ");
 			}
 
 			client_writeback(sock, buf, strlen(buf), tcp);
@@ -1230,14 +1273,14 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 				last_id = node_row[0];
 			}
 
-			if (directly_connected(connected_interfaces,node_row[4])) {
-				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-						vname, link, node_row[2],
-						(!seen_direct) ? vname : " ");
+			if (directly_connected(connected_interfaces,
+					       node_row[4])) {
+				P(vers, vname, link, node_row[6],
+				  node_row[2], (!seen_direct) ? vname : " ");
 				seen_direct = 1;
 			} else {
-				sprintf(buf, "NAME=%s LINK=%i IP=%s ALIAS= \n",
-					vname, link, node_row[2]);
+				P(vers, vname, link, node_row[6],
+				  node_row[2], " ");
 			}
 
 			client_writeback(sock, buf, strlen(buf), tcp);
@@ -1870,6 +1913,71 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		syslog(LOG_INFO, "MOUNTS: %s", buf);
 	}
 	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Return routing stuff.
+ */
+static int
+dorouting(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "ROUTES: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		syslog(LOG_ERR, "ROUTES: %s: Node is free", nodeid);
+		return 1;
+	}
+
+	/*
+	 * Get the routing type from the nodes table.
+	 */
+	res = mydb_query("select routertype from nodes where node_id='%s'",
+			 1, nodeid);
+
+	if (!res) {
+		syslog(LOG_ERR, "ROUTES: %s: DB Error getting router type!",
+		       nodeid);
+		return 1;
+	}
+
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	/*
+	 * Return type. At some point we might have to return a list of
+	 * routes too, if we support static routes specified by the user
+	 * in the NS file.
+	 */
+	row = mysql_fetch_row(res);
+	if (! row[0] || !row[0][0]) {
+		mysql_free_result(res);
+		return 0;
+	}
+	sprintf(buf, "ROUTERTYPE=%s\n", row[0]);
+	mysql_free_result(res);
+
+	client_writeback(sock, buf, strlen(buf), tcp);
+	syslog(LOG_INFO, "ROUTES: %s", buf);
 
 	return 0;
 }

@@ -61,6 +61,7 @@ sub TMNICKNAME()	{ "$SETUPDIR/nickname"; }
 sub FINDIF()		{ "$SETUPDIR/findif"; }
 sub HOSTSFILE()		{ "/etc/hosts"; }
 sub TMMOUNTDB()		{ "$SETUPDIR/mountdb"; }
+sub TMROUTECONFIG()     { "$SETUPDIR/router.conf"; }
 
 #
 # These are the TMCC commands.
@@ -70,7 +71,7 @@ sub TMCCCMD_STATUS()	{ "status"; }
 sub TMCCCMD_IFC()	{ "ifconfig"; }
 sub TMCCCMD_ACCT()	{ "accounts"; }
 sub TMCCCMD_DELAY()	{ "delay"; }
-sub TMCCCMD_HOSTS()	{ "hostnames"; }
+sub TMCCCMD_HOSTS()	{ "hostnamesV2"; }
 sub TMCCCMD_RPM()	{ "rpms"; }
 sub TMCCCMD_TARBALL()	{ "tarballs"; }
 sub TMCCCMD_STARTUP()	{ "startupcmd"; }
@@ -78,6 +79,7 @@ sub TMCCCMD_DELTA()	{ "deltas"; }
 sub TMCCCMD_STARTSTAT()	{ "startstatus"; }
 sub TMCCCMD_READY()	{ "ready"; }
 sub TMCCCMD_MOUNTS()	{ "mounts"; }
+sub TMCCCMD_ROUTING()	{ "routing"; }
 
 #
 # Some things never change.
@@ -154,6 +156,7 @@ sub inform_reboot()
 sub cleanup_node () {
     print STDOUT "Cleaning node; removing configuration files ...\n";
     unlink TMIFC, TMRPM, TMSTARTUPCMD, TMNICKNAME, TMTARBALLS;
+    unlink TMROUTECONFIG;
     unlink TMMOUNTDB . ".db";
 
     printf STDOUT "Resetting %s file\n", HOSTSFILE;
@@ -374,6 +377,51 @@ sub findiface($)
 }
 
 #
+# Do router configuration stuff. This just writes a file for someone else
+# to deal with.
+#
+sub dorouterconfig ()
+{
+    my @stuff   = ();
+    my $routing = 0;
+    my $TM;
+
+    $TM = OPENTMCC(TMCCCMD_ROUTING);
+    while (<$TM>) {
+	push(@stuff, $_);
+    }
+    close($TM);
+
+    if (! @stuff) {
+	return 0;
+    }
+
+    #
+    # Look for router type. If none, then do not bother to write this file.
+    # 
+    foreach my $line (@stuff) {
+	if (($line =~ /ROUTERTYPE=(.+)/) && ($1 ne "none")) {
+	    $routing = 1;
+	    last;
+	}
+    }
+    if (! $routing) {
+	return 0;
+    }
+    
+    open(RC, ">" . TMROUTECONFIG)
+	or die("Could not open " . TMROUTECONFIG . ": $!");
+
+    foreach my $line (@stuff) {
+	    print STDOUT "  $line";
+	    print RC "$line";
+    }
+    close(RC);
+
+    return 0;
+}
+
+#
 # Host names configuration (/etc/hosts). 
 #
 sub dohostnames ()
@@ -396,12 +444,18 @@ sub dohostnames ()
 
     #
     # Now convert each hostname into hosts file representation and write
-    # it to the hosts file.
-    # 
+    # it to the hosts file. Note that ALIASES is for backwards compat.
+    # Should go away at some point.
+    #
+    my $pat  = q(NAME=([-\w\.]+) IP=([0-9\.]*) ALIASES=\'([-\w\. ]*)\');
+    
     while (<$TM>) {
-	if ($_ =~
-	    /NAME=([-\@\w.]+) LINK=([0-9]*) IP=([0-9.]*) ALIAS=([-\@\w.]*)/) {
-	    my $hostline = os_etchosts_line($1, $2, $3, $4);
+	if ($_ =~ /$pat/) {
+	    my $name    = $1;
+	    my $ip      = $2;
+	    my $aliases = $3;
+	    
+	    my $hostline = os_etchosts_line($name, $ip, $aliases);
 	    
 	    print STDOUT "  $hostline\n";
 	    print HOSTS  "$hostline\n";
@@ -715,6 +769,12 @@ sub bootsetup()
     # 
     print STDOUT "Checking Testbed group/user configuration ... \n";
     doaccounts();
+
+    #
+    # Router Configuration.
+    #
+    print STDOUT "Checking Testbed routing configuration ... \n";
+    dorouterconfig();
 
     #
     # RPMS
