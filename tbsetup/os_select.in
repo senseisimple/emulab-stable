@@ -83,7 +83,7 @@ my $osid = shift;
 my @nodes = @ARGV;
 
 # Untaint args.
-if ($osid =~ /^([-\@\w\/]+)$/) { $osid = $1; }
+if ($osid =~ /^([-\@\w\/\.]+)$/) { $osid = $1; }
 elsif (!$mfs) { fatal("Bad data in osid: '$osid'\n"); }
 
 if ($mfs) {
@@ -243,13 +243,14 @@ sub debug ( $;$ ) {
   my $notice = shift || 0;
   my $prio="info";
   if ($notice) { $prio = "notice"; }
-  syslog($prio,$msg) || print "syslog failed: $! $?\n";;
+  syslog($prio,$msg) || notify("syslog failed: $! $?\n");
   if ($d) { print $msg; }
 }
 
 sub notify ( $ ) {
   my $msg = shift;
-  $msg .= "\ndate=".`date`."\ncmdline=\n$cmdline\n\npid=$$\n";
+  my $user= getpwuid($UID);
+  $msg .= "\ndate=".`date`."\ncmdline=\n$cmdline\n\npid=$$\n\nuser=$user\n";
   if (!$d) {
     SENDMAIL($TBOPS,"os_select error",$msg,$TBOPS);
   } else {
