@@ -39,15 +39,15 @@ option PXE.mtftp-delay code 5 = unsigned integer 8;
 option PXE.discovery-control code 6 = unsigned integer 8;
 option PXE.discovery-mcast-addr code 7 = ip-address;
 
-# Place clients in the PXE class when booting from the PXE ROM. We have to
-# set at least one option.
+# Place clients in the PXE class when booting from the PXE ROM. For some PXE
+# clients, We have to set at least one option - if they fail to dchp, try
+# uncommenting the two lines below.
 class "PXE" {
 	match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
 	option vendor-class-identifier "PXEClient";
-	vendor-option-space     PXE;
-	option PXE.mtftp-ip     0.0.0.0;
+#	vendor-option-space     PXE;
+#	option PXE.mtftp-ip     0.0.0.0;
 }
-
  
 subnet 155.101.132.0 netmask 255.255.252.0 {
 
