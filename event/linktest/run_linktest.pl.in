@@ -36,7 +36,14 @@ my $server;
 my $port;
 my %opt = ();
 getopts("s:e:d:qp:k:",\%opt);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+if ($opt{s}) { $server = $opt{s}; } else { 
+    my $results = `@CLIENT_BINDIR@/tmcc bossinfo`;
+    if($results =~ /^([\w\.]*)\s/) {
+	$server = $1; 
+    } else {
+	die "Could not determine event server name\n";
+    }
+}
 if ($opt{p}) { $port = $opt{p}; }
 exit &usage unless ($opt{e});
 my ($pid,$eid) = split(/\//,$opt{e});

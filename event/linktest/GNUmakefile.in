@@ -14,12 +14,13 @@ DAEMON	        = linktest
 LTEVENT		= ltevent
 SCRIPT		= linktest.pl
 SCRIPT_RUN	= run_linktest.pl
+SCRIPT_TBCOMPAT = tb_compat.tcl
 
 SYSTEM	       := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-all:	$(DAEMON) $(LTEVENT) $(SCRIPT) $(SCRIPT_RUN)
+all:	$(DAEMON) $(LTEVENT) $(SCRIPT) $(SCRIPT_RUN) $(SCRIPT_TBCOMPAT)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -77,6 +78,8 @@ client-install:
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
 			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
+	$(INSTALL_PROGRAM) $(SCRIPT_TBCOMPAT) \
+			$(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_TBCOMPAT)
 
 clean:
 	/bin/rm -f *.o $(TESTS)

@@ -49,7 +49,6 @@ use constant BSD => "FreeBSD";
 use constant LINUX => "Linux";
 use constant RTPROTO_STATIC => "Static";
 use constant EVENT_STOP => "STOP";
-use constant EVENT_SERVER => "boss";
 use constant PING_SEND_COUNT => 10;
 
 # test levels
@@ -72,8 +71,7 @@ use constant DEBUG_ALL => 2; # debug level for all debug info, not just msgs.
 use constant LOG_CHANCE => 0.10; # chance of logging.
 
 # more paths
-use constant TBCOMPAT_PATH => "/proj/utahstud/users/davidand/public/ltpath";
-use constant LOG_PATH => "/proj/utahstud/users/davidand/public/logpath/biglog";
+use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
 
 # struct for representing a link.
 struct ( edge => {
@@ -84,6 +82,8 @@ struct ( edge => {
     loss => '$'
 });
 
+# security: constrain the path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 
 ##############################################################################
 # Globals
@@ -106,7 +106,8 @@ my $debug_level = 0; # enable debug statements
                     # 1 = print debug statements.
                     # 2 = show STDOUT and STDERR
 my $barr_count;   # used by synserv host, nubmer of hosts -1
-my $server = "boss";       # event server. default to boss.
+my $event_server;       # event server
+my $log_file;    # common logfile for information saved over time.
 
 my @hosts; # hosts: list of text strings containing host names.
            # sorted alphabetically
@@ -289,7 +290,7 @@ sub loss_test {
 		my $z = $numerator / $denominator;
 		my $reject_region = 2.58; # alpha = 0.1, normal distro by CLT
 		if(abs($z) > $reject_region) {
-		    my $errmsg = "Probable loss misconfiguration (n:$n, received: $received; expected: $p, measured=$p_hat)";
+		    my $errmsg = "Probable loss misconfiguration (n:$n, received: $received; expected proportion: $p, measured proportion=$p_hat)";
 		    &error(NAME_LOSS, $edge, $errmsg);
 		}
 	    }
@@ -481,7 +482,7 @@ sub latency_test {
 				if(abs($z) > $t_reject
 				   && (abs($x_bar - $u) > INSIGNIFICANT_LAT_ERROR)
 				   ) {
-				    my $errmsg = "Probable latency misconfiguration (expected=$u, measured=$x_bar).";
+				    my $errmsg = "Probable latency misconfiguration (expected=$u, measured mean=$x_bar).";
 				    &error(NAME_LATENCY, $edge, $errmsg);
 				}
 			    }
@@ -566,7 +567,7 @@ sub bw_test {
 		&debug($output);
 
 		if($diff > INSIGNIFICANT_BW_ERROR) {
-		    &error (NAME_BW, $edge, "Bandwidth estimate $low to $hi Mbps fails to support expected $expected");
+		    &error (NAME_BW, $edge, "Bandwidth estimate $low to $hi Mbps does not include expected bandwidth $expected Mbps");
 		}
 
 	    } else {
@@ -657,6 +658,7 @@ sub get_topo {
 # prints out the topology read in from the NS file
 sub debug_top {
     &debug("ns script: $ns_file\n");
+    &debug("event server: $event_server\n");
     &debug("nodes:\n");
     foreach my $vert (@hosts) {
 	&debug( " " . $vert . "\n");
@@ -746,6 +748,7 @@ sub init {
 
     # get the experiment path and log path
     $expt_path = "/proj/$proj_id/exp/$exp_id/tbdata";
+    $log_file = "/proj/$proj_id/ltdata";
     $linktest_path = "$expt_path/linktest";
     if(!defined($ns_file)) {
 	if(-e "$expt_path/$exp_id-modify.ns") {
@@ -781,7 +784,7 @@ sub init {
 	    mkdir ($linktest_path,0777) or  die &fatal("Could not create directory $linktest_path");
 	}
 
-	chdir(TBCOMPAT_PATH);
+	chdir(RUN_PATH);
 	@results = &my_tick($ns_cmd,
 			    &check_filename($ns_file));
 	&write_file($outname,@results);
@@ -808,6 +811,15 @@ sub init {
 	$barr_count = @hosts;
 	$barr_count--;
     }
+
+    # what is event server...
+    @results = &my_tick("@CLIENT_BINDIR@/tmcc","bossinfo");
+    if(@results && $results[0] =~ /^([\w\.]*)\s/) {
+	$event_server = $1; 
+    } else {
+	die &fatal("Could not determine event server name");
+    }
+
 
     # big first synch waiting for collector startup and ns execution.
     &barrier;
@@ -836,9 +848,12 @@ sub ping_node {
     my $send_rate = $timeout / $send_count;
 
     # set deadline to prevent long waits
-    # TODO: note that some kind of problem occurs with the path.hmm.
     my $cmd;
     if($ttl) {
+
+	# TODO: figure out a way not to have to specify the whole path to
+	# standard programs ping and sudo.
+	# for some reason including them in the env didn't work.
 	if($platform eq BSD) {
 	    $cmd = "/usr/local/bin/sudo /sbin/ping -c $send_count -q -i $send_rate -t $timeout -m $ttl $host";
 	} elsif($platform eq LINUX) {
@@ -1024,7 +1039,7 @@ sub proc_cmd {
 # send the event indicating that the test has completed.
 sub send_done {
     if($hostname eq $synserv) {
-	&my_system(PATH_LTEVENT,"-s",EVENT_SERVER,"-e","$proj_id/$exp_id","-x",EVENT_STOP, "-k", PATH_KEYFILE);
+	&my_system(PATH_LTEVENT,"-s",$event_server,"-e","$proj_id/$exp_id","-x",EVENT_STOP, "-k", PATH_KEYFILE);
     }
 }
 
@@ -1152,7 +1167,7 @@ sub log {
     return unless (rand(1) < LOG_CHANCE);
     my $msg = shift @_;
     &debug($msg);
-    &append_file(LOG_PATH,$msg);
+    &append_file($log_file,$msg);
 }
 
 sub append_file {
