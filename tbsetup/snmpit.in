@@ -90,6 +90,8 @@ Port Control:
   -T <port> <names>      Enable trunking on the given <port>, and allow VLANs
                              with the given <names> across it
   -U <port>              Turn off trunking for the given <port>
+  -b <ports>             Print out port status for a set of ports
+  -B <statstring>        Pass in a stat string from -b to restore status
 
 More than one operation can be specified - However, beware that the order in
 which operations will occur is undefined, and some combinations of operations
@@ -102,9 +104,9 @@ END
 
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
-GetOptions(\%opt, 'a','c','d','e','g','h','i=s@','l','m=s@','M','n','o=s@',
+GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n','o=s@',
     'p=s','r','s', 'S=s@', 't','T=s','u=s','U','v','w','y=s','x=s','z=s');
-# Unused: b,f,j,q
+# Unused: f,j,q
 
 if ($opt{h}) {
     exit &usage;
@@ -141,7 +143,7 @@ if ($opt{t} || $opt{r}) {
 	@optvlanids = @ARGV;
     }
 } elsif ($opt{d} || $opt{e} || $opt{a} || $opt{p} || $opt{u} || $opt{m}
-         || $opt{U}) {
+         || $opt{U} || $opt{b}) {
     #
     # Options that take a list of ports
     #
@@ -188,6 +190,7 @@ if ($opt{t}) { push @commands, ["tables"]; }
 if ($opt{r}) { push @commands, ["reset"]; }
 if ($opt{c}) { push @commands, ["recreate"]; }
 if ($opt{U}) { push @commands, ["trunkdisable"]; }
+if ($opt{b}) { push @commands, ["portstatus"]; }
 
 #
 # Commands that can appear once, and take an agurment
@@ -209,6 +212,22 @@ if ($opt{m}) {
 if ($opt{o}) {
     foreach my $name (@{$opt{o}}) {
 	push @commands, ["remove",$name];
+    }
+}
+
+if ($opt{B}) {
+    foreach my $statstring (@{$opt{B}}) {
+	push @commands, ["restorestatus",$statstring];
+        # Set up the @ports variable so that we get permissions checking. Note,
+        # though, that we re-parse the strings again later, this is just for
+        # permissions
+        my %args = parseStatusString($statstring);
+        if (!$args{port}) {
+            die "ERROR: No port given in status string\n";
+        }
+        if ($args{port}) {
+            push @ports, $args{port};
+        }
     }
 }
 
@@ -425,7 +444,7 @@ foreach my $command (@commands) {
 			   @supplied_switches : getTestSwitches();
 	    last;
 	};
-	(/portcontrol/ || /trunkdisable/) && do {
+	(/portcontrol/ || /trunkdisable/ || /portstatus/) && do {
 	    @devicenames = $supplied_switches?
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    last;
@@ -446,11 +465,30 @@ foreach my $command (@commands) {
 	    		   @supplied_switches : getDeviceNames(@ports);
 	    @vlans = @optvlanids;
 	    last;
-	}
+	};
+        (/restorestatus/) && do {
+            # We start by parsing out the options string, then we'll reset
+            # @args
+            my ($statusarg) = @args;
+            my %args = parseStatusString($statusarg);
+            if (!$args{port}) {
+                die "ERROR: No port given in status string\n";
+            }
+            @ports = ($args{port});
+            if ($args{vlan}) {
+                @vlans = ($args{vlan});
+            }
+            @devicenames = $supplied_switches?
+                           @supplied_switches : getDeviceNames(@ports);
+
+            @args = %args;
+            last;
+        };
     }
 
     debug("Device names: " . join(",",@devicenames) . "\n");
     debug("Ports: " . join(",",@ports) . "\n");
+    if (@vlans) { debug("VLANs: " . join(",",@vlans) . "\n") };
 
     my %stacks = ();
     if (! $ELABINELAB) {
@@ -608,7 +646,15 @@ foreach my $command (@commands) {
 	/trunkdisable/ && do {
 	    $exitval += doTrunkDisable(\@stacks,@ports);
 	    last;
-	}; # /trunkenable/ && do
+	}; # /trunkdisable/ && do
+	/portstatus/ && do {
+	    $exitval += doPortStatus(\@stacks,@ports);
+	    last;
+	}; # /portstatus/ && do
+	/restorestatus/ && do {
+	    $exitval += doRestorePortStatus(\@stacks,@args);
+	    last;
+	}; # /portstatus/ && do
     }
 }
 
@@ -625,6 +671,26 @@ sub debug($) {
     if ($debug) {
 	print STDERR @_;
     }
+}
+
+#
+# Parse a port status string. Returns a key-value hash pair
+#
+sub parseStatusString($) {
+    my ($string) = @_;
+    chomp $string;
+
+    my %pairs;
+    foreach my $pair (split /;/, $string) {
+        my ($key, $value) = split /=/,$pair,2;
+        if (!$key || !$value) {
+            die "ERROR: Bad port status string: $string\n";
+        } else {
+            $pairs{$key} = $value;
+        }
+    }
+
+    return %pairs;
 }
 
 #
@@ -787,6 +853,126 @@ $port,    $enabled,$up,$speed,$duplex
     }
 
     return 0;
+}
+
+#
+# Get information on a particular port - the idea is that this string can later
+# be passed back to us to restore the status of the port.
+# This is inefficient, because it gets information about all ports and only
+# uses it for one (or a few). BUT, it doesn't require changes to the
+# vendor-specific modules, so I think it's worth it for portability.
+#
+sub doPortStatus($@) {
+
+    my $stacks = shift;
+    my @port = @_;
+
+    my $errors = 0;
+
+    #
+    # Get a listing from all stacks
+    #
+    my @portList = ();
+    foreach my $stack (@$stacks) {
+	push @portList, $stack->listPorts;
+    }
+
+    #
+    # Find the port(s) we're looking for in the portlist
+    #
+    my %ports = ();
+    foreach my $port (@ports) {
+        $ports{$port} = undef;
+    }
+    foreach my $portrecord (@portList) {
+	my ($port,$enabled,$up,$speed,$duplex) = @$portrecord;
+        if (exists $ports{$port}) {
+            $ports{$port} = "enabled=$enabled";
+        }
+    }
+
+    #
+    # Now find out what VLAN it's in
+    #
+    foreach my $stack (@$stacks) {
+	my @vlanList = $stack->listVlans();
+	foreach my $vlan (@vlanList) {
+	    my ($id,$ddep,$memberref) = @$vlan;
+            # Now we have to look through the memberref for our ports
+            foreach my $port (@$memberref) {
+                if ($ports{$port}) {
+                    $ports{$port} .= ";vlan=$id";
+                }
+            }
+	}
+    }
+
+    #
+    # XXX - This is gonna be a mess if the port is a trunk port, or otherwise
+    # somehow more complicated. For now, we just ignore this, I guess
+    #
+
+    #
+    # Check to see if we missed any
+    #
+    foreach my $port (keys %ports) {
+        if (!$ports{$port}) {
+            warn "ERROR: Unable to get status information for $port!\n";
+            $errors++;
+        } else {
+            print "port=$port;$ports{$port}\n";
+        }
+    }
+
+    if ($errors) {
+        return $errors;
+    }
+
+}
+
+#
+# Restore port status. Takes a single argument, which is an array that will be
+# turned back into a param hash
+#
+sub doRestorePortStatus($@) {
+
+    my $stacks = shift;
+    my %params = @_; # Yes, this does work
+
+    my $port = $params{port};
+    if (!$port) {
+        die "ERROR: No port passed to -B option\n";
+    }
+
+    if (@$stacks > 1) {
+	die "Port restoration accross multiple stacks is not yet supported\n" .
+	    "Stacks are " . join(",",@$stacks) . "\n";
+    }
+    my ($stack) = @$stacks;
+
+    my $errors = 0;
+
+    # Put the port in the specified VLAN
+    # If they didn't give us a VLAN, we assume that means they want it removed
+    # from its vlan
+    my $vlan = $params{vlan};
+    if (!$vlan) { $vlan = "default"; }
+    $errors += $stack->setPortVlan($vlan,$port);
+    if ($errors) { return $errors; }
+
+    # Enable or disable the port
+    # If they didn't tell us either way, we assume they wanted it disabled
+    my $enabled = $params{enabled};
+    # If they are putting the port into the default VLAN, force it to be
+    # disabled, so that a user cannot use this method to break into that VLAN
+    if ($vlan eq "default") { $enabled = "no"; }
+    if ($enabled eq "yes") {
+        $errors = $stack->portControl("enable",$port);
+    } else {
+        $errors = $stack->portControl("disable",$port);
+    }
+
+    return $errors;
 }
 
 #
