@@ -25,7 +25,7 @@ use libdb;
 # For a Cisco stack, the stack_id happens to also be the name of the stack
 # leader.
 #
-# usage: new(string name, string stack_id, list of devicenames)
+# usage: new(string name, string stack_id, int debuglevel, list of devicenames)
 # returns a new object blessed into the snmpit_cisco_stack class
 #
 sub new($$#@) {
@@ -363,7 +363,7 @@ sub portControl ($$@) {
 }
 
 #
-#
+# Get port statistics for all devices in the stack
 #
 sub getStats($) {
     my $self = shift;
