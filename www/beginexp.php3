@@ -38,6 +38,7 @@ function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN;
     global $nsdata, $projlist, $priorities, $exp_nsfile;
+    global $uid;
     
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -244,14 +245,34 @@ function SPITFORM($formfields, $errors)
                   <input type=checkbox
                          name=\"formfields[exp_batched]\"
                          value=Yep";
+    
+    if (isset($formfields[exp_batched]) &&
+	strcmp($formfields[exp_batched], "Yep") == 0)
+	echo "           checked";
+	
+    echo "                       > Yes
+              </td>
+          </tr>\n";
 
-	if (isset($formfields[exp_batched]) &&
-	    strcmp($formfields[exp_batched], "Yep") == 0)
+    #
+    # Preload?
+    #
+    if (ISADMIN($uid)) {
+	echo "<tr>
+  	          <td colspan=2>Preload Experiment?[<b>6</b>]:</td>
+                  <td class=left>
+                      <input type=checkbox
+                             name=\"formfields[exp_preload]\"
+                             value=Yep";
+
+	if (isset($formfields[exp_preload]) &&
+	    strcmp($formfields[exp_preload], "Yep") == 0)
 	    echo "           checked";
 	
 	echo "                       > Yes
                   </td>
               </tr>\n";
+    }
 
     echo "<tr>
               <td align=center colspan=3>
@@ -278,9 +299,14 @@ function SPITFORM($formfields, $errors)
                  corresponds to the project you selected.
              <li>Check this if you want to create a
                  <a href='$TBDOCBASE/tutorial/tutorial.php3#BatchMode'>
-                 batch mode</a> experiment.
-         </ol>
-         </blockquote></blockquote></blockquote>\n";
+                 batch mode</a> experiment.\n";
+    if (ISADMIN($uid)) {
+	echo "<li>Check this if you want to load the experiment, but not
+                 configure it (assign physical resources). This option is
+                 not compatible with batch mode. Admin only right now.\n";
+    }
+    echo "</ol>
+          </blockquote></blockquote></blockquote>\n";
 
     echo "<p><blockquote>
           <ul>
@@ -392,6 +418,16 @@ if (isset($formfields[exp_priority]) &&
     strcmp($formfields[exp_priority], "") &&
     ! isset($priorities[$formfields[exp_priority]])) {
     $errors["Priority"] = "Bad Value";
+}
+
+#
+# Preload and Batch are mutually exclusive.
+#
+if (isset($formfields[exp_batched]) &&
+    !strcmp($formfields[exp_batched], "Yep") &&
+    isset($formfields[exp_preload]) &&
+    !strcmp($formfields[exp_preload], "Yep")) {
+    $errors["Preload"] = "Cannot use with Batch Mode";
 }
 
 #
@@ -551,9 +587,15 @@ if (isset($formfields[exp_batched]) &&
 else {
     $exp_batched   = 0;
     $batcharg      = "-i";
+
+    if (isset($formfields[exp_preload]) &&
+	strcmp($formfields[exp_preload], "Yep") == 0) {
+	$exp_preload   = 1;
+	$batcharg     .= " -f";
+    }
 }
 
-#
+# 
 # I'm not spitting out a redirection yet.
 #
 PAGEHEADER("Begin a Testbed Experiment");
