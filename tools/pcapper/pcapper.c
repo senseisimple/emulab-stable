@@ -73,6 +73,12 @@
 #define CONTROL_IFACE "/etc/testbed/control_interface"
 
 /*
+ * Wire overhead not seen by pcapper:
+ *	interframe gap (12) + preamble (8) + CRC (4)
+ */
+#define INVISIBLE_ETHSIZE	24
+
+/*
  * A struct definitions shamelessly stolen from tcpdump.org
  */
 
@@ -180,6 +186,11 @@ int payload_only = 0;
 int add_ethernet = 0;
 
 /*
+ * Nonzero if we're supposed to add ALL ethernet overhead to the packet size
+ */
+int add_all_ethernet = 0;
+
+/*
  * Nonzero if we're supposed to _not_ count zero-sized packets in the
  * packet counts (obviously, they're already ignored in the byte counts.
  */
@@ -247,6 +258,7 @@ void usage(char *progname) {
 			   "(in ms) to report\n"
 		       "-p            Count only payload (not header) size\n"
 		       "-n            Add in ethernet header size\n"
+		       "-N            Add in all ethernet overhead\n"
 		       "-z            Don't count zero-length packets\n"
 		       "-o            Print output to stdout\n"
 #ifdef EVENTSYS
@@ -309,7 +321,7 @@ int main (int argc, char **argv) {
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:e:hpnzs:o")) != -1)
+	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:o")) != -1)
 		switch(ch) {
 		case 'f':
 			/* Find the first empty slot */
@@ -324,6 +336,9 @@ int main (int argc, char **argv) {
 			break;
 		case 'n':
 			add_ethernet = 1;
+			break;
+		case 'N':
+			add_all_ethernet = 1;
 			break;
 		case 'z':
 			no_zero = 1;
@@ -1010,6 +1025,9 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 		length = ntohs(ip_pkt->ip_len);
 	} else {
 		length = ntohs(ip_pkt->ip_len) + sizeof (struct sniff_ethernet);
+		if (add_all_ethernet) {
+			length += INVISIBLE_ETHSIZE;
+		}
 	}
 	type = ip_pkt->ip_p;
 
