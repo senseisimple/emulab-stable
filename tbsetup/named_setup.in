@@ -309,7 +309,8 @@ open(MAP, ">>$vnodesfile") || fatal("Couldn't open $vnodesfile\n");
 print MAP
     ";\n".
     "; Jail IPs (allocated nodes only).\n" .
-    ";\n";
+    ";\n\n".
+    "\$TTL\t60\n\n";
     
 $db_result =
     DBQueryFatal("select r.*,n.jailip from reserved as r ".
