@@ -265,6 +265,7 @@ int main(int argc, char *argv[])
 
 		mup.robot_id = robot_id;
 		bot.getDisplacement(mup.position.x, mup.position.y);
+		bot.resetPosition();
 		mup.position.theta = theta;
 		if (rc < 0) {
 		    mup.status = MTP_POSITION_STATUS_ERROR;
