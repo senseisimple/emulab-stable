@@ -873,7 +873,7 @@ sub fatal($)
 	     "Cc:  $TBOPS",
 	     (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
 
-    if ($hosed) {
+    if ($modifyHosed) {
 	#
 	# Copy off the workdir to the user directory, Then back up both of
 	# them for post-mortem debugging.
