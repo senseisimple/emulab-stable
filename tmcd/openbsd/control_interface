@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+NODETYPE=`$BINDIR/nodetype`
+
+if [ "$NODETYPE" = 'pc600' ]; then
+    echo 'fxp4'
+elif [ "$NODETYPE" = 'pc850' ]; then
+    echo 'fxp0'
+elif [ "$NODETYPE" = 'pcL440GX' ]; then
+    echo 'fxp1'
+elif [ "$NODETYPE" = 'pc1500' ]; then
+    echo 'xl0'
+elif [ "$NODETYPE" = 'pc2000' ]; then
+    echo 'xl0'
+else
+    echo 'unknown'
+fi

@@ -1,0 +1,5 @@
+#
+# When the release is bumped, be sure to remove sup/sup/OBSD32-STD/checkouts
+# on the client.
+#
+OBSD32-STD base=@CLIENT_VARDIR@ prefix=/ preserve release=current

@@ -1,0 +1,8 @@
+#
+# XXX emulab hack -- search emulab directory first.
+# We do this so we can provide an alternate dhclient script
+# and not replace the default binary.  This can go away if
+# OpenBSD every gets a more selective way to use DHCP at boot time.
+#
+PATH=/etc/emulab:/sbin:/bin:/usr/sbin:/usr/bin
+export PATH

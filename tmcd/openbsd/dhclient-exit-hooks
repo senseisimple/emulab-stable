@@ -1,0 +1,9 @@
+#!/bin/sh
+
+if [ x"$new_host_name" != x ]; then
+    echo "Setting hostname to $new_host_name"
+    echo ${new_host_name}.emulab.net > /etc/myname
+    hostname `cat /etc/myname`
+fi
+
+exit 0

@@ -1,0 +1,15 @@
+#!/bin/sh
+
+. /etc/emulab/paths.sh
+
+if [ $# -ne 1 ]; then
+    echo "usage: dhclient iface"
+    exit 1
+fi
+
+iface=$1
+if [ `$BINDIR/control_interface` = $iface ]; then
+    /sbin/dhclient $iface
+fi
+
+exit 0
