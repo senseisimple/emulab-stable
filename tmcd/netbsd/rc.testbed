@@ -9,3 +9,9 @@ if [ -x /etc/testbed/rc.ifc ]; then
         echo "Setting up Testbed interfaces..."
         /etc/testbed/rc.ifc
 fi
+
+/bin/rm -f /var/at/jobs/S*
+if [ -s /etc/testbed/startupcmd  ]; then
+        echo "Scheduling startup command to run in a little bit ..."
+	echo "/etc/testbed/runstartup" | at -q S 'now + 2 minutes'
+fi

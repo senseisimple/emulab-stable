@@ -15,8 +15,8 @@ if [ -x /etc/rc.d/testbed/rc.rpm  ]; then
 	/etc/rc.d/testbed/rc.rpm
 fi
 
-if [ -x /etc/rc.d/testbed/startupcmd  ]; then
+/bin/rm -f /var/spool/at/S*
+if [ -s /etc/rc.d/testbed/startupcmd  ]; then
         echo "Scheduling startup command to run in a little bit ..."
-	/bin/rm -f /var/spool/at/S*
-	echo "/etc/rc.d/testbed/runstartup" | at -q S 'now + 5 minutes'
+	echo "/etc/rc.d/testbed/runstartup" | at -q S 'now + 2 minutes'
 fi

@@ -23,6 +23,8 @@ my $DELAYCMD    = "delay";
 my $HOSTSCMD    = "hostnames";
 my $RPMCMD      = "rpms";
 my $STARTUPCMD  = "startupcmd";
+my $STARTSTATCMD= "startstatus";
+my $READYCMD    = "ready";
 my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s ".
 		  "media 100baseTX mediaopt full-duplex\n";
 my $RPMINSTALL  = "/usr/local/bin/rpm -i %s\n";
@@ -235,8 +237,14 @@ if (@delays) {
     
 	$count++;
     }
-    print DEL "echo \"Delay Configuration Complete\"\n";
+    #
+    # If a delay node, then lets report status and ready in so that batch
+    # experiments do not become stuck.
+    #
+    print DEL "$TMCC $READYCMD\n";
+    print DEL "$TMCC $STARTSTATCMD 0\n";
 
+    print DEL "echo \"Delay Configuration Complete\"\n";
     close(DEL);
     chmod(0755, "$TMDELAY");
     

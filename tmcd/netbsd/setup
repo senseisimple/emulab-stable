@@ -6,16 +6,21 @@ use English;
 #
 my $TMCC	= "/etc/testbed/tmcc";
 my $TMIFC       = "/etc/testbed/rc.ifc";
+my $TMRPM       = "/etc/testbed/rc.rpm";
+my $TMSTARTUPCMD= "/etc/testbed/startupcmd";
 my $TMGROUP     = "/etc/testbed/group";
 my $TMPASSWD    = "/etc/testbed/master.passwd";
 my $TMHOSTS     = "/etc/testbed/hosts";
 my $HOSTSFILE   = "/etc/hosts";
-my @CONFIGS	= ($TMIFC);
+my $TMNICKNAME  = "/etc/testbed/nickname";
+my @CONFIGS	= ($TMIFC, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME);
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
 my $ACCTCMD     = "accounts";
 my $HOSTSCMD    = "hostnames";
+my $RPMCMD      = "rpms";
+my $STARTUPCMD  = "startupcmd";
 my $IFCONFIG    = "/sbin/ifconfig cs%d alias %s netmask %s ".
 		  "media 10baseT mediaopt full-duplex\n";
 my $CP		= "/bin/cp -f";
@@ -27,6 +32,8 @@ my $IFACE	= "cs";
 my $CTLIFACENUM = "0";
 my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
 my $project     = "";
+my $eid         = "";
+my $vname       = "";
 my $PROJDIR     = "/proj";
 my $MOUNTCMD	= "/sbin/mount fs.emulab.net:/q/proj/";
 my $HOSTNAME    = "%s\t%s-%s %s\n";
@@ -71,13 +78,24 @@ if ($_ =~ /^FREE/) {
     print STDOUT "  Free!\n";
     exit(0);
 }
-if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*)/) {
-    print STDOUT "  Allocated: $1/$2!\n";
+if ($_ =~ /ALLOCATED=([-\@\w.]*)\/([-\@\w.]*) NICKNAME=([-\@\w.]*)/) {
     $project = $1;
+    $eid     = $2;
+    $vname   = $3;
+    $nickname= "$vname.$eid.$project";
+    print STDOUT "  Allocated! PID: $1, EID: $2, NickName: $nickname\n";
 }
 else {
     die("Error getting reservation status\n");
 }
+
+#
+# Stick our nickname in a file in case someone wants it.
+#
+open(NICK, ">$TMNICKNAME")
+    or die("Could not open $TMNICKNAME");
+print NICK "$nickname\n";
+close(NICK);
 
 #
 # Mount the project directory.
@@ -216,6 +234,26 @@ while (<TM>) {
     }
 }
 close(TM);
+
+#
+# Experiment startup Command.
+#
+print STDOUT "Checking Testbed Experiment Run Command configuration ... \n";
+
+open(TM,  "$TMCC $NODE $STARTUPCMD |")
+    or die "Cannot start $TMCC: $!";
+$_ = <TM>;
+close(TM);
+if ($_ =~ /CMD=(\'[-\@\w.\/ ]+\') UID=([0-9a-z]+)/) {
+    open(RUN, ">$TMSTARTUPCMD")
+	or die("Could not open $TMSTARTUPCMD");
+    
+    print  STDOUT "  Will run $1 as $2\n";
+    print  RUN    "$_\n";
+
+    close(RUN);
+    chmod(0755, "$TMSTARTUPCMD");
+}
 
 #
 # If node is free, reset to a moderately clean state.

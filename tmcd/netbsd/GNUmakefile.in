@@ -26,4 +26,6 @@ install:
 	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(INSTALL_DIR)/master.passwd
 	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
 	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
+	$(INSTALL) -m 755 $(SRCDIR)/runstartupcmd $(INSTALL_DIR)/runstartupcmd
+	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
