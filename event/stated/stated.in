@@ -81,6 +81,7 @@ my $TBNOTIMEOUT  = TBDB_NO_STATE_TIMEOUT;
 my $TBNODESTATE  = TBDB_TBEVENT_NODESTATE;
 my $TBNODEOPMODE = TBDB_TBEVENT_NODEOPMODE;
 my $TBCONTROL    = TBDB_TBEVENT_TBCONTROL;
+my $TB_OSID_MBKERNEL = TB_OSID_MBKERNEL;
 
 my $pidfile;
 $pidfile = "$TB/locks/stated.pid";
@@ -416,8 +417,8 @@ sub stateTransition($$) {
 	info("$node: Current OS is '$osid', OS mode is '$os_op_mode'\n");
 	DBQueryFatal("UPDATE nodes SET osid='$osid' WHERE node_id='$node'");
 	if ($os_op_mode ne $mode) {
-	    my $str = "Node $node is running OS '$osid' but was not in ".
-	      "mode '$os_op_mode'!\n";
+	    my $str = "Node $node is running OS '$osid' but in mode '$mode' ".
+	      "instead of mode '$os_op_mode'!\n";
 	    if ($os_op_mode ne "") {
 		DBQueryFatal("UPDATE nodes SET op_mode='$os_op_mode', ".
 			     "op_mode_timestamp=unix_timestamp(now()) ".
@@ -761,6 +762,7 @@ sub handleChild() {
 
 sub os_opmode() {
     my $osid = shift || "";
+    if ($osid eq $TB_OSID_MBKERNEL) { return "MINIMAL"; }
     my $cmd = "select op_mode from os_info where osid='$osid';";
     my $q = DBQueryFatal($cmd);
     if ($q->numrows() < 1) { return ""; }
