@@ -73,8 +73,8 @@ elseif (TBEventCount($pid, $eid)) {
 # Spit out an image that refers to a php script. That script will run and
 # send back the GIF image contents.
 #
-if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0 ||
-    strcmp($expstate, $TB_EXPTSTATE_SWAPPED) == 0) {
+if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
+    strcmp($expstate, $TB_EXPTSTATE_PRERUN)) {
     echo "<br>
           <center>
             <img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center>
