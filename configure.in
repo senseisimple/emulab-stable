@@ -193,7 +193,11 @@ fi
 #
 # Be sure to add to config.h.in!
 #
-AC_DEFINE_UNQUOTED(TBROOT, "$prefix")
+if test x"$prefix" = x"NONE"; then
+    AC_DEFINE_UNQUOTED(TBROOT, "/usr/testbed")
+else
+    AC_DEFINE_UNQUOTED(TBROOT, "$prefix")
+fi
 AC_DEFINE_UNQUOTED(TBDBNAME, "$TBDBNAME")
 AC_DEFINE_UNQUOTED(TBADMINGROUP, "$TBADMINGROUP")
 AC_DEFINE_UNQUOTED(IPBASE, "$IPBASE")
