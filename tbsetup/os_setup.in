@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,7 +22,7 @@ require 'ctime.pl';
 #
 sub usage()
 {
-    print STDOUT "Usage: os_setup <pid> <eid>\n";
+    print STDERR "Usage: os_setup <pid> <eid>\n";
     exit(-1);
 }
 my  $optlist = "d";
@@ -49,8 +49,8 @@ my $vnode_setup = "$TB/sbin/vnode_setup";
 my $osselect    = "$TB/bin/os_select";
 my $dbg		= 0;
 my $failed      = 0;
-my @nodes       = ();
-my @vnodes      = ();
+my %nodes       = ();
+my %vnodes      = ();
 my %osids       = ();
 my %canfail     = ();
 my $db_result;
@@ -137,18 +137,24 @@ while (my %row = $db_result->fetchhash()) {
     my $osid     = $row{'def_boot_osid'};
     my $type     = $row{'type'};
     my $bootpath = 0;
+    my $jailnode = 0;
 
     #
-    # VIRTNODE HACK: Virtual nodes are special. 
+    # VIRTNODE HACK: Virtual nodes are special. Jailed vnodes can do quite
+    # a bit, and so run them through the checks below.
     #
-    if (TBIsNodeVirtual($node)) {
-	push(@vnodes, $node);
-	next;
+    if (TBIsNodeVirtual($node, \$jailed)) {
+	$vnodes{$node} = $jailed;
+	if (! $jailed) {
+	    next;
+	}
+	$jailnode = 1;
     }
-
-    push(@nodes, $node);
+    else {
+	$nodes{$node}  = $node;
+	$reboots{$node} = 1;
+    }
     $osids{$node} = $osid;
-    $reboots{$node} = 1;
 
     #
     # Make sure the files specified in the paths exist. We mount the
@@ -238,7 +244,7 @@ while (my %row = $db_result->fetchhash()) {
     # associated with it, which means the same thing; we don't worry about
     # it. 
     #
-    if (! $bootpath) {
+    if (!$bootpath && !$jailnode) {
 	#
 	# These checks are not necessary if the front end and web page
 	# are doing the right thing, but lets be careful anyway.
@@ -353,6 +359,34 @@ while (my %row = $db_result->fetchhash()) {
 }
 
 #
+# Now do osid setup for jailed nodes. We waited until the physnodes were
+# done above so that we can set the osid for the vnodes to the same
+# as the physnode. We rely on the fact that the user is not allowed to
+# set the OS for jailed nodes or for the physnodes that are hosting
+# jailed nodes, and the node_types table has the right stuff. Non-jailed
+# nodes do not need to be done.
+#
+foreach my $vnode (keys(%vnodes)) {
+    my $jailed = $vnodes{$vnode};
+    my $pnode;
+
+    if (! $jailed) {
+	next;
+    }
+
+    if (! TBPhysNodeID($vnode, \$pnode)) {
+	die("*** $0:\n".
+	    "    Cannot determine phys_nodeid for $vnode!\n");
+    }
+    my $n_osid = $osids{$pnode};
+    
+    system("$osselect $n_osid $vnode") and
+	die("*** Could not set boot OS to $n_osid for $vnode\n");
+
+    $osids{$vnode} = $n_osid;
+}
+
+#
 # We need to issue the reboots and the reloads in parallel.
 #
 TBDebugTimeStamp("rebooting/reloading started");
@@ -380,36 +414,68 @@ if (!$TESTMODE) {
 	waitpid($pid, 0);
 	if ($?) {
 	    $failed++;
-	    print STDERR "*** Failed: $cmd\n";
+	    print "*** Failed: $cmd\n";
 	}
     }
 }
-
 TBDebugTimeStamp("rebooting/reloading finished");
 sleep(2);
+
+#
+# XXX What happens if something above fails? We could exit, but some nodes
+# that *are* rebooting would be caught in the middle. For the nodes that
+# were reloaded, we can check the state right away (and avoid the wait
+# below as well); they should be in the ISUP state when os_load is
+# finished.  If not, thats a failure and we can save some time below.  For
+# plain reboot failures, nothing to do but find out below after the wait.
+# I do not want to exit right away cause we might end up with a lot more
+# power cycles since the nodes are very likely to be in a non responsive
+# state if just rebooted!
+#
+foreach my $imageid ( keys(%reloads) ) {
+    my @list = @{ $reloads{$imageid} };
+
+    foreach my $node ( @list ) {
+	my $state;
+	
+	if (!TBGetNodeEventState($node, \$state)) {
+	    print "*** Error getting event state for $node!\n";
+	    $failed++;
+	    delete($nodes{$node});
+	}
+	if ($state ne TBDB_NODESTATE_ISUP) {
+	    print "*** Not waiting for $node since its reload failed!\n";
+	    $failed++;
+	    delete($nodes{$node});
+	}
+    }
+}
+# Remaining nodes we need to wait for.
+my @nodelist = keys(%nodes);
 
 #
 # Now lets wait for them to come back alive. Set up a retry list though
 # so that we can give each node at least 1 second chance. Avoids pointless
 # experiment failures.
 #
-if (@nodes) {
+if (@nodelist) {
     print "Waiting for local testbed nodes to finish rebooting ...\n";
 }
 
 my %retries;
 my %waitstart;
-foreach my $node ( @nodes ) {
+foreach my $node ( @nodelist ) {
     $retries{$node} = 1;
     $waitstart{$node} = time;
 }
 
 TBDebugTimeStamp("Local node waiting started");
-while ( @nodes ) {
-    my $node = shift(@nodes);
+while ( @nodelist ) {
+    my $node   = shift(@nodelist);
+    my $wstart = $waitstart{$node};
 
-    if (WaitTillAlive($node) == 0) {
-	print STDOUT "$node is alive and well\n";
+    if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*7))) {
+	print "$node is alive and well\n";
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	next;
     }
@@ -420,7 +486,7 @@ while ( @nodes ) {
 	print "*** Rebooting $node and waiting again ...\n";
 	
 	if (system("$nodereboot $node") == 0) {
-	    push(@nodes, $node);
+	    push(@nodelist, $node);
 	    $waitstart{$node} = time;
 	    next;
 	}
@@ -474,26 +540,37 @@ TBDebugTimeStamp("Local node waiting finished");
 # We do this in a sub script since nodes are not owned by the user
 # and so must be setuid root so that ssh will work.
 #
-if ( @vnodes ) {
-    system("$vnode_setup -f $pid $eid");
+# XXX - Don't bother if something above failed. A waste of time and
+# usually leads to cascading errors.
+#
+my @vnodelist = keys(%vnodes);
+
+if ($failed && @vnodelist) {
+    print "*** Skipping virtual node setup since there were previous ".
+	"failures!\n";
+}
+elsif (@vnodelist) {
+    print "Setting up virtual testbed nodes ...\n";
+    system("$vnode_setup $pid $eid");
     
     if ($?) {
 	die("*** $0:\n".
 	    "    Vnode setup failed!\n");
     }
 
-    foreach my $node ( @vnodes ) {
+    foreach my $node (@vnodelist) {
 	$waitstart{$node} = time;
     }
 
-    print "Waiting for widearea testbed nodes to finish setting up ...\n";
+    print "Waiting for virtual testbed nodes to finish setting up ...\n";
 
-    TBDebugTimeStamp("Widearea node waiting started");
-    while ( @vnodes ) {
-	my $node = shift(@vnodes);
+    TBDebugTimeStamp("Virtual node waiting started");
+    while ( @vnodelist ) {
+	my $node   = shift(@vnodelist);
+	my $wstart = $waitstart{$node};
 
-	if (WaitTillAlive($node) == 0) {
-	    print STDOUT "$node is alive and well\n";
+	if (!TBNodeStateWait($node, TBDB_NODESTATE_ISUP, $wstart, (60*3))) {
+	    print "$node is alive and well\n";
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	    next;
 	}
@@ -507,7 +584,7 @@ if ( @vnodes ) {
 	    # Send mail to testbed-ops and to the user about it.
 	    my ($user) = getpwuid($UID);
 	
-	    SENDMAIL($user, "Widearea Node $node is down",
+	    SENDMAIL($user, "Virtual Node $node is down",
 		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
 		 "Your experiment will continue to run since this failure\n".
 		 "is nonfatal, although you might encounter other problems\n".
@@ -529,68 +606,19 @@ if ( @vnodes ) {
 	# MarkNodeDown($node);
 
 	# Send mail to testbed-ops about it
-	SENDMAIL($TBOPS, "Widearea Node $node is down",
-		 "Widearea node $node in pid/eid $pid/$eid appears to be ".
+	SENDMAIL($TBOPS, "Virtual Node $node is down",
+		 "Virtual node $node in pid/eid $pid/$eid appears to be ".
 		 "unresponsive.\n\n");
 
 	print "*** Experiment will be terminated automatically.\n";
 	$failed++;
     }
-    TBDebugTimeStamp("Widearea node waiting finished");
+    TBDebugTimeStamp("Virtual node waiting finished");
 }
 
-print STDOUT "OS Setup Done!\n";
+print "OS Setup Done!\n";
 TBDebugTimeStamp("os_setup finished");
 exit $failed;
-
-#
-# Wait for a node to come back alive.
-# 
-sub WaitTillAlive ($) {
-    my ($pc) = @_;
-
-    print STDERR "Waiting for $pc to come alive\n" if $dbg;
-    
-    #
-    # Seems like a long time to wait, but it ain't!
-    # 
-    my $maxwait = (60 * 7);
-
-    #
-    # Start a counter going, relative to the time we rebooted the first
-    # node. 
-    # 
-    my $waittime  = 0;
-    my $minutes   = 0;
-
-    #
-    # Wait for the node to finish booting, as recorded in database
-    #
-    while (1) {
-	my $state;
-	if (!TBGetNodeEventState($pc,\$state)) {
-	    print "*** Error getting event state for $pc.\n";
-	    return 1;
-	}
-
-	if ($state eq TBDB_NODESTATE_ISUP) {
-	    print "$pc is alive and well\n" if $dbg;
-	    return 0;
-	}
-	
-	$waittime = time - $waitstart{$pc};
-	if ($waittime > $maxwait) {
-	    $minutes = int($waittime / 60);
-	    print "*** $pc appears dead - it's been $minutes minute(s).\n";
-	    return 1;
-	}
-	if (int($waittime / 60) > $minutes) {
-	    $minutes = int($waittime / 60);
-	    print "Still waiting for $pc - it's been $minutes minute(s).\n";
-	}
-	sleep(1);
-    }
-}
 
 #
 # Map an OSID to an imageid for a node type.
