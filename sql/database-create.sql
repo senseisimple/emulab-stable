@@ -202,7 +202,9 @@ CREATE TABLE experiments (
   swap_requests tinyint(4) NOT NULL default '0',
   last_swap_req datetime default NULL,
   idle_ignore tinyint(4) NOT NULL default '0',
-  PRIMARY KEY  (eid,pid)
+  idx int(10) unsigned NOT NULL auto_increment,
+  PRIMARY KEY  (eid,pid),
+  KEY idx (idx)
 ) TYPE=MyISAM;
 
 #
