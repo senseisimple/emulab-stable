@@ -337,7 +337,7 @@ sub step_init {
 
 	my $raw = "";
 	foreach $type (keys(%have)) {
-	    $raw .= join(" ",@{$have{$type}});
+	    $raw .= " " . join(" ",@{$have{$type}});
 	}
 	prints "  Reserving ";
 	tbexec("/usr/testbed/bin/nalloc $pid $eid $raw","$path/reserve.log");
