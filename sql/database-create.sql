@@ -169,6 +169,42 @@ CREATE TABLE eventlist (
 -- Table structure for table 'experiments'
 --
 
+CREATE TABLE experiment_stats (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  creator varchar(8) NOT NULL default '',
+  idx int(10) unsigned NOT NULL default '0',
+  gid varchar(16) NOT NULL default '',
+  created datetime default NULL,
+  destroyed datetime default NULL,
+  swapin_count smallint(5) unsigned default '0',
+  swapin_last datetime default NULL,
+  swapout_count smallint(5) unsigned default '0',
+  swapout_last datetime default NULL,
+  swapmodify_count smallint(5) unsigned default '0',
+  swapmodify_last datetime default NULL,
+  swapin_duration int(10) unsigned default '0',
+  vnodes smallint(5) unsigned default '0',
+  pnodes smallint(5) unsigned default '0',
+  wanodes smallint(5) unsigned default '0',
+  simnodes smallint(5) unsigned default '0',
+  jailnodes smallint(5) unsigned default '0',
+  delaynodes smallint(5) unsigned default '0',
+  linkdelays smallint(5) unsigned default '0',
+  walinks smallint(5) unsigned default '0',
+  links smallint(5) unsigned default '0',
+  lans smallint(5) unsigned default '0',
+  shapedlinks smallint(5) unsigned default '0',
+  shapedlans smallint(5) unsigned default '0',
+  minlinks tinyint(3) unsigned default '0',
+  maxlinks tinyint(3) unsigned default '0',
+  PRIMARY KEY  (eid,pid,idx)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'experiments'
+--
+
 CREATE TABLE experiments (
   eid varchar(32) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
@@ -259,6 +295,31 @@ CREATE TABLE group_membership (
   PRIMARY KEY  (uid,gid,pid),
   KEY pid (pid),
   KEY gid (gid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'group_stats'
+--
+
+CREATE TABLE group_stats (
+  pid varchar(12) NOT NULL default '',
+  gid varchar(12) NOT NULL default '',
+  exptstart_count int(11) unsigned default '0',
+  exptstart_last datetime default NULL,
+  exptpreload_count int(11) unsigned default '0',
+  exptpreload_last datetime default NULL,
+  exptswapin_count int(11) unsigned default '0',
+  exptswapin_last datetime default NULL,
+  exptswapout_count int(11) unsigned default '0',
+  exptswapout_last datetime default NULL,
+  exptswapmodify_count int(11) unsigned default '0',
+  exptswapmodify_last datetime default NULL,
+  allexpt_duration int(11) unsigned default '0',
+  allexpt_vnodes int(11) unsigned default '0',
+  allexpt_vnode_duration int(11) unsigned default '0',
+  allexpt_pnodes int(11) unsigned default '0',
+  allexpt_pnode_duration int(11) unsigned default '0',
+  PRIMARY KEY  (pid,gid)
 ) TYPE=MyISAM;
 
 --
@@ -872,6 +933,30 @@ CREATE TABLE proj_memb (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'project_stats'
+--
+
+CREATE TABLE project_stats (
+  pid varchar(12) NOT NULL default '',
+  exptstart_count int(11) unsigned default '0',
+  exptstart_last datetime default NULL,
+  exptpreload_count int(11) unsigned default '0',
+  exptpreload_last datetime default NULL,
+  exptswapin_count int(11) unsigned default '0',
+  exptswapin_last datetime default NULL,
+  exptswapout_count int(11) unsigned default '0',
+  exptswapout_last datetime default NULL,
+  exptswapmodify_count int(11) unsigned default '0',
+  exptswapmodify_last datetime default NULL,
+  allexpt_duration int(11) unsigned default '0',
+  allexpt_vnodes int(11) unsigned default '0',
+  allexpt_vnode_duration int(11) unsigned default '0',
+  allexpt_pnodes int(11) unsigned default '0',
+  allexpt_pnode_duration int(11) unsigned default '0',
+  PRIMARY KEY  (pid)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'projects'
 --
 
@@ -1122,6 +1207,33 @@ CREATE TABLE user_sfskeys (
   pubkey text,
   stamp datetime default NULL,
   PRIMARY KEY  (uid,comment)
+) TYPE=MyISAM;
+
+
+--
+-- Table structure for table 'user_stats'
+--
+
+CREATE TABLE user_stats (
+  uid varchar(8) NOT NULL default '',
+  weblogin_count int(11) unsigned default '0',
+  weblogin_last datetime default NULL,
+  exptstart_count int(11) unsigned default '0',
+  exptstart_last datetime default NULL,
+  exptpreload_count int(11) unsigned default '0',
+  exptpreload_last datetime default NULL,
+  exptswapin_count int(11) unsigned default '0',
+  exptswapin_last datetime default NULL,
+  exptswapout_count int(11) unsigned default '0',
+  exptswapout_last datetime default NULL,
+  exptswapmodify_count int(11) unsigned default '0',
+  exptswapmodify_last datetime default NULL,
+  allexpt_duration int(11) unsigned default '0',
+  allexpt_vnodes int(11) unsigned default '0',
+  allexpt_vnode_duration int(11) unsigned default '0',
+  allexpt_pnodes int(11) unsigned default '0',
+  allexpt_pnode_duration int(11) unsigned default '0',
+  PRIMARY KEY  (uid)
 ) TYPE=MyISAM;
 
 --
