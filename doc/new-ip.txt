@@ -41,6 +41,8 @@ The Master Plan (tm) for moving to our new IP subnets:
 * Tell CS about new IPs for paper and plastic, for backup purposes (or, we
   could leave their .212 interfaces alive)
 
+* One paper is using new address, update DNS records to use new address
+
 ***** VLANs to create
 
 * Outside: Consists only of cable running to outside router and a fake router interface
