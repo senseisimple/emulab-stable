@@ -26,13 +26,13 @@ my @MAILING_LISTS = ("@TBOPSEMAIL@","@TBLOGSEMAIL@","@TBWWWEMAIL@",
     "@TBTESTSUITEEMAIL@");
 
 
-my $OURDOMAIN = '@OURDOMAIN@';
-
-my $USERNODE = '@USERNODE@';
-my $FSNODE =   '@FSNODE@';
-my $BOSSNODE = '@BOSSNODE@';
-
-my $LOGFACIL = '@TBLOGFACIL@';
+my $OURDOMAIN   = '@OURDOMAIN@';
+my $USERNODE    = '@USERNODE@';
+my $FSNODE      = '@FSNODE@';
+my $BOSSNODE    = '@BOSSNODE@';
+my $BOSSNODE_IP = '@BOSSNODE_IP@';
+my $USERNODE_IP = '@USERNODE_IP@';
+my $LOGFACIL    = '@TBLOGFACIL@';
 
 #
 # Allow this to work if the library is left in the source directory
@@ -96,6 +96,7 @@ my $ENV        = "/usr/bin/env";
 # Some files we edit/create
 #
 my $RCCONF          = "/etc/rc.conf";
+my $HOSTS           = "/etc/hosts";
 my $RCLOCAL         = "/etc/rc.local";
 my $RCCAPTURE       = "$PREFIX/etc/rc.capture";
 my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
@@ -145,6 +146,13 @@ my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
 # an ops node
 #
 my $OPS_PORT = "emulab-ops-1.4";
+
+#
+# List of names that goes into $HOSTS and which must resolve.
+# 
+my @OPS_NAMES = ($USERNODE, "users", "ops");
+push(@OPS_NAMES, $FSNODE)
+    if ($USERNODE ne $FSNODE);
 
 #
 # Make sure they know what they're getting into...
@@ -248,6 +256,25 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 		      qq|nfs_server_enable="YES"|,
 		      qq|nfs_server_flags="-u -t -n 16"|,
 		      qq|syslogd_flags=""|);
+};
+
+Phase "hosts", "Adding boss/ops IP addresses to $HOSTS", sub {
+    DoneIfEdited($HOSTS);
+    AppendToFileFatal($HOSTS,
+		      "${BOSSNODE_IP}\t${BOSSNODE} boss",
+		      "${USERNODE_IP}\t@OPS_NAMES");
+};
+
+Phase "resolve", "Checking to make sure names for boss/ops resolve", sub {
+    foreach my $name (@OPS_NAMES, ${BOSSNODE}, "boss") {
+	Phase $name, $name, sub {
+	    if (gethostbyname($name)) {
+		PhaseSkip("$name resolves");
+	    } else {
+		PhaseFail("$name does not resolve");
+	    }
+	};
+    }
 };
 
 Phase "sendmail","Configuring sendmail", sub {
