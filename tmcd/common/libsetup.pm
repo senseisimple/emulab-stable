@@ -756,7 +756,7 @@ sub dotrafficconfig()
 
     $TM = OPENTMCC(TMCCCMD_TRAFFIC);
 
-    $pat  = q(MYNAME=([-\w.]+) MYPORT=(\d+) );
+    $pat  = q(TRAFGEN=([-\w.]+) MYNAME=([-\w.]+) MYPORT=(\d+) );
     $pat .= q(PEERNAME=([-\w.]+) PEERPORT=(\d+) );
     $pat .= q(PROTO=(\w+) ROLE=(\w+) GENERATOR=(\w+));
 
@@ -764,17 +764,18 @@ sub dotrafficconfig()
 	if ($_ =~ /$pat/) {
 	    #
 	    # The following is specific to the modified TG traffic generator:
-	    #  trafgen [-s server] [-p serverport] \
-	    #          [ -T targetip.targetport ] [-P proto] [-R role]
+	    #  trafgen [-s server] [-p serverport] [-l logfile] \
+	    #        [ -N name ] [ -T targetip.targetport ] [-P proto] [-R role]
 	    # N.B. serverport is not needed right now
 	    #
-	    my $ownaddr = inet_ntoa(my $ipaddr = gethostbyname($1));
-	    my $ownport = $2;
-	    my $peeraddr = inet_ntoa($ipaddr = gethostbyname($3));
-	    my $peerport = $4;
-	    my $proto = $5;
-	    my $role = $6;
-	    my $generator = $7;
+	    my $name = $1;
+	    my $ownaddr = inet_ntoa(my $ipaddr = gethostbyname($2));
+	    my $ownport = $3;
+	    my $peeraddr = inet_ntoa($ipaddr = gethostbyname($4));
+	    my $peerport = $5;
+	    my $proto = $6;
+	    my $role = $7;
+	    my $generator = $8;
 	    my $target;
 
 	    # Skip if not specified as a TG generator. At some point
@@ -796,7 +797,7 @@ sub dotrafficconfig()
 		print RC "#!/bin/sh\n";
 		$didopen = 1;
 	    }
-	    print RC "$SETUPDIR/trafgen -s $boss -T $target -P $proto -R $role &\n";
+	    print RC "$SETUPDIR/trafgen -s $boss -N $name -T $target -P $proto -R $role >/tmp/$name.debug 2>&1 &\n";
 	}
 	else {
 	    warn "*** WARNING: Bad traffic line: $_";
