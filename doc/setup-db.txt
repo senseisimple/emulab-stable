@@ -217,15 +217,22 @@ control_net: Interface number (described below) of the control network
 power_time: Number of second between power cycles (to help save wear and tear
 	on the hardware). We recommend 60.
 imageid: Default image to load (created in Step 6)
+imageable: Set to 1 if a disk image can be created/restored on this node type.
 delay_capacity: How many delay nodes this node can be. For example, nodes with
 	2 experimental interfaces can be 1 delay node, nodes with 4 experimental
 	interfaces can be 2 delay nodes, etc.
+virtnode_capacity: Number of virtual nodes that can be hosted on a single
+	physical node of this type.
 control_iface: Linux-style interface name for the control network (ie. 'eth0')
+disktype: FreeBSD-style disk name for the primary hard drive.
+	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
 delay_osid: Which OS should be run when this node is being a delay node. 
 	Should usually be 'FBSD-STD'
 pxe_boot_path: Path (including hostname) to the mini-kernel that should be
 	loaded by PXE. Ask Utah for this kernel. For example,
 	'boss.emulab.net:/tftboot/pxeboot'
+isvirtnode: Should be 0.
+isremotenode: Should be 0.
 
 2) Create interface types for the nodes
 

@@ -30,13 +30,14 @@ B. If the node is of a new type
    default OS id (the default OS to boot), which port is the control
    net (ie 4), how long you should make people wait before power cycling
    again, the default image id, delay capacity, control iface (ie
-   eth4), and the OS id to boot when it is acting as a delay node.
+   eth4), the type of the primary disk ('ad'==IDE,'da'==SCSI') and the
+   OS id to boot when it is acting as a delay node.
    Example:
 
    insert into node_types
-   (class,type,proc,speed,RAM,HD,max_cards,max_ports,osid,control_net,imageid,imageable,delay_capacity,control_iface,delay_osid,pxe_boot_path)
+   (class,type,proc,speed,RAM,HD,max_cards,max_ports,osid,control_net,imageid,imageable,delay_capacity,control_iface,disktype,delay_osid,pxe_boot_path)
    values
-   ("pc","pc2000","P4",2000,512,20.0,5,1,"RHL-STD",0,"UTAHPC-FBSD45+LINUX71",1,2,"eth0","FBSD-STD","boss.emulab.net:/tftpboot/pxeboot");
+   ("pc","pc2000","P4",2000,512,20.0,5,1,"RHL-STD",0,"UTAHPC-FBSD47+LINUX71",1,2,"eth0","ad","FBSD-STD","boss.emulab.net:/tftpboot/pxeboot");
 
 2. There are several scripts that limit searches to certain classes.
    If the new type you have added does not have class "pc", you may need
