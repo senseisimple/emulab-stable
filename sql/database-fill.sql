@@ -586,7 +586,7 @@ REPLACE INTO table_regex VALUES ('default','tinyint','int','regex','^[\\d]+$',-1
 REPLACE INTO table_regex VALUES ('default','boolean','int','regex','0|1',0,1,'Default regex for tiny int fields that are int booleans. Allow any 0 or 1');
 REPLACE INTO table_regex VALUES ('default','tinyuint','int','regex','^[\\d]+$',0,255,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','int','int','regex','^[\\d]+$',-2147483648,2147483647,'Default regex for int fields. Allow any standard ascii integer, but no binary data');
-REPLACE INTO table_regex VALUES ('default','float','float','regex','^[\\d\\.]+$',-2147483648,2147483647,'Default regex for float fields. Allow any digits and the decimal point');
+REPLACE INTO table_regex VALUES ('default','float','float','regex','^[+-]?\\ *(\\d+(\\.\\d*)?|\\.\\d+)([eE][+-]?\\d+)?$',-2147483648,2147483647,'Default regex for float fields. Allow any digits and the decimal point');
 REPLACE INTO table_regex VALUES ('default','default','text','regex','^[\\040-\\176]*$',0,256,'Default regex if one is not defined for a table/slot. Allow any standard ascii character, but no binary data');
 REPLACE INTO table_regex VALUES ('projects','num_members','int','redirect','default:int',0,256,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_pcs','int','redirect','default:int',0,2048,NULL);
