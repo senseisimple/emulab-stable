@@ -789,6 +789,7 @@ CREATE TABLE virt_trafgens (
   port int(11) NOT NULL default '0',
   target_vnode varchar(32) NOT NULL default '',
   target_port int(11) NOT NULL default '0',
+  generator tinytext NOT NULL,
   PRIMARY KEY  (pid,eid,vnode,vname)
 ) TYPE=MyISAM;
 
