@@ -94,7 +94,7 @@ if (! TBProjLeader($pid, $projleader)) {
 TBUserInfo($projleader, $projleader_name, $projleader_email);
 
 TBMAIL("$expleader_name <$expleader_email>",
-     "Please Swap or Terminate Experiment: $pid/$eid",
+     "$pid/$eid: Please Swap or Terminate Experiment",
      "Hi, this is an automated message from Emulab.Net.\n".
      "\n".
      "It appears that your experiment '$eid' in project '$pid' is inactive.\n".
