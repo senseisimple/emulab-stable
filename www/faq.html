@@ -677,20 +677,22 @@
 <li><a NAME="UTT-Swapping"></a>
     <font size='+1'><b>What is Swapping?</b></font>
     <p>
-    Swapping is when you (or we) temporarily swap your experiment out,
+    Swapping is when you (or we, or the Emulab system) temporarily swaps
+    out your experiment,
     releasing all of the nodes in the experiment. Your experiment is
     still resident in the Emulab database, and you can see its status
     in the web interface, but no nodes are allocated. Once an
     experiment is swapped out, you can swap it back in via the web
     interface by going to the Experiment Information page for your
     experiment, and clicking on the swapin option. 
+    You can also <a href="UTT-Modify">modify it</a>.
     </p>
 
     <p>
-    The <tt>swappable</tt> checkbox in the Begin Experiment web page
+    The <tt>idle-swap</tt> checkbox in the Begin Experiment web page
     is used to determine what experiments can be <em>automatically</em>
     swapped by the testbed scheduling system. Note that all experiments are
-    capable of being swapped; even if you do not check the swappable box,
+    capable of being swapped; even if you do not check the idle-swap box,
     you are free to swap your own experiments as you like. The only
     difference is that the testbed scheduling system will not consider your
     experiment when looking for experiments to swap out. You will sometimes
@@ -706,15 +708,15 @@
     <p>
     Be aware that we do not currently save any files that you may have
     placed on your nodes. When your experiment is swapped back in, you
-    will likely get different nodes, and with fresh copies of the disk
+    will likely get different nodes, with fresh copies of the disk
     images. For that reason, you should not swap your experiment out
     unless you make arrangements to save and restore any state you need.
     </p>
 
     <p>
-    Make sure to take a look at our 
-    <a href="docwrapper.php3?docname=swapping.html"> Node Usage Policies</a> 
-    as well.
+    <em>Please be sure to read our 
+    <a href="docwrapper.php3?docname=swapping.html"> Node Usage Policies</a></em>,
+    which contain detailed information on swapping.
     </p>
 
 <li><a NAME="UTT-Restart"></a>

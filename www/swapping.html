@@ -19,8 +19,6 @@ When is an experiment considered idle?</a>
 What is "swapping"?</a>
 <li><a href="#idleswap">
 What is an "Idle-Swap"?</a>
-<li><a href="#autoswap">
-What is "Maximum Duration" (aka an "Auto-Swap")?</a>
 <li><a href="#idle">
 How long is too long for a node to be idle?</a>
 <li><a href="#state">
@@ -30,6 +28,8 @@ I just received an email asking me to swap or terminate my
 experiment.</a>
 <li><a href="#swapped">
 Someone swapped my experiment!</a>
+<li><a href="#autoswap">
+What is "Maximum Duration"?</a>
 </ul>
 
 
@@ -41,17 +41,18 @@ As a courtesy to other experimenters, we ask that experiments be
 swapped out or terminated when they are no longer in active use. There
 are a limited number of nodes available, and node reservations are
 exclusive, so it is important to free nodes that will be idle so that
-others may use them. By way of summary, our policy is that experiments
-should be swapped out when they are not in use. In general, if they
-are idle for several hours, we will send you mail about it and/or
-swap out the experiment for you. The actual grace period will differ
-depending on the size of the experiment and other factors. 
-<!--
-If you mark
-your experiment "unswappable" at creation time, we will contact you
-before swapping it, since local node state will be lost on
-swapout. Please see full details below.
--->
+others may use them. In summary, our policy is that experiments
+should be swapped out when they are not in use.  We encourage you to
+do that yourself.  In general, if experiments are idle for several
+hours, the system will automatically swap them out, or send you mail
+about it, and/or an operator may manually swap them out.  The actual
+grace period will differ depending on the size of the experiment, the
+current demand for resources, and other factors (such as whether
+you've been a good Emulab citizen in the past!).  If you mark your
+experiment "non-idle-swappable" at creation time or before swapin, and
+testbed-ops approves your justification, we will make every effort to
+contact you before swapping it, since local node state could be lost
+on swapout.  Please see full details below.
 </p>
 
 <a name="active"></a>
@@ -69,97 +70,107 @@ operations necessary to carry out the experiment.
 <h3>When is an experiment considered idle?</h3>
 
 <p>
-Your experiment will be considered idle if it has no mesurable 
-activity for a significant period of time (a few hours). 
+Your experiment will be considered idle if it has no measurable 
+activity for a significant period of time (a few hours; the exact
+time is typically set at swapin time). 
 We detect the following types of activity:
 <ul>
-<li>Any Network activity on the experimental network
+<li>Any network activity on the experimental network
 <li>Substantial activity on the control network
 <li>TTY/console activity on nodes
 <li>High CPU activity on nodes
 <li>Certain external events, like rebooting a node with <tt>node_reboot</tt>
 </ul>
-If your experiment's activity falls outside these measurable types 
-of activity, please be sure to let us know when you create your 
+If your experiment's activity falls outside these measured types 
+of activity, or it seems that Emulab is not assessing your idle
+time correctly, please be sure to let us know when you create your 
 experiment, or you may be swapped out unexpectedly.
 </p>
+
+<p>
+<em>It is considered <b>abuse</b> to generate artificial activity in
+order to prevent your experiment from being marked idle.  Abusers'
+access to Emulab will be revoked, and their actions will be reported
+to their project leader.  Don't do it! If you think you need special
+treatment for some horrible deadline or demo or other reason, just
+mail us-- we're reasonable!</em>
+</p>
+
 
 <a name="swapping"></a>
 <h3>What is "swapping"?</h3>
 
 <p>
 Swapping is the process of instantiating your experiment,
-i.e. allocating nodes, configuring links, etc. It also refers 
-to the reverse process, where nodes are released. These are
+i.e., allocating nodes, configuring links, etc. It also refers 
+to the reverse process, in which nodes are released. These are
 called "swapping in" and "swapping out" respectively. See also
 the <A href="docwrapper.php3?docname=faq.html#UTT-Swapping">
 What is Swapping?</a> question on our FAQ.
 </p>
-<!--
-<p>
-When you create your experiment, you can mark your experiment as
-swappable or unswappable. When marking it unswappable, you must
-specify the reason, which will be reviewed by Testbed Ops. If it is
-judged unacceptable or insufficient, your experiment will be marked
-swappable. If an experiment is unswappable, our system will not
-automatically swap it out, and testbed administrators will attempt to
-contact you in the event a swapout becomes necessary. You can edit the
-swap settings (unswappable, idle-swap, auto-swap, and corresponding
-reasons and timeouts) on the experiment page for your experiment.
-</p>
--->
 
 <a name="idleswap"></a>
 <h3>What is an "Idle-Swap"?</h3>
 
 <p>
-An "Idle-Swap" is when Emulab or its administrators swap your 
-experiment out for you because it was idle for too long. 
-Experiments typically don't get idle-swapped until they've been 
-idle for several hours. We try to contact the experiment creator
-before swapping, unless they've already given us permission to 
-swap the experiment when idle.
-</p>
-<p>
-There are two ways that your experiment may be idle-swapped. The most
-common is the automatic Idle-Swap. This happens when your experiment
-is marked swappable and Idle-Swap is enabled for your experiment. When
-your experiment has been idle for several hours, and reaches the
-Idle-Swap time that was set at creation/swapin time, it is
-automatically idle-swapped by the Emulab software. The other way to
-get idle-swapped is through a manual idleswap by an Emulab
-administrator. This typically happens only after several hours of
-idleness, and may happen whether or not your experiment is marked
-swappable or idle-swappable. We will usually make every effort to
-contact you, since it may cause you to lose data stored on the nodes.
+An "Idle-Swap" is when the Emulab system or its operators swap out
+your experiment because it was idle for too long.  There are two ways
+that your experiment may be idle-swapped: automatic and manual.  The
+most common is automatic, which happens when Idle-Swap is enabled for
+your experiment and the experiment has been continuously idle for the
+idle-swap time that was set at creation/swapin time (usually a few
+hours).  The Emulab system will then automatically swap it out.  The
+other way to get idle-swapped is manually, by an Emulab operator.
+This typically happens when there is very high resource demand and the
+experiment has been idle a substantial time, usually a few hours.  In
+this case we will typically make every effort to contact you, since it
+may cause you to lose data stored on the nodes.
+<em>Note that operators (and you) may swap your excessively idle
+experiment whether or not it is marked idle-swappable!</em>
 </p>
       
-
-<a name="autoswap"></a>
-<h3>What is "Maximum Duration" (aka an "Auto-Swap")?</h3>
-
-<p>
-Each experiment may have a Maximum Duration, where an experimenter
-specifies the maximum amount of time that the experiment should
-stay swapped in. When that time expires, the experiment is swapped
-out. The timer is reset every time the experiment swaps in. A warning
-message is sent about an hour before the experiment is swapped. This
-swapout happens regardless of any activity on the nodes, and can be
-averted by using the "Edit Meta-Data" option on the experiment's page
-to adjust the swapout time or turn off the Maximum Duration
-feature. (This feature was previously also known as an "Auto-Swap".)
+When you create your experiment, you may uncheck the "Idle-Swap" box,
+disabling the <em>automatic</em> idle-swapping of your experiment.  If
+you do so, you must specify the reason, which will be reviewed by
+Testbed Ops.
+<!-- Don't encourage this yet, but obviously, the tiny space
+     in the form is too small for some of these justifications.
+  (you may choose to elaborate in email). -->
+If your reason is judged unacceptable or insufficient, we will explain
+why, and your experiment will be marked idle-swappable.  Valid reasons
+<em>might</em> be things such as:
+<ul>
+<li>"Your idle-detection system fails to detect my experimental activity."
+     </li>
+<li> "I have node-local state that is impractical to copy off in a
+     timely or reliable manner, because ....."
+     </li>
+<li>"My experiment takes a huge number of nodes, I have several runs
+    to make with intervening think time, and if someone grabs some of
+    these nodes if I'm swapped while thinking, I'll miss my deadline 2
+    days from now."
+    </li>
+</ul>
+If an experiment is non-idle-swappable, our system will not
+automatically swap it out, and testbed administrators will attempt to
+contact you in the event a swapout becomes necessary.  However, we
+expect <em>you</em> to be responsible for managing your experiment in
+a responsible way, a way that uses Emulab's hardware resources
+efficiently.
 </p>
+
 <p>
-This feature allows users to schedule experiment swapouts, to
-aid experimenters in releasing nodes in a timely manner.  For
-instance, if you plan to use your experiment throughout an 8 hour work
-day, you can schedule a swapout for 8 hours after it is swapped
-in. That way, if you forget to swap out before leaving for the day, it
-will automatically be taken care of for you, without leaving the nodes
-reserved and idle for several hours before being idle-swapped. For
-automated experiments, it can also help by letting you schedule a
-swapout for just after the maximum amount of time your experiment
-should last.
+When you create your experiment, you may decrease the idle-swap time
+from the displayed default, but you may not raise it.  If lowering it
+is compatible with your planned use, doing so helps you be a good
+Emulab citizen.  If you want it raised, for example for reasons
+similar to those given above, send mail to testbed-ops.
+</p>
+
+<p>
+You can edit the swap settings (Idle-Swap, Max-Duration, and
+corresponding reasons and timeouts) using the "Edit Experiment
+Metadata" menu item on the experiment page for your experiment.
 </p>
 
 <a name="idle"></a>
@@ -168,8 +179,8 @@ should last.
 <p>
 Ideally, an experiment should be used nearly continuously from start
 to finish of the experiment, then swapped out or terminated. However,
-this isn't always possible. In general, if your experiment will most
-likely be idle for 2 hours or more, it should be swapped out. This is
+this isn't always possible. In general, if your experiment is
+idle for 2 hours or more, it should be swapped out. This is
 especially true at night (in U.S. timezones) and on weekends. Many
 experimenters take advantage of lower demand during evenings and
 weekends to run their large-scale (50-150 node) tests. If your
@@ -181,15 +192,14 @@ you won't lose much time by doing it.
 
 <p>
 Sometimes an experiment will run long enough that you cannot be online
-to terminate it. For example, if the experiment completes in the
-middle of the night. We provide two mechanisms to assist you in
+to terminate it, for example, if the experiment completes in the
+middle of the night. We provide three mechanisms to assist you in
 terminating your experiment and releasing nodes in a timely
-manner. The first is the <a href="tutorial/tutorial.php3#BatchMode">
-<em>batch system</em></a> and the other is
+manner.  The first is the <a href="tutorial/tutorial.php3#BatchMode">
+<em>batch system</em></a>, the second is
 <a href="tutorial/tutorial.php3#Halting"><em>scheduled
-termination</em></a>. Please consult the 
-<a href = "tutorial/tutorial.php3">Emulab Tutorial</a> for information
-on these and other topics.
+termination/swapout</em></a>, and the third is the "Max Duration" option,
+explained <a href="#autoswap">above</a>.
 </p>
 
 <a name="state"></a>
@@ -197,39 +207,43 @@ on these and other topics.
 
 <p>
 Some experiments have state that is stored exclusively on the nodes
-themselves, saved to the local hard drive. This is state that is not
-in your NS file and files it references, and which is not preserved in
+themselves, on their local hard drives. This is state that is not
+in your NS file or files or disk images that it references,
+and therefore is not preserved in
 our database across swapin/swapout. This is state you add to your
 machines "by hand" after Emulab sets up your experiment, like files
 you add or modify on filesystems local to test nodes. Local node state
-does not include any data you store in /users or /proj, since they are
+does not include any data you store in /users, /proj, or /groups, since those are
 saved on a fileserver, and not on the local nodes. 
 </p>
 
 <p>
 Most experiments don't have any local node state, and can be swapped
 out and in without losing any information. This is highly recommended,
-since it is more courteous to other experimenters. It allows you to
-easily free up your nodes on request without losing any of the work
-you have done on your experiment. Please make your experiments adhere
-to this guideline whenever possible.
+since it is more courteous to other experimenters.  It allows you, or
+the Emulab system, or the operations staff, to easily free up your
+nodes at any time, without losing any of your work.
+Please make your experiments adhere to this guideline whenever possible.
 </p>
 
 <p>
-Wherever possible it is discouraged to have local node state, since
-swapping out causes this data to be lost. An experiment that needs
-local state should be marked "unswappable" when you create it. 
-(Contact Testbed Ops to have them set this for you.) If you
-must have node state, you can save it before you swap out by creating
+An experiment that needs local state that inherently cannot be saved
+(for some reason) or that you will not be able to copy off
+before your experiment hits the "idle-swap time,"
+should not be marked "idle-swap" when you create it. 
+In the "begin experiment" form you must explain the reason.
+<!-- (Contact Testbed Ops to have them set this for you.) -->
+If you
+must have node state, you can save it before you swap out by copying
+it off by hand (e.g., into a tar or RPM file), or creating
 a disk image of the node in question, and later reloading it to a new
 node after you swap in again. Disk images in effect create a "custom
 OS" that can be loaded automatically based on your NS file. More
 information about disk images can be found on our <a
 href="https://www.emulab.net/newimageid_ez.php3"> Disk Image
-page</a> (you must be logged in to use it). We are currently working
-on a system that will allow you to save disk images from all the nodes
-in your experiment at swapout time, and reload them automatically when
-you swap back in.
+page</a> (you must be logged in to use it).  We will be developing 
+a system that will allow the swapping system automatically to save and
+restore the local node state of an entire experiment.
 </p>
 
 <a name="email"></a>
@@ -240,8 +254,8 @@ Emulab has a system for detecting node use, to help achieve more
 efficient and fair use of Emulab's limited resources. This system
 sends email messages to experiment leaders whose experiments have been
 idle for several hours. If you get a message like this, your
-experiment has been inactive for too long and should free up the nodes
-it has allocated. If the experiment continues to be idle, more
+experiment has been inactive for too long and you should free up its nodes.
+If the experiment continues to be idle, more
 reminders may be sent, and soon 
 your project leader will be one of the recipients. 
 After you have been notified, your experiment may be swapped at any 
@@ -256,26 +270,65 @@ you have used your node in the last few hours. There are some types of
 activity that are difficult to accurately detect, so we'd like to know
 how we can improve our activity detection system. Above all, <b>do not
 ignore these messages</b>. If you get several reminders and don't
-respond, your experiment may be swapped out, potentially causing loss
+respond, your experiment will be swapped out, potentially causing loss
 of some of your work (see "node state" above). If there is a reason
-you need to keep your experiment running <b>tell us</b> so we don't
+you need to keep your experiment running, <b>tell us</b> so we don't
 inadvertently cause problems for you.
 </p>
 
 <a name="swapped"></a>
 <h3>Someone swapped my experiment!</h3>
 <p>
-As described above, we will typically try to contact you about your
-idle experiment before we swap it out. However, if the experiment has
-been idle for several hours, we may swap it out for you.
-<!-- unless you marked
-it as "unswappable" when you created your experiment. 
--->
+As described above, the system automatically swaps out your experiment
+after it reaches its idle time limit, or sometimes an Emulab
+operator does it earlier when resources are in especially high demand.
+In the latter case, we will typically try to contact you by email
+before we swap it out.  However, especially if the experiment has been
+idle for several hours, we may swap it out for you without
+waiting very long to hear from you.
+<!-- unless you marked it as "unswappable" when you created your experiment. -->
 Because of this,
 it is critical that you keep in close contact with us about an
 experiment that we may perceive as idle if you want to avoid any loss
 of your work.
 </p>
+
+<a name="autoswap"></a>
+<h3>What is "Maximum Duration"?</h3>
+
+<p>
+Each experiment may have a Maximum Duration, where an experimenter
+specifies the maximum amount of time that the experiment should
+stay swapped in. When that time is exceeded, the experiment is unconditionally swapped
+out. The timer is reset every time the experiment swaps in. A reminder
+message is sent about an hour before the experiment is swapped. This
+swapout happens regardless of any activity on the nodes, and can be
+averted by using the "Edit Meta-Data" menu item on the experiment's page
+to turn off the Maximum Duration feature or to lengthen the duration.
+</p>
+<p>
+This feature allows users to schedule experiment swapouts, helping
+them to release nodes in a timely manner.  For
+instance, if you plan to use your experiment throughout an 8 hour work
+day, you can schedule a swapout for 8 hours after it is swapped
+in. That way, if you forget to swap out before leaving for the day, it
+will automatically free up the nodes for other users, without leaving the nodes
+idle for several hours before being idle-swapped, and will work even
+if you leave your test programs running, making the experiment look non-idle.
+For automated experiments, it lets you schedule a swapout for slightly
+after the maximum amount of time your experiment should last.  It can
+also help catch "runaway" experiments (typically batch).
+</p>
+
+<p>
+"Max duration" has a similar effect as <a href="tutorial/tutorial.php3#Halting">
+<em>scheduled termination/swapout</em></a>, which is specified in the
+<i>ns</i> file.  The differences are that the former lets you adjust
+the duration while the experiment is running, you get a warning email,
+and you're always swapped, never terminated.  (It's also implemented
+differently, with a 5 minute scheduling granularity.)
+</p>
+
 <p>
 <a href="#top"> Back to top of page</a>
 </p>
