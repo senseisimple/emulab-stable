@@ -44,9 +44,10 @@ if (!isset($usr_title) ||
 #
 # Check joining_uid for sillyness.
 #
-if (! ereg("^[a-z0-9]+$", $joining_uid)) {
-    USERERROR("Your username name must be lowercase alphanumeric characters ".
-	      "only!", 1);
+if (! ereg("^[a-z][a-z0-9]+$", $joining_uid)) {
+    USERERROR("Your username ($joining_uid) must be composed of ".
+	      "lowercase alphanumeric characters only, and must begin ".
+	      "with a lowercase alpha character!", 1);
 }
 
 #
@@ -54,7 +55,7 @@ if (! ereg("^[a-z0-9]+$", $joining_uid)) {
 #
 if (strlen($joining_uid) > $TBDB_UIDLEN) {
     USERERROR("The name \"$joining_uid\" is too long! ".
-              "Please select another.", 1);
+              "Please select one that is shorter than $TBDB_UIDLEN.", 1);
 }
 
 #

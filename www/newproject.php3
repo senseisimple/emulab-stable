@@ -85,13 +85,15 @@ if ((strcmp($proj_public, "no") == 0) &&
 #
 # Check uid and pid for sillyness.
 #
-if (! ereg("^[-_a-zA-Z0-9]+$", $pid)) {
-    USERERROR("The project name ($pid) must be alphanumeric characters only!",
-	       1);
+if (! ereg("^[a-zA-Z][-_a-zA-Z0-9]+$", $pid)) {
+    USERERROR("The project name ($pid) must be composed of alphanumeric ".
+	      "characters only (includes _ and -), and must begin with an ".
+	      "alpha character.", 1);
 }
-if (! ereg("^[a-z0-9]+$", $proj_head_uid)) {
-    USERERROR("Your username ($proj_head_uid) name must be lowercase ".
-	      "alphanumeric characters only!", 1);
+if (! ereg("^[a-z][a-z0-9]+$", $proj_head_uid)) {
+    USERERROR("Your username ($proj_head_uid) must be composed of ".
+	      "lowercase alphanumeric characters only, and must begin ".
+	      "with a lowercase alpha character!", 1);
 }
 
 #
@@ -99,11 +101,11 @@ if (! ereg("^[a-z0-9]+$", $proj_head_uid)) {
 #
 if (strlen($pid) > $TBDB_PIDLEN) {
     USERERROR("The project name \"$pid\" is too long! ".
-              "Please select another.", 1);
+              "Please select one that is shorter than $TBDB_PIDLEN.", 1);
 }
 if (strlen($proj_head_uid) > $TBDB_UIDLEN) {
     USERERROR("The name \"$proj_head_uid\" is too long! ".
-              "Please select another.", 1);
+              "Please select one that is shorter than $TBDB_UIDLEN.", 1);
 }
 
 #
