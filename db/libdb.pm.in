@@ -2263,7 +2263,7 @@ sub TBValidNodeLogType($)
 #
 # Insert a Log entry for a node.
 #
-# usage: TBSetNodeLogEntry(char *node, char *type, char *message)
+# usage: TBSetNodeLogEntry(char *node, char *uid, char *type, char *message)
 #        Returns 1 if okay.
 #        Returns 0 if failed.
 #
