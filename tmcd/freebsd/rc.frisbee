@@ -62,12 +62,13 @@ fi
 
 #
 # set memory limits:
-#	allow 8MB for non-frisbee stuff
-#	split remaining memory between network/disk buffering in frisbee
+#	allow 16MB for non-frisbee stuff
+#	split remaining memory (at least 2MB) between network/disk buffering
+#	in frisbee
 #
 HOSTMEM=`dmesg | grep 'avail memory' | sed -e 's/.* (\([0-9]*\)K bytes.*/\1/'`
-if [ $HOSTMEM -ge 10240 ]; then
-	HOSTMEM=`expr $HOSTMEM - 8192`
+if [ $HOSTMEM -ge 18432 ]; then
+	HOSTMEM=`expr $HOSTMEM - 16384`
 	ulimit -v $HOSTMEM
 	HOSTMEM=`expr $HOSTMEM / 1024`
 
