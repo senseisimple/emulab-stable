@@ -977,3 +977,11 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table experiments add keyhash varchar(64) default NULL \
 		after mem_usage;
+
+1.187: Increase the length of the state and batchstate fields.
+
+       alter table experiments change state state varchar(16) NOT NULL \
+		default 'new';
+       alter table experiments change batchstate batchstate varchar(16) \
+	        default NULL;
+
