@@ -161,8 +161,11 @@ void handle_link_up(char * linkname, int l_index)
       return;
    
 #if 1
-   set_link_params(l_index, 0);/* 0 => dont blackhole, get the plr
-			       * from the link map table*/
+  /* 0 => dont blackhole, get the plr from the link map table
+     2 => both pipes
+       -1 => both pipes*/
+  set_link_params(l_index, 0, 2, -1);
+  
    link_map[l_index].stat = LINK_UP;
     info("==========================================\n");
 #endif
@@ -192,7 +195,10 @@ void handle_link_down(char * linkname, int l_index)
       return;
 #if 1
   if(get_link_params(l_index) == 1){
-    set_link_params(l_index, 1); /* 1 => set plr = 1.0 to blackhole packets*/
+    /* 1 => set plr = 1.0 to blackhole packets
+       2 => both pipes
+       -1 => both pipes*/
+    set_link_params(l_index, 1, 2, -1); 
     link_map[l_index].stat = LINK_DOWN;
   }
   else error("could not get params\n");
@@ -216,6 +222,8 @@ void handle_link_modify(char * linkname, int l_index,
      update the new set of params by setting the params in
      dummynet
    */
+  int p_which = -1;
+  int n_pipes = 0;
 
   info("==========================================\n");
   info("recd. MODIFY event for link = %s\n", linkname);
@@ -226,12 +234,18 @@ void handle_link_modify(char * linkname, int l_index,
    */
   if(link_map[l_index].stat == LINK_UP){
     if(get_link_params(l_index) == 1)
-      if(get_new_link_params(l_index, handle, notification) == 1)
-	set_link_params(l_index, 0); /* 0 => dont blackhole, get the plr
-				    * from the link map table*/
+      if(get_new_link_params(l_index, handle, notification,
+			     &n_pipes,&p_which) == 1)
+	/* 0 => dont blackhole, get the plr
+	 * from the link map table*/
+	info(" n_pipes = %d p_which = %d\n", n_pipes, p_which);
+	set_link_params(l_index, 0, n_pipes, p_which);
+    
+				    
   } else
     /* link is down, so just change in the link_map*/
-     get_new_link_params(l_index, handle, notification);
+     get_new_link_params(l_index, handle, notification,
+			 &n_pipes, &p_which);
 }
 
 /****************** get_link_params ***************************
@@ -420,7 +434,7 @@ for both the pipes of the duplex link, set the pipe params
 sing setsockopt getting the param values from the link_map table
 **************************************************************/
 
-void set_link_params(int l_index, int blackhole)
+void set_link_params(int l_index, int blackhole,int t_pipes, int p_which)
 {
   /* Grab the pipe params from the link_map table and then
      set them into dummynet by calling setsockopt
@@ -431,157 +445,160 @@ void set_link_params(int l_index, int blackhole)
   
   while(p_index < 2)
     {
-      struct dn_pipe pipe;
+      if((t_pipes == 2) || (t_pipes == 0) || (p_which == p_index))
+	{
+	    struct dn_pipe pipe;
+	    /* get the params stored in the link table*/
+	    structpipe_params *p_params
+	      = &(link_map[l_index].params[p_index]);
 
-      /* get the params stored in the link table*/
-      structpipe_params *p_params
-	  = &(link_map[l_index].params[p_index]);
+	    info("entered the loop, pindex = %d\n", p_index);
 	
-      memset(&pipe, 0, sizeof pipe);
+	    memset(&pipe, 0, sizeof pipe);
 
-      /* set the bandwidth and delay*/
-      pipe.bandwidth = p_params->bw;
-      pipe.delay = p_params->delay;
+	    /* set the bandwidth and delay*/
+	    pipe.bandwidth = p_params->bw;
+	    pipe.delay = p_params->delay;
 
-      /* set the pipe number*/
-      pipe.pipe_nr = link_map[l_index].pipes[p_index];
+	    /* set the pipe number*/
+	    pipe.pipe_nr = link_map[l_index].pipes[p_index];
 
-      /* if we want to blackhole (in the case of EVENT_DOWN,
-	 then we set all other pipe params same, but change the
-	 plr to 1.0
-       */
+	    /* if we want to blackhole (in the case of EVENT_DOWN,
+	       then we set all other pipe params same, but change the
+	       plr to 1.0
+	       */
       
-      if(blackhole == 1){
-	double d = 1.0;
-	pipe.fs.plr = (int)(d*0x7fffffff);
-      }
-      else{ /* we want to change plr*/
-	/* if the pipe was initially down, and if the user wants it up and he
-	   has not specied any plr, then use the default plr = 0.0*/
-	if((int)(p_params->plr) == 1)
-	  pipe.fs.plr = (int)(0*0x7fffffff);
-        else
-	  pipe.fs.plr = (int)(p_params->plr*0x7fffffff);
-      }
-      /* set the queue size*/
-      pipe.fs.qsize = p_params->q_size;
-      /* set the number of buckets used for dynamic queues*/
-      pipe.fs.rq_size = p_params->buckets;
+	    if(blackhole == 1){
+	      double d = 1.0;
+	      pipe.fs.plr = (int)(d*0x7fffffff);
+	    }
+	    else{ /* we want to change plr*/
+	      /* if the pipe was initially down, and if the user wants it up and he
+		 has not specied any plr, then use the default plr = 0.0*/
+	      if((int)(p_params->plr) == 1)
+		pipe.fs.plr = (int)(0*0x7fffffff);
+	      else
+		pipe.fs.plr = (int)(p_params->plr*0x7fffffff);
+	    }
+	    /* set the queue size*/
+	    pipe.fs.qsize = p_params->q_size;
+	    /* set the number of buckets used for dynamic queues*/
+	    pipe.fs.rq_size = p_params->buckets;
 
 
 #if 0
-      pipe.fs.rq_elements = num_qs;
+	    pipe.fs.rq_elements = num_qs;
      
 #endif
 
-      /* initialise pipe flags to zero */
-      pipe.fs.flags_fs = 0;
+	    /* initialise pipe flags to zero */
+	    pipe.fs.flags_fs = 0;
 
-      /* set if the q size is in slots or in bytes*/
-      if(p_params->flags_p & PIPE_QSIZE_IN_BYTES)
-	 pipe.fs.flags_fs |= DN_QSIZE_IS_BYTES;
+	    /* set if the q size is in slots or in bytes*/
+	    if(p_params->flags_p & PIPE_QSIZE_IN_BYTES)
+	      pipe.fs.flags_fs |= DN_QSIZE_IS_BYTES;
    
 #if 0
-      pipe.fs.flow_mask.proto = 0;
-       pipe.fs.flow_mask.src_ip = 0;
-       pipe.fs.flow_mask.dst_ip = 0;
-       pipe.fs.flow_mask.src_port = 0;
-       pipe.fs.flow_mask.dst_port = 0;
+	    pipe.fs.flow_mask.proto = 0;
+	    pipe.fs.flow_mask.src_ip = 0;
+	    pipe.fs.flow_mask.dst_ip = 0;
+	    pipe.fs.flow_mask.src_port = 0;
+	    pipe.fs.flow_mask.dst_port = 0;
 
 #endif
 
-      /* set if the pipe has a flow mask*/
-       if(p_params->flags_p & PIPE_HAS_FLOW_MASK){
-	 pipe.fs.flags_fs |= DN_HAVE_FLOW_MASK;
+	    /* set if the pipe has a flow mask*/
+	    if(p_params->flags_p & PIPE_HAS_FLOW_MASK){
+	      pipe.fs.flags_fs |= DN_HAVE_FLOW_MASK;
 
-	 pipe.fs.flow_mask.proto = p_params->id.proto;
-	 pipe.fs.flow_mask.src_ip = p_params->id.src_ip;
-	 pipe.fs.flow_mask.dst_ip = p_params->id.dst_ip;
-	 pipe.fs.flow_mask.src_port = p_params->id.src_port;
-	 pipe.fs.flow_mask.dst_port = p_params->id.dst_port;
-       }
-      /* set the queing discipline and other relevant params*/
+	      pipe.fs.flow_mask.proto = p_params->id.proto;
+	      pipe.fs.flow_mask.src_ip = p_params->id.src_ip;
+	      pipe.fs.flow_mask.dst_ip = p_params->id.dst_ip;
+	      pipe.fs.flow_mask.src_port = p_params->id.src_port;
+	      pipe.fs.flow_mask.dst_port = p_params->id.dst_port;
+	    }
+	    /* set the queing discipline and other relevant params*/
 
-       if(p_params->flags_p & (PIPE_Q_IS_GRED | PIPE_Q_IS_RED)){
-	 /* set GRED params */
-	 pipe.fs.flags_fs |= DN_IS_RED;
-	 pipe.fs.max_th = p_params->red_gred_params.max_th;
-	 pipe.fs.min_th = p_params->red_gred_params.min_th;
-	 pipe.fs.w_q = (int) ( p_params->red_gred_params.w_q * (1 << SCALE_RED) ) ;
-	 pipe.fs.max_p = (int) ( p_params->red_gred_params.max_p * (1 << SCALE_RED) );
+	    if(p_params->flags_p & (PIPE_Q_IS_GRED | PIPE_Q_IS_RED)){
+	      /* set GRED params */
+	      pipe.fs.flags_fs |= DN_IS_RED;
+	      pipe.fs.max_th = p_params->red_gred_params.max_th;
+	      pipe.fs.min_th = p_params->red_gred_params.min_th;
+	      pipe.fs.w_q = (int) ( p_params->red_gred_params.w_q * (1 << SCALE_RED) ) ;
+	      pipe.fs.max_p = (int) ( p_params->red_gred_params.max_p * (1 << SCALE_RED) );
 
-	 if(p_params->flags_p & PIPE_Q_IS_GRED)
-	 	 pipe.fs.flags_fs |= DN_IS_GENTLE_RED;
+	      if(p_params->flags_p & PIPE_Q_IS_GRED)
+		pipe.fs.flags_fs |= DN_IS_GENTLE_RED;
 
-	 if(pipe.bandwidth){
-	   size_t len ; 
-	   int lookup_depth, avg_pkt_size ;
-	   double s, idle, weight, w_q ;
-	   struct clockinfo clock ;
-	   int t ;
+	      if(pipe.bandwidth){
+		size_t len ; 
+		int lookup_depth, avg_pkt_size ;
+		double s, idle, weight, w_q ;
+		struct clockinfo clock ;
+		int t ;
 
-	   len = sizeof(int) ;
-	   if (sysctlbyname("net.inet.ip.dummynet.red_lookup_depth", 
-		     &lookup_depth, &len, NULL, 0) == -1){
-	     error("cant get net.inet.ip.dummynet.red_lookup_depth");
-	     return;
-	   }
-	   if (lookup_depth == 0) {
-	       info("net.inet.ip.dummynet.red_lookup_depth must" 
+		len = sizeof(int) ;
+		if (sysctlbyname("net.inet.ip.dummynet.red_lookup_depth", 
+				 &lookup_depth, &len, NULL, 0) == -1){
+		  error("cant get net.inet.ip.dummynet.red_lookup_depth");
+		  return;
+		}
+		if (lookup_depth == 0) {
+		  info("net.inet.ip.dummynet.red_lookup_depth must" 
 			    "greater than zero") ;
-	       return;
-	     }
+		  return;
+		}
 	   
-	   len = sizeof(int) ;
-	   if (sysctlbyname("net.inet.ip.dummynet.red_avg_pkt_size", 
+		len = sizeof(int) ;
+		if (sysctlbyname("net.inet.ip.dummynet.red_avg_pkt_size", 
 			&avg_pkt_size, &len, NULL, 0) == -1){
 
-	     error("cant get net.inet.ip.dummynet.red_avg_pkt_size");
-	     return;
-	   }
-	   if (avg_pkt_size == 0){
-	    info("net.inet.ip.dummynet.red_avg_pkt_size must" 
+		  error("cant get net.inet.ip.dummynet.red_avg_pkt_size");
+		  return;
+		}
+		if (avg_pkt_size == 0){
+		  info("net.inet.ip.dummynet.red_avg_pkt_size must" 
 				"greater than zero") ;
-	     return;
-	   }
+		  return;
+		}
 
-	   len = sizeof(struct clockinfo) ;
+		len = sizeof(struct clockinfo) ;
 
-	   if (sysctlbyname("kern.clockrate", 
-			&clock, &len, NULL, 0) == -1) {
-	     error("cant get kern.clockrate") ;
-	     return;
-	   }
+		if (sysctlbyname("kern.clockrate", 
+				 &clock, &len, NULL, 0) == -1) {
+		  error("cant get kern.clockrate") ;
+		  return;
+		}
 	   
 
-	   /* ticks needed for sending a medium-sized packet */
-	   s = clock.hz * avg_pkt_size * 8 / pipe.bandwidth;
+		/* ticks needed for sending a medium-sized packet */
+		s = clock.hz * avg_pkt_size * 8 / pipe.bandwidth;
 
-	   /*
-	    * max idle time (in ticks) before avg queue size becomes 0. 
-	    * NOTA:  (3/w_q) is approx the value x so that 
-	    * (1-w_q)^x < 10^-3. 
-	    */
-	   w_q = ((double) pipe.fs.w_q) / (1 << SCALE_RED) ; 
-	   idle = s * 3. / w_q ;
-	   pipe.fs.lookup_step = (int) idle / lookup_depth ;
-	   if (!pipe.fs.lookup_step) 
-	       pipe.fs.lookup_step = 1 ;
-	   weight = 1 - w_q ;
-	   for ( t = pipe.fs.lookup_step ; t > 0 ; --t ) 
-	      weight *= weight ;
-	   pipe.fs.lookup_weight = (int) (weight * (1 << SCALE_RED)) ;
-
-	 }
+		/*
+		 * max idle time (in ticks) before avg queue size becomes 0. 
+		 * NOTA:  (3/w_q) is approx the value x so that 
+		 * (1-w_q)^x < 10^-3. 
+		 */
+		w_q = ((double) pipe.fs.w_q) / (1 << SCALE_RED) ; 
+		idle = s * 3. / w_q ;
+		pipe.fs.lookup_step = (int) idle / lookup_depth ;
+		if (!pipe.fs.lookup_step) 
+		  pipe.fs.lookup_step = 1 ;
+		weight = 1 - w_q ;
+		for ( t = pipe.fs.lookup_step ; t > 0 ; --t ) 
+		  weight *= weight ;
+		pipe.fs.lookup_weight = (int) (weight * (1 << SCALE_RED)) ;
+	     
+	      }
 	 
-       }
-        /*  else DROPTAIL*/
+	    }
+	    /*  else DROPTAIL*/
 
-      /* now call setsockopt*/
-       if (setsockopt(s_dummy,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe)
-	    < 0)
-	 error("IP_DUMMYNET_CONFIGURE setsockopt failed\n");
-
+	    /* now call setsockopt*/
+	    if (setsockopt(s_dummy,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe)
+		< 0)
+	      error("IP_DUMMYNET_CONFIGURE setsockopt failed\n");
+	  }
       /* go on to the next pipe in the duplex link*/
       p_index++;
     }
@@ -593,8 +610,9 @@ void set_link_params(int l_index, int blackhole)
   from the event notification
  ********************************************************/
 
-int  get_new_link_params(int l_index, event_handle_t handle,
-			 event_notification_t notification)
+int get_new_link_params(int l_index, event_handle_t handle,
+			 event_notification_t notification, int* p_pipes,
+			 int * pipe_which)
 {
   /* get the params of the pipe that were sent in the notification and
      store those values into the link_map table
@@ -603,13 +621,19 @@ int  get_new_link_params(int l_index, event_handle_t handle,
   char argstring[50];
   char * argtype = NULL;
   char * argvalue = NULL;
+  int tot_pipes = 0;
+  int p_num = -1;
+  char *temp = NULL;
   
   if(event_notification_get_string(handle,
                                    notification,
                                    "ARGS", argstring, 50) != 0){
-    argtype = strtok(argstring,"=");
+    info("ARGS = %s\n", argstring);
+    temp = argstring;
     
-    while((argvalue = strtok(NULL," "))){
+    argtype = strsep(&temp,"=");
+    
+    while((argvalue = strsep(&temp," \n"))){
        if(strcmp(argtype,"BANDWIDTH")== 0){
 	 link_map[l_index].params[0].bw =
 	   link_map[l_index].params[1].bw =
@@ -629,66 +653,114 @@ int  get_new_link_params(int l_index, event_handle_t handle,
 	     atof(argvalue);
 	 info("Plr = %f\n", link_map[l_index].params[0].plr);
        }
+
+       /* Queue parameters */
+       
        else if (strcmp(argtype,"LIMIT")== 0){
-	 link_map[l_index].params[0].q_size =
+
+	 if(p_num == -1){
+	   /* this is for both pipes*/
+	   link_map[l_index].params[0].q_size =
 	   link_map[l_index].params[1].q_size =
 	     atoi(argvalue);
-	 /* set the PIPE_QSIZE_IN_BYTES flag to 0,
-	  since we assume that limit is in slots/packets by
-	  default
-	  */
-	 link_map[l_index].params[0].flags_p &=
-	  ~PIPE_QSIZE_IN_BYTES;
-	 link_map[l_index].params[1].flags_p &=
-	  ~PIPE_QSIZE_IN_BYTES;
-
-	 info("QSize/Limit = %d\n", link_map[l_index].params[0].q_size);
+	   /* set the PIPE_QSIZE_IN_BYTES flag to 0,
+	      since we assume that limit is in slots/packets by
+	      default
+	      */
+	   link_map[l_index].params[0].flags_p &=
+	     ~PIPE_QSIZE_IN_BYTES;
+	   link_map[l_index].params[1].flags_p &=
+	     ~PIPE_QSIZE_IN_BYTES;
+	 } else /* do only for the specific pipe*/
+	   {
+	     link_map[l_index].params[p_num].q_size = atoi(argvalue);
+	     link_map[l_index].params[p_num].flags_p &= ~PIPE_QSIZE_IN_BYTES;
+	   }
+	   info("QSize/Limit = %d\n", link_map[l_index].params[0].q_size);
        }
 
        else if (strcmp(argtype,"QUEUE-IN-BYTES")== 0){
 	 int qsztype = atoi(argvalue);
 	 if(qsztype == 0){
 	   /* queue size is in slots/packets*/
-	   link_map[l_index].params[0].flags_p &=
-	     ~PIPE_QSIZE_IN_BYTES;
-	   link_map[l_index].params[1].flags_p &=
-	     ~PIPE_QSIZE_IN_BYTES;
+	   if(p_num == -1){
+	     /* this is for both pipes*/
+	     link_map[l_index].params[0].flags_p &=
+	       ~PIPE_QSIZE_IN_BYTES;
+	     link_map[l_index].params[1].flags_p &=
+	       ~PIPE_QSIZE_IN_BYTES;
+	   }else /* just do for the specific pipe*/
+	     link_map[l_index].params[p_num].flags_p &=
+	       ~PIPE_QSIZE_IN_BYTES;
 	 }
 	 else if(qsztype == 1)
 	   {
-	     /* queue size is in bytes*/
-	     link_map[l_index].params[0].flags_p |= PIPE_QSIZE_IN_BYTES;
-	     link_map[l_index].params[1].flags_p |= PIPE_QSIZE_IN_BYTES;
-
+	      if(p_num == -1){
+		/* this is for both pipes*/
+		/* queue size is in bytes*/
+		link_map[l_index].params[0].flags_p |= PIPE_QSIZE_IN_BYTES;
+		link_map[l_index].params[1].flags_p |= PIPE_QSIZE_IN_BYTES;
+	      } else /*do for the specific pipe*/
+		link_map[l_index].params[p_num].flags_p |= PIPE_QSIZE_IN_BYTES;
 	   }
        }
        else if(strcmp(argtype,"MAXTHRESH")== 0){
-	 link_map[l_index].params[0].red_gred_params.max_th
-	   = link_map[l_index].params[1].red_gred_params.max_th
-	     = atoi(argvalue);
+	 if(p_num == -1){
+	   link_map[l_index].params[0].red_gred_params.max_th
+	     = link_map[l_index].params[1].red_gred_params.max_th
+	       = atoi(argvalue);
+	 } else
+	   link_map[l_index].params[p_num].red_gred_params.max_th
+	       = atoi(argvalue);
        }
        else if(strcmp(argtype,"THRESH")== 0){
-	 link_map[l_index].params[0].red_gred_params.min_th
-	   = link_map[l_index].params[1].red_gred_params.min_th
-	     = atoi(argvalue);
+	 if(p_num == -1){
+	   link_map[l_index].params[0].red_gred_params.min_th
+	     = link_map[l_index].params[1].red_gred_params.min_th
+	       = atoi(argvalue);
+	 }else
+	   link_map[l_index].params[p_num].red_gred_params.min_th
+	       = atoi(argvalue);
        }
        else if(strcmp(argtype,"LINTERM")== 0){
-	 link_map[l_index].params[0].red_gred_params.max_p
-	   = link_map[l_index].params[1].red_gred_params.max_p
-	     = 1.0 / atof(argvalue);
+	 if(p_num == -1){
+	   link_map[l_index].params[0].red_gred_params.max_p
+	     = link_map[l_index].params[1].red_gred_params.max_p
+	       = 1.0 / atof(argvalue);
+	 }else
+	   link_map[l_index].params[p_num].red_gred_params.max_p
+	       = 1.0 / atof(argvalue);
        }
        else if(strcmp(argtype,"Q_WEIGHT")== 0){
-	 link_map[l_index].params[0].red_gred_params.w_q
-	   = link_map[l_index].params[1].red_gred_params.w_q
-	     = atof(argvalue);
+	 if(p_num == -1){
+	   link_map[l_index].params[0].red_gred_params.w_q
+	     = link_map[l_index].params[1].red_gred_params.w_q
+	       = atof(argvalue);
+	 }else
+	   link_map[l_index].params[p_num].red_gred_params.w_q
+	       = atof(argvalue);
+       }
+       else if(strcmp(argtype,"PIPE")== 0){
+	 info("PIPE = %s\n", argvalue);
+
+	 tot_pipes++;
+	 if(strcmp(argvalue, "pipe0") == 0)
+	     p_num = 0;
+	 else if(strcmp(argvalue, "pipe1") == 0)
+	   p_num = 1;
+	 else error("unrecognized pipe number\n");
        }
        else {
 	 error("unrecognized argument\n");
 	 error("%s -> %s \n", argtype, argvalue);
        }
-       argtype = strtok(argstring,"=");
+       argtype = strsep(&temp,"=");
      }
   }
+  info("In func. get_new \n");
+  printf("tot_pips = %d p_num = %d \n", tot_pipes, p_num);
+  *p_pipes = tot_pipes;
+  *pipe_which = p_num;
   return 1;
 }
  /**************** get_link_info ****************************

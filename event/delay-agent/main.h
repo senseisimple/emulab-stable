@@ -156,9 +156,10 @@ void handle_link_modify(char * linkname, int l_index,
 int  get_link_params(int l_index);
 void get_flowset_params(struct dn_flow_set*, int, int);
 void get_queue_params(struct dn_flow_set*,int, int);
-void set_link_params(int l_index, int blackhole);
+void set_link_params(int l_index, int blackhole, int,int);
 int  get_new_link_params(int l_index, event_handle_t handle,
-			 event_notification_t notification);
+			 event_notification_t notification,
+			 int *, int*);
 void dump_link_map();
 int  get_link_info();
 /******************************Function prototypes******************************/
