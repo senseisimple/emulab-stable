@@ -53,7 +53,7 @@ stated:
 proxy:
 	@$(MAKE) -C proxy all
 
-proxy:
+linktest:
 	@$(MAKE) -C linktest all
 
 install: 
