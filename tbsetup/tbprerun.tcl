@@ -142,7 +142,7 @@ foreach pair $nodemap {
 }
 
 outs "Reserving resources."
-if {[catch "exec $reserve $id $machines >@ $logFp 2>@ $logFp" err]} {
+if {[catch "exec $reserve $pid $eid $machines >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error reserving resources. ($err)"
     unlock
     exit 1

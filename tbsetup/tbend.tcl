@@ -69,17 +69,16 @@ if {! [file exists $irFile]} {
 outs ""
 outs "Ending Testbed run for $irFile. [clock format [clock seconds]]"
 
-ir read $irFile
-
 outs "Unallocating resources"
 
+ir read $irFile
 set nodemap [ir get /virtual/nodes]
 set machines {}
 foreach pair $nodemap {
     lappend machines [lindex $pair 1]
 }
 
-if {[catch "exec $nfree $id $machines >@ $logFp 2>@ $logFp err"]} {
+if {[catch "exec $nfree $pid $eid >@ $logFp 2>@ $logFp err"]} {
     outs stderr "Error freeing resources. ($err)"
     exit 1
 }
