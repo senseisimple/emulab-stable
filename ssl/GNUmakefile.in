@@ -66,35 +66,6 @@ server.pem:	dirsmade server.cnf ca.cnf
 #
 # This is for the main web server on boss.
 # 
-apache2.pem:	dirsmade apache2.cnf ca.cnf
-	#
-	# Create the server side private key and certificate request.
-	#
-	openssl req -new -config apache2.cnf \
-		-keyout apache2_key.pem -out apache2_req.pem
-	#
-	# Combine key and cert request.
-	#
-	cat apache2_key.pem apache2_req.pem > newreq.pem
-	#
-	# Sign the apache cert request, creating a apache certificate.
-	#
-	openssl ca -batch -policy policy_sslxmlrpc -config ca.cnf \
-		-out apache2_cert.pem \
-		-cert cacert.pem -keyfile cakey.pem \
-		-infiles newreq.pem
-	#
-	# Combine the key and the certificate into one file. This file is
-	# is not actually installed though; the separate files will be
-	# installed into the apache cert/key directories by install/boss-install
-	# when the boss node is created.
-	#
-	cat apache2_key.pem apache2_cert.pem > apache2.pem
-	rm -f newreq.pem
-
-#
-# This is for the secondary web server on users.
-# 
 apache.pem:	dirsmade apache.cnf ca.cnf
 	#
 	# Create the server side private key and certificate request.
@@ -119,6 +90,35 @@ apache.pem:	dirsmade apache.cnf ca.cnf
 	# when the boss node is created.
 	#
 	cat apache_key.pem apache_cert.pem > apache.pem
+	rm -f newreq.pem
+
+#
+# This is for the secondary web server on users.
+# 
+apache2.pem:	dirsmade apache2.cnf ca.cnf
+	#
+	# Create the server side private key and certificate request.
+	#
+	openssl req -new -config apache2.cnf \
+		-keyout apache2_key.pem -out apache2_req.pem
+	#
+	# Combine key and cert request.
+	#
+	cat apache2_key.pem apache2_req.pem > newreq.pem
+	#
+	# Sign the apache cert request, creating a apache certificate.
+	#
+	openssl ca -batch -policy policy_sslxmlrpc -config ca.cnf \
+		-out apache2_cert.pem \
+		-cert cacert.pem -keyfile cakey.pem \
+		-infiles newreq.pem
+	#
+	# Combine the key and the certificate into one file. This file is
+	# is not actually installed though; the separate files will be
+	# installed into the apache cert/key directories by install/boss-install
+	# when the boss node is created.
+	#
+	cat apache2_key.pem apache2_cert.pem > apache2.pem
 	rm -f newreq.pem
 
 capture.pem:	dirsmade capture.cnf ca.cnf
