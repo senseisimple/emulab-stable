@@ -148,18 +148,24 @@ WRITESUBMENUBUTTON("Edit Experiment Metadata",
 #
 # Admin and project/experiment leader get this option.
 #
-if ($expstate == $TB_EXPTSTATE_ACTIVE &&
-    TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATE)) {
-    WRITESUBMENUBUTTON("Update All Nodes",
-		       "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
-}
+if ($expstate == $TB_EXPTSTATE_ACTIVE) {
+    if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATE)) {
+	WRITESUBMENUBUTTON("Update All Nodes",
+			   "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
+    }
 
-# Reboot option
-if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
-    WRITESUBMENUBUTTON("Reboot All Nodes",
-		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
-}
+    # Reboot option
+    if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
+	WRITESUBMENUBUTTON("Reboot All Nodes",
+			   "boot.php3?pid=$exp_pid&eid=$exp_eid");
+    }
 
+    if (STUDLY()) {
+	WRITESUBMENUBUTTON("Run Linktest",
+			   "linktest.php3?pid=$exp_pid&eid=$exp_eid");
+    }
+}
+    
 # Wireless maps if experiment includes wireless lans.
 if ($wireless) {
     WRITESUBMENUBUTTON("Wireless Node Map",
@@ -171,11 +177,6 @@ if ($wireless) {
 # History
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
-
-if (STUDLY()) {
-    WRITESUBMENUBUTTON("Run Linktest",
-		       "linktest.php3?pid=$exp_pid&eid=$exp_eid");
-}
 
 if (ISADMIN($uid)) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
