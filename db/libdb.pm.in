@@ -128,9 +128,9 @@ sub TBDBConnect()
     # ran it. This is for accounting purposes.
     #
     my $scriptname;
-    if ($0) {
-	$scriptname = basename($0);
-    }
+#    if ($0) {
+#	$scriptname = basename($0);
+#    }
     if (!$scriptname) {
 	$scriptname = "unknown";
     }
