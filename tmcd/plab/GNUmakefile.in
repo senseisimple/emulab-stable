@@ -1,0 +1,96 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tmcd/plab
+
+#
+# The scripts the tarball depends on
+#
+COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
+		    paths.sh paths.pm runstartup vnodesetup update watchdog)
+LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
+TMCDSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/libsetup.pm
+PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
+                    plabsetup rc.inplab)
+OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
+		    install-tarfile install-rpm)
+EESCRIPTS	= $(TESTBED_SRCDIR)/tmcd/plab/rc.vinit
+ULEESCRIPTS	= $(COMSCRIPTS) $(LINSCRIPTS) $(TMCDSCRIPTS) $(PLABSCRIPTS)
+ALLSCRIPTS	= $(ULEESCRIPTS) $(OSSCRIPTS) $(EESCRIPTS)
+
+#
+# Linux binaries the tarball needs
+#
+BINARIES	= tmcc $(SRCDIR)/suidperl
+ALLBINARIES	= $(BINARIES)
+
+#
+# Configuration, or other files necessary for tarball
+#
+ETCCONFS	= $(TESTBED_SRCDIR)/tmcd/plab/sudoers
+ALLCONFS	= $(ETCCONFS)
+
+#
+# Emulab certs for tmcc communication
+#
+CERTS		= $(addprefix /usr/testbed/etc/, emulab.pem pcplab.pem)
+ALLCERTS	= $(CERTS)
+
+#
+# Name and rootball revision
+#
+ROOTBALLREV	= 5
+ROOTBALLNAME	= plabroot-$(ROOTBALLREV).tgz
+
+include $(OBJDIR)/Makeconf
+
+all:	rootball
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+rootball:	$(ROOTBALLNAME)
+
+$(ROOTBALLNAME): copyfiles
+	chown -R 0:0 plabroot
+	tar cf - --numeric-owner -C plabroot . | gzip -c -9 > $(ROOTBALLNAME)
+
+copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
+	$(INSTALL_PROGRAM) $(ULEESCRIPTS) plabroot/usr/local/etc/emulab
+	chmod u+s plabroot/usr/local/etc/emulab/vnodesetup
+	chmod u+s plabroot/usr/local/etc/emulab/update
+	$(INSTALL_PROGRAM) $(OSSCRIPTS)   plabroot/usr/local/bin
+	$(INSTALL_PROGRAM) $(EESCRIPTS)   plabroot/etc
+	$(INSTALL) -m 600  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
+					  plabroot/etc/sudoers
+	ln -fs suidperl  plabroot/usr/bin/sperl5.6.1
+	$(INSTALL_PROGRAM) -s tmcc        plabroot/usr/local/etc/emulab/tmcc
+	$(INSTALL_PROGRAM) -s -m 4511 $(SRCDIR)/suidperl plabroot/usr/bin
+	$(INSTALL_DATA) /usr/testbed/etc/pcplab.pem \
+	                plabroot/usr/local/etc/emulab/client.pem
+	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
+			plabroot/usr/local/etc/emulab
+	echo "@BOSSNODE@" > plabroot/usr/local/etc/emulab/bossnode
+
+mkdirtree:
+	mkdir -p plabroot/usr/local/etc/emulab
+	mkdir -p plabroot/usr/local/bin
+	mkdir -p plabroot/usr/bin
+	mkdir -p plabroot/etc
+	ln -fs ../usr/local/etc/emulab plabroot/etc/emulab
+
+tmcc:
+	@echo "*** Error:"
+	@echo "You must copy the tmcc linux binary this dir"
+	@echo "prior to building the tarball."
+	@false
+
+install:
+
+rootball-install: 
+	$(INSTALL_DATA) $(ROOTBALLNAME) $(INSTALL_ETCDIR)/plab
+
+clean: 
+	rm -rf plabroot $(ROOTBALLNAME)
