@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -429,13 +429,15 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
                   \n";
 	    continue;
 	}
-	
-	$query_result = DBQueryFatal("delete FROM users where uid='$user'");
+
+	DBQueryFatal("delete from users where uid='$user'");
+	DBQueryFatal("delete from user_pubkeys where uid='$user'");
+	DBQueryFatal("delete from user_sfskeys where uid='$user'");
 	
 	echo "<p>
                 User $user was <b>denied</b> membership in $project/$group.
                 <br>
-		The account has also been <b>terminated</b> with prejudice!\n";
+		The account has also been <b>terminated</b>!\n";
 
 	continue;
     }
@@ -494,7 +496,7 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	#
         # Create user account on control node.
         #
-	MKACCT($uid, "webmkacct -a $user");
+	MKACCT($uid, "webmkacct $user");
 	SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 0);
 		
 	continue;

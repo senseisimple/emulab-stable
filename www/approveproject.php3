@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -234,11 +234,18 @@ elseif (strcmp($approval, "approve") == 0) {
     # Invoke the script. This does it all. If it fails, we will find out
     # about it.
     #
-    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", 0); 
+    echo "<br>
+          Project '$pid' is being created!<br><br>
+          This will take a minute or two. <b>Please</b> do not click the Stop
+          button during this time. If you do not receive notification within
+          a reasonable amount of time, please contact $TBMAILADDR.\n";
+    flush();
 
-    echo "<h3><p>
-              Project $pid (User: $headuid) has been approved.
-          </h3>\n";
+    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", 1); 
+
+    echo "<p><b>
+             Project $pid (User: $headuid) has been approved.
+          </b>\n";
 }
 else {
     TBERROR("Invalid approval value $approval in approveproject.php3.", 1);
