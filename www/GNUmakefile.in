@@ -12,10 +12,24 @@ all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-FILES		= tbstyle.css $(wildcard *.jpg *.gif *.html *.php3)
+#
+# Generate a list of all the files we want to install from the current
+# directory and the source directory. 
+# 
+FILES	= $(wildcard *.css *.jpg *.gif *.html *.php3)
+FILES  += $(wildcard $(SRCDIR)/*.css)
+FILES  += $(wildcard $(SRCDIR)/*.jpg)
+FILES  += $(wildcard $(SRCDIR)/*.gif)
+FILES  += $(wildcard $(SRCDIR)/*.html)
+FILES  += $(wildcard $(SRCDIR)/*.php3)
+
+#
+# Kill the directory part of the names. The vpath rule will do the rest.
+#
+ALLFILES = $(notdir $(FILES))
 
 #
 # Do not install by default
 #
 install:
-real-install: $(addprefix $(INSTALL_WWWDIR)/, $(FILES))
+real-install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES))

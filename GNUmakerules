@@ -53,8 +53,10 @@ distclean: clean
 # avoids hitting miscellaneous wrong targets in other directories
 # when configuring in the source directory.
 #
-vpath %.in $(SRCDIR)
-vpath %.c $(SRCDIR)
+vpath %.in  $(SRCDIR)
+vpath %.c   $(SRCDIR)
+vpath %.cc  $(SRCDIR)
+vpath %     $(SRCDIR)
 
 #
 # Define rules which we blew away with .SUFFIXES
