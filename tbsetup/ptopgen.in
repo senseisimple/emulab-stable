@@ -112,13 +112,25 @@ while (($class,$type,$delaycapacity,$vcap) = $result->fetchrow_array) {
 # 
 $result = DBQueryFatal("select type, feature, weight from node_type_features");
 while (my ($type, $feature, $weight) = $result->fetchrow()) {
-    if (! defined($features{$type})) {
-	$features{$type} = "$feature:$weight";
-	next;
+    if (! defined($type_features{$type})) {
+	$type_features{$type} = ["$feature:$weight"];
+    } else {
+	push @{$type_features{$type}}, "$feature:$weight";
     }
-    $features{$type} .= " $feature:$weight";
 }
 
+#
+# Read the features table for each individual node
+#
+$result = DBQueryFatal("select node_id, feature, weight from node_features");
+while (my ($node_id, $feature, $weight) = $result->fetchrow()) {
+    if (! defined($features{$node_id})) {
+	$features{$node_id} = ["$feature:$weight"];
+	next;
+    } else {
+	push @{$features{$node_id}}, "$feature:$weight";
+    }
+}
 #
 # Read in the node_auxtypes table for each node.
 #
@@ -262,8 +274,11 @@ foreach $node (keys(%nodes)) {
     }
 
     # Add features
-    if (defined($features{$type})) {
-	push @features, "$features{$type}";
+    if (defined($type_features{$type})) {
+	push @features, @{$type_features{$type}};
+    }
+    if (defined($features{$node})) {
+	push @features, @{$features{$node}};
     }
 
     #

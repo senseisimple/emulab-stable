@@ -940,3 +940,11 @@ last_net_act,last_cpu_act,last_ext_act);
 		NOT NULL default '0' after sync_server;
        alter table experiments add mem_usage tinyint(4) unsigned \
 		NOT NULL default '0' after cpu_usage;
+
+1.180: Add a node_features table, just like the node_type_features
+       table, but for individual nodes.
+
+       create table node_features (node_id varchar(30) not null,
+	   feature varchar(30) not null, weight float not null default 0.0,
+	   primary key (node_id,feature));
+
