@@ -34,6 +34,8 @@
      <li> <a href="#UTT-7">Are the nodes in my experiment backed up
                            (filesaved)?</a> 
      <li> <a href="#UTT-Swapping">What is Swapping?</a> 
+     <li> <a href="#UTT-8">How can I get switch statistics (such as packet
+                           counts) for my experiment?</a> 
      </ul>
 
 <li> <a href="#HDS">Hardware setup</a>
@@ -427,7 +429,25 @@
     images. For that reason, you should not swap your experiment out
     unless you make arrangements to save and restore any state you need.
     </p>
-    
+
+
+    <li><a NAME="UTT-8"></a>
+    <h3>How can I get switch statistics (such as packet counts) for my
+    experiment?</h3>
+    <p>
+    We have a command called <code>portstats</code> that allows you access
+    to some of the port counters on our switches. To use it, you'll need
+    to ssh to <b>users.emulab.net</b>. '<code>portstats &lt;pid&gt; 
+    &lt;eid&gt;</code>' will get you stats for all experimental interfaces in
+    your experiment. Run '<code>portstats -h</code>' to get a list of other
+    options, such as different sets of stats.
+    </p>
+
+    <p>
+    Note that the numbers returned by <code>portstats</code> do not get
+    reset between experiments.
+    </p>
+  
 </ul>
 
 <hr>
