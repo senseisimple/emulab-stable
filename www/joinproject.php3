@@ -356,7 +356,7 @@ if (isset($_GET['finished'])) {
     if (! $returning) {
 	echo "<br>
               <p>
-              In the meantime, as a new user of the Testbed you will receive
+              In the meantime, as a pending user of the Testbed you will receive
               a key via email.
               When you receive the message, please follow the instructions
               contained in the message on how to verify your account.\n";
