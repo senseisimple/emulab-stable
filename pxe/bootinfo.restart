@@ -1,0 +1,7 @@
+#!/bin/sh
+
+DIR=/usr/testbed/bin/pxe
+
+killall bootinfo
+${DIR}/bootinfo > /dev/null 2>&1 &
+
