@@ -399,7 +399,8 @@ CREATE TABLE firewalls (
   type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
   style enum('open','closed','basic') NOT NULL default 'basic',
   vlan int(11) default NULL,
-  PRIMARY KEY  (pid,eid,fwname)
+  PRIMARY KEY  (pid,eid,fwname),
+  KEY vlan (vlan)
 ) TYPE=MyISAM;
 
 --
@@ -1052,6 +1053,7 @@ CREATE TABLE nodes (
   stated_tag varchar(32) default NULL,
   rtabid smallint(5) unsigned NOT NULL default '0',
   cd_version varchar(32) default NULL,
+  cnet_vlan int(11) default NULL,
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),

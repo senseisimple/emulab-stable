@@ -2084,3 +2084,9 @@ last_net_act,last_cpu_act,last_ext_act);
            'emulab-ops-FBSD410-IPFW2','root',NULL, \
 	   'FreeBSD 4.10 with IPFW2','FreeBSD','4.10',NULL,NULL,'', \
 	   'ping,ssh,ipod,isup,veths,mlinks',1,1,1,'NORMALv2',NULL,NULL,0);
+
+1.279: Still more VLAN-enforced firewall changes.
+
+       alter table nodes add cnet_vlan int(11) default NULL;
+
+       alter table firewalls add index(vlan);
