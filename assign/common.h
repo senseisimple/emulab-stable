@@ -14,7 +14,7 @@ const int MAX_PNODES = 1024;	/* maximum # of physical nodes */
 static int init_temp = 100;
 static int USE_OPTIMAL = 1;
 static int temp_prob = 130;
-static int temp_stop = 2;
+static int temp_stop = 20;
 static int CYCLES = 20;
 
 static float temp_rate = 0.9;

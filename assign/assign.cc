@@ -51,6 +51,10 @@ dictionary<tb_pnode*,int> pnode2posistion;
 pclass_list pclasses;
 dictionary<string,pclass_list*> type_table;
 
+dictionary<string,node> pname2node;
+dictionary<string,node> vname2node;
+dictionary<string,string> fixed_nodes;
+
 /* How can we chop things up? */
 #define PARTITION_BY_ANNEALING 0
 
@@ -208,6 +212,32 @@ int assign()
   /* Set up the initial counts */
   init_score();
 
+  /* Set up fixed nodes */
+  dic_item fixed_it;
+  
+  forall_items(fixed_it,fixed_nodes) {
+    if (vname2node.lookup(fixed_nodes.key(fixed_it)) == nil) {
+      cerr << "Fixed node: " << fixed_nodes.key(fixed_it)
+	   << " does not exist.\n",
+      exit(1);
+    }
+    node vn = vname2node.access(fixed_nodes.key(fixed_it));
+    if (pname2node.lookup(fixed_nodes.inf(fixed_it)) == nil) {
+      cerr << "Fixed node: " << fixed_nodes.inf(fixed_it)
+	   << " does not exist.\n",
+      exit(1);
+    }
+    node pn = pname2node.access(fixed_nodes.inf(fixed_it));
+    int ppos = pnode2posistion.access(&PG[pn]);
+    if (add_node(vn,ppos) == 1) {
+      cerr << "Fixed node: Could not map " << fixed_nodes.key(fixed_it)
+	   << " to " << fixed_nodes.inf(fixed_it) << ".\n";
+      exit(1);
+    }
+    unassigned_nodes.del(vn);
+    G[vn].fixed=true;
+  }
+  
   bestscore = get_score();
   bestviolated = violated;
 #ifdef VERBOSE
@@ -247,8 +277,10 @@ int assign()
       iters++;
 
       n = unassigned_nodes.find_min();
-      if (n == nil)
+      while (n == nil) {
 	n = G.choose_node();
+	if (G[n].fixed) n=nil;
+      }
 
       // Note: we have a lot of +1's here because of the first
       // node loc in pnodes is 1 not 0.
@@ -362,7 +394,11 @@ int assign()
 	  int pos = 0;
 	  node ntor;
 	  while (pos == 0) {
-	    ntor = G.choose_node();
+	    ntor=nil;
+	    while (ntor == nil) {
+	      ntor = G.choose_node();
+	      if (G[ntor].fixed) ntor=nil;
+	    }
 	    pos = G[ntor].posistion;
 	  }
 	  remove_node(ntor);

@@ -20,6 +20,7 @@ public:
   int no_connections;		// how many unfulfilled connections from this node
   string type;
   string name;			// string name of the node
+  bool fixed;			// is this node fixed
 };
 
 

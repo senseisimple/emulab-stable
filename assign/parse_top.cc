@@ -17,6 +17,8 @@
 #include "common.h"
 #include "virtual.h"
 
+extern dictionary<string,node> vname2node;
+extern dictionary<string,string> fixed_nodes;
 extern list<string> vtypes;
 extern tb_vgraph G;
 
@@ -24,7 +26,6 @@ extern node_pq<int> unassigned_nodes;
 
 int parse_top(tb_vgraph &G, istream& i)
 {
-  dictionary<string, node> nmap;
   node no1;
   string s1, s2;
   char inbuf[255];
@@ -58,9 +59,10 @@ int parse_top(tb_vgraph &G, istream& i)
 	G[no1].name=string(scur);
 	G[no1].posistion = 0;
 	G[no1].no_connections=0;
-	nmap.insert(s1, no1);
+	vname2node.insert(s1, no1);
 	scur=strsep(&snext," ");
 	G[no1].type=string(scur);
+	G[no1].fixed = false;	// this may get set to true later
 	vtypes.push(G[no1].type);
 	
 	/* Read in desires */
@@ -79,15 +81,15 @@ int parse_top(tb_vgraph &G, istream& i)
       }
     } else if (!strncmp(inbuf, "link", 4)) {
       r=sscanf(inbuf, "link %s %s %s %d", lname, n1, n2,&bw);
-      if (r < 2) {
+      if (r < 3) {
 	fprintf(stderr, "bad link line: %s\n", inbuf);
       } else {
-	if (r == 2) bw = 10;
+	if (r == 3) bw = 10;
 	string s1(n1);
 	string s2(n2);
 	edge e;
-	node node1 = nmap.access(s1);
-	node node2 = nmap.access(s2);
+	node node1 = vname2node.access(s1);
+	node node2 = vname2node.access(s2);
 	e = G.new_edge(node1, node2);
 	G[e].bandwidth = bw;
 	G[e].type = tb_vlink::LINK_UNKNOWN;
@@ -95,8 +97,16 @@ int parse_top(tb_vgraph &G, istream& i)
 	G[e].plink_two = NULL;
 	G[e].name = string(lname);
       }
-    }
-    else {
+    } else if (! strncmp(inbuf, "fix-node",8)) {
+      r=sscanf(inbuf,"fix-node %s %s",n1,n2);
+      if (r != 2) {
+	fprintf(stderr, "bad fix-node line: %s\n",inbuf);
+      } else {
+	string s1(n1);
+	string s2(n2);
+	fixed_nodes.insert(s1,s2);
+      }
+    } else {
       fprintf(stderr, "unknown directive: %s\n", inbuf);
     }
   }

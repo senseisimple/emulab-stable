@@ -24,6 +24,7 @@
 #include "common.h"
 #include "physical.h"
 
+extern dictionary<string,node> pname2node;
 extern node pnodes[MAX_PNODES];	// int -> node map
 node_array<int> switch_index;
 extern list<string> ptypes;
@@ -31,7 +32,6 @@ extern list<string> ptypes;
 int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 {
   int switchi=0;
-  dictionary<string, node> nmap;
   node no1;
   edge ed1;
   string s1, s2;
@@ -116,7 +116,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	/* Done */
 	if (! isswitch)
 	  pnodes[n++]=no1;
-	nmap.insert(s, no1);
+	pname2node.insert(s, no1);
       }
     }
     else if (!strncmp(inbuf, "link", 4)) {
@@ -131,16 +131,16 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	dmac = n2;
 	snode = strsep(&smac,":");
 	dnode = strsep(&dmac,":");
-	if (nmap.lookup(snode) == nil) {
+	if (pname2node.lookup(snode) == nil) {
 	  fprintf(stderr,"PTOP error: Unknown source node %s\n",snode);
 	  exit(1);
 	}
-	if (nmap.lookup(dnode) == nil) {
+	if (pname2node.lookup(dnode) == nil) {
 	  fprintf(stderr,"PTOP error: Unknown destination node %s\n",dnode);
 	  exit(1);
 	}
-	node node1 = nmap.access(snode);
-	node node2 = nmap.access(dnode);
+	node node1 = pname2node.access(snode);
+	node node2 = pname2node.access(dnode);
 #define ISSWITCH(n) (PG[n].types.lookup("switch") != nil)
 	for (int i = 0; i < num; ++i) {
 	  ed1=PG.new_edge(node1, node2);
