@@ -378,11 +378,11 @@ foreach my $route (keys(%routes)) {
     }
 
     #
-    # If the dst is a real lan (>2 members) we want to create a net route
-    # and avoid a per-host entry for each pair. Convert the route, but
-    # remember we did it so we can skip similar routes in the future.
+    # If optimzing create a net route and avoid a per-host entry for each
+    # pair. Convert the route, but remember we did it so we can skip similar
+    # routes in the future.
     #
-    if ($optimize && @dstmembers > 2) {
+    if ($optimize) {
 	my $newip = inet_ntoa(inet_aton($dstip) & inet_aton($NETMASK));
 
 	if (defined($netroutes{"$src:$newip"})) {
