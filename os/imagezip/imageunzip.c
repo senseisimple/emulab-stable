@@ -15,6 +15,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <assert.h>
 #include <unistd.h>
@@ -52,6 +53,8 @@ char		inbuf[BSIZE], outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
 
 static int	 infd, outfd;
 static int	 doseek = 0;
+static int	 dofill = 0;
+static unsigned	 fillpat= 0;
 static int	 debug  = 0;
 static long long total  = 0;
 static char	 chunkbuf[SUBBLOCKSIZE];
@@ -93,6 +96,9 @@ usage(void)
 		"imageunzip [-d] [-s #] <input filename> [output filename]\n"
 		" -s slice        Output to DOS slice (DOS numbering 1-4)\n"
 		"                 NOTE: Must specify a raw disk device.\n"
+		" -z              Write zeros to free blocks.\n"
+		" -p pattern      Write 32 bit pattern to free blocks.\n"
+		"                 NOTE: Use -z/-p to avoid seeking.\n"
 		" -d              Turn on progressive levels of debugging\n");
 	exit(1);
 }	
@@ -101,10 +107,10 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int		ch, slice = 0;
+	int		i, ch, slice = 0;
 	struct timeval  stamp, estamp;
 
-	while ((ch = getopt(argc, argv, "dhs:")) != -1)
+	while ((ch = getopt(argc, argv, "dhs:zp:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -112,6 +118,12 @@ main(int argc, char **argv)
 
 		case 's':
 			slice = atoi(optarg);
+			break;
+
+		case 'p':
+			fillpat = strtoul(optarg, NULL, 0);
+		case 'z':
+			dofill++;
 			break;
 
 		case 'h':
@@ -129,6 +141,13 @@ main(int argc, char **argv)
 		usage();
 	}
 
+	if (fillpat) {
+		unsigned	*bp = (unsigned *) &zeros;
+
+		for (i = 0; i < sizeof(zeros)/sizeof(unsigned); i++)
+			*bp++ = fillpat;
+	}
+
 	if (strcmp(argv[0], "-")) {
 		if ((infd = open(argv[0], O_RDONLY, 0666)) < 0) {
 			perror("opening input file");
@@ -144,7 +163,7 @@ main(int argc, char **argv)
 			perror("opening output file");
 			exit(1);
 		}
-		doseek = 1;
+		doseek = !dofill;
 	}
 	else
 		outfd = fileno(stdout);
