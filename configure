@@ -1279,12 +1279,13 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
 	tbsetup/rmgroup tbsetup/webrmgroup tbsetup/mkexpdir \
 	tbsetup/webnodecontrol tbsetup/node_control \
-        tbsetup/webmkgroup tbsetup/mkgroup \
+        tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
 	tbsetup/webmkacct tbsetup/mkacct tbsetup/eventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
 	tbsetup/checkports tbsetup/webidlecheck tbsetup/webnodereboot \
+	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/ron/GNUmakefile \
@@ -1293,6 +1294,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables\
+	utils/addpubkey utils/webaddpubkey utils/cvsupd.pl \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	vis/GNUmakefile vis/vistopology vis/webvistopology vis/top2gif \
 	vis/dbvistopology vis/dbtopper \

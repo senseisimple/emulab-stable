@@ -27,7 +27,8 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
 		  console_reset db2ns bwconfig frisbeelauncher \
 		  rmgroup mkgroup mkacct setgroups mkproj \
-		  exports_setup.proxy vnode_setup eventsys_start
+		  exports_setup.proxy vnode_setup eventsys_start \
+		  sfskey_update sfskey_update.proxy
 
 LIBEXEC_STUFF	= rmproj rmacct-ctrl wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -104,6 +105,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/named_setup
 	chown root $(INSTALL_SBINDIR)/exports_setup
 	chmod u+s $(INSTALL_SBINDIR)/exports_setup
+	chown root $(INSTALL_SBINDIR)/sfskey_update
+	chmod u+s $(INSTALL_SBINDIR)/sfskey_update
 	chown root $(INSTALL_SBINDIR)/setgroups
 	chmod u+s $(INSTALL_SBINDIR)/setgroups
 	chown root $(INSTALL_LIBEXECDIR)/console_setup
@@ -131,6 +134,7 @@ LINKS=	cd $(INSTALL_BINDIR) && \
 endif
 control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
+			$(addprefix $(INSTALL_SBINDIR)/, sfskey_update.proxy) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	$(LINKS)
 

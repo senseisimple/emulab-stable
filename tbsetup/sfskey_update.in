@@ -1,0 +1,183 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Fcntl ':flock';
+
+#
+# Create new sfs_users file and fire it off to the SFS server to
+# install via the proxy perl script.
+#
+# This script always does the right thing, so it does not matter who calls it. 
+#
+# usage: sfskey_update
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TESTMODE    = @TESTMODE@;
+my $FSNODE      = "@FSNODE@";
+
+# Note no -n option. We redirect stdin from the new exports file below.
+my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
+my $PROG	= "/usr/testbed/sbin/sfskey_update.proxy";
+my $keyfile     = "/var/tmp/sfs_users";
+my $lockfile    = "/var/tmp/testbed_sfsusers_lockfile";
+my $dbg		= 1;
+my @row; 
+
+#
+# We do not want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+# XXX Hacky!
+if (0 && $TB ne "/usr/testbed") {
+    print STDERR "*** $0:\n".
+	         "    Wrong version. Maybe its a development version?\n";
+    #
+    # Let experiment continue setting up.
+    # 
+    exit(0);
+}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Testbed Support libraries
+# 
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We need to serialize this script to avoid a trashed file. Use
+# a dummy file in /var/tmp, opened for writing and flock'ed. 
+#
+if (!$TESTMODE) {
+    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+    $count = 0;
+    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+	#
+	# If we don't get it the first time, we wait for:
+	# 1) The lock to become free, in which case we do our thing
+	# 2) The time on the lock to change, in which case we wait for
+	#    that process to finish
+	#
+	my $oldlocktime = (stat(LOCK))[9];
+	my $gotlock = 0;
+	while (1) {
+	    print "Another sfskey update running, waiting for it to finish\n";
+	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		# OK, got the lock, we can do what we're supposed to
+		$gotlock = 1;
+		last;
+	    }
+	    $locktime = (stat(LOCK))[9];
+	    if ($locktime != $oldlocktime) {
+		$oldlocktime = $locktime;
+		last;
+	    }
+	    if ($count++ > 20)  {
+		fatal("Could not get the lock after a long time!\n");
+	    }
+	    sleep(1);
+	}
+
+	$count = 0;
+	#
+	# If we didn't get the lock, wait for the processes that did to finish
+	#
+	if (!$gotlock) {
+	    while (1) {
+		if ((stat(LOCK))[9] != $oldlocktime) {
+		    exit(0);
+		}
+		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		    close(LOCK);
+		    exit(0);
+		}
+		if ($count++ > 20)  {
+		    fatal("Process with the lock did not finish ".
+			  "after a long time!\n");
+		}
+		sleep(1); 
+	    }
+	}
+    }
+}
+
+#
+# Perl-style touch(1)
+#
+my $now = time;
+utime $now, $now, $lockfile;
+
+#
+# Create new keyfile.
+#
+if (!$TESTMODE) {
+    open(KEYS, ">$keyfile")
+	or fatal("Could not open $keyfile");
+}
+else {
+    open(KEYS, ">/dev/null")
+	or fatal("Could not open /dev/null");
+}
+
+#
+# Grab all the keys from the DB and stick into the file.
+#
+my $query_result =
+    DBQueryFatal("select pubkey from user_sfskeys");
+
+while (my ($pubkey) = $query_result->fetchrow_array()) {
+    print KEYS "$pubkey\n";
+}
+close(KEYS);
+
+#
+# Fire the new tail file over to the fileserver to finish. We cat the file
+# right into it.
+#
+if (!$TESTMODE) {
+    print "Updating sfs keys on $FSNODE\n";
+    
+    #
+    # Real root for ssh.
+    #
+    $UID = 0;
+
+    system("$SSH $PROG < $keyfile") == 0 or
+	fatal("Failed: $SSH $PROG < $keyfile: $?");
+
+    #
+    # Close the lock file. Exiting releases it, but might as well.
+    #
+    close(LOCK);
+}
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    SENDMAIL($TBOPS, "SFS key update failed", $msg);
+    die("*** $0:\n".
+	"    $msg\n");
+}

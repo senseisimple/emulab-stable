@@ -19,10 +19,10 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: mkacct [-a] <name>\n";
+    print STDOUT "Usage: mkacct [-a] [-f] <name>\n";
     exit(-1);
 }
-my  $optlist = "a";
+my  $optlist = "af";
 
 #
 # Configure variables
@@ -47,8 +47,10 @@ my $SFSKEYGEN = "/usr/local/bin/sfskey gen";
 my $SFSKEYREG = "/usr/local/bin/sfskey register";
 my $SETGROUPS = "$TB/sbin/setgroups";
 my $GENELISTS = "$TB/sbin/genelists";
+my $SFSUPDATE = "$TB/sbin/sfskey_update";
 
 my $auditmode = 0;
+my $sfschange = 0;
 my $logname;
 my $user;
 my @db_row;
@@ -104,6 +106,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"a"})) {
     $auditmode = 1;
+}
+if (defined($options{"f"})) {
+    $sfschange = 1;
 }
 if (@ARGV != 1) {
     usage();
@@ -369,6 +374,18 @@ while (my %row = $query_result->fetchhash()) {
     TBNodeUpdateAccountsByPid($pid);
 }
 
+#
+# If an SFS change was requested (or a new user), then must update.
+# 
+if ($WITHSFS && $sfschange) {
+    #
+    # Note that this command must be run when EUID==UID==0 because its
+    # a setuid PERL script.
+    #
+    system($SFSUPDATE) == 0
+	or fatal("$SFSUPDATE failed!");
+}
+
 if ($auditmode) {
     AUDIT("Account Create Completed!\n", 0);
     unlink($logname);
@@ -430,20 +447,16 @@ sub FirstTime()
 		   "$user\@ops.emulab.net $SFSDIR/identity'")) {
 	    fatal("Failure in sfskey gen: $!");
         }
+	$sfschange = 1;
 	
 	chown($user_number, $default_groupgid, "$SFSDIR/identity") or
 	    fatal("Could not chown $SFSDIR/identity: $!");
 	chmod(0600, "$SFSDIR/identity") or
 	    fatal("Could not chmod $SFSDIR/identity: $!");
 	
-	print "Registering sfs key\n";
-	if (system("$SSH -host $control_node '$SFSKEYREG -Su ".
-		   "$user $SFSDIR/identity'")) {
-	    fatal("Failure in sfskey register: $!");
-	}
-	
 	#
-	# Grab a copy for the DB.
+	# Grab a copy for the DB. Causes an SFS update key to run so
+	# that key is inserted into the files.
 	#
 	my $ident = `cat $SFSDIR/identity`;
 
