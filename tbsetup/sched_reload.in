@@ -21,12 +21,17 @@ my  $optlist = "f";
 #
 # Configure variables
 #
-my $TB     = "@prefix@/bin";
-my $DBNAME = "@TBDBNAME@";
+my $TB     = "@prefix@";
 
-my $osload      = "$TB/os_load";
+#
+# Load the Testbed support stuff. 
+#
+push(@INC, "$TB/lib");
+require libdb;
+
+my $osload      = "$TB/bin/os_load";
+my $nalloc      = "$TB/bin/nalloc";
 my $name        = "";
-my $mereuser    = 0;
 my $error       = 0;
 my $debug       = 0;
 my $force	= 0;
@@ -77,31 +82,10 @@ foreach my $node ( @ARGV ) {
 }
 
 #
-# Set up for querying the database.
-# 
-use Mysql;
-my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
-
+# Root and admin types can do whatever they want.
+# Mere users cannot schedule reloads.
 #
-# Figure out who called us. Root and admin types can do whatever they
-# want. Normal users can only change nodes in experiments in their
-# own projects.
-#
-if ($UID != 0) {
-    ($name) = getpwuid($UID)
-	or die "$UID not in passwd file\n";
-
-    $db_result = $DB->query("select admin from users where uid='$name'");
-    @row = $db_result->fetchrow_array();
-    if ($row[0] != 1) {
-	$mereuser = 1;
-    }
-}
-
-#
-# Mere Users cannot schedule reloads.
-#
-if ($mereuser) {
+if ($UID && !TBAdmin($UID)) {
     die("Only root or TB administrators can schedule disk reloads.\n");
 }
 
@@ -112,7 +96,7 @@ my @load_list=();
 foreach my $node (@nodes) {
     my $pc = $node;
 
-    $sth = $DB->query("select * from nodes where node_id='$pc'");
+    $sth = DBQuery("select * from nodes where node_id='$pc'");
     if ($sth == 0) {
 	die("Database lookup failed (exists). Aborted...\n");
     }
@@ -122,7 +106,7 @@ foreach my $node (@nodes) {
     }
     
     print STDERR "Checking if $pc is reserved...";
-    $sth = $DB->query("select * from reserved where node_id='$pc'");
+    $sth = DBQuery("select * from reserved where node_id='$pc'");
     if ($sth == 0) {
 	die("Database lookup failed (reserved). Aborted...\n");
     }
@@ -135,7 +119,7 @@ foreach my $node (@nodes) {
 	# XXX If you change testbed/reloading, be sure to update the
 	#     test in doreboot() in tmcd/tmcd.c.
 	# 
-	my $cmd = "$TB/nalloc testbed reloading $pc";
+	my $cmd = "$nalloc testbed reloading $pc";
         if ( system($cmd) != 0 ) {
 	    print STDERR "WARNING: Could not reserve $pc!\n";
 	} else {
@@ -143,8 +127,7 @@ foreach my $node (@nodes) {
 	    # Kill the last_reservation so that whoever gets the node next
 	    # won't be fooled into thinking a reload is required.
 	    #
-	    $sth = $DB->query("delete from last_reservation ".
-			      "where node_id='$pc'");
+	    $sth = DBQuery("delete from last_reservation where node_id='$pc'");
 	    push (@load_list,$pc);
 	    $allocated = 1;
 	}
@@ -162,8 +145,8 @@ foreach my $node (@nodes) {
 
     # Put it in the reloads table so TMCD knows to free it.
     print STDERR "Scheduling reload of $imageid for $pc:\n";
-    $sth = $DB->query("replace into reloads ".
-		      "(node_id, image_id) values ('$pc', '$imageid')");
+    $sth = DBQuery("replace into reloads ".
+		   "(node_id, image_id) values ('$pc', '$imageid')");
     if ($sth == 0) {
       die("Database update failed (reloads). Aborted...\n");
     }

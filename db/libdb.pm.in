@@ -1,0 +1,179 @@
+#!/usr/bin/perl -w
+use English;
+require Mysql;
+
+#
+# A library of useful DB stuff. Mostly things that get done a lot. Saves typing.
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $DBNAME	= "@TBDBNAME@";
+
+#
+# Set up for querying the database.
+# 
+my $DB = Mysql->connect("localhost", $DBNAME, "script", "none");
+
+#
+# Test admin status. Optional argument is the UID to test. If not provided,
+# then test the current UID.
+#
+# usage: TBAdmin([int uid]);
+#        returns 1 if an admin type.
+#        returns 0 if a mere user.
+# 
+sub TBAdmin(;$)
+{
+    my($uid) = @_;
+
+    if (!defined($uid)) {
+	$uid = $UID;
+    }
+
+    my ($name) = getpwuid($uid)
+	or die "$uid not in passwd file\n";
+
+    my $query_result =
+	DBquery("select admin from users where uid='$name'");
+
+    my @row = $query_result->fetchrow_array();
+    if ($row[0] == 1) {
+	return 1;
+    }
+    return 0;
+}
+
+#
+# Check access permission to a list of nodes. First argument is a *reference* to
+# a single node, or a list of nodes. Second argument is optional uid, defaults
+# to the current uid.
+#
+# usage: NodeAccessCheck(array or scalar \@nodelist, [int uid])
+#        returns 1 if the uid is allowed to muck with all the nodes.
+#        returns 0 if the uid is not allowed to muck with at least one of the nodes.
+#
+sub NodeAccessCheck($;$)
+{
+    my($list, $uid) = @_;
+    my(@nodelist);
+
+    if (!defined($uid)) {
+	$uid = $UID;
+    }
+
+    if (ref($list) eq "ARRAY") {
+	@nodelist = @$list;
+    }
+    elsif (ref($list) eq "SCALAR") {
+	@nodelist = ($$list);
+    }
+
+    if (!defined(@nodelist) ||
+	scalar(@nodelist) == 0) {
+	die("NodeAccessCheck:\n".
+	    "  First parameter should be a reference to a node (scalar), ".
+	    "or a list of nodes!\n");
+    }
+
+    #
+    # Admin types can do anything to any node. So can Root.
+    #
+    if ($uid == 0 || TBAdmin($uid)) {
+	return 1;
+    }
+
+    my ($name) = getpwuid($uid)
+	or die "$uid not in passwd file\n";
+
+    #
+    # Check to make sure that mere user is allowed to muck with nodes.
+    #
+    foreach my $node (@$nodelist) {
+	my $query_result =
+	    DBquery("select reserved.node_id from reserved ".
+		    "left join proj_memb on ".
+		    "reserved.pid=proj_memb.pid and reserved.node_id='$node' ".
+		    "where proj_memb.uid='$name'");
+
+	if ($query_result == 0 ||
+	    $query_result->numrows == 0) {
+	    return 0;
+	}
+    }
+    return 1;
+}
+
+#
+# Check project membership. First argument is the project to check.
+# Second argument is optional uid, defaults to the current uid.
+#
+# usage: ProjMember(char *pid, [int uid])
+#        returns 1 if the uid is a member of pid.
+#        returns 0 if the uid is not a member of pid.
+# 
+sub ProjMember($;$)
+{
+    my($pid, $uid) = @_;
+
+    if (!defined($uid)) {
+	$uid = $UID;
+    }
+
+    my ($name) = getpwuid($uid)
+	or die "$uid not in passwd file\n";
+
+    my $query_result =
+	DBquery("select * from proj_memb where uid='$name' and pid='$pid'");
+
+    if ($query_result == 0 ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Issue a DB query. Argument is a string. Returns the actual query object, so
+# it is up to the caller to test it. I would not for one moment view this
+# as encapsulation of the DB interface. I'm just tired of typing the same silly
+# stuff over and over. 
+# 
+# usage: DBQuery(char *str)
+#        returns the query object result.
+#
+sub DBQuery($)
+{
+    my($query) = $_[0];
+    my($result);
+
+    $result = $DB->query($query);
+
+    if (! $result) {
+	print "DB Query failed:\n".
+              "   Query: $query\n".
+	      "   Error: " . $DB->errstr . "\n";
+    }
+    return $result;
+}
+
+#
+# Same as above, but die on error. 
+# 
+sub DBQueryFatal($)
+{
+    my($query) = $_[0];
+    my($result);
+
+    $result = DBQuery($query);
+
+    if (! $result) {
+	exit(-1);
+    }
+    return $result;
+}
+
+1;
+

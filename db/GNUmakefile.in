@@ -11,6 +11,7 @@ include $(OBJDIR)/Makeconf
 BIN_SCRIPTS	= mac2if nalloc nfree nodeip
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status
 LIBEXEC_SCRIPTS = ptopgen
+LIB_SCRIPTS     = libdb.pm
 
 # Stuff installed on plastic for mere users.
 USERBINS	= nalloc nfree 
@@ -19,12 +20,13 @@ USERBINS	= nalloc nfree
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS)
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
 
 #
