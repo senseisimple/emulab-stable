@@ -113,6 +113,8 @@ foreach $node (@machines) {
   }
 }
 
+my %timelimited = ();
+
 if ($user ne "root") {
   my $cmd = 
     "select uid, node_id from reserved as r left join experiments as e ".
@@ -128,9 +130,33 @@ if ($user ne "root") {
     $node =~ s/(sh\d+)-\d/$1/;
     push(@OkNodes, "$node");
   }
+  if (@OkNodes > 0) {
+    @conds = ();
+    foreach $node (@OkNodes) {
+      push(@conds,"\Lo.node_id='$node'");
+    }
+    @OkNodes = ();
+    my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
+      "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
+	"(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
+	  "on n.type=t.type where ".join(" or ",@conds);
+    print "Checking times: '$cmd'\n" if $verbose;
+    $sth = $dbh->query($cmd)
+      || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
+    while ( @_ = $sth->fetchrow_array()) {
+      print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
+      my $node = "\L$_[0]";
+      $node =~ s/(sh\d+)-\d/$1/;
+      if ($_[1] <= 0) {
+	$timelimited{$node} = $_[2];
+      } else {
+	push(@OkNodes, "$node");
+      }
+    }
+  }
 } else {
   my $cmd = 
-    "select node_id from nodes where ".join(" or ",@conds);
+    "select node_id from outlets where ".join(" or ",@conds);
   print "Root user authorized. Getting node list: '$cmd'\n" if $verbose;
   $sth = $dbh->query($cmd)
     || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
@@ -139,36 +165,6 @@ if ($user ne "root") {
     my $node = "\L$_[0]";
     $node =~ s/(sh\d+)-\d/$1/;
     push(@OkNodes, "$node");
-  }
-}
-
-my %timelimited = ();
-
-if (@OkNodes > 0) {
-  @conds = ();
-  foreach $node (@OkNodes) {
-    push(@conds,"\Lo.node_id='$node'");
-  }
-
-  @OkNodes = ();
-
-  my $cmd = "select o.node_id,(now()-last_power)-power_time,power_time from ".
-    "outlets as o left join nodes as n on (o.node_id = n.node_id) or ".
-      "(n.node_id = concat(o.node_id,'-1')) left join node_types as t ".
-	"on n.type=t.type where ".join(" or ",@conds);
-
-  print "Checking times: '$cmd'\n" if $verbose;
-  $sth = $dbh->query($cmd)
-    || print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n";
-  while ( @_ = $sth->fetchrow_array()) {
-    print "Got '",join("'\t'",@_),"'\n" if $verbose > 1;
-    my $node = "\L$_[0]";
-    $node =~ s/(sh\d+)-\d/$1/;
-    if ($_[1] <= 0) {
-      $timelimited{$node} = $_[2];
-    } else {
-      push(@OkNodes, "$node");
-    }
   }
 }
 
