@@ -20,7 +20,7 @@
 
 const int MAX_BPFNUM = 16;
 const int MAX_INTERFACES = 8;
-const int SLEEP_TIME = 60;
+const int SLEEP_TIME = 30;
 
 /*
  * Destination Ethernet address - the 'Ethernet Loopback Test' one
