@@ -29,7 +29,7 @@ use Exporter;
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
 	 TMTRAFFICCONFIG TMROUTECONFIG TMLINKDELAY TMDELMAP TMMOUNTDB
 	 TMPROGAGENTS TMPASSDB TMGROUPDB TMGATEDCONFIG
-	 TMSYNCSERVER TMRCSYNCSERVER TMKEYHASH TMNODEID
+	 TMSYNCSERVER TMRCSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY
        );
 
 # Must come after package declaration!
@@ -245,6 +245,7 @@ sub TMDELMAP()		{ CONFDIR() . "/delay_mapping";}
 sub TMSYNCSERVER()	{ CONFDIR() . "/syncserver";}
 sub TMRCSYNCSERVER()	{ CONFDIR() . "/rc.syncserver";}
 sub TMKEYHASH()		{ CONFDIR() . "/keyhash";}
+sub TMEVENTKEY()	{ CONFDIR() . "/eventkey";}
 sub TMNODEID()		{ CONFDIR() . "/nodeid";}
 
 #
@@ -331,6 +332,7 @@ sub cleanup_node ($) {
     unlink TMMOUNTDB . ".db";
     unlink TMSFSMOUNTDB . ".db";
     unlink "$VARDIR/db/rtabid";
+    unlink TMKEYHASH, TMEVENTKEY;
 
     #
     # If scrubbing, remove the password/group file DBs so that we revert
@@ -2240,6 +2242,46 @@ sub dokeyhash()
 }
 
 #
+# Get the event key
+# 
+sub doeventkey()
+{
+    my $eventkey;
+    my @tmccresults;
+
+    if (tmcc(TMCCCMD_EVENTKEY, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get eventkey from server!\n");
+	return -1;
+    }
+    return 0
+	if (! @tmccresults);
+
+    #
+    # There should be just one string. Ignore anything else.
+    #
+    if ($tmccresults[0] =~ /EVENTKEY KEY=\'([\w]*)\'/) {
+	$eventkey = $1;
+    }
+    else {
+	warn "*** WARNING: Bad eventkey line: $tmccresults[0]";
+	return -1;
+    }
+
+    #
+    # Write a file so the node knows the key.
+    #
+    my $oldumask = umask(0227);
+    
+    if (system("echo -n '$eventkey' > ". TMEVENTKEY)) {
+	warn "*** WARNING: Could not write " . TMEVENTKEY . "\n";
+	umask($oldumask);
+	return -1;
+    }
+    umask($oldumask);
+    return 0;
+}
+
+#
 # Get the nodeid
 # 
 sub donodeid()
@@ -2440,8 +2482,9 @@ sub bootsetup()
 	#
 	# Get the key
 	# 
-	print STDOUT "Checking Testbed key ...\n";
+	print STDOUT "Checking Testbed keys ...\n";
 	dokeyhash();
+	doeventkey();
 	
 	#
 	# Router Configuration.
@@ -2546,8 +2589,9 @@ sub jailsetup()
 	print STDOUT "Checking Testbed sync server setup ...\n";
 	dosyncserver();
 	
-	print STDOUT "Checking Testbed key ...\n";
+	print STDOUT "Checking Testbed keys ...\n";
 	dokeyhash();
+	doeventkey();
 	
 	print STDOUT "Checking Testbed RPM configuration ... \n";
 	dorpms();
@@ -2694,8 +2738,9 @@ sub plabsetup()
 	print STDOUT "Checking Testbed hostnames configuration ... \n";
 	dohostnames();
 
-	print STDOUT "Checking Testbed key ...\n";
+	print STDOUT "Checking Testbed keys ...\n";
 	dokeyhash();
+	doeventkey();
 	
 	print STDOUT "Checking Testbed group/user configuration ... \n";
 	doaccounts();

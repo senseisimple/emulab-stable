@@ -25,7 +25,7 @@ use Exporter;
 	     TMCCCMD_SFSHOSTID TMCCCMD_JAILCONFIG
 	     TMCCCMD_PLABCONFIG TMCCCMD_SUBCONFIG TMCCCMD_LINKDELAYS
 	     TMCCCMD_PROGRAMS TMCCCMD_SYNCSERVER TMCCCMD_KEYHASH TMCCCMD_NODEID
-	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT
+	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT TMCCCMD_EVENTKEY
 	     );
 
 # Must come after package declaration!
@@ -139,6 +139,7 @@ my %commandset =
       "ntpinfo"		=> {TAG => "ntpinfo"},
       "ntprift"		=> {TAG => "ntpdrift"},
       "sdparams"	=> {TAG => "sdparams"},
+      "eventkey"	=> {TAG => "eventkey"},
     );
 
 #
@@ -177,6 +178,7 @@ sub TMCCCMD_KEYHASH()   { $commandset{"keyhash"}->{TAG}; }
 sub TMCCCMD_NODEID()    { $commandset{"nodeid"}->{TAG}; }
 sub TMCCCMD_NTPINFO()   { $commandset{"ntpinfo"}->{TAG}; }
 sub TMCCCMD_NTPDRIFT()  { $commandset{"ntpdrift"}->{TAG}; }
+sub TMCCCMD_EVENTKEY()  { $commandset{"eventkey"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
