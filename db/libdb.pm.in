@@ -244,8 +244,8 @@ sub TBDB_TBEVENT_REBOOT()	{ "REBOOT"; }
 #
 # For nodes, we use this set of events.
 #
-sub TBDB_NODESTATE_ISUP()	{ TBDB_EVENTTYPE_ISUP; }
-sub TBDB_NODESTATE_REBOOT()	{ TBDB_EVENTTYPE_REBOOT; }
+sub TBDB_NODESTATE_ISUP()	{ TBDB_TBEVENT_ISUP; }
+sub TBDB_NODESTATE_REBOOT()	{ TBDB_TBEVENT_REBOOT; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
 
 #
@@ -1388,7 +1388,7 @@ sub TBSetNodeEventState($$)
 {
     my ($node, $state) = @_;
 
-    return DBQueryFatal("update nodes set eventstatus='$state' ".
+    return DBQueryFatal("update nodes set eventstate='$state' ".
 			"where node_id='$node'");
 }
 
@@ -1404,7 +1404,7 @@ sub TBGetNodeEventState($$)
     my ($node, $state) = @_;
 
     my $query_result =
-	DBQueryFatal("select eventstatus from nodes where node_id='$node'");
+	DBQueryFatal("select eventstate from nodes where node_id='$node'");
 
     if ($query_result->numrows == 0) {
 	return 0;
