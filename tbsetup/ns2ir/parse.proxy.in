@@ -165,12 +165,13 @@ if (! $pid) {
 # Parent waits.
 #
 waitpid($pid, 0);
+my $exit_status = $? >> 8;
 
 #
 # If the child was KILLed, then it overran its time limit.
 # Send email. Otherwise, exit with result of child.
 #
-if (($? >> 8) == SIGKILL) {
+if ($exit_status == SIGKILL) {
     my $msg = "Parser Exceeded CPU Limit";
 
     SENDMAIL($TBOPS, "Parser Exceeded CPU Limit", $msg,
@@ -185,4 +186,5 @@ if (($? >> 8) == SIGKILL) {
 if (-d $tempdir) {
     system("/bin/rm -r $tempdir");
 }
-exit($? >> 8);
+exit($exit_status);
+
