@@ -83,6 +83,9 @@ trace.o:	decls.h trace.h log.h
 
 install:	$(INSTALL_SBINDIR)/frisbeed
 
+client-install: 
+	$(INSTALL_PROGRAM) frisbee $(DESTDIR)$(CLIENT_BINDIR)
+
 clean:
 	/bin/rm -f *.o *.a frisbee frisbeed frisbee.debug frisbeed.debug
 	/bin/rm -f frisbee.tar frisbee.tar.gz

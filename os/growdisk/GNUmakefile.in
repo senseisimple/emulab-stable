@@ -22,8 +22,10 @@ growdisk: growdisk.o
 	cp growdisk growdisk.debug
 	strip growdisk
 
-# right now growdisk is only installed on the FreeBSD MFS
 install:
+
+client-install: growdisk
+	$(INSTALL_PROGRAM) growdisk $(DESTDIR)$(CLIENT_BINDIR)
 
 clean:
 	rm -f *.o growdisk growdisk.debug

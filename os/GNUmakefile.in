@@ -45,6 +45,7 @@ ifneq ($(SYSTEM),Linux)
 	$(MAKE) -C imagezip client-install
 endif
 	$(MAKE) -C syncd client-install
+	$(MAKE) -C growdisk client-install
 
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
