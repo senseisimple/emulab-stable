@@ -28,6 +28,7 @@ my $TBDBNAME = "@TBDBNAME@";
 my $REALTBDBNAME = "tbdb"; # So we know if we're using the "real" db
 my $osselect = "$TB/bin/os_select";
 my $nodereboot = "$TB/bin/node_reboot";
+my $rebootlog  = "$TB/log/nodereboot.log";
 my $power = "$TB/bin/power";
 my $TBLOG = "@TBLOGFACIL@";
 
@@ -138,13 +139,16 @@ my $TBPOWEROFF   = TBDB_COMMAND_POWEROFF;
 my $TBPOWERON    = TBDB_COMMAND_POWERON;
 my $TBPOWERCYCLE = TBDB_COMMAND_POWERCYCLE;
 my $TBISUP       = TBDB_NODESTATE_ISUP;
+my $PXEWAIT      = TBDB_NODESTATE_PXEWAIT;
+my $PXEWAKEUP    = TBDB_NODESTATE_PXEWAKEUP;
+my $PXEBOOTING   = TBDB_NODESTATE_PXEBOOTING;
 my $TBTIMEOUTREBOOT   = TBDB_STATED_TIMEOUT_REBOOT;
 my $TBTIMEOUTNOTIFY   = TBDB_STATED_TIMEOUT_NOTIFY;
 my $TBTIMEOUTCMDRETRY = TBDB_STATED_TIMEOUT_CMDRETRY;
 my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 
-# This only gets used here, so it isn't in a lib constant.
-my $TBFREENODE = "FREENODE";
+# Special PXEBOOT state machine that all local nodes use.
+my $PXEKERNEL	 = "PXEKERNEL";
 
 if (!$debug) {
     if ( $TB eq $REALTB ) {
@@ -288,13 +292,13 @@ sub process_event_queue() {
 	if ($wait<=0 || $sigrestart || $sigcleanup || $do_reload) {
 	    event_poll($handle);
 	} else {
-	    debug("Using blocking event poll - $wait seconds\n");
+	    #debug("Using blocking event poll - $wait seconds\n");
 	    # timeout param is in milliseconds, so multiply
 	    event_poll_blocking($handle, $wait*1000);
 	    $now = time();
 	    # subtract seconds elapsed from my wait time
 	    $wait = $finish - $now;
-	    debug("Finished blocking event poll - $wait seconds remain\n");
+	    #debug("Finished blocking event poll - $wait seconds remain\n");
 	    if ($event_count > 0 &&
 		(qsize() > 0 || $mailqueue ||
 		 $sigrestart || $sigcleanup || $do_reload)) {
@@ -511,7 +515,7 @@ sub handleEvent($$$) {
     #
     # For readability, only do this on the main stated.
     #
-    if ($dbtag ne "") {
+    if ($dbtag eq "") {
 	debug("Got an event: ($objtype,$objname,$eventtype)\n");
     }
 
@@ -550,6 +554,10 @@ sub handleEvent($$$) {
 	    return;
 	}
     }
+    # Makes it easier to run a debugging version.
+    if ($dbtag ne "") {
+	debug("Got an event: ($objtype,$objname,$eventtype)\n");
+    }
   SWITCH: for ($objtype) {
 	
 	(/$TBNODESTATE/) && do {
@@ -581,19 +589,9 @@ sub stateTransition($$) {
 
     # Check for invalid transitions
     my ($oldstate, $mode);
-    if ($nodes{$node}) {
-	$oldstate = $nodes{$node}{state};
-	$mode = $nodes{$node}{mode};
-    } else {
-	# Try reloading the cache once before we give up on this node
-	reload();
-	if ($nodes{$node}) {
-	    $oldstate = $nodes{$node}{state};
-	    $mode = $nodes{$node}{mode};
-	} else {
-	    notify("Got an event for a node ($node) I don't know about\n");
-	}
-    }
+    $oldstate = $nodes{$node}{state};
+    $mode     = $nodes{$node}{mode};
+
     if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
@@ -632,47 +630,98 @@ sub stateTransition($$) {
 	}
     }
 
-    # Check if this state has a timeout, and if so, put it in the queue
+    #
+    # Check if this state has a timeout, and if so, put it in the queue.
+    # Note that any opmode transition below will replace (or remove) this
+    # timeout if appropriate.
+    #
     setTimeout($mode,$newstate,$node,$now);
 
-    # Check if this is TBDB_NODESTATE_BOOTING , which has actions
-    if ($newstate eq TBDB_NODESTATE_BOOTING) {
-	# If I skipped shutdown, and came to booting directly from isup,
-	# check for a mode transition so I don't miss one...
-	if ($oldstate eq TBDB_NODESTATE_ISUP) {
-	    info("$node: Came from ISUP! Checking for mode transition\n");
-	    my $r = DBQueryWarn("select next_op_mode from nodes ".
-				"where node_id='$node'");
-	    my ($nextmode) = $r->fetchrow();
-	    if ($nextmode) {
-		# Force the transition even though it is illegal
-		info("$node: Forcing mode transition!\n");
-		opModeTransition($node,$nextmode,1);
-		$mode=$nextmode;
-	    } else {
-		debug("No next mode.\n");
-	    }
+    #
+    # See if we jumped into the PXEBOOT kernel. Bootinfo will send
+    # PXEBOOTING every time a node contacts it, which is our indicator that
+    # the node is in the first phase of booting. At this point we want to
+    # switch state machines since the entire boot process is governed by a
+    # single state machine that is independent of the OS that the node will
+    # eventually boot.  Rather then encode that in each state machine, we
+    # use a special machine with a defined entrypoint (PXEBOOTING) and a
+    # defined exitpoint (BOOTING). See below for where we jump back out
+    # of this state machine.
+    #
+    # XXX should this be done with a trigger?
+    #
+    if ($newstate eq TBDB_NODESTATE_PXEBOOTING) {
+	#
+	# Jumped in. We need to change the opmode so that the state
+	# transitions are legal. We do not bother to save the old opmode
+	# since we can figure it out later when we leave.
+	#
+	if ($mode ne $PXEKERNEL) {
+	    info("$node: Forcing mode transition into $PXEKERNEL!\n");
+	    opModeTransition($node, $PXEKERNEL, 1);
+	    $mode=$PXEKERNEL;
 	}
+    }
 
-	# Check if I'm in the right mode
-	my $osid = TBBootWhat($node,$debug);
-	my $os_op_mode = os_opmode($osid);
-	info("$node: Current OS is '$osid', OS mode is '$os_op_mode'\n");
-	DBQueryFatal("UPDATE nodes SET osid='$osid' WHERE node_id='$node'");
-	if ($os_op_mode ne $mode) {
-	    my $str = "Node $node is running OS '$osid' but in mode '$mode' ".
-	      "instead of mode '$os_op_mode'!\n";
-	    # For now, only force if we're going into reload mode, so we
-	    # don't get stuck looping in reloading.
-	    if ($os_op_mode eq "RELOAD") {
-		DBQueryFatal("UPDATE nodes SET op_mode='$os_op_mode', ".
-			     "op_mode_timestamp=unix_timestamp(now()) ".
-			     "WHERE node_id='$node'");
-		$nodes{$node}{mode} = $os_op_mode;
-		$nodes{$node}{mode_timestamp} = $now;
-		$str .= "Forced op_mode to '$os_op_mode'.\n";
+    # Check if this is TBDB_NODESTATE_BOOTING, which has actions.
+    if ($newstate eq TBDB_NODESTATE_BOOTING) {
+	#
+	# See if we are in the right mode/osid. 
+	#
+	my ($bootosid,$bootopmode) = TBBootWhat($node, $debug);
+
+	info("$node: BootWhat says $bootosid (mode $bootopmode).\n");
+	DBQueryFatal("update nodes set osid='$bootosid' ".
+		     "where node_id='$node'");
+	
+	if ($bootopmode ne $mode) {
+	    if ($mode eq $PXEKERNEL) {
+		#
+		# If we came from PXE boot, then we have to jump out of the
+		# PXEKERNEL state machine into whatever state machine is
+		# current for the node. Since we came through bootinfo,
+		# we know that the node is doing what it is supposed to, and
+		# that this change matches what the node is booting. 
+		#
+		info("$node: Forcing mode transition out of $PXEKERNEL!\n");
+		opModeTransition($node, $bootopmode, 1);
+		$mode=$bootopmode;
 	    }
-	    notify($str);
+	    elsif ($oldstate eq TBDB_NODESTATE_ISUP) {
+		#
+		# Skipped SHUTDOWN, which could result in a missed opmode
+		# transition. Can this really happen anymore?
+		# 
+		info("$node: Came from ISUP! Checking for mode transition\n");
+		my $query_result =
+		    DBQueryWarn("select next_op_mode from nodes ".
+				"where node_id='$node'");
+		my ($nextmode) = $query_result->fetchrow();
+		if ($nextmode) {
+		    info("$node: Forcing mode transition!\n");
+		    opModeTransition($node, $nextmode, 1);
+		    $mode=$nextmode;
+		}
+	    }
+	    else {
+		my $str = "$node is running $bootosid, but in mode $mode\n".
+		    "instead of mode $bootopmode!\n";
+		
+		if ($bootopmode eq "RELOAD") {
+		    #
+		    # For now, only force if we're going into reload mode,
+		    # so we don't get stuck looping in reloading.
+		    # Can this happen anymore?
+		    #
+		    DBQueryFatal("UPDATE nodes SET op_mode='$bootopmode', ".
+				 "op_mode_timestamp=unix_timestamp(now()) ".
+				 "WHERE node_id='$node'");
+		    $nodes{$node}{mode} = $bootopmode;
+		    $nodes{$node}{mode_timestamp} = $now;
+		    $str .= "Forced op_mode to $bootopmode.\n";
+		}
+		notify($str);
+	    }
 	}
 	checkGenISUP($node);
     }
@@ -702,10 +751,6 @@ sub stateTransition($$) {
 		next;
 	    };
 	    /^$TBRELOADDONE$/ && do {
-		handleCtrlEvent($node,$trig);
-		next;
-	    };
-	    /^$TBFREENODE$/ && do {
 		handleCtrlEvent($node,$trig);
 		next;
 	    };
@@ -743,22 +788,13 @@ sub opModeTransition($$;$) {
     my ($node,$newmode,$force) = @_;
     if (!defined($force)) { $force = 0; }
 
-    info("$node: Mode change to $newmode requested\n");
+    info("$node: Mode change to $newmode requested ($force)\n");
+    
     # Check for invalid transitions
     my ($oldstate, $mode, $nextstate);
-    if ($nodes{$node}) {
-	$oldstate = $nodes{$node}{state};
-	$mode = $nodes{$node}{mode};
-    } else {
-	# Try reloading the cache once before we give up on this node
-	reload();
-	if ($nodes{$node}) {
-	    $oldstate = $nodes{$node}{state};
-	    $mode = $nodes{$node}{mode};
-	} else {
-	    notify("Got an event for a node ($node) I don't know about\n");
-	}
-    }
+    $oldstate = $nodes{$node}{state};
+    $mode     = $nodes{$node}{mode};
+
     if (defined($modeTrans{"$mode:$oldstate"}) || $force) {
 	if (!$force) {
 	    debug("Mode Transition check:\n");
@@ -810,31 +846,14 @@ sub handleCtrlEvent($$) {
 
     foreach ($event) {
 	/^$TBRESET$/ && do {
-	    my $result = DBQueryFatal("SELECT pxe_boot_path, def_boot_osid ".
-				      "FROM nodes where node_id='$node'");
-	    my ($pxepath,$osid) = $result->fetchrow();
-
-	    # Important note on ordering here:
-	    # Because setting a normal osid resets pxe path to PXEBOOT,
-	    # We need to read it out first, then set the osid, then set
-	    # the pxepath back to its original value at the end.
-
-	    $cmd = "$osselect $osid $node";
+	    #
+	    # Clear next_boot_path with os_select.
+	    # 
+	    $cmd = "$osselect -d -c -1 $node";
 	    system($cmd) and
-	      notify("$node/$event: Couldn't clear next_boot_*\n".
-		     "\tcmd=$cmd\n\t*** $!\n");
-
-	    $pxepath = "-p ".$pxepath;
-	    if ($pxepath eq "-p ") {
-		$pxepath="PXEBOOT";
-	    }
-	    ;
-	    my $cmd = "$osselect -m $pxepath $node";
-	    system($cmd) and
-	      notify("$node/$event: Couldn't clear next_pxe_boot_path\n".
-		     "\tcmd=$cmd\n\t*** $!\n");
-
-	    info("Performed RESET for $node to $osid/$pxepath\n");
+		notify("$node/$event: Could not clear next_boot_path!\n");
+	    
+	    info("Performed RESET for $node\n");
 	    next;
 	};
 	/^$TBRELOADDONE$/ && do {
@@ -845,19 +864,9 @@ sub handleCtrlEvent($$) {
 	    if (($pid eq NODERELOADING_PID) && ($eid eq NODERELOADING_EID)) {
 		DBQueryFatal("delete from scheduled_reloads ".
 			     "where node_id='$node'");
-		AddNodeTrigger($node, $TBANYMODE, TBDB_NODESTATE_ISUP,
-			       $TBFREENODE)
-		  && notify("$node: Couldn't add trigger $TBFREENODE!\n");
-		info("Set up freeing of $node from $pid/$eid\n");
+		DBQueryFatal("delete from reserved where node_id='$node'");
+		info("Released $node from $pid/$eid\n");
 	    }
-	    next;
-	};
-	/^$TBFREENODE$/ && do {
-	    # Don't need pid/eid, but we should put it in the log
-	    my ($pid,$eid);
-	    NodeidToExp($node,\$pid,\$eid);
-	    DBQueryFatal("delete from reserved where node_id='$node'");
-	    info("Released $node from $pid/$eid\n");
 	    next;
 	};
 	/^$TBTIMEOUT$/ && do {
@@ -890,6 +899,41 @@ sub handleCtrlEvent($$) {
 		}
 		next;
 	    }
+
+	    #
+	    # Trash. This stuff should not be encoded this way, but I have
+	    # no idea how timeouts, TBCOMMAND, and actions interact.
+	    #
+	    if ($curstate eq $PXEWAKEUP) {
+		my $optarg = ($debug ? "-d " : "");
+		
+		if ($timedout < 3) {
+		    #
+		    # Try again. 
+		    # 
+		    info("Node $node has timed out $timedout times in ".
+			 "$PXEWAKEUP!\n".
+			 "Sending it a another wakeup command\n");
+		}
+		else {
+		    #
+		    # Failed too many times, power cycle instead. 
+		    # 
+		    notify("Node $node has timed out $timedout times in ".
+			   "$PXEWAKEUP!\n".
+			   "Sending it a reboot command\n");
+		    $optarg .= "-k";
+		}
+		my $cmd = "$nodereboot -r $optarg $node";
+		debug("$cmd\n");
+		system("date 2>&1 >> $rebootlog");
+		system("$cmd 2>&1 >> $rebootlog &") and
+		    notify("PXEWAKEUP retry: ".
+			   "Command '$cmd' failed, error $?: $!\n");
+
+		next;
+	    }
+
 	    info("Node $node has timed out in state $mode/$state".
 		 ($action ne "" ? "\n\tRequested action $action." : "").
 		 "\n");
@@ -976,7 +1020,7 @@ sub handleCommand($$;$$) {
 	    # so we don't need to do any fancy stuff here.
 
 	    my $cmd = "$nodereboot -r $nodelist";
-	    my $redir = " 2>&1 >> /usr/testbed/log/nodereboot.log &";
+	    my $redir = " 2>&1 >> $rebootlog &";
 	    debug("$cmd $redir\n");
 	    system("date $redir");
 	    system($cmd.$redir) and
@@ -1350,16 +1394,16 @@ sub info($;$) {
     if ($notice) {
 	$prio = "notice";
     }
-    if ($debug) {
-	# Print out log entries like this:
-	# Sep 20 09:36:00 stated[238]: Reloading state from database
-	print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
-	$message = "DEBUG: ".$message;
-    }
     if ($nolog) {
 	print $message;
     }
     else {
+	if ($debug) {
+	    # Print out log entries like this:
+	    # Sep 20 09:36:00 stated[238]: Reloading state from database
+	    print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
+	    $message = "DEBUG: ".$message;
+	}
 	syslog($prio,$message) || notify("syslog failed: $? $!\n");
     }
 }
