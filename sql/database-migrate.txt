@@ -176,3 +176,11 @@ last_net_act,last_cpu_act,last_ext_act);
          CHANGE COLUMN name name varchar(255) PRIMARY KEY;
 
        ALTER TABLE sitevariables DROP INDEX name;
+
+1.127: Make (pid,eid,vname) unique in the reserved table. Recommended
+       commands for updating are:
+
+       alter table reserved drop index pid;
+       update reserved set vname=node_id where vname is null;
+       alter table reserved add unique vname (pid,eid,vname); 
+
