@@ -149,29 +149,23 @@ else {
 # to the DB in the child. 
 #
 my $DB;
+$DBQUERY_MAXTRIES = 1;
+$DBCONN_MAXTRIES  = 5;
+@EXPORT_OK        = qw($DBQUERY_MAXTRIES $DBCONN_MAXTRIES);
 
 sub TBDBConnect()
 {
-    my $maxtries = 5;
+    my $maxtries = $DBCONN_MAXTRIES;
 
     #
     # Construct a 'username' from the name of this script and the user who
     # ran it. This is for accounting purposes.
     #
-    my $scriptname;
-    my $prog="";
-    if ($0 =~ /^([a-z0-9\-\/\.\_]*)$/) { $prog = $1; }
-    if ($prog) {
-	$scriptname = basename($prog);
-    }
-    if (!$scriptname) {
-	$scriptname = "unknown";
-    }
     my $name = getpwuid($UID);
     if (!$name) {
 	$name = "uid$UID";
     }
-    my $dbuser = "$scriptname:$name";
+    my $dbuser = "$SCRIPTNAME:$name";
 
     while ($maxtries) {
 	$DB = Mysql->connect("localhost", $DBNAME, $dbuser, "none");
@@ -289,11 +283,11 @@ sub TB_PROJECT_DELGROUP()	{ 4; }
 sub TB_PROJECT_LEADGROUP()	{ 5; }
 sub TB_PROJECT_ADDUSER()	{ 6; }
 sub TB_PROJECT_DELUSER()	{ 7; }
-sub TB_PROJECT_MAKEOSID		{ 8; }
-sub TB_PROJECT_DELOSID		{ 9; }
-sub TB_PROJECT_MAKEIMAGEID	{ 10; }
-sub TB_PROJECT_DELIMAGEID	{ 11; }
-sub TB_PROJECT_CREATEEXPT	{ 12; }
+sub TB_PROJECT_MAKEOSID()	{ 8; }
+sub TB_PROJECT_DELOSID()	{ 9; }
+sub TB_PROJECT_MAKEIMAGEID()	{ 10; }
+sub TB_PROJECT_DELIMAGEID()	{ 11; }
+sub TB_PROJECT_CREATEEXPT()	{ 12; }
 sub TB_PROJECT_MIN()		{ TB_PROJECT_READINFO; }
 sub TB_PROJECT_MAX()		{ TB_PROJECT_CREATEEXPT; }
 
@@ -609,6 +603,9 @@ sub TBProjAccessCheck($$$$)
     }
     elsif ($access_type == TB_PROJECT_CREATEEXPT) {
 	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+    elsif ($access_type == TB_PROJECT_DELUSER) {
+	$mintrust = PROJMEMBERTRUST_PROJROOT;
     }
     else {
 	die("*** Unexpected access type: $access_type!");
@@ -2212,6 +2209,8 @@ sub TBNodeUpdateAccountsByUID($)
 {
     my ($uid) = @_;
 
+    DBQueryFatal("update users set usr_modified=now() where uid='$uid'");
+
     my $query_result =
 	DBQueryFatal("select p.pid,pcremote_ok from users as u ".
 		     "left join group_membership as g on ".
@@ -2325,7 +2324,7 @@ sub TBNodeStateWait ($$$$) {
 # the error string from the DB module. Use DBFatal (below) to print/email
 # that string, and then exit.
 #
-sub DBQuery($)
+sub DBQueryOld($)
 {
     my($query) = $_[0];
     my($result);
@@ -2340,24 +2339,29 @@ sub DBQuery($)
     return $result;
 }
 
-sub DBQueryNew($)
+sub DBQuery($)
 {
-    my($query) = $_[0];
+    my($query)   = $_[0];
+    my $maxtries = $DBQUERY_MAXTRIES;
     my $result;
-    my $maxtries = 5;
+
+    # Not really forever :-)
+    if (!$maxtries) {
+	$maxtries = 100000;
+    }
 
     while ($maxtries) {
 	$result = $DB->query($query);
 	if (! defined($result)) {
 	    $DBErrorString =
 		"  Query: $query\n".
-		    "  Error: " . $DB->errstr;
+		"  Error: " . $DB->errstr;
 	}
 	if (defined($result) || $DB->err != 2006) {
 	    last;
 	}
 
-	DBWarn("mysqld went away", 0);
+	DBWarn("mysqld went away. $maxtries tries left", 0);
 	$maxtries--;
 	sleep(1);
     }
