@@ -539,7 +539,7 @@ $minimum_nodes = $nodes + $delaynodes/$DELAYCAPACITY;
 $maximum_nodes = $nodes + $delaynodes;
 DBQueryFatal("UPDATE experiments set maximum_nodes=$maximum_nodes, " .
 	 "minimum_nodes=$minimum_nodes where pid=\"$pid\" and eid=\"$eid\"");
-print "Minumum nodes = $minimum_nodes\n";
+print "Minimum nodes = $minimum_nodes\n";
 print "Maximum nodes = $maximum_nodes\n";
 
 TBDebugTimeStamp("top finished");
