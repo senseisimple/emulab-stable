@@ -399,15 +399,17 @@ sub findVlan($$;$) {
 
 #   
 # Create a VLAN on this switch, with the given identifier (which comes from
-# the database.) Picks its own switch-specific VLAN number to use.
+# the database.) Picks its own switch-specific VLAN number to use. If ports
+# are given, puts them in the newly-created VLAN.
 #
-# usage: createVlan($self, $vlan_id)
+# usage: createVlan($self, $vlan_id,@ports)
 #        returns 1 on success
 #        returns 0 on failure
 #
-sub createVlan($$) {
+sub createVlan($$;@) {
     my $self = shift;
     my $vlan_id = shift;
+    my @ports = shift;
 
     my $okay = 0;
 
@@ -440,6 +442,16 @@ sub createVlan($$) {
     } else {
 	print "Failed\n";
 	$okay = 0;
+    }
+
+    #
+    # If we wre given any ports, put them into the VLAN now, so that
+    # we can do this without unlocking/relocking.
+    #
+    if ($okay && @ports) {
+	if ($self->setPortVlan($vlan_id,@ports)) {
+	    $okay = 0;
+	}
     }
 
     $self->vlanUnlock();
@@ -659,7 +671,7 @@ sub removePortsFromVlan($$) {
 		$self->debug("Removing $port from vlan $vlan\n");
 		my $RetVal = $self->{SESS}->set(["policyPortRuleDeleteObj",
 		    $index,1,"INTEGER"]);
-		if ($RetVal) {
+		if (!$RetVal) {
 		    $errors++;
 		}
 
@@ -684,8 +696,8 @@ sub removePortsFromVlan($$) {
 }
 
 #
-# Remove the given VLAN from this switch. This presupposes that all of its
-# ports have already been removed with removePortsFromVlan(). The VLAN is
+# Remove the given VLAN from this switch. Removes all ports from the VLAN,
+# so it's not necessary to call removePortsFromVlan() first. The VLAN is
 # given as a VLAN identifier from the database.
 #
 # usage: removeVlan(self,int vlan)
@@ -711,6 +723,17 @@ sub removeVlan($$) {
     # Need to lock the VLAN edit buffer
     #
     if (!$self->vlanLock()) {
+	return 0;
+    }
+
+    #
+    # First, remove all ports from this VLAN
+    #
+    if ($self->removePortsFromVlan($vlan_id)) {
+	#
+	# Uh oh, something went wrong. Unlock and bail
+	#
+	$self->vlanUnlock();
 	return 0;
     }
 

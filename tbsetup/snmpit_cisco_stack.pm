@@ -230,25 +230,34 @@ sub setPortVlan($$@) {
 }
 
 #
-# Creates a VLAN with the given VLAN identifier on the stack. A device list
-# is given to indicate which devices the VLAN must span. It is an error to
-# create a VLAN that already exists.
+# Creates a VLAN with the given VLAN identifier on the stack. If ports are
+# given, puts them into the newly created VLAN. It is an error to create a
+# VLAN that already exists.
 #
-# usage: createVlan(self, vlan identfier, device list)
+# usage: createVlan(self, vlan identfier, port list)
 #
 # returns: 1 on success
 # returns: 0 on failure
 #
-sub createVlan($$@) {
+sub createVlan($$;@) {
     my $self = shift;
     my $vlan_id = shift;
-    my @devicenames = @_; # Note: This is not used for Cisco switches
+    my @ports = @_;
 
     #
     # We just need to create the VLAN on the stack leader
     #
-    return $self->{LEADER}->createVlan($vlan_id);
+    my $okay = $self->{LEADER}->createVlan($vlan_id);
 
+    #
+    # We need to add the ports to VLANs at the stack level, since they are
+    # not necessarily on the leader
+    #
+    if ($okay && @ports) {
+	if ($self->setPortVlan($vlan_id,@ports)) {
+	    $okay = 0;
+	}
+    }
 }
 
 #

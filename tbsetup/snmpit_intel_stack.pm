@@ -108,12 +108,12 @@ sub setPortVlan($$@) {
     return $self->{LEADER}->setPortVlan($vlan_id,@ports);
 }
 
-sub createVlan($$@) {
+sub createVlan($$;@) {
     my $self = shift;
     my $vlan_id = shift;
-    my @devicenames = @_; # Note: This is not used for Intel switches
+    my @ports = @_;
 
-    return $self->{LEADER}->createVlan($vlan_id);
+    return $self->{LEADER}->createVlan($vlan_id,@ports);
 
 }
 
@@ -147,7 +147,6 @@ sub vlanExists($$) {
 sub removeVlan($$) {
     my $self = shift; 
     my $vlan_id = shift;
-    my $errors = 0;
 		    
     #
     # First, make sure that the VLAN really does exist
@@ -158,7 +157,6 @@ sub removeVlan($$) {
 	return 0;
     }
 
-    $errors += $self->{LEADER}->removePortsFromVlan($vlan_id);
     my $ok = $self->{LEADER}->removeVlan($vlan_id);
 
     return $ok;

@@ -591,36 +591,31 @@ sub doVlansFromTables($@) {
 	    print "  VLAN $vlan already exists\n";
 	    $errors += $stack->setPortVlan($vlan,@ports);
 	} else {
-	    if (!$stack->createVlan($vlan)) {
+	    if (!$stack->createVlan($vlan,@ports)) {
 		warn "ERROR: Failed to create VLAN with id $vlan\n";
 		#
 		# Don't try to put ports in a VLAN if it couldn't be created
 		#
 		$errors++;
-	    } else {
-		my $setErrors = $stack->setPortVlan($vlan,@ports);
-		$errors += $setErrors;
+	    }
+	}
 
-		#
-		# Set the speed and duplex of each interface depending on the
-		# value in the database
-		#
-		if (!$setErrors) {
-		    foreach my $port (@ports) {
-			my ($speed,$duplex) = getInterfaceSettings($port);
-			#
-			# If either is not set, we do nothing. We could make
-			# a 0 mean 'auto'
-			#
-			if ($speed) {
-			    my $cmd = $speed . "mbit";
-			    $errors += $stack->portControl($cmd, $port);
-			}
-			if ($duplex) {
-			    $errors += $stack->portControl($duplex, $port);
-			}
-		    }
-		}
+	#
+	# Set the speed and duplex of each interface depending on the
+	# value in the database
+	#
+	foreach my $port (@ports) {
+	    my ($speed,$duplex) = getInterfaceSettings($port);
+	    #
+	    # If either is not set, we do nothing. We could make
+	    # a 0 mean 'auto'
+	    #
+	    if ($speed) {
+		my $cmd = $speed . "mbit";
+		$errors += $stack->portControl($cmd, $port);
+	    }
+	    if ($duplex) {
+		$errors += $stack->portControl($duplex, $port);
 	    }
 	}
     }
@@ -676,26 +671,25 @@ sub doMakeVlan($$@) {
     #
     if ($stack->vlanExists($vlan_name)) {
 	print "VLAN $vlan_name already exists\n";
+	#
+	# Put requested ports into the VLAN
+	#
+	if (@ports) {
+	    print "Putting ports in VLAN ...\n";
+	    my $perrors = $stack->setPortVlan($vlan_name,@ports);
+	    print "VLAN change ";
+	    print $perrors? "failed":"succeeded",".\n";
+	    $errors += $perrors;
+
+	}
     } else {
 	print "Creating VLAN $vlan_name ...\n";
-	my $ok = $stack->createVlan($vlan_name);
+	my $ok = $stack->createVlan($vlan_name,@ports);
 	print "VLAN creation ";
 	print $ok? "succeeded":"failed",".\n";
 	if (!$ok) {
 	    $errors++;
 	}
-    }
-
-    #
-    # Put requested ports into the VLAN
-    #
-    if (@ports) {
-	print "Putting ports in VLAN ...\n";
-	my $perrors = $stack->setPortVlan($vlan_name,@ports);
-	print "VLAN change ";
-	print $perrors? "failed":"succeeded",".\n";
-	$errors += $perrors;
-
     }
 
     return $errors;
