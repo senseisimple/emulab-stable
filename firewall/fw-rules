@@ -41,9 +41,10 @@ allow all from any to any			# 65534: OPEN
 # match existing dynamic rules first (rule 1 is used as a temp rule)
 check-state					# 2: BASIC,CLOSED,ELABINELAB
 
-# XXX use ssh from boss to remove a tmp rule allowing all traffic
-# this is necessary to allow the ssh to complete!
-allow tcp from me to boss established		# 3: ELABINELAB
+# XXX we use ssh from boss to remove a tmp rule allowing all traffic.
+# These rules are necessary to allow the ssh to complete!
+allow tcp from me 22 to boss			# 3: ELABINELAB
+allow tcp from boss to me 22			# 4: ELABINELAB
 
 # Can talk to myself
 allow all from me to me				# 10: BASIC,CLOSED,ELABINELAB
