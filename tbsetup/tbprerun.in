@@ -30,7 +30,7 @@ my $state;
 my $TBROOT   = "@prefix@";
 
 # Untaint the path
-$ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
+$ENV{'PATH'} = "/usr/bin:/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
     ":$TBROOT/libexec/vis:$TBROOT/sbin:$TBROOT/bin";
 
 #
