@@ -15,7 +15,8 @@ my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
 my $ACCTCMD     = "accounts";
 my $DELAYCMD    = "delay";
-my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s\n";
+my $IFCONFIG    = "/sbin/ifconfig fxp%d inet %s netmask %s ".
+		  "media 100baseTX mediaopt full-duplex\n";
 my $CP		= "/bin/cp -f";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $PW		= "/usr/sbin/pw";
