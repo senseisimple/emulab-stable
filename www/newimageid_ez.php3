@@ -1215,10 +1215,13 @@ if (isset($_FILES['upload_file']) &&
         # Taint check shell arguments always!
 	$errors["Image File"] = "Invalid characters";
     } else {
+        # So that the webcopy, running as the user, can read the file
+        chmod($tmpfile,0644);
 	# Note - the script we call takes care of making sure that the local
         # filename is in /proj or /groups
-        $retval = SUEXEC($uid, "$pid,$unix_gid", "webcopy $tmpfile $localfile",
-             SUEXEC_ACTION_DUPDIE);
+        $retval = SUEXEC($uid, "$pid,$unix_gid",
+            "webcopy " . escapeshellarg($tmpfile) . " " . escapeshellarg($localfile),
+            SUEXEC_ACTION_DUPDIE);
     }
 }
 
