@@ -101,7 +101,7 @@ elabman's profile page  (by clicking on the uid) and freeze the user.
 
 Others at your site can now apply to join your project, or start their own.
 
-There are three meta-experiments that must be created in the emulab-ops
+There are five meta-experiments that must be created in the emulab-ops
 project.  Just start them through the normal 'begin experiment' page, and don't
 give an NS file (you must be 'red dot' to do this.) Also, uncheck the
 'idle-swap' checkbox so that they do not get swapped out accidentally.
@@ -163,30 +163,36 @@ Add entries to the node_types table for each type of switch you'll be using.
 The class column should be 'switch'. The type for Cisco switches should be
 something like 'cisco6509', or 'catalyst2950'.  Most of the other columns
 aren't important for switches (so you can leave them blank), but putting in
-max_cards (if the switch is expandable) and max_ports is a good idea.
+max_cards (if the switch is expandable) and max_ports can be useful for your
+own information.
 
 2) Create interface types for switch interconnects (if any)
 
-If you'll be connecting switches together, also add interface types for the
-ports you'll be using to link them together. Unlike the logical IP interfaces,
-make sure that you get physical information like speed (in Kbps) and duplex are
-correct.
-	
+If you'll be connecting the experimental switches together, you'll add
+interface types for the ports you'll be using to link them together.  These go
+into the interface_types table. Make up something descriptive for the 'type'
+column (no spaces.) Make sure to set the max_speed (in Kbps) and full_duplex
+(1 for full duplex, 0 for half duplex) columns correctly.
+
 3) Create switches in nodes table
 
 Next, add the switches to the nodes table. The only necessary fields here are
-node_id (choose one appropriate to the switch), type (use one of the ones you
-created earlier,) and role. Role, for switches, should be either 'testswitch'
-or 'controlswitch', depending on whether you're using it for the
-experimental or control network.
+node_id (more on this later), type (use one of the ones you created earlier,)
+and role. Role, for switches, should be either 'testswitch' or 'controlswitch',
+depending on whether you're using it for the experimental or control network.
+
+The node_id you select must resolve in DNS and/or boss's /etc/host file - we'll
+use this name to contact the switch for SNMP. Ie., you must be able to ping the
+name you select as the switch's node_id.
 
 4) Add state for switch interconnects
 
-If you'll be connecting switches together, add interfaces to each of them.
-Unlike the previous interfaces, make sure that you get the correct card and
-port numbers. For switches that do not have expansion modules, the card number
-is assumed to be 1. Make sure to get the current_speed (this time, in Mbps) and
-duplex correct.
+If you'll be connecting the experimental switches together, add interfaces to
+each of them.  Use the interface types you created above for them, and be sure
+to get the correct card and port numbers. In modular switches, such as the
+Cisco Cat6500 series, use the switch's 'native' module and port numbers.  For
+switches that do not have expansion modules, the card number is assumed to be
+0. Make sure to get the current_speed (this time, in Mbps) and duplex correct.
 
 Now, go into the wires table and add wires connecting the switch interfaces you
 just created. Make sure to set the type to 'Trunk'. In this case, it doesn't
@@ -205,7 +211,7 @@ case, for example, our experimental network stack is called 'cisco1'. The
 stack_type column is used by snmpit to determine which module to use to talk to
 the stack. The currently supported values are 'cisco' and 'intel'. Making a
 stack for the control network is optional. There are a few columns in this
-table that you may want to set:
+table that you will need to set:
 supports_private: (Cisco only) This switch can make private VLANs - probably
     best to leave it as 0
 single_domain: (Cisco only) Means that all switches in the stack use VTP to
@@ -214,8 +220,9 @@ single_domain: (Cisco only) Means that all switches in the stack use VTP to
     individually
 snmp_community: The SNMP community string we use for read-write access to the
     switch. Most switches use 'private' by default.
-min_vlan: The smallest VLAN number that the testbed software will use
-max_vlan: Ditto, but the biggest number
+min_vlan: The smallest VLAN number that the testbed software will use. If left
+    NULL, defaults to 2.
+max_vlan: Ditto, but the biggest number. Defaults to 1000.
 
 Finally, add switches to these stacks by putting entries in the switch_stacks
 table, listing the node_id of each switch and the stack_id of the stack it
