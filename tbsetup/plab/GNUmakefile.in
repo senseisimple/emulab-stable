@@ -18,11 +18,13 @@ SBIN_STUFF	= plabslice plabnode plabdaemon plabmetrics plabstats
 
 LIB_STUFF       = libplab.py
 
+LIBEXEC_STUFF	= webplabstats
+
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(SBIN_STUFF) $(LIB_STUFF) $(SUBDIRS)
+all:	$(SBIN_STUFF) $(LIB_STUFF) $(LIBEXEC_STUFF) $(SUBDIRS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -43,6 +45,7 @@ subdir-install:
 	@$(MAKE) -C etc install
 
 script-install:	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
 	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 post-install: 
