@@ -120,6 +120,7 @@ my $uselatestwadata	 = 0;
 my $wa_delay_solverweight = 1.0;
 my $wa_bw_solverweight    = 7.0;
 my $wa_plr_solverweight   = 500.0;
+my $multiplex_factor;
 
 # The BOSS name in the widearea info tables.
 my $boss = TBDB_WIDEAREA_LOCALNODE;
@@ -176,11 +177,12 @@ sub newvlan ($) {
 #
 $query_result =
     DBQueryFatal("select uselatestwadata,wa_delay_solverweight, ".
-		 "  wa_bw_solverweight,wa_plr_solverweight ".
+		 "  wa_bw_solverweight,wa_plr_solverweight,multiplex_factor ".
 		 " from experiments ".
 		 "where pid='$pid' and eid='$eid'");
 ($uselatestwadata,$wa_delay_solverweight,
- $wa_bw_solverweight,$wa_plr_solverweight) = $query_result->fetchrow_array();
+ $wa_bw_solverweight,$wa_plr_solverweight,$multiplex_factor)
+    = $query_result->fetchrow_array();
 if ($uselatestwadata) {
     printdb("Using latest widearea data.\n");
 }
@@ -270,6 +272,7 @@ foreach my $vnode (keys(%virtnodes)) {
 	my $type     = $virtnode->{TYPE};
 	my $fixed    = $virtnode->{FIXED};
 
+	# See above, type=class for classes!
 	if ($typemap{$type} eq $type) {
 	    $classcount++;
 	}
@@ -555,6 +558,9 @@ sub runwansolver() {
     }
     if (! $seenboss) {
 	$waninfoargs .= " -r";
+    }
+    if (defined($multiplex_factor)) {
+	$waninfoargs .= " -c $multiplex_factor";
     }
     open(INFO, "$waninfo $waninfoargs |") or
 	die("*** $0:\n".

@@ -17,7 +17,7 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: wanlinkinfo [-d] [-m] [-b] [-l] [-p] [-r]\n".
+	"Usage: wanlinkinfo [-d] [-m [-c <count>]] [-b] [-l] [-p] [-r]\n".
 	"       Use -m to output virtual node counts per phys node.\n".
         "       Use -b to output bandwidth matrix.\n".
         "       Use -p to output plr matrix.\n".
@@ -25,7 +25,7 @@ sub usage()
         "       Use -l to use the latest data instead of aged data.\n";
     exit(-1);
 }
-my  $optlist = "dmblrp";
+my  $optlist = "dmc:blrp";
 
 #
 # Configure variables
@@ -44,6 +44,7 @@ my $debug	= 0;
 my $dobw	= 0;
 my $doplr	= 0;
 my $dovirt	= 0;
+my $collocate   = 10000;
 my $dolatest	= 0;
 my $noboss	= 0;
 
@@ -72,6 +73,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"m"})) {
     $dovirt = 1;
+    if (defined($options{"c"})) {
+	$collocate = $options{"c"};
+    }
 }
 if (defined($options{"b"})) {
     $dobw= 1;
@@ -142,8 +146,12 @@ $result =
 while (my ($node_id, $phys_nodeid, $count) = $result->fetchrow) {
     if ($dovirt) {
 	#
-	# In dovirt mode, we care about how many free vnodes per real node.
+	# In dovirt mode, we care about how many free vnodes per real node,
+	# limited by the requested collocate factor. 
 	#
+	$count = $collocate
+	    if ($count > $collocate);
+	
 	if ($node_id ne $phys_nodeid) {
 	    $freenodes{$phys_nodeid} = $count;
 	}
