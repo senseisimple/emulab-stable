@@ -87,7 +87,7 @@ class MagicTextField implements TextListener, FocusListener {
 		if ((alphaAllowed && 
 		    (isAlphic( c ) || (i != 0 && (isNumeric(c)/* || c == '-'*/)))) ||
 			   (specialAllowed && i != 0 &&
-			    (c == '_' || c == '-' || c == '+')) ||
+			    (c == '_' || c == '-' || c == '+' || c == '.')) ||
 			   (numAllowed &&
 			    (isNumeric( c ) || c == '.'))) {
 		    // legit.

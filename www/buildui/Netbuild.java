@@ -758,7 +758,7 @@ public class Netbuild extends java.applet.Applet
     //super();
 
     public void init() {
-	status = "Netbuild v1.0 started.";
+	status = "Netbuild v1.02 started.";
 	me = this;
 	mouseDown = false;
 

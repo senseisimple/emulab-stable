@@ -199,8 +199,8 @@ class Thingee {
 	    g.fillRect( r.x - x, r.y - y, r.width, r.height );	    
 
 	    g.setColor( Color.black );
-	    g.drawRect( r.x - x , r.y - y, r.width - 2, r.height - 2);	    
-	    g.drawRect( r.x - x + 1, r.y - y + 1, r.width - 4, r.height - 4);	    
+	    g.drawRect( r.x - x , r.y - y, r.width - 1, r.height - 1);	    
+	    g.drawRect( r.x - x + 1, r.y - y + 1, r.width - 3, r.height - 3);	    
 	    /*
 	    boolean anytext = (name != "");
 	    int wid = 26;
