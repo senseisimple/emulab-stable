@@ -855,7 +855,7 @@ sub expandfwvars($)
 
     if ($rule->{RULE} =~ /EMULAB_\w+/) {
 	foreach my $key (keys %fwvars) {
-	    $rule->{RULE} =~ s/$key/$fwvars{$key}/
+	    $rule->{RULE} =~ s/$key/$fwvars{$key}/g
 		if (defined($fwvars{$key}));
 	}
 	if ($rule->{RULE} =~ /EMULAB_\w+/) {
