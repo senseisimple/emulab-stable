@@ -64,10 +64,6 @@ else {
     unset($eid);
 }
 
-if (!isset($building) && !isset($pid)) {
-    PAGEARGERROR();
-}
-
 #
 # Run the script. It will produce two output files; an image and an areamap.
 # We want to embed both of these images into the page we send back. This

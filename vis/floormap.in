@@ -11,7 +11,7 @@ use Getopt::Std;
 # TODO: Deal with multiple buildings? Currently defaults to MEB! 
 # 
 sub usage {
-    print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] <building> or \n";
+    print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] [<building>] or \n";
     print STDERR "Usage: floormap [-o <prefix>] [-f <floor>] ";
     print STDERR "[-e <pid,eid>] [<building>]\n";
     exit(-1);
@@ -109,11 +109,12 @@ if (defined($options{"e"})) {
 	$building = $ARGV[0];
     }
 }
-elsif (@ARGV != 1) {
-    usage();
+elsif (@ARGV == 1) {
+    $building = $ARGV[0];
 }
 else {
-    $building = $ARGV[0];
+    # XXX We default to MEB above. Change later. 
+    ;
 }
 
 # Building must exist. Someday deal with multiple buildings. 
