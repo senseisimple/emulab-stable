@@ -1,0 +1,25 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= install
+
+include $(OBJDIR)/Makeconf
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all: boss-install ops-install
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install:
+
+clean: 
+	rm -f boss-install ops-install
