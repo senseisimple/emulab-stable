@@ -204,6 +204,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    }
 	    
 	    if ((mcg->position.x != 0.0) || (mcg->position.y != 0.0)) {
+		acpValue av;
 		float theta;
 		
 		if (debug) {
@@ -212,6 +213,8 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    mcg->position.x,
 			    mcg->position.y);
 		}
+
+		this->pc_wheel_manager.setSpeed(mcg->speed);
 
 		/* XXX Need to figure out the real theta and send that back. */
 		theta = atan2f(mcg->position.y, mcg->position.x);

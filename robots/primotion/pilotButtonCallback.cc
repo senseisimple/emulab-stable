@@ -30,7 +30,8 @@ pilotButtonCallback::~pilotButtonCallback()
 {
 }
 
-bool pilotButtonCallback::shortClick(acpGarcia &garcia, unsigned long now)
+bool pilotButtonCallback::shortCommandClick(acpGarcia &garcia,
+					    unsigned long now)
 {
     ledClient *lc;
 
@@ -90,7 +91,7 @@ bool pilotButtonCallback::commandMode(acpGarcia &garcia,
     return true;
 }
 
-bool pilotButtonCallback::shortCommandClick(acpGarcia &garcia,
+bool pilotButtonCallback::longCommandClick(acpGarcia &garcia,
 					    unsigned long now)
 {
     ledClient *lc;
@@ -108,8 +109,7 @@ bool pilotButtonCallback::shortCommandClick(acpGarcia &garcia,
     return false;
 }
 
-bool pilotButtonCallback::longCommandClick(acpGarcia &garcia,
-					   unsigned long now)
+bool pilotButtonCallback::shortClick(acpGarcia &garcia, unsigned long now)
 {
     ledClient *lc;
 

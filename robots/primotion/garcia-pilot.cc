@@ -247,6 +247,10 @@ int main(int argc, char *argv[])
 	av.set("meters");
 	garcia.setNamedValue("distance-units-string", &av);
 
+    	/* turn off fall sensors */
+    	av.set(0);
+     	garcia.setNamedValue("down-ranger-enable", &av);
+	
 	memset(&saddr, 0, sizeof(saddr));
 #if !defined(linux)
 	saddr.sin_len = sizeof(saddr);

@@ -88,6 +88,8 @@ public:
     void setDashboard(dashboard *dashboard)
     { this->wm_dashboard = dashboard; };
 
+    void setSpeed(float speed);
+
     /**
      * Create a "pivot" behavior that will rotate the robot to the given angle
      * in the robot's local coordinate system.  The created behavior will only

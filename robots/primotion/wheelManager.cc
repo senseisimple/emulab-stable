@@ -171,6 +171,17 @@ wheelManager::~wheelManager()
 {
 }
 
+void wheelManager::setSpeed(float speed)
+{
+    acpValue av;
+    
+    if ((speed < 0.1) || (speed > 0.4))
+	speed = 0.2;
+
+    av.set(speed);
+    this->wm_garcia.setNamedValue("speed", &av);
+}
+
 acpObject *wheelManager::createPivot(float angle, wmCallback *callback)
 {
     acpObject *retval = NULL;
