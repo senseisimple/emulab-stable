@@ -32,6 +32,7 @@ p5-SNMP-4.2.0       A perl5 module for interfacing with the CMU SNMP library
 p5-SNMP_Session-0.83 A perl5 module for providing rudimentary access to SNMPv1 a
 p5-BSD-Resource	    BSD resource goo
 rpm-3.0.6_5         The Red Hat Package Manager
+swig-1.1p5_5        Simplified Wrapper and Interface Generator
 tcl-8.2.3           Tool Command Language
 tcl-sql-20000114_1  TCL module for accessing MySQL databases
 ucd-snmp-4.2        An extendable SNMP implimentation
