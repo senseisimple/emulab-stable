@@ -372,8 +372,8 @@ RPC_obstaclelist(FILE *emcd_config, char *area)
 			((ulxr::Integer)attr.getMember("obstacle_id")).
 			getInteger(),
 			((ulxr::Double)attr.getMember("x1")).getDouble(),
-			((ulxr::Double)attr.getMember("x2")).getDouble(),
 			((ulxr::Double)attr.getMember("y1")).getDouble(),
+			((ulxr::Double)attr.getMember("x2")).getDouble(),
 			((ulxr::Double)attr.getMember("y2")).getDouble());
 	}
 	
