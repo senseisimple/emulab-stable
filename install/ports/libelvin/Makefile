@@ -4,7 +4,7 @@
 
 PORTNAME=	libelvin
 PORTVERSION=	4.0.3
-PORTREVISION=   1
+PORTREVISION=   2
 CATEGORIES=	misc
 
 MAINTAINER=	ricci@cs.utah.edu
