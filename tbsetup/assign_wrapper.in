@@ -2135,7 +2135,15 @@ sub InitPnode($pnode, $vnode)
     # XXX NSE hack: if the vnode is simulated, we just
     # choose FBSD-NSE and static routing
     if (virtnodeisvnode($vnode) && virtnodeissim($vnode)) {
-	$osid = TBOSID(TB_OPSPID, "FBSD-NSE" );
+	#
+	# We can use the Jail hosting OSID for NSE now, but allow override.
+	#
+	if (defined($jail_osid)) {
+	    $osid = $jail_osid;
+	}
+	else {
+	    $osid = nodejailosid(physnodetype($pnode));
+	}
 	
 	DBQueryFatal("UPDATE nodes set def_boot_cmd_line=''," .
 		     " startstatus='none'," .
