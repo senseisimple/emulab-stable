@@ -46,11 +46,6 @@ use libdb;
 use libtestbed;
 
 #
-# This should not be hardwired in.
-# 
-my $CLASS	= "pc";	 # XXX: Needs a better approach.
-
-#
 # These come from the library.
 # 
 my $RELOADPID	= NODERELOADING_PID;
@@ -62,7 +57,7 @@ my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";
 my $logfile	= "$TB/log/reloadlog";
 my $debug	= 0;
-my $retry_time   = 10; # in minutes
+my $retry_time  = 10; # in minutes
 my $warn_time   = 30; # in minutes
 
 #
@@ -177,12 +172,16 @@ while (1) {
     # in last_reservation, which is reset anytime a node is reloaded by
     # the system).
     #
+    # XXX - This should not be hardwired in.
+    # 
+    my $CLASSCLAUSE = "(n.class='pc' or n.class='pct')";
+    
     $query_result =
 	DBQueryWarn("select a.node_id,b.pid,b.eid from nodes as a ".
 		    "left join reserved as b on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
 		    "left join node_types as n on n.type=a.type where ".
-		    "(b.node_id is null and n.class='$CLASS' and l.pid!='') ".
+		    "(b.node_id is null and $CLASSCLAUSE and l.pid!='') ".
 		    "or (b.pid='$RELOADPID' and b.eid='$PENDINGEID') ".
 		    "order by a.node_id");
 
