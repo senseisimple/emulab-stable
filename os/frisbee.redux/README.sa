@@ -58,7 +58,7 @@ It also includes the associated image creation tool.
 	image from a disk not the network).  Imagedump reveals the
 	innermost secrets of the image file.
 
-	What didn't make it in, was the saavy compression code for
+	What didn't make it in, was the savvy compression code for
 	NTFS.  Well, the glue code is there and the NTFS support
 	library can be downloaded from sourceforge (linux-ntfs),
 	I just didn't get everything put together and tested in time.
@@ -158,7 +158,34 @@ It also includes the associated image creation tool.
 	source disk/partition, how full it is, and what type of compression
 	is being used.
 
-6. I did everything you said, but it doesn't work!
+6. How can I tell if the image was created and/or installed correctly?
+
+	What, you don't trust us?!  Ok, this is a hard problem.
+	The obvious answer is to checksum both the source and target
+	disks after creating and installing an image.  But that only
+	works if you create a "raw" image.  If you are using smart
+	compression, then free blocks are not saved and thus, the
+	corresponding blocks on the target disk will be different
+	than those on the source disk.
+
+	The image creation tool does do consistency checks for some
+	filesystem types, primarily to ensure that the number of free
+	blocks found matches what the filesystem thinks.  But there are
+	other things you can do.  For example, the mtree utility in BSD
+	allows you to create a specification of a file hierarchy,
+	including a checksum or hash for every file, which can be matched
+	against another tree.  So you can create a spec for the original
+	filesystem(s) on a disk/partition and use it to validate an
+	installed copy.
+
+	Keep in mind that any solution that involves looking at the
+	contents of the target disk on every install is going to
+	increase the installation time dramatically, most likely
+	negating the advantage (speed!) of using Frisbee in the first
+	place!  Sometimes you just have to have faith...use the Force...
+	whatever.
+
+7. I did everything you said, but it doesn't work!
 
 	The most common, non-obvious failure mode is for the client and
 	server to start up and just sit there apparently doing nothing.
