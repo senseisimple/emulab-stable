@@ -28,13 +28,14 @@ use snmpit_lib;
 #
 my %cmdOIDs =
 (
-    "enable" => ["ifAdminStatus","up"],
-    "disable"=> ["ifAdminStatus","down"],
-    "100mbit"=> ["portAdminSpeed","s100000000"],
-    "10mbit" => ["portAdminSpeed","s10000000"],
-    "full"   => ["portDuplex","full"],
-    "half"   => ["portDuplex","half"],
-    "auto"   => ["portAdminSpeed","autoDetect",
+    "enable"  => ["ifAdminStatus","up"],
+    "disable" => ["ifAdminStatus","down"],
+    "1000mbit"=> ["portAdminSpeed","s1000000000"],
+    "100mbit" => ["portAdminSpeed","s100000000"],
+    "10mbit"  => ["portAdminSpeed","s10000000"],
+    "full"    => ["portDuplex","full"],
+    "half"    => ["portDuplex","half"],
+    "auto"    => ["portAdminSpeed","autoDetect",
 		 "portDuplex","auto"]
 );
 
