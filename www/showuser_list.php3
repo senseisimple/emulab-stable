@@ -34,16 +34,39 @@ echo "<b>Show: <a href='showuser_list.php3?showtype=loggedin'>loggedin</a>,
                <a href='showuser_list.php3?showtype=homeless'>homeless</a>,
                <a href='showuser_list.php3?showtype=active'>active</a>,
                <a href='showuser_list.php3?showtype=inactive'>inactive</a>,
-               <a href='showuser_list.php3?showtype=all'>all</a>.
-      </b><br><br>\n";
+               <a href='showuser_list.php3?showtype=all'>all</a>.</b>\n";
 
 if (!isset($showtype)) {
     $showtype='loggedin';
 }
-if (!isset($sortby))
+if (!isset($sortby)) {
     $sortby = "uid";
+}
+if (!isset($searchfor)) {
+    $searchfor = "";
+}
 
-if (! strcmp($showtype, "all")) {
+#
+# Spit out a search form!
+#
+echo "<form action=showuser_list.php3 method=post>
+      <input type=text
+             name=searchfor
+             value=\"$searchfor\"
+             size=20
+   	     maxlength=50>
+      <input type=hidden name=showtype value=\"$showtype\">
+      <input type=hidden name=sortby   value=\"$sortby\">
+      <b><input type=submit name=search value=Search></b>\n";
+echo "<br><br>\n";
+
+if (isset($searchfor) && strcmp($searchfor, "")) {
+    $clause  = "";
+    $where   = "where (u.usr_name like '%${searchfor}%' or ".
+	"u.usr_email like '%${searchfor}%') ";
+    $showtag = "matching";
+}
+elseif (! strcmp($showtype, "all")) {
     $where   = "";
     $clause  = "";
     $showtag = "";
@@ -141,9 +164,11 @@ echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2
 
 echo "<tr>
           <th>&nbsp</th>
-          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uid'>
+          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uid".
+                 "&searchfor=$searchfor'> 
                  UID</a></th>
-          <th><a href='showuser_list.php3?showtype=$showtype&sortby=name'>
+          <th><a href='showuser_list.php3?showtype=$showtype&sortby=name".
+                 "&searchfor=$searchfor'>
                  Name</a></th>
           <th>Projects</th>\n";
 
@@ -151,9 +176,11 @@ if (! strcmp($showtype, "inactive")) {
     echo "<th>Status</th>\n";
 }
 
-echo "    <th><a href='showuser_list.php3?showtype=$showtype&sortby=widle'>
+echo "    <th><a href='showuser_list.php3?showtype=$showtype&sortby=widle".
+                 "&searchfor=$searchfor'>
                  Web<br>Idle</a></th>
-          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uidle'>
+          <th><a href='showuser_list.php3?showtype=$showtype&sortby=uidle".
+                 "&searchfor=$searchfor'>
                  Users<br>Idle</a></th>\n";
 
 echo "</tr>\n";
