@@ -233,13 +233,13 @@ function WRITESIDEBAR() {
     
 	echo "<tr>
                 <td align=center>
-                 <b><blink>
+                 <b>
                    <span class=sidebarbutton>
                     <font size=\"+1\" color=RED>
                       $message
                     </font>
                    </span>
-                 </blink><b>
+                 <b>
                 </td>
               </tr>\n";
     }
