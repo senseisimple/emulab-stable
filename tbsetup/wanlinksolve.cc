@@ -105,10 +105,11 @@
 
 // The size of our "population."
 // (number of phenotypes)
-#define SOLUTIONS 500
+#define SOLUTIONS 400
 
 // The probability a given child will mutate (out of 1000)
-#define MUTATE_PROB 40
+//#define MUTATE_PROB 40
+#define MUTATE_PROB 10
 
 // probability crossover will happen (out of 1000)
 #define CROSSOVER_PROB 700
@@ -169,6 +170,8 @@ static float d2weight;
 static int verbose = 0;
 
 static int minrounds, maxrounds;
+
+static bool himutate = false;
 
 class Solution
 {
@@ -241,6 +244,7 @@ static inline int pickABest( Solution * currentPool )
   */
 }
 
+
 // uses a template to avoid massive numbers
 // of "if" choices.. compiler should generate two versions,
 // one with dump and one without.
@@ -275,7 +279,13 @@ static inline void calcError( Solution * t )
 	  int should = vDesiredLatency[z][x][y];
 	  if (should != -1) {
 	    int is     = pLatency[z][ t->vnode_mapping[x] ][ t->vnode_mapping[y] ];
-	    if (should != is) { 
+	    if (is == -1) {
+	      if (verbose) {
+		printf("%s -> %s link nonexistant! Super-icky penality of 10000 assessed.\n",
+		       vnodeNames[x].c_str(), vnodeNames[y].c_str() ); 
+	      }
+	      err += 10000.0f;
+	    } else if (should != is) { 
 	      float errDelta;
 
 	      if (z == 0) {
@@ -336,7 +346,7 @@ static inline void mutate( Solution * t )
   while(1) {
     IN_LOOP();
     // forecast calls for a 1% chance of mutation...
-    if ((rand() % 1000) > MUTATE_PROB) { break; }
+    if ((rand() % 1000) > (himutate ? 500 : MUTATE_PROB)) { break; }
     
     if ((rand() % 3)) {
       // swap mutation. 
@@ -619,7 +629,11 @@ int main( int argc, char ** argv )
 	while (*linePos == ' ') { linePos++; } // skip leading whitespace
 	for (int x = 0; x < pnodes; x++) {
 	  sscanf( linePos, "%i", &pLatency[z][x][y] );
-	  if (z == 1) { pLatency[z][x][y] = (int)( logf(pLatency[z][x][y]) * 1000.0f ); }
+	  if (z == 1) { 
+	    if (pLatency[z][x][y] != -1) {
+	      pLatency[z][x][y] = (int)( logf(pLatency[z][x][y]) * 1000.0f ); 
+	    }
+	  }
 	  while (*linePos != ' ' && *linePos != '\n') { linePos++; }
 	  while (*linePos == ' ') { linePos++; }
 	}
@@ -703,17 +717,26 @@ int main( int argc, char ** argv )
     int highestFoundRound = 0;
     float last = currentPool[0].error;
 
+    himutate = false;
     for (int i = 0; i != maxrounds && i < (highestFoundRound + minrounds); i++) {
       /*
-      {
-	float blah = 0.0f;
-	for (int xy = 0; xy < SOLUTIONS; xy++) { blah += currentPool[xy].error; }
-	printf("Avg = %7.2f\n", (blah / (float)SOLUTIONS) );
-      }
+
       */
+     
+      float avg = 0.0f;
+      int xy;
+      for (xy = 0; xy < SOLUTIONS; xy++) { avg += currentPool[xy].error; }
+      avg /= (float)SOLUTIONS;
+      
+      float stddev = 0.0f;
+      for (xy = 0; xy < SOLUTIONS; xy++) { 
+	float diff = currentPool[xy].error - avg;
+	stddev += diff * diff;
+      }
+      stddev = sqrtf(stddev / (float)(SOLUTIONS - 1));
       
       if (verbose && !(i % 100)) {
-	printf("Round %i. (best %4.3f)\n", i, currentPool[0].error);
+	printf("Round %i. (best %4.3f; avg %4.3f; sdev %4.3f)\n", i, currentPool[0].error, avg, stddev);
       }
       
       if (currentPool[0].error < last) {
@@ -732,15 +755,27 @@ int main( int argc, char ** argv )
 
       int j;
 
-      for (j = 1; j < SOLUTIONS - 10; j++) {
+      // if there is not enough variety, more mutation!
+      if (stddev < (avg / 10.0f)) { 
+	himutate = true;
+      }
+
+      for (j = 1; j < SOLUTIONS; j++) {
 	splice( &(nextPool[j]),
 		&(currentPool[pickABest( currentPool )]),
 		&(currentPool[pickABest( currentPool )]) );
       }
 
-      for (;j != SOLUTIONS; j++) {
-	generateRandomSolution( &(nextPool[j]) );	
+      if (stddev < 0.1f) {
+	himutate = false;
       }
+      /*
+	printf("NUKE!\n");
+	for (j = SOLUTIONS - 10; j != SOLUTIONS; j++) {
+	  generateRandomSolution( &(nextPool[j]) );	
+	}
+      }
+      */
       /*      
       for (int j = 0; j < CHILDREN_PER_ROUND; j++) {
 	// Overwrite a "bad" solution with the child of two "good" ones.
