@@ -1,6 +1,9 @@
 #!/usr/local/bin/perl -w
 
 ### Really run with -T
+### Address 'lkw' comments:
+### Break up into subroutines, possibly libraries. We'll
+### need some of the same things for the removal script.
 ###
 ### mkacct - Makes accounts for all users in this experiment's project.
 ### Adds accounts to currently booted OS only.
@@ -27,7 +30,7 @@ sub check_user_data {
 my $d = 1;			#debug flag
 if ($#ARGV < 0) { 
     die("Usage: mkacct <eid>\n".
-	"Makes accounts for all users in an experiment's project.\n");
+	"\tCreates user accounts by experiment.\n");
 }
 my $eid = $ARGV[0];
 if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) { 
@@ -213,12 +216,12 @@ foreach $IP (@nodes) {
 		    close(MKDIR); 
 		    
 		    ## If created, chown and chgrp
-		    if (!(-e "/users/$user") ) {
-			open(CHOWN, "/usr/sbin/chown $user /users/$user 2>&1 |" );
+		    if (-e "/users/$user") {
+			open(CHOWN, "/usr/sbin/chown $unix_uid{$user} /users/$user 2>&1 |" );
 			while ( <CHOWN> ) {print "$_"; }
 			close(CHOWN); 
 
-			open(CHGRP, "/usr/sbin/chgrp $unix_gid /users/$user 2>&1 |" );
+			open(CHGRP, "/usr/bin/chgrp $unix_gid /users/$user 2>&1 |" );
 			while ( <CHGRP> ) {print "$_"; }
 			close(CHGRP); 
 		    }
