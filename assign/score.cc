@@ -415,7 +415,7 @@ void remove_node(vvertex vv)
    */
   voedge_iterator vedge_it,end_vedge_it;
   tie(vedge_it,end_vedge_it) = out_edges(vv,VG);
-  hash_set<void*> seen_loopback_links;
+  hash_set<const tb_vlink*, hashptr<const tb_vlink*> > seen_loopback_links;
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink = get(vedge_pmap,*vedge_it);
 
@@ -776,7 +776,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
    */
   voedge_iterator vedge_it,end_vedge_it;
   tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
-  hash_set<void*> seen_loopback_links;
+  hash_set<const tb_vlink*, hashptr<const tb_vlink*> > seen_loopback_links;
   for (;vedge_it!=end_vedge_it;++vedge_it) {
     tb_vlink *vlink = get(vedge_pmap,*vedge_it);
     vvertex dest_vv = target(*vedge_it,VG);
