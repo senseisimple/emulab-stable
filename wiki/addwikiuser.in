@@ -180,13 +180,14 @@ utime $now, $now, $lockfile;
 # we use that. Otherwise have to form one from the user name. Ick.
 #
 my $query_result =
-    DBQueryFatal("select wikiname,usr_name,usr_email ".
+    DBQueryFatal("select wikiname,usr_name,usr_email,usr_pswd ".
 		 "from users where uid='$user'");
 
 if (!$query_result->numrows) {
     fatal("No such user $user in the DB!");
 }
-my ($wikiname,$usr_name,$usr_email) = $query_result->fetchrow_array();
+my ($wikiname,$usr_name,$usr_email,$usr_pswd) =
+    $query_result->fetchrow_array();
 
 if (!defined($wikiname)) {
     # In update mode, do nothing if no wikiname.
@@ -247,8 +248,11 @@ if ($CONTROL ne $BOSSNODE) {
 	print "Adding user $user to the wiki on $CONTROL.\n";
     }
 
+    # shell escape.
+    $usr_pswd  =~ s/\$/\\\$/g;
+
     if (system("$SSH -host $CONTROL $WIKIPROXY ".
-	       "  $optarg adduser $user $wikiname")) {
+	       "  $optarg adduser $user $wikiname '$usr_pswd'")) {
 	fatal("$WIKIPROXY failed on $CONTROL!");
     }
 }

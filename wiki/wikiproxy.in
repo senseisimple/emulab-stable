@@ -13,7 +13,7 @@ use Errno;
 #
 sub usage()
 {
-    print "Usage: wikiproxy adduser <uid> <wikiname> or\n";
+    print "Usage: wikiproxy adduser <uid> <wikiname> <passhash> or\n";
     print "       wikiproxy deluser <uid> <wikiname> or\n";
     print "       wikiproxy addproject <pid> <wikiname> or\n";
     print "       wikiproxy setgroups <wikiuser> <wikigroup> ...\n";
@@ -111,19 +111,12 @@ exit(0);
 sub AddWikiUser(@)
 {
     usage()
-	if (@_ != 2);
+	if (@_ != 3);
 
-    my ($user, $wikiname) = @_;
+    my ($user, $wikiname, $passwd) = @_;
 
     chdir("$WIKIUSERDIR") or
 	fatal("Could not chdir to $WIKIUSERDIR");
-
-    #
-    # Grab the password hash. 
-    #
-    my ($name,$passwd) = getpwnam($user);
-    fatal("No such user $user in the password file")
-	if (!defined($name));
 
     #
     # If the password file does not have the entry, just tack it onto
