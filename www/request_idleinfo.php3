@@ -106,7 +106,8 @@ if (!$confirmed) {
 
 # Info about experiment.
 $query_result =
-    DBQueryFatal("select e.expt_swap_uid as swapper, ".
+    DBQueryFatal("select e.gid,e.expt_swap_uid as swapper, ".
+		 "       e.expt_head_uid as creator, ".
 		 "       UNIX_TIMESTAMP(now())-UNIX_TIMESTAMP(e.expt_swapped)".
 		 "   as swapseconds, r.pnodes ".
 		 " from experiments as e ".
@@ -116,18 +117,27 @@ $query_result =
 		 "where e.pid='$pid' and e.eid='$eid'");
 
 $row = mysql_fetch_array($query_result);
+$gid     = $row["gid"];
 $swapper = $row["swapper"];
+$creator = $row["creator"];
 $pcs     = $row["pnodes"];
 $seconds = $row["swapseconds"];
 $hours   = intval($seconds / 3600);
 
-# Swapper email.
-$user_name  = "";
-$user_email = "";
-TBUserInfo($swapper, $user_name, $user_email);
+# Lots of email addresses!
+$allleaders    = TBLeaderMailList($pid, $gid);
+$swapper_name  = "";
+$swapper_email = "";
+TBUserInfo($swapper, $swapper_name, $swapper_email);
+$creator_name  = "";
+$creator_email = "";
+if ($swapper != $creator) {
+    TBUserInfo($creator, $creator_name, $creator_email);
+    $allleaders .= ", \"$creator_name\" <$creator_email>";
+}
 
 # And send email
-TBMAIL("$user_name <$user_email>",
+TBMAIL("$swapper_name <$swapper_email>",
        "Please tell us about your experiment",
        "Hi. We noticed that your experiment '$pid/$eid' has been\n".
        "swapped in for $hours hours and is using $pcs nodes.\n".
@@ -140,6 +150,7 @@ TBMAIL("$user_name <$user_email>",
        "experiment out so that others can use the nodes.\n\n".
        "Thanks very much!\n",
        "From: $TBMAIL_OPS\n".
+       "Cc: $allleaders\n".
        "Cc: $TBMAIL_OPS\n".
        "Errors-To: $TBMAIL_WWW");
 
