@@ -75,7 +75,7 @@ Fiber cables:
 snmpit:
 	Correctly handle multiple switches
 	Responsible: Mac
-	Status: ??
+	Status: in progress, target date 9/20
 
 tip/capture:
 	Get it working over the network and on multiple serial servers
@@ -189,6 +189,31 @@ tip/capture state:
 	Responsible: Leigh
 	Status: First two racks done
 	
+**********************************************************************
+***** Hardware Testing
+**********************************************************************
+
+Initial:
+	Boots and runs
+	Responsible: Rob
+	Status: 2 racks done
+
+Stress:
+	Ferret out flaky nodes through stress testing, eg lots of rebooting and power-cycling
+	Responsible: ?
+	Status: 2 racks partially done in course of everyday use; need real script done
+	Note: create an ns and run script for this.
+
+Temperature:
+	Run nodes all out to verify temps don't get too high.
+	Responsible: ?
+	Status: zilch
+	Note: Create an ns and run script for this.
+		Probably a 4-hour run of a big build, over and over, will do it.
+		Believe the disk and processor are the only important heat sources.
+		Measure the board temp(s) thru on-board sensors, especially of
+		top-most node.
+
 **********************************************************************
 ***** Procedures
 **********************************************************************
