@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -wT
 
-### $Id: mkacct-ctrl,v 1.5 2000-12-05 01:00:25 kwright Exp $
+### $Id: mkacct-ctrl,v 1.6 2000-12-06 19:57:57 kwright Exp $
 
 use English;
 use Mysql;
@@ -135,8 +135,26 @@ sub dowork() {
     # The following user/group creation commands must be done as root. 
     $UID = $EUID;
 
+    # 
+    # Create group on paper.
+    # 
+    print "Adding group $project to paper.\n";
+    open(ADDGROUPP, "/usr/sbin/pw groupadd $project -g $group_number 2>&1 |");
+    while (<ADDGROUPP>) { print "$_"; }
+    close(ADDGROUPP);    
+
     #
-    # Make group
+    # Make user on paper. We don't give them a password.
+    #
+    print "Adding user $user to paper.\n";
+    my $cmd = "/usr/sbin/pw useradd $user -u $user_number " .
+	      "-d /users/$user -g $project -s /usr/testbed/security/paperbag";
+    open(PWADDP, "$cmd 2>&1 |") or die "$0: Could not open pw useradd on paper.";
+    while (<PWADDP>) { print "$_"; }
+    close(PWADDP);
+
+    #
+    # Make group on control node.
     #
     print "Adding group $project to $control_node.\n";
     open(ADDGROUP, "/usr/local/bin/sshtb $control_node /usr/sbin/pw groupadd $project -g $group_number 2>&1 |");
@@ -144,14 +162,14 @@ sub dowork() {
     close(ADDGROUP);
     
     #
-    # Make user. Note that we cannot get back any output from a command
-    # that we open for input so we divide acct creation into two pieces to
-    # maximize feedback. First we add the user account. Then we change the
-    # password.
+    # Make user on control node. Note that we cannot get back any output from 
+    # a command that we open for input so we divide acct creation into two 
+    # pieces to maximize feedback. First we add the user account. Then we 
+    # change the password.
     #
     print "Adding user $user to $control_node.\n";
-    my $cmd = "/usr/local/bin/sshtb $control_node " .
-	      "/usr/sbin/pw useradd $user -u $user_number -c $fullname " .
+    $cmd = "/usr/local/bin/sshtb $control_node " .
+	      "/usr/sbin/pw useradd $user -u $user_number " .
 	      "-d /users/$user -g $project -s /bin/tcsh"; 	  
     open(PWADD, "$cmd 2>&1 |") or die "$0: Could not open pw useradd.";
     while (<PWADD>) { print "$_"; }
