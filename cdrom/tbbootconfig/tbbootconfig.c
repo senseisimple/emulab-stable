@@ -30,7 +30,7 @@ static char *usagestr =
  " -p              Purge the header block (write zeros)\n"
  " -w filename     Write system config to header block from file\n"
  " -r filename     Read system config from header block and write to file\n"
- " -k 0,1          Set the bootfromdisk flag to either 0 or 1\n"
+ " -k 0,#          Set the bootfromdisk flag to either 0 or a DOS part#\n"
  " -c 0,1          Set the bootfromcdrom flag to either 0 or 1\n"
  " -m 0,1          Set the validimage flag to either 0 or 1\n"
  " -e string       Get/Set the emulab key. Use - to get the key\n"
@@ -89,7 +89,7 @@ main(argc, argv)
 			break;
 		case 'k':
 			bootfromdisk = atoi(optarg);
-			if (bootfromdisk < 0 || bootfromdisk > 1)
+			if (bootfromdisk < 0 || bootfromdisk > 255)
 				usage();
 			break;
 		case 'c':
