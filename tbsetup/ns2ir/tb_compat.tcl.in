@@ -537,22 +537,22 @@ proc tb-set-usewatunnels {onoff} {
     set usewatunnels $onoff
 }
 
-proc tb-set-uselinkdelays {onoff} {
+proc tb-use-endnodeshaping {onoff} {
     var_import ::GLOBALS::uselinkdelays
 
     if {$onoff != 0 && $onoff != 1} {
-	perror "\[tb-set-uselinkdelays] $onoff must be 0/1"
+	perror "\[tb-use-endnodeshaping] $onoff must be 0/1"
 	return
     }
 
     set uselinkdelays $onoff
 }
 
-proc tb-set-forcelinkdelays {onoff} {
+proc tb-force-endnodeshaping {onoff} {
     var_import ::GLOBALS::forcelinkdelays
 
     if {$onoff != 0 && $onoff != 1} {
-	perror "\[tb-set-forcelinkdelays] $onoff must be 0/1"
+	perror "\[tb-force-endnodeshaping] $onoff must be 0/1"
 	return
     }
 
@@ -581,27 +581,31 @@ proc tb-set-wasolver-weights {delay bw plr} {
 #
 # Control emulated for a link (lans not allowed yet). 
 # 
-proc tb-set-link-emulated {link onoff} {
+proc tb-set-multiplexed {link onoff} {
     if {[$link info class] != "Link"} {
-	perror "\[tb-set-link-emulated] $link is not a link."
+	perror "\[tb-set-multiplexed] $link is not a link."
 	return
     }
     $link set emulated $onoff
 }
 
 #
-# Control linkdelays for lans and links
+# For emulated links, allow bw shaping to be turned off
 # 
-proc tb-set-link-uselinkdelay {link onoff} {
+proc tb-set-noshaping {link onoff} {
     if {[$link info class] != "Link"} {
-	perror "\[tb-set-link-uselinkdelay] $link is not a link."
+	perror "\[tb-set-noshaping] $link is not a link."
 	return
     }
-    $link set uselinkdelay $onoff
+    $link set nobwshaping $onoff
 }
-proc tb-set-lan-uselinkdelay {link onoff} {
-    if {[$link info class] != "Lan"} {
-	perror "\[tb-set-lan-uselinkdelay] $link is not a lan."
+
+#
+# Control linkdelays for lans and links
+# 
+proc tb-set-endnodeshaping {lanlink onoff} {
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-endnodeshaping] $lanlink is not a link or a lan."
 	return
     }
     $link set uselinkdelay $onoff

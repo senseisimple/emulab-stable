@@ -36,11 +36,11 @@ proc tb-set-link-simplex-params {link src delay bw loss} {}
 proc tb-set-uselatestwadata {onoff} {}
 proc tb-set-usewatunnels {onoff} {}
 proc tb-set-wasolver-weights {delay bw plr} {}
-proc tb-set-uselinkdelays {onoff} {}
-proc tb-set-forcelinkdelays {onoff} {}
-proc tb-set-link-emulated {link onoff} {}
-proc tb-set-link-uselinkdelay {link onoff} {}
-proc tb-set-lan-uselinkdelay {link onoff} {}
+proc tb-use-endnodeshaping {onoff} {}
+proc tb-force-endnodeshaping {onoff} {}
+proc tb-set-multiplexed {link onoff} {}
+proc tb-set-endnodeshaping {link onoff} {}
+proc tb-set-noshaping {link onoff} {}
 
 Class Program
 
