@@ -138,7 +138,7 @@ class hvFrameUI(wxFrame):
         self.hypView = hvGLCanvas(self.panel_1, -1)
         self.GoToTop = wxButton(self.Controls, -1, "go to top")
         self.LabelNodeName = wxStaticText(self.Controls, -1, "Node name:")
-        self.NodeName = wxTextCtrl(self.Controls, -1, "")
+        self.NodeName = wxTextCtrl(self.Controls, -1, "", style=wxTE_PROCESS_ENTER)
         self.LabelChildCount = wxStaticText(self.Controls, -1, "Child count:  ")
         self.ChildCount = wxStaticText(self.Controls, -1, " 0")
         self.LabelLinksIn = wxStaticText(self.Controls, -1, "Non-tree Links in:   0")

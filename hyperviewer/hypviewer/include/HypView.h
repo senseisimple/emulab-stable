@@ -496,6 +496,10 @@ public:
   // the gotoCenterNode() reset function.
   void   setGraphCenter(const string & id);
 
+  /// Get the name of the root node of the tree, which may have been
+  // set by the gotoCenterNode() reset function.
+  string getGraphCenter();
+
   /// Load a graph into the viewer. The string can either be a
   // filename or the actual data: if the string length is < 256
   // characters and a file by that name exists, assume it is a filename.

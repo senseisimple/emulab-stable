@@ -24,6 +24,9 @@ import sys
 import types
 
 import hv
+# Constants from HypData.h
+HV_ANIMATE = 0
+
 import exptToHv
 from hvFrameUI import *
 from OpenGL.GL import * 
@@ -119,7 +122,9 @@ class hvFrame(hvFrameUI):
 	self.vwr = None		# Load data under the File menu now.
 
 	# Control events.  (HyperViewer events are connected after loading data.)
-	# (These EVT_ handler functions are defined in site-packages/wxPython/wx.py .)
+	# EVT_ handler-setting functions are defined in site-packages/wxPython/wx.py .
+	# See http://www.wxwindows.org/manuals/2.4.2/wx470.htm#eventhandlingoverview .
+	EVT_TEXT_ENTER(self.NodeName, -1, self.OnNodeName)
 	EVT_CHECKBOX(self.DrawSphere, -1, self.OnDrawSphere)
 	EVT_CHECKBOX(self.DrawNodes, -1, self.OnDrawNodes)
 	EVT_CHECKBOX(self.DrawLinks, -1, self.OnDrawLinks)
@@ -167,12 +172,18 @@ class hvFrame(hvFrameUI):
 	# Select the OpenGL Graphics Context from the wxGLCanvas in the hvFrameUI.
 	self.hypView.SetCurrent()   
 
-	# Instantiate and initialize the SWIG'ed C++ HypView object, loading graph data.
+	# Get window info from the wxWindow base class of the wxGLCanvas object.
+	# GetHandler returns the platform-specific handle of the physical window:
+	# HWND for Windows, Widget for Motif or GtkWidget for GTK.
 	window = self.hypView.GetHandle()
+	# GetSizeTuple is the wxPython version of GetSize.  Returns size of the
+	# entire window in pixels, including title bar, border, scrollbars, etc.
 	width, height = self.hypView.GetSizeTuple()
+
+	# Instantiate and initialize the SWIG'ed C++ HypView object, loading graph data.
 	self.vwr = hv.hvmain([str(name), str(file)], # Must be non-unicode strings.
 			     window, width, height)  # Win32 needs the window info.
-	if self.vwr is None:
+	if self.vwr is None:		# Must have been a problem....
 	    return False
 
 	# Initial drawing.
@@ -222,6 +233,14 @@ class hvFrame(hvFrameUI):
     
     ##
     # Event handling for the HyperViewer canvas.
+    # Go to a node when its name is typed and Enter is pressed.
+    def OnNodeName(self, cmdEvent):
+	if self.vwr is None:
+	    return
+	node = self.NodeName.GetValue()
+	self.vwr.gotoNode(node, HV_ANIMATE)
+	self.vwr.setSelected(node, True)
+	self.SelectedNode(node)
     # Check boxes control boolean state.
     def OnDrawSphere(self, cmdEvent):
 	self.vwr.setSphere(self.DrawSphere.IsChecked())
@@ -242,22 +261,42 @@ class hvFrame(hvFrameUI):
     ##
     # Buttons issue commands.
     def OnGoToTop(self, buttonEvent):
-	self.vwr.gotoCenterNode(0)
-	self.SelectedNode(hv.getSelected())
+	if self.vwr is None:
+	    return
+
+	# Tell the HypView to reset.
+	self.vwr.gotoCenterNode(HV_ANIMATE)
+
+	# Unselect a previously picked node.
+	prevsel = hv.getSelected()
+	if prevsel != "":
+	    self.vwr.setSelected(prevsel, 0);
+
+	# Update the node info and draw.
+	##ctr = self.vwr.getGraphCenter()
+	ctr = hv.getGraphCenter()
+	#print "center node", ctr
+	self.SelectedNode(ctr)
 	self.DrawGL()
+	pass
+
     def OnShowLinksIn(self, buttonEvent):
 	self.vwr.setDrawBackTo(hv.getSelected(), 1, self.DescendLinksIn.IsChecked())
 	self.DrawGL()
+	pass
     def OnHideLinksIn(self, buttonEvent):
 	self.vwr.setDrawBackTo(hv.getSelected(), 0, self.DescendLinksIn.IsChecked())
 	self.DrawGL()
+	pass
     def OnShowLinksOut(self, buttonEvent):
 	self.vwr.setDrawBackFrom(hv.getSelected(), 1, self.DescendLinksOut.IsChecked())
 	self.DrawGL()
+	pass
     def OnHideLinksOut(self, buttonEvent):
 	self.vwr.setDrawBackFrom(hv.getSelected(), 0, self.DescendLinksOut.IsChecked())
 	self.DrawGL()
-    
+	pass
+
     ##
     # Combo boxes select between alternatives.
     def OnLabelsMode(self, cmdEvent):

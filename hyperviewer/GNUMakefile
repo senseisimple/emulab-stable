@@ -57,7 +57,7 @@ _hv.cpp hv.py win32/_hv.cpp win32/hv.py: hv.i
 _hv.o: _hv.cpp
 	g++ -fpic -c ${CFLAGS} ${INCDIRS} _hv.cpp
 _hv.so: hvmain.o _hv.o ${HVLIB}
-	gcc -shared hvmain.o _hv.o ${LDLIBS} -o _hv.so
+	gcc -g -shared hvmain.o _hv.o ${LDLIBS} -o _hv.so
 
 hvlib: ${HVLIB}
 ${HVLIB}: checkhv

@@ -63,6 +63,9 @@ extern int hvReadFile(char *fname, int width, int height);
 // Get the node id string last selected by the selectCB function.
 extern char *getSelected();
 
+// Get the node id string at the graph center.
+extern char *getGraphCenter();
+
 // std::string is used for INPUT args to HypView methods.
 %include "std_string.i"
 // How come %apply doesn't work for std::string?  Workaround with sed instead.

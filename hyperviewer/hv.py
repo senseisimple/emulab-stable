@@ -36,6 +36,8 @@ hvmain = _hv.hvmain
 hvReadFile = _hv.hvReadFile
 
 getSelected = _hv.getSelected
+
+getGraphCenter = _hv.getGraphCenter
 class HypView(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, HypView, name, value)
@@ -61,6 +63,7 @@ class HypView(_object):
     def saveGraph(*args): return _hv.HypView_saveGraph(*args)
     def setCurrentCenter(*args): return _hv.HypView_setCurrentCenter(*args)
     def setGraphCenter(*args): return _hv.HypView_setGraphCenter(*args)
+    def getGraphCenter(*args): return _hv.HypView_getGraphCenter(*args)
     def setGraph(*args): return _hv.HypView_setGraph(*args)
     def initGraph(*args): return _hv.HypView_initGraph(*args)
     def setDisableGroup(*args): return _hv.HypView_setDisableGroup(*args)

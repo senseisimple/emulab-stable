@@ -61,6 +61,7 @@ class HypView(_object):
     def saveGraph(*args): return _hv.HypView_saveGraph(*args)
     def setCurrentCenter(*args): return _hv.HypView_setCurrentCenter(*args)
     def setGraphCenter(*args): return _hv.HypView_setGraphCenter(*args)
+    def getGraphCenter(*args): return _hv.HypView_getGraphCenter(*args)
     def setGraph(*args): return _hv.HypView_setGraph(*args)
     def initGraph(*args): return _hv.HypView_initGraph(*args)
     def setDisableGroup(*args): return _hv.HypView_setDisableGroup(*args)

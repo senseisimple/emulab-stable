@@ -418,6 +418,23 @@ void HypView::setGraphCenter(const string & id)
 }
 
 //----------------------------------------------------------------------------
+//             string HypView::getGraphCenter()
+//............................................................................
+//  
+//----------------------------------------------------------------------------
+string HypView::getGraphCenter()
+{
+  if (!hypGraph)
+    return string("");
+  
+  HypNode *n = hypGraph->getNodeFromIndex(hypData->centerindex);
+  if (n)
+    return n->getId();
+  else 
+    return string("");
+}
+
+//----------------------------------------------------------------------------
 //                       string HypView::getCenter()                       
 //............................................................................
 //  

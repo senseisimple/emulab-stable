@@ -49,6 +49,12 @@ char *getSelected(){
   return prevsel;
 }
 
+// I guess I don't know how to handle a "string" returned by the SWIG Python wrapper.
+char *getGraphCenter(){
+  string * result = new string(hv->getGraphCenter());
+  return (char *)result->c_str();
+}
+
 void selectCB(const string & id, int shift, int control) {
   //printf("selectCB id=%s, prevsel=%s\n", id.c_str(), prevsel);
   hv->setSelected(id, 1);

@@ -742,6 +742,7 @@ NAMESPACEHACK
 extern HypView *hvmain(int,char *[],int,int,int);
 extern int hvReadFile(char *,int,int);
 extern char *getSelected();
+extern char *getGraphCenter();
 
 #define  SWIG_MemoryError    1
 #define  SWIG_IOError        2
@@ -867,6 +868,20 @@ static PyObject *_wrap_getSelected(PyObject *self, PyObject *args) {
     
     if(!PyArg_ParseTuple(args,(char *)":getSelected")) goto fail;
     result = (char *)getSelected();
+    
+    resultobj = result ? PyString_FromString(result) : Py_BuildValue((char*)"");
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_getGraphCenter(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    char *result;
+    
+    if(!PyArg_ParseTuple(args,(char *)":getGraphCenter")) goto fail;
+    result = (char *)getGraphCenter();
     
     resultobj = result ? PyString_FromString(result) : Py_BuildValue((char*)"");
     return resultobj;
@@ -1184,6 +1199,27 @@ static PyObject *_wrap_HypView_setGraphCenter(PyObject *self, PyObject *args) {
     (arg1)->setGraphCenter((std::string const &)*arg2);
     
     Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_HypView_getGraphCenter(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    HypView *arg1 = (HypView *) 0 ;
+    string result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:HypView_getGraphCenter",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_HypView,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (arg1)->getGraphCenter();
+    
+    {
+        string * resultptr;
+        resultptr = new string((string &) result);
+        resultobj = SWIG_NewPointerObj((void *) resultptr, SWIGTYPE_p_string, 1);
+    }
     return resultobj;
     fail:
     return NULL;
@@ -3159,6 +3195,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"hvmain", _wrap_hvmain, METH_VARARGS },
 	 { (char *)"hvReadFile", _wrap_hvReadFile, METH_VARARGS },
 	 { (char *)"getSelected", _wrap_getSelected, METH_VARARGS },
+	 { (char *)"getGraphCenter", _wrap_getGraphCenter, METH_VARARGS },
 	 { (char *)"new_HypView", _wrap_new_HypView, METH_VARARGS },
 	 { (char *)"HypView_afterRealize", _wrap_HypView_afterRealize, METH_VARARGS },
 	 { (char *)"delete_HypView", _wrap_delete_HypView, METH_VARARGS },
@@ -3172,6 +3209,7 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"HypView_saveGraph", _wrap_HypView_saveGraph, METH_VARARGS },
 	 { (char *)"HypView_setCurrentCenter", _wrap_HypView_setCurrentCenter, METH_VARARGS },
 	 { (char *)"HypView_setGraphCenter", _wrap_HypView_setGraphCenter, METH_VARARGS },
+	 { (char *)"HypView_getGraphCenter", _wrap_HypView_getGraphCenter, METH_VARARGS },
 	 { (char *)"HypView_setGraph", _wrap_HypView_setGraph, METH_VARARGS },
 	 { (char *)"HypView_initGraph", _wrap_HypView_initGraph, METH_VARARGS },
 	 { (char *)"HypView_setDisableGroup", _wrap_HypView_setDisableGroup, METH_VARARGS },

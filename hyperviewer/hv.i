@@ -63,6 +63,9 @@ extern int hvReadFile(char *fname, int width, int height);
 // Get the node id string last selected by the selectCB function.
 extern char *getSelected();
 
+// Get the node id string at the graph center.
+extern char *getGraphCenter();
+
 // std::string is used for INPUT args to HypView methods.
 %include "std_string.i"
 // How come %apply doesn't work for std::string?  Workaround with sed instead.
@@ -569,6 +572,10 @@ public:
   /// Set the root node for the tree, for use by subsequent calls to
   // the gotoCenterNode() reset function.
   void   setGraphCenter(const std::string & INPUT);
+
+  /// Get the name of the root node of the tree, which may have been
+  // set by the gotoCenterNode() reset function.
+  string getGraphCenter();
 
   /// Load a graph into the viewer. The string can either be a
   // filename or the actual data: if the string length is < 256
