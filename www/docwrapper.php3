@@ -15,13 +15,13 @@ if (!$printable) {
 $first = substr($docname, 0, 1);
 if (strcmp($first, ".") == 0 ||
     strcmp($first, "/") == 0) {
-    USERERROR("Invalid document name: $docname!");
+    USERERROR("Invalid document name: $docname!", 1);
 }
 #
 # Nothing that looks like a ../ is allowed anywhere in the name
 #
 if (strstr($docname, "../")) {
-    USERERROR("Invalid document name: $docname!");
+    USERERROR("Invalid document name: $docname!", 1);
 }
 
 if (!$printable) {
