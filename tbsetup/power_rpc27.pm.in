@@ -178,17 +178,24 @@ sub tipconnect($) {
 	}
 	TIP->autoflush(1);
 
+	#
+	# While its a fatal error if the connect fails, the write and the
+	# read that follows might fail because the tip is currently is
+	# active. The handshake writes back a value and then immediately
+	# closes the socket, which could manifest itself as a closed
+	# connection on this end, even before we get a change to do these.
+	# operations. In that case, just go around the loop again. We hope
+	# to succeed at some point. 
+	# 
 	if (! syswrite(TIP, $secretkey)) {
 	    print STDERR
 		"*** Cannot write to $controller on $server($portnum)\n";
-	    close(TIP);
-	    return 0;
+	    goto again;
 	}
 	if (! sysread(TIP, $capret, length($capret))) {
 	    print STDERR
 		"*** Cannot read from $controller on $server($portnum)\n";
-	    close(TIP);
-	    return 0;
+	    goto again;
 	}
 
 	my $foo = unpack("i", $capret);
@@ -198,12 +205,15 @@ sub tipconnect($) {
 	if ($foo == 0) {
 	    return(*TIP);
 	}
-	if ($i > 5) {
+	
+      again:
+	close(TIP);
+
+	if ($i && (($i % 5) == 0)) {
 	    printf STDERR
 		"*** WARNING: $controller on $server($portnum) is busy\n".
-		"    Waiting a bit before trying again.\n";
+		"    Waiting a bit before trying again. Pass $i.\n";
 	}
-
 	sleep(5);
     }
     
