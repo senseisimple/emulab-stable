@@ -64,6 +64,7 @@ cdboot-install:	destdircheck common-install etc-install \
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdroot $(SYSETCDIR)/rc.cdroot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.frisbee $(BINDIR)/rc/rc.frisbee
+	$(INSTALL) -m 755 $(SRCDIR)/slicefix $(BINDIR)/slicefix
 	cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab
 	cp $(SRCDIR)/cdboot/fstab.lbs $(SYSETCDIR)/fstab.lbs
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/boot
@@ -76,7 +77,7 @@ cdboot-install:	destdircheck common-install etc-install \
 	(cd ../../os; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 	(cd ../../os/imagezip; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 	(cd ../../os/frisbee.redux; $(MAKE) DESTDIR=$(DESTDIR) client-install)
-	(cd ../../cdrom/tbbootconfig;$(MAKE) DESTDIR=$(DESTDIR) client-install)
+	(cd ../../cdrom;$(MAKE) DESTDIR=$(DESTDIR) client-install)
 	(cd ../../tools/teachswitch; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 	$(INSTALL) -m 755 $(SRCDIR)/../../install/newclient $(BINDIR)/newclient
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/users
