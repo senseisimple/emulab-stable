@@ -41,6 +41,14 @@ sub NODEBOOTSTATUS_UNKNOWN()	{ "unknown"; }
 sub NODESTARTSTATUS_NOSTATUS()	{ "none"; }
 
 #
+# We want valid project membership to be non-zero for easy membership
+# testing. Specific trust levels are encoded thusly.
+# 
+sub PROJMEMBERTRUST_NONE()	{ 0; }
+sub PROJMEMBERTRUST_USER()	{ 1; }
+sub PROJMEMBERTRUST_TRUSTED()	{ 2; }
+
+#
 # Test admin status. Optional argument is the UID or Name to test. If not
 # provided, then test the current UID.
 #
@@ -143,10 +151,12 @@ sub NodeAccessCheck($;$)
 #
 # Check project membership. First argument is the project to check.
 # Second argument is optional uid, defaults to the current uid.
+# The return argument encodes the trust membership for members. 
 #
 # usage: ProjMember(char *pid, [int uid])
-#        returns 1 if the uid is a member of pid.
-#        returns 0 if the uid is not a member of pid.
+#        returns PROJMEMBERTRUST_NONE if uid is not a member or trust=none.
+#        returns PROJMEMBERTRUST_USER if uid is a mere user in pid.
+#        returns PROJMEMBERTRUST_ROOT if uid is a root user in pid.
 # 
 sub ProjMember($;$)
 {
@@ -160,13 +170,27 @@ sub ProjMember($;$)
 	or die "$uid not in passwd file\n";
 
     my $query_result =
-	DBQueryFatal("select * from proj_memb where ".
+	DBQueryFatal("select trust from proj_memb where ".
 		     "uid='$name' and pid='$pid'");
 
     if ($query_result->numrows == 0) {
-	return 0;
+	return PROJMEMBERTRUST_NONE;
     }
-    return 1;
+
+    my @row = $query_result->fetchrow_array();
+    if ($row[0] eq "none") {
+	return PROJMEMBERTRUST_NONE;
+    }
+    if ($row[0] eq "user") {
+	return PROJMEMBERTRUST_USER;
+    }
+    if ($row[0] eq "group_root" || $row[0] eq "local_root") {
+	return PROJMEMBERTRUST_ROOT;
+    }
+    #
+    # Should never happen.
+    #
+    DBFatal("Improper response in ProjMember()");
 }
 
 #
