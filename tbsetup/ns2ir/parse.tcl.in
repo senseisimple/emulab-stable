@@ -44,11 +44,11 @@ proc lpop {lv} {
 # Example:
 #  proc a {} {
 #    var_import ::GLOBALS::verbose
-#    if {$verbose == 1} {puts "verbose is on."}
+#    if {$verbose == 1} {puts stderr "verbose is on."}
 #  }
 # is functionally identical to:
 #  proc a {} {
-#    if {${::GLOBALS::verbose} == 1} {puts "verbose is on."}
+#    if {${::GLOBALS::verbose} == 1} {puts stderr "verbose is on."}
 #  }
 ###
 proc var_import {varspec} {

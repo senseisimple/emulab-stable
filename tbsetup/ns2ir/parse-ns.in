@@ -218,7 +218,7 @@ exit(0)
 #
 # Run the XML converter on the output. 
 #
-system("$TB/libexec/xmlconvert -d -x $outfile $pid $eid");
+system("$TB/libexec/xmlconvert -x $outfile $pid $eid");
 
 if ($?) {
     my $exit_status = $? >> 8;
