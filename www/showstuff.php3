@@ -827,7 +827,7 @@ function SHOWEXP($pid, $eid, $short = 0) {
 #
 # Show a listing of experiments by user/pid/gid
 #
-function SHOWEXPLIST($type,$id) {
+function SHOWEXPLIST($type,$id,$gid = "") {
     if ($type == "USER") {
 	$where = "expt_head_uid='$id'";
 	$title = "Current";
@@ -836,7 +836,7 @@ function SHOWEXPLIST($type,$id) {
 	$title = "Project";
 	$nopid = 1;
     } elseif ($type == "GROUP") {
-	$where = "e.gid='$id'";
+	$where = "e.pid='$id' and e.gid='$gid'";
 	$title = "Group";
 	$nopid = 1;
     } else {

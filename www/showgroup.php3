@@ -106,7 +106,7 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||
 #
 # A list of Group experiments.
 #
-SHOWEXPLIST("GROUP",$gid);
+SHOWEXPLIST("GROUP",$pid,$gid);
 
 if ($isadmin) {
     echo "<center>
