@@ -305,7 +305,7 @@ while ($tries) {
     my $starttime = time();
     my $curtdiff = 0;
     my $prevtdiff = 0;
-    my $slack = 0;
+    my $slack = $maxslack-1;
  
     while ($count) {
 
@@ -337,18 +337,23 @@ while ($tries) {
         if ($cursize > $maximagesize) {
             last;
         }
-        if ( ($cursize == $prevsize) && (++$slack >= $maxslack) ) {
-            if ($count*$sleepwait % 60 == 0) {
-                print "Timeout in ". int($count*$sleepwait/60) ." minutes.\n";
+        if ($cursize == $prevsize) {
+            if ($slack) {$slack--;}  # NFS cache slop timer
+            else {
+                if ($count*$sleepwait % 60 == 0) {
+                    print "Timeout in ". 
+                          int($count*$sleepwait/60) .
+                          " minutes.\n";
+                }
+                $count--;
             }
-            $count--;
         }
         else {
+            $slack = $maxslack-1;
             if ($count != $maxloops) {
                 print "Timeout aborted - image size increased.\n";
                 $count = $maxloops;
             }
-            $slack = 0;
         }
         $prevsize = $cursize;
 
@@ -382,6 +387,8 @@ if ($result) {
 if ($cursize > $maximagesize) {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
 }
+
+print "Image creation succeeded.  Final size: $cursize bytes. \n";
 
 SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
