@@ -8,6 +8,13 @@ fi
 
 if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
 	echo "unknown";
-else
+
+# XXX hack for minibed
+elif [ $cpuspeed = "850" -a -x '/etc/testbed/chipset.awk' ]; then
+	if [ `/etc/testbed/chipset.awk /var/run/dmesg.boot` = "GX" ]; then
+		echo pcL440GX;
+	fi
+
+else   
 	echo pc$cpuspeed;
 fi
