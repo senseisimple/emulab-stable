@@ -422,6 +422,7 @@ else {
 	echo "fdisk=image.fdisk\n";
 	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
 	echo "slice1_image=slice1.ndz\n";
+	echo "slice1_alt_image=http://${WWWHOST}/images/slice1-v4.ndz\n";
 	echo "slice1_sig=https://${WWWHOST}/images/slice1-v4.ndz.sig\n";
 	# Still return this for the root tag. Might change later.
 	echo "slice1_md5=c9f8578517f5ebb0eca70b69dce144db\n";
