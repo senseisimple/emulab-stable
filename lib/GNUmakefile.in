@@ -8,11 +8,8 @@ SUBDIR		= lib
 
 include $(OBJDIR)/Makeconf
 
-all: sql.so
+all:
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-sql.so:
-	./mk_sqlso.sh
-
-install: all $(INSTALL_LIBDIR)/sql.so
+install:
