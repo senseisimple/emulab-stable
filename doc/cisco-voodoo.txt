@@ -191,7 +191,8 @@ ID  Name                            Members of VLAN
    To forward the traffic from an entire VLAN:
       Console> (enable) set span <vlan #> <monitor>
    NOTE: You might want to append 'rx' or 'tx' to the VLAN command line, or
-      you'll get doubles of everything (incoming and outgoing both)
+      you'll get doubles of everything (incoming and outgoing both).
+      <rx> means into the switch on <port>, <tx> means out of the switch.
    NOTE2: If you want to be able to send traffic from the monitor port,
       you'll need to append 'inpkts enable' ala:
       Console> (enable) set span 18 3/9 rx inpkts enable
@@ -207,7 +208,32 @@ ID  Name                            Members of VLAN
       ifconfig fxp1 down
    when I am done.
 
-10. Good reference for making nodes boot quickly (ensuring that port spanning,
+10. Multiple span sessions
+   You can setup multiple span sessions on a switch.  Just add 'create'
+   to the end of your setup line:
+      Console> (enable) set span <port> <monitor> create
+   To tear down a specific span session, name it by the <monitor> port
+   as above:
+      Console> (enable) set span disable <monitor>
+
+11. Span on trunk ports
+   You can also span traffic on a trunk port or even a set of bonded
+   trunk ports.  For example, on our experimental switches we have four
+   bonded Gb ports, 2/1-4, as an inter switch link, so you could see all
+   traffic coming in from the trunk with:
+      Console> (enable) set span 2/1-4 5/5 rx create
+   You can even pick out a specific VLAN or VLANs from the trunk.  So
+   if you only care about VLAN 300 and 400:
+      Console> (enable) set span 2/1-4 5/5 rx filter 300,400 create
+   I haven't tried this, but according to the document cited below (#12),
+   you can preserve the VLAN tagging when spanning a trunk by putting the
+   monitor port into trunk mode first.
+
+12. Good reference for span:
+
+    http://www.netplusinc.com/misc/CiscoSPAN.pdf
+
+13. Good reference for making nodes boot quickly (ensuring that port spanning,
    trunking, etc. are off on the switch port):
 
    http://www.cisco.com/warp/public/473/12.html
