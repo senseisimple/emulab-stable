@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -62,17 +62,28 @@ my %msgs = ();
 my $reload_time = 600;
 my $last_reload = time;
 
+# Command line opts.
+my $dbtag = "";
+my $debug = 0;
+my $nolog = 0;
+my ($server,$port);
+my $lockfile;
+my $pidfile;
+
 # Process command-line arguments
 
 sub usage {
     print << "END";
-Usage: $0 [-h] [-d] [-s server] [-p port]
+Usage: $0 [-h] [-d] [-s server] [-p port] [-t dbtag]
 -h              This message
--d              Turn on debugging output, and don't go into the background
+-d              Turn on debugging output, and do not go into the background
+-l              Do not use syslog; send output to stderr. Use with -d only
+-t tag          Use only those nodes with matching tag in nodes table
 -s server       Use specified server, instead of this site's bossnode
 -p port	        Use specified port
 Send SIGHUP to reload database state, or SIGUSR1 to restart completely.
 END
+    exit(1);
 }
 
 # Only root should run this - it won't work when run as a user...
@@ -83,7 +94,7 @@ if ($UID && ( $TB eq $REALTB || ! TBAdmin($UID) ) ) {
 
 my @args = @ARGV;    # save a copy for restart before we mess with them.
 my %opt = ();
-getopts("ds:p:h",\%opt);
+if (!getopts("ds:p:ht:l",\%opt)) { usage(); }
 
 if ($opt{h}) {
     exit &usage;
@@ -92,7 +103,6 @@ if (@ARGV) {
     exit &usage;
 }
 
-my ($server,$port,$debug);
 if ($opt{s}) {
     $server = $opt{s};
 } else {
@@ -101,10 +111,16 @@ if ($opt{s}) {
 if ($opt{p}) {
     $port = $opt{p};
 }
+if ($opt{l}) {
+    usage()
+	if (! $opt{d});
+    $nolog = 1;
+}
+if ($opt{t}) {
+    $dbtag = $opt{t};
+}
 if ($opt{d}) {
     $debug = 1;
-} else {
-    $debug = 0;
 }
 
 # Grab some constants into variables
@@ -130,41 +146,47 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 # This only gets used here, so it isn't in a lib constant.
 my $TBFREENODE = "FREENODE";
 
-my $pidfile;
-if ( $TB eq $REALTB ) {
-    $pidfile = "/var/run/stated.pid";
-} else {
-    $pidfile = "$TB/locks/stated.pid";
-}
-debug("Using pidfile $pidfile\n");
-if (-e $pidfile) {
-    my $otherpid = `cat $pidfile`;
-    my $running = `ps -auxww | grep $otherpid | grep -v grep`;
-    if ($running ne "") {
-	fatal("Lockfile $pidfile exists, and process $otherpid appears to be ".
-	      "running.\n");
-    } else {
-	notify("Lockfile exists, but process $otherpid appears to be dead.\n".
-	       "Removing lock file...\n");
-    }
-    system("rm $pidfile") &&
-      fatal("Couldn't remove $pidfile: $? $!\n");
-}
-# Background
 if (!$debug) {
+    if ( $TB eq $REALTB ) {
+	$pidfile = "/var/run/stated.pid";
+    } else {
+	$pidfile = "$TB/locks/stated.pid";
+    }
+    debug("Using pidfile $pidfile\n");
+    
+    if (-e $pidfile) {
+	my $otherpid = `cat $pidfile`;
+	my $running = `ps -auxww | grep $otherpid | grep -v grep`;
+	if ($running ne "") {
+	    fatal("Lockfile $pidfile exists, and process $otherpid appears ".
+		  "to be running.\n");
+	} else {
+	    notify("Lockfile exists, but process $otherpid appears to be dead".
+		   "\n".
+		   "Removing lock file...\n");
+	}
+	system("rm $pidfile") &&
+	    fatal("Couldn't remove $pidfile: $? $!\n");
+    }
+    # Background
     # We use syslog, so redirect the output to nothing
     if (TBBackGround("/dev/null")) {
 	exit(0);
     }
 }
 # set up syslog
-openlog("stated","pid",$TBLOG);
-sysopen(PIDFILE, $pidfile, O_WRONLY | O_EXCL | O_CREAT) ||
-  fatal("Couldn't create '$pidfile': $? $!\n");
-print PIDFILE "$$";
-close PIDFILE;
-# If I make it to here, I'll need to clean up the lock file
-my $lockfile=$pidfile;
+if (! $nolog) {
+    openlog("stated","pid",$TBLOG);
+}
+
+if (defined($pidfile)) {
+    sysopen(PIDFILE, $pidfile, O_WRONLY | O_EXCL | O_CREAT) ||
+	fatal("Couldn't create '$pidfile': $? $!\n");
+    print PIDFILE "$$";
+    close PIDFILE;
+    # If I make it to here, I'll need to clean up the lock file
+    $lockfile = $pidfile;
+}
 
 # Change my $0 so that it is easier to see in a ps/top
 $0 = "$0";
@@ -344,12 +366,24 @@ sub readStates(;@) {
     #debug("readStates called\n");
     my $result = DBQueryFatal("SELECT node_id, eventstate, " .
 			      "state_timestamp, op_mode, " .
-			      "op_mode_timestamp FROM nodes ".
+			      "op_mode_timestamp, stated_tag FROM nodes ".
 			      "where node_id not like 'sh%'");
 
     my %nodes;
-    while (my ($node_id, $state, $timestamp, $mode, $mode_timestamp)
+    while (my ($node_id, $state, $timestamp, $mode, $mode_timestamp, $tag)
 	   = $result->fetchrow()) {
+	$nodes{$node_id}{"tag"} = (defined($tag) ? $tag : "");
+
+	if ($dbtag ne "" && $dbtag eq $nodes{$node_id}{"tag"}) {
+	    info("This stated will work on $node_id\n");
+	}
+	if ($dbtag eq "" && $dbtag ne $nodes{$node_id}{"tag"}) {
+	    info("This stated will *NOT* work on $node_id\n");
+	}
+	if ($dbtag ne $nodes{$node_id}{"tag"}) {
+	    remTimeout($node_id);
+	}
+	
 	#
 	# If there's an entry in oldnodes for this node, and it
 	# hasn't changed state or time, use the old entry (so that
@@ -370,7 +404,9 @@ sub readStates(;@) {
 	    $nodes{$node_id}{timedout}       = 0;
 	    $nodes{$node_id}{noretry}        = 0;
 	    # Is there a timeout? If so, set it up!
-	    setTimeout($mode,$state,$node_id,$timestamp);
+	    if ($dbtag eq $nodes{$node_id}{"tag"}) {
+		setTimeout($mode,$state,$node_id,$timestamp);
+	    }
 	}
     }
     return %nodes;
@@ -471,16 +507,49 @@ sub handleEvent($$$) {
     my $eventtype = event_notification_get_eventtype($handle,$notification);
 
     $event_count++;
-    debug("Got an event: ($objtype,$objname,$eventtype)\n");
+    
+    #
+    # For readability, only do this on the main stated.
+    #
+    if ($dbtag ne "") {
+	debug("Got an event: ($objtype,$objname,$eventtype)\n");
+    }
 
     #
     # Check to see if another instance is supposed to be handling this node
     #
-    if ($objtype ne $TBCOMMAND && !checkDBRedirect($objname)) {
-	info("Got an event for node $objname, which isn't mine\n");
-	return;
-    }
+    if ($objtype ne $TBCOMMAND) {
+	my $node = $objname;
+	
+	#
+	# If we have never seen this node, reload.
+	#
+	if (! defined($nodes{$node})) {
+	    reload();
 
+	    # Still not defined, someone screwed up! This could end up
+	    # churning via reload(). Bad. 
+	    if (defined($nodes{$node})) {
+		notify("Got $objtype/$eventtype for nonexistent $node!\n");
+		return;
+	    }
+	}
+	
+	#
+	# If a stated_tag was specified on the command line, ignore those
+	# nodes that do not match. 
+	#
+	if ($dbtag ne $nodes{$node}{"tag"}) {
+	    # Record when main stated ignores a node.
+	    info("Got $objtype/$eventtype for $node, which is not mine\n")
+		if ($dbtag eq "");
+	    return;
+	}
+	if (!checkDBRedirect($node)) {
+	    info("Got $objtype/$eventtype for $node, which is not mine\n");
+	    return;
+	}
+    }
   SWITCH: for ($objtype) {
 	
 	(/$TBNODESTATE/) && do {
@@ -1052,6 +1121,17 @@ sub setTimeout( $$$$ ) {
     if (0) { print "Done:\n"; qshow(); }
 }
 
+# Remove a timeout.
+sub remTimeout ($)
+{
+    my ($node) = @_;
+
+    if (defined(qfind($node))) {
+	qdelete($node);
+	delete($timeout_tag{$node});
+    }
+}
+
 # Reload state from the database
 sub reload() {
     debug("Reloading state from database\n");
@@ -1276,7 +1356,12 @@ sub info($;$) {
 	print strftime("%b %e %H:%M:%S",localtime)." stated[$$]: $message";
 	$message = "DEBUG: ".$message;
     }
-    syslog($prio,$message) || notify("syslog failed: $? $!\n");
+    if ($nolog) {
+	print $message;
+    }
+    else {
+	syslog($prio,$message) || notify("syslog failed: $? $!\n");
+    }
 }
 
 sub restart_wrap { $sigrestart=1; }
@@ -1341,7 +1426,9 @@ END {
     }
     debug("Annouced. Cleaning up...\n");
     # clean up Syslog
-    closelog();
+    if (! $nolog) {
+	closelog();
+    }
     if ($handle) {
 	debug("Unregistering w/event system...\n");
 	if (event_unregister($handle) == 0) {
