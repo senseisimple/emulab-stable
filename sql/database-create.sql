@@ -2165,6 +2165,7 @@ CREATE TABLE webcams (
   id int(11) unsigned NOT NULL default '0',
   server varchar(64) NOT NULL default '',
   last_update datetime default NULL,
+  URL tinytext,
   PRIMARY KEY  (id)
 ) TYPE=MyISAM;
 
