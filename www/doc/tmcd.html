@@ -1,0 +1,407 @@
+<html>
+<head>
+	<title>Emulab - TMCD</title>
+	<link rel='stylesheet' href='../tbstyle-doc.css' type='text/css'>
+</head>
+<body>
+<basefont size=4>
+
+<center>
+<h1>Testbed Master Control Daemon/Client Reference</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#INTRO">Introduction</a>
+<li> <a href="#TMCC">TMCC client program</a>
+<li> <a href="#SETUP">Node Setup Script</a>
+<li> <a href="#REFERENCE">Command Reference</a>
+     <ul>
+     <li> <a href="#REF-REBOOT">reboot</a>
+     <li> <a href="#REF-STATUS">status</a>
+     <li> <a href="#REF-IFCONFIG">ifconfig</a>
+     <li> <a href="#REF-ACCOUNTS">accounts</a>
+     <li> <a href="#REF-DELAY">delay</a>
+     <li> <a href="#REF-HOSTNAMES">hostnames</a>
+     <li> <a href="#REF-RPMS">rpms</a>
+     <li> <a href="#REF-STARTUPCMD">startupcmd</a>
+     <li> <a href="#REF-STARTSTATUS">startstatus</a>
+     <li> <a href="#REF-READY">ready</a>
+     <li> <a href="#REF-READYCOUNT">readycount</a>
+     <li> <a href="#REF-LOG">log</a>
+     </ul>
+</ul>
+
+<hr>
+
+<ul>
+<li> <a NAME="INTRO"></a>
+     <h3>Introduction</h3>
+
+The <b>Testbed Master Control Daemon</b> (TMCD) is a program that runs
+on <b>boss.emulab.net</b>, and provides configuration information to
+Testbed nodes when they boot up. The <b>Testbed Master Control
+Client</b> (TMCC), is a small program that is installed on each node,
+and is used to connect to the TMCD to issue requests and get the
+response. In addition, Testbed nodes use the TMCC/TMCD to communicate
+events of interest back to the Emulab Database and to the user via the
+Web interface. The TMCD interface is text based; clients issue
+requests in the form of strings consisting of a command and an
+optional argument. The response is also a string, in a very generic
+format that can be easly parsed by any C/C++ program or shell
+interpreter. For example, to determine how to configure the
+experimental interfaces on each testbed node in your experiment when
+it boots, you would do the following:
+
+<code><pre>
+tmcc ifconfig					</code></pre>
+
+The response to this request would be:
+
+<code><pre>
+INTERFACE=1 INET=10.0.0.1 MASK=255.255.255.0
+INTERFACE=2 INET=10.0.1.1 MASK=255.255.255.0	</code></pre>
+
+which indicates that interfaces eth1 and eth2 (or perhaps fxp1 and
+fxp2) should be configured to the given IP addresses and netmasks.
+
+<p>
+<li> <a NAME="TMCC"></a>
+     <h3>TMCC</h3>
+
+The <b>TMCC</b> is a simple client program that runs on the testbed
+nodes and handles the details of connecting to the <b>TMCD</b>,
+issuing the request, getting the response, and printing it out. It has
+been compiled on FreeBSD 4.0, Redhat Linux 6.2, and Netbsd 1.4, and
+should compile on just about any operating system. Alternatively, you
+can integrate the TMCC into your own programs. Briefly, the TMCC
+connects to port 7777 (UDP or TCP) on <b>boss.emulab.net</b>, writes a
+single string to the connection, and then waits for an <b>optional</b>
+response, which is a newline separated list of strings. The TMMC exits
+when the other side of the connection is closed by the TMCD. The
+source code for the TMCC is available upon request by sending email to
+<a href="mailto:testbed-ops@flux.cs.utah.edu"> Testbed Operations
+(testbed-ops@flux.cs.utah.edu)</a>
+
+<p>
+<li> <a NAME="SETUP"></a>
+     <h3>Node Setup Script</h3>
+
+The Emulab versions of FreeBSD 4.0, Redhat Linux 6.2, and Netbsd 1.4
+all run a <i>setup</i> script at bootup that uses the TMCC client to
+configure the node. All of the interfaces are configured, user
+accounts for each of the members of the project are created, NFS
+mounts are made, etc. These setup scripts are located in /etc/testbed
+on FreeBSD and Netbsd, and in /etc/rc.d/testbed on Linux. You can use
+these scripts as a guide when writing setup code to configure your
+custom operating systems.
+
+<p>
+<li> <a NAME="REFERENCE"></a>
+     <h3>Command Reference</h3>
+
+<ul>
+<li> <a NAME="REF-REBOOT"></a>
+     <h3>reboot</h3>
+
+Report that a node has rebooted to the TMCD. This is an informational
+message that is used by the TMCD to determine when a node reboots for
+the first time after its disk has been reloaded. No response is
+returned. 
+
+<p>
+<li> <a NAME="REF-STATUS"></a>
+     <h3>status</h3>
+
+Request status information about the project and experiment that the
+node is currently part of. Returns the project ID, experiment ID, and
+the node <i>name</i> from the NS file that described the topology.
+This command is typically used to determine if the setup script needs
+to do any further configuration; if the node is free, then no other
+information is going to be provided by the TMCD. The format of the
+reply is one of:
+
+<code><pre>
+FREE
+ALLOCATED=pid/eid NICKNAME=name			</code></pre>
+
+The first form indicates that the node is not currently allocated to
+an experiment. The second form says that the node is running as part
+of the "eid" experiment in the "pid" project, and was named "name" in
+the NS file that described the topology.
+
+<p>
+<li> <a NAME="REF-IFCONFIG"></a>
+     <h3>ifconfig</h3>
+
+Request the configuration information for each of the network
+interfaces on the node, as determined by the topology described in the
+NS file, and the assignment of IP addresses to interfaces that is
+performed when the experiment is configured. The information that is
+returned is typically converted into corresponding <tt>ifconfig</tt>
+commands on the node. However, the information can be used in any
+manner that is appropriate for the operating system that is running on
+the node. The reply to this request is one or more lines in the
+following format (in the unlikely case that the topology describes a
+node with no network links, the response to this request will be null):
+
+<code><pre>
+INTERFACE=Z INET=X.X.X.X MASK=Y.Y.Y.Y	</code></pre>
+
+Which says that network interface "Z" is assigned to IP address
+"X.X.X.X" with netmask "Y.Y.Y.Y". On Redhat 6.2, the setup script
+would take this information and issue the following ifconfig command:
+
+<code><pre>
+/sbin/ifconfig ethZ inet X.X.X.X netmask Y.Y.Y.Y	</code></pre>
+
+<p>
+<li> <a NAME="REF-ACCOUNTS"></a>
+     <h3>accounts</h3>
+
+Request group and login account information for each of the project
+members of the project that the experiment is running. This
+information can be used to generate login accounts for project members
+on each of the nodes in an experiment. The Emulab versions of FreeBSD,
+Linux, and Netbsd all have stub password/group files that do not
+contain any user accounts or groups. When a node first boots after
+being allocated to an experiment, this command is used to find out
+what accounts to build, and what directories in <tt>/users</tt> need
+to be NFS mounted. The reply to this request is one or more lines of
+group information, followed by one or more lines of login account
+information:
+
+<code><pre>
+ADDGROUP NAME=pid GID=XXXX
+ADDUSER  LOGIN=joe PSWD=ABCD UID=YYYY GID=XXXX ROOT=N NAME="Joe User"
+</code></pre>
+
+The <tt>ADDGROUP</tt> reply gives the name of the group and the
+numeric <tt>gid</tt> for that group. The <tt>ADDUSER</tt> reply has
+the following fields:
+
+<blockquote>
+<table border=0 cellpadding=0 cellspacing=0>
+<tr>
+ <td><font size=4><tt>LOGIN</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>The user/account name.</td>
+</tr>
+<tr>
+ <td><font size=4><tt>PSWD</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>The <i>encrypted</i> password string, suitable for direct
+  insertion into the password file.</td>
+</tr>
+<tr>
+ <td><font size=4><tt>UID</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>The numeric uid.</td>
+</tr>
+<tr>
+ <td><font size=4><tt>GID</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>The numeric gid.</td>
+</tr>
+<tr>
+ <td><font size=4><tt>ROOT</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>Indicates whether the user should be granted
+ root access by placing the user into the root group (wheel group on
+ FreeBSD/NetBSD). </td> 
+</tr>
+<tr>
+ <td><font size=4><tt>NAME</tt></td>
+ <td>&nbsp&nbsp&nbsp</td>
+ <td><font size=4>The full name of the user, suitable for
+ insertion into the <i>gecos</i> field of the user's password entry.</td>
+</tr>
+</table>
+</blockquote>
+
+On Linux, this information would be converted into the following
+commands:
+
+<code><pre>
+groupadd -g XXXX pid
+mkdir /users/joe
+mount fs.emulab.net:/users/joe /users/joe";
+useradd -u YYYY -g XXXX -p ABCD -G root -d /users/joe -c "Joe User" joe
+</code></pre>
+
+<p>
+<li> <a NAME="REF-RPMS"></a>
+     <h3>rpms</h3>
+
+Request the list of RPMs that should be installed on the node when it
+boots, as specified in the NS file on a per-node basis.  The reply to
+this request is null if there are no RPMs to install, or one or more
+lines in the following format:
+
+<code><pre>
+RPM=/path/to/name.rpm					</code></pre>
+
+On Linux and Freebsd, each RPM is installed with the <tt>rpm</tt>
+command, which will install the RPM only if it has not already been
+installed:
+
+<code><pre>
+rpm -i /path/to/name.rpm				</code></pre>
+
+<p>
+<li> <a NAME="REF-STARTUPCMD"></a>
+     <h3>startupcmd</h3>
+
+Request the name of the startup script (or program) that should be run
+when the node boots, as specified in the NS file on a per-node basis.
+The reply to this request is null if a startup script was not
+specified, or a single line in the following format:
+
+<code><pre>
+CMD=/path/to/runme UID=joe				</code></pre>
+
+Which says to run <tt>/path/to/runme</tt> as user <tt>joe</tt> when
+the node boots. The UID is always the experiment creator. On FreeBSD,
+Linux, and NetBSD, the command is run once the node is running
+multiuser. If the node reboots before the experiment is terminated,
+the command will be run again.
+
+<p>
+<li> <a NAME="REF-STARTSTATUS"></a>
+     <h3>startstatus</h3>
+
+Report the numeric exit value of the startupcmd back to the TMCD so
+that it can be recorded and displayed in the "Experiment Information"
+Web page. In fact, this does not have to be the result of the
+startupcmd, but can be the result of any application program. The
+intent is to report back information that can be used by the
+experimentor to determine when the experiment has finished. Each node
+reports back status individually. The format of this <b>command</b>
+is:
+
+<code><pre>
+tmcc startstatus XX				</code></pre>
+
+which sends the numeric value XX back to the TMCD. There is no
+response from the TMCD to this command. 
+
+<p>
+<li> <a NAME="REF-READY"></a>
+     <h3>ready</h3>
+
+Report an application level <i>ready</i> status back to the TMCD so
+that it can record it. A count of nodes (in your experiment) reporting
+ready is maintained by the TMCD, and is made available to nodes via
+the <tt>readycount</tt> request below. There is no response from the
+TMCD to this command.
+
+<p>
+<li> <a NAME="REF-READYCOUNT"></a>
+     <h3>readycount</h3>
+
+Request the count of nodes that have reported in <i>ready</i> with the
+<tt>ready</tt> command above. This is an application level count;
+nodes can use this as a very primitive form of synchronization to
+determine when all of the nodes in the experiment have started the
+application (say, via the <tt>startupcmd</tt> above) and have reached
+a point where it is necessary to wait until all of the nodes have
+reached the same point. The reply to this request is a single line in
+the following format:
+
+<code><pre>
+READY=N TOTAL=M				</code></pre>
+
+which says that <tt>N</tt> nodes have reported in, of a total number
+of <tt>M</tt> nodes in the experiment. The application can continue to
+poll until <tt>N==M</tt>, but be sure to add some delay between each
+poll to avoid livelock at the TMCD. Note that the ready count is
+essentially a use-once feature; The ready count cannot be
+reinitialized to zero since there is no actual synchronization
+happening.  If in the future it appears that a generalized barrier
+synchronization would be more useful, we will investigate the
+implementation of such a feature.
+
+<p>
+<li> <a NAME="REF-HOSTNAMES"></a>
+     <h3>hostnames</h3>
+
+Request information about the IP addresses and node names of all of
+the nodes in the experiment. The intent it to provide the ability to
+easily generate a suitable <tt>/etc/hosts</tt> file that allows
+experiments to operate using the symbolic names of the nodes (as
+defined in the NS file), instead of IP addresses, which are generally
+assigned by the configuration software, not the experimentor. Since
+nodes can use multiple experimental interfaces, the reply gives the IP
+address for each interface on each node. An additional alias is
+returned for nodes that are directly connected to the node making the
+hostnames request. Secondary interfaces, and interfaces that are not
+directly connected are named with a -X suffix, where X is the ordinal
+number of the interface. The reply to this request is one or more
+lines in the following format:
+
+<code><pre>
+NAME=nodeA LINK=X IP=X.X.Y.A ALIAS=nodeA
+NAME=nodeB LINK=Y IP=X.X.Y.B ALIAS=nodeB
+NAME=nodeC LINK=Z IP=X.X.Z.C ALIAS=  			</code></pre>
+
+The <tt>LINK</tt> field is the number of the network interface on the
+destination node, that this node is connected to. The /etc/hosts file
+that would be created for this response is:
+
+<code><pre>
+X.X.X.A        nodeA-X nodeA
+X.X.X.B        nodeB-Y nodeB
+X.X.Z.C        nodeC-Z					</code></pre>
+
+Say that nodeA is making this request. NodeA is obviously connected to
+itself, so it gets an alias pointing to its own interface. NodeA is
+directly connected to NodeB on NodeB's <tt>Y</tt> interface, so it to
+gets an alias so that an application running on nodeA can just use the
+name NodeB. NodeC is not directly connected to NodeA (perhaps it is
+connected to NodeB on one of NodeB's other interfaces), so it does not
+get an alias. Refering to nodeC on nodeA would be confusing and
+possibly incorrect.
+
+<p>
+<li> <a NAME="REF-LOG"></a>
+     <h3>log</h3>
+
+The <tt>log</tt> command can be used by an application to write a
+message to a log file on <b>users.emulab.net</b>. This is especially
+useful on the Sharks, most of which do not have console serial lines
+attached. The argument to the log command is a single string, in
+double quotes if operating within the shell:
+
+<code><pre>
+tmcc log "This is a log message"			</code></pre>
+
+The log file is stored in <tt>/proj/pid/logs/eid.log</tt>, where
+<tt>pid</tt> is the name of the project and <tt>eid</tt> is the name
+of the experiment. The file is appended to each time; it is the
+responsibility of the experimentor to zero the log file when done, or
+if a new experiment with the same name is started. 
+
+</ul>
+</ul>
+
+<hr size=2 noshade>
+<center>
+<!-- Force full window! -->
+<base target=_top>
+[<a href="https://www.emulab.net/">Emulab.Net Home</a>]<br>
+[<a href="http://www.cs.utah.edu/flux/testbed/">Utah Network Testbed</a>]
+[<a href="http://www.cs.utah.edu/flux/">Flux Research Group</a>]
+[<a href="http://www.cs.utah.edu/">School of Computing</a>]
+[<a href="http://www.utah.edu/">University of Utah</a>]
+</center>  
+<p align=right>
+<font size="-1">
+<a href="mailto:testbed-ops@flux.cs.utah.edu"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+Last modified on Mar 14, 2001
+</font>
+</p>
+
+</body>
+</html>

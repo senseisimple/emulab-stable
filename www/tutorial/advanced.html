@@ -1,0 +1,148 @@
+<html>
+<head>
+	<title>Emulab - Advanced Topics Tutorial</title>
+	<link rel='stylesheet' href='../tbstyle-doc.css' type='text/css'>
+</head>
+<body>
+<basefont size=4>
+
+<center>
+<h1>Emulab - Advanced Topics Tutorial</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#RPMS">Installing RPMS automatically</a>
+<li> <a href="#Startupcmd">Starting your application automatically</a>
+<li> <a href="#ReadyBits">How do I know when all my nodes are ready?</a>
+</ul>
+
+<hr>
+
+<ul>
+<li> <a NAME="RPMS"></a>
+     <h3>Installing RPMS automatically</h3>
+<p>
+
+The Testbed NS extension <tt>tb-set-node-rpms</tt> allows you to
+specify a (space separated) list of RPMs to install on each of your
+nodes when it boots:
+
+<code><pre>
+tb-set-node-rpms $nodeA /proj/pid/rpms/silly-freebsd.rpm
+tb-set-node-rpms $nodeB /proj/pid/rpms/silly-linux.rpm	</code></pre>
+
+The above NS code says to install the <tt>silly-freebsd.rpm</tt> file
+on <tt>nodeA</tt>, and the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>.
+RPMs are installed as root when the node first boots, and must reside
+on the node's local filesystem, or in a directory that can be reached
+via NFS. This is either the project's <tt>/proj</tt> directory, or a
+project member's home directory in <tt>/users</tt>.
+
+</p>
+
+<li> <a NAME="Startupcmd"></a>
+     <h3>Starting your application automatically</h3>
+<p>
+
+You can start your application automatically when your nodes boot by
+using the <tt>tb-set-node-startup</tt> NS extenstion. The argument is
+the pathname of a script or program that is run as the <tt>UID</tt> of
+the experiment creator, after the node has reached multiuser mode. You
+can specify the same program for each node, or a different program.
+For example:
+
+<code><pre>
+tb-set-node-startup $nodeA /proj/pid/runme.nodeA
+tb-set-node-startup $nodeB /proj/pid/runme.nodeB	</code></pre>
+
+will run <tt>/proj/pid/runme.nodeA</tt> on nodeA and
+<tt>/proj/pid/runme.nodeA</tt> on nodeB. The programs must reside on
+the node's local filesystem, or in a directory that can be reached via
+NFS. This is either the project's <tt>/proj</tt> directory, or a
+project member's home directory in <tt>/users</tt>.
+
+</p>
+
+<li> <a NAME="ReadyBits"></a>
+     <h3>How do I know when all my nodes are ready?</h3>
+<p>
+
+It is often necessary for your startup program to determine when all
+of the other nodes in the experiment have started, and are ready to
+proceed. Sometimes called a <i>barrier</i>, this allows programs to
+wait at a specific point, and then all proceed at once. Emulab
+provides a primitive form of this mechanism using experiment <i>ready
+bits</i>, which are set and read using the <a href = "../doc/tmcd.html">
+TMCD/TMCC</a>. When an experiment is first configured, the ready bit
+for each node is cleared. As each node starts its application and
+reaches the point where it must be sure that all other nodes have
+started up, it issues a TMCC <tt>ready</tt> command:
+
+<code><pre>
+tmcc ready				</code></pre>
+
+which tells Emulab's configuration system that the node is ready to
+proceed. The node can then poll for the <i>ready count</i> to
+determine how many nodes are ready (have issued a tmcc ready command):
+
+<code><pre>
+tmcc readycount				</code></pre>
+
+which will return the ready count as a string:
+
+<code><pre>
+READY=N TOTAL=M				</code></pre>
+
+where <tt>N</tt> is the number of nodes that are ready, and <tt>M</tt>
+is the total number of nodes in the experiment. An application can
+poll the ready count with a simple script, or it can encode the ready
+bits check directly into its program. For example, here is a simple
+Perl fragment that issues the ready command, and then polls for the
+ready count, being sure to delay a small amount between each poll.
+
+<code><pre>
+system("tmcc ready");
+while (1) {
+    my $bits = `tmcc readycount`;
+    if ($bits ~= /READY=(\d*) TOTAL=(\d*)/) {
+        if ($1 == $2) {
+            last;
+	}
+    }
+    #
+    # Please sleep to avoid swamping the TMCD!
+    # 
+    sleep(1);
+}					</code></pre>
+
+<i>Note that the ready count is essentially a use-once feature; The
+ready count cannot be reinitialized to zero since there is no actual
+synchronization happening.  If in the future it appears that a
+generalized barrier synchronization would be more useful, we will
+investigate the implementation of such a feature.</i>
+
+</p>
+</ul>
+
+<hr size=2 noshade>
+<center>
+<!-- Force full window! -->
+<base target=_top>
+[<a href="https://www.emulab.net/">Emulab.Net Home</a>]<br>
+[<a href="http://www.cs.utah.edu/flux/testbed/">Utah Network Testbed</a>]
+[<a href="http://www.cs.utah.edu/flux/">Flux Research Group</a>]
+[<a href="http://www.cs.utah.edu/">School of Computing</a>]
+[<a href="http://www.utah.edu/">University of Utah</a>]
+</center>  
+<p align=right>
+<font size="-1">
+<a href=\"mailto:testbed-ops@flux.cs.utah.edu\"> 
+   Testbed Operations (testbed-ops@flux.cs.utah.edu)</a>
+<br>
+Last modified on Mar 14, 2001
+</font>
+</p>
+
+</body>
+</html>

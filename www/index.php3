@@ -4,7 +4,12 @@
 # 
 require("defs.php3");
 
-$login_status = "";
+$STATUS_LOGGEDIN  = 1;
+$STATUS_LOGGEDOUT = 2;
+$STATUS_LOGINFAIL = 3;
+$STATUS_TIMEDOUT  = 4;
+$login_status     = 0;
+$login_message    = "";
 
 if (isset($login)) {
     #
@@ -12,7 +17,7 @@ if (isset($login)) {
     #
     if (!isset($uid) ||
         strcmp($uid, "") == 0) {
-            $login_status = "Login Failed";
+            $login_status = $STATUS_LOGINFAIL;
 	    unset($uid);
     }
     else {
@@ -24,14 +29,14 @@ if (isset($login)) {
 	# DB will not match the hash that came with the other frame. 
 	#
 	if (CHECKLOGIN($uid) == 1) {
-            $login_status = "$uid Logged In";
+            $login_status = $STATUS_LOGGEDIN;
 	}
 	elseif (DOLOGIN($uid, $password)) {
-            $login_status = "Login Failed";
+            $login_status = $STATUS_LOGINFAIL;
 	    unset($uid);
         }
         else {
-            $login_status = "$uid Logged In";
+            $login_status = $STATUS_LOGGEDIN;
         }
     }
 }
@@ -40,7 +45,7 @@ elseif (isset($logout)) {
     # Logout button pressed.
     #
     DOLOGOUT($uid);
-    $login_status = "$uid Logged Out";
+    $login_status = $STATUS_LOGGEDOUT;
     unset($uid);
 }
 elseif ($uid = GETUID()) {
@@ -53,36 +58,125 @@ elseif ($uid = GETUID()) {
         unset($uid);
         break;
     case 1:
-        $login_status = "$uid Logged In";
+        $login_status = $STATUS_LOGGEDIN;
         break;
     case -1:
-        $login_status = "$uid Login Timed Out";
+        $login_status = $STATUS_TIMEDOUT;
         unset($uid);
         break;
     }
+}
+switch ($login_status) {
+ case $STATUS_LOGGEDIN:
+     $login_message = "$uid Logged In";
+     break;
+ case $STATUS_LOGGEDOUT:
+     $login_message = "$uid Logged Out";
+     break;
+ case $STATUS_LOGINFAIL:
+     $login_message = "Login Failed";
+     break;
+ case $STATUS_TIMEDOUT:
+     $login_message = "Login Timed Out";
+     break;
 }
 ?>
 
 <html>
 <head>
 <title>Emulab.Net</title>
-<link rel='stylesheet' href='tbstyle.css' type='text/css'>
+
+<script language="JavaScript">
+   <!--
+   var sURL = unescape(window.location.pathname);
+
+   function refresh()
+   {
+       //  This version of the refresh function will cause a new
+       //  entry in the visitor's history.  It is provided for
+       //  those browsers that only support JavaScript 1.0.
+       //
+       window.location.href = sURL;
+   }
+   //-->
+</script>
+
+<script language="JavaScript1.1">
+   <!--
+   function refresh()
+   {
+       //  This version does NOT cause an entry in the browser's
+       //  page view history.  Most browsers will always retrieve
+       //  the document from the web-server whether it is already
+       //  in the browsers page-cache or not.
+       //  
+       window.location.replace( sURL );
+   }
+   //-->
+</script>
+
+<script language="JavaScript1.2">
+   <!--
+   function refresh()
+   {
+       //  This version of the refresh function will be invoked
+       //  for browsers that support JavaScript version 1.2
+       //
+       
+       //  The argument to the location.reload function determines
+       //  if the browser should retrieve the document from the
+       //  web-server.  In our example all we need to do is cause
+       //  the JavaScript block in the document body to be
+       //  re-evaluated.  If we needed to pull the document from
+       //  the web-server again (such as where the document contents
+       //  change dynamically) we would pass the argument as 'true'.
+       //  
+       window.location.reload( false );
+   }
+   //-->
+</script>
 
 <?php
+#
+# So that the user knows the login timed out.
+#
+if ($login_status == $STATUS_LOGGEDIN) {
+    $timeo = $TBAUTHTIMEOUT + 120;
+    echo "<noscript>
+            <META HTTP-EQUIV=\"refresh\" CONTENT=\"$timeo\">
+          </noscript>\n";
+    $timeo *= 1000;
+    echo "<script language=\"JavaScript\">
+            <!--
+            function doLoad() {
+                setTimeout(\"refresh()\", $timeo );
+            }
+            //-->
+          </script>\n";
+}
+
 #
 # So I can test on my home machine easily. This *is* required to make the
 # the frames work correctly.
 # 
-echo "<base href=\"$TBBASE/\" target=\"dynamic\">\n";
+echo "<link rel='stylesheet' href='tbstyle.css' type='text/css'>
+      <base href=\"$TBBASE/\" target=\"dynamic\">
+      </head>\n";
 
-echo "</head>
-        <body>
-          <basefont size=5>
-          <a href=\"$TBBASE/welcome.html\"><b>Emulab.Net Home</b></a>
-          <basefont size=4>\n";
-?>
+#
+# If logged in, start the refresh process.
+# 
+if ($login_status == $STATUS_LOGGEDIN) {
+    echo "<body onload=\"doLoad()\">\n";
+}
+else {
+    echo "<body>\n";
+}
 
-<?php
+echo "<basefont size=5>
+      <a href=\"$TBBASE/welcome.html\"><b>Emulab.Net Home</b></a>
+      <basefont size=4>\n";
+
 if (isset($uid)) {
     echo "<hr>";
     $query_result = mysql_db_query($TBDBNAME,
@@ -163,7 +257,7 @@ echo "<hr>";
 echo "<table cellpadding=\"0\" cellspacing=\"0\" width=\"100%\">";
 echo "<form action=\"index.php3\" method=\"post\" target=\"fixed\">";
 
-echo "<b>$login_status</b>";
+echo "<b>$login_message</b>";
 #
 # Present either a login box, or a logout box
 # 

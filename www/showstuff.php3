@@ -337,7 +337,7 @@ function SHOWNODES($pid, $eid) {
                 <dt>[1]
                     <dd>Exit value of the node startup command.
                 <dt>[2]
-                    <dd>User application has reported ready via TMCC.
+                    <dd>User application ready status, reported via TMCC.
               </dl>
               </blockquote></blockquote></blockquote></blockquote></h4>\n";
     }

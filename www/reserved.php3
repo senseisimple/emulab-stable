@@ -19,13 +19,48 @@ if (! $query_result) {
     TBERROR("Database Error getting node reservation status: $err\n", 1);
 }
 
-echo "<table border=1 padding=1>\n";
+#
+# Count the types up.
+#
+$numpcs    = 0;
+$numsharks = 0;
+$freepcs   = 0;
+$freesharks= 0;
+
+while ($r = mysql_fetch_array($query_result)) {
+    $type = $r["type"];
+    $eid  = $r["eid"];
+    
+    if ($type == "pc") {
+	$numpcs++;
+    }
+    if ($type == "shark") {
+	$numsharks++;
+    }
+    if ($eid && $eid != "NULL") {
+	continue;
+    }
+    if ($type == "pc") {
+	$freepcs++;
+    }
+    if ($type == "shark") {
+	$freesharks++;
+    }
+}
+
+echo "<center><h3>
+      $freepcs of $numpcs PCs Free <br>
+      $freesharks of $numsharks Sharks Free.
+      </h3></center>\n";
+
+echo "<table border=1 align=center padding=1>\n";
 echo "<tr>
           <td><b>ID</b></td>
           <td><b>Type</b></td>
           <td><b>Reservation Status</b></td>
       </tr>\n";
 
+mysql_data_seek($query_result, 0);
 while ($r = mysql_fetch_array($query_result)) {
     $id = $r["node_id"];  $type = $r["type"]; 
     $res = $r["eid"];

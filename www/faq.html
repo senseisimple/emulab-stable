@@ -53,6 +53,11 @@
                            nodes in my experiment are ready?</a>
      <li> <a href="#SWS-6">Can I run my own Operating System?</a>
      </ul>
+
+<li> <a href="#SEC">Security Issues</a>
+     <ul>
+     <li> <a href="#SEC-1">Is Emulab Firewalled?</a>
+     </ul>
 </ul>
 
 <hr>
@@ -80,14 +85,14 @@
     </p>
 
 <li><a NAME="GS-2"></a>
-    <h3>Someone told me to join their project. How do I do that?</h3>
+    <h3>How do I join a project?</h3>
     <p>
     If you are new to the Testbed, simply click on the "Join Project"
     link on the Emulab <a href="https://www.emulab.net">Home
     Page</a>. You will need to fill in the form with your personal
     information, and provide the name of the project you are trying to
     join (typically, the <i>Project Leader</i> will have told you the
-    name of the project). The click on the "Submit" button, and wait
+    name of the project). Then click on the "Submit" button, and wait
     for the project leader to approve you.  When approved you will
     receive an email message saying so, and you can then log into the
     Testbed.
@@ -101,7 +106,7 @@
     <b>users.emulab.net</b>. We require that all Emulab users use ssh. For
     example, if your Emulab account name is "joe", then you would do:
     <pre>
-	ssh <b>users.emulab.net</b> -l joe		</pre>
+	ssh users.emulab.net -l joe		</pre>
     </p>
     <p>
     Your password starts out the same as the password you initially
@@ -386,6 +391,23 @@
     </p>
 </ul>
 
+<hr>
+
+<a NAME="SEC"></a>
+<h3>Security Issues</h3>
+<ul>
+<li><a NAME="SEC-1"></a>
+    <h3>Is Emulab Firewalled?</h3>
+    <p>
+    Yes. Emulab blocks all of the <i>low numbered</i> ports (ports
+    below 1024), with the exception of port 22 (Secure Shell). This is
+    for the protection of experimentors, as well as to ensure that an
+    errant application cannot become the source of a Denial of Service
+    attack to sites outside of Emulab. If your application requires
+    external access to other low numbered ports, please contact us to
+    make special arrangements.
+    </p>
+</ul>
 
 <hr size=2 noshade>
 <center>
