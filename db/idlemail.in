@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -35,7 +35,13 @@ my $cc_grp_ldrs  = TBGetSiteVar("idle/cc_grp_ldrs");
 my $idle_warnmin = TBGetSiteVar("swap/idleswap_warn");
 # minutes before autoswap that we warn them
 my $auto_warnmin = TBGetSiteVar("swap/autoswap_warn");
+my $disabled     = TBGetSiteVar("web/nologins");
 
+#
+# When web logins are disabled, do not do anything!
+#
+exit (0)
+    if ($disabled);
 
 sub help {
     die("Usage:
