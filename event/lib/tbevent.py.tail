@@ -212,5 +212,25 @@ class EventClient:
             pass
         return
 
+    def poll(self):
+        """
+        Polling interface; returns events to caller, one at a time.
+        """
+
+        while True:
+            try:
+                #
+                # First see if anything not yet delivered.
+                #
+                ev = CallbackIterator(self.handle).next()
+                return ev;
+            except StopIteration, e:
+                pass
+            
+            rc = c_event_poll_blocking(self.handle, 0)        
+            if rc != 0:
+                sys.stderr.write("c_event_poll_blocking: " + str(rc) + "\n")
+                raise IOError, "Reading events"
+            pass
     pass
 
