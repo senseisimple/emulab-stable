@@ -263,7 +263,7 @@ else {
 		       "torn down and you can reuse the experiment name.")
 	    if (($estate ne EXPTSTATE_QUEUED &&
 		 $estate ne EXPTSTATE_SWAPPED) ||
-		$batchstate != BATCHSTATE_UNLOCKED());
+		$batchstate ne BATCHSTATE_UNLOCKED());
     }
     else {
 	#
