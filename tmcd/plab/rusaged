@@ -1,0 +1,196 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use Getopt::Std;
+use English;
+use Errno;
+use POSIX qw(strftime);
+
+#
+# PLAB rusage daemon; send back stats to Emulab Control.
+#
+sub usage()
+{
+    print "Usage: rusaged [-d] [start | stop]\n";
+    exit(1);
+}
+my $optlist = "d";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+# Locals
+my $action	= "start";
+my $logname	= "$LOGDIR/rusaged.debug";
+my $pidfile	= "/var/run/emulab-rusaged.pid";
+my $debug	= 0;
+my $isalivewait = 300; # Seconds to wait.
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    $action = $ARGV[0];
+
+    if (@ARGV != 1 || ($action ne "start" && $action ne "stop")) {
+	usage();
+    }
+}
+
+#
+# Must be root.
+# 
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# For stop, look to see if the pid file exists. If so, kill it and exit.
+#
+if ($action eq "stop") {
+    if (! -e $pidfile) {
+	exit(0);
+    }
+    system("kill `cat $pidfile`");
+    sleep(1);
+    exit($? >> 8);
+}
+
+#
+# Put this into the background and log its output. We *must* do this cause
+# we do not want to halt the boot if the testbed is down!
+# 
+if (!$debug && TBBackGround($logname)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Write our pid into the pid file so we can be killed later. We must
+# do this first so that we can be killed before we change the sig
+# handlers.
+#
+system("echo '$PID' > $pidfile") == 0
+    or die("Could not create $pidfile!");
+
+#
+# Setup a handler to catch TERM, and kill our process group.
+#
+my $pgrp = getpgrp(0);
+
+sub handler () {
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT} = 'IGNORE';
+    kill('TERM', -$pgrp);
+    unlink($pidfile);
+    sleep(5);
+    exit(0);
+}
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Loop!
+# 
+while (1) {
+    my $failed  = 0;
+    my $stats   = "";
+    
+    #
+    # Run tmcc in UDP mode.
+    # Since its UDP, we try it a couple of times if it fails. 
+    #
+    my $retries = 3;
+
+    #
+    # Get the load average. Linux only right now.
+    #
+    if (open(LA, "/proc/loadavg")) {
+	$_ = <LA>;
+
+	if ($_ =~ /^([\d\.]+)\s+([\d\.]+)\s+([\d\.]+)\s+.*$/) {
+	    $stats .= " LA1=$1 LA5=$2 LA15=$3";
+	}
+	else {
+	    print STDERR "Could not parse loadav: $_";
+	}
+	close(LA);
+    }
+    else {
+	    print STDERR "Could not open /proc/loadav: !$\n";
+	    goto nostats;
+    }
+
+    #
+    # Grab disk usage.
+    #
+    if (open(DF, "df -P -k -l / |")) {
+        # Consume all output ...
+	while (<DF>) {
+	    next
+		if ($_ =~ /^filesystem.*/i);
+
+	    if ($_ =~ /^[-\w\.\/]+\s+\d+\s+\d+\s+\d+\s+(\d+)%\s+([-\w\.\/]+)$/) {
+		if ($2 eq "/") {
+		    $stats .= " DUSED=$1";
+		}
+	    }
+	}
+	close(DF);
+    }
+    else {
+	print STDERR "Could not start df process: !$\n";
+    }
+
+  nostats: 
+    while ($retries) {
+	my @tmccresults;
+
+	if (tmcc(TMCCCMD_RUSAGE, $stats, \@tmccresults,
+		 ("timeout" => 3, "useudp" => 1)) == 0 &&
+	    scalar(@tmccresults)) {
+	    my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
+
+	    #
+	    # The format of the response is rather simple right now.
+	    # If the update failed last time, run it no matter what.
+	    #
+	    if ($failed ||
+		$tmccresults[0] =~ /^UPDATE=1$/) {
+		print "Running an update at $date ...\n";
+		system("update -i -a");
+		$failed = $?;
+	    }
+	    last;
+	}
+	$retries--;
+    }
+    sleep($isalivewait);
+}
+exit(0);
