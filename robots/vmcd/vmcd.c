@@ -23,6 +23,19 @@
 
 int debug = 0;
 
+/**
+ * Signal handler for SIGUSR1, just toggles the debugging level.
+ *
+ * @param sig The actual signal number received.
+ */
+static void sigdebug(int sig)
+{
+    if (debug == 2)
+	debug = 1;
+    else
+	debug = 2;
+}
+
 static volatile int looping = 1;
 
 static char *emc_hostname = NULL, *emc_path = NULL;
@@ -325,6 +338,8 @@ int main(int argc, char *argv[])
         }
     }
     
+    signal(SIGHUP, sigdebug);
+    
     signal(SIGQUIT, sigquit);
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
@@ -377,6 +392,7 @@ int main(int argc, char *argv[])
             }
 	    
             for (lpc = 0; lpc < vmc_config.cameras.cameras_len; lpc++) {
+		lnNewList(&vmc_clients[vmc_client_count].vc_frame);
 		vmc_clients[vmc_client_count].vc_hostname =
 		    vmc_config.cameras.cameras_val[lpc].hostname;
 		vmc_clients[vmc_client_count].vc_port =
@@ -759,23 +775,29 @@ int main(int argc, char *argv[])
 			    fflush(stdout);
 			}
 			
-			if (vtUpdate(&current_frame, vc, &mp, &vt_pool)) {
-			    if (debug > 2) {
-				printf("got frame from client %s:%d\n",
-				       vc->vc_hostname,
-				       vc->vc_port);
+			if (vtUpdate(&vc->vc_frame, vc, &mp, &vt_pool)) {
+			    if (vc->vc_handle->mh_remaining > 0) {
+				lnAppendList(&vt_pool, &vc->vc_frame);
 			    }
-
-			    /*
-			     * Got all of the tracks from this client, clear
-			     * his bit and
-			     */
-			    FD_CLR(vc->vc_handle->mh_fd, &readfds);
-			    /* ... try to wait for the next one. */
-			    current_client += 1;
-			    if (current_client < vmc_client_count)
-				FD_SET(vc[1].vc_handle->mh_fd, &readfds);
-			    break; // XXX
+			    else {
+				if (debug > 2) {
+				    printf("got frame from client %s:%d\n",
+					   vc->vc_hostname,
+					   vc->vc_port);
+				}
+				
+				lnAppendList(&current_frame, &vc->vc_frame);
+				
+				/*
+				 * Got all of the tracks from this client,
+				 * clear his bit and
+				 */
+				FD_CLR(vc->vc_handle->mh_fd, &readfds);
+				/* ... try to wait for the next one. */
+				current_client += 1;
+				if (current_client < vmc_client_count)
+				    FD_SET(vc[1].vc_handle->mh_fd, &readfds);
+			    }
 			}
 		    }
 		    
