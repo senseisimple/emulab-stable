@@ -463,6 +463,19 @@ CREATE TABLE interface_capabilities (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `interface_settings`
+--
+
+CREATE TABLE interface_settings (
+  node_id varchar(32) NOT NULL default '',
+  iface varchar(32) NOT NULL default '',
+  capkey varchar(32) NOT NULL default '',
+  capval varchar(64) NOT NULL default '',
+  PRIMARY KEY  (node_id,iface,capkey),
+  KEY node_id (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `interfaces`
 --
 

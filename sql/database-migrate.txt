@@ -1437,3 +1437,16 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table experiments add column linktest_level tinyint(4) \
 	   not null default 0 after ipassign_args;
+
+1.237: Add interface_settings table for storing and sending arbitrary
+       interface settings to the nodes when they configure their
+       interfaces. Added primarily for wireless interface support.
+
+	CREATE TABLE interface_settings (
+	  node_id varchar(32) NOT NULL default '',
+	  iface varchar(32) NOT NULL default '',
+	  capkey varchar(32) NOT NULL default '',
+	  capval varchar(64) NOT NULL default '',
+	  PRIMARY KEY  (node_id,iface,capkey),
+          KEY node_id (node_id)
+	) TYPE=MyISAM;
