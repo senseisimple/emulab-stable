@@ -465,6 +465,7 @@ foreach my $command (@commands) {
     # Now, make the object for each stack that we discovered
     #
     my @stacks;
+    my %stack_ids;
     foreach my $stack_id (keys %stacks) {
 	my ($stack_type, $supports_private, $single_domain, $community)
 		= getStackType($stack_id);
@@ -509,6 +510,24 @@ foreach my $command (@commands) {
 	    die "Unable to connect to one or more switches, exiting\n";
 	} else {
 	    push @stacks, $stack;
+	    $stack_ids{$stack_id} = $stack;
+	}
+    }
+
+
+    #
+    # If we were given ports, make sure that the stack(s) that got created
+    # cover all of them
+    #
+    if (@ports) {
+	my %devicemap = mapPortsToDevices(@ports);
+	my @devices = keys %devicemap;
+	foreach my $device (@devices) {
+	    my $stack_id = getSwitchStack($device);
+	    if (!$stack_id || !$stack_ids{$stack_id}) {
+		die "*** ERROR: One or more ports are on $device, but no " .
+		    "stack containing it was specified!\n";
+	    }
 	}
     }
 
