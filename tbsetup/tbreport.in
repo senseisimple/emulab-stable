@@ -342,6 +342,8 @@ if ($showlinks) {
 		printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth, $lossrate;
 	    }
 	}
+
+	print "\n";
     }
 
 }
