@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -31,6 +31,8 @@ static uint32_t sectfree;
 static void usage(void);
 static void dumpfile(char *name, int fd);
 static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
+
+#define SECTOBYTES(s)	((unsigned long long)(s) * SECSIZE)
 
 int
 main(int argc, char **argv)
@@ -102,6 +104,7 @@ static char chunkbuf[SUBBLOCKSIZE];
 static unsigned int magic;
 static unsigned long chunkcount;
 static uint32_t nextsector;
+static uint32_t fmax, fmin, franges, amax, amin, aranges;
 
 static void
 dumpfile(char *name, int fd)
@@ -115,6 +118,10 @@ dumpfile(char *name, int fd)
 	isstdin = (fd == fileno(stdin));
 	wasted = sectinuse = sectfree = 0;
 	nextsector = 0;
+
+	fmax = amax = 0;
+	fmin = amin = ~0;
+	franges = aranges = 0;
 
 	if (!isstdin) {
 		struct stat st;
@@ -218,8 +225,8 @@ dumpfile(char *name, int fd)
 		filesize = (off_t)(chunkno + 1) * SUBBLOCKSIZE;
 
 	cbytes = (unsigned long long)(filesize - wasted);
-	dbytes = (unsigned long long)sectinuse * SECSIZE;
-	tbytes = (unsigned long long)(sectinuse + sectfree) * SECSIZE;
+	dbytes = SECTOBYTES(sectinuse);
+	tbytes = SECTOBYTES(sectinuse + sectfree);
 
 	if (detail > 0)
 		printf("\n");
@@ -231,6 +238,15 @@ dumpfile(char *name, int fd)
 	       (double)dbytes / cbytes, dbytes);
 	printf("  %5.2fx compression of total known disk size (%qu bytes)\n",
 	       (double)tbytes / cbytes, tbytes);
+
+	if (franges)
+		printf("  %d free ranges: %qu/%qu/%qu ave/min/max size\n",
+		       franges, SECTOBYTES(sectfree)/franges,
+		       SECTOBYTES(fmin), SECTOBYTES(fmax));
+	if (aranges)
+		printf("  %d allocated ranges: %qu/%qu/%qu ave/min/max size\n",
+		       aranges, SECTOBYTES(sectinuse)/aranges,
+		       SECTOBYTES(amin), SECTOBYTES(amax));
 }
 
 static int
@@ -238,6 +254,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 {
 	blockhdr_t *hdr;
 	struct region *reg;
+	uint32_t count;
 	int i;
 
 	hdr = (blockhdr_t *)buf;
@@ -300,6 +317,10 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 		if (reg->start < nextsector)
 			printf("    WARNING: chunk %d region %d "
 			       "may overlap others\n", chunkno, i);
+		if (reg->size == 0)
+			printf("    WARNING: chunk %d region %d "
+			       "zero-length region\n", chunkno, i);
+		count = 0;
 		if (hdr->magic > COMPRESSED_V1) {
 			if (i == 0) {
 				if (hdr->firstsect > reg->start)
@@ -308,10 +329,9 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 					       chunkno, hdr->firstsect,
 					       reg->start);
 				else
-					sectfree +=
-						(reg->start - hdr->firstsect);
+					count = reg->start - hdr->firstsect;
 			} else
-				sectfree += (reg->start - nextsector);
+				count = reg->start - nextsector;
 			if (i == hdr->regioncount-1) {
 				if (hdr->lastsect < reg->start + reg->size)
 					printf("    WARNING: chunk %d bad "
@@ -319,12 +339,27 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 					       chunkno, hdr->lastsect,
 					       reg->start + reg->size);
 				else
-					sectfree += (hdr->lastsect -
-						     (reg->start+reg->size));
+					count = hdr->lastsect -
+						(reg->start+reg->size);
 			}
 		} else
-			sectfree += (reg->start - nextsector);
-		sectinuse += reg->size;
+			count = reg->start - nextsector;
+		if (count > 0) {
+			sectfree += count;
+			if (count < fmin)
+				fmin = count;
+			else if (count > fmax)
+				fmax = count;
+			franges++;
+		}
+
+		count = reg->size;
+		sectinuse += count;
+		if (count < amin)
+			amin = count;
+		else if (count > amax)
+			amax = count;
+		aranges++;
 
 		if (dumpmap) {
 			switch (hdr->magic) {
@@ -362,7 +397,7 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 
 	for (i = 0; i < hdr->reloccount; i++) {
 		struct blockreloc *reloc = (struct blockreloc *)reg;
-		uint32_t offset = reloc->sector * SECSIZE + reloc->sectoff;
+		uint32_t offset = SECTOBYTES(reloc->sector) + reloc->sectoff;
 
 		if (reloc->sector < hdr->firstsect ||
 		    reloc->sector >= hdr->lastsect)
@@ -371,8 +406,10 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 			       reloc->sector, hdr->firstsect, hdr->lastsect-1);
 		if (detail > 1)
 			printf("    Reloc %d: %s [%u-%u] (sector %d)\n", i,
-			       reloc->type == RELOC_BSDDISKLABEL ?
-			       "BSDDISKLABEL" : "??",
+			       reloc->type == RELOC_FBSDDISKLABEL ?
+			       "FBSDDISKLABEL" :
+			       (reloc->type == RELOC_OBSDDISKLABEL ?
+				"OBSDDISKLABEL" : "??"),
 			       offset, offset + reloc->size, reloc->sector);
 	}
 
