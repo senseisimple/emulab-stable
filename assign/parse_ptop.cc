@@ -117,6 +117,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  }
 	  if (type.compare("switch") == 0) {
 	    isswitch = true;
+	    p->is_switch = true;
 	    p->types["switch"] = new tb_pnode::type_record(1,false);
 	    svertex sv = add_vertex(SG);
 	    tb_switch *s = new tb_switch();

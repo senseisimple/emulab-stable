@@ -81,7 +81,7 @@ void score_link_endpoints(pedge pe);
 #ifdef SCORE_DEBUG
 #define SDEBUG(a) a
 #else
-#define SDEBUG(a)
+#define SDEBUG(a) 
 #endif
 
 /*
@@ -783,8 +783,16 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 		second_link = true;
 	      }
 
+	      // Intraswitch links to switches are not allowed - they will be
+	      // caught as direct links above
+	      if (pnode->is_switch || dest_pnode->is_switch) {
+		SDEBUG(cerr << "    intraswitch failed - switch" << endl;)
+		continue;
+	      }
+
 	      if (first_link) {
 		if (!find_link_to_switch(pv,*switch_it,vlink,first)) {
+		  SDEBUG(cerr << "    intraswitch failed - no link first" << endl;)
 		  // No link to this switch
 		  continue;
 		}
@@ -793,6 +801,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	      if (second_link) {
 		if (!find_link_to_switch(dest_pv,*switch_it,vlink,second)) {
 		  // No link to this switch
+		  SDEBUG(cerr << "    intraswitch failed - no link second" << endl;)
 		  continue;
 		}
 	      }
@@ -858,6 +867,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	      if (first_link) {
 		if (!find_link_to_switch(pv,*source_switch_it,vlink,first)) {
 		  // No link to this switch
+		  SDEBUG(cerr << "    interswitch failed - no first link" << endl;)
 		  continue;
 		}
 	      }
@@ -865,6 +875,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	      if (second_link) {
 		if (!find_link_to_switch(dest_pv,*dest_switch_it,vlink,second)) {
 		  // No link to this switch
+		  SDEBUG(cerr << "    interswitch failed - no second link" << endl;)
 		  continue;
 		}
 	      }
@@ -890,13 +901,17 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 	      SDEBUG(cerr << "    interswitch " <<
 		     get(pvertex_pmap,*source_switch_it)->name << " and " <<
 		     get(pvertex_pmap,*dest_switch_it)->name << endl);
+	    } else {
+	      SDEBUG(cerr << "    interswitch failed - no switch path";)
 	    }
 	  }
 	}
 
+	//assert(resolution_index <= 1);
+
 	// check for no link
 	if (resolution_index == 0) {
-	  SDEBUG(cerr << "  Could not find any resolutions." << endl);
+	  SDEBUG(cerr << "  Could not find any resolutions" << endl;)
 
 	  SADD(SCORE_NO_CONNECTION);
 	  vlink->no_connection=true;
@@ -1090,6 +1105,7 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
   pvertex dest_pv;
   double best_distance = 1000.0;
   int best_users = 1000;
+  double best_avail_bandwidth = 0;
   pedge best_pedge;
   bool found_best=false;
   poedge_iterator pedge_it,end_pedge_it;
@@ -1100,36 +1116,53 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
       dest_pv = source(*pedge_it,PG);
     if (dest_pv == switch_pv) {
       tb_plink *plink = get(pedge_pmap,*pedge_it);
+
+      // Get delay characteristics - NOTE: Currently does not actually do
+      // anything
       tb_delay_info physical_delay;
       physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
       physical_delay.delay = plink->delay_info.delay;
       physical_delay.loss = plink->delay_info.loss;
       double distance = vlink->delay_info.distance(physical_delay);
-      int users;
+
+      double available_bandwidth =  plink->delay_info.bandwidth - plink->bw_used;
 
       // For sticking emulated links in emulated links we care about the
       // distance, and whether or not we've gone over bandwidth
+      int users;
       users = plink->nonemulated;
       if (! vlink->emulated) {
 	users += plink->emulated;
-      } else {
-	  if (vlink->delay_info.bandwidth >
-		  (plink->delay_info.bandwidth - plink->bw_used)) {
-	      // Silly hack to make sure that this link doesn't get chosen
-	      users = best_users + 1;
-	  }
       }
 
       if (distance == -1) {
 	// -1 == infinity
 	distance = DBL_MAX;
       }
+      /*
       if ((users < best_users) ||
 	  ((users  == best_users) && (distance < best_distance))) {
-	best_pedge = *pedge_it;
-	best_distance = distance;
-	found_best = true;
-	best_users = plink->emulated+plink->nonemulated;
+	  */
+      if (vlink->emulated) {
+	// For emulated links, we want lots of remaining capacity - break ties
+	// with the fewest number of users
+	if ((available_bandwidth > best_avail_bandwidth) ||
+	    ((available_bandwidth == best_avail_bandwidth)
+	       && (users < best_users))) {
+	  best_pedge = *pedge_it;
+	  best_avail_bandwidth = available_bandwidth;
+	  found_best = true;
+	  best_users = plink->emulated+plink->nonemulated;
+	}
+      } else {
+	// For non-emulated links, we're just looking for links with few (0,
+	// actually) users
+	if (users < best_users) {
+	  best_pedge = *pedge_it;
+	  best_distance = distance;
+	  found_best = true;
+	  best_users = plink->emulated+plink->nonemulated;
+	}
       }
     }
   }
