@@ -13,6 +13,7 @@ my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
 my $HISTORY     = "/root/.history";
+my $MAILFILE    = "/var/mail/root";
 
 #
 # Load the testbed library.
@@ -102,6 +103,12 @@ print "Removing root's history ...\n";
 if (-f $HISTORY) {
     unlink($HISTORY) or
         die("Could not unlink $HISTORY: $!");
+}
+
+print "Removing root's mailfile ...\n";
+if (-f $MAILFILE) {
+    unlink($MAILFILE) or
+        die("Could not unlink $MAILFILE: $!");
 }
 
 print "Cleaing .pid files ...\n";
