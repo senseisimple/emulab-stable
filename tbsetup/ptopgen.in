@@ -163,13 +163,15 @@ else {
 # from allocating a dead virtual node to an experiment. 
 # This is especially hacky. We need another mechanism for this. We only
 # add virtnodes when assign says we need them. This reduces the problem
-# size for assign!
+# size for assign! Also note that local virtnodes never go into the
+# ptop file. 
 #
 my $virtnode_condition = "";
 
 if ($virtstuff) {
     $virtnode_condition = " or ".
-	"       (a.role='virtnode' and ns.status='up' and ".
+	"       (a.role='virtnode' and t.isremotenode=1 and ".
+	"        ns.status='up' and ".
 	"        (m.node_id is null or ".
 	"         m.pid!='$DEADPID' or m.eid!='$DEADEID')) ";
 }
