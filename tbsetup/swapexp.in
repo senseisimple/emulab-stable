@@ -32,6 +32,7 @@ use libdb;
 use libtestbed;
 
 my $tbdir    = "$TB/bin/";
+my $tbdata   = "tbdata";
 my $batch    = 0;
 my $inout;
 my $logname;
@@ -142,6 +143,11 @@ my $estate          = $hashrow{'state'};
 my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $ebatchstate     = $hashrow{'batchstate'};
+
+if (! chdir("$expt_path/$tbdata")) {
+    die("*** $0:\n".
+	"    Could not chdir to $expt_path/$tbdata: $!\n");
+}
 
 if (defined($hashrow{'expt_locked'})) {
     $val = $hashrow{'expt_locked'};
