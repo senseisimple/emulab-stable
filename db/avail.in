@@ -20,11 +20,13 @@ my $d = 0; #debug mode
 
 if ($#ARGV >= 0 && $ARGV[0] =~ /^-?h/i ) { 
   die("Usage:\navail [help] [type[=<type>]] [OS[=<OS>]] [ver[=<OS_ver>]]\n".
+      "              [includevirt]\n".
       #"      [deltas=<delta[,delta,...]>]".
       #	" [fixes=<fix_name[,fix_name,...]>]".
       "\n".
       "type \t= pc | shark\n"."OS \t= Linux | FreeBSD | NetBSD | ...\n".
       "ver \t= 6.2 | 3.4 | 4.0 | 5.2 | ...\n".#"deltas \t= anetd | ...\n".
+      "includevirt: Include virtual nodes\n".
       #	"fixes \t\t= cron_off | sendmail_off | ...\n"
       "A field name alone will show that field in the display of available\n".
       "nodes. A field name with '=' followed by a string will match nodes\n".
@@ -55,6 +57,9 @@ my $join= "nodes as a left join reserved as b on a.node_id=b.node_id".
   " left join node_types as nt on a.type=nt.type";
 my $cols= "a.node_id,a.type,nt.class";
 my $cond= "b.node_id is null and a.role='testnode'";
+if ($args{"includevirt"}) {
+    $cond .= " or a.role='virtnode' ";
+}
 my $os = 0;
 my $delta = 0;
 
