@@ -2036,7 +2036,7 @@ COMMAND_PROTOTYPE(domounts)
 	res = mydb_query("select u.uid from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "where p.pid='%s' and p.gid='%s' and "
-			 "      u.status='active'",
+			 "      u.status='active' and p.trust!='none'",
 			 1, pid, gid);
 #else
 	res = mydb_query("select distinct u.uid from users as u "
@@ -2044,7 +2044,7 @@ COMMAND_PROTOTYPE(domounts)
 			 " on a.exp_pid='%s' and a.exp_eid='%s' "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "where ((p.pid='%s' and p.gid='%s') or p.pid=a.pid) "
-			 "       and u.status='active'",
+			 "       and u.status='active' and p.trust!='none'",
 			 1, pid, eid, pid, gid);
 #endif
 	if (!res) {
