@@ -14,7 +14,11 @@
 #define MAXPACKET 2048
 
 struct portmask {
-    int port;
+    int proto;      /* currently IPPROTO_ICMP or IPPROTO_UDP */
+    union {
+      int port;
+      int icmptype;
+    } proto_data;
     int ipfw_rule;
     struct portmask *next;
 };
@@ -60,5 +64,9 @@ void free_socket(struct msockinfo *s);
 
 int add_mask_port(struct msockinfo *s, int port);
 int rem_mask_port(struct msockinfo *s, int port);
+
+/* We should clean up the interface to merge these..
+ * and add a rem_mask_icmp, or equivalent. */
+int add_mask_icmp(struct msockinfo *s, int icmptype);
 
 #endif /* _JANOS_DIVERT_H */

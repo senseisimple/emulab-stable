@@ -116,14 +116,15 @@ void freerule(int rule) {
     bit_clear(rulesused, rule - RULE_BASE);
 }
 
-struct portmask *find_mask_port(struct msockinfo *s, int port) {
+struct portmask *find_mask_port(struct msockinfo *s, int proto, int port) {
     struct portmask *next;
     
     if (s == 0) return NULL;
     
     next = s->ports;;
     while (next != NULL) {
-	if (next->port == port) return next;
+	if (next->proto == proto &&
+	    next->proto_data.port == port) return next;
 	next = next->next;
     }
     return NULL;
@@ -142,16 +143,17 @@ int add_mask_port(struct msockinfo *s, int port)
 
     DPRINTF("Adding sniffer for socket %d on port %d\n",
 	    s->sock, port);
-    if (find_mask_port(s, port)) return 0;
+    if (find_mask_port(s, IPPROTO_UDP, port)) return 0;
     addem = malloc(sizeof(*addem));
     if (!addem) return ENOMEM; /* Sigh */
-    addem->port = port;
+    addem->proto = IPPROTO_UDP;
+    addem->proto_data.port = port;
     addem->next = s->ports;
     s->ports = addem;
     addem->ipfw_rule = getrule();
 
     DPRINTF("Grabbing port %d with ipfw rule %d\n",
-	    addem->port,
+	    addem->proto_data.port,
 	    addem->ipfw_rule);
 
     if (controlsock == -1) {
@@ -169,7 +171,62 @@ int add_mask_port(struct msockinfo *s, int port)
     myipfw.fw_prot = IPPROTO_UDP;
     IP_FW_SETNSRCP(&myipfw, 0);
     IP_FW_SETNDSTP(&myipfw, 1);
-    myipfw.fw_uar.fw_pts[0] = addem->port;
+    myipfw.fw_uar.fw_pts[0] = addem->proto_data.port;
+
+    rc = setsockopt(controlsock, IPPROTO_IP, IP_FW_ADD,
+		    &myipfw, sizeof(myipfw));
+
+    DPRINTF("Result of setsockopt: %d\n", rc);
+    if (rc) {
+	    perror("setsock for fw addition failed");
+	    return errno;
+    }
+    
+    return 0;
+}
+
+int add_mask_icmp(struct msockinfo *s, int icmptype)
+{
+    struct portmask *addem;
+    int rc;
+    struct ip_fw myipfw;
+
+    if (s == 0) return -1;
+
+    DPRINTF("Adding sniffer for ICMP socket %d type %d\n",
+	    s->sock, icmptype);
+    if (find_mask_port(s, IPPROTO_ICMP, icmptype)) return 0;
+    addem = malloc(sizeof(*addem));
+    if (!addem) return ENOMEM; /* Sigh */
+    addem->proto = IPPROTO_ICMP;
+    addem->proto_data.icmptype = icmptype;
+    addem->next = s->ports;
+    s->ports = addem;
+    addem->ipfw_rule = getrule();
+
+    DPRINTF("Grabbing ICMP type %d with ipfw rule %d\n",
+	    addem->proto_data.icmptype,
+	    addem->ipfw_rule);
+
+    if (controlsock == -1) {
+	    DPRINTF("Grabbing new control socket\n");
+	    /* Grab it */
+	    controlsock = socket( AF_INET, SOCK_RAW, IPPROTO_RAW );
+	    if (controlsock < 0) {
+		    perror("Could not allocate control socket!\n");
+	    }
+    }
+    bzero(&myipfw, sizeof(myipfw));
+    myipfw.fw_number = addem->ipfw_rule;
+    myipfw.fw_divert_port = s->divert_port;
+    myipfw.fw_flg = IP_FW_F_DIVERT | IP_FW_F_IN | IP_FW_F_OUT | IP_FW_F_ICMPBIT;
+    myipfw.fw_prot = IPPROTO_ICMP;
+    myipfw.fw_uar.fw_icmptypes[icmptype / (sizeof(unsigned)*8)] |=
+                               1 << (icmptype % (sizeof(unsigned) * 8));
+
+    DPRINTF("Setting int %d to 0x%x\n",
+	    icmptype / (sizeof(unsigned)*8),
+	    icmptype % (sizeof(unsigned) *8));
 
     rc = setsockopt(controlsock, IPPROTO_IP, IP_FW_ADD,
 		    &myipfw, sizeof(myipfw));
@@ -188,7 +245,7 @@ void freeport(struct portmask *pm)
     struct ip_fw myipfw;
     int rc;
     /* XXX */
-    DPRINTF("Removing port snork for port %d\n", pm->port);
+    DPRINTF("Removing port snork for port %d\n", pm->proto_data.port);
 
     myipfw.fw_number = pm->ipfw_rule;
     rc = setsockopt(controlsock, IPPROTO_IP, IP_FW_DEL,
@@ -208,7 +265,7 @@ int rem_mask_port(struct msockinfo *s, int port)
 
     if (s == 0) return -1;
     if (s->ports == 0) return -1;
-    if (s->ports->port == port) {
+    if (s->ports->proto == IPPROTO_UDP && s->ports->proto_data.port == port) {
 	cur = s->ports;
 	s->ports = s->ports->next;
 	freeport(cur);
@@ -218,7 +275,7 @@ int rem_mask_port(struct msockinfo *s, int port)
     prev = s->ports;
     cur = prev->next;
     while (cur != NULL) {
-	if (cur->port == port) {
+	if (cur->proto_data.port == port) {
 	    prev->next = cur->next;
 	    freeport(cur);
 	    return 0;
