@@ -34,7 +34,12 @@ if (!isset($records) || !strcmp($records, "")) {
 }
 
 echo "<b>Show: <a class='static' href='showexpstats.php3'>
-              Experiment Stats</a></b><br>\n";
+                  Experiment Stats</a>";
+
+if ($isadmin) {
+    echo "<a class='static' href='showsumstats.php3'>, Summary Stats</a>\n";
+}
+echo "</b><br>\n";
 
 # Set up where clause and menu.
 $wclause = "";
