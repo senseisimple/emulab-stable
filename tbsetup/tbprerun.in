@@ -115,8 +115,7 @@ sub cleanup {
 	print "Removal done! " . TBTimeStamp() . "\n";
 
 	#
-	# If modify fails,
-	# going to "NEW" tells swapexp to fully terminate the experiment.
+	# Going to "NEW" allows the experiment to be wiped out.
 	#
 	SetExpState($pid, $eid, EXPTSTATE_NEW);
     }

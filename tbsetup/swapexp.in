@@ -70,6 +70,7 @@ my $autoswap = 0;
 my $force    = 0;
 my $reboot   = 0;
 my $errorstat= -1;
+my $modifyHosed = 0;
 
 my $inout;
 my $logname;
@@ -338,7 +339,10 @@ if ($isbatchexpt) {
 	    # Otherwise, proceed with the modify. The experiment will be
 	    # locked below, and so it cannot be injected or otherwise messed
 	    # with since its state is going to be changed before we unlock
-	    # the experiments table.
+	    # the experiments table. The batch daemon will leave it alone
+	    # until the modify is done. If the modify fails and cannot recover
+	    # it is going to get swapped out; that is okay since the batch
+	    # daemon does not keep state internally. 
 	    #
 	    goto doit;
 	}
@@ -558,24 +562,24 @@ if ($inout eq "out") {
     print STDOUT "Running 'tbswap out' with arguments: $pid $eid\n";
     if (system("$tbdir/tbswap out $arg $pid $eid") != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswap out failed!\n");
+	fatal("tbswap out failed!");
     }
 
     $estate = ExpState($pid,$eid);
     if ($estate ne EXPTSTATE_SWAPPED) {
-	fatal("Experiment is in the wrong state: $estate\n");
+	fatal("Experiment is in the wrong state: $estate");
     }
 }
 elsif ($inout eq "in") {
     print STDOUT "Running 'tbswap in' with arguments: $pid $eid\n";
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
-	fatal("tbswap in failed!\n");
+	fatal("tbswap in failed!");
     }
 
     $estate = ExpState($pid,$eid);
     if ($estate ne EXPTSTATE_ACTIVE) {
-	fatal("Experiment is in the wrong state: $estate\n");
+	fatal("Experiment is in the wrong state: $estate");
     }
 
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
@@ -588,8 +592,7 @@ elsif ($inout eq "modify") {
 
     print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
     if (TBExptBackupVirtualState($pid, $eid)) {
-	fatal("*** $0:\n".
-	      "    Could not backup experiment state; cannot safely continue!\n");
+	fatal("Could not backup experiment state; cannot safely continue!");
     }
     # Must deal with the prerender explicitly since it runs background.
     system("prerender -r $pid $eid");
@@ -620,35 +623,42 @@ elsif ($inout eq "modify") {
 	    $modifyError = "tbswap update failed!";
 	}
 
+	#
+	# See what state tbswap left it in. It might have swapped it out
+	# or restored it, if there was an error. 
+	# 
+	$estate = ExpState($pid, $eid);
+	
 	if (! $modifyError) {
-	    $estate = ExpState($pid, $eid);
 	    if ($estate ne EXPTSTATE_ACTIVE) {
+		$modifyHosed = 1;
 		fatal("Experiment is in the wrong state: $estate!");
 	    }
-	}
-
-	if (! $modifyError) {
 	    system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
+	}
+	elsif ($estate ne EXPTSTATE_ACTIVE) {
+	    # Was active, now its not! tbswap was not able to recover.
+	    $modifyHosed = 1;
 	}
     }
 
     if ($modifyError) {
-	print STDERR "*** $0:\n".
-	             "    $modifyError\n";
+	print STDOUT "Modify Error: $modifyError\n";
 	print STDOUT "Recovering experiment state...\n";
+	
 	# Must deal with the prerender explicitly since it runs background.
 	system("prerender -r $pid $eid");
-	TBExptRemoveVirtualState($pid, $eid );
+	TBExptRemoveVirtualState($pid, $eid);
 	
 	if (TBExptRestoreVirtualState($pid, $eid) == 0) {
 	    TBExptClearBackupState($pid, $eid);
 	    # Must deal with the prerender explicitly since it runs background.
 	    system("prerender -t $pid $eid");
-	    fatal("*** Update aborted; old state restored.\n");
-	} else {
-	    # Set state to NEW so experiment will get wiped.
-	    SetExpState($pid, $eid, EXPTSTATE_NEW);
-	    fatal("*** Experiment state could not be restored!\n");
+	    fatal("Update aborted; old state restored.");
+	}
+	else {
+	    $modifyHosed = 1;
+	    fatal("Experiment state could not be restored!");
 	}
     }
     TBExptClearBackupState($pid, $eid);
@@ -656,7 +666,7 @@ elsif ($inout eq "modify") {
 else { # $inout eq "restart" assumed.
     print STDOUT "Running tbrestart with arguments: $pid $eid\n";
     if (system("$tbdir/tbrestart $pid $eid") != 0) {
-	fatal("tbrestart failed!\n");
+	fatal("tbrestart failed!");
     }
 }
 
@@ -787,7 +797,8 @@ sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print STDOUT $mesg;
+    print STDOUT "*** $0:\n".
+	         "    $mesg\n";
 
     #
     # Gather stats. 
@@ -803,21 +814,11 @@ sub fatal($)
     }
 
     #
-    # if $hosed == 1, we entirely terminate the experiment.
+    # If hosed, we entirely terminate the experiment.
     #
-    my $hosed = 0;
-
-    # If we're doing a modify,
-    # and tbprerun sent the experiment to "NEW",
-    # we're hosed.
-    if ($inout eq "modify" && ExpState($pid,$eid) eq EXPTSTATE_NEW) {
-	$hosed = 1;
-    }
-
-    if ($hosed) {
+    if ($modifyHosed) {
 	#
-	# Note: $estate is still set to the state which the experiment was in
-	# when we began.
+	# Note: $estate is indeed still set appropriately!
 	#
 	if ($estate eq EXPTSTATE_ACTIVE) {
 	    print "Running 'tbswap out' with arguments: $pid $eid\n";
@@ -830,6 +831,8 @@ sub fatal($)
 	if (system("$tbdir/tbend -force $pid $eid") != 0) {
 	    print "tbend failed!\n";
 	}
+	# Must override since we are so badly hosed. 
+	$ebatchstate = BATCHSTATE_PAUSED;
     }
 
     # Copy over the log files so the user can see them.
