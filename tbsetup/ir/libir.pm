@@ -38,14 +38,14 @@
 # / seperated list and dirname returns the first n-1 components of
 # a /seperated list (length n)
 sub libir'tail {
-    split('\/',$_[0]);
-    return $_[$#_];
+    @t = split('\/',$_[0]);
+    return $t[$#t];
 }
 
 sub libir'dirname {
     local($ret);
-    split('\/',$_[0]);
-    $ret = join('/',@_[0..$#_ - 1]);
+    @t = split('\/',$_[0]);
+    $ret = join('/',@t[0..$#t - 1]);
     if ($ret eq "") {
 	$ret = "/";
     }
