@@ -12,7 +12,7 @@ lan instproc print {file} {
 	set lanname lan[$self set id]
     }
 
-    puts -nonewline $file "$lanname \""
+    puts -nonewline $file "$prefix-$lanname \""
     set lastnode [lindex [$self set nodes] end]
     foreach node [$self set nodes] {
 	if {[info exists nodeid_map(n[$node set id])]} {
