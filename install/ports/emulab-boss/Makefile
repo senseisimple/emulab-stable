@@ -3,12 +3,13 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-boss
-PORTVERSION=	1.4
+PORTVERSION=	1.5
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
 EXTRACT_ONLY=	#none
 COMMENT=	"Meta-port for an emulab boss node"
+
 
 MAINTAINER=	ricci@cs.utah.edu
 
@@ -18,9 +19,21 @@ MAINTAINER=	ricci@cs.utah.edu
 .MAKEFLAGS+=	-DSKIP_DNS_CHECK
 
 #
-# These are for the mod_php4 port
+# These are for the php4-extensions port
 #
-.MAKEFLAGS+=	-DWITH_MHASH -DWITH_XMLRPC -DWITH_CURL -DWITH_OPENSSL
+.MAKEFLAGS+=	-DWITH_MHASH -DWITH_XMLRPC -DWITH_CURL -DWITH_OPENSSL -DWITH_BZ2 \
+		-DWITH_CRACK -DWITH_GD -DWITH_MCRYPT -DWITH_MYSQL -DWITH_XML
+
+#
+# Disgusting. When we build the php4 port, we have to tell it we're going to be
+# building an SSL extention later. The port needs to be fixed.
+#
+.MAKEFLAGS+=	CFLAGS=-DHAVE_OPENSSL_EXT
+
+#
+# For SWIG, so that it doesn't feel the need to suck in php and apache
+#
+.MAKEFLAGS+=	SWIG_LANGUAGES="perl python tcl"
 
 #
 # This prevents any ports from trying to run interactively - some, like the
@@ -43,25 +56,27 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
         swish-e:${PORTSDIR}/www/swish-e \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql323-server \
 	${LOCALBASE}/libexec/apache/libphp4.so:${PORTSDIR}/www/mod_php4 \
+	${LOCALBASE}/include/php/ext/openssl/php_openssl.h:${PORTSDIR}/lang/php4-extensions \
 	anytopnm:${PORTSDIR}/graphics/netpbm \
 	tclsh8.3:${PORTSDIR}/lang/tcl83 \
-	otcl:${PORTSDIR}/lang/otcl \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/graphics/p5-GD \
+	otclsh:${PORTSDIR}/lang/otcl \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/GD.pm:${PORTSDIR}/misc/p5-GD-old \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP.pm:${PORTSDIR}/net-mgmt/p5-SNMP \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/SNMP_Session.pm:${PORTSDIR}/net-mgmt/p5-SNMP_Session \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/SNMP_Session.pm:${PORTSDIR}/net-mgmt/p5-SNMP_Session \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/MD5.pm:${PORTSDIR}/security/p5-MD5 \
 	rpm:${PORTSDIR}/archivers/rpm \
-	${LOCALBASE}/lib/tcl8.3/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
+	${LOCALBASE}/lib/tcl8.4/sql1.0/libTclMySQL.so.1:${PORTSDIR}/databases/tcl-Mysql \
 	xvcg:${PORTSDIR}/graphics/vcg \
 	${LOCALBASE}/libexec/tftpd:${PORTSDIR}/misc/emulab-tftp-hpa \
-	elvind:${PORTSDIR}/misc/elvind \
+	${LOCALBASE}/libexec/elvind:${PORTSDIR}/misc/elvind \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3-server \
 	sudo:${PORTSDIR}/security/sudo \
 	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9 \
 	wget:${PORTSDIR}/ftp/wget \
-	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
+	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto
 
 BUILD_DEPENDS=	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 	gmake:${PORTSDIR}/devel/gmake \
@@ -72,6 +87,7 @@ BUILD_DEPENDS=	${LOCALBASE}/include/boost:${PORTSDIR}/devel/boost \
 
 
 USE_PERL5=	yes
+USE_PYTHON=	yes
 
 NO_BUILD=	yes
 
