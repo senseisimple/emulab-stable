@@ -10,11 +10,18 @@
 #include <iostream.h>
 #include <float.h>
 
+/*
+ * We have to do these includes differently depending on which version of gcc
+ * we're compiling with
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#include <ext/hash_map>
+#include <ext/hash_set>
+using namespace __gnu_cxx;
+#else
 #include <hash_map>
-#include <rope>
-#include <queue>
-#include <slist>
 #include <hash_set>
+#endif
 
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
@@ -302,8 +309,10 @@ void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode, tb_vnod
 
 	if (old_over_bw) {
 	  // Count how many multiples of the maximum bandwidth we're at
-	  int num_violations = (int)(floor((old_bw -1)/src_pnode->trivial_bw)
-	      - floor((src_pnode->trivial_bw_used -1) / src_pnode->trivial_bw));
+	  int num_violations = (int)(
+	      floor((double)(old_bw -1)/src_pnode->trivial_bw)
+	      - floor((double)(src_pnode->trivial_bw_used -1) /
+		src_pnode->trivial_bw));
 	  violated -= num_violations;
 	  vinfo.bandwidth -= num_violations;
 	  double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /
@@ -622,8 +631,9 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
       if (new_over_bw) {
 	// Count how many multiples of the maximum bandwidth we're at
 	int num_violations =
-	  (int)(floor((src_pnode->trivial_bw_used -1) / src_pnode->trivial_bw)
-		- floor((old_bw -1)/src_pnode->trivial_bw));
+	  (int)(floor((double)((src_pnode->trivial_bw_used -1)
+			       / src_pnode->trivial_bw))
+		- floor((double)((old_bw -1)/src_pnode->trivial_bw)));
 	violated += num_violations;
 	vinfo.bandwidth += num_violations;
 
@@ -1057,7 +1067,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	  int index;
 	  if (!deterministic && !greedy_link_assignment) {
 	    float choice;
-	    choice = std::random()%(int)total_weight;
+	    choice = random()%(int)total_weight;
 	    for (index = 0;index < resolution_index;++index) {
 	      switch (resolutions[index].type_used) {
 	      case tb_link_info::LINK_DIRECT:
@@ -1405,8 +1415,8 @@ void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
     if (new_over_bw) {
       // Count how many multiples of the maximum bandwidth we're at
       int num_violations =
-	(int)(floor((plink->bw_used -1) / plink->delay_info.bandwidth)
-	      - floor((old_bw -1)/plink->delay_info.bandwidth));
+	(int)(floor((double)((plink->bw_used -1) / plink->delay_info.bandwidth))
+	      - floor((double)((old_bw -1)/plink->delay_info.bandwidth)));
       violated += num_violations;
       vinfo.bandwidth += num_violations;
 
@@ -1553,8 +1563,9 @@ void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
 
     if (old_over_bw) {
       // Count how many multiples of the maximum bandwidth we're at
-      int num_violations = (int)(floor((old_bw -1)/plink->delay_info.bandwidth)
-	  - floor((plink->bw_used -1) / plink->delay_info.bandwidth));
+      int num_violations = (int)
+	(floor((double)((old_bw -1)/plink->delay_info.bandwidth))
+	  - floor((double)((plink->bw_used -1) / plink->delay_info.bandwidth)));
       violated -= num_violations;
       vinfo.bandwidth -= num_violations;
       double removed_bandwidth_percent = (old_over_bw - new_over_bw) * 1.0 /

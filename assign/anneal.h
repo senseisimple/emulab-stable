@@ -16,21 +16,27 @@
 #include <boost/graph/adjacency_list.hpp>
 using namespace boost;
 
-#include <rope>
-#include <queue>
 #include <iostream>
+using namespace std;
+
+/*
+ * We have to do these includes differently depending on which version of gcc
+ * we're compiling with
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#include <ext/hash_map>
+#include <ext/slist>
+using namespace __gnu_cxx;
+#else
+#include <hash_map>
+#include <slist>
+#endif
 
 #include <math.h>
 
-#include "common.h"
 #include "delay.h"
 #include "physical.h"
-#include "virtual.h"
-#include "vclass.h"
-#include "maps.h"
-#include "score.h"
 #include "pclass.h"
-#include "solution.h"
 
 // Some defaults for #defines
 #ifndef NO_REVERT
@@ -75,5 +81,8 @@ tb_pnode *find_pnode(tb_vnode *vn);
 /* The big guy! */
 void anneal(bool scoring_selftest, double scale_neighborhood,
     double *initial_temperature, double use_connected_pnode_find);
+
+typedef hash_map<crope,crope> name_name_map;
+typedef slist<crope> name_slist;
 
 #endif

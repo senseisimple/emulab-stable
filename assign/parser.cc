@@ -4,13 +4,9 @@
  * All rights reserved.
  */
 
-#include <vector>
-#include <rope>
-#include <algo.h>
-
-#include <iostream.h>
-
 #include "parser.h"
+
+#include <iostream>
 
 #ifdef DEBUG_PARSER
 #define DEBUG(x) x

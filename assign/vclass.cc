@@ -8,11 +8,6 @@
 
 #include <stdlib.h>
 
-#include <hash_map>
-#include <rope>
-#include <queue>
-#include <slist>
-
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
 #include <boost/property_map.hpp>
@@ -82,10 +77,10 @@ crope tb_vclass::choose_type()
 {
   // This may take some tweaking - i.e. might want to make more
   // efficient, although members is usually a very small hash.
-  if (std::random()%2 == 0) {
+  if (random()%2 == 0) {
     return dominant;
   }
-  int r = std::random()%members.size();
+  int r = random()%members.size();
   members_map::iterator dit;
   for (dit=members.begin();dit != members.end();++dit) {
     if (r == 0) break;

@@ -6,11 +6,6 @@
 
 #include "port.h"
 
-#include <hash_map>
-#include <slist>
-#include <queue>
-#include <rope>
-
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
 #include <boost/property_map.hpp>
@@ -27,6 +22,7 @@ using namespace boost;
 #include "physical.h"
 #include "virtual.h"
 #include "parser.h"
+#include "anneal.h"
 
 extern name_vvertex_map vname2vertex;
 extern name_name_map fixed_nodes;

@@ -7,8 +7,11 @@
 #ifndef __DELAY_H
 #define __DELAY_H
 
-class tb_pnode;
+// For DBL_MAX
+#include <float.h>
 
+#include <iostream>
+using namespace std;
 
 template <class T> inline double basic_distance(T a,T b) {
   if (b == 0) {
@@ -68,5 +71,5 @@ public:
   }
 };
 
-#endif __DELAY_H
+#endif
 

@@ -9,6 +9,13 @@ MAKEFILE_IN	= @srcdir@/GNUmakefile.in
 
 include $(OBJDIR)/Makeconf
 
+#
+# Uncomment these to build with gcc3.3
+#
+#CC=gcc33
+#CPP=cpp33
+#CXX=g++33	
+
 all: assign 
 
 include $(TESTBED_SRCDIR)/GNUmakerules

@@ -8,7 +8,30 @@
 #define __PHYSICAL_H
 
 #include "common.h"
+
 #include <set>
+#include <list>
+using namespace std;
+
+#include <boost/config.hpp>
+#include <boost/utility.hpp>
+#include <boost/property_map.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+using namespace boost;
+
+/*
+ * We have to do these includes differently depending on which version of gcc
+ * we're compiling with
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#include <ext/hash_set>
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+#else
+#include <hash_set>
+#include <hash_map>
+#endif
 
 // Icky, but I can't include virtual.h here
 class tb_vnode;

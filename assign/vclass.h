@@ -7,6 +7,22 @@
 #ifndef __VCLASS_H
 #define __VCLASS_H
 
+#include "port.h"
+
+/*
+ * We have to do these includes differently depending on which version of gcc
+ * we're compiling with
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+#else
+#include <hash_map>
+#endif
+
+#include <iostream>
+using namespace std;
+
 // tb_vclass represents a virtual equivalence class.  The main purpose
 // of the code here is to monitor which members of the class are being
 // used, what types that are being used as, and calculating the
@@ -16,7 +32,6 @@
 // The membership of nodes is not stored here.  Rather each vnode
 // stores which vclass it belongs to.  This class is more abstract and
 // represents the scoring model.
-
 
 class tb_vclass {
 public:

@@ -6,6 +6,13 @@
 
 #include "anneal.h"
 
+#include "virtual.h"
+#include "maps.h"
+#include "common.h"
+#include "score.h"
+#include "solution.h"
+#include "vclass.h"
+
 /*
  * Internal variables
  */
@@ -51,7 +58,7 @@ inline int accept(double change, double temperature)
   } else {
     p = expf(change/temperature) * 1000;
   }
-  r = std::random() % 1000;
+  r = random() % 1000;
   if (r < p) {
     return 1;
   }
@@ -175,8 +182,8 @@ tb_pnode *find_pnode_connected(vvertex vv, tb_vnode *vn) {
     visit_order[i] = *vedge_it;
   }
   for (int i = 0; i < visit_order.size(); i++) {
-	int i1 = std::random() % visit_order.size();
-	int i2 = std::random() % visit_order.size();
+	int i1 = random() % visit_order.size();
+	int i2 = random() % visit_order.size();
 	vedge tmp = visit_order[i1];
 	visit_order[i1] = visit_order[i2];
 	visit_order[i2] = tmp;
@@ -234,8 +241,8 @@ tb_pnode *find_pnode(tb_vnode *vn)
 	traversal_order[i] = i;
   }
   for (int i = 0; i < num_types; i++) {
-	int i1 = std::random() % num_types;
-	int i2 = std::random() % num_types;
+	int i1 = random() % num_types;
+	int i2 = random() % num_types;
 	int tmp = traversal_order[i1];
 	traversal_order[i1] = traversal_order[i2];
 	traversal_order[i2] = tmp;
@@ -444,7 +451,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       absassignment[*vit] = vn->assignment;
       abstypes[*vit] = vn->type;
     } else {
-      unassigned_nodes.push(vvertex_int_pair(*vit,std::random()));
+      unassigned_nodes.push(vvertex_int_pair(*vit,random()));
     }
   }
 
@@ -578,7 +585,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	assert(!get(vvertex_pmap,vv)->assigned);
 	unassigned_nodes.pop();
       } else {
-	int start = std::random()%nnodes;
+	int start = random()%nnodes;
 	int choice = start;
 	while (get(vvertex_pmap,virtual_nodes[choice])->fixed) {
 	  choice = (choice +1) % nnodes;
@@ -619,7 +626,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       // Actually find a pnode
       tb_pnode *newpnode = NULL;
       if ((use_connected_pnode_find != 0)
-	  && ((std::random() % 1000) < (use_connected_pnode_find * 1000))) {
+	  && ((random() % 1000) < (use_connected_pnode_find * 1000))) {
 	newpnode = find_pnode_connected(vv,vn);
       }
       if (newpnode == NULL) {
@@ -634,7 +641,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       if (newpnode == NULL) {
 	// We're not going to be re-assigning this one
 #ifndef SMART_UNMAP
-	unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
+	unassigned_nodes.push(vvertex_int_pair(vv,random()));
 #endif
 	// need to free up nodes
 #ifdef SMART_UNMAP
@@ -649,7 +656,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	pclass_vector *acceptable_types = tt.second;
 	// Find a node to kick out
 	bool foundnode = false;
-	int offi = std::random();
+	int offi = random();
 	int index;
 	for (int i = 0; i < size; i++) {
 	  index = (i + offi) % size;
@@ -668,14 +675,14 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	  assert((*acceptable_types)[index]->used_members[vn->type]->size());
 	  tb_pclass::tb_pnodeset::iterator it =
 	    (*acceptable_types)[index]->used_members[vn->type]->begin();
-	  int j = std::random() %
+	  int j = random() %
 	    (*acceptable_types)[index]->used_members[vn->type]->size();
 	  while (j > 0) {
 	    it++;
 	    j--;
 	  }
 	  tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
-	  int k = std::random() % (*it)->assigned_nodes.size();
+	  int k = random() % (*it)->assigned_nodes.size();
 	  while (k > 0) {
 	    it2++;
 	    k--;
@@ -686,13 +693,13 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	  newpnode = *it;
 	  remove_node(toremove);
 	  unassigned_nodes.push(vvertex_int_pair(toremove,
-		std::random()));
+		random()));
 	} else {
 	  cerr << "Failed to find a replacement!" << endl;
 	}
 
 #else
-	int start = std::random()%nnodes;
+	int start = random()%nnodes;
 	int toremove = start;
 #ifdef SMART_UNMAP
 
@@ -741,7 +748,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	      RDEBUG(cout << "removing: freeing up nodes" << endl;)
 		remove_node(virtual_nodes[toremove]);
 	      unassigned_nodes.push(vvertex_int_pair(virtual_nodes[toremove],
-		    std::random()));
+		    random()));
 	    }
 	    continue;
 #endif /* SMART_UNMAP */
@@ -779,12 +786,12 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	      }
 	    }
 	    if (add_node(vv,newpos,false,false) != 0) {
-	      unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
+	      unassigned_nodes.push(vvertex_int_pair(vv,random()));
 	      continue;
 	    }
 	  } else {
 #ifdef SMART_UNMAP
-	    unassigned_nodes.push(vvertex_int_pair(vv,std::random()));
+	    unassigned_nodes.push(vvertex_int_pair(vv,random()));
 #endif
 	    if (freednode) {
 	      continue;

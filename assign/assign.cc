@@ -6,10 +6,6 @@
 
 #include "port.h"
 
-#include <hash_map>
-#include <rope>
-#include <queue>
-
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
 #include <boost/property_map.hpp>
@@ -28,6 +24,7 @@
 #include <sys/resource.h>
 #include <signal.h>
 #include <sys/signal.h>
+#include <queue>
 
 using namespace boost;
 
@@ -775,7 +772,7 @@ int main(int argc,char **argv)
 #endif
 
   cout << "seed = " << seed << endl;
-  std::srandom(seed);
+  srandom(seed);
 
   read_physical_topology(argv[0]);
   calculate_switch_MST();

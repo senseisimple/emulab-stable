@@ -6,24 +6,12 @@
 
 #include "port.h"
 
-#include <hash_map>
-#include <slist>
-#include <rope>
-#include <hash_set>
-
-#include <boost/config.hpp>
-#include <boost/utility.hpp>
-#include <boost/property_map.hpp>
-#include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 
 #include <iostream.h>
 
 using namespace boost;
 
-using namespace boost;
-
-#include "common.h"
 #include "delay.h"
 #include "physical.h"
 #include "parser.h"

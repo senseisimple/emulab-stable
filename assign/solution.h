@@ -14,17 +14,9 @@
 
 #include "port.h"
 
-#include <boost/graph/adjacency_list.hpp>
-using namespace boost;
-
-#include <rope>
-#include <queue>
-
-#include "common.h"
 #include "delay.h"
 #include "physical.h"
 #include "virtual.h"
-#include "vclass.h"
 #include "maps.h"
 
 /* 

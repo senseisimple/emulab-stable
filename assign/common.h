@@ -7,7 +7,20 @@
 #ifndef __COMON_H
 #define __COMON_H
 
+/*
+ * We have to do these includes differently depending on which version of gcc
+ * we're compiling with
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+#else
+#include <hash_map>
+#endif
+
 #include "config.h"
+
+#include <boost/graph/adjacency_list.hpp>
 
 /*
  * Exit vaules from assign
@@ -170,9 +183,6 @@ namespace boost {
   BOOST_INSTALL_PROPERTY(vertex,data);
 }
 
-typedef hash_map<crope,crope> name_name_map;
-typedef slist<crope> name_slist;
-
 /*
  * Used to count the number of nodes in each ptype and vtype
  */
@@ -195,6 +205,16 @@ template <class T> struct hashptr {
 #define RDEBUG(a) a
 #else
 #define RDEBUG(a)
+#endif
+
+/*
+ * Needed for the transition from gcc 2.95 to 3.x - the new gcc puts some
+ * non-standard (ie. SGI) STL extensions in different place
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#define HASH_MAP <ext/hash_map>
+#else
+#define HASH_MAP
 #endif
 
 #endif

@@ -8,11 +8,20 @@
 
 #include <stdlib.h>
 
-#include <hash_map>
-#include <rope>
 #include <queue>
 #include <list>
 #include <algorithm>
+
+/*
+ * We have to do these includes differently depending on which version of gcc
+ * we're compiling with
+ */
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+#include <ext/hash_map>
+using namespace __gnu_cxx;
+#else
+#include <hash_map>
+#endif
 
 #include <boost/config.hpp>
 #include <boost/utility.hpp>
