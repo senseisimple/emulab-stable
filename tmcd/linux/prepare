@@ -6,7 +6,7 @@ require 'ctime.pl';
 # Prepare the node for cutting a new image. Should be run just prior, on
 # each of the FreeBSD and Linux partitions.
 #
-my $SUPCHECKOUT = "/etc/rc.d/testbed/sup/sup/RHL62-STD/checkouts";
+my $SUPCHECKOUT = "/etc/rc.d/testbed/sup/sup/RHL71-STD/checkouts";
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
 my $FSTAB       = "/etc/fstab";
