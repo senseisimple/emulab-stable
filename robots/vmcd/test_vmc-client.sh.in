@@ -44,20 +44,20 @@ sleep 1
 run_test ../mtp/mtp_dump localhost ${PORT} 2
 
 check_output "bad update?" <<EOF
-Packet: length 31; version 1; role 2
+Packet: length 36; version 1; role 2
  opcode:	update-position
   id:		-1
   x:		2.500000
   y:		5.500000
   theta:	0.480000
   status:	-1
-  timestamp:	20
-Packet: length 31; version 1; role 2
+  timestamp:	20.000000
+Packet: length 36; version 1; role 2
  opcode:	update-position
   id:		-1
   x:		4.500000
   y:		6.500000
   theta:	0.540000
-  status:	-1
-  timestamp:	20
+  status:	32
+  timestamp:	20.000000
 EOF
