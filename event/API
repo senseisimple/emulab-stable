@@ -249,7 +249,8 @@
       int event_poll_blocking(event_handle_t handle, unsigned int timeout);
 
   Same as event_poll, but blocks waiting for an event. Times out
-  after the given amount of time, or doesn't time out if 0 is given.
+  after the given amount of time (which is in millseconds), or doesn't time
+  out if 0 is given.
 
   IMPORTANT: elvin uses timeouts internally. So, this function does
   NOT guarantee that when it returns, either an event has been
