@@ -18,6 +18,7 @@ import java.io.*;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.net.URLConnection;
+import java.text.DecimalFormat;
 
 /*
  * Draw the floormap and put little dots on it. 
@@ -26,7 +27,9 @@ public class RoboTrack extends JApplet {
     static Map map;
     static JTable maptable;
     static Image floorimage;
+    static double pixels_per_meter = 1.0;
     boolean frozen = false;
+    static final DecimalFormat FORMATTER = new DecimalFormat("0.00");
     
     /*
      * The connection to boss that will provide robot location info.
@@ -46,6 +49,7 @@ public class RoboTrack extends JApplet {
 	    auth    = this.getParameter("auth");
 	    pipeurl = this.getParameter("pipeurl");
 	    baseurl = this.getParameter("baseurl");
+	    pixels_per_meter = Float.parseFloat(this.getParameter("ppm"));
 
 	    // form the URL that we use to get the background image
 	    floorurl = new URL(urlServer,
@@ -142,13 +146,22 @@ public class RoboTrack extends JApplet {
      * A containter for coordinate information.
      */
     static class Robot {
-        int x, y;			// Current x,y coords
+        int x, y;			// Current x,y coords in pixels
 	double or = 500.0;		// Current orientation 
-	int dx, dy;			// Destination x,y coords
+	int dx, dy;			// Destination x,y coords in pixels
 	double dor = 500.0;		// Destination orientation
 	boolean gotdest = false;	// We have a valid destination
-	double battery_voltage    = 500.0;
-	double battery_percentage = 500.0;
+	/*
+	 * These are formatted as strings to avoid doing conversons
+	 * on the fly when the table is redrawn. Note, we have to
+	 * convert from pixel coords (what the server sends) to meters.
+	 */
+	String battery_voltage    = "";
+	String battery_percentage = "";
+	String x_meters           = "";
+	String y_meters           = "";
+	String dx_meters          = "";
+	String dy_meters          = "";
 	String pname, vname;		
 	int index;
     }
@@ -234,6 +247,8 @@ public class RoboTrack extends JApplet {
 	    robbie.vname = tokens.nextToken().trim();
 	    robbie.x     = Integer.parseInt(tokens.nextToken().trim());
 	    robbie.y     = Integer.parseInt(tokens.nextToken().trim());
+	    robbie.x_meters = FORMATTER.format(robbie.x / pixels_per_meter);
+	    robbie.y_meters = FORMATTER.format(robbie.y / pixels_per_meter);
 
 	    str = tokens.nextToken().trim();
 	    if (str.length() > 0)
@@ -244,6 +259,10 @@ public class RoboTrack extends JApplet {
 		robbie.dx  = Integer.parseInt(str);
 		robbie.dy  = Integer.parseInt(tokens.nextToken().trim());
 		robbie.dor = Float.parseFloat(tokens.nextToken().trim());
+		robbie.dx_meters = FORMATTER.format(robbie.dx /
+						    pixels_per_meter);
+		robbie.dy_meters = FORMATTER.format(robbie.dy /
+						    pixels_per_meter);
 		robbie.gotdest = true;
 	    }
 	    else {
@@ -252,12 +271,20 @@ public class RoboTrack extends JApplet {
 		str = tokens.nextToken();
 	    }
 
+	    // Store these as strings for easy display.
 	    str = tokens.nextToken().trim();
 	    if (str.length() > 0)
-		robbie.battery_percentage = Float.parseFloat(str);
+		robbie.battery_percentage =
+		    FORMATTER.format(Float.parseFloat(str));
+	    else
+		robbie.battery_percentage = "";
+
 	    str = tokens.nextToken().trim();
 	    if (str.length() > 0)
-		robbie.battery_voltage = Float.parseFloat(str);
+		robbie.battery_voltage = 
+		    FORMATTER.format(Float.parseFloat(str));
+	    else
+		robbie.battery_voltage = "";
 	}
 
 	/*
@@ -462,16 +489,14 @@ public class RoboTrack extends JApplet {
 	    switch (col) {
 	    case 0: return robbie.pname;
 	    case 1: return robbie.vname;
-	    case 2: return "" + robbie.x;
-	    case 3: return "" + robbie.y;
+	    case 2: return robbie.x_meters;
+	    case 3: return robbie.y_meters;
 	    case 4: return (robbie.or != 500.0 ? "" + robbie.or : "");
-	    case 5: return (robbie.gotdest ? "" + robbie.dx  : "");
-	    case 6: return (robbie.gotdest ? "" + robbie.dy  : "");
+	    case 5: return (robbie.gotdest ? robbie.dx_meters  : "");
+	    case 6: return (robbie.gotdest ? robbie.dy_meters  : "");
 	    case 7: return (robbie.dor != 500.0 ? "" + robbie.dor : "");
-	    case 8: return (robbie.battery_percentage != 500.0 ?
-			    "" + robbie.battery_percentage : "");
-	    case 9: return (robbie.battery_voltage != 500.0 ?
-			    "" + robbie.battery_voltage : "");
+	    case 8: return robbie.battery_percentage;
+	    case 9: return robbie.battery_voltage;
 	    }
 	    return "Foo";
         }

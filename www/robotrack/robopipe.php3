@@ -35,7 +35,7 @@ function SPEWCLEANUP()
 }
 register_shutdown_function("SPEWCLEANUP");
 
-if (!isset($real)) {
+if (isset($fake)) {
     #
     # Just loop forever writing out some stuff.
     #
