@@ -555,7 +555,7 @@ sub dorpms ()
     print RPM "#!/bin/sh\n";
     
     foreach my $rpm (@rpms) {
-	if ($rpm =~ /RPM=([-\@\w.\/]+)/) {
+	if ($rpm =~ /RPM=(.+)/) {
 	    my $rpmline = os_rpminstall_line($1);
 		    
 	    print STDOUT "  $rpmline\n";
@@ -594,7 +594,7 @@ sub dotarballs ()
     print TARBALL "#!/bin/sh\n";
     
     foreach my $tarball (@tarballs) {
-	if ($tarball =~ /DIR=([-\@\w.\/]+)\s+TARBALL=([-\@\w.\/]+)/) {
+	if ($tarball =~ /DIR=(.+)\s+TARBALL=(.+)/) {
 	    my $tbline = sprintf($TARINSTALL, $1, $2);
 		    
 	    print STDOUT  "  $tbline\n";
@@ -632,7 +632,7 @@ sub dostartupcmd ()
     open(RUN, ">" . TMSTARTUPCMD)
 	or die("Could not open $TMSTARTUPCMD: $!");
     
-    if ($startupcmd =~ /CMD=(\'[-\@\w.\/ ]+\') UID=([0-9a-z]+)/) {
+    if ($startupcmd =~ /CMD=(\'.+\') UID=([0-9a-z]+)/) {
 	print  STDOUT "  Will run $1 as $2\n";
 	print  RUN    "$startupcmd";
     }
@@ -836,7 +836,7 @@ sub install_deltas ()
     # If any fails, then give up.
     # 
     foreach $delta (@deltas) {
-	if ($delta =~ /DELTA=([-\@\w.\/]+)/) {
+	if ($delta =~ /DELTA=(.+)/) {
 	    print STDOUT  "Installing DELTA $1 ...\n";
 
 	    system(sprintf($DELTAINSTALL, $1));
