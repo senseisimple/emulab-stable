@@ -212,8 +212,6 @@ else {
     FirstTime();
 }
 
-exit(0);
-
 #
 # Make user account on control node. We do the password setup as separate
 # step since thats easier than trying to do both via ssh.
