@@ -167,7 +167,7 @@ Node instproc updatedb {DB} {
     # create one on the fly and set the type properly. 
     # 
     if {$issubnode && $fixed == ""} {
-	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" $self ]
+	$sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "deltas" "startupcmd" "tarfiles" "fixed" ] [list "host-$self" "pc" "" "" "" "" "" "" "" "" ]
 	$sim spitxml_data "virt_node_desires" [list "vname" "desire" "weight"] [list "host-$self" "hosts-$type" 1.0]
 	set fixed "host-$self"
     }
