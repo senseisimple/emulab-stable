@@ -929,12 +929,13 @@ foreach $pnode (keys(%p2vmap)) {
 foreach $pair (@nodepairs) {
     ($pnode,$vnode) = @$pair;
     $sth = $dbh->prepare("SELECT osid,cmd_line,rpms,deltas,startupcmd," .
-			  "tarfiles from virt_nodes where pid=\"$pid\"" .
-			  " and eid=\"$eid\" and vname=\"$vnode\"");
+			 "tarfiles,failureaction from virt_nodes" .
+			 " where pid=\"$pid\"" .
+			 " and eid=\"$eid\" and vname=\"$vnode\"");
     $sth->execute;
     # The if statement will cause us to skip nodes that belong to
     # the experiment but aren't virtual.  I.e. delay nodes.
-    if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles) = 
+    if (($osid,$cmdline,$rpms,$deltas,$startupcmd,$tarfiles,$failureaction) = 
 	$sth->fetchrow_array) {
 	if (! $dbh->do("UPDATE nodes set def_boot_osid=\"$osid\"," .
 		       " def_boot_cmd_line=\"$cmdline\"," .
@@ -944,7 +945,8 @@ foreach $pair (@nodepairs) {
 		       " rpms=\"$rpms\"," .
 		       " deltas=\"$deltas\"," .
 		       " tarballs=\"$tarfiles\"," .
-		       " startupcmd=\"$startupcmd\"" .
+		       " startupcmd=\"$startupcmd\"," .
+		       " failureaction=\"$failureaction\"" .
 		       " where node_id=\"$pnode\"")) {
 	    print STDERR "$0: *** Could not update nodes table." .
 		"  Giving up.\n";

@@ -40,6 +40,7 @@ Node instproc init {s} {
     $self set startup ""
     $self set deltas ""
     $self set tarfiles ""
+    $self set failureaction "fatal"
 }
 
 # The following procs support renaming (see README)
@@ -76,6 +77,7 @@ Node instproc updatedb {DB} {
     $self instvar deltas
     $self instvar iplist
     $self instvar tarfiles
+    $self instvar failureaction
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
@@ -96,7 +98,7 @@ Node instproc updatedb {DB} {
     }
 
     # Update the DB
-    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osid,cmd_line,rpms,deltas,startupcmd,tarfiles) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\")";
+    sql exec $DB "insert into virt_nodes (pid,eid,vname,type,ips,osid,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction) values (\"$pid\",\"$eid\",\"$self\",\"$type\",\"$ipraw\",\"$osid\",\"$cmdline\",\"$rpms\",\"$deltas\",\"$startup\",\"$tarfiles\",\"$failureaction\")";
 }
 
 # add_lanlink lanlink

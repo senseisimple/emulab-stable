@@ -252,3 +252,15 @@ proc tb-set-node-lan-params {node lan delay bw loss} {
     tb-set-node-lan-bandwidth $node $lan $bw
     tb-set-node-lan-loss $node $lan $loss
 }
+
+proc tb-set-node-failure-action {node type} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-failure-action] $node is not a node."
+	return
+    }
+    if {[lsearch -exact {fatal nonfatal ignore} $type] == -1} {
+	perror "\[tb-set-node-failure-action] type must be one of fatal|nonfatal|ignore."
+	return
+    }
+    $node set failureaction $type
+}
