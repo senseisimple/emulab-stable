@@ -1815,17 +1815,17 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 #ifdef  NOSHAREDEXPTS
 	res = mydb_query("select u.uid from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
-			 "where p.pid='%s' and p.pid=p.gid and "
+			 "where p.pid='%s' and p.gid='%s' and "
 			 "      u.status='active'",
-			 1, pid);
+			 1, pid, gid);
 #else
 	res = mydb_query("select distinct u.uid from users as u "
 			 "left join exppid_access as a "
 			 " on a.exp_pid='%s' and a.exp_eid='%s' "
 			 "left join group_membership as p on p.uid=u.uid "
-			 "where ((p.pid='%s' and p.pid=p.gid) or p.pid=a.pid) "
+			 "where ((p.pid='%s' and p.gid='%s') or p.pid=a.pid) "
 			 "       and u.status='active'",
-			 1, pid, eid, pid);
+			 1, pid, eid, pid, gid);
 #endif
 	if (!res) {
 		syslog(LOG_ERR, "MOUNTS: %s: DB Error getting users!", pid);
