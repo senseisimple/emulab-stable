@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -36,6 +36,8 @@ proc tb-set-link-simplex-params {link src delay bw loss} {}
 proc tb-set-uselatestwadata {onoff} {}
 proc tb-set-usewatunnels {onoff} {}
 proc tb-set-wasolver-weights {delay bw plr} {}
+proc tb-set-uselinkdelays {onoff} {}
+proc tb-set-forcelinkdelays {onoff} {}
 
 Class Program
 

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -198,6 +198,12 @@ namespace eval GLOBALS {
 
     # For remote nodes. Use tunnels
     variable usewatunnels 1
+
+    # Use link delays instead of delay nodes.
+    variable uselinkdelays 0
+
+    # Force link delays (where a delay would not otherwise be inserted)
+    variable forcelinkdelays 0
 
     # For remote nodes. The solver weights.
     variable wa_delay_solverweight 1

@@ -537,6 +537,28 @@ proc tb-set-usewatunnels {onoff} {
     set usewatunnels $onoff
 }
 
+proc tb-set-uselinkdelays {onoff} {
+    var_import ::GLOBALS::uselinkdelays
+
+    if {$onoff != 0 && $onoff != 1} {
+	perror "\[tb-set-uselinkdelays] $onoff must be 0/1"
+	return
+    }
+
+    set uselinkdelays $onoff
+}
+
+proc tb-set-forcelinkdelays {onoff} {
+    var_import ::GLOBALS::forcelinkdelays
+
+    if {$onoff != 0 && $onoff != 1} {
+	perror "\[tb-set-forcelinkdelays] $onoff must be 0/1"
+	return
+    }
+
+    set forcelinkdelays $onoff
+}
+
 proc tb-set-wasolver-weights {delay bw plr} {
     var_import ::GLOBALS::wa_delay_solverweight
     var_import ::GLOBALS::wa_bw_solverweight
