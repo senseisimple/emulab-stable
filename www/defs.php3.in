@@ -62,7 +62,7 @@ function GENKEY ($name) {
 # should then terminate if required to do so.
 #
 function TBERROR ($message, $death) {
-    global $TBMAIL_WWW, $TBMAIL_OPS;
+    global $TBMAIL_WWW, $TBMAIL_OPS, $TBMAILADDR
 
     mail($TBMAIL_OPS,
          "TESTBED WEB ERROR REPORT",
@@ -95,6 +95,8 @@ function TBERROR ($message, $death) {
 # General user errors should print something warm and fuzzy
 #
 function USERERROR($message, $death) {
+    global $TBMAILADDR;
+
     echo "<h3><br><br>
           $message
           <br>
