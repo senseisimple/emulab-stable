@@ -369,35 +369,39 @@ experiments to operate using the symbolic names of the nodes (as
 defined in the NS file), instead of IP addresses, which are generally
 assigned by the configuration software, not the experimentor. Since
 nodes can use multiple experimental interfaces, the reply gives the IP
-address for each interface on each node. An additional alias is
-returned for nodes that are directly connected to the node making the
-hostnames request. Secondary interfaces, and interfaces that are not
-directly connected are named with a -X suffix, where X is the ordinal
-number of the interface. The reply to this request is one or more
-lines in the following format:
+address for each interface on each node. Additional aliases can be returned
+for nodes that are directly connected to the node making the hostnames
+request, or that the requesting node has a route to. Secondary interfaces,
+and interfaces that are not directly connected are named with a suffix
+indicating the link or LAN that interface belongs to. For historical
+reasons, we provide an additional alias in the form 'node-X'  where X is
+the ordinal number of the interface. The reply to this request is one or
+more lines in the following format:
 
 <code><pre>
-NAME=nodeA LINK=X IP=X.X.Y.A ALIAS=nodeA
-NAME=nodeB LINK=Y IP=X.X.Y.B ALIAS=nodeB
-NAME=nodeC LINK=Z IP=X.X.Z.C ALIAS=  			</code></pre>
+NAME=nodeA-linkX IP=X.X.Y.A ALIASES='nodeA nodeA-0'
+NAME=nodeB-linkY IP=X.X.Y.B ALIASES='nodeB nodeB-0'
+NAME=nodeC-lanZ IP=X.X.Z.C ALIASES='nodeC-0'
+</code></pre>
 
-The <tt>LINK</tt> field is the number of the network interface on the
-destination node, that this node is connected to. The /etc/hosts file
-that would be created for this response is:
+ALIASES is a space-separated list of aliases. The /etc/hosts file that
+would be created for this response is:
 
 <code><pre>
-X.X.X.A        nodeA-X nodeA
-X.X.X.B        nodeB-Y nodeB
-X.X.Z.C        nodeC-Z					</code></pre>
+X.X.X.A        nodeA-linkX nodeA nodeA-0
+X.X.X.B        nodeB-linkY nodeB nodeB-0
+X.X.Z.C        nodeC-lanZ nodeC-0
+</code></pre>
 
 Say that nodeA is making this request. NodeA is obviously connected to
 itself, so it gets an alias pointing to its own interface. NodeA is
-directly connected to NodeB on NodeB's <tt>Y</tt> interface, so it to
-gets an alias so that an application running on nodeA can just use the
-name NodeB. NodeC is not directly connected to NodeA (perhaps it is
-connected to NodeB on one of NodeB's other interfaces), so it does not
-get an alias. Refering to nodeC on nodeA would be confusing and
-possibly incorrect.
+directly connected to NodeB on NodeB's <tt>linkY</tt> interface, so it too
+gets an alias so that an application running on nodeA can just use the name
+NodeB. NodeC is not directly connected to NodeA, and nodeA does not have a
+route to it (perhaps the network toplogy is disjoint, or perhaps routing
+was not enabled in the NS file,) so it does not get an alias. Note that, in
+the case of nodes that are not directly connected, no guarantee is made
+that the alias is picked for the 'nearest' interface.
 
 <p>
 <li> <a NAME="REF-LOG"></a>
