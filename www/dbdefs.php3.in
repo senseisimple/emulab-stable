@@ -1153,6 +1153,15 @@ function TBCvswebAllowed($uid) {
 }
 
 #
+# Returns > 0 if a node has a serial console, 0 if it does not
+#
+function TBHasSerialConsole($node_id) {
+    $query_result =
+	DBQueryFatal("select tipname from tiplines WHERE node_id='$node_id'");
+    return mysql_num_rows($query_result);
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
