@@ -122,6 +122,20 @@ else {
 }
 
 #
+# Only admin types can muck with the mustclean bit.
+#
+if (isset($os_clean) &&
+    strcmp($os_clean, "Yep") == 0) {
+    if (!$isadmin) {
+	USERERROR("Only Emulab Administrators can set the clean flag!", 1);
+    }
+    $os_mustclean = 0;
+}
+else {
+    $os_mustclean = 1;
+}
+
+#
 # Form the os features set.
 #
 $os_features_array = array();
@@ -169,11 +183,11 @@ if (TBValidOSID($osid)) {
 $query_result =
     DBQueryFatal("INSERT INTO os_info ".
 		 "(osname, osid, description, OS, version, path, magic, ".
-		 " osfeatures, pid, shared, creator, created) ".
+		 " osfeatures, pid, shared, creator, mustclean, created) ".
 		 "VALUES ('$osname', '$osid', '$description', '$OS', ".
 		 "        '$os_version', $os_path, '$os_magic', ".
 		 "        '$os_features', '$pid', $os_shared, ".
-	         "        '$uid', now())");
+	         "        '$uid', $os_mustclean, now())");
 
 DBQueryFatal("unlock tables");
 

@@ -136,6 +136,15 @@ if ($isadmin) {
                   (available to all projects)</td>
               <td><input type=checkbox name=os_shared value=Yep> Yes</td>
           </tr>\n";
+
+    #
+    # Mustclean?
+    #
+    echo "<tr>
+	      <td>Clean?:<br>
+                  (no disk reload required)</td>
+              <td><input type=checkbox name=os_clean value=Yep> Yes</td>
+          </tr>\n";
 }
 
 echo "<tr>

@@ -685,6 +685,7 @@ function SHOWOSINFO($osid) {
     $os_osname      = $osrow[osname];
     $creator        = $osrow[creator];
     $created        = $osrow[created];
+    $mustclean      = $osrow[mustclean];
 
     if (!$os_description)
 	$os_description = "&nbsp";
@@ -759,6 +760,18 @@ function SHOWOSINFO($osid) {
             <td class=left>\n";
 
     if ($os_shared)
+	echo "Yes";
+    else
+	echo "No";
+    
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Must Clean?: </td>
+            <td class=left>\n";
+
+    if ($mustclean)
 	echo "Yes";
     else
 	echo "No";
