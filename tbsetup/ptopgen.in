@@ -290,7 +290,8 @@ else {
 # the ordinary free condition for a local node.
 my $free_condition = "(b.node_id is null and ".
                      " (np.eventstate='" . TBDB_NODESTATE_ISUP . "' or ".
-                     "  np.eventstate='" . TBDB_NODESTATE_PXEWAIT . "')) ";
+                     "  np.eventstate='" . TBDB_NODESTATE_PXEWAIT . "' or ".
+                     "  np.eventstate='" . TBDB_NODESTATE_ALWAYSUP . "')) ";
 
 # if the user has specified an exempt pid/eid, 
 # then view any node which is reserved to that experiment as available.
@@ -780,7 +781,11 @@ exit(0);
 sub get_iface {
     ($node,$card,$port) = @_;
     if (defined($interfacemap{"$node:$card:$port"})) {
-	return $interfacemap{"$node:$card:$port"};
+	if ($interfacemap{"$node:$card:$port"} eq "") {
+	    return "(null)";
+	} else {
+	    return $interfacemap{"$node:$card:$port"};
+	}
     } else {
 	# shark hack
 	if ($node =~ /^sh/) {
