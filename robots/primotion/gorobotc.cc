@@ -5,7 +5,7 @@
  * Dan Flickinger
  *
  * 2004/12/08
- * 2004/12/09
+ * 2004/12/15
  */
 
  
@@ -15,7 +15,7 @@
 int main() {
 
   float dx, dy, dr;
-  float dxe, dye;
+  float dxe, dye, dte;
   
   int quitnow = 0;
   int gstatus = 0;
@@ -48,12 +48,13 @@ int main() {
     
       // get the status
       gstatus = mrrobot.getGOTOstatus();
-      mrrobot.getDisplacement(dxe, dye);
+      mrrobot.getDisplacement(dxe, dye, dte);
       
       std::cout << "Goto move finished with status: " << gstatus
                 << std::endl
                 << "(Estimated position: " << dxe << ", "
-                << dye << ".)" << std::endl;
+                << dye << "angle: "
+                << dte << ".)" << std::endl;
       
       
       

@@ -6,7 +6,7 @@
  * Dan Flickinger
  *
  * 2004/11/12
- * 2004/12/09
+ * 2004/12/15
  */
  
 #include <stdio.h>
@@ -76,8 +76,9 @@ static void handle_client_packet(grobot &bot,
 	    bot.estop();
 	    
 	    mup.robot_id = mp->data.command_stop->robot_id;
-	    bot.getDisplacement(mup.position.x, mup.position.y);
-	    mup.position.theta = 0;
+	    bot.getDisplacement(mup.position.x,
+                                mup.position.y,
+                                mup.position.theta);
 	    mup.status = MTP_POSITION_STATUS_IDLE;
 	    if ((ump = mtp_make_packet(MTP_UPDATE_POSITION,
 				       MTP_ROLE_RMC,
@@ -264,9 +265,10 @@ int main(int argc, char *argv[])
 		}
 
 		mup.robot_id = robot_id;
-		bot.getDisplacement(mup.position.x, mup.position.y);
+		bot.getDisplacement(mup.position.x,
+                                    mup.position.y,
+                                    mup.position.theta);
 		bot.resetPosition();
-		mup.position.theta = theta;
 		if (rc < 0) {
 		    mup.status = MTP_POSITION_STATUS_ERROR;
 		}

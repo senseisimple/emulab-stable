@@ -10,6 +10,9 @@
 #include "gcallbacks.h"
 
 
+#define MIN_DISPLACEMENT 0.02f
+#define MIN_ANGLE 0.02f
+
 grobot::grobot() {
   // default constructor
   aIO_GetLibRef(&ioRef, &err);
@@ -22,6 +25,8 @@ grobot::grobot() {
   dright = 0.0f;
   
   dt_init = 0.0f;
+  dt_final = 0.0f;
+  
   dx_est = 0.0f;
   dy_est = 0.0f;
   
@@ -133,10 +138,12 @@ void grobot::pbMove(float mdisplacement) {
   mdisplacement = floor(mdisplacement);
   mdisplacement = mdisplacement/100.0;
   
-  if (fabs(mdisplacement) > 0.05f) {
+  if (fabs(mdisplacement) > MIN_DISPLACEMENT) {
     // send the move to the robot
-    // if you want to move less than 5 cm, FUCK OFF.
+    // if you want to move less than MIN_DISPLACEMENT, FUCK OFF.
     std::cout << "Move length: " << mdisplacement << std::endl;
+    
+    resetPosition();
     
     acpValue moveLength((float)(mdisplacement));
     pBehavior = garcia.createNamedBehavior("move", "move1");
@@ -194,10 +201,12 @@ void grobot::pbPivot(float pangle) {
     }
   }
   
-  if (fabs(pangle) > 0.05f) {
+  if (fabs(pangle) > MIN_ANGLE) {
     // send the pivot to the robot
     // If it wants to turn less than 0.05 radians, it gets the hose again
     std::cout << "Pivot angle: " << pangle << std::endl;
+    
+    resetPosition();
     
     acpValue pivotAngle((float)(pangle));
     pBehavior = garcia.createNamedBehavior("pivot", "pivot1");
@@ -211,6 +220,14 @@ void grobot::pbPivot(float pangle) {
     // fake a successful pivot, and increment the callback counts
     // if this is part of a goto sequence of commands
     if (1 == gotolock) {
+      if (gotomexec == 0) {
+        // first pivot
+        dt_init = 0.0f;
+      } else {
+        // second pivot, or WHATEVER
+        dt_final = 0.0f;
+      }
+      
       ++gotomexec;
       ++gotomcomplete;
     }
@@ -242,7 +259,7 @@ void grobot::dgoto(float Dx, float Dy, float Rf) {
     gotop2 = 0;
      
     // calculate rotation components
-    dt_init = atan2(Dy, Dx); // dt_init is private to grobot
+    float Rir = atan2(Dy, Dx);
     float Rfr = Rf - dt_init;
     float moveL = sqrt((pow(Dx,2)) + (pow(Dy,2)));
 
@@ -251,7 +268,16 @@ void grobot::dgoto(float Dx, float Dy, float Rf) {
     } else {
       // execute primitives
 
-      pbPivot(dt_init);
+      // reset position estimates
+      dt_init = 0.0f;
+      dt_final = 0.0f;
+      
+      dx_est = 0.0f;
+      dy_est = 0.0f;
+      
+
+      // create behaviors    
+      pbPivot(Rir);
       pbMove(moveL);
       pbPivot(Rfr);
     }
@@ -275,9 +301,6 @@ void grobot::resetPosition() {
   
   dleft = 0.0f;
   dright = 0.0f;
-  
-  dx_est = 0.0f;
-  dy_est = 0.0f;
   
 }
 
@@ -304,11 +327,12 @@ float grobot::getArclen() {
 
 
 
-void grobot::getDisplacement(float &dxtemp, float &dytemp) {
+void grobot::getDisplacement(float &dxtemp, float &dytemp, float &dttemp) {
   // return the current displacement (for a goto move)
  
   dxtemp = dx_est;
   dytemp = dy_est;
+  dttemp = dt_est;
 }
 
 
@@ -392,23 +416,36 @@ void grobot::setCBstatus(int id, int stat, cb_type_t cbt) {
     // a goto behavior is currently executing
     ++gotomcomplete;
 
-    if (cbt == CBT_MOVE) {
+    if (cbt == CBT_MOVE && 2 == gotocomplete) {
       // get the Arclength, then estimate and store the displacement
-      // (assume that the first pivot was accurate)
+      // (the main move has completed)
+       
       float al_temp = getArclen();
       dx_est = al_temp * cos(dt_init);
       dy_est = al_temp * sin(dt_init);
+        
+      gotop1 = stat;
     }
     
-    if (1 == gotomcomplete) {
-      // first pivot has finished
-      gotop1 = stat;
-    } else if (2 == gotomcomplete) {
-      // main move has executed
-      gotom1 = stat;
+    if (cbt == CBT_PIVOT) {
+      // get the wheel odometry, then estimate and store the pivot angle
       
-    } else if (3 == gotomcomplete) {
+      
+      updatePosition();
+      float pa_temp = (dright - dleft) / TRACK_WIDTH;
+      
+      if (1 == gotomcomplete) {
+      // first pivot has finished
+        
+      dt_init = pa_temp;
+      gotop1 = stat;
+      
+      } else if (3 == gotomcomplete) {
       // second pivot has executed
+        
+      dt_final = pa_temp;
+      dt_est = dt_init + dt_final;
+      
       gotop2 = stat;
       
       // the goto command has completed
@@ -417,7 +454,10 @@ void grobot::setCBstatus(int id, int stat, cb_type_t cbt) {
       // set the gotocomplete flag
       set_gotocomplete();
       
-    } else {
+      }
+    }
+    
+    if (gotocomplete > 3) {
       // weirdness
       std::cout << "ERROR: Completion callback count "
                 << "for goto command exceeded." << std::endl;
