@@ -29,7 +29,9 @@ if (!$printable) {
              Printable version of this document</a></b><br>\n";
 }
 ?>
-<br>
+<center>
+<h2>Emulab Tutorial - Emulab in Emulab</h2>
+</center>
 
 <p>
 Emulab in Emulab (henceforth known as "ElabInElab") is a new feature

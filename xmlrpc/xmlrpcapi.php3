@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -20,7 +20,7 @@ if (!isset($printable))
 # Standard Testbed Header
 #
 if (!$printable) {
-    PAGEHEADER("XMLRPC Interface to Emulab");
+    PAGEHEADER("Emulab Tutorial: XMLRPC Interface to Emulab");
 }
 
 if (!$printable) {
@@ -32,6 +32,10 @@ if (!$printable) {
 # Drop into html mode
 #
 ?>
+<center>
+<h2>Emulab Tutorial - XMLRPC Interface to Emulab</h2>
+</center>
+
 <p>
 This page describes the <a href="http://www.xmlrpc.com">XMLRPC</a> interface
 to Emulab. Currently, the
