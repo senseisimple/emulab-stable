@@ -139,7 +139,12 @@ if (($state eq "active") || ($state eq "testing")) {
     while (($vname,$member,$delay,$bandwidth,$lossrate) 
 	   = $sth->fetchrow_array()) {
 	($vnode,$vport) = split(":",$member);
-	$pport = $portmap{$member};
+	if (defined($portmap{$member})) {
+	    $pport = $portmap{$member};
+	} else {
+	    # shark hack
+	    $pport = "eth0";
+	}
 	printf "%-15s %-15s %-15s %-10s %-10s %-10s\n", $vname, 
 	"$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }

@@ -923,10 +923,25 @@ foreach $pair (@nodepairs) {
 }
 
 foreach $pnode (keys(%p2vmap)) {
-    $dbh->do("update reserved set vname=\"$p2vmap{$pnode}\"" .
-	     " where node_id = \"$pnode\"") || do {
-		 print STDERR "Could not update reserved table. Giving up.\n";
-		 exit(1);
-	     };
+    $vnode = $p2vmap{$pnode};
+    $i = 1;
+    if (defined($nodes{$vnode}) && 
+	($nodes{$vnode} eq "shark-shelf")) {
+	foreach $shark (@{$sharkshelves{$vnode}}) {
+	    $vname = (split(":",$shark))[0];
+	    $dbh->do("update reserved set vname=\"$vname\" where" .
+		     " node_id = \"$pnode-$i\"") || do {
+			 print STDERR "Could not update reserved table.  Giving up.\n";
+			 exit(1);
+		     };
+	    $i++;
+	}
+    } else {
+	$dbh->do("update reserved set vname=\"$vnode\"" .
+		 " where node_id = \"$pnode\"") || do {
+		     print STDERR "Could not update reserved table. Giving up.\n";
+		     exit(1);
+		 };
+    }
 }
 
