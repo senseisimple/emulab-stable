@@ -29,8 +29,8 @@ tb_compare("SELECT vname,delay,bandwidth,lossrate,member from virt_lans" .
 tb_compare("SELECT ips,vname,type from virt_nodes" .
     " where pid=\"testbed\" and eid=\"test\"",
     \@result);
-tb_run("tbswapin",0);
-tb_run("tbswapout",0);
-tb_run("tbswapin",0);
-tb_run("tbswapout",0);
+tb_run("tbswap in",0);
+tb_run("tbswap out",0);
+tb_run("tbswap in",0);
+tb_run("tbswap out",0);
 tb_run("tbend",0);

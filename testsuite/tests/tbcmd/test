@@ -30,8 +30,8 @@ tb_compare("select ips,vname,type from virt_nodes" .
 tb_compare("select ips,osname,cmd_line,rpms,deltas,startupcmd,tarfiles,failureaction,type" .
     " from virt_nodes where pid=\"testbed\" and eid=\"test\"" .
     " and vname=\"node4\"",\@result);
-tb_run("tbswapin",0);
-tb_run("tbswapout",0);
-tb_run("tbswapin",0);
-tb_run("tbswapout",0);
+tb_run("tbswap in",0);
+tb_run("tbswap out",0);
+tb_run("tbswap in",0);
+tb_run("tbswap out",0);
 tb_run("tbend",0);
