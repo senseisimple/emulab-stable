@@ -59,6 +59,7 @@ if (! -r $nsfile) {
 }
 
 print "Beginning pre run for $pid/$eid. " . TBTimeStamp() . "\n";
+TBDebugTimeStamp("tbprerun started");
 
 if (! ($state = ExpState($pid, $eid))) {
     die("*** $0:\n".
@@ -91,19 +92,23 @@ sub cleanup {
 # This setups virt_nodes, virt_names including all IP address calculation
 # and tb-* handling.
 print "Running parser ... " . TBTimeStamp() . "\n";
+TBDebugTimeStamp("parser started");
 if (system("parse-ns $pid $eid $nsfile")) {
     cleanup();
     die("*** $0:\n".
 	"    Parsing failed!\n");
 }
+TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
 
+TBDebugTimeStamp("routes started");
 print "Setting up static routes (if requested) ... \n";
 if (system("staticroutes $pid $eid")) {
     cleanup();
     die("*** $0:\n".
 	"    Static route calculation failed!\n");
 }
+TBDebugTimeStamp("routes finished");
 print "Static routing done! " . TBTimeStamp() . "\n";
 
 if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
@@ -112,6 +117,7 @@ if (!SetExpState($pid, $eid, EXPTSTATE_SWAPPED)) {
 	"    Failed to set experiment state!\n");
 }
 
+TBDebugTimeStamp("tbprerun finished");
 print "Pre run finished. " . TBTimeStamp() . "\n";
 exit(0);
 
