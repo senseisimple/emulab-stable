@@ -356,7 +356,7 @@ function SPITFORM($formfields, $errors)
                   file first!
              <li> You can view a <a href='showosid_list.php3'>list of OSIDs</a>
                   that are available for you to use in your NS file.
-             <li> Create your own <a href='newimageid_explain.php3'>
+             <li> Create your own <a href='newimageid_ez.php3'>
                   custom disk images</a>.
           </ul>
           </blockquote>\n";

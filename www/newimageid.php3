@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -764,7 +764,7 @@ if (! isset($node)) {
 		       "deleteimageid.php3?imageid=$fooid");
 }
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
-		   "newimageid_explain.php3");
+		   "newimageid_ez.php3");
 WRITESUBMENUBUTTON("Create a new OS Descriptor",
 		   "newosid_form.php3");
 WRITESUBMENUBUTTON("Image Descriptor list",

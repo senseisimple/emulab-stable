@@ -74,6 +74,19 @@ function SPITFORM($formfields, $errors)
       $featurelist;
     global $TBDB_IMAGEID_IMAGENAMELEN, $TBDB_NODEIDLEN;
     global $TBDB_OSID_VERSLEN, $TBBASE;
+
+    echo "<center><b>
+          See the
+          <a href=tutorial/docwrapper.php3?docname=tutorial.html#CustomOS>
+          tutorial</a> for more info on creating/using custom Images.
+          </b></center>\n";
+
+    if ($isadmin) {
+	echo "<center>
+               Administrators get to use the
+               <a href='newimageid.php3'>long form</a>.
+              </center>\n";
+    }
     
     if ($errors) {
 	echo "<table class=nogrid
@@ -763,7 +776,7 @@ if (! isset($node)) {
 		       "deleteimageid.php3?imageid=$fooid");
 }
 WRITESUBMENUBUTTON("Create a new Image Descriptor",
-		   "newimageid_explain.php3");
+		   "newimageid_ez.php3");
 WRITESUBMENUBUTTON("Create a new OS Descriptor",
 		   "newosid_form.php3");
 WRITESUBMENUBUTTON("Image Descriptor list",

@@ -55,7 +55,7 @@ else {
 SUBPAGESTART();
 SUBMENUSTART("More Options");
 WRITESUBMENUBUTTON("Create an Image Descriptor",
-		   "newimageid_explain.php3");
+		   "newimageid_ez.php3");
 WRITESUBMENUBUTTON("Create an OS Descriptor",
 		   "newosid_form.php3");
 WRITESUBMENUBUTTON("Image Descriptor list",
