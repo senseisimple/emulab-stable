@@ -3359,6 +3359,7 @@ sub CreateTopFile()
 	my $realnodes = 0;
 	my $virtnodes = 0;
 	my $nonvirtnodes = 0;
+	my $nonbsdnodes = 0;
 	my $trivial_ok = 0;
 	my $emulated = virtlanemulated($lan);
 	my $uselinkdelay = virtlanlinkdelay($lan);
@@ -3373,24 +3374,59 @@ sub CreateTopFile()
 		    $virtnodes++;
 		} else {
 		    $nonvirtnodes++;
+		    # We check against the standard FBSD and declare the node
+		    # to be a nonbsd one even if it is actually running FBSD
+		    # via a user-specific FBSD image. Thats coz there is no
+		    # way of determining if the FBSD image is actually running
+		    # our kernel that can do veths
+		    if (virtnodeosid($node) ne TBOSID(TB_OPSPID, "FBSD-STD")) {
+			$nonbsdnodes++;
+		    }
 		}
 		$realnodes++;
 	    }
 	}
-	if ($virtnodes > 0 && $nonvirtnodes == 0) {
-	    # We use an emulated link if all members of the lan are
-	    # virtnodes. An emulated link can use a trivial link
-	    # too, if the user wanted it.
-	    $emulated = 1;
-	    $virt_lans{$lan}->{"EMULATED"} = 1;
+	if ($virtnodes > 0) {
 	    $trivial_ok = virtlantrivok($lan);
-	    #
-	    # An emulated link/lan between containing any
-	    # virtnodes always uses veth devices. Note that remote
-	    # virtual nodes never go through this path cause they
-	    # get tunnels, so its only local virtual nodes.
-	    #
-	    $virt_lans{$lan}->{"USEVETH"} = 1;
+	    if ($nonvirtnodes == 0 || $nonbsdnodes == 0) {
+		# We use an emulated link if all members of the lan are
+	        # virtnodes. An emulated link can use a trivial link
+	        # too, if the user wanted it.
+		$emulated = 1;
+		$virt_lans{$lan}->{"EMULATED"} = 1;
+	        #
+	        # An emulated link/lan between containing any
+	        # virtnodes always uses veth devices. Note that remote
+	        # virtual nodes never go through this path cause they
+	        # get tunnels, so its only local virtual nodes.
+	        #
+	        $virt_lans{$lan}->{"USEVETH"} = 1;
+	    } else {
+		# We don't support EMULATED/USEVETH for lans/links that
+		# have non-bsd nodes (nodes running Linux or a non
+		# standard BSD). This means we'll turn off these
+		# options even if the user explicitly asked for them
+
+		# If the user had explicitly asked for these, we
+		# print a warning
+		if (virtlanemulated($lan)) {
+		    print STDERR "*** WARNING: $0: ".
+	         		 "tb-set-multiplexed not supported on ".
+	         		 "$lan since one of the nodes in $lan is ".
+	         		 "not running the standard FreeBSD image ".
+				 "(FBSD-STD)\n";
+		}
+		if (virtlanuseveth($lan)) {
+		    print STDERR "*** WARNING: $0: ".
+	         		 "tb-set-useveth not supported on ".
+	         		 "$lan since one of the nodes in $lan is ".
+	         		 "not running the standard FreeBSD image ".
+				 "(FBSD-STD)\n";
+		}
+		$emulated = 0;
+		$virt_lans{$lan}->{"EMULATED"} = 0;
+	        $virt_lans{$lan}->{"USEVETH"} = 0;
+	    }
 	}
 	#
 	# If all nodes in a lan/link are simulated, the lan/link could certainly
