@@ -51,7 +51,7 @@ if (getpwnam($username)) {
     $password = <>;
     chomp($password);
 
-    my $uid = 10000;
+    $uid = 10000;
     while (getpwuid($uid)) { $uid++; }
 }
 
