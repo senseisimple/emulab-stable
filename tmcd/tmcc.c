@@ -28,17 +28,21 @@
 #include "config.h"
 #endif
 
-#ifndef STANDALONE
-#undef BOSSNODE
+#undef  BOSSNODE
+#ifndef KEYFILE
+#define KEYFILE		"/etc/emulab.pkey"
 #endif
-#ifdef BOSSNODE
-#define DEFAULT_BOSSNODE BOSSNODE
-#else
-#define DEFAULT_BOSSNODE NULL
-#endif
-#ifndef BOSSNODEFILE
-#define BOSSNODEFILE	 "/usr/local/etc/testbed/bossnode"
-#endif
+
+/*
+ * We search a couple of dirs for the bossnode file.
+ */
+static char *bossnodedirs[] = {
+	"/etc/testbed",
+	"/etc/rc.d/testbed",
+	"/usr/local/etc/testbed",
+	"/usr/local/etc/emulab",
+	0
+};
 
 /*
  * Need to try several ports cause of firewalling. 
@@ -61,6 +65,7 @@ char *usagestr =
  " -p portnum	   Specify a port number to connect to\n"
  " -v versnum	   Specify a version number for tmcd\n"
  " -n vnodeid	   Specify the vnodeid\n"
+ " -k keyfile	   Specify the private keyfile\n"
  " -u		   Use UDP instead of TCP\n"
  " -t timeout	   Timeout waiting for the controller.\n"
  "\n";
@@ -81,10 +86,13 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
-	char			*bossnode = DEFAULT_BOSSNODE;
+	char			*bossnode = NULL;
 	int			version = CURRENT_VERSION;
 	char			*vnodeid = NULL;
+	char			*keyfile = NULL;
+	char			*privkey = NULL;
 	int			waitfor = 0;
+	FILE			*fp;
 #ifdef UDP
 	int			useudp  = 0;
 #endif
@@ -100,6 +108,9 @@ main(int argc, char **argv)
 			break;
 		case 'n':
 			vnodeid = optarg;
+			break;
+		case 'k':
+			keyfile = optarg;
 			break;
 		case 'v':
 			version = atoi(optarg);
@@ -126,20 +137,30 @@ main(int argc, char **argv)
 	 * How do we find our bossnode?
 	 *
 	 * 1. Command line.
-	 * 2. Compiled in.
-	 * 3. /usr/local/etc/bossnode
-	 * 4. nameserver goo below.
+	 * 2. From a file in the list above.
+	 * 3. nameserver goo below.
 	 */
 	if (!bossnode) {
-		FILE	*fp;
-		
-		if ((fp = fopen(BOSSNODEFILE, "r")) != NULL) {
-			if (fgets(buf, sizeof(buf), fp)) {
-				if ((bp = strchr(buf, '\n')))
-					*bp = (char) NULL;
-				bossnode = strdup(buf);
+		/*
+		 * Search for the file.
+		 */
+		char **cp = bossnodedirs;
+		while (*cp) {
+			sprintf(buf, "%s/%s", *cp, BOSSNODE_FILENAME);
+
+			if (access(buf, R_OK) == 0)
+				break;
+			cp++;
+		}
+		if (*cp) {
+			if ((fp = fopen(buf, "r")) != NULL) {
+				if (fgets(buf, sizeof(buf), fp)) {
+					if ((bp = strchr(buf, '\n')))
+						*bp = (char) NULL;
+					bossnode = strdup(buf);
+				}
+				fclose(fp);
 			}
-			fclose(fp);
 		}
 	}
 	if (!bossnode)
@@ -150,6 +171,28 @@ main(int argc, char **argv)
 	else {
 		fprintf(stderr, "gethostbyname(%s) failed\n", bossnode); 
 		exit(1);
+	}
+
+	/*
+	 * Grab the key. Its not an error if we do not find it.
+	 */
+	if (keyfile) {
+		/* Well, if one was specifed it has to exist. */
+		if (access(keyfile, R_OK) < 0) {
+			perror("keyfile"); 
+			exit(1);
+		}
+	}
+	else
+		keyfile = KEYFILE;
+
+	if ((fp = fopen(keyfile, "r")) != NULL) {
+	    if (fgets(buf, sizeof(buf), fp)) {
+		if ((bp = strchr(buf, '\n')))
+		    *bp = (char) NULL;
+		privkey = strdup(buf);
+	    }
+	    fclose(fp);
 	}
 
 	if (waitfor) {
@@ -224,6 +267,11 @@ main(int argc, char **argv)
 	/* Tack on vnodeid */
 	if (vnodeid) {
 		sprintf(&buf[strlen(buf)], "VNODEID=%s ", vnodeid);
+	}
+
+	/* Tack on privkey */
+	if (privkey) {
+		sprintf(&buf[strlen(buf)], "PRIVKEY=%s ", privkey);
 	}
 
 	/*

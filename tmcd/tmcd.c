@@ -66,6 +66,7 @@ static int	iptonodeid(struct in_addr, char *,char *,char *,char *,int *);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
 static int	checkdbredirect(char *nodeid);
+static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock);
 static void	udpserver(int sock);
 static int      handle_request(int, struct sockaddr_in *, char *, int);
@@ -262,6 +263,9 @@ main(int argc, char **argv)
 			fgets(fshostid, HOSTID_SIZE, fp);
 			if (rindex(fshostid, '\n')) {
 				*rindex(fshostid, '\n') = 0;
+				if (debug) {
+				    info("fshostid: %s\n", fshostid);
+				}
 			}
 			else {
 				error("fshostid from %s may be corrupt: %s",
@@ -489,11 +493,12 @@ static int
 handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 {
 	struct sockaddr_in redirect_client;
-	int		   redirect = 0, isvnode = 0;
+	int		   redirect = 0, isvnode = 0, havekey = 0;
 	char		   buf[BUFSIZ], *bp, *cp;
 	char		   nodeid[TBDB_FLEN_NODEID];
 	char		   vnodeid[TBDB_FLEN_NODEID];
 	char		   class[TBDB_FLEN_NODECLASS];
+	char		   privkey[TBDB_FLEN_PRIVKEY];
 	char		   type[TBDB_FLEN_NODETYPE];
 	int		   i, islocal, err = 0;
 	int		   version = DEFAULT_VERSION;
@@ -503,6 +508,20 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 */
 	bp = rdata;
 	while ((bp = strsep(&rdata, " ")) != NULL) {
+		/*
+		 * Look for PRIVKEY. 
+		 */
+		if (sscanf(bp, "PRIVKEY=%64s", buf)) {
+			havekey = 1;
+			strncpy(privkey, buf, sizeof(privkey));
+
+			if (debug) {
+				info("PRIVKEY %s\n", buf);
+			}
+			continue;
+		}
+
+
 		/*
 		 * Look for VERSION. 
 		 */
@@ -649,6 +668,26 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (checkdbredirect(nodeid)) {
 		/* Something went wrong */
 		goto skipit;
+	}
+
+	/*
+	 * Do private key check. widearea nodes must report a private key
+	 * It comes over ssl of course. At present we skip this check for
+	 * ron nodes. 
+	 */
+	if (!islocal) {
+		if (!havekey) {
+			error("%s: No privkey sent!\n", nodeid);
+			/*
+			 * Skip. Okay, the problem is that the nodes out
+			 * there are not reporting the key!
+			goto skipit;
+			 */
+		}
+		else if (checkprivkey(client->sin_addr, privkey)) {
+			error("%s: privkey mismatch: %s!\n", nodeid, privkey);
+			goto skipit;
+		}
 	}
 
 	/*
@@ -2297,9 +2336,10 @@ COMMAND_PROTOTYPE(dosfshostid)
 		signal(SIGALRM, dosfshostiddead);
 		alarm(1);
 
-		unlink(dspath);
-		if (symlink(sfspath, dspath) < 0)
+		if (unlink(dspath) < 0 ||
+		    symlink(sfspath, dspath) < 0) {
 			sfshostiddeadfl = 1;
+		}
 	}
 	alarm(0);
 	if (sfshostiddeadfl) {
@@ -3217,6 +3257,37 @@ checkdbredirect(char *nodeid)
 	return 0;
 }
 
+/*
+ * Check private key. 
+ */
+static int
+checkprivkey(struct in_addr ipaddr, char *privkey)
+{
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+
+	res = mydb_query("select privkey from widearea_privkeys "
+			 "where IP='%s'",
+			 1, inet_ntoa(ipaddr));
+	
+	if (!res) {
+		error("checkprivkey: %s: DB Error getting privkey!\n",
+		      inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	if (! (int)mysql_num_rows(res)) {
+		mysql_free_result(res);
+		return 1;
+	}
+	row = mysql_fetch_row(res);
+	mysql_free_result(res);
+	if (! row[0] || !row[0][0])
+		return 1;
+
+	return strcmp(privkey, row[0]);
+}
+ 
 #ifdef EVENTSYS
 /*
  * Connect to the event system. It's not an error to call this function if

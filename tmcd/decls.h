@@ -4,9 +4,10 @@
  * All rights reserved.
  */
 
-#define TBSERVER_PORT	 7777
-#define TBSERVER_PORT2   14443
-#define MYBUFSIZE	 2048
+#define TBSERVER_PORT		7777
+#define TBSERVER_PORT2		14443
+#define MYBUFSIZE		2048
+#define BOSSNODE_FILENAME	"bossnode"
 
 /*
  * As the tmcd changes, incompatable changes with older version of
