@@ -85,6 +85,7 @@ static float SCORE_DELAY = 10.0; /* multiplier to distance for delay scoring */
 #ifdef PENALIZE_UNUSED_INTERFACES
 static float SCORE_UNUSED_INTERFACE = 0.04;
 #endif
+static float SCORE_TRIVIAL_PENALTY = 0.5; /* Cost of over-using a trivial link */
 
 // The following are used to weight possible link resolutions.  Higher
 // numbers mean a more likely resolution.  Trivial resolutions are always

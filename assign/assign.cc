@@ -1353,7 +1353,16 @@ void print_solution()
       }
       cout << endl;
     } else if (vlink->link_info.type == tb_link_info::LINK_TRIVIAL) {
-      cout << " trivial" << endl;
+      // We'll fake a bunch of output here just to make it consistent with
+      // other (ie. intraswitch) output
+      vvertex vv = vlink->src;
+      tb_vnode *vnode = get(vvertex_pmap,vv);
+      pvertex pv = vnode->assignment;
+      tb_pnode *pnode = get(pvertex_pmap,pv);
+      cout << " trivial " <<  pnode->name << ":loopback" <<
+	" (" << pnode->name << "/null,(null)) " <<
+	pnode->name << ":loopback" << " (" << pnode->name <<
+	"/null,(null)) " << endl;
     } else {
       cout << " Mapping Failed" << endl;
     }

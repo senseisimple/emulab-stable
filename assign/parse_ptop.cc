@@ -63,9 +63,11 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	p->max_load = 0;
 	p->current_load = 0;
 	p->pnodes_used = 0;
-//#ifdef PENALIZE_UNUSED_INTERFACES
 	p->total_interfaces = 0;
-//#endif
+#ifdef TRIVIAL_LINK_BW
+	p->trivial_bw = 0;
+	p->trivial_bw_used = 0;
+#endif
 	
 	unsigned int i;
 	for (i = 2;
@@ -97,7 +99,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    p->types[type] = iload;
 	  }
 	}
-	for (i=i+1;i<parsed_line.size();++i) {
+	for (i=i+1;(i<parsed_line.size()) && (parsed_line[i].compare("-")) ;++i) {
 	  crope feature,cost;
 	  if (split_two(parsed_line[i],':',feature,cost,"0") != 0) {
 	    ptop_error("Bad node line, no cost for feature: " <<
@@ -109,6 +111,26 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	    gcost = 0;
 	  }
 	  p->features[feature] = gcost;
+	}
+	/*
+	 * Parse any other node optios or flags
+	 */
+	for (i=i+1; i < parsed_line.size(); ++i) {
+	    crope flag,value;
+	    split_two(parsed_line[i],':',flag,value,"(null)");
+#ifdef TRIVIAL_LINK_BW
+	    if (flag == crope("trivial_bw")) {
+		int trivial_bw;
+		if (sscanf(value.c_str(),"%i",&trivial_bw) != 1) {
+		    ptop_error("Bad bandwidth given for trivial_bw: " << value
+			    << endl);
+		    trivial_bw = 0;
+		}
+		p->trivial_bw = trivial_bw;
+	    } else {
+		ptop_error("Bad flag given: " << flag << ".");
+	    }
+#endif
 	}
 	pname2vertex[name] = pv;
       }
@@ -221,10 +243,10 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	else if (ISSWITCH(dstnode) &&
 		 ! ISSWITCH(srcnode)) {
 	  srcnode->switches.insert(dstv);
+	  srcnode->total_interfaces++;
 #ifdef PER_VNODE_TT
 	  srcnode->total_bandwidth += ibw;
 #endif
-	  srcnode->total_interfaces++;
 	}
       }
     } else {

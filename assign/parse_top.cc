@@ -210,8 +210,10 @@ int parse_top(tb_vgraph &VG, istream& i)
 	tb_vnode *vnode1 = get(vvertex_pmap,node1);
 	tb_vnode *vnode2 = get(vvertex_pmap,node2);
 	if (l->emulated) {
-	    vnode1->total_bandwidth += l->delay_info.bandwidth;
-	    vnode2->total_bandwidth += l->delay_info.bandwidth;
+	    if (!l->allow_trivial) {
+		vnode1->total_bandwidth += l->delay_info.bandwidth;
+		vnode2->total_bandwidth += l->delay_info.bandwidth;
+	    }
 	} else {
 	    vnode1->num_links++;
 	    vnode2->num_links++;

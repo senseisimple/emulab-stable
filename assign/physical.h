@@ -123,6 +123,11 @@ public:
 #ifdef SMART_UNMAP
   tb_vnode_set assigned_nodes;
 #endif
+
+#ifdef TRIVIAL_LINK_BW
+  int trivial_bw;
+  int trivial_bw_used;
+#endif
 };
 
 class tb_switch {

@@ -165,6 +165,8 @@ PENALIZE_BANDWIDTH	Penalize based on the bandwidth of links that, for
 			example, cross interswitch links, not just the number
 			of links. Will need to be in place when we do gigabit,
 			but not well tested yet
+TRIVIAL_LINK_BW		Allow, in the ptop file, specification of how much
+			bandwidth can be used on the node for trivial links
 
 Bugfixes
 --------
