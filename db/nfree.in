@@ -6,6 +6,7 @@
 # All rights reserved.
 #
 use English;
+use Getopt::Std;
 
 #
 # nfree - Takes pysical node names, and frees them from the experiment they
@@ -16,9 +17,11 @@ use English;
 #
 sub usage ()
 {
-    die("Usage: nfree <pid> <eid> [<node> <node> <...>]\n".
+    die("Usage: nfree [-x] <pid> <eid> [<node> <node> <...>]\n".
 	"Releases all nodes in the specified experiment.\n".
-	"If nodes are listed, nfree releases only those nodes.\n");
+	"If nodes are listed, nfree releases only those nodes.\n".
+	" '-x' frees all virtual nodes on any physical node that gets freed.\n"
+	);
 }
 
 # Configure variables
@@ -46,9 +49,28 @@ $| = 1;  # Turn off line buffering on output
 $ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+my  $optlist = "x";
+
+%options = ();
+
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+
+my $freeDependantVirtuals = 0;
+
+if (defined($options{"x"})) {
+    $freeDependantVirtuals = 1;
+}
+
 if (@ARGV < 2) {
     usage();
 }
+
 my $pid = shift;
 my $eid = shift;
 
@@ -90,6 +112,22 @@ if (@ARGV) {
 	} else {
 	    # its not a shark - just add it in...
 	    push(@nodes, $n);
+
+	    # if -x was specified, remove any 
+	    # mapping to a node which has a phys_nodeid of $n.
+	    if ($freeDependantVirtuals) {
+		my $result = 
+		    DBQueryFatal("SELECT r.node_id FROM reserved AS r ".
+				 "LEFT JOIN nodes AS n ".
+				 "ON r.node_id=n.node_id ".
+				 "WHERE n.phys_nodeid='$n' AND ".
+				 "r.eid='$eid' AND r.pid='$pid'");
+		while (my ($dependantVirtual) = $result->fetchrow_array()) {
+		    if (defined $dependantVirtual && $dependantVirtual ne $n) {
+			push(@nodes, $dependantVirtual);
+		    }
+		}
+	    }
 	}
     }
 } else {
