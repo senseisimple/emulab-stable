@@ -23,17 +23,17 @@ if (isset($deletekey)) {
     # Get the actual key.
     #
     $query_result =
-	DBQueryFatal("select * from widearea_privkeys where idx=$deletekey");
+	DBQueryFatal("select * from widearea_privkeys ".
+		     "where privkey='$deletekey'");
 
     if (! mysql_num_rows($query_result)) {
-	USERERROR("No such CDROM request!", 1);
+	USERERROR("No such widearea private key!", 1);
     }
-    $row      = mysql_fetch_array($query_result);
-    $privkey  = $row[privkey];
-    $cdidx    = $row[cdidx];
-    $imageidx = $row[imageidx];
-    $updated  = $row[updated];
-    $IP       = $row[IP];
+    $row   = mysql_fetch_array($query_result);
+    $name  = $row[user_name];
+    $email = $row[user_email];
+    $when  = $row[requested];
+    $IP    = $row[IP];
 
     #
     # We run this twice. The first time we are checking for a confirmation
@@ -42,27 +42,29 @@ if (isset($deletekey)) {
     # Probably redirect the browser back up a level.
     #
     if ($canceled) {
-        PAGEHEADER("Widearea Key Deletion Request");
+        PAGEHEADER("Widearea Private Key Deletion Request");
     
         echo "<center><h2><br>
-              Widearea Key deletion has been canceled!
+              Widearea Private Key deletion has been canceled!
               </h2></center>\n";
 
         echo "<br>
-              Back to <a href=wideareakeys.php3>CDROM request queue.</a>\n";
+              Back to <a href=cdromprivkeys.php>Back to Widearea Keys.</a>\n";
     
         PAGEFOOTER();
         return;
     }
 
     if (!$confirmed) {
-        PAGEHEADER("Widearea Key Deletion Request");
+        PAGEHEADER("Widearea Private Key Deletion Request");
 
 	echo "<center><h2><br>
-              Are you <b>REALLY</b> sure you want to delete this Widearea Key?
+              Are you <b>REALLY</b> sure you want to delete this Key?<br>
+              Deleting a key that has a widearea node attached is a bad
+              thing!
               </h2>\n";
 
-	echo "<form action=wideareakeys.php3 method=post>";
+	echo "<form action=cdromprivkeys.php method=post>";
 	echo "<input type=hidden name=deletekey value=$deletekey>\n";
 	echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
 	echo "<b><input type=submit name=canceled value=Cancel></b>\n";
@@ -71,19 +73,18 @@ if (isset($deletekey)) {
 
 	echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
 	echo "<tr>
-	          <td>$IP</td>
-                  <td>$privkey</td>
-  	          <td>$cdidx</td>
-  	          <td>$imageidx</td>
-	          <td>$updated</td>
+  	          <td>$name</td>
+  	          <td>$email</td>
+  	          <td>$IP</td>
+	          <td>$when</td>
              </tr>\n";
 	echo "</table>\n";
 
 	PAGEFOOTER();
 	return;
     }
-    DBQueryFatal("delete from widearea_privkeys where idx=$deletekey");
-    header("Location: wideareakeys.php3");
+    DBQueryFatal("delete from widearea_privkeys where privkey='$deletekey'");
+    header("Location: cdromprivkeys.php");
 }
 
 #
@@ -95,39 +96,52 @@ if (isset($deletekey)) {
 PAGEHEADER("Widearea Private Keys");
 
 $query_result =
-    DBQueryFatal("select * from widearea_privkeys order by updated DESC");
+    DBQueryFatal("select wa.*,i.node_id from widearea_privkeys as wa ".
+		 "left join interfaces as i on wa.IP=i.IP ".
+		 "order by requested DESC");
 
 if (! mysql_num_rows($query_result)) {
-    USERERROR("There are no widearea keys!\n", 1);
+    USERERROR("There are no widearea private keys!\n", 1);
 }
 
 echo "<table align=center border=1 cellpadding=2 cellspacing=2>\n";
 
 echo "<tr>
           <td>Delete?</td>
+          <td>Name</td>
+          <td>Email</td>
           <td>IP</td>
-          <td>privkey</td>
-          <td>cd</td>
-          <td>image</td>
+          <td>Node</td>
+          <td>Key</td>
+          <td>Requested</td>
           <td>Updated</td>
       </tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
-    $idx      = $row[idx];
-    $privkey  = $row[privkey];
-    $cdidx    = $row[cdidx];
-    $imageidx = $row[imageidx];
+    $name    = $row[user_name];
+    $email   = $row[user_email];
+    $requested = $row[requested];
     $updated  = $row[updated];
-    $IP       = $row[IP];
+    $privkey = $row[privkey];
+    $IP      = $row[IP];
+    $nodeid  = $row[node_id];
 
     echo "<tr>
               <td align=center>
-                  <A href='wideareakeys.php3?deletekey=$idx'>
-	                  <img alt=X src=redball.gif></A>
-	      <td>$IP</td>
-	      <td>$privkey</td>
-	      <td>$cdidx</td>
-	      <td>$imageidx</td>
+                  <A href='cdromprivkeys.php?deletekey=$privkey'>
+	                  <img alt=X src=redball.gif></A></td>
+	      <td>$name</td>
+	      <td>$email</td>
+	      <td>$IP</td>\n";
+
+    if (isset($nodeid)) {
+	echo "<td><A href='shownode.php3?node_id=$nodeid'>$nodeid</a></td>\n";
+    }
+    else {
+	echo "<td>&nbsp</td>\n";
+    }
+    echo "    <td>$privkey</td>
+	      <td>$requested</td>
 	      <td>$updated</td>
          </tr>\n";
 }
