@@ -1,0 +1,25 @@
+#!/usr/local/bin/perl -w
+
+$TOPPER = "~barb/bin/topper";
+$NEATO  = "~barb/bin/neato"; 
+
+while ($_ = shift) {
+    if (/\-o(.*)/) {
+        $outfile = $1 || shift || die "Bad arguments! '-o' must be followed by output
+ file name.\n"; 
+    } else {
+        if (defined $infile) {
+	  warn "Specifying second infile \"$_\" ignores previous infile \"$infile\".\n";
+	}
+        $infile = $_;
+    }
+}
+
+defined $outfile or die "Must define output file with -o parameter.\n";
+defined $infile or die "Must specify input file.\n";
+
+(-r $infile) or die "Input file \"$infile\" not readable.\n";
+# (-w $outfile) or die "Output file \"$infile\" not writeable.\n";
+exit (system( "cat $infile | $TOPPER | $NEATO -Tgif -o $outfile" ) / 256);  
+ 
+
