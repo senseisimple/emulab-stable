@@ -43,7 +43,7 @@ if {$argc != 3 && $argc != 2} {
     exit 1
 }
 if {$argc == 3} {
-    puts stderr "Warning: Ignoring IR file argument.
+    puts stderr "Warning: Ignoring IR file argument."
 }
 
 set DB [sql connect]
@@ -67,6 +67,7 @@ outs "Ending Testbed run for $id. [clock format [clock seconds]]"
 outs "Unallocating resources"
 
 sql query $DB "select node_id from reserved where eid=\"$eid\" and pid=\"$pid\""
+set machines {}
 while {[set machine [sql fetchrow $DB]] != {}} {
     lappend machines $machine
 }
