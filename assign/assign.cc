@@ -513,6 +513,10 @@ int mapping_precheck() {
 			feature_it != pnode->features.end(); feature_it++) {
 		    crope name = (*feature_it).first;
 		    float value = (*feature_it).second;
+		    // Skip 'local' and 'global' features
+		    if (name[0] == '*' || name[0] == '?') {
+			continue;
+		    }
 		    // Only check for feature that would result in a violation if
 		    // undesired
 		    if (value >= FD_VIOLATION_WEIGHT) {
