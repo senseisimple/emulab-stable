@@ -1,7 +1,7 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl -wT
 
 ### 
-### $Id: mkacct,v 1.19 2000-11-20 19:16:35 kwright Exp $
+### $Id: mkacct,v 1.20 2000-11-21 08:13:33 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -17,49 +17,13 @@ use Mysql;
 $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-##
-## arg: @row = {user, passwd, unix_uid, comment};
-##
-sub untaint_user_data {
-    my @row = @_;
-
-    if ( @row < 4 ) {                           # need 4 fields 
-	return 0;    
-    }
-
-    if ( $row[0] =~ /^(([a-z]|\d)+)$/ ) {       # user
-	$row[0] = $1;
-    } else { 
-	return 0;
-    }
-
-    if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
-	$row[1] = $1;
-    } else {
-	return 0;
-    }
-
-    if ( $row[2] =~ /^(\d+)$/ &&                # unix UID
-	 $row[2] < 32000 ) {                    # unix UID must be < 32000   
-	$row[2] = $1;
-    } else {
-	return 0;
-    }
-	 
-    if ( $row[3] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
-	$row[3] = $1;
-    } else {
-	return 0;
-    } 
-	 
-    return 1;
-}
-
-my $d = 1;			#debug flag
+## check usage
 if ($#ARGV < 0) { 
     die("Usage: mkacct <eid>\n".
 	"\tCreates user accounts by experiment.\n");
 }
+
+## sanitize EID arg
 my $eid = $ARGV[0];
 if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) { 
     die("Invalid eid '$eid' contains illegal characters.\n"); 
@@ -86,7 +50,8 @@ my $cmd = "select eid from experiments where eid='$eid'";
 my $sth = $dbh->query($cmd);
 my $rows =0;
 ## Must put in check that $sth defined. May be undefined if
-## query command above is syntactically incorrect. -kw
+## query command above is syntactically incorrect which could
+## conceivably be caused by a weird eid argument. -kw
 while ($sth->fetchrow_array) {
     $rows += 1;
 }
@@ -98,11 +63,10 @@ if ( $rows != 1 ) {
 
 ##
 ## Select user parameters for users in given experiment.
-## Join: exp.pid -> p.pid
 ##
 print "Selecting users...\n";
 $cmd = 
-  "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name ".
+  "select u.uid,u.usr_pswd,u.unix_uid,u.usr_name, p.control_node ".
   "from experiments as e ".
   "left join projects as p on e.pid = p.pid ".
   "left join proj_memb as pm on p.pid = pm.pid ".
@@ -113,15 +77,45 @@ my %passwd = ();
 my %unix_uid = ();
 my %fullname = ();
 while (@row = $sth->fetchrow_array) {
-    if ( untaint_user_data(@row) == 1 ) {
-	$passwd{$row[0]}   = $row[1];
-	$unix_uid{$row[0]} = $row[2];
-	$fullname{$row[0]} = $row[3];
-	print "\t$row[0]\n";
+    if ( @row == 5 ) {
+	if ( $row[0] =~ /^([a-z0-9]+)$/ ) {
+	    $user = $1;
+	} else {
+	    die "username from password no good\n";
+	}
+
+	if ( $row[1] =~ /^(\w+)$/ ) {               # encrypted passwd
+	    $passwd{$user} = $1;
+	} else {
+	    die "encrypted passwd from database not valid.\n";
+	}
+
+	if ( $row[2] =~ /^(\d+)$/ &&                # unix UID
+	     $row[2] < 32000 ) {                    # unix UID must be < 32000 
+	    $unix_uid{$user} = $1;
+	} else {
+	    die "unix UID from passwd not valid.\n";
+	}
+
+	if ( $row[3] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
+	    $fullname{$user} = $1;
+	} else {
+	    die "Fullname from database not valid.\n";
+	} 
+
+	if ( $row[4] =~ /^(([^:]+$|^))$/ ) {          # comment (fullname)
+	    $control_node = $1;
+	} else {
+	    die "Control node from database not valid.\n";
+	} 
+	
     } else {
-	print "Invalid user data. Row skipped.\n";
+	die "User data query did not return correct number of elements.\n";
     }
+    print "\t$user\n";    
 }
+
+print "Control node: $control_node\n";
 
 ##
 ## Select group ID for experiment.
@@ -133,12 +127,14 @@ $cmd =
   "where e.eid = '$eid'";
 $sth = $dbh->query($cmd);
 if (@row = $sth->fetchrow_array) {
-    $unix_gid = $row[0];
-    print "$unix_gid\n";
-} else {
-    die("Invalid group ID.\n"); 
+    if ( $row[0] =~ /^(\d+)$/ &&             # unix GID
+	 $row[0] < 65536 ) {                 # unix GID must be < 65535 
+	$unix_gid = $1;
+	print "$unix_gid\n";
+    } else {
+	die("Invalid group ID.\n"); 
+    }
 }
-
  
 ##
 ## Select machines.
@@ -156,6 +152,26 @@ while (@row = $sth->fetchrow_array) {
     print " $row[0] ";
 }
 print "\n";
+
+## 
+## Add in the control node. We selected it above when 
+## getting the user info.
+##
+
+##
+## XXX control nodes not currently set correctly by
+## web interface (not yet implemented); all projects
+## use plastic as their control node. Even if it did,
+## it looks as if the database type is a string not an
+## IP address.  
+##
+## push(@nodes, $control_node);
+##
+## Turns out we can't just push the control_node here because we
+## can't su1 ssh to plastic at this time.
+##
+## push(@nodes, "155.99.212.74");  
+##
 
 ##
 ## For each machine, ping to see if its alive.
@@ -306,14 +322,10 @@ foreach $IP (@nodes) {
 	    while ( <SCP> ) { print $_; }
 	    close SCP;
 
-	    print "Before chpass.\n";
+	    print "Commiting password changes to $IP.\n";
 	    open (CHPASS, "/usr/local/bin/sshtb $IP source $chpassf 2>&1 |");
-	    print "After chpass open.\n";
-	    while ( <CHPASS> ) {print "$_"; }
-	    print "After print.\n";
+	    while ( <CHPASS> ) {print "\t$_"; }
 	    close(CHPASS);
-	    print "After close.\n";
-	    sleep 2;
 
 	} else {
 	    print "$IP is unreachable or has an unknown OS ($OS).\n";
