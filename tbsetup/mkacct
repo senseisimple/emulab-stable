@@ -1,9 +1,11 @@
 #!/usr/local/bin/perl -wT
 
-# $Id: mkacct,v 1.26 2000-12-04 21:16:30 kwright Exp $
+# $Id: mkacct,v 1.27 2000-12-06 08:43:15 kwright Exp $
 
 use English;
 use Mysql;
+
+my $control_subnet = "155\.99\.214\.";
 
 my $me;                # alphanumeric username of $UID 
 
@@ -118,9 +120,8 @@ sub is_node_ok() {
     my $node = $_[0];
     my $numseen;
 
-    # check for duplicates
-    if ( grep($node, @nodes) ) {
-	print "$node is a duplicate. Skipping.\n";
+    # the node must be on the control new
+    if ( ! ($node =~ /$control_subnet/) ) {
 	return 0;
     }
    
@@ -155,7 +156,6 @@ sub dowork() {
     # group info and user accounts and directories.
 
     my $OS = "";
-    my $IP = "";
 
     NODE: foreach $node (@nodes) {
 
@@ -176,14 +176,15 @@ sub dowork() {
             #
 
 	    print "Creating group $group_number on $node.\n";
-	    open(GROUPADD, "/usr/local/bin/sshtb $IP /usr/sbin/groupadd -g $group_number $group_name 2>&1 |");
+	    open(GROUPADD, "/usr/local/bin/sshtb $node /usr/sbin/groupadd -g $group_number $group_name 2>&1 |");
 	    while (<GROUPADD>) { print "$_"; }
 	    close(GROUPADD); 
 
-	    foreach my $user (keys %passwd) {
+	    foreach my $name (keys %epasswd) {
 
-		print "Creating user $user on $IP.\n";
-		open(USERADD, "/usr/local/bin/sshtb $IP /usr/sbin/useradd -c \"$fullname{$user}\" -d /users/$user -g $group_number -m -p $passwd{$user} -s /bin/tcsh -u $user_number{$user}  $user 2>&1 |");
+		print "Creating user $name on $node.\n";
+		my $cmd = "/usr/local/bin/sshtb $node /usr/sbin/useradd -d /users/$name -g $group_number -m -p $epasswd{$name} -s /bin/tcsh -u $user_number{$name}  $name 2>&1 |\n";
+		open(USERADD, $cmd);
 		while (<USERADD>) { print "$_"; }
 		close(USERADD);
 	    }
@@ -307,27 +308,22 @@ sub got_tuples() {
 
 sub get_os() {
 
-    my $node = $_[0];
+    my $node  = $_[0];
+    my $match = 0;
 
     print "Checking OS on $node...";
 
-    # Get the first line. If the first line isn't what we expect,
-    # print the rest and return 0 for failure.
-
     open(UNAME,"/usr/local/bin/sshtb $node uname 2>&1 |");
-    $_ = <UNAME>;
-    if ( !($_ =~ /Linux/ or $_ =~ /FreeBSD/) ) {
-	
-	print "uname returned unexpected value on $node:\n";
+    while (<UNAME>) {
 	print $_;
-	while (<UNAME>) {
-	    print;
+	if ( ($_ =~ /Linux/ or $_ =~ /FreeBSD/) ) {
+	    $match = $_;
 	}
-	return 0;
     }
+    close(UNAME);
+ 	
+    return $match;
 
-    print "$_";
-    return $_;
 } 
 
 sub make_user() {
