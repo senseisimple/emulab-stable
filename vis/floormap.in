@@ -581,28 +581,6 @@ sub dofloor($$)
 			    x=>$x_offset, y=>$y_offset);
     warn "$err" if "$err";
 
-    if ($show_cameras) {
-	my $camera_query = "select * from cameras where building='$building'";
-	my $camera_result = DBQueryFatal($camera_query . 
-					 " and floor='$floor'");
-	
-	while (my %crow = $camera_result->fetchhash()) {
-	    my $xmin    = $crow{"loc_x"} * $baseimages{$building}->{"ppm"};
-	    my $ymin    = $crow{"loc_y"} * $baseimages{$building}->{"ppm"};
-	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * 
-		$baseimages{$building}->{"ppm"};
-	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) *
-		$baseimages{$building}->{"ppm"};
-	    
-	    $err = $baseimage->Draw(stroke=>'orange',
-				    strokewidth=>'1',
-				    primitive=>'rectangle',
-				    points=>"$xmin,$ymin $xmax,$ymax");
-	    warn "$err" if "$err";
-	}
-
-    }
-    
     #
     # Stick in obstacles, if any.
     #
@@ -619,6 +597,7 @@ sub dofloor($$)
 	my $descr    = $obrow{"description"};
 	my $label    = $obrow{"label"};
 	my $drawit   = $obrow{"draw"};
+	my $no_exclusion = $obrow{"no_exclusion"};
 	my $props  = {};
 
 	$props->{"X1"}    = $x1;
@@ -630,10 +609,22 @@ sub dofloor($$)
 	$areamap->{"$id"} = $props;
 
 	if ($drawit) {
+	    my $fill;
+
+	    if ($no_exclusion) {
+		$fill = "#000000ee";
+	    }
+	    elsif ($show_exclusion) {
+		$fill = "#FFFFFF";
+	    }
+	    else {
+		$fill = "#000000dd";
+	    }
 	    $err = $baseimage->Draw(primitive=>'rectangle',
 				    points=>"$x1,$y1 $x2,$y2",
 				    stroke=>'Black',
-				    strokewidth=>'2');
+				    strokewidth=>'2',
+				    fill=>$fill);
 	    warn "$err" if "$err";
 	}
 
@@ -663,7 +654,7 @@ sub dofloor($$)
 	    warn "$err" if "$err";
 	}
 
-	if ($show_exclusion) {
+	if ($show_exclusion && !$no_exclusion) {
 	    my $obstacle_buffer = 23; # XXX
 	    my $xmin = $x1 - $obstacle_buffer;
 	    my $ymin = $y1 - $obstacle_buffer;
@@ -672,13 +663,34 @@ sub dofloor($$)
 
 	    $err = $baseimage->Draw(primitive=>'rectangle',
 				    points=>"$xmin,$ymin $xmax,$ymax",
-				    stroke=>'steelblue',
-				    strokewidth=>'1.5',
+				    stroke=>'#000000dd',
+				    strokewidth=>'0.0',
 				    fill=>"#000000dd");
 	    warn "$err" if "$err";
 	}
     }
 
+    if ($show_cameras) {
+	my $camera_query = "select * from cameras where building='$building'";
+	my $camera_result = DBQueryFatal($camera_query . 
+					 " and floor='$floor'");
+	
+	while (my %crow = $camera_result->fetchhash()) {
+	    my $xmin    = $crow{"loc_x"} * $baseimages{$building}->{"ppm"};
+	    my $ymin    = $crow{"loc_y"} * $baseimages{$building}->{"ppm"};
+	    my $xmax    = ($crow{"loc_x"} + $crow{"width"}) * 
+		$baseimages{$building}->{"ppm"};
+	    my $ymax    = ($crow{"loc_y"} + $crow{"height"}) *
+		$baseimages{$building}->{"ppm"};
+	    
+	    $err = $baseimage->Draw(stroke=>'orange',
+				    strokewidth=>'1',
+				    primitive=>'rectangle',
+				    points=>"$xmin,$ymin $xmax,$ymax");
+	    warn "$err" if "$err";
+	}
+    }
+    
     return ($baseimage, $areamap)
 	if (!$show_nodes);
 
