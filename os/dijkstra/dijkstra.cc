@@ -34,6 +34,7 @@ http://www.amazon.com/exec/obidos/ASIN/0387001638/thealgorithmrepo/
 #include <sstream>
 #include <cstdio>
 #include <cstdlib>
+
 #include "wgraph.h"
 
 using namespace std;
