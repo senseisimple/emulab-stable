@@ -198,20 +198,43 @@ elseif (strcmp($approval, "approve") == 0) {
     # Temporary Plab hack.
     #
     $pcremote_ok = array();
+    $auxtypes    = array();
     if (isset($pcplab_okay) &&
 	!strcmp($pcplab_okay, "Yep")) {
-	    $pcremote_ok[] = "pcplab";
+	    $pcremote_ok[] = "pcplabphys";
+	    $auxtypes[]    = "pcplab";
+	    $auxtypes[]    = "pcplabinet";
+	    $auxtypes[]    = "pcplabinet2";
+	    $auxtypes[]    = "pcplabintl";
+	    $auxtypes[]    = "pcplabdsl";
     }
     # RON implies pcwa too.
     if (isset($ron_okay) &&
 	!strcmp($ron_okay, "Yep")) {
 	    $pcremote_ok[] = "pcron";
 	    $pcremote_ok[] = "pcwa";
+	    $auxtypes[]    = "pcvron";
+	    $auxtypes[]    = "pcvroninet";
+	    $auxtypes[]    = "pcvroninet2";
+	    $auxtypes[]    = "pcvronintl";
+	    $auxtypes[]    = "pcvrondsl";
+	    $auxtypes[]    = "pcvwa";
+	    $auxtypes[]    = "pcvwainet";
+	    $auxtypes[]    = "pcvwainet2";
+	    $auxtypes[]    = "pcvwaintl";
+	    $auxtypes[]    = "pcvwadsl";
     }
     if (count($pcremote_ok)) {
 	    $foo = implode(",", $pcremote_ok);
 	    DBQueryFatal("UPDATE projects set pcremote_ok='$foo' ".
 			 "WHERE pid='$pid'");
+    }
+    if (count($auxtypes)) {
+	while (list ($idx, $type) = each ($auxtypes)) {
+	    DBQueryFatal("insert into nodetypeXpid_permissions ".
+			 "(pid, type) ".
+			 "values ('$pid', '$type')");
+	}
     }
 
     TBMAIL("$headname '$headuid' <$headuid_email>",
