@@ -120,7 +120,6 @@ earliest time one of the steps needs to occur.
 
 		ssh users
 		cd /your/object/tree/obj/
-		gmake
 		gmake ops-install
 
         * Install the new elvind config file on boss and restart elvind
