@@ -1,0 +1,57 @@
+# Wireless LAN adapter configuration
+#
+# The address format is "scheme,socket,instance,hwaddr".
+#
+# Theory of operation : all the Wireless specific configuration is done
+# through the Wireless Extensions, so we will just call 'iwconfig' with
+# the right parameters defined below.
+# Of course, you need to have iwconfig installled on your system.
+# To download iwconfig, or for more info on Wireless Extensions :
+#	http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html
+#
+# Note : you don't need to fill all parameters, leave them blank, in most
+# cases the driver will initialise itself with sane defaults values or
+# automatically figure out the value... And not all drivers do support
+# all settings...
+#
+# Finally, send comments and flames to me, Jean Tourrilhes <jt@hpl.hp.com>
+#
+
+case "$ADDRESS" in
+
+*,*,*,*)
+    MODE="Managed"
+    ESSID="elab-wifi"
+    ;;
+
+# Generic example (decribe all possible settings)
+*,*,*,*)
+    INFO="Fill with your own settings..."
+    # ESSID (extended network name) : My Network, any
+    ESSID=""
+    # NWID/Domain (cell identifier) : 89AB, 100, off
+    NWID=""
+    # Operation mode : Ad-Hoc, Managed, Master, Repeater, Secondary, auto
+    MODE=""
+    # Frequency or channel : 1, 2, 3 (channel) ; 2.422G, 2.46G (frequency)
+    FREQ=""
+    CHANNEL=""
+    # Sensitivity (cell size + roaming speed) : 1, 2, 3 ; -70 (dBm)
+    SENS=""
+    # Bit rate : auto, 1M, 11M
+    RATE=""
+    # Encryption key : 4567-89AB-CD, s:password
+    KEY=""
+    # RTS threshold : off, 500
+    RTS=""
+    # Fragmentation threshold : off, 1000
+    FRAG=""
+    # Other iwconfig parameters : power off, ap 01:23:45:67:89:AB
+    IWCONFIG=""
+    # iwspy parameters : + 01:23:45:67:89:AB
+    IWSPY=""
+    # iwpriv parameters : set_port 2, set_histo 50 60
+    IWPRIV=""
+    ;;
+esac
+
