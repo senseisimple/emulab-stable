@@ -1,0 +1,42 @@
+This file contains notes about the security of the tesbed, and what should
+be done to enhance it:
+
+1) Switches/Infrastucture hardware:
+  1.1) Rules need to be set up on the control switch to restrict the
+    IP/MAC that can be used on each port
+  1.2) SNMP on the switches, power contollers, and anything else that
+    uses it should be restricted to paper's IP/switch port.
+
+2) Firewalling:
+  2.1) Block outgoing connections from testbed nodes to the CS network
+    - This is because something on this network may have (misguided)
+    trust in them (especially paper/plastic)
+  2.2) May want to block outgoing connections on specific ports to all
+    IPs - for example, the SMTP port, to prevent people from using
+    testbed nodes as spam mailhubs. Then again, this may be too
+    restrictive, while giving few/no real advantages.
+
+3) Filesystems:
+  3.1) Home directories should be exported only to nodes currently
+    running experiments that the user is involved in (will be secure
+    because of 1.1)
+  3.2) Home directories on Plastic should be mounted with the 'nosuid'
+    and 'nodev' options on plastic and paper - users could, on their
+    test nodes, create set-uid root programs, or make device nodes
+    that they are allowed to read an write to.
+  3.3) Remove suidperl binary on plastic (doesn't get installed on
+    latest FreeBSD versions anyway) - See FreeBSD mount manpage for
+    reason. Related to 3.2
+  3.4) All testbed nodes, and plastic (any maybe paper too?) should
+    NOT be able to mount our NFS server(s) or CS's. Could happen
+    either through firewalling or rules on the NFS servers.
+    
+4) Policies:
+  4.1) Flux'ers accounts on plastic and testbed nodes should not have
+    stanard passwords (people may be able to get encrypted string and
+    crack)
+  4.2) No accounts on plastic should have 'special priviledges' - we
+    need to assume that any account on plastic can be compromised
+  4.3) NO special passwords should be typed on plastic or the testbed
+    nodes. This means don't telnet to the switches, ssh to any
+    machines other than the testbed nodes, etc.
