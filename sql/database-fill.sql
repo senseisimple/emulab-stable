@@ -453,7 +453,6 @@ REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirec
 REPLACE INTO table_regex VALUES ('experiments','forcelinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','usewatunnels','int','redirect','default:boolean',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','veth_encapsulate','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselatestwadata','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_delay_solverweight','float','redirect','default:float',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_bw_solverweight','float','redirect','default:float',0,1024,NULL);
@@ -574,6 +573,8 @@ REPLACE INTO table_regex VALUES ('projects','num_members','int','redirect','defa
 REPLACE INTO table_regex VALUES ('projects','num_pcs','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_pcplab','int','redirect','default:int',0,2048,NULL);
 REPLACE INTO table_regex VALUES ('projects','num_ron','int','redirect','default:int',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('experiments','veth_encapsulate','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','allowfixnode','int','redirect','default:boolean',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
