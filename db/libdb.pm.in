@@ -1800,8 +1800,8 @@ sub TBIsNodeRemote($)
     my ($nodeid) = @_;
 
     my $query_result =
-	DBQueryFatal("select isremotenode from node_types as t ".
-		     "left join nodes as n on t.type=n.type ".
+	DBQueryFatal("select isremotenode from nodes as n ".
+		     "left join node_types as t on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
 
     if (! $query_result->num_rows) {
@@ -1824,8 +1824,8 @@ sub TBIsNodeVirtual($;$)
     my ($nodeid, $jailed) = @_;
 
     my $query_result =
-	DBQueryFatal("select isvirtnode,n.jailflag from node_types as t ".
-		     "left join nodes as n on t.type=n.type ".
+	DBQueryFatal("select isvirtnode,n.jailflag from nodes as n ".
+		     "left join node_types as t on t.type=n.type ".
 		     "where n.node_id='$nodeid'");
 
     if (! $query_result->num_rows) {
