@@ -263,6 +263,7 @@ CREATE TABLE experiments (
   canceled tinyint(4) NOT NULL default '0',
   batchstate varchar(12) default NULL,
   event_sched_pid int(11) default '0',
+  prerender_pid int(11) default '0',
   uselinkdelays tinyint(4) NOT NULL default '0',
   forcelinkdelays tinyint(4) NOT NULL default '0',
   multiplex_factor smallint(5) default NULL,

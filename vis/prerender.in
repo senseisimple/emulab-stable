@@ -9,15 +9,18 @@
 use English;
 use Getopt::Std;
 use Digest::MD5  qw(md5 md5_hex md5_base64);
+use BSD::Resource;
 
 # Need this module to use mktemp (commented out below)
 # use File::MkTemp;
 
 # Configure variables
 my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
 
 use lib '@prefix@/lib';
 use libdb;
+use libtestbed;
 
 # Turn off line buffering on output
 $| = 1;
@@ -36,12 +39,13 @@ my $THUMB_CMD = "render -t 128";
 sub dprint($);
 
 sub usage {
-    die "Usage:\nprerender [-v] [-r] [-t] <pid> <eid>\n" .
+    die "Usage:\nprerender [-v] [-r] [-t] [-f] <pid> <eid>\n" .
+        "    -f  To stay in foreground (no fork).\n".
         "    -r  Just remove vis info from DB\n".
         "    -t  Generate (or remove) thumbnail\n";
 }
 
-my $optlist = "rvt";
+my $optlist = "rvtf";
 
 %options = ();
 
@@ -50,6 +54,7 @@ if (@ARGV != 2) { usage; }
 
 my $debug = 0;
 my $thumb = 0;
+my $foreground = 0;
 
 if ( defined($options{"v"}) ) { 
     $debug++; 
@@ -60,6 +65,9 @@ if ( defined($options{"v"}) ) {
 if ( defined($options{"t"}) ) { 
     $thumb++; 
 }
+if ( defined($options{"f"}) ) { 
+    $foreground++; 
+}
 
 #my ($pid) = $ARGV[0];
 #my ($eid) = $ARGV[1];
@@ -69,6 +77,21 @@ my ($eid) = $ARGV[1] =~ /([0-9a-zA-Z_\-]+)/;
 # for the mungeName function, below.
 $mungeUID = 0;
 
+# For process handling, below.
+my $renderpid;
+
+sub handler ($) {
+    my ($signame) = @_;
+
+    fatal("Caught a SIG${signame}!");
+}
+
+#
+# See if another prerender is still running. If so, kill it and update the
+# pid in the DB. We always kill a running prerender. 
+#
+KillOldRender();
+
 ### If they specified -r, meaning they just wanted to remove vis info 
 ### from the DB, we do it and quit.
 if (defined($options{"r"})) {
@@ -76,12 +99,46 @@ if (defined($options{"r"})) {
     exit 0; 
 }
 
+#
+# Okay, go into the background. 
+# 
+if (! $foreground) {
+    if (TBBackGround("prerender.output")) {
+	#
+	# Parent exits normally
+	#
+	print STDOUT "Image rendering proceeding in background mode ...\n"; 
+	exit(0);
+    }
+
+    #
+    # Setup a handler so we can be killed later.
+    #
+    $SIG{TERM} = \&handler;
+    $SIG{INT}  = \&handler;
+
+    #
+    # Enter our pid into the DB.
+    #
+    $renderpid = $PID;
+    
+    DBQueryFatal("update experiments set ".
+		 "prerender_pid=$renderpid ".
+		 "where pid='$pid' and eid='$eid'");
+}
+
+# Lower priority since this whole thing consumes CPU like nuts
+setpriority(PRIO_PROCESS, 0, 15);
+
 ### Now, read experiment virtual info from the DB.
 
 # read nodes
 
-my $result = DBQueryFatal("SELECT vname FROM virt_nodes " .
-			  "WHERE pid='$pid' AND eid='$eid'");
+my $result = DBQueryWarn("SELECT vname FROM virt_nodes " .
+			 "WHERE pid='$pid' AND eid='$eid'");
+
+fatal("Failed to get virt_nodes info from DB")
+    if (!$result);
 
 my $nodes = ();
 my $lans  = ();
@@ -94,8 +151,11 @@ while (my ($vname) = $result->fetchrow) {
 
 # read lans
 
-$result = DBQueryFatal("SELECT vname, member FROM virt_lans " .
+$result = DBQueryWarn("SELECT vname, member FROM virt_lans " .
 		       "WHERE pid='$pid' AND eid='$eid'");
+
+fatal("Failed to get virt_lans info from DB")
+    if (!$result);
 
 while (my ($vname, $member) = $result->fetchrow) {
     $member =~ s/\:.*//;
@@ -112,7 +172,7 @@ foreach my $lan (keys %lans) {
 	$links{"$a $b"} = "pair";
     } else {
 	# it's a lan; we need a visualizer node for it (of type "lan").
-	if (exists $nodes{$lan}) { die "LAN $lan name collided."; }
+	if (exists $nodes{$lan}) { fatal("LAN $lan name collided."); }
 	$nodes{$lan}{"type"} = "lan";
 
 	# make the appropriate links (from each member to the LAN)
@@ -130,7 +190,8 @@ foreach my $lan (keys %lans) {
 # Could use ($ENV{'TMP'} || "/tmp")  but not sure if that is safe.
 my $tempfile =  "/tmp/prerender.$$-" . sprintf("%i",rand(65536));
 
-open (TOPO, ">$tempfile" ) or die( "Couldn't open temporary file '$tempfile'\n" );
+open (TOPO, ">$tempfile" ) or
+    fatal("Couldn't open temporary file '$tempfile'\n");
 
 # write topology to neato
 
@@ -140,22 +201,11 @@ foreach my $node (keys %nodes) {
     print TOPO "{node [shape = box] " . mungeName($node) . "}\n";
 }
 
-#foreach my $a (keys %nodes) {
-#    foreach my $b (keys %nodes) {
-#	if (!exists $links{"$a $b"}) {
-#	    print TOPO mungeName($a) . " -- " . mungeName($b) . " [len = 4];\n";
-#	    print TOPO mungeName($a) . " -- " . mungeName($b) . " ;\n";
-#	}
-#    }
-#}
-
 foreach my $link (keys %links) {
     my ($a, $b) = $link =~ /(\S+)\s(\S+)/;
     if ($links{$link} eq "pair") {
-# 	print TOPO mungeName($a) . " -- " . mungeName($b) . " [len = 3];\n";
 	print TOPO mungeName($a) . " -- " . mungeName($b) . " ;\n";
     } else {
-#	print TOPO mungeName($a) . " -- " . mungeName($b) . " [len = 5];\n";
 	print TOPO mungeName($a) . " -- " . mungeName($b) . " ;\n";
     }
 }
@@ -264,18 +314,18 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
     foreach my $linka (keys %links) {
 	my ($a1, $a2) = ($linka =~ /(\S+)\s(\S+)/);
 
-	defined $a1 or die;
-	defined $a2 or die;
-	exists $nodes{ $a1 } or die $a1;
-	exists $nodes{ $a2 } or die $a2;
+	defined $a1 or fatal("a1");
+	defined $a2 or fatal("a2");
+	exists $nodes{ $a1 } or fatal($a1);
+	exists $nodes{ $a2 } or fatal($a2);
 
 	my ($a1x,$a1y) = ($nodes{ $a1 }{"x"}, $nodes{ $a1 }{"y"});
 	my ($a2x,$a2y) = ($nodes{ $a2 }{"x"}, $nodes{ $a2 }{"y"});
 
-	defined $a1x or die "$linka $a1";
-	defined $a1y or die $a1;
-	defined $a2x or die $a2;
-	defined $a2y or die $a2;
+	defined $a1x or fatal("$linka $a1");
+	defined $a1y or fatal($a1);
+	defined $a2x or fatal($a2);
+	defined $a2y or fatal($a2);
 
 	foreach my $linkb (keys %links) {
 	    # never check a link against itself
@@ -283,16 +333,16 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
     
 	    my ($b1, $b2) = ($linkb =~ /(\S+)\s(\S+)/);
 
-	    defined $b1 or die;
-	    defined $b2 or die;
+	    defined $b1 or fatal("b1");
+	    defined $b2 or fatal("b2");
 
 	    my ($b1x,$b1y) = ($nodes{ $b1 }{"x"}, $nodes{ $b1 }{"y"});
 	    my ($b2x,$b2y) = ($nodes{ $b2 }{"x"}, $nodes{ $b2 }{"y"});
 
-	    defined $b1x or die $b1;
-	    defined $b1y or die $b1;
-	    defined $b2x or die $b2;
-	    defined $b2y or die $b2;
+	    defined $b1x or fatal($b1);
+	    defined $b1y or fatal($b1);
+	    defined $b2x or fatal($b2);
+	    defined $b2y or fatal($b2);
 
 	    my $shared = "";
 
@@ -371,57 +421,76 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 
     dprint "Attempt = $attempt, overlaps = $overlaps.\n";
 
-    # if this is the best so far, stash it away.
+    #
+    # if this is the best so far, stash it in the DB, This gives us
+    # a picture quickly, even if its not the best picture. Also gives
+    # us something in case the experiment is terminated or modified before
+    # the render finishes, which is quite possible on giant experiments.
+    #
     if (!defined $bestOverlaps || $overlaps < $bestOverlaps) {
 	$bestOverlaps = $overlaps;
+
+        # We have to lock the table so as not to cause grief to someone
+	# trying to vis this experiment during this window.
+	$result =
+	    DBQueryWarn("lock tables vis_nodes write");
+	
+	fatal("Failed to lock vis_nodes table.")
+	    if (!$result);
+
+	$result =
+	    DBQueryWarn("DELETE FROM vis_nodes ".
+			"WHERE pid='$pid' AND eid='$eid'");
+	fatal("Failed to clear old vis_nodes from DB")
+	    if (!$result);
+
+	# Then stash new one.
 	foreach $node (keys %nodes) {
-	    $nodes{ $node }{"x_best"} = $nodes{ $node }{"x"}; 
-	    $nodes{ $node }{"y_best"} = $nodes{ $node }{"y"}; 
-	}	
-    }    
+	    $result = 
+		DBQueryWarn("INSERT INTO vis_nodes ".
+			    "(vname, pid, eid, vis_type, x, y) VALUES".
+			    " ('$node', '$pid', '$eid', " .
+			    "'" . $nodes{ $node }{"type"} . "', " .
+			    "'" . $nodes{ $node }{"x"}    . "', " .
+			    "'" . $nodes{ $node }{"y"}    . "') ");
+	
+	    fatal("Failed to insert new vis_nodes into DB")
+		if (!$result);
+	}
+	$result =
+	    DBQueryWarn("unlock tables");
+	
+	fatal("Failed to unlock vis_nodes table.")
+	    if (!$result);
+
+	#
+	# Generate thumbnail, if called for. The .png file is put into
+	# the work directory, so it is copied off to the users
+	# directory. We take that file and stash it in the DB, since
+	# that is where the system will read it from.
+	#
+	if ($thumb) {
+	    my $workdir = TBExptWorkDir($pid, $eid);
+	    my $fname   = "$workdir/$eid.png";
+	
+	    if (system("$THUMB_CMD $pid $eid > $fname")) {
+		print STDERR "Error generating thumbnail.\n";
+	    }
+	    else {
+		TBExptSetThumbNail($pid, $eid, `cat $fname`);
+	    }
+	}
+    }
 
     # if there were no overlaps, we're done.
     if ($overlaps == 0) { last; }
 } # for $attempt
 
 ### Delete tempfile
-
 unlink $tempfile;
 
-### Put new data into db.
-
-# First, wipe out the old layout.
-DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
-
-foreach $node (keys %nodes) {
-    if (exists $nodes{ $node }{"type"} &&
-        exists $nodes{ $node }{"x_best"} &&
-	exists $nodes{ $node }{"y_best"}) {
-
-	DBQueryFatal("INSERT INTO vis_nodes (vname, pid, eid, vis_type, x, y) VALUES".
-		     " ('$node', '$pid', '$eid', " .
-		     "'" . $nodes{ $node }{"type"} . "', " .
-		     "'" . $nodes{ $node }{"x_best"}    . "', " .
-		     "'" . $nodes{ $node }{"y_best"}    . "') ");
-    }
-}
-
-# Generate thumbnail, if called for. The .png file is put into the work
-# directory, so it is copied off to the users directory. We take that
-# file and stash it in the DB, since that is where the system will read
-# it from.
-
-if ($thumb) {
-    my $workdir = TBExptWorkDir($pid, $eid);
-    my $fname   = "$workdir/$eid.png";
-	
-    if (system("nice $THUMB_CMD $pid $eid > $fname")) {
-	print STDERR "Error generating thumbnail.\n";
-    }
-    TBExptSetThumbNail($pid, $eid, `cat $fname`);
-}
-
 ### Success!!
+cleanup();
 
 exit 0;
 
@@ -447,4 +516,55 @@ sub mungeName($) {
 sub dprint($) {
     my $n = shift;
     if ($debug > 0) { print STDERR $n; }
+}
+
+sub cleanup()
+{
+    # Clear our pid from the DB since we are about to exit.
+    if ($renderpid) {
+	DBQueryFatal("update experiments set prerender_pid=0 ".
+		     "where pid='$pid' and eid='$eid'");
+    }
+}
+
+sub fatal($)
+{
+    my $msg = shift;
+    
+    cleanup();
+    DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+sub KillOldRender()
+{
+    DBQueryFatal("lock tables experiments write");
+
+    my $query_result =
+	DBQueryFatal("select prerender_pid from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    
+    DBQueryFatal("update experiments set ".
+		 "prerender_pid=-prerender_pid ".
+		 "where pid='$pid' and eid='$eid'");
+		 
+    DBQueryWarn("unlock tables");
+
+    my @row    = $query_result->fetchrow_array();
+    my $procid = $row[0];
+
+    if ($procid > 0 &&
+	! kill('TERM', $procid)) {
+	DBQueryWarn("update experiments set ".
+		    "prerender_pid=-prerender_pid ".
+		    "where pid='$pid' and eid='$eid'");
+	
+	SENDMAIL($TBOPS,
+		 "Failed to stop prerender for $pid/$eid",
+		 "Could not kill(TERM) process $procid: $? $!");
+
+	die("*** $0:\n".
+	    "Failed to stop prerender for $pid/$eid!\n");
+    }
 }

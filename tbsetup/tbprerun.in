@@ -107,6 +107,9 @@ if (! $modify) {
 sub cleanup {
     if (! $modify) {
 	print STDERR "Cleaning up after errors.\n";
+	# Must kill the prerender process first!
+	system("prerender -r $pid $eid");
+	
 	print "Removing experiment state ... " . TBTimeStamp() . "\n";
 	TBExptRemoveVirtualState($pid, $eid );
 	print "Removal done! " . TBTimeStamp() . "\n";
@@ -116,7 +119,6 @@ sub cleanup {
 	# going to "NEW" tells swapexp to fully terminate the experiment.
 	#
 	SetExpState($pid, $eid, EXPTSTATE_NEW);
-	system("prerender -r $pid $eid");
     }
 }
 
@@ -133,8 +135,8 @@ TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
 
 TBDebugTimeStamp("prerender started in background");
-print "Precomputing visualization (in background)...\n";
-system("prerender -t $pid $eid &");
+print "Precomputing visualization ...\n";
+system("prerender -t $pid $eid");
 
 TBDebugTimeStamp("routes started");
 print "Setting up static routes (if requested) ... \n";

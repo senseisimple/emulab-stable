@@ -86,8 +86,9 @@ if (! SetExpState($pid, $eid, EXPTSTATE_TERMINATING)) {
 print "Clearing out virtual state.\n";
 $errors += TBExptRemoveVirtualState( $pid, $eid );
 
+# This will kill a running prerender.
 print "Removing visualization data...\n";
-system("prerender -r -t $pid $eid");
+system("prerender -r $pid $eid");
 
 if ($errors == 0) {
     SetExpState($pid, $eid, EXPTSTATE_TERMINATED) or

@@ -59,7 +59,7 @@ my $action;
 #
 # Untaint the path
 # 
-$ENV{'PATH'} = '/bin:/usr/bin';
+$ENV{'PATH'} = "/bin:/usr/bin:$TB/libexec/vis";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
@@ -470,6 +470,9 @@ elsif ($inout eq "modify") {
 	fatal("*** $0:\n".
 	      "    Could not backup experiment state; cannot safely continue!\n");
     }
+    # Must deal with the prerender explicitly since it runs background.
+    system("prerender -r $pid $eid");
+    
     TBExptRemoveVirtualState($pid, $eid);
 
     #
@@ -512,8 +515,13 @@ elsif ($inout eq "modify") {
 	print STDERR "*** $0:\n".
 	             "    $modifyError\n";
 	print STDOUT "Recovering experiment state...\n";
+	# Must deal with the prerender explicitly since it runs background.
+	system("prerender -r $pid $eid");
 	TBExptRemoveVirtualState($pid, $eid );
+	
 	if (0 == TBExptRestoreVirtualState($pid, $eid, $$)) {
+	    # Must deal with the prerender explicitly since it runs background.
+	    system("prerender -t $pid $eid");
 	    fatal("*** Update aborted; old state restored.\n");
 	} else {
 	    # Set state to NEW so experiment will get wiped.

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -162,7 +162,7 @@ if (defined($output)) {
     $args .= "2> /dev/null";
 }
 
-if (system("$render $args") != 0) { 
+if (system("nice $render $args") != 0) { 
     exit(1);
 }
 

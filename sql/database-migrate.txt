@@ -827,3 +827,10 @@ last_net_act,last_cpu_act,last_ext_act);
        I contemplated putting this into the nodes table instead, but a
        node has no role when its not reserved, so it seemed like the
        wrong place for it.
+
+1.169: Add a prerender pid so that it can run in the background, but
+       be killed if the experiment fails, terminates, or modifies.
+
+       alter table experiments add prerender_pid int(11) default '0' \
+		after event_sched_pid;
+
