@@ -71,7 +71,8 @@ function SPITFORM($formfields, $returning, $errors)
             </td>
           </tr>\n
 
-          <form action=newproject.php3 method=post>\n";
+          <form enctype=multipart/form-data
+                action=newproject.php3 method=post>\n";
 
     if (! $returning) {
         #
@@ -649,19 +650,24 @@ if (!$returning) {
     # If usr provided a file for the key, it overrides the paste in text.
     # Must read and check it.
     #
-    # XXX I allow only a single line of stuff. The rest is ignored for now.
-    #
     if (isset($usr_keyfile) &&
 	strcmp($usr_keyfile, "") &&
 	strcmp($usr_keyfile, "none")) {
-	$keyfilegoo = file($usr_keyfile);
 
-	if (! ereg("^[0-9a-zA-Z\@\. ]*$", $keyfilegoo[0])) {
+	if (! ($fp = fopen($usr_keyfile, "r"))) {
+	    TBERROR("Could not open $usr_keyfile", 1);
+	}
+	$buffer = fgets($fp, 4096);
+
+	if (! ereg("^[0-9a-zA-Z\@\. \n]*$", $buffer)) {
 	    $errors["PubKey File Contents"] = "Invalid characters";
+	    
+	    SPITFORM($formfields, $errors);
+	    PAGEFOOTER();
+	    return;
 	}
-	else {
-	    $usr_key = $keyfilegoo[0];
-	}
+	$usr_key = Chop($buffer);
+	fclose($fp);
     }
 }
 else {

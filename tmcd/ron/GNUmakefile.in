@@ -35,7 +35,8 @@ script-install:	dir-install
 	$(INSTALL_PROG) $(SRCDIR)/update $(INSTALL_DIR)/update
 	$(INSTALL_PROG) $(SRCDIR)/libsetup.pm $(INSTALL_DIR)/libsetup.pm
 	$(INSTALL_PROG) $(SRCDIR)/liblocsetup.pm $(INSTALL_DIR)/liblocsetup.pm
-#	$(INSTALL_PROG) $(SRCDIR)/rc.testbed /usr/local/etc/rc.d/testbed.sh
+	$(INSTALL_PROG) $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
+	$(INSTALL_PROG) $(SRCDIR)/mkemuman.sh $(INSTALL_DIR)/mkemuman.sh
 
 post-install:
 	chown root $(INSTALL_DIR)/update

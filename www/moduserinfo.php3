@@ -60,7 +60,8 @@ function SPITFORM($formfields, $errors)
             </td>
           </tr>\n
 
-          <form action=moduserinfo.php3 method=post>\n";
+          <form enctype=multipart/form-data
+                action=moduserinfo.php3 method=post>\n";
 
         #
         # UserName. This is a constant field. 
@@ -184,7 +185,6 @@ function SPITFORM($formfields, $errors)
 
                   <td rowspan><center>Upload (1K max)[<b>3</b>]<br>
                                   <b>Or</b><br>
-                                   <br>
                                Insert Key
                               </center></td>
 
@@ -443,16 +443,21 @@ if (isset($formfields[usr_key]) &&
 if (isset($usr_keyfile) &&
     strcmp($usr_keyfile, "") &&
     strcmp($usr_keyfile, "none")) {
-    $keyfilegoo = file($usr_keyfile);
 
-    if (! ereg("^[0-9a-zA-Z\@\. ]*$", $keyfilegoo[0])) {
+    if (! ($fp = fopen($usr_keyfile, "r"))) {
+	TBERROR("Could not open $usr_keyfile", 1);
+    }
+    $buffer = fgets($fp, 4096);
+
+    if (! ereg("^[0-9a-zA-Z\@\. \n]*$", $buffer)) {
 	$errors["PubKey File Contents"] = "Invalid characters";
 
 	SPITFORM($formfields, $errors);
 	PAGEFOOTER();
 	return;
     }
-    $usr_key = $keyfilegoo[0];
+    $usr_key = Chop($buffer);
+    fclose($fp);
 }
 
 #

@@ -142,7 +142,7 @@ sub doaccounts ()
 	    #
 	    # Group info goes in the hash table.
 	    #
-	    $newgroups{$1} = $2
+	    $newgroups{"emu-$1"} = $2
 	}
 	elsif ($_ =~ /^ADDUSER LOGIN=([0-9a-z]+)/) {
 	    #
@@ -168,9 +168,10 @@ sub doaccounts ()
     # DB as we create it.
     #
     while (($group, $gid) = each %newgroups) {
-	($exists) = getgrgid($gid);
+	my ($exists,undef,$curgid) = getgrnam($group);
+	
 	if ($exists) {
-	    if ($exists ne $group) {
+	    if ($gid != $curgid) {
 		warn "*** WARNING: $group/$gid mismatch with existing group\n";
 	    }
 	    next;
@@ -260,10 +261,11 @@ sub doaccounts ()
 	# Must ask for the current home dir since we rely on pw.conf.
 	#
 	if (defined($homedir) &&
-	    index($homedir, "/${login}") &&
+	    index($homedir, "/${login}")) {
 	    print "Removing home directory: $homedir\n";
-	    system("rm -rf $homedir")) {
+	    if (system("rm -rf $homedir")) {
 	        warn "*** WARNING: Could not remove homedir $homedir.\n";
+	    }
 	}
 	
 	# Delete from DB only if successful. 
@@ -297,9 +299,14 @@ sub doaccounts ()
 	    my ($exists,undef,$curuid) = getpwnam($login);
 
 	    if ($exists) {
-		if ($exists ne $login || $curuid != $uid) {
+		if (!defined($PWDDB{$login})) {
 		    warn "*** WARNING: ".
-			 "$login/$uid mismatch with existing login.\n";
+			 "Skipping since $login existed before EmulabMan!\n";
+		    next;
+		}
+		if ($curuid != $uid) {
+		    warn "*** WARNING: ".
+			 "$login/$uid uid mismatch with existing login.\n";
 		    next;
 		}
 		print "Updating $login login info.\n";
@@ -324,7 +331,7 @@ sub doaccounts ()
 		undef,undef,undef,$homedir) = getpwuid($uid);
 	    my $sshdir = "$homedir/.ssh";
 	    
-	    if (! -e $sshdir && (defined($ekey) || defined($hkey))) {
+	    if (! -e $sshdir && ($ekey ne "" || $hkey ne "")) {
 		if (! mkdir($sshdir, 0700)) {
 		    warn("*** WARNING: Could not mkdir $sshdir: $!\n");
 		    next;
@@ -337,10 +344,10 @@ sub doaccounts ()
 		    warn("*** WARNING: Could not open $sshdir/keys: $!\n");
 		    next;
 		}
-		if (defined($ekey)) {
+		if ($ekey ne "") {
 		    print AUTHKEYS "$ekey\n";
 		}
-		if (defined($hkey)) {
+		if ($hkey ne "") {
 		    print AUTHKEYS "$hkey\n";
 		}
 		close(AUTHKEYS);
