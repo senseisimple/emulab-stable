@@ -154,27 +154,33 @@ sub os_ifconfig_line($$$$$$$;$$)
 
     $uplines = "";
     
-    #
-    # Must set route table id before assigning IP address so that interface
-    # route winds up in the correct table.
-    #
-    if (defined($rtabid)) {
-	$uplines .= "$IFCONFIGBIN $iface rtabid $rtabid\n    ";
+    if ($inet eq "") {
+	$uplines .= "$IFCONFIGBIN $iface up $media $mediaopt";
     }
+    else {
+	#
+	# Must set route table id before assigning IP address so that interface
+	# route winds up in the correct table.
+	#
+	if (defined($rtabid)) {
+	    $uplines .= "$IFCONFIGBIN $iface rtabid $rtabid\n    ";
+	}
 
-    $uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask, $media, $mediaopt);
-    $downlines = "$IFCONFIGBIN $iface down\n";
+	# Config the interface.
+	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask, $media,$mediaopt);
+	$downlines  = "$IFCONFIGBIN $iface down\n";
+	
+	if ($aliases ne "") {
+	    # Must do this first to avoid lo0 routes.
+	    $uplines .= "\n    ".
+		"sysctl -w net.link.ether.inet.useloopback=0\n";
 
-    if ($aliases ne "") {
-	# Must do this first to avoid lo0 routes.
-	$uplines .= "\n    ".
-	            "sysctl -w net.link.ether.inet.useloopback=0\n";
+	    foreach my $alias (split(',', $aliases)) {
+		my $ifalias = sprintf($IFALIAS, $iface, $alias);
 
-	foreach my $alias (split(',', $aliases)) {
-	    my $ifalias = sprintf($IFALIAS, $iface, $alias);
-
-	    $uplines   .= "$ifalias\n";
-	    $downlines .= "$IFCONFIGBIN $iface -alias $alias\n";
+		$uplines   .= "$ifalias\n";
+		$downlines .= "$IFCONFIGBIN $iface -alias $alias\n";
+	    }
 	}
     }
     return ($uplines, $downlines);
@@ -207,13 +213,9 @@ sub os_ifconfig_veth($$$$$;$$)
 	warn("Bad vmac in veth config: $vmac\n");
 	return "";
     }
-    $uplines = "";
-    if (defined($iface)) {
-	$uplines .= "$IFCONFIGBIN $iface up $IFC_100MBS $IFC_FDUPLEX\n";
-    }
-    $uplines .= "$IFCONFIGBIN veth${id} create\n    " .
-	        "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
-		(defined($iface) ? " vethdev $iface\n    " : "\n    ");
+    $uplines = "$IFCONFIGBIN veth${id} create\n    " .
+	       "$IFCONFIGBIN veth${id} vethaddr $vmac/$vtag" .
+	       (defined($iface) ? " vethdev $iface\n    " : "\n    ");
 
     #
     # Must set route table id before assigning IP address so that interface
