@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -112,7 +112,7 @@ use Exporter;
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 
 	 TBDB_WIDEAREA_LOCALNODE
-	 TBWideareaNodeID
+	 TBWideareaNodeID TBTipServers
 	 );
 
 # Must come after package declaration!
@@ -129,21 +129,19 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $EVENTSYS    = "@EVENTSYS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TBOPSPID	= "emulab-ops";
-my $progname;
+my $SCRIPTNAME = "Unknown";
 
 if ($EVENTSYS) {
     require event;
     import event;
 }
 
-#
-# Must taint check $PROGRAM_NAME cause it comes from outside. Silly!
-#
-if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
-    $progname = $1;
+# Untainted scriptname for email below.
+if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {
+    $SCRIPTNAME = basename($1);
 }
 else {
-    $progname = "Tainted";
+    $SCRIPTNAME = "Tainted";
 }
 
 #
@@ -2274,6 +2272,7 @@ sub TBNodeBootReset($)
 # NB: This function is not as general purpose as it might seem; there are
 #     not many "terminal" states that you can wait for (like isup).
 #     Still, it avoids duplication in 4 scripts.
+#     Also, watch for events not filtering through stated in time.
 # 
 sub TBNodeStateWait ($$$$) {
     my ($pc, $waitstate, $waitstart, $maxwait) = @_;
@@ -2409,7 +2408,7 @@ sub DBWarn($;$)
     my($message, $nomail) = @_;
     my($text);
 
-    $text = "$message - In $progname\n" .
+    $text = "$message - In $SCRIPTNAME\n" .
   	    "$DBErrorString\n";
 
     print STDERR "*** $text";
@@ -2566,6 +2565,22 @@ sub TBSaveExpLogFiles($$)
     system("/bin/cp -Rpf $workdir/ $logdir");
 
     return 1;
+}
+
+#
+# Grab the tipserver list and return.
+#
+sub TBTipServers()
+{
+    my @tipservers = ();
+    
+    my $query_result =
+	DBQueryFatal("select server from tipservers");
+
+    while (my ($server) = $query_result->fetchrow_array) {
+	push(@tipservers, $server);
+    }
+    return @tipservers;
 }
 
 1;
