@@ -349,6 +349,7 @@ writehdr(int devfd, tbboot_t *tbhdr)
 
 #define CONFIG_STRING	1
 #define CONFIG_INADDR	2
+#define CONFIG_IGNORE	0x10000
 tbboot_t		foohdr;
 
 struct configval {
@@ -375,6 +376,7 @@ struct configval {
 	 (char *) &foohdr.sysconfig.hostname - (char *) &foohdr },
 	{"domain",      CONFIG_STRING, sizeof(foohdr.sysconfig.domain),
 	 (char *) &foohdr.sysconfig.domain - (char *) &foohdr },
+	{"bootdisk",    CONFIG_IGNORE, 0, NULL },
 };
 int maxconfigs = sizeof(configvals)/sizeof(struct configval);
 
@@ -420,6 +422,7 @@ readconfigfromfile(int devfd, tbboot_t *tbhdr, char *path)
 			warnx("Invalid input line: '%s'\n", buf);
 			return -1;
 		}
+
 		switch (configvals[i].type) {
 		case CONFIG_STRING:
 			if (strlen(value) > configvals[i].size - 1) {
@@ -433,6 +436,9 @@ readconfigfromfile(int devfd, tbboot_t *tbhdr, char *path)
 			inet_aton(value, &configvals[i].value.in);
 			break;
 
+		case CONFIG_IGNORE:
+			break;
+
 		default:
 			warnx("Bad config type: %d\n", configvals[i].type);
 			return -1;
@@ -444,6 +450,8 @@ readconfigfromfile(int devfd, tbboot_t *tbhdr, char *path)
 	 * set the sysconfig to valid and overwrite the current info.
 	 */
 	for (i = 0; i < maxconfigs; i++) {
+		if (configvals[i].type == CONFIG_IGNORE)
+			continue;
 		if (! configvals[i].value.string) {
 			warnx("Config is missing: '%s'\n", configvals[i].name);
 			badconfig++;
@@ -468,6 +476,9 @@ readconfigfromfile(int devfd, tbboot_t *tbhdr, char *path)
 		case CONFIG_INADDR:
 			memcpy(foo, &configvals[i].value,
 			       sizeof(struct in_addr));
+			break;
+
+		case CONFIG_IGNORE:
 			break;
 		}
 	}
