@@ -65,6 +65,7 @@ my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
+my $CRONTAB         = "/etc/crontab";
 
 #
 # Some directories we care about
@@ -305,6 +306,18 @@ Phase "syslog", "Setting up syslog", sub {
 	    "/var/log/logins\t\t\t\t640  7     200 *      Z",
 	    "/var/log/mountd.log\t\t\t640  5     200 *      Z",
 	    "/var/log/tiplogs/capture.log\t\t644  7     *    168   Z");
+    };
+};
+
+Phase "cron", "Adding cron jobs", sub {
+    Phase "crontab", "Editing $CRONTAB", sub {
+	DoneIfEdited($CRONTAB);
+	AppendToFileFatal($CRONTAB,
+	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamain");
+    };
+    Phase "cronhup", "HUPing cron", sub {
+	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
+	HUPDaemon("cron");
     };
 };
 
