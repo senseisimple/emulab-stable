@@ -397,10 +397,11 @@ function SPITFORM($formfields, $returning, $errors)
                    passwords to widearea nodes. Please either
                    paste it in or specify the path to your
                    your identity.pub file. <font color=red>NOTE:</font>
-                   We use the <a href=www.openssh.org>OpenSSH</a> key format,
+                   We use the <a href=http://www.openssh.org>OpenSSH</a>
+                   key format,
                    which has a slightly different protocol 2 public key format
                    than some of the commercial vendors such as
-                   <a href=www.ssh.com>SSH Communications</a>. If you
+                   <a href=http://www.ssh.com>SSH Communications</a>. If you
                    use one of these commercial vendors, then please
                    upload the public  key file and we will convert it
                    for you. <i>Please do not paste it in.</i>\n
