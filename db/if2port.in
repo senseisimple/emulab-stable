@@ -1,0 +1,40 @@
+#!/usr/local/bin/perl -w
+use Mysql;
+use strict;
+
+my $debug = 0;
+my ($node, $card);
+my $tbdb = "@TBDBNAME@";
+
+if (@ARGV == 2) {
+	($node,$card) = @ARGV;
+} elsif (@ARGV == 1) {
+	($node,$card) = split /:/,$ARGV[0];
+} else {
+	exit &usage;
+}
+
+&debug("Node is $node");
+&debug("Card is $card") if (defined $card);
+
+my $dbh = Mysql->connect("localhost",$tbdb,"script","none");
+die "Unable to connect to database" unless $dbh;
+
+my $query = qq|SELECT node_id1,card1,node_id2,card2,port2 FROM | .
+            qq|wires WHERE node_id1="$node"|;
+if (defined $card) {
+	$query .= qq|AND card1="$card"|;
+}
+
+&debug("Sending query $query\n");
+
+my $qh = $dbh->query($query);
+
+print $qh->as_string();
+
+sub debug { warn @_,"\n" if $debug; }
+
+sub usage {
+	print "Usage: $0 <node | node:if | node if>\n";
+	return -1;
+}
