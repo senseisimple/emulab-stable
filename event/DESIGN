@@ -4,12 +4,12 @@ OVERVIEW
 The testbed event system is composed of four parts: (1) the event
 library, which implements a simple, transport-independent API that
 clients may use to trigger and respond to events; (2) the event
-scheduler, which takes a list of events as input and triggers
-the events at the appropriate times; (3) frontends that take events
-specified by the user as input and pass them to the event scheduler;
-and (4) backends that respond to various system events on behalf of
-the testbed.  Each of these four parts are described in more detail
-in the following sections.
+scheduler, an event system client that triggers events at specified
+future times; (3) frontends that take events specified by the user as
+input and pass them to the event scheduler; and (4) backends that
+respond to various system events on behalf of the testbed.  Each
+of these four parts are described in more detail in the following
+sections.
 
 Event library
 =============
@@ -34,49 +34,55 @@ Elvin exists for several reasons:
       API, so it should be much easier to implement in environments
       such as the Linux kernel, the OSKit, or Scout.
 
-The event library is currently available as a C library on Unix.  We
-will add other language bindings as needed, and eventually
-provide kernel support for Linux, FreeBSD, and the OSKit (see TODO).
+The event library is currently available as a C library on Unix.
 The C API is described in the API file.
 
 Event representation
 --------------------
 
-Events are represented by Elvin notifications that contain three
-system defined fields: (1) "time", which specifies the time at which
-the event should be/was fired; (2) "host", which specifies the
-hostname of the testbed node that should receive the event
-notification, or "*" if the event notification should be sent to all
-nodes; and (3) "type", which specifies the event type (see "EVENT
-TYPES" for a description of supported event types).  In addition to
-the system defined fields, event notifications may contain additional
-attributes (in the form of name/value pairs) that may be used to
-provide additional information about the event that has occurred.
+Events are represented by Elvin notifications that contain two system
+defined fields: (1) "host", which specifies the hostname of the
+testbed node that should receive the event notification, or "*" if the
+event notification should be sent to all nodes; and (2) "type", which
+specifies the event type.  In addition to the system defined fields,
+event notifications may contain additional attributes (in
+the form of name/value pairs) that may be used to provide additional
+information about the event that has occurred.
 
 Event scheduler
 ===============
 
 The event scheduler is an event system client responsible for
-triggering future events.  The event scheduler reads a list of static
-events written to the database by the frontend and triggers the
-specified events at the appropriate times.  In the future,
-the event scheduler could be extended to support the scheduling
-of dynamic events via an event library API call.
+triggering future events.  To schedule an event for firing at a
+future time, event system clients may call the event library API
+function event_schedule.  event_schedule accepts a notification
+and a firing time, alters the notification to change the type
+attribute to EVENT_SCHEDULE and add a firing time attribute, and
+then sends the altered notification using event_notify.  The event
+scheduler subscribes to EVENT_SCHEDULE notifications.  As they
+arrive, it restores the type in the notification to that of the
+original event and enqueues the notification in a priority queue
+for firing at the indicated time.  When the time arrives, the
+scheduler removes the notification from the queue and resends it
+using event_notify.
 
 Frontend support
 ================
 
-The frontend for static events is the NS script.  Frontend support for
-static events consists of a set of modifications to the NS parser that
-extracts events from the NS script and writes them to the database for
-processing by the event scheduler.  For example, the NS command
+[ Note that the event system currently has no frontend support. Such
+  support needs to be added for each system event type that needs to
+  be supported, e.g. traffic generation control. ]
+
+The frontend for static events is the NS script. Frontend support
+for static events consists of a set of modifications to the NS
+parser that extracts events from the NS script and passes them to
+the event scheduler. For example, the NS command
 
     $ns at 0.5 "$cbr0 start"
 
-causes a event with time=0.5, type=TRAFGEN_START, and host=<hostname
-of the node $cbr0 is attached to> to be written to the database; the
-event scheduler then reads the event from the database and schedules
-the TRAFGEN_START event to be fired at time 0.5 seconds.
+might cause a event with type=TRAFGEN_START and host=<hostname of the
+node $cbr0 is attached to> to be scheduled by the event scheduler for
+execution in 0.5 seconds.
 
 The frontend for dynamic events could be a GUI that either triggers
 events directly (using the event library) or schedules events to be
@@ -85,17 +91,16 @@ triggered in the future (using the event scheduler).
 Backend support
 ===============
 
+[ As with frontend support, the event system currently has no backend
+  support. Such support needs to be added for each system event
+  type that needs to be supported, e.g. traffic generation control. ]
+
 The backends are event system clients responsible for responding to
 certain events on behalf of the testbed.  For example, traffic
-generation nodes are event system backends that start generating
+generation nodes might be event system backends that start generating
 traffic when they receive the TRAFGEN_START event notification
 and stop generating traffic when they receive the TRAFGEN_STOP
 event notification.
-
-EVENT TYPES
-***********
-
-(in progress)
 
 ELVIN OVERVIEW
 **************
