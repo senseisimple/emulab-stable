@@ -628,11 +628,11 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
 
 	      resolutions[resolution_index].type = tb_link_info::LINK_INTERSWITCH;
 	      if (flipped) { // Order these need to go in depends on flipped bit
-	        resolutions[resolution_index].plinks.push_back(second);
-	        resolutions[resolution_index].plinks.push_front(first);
+	        resolutions[resolution_index].plinks.push_back(first);
+	        resolutions[resolution_index].plinks.push_front(second);
 	      } else {
-	        resolutions[resolution_index].plinks.push_front(first);
-	        resolutions[resolution_index].plinks.push_back(second);
+	        resolutions[resolution_index].plinks.push_front(second);
+	        resolutions[resolution_index].plinks.push_back(first);
 	      }
 	      resolution_index++;
 	      total_weight += LINK_RESOLVE_INTERSWITCH;
