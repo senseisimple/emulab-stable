@@ -96,8 +96,8 @@ static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
 static int	checkprivkey(struct in_addr, char *);
-static void	tcpserver(int sock);
-static void	udpserver(int sock);
+static void	tcpserver(int sock, int portnum);
+static void	udpserver(int sock, int portnum);
 static int      handle_request(int, struct sockaddr_in *, char *, int);
 static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
 int		client_writeback(int sock, void *buf, int len, int tcp);
@@ -532,13 +532,13 @@ main(int argc, char **argv)
 			signal(SIGHUP, SIG_DFL);
 			
 			switch (which) {
-			case 0: tcpserver(tcpsock);
+			case 0: tcpserver(tcpsock, TBSERVER_PORT);
 				break;
-			case 1: udpserver(udpsock);
+			case 1: udpserver(udpsock, TBSERVER_PORT);
 				break;
-			case 2: udpserver(altudpsock);
+			case 2: udpserver(altudpsock, TBSERVER_PORT2);
 				break;
-			case 3: tcpserver(alttcpsock);
+			case 3: tcpserver(alttcpsock, TBSERVER_PORT2);
 				break;
 			}
 			exit(-1);
@@ -656,11 +656,12 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
  * eventually be killed off.
  */
 static void
-udpserver(int sock)
+udpserver(int sock, int portnum)
 {
 	char			buf[MYBUFSIZE];
 	struct sockaddr_in	client;
 	int			length, cc;
+	unsigned int		nreq = 0;
 	
 	info("udpserver starting: pid=%d sock=%d\n", mypid, sock);
 
@@ -668,6 +669,7 @@ udpserver(int sock)
 	 * Wait for udp connections.
 	 */
 	while (1) {
+		setproctitle("UDP %d: %u done", portnum, nreq);
 		length = sizeof(client);		
 		cc = recvfrom(sock, buf, sizeof(buf) - 1,
 			      0, (struct sockaddr *)&client, &length);
@@ -679,6 +681,7 @@ udpserver(int sock)
 		}
 		buf[cc] = '\0';
 		handle_request(sock, &client, buf, 0);
+		nreq++;
 	}
 	exit(1);
 }
@@ -687,11 +690,12 @@ udpserver(int sock)
  * Listen for TCP requests.
  */
 static void
-tcpserver(int sock)
+tcpserver(int sock, int portnum)
 {
 	char			buf[MYBUFSIZE];
 	struct sockaddr_in	client;
 	int			length, cc, newsock;
+	unsigned int		nreq = 0;
 	
 	info("tcpserver starting: pid=%d sock=%d\n", mypid, sock);
 
@@ -699,6 +703,7 @@ tcpserver(int sock)
 	 * Wait for TCP connections.
 	 */
 	while (1) {
+		setproctitle("TCP %d: %u done", portnum, nreq);
 		length  = sizeof(client);
 		newsock = ACCEPT(sock, (struct sockaddr *)&client, &length);
 		if (newsock < 0) {
@@ -719,6 +724,7 @@ tcpserver(int sock)
 		buf[cc] = '\0';
 		handle_request(newsock, &client, buf, 1);
 		CLOSE(newsock);
+		nreq++;
 	}
 	exit(1);
 }
@@ -735,6 +741,12 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	tmcdreq_t	   tmcdreq, *reqp = &tmcdreq;
 
 	byteswritten = 0;
+#ifdef	WITHSSL
+	cp = (istcp ? (isssl ? "SSL" : "TCP") : "UDP");
+#else
+	cp = (istcp ? "TCP" : "UDP");
+#endif
+	setproctitle("%s: %s", reqp->nodeid, cp);
 
 	/*
 	 * Init the req structure.
@@ -956,11 +968,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Execute it.
 	 */
-#ifdef	WITHSSL
-	cp = (isssl ? "SSL" : (istcp ? "TCP" : "UDP"));
-#else
-	cp = (istcp ? "TCP" : "UDP");
-#endif
 	if ((command_array[i].flags & F_MAXLOG) != 0) {
 		overbose = verbose;
 		verbose = 1;
@@ -968,6 +975,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (verbose || (command_array[i].flags & F_MINLOG) == 0)
 		info("%s: vers:%d %s %s\n", reqp->nodeid,
 		     version, cp, command_array[i].cmdname);
+	setproctitle("%s: %s %s", reqp->nodeid, cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, reqp, rdata, istcp, version);
 
@@ -981,6 +989,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (!istcp) 
 		client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
+
 	if (byteswritten && (command_array[i].flags & F_MINLOG) == 0)
 		info("%s: %s wrote %d bytes\n",
 		     reqp->nodeid, command_array[i].cmdname,
