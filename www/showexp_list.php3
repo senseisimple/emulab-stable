@@ -15,23 +15,40 @@ LOGGEDINORDIE($uid);
 $isadmin     = ISADMIN($uid);
 $altclause   = "";
 
-if (! isset($showactive))
-    $showactive = 0;
+if (! isset($showtype))
+    $showtype="active";
 if (! isset($sortby))
     $sortby = "normal";
 
-if ($showactive) {
-    echo "<b><a href='showexp_list.php3?showactive=0&sortby=$sortby'>
-                Show All Experiments</a>
-          </b><br><br>\n";
-    $altclause = "e.state='$TB_EXPTSTATE_ACTIVE'";
+echo "<b>Show:
+         <a href='showexp_list.php3?showtype=active&sortby=$sortby'>active</a>,
+         <a href='showexp_list.php3?showtype=batch&sortby=$sortby'>batch</a>,
+         <a href='showexp_list.php3?showtype=all&sortby=$sortby'>all</a>.
+      </b><br><br>\n";
+
+#
+# Handle showtype
+# 
+if (! strcmp($showtype, "all")) {
+    $clause = 0;
+    $title  = "All";
+}
+elseif (! strcmp($showtype, "active")) {
+    $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
+    $title  = "Active";
+}
+elseif (! strcmp($showtype, "batch")) {
+    $clause = "e.batchmode=1";
+    $title  = "Batch";
 }
 else {
-    echo "<b><a href='showexp_list.php3?showactive=1&sortby=$sortby'>
-                Show Active Experiments Only</a>
-          </b><br><br>\n";
+    $clause = "e.state='$TB_EXPTSTATE_ACTIVE'";
+    $title  = "Active";
 }
 
+#
+# Handle sortby.
+# 
 if (! strcmp($sortby, "normal") ||
     ! strcmp($sortby, "pid"))
     $order = "e.pid,e.eid";
@@ -49,25 +66,29 @@ else
 # is a member of. Or, if an admin type person, show them all!
 #
 if ($isadmin) {
-    if ($showactive)
-	$altclause = "where ($altclause)";
+    if ($clause)
+	$clause = "where ($clause)";
+    else
+        $clause = "";
     
     $experiments_result =
 	DBQueryFatal("select pid,eid,expt_head_uid,expt_name, ".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
-		     "from experiments as e $altclause ".
+		     "from experiments as e $clause ".
 		     "order by $order");
 }
 else {
-    if ($showactive)
-	$altclause = "and ($altclause)";
+    if ($clause)
+	$clause = "and ($clause)";
+    else
+        $clause = "";
     
     $experiments_result =
 	DBQueryFatal("select distinct e.pid,eid,expt_head_uid,expt_name, ".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d ".
 		     "from experiments as e ".
 		     "left join group_membership as g on g.pid=e.pid ".
-		     "where g.uid='$uid' $altclause ".
+		     "where g.uid='$uid' $clause ".
 		     "order by $order");
 }
 if (! mysql_num_rows($experiments_result)) {
@@ -77,7 +98,7 @@ if (! mysql_num_rows($experiments_result)) {
 
 if (mysql_num_rows($experiments_result)) {
     echo "<center>
-           <h2>Running Experiments</h2>
+           <h2>$title Experiments</h2>
           </center>\n";
     
     echo "<table border=2 cols=0
