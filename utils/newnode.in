@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -256,6 +256,9 @@ NODE: foreach my $node_id (@node_ids) {
 	"def_boot_osid='$INITIAL_MFS', " .
 	"state_timestamp=unix_timestamp(NOW()), " .
 	"op_mode_timestamp=unix_timestamp(NOW())");
+
+    DBQueryFatal("insert into node_hostkeys (node_id) ".
+		 "values ('$node_id')");
 
     #
     # Add some vnodes

@@ -1,7 +1,7 @@
 # -*- python -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -461,6 +461,11 @@ class Plab:
                           'FREE_CLEAN',
                           'ISUP'))
 
+            DBQueryFatal("replace into node_hostkeys"
+                         " (node_id)"
+                         " values (%s)",
+                         (vnodeid))
+
             DBQueryFatal("replace into widearea_nodeinfo"
                          " (node_id, contact_uid, hostname, site)"
                          " values (%s, %s, %s, %s)",
@@ -519,6 +524,11 @@ class Plab:
                               'PCVM', defosid, 1,
                               'FREE_CLEAN',
                               'SHUTDOWN', sshdport))
+
+                DBQueryFatal("insert into node_hostkeys"
+                             " (node_id)"
+                             " values (%s)",
+                             (vnodeid))
                 
                 DBQueryFatal("insert into node_status"
                              " (node_id, status, status_timestamp)"
