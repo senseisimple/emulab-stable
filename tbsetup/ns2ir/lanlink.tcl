@@ -27,7 +27,7 @@ LanLink instproc init {s nodes bw d} {
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
 	set bandwidth($nodepair) $bw
-	set delay($nodepair) [expr $d / 2]
+	set delay($nodepair) [expr $d / 2.0]
 	set loss($nodepair) 0
 	lappend nodelist $nodepair
     }

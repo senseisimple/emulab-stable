@@ -271,13 +271,13 @@ sub dodelays ()
 	$count = 69;
 	foreach $delay (@delays) {
 	    $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
-	    $pat .= q(PIPE0=(\d+) DELAY0=(\d+) BW0=([\d\.]+) PLR0=([\d\.]+) );
-	    $pat .= q(PIPE1=(\d+) DELAY1=(\d+) BW1=([\d\.]+) PLR1=([\d\.]+));
+	    $pat .= q(PIPE0=(\d+) DELAY0=([\d\.]+) BW0=(\d+) PLR0=([\d\.]+) );
+	    $pat .= q(PIPE1=(\d+) DELAY1=([\d\.]+) BW1=(\d+) PLR1=([\d\.]+));
 	    
 	    $delay =~ /$pat/;
 
 	    #
-	    # tmcd returns the INTs as MAC addrs.
+	    # tmcd returns the interfaces as MAC addrs.
 	    # 
 	    my $iface1 = libsetup::findiface($1);
 	    my $iface2 = libsetup::findiface($2);
@@ -289,6 +289,15 @@ sub dodelays ()
 	    $delay2    = $8;
 	    $bandw2    = $9;
 	    $plr2      = $10;
+
+	    #
+	    # Delays are floating point numbers (unit is ms). ipfw does not
+	    # support floats, so apply a cheesy rounding function to convert
+            # to an integer (since perl does not have a builtin way to
+	    # properly round a floating point number to an integer).
+	    #
+	    $delay1 = int($delay1 + 0.5);
+	    $delay2 = int($delay2 + 0.5);
 
 	    print DEL "ifconfig $iface1 media 100baseTX mediaopt full-duplex";
 	    print DEL "\n";

@@ -14,6 +14,7 @@
 
 # Settings
 # delaythresh is the maximum delay in ms above which a delay node is needed.
+#  (Note that the DB represents delays as floating point numbers)
 # maxrun is maximum number of times we run assign.
 # delaywithswitch if 1 will use the switch to delay when possible.  Currently
 #  this only works for 10mbit links.
