@@ -39,3 +39,4 @@ INSERT INTO sitevariables VALUES ('watchdog/rusage',NULL,'1','Interval in minute
 INSERT INTO sitevariables VALUES ('watchdog/hostkeys',NULL,'999999','Interval in minutes between host key reports (0=never report, 999999=once only)');
 INSERT INTO sitevariables VALUES ('plab/message',NULL,'','Message to display at the top of the plab_ez page');
 INSERT INTO sitevariables VALUES ('node/ssh_pubkey',NULL,'','Boss SSH public key to install on nodes');
+INSERT INTO sitevariables VALUES ('general/autoswap_threshold',NULL,'16','Number of hours before an experiment is forcibly swapped');
