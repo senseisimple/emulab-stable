@@ -159,6 +159,7 @@ while (1) {
 		    " e2.batchmode=1 and e2.batchstate='$BSTATE_RUNNING' and ".
 		    " e1.pid=e2.pid and e1.eid!=e2.eid ".
 		    "WHERE e2.eid is null and ".
+		    " e1.expt_head_uid!='stoller' and ".
 		    " e1.batchmode=1 and e1.canceled=0 and ".
 		    " e1.batchstate='$BSTATE_POSTED' and ".
 		    "  (e1.attempts=0 or ".
