@@ -435,6 +435,7 @@ CREATE TABLE floorimages (
   x2 int(6) NOT NULL default '0',
   y2 int(6) NOT NULL default '0',
   scale tinyint(4) NOT NULL default '1',
+  pixels_per_meter float(10,3) NOT NULL default '0.000',
   PRIMARY KEY  (building,floor,scale)
 ) TYPE=MyISAM;
 

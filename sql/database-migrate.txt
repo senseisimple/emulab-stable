@@ -2184,3 +2184,9 @@ last_net_act,last_cpu_act,last_ext_act);
        and update the default rules:
 
        mysql tbdb < fwrules-create.sql
+
+1.289: Add conversion factor floorimages that converts from pixels to
+      meters.
+
+      alter table floorimages add pixels_per_meter float(10,3) \
+             NOT NULL default '0.000' after scale;
