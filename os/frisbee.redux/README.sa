@@ -3,7 +3,7 @@ the University of Utah's Emulab testbed cluster and described in the
 USENIX '03 paper (a copy of which should be in the doc subdirectory).
 It also includes the associated image creation tool.
 
-What does Frisbee do?
+1. What does Frisbee do?
 
 	The Frisbee server uses a custom multicast protocol to distribute
 	highly-compressed disk images to consenting clients.  The Frisbee
@@ -16,7 +16,7 @@ What does Frisbee do?
 	current contents of said disk (partition).  Do not use Frisbee or
 	any tool to install an image unless you really mean it.
 
-What all is included in the box?
+2. What all is included in the box?
 
 	The Frisbee client and server are in the frisbee subdirectory.
 
@@ -32,7 +32,7 @@ What all is included in the box?
 	library can be downloaded from sourceforge (linux-ntfs),
 	I just didn't get everything put together and tested in time.
 
-How do I build everything?
+3. How do I build everything?
 
 	cd imagezip; make
 	cd frisbee; make
@@ -46,38 +46,81 @@ How do I build everything?
 
 	For Linux fans who are pissed about that FreeBSD comment,
 	take heart.  The image{zip,unzip,dump} tools work under
-	Linux as does the Frisbee server.  Currently, under Linux
+	Linux as does the Frisbee server.  Just move Makefile-linux
+	to Makefile and do the make(s).  Currently, under Linux
 	the imagezipper only knows about EXT2 filesystems.  Nothing
 	fundamental here, just having rounded up all the necessary
 	BSD headers necessary to do BSD filesystems.  The Frisbee
 	client hasn't yet been ported to Linux and you shouldn't
 	need it in this release because...
 	
-How do I run Frisbee?
+4. How do I run Frisbee?
 
 	In Emulab we have an integrated environment from which we can
-	automatically boot a memory-based FreeBSD system via PXE.
-	For this release, we provide an ISO image of a bootable
-	FreeBSD system, complete with the frisbee client installed.
-
-	[ We haven't got the ISO image ready yet.  So ignore the
-	  rest of this for now. ]
+	automatically boot a memory-based FreeBSD system via PXE.  This
+	method requires no physical interaction with the client machine
+	and is obviously the way to go for scaling.  However, it currently
+	requires more Emulab infrastructure than you would be interested
+	in setting up, so for this release we provide an ISO image of a
+	bootable FreeBSD system, complete with the frisbee client and
+	image creation tool installed.
 
 	Burn this puppy on a CD and boot it up.  It will prompt you
-	for some info about the system and then should come up to a
-	login prompt where you can login as root (no password).
+	for some info about the system (network interface, IP configuration),
+	request that you set a root password, and then should come up to a
+	login prompt where you can login as root.
 
-	To create an image using the CD, login to another machine with
-	sufficient disk space (a couple of hundred MB to a few GB,
-	depending on whether you are doing a full disk image and
-	whether you are using FS-aware compression).  Then, as root:
+	To install an image, you need to run the frisbee server (frisbeed).
+	Run the server:
 
-	ssh cd-booted-machine 'imagezip /dev/ad0 -' > imagefile
+	frisbeed -W 50000000 -p <port> -m <address> imagefile
 
-	To install an image somewhere...
+	where <address> is either a multicast address or the address of
+	the destination machine if you only want to unicast.  The -W
+	option sets a crude bandwidth throttle (in Mbit/sec) for sending.
+	By default it is pretty low (14Mbit/sec) so you will probably want
+	to crank it up.  The current frisbeed is what you might call
+	"TCP-hostile" so don't push it too high.
 	
+	To run the client on the target host, login as root either on
+	the console or via ssh and:
 
+	frisbee -p <port> -m <address> target-disk
 
+	Where <address> is either the chosen multicast address or the
+	address of the server machine if you are doing unicast.
+
+	EXAMPLES:
+
+	server: frisbeed -W 80000000 -p 3564 -m 234.5.6.1 fulldisk.ndz
+	client(s): frisbee -p 3564 -m 234.5.6.1 /dev/ad0
+		Multicast the full disk image "fulldisk.ndz" at 80Mbit/sec
+		and install on IDE drive 0 on all machines.
+
+	server: frisbeed -W 50000000 -p 3564 -m 192.168.1.2 bsd-part.ndz
+	client: frisbee -p 3564 -m 192.168.1.1 -s 2 /dev/ad0
+		Unicast a partition image at 50Mbit/sec to a specific host.
+		That host installs the image in partition (aka, "slice") 2
+		of IDE drive 0.  Note that the server has no knowledge that
+		this is a partition (vs. whole disk) image.
+
+5. Um... where do I get am image that I can install?
+
+	To create an image of a disk or partition you use the imagezip
+	tool.  If you have a machine set up as you like, and want to
+	clone the disk, boot it using the Frisbee CD.  Once up, you can
+	access it from another machine with sufficient disk space (a
+	couple of hundred MB to a few GB, depending on whether you are
+	doing a full disk image and whether you are using FS-aware
+	compression).  Then do:
+
+	ssh -n -l root cd-booted-machine 'imagezip /dev/ad0 -' > imagefile
+	<type password when prompted>
+
+	This can take quite awhile, again depending on the size of the
+	source disk/partition, how full it is, and what type of compression
+	is being used.
+--------------------------------
 
 [1] As I am sure everyone is aware, the *real* Frisbee is a trademark of
     Wham-o, Inc. makers of the finest flying discs around.  Visit them at
