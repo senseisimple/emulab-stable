@@ -2,7 +2,7 @@
 
 if ( @ARGV < 1 ) {
   print STDERR "Usage: delay_config <node> [<delay>] [<bw>] [<plr>]\n".
-       " node = tbpcXX, where tbpcXX is the delay node to be configured\n".
+       " node = pcX, where pcX is the delay node to be configured\n".
        "delay = one-way link delay in milliseconds\n".
        "   bw = bw<NNN><U>, N=bandwidth (1-100), U=units (M=Mbps, k=kbps)\n".
        "  plr = packet loss rate (0 <= plr < 1)\n";
