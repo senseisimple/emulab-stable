@@ -8,7 +8,7 @@
 </center>
 
 <font size=+1>
-Creating an Experiment with Wireless Capable Nodes:</font>
+Creating an Experiment with Wireless-Capable Nodes:</font>
 <br>
 <br>
 
@@ -23,15 +23,30 @@ in it.
 <br>
 <br>
 Before using wireless nodes in an experiment, please read the following
-<b>Acceptable Use Policy</b> regarding wireless interfaces:
+<b>Acceptable Use Policy</b> (AUP) regarding wireless interfaces.
+By using our wireless nodes, you agree to be bound by this AUP.
 
 <ul>
-<li> You may listen to anything you like; anyone who cares about the
-     privacy of their transmissions will certainly know to encrypt it!
+<li> <b>Receiving: </b>
+     You may listen to and monitor anything you like.  If you happen
+     to observe "private" information such as plaintext Web passwords,
+     you will not exploit that information, and you will take
+     care not to let it leak out publicly, e.g., in log files.
+     </li><p>
      
-<li> You may not send "large" amounts of traffic on the following list
-     of channels; they are considered "production networks" used by
-     other departments.
+<li> <b>Transmitting (1): </b>
+     Do not transmit on channels that another experiment on the
+     testbed is using, unless it's your own.  You can find out which
+     channels are currently in use by looking at the top of the <a
+     href=https://www.emulab.net/floormap.php3>wireless floormap</a>.
+     <br>Where possible, choose channels that have the least frequency overlap
+     with other experiments.  (channel/freq table coming.)
+     </li><p>
+
+<li> <b>Transmitting (2): </b>
+     You may not send "large" amounts of traffic on the following
+     channels, and may send only low rates of non-responsive traffic.
+     They are "production networks" used by others at this location.
      
      <table align=center border=2 cellpadding=0 cellspacing=2>
      <tr><th>Protocol</th><th>Channels</th></tr>
@@ -39,11 +54,6 @@ Before using wireless nodes in an experiment, please read the following
      <tr><td>B/G</td><td>1, 3, 5, 6, 7, 9, 11</td></tr>
      </table>
 
-<li> Do not use channels that another experiment on the testbed is
-     using. You can find out what channels are currently in use by
-     looking at the top of the
-     <a href=https://www.emulab.net/floormap.php3>wireless floormap</a>.
-     
 </ul>
 
 <br>
@@ -65,13 +75,13 @@ following small example:
 	# A wireless lan connecting the first three nodes.
 	set lan0 [$ns make-lan "nodew1 nodew2 nodew3" 54Mb 0ms]
 
-	# A regular duplex link from a wireless capable node to a plain node.
+	# A regular duplex link from a wireless-capable node to a plain node.
 	set link0 [$ns duplex-link $nodew1 $node4 100Mb 0ms DropTail]
 
 	# Choose the wireless lan protocol.
 	tb-set-lan-protocol $lan0 "80211g"
 
-	# You must choose which node to act as the access point.
+	# You must choose which node acts as the access point.
 	tb-set-lan-accesspoint $lan0 $nodew1
 
 	# Choose some other settings.
@@ -104,7 +114,9 @@ A few points should be noted:
 <li> <tt>link0</tt> is a plain duplex link. You may create plain links
      as long as the nodes have enough wired interfaces. If you try to
      create an experiment that uses more links (wired or wireless) on a
-     node, the experiment will fail to map.
+     node than are available in Emulab, the experiment will fail to map.
+     Of the current 9 nodes with one wifi card, the 4 pc600 nodes
+     also have 4 wired experimental net interfaces, while the 5 pc2Uwifi have none.
 
 <li> In the example above, we let Emulab decide what wireless nodes to
      use for the lan. This is not an ideal approach, as Emulab does
@@ -117,12 +129,14 @@ A few points should be noted:
 <li> You must specify which node is to act as the <em>access point</em> for
      the lan.  Rather then using dedicated access points, Emulab's
      implementation of wireless lans uses the interface's capability to
-     become an access point for a lan. The node that is choosen to be the
+     become an access point for a lan. The node that is chosen to be the
      access point should obviously be within range of all of the nodes in
      the lan. There is currently no automated mechanism to pick the access
      point for you, but one is planned for the future.
-     Also planned for the future is to support <em>ad-hoc</em> mode on
-     the cards.
+     We also plan to support <em>ad-hoc</em> mode;
+     unfortunately the proprietary layer under the Linux driver for our
+     Atheros cards does not currently support it.
+
 
 <li> Wireless lans allow a number of configuration parameters to be
      specified, either for the lan as a whole, or for individual members of
@@ -240,8 +254,7 @@ you can use in your NS file. The first approach is to use the
 	
 	set pc222 [$ns node]
 	set pc223 [$ns node]
-	set pc224 [$ns node]
-	set pc225 [$ns node] </code></pre>
+	set pc224 [$ns node] </code></pre>
 
 which says that whenever a node is named by an existing physical node
 in the testbed, do an implicit fix-node. This saves a little bit of
@@ -255,12 +268,10 @@ choose which nodes you want, and then in your NS file:
 	set nodew1 [$ns node]
 	set nodew2 [$ns node]
 	set nodew3 [$ns node]
-	set nodew4 [$ns node]
 
 	tb-fix-node $nodew1 pc222
 	tb-fix-node $nodew2 pc223
-	tb-fix-node $nodew3 pc224
-	tb-fix-node $nodew4 pc225 </code></pre>
+	tb-fix-node $nodew3 pc224 </code></pre>
 
 Keep in mind that the physical nodes you choose must be free when you
 swap in your experiment!
