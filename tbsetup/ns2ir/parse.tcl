@@ -13,6 +13,7 @@ source $libdir/tcl-object.tcl
 source $libdir/node.tcl
 source $libdir/link.tcl
 source $libdir/event.tcl
+source $libdir/lan.tcl
 
 ###
 # calfeld@cs.utah.edu
@@ -27,10 +28,11 @@ proc set {args} {
     if {! $skipset} {
 	real_set skipset 1
 	real_set var [lindex $args 0]
-	if {$var != "currnode"} {
+	if {$var != "currnode" && $var != "currlan"} {
 	    if {[llength $args] > 1} {
 		real_set val [lindex $args 1]
-		if {[regexp {^n[0-9]+$} $val] != -1} {
+		if {([regexp {^n[0-9]+$} $val] != -1) ||
+		    ([regexp {^lan[0-9]+$} $val] != -1)} {
 		    if {![info exists nodeid_map($val)]} {
 			real_set nodeid_map($val) $var
 		    }
@@ -55,6 +57,7 @@ proc nop {args} {}
 #begin at 0. 1,2,3... i cheerfully ignore the possibility of wrapping...
 set nodeID 0
 set linkID 0
+set lanID 0
 set eventID 0
 
 set nodelist {}
@@ -62,6 +65,8 @@ set nodelist {}
 set linkslist {}
 
 set eventlist {}
+
+set lanlist {}
 
 # sim.tcl handles the ns Simulator methods
 source $libdir/sim.tcl

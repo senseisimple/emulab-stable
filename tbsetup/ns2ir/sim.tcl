@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.2 2000-10-18 22:21:48 calfeld Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.3 2000-12-26 20:10:09 calfeld Exp $
 
 #
 
@@ -178,6 +178,7 @@ Simulator instproc run {} {
     global nodelist
     global linkslist
     global eventlist
+    global lanlist
     global irfile
 
     set IRfile [open $irfile w]
@@ -195,6 +196,13 @@ Simulator instproc run {} {
 	$event print $IRfile
     }
     puts $IRfile "END  events"
+    puts $IRfile "START lans"
+    foreach lan $lanlist {
+	$lan print $IRfile
+    }
+    puts $IRfile "END lans"
+
+    close $IRfile
 }
 
 Simulator instproc halt {} {
@@ -239,13 +247,13 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
 
     # if there are delay or bandwidth restrictions, add a delay node
     # and link to it
-#    if {$delay!="" && $delay!=0  || $bw!="" && $bw!=0} {
-#	#delaynode is not a 'real' Sim method. created for testbed.
-#	set dnode [$self delaynode [$self bw_parse $bw] [$self delay_parse $delay]]
-#
-#	$self duplex-link $n1 $dnode 0 0 $type $args
-#	$self duplex-link $n2 $dnode 0 0 $type $args
-#    }
+    #    if {$delay!="" && $delay!=0  || $bw!="" && $bw!=0} {
+    #	#delaynode is not a 'real' Sim method. created for testbed.
+    #	set dnode [$self delaynode [$self bw_parse $bw] [$self delay_parse $delay]]
+    #
+    #	$self duplex-link $n1 $dnode 0 0 $type $args
+    #	$self duplex-link $n2 $dnode 0 0 $type $args
+    #    }
 
     set currLink l$linkID
     link $currLink
@@ -474,3 +482,44 @@ Simulator instproc bw_parse { bspec } {
 	    }
         }
     }
+
+######################################################################
+# calfeld
+# Lan code
+######################################################################
+    Simulator instproc make-lan {nodelist bw delay 
+	{llType LL} 
+	{ifqType Queue/DropTail} 
+	{macType Mac} 
+	{chanType Channel} 
+	{phyType Phy/WiredPhy}} {
+	    global lanlist
+	    global lanID		       
+
+	    foreach node $nodelist {
+		if {[$node getLan] != {}} {
+		    throw "$node already in a LAN!"
+		}
+	    }
+	    
+	    set currlan lan$lanID
+	    lan $currlan
+	    $currlan set nodes $nodelist
+	    $currlan set bw $bw
+	    $currlan set delay $delay
+	    $currlan set id $lanID
+	    
+	    foreach node $nodelist {
+		$node setLan $currlan
+	    }
+	    
+	    lappend lanlist $currlan
+	    
+	    incr lanID
+
+	    return $currlan
+	}
+
+				       
+
+					 
