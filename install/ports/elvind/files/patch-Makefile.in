@@ -1,18 +1,35 @@
---- Makefile.in.orig	Wed Sep  5 22:58:32 2001
-+++ Makefile.in	Wed Feb  5 17:43:12 2003
-@@ -372,11 +372,11 @@
- 	$(mkinstalldirs) $(DESTDIR)$(sysconfdir)
- 	@list='$(sysconf_DATA)'; for p in $$list; do \
- 	  if test -f $(srcdir)/$$p; then \
--	    echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p"; \
--	    $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p; \
-+	    echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p.sample"; \
-+	    $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p.sample; \
- 	  else if test -f $$p; then \
--	    echo " $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p"; \
--	    $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p; \
-+	    echo " $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p.sample"; \
-+	    $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p.sample; \
- 	  fi; fi; \
- 	done
- 
+*** Makefile.in.orig	Thu Mar 20 16:17:36 2003
+--- Makefile.in	Thu Mar 20 17:10:13 2003
+***************
+*** 372,382 ****
+  	$(mkinstalldirs) $(DESTDIR)$(sysconfdir)
+  	@list='$(sysconf_DATA)'; for p in $$list; do \
+  	  if test -f $(srcdir)/$$p; then \
+! 	    echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p"; \
+! 	    $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p; \
+  	  else if test -f $$p; then \
+! 	    echo " $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p"; \
+! 	    $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p; \
+  	  fi; fi; \
+  	done
+  
+--- 372,390 ----
+  	$(mkinstalldirs) $(DESTDIR)$(sysconfdir)
+  	@list='$(sysconf_DATA)'; for p in $$list; do \
+  	  if test -f $(srcdir)/$$p; then \
+! 	    echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p.sample"; \
+! 	    $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p.sample; \
+! 	    if test ! -f $(DESTDIR)$(sysconfdir)/$$p; then \
+! 		echo " $(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p"; \
+! 		$(INSTALL_DATA) $(srcdir)/$$p $(DESTDIR)$(sysconfdir)/$$p; \
+! 	    fi; \
+  	  else if test -f $$p; then \
+! 	    echo " $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p.sample"; \
+! 	    $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p.sample; \
+! 	    if test ! -f $(DESTDIR)$(sysconfdir)/$$p; then \
+! 		echo " $(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p"; \
+! 		$(INSTALL_DATA) $$p $(DESTDIR)$(sysconfdir)/$$p; \
+! 	    fi; \
+  	  fi; fi; \
+  	done
+  
