@@ -298,9 +298,9 @@ sub WaitTillAlive {
     print STDERR "Waiting for $pc to come alive\n" if $dbg;
     
     #
-    # Eight minutes seems like a long time to wait, but it ain't!
+    # Seems like a long time to wait, but it ain't!
     # 
-    my $maxwait = (60 * 3);
+    my $maxwait = (60 * 4);
     if ($reload{$pc}) {
 	$maxwait += (60 * 5);
     }
