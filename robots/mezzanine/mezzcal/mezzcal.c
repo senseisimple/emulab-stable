@@ -21,7 +21,7 @@
  * Desc: Mezzanine calibration tool.
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezzcal.c,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: mezzcal.c,v 1.2 2004-12-15 05:06:37 johnsond Exp $
  ***************************************************************************/
 
 #include <signal.h>
@@ -85,11 +85,11 @@ int main(int argc, char **argv)
   if (tmpdir == NULL)
     tmpdir = "/tmp";
 
-  snprintf(ipcfilename,sizeof(ipcfilename),"%s/mezz_instance%s.ipc",
-		   tmpdir,opt_get_string("fgrab","device","unknown_device"));
+  snprintf(ipcfilename,sizeof(ipcfilename),"%s",
+		   opt_get_string("fgrab","device","unknown_device"));
   
   // Initialise the IPC
-  if (mezz_init(0,ipfcfilename) < 0)
+  if (mezz_init(0,ipcfilename) < 0)
     return -1;
   mmap = mezz_mmap();
 
