@@ -91,7 +91,7 @@ int
 main(int argc, char **argv)
 {
 	gzFile	       *infp;
-	char		buf[BUFSIZ], *bp;
+	char		buf[BUFSIZ], *bp, **aliases;
 	struct hostent  *he;
 	int		ch, errors = 0;
 	int		backcount = 0;
@@ -120,7 +120,7 @@ main(int argc, char **argv)
 
 	/*
 	 * We need the canonical hostname for the usersnode so that we can
-	 * ignore those logins.
+	 * put those logins in another table.
 	 */
 	if ((he = gethostbyname(USERNODE)) == NULL) {
 		syslog(LOG_ERR, "gethostname %s: %s",
@@ -235,11 +235,9 @@ doit(gzFile *infp)
 			continue;
 
 		/*
-		 * Only sshd matters to us, but not on the operations
-		 * node, since we get that info via lastlogin. 
+		 * Only sshd matters to us.
 		 */
-		if (strncmp(prog, SSHD, strlen(SSHD)) ||
-		    strncmp(node, opshostname, strlen(node)) == 0)
+		if (strncmp(prog, SSHD, strlen(SSHD)))
 			continue;
 
 		/*
@@ -310,13 +308,25 @@ doit(gzFile *infp)
 				user, node, ll_time, ll_time) < 0)
 			break;
 
-		if (mydb_update("replace into nodeuidlastlogin "
-				"(node_id, uid, date, time) "
-				"values ('%s', '%s', "
-				"        FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
-				"        FROM_UNIXTIME(%ld, '%%T')) ",
-				node, user, ll_time, ll_time) < 0)
-			break;
+		if (strncmp(node, opshostname, strlen(node)) == 0 |
+		    strncmp(node, "ops", strlen(node)) == 0) {
+			if (mydb_update("replace into userslastlogin "
+					"(uid, date, time) "
+					"values ('%s', "
+					"  FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
+					"  FROM_UNIXTIME(%ld, '%%T')) ",
+					user, ll_time, ll_time) < 0)
+				break;
+		}
+		else {
+			if (mydb_update("replace into nodeuidlastlogin "
+					"(node_id, uid, date, time) "
+					"values ('%s', '%s', "
+					"  FROM_UNIXTIME(%ld, '%%Y-%%m-%%d'), "
+					"  FROM_UNIXTIME(%ld, '%%T')) ",
+					node, user, ll_time, ll_time) < 0)
+				break;
+		}
 	}
 	return 0;
 }
