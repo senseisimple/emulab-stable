@@ -42,6 +42,8 @@ proc tb-set-multiplexed {link onoff} {}
 proc tb-set-endnodeshaping {link onoff} {}
 proc tb-set-noshaping {link onoff} {}
 proc tb-set-useveth {link onoff} {}
+proc tb-set-allowcolocate {lanlink onoff} {}
+proc tb-set-colocate-factor {factor} {}
 
 Class Program
 

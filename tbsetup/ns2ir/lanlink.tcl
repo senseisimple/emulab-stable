@@ -150,6 +150,10 @@ LanLink instproc init {s nodes bw d type} {
     # By default, a local link
     $self set widearea 0
 
+    # Colocation is on by default, but this only applies to emulated links
+    # between virtual nodes anyway.
+    $self set trivial_ok 1
+
     # Allow user to control whether link gets a linkdelay, if link is shaped.
     # If not shaped, and user sets this variable, a link delay is inserted
     # anyway on the assumption that user wants later control over the link.
@@ -385,6 +389,7 @@ Link instproc updatedb {DB} {
     $self instvar fromqueue
     $self instvar nodelist
     $self instvar src_node
+    $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
@@ -430,7 +435,7 @@ Link instproc updatedb {DB} {
 	set droptail_ [$linkqueue set drop-tail_]
 	
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_ where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
+	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_, trivial_ok=$trivial_ok where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
     }
 }
 
@@ -438,6 +443,7 @@ Lan instproc updatedb {DB} {
     $self next $DB
     $self instvar nodelist
     $self instvar linkq
+    $self instvar trivial_ok
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
@@ -478,7 +484,7 @@ Lan instproc updatedb {DB} {
 	set droptail_ [$linkqueue set drop-tail_]
 	
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_ where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
+	sql exec $DB "update virt_lans set q_limit=$limit_, q_maxthresh=$maxthresh_, q_minthresh=$thresh_, q_weight=$q_weight_, q_linterm=$linterm_, q_qinbytes=${queue-in-bytes_}, q_bytes=$bytes_, q_meanpsize=$mean_pktsize_, q_wait=$wait_, q_setbit=$setbit_, q_droptail=$droptail_, q_red=$red_, q_gentle=$gentle_, trivial_ok=$trivial_ok where pid=\"$pid\" and eid=\"$eid\" and vname=\"$self\" and member=\"$nodeportraw\""
     }
 }
 

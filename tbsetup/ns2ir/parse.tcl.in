@@ -207,6 +207,9 @@ namespace eval GLOBALS {
     # Force link delays (where a delay would not otherwise be inserted)
     variable forcelinkdelays 0
 
+    # Control multiplex_factor for the experiment. Crude.
+    variable multiplex_factor {}
+
     # For remote nodes. The solver weights.
     variable wa_delay_solverweight 1
     variable wa_bw_solverweight	   7

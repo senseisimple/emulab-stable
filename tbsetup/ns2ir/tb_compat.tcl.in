@@ -621,3 +621,31 @@ proc tb-set-endnodeshaping {lanlink onoff} {
     }
     $lanlink set uselinkdelay $onoff
 }
+
+#
+# Crude control of colocation of virt nodes. Will be flushed when we have
+# a real story. Sets it for the entire link or lan. Maybe set it on a
+# per node basis?
+#
+proc tb-set-allowcolocate {lanlink onoff} {
+    if {[$lanlink info class] != "Link" && [$lanlink info class] != "Lan"} {
+	perror "\[tb-set-allowcolocate] $lanlink is not a link or a lan."
+	return
+    }
+    $lanlink set trivial_ok $onoff
+}
+
+#
+# Another crude control. Allow override of multiplex factor that is listed
+# in the node_types table. 
+#
+proc tb-set-colocate-factor {factor} {
+    var_import ::GLOBALS::multiplex_factor
+
+    if {$factor < 1 || $factor > 100} {
+	perror "\[tb-set-colocate-factor] factor must be 1 <= factor <= 100"
+	return
+    }
+
+    set multiplex_factor $factor
+}

@@ -239,6 +239,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::wa_plr_solverweight
     var_import ::GLOBALS::uselinkdelays
     var_import ::GLOBALS::forcelinkdelays
+    var_import ::GLOBALS::multiplex_factor
 
     # Fill out IPs
     foreach obj [concat [array names lanlink_list]] {
@@ -318,8 +319,12 @@ Simulator instproc run {} {
     foreach prog [array names prog_list] {
 	$prog updatedb $DB
     }
+    set mfactor ""
+    if { $multiplex_factor != {} } {
+	$mfactor = "multiplex_factor=$multiplex_factor, "
+    }
 
-    sql exec $DB "update experiments set forcelinkdelays=$forcelinkdelays,uselinkdelays=$uselinkdelays,usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
+    sql exec $DB "update experiments set $mfactor forcelinkdelays=$forcelinkdelays,uselinkdelays=$uselinkdelays,usewatunnels=$usewatunnels,uselatestwadata=$uselatestwadata,wa_delay_solverweight=$wa_delay_solverweight,wa_bw_solverweight=$wa_bw_solverweight,wa_plr_solverweight=$wa_plr_solverweight where pid='$pid' and eid='$eid'"
     sql endquery $DB
 
     # This could probably be elsewhere.
