@@ -1,0 +1,13 @@
+#
+# Stick all the little piddly defs in here.
+# 
+prefix		= /usr/testbed
+exec_prefix	= ${prefix}
+
+INSTALL		= /usr/bin/install -c
+INSTALL_PROGRAM	= ${INSTALL}
+INSTALL_DATA	= ${INSTALL} -m 644
+
+INSTALL_BINDIR	= $(exec_prefix)/bin
+INSTALL_LIBDIR	= $(exec_prefix)/lib
+INSTALL_WWWDIR	= $(exec_prefix)/www
