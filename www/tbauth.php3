@@ -253,6 +253,28 @@ function DOLOGOUT($uid) {
 }
 
 #
+# Primitive "nologins" support.
+#
+function NOLOGINS() {
+    global $TBDBNAME;
+
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT nologins FROM nologins where nologins=1");
+    if (! $query_result) {
+        $err = mysql_error();
+        TBERROR("Database Error nologins info: $err\n", 1);
+    }
+
+    # No entry
+    if (($row = mysql_fetch_array($query_result)) == 0) {
+	return 0;
+    }
+
+    $nologins = $row[nologins];
+    return $nologins;
+}
+
+#
 # Beware empty spaces (cookies)!
 # 
 ?>

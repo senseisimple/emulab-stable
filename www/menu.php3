@@ -61,6 +61,16 @@ function WRITESIDEBAR() {
             </td>
           </tr>\n";
 
+    if (NOLOGINS()) {
+        WRITESIDEBARBUTTON("Web Interface Temporarily Unavailable",
+			   $TBDOCBASE, "nologins.php3");
+	
+	echo "</table>
+              <br>\n";
+
+	return;
+    }
+
     if ($login_status == $STATUS_LOGGEDIN) {
 	$query_result = mysql_db_query($TBDBNAME,
 		"SELECT status,admin,stud FROM users WHERE uid='$uid'");
