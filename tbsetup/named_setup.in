@@ -146,13 +146,13 @@ print MAP "\n";
 # defined. We glean the IP for the node from the interfaces table.
 #
 my $db_result =
-    DBQueryFatal("select nt.type,nt.isremotenode,n.node_id,i.IP ".
+    DBQueryFatal("select nt.type,nt.isremotenode,n.node_id,i.IP,i.role ".
 		 "  from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
-		 "left join interfaces as i on n.node_id=i.node_id and ".
-		 "     nt.control_iface=i.iface ".
+		 "left join interfaces as i on n.node_id=i.node_id ". 
 		 "where nt.isvirtnode=0 and ".
-		 "      n.role='testnode' and i.IP is not null ".
+		 "      n.role='testnode' and i.IP is not null and ".
+		 "      (i.card=nt.control_net or i.role='gw') ".
 		 "order by nt.type,n.node_id");
 
 my %reverse;
@@ -168,6 +168,7 @@ if ($db_result->numrows > 0) {
 	my $isremote= $row[1];
 	my $node_id = $row[2];
 	my $IP      = $row[3];
+	my $role    = $row[4];
 
 	if ($oldtype ne $type) {
 	    print MAP ";\n";
@@ -180,6 +181,10 @@ if ($db_result->numrows > 0) {
 	next
 	    if (! isroutable($IP));
 	$routable{$node_id} = $IP;
+
+	if ($role eq "gw") {
+	    $node_id = "$node_id-gw";
+	}
 
 	print MAP "$node_id\tIN\tA\t$IP\n";
 	print MAP "\tIN\tMX 10\t$USERS.\n";
