@@ -43,7 +43,7 @@ sub doexit {
     exit(0);
 };
 
-$dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || 
+$dbh = DBI->connect("DBI:mysql:database=$db;host=localhost") || 
     die "Could not connect to DB.\n";
 
 do {
@@ -79,7 +79,7 @@ sub tb_compare {
     my @result;
     my $rowi = 0;
     while (@row = $sth->fetchrow_array) {
-	@result = (@$results)[$rowi];
+	@result = @{(@$results)[$rowi]};
 	if ($#row != $#result) {
 	    tb_fail("Row $rowi - Length of $#row != expected $#result.");
 	}
