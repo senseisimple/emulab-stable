@@ -17,14 +17,14 @@ if (!$isadmin) {
 
 chdir("buildui");
 
+echo "<applet code=\"Netbuild.class\" width=640 height=480>
+       <param name=exporturl
+              value=\"$TBBASE/beginexp.php3\">
+       <pre>
+         The applet should be right here. Must be an error or something.
+       </pre>
+      </applet>\n";
 ?>
-<applet code="Netbuild.class" width=640 height=480>
-        <param name="exporturl"
-               value="https://www.mini.emulab.net/beginexp_form.php3">
-        <pre>The applet should be right here. Must be an error or
-             something.</pre>
-</applet>
-
 <pre>
 Helpful Hints:
 
