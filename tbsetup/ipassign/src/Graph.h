@@ -75,6 +75,9 @@ public:
     // set the partion value of every lan based on input array
     void partition(std::vector<int> & partitions);
 
+    // Figure out how much bitspace each LAN and net will require.
+    bool census(int networkSize, int lanSize, int hostSize);
+
     //////////////////////////////////////////////////////
     // output
     //////////////////////////////////////////////////////
@@ -131,6 +134,8 @@ private:
 
     // A map connecting each node (key) with its lans (value)
     std::multimap<int, std::list<Lan>::iterator> m_nodes;
+
+    std::vector<int> m_partitionBits;
 };
 
 #endif
