@@ -2511,3 +2511,10 @@ last_net_act,last_cpu_act,last_ext_act);
 	  value text,
 	  PRIMARY KEY  (pid,eid,idx)
 	) TYPE=MyISAM;
+
+
+1.320: Add wikiname to user and groups table so we can remember it and
+       display it (and a link).
+
+        alter table users add wikiname tinytext;
+        alter table groups add wikiname tinytext;

@@ -566,6 +566,7 @@ CREATE TABLE groups (
   unix_name varchar(16) NOT NULL default '',
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
+  wikiname tinytext,
   PRIMARY KEY  (pid,gid),
   KEY unix_gid (unix_gid),
   KEY gid (gid),
@@ -1837,6 +1838,7 @@ CREATE TABLE users (
   user_interface enum('emulab','plab') NOT NULL default 'emulab',
   chpasswd_key varchar(32) default NULL,
   chpasswd_expires int(10) unsigned NOT NULL default '0',
+  wikiname tinytext,
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)
