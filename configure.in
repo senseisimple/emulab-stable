@@ -55,6 +55,7 @@ AC_SUBST(TBCOOKIESUFFIX)
 AC_SUBST(TBAUTHDOMAIN)
 AC_SUBST(TBAUTHTIMEOUT)
 AC_SUBST(TBMAINSITE)
+AC_SUBST(SFSSUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -92,6 +93,7 @@ TBSECURECOOKIES=1
 TBMAINSITE=0
 JAILIPBASE=172.17.0.0
 JAILIPMASK=255.240.0.0
+SFSSUPPORT=1
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -348,20 +350,6 @@ else
         WINSUPPORT=0;
 fi
 AC_SUBST(WINSUPPORT)
-
-#
-# Disable SFS support if SFS is not installed on ops node.
-# 
-AC_ARG_ENABLE(sfs,
-[  --disable-sfs         Disable SFS support (SFS must be installed on ops)])
-
-if test "$enable_sfs" = "no"; then
-        SFSSUPPORT=0;
-else
-        SFSSUPPORT=1;
-	AC_DEFINE(SFSSUPPORT)
-fi
-AC_SUBST(SFSSUPPORT)
 
 #
 # Testing mode.  In testing mode scripts should not effect hardware state.
