@@ -239,6 +239,8 @@ sub dosomething($$)
 
 	print "Child PID $childpid exited with exit status $status\n";
 
+	sleep(15);
+
 	unlink($logname);
 	return $status;
     }
@@ -569,16 +571,16 @@ sub notify_user($$$)
     #
     if ($iserr) {
 	$to = $TBOPS;
-	$cc = "$user_name <$user_email>";
+	$cc = $user_email;
     }
     else {
-	$to = "$user_name <$user_email>";
+	$to = $user_email;
 	$cc = $TBOPS;
     }
 
     open(MAIL, "| /usr/bin/mail ".
 	 "-s \"TESTBED: Batch Mode Experiment $subline $pid/$eid\" ".
-	 "-c $cc \"$to\" >/dev/null 2>&1")
+	 "-c $cc $to >/dev/null 2>&1")
 	or die "Cannot start mail program: $!";
 
     print MAIL $mesg;
