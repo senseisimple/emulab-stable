@@ -8,12 +8,12 @@ SUBDIR		= utils
 
 include $(OBJDIR)/Makeconf
 
-BIN_SCRIPTS	= delay_config sshtb create_image
+BIN_SCRIPTS	= delay_config sshtb create_image node_admin
 SBIN_SCRIPTS	= vlandiff vlansync
 #
 # These are the ones installed on plastic (users, control, etc). 
 # 
-USERBINS        = create_image delay_config
+USERBINS        = create_image delay_config node_admin
 
 #
 # Force dependencies on the scripts so that they will be rerun through

@@ -1,0 +1,128 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+
+#
+# Turn on/off admin mode for a node. 
+#
+sub usage()
+{
+    print STDOUT "Usage: nodeadmin <on | off> <node>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSADDR	= "@BOSSNODE@";
+my $TFTPDIR     = "/tftpboot";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# 
+#
+my $freebsd     = "$BOSSADDR:$TFTPDIR/pxeboot.freebsd";
+my $nodereboot	= "$TB/bin/node_reboot";
+my $pxebootpath;
+my $dbuid;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+
+my $onoff  = $ARGV[0];
+my $node   = $ARGV[1];
+
+if ($onoff ne "on" && $onoff ne "off") {
+    usage();
+}
+
+#
+# Untaint the arguments.
+#
+if ($node =~ /^([-\w]+)$/) {
+    $node = $1;
+}
+else {
+    die("Tainted node name: $node");
+}
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Root and admin types can do whatever they want. Normal users can only
+# run this on nodes in their own experiments.
+#
+if ($UID && !TBAdmin($UID)) {
+    if (! NodeAccessCheck(\$node)) {
+	die("*** You do not have permission to create an image from $node\n");
+    }
+    if ($node =~ /^([-\w]+)$/) {
+	$node = $1;
+    }
+    else {
+	fatal("Tainted node name: $node");
+    }
+}
+
+if ($onoff eq "on") {
+    $pxebootpath = $freebsd;
+}
+else {
+    my $query_result =
+	DBQueryFatal("select node_types.pxe_boot_path from node_types " .
+		     "left join nodes on nodes.type=node_types.type " .
+		     "where node_id='$node'");
+
+    my @row = $query_result->fetchrow_array();
+    $pxebootpath = $row[0];
+}
+
+DBQueryFatal("update nodes set pxe_boot_path='$pxebootpath', ".
+	     "startupcmd='', startstatus='none' ".
+	     "where node_id='$node'");
+
+#
+# Reboot node
+#
+if (system("$nodereboot", "$node")) {
+    die("*** $0:\n".
+	"    WARNING: Could not reboot $node.\n");
+}
+exit(0);
+
+

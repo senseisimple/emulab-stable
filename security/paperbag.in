@@ -24,6 +24,7 @@ my $TB		= "@prefix@";
 		"node_update"	=> "$TB/bin/node_update",
 		"os_load"	=> "$TB/bin/os_load",
 		"create_image"	=> "$TB/bin/create_image",
+		"node_admin"	=> "$TB/bin/node_admin",
 		"delay_config"	=> "$TB/bin/delay_config",
 		"savelogs"	=> "$TB/bin/savelogs"
 	   );
