@@ -44,7 +44,7 @@
  * Timeout (in seconds!) server will hang around with no active clients.
  * Make it zero to never exit. 
  */
-#define SERVER_INACTIVE_SECONDS	0
+#define SERVER_INACTIVE_SECONDS	(60 * 30)
 
 /*
  * The number of disk read blocks in a single read on the server.
