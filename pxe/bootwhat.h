@@ -27,7 +27,6 @@ typedef struct {
 /* Opcode */
 #define BIOPCODE_BOOTWHAT_REQUEST	1	/* What to boot request */
 #define BIOPCODE_BOOTWHAT_REPLY		2	/* What to boot reply */
-#define BIOPCODE_BOOTWHAT_ACK		3	/* Ack to Reply */
 
 /* BOOTWHAT Reply */
 typedef struct {

@@ -60,8 +60,6 @@ main()
 
 	signal(SIGHUP, onhup);
 	while (1) {
-		int ack = 0;
-		
 		if ((mlen = recvfrom(sock, &boot_info, sizeof(boot_info),
 				     0, (struct sockaddr *)&client, &length))
 		    < 0) {
@@ -75,12 +73,6 @@ main()
 			       inet_ntoa(client.sin_addr));
 			err = query_bootinfo_db(client.sin_addr, boot_whatp);
 			break;
-
-		case BIOPCODE_BOOTWHAT_ACK:
-			syslog(LOG_INFO, "%s: ACK",
-			       inet_ntoa(client.sin_addr));
-			ack_bootinfo_db(client.sin_addr, boot_whatp);
-			continue;
 
 		default:
 			syslog(LOG_INFO, "%s: invalid packet",

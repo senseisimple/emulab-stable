@@ -65,12 +65,6 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 }
 
 int
-ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
-{
-	return 0;
-}
-
-int
 close_bootinfo_db(void)
 {
 	int i;
