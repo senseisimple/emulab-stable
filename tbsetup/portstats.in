@@ -205,7 +205,7 @@ foreach my $name (keys %portMap) {
     SWITCH: for ($type) {
 	/cisco/ && do {
 	    require snmpit_cisco;
-	    $device = new snmpit_cisco($name);
+	    $device = new snmpit_cisco($name,0);
 	    last;
 	};
 	/intel/ && do {
