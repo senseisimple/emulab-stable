@@ -1632,6 +1632,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "left join users as u on p.uid=u.uid "
 				 "left join groups as g on p.pid=g.pid "
 				 "where p.trust!='none' "
+				 "      and u.webonly=0 "
 				 "      and u.status='active' order by u.uid",
 				 14, reqp->pid, reqp->gid);
 	}
@@ -1657,7 +1658,9 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "left join groups as g on "
 				 "     p.pid=g.pid and p.gid=g.gid "
 				 "where ((p.pid='%s')) and p.trust!='none' "
-				 "      and u.status='active' order by u.uid",
+				 "      and u.status='active' "
+				 "      and u.webonly=0 "
+				 "order by u.uid",
 				 17, reqp->pid);
 	}
 	else if (reqp->jailflag) {
@@ -1710,6 +1713,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "where p.approved!=0 "
 				 "      and FIND_IN_SET('%s',pcremote_ok)>0 "
 				 "      and m.trust!='none' "
+				 "      and u.webonly=0 "
 				 "      and u.status='active' "
 				 "order by u.uid",
 				 17, reqp->type);
@@ -2034,7 +2038,8 @@ COMMAND_PROTOTYPE(doaccounts)
 				 "from widearea_accounts as w "
 				 "left join users as u on u.uid=w.uid "
 				 "where w.trust!='none' and "
-				 "      u.status='active' and node_id='%s' "
+				 "      u.status='active' and "
+				 "      node_id='%s' "
 				 "order by u.uid",
 				 16, reqp->nodeid);
 
@@ -2971,7 +2976,9 @@ COMMAND_PROTOTYPE(domounts)
 	res = mydb_query("select u.uid from users as u "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "where p.pid='%s' and p.gid='%s' and "
-			 "      u.status='active' and p.trust!='none'",
+			 "      u.status='active' and "
+			 "      u.webonly=0 and "
+			 "      p.trust!='none'",
 			 1, reqp->pid, reqp->gid);
 #else
 	res = mydb_query("select distinct u.uid from users as u "
@@ -2979,7 +2986,9 @@ COMMAND_PROTOTYPE(domounts)
 			 " on a.exp_pid='%s' and a.exp_eid='%s' "
 			 "left join group_membership as p on p.uid=u.uid "
 			 "where ((p.pid='%s' and p.gid='%s') or p.pid=a.pid) "
-			 "       and u.status='active' and p.trust!='none'",
+			 "       and u.status='active' and "
+			 "       u.webonly=0 and "
+			 "       p.trust!='none'",
 			 1, reqp->pid, reqp->eid, reqp->pid, reqp->gid);
 #endif
 	if (!res) {
