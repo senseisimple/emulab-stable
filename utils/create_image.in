@@ -22,7 +22,7 @@ sub usage()
     print(STDERR
 	  "Usage: create_image [-w] [-p <pid>] <imageid> <node>\n" .
 	  "switches and arguments:\n".
-	  "-w        - wait for non-batchmode experiment terminate\n".
+	  "-w        - wait for image to be fully created\n".
 	  "-p <pid>  - project ID of the imageid; defaults to system project\n".
 	  "<imageid> - imageid to use\n".
 	  "<node>    - nodeid to create the image from\n");
