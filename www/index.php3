@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -13,8 +13,9 @@ PAGEHEADER("Home");
 
 # Get some stats about current experiments
 
-$query_result = DBQueryFatal("select count(*) from experiments where ".
-	"state='active'");
+$query_result =
+    DBQueryFatal("select count(*) from experiments where ".
+		 "state='active' and pid!='emulab-ops'");
 if (mysql_num_rows($query_result) != 1) {
     $active_expts = "ERR";
 } else {
@@ -23,7 +24,7 @@ if (mysql_num_rows($query_result) != 1) {
 }
 
 $query_result = DBQueryFatal("select count(*) from experiments where ".
-	"state='swapped'");
+	"state='swapped' and pid!='emulab-ops' and pid!='testbed'");
 if (mysql_num_rows($query_result) != 1) {
     $swapped_expts = "ERR";
 } else {
@@ -32,7 +33,7 @@ if (mysql_num_rows($query_result) != 1) {
 }
 
 $query_result = DBQueryFatal("select count(*) from experiments where ".
-	"swap_requests > 0");
+	"swap_requests > 0 and pid!='emulab-ops' and pid!='testbed'");
 if (mysql_num_rows($query_result) != 1) {
     $idle_expts = "ERR";
 } else {
