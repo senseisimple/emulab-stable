@@ -74,7 +74,7 @@ function TBERROR ($message, $death) {
          "Errors-To: $TBMAIL_WWW");
 
     # Allow sendmail to run.
-    sleep(2); 
+    sleep(1); 
 
     if ($death) {
 	    echo "<h3><br><br>
@@ -190,6 +190,45 @@ function VERIFYURL($url) {
     return 0;
 }
 
+#
+# Get the last USERS node login for a user (or all users). If this fails,
+# the let testbed ops know, but its not a fatal problem.
+#
+function LASTUSERSLOGIN($uid) {
+    global $TBLIBEXEC_DIR;
+    
+    $output = array();
+    $retval = 0;
+
+    #
+    # Either a specific UID or a list of all UIDs.
+    #
+    $uidarg = "";
+    if ($uid) {
+	$uidarg = "-u $uid";
+    }
+    $cmdandargs = "$TBLIBEXEC_DIR/lastlogin $uidarg";
+
+    $result = exec($cmdandargs, $output, $retval);
+
+    if ($retval) {
+      if (0) {
+	$foo = "";
+        for ($i = 0; $i < count($output); $i++) {
+	      $foo = "$foo $output[$i]";
+	}
+	
+	TBERROR("LASTUSERSLOGIN: ".
+		"Cmd was \"$cmdandargs\". \n".
+		"Error output:\n\n $foo\n", 0);
+      }
+        return 0;
+    }
+    if ($uid) {
+	return $output[0];
+    }
+    return $output;
+}
 
 #
 # Beware empty spaces (cookies)!

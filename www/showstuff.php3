@@ -159,6 +159,14 @@ function SHOWUSER($uid) {
     $usr_title   = $row[usr_title];
     $usr_affil   = $row[usr_affil];
     $status      = $row[status];
+
+    #
+    # Last Login info.
+    #
+    if (($lastweblogin = LASTWEBLOGIN($uid)) == 0)
+	$lastweblogin = "&nbsp";
+    if (($lastuserslogin = LASTUSERSLOGIN($uid)) == 0)
+	$lastuserslogin = "&nbsp";
     
     echo "<table align=center border=1>\n";
     
@@ -210,6 +218,16 @@ function SHOWUSER($uid) {
     echo "<tr>
               <td>Status:</td>
               <td>$status</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Last Web Login:</td>
+              <td>$lastweblogin</td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Last Users Login:</td>
+              <td>$lastuserslogin</td>
           </tr>\n";
     
     echo "</table>\n";
@@ -509,6 +527,9 @@ function SHOWIMAGEID($imageid, $edit) {
     $part1_osid	 = $row[part1_osid];
     $part2_osid	 = $row[part2_osid];
     $part3_osid	 = $row[part3_osid];
+
+
+
     $part4_osid	 = $row[part4_osid];
     $default_osid= $row[default_osid];
     $path 	 = $row[path];

@@ -8,7 +8,7 @@ SUBDIR		= security
 
 include $(OBJDIR)/Makeconf
 
-BINS		= suexec
+BINS		= suexec lastlogin
 SCRIPTS		= paperbag plasticwrap
 
 #
@@ -19,15 +19,19 @@ all:	$(BINS) $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS	= -O -g \
-	  -DLOG_EXEC='"$(prefix)/log/suexec.log"' \
-	  -DDOC_ROOT='"$(prefix)/libexec/"' \
-	  -DSAFE_PATH='"$(prefix)/libexec:/usr/local/bin:/usr/bin:/bin"'
+CFLAGS	= -O -g
 
-suexec:	suexec.o
-	$(CC) $(CFLAGS) -o suexec suexec.o
+suexec:		suexec.c suexec.h
+	$(CC) $(CFLAGS) \
+		-DLOG_EXEC='"$(prefix)/log/suexec.log"' \
+		-DDOC_ROOT='"$(prefix)/libexec/"' \
+		-DSAFE_PATH='"$(prefix)/libexec:/usr/local/bin:/usr/bin:/bin"'\
+		-o suexec $<
 
-suexec.o: suexec.c suexec.h
+lastlogin:	lastlogin.c
+	$(CC) $(CFLAGS) \
+		-DUSERSVAR='"$(prefix)/usersvar"' \
+		-o lastlogin $<
 
 install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, paperbag)

@@ -210,6 +210,12 @@ function DOLOGIN($uid, $password) {
         }
 
 	#
+	# Create a last login record.
+	#
+	$query_result = mysql_db_query($TBDBNAME,
+	       "REPLACE into lastlogin (uid, time) VALUES ('$uid', NOW())");
+
+	#
 	# Issue the cookie requests so that subsequent pages come back
 	# with the hash value and auth usr embedded.
 
@@ -297,6 +303,19 @@ function NOLOGINS() {
 
     $nologins = $row[nologins];
     return $nologins;
+}
+
+function LASTWEBLOGIN($uid) {
+    global $TBDBNAME;
+
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT time from lastlogin where uid=\"$uid\"");
+    
+    if (mysql_num_rows($query_result)) {
+	$lastrow      = mysql_fetch_array($query_result);
+	return $lastrow[time];
+    }
+    return 0;
 }
 
 #
