@@ -1,6 +1,6 @@
 /* test-attr-produce.c: Test delivery of events, with attributes (producer). */
 
-static char rcsid[] = "$Id: test-attr-produce.c,v 1.3 2002-01-29 12:18:49 imurdock Exp $";
+static char rcsid[] = "$Id: test-attr-produce.c,v 1.4 2002-01-29 17:23:34 imurdock Exp $";
 
 #include <event.h>
 
@@ -12,6 +12,12 @@ main(int argc, char **argv)
     char *server = NULL;
     int c;
     struct timeval time;
+
+    /* Get current time: */
+    gettimeofday(&time, NULL);
+    TRACE("time.tv_sec = %ld, time.tv_usec = %ld\n",
+          time.tv_sec,
+          time.tv_usec);
 
     while ((c = getopt(argc, argv, "s:")) != -1) {
         switch (c) {
@@ -62,10 +68,6 @@ main(int argc, char **argv)
         return 1;
     }
 
-    gettimeofday(&time, NULL);
-    TRACE("time.tv_sec = %ld, time.tv_usec = %ld\n",
-          time.tv_sec,
-          time.tv_usec);
     if (event_notification_put_opaque(handle, notification, "opaque", &time,
                                       sizeof(time))
         == 0)
