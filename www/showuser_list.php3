@@ -19,15 +19,34 @@ LOGGEDINORDIE($uid);
 #
 $isadmin = ISADMIN($uid);
 
-#
-# Get the project list.
-#
 if (! $isadmin) {
     USERERROR("You do not have permission to view the user list!", 1);
 }
 
-$query_result =
-    DBQueryFatal("SELECT u.* FROM users as u order by u.uid");
+if (isset($alternate_view) && $alternate_view) {
+    echo "<b><a href='showuser_list.php3'>
+                Show All Users</a>
+          </b><br><br>\n";
+}
+else {
+    echo "<b><a href='showuser_list.php3?alternate_view=1'>
+                Show Logged in Users</a>
+          </b><br><br>\n";
+
+    $alternate_view = 0;
+}
+
+if ($alternate_view) {
+    $query_result =
+	DBQueryFatal("select u.* from login as l ".
+		     "left join users as u on u.uid=l.uid ".
+		     "where timeout>=unix_timestamp() ".
+		     "order by u.uid");
+}
+else {
+    $query_result =
+	DBQueryFatal("SELECT u.* FROM users as u order by u.uid");
+}
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no users!", 1);
