@@ -45,7 +45,9 @@ else {
 
 echo "<b>Show: <a href='nodecontrol_list.php3?showtype=summary'>summary</a>,
                <a href='nodecontrol_list.php3?showtype=pcs'>pcs</a>,
-               <a href='floormap.php3'>wireless</a>,
+               <a href='floormap.php3'>wireless maps</a>,
+               <a href='nodecontrol_list.php3?showtype=wireless'>
+                                                        wireless list</a>,
                <a href='nodecontrol_list.php3?showtype=widearea'>widearea</a>";
 
 if ($isadmin) {
@@ -109,6 +111,15 @@ elseif (! strcmp($showtype, "widearea")) {
 			  "ON n.node_id=wani.node_id";
 
     $view   = "Widearea";
+}
+elseif (! strcmp($showtype, "wireless")) {
+    $role   = "(role='testnode')";
+    $clause = "and (loc.node_id is not null)";
+
+    $additionalLeftJoin = "LEFT JOIN location_info AS loc ".
+			  "ON n.node_id=loc.node_id";
+
+    $view   = "Wireless";
 }
 else {
     $role   = "(role='testnode')";
