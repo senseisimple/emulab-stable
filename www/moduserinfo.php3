@@ -255,6 +255,25 @@ function SPITFORM($formfields, $errors)
              </tr>\n";
 
         #
+	# Planetlab bit
+	#
+	if ($isadmin) {
+	    if ($formfields['plab_user']) {
+		$checked = "checked";
+	    } else {
+		$checked = "";
+	    }
+
+	    echo "<tr>
+                      <td colspan=2>PlanetLab User:</td>
+                      <td class=left>
+                         <input type='checkbox' name=\"formfields[plab_user]\" value='1'
+			     $checked>
+                      </td>
+                  </tr>\n";
+	}
+
+        #
 	# Notes
 	#
 	if ($isadmin) {
@@ -371,6 +390,7 @@ $defaults[usr_title]   = $row[usr_title];
 $defaults[usr_affil]   = $row[usr_affil];
 $defaults[usr_shell]   = $row[usr_shell];
 $defaults[notes]       = $row[notes];
+$defaults[plab_user]   = $row[plab_user];
 
 #
 # On first load, display a form consisting of current user values, and exit.
@@ -581,6 +601,20 @@ if ($isadmin &&
     $notes = addslashes($formfields[notes]);
 
     DBQueryFatal("UPDATE users SET notes='$notes' ".
+		 "WHERE uid='$target_uid'");
+}
+
+#
+# Only admins can change the plab_user bit.
+#
+if ($isadmin && ($defaults[plab_user] != $formfields[plab_user])) {
+    if ($formfields[plab_user]) {
+	$new_bit = 1;
+    } else {
+	$new_bit = 0;
+    }
+
+    DBQueryFatal("UPDATE users SET plab_user=$new_bit ".
 		 "WHERE uid='$target_uid'");
 }
 
