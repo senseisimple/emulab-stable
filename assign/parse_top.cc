@@ -35,6 +35,35 @@ extern name_list_map vclasses;
 extern vvertex_vector virtual_nodes;
 
 #define top_error(s) errors++;cerr << "TOP:" << line << ": " << s << endl
+#define top_error_noline(s) errors++;cerr << "TOP: " << s << endl
+
+// Used to do late binding of subnode names to vnodes, so that we're no
+// dependant on their ordering in the top file, which can be annoying to get
+// right.
+// Returns the number of errors found
+int bind_top_subnodes() {
+    int errors = 0;
+
+    // Iterate through all vnodes looking for ones that are subnodes
+    vvertex_iterator vit,vendit;
+    tie(vit,vendit) = vertices(VG);
+    for (;vit != vendit;++vit) {
+	tb_vnode *vnode = get(vvertex_pmap, *vit);
+	if (!vnode->subnode_of_name.empty()) {
+	    if (vname2vertex.find(vnode->subnode_of_name)
+		    == vname2vertex.end()) {
+		top_error_noline(vnode->name << " is a subnode of a " <<
+			"non-existent node, " << vnode->subnode_of_name << ".");
+		continue;
+	    }
+	    vvertex parent_vv = vname2vertex[vnode->subnode_of_name];
+	    vnode->subnode_of = get(vvertex_pmap,parent_vv);
+	    vnode->subnode_of->subnodes.push_back(vnode);
+	}
+    }
+
+    return errors;
+}
 
 int parse_top(tb_vgraph &VG, istream& i)
 {
@@ -97,16 +126,11 @@ int parse_top(tb_vgraph &VG, istream& i)
 	  } else {
 	      if (desirename.compare("subnode_of") == 0) {
 		  // Okay, it's not a desire, it's a subnode declaration
-		  if (v->subnode_of) {
+		  if (!v->subnode_of_name.empty()) {
 		      top_error("Can only be a subnode of one node");
-		  }
-		  if (vname2vertex.find(desireweight) == vname2vertex.end()) {
-		      top_error("Bad link line, non-existent node.");
 		      continue;
 		  }
-		  vvertex parent_vv = vname2vertex[desireweight];
-		  v->subnode_of = get(vvertex_pmap,parent_vv);
-		  v->subnode_of->subnodes.push_back(v);
+		  v->subnode_of_name = desireweight;
 
 	      } else {
 		  double gweight;
@@ -284,6 +308,8 @@ int parse_top(tb_vgraph &VG, istream& i)
       top_error("Unknown directive: " << command << ".");
     }
   }
+
+  errors += bind_top_subnodes();
 
   if (errors > 0) {exit(2);}
   

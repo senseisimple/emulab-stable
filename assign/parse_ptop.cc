@@ -32,6 +32,35 @@ extern name_pvertex_map pname2vertex;
 extern name_count_map ptypes;
 
 #define ptop_error(s) errors++;cerr << "PTOP:" << line << ": " << s << endl
+#define ptop_error_noline(s) errors++;cerr << "PTOP: " << s << endl
+
+// Used to do late binding of subnode names to pnodes, so that we're no
+// dependant on their ordering in the ptop file, which can be annoying to get
+// right.
+// Returns the number of errors found
+int bind_ptop_subnodes() {
+    int errors = 0;
+
+    // Iterate through all pnodes looking for ones that are subnodes
+    pvertex_iterator vit,vendit;
+    tie(vit,vendit) = vertices(PG);
+    for (;vit != vendit;++vit) {
+	tb_pnode *pnode = get(pvertex_pmap,*vit);
+	if (!pnode->subnode_of_name.empty()) {
+	    if (pname2vertex.find(pnode->subnode_of_name) ==
+		    pname2vertex.end()) {
+		ptop_error_noline(pnode->name << " is a subnode of a " <<
+			"non-existent node, " << pnode->subnode_of_name << ".");
+			continue;
+		}
+		pvertex parent_pv = pname2vertex[pnode->subnode_of_name];
+		pnode->subnode_of = get(pvertex_pmap,parent_pv);
+		pnode->subnode_of->has_subnode = true;
+	}
+    }
+
+    return errors;
+}
 
 int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 {
@@ -67,25 +96,6 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	  if (split_two(parsed_line[i],':',type,load,"1") != 0) {
 	    ptop_error("Bad node line, no load for type: " << type << ".");
 	  }
-
-	  // First, check to see if it's not actually a type, but a subnode
-	  // relationship
-	  if (type.compare("subnode_of") == 0) {
-	      if (p->subnode_of) {
-		  ptop_error("Can't be a subnode of two nodes");
-		  continue;
-	      }
-	      if (pname2vertex.find(load) == pname2vertex.end()) {
-		  ptop_error("Subnode of a non-existent node.");
-	      }
-	      pvertex parent_pv = pname2vertex[load];
-	      p->subnode_of = get(pvertex_pmap,parent_pv);
-	      p->subnode_of->has_subnode = true;
-
-	      // Don't keep processing as if it were a type
-	      continue;
-	  }
-
 	  // Check to see if this is a static type
 	  bool is_static = false;
 	  if (type[0] == '*') {
@@ -137,8 +147,8 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 	for (i=i+1; i < parsed_line.size(); ++i) {
 	    crope flag,value;
 	    split_two(parsed_line[i],':',flag,value,"(null)");
-#ifdef TRIVIAL_LINK_BW
-	    if (flag == crope("trivial_bw")) {
+	    if (flag.compare("trivial_bw") == 0) {
+		// Handle trivial bandwidth spec
 		int trivial_bw;
 		if (sscanf(value.c_str(),"%i",&trivial_bw) != 1) {
 		    ptop_error("Bad bandwidth given for trivial_bw: " << value
@@ -146,10 +156,19 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 		    trivial_bw = 0;
 		}
 		p->trivial_bw = trivial_bw;
+	    } else if (flag.compare("subnode_of") == 0) {
+		// Handle subnode relationships
+		if (!p->subnode_of_name.empty()) {
+		    ptop_error("Can't be a subnode of two nodes");
+		    continue;
+		} else {
+		    // Just store the name for now, we'll do late binding to
+		    // an actual pnode later
+		    p->subnode_of_name = value;
+		}
 	    } else {
 		ptop_error("Bad flag given: " << flag << ".");
 	    }
-#endif
 	}
 	pname2vertex[name] = pv;
       }
@@ -275,6 +294,8 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
       ptop_error("Unknown directive: " << command << ".");
     }
   }
+
+  errors += bind_ptop_subnodes();
 
   if (errors > 0) {exit(2);}
   

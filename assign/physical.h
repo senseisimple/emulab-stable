@@ -78,7 +78,7 @@ public:
 			  total_bandwidth(0), my_class(NULL),
 			  my_own_class(NULL), assigned_nodes(),
 			  trivial_bw(0), trivial_bw_used(0), subnode_of(NULL),
-			  has_subnode(false) {;}
+			  subnode_of_name(""), has_subnode(false) {;}
 
   class type_record {
       public:
@@ -142,6 +142,8 @@ public:
 
   tb_pnode *subnode_of;		// the pnode, if any, that this node is a
   				// subnode of
+  crope subnode_of_name;        // name of the pnode this node is a subnode of -
+                                // used to do late bindind
 
   bool has_subnode;		// whether or not this node has any subnodes
 	

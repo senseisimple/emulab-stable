@@ -66,7 +66,8 @@ public:
 
 class tb_vnode {
 public:
-  tb_vnode(): vclass(NULL), fixed(false), assigned(false), subnode_of(NULL) {;}
+  tb_vnode(): vclass(NULL), fixed(false), assigned(false), subnode_of(NULL),
+      subnode_of_name("") {;}
 
   friend ostream &operator<<(ostream &o, const tb_vnode& node)
   {
@@ -111,6 +112,7 @@ public:
   tb_vnode *subnode_of;
   typedef list<tb_vnode*> subnode_list;
   subnode_list subnodes;
+  crope subnode_of_name;
 
 };
 
