@@ -82,7 +82,7 @@ $c=$r["c"];
 
 if (!$confirmed) {
     echo "<center><h3><br>
-Experiment '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
+Expt. '$eid' in project '$pid' has $c Emulab node".($c!=1?"s":"").
       " reserved,<br>and has been sent $swap_requests swap request".
       ($swap_requests!=1?"s":"")." since it went idle.<br>";
     if ($swap_requests > 0) {
@@ -134,13 +134,15 @@ if (! $leaders) {
 }
 
 $lastact = TBGetExptLastAct($pid,$eid);
-$idletime= TBGetExptIdleTime($pid,$eid,"G \h\o\u\\r\s\, i \m\i\\n\u\\t\e\s");
+$idletime= TBGetExptIdleTime($pid,$eid,"G:i");
+$idletime = str_replace(":0",":",$idletime);
+list($idlehrs,$idlemin) = explode(":",$idletime);
 
 $msg =
 "Hi, this is an important automated message from $THISHOMEBASE.\n\n".
 "It appears that the $c node".($c!=1?"s":"")." in your experiment ".
-"'$eid' ".($c!=1?"have":"has")." been inactive for $idletime, ".
-"since $lastact. ".
+"'$eid' ".($c!=1?"have":"has")." been inactive for ".
+"$idlehrs hours, $idlemin minutes, since $lastact. ".
 ( $swap_requests > 0 
   ? ("You have been sent ".$swap_requests." other message".
      ($swap_requests!=1?"s":"")." since this ".
@@ -170,7 +172,7 @@ $msg =
 # For debugging:
 #TBMAIL("Expt Leader <$TBMAILADDR_OPS>",
 TBMAIL("$expleader_name <$expleader_email>",
-       "$pid/$eid ($c PC".($c!=1?"s":"")."): Swap or Terminate Experiment",
+       "$c PC".($c!=1?"s":"")." idle $idlehrs hours: $pid/$eid",
        wordwrap($msg,75),
        "From: $TBMAIL_OPS\n".
        ( $swap_requests >= $tell_proj_head
