@@ -525,7 +525,7 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 
     if ($result_delays->numrows || $result_linkdelays->numrows) {
 	print  "Physical Queue Info:\n";
-	printf "%-15s %-15s %-10s %-7s %s\n",
+	printf "%-15s %-15s %-15s %-7s %s\n",
 	       "ID", "Member", "Q Limit", "Type",
 	       "weight/min_th/max_th/linterm";
 	print  "--------------- --------------- ---------- ".
@@ -534,9 +534,9 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 
     if ($result_delays->numrows) {
 	while (my %row = $result_delays->fetchhash()) {
-	    printf("%-15s %-15s %-10s %-7s %s\n", $row{vname},
+	    printf("%-15s %-15s %-15s %-7s %s\n", $row{vname},
 		   $row{vnode0},
-		   $row{q0_limit} . ($row{q0_qinbytes} ? "b" : "s"),
+		   $row{q0_limit} . ($row{q0_qinbytes} ? " bytes" : " slots"),
 		   ($row{q0_red} ?
 		    ($row{q0_gentle} ? "GRED" : "RED") : "Tail"),
 		   ($row{q0_red} ?
@@ -546,9 +546,9 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 
 	    # If equal, its a lan, and so only one queue towards the switch
 	    if ($row{vnode0} ne $row{vnode1}) {
-		printf("%-15s %-15s %-10s %-7s %s\n", $row{vname},
+		printf("%-15s %-15s %-15s %-7s %s\n", $row{vname},
 		       $row{vnode1},
-		       $row{q1_limit} . ($row{q1_qinbytes} ? "b" : "s"),
+		       $row{q1_limit} . ($row{q1_qinbytes} ? " bytes" : " slots"),
 		       ($row{q1_red} ?
 			($row{q1_gentle} ? "GRED" : "RED") : "Tail"),
 		       ($row{q1_red} ?
@@ -562,9 +562,9 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 
     if ($result_linkdelays->numrows) {
 	while (my %row = $result_linkdelays->fetchhash()) {
-	    printf("%-15s %-15s %-10s %-7s %s\n", $row{vlan},
+	    printf("%-15s %-15s %-15s %-7s %s\n", $row{vlan},
 		   $row{vnode},
-		   $row{q_limit} . ($row{q_qinbytes} ? "b" : "s"),
+		   $row{q_limit} . ($row{q_qinbytes} ? " bytes" : " slots"),
 		   ($row{q_red} ?
 		    ($row{q_gentle} ? "GRED" : "RED") : "Tail"),
 		   ($row{q_red} ?
