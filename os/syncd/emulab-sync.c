@@ -24,6 +24,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <setjmp.h>
 #include "decls.h"
 #include "config.h"
 
@@ -36,6 +37,11 @@ static int	debug = 0;
 /* Forward decls */
 static int	doudp(barrier_req_t *, struct in_addr, int);
 static int	dotcp(barrier_req_t *, struct in_addr, int);
+
+/* For connect timeouts. */
+static jmp_buf	deadline;
+static int	deadsyncdflag;
+static void	deadsyncd(int sig);
 
 char *usagestr = 
  "usage: emulab-sync [options]\n"
@@ -187,15 +193,36 @@ dotcp(barrier_req_t *barrier_reqp, struct in_addr serverip, int portnum)
 		name.sin_addr   = serverip;
 		name.sin_port   = htons(portnum);
 
-		if (connect(sock, (struct sockaddr *) &name,
-			    sizeof(name)) == 0) {
-			break;
+		/* For alarm. */
+		deadsyncdflag = 0;
+		signal(SIGALRM, deadsyncd);
+		if (setjmp(deadline)) {
+			alarm(0);
+			signal(SIGALRM, SIG_DFL);
+			goto refused;
 		}
+		alarm(5);
+
+		cc = connect(sock, (struct sockaddr *) &name, sizeof(name));
+		/*
+		 * If we get the alarm now, no problem. We will close the
+		 * connection and try again after a short wait. The server
+		 * will recongnize this for what is, not recording any state
+		 * until we actually send it the request below (write to sock).
+		 */
+		alarm(0);
+		signal(SIGALRM, SIG_DFL);
+
+		/* Success */
+		if (cc == 0)
+			break;
+
 		if (errno != ECONNREFUSED && errno != ETIMEDOUT) {
 			perror("connecting stream socket");
 			close(sock);
 			return -1;
 		}
+	refused:
 		close(sock);
 		if (debug) 
 			fprintf(stderr, "Connection refused. Waiting ...\n");
@@ -288,4 +315,11 @@ doudp(barrier_req_t *barrier_reqp, struct in_addr serverip, int portnum)
 	}
 	close(sock);
 	return 0;
+}
+
+void
+deadsyncd(int sig)
+{
+	deadsyncdflag = 1;
+	longjmp(deadline, 1);
 }
