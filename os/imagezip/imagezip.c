@@ -653,21 +653,6 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 	}
 
 	/*
-	 * In slicemode, we need to set the bounds of compression.
-	 * Slice is a DOS partition number (1-4). If not in slicemode,
-	 * we cannot set the bounds according to the doslabel since its
-	 * possible that someone will create a disk with empty space
-	 * before the first partition (typical, to start partition 1
-	 * at the second cylinder) or after the last partition (Mike!).
-	 * However, do not set the inputminsec since we usually want the
-	 * stuff before the first partition, which is the boot stuff.
-	 */
-	if (slicemode) {
-		inputminsec = bbstart + doslabel.parts[slice-1].dp_start;
-		inputmaxsec = inputminsec + doslabel.parts[slice-1].dp_size;
-	}
-
-	/*
 	 * Now operate on individual slices. 
 	 */
 	for (i = 0; i < NDOSPART; i++) {
@@ -755,7 +740,20 @@ read_image(u_int32_t bbstart, int pstart, u_int32_t extstart)
 		}
 		
 	skipcheck:
-		if (!slicemode && !maxmode) {
+		/*
+		 * In slicemode, we need to set the bounds of compression.
+		 * Slice is a DOS partition number (1-4). If not in slicemode,
+		 * we cannot set the bounds according to the doslabel since its
+		 * possible that someone will create a disk with empty space
+		 * before the first partition (typical, to start partition 1
+		 * at the second cylinder) or after the last partition (Mike!).
+		 * However, do not set the inputminsec since we usually want the
+		 * stuff before the first partition, which is the boot stuff.
+		 */
+		if (slicemode && slice == bsdix + 1) {
+			inputminsec = start;
+			inputmaxsec = start + size;
+		} else if (!slicemode && !maxmode) {
 			if (start + size > inputmaxsec)
 				inputmaxsec = start + size;
 		}
@@ -1151,6 +1149,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	struct ext2_super_block	fs;
 	struct ext2_group_desc	groups[LINUX_MAXGRPSPERBLK];
 	int			dosslice = slice + 1; /* DOS Numbering */
+	off_t			soff;
 
 	assert((sizeof(fs) & ~LINUX_SUPERBLOCK_SIZE) == 0);
 	assert((sizeof(groups) & ~EXT2_MAX_BLOCK_SIZE) == 0);
@@ -1188,13 +1187,18 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	    return 1;
 	}
 
-	numgroups = fs.s_blocks_count / fs.s_blocks_per_group;
+	numgroups = ((fs.s_blocks_count - fs.s_first_data_block)
+		     + (fs.s_blocks_per_group - 1))
+		/ fs.s_blocks_per_group;
 	if (debug) {
+		fprintf(stderr, "        %s\n",
+			(fs.s_feature_compat & 4) ? "EXT3" : "EXT2");
 		fprintf(stderr, "        count %9u, size %9d, pergroup %9d\n",
 			fs.s_blocks_count, EXT2_BLOCK_SIZE(&fs),
 			fs.s_blocks_per_group);
-		fprintf(stderr, "        bfree %9u, groups %9d\n",
-			fs.s_free_blocks_count, numgroups);
+		fprintf(stderr, "        bfree %9u, first %9u, groups %9d\n",
+			fs.s_free_blocks_count, fs.s_first_data_block,
+			numgroups);
 	}
 
 	/*
@@ -1203,10 +1207,16 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 	 * is determined by its index * s_blocks_per_group. Once we know where
 	 * the bitmap lives, we can go out to the bitmap and see what blocks
 	 * are free.
+	 *
+	 * Group descriptors are in the blocks right after the superblock.
 	 */
-	for (i = 0; i <= numgroups; i++) {
+	assert(LINUX_SUPERBLOCK_SIZE <= EXT2_BLOCK_SIZE(&fs));
+	assert(EXT2_DESC_PER_BLOCK(&fs) * sizeof(struct ext2_group_desc)
+	       == EXT2_BLOCK_SIZE(&fs)); 
+	soff = sectobytes(start) +
+		(fs.s_first_data_block + 1) * EXT2_BLOCK_SIZE(&fs);
+	for (i = 0; i < numgroups; i++) {
 		int gix;
-		off_t soff;
 
 		/*
 		 * Read the group descriptors in groups since they are
@@ -1215,12 +1225,6 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 		 */
 		gix = (i % EXT2_DESC_PER_BLOCK(&fs));
 		if (gix == 0) {
-			soff = sectobytes(start) +
-				((off_t)
-				 ((EXT2_BLOCK_SIZE(&fs) *
-				   (fs.s_first_data_block + 1)) +
-				  (i*sizeof(struct ext2_group_desc))));
-			
 			if (devlseek(infd, soff, SEEK_SET) < 0) {
 				warnx("Linux Slice %d: "
 				      "Could not seek to Group %d",
@@ -1239,6 +1243,7 @@ read_linuxslice(int slice, u_int32_t start, u_int32_t size)
 				      "Truncated Group %d", dosslice, i);
 				return 1;
 			}
+			soff += EXT2_BLOCK_SIZE(&fs);
 		}
 
 		if (debug) {
@@ -1269,14 +1274,30 @@ read_linuxgroup(struct ext2_super_block *super,
 {
 	char	*p, bitmap[EXT2_MAX_BLOCK_SIZE];
 	int	i, cc, max;
-	int	count, j;
+	int	count, j, freecount;
 	off_t	offset;
+	unsigned long block;
+
+	block = super->s_first_data_block +
+		(index * super->s_blocks_per_group);
+
+	/*
+	 * Sanity check the bitmap block numbers
+	 */
+	if (group->bg_block_bitmap < block ||
+	    group->bg_block_bitmap >= block + super->s_blocks_per_group) {
+		warnx("Linux Group %d: "
+		      "Group bitmap block (%d) out of range [%lu-%lu]",
+		      index, group->bg_block_bitmap,
+		      block, block + super->s_blocks_per_group - 1);
+		return 1;
+	}
 
 	offset  = sectobytes(sliceoffset);
 	offset += (off_t)EXT2_BLOCK_SIZE(super) * group->bg_block_bitmap;
 	if (devlseek(infd, offset, SEEK_SET) < 0) {
 		warn("Linux Group %d: "
-		     "Could not seek to Group bitmap %d",
+		     "Could not seek to Group bitmap block %d",
 		     index, group->bg_block_bitmap);
 		return 1;
 	}
@@ -1302,8 +1323,18 @@ read_linuxgroup(struct ext2_super_block *super,
 		return 1;
 	}
 
-	max = super->s_blocks_per_group;
-	p   = bitmap;
+	/*
+	 * The final group may have fewer than s_blocks_per_group
+	 */
+	max = super->s_blocks_count - block;
+	if (max > super->s_blocks_per_group)
+		max = super->s_blocks_per_group;
+	else if (debug && max != super->s_blocks_per_group)
+		fprintf(stderr,
+			"        Linux Group %d: only %d blocks\n", index, max);
+
+	p = bitmap;
+	freecount = 0;
 
 	/*
 	 * XXX The bitmap is FS blocks.
@@ -1314,7 +1345,7 @@ read_linuxgroup(struct ext2_super_block *super,
 
 	if (debug > 2)
 		fprintf(stderr, "                 ");
-	for (count = i = 0; i < max; i++)
+	for (freecount = count = i = 0; i < max; i++)
 		if (!isset(p, i)) {
 			unsigned long dboff;
 			int dbcount;
@@ -1325,14 +1356,16 @@ read_linuxgroup(struct ext2_super_block *super,
 
 			/*
 			 * The offset of this free range, relative
-			 * to the start of the disk, is the slice
+			 * to the start of the disk, is: the slice
 			 * offset, plus the offset of the group itself,
 			 * plus the index of the first free block in
-			 * the current range.
+			 * the current range, plus the offset of the
+			 * first data block in the filesystem.
 			 */
 			dboff = sliceoffset +
-				LINUX_FSBTODB(index * max) +
-				LINUX_FSBTODB(j);
+				LINUX_FSBTODB(index*super->s_blocks_per_group) +
+				LINUX_FSBTODB(j) +
+				LINUX_FSBTODB(super->s_first_data_block);
 
 			dbcount = LINUX_FSBTODB((i-j) + 1);
 					
@@ -1343,12 +1376,20 @@ read_linuxgroup(struct ext2_super_block *super,
 						" " : "\n                 ");
 				fprintf(stderr, "%lu:%d %d:%d",
 					dboff, dbcount, j, i);
+				count++;
 			}
 			addskip(dboff, dbcount);
-			count++;
+			freecount += dbcount;
 		}
 	if (debug > 2)
 		fprintf(stderr, "\n");
+
+	if (freecount != LINUX_FSBTODB(group->bg_free_blocks_count)) {
+		warnx("Linux Group %d: "
+		      "Computed free count (%d) != expected free count (%d)",
+		      index, freecount, group->bg_free_blocks_count);
+		return 1;
+	}
 
 	return 0;
 }
@@ -1839,8 +1880,11 @@ dumpskips(int verbose)
 	if (!skips)
 		return;
 
-	if (verbose)
-		fprintf(stderr, "\nSkip ranges (start/size) in sectors:\n");
+	if (verbose) {
+		fprintf(stderr, "\nMin sector %lu, Max sector %lu\n",
+			inputminsec, inputmaxsec);
+		fprintf(stderr, "Skip ranges (start/size) in sectors:\n");
+	}
 	
 	pskip = skips;
 	while (pskip) {
