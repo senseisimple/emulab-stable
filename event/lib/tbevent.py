@@ -1,7 +1,9 @@
 # This file was created automatically by SWIG.
 # Don't modify this file, modify the SWIG interface instead.
 # This file is compatible with both classic and new-style classes.
+
 import _tbevent
+
 def _swig_setattr(self,class_type,name,value):
     if (name == "this"):
         if isinstance(value, class_type):
@@ -25,6 +27,7 @@ try:
 except AttributeError:
     class _object : pass
     _newclass = 0
+del types
 
 
 MAXHOSTNAMELEN = _tbevent.MAXHOSTNAMELEN
@@ -33,51 +36,51 @@ class event_handle(_object):
     __setattr__ = lambda self, name, value: _swig_setattr(self, event_handle, name, value)
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, event_handle, name)
+    def __repr__(self):
+        return "<C event_handle instance at %s>" % (self.this,)
     __swig_setmethods__["server"] = _tbevent.event_handle_server_set
     __swig_getmethods__["server"] = _tbevent.event_handle_server_get
-    if _newclass:server = property(_tbevent.event_handle_server_get,_tbevent.event_handle_server_set)
+    if _newclass:server = property(_tbevent.event_handle_server_get, _tbevent.event_handle_server_set)
     __swig_setmethods__["status"] = _tbevent.event_handle_status_set
     __swig_getmethods__["status"] = _tbevent.event_handle_status_get
-    if _newclass:status = property(_tbevent.event_handle_status_get,_tbevent.event_handle_status_set)
+    if _newclass:status = property(_tbevent.event_handle_status_get, _tbevent.event_handle_status_set)
     __swig_setmethods__["keydata"] = _tbevent.event_handle_keydata_set
     __swig_getmethods__["keydata"] = _tbevent.event_handle_keydata_get
-    if _newclass:keydata = property(_tbevent.event_handle_keydata_get,_tbevent.event_handle_keydata_set)
+    if _newclass:keydata = property(_tbevent.event_handle_keydata_get, _tbevent.event_handle_keydata_set)
     __swig_setmethods__["keylen"] = _tbevent.event_handle_keylen_set
     __swig_getmethods__["keylen"] = _tbevent.event_handle_keylen_get
-    if _newclass:keylen = property(_tbevent.event_handle_keylen_get,_tbevent.event_handle_keylen_set)
+    if _newclass:keylen = property(_tbevent.event_handle_keylen_get, _tbevent.event_handle_keylen_set)
     __swig_setmethods__["init"] = _tbevent.event_handle_init_set
     __swig_getmethods__["init"] = _tbevent.event_handle_init_get
-    if _newclass:init = property(_tbevent.event_handle_init_get,_tbevent.event_handle_init_set)
+    if _newclass:init = property(_tbevent.event_handle_init_get, _tbevent.event_handle_init_set)
     __swig_setmethods__["connect"] = _tbevent.event_handle_connect_set
     __swig_getmethods__["connect"] = _tbevent.event_handle_connect_get
-    if _newclass:connect = property(_tbevent.event_handle_connect_get,_tbevent.event_handle_connect_set)
+    if _newclass:connect = property(_tbevent.event_handle_connect_get, _tbevent.event_handle_connect_set)
     __swig_setmethods__["disconnect"] = _tbevent.event_handle_disconnect_set
     __swig_getmethods__["disconnect"] = _tbevent.event_handle_disconnect_get
-    if _newclass:disconnect = property(_tbevent.event_handle_disconnect_get,_tbevent.event_handle_disconnect_set)
+    if _newclass:disconnect = property(_tbevent.event_handle_disconnect_get, _tbevent.event_handle_disconnect_set)
     __swig_setmethods__["cleanup"] = _tbevent.event_handle_cleanup_set
     __swig_getmethods__["cleanup"] = _tbevent.event_handle_cleanup_get
-    if _newclass:cleanup = property(_tbevent.event_handle_cleanup_get,_tbevent.event_handle_cleanup_set)
+    if _newclass:cleanup = property(_tbevent.event_handle_cleanup_get, _tbevent.event_handle_cleanup_set)
     __swig_setmethods__["mainloop"] = _tbevent.event_handle_mainloop_set
     __swig_getmethods__["mainloop"] = _tbevent.event_handle_mainloop_get
-    if _newclass:mainloop = property(_tbevent.event_handle_mainloop_get,_tbevent.event_handle_mainloop_set)
+    if _newclass:mainloop = property(_tbevent.event_handle_mainloop_get, _tbevent.event_handle_mainloop_set)
     __swig_setmethods__["notify"] = _tbevent.event_handle_notify_set
     __swig_getmethods__["notify"] = _tbevent.event_handle_notify_get
-    if _newclass:notify = property(_tbevent.event_handle_notify_get,_tbevent.event_handle_notify_set)
+    if _newclass:notify = property(_tbevent.event_handle_notify_get, _tbevent.event_handle_notify_set)
     __swig_setmethods__["subscribe"] = _tbevent.event_handle_subscribe_set
     __swig_getmethods__["subscribe"] = _tbevent.event_handle_subscribe_get
-    if _newclass:subscribe = property(_tbevent.event_handle_subscribe_get,_tbevent.event_handle_subscribe_set)
-    def __init__(self,*args):
-        _swig_setattr(self, event_handle, 'this', apply(_tbevent.new_event_handle,args))
+    if _newclass:subscribe = property(_tbevent.event_handle_subscribe_get, _tbevent.event_handle_subscribe_set)
+    def __init__(self, *args):
+        _swig_setattr(self, event_handle, 'this', _tbevent.new_event_handle(*args))
         _swig_setattr(self, event_handle, 'thisown', 1)
-    def __del__(self, destroy= _tbevent.delete_event_handle):
+    def __del__(self, destroy=_tbevent.delete_event_handle):
         try:
             if self.thisown: destroy(self)
         except: pass
-    def __repr__(self):
-        return "<C event_handle instance at %s>" % (self.this,)
 
 class event_handlePtr(event_handle):
-    def __init__(self,this):
+    def __init__(self, this):
         _swig_setattr(self, event_handle, 'this', this)
         if not hasattr(self,"thisown"): _swig_setattr(self, event_handle, 'thisown', 0)
         _swig_setattr(self, event_handle,self.__class__,event_handle)
@@ -88,24 +91,24 @@ class event_notification(_object):
     __setattr__ = lambda self, name, value: _swig_setattr(self, event_notification, name, value)
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, event_notification, name)
+    def __repr__(self):
+        return "<C event_notification instance at %s>" % (self.this,)
     __swig_setmethods__["elvin_notification"] = _tbevent.event_notification_elvin_notification_set
     __swig_getmethods__["elvin_notification"] = _tbevent.event_notification_elvin_notification_get
-    if _newclass:elvin_notification = property(_tbevent.event_notification_elvin_notification_get,_tbevent.event_notification_elvin_notification_set)
+    if _newclass:elvin_notification = property(_tbevent.event_notification_elvin_notification_get, _tbevent.event_notification_elvin_notification_set)
     __swig_setmethods__["has_hmac"] = _tbevent.event_notification_has_hmac_set
     __swig_getmethods__["has_hmac"] = _tbevent.event_notification_has_hmac_get
-    if _newclass:has_hmac = property(_tbevent.event_notification_has_hmac_get,_tbevent.event_notification_has_hmac_set)
-    def __init__(self,*args):
-        _swig_setattr(self, event_notification, 'this', apply(_tbevent.new_event_notification,args))
+    if _newclass:has_hmac = property(_tbevent.event_notification_has_hmac_get, _tbevent.event_notification_has_hmac_set)
+    def __init__(self, *args):
+        _swig_setattr(self, event_notification, 'this', _tbevent.new_event_notification(*args))
         _swig_setattr(self, event_notification, 'thisown', 1)
-    def __del__(self, destroy= _tbevent.delete_event_notification):
+    def __del__(self, destroy=_tbevent.delete_event_notification):
         try:
             if self.thisown: destroy(self)
         except: pass
-    def __repr__(self):
-        return "<C event_notification instance at %s>" % (self.this,)
 
 class event_notificationPtr(event_notification):
-    def __init__(self,this):
+    def __init__(self, this):
         _swig_setattr(self, event_notification, 'this', this)
         if not hasattr(self,"thisown"): _swig_setattr(self, event_notification, 'thisown', 0)
         _swig_setattr(self, event_notification,self.__class__,event_notification)
@@ -116,42 +119,42 @@ class address_tuple(_object):
     __setattr__ = lambda self, name, value: _swig_setattr(self, address_tuple, name, value)
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, address_tuple, name)
+    def __repr__(self):
+        return "<C address_tuple instance at %s>" % (self.this,)
     __swig_setmethods__["site"] = _tbevent.address_tuple_site_set
     __swig_getmethods__["site"] = _tbevent.address_tuple_site_get
-    if _newclass:site = property(_tbevent.address_tuple_site_get,_tbevent.address_tuple_site_set)
+    if _newclass:site = property(_tbevent.address_tuple_site_get, _tbevent.address_tuple_site_set)
     __swig_setmethods__["expt"] = _tbevent.address_tuple_expt_set
     __swig_getmethods__["expt"] = _tbevent.address_tuple_expt_get
-    if _newclass:expt = property(_tbevent.address_tuple_expt_get,_tbevent.address_tuple_expt_set)
+    if _newclass:expt = property(_tbevent.address_tuple_expt_get, _tbevent.address_tuple_expt_set)
     __swig_setmethods__["group"] = _tbevent.address_tuple_group_set
     __swig_getmethods__["group"] = _tbevent.address_tuple_group_get
-    if _newclass:group = property(_tbevent.address_tuple_group_get,_tbevent.address_tuple_group_set)
+    if _newclass:group = property(_tbevent.address_tuple_group_get, _tbevent.address_tuple_group_set)
     __swig_setmethods__["host"] = _tbevent.address_tuple_host_set
     __swig_getmethods__["host"] = _tbevent.address_tuple_host_get
-    if _newclass:host = property(_tbevent.address_tuple_host_get,_tbevent.address_tuple_host_set)
+    if _newclass:host = property(_tbevent.address_tuple_host_get, _tbevent.address_tuple_host_set)
     __swig_setmethods__["objtype"] = _tbevent.address_tuple_objtype_set
     __swig_getmethods__["objtype"] = _tbevent.address_tuple_objtype_get
-    if _newclass:objtype = property(_tbevent.address_tuple_objtype_get,_tbevent.address_tuple_objtype_set)
+    if _newclass:objtype = property(_tbevent.address_tuple_objtype_get, _tbevent.address_tuple_objtype_set)
     __swig_setmethods__["objname"] = _tbevent.address_tuple_objname_set
     __swig_getmethods__["objname"] = _tbevent.address_tuple_objname_get
-    if _newclass:objname = property(_tbevent.address_tuple_objname_get,_tbevent.address_tuple_objname_set)
+    if _newclass:objname = property(_tbevent.address_tuple_objname_get, _tbevent.address_tuple_objname_set)
     __swig_setmethods__["eventtype"] = _tbevent.address_tuple_eventtype_set
     __swig_getmethods__["eventtype"] = _tbevent.address_tuple_eventtype_get
-    if _newclass:eventtype = property(_tbevent.address_tuple_eventtype_get,_tbevent.address_tuple_eventtype_set)
+    if _newclass:eventtype = property(_tbevent.address_tuple_eventtype_get, _tbevent.address_tuple_eventtype_set)
     __swig_setmethods__["scheduler"] = _tbevent.address_tuple_scheduler_set
     __swig_getmethods__["scheduler"] = _tbevent.address_tuple_scheduler_get
-    if _newclass:scheduler = property(_tbevent.address_tuple_scheduler_get,_tbevent.address_tuple_scheduler_set)
-    def __init__(self,*args):
-        _swig_setattr(self, address_tuple, 'this', apply(_tbevent.new_address_tuple,args))
+    if _newclass:scheduler = property(_tbevent.address_tuple_scheduler_get, _tbevent.address_tuple_scheduler_set)
+    def __init__(self, *args):
+        _swig_setattr(self, address_tuple, 'this', _tbevent.new_address_tuple(*args))
         _swig_setattr(self, address_tuple, 'thisown', 1)
-    def __del__(self, destroy= _tbevent.delete_address_tuple):
+    def __del__(self, destroy=_tbevent.delete_address_tuple):
         try:
             if self.thisown: destroy(self)
         except: pass
-    def __repr__(self):
-        return "<C address_tuple instance at %s>" % (self.this,)
 
 class address_tuplePtr(address_tuple):
-    def __init__(self,this):
+    def __init__(self, this):
         _swig_setattr(self, address_tuple, 'this', this)
         if not hasattr(self,"thisown"): _swig_setattr(self, address_tuple, 'thisown', 0)
         _swig_setattr(self, address_tuple,self.__class__,address_tuple)
@@ -160,16 +163,17 @@ _tbevent.address_tuple_swigregister(address_tuplePtr)
 ADDRESSTUPLE_ALL = _tbevent.ADDRESSTUPLE_ALL
 OBJECTTYPE_TESTBED = _tbevent.OBJECTTYPE_TESTBED
 OBJECTTYPE_TRAFGEN = _tbevent.OBJECTTYPE_TRAFGEN
+
 address_tuple_alloc = _tbevent.address_tuple_alloc
 
 address_tuple_free = _tbevent.address_tuple_free
-
 EVENT_HOST_ANY = _tbevent.EVENT_HOST_ANY
 EVENT_NULL = _tbevent.EVENT_NULL
 EVENT_TEST = _tbevent.EVENT_TEST
 EVENT_SCHEDULE = _tbevent.EVENT_SCHEDULE
 EVENT_TRAFGEN_START = _tbevent.EVENT_TRAFGEN_START
 EVENT_TRAFGEN_STOP = _tbevent.EVENT_TRAFGEN_STOP
+
 event_register = _tbevent.event_register
 
 event_register_withkeyfile = _tbevent.event_register_withkeyfile
@@ -227,34 +231,34 @@ event_notification_unpack = _tbevent.event_notification_unpack
 xmalloc = _tbevent.xmalloc
 
 xrealloc = _tbevent.xrealloc
-
 class callback_data(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, callback_data, name, value)
     __swig_getmethods__ = {}
     __getattr__ = lambda self, name: _swig_getattr(self, callback_data, name)
+    def __repr__(self):
+        return "<C callback_data instance at %s>" % (self.this,)
     __swig_setmethods__["callback_notification"] = _tbevent.callback_data_callback_notification_set
     __swig_getmethods__["callback_notification"] = _tbevent.callback_data_callback_notification_get
-    if _newclass:callback_notification = property(_tbevent.callback_data_callback_notification_get,_tbevent.callback_data_callback_notification_set)
+    if _newclass:callback_notification = property(_tbevent.callback_data_callback_notification_get, _tbevent.callback_data_callback_notification_set)
     __swig_setmethods__["next"] = _tbevent.callback_data_next_set
     __swig_getmethods__["next"] = _tbevent.callback_data_next_get
-    if _newclass:next = property(_tbevent.callback_data_next_get,_tbevent.callback_data_next_set)
-    def __init__(self,*args):
-        _swig_setattr(self, callback_data, 'this', apply(_tbevent.new_callback_data,args))
+    if _newclass:next = property(_tbevent.callback_data_next_get, _tbevent.callback_data_next_set)
+    def __init__(self, *args):
+        _swig_setattr(self, callback_data, 'this', _tbevent.new_callback_data(*args))
         _swig_setattr(self, callback_data, 'thisown', 1)
-    def __del__(self, destroy= _tbevent.delete_callback_data):
+    def __del__(self, destroy=_tbevent.delete_callback_data):
         try:
             if self.thisown: destroy(self)
         except: pass
-    def __repr__(self):
-        return "<C callback_data instance at %s>" % (self.this,)
 
 class callback_dataPtr(callback_data):
-    def __init__(self,this):
+    def __init__(self, this):
         _swig_setattr(self, callback_data, 'this', this)
         if not hasattr(self,"thisown"): _swig_setattr(self, callback_data, 'thisown', 0)
         _swig_setattr(self, callback_data,self.__class__,callback_data)
 _tbevent.callback_data_swigregister(callback_dataPtr)
+
 
 allocate_callback_data = _tbevent.allocate_callback_data
 
@@ -291,7 +295,6 @@ event_notification_set_arguments = _tbevent.event_notification_set_arguments
 event_notification_get_sender = _tbevent.event_notification_get_sender
 
 event_notification_set_sender = _tbevent.event_notification_set_sender
-
 cvar = _tbevent.cvar
 
 # -*- python -*-
