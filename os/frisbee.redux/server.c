@@ -166,7 +166,8 @@ WorkQueueEnqueue(int chunk, BlockMap_t *map, int count)
 	WQelem_t	*wqel;
 	int		elt, blocks;
 
-	assert(count > 0);
+	if (count == 0)
+		return 0;
 
 	pthread_mutex_lock(&WorkQLock);
 
@@ -352,14 +353,14 @@ ClientJoin(Packet_t *p)
 
 		for (i = 0; i < MAXCLIENTS; i++) {
 			if (clients[i].id == clientid) {
-				if (clients[i].ip != p->hdr.srcip) {
+				if (clients[i].ip != ipaddr.s_addr) {
 					log("%s reuses active client id",
 					    inet_ntoa(ipaddr));
-					clients[i].ip = p->hdr.srcip;
+					clients[i].ip = ipaddr.s_addr;
 				}
 				break;
 			}
-			if (clients[i].ip == p->hdr.srcip) {
+			if (clients[i].ip == ipaddr.s_addr) {
 				log("%s rejoins with different cid, ocid=%u",
 				    inet_ntoa(ipaddr), clients[i].id);
 				clients[i].id = clientid;
@@ -372,7 +373,7 @@ ClientJoin(Packet_t *p)
 			activeclients++;
 			if (j != -1) {
 				clients[j].id = clientid;
-				clients[j].ip = p->hdr.srcip;
+				clients[j].ip = ipaddr.s_addr;
 			}
 		}
 	}
@@ -411,16 +412,24 @@ ClientLeave(Packet_t *p)
 			if (clients[i].id == clientid) {
 				activeclients--;
 				clients[i].id = 0;
+				clients[i].ip = 0;
+				log("%s (id %u): leaves at %s, "
+				    "ran for %d seconds.  %d active clients",
+				    inet_ntoa(ipaddr), clientid,
+				    CurrentTimeString(),
+				    p->msg.leave.elapsed, activeclients);
 				break;
 			}
+		if (i == MAXCLIENTS)
+			log("%s (id %u): spurious leave ignored",
+			    inet_ntoa(ipaddr), clientid);
 	}
 #else
 	activeclients--;
-#endif
-
 	log("%s (id %u): leaves at %s, ran for %d seconds.  %d active clients",
 	    inet_ntoa(ipaddr), clientid, CurrentTimeString(),
 	    p->msg.leave.elapsed, activeclients);
+#endif
 }
 
 /*
@@ -442,20 +451,22 @@ ClientLeave2(Packet_t *p)
 		for (i = 0; i < MAXCLIENTS; i++)
 			if (clients[i].id == clientid) {
 				clients[i].id = 0;
+				clients[i].ip = 0;
 				activeclients--;
 				log("%s (id %u): leaves at %s, "
 				    "ran for %d seconds.  %d active clients",
 				    inet_ntoa(ipaddr), clientid,
 				    CurrentTimeString(),
 				    p->msg.leave2.elapsed, activeclients);
-				ClientStatsDump(p->msg.leave2.clientid,
-						&p->msg.leave2.stats);
+				ClientStatsDump(clientid, &p->msg.leave2.stats);
 				break;
 			}
+		if (i == MAXCLIENTS)
+			log("%s (id %u): spurious leave ignored",
+			    inet_ntoa(ipaddr), clientid);
 	}
 #else
 	activeclients--;
-
 	log("%s (id %u): leaves at %s, ran for %d seconds.  %d active clients",
 	    inet_ntoa(ipaddr), clientid, CurrentTimeString(),
 	    p->msg.leave2.elapsed, activeclients);
@@ -475,6 +486,9 @@ ClientRequest(Packet_t *p)
 	int		block = p->msg.request.block;
 	int		count = p->msg.request.count;
 	BlockMap_t	tmp;
+
+	if (count == 0)
+		log("WARNING: ClientRequest with zero count");
 
 	EVENT(1, EV_REQMSG, ipaddr, chunk, block, count, 0);
 	if (block + count > CHUNKSIZE)
@@ -503,6 +517,10 @@ ClientPartialRequest(Packet_t *p)
 	int		count;
 
 	count = BlockMapIsAlloc(&p->msg.prequest.blockmap, 0, CHUNKSIZE);
+
+	if (count == 0)
+		log("WARNING: ClientPartialRequest with zero count");
+
 	EVENT(1, EV_PREQMSG, ipaddr, chunk, count, p->msg.prequest.retries, 0);
 	ClientEnqueueMap(chunk, &p->msg.prequest.blockmap, count,
 			 p->msg.prequest.retries);
