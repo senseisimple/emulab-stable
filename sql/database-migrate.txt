@@ -2202,3 +2202,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table users add column usr_w_pswd tinytext after usr_pswd;
 
+1.292: Add "paniced" bit to experiments table.
+
+	alter table experiments add paniced tinyint(1) NOT NULL \
+            default '0' after security_level;
+	alter table experiments add panic_date datetime default NULL \
+            after paniced;

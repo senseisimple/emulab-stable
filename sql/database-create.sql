@@ -366,6 +366,8 @@ CREATE TABLE experiments (
   elab_in_elab tinyint(1) NOT NULL default '0',
   elabinelab_eid varchar(32) default NULL,
   security_level tinyint(1) NOT NULL default '0',
+  paniced tinyint(1) NOT NULL default '0',
+  panic_date datetime default NULL,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)
