@@ -926,9 +926,9 @@ if __name__ == "__main__":
                                     [ "help",
                                       "version",
                                       "quiet",
-                                      "user-agent",
-                                      "identity",
-                                      "ssh-opts"])
+                                      "user-agent=",
+                                      "identity=",
+                                      "ssh-opts="])
 
         for opt, val in opts:
             if opt in ("-h", "--help"):
