@@ -5,12 +5,20 @@ SUBDIR		= tbsetup/checkpass
 
 include $(OBJDIR)/Makeconf
 
-all: checkpass cracklib
+all: checkpass
+
+#
+# XXX This code needs to be "imported" in the accepted manner. This
+# is for vpath.
+#
+SRCDIR	+= $(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib
+OBJECTS  = fascist.o packlib.o rules.o stringlib.o
+CFLAGS  += -I$(TESTBED_SRCDIR)/$(SUBDIR)/cracklib,2.7/cracklib -DIN_CRACKLIB
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-checkpass: cracklib
-	${CC} -g checkpass.c cracklib,2.7/cracklib/libcrack.a -o checkpass -lm
+checkpass: checkpass.o $(OBJECTS)
+	${CC} -g -o checkpass checkpass.o $(OBJECTS) -lm
 
 cracklib:
 	gmake -C cracklib,2.7 all
@@ -18,6 +26,6 @@ cracklib:
 install:	$(INSTALL_LIBEXECDIR)/checkpass
 
 clean:
-	gmake -C cracklib,2.7 clean
+#	gmake -C cracklib,2.7 clean
 	/bin/rm -f *.o checkpass
 
