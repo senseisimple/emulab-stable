@@ -155,6 +155,12 @@ elsif (-e "/etc/ntp/drift") {
 }
 
 #
+# Initial drift value, we only update if it changes
+#
+my $lastdrift = `cat $driftfile`;
+chomp($lastdrift);
+
+#
 # Loop!
 # 
 while (1) {
@@ -171,18 +177,23 @@ while (1) {
     print "Looking for new Emulab accounts ...\n";
     system("update -i -l");
 
-    # Skip all this stuff in jail. 
+    #
+    # Do this only for "real" nodes (cluster and remote PCs)
+    #
     next
-	if (JAILED() || PLAB());
+	if (JAILED() || PLAB() || MFS());
 
     #
     # Send back ntpdrift info. Should move elsewhere.
     #
-    if (!REMOTE() && !MFS() && defined($driftfile)) {
+    if (!REMOTE() && defined($driftfile)) {
 	my $drift = `cat $driftfile`;
-	if ($drift =~ /^([-\d\.]*)$/) {
+	chomp($drift);
+	if ($drift ne $lastdrift && $drift =~ /^([-\d\.]*)$/) {
+	    print "Updating NTP drift from $lastdrift to $drift\n";
 	    # Server also checks the value for sanity.
 	    tmcc(TMCCCMD_NTPDRIFT, $1, undef, ("timeout" => 3));
+	    $lastdrift = $drift;
 	}
     }
     if (REMOTE()) {
@@ -206,7 +217,9 @@ sub startisalive()
     }
     my $failed  = 0;
     
-    print "Keep alive starting up ... \n";
+    my $date = POSIX::strftime("20%y/%m/%d %H:%M:%S", localtime());
+
+    print "Keep alive starting up at $date\n";
 
     while (1) {
 	#
