@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 use English;
 require 'ctime.pl';
 
@@ -10,6 +10,9 @@ my $SUPCHECKOUT = "/etc/testbed/sup/sup/FBSD40-STD/checkouts";
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
 my $FSTAB       = "/etc/fstab";
+my $LOGDIR      = "/var/log";
+my $RUNDIR      = "/var/run";
+my $HISTORY     = "/root/.history";
 
 #
 # Load the testbed library.
@@ -75,3 +78,34 @@ while (<TAB>) {
 close(DMP);
 close(TAB);
 
+print "Cleaning logfiles ...\n";
+opendir(LOG,$LOGDIR) or
+    die("Could not open directory $LOGDIR: $!");
+
+while ($dirent = readdir(LOG)) {
+    my $file = $LOGDIR . "/" . $dirent;
+    if (-f $file) {
+        if (($file =~ /\.\d$/) || ($file =~ /\.\d\.gz$/)) {
+            # Remove archived logfiles
+            unlink($file) or
+                die("Could not unlink $file: $!");
+        } elsif (-s $file) {
+            # Truncate other logfiles - many do not get re-created
+            truncate($file,0) or
+                die("Could not truncate $file: $!");
+        }
+    }
+}
+closedir(LOG);
+
+print "Removing root's history ...\n";
+if (-f $HISTORY) {
+    unlink($HISTORY) or
+        die("Could not unlink $HISTORY: $!");
+}
+
+print "Cleaing .pid files ...\n";
+system("rm -rf $RUNDIR/*.pid");
+
+print "Cleaing out /tmp ...\n";
+system("rm -rf /tmp/* /tmp/.??*");
