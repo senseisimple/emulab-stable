@@ -98,12 +98,13 @@ echo "<tr>
 
 
 echo "<tr>
-          <td>Use the text box to add a message to the email notification.</td>
+          <td>Use the text box (70 columns wide) to add a message to the
+              email notification. </td>
       </tr>\n";
 
 echo "<tr>
          <td align=center class=left>
-             <textarea name=message rows=5 cols=60></textarea>
+             <textarea name=message rows=15 cols=70></textarea>
          </td>
       </tr>\n";
 
