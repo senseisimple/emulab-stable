@@ -76,8 +76,8 @@ diff -ru dist-tg2.0/src/tg/log.c tg2.0/src/tg/log.c
  
 diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
 --- dist-tg2.0/src/tg/prot_dgram.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_dgram.c	Wed Mar 20 10:20:15 2002
-@@ -198,6 +198,21 @@
++++ tg2.0/src/tg/prot_dgram.c	Wed Mar 20 12:25:16 2002
+@@ -198,6 +198,22 @@
  	for (;;)
  		{
  
@@ -90,16 +90,17 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
 +			errno = ETIME;
 +			return (0);
 +			}
-+		if (tv.tv_sec > 0 || tv.tv_usec > 100000) {
++		if (tv.tv_sec > 0 || tv.tv_usec > 100000)
++			{
 +			tv.tv_sec = 0;
 +			tv.tv_usec = 100000;
-+		}
++			}
 +#endif
 +
  		/* Set up for select:  get fd bitmaps.			*/
  
  		rfds = fds;
-@@ -427,6 +442,7 @@
+@@ -427,6 +443,7 @@
  
  			if (fromlen == 0)
  				{
@@ -107,7 +108,7 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  				errno = EBADF;
  				return (-1);
  				}
-@@ -489,6 +505,7 @@
+@@ -489,6 +506,7 @@
  
  	if (!dgram_get_packets(fd, endtout))
  		{
@@ -117,8 +118,8 @@ diff -ru dist-tg2.0/src/tg/prot_dgram.c tg2.0/src/tg/prot_dgram.c
  	else
 diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
 --- dist-tg2.0/src/tg/prot_stream.c	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/prot_stream.c	Wed Mar 20 10:21:08 2002
-@@ -147,6 +147,19 @@
++++ tg2.0/src/tg/prot_stream.c	Wed Mar 20 12:25:06 2002
+@@ -147,6 +147,22 @@
  	for (;;)
  		{
  
@@ -131,14 +132,17 @@ diff -ru dist-tg2.0/src/tg/prot_stream.c tg2.0/src/tg/prot_stream.c
 +			errno = ETIME;
 +			return (0);
 +			}
-+		tv.tv_sec = 0;
-+		tv.tv_usec = 10000;
++		if (tv.tv_sec > 0 || tv.tv_usec > 100000)
++			{
++			tv.tv_sec = 0;
++			tv.tv_usec = 100000;
++			}
 +#endif
 +
  		/* Set up for select:  get fd bitmaps.			*/
  
  		rfds = fds;
-@@ -440,6 +453,7 @@
+@@ -440,6 +456,7 @@
  	    /* new connections while we are waiting to write.		*/
  
              if (!stream_get_packets(fd, endtout)) {
@@ -192,7 +196,7 @@ diff -ru dist-tg2.0/src/tg/prot_udp.c tg2.0/src/tg/prot_udp.c
  	        {
 diff -ru dist-tg2.0/src/tg/tg.y tg2.0/src/tg/tg.y
 --- dist-tg2.0/src/tg/tg.y	Thu Jan 24 16:30:10 2002
-+++ tg2.0/src/tg/tg.y	Wed Mar 13 09:16:49 2002
++++ tg2.0/src/tg/tg.y	Wed Mar 20 12:23:02 2002
 @@ -133,7 +133,10 @@
  char                    *version = "2.0";	/* TG program version.	*/
  char			*ofile = NULL;

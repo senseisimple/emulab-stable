@@ -30,6 +30,10 @@ extern int		gotevent;
 extern protocol		prot;
 extern tg_action	*tg_first;
 
+extern double dist_const_gen(distribution *);
+extern char *dist_const_init(distribution *, double);
+
+
 static void
 callback(event_handle_t handle,
 	 event_notification_t notification, void *data);
@@ -250,8 +254,6 @@ tgevent_shutdown(void)
 static int
 parse_args(char *buf, tg_action *tg)
 {
-	extern double dist_const_gen(distribution *);
-	extern char *dist_const_init(distribution *, double);
 	int psize, rate;
 	double interval;
 	char *cp;
@@ -301,16 +303,16 @@ parse_args(char *buf, tg_action *tg)
 		return(EINVAL);
 	}
 	if (interval > MAX_INTERVAL) {
-		fprintf(stderr, "%s: invalid packet interval %f\n",
+		fprintf(stderr, "%s: invalid packet interval %.9f\n",
 			progname, interval);
 		return(EINVAL);
 	}
 	dist_const_init(&tg->arrival, interval);
-	dist_const_init(&tg->length, psize);
+	dist_const_init(&tg->length, (double)psize);
 	tg->tg_flags |= (TG_ARRIVAL|TG_LENGTH);
 
 #if 0
-	fprintf(stderr, "parse_args: new psize=%d, interval=%f\n",
+	fprintf(stderr, "parse_args: new psize=%d, interval=%.9f\n",
 		psize, interval);
 #endif
 
@@ -338,11 +340,15 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	event_notification_get_arguments(handle, notification, buf[7], len);
 
 #ifdef EVENTDEBUG
-	gettimeofday(&now, NULL);
-	fprintf(stderr, "Event: %lu.%03lu %s %s %s %s %s %s %s %s\n",
-		now.tv_sec, now.tv_usec / 1000,
-		buf[0], buf[1], buf[2], 
-		buf[3], buf[4], buf[5], buf[6], buf[7]);
+	{
+		static int ecount;
+
+		gettimeofday(&now, NULL);
+		fprintf(stderr, "Event %d: %lu.%03lu %s %s %s %s %s %s %s %s\n",
+			++ecount, now.tv_sec, now.tv_usec / 1000,
+			buf[0], buf[1], buf[2],
+			buf[3], buf[4], buf[5], buf[6], buf[7]);
+	}
 #endif
 
 	/*
@@ -374,15 +380,16 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 
 			/*
 			 * Delay startup of source relative to sink
+			 * by 0.5 seconds.
 			 */
 			if ((prot.qos & QOS_SERVER) == 0) {
 				now.tv_sec = 0;
-				now.tv_usec = 10000;
+				now.tv_usec = 1000000 / 2;
 				select(0, NULL, NULL, NULL, &now);
 			}
 #ifdef EVENTDEBUG
 			gettimeofday(&now, NULL);
-			fprintf(stderr, "%lu.%03lu: SETUP, exp=%s\n",
+			fprintf(stderr, "%lu.%03lu: SETUP exp=%s\n",
 				now.tv_sec, now.tv_usec / 1000,
 				myexp ? myexp : buf[1]);
 #endif
@@ -448,9 +455,20 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		else if (parse_args(buf[7], tg_first) != 0)
 			fprintf(stderr, "MODIFY invalid params\n");
 #ifdef EVENTDEBUG
-		gettimeofday(&now, NULL);
-		fprintf(stderr, "%lu.%03lu: MODIFY\n",
-			now.tv_sec, now.tv_usec / 1000);
+		else {
+			int plen;
+			double interval, bps;
+
+			plen = (int)dist_const_gen(&tg_first->length);
+			interval = dist_const_gen(&tg_first->arrival);
+			bps = (plen * 8) * (1.0 / interval);
+
+			gettimeofday(&now, NULL);
+			fprintf(stderr, "%lu.%03lu: MODIFY length=%d bytes, "
+				"interval=%.9f sec (rate=%f Kbps)\n",
+				now.tv_sec, now.tv_usec / 1000, plen,
+				interval, bps / 1000);
+		}
 #endif
 	}
 	gotevent = 1;
