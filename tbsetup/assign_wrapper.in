@@ -234,6 +234,7 @@ foreach $node (keys(%nodes)) {
 
 foreach $lan (keys(%lans)) {
     @members = @{$lans{$lan}};
+    printdb "$lan - " . join(" ",@members) . "\n";
     if ($#members == 1) {
 	($nodeport0,$nodeport1) = @members;
 	$node0 = (split(":",$nodeport0))[0];
@@ -242,14 +243,13 @@ foreach $lan (keys(%lans)) {
 	($delay1,$bw1,$loss1) = @{$delayinfo{"$lan:$nodeport1"}};
 	$delay = $delay0+$delay1;
 	$loss = 1-(1-$loss0)*(1-$loss1);
+	$bw = &min($bw0,$bw1);
 	$bandwidth = &getbandwidth(&min($bw0,$bw1));
 	if (($delay > $delaythresh) ||
-	    ($bandwidth != 100) ||
+	    ($bw != 100) ||
 	    ($loss != 0)) {
 	    $delayname = "tbsdelay$delayid";
-	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,
-						 &min($bw0,$bw1),
-						 $loss];
+	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss];
 	    printdb "Delay node linksdelaysrc/$lan ($delayname) = " . 
 		join(" ",@{$delaynodes{"linksdelaysrc/$lan"}}) . "\n";
 	    $delayid++;
