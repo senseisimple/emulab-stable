@@ -29,6 +29,8 @@ use Exporter;
 	 TB_USERINFO_READINFO TB_USERINFO_MODIFYINFO
 	 TB_USERINFO_MIN TB_USERINFO_MAX
 
+	 USERSTATUS_ACTIVE USERSTATUS_FROZEN	 
+
 	 TB_EXPT_READINFO TB_EXPT_MODIFY TB_EXPT_DESTROY
 	 TB_EXPT_MIN TB_EXPT_MAX
 
@@ -126,6 +128,9 @@ sub BATCHSTATE_POSTED()		{ "posted"; }
 sub BATCHSTATE_ACTIVATING()	{ "activating"; }
 sub BATCHSTATE_RUNNING()	{ "active"; }
 sub BATCHSTATE_TERMINATING()	{ "terminating"; }
+
+sub USERSTATUS_ACTIVE()		{ "active"; }
+sub USERSTATUS_FROZEN()		{ "frozen"; }
 
 #
 # We want valid project membership to be non-zero for easy membership
