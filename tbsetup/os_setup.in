@@ -598,12 +598,12 @@ sub WaitTillAlive ($) {
 	$waittime = time - $waitstart{$pc};
 	if ($waittime > $maxwait) {
 	    $minutes = int($waittime / 60);
-	    print "*** $pc appears dead - its been $minutes minute(s).\n";
+	    print "*** $pc appears dead - it's been $minutes minute(s).\n";
 	    return 1;
 	}
 	if (int($waittime / 60) > $minutes) {
 	    $minutes = int($waittime / 60);
-	    print "Still waiting for $pc - its been $minutes minute(s).\n";
+	    print "Still waiting for $pc - it's been $minutes minute(s).\n";
 	}
 	sleep(1);
     }
