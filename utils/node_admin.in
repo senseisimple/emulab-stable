@@ -20,7 +20,9 @@ sub usage()
     print STDOUT "-e   Operate on all nodes in an experiment\n";
     exit(-1);
 }
-my  $optlist = "hnwe:";
+my $optlist  = "hnwe:";
+my $waitmode = 0;
+my $reboot   = 1;
 
 #
 # Configure variables
@@ -33,6 +35,7 @@ my $TB		= "@prefix@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use StateWait;
 
 #
 # Turn off line buffering on output
@@ -61,9 +64,16 @@ my @nodes       = ();
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if ($options{h}) {
+if (defined($options{h})) {
     usage();
 }
+if (defined($options{"n"})) {
+    $reboot = 0;
+}
+if (defined($options{"w"})) {
+    $waitmode = 1;
+}
+
 if (!@ARGV) {
     usage();
 }
@@ -170,12 +180,46 @@ DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
 #
 # Reboot nodes
 #
-if (!$options{n}) {
-    my $optarg = ($options{"w"} ? "-w" : "");
-	
-    if (system("$nodereboot $optarg @nodes")) {
+if ($reboot) {
+    if ($waitmode) {
+	#
+	# Initialize the statewait library.
+	#
+	my @states   = (TBDB_NODESTATE_MFSSETUP(), TBDB_NODESTATE_ISUP());
+	my @finished = ();
+	my @failed   = ();
+    
+	if (initStateWait(\@states, @nodes)) {
+	    die("*** $0:\n".
+		"    Failed to initialize the statewait library!\n");
+	}
+    }
+
+    # Reboot nodes *after* setting up statewait above.
+    if (system("$nodereboot @nodes")) {
 	die("*** $0:\n".
 	    "    WARNING: Could not reboot some nodes!\n");
+    }
+
+    if ($waitmode) {
+	#
+	# Initialize the statewait library.
+	#
+	my @finished = ();
+	my @failed   = ();
+	my $timeout  = 6 * 60;
+
+	print STDOUT "node_admin: Waiting for nodes to come up.\n";
+	
+	# Now we can statewait.
+	if (waitForState(\@finished, \@failed, $timeout)) {
+	    die("*** $0:\n".
+		"    Failed in waitForState!\n");
+	}
+	if (@failed) {
+	    die("*** $0:\n".
+		"    Failed to boot MFS: @failed\n");
+	}
     }
 }
 exit(0);
