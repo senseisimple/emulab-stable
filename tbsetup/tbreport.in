@@ -221,6 +221,7 @@ $result =
 		 " from eventlist as ex ".
 		 "left join event_eventtypes as et on ex.eventtype=et.idx ".
 		 "left join event_objecttypes as ot on ex.objecttype=ot.idx ".
+		 "where ex.pid='$pid' and ex.eid='$eid' ".
 		 "order by time");
 
 if ($result->numrows) {
