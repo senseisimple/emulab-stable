@@ -56,7 +56,7 @@ foreach (split("\n",$raw)) {
     $type = $info[1];
     $nodetype{$node} = $type;
     if (! defined($ostype{$type})) {
-	$sth = $dbh->prepare("SELECT osid from os_info ".
+	$sth = $dbh->prepare("SELECT osid from node_types ".
 			     "where machinetype=\"$type\"");
 	$rr = $sth->execute;
 	if ($rr == 0) {
