@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -wT
 
 ### 
-### $Id: rmacct,v 1.4 2000-11-21 10:49:47 kwright Exp $
+### $Id: rmacct,v 1.5 2000-11-28 23:11:12 kwright Exp $
 ###
 ### rmacct - Removes accounts for all users in given experiment.
 ###
@@ -244,3 +244,39 @@ foreach $IP (@nodes) {
 }
 
 
+### Remove any tip line processes that might exist for the users
+### on each machine.
+
+##
+## Select node_ids
+##
+print "Selecting node_ids...";
+$cmd = 
+  "select ip.node_id from interfaces as ip ".
+  "left join reserved as r on r.node_id=ip.node_id ".
+  "left join experiments as e on r.eid = e.eid ".
+  "where e.eid = '$eid'";
+$sth = $dbh->query($cmd);
+my @node_ids = ();
+while (@row = $sth->fetchrow_array) {
+    push(@node_ids, $row[0]);
+    print " $row[0] ";
+}
+print "\n";
+
+print "Removing tip line processes on local node:\n";
+foreach $user (@users) {
+    foreach $node_id (@node_ids) {
+	print "$user $node_id\n";
+	if ($user =~ /^(([a-z]|\d)+)$/) {
+	    $u = $1;
+	    if ($node_id =~ /^tb(pc|sh)([0-9])+$/) {
+		$n = $1;
+		print "\tkilltip $user $node_id\n";
+		open (KILLTIP, "/usr/testbed/bin/killtip $u $n 2>&1 |");
+		while ( <KILLTIP> ) { print "$_"; }
+	    }
+	}
+    }
+}
+print "\n";
