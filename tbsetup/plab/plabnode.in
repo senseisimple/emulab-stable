@@ -78,7 +78,8 @@ def main(args):
         try:
             node = slice.loadNode(nodeid)
         except:
-            print "free: Node %s wasn't really allocated" % nodeid
+            print "free: Node %s doesn't appear to be allocated to %s/%s" % \
+                  (nodeid, pid, eid)
             sys.exit(1)
 
         node.free()

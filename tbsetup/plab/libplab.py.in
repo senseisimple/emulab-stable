@@ -742,7 +742,7 @@ class Node:
                      "\n\n%s" % (self.nodeid, tbstr), TBOPS)
             pass
 
-        deleted = self.plab.agent.freeNode(self)
+        deleted = self.slice.plab.agent.freeNode(self)
         
         TIMESTAMP("freenode %s finished." % self.nodeid)
         return not deleted
@@ -759,7 +759,7 @@ class Node:
 
     def _renew(self):
         res, self.nodemeta, self.leaseend = \
-                       self.plab.agent.renewNode(self)
+                       self.slice.plab.agent.renewNode(self)
         DBQueryFatal("update plab_slice_nodes"
                      " set nodemeta = %s, leaseend = %s"
                      " where node_id = %s",
