@@ -1202,6 +1202,7 @@ CREATE TABLE widearea_privkeys (
   user_email tinytext NOT NULL,
   cdkey varchar(64) default NULL,
   nextprivkey varchar(64) default NULL,
+  rootkey varchar(64) default NULL,
   requested datetime NOT NULL default '0000-00-00 00:00:00',
   updated datetime NOT NULL default '0000-00-00 00:00:00',
   PRIMARY KEY  (privkey,IP)
