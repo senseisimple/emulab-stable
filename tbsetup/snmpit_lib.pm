@@ -9,7 +9,8 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum Dev vlanmemb vlanid
 		getTestSwitches getVlanPorts getExperimentVlans getDeviceNames
-	    	getDeviceType mapPortsToDevices getSwitchStack tbsort );
+	    	getDeviceType getInterfaceSettings mapPortsToDevices
+		getSwitchStack tbsort );
 
 use English;
 use libdb;
@@ -244,6 +245,32 @@ sub getDeviceType ($) {
     }
 
     return $row[0];
+}
+
+#
+# Returns (current_speed,duplex) for the given interface (in node:port form)
+#
+sub getInterfaceSettings ($) {
+
+    my ($interface) = @_;
+
+    $interface =~ /^(.+):(\d+)$/;
+    my ($node, $port) = ($1, $2);
+    if ((!defined $node) || (!defined $port)) {
+	die "getInterfaceSettings: Bad interface ($interface) given\n";
+    }
+
+    my $result =
+	DBQueryFatal("SELECT current_speed, duplex FROM interfaces " .
+		     "WHERE node_id='$node' and card=$port");
+
+    my @row = $result->fetchrow();
+    # Sanity check - make sure the interface exists
+    if (!@row) {
+	die "No such interface: $interface\n";
+    }
+
+    return @row;
 }
 
 #

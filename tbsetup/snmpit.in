@@ -538,6 +538,7 @@ $port,    $inoctets, $inunicast,$innunicast,$indiscards,$inerr,  $inunk,    $out
 
     return 0;
 }
+
 #
 # Creates all VLANs given. Looks up identifiers in the database to determine
 # the membership.
@@ -566,7 +567,29 @@ sub doVlansFromTables(@) {
 		#
 		$errors++;
 	    } else {
-		$errors += $stack->setPortVlan($vlan,@ports);
+		my $setErrors = $stack->setPortVlan($vlan,@ports);
+		$errors += $setErrors;
+
+		#
+		# Set the speed and duplex of each interface depending on the
+		# value in the database
+		#
+		if (!$setErrors) {
+		    foreach my $port (@ports) {
+			my ($speed,$duplex) = getInterfaceSettings($port);
+			#
+			# If either is not set, we do nothing. We could make
+			# a 0 mean 'auto'
+			#
+			if ($speed) {
+			    my $cmd = $speed . "mbit";
+			    $errors += $stack->portControl($cmd, $port);
+			}
+			if ($duplex) {
+			    $errors += $stack->portControl($duplex, $port);
+			}
+		    }
+		}
 	    }
 	}
     }
