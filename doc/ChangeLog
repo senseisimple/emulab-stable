@@ -1,3 +1,17 @@
+ricci       2004/02/27 16:36:37 MST
+
+  Modified files:
+    www                  showimageid.php3 showosinfo.php3
+                         showstuff.php3
+  Log:
+  Add a function to showstuff.php3 to display all experiments using a
+  given OSID, and include this view on the image and osinfo pages.
+
+  Revision  Changes    Path
+  1.13      +37 -1     testbed/www/showimageid.php3
+  1.8       +11 -1     testbed/www/showosinfo.php3
+  1.127     +66 -0     testbed/www/showstuff.php3
+
 stoller     2004/02/17 15:06:34 MST
 
   Modified files:
