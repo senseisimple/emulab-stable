@@ -22,7 +22,7 @@ include Makeconf
 #
 SUBDIRS = lib db assign @optional_subdirs@ discvr ipod security sensors \
 		pxe tbsetup account tmcd utils www tip capture ipod vis \
-		sensors 
+		sensors os
 
 all:		all-subdirs
 
