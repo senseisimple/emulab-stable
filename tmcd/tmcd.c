@@ -935,8 +935,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * XXX: We allow remote nodes to use UDP for isalive/rusage only!
 	 */
 	if (!istcp && !reqp->islocal &&
-	    (command_array[i].func != doisalive ||
-	     command_array[i].func != dorusage)) {
+	    !(command_array[i].func == doisalive ||
+	      command_array[i].func == dorusage)) {
 		error("%s: Invalid request (%s) from remote node using UDP!\n",
 		      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
