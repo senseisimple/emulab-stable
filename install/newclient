@@ -118,7 +118,7 @@ sub usage {
 if (!$bossnode) {
     my $bossinfo = `$TMCC bossinfo`;
     $bossinfo =~ /^([\w\-.]+)/;
-    my $bossnode = $1;
+    $bossnode = $1;
     if (!$bossnode) {
 	error_fatal($ERROR_NOBOSS,"Unable to parse boss name from '$bossinfo'\n");
     }
