@@ -48,6 +48,9 @@ if ( -e "/usr/testbed/etc/power.conf") {
 } elsif ( -e "power.conf" ) {
     open(CONF,"power.conf") 
 	|| die("Couldn't open power.conf\n");
+} elsif ( -e "/home/newbold/switch/power.conf" ) {
+    open(CONF,"/home/newbold/switch/power.conf") 
+	|| die("Couldn't open /home/newbold/switch/power.conf\n");
 } else {
     die("Couldn't locate power.conf configuration file.\n");
 }
