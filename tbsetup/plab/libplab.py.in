@@ -594,14 +594,17 @@ class Plab:
         from signal import signal, alarm, SIGALRM
         from traceback import format_exception_only
         from xmlrpclib import Fault
+
+        # Setup alarm handler
+        class TimeoutError(StandardError): pass
+        def alrmhandler(signum, frame): raise TimeoutError
+        signal(SIGALRM, alrmhandler)
+
         endtime = int(time.mktime(time.gmtime())) + RENEW_TIME
         res = DBQueryFatal("select pid, eid, node_id from plab_slice_nodes"
                            " where %s > unix_timestamp(leaseend)",
                            (endtime, ))
         loadedSlices = {}
-        class TimeoutError(StandardError): pass
-        def alrmhandler(signum, frame): raise TimeoutError
-        signal(SIGALRM, alrmhandler)
         for pid, eid, nodeid in res:
             try:
                 slice = loadedSlices[(pid, eid)]
@@ -609,10 +612,9 @@ class Plab:
                 slice = self.loadSlice(pid, eid)
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
+            alarm(RENEW_TIMEOUT)
             try:
-                alarm(RENEW_TIMEOUT)
                 node.renew()
-                alarm(0)
             except TimeoutError:
                 print "Timeout waiting for renewal of sliver %s" % nodeid
             except Fault, e:
@@ -622,6 +624,7 @@ class Plab:
                 tb = "".join(format_exception_only(*sys.exc_info()[:2]))
                 print "unknown exception while trying to renew %s\n%s" % \
                       (nodeid, tb)
+            alarm(0)
 
     def _createAgentProxy(self, insecure = False):
         """
