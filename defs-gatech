@@ -1,0 +1,99 @@
+#
+# This is a definitions file for configure, customized for Georgia Tech
+#
+# Use the --with-TBDEFS=filename to specify your own file.
+# If you add a variable, be sure to go and update configure.in.
+#
+
+# The name of this installation
+THISHOMEBASE=NETLAB.CC.GATECH.EDU
+
+#
+# Various domain and host names
+#
+
+# Domain this testbed resides in
+OURDOMAIN=netlab.cc.gatech.edu
+
+# Host name of our web server (or host:port)
+WWWHOST=www.netlab.cc.gatech.edu
+
+# Fully-quailified hostname of the boss node
+BOSSNODE=boss.netlab.cc.gatech.edu
+
+# Fully-quailified hostname of the ops (also called users) node
+USERNODE=ops.netlab.cc.gatech.edu
+
+# Fully-quailified hostname of the fileserver (will probably be the same
+# as the ops node)
+FSNODE=ops.netlab.cc.gatech.edu
+
+# 
+# Addresses to which email will be sent - These are expected to go to mailing
+# lists. You can either host the lists on your ops node, send them off to
+# some external server. If you chose to run them from the ops node, the
+# ops-install script sets up empty lists for you.
+#
+
+# Main address for the 'operations staff' - Copies of error messages, etc. will
+# get sent to this address, and in some cases users are directed to this
+# address if they have questions and/or problems.
+TBOPSEMAIL=netlab-ops@cc.gatech.edu
+
+# Notification of new projects requests get sent to this address for approval.
+# Should have a few admin-types on it.
+TBAPPROVALEMAIL=netlab-admin@cc.gatech.edu
+
+# Logs, such as experiment creation/deletion go to this address. Probably no
+# more than one person needs to be on this one.
+TBLOGSEMAIL=netlab-log@cc.gatech.edu
+
+# Various auditing message about account maintenance go here. Again, probably
+# only needs one member.
+TBAUDITEMAIL=netlab-log@cc.gatech.edu
+
+# Some web reports get sent to this one.
+TBWWWEMAIL=netlab-ops@cc.gatech.edu
+
+# Our node state management daemon sends mail to this address. Someone should
+# be on this list, and reporting persistent error messages to Utah would be a
+# good idea.
+TBSTATEDEMAIL=netlab-log@cc.gatech.edu
+
+# We have a test suite to test the front end. This email is for the results
+# of the testsuite, but is not used yet.
+TBTESTSUITEEMAIL=netlab-log@cc.gatech.edu
+
+# We dynamically create two email addresses for notifications to users - one
+# for all testbed users, and one for all users whose projects have active
+# experiments. These addresses are included in the above lists, with the
+# intent that they can be used to archive all mail sent to them.
+# XXX - ricci - I just have these going to the ops list right now, until
+# an actual archive gets set up. Or maybe we don't need to do any archive,
+# 'cause mailman will achive these?
+TBUSERSARCHIVE=netlab-ops@cc.gatech.edu
+TBACTIVEARCHIVE=netlab-ops@cc.gatech.edu
+
+#
+# Real paths (no symlinks) to the directories that get exported from ops
+#
+FSDIR_GROUPS=/z/groups
+FSDIR_PROJ=/z/proj
+FSDIR_USERS=/z/users
+FSDIR_SHARE=/share
+FS_WITH_QUOTAS="/z"
+
+#
+# You shouldn't have to change anything below this point
+#
+
+TBADMINGROUP=tbadmin
+TBDBNAME=tbdb
+IPBASE=192.168
+DELAYCAPACITY=2
+SFSSUPPORT=0
+DISABLE_NSE=1
+
+# Sometimes the main page is down in a directory on WWWHOST
+# No trailing '/'!
+#WWW=www.example.emulab.net/emulab-www
