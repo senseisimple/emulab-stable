@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,6 +24,12 @@ if (!isset($pid) ||
 if (!isset($eid) ||
     strcmp($eid, "") == 0) {
     USERERROR("You must provide an Experiment ID.", 1);
+}
+if (!isset($sortby)) {
+    if ($pid == $TBOPSPID)
+	$sortby = "rsrvtime-down";
+    else
+	$sortby = "";
 }
 $exp_eid = $eid;
 $exp_pid = $pid;
@@ -193,7 +199,7 @@ SUBPAGEEND();
 #
 # Dump the node information.
 #
-SHOWNODES($exp_pid, $exp_eid);
+SHOWNODES($exp_pid, $exp_eid, $sortby);
 
 if (ISADMIN($uid)) {
     echo "<center>

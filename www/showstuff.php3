@@ -957,43 +957,66 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 #
 # Show Node information for an experiment.
 #
-function SHOWNODES($pid, $eid) {
-    global $TBDBNAME;
-    global $TBOPSPID;
-    global $altnodesort;
+function SHOWNODES($pid, $eid, $sortby) {
     global $SCRIPT_NAME;
+    global $TBOPSPID;
     
-    $reserved_result =
-	DBQueryFatal("select * from reserved as r " .
-		     "where r.eid='$eid' and r.pid='$pid'");
-    
-    # If this is an expt in emulab-ops, we don't care about vname,
-    # since it won't be defined. But we do want to know when the node
-    # entered the experiment, since it won't match the experiment's
-    # swapin date.
-    $nodename="<a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=1\">".
-	"Name</a>";
-    $vnamefield="vname";
-    if (!strcmp($pid, $TBOPSPID)) {
-      $nodename="<a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=2\">".
-	  "Reserve Time</a>";
-      $vnamefield="rsrvtime";
-      if (!isset($altnodesort)) { $altnodesort = 2; }
+    #
+    # If this is an expt in emulab-ops, we also want to see the reserved
+    # time. Note that vname might not be useful, but show it anyway.
+    #
+    # XXX The above is not always true. There are also real experiments in
+    # emulab-ops.
+    #
+    if (!isset($sortby)) {
+	$sortclause = "n.type,n.priority";
+    }
+    elseif ($sortby == "vname") {
+	$sortclause = "r.vname";
+    }
+    elseif ($sortby == "rsrvtime-up") {
+	$sortclause = "rsrvtime asc";
+    }
+    elseif ($sortby == "rsrvtime-down") {
+	$sortclause = "rsrvtime desc";
+    }
+    elseif ($sortby == "nodeid") {
+	$sortclause = "n.node_id";
+    }
+    else {
+	$sortclause = "n.type,n.priority";
     }
 
-    if (mysql_num_rows($reserved_result)) {
-
-	if (!isset($altnodesort)) { $altnodesort = 1; }
-	
+    $query_result =
+	DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
+		     " ns.status as nodestatus, ".
+		     " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
+		     "from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type ".
+		     "left join node_status as ns on ns.node_id=r.node_id ".
+		     "WHERE r.eid='$eid' and r.pid='$pid' ".
+		     "ORDER BY $sortclause");
+    
+    if (mysql_num_rows($query_result)) {
 	echo "<center>
               <h3>Reserved Nodes</h3>
               </center>
               <table align=center border=1>
               <tr>
-                <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid&altnodesort=0\">".
-	            "Node ID</a></th>
-                <th>$nodename</th>
-                <th>Type</th>
+                <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
+	                        "&sortby=nodeid\">Node ID</a></th>
+                <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
+	                 "&sortby=vname\">Name</a></th>\n";
+	if ($pid == $TBOPSPID) {
+	    echo "<th>Reserved<br>
+                      <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
+		         "&sortby=rsrvtime-up\">Up</a> or 
+                      <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
+		         "&sortby=rsrvtime-down\">Down</a>
+                  </th>\n";
+	}
+	echo "  <th>Type</th>
                 <th>Default OSID</th>
                 <th>Node<br>Status</th>
                 <th>Hours<br>Idle[<b>1</b>]</th>
@@ -1003,30 +1026,13 @@ function SHOWNODES($pid, $eid) {
                 <th><a href=\"faq.php3#UTT-TUNNEL\">Console</a></th>
               </tr>\n";
 
-	$sort = "n.type,n.priority";
-	if ($altnodesort==1) {
-	    $sort = "r.vname";
-	} elseif ($altnodesort==2) {
-	    $sort = "rsrvtime";
-	} # Can add other alt sorts here too
-	
-	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode, ".
-		" ns.status as nodestatus, ".
-		" date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
-	        "from reserved as r ".
-		"left join nodes as n on n.node_id=r.node_id ".
-		"left join node_types as nt on nt.type=n.type ".
-		"left join node_status as ns on ns.node_id=r.node_id ".
-	        "WHERE r.eid='$eid' and r.pid='$pid' ".
-	        "ORDER BY $sort");
-
 	$stalemark = "<b>?</b>";
 	$count = 0;
 
 	while ($row = mysql_fetch_array($query_result)) {
 	    $node_id = $row[node_id];
-	    $vname   = $row[$vnamefield];
+	    $vname   = $row[vname];
+	    $rsrvtime= $row[rsrvtime];
 	    $type    = $row[type];
 	    $def_boot_osid = $row[def_boot_osid];
 	    $startstatus   = $row[startstatus];
@@ -1053,8 +1059,10 @@ function SHOWNODES($pid, $eid) {
 	    echo "<tr>
                     <td><A href='shownode.php3?node_id=$node_id'>$node_id</a>
                         </td>
-                    <td>$vname</td>
-                    <td>$type</td>\n";
+                    <td>$vname</td>\n";
+	    if ($pid == $TBOPSPID)
+		echo "<td>$rsrvtime</td>\n";
+            echo "  <td>$type</td>\n";
 	    if ($def_boot_osid) {
 		echo "<td>";
 		SPITOSINFOLINK($def_boot_osid);
@@ -1101,8 +1109,6 @@ function SHOWNODES($pid, $eid) {
 # Show OS INFO record.
 #
 function SHOWOSINFO($osid) {
-    global $TBDBNAME;
-		
     $query_result =
 	DBQueryFatal("SELECT * FROM os_info WHERE osid='$osid'");
 
@@ -1244,8 +1250,6 @@ function SHOWOSINFO($osid) {
 # Show ImageID record.
 #
 function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
-    global $TBDBNAME;
-		
     $query_result =
 	DBQueryFatal("select * from images where imageid='$imageid'");
 
