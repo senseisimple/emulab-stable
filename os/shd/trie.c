@@ -106,7 +106,7 @@ int TrieInit(Trie ** trieOutPtr, BlockAllocateFunction blockAlloc,
         result = 1;
         if (trie == 0)
         {
-            printf ("Error doing TrieInit! Not enough memory!\n");
+            printf ("Error allocating memory for TrieInit\n");
             result = 0;
         }
         else
@@ -316,7 +316,43 @@ static int insertWeak(Trie * triePtr, TrieNode * node, TrieKey key,
     while (!done)
     {
         node = search(node, key, maxDepth);
-        if (isBranch(node))
+        if (node->depth == node->maxDepth && isLeaf(node))
+        {
+            /* The current node is larger than our insertion.
+               Nothing to do. */
+            total = 0;
+            done = 1;
+        }
+        else if (node->depth == maxDepth)
+        {
+            /* We don't want to go below this level.
+               We are weak, so we have to break up the range
+               and insert smaller blocks */
+
+            /* There are two possibilities at this point. Either the
+               node is a leaf and we are a superset of a single
+               range. Or the node is a branch and there are many
+               possible subranges which are being used. */
+            if (isLeaf(node))
+            {
+                /* The node is a leaf, so we have a single range to
+                   work around. */
+                total = weakOverlap(triePtr, node, key, maxDepth);
+            }
+            else
+            {
+                /* The node is a branch, so there are many ranges to
+                   work around. The easiest way to solve this is to
+                   split the problem in two and try to
+                   re-insert. Eventually, this should resolve itself
+                   to the other cases as we recurse. */
+                insertWeak(triePtr, node, key, maxDepth+1);
+                insertWeak(triePtr, node, key + depthToSize(maxDepth+1),
+                           maxDepth+1);
+            }
+            done = 1;
+        }
+        else if (isBranch(node))
         {
             /* If the node is a branch, we just insert ourselves. */
             TrieValue value = (triePtr->blockAlloc)(depthToSize(maxDepth));
@@ -331,21 +367,6 @@ static int insertWeak(Trie * triePtr, TrieNode * node, TrieKey key,
             {
                 total = -1;
             }
-            done = 1;
-        }
-        else if (node->depth == node->maxDepth)
-        {
-            /* The current node is larger than our insertion.
-               Nothing to do. */
-            total = 0;
-            done = 1;
-        }
-        else if (node->depth == maxDepth)
-        {
-            /* We don't want to go below this level.
-               We are weak, so we have to break up the range
-               and insert smaller blocks */
-            total = weakOverlap(triePtr, node, key, maxDepth);
             done = 1;
         }
         else
@@ -369,18 +390,18 @@ static int insertStrong(Trie * triePtr, TrieNode * node, TrieKey key,
     while (!done)
     {
         node = search(node, key, maxDepth);
-        if (isBranch(node))
-        {
-            /* If the node is a branch, we just insert ourselves. */
-            total = addChild(triePtr, node, key, maxDepth, value);
-            done = 1;
-        }
-        else if (node->depth == maxDepth)
+        if (node->depth == maxDepth)
         {
             /* We don't want to go below this level.
                We are strong, just replace whatever is here because
                it must be a subset of this level. */
             total = replace(triePtr, node, key, maxDepth, value, overlap);
+            done = 1;
+        }
+        else if (isBranch(node))
+        {
+            /* If the node is a branch, we just insert ourselves. */
+            total = addChild(triePtr, node, key, maxDepth, value);
             done = 1;
         }
         else if (node->depth == node->maxDepth)
@@ -425,7 +446,7 @@ static int addChild(Trie * triePtr, TrieNode * parent, TrieKey key,
     }
     else
     {
-        printf ("Error doing addChild for Trie! Not enough memory!\n");
+        printf ("Error allocating memory for addChild\n");
         result = -1;
     }
     return result;
@@ -476,6 +497,7 @@ static void freeChildren(Trie * triePtr, TrieNode * node, OverlapT overlap)
 , M_DEVBUF
 #endif
             );
+            node->child[i] = 0;
         }
     }
 }
@@ -579,7 +601,7 @@ static TrieNode * pushDown(Trie * triePtr, TrieNode * node)
     }
     else
     {
-        printf ("Error doing pushDown for Trie! Not enough memory!\n");
+        printf ("Error allocating memory for pushDown\n");
         middle = 0;
     }
     return middle;
