@@ -329,9 +329,6 @@ sub mkrootfs($)
     # Find a free vndevice.
     #
     for (my $i = 0; $i < $MAXVNDEVS; $i++) {
-	# Make sure the dev entries exist!
-	mysystem("(cd /dev; ./MAKEDEV vn${i})");
-	
 	system("vnconfig -c vn${i} root.vnode");
 	if (! $?) {
 	    $vndevice = $i;
@@ -402,9 +399,15 @@ sub mkrootfs($)
     mysystem("cd $path/root/dev; cp -p /dev/MAKEDEV .; ./MAKEDEV $makedevs");
 
     # Remove some extraneous devices.
-    mysystem("cd $path/root/dev; rm -f pci io klog console; ".
-	     "ln -sf null console");
+    mysystem("cd $path/root/dev; rm -f pci io klog console; ");
     
+    #
+    # "Link" /dev/console to /dev/null
+    # We actually create a separate special file rather than just linking
+    # in case anyone mucks with the permissions on /dev/console.
+    #
+    mysystem("cd $path/root/dev; hier cp null console; chmod 600 console");
+
     #
     # Create stub /var and create the necessary log files.
     #
