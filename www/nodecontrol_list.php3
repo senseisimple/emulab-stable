@@ -270,8 +270,8 @@ echo "<br><center><b>
 
 if (! strcmp($showtype, "widearea")) {
     echo "<br>
-          <a href=widearea_info.php3>(Widearea Info)</a><br>
-          <a href=plabmetrics.php3>(PlanetLab Metrics)</a>\n";
+          <a href=widearea_info.php3>(Widearea Link Metrics)</a><br>
+          <a href=plabmetrics.php3>(PlanetLab Node Metrics)</a>\n";
 }
 
 echo "</b></center><br>\n";
