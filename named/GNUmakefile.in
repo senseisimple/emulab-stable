@@ -48,11 +48,12 @@ named.conf:	named.conf.template named_makeconf
 install:
 	echo "Are you sure you want to reinstall the namedb files!"
 
-install-real:	$(NAMEDB_DIR)/named.conf \
+install-real:	resolv.conf \
+		$(NAMEDB_DIR)/named.conf \
 		$(NAMEDB_DIR)/localhost.rev \
 		$(NAMEDB_DIR)/$(OURDOMAIN).db.head \
-		$(NAMEDB_DIR)/reverse/$(REVERSE_MAPNAME).db.head \
-		$(ETCDIR)/resolv.conf
+		$(NAMEDB_DIR)/reverse/$(REVERSE_MAPNAME).db.head
+	$(INSTALL_DATA) resolv.conf $(ETCDIR)/resolv.conf
 	-rm -rf $(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head
 	ln -s $(OURDOMAIN).db.head $(NAMEDB_DIR)/$(OURDOMAIN).internal.db.head
 
