@@ -6,11 +6,15 @@
 ##### Step 0 - OS installation and setup
 
 Install FreeBSD on the machine you'll be using for your ops node, using the
-standard FreeBSD installation process. You don't need to worry about which ports
-to install, etc., as the ones required by this software will be installed
-automatically. You do, however, need to partition your filesystems so that you
-have the proper amount of space for certain directories - see below for
-details.
+standard FreeBSD installation process. When asked by the installer, it's best
+to choose the 'Developer' distribution set - this gets you full sources. The
+'X-Developer' distribution set would be fine too, if you want to be able to run
+X clients from the ops node.  When it asks if you want to install the ports
+collection, answer yes.  You don't need to worry about which packages to
+install (of course, grab your favorite editors, etc.) - the ones our software
+needs will be installed automatically later.  You'll need to partition your
+filesystems so that you have the proper amount of space for certain directories
+- see below for details.
 
 Make sure that you have the network correctly configured.
 
@@ -32,7 +36,9 @@ space to hold them:
 			source for the FreeBSD and Linux versions we run to
 			experimenters.
 			
-You may want to enforce quotas on the user-writable filesystems.
+You may want to enforce quotas on the user-writable filesystems. This is the
+main reason you'd want to keep them in seperate filesystems (ie. so people can
+have different /users/ and /proj/ quotas.)
 
 Make sure that, no matter how you decide to partition things up, you make
 symlinks to the appropriate places. ie., if you make one big filesystem called
@@ -68,8 +74,9 @@ script as root. It will take care of installing ports, and doing various other
 configuration of FreeBSD required to make it into an ops node. The script is
 designed so that you can run it as many times as you want, and it'll just skip
 stuff it's already done. If it fails, send the output to Utah so that we can
-fix it up. If it succeeds, follow any other instructions it may have, then
-reboot the machine.
+fix it up. If it succeeds, follow any other instructions it may have. The
+script will tell you to reboot the machine, but you can wait until after you do
+the next step to do so, if you want.
 
 (You may have to set the executable bit on this script, since configure won't -
 I'd like to get this solved at some point.)
@@ -83,6 +90,15 @@ finished.
 
 To install the actual testbed software, simply do a 'gmake ops-install' in your
 object directory.
+
+(Note: If you're logged in as root, /usr/local/bin, where gmake lives on
+FreeBSD, may not be in your path.)
+
+If you'll be using Cyclades boards to use the ops as a serial console server,
+you'll also want to do a 'gmake tipserv-install' in the object directory. In
+addition, you'll need to build a custom kernel with the appropriate driver (you
+may even need to get patches from Utah for some boards). You'll also need to
+set up a few things (not yet automated), described in doc/adding_nodes.txt .
 
 ##### Step 4 - Setting up mailing lists
 
