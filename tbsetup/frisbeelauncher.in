@@ -251,7 +251,7 @@ if ($EUID == 0) {
 # Select the appropriate bandwidth
 #
 my $BW;
-if ($filename =~ /^$TB\/images/) {
+if ($filename =~ /^$TB\/images/ && !$ELABINELAB) {
     $BW = $STD_BW;
 } else {
     $BW = $USR_BW;
