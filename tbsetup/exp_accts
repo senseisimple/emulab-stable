@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $Id: exp_accts,v 1.13 2000-09-19 22:36:24 kwright Exp $
+### $Id: exp_accts,v 1.14 2000-09-19 23:16:50 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
@@ -185,7 +185,11 @@ foreach $IP (@nodes) {
         do { } until ( <PING> =~ /transmitted, (\d+) packets received/ );
 	close(PING); 
 
-        if ( $1 > 0 ) {
+        if ( $1 <= 0 ) {
+
+	    die "Couldn't ping machine $IP\n";
+
+	} else {  
 
 	    print "Checking OS on $IP...";
             open(UNAME,"/usr/local/bin/ssh $IP uname 2>&1 |");
@@ -203,9 +207,7 @@ foreach $IP (@nodes) {
 		$OS = $_;
 	    }
 
-        } else {
-	    die "Couldn't ping machine $IP\n";
-	}
+        } 
 
         if ( $OS =~ /Linux/ ) {  
 	    
@@ -258,13 +260,20 @@ foreach $IP (@nodes) {
 		close MPWD;
 
 		if ( $prev == 0 ) {
-		    $addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:" .
+		    print "Adding $user to $IP\n";
+		    $addon = "$user:$passwd{$user}:$unix_uid{$user}:" .
 			     "$unix_gid:\:0:0:$fullname{$user}:/users/$user:" .
 			     "/bin/tcsh\n";
+		    open (CHPASS, "/usr/local/bin/ssh $IP /usr/bin/chpass -a '$addon' 2>&1 |");
+		    while ( <CHPASS> ) {print "$_"; }
+		    close(CHPASS)
 		}
 
 		## Create home directory
-		if ( !(-e "/users/$user") ) {
+		if ( -e "/users/$user" ) {
+		    print "/users/$user already exists.\n";
+		} else  { 
+		    print "Creating /users/$user.\n";
 		    open(MKDIR, "/bin/mkdir /users/$user 2>&1 |");
 		    while ( <MKDIR> ) { print "$_"; }
 		    close(MKDIR); 
@@ -281,35 +290,10 @@ foreach $IP (@nodes) {
 		    }
 		}
 	    }
-
-	    if ( $addon ne "" )  {
-
-		print "Adding users to $IP\n";
-		open(OUT, ">>/tmp/master.passwd.$IP");		
-		print OUT $addon;
-		close OUT;
-		open(SCP, "/usr/local/bin/scp -pq /tmp/master.passwd.$IP $IP:/etc/master.passwd |");
-		while ( <SCP> ) { print $_; }
-		close(SCP);
- 
-		## Create secure and insecure databases (/etc/s?pwd.db)
-		open (MKDB, "/usr/local/bin/ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
-		while ( <MKDB> ) { print $_; }
-		close(MKDB);
-
-		## Update /etc/passwd (this closes above MKDB)
-		open (MKDB, "/usr/local/bin/ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
-		while ( <MKDB> ) { print $_; }
-		close(MKDB);
-	    }
-	    
-#/usr/sbin/pwd_mkdb: corrupted entry
-#/usr/sbin/pwd_mkdb: at line #14
-#/usr/sbin/pwd_mkdb: /etc/master.passwd: Inappropriate file type or format
-
-	} else {  
+	} else {
 	    print "$IP is unreachable or has an unknown OS ($OS).\n";
 	}
     }
 }
+
 
