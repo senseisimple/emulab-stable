@@ -61,7 +61,8 @@ There are a few things you'll need to know about the ports:
 * Installation of the mysql323-server port will fail if the name returned by
   'hostname' doesn't resolve.
 * The php4 port will bring up a funky menu system to let you choose some
-  features to enable and disable. Enable 'mhash', and leave the rest alone
+  features to enable and disable. Enable 'mhash' and 'xmlrpc', and
+  leave the rest alone.
 * The snmp port asks all kinds of silly questions that don't matter, since
   we're not going to be running snmpd on boss. Just take the defaults.
 
