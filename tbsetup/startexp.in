@@ -182,7 +182,8 @@ if ($query_result->numrows == 0) {
 # file. The web server is going to delete it once this script returns.
 #
 if (system("/bin/cp", "$tempfile", "$tempns") != 0) {
-    fatal("Could not copy $tempfile to $tempns: $!\n");
+    print STDOUT "Could not copy $tempfile to $tempns.\n";
+    exit(1);
 }
 chmod(0770, "$tempns");
 

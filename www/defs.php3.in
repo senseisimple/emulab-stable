@@ -23,7 +23,7 @@ $TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.list";
 $TBLIST_USERS   = "$TBLIST_DIR"."/users.list";
 
 $TBPROJ_DIR     = "/proj";
-$TBUSER_DIR	= "/users/";
+$TBUSER_DIR	= "/users";
 $TBNSSUBDIR     = "nsdir";
 
 $TBAUTHCOOKIE   = "HashCookie";

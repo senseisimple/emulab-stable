@@ -60,22 +60,68 @@ if (strlen($exp_id) > $TBDB_EIDLEN) {
 # Certain of these values must be escaped or otherwise sanitized.
 # 
 $exp_name = addslashes($exp_name);
-    
-#
-# I am not going to allow shell experiments to be created (No NS file).
-# 
-if (!isset($exp_nsfile) ||
-    strcmp($exp_nsfile, "") == 0 ||
-    strcmp($exp_nsfile, "none") == 0) {
 
+#
+# Not allowed to specify both a local and an upload!
+#
+$speclocal  = 0;
+$specupload = 0;
+
+if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
+    $speclocal = 1;
+}
+if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
+    strcmp($exp_nsfile, "none")) {
+    $specupload = 1;
+}
+
+if ($speclocal && $specupload) {
+    USERERROR("You may not specify both an uploaded NS file and an ".
+	      "NS file that is located on the Emulab server", 1);
+}
+if (!$specupload && strcmp($exp_nsfile_name, "")) {
     #
-    # Catch an invalid filename and quit now.
+    # Catch an invalid filename.
     #
-    if (strcmp($exp_nsfile_name, "")) {
-        USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
-                  "valid filename. Please go back and try again.", 1);
+    USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
+	      "valid filename. Please go back and try again.", 1);
+}
+
+if ($speclocal) {
+    #
+    # No way to tell from here if this file actually exists, since
+    # the web server runs as user nobody. The startexp script checks
+    # for the file before going to ground, so the user will get immediate
+    # feedback if the filename is bogus.
+    #
+    # Do not allow anything outside of /users or /proj. I don't think there
+    # is a security worry, but good to enforce it anyway.
+    #
+    if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
+        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile)) {
+	USERERROR("You must specify a server resident in file in either ".
+                  "$TBUSER_DIR/ or $TBPROJ_DIR/", 1);
     }
     
+    $nsfile = $exp_localnsfile;
+    $nonsfile = 0;
+}
+elseif ($specupload) {
+    #
+    # XXX
+    # Set the permissions on the NS file so that the scripts can get to it.
+    # It is owned by nobody, and most likely protected. This leaves the
+    # script open for a short time. A potential security hazard we should
+    # deal with at some point.
+    #
+    chmod($exp_nsfile, 0666);
+    $nsfile = $exp_nsfile;
+    $nonsfile = 0;
+}
+else {
+    #
+    # I am going to allow shell experiments to be created (No NS file).
+    # 
     $nonsfile = 1;
 }
 
@@ -216,15 +262,6 @@ echo "<h2>Starting experiment configuration. Please wait a moment ...
 flush();
 
 #
-# XXX
-# Set the permissions on the NS file so that the scripts can get to it.
-# It is owned by nobody, and most likely protected. This leaves the
-# script open for a short time. A potential security hazard we should
-# deal with at some point.
-#
-chmod($exp_nsfile, 0666);
-
-#
 # Run the scripts. We use a script wrapper to deal with changing
 # to the proper directory and to keep most of these details out
 # of this. The user will be notified later. Its possible that the
@@ -242,7 +279,7 @@ $last   = time();
 set_time_limit(0);
 
 $result = exec("$TBSUEXEC_PATH $uid $gid webstartexp $exp_pid ".
-	       "$exp_id $exp_nsfile",
+	       "$exp_id $nsfile",
  	       $output, $retval);
 
 if ($retval) {
