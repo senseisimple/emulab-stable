@@ -382,6 +382,7 @@ sub LinkDelaySetup()
 	    or die("Could not open " . TMLINKDELAY . ": $!");
 	
 	print DEL "#!/bin/sh\n";
+	print DEL "ipfw -f flush\n";
 
 	foreach $delay (@delays) {
 	    my $pat = q(LINKDELAY IFACE=([\d\w]+) TYPE=(simplex|duplex) );
@@ -483,7 +484,7 @@ sub LinkDelaySetup()
 	    print DEL "\n";
 
 	    print DEL "ipfw add $ruleno pipe $pipeno ip from any to ".
-		      "any out xmit $iface\n";
+		      "any out xmit $iface nexthop $inet:$mask\n";
 
 	    print DEL "ipfw pipe $pipeno config delay ${delay}ms ";
 	    print DEL "bw ${bandw}Kbit/s plr $plr $queue $redparams\n";
