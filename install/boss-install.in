@@ -313,13 +313,15 @@ Phase "syslog", "Setting up syslog", sub {
 	DoneIfExists($LOGDIR);
 	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $LOGDIR : $!");
 	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
+	ExecQuietFatal("$CHMOD 775 $LOGDIR");
     };
 
     Phase "logdir", "Creating mysql log directory", sub {
 	DoneIfExists($MYSQL_LOGDIR);
 	mkdir $MYSQL_LOGDIR, 0775 or
 	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
-	ExecQuietFatal("$CHOWN mysql:mysql $LOGDIR");
+	ExecQuietFatal("$CHOWN mysql:mysql $MYSQL_LOGDIR");
+	ExecQuietFatal("$CHMOD 775 $MYSQL_LOGDIR");
     };
 
     Phase "logfiles", "Creating log files", sub {
