@@ -5,10 +5,14 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= assign
+MAKEFILE_IN	= @srcdir@/GNUmakefile.in
 
 include $(OBJDIR)/Makeconf
 
-all: assign 
+all: makefile-check assign 
+
+makefile-check: ${MAKEFILE_IN}
+	-${RM} -f assign *.o
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -57,11 +61,33 @@ CXXFLAGS += -DTRIVIAL_LINK_BW
 
 DEPLIBS=$(OBJS)
 
-assign: ${DEPLIBS} ${OBJS} 
+assign: ${DEPLIBS} ${OBJS}
 	${CXX} -o assign ${LIBS} $(OBJS) ${LDFLAGS}
 
 install: $(INSTALL_LIBEXECDIR)/assign 
 
 clean:
-	/bin/rm -f *.o assign 
+	-${RM} -f *.o assign 
 
+#
+# All this crap generated with 'g++ -MM' - don't want to do all the makefile goo
+# to make this automatic, since none of it ever changes
+#
+anneal.o: anneal.cc anneal.h port.h common.h config.h delay.h \
+ physical.h virtual.h vclass.h maps.h score.h pclass.h solution.h
+assign.o: assign.cc port.h common.h config.h delay.h physical.h \
+ virtual.h vclass.h pclass.h score.h solution.h maps.h anneal.h
+config.o: config.cc config.h
+parse_ptop.o: parse_ptop.cc port.h common.h config.h delay.h \
+ physical.h parser.h
+parse_top.o: parse_top.cc port.h common.h config.h vclass.h delay.h \
+ physical.h virtual.h parser.h
+parser.o: parser.cc parser.h
+pclass.o: pclass.cc port.h common.h config.h delay.h physical.h \
+ virtual.h pclass.h
+score.o: score.cc port.h common.h config.h vclass.h delay.h physical.h \
+ virtual.h pclass.h score.h /usr/include/math.h
+solution.o: solution.cc solution.h port.h common.h config.h delay.h \
+ physical.h virtual.h vclass.h maps.h
+vclass.o: vclass.cc port.h common.h config.h vclass.h delay.h \
+ physical.h virtual.h
