@@ -80,7 +80,12 @@ header("Pragma: no-cache");
 flush();
 
 if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile $pid $eid", "r")) {
-    while ($string = fread($fp, 128)) {
+    # Since there is no nonblocking mode, read in fairly small
+    # chunks to avoid many lines (since lines are short) from being
+    # buffered up. Its annoying when watching the web page.
+    set_file_buffer($fp, 0);
+    
+    while ($string = fread($fp, 32)) {
 	echo "$string";
 	flush();
     }
