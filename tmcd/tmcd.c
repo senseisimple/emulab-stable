@@ -82,7 +82,6 @@ static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
 static int	nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid);
-static int	nodeidtocontrolnet(char *nodeid, int *net);
 static int	checkprivkey(struct in_addr, char *);
 static void	tcpserver(int sock);
 static void	udpserver(int sock);
@@ -110,6 +109,7 @@ typedef struct {
 	int		allocated;
 	int		jailflag;
 	int		isvnode;
+	int		issubnode;
 	int		islocal;
 	int		iscontrol;
 	int		update_accounts;
@@ -122,10 +122,11 @@ typedef struct {
 	char		nickname[TBDB_FLEN_VNAME];
 	char		type[TBDB_FLEN_NODETYPE];
 	char		class[TBDB_FLEN_NODECLASS];
+        char		ptype[TBDB_FLEN_NODETYPE];	/* Of physnode */
+	char		pclass[TBDB_FLEN_NODECLASS];	/* Of physnode */
 	char		creator[TBDB_FLEN_UID];
 	char		swapper[TBDB_FLEN_UID];
 	char		syncserver[TBDB_FLEN_VNAME];	/* The vname */
-	char		role[256];
 	char		testdb[256];
 } tmcdreq_t;
 static int	iptonodeid(struct in_addr, tmcdreq_t *);
@@ -171,6 +172,7 @@ COMMAND_PROTOTYPE(dostate);
 COMMAND_PROTOTYPE(docreator);
 COMMAND_PROTOTYPE(dotunnels);
 COMMAND_PROTOTYPE(dovnodelist);
+COMMAND_PROTOTYPE(dosubnodelist);
 COMMAND_PROTOTYPE(doisalive);
 COMMAND_PROTOTYPE(doipodinfo);
 COMMAND_PROTOTYPE(doatarball);
@@ -178,6 +180,8 @@ COMMAND_PROTOTYPE(dontpinfo);
 COMMAND_PROTOTYPE(dontpdrift);
 COMMAND_PROTOTYPE(dojailconfig);
 COMMAND_PROTOTYPE(doplabconfig);
+COMMAND_PROTOTYPE(dosubconfig);
+COMMAND_PROTOTYPE(doixpconfig);
 COMMAND_PROTOTYPE(doslothdparams);
 COMMAND_PROTOTYPE(doprogagents);
 COMMAND_PROTOTYPE(dosyncserver);
@@ -215,6 +219,7 @@ struct command {
 	{ "state",	dostate},
 	{ "tunnels",	dotunnels},
 	{ "vnodelist",	dovnodelist},
+	{ "subnodelist",dosubnodelist},
 	{ "isalive",	doisalive},
 	{ "ipodinfo",	doipodinfo},
 	{ "ntpinfo",	dontpinfo},
@@ -222,6 +227,7 @@ struct command {
 	{ "tarball",	doatarball},
 	{ "jailconfig",	dojailconfig},
 	{ "plabconfig",	doplabconfig},
+	{ "subconfig",	dosubconfig},
         { "sdparams",   doslothdparams},
         { "programs",   doprogagents},
         { "syncserver", dosyncserver},
@@ -755,8 +761,8 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * If the connection is not SSL, then it must be a local node.
 	 */
 	if (isssl) {
-		if (tmcd_sslverify_client(reqp->nodeid, reqp->class,
-					  reqp->type, reqp->islocal)) {
+		if (tmcd_sslverify_client(reqp->nodeid, reqp->pclass,
+					  reqp->ptype,  reqp->islocal)) {
 			error("%s: SSL verification failure\n", reqp->nodeid);
 			if (! redirect)
 				goto skipit;
@@ -946,7 +952,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
-	int		control_net, nrows;
+	int		nrows;
 
 	/*
 	 * Now check reserved table
@@ -959,26 +965,19 @@ COMMAND_PROTOTYPE(doifconfig)
 
 	/*
 	 * Virtual nodes, do not return interface table info. No point.
+	 * Subnode are slightly different. This test might need to be
+	 * smarter?
 	 */
-	if (reqp->isvnode)
+	if (reqp->isvnode && !reqp->issubnode)
 		goto doveths;
-
-	/*
-	 * Need to know the control network for the machine since
-	 * we don't want to mess with that.
-	 */
-	if (nodeidtocontrolnet(reqp->nodeid, &control_net)) {
-		error("IFCONFIG: %s: No Control Network\n", reqp->nodeid);
-		return 1;
-	}
 
 	/*
 	 * Find all the interfaces.
 	 */
 	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
-			 " IPaliases "
+			 " IPaliases,iface,role "
 			 "from interfaces where node_id='%s'",
-			 7, reqp->nodeid);
+			 9, reqp->nodeid);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting interfaces!\n",
 		      reqp->nodeid);
@@ -993,13 +992,15 @@ COMMAND_PROTOTYPE(doifconfig)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 		if (row[1] && row[1][0]) {
-			int card    = atoi(row[0]);
+			int  card    = atoi(row[0]);
+			char *iface  = row[7];
+			char *role   = row[8];
 			char *speed  = "100";
 			char *unit   = "Mbps";
 			char *duplex = "full";
 
 			/* Never for the control net; sharks are dead */
-			if (card == control_net)
+			if (strcmp(role, TBDB_IFACEROLE_EXPERIMENT))
 				goto skipit;
 
 			/*
@@ -1032,6 +1033,17 @@ COMMAND_PROTOTYPE(doifconfig)
 					
 				sprintf(&buf[strlen(buf)],
 					" IPALIASES=\"%s\"", aliases);
+			}
+
+			/*
+			 * Tack on iface for IXPs. This should be a flag on
+			 * the interface instead of a match against type.
+			 */
+			if (vers >= 11) {
+				sprintf(&buf[strlen(buf)],
+					" IFACE=%s",
+					(strcmp(reqp->class, "ixp") ?
+					 "" : iface));
 			}
 
 			strcat(buf, "\n");
@@ -3411,6 +3423,50 @@ COMMAND_PROTOTYPE(dovnodelist)
 }
 
 /*
+ * Return subnode list, and their types.
+ */
+COMMAND_PROTOTYPE(dosubnodelist)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	if (!reqp->allocated) {
+		error("SUBNODE: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	res = mydb_query("select r.node_id,nt.class from reserved as r "
+			 "left join nodes as n on r.node_id=n.node_id "
+                         "left join node_types as nt on nt.type=n.type "
+                         "where nt.issubnode=1 and n.phys_nodeid='%s'",
+                         2, reqp->nodeid);
+
+	if (!res) {
+		error("SUBNODELIST: %s: DB Error getting vnode list\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf, "NODEID=%s TYPE=%s\n", row[0], row[1]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("SUBNODELIST: %s", buf);
+	}
+	mysql_free_result(res);
+	return 0;
+}
+
+/*
  * DB stuff
  */
 static MYSQL	db;
@@ -3530,17 +3586,22 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	/*
 	 * I love a good query!
 	 *
+	 * The join on node_types using control_iface is to prevent the
+	 * (unlikely) possibility that we get an experimental interface
+	 * trying to contact us! I doubt that can happen though. 
+	 *
 	 * XXX Locally, the jail flag is not set on the phys node, only
 	 * on the virtnodes. This is okay since all the routines that
 	 * check jailflag also check to see if its a vnode or physnode. 
 	 */
 	if (reqp->isvnode) {
-		res = mydb_query("select t.class,t.type,np.node_id,"
+		res = mydb_query("select vt.class,vt.type,np.node_id,"
 				 " nv.jailflag,r.pid,r.eid,r.vname, "
 				 " e.gid,e.testdb,nv.update_accounts, "
 				 " np.role,e.expt_head_uid,e.expt_swap_uid, "
-				 " e.sync_server "
-				 " from nodes as nv "
+				 " e.sync_server,pt.class,pt.type, "
+				 " pt.isremotenode,vt.issubnode "
+				 "from nodes as nv "
 				 "left join interfaces as i on "
 				 " i.node_id=nv.phys_nodeid "
 				 "left join nodes as np on "
@@ -3549,27 +3610,31 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 				 " r.node_id=nv.node_id "
 				 "left join experiments as e on "
 				 "  e.pid=r.pid and e.eid=r.eid "
-				 "left join node_types as t on "
-				 " t.type=np.type and i.card=t.control_net "
+				 "left join node_types as pt on "
+				 " pt.type=np.type and "
+				 " i.iface=pt.control_iface "
+				 "left join node_types as vt on "
+				 " vt.type=nv.type "
 				 "where nv.node_id='%s' and i.IP='%s'",
-				 14, reqp->vnodeid, inet_ntoa(ipaddr));
+				 18, reqp->vnodeid, inet_ntoa(ipaddr));
 	}
 	else {
 		res = mydb_query("select t.class,t.type,n.node_id,n.jailflag,"
 				 " r.pid,r.eid,r.vname,e.gid,e.testdb, "
 				 " n.update_accounts,n.role, "
 				 " e.expt_head_uid,e.expt_swap_uid, "
-				 " e.sync_server "
-				 " from interfaces as i "
+				 " e.sync_server,t.class,t.type, "
+				 " t.isremotenode,t.issubnode "
+				 "from interfaces as i "
 				 "left join nodes as n on n.node_id=i.node_id "
 				 "left join reserved as r on "
 				 "  r.node_id=i.node_id "
 				 "left join experiments as e on "
 				 " e.pid=r.pid and e.eid=r.eid "
 				 "left join node_types as t on "
-				 " t.type=n.type and i.card=t.control_net "
+				 " t.type=n.type and i.iface=t.control_iface "
 				 "where i.IP='%s'",
-				 14, inet_ntoa(ipaddr));
+				 18, inet_ntoa(ipaddr));
 	}
 
 	if (!res) {
@@ -3590,11 +3655,14 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 		      inet_ntoa(ipaddr)); 
 		return 1;
 	}
-	strncpy(reqp->class,  row[0], sizeof(reqp->class));
-	strncpy(reqp->type,   row[1], sizeof(reqp->type));
-	strncpy(reqp->nodeid, row[2], sizeof(reqp->nodeid));
-	reqp->islocal  = (! strcasecmp(reqp->class,  "pcremote") ? 0 : 1);
-	reqp->jailflag = (! strcasecmp(row[3], "0") ? 0 : 1);
+	strncpy(reqp->class,  row[0],  sizeof(reqp->class));
+	strncpy(reqp->type,   row[1],  sizeof(reqp->type));
+	strncpy(reqp->pclass, row[14], sizeof(reqp->pclass));
+	strncpy(reqp->ptype,  row[15], sizeof(reqp->ptype));
+	strncpy(reqp->nodeid, row[2],  sizeof(reqp->nodeid));
+	reqp->islocal   = (! strcasecmp(row[16], "0") ? 1 : 0);
+	reqp->jailflag  = (! strcasecmp(row[3],  "0") ? 0 : 1);
+	reqp->issubnode = (! strcasecmp(row[17], "0") ? 0 : 1);
 	if (row[8])
 		strncpy(reqp->testdb, row[8], sizeof(reqp->testdb));
 	if (row[4] && row[5]) {
@@ -3633,8 +3701,7 @@ iptonodeid(struct in_addr ipaddr, tmcdreq_t *reqp)
 	else
 		reqp->update_accounts = 0;
 
-	strncpy(reqp->role, row[10], sizeof(reqp->role));
-	reqp->iscontrol = (! strcasecmp(reqp->role,  "ctrlnode") ? 1 : 0);
+	reqp->iscontrol = (! strcasecmp(row[10], "ctrlnode") ? 1 : 0);
 
 	/* If a vnode, copy into the nodeid. Eventually split this properly */
 	strcpy(reqp->pnodeid, reqp->nodeid);
@@ -3689,36 +3756,6 @@ nodeidtoexp(char *nodeid, char *pid, char *eid, char *gid)
 	return 0;
 }
  
-/*
- * Get control network for a nodeid
- */
-static int
-nodeidtocontrolnet(char *nodeid, int *net)
-{
-	MYSQL_RES	*res;
-	MYSQL_ROW	row;
-
-	res = mydb_query("select control_net from nodes as n "
-			 "left join node_types as nt on nt.type=n.type "
-			 "where n.node_id='%s'",
-			 1, nodeid);
-
-	if (!res) {
-		error("nodeidtocontrolnet: %s: DB Error!\n", nodeid);
-		return 1;
-	}
-
-	if (! (int)mysql_num_rows(res)) {
-		mysql_free_result(res);
-		return 1;
-	}
-	row = mysql_fetch_row(res);
-	mysql_free_result(res);
-	*net = atoi(row[0]);
-
-	return 0;
-}
-
 /*
  * Check for DBname redirection.
  */
@@ -4558,6 +4595,99 @@ COMMAND_PROTOTYPE(doplabconfig)
 
 	/* XXX Anything else? */
 	
+	return 0;
+}
+
+/*
+ * Return the config for a subnode (this is returned to the physnode).
+ */
+COMMAND_PROTOTYPE(dosubconfig)
+{
+	if (!reqp->issubnode) {
+		error("SUBCONFIG: %s: Not a subnode\n", reqp->nodeid);
+		return 1;
+	}
+	if (!reqp->allocated) {
+		error("SUBCONFIG: %s: Node is free\n", reqp->nodeid);
+		return 1;
+	}
+
+	if (! strcmp(reqp->type, "ixp-bveil")) 
+		return(doixpconfig(sock, reqp, rdata, tcp, vers));
+	
+	error("SUBCONFIG: %s: Invalid subnode class %s\n",
+	      reqp->nodeid, reqp->class);
+	return 1;
+}
+
+COMMAND_PROTOTYPE(doixpconfig)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	struct in_addr  mask_addr, bcast_addr, gw_addr;
+	char		bcast_ip[16], gw_ip[16];
+
+	/*
+	 * Get the "control" net address for the IXP from the interfaces
+	 * table. This is really a virtual pci/eth interface.
+	 */
+	res = mydb_query("select i1.IP,i1.iface,i2.iface from nodes as n "
+			 "left join node_types as nt on n.type=nt.type "
+			 "left join interfaces as i1 on i1.node_id=n.node_id "
+			 "     and i1.iface=nt.control_iface "
+			 "left join interfaces as i2 on i2.node_id='%s' "
+			 "     and i2.card=255 "
+			 "where n.node_id='%s'",
+			 3, reqp->pnodeid, reqp->nodeid);
+	
+	if (!res) {
+		error("IXPCONFIG: %s: DB Error getting config!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((int)mysql_num_rows(res) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	row   = mysql_fetch_row(res);
+	if (!row[1]) {
+		error("IXPCONFIG: %s: No IXP interface!\n", reqp->nodeid);
+		return 1;
+	}
+	if (!row[2]) {
+		error("IXPCONFIG: %s: No host interface!\n", reqp->nodeid);
+		return 1;
+	}
+
+	inet_aton(NETMASK, &mask_addr);	
+	inet_aton(row[0],  &bcast_addr);	
+	inet_aton(row[0],  &gw_addr);
+
+	/*
+	 * Not sure we should do this here?
+	 */
+	gw_addr.s_addr = (gw_addr.s_addr & mask_addr.s_addr) |
+		htonl(ntohl(~mask_addr.s_addr) - 1);
+	strcpy(gw_ip, inet_ntoa(gw_addr));
+	
+	bcast_addr.s_addr = (bcast_addr.s_addr & mask_addr.s_addr) |
+		(~mask_addr.s_addr);
+	strcpy(bcast_ip, inet_ntoa(bcast_addr));
+
+	sprintf(buf,
+		"IXP_IP=\"%s\"\n"
+		"IXP_IFACE=\"%s\"\n"
+		"IXP_BCAST=\"%s\"\n"
+		"IXP_HOSTNAME=\"%s\"\n"
+		"HOST_IP=\"%s\"\n"
+		"HOST_IFACE=\"%s\"\n"
+		"NETMASK=\"%s\"\n",
+		row[0], row[1], bcast_ip, reqp->nickname,
+		gw_ip, row[2], NETMASK);
+		
+	client_writeback(sock, buf, strlen(buf), tcp);
+	mysql_free_result(res);
 	return 0;
 }
 
