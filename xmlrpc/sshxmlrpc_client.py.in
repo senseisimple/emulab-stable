@@ -114,9 +114,9 @@ def do_method(server, method_and_args):
         # If the first character of the argument looks like a dictionary,
         # try to evaluate it.
         #
-  #      if value[0] == '{':
-  #         value = eval(value);
-  #         pass
+        if value.startswith("{"):
+            value = eval(value);
+            pass
     
         params[plist[0]] = value
         pass

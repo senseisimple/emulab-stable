@@ -1,0 +1,248 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# A library of useful DB stuff. Mostly things that get done a lot.
+# Saves typing.
+#
+# XXX: The notion of "uid" is a tad confused. A unix uid is a number,
+#      while in the DB a user uid is a string (equiv to unix login).
+#      Needs to be cleaned up.
+#
+
+package libxmlrpc;
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+@ISA    = "Exporter";
+@EXPORT = qw ( RESPONSE_SUCCESS RESPONSE_BADARGS RESPONSE_ERROR
+	       RESPONSE_FORBIDDEN RESPONSE_BADVERSION RESPONSE_SERVERERROR
+	       RESPONSE_TOOBIG RESPONSE_REFUSED RESPONSE_TIMEDOUT
+
+	       ParseResponse CallMethod Config
+);
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use English;
+use XML::Parser;
+use RPC::XML;
+use RPC::XML::Parser;
+use Socket;
+use IO::Handle;     # thousands of lines just for autoflush :-(
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $BOSSNODE    = "@BOSSNODE@";
+
+# Need this on the path!
+$ENV{'PATH'} = $ENV{'PATH'} . ":/usr/local/bin";
+
+#
+# Configuration. The importer of this library should set these values
+# accordingly. 
+#
+my %config =
+    ( "debug"		=> 0,
+      "verbose",	=> 0,
+      "server"		=> undef,
+      "portnum"		=> undef,
+      "version"		=> undef,
+      "cert"		=> undef,
+    );
+my $debug = 0;
+
+#
+# Emulab XMLRPC defs.
+#
+# WARNING: If you change this stuff, also change emulabclient.py in this dir.
+#
+sub RESPONSE_SUCCESS()        { 0; }
+sub RESPONSE_BADARGS()        { 1; }
+sub RESPONSE_ERROR()          { 2; }
+sub RESPONSE_FORBIDDEN()      { 3; }
+sub RESPONSE_BADVERSION()     { 4; }
+sub RESPONSE_SERVERERROR()    { 5; }
+sub RESPONSE_TOOBIG()         { 6; }
+sub RESPONSE_REFUSED()        { 7; }
+sub RESPONSE_TIMEDOUT()       { 8; }
+
+##
+# The package version number
+#
+my $PACKAGE_VERSION = 0.1;
+
+#
+# This is the "structure" returned by the RPC server. It gets converted into
+# a perl hash by the unmarshaller, and we return that directly to the caller
+# (as a reference).
+#
+# class EmulabResponse:
+#    def __init__(self, code, value=0, output=""):
+#        self.code     = code            # A RESPONSE code
+#        self.value    = value           # A return value; any valid XML type.
+#        self.output   = output          # Pithy output to print
+#        return
+#
+sub ParseResponse($)
+{
+    my ($xmlgoo) = @_;
+
+    my $parser   = RPC::XML::Parser->new();
+    my $goo      = $parser->parse($xmlgoo);
+    my $value;
+    my $output;
+    my $code;
+
+    if ($goo->is_fault()) {
+	$code   = $goo->value()->{"faultCode"}->value;
+	$value  = $code;
+	$output = $goo->value()->{"faultString"}->value;
+    }
+    else {
+	$code   = $goo->value()->{"code"}->value;
+	$value  = $goo->value()->{"value"}->value;
+	$output = $goo->value()->{"output"}->value;
+    }
+    return {"code"   => $code,
+	    "value"  => $value,
+	    "output" => $output};
+}
+
+#
+# Caller uses this routine to set configuration of this library
+# 
+sub Config($)
+{
+    my ($opthash)  = @_;
+
+    foreach my $opt (keys(%{ $opthash })) {
+	my $val = $opthash->{$opt};
+
+	if (!exists($config{$opt})) {
+	    print STDERR "*** $0:\n".
+		         "    Invalid libxmlrpc option: $opt/$val\n";
+	    return -1;
+	}
+	$config{$opt} = $val;
+    }
+    return 0;
+}
+
+#
+# Internal routine to convert the config hash to an option string.
+#
+sub optionstring()
+{
+    my $options = "";
+
+    if ($config{"debug"}) {
+	$options .= " -d";
+    }
+    if (defined($config{"server"})) {
+	$options .= " -s " . $config{"server"};
+    }
+    if (defined($config{"portnum"})) {
+	$options .= " -p " . $config{"portnum"};
+    }
+    if (defined($config{"cert"})) {
+	if (! -r $config{"cert"}) {
+	    die("*** $0:\n".
+		"    No such certificate: " . $config{"cert"});
+	}
+	$options .= " --cert=" . $config{"cert"};
+    }
+    return $options;
+}
+
+sub CallMethod($$$)
+{
+    my ($module, $method, $arghash) = @_;
+
+    my $request = new RPC::XML::request("${module}.${method}",
+					($PACKAGE_VERSION, $arghash));
+    pipe(PARENT_RDR, CHILD_WTR) or
+	die("Error creating parent pipe pair");
+    pipe(CHILD_RDR,  PARENT_WTR) or
+	die("Error creating child pipe pair");
+
+    if ($debug) {
+	print STDERR $request->as_string();
+	print STDERR "\n";
+    }
+    
+    CHILD_WTR->autoflush(1);
+    PARENT_WTR->autoflush(1);
+
+    my $childpid = fork();
+    if (! $childpid) {
+	close(CHILD_RDR);
+	close(CHILD_WTR);
+
+	#
+	# Dup our descriptors to the parent, and exec the program.
+	# The parent then talks to it read/write.
+	#
+	open(STDIN,  "<&PARENT_RDR") || die "Can't redirect stdin";
+	open(STDOUT, ">&PARENT_WTR") || die "Can't redirect stdout";
+#	open(STDERR, ">&PARENT") || die "Can't redirect stderr";
+
+#	print STDERR "$TB/bin/sslxmlrpc_client.py -r " . optionstring() . "\n";
+
+	exec("$TB/bin/sslxmlrpc_client.py -r " . optionstring());
+	die("*** $0:\n".
+	    "    exec sslxmlrpc_client.py failed: $!\n");
+    }
+    close(PARENT_RDR);
+    close(PARENT_WTR);
+
+    #
+    # Okay, send the xmlgoo to the child and close the pipe to give child
+    # the go ahead.
+    #
+    print CHILD_WTR $request->as_string();
+    close(CHILD_WTR);
+
+    #
+    # Read back the xmlgoo from the child.
+    #
+    my $xmlgoo = "";
+    while (<CHILD_RDR>) {
+	$xmlgoo .= $_;
+    }
+    close(CHILD_RDR);
+    waitpid($childpid, 0);
+    if ($?) {
+	die("SSL XMLRPC client exited with $?\n");
+    }
+
+    if ($debug) {
+	print STDERR $xmlgoo;
+	print STDERR "\n";
+    }
+
+    #
+    # Convert the xmlgoo to Perl and return it.
+    #
+    my $response = ParseResponse($xmlgoo);
+
+    if (($config{"verbose"} || $response->{"code"}) &&
+	defined($response->{"output"}) && $response->{"output"} ne "") {
+	print $response->{"output"};
+	print "\n";
+    }
+    if ($response->{"code"}) {
+	return undef;
+    }
+    return $response->{"value"};
+}
+
+# _Always_ make sure that this 1 is at the end of the file...
+
+1;

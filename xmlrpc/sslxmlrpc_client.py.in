@@ -47,11 +47,15 @@ xmlrpc_port     = XMLRPC_PORT
 # The default RPC module to invoke.
 module          = "experiment"
 
-# Where to find the default certificate.
-certificate     = os.environ["HOME"] + "/.ssl/emulab.pem"
+# Where to find the default certificate in the users home dir.
+default_cert    = "/.ssl/emulab.pem"
+certificate     = None;
 
 # Debugging output.
 debug           = 0
+
+# Raw XML mode
+rawmode         = 0
 
 ##
 # Print the usage statement to stdout.
@@ -113,9 +117,9 @@ def do_method(server, method_and_args):
         # If the first character of the argument looks like a dictionary,
         # try to evaluate it.
         #
-  #      if value[0] == '{':
-  #         value = eval(value);
-  #         pass
+        if value.startswith("{"):
+            value = eval(value);
+            pass
     
         params[plist[0]] = value
         pass
@@ -164,8 +168,8 @@ def do_method(server, method_and_args):
 try:
     # Parse the options,
     opts, req_args =  getopt.getopt(sys.argv[1:],
-                      "dhVs:m:p:",
-                      [ "help", "version", "server=", "module=",
+                      "dhVs:m:p:r",
+                      [ "help", "version", "rawmode", "server=", "module=",
                         "cert=", "port="])
     # ... act on them appropriately, and
     for opt, val in opts:
@@ -198,6 +202,9 @@ try:
         elif opt in ("-d", "--debug"):
 	    debug = 1
             pass
+        elif opt in ("-r", "--rawmode"):
+	    rawmode = 1
+            pass
         pass
     pass
 except getopt.error, e:
@@ -206,9 +213,50 @@ except getopt.error, e:
     sys.exit(2)
     pass
 
+class MySSL_Transport(SSL_Transport):
+    def _parse_response(self, file, sock):
+        stuff = ""
+        
+        while 1:
+            if sock:
+                response = sock.recv(1024)
+            else:
+                response = file.read(1024)
+            if not response:
+                break
+            stuff += response
+        return stuff
+        pass
+    pass
+
+class MyServerProxy(xmlrpclib.ServerProxy):
+    def raw_request(self, xmlgoo):
+
+        #
+        # I could probably play tricks with the getattr method, but
+        # not sure what those tricks would be! If I try to access the
+        # members by name, the getattr definition in the ServerProxy class
+        # tries to turn that into a method lookup at the other end. 
+        #
+        transport = self.__dict__["_ServerProxy__transport"]
+        host      = self.__dict__["_ServerProxy__host"]
+        handler   = self.__dict__["_ServerProxy__handler"]
+        
+        response = transport.request(host, handler, xmlgoo)
+
+        if len(response) == 1:
+            response = response[0]
+
+        return response
+
+    pass
+
 #
 # Vanilla SSL CTX initialization.
 #
+if certificate == None:
+    certificate = os.environ["HOME"] + default_cert
+    pass
 if not os.access(certificate, os.R_OK):
     print "Certificate cannot be accessed: " + certificate
     sys.exit(-1);
@@ -222,16 +270,42 @@ ctx.set_allow_unknown_ca(0)
 # This is parsed by the Proxy object.
 URI = "https://" + xmlrpc_server + ":" + str(xmlrpc_port) + TBROOT
 if debug:
-    print URI
+    print >>sys.stderr, URI
     pass
 
-# Get a handle on the server,
-server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx));
+if rawmode:
+    # Get a handle on the server,
+    server = MyServerProxy(URI, MySSL_Transport(ctx));
 
-if len(req_args):
+    stuff = ""
+    while (True):
+        foo = sys.stdin.read(1024 * 16)
+        if foo == "":
+            break
+        stuff += foo
+        pass
+
+    #
+    # Make the call. 
+    #
+    try:
+        response = server.raw_request(stuff)
+        pass
+    except xmlrpclib.Fault, e:
+        print e.faultString
+        sys.exit(-1);
+        pass
+
+    print str(response);
+    sys.exit(0);
+elif len(req_args):
+    # Get a handle on the server,
+    server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx));
     # Method and args are on the command line.
     sys.exit(do_method(server, req_args))
 else:
+    # Get a handle on the server,
+    server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx));
     # Prompt the user for input.
     try:
         while True:

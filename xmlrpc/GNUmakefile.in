@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 
 BIN_SCRIPTS	= sshxmlrpc_client.py sslxmlrpc_client.py
 SBIN_SCRIPTS	= sshxmlrpc_server.py xmlrpcbag sslxmlrpc_server.py 
-LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py
+LIB_STUFF	= sshxmlrpc.py emulabserver.py emulabclient.py libxmlrpc.pm
 LIBEXEC_STUFF	= webxmlrpc
 WWW_STUFF	= xmlrpcapi.php3
 DOWNLOAD_STUFF  = sshxmlrpc.py sshxmlrpc_client.py emulabclient.py README \

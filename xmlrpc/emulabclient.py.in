@@ -33,7 +33,9 @@ MAXNSFILESIZE = (1024 * 512)
 #
 # Note that XMLRPC does not actually return a "class" to the caller; It gets
 # converted to a hashed array (Python Dictionary), but using a class gives
-# us a ready made constructor. 
+# us a ready made constructor.
+#
+# WARNING: If you change this stuff, also change libxmlrpc.pm in this dir.
 #
 RESPONSE_SUCCESS        = 0
 RESPONSE_BADARGS        = 1
