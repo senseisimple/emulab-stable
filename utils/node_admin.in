@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,12 +14,13 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: nodeadmin [-h] [-n] <on | off> <node>\n";
+    print STDOUT "Usage: nodeadmin [-h] [-n | -w] <on | off> <node>\n";
     print STDOUT "-h   This message\n";
-    print STDOUT "-n   Don't reboot nodes\n";
+    print STDOUT "-n   Do not reboot node\n";
+    print STDOUT "-w   Wait for node to come back up if rebooted\n";
     exit(-1);
 }
-my  $optlist = "hn";
+my  $optlist = "hnw";
 
 #
 # Configure variables
@@ -121,7 +122,9 @@ DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
 # Reboot node
 #
 if (!$options{n}) {
-    if (system("$nodereboot", "$node")) {
+    my $optarg = ($options{"w"} ? "-w" : "");
+	
+    if (system("$nodereboot $optarg $node")) {
 	die("*** $0:\n".
 	"    WARNING: Could not reboot $node.\n");
     }
