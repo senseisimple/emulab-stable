@@ -503,6 +503,8 @@ function SHOWEXP($pid, $eid) {
     $batchstate  = $exprow[batchstate];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
+    $swapreqs    = $exprow[swap_requests];
+    $lastswapreq = $exprow[last_swap_req];
     $nodes       = $exprow["count(r.node_id)"];
 
     if ($swappable)
@@ -612,8 +614,19 @@ function SHOWEXP($pid, $eid) {
             <td>Idle Time: </td>
             <td class=\"left\">$idletime hours</td>
           </tr>\n";
-    
 
+    if (! ($swapreqs=="" || $swapreqs==0)) {
+	echo "<tr>
+            <td>Swap Requests: </td>
+            <td class=\"left\">$swapreqs</td>
+          </tr>\n";
+
+	echo "<tr>
+            <td>Last Swap Req.: </td>
+            <td class=\"left\">$lastswapreq</td>
+          </tr>\n";
+    }
+    
     if ($batchmode) {
 	    echo "<tr>
                     <td>Batch Mode: </td>
