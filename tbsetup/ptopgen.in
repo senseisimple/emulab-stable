@@ -187,7 +187,8 @@ if (defined($exempt_eid)) {
 }
 
 $result =
-    DBQueryFatal("select a.node_id,a.type,t.class from nodes as a ".
+    DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode " .
+		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join node_status as ns on a.phys_nodeid=ns.node_id ".
@@ -200,10 +201,13 @@ $result =
 # You get to use a node type if no pid was specified (that is, you get
 # to use all nodes), or if there is no entry as all in 
 
-while (($node,$type,$class) = $result->fetchrow_array) {
+while (($node,$type,$physnode,$class,$issubnode) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
+    if ($issubnode) {
+	$subnode_of{$node} = $physnode;
+    }
 }
 
 $sharklinks = "";
@@ -214,12 +218,15 @@ $sharklinks = "";
 foreach $node (keys(%nodes)) {
     my $type = $nodes{$node};
     
-    $text = "node $node $type:1 $classes{$type}:1";
+    my @types = ("$type:1","$classes{$type}:1");
+    my @features;
+    my @flags;
+
     $delay_capacity = $nodetypes{$type};
     $virtnode_capacity = $virtcapacity{$type};
     
     if ($delay_capacity > 0) {
-	$text .= " delay:$delay_capacity";
+	push @types, "delay:$delay_capacity";
 	    
 	#################################################################
 	### NSE Node hack. Instead of adding sim nodes into the
@@ -229,7 +236,7 @@ foreach $node (keys(%nodes)) {
 	### type can support delay nodes, then it is a local node
 	### and therefore we can support sim nodes
 	#################################################################
-	$text .= " sim:100000";
+	push @types, "sim:100000";
     }
 
     if ($virtstuff && $virtnode_capacity > 0) {
@@ -237,27 +244,41 @@ foreach $node (keys(%nodes)) {
 	# Ditto for jailed nodes
 	#
 	if (defined($mfactor) && $mfactor <= $virtnode_capacity) {
-	    $text .= " pcvm:$mfactor";
+	    push @types, "pcvm:$mfactor";
 	}
 	else {
-	    $text .= " pcvm:$virtnode_capacity";
+	    push @types, "pcvm:$virtnode_capacity";
 	}
-	$text .= " *lan:*";
-	# Add features
-	if (defined($features{$type})) {
-	    $text .= " - $features{$type}";
-	} else {
-	    $text .= " -";
-	}
+	push @types, "*lan:*";
 	# Add trivial bw spec.
-	$text .= " - trivial_bw:400000";
-    } else {
-	if (defined($features{$type})) {
-	    $text .= " - $features{$type}";
-	} else {
-	    $text .= " -";
-	}
+	push @flags, "trivial_bw:400000";
     }
+
+    # Add features
+    if (defined($features{$type})) {
+	push @features, "$features{$type}";
+    }
+
+    #
+    # Handle subnodes
+    #
+    if ($subnode_of{$node}) {
+	# We don't want to include subnodes unless their parent node is going
+	# to be in the ptop file too
+	if (!$nodes{$subnode_of{$node}}) {
+	    # In fact, nuke it from %nodes so that we don't include its links,
+	    # either
+	    delete $nodes{$node};
+	    next;
+	}
+	# Push the subnode's information into its flags
+	push @flags, "subnode_of:$subnode_of{$node}";
+    }
+
+    my $text = "node $node " . join(" ",@types) . " - " . join(" ",@features) .
+	" - " . join(" ",@flags);
+
+
     print "$text\n";
 }
 
