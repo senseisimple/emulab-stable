@@ -224,6 +224,11 @@ namespace eval GLOBALS {
 
     # Hidden variable to relax some restrictions for debugging.
     variable enforce_user_restrictions 1
+
+    # CPU and MEM usage values. Zero means ignore. For now, lets make
+    # it an integer, 1 <= x <= 5.
+    variable cpu_usage 0
+    variable mem_usage 0
 }
 
 # Load all our classes

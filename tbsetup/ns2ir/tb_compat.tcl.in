@@ -680,3 +680,28 @@ proc tb-set-node-startcmd {node command} {
 
     return $newprog
 }
+
+#
+# More crude controls.
+#
+proc tb-set-mem-usage {usage} {
+    var_import ::GLOBALS::mem_usage
+
+    if {$usage < 1 || $usage > 5} {
+	perror "\[tb-set-mem-usage] usage must be 1 <= factor <= 5"
+	return
+    }
+
+    set mem_usage $usage
+}
+proc tb-set-cpu-usage {usage} {
+    var_import ::GLOBALS::cpu_usage
+
+    if {$usage < 1 || $usage > 5} {
+	perror "\[tb-set-cpu-usage] usage must be 1 <= factor <= 5"
+	return
+    }
+
+    set cpu_usage $usage
+}
+
