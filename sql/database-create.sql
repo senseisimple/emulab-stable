@@ -862,6 +862,7 @@ CREATE TABLE users (
   uid varchar(8) NOT NULL default '',
   usr_created datetime default NULL,
   usr_expires datetime default NULL,
+  usr_modified datetime default NULL,
   usr_name tinytext,
   usr_title tinytext,
   usr_affil tinytext,
