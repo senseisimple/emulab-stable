@@ -37,10 +37,10 @@ if (mysql_num_rows($query_result) == 0) {
     USERERROR("There are no projects to approve!", 1);
 }
 
-echo "Below is the list of projects waiting for approval or denial. Click
+echo "<p>Below is the list of projects waiting for approval or denial. Click
       on a particular project to act on it, and you will be zapped to a
       page with more information about the project, and your options menu.
-      <p>\n";
+      </p>\n";
       
 echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
        >\n";
