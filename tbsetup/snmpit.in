@@ -287,7 +287,8 @@ foreach my $stack_id (keys %stacks) {
     # more database information to be able to distinguish stack types
     #
     use snmpit_cisco_stack;
-    my $stack = new snmpit_cisco_stack($stack_id,@{$stacks{$stack_id}});
+    my $stack = new snmpit_cisco_stack($stack_id,$debug,
+	@{$stacks{$stack_id}});
     push @stacks, $stack;
 }
 
@@ -617,7 +618,7 @@ sub doDeleteVlan($) {
 	    $exists = 1;
 	    print "Deleting VLAN $vlan_name ...\n";
 	    my $ok = $stack->removeVlan($vlan_name);
-	    print "VLAN creation ";
+	    print "VLAN deletion ";
 	    print $ok? "succeeded":"failed",".\n";
 	    if (!$ok) {
 		$errors++;

@@ -591,16 +591,16 @@ sub removePortsFromVlan($$) {
     # Get a list of the ports in the VLAN
     #
     #
-    my $VlanPortVlan = ["vlanPortVlan",0]; # index by module.port, gives vlan #
+    my $VlanPortVlan = ["vlanPortVlan"]; # index by module.port, gives vlan #
 
     #
     # Walk the tree to find VLAN membership
     #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan);
+    my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan,3);
     my @ports;
     foreach my $rowref (@$rows) {
     	my ($name,$modport,$port_vlan_number) = @$rowref;
-    	$self->debug("Got $name $modport $port_vlan_number\n",3);
+    	$self->debug("Got $name $modport $port_vlan_number\n");
 	if ($port_vlan_number == $vlan_number) {
 	    push @ports, $modport;
 	}

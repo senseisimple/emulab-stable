@@ -28,13 +28,14 @@ use libdb;
 # usage: new(string name, string stack_id, list of devicenames)
 # returns a new object blessed into the snmpit_cisco_stack class
 #
-sub new($$@) {
+sub new($$#@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
     my $class = ref($proto) || $proto;
 
     my $stack_id = shift;
+    my $debuglevel = shift;
     my @devicenames = @_;
 
     #
@@ -45,7 +46,11 @@ sub new($$@) {
     #
     # Set up some defaults
     #
-    $self->{DEBUG} = 0;
+    if (defined $debuglevel) {
+	$self->{DEBUG} = $debuglevel;
+    } else {
+	$self->{DEBUG} = 0;
+    }
 
     #
     # The stackid just happens to also be leader of the stack
