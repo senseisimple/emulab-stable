@@ -59,14 +59,6 @@ if (!$isadmin) {
 
 SHOWGROUP($pid, $gid);
 
-#
-# An edit option.
-# 
-echo "<p><center>
-       Do you want to edit this Group?
-       <A href='editgroup_form.php3?pid=$pid&gid=$gid'>Yes</a>
-      </center>\n";
-
 SHOWGROUPMEMBERS($pid, $gid);
 
 #
@@ -97,13 +89,20 @@ if (mysql_num_rows($query_result)) {
 }
 
 #
+# An edit option.
+# 
+echo "<br>
+      <center>
+       <A href='editgroup_form.php3?pid=$pid&gid=$gid'>Edit</a> this Group?
+      </center>\n";
+
+#
 # A delete option, but not for the default group!
 #
 if (strcmp($gid, $pid)) {
-    echo "<p><center>
-             Do you want to delete this Group?
-             <A href='deletegroup.php3?pid=$pid&gid=$gid'>Yes</a>
-            </center>\n";
+    echo "<p>
+           <A href='deletegroup.php3?pid=$pid&gid=$gid'>Delete</a> this Group?
+          \n";
 }
 
 #
