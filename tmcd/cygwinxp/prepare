@@ -15,6 +15,7 @@ my @DBFILES     = ();
 my @VARDIRS	= ("logs", "db", "jails", "boot", "lock", "lib/dhcp");
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
+my $SOURCES     = "~root/flux/testbed";
 my $HISTORY     = "~root/.bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
 my $NTPDRIFT    = "/etc/ntp/drift";
@@ -62,6 +63,10 @@ foreach my $dbfile (@DBFILES) {
     }
 }
 
+# Stop anything holding a logfile open which we will want to remove below.
+print "Stopping the watchdog ...\n";
+system("$BINDIR/watchdog stop");
+
 print "Cleaning logfiles ...\n";
 opendir(LOG,$LOGDIR) or
     die("Could not open directory $LOGDIR: $!");
@@ -106,6 +111,9 @@ if (-f $NTPDRIFT) {
     print DRIFT "0\n";
     close(DRIFT);
 }
+
+print "Clearing out testbed sources ...\n";
+system("rm -rf $SOURCES");
 
 print "Clearing out $RUNDIR ...\n";
 system("rm -rf $RUNDIR/*.pid");
