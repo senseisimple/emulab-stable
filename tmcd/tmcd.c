@@ -2392,6 +2392,14 @@ COMMAND_PROTOTYPE(dostate)
 
 	newstate = rdata;
 
+	/*
+	 * Make sure there is some state being reported. Perhaps we should
+	 * look in the  database to make sure that the one being reported is
+	 * a valid one.
+	 */
+	if (!*newstate) {
+	    error("dostate: No state reported!\n");
+	}
 
 #ifdef EVENTSYS
 	/*
