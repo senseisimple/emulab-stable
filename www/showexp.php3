@@ -118,6 +118,43 @@ echo "<tr>
 
 ?>
 </table>
+
+<?php
+
+#
+# Suck out the node information.
+# 
+$reserved_result = mysql_db_query($TBDBNAME,
+	"SELECT * FROM reserved WHERE ".
+        "eid=\"$exp_eid\" and pid=\"$exp_pid\"");
+if (mysql_num_rows($reserved_result)) {
+    echo "<h3>Reserved Nodes</h3>
+          <table align=center border=1>
+          <tr>
+              <td>Node ID</td>
+              <td>Node Type</td>
+          </tr>\n";
+
+    #
+    # I'm so proud!
+    #
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT nodes.node_id, nodes.type FROM nodes LEFT JOIN reserved ".
+        "ON nodes.node_id=reserved.node_id ".
+        "WHERE reserved.eid=\"$exp_eid\" and reserved.pid=\"$exp_pid\"");
+
+    while ($row = mysql_fetch_array($query_result)) {
+        $node_id = $row[node_id];
+        $type    = $row[type];
+        echo "<tr>
+                  <td>$node_id</td>
+                  <td>$type</td>
+              </tr>\n";
+    }
+    echo "</table>\n";
+}
+
+?>
 </center>
 </body>
 </html>
