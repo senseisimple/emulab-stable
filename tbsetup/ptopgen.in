@@ -13,7 +13,7 @@ sub usage()
 {
     print("Usage: ptopgen [-v] [-s switch] [-p pid [-e eid]] [-m factor]\n" .
 	  "       -p include nodes the project has permission to use\n".
-	  "       -e include given experiment's resources\n" .
+	  "       -e include given experiments resources\n" .
 	  "          in the ptopfile (as if they were free)\n" .
 	  "       -v Include stuff for topologies with virtual nodes\n".
 	  "       -r Include stuff for topologies with widearea nodes\n".
@@ -59,6 +59,8 @@ my $TRACK_INTERSWITCH_BANDWIDTH = "@TRACK_INTERSWITCH_BANDWIDTH@";
 my %switches	  = ();
 my %used_switches = ();
 my %permissions   = ();
+my %typemap       = ();
+my %auxtypemap    = ();
 
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
@@ -101,12 +103,19 @@ if (defined($options{"e"})) {
 
 # Read class/type maps
 my $result =
-    DBQueryFatal("select class,type,delay_capacity,virtnode_capacity ".
+    DBQueryFatal("select class,type,delay_capacity,".
+		 "   virtnode_capacity,isvirtnode ".
 		 "from node_types");
-while (($class,$type,$delaycapacity,$vcap) = $result->fetchrow_array) {
-    $classes{$type} = $class;
-    $nodetypes{$type} = $delaycapacity;
-    $virtcapacity{$type} = $vcap;
+while (($class,$type,$delaycapacity,
+	$virtcapacity,$isvirt) = $result->fetchrow_array) {
+    $map = {};
+    $map->{'CLASS'}    = $class;
+    $map->{'DELAYCAP'} = $delaycapacity;
+    $map->{'VIRTCAP'}  = $virtcapacity;
+    $map->{'ISVIRT'}   = $isvirt;
+    $map->{'FEATURES'} = [];
+    $map->{'AUXTYPES'} = {};
+    $typemap{$type} = $map;
 
     # Default is permission to use all types,classes. 
     $permissions{$class} = 1;
@@ -118,11 +127,16 @@ while (($class,$type,$delaycapacity,$vcap) = $result->fetchrow_array) {
 # 
 $result = DBQueryFatal("select type, feature, weight from node_type_features");
 while (my ($type, $feature, $weight) = $result->fetchrow()) {
-    if (! defined($type_features{$type})) {
-	$type_features{$type} = ["$feature:$weight"];
-    } else {
-	push @{$type_features{$type}}, "$feature:$weight";
-    }
+    push(@{$typemap{$type}->{'FEATURES'}}, "$feature:$weight");
+}
+
+#
+# Read the auxtypes for each type.
+# 
+$result = DBQueryFatal("select auxtype,type from node_types_auxtypes");
+while (my ($auxtype,$type) = $result->fetchrow()) {
+    $typemap{$type}->{'AUXTYPES'}->{$auxtype} = 1;
+    $auxtypemap{$auxtype} = $type;
 }
 
 #
@@ -146,7 +160,7 @@ while (my ($node_id, $type, $count) = $result->fetchrow()) {
 	$auxtypes{$node_id} = ["$type:$count"];
 	next;
     }
-    push @{$auxtypes{$type}}, " $type:$count";
+    push @{$auxtypes{$node_id}}, "$type:$count";
 }
 #
 # Read the permission table if given a pid. If there is an entry in
@@ -169,9 +183,6 @@ if (defined($pid)) {
 	$permissions{$type} = 1;
     }
 }
-
-# switches can't delay
-$nodetypes{"switch"} = 0;
 
 # Print switches
 if (defined($switchtouse)) {
@@ -229,26 +240,26 @@ while (($node,$type,$physnode,$class,$issubnode) = $result->fetchrow_array) {
 }
 
 foreach $node (keys(%nodes)) {
-    my $type = $nodes{$node};
+    my $type  = $nodes{$node};
+    my $class = $typemap{$type}->{'CLASS'};
+    my $delay_capacity = $typemap{$type}->{'DELAYCAP'};
     
     my @types = ("$type:1");
     my @features;
     my @flags;
+    my $needvirtgoo = 0;
 
     # Might be equal, which assign would sum as two, not one!
-    if ($type ne $classes{$type}) {
-	push(@types, "$classes{$type}:1");
+    if ($type ne $class) {
+	push(@types, "$class:1");
     }
 
-    $delay_capacity = $nodetypes{$type};
-    $virtnode_capacity = $virtcapacity{$type};
-    
     if ($delay_capacity > 0) {
 	push @types, "delay:$delay_capacity";
 	    
 	#################################################################
 	### NSE Node hack. Instead of adding sim nodes into the
-	### database schema, I'm just adding it here for now
+	### database schema, I am just adding it here for now
 	### untill we can figure out how to add sim nodes into the
 	### nodes table.  One assumption is that if we the node
 	### type can support delay nodes, then it is a local node
@@ -260,29 +271,44 @@ foreach $node (keys(%nodes)) {
     #
     # Add any auxiliary types
     #
-    if ($auxtypes{$node}) {
-	push @types, @{$auxtypes{$node}};
-    }
+    foreach my $auxinfo (@{$auxtypes{$node}}) {
+	my ($auxtype,$count) = split(":", $auxinfo);
+	my $realtype;
 
-    if ($virtstuff && $virtnode_capacity > 0) {
-	#
-	# Ditto for jailed nodes
-	#
-	if (defined($mfactor) && $mfactor <= $virtnode_capacity) {
-	    push @types, "pcvm:$mfactor";
+	# Map an auxtype back to its real type, unless it is a real type.
+	if (defined($auxtypemap{$auxtype})) {
+	    $realtype = $auxtypemap{$auxtype};
 	}
 	else {
-	    push @types, "pcvm:$virtnode_capacity";
+	    $realtype = $auxtype;
 	}
+
+	if ($typemap{$realtype}->{'ISVIRT'} && $count > 0) {
+	    next
+		if (! $virtstuff);
+		
+	    if (defined($mfactor) && $mfactor <= $count) {
+		$auxinfo = "$auxtype:$mfactor";
+	    }
+	    else {
+		$auxinfo = "$auxtype:$count";
+	    }
+	    $needvirtgoo = 1;
+	}
+	push(@types, $auxinfo);
+    }
+
+    #
+    # This stuff is extra goo for local virtual nodes.
+    # 
+    if ($needvirtgoo) {
 	push @types, "*lan:*";
 	# Add trivial bw spec.
 	push @flags, "trivial_bw:400000";
     }
 
     # Add features
-    if (defined($type_features{$type})) {
-	push @features, @{$type_features{$type}};
-    }
+    push(@features, @{$typemap{$type}->{'FEATURES'}});
     if (defined($features{$node})) {
 	push @features, @{$features{$node}};
     }
@@ -321,9 +347,13 @@ foreach $node (keys(%nodes)) {
 # another mechanism for this. We only add virtnodes when assign says
 # we need them. This reduces the problem size for assign.
 #
+# The types we lay out are only those in the auxtypes table for the node,
+# since that is where we define what vtypes are hosted on a particular
+# physnode. 
+#
 if ($widearea) {
     $result =
-	DBQueryFatal("select count(a.node_id),a.type,a.phys_nodeid,aa.type, ".
+	DBQueryFatal("select count(a.node_id),a.phys_nodeid,aa.type, ".
 		     "  ns.status, wn.site ".
 		     "  from nodes as a ".
  		     "left join reserved as b on a.node_id=b.node_id ".
@@ -339,19 +369,18 @@ if ($widearea) {
 		     "         !(m.pid='$DEADPID' and m.eid='$DEADEID'))) ".
 		     "group by a.phys_nodeid");
     
-    while (($count,$type,$physnode,$ptype,$status,$site)
+    while (($count,$physnode,$ptype,$status,$site)
 	    = $result->fetchrow_array) {
+	my $class = $typemap{$ptype}->{'CLASS'};
 	my @types;
 	my @features;
 	my @flags;
 
-	$virtnode_capacity = min($count, $virtcapacity{$ptype});
-
-	@types = ("$type:$virtnode_capacity");	
-
-	# Might be equal, which assign would sum as two, not one!
-	if ($type ne $classes{$type}) {
-	    push(@types, "$classes{$type}:$virtnode_capacity");
+	# capacity is smaller of mfactor, number of unallocated virtual node
+	# and the per-auxtype capacity below.
+	my $virtnode_capacity = $count;
+	if (defined($mfactor) && $mfactor <= $virtnode_capacity) {
+	    $virtnode_capacity = $mfactor;
 	}
 
 	#
@@ -373,14 +402,14 @@ if ($widearea) {
 	#
 	# Add any auxiliary types.
 	#
-	# XXX These come from the physnode, not the vnode. 
-	#
-	if ($auxtypes{$physnode}) {
-	    foreach my $auxtype (@{$auxtypes{$physnode}}) {
-		my ($type,$num) = split(":", $auxtype);
+	foreach my $auxinfo (@{$auxtypes{$physnode}}) {
+	    my ($auxtype,$count) = split(":", $auxinfo);
 
-		push(@types, "$type:$virtnode_capacity");
+	    if ($count > $virtnode_capacity) {
+		$auxinfo = "$auxtype:$virtnode_capacity";
 	    }
+
+	    push(@types, $auxinfo);
 	}
 
 	# Add trivial bw spec.
@@ -390,9 +419,7 @@ if ($widearea) {
 	push @flags, "unique";
 
 	# Add features
-	if (defined($type_features{$type})) {
-	    push @features, @{$type_features{$type}};
-	}
+	push(@features, @{$typemap{$ptype}->{'FEATURES'}});
 	if (defined($features{$physnode})) {
 	    push @features, @{$features{$physnode}};
 	}
