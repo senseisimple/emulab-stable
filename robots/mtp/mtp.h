@@ -131,18 +131,17 @@ struct position {
   float x;
   float y;
   float theta;
+  double timestamp;
 };
 
 struct mtp_update_position {
   int robot_id;
   struct position position;
   int status;
-  int timestamp;
 };
 
 struct mtp_request_id {
   struct position position;
-  int timestamp;
 };
 
 struct mtp_update_id {
