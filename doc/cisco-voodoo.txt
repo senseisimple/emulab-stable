@@ -165,3 +165,21 @@ ID  Name                            Members of VLAN
    	Console> (enable) set port enable <port>
    To disable security for a port:
    	Console> (enable) set port security <port> disable
+
+8. Manual VLAN configuration - From the switch command line
+   To see a list of all configured VLANs, use:
+     Console> (enable) show vlan
+   On the control net, all of the VLAN names should be self-explanatory
+   Adding a port to a VLAN is very easy. Just type:
+     Console> (enable) set vlan <NUM> <PORT>
+   ... where <NUM> is the number of the VLAN, and <PORT> is the port (you can
+     use the 'if2port' script to get the port number)
+   To 'remove' a port from a VLAN, set it to VLAN 1.
+   To create a new VLAN, use:
+     Console> (enable) set vlan <NUM> name <NAME>
+   ... where <NUM> is some unused VLAN number (use 'show vlan' to find one), and
+     <NAME> is some descriptive string
+   To delte a VLAN use:
+      Console> (enable) clear vlan <NUM>
+   ... where <NUM> is the VLAN number (duh!) NOTE: This puts all of the VLANs ports
+     back into VLAN 1, and disables them. Use 'set port enable <PORT>' to re-enable it
