@@ -7,7 +7,7 @@ $WWW            = "$WWWHOST";
 $TBBASE         = "https://$WWW";
 $TBDOCBASE      = "http://$WWW";
 $TBWWW          = "<$TBBASE/>";
-$TBAUTHDOMAIN   = "mini.emulab.net";
+$TBAUTHDOMAIN   = ".mini.emulab.net";
 $TBSECURECOOKIES= 1;
 
 $TBMAILADDR_OPS		= "minitestbed-ops@flux.cs.utah.edu";
