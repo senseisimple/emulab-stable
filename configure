@@ -1511,6 +1511,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	xmlrpc/emulab xmlrpc/node xmlrpc/experiment xmlrpc/fs xmlrpc/user \
 	xmlrpc/imageid xmlrpc/osid xmlrpc/server xmlrpc/xmlrpcbag \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
+	cdrom/groklilo/GNUmakefile \
 	install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile "
 
