@@ -51,7 +51,9 @@ if (! in_array($value, $values[$type])) {
 #
 if ($type=="adminoff") {
     # must be admin
-    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN)) {
+    # Don't check if they are admin mode (ISADMIN), check if they
+    # have the power to change to admin mode!
+    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
     # Admins can change status for other users.
@@ -61,10 +63,10 @@ if ($type=="adminoff") {
     
 } elseif ($type=="swappable" || $type=="idleswap" || $type=="autoswap") {
     # must be admin OR must have permission to modify the expt...
-    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN) ||
-	! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
+    if (! ISADMIN() && !TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
+    
     # require pid/eid
     if (!isset($pid) || !isset($eid) ||
 	!TBValidExperiment($pid, $eid)) {
@@ -112,7 +114,7 @@ if ($type=="adminoff") {
     
 } elseif ($type=="idle_ignore") {
     # must be admin 
-    if (! ($CHECKLOGIN_STATUS & CHECKLOGIN_ISADMIN)) {
+    if (! ISADMIN() ) {
 	USERERROR("You do not have permission to toggle $type!", 1);
     }
     # require pid/eid
@@ -134,7 +136,9 @@ if ($type=="adminoff") {
 #
 # Spit out a redirect 
 #
-if (isset($HTTP_REFERER) && strcmp($HTTP_REFERER, "")) {
+if (isset($HTTP_REFERER) && $HTTP_REFERER != "" &&
+    strpos($HTTP_REFERER,$_SERVER[SCRIPT_NAME])===false) {
+    # Make sure the referer isn't me!
     header("Location: $HTTP_REFERER");
 }
 else {
