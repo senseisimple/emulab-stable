@@ -15,10 +15,10 @@ use URI::http;
 #
 sub usage()
 {
-    die("Usage: webserver.pl\n");
+    die("Usage: webserver.pl <start | stop>\n");
 }
 my $logname = "/var/emulab/logs/webserver.log";
-my $pidfile = "/var/run/webserver.pid";
+my $pidfile = "/var/run/emulab-webserver.pid";
 my $webpage = "http://www.emulab.net/widearea_redirect.php";
 my $IP;
 
@@ -32,6 +32,27 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
+
+# Parse command line.
+if (@ARGV != 1) {
+    usage();
+}
+my $action = $ARGV[0];
+if ($action ne "start" && $action ne "stop") {
+    usage();
+}
+
+#
+# For stop, look to see if the pid file exists. If so, kill it and exit.
+#
+if ($action eq "stop") {
+    if (! -e $pidfile) {
+	exit(0);
+    }
+    system("kill `cat $pidfile`");
+    unlink($pidfile);
+    exit($? >> 8);
+}
 
 my $webserver = HTTP::Daemon->new(LocalPort => 'http(80)',
 				  Reuse     => 1)
@@ -49,10 +70,8 @@ if ($mypid) {
 #
 # Write our pid into the pid file so we can be killed.
 #
-open(PFILE, "> $pidfile")
-    or die("Could not open $pidfile: $!");
-print PFILE "$PID\n";
-close(PFILE);
+system("echo '$PID' > $pidfile") == 0
+    or die("Could not create $pidfile!");
 
 #
 # We have to disconnect from the caller by redirecting STDIN and STDOUT.

@@ -12,12 +12,12 @@
 case "$1" in
 start)
 	if [ -f $BINDIR/emulabctl ]; then
-	    $BINDIR/emulabctl start
+	    $BINDIR/emulabctl start && echo -n ' Emulab'
 	fi
 	;;
 stop)
 	if [ -f $BINDIR/emulabctl ]; then
-	    $BINDIR/emulabctl stop
+	    $BINDIR/emulabctl stop && echo -n ' Emulab'
 	fi
 	;;
 restart)

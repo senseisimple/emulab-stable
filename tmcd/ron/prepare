@@ -1,0 +1,197 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+require 'ctime.pl';
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Prepare the node for cutting a new image. Should be run just prior, on
+# each of the FreeBSD and Linux partitions.
+#
+my $DUMPDATES   = "/etc/dumpdates";
+my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
+my $FSTAB       = "/etc/fstab";
+my $LOGDIR      = "/var/log";
+my $RUNDIR      = "/var/run";
+my $ACCTDIR     = "/var/account";
+my $HISTORY     = "/root/.history";
+my $MAILDIR     = "/var/mail";
+my $LEASES      = "/var/db/dhclient.leases";
+my $NTPDRIFT    = "/etc/ntp.drift";
+my $SFSUSERS    = "/etc/sfs/sfs_users";
+my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
+my $MOUNTINFO	= "/var/db/mounttab";
+my @ETCFILES    = ("rc.conf.local", "resolv.conf", "namedb/localhost.rev",
+		   "emulab.pkey", "emulab-hard.txt", "emulab-soft.txt");
+my $USERS	= "/users";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+#
+# First clean up the node as it would be if free.
+#
+cleanup_node(1);
+
+#
+# Build the locate database. I hate that its never there!
+#
+if (-x "/usr/libexec/locate.updatedb") {
+    print "Building the locate database ... Be patient, will ya!\n";
+    system("/usr/libexec/locate.updatedb");
+}
+
+#
+# Generate a dumpdates file. Use fstab to find out what filesystems
+# need entries, and then put in entries for each filesystem using
+# the current date.
+#
+print "Removing old /etc/dumpdates file ...\n";
+if (-e $DUMPDATES) {
+    unlink($DUMPDATES) or
+	die("Could not unlink $DUMPDATES");
+}
+
+print "Creating stub /etc/dumpdates file ...\n";
+open(TAB, "$FSTAB") or
+    die("Could not open $FSTAB: $!");
+open(DMP, ">$DUMPDATES") or
+    die("Could not open $DUMPDATES: $!");
+
+while (<TAB>) {
+    if ($_ =~ /^([\w\/]+).*(\d).*\d$/) {
+	if ($2 != 0) {
+	    my $t = localtime(time);
+	    print DMP "$1                          0 $t\n";
+	}
+    }
+}
+close(DMP);
+close(TAB);
+
+print "Cleaning logfiles ...\n";
+opendir(LOG,$LOGDIR) or
+    die("Could not open directory $LOGDIR: $!");
+
+while ($dirent = readdir(LOG)) {
+    my $file = $LOGDIR . "/" . $dirent;
+    if (-f $file) {
+        if (($file =~ /\.\d+$/) || ($file =~ /\.\d\.gz$/) ||
+	    ($file =~ /\.(today|yesterday)$/)) {
+            # Remove archived logfiles
+            unlink($file) or
+                die("Could not unlink $file: $!");
+        } elsif (-s $file) {
+            # Truncate other logfiles - many do not get re-created
+            truncate($file,0) or
+                die("Could not truncate $file: $!");
+        }
+    }
+}
+closedir(LOG);
+
+#
+# Must remove /var/db/mounttab or else at boot time the node will attempt
+# to contact all the servers listed in the file to tell them that the
+# indicated filesystems are no longer mounted by this node.  Normally this
+# is harmless however, if the listed server is not reachable in the image's
+# new environment (e.g., you are making an image for another testbed), each
+# and every one of the listed server/fs pairs will hang for 5 minutes or so.
+#
+print "Removing $MOUNTINFO ...\n";
+if (-f $MOUNTINFO) {
+    unlink($MOUNTINFO) or
+        die("Could not unlink $MOUNTINFO: $!");
+}    
+
+print "Removing root's history ...\n";
+if (-f $HISTORY) {
+    unlink($HISTORY) or
+        die("Could not unlink $HISTORY: $!");
+}
+
+print "Cleaning mail spool files ...\n";
+system("rm -rf $MAILDIR/*");
+
+#
+# Just removing the drift file results in no drift being tracked,
+# so set it to zero instead.  Not ideal, but at least the clock will
+# stabilize eventually this way.
+#
+print "Resetting drift in $NTPDRIFT ...\n";
+if (-f $NTPDRIFT) {
+    open(DRIFT, ">$NTPDRIFT") or
+	die("Could not open $NTPDRIFT: $!");
+    print DRIFT "0\n";
+    close(DRIFT);
+}
+
+print "Cleaning .pid files ...\n";
+system("rm -rf $RUNDIR/*.pid");
+
+print "Clearing utmp file ...\n";
+system("rm -rf $RUNDIR/utmp");
+
+print "Cleaning out /tmp ...\n";
+system("rm -rf /tmp/* /tmp/.??*");
+
+print "Removing dhclient leases ...\n";
+system("rm -f $LEASES");
+
+print "Cleaning out old accounting files ...\n";
+system("rm -rf $ACCTDIR/*");
+
+#
+# Urk.  Old copies of passwd files are stored here...
+#
+print "Cleaning out /var/backups ...\n";
+system("rm -rf /var/backups/*");
+
+
+print "Removing SFS files ...\n";
+if (-f $SFSUSERS) {
+    system("rm -f $SFSUSERS ${SFSUSERS}.pub");
+    system("rm -f $SFSUSERS.old ${SFSUSERS}.pub.old");
+}
+if (-f $SFSHOSTKEY) {
+    system("rm -f $SFSHOSTKEY");
+}
+
+
+print "Clearing out directories in $VARDIR ...\n";
+foreach my $dir (@VARDIRS) {
+    if (-d "$VARDIR/$dir") {
+	system("rm -rf $VARDIR/$dir/*");
+    }
+}
+
+print "Clearing localization files from /etc ...\n";
+foreach my $file (@ETCFILES) {
+    if (-f "/etc/$file") {
+	system("rm -f /etc/$file");
+    }
+}
+
+print "Clearing out /users ...\n";
+system("rm -rf $USERS/*");
+
+print "Recreating ~emulabman after clearing /users ...\n";
+system("$BINDIR/mkemuman.sh");
+
+print "Clearing out old SFS links ... \n";
+system("rm -f /netbed/*");
+
