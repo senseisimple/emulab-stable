@@ -290,19 +290,19 @@ if (mysql_num_rows($experiments_result)) {
 		isset($perexp_usage["$pid:$eid"]["pc"])) {
 	      $pcs = $perexp_usage["$pid:$eid"]["pc"];
 	    } else { $pcs=0; }
+	    $foo .= "<td align=center valign=center>\n";
  	    if ($inactive[$expt]==1 && $stale[$expt]!=1 &&
 	        !$slothderr && $pcs) {
-	      $foo .= "<td align=center valign=center>
-  <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\"> 
+	      $foo .= "  <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\"> 
   <img src=\"redball.gif\"></a>\n" ;
-	      if ($swapreq > 0) {
-		$foo .= "&nbsp;$swapreq&nbsp;sent ${lastswapreq}&nbsp;hrs&nbsp;ago\n";
-	      }
-	      $foo .= "</td>\n"; 
 	    } else {
-	      if (!$pcs) { $foo .= "<td>(no PCs)</td>\n"; }
-	      else { $foo .="<td>&nbsp;</td>\n"; }
+	      if (!$pcs) { $foo .= "(no PCs)\n"; }
+	      else { $foo .="&nbsp;"; }
 	    }
+	    if ($swapreq > 0) {
+	      $foo .= "&nbsp;$swapreq&nbsp;sent ${lastswapreq}&nbsp;hrs&nbsp;ago\n";
+	    }
+	    $foo .= "</td>\n"; 
 	}
 
 	if ($idle && ($str=="&nbsp;" || !$pcs)) { continue; }
