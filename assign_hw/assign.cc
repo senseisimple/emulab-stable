@@ -187,30 +187,23 @@ int assign()
 	  // instead re randomly choose a node and remove it and
 	  // then continue the 'continue'
 	  // XXX - could improve this
-	  node n = G.choose_node();
-	  while (G[n].posistion != 0)
-	    n = G.choose_node();
-	  remove_node(n);
-	  unassigned_nodes.insert(n,random());
+	  node ntor = G.choose_node();
+	  while (G[ntor].posistion == 0)
+	    ntor = G.choose_node();
+	  remove_node(ntor);
+	  unassigned_nodes.insert(ntor,random());
 	  continue;
 	}
       }
       if (unassigned) unassigned_nodes.del(n);
 
       newscore = get_score();
-      //      if (newscore < 0.11f) {
-      if (newscore < optimal) {
-	timeend = used_time(timestart);
-	cout << "OPTIMAL ( " << optimal << ") in "
-	     << iters << " iters, "
-	     << timeend << " seconds" << endl;
-	goto DONE;
-      }
+
       /* So it's negative if bad */
       scorediff = bestscore - newscore;
 
       // tinkering aournd witht his.
-      if ((violated < bestviolated) ||
+      if ((newscore < optimal) || (violated < bestviolated) ||
 	  ((violated == bestviolated) && (newscore < bestscore)) ||
 	  accept(scorediff*((bestviolated - violated)/2), temp)) {
 	bestnodes[n] = G[n].posistion;
@@ -227,6 +220,14 @@ int assign()
 	  absbest = newscore;
 	  absbestv = violated;
 	  cycles_to_best = iters;
+	}
+	//      if (newscore < 0.11f) {
+	if (newscore < optimal) {
+	  timeend = used_time(timestart);
+	  cout << "OPTIMAL ( " << optimal << ") in "
+	       << iters << " iters, "
+	       << timeend << " seconds" << endl;
+	  goto DONE;
 	}
       } else { /* Reject this change */
 	remove_node(n);
@@ -267,6 +268,12 @@ int assign()
   cout << "With " << violated << " violations" << endl;
   cout << "With " << accepts << " accepts of increases\n";
   cout << "Iters to find best score:  " << cycles_to_best << endl;
+  cout << "Violations: " << violated << endl;
+  cout << "  unassigned: " << vinfo.unassigned << endl;
+  cout << "  pnode_load: " << vinfo.pnode_load << endl;
+  cout << "  no_connect: " << vinfo.no_connection << endl;
+  cout << "  link_users: " << vinfo.link_users << endl;
+  cout << "  bandwidth:  " << vinfo.bandwidth << endl;
 
   return 0;
 }
@@ -529,6 +536,9 @@ int main(int argc, char **argv)
   argv += optind;
 
   int seed = time(NULL)+getpid();
+  if (getenv("ASSIGN_SEED") != NULL) {
+    sscanf(getenv("ASSIGN_SEED"),"%d",&seed);
+  }
   printf("seed = %d\n",seed);
   srandom(seed);
 

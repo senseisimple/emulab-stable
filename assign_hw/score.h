@@ -30,8 +30,17 @@ const float SCORE_UNASSIGNED = 1;
 // Cost of going over bandwidth
 const float SCORE_OVER_BANDWIDTH = 0.5;
 
+typedef struct {
+  int unassigned;
+  int pnode_load;
+  int no_connection;
+  int link_users;
+  int bandwidth;
+} violated_info;
+
 extern float score;
 extern int violated;
+extern violated_info vinfo;
 
 void init_score();
 void remove_node(node n);

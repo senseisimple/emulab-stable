@@ -122,6 +122,14 @@ int parse_ptop(tb_pgraph &PG, istream& i)
 	dnode = strsep(&dmac,":");
 	string s1(snode);
 	string s2(dnode);
+	if (nmap.lookup(s1) == nil) {
+	  fprintf(stderr,"PTOP error: Unknown source node %s\n",snode);
+	  exit(1);
+	}
+	if (nmap.lookup(s2) == nil) {
+	  fprintf(stderr,"PTOP error: Unknown destination node %s\n",dnode);
+	  exit(1);
+	}
 	node node1 = nmap.access(s1);
 	node node2 = nmap.access(s2);
 	for (int i = 0; i < num; ++i) {

@@ -35,6 +35,8 @@ int violated;			// How many times the restrictions
 node pnodes[MAX_PNODES];	// int->node map
 				// pnodes[0] == NULL
 
+violated_info vinfo;		// specific info on violations
+
 extern tb_vgraph G;		// virtual graph
 extern tb_pgraph PG;		// physical grpaph
 
@@ -71,6 +73,8 @@ void init_score()
 #endif
   score=0;
   violated=0;
+  vinfo.unassigned = vinfo.pnode_load = 0;
+  vinfo.no_connection = vinfo.link_users = vinfo.bandwidth = 0;
 
   node n;
   edge e;
@@ -79,6 +83,7 @@ void init_score()
     vn.posistion=0;
     vn.no_connections=0;
     SADD(SCORE_UNASSIGNED);
+    vinfo.unassigned++;
     violated++;
   }
   forall_edges(e,G) {
@@ -194,6 +199,7 @@ void remove_node(node n)
   // remove scores associated with the node
   SSUB(SCORE_NO_CONNECTION*vnoder.no_connections);
   violated -= vnoder.no_connections;
+  vinfo.no_connection -= vnoder.no_connections;
 
   // adjust pnode scores
   pnoder.current_load--;
@@ -221,10 +227,12 @@ void remove_node(node n)
     fprintf(stderr,"  reducing penalty, new load = %d (>= %d)\n",pnoder.current_load,pnoder.max_load);
 #endif
     SSUB(SCORE_PNODE_PENALTY);
+    vinfo.pnode_load--;
     violated--;
   }
   // add score for unassigned node
   SADD(SCORE_UNASSIGNED);
+  vinfo.unassigned++;
   violated++;
 #ifdef SCORE_DEBUG
   fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
@@ -378,9 +386,14 @@ int add_node(node n,int ploc)
 #ifdef SCORE_DEBUG
 	  fprintf(stderr,"   could not find path - no connection\n");
 #endif
+	  // XXX - this is a hack for the moment
+	  pnoder.current_type = TYPE_UNKNOWN;
+	  return 1;
+	  
 	  // couldn't find path.
 	  vnoder.no_connections++;
 	  SADD(SCORE_NO_CONNECTION);
+	  vinfo.no_connection++;
 	  violated++;
  	} else {
 #ifdef SCORE_DEBUG
@@ -417,6 +430,7 @@ int add_node(node n,int ploc)
     fprintf(stderr,"  load to high - penalty (%d)\n",pnoder.current_load);
 #endif
     SADD(SCORE_PNODE_PENALTY);
+    vinfo.pnode_load++;
     violated++;
   } else {
 #ifdef SCORE_DEBUG
@@ -439,6 +453,7 @@ int add_node(node n,int ploc)
 
   // node no longer unassigned
   SSUB(SCORE_UNASSIGNED);
+  vinfo.unassigned--;
   violated--;
 
 #ifdef SCORE_DEBUG
@@ -534,19 +549,29 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
   edge best_first,best_second;
   float best_bw;
   float bw;
+  int best_length = 1000;
   
   best_bw=100.0;
   best_first = best_second = NULL;
+
 
   if (!src || ! dst) return 0;
   
   // try to find a path to the destination
   node ldst,ldstb;
   edge first,second;
+#ifdef SCORE_DEBUG
+  tb_pnode *ldstr,*ldstbr;
+  tb_plink *firstr,*secondr;
+#endif
   forall_inout_edges(first,src) {
     ldst = PG.target(first);
     if (ldst == src)
       ldst = PG.source(first);
+#ifdef SCORE_DEBUG
+    ldstr = &PG[ldst];
+    firstr = &PG[first];
+#endif
     if (ldst == dst) {
       // we've found a path, it's just firstedge
       if (first)
@@ -555,14 +580,19 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
 	best_first = first;
 	best_bw = bw;
 	best_second = NULL;
+	best_length = 1;
       }
     }
     forall_inout_edges(second,ldst) {
       ldstb = PG.target(second);
       if (ldstb == ldst)
 	ldstb = PG.source(second);
+#ifdef SCORE_DEBUG
+      ldstbr = &PG[ldstb];
+      secondr = &PG[second];
+#endif
       if (ldstb == dst) {
-	if (! best_second) continue;
+	if (best_length == 1) continue;
 	bw = (PG[first].bw_used+bandwidth)/PG[first].bandwidth;
 	if (second)
 	  // NOTE: One thing to try differently.
@@ -571,6 +601,7 @@ int find_interswitch_path(node src,node dst,int bandwidth,edge *f,edge *s)
 	  best_first = first;
 	  best_second = second;
 	  best_bw = bw;
+	  best_length = 2;
 	}
       }
     }
@@ -608,6 +639,7 @@ void score_link(edge e,edge v,bool interswitch)
       fprintf(stderr,"    not first user - penalty\n");
 #endif
       SADD(SCORE_DIRECT_LINK_PENALTY);
+      vinfo.link_users++;
       violated++;
     }
   }
@@ -622,6 +654,7 @@ void score_link(edge e,edge v,bool interswitch)
 	    pl.bw_used,pl.bandwidth);
 #endif
     violated++;
+    vinfo.bandwidth++;
     SADD(SCORE_OVER_BANDWIDTH);
   }
 }
@@ -649,6 +682,7 @@ void unscore_link(edge e,edge v,bool interswitch)
       fprintf(stderr,"   reducing users\n");
 #endif
       SSUB(SCORE_DIRECT_LINK_PENALTY);
+      vinfo.link_users--;
       violated--;
     }
   }
@@ -663,6 +697,7 @@ void unscore_link(edge e,edge v,bool interswitch)
 	    pl.bw_used,pl.bandwidth);
 #endif
     violated--;
+    vinfo.bandwidth--;
     SSUB(SCORE_OVER_BANDWIDTH);
   }
 }
