@@ -275,7 +275,7 @@ $unix_gid = $row[0];
 #
 # The mail message to the approval list.
 # 
-mail($TBMAIL_APPROVAL,
+mail($TBMAIL_APPROVE,
      "TESTBED: New Project '$pid' ($proj_head_uid)", "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
      "Name:          $usr_name ($proj_head_uid)\n".
