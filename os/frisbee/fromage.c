@@ -1,7 +1,5 @@
 /*
- * Usage: imageunzip <input file>
- *
- * Writes the uncompressed data to stdout.
+ * userfrisbee - client to get/write disk images from frisbee server.
  */
 
 #include <stdio.h>
@@ -11,11 +9,28 @@
 #include <zlib.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/disklabel.h>
 #include <pthread.h>
 
 #include "imagehdr.h"
 
 #include "frisbee.h"
+
+/*
+ * In slice mode, we read the DOS MBR to find out where the slice is on
+ * the raw disk, and then seek to that spot. This avoids sillyness in
+ * the BSD kernel having to do with disklabels. 
+ *
+ * These numbers are in sectors.
+ */
+long		outputminsec	= 0;
+long		outputmaxsec	= 0;
+long long	outputmaxsize	= 0;	/* Sanity check */
+int slice;
+ 
+/* Why is this not defined in a public header file? */
+ #define BOOT_MAGIC	0xAA55
+
 
 #define CHECK_ERR(err, msg) { \
     if (err != Z_OK) { \
@@ -31,7 +46,7 @@ char		inbuf[BSIZE], outbuf[OUTSIZE + SECSIZE], zeros[BSIZE];
 
 int		infd, outfd;
 int		doseek = 0;
-int		debug = 1;
+int		debug = 0;
 long long	total = 0;
 int		inflate_subblock(void);
 void		writezeros(off_t zcount);
@@ -54,9 +69,29 @@ static inline int devwrite(int fd, const void *buf, size_t size)
 	assert((size & (SECSIZE-1)) == 0);
 	return write(fd, buf, size);
 }
+
+static inline int devread(int fd, void *buf, size_t size)
+{
+ 	assert((size & (SECSIZE-1)) == 0);
+ 	return read(fd, buf, size);
+}
+
 #endif
 
 /* frisbee */
+const char * commandName = NULL;
+
+static void usage(void)
+{
+  fprintf(stderr, 
+	  "usage: "
+	  "%s [-d] [-s #] <network address> <port> [output filename]\n"
+	  " -s slice        Output to DOS slice (DOS numbering 1-4)\n"
+	  "                 NOTE: Must specify a raw disk device.\n"
+	  " -d              Turn on debug mode\n", 
+	  commandName ? commandName : "userfrisbee" );
+  exit(1);
+}	
 
 static int frisbeeIndexIntoCurrentChunk = 0;
 static int frisbee_done = 0;
@@ -178,39 +213,78 @@ void * frisbee_thread( void *arg )
 
 
 /* end frisbee */
+static	off_t	minseek;
 
 int
 main(int argc, char **argv)
 {
 	struct timeval  stamp, estamp;
+	char ch;
+ 
+        commandName = argv[0];
 
-	if (argc < 3 || argc > 4) {
-		fprintf(stderr, "usage: "
-		       "%s <network address> <port> [output filename]\n", argv[0]);
-		exit(1);
+ 	while ((ch = getopt(argc, argv, "dhs:")) != -1)
+ 		switch(ch) {
+ 		case 'd':
+ 			debug++;
+ 			break;
+ 
+ 		case 's':
+ 			slice = atoi(optarg);
+ 			break;
+ 
+ 		case 'h':
+ 		case '?':
+ 		default:
+ 			usage();
+ 		}
+ 	argc -= optind;
+ 	argv += optind;
+
+	if (argc < 2 || argc > 3) {
+		usage();
 	}
 
-        printf("calling frisbeebridgeinit...\n");
-	frisbeeBridgeInit( argv[1], argv[2] );
+	if (argc == 2 && slice) {
+	  fprintf( stderr, "Cannot specify a slice when using stdout!\n" );
+	  usage();
+	}
+
+        printf("calling frisbeebridgeinit(%s,%s)...\n", argv[0], argv[1]);
+	frisbeeBridgeInit( argv[0], argv[1] );
 	/*
 	if ((infd = open(argv[1], O_RDONLY, 0666)) < 0) {
 		perror("opening input file");
 		exit(1);
 	}
 	*/
-	
 
-        printf("opening outfile...\n");
-	if (argc == 4) {
-		if ((outfd =
-		     open(argv[3], O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0) {
+	if (argc == 3) {
+	  printf("opening outfile \"%s\"...\n", argv[2]);
+	  if ((outfd =  open(argv[2], O_RDWR|O_CREAT|O_TRUNC, 0666)) < 0) {
 			perror("opening output file");
 			exit(1);
 		}
 		doseek = 1;
+	} else {
+	  printf("using standard out.\n");
+	  outfd = fileno(stdout);
 	}
-	else
-		outfd = fileno(stdout);
+	 
+ 	if (slice) {
+ 		if (readmbr(slice)) {
+ 			fprintf(stderr, "Failed to read MBR\n");
+ 			exit(1);
+ 		}
+ 		minseek = ((off_t) outputminsec) * SECSIZE;
+
+ 		if (lseek(outfd, minseek, SEEK_SET) < 0) {
+ 			perror("Setting seek pointer to slice");
+ 			exit(1);
+ 		}
+ 	} else {
+	  minseek = 0;
+	}
 	
 	printf("writing outfile, beginning mainloop.\n");
 
@@ -248,7 +322,7 @@ main(int argc, char **argv)
 
 	gettimeofday(&estamp, 0);
 	estamp.tv_sec -= stamp.tv_sec;
-	printf("Done in %ld seconds!\n", estamp.tv_sec);
+	printf("\n\nDone, in %ld seconds!\n\n", estamp.tv_sec);
 	
 	return 0;
 }
@@ -300,7 +374,7 @@ inflate_subblock(void)
 	 */
 	offset = curregion->start * (off_t) SECSIZE;
 
-	if (devlseek(outfd, offset, SEEK_SET) < 0) { /* CRB */
+	if (devlseek(outfd, offset + minseek, SEEK_SET) < 0) { /* CRB */
 	  perror("devlseek");
 	}
 
@@ -453,3 +527,64 @@ writezeros(off_t zcount)
 		total  += zcc;
 	}
 }
+
+
+/*
+ * Parse the DOS partition table to set the bounds of the slice we
+ * are writing to. 
+ */
+int
+readmbr(int slice)
+{
+	int		i, cc, rval = 0;
+	struct doslabel {
+		char		align[sizeof(short)];	/* Force alignment */
+		char		pad2[DOSPARTOFF];
+		struct dos_partition parts[NDOSPART];
+		unsigned short  magic;
+	} doslabel;
+#define DOSPARTSIZE \
+	(DOSPARTOFF + sizeof(doslabel.parts) + sizeof(doslabel.magic))
+
+	if (slice < 1 || slice > 4) {
+		fprintf(stderr, "Slice must be 1, 2, 3, or 4\n");
+ 		return 1;
+	}
+
+	if ((cc = devread(outfd, doslabel.pad2, DOSPARTSIZE)) < 0) {
+		perror("Could not read DOS label");
+		return 1;
+	}
+	if (cc != DOSPARTSIZE) {
+		fprintf(stderr, "Could not get the entire DOS label\n");
+ 		return 1;
+	}
+	if (doslabel.magic != BOOT_MAGIC) {
+		fprintf(stderr, "Wrong magic number in DOS partition table\n");
+ 		return 1;
+	}
+
+	outputminsec  = doslabel.parts[slice-1].dp_start;
+	outputmaxsec  = doslabel.parts[slice-1].dp_start +
+		        doslabel.parts[slice-1].dp_size;
+	outputmaxsize = ((long long) (outputmaxsec - outputminsec)) * SECSIZE;
+
+	if (debug) {
+		fprintf(stderr, "Slice Mode: S:%d min:%d max:%d size:%qd\n",
+			slice, outputminsec, outputmaxsec, outputmaxsize);
+	}
+	return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -139,11 +139,14 @@ int c_suggestK()
 {
   static int lastMessage = 0;
   static int lastMessageCount = 0;
-  int i, j, ei;
+  int i, ii, j, ei;
   int freeCount = 0;
   int highestWeHave;
 
-  for (i = 0; i < BufferSlotCount; i++) {
+  int foo = rand() % BufferSlotCount;
+ 
+  for (ii = 0; ii < BufferSlotCount; ii++) {
+    i = (ii + foo) % BufferSlotCount; 
     if (slots[i].mb != -1) {
       if (slots[i].gotCount != 1024) {
 	for (j = 0; j < 1024; j++) {
