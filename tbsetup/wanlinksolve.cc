@@ -17,15 +17,20 @@
    -v  Extra verbosity.
 
    -2 <weight>
-       Solve for bandwidth dimension;
+       Solve for 2nd (bandwidth) dimension;
        Penalty for error is sum of differences of natural logs,
        multiplied by <weight>.
        A good weight seems to be around 7, but the appropriate
        value is pretty much application-dependent.
 
-   -m  Handle multiple virtual->physical mapping.
+   -m <plexpenalty>
+       Handle multiple virtual->physical mapping.
+       For each vnode beyond 1 assigned to a pnode, <plexpenalty> will be assessed.
        Asks for 'p' lines of input, with the maximum number of virtual
        nodes allowed on a given physical node, per line (See below)
+
+   -s <seed>
+       Use a specific random seed.
 
    -r <minrounds>
        Specify the minimum number of rounds to go before stopping.
@@ -67,7 +72,7 @@
  output format:
  
  Easily inferred. Note that the perl regexp:
- /(\S+)\smaps\sto\s(\S+)/
+ /(\S+)\smapsTo\s(\S+)/
  will grab vnode to pnode mappings (in $1 and $2, respectively.)
  
 ****/
@@ -126,6 +131,7 @@ static int pnodes, vnodes;
 static int pLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
 static int vDesiredLatency[MAX_DIMENSIONS][MAX_NODES][MAX_NODES];
 
+static float plexPenalty = 0.0f;
 static int maxplex[MAX_NODES];
 static int userSpecifiedMultiplex = 0;
 
@@ -141,9 +147,13 @@ static int minrounds, maxrounds;
 class Solution
 {
 public:
-  int pnode_mapping[MAX_NODES]; // -1 means nothin'
-
   int vnode_mapping[MAX_NODES];
+
+  // Keep around a list of how many times each physical node is used
+  // in this solution, rather than recomputing it each time it is needed
+  // (which is often.)
+  unsigned char pnode_uses[MAX_NODES];
+
   float error;
 };
 
@@ -159,7 +169,7 @@ static inline int pickABest()
   case 1: return rand() % (SOLUTIONS / 16);
   case 2: return rand() % (SOLUTIONS / 4);
   case 3: return rand() % (SOLUTIONS / 2);
-  default: return 0; // can't happen, but appease -Wall.
+  default: return 0; // can't happen, but -Wall doesn't realize this.
   }
 }
 
@@ -168,7 +178,7 @@ static inline int pickAWorst()
   return SOLUTIONS - pickABest();
 }
 
-// uses templates to avoid massive numbers
+// uses a template to avoid massive numbers
 // of "if" choices.. compiler should generate two versions,
 // one with dump and one without.
 template <bool verbose>
@@ -178,6 +188,22 @@ static inline void calcError( Solution * t )
 
   if (verbose) {
     printf("Error listing:\n");
+  }
+
+  if (userSpecifiedMultiplex) {
+    for (int x = 0; x < pnodes; x++) {
+      if (t->pnode_uses[x] > 1) { 
+	float errDelta = (float)(t->pnode_uses[x] - 1) * plexPenalty;
+	if (verbose) {
+	  printf("%i nodes multiplexed on physical node %s, (err [(vnodes - 1) * plexPenalty] %4.3f)\n",
+		 t->pnode_uses[x],
+		 pnodeNames[x].c_str(),
+		 plexPenalty,
+		 errDelta );
+	}
+	err += errDelta;
+      }
+    }
   }
 
   {
@@ -194,6 +220,7 @@ static inline void calcError( Solution * t )
 		errDelta = sqrtf((float)(abs(should - is)));
 	      } else {
 		errDelta = d2weight * (float)(abs(should - is));
+		if (should < is) { errDelta *= 0.5f; }
 	      }
 
 	      if (verbose) {
@@ -202,10 +229,11 @@ static inline void calcError( Solution * t )
 			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 
 			 should, is, errDelta );
 		} else {
-		  printf("%s -> %s bandwidth (kB/s) should be ~%i; is ~%i (err [wt * ln (a/b)] %4.3f)\n", 
+		  printf("%s -> %s bandwidth (kB/s) should be ~%i; is ~%i (err [wt %s* ln (a/b)] %4.3f)\n", 
 			 vnodeNames[x].c_str(), vnodeNames[y].c_str(), 
 			 (int)expf((float)should / 1000.0f), 
 			 (int)expf((float)is / 1000.0f),
+			 (should < is) ? "* 0.5 " : "",
 			 errDelta );
 		}
 	      }
@@ -245,16 +273,47 @@ static inline void mutate( Solution * t )
   while(1) {
     // forecast calls for a 1% chance of mutation...
     if ((rand() % 1000) < MUTATE_PROB) { break; }
-    // swap mutation. 
-    int a, b;
-    do {
-      a = rand() % vnodes;
-      b = rand() % vnodes;
-    } while (fixed[a] != -1 || fixed[b] != -1);
-    int temp = t->vnode_mapping[a];
-    t->vnode_mapping[a] = t->vnode_mapping[b];
-    t->vnode_mapping[b] = temp;
-    // XXX add a reassign mutation.
+    
+    if ((rand() % 3)) {
+      // swap mutation. 
+      int a, b;
+      do {
+	a = rand() % vnodes;
+	b = rand() % vnodes;
+      } while (fixed[a] != -1 || fixed[b] != -1);
+      int temp = t->vnode_mapping[a];
+      t->vnode_mapping[a] = t->vnode_mapping[b];
+      t->vnode_mapping[b] = temp;
+    } else {
+      // reassign mutation
+      /*
+      int pnode_uses[MAX_NODES];
+
+      bzero( pnode_uses, sizeof( pnode_uses ) );
+
+      for (int i = 0; i < vnodes; i++) {
+	++pnode_uses[ t->vnode_mapping[i] ];
+      }
+      */
+
+      int a, b;
+      // find which vnode to remap
+      do {
+	a = rand() % vnodes;
+      } while (fixed[a] != -1);
+
+      // de-map it.
+      --t->pnode_uses[ t->vnode_mapping[a] ];
+
+      // now find a suitable physical node.
+      do {
+	b = rand() % pnodes;
+      } while (t->pnode_uses[b] >= maxplex[b]);
+
+      // now map it.
+      t->vnode_mapping[a] = b;
+      ++t->pnode_uses[b];
+    }
   }
 }
 
@@ -266,15 +325,14 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
   // temp storage so we don't clobber t unless the child turns out to be
   // cromulent.
   int vnode_mapping_t[MAX_NODES]; 
+  int pnode_uses_t[MAX_NODES];
 
-  int pnode_uses[MAX_NODES];
-
-  bzero( pnode_uses, sizeof( pnode_uses ) );
+  bzero( pnode_uses_t, sizeof( pnode_uses_t ) );
 
   for (int i = 0; i < vnodes; i++) {
     if (fixed[i] != -1) {
       vnode_mapping_t[i] = fixed[i];
-      ++pnode_uses[ fixed[i] ];
+      ++pnode_uses_t[ fixed[i] ];
     }
   }
 
@@ -291,26 +349,26 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
     pos = (pos + 1) % vnodes;
     if (fixed[pos] != -1) continue;
     if (rand() % 2) {
-      if (pnode_uses[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
+      if (pnode_uses_t[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
 	vnode_mapping_t[pos] = a->vnode_mapping[pos];
-	++pnode_uses[ a->vnode_mapping[pos] ];
+	++pnode_uses_t[ a->vnode_mapping[pos] ];
       } else {
-	if (pnode_uses[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
+	if (pnode_uses_t[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
 	  vnode_mapping_t[pos] = b->vnode_mapping[pos];
-	  ++pnode_uses[ b->vnode_mapping[pos] ];
+	  ++pnode_uses_t[ b->vnode_mapping[pos] ];
 	} else {
 	  // failed mating.
 	  return;
 	}
       }
     } else {
-      if (pnode_uses[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
+      if (pnode_uses_t[ b->vnode_mapping[pos] ] < maxplex[ b->vnode_mapping[pos] ]) {
 	vnode_mapping_t[pos] = b->vnode_mapping[pos];
-	++pnode_uses[ b->vnode_mapping[pos] ];
+	++pnode_uses_t[ b->vnode_mapping[pos] ];
       } else {
-	if (pnode_uses[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
+	if (pnode_uses_t[ a->vnode_mapping[pos] ] < maxplex[ a->vnode_mapping[pos] ]) {
 	  vnode_mapping_t[pos] = a->vnode_mapping[pos];
-	  ++pnode_uses[ a->vnode_mapping[pos] ];
+	  ++pnode_uses_t[ a->vnode_mapping[pos] ];
 	} else {
 	  // failed mating.
 	  return;
@@ -322,7 +380,11 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
   // ok.. good one..
   // since we have a cromulent child, we now clobber t.
   for(int d = 0; d < vnodes; d++) {
-    t->vnode_mapping[ d ] = vnode_mapping_t[d];
+    t->vnode_mapping[d] = vnode_mapping_t[d];
+  }
+
+  for(int e = 0; e < pnodes; e++) {
+    t->pnode_uses[e] = pnode_uses_t[e];
   }
 
   // Mazeltov!
@@ -335,13 +397,13 @@ static inline void splice( Solution * t, Solution * a, Solution * b)
 // for the initial population.
 static inline void generateRandomSolution( Solution * t )
 {
-  int pnode_uses[MAX_NODES];
-  bzero( pnode_uses, sizeof( pnode_uses ) );
+  //int pnode_uses[MAX_NODES];
+  bzero( t->pnode_uses, sizeof( t->pnode_uses ) );
 
   for (int i = 0; i < vnodes; i++) {
     if (fixed[i] != -1) {
       t->vnode_mapping[i] = fixed[i];
-      ++pnode_uses[ fixed[i] ];
+      ++t->pnode_uses[ fixed[i] ];
     }
   }
 
@@ -350,8 +412,8 @@ static inline void generateRandomSolution( Solution * t )
       int x;
       do {
 	x = rand() % pnodes;
-      } while( pnode_uses[x] >= maxplex[x] );
-      ++pnode_uses[x];
+      } while( t->pnode_uses[x] >= maxplex[x] );
+      ++t->pnode_uses[x];
       t->vnode_mapping[i] = x;
     }
   }
@@ -365,6 +427,8 @@ void usage( char * appname )
 	  "Usage:\n"
 	  "%s [-v] [-2 <weight>] [-r <minrounds>] [-R <maxrounds>]\n\n"
 	  "  -v              extra verbosity\n"
+	  "  -m <penalty>    enable many-to-one virtual to physical mappings\n"
+	  "  -s <seed>       seed the random number generator with a specific value\n"
 	  "  -2 <weight>     enable solving for bandwidth;\n"
 	  "                  multiply bandwidth penalties by <weight>.\n"
 	  "  -r <minrounds>  set minimum rounds (a.k.a. generations)\n"
@@ -385,12 +449,16 @@ int main( int argc, char ** argv )
 
   int ch;
 
-  while ((ch = getopt(argc, argv, "mv2:r:R:")) != -1) {
+  while ((ch = getopt(argc, argv, "v2:r:R:s:m:")) != -1) {
     switch (ch) {
+    case 's':
+      srand( atoi( optarg ) );
+      break;
     case 'v': 
       verbose++; 
       break;
     case 'm':
+      plexPenalty = atof( optarg );
       userSpecifiedMultiplex++;
       break;
     case '2': 
