@@ -43,9 +43,19 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_READINFO)) {
 }
 
 #
+# XXX If an admin type, then use an appropriate gid so that we can get
+# get to the top file. This needs more thought.
+#
+$gid = "nobody";
+
+if (ISADMIN($uid)) {
+    $gid = $exp_pid;
+}
+
+#
 # Spit out the image with a content header.
 #
-if ($fp = popen("$TBSUEXEC_PATH $uid nobody webvistopology $pid $eid", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $uid $gid webvistopology $pid $eid", "r")) {
     header("Content-type: image/gif");
     fpassthru($fp);
 }
