@@ -156,6 +156,7 @@ while(@r=$result->fetchrow()) {
 }
 print $result->as_string() if ($d>1);
 
+my @list=();
 # Find expts that have nodes reserved, and look up their bits.
 $cmd = "select r.pid,r.eid,swappable,expt_swapped from reserved as r
 left join experiments as e on e.pid=r.pid and e.eid=r.eid
@@ -181,7 +182,15 @@ while(@r=$result->fetchrow()) {
     if (($idle && !$stale && $swap) ||
 	($stale && $s) || 
 	(!$swap && $u)) { print $str; }
+    if ($idle) { push(@list,"(pid='$pid' and eid='$eid')"); }
 }
 print $result->as_string() if ($d>1);
+
+if (@list > 0) {
+    $cmd = "update experiments set swap_requests=0 where not (".
+      join(" or ",@list).")";
+    print "Sending cmd:\n$cmd\n" if $d;
+    DBQueryWarn($cmd);
+}
 
 exit(0);

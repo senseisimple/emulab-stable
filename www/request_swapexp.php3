@@ -56,8 +56,27 @@ if ($canceled) {
     return;
 }
 
+# We only send to the proj leader after we've sent $tell_proj_head requests
+$tell_proj_head = 2;
+$q = DBQueryWarn("select swap_requests,
+                  date_format(last_swap_req,\"%T\") as lastreq
+                  from experiments
+                  where eid='$eid' and pid='$pid'");
+$r = mysql_fetch_array($q);
+$swap_requests = $r["swap_requests"];
+$last_swap_req = $r["lastreq"];
+
 if (!$confirmed) {
     echo "<center><h2><br>
+          Experiment '$eid' in project '$pid' has been sent
+          $swap_requests swap request(s) since it went idle.\n";
+    if ($swap_requests > 0) {
+      echo "The most recent one was sent at $last_swap_req.\n";
+    }
+    if ($swap_requests >= $tell_proj_head) {
+      echo "This notification will also be sent to the project leader.\n";
+    }
+    echo "<p>
           Are you sure you want to send an email message requesting that<br>
           experiment '$eid' be swapped or terminated?
           </h2>\n";
@@ -101,6 +120,10 @@ $c=$r["c"];
 TBMAIL("$expleader_name <$expleader_email>",
      "$pid/$eid: Please Swap or Terminate Experiment",
      "Hi, this is an automated message from Emulab.Net.\n".
+       ( $swap_requests > 0 
+         ? ("You have been sent ".($swap_requests+1)." messages since this ".
+	    "experiment became idle.\n")
+         : "") .
      "\n".
      "It appears that the $c nodes in your experiment '$eid' \n".
      "in project '$pid' are inactive.\n".
@@ -120,7 +143,9 @@ TBMAIL("$expleader_name <$expleader_email>",
      "Thanks!\n".
      "Utah Network Testbed\n",
      "From: $TBMAIL_OPS\n".
-     "Cc: $projleader_name <$projleader_email>\n".
+     ( $swap_requests >= $tell_proj_head
+       ? "Cc: $projleader_name <$projleader_email>\n"
+       : "") .
      "Bcc: $TBMAIL_OPS\n".
      "Errors-To: $TBMAIL_WWW");
 
@@ -134,6 +159,10 @@ TBMAIL($TBMAIL_AUDIT,
        "A swap/terminate $pid/$eid request was sent by $uid ($uid_name).\n",
        "From: $uid_name <$uid_email>\n".
        "Errors-To: $TBMAIL_WWW");
+
+# Update the count and the time in the database
+DBQueryWarn("update experiments set swap_requests= swap_requests+1,
+             last_swap_req=now() where pid='$pid' and eid='$eid';");
 
 echo "<p><center>
          Message successfully sent!

@@ -182,6 +182,8 @@ CREATE TABLE experiments (
   wa_delay_solverweight float default '0',
   wa_bw_solverweight float default '0',
   wa_plr_solverweight float default '0',
+  swap_requests tinyint(4) NOT NULL default '0',
+  last_swap_req datetime default NULL,
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
