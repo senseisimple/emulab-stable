@@ -1274,11 +1274,17 @@ function SHOWOSINFO($osid) {
           </tr>\n";
 
     if ($nextosid) {
-	echo "<tr>
-                <td>Next Osid: </td>
-                <td class=left>
-                    <A href='showosinfo.php3?osid=$nextosid'>$nextosid</A></td>
-              </tr>\n";
+	if (strncmp($nextosid, "MAP:", 4) == 0)
+	    echo "<tr>
+		    <td>Next Osid: </td>
+		    <td class=left>
+			Mapped via DB table: " . substr($nextosid, 4) . " </td></tr>\n";
+	else
+	    echo "<tr>
+                    <td>Next Osid: </td>
+                    <td class=left>
+                        <A href='showosinfo.php3?osid=$nextosid'>$nextosid</A></td>
+                  </tr>\n";
     }
 
     echo "<tr>
