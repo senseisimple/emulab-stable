@@ -44,7 +44,7 @@ my $newfile     = "/tmp/ntp.conf.new";
 my $ntpfile     = "/etc/ntp.conf";
 my $driftfile   = "/etc/ntp.drift";
 my $pidfile	= "/var/run/ntpd.pid";
-my $debug       = 1;
+my $debug       = 0;
 
 #
 # Since this is a wrapper, we have to try to start ntp no matter what.
