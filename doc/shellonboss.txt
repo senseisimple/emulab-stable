@@ -82,7 +82,7 @@ certainly do things very differently.
 
   Also:
 	# Links your web tree into the main tree so you get to it.
-	ln -s /usr/testbed/www/dev/kwebb /usr/testbed/devel/kwebb/www
+	ln -s /usr/testbed/www/dev/USER /usr/testbed/devel/USER/www
 
 	# Need these certs for various parts of the system to work
 	# properly, and they need to be be identical to the installed
