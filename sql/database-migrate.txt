@@ -1537,3 +1537,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table experiments change use_ipassign \
 		  use_ipassign tinyint(4) NOT NULL default '0';
 
+1.246: Change routertype slots to include new type of route stuff.
+
+	alter table nodes change routertype routertype \
+		 enum('none','ospf','static','manual','static-ddijk') \
+		 NOT NULL default 'none';
+
+	alter table virt_nodes change routertype routertype \
+		 enum('none','ospf','static','manual','static-ddijk') \
+		 NOT NULL default 'none',	
+

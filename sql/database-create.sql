@@ -911,7 +911,7 @@ CREATE TABLE nodes (
   status enum('up','possibly down','down','unpingable') default NULL,
   status_timestamp datetime default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
-  routertype enum('none','ospf','static','manual') NOT NULL default 'none',
+  routertype enum('none','ospf','static','manual','static-ddijk') NOT NULL default 'none',
   next_pxe_boot_path text,
   bios_version varchar(64) default NULL,
   eventstate varchar(20) default NULL,
@@ -1697,7 +1697,7 @@ CREATE TABLE virt_nodes (
   vname varchar(32) NOT NULL default '',
   type varchar(12) default NULL,
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
-  routertype enum('none','ospf','static','manual') NOT NULL default 'none',
+  routertype enum('none','ospf','static','manual','static-ddijk') NOT NULL default 'none',
   fixed text NOT NULL,
   KEY pid (pid,eid,vname)
 ) TYPE=MyISAM;
