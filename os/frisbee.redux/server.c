@@ -862,7 +862,7 @@ main(int argc, char **argv)
 		pfatal("Cannot lseek to end of file");
 
 	FileInfo.fd     = fd;
-	FileInfo.blocks = (int) roundup(fsize, BLOCKSIZE) / BLOCKSIZE;
+	FileInfo.blocks = (int) (roundup(fsize, (off_t)BLOCKSIZE) / BLOCKSIZE);
 	FileInfo.chunks = FileInfo.blocks / CHUNKSIZE;
 	log("Opened %s: %d blocks", filename, FileInfo.blocks);
 
