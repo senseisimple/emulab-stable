@@ -96,8 +96,8 @@ elseif (strcmp($approval, "moreinfo") == 0) {
          "Thanks,\n".
          "Testbed Ops\n".
          "Utah Network Testbed\n",
-         "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_CONTROL\n".
+         "From: $TBMAIL_APPROVAL\n".
+         "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
 
     echo "<p><h3>
@@ -136,8 +136,8 @@ elseif ((strcmp($approval, "deny") == 0) ||
          "Thanks,\n".
          "Testbed Ops\n".
          "Utah Network Testbed\n",
-         "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_CONTROL\n".
+         "From: $TBMAIL_APPROVAL\n".
+         "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
 
     #
@@ -162,8 +162,8 @@ elseif ((strcmp($approval, "deny") == 0) ||
              "Thanks,\n".
              "Testbed Ops\n".
              "Utah Network Testbed\n",
-             "From: $TBMAIL_CONTROL\n".
-             "Cc: $TBMAIL_CONTROL\n".
+             "From: $TBMAIL_APPROVAL\n".
+             "Bcc: $TBMAIL_APPROVAL\n".
              "Errors-To: $TBMAIL_WWW");
     }
 
@@ -213,30 +213,6 @@ elseif (strcmp($approval, "approve") == 0) {
                     "$newstatus.",
                     1);
         }
-
-        #
-        # For new leaders, write their email addresses to files to be used for
-        # generating messages.
-        #
-        $fp = fopen($TBLIST_LEADERS, "a");
-        if (! $fp) {
-            TBERROR("Could not open $TBLIST_LEADERS to add new ".
-		    "project leader email: $headuid_email\n", 0);
-        }
-        else {
-            fwrite($fp, "$headuid_email\n");
-            fclose($fp);
-        }  
-
-        $fp = fopen($TBLIST_USERS, "a");
-        if (! $fp) {
-            TBERROR("Could not open $TBLIST_USERS to add new ".
-		    "project leader email: $headuid_email\n", 0);
-        }
-        else {
-            fwrite($fp, "$headuid_email\n");
-            fclose($fp);
-        }
     }
 
     mail("$headname '$headuid' <$headuid_email>",
@@ -249,8 +225,8 @@ elseif (strcmp($approval, "approve") == 0) {
          "Thanks,\n".
          "Testbed Ops\n".
          "Utah Network Testbed\n",
-         "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_CONTROL\n".
+         "From: $TBMAIL_APPROVAL\n".
+         "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
 
     #

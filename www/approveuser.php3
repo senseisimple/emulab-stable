@@ -118,6 +118,22 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
     }
 
     #
+    # Lets get the uid email for the mail messages below, so that we
+    # can stick in a proper return address.
+    #
+    $query_result = mysql_db_query($TBDBNAME,
+	"SELECT usr_email,usr_name from users where uid='$uid'");
+    if (! $query_result) {
+	TBERROR("Database Error restrieving user status for $uid", 1);
+    }
+    if (mysql_num_rows($query_result) == 0) {
+	TBERROR("Unknown user $uid", 1);
+    }
+    $row = mysql_fetch_row($query_result);
+    $uid_email = $row[0];
+    $uid_name  = $row[1];
+
+    #
     # Well, looks like everything is okay. Change the project membership
     # value appropriately.
     #
@@ -148,8 +164,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Thanks,\n".
              "Testbed Ops\n".
              "Utah Network Testbed\n",
-             "From: $TBMAIL_CONTROL\n".
-             "Cc: $TBMAIL_CONTROL\n".
+             "From: $uid_name <$uid_email>\n".
+             "Bcc: $TBMAIL_APPROVAL\n".
              "Errors-To: $TBMAIL_WWW");
 
 	echo "<h3><p>
@@ -192,19 +208,6 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
 	        TBERROR("Database Error changing $user status to $newstatus.",
                          1);
             }
-
-	    #
-	    # Add to user email list.
-	    # 
-	    $fp = fopen($TBLIST_USERS, "a");
-	    if (! $fp) {
-		    TBERROR("Could not open $TBLIST_USERS to add new ".
-			    "project member email: $user_email\n", 0);
-	    }
-	    else {
-		    fwrite($fp, "$user_email\n");
-		    fclose($fp);
-	    }
 	}
 
         mail("$user_name '$user' <$user_email>",
@@ -216,8 +219,8 @@ while (list ($header, $value) = each ($HTTP_POST_VARS)) {
              "Thanks,\n".
              "Testbed Ops\n".
              "Utah Network Testbed\n",
-             "From: $TBMAIL_CONTROL\n".
-             "Cc: $TBMAIL_CONTROL\n".
+             "From: $uid_name <$uid_email>\n".
+             "Bcc: $TBMAIL_APPROVAL\n".
              "Errors-To: $TBMAIL_WWW");
 
 	#

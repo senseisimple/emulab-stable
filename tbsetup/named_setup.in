@@ -13,6 +13,7 @@ use Fcntl ':flock';
 #
 my $TB		= "@prefix@";
 my $DBNAME	= "@TBDBNAME@";
+my $TBOPS       = "@TBOPSEMAIL@";
 
 my $mapdir      = "/etc/namedb";
 my $mapfile	= "$mapdir/emulab.db";
@@ -39,6 +40,12 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $| = 1; #Turn off line buffering on output
+
+#
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
 
 #
 # Set up for querying the database.
@@ -158,7 +165,6 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    system("echo \"$msg\" | /usr/bin/mail ".
-	   "-s 'TESTBED: Named Setup Failed' testbed-ops\@fast.cs.utah.edu");
+    SENDMAIL($TBOPS, "TESTBED: Named Setup Failed", $msg);
     die($msg);
 }

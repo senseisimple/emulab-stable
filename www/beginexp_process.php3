@@ -14,10 +14,6 @@ $mydebug = 0;
 # informative. Be sure to correlate these checks with any changes made to
 # the project form. 
 #
-if (!isset($uid) ||
-    strcmp($uid, "") == 0) {
-  FORMERROR("Username");
-}
 if (!isset($exp_pid) ||
     strcmp($exp_pid, "") == 0) {
   FORMERROR("Select Project");
@@ -223,15 +219,16 @@ if ($nonsfile) {
     $retval = SUEXEC($uid, $gid, "mkexpdir $exp_pid $exp_id", 0);
 
     echo "<center><br>
-          <h2>Experiment Configured!
+          <h2>Experiment Configured!</h2>
           </center><br><br>
+          <h3>
           The ID for your experiment in project `$exp_pid' is `$exp_id.'
           <br><br>
           Since you did not provide an NS script, no nodes have been
           allocated. You must log in and run the tbsetup scripts
           yourself. For your convenience, we have created a directory
           hierarchy on the control node: $dirname
-          </h2>\n";
+          </h3>\n";
 
     if (1) {
 	mail("$user_name '$uid' <$user_email>", 
@@ -245,7 +242,7 @@ if ($nonsfile) {
              "Start:       $exp_start\n".
              "End:         $exp_end\n",
              "From: $TBMAIL_WWW\n".
-	     "Cc: $TBMAIL_WWW\n".
+	     "Bcc: $TBMAIL_LOGS\n".
              "Errors-To: $TBMAIL_WWW");
     }
     #

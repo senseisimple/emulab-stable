@@ -260,8 +260,8 @@ if (! $returning) {
          "Thanks,\n".
          "Testbed Ops\n".
          "Utah Network Testbed\n",
-         "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_CONTROL\n".
+         "From: $TBMAIL_APPROVAL\n".
+         "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
 }
 
@@ -302,7 +302,7 @@ $unix_gid = $row[0];
 #
 # The mail message to the approval list.
 # 
-mail($TBMAIL_APPROVE,
+mail($TBMAIL_APPROVAL,
      "TESTBED: New Project '$pid' ($proj_head_uid)", "'$usr_name' wants to start project '$pid'.\n".
      "Contact Info:\n".
      "Name:          $usr_name ($proj_head_uid)\n".
@@ -326,7 +326,6 @@ mail($TBMAIL_APPROVE,
      "select the 'Project Approval' page.\n\nThey are expecting a result ".
      "within 72 hours.\n", 
      "From: $usr_name '$proj_head_uid' <$usr_email>\n".
-     "Cc: $TBMAIL_CONTROL\n".
      "Errors-To: $TBMAIL_WWW");
 
 #

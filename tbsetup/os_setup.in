@@ -29,7 +29,6 @@ my $TBOPS       = "@TBOPSEMAIL@";
 
 my $nodereboot	= "$TB/bin/node_reboot";
 my $ping	= "/sbin/ping";
-my $mail        = "/usr/bin/mail";
 my $dbg		= 0;
 my @nodes       = ();
 my %osid        = ();
@@ -50,6 +49,12 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $| = 1; #Turn off line buffering on output
+
+#
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -226,14 +231,13 @@ foreach my $node ( @nodes ) {
     }
 
     # Send mail to testbed-ops about it
-    open(MAIL,"| $mail -s \"TESTBED: $node down?\" $TBOPS");
-    print MAIL "User ".getpwuid($UID)." was running expt. $eid\n";
-    print MAIL "in proj. $pid using ir file /proj/$pid/exp/$eid/tbdata\n";
-    print MAIL "but $node appears to be unresponsive.\n";
-    print MAIL "\nPlease look into this matter. $node has been reserved to\n";
-    print MAIL "the testbed/down experiment until this has been resolved.\n\n";
-    print MAIL "Thanks,\nTestbed Operations\ntestbed-ops\@flux.cs.utah.edu\n";
-    close(MAIL);
+    SENDMAIL($TBOPS, "TESTBED: Node $node is down",
+	     "User ".getpwuid($UID)." was running expt. $eid\n".
+	     "in proj. $pid using ir file /proj/$pid/exp/$eid/tbdata\n".
+	     "but $node appears to be unresponsive.\n\n".
+	     "Please look into this matter. $node has been reserved to\n".
+	     "the testbed/down experiment until this has been resolved.\n\n".
+	     "Thanks,\n");
     
     die("Oops, $node did not come back alive!\n");
 }

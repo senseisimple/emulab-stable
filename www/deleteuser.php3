@@ -135,7 +135,7 @@ $row = mysql_fetch_row($query_result);
 $uid_name  = $row[0];
 $uid_email = $row[1];
 
-mail($TBMAIL_CONTROL,
+mail($TBMAIL_OPS,
      "TESTBED: User $target_uid removed",
      "User '$target_uid' has been removed by $uid ($uid_name).\n\n".
      "Please remember to remove the backup directory in /users\n\n",

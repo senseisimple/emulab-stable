@@ -23,6 +23,7 @@ my  $optlist = "d";
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
 
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";
@@ -42,13 +43,19 @@ my $eid;
 my $pid;
 my $logname;
 my $nsfile;
-my $user_name  = "Batch Daemon";
+my $user_name  = "Testbed Operations";
 my $user_email = "$TBOPS";
 
 #
 # Turn off line buffering on output
 #
 $| = 1;
+
+#
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
 
 #
 # Untaint the path
@@ -544,50 +551,47 @@ sub email_status($)
 
 sub notify_user($$$)
 {
-    my($mesg, $subline, $iserr) = @_;
-    my($to,$cc);
+    my($mesg, $subtext, $iserr) = @_;
+    my $subject, $from, $to, $cc;
+    my $MAIL;
 
     print STDOUT "$mesg\n";
 
-    #
-    # If an error, goes to TBOPS and is CC'ed to user.
-    # Otherwise goes to user and is CC'ed to TBOPS
-    #
+    $subject = "TESTBED: Batch Mode Experiment $subtext $pid/$eid";
+    $from    = $TBOPS;
+    $to      = "$user_name <$user_email>";
     if ($iserr) {
-	$to = $TBOPS;
-	$cc = $user_email;
+	$cc = "Cc: $TBOPS";
     }
     else {
-	$to = $user_email;
-	$cc = $TBOPS;
+	$cc = "Bcc: $TBLOGS";
     }
 
-    open(MAIL, "| /usr/bin/mail ".
-	 "-s \"TESTBED: Batch Mode Experiment $subline $pid/$eid\" ".
-	 "-c $cc $to >/dev/null 2>&1")
-	or die "Cannot start mail program: $!";
+    if (! ($MAIL = OPENMAIL($to, $subject, $from, $cc))) {
+	die("Cannot start mail program!");
+    }
 
-    print MAIL $mesg;
+    print $MAIL $mesg;
 
     if (defined($logname) && open(IN, "$logname")) {
-	print MAIL "\n\n---------\n\n";
+	print $MAIL "\n\n---------\n\n";
 	
 	while (<IN>) {
-	    print MAIL "$_";
+	    print $MAIL "$_";
 	}
 	close(IN);
     }
 
     if (defined($nsfile) && open(IN, "$nsfile")) {
-	print MAIL "\n\n---------\n\n";
+	print $MAIL "\n\n---------\n\n";
 	
 	while (<IN>) {
-	    print MAIL "$_";
+	    print $MAIL "$_";
 	}
 	close(IN);
     }
     
-    close(MAIL);
+    close($MAIL);
 }
 
 #

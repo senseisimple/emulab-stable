@@ -30,6 +30,7 @@ my  $optlist = "b:";
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
+my $TBLOGS   = "@TBLOGSEMAIL@";
 my $TBINFO   = "$TB/expinfo";
 
 my $tbdir    = "$TB/bin/";
@@ -56,6 +57,12 @@ $| = 1;
 # 
 $ENV{'PATH'} = '/bin:/usr/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -136,9 +143,9 @@ if ($query_result->numrows < 1) {
 }
 @row = $query_result->fetchrow_array();
 if ($row[0]) {
-    fatal("Experiment $pid/$eid is already configured!\n".
-	  "You are not allowed to reconfigure experiments unless you\n".
-	  "first terminate the existing experiment via the web interface.\n");
+    die("Experiment $pid/$eid is already configured!\n".
+	"You are not allowed to reconfigure experiments unless you\n".
+	"first terminate the existing experiment via the web interface.\n");
 }
 
 #
@@ -308,56 +315,58 @@ if ($batch) {
 #
 # Dump the report file and the log file to the user via email. 
 #
-open(MAIL, "| /usr/bin/mail ".
-     "-s \"TESTBED: New Experiment Created: $pid/$eid\" ".
-     "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
-    or die "Cannot start mail program: $!";
+if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
+			"TESTBED: New Experiment Created: $pid/$eid",
+			undef, "Bcc: $TBLOGS"))) {
+    tbendit();
+    die("Cannot start mail program!");
+}
+    
+print $MAIL "Your experiment `$eid' in project `$pid' is now configured.\n";
+print $MAIL "Here is the experiment summary detailing the nodes that were\n";
+print $MAIL "allocated to you. You may use the `Qualified Name' to log on\n";
+print $MAIL "to your nodes. See /etc/hosts on your nodes (when running\n";
+print $MAIL "FreeBSD, Linux, or NetBSD) for the IP mapping on each node\n";
 
-print MAIL "Your experiment `$eid' in project `$pid' is now configured.\n";
-print MAIL "Here is the experiment summary detailing the nodes that were\n";
-print MAIL "allocated to you. You may use the `Qualified Name' to log on\n";
-print MAIL "to your nodes. See /etc/hosts on your nodes (when running\n";
-print MAIL "FreeBSD, Linux, or NetBSD) for the IP name mapping on each node\n";
-
-print MAIL "\n";
-print MAIL "User:        $user_name\n";
-print MAIL "EID:         $eid\n";
-print MAIL "PID:         $pid\n";
-print MAIL "Name:        $expt_name\n";
-print MAIL "Created:     $expt_created\n";
-print MAIL "Expires:     $expt_expires\n";
-print MAIL "Directory:   $eiddir\n\n";
+print $MAIL "\n";
+print $MAIL "User:        $user_name\n";
+print $MAIL "EID:         $eid\n";
+print $MAIL "PID:         $pid\n";
+print $MAIL "Name:        $expt_name\n";
+print $MAIL "Created:     $expt_created\n";
+print $MAIL "Expires:     $expt_expires\n";
+print $MAIL "Directory:   $eiddir\n\n";
 
 if (open(IN, "$repfile")) {
     while (<IN>) {
-	print MAIL "$_";
+	print $MAIL "$_";
     }
     close(IN);
 }
 
-print MAIL "\n\n---------\n\n";
+print $MAIL "\n\n---------\n\n";
 
-print MAIL "Here is the log of the configuration process.\n";
-print MAIL "If you have any questions or problems, please include the\n";
-print MAIL "output below in your message to $TBOPS\n\n";
+print $MAIL "Here is the log of the configuration process.\n";
+print $MAIL "If you have any questions or problems, please include the\n";
+print $MAIL "output below in your message to $TBOPS\n\n";
 
 if (open(IN, "$logname")) {
     while (<IN>) {
-	print MAIL "$_";
+	print $MAIL "$_";
     }
     close(IN);
 }
 
 if (open(IN, "$nsfile")) {
-    print MAIL "\n\n---------\n\n";
-    print MAIL "Here is the NS file\n\n";
+    print $MAIL "\n\n---------\n\n";
+    print $MAIL "Here is the NS file\n\n";
 
     while (<IN>) {
-	print MAIL "$_";
+	print $MAIL "$_";
     }
     close(IN);
 }
-close(MAIL);
+close($MAIL);
 
 unlink("$tempns");
 unlink("$logname");
@@ -366,6 +375,7 @@ exit 0;
 sub fatal()
 {
     my($mesg)     = $_[0];
+    local $MAIL;
 
     print STDOUT "$mesg\n";
     print STDOUT "Cleaning up and exiting with status $errorstat ...\n";
@@ -412,42 +422,43 @@ sub fatal()
     #
     # Send a message to the testbed list. Append the logfile if it got
     # that far.
-    # 
-    open(MAIL, "| /usr/bin/mail ".
-	 "-s \"TESTBED: Experiment Configure Failure $pid/$eid\" ".
-	 "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
-	or die "Cannot start mail program: $!";
-
-    print MAIL $mesg;
+    #
+    if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
+			    "TESTBED: Experiment Configure Failure: $pid/$eid",
+			    undef, "Cc: $TBOPS"))) {
+	die("Cannot start mail program!");
+    }
+    
+    print $MAIL $mesg;
 
     if (open(IN, "$tempns")) {
-	print MAIL "\n\n--------- $tempns ---------\n\n";
+	print $MAIL "\n\n--------- $tempns ---------\n\n";
 
 	while (<IN>) {
-	    print MAIL "$_";
+	    print $MAIL "$_";
 	}
 	close(IN);
 	unlink("$tempns");
     }
 
     if (open(IN, "$logname")) {
-	print MAIL "\n\n--------- $logname ---------\n\n";
+	print $MAIL "\n\n--------- $logname ---------\n\n";
 	
 	while (<IN>) {
-	    print MAIL "$_";
+	    print $MAIL "$_";
 	}
 	close(IN);
     }
 
     if (open(IN, "$eiddir/assign.log")) {
-	print MAIL "\n\n--------- assign.log --------\n\n";
+	print $MAIL "\n\n--------- assign.log --------\n\n";
 	
 	while (<IN>) {
-	    print MAIL "$_";
+	    print $MAIL "$_";
 	}
 	close(IN);
     }
-    close(MAIL);
+    close($MAIL);
 
     unlink("$tempns");
     unlink("$logname");

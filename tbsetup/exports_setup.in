@@ -45,6 +45,12 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1; #Turn off line buffering on output
 
 #
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
+
+#
 # Set up for querying the database.
 # 
 use Mysql;
@@ -198,8 +204,7 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
-    system("echo \"$msg\" | /usr/bin/mail ".
-	   "-s 'TESTBED: Named Setup Failed' $TBOPS");
+    SENDMAIL($TBOPS, "TESTBED: Exports Setup Failed", $msg);
     die($msg);
 }
 

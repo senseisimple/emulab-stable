@@ -18,10 +18,6 @@ $TBSUEXEC_PATH  = "$TBLIBEXEC_DIR/suexec";
 $TBCHKPASS_PATH = "$TBLIBEXEC_DIR/checkpass";
 $TBCSLOGINS     = "$TBETC_DIR/cslogins";
 
-$TBLIST_DIR     = "$TBDIR"."lists";
-$TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.list";
-$TBLIST_USERS   = "$TBLIST_DIR"."/users.list";
-
 $TBPROJ_DIR     = "/proj";
 $TBUSER_DIR	= "/users";
 $TBNSSUBDIR     = "nsdir";
@@ -66,15 +62,15 @@ function GENKEY ($name) {
 # should then terminate if required to do so.
 #
 function TBERROR ($message, $death) {
-    global $TBMAIL_WWW;
+    global $TBMAIL_WWW, $TBMAIL_OPS;
 
-    mail($TBMAIL_WWW,
-         "TESTBED ERROR REPORT",
+    mail($TBMAIL_OPS,
+         "TESTBED WEB ERROR REPORT",
          "\n".
          "$message\n\n".
          "Thanks,\n".
          "Testbed WWW\n",
-         "From: $TBMAIL_WWW\n".
+         "From: $TBMAIL_OPS\n".
          "Errors-To: $TBMAIL_WWW");
 
     # Allow sendmail to run.

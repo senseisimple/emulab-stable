@@ -55,7 +55,8 @@ if ($returning) {
     echo "<tr>
               <td>*Username (no blanks, lowercase):</td>
               <td class=\"left\">
-                  <input type=\"readonly\" name=\"uid\" value=\"$uid\"></td>
+                  <input type=\"readonly\" name=\"joining_uid\"
+                         value=\"$uid\"></td>
           </tr>\n";
 
     echo "<tr>
@@ -118,7 +119,7 @@ else {
     echo "<tr>
               <td>*Username:</td>
               <td class=\"left\">
-                  <input type=\"text\" name=\"uid\"
+                  <input type=\"text\" name=\"joining_uid\"
                          size=$TBDB_UIDLEN maxlength=$TBDB_UIDLEN></td>
           </tr>\n";
 

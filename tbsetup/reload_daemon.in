@@ -44,6 +44,12 @@ $ENV{'PATH'} = "/bin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
@@ -196,8 +202,7 @@ sub DBquery($)
 sub fatal {
     local($msg) = $_[0];
 
-    system("echo \"$msg\" | /usr/bin/mail ".
-	   "-s 'TESTBED: Reload Daemon Died' $TBOPS");
+    SENDMAIL($TBOPS, "TESTBED: Reload Daemon Died", $msg);
     die($msg);
 }
 

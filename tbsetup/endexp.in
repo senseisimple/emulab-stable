@@ -27,6 +27,7 @@ my  $optlist = "b";
 my $TB     = "@prefix@";
 my $DBNAME = "@TBDBNAME@";
 my $TBOPS  = "@TBOPSEMAIL@";
+my $TBLOGS = "@TBLOGSEMAIL@";
 
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
@@ -44,6 +45,12 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
+
+#
+# Testbed Support library
+# 
+push(@INC, "$TB/lib");
+require libtestbed;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -229,26 +236,27 @@ if ($batch) {
 
 #
 # Send email notification if not in batch mode.
-# 
-open(MAIL, "| /usr/bin/mail ".
-     "-s \"TESTBED: Experiment $pid/$eid Terminated\" ".
-     "-c $TBOPS \"$user_name <$user_email>\" >/dev/null 2>&1")
-    or die "Cannot start mail program: $!";
+#
+if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
+			"TESTBED: Experiment $pid/$eid Terminated",
+			undef, "Bcc: $TBLOGS"))) {
+    die("Cannot start mail program!");
+}
 
-print MAIL "Experiment `$eid' in project `$pid' has been terminated.\n";
-print MAIL "You may now reuse `$eid' as an experiment name.\n\n";
-print MAIL "Appended below is the output of the experiment teardown.\n";
-print MAIL "If you have any questions or comments, please include the\n";
-print MAIL "output below in your message to $TBOPS\n";
-print MAIL "\n\n---------\n\n";
+print $MAIL "Experiment `$eid' in project `$pid' has been terminated.\n";
+print $MAIL "You may now reuse `$eid' as an experiment name.\n\n";
+print $MAIL "Appended below is the output of the experiment teardown.\n";
+print $MAIL "If you have any questions or comments, please include the\n";
+print $MAIL "output below in your message to $TBOPS\n";
+print $MAIL "\n\n---------\n\n";
 
 if (open(IN, "$logname")) {
     while (<IN>) {
-	print MAIL "$_";
+	print $MAIL "$_";
     }
     close(IN);
 }
-close(MAIL);
+close($MAIL);
 
 unlink("$logname");
 exit 0;
@@ -256,7 +264,8 @@ exit 0;
 sub fatal()
 {
     my($mesg) = $_[0];
-
+    local $MAIL;
+    
     print STDOUT $mesg;
 
     #
@@ -270,22 +279,23 @@ sub fatal()
     # Send a message to the testbed list. Append the logfile if it got
     # that far.
     #
-    open(MAIL, "| /usr/bin/mail ".
-	 "-s \"TESTBED: Termination Failure $pid/$eid\" ".
-	 "$TBOPS >/dev/null 2>&1")
-	or die "Cannot start mail program: $!";
+    if (! ($MAIL = OPENMAIL("$user_name <$user_email>",
+			    "TESTBED: Termination Failure: $pid/$eid",
+			    undef, "Cc: $TBOPS"))) {
+	die("Cannot start mail program!");
+    }
 
-    print MAIL $mesg;
+    print $MAIL $mesg;
 
     if (open(IN, "$logname")) {
-	print MAIL "\n\n---------\n\n";
+	print $MAIL "\n\n---------\n\n";
 	
 	while (<IN>) {
-	    print MAIL "$_";
+	    print $MAIL "$_";
 	}
 	close(IN);
     }
-    close(MAIL);
+    close($MAIL);
     
     unlink("$logname");
     exit(-1);

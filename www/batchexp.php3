@@ -14,10 +14,6 @@ $mydebug = 0;
 # informative. Be sure to correlate these checks with any changes made to
 # the project form. 
 #
-if (!isset($uid) ||
-    strcmp($uid, "") == 0) {
-  FORMERROR("Username");
-}
 if (!isset($exp_pid) ||
     strcmp($exp_pid, "") == 0) {
   FORMERROR("Select Project");

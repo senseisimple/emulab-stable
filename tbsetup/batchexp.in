@@ -19,7 +19,6 @@ my  $optlist = "";
 #
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
-my $TBOPS    = "@TBOPSEMAIL@";
 
 my $tbbindir = "$TB/bin/";
 my $batchdir = "$TB/batch";

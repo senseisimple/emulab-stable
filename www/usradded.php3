@@ -12,8 +12,8 @@ PAGEHEADER("Join a Project");
 # informative. Be sure to correlate these checks with any changes made to
 # the project form. 
 #
-if (!isset($uid) ||
-    strcmp($uid, "") == 0) {
+if (!isset($joining_uid) ||
+    strcmp($joining_uid, "") == 0) {
   FORMERROR("UserName");
 }
 if (!isset($usr_email) ||
@@ -38,9 +38,9 @@ if (!isset($usr_title) ||
 }
 
 #
-# Check uid for sillyness.
+# Check joining_uid for sillyness.
 #
-if (! ereg("^[a-z0-9]+$", $uid)) {
+if (! ereg("^[a-z0-9]+$", $joining_uid)) {
     USERERROR("Your username name must be lowercase alphanumeric characters ".
 	      "only!", 1);
 }
@@ -48,8 +48,8 @@ if (! ereg("^[a-z0-9]+$", $uid)) {
 #
 # Database limits
 #
-if (strlen($uid) > $TBDB_UIDLEN) {
-    USERERROR("The name \"$uid\" is too long! ".
+if (strlen($joining_uid) > $TBDB_UIDLEN) {
+    USERERROR("The name \"$joining_uid\" is too long! ".
               "Please select another.", 1);
 }
 
@@ -88,10 +88,10 @@ $usr_addr  = addslashes($usr_addr);
 # See if this is a new user or one returning.
 #
 $query_result = mysql_db_query($TBDBNAME,
-	"SELECT usr_pswd FROM users WHERE uid=\"$uid\"");
+	"SELECT usr_pswd FROM users WHERE uid=\"$joining_uid\"");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error retrieving info for $uid: $err\n", 1);
+    TBERROR("Database Error retrieving info for $joining_uid: $err\n", 1);
 }
 if (mysql_num_rows($query_result) > 0) {
     $returning = 1;
@@ -105,8 +105,8 @@ else {
 # For a new user, the password must pass our tests.
 #
 if ($returning) {
-    if (CHECKLOGIN($uid) != 1) {
-        USERERROR("The Username '$uid' is in use. ".
+    if (CHECKLOGIN($joining_uid) != 1) {
+        USERERROR("The Username '$joining_uid' is in use. ".
 		  "If you already have an Emulab account, please go back ".
 		  "and login before trying to join a new project.<br><br>".
 		  "If you are a <em>new</em> Emulab user trying to join ".
@@ -124,9 +124,9 @@ else {
 	if (! $dbm) {
 	    TBERROR("Could not dbmopen $TBCSLOGINS from usradded.php3\n", 1);
 	}
-	if (dbmexists($dbm, $uid)) {
+	if (dbmexists($dbm, $joining_uid)) {
 	    dbmclose($dbm);
-	    USERERROR("The username '$uid' is already in use. ".
+	    USERERROR("The username '$joining_uid' is already in use. ".
 		      "Please go back and choose another.", 1);
 	}
 	dbmclose($dbm);
@@ -138,7 +138,7 @@ else {
                   1);
     }
     $mypipe = popen(escapeshellcmd(
-    "$TBCHKPASS_PATH $password1 $uid '$usr_name:$usr_email'"),
+    "$TBCHKPASS_PATH $password1 $joining_uid '$usr_name:$usr_email'"),
     "w+");
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);
@@ -149,7 +149,7 @@ else {
     }
     else {
         TBERROR("TESTBED: checkpass failure\n".
-                "\n$usr_name ($uid) just tried to set up a testbed ".
+                "\n$usr_name ($joining_uid) just tried to set up a testbed ".
                 "account,\n".
                 "but checkpass pipe did not open (returned '$mypipe').", 1);
     }
@@ -189,20 +189,22 @@ if (! $returning) {
     $newuser_command = "INSERT INTO users ".
 	"(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	"usr_URL,usr_phone,usr_title,usr_affil,usr_pswd,unix_uid,status) ".
-	"VALUES ('$uid',now(),'$usr_expires','$usr_name','$usr_email',".
-	"'$usr_addr', '$usr_url', '$usr_phone','$usr_title','$usr_affil',".
-        "'$encoding',NULL,'newuser')";
+	"VALUES ('$joining_uid', now(), '$usr_expires', '$usr_name', ".
+        "'$usr_email', ".
+	"'$usr_addr', '$usr_url', '$usr_phone', '$usr_title', '$usr_affil',".
+        "'$encoding', NULL, 'newuser')";
     $newuser_result  = mysql_db_query($TBDBNAME, $newuser_command);
     if (! $newuser_result) {
         $err = mysql_error();
-        TBERROR("Database Error adding adding new user $uid: $err\n", 1);
+        TBERROR("Database Error adding adding new user $joining_uid: ".
+                "$err\n", 1);
     }
 
-    $key = GENKEY($uid);
+    $key = GENKEY($joining_uid);
 
-    mail("$usr_name '$uid' <$usr_email>", "TESTBED: Your New User Key",
+    mail("$usr_name '$joining_uid' <$usr_email>", "TESTBED: Your New User Key",
 	 "\n".
-         "Dear $usr_name ($uid):\n\n".
+         "Dear $usr_name ($joining_uid):\n\n".
          "\tHere is your key to verify your account on the ".
          "Utah Network Testbed:\n\n".
          "\t\t$key\n\n".
@@ -217,8 +219,8 @@ if (! $returning) {
          "Thanks,\n".
          "Testbed Ops\n".
          "Utah Network Testbed\n",
-         "From: $TBMAIL_CONTROL\n".
-         "Cc: $TBMAIL_CONTROL\n".
+         "From: $TBMAIL_APPROVAL\n".
+         "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
 
     #
@@ -242,7 +244,7 @@ if (! $returning) {
 # Don't try to join twice!
 # 
 $query_result = mysql_db_query($TBDBNAME,
-	"select * from proj_memb where uid='$uid' and pid='$pid'");
+	"select * from proj_memb where uid='$joining_uid' and pid='$pid'");
 if (mysql_num_rows($query_result) > 0) {
     die("<h3><br><br>".
         "You have already applied for membership in project: $pid.".
@@ -255,10 +257,10 @@ if (mysql_num_rows($query_result) > 0) {
 #
 $query_result = mysql_db_query($TBDBNAME,
 	"insert into proj_memb (uid,pid,trust) ".
-        "values ('$uid','$pid','none');");
+        "values ('$joining_uid','$pid','none');");
 if (! $query_result) {
     $err = mysql_error();
-    TBERROR("Database Error adding adding user $uid to ".
+    TBERROR("Database Error adding adding user $joining_uid to ".
             "project $pid: $err\n", 1);
 }
 
@@ -286,19 +288,19 @@ $leader_name = $row[0];
 $leader_email = $row[1];
 
 mail("$leader_name '$leader_uid' <$leader_email>",
-     "TESTBED: $uid $pid Project Join Request",
-     "\n$usr_name ($uid) is trying to join your project ($pid).\n".
+     "TESTBED: $joining_uid $pid Project Join Request",
+     "\n$usr_name ($joining_uid) is trying to join your project ($pid).\n".
      "$usr_name has the\n".
-     "Testbed username $uid and email address $usr_email.\n$usr_name's ".
-     "phone number is $usr_phone and address $usr_addr.\n\n".
+     "Testbed username $joining_uid and email address $usr_email.\n".
+     "$usr_name's phone number is $usr_phone and address $usr_addr.\n\n".
      "Please return to $TBWWW\n".
      "log in, and select the 'New User Approval' page to enter your\n".
      "decision regarding $usr_name's membership in your project\n\n".
      "Thanks,\n".
      "Testbed Ops\n".
      "Utah Network Testbed\n",
-     "From: $TBMAIL_CONTROL\n".
-     "Cc: $TBMAIL_CONTROL\n".
+     "From: $TBMAIL_APPROVAL\n".
+     "Bcc: $TBMAIL_APPROVAL\n".
      "Errors-To: $TBMAIL_WWW");
 
 #

@@ -9,6 +9,7 @@ $STATUS_NOLOGINS  = 5;
 $login_status     = $STATUS_NOSTATUS;
 $login_message    = "";
 $error_message    = 0;
+$login_uid        = 0;
 
 #
 # WRITESIDEBARBUTTON(text, link): Write a button on the sidebar menu.
@@ -39,10 +40,10 @@ function WRITESIDEBARBUTTON($text, $base, $link) {
 # sees depends on the login status and the DB status.
 #
 function WRITESIDEBAR() {
-    global $login_status, $login_message, $error_message, $uid, $TBDBNAME;
+    global $login_status, $login_message, $error_message, $login_uid;
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
     global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
-    global $TBBASE, $TBDOCBASE;
+    global $TBBASE, $TBDOCBASE, $TBDBNAME;
 
     echo "<table cellspacing=2 cellpadding=2 border=0 width=150>\n";
 
@@ -77,7 +78,7 @@ function WRITESIDEBAR() {
     }
     elseif ($login_status == $STATUS_LOGGEDIN) {
 	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT status,admin,stud FROM users WHERE uid='$uid'");
+		"SELECT status,admin,stud FROM users WHERE uid='$login_uid'");
 	$row = mysql_fetch_row($query_result);
 	$status = $row[0];
 	$admin  = $row[1];
@@ -88,7 +89,7 @@ function WRITESIDEBAR() {
         #
 	$query_result = mysql_db_query($TBDBNAME,
 		"SELECT trust FROM proj_memb ".
-		"WHERE uid='$uid' and trust='group_root'");
+		"WHERE uid='$login_uid' and trust='group_root'");
 	if (mysql_num_rows($query_result)) {
 	    $trusted = 1;
 	}
@@ -150,7 +151,7 @@ function WRITESIDEBAR() {
 
     switch ($login_status) {
     case $STATUS_LOGGEDIN:
-	$login_message = "$uid Logged In";
+	$login_message = "$login_uid Logged In";
 	break;
     case $STATUS_LOGGEDOUT:
 	$login_message = "Logged Out";
@@ -172,7 +173,7 @@ function WRITESIDEBAR() {
     echo "<form action=\"${TBBASE}index.php3\" method=post>\n";
     if ($login_status == $STATUS_LOGGEDIN) {
 	echo "<tr>
-                <td><input type=hidden name=uid value=\"$uid\"></td>
+                <td><input type=hidden name=uid value=\"$login_uid\"></td>
               </tr>
               <tr>
                 <td align=center>
@@ -185,14 +186,15 @@ function WRITESIDEBAR() {
 	# Get the UID that came back in the cookie so that we can present a
 	# default login name to the user.
 	#
-	if (($uid = GETUID()) == FALSE) {
-	    $uid = "";
+	if (($known_uid = GETUID()) == FALSE) {
+	    $known_uid = "";
 	}
 
 	echo "<tr>
                 <td>
                    Username:<br>
-                            <input type=text value=\"$uid\" name=uid size=8>
+                            <input type=text value=\"$known_uid\"
+                                   name=uid size=8>
                 </td>
               </tr>
               <tr>
@@ -313,27 +315,34 @@ function WRITETITLE($title) {
 # Spit out a vanilla page header.
 #
 function PAGEHEADER($title) {
-    global $login_status, $TBAUTHTIMEOUT, $uid;
+    global $login_status, $TBAUTHTIMEOUT, $login_uid;
     global $STATUS_NOSTATUS, $STATUS_LOGGEDIN, $STATUS_LOGGEDOUT;
     global $STATUS_LOGINFAIL, $STATUS_TIMEDOUT, $STATUS_NOLOGINS;
     global $TBBASE, $TBDOCBASE, $TBDBNAME;
 
+    #
+    # $login_uid will be set only when the index page is loaded, which
+    # is where the login/logout box is handled. Otherwise, there will
+    # be no $login_status, and $login_uid will be zero. We need to figure
+    # that out so we can generate the proper menu options for the user.
+    # 
     if ($login_status == $STATUS_NOSTATUS) {
-	if ($uid = GETUID()) {
+	if (($known_uid = GETUID()) != FALSE) {
             #
             # Check to make sure the UID is logged in (not timed out).
             #
-            $status = CHECKLOGIN($uid);
+            $status = CHECKLOGIN($known_uid);
             switch ($status) {
 	    case 0:
-		unset($uid);
+		$login_uid    = 0;
 		break;
 	    case 1:
 		$login_status = $STATUS_LOGGEDIN;
+		$login_uid    = $known_uid;
 		break;
 	    case -1:
 		$login_status = $STATUS_TIMEDOUT;
-		unset($uid);
+		$login_uid    = 0;
 		break;
 	    }
 	}
@@ -346,12 +355,12 @@ function PAGEHEADER($title) {
     #
     if ($login_status == $STATUS_LOGGEDIN && NOLOGINS()) {
 	$query_result = mysql_db_query($TBDBNAME,
-		"SELECT admin FROM users WHERE uid='$uid'");
+		"SELECT admin FROM users WHERE uid='$login_uid'");
 	$row = mysql_fetch_row($query_result);
 	$admin  = $row[0];
 
 	if (!$admin) {
-	    DOLOGOUT($uid);
+	    DOLOGOUT($login_uid);
 	    $login_status = $STATUS_NOLOGINS;
 	}
     }
