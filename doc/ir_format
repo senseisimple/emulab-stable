@@ -1,21 +1,3 @@
-Version 0.4
-
-ChangeLog:
-
-0.4:
-Added ip and ip-mac sections.
-
-0.3:
-Incorporated a number of previous, unlogged changes.
-Added Seed section.
-Removed delay nodes from the virtual topology.
-
-0.2: 
-Added events section.
-
-0.1:
-Initial revision
-
 ----------------------------------------------------------------------
 
 Conventions:
@@ -167,13 +149,14 @@ START events
 END events
 
 START ip
+START map
 # Records of the form
 # <node> <dst> <ip>
-END ip
-
-START ip-mac
+END map
+START mac
 # Records of the form
 # <mac> <ip>
+END mac
 END ip
 ----------------------------------------------------------------------
 
