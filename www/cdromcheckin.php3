@@ -111,7 +111,7 @@ if (strcmp($privIP, "1.1.1.1")) {
     }
 
     #
-    # For now we just give them a new privkey. There is no image upgrade
+    # For now we just give them a new privkey. There is no real image upgrade
     # path in place yet.
     #
     $newkey = GENHASH();
@@ -121,6 +121,16 @@ if (strcmp($privIP, "1.1.1.1")) {
 
     header("Content-Type: text/plain");
     echo "privkey=$newkey\n";
+
+    if (0) {
+    if ($cdvers == 2) {
+	    echo "slice1_image=http://${WWWHOST}/images/slice1-v2.ndz\n";
+	    echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
+	    echo "slicex_mount=/users\n";
+    }
+    }
+    echo "emulab_status=0\n";
+    
     return;
 }
 
@@ -156,23 +166,33 @@ if ($cdvers == 1) {
 	echo "slice1_image=http://${WWWHOST}/images/slice1-v1.ndz\n";
 	echo "slice1_md5=2970e2cf045f5872c6728eeea3b51dae\n";
 	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
-	echo "slicex_md5=4411f2ef89d48bf901d20a391982c3c7\n";
+	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v2.tar.gz\n";
+	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
     } else {
 	echo "fdisk=image.fdisk\n";
 	echo "slice1_image=slice1.ndz\n";
 	echo "slice1_md5=cb810b43f49d15b3ac4122ff42f8925d\n";
 	echo "slicex_mount=/users\n";
-	echo "slicex_tarball=slicex.tar.gz\n";
-	echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
+	echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
+	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
     }
 }
 else {
-    echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
-    echo "slice1_image=http://${WWWHOST}/images/slice1-v2.ndz\n";
-    echo "slice1_md5=de2989b452fc588788c2083dc48fc019\n";
-    echo "slicex_mount=/users\n";
-    echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
-    echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
+    if (0) {
+	echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
+	echo "slice1_image=http://${WWWHOST}/images/slice1-v2.ndz\n";
+	echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
+	echo "slicex_mount=/users\n";
+	echo "slicex_tarball=http://${WWWHOST}/images/slicex-v2.tar.gz\n";
+	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
+    }
+    else {
+	echo "fdisk=image.fdisk\n";
+	echo "slice1_image=slice1.ndz\n";
+	echo "slice1_md5=402f00f2e46d22507cef3d19846b48f8\n";
+	echo "slicex_mount=/users\n";
+	echo "slicex_tarball=slicex.tar.gz\n";
+	echo "slicex_md5=a5274072a40ebf2fda8b8596a6e60e0d\n";
+    }
 }
 echo "emulab_status=0\n";
