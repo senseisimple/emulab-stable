@@ -4,6 +4,7 @@
 #undef PACKAGE
 #undef VERSION
 
+#undef TBROOT
 #undef TBDBNAME
 #undef TBADMINGROUP
 #undef IPBASE
