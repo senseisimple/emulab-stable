@@ -971,7 +971,7 @@ class Plab:
             failstr = ""
             for n in failsoon:
                 failstr += "%s %s/%s: expires: %s\n" % \
-                           (n[:3] + (ctime(n[3]),))
+                           (n[:3] + (time.ctime(n[3]),))
             SENDMAIL(TBOPS, "WARNING: PLAB leases are about to expire",
                      "The following plab leases are about to expire:\n%s" %
                      failstr + "\n\nPlease look into it!", TBOPS)
