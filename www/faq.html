@@ -117,6 +117,8 @@
      <li> <a href="#TR-6">I wrote a small TCP application to test the
      bandwidth of a link/LAN. I do not observe the bandwidth that I
      asked for. Why?</a>
+     <li> <a href="#TR-7">I am running a routing daemon in my topology
+     but the daemon claims that all my nodes are directly connected! Why?</a>
      </ul>
 </ul>
 
@@ -1474,19 +1476,6 @@
     of the tutorial.
     </p>
     
-<li><a NAME="TR-3"></a>
-    <font size='+1'><b>I am running a routing daemon in my topology
-        but the daemon claims that all my nodes are directly connected!
-        Why?</b></font>
-    <p>
-    The routing daemons are probably talking to each other via the control
-    net and routing traffic through it since it is the shortest path.
-    You will need to configure your daemon to ignore the control net interface.
-    See the
-    <a href = "tutorial/tutorial.php3#ControlNet">control net section</a>
-    of the tutorial.
-    </p>
-    
 <li><a NAME="TR-4"></a>
     <font size='+1'><b>I set a non-zero packet-loss (or delay) but 'ping'
         shows a different packet-loss (or delay). Why?</b></font>
@@ -1591,4 +1580,19 @@
     mini-tutorial"</a> or a basic TCP/IP book for the gory details.
     
     </p>
+
+ <li><a NAME="TR-7"></a>
+    <font size='+1'><b>I am running a routing daemon in my topology
+        but the daemon claims that all my nodes are directly connected!
+        Why?</b></font>
+    <p>
+    The routing daemons are probably talking to each other via the control
+    net and routing traffic through it since it is the shortest path.
+    You will need to configure your daemon to ignore the control net interface.
+    See the
+    <a href = "tutorial/tutorial.php3#ControlNet">control net section</a>
+    of the tutorial.
+
+    </p>
+
 </ul>
