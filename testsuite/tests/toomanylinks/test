@@ -1,1 +1,3 @@
-tb_prerun("tbprerun",255);
+tb_prerun("tbprerun",0);
+tb_run("tbswap in",255);
+tb_run("tbend",0);

@@ -5,7 +5,7 @@ source tb_compat.tcl
 set node0 [$ns node]
 set node1 [$ns node]
 
-set link0 [$ns duplex-link $node1 $node0 150Mb 0ms DropTail]
+set link0 [$ns duplex-link $node1 $node0 1150Mb 0ms DropTail]
 
 $ns rtproto Static
 $ns run

@@ -5,7 +5,7 @@
 # be sure to go and update configure.in.
 #
 WWWDEFS=default
-IPBASE=192.168
+IPBASE=10
 DELAYCAPACITY=2
 DISABLE_NAMED_SETUP=1
 DISABLE_EVENT_SCHED=1

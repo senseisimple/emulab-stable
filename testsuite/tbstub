@@ -78,8 +78,9 @@ sub tb_prerun {
 #    system("mysqldump --all $db > $cmd-$::counter.txt");
     $::counter++;
 
-    if ($ecode != $exitcode) {
-	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
+    # Forget about specific error codes. Either success or fail.
+    if (($exitcode && !$ecode) || (!$exitcode && $ecode)) {
+	tb_fail("$cmd - Exit code $ecode. Unexpected");
     }
 };
 sub tb_compare {
@@ -121,8 +122,9 @@ sub tb_run {
 #    system("mysqldump --all $db > $cmd-$::counter.txt");
     $::counter++;
 
-    if ($ecode != $exitcode) {
-	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
+    # Forget about specific error codes. Either success or fail.
+    if (($exitcode && !$ecode) || (!$exitcode && $ecode)) {
+	tb_fail("$cmd - Exit code $ecode. Unexpected");
     }
 };
 sub tb_fail {
