@@ -112,10 +112,6 @@ function WRITESIDEBAR() {
 	    if ($admin) {
 		WRITESIDEBARBUTTON("New Project Approval",
 				   $TBBASE, "approveproject_list.php3");
-		WRITESIDEBARBUTTON("Node Control",
-				   $TBBASE, "nodecontrol_list.php3");
-		WRITESIDEBARBUTTON("User List",
-				   $TBBASE, "showuser_list.php3");
 	    }
 	    if ($trusted) {
                 # Only group leaders can do these options
@@ -129,6 +125,14 @@ function WRITESIDEBAR() {
 	    #
 	    WRITESIDEBARBUTTON("Project Information",
 			       $TBBASE, "showproject_list.php3");
+	    
+	    if ($admin) {
+		WRITESIDEBARBUTTON("User List",
+				   $TBBASE, "showuser_list.php3");
+		WRITESIDEBARBUTTON("Node Control",
+				   $TBBASE, "nodecontrol_list.php3");
+	    }
+	    
 	    WRITESIDEBARBUTTON("Begin an Experiment",
 			       $TBBASE, "beginexp_form.php3");
 	    WRITESIDEBARBUTTON("Experiment Information",
@@ -383,11 +387,6 @@ function PAGEHEADER($title) {
            <title>Emulab.Net - $title</title>\n";
 
     #
-    # Shove the Jave code through to the output. 
-    # 
-    readfile("java.html");
-
-    #
     # If logged in, initialize the refresh process.
     # 
     if ($login_status == $STATUS_LOGGEDIN) {
@@ -398,11 +397,17 @@ function PAGEHEADER($title) {
 	$timeo *= 1000;
 	echo "<script language=\"JavaScript\">
                 <!--
+                  var sURL = \"$TBDOCBASE/index.php3\";
+
                   function doLoad() {
                     setTimeout(\"refresh()\", $timeo );
                   }
                 //-->
               </script>\n";
+        #
+        # Shove the rest of the Java code through to the output. 
+        # 
+        readfile("java.html");
     }
     
     echo " <meta HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">
