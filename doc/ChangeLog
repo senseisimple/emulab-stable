@@ -1,3 +1,96 @@
+stoller     2004/03/08 12:44:01 MST
+
+  Modified files:
+    tbsetup              GNUmakefile.in node_reboot.in os_load.in 
+                         os_setup.in 
+  Added files:
+    tbsetup              libosload.pm.in libreboot.pm.in 
+  Log:
+  Converted os_load and node_reboot into libraries. Basically that meant
+  splitting the existing code between a frontend script that parses arguments
+  and does taint checking, and a backend library where all the work is done
+  (including permission checks). The interface to the libraries is simple
+  right now (didn't want to spend a lot of time on designing interface
+  without knowing if the approach would work long term).
+  
+  	use libreboot;
+  	use libosload;
+  
+          nodereboot(\%reboot_args, \%reboot_results);
+          osload(\%reload_args, \%reload_results);
+  
+  Arguments are passed to the libraries in the form of a hash. For example,
+  in os_setup:
+  
+  	$reload_args{'debug'}     = $dbg;
+  	$reload_args{'asyncmode'} = 1;
+  	$reload_args{'imageid'}   = $imageid;
+  	$reload_args{'nodelist'}  = [ @nodelist ];
+  
+  Results are passed back both as a return code (-1 means total failure right
+  away, while a positive argument indicates the number of nodes that failed),
+  and in the results hash which gives the status for each individual node. At
+  the moment it is just success or failure (0 or 1), but in the future might
+  be something more meaningful.
+  
+  os_setup can now find out about individual failures, both in reboot and
+  reload, and alter how it operates afterwards. The main thing is to not wait
+  for nodes that fail to reboot/reload, and to terminate with no retry when
+  this happens, since at the moment it indicates an unusual failure, and it
+  is better to terminate early. In the past an os_load failure would result
+  in a tbswap retry, and another failure (multiple times). I have already
+  tested this by trying to load images that have no file on disk; it is nice
+  to see those failures caught early and the experiment failure to happen
+  much quicker!
+  
+  A note about "asyncmode" above. In order to promote parallelism in
+  os_setup, asyncmode tells the library to fork off a child and return
+  immediately. Later, os_setup can block and wait for status by calling
+  back into the library:
+  
+  	my $foo = nodereboot(\%reboot_args, \%reboot_results);
+  	nodereboot_wait($foo);
+  
+  If you are wondering how the child reports individual node status back to
+  the parent (so it can fill in the results hash), Perl really is a kitchen
+  sink. I create a pipe with Perl's pipe function and then fork a child to so
+  the work; the child writes the results to the pipe (status for each node),
+  and the parent reads that back later when nodereboot_wait() is called,
+  moving the results into the %reboot_results array. The parent meanwhile can
+  go on and in the case of os_setup, make more calls to reboot/reload other
+  nodes, later calling the wait() routines once all have been initiated.
+  Also worth noting that in order to make the libraries "reentrant" I had to
+  do some cleaning up and reorganizing of the code. Nothing too major though,
+  just removal of lots of global variables. I also did some mild unrelated
+  cleanup of code that had been run over once too many times with a tank.
+  
+  So how did this work out. Well, for os_setup/os_load it works rather
+  nicely!
+  
+  node_reboot is another story. I probably should have left it alone, but
+  since I had already climbed the curve on osload, I decided to go ahead and
+  do reboot. The problem is that node_reboot needs to run as root (its a
+  setuid script), which means it can only be used as a library from something
+  that is already setuid. os_setup and os_load runs as the user. However,
+  having a consistent library interface and the ability to cleanly figure out
+  which individual nodes failed, is a very nice thing.
+  
+  So I came up with a suitable approach that is hidden in the library. When the
+  library is entered without proper privs, it silently execs an instance of
+  node_reboot (the setuid script), and then uses the same trick mentioned
+  above to read back individual node status. I create the pipe in the parent
+  before the exec, and set the no-close-on-exec flag. I pass the fileno along
+  in an environment variable, and the library uses that to the write the
+  results to, just like above. The result is that os_setup sees the same
+  interface for both os_load and node_reboot, without having to worry that
+  one or the other needs to be run setuid.
+  
+  Revision  Changes    Path
+  1.104     +1 -1      testbed/tbsetup/GNUmakefile.in
+  1.51      +85 -658   testbed/tbsetup/node_reboot.in
+  1.58      +119 -344  testbed/tbsetup/os_load.in
+  1.92      +98 -53    testbed/tbsetup/os_setup.in
+
 ricci       2004/02/27 16:36:37 MST
 
   Modified files:
@@ -87,6 +180,25 @@ stoller     2004/02/17 15:06:34 MST
   1.6       +1 -0      testbed/tmcd/linux/testbed
   1.10      +4 -2      testbed/tmcd/plab/GNUmakefile.in
   1.5       +214 -37   testbed/tmcd/plab/rc.inplab
+
+stoller     2004/02/26 11:40:00 MST
+
+  Modified files:
+    www                  dbcheck.php3 nodecontrol_list.php3 
+                         osiddefs.php3 
+  Added files:
+    www                  editnodetype.php3 
+  Log:
+  Add an editnodetype page to make it easier to operate on the
+  node_types table, especially when setting up new testbeds. Currently,
+  linked off the node summary page, when in admin mode you get the edit
+  link instead of the show link.
+  
+  Revision  Changes    Path
+  1.5       +21 -8     testbed/www/dbcheck.php3
+  1.43      +6 -2      testbed/www/nodecontrol_list.php3
+  1.4       +30 -0     testbed/www/osiddefs.php3
+
 
 stoller     2004/02/16 08:34:35 MST
 
