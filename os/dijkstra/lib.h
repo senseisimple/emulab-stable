@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <memory>
 
 // A convenient converter
 std::string intToString(int num);
