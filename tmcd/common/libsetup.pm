@@ -933,11 +933,16 @@ sub doaccounts()
     }
     CLOSETMCC($TM);
 
-    dbmopen(%PWDDB, TMPASSDB, 0660) or
-	die("Cannot open " . TMPASSDB . ": $!\n");
+    if (! MFS()) {
+	#
+	# One the MFS, these will just start out as empty hashes.
+	# 
+	dbmopen(%PWDDB, TMPASSDB, 0660) or
+	    die("Cannot open " . TMPASSDB . ": $!\n");
 	
-    dbmopen(%GRPDB, TMGROUPDB, 0660) or
-	die("Cannot open " . TMGROUPDB . ": $!\n");
+	dbmopen(%GRPDB, TMGROUPDB, 0660) or
+	    die("Cannot open " . TMGROUPDB . ": $!\n");
+    }
 
     #
     # Create any groups that do not currently exist. Add each to the
@@ -989,7 +994,9 @@ sub doaccounts()
     %deletes = ();
 
     # Write the DB back out!
-    dbmclose(%GRPDB);
+    if (! MFS()) {
+	dbmclose(%GRPDB);
+    }
 
     #
     # Repeat the same sequence for accounts, except we remove old accounts
@@ -1151,7 +1158,9 @@ sub doaccounts()
 	}
     }
     # Write the DB back out!
-    dbmclose(%PWDDB);
+    if (! MFS()) {
+	dbmclose(%PWDDB);
+    }
 
     #
     # Create sfs_users file and populate it with public SFS keys
@@ -1686,12 +1695,18 @@ sub bootsetup()
     #
     create_nicknames();
 
-    if ($USESFS && ! MFS()) {
-	#
-	# Setup SFS hostid.
-	#
-	print STDOUT "Setting up for SFS ... \n";
-	dosfshostid();
+    if ($USESFS) {
+	if (! MFS()) {
+	    #
+	    # Setup SFS hostid.
+	    #
+	    print STDOUT "Setting up for SFS ... \n";
+	    dosfshostid();
+	}
+	else {
+	    # No SFS on the MFS.
+	    $USESFS = 0;
+	}
     }
 
     #
@@ -1789,12 +1804,18 @@ sub nodeupdate()
 	return 0;
     }
 
-    if ($USESFS && ! MFS()) {
-	#
-	# Setup SFS hostid.
-	#
-	print STDOUT "Setting up for SFS ... \n";
-	dosfshostid();
+    if ($USESFS) {
+	if (! MFS()) {
+	    #
+	    # Setup SFS hostid.
+	    #
+	    print STDOUT "Setting up for SFS ... \n";
+	    dosfshostid();
+	}
+	else {
+	    # No SFS on the MFS.
+	    $USESFS = 0;
+	}
     }
 
     #
