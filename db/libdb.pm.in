@@ -169,6 +169,7 @@ use Exporter;
 
 	 TBDB_IFACEROLE_CONTROL TBDB_IFACEROLE_EXPERIMENT
 	 TBDB_IFACEROLE_JAIL TBDB_IFACEROLE_FAKE TBDB_IFACEROLE_OTHER
+	 TBDB_IFACEROLE_GW
 
 	 TBDB_ROUTERTYPE_NONE	TBDB_ROUTERTYPE_OSPF
 	 TBDB_ROUTERTYPE_STATIC TBDB_ROUTERTYPE_MANUAL
@@ -535,6 +536,7 @@ sub TBDB_IFACEROLE_CONTROL()	{ "ctrl"; }
 sub TBDB_IFACEROLE_EXPERIMENT()	{ "expt"; }
 sub TBDB_IFACEROLE_JAIL()	{ "jail"; }
 sub TBDB_IFACEROLE_FAKE()	{ "fake"; }
+sub TBDB_IFACEROLE_GW()		{ "gw"; }
 sub TBDB_IFACEROLE_OTHER()	{ "other"; }
 
 # Routertypes.
@@ -3197,7 +3199,8 @@ sub DBQuery($)
 		"  Error: " . $DB->errstr . " ($err)";
 	}
 	if (defined($result) ||
-	    ($DB->err != 2006) && ($DB->err != 1053) && ($DB->err != 2013)) {
+	    ($DB->err != 2006) && ($DB->err != 1053) && ($DB->err != 2013) &&
+	    ($DB->err != 1046)) {
 	    last;
 	}
 
