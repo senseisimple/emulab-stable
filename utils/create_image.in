@@ -89,14 +89,16 @@ if ($node =~ /^([-\w]+)$/) {
     $node = $1;
 }
 else {
-    fatal("*** Bad data in $node\n");
+    die("*** $0:\n".
+	"    Bad data in $node\n");
 }
 
 if ($imagename =~ /^([-\w\.\+]+)$/) {
     $imagename = $1;
 }
 else {
-    fatal("*** Bad data in $imagename.\n");
+    die("*** $0:\n".
+	"    Bad data in $imagename.\n");
 }
     
 if (defined($options{"p"})) {
@@ -106,7 +108,8 @@ if (defined($options{"p"})) {
 	$imagepid = $1;
     }
     else {
-	fatal("*** Bad data in $imagepid.\n");
+	die("*** $0:\n".
+	    "    Bad data in $imagepid.\n");
     }
 }
 
@@ -114,7 +117,16 @@ if (defined($options{"p"})) {
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    fatal("*** You do not exist in the Emulab Database.\n");
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database.\n");
+}
+
+#
+# Valid Node ID?
+#
+if (! TBValidNodeName($node)) {
+    die("*** $0:\n".
+	"    Invalid node name $node!\n");
 }
 
 #
@@ -124,7 +136,8 @@ if ($UID && !TBAdmin($UID)) {
     $mereuser = 1;
 
     if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, $node)) {
-	fatal("*** You do not have permission to create an image from $node\n");
+	die("*** $0:\n".
+	    "    You do not have permission to create an image from $node\n");
     }
 }
 
@@ -134,7 +147,8 @@ if ($UID && !TBAdmin($UID)) {
 my $user_name;
 my $user_email;
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    fatal("*** Cannot determine user name and email address");
+    die("*** $0:\n".
+	"    Cannot determine user name and email address!\n");
 }
 
 #
@@ -145,7 +159,8 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 my $pid;
 my $eid;
 if (! NodeidToExp($node, \$pid, \$eid)) {
-    fatal("*** Could not map $node to its pid/eid");
+    die("*** $0:\n".
+	"    Could not map $node to its project and experiment ID!\n");
 }
 
 #
@@ -158,14 +173,16 @@ $db_result =
 		 "pid='$imagepid' and imagename='$imagename'");
     
 if ($db_result->numrows < 1) {
-    fatal("*** No such image descriptor $imagename in project $imagepid!");
+    die("*** $0:\n".
+	"    No such image descriptor $imagename in project $imagepid!\n");
 }
 %imageid_row = $db_result->fetchhash();
 $imageid = $imageid_row{'imageid'};
 
 if ($mereuser &&
     ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
-    fatal("*** You do not have permission to use imageid $imageid!\n");
+    die("*** $0:\n".
+	"    You do not have permission to use imageid $imageid!\n");
 }
 
 #
@@ -179,13 +196,16 @@ if ($filename =~ /^([-\w\.\/\+]+)$/) {
     $filename = $1;
 }
 else {
-    fatal("Bad filename: $filename");
+    die("*** $0:\n".
+	"    Bad filename: $filename!\n");
 }
 
 open(FILE, "> $filename") or
-    fatal("Could not create $filename: $!");
+    die("*** $0:\n".
+	"    Could not create $filename: $!\n");
 close(FILE) or
-    fatal("Could not truncate $filename: $!");
+    die("*** $0:\n".
+	"    Could not truncate $filename: $!\n");
 
 #
 # Get the disktype for this node
@@ -204,7 +224,7 @@ my $device = "/dev/${devtype}${devnum}";
 # revision of the testbed image it was based off.
 #
 DBQueryFatal("update images set updated=now() where ".
-		 "pid='$imagepid' and imagename='$imagename'");
+	     "pid='$imagepid' and imagename='$imagename'");
 
 #
 # Okay, we want to build up a command line that will run the script on
@@ -227,14 +247,8 @@ else {
 # Go to the background since this is going to take a while.
 # 
 if (!$debug) {
-    $logname = `mktemp /tmp/create-image-$pid-$eid.XXXXXX`;
+    $logname = TBMakeLogname("create-image-$pid-$eid");
 
-    if ($logname =~ /^([-\@\w.\/]+)$/) {
-	$logname = $1;
-    }
-    else {
-	fatal("Bad data in logfile name: $logname");
-    }
     if (TBBackGround($logname)) {
 	#
 	# Parent exits normally
