@@ -50,7 +50,7 @@ is running.
 Do NOT create the tarfile in plastic:/tmp ("No Tar").
 .SH FILES
 .TP 25n
-.B $CVSROOT/testbed/doc/man/rmacct.man
+$CVSROOT/testbed/doc/man/rmacct.man
 
 .SH "SEE ALSO"
 .BR mkacct (8).

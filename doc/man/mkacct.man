@@ -52,7 +52,7 @@ are modifying the testbed database while
 is running.
 .SH FILES
 .TP 25n
-.B $CVSROOT/testbed/doc/man/mkacct.man
+$CVSROOT/testbed/doc/man/mkacct.man
 .SH "SEE ALSO"
 .BR rmacct (8).
 .SH NOTES
