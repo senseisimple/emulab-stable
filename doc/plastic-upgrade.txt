@@ -8,15 +8,22 @@ Rob:
 * Setup sendmail
 * Get correct inetd services running
 * Set up forwarding http server (if necessary)
+* Preserve ssh identity and host key
+* resolv.conf
+* Preserve password
 
 Unassigned:
 * Compile custom kernel (w/ tons of mbufs, etc.)
+* Install LEDA
 
 ################################################## ISSUES
 Open issues:
 * Do we need to move over stuff in /usr/site?
-* NIS no longer necessary?
-* Do we still need a forwarding http server?
+* NIS no longer necessary? (probably not)
+* Do we still need a forwarding http server? (probably not)
+
+Notes:
+* Preserved important files in /users/ricci/plastic-upgrade
 
 Kernel issues:
 * Lots o' mbufs
@@ -24,8 +31,8 @@ Kernel issues:
 
 Custom stuff installed on plastic:
 capture
-tip
-plasticwrap
+tip (from testbed tree)
+plasticwrap (from testbed tree)
 
 Stuff running out of inetd:
 ftp
