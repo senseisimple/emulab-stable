@@ -350,11 +350,11 @@ Phase "resolve", "Checking to make sure names for ops resolve", sub {
 Phase "mounts", "Setting up mounts of fs and ops", sub {
     DoneIfEdited($FSTAB);
     AppendToFileFatal($FSTAB,
-	"$FSNODE:/users\t\t/users\tnfs\trw\t0\t0",
-	"$FSNODE:/proj\t\t/proj\tnfs\trw\t0\t0",
-	"$FSNODE:/groups\t\t/groups\tnfs\trw\t0\t0",
-	"$FSNODE:/share\t\t/share\tnfs\trw\t0\t0",
-	"$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b\t0\t0");
+	"$FSNODE:/users\t\t/users\tnfs\trw,nodev,nosuid\t0\t0",
+	"$FSNODE:/proj\t\t/proj\tnfs\trw,nodev,nosuid\t0\t0",
+	"$FSNODE:/groups\t\t/groups\tnfs\trw,nodev,nosuid\t0\t0",
+	"$FSNODE:/share\t\t/share\tnfs\trw,nodev,nosuid\t0\t0",
+	"$USERNODE:/var\t\t$USERSVAR_DIR\tnfs\tro,soft,-b,nodev,nosuid\t0\t0");
     # XXX - Do we want to do a 'mount -a' at this point?
 };
 
