@@ -308,7 +308,7 @@ doit(gzFile *infp)
 				user, node, ll_time, ll_time) < 0)
 			break;
 
-		if (strncmp(node, opshostname, strlen(node)) == 0 |
+		if (strncmp(node, opshostname, strlen(node)) == 0 ||
 		    strncmp(node, "ops", strlen(node)) == 0) {
 			if (mydb_update("replace into userslastlogin "
 					"(uid, date, time) "

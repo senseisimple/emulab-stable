@@ -30,6 +30,7 @@ use libtestbed;
 
 my $genlastlog  = "$TB/sbin/genlastlog";
 my $logfile     = "$TB/log/genlastlog";
+my $debug       = 0;
 
 #
 # Turn off line buffering on output (dots ...).
@@ -79,12 +80,10 @@ while (1) {
     print "Running at " . TBTimeStamp() . "\n";
     
     if (system("$genlastlog")) {
-	my $exit_status = $? >> 8;
-
-	print "Exited with status $exit_status at " . TBTimeStamp() . "\n";
+	print "Exited with status $? at " . TBTimeStamp() . "\n";
 
 	SENDMAIL($TBOPS, "Genlastlog Failed!",
-		 "Failed with exit value $exit_status.\n".
+		 "Failed with exit value $?\n".
 		 "Please look at the syslog entries for genlastlog!");
     }
     sleep(60 * 15);
