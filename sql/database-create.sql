@@ -1684,6 +1684,7 @@ CREATE TABLE users (
   usr_phone tinytext,
   usr_shell tinytext,
   usr_pswd tinytext NOT NULL,
+  usr_w_pswd tinytext,
   unix_uid smallint(5) unsigned NOT NULL auto_increment,
   status enum('newuser','unapproved','unverified','active','frozen','other') NOT NULL default 'newuser',
   admin tinyint(4) default '0',
