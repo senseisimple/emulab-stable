@@ -103,6 +103,15 @@ if [ $HOSTMEM -ge `expr $RESIDMEM + 2` ]; then
 	MEMARGS="-M $HOSTMEM"
 fi
 
+#
+# Make sure the necessary device files exist (only necessary on FreeBSD 4.x)
+# Note that we create partition files for all slices, not just slice 1,
+# for the benefit of the slicefix script.
+#
+if [ -x /dev/MAKEDEV -a ! -e /dev/$DISK ]; then
+	(cd /dev; ./MAKEDEV $DISK ${DISK}s2a ${DISK}s3a ${DISK}s4a)
+fi 
+
 if [ x"$ADDRESS" != x ]; then
         PORT=`echo $ADDRESS | awk -F: '{ printf $2 }'`
 	MCAST=`echo $ADDRESS | awk -F: '{ printf $1 }'`
