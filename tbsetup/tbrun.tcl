@@ -43,6 +43,7 @@ set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
 set libir "$scriptdir/ir/libir.tcl"
 set ir2ifc "$scriptdir/ir2ifc"
 set ifcboot "$scriptdir/ifc_setup"
+set delay_setup "$scriptdir/delay_setup"
 
 source $libir
 namespace import TB_LIBIR::ir
@@ -104,6 +105,13 @@ if {[catch "exec $snmpit -debug -u -f $irFile >@ $logFp 2> $tmpio" err]} {
 readfifo $tmpioFP "SNMPIT: "
 
 #outs "PLACEHOLDER - Verifying virtual network."
+
+outs "Setting up delays"
+if {[catch "exec $delay_setup $irFile >@ $logFp 2>@ $logFp" err]}{
+    outs stderr "Error running $delay_setup. ($err)"
+    exit 1
+}
+
 outs "PLACEHOLDER - Copying disk images."
 outs "PLACEHOLDER - Booting for the first time."
 outs "PLACEHOLDER - Verifying OS functionality."
