@@ -12,7 +12,7 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  mkacct-ctrl_wrapper rmprojdir_wrapper
 DATAFILES	= default.ifc
 SUSCRIPTS	= mkprojdir rmprojdir os_setup mkacct rmacct \
-	          mkacct-ctrl rmacct-ctrl Ifc_setup
+	          mkacct-ctrl rmacct-ctrl ifc_setup os_load
 
 all:	$(BINS) $(SUBDIRS)
 
@@ -67,7 +67,7 @@ post-install:
 	chown root $(INSTALL_BINDIR)/rmacct-ctrl
 	chmod u+s $(INSTALL_BINDIR)/rmacct-ctrl
 	chown root $(INSTALL_LIBTBDIR)/rmacct-ctrl
-	chmod u+s $(INSTALL_LIBTBDIR)/rmacct-ctrl2
+	chmod u+s $(INSTALL_LIBTBDIR)/rmacct-ctrl
 	chown root $(INSTALL_BINDIR)/mkacct
 	chmod u+s $(INSTALL_BINDIR)/mkacct
 	chown root $(INSTALL_LIBTBDIR)/mkacct
@@ -80,6 +80,10 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/os_setup
 	chown root $(INSTALL_LIBTBDIR)/os_setup
 	chmod u+s $(INSTALL_LIBTBDIR)/os_setup
+	chown root $(INSTALL_BINDIR)/os_load
+	chmod u+s $(INSTALL_BINDIR)/os_load
+	chown root $(INSTALL_LIBTBDIR)/os_load
+	chmod u+s $(INSTALL_LIBTBDIR)/os_load
 	chown root $(INSTALL_BINDIR)/ifc_setup
 	chmod u+s $(INSTALL_BINDIR)/ifc_setup
 	chown root $(INSTALL_LIBTBDIR)/ifc_setup
