@@ -55,6 +55,10 @@ Program instproc updatedb {DB} {
 	perror "\[updatedb] $self has no command."
 	return
     }
+    if { [string first \n $command] != -1 } {
+	perror "\[updatedb] $self has disallowed newline in command: $command"
+	return
+    }
 
     set progvnode $node
     # if the attached node is a simulated one, we attach the
