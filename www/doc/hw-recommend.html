@@ -37,7 +37,10 @@ recommendations, and outlines the consequences of each choice.
 		sample first and try it out before committing to a card. Depedning on
 		usage, it may be OK to get a large number of nodes with 2 interfaces to
 		be edge nodes, and a smaller number with more interfaces to be
-		routers.</dd>
+		routers. <b>Note:</b> Our software currently does not support
+		nodes that are connected to multiple experimental-net switches.
+		For the time being, all NICs on a node must be attached to the same 
+		switch.</dd>
 
 	<dt><b>Case/Chassis</b></dt>
 		<dd>This will depend on your space requirements. The cheapest option is
@@ -188,7 +191,19 @@ recommendations, and outlines the consequences of each choice.
 <dl>
 	<dt><b>Network cables</b></dt>
 		<dd>We use Cat5E, chosen becasue they are not much more expensive than
-		Cat5, and can be used in the future for gigabit ethernet.</dd>
+		Cat5, and can be used in the future for gigabit ethernet. It has been
+		our experience that 'boots' on cables do more harm than good. The
+		main problems are that they make it difficult to disconnect the cables
+		one connected, and that they get in the way on densely-connected
+		switches. Cables with 'molded strain releif' are better than cables
+		with boots, but are often much more extensive. We buy cables in
+		two-foot increments, which keeps slack low without making the order
+		too complicated. Our standard so far has been to make control net
+		cables red, experimental net cables yellow, serial cables white,
+		and cables for control hardware (such as power controllers) green.
+		We've bought all of our cables from
+		<a href="http://www.dataaccessories.com">dataaccessories.com</a>,
+		and have had excellent luck with them.</dd>
 
 	<dt><b>Serial cables</b></dt>
 		<dd>We use Cat5E, but with a special pin pattern on the ends to avoid
