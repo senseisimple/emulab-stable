@@ -293,6 +293,9 @@ foreach my $n (@freed_nodes) {
     # Clean the veth_interfaces table for this node.
     DBQueryWarn("delete from veth_interfaces where node_id='$n'") || $error++;
 
+    # Clean the interface_settings table for this node.
+    DBQueryWarn("delete from interface_settings where node_id='$n'") || $error++;
+
     # Now its safe to change the reservation.
 
     # If the node has a next_reserve entry, change the reservation.
