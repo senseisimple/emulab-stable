@@ -106,6 +106,7 @@ int TrieInit(Trie ** trieOutPtr, BlockAllocateFunction blockAlloc,
         result = 1;
         if (trie == 0)
         {
+            printf ("Error doing TrieInit! Not enough memory!\n");
             result = 0;
         }
         else
@@ -424,6 +425,7 @@ static int addChild(Trie * triePtr, TrieNode * parent, TrieKey key,
     }
     else
     {
+        printf ("Error doing addChild for Trie! Not enough memory!\n");
         result = -1;
     }
     return result;
@@ -577,6 +579,7 @@ static TrieNode * pushDown(Trie * triePtr, TrieNode * node)
     }
     else
     {
+        printf ("Error doing pushDown for Trie! Not enough memory!\n");
         middle = 0;
     }
     return middle;

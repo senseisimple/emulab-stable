@@ -207,37 +207,54 @@ void (*shdrebootp)(void);
 int checkpt_flag = 0;
 int checkpt_process_sleep_variable = 0; 
 
+extern int getmntinfo(struct statfs **mntbufp, int flags);
+
 void sync_before_checkpoint (void)
 {
     register struct buf *bp;
     int iter, nbusy, pbusy;
     struct nameidata nd[5];
-    /*struct nameidata nd;
-    int mnt_cnt;
-    struct statfs *mntbuf;
-    int i;*/
-
+    /*struct nameidata nd;*/
+    int i;
     int error;
- 
+
+    /*register struct mount *mp, *nmp;
+    struct statfs *sp, sb;
+    char mntonname[128];*/
+
     waittime = 0;
     printf("\nsyncing disks... ");
 
     checkpt_flag = 1;
 
-    /*mnt_cnt = getmntinfo(&mntbuf, MNT_NOWAIT);
-    if (mnt_cnt > 0)
+    /*for (mp = TAILQ_FIRST(&mountlist); mp != NULL; mp = nmp)
     {
-        for (i = 0; i < mnt_cnt; i++)
-        if (strcmp (mntbuf[i].f_fstypename, "ufs") == 0)
+      if (prison_valid_mount(curproc->p_prison, mp, mntonname)) 
+      {
+        sp = &mp->mnt_stat;
+        error = VFS_STATFS(mp, sp, curproc);
+        if (error)
         {
-             NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, mntbuf[i].f_mntonname, curproc);
-             if ((error = namei(&nd)) != 0)
+            printf ("error calling VFS_STATFS\n");
+        } 
+        if (*mntonname)
+        {
+            bcopy((caddr_t)sp, (caddr_t)&sb, sizeof(sb));
+            if (sb.f_fstypename[0] == 'u' && sb.f_fstypename[1] == 'f' && sb.f_fstypename[2] == 's')
+            {
+                printf ("Found %s\n", sb.f_mntonname);
+                NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, sb.f_mntonname, curproc);
+                if ((error = namei(&nd)) != 0)
                  printf ("Error = %d\n", error);
-             while (nd.ni_vp->v_mount->mnt_ops_in_progress)
+                while (nd.ni_vp->v_mount->mnt_ops_in_progress)
                  tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-             NDFREE(&nd, NDF_ONLY_PNBUF);
+                NDFREE(&nd, NDF_ONLY_PNBUF);
+            }
         }
+      }
+      nmp = TAILQ_NEXT(mp, mnt_list);
     }*/
+
     NDINIT(&nd[0], LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
     if ((error = namei(&nd[0])) != 0)
         printf ("Error = %d\n", error);
@@ -247,47 +264,28 @@ void sync_before_checkpoint (void)
     NDINIT(&nd[2], LOOKUP, FOLLOW, UIO_SYSSPACE, "/var", curproc);
     if ((error = namei(&nd[2])) != 0)
         printf ("Error = %d\n", error);
-    NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
+    /*NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
     if ((error = namei(&nd[3])) != 0)
-        printf ("Error = %d\n", error);
+        printf ("Error = %d\n", error);*/
 
-/*
-    printf ("vp0 = %x\n", nd[0]);                                 
-    printf ("vp1 = %x\n", nd[1]);
-    printf ("vp2 = %x\n", nd[2]);
-    printf ("vp3 = %x\n", nd[3]);
-
-  
-    printf ("vp0 vp = %x\n", nd[0].ni_vp);
-    printf ("vp1 vp = %x\n", nd[1].ni_vp);
-    printf ("vp2 vp = %x\n", nd[2].ni_vp);
-    printf ("vp3 vp = %x\n", nd[3].ni_vp);
-
-
-   
-    printf ("vp0 vp mount= %x\n", nd[0].ni_vp->v_mount);
-    printf ("vp1 vp mount= %x\n", nd[1].ni_vp->v_mount);
-    printf ("vp2 vp mount= %x\n", nd[2].ni_vp->v_mount);
-    printf ("vp3 vp mount= %x\n", nd[3].ni_vp->v_mount);
-                                                        
-    printf ("vp0 vp mount mnt_ops_in_progress= %x\n", nd[0].ni_vp->v_mount->mnt_ops_in_progress); 
-    printf ("vp1 vp mount mnt_ops_in_progress= %x\n", nd[1].ni_vp->v_mount->mnt_ops_in_progress);
-    printf ("vp2 vp mount mnt_ops_in_progress= %x\n", nd[2].ni_vp->v_mount->mnt_ops_in_progress); 
-    printf ("vp3 vp mount mnt_ops_in_progress= %x\n", nd[3].ni_vp->v_mount->mnt_ops_in_progress);*/
- 
     while (nd[0].ni_vp->v_mount->mnt_ops_in_progress)
            tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
     while (nd[1].ni_vp->v_mount->mnt_ops_in_progress)
            tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
     while (nd[2].ni_vp->v_mount->mnt_ops_in_progress)
            tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-    while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
-           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+/*    while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
+           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);*/
 
     NDFREE(&nd[0], NDF_ONLY_PNBUF);
     NDFREE(&nd[1], NDF_ONLY_PNBUF);
     NDFREE(&nd[2], NDF_ONLY_PNBUF);
-    NDFREE(&nd[3], NDF_ONLY_PNBUF);
+    /*NDFREE(&nd[3], NDF_ONLY_PNBUF);*/
+
+    vrele(nd[0].ni_vp);
+    vrele(nd[1].ni_vp);
+    vrele(nd[2].ni_vp);
+/*    vrele(nd[3].ni_vp);*/
 
     sync(&proc0, NULL);
 
@@ -456,7 +454,7 @@ boot(howto)
 
 			if (panicstr == 0)
                         {
-                                 /*struct nameidata nd;
+                                /* struct nameidata nd;
                                  int mnt_cnt;
                                  struct statfs *mntbuf;
                                  int i;
@@ -490,10 +488,10 @@ boot(howto)
                                 NDINIT(&nd[2], LOOKUP, FOLLOW, UIO_SYSSPACE, "/var", curproc);
                                 if ((error = namei(&nd[2])) != 0)
                                     printf ("Error = %d\n", error);
-
+/*
                                 NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
                                 if ((error = namei(&nd[3])) != 0)
-                                    printf ("Error = %d\n", error);
+                                    printf ("Error = %d\n", error);*/
 
                                 while (nd[0].ni_vp->v_mount->mnt_ops_in_progress)
                                     tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
@@ -501,14 +499,19 @@ boot(howto)
                                     tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
                                 while (nd[2].ni_vp->v_mount->mnt_ops_in_progress)
                                     tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-                                while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
-                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
+/*                                while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
+                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);*/
            
                                 NDFREE(&nd[0], NDF_ONLY_PNBUF);
                                 NDFREE(&nd[1], NDF_ONLY_PNBUF);
                                 NDFREE(&nd[2], NDF_ONLY_PNBUF);
-                                NDFREE(&nd[3], NDF_ONLY_PNBUF);
+                           /*     NDFREE(&nd[3], NDF_ONLY_PNBUF);*/
 
+                                vrele(nd[0].ni_vp);
+                                vrele(nd[1].ni_vp);
+                                vrele(nd[2].ni_vp);
+
+                                DELAY (10000000);
                                 printf ("Unmounting filesystems...");
                                 vfs_unmountall();
                                 printf ("Done!\n");

@@ -153,7 +153,17 @@ do_single(argc, argv, action, flags)
         else
         if (strcmp (cp, "-c") == 0)
         {
-            if (do_io(shd, SHDCHECKPOINT, &shio))
+            time_t rawtime;
+            struct tm * timeinfo;
+            struct shd_ckpt ckpt;
+            time ( &rawtime );
+            timeinfo = localtime ( &rawtime );
+            if (*argv)
+                ckpt.name = *argv++; --argc;
+            ckpt.time = asctime (timeinfo);        
+            printf ("Name = %s\n", ckpt.name);
+            printf ("Time = %s\n", ckpt.time);
+            if (do_io(shd, SHDCHECKPOINT, &ckpt))
             {
                 return (1);
             }
@@ -260,7 +270,7 @@ do_single(argc, argv, action, flags)
             for (i = 0; i < 512; i++)
                     buf[i] = 0;
             mod.retsiz = 0;
-            if (do_io(shd, SHDGETMODBLOCKS, &mod))
+            if (do_io(shd, SHDGETMODIFIEDRANGES, &mod))
                 return (1);
             printf ("retsize = %d\n", mod.retsiz);
             for (i = 0; i < mod.retsiz; i++)
@@ -273,7 +283,7 @@ do_single(argc, argv, action, flags)
                     buf[i] = 0;
                 mod.retsiz = 0;
                 mod.command = 2;
-                if (do_io(shd, SHDGETMODBLOCKS, &mod))
+                if (do_io(shd, SHDGETMODIFIEDRANGES, &mod))
                     return (1);
                 printf ("retsize = %d\n", mod.retsiz);
                 for (i = 0; i < mod.retsiz; i++)
@@ -283,7 +293,7 @@ do_single(argc, argv, action, flags)
             } 
 
             mod.command = 3; /* Close iterator */
-            if (do_io(shd, SHDGETMODBLOCKS, &mod))
+            if (do_io(shd, SHDGETMODIFIEDRANGES, &mod))
                 return (1);
         }
 

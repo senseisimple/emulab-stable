@@ -27,6 +27,7 @@
 #include <dev/shd/shdconf.h>
 
 #include <vm/vm_zone.h>
+#include <sys/time.h>
 
 #ifdef SHDDEBUG
 int shddebug = SHDB_FOLLOW|SHDB_INIT|SHDB_IO|SHDB_MAP|SHDB_MAPDETAIL|SHDB_ERROR;
@@ -122,6 +123,8 @@ struct TrieList
 {
     Trie *trie;
     int version;
+    char *name;
+    char *time;
     struct TrieList *next;
 } *head_trie;
 
@@ -263,6 +266,40 @@ void reorder_trie_versions ()
         current->version = latest_version = ix;
         current = current->next;
         ix++;
+    }
+}
+
+set_checkpoint (int pos, char *name, char *time)
+{
+    int pos_count;
+    struct TrieList *current = head_trie;
+    while (current != 0)
+    {
+       pos_count++;
+       if (pos_count == pos)
+       {
+           current->name = (char *) malloc (strlen (name) + 1, M_DEVBUF, M_NOWAIT);
+           current->time = (char *) malloc (strlen (time) + 1, M_DEVBUF, M_NOWAIT);
+           bcopy (name, current->name, strlen (name) + 1);
+           bcopy (time, current->time, strlen (time) + 1);
+           return;
+       }
+       current = current->next; 
+    } 
+}
+
+print_checkpoint_time (int version)
+{
+    int pos_count;
+    struct TrieList *current = head_trie;
+    while (current != 0)
+    {
+       if (current->version == version)
+       {
+           printf ("Name = %s, Time = %s\n", current->name, current->time);
+           return;
+       }
+       current = current->next;
     }
 }
 
@@ -444,7 +481,33 @@ shd_timeout(void *notused)
 	}
 	timeout((timeout_t *)shd_timeout, 0, SHD_TIMEOUT * hz);
 }
-int bInit;
+
+int shd_iocset()
+{
+        int error;
+        int unit = 0;
+        struct shd_softc *ss;
+        struct shddevice shd;
+
+        bcopy(&shddevs[unit], &shd, sizeof(shd));
+        latest_version = 1;
+        bCheckpoint = 0;
+        init_trie_list ();
+        if (0 == create_new_trie (1))
+        {
+            printf ("Error creating trie!!!\n");
+            return (EINVAL);
+        } 
+
+        InitBlockAllocator (EXPLICIT_CKPT_DELETE, 3, shadow_size);
+                /*
+                 * The shd has been successfully initialized, so
+                 * we can place it into the array and read2 the disklabel.
+                 */
+        bCheckpoint = 1;
+        bcopy(&shd, &shddevs[unit], sizeof(shd));
+}
+
 void root_init (void)
 {
         int error;
@@ -455,7 +518,6 @@ void root_init (void)
         static char *copypath = "/dev/ad0s4";
          
         ss = &shd_softc[unit];
-        bInit = 0;
         bzero(&shd, sizeof(shd));
         shd.shd_unit = unit;
 
@@ -477,7 +539,7 @@ void root_init (void)
                 return (error);
         }
         bcopy(&shd, &shddevs[unit], sizeof(shd));
-
+        shd_iocset();
         shdunlock(ss);
 }
 
@@ -504,7 +566,6 @@ shd_init(shd, p)
 	error = shd_getcinfo(shd, p, 0);
 	if (error)
 		goto bad;
-        printf ("shadow size = %ld\n", shadow_size);
 
 	/*
 	 * Source sector size must be at least as large as the copy
@@ -576,6 +637,7 @@ shd_deinit(struct shddevice *shd, struct proc *p)
 		crfree(ss->sc_cred);
 	ss->sc_flags &= ~SHDF_INITED;
 }
+
 
 /* ARGSUSED */
 static int
@@ -657,6 +719,7 @@ shdclose(dev, flags, fmt, p)
 	shdunlock(ss);
 	return (0);
 }
+
 static void
 shdstrategy(bp)
 	struct buf *bp;
@@ -666,6 +729,7 @@ shdstrategy(bp)
 	int wlabel;
 	struct disklabel *lp;
         int error;
+
 
 /*#ifdef SHDDEBUG
 	if (shddebug & SHDB_FOLLOW)
@@ -1171,7 +1235,6 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
          return 0;
 }
 
-
 static void
 shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 {
@@ -1196,6 +1259,7 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	/*
 	 * Translate the partition-relative block number to an absolute.
 	 */
+
 	bn = bp->b_blkno;
 	if (shdpart(bp->b_dev) != RAW_PART)
 		bn += ss->sc_label.d_partitions[shdpart(bp->b_dev)].p_offset;
@@ -1212,6 +1276,7 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
         {
             /* Search in Trie and do a copy on write */
             int failed;
+
             failed = TrieInsertWeak (get_trie_for_version (latest_version), bn, (bp->b_bcount)/512, ss, bp, p); 
             if (failed < 0)
             {
@@ -1412,6 +1477,7 @@ shdioctl(dev, cmd, data, flag, p)
         struct shd_readbuf *shread; 
 	struct shddevice shd;
         struct shd_modinfo *shmod;
+        struct shd_ckpt *ckpt;
 
         struct vnode * vp;        
 /*#ifdef SHDDEBUG
@@ -1427,7 +1493,7 @@ shdioctl(dev, cmd, data, flag, p)
 	shd.shd_unit = unit;
 
 	switch (cmd) {
-        case SHDGETMODBLOCKS:
+        case SHDGETMODIFIEDRANGES:
                 shmod = (struct shd_modinfo *) data;
                 shmod->retsiz = get_mod_blocks (shmod->command, shmod->buf, shmod->bufsiz);
                 break;
@@ -1459,6 +1525,7 @@ shdioctl(dev, cmd, data, flag, p)
                 bCheckpoint = 0;
                 break;
         case SHDCHECKPOINT:
+                ckpt = (struct shd_ckpt *) data; 
                 printf ("[SHDCHECKPOINT] Received checkpoint command!\n");
                 sync_before_checkpoint (); /*Uncomment this*/
                 if (MAX_CHECKPOINTS <= latest_version)
@@ -1472,6 +1539,8 @@ shdioctl(dev, cmd, data, flag, p)
                 {
                     return (EINVAL);
                 } 
+                printf ("Setting checkpoint name %s time %s\n", ckpt->name, ckpt->time);
+                /*set_checkpoint (latest_version, ckpt->name, ckpt->time);*/
                 break;
         case SHDGETCHECKPOINTS:
                 if (latest_version < 1)
@@ -1479,6 +1548,7 @@ shdioctl(dev, cmd, data, flag, p)
                 for (version = 1; version <= latest_version; ++version)
                 {
                     printf ("Checkpoint version %d is ===>\n", version);
+                    /*print_checkpoint_time (version);*/
                     print_checkpoint_map (version);
                     printf ("\n");
                 }
@@ -1505,31 +1575,6 @@ shdioctl(dev, cmd, data, flag, p)
 		if ((error = shdlock(ss)) != 0)
 			return (error);
 
-		/* Fill in some important bits. */
-		switch (shio->shio_flags & (SHDF_COR|SHDF_COW)) {
-		case SHDF_COR|SHDF_COW:
-			printf("shd%d: can't specify both COR and COW, using COW\n",
-			       unit);
-			shio->shio_flags &= ~SHDF_COR;
-			break;
-		case 0:
-			shio->shio_flags |= SHDF_COW;
-			break;
-		}
-		switch (shio->shio_flags & (SHDF_ONETOONE|SHDF_COMPACT)) {
-		case SHDF_ONETOONE|SHDF_COMPACT:
-			printf("shd%d: can't specify both ONETOONE and COMPACT, using COMPACT\n",
-			       unit);
-			shio->shio_flags &= ~SHDF_ONETOONE;
-			break;
-		case 0:
-			shio->shio_flags |= SHDF_COMPACT;
-			break;
-		}
-                shio->shio_flags |= SHDF_ONETOONE;
-		shd.shd_flags = shio->shio_flags & SHDF_USERMASK;
-
-
 		if (shd.shd_srcsize < 0 || shd.shd_copysize < 0) {
 			shdunlock(ss);
 			return (EINVAL);
@@ -1550,8 +1595,6 @@ shdioctl(dev, cmd, data, flag, p)
 		shio->shio_unit = unit;
 		shio->shio_size = ss->sc_size;
 		shdgetdisklabel(dev);
-                /*shd_refresh_devices (&shd, p);
-                InitBlockAllocator (EXPLICIT_CKPT_DELETE, 3, shadow_size);*/
 		shdunlock(ss);
 
 		break;

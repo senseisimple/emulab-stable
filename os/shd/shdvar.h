@@ -40,6 +40,11 @@ struct shd_readbuf {
         long block_num;
         char *buf;
 };
+
+struct shd_ckpt {
+        char *time;
+        char *name;
+};
  
 /* shd_flags */
 #define	SHDF_ONETOONE	0x01	/* 1-to-1 mapping with source disk */
@@ -130,7 +135,7 @@ struct shd_softc {
  */
 #define SHDIOCSET	_IOWR('S', 16, struct shd_ioctl)   /* enable shd */
 #define SHDIOCCLR	_IOW('S', 17, struct shd_ioctl)    /* disable shd */
-#define SHDCHECKPOINT       _IOWR('S', 18, struct shd_ioctl)  
+#define SHDCHECKPOINT       _IOWR('S', 18, struct shd_ckpt)  
 #define SHDGETCHECKPOINTS    _IOWR('S', 19, struct shd_ioctl)  
 #define SHDENABLECHECKPOINTING       _IOWR('S', 20, struct shd_ioctl)
 #define SHDDISABLECHECKPOINTING    _IOWR('S', 21, struct shd_ioctl)
@@ -141,5 +146,5 @@ struct shd_softc {
 #define SHDDELETECHECKPOINTS _IOWR('S', 26, struct shd_ioctl)
 #define SHDREADBLOCK _IOWR('S', 27, struct shd_readbuf)
 #define SHDSETREBOOTVERSION _IOWR('S', 28, struct shd_ioctl)
-#define SHDGETMODBLOCKS _IOWR('S', 29, struct shd_modinfo)
+#define SHDGETMODIFIEDRANGES _IOWR('S', 29, struct shd_modinfo)
 
