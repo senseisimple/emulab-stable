@@ -385,9 +385,14 @@ sub removeVlan($@) {
     # For efficiency, we remove all VLANs from the leader in one function
     # call. This can save a _lot_ of locking and unlocking.
     #
-    my $ok = $self->{LEADER}->removeVlan(@vlan_ids);
+    if (!$errors) {
+	my $ok = $self->{LEADER}->removeVlan(@vlan_ids);
+	if (!$ok) {
+	    $errors++;
+	}
+    }
 
-    return ($ok && ($errors == 0));
+    return ($errors == 0);
 }
 
 #
