@@ -893,6 +893,7 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 
     $imagename   = $row[imagename];
     $pid         = $row[pid];
+    $gid         = $row[gid];
     $description = stripslashes($row[description]);
     $loadpart	 = $row[loadpart];
     $loadlength	 = $row[loadlength];
@@ -904,6 +905,7 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
     $path 	 = $row[path];
     $loadaddr	 = $row[load_address];
     $shared	 = $row[shared];
+    $globalid	 = $row["global"];
     $creator     = $row[creator];
     $created     = $row[created];
 
@@ -949,6 +951,12 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
               <a href='showproject.php3?pid=$pid'>$pid</a></td>
           </tr>\n";
 
+    echo "<tr>
+              <td>Group: </td>
+              <td class=\"left\">
+                <a href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
+          </tr>\n";
+    
     echo "<tr>
             <td>Creator: </td>
             <td class=left>$creator</td>
@@ -1069,6 +1077,18 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
             <td class=left>\n";
 
     if ($shared)
+	echo "Yes";
+    else
+	echo "No";
+    
+    echo "  </td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Global?: </td>
+            <td class=left>\n";
+
+    if ($globalid)
 	echo "Yes";
     else
 	echo "No";

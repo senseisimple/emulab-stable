@@ -104,3 +104,16 @@ last_net_act,last_cpu_act,last_ext_act);
                      user_pubkeys_new to user_pubkeys;
 	drop table user_pubkeys_old;
 		     
+1.120:  Add gid slot to images table for per-subgroup image support
+        Also add global global flag, to replace shared flag. Global
+	means testbed wide, while shared means within a project. To
+	migrate an existing DB, just need to set pid=gid,global=shared
+	for all existing images, and then set shared=0.
+
+	alter table images add gid varchar(12) NOT NULL default '' after pid;
+	alter table images add INDEX (gid);
+	alter table images add global tinyint(4) NOT NULL default '0' \
+			after shared;
+	update images set gid=pid,global=shared;
+	update images set shared=0;
+	

@@ -201,8 +201,8 @@ function WRITESIDEBAR() {
 				   $TBBASE, "showexp_list.php3");
 		WRITESIDEBARBUTTON("Begin an Experiment",
 				   $TBBASE, "beginexp.php3");
-		WRITESIDEBARBUTTON("OSIDs and ImageIDs",
-				   $TBBASE, "showosid_list.php3");
+		WRITESIDEBARBUTTON("ImageIDs and OSIDs",
+				   $TBBASE, "showimageid_list.php3");
 		WRITESIDEBARBUTTON("Update User Information",
 				   $TBBASE, "moduserinfo.php3");
 		WRITESIDEBARBUTTON("Node Reservation Status",

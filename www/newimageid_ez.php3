@@ -113,21 +113,53 @@ function SPITFORM($formfields, $errors)
     echo "<SCRIPT LANGUAGE=JavaScript>
               function SetPrefix(theform) 
               {
-                  var idx = theform['formfields[pid]'].selectedIndex;
-                  var pid = theform['formfields[pid]'].options[idx].value;
+                  var pidx   = theform['formfields[pid]'].selectedIndex;
+                  var pid    = theform['formfields[pid]'].options[pidx].value;
+                  var gidx   = theform['formfields[gid]'].selectedIndex;
+                  var gid    = theform['formfields[gid]'].options[gidx].value;
+                  var shared = theform['formfields[shared]'].checked; 
+          \n";
+    if ($isadmin)
+	echo     "var global = theform['formfields[global]'].checked;";
+    else
+	echo     "var global = 0;";
 
-                  if (pid == '') {
-                      theform['formfields[path]'].value = '/proj/';
+    echo         "if (pid == '') {
+                      theform['formfields[path]'].value = '/proj';
                   }
                   else if (theform['formfields[imagename]'].value == '') {
 		      theform['formfields[imagename]'].defaultValue = '';
-  	              theform['formfields[path]'].value =
-                              '/proj/' + pid + '/images/';
+
+                      if (global) {
+    	                  theform['formfields[path]'].value =
+                                  '/usr/testbed/images/';
+                      }
+		      else if (gid == '' || gid == pid || shared) {
+    	                  theform['formfields[path]'].value =
+                                  '/proj/' + pid + '/images/';
+                      }
+                      else {
+    	                  theform['formfields[path]'].value =
+                                  '/groups/' + pid + '/' + gid + '/';
+                      }
                   }
                   else if (theform['formfields[imagename]'].value != '') {
-  	              theform['formfields[path]'].value =
-                              '/proj/' + pid + '/images/' +
-                              theform['formfields[imagename]'].value + '.ndz';
+                      var filename = theform['formfields[imagename]'].value +
+                                     '.ndz';
+
+                      if (global) {
+    	                  theform['formfields[path]'].value =
+                                  '/usr/testbed/images/' + filename;
+                      }
+		      else if (gid == '' || gid == pid || shared) {
+    	                  theform['formfields[path]'].value =
+                                  '/proj/' + pid + '/images/' + filename;
+                      }
+                      else {
+    	                  theform['formfields[path]'].value =
+                                  '/groups/' + pid + '/' + gid + '/' +
+                                  filename;
+                      }
                   }
               }
           </SCRIPT>\n";
@@ -160,6 +192,38 @@ function SPITFORM($formfields, $errors)
     }
     echo "       </select>";
     echo "    </td>
+          </tr>\n";
+
+    #
+    # Select a group
+    # 
+    echo "<tr>
+              <td >Group:</td>
+              <td><select name=\"formfields[gid]\"
+                          onChange='SetPrefix(idform);'>
+                    <option value=''>Default Group </option>\n";
+
+    reset($projlist);
+    while (list($project, $grouplist) = each($projlist)) {
+	for ($i = 0; $i < count($grouplist); $i++) {
+	    $group    = $grouplist[$i];
+
+	    if (strcmp($project, $group)) {
+		$selected = "";
+
+		if (isset($formfields[gid]) &&
+		    isset($formfields[pid]) &&
+		    strcmp($formfields[pid], $project) == 0 &&
+		    strcmp($formfields[gid], $group) == 0)
+		    $selected = "selected";
+		
+		echo "<option $selected value=\"$group\">
+                           $project/$group</option>\n";
+	    }
+	}
+    }
+    echo "     </select>
+             </td>
           </tr>\n";
 
     #
@@ -373,20 +437,41 @@ function SPITFORM($formfields, $errors)
           </tr>\n";
 
     
+    #
+    # Shared?
+    #
+    echo "<tr>
+  	      <td>Shared?:<br>
+                  (available to all subgroups)</td>
+              <td class=left>
+                  <input type=checkbox
+                         onClick='SetPrefix(idform);'
+                         name=\"formfields[shared]\"
+                         value=Yep";
+
+    if (isset($formfields[shared]) &&
+	strcmp($formfields[shared], "Yep") == 0)
+	echo "           checked";
+	
+    echo "                       > Yes
+              </td>
+          </tr>\n";
+
     if ($isadmin) {
         #
-        # Shared?
+        # Global?
         #
 	echo "<tr>
-  	          <td>Shared?:<br>
+  	          <td>Global?:<br>
                       (available to all projects)</td>
                   <td class=left>
                       <input type=checkbox
-                             name=\"formfields[shared]\"
+                             onClick='SetPrefix(idform);'
+                             name=\"formfields[global]\"
                              value=Yep";
 
-	if (isset($formfields[shared]) &&
-	    strcmp($formfields[shared], "Yep") == 0)
+	if (isset($formfields["global"]) &&
+	    strcmp($formfields["global"], "Yep") == 0)
 	    echo "           checked";
 	
 	echo "                       > Yes
@@ -470,6 +555,32 @@ if (! $submit) {
     $defaults[os_feature_ssh]  = "checked";
     $defaults[os_feature_ipod] = "checked";
     $defaults[os_feature_isup] = "checked";
+
+    #
+    # For users that are in one project and one subgroup, it is usually
+    # the case that they should use the subgroup, and since they also tend
+    # to be in the clueless portion of our users, give them some help.
+    # 
+    if (count($projlist) == 1) {
+	list($project, $grouplist) = each($projlist);
+	
+	if (count($grouplist) <= 2) {
+	    $defaults[pid] = $project;
+	    if (count($grouplist) == 1 || strcmp($project, $grouplist[0]))
+		$group = $grouplist[0];
+	    else {
+		$group = $grouplist[1];
+	    }
+	    $defaults[gid] = $group;
+	    
+	    if (!strcmp($project, $group))
+		$defaults[path]     = "/proj/$project/images/";
+	    else
+		$defaults[path]     = "/groups/$project/$group/";
+	}
+	reset($projlist);
+    }
+    
     SPITFORM($defaults, 0);
     PAGEFOOTER();
     return;
@@ -490,9 +601,19 @@ if (!isset($formfields[pid]) ||
 elseif (!TBValidProject($formfields[pid])) {
     $errors["Project"] = "No such project";
 }
+elseif (isset($formfields[gid]) &&
+	strcmp($formfields[gid], "")) {
+    if (!TBValidGroup($formfields[pid], $formfields[gid])) {
+	$errors["Group"] = "No such group";
+    }
+    elseif (!TBProjAccessCheck($uid, $formfields[pid],
+			       $formfields[gid], $TB_PROJECT_MAKEIMAGEID)) {
+	$errors["Project/Group"] = "Not enough permission";
+    }
+}
 elseif (!TBProjAccessCheck($uid, $formfields[pid],
 			   $formfields[pid], $TB_PROJECT_MAKEIMAGEID)) {
-    $errors["Project"] = "No enough permission";
+    $errors["Project/Group"] = "Not enough permission";
 }
 
 #
@@ -560,9 +681,32 @@ elseif (! ereg("^[-_a-zA-Z0-9\.]+$", $formfields[os_version])) {
 }
 
 #
-# The path must not contain illegal chars and it must be more than
-# the original /proj/$pid we gave the user. We allow admins to specify
-# a path outside of /proj though.
+# Only admin types can set the global bit for an image. Ignore silently.
+#
+$global = 0;
+if ($isadmin &&
+    isset($formfields["global"]) &&
+    strcmp($formfields["global"], "Yep") == 0) {
+    $global = 1;
+}
+
+#
+# Image shared amongst subgroups
+#
+$shared = 0;
+if (isset($formfields[shared]) &&
+    strcmp($formfields[shared], "Yep") == 0) {
+    $shared = 1;
+}
+# Does not make sense to do this. 
+if ($global && $shared) {
+    $errors["Global"] = "Image declared both shared and global";
+}
+
+#
+# The path must not contain illegal chars and it must start with
+# /proj/$pid/images or /groups/$pid/$gid. Admins can do whatever
+# they like of course.
 # 
 if (!isset($formfields[path]) ||
     strcmp($formfields[path], "") == 0) {
@@ -571,14 +715,20 @@ if (!isset($formfields[path]) ||
 elseif (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $formfields[path])) {
     $errors["Path"] = "Contains invalid characters";
 }
-else {
-    $pdef = "/proj/$formfields[pid]/";
-
-    if (strcmp($formfields[path], "$pdef") == 0) {
-	$errors["Path"] = "Incomplete Path";
+elseif (! $isadmin) {
+    $pdef = "";
+    
+    if (!$shared &&
+	isset($formfields[gid]) &&
+	strcmp($formfields[gid], "") &&
+	strcmp($formfields[gid], $formfields[pid])) {
+	$pdef = "/groups/" . $formfields[pid] . "/" . $formfields[gid] . "/";
     }
-    elseif (!$isadmin &&
-	    strcmp(substr($formfields[path], 0, strlen($pdef)), $pdef)) {
+    else {
+	$pdef = "/proj/" . $formfields[pid] . "/images/";
+    }
+
+    if (strpos($formfields[path], $pdef) === false) {
 	$errors["Path"] = "Invalid Path";
     }
 }
@@ -651,14 +801,6 @@ if (isset($formfields[node]) &&
     $node = $formfields[node];
 }
 
-#
-# Wholedisk
-# 
-if (isset($formfields[wholedisk]) &&
-    strcmp($formfields[wholedisk], "Yep") == 0) {
-    $shared = 1;
-}
-
 if (isset($formfields[max_concurrent]) &&
     strcmp($formfields[max_concurrent],"")) {
     
@@ -682,27 +824,20 @@ if (count($errors)) {
 }
 
 #
-# Only admin types can set the shared bit for an image. Ignore silently.
-#
-$shared = 0;
-
-if ($isadmin &&
-    isset($formfields[shared]) &&
-    strcmp($formfields[shared], "Yep") == 0) {
-    $shared = 1;
-}
-
-#
 # For the rest, sanitize and convert to locals to make life easier.
 # 
 $description = addslashes($formfields[description]);
 $pid         = $formfields[pid];
+$gid         = $formfields[gid];
 $imagename   = $formfields[imagename];
 $bootpart    = $formfields[loadpart];
 $path        = $formfields[path];
 $os_name     = $formfields[os_name];
 $os_version  = $formfields[os_version];
 $op_mode     = $formfields[op_mode];
+if (!isset($gid) || !strcmp($gid, "")) {
+    $gid = $pid;
+}
 
 #
 # Special option. Whole disk image, but only one partition that actually
@@ -743,12 +878,12 @@ if (TBValidImageID($imageid) || TBValidOSID($imageid)) {
 DBQueryFatal("INSERT INTO images ".
 	     "(imagename, imageid, ezid, description, loadpart, loadlength, ".
 	     " part" . "$bootpart" . "_osid, ".
-	     " default_osid, path, pid, shared, creator, created, ".
-	     " max_concurrent) ".
+	     " default_osid, path, pid, global, creator, created, ".
+	     " max_concurrent, gid, shared) ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', $loadpart, ".
-	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $shared, ".
-             "   '$uid', now(), $max_concurrent)");
+	     "   $loadlen, '$imageid', '$imageid', '$path', '$pid', $global, ".
+             "   '$uid', now(), $max_concurrent, '$gid', $shared)");
 
 DBQueryFatal("INSERT INTO os_info ".
 	     "(osname, osid, ezid, description, OS, version, path, magic, ".
@@ -756,7 +891,7 @@ DBQueryFatal("INSERT INTO os_info ".
 	     "VALUES ".
 	     "  ('$imagename', '$imageid', 1, '$description', '$os_name', ".
 	     "   '$os_version', NULL, NULL, '$os_features', '$pid', ".
-             "   '$uid', $shared, now(), '$op_mode')");
+             "   '$uid', $global, now(), '$op_mode')");
 
 for ($i = 0; $i < count($mtypes_array); $i++) {
     DBQueryFatal("REPLACE INTO osidtoimageid ".
@@ -802,7 +937,7 @@ if (isset($node)) {
     #
     # Grab the unix GID for running script.
     #
-    TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
     echo "<br>
           Creating image using node '$node' ...

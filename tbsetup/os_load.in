@@ -196,7 +196,6 @@ foreach my $node (@nodes) {
     my $loadlen        = $imageid_row{'loadlength'};
     my $imagepath      = $imageid_row{'path'};
     my $defosid        = $imageid_row{'default_osid'};
-    my $shared         = $imageid_row{'shared'};
     my $max_concurrent = $imageid_row{'max_concurrent'};
 
     # Check for a few errors early!
@@ -247,15 +246,6 @@ foreach my $node (@nodes) {
     my $diskpart = "";
     if ($loadpart) { $diskpart = "wd0:s${loadpart}"; }
     else  {$diskpart = "wd0"; }
-
-    # For now, all testbed default images come from boss and all pid specific
-    # images come from ops:/proj.
-    if (! $shared && $mereuser) {
-	if (! ($imagepath =~ /^\/proj\//)) {
-	    die("*** $0:\n".
-		"    Your image must reside in /proj\n");
-	}
-    }
 
     print STDOUT "Changing default OS for $node to $defosid\n";
     if (!$TESTMODE) {
@@ -444,7 +434,7 @@ sub dolisting() {
 	$query_result =
 	    DBQueryFatal("select distinct i.* from images as i ".
 			 "left join group_membership as g on g.pid=i.pid ".
-			 "where g.uid='$me' or i.shared ".
+			 "where g.uid='$me' or i.global ".
 			 "order by i.pid,i.imageid");
     } else {
 	$query_result =

@@ -721,23 +721,23 @@ function TBImageIDAccessCheck($uid, $imageid, $access_type)
 	return 1;
     }
 
-    #
-    # No GIDs yet.
-    #
     $query_result =
-	DBQueryFatal("SELECT pid,shared FROM images WHERE imageid='$imageid'");
+	DBQueryFatal("SELECT pid,gid,shared,global FROM images ".
+		     "WHERE imageid='$imageid'");
     
     if (mysql_num_rows($query_result) == 0) {
 	return 0;
     }
     $row    = mysql_fetch_array($query_result);
     $shared = $row[shared];
+    $global = $row["global"];
     $pid    = $row[pid];
+    $gid    = $row[gid];
 
     #
     # Global ImageIDs can be read by anyone but written by Admins only.
     # 
-    if ($shared) {
+    if ($global) {
 	if ($access_type == $TB_IMAGEID_READINFO) {
 	    return 1;
 	}
@@ -749,12 +749,17 @@ function TBImageIDAccessCheck($uid, $imageid, $access_type)
     # 
     if ($access_type == $TB_IMAGEID_READINFO) {
 	$mintrust = $TBDB_TRUST_USER;
+        #
+        # Shared imageids are readable by anyone in the project.
+        #
+	if ($shared)
+	    $gid = $pid;
     }
     else {
 	$mintrust = $TBDB_TRUST_LOCALROOT;
     }
 
-    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
 }
 
 #

@@ -842,19 +842,22 @@ sub TBImageIDAccessCheck($$$)
     # No GIDs yet.
     #
     my $query_result =
-	DBQueryFatal("SELECT pid,shared FROM images WHERE imageid='$imageid'");
+	DBQueryFatal("SELECT pid,gid,shared,global FROM images ".
+		     "WHERE imageid='$imageid'");
     
     if ($query_result->numrows == 0) {
 	return 0;
     }
     my @row = $query_result->fetchrow_array();
     my $pid = $row[0];
-    my $shared = $row[1];
+    my $gid = $row[1];
+    my $shared = $row[2];
+    my $global = $row[3];
 
     #
     # Global ImageIDs can be read by anyone.
     # 
-    if ($shared) {
+    if ($global) {
 	if ($access_type == TB_IMAGEID_READINFO) {
 	    return 1;
 	}
@@ -866,12 +869,18 @@ sub TBImageIDAccessCheck($$$)
     # 
     if ($access_type == TB_IMAGEID_READINFO) {
 	$mintrust = PROJMEMBERTRUST_USER;
+        #
+        # Shared imageids are readable by anyone in the project.
+        #
+	if ($shared) {
+	    $gid = $pid;
+	}
     }
     else {
 	$mintrust = PROJMEMBERTRUST_LOCALROOT;
     }
 
-    return TBMinTrust(TBProjTrust($uid, $pid), $mintrust);
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust);
 }
 
 #

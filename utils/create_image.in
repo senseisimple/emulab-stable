@@ -32,7 +32,6 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $BOSSNODE	= "@BOSSNODE@";
-my $PROJROOT	= "/proj";
 my $TFTPDIR     = "/tftpboot";
 
 #
@@ -170,9 +169,8 @@ if ($mereuser &&
 }
 
 #
-# Make sure that the filename is a /proj/$pid filename and a directory that
-# exists and is writeable for the user. We test this by creating the file.
-# Its going to get wiped anyway.
+# Make sure that the directory exists and is writeable for the user.
+# We test this by creating the file. Its going to get wiped anyway.
 #
 my $filename = $imageid_row{'path'};
 
@@ -184,9 +182,6 @@ else {
     fatal("Bad filename: $filename");
 }
 
-if (! ($filename =~ /^$PROJROOT\/$pid\/.*/)) {
-    fatal("File $filename for must reside someplace in $PROJROOT/$pid\n");
-}
 open(FILE, "> $filename") or
     fatal("Could not create $filename: $!");
 close(FILE) or

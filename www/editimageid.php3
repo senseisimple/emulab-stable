@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -39,6 +39,16 @@ if (!TBImageIDAccessCheck($uid, $imageid, $TB_IMAGEID_MODIFYINFO)) {
 }
 
 #
+# Need the gid for path checking.
+#
+$query_result =
+    DBQueryFatal("select * from images where imageid='$imageid'");
+$row = mysql_fetch_array($query_result);
+$gid = $row['gid'];
+$pid = $row['pid'];
+$shared = $row['shared'];
+
+#
 # Sanitize values and create string pieces.
 #
 if (isset($description) && strcmp($description, "")) {
@@ -60,10 +70,23 @@ else {
 }
 
 if (isset($path) && strcmp($path, "")) {
-    $foo = addslashes($path);
-
-    if (strcmp($path, $foo)) {
+    if (! ereg("^[-_a-zA-Z0-9\/\.+]+$", $path)) {
 	USERERROR("The path must not contain special characters!", 1);
+    }
+
+    if (!$isadmin) {
+	$pdef = "";
+	
+	if (!$shared && strcmp($gid, $pid)) {
+	    $pdef = "/groups/" . $pid . "/" . $gid . "/";
+	}
+	else {
+	    $pdef = "/proj/" . $pid . "/images/";
+	}
+
+	if (strpos($path, $pdef) === false) {
+	    USERERROR("Invalid path! Must reside in /proj or /groups.", 1);
+	}
     }
     $path = "'$path'";
 }

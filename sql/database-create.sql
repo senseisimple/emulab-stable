@@ -303,6 +303,7 @@ CREATE TABLE iface_counters (
 CREATE TABLE images (
   imagename varchar(30) NOT NULL default '',
   pid varchar(12) NOT NULL default '',
+  gid varchar(12) NOT NULL default '',
   imageid varchar(45) NOT NULL default '',
   creator varchar(8) default NULL,
   created datetime default NULL,
@@ -320,10 +321,12 @@ CREATE TABLE images (
   load_busy tinyint(4) NOT NULL default '0',
   ezid tinyint(4) NOT NULL default '0',
   shared tinyint(4) NOT NULL default '0',
+  global tinyint(4) NOT NULL default '0',
   updated datetime default NULL,
   max_concurrent int(11) default NULL,
   PRIMARY KEY  (imagename,pid),
   KEY imageid (imageid)
+  KEY gid (gid)
 ) TYPE=MyISAM;
 
 --

@@ -44,10 +44,18 @@ if ($isadmin) {
     $query_result = DBQueryFatal("SELECT * FROM images as i order by $order");
 }
 else {
+    #
+    # User is allowed to view the list of all global images, and all images
+    # in his project. Include images in the subgroups too, since its okay
+    # for the all project members to see the descriptors. They need proper 
+    # permission to use/modify the image/descriptor of course, but that is
+    # checked in the pages that do that stuff. In other words, ignore the
+    # shared flag in the descriptors.
+    # 
     $query_result =
 	DBQueryFatal("select distinct i.* from images as i ".
 		     "left join group_membership as g on g.pid=i.pid ".
-		     "where g.uid='$uid' or i.shared order by $order");
+		     "where g.uid='$uid' or i.global order by $order");
 }
 
 SUBPAGESTART();
