@@ -78,9 +78,18 @@ echo "</tr>\n";
 mysql_data_seek($query_result, 0);
 
 while ($row = mysql_fetch_assoc($query_result)) {
+    $rsrcidx = $row[idx];
+    
     echo "<tr>\n";
     foreach($row as $key => $value) {
-	echo "<td nowrap>$value</td>\n";
+	if ($key == "thumbnail") {
+	    echo "<td nowrap>
+                     <a href='showthumb.php3?idx=$rsrcidx'>Thumbnail</a>
+                  </td>\n";
+	}
+	else {
+	    echo "<td nowrap>$value</td>\n";
+	}
     }
     echo "</tr>\n";
 }
