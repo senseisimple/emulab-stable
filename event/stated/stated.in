@@ -50,7 +50,7 @@ use Sys::Syslog;
 # (To get setlocksock: 'use Sys::Syslog qw(:DEFAULT setlogsock);' )
 
 # Do lots of db retries before we fail and die
-$libdb::DBQUERY_MAXTRIES = 5;
+$libdb::DBQUERY_MAXTRIES = 100;
 
 # Set up some notification throttling
 my $mailgap = 15;		# in seconds
