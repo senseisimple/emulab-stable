@@ -10,7 +10,7 @@ require("defs.php3");
 # The point of this is to redirect logged in users to their My Emulab
 # page. 
 #
-if (($uid = GETUID())) {
+if (!isset($stayhome) && ($uid = GETUID())) {
     $check_status = CHECKLOGIN($uid) & CHECKLOGIN_STATUSMASK;
 
     if (!isset($stayhome) && $check_status == CHECKLOGIN_LOGGEDIN) {
