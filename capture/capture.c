@@ -49,6 +49,8 @@
 
 void quit(int);
 void reinit(int);
+void newrun(int);
+void shutdown(int);
 void cleanup(void);
 void capture();
 void usage();
@@ -68,18 +70,20 @@ void usage();
 #endif
 #define PIDNAME		"%s/%s.pid"
 #define LOGNAME		"%s/%s.log"
+#define RUNNAME		"%s/%s.run"
 #define PTYNAME		"%s/tip/%s-pty"
 #define DEVNAME		"%s/%s"
 
 char 	*Progname;
 char 	*Pidname;
 char	*Logname;
+char	*Runname;
 char	*Ptyname;
 char	*Devname;
 char	*Machine;
-int	logfd, devfd, ptyfd;
+int	logfd, runfd, devfd, ptyfd;
 int	pid;
-int	hwflow = 0, speed = B9600;
+int	hwflow = 0, speed = B9600, debug = 0, runfile = 0;
 
 int
 main(argc, argv)
@@ -93,11 +97,19 @@ main(argc, argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "s:H")) != EOF)
+	while ((op = getopt(argc, argv, "rds:H")) != EOF)
 		switch (op) {
 
 		case 'H':
 			++hwflow;
+			break;
+
+		case 'd':
+			debug++;
+			break;
+
+		case 'r':
+			runfile++;
 			break;
 
 		case 's':
@@ -113,12 +125,19 @@ main(argc, argv)
 	if (argc != 2)
 		usage();
 
+#ifndef HPBSD
+	if (!debug)
+		(void)daemon(0, 0);
+#endif
+
 	Machine = argv[0];
 
 	(void) sprintf(strbuf, PIDNAME, LOGPATH, argv[0]);
 	Pidname = newstr(strbuf);
 	(void) sprintf(strbuf, LOGNAME, LOGPATH, argv[0]);
 	Logname = newstr(strbuf);
+	(void) sprintf(strbuf, RUNNAME, LOGPATH, argv[0]);
+	Runname = newstr(strbuf);
 	(void) sprintf(strbuf, PTYNAME, DEVPATH, argv[0]);
 	Ptyname = newstr(strbuf);
 	(void) sprintf(strbuf, DEVNAME, DEVPATH, argv[1]);
@@ -130,20 +149,32 @@ main(argc, argv)
 	signal(SIGINT, quit);
 	signal(SIGTERM, quit);
 	signal(SIGHUP, reinit);
+	if (runfile)
+		signal(SIGUSR1, newrun);
+	signal(SIGUSR2, shutdown);
 
 	/*
-	 * Open up log file, console tty, and controlling pty.
+	 * Open up run/log file, console tty, and controlling pty.
 	 */
 	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
 		die("open(%s) : %s", Logname, geterr(errno));
+	if (chmod(Logname, 0640) < 0)
+		die("chmod(%s) : %s", Logname, geterr(errno));
+
+	if (runfile) {
+		if ((runfd = open(Runname,O_WRONLY|O_CREAT|O_APPEND,0666)) < 0)
+			die("open(%s) : %s", Runname, geterr(errno));
+		if (chmod(Runname, 0640) < 0)
+			die("chmod(%s) : %s", Runname, geterr(errno));
+	}
+	
 	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
 		die("open(%s) : %s", Ptyname, geterr(errno));
 	if ((devfd = open(Devname, O_RDWR|O_NONBLOCK, 0666)) < 0)
 		die("open(%s) : %s", Devname, geterr(errno));
 
 	if (ioctl(devfd, TIOCEXCL, 0) < 0)
-		fprintf(stderr, "%s: TIOCEXCL %s: %s\n",
-			Progname, Devname, geterr(errno));
+		warn("TIOCEXCL %s: %s", Devname, geterr(errno));
 
 	writepid();
 	rawmode(speed);
@@ -183,10 +214,16 @@ in()
 			else
 				die("read(%s) : %s", Devname, geterr(errno));
 		}
-		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM));
+		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
+				 sigmask(SIGUSR1)|sigmask(SIGUSR2));
 
 		if (write(logfd, buf, cc) < 0)
 			die("write(%s) : %s", Logname, geterr(errno));
+
+		if (runfile) {
+			if (write(runfd, buf, cc) < 0)
+				die("write(%s) : %s", Runname, geterr(errno));
+		}
 
 		if (write(ptyfd, buf, cc) < 0) {
 			if ((errno != EIO) && (errno != EWOULDBLOCK))
@@ -209,7 +246,9 @@ out()
 	timeout.tv_usec = 100000;
 	
 	while (1) {
+		omask = sigblock(SIGUSR2);
 		if ((cc = read(ptyfd, buf, NBPG)) < 0) {
+			(void) sigsetmask(omask);
 			if ((errno == EIO) || (errno == EWOULDBLOCK) ||
 			    (errno == EINTR)) {
 				select(0, 0, 0, 0, &timeout);
@@ -218,7 +257,10 @@ out()
 			else
 				die("read(%s) : %s", Ptyname, geterr(errno));
 		}
-		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM));
+		(void) sigsetmask(omask);
+
+		omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
+				 sigmask(SIGUSR1)|sigmask(SIGUSR2));
 
 		if (write(devfd, buf, cc) < 0)
 			die("write(%s) : %s", Devname, geterr(errno));
@@ -254,10 +296,15 @@ capture()
 		}
 		fds = sfds;
 		i = select(n, &fds, NULL, NULL, NULL);
-		if (i < 0)
-			err(1, "select");
+		if (i < 0) {
+			if (errno == EINTR) {
+				warn("input select interrupted, continuing");
+				continue;
+			}
+			die("select(%s): %s", Devname, geterr(errno));
+		}
 		if (i == 0) {
-			fprintf(stderr, "%s: no fds ready!\n", Progname);
+			warn("No fds ready!");
 			sleep(1);
 			continue;
 		}
@@ -270,7 +317,8 @@ capture()
 				die("read(%s) : EOF", Devname);
 			errno = 0;
 
-			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM));
+			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
+					 sigmask(SIGUSR1)|sigmask(SIGUSR2));
 			for (lcc = 0; lcc < cc; lcc += i) {
 				i = write(ptyfd, &buf[lcc], cc-lcc);
 				if (i < 0) {
@@ -294,12 +342,22 @@ dropped:
 				die("write(%s) : %s", Logname, geterr(errno));
 			if (i != cc)
 				die("write(%s) : incomplete", Logname);
+			if (runfile) {
+				i = write(runfd, buf, cc);
+				if (i < 0)
+					die("write(%s) : %s",
+					    Runname, geterr(errno));
+				if (i != cc)
+					die("write(%s) : incomplete", Runname);
+			}
 			(void) sigsetmask(omask);
 
 		}
 		if (FD_ISSET(ptyfd, &fds)) {
+			omask = sigblock(sigmask(SIGUSR2));
 			errno = 0;
 			cc = read(ptyfd, buf, sizeof(buf), 0);
+			(void) sigsetmask(omask);
 			if (cc < 0) {
 				/* XXX commonly observed */
 				if (errno == EIO || errno == EAGAIN)
@@ -312,7 +370,8 @@ dropped:
 			}
 			errno = 0;
 
-			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM));
+			omask = sigblock(sigmask(SIGHUP)|sigmask(SIGTERM)|
+					 sigmask(SIGUSR1));
 			for (lcc = 0; lcc < cc; lcc += i) {
 				i = write(devfd, &buf[lcc], cc-lcc);
 				if (i < 0) {
@@ -350,8 +409,56 @@ reinit(int sig)
 	
 	if ((logfd = open(Logname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
 		die("open(%s) : %s", Logname, geterr(errno));
+	if (chmod(Logname, 0640) < 0)
+		die("chmod(%s) : %s", Logname, geterr(errno));
+	
+	dolog(LOG_NOTICE, "new log started");
 
-	dolog(LOG_NOTICE, "restarted");
+	if (runfile)
+		newrun(sig);
+}
+
+/*
+ * SIGUSR1 means we want to close the old run file (because it has probably
+ * been moved) and start a new version of it.
+ */
+void
+newrun(int sig)
+{
+	/*
+	 * We know that the any pending write to the log file completed
+	 * because we blocked SIGUSR1 during the write.
+	 */
+	close(runfd);
+	
+	if ((runfd = open(Runname, O_WRONLY|O_CREAT|O_APPEND, 0666)) < 0)
+		die("open(%s) : %s", Runname, geterr(errno));
+	if (chmod(Runname, 0640) < 0)
+		die("chmod(%s) : %s", Runname, geterr(errno));
+	
+	dolog(LOG_NOTICE, "new run started");
+}
+
+/*
+ * SIGUSR2 means we want to revoke the other side of the pty to close the
+ * tip down gracefully.
+ */
+void
+shutdown(int sig)
+{
+	int ofd = ptyfd;
+	
+	/*
+	 * We know that the any pending access to the pty completed
+	 * because we blocked SIGUSR2 during the operation.
+	 */
+	close(ptyfd);
+	
+	if ((ptyfd = open(Ptyname, O_RDWR, 0666)) < 0)
+		die("open(%s) : %s", Ptyname, geterr(errno));
+	dup2(ptyfd, ofd);
+	
+	dolog(LOG_NOTICE, "pty reset");
 }
 
 /*
@@ -414,7 +521,7 @@ newstr(str)
 	register char *np;
 
 	if ((np = malloc((unsigned) strlen(str) + 1)) == NULL) {
-		fprintf(stderr, "%s: malloc: out of memory\n", Progname);
+		warn("malloc: out of memory");
 		exit(1);
 	}
 
@@ -448,6 +555,9 @@ writepid()
 	
 	if ((fd = open(Pidname, O_WRONLY|O_CREAT|O_TRUNC, 0666)) < 0)
 		die("open(%s) : %s", Pidname, geterr(errno));
+
+	if (chmod(Pidname, 0644) < 0)
+		die("chmod(%s) : %s", Pidname, geterr(errno));
 	
 	(void) sprintf(buf, "%d\n", getpid());
 	
