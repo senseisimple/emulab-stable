@@ -174,8 +174,6 @@ if (mysql_num_rows($reserved_result)) {
             $next_boot_cmd_line = "NULL";
         if (!$startupcmd)
             $startupcmd = "NULL";
-        if (!$startstatus)
-            $startstatus = "NULL";
         if (!$vname)
             $vname = "--";
 
@@ -190,7 +188,7 @@ if (mysql_num_rows($reserved_result)) {
                   <td>$def_boot_path</td>
                   <td>$def_boot_cmd_line</td>
                   <td>$startupcmd</td>
-                  <td>$startstatus</td>
+                  <td align=center>$startstatus</td>
               </tr>\n";
     }
     echo "</table>\n";
