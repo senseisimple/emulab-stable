@@ -109,9 +109,9 @@ if (isset($uid)) {
                     Project Information</A><p>\n";
         echo "<p><A href='beginexp_form.php3'>
                     Begin an Experiment</A>\n";
-        echo "<p><A href='endexp_form.php3'>
+        echo "<p><A href='endexp_list.php3'>
                     End an Experiment</A>\n";
-        echo "<p><A href='showexp_form.php3'>
+        echo "<p><A href='showexp_list.php3'>
                     Experiment Information</A>\n";
         echo "<p><A href='modusr_form.php3'>
                     Update user information</A>\n";

@@ -29,16 +29,6 @@ $exp_eid = substr($exp_eid, 2);
 $exp_pid = substr($exp_pideid, 0, strpos($exp_pideid, "\$\$", 0));
 
 #
-# Stop now if the Confirm box was not Depressed
-#
-if (!isset($confirm) ||
-    strcmp($confirm, "yes")) {
-  USERERROR("The \"Confirm\" button was not depressed! If you really ".
-            "want to end experiment '$exp_eid' in project '$exp_pid', ".
-            "please go back and try again.", 1);
-}
-
-#
 # Check to make sure thats this is a valid PID/EID tuple.
 #
 $query_result = mysql_db_query($TBDBNAME,
@@ -58,6 +48,38 @@ $query_result = mysql_db_query($TBDBNAME,
 if (mysql_num_rows($query_result) == 0) {
   USERERROR("You are not a member of Project $exp_pid for ".
             "Experiment: $exp_eid.", 1);
+}
+
+#
+# We run this twice. The first time we are checking for a confirmation
+# by putting up a form. The next time through the confirmation will be
+# set. Or, the user can hit the cancel button, in which case we should
+# probably redirect the browser back up a level.
+#
+if ($canceled) {
+    echo "<center><h2><br>
+          Experiment termination canceled!
+          </h2></center>\n";
+    
+    PAGEFOOTER();
+    return;
+}
+
+if (!$confirmed) {
+    echo "<center><h2><br>
+          Are you <b>REALLY</b>
+          sure you want to terminate Experiment '$exp_eid?'
+          </h2>\n";
+    
+    echo "<form action=\"endexp.php3\" method=\"post\">";
+    echo "<input type=hidden name=exp_pideid value=\"$exp_pideid\">\n";
+    echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
+    echo "<b><input type=submit name=canceled value=Cancel></b>\n";
+    echo "</form>\n";
+    echo "</center>\n";
+
+    PAGEFOOTER();
+    return;
 }
 
 #
