@@ -113,7 +113,6 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
-	@$(MAKE) -C nseparse post-install
 	$(PLAB_POST_INSTALL)
 	@$(MAKE) -C ipassign post-install
 	chmod 775 $(INSTALL_BINDIR)
