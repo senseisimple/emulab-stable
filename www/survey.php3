@@ -107,6 +107,7 @@ if ($submit) {
     } else {
         $mesg .= "\nSurvey Responder: $effuid\n";
 	$mesg .= "Auth notes: $uidnotes\n";
+	$mesg .= "Remote IP: $REMOTE_ADDR\n";
     }
     if (strcmp($name,"")) {
     	$mesg .= "User-supplied name: $name\n";
