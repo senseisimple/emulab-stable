@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -79,27 +79,19 @@ my $eid = $ARGV[1];
 
 # Get node list.
 # (left join info from vis_nodes; could also left join virt_lans,
-#  but there's no reason to since lan info shows up on the link, not the LAN node.)
+#  but there's no reason to since lan info shows up on the link,
+#  not the LAN node.)
 
 my $result = DBQueryFatal("SELECT vis.vname, vis.vis_type, vis.x, vis.y, ".
-			  "virt.ips, virt.type " .
+			  "       virt.type " .
 			  "FROM vis_nodes as vis " .
 			  "LEFT JOIN virt_nodes as virt on ".
-			  "vis.vname=virt.vname and vis.pid=virt.pid and vis.eid=virt.eid ".
-#			  "LEFT JOIN virt_lans as lans on vis.vname=lans.vname ".
+			  "     vis.vname=virt.vname and vis.pid=virt.pid and".
+			  "     vis.eid=virt.eid ".
 			  "WHERE vis.pid='$pid' AND vis.eid='$eid'");
 
-while (my ($name, $vis_type, $vis_x, $vis_y, $ips, $virt_type) = $result->fetchrow) {
+while (my ($name, $vis_type, $vis_x, $vis_y, $virt_type) = $result->fetchrow) {
     dprint "NODE $name $vis_type $vis_x $vis_y\n";
-
-    if (defined $ips) {
-	$ips =~ s/^\d+\://g;
-	$ips =~ s/\s\d+\:/ /g;
-	$ips =~ s/^192\.168//g;
-	$ips =~ s/\s192\.168/ /g;
-
-	$nodes{$name}{"ips"} = $ips;
-    }
 
     $nodes{$name}{"type"} = $vis_type; # vis type, not hwtype.
     $nodes{$name}{"x"} = $vis_x;
@@ -108,14 +100,10 @@ while (my ($name, $vis_type, $vis_x, $vis_y, $ips, $virt_type) = $result->fetchr
     # what appears in label depends on the detail level.
     my $label = $name;
     if ($detail > 0) {
-	if (defined $virt_type) {
+	if (defined($virt_type)) {
 	    $label .= "(" . $virt_type . ")";
 	}
-	if (defined $ips) {
-	    $label .= " " . $ips;
-	}
     }
-    
     $nodes{$name}{"label"} = $label;
 
     if (!(defined $min_x) || $vis_x < $min_x) { $min_x = $vis_x; }
@@ -149,12 +137,13 @@ if (!(defined $min_x)) {
 
 # get vlan list.
 
-$result = DBQueryFatal("SELECT vname, delay, bandwidth, lossrate, " .
+$result = DBQueryFatal("SELECT vname, vnode, vport, ip, ".
+		          "delay, bandwidth, lossrate, " .
 			  "rdelay, rbandwidth, rlossrate, " . 
 			  "member FROM virt_lans " .
 			  "WHERE pid='$pid' AND eid='$eid'");
 
-while (my ($vname, $delay, $bandwidth, 
+while (my ($vname, $vnode, $vport, $ip, $delay, $bandwidth, 
            $lossrate, $rdelay, $rbandwidth, 
            $rlossrate, $member) = $result->fetchrow) {
     $member =~ s/\:.*//;
@@ -164,6 +153,13 @@ while (my ($vname, $delay, $bandwidth,
     $lans{$vname}{$member}{"rdelay"} = $rdelay;
     $lans{$vname}{$member}{"rbw"}    = $rbandwidth;
     $lans{$vname}{$member}{"rloss"}  = $rlossrate;
+
+    # what appears in label depends on the detail level.
+    if ($detail > 0) {
+	if (defined($ip)) {
+	    $nodes{$vnode}{"label"} .= " " . $ip;
+	}
+    }
 }
 
 foreach my $lan (keys %lans) {
