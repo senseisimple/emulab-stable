@@ -453,6 +453,7 @@ REPLACE INTO table_regex VALUES ('experiments','multiplex_factor','int','redirec
 REPLACE INTO table_regex VALUES ('experiments','forcelinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselinkdelays','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','usewatunnels','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','veth_encapsulate','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','uselatestwadata','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_delay_solverweight','float','redirect','default:float',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('experiments','wa_bw_solverweight','float','redirect','default:float',0,1024,NULL);
