@@ -208,6 +208,7 @@ function LASTUSERSLOGIN($uid) {
     if ($uid) {
 	$uidarg = "-u $uid";
     }
+
     $cmdandargs = "$TBLIBEXEC_DIR/lastlogin $uidarg";
 
     $result = exec($cmdandargs, $output, $retval);
@@ -225,20 +226,41 @@ function LASTUSERSLOGIN($uid) {
       }
         return 0;
     }
-    if ($uid) {
-	return $output[0];
-    }
-    #
-    # Convert to a hash table.
-    #
     $hashtable = array();
-    
-    for ($i = 0; $i < count($output); $i++) {
-	$parts = explode(" ", $output[$i]);
 
-	$hashtable["$parts[0]"] = "$parts[1] $parts[2]";
+    #
+    # In single user mode, return a hash of date, time, node.
+    # 
+    if ($uid) {
+	if (! $output[0])
+	    return 0;
+	
+	$parts = explode(" ", $output[0]);
+
+	$hashtable["date"] = $parts[0];
+	$hashtable["time"] = $parts[1];
+	$hashtable["node_id"] = $parts[2];
+	return $hashtable;
+    }
+    
+    #
+    # In all user mode, return a hash of hashes, indexed by uid.
+    #
+    for ($i = 0; $i < count($output); $i++) {
+	$utable = array();
+	$parts  = explode(" ", $output[$i]);
+
+	$utable["date"] = $parts[1];
+	$utable["time"] = $parts[2];
+	$utable["node_id"] = $parts[3];	
+
+	$hashtable["$parts[0]"] = $utable;
     }
     return $hashtable;
+}
+
+function LASTNODELOGIN($node)
+{
 }
 
 #

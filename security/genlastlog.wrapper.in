@@ -1,0 +1,49 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# usage: genlastlog.wrapper
+#
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+my $genlastlog  = "$TB/sbin/genlastlog";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Testbed Support libraries
+# 
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Only root and TB Admins.
+#
+if ($UID && !TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    You must be root or a TB administrator\n");
+}
+ 
+#
+# Run actual program. We only care about non-zero exit status, in which
+# case we notify tbops.
+#
+if (system("$genlastlog")) {
+    SENDMAIL($TBOPS, "TESTBED: Genlastlog Failed",
+	     "Please look at the syslog entries for genlastlog!");
+}
+
+exit(0);

@@ -165,6 +165,9 @@ if (system("genelists")) {
     # 
 }
 
+# Accounting info.
+TBSetExpSwapTime($pid, $eid);
+
 if (!SetExpState($pid, $eid, EXPTSTATE_ACTIVE)) {
     print STDERR "*** Failed to set experiment state!\n";
     cleanup();

@@ -1,7 +1,21 @@
 /*
- * A little ditty to pull the last log info out and report a list of
- * the last time each person has logged in.
+ * This program is invoked from the web interface to determine the last
+ * time a user logged in on the users node. We parse the lastlog
+ * file from the users node via NFS (see USERSVAR below), and spit out
+ * the last time he/she logged in. This gives us usage information to aid
+ * in scheduling and to determine who is really active. 
+ *
+ * Without a -u specification, print out a list of all users one per line 
+ * with the date of their last login.
+ * 
+ * The output format is simple:
+ *
+ *	[uid] date time hostname
+ *
+ * where [uid] is added when doing all users, and date, time, hostname all
+ * come from the lastlog data structure (see utmp.h).
  */
+
 #include <stdio.h>
 #include <time.h>
 #include <sys/types.h>
@@ -12,14 +26,20 @@
 #include <pwd.h>
 #include <setjmp.h>
 
+/*
+ * This is the NFS mountpoint where users:/var is mounted.
+ */
 #ifndef USERSVAR
-#define USERSVAR "/usr/testbed/usersvar"
+#define USERSVAR	"/usr/testbed/usersvar"
 #endif
+
+#define LASTLOG		"log/lastlog"
 
 static char	*progname;
 static int	doentry(FILE *fp, uid_t uid, int umode);
 static jmp_buf	deadline;
 static int	deadfl;
+static int	debug;
 
 void
 usage(void)
@@ -39,7 +59,7 @@ int
 main(int argc, char **argv)
 {
 	FILE	       *fp;
-	char		buf[BUFSIZ], *uidarg;
+	char		buf[BUFSIZ], *uidarg, *pcarg = 0;
 	uid_t		uid;
 	int		ch, rval, umode = 0;
 
@@ -51,11 +71,15 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 
-	while ((ch = getopt(argc, argv, "u:")) != -1)
+	while ((ch = getopt(argc, argv, "u:d")) != -1)
 		switch(ch) {
 		case 'u':
 			umode  = 1;
 			uidarg = optarg;
+			break;
+
+		case 'd':
+			debug = 1;
 			break;
 
 		case 'h':
@@ -86,13 +110,15 @@ main(int argc, char **argv)
 		}
 	}
 
-	sprintf(buf, "%s/log/lastlog", USERSVAR);
+	sprintf(buf, "%s/%s", USERSVAR, LASTLOG);
 
 	/*
 	 * Protect against NFS timeout.
 	 */
-	alarm(3);	
-	fp = fopen(buf, "r");
+	if (setjmp(deadline) == 0) {
+		alarm(3);
+		fp = fopen(buf, "r");
+	}
 	alarm(0);
 
 	if (deadfl) {
@@ -153,11 +179,24 @@ doentry(FILE *fp, uid_t uid, int umode)
 		strftime(buf, sizeof(buf),
 			 "20%y-%m-%d %H:%M:%S", localtime(&ll.ll_time));
 
+		if (! ll.ll_host[0])
+		    strcpy(ll.ll_host, "unknown");
+
 		if (umode)
-		    printf("%s\n", buf);
-		else
-		    printf("%u %s\n", uid, buf);
+		    printf("%s %.*s", buf, sizeof(ll.ll_host), ll.ll_host);
+		
+		else 
+			printf("%u %s %.*s", uid, buf,
+			       sizeof(ll.ll_host), ll.ll_host);
+		
+		if (debug) {
+			struct passwd	*pw = getpwuid(uid);
+
+			if (pw) {
+				printf(" (%s)", pw->pw_name);
+			}
+		}
+		printf("\n");
 	}
 	return 1;
 }
-

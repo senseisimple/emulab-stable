@@ -800,6 +800,63 @@ function TBExptState($pid, $eid)
     return $state;
 }
 
+function TBUidNodeLastLogin($uid)
+{
+    $query_result =
+	DBQueryFatal("select * from uidnodelastlogin where uid='$uid'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row;
+}
+
+#
+# Return the last login for the node, but only after the experiment was
+# created (swapped in).
+# 
+function TBNodeUidLastLogin($node_id)
+{
+    $query_result =
+	DBQueryFatal("select n.* from nodeuidlastlogin as n ".
+		     "left join reserved as r on n.node_id=r.node_id ".
+		     "left join experiments as e ".
+		     " on r.eid=e.eid and r.pid=e.pid ".
+		     "where r.node_id='$node_id' and ".
+		     "  DATE_ADD(n.date, INTERVAL n.time HOUR_SECOND) >= ".
+		     "           e.expt_swapped");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row;
+}
+
+#
+# Return the last login for all of the nodes in an experiment, but only
+# after the experiment was created (swapped in).
+# 
+function TBExpUidLastLogins($pid, $eid)
+{
+    $query_result =
+	DBQueryFatal("select n.* from nodeuidlastlogin as n ".
+		     "left join reserved as r on n.node_id=r.node_id ".
+		     "left join experiments as e ".
+		     " on r.eid=e.eid and r.pid=e.pid ".
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "  DATE_ADD(n.date, INTERVAL n.time HOUR_SECOND) >= ".
+		     "           e.expt_swapped ".
+		     "      order by n.date DESC");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row   = mysql_fetch_array($query_result);
+    return $row;
+}
+
 #
 # DB Interface.
 #

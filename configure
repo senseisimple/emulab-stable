@@ -1030,7 +1030,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	lib/GNUmakefile \
 	os/GNUmakefile os/split-image.sh os/imagezip/GNUmakefile \
 	pxe/GNUmakefile pxe/proxydhcp.restart pxe/bootinfo.restart \
-	security/GNUmakefile security/paperbag \
+	security/GNUmakefile security/paperbag security/genlastlog.wrapper \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/mkacct-ctrl \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
 	tbsetup/os_load tbsetup/os_setup tbsetup/mkprojdir tbsetup/power \

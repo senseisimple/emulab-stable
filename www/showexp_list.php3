@@ -46,10 +46,12 @@ if (mysql_num_rows($experiments_result)) {
             <tr>
               <td width=8%>PID</td>
               <td width=8%>EID</td>
-              <td width=3%>PCs</td>
-              <td width=3%>Sharks</td>
-              <td width=4% align=center>Terminate</td>
-              <td width=70%>Name</td>
+              <td width=3%>PCs</td>\n";
+
+    if ($isadmin)
+	echo "<td width=17% align=center>Last Login</td>\n";
+
+    echo "    <td width=60%>Name</td>
               <td width=4%>Head UID</td>
             </tr>\n";
 
@@ -83,12 +85,20 @@ if (mysql_num_rows($experiments_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?pid=$pid&eid=$eid'>
                        $eid</A></td>
-                <td>".$usage["pc"]." &nbsp;</td>
-                <td>".$usage["shark"]." &nbsp;</td>
-	        <td align=center>
-                    <A href='endexp.php3?pid=$pid&eid=$eid'>
-                       <img alt=\"o\" src=\"redball.gif\"></A></td>
-                <td>$name</td>
+                <td>".$usage["pc"]." &nbsp;</td>\n";
+
+	if ($isadmin) {
+	    $foo = "N/A";
+
+	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
+		$foo = $lastexpnodelogins["date"] . " " .
+		 "(" . $lastexpnodelogins["uid"] . ")";
+	    }
+
+	    echo "<td>$foo</td>\n";
+	}
+
+        echo "<td>$name</td>
                 <td><A href='showuser.php3?target_uid=$huid'>
                        $huid</A></td>
                </tr>\n";

@@ -9,17 +9,18 @@ SUBDIR		= security
 include $(OBJDIR)/Makeconf
 
 BINS		= suexec lastlogin
-SCRIPTS		= paperbag plasticwrap
+SCRIPTS		= plasticwrap
+SBINS		= paperbag genlastlog genlastlog.wrapper
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BINS) $(SCRIPTS)
+all:	$(BINS) $(SCRIPTS) $(SBINS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS	= -O -g
+CFLAGS	+= -O2 -g
 
 suexec:		suexec.c suexec.h
 	$(CC) $(CFLAGS) \
@@ -33,8 +34,16 @@ lastlogin:	lastlogin.c
 		-DUSERSVAR='"$(prefix)/usersvar"' \
 		-o lastlogin $<
 
+genlastlog:	genlastlog.c
+	$(CC) $(CFLAGS) -I/usr/local/include \
+		-DTBDBNAME='"$(TBDBNAME)"' \
+		-DUSERSVAR='"$(prefix)/usersvar"' \
+		-DOURDOMAIN='"$(OURDOMAIN)"' \
+                -DUSERNODE='"$(USERNODE)"' \
+		-o genlastlog $< -L/usr/local/lib/mysql -lmysqlclient
+
 install: $(addprefix $(INSTALL_LIBEXECDIR)/, $(BINS)) \
-	$(addprefix $(INSTALL_SBINDIR)/, paperbag)
+	$(addprefix $(INSTALL_SBINDIR)/, $(SBINS))
 	@echo "Don't forget to do a post-install as root"
 
 post-install:

@@ -134,6 +134,9 @@ DBQueryWarn("DELETE from delays where pid='$pid' and eid='$eid'")
 DBQueryWarn("DELETE from vlans  where pid='$pid' and eid='$eid'")
     or $errors++;
 
+# Accounting info.
+TBSetExpSwapTime($pid, $eid);
+
 if ($errors == 0) {
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
 	or $errors++;

@@ -292,8 +292,21 @@ function SHOWUSER($uid) {
     #
     if (($lastweblogin = LASTWEBLOGIN($uid)) == 0)
 	$lastweblogin = "&nbsp";
-    if (($lastuserslogin = LASTUSERSLOGIN($uid)) == 0)
-	$lastuserslogin = "&nbsp";
+    if (($lastuserslogininfo = LASTUSERSLOGIN($uid)) == 0)
+	$lastuserslogin = "N/A";
+    else {
+	$lastuserslogin = $lastuserslogininfo["date"] . " " .
+	                  $lastuserslogininfo["time"] . " " .
+                          "(" . $lastuserslogininfo["node_id"] . ")";
+    }
+    
+    if (($lastnodelogininfo = TBUidNodeLastLogin($uid)) == 0)
+	$lastnodelogin = "N/A";
+    else {
+	$lastnodelogin = $lastnodelogininfo["date"] . " " .
+		         $lastnodelogininfo["time"] . " " .
+                         "(" . $lastnodelogininfo["node_id"] . ")";
+    }
     
     echo "<table align=center border=1>\n";
     
@@ -357,6 +370,11 @@ function SHOWUSER($uid) {
               <td>$lastuserslogin</td>
           </tr>\n";
     
+    echo "<tr>
+              <td>Last Node Login:</td>
+              <td>$lastnodelogin</td>
+          </tr>\n";
+    
     echo "</table>\n";
 
 }
@@ -379,6 +397,7 @@ function SHOWEXP($pid, $eid) {
     $exp_name    = $exprow[expt_name];
     $exp_created = $exprow[expt_created];
     $exp_start   = $exprow[expt_start];
+    $exp_swapped = $exprow[expt_swapped];
     $exp_end     = $exprow[expt_end];
     $exp_created = $exprow[expt_created];
     $exp_head    = $exprow[expt_head_uid];
@@ -445,6 +464,11 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Started: </td>
             <td class=\"left\">$exp_start</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Last Swapped (in or out): </td>
+            <td class=\"left\">$exp_swapped</td>
           </tr>\n";
 
     echo "<tr>
@@ -577,7 +601,7 @@ function SHOWNODES($pid, $eid) {
                     <td>$startupcmd</td>
                     <td align=center>$startstatus</td>
                     <td align=center>$readylabel</td>
-                 </tr>\n";
+                   </tr>\n";
 	}
 	echo "</table>\n";
 	echo "<h4><blockquote><blockquote><blockquote><blockquote>
@@ -949,6 +973,22 @@ function SHOWNODE($node_id) {
               <td>Tarballs:</td>
               <td class=left>$tarballs</td>
       </tr>\n";
+
+    #
+    # We want the last login for this node, but only if its *after* the
+    # experiment was created (or swapped in).
+    #
+    if ($lastnodeuidlogin = TBNodeUidLastLogin($node_id)) {
+
+	$foo = $lastnodeuidlogin["date"] . " " .
+	       $lastnodeuidlogin["time"] . " " .
+	       "(" . $lastnodeuidlogin["uid"] . ")";
+	
+	echo "<tr>
+                  <td>Last Login:</td>
+                  <td class=left>$foo</td>
+             </tr>\n";
+    }
 
     echo "</table>\n";
 }

@@ -115,7 +115,8 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     if ($loginarray && isset($loginarray["$unix_uid"])) {
-	$lastuserslogin = $loginarray["$unix_uid"];
+	$userslogininfo = $loginarray["$unix_uid"];
+	$lastuserslogin = $userslogininfo["date"];
 
 	$idle_query = mysql_db_query($TBDBNAME,
 		"SELECT TO_DAYS(CURDATE()) - TO_DAYS(\"$lastuserslogin\")");

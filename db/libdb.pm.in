@@ -70,7 +70,7 @@ use Exporter;
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
-	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp
+	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 );
 
 # Must come after package declaration!
@@ -740,6 +740,28 @@ sub SetExpState($$$)
 
     my $query_result =
 	DBQueryWarn("update experiments set state='$state' ".
+		    "where eid='$eid' and pid='$pid'");
+
+    if (! $query_result ||
+	$query_result->numrows == 0) {
+	return 0;
+    }
+    return 1;
+}
+
+#
+# Set the swap in/out time for an experiment.
+#
+# usage: TBSetExpSwapTime(char *pid, char *eid)
+#        returns 1 if okay.
+#        returns 0 if an invalid pid/eid or if an error.
+# 
+sub TBSetExpSwapTime($$)
+{
+    my($pid, $eid) = @_;
+
+    my $query_result =
+	DBQueryWarn("update experiments set expt_swapped=now() ".
 		    "where eid='$eid' and pid='$pid'");
 
     if (! $query_result ||
