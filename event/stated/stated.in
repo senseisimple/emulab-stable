@@ -333,7 +333,7 @@ sub debug(@) {
 sub notify($) {
     	my $message = shift;
 	if (!$debug) {
-	    	SENDMAIL($TBOPS,"Node State Daemon Messsage",$message);
+	    	SENDMAIL($TBOPS,"Node State Daemon Messsage",$message,$TBOPS);
 	}
 	print $message;
 }
