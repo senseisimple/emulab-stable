@@ -752,17 +752,24 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	      // this node, then removing it, is the same one we would have
 	      // gotten otherwise
 	      double oldscore = get_score();
+	      int oldviolated = violated;
 	      double tempscore;
+	      int tempviolated;
 	      if (!add_node(vv,newpos,false,false)) {
 		tempscore = get_score();
+		tempviolated = violated;
 		remove_node(vv);
 	      }
-	      if (oldscore != get_score()) {
+	      if ((oldscore != get_score()) || (oldviolated != violated)) {
 		cerr << "Scoring problem adding a mapping - oldscore was " <<
 		  oldscore <<  " newscore is " << newscore << " tempscore was "
 		  << tempscore << endl;
+		cerr << "oldviolated was " << oldviolated << " newviolated is "
+		  << violated << " tempviolated was " << tempviolated << endl;
 		cerr << "I was tring to map " << vn->name << " to " <<
 		  newpnode->name << endl;
+		print_solution();
+		cerr << vinfo;
 		abort();
 	      }
 	    }
