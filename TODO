@@ -89,6 +89,12 @@ CDROM changes (dhcp, signing).
 
 *** Medium:
 
+* Add a web page to recreate an image from a node and an existing
+  image descriptor. Need to add a "kill runnin frisbee" function to
+  create_image though (well, need this in general cause I always get
+  bit by it). Might need some locking too (experiment should be locked
+  down).
+
 * Front end support for changing delay/bw/plr asymmetrically in
   events. Currently, we can do queue params, but the basic delay, bw,
   and plr and can be only be done symmetrically.
@@ -184,7 +190,8 @@ CDROM changes (dhcp, signing).
 
 * Bring in a bug tracking system we can use from the web interface.
   Need someone to look around for this. I hate GNATS!
-  Rob mentioned RT (http://www.fsck.com/projects/rt).
+  Rob mentioned RT (http://www.fsck.com/projects/rt). Eric mentioned
+  Bugzilla and Jitterbug
 
 * CDROM installation of nodes.
 
