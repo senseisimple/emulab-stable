@@ -42,6 +42,10 @@ my $USERDEL     = "/usr/sbin/userdel";
 my $USERMOD     = "/usr/sbin/usermod";
 my $GROUPADD	= "/usr/sbin/groupadd";
 my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s";
+my $IFC_100MBS  = "100baseTx";
+my $IFC_10MBS   = "10baseT";
+my $IFC_FDUPLEX = "FD";
+my $IFC_HDUPLEX = "HD";
 my $RPMINSTALL  = "/bin/rpm -i %s";
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 
@@ -69,11 +73,58 @@ sub os_cleanup_node () {
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$)
+sub os_ifconfig_line($$$$$)
 {
-    my ($iface, $inet, $mask) = @_;
+    my ($iface, $inet, $mask, $speed, $duplex) = @_;
+    my ($ifc, $miirest, $miisleep, $miisetspd, $media);
+
+    #
+    # Need to check units on the speed. Just in case.
+    #
+    if ($speed =~ /(\d*)([A-Za-z]*)/) {
+	if ($2 eq "Mbps") {
+	    $speed = $1;
+	}
+	elsif ($2 eq "Kbps") {
+	    $speed = $1 / 1000;
+	}
+	else {
+	    warn("*** Bad speed units in ifconfig!\n");
+	    $speed = 100;
+	}
+	if ($speed == 100) {
+	    $media = $IFC_100MBS;
+	}
+	elsif ($speed == 10) {
+	    $media = $IFC_10MBS;
+	}
+	else {
+	    warn("*** Bad Speed in ifconfig!\n");
+	    $media = $IFC_100MBS;
+	}
+    }
+    if ($duplex eq "full") {
+	$media = "$media-$IFC_FDUPLEX";
+    }
+    elsif ($duplex eq "half") {
+	$media = "$media-$IFC_HDUPLEX";
+    }
+    else {
+	warn("*** Bad duplex in ifconfig!\n");
+	$media = "$media-$IFC_FDUPLEX";
+    }
+
+    $ifc = sprintf($IFCONFIG, $iface, $inet, $mask);
+
+    if ($speed != 100 || $duplex ne "full") {
+	$mii = "sleep 2\n".
+  	       "/sbin/mii-tool --reset $iface\n".
+	       "sleep 2\n".
+	       "/sbin/mii-tool --force=$media $iface";
+	$ifc = "$ifc\n$mii";
+    }
     
-    return sprintf($IFCONFIG, $iface, $inet, $mask);
+    return "$ifc";
 }
 
 #

@@ -313,17 +313,32 @@ sub doifconfig ()
     print IFC "#!/bin/sh\n";
     
     while (<$TM>) {
-	if ($_ =~ /INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*)/) {
+	my $pat;
+
+	#
+	# Note that speed has a units spec: (K|M)bps
+	# 
+	$pat  = q(INTERFACE=(\d*) INET=([0-9.]*) MASK=([0-9.]*) MAC=(\w*) );
+	$pat .= q(SPEED=(\w*) DUPLEX=(\w*));
+	
+	if ($_ =~ /$pat/) {
 	    my $iface;
 
-	    if ($iface = findiface($4)) {
-		my $ifline = os_ifconfig_line($iface, $2, $3);
+	    my $inet  = $2;
+	    my $mask  = $3;
+	    my $mac   = $4;
+	    my $speed = $5; 
+	    my $duplex= $6;
+
+	    if ($iface = findiface($mac)) {
+		my $ifline =
+		    os_ifconfig_line($iface, $inet, $mask, $speed, $duplex);
 		    
 		print STDOUT "  $ifline\n";
 		print IFC "$ifline\n";
 	    }
 	    else {
-		warn "*** WARNING: Bad MAC: $4\n";
+		warn "*** WARNING: Bad MAC: $mac\n";
 	    }
 	}
 	else {

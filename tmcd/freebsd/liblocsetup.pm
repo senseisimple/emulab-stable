@@ -41,8 +41,10 @@ my $USERMOD     = "/usr/sbin/pw usermod";
 my $GROUPADD	= "/usr/sbin/pw groupadd";
 my $CHPASS	= "/usr/bin/chpass -p";
 my $MKDB	= "/usr/sbin/pwd_mkdb -p";
-my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s ".
-		  "media 100baseTX mediaopt full-duplex";
+my $IFCONFIG    = "/sbin/ifconfig %s inet %s netmask %s %s %s";
+my $IFC_100MBS  = "media 100baseTX";
+my $IFC_10MBS   = "media 10baseT/UTP";
+my $IFC_FDUPLEX = "mediaopt full-duplex";
 my $RPMINSTALL  = "/usr/local/bin/rpm -i %s";
 
 #
@@ -88,11 +90,43 @@ sub os_cleanup_node () {
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
-sub os_ifconfig_line($$$)
+sub os_ifconfig_line($$$$$)
 {
-    my ($iface, $inet, $mask) = @_;
-    
-    return sprintf($IFCONFIG, $iface, $inet, $mask);
+    my ($iface, $inet, $mask, $speed, $duplex) = @_;
+    my $media    = "";
+    my $mediaopt = "";
+
+    #
+    # Need to check units on the speed. Just in case.
+    #
+    if ($speed =~ /(\d*)([A-Za-z]*)/) {
+	if ($2 eq "Mbps") {
+	    $speed = $1;
+	}
+	elsif ($2 eq "Kbps") {
+	    $speed = $1 / 1000;
+	}
+	else {
+	    warn("*** Bad speed units in ifconfig!\n");
+	    $speed = 100;
+	}
+	if ($speed == 100) {
+	    $media = $IFC_100MBS;
+	}
+	elsif ($speed == 10) {
+	    $media = $IFC_10MBS;
+	}
+	else {
+	    warn("*** Bad Speed in ifconfig!\n");
+	    $media = $IFC_100MBS;
+	}
+    }
+
+    if ($duplex eq "full") {
+	$mediaopt = $IFC_FDUPLEX;
+    }
+   
+    return sprintf($IFCONFIG, $iface, $inet, $mask, $media, $mediaopt);
 }
 
 #
