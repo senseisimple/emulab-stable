@@ -51,8 +51,11 @@ echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
        <td class=stealth>This applet allows you to view the robots
                          as they move around. The table at the bottom
                          shows the current position (x, y, orientation),
-                         the destination position (dx, dy, dorientation),
+                         the destination position,
                          and the battery level (percentage and voltage).
+                         The shaded areas (blue border) are <em>exclusion</em>
+                         zones where robots
+                         are not allowed to go.
         </td>
       </tr>
       </table><hr>\n";

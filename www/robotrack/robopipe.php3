@@ -61,25 +61,26 @@ if (isset($fake)) {
     return;
 }
 
-$last_stamp = 0;
-
-$base_query_string =
-    "select loc.*,r.pid,r.eid,r.vname, ".
-    "  n.battery_voltage,n.battery_percentage, ".
-    "  n.destination_x,n.destination_y, ".
-    "  n.destination_orientation ".
-    "  from location_info as loc ".
-    "left join reserved as r on r.node_id=loc.node_id ".
-    "left join nodes as n on n.node_id=loc.node_id ".
-    "where loc.building='$building' and ".
-    "      loc.floor='$floor' ";
+$last_stamp   = 0;
 
 # Loop forever.
 while (1) {
     if ($last_stamp) 
-	$query_string = $base_query_string . "and stamp>$last_stamp";
+	$stamp_clause = " and stamp>$last_stamp ";
     else
-	$query_string = $base_query_string;
+	$stamp_clause = "";
+
+    $query_string =
+	"select loc.*,r.pid,r.eid,r.vname, ".
+	"  n.battery_voltage,n.battery_percentage, ".
+	"  n.destination_x,n.destination_y, ".
+	"  n.destination_orientation ".
+	"  from location_info as loc ".
+	"left join reserved as r on r.node_id=loc.node_id ".
+	"left join nodes as n on n.node_id=loc.node_id ".
+	"where loc.building='$building' and ".
+	"      loc.floor='$floor' $stamp_clause ".
+	"order by n.type,n.node_id";
 
     $query_result = DBQueryFatal($query_string);
 

@@ -468,8 +468,9 @@ public class RoboTrack extends JApplet {
     
     static class MyTableModel extends AbstractTableModel {
         private String[] columnNames = {"Pname", "Vname",
-	                                "X", "Y", "O",
-	                                "DX", "DY", "DO",
+	                                "X (meters)", "Y (meters)",
+					"O (degrees)",
+	                                "Dest-X", "Dest-Y", "Dest-O",
 					"Battery %", "Voltage"
 	};
 	
