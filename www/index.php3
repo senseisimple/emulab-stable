@@ -104,7 +104,7 @@ if (isset($uid)) {
                   "Please try back later", 1);
     }
     elseif (($status == "newuser") || ($status == "unverified")) {
-        echo "<A href='verify.php3?$uid'>New User Verification</A>\n";
+        echo "<A href='verifyusr_form.php3?$uid'>New User Verification</A>\n";
     }
     elseif (($status == "frozen") || ($status == "other")) {
         USERERROR("Your account has been changed to status $status, and is ".
