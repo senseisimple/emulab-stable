@@ -904,6 +904,8 @@ fi
 
 
 
+
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -1032,11 +1034,42 @@ cat >> confdefs.h <<EOF
 EOF
 
 cat >> confdefs.h <<EOF
+#define BOSSNODE_IP "$BOSSNODE_IP"
+EOF
+
+cat >> confdefs.h <<EOF
 #define USERNODE "$USERNODE"
 EOF
 
 cat >> confdefs.h <<EOF
+#define USERNODE_IP "$USERNODE_IP"
+EOF
+
+cat >> confdefs.h <<EOF
 #define FSNODE "$FSNODE"
+EOF
+
+if test -n "$FSNODE_IP"; then
+	cat >> confdefs.h <<EOF
+#define FSNODE_IP "$FSNODE_IP"
+EOF
+
+elif test "$USERNODE" = "$FSNODE"; then
+	cat >> confdefs.h <<EOF
+#define FSNODE_IP "$USERNODE_IP"
+EOF
+
+fi
+cat >> confdefs.h <<EOF
+#define CONTROL_ROUTER_IP "$CONTROL_ROUTER_IP"
+EOF
+
+cat >> confdefs.h <<EOF
+#define CONTROL_NETWORK "$CONTROL_NETWORK"
+EOF
+
+cat >> confdefs.h <<EOF
+#define CONTROL_NETMASK "$CONTROL_NETMASK"
 EOF
 
 cat >> confdefs.h <<EOF
@@ -1156,6 +1189,12 @@ if test -z "$EXTERNAL_BOSSNODE_IP"; then
 fi
 if test -z "$EXTERNAL_USERNODE_IP"; then
     EXTERNAL_USERNODE_IP=$USERNODE_IP
+fi
+if test -z "$FSNODE_IP"; then
+    FSNODE_IP=$USERNODE_IP
+fi
+if test -z "$EXTERNAL_FSNODE_IP"; then
+    EXTERNAL_FSNODE_IP=$FSNODE_IP
 fi
 if test -z "$TBAUTHDOMAIN"; then
     TBAUTHDOMAIN=".$OURDOMAIN"
@@ -1390,7 +1429,7 @@ fi
 # Check for the robot vision system dependencies.
 #
 echo $ac_n "checking how to run the C preprocessor""... $ac_c" 1>&6
-echo "configure:1395: checking how to run the C preprocessor" >&5
+echo "configure:1433: checking how to run the C preprocessor" >&5
 # On Suns, sometimes $CPP names a directory.
 if test -n "$CPP" && test -d "$CPP"; then
   CPP=
@@ -1405,13 +1444,13 @@ else
   # On the NeXT, cc -E runs the code through the compiler's parser,
   # not just through cpp.
   cat > conftest.$ac_ext <<EOF
-#line 1410 "configure"
+#line 1448 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1416: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1454: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -1422,13 +1461,13 @@ else
   rm -rf conftest*
   CPP="${CC-cc} -E -traditional-cpp"
   cat > conftest.$ac_ext <<EOF
-#line 1427 "configure"
+#line 1465 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1433: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1471: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -1439,13 +1478,13 @@ else
   rm -rf conftest*
   CPP="${CC-cc} -nologo -E"
   cat > conftest.$ac_ext <<EOF
-#line 1444 "configure"
+#line 1482 "configure"
 #include "confdefs.h"
 #include <assert.h>
 Syntax Error
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1450: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1488: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   :
@@ -1473,17 +1512,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1478: checking for $ac_hdr" >&5
+echo "configure:1516: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1483 "configure"
+#line 1521 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1488: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1526: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -1516,7 +1555,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:1521: checking for $ac_word" >&5
+echo "configure:1559: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -1588,7 +1627,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1593: checking for a BSD compatible install" >&5
+echo "configure:1631: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -1996,6 +2035,8 @@ s%@BOSSNODE_IP@%$BOSSNODE_IP%g
 s%@EXTERNAL_BOSSNODE_IP@%$EXTERNAL_BOSSNODE_IP%g
 s%@USERNODE_IP@%$USERNODE_IP%g
 s%@EXTERNAL_USERNODE_IP@%$EXTERNAL_USERNODE_IP%g
+s%@FSNODE_IP@%$FSNODE_IP%g
+s%@EXTERNAL_FSNODE_IP@%$EXTERNAL_FSNODE_IP%g
 s%@CONTROL_ROUTER_IP@%$CONTROL_ROUTER_IP%g
 s%@CONTROL_NETWORK@%$CONTROL_NETWORK%g
 s%@CONTROL_NETMASK@%$CONTROL_NETMASK%g

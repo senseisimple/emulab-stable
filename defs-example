@@ -101,6 +101,7 @@ SSLCERT_ORGNAME="Utah Network Testbed"
 #
 BOSSNODE_IP=155.98.32.70
 USERNODE_IP=155.98.33.74
+FSNODE_IP=$USERNODE_IP
 
 #
 # If your boss/ops nodes are multihomed (and typically, one of the
@@ -110,6 +111,7 @@ USERNODE_IP=155.98.33.74
 #
 EXTERNAL_BOSSNODE_IP=$BOSSNODE_IP
 EXTERNAL_USERNODE_IP=$USERNODE_IP
+EXTERNAL_FSNODE_IP=$USERNODE_IP
 
 #
 # The overall control network range
