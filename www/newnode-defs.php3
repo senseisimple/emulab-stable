@@ -60,7 +60,7 @@ function guess_node_type($proc,$disk) {
     #
     # Allow the reported speed to differ from the one in the database
     #
-    $fudge_factor = .05;
+    $fudge_factor = .10;
 
     #
     # Convert disk size from megabytes to gigabtypes
