@@ -1,11 +1,18 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+
+#
+# For firewall rule logging: log accepted or rejected packets.
+# XXX debugging
+#
+my $logaccept = 0;
+my $logreject = 1;
 
 #
 # Hosts we need un-firewalled static routes for
@@ -174,6 +181,10 @@ sub doboot()
 
 sub firewaller()
 {
+    # XXX debugging
+    $fwinfo->{LOGACCEPT} = $logaccept;
+    $fwinfo->{LOGREJECT} = $logreject;
+
     my ($upline, $downline) = os_fwconfig_line($fwinfo, @fwrules);
 
     print FWC "case \"\$action\" in\n";

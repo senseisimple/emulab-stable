@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -844,6 +844,29 @@ sub gettunnelconfig($)
     return 0;
 }
 
+my %fwvars = ();
+
+#
+# Substitute values of variables in a firewall rule.
+#
+sub expandfwvars($)
+{
+    my ($rule) = @_;
+
+    if ($rule->{RULE} =~ /EMULAB_\w+/) {
+	foreach my $key (keys %fwvars) {
+	    $rule->{RULE} =~ s/$key/$fwvars{$key}/
+		if (defined($fwvars{$key}));
+	}
+	if ($rule->{RULE} =~ /EMULAB_\w+/) {
+	    warn("*** WARNING: Unexpanded firewall variable in: \n".
+		 "    $rule->{RULE}\n");
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 #
 # Return the firewall configuration. We parse tmcd output here and return
 # a list of hash entries to the caller.
@@ -865,6 +888,7 @@ sub getfwconfig($$)
     my $rempat = q(TYPE=remote FWIP=([0-9\.]*));
     my $fwpat  = q(TYPE=([\w-]+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*) IN_VLAN=(\d+) OUT_VLAN=(\d+));
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
+    my $vpat   = q(VAR=(EMULAB_\w+) VALUE="(.*)");
 
     $fwinfo->{"TYPE"} = "none";
     foreach my $line (@tmccresults) {
@@ -908,15 +932,23 @@ sub getfwconfig($$)
 	    $fw->{"RULENO"} = $ruleno;
 	    $fw->{"RULE"} = $rule;
 	    push(@fwrules, $fw);
+	} elsif ($line =~ /$vpat/) {
+	    $fwvars{$1} = $2;
 	} else {
 	    warn("*** WARNING: Bad firewall info line: $line\n");
 	    return 1;
 	}
     }
 
+    # make a pass over the rules, expanding variables
+    my $bad = 0;
+    foreach my $rule (@fwrules) {
+	$bad += expandfwvars($rule);
+    }
+
     $$infoptr = $fwinfo;
     @$rptr = @fwrules;
-    return 0;
+    return $bad;
 }
 
 

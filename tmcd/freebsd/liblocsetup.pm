@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -522,6 +522,10 @@ sub os_fwconfig_line($@)
     my ($fwinfo, @fwrules) = @_;
     my ($upline, $downline);
 
+    # XXX debugging
+    my $logaccept = defined($fwinfo->{LOGACCEPT}) ? $fwinfo->{LOGACCEPT} : 0;
+    my $logreject = defined($fwinfo->{LOGREJECT}) ? $fwinfo->{LOGREJECT} : 0;
+
     #
     # VLAN enforced layer2 firewall with FreeBSD/IPFW2
     #
@@ -546,10 +550,26 @@ sub os_fwconfig_line($@)
 	$upline .= "    if [ -z \"`sysctl net.inet.ip.fw.enable 2>/dev/null`\" ]; then\n";
 	$upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
 	$upline .= "    fi\n";
+
+	$upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
+	$upline .= "        echo 'WARNING: could not enable firewall'\n";
+	$upline .= "        exit 1\n";
+	$upline .= "    }\n";
+
 	foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
-	    $upline .= "    ipfw add $rule->{RULENO} $rule->{RULE} || {\n";
+	    my $rulestr = $rule->{RULE};
+	    if ($logaccept && $rulestr =~ /^(allow|accept|pass|permit)\s.*/) {
+		my $action = $1;
+		$rulestr =~ s/$action/$action log/;
+	    } elsif ($logreject && $rulestr =~ /^(deny|drop)\s.*/) {
+		my $action = $1;
+		$rulestr =~ s/$action/$action log/;
+	    }
+
+	    $upline .= "    ipfw add $rule->{RULENO} $rulestr || {\n";
 	    $upline .= "        echo 'WARNING: could not load ipfw rule:'\n";
-	    $upline .= "        echo '  $rule->{RULE}'\n";
+	    $upline .= "        echo '  $rulestr'\n";
+	    $upline .= "        ipfw -q flush\n";
 	    $upline .= "        exit 1\n";
 	    $upline .= "    }\n";
 	}
@@ -571,10 +591,26 @@ sub os_fwconfig_line($@)
     $upline  = "if [ -z \"`sysctl net.inet.ip.fw.enable 2>/dev/null`\" ]; then\n";
     $upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
     $upline .= "    fi\n";
+
+    $upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
+    $upline .= "        echo 'WARNING: could not enable firewall'\n";
+    $upline .= "        exit 1\n";
+    $upline .= "    }\n";
+
     foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
-	$upline .= "    ipfw add $rule->{RULENO} $rule->{RULE} || {\n";
+	my $rulestr = $rule->{RULE};
+	if ($logaccept && $rulestr =~ /^(allow|accept|pass|permit)\s.*/) {
+	    my $action = $1;
+	    $rulestr =~ s/$action/$action log/;
+	} elsif ($logreject && $rulestr =~ /^(deny|drop)\s.*/) {
+	    my $action = $1;
+	    $rulestr =~ s/$action/$action log/;
+	}
+
+	$upline .= "    ipfw add $rule->{RULENO} $rulestr || {\n";
 	$upline .= "        echo 'WARNING: could not load ipfw rule:'\n";
-	$upline .= "        echo '  $rule->{RULE}'\n";
+	$upline .= "        echo '  $rulestr'\n";
+	$upline .= "        ipfw -q flush\n";
 	$upline .= "        exit 1\n";
 	$upline .= "    }\n";
     }
