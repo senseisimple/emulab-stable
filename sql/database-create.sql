@@ -276,6 +276,8 @@ CREATE TABLE experiments (
   last_swap_req datetime default NULL,
   idle_ignore tinyint(4) NOT NULL default '0',
   sync_server varchar(32) default NULL,
+  cpu_usage tinyint(4) unsigned NOT NULL default '0',
+  mem_usage tinyint(4) unsigned NOT NULL default '0',
   idx int(10) unsigned NOT NULL auto_increment,
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
@@ -692,6 +694,7 @@ CREATE TABLE node_status (
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
+
 --
 -- Table structure for table 'node_type_features'
 --
@@ -732,6 +735,16 @@ CREATE TABLE node_types (
   issubnode tinyint(4) NOT NULL default '0',
   isplabdslice tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'node_types_auxtypes'
+--
+
+CREATE TABLE node_types_auxtypes (
+  auxtype varchar(30) NOT NULL default '',
+  type varchar(30) NOT NULL default '',
+  PRIMARY KEY  (auxtype)
 ) TYPE=MyISAM;
 
 --

@@ -924,3 +924,19 @@ last_net_act,last_cpu_act,last_ext_act);
        create table node_auxtypes (node_id varchar(10) not null, type \
        		varchar(30) not null, count int default 1, primary \
 		key(node_id,type));
+
+1.179: Add a table to map auxtypes to node_types table. 
+
+	CREATE TABLE node_types_auxtypes (
+	  auxtype varchar(30) NOT NULL default '',
+	  type varchar(30) NOT NULL default '',
+	  PRIMARY KEY  (auxtype)
+	) TYPE=MyISAM;
+
+       Add cpu_usage and mem_usage to experiments table. Typed as tiny
+       ints, zero means ignore.
+
+       alter table experiments add cpu_usage tinyint(4) unsigned \
+		NOT NULL default '0' after sync_server;
+       alter table experiments add mem_usage tinyint(4) unsigned \
+		NOT NULL default '0' after cpu_usage;
