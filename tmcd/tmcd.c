@@ -2271,18 +2271,6 @@ dostate(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	}
 	newstate = rdata;
 
-	/*
-	 * Update the state in the database
-	 */
-	now = time(NULL);
-	if (mydb_update("update nodes set state='%s', state_timestamp=%i "
-				"where node_id='%s'",
-				newstate,now,nodeid)) {
-		syslog(LOG_ERR, "dostate: %s: DB Error updating state!",
-			nodeid);
-	    return 1;
-	}
-
 #ifdef EVENTSYS
 	/*
 	 * Send the state out via an event
