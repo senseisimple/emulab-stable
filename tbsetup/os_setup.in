@@ -628,6 +628,14 @@ foreach my $node ( @nodelist ) {
     $waitstart{$node} = time;
 }
 
+#
+# List of nodes to inform the user and testbed-ops about in the event
+# of failures.  We coalesce the nodes here so we only sent one message.
+#
+my @informuser = ();
+my @informtbopswarn = ();
+my @informtbopsfatal = ();
+
 TBDebugTimeStamp("Local node waiting started");
 while ( @nodelist ) {
     my $node   = shift(@nodelist);
@@ -672,29 +680,14 @@ while ( @nodelist ) {
 	  "    This has been reported to testbed-ops.\n";
 
     if ($canfail{$node} && !($canceled || $noretry)) {
-	# Send mail to testbed-ops and to the user about it.
-	my ($user) = getpwuid($UID);
-
-	SENDMAIL($user_email_to, "Node $node is down",
-		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
-		 "Your experiment will continue to run since this failure\n".
-		 "is nonfatal, although you might encounter other problems\n".
-		 "if your experiment depends explicitly on this node.\n".
-		 "You should terminate this experiment if it cannot ".
-		 "tolerate this failure.\n\n".
-		 "Testbed Operations has also been notified.\n\n".
-		 "Thanks\n".
-		 "Testbed Operations\n",
-		 0,
-		 "Cc: $TBOPS");
-
+	push(@informuser, $node);
 	print "*** Continuing with experiment setup anyway ...\n";
 	next;
     }
 
     #
     # If the user has picked a standard image and it fails to boot,
-    # something is wrong, so reserve it to hwdwon experiment. If the
+    # something is wrong, so reserve it to hwdown experiment. If the
     # image belongs to the user, then we assume its the image at fault,
     # and allow it to be returned to the pool (caller, tbswap will end
     # doing the nfree on nodes with a DOWN allocstate).
@@ -707,18 +700,54 @@ while ( @nodelist ) {
 			  "'Moved to hwdown by os_setup; ".
 			  "failed to boot image for osid " . $osids{$node} .
 			  " in $pid/$eid'");
+	push(@informtbopsfatal, $node);
+    } else {
+	push(@informtbopswarn, $node);
     }
     TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_DOWN() );
     $nodeAllocStates{$node} = TBDB_ALLOCSTATE_DOWN();
 
-    # Send mail to testbed-ops about it
-    SENDMAIL($TBOPS, "Node $node is down",
-	     "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
-	     "$node has been taken out of the pool until this matter ".
-	     "is resolved.\n");
-
     $failed++;
 }
+
+#
+# Spam time!  Send mail to the user and testbed-ops about failures.
+#
+my $count = scalar(@informuser);
+if ($count > 0) {
+    SENDMAIL($user_email_to, "$count nodes are down",
+	     "Nodes:\n".
+	     "  " . join(" ", @informuser) . "\n".
+	     "in pid/eid $pid/$eid appear to be dead.\n\n".
+	     "Your experiment will continue to run since these failures\n".
+	     "are nonfatal, although you might encounter other problems\n".
+	     "if your experiment depends explicitly on these nodes.\n".
+	     "You should terminate this experiment if it cannot ".
+	     "tolerate these failures.\n\n".
+	     "Testbed Operations has also been notified.\n\n".
+	     "Thanks\n".
+	     "Testbed Operations\n",
+	     0,
+	     "Cc: $TBOPS");
+}
+$count = scalar(@informtbopsfatal);
+if ($count > 0) {
+    SENDMAIL($TBOPS, "$count nodes are down",
+	     "Nodes:\n".
+	     "  " . join(" ", @informtbopsfatal) . "\n".
+	     "in pid/eid $pid/$eid appear to be dead.\n\n".
+	     "The nodes have been taken out of the pool until this matter ".
+	     "is resolved.\n");
+}
+$count = scalar(@informtbopswarn);
+if ($count > 0) {
+    SENDMAIL($TBOPS, "$count nodes are down",
+	     "Nodes:\n".
+	     "  " . join(" ", @informtbopswarn) . "\n".
+	     "in pid/eid $pid/$eid failed to boot after loading OS.\n\n".
+	     "The nodes have been freed.\n");
+}
+
 TBDebugTimeStamp("Local node waiting finished");
 
 #
