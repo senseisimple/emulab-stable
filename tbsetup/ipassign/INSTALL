@@ -5,5 +5,11 @@ Currently, ipassign is not compiled with the rest of Emulab. Until integration
 happens, run 'compile.sh' in the 'tbsetup/ipassign' directory. The binaries
 will be in 'tbsetup/ipassign/bin'
 
+Note that 'compile.sh' assumes that the directory where the METIS include
+files are kept is '/home/duerig/metis/metis/metis-4.0/Lib/'. also, it is
+assumed that the METIS library files are kept in
+'/home/duerig/metis/metis-4.0/'. If this is not the case, alter the shell
+variables at the top.
 
-
+Until integration, this program should always be run from the 'ipassign'
+directory and should be located (along with routecalc) in 'bin/ipassign'.
