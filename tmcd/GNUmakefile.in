@@ -13,7 +13,7 @@ all:	tmcd tmcc tmcd.restart findif
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 CFLAGS	+= -O -g -DUDP -DTBDBNAME='"$(TBDBNAME)"' -I/usr/local/include \
-	-DFSNODE='"$(FSNODE)"'
+	-DFSNODE='"$(FSNODE)"' -DBOSSNODE='"$(BOSSNODE)"'
 
 tmcd: tmcd.o
 	$(CC) $(CFLAGS) -o tmcd tmcd.o \

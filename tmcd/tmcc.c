@@ -81,17 +81,13 @@ main(int argc, char **argv)
 	}
 #endif
 
-#ifdef	LBS
-	inet_aton(MASTERNODE, &serverip);
-#else
-	he = gethostbyname(MASTERNODE);
+	he = gethostbyname(BOSSNODE);
 	if (he)
 		memcpy((char *)&serverip, he->h_addr, he->h_length);
 	else {
-		fprintf(stderr, "gethostbyname(%s) failed\n", MASTERNODE); 
+		fprintf(stderr, "gethostbyname(%s) failed\n", BOSSNODE); 
 		exit(1);
 	}
-#endif
 
 	while (1) {
 		/* Create socket from which to read. */
@@ -221,17 +217,13 @@ doudp(int argc, char **argv)
 	struct in_addr		serverip;
 	char			buf[MYBUFSIZE], *bp, *response = "";
 
-#ifdef	LBS
-	inet_aton(MASTERNODE, &serverip);
-#else
-	he = gethostbyname(MASTERNODE);
+	he = gethostbyname(BOSSNODE);
 	if (he)
 		memcpy((char *)&serverip, he->h_addr, he->h_length);
 	else {
-		fprintf(stderr, "gethostbyname(%s) failed\n", MASTERNODE); 
+		fprintf(stderr, "gethostbyname(%s) failed\n", BOSSNODE); 
 		exit(1);
 	}
-#endif
 
 	/* Create socket from which to read. */
 	sock = socket(AF_INET, SOCK_DGRAM, 0);
