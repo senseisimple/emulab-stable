@@ -200,7 +200,7 @@ EOT
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
-	system("$TB/sbin/idleswap -i $pid $eid > /dev/null") &&
+	system("$TB/sbin/idleswap -r -i $pid $eid > /dev/null") &&
 	  warn("idlemail: Problem idleswapping $pid/$eid: $!\n");
     }
 
@@ -215,7 +215,7 @@ EOT
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
 	$eid = $r{'eid'};
-	system("$TB/sbin/idleswap -a $pid $eid > /dev/null") &&
+	system("$TB/sbin/idleswap -r -a $pid $eid > /dev/null") &&
 	  warn("idlemail: Problem autoswapping $pid/$eid: $!\n");
     }
 

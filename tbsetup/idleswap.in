@@ -17,7 +17,8 @@ sub usage()
     print STDOUT "Usage: idleswap [-i | -a] <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "ia";
+# Hidden switch: -r = root mode - used by idlemail
+my  $optlist = "iar";
 
 #
 # Configure variables
@@ -52,19 +53,20 @@ if ($EUID != 0) {
 	"    Must be root! Maybe its a development version?\n");
 }
 
-# This script is setuid, so please do not run it as root. Hard to track
-# what has happened.
-if ($UID == 0) {
-    die("*** $0:\n".
-	"    Please do not run this as root! Its already setuid!\n");
-}
-
 # Parse command arguments. Once we return from getopts, all that should
 # left are the required arguments.
 %options = ();
 if (! getopts($optlist, \%options)) { usage(); }
 if (defined($options{"i"})) { $idleswap = 1; }
 if (defined($options{"a"})) { $autoswap = 1; }
+if (defined($options{"r"})) { $rootokay = 1; }
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0 && (!defined($rootokay) || !$rootokay) ) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
 
 if (@ARGV != 2) {
     usage();
@@ -87,7 +89,7 @@ else {
 }
 
 # Only admins can forcibly swap an idle experiment out.
-if (! TBAdmin($UID)) {
+if (! TBAdmin($UID) && ($UID!=0 || !$rootokay) ) {
     die("*** $0:\n".
 	"    Only testbed administrators can issue a forcible swap!\n");
 }
