@@ -22,18 +22,19 @@ $BASEPATH	  = "";
 #
 function WRITESIDEBARBUTTON($text, $base, $link ) {
     $link = "$base/$link";
-    echo "    <tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
+    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
 }
 
 # same as above with "new" gif next to it.
 function WRITESIDEBARBUTTON_NEW($text, $base, $link ) {
     $link = "$base/$link";
-    echo "    <tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;<img src=\"/new.gif\" /></td></tr>\n";
+    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a>&nbsp;";
+    echo "<img src=\"/new.gif\" /></td></tr>\n";
 }
 
 function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
     $link = "$link";
-    echo "    <tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
+    echo "<tr><td class=\"menuopt\"><a href=\"$link\">$text</a></td></tr>\n";
 }
 
 # same as above, but uses a slightly different style sheet so there
@@ -41,12 +42,12 @@ function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
 # The devil is, indeed, in the details.
 function WRITESIDEBARLASTBUTTON($text, $base, $link) {
     $link = "$base/$link";
-    echo "    <tr><td class=\"menuoptb\"><a href=\"$link\">$text</a></td></tr>\n";
+    echo "<tr><td class=\"menuoptb\"><a href=\"$link\">$text</a></td></tr>\n";
 }
 
 # writes a message to the sidebar, without clickability.
 function WRITESIDEBARNOTICE($text) {
-    echo "    <tr><td class=\"menuopt\"><b>$text</b></td></tr>\n";
+    echo "<tr><td class=\"menuopt\"><b>$text</b></td></tr>\n";
 }
 
 #
@@ -93,14 +94,15 @@ function WRITESIDEBAR() {
     <tr><td class="menuopts"><input name=query />
       <input type=submit style="font-size:10px;" value="Go" /></td></tr>
       <tr><td class="menuoptsb" style="font-size:12px;" >[
-      <a href="<?php echo "$TBDOCBASE/search.php3"; ?>">Advanced Search</a> ]</td></tr>
+      <a href="<?php echo "$TBDOCBASE/search.php3"; ?>">Advanced 
+      Search</a> ]</td></tr>
     </td></tr>  
   </table>
 </form>
 <br>
 <table class="menu" width=220 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Interaction</b></td></tr>
-<?php
+<?php # BACK TO PHP
 
     if ($login_status & CHECKLOGIN_LOGGEDIN) {
          $freepcs = TBFreePCs();
@@ -216,11 +218,10 @@ function WRITESIDEBAR() {
     }
 
     if ($login_message) {
-?>
-    <tr>
-      <td class="menufooter"><center><b><?php echo "$login_message"; ?></b></center></td>
-    </tr>
-<?php
+      echo "<tr>";
+      echo "<td class=\"menufooter\"><center><b>";
+      echo "$login_message</b></center></td>";
+      echo "</tr>";
     }
 
     #
@@ -231,43 +232,20 @@ function WRITESIDEBAR() {
     # cause warnings.
     # 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-
-?>
-    <tr>
-      <td class="menufooter" align=center valign=center> <?php
-echo "                <a href=\"$TBBASE/logout.php3?uid=$login_uid\">
-	           <img alt=\"logoff\" border=0
-                        src=\"$BASEPATH/logoff.gif\"></a>\n"
-?>
-      </td>
-    </tr>
-<?php
-
-#	echo "<tr>
-#               <td align=center height=50 valign=center>
-#                <a href=\"$TBBASE/logout.php3?uid=$login_uid\">
-#	           <img alt=\"logout\" border=0
-#                        src=\"$BASEPATH/logoff.gif\"></a>
-#               </td>
-#              </tr>\n";
+      echo "<tr>";
+      echo "<td class=\"menufooter\" align=center valign=center>";
+      echo "<a href=\"$TBBASE/logout.php3?uid=$login_uid\">";
+      echo "<img alt=\"logoff\" border=0 ";
+      echo "src=\"$BASEPATH/logoff.gif\"></a>\n";
+      echo "</td></tr>\n";
     }
     elseif (!NOLOGINS()) {
-?>
-    <tr>
-      <td class="menufooter" align=center valign=center> <?php
-echo "                <a href=\"$TBBASE/login.php3\">
-	           <img alt=\"logon\" border=0
-                        src=\"$BASEPATH/logon.gif\"></a>\n"
-?>
-      </td>
-    </tr>
-<?php
-
-#	echo "<tr>
-#               <td align=center height=50 valign=center>
-
-#               </td>
-#              </tr>\n";
+      echo "<tr>";
+      echo "<td class=\"menufooter\" align=center valign=center>";
+      echo "<a href=\"$TBBASE/login.php3\">";
+      echo "<img alt=\"logon\" border=0 ";
+      echo "src=\"$BASEPATH/logon.gif\"></a>\n";
+      echo "</td></tr>\n";
     }
 
 
@@ -285,6 +263,61 @@ echo "                <a href=\"$TBBASE/login.php3\">
 	WRITESIDEBARNOTICE($message);    
     }
     echo "</table>\n";
+}
+
+#
+# spits out beginning part of page
+#
+function PAGEBEGINNING( $title ) {
+    global $BASEPATH, $TBMAINSITE;
+?>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 
+ "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+  <head>
+    <title><?php echo "emulab.net - $title"; ?></title>
+    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
+    <link REL="stylesheet" HREF="<?php echo "$BASEPATH/common-style.css" ?>" 
+          TYPE="text/css" />
+    <!-- don't import full style sheet into NS47, since it does a bad job
+         of handling it. NS47 doesn't understand '@import'. -->
+    <style type="text/css" media="all">
+    <!-- @import "<?php echo "$BASEPATH/style.css" ?>"; --></style>
+<?php if ($TBMAINSITE) { ?>
+    <meta NAME="keywords" CONTENT="network, emulation, internet, emulator">
+    <meta NAME="ROBOTS" CONTENT="NOARCHIVE">
+<?php } ?>
+  </head>
+  <body bgcolor="#FFFFFF" topmargin=0 leftmargin=0 
+        marginheight=0 marginwidth=0>
+    <table cellpadding="0" cellspacing="0" width="100%">
+      <tr>
+        <td valign="top" class="bannercell" 
+            background="<?php echo "$BASEPATH/headerbgbb.jpg" ?>"
+            bgcolor=#3D627F ><img width=369 height=100 
+            src="<?php echo "$BASEPATH/overlay.gif" ?>" 
+            alt="emulab - the utah network testbed" /></td>
+      </tr>
+    </table><table cellpadding="8" cellspacing="0" height="100%">
+      <tr height=100%>
+        <td valign="top" class="leftcell" bgcolor=#ccddee>
+<!-- sidebar begins -->
+<?php
+}
+
+#
+# finishes sidebar td
+#
+function FINISHSIDEBAR()
+{
+?>
+<!-- sidebar ends -->
+        </td>
+        <td valign="top" width=* class="rightcell">
+          <table class="content" width=100% cellpadding="0" cellspacing="0">
+            <tr>
+              <td class="contentheader"><h2 class="nomargin">
+<?php
 }
 
 #
@@ -347,39 +380,11 @@ function PAGEHEADER($title) {
     else {
 	header("Expires: " . gmdate("D, d M Y H:i:s", time() + 300) . " GMT"); 
     }
-?><!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 
- "http://www.w3.org/TR/html4/loose.dtd">
-<html>
-  <head>
-    <title><?php echo "emulab.net - $title"; ?></title>
-    <!-- dumbed-down style sheet for any browser that groks (eg NS47). -->
-    <link REL="stylesheet" HREF="<?php echo "$BASEPATH/common-style.css" ?>" TYPE="text/css" />
-    <!-- don't import full style sheet into NS47, since it does a bad job
-         of handling it. NS47 doesn't understand '@import'. -->
-    <style type="text/css" media="all"><!-- @import "<?php echo "$BASEPATH/style.css" ?>"; --></style>
-<?php if ($TBMAINSITE) { ?>
-    <meta NAME="keywords" CONTENT="network, emulation, internet, emulator">
-    <meta NAME="ROBOTS" CONTENT="NOARCHIVE">
-<?php } ?>
-  </head>
-  <body bgcolor="#FFFFFF" topmargin=0 leftmargin=0 marginheight=0 marginwidth=0>
-    <table cellpadding="0" cellspacing="0" width="100%">
-      <tr>
-        <td valign="top" class="bannercell" background="<?php echo "$BASEPATH/headerbgbb.jpg" ?>"
-            bgcolor=#3D627F ><img width=369 height=100 src="<?php echo "$BASEPATH/overlay.gif" ?>" 
-            alt="emulab - the utah network testbed" /></td>
-      </tr>
-    </table><table cellpadding="8" cellspacing="0" height="100%">
-      <tr height=100%>
-        <td valign="top" class="leftcell" bgcolor=#ccddee>
-<!-- sidebar begins -->
-<?php WRITESIDEBAR(); ?>
-<!-- sidebar ends -->
-        </td>
-        <td valign="top" width=* class="rightcell">
-          <table class="content" width=100% cellpadding="0" cellspacing="0">
-            <tr>
-              <td class="contentheader"><h2 class="nomargin"><?php
+
+    PAGEBEGINNING( $title );
+    WRITESIDEBAR();
+    FINISHSIDEBAR();
+
     if ($login_uid && ISADMININSTRATOR()) {
 	if (ISADMIN($login_uid)) {
 	    echo "<a href=adminmode.php3?target_uid=$login_uid&adminoff=1>
@@ -392,28 +397,17 @@ function PAGEHEADER($title) {
                           border=0 alt='Admin Off'></a>\n";
 	}
     }
-    echo "$title";
-?></h2></td>
-            </tr>
-            <tr>
-              <td class="contentbody" width=*>
-<!-- begin content -->
-<?php
+    echo "$title</h2></td></tr>\n";
+    echo "<tr><td class=\"contentbody\" width=*>";
+    echo "<!-- begin content -->\n";
 }
 
 #
 # ENDPAGE(): This terminates the table started above.
 # 
 function ENDPAGE() {
-
-?>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-<?php
+  echo "</td></tr></table>";
+  echo "</td></tr></table>";
 }
 
 #
@@ -425,14 +419,6 @@ function PAGEFOOTER() {
 
 #    echo "<!-- Force full window! -->
 #	  <base target=_top>
-#          <center>[<a href=\"$TBDOCBASE\">$THISHOMEBASE Home</a>]</center>
-#          <center>
-#           [<a href=\"http://www.cs.utah.edu/flux/\">Flux Research Group</a>]
-#           [<a href=\"http://www.cs.utah.edu/\">School of Computing</a>]
-#           [<a href=\"http://www.utah.edu/\">University of Utah</a>]
-#          </center>
-
-# echo      "</td></tr><tr><td class=\"contentbody\">"; # new row.
 
 ?>
 <!-- end content -->
@@ -444,8 +430,9 @@ function PAGEFOOTER() {
                   <font size=-2>
                     &copy; 2000-2002 
                     <a href="http://www.utah.edu/">University of Utah</a>
-                    and the <a href="http://www.cs.utah.edu/flux/">Flux Group</a>.
-                    <a href="<?php echo "$TBDOCBASE"; ?>/docwrapper.php3?docname=copyright.html">
+                    and the 
+                    <a href="http://www.cs.utah.edu/flux/">Flux Group</a>.
+<a href="<?php echo "$TBDOCBASE"; ?>/docwrapper.php3?docname=copyright.html">
                     All rights reserved.</a>
                   </font>
                   <br />
@@ -456,15 +443,6 @@ function PAGEFOOTER() {
                 </p>
                 <!-- end copyright -->
 <?php
-
-#echo      "<p align=right>
-#            <font size=-1>
-#              &copy; 2000-2002 
-#              <a href=\"http://www.utah.edu/\">University of Utah</a>
-#              and the <a href=\"http://www.cs.utah.edu/flux/\">Flux Group</a>.
-#                <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
-#                  All rights reserved.</a>
-#           </font><br />\n";
 
     ENDPAGE();
 
@@ -480,11 +458,7 @@ function PAGEFOOTER() {
 	          </a>\n";
 	}
     }
-
-?>
-  </body>
-</html>
-<?php
+    echo "</body></html>\n";
 }
 
 function PAGEERROR($msg) {
@@ -510,11 +484,6 @@ function WRITESUBMENUBUTTON($text, $link) {
             <td valign=center align=left nowrap>
                 <b>
          	 <a class=sidebarbutton href='$link'>$text</a>\n";
-    #
-    # XXX these blanks look bad in lynx, but add required
-    #     spacing between menu and body
-    #
-#    echo "       &nbsp;&nbsp;\n";
 
     echo "      </b>
             </td>
@@ -526,7 +495,8 @@ function WRITESUBMENUBUTTON($text, $link) {
 #
 function SUBPAGESTART() {
     echo "<!-- begin subpage -->";
-    echo "<table class=\"stealth\" cellspacing=0 cellpadding=0 width='85%' border=0>\n
+    echo "<table class=\"stealth\" cellspacing=0 cellpadding=0 width='85%' 
+          border=0>\n
             <tr>\n
               <td class=\"stealth\"valign=top>\n";
 }
