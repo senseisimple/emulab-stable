@@ -18,8 +18,8 @@ all: $(PROGS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-OBJS		= emcd.o
-CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include 
+OBJS		= emcd.o robot_list.o
+CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
 CFLAGS	       += -I${SRCDIR}/../mtp -I${SRCDIR}/../../event/lib
 CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 CFLAGS	       += `elvin-config --cflags vin4c`
@@ -30,8 +30,8 @@ LIBS     += `elvin-config --libs vin4c`
 
 test_emcd.sh: emcd
 
-emcd: emcd.o robot_list.o ../mtp/libmtp.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ emcd.o robot_list.o $(LIBS)
+emcd: $(OBJS) ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin

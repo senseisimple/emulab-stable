@@ -12,7 +12,7 @@ SUBDIR		= robots/mtp
 include $(OBJDIR)/Makeconf
 
 MTPLIBS = libmtp.a
-MTPPROGS = mtp_test mtp_send mtp_recv
+MTPPROGS = mtp_test mtp_send mtp_recv mtp_dump
 
 TESTS = mtp_test
 
@@ -31,6 +31,7 @@ mtp.o:		mtp.h
 mtp_test.o:	mtp.h
 mtp_send.o:	mtp.h
 mtp_recv.o:	mtp.h
+mtp_dump.o:	mtp.h
 
 mtp_test: mtp_test.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_test.o -L. -lmtp
@@ -41,10 +42,14 @@ mtp_send: mtp_send.o $(MTPLIBS)
 mtp_recv: mtp_recv.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_recv.o -L. -lmtp
 
+mtp_dump: mtp_dump.o $(MTPLIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_dump.o -L. -lmtp
+
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL_PROGRAM) mtp_send $(INSTALL_DIR)/opsdir/bin/mtp_send
 	$(INSTALL_PROGRAM) mtp_recv $(INSTALL_DIR)/opsdir/bin/mtp_recv
+	$(INSTALL_PROGRAM) mtp_dump $(INSTALL_DIR)/opsdir/bin/mtp_dump
 
 clean:
 	/bin/rm -f *.o *.a $(MTPPROGS)

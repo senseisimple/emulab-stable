@@ -11,7 +11,7 @@ SUBDIR		= robots
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= mtp emc rmcd vmcd
+SUBDIRS	= mtp emc vmcd rmcd
 
 all:	all-subdirs
 check:	check-subdirs

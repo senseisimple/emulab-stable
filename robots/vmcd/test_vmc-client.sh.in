@@ -1,0 +1,63 @@
+#! /bin/sh
+
+## Variables
+
+# The full path of the test case
+test_file=$1
+# The base name of the test case
+test_file_base="test_vmc-client.sh"
+# The current test number for shell based tests.
+test_num=0
+
+SRCDIR=@srcdir@
+PORT=7070
+
+## Helper functions
+
+run_test() {
+    echo "run_test: $*"
+    $* > ${test_file_base}_${test_num}.tmp 2>&1
+}
+
+check_output() {
+    diff -u - ${test_file_base}_${test_num}.tmp
+    if test $? -ne 0; then
+	echo $1
+	exit 1
+    fi
+    test_num=`expr ${test_num} \+ 1`
+}
+
+##
+
+vmc-client -l `pwd`/test_vmc-client.log \
+    -i `pwd`/test_vmc-client.pid \
+    -p ${PORT} \
+    foobar
+
+trap 'kill `cat test_vmc-client.pid`' EXIT
+
+sleep 1
+
+(sleep 1; kill -s USR1 `cat test_vmc-client.pid`) &
+
+run_test ../mtp/mtp_dump localhost ${PORT} 2
+
+check_output "bad update?" <<EOF
+Packet: length 31; version 1; role 2
+ opcode:	update-position
+  id:		-1
+  x:		2.500000
+  y:		5.500000
+  theta:	0.480000
+  status:	-1
+  timestamp:	20
+Packet: length 31; version 1; role 2
+ opcode:	update-position
+  id:		-1
+  x:		4.500000
+  y:		6.500000
+  theta:	0.540000
+  status:	-1
+  timestamp:	20
+EOF

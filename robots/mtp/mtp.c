@@ -106,7 +106,7 @@ int mtp_receive_packet(int fd,struct mtp_packet **packet) {
 }
 
 int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
-  char *buf;
+  char *buf = *buf_ptr;
   int i,j;
   int buf_size;
 
@@ -119,19 +119,24 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   // but we're encoding variable-length arrays and strings in addition
   // to ints and floats -- but we didn't -- so we have to skim through.
 
-
-  if (packet->opcode == MTP_CONTROL_ERROR ||
-      packet->opcode == MTP_CONTROL_NOTIFY ||
-      packet->opcode == MTP_CONTROL_INIT ||
-      packet->opcode == MTP_CONTROL_CLOSE) {
-    struct mtp_control *data = packet->data.control;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
+  if ((buf_size = mtp_calc_size(packet->opcode,
+				(void *)packet->data.control)) == -1) {
+    return MTP_PP_ERROR;
+  }
+  
+  if (buf == NULL) {
     buf = (char *)malloc(sizeof(char)*buf_size);
     *buf_ptr = buf;
     if (buf == NULL) {
       return MTP_PP_ERROR_MALLOC;
     }
+  }
+  
+  if (packet->opcode == MTP_CONTROL_ERROR ||
+      packet->opcode == MTP_CONTROL_NOTIFY ||
+      packet->opcode == MTP_CONTROL_INIT ||
+      packet->opcode == MTP_CONTROL_CLOSE) {
+    struct mtp_control *data = packet->data.control;
 
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -151,13 +156,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_CONFIG_RMC) {
     struct mtp_config_rmc *data = packet->data.config_rmc;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-    
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -183,13 +181,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_CONFIG_VMC) {
     struct mtp_config_rmc *data = packet->data.config_rmc;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -213,13 +204,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_REQUEST_POSITION) {
     struct mtp_request_position *data = packet->data.request_position;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -234,13 +218,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_REQUEST_ID) {
     struct mtp_request_id *data = packet->data.request_id;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -258,13 +235,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_UPDATE_POSITION) {
     struct mtp_update_position *data = packet->data.update_position;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -286,13 +256,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_UPDATE_ID) {
     struct mtp_update_id *data = packet->data.update_id;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -307,13 +270,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_COMMAND_GOTO) {
     struct mtp_command_goto *data = packet->data.command_goto;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -333,13 +289,6 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   }
   else if (packet->opcode == MTP_COMMAND_STOP) {
     struct mtp_command_stop *data = packet->data.command_stop;
-    buf_size = mtp_calc_size(packet->opcode,(void *)data);
-
-    buf = (char *)malloc(sizeof(char)*buf_size);
-    *buf_ptr = buf;
-    if (buf == NULL) {
-      return MTP_PP_ERROR_MALLOC;
-    }
     
     *((int *)buf) = htonl(buf_size);
     buf[MTP_PACKET_HEADER_OFFSET_OPCODE] = (char)(packet->opcode);
@@ -541,7 +490,7 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
 }
 
 int mtp_send_packet(int fd,struct mtp_packet *packet) {
-  char *buf;
+  char *buf = NULL;
   int retval;
 
   if (packet == NULL) {
