@@ -20,6 +20,7 @@ my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
+my $ACCTDIR     = "/var/acct";
 my $HISTORY     = "/root/.history";
 my $MAILDIR     = "/var/mail";
 my $LEASES      = "/var/db/dhclient.leases";
@@ -148,11 +149,17 @@ if (-f $NTPDRIFT) {
 print "Cleaning .pid files ...\n";
 system("rm -rf $RUNDIR/*.pid");
 
+print "Clearing utmp file ...\n";
+system("rm -rf $RUNDIR/utmp");
+
 print "Cleaning out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
 
 print "Removing dhclient leases ...\n";
 system("rm -f $LEASES");
+
+print "Cleaning out old accounting files ...\n";
+system("rm -rf $ACCTDIR/*");
 
 #
 # Urk.  Old copies of passwd files are stored here...
