@@ -88,7 +88,8 @@ elseif (! strcmp($showtype, "active")) {
     $active = 1;
 }
 elseif (! strcmp($showtype, "batch")) {
-    $clause = "e.batchmode=1";
+    $clause = "(e.batchmode=1 and e.batchstate!='" .
+               TBDB_BATCHSTATE_PAUSED . "')";
     $title  = "Batch";
 }
 elseif ((!strcmp($showtype, "idle")) && $isadmin ) {
