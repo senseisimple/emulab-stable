@@ -33,6 +33,7 @@ $| = 1;
 use event;
 use libdb;
 use libtestbed;
+use TimeoutQueue;
 use Getopt::Std;
 #use strict;
 use English;
@@ -181,11 +182,12 @@ if (!event_subscribe($handle,\&handleEvent,$tuple)) {
 
 # Read in the pre-existing node states, and timeout and valid transition
 # information from the database
-my %nodes     = readStates();
 my %timeouts  = getTimeouts();
 my %valid     = getValid();
 my %modeTrans = getModeTrans();
 my %triggers  = getTriggers();
+my %nodes     = readStates();
+if ($debug) { qshow(); }
 
 # Gets set if a reload of state from the database should happen.
 my $do_reload = 0;
@@ -207,14 +209,59 @@ $SIG{KILL} = \&cleanup;
 # Track if I handled an event or not
 my $event_count = 0;
 
+# Control how long I block while waiting for events
+my $blockwait=0;
+my $nextdeadline=time();
+my $mailqueue=0;
+
 notify("Stated starting up\n");
 
 sub process_event_queue() {
     $event_count=0;
     my $lastcount=-1;
-    while ($event_count != $lastcount) {
+    my $wait;
+    my $now = time();
+    debug("Polling - mq=$mailqueue bw=$blockwait\n");
+    if ( $mailqueue == 0) {
+	# no messages waiting...
+	if ($blockwait) {
+	    # we can wait a long time - nothing else will happen
+	    # until we get an event, or get woken up by a signal
+	    $wait = 600;
+	} else {
+	    # only wait until the next deadline...
+	    if ($nextdeadline > 0) {
+		$wait = $nextdeadline - $now;
+	    }
+	}
+    } else {
+	# mail is waiting. Only block until it is time to send it.
+	$wait = $lastmail + $mailgap - $now;
+	debug("Now $now, Mailgap $mailgap, lastmail $lastmail ==> wait $wait\n");
+    }
+    if ($wait < 0) { debug("Wait was $wait!\n"); $wait=0; }
+    my $finish = $now + $wait;
+    while ($event_count != $lastcount || $wait > 0) {
 	$lastcount = $event_count;
-	event_poll($handle);
+	if ($wait<=0) {
+	    event_poll($handle);
+	} else {
+	    debug("Using blocking event poll - $wait seconds\n");
+	    # timeout param is in milliseconds, so multiply
+	    event_poll_blocking($handle, $wait*1000);
+	    $now = time();
+	    # subtract seconds elapsed from my wait time
+	    $wait = $finish - $now;
+	    debug("Finished blocking event poll - $wait seconds remian\n");
+	    if ($event_count > 0 &&
+		(qsize() > 0 || $mailqueue || $do_reload)) {
+		$blockwait=0;
+		$wait=0;
+		#debug("Cancelling wait - timeouts/msgs waiting, or HUP'd\n");
+		#debug("---End Blocking Wait ---\n");
+	    }
+	}
+	#debug("Wait is $wait\n");
     }
     if ($event_count > 0) {
 	debug("Handled $event_count event(s).\n");
@@ -225,27 +272,35 @@ sub process_event_queue() {
 while (1) {
     process_event_queue;
     my $now = time();
-    #
-    # Look for nodes that have passed their timeout
-    #
-    while (my ($node, $value) = each %nodes) {
-	my $state    = $value->{state};
-	my $mode     = $value->{mode};
-	my $time     = $value->{timestamp};
-	my $notified = $value->{notified};
-	my ($timeout,$action);
-	if ($mode && $state && $timeouts{$mode} &&
-	    $timeouts{$mode}{$state}) {
-	    ($timeout, $action) = @{$timeouts{$mode}{$state}};
-	}
-	if ((!$notified) && $time && $timeout && 
-	    $timeout!= $TBNOTIMEOUT && (($time + $timeout) < $now)) {
-	    handleCtrlEvent($node,$TBTIMEOUT);
-	    $value->{notified} = 1;
-		
-	}
-    }
+    my ($deadline,$node);
 
+    # Check for nodes that have passed their timeout
+    if (!qhead($deadline,$node)) {
+	#if (($now % 10) == 0) {
+	#    print "Time is $now, deadline is $deadline for $node\n";
+	#}
+	while ($now >= $deadline && $node ne "") {
+	    qpop($deadline,$node);
+	    $notified = $nodes{$node}{notified};
+	    if (!$notified) {
+		handleCtrlEvent($node,$TBTIMEOUT);
+		$nodes{$node}{notified} = 1;
+	    } else {
+		notify("$node: Timed out at $now (d=$deadline), ".
+		       "but notified already!\n");
+	    }
+	    if (0) { qshow(); }
+	    if (qhead($deadline,$node)) {
+		$deadline=0; $node="";
+	    }
+	}
+	$nextdeadline = $deadline;
+    }
+    if (qsize()==0) {
+	$blockwait=1;
+	debug("---Blocking wait okay---\n");
+    }
+		
     if ($do_reload || ($now - $last_reload > $reload_time)) {
 	reload();
 	$do_reload = 0;
@@ -254,7 +309,7 @@ while (1) {
     # Send any messages in the queue if it is time
     notify("",1);
 
-    sleep(1);
+    #sleep(1);
 }
 
 exit(0);
@@ -263,9 +318,7 @@ exit(0);
 sub readStates(;@) {
     my %oldnodes = @_;
 
-    #
     # Guard against undefined variable warnings
-    #
     if (! defined(%oldnodes)) {
 	%oldnodes = ();
     }
@@ -273,7 +326,8 @@ sub readStates(;@) {
     #debug("readStates called\n");
     my $result = DBQueryFatal("SELECT node_id, eventstate, " .
 			      "state_timestamp, op_mode, " .
-			      "op_mode_timestamp FROM nodes");
+			      "op_mode_timestamp FROM nodes ".
+			      "where node_id not like 'sh%'");
 
     my %nodes;
     while (my ($node_id, $state, $timestamp, $mode, $mode_timestamp)
@@ -289,11 +343,13 @@ sub readStates(;@) {
 	    ($oldnodes{$node_id}{mode} eq $mode) &&
 	    ($oldnodes{$node_id}{timestamp} == $timestamp)) {
 	    $nodes{$node_id} = $oldnodes{$node_id};
-	} else { 
+	} else {
 	    $nodes{$node_id}{state}          = $state;
 	    $nodes{$node_id}{timestamp}      = $timestamp;
 	    $nodes{$node_id}{mode}           = $mode;
 	    $nodes{$node_id}{mode_timestamp} = $mode_timestamp;
+	    # Is there a timeout? If so, set it up!
+	    setTimeout($mode,$state,$node_id,$timestamp);
 	}
     }
     return %nodes;
@@ -458,6 +514,9 @@ sub stateTransition($$) {
     info("$node: $mode/$oldstate => $mode/$newstate\n");
     DBQueryFatal("UPDATE nodes SET eventstate='$newstate', " .
 		 "state_timestamp='$now' WHERE node_id='$node'");
+
+    # Check if this state has a timeout, and if so, put it in the queue
+    setTimeout($mode,$newstate,$node,$now);
 
     # Check if this is TBDB_NODESTATE_BOOTING , which has actions
     if ($newstate eq TBDB_NODESTATE_BOOTING) {
@@ -773,15 +832,34 @@ sub checkDBRedirect($) {
     }
 }
 
+# Check if this state has a timeout, and if so, put it in the queue
+sub setTimeout( $$$$ ) {
+    my ($mode,$state,$node,$now) = @_;
+    if (defined(qfind($node))) { qdelete($node); }
+    if (defined($mode) && defined($state) &&
+	defined($timeouts{$mode}) &&
+	defined($timeouts{$mode}{$state})) {
+	my $deadline = ${$timeouts{$mode}{$state}}[0];
+        if (defined($deadline) &&
+	    $deadline != $TBNOTIMEOUT) {
+	    my $TO = $deadline + $now;
+	    debug("Setting timeout for ($node,$mode,$state) at ".
+		  "$deadline + $now ($TO)\n");
+	    qinsert($TO,$node);
+	    if (0) { qshow(); }
+	}
+    }
+}
+
 # Reload state from the database
 sub reload() {
     debug("Reloading state from database\n");
     $last_reload = time();
-    %nodes     = readStates(%nodes);
     %timeouts  = getTimeouts();
     %valid     = getValid();
     %modeTrans = getModeTrans();
     %triggers  = getTriggers();
+    %nodes     = readStates(%nodes);
 }
 
 #
@@ -883,6 +961,10 @@ sub os_opmode() {
     return "";
 }
 
+#
+# Functions for controlling output/logging, and signal handling
+#
+
 sub debug(@) {
     if ($debug) {
 	print @_;
@@ -916,6 +998,7 @@ sub notify($;$) {
     showqueue();
     if (!$checkonly) {
 	info($message);
+	$mailqueue++;
 	# Queue up the message
 	# (The queue is a hash of lists of timestamps, keyed by message
 	if (defined($msgs{$message})) {
@@ -948,6 +1031,7 @@ sub notify($;$) {
 	    }
 	    # Now reset the mail queue
 	    %msgs = ();
+	    $mailqueue=0;
 	    showqueue();
 	    $lastmail = time;
 	    if (!$debug) {
@@ -1036,6 +1120,7 @@ sub cleanup {
 
 # This gets called if we die of 'natural causes' (exit, die, etc.)
 END {
+    debug("Ending stated...\n");
     my $stat = $?;
     if (defined($lockfile) && $lockfile ne "") {
 	unlink $lockfile;
@@ -1044,13 +1129,17 @@ END {
 	# Must be a child
 	info("Stated child exiting\n");
     }
+    debug("Annouced. Cleaning up...\n");
     # clean up Syslog
     closelog();
     if ($handle) {
+	debug("Unregistering w/event system...\n");
 	if (event_unregister($handle) == 0) {
 	    die "Unable to unregister with event system\n";
 	}
+	debug("Unregistered.\n");
     }
+    debug("Cleaned up. Bye!\n");
     # Restore $? in case one of the things I called changed it
     $? = $stat;
 }
