@@ -85,7 +85,8 @@ if (!($user =~ /^([\w-]+)$/)) {
     die("*** $0:\n".
 	"    No such user $user\n");
 
-if (!($URL =~ /^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar\.gz|\.tgz|\.rpm))$/)) {
+if (!($URL =~
+	/^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar|\.tar\.gz|\.tgz|\.rpm))$/)) {
     die("*** $0:\n".
 	"    Illegal URL given: $URL\n");
 } else {

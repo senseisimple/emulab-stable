@@ -230,7 +230,8 @@ while (my ($URL, $localfile) = each %tofetch) {
 #
 sub verifyURL($) {
     my ($URL) = @_;
-    if ($URL =~ /^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar\.gz|\.tgz|\.rpm))$/) {
+    if ($URL =~
+	    /^((http|ftp):\/\/[\w.\-\/\@:~]+(\.tar|\.tar\.gz|\.tgz|\.rpm))$/) {
 	return $1;
     } else {
 	return undef;
