@@ -319,8 +319,8 @@ def ForkCmd(cmd, args=(), timeout=DEF_TIMEOUT,
             else:
                 break
 
+        signal.alarm(0)
         if gotexc:
-            signal.alarm(0)
             tb = "".join(traceback.format_exception_only(*sys.exc_info()[:2]))
             print "Exception caught while trying to " \
                   "run command %s\n%s" % (cmd.func_name, tb)
@@ -926,6 +926,7 @@ class Plab:
                            " where %s > unix_timestamp(leaseend)",
                            (endtime, ))
         loadedSlices = {}
+        failed = []
         for pid, eid, nodeid in res:
             try:
                 slice = loadedSlices[(pid, eid)]
@@ -934,10 +935,17 @@ class Plab:
                 loadedSlices[(pid, eid)] = slice
             node = slice.loadNode(nodeid)
             if node.renew():
-                print "Failed to renew lease for %s" % nodeid
-                SENDMAIL(TBOPS, "Lease renewal failed: %s" % nodeid,
-                         "Failed to renew lease on %s for %s/%s" %
-                         (nodeid, pid, eid))
+                print "Failed to renew lease for %s %s/%s" % (nodeid,pid,eid)
+                failed.append((nodeid,pid,eid))
+                
+        if failed:
+            failstr = ""
+            for n in failed:
+                failstr += "%s %s/%s\n" % n
+            SENDMAIL(TBOPS, "Lease renewal(s) failed" % nodeid,
+                     "Failed to renew lease on the following nodes:\n%s" %
+                     failstr + "\n\nPlease check the plabrenew log")
+
 
     def _createAgentProxy(self, insecure = False):
         """
