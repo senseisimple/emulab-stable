@@ -270,13 +270,14 @@ foreach my $n (@freed_nodes) {
     if (! ($n =~ /sh\d+/)) {
         # Its not a shark, so clean out all IPs except the control net.
 	DBQueryWarn("update interfaces set IP='',IPaliases=NULL,mask=NULL,".
-		    "       rtabid='0',vnode_id=NULL " .
+		    "       rtabid='0',vnode_id=NULL,current_speed='0' ".
 		    "where node_id='$n' and ".
 		    "  role='" . TBDB_IFACEROLE_EXPERIMENT() . "'")
 	    || $error++;
     } else {
 	# XXX Shark Hack!
-	DBQueryWarn("update interfaces set IPalias='',rtabid='0',vnode_id=NULL ".
+	DBQueryWarn("update interfaces set IPalias='',rtabid='0', ".
+		    "       vnode_id=NULL ".
 		    "where node_id='$n'") || $error++;
     }
 
