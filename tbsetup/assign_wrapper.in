@@ -3423,8 +3423,8 @@ sub CreateTopFile()
     # NB: This must be done last since we create internal nodes above.
     #
     foreach my $node (keys(%fixed_nodes)) {
-	if (!virtnodeusewan($node) &&
-	    (virtnodeisvnode($node) || exists $delaynodes{$node})) {
+	if ((virtnodeisvnode($node) && !virtnodeusewan($node)) ||
+	    exists($delaynodes{$node})) {
 	    my $pnode = $fixed_nodes{$node};
 
 	    print TOPFILE "fix-node $node $pnode\n";
