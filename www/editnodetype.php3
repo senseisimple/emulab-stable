@@ -674,7 +674,7 @@ if ($new_type) {
 	    $vnode_type = "$vnode_type-vm";
 	}
 	DBQueryFatal("insert into node_types_auxtypes set " .
-	    "auxtype='$vnode_type' type='pcvm'");
+	    "auxtype='$vnode_type', type='pcvm'");
     }
 } else {
     DBQueryFatal("update node_types set ".
