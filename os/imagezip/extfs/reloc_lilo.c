@@ -143,21 +143,50 @@ fixup_lilo(int slice, int stype, u_int32_t start, u_int32_t size,
 	poff = FOFFSET(sectobytes(s1-partoff), union idescriptors, idtab);
 	ip = dtab.idtab.images;
 	for (i = 0; i < MAX_IMAGE_DESC; i++) {
+		struct image *a_ip;
+
 		if (*ip->name == '\0')
 			break;
 		if (debug > 1)
 			fprintf(stderr, "  LILO parse: found image %s\n",
 				ip->name);
+		/*
+		 * Check for aliases which produce a map entry pointing
+		 * to the same sectors as the original.  We don't want to
+		 * relocate those sectors multiple times!
+		 */
+		s0 = getsector(&ip->start);
+		for (a_ip = dtab.idtab.images; a_ip < ip; a_ip++) {
+			u_int32_t a_s0;
+
+			a_s0 = getsector(&a_ip->start);
+			if (s0 == a_s0)
+				break;
+		}
+		if (a_ip < ip) {
+			if (debug > 1)
+				fprintf(stderr, "  LILO parse: "
+					"skipping %s (alias for %s)\n",
+					ip->name, a_ip->name);
+			ip++;
+			continue;
+		}
+
+		/*
+		 * Fixup initrd (if present) and map sector(s)
+		 */
 		if (*(u_int32_t *)ip->rdsize != 0) {
-			s0 = getsector(&ip->initrd);
+			u_int32_t rds;
+
+			rds = getsector(&ip->initrd);
 			fixup_sector(FOFFSET(poff, struct idtab,
 					     images[i].initrd), &ip->initrd);
-			fixup_map(infd, s0);
+			fixup_map(infd, rds);
 		}
-		s0 = getsector(&ip->start);
 		fixup_sector(FOFFSET(poff, struct idtab, images[i].start),
 			     &ip->start);
 		fixup_map(infd, s0);
+
 		ip++;
 	}
 
