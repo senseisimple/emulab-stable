@@ -87,14 +87,16 @@ main(int argc, char **argv)
 		close(sock);
 		exit(1);
 	}
+#if 0
 #ifndef linux
 	tv.tv_sec  = 30;
 	tv.tv_usec = 0;
 	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0) {
-		perror("setsockopt SO_KEEPALIVE");
+		perror("setsockopt SO_RCVTIMEO");
 		close(sock);
 		exit(1);
 	}
+#endif
 #endif
 	if (argc == 2)
 		n = snprintf(buf, sizeof(buf) - 1, "%s", argv[1]);
