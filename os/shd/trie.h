@@ -2,7 +2,7 @@
 #ifndef TRIE_H_TRIE_1
 #define TRIE_H_TRIE_1
 
-#define KERNEL
+/*#define KERNEL */
 
 #ifdef KERNEL
 
@@ -35,9 +35,7 @@
   --------------
   The insertion functions are currently not transactional.*/
 
-/* To change what the TrieKey and TrieValue types are, change the two
-   typedefs and then change the definition of the two functions.
-   TrieKey must not have a sign-extending shift.*/
+/* Do not change the typdefs for TrieKey and TrieValue */
 typedef unsigned int TrieKey;
 TrieKey getDefaultTrieKey(void);
 
@@ -63,6 +61,12 @@ enum
     TOTAL_LEVELS = TOTAL_BITS / BITS_PER_LEVEL
 };
 
+typedef enum OverlapTag
+{
+    FREE_OVERLAP,
+    DEFAULT_OVERLAP
+} OverlapT;
+
 typedef struct TrieNodeTag
 {
     char depth;
@@ -71,6 +75,7 @@ typedef struct TrieNodeTag
     TrieKey key;
     TrieValue value;
     struct TrieNodeTag * next;
+    struct TrieNodeTag * prev;
 /* Don't touch these */
     struct TrieNodeTag * parent;
     struct TrieNodeTag * child[CHILD_COUNT];
@@ -82,9 +87,8 @@ typedef void * ThirdPtrT;
 
 typedef int (*BlockAllocateFunction)(int);
 typedef int (*BlockFreeFunction)(int, int);
-typedef int (*BlockCopyFunction)(FirstPtrT, SecondPtrT, 
-                                 TrieKey source, TrieValue dest, 
-                                 int size, int type);
+typedef int (*BlockCopyFunction)(FirstPtrT, SecondPtrT,
+                                 TrieKey source, TrieValue dest, int size, int direction);
 
 typedef struct
 {
@@ -138,15 +142,17 @@ int TrieInsertWeak(Trie * triePtr, TrieKey key, int size, FirstPtrT first,
 /* Inserts every key in [key, key+size) and overwrites any of these
    keys which are already inserted. This inserts 'value' at key, 'value+1'
    at key+1, etc. up to size. This is transactional. If any of the inserts
-   fail, they all fail.
+   fail, they all fail. overlap determines whether blockFree is called
+   when an insert overlaps an existing block.
    Returns the number of new keys inserted (non-overwrite inserts).
    Returns <0 on failure. */
-int TrieInsertStrong(Trie * triePtr, TrieKey key, int size, TrieValue value);
+int TrieInsertStrong(Trie * triePtr, TrieKey key, int size, TrieValue value,
+                     OverlapT overlap);
 
 /* This is not transactional.
    The return value determines whether it succeeded or not.
    1 for success, 0 for failure. */
-int merge(Trie * dest, Trie * source);
+int merge(Trie * dest, Trie * source, OverlapT overlap);
 
 /* This is not transactional. */
 void freeAllBlocks(Trie * trie);

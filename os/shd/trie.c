@@ -20,18 +20,20 @@ static int getBlockSize(TrieKey key, int size);
 static int insertWeak(Trie * triePtr, TrieNode * node, TrieKey key,
                       int maxDepth);
 static int insertStrong(Trie * triePtr, TrieNode * node, TrieKey key,
-                        int maxDepth, TrieValue value);
+                        int maxDepth, TrieValue value, OverlapT overlap);
 static int addChild(Trie * triePtr, TrieNode * parent, TrieKey key,
                     int maxDepth, TrieValue value);
-static int replace(TrieNode * node, TrieKey key, int maxDepth,
-                   TrieValue value);
+static int replace(Trie * triePtr, TrieNode * node, TrieKey key,
+                   int maxDepth, TrieValue value, OverlapT overlap);
+static void freeChildren(Trie * triePtr, TrieNode * node, OverlapT overlap);
 static int strongOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
-                         int maxDepth, TrieValue value);
+                         int maxDepth, TrieValue value, OverlapT overlap);
 static int weakOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
                        int maxDepth);
 static TrieNode * search(TrieNode * node, TrieKey key, int maxDepth);
 static TrieNode * pushDown(Trie * triePtr, TrieNode * node);
 static void addToList(Trie * triePtr, TrieNode * node);
+static void removeFromList(Trie * triePtr, TrieNode * node);
 
 TrieKey getDefaultTrieKey(void)
 {
@@ -135,6 +137,7 @@ static void TrieNodeInit(TrieNode * node)
         node->value = getDefaultTrieValue();
         node->parent = 0;
         node->next = 0;
+        node->prev = 0;
         for (i = 0; i < CHILD_COUNT; i++)
         {
             node->child[i] = 0;
@@ -157,19 +160,14 @@ void TrieCleanup(Trie * triePtr)
 
 static void TrieNodeCleanup(TrieNode * node)
 {
-    int i = 0;
-    /*assert(node != 0); */
-    for (i = 0; i < CHILD_COUNT; i++)
+    if (node->next != 0)
     {
-        if (node->child[i] != 0)
-        {
-            TrieNodeCleanup(node->child[i]);
-            free(node->child[i]
+        TrieNodeCleanup(node->next);
+        free(node->next
 #ifdef KERNEL
 , M_DEVBUF
 #endif
-);
-        }
+            );
     }
 }
 
@@ -281,7 +279,8 @@ int TrieInsertWeak(Trie * triePtr, TrieKey key, int size, FirstPtrT first,
     return copyCount;
 }
 
-int TrieInsertStrong(Trie * triePtr, TrieKey key, int size, TrieValue value)
+int TrieInsertStrong(Trie * triePtr, TrieKey key, int size, TrieValue value,
+                     OverlapT overlap)
 {
     int insertCount = -1;
     if (triePtr != 0 && size > 0)
@@ -294,7 +293,8 @@ int TrieInsertStrong(Trie * triePtr, TrieKey key, int size, TrieValue value)
         {
             blockSize = getBlockSize(key, size);
             insertCount += insertStrong(triePtr, &(triePtr->root), key,
-                                        sizeToDepth(blockSize), value);
+                                        sizeToDepth(blockSize), value,
+                                        overlap);
             key += blockSize;
             size -= blockSize;
             value += blockSize;
@@ -357,7 +357,7 @@ static int insertWeak(Trie * triePtr, TrieNode * node, TrieKey key,
 }
 
 static int insertStrong(Trie * triePtr, TrieNode * node, TrieKey key,
-                        int maxDepth, TrieValue value)
+                        int maxDepth, TrieValue value, OverlapT overlap)
 {
     int total = 0;
     int done = 0;
@@ -379,7 +379,7 @@ static int insertStrong(Trie * triePtr, TrieNode * node, TrieKey key,
             /* We don't want to go below this level.
                We are strong, just replace whatever is here because
                it must be a subset of this level. */
-            total = replace(node, key, maxDepth, value);
+            total = replace(triePtr, node, key, maxDepth, value, overlap);
             done = 1;
         }
         else if (node->depth == node->maxDepth)
@@ -387,7 +387,8 @@ static int insertStrong(Trie * triePtr, TrieNode * node, TrieKey key,
             /* If the target node is already at its lowest level
                We need to over-ride just our portion and divide the rest up to
                be inserted seperately */
-            total = strongOverlap(triePtr, node, key, maxDepth, value);
+            total = strongOverlap(triePtr, node, key, maxDepth, value,
+                                  overlap);
             done = 1;
         }
         else
@@ -428,23 +429,57 @@ static int addChild(Trie * triePtr, TrieNode * parent, TrieKey key,
     return result;
 }
 
-static int replace(TrieNode * node, TrieKey key, int maxDepth, TrieValue value)
+static int replace(Trie * triePtr, TrieNode * node, TrieKey key,
+                   int maxDepth, TrieValue value, OverlapT overlap)
 {
-    int depth = node->depth;
-    TrieNode * parent = node->parent;
-    TrieNodeCleanup(node);
-    TrieNodeInit(node);
-    node->depth = depth;
+    if (isLeaf(node))
+    {
+        if (overlap == FREE_OVERLAP)
+        {
+            (triePtr->blockFree)(node->value, depthToSize(node->maxDepth));
+        }
+    }
+    else
+    {
+        freeChildren(triePtr, node, overlap);
+    }
+
+    /* depth is already set correctly */
     node->maxDepth = maxDepth;
     setLeaf(node);
     node->key = key;
     node->value = value;
-    node->parent = parent;
+    /* parent is already set correctly */
+    /* next is already set correctly */
+    /* prev is already set correctly */
     return depthToSize(maxDepth);
 }
 
+static void freeChildren(Trie * triePtr, TrieNode * node, OverlapT overlap)
+{
+    int i = 0;
+    for ( ; i < CHILD_COUNT; i++)
+    {
+        if (node->child[i] != 0)
+        {
+            freeChildren(triePtr, node->child[i], overlap);
+            removeFromList(triePtr, node->child[i]);
+            if (isLeaf(node->child[i]) && overlap == FREE_OVERLAP)
+            {
+                (triePtr->blockFree)(node->child[i]->value,
+                                     depthToSize(node->child[i]->maxDepth));
+            }
+            free(node->child[i]
+#ifdef KERNEL
+, M_DEVBUF
+#endif
+            );
+        }
+    }
+}
+
 static int strongOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
-                         int maxDepth, TrieValue value)
+                         int maxDepth, TrieValue value, OverlapT overlap)
 {
     /* the old key range starts before the new one and ends after it. */
     TrieKey oldKey = node->key;
@@ -454,12 +489,18 @@ static int strongOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
     TrieKey limit = key;
     TrieValue currentValue = oldValue;
 
+    if (overlap == FREE_OVERLAP)
+    {
+        (triePtr->blockFree)(oldValue, depthToSize(oldMaxDepth));
+    }
+
     node->key = key;
     node->maxDepth = maxDepth;
     node->value = value;
     for ( ; i < limit; ++i, ++currentValue)
     {
-        insertStrong(triePtr, &(triePtr->root), i, TOTAL_LEVELS, currentValue);
+        insertStrong(triePtr, &(triePtr->root), i, TOTAL_LEVELS,
+                     currentValue, overlap);
     }
 
     i = node->key + depthToSize(node->maxDepth);
@@ -467,7 +508,8 @@ static int strongOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
     currentValue += depthToSize(node->maxDepth);
     for ( ; i < limit; ++i, ++currentValue)
     {
-        insertStrong(triePtr, &(triePtr->root), i, TOTAL_LEVELS, currentValue);
+        insertStrong(triePtr, &(triePtr->root), i, TOTAL_LEVELS,
+                     currentValue, overlap);
     }
     return depthToSize(maxDepth);
 }
@@ -653,11 +695,32 @@ int TrieIteratorIsValid(TrieIterator iterator)
 static void addToList(Trie * triePtr, TrieNode * node)
 {
     node->next = 0;
+    node->prev = triePtr->tail;
     triePtr->tail->next = node;
     triePtr->tail = node;
 }
 
-int merge(Trie * dest, Trie * source)
+static void removeFromList(Trie * triePtr, TrieNode * node)
+{
+    if (node->prev != 0)
+    {
+        node->prev->next = node->next;
+    }
+
+    if (node->next != 0)
+    {
+        node->next->prev = node->prev;
+    }
+    else
+    {
+        triePtr->tail = node->prev;
+    }
+
+    node->next = 0;
+    node->prev = 0;
+}
+
+int merge(Trie * dest, Trie * source, OverlapT overlap)
 {
     if (dest != 0 && source != 0)
     {
@@ -668,7 +731,7 @@ int merge(Trie * dest, Trie * source)
             for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
             {
                 TrieInsertStrong(dest, pos->key, depthToSize(pos->maxDepth),
-                                 pos->value);
+                                 pos->value, overlap);
             }
             TrieIteratorCleanup(&pos);
         }
