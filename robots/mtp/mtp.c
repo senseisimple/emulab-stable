@@ -1,47 +1,71 @@
-#include "mtp.h"
+
+#include "config.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 #include <unistd.h>
 #include <netinet/in.h>
 
+#include "mtp.h"
+
+static int readall(int fd,char *buffer,unsigned int len)
+{
+  int rc, off = 0, retval;
+
+  assert(fd >= 0);
+  assert(buffer != NULL);
+
+  while ((rc = read(fd,&buffer[off],len - off)) > 0) {
+    off += rc;
+  }
+
+  if (rc < 0) {
+    retval = rc;
+  }
+  else {
+    retval = off;
+  }
+  
+  return retval;
+}
 
 int mtp_receive_packet(int fd,struct mtp_packet **packet) {
   unsigned int length;
-  char clength[4];
+  uint32_t clength;
   char *buf = NULL;
-  int i;
   int retval;
 
   if (packet == NULL) {
     return MTP_PP_ERROR_ARGS;
   }
 
-  retval = read(fd,(void*)(&clength),4);
+  retval = readall(fd,&clength,4);
 
   if (retval == -1) {
     return MTP_PP_ERROR_READ;
   }
   else {
+    int remaining_length;
+    
     /* length is currently in bytes 0,1,2,and 3, in network byte order */
-    length = ntohl((uint32_t)(clength));
+    length = ntohl(clength);
 
     if (length > MTP_PACKET_MAXLEN) {
       return MTP_PP_ERROR_LENGTH;
     }
 
     /* read the rest of the packet into buf */
-    int remaining_length = length - 4;
+    remaining_length = length - 4;
     buf = (char*)malloc(sizeof(char)*(length+1));
     if (buf == NULL) {
       return MTP_PP_ERROR_MALLOC;
     }
 
     // copy the header bytes to the new buf
-    for (i = 0; i < 4; ++i) {
-      buf[i] = clength[i];
-    }
+    memcpy(buf,&clength,4);
     
-    retval = read(fd,(void*)(buf+sizeof(char)*MTP_PACKET_HEADER_LEN),remaining_length);
+    retval = readall(fd,(void*)&buf[MTP_PACKET_HEADER_OFFSET_OPCODE],remaining_length);
     if (retval == -1) {
       free(buf);
       return MTP_PP_ERROR_READ;
@@ -56,10 +80,10 @@ int mtp_receive_packet(int fd,struct mtp_packet **packet) {
 
 int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
   char *buf;
-  int i,j,k;
+  int i,j;
   int buf_size;
 
-  if (packet == NULL || buf == NULL) {
+  if (packet == NULL || buf_ptr == NULL) {
     return MTP_PP_ERROR_ARGS;
   }
 
@@ -94,13 +118,9 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
     // write code field
     *((int *)(buf+i)) = htonl(data->code);
     i += 4;
-    // write msg field, and null-term it
-    for (j = 0; j < strlen(data->msg); ++j) {
-      buf[i] = data->msg[j];
-      ++i;
-    }
-    buf[i] = '\0';
-
+    // write msg field
+    strcpy(&buf[i],data->msg);
+    i += strlen(&buf[i]) + 1;
   }
   else if (packet->opcode == MTP_CONFIG_RMC) {
     struct mtp_config_rmc *data = packet->data.config_rmc;
@@ -127,13 +147,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
       *((int *)(buf+i)) = htonl(data->robots[j].id);
       i += 4;
       // write the hostname field
-      int len = strlen(data->robots[j].hostname);
-      for (k = 0; k < len; ++k) {
-	buf[i] = data->robots[j].hostname[k];
-	++i;
-      }
-      buf[i] = '\0';
-      ++i;
+      strcpy(&buf[i],data->robots[j].hostname);
+      i += strlen(&buf[i]) + 1;
     }
     // now write the global_bound data
     *((int *)(buf+i)) = htonl(data->box.horizontal);
@@ -166,13 +181,8 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
       *((int *)(buf+i)) = htonl(data->robots[j].id);
       i += 4;
       // write the hostname field
-      int len = strlen(data->robots[j].hostname);
-      for (k = 0; k < len; ++k) {
-	buf[i] = data->robots[j].hostname[k];
-	++i;
-      }
-      buf[i] = '\0';
-      ++i;
+      strcpy(&buf[i],data->robots[j].hostname);
+      i += strlen(&buf[i]) + 1;
     }
     
   }
@@ -338,7 +348,7 @@ int mtp_encode_packet(char **buf_ptr,struct mtp_packet *packet) {
 
 int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
   struct mtp_packet *packet;
-  int i,j,k;
+  int i,j;
   int len;
   
   if (buf == NULL) {
@@ -392,9 +402,11 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       return MTP_PP_ERROR_MALLOC;
     }
     for (j = 0; j < data->num_robots; ++j) {
+      int len;
+      
       data->robots[j].id = ntohl(*((int *)(buf+i)));
       i += 4;
-      int len = strlen(buf+i) + 1;
+      len = strlen(buf+i) + 1;
       data->robots[j].hostname = (char *)malloc(sizeof(char)*len);
       memcpy(data->robots[j].hostname,buf+i,len);
       i += len;
@@ -419,9 +431,11 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
       return MTP_PP_ERROR_MALLOC;
     }
     for (j = 0; j < data->num_robots; ++j) {
+      int len;
+      
       data->robots[j].id = ntohl(*((int *)(buf+i)));
       i += 4;
-      int len = strlen(buf+i) + 1;
+      len = strlen(buf+i) + 1;
       data->robots[j].hostname = (char *)malloc(sizeof(char)*len);
       memcpy(data->robots[j].hostname,buf+i,len);
       i += len;
@@ -523,20 +537,20 @@ int mtp_decode_packet(char *buf,struct mtp_packet **packet_ptr) {
 }
 
 int mtp_send_packet(int fd,struct mtp_packet *packet) {
-  char **buf;
+  char *buf;
   int retval;
 
   if (packet == NULL) {
     return MTP_PP_ERROR;
   }
 
-  retval = mtp_encode_packet(buf,packet);
+  retval = mtp_encode_packet(&buf,packet);
   if (retval < MTP_PP_SUCCESS) {
     return retval;
   }
 
   // now we can write the buffer out the socket.
-  retval = write(fd,*buf,retval);
+  retval = write(fd,buf,retval);
   if (retval != -1) {
     return MTP_PP_SUCCESS;
   }
@@ -612,7 +626,7 @@ struct mtp_packet *mtp_make_packet( unsigned char opcode,
 
 int mtp_calc_size(int opcode,void *data) {
   int retval = -1;
-  int i,j;
+  int i;
 
   if (data == NULL) {
     return retval;

@@ -1,0 +1,39 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= robots/mtp
+
+include $(OBJDIR)/Makeconf
+
+MTPLIBS = libmtp.a
+MTPPROGS = mtp_test
+
+TESTS = mtp_test
+
+all: $(MTPLIBS) $(MTPPROGS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+OBJS		= mtp.o
+CFLAGS	       += -O -g -Wall -I${OBJDIR} -I/usr/local/include
+
+libmtp.a: $(OBJS)
+	$(AR) crv $@ $<
+	$(RANLIB) $@
+
+mtp.o:		mtp.h
+mtp_test.o:	mtp.h
+
+mtp_test: mtp_test.o $(MTPLIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_test.o -L. -lmtp
+
+install: $(addprefix $(INSTALL_LIBDIR), $(MTPLIBS))
+
+clean:
+	/bin/rm -f *.o *.a $(MTPPROGS)

@@ -11,9 +11,10 @@ SUBDIR		= robots
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= emc rmcd vmcd
+SUBDIRS	= mtp emc rmcd vmcd
 
 all:	all-subdirs
+check:	check-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

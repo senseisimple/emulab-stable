@@ -48,7 +48,7 @@
 #define MTP_ROLE_RMC    1
 #define MTP_ROLE_EMULAB 5
 
-/* These are used in the status fields in MTP_POSITION_UPDATE packets */
+/* These are used in the status fields in MTP_UPDATE_POSITION packets */
 #define MTP_POSITION_STATUS_IDLE     1
 #define MTP_POSITION_STATUS_MOVING   2
 #define MTP_POSITION_STATUS_ERROR    3
@@ -68,6 +68,18 @@
 #define MTP_PACKET_HEADER_OFFSET_VERSION 5
 #define MTP_PACKET_HEADER_OFFSET_ROLE    6
 
+typedef union mtp_payload_t {
+  struct mtp_control *control;
+  struct mtp_config_rmc *config_rmc;
+  struct mtp_config_vmc *config_vmc;
+  struct mtp_request_position *request_position;
+  struct mtp_request_id *request_id;
+  struct mtp_update_position *update_position;
+  struct mtp_update_id *update_id;
+  struct mtp_command_goto *command_goto;
+  struct mtp_command_stop *command_stop;
+} mtp_payload_t;
+
 /* here is the protocol definition in terms of structures */
 typedef struct mtp_packet {
   /* length has no meaning for user applications -- it's just there to better
@@ -78,17 +90,7 @@ typedef struct mtp_packet {
   unsigned char version;
   unsigned char role;
   
-  union {
-    struct mtp_control *control;
-    struct mtp_config_rmc *config_rmc;
-    struct mtp_config_vmc *config_vmc;
-    struct mtp_request_position *request_position;
-    struct mtp_request_id *request_id;
-    struct mtp_update_position *update_position;
-    struct mtp_update_id *update_id;
-    struct mtp_command_goto *command_goto;
-    struct mtp_command_stop *command_stop;
-  } data;
+  mtp_payload_t data;
 
 } mtp_packet_t;
 

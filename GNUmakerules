@@ -68,3 +68,17 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 %: %.in
 	@echo "Regenerating $@"
 	cd $(OBJDIR) && CONFIG_FILES=$(SUBDIR)/$@ ./config.status
+
+ifeq ($(TESTS),)
+.PHONY: check
+else
+check: $(TESTS)
+	@for tst in $<; do \
+		if test `basename $$tst .sh` != `basename $$tst`; then \
+			tst="sh $$tst"; \
+		fi; \
+		if $$tst; then \
+			echo "PASS: $$tst"; \
+		fi \
+	done
+endif
