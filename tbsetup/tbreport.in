@@ -375,8 +375,10 @@ if ($showlinks) {
 	    my ($vname,$port) = split(":", $member);
 	    
 	    printf "%-15s %-15s %-15s %-20s %-9s\n", $vname,
-	           $member, $ipmap{$member}, $macmap{$ipmap{$member}}->{"MAC"},
-	           $v2pmap{$vname}->{PNODE};
+	            $member, $ipmap{$member},
+	            (defined($macmap{$ipmap{$member}}->{"MAC"}) ?
+		     $macmap{$ipmap{$member}}->{"MAC"} : ""),
+		    $v2pmap{$vname}->{PNODE};
 	}
 	print "\n";
     }
