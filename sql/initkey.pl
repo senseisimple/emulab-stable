@@ -6,7 +6,7 @@
 #
 use English;
 
-use lib "/usr/testbed/lib";
+use lib "/usr/testbed/devel/stoller/lib";
 use libdb;
 use libtestbed;
 
@@ -17,12 +17,22 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $query_result =
-    DBQueryFatal("select pid,eid from experiments ".
+    DBQueryFatal("select pid,eid,gid,expt_head_uid from experiments ".
 		 "where eventkey is null");
 
-while (($pid,$eid) = $query_result->fetchrow_array()) {
-    my $secretkey = TBGenSecretKey();
+while (($pid,$eid,$gid,$creator) = $query_result->fetchrow_array()) {
+    my $eventkey = TBGenSecretKey();
 
-    print "update experiments set eventkey='$secretkey' ".
-	"where pid='$pid' and eid='$eid';\n";
+    DBQueryFatal("update experiments set eventkey='$eventkey' ".
+		 "where pid='$pid' and eid='$eid'");
+
+    my $keyfile = TBDB_EVENTKEY($pid, $eid);
+
+    if (!open(KEY, ">$keyfile")) {
+	warn("Could not create $keyfile: $!\n");
+	next;
+    }
+    print KEY $eventkey;
+    close(KEY);
+    system("chown $creator $keyfile");
 }

@@ -1040,7 +1040,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
        To initialize run the initkey.pl script in this directory:
 
-		./initkey.pl | mysql tbdb
+       		sudo ./initkey.pl
 
 1.196: Add new virt_programs table to hold the details of a program
        object.
