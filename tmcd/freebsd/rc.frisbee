@@ -8,6 +8,7 @@
 TMCC=/etc/testbed/tmcc
 DISKDEV=/dev/rad0
 
+$TMCC state RELOADSETUP
 LOADINFO=`$TMCC loadinfo`
 
 # For testing purposes.
@@ -26,12 +27,13 @@ if [ x"$ADDRESS" != x ]; then
 	MCASTADDR="-m $MCAST -p $PORT";
 
 	/bin/echo "Running /etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV ";
+	$TMCC state RELOADING;
 	/etc/testbed/frisbee $SLICE $MCASTADDR $DISKDEV;
 	/bin/echo "Frisbee run finished";
 	/bin/echo "Resizing final disk partition";
 	/etc/testbed/growdisk -vW;
 	/bin/echo "Image load complete, rebooting ...";
-	$TMCC reset;
+	$TMCC state RELOADDONE;
 	/sbin/reboot &
 else
 	echo "Unable to get address for loading image"

@@ -13,7 +13,7 @@ use Getopt::Std;
 # usage: node_control [options] node [node ...]
 #        node_control [options] -e pid,eid
 #
-# XXX def_boot_osid and virt_nodes osname are not handled properly. 
+# XXX virt_nodes osname is not handled properly. 
 #
 sub usage()
 {
@@ -38,18 +38,12 @@ my %controlset =
  #
  #  Symbolic name   =>  Admin, Multi args, nodes DB field, virt_nodes DB field
  #
- default_boot_osid	=> [0, 0, "def_boot_osid",	undef],
- default_boot_path	=> [0, 0, "def_boot_path",	undef],
  default_boot_cmdline	=> [0, 0, "def_boot_cmd_line",  "cmd_line"],
  startup_command	=> [0, 0, "startupcmd",		"startupcmd"],
  tarfiles		=> [0, 1, "tarballs",		"tarfiles"],
  rpms			=> [0, 1, "rpms",		"rpms"],
  deltas			=> [0, 1, "deltas",		"deltas"],
- next_boot_osid		=> [1, 0, "next_boot_osid",	undef],
- next_boot_path		=> [1, 0, "next_boot_path",	undef],
  next_boot_cmdline	=> [1, 0, "next_boot_cmd_line",	undef],
- pxe_boot_path          => [0, 0, "pxe_boot_path",	undef],
- next_pxe_boot_path     => [0, 0, "next_pxe_boot_path",	undef],
  bios_version		=> [1, 0, "bios_version",	undef],
 );
   

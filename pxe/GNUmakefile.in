@@ -8,6 +8,7 @@ SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= pxe
+EVENTSYS        = @EVENTSYS@
 
 include $(OBJDIR)/Makeconf
 
@@ -37,7 +38,14 @@ INCS    = -I/usr/local/include
 
 CFLAGS	+= $(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
 		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"' \
-		-DFALLBACK_HOST='"$(BOSSNODE)"'
+		-DFALLBACK_HOST='"$(BOSSNODE)"' -DBOSSNODE='"$(BOSSNODE)"'
+
+ifeq ($(EVENTSYS),1)
+CFLAGS  += -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib \
+		`elvin-config --cflags vin4c`
+LFLAGS  += $(OBJDIR)/event/lib/libevent.a ${OBJDIR}/lib/libtb/libtb.a \
+		`elvin-config --libs vin4c`
+endif
 
 proxydhcp: proxydhcp.o $(PR_DBOBJ)
 	cc $(CFLAGS) $(DBFLAG) $(INCS) \

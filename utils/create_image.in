@@ -53,9 +53,9 @@ $| = 1;
 $ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $freebsd     = "$BOSSNODE:$TFTPDIR/pxeboot.freebsd";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
+my $osselect    = "$TB/bin/os_select";
 my $device      = "/dev/rad0";
 my $mereuser    = 0;
 my %imageid_row = ();
@@ -88,14 +88,14 @@ if ($node =~ /^([-\w]+)$/) {
     $node = $1;
 }
 else {
-    die("*** Bad data in $node\n");
+    fatal("*** Bad data in $node\n");
 }
 
 if ($imagename =~ /^([-\w\.]+)$/) {
     $imagename = $1;
 }
 else {
-    die("*** Bad data in $imagename.\n");
+    fatal("*** Bad data in $imagename.\n");
 }
     
 if (defined($options{"p"})) {
@@ -105,7 +105,7 @@ if (defined($options{"p"})) {
 	$imagepid = $1;
     }
     else {
-	die("*** Bad data in $imagepid.\n");
+	fatal("*** Bad data in $imagepid.\n");
     }
 }
 
@@ -113,7 +113,7 @@ if (defined($options{"p"})) {
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** You do not exist in the Emulab Database.\n");
+    fatal("*** You do not exist in the Emulab Database.\n");
 }
 
 #
@@ -123,7 +123,7 @@ if ($UID && !TBAdmin($UID)) {
     $mereuser = 1;
 
     if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, $node)) {
-	die("*** You do not have permission to create an image from $node\n");
+	fatal("*** You do not have permission to create an image from $node\n");
     }
 }
 
@@ -133,7 +133,7 @@ if ($UID && !TBAdmin($UID)) {
 my $user_name;
 my $user_email;
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** Cannot determine user name and email address");
+    fatal("*** Cannot determine user name and email address");
 }
 
 #
@@ -144,7 +144,7 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 my $pid;
 my $eid;
 if (! NodeidToExp($node, \$pid, \$eid)) {
-    die("*** Could not map $node to its pid/eid");
+    fatal("*** Could not map $node to its pid/eid");
 }
 
 #
@@ -157,14 +157,14 @@ $db_result =
 		 "pid='$imagepid' and imagename='$imagename'");
     
 if ($db_result->numrows < 1) {
-    die("*** No such image descriptor $imagename in project $imagepid!");
+    fatal("*** No such image descriptor $imagename in project $imagepid!");
 }
 %imageid_row = $db_result->fetchhash();
 $imageid = $imageid_row{'imageid'};
 
 if ($mereuser &&
     ! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_ACCESS)) {
-    die("*** You do not have permission to use imageid $imageid!\n");
+    fatal("*** You do not have permission to use imageid $imageid!\n");
 }
 
 #
@@ -179,16 +179,16 @@ if ($filename =~ /^([-\w\.\/\+]+)$/) {
     $filename = $1;
 }
 else {
-    die("Bad filename: $filename");
+    fatal("Bad filename: $filename");
 }
 
 if (! ($filename =~ /^$PROJROOT\/$pid\/.*/)) {
-    die("File $filename for must reside someplace in $PROJROOT/$pid\n");
+    fatal("File $filename for must reside someplace in $PROJROOT/$pid\n");
 }
 open(FILE, "> $filename") or
-    die("Could not create $filename: $!");
+    fatal("Could not create $filename: $!");
 close(FILE) or
-    die("Could not truncate $filename: $!");
+    fatal("Could not truncate $filename: $!");
 
 #
 # Record when this image was updated, so that we can figure out which
@@ -224,7 +224,7 @@ if (!$debug) {
 	$logname = $1;
     }
     else {
-	die("Bad data in logfile name: $logname");
+	fatal("Bad data in logfile name: $logname");
     }
     if (TBBackGround($logname)) {
 	#
@@ -266,7 +266,10 @@ my $maxloops = ($maxwait / $sleepwait);
 my $tries    = 2;
 
 while ($tries) {
-    if (! DBQueryWarn("update nodes set pxe_boot_path='$freebsd', ".
+    system("$osselect -m PXEFBSD $node") and
+	fatal("*** Failed to change OS on $node!\n");
+
+    if (! DBQueryWarn("update nodes set ".
 		      "startupcmd='$command', startstatus='none' ".
 		      "where node_id='$node'")) {
 	fatal("DB error updating node info for $node");
@@ -353,8 +356,10 @@ exit 0;
 
 sub cleanup ()
 {
-    DBQueryWarn("update nodes set pxe_boot_path='$saved_pxebootpath', ".
-		"startupcmd='$saved_startupcmd' where node_id='$node'");
+    system("$osselect -m $saved_pxebootpath $node") and
+	fatal("*** Failed to reset PXE boot path to $saved_pxebootpath!\n");
+    DBQueryWarn("update nodes set startupcmd='$saved_startupcmd' ".
+		"where node_id='$node'");
 }
 
 sub fatal($)

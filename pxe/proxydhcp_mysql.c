@@ -41,7 +41,7 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 	 char *bootprog, int bootlen)
 {
 	char querybuf[1024];
-	int n, nrows, ncols, part;
+	int n, nrows, ncols;
 	MYSQL db;
 	MYSQL_RES *res;
 	MYSQL_ROW row;
@@ -152,6 +152,96 @@ query_db(struct in_addr ipaddr, struct in_addr *sip,
 }
 #undef PXEBOOT_PATH
 #undef NEXT_PXEBOOT_PATH
+
+int
+ip2nodeid(struct in_addr ipaddr, char *nodeid, int len)
+{
+	char querybuf[1024];
+	int n, nrows, ncols;
+	MYSQL db;
+	MYSQL_RES *res;
+	MYSQL_ROW row;
+	char dbquery[] =
+		"select node_id from interfaces where IP = '%s'";
+
+#define NODE_ID		0
+
+	n = snprintf(querybuf, sizeof querybuf, dbquery, inet_ntoa(ipaddr));
+	if (n > sizeof querybuf) {
+		syslog(LOG_ERR, "query too long for buffer");
+		return 1;
+	}
+	
+	mysql_init(&db);
+	if (mysql_real_connect(&db, 0, 0, 0, dbname, 0, 0, 0) == 0) {
+		syslog(LOG_ERR, "%s: connect failed: %s",
+			dbname, mysql_error(&db));
+		return 1;
+	}
+
+	/* Debug message into log:
+	syslog(LOG_ERR, "USING QUERY: %s", querybuf);
+	*/
+	
+	if (mysql_real_query(&db, querybuf, n) != 0) {
+		syslog(LOG_ERR, "%s: query failed: %s",
+			dbname, mysql_error(&db));
+		mysql_close(&db);
+		return 1;
+	}
+
+	res = mysql_store_result(&db);
+	if (res == 0) {
+		syslog(LOG_ERR, "%s: store_result failed: %s",
+			dbname, mysql_error(&db));
+		mysql_close(&db);
+		return 1;
+
+	}
+	mysql_close(&db);
+
+	nrows = (int)mysql_num_rows(res);
+	switch (nrows) {
+	case 0:
+		syslog(LOG_ERR, "%s: no entry for host %s",
+			dbname, inet_ntoa(ipaddr));
+		mysql_free_result(res);
+		return 1;
+	case 1:
+		break;
+	default:
+		syslog(LOG_ERR, "%s: %d entries for IP %s, using first",
+			dbname, nrows, inet_ntoa(ipaddr));
+		break;
+	}
+
+	ncols = (int)mysql_num_fields(res);
+	switch (ncols) {
+	case 1: /* Should have 1 field */
+		break;
+	default:
+		syslog(LOG_ERR, "%s: %d fields in query for node_id of IP %s!",
+			dbname, ncols, inet_ntoa(ipaddr));
+		mysql_free_result(res);
+		return 1;
+	}
+
+	row = mysql_fetch_row(res);
+
+	if (row[NODE_ID] != 0 && row[NODE_ID][0] != '\0') {
+
+		if (strlen(row[NODE_ID]) >= len)
+			goto bad;
+		strcpy(nodeid, row[NODE_ID]);
+
+		mysql_free_result(res);
+		return 0;
+	}
+ bad:
+	mysql_free_result(res);
+	return 1;
+}
+#undef NODE_ID
 
 int
 close_db(void)

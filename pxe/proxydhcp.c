@@ -26,6 +26,10 @@
 #include <sys/uio.h>
 #include <sys/param.h>
 #endif
+#ifdef EVENTSYS
+/*#include "tbdefs.h" Do we need this?*/
+#include "event.h"
+#endif
 
 #define BOOTPS_PORT 67
 #define BOOTPC_PORT 68
@@ -75,6 +79,17 @@ int	query_db(struct in_addr, struct in_addr *, char *, int);
 int	close_db(void);
 
 int	binlmode = 0;
+
+/*
+ * Event System interface
+ */
+#ifdef EVENTSYS
+int			myevent_send(address_tuple_t address);
+static event_handle_t	event_handle = NULL;
+address_tuple_t         tuple;
+int                     ip2nodeid(struct in_addr, char *, int);
+char                    nodeid[16];
+#endif
 
 /*
  * Fall back to default
@@ -297,6 +312,36 @@ main(int argc, char *argv[])
 			continue;
 		}
 
+#ifdef EVENTSYS
+
+		/*
+		 * By this point, we know it is a DHCP packet that we
+		 * need to respond to, so the node must be booting.
+		 * So we send out a change to state BOOTING.
+		 */
+		/* XXX: Maybe we don't need to alloc a new tuple every time */
+		tuple = address_tuple_alloc();
+		if (tuple != NULL &&
+		    !ip2nodeid(client.sin_addr, nodeid, sizeof(nodeid))) {
+
+		        tuple->host      = BOSSNODE;
+			tuple->objtype   = "TBNODESTATE";
+			tuple->objname   = nodeid;
+			tuple->eventtype = "BOOTING";
+			
+			if (myevent_send(tuple)) {
+			          fprintf(stderr, "Couldn't send state "
+					  "event for %s\n",nodeid);
+			}
+			printf("Successfully sent state event for %s\n",
+			       nodeid);
+			address_tuple_free(tuple);
+		} else {
+		        fprintf(stderr, "Couldn't lookup nodeid for %s\n",
+				inet_ntoa((*((struct in_addr*)data))));
+		}
+#endif /* EVENTSYS */
+		
 		if (query_db(client.sin_addr,
 			     &sip, bootprog, sizeof(bootprog))) {
 #ifdef FALLBACK_HOST
@@ -376,3 +421,62 @@ main(int argc, char *argv[])
 		}
 	}
 }
+
+#ifdef EVENTSYS
+/*
+ * Connect to the event system. It's not an error to call this function if
+ * already connected. Returns 1 on failure, 0 on sucess.
+ */
+int
+event_connect()
+{
+	if (!event_handle) {
+		event_handle = event_register("elvin://" BOSSNODE,0);
+	}
+
+	if (event_handle) {
+		return 0;
+	} else {
+		fprintf(stderr,"event_connect: "
+		      "Unable to register with event system!\n");
+		return 1;
+	}
+}
+
+/*
+ * Send an event to the event system. Automatically connects (registers)
+ * if not already done. Returns 0 on sucess, 1 on failure.
+ */
+int myevent_send(address_tuple_t tuple) {
+	event_notification_t notification;
+
+	if (event_connect()) {
+		return 1;
+	}
+
+	notification = event_notification_alloc(event_handle,tuple);
+	if (notification == NULL) {
+		fprintf(stderr,"myevent_send: Unable to allocate notification!");
+		return 1;
+	}
+
+	if (event_notify(event_handle, notification) == NULL) {
+		event_notification_free(event_handle, notification);
+
+		fprintf(stderr,"myevent_send: Unable to send notification!");
+		/*
+		 * Let's try to disconnect from the event system, so that
+		 * we'll reconnect next time around.
+		 */
+		if (!event_unregister(event_handle)) {
+			fprintf(stderr,"myevent_send: "
+			      "Unable to unregister with event system!");
+		}
+		event_handle = NULL;
+		return 1;
+	} else {
+		event_notification_free(event_handle,notification);
+		return 0;
+	}
+}
+#endif /* EVENTSYS */

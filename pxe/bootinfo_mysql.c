@@ -25,6 +25,14 @@ open_bootinfo_db(void)
 	return 0;
 }
 
+/*
+  WARNING!!!
+  
+  DO NOT change this function without making corresponding changes to
+  the perl version of this code in db/libdb.pm . They MUST ALWAYS
+  return exactly the same result given the same inputs.
+*/
+
 int
 query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 {

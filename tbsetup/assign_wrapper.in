@@ -1154,8 +1154,8 @@ foreach $pair (@nodepairs) {
 	    die("*** $0:\n".
 		"    Invalid OS $osname in project $pid!\n");
 	}
-	DBQueryFatal("UPDATE nodes set def_boot_osid=\"$osid\"," .
-		       " def_boot_cmd_line='$cmdline'," .
+	system("os_select $osid $pnode");
+	DBQueryFatal("UPDATE nodes set def_boot_cmd_line='$cmdline'," .
 		       " startstatus='none'," .
 		       " bootstatus='unknown'," .
 		       " ready=0," .
@@ -1168,9 +1168,8 @@ foreach $pair (@nodepairs) {
 		       " where node_id='$pnode'");
     } elsif (! defined($lannodes{$p2vmap{$pnode}})) {
 	# Delay node
-	DBQueryFatal("UPDATE nodes set def_boot_osid=\"" .
-		       $delayosids{$type} . "\"," .
-		       " startstatus=\"none\"," .
+	system("os_select ". $delayosids{$type} ." $pnode");
+	DBQueryFatal("UPDATE nodes set startstatus=\"none\"," .
 		       " bootstatus=\"unknown\"," .
 		       " ready=0" .
 		       " where node_id=\"$pnode\"");

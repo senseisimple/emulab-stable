@@ -1,0 +1,236 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# os_select sets the os that should boot next on a node, and sets
+# next_op_mode accordingly. 
+
+sub usage() {
+    print <<"EOF";
+Usage: os_select [-h] [-d] [-v] [-1] [-p | -m] <osid> <node> [<node> ...]
+ -h    Display this help message
+ -d    Debug mode
+ -v    Verbose mode
+ -p    Path mode: osid is really a path to a kernel
+ -1    Set up one-time boot to OS instead of changing default OS
+ -m    MFS mode: osid={"PXEFBSD","PXEFRISBEE","PXEBOOT","host:/tftpboot/file"}
+ osid  OS identifier for the selected OS (see web interface for listing)
+ node  Node identifiers (ie pcXX)
+EOF
+    exit(-1);
+}
+
+use Getopt::Std;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+# Configure variables
+my $TB          = "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+
+# Testbed Support libraries
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use English;
+
+# Constants
+my %osidmap = # Map some magic OSIDs to op_modes
+    ( (TB_OSID_MBKERNEL) => "MINIMAL");
+
+# Global vars
+my $d=0; # debug/verbose
+my $oneshot=0; # is this a one-shot OS boot?
+my $pathmode=0; # is osid really a path instead of an osid?
+my $mfs=0; # is this for a pxe_boot_path change?
+
+# Find default pxe boot path
+my $cmd = "select path from os_info where osid='".TB_OSID_PXEBOOT."'";
+my $q = DBQueryFatal($cmd);
+my @r = $q->fetchrow_array();
+my $pxebootpath = $r[0];
+
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+my  $optlist = "hdvp1m";
+%options = ();
+if (! getopts($optlist, \%options)) { usage(); }
+if (defined($options{"h"})) { usage(); }
+if (defined($options{"d"})) { $d++; }
+if (defined($options{"v"})) { $d++; }
+if (defined($options{"p"})) { $pathmode=1; }
+if (defined($options{"1"})) { $oneshot=1; }
+if (defined($options{"m"})) { $mfs=1; }
+print "DEBUG LEVEL $d\n" if $d;
+
+print "ARGV= ".join(" ",@ARGV)."\n" if $d>1;
+if (@ARGV < 2) { warn("An osid and a node list are required.\n"); usage(); }
+
+my $osid = shift;
+my @nodes = @ARGV;
+
+# Untaint args.
+if ($osid =~ /^([-\@\w\/]+)$/) { $osid = $1; }
+elsif (!$mfs) { die("Bad data in osid: '$osid'\n"); }
+
+if ($mfs) {
+    if ($osid =~ /^[-0-9a-z\.]+:\/tftpboot\/[-0-9a-z\.]+$/) {
+	print "MFS osid '$osid' is a PXE path\n" if $d>1;
+	$pxebootpath=$osid;
+	my $cmd = "select osid from os_info where path='$osid';";
+	my $q = DBQueryFatal($cmd);
+	if ($q->numrows() > 0) {
+	    my @r = $q->fetchrow_array();
+	    $osid=$r[0];
+	} else { $pathmode=1; }
+    } else {
+	my $cmd = "select path from os_info where osid='$osid';";
+	my $q = DBQueryFatal($cmd);
+	if ($q->numrows() < 1) {
+	    die("Invalid osid '$osid' is non-existent.\n");
+	}
+	my @r = $q->fetchrow_array();
+	my $path=$r[0];
+	if (defined($path) && $path ne "") {
+	    $pxebootpath=$path;
+	} else {
+	    die("Invalid osid for use with -m: '$osid'\n");
+	}
+    }
+}
+
+my @temp;
+foreach $n (@nodes) {
+    if ($n =~ /^([\w]+)$/) { push(@temp,$1); }
+    else { warn("Ignoring bad data in node_id: '$n'\n"); }
+}
+@nodes=@temp;
+
+if (@nodes < 1) { die("No valid nodes supplied.\n"); }
+
+# Figure out who called us. Only root, people with admin status
+# in the DB, or members of the right project can do this.
+if ($UID && !TBAdmin($UID)) {
+    my ($me) = getpwuid($UID)
+        or die "$UID not in passwd file";
+    print "Not an admin.\n" if $d>1;
+    if (! TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYINFO,@nodes)) {
+        die("os_select: You do not have permission to modify ".
+	    "one or more of the nodes.\n");
+    }
+    print "Access granted to all nodes requested.\n" if $d>1;
+} else { print "Running as an admin.\n" if $d>1; }
+
+my $pernodeopmode=0;
+my $opmode = os_opmode($osid);
+print "Found opmode '$opmode' for osid '$osid'.\n" if $d;
+if ($opmode eq TBDB_NODEOPMODE_BOOTWHAT ) { $pernodeopmode=1; }
+
+foreach $n (@nodes) {
+    my $curmode = node_opmode($n);
+    if (!$curmode) { next; }
+    print "Current opmode for node '$n' is '$curmode'.\n" if $d;
+    if ($mfs) { set_pxe_path($n); } 
+    else { set_boot_osid($n); }
+    my $boot = TBBootWhat($n,$d);
+    if (!$boot) { die("***Bootwhat query failed. Contact testbed-ops.\n"); }
+    print "Bootwhat says: $n => $boot\n" if $d>1;
+    if ($pernodeopmode) { 
+	# in per-node mode, opmode is the mode for the os that we're going 
+	# to boot, whatever that may be on each node
+	$opmode= os_opmode($boot); 
+	print "Desired opmode for node '$n' is '$opmode'.\n" if $d;
+    }
+    if (!$curmode || ($curmode ne $opmode)) { set_nextmode($n); } 
+    else { set_nextmode($n,""); } # Make sure it is clear
+}
+
+exit();
+
+#
+# Subroutines
+#
+
+sub set_nextmode() {
+    my $node = shift || "";
+    my $mode = shift;
+    if (!defined($mode)) { $mode = $opmode; }
+    my $cmd = "update nodes set next_op_mode='$mode' where node_id='$node';";
+    print "Setting next_op_mode for node '$node' to '$mode'.\n" if $d;
+    my $q = DBQueryFatal($cmd);
+    return 0;
+}
+
+sub set_boot_osid() {
+    my $node = shift || "";
+    my $field = ($oneshot?"next":"def")."_boot_".($pathmode?"path":"osid");
+    my $cmd = "update nodes set $field='$osid'";
+    # Clear out the paths and the next_boot_osid except for possibly
+    # one that we're going to set. Never clear def_boot_osid, since it
+    # won't ever get in the way of what we really want to boot, and we
+    # want something to fall back on.
+    foreach $f ("next_boot_path", "def_boot_path", "next_boot_osid") {
+	if ($f ne $field) { $cmd .= ", $f=''"; }
+    }
+    $cmd .= " where node_id='$node';";
+    print "cmd=$cmd\n" if $d>1;
+    print "Setting $field for node '$node' to '$osid'.\n" if $d;
+    my $q = DBQueryFatal($cmd);
+    return 0;
+}
+
+sub set_pxe_path() {
+    my $node = shift || "";
+    my $field = ($oneshot?"next_":"")."pxe_boot_path";
+    my $cmd = "update nodes set $field='$pxebootpath'";
+    # Clear out the next_pxe_boot_path if we're not going to set it
+    foreach $f ("next_pxe_boot_path") {
+	if ($f ne $field) { $cmd .= ", $f=''"; }
+    }
+    $cmd .= " where node_id='$node';";
+    print "cmd=$cmd\n" if $d>1;
+    print "Setting $field for node '$node' to '$pxebootpath'.\n" if $d;
+    my $q = DBQueryFatal($cmd);
+    return 0;
+}
+    
+
+sub node_opmode() {
+    my $node = shift || "";
+    my $cmd = "select op_mode from nodes where node_id='$node';";
+    my $q = DBQueryFatal($cmd);
+    if ($q->numrows() < 1) {
+	warn("Ignoring invalid node '$node' (non-existent)\n");
+	return 0;
+    }
+    my @r = $q->fetchrow_array();
+    my $opmode=$r[0];
+    if (defined($opmode) && $opmode) { return $opmode; }
+    warn("Invalid opmode '$opmode' for node '$node'.\n");
+    return 0;
+}
+
+sub os_opmode() {
+    my $osid = shift || "";
+    if ($pathmode) { return $osidmap{TB_OSID_MBKERNEL}; }
+    if (defined($osidmap{$osid})) { return $osidmap{$osid}; }
+    my $cmd = "select op_mode from os_info where osid='$osid';";
+    my $q = DBQueryFatal($cmd);
+    if ($q->numrows() < 1) {
+	die("Invalid osid '$osid' is non-existent.\n");
+    }
+    my @r = $q->fetchrow_array();
+    my $opmode=$r[0];
+    print "OpMode query for '$osid' gave '$opmode'\n" if $d>1;
+    if (defined($opmode) && $opmode ne "") { return $opmode; }
+    die("No opmode found for osid '$osid'.\n");
+}
+

@@ -46,12 +46,12 @@ use libtestbed;
 my $nodereboot	= "$TB/bin/node_reboot";
 my $os_load	= "$TB/bin/os_load";
 my $vnode_setup = "$TB/sbin/vnode_setup";
+my $osselect    = "$TB/bin/os_select";
 my $dbg		= 0;
 my $failed      = 0;
 my @nodes       = ();
 my @vnodes      = ();
 my %osids       = ();
-my %waitfor     = ();
 my %canfail     = ();
 my $db_result;
 my @row;
@@ -315,9 +315,9 @@ while (my %row = $db_result->fetchhash()) {
 			    SetupReload($node, $n_osid, $type);
 			}
 			else {
-			    DBQueryFatal("update nodes ".
-					 "set def_boot_osid='$n_osid' ".
-					 "where node_id='$node'");
+			    system("$osselect $n_osid $node") and
+				die("*** Could not set boot OS to ".
+				    "$n_osid for $node\n");
 			}
 			$osids{$node} = $n_osid;
 		    }
@@ -343,16 +343,6 @@ while (my %row = $db_result->fetchhash()) {
     }
     
     #
-    # If pingable, then the node is "waitable".
-    #
-    if (OSFeatureSupported($osids{$node}, "ping")) {
-	$waitfor{$node} = 1;
-    }
-    else {
-	$waitfor{$node} = 0;
-    }
-
-    #
     # Set the canfail bit. Currently, sharks are always canfail=1.
     # Will come from DB at some point.
     #
@@ -363,7 +353,7 @@ while (my %row = $db_result->fetchhash()) {
 	$canfail{$node} = 0;
     }
     
-    print STDERR "$node - $osids{$node} - $waitfor{$node} - $canfail{$node}\n"
+    print STDERR "$node - $osids{$node} - $canfail{$node}\n"
 	if $dbg;
 }
 
@@ -422,16 +412,6 @@ foreach my $node ( @nodes ) {
 TBDebugTimeStamp("Local node waiting started");
 while ( @nodes ) {
     my $node = shift(@nodes);
-
-    #
-    # Don't bother to wait for nodes that are running foreign OSs since
-    # we are not going to deal with them anyway later in the process.
-    #
-    if ($waitfor{$node} == 0) {
-	print STDOUT "Not waiting for $node to come alive. Foreign OS.\n";
-	SetNodeBootStatus($node, NODEBOOTSTATUS_UNKNOWN);
-	next;
-    }	
 
     if (WaitTillAlive($node) == 0) {
 	print STDOUT "$node is alive and well\n";

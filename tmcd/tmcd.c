@@ -795,72 +795,10 @@ COMMAND_PROTOTYPE(doreboot)
 	char		gid[64];
 
 	/*
-	 * Clear the current_reloads for this node, in case it just finished
-	 * reloading. This needs to happen regardless of whether or not the
-	 * node is free or in the reloading experiment.
-	 * XXX: Is it better to blindly do the delete (which will be harmless
-	 * if there is no entry for this node) or to check first, which
-	 * might waste time?
+	 * This is now a no-op. The things this used to do are now
+	 * done by stated when we hit RELOAD/RELOADDONE state
 	 */
-	info("doreload: %s: Clearing current_reloads\n", nodeid);
-	if (mydb_update("delete from current_reloads where node_id='%s'",
-		        nodeid)) {
-	    error("doreload: %s: DB Error clearing current_reloads!\n",
-		  nodeid);
-	    return 1;
-	}
-
-	/*
-	 * Need to check the pid/eid to distinguish between a user
-	 * initiated reload, and a admin scheduled reload. We don't want
-	 * to deschedule an admin reload, which is supposed to happen when
-	 * the node is released.
-	 */
-	if (nodeidtoexp(nodeid, pid, eid, gid)) {
-		info("REBOOT: %s: Node is free\n", nodeid);
-		return 0;
-	}
-
-	info("REBOOT: %s: Node is in experiment %s/%s\n", nodeid, pid, eid);
-
-	/*
-	 * XXX This must match the reservation made in sched_reload
-	 *     in the tbsetup directory.
-	 */
-	if (strcmp(pid, RELOADPID) ||
-	    strcmp(eid, RELOADEID)) {
-		return 0;
-	}
-
-	/*
-	 * See if the node was in the reload state. If so we need to clear it
-	 * and its reserved status.
-	 */
-	res = mydb_query("select node_id from scheduled_reloads "
-			 "where node_id='%s'",
-			 1, nodeid);
-	if (!res) {
-		error("REBOOT: %s: DB Error getting reload!\n", nodeid);
-		return 1;
-	}
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		return 0;
-	}
-	mysql_free_result(res);
-
-	if (mydb_update("delete from scheduled_reloads where node_id='%s'",
-			nodeid)) {
-		error("REBOOT: %s: DB Error clearing reload!\n", nodeid);
-		return 1;
-	}
-	info("REBOOT: %s cleared reload state\n", nodeid);
-
-	if (mydb_update("delete from reserved where node_id='%s'", nodeid)) {
-		error("REBOOT: %s: DB Error clearing reload!\n", nodeid);
-		return 1;
-	}
-	info("REBOOT: %s cleared reserved state\n", nodeid);
+	info("doreboot: %s: Reboot reported (no-op, deprecated)\n", nodeid);
 
 	return 0;
 }
@@ -2698,79 +2636,39 @@ COMMAND_PROTOTYPE(doloadinfo)
 }
 
 /*
- * If next_pxe_boot_path is set, clear it. Otherwise, if next_boot_path
- * or next_boot_osid is set, clear both along with next_boot_cmd_line.
- * If neither is set, do nothing. Produces no output to the client.
+ * Have stated reset any next_pxe_boot_* and next_boot_* fields.
+ * Produces no output to the client.
  */
 COMMAND_PROTOTYPE(doreset)
 {
-	MYSQL_RES	*res;	
-
+#ifdef EVENTSYS
+	address_tuple_t tuple;
 	/*
-	 * Check to see if next_pxe_boot_path is set
+	 * Send the state out via an event
 	 */
-	res = mydb_query("select next_pxe_boot_path from nodes "
-			"where node_id='%s' and next_pxe_boot_path is not null "
-			"and next_pxe_boot_path != ''",
-			 1, nodeid);
-
-	if (!res) {
-		error("doreset: %s: DB Error checking for "
-		      "next_pxe_boot_path!\n", nodeid);
+	/* XXX: Maybe we don't need to alloc a new tuple every time through */
+	tuple = address_tuple_alloc();
+	if (tuple == NULL) {
+		error("doreset: Unable to allocate address tuple!\n");
 		return 1;
 	}
 
-	/*
-	 * If we get a row back, then next_pxe_boot_path was set, because
-	 * the query checks for emptiness
-	 */
-	if ((int)mysql_num_rows(res) > 0) {
-		mysql_free_result(res);
-		info("doreset: %s: Clearing next_pxe_boot_path\n", nodeid);
-		if (mydb_update("update nodes set next_pxe_boot_path='' "
-			"where node_id='%s'", nodeid)) {
-		    error("doreset: %s: DB Error clearing "
-			  "next_pxe_boot_path!\n", nodeid);
-		    return 1;
-		}
-		return 0;
-	}
+	tuple->host      = BOSSNODE;
+	tuple->objtype   = TBDB_OBJECTTYPE_TESTBED; /* "TBCONTROL" */
+	tuple->objname	 = nodeid;
+	tuple->eventtype = TBDB_EVENTTYPE_RESET;
 
-	/*
-	 * Check to see if next_boot_path or next_boot_osid are set
-	 */
-	res = mydb_query("select next_boot_path, next_boot_osid from nodes "
-			"where node_id='%s' and "
-			"((next_boot_path is not null and next_boot_path != '')"
-			" or "
-			"(next_boot_osid is not null and next_boot_osid != ''))",
-			 2, nodeid);
-
-	if (!res) {
-		error("doreset: %s: DB Error checking for "
-		      "next_boot_path or next_boot_osid!\n",
-		       nodeid);
+	if (myevent_send(tuple)) {
+		error("doreset: Error sending event\n");
 		return 1;
-	}
-
-	/*
-	 * If we get a row back, then one of them was set, because
-	 * the query checks for emptiness
-	 */
-	if ((int)mysql_num_rows(res) > 0) {
-		mysql_free_result(res);
-		info("doreset: %s: Clearing next_boot_*\n", nodeid);
-		if (mydb_update("update nodes set next_boot_path='',"
-			"next_boot_osid='',next_boot_cmd_line='' "
-			"where node_id='%s'", nodeid)) {
-		    error("doreset: %s: DB Error clearing next_boot_*!\n",
-			  nodeid);
-		    return 1;
-		}
-		return 0;
-	}
-
+	} else {
+	        info("Reset event sent for %s\n", nodeid);
+	} 
 	
+	address_tuple_free(tuple);
+#else
+	info("No event system - no reset performed.\n");
+#endif
 	return 0;
 }
 
@@ -2940,6 +2838,7 @@ COMMAND_PROTOTYPE(dostate)
 	 */
 	if (!*newstate) {
 	    error("dostate: No state reported!\n");
+	    return 1;
 	}
 
 #ifdef EVENTSYS
@@ -2960,6 +2859,7 @@ COMMAND_PROTOTYPE(dostate)
 
 	if (myevent_send(tuple)) {
 		error("dostate: Error sending event\n");
+		return 1;
 	}
 
 	address_tuple_free(tuple);

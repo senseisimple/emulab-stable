@@ -34,6 +34,7 @@ use libdb;
 use libtestbed;
 
 my $consetup	= "$TB/libexec/console_setup";
+my $osselect    = "$TB/bin/os_select";
 my $reloadpid	= "emulab-ops";
 my $pendingeid  = "reloadpending";
 my $reloadeid   = "reloading";
@@ -211,13 +212,17 @@ foreach my $n (@freed_nodes) {
     #
     my $result =
 	DBQueryFatal("select control_net,nt.osid,nt.pxe_boot_path, " .
-		     " n.def_boot_osid,n.def_boot_path, ".
-		     " nt.isvirtnode ".
-		     " from node_types as nt " .
+		     "n.def_boot_osid,n.def_boot_path, ".
+		     "nt.isvirtnode, o.osid ".
+		     "from node_types as nt " .
 		     "left join nodes as n on n.type=nt.type " .
+		     "left join os_info as o on o.path=nt.pxe_boot_path " .
 		     "where node_id='$n'");
-    my ($control,$osid,$pxe_boot_path,$def_boot_osid,$def_boot_path,$isvirt) =
-	$result->fetchrow_array();
+    my ($control, $osid, $pxe_boot_path, $def_boot_osid, $def_boot_path,
+	$isvirt, $pxe_osid) = $result->fetchrow_array();
+    if (!defined($pxe_osid) || $pxe_osid eq "") {
+	$pxe_osid = "-p $pxe_boot_path";
+    }
 
     #
     # See if the OS it was running was marked as mustclean or not. Basically,
@@ -272,6 +277,13 @@ foreach my $n (@freed_nodes) {
     }
 
     #
+    # Reset the OS to the default osid for the node type
+    #
+    # XXX disabled while forced reload hack is in place
+    #system("$osselect -m $pxe_osid $n");
+    #system("$osselect $osid $n");
+
+    #
     # Clean up the nodes table so that its in a moderately clean state.
     #
 
@@ -284,11 +296,9 @@ foreach my $n (@freed_nodes) {
         #}
         #print "\n";
     #}
-    DBQueryWarn("update nodes set def_boot_osid='$osid',def_boot_cmd_line='',".
-		"def_boot_path='',startupcmd='',rpms='',deltas='', ".
-		"tarballs='',pxe_boot_path='$pxe_boot_path', ".
-		"failureaction='fatal', routertype='none', ".
-		"next_pxe_boot_path='' where node_id='$n'") || $error++;
+    DBQueryWarn("update nodes set startupcmd='',rpms='',deltas='', ".
+		"tarballs='',failureaction='fatal', routertype='none' ".
+		"where node_id='$n'") || $error++;
 
     #
     # Clean out the current_reloads table (a just in case measure). 
@@ -340,7 +350,8 @@ foreach my $n (@freed_nodes) {
 	DBQueryFatal("select node_id,image_id from scheduled_reloads " .
 		     "where node_id='$n'");
 
-    if ($result->numrows()) {
+    # XXX force reload hack!
+    if (1 || $result->numrows()) {
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
 	DBQueryWarn("update reserved set ".

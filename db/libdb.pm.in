@@ -73,18 +73,24 @@ use Exporter;
 
 	 TB_ASSIGN_TOOFEWNODES TB_OPSPID
 
-	 TBDB_TBEVENT_NODESTATE TBDB_TBEVENT_NODEOPMODE
-	 TBDB_TBEVENT_ISUP TBDB_TBEVENT_REBOOTING TBDB_TBEVENT_REBOOTED
-	 TBDB_TBEVENT_NORMAL TBDB_TBEVENT_DELAYING TBDB_TBEVENT_UNKNOWNOS
-	 TBDB_TBEVENT_RELOADING
+	 TBDB_TBEVENT_NODESTATE TBDB_TBEVENT_NODEOPMODE TBDB_TBEVENT_CONTROL
 	 TBDB_NODESTATE_ISUP TBDB_NODESTATE_REBOOTING TBDB_NODESTATE_REBOOTED
-	 TBDB_NODESTATE_UNKNOWN
+	 TBDB_NODESTATE_SHUTDOWN TBDB_NODESTATE_BOOTING TBDB_NODESTATE_TBSETUP
+	 TBDB_NODESTATE_RELOADSETUP TBDB_NODESTATE_RELOADING 
+	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_UNKNOWN
 	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
 	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
+	 TBDB_NODEOPMODE_NORMALv1 TBDB_NODEOPMODE_MINIMAL 
+	 TBDB_NODEOPMODE_RELOAD TBDB_NODEOPMODE_DELAY
+	 TBDB_NODEOPMODE_BOOTWHAT
 	 TBDB_NODEOPMODE_UNKNOWN
 	 TBDB_EXPT_WORKDIR
 	 TBSetNodeEventState TBGetNodeEventState
 	 TBSetNodeOpMode TBGetNodeOpMode
+	 TB_OSID_MBKERNEL TB_OSID_PXEBOOT TB_OSID_FRISBEE 
+	 TBBootWhat TBNodeStateTimeout
+	 TBDB_TBCONTROL_RESET TBDB_TBCONTROL_RELOADDONE 
+	 TBDB_TBCONTROL_TIMEOUT TBDB_NO_STATE_TIMEOUT
 
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
@@ -285,6 +291,11 @@ sub TB_OSID_DESTROY()		{ 3; }
 sub TB_OSID_MIN()		{ TB_OSID_READINFO; }
 sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
 
+# Magic OSID constants
+sub TB_OSID_MBKERNEL()          { "_KERNEL_"; } # multiboot kernel OSID
+sub TB_OSID_PXEBOOT()           { "PXEBOOT"; } # osid for def pxe_boot_path
+sub TB_OSID_FRISBEE()           { "PXEFRISBEE"; } 
+
 # ImageIDs
 #
 # Clarification:
@@ -324,35 +335,39 @@ sub TB_OPSPID()			{ $TBOPSPID; }
 #
 sub TBDB_TBEVENT_NODESTATE	{ "TBNODESTATE"; }
 sub TBDB_TBEVENT_NODEOPMODE	{ "TBNODEOPMODE"; }
-
-#
-# TBNODESTATE Events
-#
-sub TBDB_TBEVENT_ISUP()		{ "ISUP"; }
-sub TBDB_TBEVENT_REBOOTED()	{ "REBOOTED"; }
-sub TBDB_TBEVENT_REBOOTING()	{ "REBOOTING"; }
-
-#
-# TBNODEOPMODE Events
-#
-sub TBDB_TBEVENT_NORMAL()	{ "NORMAL"; }
-sub TBDB_TBEVENT_DELAYING()	{ "DELAYING"; }
-sub TBDB_TBEVENT_UNKNOWNOS()	{ "UNKNOWNOS"; }
-sub TBDB_TBEVENT_RELOADING()	{ "RELOADING"; }
+sub TBDB_TBEVENT_CONTROL	{ "TBCONTROL"; }
 
 #
 # For nodes, we use this set of events.
 #
-sub TBDB_NODESTATE_ISUP()	{ TBDB_TBEVENT_ISUP; }
-sub TBDB_NODESTATE_REBOOTED()	{ TBDB_TBEVENT_REBOOTED; }
-sub TBDB_NODESTATE_REBOOTING()	{ TBDB_TBEVENT_REBOOTING; }
+sub TBDB_NODESTATE_ISUP()	{ "ISUP"; }
+sub TBDB_NODESTATE_REBOOTED()	{ "REBOOTED"; }
+sub TBDB_NODESTATE_REBOOTING()	{ "REBOOTING"; }
+sub TBDB_NODESTATE_SHUTDOWN()	{ "SHUTDOWN"; }
+sub TBDB_NODESTATE_BOOTING()	{ "BOOTING"; }
+sub TBDB_NODESTATE_TBSETUP()	{ "TBSETUP"; }
+sub TBDB_NODESTATE_RELOADSETUP() { "RELOADSETUP"; }
+sub TBDB_NODESTATE_RELOADING()	{ "RELOADING"; }
+sub TBDB_NODESTATE_RELOADDONE()	{ "RELOADDONE"; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
 
-sub TBDB_NODEOPMODE_NORMAL	{ TBDB_TBEVENT_NORMAL; }
-sub TBDB_NODEOPMODE_DELAYING	{ TBDB_TBEVENT_DELAYING; }
-sub TBDB_NODEOPMODE_UNKNOWNOS	{ TBDB_TBEVENT_UNKNOWNOS; }
-sub TBDB_NODEOPMODE_RELOADING	{ TBDB_TBEVENT_RELOADING; }
+sub TBDB_NODEOPMODE_NORMAL	{ "NORMAL"; }
+sub TBDB_NODEOPMODE_DELAYING	{ "DELAYING"; }
+sub TBDB_NODEOPMODE_UNKNOWNOS	{ "UNKNOWNOS"; }
+sub TBDB_NODEOPMODE_RELOADING	{ "RELOADING"; }
+sub TBDB_NODEOPMODE_NORMALv1	{ "NORMALv1"; } 
+sub TBDB_NODEOPMODE_MINIMAL	{ "MINIMAL"; } 
+sub TBDB_NODEOPMODE_RELOAD	{ "RELOAD"; } 
+sub TBDB_NODEOPMODE_DELAY	{ "DELAY"; } 
+sub TBDB_NODEOPMODE_BOOTWHAT	{ "_BOOTWHAT_"; } # A redirection opmode
 sub TBDB_NODEOPMODE_UNKNOWN	{ "UNKNOWN"; }
+
+sub TBDB_TBCONTROL_RESET	{ "RESET"; }
+sub TBDB_TBCONTROL_RELOADDONE	{ "RELOADDONE"; }
+sub TBDB_TBCONTROL_TIMEOUT	{ "TIMEOUT"; }
+
+# Constant we use for the timeout field when there is no timeout for a state
+sub TBDB_NO_STATE_TIMEOUT	{ 0; }
 
 #
 # Node name we use in the widearea_* tables to represent a generic local node.
@@ -1163,6 +1178,100 @@ sub OSFeatureSupported($$) {
 }
 
 #
+# Find out what osid a node will boot next time it comes up, 
+# Usually (but not always) the currently running OS as well.
+# May also return TB_OSID_MBKERNEL
+#
+sub TBBootWhat($;$) {
+    # WARNING!!!
+    #
+    # DO NOT change this function without making corresponding changes to
+    # the C version of this code in the bootinfo_mysql.c . They MUST
+    # ALWAYS find exactly the same resulting OSID given the same inputs.
+    # [The only exception is that here we must take into account 
+    # *pxe_boot_path since that can specify an OS as well.]
+    #
+    # Boot priorities go like this:
+    # NEXT_PXE_BOOT_PATH
+    # PXE_BOOT_PATH
+    # NEXT_BOOT_PATH        multiboot kernel
+    # DEF_BOOT_PATH         multiboot kernel
+    # NEXT_BOOT_OSID        osid from os_info
+    # DEF_BOOT_OSID         osid from os_info
+    # if all the above are null, error
+    my $node = shift || return 0; # error if no node
+    my $d = shift || 0; # debug flag
+    my $cmd = "select path from os_info where osid='".TB_OSID_PXEBOOT."'";
+    my $q = DBQueryFatal($cmd);
+    my @r = $q->fetchrow_array();
+    my $defpxepath = $r[0];
+    $cmd = "select next_pxe_boot_path, pxe_boot_path, 
+next_boot_path, def_boot_path, next_boot_osid, def_boot_osid 
+from nodes where node_id = '$node'";
+    $q = DBQueryFatal($cmd);
+    if ($q->numrows() < 1) {
+	warn("TBBootWhat: Ignoring invalid node '$node' (non-existent)\n");
+	return 0;
+    }
+    @r = $q->fetchrow_array();
+    $nextpxepath=$r[0];
+    $pxepath=$r[1];
+    $nextpath=$r[2];
+    $defpath=$r[3];
+    $nextosid=$r[4];
+    $defosid=$r[5];
+    print "TBBootWhat: $node => (".($nextpxepath?"nextpxe=$nextpxepath, ":"").
+	( $pxepath ne $defpxepath ? "pxe=$pxepath, ":"") .
+	    "np=$nextpath, dp=$defpath, no=$nextosid, do=$defosid)\n" if $d>1;
+    # With PXE paths, look up the osid for the path. If none, use 
+    # TB_OSID_MBKERNEL. If it is the default pxe path, just go on like normal.
+    if (defined($nextpxepath) && $nextpxepath) {
+	if ($nextpxepath ne $defpxepath) {
+	    print "TBBootWhat: Using next_pxe_boot_path $nextpxepath\n" if $d;
+	    my $cmd = "select osid from os_info where path='$nextpxepath'";
+	    my $q = DBQueryFatal($cmd);
+	    if ($q->numrows() > 0) {
+		my @r = $q->fetchrow_array();
+		my $osid = $r[0];
+		return $osid;
+	    } else {
+		return TB_OSID_MBKERNEL;
+	    }
+	} # else go on as normal
+    } else {
+	if ($pxepath ne $defpxepath) {
+	    print "TBBootWhat: Using pxe_boot_path $pxepath\n" if $d;
+	    my $cmd = "select osid from os_info where path='$pxepath'";
+	    my $q = DBQueryFatal($cmd);
+	    if ($q->numrows() > 0) {
+		my @r = $q->fetchrow_array();
+		my $osid = $r[0];
+		return $osid;
+	    } else {
+		return TB_OSID_MBKERNEL;
+	    }
+	} # else go on as normal
+    }	
+    if ((defined($nextpath) && $nextpath) || 
+	(defined($defpath) && $defpath)) {
+	# No OSID. Return a magic one.
+	print "TBBootWhat: Using {def,next}_boot_path ${nextpath}$defpath\n" 
+	    if $d;
+	return TB_OSID_MBKERNEL;
+    }
+    if (defined($nextosid) && $nextosid) { 
+	print "TBBootWhat: Using next_boot_osid $nextosid\n" if $d;
+	return $nextosid; 
+    }
+    if (defined($defosid) && $defosid) { 
+	print "TBBootWhat: Using def_boot_osid $defosid\n" if $d;
+	return $defosid; 
+    }
+    warn("***Warning: node '$node': All boot info was null!\n");
+    return TB_OSID_MBKERNEL;
+}
+
+#
 # Ah, what a hack! I'm tired of seeing regexs for sharks scattered around
 # the code. Anyway, this checks to see if a node is a shelf, and fills
 # in the shelf/node, return 1 if it is. The shelf/node arguments are
@@ -1556,11 +1665,57 @@ sub TBGetNodeEventState($$)
 }
 
 #
+# Check if a node has timed out in its current state. If it has, it gets 
+# stated involved to handle the situation.
+#
+# usage: TBNodeStateTimeout(char *node)
+#        Returns 1 if it has timed out and stated was notified
+#        Returns 0 if it is okay (still within time limits)
+#
+sub TBNodeStateTimeout($)
+{
+    my ($node) = @_;
+    
+    my $notimeout = TBDB_NO_STATE_TIMEOUT;
+
+    my $query_result =
+	DBQueryFatal("select now() - state_timestamp > timeout as over, ".
+		     "timeout='$notimeout' as none ".
+		     "from nodes as n left join state_timeouts as st ".
+		     "on n.eventstate=st.state and n.op_mode=st.op_mode ".
+		     "where node_id='$node'");
+
+    if ($query_result->numrows == 0) {
+	warn("*** TBNodeStateTimeout: Couldn't check node '$node'\n");
+	return 0;
+    }
+    my ($over,$none) = $query_result->fetchrow_array();
+    if ($over && !$none) {
+	# We're overtime... send an event and return 1
+	if ($EVENTSYS) {
+	    EventSendFatal(objtype   => TBDB_TBEVENT_CONTROL,
+			   objname   => $node,
+			   eventtype => TBDB_TBCONTROL_TIMEOUT,
+			   host      => $BOSSNODE);
+	} else {
+	    # Don't know what to do... how are state timeouts handled
+	    # if we don't have stated?
+	}
+	return 1;
+    } else {
+	# We're good... return 0
+	return 0;
+    }
+}   
+
+#
 # Set operational mode for a node.
 #
 # usage: TBSetNodeOpMode(char *node, char *mode)
 #        Returns 1 if okay.
 #        Returns 0 if failed.
+#
+# DEPRECATED - stated handles these transitions now
 #
 sub TBSetNodeOpMode($$)
 {
@@ -1594,7 +1749,7 @@ sub TBGetNodeOpMode($$)
     my ($node, $mode) = @_;
 
     my $query_result =
-	DBQueryFatal("select eventstate from nodes where node_id='$node'");
+	DBQueryFatal("select op_mode from nodes where node_id='$node'");
 
     if ($query_result->numrows == 0) {
 	return 0;

@@ -9,8 +9,19 @@ DISTCLEAN_FILES = @DISTCLEAN_FILES@
 
 include Makeconf
 
-SUBDIRS = lib assign discvr tbsetup db os security pxe tmcd utils www \
-		tip capture ipod vis sensors @optional_subdirs@
+#
+# Ordering here matters!
+# Things with no dependencies go first: 
+#   assign db lib 
+# Things that may have dependencies go next:
+#   @optional_subdirs@ (has event)
+#   discvr ipod os security sensors 
+# Then things that only depend on stuff we've done:
+#   pxe tbsetup tmcd utils www tip capture vis
+# Then things that depend on stuff we just did:
+#
+SUBDIRS = lib db assign @optional_subdirs@ discvr ipod os security sensors \
+		pxe tbsetup tmcd utils www tip capture ipod vis sensors 
 
 all:		all-subdirs
 

@@ -62,10 +62,10 @@ use libdb;
 use libtestbed;
 
 my $NETDISKOSID = "NETDISK-STD";
-my $FRISBEEPATH = "$BOSSADDR:/tftpboot/pxeboot.frisbee";
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $nodereboot	= "$TB/bin/node_reboot";
 my $schedreload	= "$TB/bin/sched_reload";
+my $osselect	= "$TB/bin/os_select";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my @row;
@@ -315,9 +315,7 @@ foreach my $node (@nodes) {
     
     print STDOUT "Changing default OS for $node to $defosid\n";
     if (!$TESTMODE) {
-      DBQueryFatal("update nodes set ".
-		   "def_boot_osid='$defosid',def_boot_path='' ".
-		   "where node_id='$node'");
+        system("$osselect $defosid $node");
     }
 
     # Put it in the current_reloads table so that nodes can find out which
@@ -472,7 +470,7 @@ sub WaitTillReloadDone {
 	$done{$node}  = 0;
     }
 
-    print STDERR "Waiting for @nodes to finish reloading\n" if $dbg;
+    print STDERR "Waiting for @nodes to finish reloading\n".`date` if $dbg;
 
     #
     # Start a counter going, relative to the time we rebooted the first
@@ -482,24 +480,20 @@ sub WaitTillReloadDone {
     my $minutes   = 0;
 
     while ($count) {
+	# Wait first to make sure reboot is done, and so that we don't
+	# wait one more time after everyone is up.
+	sleep(5);
 	foreach my $node ( @nodes ) {
 	    if (! $done{$node}) {
 		my ($query_result, @row);
 
-		if ($type eq TB_RELOADTYPE_FRISBEE) {
-		    $query_result =
-			DBQueryFatal("SELECT next_pxe_boot_path FROM nodes ".
-				     "where node_id='$node'");
-		}
-		else {
-		    $query_result =
-			DBQueryFatal("SELECT next_boot_osid FROM nodes ".
-				     "where node_id='$node'");
-		}
+		$query_result =
+		    DBQueryFatal("SELECT op_mode,eventstate FROM nodes ".
+				 "where node_id='$node'");
 
 		@row = $query_result->fetchrow_array();
-		if (! $row[0]) {
-		    print STDERR "$node alive and well\n" if $dbg;
+		if ($row[1] eq "RELOADDONE" || $row[0] ne "RELOAD" ) {
+		    print STDERR "$node alive and well\n".`date` if $dbg;
 		    $count--;
 		    $done{$node} = 1;
 		    next;
@@ -524,7 +518,6 @@ sub WaitTillReloadDone {
 		}
 	    }
 	}
-	sleep(5);
     }
     return @failed;
 }
@@ -537,16 +530,17 @@ sub SetupReload($)
     my ($node) = @_;
 
     if ($type eq TB_RELOADTYPE_FRISBEE) {
-	DBQueryFatal("update nodes set ".
-		     "next_pxe_boot_path='$FRISBEEPATH'" .
-		     "where node_id='$node'");
+	system "$osselect -1 -m PXEFRISBEE $node" and
+	    die "*** Unable to select frisbee OS\n";
 	
 	system "$FRISBEELAUNCHER ".($dbg? "-d ":"")."$imageid" and
 	    die "*** Unable to launch frisbee daemon\n";
     }
     elsif ($type eq TB_RELOADTYPE_NETDISK) {
+	system "$osselect -1 $NETDISKOSID $node" and
+	    die "*** Unable to select $NETDISKOSID OS\n";
+
 	DBQueryFatal("update nodes set ".
-		     "next_boot_osid='$NETDISKOSID',".
 		     "next_boot_cmd_line='$cmdline' ".
 		     "where node_id='$node'");
     }

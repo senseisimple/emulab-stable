@@ -1256,7 +1256,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
 	tbsetup/GNUmakefile tbsetup/console_setup tbsetup/spewlogfile \
 	tbsetup/console_reset tbsetup/bwconfig tbsetup/power_rpc27.pm \
-	tbsetup/os_load tbsetup/os_setup tbsetup/power \
+	tbsetup/os_load tbsetup/os_setup tbsetup/os_select tbsetup/power \
 	tbsetup/node_reboot tbsetup/webnscheck tbsetup/nscheck \
 	tbsetup/resetvlans tbsetup/rmacct-ctrl tbsetup/rmproj \
 	tbsetup/sched_reload tbsetup/sched_reserve tbsetup/reload_daemon \

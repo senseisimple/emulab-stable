@@ -24,6 +24,7 @@ use lib '@prefix@/lib';
 my $BOSSNODE = "@BOSSNODE@";
 my $TBOPS = "@TBOPSEMAIL@";
 my $TBDBNAME = "@TBDBNAME@";
+my $osselect = "@prefix@/bin/os_select";
 
 $| = 1;
 
@@ -99,13 +100,6 @@ if (!$handle) { die "Unable to register with event system\n"; }
 my $tuple = address_tuple_alloc();
 if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
-#
-# Unfortunately, we can't subscribe to multiple objtypes - so, we subscribe
-# to all events to $BOSSNODE, and throw away notificattions whose objtypes
-# do not match the ones we care about.
-#
-%$tuple = ( host => $BOSSNODE );
-
 if (!event_subscribe($handle,\&handleEvent,$tuple)) {
 	die "Could not subscribe to events\n";
 }
@@ -114,14 +108,24 @@ if (!event_subscribe($handle,\&handleEvent,$tuple)) {
 # Read in the pre-existing node states, and timeout and valid transition
 # information from the database
 #
-my %nodes    = readStates();
-my %timeouts = getTimeouts();
-my %valid    = getValid();
+my %nodes     = readStates();
+my %timeouts  = getTimeouts();
+my %valid     = getValid();
+my %modeTrans = getModeTrans();
+my %triggers  = getTriggers();
 
 #
 # Gets set if a reload of state from the database should happen.
 #
 my $do_reload = 0;
+
+#
+# Grab some constants into variables
+#
+my $TBRESET      = TBDB_TBCONTROL_RESET;
+my $TBRELOADDONE = TBDB_TBCONTROL_RELOADDONE;
+my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
+my $TBNOTIMEOUT  = TBDB_NO_STATE_TIMEOUT;
 
 #
 # Make the daemon reload database state on a sighup - but I'm worried
@@ -143,24 +147,21 @@ while (1) {
 	# Look for nodes that have passed their timeout
 	#
 	while (my ($node, $value) = each %nodes) {
-		my $state    = $value->{state};
-		my $mode     = $value->{mode};
-		my $time     = $value->{timestamp};
-		my $notified = $value->{notified};
-		my ($timeout,$action);
-		if ($mode && $state && $timeouts{$mode} &&
-				$timeouts{$mode}{$state}) {
-			($timeout, $action) = @{$timeouts{$mode}{$state}};
-		}
-		if ((!$notified) && $time && $timeout &&
-				(($time + $timeout) < $now)) {
-			   #
-			   # TODO: Need to actually do something!
-			   #
-			   notify("Node $node has timed out in state $state" .
-			   	  ", mode $mode\n");
-			   $value->{notified} = 1;
-		}
+	    my $state    = $value->{state};
+	    my $mode     = $value->{mode};
+	    my $time     = $value->{timestamp};
+	    my $notified = $value->{notified};
+	    my ($timeout,$action);
+	    if ($mode && $state && $timeouts{$mode} &&
+		$timeouts{$mode}{$state}) {
+		($timeout, $action) = @{$timeouts{$mode}{$state}};
+	    }
+	    if ((!$notified) && $time && $timeout && 
+		$timeout!= $TBNOTIMEOUT && (($time + $timeout) < $now)) {
+		handleCtrlEvent($node,$TBTIMEOUT);
+		$value->{notified} = 1;
+		
+	    }
 	}
 
 	if ($do_reload || ($iterations > $reload_time)) {
@@ -186,7 +187,7 @@ sub readStates(;@) {
 		%oldnodes = ();
 	}
 
-	debug("readStates called\n");
+	#debug("readStates called\n");
 	my $result = DBQueryFatal("SELECT node_id, eventstate, " .
 				  "state_timestamp, op_mode, " .
 				  "op_mode_timestamp FROM nodes");
@@ -202,6 +203,7 @@ sub readStates(;@) {
 		#
 		if ($oldnodes{$node_id} && $state && $timestamp &&
 		   ($oldnodes{$node_id}{state} eq $state) &&
+		   ($oldnodes{$node_id}{mode} eq $mode) &&
 		   ($oldnodes{$node_id}{timestamp} == $timestamp)) {
 		       $nodes{$node_id} = $oldnodes{$node_id};
 		} else { 
@@ -218,7 +220,7 @@ sub readStates(;@) {
 # Read timeouts for various states from the database
 #
 sub getTimeouts() {
-	debug("getTimeouts called\n");
+	#debug("getTimeouts called\n");
 	my $result = DBQueryFatal("SELECT op_mode, state, timeout, action " .
 				  "FROM state_timeouts");
 
@@ -233,7 +235,7 @@ sub getTimeouts() {
 # Read the list of valid state transitions from the database
 #
 sub getValid() {
-	debug("getValid called\n");
+	#debug("getValid called\n");
 	my $result = DBQueryFatal("SELECT op_mode, state1, state2 " .
 				  "FROM state_transitions");
 
@@ -242,6 +244,43 @@ sub getValid() {
 		$valid{$mode}{$state1}{$state2} = 1;
 	}
 	return %valid;
+}
+
+#
+# Read the list of valid mode transitions from the database
+#
+sub getModeTrans() {
+	#debug("getModeTrans called\n");
+	my $result = 
+	    DBQueryFatal("SELECT op_mode1, state1, op_mode2, state2 " .
+			 "FROM mode_transitions order by op_mode1,state1");
+
+	my %modeTrans;
+	while (my ($mode1,$state1, $mode2, $state2) = $result->fetchrow()) {
+	    if (!defined($modeTrans{"$mode1:$state1"})) {
+		$modeTrans{"$mode1:$state1"}= ["$mode2:$state2"];
+	    } else {
+		my @l = @{$modeTrans{"$mode1:$state1"}};
+		push(@l, "$mode2:$state2");
+		$modeTrans{"$mode1:$state1"}= \@l;
+	    }
+	}
+	return %modeTrans;
+}
+
+#
+# Read the list of states which trigger an action
+#
+sub getTriggers() {
+	#debug("getTriggers called\n");
+	my $result = 
+	    DBQueryFatal("SELECT op_mode, state, trigger " .
+			 "FROM state_triggers order by op_mode,state");
+	my %t;
+	while (my ($mode,$state, $trig) = $result->fetchrow()) {
+	    $t{"$mode:$state"} = $trig;
+	}
+	return %t;
 }
 
 #
@@ -265,16 +304,18 @@ sub handleEvent($$$) {
 
 	SWITCH: for ($objtype) {
 
-	    #
-	    # Handle both the new TBNODEOPMODE and the old TBCONTROL events, 
-	    # for backward compatibility.
-	    #
-	    (/TBNODESTATE/ || /TBCONTROL/) && do {
+	    (/TBNODESTATE/) && do {
 		stateTransition($objname,$eventtype);
 		last;
 	    };
 	    (/TBNODEOPMODE/) && do {
 		opModeTransition($objname,$eventtype);
+		notify("Use of deprecated event TBNODEOPMODE:\n".
+		       "$objname->$eventtype\n");
+		last;
+	    };
+	    (/TBCONTROL/) && do {
+		handleCtrlEvent($objname,$eventtype);
 		last;
 	    };
 
@@ -284,56 +325,268 @@ sub handleEvent($$$) {
 
 sub stateTransition($$) {
 
-	my ($node,$newstate) = @_;
+    my ($node,$newstate) = @_;
 
-	# Check for invalid transitions
-	my ($oldstate, $mode);
+    # Check for invalid transitions
+    my ($oldstate, $mode);
+    if ($nodes{$node}) {
+	$oldstate = $nodes{$node}{state};
+	$mode = $nodes{$node}{mode};
+    } else {
+	# Try reloading the cache once before we give up on this node
+	reload();
 	if ($nodes{$node}) {
-		$oldstate = $nodes{$node}{state};
-		$mode = $nodes{$node}{mode};
+	    $oldstate = $nodes{$node}{state};
+	    $mode = $nodes{$node}{mode};
 	} else {
-		#
-		# Try reloading the cache once before we give up on this node
-		#
-		reload();
-		if ($nodes{$node}) {
-				$oldstate = $nodes{$node}{state};
-				$mode = $nodes{$node}{mode};
-		} else {
-			notify("Got an event for a node ($node) I don't know ".
-					"about\n");
+	    notify("Got an event for a node ($node) I don't know about\n");
+	}
+    }
+    if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
+	!$valid{$mode}{$oldstate}{$newstate}) {
+	notify("Invalid transition for node $node from $mode/$oldstate " .
+	       "to $newstate\n");
+    }
+
+    my $now = time();
+    $nodes{$node}{state}     = $newstate;
+    $nodes{$node}{timestamp} = $now;
+    $nodes{$node}{notified}  = 0;
+
+    info("$node: $mode/$oldstate => $mode/$newstate\n");
+    DBQueryFatal("UPDATE nodes SET eventstate='$newstate', " .
+		 "state_timestamp='$now' WHERE node_id='$node'");
+
+    # Check if this is TBDB_NODESTATE_BOOTING , which has actions
+    if ($newstate eq TBDB_NODESTATE_BOOTING) {
+	my $osid = TBBootWhat($node,$debug);
+	info("$node: Current OS is '$osid'\n");
+	DBQueryFatal("UPDATE nodes SET osid='$osid' WHERE node_id='$node'");
+
+	checkGenISUP($node);
+    }
+
+    # Check if this state is the "successful boot" state
+    if (defined($triggers{"$mode:$newstate"})) {
+	my @trigs = split(/\s*,\s*/,$triggers{"$mode:$newstate"});
+	foreach ( @trigs ) {
+	    my $trig = $_;
+	    /^$TBRESET$/ && do {
+		# Check if we really need to do a reset
+		my $r = DBQueryWarn("select osid,def_boot_osid from nodes ".
+				    "where node_id='$node'");
+		my ($osid,$defosid) = $r->fetchrow();
+		if ($osid ne $defosid) {
+		    handleCtrlEvent($node,$trig);
 		}
+		next;
+	    };
+	    /^$TBRELOADDONE$/ && do {
+		handleCtrlEvent($node,$trig);
+		next;
+	    };
+	    notify("Unknown trigger '$trig' in $mode/$newstate!\n");
 	}
-	if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
-			!$valid{$mode}{$oldstate}{$newstate}) {
-		notify("Invalid transition for node $node from $oldstate " .
-		       " to $newstate\n");
-	}
+    }
 
-	my $now = time();
-	$nodes{$node}{state}     = $newstate;
-	$nodes{$node}{timestamp} = $now;
-	$nodes{$node}{notified}  = 0;
-
-	DBQueryFatal("UPDATE nodes SET eventstate='$newstate', " .
-		     "state_timestamp='$now' WHERE node_id='$node'");
-
+    # Check if this state can trigger a mode transition
+    if (defined($modeTrans{"$mode:$newstate"})) {
+	info("$node: Checking for mode transition\n");
+	my $r = DBQueryWarn("select next_op_mode from nodes ".
+			    "where node_id='$node'");
+	my ($nextmode) = $r->fetchrow();
+	if ($nextmode) {
+	    opModeTransition($node,$nextmode);
+	} else { debug("No next mode.\n"); }
+    }
+    
 }
 
 sub opModeTransition($$) {
+    
+    my ($node,$newmode) = @_;
+    
+    info("$node: Mode change to $newmode requested\n");
+    # Check for invalid transitions
+    my ($oldstate, $mode, $nextstate);
+    if ($nodes{$node}) {
+	$oldstate = $nodes{$node}{state};
+	$mode = $nodes{$node}{mode};
+    } else {
+	# Try reloading the cache once before we give up on this node
+	reload();
+	if ($nodes{$node}) {
+	    $oldstate = $nodes{$node}{state};
+	    $mode = $nodes{$node}{mode};
+	} else {
+	    notify("Got an event for a node ($node) I don't know about\n");
+	}
+    }
+    if (defined($modeTrans{"$mode:$oldstate"})) {
+	debug("Mode Transition check:\n");
+	my $translist = join(",",@{$modeTrans{"$mode:$oldstate"}});
+	#debug("translist=$translist\n");
+	#debug("splitlist=".join(", ",split(/[:,]/,$translist))."\n");
+	my %trans = split(/[:,]/,$translist);
+	debug("Valid transitions from $mode/$oldstate are:\n");
+	foreach my $k (sort keys %trans) { debug("$k => $trans{$k}\n"); }
+	if (defined($trans{$newmode})) {
+	    $nextstate=$trans{$newmode};
+	} else {
+	    notify("Invalid mode transition from ".
+		   "$mode/$oldstate to $newmode!\n");
+	}
+    } else {
+	notify("Invalid mode transition from $mode/$oldstate: ".
+	       "Not a valid mode transition state!\n");
+    }
+    if (!$nextstate) { $nextstate=$oldstate; }
 
-	my ($node,$newmode) = @_;
+    my $now = time();
+    $nodes{$node}{state}     = $nextstate;
+    $nodes{$node}{timestamp} = $now;
+    $nodes{$node}{mode}           = $newmode;
+    $nodes{$node}{mode_timestamp} = $now;
+    $nodes{$node}{notified}       = 0;
+    
+    info("$node: $mode/$oldstate => $newmode/$nextstate\n");
+    DBQueryFatal("UPDATE nodes SET eventstate='$nextstate', ".
+		 "next_op_mode='', op_mode='$newmode', ".
+		 "state_timestamp='$now', ".
+		 "op_mode_timestamp='$now' WHERE node_id='$node'");
+    
+}
 
-	info("opModeTransition: $node, $newmode\n");
+sub handleCtrlEvent($$) {
+    my ($node,$event) = @_;
 
-	my $now = time();
-	$nodes{$node}{mode}           = $newmode;
-	$nodes{$node}{mode_timestamp} = $now;
-	$nodes{$node}{notified}       = 0;
+    info("CtrlEvent: $node, $event\n");
 
-	DBQueryFatal("UPDATE nodes SET op_mode='$newmode', " .
-		     "op_mode_timestamp='$now' WHERE node_id='$node'");
+    foreach ($event) {
+	/^$TBRESET$/ && do {
+	    system("$osselect -m PXEBOOT $node") and
+		notify("$node/$event: Couldn't clear next_pxe_boot_path\n");
 
+	    my $result = DBQueryFatal("SELECT def_boot_osid FROM nodes ".
+				      "where node_id='$node'");
+	    my ($osid) = $result->fetchrow();
+
+	    system("$osselect $osid $node") and
+		notify("$node/$event: Couldn't clear next_boot_*\n");
+
+	    info("Performed RESET for $node to $osid\n");
+	    next;
+	};
+	/^$TBRELOADDONE$/ && do {
+	    info("Clearing reload info for $node\n");
+	    DBQueryFatal("delete from current_reloads where node_id='$node'");
+	    my ($pid,$eid);
+	    NodeidToExp($node,\$pid,\$eid);
+	    if (($pid eq NODERELOADING_PID) && ($eid eq NODERELOADING_EID)) {
+		DBQueryFatal("delete from scheduled_reloads ".
+			     "where node_id='$node'");
+		DBQueryFatal("delete from reserved where node_id='$node'");
+		info("Released $node from $pid/$eid\n");
+	    }
+	    next;
+	};
+	/^$TBTIMEOUT$/ && do {
+	    my $state = $nodes{$node}{state};
+	    my $mode = $nodes{$node}{mode};
+	    my ($timeout,$action);
+	    if ($mode && $state && $timeouts{$mode} &&
+		$timeouts{$mode}{$state}) {
+		($timeout, $action) = @{$timeouts{$mode}{$state}};
+	    }
+	    notify("Node $node has timed out in state $mode/$state".
+		   ($action ne "" ? "\n\tRequested action $action." : "").
+		   "\n");
+	    next;
+	};
+	notify("Unknown CtrlEvent: $event\n");
+    }
+}
+
+#
+# Check if we need to generate an ISUP
+#
+sub checkGenISUP($) {
+    my ($node) = @_;
+    info("$node: Checking ISUP Generation\n");
+    my $r = DBQueryWarn("select osfeatures from os_info as o ".
+			"left join nodes as n on o.osid=n.osid ".
+			"where node_id='$node' and osfeatures is not null");
+    my $osfeatures="";
+    # If we don't get anything back, assume it has no features.
+    if ($r->num_rows() > 0) { ($osfeatures) = $r->fetchrow(); }
+   
+    my @features = split(",",$osfeatures);
+    # Make sure features I care about are defined
+    my %can=("ping"=>0, "isup"=>0); 
+    foreach my $f (@features) {
+	$can{"\L$f"}=1; # make sure it's all lowercase
+    }
+
+    # If os will send ISUP on its own, do nothing here.
+    if ($can{"isup"}) { return 0; }
+
+    # If os doesn't support isup but can ping, fork and ping it every
+    # 5 seconds and send isup when it pings, or timeout after too long.
+    if ($can{"ping"}) {
+	my $pid = fork();
+	if ($pid) { return 0; } # don't wait, return and go on with life
+	else {
+	    debug("Forked process to ping $node\n");
+
+	    my $wait=5; # 5 seconds between ping attempts
+	    my $maxtime=600; # Set the timer for 10 minutes
+	    
+	    # XXX : If our maxtime is very different from os_setup's
+	    #idea of how long a node should take to reboot, then we've
+	    #got a problem, since it might reboot the nodes.
+
+	    # Set an alarm in case it never comes up...
+	    local $SIG{ALRM} = sub { 
+		notify("$node: checkGenISUP timed out waiting ".
+		       "for ping responses after $maxtime seconds.\n");
+		exit(); 
+	    };
+	    
+	    alarm $maxtime;
+
+	    my $n=0;
+	    while ( $n <= ($maxtime/$wait)) {
+		my $rv=system("/sbin/ping -c 1 -t 1 $node > /dev/null") >> 8;
+		if ($rv==0) {
+		    # we got a response
+		    debug("$node: ping response received... sending ISUP\n");
+		    stateTransition($node, TBDB_NODESTATE_ISUP);
+		    exit();
+		} elsif ($rv==2) {
+		    # no response
+		    debug("No ping response, waiting $wait seconds...\n");
+		} elsif ($rv==68) {
+		    # ping: cannot resolve $node: Unknown host
+		    notify("$node: ping couldn't resolve $node!\n");
+		    exit();
+		} else {
+		    notify("$node: checkGenISUP ping returned $rv!\n");
+		    exit();
+		}
+		sleep $wait;
+		$n+=1;
+	    }
+	    notify("$node: Sent $n pings in ".($n*$wait)." seconds ".
+		   "with no response.\n");
+	    exit();
+	}
+    }
+    # If os doesn't support ping or isup, stated sets it to ISUP at the
+    # same time.
+    
+    debug("$node: OS doesn't ping - sending ISUP\n");
+    stateTransition($node, TBDB_NODESTATE_ISUP);
+    
 }
 
 #
@@ -365,6 +618,8 @@ sub checkDBRedirect($) {
 	#
 	# XXX: It's hokey to hardcode tbdb here, but....
 	#
+
+	#debug("checkDBRedirect: $node => $testdb (I'm $TBDBNAME)\n");
 	if ((!$testdb && ($TBDBNAME eq "tbdb")) ||
 	    ($testdb && ($testdb eq $TBDBNAME))) {
 		return 1;
@@ -378,9 +633,11 @@ sub checkDBRedirect($) {
 #
 sub reload() {
     	info("Reloading state from database\n");
-	%nodes    = readStates(%nodes);
-	%timeouts = getTimeouts();
+	%nodes     = readStates(%nodes);
+	%timeouts  = getTimeouts();
 	%valid     = getValid();
+	%modeTrans = getModeTrans();
+	%triggers  = getTriggers();
 }
 
 sub debug(@) {
@@ -390,7 +647,9 @@ sub debug(@) {
 sub notify($) {
     	my $message = shift;
 	if (!$debug) {
-	    	SENDMAIL($TBOPS,"Node State Daemon Messsage",$message,$TBOPS);
+	    SENDMAIL($TBOPS,"Node State Daemon Messsage",$message,$TBOPS);
+	} else {
+	    print "notify: Not sending mail in debug mode\n";
 	}
 	info($message);
 }
@@ -414,3 +673,4 @@ END {
 	}
 
 }
+

@@ -27,7 +27,6 @@ my  $optlist = "hn";
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $BOSSADDR	= "@BOSSNODE@";
-my $TFTPDIR     = "/tftpboot";
 
 #
 # Testbed Support libraries
@@ -50,8 +49,8 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 # 
 #
-my $freebsd     = "$BOSSADDR:$TFTPDIR/pxeboot.freebsd";
 my $nodereboot	= "$TB/bin/node_reboot";
+my $osselect    = "$TB/bin/os_select";
 my $pxebootpath;
 my $dbuid;
 
@@ -107,7 +106,7 @@ if ($UID && !TBAdmin($UID)) {
 }
 
 if ($onoff eq "on") {
-    $pxebootpath = $freebsd;
+    $pxebootpath = "PXEFBSD";
 }
 else {
     my $query_result =
@@ -119,8 +118,10 @@ else {
     $pxebootpath = $row[0];
 }
 
-DBQueryFatal("update nodes set pxe_boot_path='$pxebootpath', ".
-	     "startupcmd='', startstatus='none' ".
+system("$osselect -m $pxebootpath $node") and
+    die("*** Failed to set PXE boot path for $node!\n");
+
+DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
 	     "where node_id='$node'");
 
 #

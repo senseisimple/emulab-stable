@@ -17,7 +17,7 @@ SUBDIRS		= checkpass ns2ir
 BIN_STUFF	= power snmpit tbend tbswapin tbswapout tbprerun tbreport \
 		  tbresize os_load startexp endexp batchexp swapexp \
 		  node_reboot nscheck node_update savelogs node_control \
-		  portstats checkports eventsys_control
+		  portstats checkports eventsys_control os_select
 
 # Stuff that mere users get on plastic.
 USERBINS        = os_load node_reboot nscheck node_update savelogs \
