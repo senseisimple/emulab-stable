@@ -589,7 +589,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/cvsupd.pl utils/newnode utils/grantnodetype \
 	utils/nsgen/GNUmakefile utils/nsgen/webnsgen \
 	utils/link_config utils/import_commitlog utils/dhcpd_wrapper \
-	utils/opsreboot utils/deletenode utils/webdeletenode \
+	utils/opsreboot utils/deletenode utils/webdeletenode utils/spewleds \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 \
 	www/swish.conf www/websearch \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
