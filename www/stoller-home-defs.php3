@@ -7,7 +7,7 @@
 #
 # Leigh's definitions. Selected via configure.
 #
-$WWWHOST        = "golden-gw.ballmoss.com:8080";
+$WWWHOST        = "golden-gw.ballmoss.com:9876";
 $WWW            = "$WWWHOST/~stoller/testbed";
 $TBBASE         = "http://$WWW";
 $TBDOCBASE      = "http://$WWW";

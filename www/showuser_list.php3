@@ -27,20 +27,37 @@ $isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have permission to view the user list!", 1);
 }
-if (!isset($showactive))
-    $showactive = 0;
+
+echo "<b>Show: <a href='showuser_list.php3?showtype=all'>all</a>,
+               <a href='showuser_list.php3?showtype=widearea'>widearea</a>,
+               <a href='showuser_list.php3?showtype=active'>active</a>.
+      </b><br><br>\n";
+
+if (!isset($showtype)) {
+    $showtype='active';
+}
 if (!isset($sortby))
     $sortby = "uid";
-    
-if (!$showactive) {
-    echo "<b><a href='showuser_list.php3?showactive=1&sortby=$sortby'>
-                Show Logged in Users</a>
-          </b><br><br>\n";
+
+if (! strcmp($showtype, "all")) {
+    $where   = "";
+    $clause  = "";
+    $showtag = "";
+}
+elseif (! strcmp($showtype, "active")) {
+    $clause  = "left join login as l on u.uid=l.uid ";
+    $where   = "where l.timeout>=unix_timestamp()";
+    $showtag = "active";
+}
+elseif (! strcmp($showtype, "widearea")) {
+    $clause  = "left join widearea_accounts as w on u.uid=w.uid ";
+    $where   = "where w.node_id is not NULL";
+    $showtag = "widearea";
 }
 else {
-    echo "<b><a href='showuser_list.php3?showactive=0&sortby=$sortby'>
-                Show All Users</a>
-          </b><br><br>\n";
+    $clause  = "";
+    $where   = "";
+    $showtag = "";
 }
 
 if (! strcmp($sortby, "name"))
@@ -55,49 +72,27 @@ else {
     $order = "u.uid";
 }
 
-if ($showactive) {
-    $query_result =
-	DBQueryFatal("SELECT u.*, ".
-		     " IF(ll.time, ".
-		     "    TO_DAYS(CURDATE()) - TO_DAYS(ll.time), ".
-		     "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
-		     "   as webidle, ".
-		     " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
-		     "FROM users as u ".
-		     "left join login as l on u.uid=l.uid ".
-		     "left join userslastlogin as ull on u.uid=ull.uid ".
-		     "left join lastlogin as ll on u.uid=ll.uid ".
-		     "where l.timeout>=unix_timestamp() ".
-		     "order by $order");
-}
-else {
-    $query_result =
-	DBQueryFatal("SELECT u.*, ".
-		     " IF(ll.time, ".
-		     "    TO_DAYS(CURDATE()) - TO_DAYS(ll.time), ".
-		     "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
-		     "   as webidle, ".
-		     " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
-		     "FROM users as u ".
-		     "left join userslastlogin as ull on u.uid=ull.uid ".
-		     "left join lastlogin as ll on u.uid=ll.uid ".
-		     "order by $order");
-}
+$query_result =
+    DBQueryFatal("SELECT u.*, ".
+		 " IF(ll.time, ".
+		 "    TO_DAYS(CURDATE()) - TO_DAYS(ll.time), ".
+		 "    TO_DAYS(CURDATE()) - TO_DAYS(u.usr_created)) ".
+		 "   as webidle, ".
+		 " TO_DAYS(CURDATE()) - TO_DAYS(ull.date) as usersidle ".
+		 "FROM users as u ".
+		 "$clause ".
+		 "left join userslastlogin as ull on u.uid=ull.uid ".
+		 "left join lastlogin as ll on u.uid=ll.uid ".
+		 "$where ".
+		 "order by $order");
 
 if (($count = mysql_num_rows($query_result)) == 0) {
     USERERROR("There are no users!", 1);
 }
 
-if ($showactive) {
-    echo "<center>
-          There are $count users logged in.
-          </center><br>\n";
-}
-else {
-    echo "<center>
-          There are $count users.
-          </center><br>\n";
-}
+echo "<center>
+       There are $count $showtag users.
+      </center><br>\n";
 
 #
 # Grab the project lists and create a hash of lists, per user.
