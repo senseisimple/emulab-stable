@@ -139,8 +139,7 @@ $cmd = "create table log (".
   "node_id char($id_len),".
   "uid char($id_len),".
   "entry_time timestamp,".
-  "log_type ENUM('powercycle','error','message','note','critical'".
-  ",'segfault'),".
+  "log_type ENUM('powercycle','error','note','critical'),".
   "message text);";
 $sth = $dbh->query($cmd) || &failed($cmd,$sth->errstr);
 
