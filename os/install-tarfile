@@ -1,0 +1,147 @@
+#!/usr/bin/perl -wT
+use English;
+use Getopt::Std;
+use POSIX 'setsid';
+
+#
+# Install a tarfile. This script is run from the setup code on client nodes.
+#
+# usage: install-tarfile <installdir> <filename>
+#
+# Exit Value Matters!: 0 if installed okay
+#                      1 if already installed
+#                     -1 if something goes wrong.
+#
+# To ensure safety, the tar filename must start with /proj.
+# 
+#
+sub usage()
+{
+    print STDOUT "Usage: install-tarfile <installdir> <filename>\n";
+    exit(-1);
+}
+my  $optlist = "";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# No configure vars.
+#
+my $IDENTFILE      = "/var/db/testbed.tarfiles";
+my $tarfile        = "";
+my $decompressflag = "";
+my $installdir     = "/";
+
+#
+# Must be running as root to work. 
+#
+if ($EUID != 0) {
+    die("Must be run as root! Try using sudo or su1!");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 2) {
+    usage();
+}
+$installdir = $ARGV[0];
+$tarfile    = $ARGV[1];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($tarfile =~ /^([-\w.\/]+)$/) {
+    $tarfile = $1;
+}
+else {
+    fatal("Tainted filename: $tarfile");
+}
+if ($installdir =~ /^([-\w.\/]+)$/) {
+    $installdir = $1;
+}
+else {
+    fatal("Tainted directory name: $installdir");
+}
+
+#
+# The tarfile may only come from a /proj directory.
+#
+if (! ($tarfile =~ /^\/proj\//)) {
+    fatal("The tar file must reside in /proj");
+}
+
+#
+# Make sure its really there.
+#
+if (! -r $tarfile) {
+    fatal("$tarfile does not exist or is not accessible!");
+}
+
+#
+# Make sure the installdir exists!
+#
+if (! -d $installdir) {
+    fatal("$installdir does not exist or is not accessible!");
+}
+
+#
+# Check to make sure this tarfile has not already been installed. Update
+# the file now. If the tar fails, we got big problems.
+#
+if (-e $IDENTFILE) {
+    if (! `egrep -q -s '^${tarfile}' $IDENTFILE`) {
+	print STDOUT "Tarfile $tarfile has already been installed!\n";
+	exit(1);
+    }
+}
+system("echo \"$tarfile\" >> $IDENTFILE") == 0 or
+    fatal("Could not update $IDENTFILE");
+
+#
+# Figure what decompression flag is required, based on file extension.
+#
+SWITCH: for ($tarfile) {
+    /^.*\.tar\.Z$/   && do {$decompressflag = "-Z"; last SWITCH; } ;
+    /^.*\.tar\.gz$/  && do {$decompressflag = "-z"; last SWITCH; } ;
+    /^.*\.tar\.tgz$/ && do {$decompressflag = "-y"; last SWITCH; } ;
+    /^.*\.tar$/      && do {last SWITCH; } ;
+}
+
+#
+# Install tar file from root?
+# 
+if (! chdir($installdir)) {
+    fatal("Could not chdir to $installdir: $!\n");
+}
+
+#
+# Run the tarfile. 
+#
+system("tar $decompressflag -xf $tarfile");
+$exit_status = $? >> 8;
+
+exit($exit_status);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    print STDERR "$msg\n";
+    exit(-1);
+}
+

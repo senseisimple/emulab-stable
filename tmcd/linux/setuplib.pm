@@ -7,6 +7,7 @@ use English;
 my $TMCC	= "/etc/rc.d/testbed/tmcc";
 my $TMIFC       = "/etc/rc.d/testbed/rc.ifc";
 my $TMRPM       = "/etc/rc.d/testbed/rc.rpm";
+my $TMTARBALLS  = "/etc/rc.d/testbed/rc.tarballs";
 my $TMSTARTUPCMD= "/etc/rc.d/testbed/startupcmd";
 my $TMGROUP     = "/etc/rc.d/testbed/group";
 my $TMPASSWD    = "/etc/rc.d/testbed/passwd";
@@ -15,7 +16,7 @@ my $TMGSHADOW   = "/etc/rc.d/testbed/gshadow";
 my $TMHOSTS     = "/etc/rc.d/testbed/hosts";
 my $TMNICKNAME  = "/etc/rc.d/testbed/nickname";
 my $HOSTSFILE   = "/etc/hosts";
-my @CONFIGS	= ($TMIFC, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME);
+my @CONFIGS	= ($TMIFC, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME, $TMTARBALLS);
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
@@ -24,6 +25,7 @@ my $ACCTCMD     = "accounts";
 my $DELAYCMD    = "delay";
 my $HOSTSCMD    = "hostnames";
 my $RPMCMD      = "rpms";
+my $TARBALLCMD  = "tarballs";
 my $STARTUPCMD  = "startupcmd";
 my $DELTACMD    = "deltas";
 my $IFCONFIG    = "/sbin/ifconfig eth%d inet %s netmask %s\n";
@@ -33,6 +35,7 @@ my $USERADD	= "/usr/sbin/useradd";
 my $USERMOD	= "/usr/sbin/usermod";
 my $GROUPADD	= "/usr/sbin/groupadd";
 my $DELTAINSTALL= "/usr/local/bin/install-delta";
+my $TARINSTALL  = "/usr/local/bin/install-tarfile";
 my $IFACE	= "eth";
 my $CTLIFACENUM = "4";
 my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
@@ -299,6 +302,40 @@ sub dorpms ()
     close(TM);
     close(RPM);
     chmod(0755, "$TMRPM");
+
+    return 0;
+}
+
+sub dotarballs ()
+{
+    my @tarballs = ();
+
+    print STDOUT "Checking Testbed Tarball configuration ... \n";
+
+    open(TM,  "$TMCC $NODE $TARBALLCMD |")
+	or die "Cannot start $TMCC: $!";
+    while (<TM>) {
+	push(@tarballs, $_);
+    }
+    close(TM);
+
+    if (! @tarballs) {
+	return 0;
+    }
+    
+    open(TARBALL, ">$TMTARBALLS")
+	or die("Could not open $TMTARBALLS: $!");
+    print TARBALL "#!/bin/sh\n";
+    
+    foreach my $tarball (@tarballs) {
+	if ($tarball =~ /DIR=([-\@\w.\/]+)\s+TARBALL=([-\@\w.\/]+)/) {
+	    print  STDOUT "  $TARINSTALL $1 $2\n";
+	    print  TARBALL  "echo \"Installing Tarball $2 in dir $1 \"\n";
+	    print  TARBALL  "$TARINSTALL $1 $2\n";
+	}
+    }
+    close(TARBALL);
+    chmod(0755, "$TMTARBALLS");
 
     return 0;
 }

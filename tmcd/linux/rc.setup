@@ -15,6 +15,11 @@ if [ -x /etc/rc.d/testbed/rc.rpm  ]; then
 	/etc/rc.d/testbed/rc.rpm
 fi
 
+if [ -x /etc/rc.d/testbed/rc.tarballs  ]; then
+        echo "Installing Tarballs ..."
+	/etc/rc.d/testbed/rc.tarballs
+fi
+
 /bin/rm -f /var/spool/at/S*
 if [ -s /etc/rc.d/testbed/startupcmd  ]; then
         echo "Scheduling startup command to run in a little bit ..."

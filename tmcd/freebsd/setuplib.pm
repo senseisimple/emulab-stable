@@ -8,13 +8,15 @@ my $TMCC	= "/etc/testbed/tmcc";
 my $TMIFC       = "/etc/testbed/rc.ifc";
 my $TMDELAY	= "/etc/testbed/rc.delay";
 my $TMRPM       = "/etc/testbed/rc.rpm";
+my $TMTARBALLS  = "/etc/testbed/rc.tarballs";
 my $TMSTARTUPCMD= "/etc/testbed/startupcmd";
 my $TMGROUP     = "/etc/testbed/group";
 my $TMPASSWD    = "/etc/testbed/master.passwd";
 my $TMHOSTS     = "/etc/testbed/hosts";
 my $HOSTSFILE   = "/etc/hosts";
 my $TMNICKNAME  = "/etc/testbed/nickname";
-my @CONFIGS	= ($TMIFC, $TMDELAY, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME);
+my @CONFIGS	= ($TMIFC, $TMDELAY, $TMRPM, $TMSTARTUPCMD, $TMNICKNAME,
+		   $TMTARBALLS);
 my $REBOOTCMD   = "reboot";
 my $STATCMD     = "status";
 my $IFCCMD      = "ifconfig";
@@ -22,6 +24,7 @@ my $ACCTCMD     = "accounts";
 my $DELAYCMD    = "delay";
 my $HOSTSCMD    = "hostnames";
 my $RPMCMD      = "rpms";
+my $TARBALLCMD  = "tarballs";
 my $STARTUPCMD  = "startupcmd";
 my $DELTACMD    = "deltas";
 my $STARTSTATCMD= "startstatus";
@@ -34,6 +37,7 @@ my $MKDB	= "/usr/sbin/pwd_mkdb -p";
 my $PW		= "/usr/sbin/pw";
 my $CHPASS	= "/usr/bin/chpass";
 my $DELTAINSTALL= "/usr/local/bin/install-delta";
+my $TARINSTALL  = "/usr/local/bin/install-tarfile";
 my $IFACE	= "fxp";
 my $CTLIFACENUM = "4";
 my $CTLIFACE    = "${IFACE}${CTLIFACENUM}";
@@ -448,6 +452,43 @@ sub dorpms ()
     close(TM);
     close(RPM);
     chmod(0755, "$TMRPM");
+
+    return 0;
+}
+
+#
+# TARBALL configuration. Done after account stuff!
+#
+sub dotarballs ()
+{
+    my @tarballs = ();
+
+    print STDOUT "Checking Testbed Tarball configuration ... \n";
+
+    open(TM,  "$TMCC $NODE $TARBALLCMD |")
+	or die "Cannot start $TMCC: $!";
+    while (<TM>) {
+	push(@tarballs, $_);
+    }
+    close(TM);
+
+    if (! @tarballs) {
+	return 0;
+    }
+    
+    open(TARBALL, ">$TMTARBALLS")
+	or die("Could not open $TMTARBALLS: $!");
+    print TARBALL "#!/bin/sh\n";
+    
+    foreach my $tarball (@tarballs) {
+	if ($tarball =~ /DIR=([-\@\w.\/]+)\s+TARBALL=([-\@\w.\/]+)/) {
+	    print  STDOUT "  $TARINSTALL $1 $2\n";
+	    print  TARBALL  "echo \"Installing Tarball $2 in dir $1 \"\n";
+	    print  TARBALL  "$TARINSTALL $1 $2\n";
+	}
+    }
+    close(TARBALL);
+    chmod(0755, "$TMTARBALLS");
 
     return 0;
 }

@@ -8,7 +8,7 @@ require 'ctime.pl';
 #
 my $SUPCHECKOUT = "/etc/rc.d/testbed/sup/sup/RHL62-STD/checkouts";
 my $DUMPDATES   = "/etc/dumpdates";
-my $IDENTFILE   = "/var/db/testbed.deltas";
+my @DBFILES     = ("/var/db/testbed.deltas", "/var/db/testbed.tarfiles");
 my $FSTAB       = "/etc/fstab";
 
 #
@@ -39,10 +39,12 @@ if (-e $SUPCHECKOUT) {
 	die("Could not unlink $SUPCHECKOUT");
 }
 
-print "Removing old $IDENTFILE file ...\n";
-if (-e $IDENTFILE) {
-    unlink($IDENTFILE) or
-	die("Could not unlink $IDENTFILE");
+print "Removing old DB files ...\n";
+foreach my $dbfile (@DBFILES) {
+    if (-e $dbfile) {
+	unlink($dbfile) or
+	    die("Could not unlink $dbfile");
+    }
 }
 
 #

@@ -26,6 +26,7 @@ control-install:
 client-install: 
 	$(INSTALL_PROGRAM) create-delta /usr/local/bin/create-delta
 	$(INSTALL_PROGRAM) install-delta /usr/local/bin/install-delta
+	$(INSTALL_PROGRAM) install-tarfile /usr/local/bin/install-tarfile
 
 clean:		subdir-clean
 

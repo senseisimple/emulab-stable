@@ -63,6 +63,11 @@ doaccounts();
 dorpms();
 
 #
+# Tar Balls
+# 
+dotarballs();
+
+#
 # Experiment startup Command.
 #
 dostartupcmd();
