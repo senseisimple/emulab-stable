@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -50,15 +50,6 @@ else {
 		     "where g.uid='$uid' or i.shared order by $order");
 }
 
-if (mysql_num_rows($query_result) == 0) {
-	if ($isadmin) {
-	    USERERROR("There are no ImageIDs!", 1);
-	}
-	else {
-	    USERERROR("There are no ImageIDs in any of your projects!", 1);
-	}
-}
-
 SUBPAGESTART();
 SUBMENUSTART("More Options");
 WRITESUBMENUBUTTON("Create an Image Descriptor",
@@ -70,33 +61,37 @@ WRITESUBMENUBUTTON("OS Descriptor list",
 SUBMENUEND();
 SUBPAGEEND();
 
-echo "<table border=2 cellpadding=0 cellspacing=2
-       align='center'>\n";
-
-echo "<tr>
-          <td><a href='showimageid_list.php3?&sortby=name'>
-              Image</td>
-          <td><a href='showimageid_list.php3?&sortby=pid'>
-              PID</td>
-          <td><a href='showimageid_list.php3?&sortby=desc'>
-              Description</td>
-      </tr>\n";
-
-while ($row = mysql_fetch_array($query_result)) {
-    $imageid    = $row[imageid];
-    # Must encode the imageid since Rob started using plus signs in the names.
-    $url        = rawurlencode($imageid);
-    $descrip    = stripslashes($row[description]);
-    $imagename  = $row[imagename];
-    $pid        = $row[pid];
+if (mysql_num_rows($query_result)) {
+    echo "<table border=2 cellpadding=0 cellspacing=2
+           align='center'>\n";
 
     echo "<tr>
-              <td><A href='showimageid.php3?imageid=$url'>$imagename</A></td>
-              <td>$pid</td>
-              <td>$descrip</td>\n";
-    echo "</tr>\n";
+              <td><a href='showimageid_list.php3?&sortby=name'>
+                  Image</td>
+              <td><a href='showimageid_list.php3?&sortby=pid'>
+                  PID</td>
+              <td><a href='showimageid_list.php3?&sortby=desc'>
+                  Description</td>
+          </tr>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$imageid    = $row[imageid];
+        # Must encode the imageid since Rob started using plus signs in
+	# the names.
+	$url        = rawurlencode($imageid);
+	$descrip    = stripslashes($row[description]);
+	$imagename  = $row[imagename];
+	$pid        = $row[pid];
+
+	echo "<tr>
+                  <td><A href='showimageid.php3?imageid=$url'>
+                         $imagename</A></td>
+                  <td>$pid</td>
+                  <td>$descrip</td>\n";
+        echo "</tr>\n";
+    }
+    echo "</table>\n";
 }
-echo "</table>\n";
 
 #
 # Standard Testbed Footer

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -52,15 +52,6 @@ else {
 		     "order by $order");
 }
 
-if (mysql_num_rows($query_result) == 0) {
-	if ($isadmin) {
-	    USERERROR("There are no OSIDs!", 1);
-	}
-	else {
-	    USERERROR("There are no OSIDs in any of your projects!", 1);
-	}
-}
-
 SUBPAGESTART();
 SUBMENUSTART("More Options");
 WRITESUBMENUBUTTON("Create an Image Descriptor",
@@ -84,31 +75,33 @@ echo "<p>
 
 SUBPAGEEND();
 
-echo "<br>
-      <table border=2 cellpadding=0 cellspacing=2 align='center'>\n";
-
-echo "<tr>
-          <th><a href='showosid_list.php3?&sortby=name'>
-              Name</th>
-          <th><a href='showosid_list.php3?&sortby=pid'>
-              PID</th>
-          <th><a href='showosid_list.php3?&sortby=desc'>
-              Description</th>
-      </tr>\n";
-
-while ($row = mysql_fetch_array($query_result)) {
-    $osname  = $row[osname];
-    $osid    = $row[osid];
-    $descrip = stripslashes($row[description]);
-    $pid     = $row[pid];
-
+if (mysql_num_rows($query_result)) {
+    echo "<br>
+          <table border=2 cellpadding=0 cellspacing=2 align='center'>\n";
+    
     echo "<tr>
-              <td><A href='showosinfo.php3?osid=$osid'>$osname</A></td>
-              <td>$pid</td>
-              <td>$descrip</td>\n";
-    echo "</tr>\n";
+              <th><a href='showosid_list.php3?&sortby=name'>
+                  Name</th>
+              <th><a href='showosid_list.php3?&sortby=pid'>
+                  PID</th>
+              <th><a href='showosid_list.php3?&sortby=desc'>
+                  Description</th>
+          </tr>\n";
+    
+    while ($row = mysql_fetch_array($query_result)) {
+        $osname  = $row[osname];
+        $osid    = $row[osid];
+        $descrip = stripslashes($row[description]);
+        $pid     = $row[pid];
+    
+        echo "<tr>
+                  <td><A href='showosinfo.php3?osid=$osid'>$osname</A></td>
+                  <td>$pid</td>
+                  <td>$descrip</td>\n";
+        echo "</tr>\n";
+    }
+    echo "</table>\n";
 }
-echo "</table>\n";
 
 #
 # Standard Testbed Footer
