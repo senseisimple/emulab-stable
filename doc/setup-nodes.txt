@@ -158,6 +158,9 @@ the Linux one, and write that down. (If necessary, you could boot the node up
 from Knoppix, or some distribution's install floppy/CD to determine the Linux
 order - use MAC addresses to map this to the FreeBSD one.)
 
+If you somehow make a mistake and need to delete a node that's been created,
+use the 'deletenode' script on boss.
+
 ##### Bringing up the rest of the nodes
 
 Okay, now that you've got the first node up, the rest should be easy. Bring the
