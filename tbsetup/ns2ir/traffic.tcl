@@ -25,11 +25,15 @@ Agent instproc init {} {
     $self set node {}
     $self set application {}
     $self set destination {}
+    $self set proto {}
+    $self set role {}
+    $self set port {}
     global ::GLOBALS::last_class
     set ::GLOBALS::last_class $self
 }
 Agent instproc set_node {node} {
     $self set node $node
+    $self set port [$node next_portnumber]
 }
 Agent instproc get_node {} {
     $self instvar node
@@ -37,6 +41,8 @@ Agent instproc get_node {} {
 }
 Agent instproc set_application {application} { 
     $self set application $application
+    $self set role [$application set role]
+    
 }
 Agent instproc connect {dst} {
     $self instvar destination
@@ -54,12 +60,47 @@ Agent instproc rename {old new} {
     }
 }
 
+# updatedb DB
+# This adds rows to the virt_trafgens table corresponding to this agent.
+Agent instproc updatedb {DB} {
+    var_import ::GLOBALS::pid
+    var_import ::GLOBALS::eid
+    $self instvar application
+    $self instvar destination
+    $self instvar node
+    $self instvar proto
+    $self instvar role
+    $self instvar port
+
+    if {$role == {}} {
+	perror "\[updatedb] $self has no role."
+	return
+    }
+    if {$destination == {}} {
+	perror "\[updatedb] $self has no destination."
+	return
+    }
+    set target_vnode [$destination set node]
+    set target_port [$destination set port]
+
+    if {$role == "sink"} {
+	set application [$destination set application]
+	set proto [$destination set proto]
+    }
+#   set src_link [lindex [$node set portlist] 0]
+#   set dst_link [lindex [$target_vnode set portlist] 0]
+
+    # Update the DB
+    sql exec $DB "insert into virt_trafgens (pid,eid,vnode,vname,role,proto,port,target_vnode,target_port) values ('$pid','$eid','$node','$application','$role','$proto', $port,'$target_vnode',$target_port)";
+}
+
 # Agent/UDP 
 Agent/UDP instproc connect {dst} {
     $self next $dst
     $self instvar node
     $self instvar application
     $self instvar destination
+
     set error 0
     if {$node == {}} {
 	perror "\[connect] $self is not attached to a node."
@@ -78,33 +119,10 @@ Agent/UDP instproc connect {dst} {
 	perror "\[connect] $node must have exactly one link to be a traffic generator."
 	set error 1
     }
-    set gateport [lindex [$node set portlist] 0]
-    set gate {}
-    foreach nodeport [$gateport set nodelist] {
-	set n [lindex $nodeport 0]
-	if {$n != $node} {
-	    set gate $n
-	    break
-	}
-    }
-    if {$gate == {}} {
-	perror "\[connect] No gateway found for $node."
-	set error 1
-    }
     if {$error} {return}
 
-    $node set osid "SEND"
-    
-    set interval [$application set interval_]
-    set packetsize [$application set packetSize_]
-    if {$interval != {}} {
-	set pktrate [expr int(1.0/$interval)]
-    } else {
-	set rate [parse_bw [$application set rate_]]
-	set pktrate [expr int(($rate*1024*1024) / (8*$packetsize))]
-    }
-    
-    $node set cmdline "DST_NAME=$dest GATE_NAME=$gate PKT_SIZE=$packetsize PKT_RATE=$pktrate"
+    $self set proto "udp"
+    $node set osid "FBSD-STD"
 }
 
 # Agent/Null
@@ -127,28 +145,16 @@ Agent/Null instproc connect {dst} {
 	perror "\[connect] $node must have exactly one link to be a traffic consumer."
 	set error 1
     }
-    set gateport [lindex [$node set portlist] 0]
-    set gate {}
-    foreach nodeport [$gateport set nodelist] {
-	set n [lindex $nodeport 0]
-	if {$n != $node} {
-	    set gate $n
-	    break
-	}
-    }
-    if {$gate == {}} {
-	perror "\[connect] No gateway found for $node."
-	set error 1
-    }
     if {$error} {return}
 
-    $node set osid "CONSUME"
-    $node set cmdline "DST_NAME=$dest GATE_NAME=$gate"
+    $self set role "sink"
+    $node set osid "FBSD-STD"
 }
 
 # Application
 Application instproc init {} {
     $self set agent {}
+    $self set role {}
     global ::GLOBALS::last_class
     set ::GLOBALS::last_class $self
 }
@@ -162,7 +168,7 @@ Application instproc get_node {} {
 }
 Application instproc rename {old new} {
     $self instvar agent
-    # In normal condition sthis will never occur.
+    # In normal condition this will never occur.
     if {$agent != {}} {
 	$agent set_application $self
     }
@@ -174,4 +180,26 @@ Application/Traffic/CBR instproc init {} {
     $self set rate_ "100Mbps"
     $self set interval_ {}
     $self next
+    
+    $self set role "source"
+}
+
+Application/Traffic/CBR instproc get_params {} {
+    $self instvar packetSize_
+    $self instvar rate_
+    $self instvar interval_
+
+    if {$rate_ != {} && $rate_ != 0} {
+	set rate [parse_bw $rate_]
+    } else {
+	set rate -1
+    }
+    set param "PACKETSIZE=$packetSize_ RATE=$rate"
+
+    if {$interval_ != {} && $interval_ != 0} {
+	set param "$param INTERVAL=$interval_"
+    } else {
+	set param "$param INTERVAL=-1"
+    }
+    return $param
 }

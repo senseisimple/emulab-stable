@@ -216,21 +216,8 @@ Simulator instproc run {} {
 	$vtype updatedb $DB
     }
     
-    catch "sql exec $DB \"drop table ${pid}_${eid}_events\""
-    sql exec $DB "CREATE TABLE ${pid}_${eid}_events ( \
-                idx        int unsigned NOT NULL auto_increment, \
-                time       float(10,3) NOT NULL default 0.000, \
-                vnode      varchar(32) NOT NULL default '', \
-                vname      varchar(20) NOT NULL default '', \
-                objecttype smallint unsigned NOT NULL default 0, \
-                eventtype  smallint unsigned NOT NULL default 0, \
-                arguments  tinytext default NULL, \
-                atstring   tinytext default NULL, \
-                PRIMARY KEY  (idx), \
-                KEY (vnode) \
-		) TYPE=MyISAM;"
     foreach event $event_list {
-	sql exec $DB "insert into ${pid}_${eid}_events (time,vnode,vname,objecttype,eventtype,arguments,atstring) values ([lindex $event 0],\"[lindex $event 1]\",\"[lindex $event 2]\",$objtypes([lindex $event 3]),$eventtypes([lindex $event 4]),\"[lindex $event 5]\",\"[lindex $event 6]\")"
+	sql exec $DB "insert into eventlist (pid,eid,time,vnode,vname,objecttype,eventtype,arguments,atstring) values (\"$pid\",\"$eid\",[lindex $event 0],\"[lindex $event 1]\",\"[lindex $event 2]\",$objtypes([lindex $event 3]),$eventtypes([lindex $event 4]),\"[lindex $event 5]\",\"[lindex $event 6]\")"
     }
 }
 
@@ -245,7 +232,7 @@ Simulator instproc attach-agent {node agent} {
 	perror "\[attach-agent] $node is not a Node."
 	return
     }
-    $agent set_node $node
+    $node attach-agent $agent
 }
 
 # connect <src> <dst>
@@ -290,8 +277,14 @@ Simulator instproc at {time event} {
 	"Application/Traffic/CBR" {
 	    set otype TRAFGEN
 	    switch -- $cmd {
-		"start" {set etype START}
-		"stop" {set etype STOP}
+		"start" {
+                    set params [$obj get_params]
+		    set etype START
+		    set args  $params
+		}
+		"stop" {
+		    set etype STOP
+		}
                 "set" {
 		    if {[llength $event] < 4} {
 			punsup "Wrong number of arguments: at $time $event"
@@ -304,7 +297,8 @@ Simulator instproc at {time event} {
 	                    set args  "PACKETSIZE=$arg"
                         }
                         "rate_" {
-	                    set args  "RATE=$arg"
+			    set bw [parse_bw $arg]
+	                    set args  "RATE=$bw"
                         }
                         "interval_" {
 	                    set args  "INTERVAL=$arg"
@@ -334,7 +328,8 @@ Simulator instproc at {time event} {
 			return
 		    }
                     set arg   [lindex $event 2]
-                    set args  "BANDWIDTH=$arg"
+		    set bw [parse_bw $arg]
+                    set args  "BANDWIDTH=$bw"
 		    set etype MODIFY
 		}
 		"delay" {

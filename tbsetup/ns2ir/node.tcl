@@ -21,6 +21,13 @@ Node instproc init {s} {
     # on port i.
     $self set portlist {}
 
+    # A list of agents attached to this node.
+    $self set agentlist {}
+
+    # A counter for udp/tcp portnumbers. Assign them in an increasing
+    # fashion as agents are assigned to the node.
+    $self set next_portnumber_ 5000
+
     # iplist, like portlist, is supported by portnumber.  An entry of
     # {} indicates an unassigned IP address for that port.
     $self set iplist {}
@@ -80,6 +87,7 @@ Node instproc updatedb {DB} {
     $self instvar failureaction
     $self instvar routertype
     $self instvar fixed
+    $self instvar agentlist
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
@@ -98,6 +106,10 @@ Node instproc updatedb {DB} {
     foreach ip $iplist {
 	lappend ipraw $i:$ip
 	incr i
+    }
+
+    foreach agent $agentlist {
+	$agent updatedb $DB
     }
 
     # Update the DB
@@ -137,4 +149,22 @@ Node instproc ip {port args} {
 # -1 if there is no connection.
 Node instproc find_port {lanlink} {
     return [lsearch [$self set portlist] $lanlink]
+}
+
+# Attach an agent to a node. This mainly a bookkeeping device so
+# that the we can update the DB at the end.
+Node instproc attach-agent {agent} {
+    $self instvar agentlist
+
+    lappend agentlist $agent
+    $agent set_node $self
+}
+
+#
+# Return and bump next agent portnumber,
+Node instproc next_portnumber {} {
+    $self instvar next_portnumber_
+    
+    set next_port [incr next_portnumber_]
+    return $next_port
 }
