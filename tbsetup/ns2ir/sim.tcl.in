@@ -251,6 +251,17 @@ Simulator instproc run {} {
 	$obj fill_ips
     }
 
+    # Go through the list of nodes, and find subnode hosts - we have to add a
+    # desire to them to have the hosts-<type-of-child> feature
+    foreach node [lsort [array names node_list]] {
+	if { [$node set subnodehost] == 1 } {
+	    set child [$node set subnodechild]
+	    set childtype [$child set type]
+	    $node add-desire "hosts-$childtype" 1.0
+	}
+    }
+
+
     # Mark that a run statement exists
     set ran 1
 
@@ -278,7 +289,7 @@ Simulator instproc run {} {
 
     # If we are running in impotent mode we stop here
     if {$impotent == 1 && $passmode == 0} {return}
-
+    
     $self spitxml_init
 
     # update the global nseconfigs using a bogus vname

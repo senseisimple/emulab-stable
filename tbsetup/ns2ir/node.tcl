@@ -56,8 +56,9 @@ Node instproc init {s} {
     $self set virthost 0
 
     # Sorta ditto for subnode stuff.
-    $self set issubnode   0
-    $self set subnodehost 0
+    $self set issubnode    0
+    $self set subnodehost  0
+    $self set subnodechild ""
 
     # If osid remains blank when updatedb is called it is changed
     # to the default OS based on it's type (taken from node_types
@@ -313,6 +314,7 @@ Node instproc set_fixed {pnode} {
         # $pnode is an object instance of class Node
 	if {$issubnode} {
 	    $pnode set subnodehost 1
+	    $pnode set subnodechild $self
 	} else {
 	    perror "\[set-fixed] Improper fix-node $self to $pnode!"
 	    return
