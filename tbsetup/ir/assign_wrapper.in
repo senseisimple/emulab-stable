@@ -250,10 +250,10 @@ foreach $link (keys(%links)) {
 	    $r = (1-(1-$Aloss)*(1-$Bloss)*(1-$loss))/
 		(sqrt(1-$Aloss)*sqrt(1-$Bloss));
 	}
-	$delayinfo{$delayname} = [&min($Abw,$Bbw,$bw),
-			      $Adelay/2+$Bdelay/2+$delay,
-			      $r];
-	printdb "delayinfo{$delayname} = [" . join(",",@{$delayinfo{$delayname}}) . "]\n";
+	$delayinfo{$link} = [&min($Abw,$Bbw,$bw),
+			     $Adelay/2+$Bdelay/2+$delay,
+			     $r];
+	printdb "delayinfo{$link} = [" . join(",",@{$delayinfo{$link}}) . "]\n";
 	
 	# Remove the original link
 	delete $links{$link};
@@ -265,10 +265,10 @@ foreach $link (keys(%links)) {
 	$nodes{$delayname} = ["dsrc_$link","ddst_$link"];
 	$links{"dsrc_$link"} = [$src,$delayname,0,0,0];
 	$links{"ddst_$link"} = [$delayname,$dst,0,0,0];
-	$delayinfo{$delayname} = [$bw,$delay,$loss];
+	$delayinfo{$link} = [$bw,$delay,$loss];
 
 	printdb "Created delay $delayname and links dsrc_$link and ddst_$link\n";
-	printdb "delayinfo{$delayname} = [$bw,$delay,$loss]\n";
+	printdb "delayinfo{$link} = [$bw,$delay,$loss]\n";
 	
         # !!! - This could be improved (splice)
 	$newsrclinks = [];
@@ -506,9 +506,13 @@ foreach $lan (keys(%lans)) {
     $vlans{$lan} = [];
 }
 
+@delaysection = ();
+
 foreach (keys(%plinks)) {
     # ignore ddst_* as those will be handled when we handle dsrc_*
     /^ddst_.+$/ && next;
+
+    $vlink = $_;
 
     @info = @{$plinks{$_}};
     ($type,$plinkA,$macA) = @info[0,1,2];
@@ -564,9 +568,12 @@ foreach (keys(%plinks)) {
 	    $delayB = $plinkB2;$delayBmac = $macB2;
 	    $dst = $plinkA2;$dstmac = $macA2;
 	}
-	push(@{$delayinfo{$p2vmap{&nodename($delayA)}}},($delayAmac,$delayBmac));
+
+	push(@delaysection,&nodename($delayA) . " " . join(" ",@{$delayinfo{$vlink}}) . " $delayAmac $delayBmac");
+
+#	push(@{$delayinfo{$p2vmap{&nodename($delayA)}}},($delayAmac,$delayBmac));
 	printdb "src=$src ($srcmac) delayA=$delayA ($delayAmac) delayB=$delayB ($delayBmac) dst=$dst ($dstmac)\n";
-	printdb "delayinfo{" . $p2vmap{&nodename($delayA)} . "}=[" . join(",",@{$delayinfo{$p2vmap{&nodename($delayA)}}}) . "]\n";
+#	printdb "delayinfo{" . $p2vmap{&nodename($delayA)} . "}=[" . join(",",@{$delayinfo{$p2vmap{&nodename($delayA)}}}) . "]\n";
 
 	# now we have another four possibilities:
 	if (&getlan($src) && &getlan($dst)) {
@@ -652,8 +659,11 @@ foreach $vlan (keys(%vlans)) {
 print IRFILE "END vlan\n";
 
 print IRFILE "START delay\n";
-foreach $delay (keys(%delayinfo)) {
-    print IRFILE $v2pmap{$delay} . " " . join(" ",@{$delayinfo{$delay}}) . "\n";
+#foreach $delay (keys(%delayinfo)) {
+#    print IRFILE $v2pmap{$delay} . " " . join(" ",@{$delayinfo{$delay}}) . "\n";
+#}
+foreach (@delaysection) {
+    print IRFILE $_ . "\n";
 }
 print IRFILE "END delay\n";
 
@@ -664,7 +674,9 @@ close IRFILE;
 # available, reserve them, and call postassign to copy the data into the
 # DB.
 
-unlink $topfile;
+if ($verbose != 1) {
+    unlink $topfile;
+}
 
 print "Assignment complete\n";
 

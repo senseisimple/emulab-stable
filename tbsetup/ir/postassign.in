@@ -53,6 +53,12 @@ if ($@) {
 }
 foreach (split("\n",$raw)) {
     ($node,$bw,$latency,$loss,$macA,$macB) = split;
+    $sth = $dbh->prepare("DELETE FROM delays WHERE node_id = \"$node\"");
+    $sth->execute;
+    $sth->finish;
+}
+foreach (split("\n",$raw)) {
+    ($node,$bw,$latency,$loss,$macA,$macB) = split;
     
     $sth = $dbh->prepare("SELECT card FROM interfaces WHERE mac = \"$macA\"");
     $sth->execute;
@@ -62,10 +68,6 @@ foreach (split("\n",$raw)) {
     $sth = $dbh->prepare("SELECT card FROM interfaces WHERE mac = \"$macB\"");
     $sth->execute;
     ($int1) = $sth->fetchrow_array;
-    $sth->finish;
-
-    $sth = $dbh->prepare("DELETE FROM delays WHERE node_id = \"$node\"");
-    $sth->execute;
     $sth->finish;
 
     $sth = $dbh->prepare("INSERT INTO delays (node_id,card0,card1,delay,bandwidth,lossrate) VALUES (\"$node\",$int0,$int1,$latency,$bw,$loss)");
