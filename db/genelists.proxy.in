@@ -1,0 +1,81 @@
+#!/usr/bin/perl -wT
+use English;
+use Fcntl ':flock';
+
+#
+# Insert new version of testbed emails lists into place on operations node.
+# The single argument indicates which list is being piped into the script
+# from the control node. 
+#
+# usage: genelists.proxy [-all | -active]
+#
+sub usage() {
+    print STDOUT "Usage: genelists.proxy [-all | -active]\n".
+	"Generate the email list files after things change\n";
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TBOPS       = "@TBOPSEMAIL@";
+
+my $maildir     = "/etc/mail/lists";
+my $tempfile    = "$maildir/tempfile.$$";
+my $alllist     = "$maildir/testbed-users";
+my $activelist  = "$maildir/testbed-active-users";
+my $thelist;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($UID != 0) {
+    die("Must be root!");
+}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+if (@ARGV != 1 || ($ARGV[0] ne "-all" && $ARGV[0] ne "-active")) {
+    usage();
+}
+if ($ARGV[0] eq "-active") {
+    $thelist = $activelist;
+}
+else {
+    $thelist = $alllist;
+}
+
+#
+# Take our input and write it to the temp file.
+#
+open(TMP, ">$tempfile") ||
+    fatal("Couldn't open $tempfile\n");
+while (<STDIN>) {
+    print TMP $_;
+}
+close(TMP);
+chmod(0644, $tempfile);
+
+#
+# Now overwrite the real file.
+#
+system("/bin/mv $tempfile $thelist") == 0 ||
+    fatal("Could not move $tempfile to $thelist: $!");
+
+exit(0);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    system("echo \"$msg\" | /usr/bin/mail ".
+	   "-s 'TESTBED: Named Setup Failed' $TBOPS");
+    die($msg);
+}
+
