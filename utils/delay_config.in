@@ -14,9 +14,9 @@ sub usage()
 	"  pid = Project ID\n",
 	"  eid = Experiment ID\n",
 	" link = link name from ns file, ie. 'link1' in\n",
-	"        'set link1 [\$ns duplex-link \$A \$B 100Mb 0ms DropTail]'\n",
+	"        'set link1 [\$ns duplex-link \$A \$B 100Kb 0ms DropTail]'\n",
 	"   -d = one-way link delay in milliseconds greater than 1\n",
-	"   -b = <NNN> N=bandwidth (1-100 Mbs)\n",
+	"   -b = <NNN> N=bandwidth (10-100000 Kbits per second)\n",
 	"   -l = packet loss rate (0 <= plr < 1)\n",
 	"   -p = Select one of the pipes. 0 - packets received on iface0\n";
 
@@ -167,12 +167,12 @@ if (defined($options{"b"})) {
 	die("Illegal bw spec: $newbw.\n");
     }
 
-    if ($newbw > 100 || $newbw < 1) {
+    if ($newbw > 100000 || $newbw < 10) {
 	usage();
     }
     
     if ($debug) {
-	print "Setting bandwidth to $newbw Mbs.\n";
+	print "Setting bandwidth to $newbw Kbs.\n";
     }
 }
 
