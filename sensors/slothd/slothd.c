@@ -62,8 +62,6 @@ void usage(void) {
 int main(int argc, char **argv) {
 
   int exitcode = -1;
-  int pfd;
-  char pidbuf[10];
   static SLOTHD_OPTS mopts;
   static SLOTHD_PACKET mpkt;
 
@@ -74,16 +72,6 @@ int main(int argc, char **argv) {
   bzero(&mpkt, sizeof(SLOTHD_PACKET));
   opts = &mopts;
   pkt = &mpkt;
-
-  /* Try to get lock.  If can't, then bail out. */
-  if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
-    lerror("Can't create lock file, quiting.");
-    exit(1);
-  }
-  fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
-  sprintf(pidbuf, "%d", getpid());
-  write(pfd, pidbuf, sizeof(pidbuf));
-  close(pfd);
 
   if (parse_args(argc, argv) < 0) {
     fprintf(stderr, "Error processing arguments.\n");
@@ -177,6 +165,8 @@ int parse_args(int argc, char **argv) {
 int init_slothd(void) {
 
   DIR *devs;
+  int pfd;
+  char pidbuf[10];
   char bufstr[MAXDEVLEN];
   struct dirent *dptr;
   struct hostent *hent;
@@ -256,6 +246,16 @@ int init_slothd(void) {
     lerror("Couldn't daemonize");
     return -1;
   }
+
+  /* Try to get lock.  If can't, then bail out. */
+  if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
+    lerror("Can't create lock file, quiting.");
+    exit(1);
+  }
+  fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
+  sprintf(pidbuf, "%d", getpid());
+  write(pfd, pidbuf, strlen(pidbuf));
+  close(pfd);
 
   return 0;
 }
