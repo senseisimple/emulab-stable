@@ -89,6 +89,13 @@ C. Cutting the image:
    but I see no reason to encrypt/decrypt 6.5GB of data (though I am sure
    there is some option to use NULL encryption...)
 
+   Alternate:
+   On plastic, go to the images directory and use ssh. You must start
+   sshd on the client node first of course.
+
+	su1 ssh -c blowfish -n pcX 'dd if=/dev/rad0 bs=64k count=100156' | \
+			dd of=wd0 obs=64k
+
 4. On plastic, use /usr/testbed/bin/imagezip to compress the image (and
    put the little magic header at the beginning).
 
