@@ -33,7 +33,7 @@ echo "</ul>\n";
 echo "<h3>Alumni:</h3>\n";
 echo "<ul>\n";
 FLUXPERSON("sclawson", "Steve Clawson");
-FLUXPERSON("ikumar", "Indajeet Kumar");
+FLUXPERSON("ikumar", "Indrajeet Kumar");
 FLUXPERSON("vanmaren", "Kevin Van Maren");
 FLUXPERSON("kwright", "Kristin Wright");
 echo "</ul>\n";
