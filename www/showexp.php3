@@ -53,7 +53,7 @@ $expstate = TBExptState($exp_pid, $exp_eid);
 
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
-     "$eid</b></font>\n";
+     "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 echo "<br /><br />\n";
 SUBPAGESTART();
 
@@ -151,6 +151,9 @@ SUBMENUEND_2B();
 
 # if we got a submission of changes, update the db now...
 if ($submit) {
+    $exp_name = addslashes(str_replace('"',"",$exp_name));
+    $noswap = addslashes(str_replace('"',"",$noswap));
+    $noidleswap = addslashes(str_replace('"',"",$noidleswap));
     # exp name is always sent...
     $str = "expt_name=\"$exp_name\"";
     if (isset($noswap) && $noswap !="") {

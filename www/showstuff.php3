@@ -549,6 +549,7 @@ function SHOWEXP($pid, $eid, $edit=0) {
 
     $exp_gid     = $exprow[gid];
     #$exp_expires = $exprow[expt_expires];
+    $exp_name_safe= htmlspecialchars(stripslashes($exprow[expt_name]));
     $exp_name    = stripslashes($exprow[expt_name]);
     $exp_created = $exprow[expt_created];
     $exp_swapped = $exprow[expt_swapped];
@@ -564,10 +565,14 @@ function SHOWEXP($pid, $eid, $edit=0) {
     $batchstate  = $exprow[batchstate];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
-    $noswap_reason = $exprow[noswap_reason];
+    $noswap_reason_safe =
+	htmlspecialchars(stripslashes($exprow[noswap_reason]));
+    $noswap_reason = stripslashes($exprow[noswap_reason]);
     $idleswap    = $exprow[idleswap];
     $idleswap_timeout = $exprow[idleswap_timeout];
-    $noidleswap_reason = $exprow[noidleswap_reason];
+    $noidleswap_reason_safe =
+	htmlspecialchars(stripslashes($exprow[noidleswap_reason]));
+    $noidleswap_reason = stripslashes($exprow[noidleswap_reason]);
     $autoswap    = $exprow[autoswap];
     $autoswap_timeout = $exprow[autoswap_timeout];
     $idle_ignore = $exprow[idle_ignore];
@@ -640,7 +645,8 @@ function SHOWEXP($pid, $eid, $edit=0) {
           </tr>\n";
 
     if ($edit) {
-	$exp_name_str = "<input type=text name=exp_name value=\"$exp_name\">";
+	$exp_name_str =
+	    "<input type=text name=exp_name size=30 value=\"$exp_name_safe\">";
     } else {
 	$exp_name_str = $exp_name;
     }
