@@ -88,12 +88,17 @@ if ($isadmin) {
 	$clause = "and ($clause)";
     else
         $clause = "";
+
+    # Note: round((now()-last_swap_req)/10000) takes a number like
+    # HHMMSS and takes it to hours, rounding up when MMSS >=5000
+    # It does _not_ round up where MMSS >= 3000 as you might think.
     
     $experiments_result =
 	DBQueryFatal("select e.*,".
 		     "date_format(expt_swapped,\"%Y-%m-%d\") as d, ".
 		     "(to_days(now())-to_days(expt_swapped)) as lastswap, ".
-                     "count(r.node_id) as ncount ".
+                     "count(r.node_id) as ncount, swap_requests, ".
+		     "round((now()-last_swap_req)/10000) as lastreq ".
 		     "from experiments as e ".
                      "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
                      "left join nodes as n on r.node_id=n.node_id ".
@@ -156,7 +161,7 @@ if (mysql_num_rows($experiments_result)) {
           </center>\n";
 
     if ($idle) {
-      echo "<center><b>Experiments that have been idle at least 1 day</b></center><p>\n";
+      echo "<center><b>Experiments that have been idle at least 24 hours</b></center><p>\n";
     }
     
     #
@@ -210,11 +215,11 @@ if (mysql_num_rows($experiments_result)) {
                <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
                   PCs</a><br>[<b>1</b>]</td>\n";
     
-    if ($isadmin)
-	echo "<td width=17% align=center>Last Login</td>\n";
+    if ($isadmin && !$idle)
+        echo "<td width=17% align=center>Last Login</td>\n";
     if ($idle)
-	echo "<td width=4% align=center>Days Idle</td>
-              <td width=4% align=center>Slothd Info</td>
+        #      "<td width=4% align=center>Days Idle</td>\n";
+	echo "<td width=4% align=center>Slothd Info</td>
               <td width=4% align=center>Swap Req.</td>\n";
 
     echo "    <td width=60%>
@@ -226,54 +231,73 @@ if (mysql_num_rows($experiments_result)) {
             </tr>\n";
 
     while ($row = mysql_fetch_array($experiments_result)) {
-	$pid  = $row[pid];
-	$eid  = $row[eid];
-	$huid = $row[expt_head_uid];
-	$name = $row[expt_name];
-	$date = $row[d];
-	$state= $row[state];
+	$pid  = $row["pid"];
+	$eid  = $row["eid"]; 
+	$huid = $row["expt_head_uid"];
+	$name = $row["expt_name"];
+	$date = $row["d"];
+	$state= $row["state"];
 	$daysidle=0;
 	
 	if ($isadmin) {
-	    $swappable= $row[swappable];
-	    $foo = "&nbsp;";
+	    $swappable= $row["swappable"];
+	    $swapreq=$row["swap_requests"];
+	    $lastswapreq=$row["lastreq"];
+	    $lastlogin = "<td>";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
 	        #if ($idle && $daysidle < 1)
 		#  continue;
-		$foo = $lastexpnodelogins["date"] . " " .
+		$lastlogin .= $lastexpnodelogins["date"] . " " .
 		 "(" . $lastexpnodelogins["uid"] . ")";
 	    } elseif ($state=="active") {
-	        $daysidle=$row[lastswap];
-	        $foo = "$date Swapped In";
+	        $daysidle=$row["lastswap"];
+	        $lastlogin .= "$date Swapped In";
 	    }
+	    $lastlogin.="</td>\n";
+	    if ($lastlogin=="<td></td>\n") { $lastlogin="<td>&nbsp;</td>\n"; }
 	}
 
 	if ($idle) {
-	    $foo .= "</td><td align=center>$daysidle</td>\n";
-	    $foo .= "</td><td align=left>";
+	    #$lastlogin .= "<td align=center>$daysidle</td>\n";
+	    $foo = "<td align=left>";
 	    $expt = "$pid/$eid";
 	    $str="";
 	    if ($inactive[$expt]==1) {
-	      if ($stale[$expt]==1 || $unswap[$expt]==1) {
-		$str .= "possibly inactive";
+	      if ($stale[$expt]==1) {
+		$str .= "possibly inactive, ";
+	      } elseif  ($unswap[$expt]==1) {
+		$str .= "<b>probably inactive, unswappable</b>";
 	      } else {
 		$str .= "<b>inactive</b>";
 	      }
 	    }
-	    if ($stale[$expt]==1) { $str .= ", <b>no&nbsp;report</b> "; }
+	    if ($stale[$expt]==1) { $str .= "<b>no&nbsp;report</b> "; }
 	    # For now, don't show this tag, it's redundant
             #if ($unswap[$expt]==1) { $str .= "unswappable"; }
 	    if ($str=="") { $str="&nbsp;"; }
 	    # sanity check
+	    $slothderr=0;
 	    if ($daysidle==0 && $inactive[$expt]==1) {
-	      $str .= "<b>FAILED SANITY CHECK:</b> has been logged into, but appears inactive. Contact Mac ASAP.";
+	      $str .= "<b>FAILED SANITY CHECK:</b>
+$pid/$eid has been logged into, but appears inactive. Contact Mac ASAP.
+<pre>
+daysidle=$daysidle
+lastlogin=$lastlogin
+idle,stale,unswap=";
+	      $str .= $inactive[$expt].",".$stale[$expt].",".$unswap[$expt];
+	      $str .="\n</pre>\n";
+	      $slothderr=1;
 	    }
-	    $foo .= "$str</td>\n";
-	    if ($swappable && $inactive[$expt]==1 && $stale[$expt]!=1) {
-	        $foo .= "<td align=center valign=center>
-                           <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\">
-                              <img src=\"redball.gif\"></a>\n";
+	    $foo .= "$str</td>\n";  
+ 	    if ($inactive[$expt]==1 && $stale[$expt]!=1) {
+	      $foo .= "<td align=center valign=center>
+  <a href=\"request_swapexp.php3?pid=$pid&eid=$eid\"> 
+  <img src=\"redball.gif\"></a>\n" ;
+	      if ($swapreq > 0) {
+		$foo .= "<br>$swapreq sent $lastswapreq hrs ago\n";
+	      }
+	      $foo .= "</td>\n"; 
 	    }
 	    else {
 		$foo .="<td>&nbsp;</td>\n";
@@ -293,6 +317,7 @@ if (mysql_num_rows($experiments_result)) {
 
 	# in idle or active, skip experiments with no nodes.
 	if (($idle || $active) && $nodes == 0) { continue; }
+	if ($idle && $str=="&nbsp;" && !$slothderr) { continue; }
 
 	if ($nodes==0) { $nodes = "&nbsp;"; }
 	
@@ -307,7 +332,8 @@ if (mysql_num_rows($experiments_result)) {
 	else
             echo "<td>$nodes</td>\n";
 
-	if ($isadmin) echo "<td>$foo</td>\n";
+	if ($isadmin && !$idle) echo "$lastlogin\n";
+	if ($idle) echo "$foo\n";
 
         echo "<td>$name</td>
                 <td><A href='showuser.php3?target_uid=$huid'>
