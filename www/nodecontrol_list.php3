@@ -198,6 +198,11 @@ if (! strcmp($showtype, "summary")) {
               <td align=center>$value</td>
               </tr>\n";
     }
+    if ($isadmin) {
+	# Give admins the option to create a new type
+	echo "<th colspan=3><a href=editnodetype.php3?new_type=1>Create a " .
+		"new type</a></th>\n";
+    }
     echo "</table>\n";
     PAGEFOOTER();
     exit();
