@@ -24,7 +24,7 @@ CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb
 
-LIBS	 += -lmtp -ltb
+LIBS	 += -lmtp -ltb -lm
 
 test_rmcd.sh: rmcd
 
