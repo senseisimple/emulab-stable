@@ -50,6 +50,8 @@
      <li> <a href="#HDS-5">Can I do traffic shaping on my links?</a>
      <li> <a href="#HDS-6">Can I modify the traffic shapping
                            parameters on my links?</a>
+     <li> <a href="#HDS-7">Are there other traffic shapping parameters
+                           besides latency, bandwidth, and PLR?</a>
      </ul>
 
 <li> <a href="#SWS">Software setup</a>
@@ -444,6 +446,33 @@
     page. The command line syntax for <tt>delay_config</tt> will be
     displayed when the <tt>-h</tt> option is given.
     </p>
+
+<li><a NAME="HDS-7"></a>
+    <h3>Are there other traffic shapping parameters besides latency,
+    bandwidth, and packet loss rate?</h3>
+    <p>
+    Yes! However, access to those other parameters is slightly more
+    difficult since you cannot specify them in your NS file. First
+    off, you should log into <tt>users.emulab.net</tt> and read the
+    man page for
+    <a href='http://www.freebsd.org/cgi/man.cgi?manpath=FreeBSD+4.3-RELEASE'>
+    <tt>ipfw</tt></a>. Refer to the section on <tt>dummynet</tt>; ipfw
+    is the user interface for the <tt>Dummynet</tt> traffic shaper.
+    As noted in previous section above, you can alter the traffic
+    shapping parameters of any delayed link (one in which you have
+    specified a bandwidth, delay, or PLR that causes a delay node to
+    be inserted). However, you will need to log into the delay node
+    for the link you wish to modify and interact with <tt>ipfw</tt>
+    directly. The easiest approach would be to make a copy of
+    </tt>/etc/testbed/rc.delay</tt> and edit the pipe commands as
+    desired (or replace the pipe commands with "queue" commands).  The
+    pipe commands are indexed by number; the mapping from pipe number
+    to virtual link is available via the web interface on the
+    Experiment Information page for your experiment.  Be sure to leave
+    the rest of the contents of the file as is. Once you have your
+    changes made, simply execute the file using the <a href="#UTT-2">
+    sudo</a> command.
+    </p>    
 </ul>
 
 <hr>
