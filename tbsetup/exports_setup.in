@@ -51,9 +51,9 @@ $| = 1;
 #
 # Testbed Support libraries
 # 
-push(@INC, "$TB/lib");
-require libtestbed;
-require libdb;
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
 
 #
 # We need to serialize this script to avoid a trashed map file. Use
