@@ -1,6 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### Really run with -T
+### Close all my pipes
 
 ###
 ### exp_accts - Makes accounts for all users in this experiment's project.
@@ -31,10 +32,9 @@ if ( !($eid =~ /^[A-Za-z0-9\.\-\_ ]+$/) ) {
 ## Check for valid user
 ##
 open(WHO,"/usr/bin/whoami 2>&1 |");
-$_ = <WHO>;
-chop;
+chop($_ = <WHO>);
 close(WHO);
-#if ($_ ne "root") { die("This won't work unless you're root.\n"); }
+if ($_ ne "root") { die("This won't work unless you're root.\n"); }
 
 ##
 ## Open database
@@ -48,10 +48,12 @@ my $dbh = Mysql->connect("localhost","tbdb","script","none");
 my $cmd = "select eid from experiments where eid='$eid'";
 my $sth = $dbh->query($cmd);
 my $rows =0;
+## Must put in check that $sth defined. May be undefined if
+## command above is syntactically incorrect.
 while ($sth->fetchrow_array) {
     $rows += 1;
 }
-if ( $rows != 1 ) { die("Invalid eid '$eid'.\n"); }
+if ( $rows != 1 ) { die("Invalid eid '$eid' (not in database).\n"); }
 
 
 ##
@@ -68,18 +70,11 @@ $cmd =
 $sth = $dbh->query($cmd);
 my %passwd = ();
 my %unix_uid = ();
-my %name = ();
+my %fullname = ();
 while (@row = $sth->fetchrow_array) {
     $passwd{$row[0]} = $row[1];
     $unix_uid{$row[0]} = $row[2];
-    $name{$row[0]} = $row[4];
-}
-
-if ($d) {
-    foreach my $name (sort keys %passwd) {
-	print "Name: $name\tPassword: $passwd{$name}\t".
-	  "Unix UID: $unix_uid{$name}\n";
-    }
+    $fullname{$row[0]} = $row[4];
 }
 
 ##
@@ -115,9 +110,8 @@ while (@row = $sth->fetchrow_array) {
 if ($d) {
     print "Nodes: ";
     foreach (@nodes) {
-	print "$_\t\n";
+	if ($_) { print "$_\t\n"; }
     }
-    print "\n";
 }
 
 ##
@@ -129,11 +123,11 @@ my $last = "";
 my $OS = "";
 my $IP = "";
 foreach $IP (@nodes) {
-    print "before foreach:$IP\n";
     ## If this machine is not the same as the last one, get the OS
-    ##
+    ## Check also that the IP address is valid (some interfaces might
+    ## not have an IP address. Do we really have to check that the node
+    ## is not the same node as in last iteration? -lkw
     if ( $IP ne $last && $IP =~ /[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/) {
-	print "in foreach:$IP\n";
         $last = $IP;
         if (-e "/bin/ping") {
             open(PING,"/bin/ping -c 1 $IP 2>&1 |");
@@ -145,50 +139,65 @@ foreach $IP (@nodes) {
         if ( $1 > 0 ) {
             open(UNAME,"su1 ssh $IP uname -a 2>&1 |");
             $_ = <UNAME>;
-            print "back from uname:$_\n";
-	    ## FreeBSD says "155.99.214.129: Connection refused
+            print "back from uname:$_";
+	    ## FreeBSD says "155.99.214.129: Connection refused"
+	    ##    and can also say "Host key doesn't match..."  
             if ( ($_=~/^Sorry/) || ($_=~/^$IP/) || ($_=~/^Host key/) ) { 
 		die("Uname failed on $IP:$_\n"); 
 	    } else { 
 		@temp = split(" ",$_); 
 		$OS = $temp[$0]; 
 	    }
-        } else {
-            #$ifstr="";
-        }
+        } 
+
         print "OS for $IP is $OS\n" if $d;
-        if ($OS eq "Linux") {  }
-        elsif ($OS eq "FreeBSD") { 
-	    ## kwright:*:1025:110:Kristin Wright:/home/kwright:/bin/tcsh
-	    ## For FreeBSD
+        if ($OS eq "Linux") {  
+	    
+
+	    ## 1) Use groupadd to add group
+	    ## 2) Use useradd to add users
+	    ##
+	    ## Rather than use useradd's defaults (which are normally)
+	    ## fine, we're explicit.
+	    
+	    open(GROUPADD, "/usr/sbin/groupadd -g $unix_gid $eid 2>&1 |");
+	    foreach my $name (keys %passwd) {
+		open(USERADD, "/usr/sbin/useradd -c $fullname{$user} -d /home/$user -p $passwd{$user} -s /bin/tcsh -u $unix_uid{$user} -m $user 2>&1 |");
+	    }
+
+	} elsif ($OS eq "FreeBSD") { 
+
 	    ## 1) Append new account info to master.passwd
 	    ## 2) Create secure (spwd.db) and insecure (pwd.db) password 
 	    ##    databases and
-	    ## 3) Create /etc/passwd
-	    foreach ($name) {
-	    }
-	    my $passwdstr = "";
+	    ## 3) Create passwd entries
+	    ## 4) Create home directories
+
+	    my $addon = "";
 	    foreach my $name (keys %passwd) {
-		$passwdstr = "$name:$passwd{$name}:$unix_uid{$name}:$unix_gid{$name}::\/home\/$name:\/bin\/tcsh\\n";
-		print $passwdstr;
-		
-		open(IFC,
-		     "su1 ssh $IP ls 2>&1 |"
-		    );
-		while ( <IFC> ) {
-		    print ">> $_";
-		}
+		$addon = "$addon$user:$passwd{$user}:$unix_uid{$user}:$unix_gid:$fullname{$user}:/home/$user:/bin/tcsh\n";
+
+		print $addon;
 	    }
+
+	    open(SCP, "scp -p $IP:/etc/master.passwd /tmp/master.passwd.$IP");
+	    open(OUT, ">>/etc/master.passwd");
+	    print OUT $addon;
+	    close(OUT);
+	    open(SCP, "scp -p /tmp/master.passwd.$IP $IP:/etc/master.passwd");
+ 
+	    ## Create secure and insecure databases (/etc/[s]*pwd.db)
+#	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb /etc/master.passwd 2>&1 |");
+	    ## Update /etc/passwd
+#	    open (MKDB, "ssh $IP /usr/sbin/pwd_mkdb -p /etc/master.passwd 2>&1 |");
+
+#/usr/sbin/pwd_mkdb: corrupted entry
+#/usr/sbin/pwd_mkdb: at line #14
+#/usr/sbin/pwd_mkdb: /etc/master.passwd: Inappropriate file type or format
+		
 	} else {  
 	    die "Unknown OS ($OS) on machine $IP.\n";
 	}
     }
-    
-    #Set up the interface
-    #    if (  eq "" ) {
-    #        print "Unknown OS $OS on $IP. Skipping.\n";
-    #        next;
-    #    }
-    
 }
 
