@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)hunt.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: hunt.c,v 1.3 2001-07-24 15:13:40 stoller Exp $";
+	"$Id: hunt.c,v 1.4 2001-07-31 21:58:35 stoller Exp $";
 #endif /* not lint */
 
 #include "tip.h"
@@ -98,12 +98,16 @@ hunt(name)
 		if (setjmp(deadline) == 0) {
 			alarm(10);
 #ifdef USESOCKETS
-			FD = socket_open(cp);
-#else
-			FD = open(cp, O_RDWR);
-			if (FD >= 0)
-				ioctl(FD, TIOCEXCL, 0);
+			if ((FD = socket_open(cp)) >= 0) {
+				HW = 0;
+				alarm(0);
+				signal(SIGALRM, SIG_DFL);
+				return ((int)cp);
+			}
+			else
 #endif
+			if ((FD = open(cp, O_RDWR)) >= 0)
+				ioctl(FD, TIOCEXCL, 0);
 		}
 		alarm(0);
 		if (FD < 0) {
@@ -111,7 +115,6 @@ hunt(name)
 			deadfl = 1;
 		}
 		if (!deadfl) {
-#ifndef USESOCKETS
 #if HAVE_TERMIOS
 			struct termios t;
 
@@ -124,7 +127,6 @@ hunt(name)
 			ioctl(FD, TIOCHPCL, 0);
 #endif
 #endif /* HAVE_TERMIOS */
-#endif /* USESOCKETS */
 			signal(SIGALRM, SIG_DFL);
 			return ((int)cp);
 		}
@@ -152,7 +154,7 @@ socket_open(char *devname)
 
 	(void) sprintf(aclname, "%s.acl", devname);
 
-	if ((fp = fopen(aclname, "r")) < 0) {
+	if ((fp = fopen(aclname, "r")) == NULL) {
 		return -1;
 	}
 	fscanf(fp, "%d %x %x %x", &port,
