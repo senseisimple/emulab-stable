@@ -9,6 +9,7 @@ TESTBED_SRCDIR  = @top_srcdir@
 OBJDIR          = ../..
 SUBDIR          = sensors/slothd
 SLOTHD_DIR	= unknownclient
+TBLIB		= $(OBJDIR)/lib/libtb/libtb.a
 
 SBIN_SCRIPTS    = sdisrunning sddeploy
 SDPROGS		= sdcollectd slothd
@@ -40,8 +41,11 @@ endif
 slothd: slothd.o slothd.h version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
 
-sdcollectd: sdcollectd.o sdcollectd.h version.o
+sdcollectd: sdcollectd.o sdcollectd.h version.o $(TBLIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o version.o $(SDLIBS)
+
+$(TBLIB):
+	gmake -C $(OBJDIR)/lib
 
 version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
@@ -57,4 +61,3 @@ client-install:
 
 clean:
 	rm -f *.o $(SDPROGS) *~ core *.core version.c
-

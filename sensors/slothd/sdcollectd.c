@@ -6,23 +6,9 @@
 
 #include "sdcollectd.h"
 
-void lerror(const char* msgstr) {
-  if (msgstr) {
-    syslog(LOG_ERR, "%s: %m", msgstr);
-    perror(msgstr);
-  }
-}
-
-void lnotice(const char *msgstr) {
-  if (msgstr) {
-    syslog(LOG_NOTICE, "%s", msgstr);
-    printf("%s", msgstr);
-  }
-}
-
 void siginthandler(int signum) {
 
-  lnotice("Daemon exiting.\n");
+  info("Daemon exiting.\n");
   exit(0);
 }
 
@@ -52,12 +38,12 @@ int parse_args(int argc, char **argv) {
     switch (ch) {
 
     case 'o':
-      lnotice("Populating old node_idlestats, and iface_counters tables");
+      info("Populating old node_idlestats, and iface_counters tables");
       opts->popold = 1;
       break;
 
     case 'd':
-      lnotice("Debug mode requested; staying in foreground.\n");
+      info("Debug mode requested; staying in foreground.\n");
       opts->debug = 1;
       break;
 
@@ -96,9 +82,12 @@ int main(int argc, char **argv) {
   /* Cleanup on sigint/term */
   signal(SIGTERM, siginthandler);
   signal(SIGINT, siginthandler);
+
+  /* setup logging facilities */
+  loginit(1, "sdcollectd");
   
   if (!parse_args(argc, argv)) {
-    lnotice("Error processing arguments, exiting.\n");
+    error("Error processing arguments, exiting.\n");
     exit(1);
   }
   
@@ -108,38 +97,30 @@ int main(int argc, char **argv) {
   servaddr.sin_addr.s_addr = INADDR_ANY;
   servaddr.sin_port = htons(SDCOLLECTD_PORT);
 
-  /* setup logging facilities */
-  if (strchr(argv[0], '/')) {
-    openlog(strrchr(argv[0], '/')+1, 0, LOG_DAEMON);
-  }
-  else {
-    openlog(argv[0], 0, LOG_DAEMON);
-  }
-
   /* Create and bind udp socket for collecting slothd client-side idle data */
   if ((sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-    lerror("Can't create socket");
+    errorc("Can't create socket");
     exit(1);
   }
 
   if (bind(sd, (struct sockaddr*)&servaddr, sizeof(struct sockaddr_in)) < 0) {
-    lerror("Can't bind socket");
+    errorc("Can't bind socket");
     exit(1);
   }
 
   /* get DB funcs ready - libtb */
   if (!dbinit()) {
-    lerror("Couldn't connect to db. bailing out.");
+    error("Couldn't connect to db. bailing out.");
     exit(1);
   }
 
   if (!opts->debug) {
     if (daemon(0, 0) < 0) {
-      lerror("Couldn't become daemon");
+      errorc("Couldn't become daemon");
       exit(1);
     }
-    lnotice("sdcollectd started successfully");
-    lnotice(build_info);
+    info("sdcollectd started successfully");
+    info(build_info);
   }
 
   /* do our thing - just loop collecting data from clients, and insert into
@@ -169,7 +150,7 @@ int CollectData(int sd, IDLE_DATA *iddata) {
                           (struct sockaddr*)&cliaddr, &slen))) {
 
     if (!mydb_iptonodeid(inet_ntoa(cliaddr.sin_addr), iddata->id)) {
-      lerror("Couldn't obtain node id");
+      error("Couldn't obtain node id");
       return 0;
     }
     if (opts->debug) {
@@ -264,7 +245,7 @@ int ParseRecord(IDLE_DATA *iddata) {
 
     if (strstr(itemptr, "vers")) {
       if ((tmpvers = strtoul(itemptr+5, NULL, 10)) > SDPROTOVERS) {
-        lerror("Unsupported protocol version; rejecting.");
+        error("Unsupported protocol version; rejecting.");
         return 0;
       }
       iddata->version = tmpvers;
@@ -282,7 +263,9 @@ int ParseRecord(IDLE_DATA *iddata) {
 
     else if (strstr(itemptr, "iface")) {
       if (!(tmpstr = tbmac(itemptr+6, &ptr))) {
-        lerror("Malformed interface record encountered, skipping");
+        error("Malformed interface record for node %s encountered: %s",
+              iddata->id,
+              itemptr);
         continue;
       }
       strcpy(iddata->ifaces[iddata->ifcnt].mac, tmpstr);
@@ -296,7 +279,7 @@ int ParseRecord(IDLE_DATA *iddata) {
     }
 
     else {
-      lnotice("Unrecognized string in packet\n");
+      info("Unrecognized string in packet: %s", itemptr);
     }
   } while ((itemptr = strtok(NULL, " \t")) && iddata->ifcnt < MAXNUMIFACES);
 
@@ -347,7 +330,7 @@ void PutDBRecord(IDLE_DATA *iddata) {
                      iddata->l1m, 
                      iddata->l5m, 
                      iddata->l15m)) {
-      lerror("Error inserting data into node_idlestats table");
+      error("Error inserting data into node_idlestats table");
     }
     
     for (i = 0; i < iddata->ifcnt; ++i) {
@@ -357,7 +340,7 @@ void PutDBRecord(IDLE_DATA *iddata) {
                        iddata->ifaces[i].mac,
                        iddata->ifaces[i].ipkts,
                        iddata->ifaces[i].opkts)) {
-        lerror("Error inserting data into iface_counters table");
+        error("Error inserting data into iface_counters table");
       }
     }
   }
@@ -376,7 +359,7 @@ void PutDBRecord(IDLE_DATA *iddata) {
     if(!mydb_update("UPDATE node_activity SET %s WHERE node_id = '%s'",
                     tmpstr,
                     iddata->id)) {
-      lerror("Error updating stamps in node_activity table");
+      error("Error updating stamps in node_activity table");
     }
   }
 

@@ -4,8 +4,7 @@
  * All rights reserved.
  */
 
-/* hmcd.h - header file for Healthd Master Collection Daemon, and peer
-   query program hmcdgrab.
+/* sdcollectd.h - header file for Slothd Collection Daemon.
 */
 #ifndef SDCOLLECTD_H
 #define SDCOLLECTD_H
@@ -25,6 +24,7 @@
 #include <signal.h>
 #include <syslog.h>
 #include <tbdb.h>
+#include "log.h"
 
 #define SDPROTOVERS 2
 #define SDCOLLECTD_PORT 8509
