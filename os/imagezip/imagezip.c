@@ -302,6 +302,10 @@ read_image()
 		case DOSPTYP_LINUX:
 			rval = read_linuxslice(i, start, size);
 			break;
+		default:
+			printf("  Slice %d is an unknown type. Skipping ...\n",
+			       i + 1 /* DOS Numbering */);
+			addskip(start, size);
 		}
 		if (rval)
 			return rval;
