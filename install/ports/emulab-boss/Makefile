@@ -28,7 +28,7 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	-DBATCH
 
-LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd2 \
+LIB_DEPENDS= gd.4:${PORTSDIR}/graphics/gd \
 	lthread.2:${PORTSDIR}/devel/linuxthreads \
 	mhash.2:${PORTSDIR}/security/mhash \
 	mysqlclient.10:${PORTSDIR}/databases/mysql323-client \
@@ -57,7 +57,7 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	elvind:${PORTSDIR}/misc/elvind \
 	dhcpd:${PORTSDIR}/net/isc-dhcp3 \
 	sudo:${PORTSDIR}/security/sudo \
-	${LOCALBASE}/sbin/named:${PORTSDIR}/net/bind9 \
+	${LOCALBASE}/sbin/named:${PORTSDIR}/dns/bind9 \
 	wget:${PORTSDIR}/ftp/wget \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser
 
