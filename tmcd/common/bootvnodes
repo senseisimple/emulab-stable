@@ -200,7 +200,7 @@ if ($reconfig) {
     # Reboot nodes that are running and in the current list from tmcd.
     # Kill nodes that are running but not in the current list from tmcd.
     #
-    foreach my $vnode (keys(%curvnodelist)) {
+    foreach my $vnode (sort(keys(%curvnodelist))) {
 	if (exists($newvnodelist{$vnode})) {
 	    bootvnode($vnode,
 		      (defined($action) ? $action : "reboot"),
@@ -246,7 +246,7 @@ for (my $i = 0;
 system("sysctl net.inet.ip.intr_queue_maxlen=128 >/dev/null 2>&1");
 system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");
 
-foreach my $vnode (keys(%newvnodelist)) {
+foreach my $vnode (sort(keys(%newvnodelist))) {
     # Blocks until mostly setup. 
     bootvnode($vnode, "boot", $newvnodelist{$vnode});
 }
