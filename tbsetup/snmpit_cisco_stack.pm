@@ -9,7 +9,7 @@
 #
 # snmpit module for a stack of Cisco Catalyst 6509 switches. The main purpose
 # of this module is to contain knowledge of how to manage stack-wide operations
-# (such as VLAN creation), and to coallate the results of listing operations
+# (such as VLAN creation), and to collate the results of listing operations
 # on multiple switches
 #
 
@@ -147,7 +147,7 @@ sub listVlans($) {
     my $self = shift;
 
     #
-    # We need to 'coallate' the results from each switch by putting together
+    # We need to 'collate' the results from each switch by putting together
     # the results from each switch, based on the VLAN identifier
     #
     my %vlans = ();
@@ -188,7 +188,7 @@ sub listPorts($) {
     my $self = shift;
 
     #
-    # All we really need to do here is coallate the results of listing the
+    # All we really need to do here is collate the results of listing the
     # ports on all devices
     #
     my %portinfo = (); 
@@ -533,7 +533,7 @@ sub getStats($) {
     my $self = shift;
 
     #
-    # All we really need to do here is coallate the results of listing the
+    # All we really need to do here is collate the results of listing the
     # ports on all devices
     #
     my %stats = (); 
