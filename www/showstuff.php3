@@ -1163,6 +1163,7 @@ function SHOWOSINFO($osid) {
     $created        = $osrow[created];
     $mustclean      = $osrow[mustclean];
     $nextosid       = $osrow[nextosid];
+    $max_concurrent = $osrow[max_concurrent];
 
     if (!$os_description)
 	$os_description = "&nbsp";
@@ -1240,6 +1241,13 @@ function SHOWOSINFO($osid) {
             <td>Operational Mode: </td>
             <td class=\"left\">$os_op_mode</td>
           </tr>\n";
+
+    if (isset($max_concurrent) and $max_concurrent > 0) {
+	echo "<tr>
+                <td>Max Concurrent Usage: </td>
+                <td class=\"left\">$max_concurrent</td>
+              </tr>\n";
+    }
 
     echo "<tr>
             <td>Shared?: </td>
