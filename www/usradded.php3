@@ -155,7 +155,7 @@ if (! $returning) {
     mail("$usr_email", "TESTBED: Your New User Key",
 	 "\n".
          "Dear $usr_name:\n\n".
-         "\tHere is your key to verify your account on the".
+         "\tHere is your key to verify your account on the ".
          "Utah Network Testbed:\n\n".
          "\t\t$key\n\n".
          "Please return to $TBWWW and log in using\n".
