@@ -15,7 +15,7 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT =
     qw ( libsetup_init cleanup_node check_status
-	 doifconfig dohostnames check_nickname
+	 doifconfig dohostnames domounts check_nickname
 	 doaccounts dorpms dotarballs dostartupcmd install_deltas
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd vnodesetup
@@ -812,6 +812,14 @@ sub doifconfig ()
 		print STDOUT "  $iface $inet $aliases\n";
 		print IFC "$ifline\n";
 		print IFC TMROUTECONFIG . " $routearg up\n";
+
+		# There could be routes for each alias.
+		foreach my $alias (split(',', $aliases)) {
+		    $routearg = inet_ntoa(inet_aton($alias) &
+					  inet_aton($mask));
+			
+		    print IFC TMROUTECONFIG . " $routearg up\n";
+		}
 	    }
 	    else {
 		warn "*** WARNING: Bad MAC: $mac\n";
