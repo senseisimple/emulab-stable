@@ -276,17 +276,19 @@ function WRITESIDEBAR() {
 # Called by _STARTPAGE
 #
 function WRITEBANNER($title) {
-    global $BANNERCOLOR, $THISPROJECT, $THISHOMEBASE;
+    global $BANNERCOLOR, $THISPROJECT, $THISHOMEBASE, $BASEPATH;
 
     echo "<!-- This is the page Banner -->\n";
+    echo "<a href='$BASEPATH/pix/merge-med.jpg'>
+          <img src='$BASEPATH/pix/merge-mini.jpg' border=2 align=right></a>\n";
     echo "<table cellpadding=0 cellspacing=0 border=0>";
     echo "<tr>
             <td align=left width=\"0%\">
              <table cellpadding=5 cellspacing=0 border=0 bgcolor=\"#880000\">
               <tr>
                 <td>
-                 <b><font size=15 color=white face=Helvetica>
-                     $THISHOMEBASE
+                 <b><font size=6 color=white face=Helvetica>
+                        $THISHOMEBASE
                     </font>
                  </b>
                 </td>
@@ -299,7 +301,7 @@ function WRITEBANNER($title) {
                   <tr>
                    <td>
                      <b>
-                       <font size=15 face=helvetica color=\"#000000\">
+                       <font size=6 face=helvetica color=\"#000000\">
                             $THISPROJECT
                        </font>
                      </b>
@@ -327,7 +329,7 @@ function WRITETITLE($title) {
                  #
     echo "     </td>
                <td align=left>
-                   <b><font size=\"+3\" color=$TITLECOLOR>$title</font></b>
+                   <b><font size=6 color=$TITLECOLOR>$title</font></b>
                </td>
             </tr>
           </table>\n";
@@ -345,6 +347,7 @@ function PAGEHEADER($title) {
     global $CHECKLOGIN_TIMEDOUT, $CHECKLOGIN_MAYBEVALID;
     global $CHECKLOGIN_PSWDEXPIRED, $THISHOMEBASE
     global $BASEPATH, $SSL_PROTOCOL, $javacode, $drewheader, $pswd_expired;
+    global $TBMAINSITE;
 
     $drewheader = 1;
 
@@ -440,9 +443,22 @@ function PAGEHEADER($title) {
 	    echo "$javacode[$i]";
 	}
     }
+
+    if ($TBMAINSITE) {
+	echo "  <meta NAME=\"keywords\"
+                      CONTENT=\"network, emulation, internet, emulator\">
+                <meta NAME=\"ROBOTS\" CONTENT=\"NOARCHIVE\">\n";
+    }
     
     echo " <meta HTTP-EQUIV=\"Pragma\" CONTENT=\"no-cache\">
-           <link rel=\"stylesheet\" href=\"$BASEPATH/tbstyle.css\"
+           <meta HTTP-EQUIV=\"Cache-Control\" CONTENT=\"no-cache\">
+           <meta HTTP-EQUIV=\"Expires\"
+                 CONTENT=\"Thu, 01 Dec 1994 16:00:00 GMT\">\n";
+
+#    echo " <meta HTTP-EQUIV=\"Cache-Control\"
+#                 CONTENT=\"post-check=30,pre-check=60\">\n";
+
+    echo " <link rel=\"stylesheet\" href=\"$BASEPATH/tbstyle.css\"
                  type=\"text/css\">
           </head>\n";
 
@@ -497,6 +513,7 @@ function ENDPAGE() {
 #
 function PAGEFOOTER() {
     global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE;
+    global $TBMAINSITE;
 
     ENDPAGE();
 
@@ -510,8 +527,14 @@ function PAGEFOOTER() {
           </center>
          <p align=right>
          <font size=-2>
-          Problems? Contact $TBMAILADDR
-          </font>
+          Problems? Contact $TBMAILADDR\n";
+
+    if ($TBMAINSITE) {
+	echo "<p>
+              <a href=\"$TBDOCBASE/netemu.php3\"></a>\n";
+    }
+
+    echo "</font>
           </body>
           </html>\n";
 }
