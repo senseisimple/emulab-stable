@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,13 +47,13 @@ sub doexit {
     if ($status eq "") {
 	$status = "PASS";
     }
-    
+
     print "$status\n";
-    
+
     exit(0);
 };
 
-$dbh = DBI->connect("DBI:mysql:database=$db;host=localhost") || 
+$dbh = DBI->connect("DBI:mysql:database=$db;host=localhost") ||
     die "Could not connect to DB.\n";
 
 do {
@@ -77,7 +77,7 @@ sub tb_prerun {
 
 #    system("mysqldump --all $db > $cmd-$::counter.txt");
     $::counter++;
-    
+
     if ($ecode != $exitcode) {
 	tb_fail("$cmd - Exit code $ecode, expected $exitcode");
     }
@@ -87,7 +87,7 @@ sub tb_compare {
     # a list of lists.  Each sublist is a list of column values and
     # refers to a row.
     my ($query,$results) = @_;
-    
+
     my $sth = $dbh->prepare($query);
     $sth->execute;
     my @row;
@@ -110,7 +110,7 @@ sub tb_compare {
 
 sub tb_run {
     my ($cmd,$exitcode) = @_;
-    print "$cmd $pid $eid\n"; 
+    print "$cmd $pid $eid\n";
     open(TBEXEC,"$cmd $pid $eid 2>&1 |");
     while (<TBEXEC>) {
 	print $_;
@@ -130,6 +130,9 @@ sub tb_fail {
     ::doexit;
 };
 
+# Clean out any old ns files in the dir (esp. temps made by tbprerun), 
+# then copy in the new ns file.
+system("rm *.ns");
 print "Debug: $dir/nsfile.ns\n";
 system("cp -f $dir/nsfile.ns .");
 if (($? >> 8) != 0) {
