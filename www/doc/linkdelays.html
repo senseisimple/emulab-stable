@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   Copyright (c) 2000-2004 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -8,33 +8,33 @@
 </center>
 
 <a NAME="LINKDELAYS"></a>
-<h3>Per-Link Delays:</h3>
+<h3>Per-Link Traffic Shaping ("linkdelays"):</h3>
 In order to conserve nodes, it is possible to
 specify that instead of doing traffic shaping on separate delay nodes
-(which eats up a node for every two links), it be done on the nodes
+(which eats up a node for every two shaped links), it be done on the nodes
 that are actually generating the traffic. 
-
+<p>
 Under FreeBSD, just like normal delay
 nodes, end node (sometimes called per-link) traffic shaping uses IPFW
 to direct traffic into the proper Dummynet pipe. On each node in a
-duplex link or lan, a set of ipfw rules and Dummynet pipes is
+duplex link or LAN, a set of ipfw rules and Dummynet pipes is
 setup. As traffic enters or leaves your node, ipfw looks at the packet
 and stuffs it into the proper Dummynet pipe. At the proper time,
 Dummynet takes the packet and sends it on its way. 
-
+</p><p>
 Under Linux, end node traffic shaping is performed by the packet
 scheduler modules, part of the kernel NET3 implementation.  Each
 packet is added to the appropriate scheduler queue tree and shaped as
 specified in your NS file.  Note that Linux traffic shaping currently
 only supports the drop-tail queueing discipline; gred and red are not
 available yet.
-
+</p><p>
 To specify end node shaping in
-your NS file, simply setup a normal link or lan, and then mark it as
+your NS file, simply setup a normal link or LAN, and then mark it as
 wanting to use end node traffic shaping. For example:
     <code><pre>
     set link0 [$ns duplex-link $nodeA $nodeD 50Mb 0ms DropTail]
-    set lan0  [$ns make-lan "nodeA nodeB nodeC" 0Mb 100ms]
+    set lan0  [$ns make-lan "nodeA nodeB nodeC" 1Mb 100ms]
 
     tb-set-endnodeshaping $link0 1
     tb-set-endnodeshaping $lan0 1		</code></pre>
@@ -61,7 +61,7 @@ regular IP packet forwarding is still enabled.
 </ul>
 
 If you would like to use end node traffic shaping globally, without
-having to specify per link or lan, then you can put this in your NS
+having to specify per link or LAN, then you can put this in your NS
 file:
     <code><pre>
     tb-use-endnodeshaping   1 		</code></pre>
@@ -96,19 +96,20 @@ while the physical link (fxp0) is 100Mbs. Of course, if your
 application actually tried to use more than 50Mbs on each multiplexed link,
 there would be a problem; a flow using more than its share on link0
 would cause packets on link1 to be dropped when they otherwise would
-not be. (<b>At this time, you cannot specify that a lan use multiplexed
+not be. (<b>At this time, you cannot specify that a LAN use multiplexed
 links</b>)
 
 <br>
 <br>
 To prevent this problem, a multiplexed link is automatically setup to use
-per-link delays (discussed above). Each of the links in the above
+<a href="#LINKDELAYS">per-link traffic shaping</a>.
+Each of the links in the above
 example would get a set of DummyNet pipes restricting their bandwidth
 to 50Mbs. Each link is forced to behave just as it would if the actual
 link bandwidth were 50Mbs. The keeps the aggregate bandwidth to that
 which can be supported by the underlying physical link (on fxp0,
-100Mbs). Of course, the same caveats mentioned above for per-link
-delays applies when using multiplexed links.
+100Mbs). Of course, the same caveats listed for per-link
+delays apply when using multiplexed links.
 
 <br>
 <br>
@@ -161,20 +162,20 @@ pipes).
 <br>
 <br>
 
-Constructing delayed lans is more complicated than duplex links
-because of the desire to allow each node in a lan to see different
-delays when talking to any other node in the lan. That is, the delay
+Constructing delayed LANs is more complicated than duplex links
+because of the desire to allow each node in a LAN to see different
+delays when talking to any other node in the LAN. That is, the delay
 when traversing from NodeA to NodeB is different than when traversing
 from NodeA to NodeC. Further, the return delays might be specified
 completely differently so that the return trips take a different
 amount of time. More information on why we allow this can be found <a
 href=../tutorial/docwrapper.php3?docname=behindthescenes.html>here.</a>
 To support this, it is necessary to insert two delay pipes for each
-node. One pipe is for traffic leaving the node for the lan, and the
-other pipe is for traffic entering the node from the lan. The reader
+node. One pipe is for traffic leaving the node for the LAN, and the
+other pipe is for traffic entering the node from the LAN. The reader
 might ask why not create N pipes on each node for each possible
-destination address in the lan, so that each packet traverses only one
-pipe. The reason is that a node on a lan has only one connection to
+destination address in the LAN, so that each packet traverses only one
+pipe. The reason is that a node on a LAN has only one connection to
 it, and multiple pipes would not respect the aggregate bw cap
 specified. The rule for the second pipe looks like:
     <code><pre>
@@ -188,7 +189,7 @@ forwarded on to the next hop, if appropriate.
 <br>
 The addition of multiplexed links complicates things further. To multiplex
 several different links on a physical interface, one must use either
-encapsulation (ipinip, vlan, etc) or IP interface aliases. We chose IP
+encapsulation (ipinip, VLAN, etc) or IP interface aliases. We chose IP
 aliases because it does not affect the MTU size. The downside of IP
 aliases is that it is difficult (if not impossible) to determine what
 flow a packet is part of, and thus what ipfw pipe to stuff the packet
@@ -213,11 +214,11 @@ matching on nexthop:
 Now, no matter how the user alters the routing table, packets will be
 stuffed into the proper pipe since the nexthop indicates which
 directly connected virtual link the packet was sent over. The use of a
-mask allows for matching when directly connected to a lan (a simplification).
+mask allows for matching when directly connected to a LAN (a simplification).
 
 <br>
 <br>
-Multiplexed lans present even worse problems because of the need to figure
+Multiplexed LANs present even worse problems because of the need to figure
 out which flow a incoming packet is part of. When a packet arrives at
 an interface, there is nothing in the packet to indicate which IP
 alias the packet was intended for (or which it came from) when the
