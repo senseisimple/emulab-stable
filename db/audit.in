@@ -49,15 +49,18 @@ my $query_result;
 # Reopen both stdout and stderr so that we can record all the output for
 # later mailing.
 # 
-open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
-open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+#open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+#open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
 
 #
 # Look for experiments running longer than 1 day, using real nodes.
 #
 if (! ($query_result = 
        DBQueryWarn("select e.pid,e.eid,e.expt_head_uid,expt_swapped, ".
-		   "       count(r.node_id) as ncount from experiments as e ".
+		   "       count(r.node_id) as ncount, ".
+		   "       UNIX_TIMESTAMP(now()) - UNIX_TIMESTAMP(expt_swapped)".
+		   "         as swapsec ".
+		   "  from experiments as e ".
 		   "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
 		   "left join nodes as n on n.node_id=r.node_id ".
 		   "left join node_types as nt on nt.type=n.type ".
@@ -73,17 +76,19 @@ if (! ($query_result =
 if ($query_result->numrows) {
     print "\n";
     print "Experiments swapped in longer than 1 day.\n";
-    printf "%-12s %-12s %-12s %-22s %s\n", "PID", "EID", "Creator", "Swapped",
-           "PCs";
-    print "------------ ------------ ------------ ".
-	  "---------------------- -------\n";
+    printf("%-12s %-8s %-12s %-12s %-22s %s\n",
+           "PID", "Hours", "EID", "Creator", "Swapped", "PCs");
+    print "------------ -------- ------------ ------------ ".
+	  "---------------------- ----\n";
     
-    while (my ($pid,$eid,$creator,$swapped,$count) = $query_result->fetchrow()) {
+    while (my ($pid,$eid,$creator,$swapped,$count,$seconds) =
+	   $query_result->fetchrow()) {
 	next
 	    if ($count == 0);
+	my $hours = int($seconds / (60 * 60));
 
-	printf("%-12s %-12s %-12s %-22s %s\n",
-	       $pid, $eid, $creator, $swapped, $count);
+	printf("%-12s %-8s %-12s %-12s %-22s %s\n",
+	       $pid, $hours, $eid, $creator, $swapped, $count);
     }
 }
 
