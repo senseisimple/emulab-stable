@@ -46,7 +46,7 @@ else {
 $prefix = &tbs_prefix($nsfile);
 $irfile = "$prefix.ir";
 $logfile = "$prefix.log";
-$ptopfile = "testbed$$.ptop";
+$ptopfile = "$$.ptop";
 $id = "$pid-$eid";
 
 $tbcmdfile = "tbcmds";
@@ -189,8 +189,6 @@ if (&tbs_exec("handle_os $irfile $tbcmdfile")) {
     &cleanup();
     exit(1);
 }
-
-unlink $ptopfile;
 
 &tbs_out("Pre run finished - " . &ctime(time) . "\n");
 

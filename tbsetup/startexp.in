@@ -26,6 +26,7 @@ my  $optlist = "b";
 my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
+my $TBINFO   = "$TB/expinfo";
 
 my $tbdir    = "$TB/bin/";
 my $projroot = "/proj";
@@ -92,6 +93,8 @@ my $nsfile  = "$eid.ns";
 my $irfile  = "$eid.ir";
 my $repfile = "$eid.report";
 my $tempns  = "$tempfile.$$";
+my $user_name  = "Startexp Script";
+my $user_email = "$TBOPS";
 
 #
 # Set up for querying the database.
@@ -228,6 +231,7 @@ if (system("$tbdir/tbreport -v $pid $eid $irfile 2>&1 > $repfile") != 0) {
 #
 if ($batch) {
     system("$tbdir/tbreport -v $pid $eid $irfile");
+    print STDOUT "\n\n";
 }
 
 #
@@ -256,6 +260,20 @@ $expt_created  = $row[1];
 $expt_expires  = $row[2];
 
 print STDOUT "Setup Success\n";
+
+#
+# Try to copy off the files for testbed information gathering
+#
+my $infodir = "$pid-$eid-" . `date +20%y%m%d-%H.%M.%S`;
+
+if ($infodir =~ /^([-\@\w.]+)$/) {
+    $infodir = $1;
+
+    if (mkdir("$TBINFO/$infodir", 0770)) {
+	system("cp $nsfile $irfile $TBINFO/$infodir");
+	system("cp *.ptop *.top $TBINFO/$infodir");
+    }
+}
 
 #
 # In batch mode, just exit without sending email. Remove tempns file!

@@ -820,10 +820,6 @@ close IRFILE;
 # available, reserve them, and call postassign to copy the data into the
 # DB.
 
-if ($verbose != 1) {
-    unlink $topfile;
-}
-
 print "Assignment complete\n";
 
 0;
