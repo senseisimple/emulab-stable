@@ -69,6 +69,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(INSTALL_DIR)/sethostname
 	$(INSTALL) -m 644 $(SRCDIR)/hosts $(INSTALL_DIR)/hosts
 	$(INSTALL) -m 644 $(SRCDIR)/pump.conf $(ETCDIR)/pump.conf
+	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(ETCDIR)/modules.conf
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(INSTALL_DIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(INSTALL_DIR)/cpuspeed.awk
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(INSTALL_DIR)/nodetype
