@@ -149,7 +149,7 @@ find_iface(char *macaddr)
 static int
 find_iface(char *macaddr)
 {
-	int		sock, i;
+	int		sock;
 	struct ifreq    ifrbuf, *ifr = &ifrbuf;
 	FILE	       *fp;
 	char		buf[BUFSIZ], *bp, enet[BUFSIZ];
@@ -175,8 +175,8 @@ find_iface(char *macaddr)
 
 	while (fgets(buf, sizeof(buf), fp)) {
 		sscanf(buf, "%s:", ifr->ifr_name);
-		if (bp = strchr(ifr->ifr_name, ':'))
-			*bp = (char *)0;
+		if ((bp = strchr(ifr->ifr_name, ':')))
+			*bp = '\0';
 				
 		ifr->ifr_addr.sa_family = AF_INET;
 		if (ioctl(sock, SIOCGIFHWADDR, ifr) < 0)
