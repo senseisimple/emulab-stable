@@ -1263,6 +1263,7 @@ makeranges(void)
 {
 	struct range	*pskip, *ptmp, *range, *lastrange = 0;
 	unsigned long	offset;
+	unsigned long	total = 0;
 	
 	if (!skips)
 		return;
@@ -1286,6 +1287,7 @@ makeranges(void)
 		range->size  = pskip->start - offset;
 		range->next  = 0;
 		offset       = pskip->start + pskip->size;
+		total	     += range->size;
 		
 		if (lastrange)
 			lastrange->next = range;
@@ -1321,6 +1323,9 @@ makeranges(void)
 		}
 		else
 			range->size = 0;
+		range->next = 0;
+		total += range->size;
+
 		lastrange->next = range;
 		lastrange = range;
 		numranges++;
@@ -1333,6 +1338,9 @@ makeranges(void)
 				"  %12d    %9d\n", range->start, range->size);
 			range  = range->next;
 		}
+		fprintf(stderr,
+			"\nTotal Number of Valid Sectors: %d (bytes %qd)\n",
+			total, (off_t)total * (off_t)secsize);
 	}
 }
 
