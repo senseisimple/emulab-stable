@@ -146,20 +146,20 @@ elseif (!TBvalid_description($formfields[exp_description])) {
 # NS File. There is a bunch of stuff here for Netbuild, which uses the
 # beginexp form as a backend. Switch to XML interface someday ...
 #
-if (isset($formfields[nsref])) {
-    if ($formfields[nsref] == "" ||
-	!preg_match("/^\d+$/", $formfields[nsref])) {
-	$errors["NS File Reference"] = "Invalid characters";
-    }
-}
 if (isset($formfields[guid])) {
     if ($formfields[guid] == "" ||
 	!preg_match("/^\d+$/", $formfields[guid])) {
 	$errors["NS File GUID"] = "Invalid characters";
     }
+}
+if (isset($formfields[nsref])) {
+    if ($formfields[nsref] == "" ||
+	!preg_match("/^\d+$/", $formfields[nsref])) {
+	$errors["NS File Reference"] = "Invalid characters";
+    }
     $nsfilelocale = "nsref";
 }
-if (isset($formfields[exp_localnsfile]) &&
+elseif (isset($formfields[exp_localnsfile]) &&
 	$formfields[exp_localnsfile] != "") {
     if (!preg_match("/^([-\@\w\.\/]+)$/", $formfields[exp_localnsfile])) {
 	$errors["Server NS File"] = "Pathname includes illegal characters";
