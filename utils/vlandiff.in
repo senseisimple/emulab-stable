@@ -1,19 +1,27 @@
 #!/usr/local/bin/perl -w
+use Getopt::Std;
 #
 # vlandiff - Show differences between switch state and vlan table, if any
 #
 
-my $TBROOT = "@prefix@";
-my $DBNAME = "@TBDBNAME@";
-
+#
+# Configure variables
+#
 $ENV{'PATH'} = '@prefix@/sbin:@prefix@/bin:/bin';
+use lib '@prefix@/lib';
+use libdb;
+
+my %opt = ();
+getopts('v',\%opt);
 
 my $debug = 0;
+if ($opt{v}) {
+    $debug = 1;
+}
 
-use Mysql;
-
-my $dbh;
-my $sth;
+if (@ARGV) {
+    die "Usage: $0 [-v]\n";
+}
 
 my %table = ();
 my %switch= ();
@@ -21,26 +29,22 @@ my %id = ();
 
 # Get all the vlans from the table
 
-$dbh = Mysql->connect("localhost",$DBNAME,"script","none");
-$sth = $dbh->
-  query("select id,members from vlans");
-while (@row = $sth->fetchrow_array()) {
-  my @list = split(" ",$row[1]);
-  foreach $port (@list) {
-    my ($node,$card) = split(":",$port);
-    #if ($node =~ /^(sh\d+)/) { $node = "$1-1"; }
-    if ($card =~ /[a-zA-Z]/) {
-      # specified ala ethX
-      my $sth2 = $dbh->
-	query("select card from interfaces where node_id='$node' ".
-	      "and iface='$card'");
-      $card = ($sth2->fetchrow_array())[0];
-      print "Had '$port', changed to '$node:$card'\n" if $debug;
-      $port = "$node:$card";
+my $result = DBQueryFatal("select id,members from vlans");
+while (@row = $result->fetchrow_array()) {
+    my @list = split(" ",$row[1]);
+    foreach $port (@list) {
+	my ($node,$card) = split(":",$port);
+	if ($card =~ /[a-zA-Z]/) {
+	    # specified ala ethX
+	    my $result2 = DBQueryFatal("select card from interfaces ".
+		    "where node_id='$node' and iface='$card'");
+	    $card = ($result2->fetchrow_array())[0];
+	    if ($debug) { print "Had '$port', changed to '$node:$card'\n"; }
+	    $port = "$node:$card";
+	}
     }
-  }
-  $table{$row[0]} = join(" ",sort @list);
-  print "In table: vlan $row[0]: $table{$row[0]}\n" if $debug;
+    $table{$row[0]} = join(" ",sort @list);
+    if ($debug) { print "In table: vlan $row[0]: $table{$row[0]}\n"; }
 }
 
 # Get all the vlans from the switch
@@ -49,35 +53,36 @@ my $list;
 my $vlan=0;
 open(LIST,"snmpit -l |") || die ("vlandiff: couldn't run snmpit: $!\n");
 while(<LIST>) {
-  chop;
-  if (/(^ID)|(^--)|(^1 )/) { next; }
-  s/[\t ]+/ /g;
-  if ( /^(\d+)\s+(\S+)(?:\s+(.*))?$/ ) {
-    if (!defined $3) { $list = ""; } else { $list = $3; }
-    if ($2 ne "default") {
-      $switch{$2} = join(" ", sort split(" ",$list));
-      $id{$2} = $1;
-      $vlan = $2;
-      print "On switch: vlan #$1 $2: $switch{$2}\n" if $debug;
+    chop;
+    if (/(^ID)|(^--)|(^1 )/) { next; }
+    s/[\t ]+/ /g;
+    if ( /^(\d+)\s+(\S+)(?:\s+(.*))?$/ ) {
+	if (!defined $3) { $list = ""; } else { $list = $3; }
+	if ($2 ne "default") {
+	    $switch{$2} = join(" ", sort split(" ",$list));
+	    $id{$2} = $1;
+	    $vlan = $2;
+	    if ($debug) { print "On switch: vlan #$1 $2: $switch{$2}\n"; }
+	}
+    } elsif ( /^\s+(.*)?$/ ) {
+	if (!defined $1) { $list = ""; } else { $list = $1; }
+	$switch{$vlan} .= " ".join(" ", sort split(" ",$list));
+	if ($debug) { print "On switch: vlan #$id{$vlan} $vlan: $switch{$vlan}\n"; }
     }
-  } elsif ( /^\s+(.*)?$/ ) {
-    if (!defined $1) { $list = ""; } else { $list = $1; }
-    $switch{$vlan} .= " ".join(" ", sort split(" ",$list));
-    print "On switch: vlan #$id{$vlan} $vlan: $switch{$vlan}\n" if $debug;
-  }
 }
 close(LIST);
 
 # Compare all of them...
 
 foreach $key (sort keys %table) {
-  if ( defined $switch{$key} && ($switch{$key} eq $table{$key}) ) {
-    # If its in both lists, delete it from both
-    print "vlan table:$key ($table{$key}) matches switch:$key ($switch{$key})\n"
-      if $debug;
-    delete $switch{$key};
-    delete $table{$key};
-  }
+    if ( defined $switch{$key} && ($switch{$key} eq $table{$key}) ) {
+	# If its in both lists, delete it from both
+	if ($debug) {
+	    print "vlan table:$key ($table{$key}) matches switch:$key ($switch{$key})\n"
+	}
+	delete $switch{$key};
+	delete $table{$key};
+    }
 }
 
 # Print out the difference
@@ -85,20 +90,25 @@ foreach $key (sort keys %table) {
 my $rv = 0;
 
 if (keys %table) {
-  print "In vlans table only:\n";
-  foreach $key(sort keys %table) {
-    print "$key\t$table{$key}\n";
-  }
-  $rv++;
+    print "In vlans table only:\n";
+    foreach $key(sort keys %table) {
+	print "$key\t$table{$key}\n";
+    }
+    $rv++;
 }
 
 if (keys %switch) {
-  print "On switch only:\n";
-  foreach $key(sort keys %switch) {
-    print "#",$id{"$key"},": $key\t$switch{$key}\n";
-  }
-  $rv++;
+    print "On switch only:\n";
+    foreach $key(sort keys %switch) {
+	print "#",$id{"$key"},": $key\t$switch{$key}\n";
+    }
+    $rv++;
 }
+
+if ($debug) {
+    print "Exiting with value $rv\n";
+}
+
 
 # Return 0 if same, 1 for a one-sided diff, 2 for a two-sided diff
 # (Could be changed to return total # of different vlans)
