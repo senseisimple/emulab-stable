@@ -20,7 +20,7 @@ use Exporter;
 	 bootsetup nodeupdate startcmdstatus whatsmynickname
 	 TBBackGround TBForkCmd vnodesetup dorouterconfig
 	 jailsetup dojailconfig JailedNFSMounts findiface
-	 tmccdie tmcctimeout libsetup_getvnodeid
+	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
 
 	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED 
 
