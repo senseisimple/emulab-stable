@@ -1,0 +1,97 @@
+.\" Copyright (c) 2000, University of Utah, all rights reserved.
+
+.Dd April 19, 2000
+.Dt CAPTURE 1
+.Os BSD 4
+.Sh NAME
+.Nm capture
+.Nd record serial port output while allowing tip access to it
+.Sh SYNOPSIS
+.Nm capture
+.Op Fl s Ar speed
+.Op Fl H
+.Ar remote-name
+.Ar dev-name
+.Sh DESCRIPTION
+.Nm capture
+records output from a tty device to a file, and makes a new tty
+device available by which you can still tip to the original
+device.
+.Pp
+The options are as follows:
+.Pp
+.Bl -tag -width indent
+.It Fl s Ar speed
+Set the speed in bps (2400, 9600, 115200, etc)
+.It Fl H
+Use hardware flow control
+.Sh CONFIGURATION
+You should run one copy of
+.Nm capture
+for each device you wish to record.  In order to run
+.Nm capture
+you'll need to set up a pty/tty pair for this device.
+By default, these devices go in
+.Pa /dev/tip
+.Pp
+The tty file (the one that's now accessible to 'tip') should
+be named
+.Ar remote-name
+and the pty file (that
+.Nm capture
+uses internally) should be named
+.Ar remote-name-pty
+
+.Sh LOGGING
+The output from
+.Nm capture
+by default goes in the file
+.Pa /var/log/tiplogs/remote-name
+
+The directory in which this occurs is configurable by modifying
+the LOGPATH variable in the source code.
+
+.Sh EXAMPLE
+To configure capture for a remote machine named
+.Ar test
+which is connected to our 
+.Pa /dev/cuaa1 
+port at 115200 bps,
+we'd do the following steps:
+.Pp
+mkdir /dev/tip
+.Pp
+mkdir /var/log/tiplogs
+.Pp
+use
+.Xr mknod 8
+to create a tty/pty pair in 
+.Pa /dev/tip 
+named test and test-pty
+respectively
+.Pp
+run 
+.Nm capture -s 115200 test cuaa1
+.Pp
+If you wish to be able to 
+.Xr tip 1
+directly to test by typing tip test, then
+put a line like the following in your
+.Xr remote 5
+file:
+.Pp
+test:dv=/dev/tip/test:br#115200:nt:pa=none:
+.Pp
+(Place the capture startup line in your rc files if
+you wish it to start automatically).
+.Sh FILES
+.Bl -tag -width /var/log/tiplogs -compact
+.It Pa /etc/remote
+Remote system descriptions
+.It Pa /var/log/tiplogs
+Logfile of machine output
+.It /dev/tip
+Directory for capture ttys and ptys
+.Sh HISTORY
+Originally written by Leigh Stoller at the University of Utah
+in 1992 for HPBSD, runs well under FreeBSD as well.
