@@ -1,6 +1,8 @@
 <?php
 #
-# Default definitions. Selected via configure.
+# Default definitions, selected via configure.
+# See doc/setup.txt in the root of the source tree for
+# explanations of some of these variables.
 # 
 $WWWHOST        = "www.emulab.net";
 $WWW            = "$WWWHOST";
