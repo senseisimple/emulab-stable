@@ -44,7 +44,7 @@ int s_dummy;
 /* agent IP address */
 char *ipaddr = NULL;
 
-static int debug = 0;
+int debug = 0;
 
 char buf_link [MAX_LINKS][MAX_LINE_LENGTH];
 /************************GLOBALS*****************************************/

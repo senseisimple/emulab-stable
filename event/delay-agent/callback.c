@@ -17,6 +17,7 @@
 extern structlink_map link_map[MAX_LINKS];
 extern int link_index;
 extern int s_dummy; 
+extern int debug;
 /******************************* EXTERNS **************************/
 
 
@@ -103,7 +104,11 @@ void handle_pipes (char *objname, char *eventtype,
      error( "not handling simplex links yet ");
      return;
    }
-	   
+
+  if(debug){
+    system ("echo ======================================== >> /tmp/ipfw.log"); 
+    system("(date;echo PARAMS ; ipfw pipe show all) >> /tmp/ipfw.log");
+  }
 }
 
 /***************** checkevent **************************************
@@ -363,24 +368,20 @@ void get_flowset_params(struct dn_flow_set *fs, int l_index,
     /* internally dummynet sets DN_IS_RED (only) if the queue is RED and
        sets DN_IS_RED and DN_IS_GENTLE_RED(both) if queue is GRED*/
 
-    if (fs->flags_fs & DN_IS_GENTLE_RED) {
-      p_params->flags_p |= PIPE_Q_IS_GRED;
-
-      /* get GRED params */
+    if (fs->flags_fs & DN_IS_RED) {
+      /* get GRED/RED params */
 
       p_params->red_gred_params.w_q =  1.0*fs->w_q/(double)(1 << SCALE_RED);
       p_params->red_gred_params.max_p = 1.0*fs->max_p/(double)(1 << SCALE_RED);
       p_params->red_gred_params.min_th = SCALE_VAL(fs->min_th);
       p_params->red_gred_params.max_th = SCALE_VAL(fs->max_th);
 
-    }else if (fs->flags_fs & DN_IS_RED){
+      if(fs->flags_fs & DN_IS_GENTLE_RED) 
+	p_params->flags_p |= PIPE_Q_IS_GRED;
+      else
 	p_params->flags_p |= PIPE_Q_IS_RED;
-	/* get RED params */
-	p_params->red_gred_params.w_q =  1.0*fs->w_q/(double)(1 << SCALE_RED);
-	p_params->red_gred_params.max_p = 1.0*fs->max_p/(double)(1 << SCALE_RED);
-	p_params->red_gred_params.min_th =  SCALE_VAL(fs->min_th);
-	p_params->red_gred_params.max_th = SCALE_VAL(fs->max_th);
-      }
+      
+    }
     /* else droptail*/
 
   }
@@ -501,24 +502,80 @@ void set_link_params(int l_index, int blackhole)
        }
       /* set the queing discipline and other relevant params*/
 
-       if(p_params->flags_p & PIPE_Q_IS_GRED){
+       if(p_params->flags_p & (PIPE_Q_IS_GRED | PIPE_Q_IS_RED)){
 	 /* set GRED params */
 	 pipe.fs.flags_fs |= DN_IS_RED;
-	 pipe.fs.flags_fs |= DN_IS_GENTLE_RED;
 	 pipe.fs.max_th = p_params->red_gred_params.max_th;
 	 pipe.fs.min_th = p_params->red_gred_params.min_th;
 	 pipe.fs.w_q = (int) ( p_params->red_gred_params.w_q * (1 << SCALE_RED) ) ;
 	 pipe.fs.max_p = (int) ( p_params->red_gred_params.max_p * (1 << SCALE_RED) );
-	}else if (p_params->flags_p & PIPE_Q_IS_RED){
-	  /* set RED params*/
-	  pipe.fs.flags_fs |= DN_IS_RED;
-	  pipe.fs.max_th = p_params->red_gred_params.max_th;
-	  pipe.fs.min_th = p_params->red_gred_params.min_th;
-	   pipe.fs.w_q = (int) ( p_params->red_gred_params.w_q * (1 << SCALE_RED) ) ;
-	 pipe.fs.max_p = (int) ( p_params->red_gred_params.max_p * (1 << SCALE_RED) );
 
-	}
-       else ; /* DROPTAIL*/
+	 if(p_params->flags_p & PIPE_Q_IS_GRED)
+	 	 pipe.fs.flags_fs |= DN_IS_GENTLE_RED;
+
+	 if(pipe.bandwidth){
+	   size_t len ; 
+	   int lookup_depth, avg_pkt_size ;
+	   double s, idle, weight, w_q ;
+	   struct clockinfo clock ;
+	   int t ;
+
+	   len = sizeof(int) ;
+	   if (sysctlbyname("net.inet.ip.dummynet.red_lookup_depth", 
+		     &lookup_depth, &len, NULL, 0) == -1){
+	     error("cant get net.inet.ip.dummynet.red_lookup_depth");
+	     return;
+	   }
+	   if (lookup_depth == 0) {
+	       info("net.inet.ip.dummynet.red_lookup_depth must" 
+			    "greater than zero") ;
+	       return;
+	     }
+	   
+	   len = sizeof(int) ;
+	   if (sysctlbyname("net.inet.ip.dummynet.red_avg_pkt_size", 
+			&avg_pkt_size, &len, NULL, 0) == -1){
+
+	     error("cant get net.inet.ip.dummynet.red_avg_pkt_size");
+	     return;
+	   }
+	   if (avg_pkt_size == 0){
+	    info("net.inet.ip.dummynet.red_avg_pkt_size must" 
+				"greater than zero") ;
+	     return;
+	   }
+
+	   len = sizeof(struct clockinfo) ;
+
+	   if (sysctlbyname("kern.clockrate", 
+			&clock, &len, NULL, 0) == -1) {
+	     error("cant get kern.clockrate") ;
+	     return;
+	   }
+	   
+
+	   /* ticks needed for sending a medium-sized packet */
+	   s = clock.hz * avg_pkt_size * 8 / pipe.bandwidth;
+
+	   /*
+	    * max idle time (in ticks) before avg queue size becomes 0. 
+	    * NOTA:  (3/w_q) is approx the value x so that 
+	    * (1-w_q)^x < 10^-3. 
+	    */
+	   w_q = ((double) pipe.fs.w_q) / (1 << SCALE_RED) ; 
+	   idle = s * 3. / w_q ;
+	   pipe.fs.lookup_step = (int) idle / lookup_depth ;
+	   if (!pipe.fs.lookup_step) 
+	       pipe.fs.lookup_step = 1 ;
+	   weight = 1 - w_q ;
+	   for ( t = pipe.fs.lookup_step ; t > 0 ; --t ) 
+	      weight *= weight ;
+	   pipe.fs.lookup_weight = (int) (weight * (1 << SCALE_RED)) ;
+
+	 }
+	 
+       }
+        /*  else DROPTAIL*/
 
       /* now call setsockopt*/
        if (setsockopt(s_dummy,IPPROTO_IP, IP_DUMMYNET_CONFIGURE, &pipe,sizeof pipe)
