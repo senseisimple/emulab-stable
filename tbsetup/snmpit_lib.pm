@@ -19,8 +19,9 @@ use Exporter;
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchStack
 		getStackType getDeviceOptions getTrunks getTrunksFromSwitches
-		getExperimentPorts snmpitGetWarn snmpitGetFatal
-		snmpitWarn snmpitFatal printVars tbsort );
+		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
+		snmpitSet snmpitSetWarn snmpitSetFatal snmpitWarn snmpitFatal
+		printVars tbsort );
 
 use English;
 use libdb;
@@ -33,6 +34,9 @@ my $TBOPS = libtestbed::TB_OPSEMAIL;
 my $debug = 0;
 
 my $DEFAULT_RETRIES = 10;
+
+my $SNMPIT_GET = 0;
+my $SNMPIT_SET = 1;
 
 my %Devices=();
 # Devices maps device names to device IPs
@@ -592,20 +596,20 @@ sub getTrunksFromSwitches($@) {
 }
 
 #
-# Get a set of SNMP variables from an SNMP session, retrying in case there are
-# transient errors.
+# Execute and SNMP command, retrying in case there are transient errors.
 #
-# usage: snmpitGet(session, var, [retries])
-# args:  session - SNMP::Session object, already connected to the SNMP
+# usage: snmpitDoIt(getOrSet, session, var, [retries])
+# args:  getOrSet - either $SNMPIT_GET or $SNMPIT_SET
+#        session - SNMP::Session object, already connected to the SNMP
 #                  device
 #        var     - An SNMP::Varbind or a reference to a two-element array
 #                  (similar to a single Varbind)
 #        retries - Number of times to retry in case of failure
 # returns: the value on sucess, undef on failure
 #
-sub snmpitGet($$;$) {
+sub snmpitDoIt($$$;$) {
 
-    my ($sess,$var,$retries) = @_;
+    my ($getOrSet, $sess,$var,$retries) = @_;
 
     if (! defined($retries) ) {
 	$retries = $DEFAULT_RETRIES;
@@ -629,7 +633,13 @@ sub snmpitGet($$;$) {
     # Retry several times
     #
     foreach my $retry ( 1 .. $retries) {
-    	my $status = $sess->get($var);
+	my $status;
+	if ($getOrSet == $SNMPIT_GET) {
+	    $status = $sess->get($var);
+	} else {
+	    $status = $sess->set($var);
+	}
+
 	#
 	# Avoid unitialized variable warnings when printing errors
 	#
@@ -648,7 +658,11 @@ sub snmpitGet($$;$) {
 		$snmpitErrorString .= "Error string is: $sess->{ErrorStr}\n";
 	    }
 	} else {
-	    return $var->[2];
+	    if ($getOrSet == $SNMPIT_GET) {
+		return $var->[2];
+	    } else {
+	        return 1;
+	    }
 	}
 
 	#
@@ -666,13 +680,31 @@ sub snmpitGet($$;$) {
 }
 
 #
+# usage: snmpitGet(session, var, [retries])
+# args:  session - SNMP::Session object, already connected to the SNMP
+#                  device
+#        var     - An SNMP::Varbind or a reference to a two-element array
+#                  (similar to a single Varbind)
+#        retries - Number of times to retry in case of failure
+# returns: the value on sucess, undef on failure
+#
+sub snmpitGet($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my $result;
+
+    $result = snmpitDoIt($SNMPIT_GET,$sess,$var,$retries);
+
+    return $result;
+}
+
+#
 # Same as snmpitGet, but send mail if any error occur
 #
 sub snmpitGetWarn($$;$) {
     my ($sess,$var,$retries) = @_;
     my $result;
 
-    $result = snmpitGet($sess,$var,$retries);
+    $result = snmpitDoIt($SNMPIT_GET,$sess,$var,$retries);
 
     if (! $result) {
 	snmpitWarn("SNMP GET failed");
@@ -688,10 +720,59 @@ sub snmpitGetFatal($$;$) {
     my ($sess,$var,$retries) = @_;
     my $result;
 
-    $result = snmpitGet($sess,$var,$retries);
+    $result = snmpitDoIt($SNMPIT_GET,$sess,$var,$retries);
 
     if (! $result) {
 	snmpitFatal("SNMP GET failed");
+    }
+    return $result;
+}
+
+#
+# usage: snmpitSet(session, var, [retries])
+# args:  session - SNMP::Session object, already connected to the SNMP
+#                  device
+#        var     - An SNMP::Varbind or a reference to a two-element array
+#                  (similar to a single Varbind)
+#        retries - Number of times to retry in case of failure
+# returns: true on success, undef on failure
+#
+sub snmpitSet($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my $result;
+
+    $result = snmpitDoIt($SNMPIT_SET,$sess,$var,$retries);
+
+    return $result;
+}
+
+#
+# Same as snmpitSet, but send mail if any error occur
+#
+sub snmpitSetWarn($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my $result;
+
+    $result = snmpitDoIt($SNMPIT_SET,$sess,$var,$retries);
+
+    if (! $result) {
+	snmpitWarn("SNMP SET failed");
+    }
+    return $result;
+}
+
+#
+# Same as snmpitSetWarn, but also exits from the program if there is a 
+# failure.
+#
+sub snmpitSetFatal($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my $result;
+
+    $result = snmpitDoIt($SNMPIT_SET,$sess,$var,$retries);
+
+    if (! $result) {
+	snmpitFatal("SNMP SET failed");
     }
     return $result;
 }
