@@ -402,8 +402,6 @@ sub UpdatePassword()
 	return 0;
     }
 
-    print "$pswd\n";
-
     $UID = 0;
     if ($CONTROL ne $BOSSNODE) {
 	print "Updating user $user password on $CONTROL.\n";
