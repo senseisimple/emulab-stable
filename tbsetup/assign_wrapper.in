@@ -137,6 +137,7 @@ sub printdb {
 #    be inserted.
 #  fixed_nodes is indexed by virtual node name and points to physical node
 #   name.
+#  vtypes is indexed by vtype name and is a list of {weight types}.
 #
 # Delay node names:
 #  delay nodes are named tbdelayXX N > 2
@@ -258,6 +259,15 @@ foreach $lan (keys(%lans)) {
 }
 # End shark hack
 
+# Load virt types
+printdb "Loading virt_vtypes.\n";
+$result = DBQueryFatal("SELECT name,weight,members from virt_vtypes" .
+		       " where pid=\"$pid\" and eid=\"$eid\"");
+while (($name,$weight,$types) = $result->fetchrow_array) {
+    printdb "  $name $weight $types\n";
+    $vtypes{$name} = "$weight $types";
+}
+
 # Open the TOP file
 $topfile = "$eid.top";
 open(TOPFILE,"> $topfile") || do {
@@ -265,6 +275,10 @@ open(TOPFILE,"> $topfile") || do {
     exit(1);
 };
 
+# Print out vtypes
+foreach $vtype (keys(%vtypes)) {
+    print TOPFILE "make-vclass $vtype $vtypes{$vtype}\n";
+}
 
 $nodes=0;
 $delaynodes=0;
