@@ -922,7 +922,9 @@ class Plab:
         defosid, controliface = self.__getNodetypeInfo()
         id, priority = self.__nextFreeNodeid()
         nodeid = "plab%d" % id
-        hostname = string.replace(hostname, ".", "-")
+        hostonly = hostname.replace(".", "-")
+        site = hostname[(hostname.find(".")+1):]
+        
         print "Creating pnode %s as %s, priority %d." % (ip, nodeid, priority)
 
         try:
@@ -939,6 +941,11 @@ class Plab:
                           'FREE_CLEAN',
                           'ISUP'))
 
+            DBQueryFatal("insert into widearea_nodeinfo"
+                         " (node_id, contact_uid, hostname, site)"
+                         " values (%s, %s, %s, %s)",
+                         (nodeid, 'bnc', hostname, site))
+
             DBQueryFatal("insert into interfaces"
                          " (node_id, card, port, IP, interface_type,"
                          " iface, role)"
@@ -948,7 +955,7 @@ class Plab:
             DBQueryFatal("insert into reserved"
                          " (node_id, pid, eid, rsrv_time, vname)"
                          " values (%s, %s, %s, now(), %s)",
-                         (nodeid, RESERVED_PID, RESERVED_EID, hostname))
+                         (nodeid, RESERVED_PID, RESERVED_EID, hostonly))
 
             DBQueryFatal("insert into node_auxtypes"
                          " (node_id, type, count)"

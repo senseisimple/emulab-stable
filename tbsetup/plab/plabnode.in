@@ -33,7 +33,7 @@ def main(args):
 
     if command == "alloc":
         node = slice.createNode(nodeid)
-#        node.addKey("/root/.ssh/identity.pub")
+        node.addKey("/root/.ssh/identity.pub")
         
         while 1:
             try:

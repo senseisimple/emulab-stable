@@ -49,6 +49,8 @@ my $killmode    = 0;
 my $dbuid;
 
 my $MAX_CHILDREN = 8;
+# Try to let auxiliary setup programs timeout naturally first.
+my $CHILD_TIMEOUT = 600;  # ten minutes
 
 #
 # Load the Testbed support stuff. 
@@ -381,7 +383,7 @@ while (1) {
 	# back around the loop
 	#
 	my $now = time();
-	my $waittime = ($oldest + 120) - time();
+	my $waittime = ($oldest + $CHILD_TIMEOUT) - time();
 
 	#
 	# Kill of the oldest if he gets too old while we're waiting

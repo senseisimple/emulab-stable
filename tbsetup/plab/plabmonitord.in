@@ -145,6 +145,12 @@ while (1) {
 
         sleep(5);
 
+
+        # * Try full vnode_setup on node - mgmt sliver.
+        #   - If (multiple?) fail, try to delete node/sliver from mgmt slice.
+        #     (can we push out this action?)
+        #
+
         #
         # Make sure the node is still in $NODEDEAD_*
         #
@@ -165,8 +171,9 @@ while (1) {
 	print "\n\#\#\# Checking $vnode on $pnode at " . TimeStamp() . "\n";
 
 	#
-	# Try to set it up, wait for ISUP, then tear it down.
+	# Try to tear it down, set it up, and wait for ISUP.
 	# 
+	system("vnode_setup -f -k -d $PLABMOND_PID $PLABMOND_EID $vnode");
 	system("vnode_setup -f -d $PLABMOND_PID $PLABMOND_EID $vnode");
 	if ($?) {
 	    print "Failed to allocate $vnode on $pnode\n";
@@ -175,11 +182,6 @@ while (1) {
                 $revive = 1;
             }
         }
-	system("vnode_setup -f -k -d $PLABMOND_PID $PLABMOND_EID $vnode");
-	if ($?) {
-            print "Failed to teardown $vnode on $pnode\n";
-	    $revive = 0;
-	}
 
 	#
 	# That all worked. Move the pnode out of hwdown and back into

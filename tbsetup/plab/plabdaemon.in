@@ -15,9 +15,10 @@ RENEW_PERIOD = 60*60
 MAXCONSECEXC = 3
 
 def usage(me):
-    print "Usage: %s [ -vd ] { getfree [-u] | renew }" % me
-    print "  Passing -u to getfree will cause it to only update"
-    print "  existing data and not fork off as a daemon"
+    print "Usage: %s [ -vd ] { getfree [-o [-i]] | renew }" % me
+    print "  Passing -o to getfree will cause it to only run once."
+    print "  Passing -i to getfree will cause if to only update using"
+    print "   existing node info (no new nodes will be added)."
     sys.exit(1)
 
 class logfile:
@@ -125,15 +126,17 @@ def main(args):
 
         plab = libplab.Plab()
         if command == "getfree":
-            opts, args = getopt.getopt(args[1:], "i")
-            update = False
+            opts, args = getopt.getopt(args[1:], "io")
+            updateOnly = False
             for o, a in opts:
                 if o == "-i":
-                    update = True
+                    updateOnly = True
+                elif o == "-o":
+                    runonce = True
             if len(args):
                 usage(me)
-            if update:
-                plab.getFree(True)
+            if runonce:
+                plab.getFree(updateOnly)
             else:
                 doDaemon(plab.getFree, GETFREE_PERIOD, "plabgetfree")
         elif command == "renew":
