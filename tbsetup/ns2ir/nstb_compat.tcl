@@ -47,6 +47,8 @@ proc tb-set-node-startcmd {node cmd} {}
 proc tb-set-encapsulate {onoff} {}
 proc tb-set-jail-os {os} {}
 proc tb-set-delay-os {os} {}
+proc tb-use-ipassign {onoff} {}
+proc tb-set-ipassign-args {args} {}
 
 Class Program
 
