@@ -847,3 +847,28 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table node_types add issubnode tinyint(4) NOT NULL default '0' \
 		after isremotenode;
 
+1.172: Add plab stuff:
+
+	alter table node_types add isplabdslice tinyint(4) NOT NULL 
+		default '0' after issubnode;
+
+	CREATE TABLE plab_slice_nodes (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  slicename varchar(64) NOT NULL default '',
+	  node_id varchar(10) NOT NULL default '',
+	  ticketdata text,
+	  leasedata text,
+	  leaseend datetime default NULL,
+	  PRIMARY KEY  (node_id)
+	) TYPE=MyISAM;
+
+	CREATE TABLE plab_slices (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  slicename varchar(64) NOT NULL default '',
+	  privkey text,
+	  pubkey text,
+	  PRIMARY KEY  (pid,eid)
+	) TYPE=MyISAM;
+

@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.52-log
+-- Server version	3.23.54-log
 
 --
 -- Table structure for table 'cdroms'
@@ -717,6 +717,7 @@ CREATE TABLE node_types (
   isvirtnode tinyint(4) NOT NULL default '0',
   isremotenode tinyint(4) NOT NULL default '0',
   issubnode tinyint(4) NOT NULL default '0',
+  isplabdslice tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -922,6 +923,34 @@ CREATE TABLE partitions (
   partition tinyint(4) NOT NULL default '0',
   osid varchar(35) default NULL,
   PRIMARY KEY  (node_id,partition)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'plab_slice_nodes'
+--
+
+CREATE TABLE plab_slice_nodes (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  slicename varchar(64) NOT NULL default '',
+  node_id varchar(10) NOT NULL default '',
+  ticketdata text,
+  leasedata text,
+  leaseend datetime default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'plab_slices'
+--
+
+CREATE TABLE plab_slices (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  slicename varchar(64) NOT NULL default '',
+  privkey text,
+  pubkey text,
+  PRIMARY KEY  (pid,eid)
 ) TYPE=MyISAM;
 
 --
