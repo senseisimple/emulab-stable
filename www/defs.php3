@@ -5,15 +5,19 @@
 $TBWWW          = "<https://www.emulab.net/tbdb.html>";
 $TBMAIL_CONTROL = "Testbed Ops <testbed-ops@flux.cs.utah.edu>";
 $TBMAIL_WWW     = "Testbed WWW <testbed-www@flux.cs.utah.edu>";
+#$TBMAIL_WWW     = "Testbed WWW <stoller@fast.cs.utah.edu>";
 $TBMAIL_APPROVE = "Testbed Approval <testbed-approval@flux.cs.utah.edu>";
 $TBDBNAME       = "tbdb";
-$TBDIR          = "/usr/testbed/www/";
+$TBDIR          = "/usr/testbed/";
+$TBWWW_DIR	= "$TBDIR"."www/";
+$TBBIN_DIR	= "$TBDIR"."bin/";
 
 $TBLIST_DIR     = "/usr/testbed/www/maillist";
 $TBLIST_LEADERS = "$TBLIST_DIR"."/leaders.txt";
 $TBLIST_USERS   = "$TBLIST_DIR"."/users.txt";
 
 $TBUSER_DIR	= "/users/";
+$TBNSSUBDIR     = "nsdir";
 
 #
 # Generate the KEY from a name
@@ -28,6 +32,7 @@ function GENKEY ($name) {
 # should then terminate if required to do so.
 #
 function TBERROR ($message, $death) {
+    if (0) {
     mail($TBMAIL_WWW,
          "TESTBED ERROR REPORT",
          "\n".
@@ -36,6 +41,9 @@ function TBERROR ($message, $death) {
          "Testbed WWW\n",
          "From: $TBMAIL_WWW\n".
          "Errors-To: $TBMAIL_WWW");
+    }
+    # Allow sendmail to run.
+    sleep(2); 
 
     if ($death) {
         die("<br><br><h3>".

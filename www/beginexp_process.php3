@@ -95,7 +95,7 @@ if ($row = mysql_fetch_row($pswd_result)) {
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT eid FROM experiments WHERE eid=\"$exp_id\"");
 if ($row = mysql_fetch_row($query_result)) {
-  USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
+    USERERROR("The experiment name \"$exp_id\" you have chosen is already ".
             "in use. Please select another.", 1);
 }
 
@@ -109,27 +109,112 @@ if ($row = mysql_fetch_row($query_result)) {
 $query_result = mysql_db_query($TBDBNAME,
 	"SELECT * FROM grp_memb WHERE gid=\"$exp_pid\" and uid=\"$uid\"");
 if (($row = mysql_fetch_array($query_result)) == 0) {
-  USERERROR("You are not a member of Project $exp_pid, so you cannot begin ".
+    USERERROR("You are not a member of Project $exp_pid, so you cannot begin ".
             "an experiment in that project.", 1);
 }
 $trust = $row[trust];
 if (strcmp($trust, "group_root") && strcmp($trust, "local_root")) {
-  USERERROR("You are not group or local root in Project $exp_pid, so you ".
-            "cannot begin an experiment in that project.", 1);
+    USERERROR("You are not group or local root in Project $exp_pid, so you ".
+              "cannot begin an experiment in that project.", 1);
 }
 
 #
-# We are going to write out the NS file to a subdir in the users
-# home directory.
+# We are going to write out the NS file to a subdir of the testbed
+# directory. We create a subdir in there, and stash the ns file for
+# processing by tbrun. We generate a name from the experiment ID,
+# which we know to be unique cause we tested that above. Later, when
+# the experiment is ended, the directory will be deleted.
+#
+# No need to tell me how bogus this is.
+#
+$dirname = "$TBWWW_DIR"."$TBNSSUBDIR"."/"."$exp_id";
+$nsname  = "$dirname"."/$exp_id".".ns";
+$irname  = "$dirname"."/$exp_id".".ir";
+$repname = "$dirname"."/$exp_id".".report";
+
+if (! mkdir($dirname, 0777)) {
+    TBERROR("Making directory for experiment: $dirname.", 1);
+}
+if (! copy($exp_nsfile, "$nsname")) {
+    rmdir($dirname);
+    TBERROR("Copying NS file for experiment into $dirname.", 1);
+}
+
+echo "<center><br>";
+echo "<h3>Setting up experiment. This may take a few minutes ...</h3>";
+echo "</center>";
+
+#
+# Run the scripts. We use a script wrapper to deal with changing
+# to the proper directory and to keep some of these details out
+# of this. We just want to know if the experiment setup worked.
+# The wrapper is going to go the extra step of running tbreport
+# so that we can give the user warm fuzzies.
+#
+$output = array();
+$retval = 0;
+$result = exec("$TBBIN_DIR/tbdoit $dirname $pid $nsname", $output, $retval);
+if ($retval) {
+    echo "<br><br><h2>
+          Setup Failure($retval): Output as follows:
+          </h2>
+          <br>
+          <XMP>\n";
+          for ($i = 0; $i < count($output); $i++) {
+	      echo "$output[$i]\n";
+          }
+    echo "</XMP>\n";
+
+    unlink("$nsname");
+    unlink("$irname");
+    unlink("$repname");
+    rmdir("$dirname");
+    die("");
+}
+
+#
+# Make sure the report file exists, just to be safe!
 # 
+if (! file_exists($repname)) {
+    unlink("$nsname");
+    unlink("$irname");
+    unlink("$repname");
+    rmdir("$dirname");
+    TBERROR("Report file for new experiment does not exist!\n", 1);
+}
 
+#
+# So, that went okay. At this point enter the exp_id into the database
+# so that it shows up as valid.
+#
+$query_result = mysql_db_query($TBDBNAME,
+	"INSERT INTO experiments ".
+        "(eid, pid, expt_created, expt_expires, expt_name, ".
+        "expt_head_uid, expt_start, expt_end) ".
+        "VALUES ('$exp_id', '$exp_pid', '$exp_created', '$exp_expires', ".
+        "'$exp_name', '$uid', '$exp_start', '$exp_end')");
+if (! $query_result) {
+    $err = mysql_error();
+    TBERROR("Database Error adding new experiment $exp_id: $err\n", 1);
+}
 
-echo "$exp_nsfile<p>";
-echo "$exp_nsfile_name<p>";
-echo "$exp_nsfile_size<p>";
-echo "$exp_nsfile_type<p>";
+echo "<center><br>";
+echo "<h2>Experiment Configured!<br>";
+echo "Here is a summary of the nodes that were allocated<br>";
+echo "</h2></center><br>";
 
-copy($exp_nsfile, "/tmp/foo.ns");
+#
+# Lets dump the report file to the user.
+#
+$fp = fopen($repname, "r");
+if (! $fp) {
+    TBERROR("Error opening report file for experiment: $exp_eid\n", 1);
+}
+echo "<XMP>";
+while ($line = fgets($fp, 1024)) {
+    echo "$line";
+}
+echo "</XMP>\n";
 
 ?>
 </body>

@@ -67,7 +67,7 @@ echo "<form action=\"endexp.php3?$uid\" method=\"post\">";
 # experiments as an option list.
 #
 echo "<tr>";
-echo "    <td><select name=\"exp_eid\">";
+echo "    <td><select name=\"exp_id\">";
                while ($grprow = mysql_fetch_array($groupmemb_result)) {
                   $pid = $grprow[gid];
 		  $exp_result = mysql_db_query($TBDBNAME,
