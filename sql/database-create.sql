@@ -712,7 +712,6 @@ CREATE TABLE node_idlestats (
   PRIMARY KEY  (node_id,tstamp)
 ) TYPE=MyISAM;
 
-
 --
 -- Table structure for table `node_rusage`
 --
@@ -910,7 +909,7 @@ CREATE TABLE nseconfigs (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
-  nseconfig text,
+  nseconfig mediumtext,
   PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
@@ -921,7 +920,7 @@ CREATE TABLE nseconfigs (
 CREATE TABLE nsfiles (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
-  nsfile text,
+  nsfile mediumtext,
   PRIMARY KEY  (eid,pid)
 ) TYPE=MyISAM;
 
