@@ -19,10 +19,11 @@
 #
 # <mode> is one of:
 #    run <db> <testdir> [<pid> <eid> <num>] - Do everything.
-#    init <db> [<pid> <eid> <num> - Initiatlize.  
+#    init <db> [<pid> <eid> <num>] - Initiatlize.  
 #    test <testdir> - Run tests
 #    single <testdir> <tests> - Run only <tests>
-#    finish - Finish run.
+#    finish [<pid> <eid>] - Finish run.
+# <num> is "X <type> ...", for example "10 pc 16 shark"
 
 use DBI;
 use POSIX;
@@ -54,7 +55,7 @@ if ($0 =~ m|/|) {
 
 $path = $pwd;
 
-$ENV{'PATH'} = "/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/site/bin:$basedir";
+$ENV{'PATH'} = "/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/site/bin:$basedir:.";
 $basepath = $ENV{'PATH'};
 
 $type = "frontend";
@@ -72,7 +73,13 @@ sub show_help {
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
     print STDERR "  test <testdir>\n";
     print STDERR "  single <testdir> <tests>\n";
-    print STDERR "  finish\n";
+    print STDERR "  finish <pid> <eid>\n";
+    print STDERR "<num>: Must be even lengthed list of <number> <type>.\n";
+    print STDERR "   Ex: \"4 pc 16 shark\"\n";
+    print STDERR "Examples:\n";
+    print STDERR "   $0 run tbdb frontend\n";
+    print STDERR "   $0 -full run tbdb frontend testbed mytest \"10 pc 16 shark\"\n";
+    print STDERR "   $0 init tbdb;$0 single frontend ping basic;$0 finish\n";
     exit(1);
 };
 
@@ -103,7 +110,7 @@ if ($mode eq "run") {
 	($TBDB,$testdir) = @ARGV;
     } else {
 	if ($#ARGV != 4) {show_help;}
-	($TBDB,$testdir,$rpid,$reid,$num) = @ARGV;
+	($TBDB,$testdir,$pid,$eid,$num) = @ARGV;
     }
 } elsif ($mode eq "init") {
     if ($type eq "frontend") {
@@ -111,7 +118,7 @@ if ($mode eq "run") {
 	($TBDB) = @ARGV;
     } else {
 	if ($#ARGV != 3) {show_help;}
-	($TBDB,$rpid,$reid,$num) = @ARGV;
+	($TBDB,$pid,$eid,$num) = @ARGV;
     }
 } elsif ($mode eq "test") {
     if ($#ARGV != 0) {show_help;}
@@ -120,7 +127,12 @@ if ($mode eq "run") {
     if ($#ARGV <= 0) {show_help;}
     ($testdir,@tests) = @ARGV;
 } elsif ($mode eq "finish") {
-    if ($#ARGV != -1) {show_help;}
+    if ($type eq "frontend") {
+	if ($#ARGV != -1) {show_help;}
+    } else {
+	if ($#ARGV != 1) {show_help;}
+	($pid,$eid) = @ARGV;
+    }
 } else {
     print STDERR "Unknown mode: $mode\n";
     show_help;
@@ -129,6 +141,13 @@ if ($mode eq "run") {
 if (($mode eq "run") || ($mode eq "test") || ($mode eq "single")) {
     if (! ($testdir =~ m|^/|)) {
 	$testdir = "$basedir/tests/$testdir";
+    }
+}
+if (($type eq "full") && (($mode eq "init") || ($mode eq "run"))) {
+    @t = split(" ",$num);
+    if (($#t % 2) == 0) {
+	print STDERR "<num> must be list of even length.\n";
+	show_help;
     }
 }
 
@@ -194,6 +213,9 @@ sub doexit {
     if ($leavedb == 0) {
 	system("echo \"drop database if exists $testdb\" | mysql");
     }
+    if (($type eq "full") && (($mode eq "run")  || ($mode eq "init"))) {
+	system("/usr/testbed/bin/nfree $pid $eid > /dev/null");
+    }
     close(LOG);
     exit($_[0]);
 };
@@ -205,6 +227,7 @@ sub step_init {
     prints "User:     $user\n";
     prints "Logfile:  $logfile\n";
     prints "Database: $TBDB\n";
+    prints "Type:     $type\n";
     prints "\n";
     prints "Beginning test run. " . ctime(time) . "\n";
     
@@ -213,6 +236,53 @@ sub step_init {
 	die "Could not connect to DB.\n";
     # Having made sure we can, we now disconnect so as not to harm DB.
     $dbh->disconnect;
+
+    # Reserve nodes
+    if ($type eq "full") {
+	prints "Reserving nodes.\n";
+	
+	my (@nums) = split(" ",$num);
+	my $num;
+	my $type;
+	my %want;
+	my %have;
+	my $node;
+
+	while ($#nums > -1) {
+	    $num = shift @nums;
+	    $type = shift @nums;
+	    $want{$type} = $num;
+	    $have{$type} = [];
+	}
+	
+	open(AVAIL,"/usr/testbed/sbin/avail |");
+	while (<AVAIL>) {
+	    if (! /^\|/) {next};
+	    if (/node_id/) {next;}
+	    ($node,$type) = /^\|([-a-zA-Z0-9]+)\s*\|(\w+)\s*\|$/;
+	    if (defined($want{$type}) && $want{$type} > 0) {
+		push(@{$have{$type}},$node);
+		$want{$type}--;
+	    }
+	}
+	close(AVAIL);
+
+	my $good = 1;
+	foreach $type (keys(%want)) {
+	    if ($want{$type} > 0) {
+		print STDERR "Could not get enough $type - Need $want{$type} more.\n";
+		$good = 0;
+	    }
+	}
+	if (! $good) {exit(1);}
+
+	my $raw = "";
+	foreach $type (keys(%have)) {
+	    $raw .= join(" ",@{$have{$type}});
+	}
+	prints "  Reserving ";
+	tbexec("/usr/testbed/bin/nalloc $pid $eid $raw","$path/reserve.log");
+    }
 
     # Set up object tree
     prints "Setting up object tree.\n";
@@ -223,6 +293,10 @@ sub step_init {
     mkdir "install",0755;
     chdir "tbobj";
     system("cp -f $basedir/test-defs $path/defs");
+    if (($? >> 8) != 0) {
+	print STDERR "ERROR: Could not copy defs file.\n";
+	doexit(1);
+    }
     open(DEFS,">>$path/defs");
     print DEFS "TBDBNAME=$testdb\n";
     print DEFS "TBOPSEMAIL=$user\@emulab.net\n";
@@ -230,7 +304,13 @@ sub step_init {
     close(DEFS);
     
     prints "  Configuring ";
-    tbexec("$basedir/../configure --prefix=$path/install --enable-testmode ".
+    my $testmode;
+    if ($type eq "full") {
+	$testmode = "";
+    } else {
+	$testmode = "--enable-testmode";
+    }
+    tbexec("$basedir/../configure --prefix=$path/install $testmode ".
 	   "--with-TBDEFS=$path/defs --with-LEDA=/usr/testbed/LEDA/LEDA-4.0",
 	   "$path/configure.log");
     
@@ -251,52 +331,86 @@ sub step_init {
     tbexec("mysqldump $TBDB","$path/dbdump.txt");
     
     prints "  Creating DB ";
+    system("echo \"drop database if exists $testdb\" | mysql");
     tbexec("echo \"create database $testdb\" | mysql","createdb.log");
     
     prints "  Filling DB ";
     tbexec("cat $path/dbdump.txt | mysql $testdb","fill.log");
-    
-    # Clear out experiments and set up test experiment.
+
+
     $dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || do {
 	prints "ERROR: Could not connect to new DB.\n";
 	doexit(1);
     };
-
     $ENV{'PATH'} = "$basepath:$path/install/bin:$path/install/sbin";    
-    prints "  Clearing out existing experiments ";
-    open(CLEARLOG,"> clear.log");
-    $sth = $dbh->prepare("SELECT pid,eid from experiments");
-    $sth->execute;
-    while (($pid,$eid) = $sth->fetchrow_array) {
-	print CLEARLOG "$pid $eid\n";
-	print CLEARLOG "tbswapout -nologfile -force $pid $eid\n";
-	open(EXEC,"tbswapout -nologfile -force $pid $eid 2>&1 |");
-	while (<EXEC>) {
-	    print CLEARLOG $_;
+
+    if ($type eq "frontend") {
+	# Clear out experiments and set up test experiment.     
+	prints "  Clearing out existing experiments ";
+	open(CLEARLOG,"> clear.log");
+	$sth = $dbh->prepare("SELECT pid,eid from experiments");
+	$sth->execute;
+	while (($pid,$eid) = $sth->fetchrow_array) {
+	    print CLEARLOG "$pid $eid\n";
+	    print CLEARLOG "tbswapout -nologfile -force $pid $eid\n";
+	    open(EXEC,"tbswapout -nologfile -force $pid $eid 2>&1 |");
+	    while (<EXEC>) {
+		print CLEARLOG $_;
+	    }
+	    close(EXEC);
+	    if (($? >> 8) != 0) {
+		prints "FAIL - For $pid $eid - On tbswapout - See clear.log\n";
+		$fail++;
+		doexit(1);
+	    } 
+	    print CLEARLOG "tbend -nologfile $pid $eid\n";
+	    open(EXEC,"tbend -nologfile $pid $eid 2>&1 |");
+	    while (<EXEC>) {
+		print CLEARLOG $_;
+	    }
+	    close(EXEC);
+	    if (($? >> 8) != 0) {
+		prints " FAIL - For $pid $eid - On tbend - See clear.log\n";
+		$fail++;
+		doexit(1);
+	    }   
 	}
-	close(EXEC);
-	if (($? >> 8) != 0) {
-	    prints "FAIL - For $pid $eid - On tbswapout - See clear.log\n";
-	    $fail++;
-	    doexit(1);
-	} 
-	print CLEARLOG "tbend -nologfile $pid $eid\n";
-	open(EXEC,"tbend -nologfile $pid $eid 2>&1 |");
-	while (<EXEC>) {
-	    print CLEARLOG $_;
+	prints "PASS\n";
+	$pass++;
+
+	close(CLEARLOG);
+    } else {
+	# Free nodes we allocated for the experiment and allocate all
+	# others.
+	prints "  Creating testbed/unavailable in test DB.\n";
+	open(AVAIL,"avail |");
+	$raw = "";
+	while (<AVAIL>) {
+	    if (! /^\|/) {next};
+	    if (/node_id/) {next;}
+	    ($node) = /^\|([-a-zA-Z0-9]+)/;
+	    $raw .= " $node";
 	}
-	close(EXEC);
-	if (($? >> 8) != 0) {
-	    prints " FAIL - For $pid $eid - On tbend - See clear.log\n";
-	    $fail++;
-	    doexit(1);
-	}   
+	print "DEBUG: $raw\n";
+	close(AVAIL);
+	
+	$dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"unavailable\"");
+	$dbh->do("INSERT into experiments (pid,eid) "
+		 . "values (\"testbed\",\"unavailable\")") || do {
+		     prints "FAIL\n";
+		     $fail++;
+		     doexit(1);
+		 };
+	print "PASS\n";
+	$pass++;
+
+	prints "  Marking nodes as unavailable ";
+	tbexec("nalloc testbed unavailable $raw","unavailable.log");
+
+	prints "  Freeing test nodes ";
+	tbexec("nfree $pid $eid","free.log");
     }
-    prints "PASS\n";
-    $pass++;
-
-    close(CLEARLOG);
-
+    
     prints "  Setting up test experiment ";
     $dbh->do("DELETE from experiments where pid=\"testbed\" and eid=\"test\"");
     $dbh->do("INSERT into experiments (pid,eid) "
@@ -307,7 +421,6 @@ sub step_init {
 	     };
     print "PASS\n";
     $pass++;
-    
     
     prints "  Snapshotting clean state ";
     tbexec("mysqldump $testdb","clean.txt");
@@ -424,8 +537,11 @@ sub step_cleanup {
 
     prints "START CLEANUP\n";
     prints "Cleaning up\n";
-    prints "  Dropping test DB ";
-    tbexec("echo \"drop database $testdb\" | mysql","cleanup.log");
+
+    if ($type eq "full") {
+	prints "  Freeing reserved nodes ";
+	tbexec("/usr/testbed/bin/nfree $pid $eid","cleanup.log");
+    }
     
     prints "End test run. " . ctime(time) . "\n";
     prints "END CLEANUP\n";
