@@ -1126,3 +1126,10 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table users add chpasswd_key varchar(32) default NULL;
        alter table users add chpasswd_expires int(10) unsigned \
 			NOT NULL default '0';
+
+1.207: Add project table linked_to_us entry.
+
+       alter table projects add linked_to_us tinyint(4) NOT NULL \
+	       default '0' after default_user_interface;
+
+       
