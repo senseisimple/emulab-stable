@@ -109,9 +109,9 @@ if ($dochange == "1") {
 	#
 	# Must taint check! This stuff is going to a shell program. 
 	# 
-	if (!ereg("^[0-9a-zA-Z\-\_]*$", $param) ||
-	    !ereg("^[0-9a-zA-Z\-\_]*$", $lan) ||
-	    !ereg("^[0-9a-zA-Z\-\_]*$", $vnode)) {
+	if (!preg_match("/^[-\w]*$/", $param) ||
+	    !preg_match("/^[-\w]*$/", $lan) ||
+	    !preg_match("/^[-\w]*$/", $vnode)) {
 	    continue;
 	}
 
@@ -150,6 +150,7 @@ if ($dochange == "1") {
 	    }
 	    	
 	    $cmd = "webdelay_config $modbasearg $vnode $pid $eid $lan $string";
+	    #echo "$cmd<br>\n";
 
 	    #
 	    # Need proper auditing or logging. For now, run as normal and
