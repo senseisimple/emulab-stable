@@ -110,6 +110,21 @@ else {
 }
 
 #
+# Lets verify the project name and quit early if the project is bogus.
+# We could let things continue, resulting in a valid account but no
+# project membership, but I don't like that.
+# 
+$query_result = mysql_db_query($TBDBNAME,
+	"SELECT * FROM projects WHERE pid=\"$pid\"");
+if (! $query_result) {
+    $err = mysql_error();
+    TBERROR("Database Error retrieving info for $pid: $err\n", 1);
+}
+if (mysql_num_rows($query_result) == 0) {
+    USERERROR("No such project $pid. Please go back and try again.", 1);
+}
+
+#
 # For a new user:
 # * Create a new account in the database.
 # * Add user email to the list of email address.
