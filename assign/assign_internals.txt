@@ -42,7 +42,7 @@ Changes and Scoring
 The simulated annealing loop interfaces with the scoring system and
 the data via two routines, add_node and remove_node.  Both routines
 update the data structures appropriately and modify the score and
-violations count.  add_score takes a vnode and a pnode to map it to
+violations count.  add_node takes a vnode and a pnode to map it to
 and returns whether that match is even remotely valid or not.
 remove_node just takes a vnode.  The initial state of the mapping is
 assumed to be the null mapping.  I.e., no vnodes have been mapped and
@@ -61,10 +61,10 @@ four interfaces can either be a test node or up to two delay nodes.  A
 pnode that has not been matched to a vnode is called virgin and can
 take on any of its types.  Once it has been mapped to a vnode it
 becomes typed and is locked into a certain type (that of the vnode).
-When add_score is called the first thing checked is whether the pnode
+When add_node is called the first thing checked is whether the pnode
 has a suitable type for the vnode.  If it is virgin then all its types
 are checked, otherwise only its current type is checked.  If the types
-can not be matched then add_score returns an invalid condition,
+can not be matched then add_node returns an invalid condition,
 otherwise it continues on.
 
 Each type of a pnode also has a limit.  This is the number of vnodes
