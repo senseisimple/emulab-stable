@@ -22,14 +22,13 @@ if ($#ARGV < 1 || $#ARGV > 2 ||
 }
 
 if ($#ARGV == 2) {
-    $pid   = $ARGV[1];
-    $eid   = $ARGV[2];
+    shift;
     $dolog = 0;
 }
 else {
-    ($pid,$eid) = @ARGV;
     $dolog = 1;
 }
+($pid,$eid) = @ARGV;
 
 use DBI;
 $dbh=&tbs_initdbi($TBDB);
