@@ -66,8 +66,8 @@ sub new {
     } else {
 	$self->{DEBUG} = 0;
     }
-    $self->{BLOCK} = 0;
-    $self->{CONFIRM} = 0;
+    $self->{BLOCK} = 1;
+    $self->{CONFIRM} = 1;
     $self->{NAME} = $name;
 
     if ($self->{DEBUG}) {
