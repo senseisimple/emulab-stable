@@ -49,11 +49,15 @@ if (mysql_num_rows($query_result) != 1) {
 <tr><th nowrap colspan=2 class="contentheader" align="center">
 	Current Experiments</th></tr>
 <tr><td align="right" class="menuopt"><?php echo $active_expts ?></td> 
-    <td align="left" class="menuopt">Active</td></tr>
+    <td align="left" class="menuopt">
+        <a href=explist.php3>Active</a>
+    </td></tr>
 <tr><td align="right" class="menuopt"><?php echo $idle_expts ?></td>
     <td align="left" class="menuopt">Idle</td></tr>
 <tr><td align="right" class="menuopt"><?php echo $swapped_expts ?></td>
-    <td align="left" class="menuopt">Swapped</td></tr>
+    <td align="left" class="menuopt">
+        <a href=explist.php3>Swapped</a>
+    </td></tr>
 </table>
 </center>
 
