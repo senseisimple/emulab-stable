@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -136,13 +136,13 @@ print "\n";
 if (($state eq EXPTSTATE_ACTIVE) ||
     ($state eq EXPTSTATE_TESTING)) {
     my $query_result =
-	DBQueryFatal("select r.vname,r.node_id,n.type,n.phys_nodeid,o.osname ".
-		     " from reserved as r ".
+	DBQueryFatal("select r.vname,r.node_id,n.type,n.phys_nodeid,o.osname,".
+		     " n.sshdport from reserved as r ".
 		     "left join nodes as n on r.node_id=n.node_id ".
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     " where r.pid='$pid' and r.eid='$eid'");
 
-    while (($v,$p,$t,$m,$o) = $query_result->fetchrow_array()) {
+    while (($v,$p,$t,$m,$o,$s) = $query_result->fetchrow_array()) {
 	if (!$v) {
 	    $v = $p;
 	}
@@ -150,6 +150,7 @@ if (($state eq EXPTSTATE_ACTIVE) ||
 	$p2type{$p}  = $t;
 	$p2osid{$p}  = $o;
 	$vv2pmap{$p} = $m;
+	$sshdport{$p}= $s;
     }
 }
 
@@ -226,10 +227,25 @@ if ($showmap &&
 	my ($low,$high) = $range_result->fetchrow_array();
 	
 	print  "IP Port allocation:\n";
-	printf "%-15s %-12s %-15s \n", "Low", "High", "SSHD";
-	print  "--------------- ------------ ---------------\n";
-	printf "%-15s %-12s %-15s (use 'ssh -p $low')\n", $low, $high, $low;
+	printf "%-15s %-12s \n", "Low", "High";
+	print  "--------------- ------------\n";
+	printf "%-15s %-12s\n", $low, $high;
 	print  "\n";
+
+	print  "SSHD Port allocation ('ssh -p portnum'):\n";
+	printf "%-15s %-10s %-20s\n", "ID", "Port", "SSH command";
+	print  "--------------- ---------- ----------------------\n";
+	foreach $v (keys(%v2pmap)) {
+	    my $p = $v2pmap{$v};
+	    my $s = $sshdport{$p};
+	    my $m = $vv2pmap{$p};
+	    my $q = "$v.$eid.$pid.$DOMAIN";
+	    if ($m ne $p) {
+		printf "%-15s %-10s %-20s", $v, $s, "ssh -p $s $q";
+		print  "\n";
+	    }
+	}
+	print "\n";
     }
 }
 
