@@ -1803,14 +1803,14 @@ last_net_act,last_cpu_act,last_ext_act);
       group event. 
 
         alter table eventlist add isgroup tinyint(1) unsigned \
-             NOT NULL default '0' after eventtype;
+              default '0' after eventtype;
 
       Add mustdelay boolean to virt_lans to relieve assign_wrapper
       from the chore of guessing when a delay node needs to be
       inserted; assign_wrapper can still override of course, but this
       should make it less error prone.
 
-        alter table virt_lans add mustdelay tinyint(1) unsigned \
+        alter table virt_lans add mustdelay tinyint(1) \
              default '0' after nobwshaping;
 	update virt_lans set mustdelay=q_red;
 
