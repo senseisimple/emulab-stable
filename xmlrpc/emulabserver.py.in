@@ -232,7 +232,8 @@ class EmulabServer:
         if len(dotted) != 2:
             raise AttributeError("Bad name '%s'" % name)
         if not self.instances.has_key(dotted[0]):
-            raise AttributeError("unknown method '%s'" % name)
+            raise AttributeError("unknown method '%s' (readonly=%d)" %
+                                 (name, self.readonly))
         
         return getattr(self.instances[dotted[0]], dotted[1]);
     pass
