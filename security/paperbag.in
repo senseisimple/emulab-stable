@@ -33,6 +33,7 @@ my $USERNODE    = "@USERNODE@";
 		"node_admin"	=> "$TB/bin/node_admin",
 		"node_list"	=> "$TB/bin/node_list",
 		"delay_config"	=> "$TB/bin/delay_config",
+		"link_config"	=> "$TB/bin/link_config",
 		"savelogs"	=> "$TB/bin/savelogs",
 		"portstats"	=> "$TB/bin/portstats",
 		"readycount"	=> "$TB/bin/readycount",
