@@ -36,7 +36,7 @@ for (my $i = $startNum; $i <= $endNum; $i++) {
 		warn "No MACs found for ${nodeType}${i} in file $filename\n";
 	} else {
 		print qq|UPDATE nodes SET bios_version='$version' | .
-			qq|WHERE node_id=${nodeType}${i}\n|;
+			qq|WHERE node_id=${nodeType}${i};\n|;
 	}
 }
 
@@ -53,7 +53,7 @@ sub parseVersion {
 	while (<LOG>) {
 		chomp;
 		# XXX: The following regexp is specific to the Intel ISP1100
-		if (/\033\[6;1f(TR440BXA)\.(86B).(\d{4})\.(P\d{2})\.(\d{10})\033/) {
+		if (/\033\[.{4}(TR440BXA)\.(86B).(\d{4})\.(P\d{2})\.(\d{10})\033/) {
 			$version = "$1.$2.$3.$4.$5";
 		}
 	}
