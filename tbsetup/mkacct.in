@@ -253,10 +253,6 @@ if (system("egrep -q -s '^${user}:' /etc/passwd")) {
 	       "-g $default_groupname -s $PBAG")) {
 	fatal("Could not add user $user to local node.");
     }
-    #
-    # First time account is made, do some extra work. 
-    #
-    FirstTime();
 }
 else {
     print "Updating user $user ($user_number) on local node.\n";
@@ -267,11 +263,6 @@ else {
     if (system("$USERMOD $user -c \"$fullname\" ")) {
 	fatal("Could not modify user $user on local node.");
     }
-
-    #
-    # Temp Hack!
-    # 
-    FirstTime();
 }
 
 #
@@ -314,6 +305,11 @@ if ($control_node ne $BOSSNODE) {
 	fatal("Could not change password for user $user on $control_node.\n");
     }
 }
+
+#
+# Do "first time" stuff.
+# 
+FirstTime();
 
 #
 # Create a new authorized keys file from DB.
@@ -425,14 +421,14 @@ sub FirstTime()
 	chown($user_number, $default_groupgid, "$SFSDIR") or
 	    fatal("Could not chown $SFSDIR: $!");
 
-	$dosfs = 0;
+	$dosfs = 1;
     }
 
     #
     # Check for missing identity file
     #
     if (! -e "$SFSDIR/identity") {
-	$dosfs = 0;
+	$dosfs = 1;
     }
 
     if ($dosfs) {
@@ -460,7 +456,8 @@ sub FirstTime()
 
 	if ($ident =~ /.*,.*,.*,(.*),(.*)/) {
 	    DBQueryFatal("replace into user_sfskeys ".
-			 "values ('$user', '$2', '${user}:${1}:${user}::', now())");
+			 "values ('$user', '$2', '${user}:${1}:${user}::', ".
+			 "now())");
 	}
 	else {
 	    warn("*** $0:\n".
