@@ -102,7 +102,48 @@ proc querydb {node} {
 # Queries the node about the it's state and creates a node_state.
 ##################################################
 proc querynode {node} {
-    # XXX - This is non-trivial.  Might use the roatan library.
+    variable DB
+
+    # calculate OS type
+    if {[catch "exec ssh -n -x $node uname -a" uname]} {
+	error "$uname"
+    }
+    sql query $DB "select image_id, magic from disk_images"
+    set os {}
+    while {[set row [sql fetchrow $DB]] != {}} {
+	set id [lindex $row 0]
+	set magic [lindex $row 1]
+	if {$magic != {}} {
+	    if {[string first $magic $uname] != -1} {
+		set os $id
+		break
+	    }
+	}
+    }
+
+    # calculate deltas
+    if {[catch "exec ssh -n -x $node rpm -qa" result]} {
+	error "$result"
+    }
+    
+    foreach pkg $result {
+	sql query $DB "select fix_id from fixes_table where fix_path like \"$pkg\""
+	while {[set row [sql fetchrow $DB]] != {}} {
+	    lappend potential($row) $pkg
+	}
+	sql endquery $DB
+    }
+
+    set deltas {}
+    foreach delta [array names potential] {
+	sql query $DB "select fix_path from fixes table where fix_id = \"$delta\""
+	set pkgs [split [sql fetchrow $DB] ,]
+	if {[lsort $pkgs] == [lsort $potential($delta)]} {
+	    lappend deltas $delta
+	}
+    }
+    
+    return [list $os $deltas]
 }
 
 ##################################################
