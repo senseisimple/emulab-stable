@@ -563,6 +563,7 @@ CREATE TABLE nodes (
   next_op_mode varchar(20) default NULL,
   ipodhash varchar(64) default NULL,
   osid varchar(35) NOT NULL default '',
+  ntpdrift float default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -618,6 +619,17 @@ CREATE TABLE nsfiles (
   eid varchar(32) NOT NULL default '',
   nsfile text,
   PRIMARY KEY  (eid,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'ntpinfo'
+#
+
+CREATE TABLE ntpinfo (
+  node_id varchar(10) NOT NULL default '',
+  IP varchar(15) NOT NULL default '',
+  type enum('server','peer') NOT NULL default 'peer',
+  PRIMARY KEY  (node_id,IP,type)
 ) TYPE=MyISAM;
 
 #
