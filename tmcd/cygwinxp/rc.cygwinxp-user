@@ -18,19 +18,22 @@ if [ $user = root ]; then
 fi
 
 # Shares are local to the Win32 login session context.
-# We must process a user name and password for the first one to be opened.
-###host=fs
-host=pc88
+# We must process a user name and password for the first one to be opened, and it
+# has to go onto a drive letter.  After that, we can use UNC //host paths freely.
+host=fs
 pswd=`tmcc accounts | awk '/LOGIN='$user' /{print substr($0,index($0," PSWD=")+9,8)}'`
 echo "Connecting to //$host as $user."
-while ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no > /dev/null
+while ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no
 do
-    read -p "Connection failed, try again? [y]: " -n 1 chr
+    # Read one char (or none on <Enter>), add a time-out for autologins after boot.
+    read -p "Connection failed, try again? [y]: " -n 1 -t 5 chr
     echo ""
-    if [[ "$chr" != [yY] ]]; then break; fi
+    if [[ ! -z "$chr" && "$chr" != [yY] ]]; then break; fi
     echo ""
-    echo "Re-trying Connection to //$host as $user."
+    echo "Re-trying connection to //$host as $user."
 done
+# Show network mount status.
+net use
 
 # Set the homedir for ssh in case we don't get through rc.mounts .
 ln -f -s //$host/$user /users/$user

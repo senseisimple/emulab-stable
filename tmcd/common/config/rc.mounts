@@ -166,12 +166,12 @@ sub doboot()
 	return;
     }
 
-    # On Cygwin, the Samba mount is set up per-user by rc.cygwinxp-user, and what is
+    # On CygWin, the Samba mount is set up per-user by rc.cygwinxp-user, and what is
     # available through the mount is controlled by the smb.conf file on the file
     # server.  All that's left is to wrap the //fs names in symlinks.
     if (WINDOWS()) {
 	while (($remote, $local) = each %mounts) {
-	    my $host="fs";
+	    my $host = "fs";
 	    print "Link $local to //$host\n";
 	    os_samba_mount($local, $host, 0);
 	}

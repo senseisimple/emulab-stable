@@ -187,9 +187,14 @@ sub doboot()
 	}
     }
 
-    if (! MFS()) {
+    # On CygWin, just make a batch of Windows accounts and generate
+    # /etc/passwd and /etc/group from the Windows accounts.
+    goto bad
+	if (WINDOWS() && os_accounts_start());
+
+    if (! MFS() && ! WINDOWS()) {
 	#
-	# On the MFS, these will just start out as empty hashes.
+	# These will just start out as empty hashes so everything is added.
 	# 
 	dbmopen(%PWDDB, $PASSDB, 0660) or
 	    fatal("Cannot open $PASSDB: $!");
@@ -206,8 +211,14 @@ sub doboot()
 	my ($exists,undef,$curgid) = getgrnam($group);
 	
 	if ($exists) {
-	    if ($gid != $curgid) {
-		warning("$group/$gid mismatch with existing group");
+	    if (WINDOWS()) {
+		# Windows needs to know all of the groups by name.
+		os_groupgid($group, $gid);
+	    }
+	    else {
+		if ($gid != $curgid) {
+		    warning("$group/$gid mismatch with existing group");
+		}
 	    }
 	    next;
 	}
@@ -248,7 +259,7 @@ sub doboot()
     %deletes = ();
 
     # Write the DB back out!
-    if (! MFS()) {
+    if (! MFS() && ! WINDOWS()) {
 	dbmclose(%GRPDB);
     }
 
@@ -439,9 +450,11 @@ sub doboot()
 	}
     }
     # Write the DB back out!
-    if (! MFS()) {
+    if (! MFS() && ! WINDOWS()) {
 	dbmclose(%PWDDB);
     }
+    os_accounts_end()
+	if (WINDOWS());
 
     #
     # Create sfs_users file and populate it with public SFS keys

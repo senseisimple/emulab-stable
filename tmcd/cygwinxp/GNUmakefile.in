@@ -60,12 +60,22 @@ bin-install:	dir-install
 	# These are found in the /share/windows directory.
 	$(INSTALL) -m 755 $(SRCDIR)/WSName.exe $(BINDIR)/WSName.exe
 	$(INSTALL) -m 755 $(SRCDIR)/addusers.exe $(BINDIR)/addusers.exe
+	$(INSTALL) -m 755 $(SRCDIR)/addusers.exe $(BINDIR)/usrtogrp.exe
 
 etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	dir-install ###ifcfgs
+	# Copy host keys for the user sshd on port 2222
+	chmod g+r /etc/ssh_host*key
+	-cp /etc/ssh_host_key /etc/ssh_host_key.user
+	-cp /etc/ssh_host_dsa_key /etc/ssh_host_dsa_key.user
+	-cp /etc/ssh_host_rsa_key /etc/ssh_host_rsa_key.user
+	chmod g-r /etc/ssh_host*key /etc/ssh_host*key.user
+	# Install an /etc/shells file.
+	$(INSTALL) -m 755 $(SRCDIR)/shells /etc/shells
 
 sysetc-remove:
+	rm -f /etc/ssh_host*key.user /etc/shells
 
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm

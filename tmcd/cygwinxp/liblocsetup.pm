@@ -15,8 +15,9 @@ use Exporter;
     qw ( $CP $LN $RM $CHOWN $EGREP 
 	 $NFSMOUNT $UMOUNT $SFCMOUNT $SFCUMOUNT $NTS $NET
 	 $TMPASSWD $SFSSD $SFSCD $RPMCMD
-	 os_account_cleanup os_ifconfig_line os_etchosts_line
-	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
+	 os_account_cleanup os_accounts_start os_accounts_end
+	 os_ifconfig_line os_etchosts_line
+	 os_setup os_groupadd os_groupgid os_useradd os_userdel os_usermod os_mkdir
 	 os_ifconfig_veth
 	 os_routing_enable_forward os_routing_enable_gated
 	 os_routing_add_manual os_routing_del_manual os_homedirdel
@@ -75,11 +76,7 @@ $BASH		= "/bin/bash";
 #
 # These are not exported
 #
-my $USERADD     = "/usr/sbin/useradd";
-my $USERDEL     = "/usr/sbin/userdel";
-my $USERMOD     = "/usr/sbin/usermod";
-my $GROUPADD	= "/usr/sbin/groupadd";
-my $GROUPDEL	= "/usr/sbin/groupdel";
+my $ADDUSERS     = "$BINDIR/addusers.exe";
 my $IFCONFIGBIN = "/sbin/ifconfig";
 my $IFCONFIG    = "$IFCONFIGBIN %s inet %s netmask %s";
 my $IFC_1000MBS  = "1000baseTx";
@@ -102,17 +99,24 @@ sub os_account_cleanup()
     unlink @LOCKFILES;
 
     # Generate the CygWin password and group files from the registry users.
-    # Make root's UID zero.
-    printf STDOUT "Resetting passwd and group files\n";
-    if (system("$MKPASSWD -l | \
-            $AWK -F: '/^root:/{\$3=\"0\"} {OFS=\":\"; print}' > /etc/passwd") != 0) {
+    print "Resetting the CygWin passwd and group files.\n";
+
+    my $cmd = "$MKPASSWD -l | $AWK -F: '" . 'BEGIN{ OFS=":" } ';
+    # Make root's UID zero.  Put non-root homedirs under /users, not /home.
+    $cmd   .= '{ if ($1=="root") $3="0"; else sub("/home/", "/users/"); print }';
+    $cmd   .= "' > /etc/passwd";
+    ##print "$cmd\n";
+    if (system("$cmd") != 0) {
 	print STDERR "Could not generate /etc/password file: $!\n";
 	return -1;
     }
-    # Make wheel an alias for Administrators.
-    if (system("mkgroup -l | \
-           $AWK '/^Administrators:/{print \"wheel\" substr(\$0, index(\$0,\":\"))} \
-                {print}' > /etc/group") != 0) {
+
+    $cmd  = "mkgroup -l | $AWK '";
+    # Make a duplicate group line that is a wheel alias for Administrators.
+    $cmd .= '/^Administrators:/{print "wheel" substr($0, index($0,":"))} {print}';
+    $cmd .= "' > /etc/group";
+    ##print "$cmd\n";
+    if (system("$cmd") != 0) {
 	print STDERR "Could not generate /etc/group file: $!\n";
 	return -1;
     }
@@ -342,13 +346,64 @@ sub os_etchosts_line($$$)
 }
 
 #
+# On Windows NT, accumulate an input file for the addusers command.
+# See "AddUsers Automates Creation of a Large Number of Users",
+# http://support.microsoft.com/default.aspx?scid=kb;en-us;199878
+# 
+# The file format is comma-delimited, as follows:
+# 
+# [Users]
+# User Name,Full name,Password,Description,HomeDrive,Homepath,Profile,Script
+# 
+# [Global] or [Local]
+# Group Name,Comment,UserName,...
+# 
+my $winusersfile = "$BOOTDIR/winusers";
+my @groupNames;
+my %groupsByGid;
+my %groupMembers;
+sub os_accounts_start()
+{
+    # Remember group info to be put out at the end.
+    @groupNames = ();
+    %groupsByGid = ();
+    %groupMembers = ();
+
+    if (! open(WINUSERS, "> $winusersfile")) {
+	print STDERR "os_accounts_start: Cannot create $winusersfile .\n";
+	return -1;
+    }
+
+    # Users come before groups in the addusers.exe account stream.
+    # Notice the <CR>'s.  It's a Windows file.
+    print WINUSERS "[Users]\r\n";
+
+    return 0;
+}
+
+#
+# Remember the mapping from an existing group GID to its name.
+#
+sub os_groupgid($$)
+{
+    my($group, $gid) = @_;
+
+    $groupsByGid{$gid} = $group;    # Remember the name associated with the gid.
+
+    return 0;
+}
+
+#
 # Add a new group
 # 
 sub os_groupadd($$)
 {
     my($group, $gid) = @_;
 
-    return system("$GROUPADD -g $gid $group");
+    push(@groupNames, $group);      # Remember all of the group names.
+    os_groupgid($group, $gid);
+
+    return 0;
 }
 
 #
@@ -358,7 +413,8 @@ sub os_groupdel($)
 {
     my($group) = @_;
 
-    return system("$GROUPDEL $group");
+    # Unimplemented.
+    return -1;
 }
 
 #
@@ -368,7 +424,8 @@ sub os_userdel($)
 {
     my($login) = @_;
 
-    return system("$USERDEL $login");
+    # Unimplemented.
+    return -1;
 }
 
 #
@@ -377,6 +434,9 @@ sub os_userdel($)
 sub os_usermod($$$$$$)
 {
     my($login, $gid, $glist, $pswd, $root, $shell) = @_;
+
+    # Unimplemented.
+    return -1;
 
     if ($root) {
 	$glist = join(',', split(/,/, $glist), "root");
@@ -397,21 +457,76 @@ sub os_useradd($$$$$$$$$)
 {
     my($login, $uid, $gid, $pswd, $glist, $homedir, $gcos, $root, $shell) = @_;
 
-    if ($root) {
-	$glist = join(',', split(/,/, $glist), "root");
+    # Groups have to be created before we can add members.
+    my $gname = $groupsByGid{$gid};
+    warn "*** Missing group name for gid $gid.\n"
+	if (!$gname);
+    $groupMembers{$gname} .= "$login ";
+    $groupMembers{'Administrators'} .= "$login "
+	if ($root);
+    foreach my $gid (split(/,/, $glist)) {
+	$gname = $groupsByGid{$gid};
+	if ($gname) {
+	    $groupMembers{$gname} .= "$login ";
+	}
+	else {
+	    warn "*** Missing group name for gid $gid.\n";
+	}
     }
-    if ($glist ne "") {
-	$glist = "-G $glist";
-    }
+		     
     # Map the shell into a full path.
     $shell = MapShell($shell);
 
-    if (system("$USERADD -M -u $uid -g $gid $glist -p '$pswd' ".
-	       "-d $homedir -s $shell -c \"$gcos\" $login") != 0) {
-	warn "*** WARNING: $USERADD $login error.\n";
+    # Use the leading 8 chars of the Unix MD5 passwd hash as a known random
+    # password, both here and in Samba.  Skip over a "$1$" prefix.
+    my $pwd = $pswd;
+    $pwd =~ s/^(\$1\$)?(.{8}).*/$2/;
+    
+    print WINUSERS "$login,$gcos,$pwd,,,,,\r\n";
+
+    return 0;
+}
+
+#
+# Finish the input for the addusers command.
+#
+sub os_accounts_end()
+{
+    # Dump out the group *creation* lines.
+    print WINUSERS "[Local]\r\n";
+    foreach my $grp (@groupNames) {
+	# Ignore group membership here.  See "net localgroup" below.
+	print WINUSERS "$grp,Emulab $grp group,\r\n";
+    }
+    close WINUSERS;
+       
+    # Create the whole batch of groups and accounts listed in the file.
+    # /p options: Users don't have to change passwords, and they never expire.
+    print "Creating the Windows users and groups.\n";
+    my $winfile = "C:/cygwin$winusersfile";
+    $winfile =~ s|/|\\|g;
+    my $cmd = "$ADDUSERS /c '$winfile' /p:le";
+    ##print "    $cmd\n";
+    if (system($cmd) != 0) {
+	warn "*** WARNING: AddUsers error ($cmd)\n";
 	return -1;
     }
-    return 0;
+
+    # Add members into groups using the "net localgroup /add" command.
+    # (Addusers only creates groups, it can't add a user to an existing group.)
+    while (my($grp, $members) = each %groupMembers) {
+	foreach my $mbr (split(/ /,$members)) {
+	    print "  Adding $mbr to $grp.\n";
+	    my $cmd = "$NET localgroup $grp $mbr /add > /dev/null";
+	    ##print "    $cmd\n";
+	    if (system($cmd) != 0) {
+		warn "*** WARNING: net localgroup error ($cmd)\n";
+	    }
+	}
+    }
+
+    # Make the CygWin /etc/passwd and /etc/group files match Windows.
+    return os_account_cleanup();
 }
 
 #
@@ -543,7 +658,7 @@ sub MapShell($)
    return $fullpath;
 }
 
-sub os_samba_mount($$)
+sub os_samba_mount($$$)
 {
     my ($local, $host, $verbose) = @_;
 

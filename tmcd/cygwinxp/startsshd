@@ -17,19 +17,24 @@
 # If you're logged in via rdesktop, see the Users tab in Task Manager.
 
 pidfile=/var/run/sshd.pid
+upidfile=$pidfile.user
 running=
-if [ -e $pidfile ]; then
+if [ -e $upidfile ]; then
     # Check that the process ID actually refers to a running process. 
-    pid=`cat $pidfile`
+    pid=`cat $upidfile`
     if ( kill -0 $pid >& /dev/null ); then
 	running=yes
     fi
 fi
 if [ $running ]; then
-    # Kill a previous copy of sshd, so we can run one as this user.
-    echo "Killing previous sshd daemon."
-    ps -ef | awk '$2=='$pid'{print}'
-    kill $pid
+    if ( ps -u SYSTEM | grep -q "^ *$pid " ); then
+        echo "Ignoring SYSTEM sshd."
+    else
+        # Kill a previous copy of sshd, so we can run one as this user.
+        echo "Killing previous user sshd daemon."
+        ps -ef | awk '$2=='$pid'{print}'
+        kill $pid
+    fi
 fi
 
 # Set permissions on the key files needed for sshd to start up as this user.
@@ -46,3 +51,8 @@ chmod o-r /etc/ssh*key.user
 echo "Starting new sshd daemon as $user."
 (CYGWIN="ntsec tty" /usr/sbin/sshd -p 2222 -o "UsePrivilegeSeparation no" \
 	-h /etc/ssh_host_key.user -h /etc/ssh_host_dsa_key.user  &)
+
+# Remember this one separately from the SYSTEM sshd.
+chmod -f g+w $upidfile
+cp $pidfile $upidfile
+chmod -f g+w $upidfile
