@@ -405,6 +405,8 @@ sub doSwapout($) {
 	    $swapout_errors = 1;
 	}
 	TBDebugTimeStamp("nfree finished");
+	DBQueryWarn("update experiments set swap_requests='' ".
+		    "where eid='$eid' and pid='$pid'");
     } else {
 	#
 	# $type == RETRY or $type == UPDATE.
