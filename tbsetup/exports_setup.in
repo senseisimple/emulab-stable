@@ -120,13 +120,15 @@ if ($db_result->numrows > 0) {
 	}
 
 	if ($pid ne $lastpid) {
-	    print MAP "$projdir/$lastpid -maproot=root @hostlist\n";
+	    print MAP "$projdir/$lastpid $projdir/$lastpid/images ".
+		      "-maproot=root @hostlist\n";
 	    @hostlist = ();
 	    $lastpid = $pid;
 	}
 	push(@hostlist, $ip);
     }
-    print MAP "$projdir/$lastpid -maproot=root @hostlist\n";
+    print MAP "$projdir/$lastpid $projdir/$lastpid/images ".
+	      "-maproot=root @hostlist\n";
 }
 
 #
