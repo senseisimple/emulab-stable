@@ -1,0 +1,46 @@
+``Ntip'' aka the Emulab version of tip.
+
+This is a variant of the old UNIX ``tip'' program (specifically, based on the
+FreeBSD version) that has been bent to our will.  There are two significant
+additions:
+
+1.   Support for Linux.  It should now build/run under at least RedHat Linux.
+     Changes are ifdefed under LINUX which should get automatically defined
+     in a native build (assuming __linux__ is defined).
+
+2.   Support for talking to a socket instead of a tty device.  We use this
+     for connecting to our "capture" console serial line proxy.  It is only
+     useful with that proxy.  Ifdefed under USESOCKETS.
+
+There are also a number of significant "subtractions" to make tip more
+palatable in our environment:
+
+1.   It does not support calling a remote system, all auto-dialing code
+     has been removed.
+
+2.   All the cheezy file transfer support has been removed.
+
+3.   Most of the tilde escapes have been removed.  Mostly these were the
+     file transfer related ones.  See below for what remains.
+
+4.   It ignores 90% of the remote(5) capabilities.  You can set the
+     baud rate (br) and the device (dv).  Period.
+
+5.   All of tip's variables are still present, but most don't do anything.
+     It is left as an exercise to the interested user to differentiate.
+
+6.   By default, it operates in ``raw'' mode instead of the usual
+     ``cbreak'' mode.  This means that all input processing (if any) is
+     performed by the remote system.  Raw mode also disables
+     ``raisechar'' and ``force'' variable interpretation.  Yes, you can
+     actually run emacs on a tip line (modulo the '~' thing).
+
+7.   Regular tip is the poster-child for fork-without-exec, creating separate
+     reader and writer processes executing ``the same code.''  Our tip is a
+     child of convenience and consists of a single process using select(2).
+
+8.   Tip no longer uses uucp(1) style locking.  It relies on the TIOCEXCL
+     ioctl (see tty(4))  to provide ``reasonably mutually exclusive''
+     access.  While it is still technically possible that two parties
+     could open the same line and both get ``exclusive'' access to it, we
+     consider this to be the source of amusing anecdotes rather than a bug.
