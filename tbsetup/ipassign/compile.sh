@@ -17,7 +17,7 @@ ${CC} ${COMPILE_FLAGS} -c -o tmp/Router.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"
 #${CC} ${COMPILE_FLAGS} -c -o tmp/LanRouter.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/LanRouter.cc
 ${CC} ${COMPILE_FLAGS} -c -o tmp/NetRouter.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/NetRouter.cc
 ${CC} ${COMPILE_FLAGS} -c -o tmp/coprocess.o -I${EXTRA_INCLUDE_PATH} -DROUTECALC=\"bin/routecalc\" src/coprocess.cc
-${CC} ${LINK_FLAGS} -o bin/ipassign -L${EXTRA_LIB_PATH}/ tmp/ipassign.o tmp/bitmath.o tmp/Assigner.o tmp/ConservativeAssigner.o tmp/HierarchicalAssigner.o tmp/Framework.o  tmp/Router.o tmp/HostRouter.o tmp/NetRouter.o tmp/coprocess.o -lmetis -lm
+${CC} ${LINK_FLAGS} -o bin/ipassign -L${EXTRA_LIB_PATH}/ tmp/ipassign.o tmp/bitmath.o tmp/Assigner.o tmp/ConservativeAssigner.o tmp/HierarchicalAssigner.o tmp/Framework.o  tmp/Router.o tmp/NetRouter.o tmp/coprocess.o -lmetis -lm
 
 #tmp/LanRouter.o 
 #tmp/HostRouter.o
