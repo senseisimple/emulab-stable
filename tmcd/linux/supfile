@@ -2,4 +2,4 @@
 # When the release is bumped, be sure to remove sup/sup/RHL62-STD/checkouts
 # on the client.
 #
-RHL62-STD  host=boss.emulab.net base=/etc/rc.d/testbed/sup prefix=/ preserve release=20010329
+RHL62-STD  host=boss.emulab.net base=/etc/rc.d/testbed/sup prefix=/ preserve release=20010409
