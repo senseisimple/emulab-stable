@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -89,6 +89,7 @@ EOF
 my $vcgtag="-vcg";
 my $dottag="-dot";
 my $cleanup=1;
+my $nocluster=1;
 if (!$dot && !$vcg) { $dot=1; }
 if (!$ps && !$gif && !$png) { $ps=1; }
 if (!($dot && $vcg)) { $vcgtag=""; $dottag=""; }
@@ -111,8 +112,11 @@ if ($vcg) {
 
 if ($dot) {
     open(TMPN,">$filename2");
-    print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n  edge [fontsize=8]\n";
-    #print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n  graph [clusterrank=global]\n";
+    if (!$nocluster) {
+	print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n  edge [fontsize=8]\n";
+    } else {
+	print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n  edge [fontsize=8]\n  graph [clusterrank=global]\n";
+    }
     #print TMPN "digraph StateGraph {\n  node [shape=ellipse]\n";
 }
 
@@ -283,8 +287,11 @@ sub mkstates {
 	    }
 	    print "Adding node '$n'\n" if ($v);
 	    print TMP "  node: { title: \"$n\" label: \"$l\"}\n" if $vcg;
-	    print TMPN "    $n [label=\"$s\"];\n" if $dot;
-	    #print TMPN "    $n [label=\"$m\\n$s\"];\n" if $dot;
+	    if (!$nocluster) {
+		print TMPN "    $n [label=\"$s\"];\n" if $dot;
+	    } else {
+		print TMPN "    $n [label=\"$m\\n$s\"];\n" if $dot;
+	    }
 	    #print TMPN "    $n;\n" if $dot;
 	    $states{$n}=1;
 	}
