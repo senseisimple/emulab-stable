@@ -74,6 +74,10 @@ proc tb-set-node-rpms {node args} {
     global TBCMD 
     puts $TBCMD "tb-set-node-rpms $node $args"
 }
+proc tb-set-node-tarfiles {node args} {
+    global TBCMD 
+    puts $TBCMD "tb-set-node-tarfiles $node $args"
+}
 proc tb-set-node-startup {node cmd} {
     global TBCMD 
     puts $TBCMD "tb-set-node-startup $node $cmd"

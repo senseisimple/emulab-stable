@@ -100,6 +100,7 @@ $cmdlines = ();
 $startups = ();
 $rpms = ();
 $deltas = ();
+$tarfiles = ();
 while (<TBCMD>) {
     chop;
     @line = split;
@@ -195,7 +196,7 @@ while (<TBCMD>) {
 	$startups{$line[1]} = join(" ",@line[2..$#line]);	
     } elsif ($line[0] eq "tb-set-node-deltas") {
 	if ($#line < 2) {
-	    push(@ERRORS,"Syntax: tb-set-node-deltas node rpms...");
+	    push(@ERRORS,"Syntax: tb-set-node-deltas node deltas...");
 	    next;
 	} 
 	if (! defined($nodes{$line[1]})) {
@@ -203,6 +204,17 @@ while (<TBCMD>) {
 	    next;
 	}
 	$deltas{$line[1]} = join(" ",@line[2..$#line]);
+    } elsif ($line[0] eq "tb-set-node-tarfiles") {
+	if ($#line < 3 || ($#line - 1) % 2) {
+	    push(@ERRORS, "Syntax: tb-set-node-tarfiles ".
+		 "node dir tarfile [dir tarfile] ...");
+	    next;
+	} 
+	if (! defined($nodes{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid node.");
+	    next;
+	}
+	$tarfiles{$line[1]} = join(" ",@line[2..$#line]);
     }
 }
 
@@ -294,6 +306,15 @@ foreach $node (keys(%nodes)) {
     }
 }
 print IRFILE "END rpms\n";
+print IRFILE "START tarfiles\n";
+foreach $node (keys(%nodes)) {
+    if (defined($tarfiles{$node})) {
+	print IRFILE "$node $tarfiles{$node}\n";
+    } else {
+	print IRFILE "$node\n";
+    }
+}
+print IRFILE "END tarfiles\n";
 print IRFILE "START startup\n";
 foreach $node (keys(%nodes)) {
     if (defined($startups{$node})) {

@@ -202,6 +202,31 @@ foreach (split("\n",&ir_get("/rpms"))) {
     $sth->execute;
     $sth->finish;
 }
+if (! &ir_exists("/tarfiles")) {
+    print STDERR "IR incomplete: No /tarfiles.\n";
+    exit(1);
+}
+foreach (split("\n",&ir_get("/tarfiles"))) {
+    my $tarfiles = "";
+    ($node,$dirsandfiles) = /^([^ ]+)(.*)$/;
+    $dirsandfiles =~ s/^ //;
+
+    @line = split(" ", $dirsandfiles);
+    while (@line) {
+	$dir = shift(@line);
+	$tar = shift(@line);
+	if ($tarfiles eq "") {
+	    $tarfiles = "$dir $tar";
+	}
+	else {
+	    $tarfiles = "$tarfiles:$dir $tar";
+	}
+    }
+    $sth = $dbh->prepare("UPDATE nodes set tarballs = \"$tarfiles\" ".
+			 "where node_id = \"$nodemap{$node}\"");
+    $sth->execute;
+    $sth->finish;
+}
 if (! &ir_exists("/deltas")) {
     print STDERR "IR incomplete: No /deltas.\n";
     exit(1);
