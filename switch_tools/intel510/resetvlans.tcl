@@ -20,6 +20,7 @@ while {[gets $vlanFp line] >= 0} {
     set id [lindex $line 0]
     if {! [regexp {[0-9]+} $id]} {continue}
     if {[lindex $line 1] == "Control"} {continue}
+    if {[lindex $line 1] == "System"} {continue}
     set remove 1
     foreach member [lrange $line 2 end] {
 	set mname [lindex [split $member :] 0]
