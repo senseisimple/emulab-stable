@@ -71,6 +71,7 @@ my $beproxy     = 0;
       "keyfile"		=> undef,
       "timeout"		=> undef,
       "logfile"		=> undef,
+      "nocache"         => 0,
     );
 
 # The cache directory is named by the vnodeid. This avoids some confusion.
@@ -324,7 +325,7 @@ sub tmcc ($;$$%)
     #
     # See if this is a cmd we can get from the local config stash. 
     #
-    if (!defined($args) || $args eq "") {
+    if (!$config{"nocache"} && (!defined($args) || $args eq "")) {
 	foreach my $key (keys(%commandset)) {
 	    my $tag = $commandset{$key}->{TAG};
 

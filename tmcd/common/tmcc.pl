@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -15,6 +15,7 @@ sub usage()
 {
     print STDERR "usage: tmcc [options] <command> [arg1 ...]\n";
     print STDERR " -d		Turn on debugging\n";
+    print STDERR " -b		Bypass the tmcc cache and goto to server\n";
     print STDERR " -s server	Specify a tmcd server to connect to\n";
     print STDERR " -p portnum	Specify a port number to connect to\n";
     print STDERR " -v versnum	Specify a version number for tmcd\n";
@@ -27,7 +28,7 @@ sub usage()
     print STDERR " -o path	Specify log file name for -x option\n";
     exit(1);
 }
-my $optlist	= "ds:p:v:n:k:ul:t:x:o:";
+my $optlist	= "ds:p:v:n:k:ul:t:x:o:b";
 my $debug       = 0;
 my $CMD;
 my $ARGS;
@@ -79,6 +80,9 @@ sub ParseOptions()
     if (defined($options{"d"})) {
         libtmcc::configtmcc("debug", 1);
 	$debug = 1;
+    }
+    if (defined($options{"b"})) {
+        libtmcc::configtmcc("nocache", 1);
     }
     if (defined($options{"s"})) {
         libtmcc::configtmcc("server", $options{"s"});
