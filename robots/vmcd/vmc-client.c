@@ -83,6 +83,7 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     struct mtp_packet mp;
     int lpc, retval;
     char *cursor;
+    struct mtp_packet *hack_decl = NULL;
     
     assert(buffer != NULL);
     assert(mm != NULL);
@@ -115,19 +116,28 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
     mp.data.update_position = &mup;
     
     cursor = buffer;
-    for (lpc = 0; lpc < mol->count; lpc++) {
+    int last_idx_set = 0;
+    for (lpc = 0; lpc < mol->count; ++lpc) {
+        if (mol->objects[lpc].valid) {
+            last_idx_set = lpc;
+        }
+    }
+
+    for (lpc = 0; lpc < mol->count; ++lpc) {
         // we don't want to send meaningless data!
         if (mol->objects[lpc].valid) {
             mup.robot_id = -1;
             mup.position.x = mol->objects[lpc].px;
             mup.position.y = mol->objects[lpc].py;
             mup.position.theta = mol->objects[lpc].pa;
-            if (lpc == mol->count - 1) {
+
+            if (lpc == last_idx_set) {
                 /* this value being set tells vmc when it can delete stale
                  * tracks.
                  */
                 mup.status = MTP_POSITION_STATUS_CYCLE_COMPLETE;
             }
+
             else {
                 mup.status = MTP_POSITION_STATUS_UNKNOWN;
             }
@@ -136,7 +146,11 @@ static int encode_packets(char *buffer, mezz_mmap_t *mm)
             cursor += mtp_encode_packet(&cursor, &mp);
         }
     }
-    
+
+    //if (cursor != buffer) {
+    //    hack_decl = (struct mtp_packet *)(cursor - mtp_calc_size(MTP_UPDATE_POSITION,NULL));
+    //    hack_decl->data.update_position->status = MTP_POSITION_STATUS_CYCLE_COMPLETE;
+    //}
     retval = cursor - buffer;
     
     return retval;
