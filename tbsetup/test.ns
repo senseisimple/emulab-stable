@@ -1,0 +1,11 @@
+set ns [new Simulator]
+
+set n0 [$ns node]
+set n1 [$ns node]
+set n2 [$ns node]
+
+$ns duplex-link $n0 $n1 100Mb 10ms DropTail
+$ns duplex-link $n1 $n2 100Mb 10ms DropTail
+
+$ns run
+

@@ -1,0 +1,8 @@
+tbsetup
+
+Syntax:
+	tbsetup <ns-file>
+
+tbsetup does all tasks necessary to setup up for an experiment on the
+testbed.  It generates an IR file that can be used with 'tbrun' to
+actually configure the testbed.
