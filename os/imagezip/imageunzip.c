@@ -1469,6 +1469,16 @@ reloc_bsdlabel(struct disklabel *label, int reloctype)
 
 #include "extfs/lilo.h"
 
+/*
+ * Relocate a LILO sector address.  The address has been made relative
+ * to the partition start so we need to add back the current partition
+ * offset.
+ *
+ * XXX we still need to update the device portion of the sector to plug in
+ * the appropriate BIOS device number for the drive we are being loaded on.
+ * Either the user will have to specify that explicitly, or imageunzip will
+ * have to get it from the OS or figure it out itself.
+ */
 static void
 reloc_lilo(void *addr, int reloctype, uint32_t size)
 {
