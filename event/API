@@ -1,0 +1,143 @@
+* event_register: Register with the testbed event system
+
+      #include <event.h>
+
+      event_handle_t event_register(void);
+
+  Register with the testbed event system.  Returns a pointer to
+  a handle that may be passed to other event system routines if
+  the operation is successful, NULL otherwise.
+
+
+* event_unregister: Unregister with the testbed event system
+
+      #include <event.h>
+
+      int event_unregister(event_handle_t handle);
+
+  Unregister with the testbed event system.  Returns non-zero if the
+  operation is successful, 0 otherwise.
+
+
+* event_main: Enter the main loop of the event system
+
+      #include <event.h>
+
+      int event_main(event_handle_t handle);
+
+  Enter the main loop of the event system, waiting to receive event
+  notifications. Returns non-zero if the operation is successful, 0
+  otherwise.
+
+
+* event_notify: Send an event notification
+
+      #include <event.h>
+
+      int event_notify(event_handle_t handle,
+                       event_notification notification);
+
+  Send the event notification NOTIFICATION.  NOTIFICATION is
+  allocated by event_notification_alloc, and may optionally
+  have attributes added to it by event_notification_attr_put.
+  Returns non-zero if the operation is successful, 0 otherwise.
+
+
+* event_notification_alloc: Allocate an event notification
+
+      #include <event.h>
+
+      event_notification_t event_notification_alloc(event_handle_t handle,
+                                                    char *host,
+                                                    event_type_t type);
+
+  Allocate an event notification.  The HOST parameter specifies
+  the hostname of the node that should receive the notification,
+  or EVENT_HOST_ANY if the notification should go to all hosts.
+  The TYPE parameter specifies the event type.  The event types
+  currently recognized are:
+
+      EVENT_TEST - test event
+      EVENT_TRAFGEN_START - start generating traffic
+      EVENT_TRAFGEN_STOP - stop generating traffic
+
+  Returns a pointer to an event notification structure if the
+  operation is successful, 0 otherwise.
+
+
+* event_notification_free: Free an event notification
+
+      #include <event.h>
+
+      int event_notification_free(event_handle_t handle,
+                                  event_notification_t notification);
+
+  Free the event notification NOTIFICATION.  Returns non-zero if the
+  operation is successful, 0 otherwise.
+
+
+* event_notification_attr_get: Get an attribute from an event notification
+
+      #include <event.h>
+
+      int event_notification_attr_get(event_handle_t handle,
+                                      event_notification_t notification,
+                                      event_attr_type_t type,
+                                      char *name,
+                                      event_attr_value_t *value);
+
+  Get the attribute with name NAME and type TYPE from the event
+  notification NOTIFICATION.  Valid attribute types are:
+
+      EVENT_ATTR_INT32: 32-bit integer
+      EVENT_ATTR_INT64: 64-bit integer
+      EVENT_ATTR_DOUBLE: double precision floating point
+      EVENT_ATTR_STRING: string
+
+  Writes the value of the attribute to *VALUE and returns non-zero
+  if the named attribute is found, 0 otherwise.
+
+
+* event_notification_attr_put: Add an attribute to an event notification
+
+      #include <event.h>
+
+      int event_notification_attr_put(event_handle_t handle,
+                                      event_notification_t notification,
+                                      event_attr_type_t type,
+                                      char *name,
+                                      event_attr_value_t value);
+
+  Add an attribute with name NAME, type TYPE, and value VALUE to the
+  notification NOTIFICATION.  Valid attribute types are:
+
+      EVENT_ATTR_INT32: 32-bit integer
+      EVENT_ATTR_INT64: 64-bit integer
+      EVENT_ATTR_DOUBLE: double precision floating point
+      EVENT_ATTR_STRING: string
+
+  Returns non-zero if the operation is successful, 0 otherwise.
+
+
+* event_subscribe: Subscribe to an event
+
+      #include <event.h>
+
+      event_subscription_t event_subscribe(event_handle_t handle,
+                                           event_notify_callback_t callback,
+                                           event_type_t type,
+                                           void *data);
+
+  Subscribe to events of type TYPE.  Event notifications that match
+  TYPE will be passed to the callback function CALLBACK; DATA is
+  an arbitrary pointer that will be passed to the callback function.
+  Callback functions are of the form
+
+      void callback(event_handle_t handle,
+                    event_notification_t notification,
+                    void *data);
+
+  where HANDLE is the handle to the event server, NOTIFICATION is
+  the event notification, and DATA is the arbitrary pointer passed to
+  event_subscribe.  Returns a pointer to an event
+  subscription structure if the operation is successful, 0 otherwise.
