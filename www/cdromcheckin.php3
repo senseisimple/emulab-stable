@@ -144,19 +144,23 @@ DBQueryFatal("update widearea_privkeys ".
 	     "set nextprivkey='$newkey',updated=now()".
 	     "where privkey='$privkey'");
 
+header("Content-Type: text/plain");
+echo "privkey=$newkey\n";
 if (0) {
-    header("Content-Type: text/plain");
-    echo "privkey=$newkey\n";
     echo "fdisk=http://${WWWHOST}/images/image.fdisk\n";
     echo "slice1_image=http://${WWWHOST}/images/slice1.ndz\n";
     echo "slice1_md5=cb810b43f49d15b3ac4122ff42f8925d\n";
     echo "slicex_mount=/users\n";
     echo "slicex_tarball=http://${WWWHOST}/images/slicex.tar.gz\n";
     echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
-    echo "emulab_status=0\n";
 }
 else {
-
-
+    echo "fdisk=image.fdisk\n";
+    echo "slice1_image=slice1.ndz\n";
+    echo "slice1_md5=cb810b43f49d15b3ac4122ff42f8925d\n";
+    echo "slicex_mount=/users\n";
+    echo "slicex_tarball=slicex.tar.gz\n";
+    echo "slicex_md5=1f84fbc3434d174151ac3a2b8389799a\n";
 }
+echo "emulab_status=0\n";
 
