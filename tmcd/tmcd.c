@@ -112,6 +112,18 @@ static int	maxchildren = 10;
 static int	mypid;
 static volatile int killme;
 
+/* Output macro to check for string overflow */
+#define OUTPUT(buf, size, format...) \
+({ \
+	int __count__ = snprintf((buf), (size), ##format); \
+        \
+        if (__count__ >= ((size) - 1)) { \
+		error("Not enough room in output buffer! line %d.\n", __LINE__);\
+		return 1; \
+	} \
+	__count__; \
+})
+
 /*
  * This structure is passed to each request function. The intent is to
  * reduce the number of DB queries per request to a minimum.
@@ -948,7 +960,7 @@ COMMAND_PROTOTYPE(donodeid)
 {
 	char		buf[MYBUFSIZE];
 
-	sprintf(buf, "%s\n", reqp->nodeid);
+	OUTPUT(buf, sizeof(buf), "%s\n", reqp->nodeid);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
@@ -970,8 +982,8 @@ COMMAND_PROTOTYPE(dostatus)
 		return 0;
 	}
 
-	sprintf(buf, "ALLOCATED=%s/%s NICKNAME=%s\n",
-		reqp->pid, reqp->eid, reqp->nickname);
+	OUTPUT(buf, sizeof(buf), "ALLOCATED=%s/%s NICKNAME=%s\n",
+	       reqp->pid, reqp->eid, reqp->nickname);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
@@ -986,7 +998,7 @@ COMMAND_PROTOTYPE(doifconfig)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		buf[MYBUFSIZE];
+	char		buf[MYBUFSIZE], *ebufp = &buf[MYBUFSIZE];
 	int		nrows;
 
 	/*
@@ -1033,6 +1045,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			char *speed  = "100";
 			char *unit   = "Mbps";
 			char *duplex = "full";
+			char *bufp   = buf;
 			char *mask;
 
 			/* Never for the control net; sharks are dead */
@@ -1055,11 +1068,13 @@ COMMAND_PROTOTYPE(doifconfig)
 			 * older images still want that tag at the front.
 			 */
 			if (vers < 10)
-			  sprintf(buf, "INTERFACE=%d ", card);
-			else 
-			  sprintf(buf, "IFACETYPE=eth ");
-			
-			sprintf(&buf[strlen(buf)],
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       "INTERFACE=%d ", card);
+			else
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       "IFACETYPE=eth ");
+
+			bufp += OUTPUT(bufp, ebufp - bufp,
 				"INET=%s MASK=%s MAC=%s SPEED=%s%s DUPLEX=%s",
 				row[1], mask, row[3], speed, unit, duplex);
 
@@ -1069,9 +1084,9 @@ COMMAND_PROTOTYPE(doifconfig)
 				
 				if (row[6] && row[6][0])
 					aliases = row[6];
-					
-				sprintf(&buf[strlen(buf)],
-					" IPALIASES=\"%s\"", aliases);
+
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " IPALIASES=\"%s\"", aliases);
 			}
 
 			/*
@@ -1079,13 +1094,12 @@ COMMAND_PROTOTYPE(doifconfig)
 			 * the interface instead of a match against type.
 			 */
 			if (vers >= 11) {
-				sprintf(&buf[strlen(buf)],
-					" IFACE=%s",
-					(strcmp(reqp->class, "ixp") ?
-					 "" : iface));
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " IFACE=%s",
+					       (strcmp(reqp->class, "ixp") ?
+						"" : iface));
 			}
-
-			strcat(buf, "\n");
+			OUTPUT(bufp, ebufp - bufp, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
 				info("IFCONFIG: %s", buf);
@@ -1137,11 +1151,11 @@ COMMAND_PROTOTYPE(doifconfig)
 		 * no underlying phys interface (say, colocated nodes in a
 		 * link).
 		 */
-		sprintf(buf,
-			"IFACETYPE=veth "
-			"INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s\n",
-			row[1], CHECKMASK(row[4]), row[0], row[2],
-			row[3] ? row[3] : "none");
+		OUTPUT(buf, sizeof(buf),
+		       "IFACETYPE=veth "
+		       "INET=%s MASK=%s ID=%s VMAC=%s PMAC=%s\n",
+		       row[1], CHECKMASK(row[4]), row[0], row[2],
+		       row[3] ? row[3] : "none");
 
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
@@ -1242,7 +1256,8 @@ COMMAND_PROTOTYPE(doaccounts)
 		}
 
 		gidint = atoi(row[1]);
-		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
+		OUTPUT(buf, sizeof(buf),
+		       "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
 			info("ACCOUNTS: %s", buf);
@@ -1385,6 +1400,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		int		pubkeys_nrows, sfskeys_nrows, i, root = 0;
 		int		auxgids[128], gcount = 0;
 		char		glist[BUFSIZ];
+		char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 
 		gidint     = -1;
 		tbadmin    = root = atoi(row[8]);
@@ -1471,7 +1487,7 @@ COMMAND_PROTOTYPE(doaccounts)
 		}
 
 		if (vers < 4) {
-			sprintf(buf,
+			bufp += OUTPUT(buf, sizeof(buf),
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
 				"HOMEDIR=%s/%s GLIST=%s\n",
@@ -1479,7 +1495,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				USERDIR, row[0], glist);
 		}
 		else if (vers == 4) {
-			snprintf(buf, sizeof(buf) - 1,
+			bufp += OUTPUT(buf, sizeof(buf),
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
 				"HOMEDIR=%s/%s GLIST=\"%s\" "
@@ -1496,7 +1512,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				else
 					row[1] = "*";
 			}
-			sprintf(buf,
+			bufp += OUTPUT(buf, sizeof(buf),
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
 				"HOMEDIR=%s/%s GLIST=\"%s\" SERIAL=%s",
@@ -1504,14 +1520,14 @@ COMMAND_PROTOTYPE(doaccounts)
 				USERDIR, row[0], glist, row[11]);
 
 			if (vers >= 9) {
-				sprintf(&buf[strlen(buf)],
-					" EMAIL=\"%s\"", row[12]);
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " EMAIL=\"%s\"", row[12]);
 			}
 			if (vers >= 10) {
-				sprintf(&buf[strlen(buf)],
-					" SHELL=%s", row[13]);
+				bufp += OUTPUT(bufp, ebufp - bufp,
+					       " SHELL=%s", row[13]);
 			}
-			strcat(buf, "\n");
+			OUTPUT(bufp, ebufp - bufp, "\n");
 		}
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -1543,8 +1559,9 @@ COMMAND_PROTOTYPE(doaccounts)
 
 				pubkey_row = mysql_fetch_row(pubkeys_res);
 
-				sprintf(buf, "PUBKEY LOGIN=%s KEY=\"%s\"\n",
-					row[0], pubkey_row[1]);
+				OUTPUT(buf, sizeof(buf),
+				       "PUBKEY LOGIN=%s KEY=\"%s\"\n",
+				       row[0], pubkey_row[1]);
 			
 				client_writeback(sock, buf, strlen(buf), tcp);
 				pubkeys_nrows--;
@@ -1578,8 +1595,8 @@ COMMAND_PROTOTYPE(doaccounts)
 
 				sfskey_row = mysql_fetch_row(sfskeys_res);
 
-				sprintf(buf, "SFSKEY KEY=\"%s\"\n",
-					sfskey_row[1]);
+				OUTPUT(buf, sizeof(buf),
+				       "SFSKEY KEY=\"%s\"\n", sfskey_row[1]);
 
 				client_writeback(sock, buf, strlen(buf), tcp);
 				sfskeys_nrows--;
@@ -1634,7 +1651,7 @@ COMMAND_PROTOTYPE(dodelay)
 {
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
-	char		buf[2*MYBUFSIZE];
+	char		buf[2*MYBUFSIZE], *ebufp = &buf[sizeof(buf)];
 	int		nrows;
 
 	/*
@@ -1675,6 +1692,8 @@ COMMAND_PROTOTYPE(dodelay)
 		return 0;
 	}
 	while (nrows) {
+		char	*bufp = buf;
+		
 		row = mysql_fetch_row(res);
 
 		/*
@@ -1688,7 +1707,8 @@ COMMAND_PROTOTYPE(dodelay)
 			return 1;
 		}
 
-		sprintf(buf, "DELAY INT0=%s INT1=%s "
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			"DELAY INT0=%s INT1=%s "
 			"PIPE0=%s DELAY0=%s BW0=%s PLR0=%s "
 			"PIPE1=%s DELAY1=%s BW1=%s PLR1=%s "
 			"LINKNAME=%s "
@@ -1720,12 +1740,12 @@ COMMAND_PROTOTYPE(dodelay)
 			 * Temp. This is so current experiments with delay
 			 * entries continues to work okay with the new image.
 			 */
-			sprintf(&buf[strlen(buf)],
-				" VNODE0=%s VNODE1=%s",
-				(row[37] ? row[37] : "foo"),
-				(row[38] ? row[38] : "bar"));
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       " VNODE0=%s VNODE1=%s",
+				       (row[37] ? row[37] : "foo"),
+				       (row[38] ? row[38] : "bar"));
 		}
-		strcat(buf, "\n");
+		OUTPUT(bufp, ebufp - bufp, "\n");
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
@@ -1801,7 +1821,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "LINKDELAY IFACE=%s TYPE=%s "
+		OUTPUT(buf, sizeof(buf),
+		        "LINKDELAY IFACE=%s TYPE=%s "
 			"LINKNAME=%s VNODE=%s INET=%s MASK=%s "
 			"PIPE=%s DELAY=%s BW=%s PLR=%s "
 			"RPIPE=%s RDELAY=%s RBW=%s RPLR=%s "
@@ -2137,17 +2158,17 @@ COMMAND_PROTOTYPE(dohosts)
 
 		/* Old format */
 		if (vers == 2) {
-			sprintf(buf,
-				"NAME=%s LINK=%i IP=%s ALIAS=%s\n",
-				host->vname, host->virtiface,
-				inet_ntoa(host->ipaddr), alias);
+			OUTPUT(buf, sizeof(buf),
+			       "NAME=%s LINK=%i IP=%s ALIAS=%s\n",
+			       host->vname, host->virtiface,
+			       inet_ntoa(host->ipaddr), alias);
 		}
 		else {
-			sprintf(buf,
-				"NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n",
-				host->vname, host->vlan,
-				inet_ntoa(host->ipaddr),
-				host->vname, host->virtiface, alias);
+			OUTPUT(buf, sizeof(buf),
+			       "NAME=%s-%s IP=%s ALIASES='%s-%i %s'\n",
+			       host->vname, host->vlan,
+			       inet_ntoa(host->ipaddr),
+			       host->vname, host->virtiface, alias);
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
 		host = host->next;
@@ -2169,9 +2190,10 @@ COMMAND_PROTOTYPE(dohosts)
 		while (nrows--) {
 		    row = mysql_fetch_row(res);
 
-		    sprintf(buf, "NAME=%s IP=%s ALIASES='%s.%s.%s.%s'\n",
-			    row[0], row[2], row[1], reqp->eid, reqp->pid,
-			    OURDOMAIN);
+		    OUTPUT(buf, sizeof(buf),
+			   "NAME=%s IP=%s ALIASES='%s.%s.%s.%s'\n",
+			   row[0], row[2], row[1], reqp->eid, reqp->pid,
+			   OURDOMAIN);
 		    client_writeback(sock, buf, strlen(buf), tcp);
 		    hostcount++;
 		}
@@ -2236,7 +2258,7 @@ COMMAND_PROTOTYPE(dorpms)
 	do {
 		bp = strsep(&sp, ":");
 
-		sprintf(buf, "RPM=%s\n", bp);
+		OUTPUT(buf, sizeof(buf), "RPM=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
 			info("RPM: %s", buf);
@@ -2296,7 +2318,7 @@ COMMAND_PROTOTYPE(dotarballs)
 			continue;
 		*tp++ = '\0';
 
-		sprintf(buf, "DIR=%s TARBALL=%s\n", bp, tp);
+		OUTPUT(buf, sizeof(buf), "DIR=%s TARBALL=%s\n", bp, tp);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
 			info("TARBALLS: %s", buf);
@@ -2352,7 +2374,7 @@ COMMAND_PROTOTYPE(dodeltas)
 	do {
 		bp = strsep(&sp, ":");
 
-		sprintf(buf, "DELTA=%s\n", bp);
+		OUTPUT(buf, sizeof(buf), "DELTA=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		if (verbose)
 			info("DELTAS: %s", buf);
@@ -2404,7 +2426,7 @@ COMMAND_PROTOTYPE(dostartcmd)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "CMD='%s' UID=%s\n", row[0], reqp->swapper);
+	OUTPUT(buf, sizeof(buf), "CMD='%s' UID=%s\n", row[0], reqp->swapper);
 	mysql_free_result(res);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
@@ -2540,7 +2562,7 @@ COMMAND_PROTOTYPE(doreadycount)
 	}
 	mysql_free_result(res);
 
-	sprintf(buf, "READY=%d TOTAL=%d\n", ready, total);
+	OUTPUT(buf, sizeof(buf), "READY=%d TOTAL=%d\n", ready, total);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
@@ -2657,7 +2679,7 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return project mount first. 
 		 */
-		sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
 			FSPROJDIR, reqp->pid, PROJDIR, reqp->pid);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
@@ -2667,7 +2689,8 @@ COMMAND_PROTOTYPE(domounts)
 		/*
 		 * Return share mount if its defined.
 		 */
-		sprintf(buf, "REMOTE=%s LOCAL=%s\n",FSSHAREDIR, SHAREDIR);
+		OUTPUT(buf, sizeof(buf),
+		       "REMOTE=%s LOCAL=%s\n",FSSHAREDIR, SHAREDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
@@ -2677,9 +2700,10 @@ COMMAND_PROTOTYPE(domounts)
 		 * a mount for the group directory too.
 		 */
 		if (strcmp(reqp->pid, reqp->gid)) {
-			sprintf(buf, "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
-				FSGROUPDIR, reqp->pid, reqp->gid,
-				GROUPDIR, reqp->pid, reqp->gid);
+			OUTPUT(buf, sizeof(buf),
+			       "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
+			       FSGROUPDIR, reqp->pid, reqp->gid,
+			       GROUPDIR, reqp->pid, reqp->gid);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			/* Leave this logging on all the time for now. */
 			info("MOUNTS: %s", buf);
@@ -2693,9 +2717,10 @@ COMMAND_PROTOTYPE(domounts)
 		 * back mounts for the top level directories. 
 		 */
 		if (reqp->islocal) {
-			sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
-				fshostid, FSDIR_PROJ, reqp->pid,
-				PROJDIR, reqp->pid);
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s/%s LOCAL=%s/%s\n",
+			       fshostid, FSDIR_PROJ, reqp->pid,
+			       PROJDIR, reqp->pid);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
 				info("MOUNTS: %s", buf);
@@ -2704,11 +2729,11 @@ COMMAND_PROTOTYPE(domounts)
 			 * Return SFS-based group mount.
 			 */
 			if (strcmp(reqp->pid, reqp->gid)) {
-				sprintf(buf,
-				     "SFS REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
-				     fshostid,
-				     FSDIR_GROUPS, reqp->pid, reqp->gid,
-				     GROUPDIR, reqp->pid, reqp->gid);
+				OUTPUT(buf, sizeof(buf),
+				       "SFS REMOTE=%s%s/%s/%s LOCAL=%s/%s/%s\n",
+				       fshostid,
+				       FSDIR_GROUPS, reqp->pid, reqp->gid,
+				       GROUPDIR, reqp->pid, reqp->gid);
 				client_writeback(sock, buf, strlen(buf), tcp);
 				info("MOUNTS: %s", buf);
 			}
@@ -2716,7 +2741,7 @@ COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /share.
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
+			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s\n",
 				fshostid, FSDIR_SHARE, SHAREDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -2728,8 +2753,9 @@ COMMAND_PROTOTYPE(domounts)
 			 * allows the same paths to work on remote
 			 * nodes.
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s/%s LOCAL=%s%s\n",
-				fshostid, FSDIR_PROJ, DOTSFS, PROJDIR, DOTSFS);
+			OUTPUT(buf, sizeof(buf),
+			       "SFS REMOTE=%s%s/%s LOCAL=%s%s\n",
+			       fshostid, FSDIR_PROJ, DOTSFS, PROJDIR, DOTSFS);
 			client_writeback(sock, buf, strlen(buf), tcp);
 		}
 		else {
@@ -2739,7 +2765,7 @@ COMMAND_PROTOTYPE(domounts)
 			 *
 			 * Pointer to /proj.
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s/%s\n",
+			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s/%s\n",
 				fshostid, FSDIR_PROJ, NETBEDDIR, PROJDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			info("MOUNTS: %s", buf);
@@ -2747,7 +2773,7 @@ COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /groups
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
+			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s%s\n",
 				fshostid, FSDIR_GROUPS, NETBEDDIR, GROUPDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -2756,7 +2782,7 @@ COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /users
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
+			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s%s\n",
 				fshostid, FSDIR_USERS, NETBEDDIR, USERDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -2765,7 +2791,7 @@ COMMAND_PROTOTYPE(domounts)
 			/*
 			 * Pointer to /share.
 			 */
-			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
+			OUTPUT(buf, sizeof(buf), "SFS REMOTE=%s%s LOCAL=%s%s\n",
 				fshostid, FSDIR_SHARE, NETBEDDIR, SHAREDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
@@ -2795,8 +2821,8 @@ COMMAND_PROTOTYPE(domounts)
 	if ((nrows = (int)mysql_num_rows(res))) {
 		while (nrows) {
 			row = mysql_fetch_row(res);
-
-			sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+			
+			OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
 				FSPROJDIR, row[0], PROJDIR, row[0]);
 			client_writeback(sock, buf, strlen(buf), tcp);
 
@@ -2839,7 +2865,7 @@ COMMAND_PROTOTYPE(domounts)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 				
-		sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
+		OUTPUT(buf, sizeof(buf), "REMOTE=%s/%s LOCAL=%s/%s\n",
 			FSUSERDIR, row[0], USERDIR, row[0]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
@@ -2896,8 +2922,8 @@ safesymlink(char *name1, char *name2)
  */
 COMMAND_PROTOTYPE(dosfshostid)
 {
-	char	nodehostid[HOSTID_SIZE];
-	char	sfspath[MYBUFSIZE], dspath[MYBUFSIZE];
+	char	nodehostid[HOSTID_SIZE], buf[BUFSIZ];
+	char	sfspath[BUFSIZ], dspath[BUFSIZ];
 
 	if (!strlen(fshostid)) {
 		/* SFS not being used */
@@ -2914,15 +2940,21 @@ COMMAND_PROTOTYPE(dosfshostid)
 	}
 
 	/*
-	 * Create symlink names
+	 * Dig out the hostid. Need to be careful about not overflowing
+	 * the buffer.
 	 */
-	if (! sscanf(rdata, "%s", nodehostid)) {
+	sprintf(buf, "%%%ds", sizeof(nodehostid));
+	if (! sscanf(rdata, buf, nodehostid)) {
 		error("dosfshostid: No hostid reported!\n");
 		return 1;
 	}
-	sprintf(sfspath, "/sfs/%s", nodehostid);
-	sprintf(dspath, "/proj/%s/%s.%s.%s", DOTSFS,
-		reqp->nickname, reqp->eid, reqp->pid);
+
+	/*
+	 * Create symlink names
+	 */
+	OUTPUT(sfspath, sizeof(sfspath), "/sfs/%s", nodehostid);
+	OUTPUT(dspath, sizeof(dspath), "/proj/%s/%s.%s.%s", DOTSFS,
+	       reqp->nickname, reqp->eid, reqp->pid);
 	
 	if (safesymlink(sfspath, dspath) < 0) {
 		return 1;
@@ -2985,7 +3017,7 @@ COMMAND_PROTOTYPE(dorouting)
 		mysql_free_result(res);
 		return 0;
 	}
-	sprintf(buf, "ROUTERTYPE=%s\n", row[0]);
+	OUTPUT(buf, sizeof(buf), "ROUTERTYPE=%s\n", row[0]);
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
@@ -3015,6 +3047,7 @@ COMMAND_PROTOTYPE(dorouting)
 
 	while (n) {
 		char dstip[32];
+		char *bufp = buf, *ebufp = &buf[sizeof(buf)];
 
 		row = mysql_fetch_row(res);
 				
@@ -3036,14 +3069,15 @@ COMMAND_PROTOTYPE(dorouting)
 		} else
 			strncpy(dstip, row[0], sizeof(dstip));
 
-		sprintf(buf, "ROUTE DEST=%s DESTTYPE=%s DESTMASK=%s "
-			"NEXTHOP=%s COST=%s",
-			dstip, row[1], row[2], row[3], row[4]);
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "ROUTE DEST=%s DESTTYPE=%s DESTMASK=%s "
+			       "NEXTHOP=%s COST=%s",
+			       dstip, row[1], row[2], row[3], row[4]);
 
 		if (vers >= 12) {
-			sprintf(&buf[strlen(buf)], " SRC=%s", row[5]);
+			bufp += OUTPUT(bufp, ebufp - bufp, " SRC=%s", row[5]);
 		}
-		strcat(buf, "\n");		
+		OUTPUT(bufp, ebufp - bufp, "\n");		
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		n--;
@@ -3064,13 +3098,15 @@ COMMAND_PROTOTYPE(doloadinfo)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
+	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	char		*disktype;
 	int		disknum;
 
 	/*
 	 * Get the address the node should contact to load its image
 	 */
-	res = mydb_query("select load_address,loadpart,OS from current_reloads as r "
+	res = mydb_query("select load_address,loadpart,OS "
+			 "  from current_reloads as r "
 			 "left join images as i on i.imageid = r.image_id "
 			 "left join os_info as o on i.default_osid = o.osid "
 			 "where node_id='%s'",
@@ -3096,7 +3132,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 		return 0;
 	}
 
-	sprintf(buf, "ADDR=%s PART=%s PARTOS=%s", row[0], row[1], row[2]);
+	bufp += OUTPUT(bufp, ebufp - bufp,
+		       "ADDR=%s PART=%s PARTOS=%s", row[0], row[1], row[2]);
 	mysql_free_result(res);
 
 	/*
@@ -3119,7 +3156,7 @@ COMMAND_PROTOTYPE(doloadinfo)
 		if (row[0] && row[0][0])
 			disktype = row[0];
 	}
-	sprintf(&buf[strlen(buf)], " DISK=%s%d\n", disktype, disknum);
+	OUTPUT(bufp, ebufp - bufp, " DISK=%s%d\n", disktype, disknum);
 	mysql_free_result(res);
 	
 	client_writeback(sock, buf, strlen(buf), tcp);
@@ -3220,7 +3257,8 @@ COMMAND_PROTOTYPE(dotrafgens)
 			strcat(peername, "-0");
 		}
 
-		sprintf(buf, "TRAFGEN=%s MYNAME=%s MYPORT=%s "
+		OUTPUT(buf, sizeof(buf),
+		        "TRAFGEN=%s MYNAME=%s MYPORT=%s "
 			"PEERNAME=%s PEERPORT=%s "
 			"PROTO=%s ROLE=%s GENERATOR=%s\n",
 			row[0], myname, row[4], peername, row[7],
@@ -3290,7 +3328,7 @@ COMMAND_PROTOTYPE(donseconfigs)
  */
 COMMAND_PROTOTYPE(dostate)
 {
-	char 		*newstate;
+	char 		newstate[128];	/* More then we will ever need */
 #ifdef EVENTSYS
 	address_tuple_t tuple;
 #endif
@@ -3302,29 +3340,10 @@ COMMAND_PROTOTYPE(dostate)
 	/*
 	 * Dig out state that the node is reporting
 	 */
-	while (isspace(*rdata)) {
-		rdata++;
-	}
-
-	/*
-	 * Pull blanks off the end of rdata
-	 */
-	newstate = rdata + (strlen(rdata) -1);
-	while ((newstate >= rdata) && (*newstate == ' ')) {
-		*newstate = '\0';
-		newstate--;
-	}
-
-	newstate = rdata;
-
-	/*
-	 * Make sure there is some state being reported. Perhaps we should
-	 * look in the  database to make sure that the one being reported is
-	 * a valid one.
-	 */
-	if (!*newstate) {
-	    error("dostate: No state reported!\n");
-	    return 1;
+	if (sscanf(rdata, "%128s", newstate) != 1 ||
+	    strlen(newstate) == sizeof(newstate)) {
+		error("DOSTATE: %s: Bad arguments\n", reqp->nodeid);
+		return 1;
 	}
 
 #ifdef EVENTSYS
@@ -3370,7 +3389,7 @@ COMMAND_PROTOTYPE(docreator)
 	if (!reqp->allocated)
 		return 0;
 
-	sprintf(buf, "CREATOR=%s\n", reqp->creator);
+	OUTPUT(buf, sizeof(buf), "CREATOR=%s\n", reqp->creator);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("CREATOR: %s", buf);
@@ -3412,7 +3431,8 @@ COMMAND_PROTOTYPE(dotunnels)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "TUNNEL=%s ISSERVER=%s PEERIP=%s PEERPORT=%s "
+		OUTPUT(buf, sizeof(buf),
+		        "TUNNEL=%s ISSERVER=%s PEERIP=%s PEERPORT=%s "
 			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s "
 			"INET=%s MASK=%s PROTO=%s\n",
 			row[0], row[1], row[2], row[3], row[4],
@@ -3460,11 +3480,12 @@ COMMAND_PROTOTYPE(dovnodelist)
 		row = mysql_fetch_row(res);
 
 		if (vers <= 6) {
-			sprintf(buf, "%s\n", row[0]);
+			OUTPUT(buf, sizeof(buf), "%s\n", row[0]);
 		}
 		else {
 			/* XXX Plab? */
-			sprintf(buf, "VNODEID=%s JAILED=%s\n", row[0], row[1]);
+			OUTPUT(buf, sizeof(buf),
+			       "VNODEID=%s JAILED=%s\n", row[0], row[1]);
 		}
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
@@ -3510,7 +3531,7 @@ COMMAND_PROTOTYPE(dosubnodelist)
 	while (nrows) {
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "NODEID=%s TYPE=%s\n", row[0], row[1]);
+		OUTPUT(buf, sizeof(buf), "NODEID=%s TYPE=%s\n", row[0], row[1]);
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
 		if (verbose)
@@ -4036,7 +4057,7 @@ COMMAND_PROTOTYPE(doisalive)
 	 * just return yes/no and let the client assume it knows what
 	 * to do (update accounts).
 	 */
-	sprintf(buf, "UPDATE=%d\n", doaccounts);
+	OUTPUT(buf, sizeof(buf), "UPDATE=%d\n", doaccounts);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	return 0;
@@ -4086,7 +4107,7 @@ COMMAND_PROTOTYPE(doipodinfo)
 	/*
 	 * XXX host/mask hardwired to us
 	 */
-	sprintf(buf, "HOST=%s MASK=255.255.255.255 HASH=%s\n",
+	OUTPUT(buf, sizeof(buf), "HOST=%s MASK=255.255.255.255 HASH=%s\n",
 		inet_ntoa(myipaddr), hashbuf);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
@@ -4131,10 +4152,12 @@ COMMAND_PROTOTYPE(dontpinfo)
 			if (row[0] && row[0][0] &&
 			    row[1] && row[1][0]) {
 				if (!strcmp(row[0], "peer")) {
-					sprintf(buf, "PEER=%s\n", row[1]);
+					OUTPUT(buf, sizeof(buf),
+					       "PEER=%s\n", row[1]);
 				}
 				else {
-					sprintf(buf, "SERVER=%s\n", row[1]);
+					OUTPUT(buf, sizeof(buf),
+					       "SERVER=%s\n", row[1]);
 				}
 				client_writeback(sock, buf, strlen(buf), tcp);
 				if (verbose)
@@ -4161,7 +4184,7 @@ COMMAND_PROTOTYPE(dontpinfo)
 	if ((int)mysql_num_rows(res)) {
 		row = mysql_fetch_row(res);
 		if (row[0] && row[0][0]) {
-			sprintf(buf, "DRIFT=%s\n", row[0]);
+			OUTPUT(buf, sizeof(buf), "DRIFT=%s\n", row[0]);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			if (verbose)
 				info("NTPINFO: %s", buf);
@@ -4585,6 +4608,7 @@ COMMAND_PROTOTYPE(dojailconfig)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
+	char		*bufp = buf, *ebufp = &buf[sizeof(buf)];
 	int		low, high;
 
 	/*
@@ -4645,20 +4669,19 @@ COMMAND_PROTOTYPE(dojailconfig)
 
 	bzero(buf, sizeof(buf));
 	if (row[1]) {
-		sprintf(buf, "JAILIP=\"%s,%s\"\n", row[1], JAILIPMASK);
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "JAILIP=\"%s,%s\"\n", row[1], JAILIPMASK);
 	}
-	
-	sprintf(&buf[strlen(buf)], 
-		"PORTRANGE=\"%d,%d\"\n"
-		"SSHDPORT=%d\n"
-		"SYSVIPC=1\n"
-		"INETRAW=1\n"
-		"BPFRO=1\n"
-		"INADDRANY=1\n"
-		"ROUTING=%d\n"
-		"DEVMEM=%d\n",
-		low, high, atoi(row[0]), reqp->islocal, reqp->islocal);
-		
+	bufp += OUTPUT(bufp, ebufp - bufp,
+		       "PORTRANGE=\"%d,%d\"\n"
+		       "SSHDPORT=%d\n"
+		       "SYSVIPC=1\n"
+		       "INETRAW=1\n"
+		       "BPFRO=1\n"
+		       "INADDRANY=1\n"
+		       "ROUTING=%d\n"
+		       "DEVMEM=%d\n",
+		       low, high, atoi(row[0]), reqp->islocal, reqp->islocal);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
@@ -4669,7 +4692,8 @@ COMMAND_PROTOTYPE(dojailconfig)
 	 * its easier just to consult the virt_nodes table. That table has
 	 * a funky format, but thats okay.
 	 */
-	strcpy(buf, "IPADDRS=\"");
+	bufp  = buf;
+	bufp += OUTPUT(bufp, ebufp - bufp, "IPADDRS=\"");
 
 	res = mydb_query("select ips from virt_nodes "
 			 "where vname='%s' and pid='%s' and eid='%s'",
@@ -4696,15 +4720,15 @@ COMMAND_PROTOTYPE(dojailconfig)
 				cp = strsep(&bp, ":");
 				ip = strsep(&bp, " ");
 
-				strcat(buf, ip);
+				bufp += OUTPUT(bufp, ebufp - bufp, "%s", ip);
 				if (bp)
-					strcat(buf, ",");
+					bufp += OUTPUT(bufp, ebufp - bufp, ",");
 			}
 		}
 	}
 	mysql_free_result(res);
 
-	strcat(buf, "\"\n");
+	OUTPUT(bufp, ebufp - bufp, "\"\n");
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
@@ -4747,11 +4771,7 @@ COMMAND_PROTOTYPE(doplabconfig)
 	}
 	row   = mysql_fetch_row(res);
 
-	bzero(buf, sizeof(buf));
-	sprintf(&buf[strlen(buf)], 
-		"SSHDPORT=%d\n",
-		atoi(row[0]));
-
+	OUTPUT(buf, sizeof(buf), "SSHDPORT=%d\n", atoi(row[0]));
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
 
@@ -4833,16 +4853,16 @@ COMMAND_PROTOTYPE(doixpconfig)
 		(~mask_addr.s_addr);
 	strcpy(bcast_ip, inet_ntoa(bcast_addr));
 
-	sprintf(buf,
-		"IXP_IP=\"%s\"\n"
-		"IXP_IFACE=\"%s\"\n"
-		"IXP_BCAST=\"%s\"\n"
-		"IXP_HOSTNAME=\"%s\"\n"
-		"HOST_IP=\"%s\"\n"
-		"HOST_IFACE=\"%s\"\n"
-		"NETMASK=\"%s\"\n",
-		row[0], row[1], bcast_ip, reqp->nickname,
-		row[4], row[2], row[3]);
+	OUTPUT(buf, sizeof(buf),
+	       "IXP_IP=\"%s\"\n"
+	       "IXP_IFACE=\"%s\"\n"
+	       "IXP_BCAST=\"%s\"\n"
+	       "IXP_HOSTNAME=\"%s\"\n"
+	       "HOST_IP=\"%s\"\n"
+	       "HOST_IFACE=\"%s\"\n"
+	       "NETMASK=\"%s\"\n",
+	       row[0], row[1], bcast_ip, reqp->nickname,
+	       row[4], row[2], row[3]);
 		
 	client_writeback(sock, buf, strlen(buf), tcp);
 	mysql_free_result(res);
@@ -4855,8 +4875,8 @@ COMMAND_PROTOTYPE(doixpconfig)
 COMMAND_PROTOTYPE(doslothdparams) 
 {
 	char buf[MYBUFSIZE];
-  
-	sprintf(buf, "%s\n", SDPARAMS);
+	
+	OUTPUT(buf, sizeof(buf), "%s\n", SDPARAMS);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	return 0;
 }
@@ -4895,18 +4915,21 @@ COMMAND_PROTOTYPE(doprogagents)
 	/*
 	 * First spit out the UID, then the agents one to a line.
 	 */
-	sprintf(buf, "UID=%s\n", reqp->swapper);
+	OUTPUT(buf, sizeof(buf), "UID=%s\n", reqp->swapper);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("PROGAGENTS: %s", buf);
 	
 	while (nrows) {
+		char	*bufp = buf, *ebufp = &buf[sizeof(buf)];
+		
 		row = mysql_fetch_row(res);
 
-		sprintf(buf, "AGENT=%s", row[0]);
+		bufp += OUTPUT(bufp, ebufp - bufp, "AGENT=%s", row[0]);
 		if (vers >= 13)
-			sprintf(&buf[strlen(buf)], " COMMAND='%s'", row[1]);
-		strcat(buf, "\n");
+			bufp += OUTPUT(bufp, ebufp - bufp,
+				       " COMMAND='%s'", row[1]);
+		OUTPUT(bufp, ebufp - bufp, "\n");
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
@@ -4934,10 +4957,11 @@ COMMAND_PROTOTYPE(dosyncserver)
 	if (!strlen(reqp->syncserver))
 		return 0;
 
-	sprintf(buf, "SYNCSERVER SERVER='%s.%s.%s.%s' ISSERVER=%d\n",
-		reqp->syncserver,
-		reqp->eid, reqp->pid, OURDOMAIN,
-		(strcmp(reqp->syncserver, reqp->nickname) ? 0 : 1));
+	OUTPUT(buf, sizeof(buf),
+	       "SYNCSERVER SERVER='%s.%s.%s.%s' ISSERVER=%d\n",
+	       reqp->syncserver,
+	       reqp->eid, reqp->pid, OURDOMAIN,
+	       (strcmp(reqp->syncserver, reqp->nickname) ? 0 : 1));
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
@@ -4963,7 +4987,7 @@ COMMAND_PROTOTYPE(dokeyhash)
 	if (!strlen(reqp->keyhash))
 		return 0;
 
-	sprintf(buf, "KEYHASH HASH='%s'\n", reqp->keyhash);
+	OUTPUT(buf, sizeof(buf), "KEYHASH HASH='%s'\n", reqp->keyhash);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
@@ -4989,7 +5013,7 @@ COMMAND_PROTOTYPE(doeventkey)
 	if (!strlen(reqp->eventkey))
 		return 0;
 
-	sprintf(buf, "EVENTKEY KEY='%s'\n", reqp->eventkey);
+	OUTPUT(buf, sizeof(buf), "EVENTKEY KEY='%s'\n", reqp->eventkey);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
 	if (verbose)
@@ -5023,7 +5047,8 @@ COMMAND_PROTOTYPE(dofullconfig)
 
 	for (i = 0; i < numcommands; i++) {
 		if (command_array[i].fullconfig & mask) {
-			sprintf(buf, "*** %s\n", command_array[i].cmdname);
+			OUTPUT(buf, sizeof(buf),
+			       "*** %s\n", command_array[i].cmdname);
 			client_writeback(sock, buf, strlen(buf), tcp);
 			command_array[i].func(sock, reqp, rdata, tcp, vers);
 			client_writeback(sock, buf, strlen(buf), tcp);
