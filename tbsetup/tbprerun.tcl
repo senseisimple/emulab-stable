@@ -40,14 +40,15 @@ if {$scriptdir == "."} {set scriptdir [pwd]}
 set updir [file dirname $scriptdir]
 
 set lockfile "/usr/testbed/locks/tblock"
-set ns2ir "$updir/ir/ns2ir/parse.tcl"
-set assign "$updir/ir/assign.tcl"
-set handle_ip "$updir/ir/handle_ip.tcl"
+set ns2ir "$scriptdir/ns2ir/parse.tcl"
+set postparse "$scriptdir/ns2ir/postparse.tcl"
+set assign "$scriptdir/ir/assign.tcl"
+set handle_ip "$scriptdir/ir/handle_ip.tcl"
 set avail "$updir/db/avail"
 set ptopgen "$updir/db/ptopgen"
 set ptopfile "/tmp/testbed[pid].ptop"
 set reserve "$updir/db/nalloc"
-set libir "$updir/ir/libir.tcl"
+set libir "$scriptdir/ir/libir.tcl"
 
 source $libir
 namespace import TB_LIBIR::ir
@@ -88,6 +89,14 @@ if {! [file exists $irFile]} {
     outs stderr "$irFile not generated.  Make sure you have a 'run' command in your ns file."
     exit 1
 }
+
+outs "Post Parsing ns input."
+if {[catch "exec $postparse $nsFile $irFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error post parsing ns input. ($err)"
+    exit 1
+}
+
+exit 1
 
 outs "Locking the world!"
 set wait {15 30 60 600 600}
