@@ -176,6 +176,7 @@ printdb "Loading virt_nodes.\n";
 $result = DBQueryFatal("SELECT vname,ips,type,fixed from virt_nodes" .
 		     " where pid=\"$pid\" and eid=\"$eid\"");
 while (($vname,$ips,$type,$fixed) = $result->fetchrow_array) {
+    if (! defined($fixed)) {$fixed = "";}
     printdb "  $vname $type $ips $fixed\n";
     # We need to check the names to make sure they won't clash with
     # our internal delay node names.
