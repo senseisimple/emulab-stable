@@ -21,3 +21,6 @@ proc tb-set-node-lan-params {node lan delay bw loss} {}
 proc tb-set-node-failure-action {node type} {}
 proc tb-set-ip-routing {type} {}
 proc tb-fix-node {v p} {}
+proc tb-make-weighted-vtype {name weight types} {}
+proc tb-make-soft-vtype {name types} {}
+proc tb-make-hard-vtype {name types} {}
