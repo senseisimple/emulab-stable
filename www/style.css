@@ -20,6 +20,7 @@ td.stealth { background-color:#FFF; }
 img.stealth { background-color:#FFF; }
 
 table.topbar { border-bottom: solid 2px #000; }
+table.bottombar { border-top: solid 2px #000; }
 
 td.pad4 { padding: 4px; }
 td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
