@@ -942,6 +942,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/checkpass/GNUmakefile \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
+	tmcd/netbsd/GNUmakefile \
 	tmcd/tmcd.restart \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3"
 

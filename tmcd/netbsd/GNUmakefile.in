@@ -1,0 +1,29 @@
+#
+# DON'T RUN THIS!
+#
+# Trivial. These things just need to be installed into the right place
+# on a testbed node before cutting an image.
+#
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tmcd
+
+include $(OBJDIR)/Makeconf
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+INSTALL_DIR	= /etc/testbed
+INSTALL_FILES	= group master.passwd setup
+INSTALL		= /usr/bin/install -c 
+
+install:
+	-mkdir -p $(INSTALL_DIR)
+	$(INSTALL) -m 644 $(SRCDIR)/group $(INSTALL_DIR)/group
+	$(INSTALL) -m 600 $(SRCDIR)/master.passwd $(INSTALL_DIR)/master.passwd
+	$(INSTALL) -m 755 $(SRCDIR)/setup $(INSTALL_DIR)/setup
+	$(INSTALL) -m 755 $(SRCDIR)/rc.testbed $(INSTALL_DIR)/rc.testbed
+	$(INSTALL) -m 755 ../tmcc $(INSTALL_DIR)/tmcc
