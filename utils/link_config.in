@@ -16,7 +16,7 @@ sub usage()
 {
     print(STDERR
 	  "Usage: link_config [-m] [-d] [-s vnode] <pid> <eid> <link>".
-	  " PARAM=VALUE ...\n".
+	  " [PARAM=VALUE ...\n".
 	  "Required: pid, eid, link, and at least one parameter to change!\n".
 	  "  pid = Project ID\n".
 	  "  eid = Experiment ID\n".
@@ -25,8 +25,10 @@ sub usage()
 	  "Options:\n".
 	  "   -d = turn on debugging\n".
 	  "   -s = Select the source of the link to determine which pipe\n".
-	  "   -m = Modify the base experiment in addition to current state.\n"
-	  );
+	  "   -m = Modify the base experiment in addition to current state.\n".
+	  "Special PARAM:\n".
+	  " ENABLE=yes/no    - Bring the link up or down (or ENABLE=up/down)".
+	  "\n");
     # Web interface cares about this return value!
     exit(2);
 }
@@ -77,6 +79,7 @@ my $pid    = shift(@ARGV);
 my $eid    = shift(@ARGV);
 my $link   = shift(@ARGV);
 my $modify = 0;
+my $enable;		# Special case for bringing interface up/down.
 my $srcvnode;
 my $member;		# For operating on virt_lans table (vname:port)
 my %physmap;		# For operating on the interface_settings table (pcXXX)
@@ -202,6 +205,20 @@ while (@ARGV) {
     if ($opt =~ /^(.*)=(.*)$/) {
 	my $key = $1;
 	my $val = $2;
+
+	if ($key eq "enable" || $key eq "ENABLE") {
+	    if ($val eq "yes" || $val eq "up") {
+		$enable = "yes";
+	    }
+	    elsif ($val eq "no" || $val eq "no") {
+		$enable = "no";
+	    }
+	    else {
+		die("*** $0:\n".
+		    "    Should be ENABLE=yes/no or ENABLE=up/down!\n");
+	    }
+	    next;
+	}
 
 	if (! TBcheck_dbslot($key, "virt_lan_settings", "capkey",
 			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
@@ -347,6 +364,11 @@ $inject_string .= "-${srcvnode} "
     if (defined($srcvnode));
 
 $inject_string .= " modify ";
+
+# Add in enable=yes/no first.
+if (defined($enable)) {
+    $inject_string .= "enable=${enable} ";
+}
 
 # Append the parameters.
 foreach my $key (keys(%config)) {
