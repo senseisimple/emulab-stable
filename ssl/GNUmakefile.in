@@ -108,6 +108,9 @@ client-install:
 	$(INSTALL_DATA) localnode.pem /etc/testbed/client.pem
 	$(INSTALL_DATA) emulab.pem /etc/testbed/emulab.pem
 
+tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
+	chmod 640 $(INSTALL_SBINDIR)/capture.pem
+
 clean:
 	rm -f *.pem serial index.txt *.old dirsmade *.cnf
 	rm -rf newcerts certs
