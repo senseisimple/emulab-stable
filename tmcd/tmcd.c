@@ -104,6 +104,7 @@ COMMAND_PROTOTYPE(dotrafgens);
 COMMAND_PROTOTYPE(donseconfigs);
 COMMAND_PROTOTYPE(dostate);
 COMMAND_PROTOTYPE(docreator);
+COMMAND_PROTOTYPE(dotunnels);
 
 struct command {
 	char	*cmdname;
@@ -133,6 +134,7 @@ struct command {
 	{ "nseconfigs",	donseconfigs},
 	{ "creator",	docreator},
 	{ "state",	dostate},
+	{ "tunnels",	dotunnels},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2470,6 +2472,59 @@ COMMAND_PROTOTYPE(docreator)
 	client_writeback(sock, buf, strlen(buf), tcp);
 	info("CREATOR: %s", buf);
 
+	return 0;
+}
+
+/*
+ * Return tunnels info.
+ */
+COMMAND_PROTOTYPE(dotunnels)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		pid[64];
+	char		eid[64];
+	char		gid[64];
+	char		buf[MYBUFSIZE];
+	int		nrows;
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid, gid)) {
+		error("TRAFGENS: %s: Node is free\n", nodeid);
+		return 1;
+	}
+
+	res = mydb_query("select vname,isserver,peer_ip,port,password, "
+			 " encrypt,compress,assigned_ip "
+			 "from tunnels where node_id='%s'",
+			 8, nodeid);
+
+	if (!res) {
+		error("TUNNELS: %s: DB Error getting tunnels\n", nodeid);
+		return 1;
+	}
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf, "TUNNEL=%s ISSERVER=%s PEERIP=%s PEERPORT=%s "
+			"PASSWORD=%s ENCRYPT=%s COMPRESS=%s INET=%s\n",
+			row[0], row[1], row[2], row[3], row[4],
+			row[5], row[6], row[7]);
+		       
+		client_writeback(sock, buf, strlen(buf), tcp);
+		
+		nrows--;
+		info("TUNNELS: %s ISSERVER=%s PEERIP=%s PEERPORT=%s INET=%s\n",
+		     row[0], row[1], row[2], row[3], row[7]);
+	}
+	mysql_free_result(res);
 	return 0;
 }
 
