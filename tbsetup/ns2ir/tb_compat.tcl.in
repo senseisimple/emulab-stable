@@ -13,7 +13,29 @@ proc tb-set-ip {node ip} {
 }
 proc tb-set-ip-interface {src dst ip} {
     global TBCMD nodeid_map
-    puts $TBCMD "tb-set-ip-interface $nodeid_map($src) $nodeid_map($dst) $ip"
+    global linkmap prefix lanlist
+    if {[info exists linkmap($src:$dst)]} {
+	if {[info exists nodeid_map($linkmap($src:$dst))]} {
+	    real_set linkname $nodeid_map($linkmap($src:$dst))
+	} else {
+	    real_set linkname $linkmap($src:$dst)
+	}
+	puts $TBCMD "tb-set-ip-link $nodeid_map($src) $prefix-$linkname $ip"
+    } elseif {([lsearch $lanlist $dst] != -1)} {
+	tb-set-ip-lan $src $dst $ip
+    } else {
+	print stderr "No link exists between $src and $dst."
+	exit 1
+    }
+}
+proc tb-set-ip-lan {src lan ip} {
+    global TBCMD nodeid_map
+    global prefix
+    puts $TBCMD "tb-set-ip-lan $nodeid_map($src) $prefix-$nodeid_map($lan) $ip"
+}
+proc tb-set-ip-link {src link ip} {
+    global TBCMD nodeid_map prefix
+    puts $TBCMD "tb-set-ip-link $nodeid_map($src) $prefix-$nodeid_map($link) $ip"
 }
 proc tb-set-hardware {node type args} {
     global TBCMD nodeid_map
@@ -27,9 +49,30 @@ proc tb-create-os {label path partition} {
     global TBCMD nodeid_map
     puts $TBCMD "tb-create-os $label $path $partition"
 }
-proc tb-set-link-loss {src dst rate} {
+proc tb-set-link-loss {srclink args} {
     global TBCMD nodeid_map
-    puts $TBCMD "tb-set-link-loss $nodeid_map($src) $nodeid_map($dst) $rate"
+    global linkmap prefix
+    if {[llength $args] == 2} {
+	set dst [lindex $args 0]
+	set loss [lindex $args 1]
+	if {[info exists linkmap($srclink:$dst)]} {
+	    if {[info exists nodeid_map($linkmap($srclink:$dst))]} {
+		real_set linkname $nodeid_map($linkmap($srclink:$dst))
+	    } else {
+		real_set linkname $linkmap($srclink:$dst)
+	    }
+	    puts $TBCMD "tb-set-link-loss $prefix-$linkname $loss"
+	} else {
+	    puts stderr "No link between $srclink and $dst."
+	    exit 1
+	}
+    } elseif {[llength $args] == 1} {
+	set loss [lindex $args 0]
+	puts $TBCMD "tb-set-link-loss $prefix-$nodeid_map($srclink) $loss"
+    } else {
+	puts stderr "tb-set-link-loss takes 2 or 3 parameters."
+	exit 1
+    }
 }
 proc tb-set-lan-loss {lan rate} {
     global TBCMD nodeid_map prefix

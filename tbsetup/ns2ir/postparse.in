@@ -72,7 +72,7 @@ if ($@) {
 # Shove it in a membership array
 foreach (split("\n",$raw)) {
     split;
-    $links{"$_[1]:$_[3]"} = 1;
+    $links{"$_[0]"} = [$_[1],$_[2]]
 }
 
 # Read in possible hardware types - we add shark_shelf manually
@@ -111,32 +111,22 @@ while (<TBCMD>) {
 	# hwtype(node) = type
 	$hwtype{$line[1]} = $line[2];
     } elsif ($line[0] eq "tb-set-link-loss") {
-	if ($#line != 3) {
-	    push(@ERRORS,"Syntax: tb-set-link-loss src dst loss_rate");
+	if ($#line != 2) {
+	    push(@ERRORS,"Syntax: tb-set-link-loss link loss_rate");
 	    next;
 	}
-	if ((! defined($nodes{$line[1]})) &&
-	    (! defined($lans{$line[1]}))) {
-	    push(@ERRORS,"$line[1] is not a valid node.");
+	if (! defined($links{$line[1]})) {
+	    push(@ERRORS,"$line[1] is not a valid link.");
 	    next;
 	}
-	if ((! defined($nodes{$line[2]})) &&
-	    (! defined($lans{$line[2]}))) {
-	    push(@ERRORS,"$line[2] is not a valid node.");
-	    next;
-	}
-	if (! defined($links{"$line[1]:$line[2]"})) {
-	    push(@ERRORS,"No link between $line[1] and $line[2]");
-	    next;
-	}
-	if ( ((! ($line[3] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
-	      (! ($line[3] =~ /^\.[0-9]+$/))) ||
-	     ($line[3] < 0) || ($line[3] > 1)) {
-	    push(@ERRORS,"$line[3] not between 0.0 and 1.0");
+	if ( ((! ($line[2] =~ /^[0-9]+(\.[0-9]+)?$/)) &&
+	      (! ($line[2] =~ /^\.[0-9]+$/))) ||
+	     ($line[2] < 0) || ($line[2] > 1)) {
+	    push(@ERRORS,"$line[2] not between 0.0 and 1.0");
 	    next;
 	}
 	# linkloss(src:dst) = loss
-	$linkloss{"$line[1]:$line[2]"} = $line[4];
+	$linkloss{$line[1]} = $line[2];
     } elsif ($line[1] eq "tb-set-lan-loss") {
 	if ($#line != 2) {
 	    push(@ERRORS,"Syntax: tb-set-lan-loss lan loss_rate");
@@ -187,10 +177,9 @@ if ($@) {
 @newlinks = ();
 foreach (@links) {
     @info = split;
-    $src = $info[1];
-    $dst = $info[3];
-    if (defined($linkloss{$src . ":" . $dst})) {
-	push(@newlinks,"$_ " . $linkloss{$src . ":" . $dst});
+    $link = $info[0];
+    if (defined($linkloss{$link})) {
+	push(@newlinks,"$_ " . $linkloss{$link});
     } else {
 	push(@newlinks,"$_ 0.0");
     }

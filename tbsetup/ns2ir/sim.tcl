@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.6 2001-03-14 19:37:37 calfeld Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.7 2001-03-14 21:06:40 calfeld Exp $
 
 #
 
@@ -252,6 +252,7 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
     global linkID
     global linkslist
     global nodeID
+    global linkmap
 
     # if there are delay or bandwidth restrictions, add a delay node
     # and link to it
@@ -279,6 +280,8 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
     incr linkID
 
     lappend linkslist $currLink
+    lappend linkmap($n1:$n2) $currLink
+    lappend linkmap($n2:$n1) $currLink
 
     return $currLink
 }

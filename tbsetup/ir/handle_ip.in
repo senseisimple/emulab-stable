@@ -152,27 +152,53 @@ while (<TBCMD>) {
 	  last SWITCH1;
       };
       /^tb-set-ip-interface$/ && do {
-	  # tb-set-ip-interface <node> <dst> <ip>
+	  push(@ERRORS,"tb-set-ip-interface should have been converted to tb-set-ip-link.  Check for newest version of tb_compat.tcl");
+	  last SWITCH1;
+      };
+      /^tb-set-ip-link$/ && do {
+	  # tb-set-ip-link <node> <link> <ip>
 	  if ($#line != 3) {
-	      push(@ERRORS,"Syntax: tb-set-ip-interface node dst ip\n");
+	      push(@ERRORS,"Syntax: tb-set-ip-link node link ip\n");
 	      last SWITCH1;
 	  } 
-	  ($node,$dst,$ip) = @line[1..3];
+	  ($node,$link,$ip) = @line[1..3];
 	  if (! defined($vnodemap{$node})) {
 	      push(@ERRORS,"$node is not a valid node.\n");
 	      last SWITCH1;
 	  }
-	  if (! defined($vnodemap{$dst})) {
-	      push(@ERRORS,"$dst is not a valid node.\n");
+	  if (! defined($links{$link})) {
+	      push(@ERRORS,"$link is not a valid link.\n");
 	      last SWITCH1;
 	  } 
 	  if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
 	      push(@ERRORS,"$ip is not a valid ip address.\n");
 	      last SWITCH1;
 	  }
-	  $IP{"$node:$dst"} = $ip;
+	  $IP{"$node:$link"} = $ip;
 	  last SWITCH1;
-      }
+      };
+      /^tb-set-ip-lan$/ && do {
+	  # tb-set-ip-lan <node> <lan> <ip>
+	  if ($#line != 3) {
+	      push(@ERRORS,"Syntax: tb-set-ip-lan node lan ip\n");
+	      last SWITCH1;
+	  } 
+	  ($node,$lan,$ip) = @line[1..3];
+	  if (! defined($vnodemap{$node})) {
+	      push(@ERRORS,"$node is not a valid node.\n");
+	      last SWITCH1;
+	  }
+	  if (! defined($lans{$lan})) {
+	      push(@ERRORS,"$lan is not a valid lan.\n");
+	      last SWITCH1;
+	  } 
+	  if (! ($ip =~ /^([0-9]{1,3}\.){3,3}[0-9]{1,3}$/)) {
+	      push(@ERRORS,"$ip is not a valid ip address.\n");
+	      last SWITCH1;
+	  }
+	  $IPLAN{"$node:$lan"} = $ip;
+	  last SWITCH1;
+      };
   }
 }
 
@@ -283,22 +309,22 @@ foreach $link (keys(%links)) {
 	    next;
 	}
 	# Look for assigned ip
-	if (defined($IP{"$A:$B"})) {
-	    printdb "Defined link IP " . $IP{"$A:$B"} . "\n";
+	if (defined($IP{"$A:$link"})) {
+	    printdb "Defined link IP " . $IP{"$A:$link"} . "\n";
 	    if (&islan($B)) {
-		$lansubnet{$B} = &get_subnet($IP{"$A:$B"});
+		$lansubnet{$B} = &get_subnet($IP{"$A:$link"});
 		printdb "lansubnet{$B} = $lansubnet{$B}\n";
 	    }
-	    $ip_section .= "$A $B $IP{$A . ':' . $B}\n";
-	    printdb "ip_section .= \"$A $B " . $IP{"$A:$B"} . "\n";
+	    $ip_section .= "$A $B $IP{$A . ':' . $link}\n";
+	    printdb "ip_section .= \"$A $B " . $IP{"$A:$link"} . "\n";
 	    push(@ip_mac_section, 
-		 [&intersect($MACTABLE{$A},&get_macs($link)),$IP{"$A:$B"}]);
-	    printdb "ip_mac_section <- [" . join(",",&intersect($MACTABLE{$A},&get_macs($link))) . "," . $IP{"$A:$B"} . "]\n";
-	    $ips_assigned{$IP{"$A:$B"}} = 1;
+		 [&intersect($MACTABLE{$A},&get_macs($link)),$IP{"$A:$link"}]);
+	    printdb "ip_mac_section <- [" . join(",",&intersect($MACTABLE{$A},&get_macs($link))) . "," . $IP{"$A:$link"} . "]\n";
+	    $ips_assigned{$IP{"$A:$link"}} = 1;
 	    if (!defined($ips_node{$A})) {
 		$ips_node{$A} = [];
 	    }
-	    push(@{$ips_node{$A}},$IP{"$A:$B"});
+	    push(@{$ips_node{$A}},$IP{"$A:$link"});
 	} elsif (defined($IP{$A})) {
 	    printdb "Node IP address $IP{$A}\n";
 	    # node-wide IP address
@@ -341,14 +367,14 @@ foreach $lan (keys(%lans)) {
     @nodes = @{$lans{$lan}[1]};
     foreach $node (@nodes) {
 	printdb "Looking at $node\n";
-	if (defined($IP{"$node:$lan"}) ||
-	    defined($IP{"$lan:$node"})) {
-	    if (defined($IP{"$node:$lan"})) {
-		$ip = $IP{"$node:$lan"};
-		$ips_assigned{$IP{"$node:$lan"}} = 1;
+	if (defined($IPLAN{"$node:$lan"}) ||
+	    defined($IPLAN{"$lan:$node"})) {
+	    if (defined($IPLAN{"$node:$lan"})) {
+		$ip = $IPLAN{"$node:$lan"};
+		$ips_assigned{$ip} = 1;
 	    } else {
-		$ip = $IP{"$lan:$node"};
-		$ips_assigned{$IP{"$lan:$node"}} = 1;
+		$ip = $IPLAN{"$lan:$node"};
+		$ips_assigned{$ip} = 1;
 	    }
 	    printdb "Found link IP $ip\n";
 	    $ip_section .= "$node $lan $ip\n";
@@ -448,8 +474,8 @@ foreach $left (keys(%to_assign)) {
 	push(@{$ips_node{$node}},$ipA);
 	push(@{$ips_node{$dst}},$ipB);
     } else {
-	if (defined($IP{"$dst:$node"})) {
-	    $subnet = &get_subnet($IP{"$dst:$node"});
+	if (defined($IP{"$dst:$left"})) {
+	    $subnet = &get_subnet($IP{"$dst:$left"});
 	} elsif (defined($IP{$dst})) {
 	    $subnet = &get_subnet($IP{$dst});
 	} else {
