@@ -30,7 +30,7 @@ AGENTIP = "dslice.planet-lab.org"
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
 RESERVED_PID = "emulab-ops"
-RESERVED_EID = "plab-nodes"
+RESERVED_EID = "plabnodes"
 
 MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
 MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113")
@@ -40,6 +40,7 @@ ALLOWED_NODES = ("155.98.35.3", "155.98.35.4")
 
 DEFAULT_DATA_PATH = "@prefix@/etc/plab"
 SSH = "@prefix@/bin/sshtb"
+NAMED_SETUP = "@prefix@/sbin/named_setup";
 
 verbose = 0
 debug = 0
@@ -49,8 +50,6 @@ debug = 0
 #
 
 __dbName = "@TBDBNAME@"
-if __dbName == "@TBDB" + "NAME@":
-    raise RuntimeError, "libplab has not been run through configure"
 __dbQueryMaxtries = 1
 __dbConnMaxtries = 5
 
@@ -199,7 +198,7 @@ class Plab:
         it's a list of the nodes reporting to ganglia that they support
         dslices)
         """
-        print "Getting free nodes"
+        print "Getting free Plab nodes ..."
         agent = self._createAgentProxy(insecure = True)
         avail = agent.getads()
         if debug:
@@ -232,21 +231,27 @@ class Plab:
         toadd = []  # List of IP's
         for ip in avail:
             if not known.has_key(ip):
+                if len(ALLOWED_NODES) and not ip in ALLOWED_NODES:
+                    if verbose:
+                        print "Skipping %s because it's not in the allowed" \
+                              " list" % ip
+                    continue
                 toadd.append(ip)
         if len(toadd):
             if ignorenew:
-                print "%d new Plab nodes, but ignored for now" % len(toadd)
+                if verbose:
+                    print "%d new Plab nodes, but ignored for now" % len(toadd)
             else:
-                print "There are %d new Plab nodes" % len(toadd)
+                print "There are %d new Plab nodes." % len(toadd)
                 for ip in toadd:
-                    if len(ALLOWED_NODES) and not ip in ALLOWED_NODES:
-                        print "Skipping %s because it's not in the allowed" \
-                              " list" % ip
-                        continue
                     linktype = self.__findLinkType(ip)
                     if debug:
                         print "Found linktype %s for node %s" % (linktype, ip)
                     self.__addNode(ip, linktype)
+
+                print "Forcing a named map update ..."
+                os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
+                print "Done adding new Plab nodes."
 
     def __getKnownPnodes(self):
         """
@@ -271,20 +276,23 @@ class Plab:
         """
         if not len(pnodeids):
             return
+        if debug:
+            print "Setting status to %s for vnodes of %s" % (status, pnodeids)
         # Unfortunately, this query has to join nodes and node_status,
         # which means it can't all be done with a single update (until
         # we upgrade to MySQL 4.0.4 at least :)
-        clause = " or ".join(["phys_nodeid = %s"] * len(pnodeids))
+        clause = ", ".join(["%s"] * len(pnodeids))
         res = DBQueryFatal("select node_id from nodes"
                            " where eventstate = 'SHUTDOWN'"
-                           " and (" + clause + ")",
+                           " and phys_nodeid in (" + clause + ")",
                            pnodeids)
         if len(res):
-            for nodeid, in res:
-                DBQueryFatal("replace into node_status"
-                             " (node_id, status, status_timestamp)"
-                             " values (%s, %s, now())",
-                             (nodeid, status))
+            vnodeids = map(lambda x: x[0], res)
+            clause = ", ".join(["%s"] * len(vnodeids))
+            DBQueryFatal("update node_status set status = %s,"
+                         " status_timestamp = now()"
+                         " where node_id in (" + clause + ")",
+                         [status] + list(vnodeids))
 
     def __setPnodesStatus(self, pnodeids, status):
         """
@@ -293,10 +301,12 @@ class Plab:
         """
         if not len(pnodeids):
             return
-        clause = " or ".join(["node_id = %s"] * len(pnodeids))
+        if debug:
+            print "Setting status to %s for pnodes %s" % (status, pnodeids)
+        clause = ", ".join(["%s"] * len(pnodeids))
         DBQueryFatal("update node_status set status = %s,"
                      " status_timestamp = now()"
-                     " where " + clause,
+                     " where node_id in (" + clause + ")",
                      [status] + list(pnodeids))
 
     def __findLinkType(self, ip):
@@ -352,50 +362,61 @@ class Plab:
 
         XXX This duplicates a lot of the functionality of newwanode.
         Note that, very unlike newwanode, the node is initially up,
-        since it had to be up to be added in the first place.
+        since it had to be up to be added in the first place.  This also
+        adds some additional fields that newwanode doesn't, and takes
+        advantage of the fact that the Plab nodes may be added in bulk.
         """
         defosid, controlnet, numvnodes = self.__getNodetypeInfo()
         id, priority = self.__nextFreeNodeid()
         nodeid = "pcplab%d" % id
-        print "Creating pnode %s as %s, priority %d" % (ip, nodeid, priority)
-        print "XXX Just kidding"
-        return
+        print "Creating pnode %s as %s, priority %d." % (ip, nodeid, priority)
 
         DBQueryFatal("insert into nodes"
                      " (node_id, type, phys_nodeid, role, priority,"
-                     "  op_mode, def_boot_osid)"
-                     " values (%s, %s, %s, %s, %s, %s, %s)",
+                     "  op_mode, def_boot_osid,"
+                     "  allocstate, allocstate_timestamp,"
+                     "  eventstate, state_timestamp)"
+                     " values (%s, %s, %s, %s, %s,"
+                     "  %s, %s, %s, now(), %s, now())",
                      (nodeid, 'pcplabphys', nodeid, 'testnode', priority*100,
-                      'ALWAYSUP', defosid))
-
-        DBQueryFatal("replace into node_status"
-                     " (node_id, status, status_timestamp)"
-                     " values (%s, %s, now())",
-                     (nodeid, 'up'))
+                      'ALWAYSUP', defosid,
+                      'FREE_CLEAN',
+                      'ISUP'))
 
         DBQueryFatal("insert into interfaces"
-                     " (node_id, card, port, IP, interface_type, iface)"
-                     " values (%s, %s, %s, %s, %s, %s)",
-                     (nodeid, controlnet, 1, ip, 'fxp', 'eth0'))
+                     " (node_id, card, port, IP, interface_type, iface, role)"
+                     " values (%s, %s, %s, %s, %s, %s, %s)",
+                     (nodeid, controlnet, 1, ip, 'fxp', 'eth0', 'ctrl'))
 
         DBQueryFatal("insert into reserved"
                      " (node_id, pid, eid, rsrv_time, vname)"
                      " values (%s, %s, %s, now(), %s)",
                      (nodeid, RESERVED_PID, RESERVED_EID, nodeid))
 
+        DBQueryFatal("insert into node_status"
+                     " (node_id, status, status_timestamp)"
+                     " values (%s, %s, now())",
+                     (nodeid, 'up'))
+
         vnodetype = "pcplab%s" % linktype
         for n in range(numvnodes):
             vprio = (priority * 100) + (n+1)
-            vnodeid = "v%s-%d" % (nodeid, n+1)
+            sshdport = 38000+n
+            vnodeid = "%s-%d" % (nodeid, n+1)
             if verbose:
                 print "Creating vnode %s, priority %d" % (vnodeid, vprio)
 
             DBQueryFatal("insert into nodes"
                          " (node_id, type, phys_nodeid, role, priority,"
-                         "  op_mode, def_boot_osid, update_accounts)"
-                         " values (%s, %s, %s, %s, %s, %s, %s, %s)",
+                         "  op_mode, def_boot_osid, update_accounts,"
+                         "  allocstate, allocstate_timestamp,"
+                         "  eventstate, state_timestamp, sshdport)"
+                         " values (%s, %s, %s, %s, %s,"
+                         "  %s, %s, %s, %s, now(), %s, now(), %s)",
                          (vnodeid, vnodetype, nodeid, 'virtnode', vprio,
-                          'PCVM', defosid, 1))
+                          'PCVM', defosid, 1,
+                          'FREE_CLEAN',
+                          'SHUTDOWN', sshdport))
 
             DBQueryFatal("insert into node_status"
                          " (node_id, status, status_timestamp)"
@@ -443,6 +464,7 @@ class Plab:
         """
         Renews all of the Plab leases that are going to expire soon.
         """
+        print "Renewing Plab leases ..."
         # Ugh, MySQL doesn't know UTC until v4.1.1, and unix_timestamp()
         # returns the local time
         import time
@@ -491,7 +513,7 @@ class Slice:
         this directly, use Plab.createSlice instead.
         """
         self.slicename = "emulab_%s_%s" % (self.pid, self.eid)
-        print "Creating slice %s" % self.slicename
+        print "Creating Plab slice %s." % self.slicename
         self.privkey, self.pubkey = self.__genKeypair()
         try:
             DBQueryFatal("insert into plab_slices"
@@ -531,7 +553,7 @@ class Slice:
         in the slice, but those should be removed by Emulab before the
         slice is destroyed.
         """
-        print "Destroying slice %s" % self.slicename
+        print "Destroying Plab slice %s." % self.slicename
         res = DBQueryFatal("select node_id from plab_slice_nodes"
                            " where slicename = %s",
                            (self.slicename))
@@ -568,10 +590,12 @@ class Slice:
         # XXX This is a workaround for a bug in M2Crypto
         import tempfile
 
+        if verbose:
+            print "Generating slice keypair"
         # pdssi = Plab Dynamic Slice SSH Identity
         fname = tempfile.mktemp("pdssi%d" % os.getpid())
-        if verbose:
-            print "Generating slice keypair into %s" % fname
+        if debug:
+            print "Writing keypair to %s(.pub)" % fname
         if os.spawnlp(os.P_WAIT, "ssh-keygen",
                       "ssh-keygen", "-t", "rsa", "-b", "1024", "-P", "",
                       "-f", fname, "-q"):
@@ -585,6 +609,8 @@ class Slice:
         
         
         # Below here is the way it _should_ be done
+        if verbose:
+            print "Generating slice keypair"
         key = RSA.gen_key(1024, 35)    # OpenSSH ssh-keygen uses 35 for e
 
         privkeyio = cStringIO.StringIO()
@@ -617,7 +643,7 @@ class Node:
         node setup is performed.  Don't call this directly, use
         Slice.createNode instead.
         """
-        print "Creating node %s on %s" % (self.nodeid, self.ip)
+        print "Creating Plab node %s on %s." % (self.nodeid, self.ip)
         agent = self.plab._createAgentProxy()
         tickets = agent.newtickets(self.slice.slicename, 1, LEASELEN,
                                    (self.ip,))
@@ -671,14 +697,10 @@ class Node:
         
     def free(self):
         """
-        Shuts down this node by calling 'rc.vinit stop', frees the node,
-        and kills the VM.
+        Frees the node and kills the VM.  Note that this does not
+        shutdown anything inside the vserver.
         """
-        print "Freeing node %s" % self.nodeid
-        #try:
-        #    self.__perform("sudo /etc/rc.vinit stop")
-        #except RuntimeError:
-        #    print "WARNING: Skipping node shutdown on %s" % self.nodeid
+        print "Freeing Plab node %s." % self.nodeid
         # XXX Should this wait a bit before nuking the VM?
         nodemgr = self._createNodemgrProxy()
         ret = nodemgr.deletelease(self.slice.slicename)
@@ -710,7 +732,7 @@ class Node:
         return ret
 
     def renew(self):
-        print "Renewing lease on node %s" % self.nodeid
+        print "Renewing lease on Plab node %s." % self.nodeid
         nodemgr = self._createNodemgrProxy()
         self.leasedata = nodemgr.renewlease(self.slice.slicename)
         if debug:
@@ -727,7 +749,7 @@ class Node:
         Emulab/Plab node.  Primarily, this unpacks the magic files on to
         the node.
         """
-        print "Overlaying Emulab files on %s" % self.nodeid
+        print "Overlaying Emulab files on %s ..." % self.nodeid
         self.addToGroup(self.slice.slicename, "root")
         self.unpackTgz(rootball)
         # Ugh
