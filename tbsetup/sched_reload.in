@@ -17,19 +17,17 @@ use Getopt::Std;
 # 
 sub usage()
 {
-    print STDOUT "Usage: sched_reload [-f | -p] [-r | -n] [-m <imageid>] ".
+    print STDOUT "Usage: sched_reload [-f | -n] [-m <imageid>] ".
 	         "[[-p <pid>] -i <imagename>] <node> [node ...]\n".
 		 "       sched_reload <options> -e pid,eid\n".
 	"Use -i to specify an image name. Use node default otherwise.\n".
 	"Use -m to specify an image ID (internal name, TB admins only!).\n".
 	"Use -f to force reload. Fail if node cannot be reserved.\n".
-	"Use -p to pend reload for the reload daemon.\n".
-	"Use -e to schedule a reload for all nodes in an experiment.\n".
-	"Use -r to use Frisbee for reloading disks.\n" .
-	"Use -n to use netdisk for reloading disks.\n";
+	"Use -n to pend reload for the reload daemon.\n".
+        "Use -e to schedule a reload for all nodes in an experiment.\n";
     exit(-1);
 }
-my  $optlist = "fprni:e:m:";
+my  $optlist = "fnp:i:e:m:";
 
 #
 # Configure variables
@@ -56,8 +54,8 @@ my $error       = 0;
 my $debug       = 0;
 my $force	= 0;
 my $pend	= 0;
-my $type	= TB_DEFAULT_RELOADTYPE;
 my @nodes       = ();
+my $type	= TB_DEFAULT_RELOADTYPE;
 my $usedefault  = 1;
 my $imagename;
 my $imageid;
@@ -83,19 +81,10 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"f"})) {
-    $force = $options{"f"};
-}
-if (defined($options{"p"})) {
-    $pend = $options{"p"};
-}
-if (defined($options{"r"})) {
-    if (defined($options{"n"})) {
-	die "Only one of -r or -n should be given\n";
-    }
-    $type = TB_RELOADTYPE_FRISBEE;
+    $force = 1;
 }
 if (defined($options{"n"})) {
-	$type = TB_RELOADTYPE_NETDISK;
+    $pend = 1;
 }
 if ($pend and $force) {
     usage();
@@ -155,16 +144,6 @@ else {
     if (@ARGV < 1) {
 	usage();
     }
-}
-
-#
-# Depending on the reload type, we pass different flags to os_load
-#
-my $osload_flags = "";
-if ($type eq TB_RELOADTYPE_NETDISK) {
-    $osload_flags .= ' -n ';
-} elsif ($type eq TB_RELOADTYPE_FRISBEE) {
-    $osload_flags .= ' -r ';
 }
 
 if ($eidmode) {
@@ -323,7 +302,7 @@ if ($pend) {
 foreach my $id ( keys(%imagenodes) ) {
     my @nodelist = @{ $imagenodes{$imageid} };
 
-    my $cmd = "$osload $osload_flags -i $id @nodelist";
+    my $cmd = "$osload -m $id @nodelist";
 
     print "Issuing $cmd\n";
     if (system($cmd)) {
