@@ -150,13 +150,15 @@ NODE: foreach my $node_id (@node_ids) {
     #
     # Grab information about the node from the new_nodes table
     #
-    $query_result = DBQueryFatal("SELECT new_node_id, type, IP, temporary_IP " .
+    $query_result = DBQueryFatal("SELECT new_node_id, type, IP, temporary_IP, ".
+	"floor, building, loc_x, loc_y, contact, phone, room " .
 	"FROM new_nodes WHERE node_id='$node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: No pending node with that name exists!\n";
 	next NODE;
     }
-    my ($new_node_id, $type, $IP, $tempIP) = $query_result->fetchrow();
+    my ($new_node_id, $type, $IP, $tempIP, $floor, $building, $loc_x, $loc_y,
+	$contact, $phone, $room) = $query_result->fetchrow();
 
     #
     # Make sure they've given it an IP address that looks valid
@@ -265,6 +267,36 @@ NODE: foreach my $node_id (@node_ids) {
 
     DBQueryFatal("insert into node_hostkeys (node_id) ".
 		 "values ('$node_id')");
+
+    #
+    # Copy data into the location_info table, if they provided any
+    #
+    if ($floor || $building || $loc_x || $loc_y || $contact
+	|| $phone || $room) {
+
+	#
+	# Handle columns that could have come to us NULL (and thus are undef)
+	#
+	if (defined $floor) {
+	    $floor = "'$floor'";
+	} else {
+	    $floor = "NULL";
+	}
+	if (defined $building) {
+	    $building = "'$building'";
+	} else {
+	    $building = "NULL";
+	}
+	if (defined $room) {
+	    $room = "'$room'";
+	} else {
+	    $room = "NULL";
+	}
+
+	DBQueryFatal("INSERT INTO location_info SET node_id='$node_id', " .
+	    "floor=$floor, building=$building, loc_x=$loc_x, loc_y=$loc_y, ".
+	    "contact='$contact', phone='$phone', room=$room;");
+    }
 
     #
     # Add some vnodes
