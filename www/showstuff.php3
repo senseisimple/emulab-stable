@@ -447,8 +447,11 @@ function SHOWEXP($pid, $eid) {
     global $TBDBNAME, $TBDOCBASE;
 		
     $query_result =
-	DBQueryFatal("SELECT * FROM experiments WHERE ".
-		     "eid='$eid' and pid='$pid'");
+	DBQueryFatal("select e.*,count(r.node_id) from experiments as e ".
+		     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+		     "where e.pid='$pid' and e.eid='$eid' ".
+		     "group by e.eid order by eid");
+    
     if (($exprow = mysql_fetch_array($query_result)) == 0) {
 	TBERROR("Experiment $eid in project $pid is gone!\n", 1);
     }
@@ -470,6 +473,7 @@ function SHOWEXP($pid, $eid) {
     $batchstate  = $exprow[batchstate];
     $priority    = $exprow[priority];
     $swappable   = $exprow[swappable];
+    $nodes       = $exprow["count(r.node_id)"];
 
     if ($swappable)
 	$swappable = "Yes";
@@ -560,6 +564,11 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Status: </td>
             <td class=\"left\">$exp_status</td>
+          </tr>\n";
+
+    echo "<tr>
+            <td>Reserved Nodes: </td>
+            <td class=\"left\">$nodes</td>
           </tr>\n";
 
     if ($batchmode) {
