@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -61,19 +61,46 @@ my ($tempfile) = @ARGV;
 # Untaint the arguments.
 #
 # Note different taint check (allow /).
-if ($tempfile =~ /^([-\@\w.\/]+)$/) {
+if ($tempfile =~ /^([-\w\.\/]+)$/) {
     $tempfile = $1;
 }
-
 else {
     fatal("Tainted argument $tempfile");
+}
+
+#
+# Called from ops interactively. Make sure NS file in /proj or /users.
+#
+# Use realpath to resolve any symlinks.
+#
+my $translated = `realpath $tempfile`;
+if ($translated =~ /^([-\w\.\/]+)$/) {
+    $tempfile = $1;
+}
+else {
+    fatal("Tainted nsfile returned by realpath: $translated\n");
+}
+
+#
+# The file must reside in /proj, /groups, or /users. Since this script
+# runs as the caller, regular file permission checks ensure its a file
+# the user is allowed to use. /tmp/$guid-$nsref.nsfile also allowed
+# since this script is invoked directly from web interface, which generates
+# a name that should not be guessable, so as long as it looks to be in
+# proper format, we accept it. 
+#
+if (! ($tempfile =~ /^\/tmp/) &&
+    ! ($tempfile =~ /^\/proj/) &&
+    ! ($tempfile =~ /^\/groups/) &&
+    ! ($tempfile =~ /^\/users/)) {
+    fatal("$tempfile does not resolve to an appropriate directory!\n");
 }
 
 $nsfile    = "foo.ns";
 
 # Check for existence of NS file and exit with error such that web
 # interface tells the user (positive exit value).
-if (! -f $tempfile || ! -r $tempfile) {
+if (! -f $tempfile || ! -r $tempfile || -z $tempfile) {
     print STDERR "*** $0:\n".
 	         "    $tempfile does not exist or is not a readable file!\n";
     exit(1);
