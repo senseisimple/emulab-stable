@@ -90,6 +90,7 @@ node_agent_t create_node_agent(void)
 		retval = NULL;
 	}
 	else {
+		na->na_local_agent.la_flags |= LAF_MULTIPLE;
 		na->na_local_agent.la_looper = node_agent_looper;
 		retval = na;
 		na = NULL;

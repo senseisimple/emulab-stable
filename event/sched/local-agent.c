@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -33,7 +33,7 @@ typedef struct _local_agent_event *local_agent_event_t;
 int local_agent_invariant(local_agent_t la)
 {
 	assert(la != NULL);
-	assert(!(la->la_flags & ~(LAF_IMMEDIATE | LAF_LOOPING)));
+	assert(!(la->la_flags & ~(LAF_IMMEDIATE|LAF_LOOPING|LAF_MULTIPLE)));
 	lnCheck(&la->la_queue);
 	assert(la->la_handle != NULL);
 	assert(la->la_looper != NULL);

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -29,6 +29,9 @@ enum {
 			  a separate thread. */
 	LAB_LOOPING,	/*< Flag number used to indicate that the agent is
                           alive and in its event loop. */
+	LAB_MULTIPLE,	/*< Flag number used to indicate that the agent can
+			  handle a single event for multiple agents in a
+			  group. */
 
 	LAB_MAX
 };
@@ -36,6 +39,7 @@ enum {
 enum {
 	LAF_IMMEDIATE = (1L << LAB_IMMEDIATE),
 	LAF_LOOPING = (1L << LAB_LOOPING),
+	LAF_MULTIPLE = (1L << LAB_MULTIPLE),
 };
 
 /**

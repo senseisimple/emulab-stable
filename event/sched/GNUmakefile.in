@@ -61,17 +61,24 @@ OBJS = \
 event-sched_rrpc: $(OBJS) event-sched.h ../lib/libevent.a
 	$(CXX) $(CFLAGS) -static $(LDFLAGS) -o $@ $(OBJS) $(ULXRLIBS) $(LIBS)
 
-queue.o:		event-sched.h
-listNode.o:		listNode.h event-sched.h
-error-record.o:		error-record.h event-sched.h rpc.h listNode.h ../lib/event.h
-local-agent.o:		local-agent.h event-sched.h rpc.h listNode.h ../lib/event.h
-group-agent.o:		group-agent.h local-agent.h event-sched.h rpc.h listNode.h ../lib/event.h
-event-sched_rpc.o:	event-sched.c local-agent.h event-sched.h rpc.h listNode.h ../lib/event.h
+DEPS = \
+	error-record.h event-sched.h group-agent.h listNode.h \
+	local-agent.h node-agent.h rpc.h simulator-agent.h timeline-agent.h \
+	../lib/event.h
+
+queue.o:		$(DEPS)
+listNode.o:		$(DEPS)
+error-record.o:		$(DEPS)
+local-agent.o:		$(DEPS)
+group-agent.o:		$(DEPS)
+simulator-agent.o:	$(DEPS)
+node-agent.o:		$(DEPS)
+event-sched_rpc.o:	$(DEPS)
 	$(CC) $(CFLAGS) -DRPC -c -o $@ $<
 rpc.o:			rpc.cc rpc.h event-sched.h
 	$(CXX) $(CXXFLAGS) -DSSHRPC $(ULXRINC) -c $<
 
-rrpc.o:			rpc.cc rpc.h event-sched.h
+rrpc.o:			$(DEPS)
 	$(CXX) -g $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
 
 install: event-sched_rrpc
@@ -79,7 +86,7 @@ install: event-sched_rrpc
 	$(INSTALL_PROGRAM) $< $(INSTALL_DIR)/opsdir/sbin/event-sched
 	-mkdir -p $(INSTALL_DIR)/opsdir/man/man8
 	$(INSTALL) -m 0644 $(SRCDIR)/event-sched.8 \
-		$(DESTDIR)$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
+		$(INSTALL_DIR)/opsdir/man/man8/event-sched.8
 
 control-install: event-sched_rrpc
 	$(INSTALL_PROGRAM) $< $(INSTALL_SBINDIR)/event-sched

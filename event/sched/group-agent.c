@@ -275,7 +275,17 @@ static int group_agent_immediate(local_agent_t la, sched_event_t *se)
 	}
 
 	if (se->agent.m[1]->handler != NULL) {
-		local_agent_queue(se->agent.m[1]->handler, se);
+		if (se->agent.m[1]->handler->la_flags & LAF_MULTIPLE) {
+			local_agent_queue(se->agent.m[1]->handler, se);
+		}
+		else {
+			int lpc;
+
+			for (lpc = 1; lpc <= ga->ga_count; lpc++) {
+				local_agent_queue(ga->ga_agents[lpc]->handler,
+						  se);
+			}
+		}
 		
 		retval = 0;
 	}
