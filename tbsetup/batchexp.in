@@ -15,6 +15,15 @@ use Getopt::Std;
 # supplied, an experiment shell is created (this is currently an admin
 # only option).
 #
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
 sub usage()
 {
     die("Usage: batchexp [-i [-f]] [-x expires] [-E description] [-g gid] ".
@@ -45,6 +54,7 @@ my $tbdata   = "tbdata";
 my $immediate= 0;
 my $frontend = 0;
 my $quiet    = 0;
+my $errorstat=-1;
 my $dbuid;
 my @row;
 
@@ -257,6 +267,8 @@ chmod(0664, "$nsfile");
 # will display any errors.
 #
 if (system("$parser -n $pid $gid $eid $nsfile") != 0) {
+    # Obey exit status protocol for web page.
+    $errorstat = 1;
     fatal("NS Parse failed!");
 }
 
@@ -296,6 +308,8 @@ if ($immediate) {
 	if ($quiet);
 
     if (system("$startexp $optargs -g $gid $pid $eid $nsfile")) {
+	# Obey exit status protocol for web page.
+	$errorstat = 1;
 	fatal("Failed to start experiment $pid/$eid!");
     }
 }
@@ -306,6 +320,8 @@ else {
     # at it.
     #
     if (system("$startexp -f -b -g $gid $pid $eid $nsfile")) {
+	# Obey exit status protocol for web page.
+	$errorstat = 1;
 	fatal("Failed to preload batch experiment $pid/$eid!");
     }
     # And drop the batch into the queue unless the user was preloading
@@ -348,7 +364,7 @@ sub fatal($)
     #
     TBExptDestroy($pid, $eid);
 
-    exit(-1);
+    exit($errorstat);
 }
 
 #

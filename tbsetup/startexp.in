@@ -427,7 +427,7 @@ sub fatal()
     # case the user tries to muck with it. 
     #
     if ($nodetach) {
-	exit(0);
+	exit($errorstat);
     }
 
     #

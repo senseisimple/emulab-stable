@@ -834,12 +834,22 @@ if ($delnsfile) {
 # Fatal Error. Report to the user, even though there is not much he can
 # do with the error. Also reports to tbops.
 # 
-if ($retval) {
+if ($retval < 0) {
     SUEXECERROR(SUEXEC_ACTION_DIE);
     #
     # Never returns ...
     #
     die("");
+}
+
+# User error. Tell user and exit.
+if ($retval) {
+    echo "<br>";
+    echo "<h3>Experiment could not be created</h3>";
+    echo "<blockquote><pre>$suexec_output<pre></blockquote>";
+
+    PAGEFOOTER();
+    exit();
 }
 
 # add reasons to db, since we don't want to pass these on the command line.
