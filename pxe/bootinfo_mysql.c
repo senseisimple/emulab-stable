@@ -134,7 +134,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	}
 	else if (row[OSID_PATH] != 0 && row[OSID_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
-		parse_multiboot_path(row[DEF_BOOT_PATH], info);
+		parse_multiboot_path(row[OSID_PATH], info);
 	}
 	else if (row[PARTITION] != 0 && row[PARTITION][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_PART;
