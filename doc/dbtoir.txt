@@ -1,5 +1,5 @@
 This file gives a basic overview of experiment creation and teardown, though
-it is very out-of-date.
+it is very out-of-date (as of 4/28/03).
 
 Prerun Outline:
 
