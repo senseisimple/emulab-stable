@@ -91,7 +91,7 @@ sub new($$#@) {
 	# we weren't given devicenames for devices that aren't ciscos
 	#
 	SWITCH: for ($type) {
-	    /cisco6509/ && do {
+	    (/cisco6509/ || /cisco4006/) && do {
 		use snmpit_cisco;
 		$device = new snmpit_cisco($devicename,$self->{DEBUG});
 		if (!$device) {
