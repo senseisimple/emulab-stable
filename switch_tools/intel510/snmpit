@@ -1,13 +1,13 @@
 #!/usr/local/bin/perl -w
 #########################################################################
-# SnmpIt! - An SNMP Tool                                                #
+# snmpit - A General Purpose SNMP Tool                                  #
 # (specialized for the Intel 510T Switch and APC power controllers)     #
 #                                                                       #
 # Run with -h option to see command line syntax/options.                #
 #                                                                       #
 #      Author: Mac Newbold, Flux Research Group, University of Utah     #
-# Last Change: May 18, 2000                                             #
-#     Version: 1.1                                                      #
+# Last Change: May 23, 2000                                             #
+#     Version: 1.11                                                     #
 #                                                                       #
 #########################################################################
 
@@ -45,7 +45,7 @@ sub myMain {
     my @outlets=();
     my %Interfaces=();
     my %Ports=();
-    
+
     &ParseArgs(\@ARGV,\$i,\@p,\$d,\$e,\$a,\$dup,\$spd,\$s,\$f,\$l,\$m,\@vlan,
 	       \@r,\$u,\$b,\$c,\$v,
 	       \$on,\$off,\$cyc,\$all,\@outlets,\%Interfaces,\%Ports);
@@ -57,23 +57,9 @@ sub myMain {
     
     &SNMP::addMibDirs('/usr/local/share/snmp/mibs');
     if (($i=~/155\.99\.214\.17(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/)) {
-	&SNMP::addMibFiles(
-#		       '/usr/local/share/snmp/mibs/RFC1155-SMI.txt',
-#		       '/usr/local/share/snmp/mibs/RFC1213-MIB.txt',
-#		       '/usr/local/share/snmp/mibs/BRIDGE-MIB.txt', 
-#		       '/usr/local/share/snmp/mibs/EtherLike-MIB.txt',
-#		   '/usr/local/share/snmp/mibs/RMON-MIB.txt',
-			   '/usr/local/share/snmp/mibs/INTEL-GEN-MIB.txt', 
+	&SNMP::addMibFiles('/usr/local/share/snmp/mibs/INTEL-GEN-MIB.txt', 
 			   '/usr/local/share/snmp/mibs/INTEL-S500-MIB.txt',
-			   '/usr/local/share/snmp/mibs/INTEL-VLAN-MIB.txt',
-#		   '/usr/local/share/snmp/mibs/DVMRP-MIB.txt', 
-#		   '/usr/local/share/snmp/mibs/INTEL-L3LINK-MIB.txt',
-#		   '/usr/local/share/snmp/mibs/IGMP-MIB.txt',
-#		   '/usr/local/share/snmp/mibs/INTEL-IPF-MIB.txt', 
-#		   '/usr/local/share/snmp/mibs/INTEL-IPROUTER-MIB.txt',
-#		   '/usr/local/share/snmp/mibs/INTEL-IGMP-PRUNING-MIB.txt', 
-#		   '/usr/local/share/snmp/mibs/INTEL-IPX-MIB.txt'
-			   );
+			   '/usr/local/share/snmp/mibs/INTEL-VLAN-MIB.txt');
     } else {
 	&SNMP::addMibFiles('/n/moab/x/newbold/mibs/PowerNet-MIB.txt');
     }
@@ -97,21 +83,21 @@ sub myMain {
 	my $Status = "";
 	$Status = "down" if ($d);
 	$Status = "up" if ($e);
-	if (! &UpdateField(\$sess,$Admin,\@p,$Status,\$b,\$c,\$v)) {
+	if (! &UpdateField(\$sess,\$Admin,\@p,\$Status,\$b,\$c,\$v)) {
 	    print STDERR "Port ",($d?"disable":"enable")," failed.\n";
 	}    
     }
     
     if ($spd) {
 	my $Speed = ".1.3.6.1.4.1.343.6.10.2.4.1.10.1.1";
-	if (! &UpdateField(\$sess,$Speed,\@p,$spd,\$b,\$c,\$v)) {
+	if (! &UpdateField(\$sess,\$Speed,\@p,\$spd,\$b,\$c,\$v)) {
 	    print STDERR "Port Speed change failed.\n";
 	}    
     }
     
     if ($dup) {
 	my $duplex = ".1.3.6.1.4.1.343.6.10.2.4.1.11.1.1";
-	if (! &UpdateField(\$sess,$duplex,\@p,$dup,\$b,\$c,\$v)) {
+	if (! &UpdateField(\$sess,\$duplex,\@p,\$dup,\$b,\$c,\$v)) {
 	    print STDERR "Port Duplex change failed.\n";
 	}    
     }
@@ -119,15 +105,14 @@ sub myMain {
     if ($a) {
 	my $Auto = ".1.3.6.1.4.1.343.6.10.2.4.1.12.1.1";
 	my $aOp = ( $a=~/en/ ? "auto" : "manual");
-	if (! &UpdateField(\$sess,$Auto,\@p,$a,\$b,\$c,\$v)) {
+	if (! &UpdateField(\$sess,\$Auto,\@p,\$a,\$b,\$c,\$v)) {
 	    print STDERR "Port Auto-Configuration change failed.\n";
 	}    
     }
 
     #Show always goes after changes, so that they are reflected.
     if ($s) {
-	&ShowPorts(\$sess,\%Ports,$i,\$v);
-	
+	&ShowPorts(\$sess,\%Ports,\%Interfaces,\$i,\$v);
     }
     
 #
@@ -145,8 +130,8 @@ sub myMain {
     }
     
     if (@r) {
-	&GetToken(\$sess,\$v);
-	foreach $x (sort num @r)
+	&GetToken(\$sess,\$v);	
+	foreach my $x (sort num @r)
 	{
 	    &RemoveVLAN(\$sess,\$x,\$v);
 	}
@@ -203,7 +188,7 @@ sub ParseArgs {
     local(*CMDS,*i,*p,*d,*e,*a,*dup,*spd,*s,*f,*l,*m,*vlan,*r,*u,*b,*c,*v,
 	  *on,*off,*cyc,*all,*outlets,*Interfaces,*Ports) = @_;
     my $help=0; 
-    if (@CMDS < 1) {$help = 2; }
+    if (@main::CMDS < 1) {$help = 1; }
     while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
 	$_ = shift(@CMDS);
 	#print "Item=$_*\n";
@@ -225,7 +210,7 @@ sub ParseArgs {
 	    }
 	    while (@CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) );
 	}
-	elsif (/^-h(.*)/) {$help = 1;}
+	elsif (/^-h(.*)/) {$help = 2;}
 	elsif (/^-off(.*)/) {$off = 1;}
 	elsif (/^-on(.*)/) {$on = 1;}
 	elsif (/^-cyc(.*)/) {$cyc = 1;}
@@ -259,7 +244,7 @@ sub ParseArgs {
 	elsif (/^\+b(.*)/) {$b = 1;}
 	elsif (/^-c(.*)/) {$c = 0;}
 	elsif (/^\+c(.*)/) {$c = 1;}
-	elsif (/^-(\d*)/) { push(@outlets, $1);}
+	elsif (/^-([1-8])$/) { push(@outlets, $1);}
 	else {die("Unknown Option: $_\n");}
     }
     #print "Done:\nS=$i p=@p D=$d E=$e a=$a d=$dup s=$s C=$m vlan=@vlan B=$b V=$c on=$on off=$off cyc=$cyc\n";
@@ -278,7 +263,7 @@ sub ParseArgs {
 #	    "\t[ [-on|-off|-cyc] [-all] | [-<n>] ]\n";
 	
     }
-    if ($help == 1) {
+    if ($help > 1) {
 	print
 	    "\nGeneral:\n",
 	    "  -h    Display this help message\n",
@@ -325,11 +310,11 @@ sub ParseArgs {
     if ($i =~ /Beta/i)  { $i = "155.99.214.171"; }
     if ($i =~ /Gamma/i)  { $i = "155.99.214.172"; }
     if ($i =~ /Delta/i)  { $i = "155.99.214.173"; }
-    die("$i is not an Intel 510 Switch: Possible completions are\n",
+    die("\"$i\" is not an Intel 510 Switch:\nPossible completions are:\n",
 	"Alpha/155.99.214.170\n Beta/155.99.214.171\n",
 	"Gamma/155.99.214.172\n Delta/155.99.214.173\n") 
 	if ( (!(($i=~/155\.99\.214\.17(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/))) && 
-	     ($d || $e || $a || $spd || $dup || @vlan || $f || @r || $l ));
+	     ($d||$e||$a||$spd||$dup||$s||@vlan||$f||@r||$l));
     die("$i is not a power controller.\n") 
 	if ( (($i=~/155\.99\.214\.(.*)/) && ($1=~ /^0$|^1$|^2$|^3$/)) && 
 	     ($on||$off||$cyc) );
@@ -349,7 +334,7 @@ sub ParseArgs {
 	if (!($spd=~/^10$|^100$|^0$/));
     if ($spd eq "10" ) { $spd="speed10Mbit" ;}
     if ($spd eq "100") { $spd="speed100Mbit";}
-    if ($s || @vlan || $f || $r || $l) {
+    if ($s || @vlan || $f || @r || $l) {
 	&ReadTranslationTable(\%Interfaces,\%Ports);
     }
     $n=0;
@@ -367,11 +352,13 @@ sub ParseArgs {
 	$n++;
     }
     die("Can't use file mode with manual vlan creation.\n") if ($f && @vlan);
-    $n=0;
-    while(@outlets != 0 && $n < @outlets) {
-	die("Invalid Outlet \"",$outlets[$n],"\": Must be 1 to 8.\n")
-	    if (! ($outlets[$n]=~ /^[1-8]$/ ));
-	$n++;
+    if ($on || $off || $cyc) {
+	$n=0;
+	while(@outlets != 0 && $n < @outlets) {
+	    die("Invalid Outlet \"",$outlets[$n],"\": Must be 1 to 8.\n")
+		if (! ($outlets[$n]=~ /^[1-8]$/ ));
+	    $n++;
+	}
     }
 }
 
@@ -380,7 +367,7 @@ sub ParseArgs {
 #
 
 sub ShowPorts {
-    local(*sess,*Ports,$i,*v) = @_;
+    local(*sess,*Ports,*Interfaces,*i,*v) = @_;
     my $portConf = ["portConfSpeed",0];
     my $ifTable = ["ifAdminStatus",0];
     my %Able = ();
@@ -388,6 +375,7 @@ sub ShowPorts {
     my %auto = ();
     my %speed = ();
     my %duplex = ();
+    my @data=();
     #do one to get the first field...
     $sess->getnext($ifTable);
     do {
@@ -426,20 +414,55 @@ sub ShowPorts {
 	#one is junk to all the processing instructions...
 	$sess->getnext($portConf);
     } while ( $data[0] =~ /^portConf(Speed|Duplex|AutoNeg)$/);
+    my $field = ["vlanPolicyVlanTable",0];
+    my %vlanNames = ();
+    my %portNames = ();
+    my $mac="";
+    my $id=0;
+    #do one to get the first field...
+    $sess->getnext($field);
+    do {
+	@data = @{$field};
+	#print "$data[0]\t$data[1]\t$data[2]\n";
+	if ($data[0] =~ /policyVlanName/) { $vlanNames{$data[1]} = $data[2]; }
+	if ($data[0] =~ /MacRuleVlanId/) 
+	{ 
+	    my @vlan=();
+	    if (defined ( @{$MACs{$data[2]}} ) ) { @vlan =@{$MACs{$data[2]}}; }
+	    $_= sprintf("%d:%02x%02x%02x%02x%02x%02x", split(/\./,$data[1]));
+	    @_= split(/:/,$_);
+	    $id=$_[0];
+	    $mac = $_[1];
+	    $portNames{$mac}=$vlanNames{$id};
+	}
+	#do the getnext at the end, because if we're on the last, the next
+	#one is junk to all the processing instructions...
+        $sess->getnext($field);
+    } while ( $data[0] =~ /^(policyVlan)|(policyMacRuleVlanId)/);
     my $switch = "";
     if ($i =~ /155\.99\.214\.170/) { $switch = "Alpha"; }
     if ($i =~ /155\.99\.214\.171/) { $switch = "Beta"; }
     if ($i =~ /155\.99\.214\.172/) { $switch = "Gamma"; }
     if ($i =~ /155\.99\.214\.173/) { $switch = "Delta"; }
     print "Port Configuration, Switch $switch ($i)\n";
-    print "Port\tInterface\tEnabled\tLink\tAutoNeg\tSpeed\t\tDuplex\n";
+    print "Port Interface\tVLAN\tEnabled\tLink\tAutoNeg\tSpeed\t\tDuplex\n";
     print "----------------------------------------------------------------";
-    print "----------\n";
-    foreach $id ( sort num keys (%Able) ) {
+    print "------------\n";
+    foreach my $id ( sort num keys (%Able) ) {
+	my $vlan;
 	my $switchport = join(":",$i,$id);
 	my $ifname = $Ports{$switchport};
 	if (! defined ($ifname) ) { $ifname = "\t"; }
-	print $id,"\t",$ifname,"\t";
+	if ($id < 10) { print " "; }
+	print " ",$id,"  ";
+	print $ifname,"\t";
+	if (defined ($Interfaces{$ifname})) {
+	    $vlan = $portNames{$Interfaces{$ifname}};
+	}
+	if ( defined $vlan) {
+	    print $vlan;
+	}
+	print "\t";
 	print $Able{$id},"\t",$Link{$id},"\t";
 	print $auto{$id},"\t",$speed{$id},"\t";
 	if (length ($speed{$id}) < 8 ) { print "\t"; }
@@ -452,9 +475,10 @@ sub ShowPorts {
 #
 
 sub UpdateField {
-    local(*session,$OID,*ports,$val,*b,*c,*v)= @_;
+    local(*session,*OID,*ports,*val,*b,*c,*v)= @_;
     my $Status = 0;
-    foreach $port (@ports) {
+    foreach my $port (@ports) {
+	#print "Processing port $port, $OID, to $val. Last was $Status.\n";
 	$Status = $session->get([[$OID,$port]]);
 	print "Value for $port was $Status\n" if ($v);
 	if ($Status ne $val) {
@@ -474,7 +498,7 @@ sub UpdateField {
 	my $max_loops=20;
 	my %notdone=();
 	my @done=();
-	foreach $port (@ports) {
+	foreach my $port (@ports) {
 	    $Status=$session->get([[$OID,$port]]);
 	    print "Value for $port was ",$Status,"\n" if ($v);
 	    if ($Status ne $val) {
@@ -482,18 +506,18 @@ sub UpdateField {
 	    }
 	}
 	while ( %notdone && $loops < $max_loops ) {
-	    foreach $port (sort num keys(%notdone)) {
+	    foreach my $port (sort num keys(%notdone)) {
 		$Status=$session->get([[$OID,$port]]);
 		print "Value for $port was ",$Status,"\n" if ($v);
 		if ($Status eq $val) {
 		    push(@done,$port);
 		}
 	    }
-	    foreach $i (@done) { delete $notdone{$i}};
+	    foreach my $i (@done) { delete $notdone{$i}};
 	    $loops++;
 	}
 	if ($loops==$max_loops) {
-	    foreach $port (sort num keys(%notdone)) {
+	    foreach my $port (sort num keys(%notdone)) {
 		print STDERR "Port $port Change not verified!\n";
 	    }
 	    return(0); #Return False!
@@ -514,7 +538,7 @@ sub ReleaseToken {
     my $save = ($u ? "saveWithConfirmOption" : "save");
     print "Releasing Token with $save command\n" if ($v);
     $sess->set([[$TokenRelease,0,$save,"INTEGER"]]);
-    $RetVal = $sess->get([[$TokenReleaseResult,0]]);
+    my $RetVal = $sess->get([[$TokenReleaseResult,0]]);
     print "VLAN Configuration Save Result is $RetVal\n" if ($v);
     while ($RetVal eq "notReady") {
 	$RetVal = $sess->get([[$TokenReleaseResult,0]]);
@@ -583,7 +607,7 @@ sub GetToken {
 
 sub OneVLAN {
     #This is to be called ONLY after the edit token has already been taken!
-    local(*sess,$m,*vlan,*v) = @_;
+    local(*sess,*m,*vlan,*v) = @_;
     my $NextVLANId = '.1.3.6.1.4.1.343.6.11.1.6';
     my $Vlan = $sess->get([[$NextVLANId,0]]);
     my $CreateOID = ".1.3.6.1.4.1.343.6.11.1.9.1.3";
@@ -626,6 +650,7 @@ sub AutoVLANConfig {
     &ReadIRFile(*f,\@names,\@VLANS,\%Interfaces);
     &GetToken(*sess,*v);
     my $m="";
+    my @vlan=();
     while (@VLANS) {
 	@vlan = @{shift(@VLANS)};
 	$m = shift @names;
@@ -640,58 +665,57 @@ sub AutoVLANConfig {
 #
 
 sub ReadIRFile {
-   local(*f,*names,*VLANS,*Interfaces) = @_;
-   my %exists = ();
-   my $skip = 1;
-   my $name = "";
-   my $switch = $i;
-   my $section = "";
-   if ( -e "/usr/testbed/etc/$f") {
-       open(IR,"/usr/testbed/etc/$f") 
-	   || die("Couldn't open /usr/testbed/etc/$f\n");
-   } elsif ( -e "$f" ) {
-       open(IR,"$f") 
-	   || die("Couldn't open $f\n");
-   } elsif ( -e "/home/newbold/switch/$f" ) {
-       open(IR,"/home/newbold/switch/$f") 
-	   || die("Couldn't open /home/newbold/switch/$f\n");
-   } else {
-       die("Couldn't locate $f for VLAN setup.\n");
-   }
-   while (<IR>) {
-       chop;
-       if ( /^\#/ ) {  next; } #skip comments
-       if ( /^start vlan/i ) { $skip = 0 ; next; }
-       if ($skip) { next; }
-       if ( /^end vlan/i ) { $skip = 1 ; next; }
-       # If I'm in the right section, turn the line into a VLAN
-       my @v= split;
-       $name = shift @v;
-       my $n=0;
-       while(@v != 0 && $n < @v) {
-	   #Lowercase it all, but leave in : for tbpcx:y syntax
-	   $v[$n] = "\L$v[$n]\E";
-	   #print "Took $v[$n]\t";
-	   if ((!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)))
-	       && (defined $Interfaces{$v[$n]})) {
-	       $v[$n] = $Interfaces{$v[$n]};
-	   }
-	   # Allow people to specify addresses with colons or dots
-	   $v[$n] =~ s/[:\.]//g;
-	   #print "Got $v[$n]\t";
-	   die("Invalid MAC Address ",$v[$n],". Must be 6 byte Hex value.\n")
+    local(*f,*names,*VLANS,*Interfaces) = @_;
+    my %exists = ();
+    my $skip = 1;
+    my $name = "";
+    my $section = "";
+    if ( -e "/usr/testbed/etc/$f") {
+	open(IR,"/usr/testbed/etc/$f") 
+	    || die("Couldn't open /usr/testbed/etc/$f\n");
+    } elsif ( -e "$f" ) {
+	open(IR,"$f") 
+	    || die("Couldn't open $f\n");
+    } elsif ( -e "/home/newbold/switch/$f" ) {
+	open(IR,"/home/newbold/switch/$f") 
+	    || die("Couldn't open /home/newbold/switch/$f\n");
+    } else {
+	die("Couldn't locate $f for VLAN setup.\n");
+    }
+    while (<IR>) {
+	chop;
+	if ( /^\#/ ) {  next; } #skip comments
+	if ( /^start vlan/i ) { $skip = 0 ; next; }
+	if ($skip) { next; }
+	if ( /^end vlan/i ) { $skip = 1 ; next; }
+	# If I'm in the right section, turn the line into a VLAN
+	my @v= split;
+	$name = shift @v;
+	my $n=0;
+	while(@v != 0 && $n < @v) {
+	    #Lowercase it all, but leave in : for tbpcx:y syntax
+	    $v[$n] = "\L$v[$n]\E";
+	    #print "Took $v[$n]\t";
+	    if ((!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)))
+		&& (defined $Interfaces{$v[$n]})) {
+		$v[$n] = $Interfaces{$v[$n]};
+	    }
+	    # Allow people to specify addresses with colons or dots
+	    $v[$n] =~ s/[:\.]//g;
+	    #print "Got $v[$n]\t";
+	    die("Invalid MAC Address ",$v[$n],". Must be 6 byte Hex value.\n")
 	       if (!(($v[$n]=~/^([a-f]|\d)*$/i)&&(length ($v[$n])== 12)));
-	   $n++;
-       }
-       @v = sort @v;
-       if (!defined $exists{ join(' ',@v) }) {
-	   #print "Read VLAN $name with: ",join (" ",@v),"\n";
-	   push(@VLANS, \@v);
+	    $n++;
+	}
+	@v = sort @v;
+	if (!defined $exists{ join(' ',@v) }) {
+	    #print "Read VLAN $name with: ",join (" ",@v),"\n";
+	   push( @VLANS, \@v);
 	   push(@names, $name);
 	   $exists{join(' ',@v)} = 1;
        }
-   }   
-   close (IR);
+    }   
+    close (IR);
 }
 
 
@@ -700,43 +724,43 @@ sub ReadIRFile {
 #
 
 sub ReadTranslationTable {
-   local(*Table,*Ports) = @_;
-   my $name="";
-   my $mac="";
-   my $switchport="";
-   if ( -e "/usr/testbed/etc/macslist") {
-       open(FILE,"/usr/testbed/etc/macslist") 
-	   || die("Couldn't open /usr/testbed/etc/macslist\n");
-   } elsif ( -e "macslist" ) {
-       open(FILE,"macslist") 
-	   || die("Couldn't open macslist\n");
-   } elsif ( -e "/home/newbold/switch/macslist" ) {
-       open(FILE,"/home/newbold/switch/macslist") 
-	   || die("Couldn't open /home/newbold/switch/macslist\n");
-   } else {
-       print "Couldn't locate macslist configuration file.\n",
+    local(*Table,*Ports) = @_;
+    my $name="";
+    my $mac="";
+    my $switchport="";
+    if ( -e "/usr/testbed/etc/macslist") {
+	open(FILE,"/usr/testbed/etc/macslist") 
+	    || die("Couldn't open /usr/testbed/etc/macslist\n");
+    } elsif ( -e "macslist" ) {
+	open(FILE,"macslist") 
+	    || die("Couldn't open macslist\n");
+    } elsif ( -e "/home/newbold/switch/macslist" ) {
+	open(FILE,"/home/newbold/switch/macslist") 
+	    || die("Couldn't open /home/newbold/switch/macslist\n");
+    } else {
+	print "Couldn't locate macslist configuration file.\n",
 	   "Translation of MAC addresses will be disabled.\n";
-       return 0;
-   }
-   while ( <FILE> ) {
-       chop;
-       s/(( )+|\t)/ /g;
-       s/(( )+|\t)/ /g;
-       @_ = split(/ /,$_);
-       $name = $_[0];
-       $mac = $_[1];
-       if ( defined $_[3] ) {
-	   $switchport = join(":",($_[2],$_[3]));
-	   $Ports{$name} = $switchport;
-	   $Ports{$switchport} = $name;
-       } else {
-	   $switchport = "";
-       }
+	return 0;
+    }
+    while ( <FILE> ) {
+	chop;
+	s/(( )+|\t)/ /g;
+	s/(( )+|\t)/ /g;
+	@_ = split(/ /,$_);
+	$name = $_[0];
+	$mac = $_[1];
+	if ( defined $_[3] ) {
+	    $switchport = join(":",($_[2],$_[3]));
+	    $Ports{$name} = $switchport;
+	    $Ports{$switchport} = $name;
+	} else {
+	    $switchport = "";
+	}
        #print "$name <==> $mac <==> $switchport\n";
-       $Table{$name} = $mac;
-       $Table{$mac} = $name;
-   }
-   close(FILE);
+	$Table{$name} = $mac;
+	$Table{$mac} = $name;
+    }
+    close(FILE);
 }
 
 #
@@ -777,11 +801,11 @@ sub ListVLANs {
     } while ( $data[0] =~ /^(policyVlan)|(policyMacRuleVlanId)/) ;
     print "ID\tName\t\tMembers of VLAN\n";
     print "------------------------------------------\n";  
-    foreach $id ( sort num keys (%Names) ) {
+    foreach my $id ( sort num keys (%Names) ) {
 	print $id,"\t",$Names{$id},"\t";
 	if ( length ($Names{$id}) < 8 ) { print "\t"; }
 	if (defined ( @{$MACs{$id}}) ) {
-	    foreach $m ( @{$MACs{$id}} ) {
+	    foreach my $m ( @{$MACs{$id}} ) {
 		if ( defined ($Interfaces{$m})) {
 		    print $Interfaces{$m}," \t";
 		} else {

@@ -1,4 +1,14 @@
 #!/usr/local/bin/perl -w
+#########################################################################
+# vsnmpit - A General Purpose Visual SNMP Tool                          #
+# (specialized for the Intel 510T Switch and APC power controllers)     #
+#                                                                       #
+#      Author: Mac Newbold, Flux Research Group, University of Utah     #
+# Last Change: May 23, 2000                                             #
+#     Version: 1.11                                                     #
+#                                                                       #
+#########################################################################
+
 use strict;
 use Tk;
 
@@ -171,29 +181,30 @@ sub vlanSetup {
 			 -bg=>$main_bg,-fg=>$main_fg
 			 )->pack(-side=>'top',-expand=>"1",-fill=>'x');
 	if ($ID != 25) {
-	    $row->Checkbutton(-variable=>\$vlans{$ID},-relief=>'sunken',
-			      -width=>5,-anchor=>'center',
-			      -bg=>$main_bg,-fg=>$main_fg,
-			      -activebackground=>$main_abg,
-			      -activeforeground=>$main_afg,
-			      -selectcolor=>$btn_bg,
-			      -borderwidth=>3
-			      )->pack(-side=>'left');
+	    $row->Checkbutton
+		(-variable=>\$vlans{$ID},-relief=>'sunken',
+		 -width=>5,-anchor=>'center',
+		 -bg=>$main_bg,-fg=>$main_fg,
+		 -activebackground=>$main_abg,
+		 -activeforeground=>$main_afg,
+		 -selectcolor=>$btn_bg,
+		 -borderwidth=>3
+		 )->pack(-side=>'left',-fill=>'y');
 	} else {
 	    $row->Label(-relief=>'sunken',
 			-width=>8,-anchor=>'center',
 			-bg=>$main_bg,-fg=>$main_fg,
 			-borderwidth=>3
-			)->pack(-side=>'left');
+			)->pack(-side=>'left',-fill=>'y');
 	}	    
 	$row->Label(-relief=>'sunken',-text=>$ID,-width=>8,
 		    -bg=>$main_bg,-fg=>$main_fg,
 		    -borderwidth=>3
-		    )->pack(-side=>'left');
+		    )->pack(-side=>'left',-fill=>'y');
 	$row->Label(-relief=>'sunken',-text=>$names{$ID},-width=>12,
 		    -bg=>$main_bg,-fg=>$main_fg,
 		    -borderwidth=>3
-		    )->pack(-side=>'left');
+		    )->pack(-side=>'left',-fill=>'y');
 	$row->Label(-relief=>'sunken',-text=>$members{$ID},
 		    -bg=>$main_bg,-fg=>$main_fg,-anchor=>'w',
 		    -borderwidth=>3,-wraplength=>'350',-justify=>'left'
@@ -350,11 +361,6 @@ sub portSetup {
     my $switch="";
     my @args=();
     ($switch, @args) = @_;
-    $area->packForget();
-    $area = 
-	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
-			 -fg=>$main_fg,-width=>50
-			 )->pack(-side=>'top',-fill=>'both');
     $area->pack('forget');
     $area = 
 	$area_frm->Frame(-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
@@ -400,6 +406,7 @@ sub portSetup {
     my $sw_name="";
     my $sw_IP="";
     my %names=();
+    my %vlanName=();
     my %enabled=();
     my %link=();
     my %auto=();
@@ -415,12 +422,16 @@ sub portSetup {
 	    $sw_IP = $2;
 	    next;
 	}
-	if (/^Port\tInterface/) {next;}
+	if (/^Port Interface/) {next;}
 	if (/^--/) {next;}
-	s/\t\t/\t/g;
+	s/^ +//;
+	s/ +/\t/;
+	s/\t\t\t/\t\t/;
+	s/Mbit\t\t/Mbit\t/;
 	@line= split("\t",$_);
 	$port = shift(@line);
 	$names{$port}= shift(@line);
+	$vlanName{$port}= shift(@line);
 	$enabled{$port}= shift(@line);
 	$link{$port}= shift(@line);
 	$auto{$port}= shift(@line);
@@ -458,8 +469,12 @@ sub portSetup {
 		       )->pack(-side=>'left',-fill=>'x');
     my $L_interface = 
 	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
-		       -fg=>$main_fg,-text=>'Interface',-width=>12
-		       )->pack(-side=>'left',-fill=>'x');
+		       -fg=>$main_fg,-text=>'Interface',-width=>10
+		       )->pack(-side=>'left',-expand=>1,-fill=>'x');
+    my $L_vlan = 
+	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
+		       -fg=>$main_fg,-text=>'VLAN',-width=>8
+		       )->pack(-side=>'left',-expand=>1,-fill=>'x');
     my $L_enabled = 
 	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
 		       -fg=>$main_fg,-text=>'Enabled',-width=>8
@@ -474,13 +489,14 @@ sub portSetup {
 		       )->pack(-side=>'left',-fill=>'x');
     my $L_speed = 
 	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
-		       -fg=>$main_fg,-text=>'Speed',-width=>16
+		       -fg=>$main_fg,-text=>'Speed',-width=>14
 		       )->pack(-side=>'left',-fill=>'x');
     my $L_duplex = 
 	$titles->Label(-relief=>'sunken',-borderwidth=>3,-bg=>$main_bg,
-		       -fg=>$main_fg,-text=>'Duplex',-width=>12
+		       -fg=>$main_fg,-text=>'Duplex',-width=>10
 		       )->pack(-side=>'left',-fill=>'x');
     my %marked=();
+    my $selVLANs=0;
     foreach $port ( sort num keys(%names)) {
 	my $row = 
 	    $table->Frame(-relief=>'flat',
@@ -491,14 +507,27 @@ sub portSetup {
 			  -bg=>$main_bg,-fg=>$main_fg,
 			  -activebackground=>$main_abg,
 			  -activeforeground=>$main_afg,
-			  -selectcolor=>$btn_bg,-borderwidth=>3
+			  -selectcolor=>$btn_bg,-borderwidth=>3,
+			  -command => sub {
+			      if ($selVLANs) {
+				  my $myVlan=$vlanName{$port};
+				  foreach my $p (keys %names) {
+				      if ($vlanName{$p} eq $myVlan) {
+					  $marked{$p}=$marked{$port};
+				      }
+				  }
+			      }
+			  }
 			  )->pack(-side=>'left');
 	$row->Label(-relief=>'sunken',-text=>$port,-width=>6,
 		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
 		    )->pack(-side=>'left');
-	$row->Label(-relief=>'sunken',-text=>$names{$port},-width=>12,
+	$row->Label(-relief=>'sunken',-text=>$names{$port},-width=>10,
 		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
-		    )->pack(-side=>'left');
+		    )->pack(-expand=>1,-side=>'left',-fill=>'x');
+	$row->Label(-relief=>'sunken',-text=>$vlanName{$port},-width=>8,
+		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
+		    )->pack(-expand=>1,-side=>'left',-fill=>'x');
 	$row->Label(-relief=>'sunken',-text=>$enabled{$port},-width=>8,
 		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
 		    )->pack(-side=>'left');
@@ -508,10 +537,10 @@ sub portSetup {
 	$row->Label(-relief=>'sunken',-text=>$auto{$port},-width=>12,
 		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
 		    )->pack(-side=>'left');
-	$row->Label(-relief=>'sunken',-text=>$spd{$port},-width=>16,
+	$row->Label(-relief=>'sunken',-text=>$spd{$port},-width=>14,
 		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
 		    )->pack(-side=>'left');
-	$row->Label(-relief=>'sunken',-text=>$dup{$port},-width=>12,
+	$row->Label(-relief=>'sunken',-text=>$dup{$port},-width=>10,
 		    -bg=>$main_bg,-fg=>$main_fg,-borderwidth=>3
 		    )->pack(-side=>'left');
     }
@@ -523,6 +552,26 @@ sub portSetup {
 	$row->Frame(-relief=>'flat',-borderwidth=>2,
 		      -bg=>$main_bg,-fg=>$main_fg
 		      )->pack(-side=>'left',-expand=>"1",-fill=>'both');
+    my $sel_mode_frm = 
+	$btn_frm->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'both');
+    my $byPort_opt = 
+	$sel_mode_frm->Radiobutton(-variable=>\$selVLANs,-value=>"0",
+			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			     -fg=>$main_fg,-activebackground=>$main_abg,
+			     -activeforeground=>$main_afg,-anchor=>'nw',
+			     -selectcolor=>$btn_bg,-width=>'11',
+			     -text=>"Sel. by Port"
+			     )->pack(-side=>'left',-fill=>'x',-padx=>'2');
+    my $byVLAN_opt = 
+	$sel_mode_frm->Radiobutton(-variable=>\$selVLANs,-value=>"1",
+			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			     -fg=>$main_fg,-activebackground=>$main_abg,
+			     -activeforeground=>$main_afg,-anchor=>'nw',
+			     -selectcolor=>$btn_bg,-width=>'11',
+			     -text=>"Sel. by VLAN"
+			     )->pack(-side=>'left',-fill=>'x',-padx=>'2');
     my $sel_frm = 
 	$btn_frm->Frame(-relief=>'flat',-borderwidth=>2,
 		      -bg=>$main_bg,-fg=>$main_fg
@@ -555,8 +604,12 @@ sub portSetup {
     my $p_spd = "";
     my $p_dup = "";
 
+    my $upd_frm = 
+	$btn_frm->Frame(-relief=>'flat',-borderwidth=>2,
+		      -bg=>$main_bg,-fg=>$main_fg
+		      )->pack(-side=>'top',-expand=>"1",-fill=>'both');
     my $update_btn = 
-	$btn_frm->Button(-text=>'Update',-bg=>$main_bg,-width=>'16', 
+	$upd_frm->Button(-text=>'Update',-bg=>$main_bg,-width=>'16', 
 			 -anchor=>'center', -relief=>'raised',-borderwidth=>3,
 			 -fg=>$main_fg,-activebackground=>$main_abg,
 			 -activeforeground=>$main_afg,
@@ -596,7 +649,7 @@ sub portSetup {
 			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
 			     -fg=>$main_fg,-activebackground=>$main_abg,
 			     -activeforeground=>$main_afg,-anchor=>'nw',
-			     -selectcolor=>$btn_bg,-width=>'6',
+			     -selectcolor=>$btn_bg,-width=>'9',
 			     -text=>"Enable"
 			     )->pack(-side=>'top',-fill=>'x',
 				     -padx=>'3',-pady=>'3');
@@ -605,39 +658,78 @@ sub portSetup {
 			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
 			     -fg=>$main_fg,-activebackground=>$main_abg,
 			     -activeforeground=>$main_afg,-anchor=>'nw',
-			     -selectcolor=>$btn_bg,-width=>'6',
+			     -selectcolor=>$btn_bg,-width=>'9',
 			     -text=>"Disable"
+			     )->pack(-side=>'top',-fill=>'x',
+				     -padx=>'3',-pady=>'3');
+    my $en_no_opt = 
+	$en_frm->Radiobutton(-variable=>\$p_enable,-value=>"",
+			     -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			     -fg=>$main_fg,-activebackground=>$main_abg,
+			     -activeforeground=>$main_afg,-anchor=>'nw',
+			     -selectcolor=>$btn_bg,-width=>'9',
+			     -text=>"No Change"
 			     )->pack(-side=>'top',-fill=>'x',
 				     -padx=>'3',-pady=>'3');
     my $spd100_opt = "";
     my $spd10_opt = "";
+    my $spd_no_opt = "";
     my $dupFull_opt = "";
     my $dupHalf_opt = "";
+    my $dup_no_opt = "";
 
-    my $auto_opt = 
+    my $auto_on_opt = 
 	$auto_frm->
-	    Checkbutton(-variable=>\$p_auto,
-			-onvalue=>"+a",-offvalue=>"-a",
+	    Radiobutton(-variable=>\$p_auto,-value=>"+a",
 			-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
 			-fg=>$main_fg,-activebackground=>$main_abg,
-			-activeforeground=>$main_afg,-anchor=>'center',
-			-selectcolor=>$btn_bg,-width=>'10',
-			-text=>"Auto Config.", -command => sub {
-			    if ($p_auto eq "+a") {
-				$spd100_opt->configure(-state=>'disabled');
-				$spd10_opt->configure(-state=>'disabled');
-				$dupFull_opt->configure(-state=>'disabled');
-				$dupHalf_opt->configure(-state=>'disabled');
-				$p_spd = "";
-				$p_dup = "";
-			    } else {
-				$spd100_opt->configure(-state=>'normal');
-				$spd10_opt->configure(-state=>'normal');
-				$dupFull_opt->configure(-state=>'normal');
-				$dupHalf_opt->configure(-state=>'normal');
-			    }
+			-activeforeground=>$main_afg,-anchor=>'nw',
+			-selectcolor=>$btn_bg,-width=>'11',
+			-text=>"AutoConf On", -command => sub {
+			    $spd100_opt->configure(-state=>'disabled');
+			    $spd10_opt->configure(-state=>'disabled');
+			    $spd_no_opt->configure(-state=>'disabled');
+			    $dupFull_opt->configure(-state=>'disabled');
+			    $dupHalf_opt->configure(-state=>'disabled');
+			    $dup_no_opt->configure(-state=>'disabled');
+			    $p_spd = "";
+			    $p_dup = "";
 			}
-			)->pack(-side=>'top',-expand=>1,-fill=>'y',
+			)->pack(-side=>'top',-fill=>'x',
+				-padx=>'3',-pady=>'3');
+    my $auto_off_opt = 
+	$auto_frm->
+	    Radiobutton(-variable=>\$p_auto,-value=>"-a",
+			-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			-fg=>$main_fg,-activebackground=>$main_abg,
+			-activeforeground=>$main_afg,-anchor=>'nw',
+			-selectcolor=>$btn_bg,-width=>'11',
+			-text=>"AutoConf Off", -command => sub {
+			    $spd100_opt->configure(-state=>'normal');
+			    $spd10_opt->configure(-state=>'normal');
+			    $spd_no_opt->configure(-state=>'normal');
+			    $dupFull_opt->configure(-state=>'normal');
+			    $dupHalf_opt->configure(-state=>'normal');
+			    $dup_no_opt->configure(-state=>'normal');
+			}
+			)->pack(-side=>'top',-fill=>'x',
+				-padx=>'3',-pady=>'3');
+    my $auto_opt = 
+	$auto_frm->
+	    Radiobutton(-variable=>\$p_auto,-value=>"",
+			-relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			-fg=>$main_fg,-activebackground=>$main_abg,
+			-activeforeground=>$main_afg,-anchor=>'nw',
+			-selectcolor=>$btn_bg,-width=>'11',
+			-text=>"No Change", -command => sub {
+			    $spd100_opt->configure(-state=>'normal');
+			    $spd10_opt->configure(-state=>'normal');
+			    $spd_no_opt->configure(-state=>'normal');
+			    $dupFull_opt->configure(-state=>'normal');
+			    $dupHalf_opt->configure(-state=>'normal');
+			    $dup_no_opt->configure(-state=>'normal');
+			}			
+			)->pack(-side=>'top',,-fill=>'x',
 				-padx=>'3',-pady=>'3');
     $spd100_opt = 
 	$spd_frm->Radiobutton(-variable=>\$p_spd,-value=>"-spd 100",
@@ -645,7 +737,7 @@ sub portSetup {
 			      -fg=>$main_fg,-activebackground=>$main_abg,
 			      -activeforeground=>$main_afg,-anchor=>'nw',
 			      -disabledforeground=>$dis_fg,
-			      -selectcolor=>$btn_bg,-width=>'8',
+			      -selectcolor=>$btn_bg,-width=>'9',
 			      -text=>"100 Mbps"
 			      )->pack(-side=>'top',-fill=>'x',
 				      -padx=>'3',-pady=>'3');
@@ -655,8 +747,18 @@ sub portSetup {
 			      -fg=>$main_fg,-activebackground=>$main_abg,
 			      -activeforeground=>$main_afg,-anchor=>'nw',
 			      -disabledforeground=>$dis_fg,
-			      -selectcolor=>$btn_bg,-width=>'8',
+			      -selectcolor=>$btn_bg,-width=>'9',
 			      -text=>"10 Mbps"
+			      )->pack(-side=>'top',-fill=>'x',
+				      -padx=>'3',-pady=>'3');
+    $spd_no_opt = 
+	$spd_frm->Radiobutton(-variable=>\$p_spd,-value=>"",
+			      -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			      -fg=>$main_fg,-activebackground=>$main_abg,
+			      -activeforeground=>$main_afg,-anchor=>'nw',
+			      -disabledforeground=>$dis_fg,
+			      -selectcolor=>$btn_bg,-width=>'9',
+			      -text=>"No Change"
 			      )->pack(-side=>'top',-fill=>'x',
 				      -padx=>'3',-pady=>'3');
     $dupFull_opt = 
@@ -679,6 +781,16 @@ sub portSetup {
 			      -text=>"Half Duplex"
 			      )->pack(-side=>'top',-fill=>'x',
 				      -padx=>'3',-pady=>'3');
+    $dup_no_opt = 
+	$dup_frm->Radiobutton(-variable=>\$p_dup,-value=>"",
+			      -relief=>'flat',-borderwidth=>3,-bg=>$main_bg,
+			      -fg=>$main_fg,-activebackground=>$main_abg,
+			      -activeforeground=>$main_afg,-anchor=>'nw',
+			      -disabledforeground=>$dis_fg,
+			      -selectcolor=>$btn_bg,-width=>'10',
+			      -text=>"No Change"
+			      )->pack(-side=>'top',-fill=>'x',
+				      -padx=>'3',-pady=>'3');
     $area->pack();
 }
 
@@ -686,6 +798,8 @@ sub updatePorts {
     (my $switch, my $en, my $auto, my $spd, my $dup, my @ports) = @_;
     open(DATA,"snmpit -i $switch $snmp_v $snmp_b $snmp_c -p ".
 	 join(" ",@ports)." $en $auto $spd $dup 2>&1  |");
+    #print "snmpit -i $switch $snmp_v $snmp_b $snmp_c -p ".
+    #	join(" ",@ports)." $en $auto $spd $dup ";
     my @output =();
     while (<DATA>) {
 	chop;
