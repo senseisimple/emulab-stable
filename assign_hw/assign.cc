@@ -3,6 +3,7 @@
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
+#include <LEDA/node_pq.h>
 #include <iostream.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +17,12 @@
 #include "physical.h"
 #include "virtual.h"
 #include "score.h"
+
+// Purely heuristic
+#define OPTIMAL_SCORE(edges,nodes) (nodes*SCORE_PNODE + \
+                                    nodes/5.0*SCORE_SWITCH + \
+                                    edges*(SCORE_INTRASWITCH_LINK*4+\
+                                           SCORE_INTERSWITCH_LINK)/5.0)
 
 tb_pgraph PG(1,1);
 tb_vgraph G(1,1);
@@ -45,7 +52,9 @@ float bestscore, absbest;
 
 extern node pnodes[MAX_PNODES];
 extern node_array<int> switch_index;
-void parse_top(tb_vgraph &G, istream& i);
+node_pq<int> unassigned_nodes(G);
+
+int parse_top(tb_vgraph &G, istream& i);
 int parse_ptop(tb_pgraph &G, istream& i);
 
 /*
@@ -90,7 +99,7 @@ inline int accept(float change, float temperature)
 
 int assign()
 {
-  float newscore, bestscore, absbest;
+  float newscore, bestscore;
   node n;
   int iters = 0;
 
@@ -102,6 +111,8 @@ int assign()
  
   float cycles = 120.0*(float)(nnodes + G.number_of_edges());
 
+  float optimal = OPTIMAL_SCORE(G.number_of_edges(),nnodes);
+  
   int mintrans = (int)cycles;
   int trans;
   int naccepts = 40*nnodes;
@@ -125,7 +136,8 @@ int assign()
     absnodes[n3] = G[n3].posistion;
   }
 
-  if (bestscore < 0.11f) {
+  //  if (bestscore < 0.11f) {
+  if (bestscore < optimal) {
 #ifdef VERBOSE
     cout << "Problem started optimal\n";
 #endif
@@ -138,26 +150,50 @@ int assign()
 #endif
     trans = 0;
     accepts = 0;
-      
+
+    bool unassigned = true;
     while (trans < mintrans && accepts < naccepts) {
       int newpos;
       trans++;
       iters++;
-      n = G.choose_node();
-      oldpos = G[n].posistion;
 
-      newpos = oldpos;
-      /* XXX:  Room for improvement. :-) */
-      while (newpos == oldpos)
-	newpos = (random() % nparts)+1;
+      n = unassigned_nodes.find_min();
+      if (n == nil)
+	n = G.choose_node();
+
+      // Note: we have a lot of +1's here because of the first
+      // node loc in pnodes is 1 not 0.
+      oldpos = G[n].posistion;
+      newpos = ((oldpos+(random()%(nparts-1)+1))%nparts)+1;
+
       if (oldpos != 0) {
 	remove_node(n);
+	unassigned = false;
       }
-      if (add_node(n,newpos) == 1) continue; // didn't go through
+
+      int first_newpos = newpos;
+      while (add_node(n,newpos) == 1) {
+	newpos = (newpos % nparts)+1;
+	if (newpos == first_newpos) {
+	  // no place to put a node.
+	  // instead re randomly choose a node and remove it and
+	  // then continue the 'continue'
+	  // XXX - could improve this
+	  node n = G.choose_node();
+	  while (G[n].posistion != 0)
+	    n = G.choose_node();
+	  remove_node(n);
+	  unassigned_nodes.insert(n,random());
+	  continue;
+	}
+      }
+      if (unassigned) unassigned_nodes.del(n);
+
       newscore = get_score();
-      if (newscore < 0.11f) {
+      //      if (newscore < 0.11f) {
+      if (newscore < optimal) {
 	timeend = used_time(timestart);
-	cout << "OPTIMAL (0.0) in "
+	cout << "OPTIMAL ( " << optimal << ") in "
 	     << iters << " iters, "
 	     << timeend << " seconds" << endl;
 	goto DONE;
@@ -205,10 +241,16 @@ int assign()
   forall_nodes(n, G) {
     if (G[n].posistion != 0)
       remove_node(n);
-    if (absnodes[n] != 0)
-      add_node(n,absnodes[n]);
-    else
+  }
+	
+  forall_nodes(n, G) {
+    if (absnodes[n] != 0) {
+      if (add_node(n,absnodes[n]) != 0) {
+	cerr << "Invalid assumption.  Tell calfeld that reseting to best configuration doesn't work" << endl;
+      }
+    } else {
       cout << "Unassigned node: " << G[n].name << endl;
+    }
   }
   
   timeend = used_time(timestart);

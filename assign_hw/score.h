@@ -27,7 +27,6 @@ const float SCORE_SWITCH = 0.5;
 // Cost of an unassigned node
 const float SCORE_UNASSIGNED = 1;
 
-
 extern float score;
 extern int violated;
 

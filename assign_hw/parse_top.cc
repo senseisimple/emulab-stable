@@ -10,18 +10,24 @@
 #include <LEDA/dictionary.h>
 #include <LEDA/map.h>
 #include <LEDA/graph_iterator.h>
+#include <LEDA/node_pq.h>
 
 #include "common.h"
 #include "virtual.h"
 
-void parse_top(tb_vgraph &G, istream& i)
+extern tb_vgraph G;
+
+extern node_pq<int> unassigned_nodes;
+
+int parse_top(tb_vgraph &G, istream& i)
 {
   dictionary<string, node> nmap;
   node no1;
   string s1, s2;
   char inbuf[255];
   char n1[32], n2[32], type[32];
-	
+  int num_nodes = 0;
+  
   while (!i.eof()) {
     char *ret;
     i.getline(inbuf, 254);
@@ -33,8 +39,10 @@ void parse_top(tb_vgraph &G, istream& i)
       if (sscanf(inbuf, "node %s %s", n1, type) < 1) {
 	fprintf(stderr, "bad node line: %s\n", inbuf);
       } else {
+	num_nodes++;
 	string s1(n1);
 	no1 = G.new_node();
+	unassigned_nodes.insert(no1,random());
 	G[no1].name=strdup(n1);
 	G[no1].posistion = 0;
 	G[no1].no_connections=0;
@@ -79,4 +87,5 @@ void parse_top(tb_vgraph &G, istream& i)
       fprintf(stderr, "unknown directive: %s\n", inbuf);
     }
   }
+  return num_nodes;
 }
