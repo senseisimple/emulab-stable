@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -15,14 +15,22 @@ fi
 if [ x$cpuspeed = x ] || [ $cpuspeed = 0 ]; then
 	echo "unknown";
 
-# XXX hack for minibed
+# XXX hack for minibed and buff pc600s
 elif [ $cpuspeed = "850" -a -x $BINDIR/chipset.awk ]; then
-	if [ "`$BINDIR/chipset.awk /proc/pci`" = "GX" ]; then
-		echo pcL440GX;
-	else
-		echo pc$cpuspeed;
-	fi
-
+    case `$BINDIR/chipset.awk /proc/pci` in
+    BX)
+	echo pc850	# normal pc850
+	;;
+    GX)
+	echo pcL440GX	# minibed node
+	;;
+    BX-AGP)
+	echo pc850a    # buff pc600 node
+	;;
+    *)
+	echo unknown
+   	;;
+esac
 # For Wiconsin nodes - they have a different node typing scheme
 elif [ $cpuspeed = "2500" ]; then
 	echo i2;

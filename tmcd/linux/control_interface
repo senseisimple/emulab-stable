@@ -14,13 +14,10 @@ pc300|pc1500|pc2000)
 i2)
     echo 'eth1'
     ;;
-pc850)
+pc850|pcL440GX)
     echo 'eth2'
     ;;
-pcL440GX)
-    echo 'eth2'
-    ;;
-pc600)
+pc600|pc850a)
     echo 'eth4'
     ;;
 *)
