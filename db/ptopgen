@@ -17,10 +17,7 @@ while (<>) {
   if ( /^\|node_id/) {next;}
   /^\|([a-zA-Z0-9-]*) *\|/;
   $node=$1;
-  if ($node =~/tbpc/) {
-    $nodes{$node} = 1;
-    print STDERR "Got '$node' \t" if $d;
-  } elsif ($node =~ /(tbsh.*)-1/ ) {
+  if ($node =~/tbpc|tbsh/) {
     $nodes{$node} = 1;
     print STDERR "Got '$node' \t" if $d;
   }
@@ -38,7 +35,7 @@ my $cond = join (" or ",@list);
 
 my $query = "select node_id,card,MAC from interfaces where $cond";
 
-print STDERR "Using query $query\n" if $d;
+print STDERR "Using query '$query'\n" if $d;
 
 my $sth = $dbh->query($query);
 
