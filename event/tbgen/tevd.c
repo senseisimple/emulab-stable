@@ -135,8 +135,8 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	char		eventtype[TBDB_FLEN_EVEVENTTYPE];
 	char		ipaddr[32];
 
-	event_notification_get_host(handle, notification,
-				    ipaddr, sizeof(ipaddr));
+	event_notification_get_sender(handle, notification,
+				      ipaddr, sizeof(ipaddr));
 	
 	event_notification_get_eventtype(handle, notification,
 					 eventtype, sizeof(eventtype));

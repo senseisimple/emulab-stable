@@ -12,6 +12,9 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "event.h"
 #include "log.h"
 
@@ -23,6 +26,7 @@
 #endif
 
 static char hostname[MAXHOSTNAMELEN];
+static char ipaddr[32];
 
 /*
  * Register with the testbed event system.  NAME specifies the name of
@@ -53,14 +57,26 @@ static char hostname[MAXHOSTNAMELEN];
 event_handle_t
 event_register(char *name, int threaded)
 {
-    event_handle_t handle;
-    elvin_handle_t server;
-    elvin_error_t status;
+    event_handle_t	handle;
+    elvin_handle_t	server;
+    elvin_error_t	status;
+    struct hostent     *he;
+    struct in_addr	myip;
 
     if (gethostname(hostname, MAXHOSTNAMELEN) == -1) {
         ERROR("could not get hostname: %s\n", strerror(errno));
         return 0;
     }
+
+    /*
+     * Get our IP address. Thats how we name ourselves to the
+     * Testbed Event System. 
+     */
+    if (! (he = gethostbyname(hostname))) {
+	ERROR("could not get IP address from hostname: %s", hostname);
+    }
+    memcpy((char *)&myip, he->h_addr, he->h_length);
+    strcpy(ipaddr, inet_ntoa(myip));
 
     TRACE("registering with event system (hostname=\"%s\")\n", hostname);
 
@@ -386,6 +402,9 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 	ERROR("could not add attributes to notification %p\n", notification);
         return NULL;
     }
+
+    /* Add our address */
+    event_notification_set_sender(handle, notification, ipaddr);
 
     return notification;
 }
@@ -845,8 +864,11 @@ addclause(char *tag, char *clause, char *exp, int size, int *index)
 	char	*bp;
 	char    clausecopy[BUFSIZ], *strp = clausecopy;
 	char	buf[BUFSIZ];
+	int     needglob = 1;
 
 	/* Must copy clause since we use strsep! */
+	if (strlen(clause) >= sizeof(clausecopy)-1)
+		goto bad;
 	strcpy(clausecopy, clause);
 
 	/*
@@ -858,6 +880,9 @@ addclause(char *tag, char *clause, char *exp, int size, int *index)
 		/* Empty token (two delimiters next to each other) */
 		if (! *bp)
 			continue;
+
+		if (! strcmp("*", bp))
+			needglob = 0;
 		
 		count += snprintf(&buf[count], sizeof(buf) - count,
 				  "%s %s == \"%s\" ",
@@ -865,7 +890,16 @@ addclause(char *tag, char *clause, char *exp, int size, int *index)
 	}
 	if (strp || count >= sizeof(buf))
 		goto bad;
-	
+#if 0
+	if (needglob) {
+		count += snprintf(&buf[count], sizeof(buf) - count,
+				  "%s %s == \"*\" ",
+				  (count ? "||" : ""), tag);
+
+		if (count >= size)
+			goto bad;
+	}
+#endif
 	/*
 	 * And wrap in parens (add an "and" if not the first clause).
 	 */
