@@ -173,16 +173,13 @@ while (<IF>) {
 		my $nodetype = $2;
 		my $query_result =
 		    DBQueryWarn("select n.node_id,i.IP,i.MAC,r.pid,r.eid, ".
-				"       r.vname,v.inner_elab_role ".
+				"       r.vname,r.inner_elab_role ".
 				"from nodes as n ".
 				"left join interfaces as i on ".
 				"     n.node_id=i.node_id ".
 				"left join node_types as t on n.type=t.type ".
 				"left join reserved as r on ".
 				"     n.node_id=r.node_id ".
-				"left join virt_nodes as v on ".
-				"     v.vname=r.vname and ".
-				"     v.pid=r.pid and v.eid=r.eid ".
 				"where (n.type='$nodetype' or ".
 				"       t.class='$nodetype') and ".
 				"      i.role='$CRTLTAG' ".
