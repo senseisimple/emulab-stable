@@ -1,3 +1,30 @@
+stoller     2004/01/20 08:21:20 MST
+
+  Modified files:
+    pxe                  bootinfo.c bootwhat.h 
+  Log:
+  Add back the cache to avoid generating spurious events when bootinfo
+  packets are lost; do not send the events if a node has requested
+  bootinfo within the last 10 seconds; this implies that the bootinfo
+  reply packet was lost and the node is retrying. This should quiet
+  things a bit from stated, although eventually this should be dealt
+  with in stated instead of with this hack.
+  
+  Mac originally added the cache to proxydhcp. I've added a cache to
+  bootinfo to solve the same problem (proxydhcp is no longer used),
+  although I have changed to implementation to use the DBM backend
+  rather then a one-off hash table. dbopen() with a NULL file argument
+  creates an in-memory database (no backing store), and I have used the
+  DB_HASH db type. So, the hash table is done with a couple of calls to
+  DBM routines.
+  
+  Revision  Changes    Path
+  1.11      +127 -20   testbed/pxe/bootinfo.c
+  1.7       +1 -1      testbed/pxe/bootwhat.h
+
+
+stoller     2004/01/15 09:18:41 MST
+	
   Modified files:
     tbsetup              GNUmakefile.in frisbeelauncher.in 
     .                    configure configure.in 
