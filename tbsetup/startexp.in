@@ -273,7 +273,7 @@ if (! $frontend) {
     # Look for the unsual case of more than 2 nodes and no vlans. Send a
     # warning message.
     #
-    if (ExpNodes($pid, $eid) > 2) {
+    if (ExpNodes($pid, $eid, 1) > 2) {
 	my $vlans_result =
 	    DBQueryFatal("select pid from virt_lans where ".
 			 "pid='$pid' and eid='$eid'");

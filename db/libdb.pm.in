@@ -1407,15 +1407,21 @@ sub TBSetBatchCancelFlag($$$)
 #        returns the list if a valid pid/eid.
 #        returns 0 if an invalid pid/eid or if an error.
 # 
-sub ExpNodes($$)
+sub ExpNodes($$;$)
 {
-    my($pid, $eid) = @_;
+    my($pid, $eid, $flag) = @_;
     my(@row);
     my(@nodes);
+    my $clause = "";
 
+    if (defined($flag)) {
+	$clause = "and nt.isremotenode=0";
+    }
     my $query_result =
-	DBQueryWarn("select node_id from reserved where ".
-		    "pid='$pid' and eid='$eid'");
+	DBQueryWarn("select r.node_id from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid' $clause");
 
     if (! $query_result or
 	$query_result->numrows == 0) {
