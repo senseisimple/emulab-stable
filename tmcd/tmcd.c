@@ -130,6 +130,7 @@ COMMAND_PROTOTYPE(dostatus);
 COMMAND_PROTOTYPE(doifconfig);
 COMMAND_PROTOTYPE(doaccounts);
 COMMAND_PROTOTYPE(dodelay);
+COMMAND_PROTOTYPE(dolinkdelay);
 COMMAND_PROTOTYPE(dohosts);
 COMMAND_PROTOTYPE(dohostsV2);
 COMMAND_PROTOTYPE(dorpms);
@@ -168,6 +169,7 @@ struct command {
 	{ "ifconfig",	doifconfig },
 	{ "accounts",	doaccounts },
 	{ "delay",	dodelay },
+	{ "linkdelay",	dolinkdelay },
 	{ "hostnamesV2",dohostsV2 },	/* This will go away */
 	{ "hostnames",	dohosts },
 	{ "rpms",	dorpms },
@@ -891,9 +893,10 @@ COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex "
+	res = mydb_query("select card,IP,IPalias,MAC,current_speed,duplex, "
+			 " IPaliases "
 			 "from interfaces where node_id='%s'",
-			 6, reqp->nodeid);
+			 7, reqp->nodeid);
 	if (!res) {
 		error("IFCONFIG: %s: DB Error getting interfaces!\n",
 		      reqp->nodeid);
@@ -955,9 +958,19 @@ COMMAND_PROTOTYPE(doifconfig)
 			if (row[5] && row[5][0]) {
 				duplex = row[5];
 			}
-			
 			sprintf(&buf[strlen(buf)],
 				" SPEED=%s%s DUPLEX=%s", speed, unit, duplex);
+
+			/* Tack on IPaliases */
+			if (vers >= 8) {
+				char *aliases = "";
+				
+				if (row[6] && row[6][0])
+					aliases = row[6];
+					
+				sprintf(&buf[strlen(buf)],
+					" IPALIASES=\"%s\"", aliases);
+			}
 
 			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
@@ -1405,7 +1418,7 @@ COMMAND_PROTOTYPE(doaccounts)
 }
 
 /*
- * Return account stuff.
+ * Return delay config stuff.
  */
 COMMAND_PROTOTYPE(dodelay)
 {
@@ -1495,6 +1508,74 @@ COMMAND_PROTOTYPE(dodelay)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
 		info("DELAY: %s", buf);
+	}
+	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Return link delay config stuff.
+ */
+COMMAND_PROTOTYPE(dolinkdelay)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[2*MYBUFSIZE];
+	int		nrows;
+
+	/*
+	 * Now check reserved table
+	 */
+	if (!reqp->allocated)
+		return 0;
+
+	/*
+	 * Get delay parameters for the machine. The point of this silly
+	 * join is to get the type out so that we can pass it back. Of
+	 * course, this assumes that the type is the BSD name, not linux.
+	 */
+	res = mydb_query("select i.MAC,dir,vlan,d.ip,netmask, "
+		 "pipe,delay,bandwidth,lossrate, "
+		 "q_red,q_limit,q_maxthresh,q_minthresh,q_weight,q_linterm, " 
+		 "q_qinbytes,q_bytes,q_meanpsize,q_wait,q_setbit, " 
+		 "q_droptail,q_gentle "
+                 " from linkdelays as d "
+		 "left join interfaces as i on "
+		 " i.node_id=d.node_id and i.iface=d.iface "
+		 " where d.node_id='%s'",	 
+		 22, reqp->nodeid);
+	if (!res) {
+		error("LINKDELAY: %s: DB Error getting link delays!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		sprintf(buf, "LINKDELAY IFACE=%s DIR=%s "
+			"LINKNAME=%s INET=%s MASK=%s "
+			"PIPE=%s DELAY=%s BW=%s PLR=%s "
+			"RED=%s LIMIT=%s MAXTHRESH=%s MINTHRESH=%s WEIGHT=%s "
+			"LINTERM=%s QINBYTES=%s BYTES=%s "
+			"MEANPSIZE=%s WAIT=%s SETBIT=%s "
+			"DROPTAIL=%s GENTLE=%s \n",
+			row[0],  row[1],
+			row[2],  row[3],  row[4],
+			row[5],	 row[6],  row[7],  row[8],
+			row[9],	 row[10], row[11], row[12], row[13],
+			row[14], row[15], row[16],
+			row[17], row[18], row[19],
+			row[20], row[21]);
+			
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		info("LINKDELAY: %s", buf);
 	}
 	mysql_free_result(res);
 
