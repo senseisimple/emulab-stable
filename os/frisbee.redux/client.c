@@ -95,14 +95,16 @@ typedef struct {
  */
 typedef struct {
 	int	   thischunk;		/* Which chunk in progress */
-	int	   inprogress;		/* Chunk in progress? Free/Allocated */
-	int	   ready;		/* Ready to write to disk? */
+	int	   state;		/* State of chunk */
 	int	   blockcount;		/* Number of blocks not received yet */
 	BlockMap_t blockmap;		/* Which blocks have been received */
 	struct {
 		char	data[BLOCKSIZE];
 	} blocks[CHUNKSIZE];		/* Actual block data */
 } ChunkBuffer_t;
+#define CHUNK_EMPTY	0
+#define CHUNK_FILLING	1
+#define CHUNK_FULL	2
 
 Chunk_t		*Chunks;		/* Chunk descriptors */
 ChunkBuffer_t   *ChunkBuffer;		/* The cache */
@@ -585,10 +587,8 @@ ChunkerStartup(void)
 	/*
 	 * Set all the buffers to "free"
 	 */
-	for (i = 0; i < maxchunkbufs; i++) {
-		ChunkBuffer[i].inprogress = 0;
-		ChunkBuffer[i].ready      = 0;
-	}
+	for (i = 0; i < maxchunkbufs; i++)
+		ChunkBuffer[i].state = CHUNK_EMPTY;
 
 	for (i = 0; i < TotalChunkCount; i++)
 		ChunkRequestList[i] = i;
@@ -626,7 +626,7 @@ ChunkerStartup(void)
 		 * Search the chunk cache for a chunk that is ready to write.
 		 */
 		for (i = 0; i < maxchunkbufs; i++)
-			if (ChunkBuffer[i].ready)
+			if (ChunkBuffer[i].state == CHUNK_FULL)
 				break;
 
 		/*
@@ -690,8 +690,7 @@ ChunkerStartup(void)
 		/*
 		 * Okay, free the slot up for another chunk.
 		 */
-		ChunkBuffer[i].ready      = 0;
-		ChunkBuffer[i].inprogress = 0;
+		ChunkBuffer[i].state = CHUNK_EMPTY;
 		chunkcount--;
 		CLEVENT(1, EV_CLIWRDONE,
 			ChunkBuffer[i].thischunk, chunkcount,
@@ -778,8 +777,7 @@ RequestStamp(int chunk, int block, int count, void *arg)
 
 		for (i = 0; i < maxchunkbufs; i++)
 			if (ChunkBuffer[i].thischunk == chunk &&
-			    ChunkBuffer[i].inprogress &&
-			    !ChunkBuffer[i].ready)
+			    ChunkBuffer[i].state == CHUNK_FILLING)
 				break;
 		if (i < maxchunkbufs &&
 		    BlockMapIsAlloc(&ChunkBuffer[i].blockmap, block, count)
@@ -831,13 +829,13 @@ GotBlock(Packet_t *p)
 	 * Search the chunk buffer for a match (or a free one).
 	 */
 	for (i = 0; i < maxchunkbufs; i++) {
-		if (!ChunkBuffer[i].inprogress) {
+		if (ChunkBuffer[i].state == CHUNK_EMPTY) {
 			if (free == -1)
 				free = i;
 			continue;
 		}
 		
-		if (!ChunkBuffer[i].ready &&
+		if (ChunkBuffer[i].state == CHUNK_FILLING &&
 		    ChunkBuffer[i].thischunk == chunk)
 			break;
 	}
@@ -879,8 +877,7 @@ GotBlock(Packet_t *p)
 			log("Starting chunk %d (buffer %d)", chunk, free);
 
 		i = free;
-		ChunkBuffer[i].ready      = 0;
-		ChunkBuffer[i].inprogress = 1;
+		ChunkBuffer[i].state      = CHUNK_FILLING;
 		ChunkBuffer[i].thischunk  = chunk;
 		ChunkBuffer[i].blockcount = CHUNKSIZE;
 		bzero(&ChunkBuffer[i].blockmap,
@@ -914,7 +911,7 @@ GotBlock(Packet_t *p)
 
 		if (lastchunk != -1 && chunk != lastchunk &&
 		    lastchunk == ChunkBuffer[lastchunkbuf].thischunk &&
-		    ChunkBuffer[lastchunkbuf].ready == 0)
+		    ChunkBuffer[lastchunkbuf].state == CHUNK_FILLING)
 			CLEVENT(1, EV_CLILCHUNK, lastchunk, lastblock, 0, 0);
 		lastchunkbuf = i;
 		lastchunk = chunk;
@@ -938,7 +935,7 @@ GotBlock(Packet_t *p)
 		CLEVENT(1, EV_CLIECHUNK, chunk, block, inprogress, 0);
 		if (debug)
 			log("Releasing chunk %d to main thread", chunk);
-		ChunkBuffer[i].ready = 1;
+		ChunkBuffer[i].state = CHUNK_FULL;
 
 		/*
 		 * Send off a request for a chunk we do not have yet. This
@@ -969,7 +966,7 @@ RequestMissing(int chunk, BlockMap_t *map, int count)
 	BlockMapInvert(map, &p->msg.prequest.blockmap);
 	PacketSend(p, 0);
 #ifdef STATS
-	assert(count==BlockMapIsAlloc(&p->msg.prequest.blockmap,0,CHUNKSIZE));
+	assert(count == BlockMapIsAlloc(&p->msg.prequest.blockmap,0,CHUNKSIZE));
 	if (count == 0)
 		log("Request 0 blocks from chunk %d", chunk);
 	Stats.u.v1.lostblocks += count;
@@ -1038,14 +1035,14 @@ RequestChunk(int timedout)
 		/*
 		 * Skip empty and full buffers
 		 */
-		if (! ChunkBuffer[i].inprogress) {
+		if (ChunkBuffer[i].state == CHUNK_EMPTY) {
 			/*
 			 * Keep track of empty chunk buffers while we are here
 			 */
 			emptybufs++;
 			continue;
 		}
-		if (ChunkBuffer[i].ready)
+		if (ChunkBuffer[i].state == CHUNK_FULL)
 			continue;
 
 		fillingbufs++;
