@@ -43,6 +43,7 @@ RESPONSE_BADVERSION     = 4
 RESPONSE_SERVERERROR    = 5
 RESPONSE_TOOBIG         = 6
 RESPONSE_REFUSED        = 7  # Emulab is down, try again later.
+RESPONSE_TIMEDOUT       = 8
 
 class EmulabResponse:
     def __init__(self, code, value=0, output=""):
