@@ -56,10 +56,14 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
-double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &out_fd_violated,
+inline double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &out_fd_violated,
 	bool include_violations);
 inline void add_global_fds(tb_vnode *vnode,tb_pnode *pnode);
 inline void remove_global_fds(tb_vnode *vnode,tb_pnode *pnode);
+inline double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
+			       int &out_fd_violated);
+inline double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
+				  int &out_fd_violated);
 void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
 	tb_vnode *src_vnode, tb_vnode *dst_vnode);
 void unscore_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
@@ -499,8 +503,10 @@ void remove_node(vvertex vv)
    */
   int fd_violated;
   double fds=fd_score(vnode,pnode,fd_violated,true);
-  remove_global_fds(vnode,pnode);
   SSUB(fds);
+  remove_global_fds(vnode,pnode);
+  double sfds=remove_stateful_fds(vnode,pnode,fd_violated);
+  SSUB(sfds);
   violated -= fd_violated;
   vinfo.desires -= fd_violated;
 
@@ -1100,6 +1106,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
   int fd_violated;
   double fds = fd_score(vnode,pnode,fd_violated,is_fixed);
   SADD(fds);
+  double sfds = add_stateful_fds(vnode,pnode,fd_violated);
+  SADD(sfds);
   violated += fd_violated;
   vinfo.desires += fd_violated;
 
@@ -1549,6 +1557,11 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
     for (desire_it = vnode->desires.begin();
 	desire_it != vnode->desires.end();
 	desire_it++) {
+      // We ignore local desires, which are handled by add_stateful_fds() and
+      // remove_stateful_fds()
+      if (desire_it->first[0] == '?') {
+	continue;
+      }
       feature_it = pnode->features.find((*desire_it).first);
       SDEBUG(cerr << "  desire = " << (*desire_it).first << " " <<
 	  (*desire_it).second << endl);
@@ -1581,6 +1594,11 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
   if (!pnode->features.empty()) {
     for (feature_it = pnode->features.begin();
 	feature_it != pnode->features.end();++feature_it) {
+      // We ignore local features, which are handled by add_stateful_fds() and
+      // remove_stateful_fds()
+      if (feature_it->first[0] == '?') {
+	continue;
+      }
       crope feature_name = (*feature_it).first;
       value = (*feature_it).second;
       SDEBUG(cerr << "  feature = " << feature_name
@@ -1635,6 +1653,105 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
 
   SDEBUG(cerr << "  Total feature score: " << fd_score << endl);
   return fd_score;
+}
+
+/*
+ * Compute the features/desires score resulting from mapping the given vnode to
+ * the given vnode. We do this specially for local features and desires,
+ * because they are stateful (ie. we have to explicitly add and subtract them,
+ * we can't just compute the current value statelessly.)
+ * 
+ * Right now, these are all or nothing - we do violations, but no scores
+ */
+double add_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
+                        int &out_fd_violated) {
+  tb_vnode::desires_map::iterator desire_it;
+  if (!vnode->desires.empty()) {
+    for (desire_it = vnode->desires.begin();
+	desire_it != pnode->features.end();++desire_it) {
+      if (desire_it->first[0] == '?') {
+	// Found a local desire - does the pnode have it?
+	tb_pnode::features_map::iterator feature_it;
+	feature_it = pnode->features.find(desire_it->first);
+	if (feature_it == pnode->features.end()) {
+	  // Didn't find the feature - violation!
+	  out_fd_violated++;
+	} else {
+	  // Found the feature, score it
+	  switch (((*desire_it).first)[1]) {
+	    case '+':
+	      /*
+	       * A 'sum' local feature - we add up all of the vnode desires,
+	       * and everything's fine as long as they're <= the pnodes'
+	       * feature weight.
+	       */
+	      double oldvalue;
+	      oldvalue = feature_it->second; 
+	      feature_it->second -= desire_it->second;
+	      if ((oldvalue >= 0) && (feature_it->second < 0)) {
+		// This one pushed us over the edge, violation!
+		out_fd_violated++;
+	      }
+	      break;
+	    default:
+	      // Local features are required to have some kind of type
+	      cout << "Bad local desire " << (*desire_it).first << endl;
+	      exit(EXIT_UNRETRYABLE);
+	    }
+	}
+      }
+    }
+  }
+
+  return 0;
+}
+
+double remove_stateful_fds(tb_vnode *vnode, tb_pnode *pnode,
+                           int &out_fd_violated) {
+  tb_vnode::desires_map::iterator desire_it;
+  if (!vnode->desires.empty()) {
+    for (desire_it = vnode->desires.begin();
+	desire_it != pnode->features.end();++desire_it) {
+      if (desire_it->first[0] == '?') {
+	// Found a local desire - does the pnode have it?
+	tb_pnode::features_map::iterator feature_it;
+	feature_it = pnode->features.find(desire_it->first);
+	if (feature_it == pnode->features.end()) {
+	  // Didn't find the feature, so we just removed a violation (note -
+	  // out_fd_violted gets subtracted from the total violation count, so
+	  // adding to it causes a violation to be removed.)
+	  out_fd_violated++;
+	} else {
+	  // Found the feature, score it
+	  switch (((*desire_it).first)[1]) {
+	    case '+':
+	      /*
+	       * A 'sum' local feature - we add up all of the vnode desires,
+	       * and everything's fine as long as they're <= the pnodes'
+	       * feature weight.
+	       */
+	      double oldvalue;
+	      oldvalue = feature_it->second; 
+	      feature_it->second += desire_it->second;
+	      if ((oldvalue < 0) && (feature_it->second >= 0)) {
+		// This one pushed us over the edge, we removed a violation
+		// (note - out_fd_violted gets subtracted from the total
+		// violation count, so adding to it causes a violation to be
+		// removed.)
+		out_fd_violated++;
+	      }
+	      break;
+	    default:
+	      // Local features are required to have some kind of type
+	      cout << "Bad local desire " << (*desire_it).first << endl;
+	      exit(EXIT_UNRETRYABLE);
+	    }
+	}
+      }
+    }
+  }
+
+  return 0;
 }
 
 /*
