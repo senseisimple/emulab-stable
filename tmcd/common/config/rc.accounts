@@ -542,6 +542,10 @@ sub doshutdown()
     # Nothing to do; we leave the accounts as is when we shutdown.
     # When we update, the boot routine handles adding and deleting
     # old accounts as needed. 
+
+    # Make the CygWin /etc/passwd and /etc/group files match Windows.
+    os_account_cleanup()
+	if (WINDOWS());
 }
 
 #
