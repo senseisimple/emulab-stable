@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	emulab-ops
-PORTVERSION=	1.2
+PORTVERSION=	1.3
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -20,7 +20,8 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	otcl:${PORTSDIR}/lang/otcl \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/BSD/Resource.pm:${PORTSDIR}/devel/p5-BSD-Resource \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Time/HiRes.pm:${PORTSDIR}/devel/p5-Time-HiRes \
-	wget:${PORTSDIR}/ftp/wget
+	wget:${PORTSDIR}/ftp/wget \
+	elvind:${PORTSDIR}/misc/elvind
 
 NO_BUILD=	yes
 

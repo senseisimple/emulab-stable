@@ -43,6 +43,14 @@ use English;
 use libinstall;
 
 #
+# Figure out which directory we live in, so that some stages can do thing
+# relative to it.
+#
+my $OBJDIR = `/usr/bin/dirname $0`;
+chomp $OBJDIR;
+my $TOP_OBJDIR = "$OBJDIR/..";
+
+#
 # Some programs we use
 #
 my $CHGRP      = "/usr/bin/chgrp";
@@ -52,6 +60,7 @@ my $NEWALIASES = "/usr/bin/newaliases";
 my $SH         = "/bin/sh";
 my $PKG_INFO   = "/usr/sbin/pkg_info";
 my $PWD        = "/bin/pwd";
+my $CP         = "/bin/cp";
 
 #
 # Some files we edit/create
@@ -87,6 +96,12 @@ my @MAILING_LIST_NAMES = map { /^([\w-]+)\@/ } @MAILING_LISTS;
 
 my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
     ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
+
+#
+# A few files we have to deal with
+#
+my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
+my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
 
 #
 # Make sure they know what they're getting into...
@@ -139,7 +154,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Installing ports (may take a while)", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.1")) {
+	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.3")) {
 	    PhaseSkip("Ports already installed");
 	}
 
@@ -376,6 +391,13 @@ Phase "capture", "Setting up capture", sub {
 	DoneIfExists($RCCAPTURE);
 	CreateFileFatal($RCCAPTURE,"#!/bin/sh");
 	ExecQuietFatal("$CHMOD a+rx $RCCAPTURE");
+    };
+};
+
+Phase "event", "Setting up event system", sub {
+    Phase "elvinconf", "Installing elvind config file", sub {
+	DoneIfExists("$ELVIND_CONF");
+	ExecQuietFatal("$CP $OPS_ELVIND_CONF $ELVIND_CONF");
     };
 };
 
