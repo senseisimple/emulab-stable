@@ -720,7 +720,13 @@ sub RunAssign ()
     # Assign success; parse results.
     # 
     # read nodes section
-    while (<ASSIGNFP> !~ /^Nodes:/) {}
+    while ((my $line = <ASSIGNFP>) !~ /^Nodes:/) {
+	# find the 'BEST SCORE' line and print that out for informational
+	# purposes
+	if ($line =~ /BEST SCORE/) {
+	    print $line;
+	}
+    }
     printdb "Nodes:\n";
     while (<ASSIGNFP>) {
 	chop;
