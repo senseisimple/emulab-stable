@@ -247,105 +247,103 @@ if ($showlinks) {
     #
     # Actual mapped information for widearea links
     #
+    if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
+	#
+	# Grab all widearea links from the database
+	#
+	my %links = ();
+	$result =
+	    DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
+			 "from virt_lans where pid='$pid' and eid='$eid' and ".
+			 "widearea!=0");
+	if ($result->numrows) {
+	    while (($vname,$member,$delay,$bandwidth,$lossrate) 
+		       = $result->fetchrow_array()) {
+		$member =~ /(.+):(\d+)/;
+		my ($pname,$card) = ($v2pmap{$1},$2);
 
-    #
-    # Grab all widearea links from the database
-    #
-    my %links = ();
-    $result =
-	DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
-		     "from virt_lans where pid='$pid' and eid='$eid' and ".
-		     "widearea!=0");
-    if ($result->numrows) {
-	while (($vname,$member,$delay,$bandwidth,$lossrate) 
-		   = $result->fetchrow_array()) {
-	    $member =~ /(.+):(\d+)/;
-	    my ($pname,$card) = ($v2pmap{$1},$2);
-
-	    #
-	    # Check to see if the 'physical' node name is just a
-	    # virtual (multiplexed) name for a _real_ physical name
-	    #
-	    my $realpname;
-	    if (TBPhysNodeID($pname,\$realpname)) {
-		push @{$links{$vname}}, [$member,$realpname,$card];
-	    } else {
-		push @{$links{$vname}}, [$member,$pname,$card];
+		#
+		# Check to see if the 'physical' node name is just a
+		# virtual (multiplexed) name for a _real_ physical name
+		#
+		my $realpname;
+		if (TBPhysNodeID($pname,\$realpname)) {
+		    push @{$links{$vname}}, [$member,$realpname,$card];
+		} else {
+		    push @{$links{$vname}}, [$member,$pname,$card];
+		}
 	    }
+	}
+
+	if (keys %links) {
+
+	    #
+	    # Grab all data from widearea_recent
+	    #
+	    my $result = DBQueryFatal("select node_id1, node_id2, time, " .
+		"bandwidth, lossrate from widearea_recent");
+	    my %delaymap = ();
+	    while (my ($node_id1, $node_id2, $time, $bandwidth,
+		    $lossrate) = $result->fetchrow) {
+		$delaymap{"$node_id1 $node_id2"} = 
+		    [$time * 1000 / 2, $bandwidth * 8, $lossrate];
+	    }
+
+	    print  "Wide-Area Lan/Link Info: Recent Data\n";
+	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
+		    "ID", "Source", "Destination", "Delay/2", "BW (Kbs)",
+		    "Loss Rate";
+	    print  "--------------- --------------- --------------- --------- ".
+		    "--------- ---------\n";
+
+	    foreach my $link (sort keys %links) {
+		my ($node1, $node2) = @{$links{$link}};
+		my ($virt1,$pname1,$card1) = @$node1;
+		my ($virt2,$pname2,$card2) = @$node2;
+
+		my ($wname1, $wname2);
+		if (!TBWideareaNodeID($pname1,\$wname1)) {
+		    $wname1 = $pname1;
+		}
+		if (!TBWideareaNodeID($pname2,\$wname2)) {
+		    $wname2 = $pname2;
+		}
+
+		#
+		# Have to get both orders (node1,node2) and (node2,node1)
+		#
+		printf "%-15s %-15s %-15s ", $link, $virt1, $virt2;
+		my $delay1 = $delaymap{"$wname1 $wname2"};
+		if (!$delay1) {
+		    if ($wname1 eq $wname2) {
+			print "Local or loopback connection\n";
+		    } else {
+			print "No data available\n";
+		    }
+		} else {
+		    my ($time, $bandwidth, $lossrate) =  @$delay1;
+		    printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth,
+			    $lossrate;
+		}
+
+		printf "%-15s %-15s %-15s ", $link, $virt2, $virt1;
+		my $delay2 = $delaymap{"$wname2 $wname1"};
+		if (!$delay2) {
+		    if ($wname1 eq $wname2) {
+			print "Local or loopback connection\n";
+		    } else {
+			print "No data available\n";
+		    }
+		} else {
+		    my ($time, $bandwidth, $lossrate) =  @$delay2;
+		    printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth,
+			    $lossrate;
+		}
+	    }
+
+	    print "\n";
 	}
     }
-
-    if (keys %links &&
-	    (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
-	#
-	# First, show using recent widearea data
-	#
-
-	#
-	# Grab all data from widearea_recent
-	#
-	my $result = DBQueryFatal("select node_id1, node_id2, time, " .
-	    "bandwidth, lossrate from widearea_recent");
-	my %delaymap = ();
-	while (my ($node_id1, $node_id2, $time, $bandwidth,
-		$lossrate) = $result->fetchrow) {
-	    $delaymap{"$node_id1 $node_id2"} = 
-	    	[$time * 1000 / 2, $bandwidth * 8, $lossrate];
-	}
-
-	print  "Wide-Area Lan/Link Info: Recent Data\n";
-	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-		"ID", "Source", "Destination", "Delay/2", "BW (Kbs)",
-		"Loss Rate";
-	print  "--------------- --------------- --------------- --------- ".
-		"--------- ---------\n";
-
-	foreach my $link (sort keys %links) {
-	    my ($node1, $node2) = @{$links{$link}};
-	    my ($virt1,$pname1,$card1) = @$node1;
-	    my ($virt2,$pname2,$card2) = @$node2;
-
-	    my ($wname1, $wname2);
-	    if (!TBWideareaNodeID($pname1,\$wname1)) {
-		$wname1 = $pname1;
-	    }
-	    if (!TBWideareaNodeID($pname2,\$wname2)) {
-		$wname2 = $pname2;
-	    }
-
-	    #
-	    # Have to get both orders (node1,node2) and (node2,node1)
-	    #
-	    printf "%-15s %-15s %-15s ", $link, $virt1, $virt2;
-	    my $delay1 = $delaymap{"$wname1 $wname2"};
-	    if (!$delay1) {
-		if ($wname1 eq $wname2) {
-		    print "Local or loopback connection\n";
-		} else {
-		    print "No data available\n";
-		}
-	    } else {
-		my ($time, $bandwidth, $lossrate) =  @$delay1;
-		printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth, $lossrate;
-	    }
-
-	    printf "%-15s %-15s %-15s ", $link, $virt2, $virt1;
-	    my $delay2 = $delaymap{"$wname2 $wname1"};
-	    if (!$delay2) {
-		if ($wname1 eq $wname2) {
-		    print "Local or loopback connection\n";
-		} else {
-		    print "No data available\n";
-		}
-	    } else {
-		my ($time, $bandwidth, $lossrate) =  @$delay2;
-		printf "%-9.2f %-9.2f %-9.4f\n", $time, $bandwidth, $lossrate;
-	    }
-	}
-
-	print "\n";
-    }
-
 }
 
 
