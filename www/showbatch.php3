@@ -105,12 +105,12 @@ echo "<tr>
       </tr>\n";
 
 echo  "<tr>
-          <td>Extimated #PCs: </td>
+          <td>Estimated #PCs: </td>
           <td class=\"left\">$numpcs</td>
       </tr>\n";
 
 echo  "<tr>
-          <td>Extimated #Sharks: </td>
+          <td>Estimated #Sharks: </td>
           <td class=\"left\">$numsharks</td>
       </tr>\n";
 
@@ -120,6 +120,12 @@ echo "<tr>
       </tr>\n";
 
 echo "</table>\n";
+
+# Terminate option.
+echo "<p><center>
+       Do you want to terminate this batch experiment?
+       <A href='endbatch.php3?exp_pideid=$exp_pid\$\$$exp_eid'>Yes</a>
+      </center>\n";    
 
 #
 # Dump experiment record if its currently running.

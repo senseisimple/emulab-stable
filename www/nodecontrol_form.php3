@@ -62,6 +62,7 @@ $def_boot_path      = $row[def_boot_path];
 $def_boot_cmd_line  = $row[def_boot_cmd_line];
 $next_boot_path     = $row[next_boot_path];
 $next_boot_cmd_line = $row[next_boot_cmd_line];
+$rpms               = $row[rpms];
 $startupcmd         = $row[startupcmd];
 
 echo "<table border=2 cellpadding=0 cellspacing=2
@@ -131,12 +132,19 @@ echo "<tr>
 
 
 echo "<tr>
-          <td>Startup Command:</td>
+          <td>Startup Command[1]:</td>
           <td class=\"left\">
               <input type=\"text\" name=\"startupcmd\" size=\"60\"
                      value=\"$startupcmd\"></td>
       </tr>\n";
 
+
+echo "<tr>
+          <td>RPMs[2]:</td>
+          <td class=\"left\">
+              <input type=\"text\" name=\"rpms\" size=\"60\"
+                     value=\"$rpms\"></td>
+      </tr>\n";
 
 echo "<tr>
           <td colspan=2 align=center>
@@ -145,6 +153,15 @@ echo "<tr>
      </tr>
      </form>
      </table>\n";
+
+echo "<p>
+      <dl COMPACT>
+        <dt> [1]
+           <dd> Node startup command must be a pathname. You may also include
+                optional arguments.
+        <dt> [2]
+           <dd> RPMs must be a comma separated list of pathnames.
+      </dl>\n";
 
 #
 # Standard Testbed Footer

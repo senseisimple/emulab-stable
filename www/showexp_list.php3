@@ -55,13 +55,13 @@ if (mysql_num_rows($experiments_result)) {
            <h2>Running Experiments</h2>
           </center>\n";
     
-    echo "<table width=\"100%\" border=2
+    echo "<table border=2 cols=0
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
-              <td>PID</td>
-              <td>EID</td>
-              <td>Name</td>
-              <td align=center>Terminate</td>
+              <td width=10%>PID</td>
+              <td width=20%>EID</td>
+              <td width=5% align=center>Terminate</td>
+              <td width=65%>Name</td>
             </tr>\n";
 
     while ($row = mysql_fetch_array($experiments_result)) {
@@ -73,10 +73,10 @@ if (mysql_num_rows($experiments_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showexp.php3?exp_pideid=$pid\$\$$eid'>
                        $eid</A></td>
-                <td>$name</td>
 	        <td align=center>
                     <A href='endexp.php3?exp_pideid=$pid\$\$$eid'>
                        <img alt=\"o\" src=\"redball.gif\"></A></td>
+                <td>$name</td>
                </tr>\n";
     }
     echo "</table>\n";
@@ -87,13 +87,13 @@ if (mysql_num_rows($batch_result)) {
            <h2>Batch Mode Experiments</h2>
           </center>\n";
     
-    echo "<table width=\"100%\" border=2
+    echo "<table border=2
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
-              <td>PID</td>
-              <td>EID</td>
-              <td>Name</td>
-              <td align=center>Terminate</td>
+              <td width=10%>PID</td>
+              <td width=20%>EID</td>
+              <td width=5% align=center>Terminate</td>
+              <td width=65%>Name</td>
             </tr>\n";
 
     while ($row = mysql_fetch_array($batch_result)) {
@@ -105,10 +105,10 @@ if (mysql_num_rows($batch_result)) {
                 <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
                 <td><A href='showbatch.php3?exp_pideid=$pid\$\$$eid'>
                        $eid</A></td>
-                <td>$name</td>
 	        <td align=center>
                     <A href='endbatch.php3?exp_pideid=$pid\$\$$eid'>
                        <img alt=\"o\" src=\"redball.gif\"></A></td>
+                <td>$name</td>
                </tr>\n";
     }
     echo "</table>\n";

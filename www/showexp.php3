@@ -63,6 +63,12 @@ echo "<center>
       </center>\n";
 SHOWEXP($exp_pid, $exp_eid);
 
+# Terminate option.
+echo "<p><center>
+       Do you want to terminate this experiment?
+       <A href='endexp.php3?exp_pideid=$exp_pid\$\$$exp_eid'>Yes</a>
+      </center>\n";    
+
 #
 # Dump the node information.
 #
