@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -146,6 +146,7 @@ system("rm -rf /tmp/* /tmp/.??*");
 print "Removing SFS files ...\n";
 if (-f $SFSUSERS) {
     system("rm -f $SFSUSERS ${SFSUSERS}.pub");
+    system("rm -f $SFSUSERS.old ${SFSUSERS}.pub.old");
 }
 if (-f $SFSHOSTKEY) {
     system("rm -f $SFSHOSTKEY");
