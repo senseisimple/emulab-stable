@@ -216,7 +216,7 @@ sub doboot()
     #
     if (-x "$BINDIR/evproxy") {
 	print("Starting elvin proxy daemon\n");
-	system("$BINDIR/evproxy -s $bossip -e $pid/$eid");
+	system("$BINDIR/evproxy -s event-server -e $pid/$eid");
 	if ($?) {
 	    fatal("Error running $BINDIR/evproxy");
 	}
