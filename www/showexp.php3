@@ -87,7 +87,19 @@ if ($expstate) {
     elseif (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
 	WRITESUBMENUBUTTON("Swap this Experiment out",
 		      "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
-	if (ISADMIN($uid)) {
+        #
+        # Admin folks get a swap request link to send email.
+        #
+        if (ISADMIN($uid)) {
+            WRITESUBMENUBUTTON("Send a swap/terminate request",
+			       "request_swapexp.php3?".
+			       "&pid=$exp_pid&eid=$exp_eid");
+
+	    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
+		WRITESUBMENUBUTTON("Force Swap Out (Idle-Swap)",
+				   "swapexp.php3?inout=out&force=1".
+				   "&pid=$exp_pid&eid=$exp_eid");
+	    }
 	    WRITESUBMENUBUTTON("Control Delay Nodes (BETA)",
 			       "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
 	    
@@ -119,19 +131,6 @@ if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
 		       "boot.php3?pid=$exp_pid&eid=$exp_eid");
 }
 
-#
-# Admin folks get a swap request link to send email.
-#
-if (ISADMIN($uid)) {
-    WRITESUBMENUBUTTON("Send a swap/terminate request",
-		       "request_swapexp.php3?&pid=$exp_pid&eid=$exp_eid");
-
-    if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) == 0) {
-	WRITESUBMENUBUTTON("Force Experiment Swap Out",
-			   "swapexp.php3?inout=out&force=1".
-			   "&pid=$exp_pid&eid=$exp_eid");
-    }
-}
 SUBMENUEND_2A();
 
 echo "<br>
