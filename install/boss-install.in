@@ -208,7 +208,7 @@ use Getopt::Std;
 # Handle command-line options
 #
 sub usage {
-    print "Usage: ops-install [-p packagedir]\n";
+    print "Usage: boss-install [-p packagedir] [-P portname]\n";
     exit(1);
 }
 
@@ -217,7 +217,7 @@ my $batchmode  = 0;
 my $password;
 my %opts;
 
-if (! getopts("p:bw:", \%opts)) {
+if (! getopts("P:p:bw:", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -228,6 +228,9 @@ if (defined($opts{b})) {
 }
 if (defined($opts{w})) {
     $password = $opts{w};
+}
+if (defined($opts{P})) {
+    $BOSS_PORT = $opts{P};
 }
 
 if (@ARGV) {

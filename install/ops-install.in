@@ -52,14 +52,14 @@ use Getopt::Std;
 # Handle command-line options
 #
 sub usage {
-    print "Usage: ops-install [-b] [-p packagedir]\n";
+    print "Usage: ops-install [-b] [-p packagedir] [-P portname]\n";
     exit(1);
 }
 
 my $packagedir = "";
 my $batchmode  = 0;
 my %opts;
-if (! getopts("p:b", \%opts)) {
+if (! getopts("P:p:b", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -67,6 +67,9 @@ if (defined($opts{p})) {
 }
 if (defined($opts{b})) {
     $batchmode = 1;
+}
+if (defined($opts{P})) {
+    $OPS_PORT = $opts{P};
 }
 
 if (@ARGV) {
