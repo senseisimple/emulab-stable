@@ -1042,6 +1042,25 @@ last_net_act,last_cpu_act,last_ext_act);
 
 		./initstats.pl | mysql tbdb
 
+1.196: Add new virt_programs table to hold the details of a program
+       object.
 
+	CREATE TABLE virt_programs (
+	  pid varchar(12) NOT NULL default '',
+	  eid varchar(32) NOT NULL default '',
+	  vnode varchar(32) NOT NULL default '',
+	  vname varchar(32) NOT NULL default '',
+	  command tinytext,
+	  PRIMARY KEY  (pid,eid,vnode,vname),
+	  KEY vnode (vnode)
+	) TYPE=MyISAM;
 
-       
+	Existing experiments have the info contained in the static
+	eventlist. We can create the above records from the eventlist
+	with the following query, which I will run once all the
+	support is installed.
+
+	insert into virt_programs (pid, eid, vnode, vname, command) \
+	    select pid,eid,vnode,vname,SUBSTRING(arguments,9) \
+	    from eventlist where objecttype=4 and eventtype=1;
+

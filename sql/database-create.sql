@@ -1539,6 +1539,20 @@ CREATE TABLE virt_nodes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `virt_programs`
+--
+
+CREATE TABLE virt_programs (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vnode varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  command tinytext,
+  PRIMARY KEY  (pid,eid,vnode,vname),
+  KEY vnode (vnode)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `virt_routes`
 --
 
