@@ -57,17 +57,17 @@ my $debug = 0;
 my $thumb = 0;
 my $foreground = 0;
 
-if ( defined($options{"v"}) ) { 
-    $debug++; 
+if ( defined($options{"v"}) ) {
+    $debug++;
     # pass verbosity along to thumbnail render.
-    $THUMB_CMD .= " -v"; 
+    $THUMB_CMD .= " -v";
 }
 
-if ( defined($options{"t"}) ) { 
-    $thumb++; 
+if ( defined($options{"t"}) ) {
+    $thumb++;
 }
-if ( defined($options{"f"}) ) { 
-    $foreground++; 
+if ( defined($options{"f"}) ) {
+    $foreground++;
 }
 
 #my ($pid) = $ARGV[0];
@@ -89,26 +89,26 @@ sub handler ($) {
 
 #
 # See if another prerender is still running. If so, kill it and update the
-# pid in the DB. We always kill a running prerender. 
+# pid in the DB. We always kill a running prerender.
 #
 KillOldRender();
 
-### If they specified -r, meaning they just wanted to remove vis info 
+### If they specified -r, meaning they just wanted to remove vis info
 ### from the DB, we do it and quit.
 if (defined($options{"r"})) {
-    DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
-    exit 0; 
+    DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");
+    exit 0;
 }
 
 #
-# Okay, go into the background. 
-# 
+# Okay, go into the background.
+#
 if (! $foreground) {
     if (TBBackGround("prerender.output")) {
 	#
 	# Parent exits normally
 	#
-	print STDOUT "Image rendering proceeding in background mode ...\n"; 
+	print STDOUT "Image rendering proceeding in background mode ...\n";
 	exit(0);
     }
 
@@ -122,7 +122,7 @@ if (! $foreground) {
     # Enter our pid into the DB.
     #
     $renderpid = $PID;
-    
+
     DBQueryFatal("update experiments set ".
 		 "prerender_pid=$renderpid ".
 		 "where pid='$pid' and eid='$eid'");
@@ -135,7 +135,7 @@ setpriority(PRIO_PROCESS, 0, 15);
 
 # read nodes
 
-my $result = DBQueryWarn("SELECT vname FROM virt_nodes " .
+my $result = DBQueryWarn("SELECT vname,fixed FROM virt_nodes " .
 			 "WHERE pid='$pid' AND eid='$eid'");
 
 fatal("Failed to get virt_nodes info from DB")
@@ -144,10 +144,30 @@ fatal("Failed to get virt_nodes info from DB")
 my $nodes = ();
 my $lans  = ();
 my $links = ();
+my $fixednodes = ();
 
 # all virt_nodes are visualizer nodes of type "node"
-while (my ($vname) = $result->fetchrow) {
-    $nodes{$vname}{"type"} = "node";
+while (my ($vname,$fixed) = $result->fetchrow) {
+    dprint "node $vname $fixed\t";
+    if (!defined($fixednodes{$vname})) {
+	# This node is not a parent node, so we can add it
+	$nodes{$vname}{"type"} = "node";
+	dprint "added nodes($vname)\t";
+    } else {
+	dprint "$vname is a fixed host!\t";
+    }
+    if (defined($fixed) && $fixed ne "") {
+	# $vname is a subnode of $fixed, so we don't want
+	# to viz any vnames named $fixed
+	dprint "adding fixed($fixed)\t";
+	$fixednodes{$fixed} = $vname;
+	if (defined($nodes{$fixed})) {
+	    # Remove the node if it is already there
+	    delete $nodes{$fixed};
+	    dprint "rm nodes($fixed)\t";
+	}
+    }
+    dprint "\n";
 }
 
 # read lans
@@ -160,7 +180,13 @@ fatal("Failed to get virt_lans info from DB")
 
 while (my ($vname, $member) = $result->fetchrow) {
     $member =~ s/\:.*//;
-    $lans{$vname}{$member} = 1;
+    dprint "link $vname $member\t";
+    if (defined($nodes{$member})) {
+	# the node exists, so add the link
+	$lans{$vname}{$member} = 1;
+	dprint "added lans($vname)($member)\t";
+    }
+    dprint "\n";
 }
 
 # construct links from lans
@@ -233,21 +259,21 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 # stashes away all properties returned for each graph node.
 # (All we care about for now is "pos")
 # Links are ignored.
-    
+
     while (<NEATO>) {
 	if (/^\s*(\w+)\s\[([^\]]*)\]/) {
 	    # this line is a property set
 	    ($cmd, $props) = ($1, $2);
 	    $props =~ s/[\=\,]/ /g;
-	    
+
 	    while (($props =~ s/^\s*(\w+)\s+((\"[^\"]*\")|(\w+))\s*//)) {
 		# add each property to %props
 		($k, $v) = ($1, $2);
 		$v =~ s/\"//g;
 		$props{$k} = $v;
 #	        print "property $k gets value $v\n";
-	    } 
-	    
+	    }
+
 	    if ($cmd =~ /^node$/) {
 #	print "node property $props\n";
 	    } elsif ($cmd =~ /^graph$/) {
@@ -255,32 +281,32 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	    } else {
 		# there is a name here, not "node" or "graph"
 		# so it terminates the node.. store props away.
-		$nodeProps{$cmd} = {%props}; 
+		$nodeProps{$cmd} = {%props};
 		%props = ();
 	    }
-	} 
+	}
     }
 
 # done with neato process.
-    
+
     close(NEATO);
-    
+
 # obtain X,Y for each node from stashed Properties.
-    
+
     foreach $node (keys %nodes) {
 	my $mungedName = mungeName( $node );
 	if (exists $nodeProps{$mungedName}{"pos"}) {
 	    $s = $nodeProps{$mungedName}{"pos"};
-	    $s =~ /^\s*(\d+)\s+(\d+)/;    
+	    $s =~ /^\s*(\d+)\s+(\d+)/;
 	    $nodes{ $node }{"x"} = $1;
-	    $nodes{ $node }{"y"} = $2; 	
+	    $nodes{ $node }{"y"} = $2;
 	} else {
 	    warn "No position information returned for $node (mungedName=$mungedName)";
 	}
     }
-    
+
 ### Fixup positions (eat free columns and rows)
-    
+
     my $subX = 0;
     my $lastX = 0;
     foreach $i (sort {$nodes{$a}{"x"} <=> $nodes{$b}{"x"}} keys %nodes) {
@@ -292,7 +318,7 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	$lastX = $nodes{$i}{"x"};
 	$nodes{$i}{"x"} -= $subX;
     }
-    
+
     my $subY = 0;
     my $lastY = 0;
     foreach $i (sort {$nodes{$a}{"y"} <=> $nodes{$b}{"y"}} keys %nodes) {
@@ -305,7 +331,7 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	$nodes{$i}{"y"} -= $subY;
     }
 
-    # check for overlaps 
+    # check for overlaps
     # false positive: each pair is checked twice. should fix this
     # false positive: two edges which end at the same node "collide".
     #                 but, this shouldn't give any attempt an unfair advantage.
@@ -331,7 +357,7 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	foreach my $linkb (keys %links) {
 	    # never check a link against itself
 	    if ($linka eq $linkb) { next; }
-    
+
 	    my ($b1, $b2) = ($linkb =~ /(\S+)\s(\S+)/);
 
 	    defined $b1 or fatal("b1");
@@ -360,13 +386,13 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 		    # there's nothing to be done.
 		    next;
 		}
-		
+
 		# if segments share a common endpoint,
 		# then see if they are at a greater than 5 degree angle.
 
-		my ($adx, $ady) = ($nodes{$unshared0}{"x"} - $nodes{$shared}{"x"}, 
+		my ($adx, $ady) = ($nodes{$unshared0}{"x"} - $nodes{$shared}{"x"},
 				   $nodes{$unshared0}{"y"} - $nodes{$shared}{"y"} );
-		my ($bdx, $bdy) = ($nodes{$unshared1}{"x"} - $nodes{$shared}{"x"}, 
+		my ($bdx, $bdy) = ($nodes{$unshared1}{"x"} - $nodes{$shared}{"x"},
 				   $nodes{$unshared1}{"y"} - $nodes{$shared}{"y"} );
 
 		my $alen = sqrt( $adx * $adx + $ady * $ady );
@@ -377,42 +403,42 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 		# cos(Theta), which we compare with cos(5 degrees).
 		my $dotProduct = ($adx * $bdx + $ady * $bdy) / ($alen * $blen);
 
-		# cosine of 10 deg is ~0.9848	       
-		# cosine of 5 deg is ~0.9962	       
-		if ($dotProduct > 0.9962) { 
+		# cosine of 10 deg is ~0.9848
+		# cosine of 5 deg is ~0.9962
+		if ($dotProduct > 0.9962) {
 		    # dprint "overlap '$linka'-'$linkb' $dotProduct\n";
 		    # bad overlap.
-		    $overlaps += 0.9; 
-		} elsif ($dotProduct > 0.9848) { 
+		    $overlaps += 0.9;
+		} elsif ($dotProduct > 0.9848) {
 		    # dprint "overlap '$linka'-'$linkb' $dotProduct\n";
-		    $overlaps += 0.5; 
+		    $overlaps += 0.5;
 		}
-		
+
 		next;
 	    }
 
-	    
+
 	    # formula derived from solving simultaneous parametric line equations
 	    # u is parameter for line A, v is for line B.
-	    # for line segments to collide, u and v of collision must both be 
+	    # for line segments to collide, u and v of collision must both be
 	    # between 0 and 1 (inclusive).
 
 	    my ($k0, $k1, $k2) = ($a2x - $a1x, $b1x - $b2x, $a1x - $b1x);
 	    my ($k3, $k4, $k5) = ($a2y - $a1y, $b1y - $b2y, $a1y - $b1y);
-	    
+
 	    my $v_n = ($k2 * $k3 - $k0 * $k5);
 	    my $v_d = ($k0 * $k4 - $k3 * $k1);
-	    
+
 	    if ($v_d < 0.001 && $v_d > -0.001) { next; } # no solution (i.e., lines are parallel)
 	    my $v = $v_n / $v_d;
-	    
+
 	    my $u_n = -($k4 * $v + $k5);
 	    my $u_d = $k3;
 	    if ($u_d < 0.001 && $u_d > -0.001) { next; } # no solution (i.e., lines are parallel)
-	    
+
 	    my $u = $u_n / $u_d;
-	    
-	    if ($u >= 0.0 && $u <= 1.0 && 
+
+	    if ($u >= 0.0 && $u <= 1.0 &&
 		$v >= 0.0 && $v <= 1.0) {
 		#dprint "overlap '$linka'-'$linkb' u=$u v=$v\n";
 		$overlaps++;
@@ -435,7 +461,7 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	# trying to vis this experiment during this window.
 	$result =
 	    DBQueryWarn("lock tables vis_nodes write");
-	
+
 	fatal("Failed to lock vis_nodes table.")
 	    if (!$result);
 
@@ -447,20 +473,20 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 
 	# Then stash new one.
 	foreach $node (keys %nodes) {
-	    $result = 
+	    $result =
 		DBQueryWarn("INSERT INTO vis_nodes ".
 			    "(vname, pid, eid, vis_type, x, y) VALUES".
 			    " ('$node', '$pid', '$eid', " .
 			    "'" . $nodes{ $node }{"type"} . "', " .
 			    "'" . $nodes{ $node }{"x"}    . "', " .
 			    "'" . $nodes{ $node }{"y"}    . "') ");
-	
+
 	    fatal("Failed to insert new vis_nodes into DB")
 		if (!$result);
 	}
 	$result =
 	    DBQueryWarn("unlock tables");
-	
+
 	fatal("Failed to unlock vis_nodes table.")
 	    if (!$result);
 
@@ -473,7 +499,7 @@ for ($attempt = 0; $attempt < 16; $attempt++) {
 	if ($thumb) {
 	    my $workdir = TBExptWorkDir($pid, $eid);
 	    my $fname   = "$workdir/$eid.png";
-	
+
 	    if (system("$THUMB_CMD $pid $eid > $fname")) {
 		print STDERR "Error generating thumbnail.\n";
 	    }
@@ -505,7 +531,7 @@ sub mungeName($) {
 	return $mungeMap{$n};
     }
     my $nm = $n;
-    $nm =~ s/\W+/_/g; 
+    $nm =~ s/\W+/_/g;
     $nm .= "__" . $mungeUID++;
     $mungeMap{$n} = $nm;
     return $nm;
@@ -532,9 +558,9 @@ sub cleanup()
 sub fatal($)
 {
     my $msg = shift;
-    
+
     cleanup();
-    DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");    
+    DBQueryFatal("DELETE FROM vis_nodes WHERE pid='$pid' AND eid='$eid'");
     die("*** $0:\n".
 	"    $msg\n");
 }
@@ -546,11 +572,11 @@ sub KillOldRender()
     my $query_result =
 	DBQueryFatal("select prerender_pid from experiments ".
 		     "where pid='$pid' and eid='$eid'");
-    
+
     DBQueryFatal("update experiments set ".
 		 "prerender_pid=-prerender_pid ".
 		 "where pid='$pid' and eid='$eid'");
-		 
+
     DBQueryWarn("unlock tables");
 
     my @row    = $query_result->fetchrow_array();
@@ -566,7 +592,7 @@ sub KillOldRender()
 	    DBQueryWarn("update experiments set ".
 			"prerender_pid=-prerender_pid ".
 			"where pid='$pid' and eid='$eid'");
-	
+
 	    SENDMAIL($TBOPS,
 		     "Failed to stop prerender for $pid/$eid",
 		     "Could not kill(TERM) process $procid: $? $err");
