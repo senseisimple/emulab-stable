@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DIR=/usr/testbed/bin/pxe
+DIR=@prefix@/sbin
 
 killall bootinfo
 ${DIR}/bootinfo > /dev/null 2>&1 &

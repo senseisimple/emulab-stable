@@ -1,6 +1,0 @@
-#!/bin/sh
-
-DIR=/usr/testbed/bin/pxe
-
-killall proxydhcp
-${DIR}/proxydhcp ${DIR}/proxydhcp.conf > /dev/null 2>&1 &

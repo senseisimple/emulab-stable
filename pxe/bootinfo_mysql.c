@@ -8,7 +8,7 @@
 
 #ifdef USE_MYSQL_DB
 
-static char dbname[] = "tbdb";
+static char dbname[] = TBDBNAME;
 static MYSQL db;
 
 int

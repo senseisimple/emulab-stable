@@ -2,9 +2,10 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
-include ../GNUmakerules
 
 all: sql.so
+
+include ../GNUmakerules
 
 sql.so:
 	./mk_sqlso.sh

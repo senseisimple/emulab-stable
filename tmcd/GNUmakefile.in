@@ -2,11 +2,12 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
+
+all:	tmcd tmcc
+
+DISTCLEAN_FILES = tmcd.restart
+
 include ../GNUmakerules
-
-PROGRAMS = tmcd tmcc
-
-all:	$(PROGRAMS)
 
 tmcd: tmcd.c
 	$(CC) $(CFLAGS) -g -o tmcd tmcd.c \
@@ -21,8 +22,8 @@ tmcd.c:	decls.h
 
 install:	all
 
-install:	$(INSTALL_BINDIR)/tmcd/tmcd \
-		$(INSTALL_BINDIR)/tmcd/tmcd.restart
+install:	$(INSTALL_SBINDIR)/tmcd \
+		$(INSTALL_SBINDIR)/tmcd.restart
 
 $(INSTALL_BINDIR)/tmcd/%: %
 	@echo "Installing $<"
@@ -30,5 +31,4 @@ $(INSTALL_BINDIR)/tmcd/%: %
 	$(INSTALL_PROGRAM) $< $@
 
 clean: 
-	rm -f *.o core $(PROGRAMS)
-
+	rm -f *.o core tmcd tmcc

@@ -43,15 +43,9 @@ I could just figure out how to add a php mode to emacs ...
 
 * Backup links in all the pages.
 
-* Admin page to remove a project.
-
-* Admin page to remove a user.
-
 * Admin page to remove an experiment.
 
-* Add confirm buttons in various places. I did one in the end experiments
-  page, as a simple button (so you gotta press two things). I think this
-  appproach is fine.
+* Edit project information page.
 
 * Fix case sensitivity problems in project, user, and experiment names.
   That is, anyplace a user *types* in a username, project name, or an

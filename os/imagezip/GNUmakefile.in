@@ -1,10 +1,11 @@
 include ../../Makeconf
+
+all:	imagezip imageunzip
+
 include ../../GNUmakerules
 
 CFLAGS = -O2 -g
 LIBS = -lz
-
-all:	imagezip imageunzip
 
 imagezip: imagezip.c
 	$(CC) $(CFLAGS) imagezip.c $(LIBS) -o imagezip

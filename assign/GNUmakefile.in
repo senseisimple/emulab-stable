@@ -2,11 +2,13 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
+
+all: assign 
+
 include ../GNUmakerules
 
-CXX=/usr/bin/g++
-CC=/usr/bin/gcc 
-LEDA=/usr/testbed/LEDA/LEDA-4.0
+LEDA=@LEDA@
+
 OBJS=score.o parse_top.o parse_ptop.o
 LIBS+=-L${LEDA} -lD3 -lW -lP -lG -lL -L/usr/X11R6/lib -lX11 -lm -L.
 LDFLAGS+= -O3 -fomit-frame-pointer -m486
@@ -15,8 +17,6 @@ CXXFLAGS = -I${LEDA}/incl
 CXXFLAGS += -Wall -O3 -fomit-frame-pointer -m486
 #CXXFLAGS += -O0 -g -Wall -DSCORE_DEBUG -DVERBOSE -DSCORE_DEBUG_MORE
 DEPLIBS=$(OBJS)
-
-all: assign 
 
 assign: ${DEPLIBS} ${OBJS} assign.o
 	${CXX} assign.o -o assign ${LIBS} $(OBJS) ${LDFLAGS}
@@ -31,4 +31,3 @@ install: $(INSTALL_BINDIR)/assign $(INSTALL_LIBDIR)/assign
 
 clean:
 	/bin/rm -f *.o assign 
-

@@ -1,7 +1,8 @@
 include ../../Makeconf
-include ../../GNUmakerules
 
 all: checkpass cracklib
+
+include ../../GNUmakerules
 
 checkpass: cracklib
 	${CC} -g checkpass.c cracklib,2.7/cracklib/libcrack.a -o checkpass -lm

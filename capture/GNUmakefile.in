@@ -1,3 +1,9 @@
+include ../Makeconf
+
+all: capture
+
+include ../GNUmakerules
+
 DESTDIR=
 
 #
@@ -6,16 +12,15 @@ DESTDIR=
 #
 CFLAGS= -g -O2 -DLOG_DROPS
 
-all: capture
-
 capture: capture.c
 	cc $(CFLAGS) -o capture capture.c
 
-install: capture
+#
+# Do not install by default.
+#
+install:
+real-install:	all
 	install -s capture $(DESTDIR)/usr/site/bin
 
-clean: FRC
+clean:
 	rm -f *.o capture core errs Errs
-
-FRC:
-

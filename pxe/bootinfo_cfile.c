@@ -14,11 +14,7 @@
  */
 #ifdef USE_CFILE_DB
 
-#ifdef TEST
 #define CFILE	"bootinfo.conf"
-#else
-#define CFILE	"/usr/testbed/etc/bootinfo.conf"
-#endif
 
 struct config {
 	struct in_addr	client;
@@ -39,7 +35,15 @@ static void		print_bootwhat(boot_what_t *bootinfo);
 int
 open_bootinfo_db(void)
 {
-	return parse_configs(CFILE);
+	char	cfile[BUFSIZ];
+	
+#ifdef TEST
+	strcpy(cfile, CFILE);
+#else
+	strcpy(cfile, CONFPATH);
+	strcat(cfile, CFILE);
+#endif
+	return parse_configs(cfile);
 }
 
 int
@@ -51,6 +55,12 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		return 1;
 
 	memcpy(info, &configp->bootinfo, configp->bootinfolen);
+	return 0;
+}
+
+int
+ack_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
+{
 	return 0;
 }
 

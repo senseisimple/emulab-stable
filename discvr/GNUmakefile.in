@@ -2,6 +2,9 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
+
+all: cli serv
+
 include ../GNUmakerules
 
 OBJS=get_ifi_info.o get_rtaddrs.o net_rt_iflist.o sock_ntop.o util.o
@@ -10,8 +13,6 @@ COBJS=cli.o
 LIBS = -lm
 CFLAGS += -Wall -g 
 CC=gcc
-
-all: cli serv
 
 cli: ${OBJS} ${COBJS}
 	$(CC) $(LIBS) $(OBJS) $(COBJS) -o cli

@@ -2,7 +2,6 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
-include ../GNUmakerules
 
 SUBDIRS		= checkpass
 SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
@@ -10,12 +9,13 @@ SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
 		  tbrun tbprerun tbreport vpower vsnmpit killtip \
 		  mkacct-ctrl_wrapper rmacct-ctrl_wrapper rmprojdir_wrapper \
 		  sched_reload os_setup
-DATAFILES	= 
 SUSCRIPTS	= mkprojdir rmprojdir os_setup  \
 	          mkacct-ctrl rmacct-ctrl os_load console_setup
 SBINSCRIPTS     = console_setup.proxy
 
 all:	$(BINS) $(SUBDIRS)
+
+include ../GNUmakerules
 
 .PHONY:	checkpass
 checkpass:
@@ -41,7 +41,7 @@ subdir-install:
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(SCRIPTS)) \
 	 $(addprefix $(INSTALL_BINDIR)/, $(SUSCRIPTS)) \
 	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SCRIPTS)) \
-	 $(addprefix $(INSTALL_LIBTBDIR)/, $(DATAFILES)) \
+	 $(addprefix $(INSTALL_LIBTBDIR)/, $(SUSCRIPTS)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBINSCRIPTS))
 
 #
@@ -84,5 +84,17 @@ post-install:
 	chown root $(INSTALL_LIBTBDIR)/console_setup
 	chmod u+s $(INSTALL_LIBTBDIR)/console_setup
 
-clean:
+clean:	subdir-clean
 	rm -f *.o $(BINS) core
+
+subdir-clean:
+	@$(MAKE) -C checkpass clean
+	@$(MAKE) -C ir clean
+	@$(MAKE) -C ns2ir clean
+
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C checkpass distclean
+	@$(MAKE) -C ir distclean
+	@$(MAKE) -C ns2ir distclean

@@ -2,16 +2,23 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
-include ../GNUmakerules
-
-DBFLAG	= -DUSE_MYSQL_DB #-DUSE_CFILE_DB #-DUSE_NULL_DB
-DBSRC	= bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
-
-CFLAGS	= -g -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG
-INCS	= -I/n/moab/z/mike/flux/install.debug/include
-#INCS	= -I/build/oskit-debug/install/include
 
 all: proxydhcp bootinfo
+
+DISTCLEAN_FILES = proxydhcp.restart bootinfo.restart
+
+include ../GNUmakerules
+
+DBFLAG	= -DUSE_MYSQL_DB
+#DBFLAG = -DUSE_CFILE_DB
+#DBFLAG = -DUSE_NULL_DB
+DBSRC	= bootinfo_null.c bootinfo_cfile.c bootinfo_mysql.c
+
+CFLAGS	= -g -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
+		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"'
+INCS	= -I/n/moab/z/mike/flux/install.debug/include
+#INCS	= -I/n/moab/z/stoller/oskit-debug/install/include
+#INCS	= -I/build/oskit-debug/install/include
 
 proxydhcp: proxydhcp.c
 	cc $(CFLAGS) -o proxydhcp proxydhcp.c $(LFLAGS)
@@ -27,24 +34,17 @@ testmysql: bootinfo_mysql.c
 		$(LFLAGS) -L/usr/local/lib/mysql -lmysqlclient
 
 testcfile: bootinfo_cfile.c
-	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile bootinfo_cfile.c \
-		$(LFLAGS)
+	cc $(CFLAGS) -DUSE_CFILE_DB -DTEST $(INCS) -o testcfile \
+		bootinfo_cfile.c $(LFLAGS)
 
 install:	all
 
-install:	$(INSTALL_BINDIR)/pxe/proxydhcp \
-		$(INSTALL_BINDIR)/pxe/bootinfo
-	$(INSTALL_DATA) proxydhcp.conf $(INSTALL_BINDIR)/pxe
-	$(INSTALL_PROGRAM) proxydhcp.restart $(INSTALL_BINDIR)/pxe
-	$(INSTALL_PROGRAM) bootinfo.restart $(INSTALL_BINDIR)/pxe
-	-mkdir -p $(INSTALL_DIR)/etc
-	$(INSTALL_DATA) bootinfo.conf $(INSTALL_DIR)/etc/bootinfo.conf
-
-$(INSTALL_BINDIR)/pxe/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_BINDIR)/pxe
-	$(INSTALL_PROGRAM) $< $@
+install:	$(INSTALL_SBINDIR)/proxydhcp \
+		$(INSTALL_SBINDIR)/proxydhcp.restart \
+		$(INSTALL_SBINDIR)/bootinfo \
+		$(INSTALL_SBINDIR)/bootinfo.restart \
+		$(INSTALL_ETCDIR)/proxydhcp.conf \
+		$(INSTALL_ETCDIR)/bootinfo.conf
 
 clean: 
 	rm -f proxydhcp bootinfo testmysql
-

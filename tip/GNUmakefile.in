@@ -1,3 +1,9 @@
+include ../Makeconf
+
+all: tip.static # tip
+
+include ../GNUmakerules
+
 CC = gcc -g -O2
 
 OBJS = cmds.o cmdtab.o hunt.o partab.o \
@@ -8,10 +14,6 @@ OBJS = cmds.o cmdtab.o hunt.o partab.o \
 #
 LIBS=
 
-DESTDIR = /usr/testbed
-
-all: tip.static # tip
-
 tip: $(OBJS)
 	$(CC) -o tip $(OBJS) $(LIBS)
 
@@ -21,8 +23,7 @@ tip.static: $(OBJS)
 $(OBJS): tipconf.h tip.h
 
 install: all
-#	install -s -c tip $(DESTDIR)/bin/tip
-	install -s -c tip.static $(DESTDIR)/bin/ntip
+	$(INSTALL_PROGRAM) tip.static $(INSTALL_BINDIR)/ntip
 
 clean:
 	rm -f $(OBJS) tip tip.static

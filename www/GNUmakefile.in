@@ -1,0 +1,16 @@
+#
+# For installation.
+#
+include ../Makeconf
+
+all:
+
+include ../GNUmakerules
+
+FILES		= tbstyle.css $(wildcard *.jpg *.gif *.html *.php3)
+
+#
+# Do not install by default
+#
+install:
+real-install: $(addprefix $(INSTALL_WWWDIR)/, $(FILES))

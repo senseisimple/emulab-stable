@@ -2,13 +2,12 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
-include ../GNUmakerules
 
 SUBDIRS	= imagezip
 
-.PHONY:	$(SUBDIRS)
-
 all:	$(SUBDIRS)
+
+include ../GNUmakerules
 
 imagezip:
 	@$(MAKE) -C imagezip all
@@ -16,5 +15,15 @@ imagezip:
 install: 
 	@$(MAKE) -C imagezip install	
 
-clean:
+clean:		subdir-clean
+
+subdir-clean:
 	@$(MAKE) -C imagezip clean
+
+distclean:	subdir-distclean
+
+subdir-distclean:
+	@$(MAKE) -C imagezip distclean
+
+.PHONY:	$(SUBDIRS)
+

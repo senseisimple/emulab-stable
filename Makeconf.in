@@ -1,0 +1,35 @@
+# 
+# Most of the configure-substitution magic is done here.
+# All the other makefiles in the NodeOS include
+# this fragment
+#
+
+export CC       = @CC@
+export CXX	= @CXX@
+export LD	= @CC@ ${CFLAGS}
+export STRIP    = @STRIP@
+export RANLIB	= @RANLIB@
+
+prefix		= @prefix@
+exec_prefix	= @exec_prefix@
+
+TBDBNAME	= @TBDBNAME@
+CPPFLAGS	= @CPPFLAGS@
+CFLAGS	       += @CFLAGS@
+CXXFLAGS       += @CXXFLAGS@
+LDFLAGS		= @LDFLAGS@
+OPT_CFLAGS	= @OPT_CFLAGS@
+
+INSTALL_TOPDIR	= @exec_prefix@
+INSTALL_DIR     = @exec_prefix@
+INSTALL_LIBDIR  = @libdir@
+INSTALL_BINDIR	= @bindir@
+INSTALL_SBINDIR	= @sbindir@
+INSTALL_LIBEXECDIR = @libexecdir@
+INSTALL_ETCDIR  = @sysconfdir@
+INSTALL_WWWDIR	= @exec_prefix@/www
+
+INSTALL		= @INSTALL@
+INSTALL_PROGRAM	= @INSTALL@ -m 755
+INSTALL_DATA	= @INSTALL@ -m 444
+

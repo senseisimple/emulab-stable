@@ -1,6 +1,6 @@
 #!/bin/sh
 
-DIR=/usr/testbed/bin/tmcd
+DIR=@prefix@/sbin
 
 killall tmcd
 ${DIR}/tmcd > /dev/null 2>&1 &

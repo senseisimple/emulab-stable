@@ -2,14 +2,15 @@
 # Insert Copyright Here.
 #
 include ../Makeconf
-include ../GNUmakerules
 
 BINS		= suexec
 SCRIPTS		= paperbag plasticwrap
 
-CFLAGS		= -O -g
-
 all:	$(BINS)
+
+include ../GNUmakerules
+
+CFLAGS		= -O -g
 
 suexec:	suexec.c suexec.h
 	$(CC) $(CFLAGS) -o suexec suexec.c

@@ -21,5 +21,21 @@ $(INSTALL_LIBDIR)/%: %
 	-mkdir -p $(INSTALL_LIBDIR)
 	$(INSTALL_PROGRAM) $< $@
 
+$(INSTALL_ETCDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_ETCDIR)
+	$(INSTALL_DATA) $< $@
+
+$(INSTALL_WWWDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_WWWDIR)
+	$(INSTALL_DATA) $< $@
+
 CFLAGS += $(LOCALCFLAGS)
 
+vpath %.c $(SRCDIR)
+
+clean:
+
+distclean: clean
+	rm -f GNUmakefile $(DISTCLEAN_FILES)
