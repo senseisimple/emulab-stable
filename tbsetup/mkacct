@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 ### 
-### $ID$
+### $Id: mkacct,v 1.13 2000-09-19 22:36:24 kwright Exp $
 ###
 ### Address 'lkw' comments:
 ### Break up into subroutines, possibly libraries. We'll
