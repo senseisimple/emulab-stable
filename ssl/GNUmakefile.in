@@ -12,7 +12,7 @@ SUBDIR		= ssl
 
 include $(OBJDIR)/Makeconf
 
-all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem
+all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem keys
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -93,6 +93,21 @@ pcplab.pem:		dirsmade pcplab.cnf ca.cnf $(SRCDIR)/mkclient.sh
 pcwa.pem:		dirsmade pcwa.cnf ca.cnf $(SRCDIR)/mkclient.sh
 	$(SRCDIR)/mkclient.sh pcwa
 
+keys:		emulab_privkey.pem emulab_pubkey.pem
+
+emulab_privkey.pem:
+	#
+	# Generate a priv key for signing stuff. This one gets a
+	# passphrase.
+	# 
+	openssl genrsa -out emulab_privkey.pem -des3
+
+emulab_pubkey.pem:	emulab_privkey.pem
+	#
+	# Extract a pubkey from the privkey
+	# 
+	openssl rsa -in emulab_privkey.pem -pubout -out emulab_pubkey.pem
+
 dirsmade:
 	-mkdir -p certs
 	-mkdir -p newcerts
@@ -113,7 +128,9 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 		$(INSTALL_ETCDIR)/pcplab.pem \
 		$(INSTALL_ETCDIR)/pcwa.pem \
 		$(INSTALL_ETCDIR)/ronnode.pem \
-		$(INSTALL_ETCDIR)/capture.pem
+		$(INSTALL_ETCDIR)/capture.pem \
+		$(INSTALL_ETCDIR)/emulab_privkey.pem \
+		$(INSTALL_ETCDIR)/emulab_pubkey.pem
 	$(INSTALL_DATA) localnode.pem $(INSTALL_ETCDIR)/client.pem
 	chmod 640 $(INSTALL_ETCDIR)/emulab.pem
 	chmod 640 $(INSTALL_ETCDIR)/server.pem
@@ -121,11 +138,13 @@ boss-installX:	$(INSTALL_ETCDIR)/emulab.pem \
 	chmod 640 $(INSTALL_ETCDIR)/pcplab.pem
 	chmod 640 $(INSTALL_ETCDIR)/ronnode.pem
 	chmod 640 $(INSTALL_ETCDIR)/pcwa.pem
-	chmod 640 $(INSTALL_ETCDIR)/capture.pem
+	chmod 640 $(INSTALL_ETCDIR)/emulab_privkey.pem
 
 client-install:
-	$(INSTALL_DATA) localnode.pem /etc/testbed/client.pem
-	$(INSTALL_DATA) emulab.pem /etc/testbed/emulab.pem
+	$(INSTALL_DATA) localnode.pem $(DESTDIR)$(CLIENT_ETCDIR)/client.pem
+	$(INSTALL_DATA) emulab.pem $(DESTDIR)$(CLIENT_ETCDIR)/emulab.pem
+	$(INSTALL_DATA) emulab_pubkey.pem \
+			$(DESTDIR)$(CLIENT_ETCDIR)/emulab_pubkey.pem
 
 tipserv-install:	$(INSTALL_SBINDIR)/capture.pem
 	chmod 640 $(INSTALL_SBINDIR)/capture.pem
