@@ -21,6 +21,13 @@
 # Syntax:
 #   tbstub <db> <pid> <eid> <testname> <testdir>
 
+use DBI;
+
+if ($#ARGV != 4) {
+    print STDERR "Do not run directly!\n";
+    exit(1);
+}
+
 ($db,$pid,$eid,$test,$dir) = @ARGV;
 
 # The status of the test.
@@ -36,12 +43,16 @@ sub doexit {
     exit(0);
 };
 
+$dbh = DBI->connect("DBI:mysql:database=$testdb;host=localhost") || 
+    die "Could not connect to DB.\n";
+
 do {
 package TEST;
 $eid = $::eid;
 $pid = $::pid;
 $test = $::test;
 $dir = $::dir;
+$dbh = $::dbh;
 
 sub tb_prerun {
     my ($cmd,$exitcode) = @_;
@@ -56,8 +67,31 @@ sub tb_prerun {
     }
 };
 sub tb_compare {
-    print "tb_compare not yet implemented.\n";
+    # results is a reference to a list of list references.  I.e.
+    # a list of lists.  Each sublist is a list of column values and
+    # refers to a row.
+    my ($query,$results) = @_;
+    
+    my $sth = $dbh->prepare($query);
+    $sth->execute;
+    my @row;
+    my $i;
+    my @result;
+    my $rowi = 0;
+    while (@row = $sth->fetchrow_array) {
+	@result = (@$results)[$rowi];
+	if ($#row != $#result) {
+	    tb_fail("Row $rowi - Length of $#row != expected $#result.");
+	}
+	for ($i=0;$i<$#row;++$i) {
+	    if ($row[$i] ne $result[$i]) {
+		tb_fail("$rowi/$i - Found $row[$i], expected $result[$i].\n");
+	    }
+	}
+	$rowi++;
+    }
 };
+
 sub tb_run {
     my ($cmd,$exitcode) = @_;
     print "$cmd $pid $eid\n"; 

@@ -172,7 +172,7 @@ potentially messing your own test up).
 $pid, $eid - PID and EID of test experiment.
 $test - Test name.
 $dir - Directory containing test files.
-
+$dbh - Handle to DB connection.
 
 Other notes:
 
