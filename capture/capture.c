@@ -53,7 +53,11 @@
 #include <arpa/inet.h>
 #include <setjmp.h>
 #include <netdb.h>
-#endif
+#ifdef WITHSSL
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#endif /* WITHSSL */
+#endif /* USESOCKETS */
 #include "capdecls.h"
 #include "config.h"
 
@@ -110,7 +114,19 @@ char		   ourhostname[MAXHOSTNAMELEN];
 int		   needshake;
 gid_t		   tipgid;
 uid_t		   tipuid;
-#endif
+
+#ifdef  WITHSSL
+
+SSL_CTX * ctx;
+SSL * sslCon;
+
+int initializedSSL = 0;
+int usingSSL = 0;
+
+const char * certfile = NULL;
+
+#endif /* WITHSSL */ 
+#endif /* USESOCKETS */
 
 int
 main(argc, argv)
@@ -127,9 +143,14 @@ main(argc, argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:itp:")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:itp:c:")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
+#ifdef  WITHSSL
+		case 'c':
+		        certfile = optarg;
+		        break;
+#endif  WITHSSL
 		case 'b':
 			Bossnode = optarg;
 			break;
@@ -137,7 +158,7 @@ main(argc, argv)
 		case 'p':
 			serverport = atoi(optarg);
 			break;
-#endif
+#endif /* USESOCKETS */
 		case 'H':
 			++hwflow;
 			break;
@@ -475,7 +496,15 @@ capture()
 				goto dropped;
 #endif
 			for (lcc = 0; lcc < cc; lcc += i) {
-				i = write(ptyfd, &buf[lcc], cc-lcc);
+#ifdef  WITHSSL
+			        if (usingSSL) {
+				        i = SSL_write(sslCon, &buf[lcc], cc-lcc);
+					if (i < 0) { i = 0; } /* XXX Hack */
+			        } else
+#endif /* WITHSSL */ 
+			        {
+				        i = write(ptyfd, &buf[lcc], cc-lcc);
+				}
 				if (i < 0) {
 					/*
 					 * Either tip is blocked (^S) or
@@ -521,7 +550,15 @@ dropped:
 		if (FD_ISSET(ptyfd, &fds)) {
 			omask = sigblock(sigmask(SIGUSR2));
 			errno = 0;
-			cc = read(ptyfd, buf, sizeof(buf), 0);
+#ifdef WITHSSL
+			if (usingSSL) {
+			        cc = SSL_read( sslCon, buf, sizeof(buf) );
+				if (cc < 0) { cc = 0; } /* XXX hack */
+			} else
+#endif /* WITHSSL */ 
+			{
+			        cc = read(ptyfd, buf, sizeof(buf), 0);
+			}
 			(void) sigsetmask(omask);
 			if (cc < 0) {
 				/* XXX commonly observed */
@@ -972,6 +1009,7 @@ int
 clientconnect()
 {
 	int		cc, length = sizeof(tipclient);
+	int             ret;
 	int		newfd;
 	secretkey_t     key;
 	capret_t	capret;
@@ -1010,17 +1048,127 @@ clientconnect()
 		      inet_ntoa(tipclient.sin_addr));
 		return 1;
 	}
+
+#ifdef WITHSSL
+	usingSSL = 0;
+
+	if (cc == sizeof(key) && 
+	    0 == strncmp( key.key, "USESSL", 6 )) {
+	  usingSSL = 1;
+	  /* 
+	     dolog(LOG_NOTICE, "Client %s wants to use SSL",
+		inet_ntoa(tipclient.sin_addr) );
+	  */
+
+	  if (!initializedSSL) {
+	    SSL_load_error_strings();
+	    SSL_library_init();
+
+	    ctx = SSL_CTX_new( SSLv23_method() );
+	    if (ctx == NULL) {
+	      dolog( LOG_NOTICE, "Failed to create context.");
+	      close( ptyfd );
+	      return 1;
+	    }
+
+#ifndef PREFIX
+#define PREFIX
+#endif
+
+	    if (!certfile) { certfile = PREFIX"/etc/capture/cert.pem"; }
+
+	    if (SSL_CTX_use_certificate_file( ctx, certfile, SSL_FILETYPE_PEM )
+		<= 0) {
+	      dolog(LOG_NOTICE, 
+		    "Could not load %s as certificate file.",
+		    certfile );
+	      close(ptyfd);
+	      return 1;
+	    }
+
+	    if (SSL_CTX_use_PrivateKey_file( ctx, certfile, SSL_FILETYPE_PEM )
+		<= 0) {
+	      dolog(LOG_NOTICE, 
+		    "Could not load %s as key file.",
+		    certfile );
+	      close(ptyfd);
+	      return 1;
+	    }
+
+	    initializedSSL = 1;
+	  }
+	  /*
+	  if ( write( ptyfd, "OKAY", 4 ) <= 0) {
+	    dolog( LOG_NOTICE, "Failed to send OKAY to client." );
+	    close( ptyfd );
+	    return 1;
+	  }
+	  */
+
+	  sslCon = SSL_new( ctx );
+	  if (!sslCon) {
+	    dolog(LOG_NOTICE, "SSL_new failed.");
+	    close(ptyfd);
+	    return 1;
+	  }	    
+	    
+	  if ((ret = SSL_set_fd( sslCon, ptyfd )) <= 0) {
+	    dolog(LOG_NOTICE, "SSL_set_fd failed.");
+	    close(ptyfd);
+	    return 1;
+	  }
+
+	  dolog(LOG_NOTICE, "going to accept" );
+
+	  if ((ret = SSL_accept( sslCon )) <= 0) {
+	    dolog(LOG_NOTICE, "%s connecting, SSL_accept error.",
+		  inet_ntoa(tipclient.sin_addr));
+	    goto sslerror;
+	  }
+
+	  dolog(LOG_NOTICE, "going to read key" );
+
+	  if ((cc = SSL_read(sslCon, (void *)&key, sizeof(key))) <= 0) {
+	    ret = cc;
+	    close(ptyfd);
+	    dolog(LOG_NOTICE, "%s connecting, error reading capturekey.",
+		  inet_ntoa(tipclient.sin_addr));
+	  sslerror:
+	    /*
+	    {
+	      FILE * foo = fopen("/tmp/err.txt", "w");
+	      ERR_print_errors_fp( foo );
+	      fclose( foo );
+	    }
+	    */
+	    close(ptyfd);
+	    return 1;
+	  }
+
+	  dolog(LOG_NOTICE, "got key" );
+	}
+#endif /* WITHSSL */
 	/* Verify size of the key is sane */
 	if (cc != sizeof(key) ||
 	    key.keylen != strlen(key.key) ||
 	    strncmp(secretkey.key, key.key, key.keylen)) {
 		/*
-		 * Tell the other side that all is okay.
+		 * Tell the other side that their key is bad.
 		 */
 		capret = CAPNOPERM;
-		if ((cc = write(ptyfd, &capret, sizeof(capret))) <= 0) {
-			dolog(LOG_NOTICE, "%s connecting, error perm status",
+#ifdef WITHSSL
+		if (usingSSL) {
+		    if ((cc = SSL_write(sslCon, (void *)&capret, sizeof(capret))) <= 0) {
+		        dolog(LOG_NOTICE, "%s connecting, error perm status",
 			      inet_ntoa(tipclient.sin_addr));
+		    }
+		} else
+#endif /* WITHSSL */
+		{
+		    if ((cc = write(ptyfd, &capret, sizeof(capret))) <= 0) {
+		        dolog(LOG_NOTICE, "%s connecting, error perm status",
+			      inet_ntoa(tipclient.sin_addr));
+		    }
 		}
 		close(ptyfd);
 		dolog(LOG_NOTICE,
@@ -1037,11 +1185,23 @@ clientconnect()
 	 * Tell the other side that all is okay.
 	 */
 	capret = CAPOK;
-	if ((cc = write(ptyfd, &capret, sizeof(capret))) <= 0) {
+#ifdef WITHSSL
+	if (usingSSL) {
+	    if ((cc = SSL_write(sslCon, (void *)&capret, sizeof(capret))) <= 0) {
 		close(ptyfd);
 		dolog(LOG_NOTICE, "%s connecting, error writing status",
 		      inet_ntoa(tipclient.sin_addr));
 		return 1;
+	    }
+	} else
+#endif /* WITHSSL */
+	{
+	    if ((cc = write(ptyfd, &capret, sizeof(capret))) <= 0) {
+		close(ptyfd);
+		dolog(LOG_NOTICE, "%s connecting, error writing status",
+		      inet_ntoa(tipclient.sin_addr));
+		return 1;
+	    }
 	}
 	
 	/*

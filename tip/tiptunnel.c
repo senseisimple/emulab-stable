@@ -381,9 +381,7 @@ acceptor:
 	  perror("write sock");
 	  return;
 	}
-      } else {
-	printf( "Tossed %i bytes beginning with IAC.\n", got);
-      }
+      } 
     }
 
     if ( FD_ISSET( sock, &fds ) ) {

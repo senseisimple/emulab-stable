@@ -20,7 +20,7 @@ DESTDIR=
 CFLAGS= -g -O2 -DLOG_DROPS -I${OBJDIR}
 
 capture: capture.c capdecls.h
-	cc $(CFLAGS) -DUSESOCKETS -o capture $<
+	cc $(CFLAGS) -DUSESOCKETS -DWITHSSL -DPREFIX=\"$(TBROOT)\" -o capture $< -lssl -lcrypto
 
 capture-tty: capture.c capdecls.h
 	cc $(CFLAGS) -o capture-tty $<
