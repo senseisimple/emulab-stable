@@ -210,7 +210,6 @@ sub TMCCCMD_LINKDELAYS(){ "linkdelays"; }
 # Some things never change.
 # 
 my $TARINSTALL  = "/usr/local/bin/install-tarfile %s %s %s";
-my $DELTAINSTALL= "/usr/local/bin/install-delta %s";
 my $VTUND       = "/usr/local/sbin/vtund";
 
 #
@@ -1693,7 +1692,7 @@ sub dotrafficconfig()
 		$didopen = 1;
 	    }
 	    print RC "$cmdline -N $name -S $source -T $target -P $proto ".
-		"-R $role >/tmp/${name}-${pid}-${eid}.debug 2>&1 &\n";
+		"-R $role >$LOGDIR/${name}-${pid}-${eid}.debug 2>&1 &\n";
 	}
 	else {
 	    warn "*** WARNING: Bad traffic line: $_";
@@ -1826,13 +1825,13 @@ sub dotunnels()
 	    if ($isserver) {
 		if (!$didserver) {
 		    print RC
-			"$cmd -s >/tmp/vtund-${pid}-${eid}.debug 2>&1 &\n";
+			"$cmd -s >$LOGDIR/vtund-${pid}-${eid}.debug 2>&1 &\n";
 		    $didserver = 1;
 		}
 	    }
 	    else {
 		print RC "$cmd $name $peeraddr ".
-		    " >/tmp/vtun-${pid}-${eid}-${name}.debug 2>&1 &\n";
+		    " >$LOGDIR/vtun-${pid}-${eid}-${name}.debug 2>&1 &\n";
 	    }
 	    #
 	    # Sheesh, vtund fails if it sees "//" in a path. 
@@ -2028,69 +2027,6 @@ sub bootsetup()
     # OS specific stuff
     #
     os_setup();
-
-    return 0;
-}
-
-#
-# These are additional support routines for other setup scripts.
-#
-#
-# Node update. This gets fired off after reboot to update accounts,
-# mounts, etc. Quite rough at the moment. 
-#
-sub nodeupdate()
-{
-    if (REMOTE()) {
-	local $tmcctimeout = $TMCCTIMEO;
-	nodeupdateaux();
-    }
-    else {
-	nodeupdateaux();
-    }
-}
-
-sub nodeupdateaux()
-{
-    #
-    # Check allocation. If the node is now free, then do a cleanup
-    # to reset the password files. The node should have its disk
-    # reloaded to be safe, at the very least a reboot, but thats for
-    # the future. We also need to kill processes belonging to people
-    # whose accounts have been killed. Need to check the atq also for
-    # queued commands.
-    #
-    if (!REMOTE() && !check_status()) {
-	if (! JAILED()) {
-	    print "Node is free. Cleaning up password and group files.\n";
-	    cleanup_node(1);
-	}
-	return 0;
-    }
-
-    #
-    # Mount the project and user directories and symlink SFS "mounted"
-    # directories
-    #
-    if (! JAILED()) {
-	# not inside a jail though, not yet!
-	print STDOUT "Mounting project and home directories ... \n";
-	domounts();
-    }
-
-    #
-    # Host names configuration (/etc/hosts). 
-    #
-    if (!REMOTE()) {
-	print STDOUT "Checking Testbed hostnames configuration ... \n";
-	dohostnames();
-    }
-
-    #
-    # Do account stuff.
-    # 
-    print STDOUT "Checking Testbed group/user configuration ... \n";
-    doaccounts();
 
     return 0;
 }
