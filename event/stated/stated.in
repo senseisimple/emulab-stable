@@ -22,6 +22,7 @@ use lib '@prefix@/lib';
 my $TB = "@prefix@";
 my $BOSSNODE = "@BOSSNODE@";
 my $TBOPS = '@TBSTATEDEMAIL@';
+my $REALTBOPS = "@TBOPSEMAIL@";
 my $TBDBNAME = "@TBDBNAME@";
 my $osselect = "$TB/bin/os_select";
 
@@ -44,7 +45,8 @@ use Sys::Syslog;
 # Number of iterations (roughly, seconds) after which we'll reload 
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
-my $reload_time = 3600;
+my $reload_time = 600;
+my $last_reload = 0;
 
 # Process command-line arguments
 
@@ -165,12 +167,26 @@ my $mailgap = 15; # in seconds
 my $lastmail = time - $mailgap + 2; # Send a digest of startup msgs after 2s.
 my %msgs = ();
 
-info("stated starting up\n");
+# Track if I handled an event or not
+my $event_count = 0;
+
+notify("Stated starting up\n");
+
+sub process_event_queue() {
+    $event_count=0;
+    my $lastcount=-1;
+    while ($event_count != $lastcount) {
+	$lastcount = $event_count;
+	event_poll($handle);
+    }
+    if ($event_count > 0) {
+      debug("Handled $event_count event(s).\n");
+    }
+}
 
 # Now, we just poll for events, and watch for timeouts
-my $iterations = 0;
 while (1) {
-	event_poll($handle);
+	process_event_queue;
 	my $now = time();
 	#
 	# Look for nodes that have passed their timeout
@@ -193,10 +209,9 @@ while (1) {
 	    }
 	}
 
-	if ($do_reload || ($iterations > $reload_time)) {
+	if ($do_reload || ($now - $last_reload > $reload_time)) {
 		reload();
 		$do_reload = 0;
-		$iterations = 0;
 	}
 
 	if ($have_children) {
@@ -207,7 +222,6 @@ while (1) {
 	# Send any messages in the queue if it is time
 	notify("",1);
 
-	$iterations++;
 	sleep(1);
 }
 
@@ -329,6 +343,7 @@ sub handleEvent($$$) {
 	my $objname = event_notification_get_objname($handle,$notification);
 	my $eventtype = event_notification_get_eventtype($handle,$notification);
 
+	$event_count++;
 	info("Got an event: ($objtype,$objname,$eventtype)\n");
 
 	#
@@ -382,7 +397,7 @@ sub stateTransition($$) {
     if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
 	!$valid{$mode}{$oldstate}{$newstate}) {
 	notify("Invalid transition for node $node from $mode/$oldstate " .
-	       "to $newstate\n".`/usr/testbed/sbin/inuse | grep $node\\  `);
+	       "to $newstate\n");
     }
 
     my $now = time();
@@ -546,7 +561,7 @@ sub handleCtrlEvent($$) {
 	    }
 	    notify("Node $node has timed out in state $mode/$state".
 		   ($action ne "" ? "\n\tRequested action $action." : "").
-		   "\n".`/home/newbold/z/bin/statetime | grep '$node\t'`);
+		   "\n");
 	    next;
 	};
 	notify("$node: Unknown CtrlEvent: $event\n");
@@ -683,15 +698,16 @@ sub checkDBRedirect($) {
 	#debug("checkDBRedirect: $node => $testdb (I'm $TBDBNAME)\n");
 	if ((!$testdb && ($TBDBNAME eq "tbdb")) ||
 	    ($testdb && ($testdb eq $TBDBNAME))) {
-		return 1;
+	  return 1;
 	} else {
-		return 0;
+	  return 0;
 	}
 }
 
 # Reload state from the database
 sub reload() {
-  info("Reloading state from database\n");
+  debug("Reloading state from database\n");
+  $last_reload = time();
   %nodes     = readStates(%nodes);
   %timeouts  = getTimeouts();
   %valid     = getValid();
@@ -742,6 +758,7 @@ sub fatal($) {
 }
 
 sub showqueue() {
+  if ($debug < 2) { return; }
   if ((keys %msgs) > 0) {
     debug("\nMAILQUEUE:\n");
   }
@@ -795,7 +812,7 @@ sub notify($;$) {
       $lastmail = time;
       if (!$debug) {
 	SENDMAIL("Stated List <".$TBOPS.">",
-		 "Node State Daemon Messsage",$mailbody,
+		 "Stated Messsage",$mailbody,
 		 "Stated Daemon <".$TBOPS.">");
       } else {
 	debug("notify: Not sending mail in debug mode\n");
@@ -803,6 +820,21 @@ sub notify($;$) {
       }
     }
   }  # else do nothing, not time yet
+}
+
+sub announce($) {
+  my $message = shift;
+  my $tstamp=strftime("%b %e %H:%M:%S",localtime);
+  notify("ANNOUCEMENT: ".$message."\n\n(Sent to $REALTBOPS)\n");
+  $mailbody = "\n$message\n\n$tstamp\n";
+  if (!$debug) {
+    SENDMAIL($REALTBOPS,
+	     "Stated Messsage",$mailbody,
+	     "Stated Daemon <".$TBOPS.">");
+  } else {
+    debug("announce: Not sending mail in debug mode\n");
+    debug("MAIL CONTAINS:\n".$mailbody."\n");
+  }
 }
 
 sub info($;$) {
@@ -823,7 +855,7 @@ sub info($;$) {
 # This gets called if we catch a signal USR1
 sub restart {
   info("SIGUSER1 received: Performing final event poll before restarting\n");
-  event_poll($handle);
+  process_event_queue;
   my $params = join(" ",@args);
   my $prog = "";
   # If we're started from an abosolute path, use that.
@@ -837,12 +869,12 @@ sub restart {
     notify("sigprocmask: sig unblock failed! $?, $!\n");
     die("\n");
   }
-  notify("Stated restarted\n");
+  announce("Stated restarted\n");
   exec("$prog $params") or 
     do {
       my $msg = "Couldn't restart stated! cmd='$prog $params'\n".
 	"Error: ($?) $!\n";
-      notify($msg);
+      announce($msg);
       die($msg);
     };
 }
@@ -856,8 +888,13 @@ sub cleanup {
 
 # This gets called if we die of 'natural causes' (exit, die, etc.)
 END {
-  notify("Stated exiting, cleaning up\n");
-  if (defined($lockfile) && $lockfile ne "") { unlink $lockfile; }
+  if (defined($lockfile) && $lockfile ne "") {
+    unlink $lockfile;
+    announce("Stated exiting, cleaning up\n");
+  } else {
+    # Must be a child
+    info("Stated child exiting\n");
+  }
   # clean up Syslog
   closelog();
   if ($handle) {
