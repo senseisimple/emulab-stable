@@ -60,7 +60,7 @@ my $filename = &get_filename($imageid);
 # Make sure that the user has sufficient permissions, and read the image file
 # or bomb out right now.
 #
-if (!TBImageIDAccessCheck($UID,$imageid,TB_IMAGEID_ACCESS)) {
+if (!TBImageIDAccessCheck($UID,$imageid,TB_IMAGEID_READINFO)) {
 	die("*** You do not have pemssion to load $imageid on nodes\n");
 }
 

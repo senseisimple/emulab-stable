@@ -541,7 +541,7 @@ sub SetupReload($)
 		     "next_pxe_boot_path='$FRISBEEPATH'" .
 		     "where node_id='$node'");
 	
-	system "$FRISBEELAUNCHER $imageid" and
+	system "$FRISBEELAUNCHER ".($dbg? "-d ":"")."$imageid" and
 	    die "*** Unable to launch frisbee daemon\n";
     }
     elsif ($type eq TB_RELOADTYPE_NETDISK) {

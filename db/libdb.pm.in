@@ -286,6 +286,11 @@ sub TB_OSID_MIN()		{ TB_OSID_READINFO; }
 sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
 
 # ImageIDs
+#
+# Clarification:
+# READINFO is read-only access to the image and its contents
+# (This is what people get for shared images)
+# ACCESS means complete power over the image and its [meta]data
 sub TB_IMAGEID_READINFO()	{ 1; }
 sub TB_IMAGEID_MODIFYINFO()	{ 2; }
 sub TB_IMAGEID_CREATE()		{ 3; }
@@ -760,9 +765,9 @@ sub TBImageIDAccessCheck($$$)
     }
 
     #
-    # Admins do whatever they want!
+    # Admins and root do whatever they want!
     # 
-    if (TBAdmin($uid)) {
+    if (TBAdmin($uid) || !$UID || $UID eq "root" || $uid eq "root") {
 	return 1;
     }
     $uid = MapNumericUID($uid);
