@@ -177,6 +177,7 @@ CREATE TABLE experiment_resources (
   vnodes smallint(5) unsigned default '0',
   pnodes smallint(5) unsigned default '0',
   wanodes smallint(5) unsigned default '0',
+  plabnodes smallint(5) unsigned default '0',
   simnodes smallint(5) unsigned default '0',
   jailnodes smallint(5) unsigned default '0',
   delaynodes smallint(5) unsigned default '0',

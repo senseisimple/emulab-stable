@@ -948,3 +948,10 @@ last_net_act,last_cpu_act,last_ext_act);
 	   feature varchar(30) not null, weight float not null default 0.0,
 	   primary key (node_id,feature));
 
+
+1.181: Add plabnodes count to the experiment resource table so we can
+       track exactly how many slices an experiment is using.
+
+       alter table experiment_resources add
+          plabnodes smallint(5) unsigned default '0' after wanodes;
+	  
