@@ -1037,7 +1037,7 @@ sub dotrafficconfig()
     my $TM;
     my $boss;
     my $startnse = 0;
-
+    
     #
     # Kinda ugly, but there is too much perl goo included by Socket to put it
     # on the MFS. 
@@ -1049,7 +1049,18 @@ sub dotrafficconfig()
     import Socket;
     
     $TM = OPENTMCC(TMCCCMD_BOSSINFO);
-    ($boss) = split(" ", <$TM>);
+    my $bossinfo = <$TM>;
+    ($boss) = split(" ", $bossinfo);
+
+    #
+    # XXX hack: workaround for tmcc cmd failure inside TCL
+    #     storing the output of a few tmcc commands in
+    #     $SETUPDIR files for use by NSE
+    #    
+    open( BOSSINFCFG, ">$SETUPDIR/tmcc.bossinfo"  ) or die "Cannot open file $SETUPDIR/tmcc.bossinfo: $!";
+    print BOSSINFCFG "$bossinfo";
+    close(BOSSINFCFG);
+
     CLOSETMCC($TM);
     my ($pid, $eid, $vname) = check_status();
 
@@ -1058,13 +1069,33 @@ sub dotrafficconfig()
 	$cmdline .= " -E $pid/$eid";
     }
 
+    #
+    # XXX hack: workaround for tmcc cmd failure inside TCL
+    #     storing the output of a few tmcc commands in
+    #     $SETUPDIR files for use by NSE
+    #
+    my $record_sep;
+
+    $record_sep = $/;
+    undef($/);
+    $TM = OPENTMCC(TMCCCMD_IFC);
+    open( IFCFG, ">$SETUPDIR/tmcc.ifconfig"  ) or die "Cannot open file $SETUPDIR/tmcc.ifconfig: $!";
+    print IFCFG <$TM>;
+    close(IFCFG);
+    CLOSETMCC($TM);
+    $/ = $record_sep;
+
     $TM = OPENTMCC(TMCCCMD_TRAFFIC);
 
+    open( TRAFCFG, ">$SETUPDIR/tmcc.trafgens"  ) or die "Cannot open file $SETUPDIR/tmcc.trafgens: $!";    
+    
     $pat  = q(TRAFGEN=([-\w.]+) MYNAME=([-\w.]+) MYPORT=(\d+) );
     $pat .= q(PEERNAME=([-\w.]+) PEERPORT=(\d+) );
     $pat .= q(PROTO=(\w+) ROLE=(\w+) GENERATOR=(\w+));
 
     while (<$TM>) {
+
+	print TRAFCFG "$_";
 	if ($_ =~ /$pat/) {
 	    #
 	    # The following is specific to the modified TG traffic generator:
@@ -1120,19 +1151,28 @@ sub dotrafficconfig()
 	    warn "*** WARNING: Bad traffic line: $_";
 	}
     }
+    close(TRAFCFG);
 
     if( $startnse ) {
 	print RC "$SETUPDIR/startnse &\n";
     }
     CLOSETMCC($TM);
 
+    open( NSECFG, ">$SETUPDIR/tmcc.nseconfigs" ) or die "Cannot open file $SETUPDIR/tmcc.nseconfigs: $!";
     # XXX hack: need a separate section for starting up NSE when we
     #           support simulated nodes
     if( ! $startnse ) {
 
 	# start NSE if 'tmcc nseconfigs' is not empty
 	$TM = OPENTMCC(TMCCCMD_NSECONFIGS);
-	if( <$TM> ) {
+	$record_sep = $/;
+	undef($/);
+	my $nseconfig = <$TM>;
+	$/ = $record_sep;
+	
+	if( $nseconfig ) {
+
+	    print NSECFG $nseconfig;
 	    if ( ! $didopen ) {
 		open(RC, ">" . TMTRAFFICCONFIG)
 		    or die("Could not open " . TMTRAFFICCONFIG . ": $!");
@@ -1143,6 +1183,7 @@ sub dotrafficconfig()
 	}
 	CLOSETMCC($TM)
     }
+    close(NSECFG);
     
     if ($didopen) {
 	printf RC "%s %s\n", TMCC(), TMCCCMD_READY();
@@ -1341,6 +1382,13 @@ sub bootsetup()
 	print STDOUT "Checking Testbed routing configuration ... \n";
 	dorouterconfig();
 
+	#
+	# Make 32 BPF devices in /dev
+	#
+	select STDOUT; $| = 1;
+	print STDOUT "Making /dev/bpf* devices ...";
+	makebpfdevs();
+	
 	#
 	# Traffic generator Configuration.
 	#
@@ -1636,6 +1684,34 @@ sub TBForkCmd($) {
 
     system($cmd);
     exit($? >> 8);
+}
+
+#
+# make some bpf devices in /dev
+#
+sub makebpfdevs() {
+
+    my ($i) = 0;
+
+    chomp($cwd = `pwd`);
+    # Untaint the args.
+    if ($cwd=~ /^([\/\w-]+)$/) {
+	$cwd = $1;
+    }
+
+    chdir("/dev");
+    while( $i < 32 ) {
+
+	if( ! -e "bpf$i" ) {
+	    system("./MAKEDEV bpf$i");
+	    print STDOUT "."
+	}
+	
+	$i++;
+    }
+    print STDOUT "\n";
+    chdir($cwd);
+    return 0;
 }
 
 1;
