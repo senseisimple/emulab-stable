@@ -2,7 +2,7 @@
 
 %color = (
   "pc850", "skyblue",
-  "pc",    "skyblue",
+  "pc600", "steelblue",
   "shark", "darkblue",
   "lan",   "green",
   "delay", "orange"
@@ -13,7 +13,7 @@ while (<>) {
     if (/^node/) {
 	my ($nodename, $nodetype) = /^node\s+(\S+)\s+(\S+)/;
 	$nodename =~ s/[^\w]/_/g;
-	print "{node [width = .1, height = .1, shape = box,";
+	print "{node [label = $nodename, shape = box,";
 
 	if (exists $color{ $nodetype }) {
 	    print "color = " . $color{ $nodetype };
