@@ -722,6 +722,18 @@ CREATE TABLE scheduled_reloads (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'switch_paths'
+#
+
+CREATE TABLE switch_paths (
+  pid varchar(12) default NULL,
+  eid varchar(32) default NULL,
+  vname varchar(32) default NULL,
+  node_id1 varchar(10) default NULL,
+  node_id2 varchar(10) default NULL
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'state_timeouts'
 #
 
