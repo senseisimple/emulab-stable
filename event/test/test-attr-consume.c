@@ -1,6 +1,6 @@
-/* test-consume.c: Test delivery of events, with attributes (consumer). */
+/* test-attr-consume.c: Test delivery of events, with attributes (consumer). */
 
-static char rcsid[] = "$Id: test-attr-consume.c,v 1.3 2002-01-29 12:18:48 imurdock Exp $";
+static char rcsid[] = "$Id: test-attr-consume.c,v 1.4 2002-01-29 17:12:51 imurdock Exp $";
 
 #include <event.h>
 
