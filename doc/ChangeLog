@@ -1,3 +1,20 @@
+ricci       2003/12/02 17:20:12 MST
+
+  Added files:
+    www                  plab_ez.php3 plab_ez_footnote1.html
+                         plab_ez_footnote2.html
+                         plab_ez_footnote3.html
+                         plab_ez_footnote4.html
+                         plab_ez_footnote5.html
+                         plab_ez_footnote6.html
+                         plab_ez_footnote7.html
+                         plab_ez_footnote8.html
+  Log:
+  New form: plab_ez.php3 .
+
+  Provides a simple interface to create an NS file, and then an
+  experiment, for use on PlanetLab.
+
 ricci       2003/12/01 13:48:18 MST
 
   Modified files:
