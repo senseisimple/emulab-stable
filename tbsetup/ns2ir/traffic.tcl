@@ -318,8 +318,8 @@ Agent/TCP/FullTcp instproc connect {dst} {
     $dst set proto "tcp"
     $node set osid "FBSD-STD"
     $node set realtime 1
-    $dest set osid "FBSD-STD"
-    $dest set realtime 1
+    $dst set osid "FBSD-STD"
+    $dst set realtime 1
 }
 
 # Agent/Null
