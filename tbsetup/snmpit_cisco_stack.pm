@@ -218,6 +218,15 @@ sub setPortVlan($$@) {
     my $errors = 0;
 
     #
+    # Grab the VLAN number
+    #
+    my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
+    if (!$vlan_number) {
+	print STDERR "ERROR: VLAN with identifier $vlan_id does not exist!\n";
+	return 1;
+    }
+
+    #
     # Split up the ports among the devices involved
     #
     my %map = mapPortsToDevices(@ports);
@@ -233,11 +242,10 @@ sub setPortVlan($$@) {
 	#
 	# Simply make the appropriate call on the device
 	#
-	$errors += $device->setPortVlan($vlan_id,@{$map{$devicename}});
+	$errors += $device->setPortVlan($vlan_number,@{$map{$devicename}});
     }
 
     if ($vlan_id ne 'default') {
-	my $vlan_number = $self->{LEADER}->findVlan($vlan_id);
 	$errors += (!$self->setVlanOnTrunks($vlan_number,1,@ports));
     }
 
@@ -263,7 +271,8 @@ sub createVlan($$$;$$$) {
     #
     # We just need to create the VLAN on the stack leader
     #
-    my $okay = $self->{LEADER}->createVlan($vlan_id,@otherargs);
+    my $vlan_number = $self->{LEADER}->createVlan($vlan_id,@otherargs);
+    my $okay = ($vlan_number != 0);
 
     #
     # We need to add the ports to VLANs at the stack level, since they are
@@ -356,7 +365,6 @@ sub existantVlans($@) {
 
 }
 
-
 #
 # Removes a VLAN from the stack. This implicitly removes all ports from the
 # VLAN. It is an error to remove a VLAN that does not exist.
@@ -368,7 +376,7 @@ sub existantVlans($@) {
 #
 sub removeVlan($@) {
     my $self = shift;
-    my (@vlan_ids) = @_;
+    my @vlan_ids = @_;
     my $errors = 0;
 
     my %vlan_numbers = $self->{LEADER}->findVlans(@vlan_ids);
@@ -409,7 +417,7 @@ sub removeVlan($@) {
 	    # device. Do it in one pass for efficiency
 	    #
 	    if (defined $vlan_numbers{$vlan_id}) {
-		push @existant_vlans, $vlan_id;
+		push @existant_vlans, $vlan_numbers{$vlan_id};
 	    }
 	}
 
@@ -421,7 +429,18 @@ sub removeVlan($@) {
     # call. This can save a _lot_ of locking and unlocking.
     #
     if (!$errors) {
-	my $ok = $self->{LEADER}->removeVlan(@vlan_ids);
+	#
+	# Make a list of all the VLANs that really did exist
+	#
+	my @vlan_numbers;
+	my ($key, $value);
+	while (($key, $value) = each %vlan_numbers) {
+	    if ($value) {
+		push @vlan_numbers, $value;
+	    }
+	}
+
+	my $ok = $self->{LEADER}->removeVlan(@vlan_numbers);
 	if (!$ok) {
 	    $errors++;
 	}

@@ -417,6 +417,31 @@ sub vlanUnlock($;$) {
     return $ApplyRetVal;
 }
 
+# 
+# Check to see if the given (cisco-specific) VLAN number exists on the switch
+#
+# usage: vlanNumberExists($self, $vlan_number)
+#        returns 1 if the VLAN exists, 0 otherwise
+#
+sub vlanNumberExists($$) {
+    my $self = shift;
+    my $vlan_number = shift;
+
+    my $VlanName = "vtpVlanName";
+
+    #
+    # Just look up the name for this VLAN, and see if we get an answer back
+    # or not
+    #
+    my $rv = $self->{SESS}->get([$VlanName,"1.$vlan_number"]);
+    if (!$rv) {
+	print "rv was $rv\n";
+	return 0;
+    } else {
+    	return 1;
+    }
+}
+
 #
 # Given VLAN indentifiers from the database, finds the cisco-specific VLAN
 # number for them. If not VLAN id is given, returns mappings for the entire
@@ -511,7 +536,7 @@ sub findVlan($$;$) {
 #
 # usage: createVlan($self, $vlan_id [,$private_type [,$private_primary,
 # 		$private_port]])
-#        returns 1 on success
+#        returns the new VLAN number on success
 #        returns 0 on failure
 #        if $private_type is given, creates a private VLAN - if private_type
 #        is 'community' or 'isolated', then the assocated primary VLAN and
@@ -548,6 +573,7 @@ sub createVlan($$;$$$) {
     #
     my $max_tries = 3;
     my $tries_remaining = $max_tries;
+    my $vlan_number;
     while ($tries_remaining) {
 	#
 	# Try to wait out transient failures
@@ -568,7 +594,7 @@ sub createVlan($$;$$$) {
 	# Ciscos, we start with number 2.
 	# XXX: The maximum VLAN number is hardcoded at 1000
 	#
-	my $vlan_number = 2; # We need to start at 2
+	$vlan_number = 2; # We need to start at 2
 	my $RetVal = snmpitGetFatal($self->{SESS},
 		[$VlanRowStatus,"1.$vlan_number"]);
 	$self->debug("Row $vlan_number got '$RetVal'\n",2);
@@ -725,7 +751,11 @@ sub createVlan($$;$$$) {
 
 		}
 	    }
-	    return $okay;
+	    if ($okay) {
+		return $vlan_number;
+	    } else {
+		return 0;
+	    }
 	}
     }
 
@@ -735,29 +765,24 @@ sub createVlan($$;$$$) {
 }
 
 #
-# Put the given ports in the given VLAN. The VLAN is given as a VLAN
-# identifier from the database.
+# Put the given ports in the given VLAN. The VLAN is given as a cisco-specific
+# VLAN number
 #
-# usage: setPortVlan($self,$vlan_id, @ports)
+# usage: setPortVlan($self, $vlan_number, @ports)
 #	 returns 0 on sucess.
 #	 returns the number of failed ports on failure.
 #
 sub setPortVlan($$@) {
     my $self = shift;
-    my $vlan_id = shift;
+    my $vlan_number = shift;
     my @ports = @_;
 
     my $errors = 0;
 
-    #
-    # Find the real VLAN number from the passed VLAN ID
-    #
-    my $vlan_number = $self->findVlan($vlan_id);
-    if (!defined($vlan_number)) {
-	print STDERR "ERROR: VLAN with identifier $vlan_id does not exist\n";
+    if (!$self->vlanNumberExists($vlan_number)) {
+	print STDERR "ERROR: VLAN $vlan_number does not exist\n";
 	return 1;
     }
-    $self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
 
     #
     # If this switch supports private VLANs, check to see if the VLAN we're
@@ -850,8 +875,8 @@ sub setPortVlan($$@) {
 }
 
 #
-# Remove all ports from the given VLAN. The VLAN is given as a VLAN
-# identifier from the database.
+# Remove all ports from the given VLANs, which are given as Cisco-specific
+# VLAN numbers
 #
 # usage: removePortsFromVlan(self,int vlans)
 #	 returns 0 on sucess.
@@ -859,21 +884,23 @@ sub setPortVlan($$@) {
 #
 sub removePortsFromVlan($@) {
     my $self = shift;
-    my @vlan_ids = @_;
+    my @vlan_numbers = @_;
 
     #
-    # Find the real VLAN numbers from the passed VLAN IDs
+    # Make sure the VLANs actually exist
     #
-    my %vlan_numbers = ();
-    foreach my $vlan_id (@vlan_ids) {
-	my $vlan_number = $self->findVlan($vlan_id);
-	if (!defined($vlan_number)) {
-	    print STDERR "ERROR: VLAN with identifier $vlan_id does not exist\n";
+    foreach my $vlan_number (@vlan_numbers) {
+	if (!$self->vlanNumberExists($vlan_number)) {
+	    print STDERR "ERROR: VLAN $vlan_number does not exist\n";
 	    return 1;
 	}
-	$self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
-	$vlan_numbers{$vlan_number} = 1;
     }
+
+    #
+    # Make a hash of the vlan number for easy lookup later
+    #
+    my %vlan_numbers = ();
+    @vlan_numbers{@vlan_numbers} = 1;
 
     #
     # Get a list of the ports in the VLAN
@@ -900,7 +927,7 @@ sub removePortsFromVlan($@) {
 
     $self->debug("About to remove ports " . join(",",@ports) . "\n");
     if (@ports) {
-	return $self->setPortVlan("default",@ports);
+	return $self->setPortVlan(1,@ports);
     } else {
 	return 0;
     }
@@ -909,7 +936,7 @@ sub removePortsFromVlan($@) {
 #
 # Remove the given VLAN from this switch. This presupposes that all of its
 # ports have already been removed with removePortsFromVlan(). The VLAN is
-# given as a VLAN identifier from the database.
+# given as a Cisco-specific VLAN number
 #
 # usage: removeVlan(self,int vlan)
 #	 returns 1 on success
@@ -918,7 +945,7 @@ sub removePortsFromVlan($@) {
 #
 sub removeVlan($@) {
     my $self = shift;
-    my @vlan_ids = @_;
+    my @vlan_numbers = @_;
 
     #
     # Need to lock the VLAN edit buffer
@@ -929,17 +956,14 @@ sub removeVlan($@) {
 
     my $errors = 0;
 
-    foreach my $vlan_id (@vlan_ids) {
+    foreach my $vlan_number (@vlan_numbers) {
 	#
-	# Find the real VLAN number from the passed VLAN ID
+	# Make sure the VLAN actually exists
 	#
-	my $vlan_number = $self->findVlan($vlan_id);
-	if (!defined($vlan_number)) {
-	    print STDERR "ERROR: VLAN with identifier $vlan_id does ".
-		    "not exist\n";
+	if (!$self->vlanNumberExists($vlan_number)) {
+	    print STDERR "ERROR: VLAN $vlan_number does not exist\n";
 	    return 0;
 	}
-	$self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
 
 	#
 	# Perform the actual removal
