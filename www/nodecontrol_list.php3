@@ -39,6 +39,9 @@ if (!isset($showtype)) {
     $showtype='pcs';
 }
 
+$additionalVariables = "";
+$additionalLeftJoin  = "";
+
 if (! strcmp($showtype, "all")) {
     $role   = "(role='testnode' or role='virtnode')";
     $clause = "";
@@ -62,6 +65,17 @@ elseif (! strcmp($showtype, "virtnodes")) {
 elseif (! strcmp($showtype, "widearea")) {
     $role   = "(role='testnode')";
     $clause = "and (nt.isremotenode=1)";
+
+    $additionalVariables = ",".
+			   "wani.machine_type,".
+			   "REPLACE(CONCAT_WS(', ',".
+			   "wani.city,wani.state,wani.country,wani.zip), ".
+		 	   "'USA, ','')".
+			   "AS location, ".
+	 		   "wani.connect_type";
+    $additionalLeftJoin = "LEFT JOIN widearea_nodeinfo AS wani ".
+			  "ON n.node_id=wani.node_id";
+
     $view   = "Widearea";
 }
 else {
@@ -81,10 +95,12 @@ if ($isadmin || !strcmp($showtype, "widearea")) {
 $query_result =
     DBQueryFatal("select n.node_id,n.phys_nodeid,n.type,ns.status, ".
 		 "   n.def_boot_osid,r.pid,r.eid,nt.class,r.vname ".
-		 " from nodes as n ".
+		 "$additionalVariables ".
+		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join node_status as ns on n.node_id=ns.node_id ".
 		 "left join reserved as r on n.node_id=r.node_id ".
+		 "$additionalLeftJoin ".
 		 "where $role $clause ".
 		 "ORDER BY priority");
 
@@ -183,7 +199,14 @@ if ($isadmin) {
 elseif (strcmp($showtype, "widearea")) {
     # Widearea nodes are always "free"
     echo "<th align=center>Free?</th>\n";
-}    
+}
+
+if (!strcmp($showtype, "widearea")) {
+    echo "<th align=center>Processor</th>
+	  <th align=center>Connection</th>
+	  <th align=center>Location</th>\n";
+}
+    
 echo "</tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
@@ -196,6 +219,12 @@ while ($row = mysql_fetch_array($query_result)) {
     $eid                = $row[eid];
     $vname              = $row[vname];
     $status             = $row[status];
+
+    if (!strcmp($showtype, "widearea")) {	
+	$machine_type = $row[machine_type];
+	$location = $row[location];
+	$connect_type = $row[connect_type];
+    } 
 
     echo "<tr>";
 
@@ -254,6 +283,12 @@ while ($row = mysql_fetch_array($query_result)) {
 	    echo "<td>No</td>\n";
 	else
 	    echo "<td>Yes</td>\n";
+    }
+
+    if (!strcmp($showtype, "widearea")) {	
+	echo "<td>$machine_type</td>
+	      <td>$connect_type</td>
+	      <td><font size='-1'>$location</font></td>\n";
     }
     
     echo "</tr>\n";
