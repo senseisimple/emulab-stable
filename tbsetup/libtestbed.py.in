@@ -100,15 +100,18 @@ def SENDMAIL(To, Subj, Msg, From = None, Headers = None, Files = ()):
         for fname in Files:
             try:
                 infile = open(fname)
-            except IOError:
-                continue
-            
-            sm.write("\n--------- %s --------\n" % fname)
+                sm.write("\n--------- %s --------\n" % fname)
 
-            for line in infile.readlines():
-                sm.write(line)
-            
-            infile.close()
+                for line in infile.readlines():
+                    sm.write(line)
+                    pass
+
+                infile.close()
+                pass
+            except:
+                pass
+            pass
+        pass
     
     sm.write("\n")
     sm.close()
