@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -87,7 +87,9 @@ use Exporter;
 	 TBDB_NODESTATE_ISUP TBDB_NODESTATE_REBOOTING TBDB_NODESTATE_REBOOTED
 	 TBDB_NODESTATE_SHUTDOWN TBDB_NODESTATE_BOOTING TBDB_NODESTATE_TBSETUP
 	 TBDB_NODESTATE_RELOADSETUP TBDB_NODESTATE_RELOADING
-	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_UNKNOWN TBDB_NODESTATE_PXEWAIT
+	 TBDB_NODESTATE_RELOADDONE TBDB_NODESTATE_UNKNOWN
+	 TBDB_NODESTATE_PXEWAIT TBDB_NODESTATE_PXEWAKEUP
+	 TBDB_NODESTATE_PXEBOOTING
 
 	 TBDB_NODEOPMODE_NORMAL TBDB_NODEOPMODE_DELAYING
 	 TBDB_NODEOPMODE_UNKNOWNOS TBDB_NODEOPMODE_RELOADING
@@ -125,7 +127,8 @@ use Exporter;
 	 TBSetNodeEventState TBGetNodeEventState
 	 TBSetNodeAllocState TBGetNodeAllocState
 	 TBSetNodeOpMode TBGetNodeOpMode
-	 TB_OSID_MBKERNEL TB_OSID_PXEBOOT TB_OSID_FRISBEE 
+	 TB_OSID_MBKERNEL TB_OSID_PXEBOOT TB_OSID_FRISBEE
+	 TB_OSID_FREEBSD_MFS TB_OSID_FRISBEE_MFS	 
 	 TBBootWhat TBNodeStateTimeout
 	 TBDB_TBCONTROL_RESET TBDB_TBCONTROL_RELOADDONE 
 	 TBDB_TBCONTROL_TIMEOUT TBDB_NO_STATE_TIMEOUT
@@ -392,7 +395,11 @@ sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
 # Magic OSID constants
 sub TB_OSID_MBKERNEL()          { "_KERNEL_"; } # multiboot kernel OSID
 sub TB_OSID_PXEBOOT()           { "PXEBOOT"; } # osid for def pxe_boot_path
-sub TB_OSID_FRISBEE()           { "PXEFRISBEE"; } 
+sub TB_OSID_FRISBEE()           { "PXEFRISBEE"; }
+
+# Magic MFS constants
+sub TB_OSID_FREEBSD_MFS()	{ "FREEBSD-MFS" };
+sub TB_OSID_FRISBEE_MFS()	{ "FRISBEE-MFS" };
 
 # ImageIDs
 #
@@ -450,6 +457,8 @@ sub TBDB_NODESTATE_RELOADING()	{ "RELOADING"; }
 sub TBDB_NODESTATE_RELOADDONE()	{ "RELOADDONE"; }
 sub TBDB_NODESTATE_UNKNOWN()	{ "UNKNOWN"; };
 sub TBDB_NODESTATE_PXEWAIT()	{ "PXEWAIT"; }
+sub TBDB_NODESTATE_PXEWAKEUP()	{ "PXEWAKEUP"; }
+sub TBDB_NODESTATE_PXEBOOTING()	{ "PXEBOOTING"; }
 
 sub TBDB_NODEOPMODE_ANY		{ "*"; } # A wildcard opmode
 sub TBDB_NODEOPMODE_NORMAL	{ "NORMAL"; }
@@ -1534,95 +1543,50 @@ sub OSFeatureSupported($$) {
 #
 # Find out what osid a node will boot next time it comes up, 
 # Usually (but not always) the currently running OS as well.
-# May also return TB_OSID_MBKERNEL
 #
-sub TBBootWhat($;$) {
+sub TBBootWhat($;$)
+{
+    my ($node, $debug) = @_;
+    $debug = 0
+	if (!defined($debug));
+
+    #
     # WARNING!!!
     #
     # DO NOT change this function without making corresponding changes to
-    # the C version of this code in the bootinfo_mysql.c . They MUST
+
     # ALWAYS find exactly the same resulting OSID given the same inputs.
-    # [The only exception is that here we must take into account 
-    # *pxe_boot_path since that can specify an OS as well.]
     #
-    # Boot priorities go like this:
-    # NEXT_PXE_BOOT_PATH
-    # PXE_BOOT_PATH
-    # NEXT_BOOT_PATH        multiboot kernel
-    # DEF_BOOT_PATH         multiboot kernel
-    # NEXT_BOOT_OSID        osid from os_info
-    # DEF_BOOT_OSID         osid from os_info
-    # if all the above are null, error
-    my $node = shift || return 0; # error if no node
-    my $d = shift || 0; # debug flag
-    my $cmd = "select path from os_info where osid='".TB_OSID_PXEBOOT."'";
-    my $q = DBQueryFatal($cmd);
-    my @r = $q->fetchrow_array();
-    my $defpxepath = $r[0];
-    $cmd = "select next_pxe_boot_path, pxe_boot_path, 
-next_boot_path, def_boot_path, next_boot_osid, def_boot_osid 
-from nodes where node_id = '$node'";
-    $q = DBQueryFatal($cmd);
-    if ($q->numrows() < 1) {
-	warn("TBBootWhat: Ignoring invalid node '$node' (non-existent)\n");
+    my $query_result =
+	DBQueryWarn("select def_boot_osid, odef.op_mode, ".
+		    "       temp_boot_osid, otemp.op_mode, ".
+		    "       next_boot_osid, onext.op_mode ".
+		    "from nodes as n ".
+		    "left join os_info as odef  on odef.osid=def_boot_osid ".
+		    "left join os_info as otemp on otemp.osid=temp_boot_osid ".
+		    "left join os_info as onext on onext.osid=next_boot_osid ".
+		    "where node_id='$node'");
+
+    if (!$query_result || !$query_result->numrows) {
+	print("*** Warning: No bootwhat info for $node\n");
 	return 0;
     }
-    @r = $q->fetchrow_array();
-    $nextpxepath=$r[0];
-    $pxepath=$r[1];
-    $nextpath=$r[2];
-    $defpath=$r[3];
-    $nextosid=$r[4];
-    $defosid=$r[5];
-    print "TBBootWhat: $node => (".($nextpxepath?"nextpxe=$nextpxepath, ":"").
-	( $pxepath ne $defpxepath ? "pxe=$pxepath, ":"") .
-	    "np=$nextpath, dp=$defpath, no=$nextosid, do=$defosid)\n" if $d>1;
-    # With PXE paths, look up the osid for the path. If none, use 
-    # TB_OSID_MBKERNEL. If it is the default pxe path, just go on like normal.
-    if (defined($nextpxepath) && $nextpxepath) {
-	if ($nextpxepath ne $defpxepath) {
-	    print "TBBootWhat: Using next_pxe_boot_path $nextpxepath\n" if $d;
-	    my $cmd = "select osid from os_info where path='$nextpxepath'";
-	    my $q = DBQueryFatal($cmd);
-	    if ($q->numrows() > 0) {
-		my @r = $q->fetchrow_array();
-		my $osid = $r[0];
-		return $osid;
-	    } else {
-		return TB_OSID_MBKERNEL;
-	    }
-	} # else go on as normal
-    } else {
-	if ($pxepath ne $defpxepath) {
-	    print "TBBootWhat: Using pxe_boot_path $pxepath\n" if $d;
-	    my $cmd = "select osid from os_info where path='$pxepath'";
-	    my $q = DBQueryFatal($cmd);
-	    if ($q->numrows() > 0) {
-		my @r = $q->fetchrow_array();
-		my $osid = $r[0];
-		return $osid;
-	    } else {
-		return TB_OSID_MBKERNEL;
-	    }
-	} # else go on as normal
-    }	
-    if ((defined($nextpath) && $nextpath) || 
-	(defined($defpath) && $defpath)) {
-	# No OSID. Return a magic one.
-	print "TBBootWhat: Using {def,next}_boot_path ${nextpath}$defpath\n" 
-	    if $d;
-	return TB_OSID_MBKERNEL;
-    }
-    if (defined($nextosid) && $nextosid) { 
-	print "TBBootWhat: Using next_boot_osid $nextosid\n" if $d;
-	return $nextosid; 
-    }
-    if (defined($defosid) && $defosid) { 
-	print "TBBootWhat: Using def_boot_osid $defosid\n" if $d;
-	return $defosid; 
-    }
-    warn("***Warning: node '$node': All boot info was null!\n");
-    return TB_OSID_MBKERNEL;
+    my ($def_boot_osid, $def_boot_opmode,
+	$temp_boot_osid, $temp_boot_opmode,
+	$next_boot_osid, $next_boot_opmode) = $query_result->fetchrow_array();
+
+    #
+    # The priority would seem pretty clear. 
+    #
+    return ($next_boot_osid, $next_boot_opmode)
+	if (defined($next_boot_osid) && $next_boot_osid ne "");
+    return ($temp_boot_osid, $temp_boot_opmode)
+	if (defined($temp_boot_osid) && $temp_boot_osid ne "");
+    return ($def_boot_osid, $def_boot_opmode)
+	if (defined($def_boot_osid) && $def_boot_osid ne "");
+	
+    print("*** Warning: node '$node': All boot info was null!\n");
+    return undef;
 }
 
 #
