@@ -17,7 +17,7 @@ sub usage()
 {
     die("Usage: webserver.pl\n");
 }
-my $logname = "/var/tmp/webserver.log";
+my $logname = "/var/emulab/logs/webserver.log";
 my $pidfile = "/var/run/webserver.pid";
 my $webpage = "http://www.emulab.net/widearea_redirect.php";
 my $IP;
@@ -25,7 +25,7 @@ my $IP;
 #
 # Untaint path
 #
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/etc/emulab';
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 #

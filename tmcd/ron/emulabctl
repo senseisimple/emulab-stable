@@ -4,20 +4,21 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
+. /etc/emulab/paths.sh
 
 #
 # Boottime initialization. 
 #
 case "$1" in
 start)
-	/usr/local/etc/emulab/watchdog > /dev/null 2>&1 && echo -n ' Emulab'
+	$BINDIR/watchdog > /dev/null 2>&1 && echo -n ' Emulab'
 
 	#
 	# Do not start the mini server on RON nodes yet. 
 	#
-	if [ -x /usr/local/etc/emulab/webserver.pl -a -e /etc/emulab.pkey ]
+	if [ -x $BINDIR/webserver.pl -a -e /etc/emulab.pkey ]
 	then
-		/usr/local/etc/emulab/webserver.pl && echo -n ' Webserver'
+		$BINDIR/webserver.pl && echo -n ' Webserver'
 	fi
 	;;
 stop)
