@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <mysql/mysql.h>
+#include <sys/time.h>
 #include "capdecls.h"
 
 #define TESTMODE
@@ -56,6 +57,7 @@ main(int argc, char **argv)
 	int			tcpsock, ch;
 	int			length, i, err = 0;
 	struct sockaddr_in	name;
+	struct timeval		timeout;
 
 	while ((ch = getopt(argc, argv, "dp:")) != -1)
 		switch(ch) {
@@ -112,7 +114,7 @@ main(int argc, char **argv)
 		syslog(LOG_ERR, "getting socket name: %m");
 		exit(1);
 	}
-	if (listen(tcpsock, 20) < 0) {
+	if (listen(tcpsock, 40) < 0) {
 		syslog(LOG_ERR, "listening on socket: %m");
 		exit(1);
 	}
@@ -133,6 +135,23 @@ main(int argc, char **argv)
 			exit(1);
 		}
 		syslog(LOG_INFO, "%s connected", inet_ntoa(client.sin_addr));
+
+		/*
+		 * Set timeouts
+		 */
+		timeout.tv_sec  = 6;
+		timeout.tv_usec = 0;
+		
+		if (setsockopt(clientsock, SOL_SOCKET, SO_RCVTIMEO,
+			       &timeout, sizeof(timeout)) < 0) {
+			syslog(LOG_ERR, "SO_RCVTIMEO failed: %m");
+			goto done;
+		}
+		if (setsockopt(clientsock, SOL_SOCKET, SO_SNDTIMEO,
+			       &timeout, sizeof(timeout)) < 0) {
+			syslog(LOG_ERR, "SO_SNDTIMEO failed: %m");
+			goto done;
+		}
 		
 		/*
 		 * Read in the whoami info.
