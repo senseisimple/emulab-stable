@@ -1,4 +1,11 @@
 #!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 use strict;
 
 # macgrabber.pl, a new script to harvest MAC address (as printed out by Mike's

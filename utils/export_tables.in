@@ -1,4 +1,11 @@
 #!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #
 # export_tables - Create an SQL file with the contents of selected tables 
 # that should more or less be the same across all sites.

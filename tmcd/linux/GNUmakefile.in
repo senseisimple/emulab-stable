@@ -1,4 +1,10 @@
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # XXX ONLY RUN THIS INSTALL ON A LINUX TESTBED NODE!
 #
 # Trivial. These things just need to be installed into the right place
