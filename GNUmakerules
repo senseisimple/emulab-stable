@@ -62,6 +62,9 @@ vpath %.c $(SRCDIR)
 %.o: %.c
 	$(CC) -c -o $@ $(CFLAGS) $<
 
+%.o: %.cc
+	$(CXX) -c -o $@ $(CXXFLAGS) $<
+
 #
 # Rules to regen configure written files.
 #
