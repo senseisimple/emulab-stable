@@ -418,6 +418,13 @@ sub mkrootfs($)
     }
 
     #
+    # Stash the control net IP if not the same as the host IP
+    #
+    if ($IP ne $hostip) {
+	mysystem("echo $IP >> $path/root/var/emulab/boot/myip");
+    }
+
+    #
     # Get a list of all the plain files and create zero length versions
     # in the new var.
     #
