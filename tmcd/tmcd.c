@@ -1066,7 +1066,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 				"FROM interfaces AS i LEFT JOIN reserved AS r ON i.node_id = r.node_id "
 				"LEFT JOIN nodes AS n ON i.node_id = n.node_id "
 				"LEFT JOIN node_types AS t ON n.type = t.type "
-				"LEFT JOIN portmap AS p ON i.iface = p.pport AND p.vnode=r.vname "
+				"LEFT JOIN portmap AS p ON i.iface = p.pport AND p.vnode=r.vname AND p.pid=r.pid AND p.eid=r.eid "
 				"WHERE IP IS NOT NULL AND IP != '' AND r.pid='%s' AND r.eid='%s'"
 				"ORDER BY node_id DESC, IP",
 				6,pid,eid);
