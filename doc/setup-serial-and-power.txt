@@ -1,0 +1,128 @@
+The following is a guide to setting up power control and serial lines.
+
+Overview:
+
+1) Enter all the power controller's info into the emulab DB 
+   and "capture" startup script (if applicable).
+2) Enter all the nodes' outlet info into the DB
+3) Enter all the nodes' serial line info into the DB and "capture" startup
+4) Collect interface mapping from nodes
+
+Details:
+
+Steps two and three can be easily scripted (automated) if you have an
+online mapping of node to outlet and node to serial line.
+
+1) Enter all the power controller's serial line info into the emulab DB
+   and add a line to the "capture" startup script.
+
+For each power controller, do the following:
+
+* Create an entry in the "nodes" table.
+
+insert into nodes (node_id, type, phys_nodeid, role)
+	values ("power<X>", "<type>", "power<X>", "powerctrl");
+
+Where "<X>" is the power controller designation you pick.  I suggest just 
+using a simple number.  You can, of course, change this name if you wish, 
+just use the same designation below.  <type> is the type of power 
+controller; valid values are "RPC27" and "APC".
+
+If this power controller of type "APC", make sure it has an entry in your 
+/ets/hosts file on your boss node, and skip to step 2.
+
+* Create an entry in the "tiplines" table.
+
+insert into tiplines (tipname, node_id, server)
+	values ("power<X>", "power<X>", "<serial_server>");
+
+Where "<X>" is the same value as above and <serial_server> is the hostname 
+of the machine that has the serial connection to the power controller.
+
+* Create a capture startup line in /usr/local/etc/rc.d/capture.sh on the 
+  machine that has the serial connection to "power<X>".
+
+If the file doesn't exist yet, create it, and put
+
+#!/bin/sh
+
+at the top, then change the file's mode to 0755.
+
+Add a line like this to the above file:
+
+/usr/testbed/sbin/capture -T 15 -r -s 9600 power<X> <ttyport> >/dev/null 2>&1 &
+
+Where <X> is as above, and <ttyport> is the tty device file associated 
+with this power controller.
+
+* Disable the status detail and confirmation prompt on the power 
+  controller.
+
+Manually execute the command line you added above, then run "console 
+power<X>".  You will now have access to this device's serial line.  
+Navigate the menus to turn off status reporting and confirmation.
+
+2) Enter all the nodes' outlet info into the DB
+
+For each node, do the following:
+
+* insert row into outlets table
+
+insert into outlets values ("pc<XXX>", "power<X>", <outlet>, NULL);
+
+Where <XXX> is the testbed node unique suffix (e.g., number), <X> is the 
+power controller that its connected to, and <outlet> is the outlet number 
+on the power controller.
+
+* Try power cycling the node (perhaps wait to do this until you get to 
+  the end of step 3)
+
+on your boss node, execute
+
+sudo /usr/testbed/bin/power cycle pc<XXX>
+
+You shouldn't get any errors, and the machine should go through a cold 
+reboot cycle.
+
+3) Enter all the nodes' serial line info into the DB and "capture" startup
+
+This process is nearly identical to step one.
+
+For each node, do the following:
+
+* Insert tipline row into DB
+
+insert into tiplines (tipname, node_id, server)
+	values ("pc<XXX>", "pc<XXX>", "<serial_server>");
+
+* Create a capture startup line in /usr/local/etc/rc.d/capture.sh on the 
+  machine with the serial conection to "pc<XXX>".
+
+If the file doesn't exist, follow the script creation step outlined above 
+in step 1.
+
+Open the above file, and add a line like this:
+
+/usr/testbed/sbin/capture -T 15 -r -s 115200 pc<XXX> <ttyport> >/dev/null 2>&1 &
+
+Where <XXX> is as above, and <ttyport> is the tty device file associated
+with this power controller.
+
+* Test the console line
+
+Run "console pc<XXX>" on serial 2.  Hit enter a couple of times, or reboot
+(using "power"!) the machine and wait to see if the PXE and MFS kernel 
+console messages appear.
+
+
+4) Collect interface mapping from nodes
+
+Emulab requires a mapping from FreeBSD interface number to Linux interface 
+number.
+
+You'll need to boot one of each different node type into both freebsd and
+linux, recording the interface number to MAC address mapping.  Use these
+two mappings to correlate the FreeBSD and Linux interface numbers.  You'll 
+use this information in conjunction with the instructions for adding nodes 
+in setup-nodes.txt
+
