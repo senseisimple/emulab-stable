@@ -173,10 +173,12 @@ The current features of the mobile wireless testbed are:
 <li>Four <a href="http://www.acroname.com">Acroname Garcia</a> robots
 <li><a href="http://www.xbow.com/Products/XScale.htm">Intel Stargate</a> single
 board computers for each robot.
-<li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">900MHz Mica2 
-motes</a> attached to each Stargate.
-<!-- <li>Some non-mobile Mica2 motes nearby. -->
 <li>Roaming an area about 8 x 3.5 meters with a sheetrock-covered steel pillar in the middle.
+<li>Two statically-placed
+<a href="http://www.xbow.com/Products/productsdetails.aspx?sid=90">E-Mote</a>
+Eternet gateways for Berkeley Motes.
+<li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">900MHz Mica2 
+motes</a> attached to each Stargate and E-Mote.
 <li>Four overhead cameras for vision-based position tracking of the robots.
 <li>Two <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> for viewing the
 robots in their habitat.
