@@ -15,6 +15,8 @@ use POSIX qw(strftime);
 # supplied, an experiment shell is created (this is currently an admin
 # only option).
 #
+# TODO: Remove expt_expires and priority.
+# 
 # Exit codes are important; they tell the web page what has happened so
 # it can say something useful to the user. Fatal errors are mostly done
 # with die(), but expected errors use this routine. At some point we will
@@ -26,13 +28,27 @@ use POSIX qw(strftime);
 # 
 sub usage()
 {
-    die("Usage: batchexp [-w] [-i [-f]] [-x expires] [-E description] [-g gid] ".
-	"[-s] [-a <autotime>] [-l <idletime>]] [-n low|high] ".
-        "-p <pid> -e <eid> [<nsfile>]\n");
+    print(STDERR
+	  "Usage: batchexp [-i [-w]] [-f] [-E description] [-g gid] [-s]\n".
+	  "                [-a <autotime>] [-l <idletime>]\n".
+	  "                -p <pid> -e <eid> <nsfile>\n".
+	  "switches:\n".
+	  "-i       - swapin immediately; by default experiment is batched\n".
+	  "-w       - wait for non-batchmode experiment to preload or swapin\n".
+	  "-f       - preload experiment (do not swapin or queue yet)\n".
+	  "-s       - Experiment can be swapped at any time\n".
+	  "-a <nnn> - Auto swapout nnn minutes after experiment is swapped in\n".
+	  "-l <nnn> - Auto swapout nnn minutes after experiment goes idle\n".
+	  "-E <str> - A pithy sentence describing your experiment\n".
+	  "-p <pid> - The project in which to create the experiment\n".
+	  "-g <gid> - The group in which to create the experiment\n".
+	  "-e <eid> - The experiment name (unique, alphanumeric, no blanks)\n".
+	  "<nsfile> - NS file to parse for experiment.\n");
+    exit(-1);
 }
 
-my $optlist = "iE:d:g:x:e:p:sa:l:n:fw";
-my $immediate= 0;
+my $optlist = "iE:g:e:p:sa:l:fw";
+my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
 
@@ -86,7 +102,6 @@ my $eid;
 my $pid;
 my $gid;
 my $description;
-my $expires;
 my $tempnsfile;
 my $swappable    = 0;
 my $idleswap     = 0;
@@ -135,9 +150,6 @@ if (defined($description)) {
 else {
     $description = "'Created by $dbuid'";
 }
-if (! defined($expires)) {
-    $expires = DBDateTime(60 * 60 * 24 * 30);
-}
 if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
     die("*** $0:\n".
 	"    Only admins can create experiments with no NS file\n");
@@ -172,7 +184,7 @@ elsif (! -f $tempnsfile || ! -r $tempnsfile || -z $tempnsfile) {
 # Batch jobs get a shorter idle time
 #
 my $swaptime = $idleswaptime;
-if (!$immediate && TBSiteVarExists("idle/batch_threshold")) {
+if ($batchmode && TBSiteVarExists("idle/batch_threshold")) {
     my $batchidleswaptime = TBGetSiteVar("idle/batch_threshold");
     if ($swaptime > $batchidleswaptime) {
 	$swaptime = $batchidleswaptime;
@@ -218,16 +230,17 @@ if ($query_result->numrows) {
 # no one can mess with the experiment until later. 
 #
 if (! DBQueryWarn("INSERT INTO experiments ".
-		  "(eid, pid, gid, expt_created, expt_expires, expt_name,".
+		  "(eid, pid, gid, expt_created, expt_name,".
 		  " expt_head_uid,expt_swap_uid, state, priority, swappable,".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
 		  " idle_ignore, keyhash, expt_locked, eventkey,".
-		  " noswap_reason, noidleswap_reason) ".
-		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
+		  " noswap_reason, noidleswap_reason, batchmode) ".
+		  "VALUES ('$eid', '$pid', '$gid', now(), ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
-		  "now(), '$eventkey', 'None Given', 'None Given')")) {
+		  "now(), '$eventkey', 'None Given', 'None Given', ".
+		  "$batchmode)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    Database error inserting record for $pid/$eid!\n");
@@ -253,8 +266,7 @@ if (! DBQueryWarn("insert into experiment_resources (idx, tstamp, exptidx) ".
 if (! DBQueryWarn("insert into experiment_stats ".
 		  "(eid, pid, creator, gid, created, batch, exptidx,rsrcidx) ".
 		  "select '$eid', '$pid', '$dbuid', '$gid', now(), ".
-		  ($immediate ? 0 : 1) .
-		  ", e.idx,r.idx from experiments as e ".
+		  "$batchmode, e.idx,r.idx from experiments as e ".
 		  "left join experiment_resources as r on e.idx=r.exptidx ".
 		  "where pid='$pid' and eid='$eid'")) {
     DBQueryWarn("unlock tables");
@@ -325,7 +337,7 @@ if (system("$parser -n $pid $gid $eid $nsfile") != 0) {
 #
 # Gather statistics; start the clock ticking.
 #
-if ($frontend) {
+if ($frontend || $batchmode) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0,
 		    TBDB_STATS_FLAGS_START);
 }
@@ -354,7 +366,7 @@ if (my $childpid = TBBackGround($logname)) {
 	      "ready to use\n");
 	exit(0);
     }
-    print("Waiting for " . (!$immediate ? "batch " : "") . "experiment $eid ".
+    print("Waiting for " . ($batchmode ? "batch " : "") . "experiment $eid ".
 	  "to finish " . ($frontend ? "preloading." : "swapping in.") . "\n");
     print("You may type ^C at anytime; you will be notified via email later;\n".
 	  "you will not actually interrupt the experiment itself.\n");
@@ -412,7 +424,7 @@ SetExpState($pid, $eid, EXPTSTATE_SWAPPED);
 #
 # If not in frontend mode (preload only) continue to swapping exp in.
 # 
-if (!$frontend) {
+if (! ($frontend || $batchmode)) {
     SetExpState($pid, $eid, EXPTSTATE_ACTIVATING);
 
     print "Running 'tbswap in $pid $eid'\n";
@@ -453,7 +465,7 @@ if (system("$tbbindir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
 #
 # Gather statistics.
 #
-if ($frontend) {
+if ($frontend || $batchmode) {
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_PRELOAD, 0);
 }
 else {
@@ -479,7 +491,7 @@ TBExptCloseLogFile($pid, $eid);
 #
 # Must unlock and drop batch experiments into the queue before exit.
 #
-if (!$frontend && !$immediate) {
+if ($batchmode && !$frontend) {
     TBUnLockExp($pid, $eid, EXPTSTATE_QUEUED());
 }
 else {
@@ -537,9 +549,9 @@ $message .=
     "Description: $description\n" .
     "Swappable:   " . ($swappable ? "Yes\n" :
 		                    "No  (Reason: $noswap_reason)\n") .
-    "Idle-Swap:   " . ($idleswap  ? "Yes, at $idleswaptime hours\n" :
+    "Idle-Swap:   " . ($idleswap  ? "Yes, at " . $idleswaptime/60.0 . " hours\n":
 		                    "No  (Reason: $noidleswap_reason)\n") .
-    "Auto-Swap:   " . ($autoswap  ? "Yes, at $autoswaptime hours\n" :
+    "Auto-Swap:   " . ($autoswap  ? "Yes, at " . $autoswaptime/60.0 . " hours\n":
 		                    "No\n") .
     "Created:     $expt_created\n".
     "Directory:   $userdir\n".
@@ -715,7 +727,7 @@ sub ParseArgs()
     }
     
     if (defined($options{"i"})) {
-	$immediate = 1;
+	$batchmode = 0;
     }
     if (defined($options{"f"})) {
 	$frontend = 1;
@@ -750,9 +762,6 @@ sub ParseArgs()
 	    die("Bad data in argument: $gid.");
 	}
     }
-    if (defined($options{"x"})) {
-	$expires = $options{"x"};
-    }
     if (defined($options{"E"})) {
 	$description = $options{"E"};
     }
@@ -773,16 +782,5 @@ sub ParseArgs()
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
-    }
-    if (defined($options{"n"})) {
-	if ($options{"n"} eq "low") {
-	    $priority = TB_EXPTPRIORITY_LOW;
-	}
-	elsif ($options{"n"} eq "high") {
-	    $priority = TB_EXPTPRIORITY_HIGH;
-	}
-	else {
-	    usage();
-	}
     }
 }
