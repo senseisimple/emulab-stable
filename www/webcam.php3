@@ -53,6 +53,18 @@ if (!$query_result || !mysql_num_rows($query_result)) {
     MyError("There are no webcams to view!");
 }
 
+if (isset($refreshrate)) {
+    echo "<center>
+          <a href=webcam.php3>Stop Auto-refresh.</a>
+          </center>\n";
+}
+else {
+    echo "<center>
+          <a href=webcam.php3?refreshrate=1>Auto-refresh</a> images at one
+             second interval.
+          </center>\n";
+}
+
 echo "<table cellpadding='0' cellspacing='0' border='0' class='stealth'>\n";
 
 while ($row = mysql_fetch_array($query_result)) {
