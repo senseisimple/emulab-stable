@@ -274,7 +274,7 @@ foreach my $power_id (keys %outlets) {
 		$errors++;
 	    }
 	}
-    } elsif ($type eq "RPC27") {
+    } elsif ($type =~ "RPC") {
 	if (rpc27ctrl($op,$power_id,@outlets)) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
 	}
