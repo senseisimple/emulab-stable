@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,9 +22,9 @@ Firewall instproc init {s} {
 
     $self set sim $s
 
-    $self set type    "ipfw"
+    $self set type    "ipfw2-vlan"
     $self set style   "basic"
-    $self set osid    "FW-IPFW"
+    $self set osid    "FW-IPFW2"
     $self set cmdline ""
     $self set parent  ""
 
