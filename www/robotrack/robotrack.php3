@@ -107,19 +107,19 @@ echo "<applet code='RoboTrack.class'
             <param name='ppm' value='$ppm'>
           </applet>\n";
 
-<br>
-<center>
-<h3>Using the Robot Tracker Applet</h3>
-<ul>
-<li> Right Click over a robot or mote will pop up a browser window showing
-     information about the robot/mote.
-<li> Left click and drag over a (stationary) robot allows you to setup a
-     move to a new position. Remember to edit the orientation in the table,
-     if needed. Cancel by moving back to its original position. 
-<li> Left click over the background image brings up a menu to submit your 
-     moves (start the robots on their way), or cancel the moves.
-<li> Only one move per robot at a time. 
-</ul>
+echo "<br>
+     <center>
+     <h3>Using the Robot Tracker Applet</h3>
+     <ul>
+     <li> Right Click over a robot or mote will pop up a browser window 
+          showing information about the robot/mote.
+     <li> Left click and drag over a (stationary) robot allows you to setup a
+          move to a new position. Remember to edit the orientation in the
+          table, if needed. Cancel by moving back to its original position. 
+     <li> Left click over the background image brings up a menu to submit your 
+          moves (start the robots on their way), or cancel the moves.
+     <li> Only one move per robot at a time. 
+     </ul>\n";
 
 PAGEFOOTER();
 ?>
