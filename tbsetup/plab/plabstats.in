@@ -9,6 +9,11 @@ use Getopt::Std;
 use XML::Parser;
 
 #
+# Configure variables
+#
+my $TB = "@prefix@";
+
+#
 # XXX user-specified desires assumed to be between 1 and DESIREMAX
 #
 my $DESIREMAX = 5;
@@ -25,7 +30,8 @@ my $STALEAGE  = 30 * 60;
 
 my $fetch   = 0;
 my $debug   = 0;
-my $xmlfile = "/tmp/plabxml";
+my $tempfile = "/tmp/plabxml.$$";
+my $agedfile = "$TB/log/plabxml.txt";
 my $showload = 0;
 my $showcpu = 0;
 my $showmem = 0;
@@ -42,7 +48,7 @@ sub usage()
     print STDOUT
 	"Usage: plabstats [-dfh] [-CDHILMS]\n".
 	"  -d	print debug diagnostics\n".
-	"  -f	fetch new data, else use what is in $xmlfile\n".
+	"  -f	fetch new data, else use what is in $agedfile\n".
 	"  -h	this help message\n".
 	"  -i	print IP address along with metrics\n".
 	"  -n	do not print hostname with metrics\n".
@@ -183,10 +189,20 @@ if ($fetch) {
 	    if ($?);
     }
     else {
-	exec("/usr/local/bin/wget -q -O $xmlfile ".
+	exec("/usr/local/bin/wget -q -O $tempfile ".
 	     "http://www.planet-lab.org/xml/gmetad.xml");
 	exit(0);
     }
+}
+else {
+    #
+    # Copy aged file to avoid having it changed underneath. Not perfect.
+    # Okay for now; will eventually be in the DB where we can lock it.
+    #
+    fatal("File does not exist: $agedfile")
+        if (! -e $agedfile);
+    system("cp -pf $agedfile $tempfile") == 0 or
+        fatal("Could not copy $agedfile to $tempfile!");
 }
 
 #
@@ -198,7 +214,7 @@ my $query_result =
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join interfaces as i on i.node_id=n.node_id ".
 		 "where nt.isremotenode=1 and nt.isvirtnode=0 ".
-    		 "and nt.type like 'pcplab%'");
+    		 "and nt.class='pcplabphys'");
 
 while (my ($nodeid,$IP) = $query_result->fetchrow_array()) {
     $nodemap{$IP} = $nodeid;
@@ -222,7 +238,7 @@ $p1->setHandlers('Start'   => \&StartElement,
 		 'End'     => \&EndElement);
 
 fatal($@)
-    if (eval { $p1->parsefile($xmlfile); return 1; } != 1);
+    if (eval { $p1->parsefile($tempfile); return 1; } != 1);
 
 #
 # Loop thru the IP map looking for any nodes that we have listed in the DB
@@ -543,5 +559,7 @@ sub EndElement ($$)
 sub fatal {
     my $msg = $_[0];
 
+    unlink($tempfile)
+	if (defined($tempfile) && -e $tempfile);
     die($msg);
 }
