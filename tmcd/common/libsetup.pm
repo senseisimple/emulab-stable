@@ -754,6 +754,12 @@ sub dotrafficconfig()
     $TM = OPENTMCC(TMCCCMD_BOSSINFO);
     ($boss) = split(" ", <$TM>);
     close($TM);
+    my ($pid, $eid, $vname) = check_status();
+
+    my $cmdline = "$SETUPDIR/trafgen -s $boss";
+    if ($pid) {
+	$cmdline .= " -E $pid/$eid";
+    }
 
     $TM = OPENTMCC(TMCCCMD_TRAFFIC);
 
@@ -805,7 +811,7 @@ sub dotrafficconfig()
 		print RC "#!/bin/sh\n";
 		$didopen = 1;
 	    }
-	    print RC "$SETUPDIR/trafgen -s $boss -N $name -T $target -P $proto -R $role >/tmp/$name.debug 2>&1 &\n";
+	    print RC "$cmdline -N $name -T $target -P $proto -R $role >/tmp/$name.debug 2>&1 &\n";
 	}
 	else {
 	    warn "*** WARNING: Bad traffic line: $_";
