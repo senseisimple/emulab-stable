@@ -9,6 +9,11 @@ echo "Checking for file updates ..."
 export HOME=/root
 /usr/local/bin/cvsup -e -1 -g -L 1 /etc/testbed/supfile
 
+if [ -x /etc/testbed/rc.healthd ]; then
+    echo "Starting node health monitoring ..."
+    /etc/testbed/rc.healthd start
+fi
+
 if [ -x /etc/testbed/rc.setup ]; then
         echo "Starting Testbed Setup ..."
         /etc/testbed/rc.setup
