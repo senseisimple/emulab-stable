@@ -1,0 +1,121 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+
+#
+# Configure variables
+#
+my $USEPNAME	= "@DISABLE_NAMED_SETUP@";
+
+#
+# Set the hostname for the node according to the current experiment.
+#
+# In Linux, this gets invoked directly from the "pump" configuration
+# program. See /etc/pump.conf. Who came up that name? Anyway, the
+# first argument to the script is a token, one of up, renewal, or
+# release. We set the hostname on either of the first two.
+#
+# If no args supplied at all (which means being run by hand, then do it).
+#
+# We don't need to worry about the domainname on Linux. Its set via a
+# different mechanism, so changing the hostname will not effect the
+# domain suffix. 
+#
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Turn off line buffering on output
+$| = 1;
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+
+my ($action,$iface,$ip) = @ARGV;
+
+if (defined($action)) {
+    if ($token ne "up" && $token ne "renewal") {
+	exit 0;
+    }
+}
+
+#
+# If testbed is not maintaining DNS aliases, we had better not
+# use the nickname for the hostname as it will not resolve.
+#
+my $nickname;
+if ($USEPNAME) {
+    # Taint check
+    if ($ip =~ /^([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)$/) {
+	$ip = $1;
+    } else {
+	die("Bad data in IP address: '$ip'\n");
+    }
+
+    #
+    # XXX use of the link, e.g., for DNS lookups, may still be flaky
+    # (some autonegotiation thing?) so if ipcalc fails, try again
+    # a couple of times.
+    #
+    $nickname = "";
+    for (my $i = 0; $i < 3; $i++) {
+	$nickname = `/bin/ipcalc --silent --hostname $ip`;
+	last if ($? == 0);
+	sleep($i) if ($i > 0);
+    }
+    if ($nickname =~ /^HOSTNAME=([^\.]+)\..*$/) {
+	$nickname = $1;
+    } else {
+	$nickname = "";
+    }
+} else {
+    $nickname = whatsmynickname();
+}
+if (! $nickname) {
+    print STDERR "No Testbed nickname available!\n";
+    exit(0);
+}
+$nickname = lc($nickname);
+
+#
+# We assume that we are in the same domain as our boss node
+#
+my $bossname = tmccbossname();
+if ($bossname =~ /^[^\.]+\.(.*)$/) {
+    $domain = ".$1";
+}
+else {
+    $domain = ".foo.net";
+}
+
+# Taint check to make perl happy
+if ($nickname =~ /^([-\w\.]+)$/) {
+    $nickname = $1; 
+}
+else {
+    die("Bad data in nickname: '$nickname'\n");
+}
+if ($domain =~ /^([-\w\.]+)$/) {
+    $domain = $1;
+}
+else {
+    die("Bad data in nickname: '$domain'\n");
+}
+
+print STDERR "Resetting hostname to ${nickname}${domain} ... ";
+
+if (system("hostname", "${nickname}${domain}")) {
+    print STDERR "*** FAILED!\n";
+    exit 1;
+}
+
+print STDERR "Done!\n";
+exit 0;

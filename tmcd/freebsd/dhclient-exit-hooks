@@ -25,7 +25,7 @@ fi
 # 
 if [ -x $BINDIR/sethostname ]
 then
-    $BINDIR/sethostname $new_domain_name
+    $BINDIR/sethostname $new_domain_name >$LOGDIR/dhclient.log 2>&1
 fi
 
 #

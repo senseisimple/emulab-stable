@@ -18,7 +18,13 @@ SUBDIR		= tmcd/linux
 
 include $(OBJDIR)/Makeconf
 
-all:	pump.conf supfile
+SCRIPTS		= sethostname sethostname.dhclient
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	pump.conf supfile $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -110,16 +116,15 @@ sysetc-install:	dir-install
 sysetc-remove:
 	-rm -f $(RCDIR)/*/S95anacron $(RCDIR)/*/K05anacron 
 
-script-install:	dir-install
+script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/rc.linux $(BINDIR)/rc/rc.linux
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc/rc.ixp
-	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
-	$(INSTALL) -m 755 $(SRCDIR)/sethostname.dhclient \
-				$(BINDIR)/sethostname.dhclient
+	$(INSTALL) -m 755 ./sethostname $(BINDIR)/sethostname
+	$(INSTALL) -m 755 ./sethostname.dhclient $(BINDIR)/sethostname.dhclient
 	$(INSTALL) -m 755 $(SRCDIR)/rc.healthd $(BINDIR)/rc/rc.healthd
 	$(INSTALL) -m 755 $(SRCDIR)/healthd.conf $(BINDIR)/healthd.conf
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk

@@ -39,6 +39,7 @@ AC_SUBST(TIMESTAMPS)
 AC_SUBST(UNIFIED_BOSS_AND_OPS)
 AC_SUBST(DISABLE_NSE)
 AC_SUBST(DISABLE_NAMED_SETUP)
+AC_SUBST(DISABLE_EXPORTS_SETUP)
 AC_SUBST(DISABLE_EVENT_SCHED)
 AC_SUBST(CLIENT_ETCDIR)
 AC_SUBST(CLIENT_BINDIR)
@@ -495,10 +496,14 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
 	tip/GNUmakefile \
-	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/freebsd5/GNUmakefile \
-	tmcd/openbsd/GNUmakefile \
-	tmcd/linux/GNUmakefile tmcd/ron/GNUmakefile tmcd/common/GNUmakefile \
-	tmcd/tmcd.restart tmcd/plab/GNUmakefile tmcd/common/config/GNUmakefile \
+	tmcd/GNUmakefile tmcd/tmcd.restart \
+	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
+	tmcd/freebsd/GNUmakefile \
+	tmcd/freebsd/supfile tmcd/freebsd/sethostname \
+	tmcd/linux/GNUmakefile tmcd/linux/supfile tmcd/linux/pump.conf \
+	tmcd/linux/sethostname tmcd/linux/sethostname.dhclient \
+	tmcd/freebsd5/GNUmakefile tmcd/openbsd/GNUmakefile \
+	tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
 	utils/sshtb utils/create_image utils/node_admin utils/webcreateimage \
 	utils/firstuser utils/export_tables utils/eventping \

@@ -29,6 +29,7 @@ my $FSNODE      = "@FSNODE@";
 my $projdir     = "@FSDIR_PROJ@";
 my $usersdir    = "@FSDIR_USERS@";
 my $groupdir    = "@FSDIR_GROUPS@";
+my $DISABLED	= "@DISABLE_EXPORTS_SETUP@";
 
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
@@ -41,6 +42,13 @@ my @row;
 # For determining file server mountpoints (XXX BSD specific)
 my $MOUNTPROG	= "/sbin/mount";
 my $EXPORT_PAT	= q(on ([\S]+)\s\(.*NFS exported.*\));
+
+#
+# Testbed doesn't support changing exports file
+#
+if ($DISABLED) {
+    exit(0);
+}
 
 #
 # We don't want to run this script unless its the real version.

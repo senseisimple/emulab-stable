@@ -18,7 +18,13 @@ SUBDIR		= tmcd/freebsd
 
 include $(OBJDIR)/Makeconf
 
-all:	supfile injail
+SCRIPTS		= sethostname
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	supfile injail $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -105,7 +111,7 @@ sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/testbed.sh $(RCDIR)/testbed.sh
 	$(INSTALL) -m 755 $(SRCDIR)/elvind.sh $(RCDIR)/elvind.sh
 
-script-install:	dir-install
+script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
 	$(INSTALL) -m 755 $(SRCDIR)/rc.delayagent $(BINDIR)/rc/rc.delayagent
@@ -114,7 +120,7 @@ script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc/rc.kname
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
-	$(INSTALL) -m 755 $(SRCDIR)/sethostname $(BINDIR)/sethostname
+	$(INSTALL) -m 755 ./sethostname $(BINDIR)/sethostname
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype
 	$(INSTALL) -m 755 $(SRCDIR)/chipset.awk $(BINDIR)/chipset.awk
 	$(INSTALL) -m 755 $(SRCDIR)/cpuspeed.awk $(BINDIR)/cpuspeed.awk
@@ -167,4 +173,4 @@ locrem-install:
 			$(BINDIR)/control_interface
 
 clean:
-	/bin/rm -f supfile injail
+	/bin/rm -f injail
