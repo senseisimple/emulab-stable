@@ -105,7 +105,7 @@ foreach my $name (keys %portMap) {
     SWITCH: for ($type) {
 	/cisco/ && do {
 	    require snmpit_cisco;
-	    $device = new snmpit_cisco($name);
+	    $device = new snmpit_cisco($name,0,$type);
 	    last;
 	};
 	/intel/ && do {
@@ -154,7 +154,7 @@ foreach my $line (sort {$$a[0] cmp $$b[0]} @portinfo) {
     }
 }
 
-if ($errors) {
+if (!$errors) {
     print "There were no errors found\n";
     exit(1);
 } else {
