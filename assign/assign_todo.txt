@@ -95,13 +95,4 @@ This is the current TODO list for assign (not in order by priority):
    up a mapping for an unassignable vnode. Doesn't seem to hurt anything, so is
    low priority
 
-14.  do dynamic pclasses
-
-   pclasses are computed when assign starts. Since a partially-filled
-   multiplexable pnode is no longer really equivalent to the others in its
-   pclass, we have to turn off pclasses entirely when using them. If we were to
-   allow nodes to dynamically leave and enter pclasses, then we wouldn't have
-   to do this, and runtimes and/or solutions might get better. Probably will be
-   pretty hard, and/or requires a lot of bookkeeping.
-
 (next free #:15)

@@ -35,6 +35,8 @@ using namespace boost;
 // fill out the pclass structure.  Then two routines pclass_set, and
 // pclass_unset are used to maintaing the structure during annealing.
 
+// Used to catch cumulative floating point errors
+static double ITTY_BITTY = 0.00000001;
 
 extern pnode_pvertex_map pnode2vertex;
 
@@ -121,7 +123,8 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
    list of all equivalence classes) and type_table (and table of
    physical type to list of classes that can satisfy that type) are
    set by this routine. */
-int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode) {
+int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
+    bool dynamic_pclasses) {
   typedef hash_map<tb_pclass*,tb_pnode*,hashptr<tb_pclass*> > pclass_pnode_map;
   typedef hash_map<crope,pclass_list*> name_pclass_list_map;
 
@@ -159,6 +162,38 @@ int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode) {
       canonical_members[n]=curP;
       n->name = curP->name;
       n->add_member(curP);
+    }
+  }
+
+  if (dynamic_pclasses) {
+    // Make a pclass for each node, which starts out disabled. It will get
+    // enabled later when something is assigned to the pnode
+    pvertex_iterator vit,vendit;
+    tie(vit,vendit) = vertices(PG);
+    for (;vit != vendit;++vit) {
+      tb_pnode *pnode = get(pvertex_pmap,*vit);
+      // No point in doing this if the pnode is either: already in a pclass of
+      // size one, or can only have a single vnode mapped to it anyway
+      if (pnode->my_class->size == 1) {
+	  continue;
+      }
+      bool multiplexed = false;
+      tb_pnode::types_map::iterator it = pnode->types.begin();
+      for (; it != pnode->types.end(); it++) {
+	  if ((*it).second->max_load > 1) {
+	      multiplexed = true;
+	      break;
+	  }
+      }
+      if (!multiplexed) {
+	  continue;
+      }
+      tb_pclass *n = new tb_pclass;
+      pclasses.push_back(n);
+      n->name = pnode->name + "-own";
+      n->add_member(pnode);
+      n->disabled = true;
+      pnode->my_own_class = n;
     }
   }
 
@@ -212,6 +247,38 @@ int tb_pclass::add_member(tb_pnode *p)
   return 0;
 }
 
+// Debugging function to check the invariant that a node is either in its
+// dynamic pclass, a 'normal' pclass, but not both
+void assert_own_class_invariant(tb_pnode *p) {
+  cerr << "class_invariant: " << p->name << endl;
+  bool own_class = false;
+  bool other_class = false;
+  pclass_list::iterator pit = pclasses.begin();
+  for (;pit != pclasses.end(); pit++) {
+    tb_pclass::pclass_members_map::iterator mit = (*pit)->members.begin();
+    for (;mit != (*pit)->members.end(); mit++) {
+      if (mit->second->exists(p)) {
+	if (*pit == p->my_own_class) {
+	  cerr << "In own pclass (" << (*pit)->name << "," << (*pit)->disabled
+	    << ")" << endl;
+	  if (!(*pit)->disabled) {
+	    own_class = true;
+	  }
+	} else {
+	  cerr << "In pclass " << (*pit)->name << " type " << mit->first <<
+	    " size " << mit->second->size() << endl;
+	  other_class = true;
+	}
+      }
+    }
+  }
+  if (own_class && other_class) {
+    cerr << "Uh oh, in own and other class!" << endl;
+    pclass_debug();
+    abort();
+  }
+}
+
 // should be called after add_node
 int pclass_set(tb_vnode *v,tb_pnode *p)
 {
@@ -222,12 +289,13 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
   for (dit=c->members.begin();dit!=c->members.end();dit++) {
     if ((*dit).first == p->current_type) {
       // same class - only remove if node is full
-      if (p->types[p->current_type]->current_load ==
-	      p->types[p->current_type]->max_load) {
+      if ((p->current_type_record->current_load ==
+	      p->current_type_record->max_load) ||
+	      p->my_own_class) {
 	(*dit).second->remove(p);
-//#ifdef SMART_UNMAP
-//	c->used_members[(*dit).first]->push_back(p);
-//#endif
+	if (p->my_own_class) {
+	  p->my_own_class->disabled = false;
+	}
       }
     } else {
       // If it's not in the list then this fails quietly.
@@ -246,9 +314,9 @@ int pclass_set(tb_vnode *v,tb_pnode *p)
 #endif
   }
 
+  c->used_members++;
   
-  c->used += 1.0/(p->current_type_record->max_load);
-  
+  //assert_own_class_invariant(p);
   return 0;
 }
 
@@ -257,35 +325,29 @@ int pclass_unset(tb_pnode *p)
   // add pnode to all lists in equivalence class.
   tb_pclass *c = p->my_class;
 
-  //cout << "Unassigning " << p->name << ": ";
-
   tb_pclass::pclass_members_map::iterator dit;
   for (dit=c->members.begin();dit!=c->members.end();++dit) {
-    //cout << " Type " << dit->first << ": ";
     if ((*dit).first == p->current_type) {
       // If it's not in the list then we need to add it to the back if it's
       // empty and the front if it's not.  Since unset is called before
       // remove_node empty means only one user.
       if (! (*dit).second->exists(p)) {
-	assert(p->types[p->current_type]->current_load > 0);
+	assert(p->current_type_record->current_load > 0);
 #ifdef PNODE_ALWAYS_FRONT
 	(*dit).second->push_front(p);
 #else
 #ifdef PNODE_SWITCH_LOAD
-	if (p->types[p->current_type]->current_load == 0) {
+	if (p->current_type_record->current_load == 0) {
 #else
 	if (p->current_load == 1) {
 #endif
-	  //cout << "Pushing back: " << p->current_load << " ";
 	  (*dit).second->push_back(p);
 	} else {
-	  //cout << "Pushing front: " << p->current_load << " ";
 	  (*dit).second->push_front(p);
 	}
 #endif
       }
     } else {
-      //cout << "Pushing back (2) ";
       (*dit).second->push_back(p);
     }
 
@@ -294,10 +356,13 @@ int pclass_unset(tb_pnode *p)
 #endif
   }
 
-  //cout << endl;
+  if (p->my_own_class) {
+    p->my_own_class->disabled = true;
+  }
 
-  c->used -= 1.0/(p->current_type_record->max_load);
+  c->used_members--;
   
+  //assert_own_class_invariant(p);
   return 0;
 }
 
@@ -312,7 +377,8 @@ void pclass_debug()
   cout << "\n";
   cout << "Type Table:\n";
   pclass_types::iterator dit;
-  for (dit=type_table.begin();dit!=type_table.end();++dit) {
+  extern pclass_types vnode_type_table; // from assign.cc
+  for (dit=vnode_type_table.begin();dit!=vnode_type_table.end();++dit) {
     cout << (*dit).first << ":";
     int n = (*dit).second.first;
     pclass_vector &A = *((*dit).second.second);

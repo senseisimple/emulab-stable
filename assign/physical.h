@@ -75,7 +75,8 @@ public:
   			  current_type_record(NULL), total_load(0),
 			  switches(), sgraph_switch(), switch_used_links(0),
 			  total_interfaces(0), used_interfaces(0),
-			  total_bandwidth(0), my_class(NULL), assigned_nodes(),
+			  total_bandwidth(0), my_class(NULL),
+			  my_own_class(NULL), assigned_nodes(),
 			  trivial_bw(0), trivial_bw_used(0) {;}
 
   class type_record {
@@ -127,6 +128,9 @@ public:
   int total_bandwidth;		// total bandwidth of all this nodes' links
 
   tb_pclass *my_class;		// the pclass this node belongs to
+
+  tb_pclass *my_own_class;	// if using DYNAMIC_PCLASSES, a pointer to the
+  				// node's own class
 
   tb_vnode_set assigned_nodes;	// the set of vnodes currently assigned
 

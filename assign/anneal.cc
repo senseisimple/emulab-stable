@@ -48,18 +48,6 @@ inline int accept(double change, double temperature)
   return 0;
 }
 
-// finds a random pnode, of any type at all
-tb_pnode *find_random_pnode() {
-  int choice = std::random() % num_vertices(PG);
-  pvertex_iterator vit, vendit;
-  tie(vit,vendit) = vertices(PG);
-  cout << "Chose pnode " << choice << " of " << num_vertices(PG) << endl;
-  for (int i = 0; i < choice;++vit, ++i) {
-  }
-  tb_pnode *curP = get(pvertex_pmap,*vit);
-  return curP;
-}
-
 tb_pnode *find_pnode(tb_vnode *vn)
 {
 #ifdef PER_VNODE_TT
@@ -71,6 +59,19 @@ tb_pnode *find_pnode(tb_vnode *vn)
   pclass_vector *acceptable_types = tt.second;
   
   tb_pnode *newpnode;
+
+  /*
+  int enabled_pclasses = 0;
+  for (int i = 0; i < num_types; i++) {
+    if ((*acceptable_types)[i]->disabled) {
+	continue;
+    }
+    enabled_pclasses++;
+  }
+  cout << "Looking for a pnode for " << vn->name << " - there are " <<
+      enabled_pclasses << " to choose from (" << num_types << " total)" << endl;
+  assert(num_types == enabled_pclasses);
+  */
   
   int i = std::random()%num_types;
   int first = i;
@@ -95,6 +96,10 @@ REDO_SEARCH:
     // type
     if ((*acceptable_types)[i]->members.find(vn->type) ==
 	    (*acceptable_types)[i]->members.end()) {
+	continue;
+    }
+    if ((*acceptable_types)[i]->disabled) {
+	i = std::rand()%num_types;
 	continue;
     }
 #endif
@@ -898,6 +903,15 @@ NOTQUITEDONE:
 	      endl << "     This indicates a bug - contact the operators" <<
 	      endl << "     (initial score: " << initial_score <<
 	      ", current score: " << get_score() << ")" << endl;
+	  // One source of this can be pclasses that are still used - check for
+	  // those
+	  pclass_list::iterator pit = pclasses.begin();
+	  for (;pit != pclasses.end();pit++) {
+	      if ((*pit)->used_members != 0) {
+		  cerr << (*pit)->name << " is " << (*pit)->used_members
+		      << "% used" << endl;
+	      }
+	  }
       }
       tie(vvertex_it,end_vvertex_it) = vertices(VG);
       for (;vvertex_it!=end_vvertex_it;++vvertex_it) {

@@ -72,6 +72,10 @@ void score_link_endpoints(pedge pe);
 #define SSUB(amount) score -= amount
 #endif
 
+// For convenience, so we can easily turn on or off one statement
+#define SDEBADD(amount) cerr << "SADD: " << #amount << "=" << amount << " from " << score;score+=amount;cerr << " to " << score << endl
+#define SDEBSUB(amount)  cerr << "SSUB: " << #amount << "=" << amount << " from " << score;score-=amount;cerr << " to " << score << endl
+
 #ifdef SCORE_DEBUG
 #define SDEBUG(a) a
 #else
@@ -266,7 +270,8 @@ void remove_node(vvertex vv)
 #endif
 
   // pclass
-  if ((!disable_pclasses) && pnode->my_class && (pnode->my_class->used == 0)) {
+  if ((!disable_pclasses) && !(tr->is_static) && pnode->my_class
+	  && (pnode->my_class->used_members == 0)) {
     SDEBUG(cerr << "  freeing pclass" << endl);
     SSUB(SCORE_PCLASS);
   }
@@ -312,11 +317,7 @@ void remove_node(vvertex vv)
     // Only unscore the link if the vnode on the other end is assigned - this
     // way, only the first end to be unmapped causes unscoring
     if (! dest_vnode->assigned) {
-      //cerr << "Skipping link unassignment, because " << dest_vnode->name
-	//<< " is unassigned " << endl;
       continue;
-    } else {
-      //cerr << "Unassigning, " << dest_vnode->name << " is assigned " << endl;
     }
     
     // Find the pnode on the ther end of the link, and unscore it!
@@ -507,19 +508,11 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
       // Remove check assuming at higher level?
       // Remove higher level checks?
       if (!pnode->set_current_type(vnode->type)) {
-	//    pnode->max_load=0;
-	//   if (pnode->types.find(vnode->type) != pnode->types.end()) {
-	//    pnode->max_load = pnode->types[vnode->type];
-	// }
-	//if (pnode->max_load == 0) {
 	// didn't find a type
 	SDEBUG(cerr << "  no matching type" << endl);
 	//cerr << "Failed due to bad type!" << endl;
 	return 1;
       }
-
-      //    pnode->current_type=vnode->type;
-      //    pnode->typed=true;
 
       SDEBUG(cerr << "  matching type found (" << pnode->current_type <<
 	  ", max = " << pnode->current_type_record->max_load << ")" << endl);
@@ -793,14 +786,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   if (pnode->total_load == 1) {
     SDEBUG(cerr << "  new pnode" << endl);
     SADD(SCORE_PNODE);
-#ifdef LOAD_BALANCE
-    //SADD(SCORE_PNODE); // Yep, twice
-#endif
   }
 #ifdef LOAD_BALANCE
-  //SSUB(SCORE_PNODE * (1.0 / pnode->max_load));
-  //SSUB(SCORE_PNODE * (1 + powf(((pnode->current_load-1) * 1.0)/pnode->max_load,2)));
-  //SADD(SCORE_PNODE * (1 + powf(((pnode->current_load) * 1.0)/pnode->max_load,2)));
   SSUB(SCORE_PNODE * (powf(1 + ((pnode->current_load-1) * 1.0)/pnode->max_load,2)));
   SADD(SCORE_PNODE * (powf(1 + ((pnode->current_load) * 1.0)/pnode->max_load,2)));
 #endif
@@ -818,7 +805,8 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   vinfo.desires += fd_violated;
 
   // pclass
-  if ((!disable_pclasses) && pnode->my_class && (pnode->my_class->used == 0)) {
+  if ((!disable_pclasses) && (!tr->is_static) && pnode->my_class &&
+	  (pnode->my_class->used_members == 0)) {
     SDEBUG(cerr << "  new pclass" << endl);
     SADD(SCORE_PCLASS);
   }
@@ -1307,7 +1295,6 @@ pvertex make_lan_node(vvertex vv)
   tb_vnode *vnode = get(vvertex_pmap,vv);
 
   SDEBUG(cerr << "make_lan_node(" << vnode->name << ")" << endl);
-  //cerr << "make_lan_node(" << vnode->name << ")" << endl;
   
   // Choose switch
   pvertex largest_switch;

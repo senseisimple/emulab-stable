@@ -52,6 +52,10 @@ public:
     return (L.empty() ? NULL : L.front());
   };
 
+  int size() {
+      return L.size();
+  };
+
   friend ostream &operator<<(ostream &o, const tb_pnodelist& l)
   {
     pnode_list::const_iterator lit;
@@ -64,7 +68,8 @@ public:
 
 class tb_pclass {
 public:
-  tb_pclass() : name(), size(0), used(0), refcount(0) {;}
+  tb_pclass() : name(), size(0), used_members(0), refcount(0), disabled(false)
+      {;}
 
   typedef map<crope,tb_pnodelist*> pclass_members_map;
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
@@ -74,11 +79,13 @@ public:
 
   crope name;			// purely for debugging
   int size;
-  double used;
+  int used_members;
   pclass_members_map members;
 #ifdef SMART_UNMAP
   pclass_members_set used_members;
 #endif
+
+  bool disabled;
 
   // A count of how many nodes can use this pclass
   // For use with PRUNE_PCLASSES
@@ -87,7 +94,7 @@ public:
   friend ostream &operator<<(ostream &o, const tb_pclass& p)
   {
     o << p.name << "(" << &p << ") size=" << p.size <<
-      " used=" << p.used << "\n";
+      " used_members=" << p.used_members << " disabled=" << p.disabled << "\n";
     pclass_members_map::const_iterator dit;
     for (dit=p.members.begin();dit!=p.members.end();++dit) {
       o << "  " << (*dit).first << ":\n";
@@ -114,7 +121,8 @@ typedef hash_map<crope,tt_entry> pclass_types;
 // Takes two arguments - a physical graph, and a flag indicating whether or not
 // each physical node should get its own pclass (effectively disabling
 // pclasses)
-int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode);
+int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
+	bool dynamic_pclasses);
 
 /* The following two routines sets and remove mappings in pclass
    datastructures */

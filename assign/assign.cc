@@ -95,6 +95,9 @@ bool disable_pclasses = false;
 // Whether or not assign should prune out pclasses that it knows can
 // never be used
 bool prune_pclasses = false;
+
+// Whether or not we should use the experimental support for dynamic pclasses
+bool dynamic_pclasses = false;
   
 // XXX - shouldn't be in this file
 double absbest;
@@ -295,6 +298,7 @@ void print_help()
     endl;
   cerr << "  -r          - Don't allow trivial links." << endl;
   cerr << "  -p          - Disable pclasses." << endl;
+  cerr << "  -d          - Enable dynamic pclasses." << endl;
 #ifdef PER_VNODE_TT
   cerr << "  -P          - Prune unusable pclasses." << endl;
 #endif
@@ -530,7 +534,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpP")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTd")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -564,6 +568,8 @@ int main(int argc,char **argv)
 #endif
     case 'T':
       scoring_selftest = true; break;
+    case 'd':
+      dynamic_pclasses = true; break;
     default:
       print_help();
     }
@@ -608,7 +614,7 @@ int main(int argc,char **argv)
   calculate_switch_MST();
   
   cout << "Generating physical equivalence classes:";
-  generate_pclasses(PG,disable_pclasses);
+  generate_pclasses(PG,disable_pclasses,dynamic_pclasses);
   cout << pclasses.size() << endl;
 
 #ifdef PCLASS_DEBUG

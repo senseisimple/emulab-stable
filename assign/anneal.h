@@ -30,6 +30,7 @@ using namespace boost;
 #include "maps.h"
 #include "score.h"
 #include "pclass.h"
+#include "solution.h"
 
 // Some defaults for #defines
 #ifndef NO_REVERT
@@ -49,15 +50,6 @@ using namespace boost;
 #else
 #define PHYSICAL(x) 0
 #endif
-
-/*
- * Information returned by the annealing process - note that this does not
- * include the solution, which is still global for now.
- */
-struct annealing_results {
-    int violated; /* Number of violations - XXX make vinfo non-global too */
-    
-};
 
 /*
  * Globals - XXX made non-global!
