@@ -1,20 +1,21 @@
+This file is just an unedited transcript of mail between
+Utah and ISI.  It includes detailed information about
+various hardware features and models, mostly Cisco switches.
+
+It won't be that easy to follow since it is missing some
+context, but it contains a lot of valuable information.
+
+Be sure also to see the file www/doc/hw-recommend.html
+for more basic information, especially the "Switch" section.
+
+----------------------------------------------------------------------
 From ricci@cs.utah.edu Mon Oct 27 17:25:49 2003
 Date: Mon, 27 Oct 2003 17:25:49 -0700
 From: Robert P Ricci <ricci@cs.utah.edu>
 To: Bob Braden <braden@ISI.EDU>
 Cc: testbed-ops@emulab.net, deter-isi@ISI.EDU, lepreau@cs.utah.edu
 Subject: Re: Hardware configuration for Emulab clone
-Message-ID: <20031027172549.X95279@cs.utah.edu>
-Mail-Followup-To: Bob Braden <braden@ISI.EDU>, testbed-ops@emulab.net,
-	deter-isi@ISI.EDU, lepreau@cs.utah.edu
-References: <200310272219.OAA28834@gra.isi.edu>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <200310272219.OAA28834@gra.isi.edu>; from braden@ISI.EDU on Mon, Oct 27, 2003 at 02:19:38PM -0800
-Status: RO
-Content-Length: 5681
 Lines: 113
 
 You may already know many of these things.
@@ -138,17 +139,7 @@ To: Bob Lindell <bob@jensar.us>
 Cc: Bob Braden <braden@ISI.EDU>, testbed-ops@emulab.net, deter-isi@ISI.EDU,
 	lepreau@cs.utah.edu
 Subject: Re: [Deter-isi] Re: Hardware configuration for Emulab clone
-Message-ID: <20031028104659.C95279@cs.utah.edu>
-Mail-Followup-To: Bob Lindell <bob@jensar.us>, Bob Braden <braden@ISI.EDU>,
-	testbed-ops@emulab.net, deter-isi@ISI.EDU, lepreau@cs.utah.edu
-References: <20031027172549.X95279@cs.utah.edu> <A29CA1D8-0910-11D8-BB39-000393DC7572@jensar.us>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <A29CA1D8-0910-11D8-BB39-000393DC7572@jensar.us>; from bob@jensar.us on Mon, Oct 27, 2003 at 10:33:25PM -0800
-Status: RO
-Content-Length: 2195
 Lines: 37
 
 Thus spake Bob Lindell on Mon, Oct 27, 2003 at 10:33:25PM -0800:
@@ -196,18 +187,7 @@ To: Stephen_Schwab@NAI.com, John Mehringer <mehringe@isi.edu>
 Cc: braden@ISI.EDU, testbed-ops@emulab.net, deter-isi@ISI.EDU,
 	lepreau@cs.utah.edu
 Subject: Re: [Deter-isi] Re: Hardware configuration for Emulab clone
-Message-ID: <20031029133157.R51103@cs.utah.edu>
-Mail-Followup-To: Stephen_Schwab@NAI.com, John Mehringer <mehringe@isi.edu>,
-	braden@ISI.EDU, testbed-ops@emulab.net, deter-isi@ISI.EDU,
-	lepreau@cs.utah.edu
-References: <613FA566484CA74288931B35D971C77E13429A@losexmb1.corp.nai.org>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <613FA566484CA74288931B35D971C77E13429A@losexmb1.corp.nai.org>; from Stephen_Schwab@NAI.com on Wed, Oct 29, 2003 at 11:27:45AM -0800
-Status: RO
-Content-Length: 1644
 Lines: 30
 
 Thus spake Stephen_Schwab@NAI.com on Wed, Oct 29, 2003 at 11:27:45AM -0800:
@@ -242,43 +222,12 @@ to do this.
 \-----------------------------------------------------------
 
 From mailnull@bas.flux.utah.edu Wed Oct 29 13:50:27 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TKoRLj096989
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Wed, 29 Oct 2003 13:50:27 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id h9TKoRbB096988
-	for testbed-ops-hidden; Wed, 29 Oct 2003 13:50:27 -0700 (MST)
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TKoRLj096984
-	for <testbed-ops@[155.98.60.2]>; Wed, 29 Oct 2003 13:50:27 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TKoQPe006870
-	for <testbed-ops@flux.utah.edu>; Wed, 29 Oct 2003 13:50:26 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from ops.emulab.net (ops.emulab.net [155.101.129.74])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id NAA05684
-	for <testbed-ops@fast.flux.utah.edu>; Wed, 29 Oct 2003 13:50:21 -0700 (MST)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by ops.emulab.net (8.12.9/8.12.6) with ESMTP id h9TKnpbD056579
-	for <testbed-ops@emulab.net>; Wed, 29 Oct 2003 13:49:51 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (lepreau@localhost)
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id NAA05680;
-	Wed, 29 Oct 2003 13:49:24 -0700 (MST)
-Message-Id: <200310292049.NAA05680@fast.cs.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Stephen_Schwab@NAI.com, John Mehringer <mehringe@isi.edu>, braden@isi.edu,
    testbed-ops@emulab.net, deter-isi@isi.edu
 Subject: Re: [Deter-isi] Re: Hardware configuration for Emulab clone
 In-Reply-To: <20031029133157.R51103@cs.utah.edu>; from Robert P Ricci on Wed, 29 Oct 2003 13:31:57 MST
 Date: Wed, 29 Oct 2003 13:49:24 MST
-X-Spam-Status: No, hits=-8 required=5 tests=ACADEMICS,GLOB_WHITELIST version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-X-Status: A
-Content-Length: 902
 Lines: 18
 
 Here's another datapoint from Kentucky's experience:
@@ -307,18 +256,7 @@ To: Jay Lepreau <lepreau@cs.utah.edu>
 Cc: Stephen_Schwab@NAI.com, John Mehringer <mehringe@isi.edu>,
 	braden@isi.edu, testbed-ops@emulab.net, deter-isi@isi.edu
 Subject: Re: [Deter-isi] Re: Hardware configuration for Emulab clone
-Message-ID: <20031029141421.U51103@cs.utah.edu>
-Mail-Followup-To: Jay Lepreau <lepreau@cs.utah.edu>, Stephen_Schwab@NAI.com,
-	John Mehringer <mehringe@isi.edu>, braden@isi.edu,
-	testbed-ops@emulab.net, deter-isi@isi.edu
-References: <20031029133157.R51103@cs.utah.edu> <200310292049.NAA05680@fast.cs.utah.edu>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <200310292049.NAA05680@fast.cs.utah.edu>; from lepreau@cs.utah.edu on Wed, Oct 29, 2003 at 01:49:24PM -0700
-Status: RO
-Content-Length: 1661
 Lines: 31
 
 Thus spake Jay Lepreau on Wed, Oct 29, 2003 at 01:49:24PM -0700:
@@ -354,28 +292,12 @@ suggest, I would only view this as a temporary thing, though.
 \-----------------------------------------------------------
 
 From lepreau@fast.cs.utah.edu Mon Oct 27 23:52:02 2003
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S6q2Lj023116
-	for <ricci@[155.98.60.2]>; Mon, 27 Oct 2003 23:52:02 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S6pwPe092690
-	for <ricci@flux.utah.edu>; Mon, 27 Oct 2003 23:51:59 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (lepreau@localhost)
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id XAA14364;
-	Mon, 27 Oct 2003 23:51:48 -0700 (MST)
-Message-Id: <200310280651.XAA14364@fast.cs.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Bob Braden <braden@ISI.EDU>, deter-isi@ISI.EDU
 cc: ricci@flux.utah.edu, testbed-ops@emulab.net
 Subject: Re: Hardware configuration for Emulab clone
 In-Reply-To: <20031027172549.X95279@cs.utah.edu>; from Robert P Ricci on Mon, 27 Oct 2003 17:25:49 MST
 Date: Mon, 27 Oct 2003 23:51:48 MST
-X-Spam-Status: No, hits=-8 required=5 tests=ACADEMICS,GLOB_WHITELIST version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-Content-Length: 1548
 Lines: 32
 
 Bob:
@@ -412,42 +334,12 @@ All our hardware is listed on our site, with URLs to the vendor's pages.
 http://www.emulab.net/docwrapper.php3?docname=hardware.html
 
 From mailnull@bas.flux.utah.edu Tue Oct 28 00:26:14 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S7QELj023947
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Tue, 28 Oct 2003 00:26:14 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id h9S7QEVF023946
-	for testbed-ops-hidden; Tue, 28 Oct 2003 00:26:14 -0700 (MST)
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S7QELj023942
-	for <testbed-ops@[155.98.60.2]>; Tue, 28 Oct 2003 00:26:14 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S7QBPe092882
-	for <testbed-ops@flux.utah.edu>; Tue, 28 Oct 2003 00:26:11 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from ops.emulab.net (ops.emulab.net [155.101.129.74])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id AAA14522
-	for <testbed-ops@fast.flux.utah.edu>; Tue, 28 Oct 2003 00:26:05 -0700 (MST)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by ops.emulab.net (8.12.9/8.12.6) with ESMTP id h9S7PZbD021125
-	for <testbed-ops@emulab.net>; Tue, 28 Oct 2003 00:25:35 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (lepreau@localhost)
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id AAA14518;
-	Tue, 28 Oct 2003 00:25:24 -0700 (MST)
-Message-Id: <200310280725.AAA14518@fast.cs.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Bob Braden <braden@ISI.EDU>
 Cc: testbed-ops@emulab.net, deter-isi@ISI.EDU
 Subject: Re: Hardware configuration for Emulab clone
 In-Reply-To: <200310272219.OAA28834@gra.isi.edu>; from Bob Braden on Mon, 27 Oct 2003 14:19:38 PST
 Date: Tue, 28 Oct 2003 00:25:24 MST
-X-Spam-Status: No, hits=-10 required=5 tests=ACADEMICS,GEEKWORDS1,GLOB_WHITELIST version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-Content-Length: 1522
 Lines: 31
 
 
@@ -483,42 +375,12 @@ hasn't been sufficient demand.  OTOH, what is easy to use oftern
 determines what gets used.
 
 From mailnull@bas.flux.utah.edu Tue Oct 28 00:45:41 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S7jeLj024385
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Tue, 28 Oct 2003 00:45:40 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id h9S7jen4024384
-	for testbed-ops-hidden; Tue, 28 Oct 2003 00:45:40 -0700 (MST)
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S7jeLj024380
-	for <testbed-ops@[155.98.60.2]>; Tue, 28 Oct 2003 00:45:40 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9S7jePe092959
-	for <testbed-ops@flux.utah.edu>; Tue, 28 Oct 2003 00:45:40 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from ops.emulab.net (ops.emulab.net [155.101.129.74])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id AAA14610
-	for <testbed-ops@fast.flux.utah.edu>; Tue, 28 Oct 2003 00:45:34 -0700 (MST)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by ops.emulab.net (8.12.9/8.12.6) with ESMTP id h9S7j4bD021384
-	for <testbed-ops@emulab.net>; Tue, 28 Oct 2003 00:45:04 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (lepreau@localhost)
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id AAA14588;
-	Tue, 28 Oct 2003 00:44:51 -0700 (MST)
-Message-Id: <200310280744.AAA14588@fast.cs.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Bob Braden <braden@ISI.EDU>, bob@jensar.us, Stephen_Schwab@NAI.com
 Cc: testbed-ops@emulab.net, deter-isi@ISI.EDU
 Subject: Re: Hardware configuration for Emulab clone
 In-Reply-To: <200310272219.OAA28834@gra.isi.edu>; from Bob Braden on Mon, 27 Oct 2003 14:19:38 PST
 Date: Tue, 28 Oct 2003 00:44:51 MST
-X-Spam-Status: No, hits=-10 required=5 tests=ACADEMICS,GEEKWORDS2,GLOB_WHITELIST version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-Content-Length: 1745
 Lines: 46
 
 
@@ -569,61 +431,17 @@ What blade to backplane BW have you been told?
 How sure are you?
 
 From mailnull@bas.flux.utah.edu Tue Oct 28 22:56:31 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9T5uULj074631
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Tue, 28 Oct 2003 22:56:30 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id h9T5uUAL074630
-	for testbed-ops-hidden; Tue, 28 Oct 2003 22:56:30 -0700 (MST)
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9T5uULj074626
-	for <testbed-ops@[155.98.60.2]>; Tue, 28 Oct 2003 22:56:30 -0700 (MST)
-	(envelope-from Stephen_Schwab@NAI.com)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9T5uQPe002020
-	for <testbed-ops@flux.utah.edu>; Tue, 28 Oct 2003 22:56:26 -0700 (MST)
-	(envelope-from Stephen_Schwab@NAI.com)
-Received: from ops.emulab.net (ops.emulab.net [155.101.129.74])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id WAA27611
-	for <testbed-ops@fast.flux.utah.edu>; Tue, 28 Oct 2003 22:56:21 -0700 (MST)
 From: Stephen_Schwab@NAI.com
-Received: from RelayDAL.nai.com (relaydal.nai.com [205.227.136.197])
-	by ops.emulab.net (8.12.9/8.12.6) with ESMTP id h9T5tobD042474
-	for <testbed-ops@emulab.net>; Tue, 28 Oct 2003 22:55:50 -0700 (MST)
-	(envelope-from Stephen_Schwab@NAI.com)
-Received: from dalexwsout2.na.nai.com (dalexwsout2.na.nai.com [161.69.212.93] (may be forged))
-	by RelayDAL.nai.com (Switch-2.2.8/Switch-2.2.6) with SMTP id h9T5qMV15609;
-	Tue, 28 Oct 2003 23:52:22 -0600 (CST)
-Received: from mail.na.nai.com(161.69.111.81) by dalexwsout2.na.nai.com via csmap 
-	 id 278c5c60_09d4_11d8_880c_00304811fc74_7761;
-	Tue, 28 Oct 2003 23:53:00 -0600 (CST)
-Received: from losexmb1.corp.nai.org ([161.69.83.203]) by DALEXBR1.corp.nai.org with Microsoft SMTPSVC(5.0.2195.5329);
-	 Tue, 28 Oct 2003 23:55:38 -0600
-content-class: urn:content-classes:message
-MIME-Version: 1.0
-Content-Type: text/plain;
-	charset="us-ascii"
 Subject: shedding some light on the new Cisco 720Gb/s switch fabric
-X-MimeOLE: Produced By Microsoft Exchange V6.0.6487.1
 Date: Tue, 28 Oct 2003 21:55:37 -0800
-Message-ID: <613FA566484CA74288931B35D971C77E13428C@losexmb1.corp.nai.org>
-Thread-Topic: shedding some light on the new Cisco 720Gb/s switch fabric
-Thread-Index: AcOd4UaDpbU7QPVxR5SqgTKHrLS9EQ==
 To: <deter-isi@isi.edu>, <testbed-ops@emulab.net>
-X-OriginalArrivalTime: 29 Oct 2003 05:55:38.0460 (UTC) FILETIME=[473899C0:01C39DE1]
-X-Spam-Status: No, hits=-2.715 required=5 tests=ACADEMICS,NO_REAL_NAME version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Content-Transfer-Encoding: 8bit
-X-MIME-Autoconverted: from quoted-printable to 8bit by bas.flux.utah.edu id h9T5uULj074626
-Status: RO
-X-Status: A
-Content-Length: 2269
 Lines: 27
 
 Hi,
 
-I think I see the confusion -- it appears that Cisco dropped a new switch fabric into the 6500s by putting the switch fabric on the supervisor module.
+I think I see the confusion -- it appears that Cisco dropped a new
+switch fabric into the 6500s by putting the switch fabric on the
+supervisor module.
 
 If you search through this web page:
 
@@ -631,19 +449,44 @@ http://www.cisco.com/en/US/products/hw/switches/ps708/products_data_sheet09186a0
 
 you can find a reference buried where it describe the switch fabrics.
 
-I can't quite see how they wire this beast -- perhaps they physically re-cable the slot connectors from the internal 256 Gb/s switch fabric to the 720 Gb/s switch fabric on the supervisor module.
+I can't quite see how they wire this beast -- perhaps they physically
+re-cable the slot connectors from the internal 256 Gb/s switch fabric
+to the 720 Gb/s switch fabric on the supervisor module.
 
-There is a reference somewhere else to the auto-sensing/auto-switching cababilities of the 720 Gb/s switch fabric -- so if you happen to plug in older 16 or 8 Gb/s blades, the switch fabric will still talk to them.
+There is a reference somewhere else to the auto-sensing/auto-switching
+cababilities of the 720 Gb/s switch fabric -- so if you happen to plug
+in older 16 or 8 Gb/s blades, the switch fabric will still talk to
+them.
 
-The WS-X6748-GE-TX blades are definitely designed to talk to the 720 Gb/s switch fabric.  The way we will use them, it is unlikely that more than 24 Gb/s will ever be sourced or sinked on a blade, so 40 Gb/s will be enough headroom.
+The WS-X6748-GE-TX blades are definitely designed to talk to the 720
+Gb/s switch fabric.  The way we will use them, it is unlikely that
+more than 24 Gb/s will ever be sourced or sinked on a blade, so 40
+Gb/s will be enough headroom.
 
-But there is a gotcha: we didn't plan to order any WS-F6700-DFC3A daughter cards!
+But there is a gotcha: we didn't plan to order any WS-F6700-DFC3A
+daughter cards!
 
-The way Cisco gets the packet processing rate up is to decentralize the forwarding onto daughter cards -- each of these dCEF (distributed Cisco Express Forwarding) cards is co-located on a blade, and the supervisor module downloads forwarding rules to all the dCEFs.  It is really unclear to me what happens if you try to forward all those packets from 6 blades through a single supervisor module 720s CEF engine (the MSFC3 PFC3A daughter card).  The performance is listed as 400 Mpps with dCEF, but the table doesn't have any numbers for centralized CEF.
+The way Cisco gets the packet processing rate up is to decentralize
+the forwarding onto daughter cards -- each of these dCEF (distributed
+Cisco Express Forwarding) cards is co-located on a blade, and the
+supervisor module downloads forwarding rules to all the dCEFs.  It is
+really unclear to me what happens if you try to forward all those
+packets from 6 blades through a single supervisor module 720s CEF
+engine (the MSFC3 PFC3A daughter card).  The performance is listed as
+400 Mpps with dCEF, but the table doesn't have any numbers for
+centralized CEF.
 
-However, I think we should just go ahead and get 6 of the WS-X6748-GE-TX blades and try out CEF.  That will give us 288 10/100/1000 ports, allowing us to support up to 72 machines.  If we find we are over-subscribing something, we can decide whether to redistribute across more 6509s, or add the dCEF modules.  
+However, I think we should just go ahead and get 6 of the
+WS-X6748-GE-TX blades and try out CEF.  That will give us 288
+10/100/1000 ports, allowing us to support up to 72 machines.  If we
+find we are over-subscribing something, we can decide whether to
+redistribute across more 6509s, or add the dCEF modules.
 
-The alternative is to just use 100BaseT in the first 64 PCs, and plan to upgrade to gigabit later, on the assumption that the price will drop.  If we did that, we could just buy the 256 Gb/s switch fabric also -- in fact, we would just be buying the 6509 configurations that Utah's emulab uses. 
+The alternative is to just use 100BaseT in the first 64 PCs, and plan
+to upgrade to gigabit later, on the assumption that the price will
+drop.  If we did that, we could just buy the 256 Gb/s switch fabric
+also -- in fact, we would just be buying the 6509 configurations that
+Utah's emulab uses.
 
 --Steve
 
@@ -655,17 +498,7 @@ From: Robert P Ricci <ricci@cs.utah.edu>
 To: Stephen_Schwab@NAI.com
 Cc: deter-isi@isi.edu, testbed-ops@emulab.net
 Subject: Re: shedding some light on the new Cisco 720Gb/s switch fabric
-Message-ID: <20031029105955.F51103@cs.utah.edu>
-Mail-Followup-To: Stephen_Schwab@NAI.com, deter-isi@isi.edu,
-	testbed-ops@emulab.net
-References: <613FA566484CA74288931B35D971C77E13428C@losexmb1.corp.nai.org>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <613FA566484CA74288931B35D971C77E13428C@losexmb1.corp.nai.org>; from Stephen_Schwab@NAI.com on Tue, Oct 28, 2003 at 09:55:37PM -0800
-Status: RO
-Content-Length: 3472
 Lines: 71
 
 Thus spake Stephen_Schwab@NAI.com on Tue, Oct 28, 2003 at 09:55:37PM -0800:
@@ -741,42 +574,12 @@ out, with gigabit and such coming.
 \-----------------------------------------------------------
 
 From mailnull@bas.flux.utah.edu Wed Oct 29 14:01:24 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TL1OLj097498
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Wed, 29 Oct 2003 14:01:24 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id h9TL1OFd097497
-	for testbed-ops-hidden; Wed, 29 Oct 2003 14:01:24 -0700 (MST)
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TL1OLj097493
-	for <testbed-ops@[155.98.60.2]>; Wed, 29 Oct 2003 14:01:24 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TL1NPe006939
-	for <testbed-ops@flux.utah.edu>; Wed, 29 Oct 2003 14:01:23 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from ops.emulab.net (ops.emulab.net [155.101.129.74])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id OAA05815
-	for <testbed-ops@fast.flux.utah.edu>; Wed, 29 Oct 2003 14:01:18 -0700 (MST)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by ops.emulab.net (8.12.9/8.12.6) with ESMTP id h9TL0mbD056856
-	for <testbed-ops@emulab.net>; Wed, 29 Oct 2003 14:00:48 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (lepreau@localhost)
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id OAA05793;
-	Wed, 29 Oct 2003 14:00:36 -0700 (MST)
-Message-Id: <200310292100.OAA05793@fast.cs.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Stephen_Schwab@NAI.com
 Cc: deter-isi@isi.edu, testbed-ops@emulab.net
 Subject: Re: shedding some light on the new Cisco 720Gb/s switch fabric
 In-Reply-To: <613FA566484CA74288931B35D971C77E13428C@losexmb1.corp.nai.org>; from Stephen_Schwab@NAI.com on Tue, 28 Oct 2003 21:55:37 PST
 Date: Wed, 29 Oct 2003 14:00:36 MST
-X-Spam-Status: No, hits=-8 required=5 tests=ACADEMICS,GLOB_WHITELIST version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-Content-Length: 947
 Lines: 22
 
 
@@ -803,41 +606,11 @@ That is the sort of expansion we were going to do.
 Emulab will handle the resource assignment just fine.
 
 From mailnull@bas.flux.utah.edu Wed Oct 29 16:28:09 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TNS9Lj002647
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Wed, 29 Oct 2003 16:28:09 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id h9TNS9v1002645
-	for testbed-ops-hidden; Wed, 29 Oct 2003 16:28:09 -0700 (MST)
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TNS9Lj002641
-	for <testbed-ops@[155.98.60.2]>; Wed, 29 Oct 2003 16:28:09 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id h9TNS5Pe008007
-	for <testbed-ops@flux.utah.edu>; Wed, 29 Oct 2003 16:28:05 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from ops.emulab.net (ops.emulab.net [155.101.129.74])
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id QAA06698
-	for <testbed-ops@fast.flux.utah.edu>; Wed, 29 Oct 2003 16:27:59 -0700 (MST)
-Received: from fast.cs.utah.edu (fast.cs.utah.edu [155.99.212.1])
-	by ops.emulab.net (8.12.9/8.12.6) with ESMTP id h9TNRTbD060624
-	for <testbed-ops@emulab.net>; Wed, 29 Oct 2003 16:27:29 -0700 (MST)
-	(envelope-from lepreau@fast.cs.utah.edu)
-Received: from fast.cs.utah.edu (lepreau@localhost)
-	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id QAA06685;
-	Wed, 29 Oct 2003 16:27:17 -0700 (MST)
-Message-Id: <200310292327.QAA06685@fast.cs.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Stephen_Schwab@NAI.com, deter-isi@isi.edu, testbed-ops@emulab.net
 Subject: Re: shedding some light on the new Cisco 720Gb/s switch fabric
 In-Reply-To: <200310292100.OAA05793@fast.cs.utah.edu>; from Jay Lepreau on Wed, 29 Oct 2003 14:00:36 MST
 Date: Wed, 29 Oct 2003 16:27:17 MST
-X-Spam-Status: No, hits=-7 required=5 tests=GEEKWORDS1,GLOB_WHITELIST version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-Content-Length: 533
 Lines: 14
 
 I had said:
@@ -861,17 +634,7 @@ From: Robert P Ricci <ricci@cs.utah.edu>
 To: Stephen_Schwab@NAI.com
 Cc: deter-isi@isi.edu, testbed-ops@emulab.net
 Subject: Re: NAMs for the 6509s -- required or optional?
-Message-ID: <20031029110142.G51103@cs.utah.edu>
-Mail-Followup-To: Stephen_Schwab@NAI.com, deter-isi@isi.edu,
-	testbed-ops@emulab.net
-References: <613FA566484CA74288931B35D971C77E13428D@losexmb1.corp.nai.org>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <613FA566484CA74288931B35D971C77E13428D@losexmb1.corp.nai.org>; from Stephen_Schwab@NAI.com on Tue, Oct 28, 2003 at 09:57:27PM -0800
-Status: RO
-Content-Length: 688
 Lines: 15
 
 Thus spake Stephen_Schwab@NAI.com on Tue, Oct 28, 2003 at 09:57:27PM -0800:
@@ -891,37 +654,11 @@ okay without them.
 \-----------------------------------------------------------
 
 From braden@ISI.EDU Wed Nov 19 14:10:00 2003
-Received: from slow.flux.utah.edu (slow.flux.utah.edu [155.98.63.200])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id hAJLA0LQ064563
-	for <ricci@[155.98.60.2]>; Wed, 19 Nov 2003 14:10:00 -0700 (MST)
-	(envelope-from braden@ISI.EDU)
-Received: from mail-svr1.cs.utah.edu (brahma.cs.utah.edu [155.99.198.200])
-	by slow.flux.utah.edu (8.12.9/8.12.5) with ESMTP id hAJL9ZPe091915
-	for <ricci@flux.utah.edu>; Wed, 19 Nov 2003 14:09:35 -0700 (MST)
-	(envelope-from braden@ISI.EDU)
-Received: by mail-svr1.cs.utah.edu (Postfix)
-	id 99190346F3; Wed, 19 Nov 2003 14:09:30 -0700 (MST)
-Delivered-To: ricci@cs.utah.edu
-Received: from boreas.isi.edu (boreas.isi.edu [128.9.160.161])
-	by mail-svr1.cs.utah.edu (Postfix) with ESMTP
-	id A8F30346ED; Wed, 19 Nov 2003 14:09:29 -0700 (MST)
-Received: from gra.isi.edu (gra.isi.edu [128.9.160.133])
-	by boreas.isi.edu (8.11.6p2+0917/8.11.2) with ESMTP id hAJL9La28057;
-	Wed, 19 Nov 2003 13:09:21 -0800 (PST)
 From: Bob Braden <braden@ISI.EDU>
-Received: (from braden@localhost)
-	by gra.isi.edu (8.9.3/8.8.6) id NAA04791;
-	Wed, 19 Nov 2003 13:09:21 -0800 (PST)
 Date: Wed, 19 Nov 2003 13:09:21 -0800 (PST)
-Message-Id: <200311192109.NAA04791@gra.isi.edu>
 To: lepreau@cs.utah.edu, ricci@cs.utah.edu, deter-isi@ISI.EDU
 Subject: Performance figures
 Cc: braden@ISI.EDU
-X-Sun-Charset: US-ASCII
-X-Spam-Status: No, hits=0 required=5 tests= version=FluxMilter1.2
-X-Scanned-By: MIMEDefang 2.26 (www . roaringpenguin . com / mimedefang)
-Status: RO
-Content-Length: 733
 Lines: 28
 
 
@@ -954,28 +691,12 @@ Bob
 
 
 From mailnull@bas.flux.utah.edu Wed Nov 19 15:13:30 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id hAJMDULQ067272
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Wed, 19 Nov 2003 15:13:30 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id hAJMDUPm067271
-	for testbed-ops-hidden; Wed, 19 Nov 2003 15:13:30 -0700 (MST)
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id hAJMDULQ067267;
-	Wed, 19 Nov 2003 15:13:30 -0700 (MST)
-	(envelope-from lepreau@bas.flux.utah.edu)
-Message-Id: <200311192213.hAJMDULQ067267@bas.flux.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Bob Braden <braden@ISI.EDU>
 Cc: ricci@cs.utah.edu, deter-isi@ISI.EDU, testbed-ops@flux.utah.edu
 Subject: Re: Performance figures
 In-Reply-To: <200311192109.NAA04791@gra.isi.edu>; from Bob Braden on Wed, 19 Nov 2003 13:09:21 PST
 Date: Wed, 19 Nov 2003 15:13:30 -0700
-Sender: lepreau@flux.utah.edu
-Status: RO
-X-Status: A
-Content-Length: 1541
 Lines: 48
 
 Added testbed-ops so you get more, more informed people.
@@ -983,7 +704,6 @@ Some quick remarks, not complete.  I have not digested your numbers.
 
 	---------------
 	From: Bob Braden <braden@ISI.EDU>
-	Date: Wed, 19 Nov 2003 13:09:21 -0800 (PST)
 	To: lepreau@cs.utah.edu, ricci@cs.utah.edu, deter-isi@ISI.EDU
 	Subject: Performance figures
 	Cc: braden@ISI.EDU
@@ -1034,17 +754,7 @@ To: Bob Braden <braden@ISI.EDU>
 Cc: deter-isi@ISI.EDU, testbed-ops@flux.utah.edu,
 	Jay Lepreau <lepreau@cs.utah.edu>
 Subject: Re: Performance figures
-Message-ID: <20031119154357.I534@cs.utah.edu>
-Mail-Followup-To: Bob Braden <braden@ISI.EDU>, deter-isi@ISI.EDU,
-	testbed-ops@flux.utah.edu, Jay Lepreau <lepreau@cs.utah.edu>
-References: <200311192109.NAA04791@gra.isi.edu> <200311192213.hAJMDULQ067267@bas.flux.utah.edu>
-Mime-Version: 1.0
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-User-Agent: Mutt/1.2.5.1i
 In-Reply-To: <200311192213.hAJMDULQ067267@bas.flux.utah.edu>; from lepreau@cs.utah.edu on Wed, Nov 19, 2003 at 03:13:30PM -0700
-Status: RO
-Content-Length: 1150
 Lines: 26
 
 Note: I have not verified your numbers.
@@ -1075,27 +785,12 @@ to avoid overloading the switch.
 \-----------------------------------------------------------
 
 From mailnull@bas.flux.utah.edu Wed Nov 19 15:53:22 2003
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id hAJMrMLQ069501
-	for <testbed-ops-hidden@bas.flux.utah.edu>; Wed, 19 Nov 2003 15:53:22 -0700 (MST)
-	(envelope-from mailnull@bas.flux.utah.edu)
-Received: (from mailnull@localhost)
-	by bas.flux.utah.edu (8.12.9/8.12.5/Submit) id hAJMrMaH069500
-	for testbed-ops-hidden; Wed, 19 Nov 2003 15:53:22 -0700 (MST)
-Received: from bas.flux.utah.edu (localhost [127.0.0.1])
-	by bas.flux.utah.edu (8.12.9/8.12.5) with ESMTP id hAJMrMLQ069496;
-	Wed, 19 Nov 2003 15:53:22 -0700 (MST)
-	(envelope-from lepreau@bas.flux.utah.edu)
-Message-Id: <200311192253.hAJMrMLQ069496@bas.flux.utah.edu>
 From: Jay Lepreau <lepreau@cs.utah.edu>
 To: Robert P Ricci <ricci@cs.utah.edu>
 Cc: Bob Braden <braden@ISI.EDU>, deter-isi@ISI.EDU, testbed-ops@flux.utah.edu
 Subject: Re: Performance figures
 In-Reply-To: <20031119154357.I534@cs.utah.edu>; from Robert P Ricci on Wed, 19 Nov 2003 15:43:57 MST
 Date: Wed, 19 Nov 2003 15:53:22 -0700
-Sender: lepreau@flux.utah.edu
-Status: RO
-Content-Length: 459
 Lines: 10
 
 > To me, this would suggest that you could save a lot by not putting more
@@ -1109,3 +804,4 @@ Note that Gbit and FE NICs are not much different in price; it's the switch
 ports that really cost.  So buy all Gbit NICs and run some at 100.
 Gives you later flexibility.
 
+----------------------------------------------------------------------
