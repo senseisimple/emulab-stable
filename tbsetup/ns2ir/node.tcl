@@ -140,12 +140,12 @@ Node instproc updatedb {DB} {
 	}
     } else {
 	# Do not allow user to set os for virt nodes at this time.
-	if {0 && $isvirt} {
+	if {$isvirt} {
 	    perror "You may not specify an OS for virtual nodes ($self)!"
 	    return
 	}
 	# Do not allow user to set os for host running virt nodes.
-	if {0 && $virthost} {
+	if {$virthost} {
 	    perror "You may not specify an OS for hosting virtnodes ($self)!"
 	    return
 	}
