@@ -27,10 +27,14 @@ capserver:	capserver.c capdecls.h
 		-L/usr/local/lib/mysql -lmysqlclient
 
 #
-# Do not install by default.
+# Do not capture install by default.
 #
-install:
+install:	all $(INSTALL_SBINDIR)/capserver
+
 real-install:	all $(INSTALL_SBINDIR)/capserver
+	install -s capture $(DESTDIR)/usr/site/bin
+
+tipserv-install:	all
 	install -s capture $(DESTDIR)/usr/site/bin
 
 clean:

@@ -24,7 +24,7 @@ tip:	$(OBJS)
 
 $(OBJS): tipconf.h tip.h
 
-install:	all $(INSTALL_BINDIR)/tip
+control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip
 
 clean:
 	rm -f $(OBJS) tip

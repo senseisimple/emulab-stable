@@ -15,6 +15,7 @@ all:		all-subdirs
 
 install:	
 	@echo "Choose either boss-install (paper) or ops-install (plastic)"
+	@echo "Choose tipserv-install for dedicated tip server machines."
 
 #
 # For installation on boss node (okay, paper).
@@ -49,6 +50,12 @@ install-mkdirs:
 	-chmod 777 $(INSTALL_TOPDIR)/batch
 	-mkdir -p $(INSTALL_TOPDIR)/expinfo
 	-chmod 777 $(INSTALL_TOPDIR)/expinfo
+
+tipserv-install:
+	-mkdir -p $(INSTALL_TOPDIR)/log/tiplogs
+	@$(MAKE) -C tip tipserv-install
+	@$(MAKE) -C capture tipserv-install
+	@$(MAKE) -C tbsetup tipserv-install
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

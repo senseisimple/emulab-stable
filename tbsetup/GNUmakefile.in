@@ -94,6 +94,11 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
 			ln -s plasticwrap $$file; \
 		done;
 
+#
+# Tip servers get very little
+#
+tipserv-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy)
+
 clean:	subdir-clean
 	rm -f *.o core
 
