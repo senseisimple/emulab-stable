@@ -317,7 +317,8 @@ foreach $node (keys(%nodes)) {
 #
 if ($widearea) {
     $result =
-	DBQueryFatal("select count(a.node_id),a.type,a.phys_nodeid,aa.type ".
+	DBQueryFatal("select count(a.node_id),a.type,a.phys_nodeid,aa.type, ".
+		     "  ns.status ".
 		     "  from nodes as a ".
  		     "left join reserved as b on a.node_id=b.node_id ".
 		     "left join nodes as aa on aa.node_id=a.phys_nodeid ".
@@ -326,12 +327,11 @@ if ($widearea) {
 		     "     a.phys_nodeid=ns.node_id ".
 		     "left join node_types as t on t.type=a.type ".
 		     "where  (a.role='virtnode' and t.isremotenode=1 and ".
-		     "        ns.status='up' and ".
 		     "        (b.node_id is null and ".
 		     "         !(m.pid='$DEADPID' and m.eid='$DEADEID'))) ".
 		     "group by a.phys_nodeid");
     
-    while (($count,$type,$physnode,$ptype) = $result->fetchrow_array) {
+    while (($count,$type,$physnode,$ptype,$status) = $result->fetchrow_array) {
 	my @types;
 	my @features;
 	my @flags;
@@ -343,6 +343,15 @@ if ($widearea) {
 	# Might be equal, which assign would sum as two, not one!
 	if ($type ne $classes{$type}) {
 	    push(@types, "$classes{$type}:$virtnode_capacity");
+	}
+
+	#
+	# Mark any nodes that are not up with a feature, so that they won't
+	# normally get assigned. We want to include them, though, because we
+	# allow people to do fix-node to down nodes
+	#
+	if ($status && ($status ne 'up')) {
+	    push @features, "down:1";
 	}
 
 	#
