@@ -325,16 +325,21 @@
 <li><a NAME="UTT-3"></a>
     <h3>Do my nodes have consoles I can look at?</h3>
     <p>
-    Yes. Each of the PCs has its own serial console line that you can
-    interact with using the unix <tt>tip</tt> utility. To "tip" to
+    Yes. Each of the PCs has its own serial console line with which you can
+    interact, either directly from your desktop (see next FAQ entry),
+    or by hopping through the "users" machine,
+    using our <tt>console</tt> program. To connect over serial line to
     "pc1" in your experiment, ssh into <b>users.emulab.net</b>, and
-    then type <tt>tip pc1</tt> at the unix prompt. You may then
-    interact with the serial console. The console output is also saved
-    for each node so that you may look at it it later. For each node,
+    then type <tt>console pc1</tt> at the Unix prompt. You may then
+    interact with the serial console (hit "enter" to elicit output from
+    the target machine).
+    </p><p>
+    In any case, all console output from each node is saved
+    so that you may look at it it later. For each node,
     the console log is stored as <tt>/var/log/tiplogs/pcXXX.run</tt>.
     This <em>run</em> file is created when nodes are first allocated
-    to an experiment, and the unix permissions of the run files permit
-    just members of the project to view them. When the nodes are
+    to an experiment, and the Unix permissions of the run files permit
+    only members of the project to view them. When the nodes are
     deallocated, the run files are cleared, so if you want to save
     them, you must do so before terminating the experiment. 
     </p>
@@ -342,8 +347,8 @@
     The Sharks also have serial console lines, but because of the
     limited number of serial ports available on <b>users.emulab.net</b>, only
     one Shark, the last or "eighth", on each shelf has a console line
-    attached. To tip to that shark, you would type <tt>tip shXX</tt>
-    at the unix prompt, where "XX" is the shark shelf number. The
+    attached. To connect to that shark, you would type <tt>console shXX</tt>
+    at the Unix prompt, where "XX" is the shark shelf number. The
     shark shelf number is the first digit in the name. Using shark
     sh16-8 as an example, the shelf number is sixteen, and the number
     of the node on the shelf is eight.
@@ -362,6 +367,8 @@
     In FreeBSD or Linux, you can save the file and pass it as an argument
     to <code>tiptunnel</code>, or associate it with
     <code>tiptunnel</code> in your web browser.
+    Upon connection you typically first have to hit "enter" to
+    elicit output from the target machine.
 
 <!--
     If you have downloaded <code>tiptunnel</code> and set it as the 
@@ -421,6 +428,7 @@
         to connect to a node in your experiment.
         Note that these files are valid for the lifetime of your experiment.)</li>
     </ul>
+
     <h3>Linux/FreeBSD and Netscape 4.7:</h3>
     <ul>
     <li>Choose <code>preferences</code> from the <code>edit</code> menu.</li>
@@ -443,23 +451,24 @@
     <li>Clicking a "connect to serial line" link should now
         bring up a connection in an xterm window.</li>
     </ul> 
+
     <h3>Linux/FreeBSD and Mozilla:</h3>
     <ul>
     <li>Choose <code>preferences</code> from the <code>edit</code> menu.</li>
     <li>Select <code>Navigator</code>, then <code>Helper Applications</code> 
         under it.</li>
     <li>Click the <code>New Type...</code> button.</li>
-    <li>In the <code>MIMEType</code> box, type <code>text/x-testbed-acl</code>
-    </li>
+    <li>In the <code>MIMEType</code> box, type <code>text/x-testbed-acl</code></li>
     <li>In the <code>File extension</code> box, type <code>tbacl</code></li>
     <li>For <code>Application to use</code>, either type the path to the
         <code>tiptunnel</code> binary, or use <code>Choose...</code> to find
-        it.</li>
+	it.</li>
     <li>In Mozilla do <b>not</b> add a <code>%s</code>.</li>
     <li>Click <code>OK</code>, then <code>OK</code> again.</li>
     <li>Clicking a "connect to serial line" link should now
         bring up a connection in an xterm window.</li>
     </ul> 
+    </p>
 
 <li><a NAME="UTT-4"></a>
     <h3>Can I reboot (power cycle) my nodes?</h3>
