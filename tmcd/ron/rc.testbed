@@ -4,7 +4,7 @@
 # Boottime initialization. 
 #
 
-if [ -f /usr/local/etc/testbed/update ]; then
-    echo "Checking for Emulab account updates ..."
-    /usr/local/etc/testbed/update
+if [ -f /usr/local/etc/testbed/rc.setup ]; then
+    echo "Joining Emulab ..."
+    /usr/local/etc/testbed/rc.setup
 fi
