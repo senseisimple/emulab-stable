@@ -202,6 +202,12 @@ while (1) {
 	    print "$sched_reload failed on $node. Waiting a bit.\n";
 	    next;
 	}
+
+	#
+	# XXX: Hardcoded the default reload type. Will need to
+	# be changed if/when this type changes.
+	#
+	$reload_type = "netdisk";
     }
     $stamp = DBDateTime();
 	
