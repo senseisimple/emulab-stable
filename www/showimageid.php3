@@ -43,9 +43,11 @@ SUBMENUSTART("More Options");
 $fooid = rawurlencode($imageid);
 WRITESUBMENUBUTTON("Edit this Image Descriptor",
 		   "editimageid_form.php3?imageid=$fooid");
+WRITESUBMENUBUTTON("Load Image from Node",
+		   "loadimage.php3?imageid=$fooid");
 WRITESUBMENUBUTTON("Delete this Image Descriptor",
 		   "deleteimageid.php3?imageid=$fooid");
-WRITESUBMENUBUTTON("Create a new Image Descriptor",
+WRITESUBMENUBUTTON("Create a New Image Descriptor",
 		   "newimageid_ez.php3");
 if ($isadmin) {
     WRITESUBMENUBUTTON("Create a new OS Descriptor",

@@ -867,9 +867,10 @@ $confirmationWarning = "";
 if (! isset($node)) {
     $confirmationWarning .=
           "<h2>You have not defined a node from which to load the image!
-           If you do not specify such a node,
-           you will have to use <code>create_image</code> on <i>ops</i> to
-	   load an image to the Image Descriptor you are creating.
+           If you do not specify such a node now,
+	   you will later have to go to the Image Descriptor information
+	   page for the new image and then click 'load image from node' from
+	   the menu.
   	   Continue only if this is what you want.</h2>";
 }
 
