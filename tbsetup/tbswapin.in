@@ -50,7 +50,7 @@ sub cleanup {
 
     if ($cleanvlans) {
 	print STDERR "Removing VLANs.\n";
-	if (system("snmpit -reset $pid $eid")) {
+	if (system("snmpit -r $pid $eid")) {
 	    print STDERR "*** Failed to clean up VLANs\n";
 	}
 

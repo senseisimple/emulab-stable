@@ -1,584 +1,664 @@
-#!/usr/local/bin/perl -w
-#########################################################################
-# snmpit - A General Purpose SNMP Tool                                  #
-# (specialized for Intel 510T, Cisco 6509 and APC power controllers)    #
-#                                                                       #
-# Run with -h option to see command line syntax/options.                #
-#                                                                       #
-#########################################################################
+#!/usr/bin/perl -w
 
-my $TB;
-my $DBNAME = "@TBDBNAME@";
+#
+# snmpit - A tool for setting up VLANs on SNMP-controllable switches
+#
+
+#
+# Configure variables
+#
+
+use lib '@prefix@/lib';
 my $TESTMODE = @TESTMODE@;
+my $TB = '@prefix@';
 
-BEGIN {
-  $TB     = "@prefix@";
-  # This needs to go in BEGIN so it happens before the use clauses...
-  push(@INC,$TB."/lib");
-}
-
-my $debug = 0;
-#If there is debug, turn it on right now...
-if ( join(" ",@ARGV) =~ /-debug\s*(\d*)/ ) {
-  if ( defined $1 && $1 ne "") { $debug = $1; } else { $debug = 1; }
-  print "DEBUG MODE ON: Set to level $debug\n";
-}
-
-use English;
-
-#Uncomment this when we really need to be able to handle intel switches
-#use snmpit_intel;
-use snmpit_cisco;
-use snmpit_apc;
+use libdb;
 use snmpit_lib;
 
-$| = 1; # Turn off line buffering on output
+use English;
+use Getopt::Std;
+use strict;
 
-my $device;
+#
+# Defaults
+#
+my $debug = 0;
+
+######################################################################
+# Step 1 - Process command-line arguments
+#
+# We have a fairly complex set of command line arguments, and we
+# need to make sure that the user only specifies one command at a
+# time.
+######################################################################
+sub usage {
+    print << "END";
+Usage: $0 [-h] [-v] [-i device] 
+	  [-l] [-s] [-g]
+	  [-m name [ports]]
+	  [-o name]
+          [-r pid eid]
+	  [-t pid eid]
+General:
+  -h          Display this help message
+  -v          Verbose mode
+  -i <device> Operate on <device>, overriding default device list
+
+VLAN Control:
+  -t <pid> <eid>    Create all VLANs from database tables for an experiment
+  -r <pid> <eid>    Remove all VLANs from database tables for an experiment
+  -l                List all VLANs
+  -m <name> [ports] Create a new VLAN with name <name>, if it doesn't exist,
+                        and put [ports] in it
+  -o <name>         Delete the VLAN with name <name>
+
+Port Control:
+  -s         List all ports, and show configuration information
+  -g         Get port statistics
+  -d <ports> Disable <ports>
+  -e <ports> Enable <ports>
+  -a <ports> Enable auto-negotiation of port speed/duplex
+  -p <ports> Set speed of <ports> to 10 or 100 Mbps
+  -u <ports> Set duplex of <ports> to half or full
+
+
+END
+
+    return 1;
+}
+
+
+my $opts = 'hlvstri:m:o:p:u:deag';
+my %opt = ();
+getopts($opts,\%opt);
+
+if ($opt{h}) {
+    exit &usage;
+}
+
+if ($opt{v}) {
+    $debug = $opt{v};
+    print "Debug level is $debug\n";
+}
+
+#
+# Make sure the user specified exactly one operation
+#
+my @commandOpts = ('l','m','o','s','t','r','d','e','a','p','u','g');
+if (!exactlyOne(map {$opt{$_}} @commandOpts)) {
+    warn "ERROR: You must specify exactly one of " .
+	    join(",", map {"-$_"} @commandOpts) . "\n";
+    exit &usage;
+}
+
+#
+# Values that may have been passed on the command line
+#
 my $pid;
 my $eid;
-my $t = 0; #VLANs from db table
-my $reset = 0; #reset VLANs
-my $n;     #VLAN # to move ports into
-my %vlantable = ();
-my @vlanlist = ();
-my %vlansbyname = ();
-my %vlanids = ();
+my @ports;
 
-&myMain;
+#
+# Some operations have mandatory agruments - for others, make sure that
+# the user didn't give any extraneous arguments
+#
+if ($opt{t} || $opt{r}) {
+    #
+    # Options that take 'pid eid'
+    #
+    if (@ARGV != 2) {
+	warn "ERROR: pid/eid reqired!\n";
+	exit &usage;
+    } else {
+	($pid, $eid) = @ARGV;
+    }
+} elsif ($opt{d} || $opt{e} || $opt{a} || $opt{p} || $opt{u} || $opt{m}) {
+    #
+    # Options that take a list of ports
+    #
+    @ports = @ARGV;
+} else {
+    #
+    # Everything else
+    #
+    if (@ARGV) {
+	warn "ERROR: Too many arguments!\n";
+	exit &usage;
+    }
+}
 
-# Numerically sort
-sub num { $a <=> $b; }
+#
+# Determine which operation we're performing. This is just for convenience,
+# so that we can use switch-like constructs later. While we're at it, we
+# pull out any arguments that were given in the $opt{} values.
+#
+my $operation;
+my $vlan_name;
+my $portcommand;
+if ($opt{l}) {
+    $operation = "listvlans";
+} elsif ($opt{s}) {
+    $operation = "listports";
+} elsif ($opt{g}) {
+    $operation = "getstats";
+} elsif ($opt{t}) {
+    $operation = "tables";
+} elsif ($opt{r}) {
+    $operation = "reset";
+} elsif ($opt{m}) {
+    $operation = "make";
+    $vlan_name = $opt{m};
+} elsif ($opt{o}) {
+    $operation = "remove";
+    $vlan_name = $opt{o};
+} elsif ($opt{d}) {
+    $operation = "portcontrol";
+    $portcommand = "disable";
+} elsif ($opt{e}) {
+    $operation = "portcontrol";
+    $portcommand = "enable";
+} elsif ($opt{a}) {
+    $operation = "portcontrol";
+    $portcommand = "auto";
+} elsif ($opt{p}) {
+    $operation = "portcontrol";
+    #
+    # We'll put the argument in the form needed by the portControl function
+    #
+    if ($opt{p} =~ /^100/) {
+	$portcommand = "100mbit";
+    } elsif ($opt{p} =~ /^10/) {
+	$portcommand = "10mbit";
+    } else {
+	die "Bad port speed: $opt{p}. Valid values are 10 and 100\n";
+    }
+} elsif ($opt{u}) {
+    #
+    # We'll put the argument in the form needed by the portControl function
+    #
+    $operation = "portcontrol";
+    if ($opt{u} =~ /half/) {
+	$portcommand = "half";
+    } elsif ($opt{u} =~ /full/) {
+	$portcommand = "full";
+    } else {
+	die "Bad port duplex: $opt{u}. Valid values are full and half\n";
+    }
+} else {
+    die "No operation given\n";
+}
 
-sub myMain {
+debug("Operation is $operation\n");
 
-  my $i = "";	#IP addr.
-  my @p = ();	#Port numbers
-  my $d = 0;    #Disable (bool)
-  my $e = 0;	#Enable (bool)
-  my $a = "";	#Auto Negotiation enable
-  my $dup = "";	#Duplex (half/full)
-  my $spd = 0;	#Speed (10/100)
-  my $s = 0;	#Show port configs
-  my $g = 0;	#Get Statistics
-  my $f = "";	#AutoVLAN filename
-  my $l = 0;	#List all VLANs on switch
-  my $m = "";	#Create VLAN - name
-  my @vlan =();	#VLAN Members - list of MAC Addresses
-  my @r = ();	#VLAN(s) to be removed
-  my $u = 0;	#Wait for Update of VLAN tables
-  my $b = 0;	#Block (bool) (two-way switch)
-  my $c = 1;	#Confirm Changes (bool) (two-way switch)
-  my $v = 0;	#Verbose (bool) !Must default quiet; switch only turns on!
+######################################################################
+# Step 3 - Set up the stack objects
+#
+# Determine which devices to talk to, and make the appropriate
+# stack objects
+######################################################################
 
-  #power control
-  my $powerop=0;
-  my @outlets=();
-
-  &ParseArgs(\@ARGV,\$i,\@p,\$d,\$e,\$a,\$dup,\$spd,\$s,\$f,\$l,\$m,\@vlan,
-	     \@r,\$u,\$b,\$c,\$v,\$g,
-	     \$powerop,\@outlets);
-
-  if ($TESTMODE) {
-    print "snmpit: Running in test mode...exiting\n";
+if ($TESTMODE) {
+    print "Test mode, exiting without touching hardware\n";
     exit(0);
-  }
+}
 
-  if ($d) {
-    my $rv = $device->portControl("disable",@p);
-    print "Port disable for @p had $rv failures.\n";
-  } elsif ($e) {
-    my $rv = $device->portControl("enable",@p);
-    print "Port enable for @p had $rv failures.\n";
-  }
-  if ($spd) {
-    my $rv = $device->portControl($spd,@p);
-    print "Port speed change for @p had $rv failures.\n";
-  }
-  if ($dup) {
-    my $rv = $device->portControl($dup,@p);
-    print "Port duplex change for @p had $rv failures.\n";
-  }
-  if ($a) {
-    my $rv = $device->portControl("auto",@p);
-    print "Port auto-configuration change for @p had $rv failures.\n";
-  }
-  if ($n) {
-    my $rv = $device->portControl("VLAN$n",@p);
-    print "Port VLAN change for @p had $rv failures.\n";
-  }
+#
+# snmpit_lib fills out some hashes for speed of lookup later. Initialize
+# them now
+#
+snmpit_lib::init($debug);
 
-  #Show always goes after changes, so that they are reflected.
-  if ($s) { $device->showPorts; }
-  if ($g) { $device->getStats; }
+#
+# Discover the set of devices we need to talk to. This differs depending
+# on the operation which we're performing. We also get a list of all ports
+# and vlan IDs involved in this operation, if appropriate
+#
+my @devicenames;
+my @vlans;
+SWITCH: for ($operation) {
+    (/listvlans/ || /getstats/) && do {
+	@devicenames = $opt{i}? $opt{i} : getTestSwitches();
+    };
+    (/listports/ || /make/ || /remove/) && do {
+	@devicenames = $opt{i}? $opt{i} :
+	    (@ports? getDeviceNames(@ports) : getTestSwitches());
+	last;
+    };
+    (/tables/) && do {
+	@vlans = getExperimentVlans($pid,$eid);
+	@ports = getVlanPorts(@vlans);
+	@devicenames = $opt{i}? $opt{i} : getDeviceNames(@ports);
+    };
+    (/reset/) && do {
+	#
+	# When we reset, we operate on all test switches, just to be safe
+	#
+	@vlans = getExperimentVlans($pid,$eid);
+	@devicenames = $opt{i}? $opt{i} : getTestSwitches();
+    };
+    (/portcontrol/) && do {
+	@devicenames = $opt{i}? $opt{i} : getDeviceNames(@ports);
+    };
+}
 
-  if (@vlan) {
-    getvlans();
-    if (vlanexists($m,@vlan)) {
-      print "VLAN $m exists with ",join(" ",sort @vlan),"\n";
-    } else {
-      $device->vlanLock;
-      $device->setupVlan($m,@vlan);
-      $device->vlanUnlock;
+debug("Device names: " . join(",",@devicenames) . "\n");
+debug("Ports: " . join(",",@ports) . "\n");
+
+#
+# If this is an operation on an experiment, make sure that they have permission
+# to modify that experiment
+#
+if ($pid && $eid) {
+    if (!TBExptAccessCheck($UID,$pid,$eid,TB_EXPT_MODIFY)) {
+	die "You do not have permission to modify experiment $pid/$eid\n";
     }
-  }
+}
 
-  if ($f) {
-    getvlans();
-    my @VLANS= ();
-    my @names= ();
-    my $m="";
-    my @vlan=();
-    &ReadIRFile(\$f,\@names,\@VLANS);
-    $device->vlanLock;
-    while (@VLANS) {
-      @vlan = @{shift(@VLANS)};
-      $m = shift @names;
-      if (vlanexists($m,@vlan)) {
-	print "VLAN $m exists with ",join(" ",sort @vlan),"\n";
-      } else {
-	print "Making $m with ",join(' ',sort @vlan),"\n" if $debug;
-	$device->setupVlan($m,@vlan);
-      }
+#
+# If their operation involves a set of ports, make sure that the caller has
+# access to the nodes that the ports are on
+#
+if (@ports) {
+    my @nodes = map /^([^:]+)/, @ports;
+    if (!TBNodeAccessCheck($UID,TB_NODEACCESS_MODIFYVLANS,@nodes)) {
+	die "You do not have permission to modify some or all of the nodes\n" .
+		"that will be affected by the operation you requested\n";
     }
-    $device->vlanUnlock;
-  }
+}
 
-  if ($t) {
-    getvlans();
-    $device->vlanLock;
-    my @vlan;
-    foreach $id (keys %vlantable) {
-      @vlan = sort split(" ",$vlantable{$id});
-      if (vlanexists($id,@vlan)) {
-	print "VLAN $id exists with ",join(" ",@vlan),"\n";
-      } else {
-	print "Making VLAN '$id' with @vlan\n" if $debug;
-	$device->setupVlan($id,@vlan);
-      }
+#
+# Find out which stack each device belongs to
+#
+my %stacks = ();
+foreach my $devicename (@devicenames) {
+    my $stack = getSwitchStack($devicename);
+    if (defined($stack)) {
+	push @{$stacks{$stack}}, $devicename;
     }
-    $device->vlanUnlock;
-  }
+}
 
-  if ($reset) {
-    getvlans();
-    $device->vlanLock;
-    my @vlan;
-    foreach $id (keys %vlantable) {
-      @vlan = sort split(" ",$vlantable{$id});
-      if (vlanexists($id,@vlan)) {
-	if ( ($num = vlannum($id)) > 0) {
-	  print "VLAN #$num $id exists with ",join(" ",@vlan),"\n";
-	  $device->removeVlan($num);
-	} else {print STDERR "Couldn't find VLAN nubmer for '$id'\n";}
-      } else {print STDERR "Couldn't find VLAN '$id' (",join(" ",@vlan),")\n";}
+#
+# Now, make the object for each stack that we discovered
+#
+my @stacks;
+foreach my $stack_id (keys %stacks) {
+    #
+    # XXX: For now, we assume that the stack is a Cisco stack. We'll need
+    # more database information to be able to distinguish stack types
+    #
+    use snmpit_cisco_stack;
+    my $stack = new snmpit_cisco_stack($stack_id,@{$stacks{$stack_id}});
+    push @stacks, $stack;
+}
+
+#
+# This should not be possible, but we'll perform a sanity check to be safe
+#
+if (!@stacks) {
+    die "Found no stacks to operate on\n";
+}
+
+######################################################################
+# Step 3 - Actually perfrom the operation
+#
+# Finally, we just call the helper function for the operation that
+# is to be performed. Note that all functions use the global @stacks
+# variable, so it isn't passed to every one.
+######################################################################
+
+my $exitval;
+SWITCH: for ($operation) {
+    /listvlans/ && do {
+	$exitval = doListVlans();
+	last;
+    }; # /vlans/ && do 
+    /listports/ && do {
+	$exitval = doListPorts();
+	last;
+    }; # /ports/ && do
+    /getstats/ && do {
+	$exitval = doGetStats();
+	last;
+    }; # /ports/ && do
+    /tables/ && do {
+	$exitval = doVlansFromTables(@vlans);
+	last;
+    }; # /tables/ && do
+    /reset/ && do {
+	$exitval = doReset(@vlans);
+	last;
+    };
+    /make/ && do {
+	$exitval = doMakeVlan($vlan_name,@ports);
+	last;
+    };
+    /remove/ && do {
+	$exitval = doDeleteVlan($vlan_name);
+	last;
+    };
+    /portcontrol/ && do {
+	$exitval = doPortControl($portcommand,@ports);
+    };
+}
+
+exit $exitval;
+
+######################################################################
+# Subs
+######################################################################
+
+#
+# Return true if exactly one element of the given array is true
+#
+sub exactlyOne (@) {
+    my $one = 0;
+    foreach my $value ( @_ ) {
+	if ($value) {
+	    if ($one) {
+		return 0; # More than one
+	    } else {
+		$one = 1; # This is the first
+	    }
+	}
     }
-    $device->vlanUnlock;
-  }
+    return $one;
+}
 
-  if (@r) {
-    $device->vlanLock;	
-    foreach my $x (sort num @r) {
-      $device->removeVlan($x);
+#
+# Print given message to STDERR, only if debug mode is on
+#
+sub debug($) {
+    if ($debug) {
+	print STDERR @_;
     }
-    $device->vlanUnlock;
-  }
+}
 
-  #List VLANs is always last so that changes made are reflected
-  if ($l) {
-    my @vlans;
-    getvlans();
-    @vlans = @vlanlist;
-    print "ID  Name\t\t\t    Members of VLAN\n";
-    print "-"x75,"\n";
-    my $id;
-    my $name;
-    my $memberstr;
-    # I'm trying out using formats. See perldoc perlform for details.
-    format vlan = 
-@<< @<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-$id,$name,                          $memberstr
-~~                                  ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                                    $memberstr
+#
+# Lists all vlans on all stacks
+#
+sub doListVlans () {
+    
+    my %vlans;
+
+    #
+    # We need to 'coallate' the results from each stack by putting together
+    # the results from each stack, based on the VLAN identifier
+    #
+    foreach my $stack (@stacks) {
+	# TODO: Add a way to print ddep 
+	my @vlanList = $stack->listVlans();
+	foreach my $vlan (@vlanList) {
+	    my ($id,$ddep,$memberref) = @$vlan;
+	    push @{${$vlans{$id}}[1]}, @$memberref;
+	}
+    }
+
+    #
+    # These need to be declared here for the benefit of the format string
+    # See perlform(1) for help with formats
+    #
+    my ($vlan_id,$pideid,$vname,$members);
+    print << "END";
+VLAN  Project/Experiment   VName      Members
+--------------------------------------------------------------------------------
+END
+    format vlanlist =
+@<<<< @<<<<<<<<<<<<<<<<<<< @<<<<<<<<< ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+$vlan_id,$pideid,          $vname,    $members
+~~                                    ^<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                                      $members
 .
-    $FORMAT_NAME = "vlan";
-    while (@vlans) {
-      ($id,$name,$memberstr) = split ("\t",shift @vlans);
-      write;
-    }
-    $FORMAT_NAME = "STDOUT"; # Go back to the normal format
-  }
 
-  if ($powerop) {
-    foreach $outlet (@outlets) {
-      $device->power($powerop,$outlet);
-    }
-  }
-}
+    $FORMAT_NAME = 'vlanlist';
+    foreach $vlan_id (sort {tbsort($a,$b)} keys %vlans) {
+	my ($ddep,$memberref) = @{$vlans{$vlan_id}};
 
-sub getvlans {
-  if ( @vlanlist ) { return; }
-  @vlanlist = $device->listVlans;
-  foreach $entry (@vlanlist) {
-    my ($id,$name,$memberstr) = split ("\t", $entry);
-    $vlansbyname{$name} = $memberstr;
-    $vlanids{$name} = $id;
-    print "vlans: #$id -> $name -> $memberstr\n" if $debug;
-  }
-}
+	#
+	# Find which, if any, experiment this VLAN belongs to.
+	#
+	my $result = DBQueryFatal("select pid, eid, virtual from " .
+				  "vlans where id='$vlan_id'");
+	my ($eid,$pid);
+	($eid,$pid,$vname) = $result->fetchrow();
 
-sub vlanexists {
-  my $m = shift;
-  my $members = join(" ",sort @_);
-  print "Checking $m ($members)...\n" if $debug;
-  if (defined $vlansbyname{$m} && $vlansbyname{$m} eq $members) {
-    print "Found $m == $vlansbyname{$m}\n" if $debug;
-    return 1;
-  }
-  return 0;
-}
+	if (!$vname) { $vname = ""; }
+	$members = join(" ",@$memberref);
 
-sub vlannum {
-  my $n = shift;
-  print "Checking $n...\n" if $debug;
-  if (defined $vlanids{$n}) {
-    print "Found $n == $vlanids{$n}\n" if $debug;
-    return $vlanids{$n};
-  }
-  return 0;
-}
-
-sub ParseArgs {
-  local(*CMDS,*i,*p,*d,*e,*a,*dup,*spd,*s,*f,*l,*m,*vlan,*r,*u,*b,*c,*v,*g,
-	*powerop,*outlets) = @_;
-  my $help=0;
-  if (@main::CMDS < 1) {$help = 1; }
-  print "Command line was: snmpit ",join(" ",@ARGV),"\n" if $debug;
-  while (@CMDS != 0 && $CMDS[0] =~ /^(-|\+)/) {
-    $_ = shift(@CMDS);
-    if (/^-i(.*)/) {$i = ($1 ? $1 : shift(@CMDS));}
-    elsif (/^-p(.*)/) {
-      my $Range ="";
-      do {
-	$Range = ($1 ? $1 : shift(@CMDS));
-	#print "Range=$Range\n";
-	if ( $Range =~ /^(\d*)\.\.(\d*)$/ ) {
-	  #print "1Pushing ",$1..$2,"*\n";
-	  push(@p, $1..$2);
+	#
+	# Setup $pideid for a more compact display
+	#
+	if ($eid && $pid) {
+	    $pideid = "$eid/$pid";
 	} else {
-	  #print "2Pushing ",$Range,"*\n";
-	  push(@p, $Range);
+	    $pideid = "";
 	}
-      }
-      while (@CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) );
+	write;
     }
-    elsif (/^-debug(.*)/) {
-      if ( defined($CMDS[0]) && !($CMDS[0] =~ /^-/)) { 
-	shift (@CMDS); # possibly ignore number
-      }
-      $v=1; # debug is already set, so don't do it here
-    }
-    elsif (/^-h(.*)/) {$help = 2;}
-    elsif (/^-off(.*)/) {$powerop = "off";}
-    elsif (/^-on(.*)/) {$powerop = "on";}
-    elsif (/^-cyc(.*)/) {$powerop = "cycle";}
-    elsif (/^-a(.*)/) {$a="enable";}
-    elsif (/^-dup(.*)/) {$dup = ($1 ? $1 : shift(@CMDS));}
-    elsif (/^-spd(.*)/) {$spd = ($1 ? $1 : shift(@CMDS));}
-    elsif (/^-n(.*)/) {$n = ($1 ? $1 : shift(@CMDS));}
-    elsif (/^-d(.*)/) {$d = 1;}
-    elsif (/^-e(.*)/) {$e = 1;}
-    elsif (/^-s(.*)/) {$s = 1;}
-    elsif (/^-g(.*)/) {$g = 1;}
-    elsif (/^-l(.*)/) {$l = 1;}
-    elsif (/^-u(.*)/) {$u = 1;}
-    elsif (/^-f(.*)/) {$f = ($1 ? $1 : shift(@CMDS));}
-    elsif (/^-t(.*)/) {$t = 1; $pid = ($1 ? $1 : shift(@CMDS));
-		       $eid = shift(@CMDS); }
-    elsif (/^-reset(.*)/) {$reset = 1; $pid = ($1 ? $1 : shift(@CMDS));
-			   $eid = shift(@CMDS); }
-    elsif (/^-m(.*)/) {$m = ( !(@CMDS==0 || $CMDS[0] =~ /^(-|\+)(.*)/) ?
-			      ($1 ? $1 : shift(@CMDS)) : "");}
-    elsif (/^-vlan(.*)/) {
-      push(@vlan, ($1 ? $1 : shift(@CMDS)));
-      while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) {
-	push(@vlan, shift(@CMDS));
-      }
-    }
-    elsif (/^-r(.*)/) {
-      my @tmp = ();
-      @r = ();
-      push(@tmp, ($1 ? $1 : shift(@CMDS)));
-      while ( @CMDS>0 && ! ($CMDS[0] =~ /^(-|\+)(.*)/ ) ) {
-	push(@tmp, shift(@CMDS));
-      }
-      foreach $n (@tmp) {
-	if ($n =~ /^[0-9]+$/) { push(@r, $n); }
-      }
-      print "remove: '@r' ($#r)\n" if $debug;
-      if ($#r < 0) { die("Which VLANs should I remove?\n"); }
-      if (join(" ",@r) =~ /[^0-9 ]/) { die("Removal list '@r' invalid.\n"); }
-    }
-    elsif (/^-v(.*)/) {$v = 1;}
-    elsif (/^-b(.*)/) {$b = 0;}
-    elsif (/^\+b(.*)/) {$b = 1;}
-    elsif (/^-c(.*)/) {$c = 0;}
-    elsif (/^\+c(.*)/) {$c = 1;}
-    elsif (/^-([1-8])$/) { push(@outlets, $1);}
-    else {die("Unknown Option: $_\n");}
-  }
-  #print "Done\ni=$i p=",@p," d=$d e=$e a=$a dup=$dup s=$spd s=$s f=$f l=$l",
-  #  "m=$m vlan=",@vlan," r=",@r,"u=$u b=$b c=$c v=$v g=$g ".
-  #  "powerop=$powerop\n" if $debug;
-  if ($help) {
-    print
-      "snmpit - A general purpose SNMP tool\n",
-      "Syntax:\n",
-      " snmpit [-h] [-v] -i<ip>\n",
-      "\t[-u] [-l] [-f<filename>] [-m<vlan name>] [-vlan<port>]\n",
-      "\t[-t <pid> <eid>] [-reset <pid> <eid>] [-r<vlan #> <vlan #> ... ]\n",
-      "\t[+b|-b] [+c|-c] [-g] [-s] [-p <port> <port x>..<port y> ... ]\n",
-      "\t[-d|-e] [-a] [-spd<speed>] [-dup<duplex>] [-n<vlan #>]\n";
-    # Hidden Power control functionality
-    # "\t[ [-on|-off|-cycle] | [-<n>] ]\n";
-  }
-  if ($help > 1) {
-    print
-      "\nGeneral:\n",
-      "  -h     Display this help message\n",
-      "  -v     Verbose mode (now ",($v?"on":"off"),")\n",
-      "  -i     IP address or switch name\n",
-      "\nVLAN Control:\n",
-      "  -u     Wait for Update of VLAN tables (takes ~10 seconds)\n",
-      "  -l     List all VLANs on switch (ell, not #1)\n",
-      "  -m     Make a VLAN called <name> (optional)\n",
-      "  -vlan  Put ports in new VLAN (may be <node>:<if> or MAC)\n",
-      "  -f     File mode - Automatically set up group of VLANs\n",
-      "  -t     Use Table in database to set up VLANs for pid/eid\n",
-      "  -reset Reset VLAN(s) for nodes in pid/eid\n",
-      "  -r     Remove VLAN(s) (specify VLAN number)\n",
-      "\nPort Control:\n",
-      "  +b/-b  Blocking mode (now ",($b?"on":"off"),")\n",
-      "  +c/-c  Confirm Changes (now ",($c?"on":"off"),")\n",
-      "  -g     Get Statistics\n",
-      "  -s     Show Port Configurations\n",
-      "  -p     List of port numbers and ranges (port = <node>:<if>)\n",
-      "  -d     Disable port(s)\n",
-      "  -e     Enable port(s)\n",
-      "  -a     Enable Port Auto-Negotiation of speed/duplex\n",
-      "  -spd   Port Speed (10 or 100 Mbits)\n",
-      "  -dup   Port Duplex (half or full)\n",
-      "  -n     Change port VLAN #\n";
-    # Hidden Power control functionality
-    # "  -on   Turn on outlets\n",
-    # "  -off  Turn off outlets\n",
-    # "  -cycle  Power Cycle outlets\n",
-    # "  -(n)  Outlet #(n) (n=1-8)\n";
-  }
-  #Unused letters of the alphabet:
-  # j, k, q, w, x, y, z
-  #
-  #If help only, end here...
-  die("\b\n") if ($help);
-  #Now die on any combinations that don't make sense...
-  die("What shall I do?\n")
-    if (!($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||$t||$reset||@r||$l
-	  ||$powerop));
-  die("Can't enable and disable at the same time.\n") if ($d && $e);
-  die("Can't use auto with duplex or speed.\n") if(($a=~/en/)&&($dup||$spd)); 
-  die("Which ports do I control?\n") if (!@p&&($d||$e||$dup||$spd||$a||$n));
-  $dup = "\L$dup\E";		#lowercase it all...
-  die("Invalid duplex $dup: Must be full or half\n")
-    if(!($dup=~/^full$|^half$|^$/));
-  die("Invalid speed $spd: Must be 10 or 100\n")
-    if (!($spd=~/^10$|^100$|^0$/));
-  if (defined($spd) && ($spd != 0)) { $spd= "${spd}mbit"; }
-  die("Only one of -f, -t, -reset, and -vlan may be used.\n")
-    if (($f && @vlan) || ($reset && $t) || ($t && @vlan) ||
-	($reset && @vlan) || ($f && $t) || ($f && $reset));
-  die("Project and expt must be specified with -t: '-t <pid> <eid>'\n")
-    if ($t && ((!defined $pid) || (!defined $eid)));
-  die("Project and expt must be specified with -reset: '-reset <pid> <eid>'\n")
-    if ($reset && ((!defined $pid) || (!defined $eid)));
-  # If everything is okay so far, initialize snmpit_lib
-  snmpit_lib::init($DBNAME, $debug);
 
-  if ($t || $reset) {
-    if ( ! vlanid("$pid:$eid")) {
-      print "There were no VLANs in the database table for '$pid' '$eid'\n";
-      exit(0);
-    } else {
-      foreach $id ( split(" ",vlanid("$pid:$eid")) ) {
-	my $members = vlanmemb($id);
-	$vlantable{$id} = $members;
-	print "id: $id\t$members\n" if $debug;
-	foreach $node (split (" ",$members)) {
-	  if (!defined macport($node)) {
-	    die("Invalid node found in VLANs table: '$node'\n");
-	  }
-	}
-      }
-    }
-  }
-
-  if (!defined($i)||!$i||$i eq "") {
-      if ($t || $reset) {
-	  # When creating and deleteing VLANs, we look at a random node to
-	  # figure out which switch to contact. XXX: This does NOT work
-	  # for experiments using multiple switches
-	  my $nodes = $vlantable{(keys %vlantable)[0]};
-	  my $node = (split(" ",$nodes))[0];
-	  my $switch = (split(":",portnum($node)))[0];
-	  print "Using switch $switch\n";
-	  $i = $switch;
-      } else {
-	  # In other modes, we default to cisco1
-	  $i = "cisco1";
-      }
-  }
-  if ( defined Dev($i) ) {
-    if (! ($i =~ /[a-zA-Z]/) ) { $i = Dev($i); } # i is now name
-    print "Found device $i (",Dev($i),")..." if $debug;
-    if ( DevType($i) eq "cisco6509" ) {
-      print "Making new snmpit_cisco\n" if $debug;
-      $device = new snmpit_cisco
-	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-#    elsif ( DevType($i) eq "intel510t") {
-#      print "Making new snmpit_intel\n" if $debug;
-#      $device = new snmpit_intel
-#	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-    } elsif (DevType($i) eq "APC") {
-      print "Making new snmpit_apc\n" if $debug;
-      $device = new snmpit_apc
-	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-    } else { die("Unknown device '$i'.\n"); }
-  } else {
-    die ("'$i' is not a known device.\n");
-  }
-  if ($debug) {
-    if (ref($device)) {
-      print "Checking type:\n";
-      print $device->isa(snmpit_intel)||"0"," for intel\n";
-      print $device->isa(snmpit_cisco)||"0"," for cisco\n";
-      print $device->isa(snmpit_apc)||"0"," for APC\n";
-    } else { print "Type '$device' is not a ref!\n"; }
-  }
-  if ( $i =~ /[a-zA-Z]/) { $i = Dev($i); }
-  die("\"$i\" is not a switch. Illegal operation requested.\n")
-    if ( ($device->isa(snmpit_apc) )  &&
-	 ($d||$e||$a||$spd||$dup||$n||$s||$g||@vlan||$f||@r||$l));
-  die("\"$i\" is not a power controller.\n")
-    if (! $device->isa(snmpit_apc) && ($powerop || @outlets) );
-  my $num=0;
-  if ($device->isa(snmpit_intel)) {
-    while( @p != 0 && $num < @p ) {
-      die("Invalid port ",$p[$num],": Must be 1-24\n")
-	if ($p[$num] =~ /\D/ || $p[$num]>24 || $p[$num]<1);
-      $num++;
-    }
-  }
-  print "original ports: \t@p\n" if ($debug && @p);
-  @p = map(lc,@p);
-  @p = map {
-    my $orig = $_;
-    my $pnum = 0;
-    if ($_ =~ /^[0-9\.]+$/) { $_ = portnum($i.":$_"); }
-    if (!defined $_) {
-      die("Invalid port '$orig' not known. Try '<node>:<if>'.\n");
-    }
-    print "$_ => ",macport($_)," => ",portnum($_),"\n" if $debug;
-    if (defined portnum($_)) {
-      @_ = split(":", portnum($_));
-      $pnum = $_[1];
-    } else { die("Invalid port '$orig' not known. Try 'pcX:Y'.\n"); }
-    if (! NodeCheck($_) ) { die("You are not authorized to control $_.\n"); }
-    $_;
-  } @p;
-  print "translated ports: \t@p\n" if ($debug && @p);
-  $num=0;
-  while(@vlan != 0 && $num < @vlan) {
-    $vlan[$num] = lc $vlan[$num];
-    print "Checking node $vlan[$num] for validity...\n" if $debug;
-    if (defined macport($vlan[$num])) {
-      if ($vlan[$num]=~/^([a-f]|\d)*$/i) {
-	$vlan[$num]=macport($vlan[$num]);
-      }
-      print "Found node $vlan[$num]\n" if $debug;
-    } else {
-      # Allow people to specify addresses with colons or dots
-      $vlan[$num] =~ s/[:\.]//g;
-      if (defined macport($vlan[$num])) {
-	$vlan[$num]=macport($vlan[$num]);
-	print "Found node $vlan[$num]\n" if $debug;
-      } else {
-	die("Invalid VLAN member '$vlan[$num]': must be 'pcX:Y' or MAC.\n");
-      }
-    }
-    $num++;
-  }
-  if ($powerop) {
-    $num=0;
-    while(@outlets != 0 && $num < @outlets) {
-      die("Invalid Outlet \"",$outlets[$num],"\": Must be 1 to 8.\n")
-	if (! ($outlets[$num]=~ /^[1-8]$/ ));
-      $num++;
-    }
-  }
+    return 0;
 }
 
-sub ReadIRFile {
-  local(*f,*names,*VLANS) = @_;
-  my %exists = ();
-  my $skip = 1;
-  my $name = "";
-  print "Opening '$f' to read vlans...\n" if $debug;
-  if ( -e "$TB/etc/$f") {
-    open(IR,"$TB/etc/$f")
-      || die("Couldn't open $TB/etc/$f\n");
-  } elsif ( -e "$f" ) {
-    open(IR,"$f")
-      || die("Couldn't open $f\n");
-  } else {
-    die("Couldn't locate $f for VLAN setup.\n");
-  }
-  print "Opened $f for reading...\n" if $debug;
-  while (<IR>) {
-    chomp;
-    if ( /^\#/ ) { next; }	 #skip comments
-    if ( /^start vlan/i ) { $skip = 0 ; next; }
-    if ($skip) { next; }
-    if ( /^end vlan/i ) { $skip = 1 ; next; }
-    # If I'm in the right section, turn the line into a VLAN
-    my @v= split;
-    $name = shift @v;
-    my $num=0;
-    while (@v != 0 && $num < @v) {
-      $v[$num] = lc $v[$num];
-      print "Checking node $v[$num] for validity...\n" if $debug;
-      if (defined macport($v[$num])) {
-	if ($v[$num]=~/^([a-f]|\d)*$/i) {
-	  $v[$num]=macport($v[$num]);
-	  print "Found node $v[$num]\n" if $debug;
-	}
-      } else {
-	# Allow people to specify addresses with colons or dots
-	$v[$num] =~ s/[:\.]//g;
-	if (defined macport($v[$num])) {
-	  $v[$num]=macport($v[$num]);
-	  print "Found node $v[$num]\n" if $debug;
-	} else {
-	  die("Invalid VLAN member '$v[$num]': must be 'pcX:Y' or MAC.\n");
-	}
-      }
-      $num++;
+#
+# Lists all ports on all stacks
+#
+sub doListPorts() {
+
+    #
+    # Get a listing from all stacks
+    #
+    my @portList = ();
+    foreach my $stack (@stacks) {
+	push @portList, $stack->listPorts;
     }
-    @v = sort @v;
-    if (!defined $exists{ join(' ',@v) }) {
-      print "Read VLAN $name with: ",join (" ",@v),"\n" if $debug;
-      push( @VLANS, \@v);
-      push(@names, $name);
-      $exists{join(' ',@v)} = 1;
+
+    #
+    # See perlform(1) for help with formats
+    #
+    my ($port,$enabled,$up,$speed,$duplex);
+    print << "END";
+Port      Enabled Up   Speed      Duplex
+----------------------------------------
+END
+    format portlist =
+@<<<<<<<< @<<<<<< @<<< @<<<<<<<<< @<<<
+$port,    $enabled,$up,$speed,$duplex
+.
+    $FORMAT_NAME = 'portlist';
+    foreach my $line (sort {tbsort($$a[0],$$b[0])} @portList) {
+	($port,$enabled,$up,$speed,$duplex) = @$line;
+	write;
     }
-  }
-  close (IR);
+
+    return 0;
 }
+
+#
+# Get statistics for all ports on all stacks
+#
+sub doGetStats() {
+
+    #
+    # Get a listing from all stacks
+    #
+    my @statList = ();
+    foreach my $stack (@stacks) {
+	push @statList, $stack->getStats();
+    }
+
+    my ($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
+        $inunk, $outoctets, $outunicast, $outnunicast, $outdiscards,
+	$outerr,$outq);
+    #
+    # See perlform(1) for help with formats
+    #
+    print << "END";
+          In         InUnicast  InNUnicast In         In         Unknown    Out        OutUnicast OutNUcast  Out       Out         OutQueue
+Port      Octets     Packets    Packets    Discards   Errors     Protocol   Octets     Packets    Packets    Discards  Errors      Length
+---------------------------------------------------------------------------------------------------------------------------------------------
+END
+    format stats =
+@<<<<<<<< @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> @>>>>>>>>> 
+$port,    $inoctets, $inunicast,$innunicast,$indiscards,$inerr,  $inunk,    $outoctets,$outunicast,$outnunicast,$outdiscards,$outerr,$outq
+.
+    $FORMAT_NAME = 'stats';
+    foreach my $line (sort {tbsort($a,$b)} @statList) {
+	($port, $inoctets, $inunicast, $innunicast, $indiscards, $inerr,
+	 $inunk, $outoctets, $outunicast, $outnunicast, $outdiscards,
+	 $outerr, $outq) = @$line;
+	write;
+    }
+
+    return 0;
+}
+#
+# Creates all VLANs given. Looks up identifiers in the database to determine
+# the membership.
+#
+sub doVlansFromTables(@) {
+    my @vlans = @_;
+
+    my $errors = 0;
+
+    if (@stacks > 1) {
+	die "VLAN creation accross multiple stacks is not yet supported\n";
+    }
+    my ($stack) = @stacks;
+
+    foreach my $vlan (@vlans) {
+	if (!$stack->createVlan($vlan)) {
+    	    warn "ERROR: Failed to create VLAN with id $vlan\n";
+	    #
+	    # Don't try to put ports in a VLAN if it couldn't be created
+	    #
+	    $errors++;
+    	} else {
+	    my @ports = getVlanPorts($vlan);
+	    $errors += $stack->setPortVlan($vlan,@ports);
+	}
+    }
+
+    return $errors;
+}
+
+#
+# Remove all VLANs given from every switch in the stack. All ports in the
+# VLANs are removed, irrespective of what the database says membership should
+# be
+#
+sub doReset(@) {
+    my @vlans = @_;
+
+    my $errors = 0;
+    foreach my $vlan (@vlans) {
+	#
+	# Just remove the VLAN from evey satck on which it exists
+	#
+	foreach my $stack (@stacks) {
+	    if ($stack->vlanExists($vlan)) {
+		if (!$stack->removeVlan($vlan)) {
+		    $errors++;
+		}
+	    }
+	}
+    }
+    return $errors;
+}
+
+#
+# Create a vlan with name $vlan_name. It is not an error to try to create a
+# VLAN that already exists, as this can be used to add ports to an existing
+# VLAN. If ports are given, they are put into the VLAN.
+#
+sub doMakeVlan($@) {
+    my $vlan_name = shift;
+    my @ports = @_;
+
+    my $errors;
+
+    if (@stacks > 1) {
+	die "VLAN creation accross multiple stacks is not yet supported\n";
+    }
+    my ($stack) = @stacks;
+
+    #
+    # Create it if it doesn't already exist
+    #
+    if ($stack->vlanExists($vlan_name)) {
+	print "VLAN $vlan_name already exists\n";
+    } else {
+	print "Creating VLAN $vlan_name ...\n";
+	my $ok = $stack->createVlan($vlan_name);
+	print "VLAN creation ";
+	print $ok? "succeeded":"failed",".\n";
+	if (!$ok) {
+	    $errors++;
+	}
+    }
+
+    #
+    # Put requested ports into the VLAN
+    #
+    if (@ports) {
+	print "Putting ports in VLAN ...\n";
+	my $perrors = $stack->setPortVlan($vlan_name,@ports);
+	print "VLAN change ";
+	print $perrors? "failed":"succeeded",".\n";
+	$errors += $perrors;
+
+    }
+
+    return $errors;
+}
+
+#
+# Delete the given VLAN, if it exists
+#
+sub doDeleteVlan($) {
+    my $vlan_name = shift;
+
+    my $errors = 0;
+
+    my $exists = 0;
+    foreach my $stack (@stacks) {
+	if ($stack->vlanExists($vlan_name)) {
+	    $exists = 1;
+	    print "Deleting VLAN $vlan_name ...\n";
+	    my $ok = $stack->removeVlan($vlan_name);
+	    print "VLAN creation ";
+	    print $ok? "succeeded":"failed",".\n";
+	    if (!$ok) {
+		$errors++;
+	    }
+	}
+    }
+
+    if (!$exists) {
+	print "VLAN $vlan_name does not exist\n";
+	$errors++;
+    }
+
+    return $errors;
+}
+
+#
+# Send $command to @ports.
+# TODO: List of commands
+#
+sub doPortControl($@) {
+    my $command = shift;
+    my @ports = @_;
+
+    if (@stacks > 1) {
+	die "Port control accross multiple stacks is not yet supported\n";
+    }
+    my ($stack) = @stacks;
+
+    print "Applying command '$command' to ports " . join(",",@ports) . " ...\n";
+    my $errors = $stack->portControl($command,@ports);
+    print "Port command ";
+    print $errors? "failed":"succeeded",".\n";
+
+    return $errors;
+
+}
+

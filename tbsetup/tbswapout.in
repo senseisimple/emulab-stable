@@ -90,7 +90,7 @@ if (! SetExpState($pid, $eid, EXPTSTATE_SWAPPING)) {
 
 if (! $TESTMODE) {
     print "Clearing VLANs.\n";
-    if (system("snmpit -reset $pid $eid")) {
+    if (system("snmpit -r $pid $eid")) {
 	print STDERR "*** Failed to reset VLANs.\n";
 	$errors = 1;
     }

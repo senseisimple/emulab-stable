@@ -29,7 +29,8 @@ LIBEXEC_STUFF	= mkprojdir rmproj mkacct-ctrl rmacct-ctrl \
 		  webrmgroup webswapexp
 
 LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
-                  snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm
+                  snmpit_cisco.pm snmpit_lib.pm snmpit_apc.pm power_rpc27.pm \
+		  snmpit_cisco_stack.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through
