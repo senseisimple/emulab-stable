@@ -71,7 +71,7 @@ $ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 # Turn off line buffering on output
-$| = 1; 
+$| = 1;
 
 #
 # We don't want to run this script unless its the real version.
@@ -163,7 +163,10 @@ else {
 	    $node = $1;
 	}
 	else {
-	    die("Bad node name: $node.");
+	    die("Bad node name: $node\n");
+	}
+	if (!TBValidNodeName($node)) {
+	    die("Node does not exist: $node\n");
 	}
 
 	push(@nodes, $node);
@@ -250,7 +253,7 @@ if (!$realmode) {
 # Another shark hack. Well, perhaps not. We really don't want 50 nodes
 # all rebooting at the same time, PCs *or* sharks. Lets order them
 # so that the shelves are grouped together at least, and issue the reboots
-# in batches. 
+# in batches.
 #
 while (@sortednodes) {
     my @batch = ();
@@ -299,7 +302,7 @@ while (@sortednodes) {
 	}
     }
 
-    # 
+    #
     # If there are more nodes to go, then lets pause a bit so that we
     # do not get a flood of machines coming up all at the same exact
     # moment.
@@ -346,7 +349,7 @@ if (@needPowercycle) {
 
 #
 # Now do vnodes. Do these serially for now (simple).
-# 
+#
 for my $node ( keys(%virtnodes) ) {
     my $pnode = $virtnodes{$node};
 
@@ -365,8 +368,8 @@ if ($failed) {
 }
 
 #
-# Wait for nodes to reboot. We wait only once, no reboots. 
-# 
+# Wait for nodes to reboot. We wait only once, no reboots.
+#
 if ($waitmode) {
     my $waitstart = time;
 
@@ -392,7 +395,7 @@ exit $failed;
 #
 # Reboot a node in a child process. Return the pid to the parent so
 # that it can wait on all the children later.
-# 
+#
 sub RebootNode {
     my ($pc) = @_;
     my ($status, $syspid, $mypid, $didipod);
@@ -412,7 +415,7 @@ sub RebootNode {
     # See if the machine is pingable. If its not pingable, then we just
     # power cycle the machine rather than wait for ssh to time out.
     #
-    # ping returns 0 if any packets make it through. 
+    # ping returns 0 if any packets make it through.
     #
     if (! DoesPing($pc)) {
 	info("$pc appears dead: power cycle");
@@ -423,7 +426,7 @@ sub RebootNode {
 
     #
     # Machine is pingable at least. Try to reboot it gracefully,
-    # or power cycle anyway if that does not work. 
+    # or power cycle anyway if that does not work.
     #
     print STDERR "Trying ssh reboot of $pc ...\n" if $debug;
 
@@ -439,7 +442,7 @@ sub RebootNode {
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
     # some funky state.
-    # 
+    #
     $syspid = fork();
 
     if ($syspid) {
@@ -457,7 +460,7 @@ sub RebootNode {
 	#
 	# If either ssh is not running or it timed out,
 	# send it a ping of death.
-	# 
+	#
 	if ($? == 256 || $? == 15) {
 	    if ($? == 256) {
 		print STDERR "$pc is not running sshd.\n" if $debug;
@@ -480,7 +483,7 @@ sub RebootNode {
     }
 
     #
-    # Restore the old UID so that scripts run from this point on get the 
+    # Restore the old UID so that scripts run from this point on get the
     # user's real UID
     #
     $UID = $oldUID;
@@ -522,8 +525,8 @@ sub RebootNode {
 }
 
 #
-# Reboot a vnode in a child process, and wait for it. 
-# 
+# Reboot a vnode in a child process, and wait for it.
+#
 sub RebootVNode($$) {
     my ($vnode, $pnode) = @_;
     my $syspid;
@@ -534,7 +537,7 @@ sub RebootVNode($$) {
     # Run an ssh command in a child process, protected by an alarm to
     # ensure that the ssh is not hung up forever if the machine is in
     # some funky state.
-    # 
+    #
     $syspid = fork();
 
     if ($syspid) {
@@ -552,7 +555,7 @@ sub RebootVNode($$) {
 
 	#
 	# Look for setup failure, reported back through ssh.
-	# 
+	#
 	if ($exitstatus) {
 	    if ($exitstatus == 256) {
 		print STDERR "$pnode is not running sshd.\n" if $debug;
@@ -586,7 +589,7 @@ sub PowerCycle {
 
 #
 # Wait until a machine stops returning ping packets.
-# 
+#
 sub WaitTillDead {
     my ($pc) = @_;
 
@@ -625,7 +628,7 @@ sub DoesPing {
     # Returns 0 if any packets are returned. Returns 2 if pingable
     # but no packets are returned. Other non-zero error codes indicate
     # other problems.  Any non-zero return indicates "not pingable" to us.
-    # 
+    #
     print STDERR "$ping $pc returned $status\n" if $debug;
     if ($status) {
 	return 0;
