@@ -180,3 +180,105 @@ if it exceeds some thresshold, and then ramp it back up a bit over time?
 (super aggressive tcp)
 
   -dave
+
+From testbed-request  Fri May 10 12:34:34 2002
+Return-Path: <stoller@stoller.casco.net>
+Received: from clark.casco.net (clark.pioneer.net [204.119.56.2])
+	by fast.cs.utah.edu (8.9.1/8.9.1) with ESMTP id MAA19435
+	for <testbed@fast.cs.utah.edu>; Fri, 10 May 2002 12:34:34 -0600 (MDT)
+Received: from stoller.casco.net (stoller.casco.net [204.119.59.136])
+	by clark.casco.net (Postfix) with ESMTP
+	id 9036DCF5E2; Fri, 10 May 2002 11:34:30 -0700 (PDT)
+Received: (from stoller@localhost)
+	by stoller.casco.net (8.11.3/8.11.0) id g4AIYUY46479;
+	Fri, 10 May 2002 11:34:30 -0700 (PDT)
+	(envelope-from stoller@stoller.casco.net)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Transfer-Encoding: 7bit
+Message-ID: <15580.4790.185138.434691@stoller.casco.net>
+Date: Fri, 10 May 2002 11:34:30 -0700
+From: Leigh Stoller <stoller@fast.cs.utah.edu>
+To: Testbed Project <testbed@fast.cs.utah.edu>
+Cc: Jay Lepreau <lepreau@cs.utah.edu>
+Subject: Frisbee and Multicast
+X-Mailer: VM 6.92 under Emacs 20.7.1
+Status: O
+X-Status: 
+X-Keywords:                  
+X-UID: 1193
+
+Found this site: http://www.roads.lut.ac.uk/DS-Archive/MTP.html
+
+Scanned a few papers, and found one that was interesting:
+
+   http://www.cse.ucsc.edu/research/ccrg/publications/brian.icnp.ps.gz
+
+Brian Neil Levine and J.J. Garcia-Luna-Aceves,``A Comparison of Known
+Classes of Reliable Multicast Protocols,'' Master's Thesis, Computer
+Engineering, University of California, Santa Cruz, CA 95064, June
+1996. Or a shorter version to appear in Proc. International Conference
+on Network Protocols (ICNP-96) October 1996.
+http://www.cse.ucsc.edu/research/ccrg/publications/brian.icnp.ps.gz
+
+I read the paper. Its an okay paper, but it hits the highpoints and is a
+reasonable survey. I have no idea if ICNP-96 is a respectable conference.
+
+Main points below. NOTE THE DIRECT QUOTATION! The thing to note about
+it is that both versions of Frisbee (old/new) use a receiver-initiated
+approach, although I think mine is more classically receiver-initiated
+than Chad's. Mine is also less synchronous.
+
+"There are two main classes of multicast protocols: sender-initiated
+and receiver-initiated. In sender initiated, the sender maintains the
+state of all receivers to whom it has sent data and from whom it is
+expecting ACKs. Each sender's transmission or retransmission is
+multicast to all receivers; for each packet that each receiver obtains
+correctly, it sends a unicast ACK back to the sender. In contrast, in
+the receiver initiated approach, each receiver informs the sender of
+the information that is in error or missing; the sender multicasts all
+packets, giving priority to retransmissions, and a reciever sends a
+NACK when it detects an error or lost packet."
+
+"The first comparative analysis of sender-initiated and
+reciever-initiated reliable multicast protocols was presented in
+[15,16]. This analysis showed that reciever-initiated protocols are
+far more scalable than sender-initiated protocols because the maximum
+throughput of sender-initiated protocols is dependent on the number of
+recievers, while the maximum throughput of reciever-initiated
+protocols is *independent* [my emphasis] of the number of recievers
+(when the probability of lacket loss is low). However, as this paper
+demonstrates, the reciever-initiated protocols to date cannot prevent
+deadlock when they operate with finite memory."
+
+It goes on to talk about ACK implosion of sender-initiated protocols
+being a big problem. The issue of finite memory (at the sender) is not
+really a problem for us since we are not doing general multicast bulk
+transfer (say, delivering 100s of different files), but instead are
+more constrained. We also do not buffer much data at the sender, but
+instead read directly from the disk since the time to decompress and
+write to the raw device at the receiver, is ultimately the bottleneck.
+Besides, we depend on the buffer cache to do the caching at the
+sender, although since we are reading randomly, we may not get much
+benefit there. May not matter though.
+
+They also talk about NACK implosion in receiver-based protocols, where a
+lost packet results in a NACK from every receiver. One solution to this
+problem is to multicast NACKs so that other receivers see them, and refrain
+from sending their own NACK for a time (random amount). We might benefit
+from this if we get to very large scale experiments (100s of nodes that
+need disk reloading). My solution to this problem was a little different.
+Receivers backoff when NACKS go unanswered (new data not received within a
+set period of time). At the sender, I keep a time ordered list of packets
+that need to be sent, and if a NACK arrives requesting data already on the
+queue, I do not do anything cause the data is going to get sent soon.
+However in the presence of lost NACKS (unlikely in the local area case),
+the other solution they talk about is probably better. 
+
+Then there are several pages of formulas which I prudently skipped
+right over without looking at. Table 1 might be interesting though.
+
+The ultimate conclusion is that tree based multicast is best ...
+
+Lbs
+
