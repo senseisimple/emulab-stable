@@ -4812,6 +4812,11 @@ COMMAND_PROTOTYPE(dorusage)
 			    " (node_id, status, status_timestamp) "
 			    " values ('%s', 'up', now())",
 			    reqp->pnodeid);
+
+		mydb_update("replace delayed into node_status "
+			    " (node_id, status, status_timestamp) "
+			    " values ('%s', 'up', now())",
+			    reqp->vnodeid);
         }
 
 	/*
