@@ -126,6 +126,10 @@ C. What to do on boss:
 	  then do these:
 	  sudo touch /var/log/tiplogs/pcN.log
 	  sudo touch /var/log/tiplogs/pcN.run
+   - capture: on ops, edit /usr/site/etc/capture.rc:
+	  add a line like this:
+	  /usr/site/bin/capture -r -s 115200 pcN tty<port#> >/dev/null 2>&1 &
+
 
 D. How to get the first image on it:
 ------------------------------------
