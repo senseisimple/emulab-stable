@@ -33,7 +33,7 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 echo "<center><h3>
-      Here is a list of research groups using Emulab.Net
+      Here is a list of research groups actively using Emulab.Net
       </h3></center>\n";
 
 echo "<table width=\"100%\" border=0 cellpadding=2 cellspacing=2
