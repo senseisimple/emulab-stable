@@ -1734,3 +1734,10 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table experiments add modelnetedge_osname varchar(20) \
 		default NULL after modelnetcore_osname;
 
+1.262: Change the current_speed enum in the interfaces table to allow "0"
+       as a legal value; when interfaces are not in use, set the speed
+       to 0.
+
+	alter table interfaces change current_speed \
+              current_speed enum('0','10','100','1000') \
+	      NOT NULL default '0';
