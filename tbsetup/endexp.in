@@ -256,8 +256,11 @@ else {
 #
 # Done! Remove all trace from the DB.
 # 
-DBQueryFatal("DELETE from experiments ".
-	     "WHERE eid='$eid' and pid='$pid'");
+DBQueryWarn("DELETE from experiments ".
+	    "WHERE eid='$eid' and pid='$pid'");
+
+DBQueryWarn("DELETE from nsfiles ".
+	    "WHERE eid='$eid' and pid='$pid'");
 
 print STDOUT "Termination Success\n";
 

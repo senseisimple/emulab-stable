@@ -304,6 +304,25 @@ if ($infodir =~ /^([-\@\w.]+)$/) {
 }
 
 #
+# Shove a copy of the NS file into the DB to make Mike happy.
+#
+$nsfile_string = `cat $nsfile`;
+
+if ($nsfile_string) {
+    $nsfile_string = $DB->quote($nsfile_string);
+
+    $DB->query("delete from nsfiles WHERE eid='$eid' and pid='$pid'");
+
+    #
+    # I could strlen check the string, but the webserver has a limit,
+    # plus the DB is going to truncate it if its longer. Doing it here
+    # would be a third (call it redundant) check. 
+    # 
+    $DB->query("insert into nsfiles (pid, eid, nsfile) ".
+	       "VALUES('$pid', '$eid', $nsfile_string)");
+}
+
+#
 # In batch mode, just exit without sending email. Remove tempns file!
 #
 if ($batch) {

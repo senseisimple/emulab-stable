@@ -5,7 +5,7 @@ include("showstuff.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Show Experiment Information");
+PAGEHEADER("Show me the NS File");
 
 #
 # Only known and logged in users can end experiments.
@@ -55,35 +55,16 @@ if (!$isadmin) {
     }
 }
 
-# Terminate option.
-echo "<p><center>
-       Do you want to terminate this experiment?
-       <A href='endexp.php3?exp_pideid=$exp_pid\$\$$exp_eid'>Yes</a>
-      </center><br>\n";    
+$query_result = mysql_db_query($TBDBNAME,
+       "SELECT nsfile from nsfiles where pid='$exp_pid' and eid='$exp_eid'");
+if (!$query_result ||
+    mysql_num_rows($query_result) == 0) {
+    USERERROR("There is no stored NS file for $exp_pid/$exp_eid", 1);
+}
+$row    = mysql_fetch_array($query_result);
+$nsfile = $row[nsfile];
 
-#
-# Dump experiment record.
-# 
-SHOWEXP($exp_pid, $exp_eid);
-
-# NS File option
-echo "<p><center>
-       Do you want to see the
-       <A href='shownsfile.php3?exp_pideid=$exp_pid\$\$$exp_eid'>NS file?</a>
-      </center>\n";
-
-#
-# Dump the node information.
-#
-SHOWNODES($exp_pid, $exp_eid);
-    
-#
-# Lets dump the project information too.
-#
-echo "<center>
-      <h3>Project Information</h3>
-      </center>\n";
-SHOWPROJECT($exp_pid, $uid);
+echo "<XMP>$nsfile</XMP>\n";
 
 #
 # Standard Testbed Footer

@@ -9,12 +9,16 @@ package libdb;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-  qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
-       NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
-       NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
-       PROJMEMBERTRUST_TRUSTED TBAdmin NodeAccessCheck ProjMember ExpLeader
-       MarkNodeDown SetNodeBootStatus OSFeatureSupported IsShelved
-       NodeidToExp UIDInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal );
+    qw ( NODERELOADING_PID NODERELOADING_EID NODEDEAD_PID NODEDEAD_EID
+	 NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
+	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
+	 PROJMEMBERTRUST_TRUSTED DBLIMIT_NSFILESIZE
+
+	 TBAdmin NodeAccessCheck ProjMember ExpLeader MarkNodeDown
+	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp
+	 UIDInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBQuoteSpecial
+
+	 );
 
 # Configure variables
 my $TB		= "@prefix@";
@@ -54,6 +58,11 @@ sub NODESTARTSTATUS_NOSTATUS()	{ "none"; }
 sub PROJMEMBERTRUST_NONE()	{ 0; }
 sub PROJMEMBERTRUST_USER()	{ 1; }
 sub PROJMEMBERTRUST_TRUSTED()	{ 2; }
+
+#
+# We should list all of the DB limits.
+#
+sub DBLIMIT_NSFILESIZE()	{ (1024 * 16); }
 
 #
 # Test admin status. Optional argument is the UID or Name to test. If not
@@ -453,7 +462,7 @@ sub DBWarn($)
 #
 # Same as above, but die after the warning.
 # 
-# usage: DBFatal(char *message)
+# usage: DBFatal(char *message);
 #
 sub DBFatal($)
 {
@@ -462,6 +471,20 @@ sub DBFatal($)
     DBWarn($message);
 
     exit(1);
+}
+
+#
+# Quote a string for DB insertion.
+#
+# usage: DBQuoteSpecial(char *string);
+#
+sub DBQuoteSpecial($)
+{
+    my($string) = $_[0];
+
+    $string = $DB->quote($string);
+
+    return $string;
 }
 
 1;
