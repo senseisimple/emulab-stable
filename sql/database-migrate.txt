@@ -919,3 +919,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
        alter table users add notes text after wideareajailroot;
 
+1.178: Add a table to contain auxiliary types for nodes.
+
+       create table node_auxtypes (node_id varchar(10) not null, type \
+       		varchar(30) not null, count int default 1, primary \
+		key(node_id,type));

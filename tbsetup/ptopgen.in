@@ -115,6 +115,17 @@ while (my ($type, $feature, $weight) = $result->fetchrow()) {
 }
 
 #
+# Read in the node_auxtypes table for each node.
+#
+$result = DBQueryFatal("select node_id, type, count from node_auxtypes");
+while (my ($node_id, $type, $count) = $result->fetchrow()) {
+    if (! defined($auxtypes{$node_id})) {
+	$auxtypes{$node_id} = ["$type:$count"];
+	next;
+    }
+    push @{$auxtypes{$type}}, " $type:$count";
+}
+#
 # Read the permission table if given a pid. If there is an entry in
 # the table for a type/class, then permission is granted only if there
 # is a record with the pid. If not, remove the permission granted above.
@@ -237,6 +248,13 @@ foreach $node (keys(%nodes)) {
 	### and therefore we can support sim nodes
 	#################################################################
 	push @types, "sim:100000";
+    }
+
+    #
+    # Add any auxiliary types
+    #
+    if ($auxtypes{$node}) {
+	push @types, @{$auxtypes{$node}};
     }
 
     if ($virtstuff && $virtnode_capacity > 0) {

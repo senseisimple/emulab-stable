@@ -2,7 +2,7 @@
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
--- Server version	3.23.54-log
+-- Server version	3.23.52-log
 
 --
 -- Table structure for table 'cdroms'
@@ -654,6 +654,17 @@ CREATE TABLE node_activity (
   last_ext_act datetime NOT NULL default '0000-00-00 00:00:00',
   last_report datetime NOT NULL default '0000-00-00 00:00:00',
   PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table 'node_auxtypes'
+--
+
+CREATE TABLE node_auxtypes (
+  node_id varchar(10) NOT NULL default '',
+  type varchar(30) NOT NULL default '',
+  count int(11) default '1',
+  PRIMARY KEY  (node_id,type)
 ) TYPE=MyISAM;
 
 --
