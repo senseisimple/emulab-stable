@@ -148,7 +148,7 @@ if (! isset($go)) {
 	if (! ($fp = fopen($nsfile, "w"))) {
 	    TBERROR("Could not create temporary file $nsfile", 1);
 	}
-	$nsdata_string = urldecode($nsdata);
+	$nsdata_string = $nsdata;
 	fwrite($fp, $nsdata_string);
 	fclose($fp);
 	chmod($nsfile, 0666);	
