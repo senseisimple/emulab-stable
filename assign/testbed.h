@@ -52,6 +52,8 @@ public:
 	testedge();
 	virtual ~testedge();
 
+        inline int number() { return number_; }
+    	inline void number(int newnum) { number_ = newnum; }
 	inline int capacity() { return capacity_; }
 	inline void capacity(int newcap) { capacity_ = newcap; }
 
@@ -69,7 +71,7 @@ public:
 
 private:
 	int capacity_;
-
+        int number_;
 };
 
 /*
@@ -84,5 +86,6 @@ typedef GRAPH<testnode, testedge> tbgraph;
 
 void parse_top(tbgraph &G, istream& i);
 void parse_ir(tbgraph &G, istream& i);
+void parse_ptop(tbgraph &G, istream& i);
 
 
