@@ -373,6 +373,15 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     echo "</table>\n";
     echo "</form>\n";
 
+    #
+    # On the advanced form, give a link to the link information, too
+    #
+    if ($advanced) {
+	echo "<h4>You can also take a look at the " .
+	     "<a href=widearea_nodeinfo.php3>widearea node link metrics</a> " .
+	     "</h4>\n";
+    }
+
     PAGEFOOTER();
 }
 
