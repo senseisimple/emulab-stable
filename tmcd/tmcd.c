@@ -1025,7 +1025,8 @@ COMMAND_PROTOTYPE(doaccounts)
 	row = mysql_fetch_row(res);
 	while (nrows) {
 		MYSQL_ROW	nextrow;
-		int		i, root = 0;
+		MYSQL_RES	*pubkeys_res;	
+		int		pubkeys_nrows, i, root = 0;
 		int		auxgids[128], gcount = 0;
 		char		glist[BUFSIZ];
 
@@ -1112,7 +1113,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				row[0], row[1], row[2], gidint, root, row[3],
 				USERDIR, row[0], glist);
 		}
-		else {
+		else if (vers == 4) {
 			snprintf(buf, sizeof(buf) - 1,
 				"ADDUSER LOGIN=%s "
 				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
@@ -1123,6 +1124,14 @@ COMMAND_PROTOTYPE(doaccounts)
 				row[9] ? row[9] : "",
 				row[10] ? row[10] : "");
 		}
+		else {
+			sprintf(buf,
+				"ADDUSER LOGIN=%s "
+				"PSWD=%s UID=%s GID=%d ROOT=%d NAME=\"%s\" "
+				"HOMEDIR=%s/%s GLIST=\"%s\"\n",
+				row[0], row[1], row[2], gidint, root, row[3],
+				USERDIR, row[0], glist);
+		}
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 
@@ -1130,10 +1139,43 @@ COMMAND_PROTOTYPE(doaccounts)
 		     "ADDUSER LOGIN=%s "
 		     "UID=%s GID=%d ROOT=%d GLIST=%s\n",
 		     row[0], row[2], gidint, root, glist);
+
+		if (vers < 5)
+			goto skipkeys;
+
+		/*
+		 * Need a list of keys for this user.
+		 */
+		pubkeys_res = mydb_query("select comment,pubkey "
+					 " from user_pubkeys "
+					 "where uid='%s'",
+					 2, row[0]);
+	
+		if (!pubkeys_res) {
+			error("ACCOUNTS: %s: DB Error getting keys\n", row[0]);
+			goto skipkeys;
+		}
+		if ((pubkeys_nrows = (int)mysql_num_rows(pubkeys_res))) {
+			while (pubkeys_nrows) {
+				MYSQL_ROW	pubkey_row;
+
+				pubkey_row = mysql_fetch_row(pubkeys_res);
+
+				sprintf(buf, "PUBKEY LOGIN=%s KEY=\"%s\"\n",
+					row[0], pubkey_row[1]);
+			
+				client_writeback(sock, buf, strlen(buf), tcp);
+				pubkeys_nrows--;
+
+				info("ACCOUNTS: PUBKEY LOGIN=%s COMMENT=%s\n",
+				     row[0], pubkey_row[0]);
+			}
+		}
+		mysql_free_result(pubkeys_res);
+	skipkeys:
 		row = nextrow;
 	}
 	mysql_free_result(res);
-
 	return 0;
 }
 
