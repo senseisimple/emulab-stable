@@ -6,14 +6,13 @@ include ../GNUmakerules
 
 SUBDIRS		= checkpass
 SCRIPTS		= mkprojdir_wrapper tbdoit tbstopit mkexpdir \
-		  delay_setup ifc_setup ifc_filegen \
-		  ir2ifc power resetvlans savevlans snmpit tbend \
+		  power resetvlans savevlans snmpit tbend \
 		  tbrun tbprerun tbreport vpower vsnmpit killtip \
 		  mkacct-ctrl_wrapper rmacct-ctrl_wrapper rmprojdir_wrapper \
 		  sched_reload os_setup
-DATAFILES	= default.ifc
-SUSCRIPTS	= mkprojdir rmprojdir os_setup mkacct rmacct \
-	          mkacct-ctrl rmacct-ctrl ifc_setup os_load console_setup
+DATAFILES	= 
+SUSCRIPTS	= mkprojdir rmprojdir os_setup  \
+	          mkacct-ctrl rmacct-ctrl os_load console_setup
 SBINSCRIPTS     = console_setup.proxy
 
 all:	$(BINS) $(SUBDIRS)
@@ -72,14 +71,6 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/rmacct-ctrl
 	chown root $(INSTALL_LIBTBDIR)/rmacct-ctrl
 	chmod u+s $(INSTALL_LIBTBDIR)/rmacct-ctrl
-	chown root $(INSTALL_BINDIR)/mkacct
-	chmod u+s $(INSTALL_BINDIR)/mkacct
-	chown root $(INSTALL_LIBTBDIR)/mkacct
-	chmod u+s $(INSTALL_LIBTBDIR)/mkacct
-	chown root $(INSTALL_BINDIR)/rmacct
-	chmod u+s $(INSTALL_BINDIR)/rmacct
-	chown root $(INSTALL_LIBTBDIR)/rmacct
-	chmod u+s $(INSTALL_LIBTBDIR)/rmacct
 	chown root $(INSTALL_BINDIR)/os_setup
 	chmod u+s $(INSTALL_BINDIR)/os_setup
 	chown root $(INSTALL_LIBTBDIR)/os_setup
@@ -88,14 +79,6 @@ post-install:
 	chmod u+s $(INSTALL_BINDIR)/os_load
 	chown root $(INSTALL_LIBTBDIR)/os_load
 	chmod u+s $(INSTALL_LIBTBDIR)/os_load
-	chown root $(INSTALL_BINDIR)/ifc_setup
-	chmod u+s $(INSTALL_BINDIR)/ifc_setup
-	chown root $(INSTALL_LIBTBDIR)/ifc_setup
-	chmod u+s $(INSTALL_LIBTBDIR)/ifc_setup
-	chown root $(INSTALL_BINDIR)/delay_setup
-	chmod u+s $(INSTALL_BINDIR)/delay_setup
-	chown root $(INSTALL_LIBTBDIR)/delay_setup
-	chmod u+s $(INSTALL_LIBTBDIR)/delay_setup
 	chown root $(INSTALL_BINDIR)/console_setup
 	chmod u+s $(INSTALL_BINDIR)/console_setup
 	chown root $(INSTALL_LIBTBDIR)/console_setup

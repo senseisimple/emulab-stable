@@ -40,11 +40,7 @@ if {[file exists $scriptdir/ns2ir]} {
 
 set snmpit "$scriptdir/snmpit"
 set libir "$scriptdir/ir/libir.tcl"
-set ir2ifc "$scriptdir/ir2ifc"
-set ifcboot "$scriptdir/ifc_setup"
-set delay_setup "$scriptdir/delay_setup"
 set os_setup "$scriptdir/os_setup"
-set mkacct "$scriptdir/mkacct"
 
 source $libir
 namespace import TB_LIBIR::ir
@@ -61,7 +57,6 @@ set irFile [lindex $argv 2]
 set t [split $irFile .]
 set prefix [join [lrange $t 0 [expr [llength $t] - 2]] .]
 set logFile "$prefix.log"
-set ifcfile "$prefix.ifc"
 
 if {[catch "open $logFile a+" logFp]} {
     puts stderr "Could not open $logFile for writing."
