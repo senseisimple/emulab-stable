@@ -68,7 +68,7 @@ echo "<font size=+2><b>".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>".
      "</b></font>\n";
 echo "<br />\n";
-echo "<br />\n";
+#echo "<br />\n";
 
 if ($showevents) {
     echo "<b><a href='shownsfile.php3?pid=$pid&eid=$eid'>
@@ -87,32 +87,68 @@ elseif (TBEventCount($pid, $eid)) {
 #
 if (strcmp($expstate, $TB_EXPTSTATE_NEW) &&
     strcmp($expstate, $TB_EXPTSTATE_PRERUN)) {
-    echo "<br>
-          <blockquote><blockquote><blockquote><blockquote>
-            <img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center>
+    echo "<table cellpadding='0' cellspacing='0' border='0' class='stealth'>
+	    <tr><td class='stealth' width='32'>&nbsp;</td>
+            <td class='stealth'><center>
+		<img src='top2image.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=$detail' align=center />
 	    <h5>
-	      zoom:
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.00&detail=$detail'>100%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.12&detail=$detail'>112%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.25&detail=$detail'>125%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.50&detail=$detail'>150%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.75&detail=$detail'>175%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.00&detail=$detail'>200%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.50&detail=$detail'>250%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=3.00&detail=$detail'>300%</a>
-	      <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=4.00&detail=$detail'>400%</a>
-	      <br>";
+	      zoom: ";
+    if ($zoom == 1.00) { 
+	echo "<b>100%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.00&detail=$detail'>100%</a> ";
+    }
+    if ($zoom == 1.12) { 
+	echo "<b>112%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.12&detail=$detail'>112%</a> ";
+    }
+    if ($zoom == 1.25) { 
+	echo "<b>125%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.25&detail=$detail'>125%</a> ";
+    }
+    if ($zoom == 1.50) { 
+	echo "<b>150%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.50&detail=$detail'>150%</a> ";
+    }
+    if ($zoom == 1.75) { 
+	echo "<b>175%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.75&detail=$detail'>175%</a> ";
+    }
+    if ($zoom == 2.00) { 
+	echo "<b>200%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.00&detail=$detail'>200%</a> ";
+    }
+    if ($zoom == 2.50) { 
+	echo "<b>250%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=2.50&detail=$detail'>250%</a> ";
+    }
+    if ($zoom == 3.00) { 
+	echo "<b>300%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=3.00&detail=$detail'>300%</a> ";
+    }
+    if ($zoom == 4.00) { 
+	echo "<b>400%</b> "; 
+    } else { 
+	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=4.00&detail=$detail'>400%</a> ";
+    }
+    echo "<br>detail: ";
     if ($detail == 0) {
 	if ($zoom < 1.75) {
-      	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.75&detail=1'>More detail (and zoom)</a>";
+      	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=1.75&detail=1'>high</a> <b>low</b>";
 	} else {
-    	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=1'>More detail</a>";
+    	    echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=1'>high</a> <b>low</b>";
 	}
     } else {
-    	echo "<a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=0'>Less detail</a>";
+    	echo "<b>high</b> <a href='shownsfile.php3?pid=$pid&eid=$eid&zoom=$zoom&detail=0'>low</a>";
     }
-    echo "  </h5>
-          </blockquote></blockquote></blockquote></blockquote>\n";
+    echo "  </h5></center></td></tr></table>";
 }
 
 echo "<br>
