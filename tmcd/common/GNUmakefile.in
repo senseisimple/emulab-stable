@@ -86,8 +86,12 @@ script-install:	dir-install
 
 remote-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/../libsetup.pm $(BINDIR)/libsetup.pm
+	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
 	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup
 	$(INSTALL) -m 755 $(SRCDIR)/runcvsup.sh $(BINDIR)/runcvsup.sh
 	$(INSTALL) -m 755 $(SRCDIR)/update $(BINDIR)/update
 	$(INSTALL) -m 755 $(SRCDIR)/vnodesetup $(BINDIR)/vnodesetup
+	-chown root $(BINDIR)/vnodesetup
+	-chmod u+s $(BINDIR)/vnodesetup
+	$(INSTALL) -m 755 $(SRCDIR)/bootvnodes $(BINDIR)/bootvnodes
