@@ -91,22 +91,22 @@ echo "<center><b>
        View: $view
       </b></center><br>\n";
 
-echo "<table border=2 cellpadding=2 cellspacing=1
+echo "<table border=2 cellpadding=2 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td align=center>ID</td>
-          <td align=center>Type (Class)</td>
-          <td align=center>Up?</td>\n";
+          <th align=center>ID</th>
+          <th align=center>Type (Class)</th>
+          <th align=center>Up?</th>\n";
 
 if ($isadmin) {
-    echo "<td align=center>PID</td>
-          <td align=center>EID</td>
-          <td align=center>Name</td>
-          <td align=center>Default<br>OSID</td>\n";
+    echo "<th align=center>PID</th>
+          <th align=center>EID</th>
+          <th align=center>Name</th>
+          <th align=center>Default<br>OSID</th>\n";
 }
 else {
-    echo "<td align=center>Free?</td>\n";
+    echo "<th align=center>Free?</th>\n";
 }    
 echo "</tr>\n";
     

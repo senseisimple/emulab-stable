@@ -77,12 +77,18 @@ printf("%.2f",(($num_up + $num_unpingable)/$num_total) *100);
 % up or unpingable</b>
 
 <h3>Key:</h3>
-<p>
+<ul>
+<li>
 <img src="/autostatus-icons/greenball.gif" alt="up"> - Up<br>
+</li><li>
 <img src="/autostatus-icons/yellowball.gif" alt="possibly down"> - Possibly down<br>
+</li><li>
 <img src="/autostatus-icons/redball.gif" alt="down"> - Down<br>
+</li><li>
 <img src="/autostatus-icons/blueball.gif" alt="unpingable"> - Unpingable: Running an operating system that does not respond to pings<br>
-</p>
+</li>
+</ul>
+
 
 <?php
 $nodecount = 0;
@@ -102,7 +108,7 @@ while ($r = mysql_fetch_array($query_result)) {
 		}
 
 		print("<h3>$type</h3>\n");
-		print("<table cellspacing=0 border=0 cellpadding=5>\n");
+		print("<table class=\"nogrid\" cellspacing=0 border=0 cellpadding=5>\n");
 
 		$lasttype = $type;
 		$column = 0;

@@ -26,11 +26,9 @@ PAGEHEADER("Projects that have actively used emulab.net");
 function GENPLIST ($query_result)
 {
     echo "<tr>
-             <td><h4>Name</td>
-             <td><h4>Institution</td>
+             <th>Name</th>
+             <th>Institution</th>
           </tr>\n";
-    echo "<tr></tr>\n";
-    echo "<tr></tr>\n";
 
     while ($projectrow = mysql_fetch_array($query_result)) {
 	$pname  = $projectrow[name];
@@ -79,11 +77,9 @@ $query_result =
 		 "order by name");
 
 if (mysql_num_rows($query_result)) {
-    echo "<tr></tr>\n";
-    echo "<tr></tr>\n";
-    echo "<tr><td colspan=2 align=center>
-              <h4>Other projects registered on Emulab.Net</h4>
-              </td>
+    echo "<tr><th colspan=2>
+              Other projects registered on Emulab.Net:</h4>
+              </th>
           </tr>\n";
     GENPLIST($query_result);
 }

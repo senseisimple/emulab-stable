@@ -115,27 +115,27 @@ while ($row = mysql_fetch_array($projmemb_result)) {
     $projmemb_array[$uid][] = $pid;
 }
 
-echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=0
+echo "<table width=\"100%\" border=2 cellpadding=1 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td>&nbsp</td>
-          <td><a href='showuser_list.php3?showactive=$showactive&sortby=uid'>
-                 UID</a></td>
-          <td><a href='showuser_list.php3?showactive=$showactive&sortby=name'>
-                 Name</a></td>
-          <td>Projects</td>
-          <td><a href='showuser_list.php3?showactive=$showactive&sortby=widle'>
-                 Web<br>Idle</a></td>
-          <td><a href='showuser_list.php3?showactive=$showactive&sortby=uidle'>
-                 Users<br>Idle</a></td>\n";
+          <th>&nbsp</th>
+          <th><a href='showuser_list.php3?showactive=$showactive&sortby=uid'>
+                 UID</a></th>
+          <th><a href='showuser_list.php3?showactive=$showactive&sortby=name'>
+                 Name</a></th>
+          <th>Projects</th>
+          <th><a href='showuser_list.php3?showactive=$showactive&sortby=widle'>
+                 Web<br>Idle</a></th>
+          <th><a href='showuser_list.php3?showactive=$showactive&sortby=uidle'>
+                 Users<br>Idle</a></th>\n";
 
 #
 # Admin users get a "delete" and a "modify" option.
 # 
 if ($isadmin) {
-    echo "<td align=center>Modify</td>\n";
-    echo "<td align=center>Delete</td>\n";
+    echo "<th align=center>Modify</th>\n";
+    echo "<th align=center>Delete</th>\n";
 }
 
 echo "</tr>\n";

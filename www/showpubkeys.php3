@@ -69,8 +69,8 @@ function SPITFORM($formfields, $errors)
               </center><br>\n";
 
 	echo "<tr>
-                 <td>Delete?</td>
-                 <td>Key</td>
+                 <th>Delete?</th>
+                 <th>Key</th>
               </tr>\n";
 
 	while ($row = mysql_fetch_array($query_result)) {

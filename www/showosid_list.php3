@@ -71,7 +71,7 @@ WRITESUBMENUBUTTON("Image Descriptor list",
 		   "showimageid_list.php3");
 SUBMENUEND();
 
-echo "<p><br>
+echo "<p>
       Listed below are the OS Descriptors that you may use in your NS file
       with the <a href='tutorial/docwrapper.php3?docname=nscommands.html#OS'>
       <tt>tb-set-node-os</tt></a> directive. If the OS you have selected for
@@ -80,7 +80,7 @@ echo "<p><br>
       appropriate image. You might notice that it takes a few minutes longer
       to start start your experiment when selecting an OS that is not
       already resident. Please be patient.
-      <br>\n";
+      </p><br />\n";
 
 SUBPAGEEND();
 
@@ -88,12 +88,12 @@ echo "<br>
       <table border=2 cellpadding=0 cellspacing=2 align='center'>\n";
 
 echo "<tr>
-          <td><a href='showosid_list.php3?&sortby=name'>
-              Name</td>
-          <td><a href='showosid_list.php3?&sortby=pid'>
-              PID</td>
-          <td><a href='showosid_list.php3?&sortby=desc'>
-              Description</td>
+          <th><a href='showosid_list.php3?&sortby=name'>
+              Name</th>
+          <th><a href='showosid_list.php3?&sortby=pid'>
+              PID</th>
+          <th><a href='showosid_list.php3?&sortby=desc'>
+              Description</th>
       </tr>\n";
 
 while ($row = mysql_fetch_array($query_result)) {

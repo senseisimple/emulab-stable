@@ -30,15 +30,15 @@ chdir("buildui");
   <param name=expcreateurl
          value="<?php echo $TBBASE?>/beginexp.php3">
 <pre>
-We're sorry, NetBuild in unable to run,
-as it seems your browser doesn't support Java.
+NetBuild requires Java.
 
-You should either enable Java in your browser, 
-download the latest version of a Java-compliant browser 
-(such as Netscape or Internet Explorer,) or quit using that 
-browser that doesn't support Java, you hippie.
+If you want to use NetBuild,
+you should either enable Java in your browser 
+or use the latest version of a Java-compliant browser 
+(such as Mozilla, Netscape or Internet Explorer.)
 
-If you decide its worth it (and we think you will,) come back and enjoy NetBuild.
+Once you've gotten your Java on, 
+please come back and enjoy NetBuild.
 We'll still be here waiting for you.	
 
    - Testbed Ops
@@ -49,13 +49,13 @@ We'll still be here waiting for you.
 <h2>Basic usage:</h2>
 <list>
 <li>
-  <p>Drag Nodes and LANs from the <i>Palette</i> on the left into the <i>Workarea</i> in the middle.</p>
+  Drag Nodes and LANs from the <i>Palette</i> on the left into the <i>Workarea</i> in the middle.
 </li>
 <li>
-  <p>To link a Node to a Node (or to a LAN,) select the node (by clicking it,) then hold "ctrl" and click on the node (or LAN) you wish to link it to.</p> 
+  To link a Node to a Node (or to a LAN,) select the node (by clicking it,) then hold "ctrl" and click on the node (or LAN) you wish to link it to.
 </li>
 <li>
-  <p>Clicking the "create experiment" button will send you to the Emulab "create experiment" web page, automatically generating and sending an NS file for your designed topology along. From that page, you may create the experiment and/or view the generated NS file.</p>
+  Clicking the "create experiment" button will send you to the Emulab "create experiment" web page, automatically generating and sending an NS file for your designed topology along. From that page, you may create the experiment and/or view the generated NS file.
 </li>
 </list>
 <p>

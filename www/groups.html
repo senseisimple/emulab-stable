@@ -80,7 +80,7 @@ another group. Users may create shared directories by using the unix
 nodes after a new experiment is started, only those members of the
 group will get accounts on the nodes; other members of the same
 project, not in the group, will not get accounts.
-
+</li>
 <li>
 Emulab uses NFS mounted filesystems for <tt>/users</tt> and
 <tt>/proj</tt> on the experimental nodes. Because of the nature of
@@ -91,7 +91,7 @@ project directory and in the home directories of other members of the
 group, can be can be "compromised" by a group member. Please note that
 no other directories are NFS mounted; other projects and users on
 Emulab are safe.
-
+</li>
 <li>
 It is important to remember that granting "root" permissions to a user
 in the project (or default group) and "user" permissions in a
@@ -109,7 +109,7 @@ including Bob. The correct approach is to specify "user" permissions
 in the default group, and either "user" or "root" in the subgroup
 (depending on whether subgroup members are mutually trust each other
 and need to create experiments).
-
+</li>
 <li>
 Equally dangerous is specifying different levels of trust for a user
 that is in multiple subgroups of a project. In this case, any
@@ -120,31 +120,22 @@ another user Bob who is in both subgroups, then Joe can access Bob's
 files when creating an experiment in one of the subgroups, but not the
 other. If Joe is really not supposed to access Bob's files, then Joe
 should not have "root" permission in a subgroup that contains Bob.
-
+</li>
 </ul>
 
-<table cellspacing=2 border=0>
+<center><h4>You have the following choices for <b>Trust</b>:</h4>
+<table>
         <tr>
-            <td colspan=4>
-                <h4>You have the following choices for <b>Trust</b>:</td>
-        <tr>
-        <tr>
-            <td>&nbsp</td>
             <td>User</td>
-            <td>-</td>
             <td>User may log into machines in your experiments</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
             <td nowrap=1>Local Root</td>
-            <td>-</td>
             <td>User may create/destroy experiments in your project and
                 has root privileges on machines in your experiments</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
-            <td nowrap=1>Group Root</td>
-            <td>-</td>
+            <td nowrap=1>Group Root&nbsp;&nbsp;</td>
             <td>In addition to Local Root privileges, user may also
                 approve new group members and 
                 modify user info for other users within the group. This
@@ -152,3 +143,4 @@ should not have "root" permission in a subgroup that contains Bob.
                 like.</td>
         </tr>
       </table>
+</center>

@@ -43,20 +43,20 @@ echo "Below is the list of projects waiting for approval or denial. Click
       <p>\n";
       
 echo "<table width=\"100%\" border=2 cellpadding=0 cellspacing=2
-       align='center'>\n";
+       >\n";
 
 echo "<tr>
-          <td rowspan=2>Act</td>
-          <td rowspan=2>Project Info</td>
-          <td rowspan=2>User</td>
-          <td>User Name</td>
-          <td>Title</td>
-          <td>E-mail</td>
+          <th rowspan=2>Act</th>
+          <th rowspan=2>Project Info</th>
+          <th rowspan=2>User</th>
+          <th>User Name</th>
+          <th>Title</th>
+          <th>E-mail</th>
       </tr>
       <tr>
-          <td>Proj Name</td>
-          <td>User Affil</td>
-          <td>Phone</td>
+          <th>Proj Name</th>
+          <th>User Affil</th>
+          <th>Phone</th>
       </tr>\n";
 
 while ($projectrow = mysql_fetch_array($query_result)) {
@@ -84,7 +84,7 @@ while ($projectrow = mysql_fetch_array($query_result)) {
               <td height=15 colspan=6></td>
           </tr>
           <tr>
-              <td align=center rowspan=2>
+              <td align=center valign=center rowspan=2>
                   <A href='approveproject_form.php3?pid=$pid'>
                      <img alt=\"o\" src=\"redball.gif\"></A></td>
               <td rowspan=2>

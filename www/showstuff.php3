@@ -246,10 +246,10 @@ function SHOWGROUPMEMBERS($pid, $gid) {
           <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
-              <td align=center>Name</td>
-              <td align=center>UID</td>
-              <td align=center>Privs</td>
-              <td align=center>Approved?</td>
+              <th>Name</th>
+              <th>UID</th>
+              <th>Privs</th>
+              <th>Approved?</th>
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -301,9 +301,9 @@ function SHOWGROUPMEMBERSHIP($uid) {
           <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
-              <td align=center>PID</td>
-              <td align=center>GID</td>
-              <td align=center>Privs</td>
+              <th>PID</th>
+              <th>GID</th>
+              <th>Privs</th>
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -489,7 +489,7 @@ function SHOWEXP($pid, $eid) {
     #
     # Generate the table.
     #
-    echo "<table align=center cellpadding=2 cellspacing=0 border=1>\n";
+    echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
 
     echo "<tr>
             <td>Name: </td>
@@ -625,16 +625,16 @@ function SHOWNODES($pid, $eid) {
               </center>
               <table align=center border=1>
               <tr>
-                <td align=center>Node ID</td>
-                <td align=center>$nodename</td>
-                <td align=center>Type</td>
-                <td align=center>Default<br>OSID</td>
-                <td align=center>Default<br>Path</td>
-                <td align=center>Default<br>Cmdline</td>
-                <td align=center>Boot<br>Status[<b>1</b>]</td>
-                <td align=center>Startup<br>Command</td>
-                <td align=center>Startup<br>Status[<b>2</b>]</td>
-                <td align=center>Ready<br>Status[<b>3</b>]</td>
+                <th>Node ID</th>
+                <th>$nodename</th>
+                <th>Type</th>
+                <th>Default<br>OSID</th>
+                <th>Default<br>Path</th>
+                <th>Default<br>Cmdline</th>
+                <th>Boot<br>Status[<b>1</b>]</th>
+                <th>Startup<br>Command</th>
+                <th>Startup<br>Status[<b>2</b>]</th>
+                <th>Ready<br>Status[<b>3</b>]</th>
               </tr>\n";
 	
 	$query_result =
@@ -1280,12 +1280,12 @@ function SHOWNODELOG($node_id)
     echo "<table border=1 cellpadding=2 cellspacing=2 align='center'>\n";
 
     echo "<tr>
-             <td align=center>Delete?</td>
-             <td align=center>Date</td>
-             <td align=center>ID</td>
-             <td align=center>Type</td>
-             <td align=center>Reporter</td>
-             <td align=center>Entry</td>
+             <th>Delete?</th>
+             <th>Date</th>
+             <th>ID</th>
+             <th>Type</th>
+             <th>Reporter</th>
+             <th>Entry</th>
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {

@@ -9,8 +9,10 @@
 </h1>
 </center>
 
+<p>
 Here is a brief rundown of some important security issues you should
 be aware of. 
+</p>
 
 <h3>Cookies</h3>
 
@@ -19,6 +21,7 @@ To enhance operation and security, we make use of a "Cookie" that
 holds your login name. Therefor, you will need to enable cookies on
 your browser. Please contact us if you have questions about how to do
 that in your browser.
+</p>
 
 <h3>SSL</h3>
 
@@ -27,21 +30,24 @@ To protect data you submit, SSL is used to encrypt data as it
 is transferred accross the Internet. Therefore, you will need to
 access these pages with a browser that supports SSL.  We recommend
 Netscape 4.0 or later, or presumably a recent IE.
+</p>
 
 <p>
 When you first visit Emulab, you might be asked if you want to accept
 the <i>server certificate</i>. Be sure to accept it!
-
+</p>
 
 <a NAME="SSH"></a>
 <h3>SSH</h3>
 
+<p>
 We require all users to use Secure Shell (SSH) to log into Emulab
 nodes. Experience has taught us a few things about managing keys
 which we will pass on to you at no extra charge:
+</p>
 
 <p>
-<p><blockquote>
+<blockquote>
 <ul>
 <li> You should <b>not</b> store your Emulab public key
      (.ssh/identity.pub) in your authorized_keys file on remote
@@ -63,13 +69,14 @@ which we will pass on to you at no extra charge:
      matter). Private keys should always be well protected!
 </ul>
 </blockquote>
+</p>
 
 <h3>Email Addresses</h3>
 
 <p>
 We require all Emulab users to provided current, non-pseudonymic email
 addresses. Redirections and anonymous email addresses are not allowed.
-
+</p>
 
 <h3>Passwords</h3>
 
@@ -80,6 +87,7 @@ rules are that standard english dictionary words are not permitted, as
 well as anything deemed too short or easily guessable. Also, you
 should take care not to use the same password on Emulab that you use
 at other sites.
+</p>
 
 <h3>Firewalling</h3>
 
@@ -90,7 +98,7 @@ for the protection of experimentors, as well as to ensure that an errant
 application cannot become the source of a Denial of Service attack to sites
 outside of Emulab. If your application requires external access to other low
 numbered ports, please contact us to make special arrangements.
-
+</p>
 <p>
 Emulab also prevents machines from using IP and MAC addresses other than their
 own on the control net. The control net router blocks all traffic not
@@ -98,7 +106,7 @@ originating from the proper subnet, both to prevent IP spoofing and to prevent
 experimental traffic from accidentally making it to the 'real world' (say,
 through routing misconfiguration.) These restrictions are not present on the
 experimental net.
-
+</p>
 <h3>Accounts</h3>
 
 <p>
@@ -109,12 +117,12 @@ groups that correspond to each of the projects they are working on,
 and thus may share files with other members of those projects. The
 default directory permissions are set so that project files are not
 readable by members of other projects.
-
+</p>
 <p>
 Each project gets its own directory hierachy (again, protected by the
 Unix group mechanism) that is NFS-exported only to that project's
 assigned test machines.  We don't currently protect against spoofing
 on the control network, so there are vulnerabilities.  The test
 networks are fully separated between experiments by way of VLANs.
-
+</p>
 

@@ -81,7 +81,7 @@ if ($isadmin) {
     mysql_data_seek($query_result, 0);
     $never_active = $total_projects - $active_projects;
 
-    echo "<table border=0 align=center cellpadding=0 cellspacing=3>
+    echo "<table border=0 align=center cellpadding=0 cellspacing=2>
         <tr>
           <td align=right><b>Been Active:</b></td>
           <td align=left>$active_projects</td>
@@ -94,7 +94,7 @@ if ($isadmin) {
           <td align=right><b>Total:</b></td>
           <td align=left>$total_projects</td>
         </tr>
-      </table>\n";
+      </table><br />\n";
 }
 
 function GENPLIST ($query_result)
@@ -102,38 +102,38 @@ function GENPLIST ($query_result)
     global $isadmin, $splitview;
 
     echo "<table width='100%' border=2
-                 cellpadding=2 cellspacing=0 align=center>
+                 cellpadding=2 cellspacing=2 align=center>
           <tr>\n";
 
-    echo "<td><a href='showproject_list.php3?splitview=$splitview&sortby=pid'>
-               PID</a></td>\n";
+    echo "<th><a href='showproject_list.php3?splitview=$splitview&sortby=pid'>
+               PID</a></th>\n";
     
-    echo "<td>(Approved?)
+    echo "<th>(Approved?)
               <a href='showproject_list.php3?splitview=$splitview&sortby=name'>
-               Description</a></td>\n";
+               Description</a></th>\n";
 
-    echo "<td><a href='showproject_list.php3?splitview=$splitview&sortby=uid'>
-               Leader</a></td>\n";
+    echo "<th><a href='showproject_list.php3?splitview=$splitview&sortby=uid'>
+               Leader</a></th>\n";
 
-    echo "<td align=center>
+    echo "<th>
               <a href='showproject_list.php3?splitview=$splitview&sortby=idle'>
-              Days<br>Idle</a></td>\n";
+              Days<br>Idle</a></th>\n";
 
-    echo "<td align=center colspan=2>Expts<br>
+    echo "<th colspan=2>Expts<br>
            <a href='showproject_list.php3?splitview=$splitview&sortby=created'>
               Cr</a>,
            <a href='showproject_list.php3?splitview=$splitview&sortby=running'>
-              Run</a></td>\n";
+              Run</a></th>\n";
 
-    echo "<td align=center>
+    echo "<th>
              <a href='showproject_list.php3?splitview=$splitview&sortby=nodes'>
-             Nodes</a></td>\n";
+             Nodes</a></th>\n";
 
     #
     # Admin users get other fields.
     # 
     if ($isadmin) {
-	echo "<td align=center>Pub?</td>\n";
+	echo "<th align=center>Pub?</th>\n";
     }
     echo "</tr>\n";
 

@@ -87,11 +87,11 @@ if (mysql_num_rows($query_result)) {
           <table align=center border=1 cellpadding=2 cellspacing=2>\n";
 
     echo "<tr>
-              <td align=center>PID</td>
-              <td align=center>EID</td>
-              <td align=center>State</td>
-              <td align=center>Nodes</td>
-              <td align=center>Description</td>
+              <th align=center>PID</td>
+              <th align=center>EID</td>
+              <th align=center>State</td>
+              <th align=center>Nodes</td>
+              <th align=center>Description</td>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
@@ -132,9 +132,9 @@ if (mysql_num_rows($query_result)) {
           <table align=center border=1 cellpadding=1 cellspacing=2>\n";
 
     echo "<tr>
-              <td align=center>PID</td>
-              <td align=center>Name</td>
-              <td align=center>MailTo</td>
+              <th>PID</td>
+              <th>Name</td>
+              <th>MailTo</td>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
@@ -185,3 +185,6 @@ if ($isadmin ||
 # 
 PAGEFOOTER();
 ?>
+
+
+

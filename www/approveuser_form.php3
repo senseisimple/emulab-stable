@@ -19,68 +19,49 @@ LOGGEDINORDIE($auth_usr);
 
 echo "
       <h2>Approve new users in your Project or Group</h2>
+      <p>
       Use this page to approve new members of your Project or Group.  Once
       approved, they will be able to log into machines in your Project's 
       experiments. Be sure to toggle the menu options appropriately for
       each pending user.
+      </p>
 
-      <p>
+      <center>
+      <h4>You have the following choices for <b>Action</b>:</h4>
       <table cellspacing=2 border=0>
         <tr>
-            <td colspan=4>
-                <h4>You have the following choices for <b>Action</b>:</td>
-        <tr>
-        <tr>
-            <td>&nbsp</td>
-            <td>Postpone</td>
-            <td>-</td>
+            <td><b>Postpone</b></td>
             <td>Do nothing; application remains, pending a decision.</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
-            <td>Deny</td>
-            <td>-</td>
+            <td><b>Deny</b></td>
             <td>Deny user application and so notify the user.</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
-            <td>Nuke</td>
-            <td>-</td>
+            <td><b>Nuke</b></td>
             <td>Nuke user application.  Kills user account, without
 		notice to user.  Useful for
                 bogus project applications.</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
-            <td>Approve</td>
-            <td>-</td>
+            <td><b>Approve</b></td>
             <td>Approve the user</td>
         </tr>
       </table>
-      </center>
-      <p>
-      <table cellspacing=2 border=0>
+      <br />
+      <h4>You have the following choices for <b>Trust</b>:</h4>
+      <table cellspacing=2 cellpadding=4 border=0>
         <tr>
-            <td colspan=4>
-                <h4>You have the following choices for <b>Trust</b>:</td>
-        <tr>
-        <tr>
-            <td>&nbsp</td>
-            <td>User</td>
-            <td>-</td>
+            <td><b>User</b></td>
             <td>User may log into machines in your experiments</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
-            <td>Local Root</td>
-            <td>-</td>
+            <td><b>Local Root</b></td>
             <td>User may create/destroy experiments in your project and
                 has root privileges on machines in your experiments</td>
         </tr>
         <tr>
-            <td>&nbsp</td>
-            <td>Group Root</td>
-            <td>-</td>
+            <td><b>Group Root</b></td>
             <td>In addition to Local Root privileges, user may also
                 approve new group members and 
                 modify user info for other users within the group. This
@@ -88,14 +69,13 @@ echo "
                 like.</td>
         </tr>
       </table>
-
-      <center>
+      <br />
       <b>Important group
        <a href='docwrapper.php3?docname=groups.html#SECURITY'>
        security issues</a> are discussed in the
-       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>
+       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>.
       </b>
-      </center><br>
+      </center><br />
 
       \n";
 

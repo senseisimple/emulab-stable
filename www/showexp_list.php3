@@ -206,29 +206,29 @@ if (mysql_num_rows($experiments_result)) {
     echo "<table border=2 cols=0
                  cellpadding=0 cellspacing=2 align=center>
             <tr>
-              <td width=8%>
+              <th width=8%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=pid'>
-                  PID</td>
-              <td width=8%>
+                  PID</th>
+              <th width=8%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=eid'>
-                  EID</td>
-              <td align=center width=3%>
+                  EID</th>
+              <th align=center width=3%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=pcs'>
-                  PCs</a><br>[<b>1</b>]</td>\n";
+                  PCs</a><br>[<b>1</b>]</th>\n";
     
     if ($isadmin && !$idle)
-        echo "<td width=17% align=center>Last Login</td>\n";
+        echo "<th width=17% align=center>Last Login</th>\n";
     if ($idle)
-        #      "<td width=4% align=center>Days Idle</td>\n";
-	echo "<td width=4% align=center>Slothd Info</td>
-              <td width=4% align=center>Swap Req.</td>\n";
+        #      "<th width=4% align=center>Days Idle</th>\n";
+	echo "<th width=4% align=center>Slothd Info</th>
+              <th width=4% align=center>Swap Req.</th>\n";
 
-    echo "    <td width=60%>
+    echo "    <th width=60%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=name'>
-                  Name</td>
-              <td width=4%>
+                  Name</th>
+              <th width=4%>
                <a href='showexp_list.php3?showtype=$showtype&sortby=uid'>
-                  Head UID</td>
+                  Head UID</th>
             </tr>\n";
 
     while ($row = mysql_fetch_array($experiments_result)) {

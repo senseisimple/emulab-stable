@@ -13,6 +13,7 @@ PAGEHEADER("Home");
 
 ?>
 
+<p>
 Welcome to Emulab.  Emulab (sometimes called the Utah Network Testbed)
 is a new and unique type of experimental environment: a
 universally-available "Internet Emulator" which provides a
@@ -24,7 +25,7 @@ the hardware level:
 packet loss, latency, bandwidth, packet ordering,
 buffer space all can be user-defined. Even the operating system disk
 contents can be securely and fully replaced with custom images.
-
+</p>
 <p>
 The Testbed currently features high-speed Cisco switches connecting,
 with over 5 miles of cabling, 168 core nodes (PCs) and 160 edge nodes
@@ -36,7 +37,7 @@ machines, including root access if desired.  Until we finish designing
 and building smarter scheduling and state-saving software, and obtain
 the disk space, scheduling is manual and done at coarse granularity
 (days).
-
+</p>
 <p>
 We provide some default software (e.g. Redhat Linux and FreeBSD on the PCs,
 NetBSD on the Sharks) that many users want. The basic software
@@ -45,10 +46,10 @@ root access, DNS service, compilers and linkers. But fundamentally,
 the software you run on it, including all bits on the disks, is
 replaceable and up to you.  The same applies to the network's
 characteristics, including its topology: configurable by users.
-
-<br><br>
+</p>
+<br /><br />
 <a href='pix/side-crop-big.jpg'>
-   <img src='pix/side-crop-small.jpg' align=right></a>
+   <img src='pix/side-crop-small.jpg' align=right /></a>
 
 <h3>Links to help you get started:</h3>
 <ul>

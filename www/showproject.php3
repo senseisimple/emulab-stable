@@ -66,10 +66,10 @@ if (mysql_num_rows($query_result)) {
           <table align=center border=1 cellpadding=2 cellspacing=2>\n";
 
     echo "<tr>
-              <td align=center>EID</td>
-              <td align=center>State</td>
-              <td align=center>Nodes</td>
-              <td align=center>Description</td>
+              <th>EID</th>
+              <th>State</th>
+              <th>Nodes</th>
+              <th>Description</th>
           </tr>\n";
 
     while ($projrow = mysql_fetch_array($query_result)) {
@@ -102,10 +102,10 @@ if (mysql_num_rows($query_result)) {
           <table align=center border=1>\n";
 
     echo "<tr>
-              <td align=center>Name</td>
-              <td align=center>UID</td>
-              <td align=center>Privs</td>
-              <td align=center>Approved?</td>
+              <th>Name</th>
+              <th>UID</th>
+              <th>Privs</th>
+              <th>Approved?</th>
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
@@ -147,9 +147,9 @@ if (mysql_num_rows($query_result)) {
           <table align=center border=1>\n";
 
     echo "<tr>
-              <td align=center>GID</td>
-              <td align=center>Desription</td>
-              <td align=center>Leader</td>
+              <th>GID</th>
+              <th>Desription</th>
+              <th>Leader</th>
           </tr>\n";
 
     while ($row = mysql_fetch_array($query_result)) {
