@@ -5,7 +5,6 @@
 # All rights reserved.
 #
 include("defs.php3");
-include("showstuff.php3");
 
 #
 # Only known and logged in users can do this.
@@ -15,11 +14,30 @@ LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
 #
-# Verify form arguments.
-# 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
-    $target_uid = $uid;
+# Verify page/form arguments. Note that the target uid comes initially as a
+# page arg, but later as a form argument, hence this odd check.
+#
+if (! isset($_POST['submit'])) {
+    # First page load. Default to current user.
+    if (! isset($_GET['target_uid']))
+	$target_uid = $uid;
+    else
+	$target_uid = $_GET['target_uid'];
+}
+else {
+    # Form submitted. Make sure we have a formfields array and a target_uid.
+    if (!isset($_POST['formfields']) ||
+	!is_array($_POST['formfields']) ||
+	!isset($_POST['formfields']['target_uid'])) {
+	PAGEARGERROR("Invalid form arguments.");
+    }
+    $formfields = $_POST['formfields'];
+    $target_uid = $formfields['target_uid'];
+}
+
+# Pedantic check of uid before continuing.
+if ($target_uid == "" || !TBvalid_uid($target_uid)) {
+    PAGEARGERROR("Invalid uid: '$target_uid'");
 }
 
 #
@@ -43,7 +61,7 @@ if (!$isadmin &&
 
 function SPITFORM($formfields, $errors)
 {
-    global $isadmin, $usr_keyfile_name, $target_uid, $BOSSNODE;
+    global $isadmin, $target_uid, $BOSSNODE;
 
     #
     # Standard Testbed Header, now that we know what we want to say.
@@ -136,7 +154,9 @@ function SPITFORM($formfields, $errors)
 
     echo "<table align=center border=1> 
           <form enctype=multipart/form-data
-                action=showpubkeys.php3?target_uid=$target_uid method=post>\n";
+                action=showpubkeys.php3 method=post>\n";
+    echo "<input type=hidden name=\"formfields[target_uid]\" ".
+	         "value=$target_uid>\n";
 
     #
     # SSH public key
@@ -151,6 +171,7 @@ function SPITFORM($formfields, $errors)
                   <input type=hidden name=MAX_FILE_SIZE value=4096>
 	          <input type=file
                          name=usr_keyfile
+                         value=\"" . $_FILES['usr_keyfile']['name'] . "\"
 	                 size=50>
                   <br>
                   <br>
@@ -171,7 +192,7 @@ function SPITFORM($formfields, $errors)
                   <td class=left>
                       <input type=password
                              name=\"formfields[password]\"
-                             size=8></td>
+                             size=12></td>
               </tr>\n";
     }
 
@@ -216,7 +237,7 @@ function SPITFORM($formfields, $errors)
 #
 # On first load, display a form of current values.
 #
-if (! isset($submit) || isset($finished)) {
+if (! isset($_POST['submit'])) {
     $defaults = array();
     
     SPITFORM($defaults, 0);
@@ -251,16 +272,22 @@ if (isset($formfields[usr_key]) &&
 #
 # If usr provided a file for the key, it overrides the paste in text.
 #
-if (isset($usr_keyfile) &&
-    strcmp($usr_keyfile, "") &&
-    strcmp($usr_keyfile, "none")) {
+if (isset($_FILES['usr_keyfile']) &&
+    $_FILES['usr_keyfile']['name'] != "" &&
+    $_FILES['usr_keyfile']['name'] != "none") {
 
-    if (! stat($usr_keyfile)) {
+    $localfile = $_FILES['usr_keyfile']['tmp_name'];
+
+    if (! stat($localfile)) {
 	$errors["PubKey File"] = "No such file";
     }
+    # Taint check shell arguments always!
+    elseif (! preg_match("/^[-\w\.\/]*$/", $localfile)) {
+	$errors["PubKey File"] = "Invalid characters";
+    }
     else {
-	$addpubkeyargs = "$target_uid $usr_keyfile";
-	chmod($usr_keyfile, 0644);	
+	$addpubkeyargs = "$target_uid $localfile";
+	chmod($localfile, 0644);	
     }
 }
 
@@ -304,5 +331,8 @@ if (ADDPUBKEY($uid, "webaddpubkey -n $addpubkeyargs")) {
 #
 ADDPUBKEY($uid, "webaddpubkey $addpubkeyargs");
 
-header("Location: showpubkeys.php3?target_uid=$target_uid&finished=1");
+#
+# Redirect back, avoiding a POST in the history.
+# 
+header("Location: showpubkeys.php3?target_uid=$target_uid");
 ?>

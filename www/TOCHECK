@@ -48,8 +48,8 @@ deleteimageid.php3
 deletenodelog.php3
 deleteosid.php3
 deleteproject.php3
-deletepubkey.php3
-deletesfskey.php3
+deletepubkey.php3		X
+deletesfskey.php3		X
 deleteuser.php3
 doc.php3
 doc/docwrapper.php3		X
@@ -130,8 +130,8 @@ showosid_list.php3
 showosinfo.php3
 showproject.php3
 showproject_list.php3
-showpubkeys.php3
-showsfskeys.php3
+showpubkeys.php3		X
+showsfskeys.php3		X
 showstats.php3
 showstuff.php3
 showsumstats.php3

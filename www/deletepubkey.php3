@@ -18,16 +18,14 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
-#
-# Verify form arguments.
-# 
-if (!isset($target_uid) ||
-    strcmp($target_uid, "") == 0) {
-    USERERROR("Improper form arguments!", 1);
-}
-if (!isset($key) ||
-    strcmp($key, "") == 0) {
-    USERERROR("Improper form arguments!", 1);
+# Page arguments.
+$target_uid = $_GET['target_uid'];
+$key        = $_GET['key'];
+
+# Pedantic argument checking.
+if (!isset($target_uid) || $target_uid == "" || !TBvalid_uid($target_uid) ||
+    !isset($key) || $key == "" || !preg_match("/^[\d]+$/", $key)) {
+    PAGEARGERROR();
 }
 
 #
