@@ -157,11 +157,11 @@ if ($submit) {
     # exp name is always sent...
     $str = "expt_name=\"$exp_name\"";
     $mail=0;
-    if (isset($noswap) && $noswap !="") {
+    if (isset($noswap)) {
 	$str .= ",noswap_reason=\"$noswap\"";
 	$mail=1;
     }
-    if (isset($noidleswap) && $noidleswap !="") {
+    if (isset($noidleswap)) {
 	$str .= ",noidleswap_reason=\"$noidleswap\"";
 	$mail=1;
     }

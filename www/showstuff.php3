@@ -592,8 +592,8 @@ function SHOWEXP($pid, $eid, $edit=0) {
 	$autoswap_str= "<input type=text size=3 name=autoswap ".
 	    "value=\"$autoswap_hrs\"> hour".($autoswap_hrs==1 ? "" : "s");
     } else {
-	$noswap = "(\"$noswap_reason\")";
-	$noidleswap = "(\"$noidleswap_reason\")";
+	$noswap = "($noswap_reason)";
+	$noidleswap = "($noidleswap_reason)";
 	$autoswap_str= $autoswap_hrs." hour".($autoswap_hrs==1 ? "" : "s");
     }
     if ($edit && ISADMIN() ) {
