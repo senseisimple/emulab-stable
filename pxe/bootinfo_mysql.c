@@ -9,15 +9,6 @@
 #ifdef USE_MYSQL_DB
 
 static char dbname[] = "tbdb";
-static char dbquery[] =
-   "select n.next_boot_path, n.next_boot_cmd_line, n.def_boot_image_id, "
-   "d.img_desc, p.partition, n.def_boot_cmd_line, "
-   "n.def_boot_path from nodes "
-   "as n left join partitions as p on n.node_id=p.node_id and "
-   "n.def_boot_image_id=p.image_id left join disk_images as d on "
-   "p.image_id=d.image_id left join interfaces as i on "
-   "i.node_id=n.node_id where i.IP = '%s'";
-
 static MYSQL db;
 
 int
@@ -34,6 +25,20 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	MYSQL db;
 	MYSQL_RES *res;
 	MYSQL_ROW row;
+	char dbquery[] =
+		"select n.next_boot_path, n.next_boot_cmd_line, "
+		"n.def_boot_image_id, "
+		"p.partition, n.def_boot_cmd_line, n.def_boot_path from nodes "
+		"as n left join partitions as p on n.node_id=p.node_id and "
+		"n.def_boot_image_id=p.image_id left join interfaces as i on "
+		"i.node_id=n.node_id where i.IP = '%s'";
+
+#define NEXT_BOOT_PATH		0
+#define NEXT_BOOT_CMD_LINE	1
+#define DEF_BOOT_IMAGE_ID	2
+#define PARTITION		3
+#define DEF_BOOT_CMD_LINE	4
+#define DEF_BOOT_PATH		5
 
 	n = snprintf(querybuf, sizeof querybuf, dbquery, inet_ntoa(ipaddr));
 	if (n > sizeof querybuf) {
@@ -86,7 +91,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 	ncols = (int)mysql_num_fields(res);
 	switch (ncols) {
-	case 7: /* Should have 7 fields */
+	case 6: /* Should have 6 fields */
 		break;
 	default:
 		syslog(LOG_ERR, "%s: %d fields in query for IP %s!",
@@ -98,15 +103,17 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	row = mysql_fetch_row(res);
 
 	/*
-	 * First element is next_boot_path.  If set, assume it is a
-	 * multiboot kernel.
+	 * Check next_boot_path.  If set, assume it is a multiboot kernel.
 	 */
-	if (row[0] != 0 && row[0][0] != '\0') {
+	if (row[NEXT_BOOT_PATH] != 0 && row[NEXT_BOOT_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
 		info->what.mb.tftp_ip.s_addr = 0;
-		strncpy(info->what.mb.filename, row[0], MAX_BOOT_PATH-1);
-		if (row[1] != 0 && row[1][0] != '\0')
-			strncpy(info->cmdline, row[1], MAX_BOOT_CMDLINE-1);
+		strncpy(info->what.mb.filename, row[NEXT_BOOT_PATH],
+			MAX_BOOT_PATH-1);
+		if (row[NEXT_BOOT_CMD_LINE] != 0 &&
+		    row[NEXT_BOOT_CMD_LINE][0] != '\0')
+			strncpy(info->cmdline, row[NEXT_BOOT_CMD_LINE],
+				MAX_BOOT_CMDLINE-1);
 		else
 			info->cmdline[0] = 0;	/* Must zero first byte! */
 		mysql_free_result(res);
@@ -117,14 +124,15 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	 * There is either a partition number or default boot path.
 	 * The default boot path overrides the partition.
 	 */
-	if (row[6] != 0 && row[6][0] != '\0') {
+	if (row[DEF_BOOT_PATH] != 0 && row[DEF_BOOT_PATH][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_MB;
 		info->what.mb.tftp_ip.s_addr = 0;
-		strncpy(info->what.mb.filename, row[6], MAX_BOOT_PATH-1);
+		strncpy(info->what.mb.filename, row[DEF_BOOT_PATH],
+			MAX_BOOT_PATH-1);
 	}
-	else if (row[4] != 0 && row[4][0] != '\0') {
+	else if (row[PARTITION] != 0 && row[PARTITION][0] != '\0') {
 		info->type = BIBOOTWHAT_TYPE_PART;
-		info->what.partition = atoi(row[4]);
+		info->what.partition = atoi(row[PARTITION]);
 	}
 	else {
 		syslog(LOG_ERR, "%s: null query result for IP %s!",
@@ -132,8 +140,9 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 		mysql_free_result(res);
 		return 1;
 	}
-	if (row[5] != 0 && row[5][0] != '\0')
-		strncpy(info->cmdline, row[5], MAX_BOOT_CMDLINE-1);
+	if (row[DEF_BOOT_CMD_LINE] != 0 && row[DEF_BOOT_CMD_LINE][0] != '\0')
+		strncpy(info->cmdline, row[DEF_BOOT_CMD_LINE],
+			MAX_BOOT_CMDLINE-1);
 	else
 		info->cmdline[0] = 0;	/* Must zero first byte! */
 	
@@ -142,6 +151,13 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	 */
 	mysql_free_result(res);
 	return 0;
+
+#undef NEXT_BOOT_PATH
+#undef NEXT_BOOT_CMD_LINE
+#undef DEF_BOOT_IMAGE_ID
+#undef PARTITION
+#undef DEF_BOOT_CMD_LINE
+#undef DEF_BOOT_PATH
 }
 
 int
