@@ -59,6 +59,7 @@
      <li> <a href="#SWS-6">How does my software determine when other
                            nodes in my experiment are ready?</a>
      <li> <a href="#SWS-7">Can I run my own Operating System?</a>
+     <li> <a href="#SWS-8">What if I need more disk space on my nodes?</a>
      </ul>
 
 <li> <a href="#SEC">Security Issues</a>
@@ -629,6 +630,27 @@ tb-set-ip-routing ospf
     href="tutorial/tutorial.php3#CustomOS">Custom OS</a> documentation
     page. The procedure for creating and installing your custom OS are
     also described in this document.
+    </p>
+</ul>
+
+<li><a NAME="SWS-8"></a>
+    <h3>What if I need more disk space on my nodes?</h3>
+    <p>
+    Each node has a partition at the end of the disk that you can use if
+    you wish. In Linux, the partition is <code>/dev/hda4</code> ; in FreeBSD,
+    it's </code>/dev/ad0s4</code> . There is no filesystem on this partition,
+    so you'll need to create it yourself. For example, in Linux:
+    <blockquote>
+	<code>
+	    mkfs /dev/hda4;<br>
+	    mount /dev/hda4 /mnt;
+	</code>
+    </blockquote>
+
+    This partition is only 6 Gigs, the size of the leftover space on our
+    smallest drives. If you need more space than this, it would be possible
+    to enlarge this partition on some machines (for example, our pc850s
+    have 40 GB disks,) but that is outside the scope of this FAQ.
     </p>
 </ul>
 
