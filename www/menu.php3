@@ -77,7 +77,7 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON_NEW("Join Netbed (CD)",
 			   $TBDOCBASE, "cdrom.php");
 
-    WRITESIDEBARBUTTON_NEW("News (August&nbsp;15)", $TBDOCBASE,
+    WRITESIDEBARBUTTON("News (August&nbsp;15)", $TBDOCBASE,
 		       "docwrapper.php3?docname=news.html");
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
     WRITESIDEBARBUTTON_NEW("Papers", $TBDOCBASE, "pubs.php3");
