@@ -34,7 +34,7 @@ proc set {args} {
 	if {$var != "currnode" && $var != "currlan"} {
 	    if {[llength $args] > 1} {
 		# Munge var in case it's a variable
-		regsub -all {[()]} $var {_} out
+		regsub -all {[()]} $var {-} out
 		set var $out
 		real_set val [lindex $args 1]
 		if {([regexp {^n[0-9]+$} $val] != -1) ||
