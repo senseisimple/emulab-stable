@@ -24,6 +24,7 @@ my $mkacct  = '@prefix@/sbin/tbacct add';
 my $protouser       = 'elabman';
 my $protouser_name  = 'Emulab Manager';
 my $protouser_email = '@TBOPSEMAIL@';
+my $protouser_shell = 'tcsh';
 my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
@@ -106,7 +107,8 @@ if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G $Ggid -h - " .
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
 	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
-	"usr_modified=now(), admin=1, webonly=1, status='active'");
+	"usr_modified=now(), admin=1, webonly=1, status='active', ".
+	"usr_shell='$protouser_shell', usr_email='$protouser_email'");
 
 print "Creating project in database...\n";
 DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
