@@ -11,9 +11,9 @@ local $debug = 0;
 local $block = 1;
 local $verbose = 0 + $debug;
 
+use English;
 use SNMP;
 use snmpit_lib;
-use English;
 
 my $sess;                     # My snmp session - initialized in new()
 my $ip;
@@ -504,12 +504,14 @@ sub showPorts {
     $port = portnum("$ip:$data[1]") || portnum("$ip:".$ifIndex{$data[1]});
     if (! defined $port) { next; }
     print "$port\t$data[0]\t$data[2]\n" if $debug > 1;
-    if    ($data[0]=~/AdminStatus/){ $Able{$port}=($data[2]=~/up/?"yes":"no");}
-    elsif ($data[0]=~/OperStatus/) { $Link{$port}= $data[2];}
-    elsif ($data[0]=~/AdminSpeed/) {$speed{$port}= $data[2];}
-    elsif ($data[0]=~/Duplex/)     {$duplex{$port}=$data[2];}
-    # Insert stuff here to get speed, duplex
-  }} while ( $data[0] =~ /^(i(f)(.*)Status)|(port(AdminSpeed|Duplex))$/) ;
+    if    ($data[0]=~/AdminStatus/) {$Able{$port}=($data[2]=~/up/?"yes":"no");}
+    elsif ($data[0]=~/ifOperStatus/)         {  $Link{$port}=$data[2];}
+    elsif ($data[0]=~/AdminSpeed/)           { $speed{$port}=$data[2];}
+    elsif ($data[0]=~/Duplex/)               {$duplex{$port}=$data[2];}
+    # Insert stuff here to get ifSpeed if necessary... AdminSpeed is the
+    # _desired_ speed, and ifSpeed is the _real_ speed it is using
+  }} while ( $data[0] =~
+	     /(i(f).*Status)|(port(AdminSpeed|Duplex))/) ;
   print "Port Configuration, Testbed Switch $ip\n";
   print "Port     \tEnabled\tLink\tSpeed\t\tDuplex\n";
   print "---------------------------------------------------------------\n";
