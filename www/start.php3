@@ -25,11 +25,11 @@ if (($uid = GETUID())) {
     if ($check_status == CHECKLOGIN_LOGGEDIN) {
 	$LOC = "$TBBASE/showuser.php3?target_uid=$uid";
     }
-    elseif ($check_status == CHECKLOGIN_MAYBEVALID) {
-	$LOC = "$TBBASE/start.php3";
-    }
     elseif (isset($SSL_PROTOCOL)) {
 	$LOC = "$TBBASE/index.php3";
+    }
+    elseif ($check_status == CHECKLOGIN_MAYBEVALID) {
+	$LOC = "$TBBASE/start.php3";
     }
     else 
 	$LOC = "$TBDOCBASE/index.php3";

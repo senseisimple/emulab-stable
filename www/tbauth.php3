@@ -241,7 +241,8 @@ function LOGGEDINORDIE($uid, $modifier = 0) {
         break;
     case CHECKLOGIN_MAYBEVALID:
         USERERROR("Your login cannot be verified. Are cookies turned on? ".
-		  "Are you using https?", 1);
+		  "Are you using https? Are you logged in using another ".
+		  "browser or another machine?", 1);
         break;
     case CHECKLOGIN_LOGGEDIN:
 	break;

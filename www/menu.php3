@@ -68,7 +68,7 @@ function WRITESIDEBAR() {
              <b><span class=sidebarbutton>
                   Web Interface Options\n";
 
-    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+    if ($login_status & CHECKLOGIN_LOGGEDIN) {
 	$freepcs = TBFreePCs();
 	
 	echo "    <br>($freepcs Free PCs)\n";
