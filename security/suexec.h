@@ -70,7 +70,7 @@
  *               this program.
  */
 #ifndef HTTPD_USER
-#define HTTPD_USER "www"
+#define HTTPD_USER "nobody"
 #endif
 
 /*
@@ -78,7 +78,7 @@
  *            for suEXEC.  For most systems, 500 or 100 is common.
  */
 #ifndef UID_MIN
-#define UID_MIN 100
+#define UID_MIN 1
 #endif
 
 /*
@@ -120,7 +120,7 @@
  *             debugging purposes.
  */
 #ifndef LOG_EXEC
-#define LOG_EXEC "/usr/local/apache/logs/cgi.log"	/* Need me? */
+#define LOG_EXEC "/usr/testbed/log/suexec.log"	/* Need me? */
 #endif
 
 /*
@@ -129,7 +129,7 @@
  *             that can be used for suEXEC behavior.
  */
 #ifndef DOC_ROOT
-#define DOC_ROOT "/usr/local/apache/htdocs"
+#define DOC_ROOT "/usr/testbed/bin/"
 #endif
 
 /*
@@ -137,7 +137,7 @@
  *
  */
 #ifndef SAFE_PATH
-#define SAFE_PATH "/usr/local/bin:/usr/bin:/bin"
+#define SAFE_PATH "/usr/testbed/bin:/usr/local/bin:/usr/bin:/bin"
 #endif
 
 #endif /* _SUEXEC_H */

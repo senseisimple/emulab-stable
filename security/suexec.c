@@ -82,14 +82,17 @@
  * info:   Normal activity message
  * debug:  Self-explanatory
  */
+#define TESTBED
 
-#include "ap_config.h"
+#include <stdio.h>
+#include <string.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
+#include <pwd.h>
+#include <grp.h>
+#include <errno.h>
 #include <stdarg.h>
-
 #include "suexec.h"
 
 /*
@@ -262,6 +265,9 @@ int main(int argc, char *argv[])
     char *cmd;			/* command to be executed    */
     char cwd[AP_MAXPATH];	/* current working directory */
     char dwd[AP_MAXPATH];	/* docroot working directory */
+#ifdef TESTBED
+    char cmdpath[AP_MAXPATH];	/* full path to command      */
+#endif
     struct passwd *pw;		/* password entry holder     */
     struct group *gr;		/* group entry holder        */
     struct stat dir_info;	/* directory info holder     */
@@ -322,6 +328,7 @@ int main(int argc, char *argv[])
 	exit(104);
     }
 
+#ifndef TESTBED
     /*
      * Check to see if this is a ~userdir request.  If
      * so, set the flag, and remove the '~' from the
@@ -331,6 +338,7 @@ int main(int argc, char *argv[])
 	target_uname++;
 	userdir = 1;
     }
+#endif
 
     /*
      * Error out if the target username is invalid.
@@ -438,6 +446,18 @@ int main(int argc, char *argv[])
 	exit(110);
     }
 
+#ifdef TESTBED
+    /*
+     * All programs exist in the testbed bin directory, and we won't be
+     * running those programs from that directory (cwd will not be the
+     * bin directory, but rather someplace else). So, fake things
+     * up so the rest of this code works okay.
+     */
+    strcpy(cwd, DOC_ROOT);
+    strcpy(cmdpath, DOC_ROOT);
+    strcat(cmdpath, cmd);
+    cmd = cmdpath;
+#else
     /*
      * Get the current working directory, as well as the proper
      * document root (dependant upon whether or not it is a
@@ -474,6 +494,7 @@ int main(int argc, char *argv[])
 	log_err("error: command not in docroot (%s/%s)\n", cwd, cmd);
 	exit(114);
     }
+#endif
 
     /*
      * Stat the cwd and verify it is a directory, or error out.
@@ -515,6 +536,7 @@ int main(int argc, char *argv[])
 	exit(119);
     }
 
+#ifndef TESTBED
     /*
      * Error out if the target name/group is different from
      * the name/group of the cwd or the program.
@@ -530,6 +552,7 @@ int main(int argc, char *argv[])
 		prg_info.st_uid, prg_info.st_gid);
 	exit(120);
     }
+#endif
     /*
      * Error out if the program is not executable for the user.
      * Otherwise, she won't find any error in the logs except for
