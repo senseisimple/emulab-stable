@@ -185,6 +185,23 @@ else {
 }
 
 #
+# VIRTNODE HACK: Virtual nodes are special. Do not reload!
+#
+my @temp = ();
+foreach my $node ( @nodes ) {
+    if (TBIsNodeVirtual($node)) {
+	print "*** Skipping virtual node $node ...\n";
+	next;
+    }
+    push(@temp, $node);
+}
+@nodes = @temp;
+if (! @nodes) {
+    print "No nodes to load. Exiting ...\n";
+    exit(0);
+}
+
+#
 # Figure out who called us. Root and admin types can do whatever they
 # want. Normal users can only change nodes in experiments in their
 # own projects.

@@ -147,6 +147,23 @@ else {
 }
 
 #
+# VIRTNODE HACK: Virtual nodes are special. Do not reboot!
+#
+my @temp = ();
+foreach my $node ( @nodes ) {
+    if (TBIsNodeVirtual($node)) {
+	print "*** Skipping virtual node $node ...\n";
+	next;
+    }
+    push(@temp, $node);
+}
+@nodes = @temp;
+if (! @nodes) {
+    print "No nodes to load. Exiting ...\n";
+    exit(0);
+}
+
+#
 # Another shark hack. Well, perhaps not. We really don't want 50 nodes
 # all rebooting at the same time, PCs *or* sharks. Lets order them
 # so that the shelves are grouped together at least, and issue the reboots

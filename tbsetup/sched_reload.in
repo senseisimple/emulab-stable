@@ -183,6 +183,23 @@ else {
 }
 
 #
+# VIRTNODE HACK: Virtual nodes are special. Do not reload!
+#
+my @temp = ();
+foreach my $node ( @nodes ) {
+    if (TBIsNodeVirtual($node)) {
+	print "*** Skipping virtual node $node ...\n";
+	next;
+    }
+    push(@temp, $node);
+}
+@nodes = @temp;
+if (! @nodes) {
+    print "No nodes to load. Exiting ...\n";
+    exit(0);
+}
+
+#
 # Root and admin types can do whatever they want.
 # Mere users cannot schedule reloads.
 #

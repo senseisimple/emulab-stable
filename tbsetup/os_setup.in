@@ -130,6 +130,14 @@ while (my %row = $db_result->fetchhash()) {
     my $type     = $row{'type'};
     my $bootpath = 0;
 
+    #
+    # VIRTNODE HACK: Virtual nodes are special. No setup.
+    #
+    if (TBIsNodeVirtual($node)) {
+	print "*** Skipping setup on virtual node $node ...\n";
+	next;
+    }
+
     push(@nodes, $node);
     $osids{$node} = $osid;
     $reboots{$node} = 1;
