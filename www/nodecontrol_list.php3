@@ -32,7 +32,6 @@ echo "<table border=2 cellpadding=0 cellspacing=2
        align='center'>\n";
 
 echo "<tr>
-          <td align=center>Change</td>
           <td align=center>ID</td>
           <td align=center>Type</td>
           <td align=center>PID</td>
