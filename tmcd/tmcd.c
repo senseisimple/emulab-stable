@@ -66,7 +66,7 @@ int		mydb_update(char *query, ...);
 #define MINCHILDREN	5
 static int	udpchild;
 static int	numchildren;
-static int	maxchildren = 10;
+static int	maxchildren = 15;
 static volatile int killme;
 
 #ifdef EVENTSYS
