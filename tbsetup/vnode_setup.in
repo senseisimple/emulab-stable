@@ -348,11 +348,11 @@ while (1) {
 	# old (not much of a life, is it?), so we find the first one marked for
 	# death.
 	#
-	my $oldest = 0;
+	my $oldest;
 	my $oldestpid = 0;
 	while (my ($pid, $aref) = each %child_vnodes) {
 	    my ($vnode, $pnode, $mode, $jailed, $plab, $birthtime) = @$aref;
-	    if ($birthtime > $oldest) {
+	    if ((!$oldestpid) || ($birthtime < $oldest)) {
 		$oldest = $birthtime;
 		$oldestpid = $pid;
 	    }
