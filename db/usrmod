@@ -1,0 +1,18 @@
+#!/usr/local/bin/perl -w
+
+use DBI;
+
+$dbh = DBI->connect ("DBI:mysql:database=tbdb;host=localhost")
+    || die "Could not connect.\n";
+
+if ($#ARGV == 2) {
+    ($uid, $udt, $new) = @ARGV;
+    $sth = $dbh->prepare("UPDATE users SET $udt = \"$new\" WHERE uid = \"$uid\"");
+$rr = $sth->execute;
+$rr == 1 || die "Command not executed properly.\n";
+print "$udt changed to $new for user $uid.\n";
+} else {
+    print "usrmod expects first a user ID then the column to be updated and finally the new value.\n";
+}
+
+

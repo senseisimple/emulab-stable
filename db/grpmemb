@@ -1,0 +1,47 @@
+#!/usr/local/bin/perl -w
+
+use DBI;
+
+$driver = "mysql";
+$dbh = DBI->connect("DBI:$driver:database=tbdb;host=localhost")
+    || die "Could not connect.\n";
+
+if ($#ARGV >= 0) {
+    foreach $id (@ARGV) {
+	$sth = $dbh->prepare("SELECT gid FROM grp_memb WHERE uid = \"$id\"");
+	$rr = $sth->execute; 
+	if ($rr == 0) { #if $id is not a user ID, then see if it is a group ID.
+	    $sth2 = $dbh->prepare("SELECT uid FROM grp_memb WHERE gid = \"$id\"");
+	    $rr2 = $sth2->execute;
+	    if ($rr2 == 0) {
+		print "The ID $id was not found in database.\n";
+	    } else {
+		printer("Group ID $id:", $sth2);
+	    }
+	} else {
+	    printer("User ID $id:", $sth);
+	}
+    }
+} else { #if there are no command line arguments print the entire table.
+    $sth = $dbh->prepare("SELECT * FROM grp_memb");
+    $sth->execute;
+    while (@row = $sth->fetchrow_array) {
+	foreach (@row) {
+	    print "$_ ";
+	} print "\n";
+    }
+}
+
+sub printer { #a subroutine to return the information in Mysql tables.
+    print $_[0];
+    while (@row = $_[1]->fetchrow_array) {
+	foreach (@row) {
+	    print " $_";
+	}
+    } print ".\n";
+}
+
+
+
+
+
