@@ -436,14 +436,14 @@ foreach my $imageid ( keys(%reloads) ) {
     my @list = @{ $reloads{$imageid} };
 
     foreach my $node ( @list ) {
-	my $state;
+	my $mode;
 	
-	if (!TBGetNodeEventState($node, \$state)) {
-	    print "*** Error getting event state for $node!\n";
+	if (!TBGetNodeOpMode($node, \$mode)) {
+	    print "*** Error getting operational mode for $node!\n";
 	    $failed++;
 	    delete($nodes{$node});
 	}
-	if ($state ne TBDB_NODESTATE_ISUP) {
+	if ($mode eq TBDB_NODEOPMODE_RELOAD) {
 	    print "*** Not waiting for $node since its reload failed!\n";
 	    $failed++;
 	    delete($nodes{$node});
