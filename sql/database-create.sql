@@ -1242,6 +1242,20 @@ CREATE TABLE virt_vtypes (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table 'vis_nodes'
+--
+
+CREATE TABLE vis_nodes (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  vis_type varchar(10) NOT NULL default '',
+  x float NOT NULL default '0',
+  y float NOT NULL default '0',
+  PRIMARY KEY  (pid,eid,vname)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table 'vlans'
 --
 
