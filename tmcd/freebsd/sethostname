@@ -29,6 +29,7 @@ $| = 1;
 # library and initialize itself. 
 # 
 use libsetup;
+use libtmcc;
 
 #
 # Check to see if hostname actually set yet. The dhclient exit hook gets
@@ -42,18 +43,14 @@ if (! ($curname =~ /.+/)) {
 }
 
 #
-# Make sure we get a valid domainname. If not then do not reset the hostname.
-# 
-if (! @ARGV) {
-    exit 0;
-}
-
-$domain = $ARGV[0];
-if ($domain =~ /\./) {
-    $domain = ".$domain";
+# We assume that we are in the same domain as our boss node
+#
+my $bossname = tmccbossname();
+if ($bossname =~ /^[^\.]+\.(.*)$/) {
+    $domain = ".$1";
 }
 else {
-    exit 0;
+    $domain = ".foo.net";
 }
 
 my $nickname = whatsmynickname();
