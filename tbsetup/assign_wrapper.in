@@ -15,8 +15,11 @@
 # Settings
 # delaythresh is the maximum delay in ms above which a delay node is needed.
 # maxrun is maximum number of times we run assign.
+# delaywithswitch if 1 will use the switch to delay when possible.  Currently
+#  this only works for 10mbit links.
 $delaythresh = 3;
 $maxrun = 5;
+$delaywithswitch=0;
 
 use DBI;
 
@@ -87,6 +90,10 @@ sub printdb {
 #  lannodes is indexed by physical name is the set of lan nodes.
 #  interfacespeed is indexed by type and contains the bandwidth.
 #  delaynodes is indexed by link name and contains [delay,bw,loss]
+#  portbw is indexed by virtual nodeport and contains the bandwidth
+#    of that port.  Note that the bandwidth of a port is one of 100
+#    or 10.  For LANs with other bandwidths the port speed will be
+#    100 and a delay node will be inserted.
 #
 # Delay node names:
 #  delay nodes are named tbdelayXX N > 2
@@ -157,7 +164,13 @@ while (($vname,$member,$delay,$bandwidth,$lossrate) = $sth->fetchrow_array) {
     push(@{$lans{$vname}},$member);
     $delayinfo{"$vname:$member"} = [$delay,$bandwidth,$lossrate];
     ($node,$port) = split(":",$member);
+    if ($bandwidth == 10) {
+	$portbw{$member} = 10;
+    } else {
+	$portbw{$member} = 100;
+    }
     push(@{$nodelans{$node}},"$port:$vname");
+    printdb "  portbw of $member = $portbw{$member}\n";
     printdb "  $vname $member - $delay $bandwidth $lossrate\n";
     printdb "    Added $port:$vname to nodelans of $node\n";
 }
@@ -261,7 +274,8 @@ foreach $lan (keys(%lans)) {
 	$bandwidth = &getbandwidth(&min($bw0,$bw1));
 	if (($delay > $delaythresh) ||
 	    (($bw != 100) && ($bw != 10)) ||
-	    (($bw != 100) && (($sharks == 0) || ($nonsharks > 1))) || 
+	    (($delaywithswitch == 0) && 
+	     (($bw != 100) && (($sharks == 0) || ($nonsharks > 1)))) || 
 	    ($loss != 0)) {
 	    $delayname = "tbsdelay$delayid";
 	    $delaynodes{"linksdelaysrc/$lan"} = [$delay,$bw,$loss];
@@ -288,7 +302,8 @@ foreach $lan (keys(%lans)) {
 # Probably needs to happen post assign somehow.
 	    if (($delay > $delaythresh) ||
 		(($bw != 100) && ($bw != 10))  ||
-		(($bw != 100) && (($sharks == 0) || ($nonsharks > 1))) || 
+		(($delaywithswitch == 0) && 
+		 (($bw != 100) && (($sharks == 0) || ($nonsharks > 1)))) || 
 		($loss != 0)) {
 		$delayname = "tbdelay$delayid";
 		$delaynodes{"linkdelaysrc/$lan/$member"} = [$delay,$bw,$loss];
@@ -978,3 +993,14 @@ foreach $pnode (keys(%p2vmap)) {
     }
 }
 
+foreach $vnodeport (keys(%portbw)) {
+    ($vnode,$vport) = split(":",$vnodeport);
+    $pnode = $v2pmap{$vnode};
+    $pport = $portmap{$vnodeport};
+    $dbh->do("update interfaces set current_speed=\"$portbw{$vnodeport}\"" .
+	     " where node_id=\"$pnode\" and iface=\"$pport\"") || do {
+		 print STDERR "$0: *** Could not update current_speed on" .
+		     " interfaces.  Giving up.\n";
+		 exit(1);
+	     }
+}
