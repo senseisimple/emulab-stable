@@ -992,3 +992,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	   eid varchar(32) not null, vname varchar(32) not null, \
 	   desire varchar(30) not null, weight float, \
 	   primary key(pid,eid,vname));
+
+1.189: Hah, I had the primary key for virt_node_desires wrong - it should
+       allow multiple desires for each vnode:
+
+       alter table virt_node_desires drop primary key;
+       alter table virt_node_desires add primary key(pid,eid,vname,desire);

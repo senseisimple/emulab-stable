@@ -1506,7 +1506,7 @@ CREATE TABLE virt_node_desires (
   vname varchar(32) NOT NULL default '',
   desire varchar(30) NOT NULL default '',
   weight float default NULL,
-  PRIMARY KEY  (pid,eid,vname)
+  PRIMARY KEY  (pid,eid,vname,desire)
 ) TYPE=MyISAM;
 
 --
