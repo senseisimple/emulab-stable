@@ -406,7 +406,7 @@ if (@failed_nodes) {
     my $failed_lines = join("\n",map { join("\t",@{$_}) } @failed_nodes);
     SENDMAIL($TBOPS, "Virtual Node failure for $pid/$eid",
 	"The following virtual nodes failed: \n" .
-	"vnode\t\tpnode\t\tmode\texit status\n" .
+	"vnode\t\tpnode\tmode\texit status\n" .
 	$failed_lines);
 }
 
