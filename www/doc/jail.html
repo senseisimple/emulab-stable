@@ -13,16 +13,31 @@ What follows is the story of my incredible journey (of woe).
 <br>
 <br>
 
-Initially, we started out with some simple changes to jail. Mike made
+Initially, we started out with some small changes to jail. Mike made
 these changes around October of 2002.
 
 <ul>
-<li> Allow access to raw sockets and read-only access to BPF
-     devices. In the context of Emulab, the additional access is
-     deemed reasonable.
+<li> Optionally allow access to raw sockets. The jail is allowed to
+     both read and write, but is restricted from accessing the
+     firewall, dummynet, route, and RSVP interfaces. We also ensure
+     that the packet header reflects the IP address of the jail.  This
+     option is enabled globally with a MIB entry, and then on a
+     per-jail basis via a command line option to the jail command.
+     TODO: Allow header to reflect any of the IPs to which the jail
+     has access to.
 
-<li> Make access of new and existing capabilities per-jail instead of
-     global MIB entries for all jails
+<li> Optionally allow access to BPF devices. The jail is only allowed to
+     read packets. The interface is not put into promiscuous mode, so
+     the jail is not able to see all of the packets on the wire, but
+     only those addressed to the node. However, if the interface is
+     already in promiscuous mode (say, cause someone outside the jail
+     is using tcpdump), then the jail will also be able to any packet
+     that goes by. This option is enabled globally with a MIB entry,
+     and then on a per-jail basis via a command line option to the
+     jail command.  TODO: Allow header to reflect any of the IPs to
+     which the jail has access to. TODO: Limit packets to those
+     addressed to the IPs or interfaces (tunnels) that the jail is
+     allowed to access.
      
 <li> Restrict the port range to which a jail can bind to. This allows
      multiple jails on the same node to safely share the port space
@@ -61,9 +76,16 @@ To set up the outer environment it is necessary to:
 
 <ul>
 <li> Create the tunnels if the experiment requested tunnels. This applies
-     only to widearea nodes, not to local nodes.
+     only to widearea nodes, not to local nodes. At the same time,
+     routes are setup if the user requested them (static and manual
+     only; we do not run gated on widearea nodes!). At present, the
+     routing setup is done via the vtun config file, which specifies
+     external commands to run as each tap interface is configured and
+     torn down. 
 
-<li> Ask tmcd for the set of jail options that apply.
+<li> Ask tmcd for the set of jail options that apply. Different users
+     and/or experiments might get differing levels of permission to
+     access the extended jail features mentioned above. 
 
 <li> Create a base filesystem for the jail, and then apply some
      customizations to it. In addition to customizations based on the
@@ -137,6 +159,30 @@ alternatives for accomplishing this, but this was fairly easy to do.
 <br>
 <br>
 
+<h3>Setting up the jail, phase two:</h3>
 
+Once the jail system call has been issued, it is up to the inner
+environment to finish getting it set up. Inside the jail, the first
+program to run is a little perl script (injail.pl) that is intended to
+act like "init" in that it starts the initial shell and then waits
+until it receives a signal to terminate. The easiest way to ensure
+that all processes inside the jail are terminated is for injail.pl to
+send a TERM to the entire process group, and then a KILL to pick up
+any stragglers. The initial shell mentioned above is /etc/rc, which
+proceeds to do all of the same boot time configuration that normally
+happens when a node boots. The difference of course is that the jail
+has a heavily constrained /etc/rc.conf that starts up just a few
+essential services such as syslogd and sshd (on the specific port
+assigned sshd for the jail; see above). The last part of configuration
+it run the standard testbed setup, although again in a somewhat
+restricted manner.
 
+<br>
+<br>
+
+The next set of changes was made by Leigh and Mike in March of 2003.
+
+<ul>
+<li>
+</ul>
 
