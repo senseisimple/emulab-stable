@@ -62,7 +62,7 @@ foreach $node (sort keys %nodes) {
     print "link $node-2 $node:$links{$node.'-2'} cisco 100 1\n";
     print "link $node-3 $node:$links{$node.'-3'} cisco 100 1\n";
   } else {
-    print "node $node shark_shelf:1\n";
+    print "node $node shark-shelf:1\n";
     print "link $node $node:$links{$node} cisco 100 1\n";
   }
 }
