@@ -219,68 +219,77 @@ COMMAND_PROTOTYPE(dofullconfig);
 COMMAND_PROTOTYPE(doroutelist);
 COMMAND_PROTOTYPE(dorole);
 COMMAND_PROTOTYPE(dorusage);
+COMMAND_PROTOTYPE(dodoginfo);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
- * pushing out a full configuration. Physnodes get slightly different
+ * out a full configuration. Physnodes get slightly different
  * then vnodes, and at some point we might want to distinguish different
  * types of vnodes (jailed, plab).
  */
 #define FULLCONFIG_NONE		0x0
 #define FULLCONFIG_PHYS		0x1
 #define FULLCONFIG_VIRT		0x2
-#define FULLCONFIG_ALL		FULLCONFIG_PHYS|FULLCONFIG_VIRT
+#define FULLCONFIG_ALL		(FULLCONFIG_PHYS|FULLCONFIG_VIRT)
+
+/*
+ * Flags encode a few other random properties of commands
+ */
+#define F_REMUDP	0x1	/* remote nodes can request using UDP */
+#define F_MINLOG	0x2	/* record minimal logging info */
 
 struct command {
 	char	*cmdname;
 	int	fullconfig;	
+	int	flags;
 	int    (*func)(int, tmcdreq_t *, char *, int, int);
 } command_array[] = {
-	{ "reboot",	  FULLCONFIG_NONE, doreboot },
-	{ "nodeid",	  FULLCONFIG_ALL,  donodeid },
-	{ "status",	  FULLCONFIG_NONE, dostatus },
-	{ "ifconfig",	  FULLCONFIG_ALL,  doifconfig },
-	{ "accounts",	  FULLCONFIG_ALL,  doaccounts },
-	{ "delay",	  FULLCONFIG_ALL,  dodelay },
-	{ "linkdelay",	  FULLCONFIG_ALL,  dolinkdelay },
-	{ "hostnamesV2",  FULLCONFIG_NONE, dohostsV2 },	/* This will go away */
-	{ "hostnames",	  FULLCONFIG_ALL,  dohosts },
-	{ "rpms",	  FULLCONFIG_ALL,  dorpms },
-	{ "deltas",	  FULLCONFIG_NONE, dodeltas },
-	{ "tarballs",	  FULLCONFIG_ALL,  dotarballs },
-	{ "startupcmd",	  FULLCONFIG_ALL,  dostartcmd },
-	{ "startstatus",  FULLCONFIG_NONE, dostartstat }, /* Before startstat*/
-	{ "startstat",	  FULLCONFIG_NONE, dostartstat },
-	{ "readycount",   FULLCONFIG_NONE, doreadycount },
-	{ "ready",	  FULLCONFIG_NONE, doready },
-	{ "mounts",	  FULLCONFIG_ALL,  domounts },
-	{ "sfshostid",	  FULLCONFIG_NONE, dosfshostid },
-	{ "loadinfo",	  FULLCONFIG_NONE, doloadinfo},
-	{ "reset",	  FULLCONFIG_NONE, doreset},
-	{ "routing",	  FULLCONFIG_ALL,  dorouting},
-	{ "trafgens",	  FULLCONFIG_ALL,  dotrafgens},
-	{ "nseconfigs",	  FULLCONFIG_ALL,  donseconfigs},
-	{ "creator",	  FULLCONFIG_ALL,  docreator},
-	{ "state",	  FULLCONFIG_NONE, dostate},
-	{ "tunnels",	  FULLCONFIG_ALL,  dotunnels},
-	{ "vnodelist",	  FULLCONFIG_PHYS, dovnodelist},
-	{ "subnodelist",  FULLCONFIG_PHYS, dosubnodelist},
-	{ "isalive",	  FULLCONFIG_NONE, doisalive},
-	{ "ipodinfo",	  FULLCONFIG_NONE, doipodinfo},
-	{ "ntpinfo",	  FULLCONFIG_PHYS, dontpinfo},
-	{ "ntpdrift",	  FULLCONFIG_NONE, dontpdrift},
-	{ "jailconfig",	  FULLCONFIG_VIRT, dojailconfig},
-	{ "plabconfig",	  FULLCONFIG_VIRT, doplabconfig},
-	{ "subconfig",	  FULLCONFIG_NONE, dosubconfig},
-        { "sdparams",     FULLCONFIG_PHYS, doslothdparams},
-        { "programs",     FULLCONFIG_ALL,  doprogagents},
-        { "syncserver",   FULLCONFIG_ALL,  dosyncserver},
-        { "keyhash",      FULLCONFIG_ALL,  dokeyhash},
-        { "eventkey",     FULLCONFIG_ALL,  doeventkey},
-        { "fullconfig",   FULLCONFIG_NONE, dofullconfig},
-        { "routelist",	  FULLCONFIG_PHYS, doroutelist},
-        { "role",	  FULLCONFIG_PHYS, dorole},
-        { "rusage",	  FULLCONFIG_NONE, dorusage},
+	{ "reboot",	  FULLCONFIG_NONE, 0, doreboot },
+	{ "nodeid",	  FULLCONFIG_ALL,  0, donodeid },
+	{ "status",	  FULLCONFIG_NONE, 0, dostatus },
+	{ "ifconfig",	  FULLCONFIG_ALL,  0, doifconfig },
+	{ "accounts",	  FULLCONFIG_ALL,  0, doaccounts },
+	{ "delay",	  FULLCONFIG_ALL,  0, dodelay },
+	{ "linkdelay",	  FULLCONFIG_ALL,  0, dolinkdelay },
+	{ "hostnamesV2",  FULLCONFIG_NONE, 0, dohostsV2 },   /* Will go away */
+	{ "hostnames",	  FULLCONFIG_ALL,  0, dohosts },
+	{ "rpms",	  FULLCONFIG_ALL,  0, dorpms },
+	{ "deltas",	  FULLCONFIG_NONE, 0, dodeltas },
+	{ "tarballs",	  FULLCONFIG_ALL,  0, dotarballs },
+	{ "startupcmd",	  FULLCONFIG_ALL,  0, dostartcmd },
+	{ "startstatus",  FULLCONFIG_NONE, 0, dostartstat }, /* Before startstat*/
+	{ "startstat",	  FULLCONFIG_NONE, 0, dostartstat },
+	{ "readycount",   FULLCONFIG_NONE, 0, doreadycount },
+	{ "ready",	  FULLCONFIG_NONE, 0, doready },
+	{ "mounts",	  FULLCONFIG_ALL,  0, domounts },
+	{ "sfshostid",	  FULLCONFIG_NONE, 0, dosfshostid },
+	{ "loadinfo",	  FULLCONFIG_NONE, 0, doloadinfo},
+	{ "reset",	  FULLCONFIG_NONE, 0, doreset},
+	{ "routing",	  FULLCONFIG_ALL,  0, dorouting},
+	{ "trafgens",	  FULLCONFIG_ALL,  0, dotrafgens},
+	{ "nseconfigs",	  FULLCONFIG_ALL,  0, donseconfigs},
+	{ "creator",	  FULLCONFIG_ALL,  0, docreator},
+	{ "state",	  FULLCONFIG_NONE, 0, dostate},
+	{ "tunnels",	  FULLCONFIG_ALL,  0, dotunnels},
+	{ "vnodelist",	  FULLCONFIG_PHYS, 0, dovnodelist},
+	{ "subnodelist",  FULLCONFIG_PHYS, 0, dosubnodelist},
+	{ "isalive",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, doisalive},
+	{ "ipodinfo",	  FULLCONFIG_NONE, 0, doipodinfo},
+	{ "ntpinfo",	  FULLCONFIG_PHYS, 0, dontpinfo},
+	{ "ntpdrift",	  FULLCONFIG_NONE, 0, dontpdrift},
+	{ "jailconfig",	  FULLCONFIG_VIRT, 0, dojailconfig},
+	{ "plabconfig",	  FULLCONFIG_VIRT, 0, doplabconfig},
+	{ "subconfig",	  FULLCONFIG_NONE, 0, dosubconfig},
+        { "sdparams",     FULLCONFIG_PHYS, 0, doslothdparams},
+        { "programs",     FULLCONFIG_ALL,  0, doprogagents},
+        { "syncserver",   FULLCONFIG_ALL,  0, dosyncserver},
+        { "keyhash",      FULLCONFIG_ALL,  0, dokeyhash},
+        { "eventkey",     FULLCONFIG_ALL,  0, doeventkey},
+        { "fullconfig",   FULLCONFIG_NONE, 0, dofullconfig},
+        { "routelist",	  FULLCONFIG_PHYS, 0, doroutelist},
+        { "role",	  FULLCONFIG_PHYS, 0, dorole},
+        { "rusage",	  FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dorusage},
+        { "watchdoginfo", FULLCONFIG_ALL,  0, dodoginfo},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -813,9 +822,9 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	 * Map the ip to a nodeid.
 	 */
 	if ((err = iptonodeid(client->sin_addr, reqp))) {
-		if (err == 2) {
-			error("No such node vnode mapping %s on %s\n",
-			      reqp->vnodeid, reqp->nodeid);
+		if (reqp->isvnode) {
+			error("No such vnode %s associated with %s\n",
+			      reqp->vnodeid, inet_ntoa(client->sin_addr));
 		}
 		else {
 			error("No such node: %s\n",
@@ -933,11 +942,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	}
 
 	/*
-	 * XXX: We allow remote nodes to use UDP for isalive/rusage only!
+	 * If this is a UDP request from a remote node,
+	 * make sure it is allowed.
 	 */
 	if (!istcp && !reqp->islocal &&
-	    !(command_array[i].func == doisalive ||
-	      command_array[i].func == dorusage)) {
+	    (command_array[i].flags & F_REMUDP) == 0) {
 		error("%s: Invalid request (%s) from remote node using UDP!\n",
 		      reqp->nodeid, command_array[i].cmdname);
 		goto skipit;
@@ -951,8 +960,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 #else
 	cp = (istcp ? "TCP" : "UDP");
 #endif
-	if (verbose || ! (command_array[i].func == doisalive ||
-			  command_array[i].func == dorusage))
+	if (verbose || (command_array[i].flags & F_MINLOG) == 0)
 		info("%s: vers:%d %s %s\n", reqp->nodeid,
 		     version, cp, command_array[i].cmdname);
 
@@ -966,8 +974,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (!istcp) 
 		client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
-	if (byteswritten && ! (command_array[i].func == doisalive ||
-			       command_array[i].func == dorusage))
+	if (byteswritten && (command_array[i].flags & F_MINLOG) == 0)
 		info("%s: %s wrote %d bytes\n",
 		     reqp->nodeid, command_array[i].cmdname,
 		     byteswritten);
@@ -4831,3 +4838,81 @@ COMMAND_PROTOTYPE(dorusage)
 	return 0;
 }
 
+/*
+ * Report time intervals to use in the watchdog process.  All times in
+ * seconds (0 means never, -1 means no value is available in the DB):
+ *
+ *	INTERVAL=	how often to check for new intervals
+ *	ISALIVE=	how often to report isalive info
+ *			(note that also controls how often new accounts
+ *			 are noticed)
+ *	NTPDRIFT=	how often to report NTP drift values
+ *	CVSUP=		how often to check for software updates
+ */
+COMMAND_PROTOTYPE(dodoginfo)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[MYBUFSIZE];
+	int		nrows, *iv;
+	int		iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup;
+
+	/*
+	 * XXX sitevar fetching should be a library function
+	 */
+	res = mydb_query("select name,value,defaultvalue "
+			 "from sitevariables where name like 'watchdog/%%'",
+			 3, buf);
+	if (!res || (nrows = (int)mysql_num_rows(res)) == 0) {
+		error("WATCHDOGINFO: no watchdog sitevars\n");
+		if (res)
+			mysql_free_result(res);
+		return 1;
+	}
+
+	iv_interval = iv_isalive = iv_ntpdrift = iv_cvsup = -1;
+	while (nrows) {
+		iv = 0;
+		row = mysql_fetch_row(res);
+		if (strcmp(row[0], "watchdog/interval") == 0) {
+			iv = &iv_interval;
+		} else if (strcmp(row[0], "watchdog/ntpdrift") == 0) {
+			iv = &iv_ntpdrift;
+		} else if (strcmp(row[0], "watchdog/cvsup") == 0) {
+			iv = &iv_cvsup;
+		} else if (strcmp(row[0], "watchdog/isalive/local") == 0) {
+			if (reqp->islocal && !reqp->isvnode)
+				iv = &iv_isalive;
+		} else if (strcmp(row[0], "watchdog/isalive/vnode") == 0) {
+			if (reqp->islocal && reqp->isvnode)
+				iv = &iv_isalive;
+		} else if (strcmp(row[0], "watchdog/isalive/plab") == 0) {
+			if (!reqp->islocal && reqp->isplabdslice)
+				iv = &iv_isalive;
+		} else if (strcmp(row[0], "watchdog/isalive/wa") == 0) {
+			if (!reqp->islocal && !reqp->isplabdslice)
+				iv = &iv_isalive;
+		}
+
+		if (iv) {
+			/* use the current value if set */
+			if (row[1] && row[1][0])
+				*iv = atoi(row[1]) * 60;
+			/* else check for default value */
+			else if (row[2] && row[2][0])
+				*iv = atoi(row[2]) * 60;
+			else
+				error("WATCHDOGINFO: sitevar %s not set\n",
+				      row[0]);
+		}
+		nrows--;
+	}
+	mysql_free_result(res);
+
+	OUTPUT(buf, sizeof(buf),
+	       "INTERVAL=%d ISALIVE=%d NTPDRIFT=%d CVSUP=%d\n",
+	       iv_interval, iv_isalive, iv_ntpdrift, iv_cvsup);
+	client_writeback(sock, buf, strlen(buf), tcp);
+
+	return 0;
+}
