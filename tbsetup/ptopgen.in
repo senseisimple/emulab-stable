@@ -11,27 +11,15 @@ use Getopt::Std;
 
 sub usage()
 {
-    print STDOUT "Usage: ptopgen [-s switch]\n";
+    print STDOUT "Usage: ptopgen [-s switch] [-e pid/eid] \n" .
+                 "       -e include given experiment's resources\n" .
+                 "          in the ptopfile (as if they were free)\n";
     exit(-1);
 }
-my  $optlist = "s:";
+my  $optlist = "s:e:";
 
 
 # Settings - Change these to your particular network.
-#
-# Explanation from Mac:
-#
-# These are for the imaginary "lan nodes". Internally the way we map
-# lans is as a bunch of machines connected in a star to a "lan node"
-# that has infinite bw basically, and an infinite number of connections
-# available to it. So the first big number is BW (100Gbps), and the
-# 1000 means it has 1000 connections to the switch. That number is
-# plenty high as it is, since our limit on one switch is under 400.
-#
-# Speed in in Kbs!
-#
-my $lannode_switch2switch_speed = 100000000;
-my $lannode_switch2switch_links = 1000;
 
 #
 # Also bogus. The interfaces table does not hold entries for the switch
@@ -58,6 +46,9 @@ my $switchtouse;
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
 
+my $exempt_pid;
+my $exempt_eid;
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
@@ -73,11 +64,19 @@ if (defined($options{"s"})) {
     $switchtouse = $options{"s"};
 }
 
+if (defined($options{"e"})) {
+    ($exempt_pid, $exempt_eid) = split( /\//, $options{"e"} );
+    if (!defined($exempt_eid)) { usage(); }
+}
+
 # Read class/type maps
-my $result = DBQueryFatal("select class,type,delay_capacity from node_types");
-while (($class,$type,$delaycapacity) = $result->fetchrow_array) {
+my $result =
+    DBQueryFatal("select class,type,delay_capacity,virtnode_capacity ".
+		 "from node_types");
+while (($class,$type,$delaycapacity,$vcap) = $result->fetchrow_array) {
     $classes{$type} = $class;
     $nodetypes{$type} = $delaycapacity;
+    $virtcapacity{$type} = $vcap;
 }
 $result->finish;
 
@@ -111,7 +110,17 @@ else {
 #
 my $pc601hack_only = "a.type='pc601' and";
 my $pc601hack_none = "a.type!='pc601' and";
-my $pcvmhack       = "(a.type!='pcvm600' and a.type!='pcvm850') and ";
+my $pcvmhack       = "(t.class!='pcvm') and ";
+
+# the ordinary free condition for a node
+my $free_condition = "(b.node_id is null)";
+
+# if the user has specified an exempt pid/eid, 
+# then view any node which is reserved to that experiment as available.
+if (defined($exempt_eid)) {
+    $free_condition = "($free_condition or ".
+	"(b.pid='$exempt_pid' and b.eid='$exempt_eid'))"; 
+}
 
 $result =
     DBQueryFatal("select a.node_id,a.type from nodes as a ".
@@ -119,7 +128,7 @@ $result =
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
 		 "left join node_status as ns on a.phys_nodeid=ns.node_id ".
 		 "left join node_types as t on t.type=a.type ".
-		 "where b.node_id is null and $pcvmhack ".
+		 "where $free_condition and $pcvmhack ".
 		 "      $pc601hack_none ".
 		 "      (a.role='testnode' or ".
 		 "       (a.role='virtnode' and ns.status='up' and ".
@@ -150,16 +159,29 @@ foreach $node (keys(%nodes)) {
     } else {
 	$text = "node $node $nodes{$node}:1 $classes{$nodes{$node}}:1";
 	$delay_capacity = $nodetypes{$nodes{$node}};
+	$virtnode_capacity = $virtcapacity{$nodes{$node}};
 	if ($delay_capacity > 0) {
 	    $text .= " delay:$delay_capacity";
-##################################################################################
-### NSE Node hack. Instead of adding sim nodes into the database schema,
-### I'm just adding it here for now untill we can figure out how to add sim nodes
-### into the nodes table.
-### One assumption is that if we the node type can support delay nodes,
-### then it is a local node and therefore we can support sim nodes
-#################################################################################
+	    
+            #################################################################
+            ### NSE Node hack. Instead of adding sim nodes into the
+            ### database schema, I'm just adding it here for now
+            ### untill we can figure out how to add sim nodes into the
+            ### nodes table.  One assumption is that if we the node
+            ### type can support delay nodes, then it is a local node
+            ### and therefore we can support sim nodes
+            #################################################################
             $text .= " sim:100000";
+	    #
+	    # Ditto for jailed nodes
+	    #
+            $text .= " pcvm:10";
+	}
+	if ($virtnode_capacity > 0) {
+	    #
+	    # Ditto for jailed nodes
+	    #
+            $text .= " pcvm:$virtnode_capacity";
 	}
 	print "$text\n";
     }
@@ -234,7 +256,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	    # !!! - Here we use our knowledge that in the wires table links
 	    # to the switch always come as node2.
 	    print "link link-$node1:$iface1-$node2:$iface2 $node1:$node1/$iface1" .
-		" $node2:$iface2 $bw 1\n";
+		" $node2:$iface2 $bw 0 0 1\n";
 	}
     } 
 }
@@ -291,21 +313,10 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
 
 foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
-    print "link link-$interconnect $src $dst $interconnects{$interconnect} 1\n";
+    print "link link-$interconnect $src $dst $interconnects{$interconnect} 0 0 1\n";
 }
 
 print $sharklinks;
-
-# Add a bunch of LANs
-foreach $switch (keys(%used_switches)) {
-    for ($i = 0;$i <= 20;$i++) {
-	print "node lan-$switch-$i lan:1\n";
-	print "link link-lan-$switch-$i lan-$switch-${i}:lan-$switch-$i " .
-	    "$switch ".
-	    "$lannode_switch2switch_speed $lannode_switch2switch_links\n";
-    }
-}
-
 
 # Print out links
 sub get_iface {

@@ -265,21 +265,53 @@ if ($showlinks) {
     }
 
     my $result =
-	DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
+	DBQueryFatal("select vname,member,delay,bandwidth,lossrate, ".
+		     "rdelay,rbandwidth,rlossrate ".
 		     "from virt_lans where pid='$pid' and eid='$eid'".
 		     "order by vname");
 
     if ($result->numrows) {
-	print  "Lan/Link Info:\n";
+	print  "Virtual Lan/Link Info:\n";
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
 	       "ID", "Member", "IP", "Delay", "BW (Kbs)", "Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 	       "--------- ---------\n";
     
-	while (($vname,$member,$delay,$bandwidth,$lossrate) 
-	       = $result->fetchrow_array()) {
+	while (($vname,$member,$delay,$bandwidth,$lossrate,
+		$rdelay,$rbandwidth,$rlossrate) = $result->fetchrow_array()) {
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname, 
-	    $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
+	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "",
+	           "", "", $rdelay, $rbandwidth, $rlossrate;
+	}
+	print "\n";
+    }
+
+    # Queue info.
+    $result =
+	DBQueryFatal("select vname,member,q_limit,q_maxthresh,q_minthresh, ".
+		     "q_weight,q_linterm,q_qinbytes,q_red,q_gentle ".
+		     "  from virt_lans ".
+		     "where pid='$pid' and eid='$eid'".
+		     "order by vname");
+
+    if ($result->numrows) {
+	print  "Virtual Queue Info:\n";
+	printf "%-15s %-15s %-10s %-7s %s\n",
+	       "ID", "Member", "Q Limit", "Type",
+	       "weight/min_th/max_th/linterm";
+	print  "--------------- --------------- ---------- ".
+	       "------- ----------------------------\n";
+    
+	while (($vname,$member,$q_limit,$q_maxthresh,$q_minthresh,
+		$q_weight,$q_linterm,$q_qinbytes,$q_red,$q_gentle)
+	       = $result->fetchrow_array()) {
+
+	    printf("%-15s %-15s %-10s %-7s %s\n", $vname, $member,
+		   $q_limit . ($q_qinbytes ? "b" : "s"),
+		   ($q_red ? ($q_gentle ? "GRED" : "RED") : "Tail"),
+		   ($q_red ? "$q_weight/$q_minthresh/$q_maxthresh/$q_linterm" :
+		    "0/0/0/0"));
 	}
 	print "\n";
     }
@@ -393,22 +425,111 @@ if ($showlinks) {
 if ($showdelays &&
     (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING))) {
     
-    my $result =
-	DBQueryFatal("select d.node_id,d.vname,d.pipe0,d.pipe1,r.vname ".
-		     " from delays as d ".
+    $result_delays =
+	DBQueryFatal("select d.*,r.vname as delayvname from delays as d ".
 		     "left join reserved as r on d.node_id=r.node_id ".
-		     "where d.pid='$pid' and d.eid='$eid' ".
-		     "order by d.vname ASC");
+		     "where d.pid='$pid' and d.eid='$eid'");
 
-    if ($result->numrows) {
-	print "Delay Node Info:\n";
-	printf "%-15s %-15s %-15s %-15s\n",
-	       "ID", "Virtual", "Physical", "Pipe Numbers";
-	print "--------------- --------------- --------------- ".
-	      "--------------- \n";
-	while (($phys,$vname,$pipe0,$pipe1,$virt) = $result->fetchrow_array()){
-	    printf "%-15s %-15s %-15s %-15s\n",
-	           $vname, $virt, $phys, "$pipe0,$pipe1";
+    $result_linkdelays =
+	DBQueryFatal("select * from linkdelays ".
+		     "where pid='$pid' and eid='$eid'");
+    
+    if ($result_delays->numrows || $result_linkdelays->numrows) {
+	print  "Physical Lan/Link Info:\n";
+	printf "%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
+	       "ID", "Member", "Delay Node", "Delay", "BW (Kbs)", "PLR",
+	       "Pipe";
+	print  "--------------- --------------- ------------ -------- ".
+	       "-------- ------ ---------\n";
+    }
+
+    if ($result_delays->numrows) {
+	while (my %row = $result_delays->fetchhash()) {
+	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
+		   $row{vname}, $row{vnode0}, $row{delayvname},
+		   $row{delay0}, $row{bandwidth0}, $row{lossrate0},
+		   $row{pipe0});
+
+	    # If vnode0 eq vnode1, its a lan node. Print differently.
+	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
+		   ($row{vnode0} eq $row{vnode1} ? "" : $row{vname}),
+		   ($row{vnode0} eq $row{vnode1} ? "" : $row{vnode1}),
+		   ($row{vnode0} eq $row{vnode1} ? "" : $row{delayvname}),
+		   $row{delay1}, $row{bandwidth1}, $row{lossrate1},
+		   $row{pipe1});
+	}
+	print "\n";
+    }
+    
+    if ($result_linkdelays->numrows) {
+	while (my %row = $result_linkdelays->fetchhash()) {
+	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
+		   $row{vlan}, $row{vnode}, $row{node_id},
+		   $row{delay}, $row{bandwidth}, $row{lossrate},
+		   $row{pipe});
+
+
+	    # Lan node, from the switch
+	    if ($row{type} eq "duplex") {
+		printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n", "", "", "",
+		       $row{rdelay}, $row{rbandwidth}, $row{rlossrate},
+		       $row{rpipe});
+	    }
+	}
+	print "\n";
+    }
+	
+    $result_delays->dataseek(0);
+    $result_linkdelays->dataseek(0);
+
+    if ($result_delays->numrows || $result_linkdelays->numrows) {
+	print  "Physical Queue Info:\n";
+	printf "%-15s %-15s %-10s %-7s %s\n",
+	       "ID", "Member", "Q Limit", "Type",
+	       "weight/min_th/max_th/linterm";
+	print  "--------------- --------------- ---------- ".
+	       "------- ----------------------------\n";
+    }
+    
+    if ($result_delays->numrows) {
+	while (my %row = $result_delays->fetchhash()) {
+	    printf("%-15s %-15s %-10s %-7s %s\n", $row{vname},
+		   $row{vnode0},
+		   $row{q0_limit} . ($row{q0_qinbytes} ? "b" : "s"),
+		   ($row{q0_red} ?
+		    ($row{q0_gentle} ? "GRED" : "RED") : "Tail"),
+		   ($row{q0_red} ?
+		    "$row{q0_weight}/$row{q0_minthresh}/".
+		    "$row{q0_maxthresh}/$row{q0_linterm}" :
+		    "0/0/0/0"));
+
+	    # If equal, its a lan, and so only one queue towards the switch
+	    if ($row{vnode0} ne $row{vnode1}) {
+		printf("%-15s %-15s %-10s %-7s %s\n", $row{vname},
+		       $row{vnode1},
+		       $row{q1_limit} . ($row{q1_qinbytes} ? "b" : "s"),
+		       ($row{q1_red} ?
+			($row{q1_gentle} ? "GRED" : "RED") : "Tail"),
+		       ($row{q1_red} ?
+			"$row{q1_weight}/$row{q1_minthresh}/".
+			"$row{q1_maxthresh}/$row{q1_linterm}" :
+			"0/0/0/0"));
+	    }
+	}
+	print "\n";
+    }
+
+    if ($result_linkdelays->numrows) {
+	while (my %row = $result_linkdelays->fetchhash()) {
+	    printf("%-15s %-15s %-10s %-7s %s\n", $row{vlan},
+		   $row{vnode},
+		   $row{q_limit} . ($row{q_qinbytes} ? "b" : "s"),
+		   ($row{q_red} ?
+		    ($row{q_gentle} ? "GRED" : "RED") : "Tail"),
+		   ($row{q_red} ?
+		    "$row{q_weight}/$row{q0_minthresh}/".
+		    "$row{q_maxthresh}/$row{q0_linterm}" :
+		    "0/0/0/0"));
 	}
 	print "\n";
     }

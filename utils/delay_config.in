@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -14,23 +14,33 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDERR
-	"Usage: delay_config [-m] [-d delay] [-b bw] [-l plr] [-p 0|1] ",
-	"<pid> <eid> <link>\n",
-	"Required: pid, eid, link, and at least one of -d, -b, or -l\n",
-	"  pid = Project ID\n",
-	"  eid = Experiment ID\n",
-	" link = link name from ns file, ie. 'link1' in\n",
-	"        'set link1 [\$ns duplex-link \$A \$B 100Kb 0ms DropTail]'\n",
-	"   -d = one-way link delay in milliseconds greater than 1\n",
-	"   -b = <NNN> N=bandwidth (10-100000 Kbits per second)\n",
-	"   -l = packet loss rate (0 <= plr < 1)\n",
-	"   -p = Select one of the pipes. 0 - packets received on iface0\n".
-	"   -m = Modify the base experiment in addition to current state.\n";
-
+    print(STDERR
+	  "Usage: delay_config [-m] [-d] [-s vnode] <pid> <eid> <link>".
+	  " PARAM=VALUE ...\n".
+	  "Required: pid, eid, link, and at least one parameter to change!\n".
+	  "  pid = Project ID\n".
+	  "  eid = Experiment ID\n".
+	  " link = link name from ns file, ie. 'link1' in\n".
+	  "        'set link1 [\$ns duplex-link \$A \$B 10Kb 0ms DropTail]'\n".
+	  "Options:\n".
+	  "   -d = turn on debugging\n".
+	  "   -s = Select the source of the link to determine which pipe\n".
+	  "        This is easier than using the -p option!\n".
+	  "   -m = Modify the base experiment in addition to current state.\n".
+	  "Parameters:\n".
+	  " BANDWIDTH=NNN    - N=bandwidth (10-100000 Kbits per second)\n",
+	  " PLR=NNN          - N=lossrate (0 <= plr < 1)\n".
+	  " DELAY=NNN        - N=delay (one-way delay in milliseconds > 0)\n".
+	  " LIMIT=NNN        - The queue size in bytes or packets\n".
+	  " QUEUE-IN-BYTES=N - 0 means in packets, 1 means in bytes\n".
+	  "RED/GRED Options: (only if link was specified as RED/GRED)\n".
+	  " MAXTHRESH=NNN    - Maximum threshold for the average queue size\n".
+	  " THRESH=NNN       - Maximum threshold for the average queue size\n".
+	  " LINTERM=NNN      - Packet dropping probability\n".
+	  " Q_WEIGHT=NNN     - For calculating the average queue size\n");
     exit(-1);
 }
-my  $optlist = "gd:b:l:p:m";
+my  $optlist = "dms:";
 
 #
 # Configure variables
@@ -69,31 +79,121 @@ if (@ARGV < 4) {
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 3) {
-    usage();
-}
-if (defined($options{"g"})) {
+if (defined($options{"d"})) {
     $debug = 1;
 }
 
-my $pid    = $ARGV[0];
-my $eid    = $ARGV[1];
-my $link   = $ARGV[2];
+my $pid    = shift(@ARGV);
+my $eid    = shift(@ARGV);
+my $link   = shift(@ARGV);
 my $modify = 0;
-my $islink = 0;
+my $srcvnode;
+my %config;
+my $pipeno;
 my $pipe;
 
 if (defined($options{"m"})) {
     $modify = 1;
 }
+if (defined($options{"s"})) {
+    $srcvnode = $options{"s"};
+}
 
-if (defined($options{"p"})) {
-    $pipe = $options{"p"};
+#
+# Parse options, which will modify the existing configuration below.
+#
+while (@ARGV) {
+    my $opt = shift(@ARGV);
 
-    if ($pipe != 0 && $pipe != 1) {
+    #
+    # The parameter names correspond roughly to the names that the user
+    # uses in the NS file. The $config{} keys correspond to the names of
+    # the slots in the DB table. Well, roughly correspond since the delays
+    # table uses q0_ and q1_, but we handle that below.
+    #
+    # XXX If you add to this list, be sure to add to agentmap hash below.
+    #
+    SWITCH: for ($opt) {
+	/^BANDWIDTH=([0-9]*)$/i && do {
+	    if ($1 > 100000 || $1 < 10) {
+		usage();
+	    }
+	    $config{"bandwidth"} = $1;
+	    last SWITCH;
+	};
+	/^DELAY=([0-9]*)$/i && do {
+	    if ($1 < 0) {
+		usage();
+	    }
+	    $config{"delay"} = $1;
+	    last SWITCH;
+	};
+	/^PLR=([0-9\.]*)$/i && do {
+	    if ($1 < 0) {
+		usage();
+	    }
+	    $config{"lossrate"} = $1;
+	    last SWITCH;
+	};
+	/^LIMIT=([0-9]*)$/i && do {
+	    $config{"q_limit"} = $1;
+	    last SWITCH;
+	};
+	/^QUEUE-IN-BYTES=(\d)$/i && do {
+	    if ($1 != 0 && $1 != 1) {
+		usage();
+	    }
+	    $config{"q_qinbytes"} = $1;
+	    last SWITCH;
+	};
+	/^MAXTHRESH=(\d*)$/i && do {
+	    $config{"q_maxthresh"} = $1;
+	    last SWITCH;
+	};
+	/^THRESH=(\d*)$/i && do {
+	    $config{"q_minthresh"} = $1;
+	    last SWITCH;
+	};
+	/^LINTERM=([0-9\.]*)$/i && do {
+	    $config{"q_linterm"} = $1;
+	    last SWITCH;
+	};
+	/^Q_WEIGHT=([0-9\.]*)$/i && do {
+	    $config{"q_weight"} = $1;
+	    last SWITCH;
+	};
+	print "Invalid config option: $opt\n";
 	usage();
     }
 }
+
+#
+# More sanity checks.
+#
+foreach my $key (keys(%config)) {
+    my $val = $config{$key};
+
+    if ($debug) {
+	print "$key=$val\n";
+    }
+}
+
+#
+# These map the names I'm using in the config hash (which correspond
+# to the DB slot names) into the event parameter names to send over to the
+# delay agent.
+#
+my %agentmap =
+    ( bandwidth		=> BANDWIDTH,
+      delay             => DELAY,
+      lossrate		=> PLR,
+      q_limit		=> LIMIT,
+      q_qinbytes	=> "QUEUE-IN-BYTES",
+      q_maxthresh	=> MAXTHRESH,
+      q_minthresh	=> THRESH,
+      q_linterm		=> LINTERM,
+      q_weight		=> Q_WEIGHT
+    );
 
 #
 # Verify user and get his DB uid.
@@ -113,166 +213,319 @@ if ($UID && !TBAdmin($UID) &&
 }
 
 #
-# Get current delay configuration.
+# Link or Lan!
 # 
-my $query_result = 
-    DBQueryFatal("select * from delays ".
+my $query_result =
+    DBQueryFatal("select member from virt_lans ".
 		 "where pid='$pid' and eid='$eid' and vname='$link'");
-if (! $query_result->numrows) {
-    die("*** $0:\n".
-	"    No such delay link $link in $pid/$eid!\n");
-}
-if ($query_result->numrows > 1) {
-    die("*** $0:\n".
-	"    Cannot modify delay parameters for Lans. Duplex Links Only!\n");
-}
-
-my %row    = $query_result->fetchhash();
-my %bw;
-my %delay;
-my %plr;
-
-$delay[0] = $row{'delay0'};
-$bw[0]    = $row{'bandwidth0'};
-$plr[0]   = $row{'lossrate0'};
-$delay[1] = $row{'delay1'};
-$bw[1]    = $row{'bandwidth1'};
-$plr[1]   = $row{'lossrate1'};
+my $islink = ($query_result->numrows == 2 ? 1 : 0);
 
 #
-# Parse options, which modify the above configuration.
+# Check to see if linkdelays or normal delay nodes. This is a gross
+# complication of this entire script!
 #
-my $newdelay;
-my $newbw;
-my $newplr;
-
-if (defined($options{"d"})) {
-    $newdelay = $options{"d"};
-
-    if (! ($newdelay =~ /^[0-9]*$/)) {
-	die("Illegal delay spec: $newdelay\n");
-    }
-
-    if ($newdelay < 0) {
-	usage();
-    }
-    if ($debug) {
-	print "Setting delay to $newdelay milliseconds.\n";
-    }
-}
-
-if (defined($options{"l"})) {
-    $newplr = $options{"l"};
-
-    if (! ($newplr =~ /^[0-9\.]*$/)) {
-	die("Illegal plr spec: $newplr.\n");
-    }
-
-    if ($newplr < 0 || $newplr > 1) {
-	usage();
-    }
-    if ($debug) {
-	print "Setting plr to $newplr.\n";
-    }
-}
-
-if (defined($options{"b"})) {
-    $newbw = $options{"b"};
-
-    if (! ($newbw =~ /^[0-9]*$/)) {
-	die("Illegal bw spec: $newbw.\n");
-    }
-
-    if ($newbw > 100000 || $newbw < 10) {
-	usage();
-    }
-    
-    if ($debug) {
-	print "Setting bandwidth to $newbw Kbs.\n";
-    }
-}
-
-if (defined($pipe)) {
-    if (defined($newbw)) {
-	$bw[$pipe] = $newbw;
-    }
-    if (defined($newplr)) {
-	$plr[$pipe] = $newplr;
-    }
-    if (defined($newdelay)) {
-	$delay[$pipe] = $newdelay;
-    }
-}
-else {
-    if (defined($newbw)) {
-	$bw[0] = $newbw;
-	$bw[1] = $newbw;
-    }
-    if (defined($newplr)) {
-	$plr[0] = $newplr;
-	$plr[1] = $newplr;
-    }
-    if (defined($newdelay)) {
-	$delay[0] = $newdelay;
-	$delay[1] = $newdelay;
-    }
+if (ChangeDelayConfig() < 0 &&
+    ChangeLinkDelayConfig() < 0) {
+    die("*** $0:\n".
+	"    No such link or node in $pid/$eid!\n");
 }
 
 if ($modify) {
-    my $d0 = $delay[0] / 2.0;
-    my $d1 = $delay[1] / 2.0;
-    my $l0 = 1-sqrt(1-$plr[0]);
-    my $l1 = 1-sqrt(1-$plr[1]);
-    my $b0 = $bw[0];
-    my $b1 = $bw[1];
-
-    #
-    # Need to get each of the virt_lan entries. Remember, just links! No lans!
-    #
-    # XXX We don't actually know which entry is which, but depend on their
-    # order in the DB. Rather bogus. Needs fixing.
-    #
-    $query_result =
-	DBQueryFatal("select member from virt_lans ".
-		     "where pid='$pid' and eid='$eid' and vname='$link'");
-
-    my ($member1) = $query_result->fetchrow_array();
-    my ($member2) = $query_result->fetchrow_array();
-    
-    DBQueryWarn("update virt_lans set ".
-		" delay=$d1, bandwidth=$b1, lossrate=$l1, ".
-		"rdelay=$d0,rbandwidth=$b0,rlossrate=$l0  ".
-		"where pid='$pid' and eid='$eid' and ".
-		"vname='$link' and member='$member1'");
-
-    DBQueryWarn("update virt_lans set ".
-		" delay=$d0, bandwidth=$b0, lossrate=$l0, ".
-		"rdelay=$d1,rbandwidth=$b1,rlossrate=$l1  ".
-		"where pid='$pid' and eid='$eid' and ".
-		"vname='$link' and member='$member2'");
+    ChangeVirtLans();
 }
 
 #
-# Update the delays table.
+# Get current delay configuration. 
+# 
+sub ChangeDelayConfig() {
+    my $query_clause;
+    my $query_string;
+
+    $query_string = "select * from delays ".
+	"where pid='$pid' and eid='$eid' and vname='$link' ";
+
+    $query_string .= "and (vnode0='$srcvnode' or vnode1='$srcvnode')"
+	if (defined($srcvnode));
+
+    #
+    # Okay, see if there is a delay node.
+    # 
+    my $query_result = DBQueryFatal($query_string);
+    if (! $query_result->numrows) {
+	return -1;
+    }
+    
+    if (defined($srcvnode) && $islink) {
+	#
+	# If given a source node of a duplex link, must map that into
+	# the actual delay pipe side and the pipe number, since the
+	# names of the slots in the DB table have a 0/1 appended. Big
+	# Yuck.
+	#
+	if ($query_result->numrows != 1) {
+	    die("*** $0:\n".
+		"    Too many delay links for $link in $pid/$eid!\n");
+	}
+	my %row = $query_result->fetchhash();
+
+	if ($row{'vnode0'} eq $srcvnode) {
+	    $pipe   = 0;
+	}
+	else {
+	    $pipe   = 1;
+	}
+	$pipeno = $row{"pipe${pipe}"};
+	
+	foreach my $key (keys(%config)) {
+	    my $val = $config{$key};
+
+	    $query_clause .= ", "
+		if (defined($query_clause));
+		
+	    if ($key =~ /^q_(.*)/) {
+		$query_clause .= "q${pipe}_${1}=$val";
+	    }
+	    else {
+		$query_clause .= "${key}${pipe}=$val";
+	    }
+	}
+    }
+    else {
+	#
+	# We are changing a link or entire lan symmetrically, or we are
+	# changing one node in a lan symmetrically. Note, we cannot yet
+	# make an asymmetric change to an indvidual lan node. Sorry, too
+	# much pain. 
+	#
+	foreach my $key (keys(%config)) {
+	    my $val = $config{$key};
+
+	    $query_clause .= ", "
+		if (defined($query_clause));
+		
+	    if ($key =~ /^q_(.*)/) {
+		$query_clause .= "q0_${1}=$val,q1_${1}=$val";
+	    }
+	    else {
+		$query_clause .= "${key}0=$val,${key}1=$val";
+	    }
+	}
+    }
+    
+    #
+    # Update the delays table.
+    #
+    $query_string =
+	"update delays set $query_clause ".
+	"where pid='$pid' and eid='$eid' and vname='$link' ";
+    
+    if (defined($srcvnode)) {
+	$query_string .= "and (vnode0='$srcvnode' or vnode1='$srcvnode')";
+    }
+    if ($debug) {
+	print "$query_string\n";
+    }
+    DBQueryFatal($query_string);
+    return 0;
+}    
+
 #
-DBQueryWarn("update delays set ".
-	    "delay0=$delay[0],bandwidth0=$bw[0],lossrate0=$plr[0], ".
-	    "delay1=$delay[1],bandwidth1=$bw[1],lossrate1=$plr[1] ".
-	    "where pid='$pid' and eid='$eid' and vname='$link'");
+# Change linkdelays.
+# 
+sub ChangeLinkDelayConfig() {
+    my @query_clauses;
+    my $query_string;
+
+    $query_string = "select * from linkdelays ".
+	"where pid='$pid' and eid='$eid' and vlan='$link' ";
+
+    $query_string .= "and vnode='$srcvnode'"
+	if (defined($srcvnode));
+
+    #
+    # Okay, see if there is a linkdelay.
+    # 
+    my $query_result = DBQueryFatal($query_string);
+    if (! $query_result->numrows) {
+	return -1;
+    }
+
+    #
+    # This is much easier than delay nodes! As above, we cannot change a
+    # lan node asymmetrically yet.
+    #
+    foreach my $key (keys(%config)) {
+	my $val = $config{$key};
+
+	push(@query_clauses, "${key}=$val");
+	
+	#
+	# For a lan node, must also set the "r" params.
+	# 
+	if (!$islink &&
+	    ($key eq "delay" ||
+	     $key eq "bandwidth" ||
+	     $key eq "lossrate")) {
+
+	    push(@query_clauses, "r${key}=$val");
+	}
+    }
+    
+    #
+    # Update the delays table.
+    #
+    $query_string = "update linkdelays set ".
+	join(",", @query_clauses) . 
+	" where pid='$pid' and eid='$eid' and vlan='$link' ";
+    
+    if (defined($srcvnode)) {
+	$query_string .= "and vnode='$srcvnode'";
+    }
+    if ($debug) {
+	print "$query_string\n";
+    }
+    DBQueryFatal($query_string);
+    return 0;
+}
+
+#
+# Change the virt_lans entry.
+#
+sub ChangeVirtLans() {
+    my @query_clauses;
+    my $query_string;
+    my @query_clauses2;
+    
+    #
+    # When changing an entire link or lan symmetrically its easy; they can
+    # be done the same. When changing one node in a lan (symmetrically),
+    # the numbers are slightly different for delay/lossrate, but otherwise
+    # its the same operation, except for operating on a single node.
+    #
+    if (!defined($srcvnode) || !$islink) {
+	foreach my $key (keys(%config)) {
+	    my $val = $config{$key};
+
+	    if ($key eq "delay") {
+		my $delay = $val;
+
+		# This follows what is done in the parser.
+		$delay = $delay / 2.0
+		    if ($islink);
+
+		push(@query_clauses, "delay=$delay");
+		push(@query_clauses, "rdelay=$delay");
+	    }
+	    elsif ($key eq "lossrate") {
+		my $lossrate = $val;
+
+		# This follows what is done in the parser.
+		$lossrate = 1-sqrt(1-$lossrate)
+		    if ($islink);
+
+		push(@query_clauses, "lossrate=$lossrate");
+		push(@query_clauses, "rlossrate=$lossrate");
+	    }
+	    elsif ($key eq "bandwidth") {
+		push(@query_clauses, "bandwidth=$val");
+		push(@query_clauses, "rbandwidth=$val");
+	    }
+	    else {
+		push(@query_clauses, "$key=$val");
+	    }
+	}
+
+	$query_string = "update virt_lans set ".
+	    join(",", @query_clauses) .
+	    " where pid='$pid' and eid='$eid' and vname='$link'";
+
+	#
+	# A lan node change since it cannot be a link if srcvnode defined.
+	# 
+	if (defined($srcvnode)) {
+	    $query_string .= " and member like '${srcvnode}:%'";
+	}
+
+	if ($debug) {
+	    print "$query_string\n";
+	}
+	DBQueryFatal($query_string);
+    }
+    else {
+	#
+	# Here we change a duplex link asymmetrically. In a duplex link
+	# the delay/bw/plr params are split between the two virt_lan
+	# members using the "r" params to hold the "from switch" half of
+	# the value. This makes it rather confusing. 
+	# 
+	foreach my $key (keys(%config)) {
+	    my $val = $config{$key};
+
+	    if ($key eq "delay") {
+		my $delay = $val / 2.0;
+
+		push(@query_clauses,  "delay=$delay");
+		push(@query_clauses2, "rdelay=$delay");
+	    }
+	    elsif ($key eq "lossrate") {
+		my $lossrate = 1-sqrt(1-$val);
+
+		push(@query_clauses, "lossrate=$lossrate");
+		push(@query_clauses2, "rlossrate=$lossrate");
+	    }
+	    elsif ($key eq "bandwidth") {
+		push(@query_clauses, "bandwidth=$val");
+		push(@query_clauses2, "rbandwidth=$val");
+	    }
+	    else {
+		push(@query_clauses, "$key=$val");
+	    }
+	}
+	$query_string = "update virt_lans set ".
+	    join(",", @query_clauses) .
+	    " where pid='$pid' and eid='$eid' and ".
+	    "      vname='$link' and member like '${srcvnode}:%'";
+	
+	if ($debug) {
+	    print "$query_string\n";
+	}
+	DBQueryFatal($query_string);
+
+	$query_string = "update virt_lans set ".
+	    join(",", @query_clauses2) .
+	    " where pid='$pid' and eid='$eid' and ".
+	    "      vname='$link' and member not like '${srcvnode}:%'";
+	
+	if ($debug) {
+	    print "$query_string\n";
+	}
+	DBQueryFatal($query_string);
+    }
+}
 
 #
 # Inject an event. 
 #
-my $pipearg = "";
-if (defined($pipe)) {
-    $pipearg = "PIPE=pipe${pipe}";
-}
-else {
-    $pipe = 0;
-}
+my $inject_string = "$TEVC -e $pid/$eid now $link";
+
+# Direct the event to the whoever is handling this particular delay.
+$inject_string .= "-${srcvnode} "
+    if (defined($srcvnode));
+
+$inject_string .= " modify ";
+
+# Append the parameters.
+foreach my $key (keys(%config)) {
+    my $val = $config{$key};
+    my $str = $agentmap{$key};
     
-system("$TEVC -e $pid/$eid now $link modify $pipearg ".
-       "BANDWIDTH=$bw[$pipe] DELAY=$delay[$pipe] PLR=$plr[$pipe]") &&
+    $inject_string .= "${str}=$val ";
+}
+if ($debug) {
+    print "$inject_string\n";
+}
+
+system($inject_string) &&
     die("*** $0:\n".
 	"    Failed to inject delay update event!\n");
     
