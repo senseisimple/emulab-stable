@@ -1,80 +1,89 @@
-/*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
- * All rights reserved.
- */
+#include "port.h"
 
-/*
- * ASSUMPTIONS:
- *  1. Any switch can get to any other switch either directly
- *     or via at most one other switch (star formation).
- */
-
-// Note on variable names: LEDA has generic 'edge' and 'node'.  When
-// these are translated to 'tb_*' structures the variables end in
-// r.  I.e. dst -> dstr.  dst is a node, and dstr is a tb_pnode or similar.
-
-// Not sure we need all these LEDA includes.
-#include <LEDA/graph_alg.h>
-#include <LEDA/ugraph.h>
-#include <LEDA/graphwin.h>
-#include <LEDA/dictionary.h>
-#include <LEDA/map.h>
-#include <LEDA/graph_iterator.h>
-#include <LEDA/sortseq.h>
 #include <iostream.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <sys/time.h>
-#include <string.h>
+#include <float.h>
+
+#include <hash_map>
+#include <rope>
+#include <queue>
+#include <slist>
+#include <hash_set>
+
+#include <boost/config.hpp>
+#include <boost/utility.hpp>
+#include <boost/property_map.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+
+using namespace boost;
 
 #include "common.h"
 #include "vclass.h"
-#include "virtual.h"
+#include "delay.h"
 #include "physical.h"
+#include "virtual.h"
 #include "pclass.h"
 #include "score.h"
 
+#include "math.h"
 
-#include "assert.h"
+extern switch_pred_map_map switch_preds;
 
-typedef node_array<edge> switch_pred_array;
-extern node_array<switch_pred_array> switch_preds;
-
-float score;			// The score of the current mapping
+double score;			// The score of the current mapping
 int violated;			// How many times the restrictions
 				// have been violated.
-node pnodes[MAX_PNODES];	// int->node map
-				// pnodes[0] == NULL
 
 violated_info vinfo;		// specific info on violations
 
-extern tb_vgraph G;		// virtual graph
+extern tb_vgraph VG;		// virtual graph
 extern tb_pgraph PG;		// physical grpaph
 extern tb_sgraph SG;		// switch fabric
 
-edge direct_link(node a,node b);
-void score_link(edge e,edge v,bool interswitch);
-void unscore_link(edge e,edge v,bool interswitch);
-edge find_link_to_switch(node n);
-int find_intraswitch_path(node src,node dst,edge *first,edge *second);
-int find_interswitch_path(node src,node dst,int bandwidth,list<edge> &L);
+bool direct_link(pvertex a,pvertex b,tb_vlink *vlink,pedge &edge);
+#ifdef FIX_PLINK_ENDPOINTS
+void score_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
+void unscore_link(pedge pe,vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode);
+#else
+void score_link(pedge pe,vedge ve);
+void unscore_link(pedge pe,vedge ve);
+#endif
+bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
+			 pedge &out_edge);
+int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
+			  int bandwidth,pedge_path &out_path,
+			  pvertex_list &out_switches);
+double fd_score(tb_vnode *vnode,tb_pnode *pnoder,int &out_fd_violated);
+#ifdef FIX_PLINK_ENDPOINTS
+void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode);
+void unscore_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode);
+#else
+void score_link_info(vedge ve);
+void unscore_link_info(vedge ve);
+#endif
+
+#ifdef FIX_PLINK_ENDPOINTS
+void score_link_endpoints(pedge pe);
+#endif
 
 #ifdef SCORE_DEBUG_MORE
-#define SADD(amount) fprintf(stderr,"SADD: %s = %.2f\n",#amount,amount);score+=amount
-#define SSUB(amount) fprintf(stderr,"SSUB: %s = %.2f\n",#amount,amount);score-=amount
+#define SADD(amount) cerr << "SADD: " << #amount << "=" << amount << " from " << score;score+=amount;cerr << " to " << score << endl
+#define SSUB(amount)  cerr << "SSUB: " << #amount << "=" << amount << " from " << score;score-=amount;cerr << " to " << score << endl
 #else
 #define SADD(amount) score += amount
 #define SSUB(amount) score -= amount
+#endif
+
+#ifdef SCORE_DEBUG
+#define SDEBUG(a) a
+#else
+#define SDEBUG(a)
 #endif
 
 /*
  * score()
  * Returns the score.
  */
-float get_score() {return score;}
+double get_score() {return score;}
 
 /*
  * init_score()
@@ -83,85 +92,170 @@ float get_score() {return score;}
  */
 void init_score()
 {
-#ifdef SCORE_DEBUG
-  fprintf(stderr,"SCORE: Initializing\n");
-#endif
+  SDEBUG(cerr << "SCORE: Initializing" << endl);
   score=0;
   violated=0;
   vinfo.unassigned = vinfo.pnode_load = 0;
   vinfo.no_connection = vinfo.link_users = vinfo.bandwidth = 0;
+#ifdef FIX_PLINK_ENDPOINTS
+  vinfo.incorrect_endpoints = 0;
+#endif
 
-  node n;
-  edge e;
-  forall_nodes(n,G) {
-    tb_vnode &vn=G[n];
-    vn.posistion=0;
-    vn.no_connections=0;
+  vvertex_iterator vvertex_it,end_vvertex_it;
+  tie(vvertex_it,end_vvertex_it) = vertices(VG);
+  for (;vvertex_it!=end_vvertex_it;++vvertex_it) {
+    tb_vnode *vnode=get(vvertex_pmap,*vvertex_it);
+    vnode->assigned = false;
     SADD(SCORE_UNASSIGNED);
+    //cout << "Init: Counting " << vnode->name << endl;
     vinfo.unassigned++;
     violated++;
   }
-  forall_edges(e,G) {
-    tb_vlink &ve=G[e];
-    ve.type=tb_vlink::LINK_UNKNOWN;
-    ve.plink=NULL;
+  vedge_iterator vedge_it,end_vedge_it;
+  tie(vedge_it,end_vedge_it) = edges(VG);
+  for (;vedge_it!=end_vedge_it;++vedge_it) {
+    tb_vlink *vlink=get(vedge_pmap,*vedge_it);
+    vlink->link_info.type=tb_link_info::LINK_UNKNOWN;
+    vlink->no_connection=false;
   }
-  forall_nodes(n,PG) {
-    tb_pnode &pn=PG[n];
-    pn.typed=false;
-    pn.current_load=0;
-    pn.pnodes_used=0;
+  pvertex_iterator pvertex_it,end_pvertex_it;
+  tie(pvertex_it,end_pvertex_it) = vertices(PG);
+  for (;pvertex_it!=end_pvertex_it;++pvertex_it) {
+    tb_pnode *pn=get(pvertex_pmap,*pvertex_it);
+    pn->typed=false;
+    pn->current_load=0;
+    pn->pnodes_used=0;
+    pn->switch_used_links=0;
   }
-  forall_edges(e,PG) {
-    tb_plink &pe=PG[e];
-    pe.bw_used=0;
-    pe.emulated=0;
-    pe.nonemulated=0;
+  pedge_iterator pedge_it,end_pedge_it;
+  tie(pedge_it,end_pedge_it) = edges(PG);
+  for (;pedge_it!=end_pedge_it;++pedge_it) {
+    tb_plink *plink=get(pedge_pmap,*pedge_it);
+    plink->bw_used=0;
+    plink->emulated=0;
+    plink->nonemulated=0;
   }
 
-  assert(pnodes[0] == NULL);
-#ifdef SCORE_DEBUG
-  fprintf(stderr,"  score = %.2f violated = %d\n",score,violated);
-#endif
+  SDEBUG(cerr << "  score=" << score << " violated=" << violated << endl);
 }
 
-/*
- * void remove_node(node node)
- * This removes a virtual node from the assignments, adjusting
- * the score appropriately.
+/* unscore_link_info(vedge ve)
+ * This routine is the highest level link scorer.  It handles all
+ * scoring that depends on the link_info of vlink.
  */
-void remove_node(node n)
+#ifdef FIX_PLINK_ENDPOINTS
+void unscore_link_info(vedge ve,tb_pnode *src_pnode,tb_pnode *dst_pnode)
+#else
+void unscore_link_info(vedge ve)
+#endif
+{
+  tb_vlink *vlink = get(vedge_pmap,ve);
+  if (vlink->link_info.type == tb_link_info::LINK_DIRECT) {
+    // DIRECT LINK
+    SDEBUG(cerr << "   direct link" << endl);
+#ifdef FIX_PLINK_ENDPOINTS
+    unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
+#else
+    unscore_link(vlink->link_info.plinks.front(),ve);
+#endif
+    vlink->link_info.plinks.clear();
+  } else if (vlink->link_info.type == tb_link_info::LINK_INTERSWITCH) {
+    // INTERSWITCH LINK
+    SDEBUG(cerr << "  interswitch link" << endl);
+    
+    pedge_path &path = vlink->link_info.plinks;
+#ifndef INTERSWITCH_LENGTH
+    SSUB(SCORE_INTERSWITCH_LINK);
+#endif
+    // XXX: Potentially bogus;
+    int numinterlinks;
+    numinterlinks = -2;
+    for (pedge_path::iterator it=path.begin();
+	 it != path.end();++it) {
+#ifdef FIX_PLINK_ENDPOINTS
+      unscore_link(*it,ve,src_pnode,dst_pnode);
+#else
+      unscore_link(*it,ve);
+#endif
+      numinterlinks++;
+    }
+#ifdef INTERSWITCH_LENGTH
+    for (int i = 1; i <= numinterlinks; i++) {
+      SSUB(SCORE_INTERSWITCH_LINK);
+    }
+#endif
+
+    path.clear();
+    for (pvertex_list::iterator it = vlink->link_info.switches.begin();
+	 it != vlink->link_info.switches.end();++it) {
+      tb_pnode *the_switch = get(pvertex_pmap,*it);
+      if (--the_switch->switch_used_links == 0) {
+	SDEBUG(cerr << "  releasing switch" << endl);
+	SSUB(SCORE_SWITCH);
+      }
+    }
+    vlink->link_info.switches.clear();
+  } else if (vlink->link_info.type == tb_link_info::LINK_INTRASWITCH) {
+    // INTRASWITCH LINK
+    SDEBUG(cerr << "   intraswitch link" << endl);
+    SSUB(SCORE_INTRASWITCH_LINK);
+    
+#ifdef FIX_PLINK_ENDPOINTS
+    unscore_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
+    unscore_link(vlink->link_info.plinks.back(),ve,src_pnode,dst_pnode);
+#else
+    unscore_link(vlink->link_info.plinks.front(),ve);
+    unscore_link(vlink->link_info.plinks.back(),ve);
+#endif
+    vlink->link_info.plinks.clear();
+    tb_pnode *the_switch = get(pvertex_pmap,
+			       vlink->link_info.switches.front());
+    if (--the_switch->switch_used_links == 0) {
+      SDEBUG(cerr << "  releasing switch" << endl);
+      SSUB(SCORE_SWITCH);
+    }
+    vlink->link_info.switches.clear();
+  }
+}
+/*
+ * This removes a virtual node from the assignments, adjusting
+ * the score appropriately.  */
+void remove_node(vvertex vv)
 {
   /* Find pnode assigned to */
-  node pnode;
+  tb_vnode *vnode = get(vvertex_pmap,vv);
+  assert(vnode->assigned);
+  pvertex pv = vnode->assignment;
+  tb_pnode *pnode = get(pvertex_pmap,pv);
+  //cerr << "remove_node: " << vnode->name << endl;
 
-  tb_vnode &vnoder = G[n];
-  pnode = pnodes[vnoder.posistion];
-  tb_pnode &pnoder = PG[pnode];
-
-#ifdef SCORE_DEBUG
-  cerr <<  "SCORE: remove_node(" << vnoder.name << ")\n";
-  fprintf(stderr,"       no_connections = %d\n",vnoder.no_connections);
+  SDEBUG(cerr <<  "SCORE: remove_node(" << vnode->name << ")" << endl);
+  SDEBUG(cerr <<  "  assignment=" << pnode->name << endl);
+#ifdef SCORE_DEBUG_LOTS
+  cerr << *vnode;
+  cerr << *pnode;
 #endif
 
   assert(pnode != NULL);
 
-  pclass_unset(pnoder);
+  if (pnode->my_class) {
+    pclass_unset(pnode);
+  }
+
+#ifdef SMART_UNMAP
+  pnode->assigned_nodes.erase(vnode);
+#endif
 
   // pclass
-  if (pnoder.my_class->used == 0) {
-#ifdef SCORE_DEBUG
-    cerr << "  freeing pclass\n";
-#endif
+  if (pnode->my_class && (pnode->my_class->used == 0)) {
+    SDEBUG(cerr << "  freeing pclass" << endl);
     SSUB(SCORE_PCLASS);
   }
 
   // vclass
-  if (vnoder.vclass != NULL) {
-    double score_delta = vnoder.vclass->unassign_node(vnoder.type);
-#ifdef SCORE_DEBUG
-    cerr << "  vclass unassign " << score_delta << endl;
-#endif
+  if (vnode->vclass != NULL) {
+    double score_delta = vnode->vclass->unassign_node(vnode->type);
+    SDEBUG(cerr << "  vclass unassign " << score_delta << endl);
     
     if (score_delta <= -1) {
       violated--;
@@ -170,97 +264,70 @@ void remove_node(node n)
     SSUB(-score_delta*SCORE_VCLASS);
   }
   
-  edge e;
-  tb_vlink *vlink;
-  node vdst;
-  tb_vnode *vdstr;
-  node pdst;
-  tb_pnode *pdstr;
-
   // remove the scores associated with each edge
-  forall_inout_edges(e,n) {
-    vlink=&G[e];
-    vdst=G.target(e);
-    if (vdst == n)
-      vdst = G.source(e);
-    vdstr=&G[vdst];
-#ifdef SCORE_DEBUG
-    cerr << "  edge to " << vdstr->name << endl;
-#endif
-    if (vdstr->posistion == 0) continue;
-    if (vlink->type == tb_vlink::LINK_DIRECT) {
-      // DIRECT LINK
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"   direct link\n");
-#endif
-      unscore_link(vlink->plink,e,false);
-    } else if (vlink->type == tb_vlink::LINK_INTERSWITCH) {
-      // INTERSWITCH LINK
-      pdst=pnodes[vdstr->posistion];
-      pdstr=&PG[pdst];
-#ifdef SCORE_DEBUG
-      cerr << "  interswitch link\n";
-#endif
+  voedge_iterator vedge_it,end_vedge_it;
+  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);
+  for (;vedge_it!=end_vedge_it;++vedge_it) {
+    tb_vlink *vlink = get(vedge_pmap,*vedge_it);
+    vvertex dest_vv = target(*vedge_it,VG);
+    if (dest_vv == vv)
+      dest_vv = source(*vedge_it,VG);
+    tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
+    SDEBUG(cerr << "  edge to " << dest_vnode->name << endl);
 
-      edge cur;      
-      forall(cur,G[e].path) {
-	SSUB(SCORE_INTERSWITCH_LINK);
-	unscore_link(cur,e,true);
-      }
-      G[e].path.clear();
-      
-      unscore_link(vlink->plink_local_one,e,false);
-      unscore_link(vlink->plink_local_two,e,false);
-    } else if (vlink->type == tb_vlink::LINK_INTRASWITCH) {
-      // INTRASWITCH LINK
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"   intraswitch link\n");
-#endif
-      SSUB(SCORE_INTRASWITCH_LINK);
-
-      unscore_link(vlink->plink,e,false);
-      unscore_link(vlink->plink_two,e,false); 
-    } else if (vlink->type != tb_vlink::LINK_TRIVIAL) {
-      // No link
-      fprintf(stderr,"Internal error - no link\n");
-      abort();
+    if (vlink->no_connection) {
+      SDEBUG(cerr << "  link no longer in violation.\n";)
+      SSUB(SCORE_NO_CONNECTION);
+      vlink->no_connection=false;
+      vinfo.no_connection--;
+      violated--;
     }
+    
+    if (! dest_vnode->assigned) continue;
+    
+#ifdef FIX_PLINK_ENDPOINTS
+    pvertex dest_pv = dest_vnode->assignment;
+    tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
+    unscore_link_info(*vedge_it,pnode,dest_pnode);
+#else
+    unscore_link_info(*vedge_it);
+#endif
   }
-
-  // remove scores associated with the node
-  SSUB(SCORE_NO_CONNECTION*vnoder.no_connections);
-  violated -= vnoder.no_connections;
-  vinfo.no_connection -= vnoder.no_connections;
-
+ 
+#ifdef PENALIZE_UNUSED_INTERFACES
+  SSUB((pnode->total_interfaces - pnode->used_interfaces) * SCORE_UNUSED_INTERFACE);
+  pnode->used_interfaces = 0;
+#endif
+ 
   // adjust pnode scores
-  pnoder.current_load--;
-  vnoder.posistion = 0;
-  if (pnoder.current_load == 0) {
+  pnode->current_load--;
+  vnode->assigned = false;
+#ifdef LOAD_BALANCE
+  //SADD(SCORE_PNODE * (1.0/pnode->max_load));
+  //SSUB(SCORE_PNODE * (1+powf(((pnode->current_load+1) * 1.0)/pnode->max_load,2)));
+  //SADD(SCORE_PNODE * (1+powf(pnode->current_load * 1.0/pnode->max_load,2)));
+  SSUB(SCORE_PNODE * (powf(1+ ((pnode->current_load+1) * 1.0)/pnode->max_load,2)));
+  SADD(SCORE_PNODE * (powf(1+ pnode->current_load * 1.0/pnode->max_load,2)));
+#endif
+  if (pnode->current_load == 0) {
     // release pnode
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  releasing pnode\n");
-#endif
+    SDEBUG(cerr << "  releasing pnode" << endl);
     SSUB(SCORE_PNODE);
-    node the_switch=pnoder.the_switch;
-    if (the_switch) {
-      if ((--PG[the_switch].pnodes_used) == 0) {
-#ifdef SCORE_DEBUG
-	cerr << "  releasing switch " << PG[the_switch].name << endl;
+#ifdef LOAD_BALANCE
+    //SSUB(SCORE_PNODE);
 #endif
-	// release switch
-	SSUB(SCORE_SWITCH);
-      }
-    }
+  
+    
     // revert pnode type
-    pnoder.typed=false;
-  } else if (pnoder.current_load >= pnoder.max_load) {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  reducing penalty, new load = %d (>= %d)\n",pnoder.current_load,pnoder.max_load);
-#endif
+    pnode->typed=false;
+  } else if (pnode->current_load >= pnode->max_load) {
+    SDEBUG(cerr << "  reducing penalty, new load=" << pnode->current_load <<
+	   " (>= " << pnode->max_load << ")" << endl);
     SSUB(SCORE_PNODE_PENALTY);
     vinfo.pnode_load--;
     violated--;
   }
+
   // add score for unassigned node
   SADD(SCORE_UNASSIGNED);
   vinfo.unassigned++;
@@ -268,264 +335,421 @@ void remove_node(node n)
 
   // features/desires
   int fd_violated;
-  double fds=fd_score(vnoder,pnoder,&fd_violated);
+  double fds=fd_score(vnode,pnode,fd_violated);
   SSUB(fds);
   violated -= fd_violated;
   vinfo.desires -= fd_violated;
+
+  // remove lan node if necessary
+  if (vnode->type.compare("lan") == 0) {
+    SDEBUG(cerr << "Deleting lan node." << endl);
+    delete_lan_node(pv);
+  }
   
-#ifdef SCORE_DEBUG
-  fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
+  SDEBUG(cerr << "  new score = " << score << " new violated = " << violated << endl);
+}
+
+/* score_link_info(vedge ve)
+ * This routine is the highest level link scorer.  It handles all
+ * scoring that depends on the link_info of vlink.
+ */
+#ifdef FIX_PLINK_ENDPOINTS
+void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
+#else
+void score_link_info(vedge ve)
 #endif
+{
+  tb_vlink *vlink = get(vedge_pmap,ve);
+  tb_pnode *the_switch;
+  switch (vlink->link_info.type) {
+  case tb_link_info::LINK_DIRECT:
+    SADD(SCORE_DIRECT_LINK);
+#ifdef FIX_PLINK_ENDPOINTS
+    score_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
+#else
+    score_link(vlink->link_info.plinks.front(),ve);
+#endif
+    break;
+  case tb_link_info::LINK_INTRASWITCH:
+    SADD(SCORE_INTRASWITCH_LINK);
+#ifdef FIX_PLINK_ENDPOINTS
+    score_link(vlink->link_info.plinks.front(),ve,src_pnode,dst_pnode);
+    score_link(vlink->link_info.plinks.back(),ve,src_pnode,dst_pnode);
+#else
+    score_link(vlink->link_info.plinks.front(),ve);
+    score_link(vlink->link_info.plinks.back(),ve);
+#endif
+    the_switch = get(pvertex_pmap,
+		     vlink->link_info.switches.front());
+    if (++the_switch->switch_used_links == 1) {
+      SDEBUG(cerr << "  new switch" << endl);
+      SADD(SCORE_SWITCH);
+    }
+    break;
+  case tb_link_info::LINK_INTERSWITCH:
+#ifndef INTERSWITCH_LENGTH
+    SADD(SCORE_INTERSWITCH_LINK);
+#endif
+    // XXX: Potentially bogus!
+    int numinterlinks;
+    numinterlinks = -2;
+    for (pedge_path::iterator plink_It = vlink->link_info.plinks.begin();
+	 plink_It != vlink->link_info.plinks.end();
+	 ++plink_It) {
+#ifdef FIX_PLINK_ENDPOINTS
+	score_link(*plink_It,ve,src_pnode,dst_pnode);
+#else
+	score_link(*plink_It,ve);
+#endif
+	numinterlinks++;
+    }
+#ifdef INTERSWITCH_LENGTH
+    for (int i = 1; i <= numinterlinks; i++) {
+	SADD(SCORE_INTERSWITCH_LINK);
+    }
+#endif
+
+    for (pvertex_list::iterator switch_it = vlink->link_info.switches.begin();
+	 switch_it != vlink->link_info.switches.end();++switch_it) {
+      the_switch = get(pvertex_pmap,*switch_it);
+      if (++the_switch->switch_used_links == 1) {
+	SDEBUG(cerr << "  new switch" << endl);
+	SADD(SCORE_SWITCH);
+      }
+    }
+    break;
+  case tb_link_info::LINK_UNKNOWN:
+  case tb_link_info::LINK_TRIVIAL:
+    cerr << "Internal error: Should not be here either." << endl;
+    exit(1);
+    break;
+  }
 }
 
 /*
- * int add_node(node node,int ploc)
- * Add a mapping of node to ploc and adjust score appropriately.
- * Returns 1 in the case of an incompatible mapping.  This should
- * never happen as the same checks should be in place in a higher
- * level.  (Optimization?)
+ * int add_node(vvertex vv,pvertex pv,bool deterministic)
+ * Add a mapping of vv to pv and adjust score appropriately.
+ * Returns 1 in the case of an incompatible mapping.  If determinisitic
+ * is true then it deterministically solves the link problem for best
+ * score.  Note: deterministic takes considerably longer.
  */
-int add_node(node n,int ploc)
+int add_node(vvertex vv,pvertex pv, bool deterministic)
 {
-  tb_vnode &vnoder=G[n];
-  node pnode = pnodes[ploc];
-  tb_pnode &pnoder=PG[pnode];
+  tb_vnode *vnode = get(vvertex_pmap,vv);
+  tb_pnode *pnode = get(pvertex_pmap,pv);
+  //cerr << "add_node: " << vnode->name << endl;
+  assert(!vnode->assigned);
 
-#ifdef SCORE_DEBUG
-  cerr << "SCORE: add_node(" << vnoder.name << "," << pnoder.name << "[" << ploc << "])\n";
-  fprintf(stderr,"  vnode type = ");
-  cerr << vnoder.type << " pnode switch = ";
-  if (pnoder.the_switch) {
-    cerr << PG[pnoder.the_switch].name;
-  } else {
-    cerr << "No switch";
-  }
-  cerr << endl;
+  SDEBUG(cerr << "SCORE: add_node(" << vnode->name << "," <<
+	 pnode->name << ")" << endl);
+#ifdef SCORE_DEBUG_LOTS
+  cerr << *vnode;
+  cerr << *pnode;
 #endif
+  SDEBUG(cerr << "  vnode type = " << vnode->type << endl);
   
   // set up pnode
+
   // figure out type
-  if (!pnoder.typed) {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  virgin pnode\n");
-    cerr << "    vtype = " << vnoder.type << "\n";
-#endif
-    
+  if (!pnode->typed) {
+    SDEBUG(cerr << "  virgin pnode" << endl);
+    SDEBUG(cerr << "    vtype = " << vnode->type << endl);
+
     // Remove check assuming at higher level?
     // Remove higher level checks?
-    pnoder.max_load=0;
-    if (pnoder.types.lookup(vnoder.type) != nil)
-      pnoder.max_load = pnoder.types.access(vnoder.type);
-    
-    if (pnoder.max_load == 0) {
+    pnode->max_load=0;
+    if (pnode->types.find(vnode->type) != pnode->types.end()) {
+      pnode->max_load = pnode->types[vnode->type];
+    }
+    if (pnode->max_load == 0) {
       // didn't find a type
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"  no matching type\n");
-#endif
+      SDEBUG(cerr << "  no matching type" << endl);
+      //cerr << "add_node FAILED! (no matching type)" << endl;
       return 1;
     }
+    
+    pnode->current_type=vnode->type;
+    pnode->typed=true;
 
-    pnoder.current_type=vnoder.type;
-    pnoder.typed=true;
-
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  matching type found (");
-    cerr << pnoder.current_type << ", max = " << pnoder.max_load;
-    cerr << ")" << endl;
-#endif
+    SDEBUG(cerr << "  matching type found (" <<pnode->current_type <<
+	   ", max = " << pnode->max_load << ")" << endl);
   } else {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  pnode already has type\n");
-#endif
-    if (pnoder.current_type != vnoder.type) {
-#ifdef SCORE_DEBUG      
-      fprintf(stderr,"  incompatible types\n");
-#endif
+    SDEBUG(cerr << "  pnode already has type" << endl);
+    if (pnode->current_type != vnode->type) {
+      SDEBUG(cerr << "  incompatible types" << endl);
+      //cerr << "add_node FAILED! (incompatible types)" << endl;
       return 1;
     } else {
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"  comaptible types\n");
-#endif
-      if (pnoder.current_load == pnoder.max_load) {
+      SDEBUG(cerr << "  compatible types" << endl);
+      if (pnode->current_load == pnode->max_load) {
 	/* XXX - We could ignore this check and let the code
 	   at the end of the routine penalize for going over
 	   load.  Failing here seems to work better though. */
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"  node is full\n");
-#endif
+
+	// XXX is this a bug?  do we need to revert the pnode/vnode to
+	// it's initial state.
+	SDEBUG(cerr << "  node is full" << endl);
+	//cerr << "add_node FAILED! (node is full)" << endl;
 	return 1;
       }
-      
     }
   }
 
+#ifdef PENALIZE_UNUSED_INTERFACES
+  pnode->used_interfaces = 0;
+#endif
+ 
+#ifdef SMART_UNMAP
+  pnode->assigned_nodes.insert(vnode);
+#endif
+ 
   // set up links
-  vnoder.no_connections=0;
-  edge e;
-  node dst;
-  tb_vlink *er;
-  tb_plink *pl;
-  edge pedge;
-  forall_inout_edges(e,n) {
-    dst=G.source(e);
-    er=&G[e];
-    if (dst == n) {
-      dst=G.target(e);
-    }
-    tb_vnode &dstr=G[dst];
-    assert(dst != n);
-    assert(&dstr != &vnoder);
-#ifdef SCORE_DEBUG
-    cerr << "  edge to " << dstr.name << endl;
-#endif
+  voedge_iterator vedge_it,end_vedge_it;
+  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
+  for (;vedge_it!=end_vedge_it;++vedge_it) {
+    tb_vlink *vlink = get(vedge_pmap,*vedge_it);
+    vvertex dest_vv = target(*vedge_it,VG);
+    if (dest_vv == vv)
+      dest_vv = source(*vedge_it,VG);
+    tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
 
-    if (dstr.posistion != 0) {
-      // dstr is assigned
-      node dpnode=pnodes[dstr.posistion];
-      tb_pnode &dpnoder=PG[dpnode];
+    pedge pe;
+    
+    SDEBUG(cerr << "  edge to " << dest_vnode->name << endl);
 
-#ifdef SCORE_DEBUG
-      cerr << "   goes to " << dpnoder.name << endl;
-#endif
+    if (dest_vnode->assigned) {
+      pvertex dest_pv = dest_vnode->assignment;
+      tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
 
-      if (dpnode == pnode) {
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"  trivial link\n");
-#endif SCORE_DEBUG
-	if (allow_trivial_links) {
-	  er->type = tb_vlink::LINK_TRIVIAL;
-	} else {
-	  goto CLEANUP;
-	}
-      } else if ((pedge=direct_link(dpnode,pnode)) != NULL) {
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"   found direct link = %p\n",pedge);
-#endif
-	pl = &PG[pedge];
+      SDEBUG(cerr << "   goes to " << dest_pnode->name << endl);
 
-	// direct
-	er->type = tb_vlink::LINK_DIRECT;
-	er->plink = pedge;
-
-	score_link(pedge,e,false);
-      } else if (pnoder.the_switch &&
-		 (pnoder.the_switch == dpnoder.the_switch)) {
-	// intraswitch
-	assert(pnoder.the_switch == dpnoder.the_switch);
-	edge first,second;
-	if (find_intraswitch_path(pnode,dpnode,&first,&second) == 1) {
-	  fprintf(stderr,"Internal error: Could not find intraswitch link!\n");
-	  abort();
-	}
-
-	assert(first != NULL);
-	assert(second != NULL);
-	
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"   found intraswitch link (%p,%p)\n",first,second);
-#endif
-	er->type = tb_vlink::LINK_INTRASWITCH;
-	er->plink = first;
-	er->plink_two = second;
-	SADD(SCORE_INTRASWITCH_LINK);
-
-	// check users and bandwidth
-	score_link(first,e,false);
-	score_link(second,e,false);
+      if (dest_pv == pv) {
+	SDEBUG(cerr << "  trivial link" << endl);
+	vlink->link_info.type = tb_link_info::LINK_TRIVIAL;
       } else {
-	// try to find interswitch
-#ifdef SCORE_DEBUG
-	cerr << "   looking for interswitch link " <<
-	  (pnoder.the_switch != nil?PG[pnoder.the_switch].name:string("No Switch")) << " " <<
-	  (dpnoder.the_switch != nil?PG[dpnoder.the_switch].name:string("No Switch")) << endl;
-#endif
-	if (find_interswitch_path(pnoder.the_switch,dpnoder.the_switch,
-				  er->bandwidth,er->path) == 0) {
-#ifdef SCORE_DEBUG
-	  fprintf(stderr,"   could not find path - no connection\n");
-#endif
+	SDEBUG(cerr << "   finding link resolutions" << endl);
+	// We need to calculate all possible link resolutions, stick them
+	// in a nice datastructure along with their weights, and then
+	// select one randomly.
+	typedef vector<tb_link_info> resolution_vector;
+	typedef vector<pvertex_list> switchlist_vector;
 
-CLEANUP:
-	  // Need to free up all links already made and abort
-	  forall_inout_edges(e,n) {
-	    tb_vlink &vlink = G[e];
-	    if (vlink.type == tb_vlink::LINK_DIRECT) {
-	      unscore_link(vlink.plink,e,false);
-	    } else if (vlink.type == tb_vlink::LINK_INTRASWITCH) {
-	      SSUB(SCORE_INTRASWITCH_LINK);
-	      unscore_link(vlink.plink,e,false);
-	      unscore_link(vlink.plink_two,e,false);
-	    } else if (vlink.type == tb_vlink::LINK_INTERSWITCH) {
-	      edge cur;
-	      forall(cur,G[e].path) {
-		SSUB(SCORE_INTERSWITCH_LINK);
-		unscore_link(cur,e,true);
+	resolution_vector resolutions(10);
+	int resolution_index = 0;
+	float total_weight = 0;
+
+	// Direct link
+	if (direct_link(dest_pv,pv,vlink,pe)) {
+	  resolutions[resolution_index].type = tb_link_info::LINK_DIRECT;
+	  resolutions[resolution_index].plinks.push_back(pe);
+	  resolution_index++;
+	  total_weight += LINK_RESOLVE_DIRECT;
+	  SDEBUG(cerr << "    direct_link " << pe << endl);
+	}
+	// Intraswitch link
+	pedge first,second;
+	for (pvertex_set::iterator switch_it = pnode->switches.begin();
+	     switch_it != pnode->switches.end();++switch_it) {
+	  if (dest_pnode->switches.find(*switch_it) != dest_pnode->switches.end()) {
+#ifdef FIX_SHARED_INTERFACES
+	      if ((!find_link_to_switch(pv,*switch_it,vlink,first)) || 
+		      (!find_link_to_switch(dest_pv,*switch_it,vlink,second))) {
+		  //cerr << "No acceptable links" << endl;
+		  continue;
 	      }
-	      G[e].path.clear();
-	      unscore_link(vlink.plink_local_one,e,false);
-	      unscore_link(vlink.plink_local_two,e,false);
-	    } // else LINK_UNKNOWN i.e. unassigned.
-	  }
-
-	  // Reset to be retyped next time and abort.  This is a
-	  // fatal error.
-	  pnoder.typed = false;
-	  return 1;
- 	} else {
-#ifdef SCORE_DEBUG
-	  fprintf(stderr,"   found interswitch link\n");
+#else
+	    find_link_to_switch(pv,*switch_it,vlink,first);
+	    find_link_to_switch(dest_pv,*switch_it,vlink,second);
 #endif
-	  er->type=tb_vlink::LINK_INTERSWITCH;
-
-	  edge cur;
-	  forall(cur,er->path) {
-	    SADD(SCORE_INTERSWITCH_LINK);
-#ifdef SCORE_DEBUG
-	    cerr << "     " << PG[cur].name << endl;
-#endif
-	    score_link(cur,e,true);
+	    resolutions[resolution_index].type = tb_link_info::LINK_INTRASWITCH;
+	    resolutions[resolution_index].plinks.push_back(first);
+	    resolutions[resolution_index].plinks.push_back(second);
+	    resolutions[resolution_index].switches.push_front(*switch_it);
+	    resolution_index++;
+	    total_weight += LINK_RESOLVE_INTRASWITCH;
+	    SDEBUG(cerr << "    intraswitch " << first << " and " << second << endl);
 	  }
+	}
+	// Interswitch paths
+	//cout << "Source switches list has " << pnode->switches.size() <<
+	 //   " entries" << endl;
+	for (pvertex_set::iterator source_switch_it = pnode->switches.begin();
+	     source_switch_it != pnode->switches.end();
+	     ++source_switch_it) {
+	  //cout << "Source switch: " << get(pvertex_pmap,*source_switch_it)->name << endl;
+	  //cout << "Dest switches list has " << dest_pnode->switches.size() <<
+	   //   " entries" << endl;
+	  //cout << "Dest pnode is " << dest_pnode->name << endl;
+	  int tmp = 0;
+	  for (pvertex_set::iterator dest_switch_it = dest_pnode->switches.begin();
+	       dest_switch_it != dest_pnode->switches.end();
+	       ++dest_switch_it) {
+	    //cout << "Dest switch number " << ++tmp << endl;
+	    //cout << "Dest switch: " << get(pvertex_pmap,*dest_switch_it)->name << endl;
+	    if (*source_switch_it == *dest_switch_it) continue;
+	    if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
+				      resolutions[resolution_index].plinks,
+				      resolutions[resolution_index].switches) != 0) {
+#ifdef FIX_SHARED_INTERFACES
+	      if ((!find_link_to_switch(pv,*source_switch_it,vlink,first)) || 
+		      (!find_link_to_switch(dest_pv,*dest_switch_it,vlink,second))) {
+		  //cerr << "No acceptable links" << endl;
+		  continue;
+	      }
+#else
+	      find_link_to_switch(pv,*source_switch_it,vlink,first);
+	      find_link_to_switch(dest_pv,*dest_switch_it,vlink,second);
+#endif
 
-	  er->plink_local_one = find_link_to_switch(pnode);
-	  assert(er->plink_local_one != NULL);
-	  er->plink_local_two = find_link_to_switch(dpnode);
-	  assert(er->plink_local_two != NULL);
+	      resolutions[resolution_index].type = tb_link_info::LINK_INTERSWITCH;
+	      resolutions[resolution_index].plinks.push_front(first);
+	      resolutions[resolution_index].plinks.push_back(second);
+	      resolution_index++;
+	      total_weight += LINK_RESOLVE_INTERSWITCH;
+	      SDEBUG(cerr << "    interswitch " <<
+		     get(pvertex_pmap,*source_switch_it)->name << " and " <<
+		     get(pvertex_pmap,*dest_switch_it)->name << endl);
+	    }
+	  }
+	}
 
-	  score_link(er->plink_local_one,e,false);
-	  score_link(er->plink_local_two,e,false);
+	// check for no link
+	if (resolution_index == 0) {
+	    //cerr << "No resolutions at all" << endl;
+	  SDEBUG(cerr << "  Could not find any resolutions. Trying delay." <<
+		 endl);
+
+#if 0
+	  // Create virtual delay node and link with special free vlinks.
+	  vvertex delayv = make_delay_node(vlink);
+	  tb_pnode *delaypnode = find_pnode(get(vvertex_pmap,delayv));
+	  
+	  // Assign delay node
+	  if (add_node(delayv,pnode2vertex[delaypnode],false) == 1) {
+#endif
+	    SDEBUG(cerr << "Failed to delay." << endl);
+	    SADD(SCORE_NO_CONNECTION);
+	    vlink->no_connection=true;
+	    vinfo.no_connection++;
+	    violated++;
+#if 0
+	  }
+#endif
+	} else {
+	    //cerr << "Some resolutions" << endl;
+	  // Check to see if we are fixing a violation
+	  if (vlink->no_connection) {
+	    SDEBUG(cerr << "  Fixing previous violations." << endl);
+	    SSUB(SCORE_NO_CONNECTION);
+	    vlink->no_connection=false;
+	    vinfo.no_connection--;
+	    violated--;
+	  }
+	  
+	  // Choose a link
+	  int index;
+	  if (!deterministic) {
+	    float choice = std::random()%(int)total_weight;
+	    for (index = 0;index < resolution_index;++index) {
+	      switch (resolutions[index].type) {
+	      case tb_link_info::LINK_DIRECT:
+		choice -= LINK_RESOLVE_DIRECT; break;
+	      case tb_link_info::LINK_INTRASWITCH:
+		choice -= LINK_RESOLVE_INTRASWITCH; break;
+	      case tb_link_info::LINK_INTERSWITCH:
+		choice -= LINK_RESOLVE_INTERSWITCH; break;
+	      case tb_link_info::LINK_UNKNOWN:
+	      case tb_link_info::LINK_TRIVIAL:
+		cerr << "Internal error: Should not be here." << endl;
+		exit(1);
+		break;
+	      }
+	      if (choice < 0) break;
+	    }
+	  } else {
+	    // Deterministic
+	    int bestindex;
+	    int bestviolated = 10000;
+	    double bestscore=10000.0;
+	    int i;
+	    for (i=0;i<resolution_index;++i) {
+	      vlink->link_info = resolutions[i];
+#ifdef FIX_PLINK_ENDPOINTS
+	      score_link_info(*vedge_it,pnode,dest_pnode);
+#else
+	      score_link_info(*vedge_it);
+#endif
+	      if ((score <= bestscore) &&
+		  (violated <= bestviolated)) {
+		bestscore = score;
+		bestviolated = violated;
+		bestindex = i;
+	      }
+#ifdef FIX_PLINK_ENDPOINTS
+	      unscore_link_info(*vedge_it,pnode,dest_pnode);
+#else
+	      unscore_link_info(*vedge_it);
+#endif
+	    }
+	    index = bestindex;
+	  }
+#ifdef PENALIZE_UNUSED_INTERFACES
+	  pnode->used_interfaces++;
+#endif
+	  vlink->link_info = resolutions[index];
+	  SDEBUG(cerr << "  choice:" << vlink->link_info);
+#ifdef FIX_PLINK_ENDPOINTS
+	  score_link_info(*vedge_it,pnode,dest_pnode);
+#else
+	  score_link_info(*vedge_it);
+#endif
 	}
       }
+#ifdef AUTO_MIGRATE
+      if (dest_vnode->type.compare("lan") == 0) {
+	  //cout << "Auto-migrating LAN " << dest_vnode->name << " (because of "
+	   //   << vnode->name << ")" << endl;
+	  remove_node(dest_vv);
+	  pvertex lanpv = make_lan_node(dest_vv);
+	  add_node(dest_vv,lanpv,false);
+      }
+#endif
     }
   }
-    
+  
   // finish setting up pnode
-  pnoder.current_load++;
-  vnoder.posistion = ploc;
-  if (pnoder.current_load > pnoder.max_load) {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  load to high - penalty (%d)\n",pnoder.current_load);
+  pnode->current_load++;
+
+#ifdef PENALIZE_UNUSED_INTERFACES
+  assert(pnode->used_interfaces <= pnode->total_interfaces);
+  SADD((pnode->total_interfaces - pnode->used_interfaces) * SCORE_UNUSED_INTERFACE);
 #endif
+
+  vnode->assignment = pv;
+  vnode->assigned = true;
+  if (pnode->current_load > pnode->max_load) {
+    SDEBUG(cerr << "  load to high - penalty (" << pnode->current_load <<
+	   ")" << endl);
     SADD(SCORE_PNODE_PENALTY);
     vinfo.pnode_load++;
     violated++;
   } else {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  load is fine\n");
-#endif
+    SDEBUG(cerr << "  load is fine" << endl);
   }
-  if (pnoder.current_load == 1) {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"  new pnode\n");
-#endif
+  if (pnode->current_load == 1) {
+    SDEBUG(cerr << "  new pnode" << endl);
     SADD(SCORE_PNODE);
-    if (pnoder.the_switch &&
-	(++PG[pnoder.the_switch].pnodes_used) == 1) {
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"  new switch\n");
+#ifdef LOAD_BALANCE
+    //SADD(SCORE_PNODE); // Yep, twice
 #endif
-      SADD(SCORE_SWITCH);
-    }
   }
+#ifdef LOAD_BALANCE
+  //SSUB(SCORE_PNODE * (1.0 / pnode->max_load));
+  //SSUB(SCORE_PNODE * (1 + powf(((pnode->current_load-1) * 1.0)/pnode->max_load,2)));
+  //SADD(SCORE_PNODE * (1 + powf(((pnode->current_load) * 1.0)/pnode->max_load,2)));
+  SSUB(SCORE_PNODE * (powf(1 + ((pnode->current_load-1) * 1.0)/pnode->max_load,2)));
+  SADD(SCORE_PNODE * (powf(1 + ((pnode->current_load) * 1.0)/pnode->max_load,2)));
+#endif
 
   // node no longer unassigned
   SSUB(SCORE_UNASSIGNED);
@@ -534,25 +758,21 @@ CLEANUP:
 
   // features/desires
   int fd_violated;
-  double fds = fd_score(vnoder,pnoder,&fd_violated);
+  double fds = fd_score(vnode,pnode,fd_violated);
   SADD(fds);
   violated += fd_violated;
   vinfo.desires += fd_violated;
 
   // pclass
-  if (pnoder.my_class->used == 0) {
-#ifdef SCORE_DEBUG
-    cerr << "  new pclass\n";
-#endif
+  if (pnode->my_class && (pnode->my_class->used == 0)) {
+    SDEBUG(cerr << "  new pclass" << endl);
     SADD(SCORE_PCLASS);
   }
 
   // vclass
-  if (vnoder.vclass != NULL) {
-    double score_delta = vnoder.vclass->assign_node(vnoder.type);
-#ifdef SCORE_DEBUG
-    cerr << "  vclass assign " << score_delta << endl;
-#endif
+  if (vnode->vclass != NULL) {
+    double score_delta = vnode->vclass->assign_node(vnode->type);
+    SDEBUG(cerr << "  vclass assign " << score_delta << endl);
     SADD(score_delta*SCORE_VCLASS);
     if (score_delta >= 1) {
       violated++;
@@ -560,12 +780,12 @@ CLEANUP:
     }
   }
 
-#ifdef SCORE_DEBUG
-  fprintf(stderr,"  posistion = %d\n",vnoder.posistion);
-  fprintf(stderr,"  new score = %.2f  new violated = %d\n",score,violated);
-#endif
+  SDEBUG(cerr << "  assignment=" << vnode->assignment << endl);
+  SDEBUG(cerr << "  new score=" << score << " new violated=" << violated << endl);
 
-  pclass_set(vnoder,pnoder);
+  if (pnode->my_class) {
+    pclass_set(vnode,pnode);
+  }
   
   return 0;
 }
@@ -573,86 +793,114 @@ CLEANUP:
 // returns "best" direct link between a and b.
 // best = less users
 //        break ties with minimum bw_used
-edge direct_link(node a,node b)
+bool direct_link(pvertex a,pvertex b,tb_vlink *vlink,pedge &edge)
 {
-  node dst;
-  edge e;
-  edge best = NULL;
-  tb_plink *pl;
-  tb_plink *bestpl = NULL;
-  forall_inout_edges(e,a) {
-    dst=PG.target(e);
-    if (dst == a)
-      dst=PG.source(e);
-    if (dst == b) {
-      pl = &PG[e];
-      if (! bestpl ||
-	  ((pl->emulated+pl->nonemulated <
-	    bestpl->emulated+bestpl->nonemulated) ||
-	   (pl->emulated+pl->nonemulated ==
-	    bestpl->emulated+bestpl->nonemulated) &&
-	   (pl->bw_used < bestpl->bw_used))) {
-	best = e;
-	bestpl = pl;
+  pvertex dest_pv;
+  pedge best_pedge;
+  tb_plink *plink;
+  tb_plink *best_plink = NULL;
+  poedge_iterator pedge_it,end_pedge_it;
+  int best_users;
+  double best_distance;
+  tie(pedge_it,end_pedge_it) = out_edges(a,PG);
+  for (;pedge_it!=end_pedge_it;++pedge_it) {
+    dest_pv = target(*pedge_it,PG);
+    if (dest_pv == a)
+      dest_pv = source(*pedge_it,PG);
+    if (dest_pv == b) {
+      plink = get(pedge_pmap,*pedge_it);
+      int users = plink->nonemulated;
+      if (! vlink->emulated) {
+	users += plink->emulated;
+      }
+      tb_delay_info physical_delay;
+      physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
+      physical_delay.delay = plink->delay_info.delay;
+      physical_delay.loss = plink->delay_info.loss;
+      double distance = vlink->delay_info.distance(physical_delay);
+      if (distance == -1) {distance = DBL_MAX;}
+      
+      if ((! best_plink) ||
+	  (users < best_users) ||
+	  ((users == best_users) && (distance < best_distance))) {
+	best_users = users;
+	best_distance = distance;
+	best_pedge = *pedge_it;
+	best_plink = plink;
       }
     }
   }
-  return best;
+  if (best_plink == NULL) {
+    return false;
+  } else {
+    edge = best_pedge;
+    return true;
+  }
 }
 
-edge find_link_to_switch(node n)
+bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
+			 pedge &out_edge)
 {
-  tb_pnode &nr = PG[n];
-
-  edge e;
-  node edst;
-  float best_bw=1000.0;
+  pvertex dest_pv;
+  double best_distance = 1000.0;
   int best_users = 1000;
-  float bw;
-  edge best=NULL;
-  forall_inout_edges(e,n) {
-    edst = PG.target(e);
-    if (edst == n)
-      edst = PG.source(e);
-    if (edst == nr.the_switch) {
-      tb_plink &er = PG[e];
-      bw = er.bw_used / er.bandwidth;
-      if ((er.emulated+er.nonemulated < best_users) ||
-	  ((er.emulated+er.nonemulated == best_users) && (bw < best_bw))) {
-	best = e;
-	best_bw = bw;
-	best_users = er.emulated+er.nonemulated;
+  pedge best_pedge;
+  bool found_best=false;
+  poedge_iterator pedge_it,end_pedge_it;
+  tie(pedge_it,end_pedge_it) = out_edges(pv,PG);
+  for (;pedge_it!=end_pedge_it;++pedge_it) {
+    dest_pv = target(*pedge_it,PG);
+    if (dest_pv == pv)
+      dest_pv = source(*pedge_it,PG);
+    if (dest_pv == switch_pv) {
+      tb_plink *plink = get(pedge_pmap,*pedge_it);
+      tb_delay_info physical_delay;
+      physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
+      physical_delay.delay = plink->delay_info.delay;
+      physical_delay.loss = plink->delay_info.loss;
+      double distance = vlink->delay_info.distance(physical_delay);
+      int users;
+
+      // For sticking emulated links in emulated links we only care
+      // about the distance.
+      users = plink->nonemulated;
+      if (! vlink->emulated) {
+	users += plink->emulated;
+      }
+      if (distance == -1) {
+	// -1 == infinity
+	distance = DBL_MAX;
+      }
+      if ((users < best_users) ||
+	  ((users  == best_users) && (distance < best_distance))) {
+	best_pedge = *pedge_it;
+	best_distance = distance;
+	found_best = true;
+	best_users = plink->emulated+plink->nonemulated;
       }
     }
   }
-  
-  return best;
-}
 
-// this looks for the best links between the src and the switch
-// and the dst and the switch.
-int find_intraswitch_path(node src,node dst,edge *first,edge *second)
-{
-  tb_pnode &srcr=PG[src];
-  tb_pnode &dstr=PG[dst];
-
-  assert(srcr.the_switch == dstr.the_switch);
-  assert(srcr.the_switch != NULL);
-  assert(src != dst);
-
-  *first = find_link_to_switch(src);
-  *second = find_link_to_switch(dst);
-
-  if ((*first != NULL) &&
-      (*second != NULL)) return 0;
-  return 1;
+#ifdef FIX_SHARED_INTERFACES
+  if ((!vlink->emulated) && found_best && (best_users > 0)) {
+      return false;
+  }
+#endif
+  if (found_best) {
+    out_edge = best_pedge;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 // this uses the shortest paths calculated over the switch graph to
 // find a path between src and dst.  It passes out list<edge>, a list
 // of the edges used. (assumed to be empty to begin with).
 // Returns 0 if no path exists and 1 otherwise.
-int find_interswitch_path(node src,node dst,int bandwidth,list<edge> &L)
+int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
+			  int bandwidth,pedge_path &out_path,
+			  pvertex_list &out_switches)
 {
   // We know the shortest path from src to node already.  It's stored
   // in switch_preds[src] and is a node_array<edge>.  Let P be this
@@ -660,181 +908,420 @@ int find_interswitch_path(node src,node dst,int bandwidth,list<edge> &L)
   // following the pred edges back until we reach src.  We need to be
   // careful though because the switch_preds deals with elements of SG
   // and we have elements of PG.
-  if ((src == nil) || (dst == nil)) {return 0;}
+
+  svertex src_sv = get(pvertex_pmap,src_pv)->sgraph_switch;
+  svertex dest_sv = get(pvertex_pmap,dest_pv)->sgraph_switch;
+
+  sedge current_se;
+  svertex current_sv = dest_sv;
+  switch_pred_map &preds = *switch_preds[src_sv];
   
-  node sg_src = PG[src].sgraph_switch;
-  node sg_dst = PG[dst].sgraph_switch;
-  edge sg_ed;
-  node sg_cur=sg_dst;
-  switch_pred_array &preds = switch_preds[sg_src];
-  if (preds[sg_dst] == nil) {
+  if (preds[dest_sv] == dest_sv) {
     // unreachable
     return 0;
   }
-  while (sg_cur != sg_src) {
-    sg_ed = preds[sg_cur];
-    L.push(SG[sg_ed].mate);
-    if (SG.source(sg_ed) == sg_cur) {
-      sg_cur = SG.target(sg_ed);
-    } else {
-      sg_cur = SG.source(sg_ed);
-    }
+  while (current_sv != src_sv) {
+    out_switches.push_front(get(svertex_pmap,current_sv)->mate);
+    current_se = edge(current_sv,preds[current_sv],SG).first;
+    out_path.push_back(get(sedge_pmap,current_se)->mate);
+    current_sv = preds[current_sv];
   }
+  out_switches.push_front(get(svertex_pmap,current_sv)->mate);
   return 1;
 }
 
 // this does scoring for over users and over bandwidth on edges.
-void score_link(edge e,edge v,bool interswitch)
-{
-  tb_plink &pl = PG[e];
-  tb_vlink &er = G[v];
-
-#ifdef SCORE_DEBUG
-  cerr << "  score_link(" << e << ") - " << pl.name << " / " << er.name << endl;
+#ifdef FIX_PLINK_ENDPOINTS
+void score_link(pedge pe,vedge ve,tb_pnode *src_pnode, tb_pnode *dst_pnode)
+#else
+void score_link(pedge pe,vedge ve)
 #endif
+{
+  tb_plink *plink = get(pedge_pmap,pe);
+  tb_vlink *vlink = get(vedge_pmap,ve);
 
-  if (! interswitch) {
+  SDEBUG(cerr << "  score_link(" << pe << ") - " << plink->name << " / " <<
+	 vlink->name << endl);
+
+#ifdef SCORE_DEBUG_LOTS
+  cerr << *plink;
+  cerr << *vlink;
+#endif
+  
+  if (plink->type == tb_plink::PLINK_NORMAL) {
     // need too account for three things here, the possiblity of a new plink
     // the user of a new emulated link, and a possible violation.
-    if (er.emulated) {
-      pl.emulated++;
+    if (vlink->emulated) {
+      plink->emulated++;
       SADD(SCORE_EMULATED_LINK);
     }
-    else pl.nonemulated++;
-    if (pl.nonemulated+pl.emulated == 1) {
+    else plink->nonemulated++;
+    if (plink->nonemulated+plink->emulated == 1) {
       // new link
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"    first user\n");
-#endif
+      SDEBUG(cerr << "    first user" << endl);
       SADD(SCORE_DIRECT_LINK);
     } else {
       // check for violation, basically if this is the first of it's
       // type to be added.
-      if (((! er.emulated) && (pl.nonemulated == 1)) ||
-	  ((er.emulated) && (pl.emulated == 1))) {
-#ifdef SCORE_DEBUG
-	  fprintf(stderr,"    link user - penalty\n");
-#endif
+      if (((! vlink->emulated) && (plink->nonemulated == 1)) ||
+	  ((vlink->emulated) && (plink->emulated == 1))) {
+	SDEBUG(cerr << "    link user - penalty" << endl);
+	SADD(SCORE_DIRECT_LINK_PENALTY);
+	vinfo.link_users++;
+	violated++;
+      }
+#ifdef FIX_SHARED_INTERFACES
+      if ((! vlink->emulated) && (plink->nonemulated > 1)) {
+	  //cerr << "Penalizing overused link" << endl;
+	  assert(false);
 	  SADD(SCORE_DIRECT_LINK_PENALTY);
 	  vinfo.link_users++;
 	  violated++;
       }
+#endif
     }
   }
-    
-  // bandwidth
-  int prev_bw = pl.bw_used;
-  pl.bw_used += er.bandwidth;
-  if ((pl.bw_used > pl.bandwidth) &&
-      (prev_bw <= pl.bandwidth)) {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"    went over bandwidth (%d > %d)\n",
-	    pl.bw_used,pl.bandwidth);
+
+#ifdef FIX_PLINK_ENDPOINTS
+  if (plink->fixends) {
+      // Add this to the list of endpoints used by this plink
+      nodepair p;
+      if (src_pnode->name < dst_pnode->name) {
+	  p.first = src_pnode->name;
+	  p.second = dst_pnode->name;
+      } else {
+	  p.first = dst_pnode->name;
+	  p.second = src_pnode->name;
+      }
+      if (plink->vedge_counts.find(p) == plink->vedge_counts.end()) {
+	  plink->vedge_counts[p] = 1;
+      } else {
+	  plink->vedge_counts[p]++;
+      }
+      // Figure out if we need to add a violation
+      if (p == plink->current_endpoints) {
+	  plink->current_count++;
+      } else {
+	  // Nope, we just passed the old leader
+	  if (plink->vedge_counts[p] > plink->current_count) {
+	      plink->current_endpoints = p;
+	      plink->current_count++;
+	  } else {
+	      // Yup, it's a new violation
+	      SADD(5 * SCORE_DIRECT_LINK_PENALTY);
+	      vinfo.incorrect_endpoints++;
+	      violated++;
+	  }
+      }
+  }
 #endif
-    violated++;
-    vinfo.bandwidth++;
-    SADD(SCORE_OVER_BANDWIDTH);
+
+  if (plink->type != tb_plink::PLINK_LAN) {
+    tb_delay_info physical_delay;
+    physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
+    physical_delay.delay = plink->delay_info.delay;
+    physical_delay.loss = plink->delay_info.loss;
+    
+    double distance = vlink->delay_info.distance(physical_delay);
+
+    plink->bw_used += vlink->delay_info.bandwidth;
+#ifdef PENALIZE_BANDWIDTH
+    SADD(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
+#endif
+
+    if (distance == -1) {
+      // violation
+      SDEBUG(cerr << "    outside delay requirements." << endl);
+      violated++;
+      vinfo.delay++;
+      SADD(SCORE_OUTSIDE_DELAY);
+    } else {
+      SADD(distance * SCORE_DELAY);
+    }
   }
 }
 
-void unscore_link(edge e,edge v,bool interswitch)
+#ifdef FIX_PLINK_ENDPOINTS
+void unscore_link(pedge pe,vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode)
+#else
+void unscore_link(pedge pe,vedge ve)
+#endif
 {
-  tb_plink &pl = PG[e];
-  tb_vlink &er = G[v];
+  tb_plink *plink = get(pedge_pmap,pe);
+  tb_vlink *vlink = get(vedge_pmap,ve);
 
-#ifdef SCORE_DEBUG
-  fprintf(stderr,"  unscore_link(%p)\n",e);
+  SDEBUG(cerr << "  unscore_link(" << pe << ") - " << plink->name << " / " <<
+	 vlink->name << endl);
+
+#ifdef SCORE_DEBUG_LOTS
+  cerr << *plink;
+  cerr << *vlink;
 #endif
 
-  if (!interswitch) {
-    if (er.emulated) {
-      pl.emulated--;
+  if (plink->type == tb_plink::PLINK_NORMAL) {
+    if (vlink->emulated) {
+      plink->emulated--;
       SSUB(SCORE_EMULATED_LINK);
     } else {
-      pl.nonemulated--;
-    }
-    if (pl.nonemulated+pl.emulated == 0) {
-      // link no longer used
-#ifdef SCORE_DEBUG
-      fprintf(stderr,"   freeing link\n");
+      plink->nonemulated--;
+#ifdef FIX_SHARED_INTERFACES
+      if (plink->nonemulated >= 1) {
+	  //cerr << "Freeing overused link" << endl;
+	  SSUB(SCORE_DIRECT_LINK_PENALTY);
+	  vinfo.link_users--;
+	  violated--;
+      }
 #endif
+    }
+    if (plink->nonemulated+plink->emulated == 0) {
+      // link no longer used
+      SDEBUG(cerr << "   freeing link" << endl);
       SSUB(SCORE_DIRECT_LINK);
     } else {
       // check to see if re freed up a violation, basically did
       // we remove the last of it's link type.
-      if ((er.emulated && (pl.emulated == 0)) ||
-	  ((! er.emulated) && pl.nonemulated == 0)) {
+      if ((vlink->emulated && (plink->emulated == 0)) ||
+	  ((! vlink->emulated) && plink->nonemulated == 0)) {
 	// all good
-#ifdef SCORE_DEBUG
-	fprintf(stderr,"   users ok\n");
-#endif
+	SDEBUG(cerr << "   users ok" << endl);
 	SSUB(SCORE_DIRECT_LINK_PENALTY);
 	vinfo.link_users--;
 	violated--;
       }
     }
   }
+#ifdef FIX_PLINK_ENDPOINTS
+  if (plink->fixends) {
+      // Subtract this from the list of endpoints for this plink
+      nodepair p;
+      if (src_pnode->name < dst_pnode->name) {
+	  p.first = src_pnode->name;
+	  p.second = dst_pnode->name;
+      } else {
+	  p.first = dst_pnode->name;
+	  p.second = src_pnode->name;
+      }
+      int newcount;
+      assert(plink->vedge_counts[p] > 0);
+      newcount = --plink->vedge_counts[p];
+      if (newcount == 0) {
+	  plink->vedge_counts.erase(p);
+      }
+
+      // Ok, let's see if this removes any violations
+      if (p == plink->current_endpoints) {
+	  // Need to re-find the heaviest endpoint count
+	  nodepair_count_map::iterator it = plink->vedge_counts.begin();
+	  int highestcount = 0;
+	  nodepair highestp;
+	  while (it != plink->vedge_counts.end()) {
+	      if (it->second > highestcount) {
+		  highestcount = it->second;
+		  highestp = it->first;
+	      }
+	      it++;
+	  }
+	  plink->current_endpoints = highestp;
+	  plink->current_count = highestcount;
+	  if (newcount < highestcount) {
+	      // Yep, we just got rid of a violation
+	      SSUB(5*SCORE_DIRECT_LINK_PENALTY);
+	      vinfo.incorrect_endpoints--;
+	      violated--;
+	  }
+      } else {
+	  // Yep, we just got rid of a violation
+	  SSUB(5*SCORE_DIRECT_LINK_PENALTY);
+	  vinfo.incorrect_endpoints--;
+	  violated--;
+      }
+  }
+#endif
   
   // bandwidth check
-  int prev_bw = pl.bw_used;
-  pl.bw_used -= er.bandwidth;
-  if ((pl.bw_used <= pl.bandwidth) &&
-      (prev_bw > pl.bandwidth)) {
-#ifdef SCORE_DEBUG
-    fprintf(stderr,"   went under bandwidth (%d <= %d)\n",
-	    pl.bw_used,pl.bandwidth);
+  if (plink->type != tb_plink::PLINK_LAN) {
+    plink->bw_used -= vlink->delay_info.bandwidth;
+#ifdef PENALIZE_BANDWIDTH
+    SSUB(plink->penalty * (vlink->delay_info.bandwidth * 1.0) / (plink->delay_info.bandwidth));
 #endif
-    violated--;
-    vinfo.bandwidth--;
-    SSUB(SCORE_OVER_BANDWIDTH);
+
+    tb_delay_info physical_delay;
+    physical_delay.bandwidth = plink->delay_info.bandwidth - plink->bw_used;
+    physical_delay.delay = plink->delay_info.delay;
+    physical_delay.loss = plink->delay_info.loss;
+    double distance = vlink->delay_info.distance(physical_delay);
+
+    if (distance == -1) {
+      // violation
+      SDEBUG(cerr << "    removing delay violation." << endl);
+      violated--;
+      vinfo.delay--;
+      SSUB(SCORE_OUTSIDE_DELAY);
+    } else {
+      SSUB(distance * SCORE_DELAY);
+    }
   }
 
-  er.type = tb_vlink::LINK_UNKNOWN;
+  vlink->link_info.type = tb_link_info::LINK_UNKNOWN;
 }
 
-double fd_score(tb_vnode &vnoder,tb_pnode &pnoder,int *fd_violated)
+double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 {
   double fd_score=0;
-  (*fd_violated)=0;
-  
-  seq_item desire;
-  seq_item feature;
+  fd_violated=0;
+
   double value;
-  for (desire = vnoder.desires.min_item();desire;
-       desire = vnoder.desires.succ(desire)) {
-    feature = pnoder.features.lookup(vnoder.desires.key(desire));
-#ifdef SCORE_DEBUG
-    cerr << "  desire = " << vnoder.desires.key(desire) \
-	 << " " << vnoder.desires.inf(desire) << "\n";
-#endif
-    if (!feature) {
+  tb_vnode::desires_map::iterator desire_it;
+  tb_pnode::features_map::iterator feature_it;
+  for (desire_it = vnode->desires.begin();
+       desire_it != vnode->desires.end();
+       desire_it++) {
+    feature_it = pnode->features.find((*desire_it).first);
+    SDEBUG(cerr << "  desire = " << (*desire_it).first << " " <<
+	   (*desire_it).second << endl);
+
+    if (feature_it == pnode->features.end()) {
       // Unmatched desire.  Add cost.
-#ifdef SCORE_DEBUG
-      cerr << "    unmatched\n";
-#endif
-      value = vnoder.desires.inf(desire);
+      SDEBUG(cerr << "    unmatched" << endl);
+      value = (*desire_it).second;
       fd_score += SCORE_DESIRE*value;
       if (value >= 1) {
-	(*fd_violated)++;
+	fd_violated++;
       }
     }
   }
-  for (feature = pnoder.features.min_item();feature;
-       feature = pnoder.features.succ(feature)) {
-    desire = vnoder.desires.lookup(pnoder.features.key(feature));
-#ifdef SCORE_DEBUG
-    cerr << "  feature = " << pnoder.features.key(feature) \
-	 << " " << pnoder.features.inf(feature) << "\n";
-#endif
-    if (! desire) {
+  for (feature_it = pnode->features.begin();
+       feature_it != pnode->features.end();++feature_it) {
+    desire_it = vnode->desires.find((*feature_it).first);
+    SDEBUG(cerr << "  feature = " << (*feature_it).first
+	   << " " << (*feature_it).second << endl);
+
+    if (desire_it == vnode->desires.end()) {
       // Unused feature.  Add weight
-#ifdef SCORE_DEBUG
-      cerr << "    unused\n";
-#endif
-      value = pnoder.features.inf(feature);
+      SDEBUG(cerr << "    unused" << endl);
+      value = (*feature_it).second;
       fd_score+=SCORE_FEATURE*value;
     }
   }
 
+  SDEBUG(cerr << "  Total feature score: " << fd_score << endl;)
   return fd_score;
+}
+
+/* make_lan_node(vvertex vv)
+ * This routines create a physical lan node and connects it to a switch
+ * with a LAN plink.  Most of the code is in determining which switch to
+ * connect the LAN node to.  Specifically, it connects it to the switch
+ * which will maximize the number of intra (rather than inter) links for
+ * assigned adjancent nodes of vv.
+ */
+pvertex make_lan_node(vvertex vv)
+{
+  typedef hash_map<pvertex,int,hashptr<void *> > switch_int_map;
+  switch_int_map switch_counts;
+
+  tb_vnode *vnode = get(vvertex_pmap,vv);
+
+  SDEBUG(cerr << "make_lan_node(" << vnode->name << ")" << endl);
+  //cerr << "make_lan_node(" << vnode->name << ")" << endl;
+  
+  // Choose switch
+  pvertex largest_switch;
+  int largest_switch_count=0;
+  voedge_iterator vedge_it,end_vedge_it;
+  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);
+  for (;vedge_it!=end_vedge_it;++vedge_it) {
+    vvertex dest_vv = target(*vedge_it,VG);
+    if (dest_vv == vv)
+      dest_vv = source(*vedge_it,VG);
+    tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
+    //cout << "Checking " << dest_vnode->name << endl;
+    if (dest_vnode->assigned) {
+      pvertex dest_pv = dest_vnode->assignment;
+      tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
+      for (pvertex_set::iterator switch_it = dest_pnode->switches.begin();
+	   switch_it != dest_pnode->switches.end();switch_it++) {
+	  //cout << "     Connected to " << *switch_it << endl;
+	if (switch_counts.find(*switch_it) != switch_counts.end()) {
+	  switch_counts[*switch_it]++;
+	} else {
+	  switch_counts[*switch_it]=1;
+	}
+	if (switch_counts[*switch_it] > largest_switch_count) {
+	  largest_switch = *switch_it;
+	  largest_switch_count = switch_counts[*switch_it];
+	}
+      }
+    }
+  }
+
+  //cout << "  largest_switch=" << largest_switch <<
+  //	 " largest_switch_count=" << largest_switch_count << endl;
+  SDEBUG(cerr << "  largest_switch=" << largest_switch <<
+	 " largest_switch_count=" << largest_switch_count << endl);
+  
+  pvertex pv = add_vertex(PG);
+  tb_pnode *p = new tb_pnode();
+  put(pvertex_pmap,pv,p);
+  p->name = "lan_";
+  p->name += vnode->name;
+  p->name += "_";
+  p->typed = true;
+  p->current_type = "lan";
+  p->max_load = 1;
+  p->current_load = 0;
+  p->pnodes_used = 0;
+  p->types["lan"] = 1;
+  p->my_class = NULL;
+  
+  // If the below is false then we have an orphined lan node which will
+  // quickly be destroyed when add_node fails.
+  if (largest_switch_count != 0) {
+    pedge pe = (add_edge(pv,largest_switch,PG)).first;
+    tb_plink *pl = new tb_plink();
+    put(pedge_pmap,pe,pl);
+    pl->name = crope("lanlink_");
+    pl->name += vnode->name;
+    pl->type = tb_plink::PLINK_LAN;
+    pl->srcmac = vnode->name;
+    pl->dstmac = get(pvertex_pmap,largest_switch)->name;
+    pl->bw_used = 0;
+    pl->emulated = pl->nonemulated = 0;
+    p->switches.insert(largest_switch);
+    p->name += pl->dstmac;
+  } else {
+    p->name += "orphin";
+  }
+
+  return pv;
+}
+
+/* delete_lan_node(pvertex pv)
+ * Removes the physical lan node and the physical lan link.  Assumes that
+ * nothing is assigned to it.
+ */
+void delete_lan_node(pvertex pv)
+{
+  tb_pnode *pnode = get(pvertex_pmap,pv);
+
+  SDEBUG(cerr << "delete_lan_node(" << pnode->name << ")" << endl);
+
+  // delete LAN link
+  typedef list<pedge> pedge_list;
+  pedge_list to_free;
+  
+  poedge_iterator pedge_it,end_pedge_it;
+  tie(pedge_it,end_pedge_it) = out_edges(pv,PG);
+  // We need to copy because removing edges invalidates out iterators.
+  for (;pedge_it != end_pedge_it;++pedge_it) {
+    to_free.push_front(*pedge_it);
+  }
+  for (pedge_list::iterator free_it = to_free.begin();
+       free_it != to_free.end();++free_it) {
+    delete(get(pedge_pmap,*free_it));
+    remove_edge(*free_it,PG);
+  }
+
+  remove_vertex(pv,PG);
+  delete pnode;
 }

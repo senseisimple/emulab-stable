@@ -1,190 +1,222 @@
-/*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
- * All rights reserved.
- */
+#include "port.h"
 
-/*
- * parse ptop files.  These are basic topologies
- * that are used to represent the physical topology.
- *
- * format:
- * node <name> <type> [<type2> ...]
- *   <type> = <t>[:<max>]
- *   <t>    = pc | switch | dnard
- *   <max>  = how many virtual entities of that type per physical entity.
- * link <name> <src>[:<mac>] <dst>[:<mac>] <size> <number>
- */
+#include <hash_map>
+#include <slist>
+#include <rope>
+#include <hash_set>
 
-#include <LEDA/graph_alg.h>
-#include <LEDA/graphwin.h>
-#include <LEDA/ugraph.h>
-#include <LEDA/dictionary.h>
-#include <LEDA/map.h>
-#include <LEDA/graph_iterator.h>
-#include <LEDA/sortseq.h>
+#include <boost/config.hpp>
+#include <boost/utility.hpp>
+#include <boost/property_map.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+
 #include <iostream.h>
-#include <string.h>
-#include <stdio.h>
+
+using namespace boost;
+
+using namespace boost;
 
 #include "common.h"
+#include "delay.h"
 #include "physical.h"
+#include "parser.h"
 
-extern dictionary<string,node> pname2node;
-extern node pnodes[MAX_PNODES];	// int -> node map
-node_array<int> switch_index;
-extern list<string> ptypes;
+extern name_pvertex_map pname2vertex;
+extern name_slist ptypes;
+
+#define ptop_error(s) errors++;cerr << "PTOP:" << line << ": " << s << endl
 
 int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i)
 {
-  int switchi=0;
-  node no1;
-  edge ed1;
-  string s1, s2;
-  char inbuf[255];
-  char n1[32], n2[32];
-  int size, num;
-  int n=1;
-  char *snext;
-  char *snode;
-  char *scur;
-  char lname[32];
-  int isswitch;
+  int num_nodes = 0;
+  int line=0,errors=0;
+  char inbuf[1024];
+  string_vector parsed_line;
 
-  switch_index.init(PG,MAX_PNODES,0);
-  pnodes[0] = NULL;
   while (!i.eof()) {
-    char *ret;
-    i.getline(inbuf, 254);
-    ret = strchr(inbuf, '\n');
-    if (ret) *ret = 0;
-    if (strlen(inbuf) == 0) { continue; }
-    
-    if (!strncmp(inbuf, "node", 4)) {
-      isswitch = 0;
-      snext = inbuf;
-      scur = strsep(&snext," ");
-      if (strcmp("node",scur) != 0) {
-	fprintf(stderr, "bad node line: %s\n", inbuf);
+    line++;
+    i.getline(inbuf,1024);
+    parsed_line = split_line(inbuf,' ');
+    if (parsed_line.size() == 0) {continue;}
+
+    crope command = parsed_line[0];
+
+    if (command.compare("node") == 0) {
+      if (parsed_line.size() < 3) {
+	ptop_error("Bad node line, too few arguments.");
       } else {
-	scur = strsep(&snext," ");
-	snode = scur;
-	string s(snode);
-#ifdef GRAPH_DEBUG
-	cout << "Found phys. node '"<<snode<<"'\n";
-#endif
-	no1 = PG.new_node();
-	PG[no1].name=string(snode);
-	PG[no1].typed = false;
-	PG[no1].max_load = 0;
-	PG[no1].current_load = 0;
-	PG[no1].pnodes_used=0;
-	while ((scur = strsep(&snext," ")) != NULL &&
-	       (strcmp(scur,"-"))) {
-	  char *t,*load=scur;
+	num_nodes++;
+	crope name = parsed_line[1];
+	bool isswitch = false;
+	pvertex pv = add_vertex(PG);
+	tb_pnode *p = new tb_pnode();
+	put(pvertex_pmap,pv,p);
+	p->name = name;
+	p->typed = false;
+	p->max_load = 0;
+	p->current_load = 0;
+	p->pnodes_used = 0;
+//#ifdef PENALIZE_UNUSED_INTERFACES
+	p->total_interfaces = 0;
+//#endif
+	
+	unsigned int i;
+	for (i = 2;
+	     (i < parsed_line.size()) &&
+	       (parsed_line[i].compare("-") != 0);++i) {
+	  crope type,load;
+	  if (split_two(parsed_line[i],':',type,load,"1") != 0) {
+	    ptop_error("Bad node line, no load for type: " << type << ".");
+	  }
 	  int iload;
-	  t = strsep(&load,":");
-	  string stype(t);
-	  if (load) {
-	    if (sscanf(load,"%d",&iload) != 1) {
-	      fprintf(stderr,"Bad load specifier: %s\n",load);
-	      iload=1;
-	    }
-	  } else {
-	    iload=1;
+	  if (sscanf(load.c_str(),"%d",&iload) != 1) {
+	    ptop_error("Bad node line, bad load: " << load << ".");
+	    iload = 1;
 	  }
-	  ptypes.push(stype);
-	  if (strcmp(t,"switch") == 0) {
-	    isswitch = 1;
-	    PG[no1].types.insert(stype,1);
-	    PG[no1].the_switch = no1;
-	    node sw = SG.new_node();
-	    SG[sw].mate = no1;
-	    PG[no1].sgraph_switch = sw;
-	    switch_index[no1] = switchi++;
+	  ptypes.push_front(type);
+	  if (type.compare("switch") == 0) {
+	    isswitch = true;
+	    p->types["switch"] = 1;
+	    svertex sv = add_vertex(SG);
+	    tb_switch *s = new tb_switch();
+	    put(svertex_pmap,sv,s);
+	    s->mate = pv;
+	    p->sgraph_switch = sv;
 	  } else {
-	    PG[no1].types.insert(stype,iload);
+	    p->types[type] = iload;
 	  }
 	}
-	/* Either end of line or - .  Read in features */
-	while ((scur = strsep(&snext," ")) != NULL) {
-	  char *feature=scur;
-	  double icost;
-	  char *t;
-	  t = strsep(&feature,":");
-	  string sfeat(t);
-	  if ((! feature) || sscanf(feature,"%lg",&icost) != 1) {
-	    fprintf(stderr,"Bad cost specifier for %s\n",t);
-	    icost = 0.01;
+	for (i=i+1;i<parsed_line.size();++i) {
+	  crope feature,cost;
+	  if (split_two(parsed_line[i],':',feature,cost,"0") != 0) {
+	    ptop_error("Bad node line, no cost for feature: " <<
+		       feature << ".");
 	  }
-	  PG[no1].features.insert(sfeat,icost);
+	  double gcost;
+	  if (sscanf(cost.c_str(),"%lg",&gcost) != 1) {
+	    ptop_error("Bad node line, bad cost: " << gcost << ".");
+	    gcost = 0;
+	  }
+	  p->features[feature] = gcost;
 	}
-	/* Done */
-	if (! isswitch)
-	  pnodes[n++]=no1;
-	pname2node.insert(s, no1);
+	pname2vertex[name] = pv;
       }
-    }
-    else if (!strncmp(inbuf, "link", 4)) {
-      if (sscanf(inbuf, "link %s %s %s %d %d", lname, n1, n2, &size, &num)
-	  != 5) {
-	fprintf(stderr, "bad link line: %s\n", inbuf);
-      } else {
-	string linkname(lname);
-	char *snode,*smac;
-	char *dnode,*dmac;
-	smac = n1;
-	dmac = n2;
-	snode = strsep(&smac,":");
-	dnode = strsep(&dmac,":");
-	if (pname2node.lookup(snode) == nil) {
-	  fprintf(stderr,"PTOP error: Unknown source node %s\n",snode);
-	  exit(1);
+    } else if (command.compare("link") == 0) {
+      if (parsed_line.size() < 7) {
+	ptop_error("Bad link line, too few arguments.");
+      }
+      int num = 1;
+#ifdef PENALIZE_BANDWIDTH
+      float penalty;
+      if (parsed_line.size() == 8) {
+	if (sscanf(parsed_line[7].c_str(),"%f",&penalty) != 1) {
+	  ptop_error("Bad number argument: " << parsed_line[7] << ".");
+	  penalty=1.0;
 	}
-	if (pname2node.lookup(dnode) == nil) {
-	  fprintf(stderr,"PTOP error: Unknown destination node %s\n",dnode);
-	  exit(1);
+      }
+#else
+      if (parsed_line.size() == 8) {
+	if (sscanf(parsed_line[7].c_str(),"%d",&num) != 1) {
+	  ptop_error("Bad number argument: " << parsed_line[7] << ".");
+	  num=1;
 	}
-	node node1 = pname2node.access(snode);
-	node node2 = pname2node.access(dnode);
-#define ISSWITCH(n) (PG[n].types.lookup("switch") != nil)
-	for (int i = 0; i < num; ++i) {
-	  ed1=PG.new_edge(node1, node2);
-	  PG[ed1].bandwidth=size;
-	  PG[ed1].bw_used=0;
-	  PG[ed1].name=linkname;
-	  PG[ed1].emulated=0;
-	  PG[ed1].nonemulated=0;
-	  if (smac)
-	    PG[ed1].srcmac = string(smac);
-	  else
-	    PG[ed1].srcmac = string("(null)");
-	  if (dmac)
-	    PG[ed1].dstmac = string(dmac);
-	  else
-	    PG[ed1].dstmac = string("(null)");
-	  if (ISSWITCH(node1) && ISSWITCH(node2)) {
-	    if (i != 0) {
-	      cout <<
-		"Warning: Extra links between switches will be ignored." <<
-		endl;
-	    }
-	    edge swedge = SG.new_edge(PG[node1].sgraph_switch,
-				      PG[node2].sgraph_switch);
-	    SG[swedge].mate = ed1;
+      }
+#endif
+
+#ifdef FIX_PLINK_ENDPOINTS
+      bool fixends = false;
+      if (parsed_line.size() == 9) {
+	  if (parsed_line[8].compare("fixends") == 0) {
+	      fixends = true;
+	  }
+      }
+#else
+      if (parsed_line.size() > 8) {
+	ptop_error("Bad link line, too many arguments.");
+      }
+#endif
+      crope name = parsed_line[1];
+      crope src,srcmac;
+      split_two(parsed_line[2],':',src,srcmac,"(null)");
+      crope dst,dstmac;
+      split_two(parsed_line[3],':',dst,dstmac,"(null)");
+      crope bw = parsed_line[4];
+      crope delay = parsed_line[5];
+      crope loss = parsed_line[6];
+      int ibw,idelay;
+      double gloss;
+
+      
+      if ((sscanf(bw.c_str(),"%d",&ibw) != 1) ||
+	  (sscanf(delay.c_str(),"%d",&idelay) != 1) ||
+	  (sscanf(loss.c_str(),"%lg",&gloss) != 1)) {
+	ptop_error("Bad link line, bad delay characteristics.");
+      }
+
+#define ISSWITCH(n) (n->types.find("switch") != n->types.end())
+      pvertex srcv = pname2vertex[src];
+      pvertex dstv = pname2vertex[dst];
+      tb_pnode *srcnode = get(pvertex_pmap,srcv);
+      tb_pnode *dstnode = get(pvertex_pmap,dstv);
+      
+      for (int cur = 0;cur<num;++cur) {
+	pedge pe = (add_edge(srcv,dstv,PG)).first;
+	tb_plink *pl = new tb_plink();
+	put(pedge_pmap,pe,pl);
+	pl->delay_info.bandwidth = ibw;
+	pl->delay_info.delay = idelay;
+	pl->delay_info.loss = gloss;
+	pl->bw_used = 0;
+	pl->name = name;
+	pl->emulated = 0;
+	pl->nonemulated = 0;
+#ifdef FIX_PLINK_ENDPOINTS
+	pl->fixends = fixends;
+#endif
+#ifdef PENALIZE_BANDWIDTH
+	pl->penalty = penalty;
+#endif
+	pl->type = tb_plink::PLINK_NORMAL;
+	pl->srcmac = srcmac;
+	pl->dstmac = dstmac;
+	if (ISSWITCH(srcnode) && ISSWITCH(dstnode)) {
+	  if (cur != 0) {
+	    cout <<
+	      "Warning: Extra links between switches will be ignored. (" <<
+	      name << ")" << endl;
+	  } else {
+	    svertex src_switch = get(pvertex_pmap,srcv)->sgraph_switch;
+	    svertex dst_switch = get(pvertex_pmap,dstv)->sgraph_switch;
+	    sedge swedge = add_edge(src_switch,dst_switch,SG).first;
+	    tb_slink *sl = new tb_slink();
+	    put(sedge_pmap,swedge,sl);
+	    sl->mate = pe;
+	    pl->type = tb_plink::PLINK_INTERSWITCH;
 	  }
 	}
-	if (ISSWITCH(node1) &&
-	    ! ISSWITCH(node2))
-	  PG[node2].the_switch = node1;
-	else if (ISSWITCH(node2) &&
-		 ! ISSWITCH(node1))
-	  PG[node1].the_switch = node2;
+	if (ISSWITCH(srcnode) &&
+	    ! ISSWITCH(dstnode)) {
+	  dstnode->switches.insert(srcv);
+//#ifdef PENALIZE_UNUSED_INTERFACES
+	  dstnode->total_interfaces++;
+//#endif
+	}
+	else if (ISSWITCH(dstnode) &&
+		 ! ISSWITCH(srcnode)) {
+	  srcnode->switches.insert(dstv);
+//#ifdef PENALIZE_UNUSED_INTERFACES
+	  srcnode->total_interfaces++;
+//#endif
+	}
       }
     } else {
-      fprintf(stderr, "unknown directive: %s\n", inbuf);
+      ptop_error("Unknown directive: " << command << ".");
     }
   }
-  return n-1;
+
+  if (errors > 0) {exit(1);}
+  
+  return num_nodes;
 }
 
