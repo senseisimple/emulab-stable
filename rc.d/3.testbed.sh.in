@@ -76,6 +76,11 @@ case "$1" in
 			@prefix@/sbin/robomonitord
 		fi
 
+		if [ -x @prefix@/sbin/grabwebcams  ]; then
+			echo -n " grabwebcams"
+			@prefix@/sbin/grabwebcams
+		fi
+
 		#
 		# Could trigger experiment creation, so make sure everything
 		# else is setup first; i.e., run this last!

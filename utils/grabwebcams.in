@@ -5,12 +5,28 @@
 # All rights reserved.
 #
 use English;
+use Getopt::Std;
 
 #
-# Grab webcam images.
-# Currently run as a cron job, but is probably better as a testbed
-# daemon. 
+# Grab webcam images daemon. 
 #
+sub usage()
+{
+    print STDOUT "Usage: grabwebcams [-d]\n" .
+	"Use the -d option to prevent daemonization\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Must be runs as root, from boot.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
+
 #
 # Configure variables
 #
@@ -18,15 +34,11 @@ my $TB		= "@prefix@";
 my $WEBCAMDIR   = "$TB/webcams";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
-my $SCP		= "/usr/bin/scp";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $verbose = 1;
-my $debug   = 0;
-my @failed  = ();
 #
 # Turn off line buffering on output
 #
@@ -36,51 +48,84 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
 #
-# Only root and admins are allowed to use this script
+# Locals
+# 
+my $logfile	= "$TB/log/webcams.log";
+my $SCP		= "/usr/bin/scp";
+
 #
-if ($UID != 0) {
-    die("*** $0:\n".
-	"    You do not have permission to run this script!\n");
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 0) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+
+# Go to ground.
+if (! $debug) {
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
 }
 
 #
-# Grab the webcams from the DB and get the images
+# Grab the webcams from the DB and get the images.
 #
-my $query_result = DBQueryFatal("select * from webcams");
+while (1) {
+    my $query_result = DBQueryWarn("select * from webcams");
 
-while (my %row = $query_result->fetchhash()) {
-    my $id       = $row{"id"};
-    my $server   = $row{"server"};
-    my $filename = "/var/tmp/camera-${id}.jpg";
+    goto skip
+	if (!$query_result);
 
-    #
-    # ssh to server, protected by timeout.
-    # 
-    my $syspid = fork();
+    while (my %row = $query_result->fetchhash()) {
+	my $id       = $row{"id"};
+	my $server   = $row{"server"};
+	my $filename = "/var/tmp/camera-${id}.jpg";
 
-    if ($syspid) {
-	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	alarm 5;
-	waitpid($syspid, 0);
-	alarm 0;
+	print "Grabbing image ${server}:${filename}\n"
+	    if ($debug);
 
 	#
-	# Any failure, skip to next one.
-	#
-	if ($?) {
-	    print "Failed to get webcam image $id from $server\n";
+	# ssh to server, protected by timeout.
+	# 
+	my $syspid = fork();
 
-	    SENDMAIL($TBOPS, "Grab WebCam Image Failure",
-		     "Failed to webcam $id from $server: $?\n");
-	    next;
+	if ($syspid) {
+	    local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	    alarm 5;
+	    waitpid($syspid, 0);
+	    alarm 0;
+
+	    #
+	    # Any failure, skip to next one.
+	    #
+	    if ($?) {
+		print "Failed to get webcam image $id from $server\n";
+
+		SENDMAIL($TBOPS, "Grab WebCam Image Failure",
+			 "Failed to webcam $id from $server: $?\n");
+		next;
+	    }
 	}
+	else {
+	    exec("$SCP -q ${server}:${filename} $WEBCAMDIR");
+	    exit(0);
+	}
+	DBQueryWarn("update webcams set last_update=now() ".
+		    "where $id='$id'");
     }
-    else {
-	exec("$SCP -q ${server}:${filename} $WEBCAMDIR");
-	exit(0);
-    }
-    DBQueryFatal("update webcams set last_update=now() ".
-		 "where $id='$id'");
+  skip:
+    sleep(5);
 }
 exit(0);
