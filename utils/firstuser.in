@@ -2,13 +2,14 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 
 use English;
 use strict;
+use Getopt::Std;
 
 use lib '@prefix@/lib';
 use libdb;
@@ -25,6 +26,26 @@ my $protouser_name  = 'Emulab Manager';
 my $protouser_email = '@TBOPSEMAIL@';
 my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
+my $batchmode       = 0;
+my $password;
+my %opts;
+
+#
+# Handle command-line options
+#
+sub usage {
+    print "Usage: firstuser [-b] [-p password]\n";
+    exit(1);
+}
+if (! getopts("bp:", \%opts)) {
+    usage();
+}
+if (defined($opts{b})) {
+    $batchmode = 1;
+}
+if (defined($opts{p})) {
+    $password = $opts{p};
+}
 
 my $result = DBQueryFatal("select * from users where uid='$protouser'");
 if ($result->num_rows()) {
@@ -40,9 +61,11 @@ print "use to bootstrap other users. It also creates the emulab-ops\n";
 print "meta-project.\n\n";
 
 # Get a password for the user
-print "Pick a password for $protouser (warning, will be echoed): ";
-my $password = <>;
-chomp($password);
+if (!defined($password)) {
+    print "Pick a password for $protouser (warning, will be echoed): ";
+    my $password = <>;
+    chomp($password);
+}
 my @salt_chars = ('a'..'z','A'..'Z','0'..'9');
 my $salt = $salt_chars[rand(@salt_chars)] .
 	   $salt_chars[rand(@salt_chars)];
@@ -65,9 +88,11 @@ if (!defined $agid) {
     die "Unable to get group ID for $tbadmin\n";
 }
 
-print "Creating user/project: Are you sure? (Y/N) ";
-if (<> !~ /Y/i) {
-    die "Aborted\n";
+if (!$batchmode) {
+    print "Creating user/project: Are you sure? (Y/N) ";
+    if (<> !~ /Y/i) {
+	die "Aborted\n";
+    }
 }
 
 print "Creating user on boss...\n";
