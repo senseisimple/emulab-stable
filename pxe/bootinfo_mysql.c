@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <syslog.h>
 
-#include <oskit/boot/bootwhat.h>
+#include "bootwhat.h"
 #include <mysql/mysql.h>
 
 #ifdef USE_MYSQL_DB
@@ -27,15 +27,15 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 	MYSQL_ROW row;
 	char dbquery[] =
 		"select n.next_boot_path, n.next_boot_cmd_line, "
-		"n.def_boot_image_id, "
+		"n.def_boot_osid, "
 		"p.partition, n.def_boot_cmd_line, n.def_boot_path from nodes "
 		"as n left join partitions as p on n.node_id=p.node_id and "
-		"n.def_boot_image_id=p.image_id left join interfaces as i on "
+		"n.def_boot_osid=p.osid left join interfaces as i on "
 		"i.node_id=n.node_id where i.IP = '%s'";
 
 #define NEXT_BOOT_PATH		0
 #define NEXT_BOOT_CMD_LINE	1
-#define DEF_BOOT_IMAGE_ID	2
+#define DEF_BOOT_OSID		2
 #define PARTITION		3
 #define DEF_BOOT_CMD_LINE	4
 #define DEF_BOOT_PATH		5
@@ -154,7 +154,7 @@ query_bootinfo_db(struct in_addr ipaddr, boot_what_t *info)
 
 #undef NEXT_BOOT_PATH
 #undef NEXT_BOOT_CMD_LINE
-#undef DEF_BOOT_IMAGE_ID
+#undef DEF_BOOT_OSID
 #undef PARTITION
 #undef DEF_BOOT_CMD_LINE
 #undef DEF_BOOT_PATH

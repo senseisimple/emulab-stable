@@ -4,8 +4,7 @@
 #include <stdio.h>
 #include <syslog.h>
 #include <signal.h>
-
-#include <oskit/boot/bootwhat.h>
+#include "bootwhat.h"
 
 static void log_bootwhat(struct in_addr ipaddr, boot_what_t *bootinfo);
 static void onhup(int sig);

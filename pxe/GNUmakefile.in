@@ -24,11 +24,11 @@ DBOBJ   = bootinfo_null.o bootinfo_cfile.o bootinfo_mysql.o
 
 INCS    = -I/usr/local/include
 
-ifeq "$(filter -DLBS, $(CFLAGS))" "-DLBS"
-INCS   += -I/build/oskit-debug/install/include
-else
-INCS   += -I/n/moab/z/mike/flux/install.debug/include
-endif
+#ifeq "$(filter -DLBS, $(CFLAGS))" "-DLBS"
+#INCS   += -I/build/oskit-debug/install/include
+#else
+#INCS   += -I/n/moab/z/mike/flux/install.debug/include
+#endif
 
 CFLAGS	+= $(INCS) $(DBFLAG) -DSOLARIS -DHAVE_SOCKADDR_SA_LEN -DUSE_RECVMSG \
 		-DCONFPATH='"$(INSTALL_ETCDIR)/"' -DTBDBNAME='"$(TBDBNAME)"'
