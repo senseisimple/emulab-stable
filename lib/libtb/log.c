@@ -5,27 +5,41 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <assert.h>
 #include <errno.h>
 #include "log.h"
 
-static int usesyslog = 0;
+static int	usesyslog = 0;
+static char    *filename;
 
 /*
  * Init.
  */
 int
-loginit(char *progname, int slog)
+loginit(int slog, char *name)
 {
-	if (! slog) {
-		usesyslog = 0;
-		return 1;
+	if (slog) {
+		usesyslog = 1;
+		openlog(name, LOG_PID, LOG_USER);
+		return 0;
 	}
-	usesyslog = 1;
-	openlog(progname, LOG_PID, LOG_USER);
 
+	usesyslog = 0;
+
+	if (name) {
+		int	fd;
+
+		if ((fd = open(name, O_RDWR|O_CREAT|O_APPEND, 0)) != -1) {
+			(void)dup2(fd, STDOUT_FILENO);
+			(void)dup2(fd, STDERR_FILENO);
+			if (fd > 2)
+				(void)close(fd);
+		}
+		filename = name;
+	}
 	return 0;
 }
 

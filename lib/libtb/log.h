@@ -3,7 +3,7 @@
  */
 #include <stdarg.h>
 
-int	loginit(char *progname, int usesyslog);
+int	loginit(int usesyslog, char *name);
 void	info(const char *fmt, ...);
 void	warning(const char *fmt, ...);
 void	error(const char *fmt, ...);
