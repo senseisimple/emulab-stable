@@ -705,7 +705,7 @@ else {
           of time, please contact $TBMAILADDR.<br>
           <br>
           While you are waiting, you can watch the log of experiment creation
-          in <a target=logfile href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
+          in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
            realtime</a>.\n";
 }
 echo "<br>
