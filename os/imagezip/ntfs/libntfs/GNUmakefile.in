@@ -1,8 +1,8 @@
-#	from @(#)Makefile.inc	8.1 (Berkeley) 6/4/93
-# $FreeBSD: src/lib/libc/locale/Makefile.inc,v 1.42 2002/11/18 09:50:55 ru Exp $
-
-# locale sources
-#.PATH: ${.CURDIR}/${MACHINE_ARCH}/locale ${.CURDIR}/locale
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
 
 SRCDIR		= @srcdir@
 TESTBED_SRCDIR	= @top_srcdir@
