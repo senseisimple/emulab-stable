@@ -2,26 +2,17 @@
 #
 # Host: localhost    Database: tbdb
 #--------------------------------------------------------
-# Server version	3.23.36-log
+# Server version	3.23.47-log
 
 #
-# Table structure for table 'batch_experiments'
+# Table structure for table 'comments'
 #
 
-CREATE TABLE batch_experiments (
-  eid varchar(32) NOT NULL default '',
-  pid varchar(12) NOT NULL default '',
-  gid varchar(16) NOT NULL default '',
-  created datetime default NULL,
-  started datetime default NULL,
-  expires datetime default NULL,
-  name tinytext,
-  creator_uid varchar(8) NOT NULL default '',
-  start datetime default NULL,
-  status enum('new','configuring','running','stopping') NOT NULL default 'new',
-  attempts smallint(5) unsigned NOT NULL default '0',
-  canceled tinyint(4) NOT NULL default '0',
-  PRIMARY KEY  (eid,pid)
+CREATE TABLE comments (
+  table_name varchar(64) NOT NULL default '',
+  column_name varchar(64) default NULL,
+  description text,
+  UNIQUE KEY table_name (table_name,column_name)
 ) TYPE=MyISAM;
 
 #
@@ -30,7 +21,7 @@ CREATE TABLE batch_experiments (
 
 CREATE TABLE current_reloads (
   node_id varchar(10) NOT NULL default '',
-  image_id varchar(30) NOT NULL default '',
+  image_id varchar(45) NOT NULL default '',
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
@@ -56,16 +47,6 @@ CREATE TABLE delays (
   card0 tinyint(3) unsigned default NULL,
   card1 tinyint(3) unsigned default NULL,
   PRIMARY KEY  (node_id,iface0,iface1)
-) TYPE=MyISAM;
-
-#
-# Table structure for table 'delta_compat'
-#
-
-CREATE TABLE delta_compat (
-  image_id varchar(10) NOT NULL default '',
-  delta_id varchar(10) NOT NULL default '',
-  PRIMARY KEY  (image_id,delta_id)
 ) TYPE=MyISAM;
 
 #
@@ -145,6 +126,18 @@ CREATE TABLE exppid_access (
 ) TYPE=MyISAM;
 
 #
+# Table structure for table 'foreign_keys'
+#
+
+CREATE TABLE foreign_keys (
+  table1 varchar(30) NOT NULL default '',
+  column1 varchar(30) NOT NULL default '',
+  table2 varchar(30) NOT NULL default '',
+  column2 varchar(30) NOT NULL default '',
+  PRIMARY KEY  (table1,column1)
+) TYPE=MyISAM;
+
+#
 # Table structure for table 'group_membership'
 #
 
@@ -181,22 +174,26 @@ CREATE TABLE groups (
 #
 
 CREATE TABLE images (
-  imageid varchar(30) NOT NULL default '',
+  imagename varchar(30) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  imageid varchar(45) NOT NULL default '',
+  creator varchar(8) default NULL,
+  created datetime default NULL,
   description tinytext NOT NULL,
   loadpart tinyint(4) NOT NULL default '0',
   loadlength tinyint(4) NOT NULL default '0',
-  part1_osid varchar(30) default NULL,
-  part2_osid varchar(30) default NULL,
-  part3_osid varchar(30) default NULL,
-  part4_osid varchar(30) default NULL,
-  default_osid varchar(30) NOT NULL default '',
+  part1_osid varchar(35) default NULL,
+  part2_osid varchar(35) default NULL,
+  part3_osid varchar(35) default NULL,
+  part4_osid varchar(35) default NULL,
+  default_osid varchar(35) NOT NULL default '',
   path tinytext,
   magic tinytext,
-  pid varchar(12) default NULL,
   load_address text,
   load_busy tinyint(4) NOT NULL default '0',
   ezid tinyint(4) NOT NULL default '0',
-  PRIMARY KEY  (imageid)
+  shared tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (imagename,pid)
 ) TYPE=MyISAM;
 
 #
@@ -204,13 +201,13 @@ CREATE TABLE images (
 #
 
 CREATE TABLE interface_types (
-  type enum('fxp','cs','cisco_supervisor','dc','xl','cisco_ip') NOT NULL default 'fxp',
+  type varchar(30) NOT NULL default '',
   max_speed int(11) default NULL,
   full_duplex tinyint(1) default NULL,
   manufacturuer varchar(30) default NULL,
   model varchar(30) default NULL,
   ports tinyint(4) default NULL,
-  connector enum('RJ45','SC') default NULL,
+  connector varchar(30) default NULL,
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
@@ -225,7 +222,7 @@ CREATE TABLE interfaces (
   mac varchar(12) NOT NULL default '000000000000',
   IP varchar(15) default NULL,
   IPalias varchar(15) default NULL,
-  interface_type enum('fxp','cs','cisco_supervisor','dc','xl','cisco_ip') default NULL,
+  interface_type varchar(30) default NULL,
   iface text,
   current_speed enum('100','10','1000') NOT NULL default '100',
   duplex enum('full','half') NOT NULL default 'full',
@@ -314,20 +311,20 @@ CREATE TABLE next_reserve (
 
 CREATE TABLE node_types (
   class enum('pc','shark','switch','power') NOT NULL default 'pc',
-  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','RPC27','pc1500','laptop') NOT NULL default 'pc600',
-  proc enum('PIII','StrongARM','Intel510','Cisco6509','P4') default NULL,
+  type varchar(30) NOT NULL default '',
+  proc varchar(30) default NULL,
   speed smallint(5) unsigned default NULL,
   RAM smallint(5) unsigned default NULL,
   HD float(10,2) default NULL,
   max_cards tinyint(3) unsigned default NULL,
   max_ports tinyint(3) unsigned default NULL,
-  osid varchar(30) NOT NULL default '',
+  osid varchar(35) NOT NULL default '',
   control_net tinyint(3) unsigned default NULL,
   power_time smallint(5) unsigned NOT NULL default '60',
-  imageid varchar(30) NOT NULL default '',
+  imageid varchar(45) NOT NULL default '',
   delay_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
-  delay_osid varchar(30) default NULL,
+  delay_osid varchar(35) default NULL,
   pxe_boot_path text,
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
@@ -352,12 +349,12 @@ CREATE TABLE nodelog (
 
 CREATE TABLE nodes (
   node_id varchar(10) NOT NULL default '',
-  type enum('pc600','pc850','dnard','intel510t','cisco6509','APC','RPC27','pc1500','laptop') NOT NULL default 'pc600',
+  type varchar(30) NOT NULL default '',
   role enum('testnode','ctrlnode','testswitch','ctrlswitch','powerctrl','unused') NOT NULL default 'unused',
-  def_boot_osid varchar(30) NOT NULL default '',
+  def_boot_osid varchar(35) NOT NULL default '',
   def_boot_path text,
   def_boot_cmd_line text,
-  next_boot_osid varchar(30) NOT NULL default '',
+  next_boot_osid varchar(35) NOT NULL default '',
   next_boot_path text,
   next_boot_cmd_line text,
   pxe_boot_path text,
@@ -414,17 +411,32 @@ CREATE TABLE nsfiles (
 #
 
 CREATE TABLE os_info (
-  osid varchar(30) NOT NULL default '',
+  osname varchar(20) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  osid varchar(35) NOT NULL default '',
+  creator varchar(8) default NULL,
+  created datetime default NULL,
   description tinytext NOT NULL,
-  OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit') NOT NULL default 'Unknown',
+  OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Other') NOT NULL default 'Unknown',
   version varchar(12) default '',
   path tinytext,
   magic tinytext,
-  machinetype enum('pc600','pc850','dnard','pc1500') default NULL,
+  machinetype varchar(30) NOT NULL default '',
   osfeatures set('ping','ssh','ipod') default NULL,
   ezid tinyint(4) NOT NULL default '0',
-  pid varchar(12) default '',
-  PRIMARY KEY  (osid)
+  shared tinyint(4) NOT NULL default '0',
+  PRIMARY KEY  (osname,pid)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'osidtoimageid'
+#
+
+CREATE TABLE osidtoimageid (
+  osid varchar(30) NOT NULL default '',
+  type varchar(30) NOT NULL default '',
+  imageid varchar(30) NOT NULL default '',
+  PRIMARY KEY  (osid,type)
 ) TYPE=MyISAM;
 
 #
@@ -446,7 +458,7 @@ CREATE TABLE outlets (
 CREATE TABLE partitions (
   node_id varchar(10) NOT NULL default '',
   partition tinyint(4) NOT NULL default '0',
-  osid varchar(30) default NULL,
+  osid varchar(35) default NULL,
   PRIMARY KEY  (node_id,partition)
 ) TYPE=MyISAM;
 
@@ -522,7 +534,7 @@ CREATE TABLE reserved (
 
 CREATE TABLE scheduled_reloads (
   node_id varchar(10) NOT NULL default '',
-  image_id varchar(30) NOT NULL default '',
+  image_id varchar(45) NOT NULL default '',
   reload_type enum('netdisk','frisbee') default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
@@ -532,8 +544,9 @@ CREATE TABLE scheduled_reloads (
 #
 
 CREATE TABLE switch_stack_types (
-  stack_id varchar(10) default NULL,
-  stack_type varchar(10) default NULL
+  stack_id varchar(10) NOT NULL default '',
+  stack_type varchar(10) default NULL,
+  PRIMARY KEY  (stack_id)
 ) TYPE=MyISAM;
 
 #
@@ -541,8 +554,9 @@ CREATE TABLE switch_stack_types (
 #
 
 CREATE TABLE switch_stacks (
-  node_id varchar(10) default NULL,
-  stack_id varchar(10) default NULL
+  node_id varchar(10) NOT NULL default '',
+  stack_id varchar(10) NOT NULL default '',
+  PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
 #
@@ -655,7 +669,7 @@ CREATE TABLE virt_nodes (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   ips text,
-  osid varchar(30) default NULL,
+  osname varchar(20) default NULL,
   cmd_line text,
   rpms text,
   deltas text,
@@ -691,6 +705,18 @@ CREATE TABLE vlans (
   members text NOT NULL,
   id int(11) NOT NULL auto_increment,
   PRIMARY KEY  (id)
+) TYPE=MyISAM;
+
+#
+# Table structure for table 'webdb_table_permissions'
+#
+
+CREATE TABLE webdb_table_permissions (
+  table_name varchar(64) NOT NULL default '',
+  allow_read tinyint(1) default '1',
+  allow_row_add_edit tinyint(1) default '0',
+  allow_row_delete tinyint(1) default '0',
+  PRIMARY KEY  (table_name)
 ) TYPE=MyISAM;
 
 #
