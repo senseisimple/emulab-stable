@@ -293,6 +293,10 @@ REPLACE INTO state_timeouts VALUES ('TBCOMMAND','REBOOT',15,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWEROFF',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERON',0,'CMDRETRY');
 REPLACE INTO state_timeouts VALUES ('TBCOMMAND','POWERCYCLE',0,'CMDRETRY');
+REPLACE INTO state_timeouts VALUES ('PCVM','BOOTING',180,'NOTIFY');
+REPLACE INTO state_timeouts VALUES ('PCVM','SHUTDOWN',0,'');
+REPLACE INTO state_timeouts VALUES ('PCVM','ISUP',0,'');
+REPLACE INTO state_timeouts VALUES ('PCVM','TBSETUP',600,'NOTIFY');
 
 --
 -- Dumping data for table 'state_transitions'
@@ -358,6 +362,12 @@ REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','BOOTING');
 REPLACE INTO state_transitions VALUES ('NORMALv1','SHUTDOWN','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','ISUP');
 REPLACE INTO state_transitions VALUES ('NORMALv1','TBSETUP','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('PCVM','BOOTING','TBSETUP');
+REPLACE INTO state_transitions VALUES ('PCVM','ISUP','SHUTDOWN');
+REPLACE INTO state_transitions VALUES ('PCVM','SHUTDOWN','BOOTING');
+REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','ISUP');
+REPLACE INTO state_transitions VALUES ('PCVM','TBSETUP','SHUTDOWN');
 REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','BOOTING');
 REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','RELOADSETUP');
 REPLACE INTO state_transitions VALUES ('RELOAD','BOOTING','SHUTDOWN');
@@ -398,6 +408,7 @@ REPLACE INTO state_triggers VALUES ('*','NORMALv1','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD','RELOADDONE','RESET, RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','ALWAYSUP','SHUTDOWN','ISUP');
+REPLACE INTO state_triggers VALUES ('*','PCVM','ISUP','RESET');
 
 --
 -- Dumping data for table 'testsuite_preentables'
