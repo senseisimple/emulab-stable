@@ -64,6 +64,7 @@ static int doreadycount(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int dolog(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int domounts(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 static int doloadaddr(int sock, struct in_addr ipaddr,char *rdata,int tcp);
+static int doreset(int sock, struct in_addr ipaddr,char *rdata,int tcp);
 
 struct command {
 	char	*cmdname;
@@ -86,6 +87,7 @@ struct command {
 	{ "log",	dolog },
 	{ "mounts",	domounts },
 	{ "loadaddr",	doloadaddr},
+	{ "reset",	doreset},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -1697,7 +1699,103 @@ doloadaddr(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	return 0;
 }
 
+/*
+ * If next_pxe_boot_path is set, clear it. Otherwise, if next_boot_path
+ * or next_boot_osid is set, clear both along with next_boot_cmd_line.
+ * If neither is set, do nothing. Produces no output to the client.
+ */
+static int
+doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		nodeid[32];
+	char		pid[64];
+	char		eid[64];
+	char		buf[MYBUFSIZE], *bp, *sp;
 
+	if (iptonodeid(ipaddr, nodeid)) {
+		syslog(LOG_ERR, "doreset: %s: No such node",
+		       inet_ntoa(ipaddr));
+		return 1;
+	}
+
+	/*
+	 * Now check reserved table
+	 */
+	if (nodeidtoexp(nodeid, pid, eid))
+		return 0;
+
+	/*
+	 * Check to see if next_pxe_boot_path is set
+	 */
+	res = mydb_query("select next_pxe_boot_path from nodes "
+			"where node_id='%s' and next_pxe_boot_path is not null "
+			"and next_pxe_boot_path != ''",
+			 1, nodeid);
+
+	if (!res) {
+		syslog(LOG_ERR, "doreset: %s: DB Error checking for "
+		       "next_pxe_boot_path!",
+		       nodeid);
+		return 1;
+	}
+
+	/*
+	 * If we get a row back, then next_pxe_boot_path was set, because
+	 * the query checks for emptiness
+	 */
+	if ((int)mysql_num_rows(res) > 0) {
+		mysql_free_result(res);
+		syslog(LOG_INFO, "doreset: %s: Clearing next_pxe_boot_path",
+			nodeid);
+		if (mydb_update("update nodes set next_pxe_boot_path='' "
+			"where node_id='%s'", nodeid)) {
+		    syslog(LOG_ERR, "doreset: %s: DB Error clearing "
+			    "next_pxe_boot_path!", nodeid);
+		    return 1;
+		}
+		return 0;
+	}
+
+	/*
+	 * Check to see if next_boot_path or next_boot_osid are set
+	 */
+	res = mydb_query("select next_boot_path, next_boot_osid from nodes "
+			"where node_id='%s' and "
+			"((next_boot_path is not null and next_boot_path != '')"
+			" or "
+			"(next_boot_osid is not null and next_boot_osid != ''))",
+			 2, nodeid);
+
+	if (!res) {
+		syslog(LOG_ERR, "doreset: %s: DB Error checking for "
+		       "next_boot_path or next_boot_osid!",
+		       nodeid);
+		return 1;
+	}
+
+	/*
+	 * If we get a row back, then one of them was set, because
+	 * the query checks for emptiness
+	 */
+	if ((int)mysql_num_rows(res) > 0) {
+		mysql_free_result(res);
+		syslog(LOG_INFO, "doreset: %s: Clearing next_boot_*",
+			nodeid);
+		if (mydb_update("update nodes set next_boot_path='',"
+			"next_boot_osid='',next_boot_cmd_line='' "
+			"where node_id='%s'", nodeid)) {
+		    syslog(LOG_ERR, "doreset: %s: DB Error clearing "
+			    "next_boot_*!", nodeid);
+		    return 1;
+		}
+		return 0;
+	}
+
+	
+	return 0;
+}
 
 /*
  * DB stuff
