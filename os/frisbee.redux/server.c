@@ -40,6 +40,26 @@ void		quit(int);
 void		reinit(int);
 static ssize_t	mypread(int fd, void *buf, size_t nbytes, off_t offset);
 
+#ifdef STATS
+/*
+ * Stats gathering.
+ */
+struct {
+	unsigned long	msgin;
+	unsigned long	joins;
+	unsigned long	leaves;
+	unsigned long	requests;
+	unsigned long	duprequests;
+	unsigned long	joinrep;
+	unsigned long	blockssent;
+	unsigned long	filereads;
+	unsigned long	filebytes;
+} Stats;
+#define DOSTAT(x)	(Stats.x)
+#else
+#define DOSTAT(x)
+#endif
+
 /*
  * This structure defines the file we are spitting back.
  */
@@ -168,6 +188,7 @@ ClientJoin(Packet_t *p)
 	p->hdr.datalen         = sizeof(p->msg.join);
 	p->msg.join.blockcount = FileInfo.blocks;
 	PacketReply(p);
+	DOSTAT(joinrep++);
 	EVENT(1, EV_JOINREP, ipaddr, FileInfo.blocks, 0, 0, 0);
 
 	/*
@@ -215,8 +236,10 @@ ClientRequest(Packet_t *p)
 		      inet_ntoa(ipaddr), chunk, block, count);
 	
 	enqueued = WorkQueueEnqueue(chunk, block, count);
+	if (!enqueued)
+		DOSTAT(duprequests++);
 
-	if (debug) {
+	if (debug > 1) {
 		log("Client %s requests chunk:%d block:%d size:%d new:%d",
 		    inet_ntoa(ipaddr), chunk, block, count, enqueued);
 	}
@@ -231,22 +254,26 @@ ServerRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
 
-	if (debug)
+	if (debug > 1)
 		log("Server pthread starting up ...");
 	
 	while (1) {
 		if (PacketReceive(p) < 0) {
 			continue;
 		}
+		DOSTAT(msgin++);
 
 		switch (p->hdr.subtype) {
 		case PKTSUBTYPE_JOIN:
+			DOSTAT(joins++);
 			ClientJoin(p);
 			break;
 		case PKTSUBTYPE_LEAVE:
+			DOSTAT(leaves++);
 			ClientLeave(p);
 			break;
 		case PKTSUBTYPE_REQUEST:
+			DOSTAT(requests++);
 			ClientRequest(p);
 			break;
 		default:
@@ -328,6 +355,8 @@ PlayFrisbee(void)
 					pfatal("Reading File");
 				fatal("EOF on file");
 			}
+			DOSTAT(filereads++);
+			DOSTAT(filebytes += cc);
 			EVENT(2, EV_READFILE, mcastaddr,
 			      offset, readsize, cc, 0);
 			if (cc != readsize)
@@ -344,6 +373,7 @@ PlayFrisbee(void)
 				       BLOCKSIZE);
 
 				PacketSend(p);
+				DOSTAT(blockssent++);
 				EVENT(3, EV_BLOCKMSG, mcastaddr,
 				      chunk, block+j, 0, 0);
 			}
@@ -466,6 +496,20 @@ main(int argc, char **argv)
 		TraceDump();
 	}
 
+#ifdef  STATS
+	log("Stats:");
+	log("  msgs in/out:      %d/%d",
+	    Stats.msgin, Stats.joinrep + Stats.blockssent);
+	log("  joins/leaves:     %d/%d", Stats.joins, Stats.leaves);
+	log("  block requests:   %d (%d duplicates ignored)",
+	    Stats.requests, Stats.duprequests);
+	log("  1k blocks sent:   %d (%d repeated)",
+	    Stats.blockssent, Stats.blockssent - FileInfo.blocks);
+	log("  file reads:       %d (%d bytes, %d repeated)",
+	    Stats.filereads, Stats.filebytes,
+	    Stats.filebytes - FileInfo.blocks * BLOCKSIZE);
+#endif
+
 	/*
 	 * Exit from main thread will kill all the children.
 	 */
@@ -480,11 +524,6 @@ main(int argc, char **argv)
 void
 quit(int sig)
 {
-	if (tracing) {
-		TraceStop();
-		TraceDump();
-	}
-
 	log("Caught signal %d. Exiting ...", sig);
 	exit(0);
 }
@@ -495,11 +534,6 @@ quit(int sig)
 void
 reinit(int sig)
 {
-	if (tracing) {
-		TraceStop();
-		TraceDump();
-	}
-
 	log("Caught signal %d. Exiting ...", sig);
 	exit(1);
 }

@@ -162,46 +162,52 @@ TraceDump(void)
 				fprintf(fd, "ip=%s\n", inet_ntoa(ipaddr));
 				break;
 			}
-
 			case EV_CLINOROOM:
 				fprintf(fd, "%s: block %lu/%lu, no room\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
-
 			case EV_CLIDUPCHUNK:
 				fprintf(fd, "%s: block %lu/%lu, dup chunk\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
-
 			case EV_CLIDUPBLOCK:
 				fprintf(fd, "%s: block %lu/%lu, dup block\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1]);
 				break;
-
 			case EV_CLIBLOCK:
 				fprintf(fd, "%s: block %lu/%lu, bcount=%lu\n",
 					inet_ntoa(ptr->srcip),
 					ptr->args[0], ptr->args[1],
 					ptr->args[2]);
 				break;
-
 			case EV_CLICHUNK:
 				fprintf(fd, "%s: got chunk %lu\n",
 					inet_ntoa(ptr->srcip), ptr->args[0]);
 				break;
-
 			case EV_CLIREQ:
 				fprintf(fd, "%s: send REQUEST, %lu@%lu/%lu\n",
 					inet_ntoa(ptr->srcip), ptr->args[2],
 					ptr->args[0], ptr->args[1]);
 				break;
-
 			case EV_CLIREQCHUNK:
 				fprintf(fd, "%s: request chunk, timeo=%lu\n",
 					inet_ntoa(ptr->srcip), ptr->args[0]);
+				break;
+			case EV_CLIJOINREQ:
+				fprintf(fd, "%s: send JOIN, ID=%lx\n",
+					inet_ntoa(ptr->srcip), ptr->args[0]);
+				break;
+			case EV_CLIJOINREP:
+				fprintf(fd, "%s: got JOIN reply, blocks=%lu\n",
+					inet_ntoa(ptr->srcip), ptr->args[0]);
+				break;
+			case EV_CLILEAVE:
+				fprintf(fd, "%s: send LEAVE, ID=%lx, time=%lu\n",
+					inet_ntoa(ptr->srcip),
+					ptr->args[0], ptr->args[1]);
 				break;
 			}
 		}

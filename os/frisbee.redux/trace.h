@@ -2,7 +2,7 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
-//#define NEVENTS	5000
+#define NEVENTS	8192
 
 #ifdef NEVENTS
 struct event {
@@ -65,8 +65,11 @@ if (evlogging >= (l)) { \
 #define EV_CLIBLOCK	14
 #define EV_CLICHUNK	15
 #define EV_CLIREQCHUNK	16
+#define EV_CLIJOINREQ	17
+#define EV_CLIJOINREP	18
+#define EV_CLILEAVE	19
 
-#define EV_MAX		16
+#define EV_MAX		19
 
 extern void ClientTraceInit(char *file);
 extern void ServerTraceInit(char *file);

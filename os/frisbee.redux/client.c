@@ -590,6 +590,7 @@ PlayFrisbee(void)
 		int	countdown = 0;
 
 		if (countdown <= 0) {
+			CLEVENT(1, EV_CLIJOINREQ, myid, 0, 0, 0);
 			p->hdr.type       = PKTTYPE_REQUEST;
 			p->hdr.subtype    = PKTSUBTYPE_JOIN;
 			p->hdr.datalen    = sizeof(p->msg.join);
@@ -610,6 +611,8 @@ PlayFrisbee(void)
 
 		if (p->hdr.subtype == PKTSUBTYPE_JOIN &&
 		    p->hdr.type == PKTTYPE_REPLY) {
+			CLEVENT(1, EV_CLIJOINREP,
+				p->msg.join.blockcount, 0, 0, 0);
 			break;
 		}
 	}
@@ -634,6 +637,7 @@ PlayFrisbee(void)
 	 * the server gets it. All the server does with it is print a
 	 * timestamp, and that is not critical to operation.
 	 */
+	CLEVENT(1, EV_CLILEAVE, myid, estamp.tv_sec, 0, 0);
 	p->hdr.type       = PKTTYPE_REQUEST;
 	p->hdr.subtype    = PKTSUBTYPE_LEAVE;
 	p->hdr.datalen    = sizeof(p->msg.leave);
