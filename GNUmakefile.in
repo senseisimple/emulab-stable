@@ -22,7 +22,7 @@ include Makeconf
 #
 SUBDIRS = lib db assign @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils www tip capture ipod vis \
-		sensors os
+		sensors os install/newnode_sshkeys
 
 all:		all-subdirs
 
