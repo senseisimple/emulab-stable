@@ -30,7 +30,7 @@ set snmpit "$updir/switch_tools/intel510/snmpit"
 set resetvlans "$updir/switch_tools/intel510/resetvlans.tcl"
 set libir "$updir/ir/libir.tcl"
 set ir2ifc "$updir/hw_config/ir2ifc"
-set ifcboot "$scriptdir/ifc_boot"
+set ifcboot "$updir/hw_config/ifc_boot"
 
 source $libir
 namespace import TB_LIBIR::ir
