@@ -163,7 +163,7 @@ use vars qw(@ISA @EXPORT);
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
-	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown
+	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
 
 	 TBNodeType TBNodeTypeProcInfo
 
@@ -2942,6 +2942,7 @@ sub TBGetSiteVar($;$)
 
 @physicalTables = ("delays",
 		   "vlans",
+		   "elabinelab_vlans",
 		   "tunnels",
 		   "ipport_ranges",
 		   "v2pmap",
@@ -3185,6 +3186,29 @@ sub TBExptPortRange($$$$)
     my @row = $query_result->fetchrow_array();
     $$low  = $row[0];
     $$high = $row[1];
+    return 1;
+}
+
+#
+# Get elabinelab flag for an experiment.
+#
+# usage TBControlNetIP(char *pid, char *eid, int \*elabinelab)
+#	Return 1 if success.
+#	Return 0 if error.
+#
+sub TBExptIsElabInElab($$$)
+{
+    my ($pid, $eid, $elabinelab) = @_;
+
+    my $query_result =
+	DBQueryFatal("select elab_in_elab from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    $$elabinelab = $row[0];
     return 1;
 }
 
