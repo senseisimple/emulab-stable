@@ -169,6 +169,22 @@ if (($state eq EXPTSTATE_ACTIVE) || ($state eq EXPTSTATE_TESTING)) {
 	    "$vnode:$pport", $ipmap{$member}, $delay, $bandwidth, $lossrate;
     }
     $result->finish();
+
+    $result =
+	DBQueryFatal("select d.node_id,d.vname,r.vname from delays as d ".
+		     "left join reserved as r on d.node_id=r.node_id ".
+		     "where d.pid='$pid' and d.eid='$eid' ".
+		     "order by d.vname ASC");
+
+    if ($result->numrows) {
+	print "\n";
+	print "Delay Node Info:\n";
+	printf "%-15s %-15s %-15s\n", "LinkID", "Virtual", "Physical";
+	print "--------------- --------------- --------------- \n";
+	while (($phys,$vname,$virt) = $result->fetchrow_array()) {
+	    printf "%-15s %-15s %-15s\n", $vname, $virt, $phys;
+	}
+    }
 }
 
 0;
