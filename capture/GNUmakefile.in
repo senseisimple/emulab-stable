@@ -11,7 +11,9 @@ SUBDIR		= capture
 
 include $(OBJDIR)/Makeconf
 
-all: capture capserver capture-tty
+all:		boss-all tipserv-all
+boss-all:	capserver
+tipserv-all:	capture capture-tty
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -42,7 +44,7 @@ install:	all $(INSTALL_SBINDIR)/capserver
 
 real-install:	all $(INSTALL_SBINDIR)/capserver $(INSTALL_SBINDIR)/capture
 
-tipserv-install:	all $(INSTALL_SBINDIR)/capture
+tipserv-install:	tipserv-all $(INSTALL_SBINDIR)/capture
 
 clean:
 	rm -f *.o capture core errs Errs
