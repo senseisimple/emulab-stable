@@ -142,7 +142,9 @@ namespace eval TBCOMPAT {
     # XXX Just for now...
     global tbxlogfile
     if {[file exists "$expdir"]} {
-	set tbxlogfile [open "$expdir/logs/feedback.log" w];
+	set logname "$expdir/logs/feedback.log"
+	set tbxlogfile [open $logname w 0664];
+	exec chmod 0664 $logname
     }
 
     # Get any Emulab generated feedback data from the experiment directory.
