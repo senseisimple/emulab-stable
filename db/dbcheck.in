@@ -1,0 +1,128 @@
+#!/usr/bin/perl -w
+
+#
+# dbcheck - A script to check database consistency
+#
+
+#
+# Configure variables
+#
+use lib '@prefix@/lib';
+use libdb;
+
+use strict;
+use Getopt::Std;
+
+my $debug = 0;
+my $verbose = 0;
+
+#
+# Process command-line arguments
+#
+my %opt = ();
+getopts('dvh',\%opt);
+
+if ($opt{d}) {
+    $debug = 1;
+} 
+if ($opt{v}) {
+    $verbose = 1;
+}
+if ($opt{h} || @ARGV) {
+    exit &usage;
+}
+ 
+my $start_time = time();
+my $constraint_count = 0;
+my $failures = 0;
+
+#
+# Grab all of the foreign key information from the database
+#
+my $result = DBQueryFatal("SELECT table1,column1,table2,column2 " .
+	"FROM foreign_keys");
+while (my ($table1, $column1, $table2, $column2) = $result->fetchrow()) {
+    $constraint_count++;
+
+    verbose("Checking $table1\[$column1\] against $table2\[$column2\]\n");
+
+    #
+    # Grab a list of all values listed in column2
+    #
+    my %valid_values = ();
+    my $result = DBQueryWarn("SELECT $column2 FROM $table2");
+    while (my @row = $result->fetchrow()) {
+	my $value = join(",",@row);
+	debug("Adding $value to valid_values\n");
+	$valid_values{$value} = 1;
+    }
+
+    #
+    # Now, grab all of the values in column1, and make sure that they actually
+    # exist
+    #
+    $result = DBQueryWarn("SELECT $column1 FROM $table1");
+    while (my @row = $result->fetchrow()) {
+	#
+	# Skip values with undefined results
+	#
+	if (grep {(!defined $_) || ($_ eq '')} @row) {
+	    debug("Skipping a row with an undefined value\n");
+	    next;
+	}
+	my $value = join(",",@row);
+	debug("Checking to see if $value is valid\n");
+	if (!$valid_values{$value}) {
+	    print STDERR "ERROR: Found a value in $table1 ($value) that has " .
+	    	"no corresponding row in $table2\n";
+	    $failures++;
+	}
+    }
+}
+
+#
+# See how long it took
+# 
+my $end_time = time();
+my $time = $end_time - $start_time;
+
+verbose("Finished checking $constraint_count constraints in $time seconds\n");
+
+if ($failures) {
+    print "There were $failures failures\n";
+} else {
+    verbose("No failures\n");
+}
+
+exit($failures);
+
+
+#
+# Print out a usage message
+#
+sub usage {
+    print "$0 [-h] [-v] [-d]\n";
+    print "-h    Displays this mesage\n";
+    print "-v    Turns on verbose output\n";
+    print "-d    Turns on debugging output\n";
+    return 1;
+}
+
+#
+# Print the arguments, only if the debug flag is on
+#
+sub debug(@) {
+    if ($debug) {
+	print STDERR @_;
+    }
+}
+
+#
+# Print the arguments, but only if we're in verbose mode. debug mode
+# implies verbosity
+#
+sub verbose(@) {
+    if ($verbose || $debug) {
+	print STDERR @_;
+    }
+}
