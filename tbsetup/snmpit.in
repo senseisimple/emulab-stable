@@ -9,6 +9,7 @@
 
 my $TB;
 my $DBNAME = "@TBDBNAME@";
+my $TESTMODE = "@TESTMODE@";
 
 BEGIN {
   $TB     = "@prefix@";
@@ -77,6 +78,11 @@ sub myMain {
   &ParseArgs(\@ARGV,\$i,\@p,\$d,\$e,\$a,\$dup,\$spd,\$s,\$f,\$l,\$m,\@vlan,
 	     \@r,\$u,\$b,\$c,\$v,\$g,
 	     \$powerop,\@outlets);
+
+  if ($TESTMODE) {
+    print "snmpit: Running in test mode...exiting\n";
+    exit(0);
+  }
 
   if ($d) {
     my $rv = $device->portControl("disable",@p);
@@ -396,23 +402,23 @@ sub ParseArgs {
     if ($reset && ((!defined $pid) || (!defined $eid)));
   # If everything is okay so far, initialize snmpit_lib
   snmpit_lib::init($DBNAME, $debug);
-  if (!defined($i)||!$i||$i eq "") { $i = "cisco"; }
+  if (!defined($i)||!$i||$i eq "") { $i = "cisco1"; }
   if ( defined Dev($i) ) {
     if (! ($i =~ /[a-zA-Z]/) ) { $i = Dev($i); } # i is now name
     print "Found device $i (",Dev($i),")..." if $debug;
-    if ($i =~ /cisco/i) {
+    if ( DevType($i) eq "cisco6509" ) {
       print "Making new snmpit_cisco\n" if $debug;
       $device = new snmpit_cisco
 	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-#    elsif ($i =~ /intel/i) {
+#    elsif ( DevType($i) eq "intel510t") {
 #      print "Making new snmpit_intel\n" if $debug;
 #      $device = new snmpit_intel
 #	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-    } else {
+    } elsif (DevType($i) eq "APC") {
       print "Making new snmpit_apc\n" if $debug;
       $device = new snmpit_apc
 	(Dev($i),"debug=$debug","block=$b","confirm=$c","verbose=$v");
-    }
+    } else { die("Unknown device '$i'.\n"); }
   } else {
     die ("'$i' is not a known device.\n");
   }
