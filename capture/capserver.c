@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -205,11 +205,11 @@ main(int argc, char **argv)
 		 * Figure out current owner. Might not be a reserved node,
 		 * in which case set it to root/wheel by default. 
 		 */
-		res = mydb_query("select g.unix_gid from groups as g "
-				 "left join experiments as e "
-				 " on g.pid=e.pid and g.gid=e.gid "
-				 "left join reserved as r "
-				 " on e.pid=r.pid and e.eid=r.eid "
+		res = mydb_query("select g.unix_gid from reserved as r "
+				 "left join experiments as e on "
+				 " r.pid=e.pid and r.eid=e.eid "
+				 "left join groups as g on "
+				 " g.pid=e.pid and g.gid=e.gid "
 				 "where r.node_id='%s'",
 				 1, node_id);
 
