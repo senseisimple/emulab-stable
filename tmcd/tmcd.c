@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <sys/wait.h>
 #include <mysql/mysql.h>
 #include "decls.h"
 #include "config.h"
@@ -32,7 +33,7 @@
 #define RELOADEID	"reloading"
 
 #define TESTMODE
-#define VERSION		2
+#define VERSION		3
 #define NETMASK		"255.255.255.0"
 
 /* Defined in configure and passed in via the makefile */
@@ -47,10 +48,20 @@ static int	iptonodeid(struct in_addr ipaddr, char *bufp);
 static int	nodeidtonickname(char *nodeid, char *nickname);
 static int	nodeidtocontrolnet(char *nodeid, int *net);
 static int	checkdbredirect(struct in_addr ipaddr);
+static void	tcpserver(int sock);
+static void	udpserver(int sock);
+static int      handle_request(int, struct sockaddr_in *, char *, int);
 int		client_writeback(int sock, void *buf, int len, int tcp);
 void		client_writeback_done(int sock, struct sockaddr_in *client);
 MYSQL_RES *	mydb_query(char *query, int ncols, ...);
 int		mydb_update(char *query, ...);
+
+/* thread support */
+#define MAXCHILDREN	25
+#define MINCHILDREN	5
+static int	udpchild;
+static int	numchildren;
+static int	maxchildren = MINCHILDREN;
 
 #ifdef EVENTSYS
 int			myevent_send(address_tuple_t address);
@@ -129,12 +140,13 @@ char *usagestr =
  "usage: tmcd [-d] [-p #]\n"
  " -d              Turn on debugging. Multiple -d options increase output\n"
  " -p portnum	   Specify a port number to listen on\n"
+ " -c num	   Specify number of servers (must be %d <= x <= %d)\n"
  "\n";
 
 void
 usage()
 {
-	fprintf(stderr, usagestr);
+	fprintf(stderr, usagestr, MINCHILDREN, MAXCHILDREN);
 	exit(1);
 }
 
@@ -142,16 +154,19 @@ int
 main(int argc, char **argv)
 {
 	int			tcpsock, udpsock, ch;
-	int			length, i, err = 0;
+	int			length, i, status, pid;
 	struct sockaddr_in	name;
 
-	while ((ch = getopt(argc, argv, "dp:")) != -1)
+	while ((ch = getopt(argc, argv, "dp:c:")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
 			break;
 		case 'd':
 			debug++;
+			break;
+		case 'c':
+			maxchildren = atoi(optarg);
 			break;
 		case 'h':
 		case '?':
@@ -163,6 +178,8 @@ main(int argc, char **argv)
 
 	if (argc)
 		usage();
+	if (maxchildren < MINCHILDREN || maxchildren > MAXCHILDREN)
+		usage();
 
 	openlog("tmcd", LOG_PID, LOG_USER);
 	syslog(LOG_NOTICE, "daemon starting (version %d)", VERSION);
@@ -171,7 +188,7 @@ main(int argc, char **argv)
 		(void)daemon(0, 0);
 
 	/*
-	 * Setup TCP socket
+	 * Setup TCP socket for incoming connections.
 	 */
 
 	/* Create socket from which to read. */
@@ -239,172 +256,236 @@ main(int argc, char **argv)
 	}
 	syslog(LOG_NOTICE, "listening on UDP port %d", ntohs(name.sin_port));
 
+	/*
+	 * Now fork a set of children to handle requests. We keep the
+	 * pool at a set level. No need to get too fancy at this point. 
+	 */
 	while (1) {
-		struct sockaddr_in client;
-		struct sockaddr_in redirect_client;
-		int		   redirect = 0;
-		int		   clientsock, length = sizeof(client);
-		char		   buf[MYBUFSIZE], *bp, *cp;
-		int		   cc, nfds, istcp;
-		fd_set		   fds;
-
-		nfds = udpsock;
-		if (tcpsock > nfds)
-			nfds = tcpsock;
-		FD_ZERO(&fds);
-		FD_SET(tcpsock, &fds);
-		FD_SET(udpsock, &fds);
-
-		nfds = select(nfds+1, &fds, 0, 0, 0);
-		if (nfds <= 0) {
-			syslog(LOG_ERR, nfds == 0 ?
-			       "select: returned zero!?" : "select: %m");
-			exit(1);
-		}
-
-		if (FD_ISSET(tcpsock, &fds)) {
-			istcp = 1;
-			clientsock = accept(tcpsock,
-					    (struct sockaddr *)&client,
-					    &length);
-
-			/*
-			 * Read in the command request.
-			 */
-			if ((cc = read(clientsock, buf, MYBUFSIZE - 1)) <= 0) {
-				if (cc < 0)
-					syslog(LOG_ERR, "Reading request: %m");
-				syslog(LOG_ERR, "Connection aborted");
-				close(clientsock);
+		while (numchildren < maxchildren) {
+			int doudp = (udpchild ? 0 : 1);
+			if ((pid = fork()) < 0) {
+				syslog(LOG_ERR, "forking server: %m");
+				goto done;
+			}
+			if (pid) {
+				if (doudp)
+					udpchild = pid;
+				numchildren++;
 				continue;
 			}
-		} else {
-			istcp = 0;
-			clientsock = udpsock;
-
-			cc = recvfrom(clientsock, buf, MYBUFSIZE - 1,
-				      0, (struct sockaddr *)&client, &length);
-			if (cc <= 0) {
-				if (cc < 0)
-					syslog(LOG_ERR, "Reading request: %m");
-				syslog(LOG_ERR, "Connection aborted");
-				continue;
-			}
-		}
-
-		buf[cc] = '\0';
-		bp = buf;
-
-		/*
-		 * Look for REDIRECT, which is a proxy request for a
-		 * client other than the one making the request. Good
-		 * for testing. Might become a general tmcd redirect at
-		 * some point, so that we can test new tmcds.
-		 */
-		if (strncmp("REDIRECT=", buf, strlen("REDIRECT=")) == 0) {
-			char *tp;
-			
-			bp += strlen("REDIRECT=");
-			tp = bp;
-			while (! isspace(*tp))
-				tp++;
-			*tp++ = '\0';
-			redirect_client = client;
-			redirect        = 1;
-			inet_aton(bp, &client.sin_addr);
-			bp = tp;
-		}
-		cp = (char *) malloc(cc + 1);
-		assert(cp);
-		strcpy(cp, bp);
-		
-#ifndef	TESTMODE
-		/*
-		 * IN TESTMODE, we allow redirect.
-		 * Otherwise not since that would be a (minor) privacy
-		 * risk, by allowing testbed nodes to get info for other
-		 * nodes.
-		 */
-		if (redirect) {
-			char	buf1[32], buf2[32];
-
-			strcpy(buf1, inet_ntoa(redirect_client.sin_addr));
-			strcpy(buf2, inet_ntoa(client.sin_addr));
-			
-			syslog(LOG_INFO,
-			       "%s INVALID REDIRECT: %s", buf1, buf2);
-			goto skipit;
-		}
-#endif
-		/*
-		 * Check for a redirect using the default DB. This allows
-		 * for a simple redirect to a secondary DB for testing.
-		 * Not very general. Might change to full blown tmcd
-		 * redirection at some point, but this is a very quick and
-		 * easy hack. Upon return, the dbname has been changed if
-		 * redirection is in force. 
-		 */
-		strcpy(dbname, DEFAULT_DBNAME);
-		if (checkdbredirect(client.sin_addr)) {
-			/* Something went wrong */
-			goto skipit;
-		}
-		
-		/*
-		 * Figure out what command was given.
-		 */
-		for (i = 0; i < numcommands; i++)
-			if (strncmp(cp, command_array[i].cmdname,
-				    strlen(command_array[i].cmdname)) == 0)
-				break;
-
-		/*
-		 * And execute it.
-		 */
-		if (i == numcommands) {
-			syslog(LOG_INFO, "%s INVALID REQUEST: %.8s...",
-			       inet_ntoa(client.sin_addr), cp);
-			goto skipit;
-		}
-		else {
-			bp = cp + strlen(command_array[i].cmdname);
-
-			/*
-			 * XXX hack, don't log "log" contents,
-			 * both for privacy and to keep our syslog smaller.
-			 */
-			if (command_array[i].func == dolog)
-				syslog(LOG_INFO, "%s REQUEST: log %d chars",
-				       inet_ntoa(client.sin_addr), strlen(bp));
+			/* Child does useful work! Never Returns! */
+			if (doudp) 
+				udpserver(udpsock);
 			else
-				syslog(LOG_INFO, "%s REQUEST: %s",
-				       inet_ntoa(client.sin_addr),
-				       command_array[i].cmdname);
-
-			err = command_array[i].func(clientsock,
-						    client.sin_addr,
-						    bp, istcp);
-
-			syslog(LOG_INFO, "%s REQUEST: %s: returned %d",
-			       inet_ntoa(client.sin_addr),
-			       command_array[i].cmdname, err);
+				tcpserver(tcpsock);
+			exit(-1);
 		}
 
-	skipit:
-		free(cp);
-		if (redirect) 
-			client = redirect_client;
-
-		if (istcp)
-			close(clientsock);
-		else
-			client_writeback_done(clientsock, &client);
+		/*
+		 * Parent waits.
+		 */
+		pid = waitpid(-1, &status, 0);
+		if (pid < 0) {
+			syslog(LOG_ERR, "waitpid failed: %m");
+			continue;
+		}
+		syslog(LOG_ERR, "server %d exited with status 0x%x!",
+		       pid, status);
+		numchildren--;
+		if (pid == udpchild)
+			udpchild = 0;
 	}
-
+ done:
 	close(tcpsock);
 	close(udpsock);
 	syslog(LOG_NOTICE, "daemon terminating");
+	kill(0, SIGTERM);
 	exit(0);
+}
+
+/*
+ * Listen for UDP requests. This not a secure channel, and so this should
+ * eventually be killed off.
+ */
+static void
+udpserver(int sock)
+{
+	char			buf[MYBUFSIZE];
+	struct sockaddr_in	client;
+	int			length, cc;
+	
+	syslog(LOG_INFO, "udpserver starting");
+
+	/*
+	 * Wait for udp connections.
+	 */
+	while (1) {
+		length = sizeof(client);		
+		cc = recvfrom(sock, buf, MYBUFSIZE - 1,
+			      0, (struct sockaddr *)&client, &length);
+		if (cc <= 0) {
+			if (cc < 0)
+				syslog(LOG_ERR, "Reading request: %m");
+			syslog(LOG_ERR, "Connection aborted");
+			continue;
+		}
+		buf[cc] = '\0';
+		handle_request(sock, &client, buf, 0);
+	}
+	exit(1);
+}
+
+/*
+ * Listen for TCP requests. This not a secure channel, and so this should
+ * eventually be killed off.
+ */
+static void
+tcpserver(int sock)
+{
+	char			buf[MYBUFSIZE];
+	struct sockaddr_in	client;
+	int			length, cc, newsock;
+	
+	syslog(LOG_INFO, "tcpserver starting");
+
+	/*
+	 * Wait for TCP connections.
+	 */
+	while (1) {
+		length  = sizeof(client);
+		newsock = accept(sock, (struct sockaddr *)&client, &length);
+		if (newsock < 0) {
+			syslog(LOG_ERR, "accepting connection: %m");
+			continue;
+		}
+
+		/*
+		 * Read in the command request.
+		 */
+		if ((cc = read(newsock, buf, MYBUFSIZE - 1)) <= 0) {
+			if (cc < 0)
+				syslog(LOG_ERR, "Reading request: %m");
+			syslog(LOG_ERR, "Connection aborted");
+			close(newsock);
+			continue;
+		}
+		buf[cc] = '\0';
+		handle_request(newsock, &client, buf, 1);
+		close(newsock);
+	}
+	exit(1);
+}
+
+static int
+handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
+{
+	struct sockaddr_in redirect_client;
+	int		   redirect = 0;
+	char		   *bp, *cp;
+	int		   i, cc, err = 0;
+
+	cc = strlen(rdata);
+	bp = rdata;
+
+	/*
+	 * Look for REDIRECT, which is a proxy request for a
+	 * client other than the one making the request. Good
+	 * for testing. Might become a general tmcd redirect at
+	 * some point, so that we can test new tmcds.
+	 */
+	if (strncmp("REDIRECT=", bp, strlen("REDIRECT=")) == 0) {
+		char *tp;
+		
+		bp += strlen("REDIRECT=");
+		tp = bp;
+		while (! isspace(*tp))
+			tp++;
+		*tp++ = '\0';
+		redirect_client = *client;
+		redirect        = 1;
+		inet_aton(bp, &client->sin_addr);
+		bp = tp;
+	}
+	if ((cp = (char *) malloc(cc + 1)) == NULL) {
+		syslog(LOG_ERR, "Out of memory");
+		return 1;
+	}
+	strcpy(cp, bp);
+		
+#ifndef	TESTMODE
+	/*
+	 * IN TESTMODE, we allow redirect.
+	 * Otherwise not since that would be a (minor) privacy
+	 * risk, by allowing testbed nodes to get info for other
+	 * nodes.
+	 */
+	if (redirect) {
+		char	buf1[32], buf2[32];
+		
+		strcpy(buf1, inet_ntoa(redirect_client.sin_addr));
+		strcpy(buf2, inet_ntoa(client->sin_addr));
+			
+		syslog(LOG_INFO, "%s INVALID REDIRECT: %s", buf1, buf2);
+		goto skipit;
+	}
+#endif
+	/*
+	 * Check for a redirect using the default DB. This allows
+	 * for a simple redirect to a secondary DB for testing.
+	 * Not very general. Might change to full blown tmcd
+	 * redirection at some point, but this is a very quick and
+	 * easy hack. Upon return, the dbname has been changed if
+	 * redirection is in force. 
+	 */
+	strcpy(dbname, DEFAULT_DBNAME);
+	if (checkdbredirect(client->sin_addr)) {
+		/* Something went wrong */
+		goto skipit;
+	}
+		
+	/*
+	 * Figure out what command was given.
+	 */
+	for (i = 0; i < numcommands; i++)
+		if (strncmp(cp, command_array[i].cmdname,
+			    strlen(command_array[i].cmdname)) == 0)
+			break;
+
+	/*
+	 * And execute it.
+	 */
+	if (i == numcommands) {
+		syslog(LOG_INFO, "%s INVALID REQUEST: %.8s...",
+		       inet_ntoa(client->sin_addr), cp);
+		goto skipit;
+	}
+	else {
+		bp = cp + strlen(command_array[i].cmdname);
+
+		/*
+		 * XXX hack, don't log "log" contents,
+		 * both for privacy and to keep our syslog smaller.
+		 */
+		if (command_array[i].func == dolog)
+			syslog(LOG_INFO, "%s REQUEST: log %d chars",
+			       inet_ntoa(client->sin_addr), strlen(bp));
+		else
+			syslog(LOG_INFO, "%s REQUEST: %s",
+			       inet_ntoa(client->sin_addr),
+			       command_array[i].cmdname);
+
+		err = command_array[i].func(sock, client->sin_addr, bp, istcp);
+
+		syslog(LOG_INFO, "%s REQUEST: %s: returned %d",
+		       inet_ntoa(client->sin_addr),
+		       command_array[i].cmdname, err);
+	}
+
+ skipit:
+	free(cp);
+	if (!istcp)
+		client_writeback_done(sock, &redirect_client);
+	return 0;
 }
 
 /*
@@ -1054,7 +1135,7 @@ dohosts(int sock, struct in_addr ipaddr, char *rdata, int tcp, int vers)
 	char		pid[64], eid[64], gid[64];
 	char		nodeid[32];
 	int		nrows;
-	int		rv;
+	int		rv = 0;
 
 	/*
 	 * We build up a canonical host table using this data structure.
@@ -1336,7 +1417,7 @@ dorpms(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "RPM: %s", buf);
 		
-	} while (bp = sp);
+	} while ((bp = sp));
 	
 	mysql_free_result(res);
 	return 0;
@@ -1406,7 +1487,7 @@ dotarballs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "TARBALLS: %s", buf);
 		
-	} while (bp = sp);
+	} while ((bp = sp));
 	
 	mysql_free_result(res);
 	return 0;
@@ -1473,7 +1554,7 @@ dodeltas(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		syslog(LOG_INFO, "DELTAS: %s", buf);
 		
-	} while (bp = sp);
+	} while ((bp = sp));
 	
 	mysql_free_result(res);
 	return 0;
@@ -1492,7 +1573,7 @@ dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		buf[MYBUFSIZE], *bp, *sp;
+	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "STARTUPCMD: %s: No such node",
@@ -1570,7 +1651,6 @@ dostartcmd(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 static int
 dostartstat(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
-	MYSQL_RES	*res;	
 	char		nodeid[32];
 	char		pid[64];
 	char		eid[64];
@@ -1910,7 +1990,6 @@ dorouting(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		eid[64];
 	char		gid[64];
 	char		buf[MYBUFSIZE];
-	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "ROUTES: %s: No such node",
@@ -1972,10 +2051,7 @@ doloadinfo(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	MYSQL_RES	*res;	
 	MYSQL_ROW	row;
 	char		nodeid[32];
-	char		pid[64];
-	char		eid[64];
-	char		gid[64];
-	char		buf[MYBUFSIZE], *bp, *sp;
+	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "doloadinfo: %s: No such node",
@@ -2029,12 +2105,7 @@ static int
 doreset(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
 	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
 	char		nodeid[32];
-	char		pid[64];
-	char		eid[64];
-	char		gid[64];
-	char		buf[MYBUFSIZE], *bp, *sp;
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "doreset: %s: No such node",
@@ -2125,7 +2196,7 @@ dotrafgens(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		buf[MYBUFSIZE], *bp, *sp;
+	char		buf[MYBUFSIZE];
 	int		nrows;
 
 	if (iptonodeid(ipaddr, nodeid)) {
@@ -2190,7 +2261,6 @@ donseconfigs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		buf[MYBUFSIZE], *bp, *sp;
 	int		nrows;
 
 	if (!tcp) {
@@ -2247,10 +2317,7 @@ donseconfigs(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 static int
 dostate(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 {
-	MYSQL_RES	*res;	
-	MYSQL_ROW	row;
 	char		nodeid[32];
-	int		nrows;
 	char 		*newstate;
 	time_t		now;
 #ifdef EVENTSYS
@@ -2310,7 +2377,7 @@ docreator(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		buf[MYBUFSIZE], *bp, *sp;
+	char		buf[MYBUFSIZE];
 
 	if (iptonodeid(ipaddr, nodeid)) {
 		syslog(LOG_ERR, "CREATOR: %s: No such node",
@@ -2383,6 +2450,7 @@ mydb_connect()
 	}
 	strcpy(db_dbname, dbname);
 	db_connected = 1;
+	return 1;
 }
 
 static void
@@ -2611,7 +2679,6 @@ checkdbredirect(struct in_addr ipaddr)
 	char		pid[64];
 	char		eid[64];
 	char		gid[64];
-	char		newdb[128];
 	
 	/*
 	 * Find the nodeid.
