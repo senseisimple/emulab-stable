@@ -28,8 +28,8 @@ if (! $EUID) {
 
 # signal handler in case the process is killed.
 $SIG{INT} = sub {
-    print "Aborted. Linktest continues on nodes.\n";
-    exit(1);
+    print "Aborted. Linktest continues on nodes.\nErrors so far:\n";
+    exit &analyze;
 };
 
 my $server;

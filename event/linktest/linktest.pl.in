@@ -33,8 +33,8 @@ use constant LIMIT_BW_LOSS => 0;
 # A hack to make sure that we don't get bogged down in being too
 # accurate! Make sure the 
 # error is a certain significance before we start reporting it.
-use constant INSIGNIFICANT_LAT_ERROR => 0.25; # ms 
-use constant INSIGNIFICANT_BW_ERROR  => 0.25;  # mb
+use constant INSIGNIFICANT_LAT_ERROR => 0.40;  # ms  (quite wide)
+use constant INSIGNIFICANT_BW_ERROR  => 1.00;  # mb  (quite wide)
 
 # latency must be corrected for xmit delay under this speed.
 use constant LAT_LOW_BW => 10000000;
@@ -801,6 +801,9 @@ sub init {
     }
     if(&dotest(TEST_BW)){
 	&my_system_initonly(PATH_PATHRATE_SND,"-i","-q");
+    }
+    if(&dotest(TEST_LOSS) || &dotest(TEST_BW)) {
+	sleep(1); # give collectors time to start up (potential race)
     }
 
     # synserver host reads the ns file early to get the node count.
