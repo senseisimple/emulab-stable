@@ -384,7 +384,18 @@
     each node can be a member of up to 4 links or LANs. A good
     strategy for making your topology fit within those limits is to
     replace multiple links to a node with a LAN or with a router
-    node. Ask Testbed Operations if you need further assistance.
+    node. 
+    </p>
+    <p>
+    Another approach is to use
+    <a href=doc/docwrapper.php3?docname=linkdelays.html#EMULINKS>
+    <em>emulated</em> network links.</a> Emulated links are multiplexed
+    over the actual physical links, up to the physical bandwidth that
+    the physical link can support. In other words, five 20Mb links can
+    be multiplexed over a 100Mb physical link. More information on
+    emulated links can be found <a
+    href=doc/docwrapper.php3?docname=linkdelays.html>here.</a> Ask
+    Testbed Operations if you need further assistance.
     </p>
 
 <li><a NAME="UTT-NODES"></a>
