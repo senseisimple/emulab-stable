@@ -565,6 +565,18 @@ sub DumpDBGoo()
 		   "    Could not dump table $table\n");
     }
 
+    #
+    # Special case the group and user policy tables. Not sure what to
+    # really do about this; should there be any restrictions inside the
+    # inner elab?
+    #
+    unlink("$statedir/group_policies");
+    DBQueryWarn("select * from group_policies ".
+		"where pid='$pid' or pid='+' or pid='-' ".
+		"into outfile '$statedir/group_policies'")
+	or die("*** $0:\n".
+	       "    Could not dump table group_policies\n");
+
     foreach my $table (@USERTABLES) {
 	unlink("$statedir/$table");
 	DBQueryWarn("select t.* from group_membership as gm ".
