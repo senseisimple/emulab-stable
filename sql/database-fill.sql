@@ -444,6 +444,8 @@ REPLACE INTO state_transitions VALUES ('OPSNODEBSD','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('OPSNODEBSD','SHUTDOWN','TBSETUP','Booting');
 REPLACE INTO state_transitions VALUES ('OPSNODEBSD','TBSETUP','ISUP','BootDone');
 REPLACE INTO state_transitions VALUES ('OPSNODEBSD','ISUP','TBSETUP','Crash');
+REPLACE INTO state_transitions VALUES ('RELOAD-MOTE','RELOADING','RELOADDONE','ReloadDone');
+REPLACE INTO state_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','RELOADING','Booting');
 
 --
 -- Dumping data for table `state_triggers`
@@ -549,7 +551,6 @@ REPLACE INTO table_regex VALUES ('virt_nodes','startupcmd','text','redirect','de
 REPLACE INTO table_regex VALUES ('virt_nodes','tarfiles','text','regex','^([-\\w\\.\\/\\+]+\\s+[-\\w\\.\\/\\+:~]+;{0,1})*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','vname','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','type','text','regex','^[-\\w]*$',0,30,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','inner_elab_role','text','regex','^(boss|ops|node)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(fatal|nonfatal|ignore)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','routertype','text','regex','^(none|ospf|static|manual|static-ddijk|static-old)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','regex','^[-\\w]*$',0,32,NULL);
@@ -606,8 +607,6 @@ REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','
 REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('nodes','bios_version','text','regex','^[-\\w\\.+]+$',0,64,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
-REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',0,45,NULL);
-REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
 REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',1,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noidleswap_reason','text','redirect','default:tinytext',1,255,NULL);
@@ -640,7 +639,6 @@ REPLACE INTO table_regex VALUES ('virt_lans','vnode','text','redirect','virt_nod
 REPLACE INTO table_regex VALUES ('virt_lans','vport','int','redirect','default:tinyint',0,99,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','ip','text','regex','^(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3})$',0,15,NULL);
 REPLACE INTO table_regex VALUES ('experiments','usemodelnet','int','redirect','default:boolean',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','modelnet_cores','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('experiments','modelnet_edges','int','redirect','default:tinyint',0,5,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','mustdelay','int','redirect','default:boolean',0,0,NULL);
@@ -661,6 +659,10 @@ REPLACE INTO table_regex VALUES ('firewall_rules','eid','text','redirect','exper
 REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','ruleno','int','redirect','default:int',0,50000,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','rule','text','regex','^\\w[-\\w \\t,/\\{\\}\\(\\)!:\\.]*$',0,1024,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','inner_elab_role','text','regex','^(boss|ops|node)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',0,45,NULL);
+REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
