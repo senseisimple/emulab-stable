@@ -124,6 +124,10 @@ my $wa_plr_solverweight   = 500.0;
 # The BOSS name in the widearea info tables.
 my $boss = TBDB_WIDEAREA_LOCALNODE;
 
+# Nodes reserved out.
+my $DEADPID = NODEDEAD_PID();
+my $DEADEID = NODEDEAD_EID();
+
 #
 # A node record (poor man struct). We create a hashed array of these,
 # indexed by the vnode name.
@@ -437,13 +441,18 @@ if ($typecount || $classcount == $fixedcount) {
 	}
 
 	#
-	# This query gets free nodes for the choosen type.
+	# This query gets free nodes for the choosen type, but leaves out
+	# any that are mapped to dead nodes or nodes that are in hwdown.
 	#
 	$query_result =
 	    DBQueryFatal("select a.node_id from nodes as a ".
 			 "left join reserved as b on a.node_id=b.node_id ".
+			 "left join reserved as m on a.phys_nodeid=m.node_id ".
 			 "left join nodes as n on a.phys_nodeid=n.node_id ".
-			 "where b.node_id is null and a.type='$type' ".
+			 "where b.node_id is null and a.type='$type' and ".
+			 "      (n.status='up' and ".
+			 "       (m.node_id is null or ".
+			 "        m.pid!='$DEADPID' or m.eid!='$DEADEID')) ".
 			 "$omit ".
 			 "order by RAND() limit $count");
 	if ($query_result->numrows != $count) {
