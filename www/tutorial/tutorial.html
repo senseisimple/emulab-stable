@@ -722,13 +722,27 @@ the "Experiment Information" page. As each node completes the startup
 command, the listing for that node will be updated to reflect the exit
 status of the command (you may need to hit the Reload button to see
 the changes). Once all of the nodes hare reported in an exit status,
-the batch system will tear down the experiment and send you email.
+the batch system will tear down the experiment and send you email.  If
+your experiment is such that one node is the controller, and runs
+commands on all the other nodes, then simply run a dummy startup
+command on the other nodes so that the batch system will receive an
+exit value for that node. Since the batch is not terminated until
+<em>all</em> nodes have reported in, be sure that the controlling node
+does not exit from its startup command until all of the nodes have
+finished. A dummy startup command can be setup like this:
+
+<code><pre>
+tb-set-node-startup $nodeC /bin/echo
+</code></pre>
 
 <p>
 The status of your batch experiment can be viewed via the "Experiment
 Information" link in the Web Interface Options menu. You may also
 cancel a batch after you have submitted it using the "Terminate"
-option in the information display.
+option in the information display. As noted in the section on the <a
+href="#Startupcmd">Startupcmd</a>, the output of the startup command
+on each node is written to separate files in your project log
+directory. You can use these log files to debug your batch experiment.
 
 <p>
 <i>
