@@ -58,7 +58,8 @@ function SHOWPROJECT($pid, $thisuid) {
     # 
     echo "<tr>
               <td>Name: </td>
-              <td class=\"left\">$pid</td>
+              <td class=\"left\">
+                <a href='showproject.php3?pid=$pid'>$pid</a></td>
           </tr>\n";
     
     echo "<tr>
@@ -180,12 +181,14 @@ function SHOWGROUP($pid, $gid) {
     # 
     echo "<tr>
               <td>GID: </td>
-              <td class=\"left\">$gid</td>
+              <td class=\"left\">
+                <a href='showgroup.php3pid=$pid&gid=$gid'>$gid</a></td>
           </tr>\n";
     
     echo "<tr>
               <td>PID: </td>
-              <td class=\"left\">$pid</td>
+              <td class=\"left\">
+                <a href='showproject.php3?pid=$pid'>$pid</a></td>
           </tr>\n";
     
     echo "<tr>
@@ -313,9 +316,9 @@ function SHOWGROUPMEMBERSHIP($uid) {
 
 	if (TBTrustConvert($trust) != $TBDB_TRUST_NONE) {
 	    echo "<tr>
-                      <td>$pid</td>
-                      <td>$gid</td>
-                      <td>$trust</td>\n";
+              <td><a href='showproject.php3?pid=$pid'>$pid</a></td>
+              <td><a href='showgroup.php3?pid=$pid&gid=$gid'>$gid</a></td>
+              <td>$trust</td>\n";
 	    echo "</tr>\n";
 	}
     }
@@ -504,20 +507,19 @@ function SHOWEXP($pid, $eid) {
     echo "<tr>
             <td>Project: </td>
             <td class=\"left\">
-                <A href='showproject.php3?pid=$pid'>$pid</td>
+              <a href='showproject.php3?pid=$pid'>$pid</a></td>
           </tr>\n";
 
     echo "<tr>
             <td>Group: </td>
             <td class=\"left\">
-                <A href='showgroup.php3?pid=$pid&gid=$exp_gid'>$exp_gid</td>
+              <a href='showgroup.php3?pid=$pid&gid=$exp_gid'>$exp_gid</a></td>
           </tr>\n";
 
     echo "<tr>
             <td>Experiment Head: </td>
             <td class=\"left\">
-                <A href='showuser.php3?target_uid=$exp_head'>
-                   $exp_head</td>
+              <a href='showuser.php3?target_uid=$exp_head'>$exp_head</a></td>
           </tr>\n";
 
     echo "<tr>
@@ -761,12 +763,14 @@ function SHOWOSINFO($osid) {
 
     echo "<tr>
             <td>Project: </td>
-            <td class=\"left\">$os_pid</td>
+            <td class=\"left\">
+              <a href='showproject.php3?pid=$os_pid'>$os_pid</a></td>
           </tr>\n";
 
     echo "<tr>
             <td>Creator: </td>
-            <td class=left>$creator</td>
+            <td class=left>
+              <a href='showuser.php3?target_uid=$creator'>$creator</a></td>
  	  </tr>\n";
 
     echo "<tr>
@@ -906,7 +910,8 @@ function SHOWIMAGEID($imageid, $edit, $isadmin = 0) {
 
     echo "<tr>
             <td>Project: </td>
-            <td class=\"left\">$pid</td>
+            <td class=\"left\">
+              <a href='showproject.php3?pid=$pid'>$pid</a></td>
           </tr>\n";
 
     echo "<tr>
@@ -1162,12 +1167,12 @@ function SHOWNODE($node_id) {
 	echo "<tr>
                 <td>Project: </td>
                 <td class=\"left\">
-                    <A href='showproject.php3?pid=$pid'>$pid</td>
+                    <a href='showproject.php3?pid=$pid'>$pid</a></td>
               </tr>\n";
 
 	echo "<tr>
                   <td>Experiment:</td>
-                  <td><A href='showexp.php3?pid=$pid&eid=$eid'>$eid</A></td>
+                  <td><a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></td>
                </tr>\n";
     }
 
