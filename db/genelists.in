@@ -1,6 +1,7 @@
 #!/usr/bin/perl -wT
-#use English;
 use Fcntl ':flock';
+use English;
+$ENV{'PATH'} = '@prefix@/sbin:@prefix@/bin:/bin';
 
 sub usage() {
     print STDOUT "Usage: genelists\n".
@@ -24,6 +25,7 @@ $| = 1; # Turn off line buffering on output
 # Load the Testbed support stuff.
 push(@INC, "$TB/lib");
 require libdb;
+require libtestbed;
 
 # Set up a mutex so this doesn't get run twice at the same time
 
@@ -50,10 +52,11 @@ foreach my $active ( 0, 1 ) {
        ) {
       DBFatal("Getting Active Users!");
     }
-    $userlist = "testbed-ops\@flux.cs.utah.edu
-testbed-active-users-archive\@flux.cs.utah.edu\n";
-    open(LIST,">/mnt/usr/site/lib/lists/testbed-active-users") ||
-      die("Couldn't open testbed-active-users: $!\n");
+    $userlist =
+      "$TBOPS\n".
+      "testbed-active-users-archive\@flux.cs.utah.edu\n";
+    open(LIST,"> /n/ops/usr/site/lib/lists/testbed-active-users.new") ||
+      fatal("Couldn't open testbed-active-users: $!\n");
     print "Opened testbed-active-users\n" if $d;
   } else {
     print "Getting All Users\n" if $d;
@@ -64,10 +67,11 @@ testbed-active-users-archive\@flux.cs.utah.edu\n";
        ) {
       DBFatal("Getting Users!");
     }
-    $userlist = "testbed-ops\@flux.cs.utah.edu
-testbed-users-archive\@flux.cs.utah.edu\n";
-    open(LIST,">/mnt/usr/site/lib/lists/testbed-users") ||
-      die("Couldn't open testbed-users: $!\n");
+    $userlist =
+      "$TBOPS\n".
+      "testbed-users-archive\@flux.cs.utah.edu\n";
+    open(LIST,"> /n/ops/usr/site/lib/lists/testbed-users.new") ||
+      fatal("Couldn't open testbed-users: $!\n");
     print "Opened testbed-users list\n" if $d;
   }
 
@@ -82,11 +86,20 @@ testbed-users-archive\@flux.cs.utah.edu\n";
   close(LIST);
 }
 
+if (system("mv /n/ops/usr/site/lib/lists/testbed-active-users.new ".
+	   "/n/ops/usr/site/lib/lists/testbed-active-users")) {
+  fatal("Couldn't move testbed-active-users.new: $!\n");
+}
+
+if (system("mv /n/ops/usr/site/lib/lists/testbed-users.new ".
+	   "/n/ops/usr/site/lib/lists/testbed-users")) {
+  fatal("Couldn't move testbed-users.new: $!\n");
+}
+
 exit 0;
 
 sub fatal {
   local($msg) = $_[0];
-  system("echo \"$msg\" | /usr/bin/mail ".
-	 "-s 'TESTBED: Failure Generating Email Lists' $TBOPS");
+  SENDMAIL($TBOPS, "TESTBED: Failure Generating Email Lists", $msg);
   die($msg);
 }
