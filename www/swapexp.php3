@@ -159,7 +159,10 @@ if ($retval == 0) {
     else
 	$howlong = "less than two";
     
-    echo "Experiment `$exp_eid' in project `$exp_pid' is swapping $inout.
+    echo "Experiment
+	  <a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>
+          in project <A href='showproject.php3?pid=$exp_pid'>$exp_pid</A>
+          is swapping $inout.
           <br><br>
           You will be notified via email when the experiment has finished
           swapping. This typically takes $howlong minutes, depending on the
