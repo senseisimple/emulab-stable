@@ -2,7 +2,7 @@
 
 echo "Checking for file updates ..."
 export HOME=/root
-/usr/local/bin/cvsup -1 -g -L 1 /etc/testbed/supfile
+/usr/local/bin/cvsup -e -1 -g -L 1 /etc/testbed/supfile
 
 if [ -x /etc/testbed/setup ]; then
         echo "Setting up Testbed configuration..."
