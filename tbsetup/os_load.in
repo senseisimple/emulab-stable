@@ -214,7 +214,7 @@ foreach my $node (@nodes) {
     #
     my $sb     = stat($imagepath);
     my $chunks = $sb->size / (1024 * 1024);
-    $maxwait   = int((($chunks / 100.0) * 25) + (4 * 60));
+    $maxwait   = int((($chunks / 100.0) * 30) + (5 * 60));
 
     # 0 means load the entire disk.
     my $diskpart = "";

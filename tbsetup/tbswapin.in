@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -80,7 +80,7 @@ sub cleanup {
     # we just kill off the vnode stuff. 
     #
     TBDebugTimeStamp("vnode_setup -k started");
-    if (system("vnode_setup -f -d -k $pid $eid")) {
+    if (system("vnode_setup -d -k $pid $eid")) {
 	print STDERR "*** Failed tear down vnodes.\n";
     }
 

@@ -972,7 +972,8 @@ foreach my $vname (keys(%isvirtnode)) {
     # Try to allocate. Note, if this fails we are done for. Okay for now
     # since it is never the case that it should fail given the current
     # requirement that all local vnodes are "fixed" to a real node.
-    # 
+    #
+    print "Reserving $pnode (for $vname) ...\n";
     if (system("nalloc $pid $eid $pnode")) {
 	die("*** $0:\n".
 	    "Failed to reserve $pnode (on $fixed)\n");

@@ -122,9 +122,6 @@ if (!TBAdmin($UID) &&
 	"    You do not have permission to mess with $pid/$eid!\n");
 }
 
-# Need the state.
-$exptstate = ExpState($pid, $eid);
-
 #
 # Get the list of nodes.
 # 
@@ -154,8 +151,10 @@ foreach my $node (@nodes) {
 	# no need to do anything. Ditto for swapping out; the vnode
 	# will get torn down when the node goes down, obviously. 
 	#
-	if (($killmode  && ExpState($pid, $eid) eq EXPTSTATE_SWAPPING) ||
-	    (!$killmode && ExpState($pid, $eid) eq EXPTSTATE_ACTIVATING)) {
+	my $exptstate = ExpState($pid, $eid);
+
+	if ($exptstate eq EXPTSTATE_SWAPPING ||
+	    $exptstate eq EXPTSTATE_ACTIVATING) {
 	    print STDOUT "Skipping $mode of vnode $node on local $pnode ...\n";
 	    next;
 	}
