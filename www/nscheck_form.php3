@@ -34,7 +34,7 @@ echo "<form enctype=\"multipart/form-data\"
 echo "<tr>
           <td rowspan>*Your NS file: &nbsp</td>
 
-          <td rowspan><center>Upload (20K max)<br>
+          <td rowspan><center>Upload (50K max)<br>
                                    <br>
                                    Or<br>
                                    <br>
@@ -42,7 +42,7 @@ echo "<tr>
                       </center></td>
 
           <td rowspan>
-              <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"20000\">
+              <input type=\"hidden\" name=\"MAX_FILE_SIZE\" value=\"51200\">
               <input type=\"file\" name=\"exp_nsfile\" size=\"30\">
               <br>
               <br>

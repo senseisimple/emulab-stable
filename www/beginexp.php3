@@ -141,7 +141,7 @@ function SPITFORM($formfields, $errors)
 	echo "<tr>
                   <td rowspan>*Your NS file: &nbsp</td>
 
-                  <td rowspan><center>Upload (20K max)[<b>1</b>]<br>
+                  <td rowspan><center>Upload (50K max)[<b>1</b>]<br>
                                    <br>
                                    Or<br>
                                    <br>
@@ -149,7 +149,7 @@ function SPITFORM($formfields, $errors)
                               </center></td>
 
                   <td rowspan>
-                      <input type=hidden name=MAX_FILE_SIZE value=20000>
+                      <input type=hidden name=MAX_FILE_SIZE value=51200>
 	              <input type=file
                              name=exp_nsfile
                              value=\"" . $exp_nsfile . "\"
