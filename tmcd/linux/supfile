@@ -1,2 +1,2 @@
-RHL62-STD  host=boss.emulab.net base=/etc/rc.d/testbed/sup prefix=/ preserve delete release=current
+RHL62-STD  host=boss.emulab.net base=/etc/rc.d/testbed/sup prefix=/ preserve release=current
 

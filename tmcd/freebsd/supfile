@@ -1,2 +1,2 @@
-FBSD40-STD host=boss.emulab.net base=/etc/testbed/sup prefix=/ preserve delete release=current
+FBSD40-STD host=boss.emulab.net base=/etc/testbed/sup prefix=/ preserve release=current
 
