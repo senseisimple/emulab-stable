@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -45,6 +45,7 @@ $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" .
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libadminctrl;
 require exitonwarn; # exitonwarn isn't really a module, so just require it
 
 #
@@ -208,11 +209,26 @@ elsif ($swapop eq "update") {
     #
     if ($firewalled) {
 	print STDERR "Cannot modify firewalled experiment right now.\n";
-	print "Failingly finished swap-$swapop for $pid/$eid. ".TBTimeStamp()."\n";
+	print "Failingly finished swap-$swapop for $pid/$eid. " .
+	    TBTimeStamp() . "\n";
 	TBDebugTimeStamp("tbswap $swapop finished (failed)");
 	exit(1);
     }
 
+    #
+    # Before swapout, do cursory admission control to see if the
+    # modified experiment will be swappable. assign_wrapper does a
+    # more stringent check using assign.
+    #
+    print STDERR "Checking with Admission Control ...\n";
+    if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
+	print STDERR "Admission control failure!\n";
+	print "Failingly finished swap-$swapop for $pid/$eid. " .
+	    TBTimeStamp() . "\n";
+	TBDebugTimeStamp("tbswap $swapop finished (failed)");
+	exit(1);
+    }
+    
     #
     # Update.
     #
@@ -288,6 +304,19 @@ elsif ($swapop eq "in") {
     # Swap in
     #
     my $retries = 2;
+
+    #
+    # Before real swapin, do cursory admission control. assign_wrapper does
+    # a more stringent check using assign.
+    #
+    print STDERR "Checking with Admission Control ...\n";
+    if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
+	print STDERR "Admission control failure!\n";
+	print "Failingly finished swap-$swapop for $pid/$eid. " .
+	    TBTimeStamp() . "\n";
+	TBDebugTimeStamp("tbswap $swapop finished (failed)");
+	exit(1);
+    }
     
     $errors = doSwapin(REAL);
 

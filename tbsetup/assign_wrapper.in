@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -76,6 +76,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use Node;
+use libadminctrl;
 
 #
 # assign_wrapper Settings
@@ -278,6 +279,9 @@ my %plinks = ();
 my %virtnodes = ();
 my %v2vmap = ();
 
+# Admission control counts
+my %admission_control = ();
+
 #
 # Support for experiment modify. We create v2p and v2v mappings of the
 # current topology so we can figure out how its changed after assign
@@ -459,6 +463,14 @@ printdb "Generating TOP file.\n";
 TBDebugTimeStamp("TOP started");
 
 #
+# Do admission control test right away.
+#
+if (!$toponly) {
+    fatal("Failed admission control checks!")
+	if (!TBAdmissionControlCheck($UID, $pid, $eid, \%admission_control));
+}
+
+#
 # vtypes are a funny mix beteween physical and virtual state, so we have to
 # load them before getting the PhysInfo.
 #
@@ -559,6 +571,7 @@ while (1) {
     $currentrun++;
 }
 TBDebugTimeStamp("assign_loop finished");
+die("foo\n");
 
 #
 # Run assign once.
@@ -596,6 +609,18 @@ sub RunAssign ()
     	if ($precheck);
     system("ptopgen $ptopargs > $ptopfile");
     TBDebugTimeStamp("ptopgen finished");
+
+    if (scalar(keys(%admission_control))) {
+	open(PTOP, ">> $ptopfile") or
+	    return -1;
+
+	foreach my $typeclass (keys(%admission_control)) {
+	    my $count = $admission_control{$typeclass};
+
+	    print PTOP "set-type-limit $typeclass $count\n";
+	}
+	close(PTOP);
+    }
 
     TBDebugTimeStamp("assign started");
     # Run assign
