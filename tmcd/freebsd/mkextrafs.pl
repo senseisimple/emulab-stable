@@ -30,6 +30,8 @@ my $partition  = "e";
 
 my $forceit    = 0;
 
+sub mysystem($);
+
 #
 # Turn off line buffering on output
 #
@@ -116,28 +118,47 @@ if (!$forceit) {
 #
 # Set the partition type to BSD and create a disk label
 #
+my $tmpfile = "/tmp/disklabel";
 mysystem("echo \"p $slice 165 $sstart $ssize\" | fdisk -f - $disk");
 mysystem("disklabel -w -r $slicedev auto");
+mysystem("disklabel -r $slicedev > $tmpfile");
 
-# Make sure the kernel really has the new label!
-mysystem("disklabel -r $slicedev > /tmp/disklabel");
-mysystem("disklabel -R -r $slicedev /tmp/disklabel");
-
-$ENV{'EDITOR'} = "ed";
-
-open(ED, "| disklabel -e -r $slicedev") or
+#
+# Tweak the disk label to ensure there is an 'e' partition
+# In FreeBSD 4.x, we just add one.
+# In FreeBSD 5.x, we replace the 'a' partition which is created by default.
+#
+open(DL, "+<$tmpfile") or
     die("*** $0:\n".
-	"    Oops, could not edit label on /dev/${slicedev}!\n");
-
-print ED "/^  c: /\n";
-print ED "t\n";
-print ED "s/c: /${partition}: /\n";
-print ED "w\n";
-print ED "q\n";
-if (!close(ED)) {
+	"    Could not edit temporary label in $tmpfile!\n");
+my @dl = <DL>;
+if (scalar(grep(/^  ${partition}: /, @dl)) != 0) {
     die("*** $0:\n".
-	"    Oops, error editing label on /dev/${slicedev}!\n");
+	"    Already an \'$partition\' partition?!\n");
 }
+seek(DL, 0, 0);
+truncate(DL, 0);
+
+my $done = 0;
+foreach my $line (@dl) {
+    # we assume that if the 'a' paritition exists, it is the correct one
+    my $pat = q(^  a: );
+    if (!$done && $line =~ /$pat/) {
+	$line =~ s/$pat/  e: /;
+	$done = 1;
+    }
+    $pat = q(^  c: );
+    if (!$done && $line =~ /$pat/) {
+	print DL $line;
+	$line =~ s/$pat/  e: /;
+	$done = 1;
+    }
+    print DL $line;
+}
+close(DL);
+mysystem("disklabel -R -r $slicedev $tmpfile");
+unlink($tmpfile);
+
 mysystem("newfs -U -i 25000 $fsdevice");
 mysystem("echo \"$fsdevice $mountpoint ufs rw 0 2\" >> /etc/fstab");
 
