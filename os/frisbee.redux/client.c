@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  * Frisbee client.
  *
  * TODO: Deal with a dead server. Its possible that too many clients

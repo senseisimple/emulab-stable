@@ -1,7 +1,7 @@
 /*
- * Copyright (c) 2000 University of Utah and the Flux Group.
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2000-2002 University of Utah and the Flux Group.
  * All rights reserved.
- * @OSKIT-FLUX-GPLUS@
  */
 
 #ifndef _OSKIT_BOOT_BOOTWHAT_H_
