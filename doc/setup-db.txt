@@ -147,13 +147,10 @@ on the end of the address, to match the entire subnet). You can have as
 many 'allow' lines as you want. Restart apache.
 
 Next, you'll need to specify which users have the ability to edit the database.
-This is done with the 'dbedit' column in the users table. When we automate
-user creation, we'll add a way to set this when the user is created.
+This is done with the 'dbedit' column in the users table. You can turn on
+a user's dbedit bit like so:
 
-Now, you'll need to specify which tables are editable from the web interface.
-This is to protect against accidental database damage, as mentioned in the
-warning above. We'll soon provide contents for this table
-(webdb_table_permissions) with the testbed software.
+   echo 'update users set dbedit=1 where uid="<username>"' | mysql tbdb
 
 ##### Step 3 - Setup switches
 ##### Local Only
