@@ -223,7 +223,7 @@ sub osload ($$) {
 	#
 	if (!exists($maxwaits{$imageid})) {
 	    my $sb      = stat($imagepath);
-	    my $chunks  = $sb->size / (1024 * 1024);
+	    my $chunks  = $sb->size >> 20; # Size may be > 2^31.  Shift is unsigned.
 
 	    $maxwaits{$imageid} = int((($chunks / 100.0) * 30) + (5 * 60));
 	}
