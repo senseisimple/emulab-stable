@@ -333,6 +333,7 @@ sub GetTarFile($$$)
 	# Okay, run wget with the proper arguments. 
 	#
 	my $cmd = "wget -q -O $copyfile ".
+	          ($debug ? "--server-response " : "") .
 	          "'https://${www}/spewrpmtar.php3".
 	          "?nodeid=${nodeid}&file=${tarfile}&key=${keyhash}'";
     
