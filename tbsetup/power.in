@@ -89,17 +89,20 @@ if ($user ne "root") {
   my @conds = ();
   foreach $node (@machines) {
     push(@conds,"\Lnode_id='$node'");
+    if ($node =~ /sh\d+/) { push(@conds,"\Lnode_id like '$node%'"); }
   }
   my $cmd = 
     "select uid, node_id from reserved as r left join experiments as e ".
      "on r.eid = e.eid left join proj_memb as pm on pm.pid=e.pid where (".
      join(" or ",@conds).") and uid='$user';";
-  
+
   $sth = $dbh->query($cmd);
   #print "$cmd\n";  
   while ( @_ = $sth->fetchrow_array()) {
     #print "Got '",join("'\t'",@_),"'\n";
-    push(@OkNodes, "\L$_[1]"); #make sure its lowercase
+    my $node = "\L$_[1]";
+    $node =~ s/(sh\d+)-\d/$1/;
+    push(@OkNodes, "$node");
   }
 }
 
@@ -111,17 +114,22 @@ if ($user ne "root") {
 foreach $node ( sort @machines) {
   my $Approved = 0;
   foreach $ok (sort @OkNodes) { if ($node eq $ok) { $Approved = 1; } }
-  if (!$Approved && ($user ne "root")) { 
-    print "You are not authorized to control $node. Skipping...\n";
+  if (!$Approved && ($user ne "root")) {
+    if ($node =~ /(sh\d+)-\d/) {
+      print "$node: Sharks are controlled by shelf only. Use '$1'.\n"; 
+    } else {
+      print "You are not authorized to control $node. Skipping...\n";
+    }
     $exitval++;
   } else {
-    #print $snmpit, '-i',$IPList{$node},$op,$OutletList{$node},"\n";
+    $node =~ /(sh\d+)-(\d)/;
     if ( ! defined ($IPList{$node}) ) {
       print "Machine $node not found. Skipping...\n";
       $exitval++;
     } else {
       my $cmd=join(" ",
 		   ($snmpit,'-v','-i',$IPList{$node},$op,$OutletList{$node}));
+      #print "calling $cmd\n";
       open(OUT,$cmd." |");
       while (<OUT>) {
 	if (/was outlet([OnfRebot]+)/) {

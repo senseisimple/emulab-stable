@@ -1,6 +1,6 @@
 #!/usr/local/bin/perl -w
 
-if ($#ARGV >= 1) {
+if ($#ARGV >= 1 || $#ARGV < 0) {
     #Help mode
     print "Usage: showgraph [display]\n";
     print "\n";
@@ -18,7 +18,8 @@ if ($#ARGV >= 1) {
     print "in the actual database, and is always current.\n";
     print "\n";
     print "If you get an 'Unable to open display' message, give a display \n";
-    print "parameter on the command line, and it will attempt to open it.\n";
+    print "parameter (like 'myhost:0') on the command line, and it will \n";
+    print "attempt to open it.\n";
     die("\n");
 } else  {
     use Mysql;
@@ -43,11 +44,16 @@ open(TMP,">$filename");
 
 print TMP "graph: {\n  orientation: left_to_right\n".
     "  title: \"Testbed Database Relational Graph - ".$date."\"\n";
-print TMP "  display_edge_labels: yes\n  scaling: 0.40\n";
 print TMP "  height: 1000\n width: 500\n";
 print TMP "  priority_phase: yes\n  straight_phase: yes\n";
-print TMP "  crossingweight: medianbary\n  splines: yes\n";
 print TMP "  arrowmode: fixed\n";
+
+# Adjust the scale here...
+print TMP "  display_edge_labels: yes\n  scaling: 0.37\n";
+
+# Use one of the following to control layout... whichever works better...
+print TMP "  crossingweight: medianbary\n  splines: yes\n";
+#print TMP "  crossingweight: barymedian\n  splines: yes\n";
 
 my $sth ="";
 my $cmd ="";
@@ -88,7 +94,7 @@ foreach $col ( sort keys %tablecols) {
     @tables= sort split('\.',$tablecols{$col});
     foreach $tbl (sort @tables) {
 	if (@tables < 2 || 
-	    $tbl=~/^delta_|proj_|dela|rel|nodes|log|exper|res|out|part|int/i ) {
+	    $tbl=~/^delta_|proj_|dela|rel|nodes|log|exper|res|part|int/i ) {
 	    print TMP "  edge: { sourcename: \"$col\" ".
 		"targetname: \"$tbl\" }\n";
 	} else {

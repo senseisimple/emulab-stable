@@ -22,8 +22,25 @@ my $reloadpid="testbed";
 my $reloadeid="reloading";
 my $pid = shift;
 my $eid = shift;
-my @node_names=@ARGV;
+my @node_names=();
 my @freed_nodes=();
+
+foreach my $n (@ARGV) {
+  if ($n =~ /(sh\d+)/ ) {
+    # its a shark - do the whole shelf if its not done already.
+    my $shelf = $1;
+    if ( ! (join(",",@node_names) =~ /,$shelf-\d,/)) {
+      # Shelf hasn't been done yet...
+      foreach my $n ( 1 .. 8 ) {
+	push(@node_names,"$shelf-$n");
+      }
+    }
+  } else {
+    # its not a shark - just add it in...
+    push(@node_names,"$n");
+  }
+}
+
 
 my $cmd = "";
 my $sth = "";
@@ -76,7 +93,7 @@ foreach my $n (@node_names) {
       $i++;
       @reload = $sth->fetchrow_array();
       my ($node, $part, $image, $path) = @reload;
-      
+
       if (! defined($reloads{"$image $part $path"})) {
 	my @list = ($node);
 	$reloads{"$image $part $path"} = \@list;
@@ -96,7 +113,7 @@ foreach my $n (@node_names) {
 	  && $error++);
   }
 
-  if (! ($n =~ /^tbsh/)) { #If its not a shark
+  if (! ($n =~ /sh\d+/)) { #If its not a shark
     # Find the control net interface for this node type
     $sth = 
       $dbh->query("select control_net from node_types left join ".
@@ -106,6 +123,12 @@ foreach my $n (@node_names) {
     # Clean out all IPs except the control net
     $cmd = 
       "update interfaces set IP='' where node_id='$n' and card!='$control'";
+    $sth = $dbh->query($cmd)
+      || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
+	  && $error++);
+  } else {
+    # it is a shark, so clear out the alias(es)
+    $cmd = "update interfaces set IPalias='' where node_id='$n'";
     $sth = $dbh->query($cmd)
       || (print "Failed Command:\n$cmd\nError string is:".$dbh->errstr."\n"
 	  && $error++);
@@ -161,9 +184,21 @@ if ( @reloaded > 0 ) {
     || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 }
 
+my @sharks=();
+
 foreach $n ( @freed_nodes ) {
-  system("$consetup $n") == 0 or
-    print STDERR "WARNING: $consetup $n failed!\n";
+  if ($n =~ /(sh\d+)/) {
+    # Its a shark - do the shelf if it hasn't been done yet
+    my $shelf = $1;
+    if (!(join(",",@sharks) =~ /\b$shelf\b/)) {
+      push (@sharks,$shelf);
+      system("$consetup $shelf") == 0 or
+	print STDERR "WARNING: $consetup $shelf failed!\n";
+    }
+  } else {
+    system("$consetup $n") == 0 or
+      print STDERR "WARNING: $consetup $n failed!\n";
+  }
 }
 
 exit($error);

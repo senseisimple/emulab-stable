@@ -15,11 +15,11 @@ my $node;
 while (<>) {
   if (!/^\|/ ) {next;}
   if ( /^\|node_id/) {next;}
-  /^\|([a-zA-Z0-9-]*) *\|/;
+  /^\|([a-zA-Z0-9]*).*\|/;
   $node=$1;
-  if ($node =~/tbpc|tbsh/) {
+  if ($node =~/^(tbpc|sh)/) {
+    print STDERR "Got '$node' \t" if $d && !defined ($nodes{$node});
     $nodes{$node} = 1;
-    print STDERR "Got '$node' \t" if $d;
   }
 }
 
@@ -27,23 +27,28 @@ print STDERR "\n" if $d;
 
 my @list = sort keys %nodes;
 foreach my $item (@list) { 
-  print STDERR "From '$item'\t" if $d;
-  $item = "node_id='$item'"; 
-  print STDERR "To '$item'\n" if $d;
+  print STDERR "From '$item'\t" if $d > 1;
+  if ($item =~ /^sh/) { # If its a shark
+    $item = "node_id='$item-1'"; 
+  } else {
+    $item = "node_id='$item'"; 
+  }
+  print STDERR "To '$item'\n" if $d > 1;
 }
 my $cond = join (" or ",@list);
 
 my $query = "select node_id,card,MAC from interfaces where $cond";
 
-print STDERR "Using query '$query'\n" if $d;
+print STDERR "\nUsing query '$query'\n\n" if $d;
 
 my $sth = $dbh->query($query);
 
 while (my @row = $sth->fetchrow()) {
-  if ( $row[0] =~ /tbpc/ ) {
-    $links{$row[0]."-".$row[1]} = $row[2];
+  print STDERR "Got '$row[0]'\t'$row[1]'\t'$row[2]'\n" if $d > 1;
+  if ( $row[0] =~ /^(sh\d+)-\d/ ) {
+    $links{$1} = $row[2];
   } else {
-    $links{$row[0]} = $row[2];
+    $links{$row[0]."-".$row[1]} = $row[2];
   }
 }
 

@@ -32,7 +32,7 @@ $sth = $dbh->query($cmd);
 if ( ($sth->numrows < 1) && ($UID != 0) && ($EUID != 0)) {	
   die("You are not a member of experiment '$eid' in project '$pid'.\n");
 }
- 
+
 $cmd = "lock tables nodes read, reserved write";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
@@ -58,8 +58,21 @@ foreach my $n (@node_names) {
       next;
     } else {
       # No one has reserved it, and it exists, so add it to my list
-      push(@vals,"('$n','$pid','$eid')");
-      push(@nodes,"$n");
+      if ($n =~ /(sh\d+)/ ) {
+	# its a shark - do the whole shelf if its not done already.
+	my $shelf = $1;
+	if ( ! (join(",",@nodes) =~ /,$shelf-\d,/)) {
+	  # Shelf hasn't been done yet...
+	  foreach my $n ( 1 .. 8 ) {
+	    push(@vals,"('$shelf-$n','$pid','$eid')");
+	    push(@nodes,"$shelf-$n");
+	  }
+	}
+      } else {
+	# its not a shark - just add it in...
+	push(@vals,"('$n','$pid','$eid')");
+	push(@nodes,"$n");
+      }
     }
   }
 }
@@ -79,10 +92,22 @@ $cmd = "unlock tables";
 $sth = $dbh->query($cmd) 
   || die("Locking error:\n$cmd\nError string is:".$dbh->errstr."\n");
 
+my @sharks=();
+
 if (!$error && @nodes) {
   foreach $n ( @nodes ) { 
-    system("$consetup $n") == 0 or
-      print STDERR "WARNING: $consetup $n failed!\n";
+    if ($n =~ /(sh\d+)/) {
+      # Its a shark - do the shelf if it hasn't been done yet
+      my $shelf = $1;
+      if (!(join(",",@sharks) =~ /\b$shelf\b/)) {
+	push (@sharks,$shelf);
+	system("$consetup $shelf") == 0 or
+	  print STDERR "WARNING: $consetup $shelf failed!\n";
+      }
+    } else {
+      system("$consetup $n") == 0 or
+	print STDERR "WARNING: $consetup $n failed!\n";
+    }
   }
 }
 
