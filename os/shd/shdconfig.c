@@ -74,6 +74,7 @@ static	void print_shd_info __P((struct shd_softc *, kvm_t *));
 static	char *resolve_shdname __P((char *));
 static	void usage __P((void));
 int save_checkpoint (char * shd, int version);
+int load_checkpoint (char * shd, int version);
 
 int
 main(argc, argv)
@@ -197,7 +198,7 @@ do_single(argc, argv, action, flags)
         {
             version = atoi(*argv++); --argc;
             printf ("Saving version %d\n", version);
-            save_checkpoint (shd, version);
+            load_checkpoint (shd, version);
         }   
 	printf("shd%d: ", shio.shio_unit);
 	printf("%lu blocks ", (u_long)shio.shio_size);
@@ -627,8 +628,7 @@ int save_checkpoint (char * shd, int version)
     struct shd_readbuf shread;
     char buffer [MAXBUF];
     long block [BLOCKSIZE/4 + 1];
-    TrieIterator pos;
-    int ok;
+    off_t off;
     int i;
     int ix;
     int fd_read;
@@ -686,7 +686,8 @@ int save_checkpoint (char * shd, int version)
 
     read_start = (long) block[(2*version - 2)]; 
     num_blocks = (long) block[(2*version - 1)];
-
+    write (fd_write_mdata, &read_start, sizeof (long));
+    write (fd_write_mdata, &num_blocks, sizeof (long));
     printf ("read start = %ld, num blocks = %ld\n", read_start, num_blocks); 
     for (ix = 0; ix < num_blocks; ix++)
     {
@@ -695,7 +696,6 @@ int save_checkpoint (char * shd, int version)
                 return (1);
         for (i = 0; i < 126; i+=3)
         {
-             off_t off; 
              if (0 == block [i])
                  break;
              printf ("(%ld, %ld, %ld)\n", block[i], block[i+1], block[i+2] * BLOCKSIZE);
@@ -708,6 +708,7 @@ int save_checkpoint (char * shd, int version)
                  perror ("error");
              write (fd_write_mdata, &block[i], sizeof (long));
              write (fd_write_mdata, &block[i+1], sizeof (long));
+             write (fd_write_mdata, &block[i+2], sizeof (long));
         } 
         read_start++;
     }
@@ -716,10 +717,107 @@ int save_checkpoint (char * shd, int version)
     close (fd_write_data);
     close (fd_write_mdata);
     printf ("Save operation successful \n");
+}
 
-/* Similarly swap in blocks by changing fd_read, fd_write pointers */
+int load_checkpoint (char * shd, int version)
+{
+    char buffer [MAXBUF];
+    long block [BLOCKSIZE/4 + 1];
+    off_t off;
+    int i;   
+    int ix;
+    int fd_read_data; 
+    int fd_read_mdata;
+    int fd_write_data;
+    int fd_write_mdata; 
+    int size;    
+    int write_start; 
+    int num_blocks;
+    long byte_count = 0;
+    long block_count = 0;
+    long chunk_size;
+    long key;
+    long value;
 
-    return;
+    fd_write_data = open ("/dev/ad0s4", O_RDWR);
+    if (fd_write_data < 0)
+    {        
+        perror ("error");
+        return;
+    }
+    fd_write_mdata = open ("/dev/ad0s4", O_RDWR);
+    if (fd_write_mdata < 0)
+    {
+        perror ("error");
+        return;
+    }
+
+    /* Open the data file to read from */
+    
+    fd_read_data = open ("/users/saggarwa/image1.data", O_RDWR);
+    if (fd_read_data < 0)
+    {
+        perror ("error");
+        return;
+    }
+
+    /* Open the metadata file to read from */
+
+    fd_read_mdata = open ("/users/saggarwa/image1.mdata", O_RDWR);
+    if (fd_read_mdata < 0)
+    {
+        perror ("error");
+        return;
+    }
+
+    for (i=0; i<128; i++)
+        block[i] = 0;
+
+    read (fd_read_mdata, &write_start, sizeof (long)); 
+    read (fd_read_mdata, &num_blocks, sizeof (long));
+    printf ("Writing %ld blocks starting at %ld\n", num_blocks, write_start); 
+    off = lseek (fd_write_mdata, write_start * BLOCKSIZE, SEEK_SET);
+    while (read (fd_read_mdata, &key, sizeof (long))) 
+    {
+        read (fd_read_mdata, &value, sizeof (long));
+        read (fd_read_mdata, &chunk_size, sizeof (long)); 
+        printf ("Read new triplet (%ld, %ld, %ld)\n", key, value, chunk_size);
+        off = lseek (fd_write_data, value * BLOCKSIZE, SEEK_SET); 
+        size = read (fd_read_data, &buffer, chunk_size * BLOCKSIZE);
+        if (size < 0)
+            perror ("error"); 
+        printf ("Read %ld bytes\n", size);
+        size = write (fd_write_data, &buffer, size);
+        if (size < 0)
+            perror ("error"); 
+        printf ("Wrote %ld bytes\n", size);
+
+        block[byte_count++] = key;
+        block[byte_count++]= value;
+        block[byte_count++] = chunk_size; 
+
+        if (byte_count >= 125)
+        {
+            byte_count = 0;
+            write (fd_write_mdata, &block, BLOCKSIZE);
+            for (i=0; i<128; i++)
+                block[i] = 0; 
+            write_start++;
+            block_count++;
+            if (block_count >= num_blocks) 
+                break; 
+            off = lseek (fd_write_mdata, write_start * BLOCKSIZE, SEEK_SET);
+        } 
+    }
+    if (byte_count > 0)
+    {
+        write (fd_write_mdata, &block, BLOCKSIZE);
+    }
+    close (fd_write_data);
+    close (fd_write_mdata);
+    close (fd_read_data);
+    close (fd_read_mdata);
+    printf ("Load operation successful \n");
 }
 
 /* Local Variables: */

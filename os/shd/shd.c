@@ -111,7 +111,7 @@ long shadow_size; /* in BLOCK_SIZE byte blocks */
 
 Trie * latest_trie;
 int latest_version;
-long copy_block (struct shd_softc *ss, struct proc *p, long src_block, long dest_block, long size, int type);
+long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest_block, long size, int direction);
 struct TrieList
 {
     Trie *trie;
@@ -146,7 +146,7 @@ Trie * create_new_trie (int version)
 {
    Trie * new_trie = 0;
    struct TrieList *current;
-   if (TrieInit (&new_trie, BlockAlloc, BlockFree, copy_block) == 0)
+   if (TrieInit (&new_trie, BlockAlloc, BlockFree, block_copy) == 0)
    {
        printf ("Error initializing new trie\n");
        return 0;
@@ -640,7 +640,7 @@ void swapout_modified_blocks (struct shd_softc *ss, struct proc *p)
     int ix;
     int ok;
     TrieIterator pos;
-    TrieInit (&merged_trie, BlockAlloc, BlockFree, copy_block);
+    TrieInit (&merged_trie, BlockAlloc, BlockFree, block_copy);
 
     for (ix = latest_version; ix >= 1; ix--)
     {
@@ -665,7 +665,7 @@ void swapout_checkpoint (int version, struct shd_softc *ss, struct proc *p)
     TrieIterator pos;
     int ix;
     int ok;
-    TrieInit (&merged_trie, BlockAlloc, BlockFree, copy_block);
+    TrieInit (&merged_trie, BlockAlloc, BlockFree, block_copy);
 
     for (ix = latest_version; ix >= version; ix--)
     {
@@ -691,7 +691,7 @@ void rollback_to_checkpoint (int version, struct shd_softc *ss, struct proc *p)
     TrieIterator pos;
     int ix;
     int ok; 
-    TrieInit (&merged_trie, BlockAlloc, BlockFree, copy_block);
+    TrieInit (&merged_trie, BlockAlloc, BlockFree, block_copy);
 
     for (ix = latest_version; ix >= version; ix--)
     {
@@ -711,7 +711,7 @@ void rollback_to_checkpoint (int version, struct shd_softc *ss, struct proc *p)
         for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
         {
              printf ("value = %ld, key = %ld, size = %d\n", pos->value, pos->key, depthToSize(pos->maxDepth)); 
-             copy_block (ss, p, pos->value, pos->key, depthToSize(pos->maxDepth), SHADOW_TO_SRC);    
+             block_copy (ss, p, pos->value, pos->key, depthToSize(pos->maxDepth), SHADOW_TO_SRC);    
         }
         TrieIteratorCleanup(&pos);
     }
@@ -736,90 +736,46 @@ void print_checkpoint_map (int version)
 
 void load_checkpoint_map (struct shd_softc *ss, struct proc *p)
 {
-    long temp_addr [128];
+    long int temp_addr [128];
     int ix;
     long metadata_block;
     long blocks_used;
     long map [128];
     int array_ix;
-    int i;
-    long read_start;
-    int lbn;
-    int pbn;
-    int lp_flag;
-    long size;
-    int failed;
+    int i, j, k;
+    int write_start;
+    int current_block;
+    int read_start;
+    int num_blocks;
 
-    latest_version = 1;
     metadata_block = 2;
-    blocks_used = 0;
-    array_ix = 0;
+    latest_version = 0;
 
-    for (i = 0; i < 512 / sizeof(long); i++)
+    for (i = 0; i < 512 / sizeof(long int); i++)
     {
+       map[i] = 0;  
        temp_addr[i] = 0;
-       map[i] = 0;
-    }
-
-    if (read_block (ss, p, (char *) temp_addr, metadata_block))
-        return;
-    read_start = (long int) temp_addr[0];
-    blocks_used = (long int) temp_addr[1]; 
-    printf ("Read start = %ld\n", read_start);
-    printf ("Blocks used = %ld\n", blocks_used);
-
-    lp_flag = 0;
-    for (ix = 0; ix < blocks_used; ix++)
+    }   
+    
+    read_block (ss, p, (char *) temp_addr, metadata_block);        
+    while (temp_addr[i] != 0)
     {
-        if (read_block (ss, p, (char*) map, read_start))
-            return;
-        read_start++;
-        i = 0;
-        while (i < 128)
+        read_start = temp_addr[i];
+        num_blocks = temp_addr[i+1]; 
+        i+=2;
+        for (j=0; j<num_blocks; j++)
         {
-            if (0 == map[i])
+            read_block (ss, p, (char *) map, read_start);
+            for (k=0; k<126; k+=3)
             {
-                if (0 == map[i+1])
-                {
-                    i = 128;
-                    continue;
-                }
-                latest_version++;
-                i++;
-                if (i >= 128)
-                    continue;
+                /*TrieInsertWeak (map[k], map[k+1], map[k+2]); */
+                /* use non-allocating version of insertweak */
             }
-            else
-            {
-                 if (lp_flag == 0)
-                 { 
-                     lbn = map[i++];
-                     lp_flag = 1;
-                     if (i >= 128)
-                         continue; 
-                 }
-                 else
-                 if (lp_flag == 1)
-                 {
-                     pbn = map[i++];
-                     lp_flag = 2;
-                     if (i >= 128)
-                         continue;
-                 }
-                 if (lp_flag == 2)
-                 {
-                     size = map[i++];
-    /* A trie function needed which can insert the lbn and pbn into the trie. unlike the COW, this function must not call BlockAlloc() */
-    /*               failed = TrieInsertWeak (trie, bn, (bp->b_bcount)/512, ss, bp, p); */
-                     lp_flag = 0;
-                     if (i >= 128)
-                         continue;
-                 }
-            }
-        }  
+            read_start++;
+        } 
+        latest_version++;
     }
-    latest_version++;
-}
+}                    
 
 void save_checkpoint_map (struct shd_softc *ss, struct proc *p)
 {
@@ -941,7 +897,7 @@ int write_block (struct shd_softc *ss, struct proc *p, char block[512], long int
 
 /* Copies "size" bytes starting at block src_block to block dest_block */
  
-long copy_block (struct shd_softc *ss, struct proc *p, long src_block, long dest_block, long num_blocks, int type)
+long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest_block, long num_blocks, int direction)
 {
         int error = 0;
         struct uio auio;
@@ -953,7 +909,7 @@ long copy_block (struct shd_softc *ss, struct proc *p, long src_block, long dest
         size = num_blocks * 512; /* convert number of blocks to number of bytes */
         printf ("Copying %ld bytes from %d to %d \n", size, src_block, dest_block);  
         temp_addr = (char *) malloc (size + 1, M_DEVBUF, M_NOWAIT);
-        if (SRC_TO_SHADOW == type) {
+        if (SRC_TO_SHADOW == direction) {
             vp = ss->sc_srcdisk.ci_vp;
         }
         else {
@@ -983,7 +939,7 @@ long copy_block (struct shd_softc *ss, struct proc *p, long src_block, long dest
 
 
          /*Write this to block free_block in dest*/
-         if (SRC_TO_SHADOW == type) {
+         if (SRC_TO_SHADOW == direction) {
              vp = ss->sc_copydisk.ci_vp;
          }
          else {
