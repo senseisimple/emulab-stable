@@ -198,7 +198,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Checking for port installation", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.2")) {
+	if (!ExecQuiet("$PKG_INFO -e emulab-boss-1.3")) {
 	    PhaseSkip("Ports already installed");
 	}
 	PhaseFail("Please install ports manually, since some\n of them are " .
