@@ -1,0 +1,134 @@
+diff -rcN /usr/local/include/boost.orig/graph/dijkstra_shortest_paths.hpp /usr/local/include/boost/graph/dijkstra_shortest_paths.hpp
+*** /usr/local/include/boost.orig/graph/dijkstra_shortest_paths.hpp	Fri Sep 20 14:12:02 2002
+--- /usr/local/include/boost/graph/dijkstra_shortest_paths.hpp	Mon Sep 23 12:39:36 2002
+***************
+*** 39,44 ****
+--- 39,45 ----
+  #include <boost/pending/mutable_queue.hpp>
+  #include <boost/graph/relax.hpp>
+  #include <boost/pending/indirect_cmp.hpp>
++ #include <boost/graph/exception.hpp>
+  
+  namespace boost {
+  
+***************
+*** 62,68 ****
+    template <class Visitors = null_visitor>
+    class dijkstra_visitor : public bfs_visitor<Visitors> {
+    public:
+!     dijkstra_visitor(Visitors vis = Visitors())
+        : bfs_visitor<Visitors>(vis) { }
+  
+      template <class Edge, class Graph>
+--- 63,70 ----
+    template <class Visitors = null_visitor>
+    class dijkstra_visitor : public bfs_visitor<Visitors> {
+    public:
+!     dijkstra_visitor() { }
+!     dijkstra_visitor(Visitors vis)
+        : bfs_visitor<Visitors>(vis) { }
+  
+      template <class Edge, class Graph>
+***************
+*** 127,133 ****
+        template <class Vertex, class Graph>
+        void examine_vertex(Vertex u, Graph& g) { m_vis.examine_vertex(u, g); }
+        template <class Edge, class Graph>
+!       void examine_edge(Edge e, Graph& g) { m_vis.examine_edge(e, g); }
+        template <class Edge, class Graph>
+        void black_target(Edge, Graph&) { }
+        template <class Vertex, class Graph>
+--- 129,139 ----
+        template <class Vertex, class Graph>
+        void examine_vertex(Vertex u, Graph& g) { m_vis.examine_vertex(u, g); }
+        template <class Edge, class Graph>
+!       void examine_edge(Edge e, Graph& g) { 
+! 	if (get(m_weight, e) < 0)
+! 	  throw negative_edge();
+! 	m_vis.examine_edge(e, g);
+!       }
+        template <class Edge, class Graph>
+        void black_target(Edge, Graph&) { }
+        template <class Vertex, class Graph>
+***************
+*** 200,207 ****
+      }
+      put(distance, s, zero);
+  
+!     dijkstra_shortest_paths(g, s, predecessor, distance, weight,
+! 			    index_map, compare, combine, inf, zero, vis);
+    }
+  
+    namespace detail {
+--- 206,213 ----
+      }
+      put(distance, s, zero);
+  
+!     dijkstra_shortest_paths_no_init(g, s, predecessor, distance, weight,
+!                             index_map, compare, combine, inf, zero, vis);
+    }
+  
+    namespace detail {
+diff -rcN /usr/local/include/boost.orig/graph/exception.hpp /usr/local/include/boost/graph/exception.hpp
+*** /usr/local/include/boost.orig/graph/exception.hpp	Wed Dec 31 17:00:00 1969
+--- /usr/local/include/boost/graph/exception.hpp	Thu Jun  6 11:04:09 2002
+***************
+*** 0 ****
+--- 1,57 ----
++ //=======================================================================
++ // Copyright 2002 Indiana University.
++ // Authors: Andrew Lumsdaine, Lie-Quan Lee, Jeremy G. Siek
++ //
++ // This file is part of the Boost Graph Library
++ //
++ // You should have received a copy of the License Agreement for the
++ // Boost Graph Library along with the software; see the file LICENSE.
++ //
++ // Permission to modify the code and to distribute modified code is
++ // granted, provided the text of this NOTICE is retained, a notice that
++ // the code was modified is included with the above COPYRIGHT NOTICE and
++ // with the COPYRIGHT NOTICE in the LICENSE file, and that the LICENSE
++ // file is distributed with the modified code.
++ //
++ // LICENSOR MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED.
++ // By way of example, but not limitation, Licensor MAKES NO
++ // REPRESENTATIONS OR WARRANTIES OF MERCHANTABILITY OR FITNESS FOR ANY
++ // PARTICULAR PURPOSE OR THAT THE USE OF THE LICENSED SOFTWARE COMPONENTS
++ // OR DOCUMENTATION WILL NOT INFRINGE ANY PATENTS, COPYRIGHTS, TRADEMARKS
++ // OR OTHER RIGHTS.
++ //=======================================================================
++ 
++ #ifndef BOOST_GRAPH_EXCEPTION_HPP
++ #define BOOST_GRAPH_EXCEPTION_HPP
++ 
++ #include <stdexcept>
++ 
++ namespace boost {
++ 
++   struct bad_graph : public std::invalid_argument {
++     bad_graph(const std::string& what_arg)
++       : std::invalid_argument(what_arg) { }
++   };
++ 
++   struct not_a_dag : public bad_graph {
++     not_a_dag()
++       : bad_graph("The graph must be a DAG.") { } 
++   };
++ 
++   struct negative_edge : public bad_graph {
++     negative_edge()
++       : bad_graph("The graph may not contain an edge with negative weight."){ }
++   };
++ 
++   struct negative_cycle : public bad_graph {
++     negative_cycle()
++       : bad_graph("The graph may not contain negative cycles.") { }
++   };
++   struct not_connected : public bad_graph {
++     not_connected()
++       : bad_graph("The graph must be connected.") { }
++   };
++ 
++ } // namespace boost
++ 
++ #endif // BOOST_GRAPH_EXCEPTION_HPP

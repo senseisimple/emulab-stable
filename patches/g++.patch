@@ -1,0 +1,39 @@
+diff -rcN /usr/include/g++.orig/stl_rope.h /usr/include/g++/stl_rope.h
+*** /usr/include/g++.orig/stl_rope.h	Sat Apr 21 03:06:09 2001
+--- /usr/include/g++/stl_rope.h	Thu Jun  6 13:25:54 2002
+***************
+*** 387,393 ****
+      _Rope_RopeRep(_Tag __t, int __d, bool __b, size_t __size,
+                    allocator_type __a)
+          : _Rope_rep_base<_CharT,_Alloc>(__size, __a),
+!           _M_tag(__t), _M_depth(__d), _M_is_balanced(__b), _M_c_string(0)
+      {
+  #       ifndef __GC
+              _M_refcount = 1;
+--- 387,393 ----
+      _Rope_RopeRep(_Tag __t, int __d, bool __b, size_t __size,
+                    allocator_type __a)
+          : _Rope_rep_base<_CharT,_Alloc>(__size, __a),
+!           _M_tag(__t), _M_is_balanced(__b), _M_depth(__d), _M_c_string(0)
+      {
+  #       ifndef __GC
+              _M_refcount = 1;
+***************
+*** 865,872 ****
+    protected:
+      enum { _S_path_cache_len = 4 }; // Must be <= 9.
+      enum { _S_iterator_buf_len = 15 };
+-     size_t _M_current_pos;
+      _RopeRep* _M_root;     // The whole rope.
+      size_t _M_leaf_pos;    // Starting position for current leaf
+      __GC_CONST _CharT* _M_buf_start;
+                          // Buffer possibly
+--- 865,872 ----
+    protected:
+      enum { _S_path_cache_len = 4 }; // Must be <= 9.
+      enum { _S_iterator_buf_len = 15 };
+      _RopeRep* _M_root;     // The whole rope.
++     size_t _M_current_pos;
+      size_t _M_leaf_pos;    // Starting position for current leaf
+      __GC_CONST _CharT* _M_buf_start;
+                          // Buffer possibly

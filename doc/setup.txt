@@ -50,6 +50,13 @@ IMPORTANT: The mhash package should be installed _before_ the mod_php4 port is
 built. When building mod_php4, you will be given a menu to choose the various
 features you want support for. Make sure to select support for mhash.
 
+IMPORTANT: There is a bug in the g++ headers that come with FreeBSD 4.3 - we
+assume that it has been fixed in newer versions, but are not sure. BEFORE you
+build the testbed software, be sure to apply the 'g++.patch' file from the
+patches/ directory. (As root, 'patch -p0 < g++.patch') Also, the version of
+bosst from the FreeBSD package has a bug, sou you'll need to apply
+'boost.patch' (using the same method) before you build as well.
+
 Note on TCL: Do NOT install tcl83; otcl, which is used by some testbed
 scripts, requires tcl82. When you install the tcl-sql package, it will be put
 in the library directory for the latest version of tcl you have installed, so
