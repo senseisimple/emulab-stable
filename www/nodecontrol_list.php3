@@ -180,7 +180,8 @@ if ($isadmin) {
           <th align=center>EID</th>
           <th align=center>Default<br>OSID</th>\n";
 }
-else {
+elseif (strcmp($showtype, "widearea")) {
+    # Widearea nodes are always "free"
     echo "<th align=center>Free?</th>\n";
 }    
 echo "</tr>\n";
@@ -248,7 +249,7 @@ while ($row = mysql_fetch_array($query_result)) {
 	else
 	    echo "<td>&nbsp</td>\n";
     }
-    else {
+    elseif (strcmp($showtype, "widearea")) {
 	if ($pid)
 	    echo "<td>No</td>\n";
 	else
