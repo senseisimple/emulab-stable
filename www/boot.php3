@@ -161,14 +161,14 @@ header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
 flush();
 
-echo date("D M d g:ia T");
+echo date("D M d G:i:s T");
 echo "\n";
 while (!feof($fp)) {
     $string = fgets($fp, 1024);
     echo "$string";
     flush();
 }
-echo date("D M d g:ia T");
+echo date("D M d G:i:s T");
 echo "\n";
 pclose($fp);
 $fp = 0;
