@@ -465,6 +465,7 @@ while (1) {
 	#
 	fatal($exitcode, "Unretriable error. Giving up.");
     }
+    
     print "Waiting 5 seconds and trying again...\n";
     sleep(5);
     $currentrun++;
@@ -952,10 +953,10 @@ sub RunAssign ($)
 #
 if ($needwanassign) {
     my $success  = 0;
-    my $wanargs  = ($impotent ? "-n" : "");
+    my %wanmap   = ();
 
-    print "Running 'wanassign -d $wanargs $pid $eid'\n";
-    open(WANFP,"wanassign -d $wanargs $pid $eid 2>&1 | tee wanassign.log |") or
+    print "Running 'wanassign -d $pid $eid'\n";
+    open(WANFP,"wanassign -d $pid $eid 2>&1 | tee wanassign.log |") or
 	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	      "Failed to start wanassign: $!");
 
@@ -963,8 +964,8 @@ if ($needwanassign) {
     while (<WANFP>) {
 	chop;
 	if ($_ =~ /(\S+) mapsto (\S+)/) {
-	    $v2vmap{$1} = $2;
-	    printdb "  $1 $2\n";
+	    $wanmap{$1} = $2;
+	    printdb "  $1 mapsto $2\n";
 	}
 	if ($_ =~ /^Success/) {
 	    $success = 1;
@@ -981,22 +982,27 @@ if ($needwanassign) {
 	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
 	      "wanassign could not find a solution!");
     }
-    foreach my $virtual (keys(%v2vmap)) {
-	my $physical = $v2vmap{$virtual};
-	my $phys_nodeid;
+    foreach my $virtual (keys(%wanmap)) {
+	my $physical = $wanmap{$virtual};
 
-	TBPhysNodeID($physical, \$phys_nodeid);
-	    
-	$v2pmap{$virtual} = $phys_nodeid;
-	if ( !defined($p2vmap{$phys_nodeid})) {
-	    $p2vmap{$phys_nodeid} = [];
+	fatal($WRAPPER_FAILED|$WRAPPER_FAILED_CANRECOVER,
+	      "Improper mapping from wanassign: $virtual/$physical")
+	    if (!virtnodeisvirt($virtual));
+	
+	#
+	# If mapping a virtual node, then record that, since we need
+	# to allocate the virtnodes on that physnode, later.
+	#
+	if (!defined($virtnodes{$physical})) {
+	    $virtnodes{$physical} = [];
 	}
-	push(@{$p2vmap{$phys_nodeid}}, $virtual);
-
-	# Virtual nodes are always clean. Also prevents errors elsewhere.
-	if (!$impotent) {
-	    TBSetNodeAllocState($physical, TBDB_ALLOCSTATE_RES_INIT_CLEAN());
+	push(@{$virtnodes{$physical}}, $virtual);
+	
+	$v2pmap{$virtual} = $physical;
+	if( ! defined($p2vmap{$physical}) ) {
+	    $p2vmap{$physical} = [];
 	}
+	push(@{$p2vmap{$physical}}, $virtual);
     }
     TBDebugTimeStamp("wanassign finished");
 }
@@ -1102,11 +1108,11 @@ foreach my $pnode (keys(%virtnodes)) {
 	# since it is never the case that it should fail!
 	#
 	if ($impotent) {
-	    print "Selected ($pnode) @plist\n";
+	    print "Selected for $pnode: @plist\n";
 	    print "Skipping physical reservation, as directed.\n";
 	}
 	else {
-	    print "Reserving ($pnode) @plist ...\n";
+	    print "Reserving on $pnode: @plist ...\n";
 	    if (system("nalloc $pid $eid @plist")) {
 		fatal($WRAPPER_FAILED,
 		      "Failed to reserve @plist (on $pnode)");
@@ -3104,8 +3110,14 @@ sub LoadVirtLans()
 	    }
 	    $expt_stats{"walinks"} += 1;
 	    $needwanassign = 1;
-	    # Must let wanassign do this. 
-	    virtnodesetusewan($node);
+	    #
+	    # Must let wanassign do this, but it only handles the remote
+	    # side. If a link is between a local node and a remote node,
+	    # then the local node is still handled in here, but it is
+	    # allocated as unconnected.
+	    #
+	    virtnodesetusewan($node)
+		if (virtnodeisremote($node));
 	    next;
 	}
 

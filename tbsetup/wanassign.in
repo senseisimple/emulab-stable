@@ -1,11 +1,9 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 use Socket;
@@ -18,10 +16,10 @@ use IO::Handle;     # thousands of lines just for autoflush :-(
 sub usage()
 {
     print STDOUT
-	"Usage: wanassign [-d] [-n] <pid> <eid>\n";
+	"Usage: wanassign [-d] <pid> <eid>\n";
     exit(-1);
 }
-my  $optlist = "dn";
+my  $optlist = "d";
 
 #
 # Configure variables
@@ -41,7 +39,6 @@ use libtestbed;
 
 # Locals
 my $debug	= 0;
-my $impotent    = 0;
 my $failed	= 0;
 my $query_result;
 
@@ -67,9 +64,6 @@ if (@ARGV != 2) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
-}
-if (defined($options{"n"})) {
-    $impotent = 1;
 }
 my $pid = $ARGV[0];
 my $eid = $ARGV[1];
@@ -108,9 +102,8 @@ my %virtlans		= ();
 my %rlanmap		= ();
 
 #
-# A list of nodes to allocate with nalloc when we finally get that far.
+# The mappings we get from the solver.
 #
-my @toreserve;
 my %mappings;
 
 # Use latest data flag. From the experiments table.
@@ -129,12 +122,21 @@ my $boss = TBDB_WIDEAREA_LOCALNODE;
 my $DEADPID = NODEDEAD_PID();
 my $DEADEID = NODEDEAD_EID();
 
+# Signal error.
+sub fatal($)
+{
+    my ($msg) = @_;
+    
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
 #
 # A node record (poor man struct). We create a hashed array of these,
 # indexed by the vnode name.
 #
-sub newnode ($$$$$$) {
-    my ($vname,$type,$isvirt,$isremote,$fixed,$physnode) = @_;
+sub newnode ($$$$$) {
+    my ($vname,$type,$isvirt,$isremote,$fixed) = @_;
 
     printdb("  $vname $type isremote:$isremote isvirt:$isvirt " .
 	    ($fixed ? $fixed : "") . " " .
@@ -144,17 +146,21 @@ sub newnode ($$$$$$) {
 	VNAME    => $vname,
 	TYPE     => $type,
 	FIXED    => $fixed,	# tb-fix-node. This is the node name.
-	ISREMOTE => $isremote,  
+	ISREMOTE => $isremote,
+	ISLINKED => 0,		# Member of a link (all we care about).
 	ISVIRT   => $isvirt,    # is a multiplexed node.
-	PHYSNODE => $physnode,  # if a multiplexed node, this is the real node.
 	SOLUTION => undef,      # the solver solution. Might be same as FIXED.
 	MAPPING  => undef,      # Final mapping. 
     };
 }
-sub isremotenode($)	{ return $virtnodes{$_[0]}->{ISREMOTE}; }
-sub isfixednode($)	{ return $virtnodes{$_[0]}->{FIXED}; }
-sub isvirtnode($)	{ return $virtnodes{$_[0]}->{ISVIRT}; }
-sub physnode($)		{ return $virtnodes{$_[0]}->{PHYSNODE}; }
+sub isremotenode($)	    { return $virtnodes{$_[0]}->{ISREMOTE}; }
+sub isfixednode($)	    { return $virtnodes{$_[0]}->{FIXED}; }
+sub isvirtnode($)	    { return $virtnodes{$_[0]}->{ISVIRT}; }
+sub virtnodetype($)         { return $virtnodes{$_[0]}->{TYPE}; }
+sub incvirtnodelinked($)    { return ++$virtnodes{$_[0]}->{ISLINKED}; }
+sub virtnodelinked($)       { return $virtnodes{$_[0]}->{ISLINKED}; }
+sub virtnodemapping($)      { return $virtnodes{$_[0]}->{MAPPING}; }
+sub setvirtnodemapping($$)  { return $virtnodes{$_[0]}->{MAPPING} = $_[1]; }
 
 #
 # A lan record (poor man struct). We create a hashed array of these,
@@ -212,7 +218,8 @@ while (my ($type,$class) = $query_result->fetchrow_array()) {
 }
 
 #
-# Load up virt_nodes. We only care about the virtual nodes.
+# Load up virt_nodes. We only care about the virtual nodes that are members
+# of links, but we have to read virt_lans to figure that out.
 #
 printdb("Reading virt_nodes ...\n");
 
@@ -225,8 +232,6 @@ $query_result =
 
 while (my ($vname,$type,$fixed,$isremote,$isvirt) =
        $query_result->fetchrow_array) {
-    my $physnode = 0;
-    
     if (! defined($fixed)) {
 	$fixed = 0;
     }
@@ -242,69 +247,49 @@ while (my ($vname,$type,$fixed,$isremote,$isvirt) =
     if (! defined($isvirt)) {
 	$isvirt = 0;
     }
-    #
-    # A fixed node. Need to map that to the physnode so that
-    # we can tell the solver (the p section of the solver operates on
-    # the physnodes). This is a messy complication.
-    # 
     if ($fixed) {
-	TBPhysNodeID($fixed, \$physnode);
+	if (! TBValidNodeName($fixed)) {
+	    fatal("Fixed node error ($vname): No such physnode $fixed!");
+	}
     }
-    
-    newnode($vname, $type, $isvirt, $isremote, $fixed, $physnode);
+    newnode($vname, $type, $isvirt, $isremote, $fixed);
 }
 
 #
-# XXX. At present, we cannot mix specific types and generic classes.
-#      That is, the user cannot specify a pcvroninet and a pcvron. Thats
-#      because we want to solve for pcvrons, but first we would have to
-#      assign the pcvroninet nodes, and feed them in as fixed nodes. Thats
-#      a suspect operation, and too much work right now.
+# XXX. At present, we cannot support specific types when using the wan
+#      solver (note, all other nodes have already been allocated by
+#      assign_wrapper, this includes remote nodes that not members of links).
+#      The reason is that the wan solver knows nothing about types, all 
+#      it cares about is the metrics. 
 #
-# The following code checks to make sure no mixed types/classes.
+# The following code checks to make sure no specific types.
 #
-my $typecount  = 0;
-my $classcount = 0;
-my $fixedcount = 0;
 foreach my $vnode (keys(%virtnodes)) {
     if (isremotenode($vnode)) {
-	my $virtnode = $virtnodes{$vnode};
-	my $type     = $virtnode->{TYPE};
-	my $fixed    = $virtnode->{FIXED};
+	my $type = virtnodetype($vnode);
 
 	# See above, type=class for classes!
-	if ($typemap{$type} eq $type) {
-	    $classcount++;
-	}
-	else {
-	    $typecount++;
-	}
-	if ($fixed) {
-	    $fixedcount++;
+	if ($typemap{$type} ne $type) {
+	    fatal("Cannot request specific types ($type) for widearea links!");
 	}
     }
 }
-#
-# If no remote nodes, we are done.
-#
-if (!$typecount && !$classcount) {
-    print "There are no remote nodes. This is okay!\n";
-    exit(0);
-}
-if ($typecount && $classcount) {
-    die("*** $0:\n".
-	"    Bad mix of generic classes and specific types of remote nodes.\n".
-	"    We cannot do that yet!\n");
-}
 
 #
-# Load up the virt lans to find the link characteristics.
+# Load up the virt lans to find the link characteristics, and to determine
+# the actual nodes we care about (those that are members of widearea links).
 #
 printdb("Reading virt_lans ...\n");
 $query_result =
     DBQueryFatal("select vname,member,delay,bandwidth,lossrate," .
 		 "rdelay,rbandwidth,rlossrate " .
-		 "from virt_lans where pid='$pid' and eid='$eid'");
+		 "from virt_lans where pid='$pid' and eid='$eid' and ".
+		 "     widearea=1");
+
+if (! $query_result->numrows) {
+    print "There are no remote links. This is okay!\n";
+    exit(0);
+}
 
 while (my ($vname,$member,
 	   $delay,$bandwidth,$lossrate,
@@ -315,12 +300,11 @@ while (my ($vname,$member,
 	newvlan($vname);
     }
     my $virtlan = $virtlans{$vname};
-
-    if (isremotenode($node)) {
-	$virtlan->{ISREMOTE} = 1;
-    }
-    $virtlan->{COUNT} += 1;
+    
+    $virtlan->{ISREMOTE} = 1;
+    $virtlan->{COUNT}   += 1;
     push(@{$virtlan->{MEMBERS}}, $member);
+    incvirtnodelinked($node);
 
     #
     # Create a data structure for the parameters.
@@ -336,6 +320,18 @@ while (my ($vname,$member,
 }
 
 #
+# Kill off any nodes that are not part of widearea links. They
+# just get in the way below. Since local nodes can be connected to
+# remote nodes in a link, the table might still include non remote
+# nodes. 
+#
+foreach my $vnode (keys(%virtnodes)) {
+    if (!virtnodelinked($vnode)) {
+	delete($virtnodes{$vnode});
+    }
+}
+
+#
 # Check the table, looking for remote nodes in lans.
 #
 foreach my $vname (keys(%virtlans)) {
@@ -345,8 +341,7 @@ foreach my $vname (keys(%virtlans)) {
     printdb("  $vname isremote:$virtlan->{ISREMOTE} @members\n");
 
     if ($virtlan->{ISREMOTE} && $virtlan->{COUNT} > 2) {
-	die("*** $0:\n".
-	    "    Lan $vname has a remote member. Not allowed!!\n");
+	fatal("Lan $vname has a remote member. Not allowed!");
     }
 
     # Just debugging.
@@ -378,9 +373,8 @@ foreach my $vname (keys(%virtlans)) {
 	    }
 
 	    if (defined($rlanmap{"$node1:$node2"})) {
-		die("*** $0:\n".
-		    "    Cannot have multiple links bewteen widearea nodes ".
-		    "$node1:$node2\n");
+		fatal("Cannot have multiple links bewteen widearea nodes ".
+		      "$node1:$node2");
 	    }
 	    $rlanmap{"$node1:$node2"} = $virtlan;
 	}
@@ -388,125 +382,22 @@ foreach my $vname (keys(%virtlans)) {
 }
 
 #
-# Assign nodes
-# 
-if ($typecount || $classcount == $fixedcount) {
-    #
-    # If the user provided types instead of classes, we have to do the
-    # assignment instead of using the solver.
-    #
-    # Or, if the user provided classes, but fixed all the nodes, we need to
-    # try to allocate them.
-    # 
-    foreach my $vnode (keys(%virtnodes)) {
-	if (isremotenode($vnode)) {
-	    my $virtnode = $virtnodes{$vnode};
-	    my $type     = $virtnode->{TYPE};
-
-	    if (isfixednode($vnode)) {
-		#
-		# A fixed node is easy. Just want to reserve it (or try to).
-		# 
-		$virtnode->{MAPPING} = $virtnode->{FIXED};
-		push(@toreserve, $virtnode->{FIXED});
-		next;
-	    }
-
-	    #
-	    # Otherwise, create a list of vnodes for each type we need.
-	    # This works as a count as well.
-	    #
-	    if (!defined($mappings{$type})) {
-		$mappings{$type} = [];
-	    }
-	    push(@{$mappings{$type}}, $vnode);
-	}
-    }
-
-    #
-    # Okay, now that we know how many of each type, get some names
-    # from the DB.
-    #
-    foreach my $type (keys(%mappings)) {
-	my @vlist = @{$mappings{$type}};
-	my $count = scalar(@vlist);
-	my $omit  = "";
-
-	printdb("Trying to find $count nodes of type $type\n");
-
-	#
-	# Must exclude anything we decided to reserve so far.
-	#
-	if (@toreserve) {
-	    foreach my $n (@toreserve) {
-		$omit .= "and a.node_id!='$n' ";
-	    }
-	}
-
-	#
-	# This query gets free nodes for the choosen type, but leaves out
-	# any that are mapped to dead nodes or nodes that are in hwdown.
-	#
-	$query_result =
-	    DBQueryFatal("select a.node_id from nodes as a ".
-			 "left join reserved as b on a.node_id=b.node_id ".
-			 "left join reserved as m on a.phys_nodeid=m.node_id ".
-			 "left join node_status as ns on ".
-			 " a.phys_nodeid=ns.node_id ".
-			 "where b.node_id is null and a.type='$type' and ".
-			 "      (ns.status='up' and ".
-			 "       (m.node_id is null or ".
-			 "        m.pid!='$DEADPID' or m.eid!='$DEADEID')) ".
-			 "$omit ".
-			 "order by RAND() limit $count");
-	if ($query_result->numrows != $count) {
-	    # Not enough free nodes. Die.
-	    die("*** $0:\n".
-		"    Not enough free nodes of type $type!\n");
-	}
-	while (my ($mapping) = $query_result->fetchrow_array()) {
-	    my $vnode    = pop(@vlist);
-	    my $virtnode = $virtnodes{$vnode};
-
-	    $virtnode->{MAPPING} = $mapping;
-	    push(@toreserve, $mapping);
-	}
-    }
-}
-else {
-    #
-    # Run the solver
-    #
-    runwansolver();
-}
-
-printdb("Reserving @toreserve\n");
-
+# Run the solver
 #
-# Allocate the nodes we need. 
-# 
-if (!$impotent) {
-    printdb("Allocating nodes ...\n");
-    
-    if (system("nalloc $pid $eid " . join(" ",@toreserve))) {
-	die("*** $0\n".
-	    "    Failed to reserve resources!\n");
-    }
-}
+runwansolver();
 
 #
 # Print out the mapping for the caller (assign_wrapper) in a more normalized
-# format. We skip the "boss" node. Note this bogus test; need to change the
-# wansolver to allow v2p mappings when fixing a node. 
+# format. The caller is responsible for allocating the nodes. 
 #
 print STDOUT "Node Mapping:\n";
 
 foreach my $vnode (sort(keys(%virtnodes))) {
+    # Local nodes are always allocated in assign_wrapper. 
     if (!isremotenode($vnode)) {
 	next;
     }
-    my $virtnode = $virtnodes{$vnode};
-    my $mapping  = $virtnode->{MAPPING};
+    my $mapping  = virtnodemapping($vnode);
 
     print STDOUT "$vnode mapsto $mapping\n";
 }
@@ -526,8 +417,7 @@ sub printdb {
 #
 sub runwansolver() {
     open(INPUT, ">wanlinkinfo.input") or
-	die("*** $0:\n".
-	    "    Could not open wanlinkinfo.input: $!\n");
+	fatal("Could not open wanlinkinfo.input: $!");
     
     #
     # Need the count of remotenodes, plus the boss node if there are
@@ -563,17 +453,15 @@ sub runwansolver() {
 	$waninfoargs .= " -c $multiplex_factor";
     }
     open(INFO, "$waninfo $waninfoargs |") or
-	die("*** $0:\n".
-	    "    Could not start $waninfo: $!\n");
+	fatal("Could not start $waninfo: $!");
 
     while (<INFO>) {
 	print INPUT $_;
     }
 
     close(INFO) or
-	die("*** $0:\n".
-	    "    $waninfo: " . $? ? "exited with status $?.\n" :
-	    "error closing pipe: $!\n");
+	fatal("$waninfo: " . ($? ? "exited with status $?."
+			         : "error closing pipe: $!"));
 
     #
     # Now send it the second section.
@@ -593,7 +481,7 @@ sub runwansolver() {
 	    # Check for fixed mappings. 
 	    #
 	    if (isfixednode($vnode)) {
-		$tag = "$tag " . physnode($vnode);
+		$tag = "$tag " . isfixednode($vnode);
 	    }
 	    print INPUT "$tag\n";
 	}
@@ -676,8 +564,7 @@ sub runwansolver() {
 	printdb("\n");
     }
     close(INPUT) or
-	die("*** $0:\n".
-	    "    Error closing input file: $!\n");
+	fatal("Error closing input file: $!");
 
     #
     # Need to start the wansolver. 
@@ -685,8 +572,7 @@ sub runwansolver() {
     # (normal perl I/O provides just unidirectional I/O to a process).
     # 
     if (! socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)) {
-	die("*** $0:\n".
-	    "    socketpair failed: $!\n");
+	fatal("socketpair failed: $!");
     }
     CHILD->autoflush(1);
     PARENT->autoflush(1);
@@ -699,9 +585,9 @@ sub runwansolver() {
 	# Dup our descriptors to the parent, and exec the program.
 	# The parent then talks to it read/write.
 	#
-	open(STDIN,  "<&PARENT") || die "Can't redirect stdin";
-	open(STDOUT, ">&PARENT") || die "Can't redirect stdout";
-	open(STDERR, ">&PARENT") || die "Can't redirect stderr";
+	open(STDIN,  "<&PARENT") || fatal("Cannot redirect stdin");
+	open(STDOUT, ">&PARENT") || fatal("Cannot redirect stdout");
+	open(STDERR, ">&PARENT") || fatal("Cannot redirect stderr");
 
 	#
 	# Start the solver. We will pipe in the stuff later.
@@ -732,15 +618,12 @@ sub runwansolver() {
 	    if ($1 eq $boss) {
 		next;
 	    }
-	    my $virtnode = $virtnodes{$1};
 	    my ($pnode)  = split(":", $2);
 
 	    if ($pnode eq $boss) {
-		die("*** $0:\n".
-		    "    Oops, $1 was assigned to boss. That won't work!\n");
+		fatal("Oops, $1 was assigned to boss. That won't work!");
 	    }
-	    
-	    $virtnode->{SOLUTION} = $pnode;
+	    setvirtnodemapping($1, $pnode);
 	}
     }
     close(CHILD);
@@ -748,92 +631,12 @@ sub runwansolver() {
     waitpid($childpid, 0);
     alarm 0;
     if ($?) {
-	die("*** $0:\n".
-	    ($? == 15) ? "$wansolve timed out looking for a solution.\n"
-	               : "$wansolve failed with status: $?\n");
+	fatal((($? == 15) ? "$wansolve timed out looking for a solution."
+	                  : "$wansolve failed with status: $?"));
     }
 
     if ($failed) {
-	die("*** $0:\n".
-	    "    $wansolve failed to produce a valid result\n");
-    }
-
-    #
-    # Okay, need to convert any vnodes that are virtual (multiplexed) into
-    # a corresponding virtual node for the physnode that was choosen.
-    # Yikes, thats confusing. 
-    #
-    foreach my $vnode (sort(keys(%virtnodes))) {
-	my $virtnode = $virtnodes{$vnode};
-
-	# At some point we will support virtual nodes on non-remote nodes
-	if (!isremotenode($vnode)) {
-	    next;
-	}
-
-	my $solution = $virtnode->{SOLUTION};
-
-	if (!isvirtnode($vnode)) {
-	    #
-	    # The solution is the thing we want to allocate.
-	    #
-	    $virtnode->{MAPPING} = $solution;
-	    push(@toreserve, $solution);
-	}
-	else {
-	    #
-	    # Otherwise, create a per-vnode list for each solution.
-	    #
-	    printdb("Adding $vnode to list for $solution\n");
-	    
-	    if (!defined($mappings{$solution})) {
-		$mappings{$solution} = [];
-	    }
-	    push(@{$mappings{$solution}}, $vnode);
-	}
-    }
-
-    #
-    # Okay, now that we know how many of each virtual node, get some names
-    # from the DB.
-    #
-    foreach my $solution (keys(%mappings)) {
-	my @vlist = @{$mappings{$solution}};
-	my $count = scalar(@vlist);
-	my $omit  = "";
-
-	#
-	# Must exclude anything we decided to reserve so far.
-	#
-	if (@toreserve) {
-	    foreach my $n (@toreserve) {
-		$omit .= "and a.node_id!='$n' ";
-	    }
-	}
-
-	#
-	# This query gets free virtual nodes for the choosen solution.
-	#
-	$query_result =
-	    DBQueryFatal("select a.node_id from nodes as a ".
-			 "left join reserved as b on a.node_id=b.node_id ".
-			 "left join nodes as n on a.phys_nodeid=n.node_id ".
-			 "where b.node_id is null and a.role='virtnode' and ".
-			 "a.phys_nodeid='$solution' ".
-			 "$omit ".
-			 "order by RAND() limit $count");
-	if ($query_result->numrows != $count) {
-	    # Not enough free nodes. Die.
-	    die("*** $0:\n".
-		"    Not enough free virtual nodes on $solution!\n");
-	}
-	while (my ($mapping) = $query_result->fetchrow_array()) {
-	    my $vnode    = pop(@vlist);
-	    my $virtnode = $virtnodes{$vnode};
-
-	    $virtnode->{MAPPING} = $mapping;
-	    push(@toreserve, $mapping);
-	}
+	fatal("$wansolve failed to produce a valid result");
     }
 }
 
@@ -859,8 +662,7 @@ sub findlinkvalue($$$$)
 	}
     }
     if (!defined($member1) || ! defined($member2)) {
-	die("*** $0:\n".
-	    "    Could not find members for link $vnode1:$vnode2!\n");
+	fatal("Could not find members for link $vnode1:$vnode2!");
     }
     my %param1 = %{$virtlan->{PARAMS}{$member1}};
     my %param2 = %{$virtlan->{PARAMS}{$member2}};
@@ -875,8 +677,6 @@ sub findlinkvalue($$$$)
 	return 1 - (1 - $param1{PLR}) * (1 - $param2{RPLR});
     }
     else {
-	die("*** $0:\n".
-	    "    Bad param $param in findlinkvalue!\n");
+	fatal("Bad param $param in findlinkvalue!");
     }
 }
-
