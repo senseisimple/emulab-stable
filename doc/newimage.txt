@@ -126,7 +126,7 @@ C. Cutting the image:
    plastic:/root/.rhosts and then (from the testbed machine):
 
 	dd if=/dev/rad0 bs=64k count=100156 | \
-		rsh 155.99.214.74 "dd of=/q/testbed/images/foo obs=64k"
+		rsh 155.101.129.74 "dd of=/q/testbed/images/Full/wd0 obs=64k"
 
    which is about 6.5GB.  The count is simply the smallest amount necessary
    to capture the partitions in question.  If you don't trust me, run
