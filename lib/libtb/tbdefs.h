@@ -1,11 +1,13 @@
 /*
  * Various constants that are reflected in the DB!
  */
-#define	TBDB_FLEN_NODEID	64
-#define	TBDB_FLEN_VNAME		32
-#define	TBDB_FLEN_EID		32
-#define	TBDB_FLEN_PID		12
-#define	TBDB_FLEN_GID		16
+#define	TBDB_FLEN_NODEID	(12 + 1)
+#define	TBDB_FLEN_VNAME		(32 + 1)
+#define	TBDB_FLEN_EID		(32 + 1)
+#define	TBDB_FLEN_PID		(12 + 1)
+#define	TBDB_FLEN_GID		(16 + 1)
+#define	TBDB_FLEN_NODECLASS	(10 + 1)
+#define	TBDB_FLEN_NODETYPE	(30 + 1)
 #define TBDB_FLEN_EVOBJTYPE	128
 #define TBDB_FLEN_EVOBJNAME	128
 #define TBDB_FLEN_EVEVENTTYPE	128
