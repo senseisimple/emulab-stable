@@ -644,12 +644,20 @@ sub combine_fixed($) {
 sub do_metis($) {
     my ($nodes) = @_;
 
-    my @metisfile = generate_metis_graphfile($nodes);
+    my @nodelists;
+    my %nodes_by_type = separate_nodes_by_type($nodes);
+    while (my ($type,$nodelist) = each(%nodes_by_type)) {
+	my @metisfile = generate_metis_graphfile($nodes);
 
-    my $metisfilename = "$::base.metis";
-    my $metislog = "metis-$::base.log";
+	my $metisfilename = "$::base.$type.metis";
+	my $metislog = "metis-$::base.$type.log";
 
-    my @nodelists = run_metis(\@metisfile,$nodes,$metisfilename,$metislog);
+	my $packing_factor = $::colocate{$type};
+
+	push @nodelists,
+	    run_metis(\@metisfile,$nodelist,$metisfilename,$metislog,
+		$packing_factor);
+    }
 
     #
     # Create the new graph by coarsening into the lists we made above
@@ -676,6 +684,25 @@ sub factor_out_fixednodes($$) {
     my ($fixednodes, $unfixed) = combine_fixed($nodes);
     my $newgraph = &$func_ref($unfixed);
     return {%$newgraph, %$fixednodes};
+}
+
+#
+# Return a hash of hashes - each hash contains nodes that all have the same type
+#
+sub separate_nodes_by_type($) {
+    my ($nodes) = @_;
+
+    my %types;
+    while (my ($name, $node) = each %$nodes) {
+	my $type = $node->{type};
+	if ($types{$type}) {
+	    $types{$type}{$name} = $node;
+	} else {
+	    $types{$type} = {$name => $node};
+	}
+    }
+
+    return %types;
 }
 
 #####
@@ -770,12 +797,18 @@ sub read_metis_partfile($$) {
 #
 # Actually run metis, and return lists of the partitions it came up with
 #
-sub run_metis($$$$) {
-    my ($metisfile,$nodes,$metisfilename,$metislogfile) = @_;
+sub run_metis($$$$;$) {
+    my ($metisfile,$nodes,$metisfilename,$metislogfile,$colocate) = @_;
+    print "run_metis called with colocate of $colocate\n";
 
     # Pick a number of partitions such that the average parition size
     # will be $AVG_NODES_PER_PARTITION
-    my $npart = POSIX::ceil(scalar(keys %$nodes) /$AVG_NODES_PER_PARTITION);
+    my $npart;
+    if ($colocate) {
+	$npart = POSIX::ceil(scalar(keys %$nodes) / $colocate);
+    } else {
+	$npart = POSIX::ceil(scalar(keys %$nodes) /$AVG_NODES_PER_PARTITION);
+    }
     if ($npart <= 1) {
 	# No point in running METIS, just give the list of nodes back
 	return [values(%$nodes)];
