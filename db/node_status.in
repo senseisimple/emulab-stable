@@ -52,6 +52,9 @@ my $query_result =
 		 "left join node_status as ns on ns.node_id=n.node_id ".
 		 "left join reserved as r on r.node_id=n.node_id ".
 		 "where nt.isvirtnode=0 and ".
+		 # We ignore plab nodes, because the physical plab nodes do not
+		 # do the keepalive
+		 " n.type != 'pcplabphys' and " .
 		 " (UNIX_TIMESTAMP(now()) - ".
 		 "   UNIX_TIMESTAMP(ns.status_timestamp)) > 90");
 
