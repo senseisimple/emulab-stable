@@ -18,7 +18,7 @@
 # delaywithswitch if 1 will use the switch to delay when possible.  Currently
 #  this only works for 10mbit links.
 $delaythresh = 3;
-$maxrun = 5;
+$maxrun = 20;
 $delaywithswitch=0;
 
 $DELAYCAPACITY = @DELAYCAPACITY@;
