@@ -469,11 +469,13 @@ REPLACE INTO table_regex VALUES ('experiments','mem_usage','int','redirect','def
 REPLACE INTO table_regex VALUES ('experiments','sync_server','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('groups','gid','text','regex','^[a-zA-Z][-\\w]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('nodes','node_id','text','regex','^[-\\w]+$',1,10,NULL);
+REPLACE INTO table_regex VALUES ('nodes','bios_version','text','regex','^[-\\w\\.+]+$',0,64,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','vname','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('nseconfigs','nseconfig','text','regex','^[\\040-\\176\\012\\015]*$',0,16777215,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+$',2,20,NULL);
+REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[a-zA-Z][-a-zA-Z0-9]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
 REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][-\\w]+$',2,8,NULL);
