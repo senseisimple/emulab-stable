@@ -67,9 +67,12 @@ proc perror {msg} {
 ###
 proc punsup {msg} {
     var_import ::GLOBALS::verbose
+    var_import ::GLOBALS::WARN_FILE
     if {$verbose == 1} {
 	puts stderr "*** WARNING: Unsupported NS Statement!"
 	puts stderr "    $msg"
+	puts $WARN_FILE "*** WARNING: Unsupported NS Statement!"
+	puts $WARN_FILE "    $msg"
     }
 }	
 
@@ -154,6 +157,9 @@ namespace eval GLOBALS {
 
     # These are going to be default values within the NS file.
     variable default_ip_routing_type "none"
+
+    # This is the file handler for the warnings file
+    variable WARN_FILE [open "$eid.warnings" w]
 }
 
 # Connect to the DB
@@ -349,4 +355,7 @@ sql disconnect ${GLOBALS::DB}
 if {${GLOBALS::ran} == 0} {
     perror "No 'Simulator run' statement found."
 }
+
+close ${GLOBALS::WARN_FILE}
+
 exit ${GLOBALS::errors}
