@@ -71,6 +71,12 @@ BUIFILES += $(wildcard $(SRCDIR)/buildui/*.php3)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.php)
 BUIFILES += $(wildcard $(SRCDIR)/buildui/*.class)
 
+NLFILES  = $(wildcard $(SRCDIR)/netlab/*.html)
+NLFILES += $(wildcard $(SRCDIR)/netlab/*.php3)
+NLFILES += $(wildcard $(SRCDIR)/netlab/*.png)
+NLFILES += $(wildcard $(SRCDIR)/netlab/*.gif)
+NLFILES += $(wildcard $(SRCDIR)/netlab/*.txt)
+
 WEBDBFILES = $(wildcard $(SRCDIR)/webdb/*.php3)
 WEBDBFILES += $(wildcard $(SRCDIR)/webdb/*.php)
 
@@ -105,6 +111,7 @@ ALLWEBDB  = $(notdir $(WEBDBFILES))
 ALLDOWNLOADS = $(notdir $(DOWNLOADFILES))
 ALLCVSWEB = $(notdir $(CVSWEBFILES))
 ALLBUI    = $(notdir $(BUIFILES))
+ALLNL     = $(notdir $(NLFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
@@ -113,6 +120,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/webdb/, $(ALLWEBDB)) \
 	$(addprefix $(INSTALL_WWWDIR)/downloads/, $(ALLDOWNLOADS)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
+	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB))
