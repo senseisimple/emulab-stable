@@ -34,7 +34,7 @@ if {[file exists $scriptdir/ns2ir]} {
 
 set nfree "$updir/db/nfree"
 set libir "$scriptdir/ir/libir.tcl"
-set resetvlans "$scriptdir/resetvlans.pl"
+set resetvlans "$scriptdir/resetvlans"
 
 load $updir/sql.so
 
