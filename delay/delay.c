@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
 	extern int optind;
 	int ch;
 
-	while ((ch = getopt(argc, argv, "uip:d:")) != -1)
+	while ((ch = getopt(argc, argv, "huip:d:")) != -1)
 		switch (ch) {
 		case 'u':
 			proto = IPPROTO_UDP;
