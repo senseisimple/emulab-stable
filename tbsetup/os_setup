@@ -1,0 +1,213 @@
+#!/usr/bin/perl -wT
+use English;
+
+#
+# Parse an IR file and determine what OS has been requested on each node.
+# Do the database magic to make it so. Only root, admin types, or the
+# owners of the nodes in an experiments may do this.
+# 
+# usage: os_setup <pid> <eid> <ir_file>
+#
+my $rsh		= "sshtb -v -q";
+my $ssh		= "sshtb -v -q";
+my $TB		= "/usr/testbed/bin";
+my $power	= "$TB/power";
+my $ping	= "/sbin/ping";
+my $dbg		= 1;
+my %nodeos      = ();
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+$| = 1; #Turn off line buffering on output
+
+#
+# Set up for querying the database.
+# 
+use Mysql;
+my $DB = Mysql->connect("localhost", "tbdb", "script", "none");
+
+if ( $#ARGV != 2) {
+    die("Usage: os_setup <pid> <eid> <ir_file>\n". 	
+	"Sets node PS configuration from a .ir file.\n");
+}
+my $pid = $ARGV[0];
+my $eid = $ARGV[1];
+my $ir  = $ARGV[2];
+
+#
+# Figure out who called us. Only root, tbroot, people with admin status
+# in the DB, or the owner of the experiment can run this script.
+#
+if ($UID != 0) {
+    my ($me) = getpwuid($UID)
+	or die "$UID not in passwd file";
+
+    $db_result = $DB->query("select expt_head_uid from experiments ".
+			    "where eid='$eid' and pid='$pid'");
+    if ($db_result->numrows < 1) {	
+	die("There is no experiment '$eid' in project '$pid'.\n");
+    }
+    my @row = $db_result->fetchrow_array();
+    if ($row[0] ne "$me") {
+	print STDOUT "Checking for admin status ...\n";
+	$db_result = $DB->query("select admin from users where uid='$me'");
+        my @row = $db_result->fetchrow_array();
+	if ($row[0] != 1) {
+	    die("mkprojdir: You must be root or a TB administrator\n");
+	}
+    }
+}
+
+#
+# Open up the ir file.
+#
+if (-e "$ir") {
+    open(IN, $ir) || die("Couldn't open $ir\n");
+}
+else {
+    die("Couldn't open $ir\n");
+}
+
+#
+# Look for the start of the OS section. Exit if not found
+#
+my $ossection=0;
+
+while (<IN>) {
+    if ( /^start os/i ) { 
+	$ossection=1; 
+	print STDERR "Start OS section...\n" if $dbg;
+	last;
+    }
+}
+if ($ossection == 0) {
+    die("No OS section in $ir\n");
+}
+
+#
+# Okay, parse the OS section.
+# 
+# Search the NODES section for OS labels. Consult the database to make
+# sure the node specified in the IR file is really in the pid/eid that
+# was given on the command line. 
+# 
+while (<IN>) {
+    if ( /^start nodes/i ) { 
+	print STDERR "Start NODES section...\n" if $dbg;
+	next;
+    }
+    elsif ( /^end nodes/i ) {
+	print STDERR "End NODES section...\n" if $dbg;
+	last;
+    }
+    my ($node,$os) = split();
+    print STDERR "$node $os\n" if $dbg;
+    $nodeos{$node} = $os;
+
+    $db_result = $DB->query("select pid,eid from reserved ".
+			    "where node_id='$node'");
+    if ($db_result->numrows < 1) {	
+	die("There is no node '$node' in the DB.\n");
+    }
+    my @row = $db_result->fetchrow_array();
+    if ($row[0] ne "$pid" ||
+	$row[1] ne "$eid") {
+	die("Node '$node' pid/eid mismatch: $pid/$eid ... $row[0]/$row[1]\n");
+    }
+}
+
+#
+# Lifted right out of delay_setup.
+# 
+foreach my $node ( keys %nodeos ) {
+    my $pc	= $node;
+    my $os	= $nodeos{$node};
+
+    #
+    # database goo. We check to make sure the default image is set correctly
+    # and reset it if not. 
+    #
+    my $cmd = "select def_boot_image_id from nodes where node_id='$pc'";
+    my $sth = $DB->query($cmd);
+    my @row = $sth->fetchrow_array();
+    print STDERR "$pc is currently set to OS = $row[0]\n" if $dbg;
+    if ($row[0] ne $os) {
+	print STDERR "Changing default OS for $pc to $os\n";
+	$cmd = "update nodes set def_boot_image_id='$os' ";
+	$cmd = "$cmd where node_id='$pc'";
+	$sth = $DB->query($cmd);
+	if ($sth == 0) {
+	    die("Database update failed. Aborted...\n");
+	}
+    }
+
+    #
+    # See if the machine is pingable. If its not pingable, then
+    # we just power cycle the machine rather than wait for a bunch
+    # of ssh/rsh commands to time out.
+    #
+    print STDERR "Pinging $pc ... \n" if $dbg;
+    if (-e $ping) {
+	open(PING, "$ping -c 4 $pc 2>&1 |");
+    }
+    else {
+	die("PING command $ping not found!\n");
+    }
+    do {
+    }
+    until ( <PING> =~ /transmitted, (\d*) packets received/ );
+    close(PING);
+    print STDERR "Got back $1 ping packets from $pc.\n" if $dbg;
+
+    #
+    # Power cycle if the machine is dead. It will come back up with the
+    # proper OS, cause we modified the database above.
+    #
+    if ( $1 == 0 ) {
+	print STDERR "$pc appears to be dead. Power cycling ... ";
+	PowerCycle($pc);
+	print STDERR "Done!\n";
+	next;
+    }
+
+    #
+    # Machine is pingable at least. Try to reboot it gracefully,
+    # or power cycle anyway if that does not work.
+    #
+    print STDERR "Rebooting $pc ...\n";
+
+    if (system("$rsh -l root $pc /sbin/reboot") == 0 ||
+	system("$ssh -l root $pc /sbin/reboot") == 0) {
+	printf STDERR "$pc appears to be rebooting\n" if $dbg;
+    }
+    else {
+	print STDERR "$pc appears to be unrepsonsive Waiting a bit ...\n";
+	sleep(3);
+	print STDERR "Okay, power cycling $pc ...\n";
+	PowerCycle($pc);
+	print STDERR "Done!\n";
+    }
+}
+
+print STDOUT "OS Setup Done!\n";
+exit 0;
+
+#
+# Power cycle a PC using the testbed power program.
+#
+sub PowerCycle {
+    local($pc) = @_;
+
+    open(POWER, "$power cycle $pc 2>&1 |");
+    $_ = <POWER>;
+    close(POWER);
+    if ( $_ =~ /Reboot/ ) {
+	return;
+    }
+    else {
+	die("Could not power cycle $pc! Quitting\n");
+    }
+}
+
