@@ -28,6 +28,7 @@ real_set skipset 0
 proc set {args} {
     global skipset
     global nodeid_map
+    global rid_map
     if {! $skipset} {
 	real_set skipset 1
 	real_set var [lindex $args 0]
@@ -39,11 +40,20 @@ proc set {args} {
 		regsub -all {[)]} $var {} out
 		real_set var $out
 		real_set val [lindex $args 1]
-		if {([regexp {^n[0-9]+$} $val] != -1) ||
-		    ([regexp {^lan[0-9]+$} $val] != -1) ||
-		    ([regexp {^l[0-9]+$} $val] != -1)} {
-		    if {![info exists nodeid_map($val)]} {
+		if {([regexp {^n[0-9]+$} $val] != 0) ||
+		    ([regexp {^lan[0-9]+$} $val] != 0) ||
+		    ([regexp {^l[0-9]+$} $val] != 0)} {
+		    # Ok, we change it so that the variable will hold
+		    # it's own name.  We still need nodeid_map for
+		    # classes to find their names.  rid_map is the
+		    # reverse mapping of nodeid_map
+		    # XXX - might be cleaner to have a class variable
+		    # that we set here instead of using the nodeid_map.
+		    if {([llength $args] == 2) &&
+			(![info exists nodeid_map($val)])} {
 			real_set nodeid_map($val) $var
+			real_set rid_map($var) $val
+			real_set args [list [lindex $args 0] $var]
 		    }
 		}
 	    }

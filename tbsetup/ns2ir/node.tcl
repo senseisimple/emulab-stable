@@ -32,8 +32,8 @@ node instproc print {file} {
 #add link
 
 node instproc addlink {link} {
-$self instvar nodelinks
-lappend nodelinks $link 
+    $self instvar nodelinks
+    lappend nodelinks $link 
 }
 
 #getLan/setLan

@@ -35,7 +35,7 @@
 # SUCH DAMAGE.
 #
 
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.7 2001-03-14 21:06:40 calfeld Exp $
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/tbsetup/ns2ir/Attic/sim.tcl,v 1.8 2001-04-11 16:54:14 calfeld Exp $
 
 #
 
@@ -227,8 +227,7 @@ Simulator instproc clearMemTrace {} {
 }
 
 Simulator instproc simplex-link { n1 n2 bw delay qtype args } {
-
-    $self duplex-link $n1 $n2 $bw $delay $qtype $args
+    $self duplex-link $id_map$n1 $n2 $bw $delay $qtype $args
 }
 
 #
@@ -253,6 +252,7 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
     global linkslist
     global nodeID
     global linkmap
+    global rid_map
 
     # if there are delay or bandwidth restrictions, add a delay node
     # and link to it
@@ -274,8 +274,8 @@ Simulator instproc duplex-link { n1 n2 bw delay type args } {
     $currLink set bw $bw
 
     $currLink set id $linkID
-    $n1 addlink $currLink
-    $n2 addlink $currLink
+    $rid_map($n1) addlink $currLink
+    $rid_map($n2) addlink $currLink
 
     incr linkID
 
@@ -507,10 +507,11 @@ Simulator instproc bw_parse { bspec } {
 	{chanType Channel} 
 	{phyType Phy/WiredPhy}} {
 	    global lanlist
-	    global lanID		       
+	    global lanID	
+	    global rid_map
 
 	    foreach node $nodelist {
-		if {[$node getLan] != {}} {
+		if {[$rid_map($node) getLan] != {}} {
 		    throw "$node already in a LAN!"
 		}
 	    }
@@ -523,7 +524,7 @@ Simulator instproc bw_parse { bspec } {
 	    $currlan set id $lanID
 	    
 	    foreach node $nodelist {
-		$node setLan $currlan
+		$rid_map($node) setLan $currlan
 	    }
 	    
 	    lappend lanlist $currlan

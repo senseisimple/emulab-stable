@@ -8,19 +8,15 @@ if {[catch "open tbcmds w" TBCMD]} {
 }
 
 proc tb-set-ip {node ip} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-ip $nodeid_map($node) $ip"
+    global TBCMD 
+    puts $TBCMD "tb-set-ip $node $ip"
 }
 proc tb-set-ip-interface {src dst ip} {
-    global TBCMD nodeid_map
+    global TBCMD 
     global linkmap prefix lanlist
     if {[info exists linkmap($src:$dst)]} {
-	if {[info exists nodeid_map($linkmap($src:$dst))]} {
-	    real_set linkname $nodeid_map($linkmap($src:$dst))
-	} else {
-	    real_set linkname $linkmap($src:$dst)
-	}
-	puts $TBCMD "tb-set-ip-link $nodeid_map($src) $prefix-$linkname $ip"
+	real_set linkname $linkmap($src:$dst)
+	puts $TBCMD "tb-set-ip-link $src $prefix-$linkname $ip"
     } elseif {([lsearch $lanlist $dst] != -1)} {
 	tb-set-ip-lan $src $dst $ip
     } else {
@@ -29,38 +25,34 @@ proc tb-set-ip-interface {src dst ip} {
     }
 }
 proc tb-set-ip-lan {src lan ip} {
-    global TBCMD nodeid_map
+    global TBCMD 
     global prefix
-    puts $TBCMD "tb-set-ip-lan $nodeid_map($src) $prefix-$nodeid_map($lan) $ip"
+    puts $TBCMD "tb-set-ip-lan $src $prefix-$lan $ip"
 }
 proc tb-set-ip-link {src link ip} {
-    global TBCMD nodeid_map prefix
-    puts $TBCMD "tb-set-ip-link $nodeid_map($src) $prefix-$nodeid_map($link) $ip"
+    global TBCMD prefix
+    puts $TBCMD "tb-set-ip-link $src) $prefix-$link $ip"
 }
 proc tb-set-hardware {node type args} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-hardware $nodeid_map($node) $type $args"
+    global TBCMD 
+    puts $TBCMD "tb-set-hardware $node $type $args"
 }
 proc tb-set-node-os {node os} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-node-os $nodeid_map($node) $os"
+    global TBCMD 
+    puts $TBCMD "tb-set-node-os $node $os"
 }
 proc tb-create-os {label path partition} {
-    global TBCMD nodeid_map
+    global TBCMD 
     puts $TBCMD "tb-create-os $label $path $partition"
 }
 proc tb-set-link-loss {srclink args} {
-    global TBCMD nodeid_map
+    global TBCMD 
     global linkmap prefix
     if {[llength $args] == 2} {
 	set dst [lindex $args 0]
 	set loss [lindex $args 1]
 	if {[info exists linkmap($srclink:$dst)]} {
-	    if {[info exists nodeid_map($linkmap($srclink:$dst))]} {
-		real_set linkname $nodeid_map($linkmap($srclink:$dst))
-	    } else {
-		real_set linkname $linkmap($srclink:$dst)
-	    }
+	    real_set linkname $linkmap($srclink:$dst)
 	    puts $TBCMD "tb-set-link-loss $prefix-$linkname $loss"
 	} else {
 	    puts stderr "No link between $srclink and $dst."
@@ -68,31 +60,31 @@ proc tb-set-link-loss {srclink args} {
 	}
     } elseif {[llength $args] == 1} {
 	set loss [lindex $args 0]
-	puts $TBCMD "tb-set-link-loss $prefix-$nodeid_map($srclink) $loss"
+	puts $TBCMD "tb-set-link-loss $prefix-$srclink $loss"
     } else {
 	puts stderr "tb-set-link-loss takes 2 or 3 parameters."
 	exit 1
     }
 }
 proc tb-set-lan-loss {lan rate} {
-    global TBCMD nodeid_map prefix
-    puts $TBCMD "tb-set-lan-loss $prefix-$nodeid_map($lan) $rate"
+    global TBCMD prefix
+    puts $TBCMD "tb-set-lan-loss $prefix-$lan $rate"
 }
 proc tb-set-node-cmdline {node cmdline} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-node-cmdline $nodeid_map($node) $cmdline"
+    global TBCMD 
+    puts $TBCMD "tb-set-node-cmdline $node $cmdline"
 }
 proc tb-set-node-rpms {node args} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-node-rpms $nodeid_map($node) $args"
+    global TBCMD 
+    puts $TBCMD "tb-set-node-rpms $node $args"
 }
 proc tb-set-node-startup {node cmd} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-node-startup $nodeid_map($node) $cmd"
+    global TBCMD 
+    puts $TBCMD "tb-set-node-startup $node $cmd"
 }
 proc tb-set-node-deltas {node args} {
-    global TBCMD nodeid_map
-    puts $TBCMD "tb-set-node-deltas $nodeid_map($node) $args"
+    global TBCMD 
+    puts $TBCMD "tb-set-node-deltas $node $args"
 }
 
 # Show that we have loaded

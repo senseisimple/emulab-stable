@@ -4,7 +4,7 @@ Class lan
 
 # output format: <id> "<nodes>" <delay> <bw>
 lan instproc print {file} {
-    global nodeid_map prefix
+    global nodeid_map prefix rid_map
 
     if {[info exists nodeid_map(lan[$self set id])]} {
 	set lanname $nodeid_map(lan[$self set id])
@@ -15,8 +15,8 @@ lan instproc print {file} {
     puts -nonewline $file "$prefix-$lanname \""
     set lastnode [lindex [$self set nodes] end]
     foreach node [$self set nodes] {
-	if {[info exists nodeid_map(n[$node set id])]} {
-	    set nodename $nodeid_map(n[$node set id])
+	if {[info exists nodeid_map(n[$rid_map($node) set id])]} {
+	    set nodename $nodeid_map(n[$rid_map($node) set id])
 	} else {
 	    set nodename n[$self set id]
 	}
