@@ -169,6 +169,7 @@ while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
 # to avoid blocking at boot time.
 #
 libsetup_settimeout(30);
+libsetup_refresh();
 
 #
 # Order matters!

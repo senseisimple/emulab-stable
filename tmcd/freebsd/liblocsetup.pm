@@ -309,7 +309,7 @@ sub os_useradd($$$$$$$$$)
 	# Locally, if directory exists and is populated, skip -m
 	# cause FreeBSD copies files in anyway!
 	$args .= "-m "
-	    if (! -e "$homedir/.cshrc");
+	    if (! -d $homedir || ! -e "$homedir/.cshrc");
     }
     else {
 	# populate on remote nodes. At some point will tar files over.
@@ -324,6 +324,7 @@ sub os_useradd($$$$$$$$$)
 	warn "*** WARNING: $USERADD $login error.\n";
 	return -1;
     }
+    chown($uid, $gid, $homedir);
 
     if (system("$CHPASS '$pswd' $login") != 0) {
 	warn "*** WARNING: $CHPASS $login error.\n";

@@ -17,6 +17,7 @@ use Fcntl ':flock';
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 use libsetup qw(JailedMounts REMOTE LOCALROOTFS TMPASSDB TMGROUPDB);
+use libtmcc;
 
 #
 # Questions:
@@ -430,6 +431,7 @@ sub mkrootfs($)
 		fatal("Could not mkdir 'dir' in $path/root/var/emulab: $!");
 	}
     }
+    tmcccopycache($vnodeid, "$path/root");
 
     #
     # Stash the control net IP if not the same as the host IP
@@ -591,6 +593,7 @@ sub restorerootfs($)
 	}
 	push(@mntpoints, "$path/root/$dir");
     }
+    tmcccopycache($vnodeid, "$path/root");
 
     #
     # The proc FS in the jail is per-jail of course.

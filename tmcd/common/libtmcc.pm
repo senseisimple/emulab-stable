@@ -14,14 +14,15 @@
 package libtmcc;
 use Exporter;
 @ISA    = "Exporter";
-@EXPORT = qw(configtmcc tmcc tmccbossname
+@EXPORT = qw(configtmcc tmcc tmccbossname tmccgetconfig tmccclrconfig
+	     tmcccopycache
 	     TMCCCMD_REBOOT TMCCCMD_STATUS TMCCCMD_STATE TMCCCMD_IFC
 	     TMCCCMD_ACCT TMCCCMD_DELAY TMCCCMD_HOSTS TMCCCMD_RPM
 	     TMCCCMD_TARBALL TMCCCMD_STARTUP TMCCCMD_DELTA TMCCCMD_STARTSTAT
 	     TMCCCMD_READY TMCCCMD_MOUNTS TMCCCMD_ROUTING TMCCCMD_TRAFFIC
 	     TMCCCMD_BOSSINFO TMCCCMD_TUNNEL TMCCCMD_NSECONFIGS
 	     TMCCCMD_VNODELIST TMCCCMD_SUBNODELIST TMCCCMD_ISALIVE
-	     TMCCCMD_SFSHOSTID TMCCCMD_SFSMOUNTS TMCCCMD_JAILCONFIG
+	     TMCCCMD_SFSHOSTID TMCCCMD_JAILCONFIG
 	     TMCCCMD_PLABCONFIG TMCCCMD_SUBCONFIG TMCCCMD_LINKDELAYS
 	     TMCCCMD_PROGRAMS TMCCCMD_SYNCSERVER TMCCCMD_KEYHASH TMCCCMD_NODEID
 	     TMCCCMD_NTPINFO TMCCCMD_NTPDRIFT
@@ -29,6 +30,11 @@ use Exporter;
 
 # Must come after package declaration!
 use English;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
 
 # Load up the paths. Done like this in case init code is needed.
 BEGIN
@@ -43,6 +49,8 @@ BEGIN
 # The actual TMCC binary.
 my $TMCCBIN	= "$BINDIR/tmcc.bin";
 my $PROXYDEF    = "$BOOTDIR/proxypath";
+my $CACHEDIR	= "$BOOTDIR";
+my $CACHENAME   = "tmcc";
 my $debug       = 0;
 my $beproxy     = 0;
 
@@ -64,45 +72,73 @@ my $beproxy     = 0;
       "logfile"		=> undef,
     );
 
+# The cache directory is named by the vnodeid. This avoids some confusion.
+sub CacheDir()
+{
+    return "$CACHEDIR/$CACHENAME"
+	if (!defined($config{"subnode"}));
+
+    return "$CACHEDIR/$CACHENAME" . "." . $config{"subnode"};
+}
+
+# Copy a cachedir. This is for mkjail, which needs to copy the cache
+# dir into the jail to avoid another download of the full config.
+sub tmcccopycache($$)
+{
+    my ($vnodeid, $root) = @_;
+    my $fromdir = "$CACHEDIR/$CACHENAME" . "." . $vnodeid;
+    my $todir   = "$root/$fromdir";
+
+    if (! -d $fromdir) {
+	warn("*** WARNING: No such directory $fromdir!\n");
+	return -1;
+    }
+    if (! -d $root) {
+	warn("*** WARNING: No such directory $root!\n");
+	return -1;
+    }
+    return system("cp -rp $fromdir $todir");
+}
+
 #
 # List of TMCD commands. Some of these have to be passed through to
 # tmcd, others can come from a local config file if it exists.
 #
 my %commandset =
-    ( "reboot"		=> {TAG => "reboot",		LOCAL => 0},
-      "status"		=> {TAG => "status",		LOCAL => 0},
-      "state"		=> {TAG => "state",		LOCAL => 0},
-      "ifconfig"	=> {TAG => "ifconfig",		LOCAL => 1},
-      "accounts"	=> {TAG => "accounts",		LOCAL => 1},
-      "delay"		=> {TAG => "delay",		LOCAL => 1},
-      "hostnames"	=> {TAG => "hostnames",		LOCAL => 1},
-      "rpms"		=> {TAG => "rpms",		LOCAL => 1},
-      "tarballs"	=> {TAG => "tarballs",		LOCAL => 1},
-      "startupcmd"	=> {TAG => "startupcmd",	LOCAL => 1},
-      "deltas"		=> {TAG => "deltas",		LOCAL => 1},
-      "startstatus"	=> {TAG => "startstatus",	LOCAL => 0},
-      "ready"		=> {TAG => "ready",		LOCAL => 0},
-      "mounts"		=> {TAG => "mounts",		LOCAL => 1},
-      "routing"		=> {TAG => "routing",		LOCAL => 1},
-      "trafgens"	=> {TAG => "trafgens",		LOCAL => 1},
-      "bossinfo"	=> {TAG => "bossinfo",		LOCAL => 0},
-      "tunnels"		=> {TAG => "tunnels",		LOCAL => 1},
-      "nseconfigs"	=> {TAG => "nseconfigs",	LOCAL => 1},
-      "vnodelist"	=> {TAG => "vnodelist",		LOCAL => 1},
-      "subnodelist"	=> {TAG => "subnodelist",	LOCAL => 1},
-      "isalive"		=> {TAG => "isalive",		LOCAL => 0},
-      "sfshostid"	=> {TAG => "sfshostid",		LOCAL => 0},
-      "sfsmounts"	=> {TAG => "sfsmounts",		LOCAL => 1},
-      "jailconfig"	=> {TAG => "jailconfig",	LOCAL => 1},
-      "plabconfig"	=> {TAG => "plabconfig",	LOCAL => 1},
-      "subconfig"	=> {TAG => "subconfig",		LOCAL => 1},
-      "linkdelays"	=> {TAG => "linkdelays",	LOCAL => 1},
-      "programs"	=> {TAG => "programs",		LOCAL => 1},
-      "syncserver"	=> {TAG => "syncserver",	LOCAL => 1},
-      "keyhash"		=> {TAG => "keyhash",		LOCAL => 1},
-      "nodeid"		=> {TAG => "nodeid",		LOCAL => 1},
-      "ntpinfo"		=> {TAG => "ntpinfo",		LOCAL => 1},
-      "ntprift"		=> {TAG => "ntpdrift.",		LOCAL => 0},
+    ( "reboot"		=> {TAG => "reboot"},
+      "status"		=> {TAG => "status"},
+      "state"		=> {TAG => "state"},
+      "ifconfig"	=> {TAG => "ifconfig"},
+      "accounts"	=> {TAG => "accounts"},
+      "delay"		=> {TAG => "delay"},
+      "hostnames"	=> {TAG => "hostnames"},
+      "rpms"		=> {TAG => "rpms"},
+      "tarballs"	=> {TAG => "tarballs"},
+      "startupcmd"	=> {TAG => "startupcmd"},
+      "deltas"		=> {TAG => "deltas"},
+      "startstatus"	=> {TAG => "startstatus"},
+      "ready"		=> {TAG => "ready"},
+      "mounts"		=> {TAG => "mounts"},
+      "routing"		=> {TAG => "routing"},
+      "trafgens"	=> {TAG => "trafgens"},
+      "bossinfo"	=> {TAG => "bossinfo"},
+      "tunnels"		=> {TAG => "tunnels"},
+      "nseconfigs"	=> {TAG => "nseconfigs"},
+      "vnodelist"	=> {TAG => "vnodelist"},
+      "subnodelist"	=> {TAG => "subnodelist"},
+      "isalive"		=> {TAG => "isalive"},
+      "sfshostid"	=> {TAG => "sfshostid"},
+      "jailconfig"	=> {TAG => "jailconfig"},
+      "plabconfig"	=> {TAG => "plabconfig"},
+      "subconfig"	=> {TAG => "subconfig"},
+      "linkdelay"	=> {TAG => "linkdelay"},
+      "programs"	=> {TAG => "programs"},
+      "syncserver"	=> {TAG => "syncserver"},
+      "keyhash"		=> {TAG => "keyhash"},
+      "nodeid"		=> {TAG => "nodeid"},
+      "ntpinfo"		=> {TAG => "ntpinfo"},
+      "ntprift"		=> {TAG => "ntpdrift"},
+      "sdparams"	=> {TAG => "sdparams"},
     );
 
 #
@@ -131,11 +167,10 @@ sub TMCCCMD_VNODELIST() { $commandset{"vnodelist"}->{TAG}; }
 sub TMCCCMD_SUBNODELIST(){ $commandset{"subnodelist"}->{TAG}; }
 sub TMCCCMD_ISALIVE()   { $commandset{"isalive"}->{TAG}; }
 sub TMCCCMD_SFSHOSTID()	{ $commandset{"sfshostid"}->{TAG}; }
-sub TMCCCMD_SFSMOUNTS() { $commandset{"sfsmounts"}->{TAG}; }
 sub TMCCCMD_JAILCONFIG(){ $commandset{"jailconfig"}->{TAG}; }
 sub TMCCCMD_PLABCONFIG(){ $commandset{"plabconfig"}->{TAG}; }
 sub TMCCCMD_SUBCONFIG() { $commandset{"subconfig"}->{TAG}; }
-sub TMCCCMD_LINKDELAYS(){ $commandset{"linkdelays"}->{TAG}; }
+sub TMCCCMD_LINKDELAYS(){ $commandset{"linkdelay"}->{TAG}; }
 sub TMCCCMD_PROGRAMS()  { $commandset{"programs"}->{TAG}; }
 sub TMCCCMD_SYNCSERVER(){ $commandset{"syncserver"}->{TAG}; }
 sub TMCCCMD_KEYHASH()   { $commandset{"keyhash"}->{TAG}; }
@@ -157,7 +192,6 @@ sub configtmcc($$)
     }
     $config{$opt} = $val;
 }
-
 
 #
 # Convert the config hash to an option string. This is separate so that
@@ -273,6 +307,42 @@ sub tmcc ($;$$%)
     my ($cmd, $args, $results, %opthash) = @_;
 
     #
+    # See if this is a cmd we can get from the local config stash. 
+    #
+    if (!defined($args) || $args eq "") {
+	foreach my $key (keys(%commandset)) {
+	    my $tag = $commandset{$key}->{TAG};
+
+	    if ($cmd eq $tag) {
+		#
+		# If we can get it, great! Otherwise go to tmcd.
+		#
+		my $filename = CacheDir() . "/$tag";
+		my @strings  = ();
+
+		if (-e $filename && open(TD, $filename)) {
+		    #
+		    # Read file contents and return
+		    #
+		    print STDERR "Fetching locally from $filename\n"
+			if ($debug);
+		
+		    while (<TD>) {
+			next
+			    if ($_ =~ /^\*\*\* $tag$/);
+
+			push(@strings, $_);
+		    }
+		    @$results = @strings
+			if (defined($results));
+		    return 0;
+		}
+		last;
+	    }
+	}
+    }
+
+    #
     # Check for proxypath file, but do not override config option. 
     #
     if (!$config{"dounix"} && -e $PROXYDEF) {
@@ -319,6 +389,82 @@ sub tmccbossname()
 	return undef;
     }
     return $bossname;
+}
+
+#
+# Special entrypoint to clear the current config cache (say, at reboot).
+#
+sub tmccclrconfig()
+{
+    my $dir = CacheDir();
+	
+    if (-d $dir) {
+	system("rm -rf $dir");
+    }
+}
+
+#
+# Special entrypoint to download the entire configuration and cache for
+# subsequent calls.
+#
+sub tmccgetconfig()
+{
+    my @tmccresults;
+    my $cdir = CacheDir();
+
+    #
+    # Check for proxypath file, but do not override config option. 
+    #
+    if (!$config{"dounix"} && -e $PROXYDEF) {
+	#
+	# Suck out the path and untaint. 
+	# 
+	open(PP, "$BOOTDIR/proxypath");
+	my $ppath = <PP>;
+	close(PP);
+
+	if ($ppath =~ /^([-\w\.\/]+)$/) {
+	    $config{"dounix"} = $1;
+	}
+	else {
+	    die("Bad data in tmccproxy path: $ppath");
+	}
+    }
+
+    tmccclrconfig();
+    if (!mkdir("$cdir", 0775)) {
+	warn("*** WARNING: Could not mkdir $cdir: $!\n");
+	return -1;
+    }
+   
+    if (runtmcc("fullconfig", undef, \@tmccresults) < 0 ||
+	!scalar(@tmccresults)) {
+	warn("*** WARNING: Could not get fullconfig from tmcd!\n");
+	return -1;
+    }
+
+    my $str;
+    while ($str = shift(@tmccresults)) {
+	if ($str =~ /^\*\*\* ([-\w]*)$/) {
+	    my $param = $1;
+	    
+	    if (open(TD, "> $cdir/$param")) {
+		while (@tmccresults) {
+		    $str = shift(@tmccresults);
+		    
+		    last
+			if ($str =~ /^\*\*\* $param$/);
+		    print TD $str;
+		}
+		close(TD);
+	    }
+	    else {
+		warn("*** WARNING: Could not create $cdir/$str: $!\n");
+		return -1;
+	    }
+	}
+    }
+    return 0;
 }
 
 1;

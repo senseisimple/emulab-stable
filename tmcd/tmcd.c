@@ -2610,7 +2610,6 @@ COMMAND_PROTOTYPE(domounts)
 	/*
 	 * Should SFS mounts be served?
 	 */
-	printf("foo %s\n", rdata);
 	usesfs = 0;
 	if (vers >= 6 && strlen(fshostid)) {
 		if (strlen(reqp->sfshostid))

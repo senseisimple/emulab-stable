@@ -398,14 +398,16 @@ sub LinkDelaySetup()
     # We need to know if any jailed nodes. That changes which kernel
     # we want to boot. Temporary until the jail stuff is better tested.
     #
-    if (tmcc(TMCCCMD_VNODELIST, undef, \@jails) < 0) {
-	warn("*** WARNING: Could not get jails from server!\n");
-	return -1;
-    }
-    foreach my $str (@jails) {
-	if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
-	    if ($2) {
-		$gotjails++;
+    if (!$gotjails) {
+	if (tmcc(TMCCCMD_VNODELIST, undef, \@jails) < 0) {
+	    warn("*** WARNING: Could not get jails from server!\n");
+	    return -1;
+	}
+	foreach my $str (@jails) {
+	    if ($str =~ /^VNODEID=([-\w]+) JAILED=(\d)$/) {
+		if ($2) {
+		    $gotjails++;
+		}
 	    }
 	}
     }

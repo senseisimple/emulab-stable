@@ -21,7 +21,7 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
 	 tmcctimeout libsetup_getvnodeid dotrafficconfig
-	 ixpsetup dokeyhash donodeid
+	 ixpsetup dokeyhash donodeid libsetup_refresh
 
 	 MFS REMOTE JAILED PLAB LOCALROOTFS IXP
 
@@ -49,6 +49,9 @@ libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
 sub libsetup_settimeout($) { libtmcc::configtmcc("timeout", $_[0]); };
+
+# Redresh tmcc cache.
+sub libsetup_refresh()	   { libtmcc::tmccgetconfig(); };
 
 #
 # For virtual (multiplexed nodes). If defined, tack onto tmcc command.
@@ -430,25 +433,7 @@ sub domounts()
     my %sfsdeletes;
     my @tmccresults;
 
-    #
-    # Update our SFS hostid first. If this fails, dosfshostid will
-    # unset USESFS.
-    # 
-    if ($USESFS) {
-	if (! MFS()) {
-	    #
-	    # Setup SFS hostid.
-	    #
-	    print STDOUT "Setting up for SFS ... \n";
-	    dosfshostid();
-	}
-	else {
-	    # No SFS on the MFS.
-	    $USESFS = 0;
-	}
-    }
-
-    if (tmcc(TMCCCMD_MOUNTS, "USESFS=$USESFS", \@tmccresults) < 0) {
+    if (tmcc(TMCCCMD_MOUNTS, undef , \@tmccresults) < 0) {
 	warn("*** WARNING: Could not get mount list from server!\n");
 	return -1;
     }
@@ -701,6 +686,7 @@ sub JailedMounts($$$)
     dbmclose(%MDB);	   
     return @mountlist;
 }
+
 #
 # Do SFS hostid setup.
 # Creates an SFS host key for this node, if it doesn't already exist,
@@ -2350,6 +2336,9 @@ sub doplabconfig()
 sub bootsetup()
 {
     my $oldpid;
+
+    # Tell libtmcc to forget anything it knows.
+    tmccclrconfig();
     
     print STDOUT "Checking Testbed reservation status ... \n";
 
@@ -2387,6 +2376,21 @@ sub bootsetup()
     }
     print STDOUT "  Allocated! $pid/$eid/$vname\n";
 
+    #
+    # Setup SFS hostid.
+    #
+    if ($USESFS && !MFS()) {
+	print STDOUT "Setting up for SFS ... \n";
+	dosfshostid();
+    }
+
+    #
+    # Tell libtmcc to get the full config. Note that this must happen
+    # AFTER dosfshostid() right above, since that changes what tmcd
+    # is going to tell us.
+    #
+    tmccgetconfig();
+    
     #
     # Mount the project and user directories and symlink SFS "mounted"
     # directories
@@ -2502,31 +2506,20 @@ sub jailsetup()
     system("echo '$vnodeid' > " . TMJAILNAME());
     # Need to unify this with jailname.
     system("echo '$vnodeid' > " . TMNODEID());
-    
-    #
-    # Do account stuff.
-    #
-    {
-	print STDOUT "Checking Testbed reservation status ... \n";
-	if (! check_status()) {
-	    print STDOUT "  Free!\n";
-	    return 0;
-	}
-	print STDOUT "  Allocated! $pid/$eid/$vname\n";
 
+    print STDOUT "Checking Testbed reservation status ... \n";
+    if (! check_status()) {
+	print STDOUT "  Free!\n";
+	return 0;
+    }
+    print STDOUT "  Allocated! $pid/$eid/$vname\n";
+
+    {
 	#
 	# XXX just generates interface list for routing config
 	#
 	print STDOUT "Checking Testbed interface configuration ... \n";
 	doifconfig();
-
-	#
-	# Setup SFS hostid.
-	#
-	if ($USESFS) {
-	    print STDOUT "Setting up for SFS ... \n";
-	    dosfshostid();
-	}
 
 #	print STDOUT "Mounting project and home directories ... \n";
 #	domounts();
@@ -2631,6 +2624,14 @@ sub vnodejailsetup($)
     }
 
     #
+    # Tell libtmcc to get the full config for the jail. At the moment
+    # we do not use SFS inside jails, so okay to do this now (usually
+    # have to call dosfshostid() first). The full config will be copied
+    # to the proper location inside the jail by mkjail.
+    #
+    tmccgetconfig();
+    
+    #
     # Get jail config.
     #
     print STDOUT "Checking Testbed jail configuration ...\n";
@@ -2644,6 +2645,9 @@ sub vnodejailsetup($)
 #
 sub plabsetup()
 {
+    # Tell libtmcc to forget anything it knows.
+    tmccclrconfig();
+    
     #
     # vnodeid will either be found in BEGIN block or will be passed to
     # vnodeplabsetup, so it doesn't need to be found here
@@ -2667,6 +2671,13 @@ sub plabsetup()
 	    print STDOUT "Setting up for SFS ... \n";
 	    dosfshostid();
 	}
+
+	#
+	# Tell libtmcc to get the full config. Note that this must happen
+	# AFTER dosfshostid() right above, since that changes what tmcd
+	# is going to tell us.
+	#
+	tmccgetconfig();
 
 #	print STDOUT "Mounting project and home directories ... \n";
 #	domounts();

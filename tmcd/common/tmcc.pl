@@ -60,7 +60,9 @@ if (my $rval = tmcc($CMD, $ARGS, \@results) != 0) {
     exit($rval);
 }
 if (@results) {
-    print STDOUT "@results";
+    foreach my $str (@results) {
+	print STDOUT "$str";
+    }
 }
 exit(0);
 
