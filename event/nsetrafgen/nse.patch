@@ -1717,7 +1717,7 @@
   protected:
  	int command(int argc, const char*const* argv);
 --- dist-ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Feb 26 15:08:40 2003
-+++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Wed Jan  7 01:49:13 2004
++++ ns-allinone-2.26/ns-2.26/emulate/iptap.cc	Thu Jan 15 13:16:30 2004
 @@ -1,5 +1,5 @@
  /*
 - * Copyright (c) 1997, 1998 The Regents of the University of California.
@@ -2031,7 +2031,7 @@
      fprintf(stderr,
  	    "IPTapAgent(%s): sendpkt attempted with NULL net\n",
  	    name());
-@@ -273,27 +470,172 @@
+@@ -273,27 +470,173 @@
      return(-1);
    }
  
@@ -2062,20 +2062,21 @@
 +						 sizeof(struct ip));
 +
 +    ip_off = ntohs(ipheader->ip_off);
-+    if ( (hc->size() > mtu) && (ip_off & IP_DF) ) {
++    sendlen = ntohs(ipheader->ip_len);
++    if ( (sendlen > mtu) && (ip_off & IP_DF) ) {
 +      if (icmpagent) {
 +	icmpagent->sendfragneeded(srcnodeipaddr, ipheader->ip_src, mtu, packet );
 +      }
 +      TDEBUG4("IPTapAgent(%s): Packet size (sz: %d) exceeded MTU: %d\n",
-+	      name(), hc->size(), mtu);
++	      name(), sendlen, mtu);
 +      drop(p);
 +      return (-1);
 +    } 
 +
-+    if (net_outgoing_->send(p->accessdata(), hc->size()) < 0) {
++    if (net_outgoing_->send(p->accessdata(), sendlen) < 0) {
 +      fprintf(stderr,
 +	      "IPTapAgent(%s): sendpkt (%p, %d): %s\n",
-+	      name(), p->accessdata(), hc->size(), strerror(errno));
++	      name(), p->accessdata(), sendlen, strerror(errno));
 +      drop(p);
 +      return (-1);
 +    
@@ -2385,7 +2386,7 @@
  	icp->icmp_cksum = Internet::in_cksum((u_short*)icp,
  		8 + sizeof(ip) + 8);
  
---- /dev/null	Mon Jan 12 00:37:15 2004
+--- /dev/null	Thu Jan 15 14:50:05 2004
 +++ ns-allinone-2.26/ns-2.26/emulate/icmp.h	Sun Dec 14 20:33:36 2003
 @@ -0,0 +1,50 @@
 +/*
