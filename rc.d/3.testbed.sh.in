@@ -24,11 +24,6 @@ case "$1" in
 			@prefix@/sbin/tmcd.restart
 		fi
 
-		if [ -x @prefix@/sbin/tevd.restart  ]; then
-			echo -n " tevd"
-			@prefix@/sbin/tevd.restart
-		fi
-
 		if [ -x @prefix@/sbin/capserver  ]; then
 			echo -n " capd"
 			@prefix@/sbin/capserver

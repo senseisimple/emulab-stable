@@ -11,9 +11,6 @@ SUBDIR		= event/tbgen
 
 SYSTEM	       := $(shell uname -s)
 PROGRAMS	= tevc
-ifneq ($(SYSTEM),Linux)
-PROGRAMS       += tevd tevd.restart
-endif
 
 include $(OBJDIR)/Makeconf
 
@@ -55,15 +52,9 @@ tevc:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
 	$(CC) $(LDFLAGS) -static -o $@ tevc.o $(LIBTBDIR)/log.o \
 		$(LIBTBDIR)/tbdefs.o $(LIBS)
 
-tevd:	tevd.o
-	$(CC) $(LDFLAGS) -o $@ tevd.o \
-		-L/usr/local/lib/mysql -lmysqlclient -ltb $(LIBS)
-
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:	$(INSTALL_SBINDIR)/tevd \
-		$(INSTALL_SBINDIR)/tevd.restart \
-		$(INSTALL_BINDIR)/tevc
+install:	$(INSTALL_BINDIR)/tevc
 
 control-install:	$(INSTALL_BINDIR)/tevc
 

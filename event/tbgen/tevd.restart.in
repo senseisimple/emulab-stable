@@ -1,7 +1,0 @@
-#!/bin/csh
-
-set TBDIR=@prefix@
-
-killall tevd
-exec ${TBDIR}/sbin/tevd >>& $TBDIR/log/tevd.log
-

@@ -117,7 +117,7 @@ my @MOUNTPOINTS = ("$PREFIX/usersvar", "$PREFIX/opsdir",
 
 my @LOGFILES = ("$LOGDIR/bootinfo.log", "$LOGDIR/tmcd.log",
     "$LOGDIR/capture.log", "$LOGDIR/dhcpd.log", "$LOGDIR/capserver.log",
-    "$LOGDIR/frisbeed.log", "$LOGDIR/tevd.log", "$LOGDIR/proxydhcpd.log",
+    "$LOGDIR/frisbeed.log", "$LOGDIR/proxydhcpd.log",
     "$LOGDIR/elvind.log", "$LOGDIR/stated.log", "$LOGDIR/osselect.log",
     "$LOGDIR/tftpd.log", "$LOGDIR/sdcollectd.log", "$LOGDIR/genlastlog.log",
     "$LOGDIR/sshxmlrpc.log", "$LOGDIR/plabgetfree.log", "$LOGDIR/xmlrpcbag.log"
@@ -311,7 +311,6 @@ Phase "syslog", "Setting up syslog", sub {
 	    "!tftpd",     "*.*\t\t\t\t\t\t$LOGDIR/tftpd.log",
 	    "!capserver", "*.*\t\t\t\t\t\t$LOGDIR/capserver.log",
 	    "!frisbeed",  "*.*\t\t\t\t\t\t$LOGDIR/frisbeed.log",
-	    "!tevd",      "*.*\t\t\t\t\t\t$LOGDIR/tevd.log",
 	    "!elvind",    "*.*\t\t\t\t\t\t$LOGDIR/elvind.log",
 	    "!stated",    "*.*\t\t\t\t\t\t$LOGDIR/stated.log",
 	    "!osselect",  "*.*\t\t\t\t\t\t$LOGDIR/osselect.log",
@@ -362,7 +361,6 @@ Phase "syslog", "Setting up syslog", sub {
 	    "$LOGDIR/bootinfo.log           640  7     200  *     Z",
 	    "$LOGDIR/capserver.log          640  5     200  *     Z",
 	    "$LOGDIR/elvind.log             640  5     1000 *     Z",
-	    "$LOGDIR/tevd.log               640  3     200  *     Z",
 	    "$LOGDIR/suexec.log             640  3     200  *     Z",
 	    "$LOGDIR/genlastlog.log         640  3     200  *     Z",
 	    "$LOGDIR/genlastlog             640  3     200  *     Z " .
