@@ -6,8 +6,17 @@
  * All rights reserved.
  */
 
+// Checks that a set of routes is valid and provides statistics on how
+// good the routes are.
+
+// If the arguments are '-l <filename>' then the lengths from each node
+// to each interface will be sent to <filename> in turn. The order of the
+// output is first by node number and second by the order the interface is
+// listed in the .route file.
+
 #include "lib.h"
 #include "Exception.h"
+#include <fstream>
 
 using namespace std;
 
@@ -74,6 +83,24 @@ public:
         ostringstream buffer;
         buffer << "Node: " << current << " Destination: "
                << ipToString(destination);
+    }
+};
+
+class FailedFileOpenException : public StringException
+{
+public:
+    explicit FailedFileOpenException(string const & file)
+        : StringException("Could not open file: " + file)
+    {
+    }
+};
+
+class LogException : public StringException
+{
+public:
+    explicit LogException(std::exception const & other)
+        : StringException(string("Log Error: ") + other.what())
+    {
     }
 };
 
@@ -216,6 +243,14 @@ private:
     bool valid;
 };
 
+namespace arg
+{
+    bool shouldLog = false;
+    ofstream log;
+}
+
+void parseArgs(int argc, char * argv[]);
+
 // take the ip assignment portion of the output and use that to set up
 // ip addresses and adjascency for the nodes
 void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces);
@@ -250,11 +285,12 @@ void displayResults(size_t routeCount, size_t routeLength);
 // cycles in a route.
 void clearVisited(vector<Node> & nodes);
 
-int main()
+int main(int argc, char * argv[])
 {
     int result = 0;
     try
     {
+        parseArgs(argc, argv);
         vector<Node> nodes;
         map<IPAddress,size_t> interfaces;
         setupNodes(nodes, interfaces);
@@ -268,6 +304,22 @@ int main()
         result = 1;
     }
     return result;
+}
+
+void parseArgs(int argc, char * argv[])
+{
+    if (argc == 3)
+    {
+        if (argv[1] == string("-l") && argv[2] != string(""))
+        {
+            arg::shouldLog = true;
+            arg::log.open(argv[2], ios::out | ios::trunc);
+            if (!(arg::log))
+            {
+                throw LogException(FailedFileOpenException(argv[2]));
+            }
+        }
+    }
 }
 
 void setupNodes(vector<Node> & nodes, map<IPAddress,size_t> & interfaces)
@@ -411,6 +463,10 @@ int64 followRoute(size_t source, IPAddress destination, size_t destNode,
         currentBuffer << " FromNode: " << current;
         error.addToMessage(currentBuffer.str());
         throw error;
+    }
+    if (arg::shouldLog)
+    {
+        arg::log << result << endl;
     }
     return result;
 }

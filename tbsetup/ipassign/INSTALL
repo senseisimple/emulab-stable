@@ -11,5 +11,9 @@ assumed that the METIS library files are kept in
 '/home/duerig/metis/metis-4.0/'. If this is not the case, alter the shell
 variables at the top.
 
+To use 'compile.sh', make sure that there are 'ipassign/bin' and
+'ipassign/tmp' directories to hold the various files created.
+
 Until integration, this program should always be run from the 'ipassign'
 directory and should be located (along with routecalc) in 'bin/ipassign'.
+
