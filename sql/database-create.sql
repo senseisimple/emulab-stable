@@ -283,9 +283,9 @@ CREATE TABLE experiment_stats (
   idle_swaps smallint(5) unsigned default '0',
   swapin_duration int(10) unsigned default '0',
   batch tinyint(3) unsigned default '0',
-  elabinelab tinyint(1) unsigned default '0',
+  elabinelab tinyint(1) NOT NULL default '0',
   elabinelab_exptidx int(10) unsigned default NULL,
-  security_level tinyint(1) NOT NULL default '0',  
+  security_level tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (eid,pid,exptidx),
   KEY exptidx (exptidx),
   KEY rsrcidx (rsrcidx)
@@ -982,6 +982,7 @@ CREATE TABLE node_types (
   issimnode tinyint(4) NOT NULL default '0',
   simnode_capacity smallint(5) unsigned NOT NULL default '0',
   trivlink_maxspeed int(11) unsigned NOT NULL default '0',
+  isrebootable tinyint(1) default '1',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 
