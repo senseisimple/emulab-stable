@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -75,10 +75,14 @@ if (!$confirmed) {
 	SHOWNODE($node_id);
     }
     else {
-	echo "<center><h2><br>
+        echo "<font size=+2>Experiment <b>".
+             "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+             "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+
+	echo "<center><font size=+2><br>
               Are you <b>REALLY</b>
                 sure you want to reboot all nodes in experiment $pid/$eid?
-              </h2>\n";
+              </font>\n";
 
 	SHOWEXP($pid, $eid);
     }
@@ -157,11 +161,15 @@ header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
 flush();
 
+echo date("D M d g:ia T");
+echo "\n";
 while (!feof($fp)) {
     $string = fgets($fp, 1024);
     echo "$string";
     flush();
 }
+echo date("D M d g:ia T");
+echo "\n";
 pclose($fp);
 $fp = 0;
 
