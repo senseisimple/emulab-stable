@@ -136,6 +136,17 @@ if (!defined($tempnsfile)) {
 }
 
 #
+# Batch jobs get a shorter idle time
+#
+my $swaptime = $idleswaptime;
+if (!$immediate && TBSiteVarExists("idle/batch_threshold")) {
+    my $batchidleswaptime = TBGetSiteVar("idle/batch_threshold");
+    if ($swaptime > $batchidleswaptime) {
+	$swaptime = $batchidleswaptime;
+    }
+}
+
+#
 # Create an experiment record. The pid/eid has to be unique, so lock the
 # table for the check/insert.
 #
@@ -163,7 +174,7 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  " idle_ignore) ".
 		  "VALUES ('$eid', '$pid', '$gid', now(), '$expires', ".
 		  "$description,'$dbuid', '$dbuid', 'new', $priority, ".
-		  "$swappable, $idleswap, '$idleswaptime', $autoswap, ".
+		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
