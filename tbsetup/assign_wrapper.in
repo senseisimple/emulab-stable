@@ -44,14 +44,17 @@ sub usage ()
     print STDERR " -f   - Fix current resources during update mode\n";
     print STDERR " -t   - Create the TOP file and then exit\n";
     print STDERR " -n   - Run assign, but do not reserve/modify resources.\n";
+    print STDERR " -p   - Do a precheck for mapability on an empty testbed - ".
+		 "implies -n\n";
     exit($WRAPPER_FAILED);
 }
-my $optlist  = "vutnf";
+my $optlist  = "vutnfp";
 my $verbose  = 0;
 my $fixmode  = 0;
 my $updating = 0;
 my $toponly  = 0;
 my $impotent = 0;
+my $precheck = 0;
 my $warnings = 0;
 
 #
@@ -123,6 +126,10 @@ if (defined($options{"t"})) {
 }
 if (defined($options{"n"})) {
     $impotent = 1;
+}
+if (defined($options{"p"})) {
+    $impotent = 1;
+    $precheck = 1;
 }
 if (defined($options{"f"})) {
     $fixmode = 1;
@@ -581,6 +588,8 @@ sub RunAssign ()
 	if ($remotecount);
     $ptopargs   .= "-S "
 	if ($simcount);
+    $ptopargs	.= "-a "
+    	if ($precheck);
     system("ptopgen $ptopargs > $ptopfile");
     TBDebugTimeStamp("ptopgen finished");
 
@@ -589,6 +598,8 @@ sub RunAssign ()
     my $cmdargs = "$ptopfile $topfile";
     $cmdargs = "-uPod -c .75 $cmdargs"
 	if ($virtcount);
+    $cmdargs = "-n $cmdargs"
+    	if ($precheck);
 
     my $cmd;
 
@@ -658,6 +669,7 @@ sub RunAssign ()
 	print("Could not open assign logfile!\n");
 	return -1;
     }
+
     printdb "Reading assign results.\n";
 
     #
@@ -668,7 +680,7 @@ sub RunAssign ()
     #
     if ($assignexitcode) {
 	my $violations = 0;
-	
+
 	print "ASSIGN FAILED:\n";
 	while (<ASSIGNFP> !~ /^[\w\s]*precheck:$/) {}
 	while (<ASSIGNFP>) {
@@ -695,6 +707,15 @@ sub RunAssign ()
 	return (($assignexitcode == 1) ? 1 : -1);
     }
     
+    #
+    # If we were doing the precheck, go ahead and exit now - there won't be
+    # any useful information to parse out
+    #
+    if ($precheck) {
+	print "Precheck succeeded.\n";
+	return 0;
+    }
+
     #
     # Assign success; parse results.
     # 
