@@ -681,7 +681,7 @@ sub fatal($)
     if ($estate ne EXPTSTATE_NEW) {    
 	if ($estate eq EXPTSTATE_ACTIVE) {
 	    print "Running 'tbswap out -force $pid $eid'\n";
-	    if (system("$tbbindir/tbswap out $pid $eid") != 0) {
+	    if (system("$tbbindir/tbswap out -force $pid $eid") != 0) {
 		print "tbswap out failed!\n";
 	    }
 	}
