@@ -25,7 +25,7 @@ $isadmin = ISADMIN($uid);
 #
 if ($isadmin) {
     $query_result = mysql_db_query($TBDBNAME,
-	"SELECT * FROM projects order by pid");
+	"SELECT pid,head_uid,name,approved FROM projects order by pid");
 }
 else {
     $query_result = mysql_db_query($TBDBNAME,
@@ -52,6 +52,8 @@ echo "<tr>
           <td>Project Info</td>
           <td>Name</td>
           <td>Leader</td>
+          <td>Expts</td>
+          <td>Nodes</td>
 	  <td align=center>Approved?</td>\n";
 
 #
@@ -67,12 +69,24 @@ while ($projectrow = mysql_fetch_array($query_result)) {
     $headuid  = $projectrow[head_uid];
     $Pname    = $projectrow[name];
     $approved = $projectrow[approved];
-
+    
     echo "<tr>
               <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
               <td>$Pname</td>
               <td><A href='showuser.php3?target_uid=$headuid'>
                      $headuid</A></td>\n";
+
+    if ($isadmin) {
+      $count1 = mysql_db_query($TBDBNAME,
+      "SELECT count(*) FROM experiments where pid='$pid'");
+      $row1 = mysql_fetch_array($count1);
+      $count2 = mysql_db_query($TBDBNAME,
+      "SELECT count(*) FROM reserved where pid='$pid'");
+      $row2 = mysql_fetch_array($count2);
+      if ($row1[0] > 0) {
+	echo "<td>$row1[0]</td><td>$row2[0]</td>\n";
+      } else { echo "<td>&nbsp;</td><td>&nbsp;</td>\n"; }
+    }
 
     if ($approved) {
 	echo "<td align=center><img alt=\"Y\" src=\"greenball.gif\"></td>\n";
