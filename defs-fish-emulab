@@ -1,0 +1,26 @@
+#
+# This is the definitions file for Russ on Emulab.Net.
+#
+TBDBNAME=tbdb
+TBOPSEMAIL=fish@flux.utah.edu
+TBLOGSEMAIL=fish@flux.utah.edu
+TBWWWEMAIL=fish@flux.utah.edu
+TBAPPROVALEMAIL=fish@flux.utah.edu
+TBAUDITEMAIL=fish@flux.utah.edu
+DELAYCAPACITY=2
+BOSSNODE=boss.emulab.net
+USERNODE=users.emulab.net
+FSNODE=fs.emulab.net
+OURDOMAIN=emulab.net
+FSDIR_GROUPS=/groups
+FSDIR_PROJ=/q/proj
+FSDIR_USERS=/users
+FSDIR_SHARE=/share
+TBSTATEDEMAIL=fish@flux.utah.edu
+TBTESTSUITEEMAIL=fish@flux.utah.edu
+WWWHOST=www.emulab.net
+WWW=www.emulab.net/dev/fish
+THISHOMEBASE=Fish.Emulab.Net
+FS_WITH_QUOTAS="/q /groups /users"
+PLABSUPPORT=1
+PLAB_ROOTBALL="plabroot-10.tar.bz2"
