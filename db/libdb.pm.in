@@ -109,7 +109,7 @@ use Exporter;
 	 TBNodeUpdateAccountsByPid TBNodeUpdateAccountsByType
 	 TBNodeUpdateAccountsByUID
 	 TBSaveExpLogFiles TBExptWorkDir TBExptUserDir TBExptLogDir
-	 TBExptDestroy TBIPtoNodeID
+	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 
 	 TBDB_WIDEAREA_LOCALNODE
 	 TBWideareaNodeID
@@ -129,10 +129,21 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $EVENTSYS    = "@EVENTSYS@";
 my $BOSSNODE    = "@BOSSNODE@";
 my $TBOPSPID	= "emulab-ops";
+my $progname;
 
 if ($EVENTSYS) {
     require event;
     import event;
+}
+
+#
+# Must taint check $PROGRAM_NAME cause it comes from outside. Silly!
+#
+if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
+    $progname = $1;
+}
+else {
+    $progname = "Tainted";
 }
 
 #
@@ -175,7 +186,8 @@ sub TBDBConnect()
     if (!defined($DB)) {
 	die("Cannot connect to DB after several attempts!\n");
     }
-    $DB->{'dbh'}->{'PrintError'} = 0;    
+    $DB->{'dbh'}->{'PrintError'} = 0;
+    $Mysql::QUIET = 1;
 }
 TBDBConnect();
 
@@ -2240,6 +2252,68 @@ sub TBNodeUpdateAccountsByUID($)
 }
 
 #
+# Clear various bits of info from a node, just as if it was booting for
+# the first time in an experiment. 
+# 
+sub TBNodeBootReset($)
+{
+    my ($nodeid) = @_;
+
+    DBQueryFatal("update nodes set ready=0, ".
+		 "startstatus='" . NODESTARTSTATUS_NOSTATUS() . "', ".
+		 "bootstatus='"  . NODEBOOTSTATUS_UNKNOWN()   . "' ".
+		 "where node_id='$nodeid'");
+    
+    return 0;
+}
+
+#
+# Wait for a node to hit a certain state. Provide a start time and a max
+# wait time.
+#
+# NB: This function is not as general purpose as it might seem; there are
+#     not many "terminal" states that you can wait for (like isup).
+#     Still, it avoids duplication in 4 scripts.
+# 
+sub TBNodeStateWait ($$$$) {
+    my ($pc, $waitstate, $waitstart, $maxwait) = @_;
+
+    #
+    # Start a counter going, relative to the time we rebooted the first
+    # node. 
+    # 
+    my $waittime  = 0;
+    my $minutes   = 0;
+
+    #
+    # Wait for the node to finish booting, as recorded in database
+    #
+    while (1) {
+	my $state;
+	if (!TBGetNodeEventState($pc, \$state)) {
+	    print "*** Error getting event state for $pc.\n";
+	    return 1;
+	}
+
+	if ($state eq $waitstate) {
+	    return 0;
+	}
+	
+	$waittime = time - $waitstart;
+	if ($waittime > $maxwait) {
+	    $minutes = int($waittime / 60);
+	    print "*** Giving up on $pc - it's been $minutes minute(s).\n";
+	    return 1;
+	}
+	if (int($waittime / 60) > $minutes) {
+	    $minutes = int($waittime / 60);
+	    print "Still waiting for $pc - it's been $minutes minute(s).\n";
+	}
+	sleep(1);
+    }
+}
+
+#
 # Issue a DB query. Argument is a string. Returns the actual query object, so
 # it is up to the caller to test it. I would not for one moment view this
 # as encapsulation of the DB interface. I'm just tired of typing the same
@@ -2263,6 +2337,30 @@ sub DBQuery($)
 	$DBErrorString =
 	    "  Query: $query\n".
 	    "  Error: " . $DB->errstr;
+    }
+    return $result;
+}
+
+sub DBQueryNew($)
+{
+    my($query) = $_[0];
+    my $result;
+    my $maxtries = 5;
+
+    while ($maxtries) {
+	$result = $DB->query($query);
+	if (! defined($result)) {
+	    $DBErrorString =
+		"  Query: $query\n".
+		    "  Error: " . $DB->errstr;
+	}
+	if (defined($result) || $DB->err != 2006) {
+	    last;
+	}
+
+	DBWarn("mysqld went away", 0);
+	$maxtries--;
+	sleep(1);
     }
     return $result;
 }
@@ -2306,27 +2404,19 @@ sub DBQueryWarn($)
 # 
 # usage: DBWarn(char *message)
 #
-sub DBWarn($)
+sub DBWarn($;$)
 {
-    my($message) = $_[0];
-    my($text, $progname);
-
-    #
-    # Must taint check $PROGRAM_NAME cause it comes from outside. Silly!
-    #
-    if ($PROGRAM_NAME =~ /^([-\w.\/]+)$/) {
-	$progname = $1;
-    }
-    else {
-	$progname = "Tainted";
-    }
+    my($message, $nomail) = @_;
+    my($text);
 
     $text = "$message - In $progname\n" .
   	    "$DBErrorString\n";
 
     print STDERR "*** $text";
 
-    libtestbed::SENDMAIL($TBOPS, "DBError - $message", $text);
+    if (! defined($nomail)) {
+      libtestbed::SENDMAIL($TBOPS, "DBError - $message", $text);
+    }
 }
 
 #
