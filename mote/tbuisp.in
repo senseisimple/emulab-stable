@@ -66,7 +66,7 @@ if (!@motes) {
 #
 # Permission check
 #
-if (!TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@motes)) {
+if ($UID && !TBNodeAccessCheck($UID,TB_NODEACCESS_LOADIMAGE,@motes)) {
     die "You do not have permission to modify one or more nodes\n";
 }
 
