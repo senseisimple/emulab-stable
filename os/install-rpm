@@ -1,0 +1,264 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use POSIX 'setsid';
+
+#
+# Install an RPM. This script is run from the setup code on client nodes.
+# By default the RPM is accessed directly via NFS, if '-c' is specified
+# the RPM is copied over first either via NFS (the default) or tmcc
+# (-t option).
+#
+# Exit Value Matters!: 0 if installed okay
+#                      1 if already installed
+#                     -1 if something goes wrong.
+#
+# To ensure safety, the RPM filename must start with /proj, except if
+# running with jail option. Must be run as root.
+#
+sub usage()
+{
+    print STDOUT "Usage: install-rpm [-ct] [-n nodeid] <filename>\n";
+    exit(-1);
+}
+my $optlist  = "ctn:";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/etc/emulab";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# No configure vars.
+#
+my $IDENTFILE      = "/var/db/testbed.rpms";
+my $rpm        = "";
+my $usetmcc	   = 0;
+my $copymode	   = 0;
+my $copyfile       = "";
+my $vnodeid;
+
+# Protos
+sub GetRPMFile($$$);
+
+#
+# Must be running as root to work. 
+#
+if ($EUID != 0) {
+    die("Must be run as root! Try using sudo!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"c"})) {
+    $copymode = 1;
+}
+if (defined($options{"t"})) {
+    $usetmcc = 1;
+    $copymode = 1;
+}
+if (defined($options{"n"})) {
+    $vnodeid = $options{"n"};
+    if ($vnodeid =~ /^([-\w]+)$/) {
+	$vnodeid = $1;
+    }
+}
+if (@ARGV != 1) {
+    usage();
+}
+$rpm    = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+# Note different taint check (allow /).
+if ($rpm =~ /^([-\w.\/]+)$/) {
+    $rpm = $1;
+}
+else {
+    fatal("Tainted filename: $rpm");
+}
+
+#
+# Check to make sure this RPM has not already been installed. Update
+# the file now. If the rpm fails, we got big problems.
+#
+if (-e $IDENTFILE) {
+    if (! system("egrep -q -s '^${rpm}' $IDENTFILE")) {
+	print STDOUT "RPM $rpm has already been installed!\n";
+	exit(1);
+    }
+}
+
+#
+# Must be able to see the RPM if not copying. The front end
+# ensures that its in a reasonable place, but have to make sure here.
+#
+if (! $copymode) {
+    #
+    # Make sure its really there.
+    #
+    if (! -r $rpm) {
+	fatal("$rpm does not exist or is not accessible!");
+    }
+}
+else {
+    $copyfile = `mktemp /var/tmp/rpm.XXXXXX`;
+
+    if ($copyfile =~ /^([-\@\w\.\/]+)$/) {
+	$copyfile = $1;
+    }
+    else {
+	die("Bad data in copyfile name: $copyfile");
+    }
+    GetRPMFile($rpm, $copyfile, $usetmcc);
+    #
+    # Dies on any failure!
+    #
+}
+
+#
+# Add to index first; if fails too bad.
+# 
+if (system("echo \"$rpm\" >> $IDENTFILE")) {
+    if ($copymode) {
+	unlink($copyfile);
+    }
+    fatal("Could not update $IDENTFILE");
+}
+
+#
+# Run the RPM. 
+#
+if ($copymode) {
+    $rpm = $copyfile;
+}
+system("rpm -i $rpm");
+$exit_status = $? >> 8;
+if ($copymode) {
+    unlink($copyfile);
+}
+
+exit($exit_status);
+
+sub fatal {
+    local($msg) = $_[0];
+
+    print STDERR "$msg\n";
+    exit(-1);
+}
+
+#
+# Get an RPM from the server via tmcc and stash.
+#
+sub GetRPMFile($$$)
+{
+    my ($rpm, $copyfile, $usetmcc) = @_;
+    my $buf;
+    my $bytelen;
+
+    #
+    # If copying via NFS, open the file.  Otherwise pipe from tmcc.
+    #
+    if (! $usetmcc) {
+	open(TMCC, "< $rpm")
+	    or fatal("Could not open RPM on server!");
+	$bytelen = (stat($rpm))[7];
+    } else {
+	my $tmccopt = "-t 300";
+	if (defined($vnodeid)) {
+	    $tmccopt .= " -n $vnodeid";
+	}
+
+	#
+	# Protocol is a little odd. First word is the number of bytes
+	# (yes, limited to 31 bits of length!), then the data. If we do
+	# not get that much data, we fail. What about timeout option?
+	# Could take a while to get the entire file, but instead of a
+	# timeout let Emulab decide when its too long.
+	#
+	open(TMCC, "tmcc $tmccopt rpm $rpm |")
+	    or fatal("Could not download RPM from server!");
+
+	# Hokey C struct stuff
+	my $firstword = pack("i", 0);
+    
+	if (! sysread(TMCC, $firstword, length($firstword))) {
+	    fatal("Could not read length of RPM from server!");
+	}
+	$bytelen = unpack("i", $firstword);
+    }
+    if ($bytelen == 0) {
+	fatal("Zero length of RPM from server!");
+    }
+
+    #
+    # Open the target file and start dumping the data in.
+    #
+    open(JFILE, "> $copyfile")
+	or fatal("Could not open local file $copyfile: $!");
+
+    #
+    # Deal with NFS read failures
+    #
+    my $foffset = 0;
+    my $retries = 5;
+
+    while ($bytelen) {
+	my $rlen = sysread(TMCC, $buf, 8192);
+
+	if (! defined($rlen)) {
+	    #
+	    # If we are copying the file via NFS, retry a few times
+	    # on error to avoid the changing-exports-file server problem.
+	    #
+	    if (! $usetmcc) {
+		if ($retries > 0 && sysseek(TMCC, $foffset, 0)) {
+		    warn("*** WARNING retrying read of $rpm ".
+			 "at offset $foffset\n");
+		    $retries--;
+		    sleep(2);
+		    next;
+		}
+	    }
+	    unlink($copyfile);
+	    fatal("Error reading RPM $rpm: $!");
+	}
+        if ($rlen == 0) {
+	    last;
+	}
+	if (! syswrite(JFILE, $buf)) {
+	    unlink($copyfile);
+	    fatal("Error writing RPM $copyfile: $!");
+	}
+	$foffset += $rlen;
+	$bytelen -= $rlen;
+	$retries = 5;
+    }
+    if ($bytelen) {
+	unlink($copyfile);
+	fatal("Did not get the entire RPM! $bytelen bytes left.");
+    }
+    close(JFILE);
+    close(TMCC);
+    return 0;
+}

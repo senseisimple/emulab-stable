@@ -40,6 +40,7 @@ client-install:
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-delta $(LBINDIR)/create-delta
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-delta $(LBINDIR)/install-delta
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
 	$(MAKE) -C imagezip client-install
 	$(MAKE) -C syncd client-install
@@ -47,6 +48,7 @@ client-install:
 remote-install: 
 	$(INSTALL) -m 755 -o root -g wheel -d $(LBINDIR)
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-tarfile $(LBINDIR)/install-tarfile
+	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 
 clean:		subdir-clean
 
