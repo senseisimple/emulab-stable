@@ -448,6 +448,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	security/plasticwrap \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
 	sensors/slothd/sdisrunning sensors/slothd/sddeploy \
+        sensors/canaryd/GNUmakefile \
 	account/GNUmakefile account/tbacct account/webtbacct \
 	account/addpubkey account/webaddpubkey \
 	account/addsfskey account/webaddsfskey \
