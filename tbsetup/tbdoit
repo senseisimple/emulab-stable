@@ -107,7 +107,7 @@ if (system("$tbdir/tbreport -v $irfile 2>&1 > $repfile") != 0) {
 # The web server will not be able to access the report file, so just
 # dump it STDOUT and let the php script do something with it.
 #
-dumplog();
+dumpreport();
 
 print STDOUT "Setup Success\n";
 exit 0;
@@ -130,6 +130,17 @@ sub fatal()
 }
 
 sub dumplog()
+{
+    if (open(IN, "$eid.log")) {
+	print STDOUT "Dumping $eid.log\n";
+	while (<IN>) {
+	    print STDOUT "$_";
+	}
+	close(IN);
+    }
+}
+
+sub dumpreport()
 {
     if (open(IN, "$eid.report")) {
 	print STDOUT "Dumping $eid.report\n";

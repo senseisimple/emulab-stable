@@ -111,12 +111,6 @@ readfifo $tmpioFP "SNMPIT: "
 
 #outs "PLACEHOLDER - Verifying virtual network."
 
-#outs "Setting up delays"
-#if {[catch "exec $delay_setup $irFile >@ $logFp 2>@ $logFp" err]} {
-#    outs stderr "Error running $delay_setup. ($err)"
-#    exit 1
-#}
-
 outs "PLACEHOLDER - Copying disk images."
 
 outs "Resetting OS and rebooting."
@@ -133,6 +127,13 @@ if {[catch "exec cat $irFile | $ir2ifc | sort > $ifcfile 2>@ $logFp" err]} {
     outs stderr "Error generating $ifcfile ($err)"
     exit 1
 }
+
+outs "Setting up delay nodes"
+if {[catch "exec $delay_setup $irFile >@ $logFp 2>@ $logFp" err]} {
+    outs stderr "Error running $delay_setup. ($err)"
+    exit 1
+}
+
 
 if {[catch "exec $ifcboot $pid $eid $ifcfile >@ $logFp 2>@ $logFp" err]} {
     outs stderr "Error setting interfaces ($err)"

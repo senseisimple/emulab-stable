@@ -264,7 +264,7 @@ foreach my $node ( keys %nodeos ) {
     $UID = $SAVEUID;
 
     #
-    # Okay, before we reboot lets really make sure. On FreeBSD, it might
+    # Okay, before we power cycle lets really make sure. On FreeBSD, it might
     # have rebooted, but since the connection is terminated, system returns
     # an error status. So, lets ping it again and if its pingable, the
     # reboot must have failed. If it is not pingable, I assume that the
