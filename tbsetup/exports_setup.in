@@ -76,16 +76,57 @@ use libtestbed;
 # a dummy file in /var/tmp, opened for writing and flock'ed. 
 #
 if (!$TESTMODE) {
-  open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-  $count = 0;
-  while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-    print "Another /etc/exports update in progress. Waiting a moment ...\n";
-    if ($count++ > 20) {
-      fatal("Could not get the lock after a long time!\n");
+    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+    $count = 0;
+    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+	#
+	# If we don't get it the first time, we wait for:
+	# 1) The lock to become free, in which case we do our thing
+	# 2) The time on the lock to change, in which case we wait for that process
+	#    to finish
+	#
+	my $oldlocktime = (stat(LOCK))[9];
+	my $gotlock = 0;
+	while (1) {
+	    print "Another exports update in progress, waiting for it to finish\n";
+	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		# OK, got the lock, we can do what we're supposed to
+		$gotlock = 1;
+		last;
+	    }
+	    $locktime = (stat(LOCK))[9];
+	    if ($locktime != $oldlocktime) {
+		$oldlocktime = $locktime;
+		last;
+	    }
+	    if ($count++ > 20)  {
+		fatal("Could not get the lock after a long time!\n");
+	    }
+	    sleep(1);
+	}
+
+	$count = 0;
+	#
+	# If we didn't get the lock, wait for the processes that did to finish
+	#
+	if (!$gotlock) {
+	    while (((stat(LOCK))[9] != $oldlocktime) &&
+	           (flock(LOCK, LOCK_EX|LOCK_NB) == 0)) {
+		if ($count++ > 20)  {
+		    fatal("Could not get the lock after a long time!\n");
+		}
+		sleep(1); 
+	    }
+	    exit(0);
+	}
     }
-    sleep(1);
-  }
 }
+
+#
+# Perl-style touch(1)
+#
+my $now = time;
+utime $now, $now, $lockfile;
 
 #
 # We stick the new map entries into the tail file. First zero it out.
