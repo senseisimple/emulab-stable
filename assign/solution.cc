@@ -134,7 +134,8 @@ void print_solution_summary()
       // Print name, number of vnodes, and some bandwidth numbers
       cout << pnode->name << " " << pnode->total_load << " vnodes, " <<
 	pnode->nontrivial_bw_used << " nontrivial BW, " <<
-	pnode->trivial_bw_used << " trivial BW" << endl;
+	pnode->trivial_bw_used << " trivial BW, type=" << pnode->current_type
+	<< endl;
 
       // Go through all links on this pnode
       poedge_iterator pedge_it,end_pedge_it;
@@ -157,6 +158,16 @@ void print_solution_summary()
 	  continue;
 	}
 	cout << "    " << plink->bw_used << " " << plink->name << endl;
+      }
+
+      // Print out used local additive features
+      tb_pnode::features_map::iterator feature_it;
+      for (feature_it = pnode->features.begin();
+	  feature_it != pnode->features.end();++feature_it) {
+	if ((feature_it->first[0] == '?') && (feature_it->first[1] == '+')) {
+	  double remaining = feature_it->second; 
+	  cerr << "    " << feature_it->first << ":" << remaining << endl;
+	}
       }
     }
   }
