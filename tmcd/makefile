@@ -31,12 +31,12 @@ ssl.o:	ssl.c ssl.h decls.h
 clean: 
 	rm -f *.o core tmcc
 
-force-install:	misc-install script-install bin-install
+emulab-install:	misc-install script-install bin-install
 
 dir-install:
 	-mkdir -p $(INSTALL_DIR)
 	cp /dev/null $(INSTALL_DIR)/isrem
-	rm /usr/local/etc/testbed
+	-rm -rf /usr/local/etc/testbed
 	ln -s emulab /usr/local/etc/testbed
 
 misc-install:	dir-install
@@ -75,8 +75,8 @@ dist:	trafgen pemfile
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
 	cp -p $(DISTFILES) $(DISTDIR)
-	cp -p $(BSDFILES) $(DISTDIR)
 	for file in $(WAFILES); do cp ron/$$file $(DISTDIR); done
+	for file in $(BSDFILES); do cp freebsd/$$file $(DISTDIR); done
 	cp /usr/testbed/etc/emulab.pem $(DISTDIR)
 	cp /usr/testbed/etc/$(PEMFILE) $(DISTDIR)/client.pem
 	cp /usr/local/sbin/vtund $(DISTDIR)
