@@ -2488,3 +2488,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table location_info add loc_z float default NULL after loc_y;
 
+1.318: Add a stillimage URL to the webcams table until I figure this
+       mess out.
+
+       alter table webcams add stillimage_URL tinytext;
+
+       
+  
