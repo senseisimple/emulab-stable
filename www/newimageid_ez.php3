@@ -16,9 +16,26 @@ include("osiddefs.php3");
 # 
 
 #
+# Options for using this page with different types of nodes
+#
+$nodetypes = array( "mote" );
+if ($nodetype == "mote") {
+    $view = array('hide_partition' => 1, 'hide_os' => 1, 'hide_version' => 1,
+		  'hide_snapshot' => 1, 'hide_features' => 1,
+		  'hide_opmode' => 1, 'hide_footnotes' => 1);
+    $nodeclass = "mote";
+    $title = "Mote Form";
+} else {
+    # Defaults to PC view
+    $view = array('hide_upload' => 1);
+    $nodeclass = "pc";
+    $title = "EZ Form";
+}
+
+#
 # Standard Testbed Header
 #
-PAGEHEADER("Create a new Image Descriptor (EZ Form)");
+PAGEHEADER("Create a new Image Descriptor ($title)");
 
 #
 # Only known and logged in users.
@@ -35,21 +52,6 @@ $projlist = TBProjList($uid, $TB_PROJECT_MAKEIMAGEID);
 if (! count($projlist)) {
     USERERROR("You do not appear to be a member of any Projects in which ".
 	      "you have permission to create new Image descriptors.", 1);
-}
-
-#
-# Options for using this page with different types of nodes
-#
-$nodetypes = array( "mote" );
-if ($nodetype == "mote") {
-    $view = array('hide_partition' => 1, 'hide_os' => 1, 'hide_version' => 1,
-		  'hide_snapshot' => 1, 'hide_features' => 1,
-		  'hide_opmode' => 1, 'hide_footnotes' => 1);
-    $nodeclass = "mote";
-} else {
-    # Defaults to PC view
-    $view = array('hide_upload' => 1);
-    $nodeclass = "pc";
 }
 
 #
