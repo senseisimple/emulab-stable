@@ -511,7 +511,7 @@ if ($thumb && !$idle) {
 	    }
 	    $idlemailinterval = TBGetSiteVar("idle/mailinterval");
 	    # Is it toosoon to send another mail?
-	    $toosoon = ($swapreq==0 || ($lastswapreq < $idlemailinterval));
+	    $toosoon = ($swapreq>0 && ($lastswapreq < $idlemailinterval));
 	    $lastlogin = "<td>";
 	    if ($lastexpnodelogins = TBExpUidLastLogins($pid, $eid)) {
 	        $daysidle=$lastexpnodelogins["daysidle"];
