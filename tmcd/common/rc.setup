@@ -102,7 +102,7 @@ fi
 #
 # Start the elvin proxy.
 #
-if [ -x $BINDIR/evproxy ]; then
+if [ -x $BINDIR/evproxy -a -r $BOOTDIR/nickname ]; then
 	echo "Starting elvin proxy daemon ..."
 	$BINDIR/evproxy -e `cat $BOOTDIR/nickname | awk -F. '{print $3"/"$2}'`
 fi
