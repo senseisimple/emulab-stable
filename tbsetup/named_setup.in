@@ -151,8 +151,9 @@ my $db_result =
 		 "left join interfaces as i on n.phys_nodeid=i.node_id ". 
 		 "where (n.role='testnode' or n.role='virtnode') ".
 		 "    and (i.IP is not null or n.jailip is not null) ".
-		 "    and (i.card is null or i.card=nt.control_net " .
-		 "        or i.role='gw') ");
+		 "    and (i.card is null or ".
+		 "         i.role='" . TBDB_IFACEROLE_CONTROL() . "' or " .
+		 "         i.role='" . TBDB_IFACEROLE_GW() . "') ");
 
 #
 # Sort out the routable and unroutable addresses, and make a map for reversing
@@ -184,7 +185,7 @@ while (my @row = $db_result->fetchrow_array()) {
     # Special treatment for gateway interfaces - we give act as if they are a
     # separate node
     #
-    if ($irole && $irole eq "gw") {
+    if ($irole && $irole eq TBDB_IFACEROLE_GW()) {
 	$node_id = "$node_id-gw";
     }
 
