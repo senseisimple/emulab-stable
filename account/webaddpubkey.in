@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,6 +20,6 @@ my $TB       = "@prefix@";
 #
 # Run the real thing, and never return.
 # 
-exec "$TB/bin/addpubkey", @ARGV;
+exec "$TB/sbin/addpubkey", @ARGV;
 
 die("webaddpubkey: Could not exec addpubkey: $!");
