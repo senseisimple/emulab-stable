@@ -921,6 +921,7 @@ CREATE TABLE virt_lans (
   rbandwidth int(10) unsigned default NULL,
   rlossrate float(10,3) default NULL,
   cost float NOT NULL default '1'
+  widearea tinyint(4) default '0',
 ) TYPE=MyISAM;
 
 #

@@ -124,6 +124,9 @@ LanLink instproc init {s nodes bw d type} {
     # The simulator
     $self set sim $s
 
+    # By default, a local link
+    $self set widearea 0
+
     # Now we need to fill out the nodelist
     $self instvar nodelist
 
@@ -171,6 +174,7 @@ LanLink instproc get_port {node} {
 LanLink instproc fill_ips {} {
     $self instvar nodelist
     $self instvar sim
+    $self instvar widearea
     set isremote 0
 
     # Determined a subnet (if possible) and any used IP addresses in it.
@@ -189,6 +193,7 @@ LanLink instproc fill_ips {} {
 	    set ips($ip) 1
 	}
     }
+    set widearea $isremote
 
     # If we couldn't find a subnet we ask the Simulator for one.
     if {$subnet == {}} {
@@ -368,11 +373,12 @@ LanLink instproc updatedb {DB} {
     $self instvar loss
     $self instvar rloss
     $self instvar cost
+    $self instvar widearea
     var_import ::GLOBALS::pid
     var_import ::GLOBALS::eid
 
     foreach nodeport $nodelist {
 	set nodeportraw [join $nodeport ":"]
-	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport))"
+	sql exec $DB "insert into virt_lans (pid,eid,vname,member,delay,rdelay,bandwidth,rbandwidth,lossrate,rlossrate,cost,widearea) values (\"$pid\",\"$eid\",\"$self\",\"$nodeportraw\",$delay($nodeport),$rdelay($nodeport),$bandwidth($nodeport),$rbandwidth($nodeport),$loss($nodeport),$rloss($nodeport),$cost($nodeport),$widearea)"
     }
 }
