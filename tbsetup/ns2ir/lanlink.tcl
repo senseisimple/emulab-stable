@@ -448,6 +448,12 @@ Lan instproc updatedb {DB} {
     var_import ::GLOBALS::eid
 
     foreach nodeport $nodelist {
+	set node [lindex $nodeport 0]
+	set isvirt [$node set isvirt]
+	if {$isvirt} {
+	    perror "Virtual nodes ($node) may not be in lans yet!"
+	    return
+	}
 	set linkqueue $linkq($nodeport)
 	set limit_ [$linkqueue set limit_]
 	set maxthresh_ [$linkqueue set maxthresh_]
