@@ -599,6 +599,16 @@ if (! $returning) {
     elseif (! TBvalid_email($formfields[usr_email])) {
 	$errors["Email Address"] = TBFieldErrorString();
     }
+    elseif (TBCurrentEmail($formfields[usr_email])) {
+        #
+        # Treat this error separate. Not allowed.
+        #
+	PAGEHEADER("Start a New Testbed Project");
+	USERERROR("The email address '$formfields[usr_email]' is already in ".
+		  "use by another user.<br>Perhaps you have ".
+		  "<a href='password.php3?email=$formfields[usr_email]'>".
+		  "forgotten your username.</a>", 1);
+    }
     if (isset($formfields[usr_URL]) &&
 	strcmp($formfields[usr_URL], "") &&
 	strcmp($formfields[usr_URL], $HTTPTAG) &&

@@ -846,6 +846,21 @@ function TBCurrentUser($uid)
 }
 
 #
+# Check to see if an email is being used twice.
+#
+# usage TBCurrentEmail($email)
+#       returns 1 if a valid email for someone.
+#       returns 0 if no such email address used by anyone.
+#
+function TBCurrentEmail($email)
+{
+    $query_result =
+	DBQueryFatal("SELECT uid FROM users WHERE usr_email='$email'");
+
+    return mysql_num_rows($query_result);
+}
+
+#
 # Get user status,
 #
 # usage TBUserStatus($uid)
