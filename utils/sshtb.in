@@ -1,2 +1,2 @@
 #!/bin/sh
-@SSH@ @SSH_ARGS@ $*
+exec @SSH@ @SSH_ARGS@ $*
