@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -64,7 +64,7 @@ main(int argc, char **argv)
 	event_handle_t handle;
 	address_tuple_t	tuple;
 	char *progname;
-	char *server = NULL;
+	char *server = "localhost";
 	char *port = NULL;
 	char *logfile = NULL;
 	char *pidfile = NULL;

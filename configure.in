@@ -243,7 +243,7 @@ if test -z "$THISHOMEBASE"; then
     THISHOMEBASE="Emulab.Net"
 fi
 if test -z "$EVENTSERVER"; then
-    EVENTSERVER="$BOSSNODE"
+    EVENTSERVER="event-server"
 fi
 AC_DEFINE_UNQUOTED(EVENTSERVER, "$EVENTSERVER")
 
@@ -358,6 +358,7 @@ if test "$enable_events" = "no"; then
 else
 	eventfiles="event/GNUmakefile event/lib/GNUmakefile \
 		    event/etc/elvind-boss.conf event/etc/elvind-ops.conf \
+		    event/etc/elvind-inetd.conf event/etc/GNUmakefile\
 		    event/sched/GNUmakefile event/test/GNUmakefile \
                     event/tbgen/GNUmakefile \
                     event/example/GNUmakefile event/example/tbsend.pl \

@@ -11,19 +11,24 @@ SUBDIR		= event/sched
 
 include $(OBJDIR)/Makeconf
 
-all:	event-sched
+all:	event-sched event-sched_rpc
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CFLAGS   += -pthread
+CFLAGS   += -pthread -DBINDIR='"$(INSTALL_BINDIR)"'
 #CFLAGS  += -DDEBUG
-CFLAGS	 += -O -g -Wall
+CFLAGS	 += -O -Wall
 CFLAGS   += -I. -I${OBJDIR} -I$(SRCDIR)/../lib -I$(TESTBED_SRCDIR)/lib/libtb
 CFLAGS   += `elvin-config --cflags vin4mt`
 
-LDFLAGS  += -pthread -static
+LDFLAGS  += -pthread
 LDFLAGS  += -L../lib -L${OBJDIR}/lib/libtb
-LIBS     += -levent_r -ltb -lcipher -L/usr/local/lib/mysql -lmysqlclient -lz
+DBLIBS    = -L/usr/local/lib/mysql -lmysqlclient -lz
+LIBS     += -levent_r -ltb -lcipher -lz
+
+ULXRINC   = -I/usr/local/include -I/usr/local/include/ulxmlrpcpp
+CXXFLAGS += -pthread -O $(ULXRINC)
+ULXRLIBS  = -L/usr/local/lib  -lulsshxmlrpcpp -lulxmlrpcpp -lexpat
 
 #
 # XXX elvin-config adds -lc which is rather bogus, and messes up -pthread
@@ -33,18 +38,44 @@ LIBS     += -levent_r -ltb -lcipher -L/usr/local/lib/mysql -lmysqlclient -lz
 #LIBS     += `elvin-config --libs vin4mt`
 LIBS	 += -L/usr/local/lib -lvin4mt -lvin4c -lvin4 -lssl -lcrypto -lm
 
-OBJS	  = event-sched.o queue.o
+OBJS	  = event-sched.o 
 
-event-sched:	$(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+event-sched:	event-sched.c queue.o event-sched.h ../lib/libevent.a
+	$(CC) $(CFLAGS) -DDBIFACE=1 $(LDFLAGS) -o $@ $< queue.o $(LIBS) $(DBLIBS)
 
-$(OBJS):	event-sched.h ../lib/libevent.a
+event-sched_rpc:	event-sched_rpc.o rpc.o queue.o event-sched.h \
+				../lib/libevent.a
+	$(CXX) $(CFLAGS) -static $(LDFLAGS) -o $@ event-sched_rpc.o \
+			rpc.o queue.o $(ULXRLIBS) $(LIBS)
 
-install:	$(addprefix $(INSTALL_SBINDIR)/, event-sched)
+event-sched_rrpc:	event-sched_rpc.o rrpc.o queue.o event-sched.h \
+				../lib/libevent.a
+	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@ event-sched_rpc.o \
+			rrpc.o queue.o $(ULXRLIBS) $(LIBS)
+
+queue.o:		event-sched.h
+event-sched_rpc.o:	event-sched.c event-sched.h rpc.h
+	$(CC) $(CFLAGS) -DRPC -c -o $@ $<
+rpc.o:			rpc.cc rpc.h
+	$(CXX) $(CXXFLAGS) -DSSHRPC $(ULXRINC) -c $<
+
+rrpc.o:			rpc.cc rpc.h
+	$(CXX) $(CXXFLAGS) -DSSLRPC $(ULXRINC) -c -o rrpc.o $<
+
+install:
+	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_DIR)/opsdir/sbin/event-sched
+
+control-install:
+	$(INSTALL_PROGRAM) event-sched_rpc $(INSTALL_SBINDIR)/event-sched
 
 # not a client thing
 client:
 client-install: client
 
 clean:
-	/bin/rm -f *.o event-sched
+	/bin/rm -f *.o event-sched event-sched_rpc event-sched_rrpc
+
+$(INSTALL_DIR)/opsdir/bin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@

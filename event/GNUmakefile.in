@@ -19,7 +19,7 @@ ifeq ($(SYSTEM),FreeBSD)
 SUBDIRS	       += sched delay-agent nsetrafgen stated
 endif
 
-all:	trafgen-fetch all-subdirs
+all:	etc-subdir trafgen-fetch all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -28,6 +28,9 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 #
 trafgen-fetch:
 	$(SRCDIR)/trafgen/tg-install $(SRCDIR)/trafgen
+
+etc-subdir:
+	@$(MAKE) -C etc all
 
 install: 
 	@$(MAKE) -C lib install
@@ -42,6 +45,8 @@ client-install: client client-install-subdirs
 control-install: 
 	@$(MAKE) -C lib control-install
 	@$(MAKE) -C tbgen control-install
+	@$(MAKE) -C sched control-install
+	@$(MAKE) -C linktest install
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs

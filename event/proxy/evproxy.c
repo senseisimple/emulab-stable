@@ -103,12 +103,12 @@ main(int argc, char **argv)
 	strcpy(ipaddr, inet_ntoa(myip));
 
 	/*
-	 * If server is not specified, then it defaults to BOSSNODE.
+	 * If server is not specified, then it defaults to EVENTSERVER.
 	 * This allows the client to work on either users.emulab.net
 	 * or on a client node. 
 	 */
 	if (!server)
-		server = BOSSNODE;
+		server = EVENTSERVER;
 
 	/*
 	 * Convert server/port to elvin thing.

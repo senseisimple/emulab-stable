@@ -27,7 +27,10 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  rmgroup mkgroup setgroups mkproj \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
-		  newnode_reboot savelogs.proxy
+		  newnode_reboot savelogs.proxy eventsys.proxy
+
+CTRLBIN_STUFF   = console_setup.proxy exports_setup.proxy sfskey_update.proxy \
+		  savelogs.proxy eventsys.proxy
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -105,7 +108,8 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
 	 $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
 	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_STUFF)) \
-	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.pm)
+	 $(addprefix $(INSTALL_DIR)/opsdir/lib/, libtestbed.pm) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRLBIN_STUFF))
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
@@ -158,10 +162,7 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-control-install:	$(addprefix $(INSTALL_SBINDIR)/, console_setup.proxy) \
-			$(addprefix $(INSTALL_SBINDIR)/, exports_setup.proxy) \
-			$(addprefix $(INSTALL_SBINDIR)/, sfskey_update.proxy) \
-			$(addprefix $(INSTALL_SBINDIR)/, savelogs.proxy) \
+control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRLBIN_STUFF)) \
 			$(addprefix $(INSTALL_BINDIR)/, fetchtar.proxy) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
@@ -200,4 +201,9 @@ subdir-distclean:
 $(INSTALL_DIR)/opsdir/lib/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@

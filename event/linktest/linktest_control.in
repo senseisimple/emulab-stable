@@ -17,17 +17,19 @@ use POSIX;
 #
 sub usage()
 {
-    print("Usage: linktest_control [-d] [-k | -l <level>] [-o <file>] ".
-	  "<pid> <eid>\n".
+    print("Usage: linktest_control [-d] [-t timeout] [-k | -l <level>] ".
+	  "[-o <file>] <pid> <eid>\n".
 	  "-l   - Run linktest at a specific level; defaults to DB value.\n".
 	  "-k   - Kill a currently running linktest.\n".
+	  "-t   - Specify timeout in seconds.\n".
 	  "-o   - Specify output file for linktest results.\n".
 	  "-d   - Turn on debugging output.\n");
     exit(-1);
 }
-my $optlist  = "dkl:o:";
+my $optlist  = "dkl:o:t:";
 my $debug    = 0;
 my $cancel   = 0;
+my $timeout;
 my $level;
 my $output;
 my $child_pid;			# Child run_linktest process.
@@ -37,6 +39,8 @@ my $child_pid;			# Child run_linktest process.
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL	= "@USERNODE@";
+my $SSH		= "$TB/bin/sshtb";
 
 #
 # Testbed Support libraries
@@ -67,6 +71,16 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"k"})) {
     $cancel = 1;
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+
+    if ($timeout =~ /^(\d*)$/) {
+	$timeout = $1;
+    }
+    else {
+	die("Bad data in timeout: $timeout");
+    }
 }
 if (defined($options{"l"})) {
     $level = $options{"l"};
@@ -209,12 +223,23 @@ if ($child_pid) {
 }
 
 #
-# Child execs run_linktest. 
+# Child execs an ssh to users.emulab.net where linktest is actually run.
+# We tell ssh to allocate a tty so that we can kill it with TERM and have
+# everything die off properly.
 #
-exec "$TB/bin/run_linktest.pl",
-    ("-d", $debug, "-v"),
-    (defined($output) ? ("-o", $output) : ()),
-    ("-l", (defined($level) ? $level : $linktest_level), "-e", "$pid/$eid");
+my $cmd = "$SSH -t -host $CONTROL $TB/bin/run_linktest.pl -v";
+$cmd .= " -d $debug"
+    if ($debug);
+$cmd .= " -t $timeout"
+    if (defined($timeout));
+$cmd .= " -o $output"
+    if (defined($output));
+$cmd .= " -l " . (defined($level) ? $level : $linktest_level);
+$cmd .= " -s ops -e $pid/$eid";
 
+print "Running '$cmd'\n"
+    if ($debug);
+
+exec($cmd);
 die("*** $0:\n".
     "    Could not exec run_linktest.pl\n");

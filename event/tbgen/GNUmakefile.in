@@ -54,7 +54,8 @@ tevc:	tevc.o $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
-install:	$(INSTALL_BINDIR)/tevc
+install:	$(INSTALL_BINDIR)/tevc \
+		$(INSTALL_DIR)/opsdir/bin/tevc
 
 control-install:	$(INSTALL_BINDIR)/tevc
 
@@ -64,3 +65,8 @@ client-install: client
 
 clean:
 	rm -f *.o $(PROGRAMS)
+
+$(INSTALL_DIR)/opsdir/bin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@

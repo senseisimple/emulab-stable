@@ -6,6 +6,124 @@ This file is in the same format at the FreeBSD UPDATING file, whis is
 to say, in reverse chronological order, with the date of the change
 in YYYYMMDD format.
 
+20040816:
+	The event system has moved to users.emulab.net.
+
+	* Install the elvin libraries and daemon on users.emulab.net.
+
+	* Pick up this package:
+
+	     http://boss.emulab.net/downloads/ulsshxmlrpcpp-0.1.0.tar.gz
+
+             cd /someplace
+	     tar zxf ulsshxmlrpcpp-0.1.0.tar.gz
+	     cd ulsshxmlrpcpp-0.1.0
+	     configure
+	     gmake
+	     sudo gmake install
+
+	* Reconfig, rebuild, and reinstall the testbed software on your
+	  boss node.
+
+	* Reconfig, rebuild, and reinstall the testbed software on your
+          users node. 
+
+		ssh users
+		cd /your/object/tree/obj/
+		gmake
+		gmake control-install
+		cd /your/object/tree/obj/event/etc
+		sudo gmake control-install
+
+        * Install the new elvind config file on boss and restart elvind
+          Note that this is not done as part of toplevel install.
+
+		cd /your/object/tree/obj/event/etc
+		sudo gmake install
+		sudo /usr/local/etc/rc.d/2.elvind.sh stop
+		sudo /usr/local/etc/rc.d/2.elvind.sh start
+
+	* Restart tmcd and stated on boss (note that if you plan to just
+	  reboot boss, a lot of these steps can be skipped).
+
+		sudo /usr/testbed/sbin/tmcd.restart
+		sudo kill -USR1 `cat /var/run/stated.pid`
+
+        * Install the elvind config file on users.
+          Note that this is not done as part of toplevel install.
+
+		ssh users
+		cd /your/object/tree/obj/event/etc
+		sudo gmake control-install
+
+	* Install new rc.d file on boss.
+          Note that this is not done as part of toplevel install.
+
+		cd /your/object/tree/obj/rc.d
+		sudo gmake install
+
+        * Install the rc.d file that starts elvind on users.
+          Note that this is not done as part of toplevel install.
+
+		ssh users
+		cd /your/object/tree/obj/rc.d
+		sudo gmake control-install
+
+        * Start the elvin server on users.emulab.net:
+
+		ssh users
+		sudo /usr/local/etc/rc.d/2.elvind.sh
+
+	* Create the ops certificate (on boss) and copy it to your users node.
+
+		cd /your/object/tree/obj/ssl
+		gmake ctrlnode.pem
+		sudo scp ctrlnode.pem users:/etc/emulab/client.pem
+		sudo ssh users chmod 600 /etc/emulab/client.pem
+		sudo scp emulab.pem users:/etc/emulab
+
+        * Install the tmcd client stuff on users.emulab.net.
+
+		ssh users.emulab.net
+		cd /your/object/tree/obj/tmcd/freebsd
+		sudo gmake control-install
+
+        * Create the emulab-ops/opsnode experiment. Do this the same way
+          that hwdown is created in setup-db.txt.
+
+	* Create a node_types entry for ops. This is mostly just a stub
+	  entry so that tmcd will recognize it and so that other parts of
+	  the system are happy. Be sure that you get the interface correct,
+	  and set the Default OSID to emulab-ops/OPSNODE-BSD. The type is
+	  ops and the class is misc.
+
+	* Create the ops node nodes table entry ...
+
+	* Place the ops node into the above experiment:
+
+		wap nalloc emulab-ops opsnode ops
+
+	* Make sure that netcat is installed.
+
+		cd /usr/ports/net/netcat
+		sudo make
+		sudo make install
+		
+	* Add entry to /etc/services for elvin:
+
+		elvin		2917/tcp
+
+	* Change the CNAME event-server to your zone file from boss to ops.
+
+		event-server	IN	CNAME	ops
+
+	* Start the alternate inetd service so that old images trying to
+	  connect to the event server are redirected to users.emulab.net.
+	  Be sure to replace boss.foo.bar with the right name.
+
+		sudo inetd -a boss.foo.bar -p /var/run/testbed-inetd.pid \
+			/usr/testbed/etc/inetd.conf
+
 20040815:
 	After some changes to ptopgen, you'll need to run the following SQL
 	command to keep vnodes working properly:

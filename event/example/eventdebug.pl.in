@@ -15,18 +15,19 @@ use Getopt::Std;
 use strict;
 
 sub usage {
-	warn "Usage: $0 [-s server] [-p port] <event>\n";
+	warn "Usage: $0 [-b] [-s server] [-p port] <event>\n";
 	return 1;
 }
 
 my %opt = ();
-getopt("s:p:h", \%opt);
+getopt("s:p:hb", \%opt);
 
 if ($opt{h}) { exit &usage; }
 if (@ARGV) { exit &usage; }
 
 my ($server,$port);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
+if ($opt{b}) { $port = @BOSSEVENTPORT@ ; }
 if ($opt{p}) { $port = $opt{p}; }
 
 my $URL = "elvin://$server";

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -102,12 +102,12 @@ main(int argc, char **argv)
 	memcpy((char *)&myip, he->h_addr, he->h_length);
 
 	/*
-	 * If server is not specified, then it defaults to BOSSNODE.
+	 * If server is not specified, then it defaults to EVENTSERVER.
 	 * This allows the client to work on either users.emulab.net
 	 * or on a client node. 
 	 */
 	if (!server)
-		server = BOSSNODE;
+		server = EVENTSERVER;
 
 	if (! (he = gethostbyname(server))) {
 		fatal("could not get IP address for server: %s", server);

@@ -137,12 +137,12 @@ main(int argc, char **argv)
 	}
 
 	/*
-	 * If server is not specified, then it defaults to BOSSNODE.
+	 * If server is not specified, then it defaults to localhost.
 	 * This allows the client to work on either users.emulab.net
 	 * or on a client node. 
 	 */
 	if (!server)
-		server = BOSSNODE;
+		server = "localhost";
 
 	/*
 	 * Convert server/port to elvin thing.

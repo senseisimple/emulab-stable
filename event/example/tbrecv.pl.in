@@ -26,7 +26,7 @@ if ($opt{h}) { exit &usage; }
 if (@ARGV) { exit &usage; }
 
 my ($server,$port);
-if ($opt{s}) { $server = $opt{s}; } else { $server = "boss"; }
+if ($opt{s}) { $server = $opt{s}; } else { $server = "localhost"; }
 if ($opt{p}) { $port = $opt{p}; }
 
 my $URL = "elvin://$server";

@@ -50,6 +50,7 @@ use constant PATH_PATHRATE_RCV => "/usr/local/bin/pathrate_rcv";
 use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
 use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
 use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
+use constant EVENTSERVER => "@EVENTSERVER@";
 
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
@@ -140,7 +141,6 @@ my $debug_level = 0; # enable debug statements
                     # 1 = print debug statements.
                     # 2 = show STDOUT and STDERR
 my $barr_count;   # used by synserv host, nubmer of hosts -1
-my $event_server;       # event server
 my $log_file;    # common logfile for information saved over time.
 
 my @hosts; # hosts: list of text strings containing host names.
@@ -231,16 +231,6 @@ die("Could not locate an emulab-sync server\n") unless -e $ssname;
 @results = &read_file($ssname);
 ($synserv) = split/\./, $results[0];
 chomp $synserv;
-
-#
-# Execute tmcc to find out the name of the event server.
-#
-@results = &my_tick("@CLIENT_BINDIR@/tmcc","bossinfo");
-if(@results && $results[0] =~ /^([\w\.]*)\s/) {
-    $event_server = $1; 
-} else {
-    die("Could not determine event server name\n");
-}
 
 #
 # If the current node is the special node (arbitrarily the sync
@@ -931,7 +921,6 @@ sub get_topo {
 # prints out the topology read in from the NS file
 sub debug_top {
     &debug("ns script: $ns_file\n");
-    &debug("event server: $event_server\n");
     &debug("nodes:\n");
     foreach my $vert (@hosts) {
 	&debug( " " . $vert . "\n");
@@ -1102,7 +1091,7 @@ sub post_event {
     if($hostname eq $synserv) {
 	system(PATH_LTEVENT,
 		   "-s",
-		   $event_server,
+		   EVENTSERVER,
 		   "-e",
 		   "$proj_id/$exp_id",
 		   "-k", 

@@ -39,7 +39,7 @@ sub TB_OPSEMAIL()	{ $TBOPSEMAIL; }
 
 # This is for the swigged event library which includes this file.
 sub TB_BOSSEVENTPORT()  { "@BOSSEVENTPORT@"; }
-sub TB_EVENTSERVER()    { "@EVENTSERVER@"; }
+sub TB_EVENTSERVER()    { "@EVENTSERVER@" . "." . "@OURDOMAIN@"; }
 
 # Untainted scriptname for email below.
 if ($PROGRAM_NAME =~ /^([-\w\.\/]+)$/) {

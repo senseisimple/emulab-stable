@@ -124,8 +124,21 @@ main(int argc, char **argv)
 	 * This allows the client to work on either users.emulab.net
 	 * or on a client node. 
 	 */
-	if (!server)
-		server = BOSSNODE;
+	if (!server) {
+		/*
+		 * We should kill the control events from tevc; nothing
+		 * uses it to send control events. Note that since the
+		 * event port on boss is firewalled, you have to be on boss
+		 * to use tevc to send a control event.
+		 */
+		if (control)
+			server = "localhost";
+		else
+			server = EVENTSERVER;
+	}
+	if (!port && control) {
+		port = BOSSEVENTPORT;
+	}
 
 	/*
 	 * Convert server/port to elvin thing.
@@ -171,17 +184,20 @@ main(int argc, char **argv)
 				temp, bp);
 			keyfile = keyfilebuf;
 		}
+
+		/*
+		 * Make sure the keyfile exists and is readable.
+		 */
+		if (access(keyfile, R_OK) < 0) {
+			pfatal("Could not read %s", keyfile);
+		}
 	}
 
-	/*
-	 * Make sure the keyfile exists and is readable.
-	 */
-	if (access(keyfile, R_OK) < 0) {
-		pfatal("Could not read %s", keyfile);
-	}
-	
 	/* Register with the event system: */
-	handle = event_register_withkeyfile(server, 0, keyfile);
+	if (control)
+		handle = event_register(server, 0);
+	else
+		handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}

@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -369,7 +369,7 @@ int main (int argc, char **argv) {
 	bzero(filenames,sizeof(filenames));
 	filetime = 1000;
 #ifdef EMULAB
-	event_server = BOSSNODE;
+	event_server = "localhost";
 #else
 	event_server = NULL;
 #endif

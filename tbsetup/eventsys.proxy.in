@@ -1,0 +1,215 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Errno;
+use POSIX ":sys_wait_h";
+    
+#
+# A wrapper for controlling the event scheduler from boss. 
+#
+# The first argument option is the user to run this script as, since we
+# get invoked by a root ssh from boss. 
+#
+#
+sub usage()
+{
+    print "Usage: eventsys.proxy -u user -g gid -e pid/eid -k keyfile ".
+	"-l logfile start|stop|replay\n";
+    exit(-1);
+}
+my $optlist = "u:e:k:dl:g:";
+my $debug   = 0;
+my $user;
+my $pid;
+my $eid;
+my $gid;
+my $keyfile;
+my $logfile;
+my $action;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $sched    = "$TB/sbin/event-sched";
+my $PIDDIR   = "/var/run/emulab/evsched";
+my $PIDFILE;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 1) {
+    usage();
+}
+if (! defined($options{"u"}) ||
+    ! defined($options{"e"}) ||
+    ! defined($options{"g"}) ||
+    ! defined($options{"l"}) ||
+    ! defined($options{"k"})) {
+    usage();
+}    
+	    
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+$logfile    = $options{"l"};
+$keyfile    = $options{"k"};
+$user       = $options{"u"};
+$gid        = $options{"g"};
+$action     = $ARGV[0];
+
+if ($options{"e"} =~ /^([-\w]*)\/([-\w]*)$/) {
+    $pid = $1;
+    $eid = $2;
+}
+else {
+    usage();
+}
+$PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
+
+#
+# Deal with stop and replay.
+#
+if ($action eq "stop" || $action eq "replay") {
+    if (-e $PIDFILE) {    
+	my $epid = `cat $PIDFILE`;
+	# untaint
+	if ($epid =~ /^(\d*)$/) {
+	    $epid = $1;
+	}
+	else {
+	    die("*** $0:\n".
+		"    Bad data in pid: $epid!\n");
+	}
+	unlink($PIDFILE);
+
+	if (kill($epid, 0) == 0 || $Errno::errno != $Errno::ESRCH) {
+	    if (! kill('TERM', $epid)) {
+		die("*** $0:\n".
+		    "Failed to stop event system for $pid/$eid!\n");
+	    }
+	}
+    }
+    
+    if ($action eq "stop") {
+	exit(0);
+    }
+    # replay continues below, but give exiting scheduler a chance to react!
+    sleep(1);
+}
+
+#
+# Make sure the pid directory exists.
+#
+if (! -d $PIDDIR) {
+    if (system("mkdir -p -m 775 $PIDDIR")) {
+	die("*** $0:\n".
+	    "    Could not mkdir $PIDDIR\n");
+    }
+}
+
+#
+# Okay, now flip to user before running the event scheduler. Must put the
+# user into both the project group and the experiment subgroup.
+#
+my (undef,undef,$unix_uid) = getpwnam($user) or
+    die("*** $0:\n".
+	"    No such user $user\n");
+
+my (undef,undef,$unix_ggid) = getgrnam($gid) or
+    die("*** $0:\n".
+	"    No such group $gid\n");
+
+my (undef,undef,$unix_pgid) = getgrnam($pid) or
+    die("*** $0:\n".
+	"    No such group $pid\n");
+
+#
+# Create a chile whose output is directed into the logfile. Parents waits
+# a moment and then exits.
+#
+if (-e $logfile) {
+    system("mv -f $logfile ${logfile}.old");
+}
+
+if (my $childpid = TBBackGround($logfile)) {
+    #
+    # Delay a moment, and they look for an exit status. This is intended
+    # to catch startup problems.
+    #
+    sleep(1);
+    my $foo = waitpid($childpid, &WNOHANG);
+    if ($foo) {
+	my $status = $?;
+	unlink($PIDFILE);
+
+	system("cat $logfile")
+	    if (-s $logfile);
+	
+	die("*** $0:\n".
+	    "    Failed to start event system for $pid/$eid: $foo $status!\n");
+    }
+    exit(0);
+}
+
+#
+# Write out a pid file just prior to doing the exec. The user is not granted
+# access to this pid file.
+#
+if (system("echo '$PID' > $PIDFILE")) {
+    die("*** $0:\n".
+	"    Could not create $PIDFILE!");
+}
+
+# Flip to user and never go back!
+$GID            = $unix_ggid;
+$EGID           = "$unix_ggid $unix_ggid $unix_pgid";
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = $user;
+$ENV{'LOGNAME'} = $user;
+
+# And run it.
+exec("$sched " . ($debug ? "-d" : "") . " -s localhost -k $keyfile $pid $eid");
+die("*** $0:\n".
+    "    Could not exec $sched!");
+

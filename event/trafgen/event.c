@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -77,7 +77,7 @@ void
 tgevent_init(int argc, char *argv[])
 {
 	address_tuple_t	tuple;
-	char *server = NULL;
+	char *server = "localhost";
 	char *port = NULL;
 	char *ipaddr = NULL;
 	char *myname = NULL;

@@ -106,9 +106,10 @@ _tbevent.so:	event.o event_wrap_py.o util.o
 
 LIB_STUFF       = event.pm event.so tbevent.py _tbevent.so
 
-install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
+install: $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/lib/, $(LIB_STUFF))
 
-control-install:	install
+control-install:	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 
 #
 # Right now we don't bother with the dynamic libs since all of the existing
@@ -129,3 +130,8 @@ client-libinstall:
 
 clean:
 	/bin/rm -f *.o libevent.a libevent_r.a *.so *.py swig-pywrappers
+
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL) $< $@

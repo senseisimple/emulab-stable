@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -30,9 +30,11 @@ my  $optlist = "df";
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
-my $BOSSADDR	= "@BOSSNODE@";
+my $CONTROL     = "@USERNODE@";
 my $EVENTSYS    = @EVENTSYS@;
 my $TESTMODE    = @TESTMODE@;
+my $UNIFIED     = @UNIFIED_BOSS_AND_OPS@;
+my $DBIFACE     = 0;
 
 #
 # The event system is currently optional.
@@ -45,8 +47,13 @@ if (! $EVENTSYS) {
 # Do nothing when testing.
 #
 if ($TESTMODE) {
-    print "Testing run - no event system.\n";
-    exit(0);
+#    print "Testing run - no event system.\n";
+#    exit(0);
+}
+
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
 }
 
 #
@@ -65,10 +72,11 @@ $| = 1;
 $ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
-my $evsched	= "$TB/sbin/event-sched";
-my $debug	= 0;
+my $proxy	= "$TB/sbin/eventsys.proxy";
+my $debug	= 1;
 my $force       = 0;
 my $expstate;
+my $dbuid;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -94,9 +102,10 @@ my $eid    = $ARGV[2];
 #
 # Untaint args.
 #
-if ($action ne "start" &&
-    $action ne "replay" &&
-    $action ne "stop") {
+if ($action =~ /^(start|stop|replay)$/) {
+    $action = $1;
+}
+else {
     usage();
 }
 if ($pid =~ /^([-\@\w]+)$/) {
@@ -115,6 +124,11 @@ else {
 if (! ($expstate = ExpState($pid, $eid))) {
     die("*** $0:\n".
 	"    No such experiment $pid/$eid!\n");
+}
+
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database!\n");
 }
 
 #
@@ -139,127 +153,36 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
 }
 
 #
-# If stopping, find the pid from the DB and send it a kill.
+# If being asked to start the event system, but there are no nodes in
+# the experiment, balk unless force mode is on.
 #
-if ($action eq "stop" ||
-    $action eq "replay") {
-    #
-    # Simple protocol to prevent concurrent manipulation; If there is a pid
-    # set it to -pid to prevent another start/stop operation. The event
-    # scheduler itself will catch the signal and clear the pid to 0 when it
-    # exits, thus releasing the scheduler. 
-    # 
-    DBQueryFatal("lock tables experiments write");
-
-    $query_result =
-	DBQueryFatal("select event_sched_pid from experiments ".
-		     "where pid='$pid' and eid='$eid'");
-    
-    DBQueryFatal("update experiments set ".
-		 "event_sched_pid=-event_sched_pid ".
-		 "where pid='$pid' and eid='$eid'");
-		 
-    DBQueryWarn("unlock tables");
-
-    my @row    = $query_result->fetchrow_array();
-    my $procid = $row[0];
-
-    if ($procid > 0 &&
-	! kill('TERM', $procid)) {
-	DBQueryFatal("update experiments set ".
-		     "event_sched_pid=-event_sched_pid ".
-		     "where pid='$pid' and eid='$eid'");
-	
-	SENDMAIL($TBOPS,
-		 "Failed to stop event system for $pid/$eid",
-		 "Could not kill(TERM) process $procid: $? $!");
-
-	die("*** $0:\n".
-	    "Failed to stop event system for $pid/$eid!\n");
-    }
-    
-    if ($action eq "stop") {
-	if ($procid <= 0) {
-	    print "There is no event scheduler running for $pid/$eid!\n";
-	}
-	exit(0);
-    }
-    # replay continues below, but give exiting scheduler a chance to react!
-    sleep(1);
-}
-
-#
-# Otherwise, flip back to actual UID since no special privilege is
-# needed to start/run the event scheduler.
-#
-$EUID=$UID;
-
-#
-# Check for a running scheduler, This is a loose check since its the users 
-# responsibility to make sure that they don't try and do two things
-# at the same time. All that *really* matters is that we do not start two
-# at a time, and that we make sure we kill off existing ones (making sure
-# the pid is not cleared from the DB unless it really does die). This is
-# handled by the stop code above. For start, just check for zero pid.
-# The scheduler itself will lock the table to prevent concurrent startup.
-# 
-$query_result =
-    DBQueryFatal("select event_sched_pid,path from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-my @row    = $query_result->fetchrow_array();
-my $procid = $row[0];
-my $path   = $row[1];
-
-if ($procid != 0) {
-    die("*** $0:\n".
-	"There is already an event scheduler running for $pid/$eid!\n");
-}
-
-#
-# Do not start an event system for experiments with no nodes
-#
-if (! ExpNodes($pid, $eid)) {
+if ($action eq "start" && !$force && !ExpNodes($pid, $eid)) {
     print("*** There are no nodes in $pid/$eid. ".
 	  "Not starting a scheduler.\n");
     exit(0);
 }
 
 #
-# For now, lets not start an event system if there are no events.
+# Pase the whole thing off to the proxy, which might be local when running
+# in UNIFIED_BOSS_AND_OPS mode. Become real root either way; the proxy will
+# flip back. 
 #
-if (0) {
-    $query_result =
-	DBQueryFatal("select distinct pid,eid from eventlist ".
-		     "where pid='$pid' and eid='$eid'");
+my $cmd = $proxy;
+$cmd .= " -d"
+    if ($debug);
+$cmd .= " -l " . TBExptUserDir($pid, $eid) . "/logs/event-sched.log";
+$cmd .= " -k " . TBDB_EVENTKEY($pid, $eid);
+$cmd .= " -g " . ExpGroup($pid, $eid);
+$cmd .= " -e $pid/$eid";
+$cmd .= " -u $dbuid";
+$cmd .= " $action";
 
-    if (! $query_result->numrows) {
-	print("*** There are no events for $pid/$eid. ".
-	      "Not starting a scheduler.\n");
-	exit(0);
-    }
+$UID=0;
+if ($UNIFIED || $DBIFACE) {
+    exec($cmd);
 }
-
-#
-# start the event scheduler, redirecting output to the experiment
-# directory. 
-#
-if (my $childpid = TBBackGround("$path/logs/event-sched.log")) {
-    #
-    # Delay just in case. The event scheduler needs to be turned into
-    # a proper daemon so we can avoid this sillyness (wanting to report
-    # startup error immediately to caller).
-    #
-    sleep(1);
-    my $foo = waitpid($childpid, &WNOHANG);
-    if ($foo) {
-	print STDERR "Failed to start event system for $pid/$eid: $foo $?!\n";
-	SENDMAIL($TBOPS,
-		 "Event System Failure: $pid/$eid!",
-		 "Failed to start event system for $pid/$eid",
-		 undef, undef, "$path/logs/event-sched.log");
-	exit(-1);
-    }
-    exit(0);
+else {
+    exec("sshtb -host $CONTROL $cmd");
 }
-system("$evsched -dd -s $BOSSADDR -k ".TBDB_EVENTKEY($pid,$eid)." $pid $eid");
-exit($? >> 0);
+die("*** $0:\n".
+    "    Could not exec '$cmd'\n");

@@ -12,9 +12,7 @@ use POSIX;
 
 #
 # Wrapper for running the linktest daemon. This script is currently
-# setup so it can run on either boss (or ops via plasticwrap), or from
-# an experimental node. Hence the odd paths and ltevent aux program,
-# which is not really on boss. Also not use of tmcc to find the server. 
+# setup so it can run on either ops or from an experimental node.
 #
 sub usage()
 {
@@ -44,8 +42,7 @@ my $stopAt = 4 ; # default stop level
 my $TB          = "@prefix@";
 my $TMCC	= "@CLIENT_BINDIR@/tmcc";
 my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
-my $LTEVENTBOSS = "$TB/libexec/ltevent";
-my $BOSSNODE    = "@BOSSNODE@";
+my $LTEVENTOPS  = "$TB/libexec/ltevent";
 my $STOPEVENT   = "STOP";
 my $KILLEVENT   = "KILL";
 my $REPORTEVENT   = "REPORT";
@@ -182,24 +179,10 @@ else {
 
 
 #
-# Need to figure out the elvind server. Since this script runs on boss
-# and on experimental nodes, do something gross!
+# Default to the standard event server.
 #
 if (!defined($server)) {
-    if (-x $TMCC) {
-	my $results = `$TMCC bossinfo`;
-	if ($results =~ /^([\w\.]*)\s/) {
-	    $server = $1; 
-	}
-	else {
-	    die("*** $0:\n".
-		"    Bad data in server: $results\n");
-	}
-    }
-    else {
-	# We can do this on boss/ops, but not on experimental node.
-	$server = $BOSSNODE;
-    }
+    $server = "@EVENTSERVER@";
 }
 
 #
@@ -352,6 +335,9 @@ sub analyze {
     @dir_contents = grep(/\.fatal$|\.error$/, readdir(DIR));
     closedir(DIR);
 
+    unlink($logfile)
+	if (defined($logfile));
+
     foreach my $file (@dir_contents) {
 	# Hmm, need to taint check the filenames. Ick.
 	if ($file =~ /^([-\w\.\/]+)$/) {
@@ -361,7 +347,7 @@ sub analyze {
 	    die("*** $0:\n".
 		"    Bad data in filename: $file\n");
 	}
-	if(defined($options{"o"})) {
+	if (defined($logfile)) {
 	    open LOG_FILE, ">>$logfile" || 
 		die "Could not open $logfile for append: $!";
 
@@ -383,8 +369,8 @@ sub analyze {
 sub starter {
     my $cmd;
 
-    if (-x $LTEVENTBOSS) {
-	$cmd = $LTEVENTBOSS;
+    if (-x $LTEVENTOPS) {
+	$cmd = $LTEVENTOPS;
     }
     else {
 	$cmd = $LTEVENT;
