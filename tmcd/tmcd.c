@@ -75,7 +75,9 @@
 #define DEFAULT_DBNAME	TBDBNAME
 
 int		debug = 0;
+static int	verbose = 0;
 static int	insecure = 0;
+static int	byteswritten = 0;
 static char     dbname[DBNAME_SIZE];
 static struct in_addr myipaddr;
 static char	fshostid[HOSTID_SIZE];
@@ -97,6 +99,7 @@ static int	safesymlink(char *name1, char *name2);
 #define MINCHILDREN	5
 static int	numchildren;
 static int	maxchildren = 10;
+static int	mypid;
 static volatile int killme;
 
 /*
@@ -242,6 +245,21 @@ cleanup()
 	killpg(0, SIGHUP);
 }
 
+static void
+setverbose(int sig)
+{
+	signal(sig, SIG_IGN);
+	
+	if (sig == SIGUSR1)
+		verbose = 1;
+	else
+		verbose = 0;
+	/* Just the parent sends this */
+	if (numchildren)
+		killpg(0, sig);
+	signal(sig, setverbose);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -254,7 +272,7 @@ main(int argc, char **argv)
 	struct hostent		*he;
 	extern char		build_info[];
 
-	while ((ch = getopt(argc, argv, "dp:c:X")) != -1)
+	while ((ch = getopt(argc, argv, "dp:c:Xv")) != -1)
 		switch(ch) {
 		case 'p':
 			portnum = atoi(optarg);
@@ -267,6 +285,9 @@ main(int argc, char **argv)
 			break;
 		case 'X':
 			insecure = 1;
+			break;
+		case 'v':
+			verbose++;
 			break;
 		case 'h':
 		case '?':
@@ -358,14 +379,17 @@ main(int argc, char **argv)
 	signal(SIGTERM, cleanup);
 	signal(SIGINT, cleanup);
 	signal(SIGHUP, cleanup);
+	signal(SIGUSR1, setverbose);
+	signal(SIGUSR2, setverbose);
 
 	/*
 	 * Stash the pid away.
 	 */
+	mypid = getpid();
 	sprintf(buf, "%s/tmcd.pid", _PATH_VARRUN);
 	fp = fopen(buf, "w");
 	if (fp != NULL) {
-		fprintf(fp, "%d\n", getpid());
+		fprintf(fp, "%d\n", mypid);
 		(void) fclose(fp);
 	}
 
@@ -394,6 +418,10 @@ main(int argc, char **argv)
 				numchildren++;
 				continue;
 			}
+			/* Poor way of knowing parent/child */
+			numchildren = 0;
+			mypid = getpid();
+			
 			/* Child does useful work! Never Returns! */
 			signal(SIGTERM, SIG_DFL);
 			signal(SIGINT, SIG_DFL);
@@ -419,11 +447,14 @@ main(int argc, char **argv)
 		if (pid < 0) {
 			errorc("waitpid failed");
 			continue;
+		} 
+		if (WIFSIGNALED(status)) {
+			error("server %d exited with signal %d!\n",
+			      pid, WTERMSIG(status));
 		}
-		if( WIFSIGNALED(status) ) {
-		  error("server %d exited with signal %d!\n", pid, WTERMSIG(status));
-		} else if( WIFEXITED(status) ) {
-		  error("server %d exited with status %d!\n", pid, WEXITSTATUS(status));	  
+		else if (WIFEXITED(status)) {
+			error("server %d exited with status %d!\n",
+			      pid, WEXITSTATUS(status));	  
 		}
 		numchildren--;
 		for (i = 0; i < (sizeof(foo)/sizeof(int)); i++) {
@@ -527,7 +558,7 @@ udpserver(int sock)
 	struct sockaddr_in	client;
 	int			length, cc;
 	
-	info("udpserver starting: pid=%d sock=%d\n", getpid(), sock);
+	info("udpserver starting: pid=%d sock=%d\n", mypid, sock);
 
 	/*
 	 * Wait for udp connections.
@@ -558,7 +589,7 @@ tcpserver(int sock)
 	struct sockaddr_in	client;
 	int			length, cc, newsock;
 	
-	info("tcpserver starting: pid=%d sock=%d\n", getpid(), sock);
+	info("tcpserver starting: pid=%d sock=%d\n", mypid, sock);
 
 	/*
 	 * Wait for TCP connections.
@@ -598,7 +629,6 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	int		   i, err = 0;
 	int		   version = DEFAULT_VERSION;
 	tmcdreq_t	   tmcdreq, *reqp = &tmcdreq;
-
 
 	/*
 	 * Init the req structure.
@@ -709,8 +739,9 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		
 		strcpy(buf1, inet_ntoa(redirect_client.sin_addr));
 		strcpy(buf2, inet_ntoa(client->sin_addr));
-			
-		info("%s INVALID REDIRECT: %s\n", buf1, buf2);
+
+		if (verbose)
+			info("%s INVALID REDIRECT: %s\n", buf1, buf2);
 		goto skipit;
 	}
 
@@ -817,21 +848,24 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	/*
 	 * Execute it.
 	 */
+	byteswritten = 0;
 #ifdef	WITHSSL
-	cp = isssl ? "ssl:yes" : "ssl:no";
+	cp = (isssl ? "SSL" : (istcp ? "TCP" : "UDP"));
 #else
-	cp = "";
+	cp = (istcp ? "TCP" : "UDP");
 #endif
 	/*
 	 * XXX hack, don't log "log" contents,
 	 * both for privacy and to keep our syslog smaller.
 	 */
 	if (command_array[i].func == dolog)
-		info("%s: vers:%d %s %s log %d chars\n", reqp->nodeid, version,
-		     istcp ? "TCP" : "UDP", cp, strlen(rdata));
-	else
-		info("%s: vers:%d %s %s %s\n", reqp->nodeid, version,
-		     istcp ? "TCP" : "UDP", cp, command_array[i].cmdname);
+		info("%s: pid:%d vers:%d %s log %d chars\n",
+		     reqp->nodeid, mypid, version,
+		     cp, strlen(rdata));
+	else if (command_array[i].func != doisalive || verbose)
+		info("%s: pid:%d vers:%d %s %s\n", reqp->nodeid,
+		     mypid, version,
+		     cp, command_array[i].cmdname);
 
 	err = command_array[i].func(sock, reqp, rdata, istcp, version);
 
@@ -843,6 +877,11 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 	if (!istcp) 
 		client_writeback_done(sock,
 				      redirect ? &redirect_client : client);
+	if (byteswritten)
+		info("%s: pid:%d %s wrote %d bytes\n",
+		     reqp->nodeid, mypid, command_array[i].cmdname,
+		     byteswritten);
+
 	return 0;
 }
 
@@ -891,7 +930,8 @@ COMMAND_PROTOTYPE(dostatus)
 		reqp->pid, reqp->eid, reqp->nickname);
 	client_writeback(sock, buf, strlen(buf), tcp);
 
-	info("STATUS: %s: %s", reqp->nodeid, buf);
+	if (verbose)
+		info("STATUS: %s: %s", reqp->nodeid, buf);
 	return 0;
 }
 
@@ -909,7 +949,8 @@ COMMAND_PROTOTYPE(doifconfig)
 	 * Now check reserved table
 	 */
 	if (! reqp->allocated) {
-		info("IFCONFIG: %s: Node is free\n", reqp->nodeid);
+		if (verbose)
+			info("IFCONFIG: %s: Node is free\n", reqp->nodeid);
 		return 1;
 	}
 
@@ -992,7 +1033,8 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			strcat(buf, "\n");
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("IFCONFIG: %s", buf);
+			if (verbose)
+				info("IFCONFIG: %s", buf);
 		}
 	skipit:
 		nrows--;
@@ -1048,7 +1090,8 @@ COMMAND_PROTOTYPE(doifconfig)
 			row[3] ? row[3] : "none");
 
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("IFCONFIG: %s", buf);
+		if (verbose)
+			info("IFCONFIG: %s", buf);
 		nrows--;
 	}
 	mysql_free_result(res);
@@ -1147,7 +1190,8 @@ COMMAND_PROTOTYPE(doaccounts)
 		gidint = atoi(row[1]);
 		sprintf(buf, "ADDGROUP NAME=%s GID=%d\n", row[0], gidint);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("ACCOUNTS: %s", buf);
+		if (verbose)
+			info("ACCOUNTS: %s", buf);
 
 		nrows--;
 	}
@@ -1418,10 +1462,11 @@ COMMAND_PROTOTYPE(doaccounts)
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 
-		info("ACCOUNTS: "
-		     "ADDUSER LOGIN=%s "
-		     "UID=%s GID=%d ROOT=%d GLIST=%s\n",
-		     row[0], row[2], gidint, root, glist);
+		if (verbose)
+			info("ACCOUNTS: "
+			     "ADDUSER LOGIN=%s "
+			     "UID=%s GID=%d ROOT=%d GLIST=%s\n",
+			     row[0], row[2], gidint, root, glist);
 
 		if (vers < 5)
 			goto skipkeys;
@@ -1450,8 +1495,10 @@ COMMAND_PROTOTYPE(doaccounts)
 				client_writeback(sock, buf, strlen(buf), tcp);
 				pubkeys_nrows--;
 
-				info("ACCOUNTS: PUBKEY LOGIN=%s IDX=%s\n",
-				     row[0], pubkey_row[0]);
+				if (verbose)
+					info("ACCOUNTS: PUBKEY LOGIN=%s "
+					     "IDX=%s\n",
+					     row[0], pubkey_row[0]);
 			}
 		}
 		mysql_free_result(pubkeys_res);
@@ -1483,8 +1530,10 @@ COMMAND_PROTOTYPE(doaccounts)
 				client_writeback(sock, buf, strlen(buf), tcp);
 				sfskeys_nrows--;
 
-				info("ACCOUNTS: SFSKEY LOGIN=%s COMMENT=%s\n",
-				     row[0], sfskey_row[0]);
+				if (verbose)
+					info("ACCOUNTS: SFSKEY LOGIN=%s "
+					     "COMMENT=%s\n",
+					     row[0], sfskey_row[0]);
 			}
 		}
 		mysql_free_result(sfskeys_res);
@@ -1626,7 +1675,8 @@ COMMAND_PROTOTYPE(dodelay)
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
-		info("DELAY: %s", buf);
+		if (verbose)
+			info("DELAY: %s", buf);
 	}
 	mysql_free_result(res);
 
@@ -1716,7 +1766,8 @@ COMMAND_PROTOTYPE(dolinkdelay)
 			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
-		info("LINKDELAY: %s", buf);
+		if (verbose)
+			info("LINKDELAY: %s", buf);
 	}
 	mysql_free_result(res);
 
@@ -2133,7 +2184,8 @@ COMMAND_PROTOTYPE(dorpms)
 
 		sprintf(buf, "RPM=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("RPM: %s", buf);
+		if (verbose)
+			info("RPM: %s", buf);
 		
 	} while ((bp = sp));
 	
@@ -2192,7 +2244,8 @@ COMMAND_PROTOTYPE(dotarballs)
 
 		sprintf(buf, "DIR=%s TARBALL=%s\n", bp, tp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("TARBALLS: %s", buf);
+		if (verbose)
+			info("TARBALLS: %s", buf);
 		
 	} while ((bp = sp));
 	
@@ -2247,7 +2300,8 @@ COMMAND_PROTOTYPE(dodeltas)
 
 		sprintf(buf, "DELTA=%s\n", bp);
 		client_writeback(sock, buf, strlen(buf), tcp);
-		info("DELTAS: %s", buf);
+		if (verbose)
+			info("DELTAS: %s", buf);
 		
 	} while ((bp = sp));
 	
@@ -2299,7 +2353,8 @@ COMMAND_PROTOTYPE(dostartcmd)
 	sprintf(buf, "CMD='%s' UID=%s\n", row[0], reqp->swapper);
 	mysql_free_result(res);
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("STARTUPCMD: %s", buf);
+	if (verbose)
+		info("STARTUPCMD: %s", buf);
 	
 	return 0;
 }
@@ -2314,10 +2369,8 @@ COMMAND_PROTOTYPE(dostartstat)
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
-	if (!reqp->allocated) {
-		info("STARTSTAT: %s: Node is free\n", reqp->nodeid);
+	if (!reqp->allocated)
 		return 0;
-	}
 
 	/*
 	 * Dig out the exit status
@@ -2327,10 +2380,11 @@ COMMAND_PROTOTYPE(dostartstat)
 		      reqp->nodeid, rdata);
 		return 1;
 	}
-	
-	info("STARTSTAT: "
-	     "%s is reporting startup command exit status: %d\n",
-	     reqp->nodeid, exitstatus);
+
+	if (verbose)
+		info("STARTSTAT: "
+		     "%s is reporting startup command exit status: %d\n",
+		     reqp->nodeid, exitstatus);
 
 	/*
 	 * Update the node table record with the exit status. Setting the
@@ -2355,7 +2409,6 @@ COMMAND_PROTOTYPE(doready)
 	 * Make sure currently allocated to an experiment!
 	 */
 	if (!reqp->allocated) {
-		info("READY: %s: Node is free\n", reqp->nodeid);
 		return 0;
 	}
 
@@ -2369,7 +2422,8 @@ COMMAND_PROTOTYPE(doready)
 		return 1;
 	}
 
-	info("READY: %s: Node is reporting ready\n", reqp->nodeid);
+	if (verbose)
+		info("READY: %s: Node is reporting ready\n", reqp->nodeid);
 
 	/*
 	 * Nothing is written back
@@ -2390,10 +2444,8 @@ COMMAND_PROTOTYPE(doreadycount)
 	/*
 	 * Make sure currently allocated to an experiment!
 	 */
-	if (!reqp->allocated) {
-		info("READYCOUNT: %s: Node is free\n", reqp->nodeid);
+	if (!reqp->allocated)
 		return 0;
-	}
 
 	/*
 	 * See how many are ready. This is a non sync protocol. Clients
@@ -2425,8 +2477,9 @@ COMMAND_PROTOTYPE(doreadycount)
 
 	sprintf(buf, "READY=%d TOTAL=%d\n", ready, total);
 	client_writeback(sock, buf, strlen(buf), tcp);
-		
-	info("READYCOUNT: %s: %s", reqp->nodeid, buf);
+
+	if (verbose)
+		info("READYCOUNT: %s: %s", reqp->nodeid, buf);
 
 	return 0;
 }
@@ -2447,7 +2500,8 @@ COMMAND_PROTOTYPE(dolog)
 	 * Find the pid/eid of the requesting node
 	 */
 	if (!reqp->allocated) {
-		info("LOG: %s: Node is free\n", reqp->nodeid);
+		if (verbose)
+			info("LOG: %s: Node is free\n", reqp->nodeid);
 		return 1;
 	}
 
@@ -2507,7 +2561,7 @@ COMMAND_PROTOTYPE(domounts)
 			break;
 		}
 
-		if (debug) {
+		if (verbose) {
 			if (usesfs) {
 				info("Using SFS\n");
 			}
@@ -2542,6 +2596,7 @@ COMMAND_PROTOTYPE(domounts)
 		sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
 			FSPROJDIR, reqp->pid, PROJDIR, reqp->pid);
 		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 		
 #ifdef FSSHAREDIR
@@ -2550,6 +2605,7 @@ COMMAND_PROTOTYPE(domounts)
 		 */
 		sprintf(buf, "REMOTE=%s LOCAL=%s\n",FSSHAREDIR, SHAREDIR);
 		client_writeback(sock, buf, strlen(buf), tcp);
+		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 #endif
 		/*
@@ -2561,6 +2617,7 @@ COMMAND_PROTOTYPE(domounts)
 				FSGROUPDIR, reqp->pid, reqp->gid,
 				GROUPDIR, reqp->pid, reqp->gid);
 			client_writeback(sock, buf, strlen(buf), tcp);
+			/* Leave this logging on all the time for now. */
 			info("MOUNTS: %s", buf);
 		}
 	}
@@ -2576,7 +2633,8 @@ COMMAND_PROTOTYPE(domounts)
 				fshostid, FSDIR_PROJ, reqp->pid,
 				PROJDIR, reqp->pid);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("MOUNTS: %s", buf);
+			if (verbose)
+				info("MOUNTS: %s", buf);
 
 			/*
 			 * Return SFS-based group mount.
@@ -2597,7 +2655,8 @@ COMMAND_PROTOTYPE(domounts)
 			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s\n",
 				fshostid, FSDIR_SHARE, SHAREDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("MOUNTS: %s", buf);
+			if (verbose)
+				info("MOUNTS: %s", buf);
 #endif
 			/*
 			 * Return a mount for "certprog dirsearch"
@@ -2627,7 +2686,8 @@ COMMAND_PROTOTYPE(domounts)
 			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
 				fshostid, FSDIR_GROUPS, NETBEDDIR, GROUPDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("MOUNTS: %s", buf);
+			if (verbose)
+				info("MOUNTS: %s", buf);
 
 			/*
 			 * Pointer to /users
@@ -2635,7 +2695,8 @@ COMMAND_PROTOTYPE(domounts)
 			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
 				fshostid, FSDIR_USERS, NETBEDDIR, USERDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("MOUNTS: %s", buf);
+			if (verbose)
+				info("MOUNTS: %s", buf);
 #ifdef FSSHAREDIR
 			/*
 			 * Pointer to /share.
@@ -2643,7 +2704,8 @@ COMMAND_PROTOTYPE(domounts)
 			sprintf(buf, "SFS REMOTE=%s%s LOCAL=%s%s\n",
 				fshostid, FSDIR_SHARE, NETBEDDIR, SHAREDIR);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("MOUNTS: %s", buf);
+			if (verbose)
+				info("MOUNTS: %s", buf);
 #endif
 		}
 	}
@@ -2718,6 +2780,7 @@ COMMAND_PROTOTYPE(domounts)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
+		/* Leave this logging on all the time for now. */
 		info("MOUNTS: %s", buf);
 	}
 	mysql_free_result(res);
@@ -2852,7 +2915,8 @@ COMMAND_PROTOTYPE(dorouting)
 	mysql_free_result(res);
 
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("ROUTES: %s", buf);
+	if (verbose)
+		info("ROUTES: %s", buf);
 
 	/*
 	 * Get the routing type from the nodes table.
@@ -2979,7 +3043,8 @@ COMMAND_PROTOTYPE(doloadinfo)
 	mysql_free_result(res);
 	
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("doloadinfo: %s", buf);
+	if (verbose)
+		info("doloadinfo: %s", buf);
 	
 	return 0;
 }
@@ -3084,7 +3149,8 @@ COMMAND_PROTOTYPE(dotrafgens)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("TRAFGENS: %s", buf);
+		if (verbose)
+			info("TRAFGENS: %s", buf);
 	}
 	mysql_free_result(res);
 	return 0;
@@ -3149,8 +3215,6 @@ COMMAND_PROTOTYPE(dostate)
 	address_tuple_t tuple;
 #endif
 
-	info("%s\n", rdata);
-
 #ifdef LBS
 	return 0;
 #endif
@@ -3207,6 +3271,7 @@ COMMAND_PROTOTYPE(dostate)
 	address_tuple_free(tuple);
 #endif /* EVENTSYS */
 	
+	/* Leave this logging on all the time for now. */
 	info("STATE: %s\n", newstate);
 	return 0;
 
@@ -3227,7 +3292,8 @@ COMMAND_PROTOTYPE(docreator)
 
 	sprintf(buf, "CREATOR=%s\n", reqp->creator);
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("CREATOR: %s", buf);
+	if (verbose)
+		info("CREATOR: %s", buf);
 	return 0;
 }
 
@@ -3275,8 +3341,10 @@ COMMAND_PROTOTYPE(dotunnels)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("TUNNELS: %s ISSERVER=%s PEERIP=%s PEERPORT=%s INET=%s\n",
-		     row[0], row[1], row[2], row[3], row[7]);
+		if (verbose)
+			info("TUNNELS: %s ISSERVER=%s PEERIP=%s "
+			     "PEERPORT=%s INET=%s\n",
+			     row[0], row[1], row[2], row[3], row[7]);
 	}
 	mysql_free_result(res);
 	return 0;
@@ -3320,7 +3388,8 @@ COMMAND_PROTOTYPE(dovnodelist)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("VNODELIST: %s", buf);
+		if (verbose)
+			info("VNODELIST: %s", buf);
 	}
 	mysql_free_result(res);
 	return 0;
@@ -3769,6 +3838,7 @@ client_writeback(int sock, void *buf, int len, int tcp)
 				error("write to TCP client aborted");
 				return -1;
 			}
+			byteswritten += cc;
 			len  -= cc;
 			bufp += cc;
 		}
@@ -3809,6 +3879,7 @@ client_writeback_done(int sock, struct sockaddr_in *client)
 		if (err < 0)
 			errorc("writing to UDP client");
 	}
+	byteswritten = udpix;
 	udpfd = -1;
 	udpix = 0;
 }
@@ -3943,7 +4014,8 @@ COMMAND_PROTOTYPE(dontpinfo)
 					sprintf(buf, "SERVER=%s\n", row[1]);
 				}
 				client_writeback(sock, buf, strlen(buf), tcp);
-				info("NTPINFO: %s", buf);
+				if (verbose)
+					info("NTPINFO: %s", buf);
 			}
 			nrows--;
 		}
@@ -3968,7 +4040,8 @@ COMMAND_PROTOTYPE(dontpinfo)
 		if (row[0] && row[0][0]) {
 			sprintf(buf, "DRIFT=%s\n", row[0]);
 			client_writeback(sock, buf, strlen(buf), tcp);
-			info("NTPINFO: %s", buf);
+			if (verbose)
+				info("NTPINFO: %s", buf);
 		}
 	}
 	mysql_free_result(res);
@@ -4004,8 +4077,9 @@ COMMAND_PROTOTYPE(dontpdrift)
 	}
 	mydb_update("update nodes set ntpdrift='%f' where node_id='%s'",
 		    drift, reqp->nodeid);
-	
-	info("NTPDRIFT: %f", drift);
+
+	if (verbose)
+		info("NTPDRIFT: %f", drift);
 	return 0;
 }
 
@@ -4179,6 +4253,7 @@ COMMAND_PROTOTYPE(doatarball)
 	cc = statbuf.st_size;
 	client_writeback(sock, &cc, sizeof(cc), tcp);
 
+	/* Leave this logging on all the time for now. */
 	info("GETTAR: %s: Sending tarball (%d): %s\n", reqp->nodeid, cc, buf);
 
 	/*
@@ -4465,7 +4540,8 @@ COMMAND_PROTOTYPE(doprogagents)
 	 */
 	sprintf(buf, "UID=%s\n", reqp->swapper);
 	client_writeback(sock, buf, strlen(buf), tcp);
-	info("PROGAGENTS: %s", buf);
+	if (verbose)
+		info("PROGAGENTS: %s", buf);
 	
 	while (nrows) {
 		row = mysql_fetch_row(res);
@@ -4474,7 +4550,8 @@ COMMAND_PROTOTYPE(doprogagents)
 		client_writeback(sock, buf, strlen(buf), tcp);
 		
 		nrows--;
-		info("PROGAGENTS: %s", buf);
+		if (verbose)
+			info("PROGAGENTS: %s", buf);
 	}
 	mysql_free_result(res);
 	return 0;
