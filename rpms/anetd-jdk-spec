@@ -1,0 +1,32 @@
+# $Id: anetd-jdk-spec,v 1.1 2000-08-08 16:47:11 kwright Exp $
+Summary: JDK v1.1.8 - recommended by ABOCC for anetd
+Name: jdk-abocc
+Version: 1.1.8
+Release: 1
+Copyright: See sun. 
+Group: Net-Extra
+Source: http://www.csl.sri.com/pub/anetd/java/jdk118_v1-glibc-2.1.2.tar.bz
+
+%description
+The ABOCC recommends this specific JDK for use
+with anetd.
+
+%prep
+/bin/rm -rf /usr/local/jdk118_v1
+
+%build
+# no build steps required.
+
+%install
+cp $RPM_SOURCE_DIR/jdk118_v1-glibc-2.1.2.tar.bz /usr/local
+cd /usr/local
+/usr/bin/bunzip2 jdk118_v1-glibc-2.1.2.tar.bz
+tar xvf jdk118_v1-glibc-2.1.2.tar
+chown -R root jdk118_v1
+chgrp -R root jdk118_v1
+
+%files
+/usr/local/jdk118_v1
+
+%clean
+/bin/rm /usr/local/jdk118_v1-glibc-2.1.2.tar
