@@ -36,6 +36,8 @@ $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 install:	$(INSTALL_SBINDIR)/tevd \
 		$(INSTALL_SBINDIR)/tevd.restart
 
+control-install:	$(INSTALL_BINDIR)/tevc
+
 client-install: 
 	$(INSTALL_PROGRAM) tevc /etc/testbed/tevc
 

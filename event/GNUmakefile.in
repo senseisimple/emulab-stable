@@ -38,6 +38,9 @@ install:
 	@$(MAKE) -C sched install
 	@$(MAKE) -C tbgen install
 
+control-install: 
+	@$(MAKE) -C tbgen control-install
+
 clean:		subdir-clean
 
 subdir-clean:

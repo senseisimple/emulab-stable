@@ -47,6 +47,7 @@ ops-install:
 	@$(MAKE) -C db control-install
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
+	@$(MAKE) -C event control-install
 
 install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/locks
