@@ -20,7 +20,7 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 # These are for the mod_php4 port
 #
-.MAKEFLAGS+=	-DWITH_MHASH -DWITH_XMLRPC
+.MAKEFLAGS+=	-DWITH_MHASH -DWITH_XMLRPC -DWITH_CURL -DWITH_OPENSSL
 
 #
 # This prevents any ports from trying to run interactively - some, like the
