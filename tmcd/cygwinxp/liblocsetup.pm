@@ -60,18 +60,18 @@ $MOUNT		= "/bin/mount";
 $UMOUNT		= "/bin/umount";
 $EGREP		= "/bin/egrep -q";
 
-# Emulab wrappers for Windows.
+# Cygwin.
 $MKPASSWD	= "/bin/mkpasswd";
 $MKGROUP	= "/bin/mkgroup";
 $AWK		= "/bin/gawk";
+$BASH		= "/bin/bash";
 
+# Windows under Cygwin.
 $NTS		= "/cygdrive/c/WINDOWS/system32";
 $NET		= "$NTS/net";
 $NETSH		= "$NTS/netsh";
 $NTE		= "$NTS/drivers/etc";
 $HOSTSFILE	= "$NTE/hosts";
-
-$BASH		= "/bin/bash";
 
 #
 # These are not exported
@@ -198,7 +198,7 @@ sub os_accounts_sync()
 	return -1;
     }
 
-    $cmd  = "mkgroup -l | $AWK '";
+    $cmd  = "$MKGROUP -l | $AWK '";
     # Make a duplicate group line that is a wheel alias for Administrators.
     $cmd .= '/^Administrators:/{print "wheel" substr($0, index($0,":"))} {print}';
     $cmd .= "' > /etc/group";
@@ -616,73 +616,6 @@ sub os_mountlocal($)
     $local =~ s|^.*:||;			# Remove server prefix.
     $local =~ s|^/q/proj/|/proj/|;	# Remove /q prefix from /proj.
     return $local;
-}
-
-sub os_getnfsmounts($)
-{
-    my ($rptr) = @_;
-    my %mounted = ();
-
-    #
-    # Grab the output of the mount command and parse.  ("net use" on Windows.)
-    #
-    if (! open(MOUNT, "$NET use|")) {
-	print "os_getnfsmounts: Cannot run net use command\n";
-	return -1;
-    }
-    while (<MOUNT>) {
-	# We get lines like:
-	#              P:        \\fs.emulab.net\q\proj\testbed       NFS Network
-	# When the remote string is too long, "NFS Network" is on the next line.
-	if ($_ =~ m|^ +(\w:) +([-\w\.\\]+)|) {
-	    # Bash the remote UNC path into a NFS path like fs:/q/proj/testbed .
-	    my $driveletter = $1;
-	    my $rpath = $2;
-	    $rpath =~ s|^\\\\([-\w\.]+)|$1:|; # \\host -> host:
-	    $rpath =~ s|\\|/|g;		      # Backslashes to forward.
-	    # Key is the remote NFS path, value is the CygWin local path.
-	    $mounted{$rpath} = os_mountlocal($rpath);
-	}
-    }
-    close(MOUNT);
-    %$rptr = %mounted;
-    return 0;
-}
-
-sub os_getnfsmountpoints($)
-{
-    my ($rptr) = @_;
-    my %mounted = ();
-
-    #
-    # Grab the output of the mount command and parse.  ("net use" on Windows.)
-    #
-    if (! open(MOUNT, "$NET use|")) {
-	print "os_getnfsmounts: Cannot run net use command\n";
-	return -1;
-    }
-    while (<MOUNT>) {
-	# We get lines like:
-	#              P:        \\fs.emulab.net\q\proj\testbed       NFS Network
-	# When the remote string is too long, "NFS Network" is on the next line.
-	##print;
-	if ($_ =~ m|^ +(\w:) +([-\w\.\\]+)|) {
-	    # Bash the remote UNC path into a NFS path like fs:/q/proj/testbed .
-	    my $driveletter = $1;
-	    my $rpath = $2;
-	    ##print "driveletter '$driveletter', rpath '$rpath'\n";
-	    $rpath =~ s|^\\\\([-\w\.]+)|$1:|; # \\host -> host:
-	    $rpath =~ s|\\|/|g;		      # Backslashes to forward.
-	    ##print "driveletter '$driveletter', rpath '$rpath'\n";
-	    # Key is CygWin local path, value is drive letter and remote NFS path.
-	    my $local = os_mountlocal($rpath);
-	    ##print "local '$local'\n";
-	    $mounted{$local} = [$rpath, $driveletter];
-	}
-    }
-    close(MOUNT);
-    %$rptr = %mounted;
-    return 0;
 }
 
 # Execute a noisy bash command, throwing away the output unless we ask for it.
