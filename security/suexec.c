@@ -273,6 +273,14 @@ int main(int argc, char *argv[])
     struct stat dir_info;	/* directory info holder     */
     struct stat prg_info;	/* program info holder       */
 
+#ifdef TESTBED
+    /*
+     * For the Testbed, we run this from php3, and it loses all
+     * outout sent to stderr, so make sure it all goes to stdout.
+     */
+    dup2(1, 2);
+#endif
+
     /*
      * If there are a proper number of arguments, set
      * all of them to variables.  Otherwise, error out.
@@ -507,7 +515,11 @@ int main(int argc, char *argv[])
     /*
      * Error out if cwd is writable by others.
      */
+#ifdef TESTBED
+    if (dir_info.st_mode & S_IWOTH) {
+#else
     if ((dir_info.st_mode & S_IWOTH) || (dir_info.st_mode & S_IWGRP)) {
+#endif
 	log_err("error: directory is writable by others: (%s)\n", cwd);
 	exit(116);
     }
