@@ -928,15 +928,23 @@ routing:
 $ns rtproto <i>protocol</i>
 </pre></code>
 where the <i>protocol</i> option is limited to one of
-<code>Session</code>, <code>Static</code>, or <code>Manual</code>.
+<code>Session</code>, <code>Static</code>, <code>Static-old</code>, 
+or <code>Manual</code>. <p>
+
 <code>Session</code> routing provides fully automated routing support, 
 and is implemented by enabling <code>gated</code> running the OSPF protocol
-on all nodes in the experiment. <code>Static</code> routing also
-provides automatic routing support, but rather than computing the
-routes dynamically, the routes are precomputed when the experiment is
-created, and then loaded on each node when it boots.
+on all nodes in the experiment.  <p>
 
-<p>
+<code>Static</code> routing also provides automatic routing support, but
+rather than computing the routes dynamically, the routes are precomputed by a
+distributed route computation algorithm running in parallel on the experiment
+nodes. <p>
+
+<code>Static-old</code> specifies use of the older centralized route
+computation algorithm, precomputing the nodes when the experiment is created,
+and then loading them onto each node when it boots.  <p>
+
+
 <code>Manual</code> routing allows you to explicitly specify per-node
 routing information in the NS file. To do this, use the
 <tt>Manual</tt> routing option to <tt>rtproto</tt>, 
