@@ -117,9 +117,9 @@ if (!TBAdmin($UID)) {
 	    "    You are not a valid emulab user!\n");
     }
 
-    if (! TBMinTrust(TBProjTrust($dbuid, $pid), PROJMEMBERTRUST_PROJROOT)) {
+    if (! TBProjAccessCheck($dbuid, $pid, $pid, TB_PROJECT_DELGROUP())) {
 	die("*** $0:\n".
-	    "    Yoo do not have permission to remove a group directory\n");
+	    "    You do not have permission to remove a project group!\n");
     }
 }
 
