@@ -8,4 +8,6 @@ $TTL	10800
 				3600 )    ; Minimum
 	IN	NS	ns.@OURDOMAIN@.
 
+@BOSSNODE_IP@	IN	PTR	boss.@OURDOMAIN@.
+@USERNODE_IP@	IN	PTR	ops.@OURDOMAIN@.
 

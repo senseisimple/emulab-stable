@@ -34,7 +34,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 # This file is just a copy for now. Ick.
 $(REVERSE_MAPNAME).db.head:	reverse.head
-	cp reverse.head $(REVERSE_MAPNAME).db.head
+	cat reverse.head | sed -e 's/$(REVERSE_MAPNAME)\.//' > $(REVERSE_MAPNAME).db.head
 
 $(OURDOMAIN).db.head:		forward.head
 	cp forward.head $(OURDOMAIN).db.head
