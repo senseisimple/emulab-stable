@@ -7,7 +7,6 @@
  */
 
 #include "lib.h"
-#include "Exception.h"
 #include "Assigner.h"
 
 Assigner::~Assigner()

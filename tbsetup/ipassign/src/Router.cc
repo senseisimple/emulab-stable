@@ -23,6 +23,13 @@ void Router::reset(Assigner const & newAssign)
 
 bool Router::isValidNode(size_t node) const
 {
-    // [0] is the LAN level and [node] is which LAN that node belongs to.
-    return !(m_nodeToLevel[0][node].empty());
+    if (node < m_nodeToLevel[0].size())
+    {
+        // [0] is the LAN level and [node] is which LAN that node belongs to.
+        return !(m_nodeToLevel[0][node].empty());
+    }
+    else
+    {
+        return false;
+    }
 }

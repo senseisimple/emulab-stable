@@ -12,14 +12,28 @@
 class Partition
 {
 public:
+    // Notify this partition that there is another LAN. Used in schemes
+    // that depend on the number of LANs in a graph. Now that I think about
+    // it, this is redundant. The number of LANs can be garnerd from the
+    // size of indexes at partition time.
+    // TODO: Remove this function and the need to use it.
     virtual void addLan(void)=0;
+
+    // Partition up the graph. indexes, neighbors, and weights are the
+    // converted form of the LAN-graph.
     virtual void partition(std::vector<int> & indexes,
                            std::vector<int> & neighbors,
                            std::vector<int> & weights,
                            std::vector<int> & partitions)=0;
+
+    // Get a polymorphic copy of this object.
     virtual std::auto_ptr<Partition> clone(void)=0;
+
+    // After partitioning, how many partitions were decided upon?
     virtual int getPartitionCount(void)=0;
 public:
+    // Most partitioning schemes (at least in the near future) will presumably
+    // use METIS. This is the common code to use METIS in the standard fashion.
     static void partitionN(int partitionCount,
                            std::vector<int> & indexes,
                            std::vector<int> & neighbors,

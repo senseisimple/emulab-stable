@@ -10,12 +10,6 @@
 // the program. Each one has a string associated with it that is printed
 // to the user as output.
 
-// Note that as of now, the strings are completely determined by the
-// creator of an Exception object. I ought to go back and change this
-// so that each Exception contributes its exception name to the beginning
-// of the string and the Exception creator just provides the incidental
-// information.
-
 #ifndef EXCEPTION_H_IP_ASSIGN_1
 #define EXCEPTION_H_IP_ASSIGN_1
 
@@ -42,6 +36,7 @@ private:
     string message;
 };
 
+// Can be thrown during IP assignment
 class BitOverflowException : public StringException
 {
 public:
@@ -51,6 +46,7 @@ public:
     }
 };
 
+// Can be thrown during input phase
 class InvalidCharacterException : public StringException
 {
 public:
@@ -60,6 +56,7 @@ public:
     }
 };
 
+// Can be thrown during input phase
 class MissingWeightException : public StringException
 {
 public:
@@ -69,6 +66,7 @@ public:
     }
 };
 
+// Can be thrown during input phase
 class NotEnoughNodesException : public StringException
 {
 public:
@@ -78,6 +76,8 @@ public:
     }
 };
 
+// Should not be thrown.
+// This is deprecated and will be removed soon.
 class NoHeaderException : public StringException
 {
 public:
@@ -87,6 +87,7 @@ public:
     }
 };
 
+// Can be thrown during startup
 class InvalidArgumentException : public StringException
 {
 public:
@@ -96,6 +97,8 @@ public:
     }
 };
 
+// Can be thrown in various places. I put this here whenever there was
+// a dangling 'else' or 'default' that should never be reached.
 class ImpossibleConditionException : public StringException
 {
 public:
@@ -105,6 +108,8 @@ public:
     }
 };
 
+// Can be thrown during route calculation. This is also currently what
+// gets thrown in the event of a disconnected input graph.
 class NoConnectionException : public StringException
 {
 public:
@@ -115,6 +120,7 @@ public:
     }
 };
 
+// Can be thrown during route calculation.
 class NoGraphToRouteException : public StringException
 {
 public:
@@ -125,6 +131,9 @@ public:
     }
 };
 
+// TODO:
+// Can be thrown during route calculation. This should be removed once
+// the disconnected graph problem is fixed.
 class NoTopLevelException : public StringException
 {
 public:

@@ -16,7 +16,6 @@
 using namespace std;
 
 HostRouter::HostRouter()
-    : routeCount(0)
 {
 }
 
@@ -79,161 +78,77 @@ void HostRouter::calculateRoutes(void)
 
 void HostRouter::print(ostream & output) const
 {
-    routeCount = 0;
-    // Use '%%' to divide routing tables from another.
+    // Preprocessing. Figure out which IP addresses to use for all
+    // adjascent interfaces. We have the first hop in terms of hosts,
+    // and this structure will provide a link from the host to the interface
+    // IP address.
+    // This maps adjascent nodes to IP addresses.
+    map<size_t, IPAddress> nodeToIP;
+
     output << "%%" << endl;
     for (size_t i = 0; i < m_tableList.size(); ++i)
     {
         if (m_tableList[i].size() != 0)
         {
-            // Preprocessing. Figure out which IP addresses to use for all
-            // adjascent interfaces.
-            // This maps adjascent nodes to IP addresses.
-            map<size_t, IPAddress> NodeToIP;
-
-            // in every LAN that we're connected to
-            vector<size_t>::const_iterator lanPos =
-                                                 m_nodeToLevel[0][i].begin();
-            for (; lanPos != m_nodeToLevel[0][i].end(); ++lanPos)
-            {
-                // in every node that is in one of those LANs
-                size_t pos = 0;
-                for (; pos < m_levelMakeup[0][*lanPos].size(); ++pos)
-                {
-                    NodeToIP[m_levelMakeup[0][*lanPos][pos]]
-                        = m_levelPrefix[0][*lanPos] + pos + 1;
-                }
-            }
-
-            // Print the routing table itself
-            output << "Routing table for node: " << i << endl;
-            for (size_t j = 0; j < m_levelMakeup[0].size(); ++j)
-            {
-                for (size_t k = 0; k < m_levelMakeup[0][j].size(); ++k)
-                {
-                    if (NodeToIP.count(m_levelMakeup[0][j][k]) == 0
-                        || find(m_nodeToLevel[0][i].begin(),
-                                m_nodeToLevel[0][i].end(), j)
-                        == m_nodeToLevel[0][i].end())
-                    {
-                    output << "Destination: "
-                           << ipToString(m_levelPrefix[0][j] + k + 1)
-                           << "/32" // host routing means no subnets
-                           << " FirstHop: "
-                           << ipToString(
-                              NodeToIP[m_tableList[i][m_levelMakeup[0][j][k]]])
-                           << endl;
-                    ++routeCount;
-                    }
-                }
-            }
-            output << "%%" << endl;
+            findAdjascentInterfaces(i, nodeToIP);
+            printTable(output, i, nodeToIP);
         }
     }
 }
 
-void HostRouter::printStatistics(ostream & output) const
+void HostRouter::findAdjascentInterfaces(size_t node,
+                                map<size_t, IPAddress> & nodeToIP) const
 {
-    size_t i = 0;
-    output << "Total Number of Routes: " << routeCount << endl;
-
-    // calculate route length from every interface to every node
-    // this should be equivalent to getting a route length from every node
-    // to every interface.
-    int totalRouteLength = 0;
-    for (i = 0; i < m_levelMakeup[0].size(); ++i)
+    nodeToIP.clear();
+    // in every LAN that we're connected to
+    vector<size_t>::const_iterator lanPos = m_nodeToLevel[0][node].begin();
+    for (; lanPos != m_nodeToLevel[0][node].end(); ++lanPos)
     {
-        for (size_t j = 0; j < m_levelMakeup[0][i].size(); ++i)
+        // in every node that is in one of those LANs
+        vector<size_t> const & firstHopList = m_levelMakeup[0][*lanPos];
+        vector<size_t>::const_iterator pos = firstHopList.begin();
+        for (; pos != firstHopList.end(); ++pos)
         {
-            for (size_t k = 0; k < m_tableList[j].size(); ++k)
-            {
-                size_t current = j;
-                while (current != k)
-                {
-                    totalRouteLength += getWeight(current,
-                                                  m_tableList[current][k]);
-                    current = m_tableList[current][k];
-                }
-            }
+            // Note that we'll be repeatedly overwriting an IPAddress for
+            // the current node. But that is ok since the current node is
+            // never used as a firstHop.
+            // If this becomes an issue, put a conditional here.
+            nodeToIP[*pos] = m_levelPrefix[0][*lanPos] + *pos + 1;
         }
     }
-    output << "Total Route Length: " << totalRouteLength << endl;
-}
-
-int HostRouter::getWeight(size_t first, size_t second) const
-{
-    // TODO. Fix this so that it reports weights accurately.
-    return 1;
 }
 
 
-void HostRouter::calculateRoutesFrom(size_t node)
+void HostRouter::printTable(ostream & output, size_t node,
+                            map<size_t, IPAddress> & nodeToIP) const
 {
-    static const int MAX_DISTANCE = INT_MAX;
-    // The minimum distance discovered to every node
-    vector<int> distance;
-    distance.resize(m_nodeToLevel[0].size());
-    fill(distance.begin(), distance.end(), MAX_DISTANCE);
-
-    // The minimum distance to every node, except that
-    // Nodes which have already been selected are MAX_DISTANCE
-    vector<int> unselectedDistance;
-    unselectedDistance.resize(m_nodeToLevel[0].size());
-    fill(unselectedDistance.begin(), unselectedDistance.end(),
-         MAX_DISTANCE);
-
-    // Distance to ourselves is 0
-    distance[node] = 0;
-    unselectedDistance[node] = 0;
-
-    // Keep track of the first hop used to get to minimum distance
-    m_tableList[node].resize(m_nodeToLevel[0].size());
-    m_tableList[node][node] = node;
-
-    // Dijkstra
-    size_t distanceIndex = minIndex(unselectedDistance.begin(),
-                                    unselectedDistance.end());
-    while (unselectedDistance[distanceIndex] != MAX_DISTANCE)
+    size_t lanCount = m_levelMakeup[0].size();
+    // Print the routing table itself
+    output << "Routing table for node: " << node << endl;
+    for (size_t destLan = 0; destLan < lanCount; ++destLan)
     {
-        unselectedDistance[distanceIndex] = MAX_DISTANCE;
-        // in every LAN that we're connected to
-        vector<size_t>::iterator lanPos = m_nodeToLevel[0][distanceIndex].begin();
-        for (; lanPos != m_nodeToLevel[0][distanceIndex].end(); ++lanPos)
+        for (size_t destNodeIndex = 0;
+             destNodeIndex < m_levelMakeup[0][destLan].size();
+             ++destNodeIndex)
         {
-            // in every node that is in one of those LANs
-            vector<size_t>::iterator pos = m_levelMakeup[0][*lanPos].begin();
-            for (; pos != m_levelMakeup[0][*lanPos].end(); ++pos)
+            size_t destNode = m_levelMakeup[0][destLan][destNodeIndex];
+
+            // if the destination LAN is not connected to the current node.
+            if (find(m_nodeToLevel[0][node].begin(),
+                     m_nodeToLevel[0][node].end(), destLan)
+                == m_nodeToLevel[0][node].end())
             {
-                int newDistance = distance[distanceIndex]
-                                + m_lanWeights[*lanPos];
-                if (newDistance < distance[*pos])
-                {
-                    distance[*pos] = newDistance;
-                    unselectedDistance[*pos] = newDistance;
-                    // if this is the original node, we don't want to
-                    // set the first hop to us. Rather, we should set
-                    // the first hop to the node itself.
-                    if (distanceIndex == node)
-                    {
-                        m_tableList[node][*pos] = *pos;
-                    }
-                    else
-                    {
-                        m_tableList[node][*pos] =
-                                           m_tableList[node][distanceIndex];
-                    }
-                }
+                output << "Destination: "
+                       << ipToString(m_levelPrefix[0][destLan] + destNodeIndex
+                                                               + 1)
+                       << "/32" // host routing means no subnets
+                       << " FirstHop: "
+                       << ipToString(
+                           nodeToIP[m_tableList[node][destNode]])
+                       << endl;
             }
         }
-        distanceIndex = minIndex(unselectedDistance.begin(),
-                                 unselectedDistance.end());
     }
+    // Use '%%' to divide routing tables from another.
+    output << "%%" << endl;
 }
-
-
-
-
-
-
-
-

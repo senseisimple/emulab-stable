@@ -18,7 +18,8 @@ ConservativeAssigner::ConservativeAssigner(Partition & newPartition)
     , m_largestLan(0)
     , m_lanMaskSize(0)
     , m_netMaskSize(0)
-    , m_partition(newPartition)
+    , m_partition(&newPartition)
+    // m_lanList, m_nodeToLan, and m_partitionIPList initialize themselves.
 {
 }
 
@@ -31,35 +32,49 @@ auto_ptr<Assigner> ConservativeAssigner::clone(void) const
     return auto_ptr<Assigner>(new ConservativeAssigner(*this));
 }
 
- void ConservativeAssigner::setPartition(Partition & newPartition)
+void ConservativeAssigner::setPartition(Partition & newPartition)
 {
+    m_partition = &newPartition;
 }
 
 void ConservativeAssigner::addLan(int bits, int weight, vector<size_t> nodes)
 {
+    // add the new LAN to m_lanList
     Lan temp;
     temp.number = m_lanList.size();
     temp.weight = weight;
     temp.nodes = nodes;
     m_lanList.push_back(temp);
+
+    // if this LAN is the largest we've encountered, note that fact.
     m_largestLan = max(m_largestLan, static_cast<int>(nodes.size()));
+
+    // Update m_nodeToLan such that the nodes with interfaces in this LAN
+    // know that fact.
     for (size_t i = 0; i < nodes.size(); ++i)
     {
         if (nodes[i] >= m_nodeToLan.size())
         {
             m_nodeToLan.resize(nodes[i] + 1);
         }
-        m_nodeToLan[nodes[i]].push_back(m_lanList.back().number);
+        vector<size_t> & currentNode = m_nodeToLan[nodes[i]];
+        currentNode.push_back(m_lanList.back().number);
     }
 }
 
 void ConservativeAssigner::ipAssign(void)
 {
+    // TODO: When I fix the disconnected graphs problem, remove this.
+    // The reason that this is here is that disconnected graphs don't
+    // cause an error until route calculation. The error that is caused
+    // is not obviously due to the graph not being connected. Therefore,
+    // this is provided as a hint until that is fixed.
     if (!(isConnected(0)))
     {
         cerr << "Graph is not connected" << endl;
     }
 
+    // These hold a METIS-ready conversion of the LAN-graph data.
     std::vector<int> partitionArray;
     std::vector<int> graphIndexArray;
     std::vector<int> graphNeighborArray;
@@ -69,10 +84,11 @@ void ConservativeAssigner::ipAssign(void)
     convert(graphIndexArray, graphNeighborArray, weightArray);
 
     // partition the graph
-    m_partition.partition(graphIndexArray, graphNeighborArray, weightArray,
+    m_partition->partition(graphIndexArray, graphNeighborArray, weightArray,
                           partitionArray);
-    m_partitionCount = m_partition.getPartitionCount();
+    m_partitionCount = m_partition->getPartitionCount();
 
+// This is the code for calling METIS and changing its tolerances.
 /*    if (numPartitions > 1)
     {
         int numConstraints = 2;
@@ -100,6 +116,7 @@ void ConservativeAssigner::ipAssign(void)
             &(partitionArray[0]));     // return the partition of each vertex
     }
 */
+
     // Each number in the partitions vector is the partition that
     // the associated Lan in m_lanList belongs too.
     // Let each Lan know where it belongs.
@@ -111,41 +128,20 @@ void ConservativeAssigner::ipAssign(void)
         pos->partition = *partPos;
     }
 
+    // If there are disconnected partitions, turn them into different
+    // partitions.
     // m_partitionCount may increase during this loop
     int loop = 0;
     while (loop < m_partitionCount)
     {
+        // Each time a breadth-first walk from a LAN in a partition fails
+        // to reach every LAN in that partition, the remainder is slopped
+        // together into a new partition which is m_partitionCount+1.
+        // Then m_partitionCount is incremented.
         makeConnected(loop);
         ++loop;
     }
 
-    for (int i = 0; i < m_partitionCount; ++i)
-    {
-        if (!(isConnected(i)))
-        {
-            cerr << "Not connected " << i << endl;
-        }
-    }
-
-    // output how many border LANs there are.
-    vector<bool> border;
-    border.resize(m_lanList.size());
-    fill(border.begin(), border.end(), false);
-    for (size_t i = 0; i < border.size(); ++i)
-    {
-        for (size_t j = 0; j < m_lanList[i].nodes.size(); ++j)
-        {
-            size_t node = (m_lanList[i].nodes)[j];
-            for (size_t k = 0; k < m_nodeToLan[node].size(); ++k)
-            {
-                size_t destLan = m_nodeToLan[node][k];
-                if (m_lanList[i].partition != m_lanList[destLan].partition)
-                {
-                    border[i] = true;
-                }
-            }
-        }
-    }
     //////////////////////////////////////////////////////
     // find out which bits go to which subnet
     //////////////////////////////////////////////////////
@@ -180,6 +176,8 @@ void ConservativeAssigner::print(ostream & output) const
         {
             output << lanPos->number << " ";
             output << lanPos->nodes[i] << " ";
+            // The ip address of a particular interface is just an offset
+            // from the prefix associated with its LAN.
             output << ipToString(lanPos->ip + i + 1);
             output << endl;
         }
@@ -223,10 +221,6 @@ void ConservativeAssigner::graph(vector<Assigner::NodeLookup> & nodeToLevel,
         {
             (nodeToLevel.back())[i].push_back(*pos);
         }
-/*        for (size_t j = 0; j < m_nodeToLan[i].size(); ++j)
-          {
-          (nodeToLevel.back())[i].push_back(m_lanList[m_nodeToLan[i][j]].partition);
-          }*/
     }
 
     nodeToLevel.push_back(NodeLookup());
@@ -353,6 +347,9 @@ int ConservativeAssigner::getBits(int num)
 int ConservativeAssigner::getLanBits(vector<int> const & partitionArray,
                                      int numPartitions)
 {
+    // Create an array of counters, adding to the appropriate counter
+    // whenever we encounter a LAN in that partition. Then take the largest
+    // and voila! instant largest partition!
     vector<int> counter;
     int current;
     counter.resize(numPartitions);
@@ -397,7 +394,7 @@ void ConservativeAssigner::assignNumbers(int networkSize, int lanSize,
     counter.resize(numPartitions);
     fill(counter.begin(), counter.end(), 0);
 
-    // we want to set up intuitive bit boundaries if possible
+    // we want to set up human readable bit boundaries if possible
     if (networkSize <= 8 && lanSize <= 8 && hostSize <= 8)
     {
         networkSize = 8;
@@ -433,13 +430,14 @@ void ConservativeAssigner::assignNumbers(int networkSize, int lanSize,
 
 bool ConservativeAssigner::isConnected(int whichPartition)
 {
-//    size_t orig = m_partitionCount;
-//    makeConnected(whichPartition);
-//    return orig >= m_partitionCount;
+    // Use a queue for a breadth-first search
     queue<size_t> nextConnection;
     size_t first = 0;
     size_t numInPartition = 0;
+    // This extra scoping is to make sure that i can be re-used.
     {
+        // Find out how many LANs are in whichPartition and find an arbitrary
+        // starting LAN for the search.
         for (size_t i = 0; i < m_lanList.size(); ++i)
         {
             if (m_lanList[i].partition == whichPartition)
@@ -449,40 +447,36 @@ bool ConservativeAssigner::isConnected(int whichPartition)
             }
         }
     }
-    if (whichPartition == 0)
+    // trivial case
+    if (numInPartition == 0 || m_lanList.size() == 0)
     {
-        cerr << whichPartition << ':' << numInPartition << endl;
-    }
-    if (numInPartition == 0)
-    {
-        cerr << "Empty partition " << whichPartition << endl;
         return true;
     }
+
     nextConnection.push(first);
     vector<bool> connected;
     connected.resize(m_lanList.size());
     fill(connected.begin(), connected.end(), false);
     connected[first] = true;
-    if (m_lanList.size() > 0)
+
+    // breadth-first search
+    while (!(nextConnection.empty()))
     {
-        while (!(nextConnection.empty()))
+        size_t current = nextConnection.front();
+        nextConnection.pop();
+
+        // add all adjascent LANs in this partition
+        for (size_t i = 0; i < m_lanList[current].nodes.size(); ++i)
         {
-            size_t current = nextConnection.front();
-            nextConnection.pop();
-            for (size_t i = 0; i < m_lanList[current].nodes.size(); ++i)
+            size_t currentNode = m_lanList[current].nodes[i];
+            for (size_t j = 0; j < m_nodeToLan[currentNode].size(); ++j)
             {
-                size_t currentNode = m_lanList[current].nodes[i];
-                for (size_t j = 0; j < m_nodeToLan[currentNode].size(); ++j)
+                size_t destLan = m_nodeToLan[currentNode][j];
+                if (m_lanList[destLan].partition == whichPartition
+                    && !(connected[destLan]))
                 {
-                    size_t destLan = m_nodeToLan[currentNode][j];
-                    if (m_lanList[destLan].partition == whichPartition)
-                    {
-                        if (!(connected[destLan]))
-                        {
-                            connected[destLan] = true;
-                            nextConnection.push(destLan);
-                        }
-                    }
+                        connected[destLan] = true;
+                        nextConnection.push(destLan);
                 }
             }
         }
@@ -490,11 +484,14 @@ bool ConservativeAssigner::isConnected(int whichPartition)
     vector<bool>::difference_type num = count(connected.begin(),
                                               connected.end(),
                                               true);
+    // iff we got to every node in this partition during our search,
+    // then the partition is connected.
     return num == numInPartition;
 }
 
 void ConservativeAssigner::makeConnected(int whichPartition)
 {
+    // breadth first search. This is very similar to isConnected()
     queue<size_t> nextConnection;
     size_t first = 0;
     size_t numInPartition = 0;

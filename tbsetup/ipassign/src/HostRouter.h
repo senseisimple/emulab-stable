@@ -6,6 +6,11 @@
  * All rights reserved.
  */
 
+// This module sets up individual routes from every host to every interface.
+// Because of this, the routes are guaranteed to the the shortest path.
+// Unfortunately, this also means that the routing tables are going to be
+// huge and the speed will be glacial.
+
 #ifndef HOST_ROUTER_H_IP_ASSIGN_2
 #define HOST_ROUTER_H_IP_ASSIGN_2
 
@@ -20,22 +25,18 @@ public:
 
     virtual void calculateRoutes(void);
     virtual void print(std::ostream & output) const;
-    virtual void printStatistics(std::ostream & output) const;
 private:
-    int getWeight(size_t first, size_t second) const;
-    void calculateRoutesFrom(size_t node);
-    template <typename RandomAccessIterator>
-    size_t minIndex(RandomAccessIterator startPos, RandomAccessIterator endPos)
-    {
-        return min_element(startPos, endPos) - startPos;
-    }
+    // pre-processing for print. Each host has adjascent interfaces.
+    // The first hop information in m_tableList provides hops in terms of
+    // nodes. But the first hop info we are to output is in terms of the
+    // IP addresses of adjascent interfaces.
+    // This function calculates those IP addresses.
+    void findAdjascentInterfaces(size_t node,
+                                 map<size_t, IPAddress> & nodeToIP) const;
 
-    template <typename T>
-    size_t findIndex(vector<T>::const_iterator startPos,
-                     vector<T>::const_iterator endPos, T const & item)
-    {
-        return find(startPos, endPos, item) - startPos;
-    }
+    // Print out the actual table for a particular node.
+    void printTable(ostream & output, size_t node,
+                    map<size_t, IPAddress> & nodeToIP) const;
 private:
     // For each node, which is the first node on the shortest path to it?
     typedef std::vector< size_t > RouteTable;
@@ -43,7 +44,6 @@ private:
     // table. The second index is the destination. The result is the next
     // hop.
     std::vector<RouteTable> m_tableList;
-    mutable int routeCount;
 };
 
 #endif

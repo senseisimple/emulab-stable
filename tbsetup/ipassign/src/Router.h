@@ -6,6 +6,9 @@
  * All rights reserved.
  */
 
+// This is the base class for the Router module. Any new routing method should
+// inherit from Router. This defines the routing method interface.
+
 #ifndef ROUTER_H_IP_ASSIGN_2
 #define ROUTER_H_IP_ASSIGN_2
 
@@ -15,13 +18,18 @@ class Router
 {
 public:
     virtual ~Router();
+
+    // Polymorphic copy
     virtual std::auto_ptr<Router> clone(void) const=0;
 
+    // Set up internal hierarchy based on an Assigner
     virtual void reset(Assigner const & newAssign);
+    // calculate the routing tables for every node
     virtual void calculateRoutes(void)=0;
+    // print out the routing tables for every node
     virtual void print(ostream & output) const=0;
-    virtual void printStatistics(ostream & output) const=0;
 protected:
+    // Common code. Is this node valid?
     bool isValidNode(size_t node) const;
 protected:
     // Each NodeLookup in the nodeToLevel vector is a mapping from nodes
@@ -48,3 +56,6 @@ protected:
 };
 
 #endif
+
+
+

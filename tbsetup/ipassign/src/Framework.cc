@@ -43,8 +43,8 @@ Framework::Framework(Framework const & right)
     if (right.m_assign.get() != NULL)
     {
         // This just means m_assign = right.m_assign->clone()
-        // The left hand side becomes a clone of the right
-        // the reason that we bend our backs here is because
+        // The left hand side becomes a clone of the right.
+        // The reason that we bend our backs here is because
         // of an obscure C++ rule involving rvalues.
         // You don't want to know.
         m_assign.reset(right.m_assign->clone().release());
@@ -102,7 +102,7 @@ void Framework::input(istream & inputStream)
             buffer >> bits;
             if (!buffer)
             {
-                // if the line contains characters other than whitespace and
+                // the line contains characters other than whitespace and
                 // we know that it only contains numbers and whitespace
                 // therefore after reading in one number, buffer should not
                 // have flagged an error.
@@ -131,6 +131,7 @@ void Framework::input(istream & inputStream)
     }
 }
 
+// These functions simply delegate the commands.
 void Framework::ipAssign(void)
 {
     m_assign->ipAssign();
@@ -284,7 +285,3 @@ void Framework::parseArgument(string const & arg,
         }
     }
 }
-
-
-
-

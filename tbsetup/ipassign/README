@@ -6,7 +6,7 @@ certain check results and progress messages are printed to standard error
 as well. When the program is integrated with the rest of Emulab, these will
 be removed.
 
-Note that for now, the command line option should include '-c ', then either '-s ' or '-p<number> ', then one of '-h ', '-l ', or '-n '.
+Note that for now, the command line option should include '-c ', then either '-s ' or '-p<something> ', then one of '-h ', '-l ', or '-n '.
 
 Example: "bin/ipassign -c -p2 -n < graph/pastry44.graph"
          Use conservative bitspace allocation for 2 partitions with
@@ -140,32 +140,101 @@ Framework -- The framework processes the command line arguments and uses
              as an intermediary for feeding the results of ip assignment
              into the router.
 
-ConservativeAssigner --
+SquareRootPartition -- the square root of the number of LANs is calculated
+    and this number is used to determine how many partitions METIS should
+    create.
 
-HostRouter --
+SearchPartition -- METIS is called repeatedly with different numbers of
+    partitions and the result is scored. The best scored partitioning is then
+    used. The scoring function optimizes for quickest routing speed by
+    cubing the number of border LANs and adding the result to the sum of
+    the cubes of each partition size.
 
-LanRouter --
+FixedPartition -- METIS is used to create a specific number of partitions
 
-NetRouter --
+ConservativeAssigner -- The largest LAN size is used to determine the number
+    of bits used to represent hosts in a LAN. The largest partition size is
+    used to determine the number of bits to represent LANs in a partition,
+    and the remaining bits are used to represent partition number. This
+    causes waste in bitspace usage, but the bitspace is large enough that this
+    should only cause problems when tens or hundreds of thousands of nodes
+    are in a network. If the largest LAN, the largest partition, and the number
+    of partitions can each fit within their own 8-bitspace, then 8-bit
+    boundaries are used because of human readability. Note that in addition
+    to IP assignment, disconnected partitions are seperated here.
 
-Errors
-------
+HostRouter -- Ignore any hierarchy that was given to us by ip assignment.
+    Use routecalc to get the shortest path from every node to every other node
+    and use this information to calculate a route from every node to every
+    interface.
+
+LanRouter -- Ignore any hierarchy that was given to us by ip assignment.
+    Use routecalc to get the shortest path from every LAN to every other LAN,
+    and use the result to calculate a route from every node to every LAN.
+
+NetRouter -- This is a generalized algorithm that takes advantage of all levels
+    of hierarchy that ip assignment provides. Here is the outline of that
+    algorithm:
+  A) Algorithm
+    1) for each level starting at just above the LAN level
+      a) for each partition in the current level
+        i) calculateBorders()
+        ii) calculateBorderToBorderPaths()
+        iii) calculateNodeToBorderPaths()
+        iv) calculatePartitionRoutes()
+  B) calculateBorders
+    1) The border LANs at each level are a subset of the border LANs of
+       the level below.
+    2) Therefore, only border LANs of the level below need
+       to be checked to see if they are still border LANs.
+    3) To check if a LAN is a border LAN, go through every host that it
+       connects to. If any host connects to more than one partition on
+       this level, this is a border LAN.
+  C) calculateBorderToBorderPaths
+    1) Take all the border nodes within the current partition and
+       temporarily renumber them so that they are contiguous and small.
+    2) Feed them into routecalc
+    3) Take the results and update the borderConnection structure to
+       reflect the known routes.
+  D) calculateNodeToBorderPaths
+    1) From any host, we already know the routes to the border LANs in its
+       partition from the level below.
+    2) We also know the routes between the old border LANs and the new
+       ones from G.
+    3) Therefore, we can find the shortest path to the new border LANs by
+       systematically combining pairs of the two routes.
+  E) calculatePartitionRoutes
+    1) We know the routes from each host to every border LAN in its
+       sub-partition and routes from each border LAN in that sub-partition
+       to every other border LAN in the partition. Calculating routes is
+       similar to the above.
+
+
+Exceptions
+----------
 
 Non-numeric and non-whitespace characters in the input are invalid.
-LANs must have at least two nodes connected to them.
-Input graphs should be connected
+Each LAN must have at least two nodes connected to it.
+Input graphs should be connected.
+Some graph configurations could cause the bitspace to be used up.
+One of the input arguments may be invalid.
+Various impossible conditions should never happen.
 
 Room for Improvement
 --------------------
 
-
+Take the adaptive ip-assignment algorithm and turn it into an ip assignment
+    module which works with the framework.
+Create an ip-assignment module that provides more than one additional level
+    of hierarchy.
+Change output format to be more compact. Possible change it to some form of
+    binary representation.
+Modify both ip assignment and routing to allow for disconnected graphs.
+Find a better scoring algorithm for METIS.
+Find a replacement for METIS which is more suited to this particular problem.
+    I have talked with Scott a bit about a suggestion for using spanning-trees
+    in partitioning.
+Improve logging/testing automation.
 
 Bugs
 ----
-
-In the LAN-router, circular topologies are generated for large graphs. I am
-investigating it. This is not that critical as LAN routing is not used
-frequently.
-
-
-
