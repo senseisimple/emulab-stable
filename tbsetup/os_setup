@@ -4,17 +4,19 @@ use English;
 #
 # Parse an IR file and determine what OS has been requested on each node.
 # Do the database magic to make it so. Only root, admin types, or the
-# owners of the nodes in an experiments may do this.
+# owners of the nodes in an experiments may do this. The machines are then
+# rebooted (or power cycled).
 # 
 # usage: os_setup <pid> <eid> <ir_file>
 #
-my $rsh		= "sshtb -v -q";
-my $ssh		= "sshtb -v -q";
+my $rsh		= "sshtb -q";
+my $ssh		= "sshtb -q";
 my $TB		= "/usr/testbed/bin";
 my $power	= "$TB/power";
 my $ping	= "/sbin/ping";
 my $dbg		= 1;
 my %nodeos      = ();
+my $SAVEUID	= $UID;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -51,7 +53,7 @@ if ($UID != 0) {
     }
     my @row = $db_result->fetchrow_array();
     if ($row[0] ne "$me") {
-	print STDOUT "Checking for admin status ...\n";
+	print STDOUT "Checking for admin status ...\n" if $dbg;
 	$db_result = $DB->query("select admin from users where uid='$me'");
         my @row = $db_result->fetchrow_array();
 	if ($row[0] != 1) {
@@ -166,7 +168,7 @@ foreach my $node ( keys %nodeos ) {
     # proper OS, cause we modified the database above.
     #
     if ( $1 == 0 ) {
-	print STDERR "$pc appears to be dead. Power cycling ... ";
+	print STDERR "$pc appears to be dead. Power cycling ...\n";
 	PowerCycle($pc);
 	print STDERR "Done!\n";
 	next;
@@ -174,21 +176,51 @@ foreach my $node ( keys %nodeos ) {
 
     #
     # Machine is pingable at least. Try to reboot it gracefully,
-    # or power cycle anyway if that does not work.
+    # or power cycle anyway if that does not work. To this, we must
+    # change our real UID to root so that ssh will work.
     #
     print STDERR "Rebooting $pc ...\n";
+    
+    $UID = 0;
+    if (system("$ssh -l root $pc /sbin/reboot") == 0) {
+	$UID = $SAVEUID;
+	print STDERR "$pc appears to be rebooting\n" if $dbg;
+	next;
+    }
+    $UID = $SAVEUID;
 
-    if (system("$rsh -l root $pc /sbin/reboot") == 0 ||
-	system("$ssh -l root $pc /sbin/reboot") == 0) {
-	printf STDERR "$pc appears to be rebooting\n" if $dbg;
+    #
+    # Okay, before we reboot lets really make sure. On FreeBSD, it might
+    # have rebooted, but since the connection is terminated, system returns
+    # an error status. So, lets ping it again and if its pingable, the
+    # reboot must have failed. If it is not pingable, I assume that the
+    # reboot really worked, and the exit value can be ignored.
+    #
+    my $exit_value = $? >> 8;
+    print STDERR "reboot returned $exit_value. Lets make sure ...\n" if $dbg;
+
+    print STDERR "Sleeping for a few seconds to give reboot a chance ...\n";
+    sleep(10);
+    if (-e $ping) {
+	open(PING, "$ping -c 4 $pc 2>&1 |");
     }
     else {
-	print STDERR "$pc appears to be unrepsonsive Waiting a bit ...\n";
-	sleep(3);
-	print STDERR "Okay, power cycling $pc ...\n";
-	PowerCycle($pc);
-	print STDERR "Done!\n";
+	die("PING command $ping not found!\n");
     }
+    do {
+    }
+    until ( <PING> =~ /transmitted, (\d*) packets received/ );
+    close(PING);
+    print STDERR "Got back $1 ping packets from $pc.\n" if $dbg;
+
+    if ( $1 == 0 ) {
+	print STDERR "Good, $pc must have rebooted. Continuing ...\n" if $dbg;
+	next;
+    }
+	
+    print STDERR "$pc appears to still be running Power cycling ...\n";
+    PowerCycle($pc);
+    print STDERR "Done!\n";
 }
 
 print STDOUT "OS Setup Done!\n";
@@ -200,14 +232,8 @@ exit 0;
 sub PowerCycle {
     local($pc) = @_;
 
-    open(POWER, "$power cycle $pc 2>&1 |");
-    $_ = <POWER>;
-    close(POWER);
-    if ( $_ =~ /Reboot/ ) {
-	return;
-    }
-    else {
-	die("Could not power cycle $pc! Quitting\n");
+    if (system("$power cycle $pc") != 0) {
+	print STDERR "WARNING: Could not power cycle $pc. Skipping ...\n";
     }
 }
 
