@@ -679,7 +679,7 @@ sub dofloor($$)
 
 		    # Shift the label above of the orientation line would go
 		    # through it.
-		    $ly = $dy - ($DOT_RAD + 2)
+		    $dly = $dy - ($DOT_RAD + 2)
 			if ($do > 90.0 && $do < 270.0);
 		}
 		$err = $baseimage->Annotate(fill=>'black',
