@@ -329,6 +329,25 @@ Simulator instproc run {} {
 	close $file
     }
 
+    # Write out the feedback "estimate" file.
+    var_import ::TBCOMPAT::EstimatedReservations;
+
+    if {! [file isdirectory $expdir]} {
+	# Experiment directory does not exist, so we cannot write the file...
+    } elseif {[array size EstimatedReservations] > 0} {
+	set file [open "$expdir/tbdata/feedback_estimate.tcl" w]
+	puts $file "# -*- TCL -*-"
+	puts $file "# Automatically generated feedback estimated file."
+	puts $file "#"
+	puts $file "# Generated at: [clock format [clock seconds]]"
+	puts $file "#"
+	puts $file ""
+	foreach res [array names EstimatedReservations] {
+	    puts $file "set EstimatedReservations($res) $EstimatedReservations($res)"
+	}
+	close $file
+    }
+
     # If we are running in impotent mode we stop here
     if {$impotent == 1 && $passmode == 0} {return}
     

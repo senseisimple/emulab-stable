@@ -13,7 +13,20 @@
 #
 
 BEGIN {
-    OVERLOAD_MAX = 3; # XXX Make this a command line argument.
+#   The overload "threshold", so, this many overload signals in a row means
+#   the node is overloaded.  The 2.25 here requires three CPU/swapout/etc
+#   related overloads or a few timing related overloads.
+    OVERLOAD_MAX = 2.25; # XXX Make this a command line argument.
+
+#   The maximum allowed time between canaryd reports, otherwise we consider
+#   it an overload condition.
+    TIME_OVERLOAD = 1.1;
+
+#   The maximum number of pageouts allowed.  XXX I don't know the semantics...
+    SWAPOUT_OVERLOAD = 2;
+
+    DISK_OVERLOAD = 50;
+    
     error = 0;
     if( ARGC < 2 )
     {
@@ -34,18 +47,6 @@ BEGIN {
 	error = -1;
 	exit error;
     }
-    
-    printf("# -*- TCL -*-\n");
-    printf("# Automatically generated feedback file.\n");
-    printf("#\n");
-    for( lpc = 1; lpc < ARGC; lpc++ )
-    {
-	printf("# ARGV[%d]: %s\n", lpc, ARGV[lpc]);
-    }
-    printf("#\n");
-    printf("# Generated at: %s\n", strftime());
-    printf("#\n\n");
-    printf("# BEGIN Node/LAN\n");
 }
 
 #
@@ -64,13 +65,14 @@ BEGIN {
 #
 # vers=3 mis=1084907941 lave=0.0000000000,0.0000000000,0.0000000000 abits=0x5 page=0,0 ints=1134,693,82 cpu=0,1,98 iface=00:02:b3:3f:7a:20,18804,3352,14047137,457522 iface=00:03:47:73:a2:42,9079,125118,3428409,60045802 iface=00:00:00:00:00:00,0,0,0,0 iface=00:00:0a:01:08:03,2846,125780,385828,58014417 iface=00:00:0a:01:12:03,125782,2843,58015462,385822 iface=00:00:0a:01:0d:02,6285,152,2896485,19985 iface=00:00:0a:01:12:02,2845,125781,385780,58015462 vnode=dslclient-11.testdssvm.tbres.emulab.net,0.0,1.8 vnode=server.testdssvm.tbres.emulab.net,2.1,2.5 vnode=corerouter.testdssvm.tbres.emulab.net,0.0,1.2
 #
-/vers=3/ {
+/vers=2/ {
     line_count[ARGIND] += 1;
     if( (vnode_count > 1) &&
 	(line_count[ARGIND - 1] > 0) &&
 	(line_count[ARGIND - 1] < 3) )
     {
-#       There are not enough lines to deduce anything other than overload.
+#       There are not enough canaryd lines to deduce anything other than
+#       overload.
 	for( vnode_name in line_vnode_names )
 	{
 	    alerts[vnode_name] = 1;
@@ -80,12 +82,17 @@ BEGIN {
 	    alerts[mac] = 1;
 	}
     }
-    vnode_count = 0;
-    total_vnode_cpu = 0;
+
+#   Initialize some "locals"
+    vnode_count = 0; # The number of vnodes on this pnode.
+    total_vnode_cpu = 0; # The total CPU used by vnodes
+    total_vnode_pps = 0; # The total number of packets per second (in and out)
     time_diff_s = 0;
     ovld = 0;
     delete line_vnode_names;
     delete line_macs;
+
+#   Loop through the key/value pairs on the canaryd line.
     for( lpc = 2; lpc <= NF; lpc++ )
     {
 #       Determine the field type and
@@ -93,6 +100,8 @@ BEGIN {
 #       ... handle it.
 	if( field[1] == "stamp" )
 	{
+#           Timestamp, mostly just care about how far off we are from the last
+#           period.
 	    split(field[2], data, /,/);
 	    if( last_stamp_s[ARGIND] )
 	    {
@@ -107,22 +116,55 @@ BEGIN {
 	    last_stamp_s[ARGIND] = data[1];
 	    last_stamp_us[ARGIND] = data[2];
 
-#           Assume overload if the time diff is relatively large.
-	    if( time_diff_s > 1.25 )
+#           Assume some overload if the diff from the last period is relatively
+#           large.
+	    if( time_diff_s > TIME_OVERLOAD )
 	    {
-		ovld = 1;
 #               Signal multiple overload events for each missed time interval.
 		overload[ARGIND] += (time_diff_s - 1.0);
+		printf("# tstmp ovld (%f): %s\n", (time_diff_s - 1.0), $0);
 	    }
 	}
 	else if( field[1] == "ovld" )
 	{
-	    if( !ovld )
-		ovld = field[2];
+	    if( field[2] == 1 )
+		overload[ARGIND] += 1;
 	}
 	else if( field[1] == "cpu" )
 	{
+#           Total CPU time and
 	    total_cpu = field[2];
+#           ... signal overload if its too high.
+	    if( total_cpu >= 99 )
+		overload[ARGIND] += 1;
+	}
+	else if( field[1] == "intr" )
+	{
+#           Record interrupt load so we can try to assign it to node members
+#           later on.
+	    intr = field[2];
+	}
+	else if( field[1] == "sys" )
+	{
+#           Record system CPU load so we can try to assign it to node members
+#           later on.
+	    sys_cpu = field[2];
+	}
+	else if( field[1] == "mem" )
+	{
+	    split(field[2], data, /,/);
+	    if( data[2] > SWAPOUT_OVERLOAD )
+	    {
+#               Swapping out too much...
+		overload[ARGIND] += 1;
+	    }
+	}
+	else if( field[1] == "disk" )
+	{
+	    if( fields[2] > DISK_OVERLOAD )
+	    {
+		overload[ARGIND] += 1;
+	    }
 	}
 	else if( field[1] == "iface" )
 	{
@@ -175,6 +217,12 @@ BEGIN {
 	    in_pkts = in_pkts / time_diff_s;
 	    out_bw = out_bw / time_diff_s;
 	    out_pkts = out_pkts / time_diff_s;
+
+#           Record these values so we can do something with them and the
+#           interrupt load numbers later.
+	    total_vnode_pps += in_pkts + out_pkts;
+	    line_pps[link_mac] = in_pkts + out_pkts;
+	    
 #           Find the maximum of bandwidth/packets of the data seen so far.
 	    if( in_pkts > links_mac_pkts[link_mac] )
 	    {
@@ -192,6 +240,8 @@ BEGIN {
 	    {
 		links_mac_bw[link_mac] = out_bw;
 	    }
+
+#           We've seen this MAC address...
 	    line_macs[link_mac] = 1;
 	}
 	else if( field[1] == "vnode" )
@@ -217,44 +267,61 @@ BEGIN {
     }
     else if( vnode_count == 1 )
     {
-	vnodes_cpu[vnode_name,FNR] = total_cpu;
-    }
-    else
-    {
-#       Check if slothd signalled overload for this period.
-	if( ovld || (total_cpu >= 99) )
+	if( total_cpu >= 99 )
 	{
-#           We're in overload for this period, but do not signal an alert until
-#           we see OVERLOAD_MAX consecutive indicators.
-	    if( overload[ARGIND] >= OVERLOAD_MAX )
-	    {
-		for( vnode_name in line_vnode_names )
-		{
-		    alerts[vnode_name] = 1;
-		}
-		for( mac in line_macs )
-		{
-		    alerts[mac] = 1;
-		}
-	    }
-	    else
-	    {
-		overload[ARGIND] += 1;
-	    }
+	    vnodes_cpu[vnode_name,FNR] = total_cpu;
 	}
 	else
 	{
-#           We're not in overload, so we clear it, and
-	    overload[ARGIND] = 0;
-#           ... add any unaccounted for CPU to _all_ of the vnodes.  Kind of a
-#           hack, but, nothing else to do here except be conservative.
-	    diff = total_cpu - total_vnode_cpu;
-	    printf("warning: unaccounted for CPU %f\n", diff) > /dev/stderr;
+	    vnodes_cpu[vnode_name,FNR] += intr;
+	}
+    }
+    else
+    {
+#       We're in overload for this period, but do not signal an alert until
+#       we see OVERLOAD_MAX consecutive indicators.
+	if( overload[ARGIND] >= OVERLOAD_MAX )
+	{
+	    printf("# overload! %f %f\n", last_overload[ARGIND], overload[ARGIND]);
 	    for( vnode_name in line_vnode_names )
 	    {
-		vnodes_cpu[vnode_name,FNR] += diff;
+		alerts[vnode_name] = 1;
+	    }
+	    for( mac in line_macs )
+	    {
+		alerts[mac] = 1;
 	    }
 	}
+	else if( last_overload[ARGIND] == overload[ARGIND] )
+	{
+	    overload[ARGIND] = 0;
+	}
+	else
+	{
+	    printf("# more overload %f %f\n", last_overload[ARGIND], overload[ARGIND]);
+	}
+	if( total_vnode_pps > 0 )
+	{
+#           Try to guess how much interrupt load can be attributed to a vnode
+#           based on the number of packets sent/received.
+	    ipp = intr / total_vnode_pps;
+	    printf("# ipp %f = %f / %f\n", ipp, intr, total_vnode_pps);
+	    for( mac in line_macs )
+	    {
+		if( mac in mac2node )
+		{
+		    nipp = ipp * line_pps[mac];
+		    vnodes_cpu[mac2node[mac],FNR] += nipp;
+		    printf("# adding %s %s %f -> %f\n", 
+			   mac2node[mac],
+			   mac2link[mac],
+			   nipp,
+			   vnodes_cpu[mac2node[mac],FNR]);
+		}
+	    }
+	}
+	
+	last_overload[ARGIND] = overload[ARGIND];
     }
 }
 
@@ -273,27 +340,8 @@ BEGIN {
 #   set Reservations(link,node0,kbps) 123235.00
 #
 /^[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]]\:[[:xdigit:]][[:xdigit:]] [[:alnum:]\-]* [[:alnum:]\-]*$/ {
-    if( $1 in links_mac )
-    {
-	printf("set Reservations(%s,%s,kbps) %f\n",
-	       $3,
-	       $2,
-	       (links_mac_bw[$1] * 8) / 1000.0);
-	printf("set Reservations(%s,%s,pps) %f\n",
-	       $3,
-	       $2,
-	       links_mac_pkts[$1]);
-	links_name[$3] = 1;
-	if( links_mac_bw[$1] > links_bw[$3] )
-	    links_bw[$3] = links_mac_bw[$1];
-	if( links_mac_pkts[$1] > links_pkts[$3] )
-	    links_pkts[$3] = links_mac_pkts[$1];
-	if( $1 in alerts )
-	{
-	    printf("set Alerts(%s,%s) 1\n", $3, $2);
-	    printf("set Alerts(%s) 1\n", $3);
-	}
-    }
+    mac2node[$1] = $2;
+    mac2link[$1] = $3;
 }
 
 #
@@ -304,6 +352,56 @@ END {
     if( error )
     {
 	exit error;
+    }
+
+    if( (vnode_count > 1) &&
+	(line_count[ARGIND - 1] > 0) &&
+	(line_count[ARGIND - 1] < 3) )
+    {
+#       There are not enough lines to deduce anything other than overload.
+	for( vnode_name in line_vnode_names )
+	{
+	    alerts[vnode_name] = 1;
+	}
+	for( mac in line_macs )
+	{
+	    alerts[mac] = 1;
+	}
+    }
+
+    printf("# -*- TCL -*-\n");
+    printf("# Automatically generated feedback file.\n");
+    printf("#\n");
+    for( lpc = 1; lpc < ARGC; lpc++ )
+    {
+	printf("# ARGV[%d]: %s\n", lpc, ARGV[lpc]);
+    }
+    printf("#\n");
+    printf("# Generated at: %s\n", strftime());
+    printf("#\n\n");
+    printf("# BEGIN Node/LAN\n");
+
+    for( mac in mac2node )
+    {
+	printf("set Reservations(%s,%s,kbps) %f # %s\n",
+	       mac2link[mac],
+	       mac2node[mac],
+	       (links_mac_bw[mac] * 8) / 1000.0,
+	       mac);
+	printf("set Reservations(%s,%s,pps) %f\n",
+	       mac2link[mac],
+	       mac2node[mac],
+	       links_mac_pkts[mac]);
+	links_name[mac2link[mac]] = 1;
+	if( links_mac_bw[mac] > links_bw[mac2link[mac]] )
+	    links_bw[mac2link[mac]] = links_mac_bw[mac];
+	if( links_mac_pkts[mac] > links_pkts[mac2link[mac]] )
+	    links_pkts[mac2link[mac]] = links_mac_pkts[mac];
+	if( mac in alerts )
+	{
+	    printf("set Alerts(%s,%s) 1\n", mac2link[mac], mac2node[mac]);
+	    printf("set Alerts(%s) 1\n", mac2link[mac]);
+	}
     }
 
     printf("# END Node/LAN\n\n");

@@ -62,6 +62,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use event;
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -170,26 +171,46 @@ if ($mode eq "record") {
     }
     
     print STDOUT "Starting tracers...\n";
+
+    # Just need to send a START event to all of the canaryds.
+    my $handle = event_register_withkeyfile("elvin://boss",
+					    0,
+					    "/proj/$pid/exp/$eid/tbdata/eventkey");
+    if (!$handle) { die "Unable to register with event system\n"; }
+
+    my $tuple = address_tuple_alloc();
+    if (!$tuple) { die "Could not allocate an address tuple\n"; }
+    
+    # XXX Need to update DB and what not to say "CANARYD" instead of "SLOTHD"
+    %$tuple = ( objtype => "SLOTHD",
+		eventtype => "START",
+		expt => "$pid/$eid",
+		host => "*",
+		site => "*",
+		group => "*",
+		objname => "slothd");
+    
+    my $notification = event_notification_alloc($handle,$tuple);
+    if (!$notification) { die "Could not allocate notification\n"; }
+
+    # Tell canaryd how long it should record data for.
+    event_notification_put_string($handle, $notification, "ARGS",
+				  "DURATION=$duration");
+
+    if (!event_notify($handle, $notification)) {
+	die("could not send test event notification");
+    }
+    
+    event_notification_free($handle, $notification);
+    
+    if (event_unregister($handle) == 0) {
+	die("could not unregister with event system");
+    }
     
     # Get the list of virtual hosts for the virtual nodes.
     my $query_result =
 	DBQueryFatal("select node_id,vname from reserved ".
 		     "where pid='$pid' and eid='$eid' and erole='virthost'");
-    
-    # Iterate through the virthosts starting up slothd in high-resolution
-    # tracing mode.
-    while (my ($node_id,$vname) = $query_result->fetchrow_array()) {
-	my $cmd;
-	
-	$cmd = "rm -f /var/run/slothd.pid";
-	if (!$fake) {
-	    system("/usr/local/bin/sudo $TB/bin/sshtb -host $node_id \"$cmd\"");
-	}
-	$cmd = "/proj/tbres/kwebb/evslothd -e -i 1 -t ${duration}";
-	if (!$fake) {
-	    system("/usr/local/bin/sudo $TB/bin/sshtb -host $node_id \"$cmd\"");
-	}
-    }
     
     # Sleep for the duration of the run, then
     sleep($duration + 3);
@@ -207,10 +228,8 @@ if ($mode eq "record") {
 	$cmd = "/usr/local/bin/rsync -az ".
 	    "--rsh=\"/usr/local/bin/sudo sshtb -host \" ".
 		"${node_id}:/var/emulab/logs/ ${expdir}/logs/${vname}/";
-	$vhost_logs .= " ${expdir}/logs/${vname}/slothd.log";
-	#if (!$fake) {
-	    system($cmd);
-	#}
+	$vhost_logs .= " ${expdir}/logs/${vname}/canaryd.log";
+	system($cmd);
     }
     
 
@@ -305,7 +324,7 @@ if ($mode eq "record") {
     # Start digest-slothd with all of the slothd logs, tee its output to the
     # feedback file, and
     open(DIGESTER,
-	 "| $digest_slothd ${vhost_logs} - ".
+	 "| $digest_slothd - ${vhost_logs} ".
 	 " | tee ${expdir}/tbdata/feedback_data.tcl") or
 	     fatal("Could not run digest-slothd!");
     

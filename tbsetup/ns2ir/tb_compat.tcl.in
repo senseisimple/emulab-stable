@@ -135,6 +135,13 @@ namespace eval TBCOMPAT {
     # to be read in during future evaluations of the NS file.
     variable BootstrapReservations
 
+    # Table of vnodes/vlinks that were locate on an overloaded pnode.
+    variable Alerts
+
+    # Table of "estimated" reservations.  Basically, its our memory of previous
+    # guesses for vnodes that have 0% CPU usage on an overloaded pnode.
+    variable EstimatedReservations
+
     # The experiment directory, this is where the feedback related files will
     # be read from and dumped to.  XXX Hacky
     set expdir "/proj/${::GLOBALS::pid}/exp/${::GLOBALS::eid}/"
@@ -154,6 +161,10 @@ namespace eval TBCOMPAT {
     # Get any bootstrap feedback data from a previous run.
     if {[file exists "${expdir}/tbdata/bootstrap_data.tcl"]} {
 	source "${expdir}/tbdata/bootstrap_data.tcl"
+    }
+    # Get any estimated feedback data from a previous run.
+    if {[file exists "${expdir}/tbdata/feedback_estimate.tcl"]} {
+	source "${expdir}/tbdata/feedback_estimate.tcl"
     }
 
     #
@@ -192,6 +203,27 @@ namespace eval TBCOMPAT {
 	    # Node-specific values exist, use those.
 	    set retval 1
 	}
+	return $retval
+    }
+
+    #
+    # Produce an estimate of a vnode's resource usage.  If a guess was already
+    # made in the previous iteration, double that value.  Otherwise, we just
+    # assume 10%.
+    #
+    # @param object The object for which to produce the estimate.
+    # @param rtype The resource type: cpupercent, rampercent
+    # @return The estimated resource usage.
+    # 
+    proc feedback-estimate {object rtype} {
+	var_import ::TBCOMPAT::EstimatedReservations
+
+	if {[array get EstimatedReservations $object,$rtype] != ""} {
+	    set retval [expr [set EstimatedReservations($object,$rtype)] * 2]
+	} else {
+	    set retval 10.0; # XXX get from DB
+	}
+	set EstimatedReservations($object,$rtype) $retval
 	return $retval
     }
 
@@ -1069,8 +1101,8 @@ proc tb-feedback-vnode {vnode hardware args} {
     # ... set computed default values, and
     if {[::TBCOMPAT::feedback-defaults $vnode $(-rclass)] == 0} {
 	# No feedback exists yet, so we assume 100%.
-	set Reservations($vnode,cpupercent) 100.0
-	set Reservations($vnode,rampercent) 100.0
+	set Reservations($vnode,cpupercent) 92.0
+	set Reservations($vnode,rampercent) 80.0
 	tbx-log "  Initializing node, $vnode, to one-to-one."
     }
 
@@ -1093,12 +1125,27 @@ proc tb-feedback-vnode {vnode hardware args} {
 	    return
 	}
 	if {([array get Alerts $vnode] != "") && [set Alerts($vnode)] > 0} {
-	    tbx-log "Alert for $vnode"
-	    set desired_reservation \
-		    [expr $desired_reservation * $(-alertscale)]; # XXX
+	    # The pnode was overloaded, need to adjust the reservation in a
+	    # more radical fashion.
+	    tbx-log "Alert for $vnode $desired_reservation"
+	    if {$desired_reservation < 0.1} {
+		# No good data to work with, make an estimate.
+		set desired_reservation [::TBCOMPAT::feedback-estimate \
+			$vnode $reservation_type]
+	    } else {
+		# Some data, try applying the alert scale value.
+		set desired_reservation \
+			[expr $desired_reservation * $(-alertscale)]; # XXX
+	    }
 	}
-	if {$desired_reservation > 100.0} {
-	    set desired_reservation 100.0
+	if {$reservation_type == "cpupercent"} {
+	    if {$desired_reservation > 92.0} {
+		set desired_reservation 92.0
+	    }
+	} else {
+	    if {$desired_reservation > 80.0} {
+		set desired_reservation 80.0
+	    }
 	}
 	tbx-log "  $reservation_type: ${desired_reservation}"
 	# Finally, tell assign about our desire.
@@ -1173,6 +1220,8 @@ proc tb-feedback-vlan {vnode lan args} {
 	}
 	if {([array get Alerts $lan,$vnode] != "") &&
 	    [set Alerts($lan,$vnode)] > 0} {
+	    # The pnode was overloaded, need to adjust the reservation in a
+	    # more radical fashion.
 	    tbx-log "Alert for $lan, $vnode"
 	    set desired_reservation \
 		    [expr $desired_reservation * $(-alertscale)]; # XXX
