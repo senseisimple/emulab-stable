@@ -758,7 +758,7 @@ sub ListVLANs {
     $sess->getnext($field);
     do {
 	@data = @{$field};
-	print "$data[0]\t$data[1]\t$data[2]\n";
+	#print "$data[0]\t$data[1]\t$data[2]\n";
 	if ($data[0] =~ /policyVlanName/) { $Names{$data[1]} = $data[2]; }
 	if ($data[0] =~ /MacRuleVlanId/) 
 	{ 
