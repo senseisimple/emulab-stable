@@ -39,7 +39,7 @@ if ($UID != 0) {
 # information from the database. This is so we don't end up with information
 # that's _too_ out of sync.
 #
-my $reload_time = 360;
+my $reload_time = 3600;
 
 #
 # Process command-line arguments
@@ -167,6 +167,13 @@ while (1) {
 sub readStates(;@) {
     	my %oldnodes = @_;
 
+	#
+	# Guard against undefined variable warnings
+	#
+	if (! defined(%oldnodes)) {
+		%oldnodes = ();
+	}
+
 	debug("readStates called\n");
 	my $result = DBQueryFatal("SELECT node_id, eventstate, " .
 				  "state_timestamp, op_mode, " .
@@ -264,7 +271,7 @@ sub stateTransition($$) {
 		notify("Got an event for a node ($node) I don't know ".
 		      "about\n");
 	}
-	if ($oldstate && $valid{$mode} && $valid{$mode}{$oldstate} &&
+	if ($oldstate && $mode && $valid{$mode} && $valid{$mode}{$oldstate} &&
 			!$valid{$mode}{$oldstate}{$newstate}) {
 		notify("Invalid transition for node $node from $oldstate " .
 		       " to $newstate\n");
