@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2002 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -78,8 +78,8 @@ single string to the connection, and then waits for an <b>optional</b>
 response, which is a newline separated list of strings. The TMMC exits
 when the other side of the connection is closed by the TMCD. The
 source code for the TMCC is available upon request by sending email to
-<a href="mailto:testbed-ops@flux.cs.utah.edu"> Testbed Operations
-(testbed-ops@flux.cs.utah.edu)</a>
+<a href="mailto:testbed-ops@flux.utah.edu"> Testbed Operations
+(testbed-ops@flux.utah.edu)</a>
 
 <p>
 <li> <a NAME="SETUP"></a>
@@ -89,10 +89,8 @@ The Emulab versions of FreeBSD 4.5, Redhat Linux 7.1, and Netbsd 1.4
 all run a <i>setup</i> script at bootup that uses the TMCC client to
 configure the node. All of the interfaces are configured, user
 accounts for each of the members of the project are created, NFS
-mounts are made, etc. These setup scripts are located in /etc/testbed
-on FreeBSD and Netbsd, and in /etc/rc.d/testbed on Linux. You can use
-these scripts as a guide when writing setup code to configure your
-custom operating systems.
+mounts are made, etc. These setup scripts are located in
+/usr/local/etc/emulab.
 
 <p>
 <li> <a NAME="REFERENCE"></a>
