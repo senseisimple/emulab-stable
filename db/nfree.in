@@ -230,13 +230,13 @@ foreach my $n (@freed_nodes) {
 
     # Find the default values for its node type.
     my $result =
-	DBQueryFatal("select nt.osid, " .
+	DBQueryFatal("select nt.osid,n.eventstate, " .
 		     "       nt.isvirtnode, nt.imageable, o.mustclean ".
 		     " from nodes as n " .
 		     "left join node_types as nt on n.type=nt.type " .
 		     "left join os_info as o on o.osid=n.def_boot_osid ".
 		     "where node_id='$n'");
-    my ($osid, $isvirt, $imageable, $clean) = $result->fetchrow_array();
+    my ($osid, $estate, $isvirt, $imageable, $clean) = $result->fetchrow_array();
 
     # See if the OS it was running was marked as mustclean or not. Basically,
     # this is an OSKit hack to avoid reloading disks that have not been
@@ -275,6 +275,14 @@ foreach my $n (@freed_nodes) {
 		"update_accounts=0,ipport_next=ipport_low, ".
 		"sfshostid=NULL,allocstate='$allocFreeState' ".
 		"where node_id='$n'") || $error++;
+
+    #
+    # If the node is a virtnode, force its state to SHUTDOWN. This is mostly
+    # to avoid silly stated warnings for nodes that do not have a physical
+    # representation most of the time!
+    #
+    TBSetNodeEventState($n, TBDB_NODESTATE_SHUTDOWN)
+	if ($isvirt && $estate ne TBDB_NODESTATE_SHUTDOWN());
 
     # Clean out the current_reloads table (a just in case measure).
     DBQueryWarn("delete from current_reloads where node_id='$n'") || $error++;
