@@ -1,6 +1,5 @@
 OVERVIEW
 ********
-
 The testbed event system is composed of four parts: (1) the event
 library, which implements a simple, transport-independent API that
 clients may use to trigger and respond to events; (2) the event
@@ -11,12 +10,28 @@ respond to various system events on behalf of the testbed.  Each
 of these four parts are described in more detail in the following
 sections.
 
+Quick Elvin Overview
+====================
+
+The testbed event system currently uses the Elvin publish/subscribe
+system for communicating between event producers and event consumers.
+Elvin uses a client/server architecture for delivering notifications.
+The server accepts subscriptions from clients and routes notifications
+from producers to the consumers that wish to receive them.
+Notifications are arbitrary-length lists of name/value pairs (e.g.,
+"type: NODE_FAILED, time: 23"), and subscriptions are expressed using
+a simple syntax (e.g., "type == NODE_FAILED && time > 20").  Clients
+can be both producers and consumers in the same session.  Clients may
+be written in C, C++, Java, Python, and Emacs Lisp.  For more
+information about how Elvin works, please see http://elvin.dstc.com/.
+
+
 Event library
 =============
 
 Clients in the system trigger and respond to events using the event
 library.  The event library is currently implemented as a layer above
-the Elvin publish/subscribe system (see "ELVIN OVERVIEW" below for a
+the Elvin publish/subscribe system (see "ELVIN OVERVIEW" above for a
 brief overview of how Elvin works).  A library and API separate from
 Elvin exists for several reasons:
 
@@ -34,89 +49,255 @@ Elvin exists for several reasons:
       API, so it should be much easier to implement in environments
       such as the Linux kernel, the OSKit, or Scout.
 
-The event library is currently available as a C library on Unix.
-The C API is described in the API file.
+The event library is currently available as a C library on Unix, and
+as a PERL module. The C API is described in the API file, while the
+Perl interface is described in API.PERL.
+
 
 Event representation
---------------------
+====================
 
-Events are represented by Elvin notifications that contain two system
-defined fields: (1) "host", which specifies the hostname of the
-testbed node that should receive the event notification, or "*" if the
-event notification should be sent to all nodes; and (2) "type", which
-specifies the event type.  In addition to the system defined fields,
-event notifications may contain additional attributes (in
-the form of name/value pairs) that may be used to provide additional
-information about the event that has occurred.
+Events are represented by Elvin notifications that contain a number of
+system defined fields which specifies what client should receive the
+notifications. The system defined fields include:
+
+    typedef struct {
+	char		*site;		/* Which Emulab site. */
+	char		*expt;		/* Project and experiment IDs */
+	char		*group;		/* User defined group of nodes */
+	char		*host;		/* A specific host (ipaddr) */
+	char		*objtype;	/* LINK, TRAFGEN, etc ... */
+        char		*objname;	/* link0, cbr0, cbr1, etc ... */
+        char		*eventtype;	/* START, STOP, UP, DOWN, etc ... */
+	int		scheduler;	/* A dynamic event to schedule */
+    } address_tuple;
+    
+The last field, scheduler, is used internally to route notifications to the
+scheduler for an experiment. This is described in more detail below.
+
+In addition to the system defined fields, event notifications may contain
+additional attributes (in the form of name/value pairs) that may be used to
+provide additional information about the event that has occurred. Each
+event client is responsible for extracting those additional fields as is
+necessary.
+
+To further hide the details of Elvin, event clients use a simple API to
+construct a notification or a subscription. The API functions take an
+"address_tuple" structure as above. The library converts the fields in this
+structure into an Elvin notification or subscription statement. 
+
 
 Event scheduler
 ===============
 
-The event scheduler is an event system client responsible for
-triggering future events.  To schedule an event for firing at a
-future time, event system clients may call the event library API
-function event_schedule.  event_schedule accepts a notification
-and a firing time, alters the notification to change the type
-attribute to EVENT_SCHEDULE and add a firing time attribute, and
-then sends the altered notification using event_notify.  The event
-scheduler subscribes to EVENT_SCHEDULE notifications.  As they
-arrive, it restores the type in the notification to that of the
-original event and enqueues the notification in a priority queue
-for firing at the indicated time.  When the time arrives, the
-scheduler removes the notification from the queue and resends it
-using event_notify.
+The event scheduler is an plain event system client responsible for
+triggering future events. There is an event scheduler running for each
+swapped in experiment on the testbed. The scheduler subscribes to all
+events for its experiment (see "expt" field above), that have the
+"scheduler" bit set.
+
+To schedule an event for firing at a future time, event system clients may
+call the event library API function event_schedule.  event_schedule accepts
+a notification and a firing time, alters the notification so that the
+"scheduler" bit is on and includes a firing time attribute, and then sends
+the altered notification using event_notify. The event scheduler receives
+this event since it is listening for events with the scheduler bit on!
+
+As the events arrive, it clears the scheduler bit in the notification and
+removes the firing time attribute. The notification is then enqueued in a
+priority queue for firing at the indicated time.  When the time arrives,
+the scheduler removes the notification from the queue and resends it using
+event_notify. 
+
 
 Frontend support
 ================
 
-[ Note that the event system currently has no frontend support. Such
-  support needs to be added for each system event type that needs to
-  be supported, e.g. traffic generation control. ]
+There two frontends to the event system, one static and one dynamic.
 
-The frontend for static events is the NS script. Frontend support
-for static events consists of a set of modifications to the NS
-parser that extracts events from the NS script and passes them to
-the event scheduler. For example, the NS command
+Static Events - The frontend for static events is the NS script, using the
+ns "at" statement:
 
     $ns at 0.5 "$cbr0 start"
 
-might cause a event with type=TRAFGEN_START and host=<hostname of the
-node $cbr0 is attached to> to be scheduled by the event scheduler for
-execution in 0.5 seconds.
+Each "at" statement is converted by the NS parser to an entry in the DB for
+that experiment. When the experiment is swapped in and the scheduler
+started, it reads the static event list from the DB, building the initial
+queue of events to be fired at their respective times. Each DB entry is
+converted to a corresponding event notification structure based on the name
+of the object, the type of event, and any arguments to be sent along with
+it.
 
-The frontend for dynamic events could be a GUI that either triggers
-events directly (using the event library) or schedules events to be
-triggered in the future (using the event scheduler).
+Dynamic Events - The frontend for dynamic events is the "tevc" client
+program that runs on users.emulab.net or on any of the local nodes in an
+experiment. Briefly, the tevc client allows you to inject an event that
+will be received by the scheduler for an experiment. For example, to
+control the "cbr0" object above:
+
+    tevc -e foo/bar now cbr0 start
+
+This will construct a notification, and send it using the event_schedule()
+API function described above. The per-experiment scheduler will recieve the
+notification and schedule it accordingly. More information on the tevc
+client can be found at:
+
+	www.emulab.net/tutorial/docwrapper.php3?docname=advanced.html
+
 
 Backend support
 ===============
 
-[ As with frontend support, the event system currently has no backend
-  support. Such support needs to be added for each system event
-  type that needs to be supported, e.g. traffic generation control. ]
+The backends are event system clients responsible for responding to certain
+events on behalf of the testbed.  For example, the testbed traffic
+generators respond to events so that they can be controlled via the NS file
+or with dynamic events. A trafgen can be started, stopped, or its
+parameters may be changed on the fly during an experiment.
 
-The backends are event system clients responsible for responding to
-certain events on behalf of the testbed.  For example, traffic
-generation nodes might be event system backends that start generating
-traffic when they receive the TRAFGEN_START event notification
-and stop generating traffic when they receive the TRAFGEN_STOP
-event notification.
+Each client subscribes to the event system with a subscription that
+includes at least the name of the object ("cbr0") and the experiment
+(pid/eid) in which it is running. The subscription can be more finely tuned
+of course, say by listening for specific types of events (START, STOP,
+etc), or a client can listen for all events of a particular type (LINK,
+TRAFGEN, etc). A client can also listen for all events in an experiment by
+setting all of the fields to ANY except the expt field, which should always
+be set to pid/eid (although nothing actually enforces this; a client may
+listen for events in any experiment, but since nothing sensitive is ever
+sent via the event system, this is deemed okay).
 
-ELVIN OVERVIEW
-**************
+More information on backend clients can be found at:
+www.emulab.net/tutorial/docwrapper.php3?docname=advanced.html
 
-The testbed event system currently uses the Elvin publish/subscribe
-system for communicating between event producers and event consumers.
-Elvin uses a client/server architecture for delivering notifications.
-The server accepts subscriptions from clients and routes notifications
-from producers to the consumers that wish to receive them.
-Notifications are arbitrary-length lists of name/value pairs (e.g.,
-"type: NODE_FAILED, time: 23"), and subscriptions are expressed using
-a simple syntax (e.g., "type == NODE_FAILED && time > 20").  Clients
-can be both producers and consumers in the same session.  Clients may
-be written in C, C++, Java, Python, and Emacs Lisp.  For more
-information about how Elvin works, please see http://elvin.dstc.com/.
+Implementation Details
+======================
 
-Elvin supports wide-area federations of Elvin servers; we can use this
-feature to enable a global event namespace across multiple testbeds in
-different geographic locations when the time comes.
+The original implementation was very simple. There was an instance of
+elvind running on boss, and each event scheduler as well as all of the
+event clients on every node, connected to that elvind via TCP. This quickly
+got out of hand as we added more physical nodes, and then added jailed
+nodes (which also run event clients inside).
+
+We experimented with Elvin's UDP mode, but we found that it does not work
+properly (nor does its unix domain socket mode), but even if it did, there
+is no reliability model built into it.
+
+We then changed to the following model:
+
+         Boss                   |                Testbed Node
+                                |
+   Event      Elvin             |           Event      Elvin       Node
+   ----->---->------>--->control network--->----->---->----->---->------
+   Sched      Daemon            |           Proxy      Daemon     Agents
+                                |
+	event flow ===>  	|
+
+
+The above scheme reduces the number of TCP connections to one per physical
+node. Each agent on a node connects to a local elvind. If the node is
+hosting jails, then agents running inside the jail also connect to the
+elvind on the physical node via "localhost".
+
+An "event proxy" runs on each node. This is a poor mans implementation of
+"clustering" which also does not work in 4.0. Instead, we wrote a simple
+proxy that subscribes to both the local elvind and the elvind on boss. The
+proxy subscribes to all events for that physical node. Each event the proxy
+receives is then forwarded to the local elvind (via the usual event
+notification API function) without change. The local elvind delivers the
+event to proper agent, as specified in the agent's subscription.
+
+The event scheduler handles both static (from the NS file) and dynamic
+(command line) events. Static events follow the path described above
+exactly, since they originate from the scheduler at the proper time.
+
+Dynamic events are injected with the tevc client. This causes an additional
+hop through elvind on boss:
+
+    users.emulab.net     |                  Boss
+                         |
+     Tevc                |             Elvin        Event
+    ------>------>control network----->------>----->------> ...
+    Client               |             Daemon       Sched
+                         |
+    event flow ===>      |
+
+tevc sets the scheduler bit in the notification, as well as the pid/eid.
+As described above, the event scheduler on boss is listening for these
+events. See above for more details.
+
+While this may sound sound really complicated (and it is!), the time it
+takes to deliver a static event is not too bad; about 1ms. Dynamic events
+take a little more, but still less than 2ms.
+
+
+Security
+========
+
+This section describes work in progress, but not yet finished. It should be
+finished real soon.
+
+Security is based on end-to-end HMACs using a shared secret key that is
+transfered to the client via the secure tmcd connection and placed on the
+local disk. Notifications and the attached HMAC are transferred in the
+clear; there is no encryption of the event stream. The goal is strictly
+authentication of notifications before they are delivered to the clients.
+
+Further, widearea clients will not be able to inject events at this
+time. We will enforce that by firewalling the elvin port at the
+firewall. They will be able to receive events only. Event clients on
+widearea nodes *must* use the aforementioned authentication mechanism as
+well, to ensure that they do get bogus events. This is desctibed in more
+detail below in the section on widearea nodes.
+
+All of the event client programs take a [-k keyfile] argument that points
+to the file containing the key. This obviously has to be kept secret! The
+name of the file is passed to the event library when the client registers,
+thus the key is totally opaque to the clients and servers.
+
+The frontend programs (event scheduler and tevc) attach the HMACs to each
+event before it is sent. Note that events generated with tevc flow through
+the scheduler, but because the notification includes the scheduler info,
+which must be removed, the hmac must be recomputed after the notification
+is altered. For static events, the scheduler computes the HMAC when the
+event list is read from the DB, thus keeping that computation out of the
+delivery path.
+
+The scheduler gets the secret key from the DB, while tevc gets the key from
+the /proj/$pid/exp/$eid/tbdata directory. Since only people in the
+project/experiment can access the tbdata directory, only authorized people
+will be able to inject events for an experiment.
+
+Each node that cares about security (which should be *all* remote nodes)
+passes the keyfile name to the event client on the command line. If the
+event library has a keyfile it will compute a HMAC and attach it to the
+notification on the server, and compute/compare the HMAC if it is a
+client. In other words, a notification might have an HMAC, but if the
+client has not provided a keyfile, no check will be done on the
+notification. This is fairly coarse control of course, and we might need to
+extend this. If the HMACs do not compare, the notification is dropped in
+the client side library (warning printed).
+
+The API change for supplying the key to the event system is two new
+functions, and will eventually replace the original event_register().
+
+    event_handle_t
+    event_register_withkeyfile(char *name, int threaded, char *keyfile);
+
+    event_handle_t
+    event_register_withkeydata(char *name, int threaded,
+	   		       unsigned char *keydata, int keylen);
+
+
+The first function allows you to provide a file, which the event library
+will read the key from. The second allows you to supply the key directly,
+say if you were to read it from the DB.
+
+What about subscriptions and snooping? Since we are not using Elvin's
+builtin security mechanisms, the Elvin subscription protocol makes it easy
+to capture events simply by connecting to the server and supplying an
+appropriate subscription. Since we do not send any sensitive information
+via the event system, this is okay. The event stream is also sent in clear
+text, and in the widearea it would be easy to snoop the events. Again, this
+is not considered a problem.
+
+
+Widearea Nodes
+==============
