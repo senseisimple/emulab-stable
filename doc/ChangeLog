@@ -1,3 +1,1135 @@
+stoller     2004/02/17 15:06:34 MST
+
+  Modified files:
+    tmcd/common          GNUmakefile.in bootvnodes libsetup.pm 
+                         libtmcc.pm rc.linktest rc.slothd 
+                         rc.testbed runstartup update vnodesetup 
+                         watchdog 
+    tmcd/freebsd         GNUmakefile.in delaysetup liblocsetup.pm 
+                         mkextrafs.pl prepare rc.conf 
+                         rc.delayagent rc.kname rc.mfs supfile.in 
+                         testbed.sh 
+    tmcd/freebsd/jail    mkjail.pl rc.injail rc.local 
+    tmcd/linux           GNUmakefile.in delaysetup liblocsetup.pm 
+                         prepare supfile.in testbed 
+    tmcd/plab            GNUmakefile.in rc.inplab 
+  Added files:
+    tmcd/common          ifsetup rc.bootsetup 
+    tmcd/common/config   librc.pm rc.accounts rc.config rc.delays 
+                         rc.hostnames rc.ifconfig rc.keys rc.misc 
+                         rc.mounts rc.progagent rc.route rc.rpms 
+                         rc.simulator rc.startcmd rc.syncserver 
+                         rc.tarfiles rc.template rc.trafgen 
+                         rc.tunnels 
+  Removed files:
+    tmcd/common          bootsetup rc.agents rc.progagent rc.setup 
+    tmcd/freebsd         ifsetup 
+    tmcd/freebsd/jail    jailsetup 
+    tmcd/plab            plabsetup 
+  Log:
+  Medium size cleanup of the client side code. The main impetus behind
+  this was to add soft reconfig support so that nodes could be
+  reconfigured without having to reboot them. This appears to work, and
+  has been tested with jails getting moved around. I've also tested the
+  new code on the MFS, but still no testing has been done on PLAB nodes.
+  
+  The main change is that most of the code moved out of libsetup.pm, and
+  was split into constituent rc scripts, each of which does its own
+  thing, including cleaning up and preparing for making an image. Most
+  of that central knowledge has been moved out into the scripts. Still more
+  to do but this was a good start.
+  
+  Revision  Changes    Path
+  1.19      +7 -8      testbed/tmcd/common/GNUmakefile.in
+  1.12      +105 -41   testbed/tmcd/common/bootvnodes
+  1.97      +304 -2246 testbed/tmcd/common/libsetup.pm
+  1.9       +35 -1     testbed/tmcd/common/libtmcc.pm
+  1.2       +3 -0      testbed/tmcd/common/rc.linktest
+  1.3       +2 -1      testbed/tmcd/common/rc.slothd
+  1.2       +2 -2      testbed/tmcd/common/rc.testbed
+  1.5       +11 -4     testbed/tmcd/common/runstartup
+  1.7       +44 -70    testbed/tmcd/common/update
+  1.20      +32 -49    testbed/tmcd/common/vnodesetup
+  1.12      +4 -3      testbed/tmcd/common/watchdog
+  1.43      +7 -8      testbed/tmcd/freebsd/GNUmakefile.in
+  1.13      +26 -31    testbed/tmcd/freebsd/delaysetup
+  1.42      +40 -15    testbed/tmcd/freebsd/liblocsetup.pm
+  1.3       +3 -3      testbed/tmcd/freebsd/mkextrafs.pl
+  1.27      +4 -1      testbed/tmcd/freebsd/prepare
+  1.4       +4 -2      testbed/tmcd/freebsd/rc.conf
+  1.9       +7 -5      testbed/tmcd/freebsd/rc.delayagent
+  1.2       +7 -0      testbed/tmcd/freebsd/rc.kname
+  1.6       +152 -38   testbed/tmcd/freebsd/rc.mfs
+  1.4       +1 -1      testbed/tmcd/freebsd/supfile.in
+  1.4       +3 -5      testbed/tmcd/freebsd/testbed.sh
+  1.30      +146 -72   testbed/tmcd/freebsd/jail/mkjail.pl
+  1.4       +138 -45   testbed/tmcd/freebsd/jail/rc.injail
+  1.5       +2 -2      testbed/tmcd/freebsd/jail/rc.local
+  1.38      +4 -4      testbed/tmcd/linux/GNUmakefile.in
+  1.4       +30 -18    testbed/tmcd/linux/delaysetup
+  1.24      +31 -12    testbed/tmcd/linux/liblocsetup.pm
+  1.24      +4 -1      testbed/tmcd/linux/prepare
+  1.5       +1 -1      testbed/tmcd/linux/supfile.in
+  1.6       +1 -0      testbed/tmcd/linux/testbed
+  1.10      +4 -2      testbed/tmcd/plab/GNUmakefile.in
+  1.5       +214 -37   testbed/tmcd/plab/rc.inplab
+
+stoller     2004/02/16 08:34:35 MST
+
+  Modified files:
+    tbsetup              assign_wrapper.in tbswap.in 
+  Log:
+  Add new -f flag to assign_wrapper, and have tbswap use that flag when
+  tbswap is doing a swapretry (this happens during a normal swapin, when
+  a node fails). In this case, we want to fix all the nodes (overriding
+  user setting) when replacing failed nodes!
+  
+  Revision  Changes    Path
+  1.161     +17 -5     testbed/tbsetup/assign_wrapper.in
+  1.34      +8 -5      testbed/tbsetup/tbswap.in
+
+ricci       2004/02/13 15:42:46 MST
+
+  Modified files:
+    doc                  setup-cisco.txt 
+  Log:
+  Recommend turning off MAC aging for the control network.
+  
+  Revision  Changes    Path
+  1.4       +6 -0      testbed/doc/setup-cisco.txt
+
+stoller     2004/02/12 14:26:13 MST
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+  Log:
+  Fix problem with trivial links not getting lindelays. In the case that
+  a 100Mb link is mapped to a trivial link, a linkdelay has to be
+  inserted since the actual loopback bandwidth is much higher. The
+  problem is that unlike other delays where requires_delay() will return
+  true, this decision has to wait until after assign does the mapping
+  and we find out that a link was mapped to a trivial link. When this
+  happens, I insert a linkdelay "on the fly" when processing the link
+  statements from assign.
+  
+  Revision  Changes    Path
+  1.160     +76 -35    testbed/tbsetup/assign_wrapper.in
+
+ricci       2004/02/12 10:46:22 MST
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+  Log:
+  Unbreak vtypes by putting entries for them into the %node_type_linkbw
+  hash.
+  
+  This means we have to call LoadVirtTypes() from a slightly different
+  place, so that we have the virt types before calling LoadPhysInfo(),
+  where %node_type_linkbw is built.
+  
+  Revision  Changes    Path
+  1.159     +25 -1     testbed/tbsetup/assign_wrapper.in
+
+stoller     2004/02/12 08:43:37 MST
+
+  Modified files:
+    tbsetup              GNUmakefile.in batchexp.in endexp.in 
+                         swapexp.in 
+  Removed files:
+    tbsetup              startexp.in webstartexp.in 
+  Log:
+  * Removed startexp, and merged its contents into batchexp. There has been
+    no reason for the separation for a long time, and it made maintence more
+    difficult cause of duplication between batchexp and startexp (batch was
+    the sole user of startexp). Cleaner solution.
+  
+  * Check argument processing for batchexp, swapexp, endexp to make sure the
+    taint checks are correct. All three of these scripts will now be
+    available from ops. I especially watch the filename processing, which was
+    pretty loose before and could allow some to grab a file on boss by trying
+    to use it as an NS file (scripts all runs as user of course). The web
+    interface generates filenames that are hard to guess, so rather then
+    wrapping these scripts when invoked from ops, just allow the usual paths
+    (/proj, /groups, /users) but also /tmp/$uid-XXXXXX.nsfile pattern, which
+    should be hard enough to guess that users will not be able to get
+    anything they are not supposed to.
+  
+  * Add -w (waitmode) options to all three scripts. In waitmode, the backend
+    detaches, but the parent remains waiting for the child to finish so it
+    can exit with the appropriate status (for scripting). The user can
+    interrupt (^C), but it has no effect on the backend; it just kills the
+    parent side that is waiting (backend is in a new session ID). Log outout
+    still goes to the file (available from web page) and is emailed.
+  
+  Revision  Changes    Path
+  1.103     +4 -3      testbed/tbsetup/GNUmakefile.in
+  1.45      +399 -62   testbed/tbsetup/batchexp.in
+  1.30      +59 -13    testbed/tbsetup/endexp.in
+  1.52      +92 -15    testbed/tbsetup/swapexp.in
+
+stoller     2004/02/12 08:37:10 MST
+
+  Modified files:
+    www                  beginexp.php3 beginexp_form.php3 
+                         beginexp_xml.php3 menu.php3 plab_ez.php3 
+    www/buildui          bui.php3 
+  Log:
+  Make the new version of beginexp_xml live now that its been through
+  the paper effort for everyone. I've redirected everything to
+  beginexp_html.php3 (the front end to the XML version), including the
+  plab and bui pages.
+  
+  I've stuck a redirect in the old beginexp.php3, to make it easy to
+  bring back the old version in case something goes wrong. Just comment
+  out the lines at the top and reinstall, along with changing the other
+  links to it.
+  
+  Revision  Changes    Path
+  1.45      +7 -1      testbed/www/beginexp.php3
+  1.30      +2 -2      testbed/www/beginexp_form.php3
+  1.4       +3 -2      testbed/www/beginexp_xml.php3
+  1.132     +2 -8      testbed/www/menu.php3
+  1.6       +2 -2      testbed/www/plab_ez.php3
+  1.11      +2 -2      testbed/www/buildui/bui.php3
+
+ricci       2004/02/11 16:42:23 MST
+
+  Modified files:
+    tmcd                 tmcd.c 
+  Log:
+  Change the alias behavior in dohosts() . We used to only give aliases
+  for nodes that are not directly connected if we had a route to them.
+  Now, we give them to everyone.
+  
+  This should make hosts file generation go much faster for large
+  topologies.
+  
+  Revision  Changes    Path
+  1.208     +16 -74    testbed/tmcd/tmcd.c
+
+stoller     2004/02/11 15:04:15 MST
+
+  Modified files:
+    db                   nfree.in 
+  Log:
+  Kill off all of the old osid handling that nfree did. When a node is
+  released, all of def_boot_osid,temp_boot_osid,next_boot_osid is cleared.
+  bootinfo currently uses the nodes free/alloc status to determine if the
+  node gets PXEWAIT, but will eventually switch to looking at the osids;
+  A node with no osids set (as will be when free) will go into PXEWAIT. This
+  will allow os_load of free nodes!
+  
+  Change temporary locked pid/eid to a real pid/eid (emulab-ops/nfree-locked)
+  to avoid transient problems in tmcd, where isalive would cause tmcd to
+  core dump cause the reserved table had a nonexistent pid/eid setting.
+  
+  Revision  Changes    Path
+  1.74      +12 -30    testbed/db/nfree.in
+
+kwebb       2004/02/10 14:13:05 MST
+
+  Modified files:
+    .                    configure configure.in 
+    tbsetup              GNUmakefile.in 
+    tbsetup/ipassign     GNUmakefile.in README compile.sh 
+    tbsetup/ipassign/src Assigner.cc Assigner.h 
+                         ConservativeAssigner.cc 
+                         ConservativeAssigner.h Framework.cc 
+                         Framework.h GNUmakefile.in HostRouter.cc 
+                         LanRouter.cc NetRouter.cc difference.cc 
+                         ipassign.cc routestat.cc 
+  Added files:
+    tbsetup/ipassign     ipassign_wrapper.in 
+    tbsetup/ipassign/etc autocheck.conf 
+    tbsetup/ipassign/src FixedPartition.h Partition.h 
+                         SearchPartition.h SquareRootPartition.h 
+  Log:
+  Merge of ipassign stuff from commvirtsig-branch into main trunk.
+  
+  Revision  Changes    Path
+  1.199     +1 -1      testbed/configure
+  1.206     +1 -1      testbed/configure.in
+  1.102     +10 -3     testbed/tbsetup/GNUmakefile.in
+  1.3       +8 -4      testbed/tbsetup/ipassign/GNUmakefile.in
+  1.4       +12 -9     testbed/tbsetup/ipassign/README
+  1.5       +10 -10    testbed/tbsetup/ipassign/compile.sh
+  1.2       +0 -4      testbed/tbsetup/ipassign/src/Assigner.cc
+  1.2       +3 -3      testbed/tbsetup/ipassign/src/Assigner.h
+  1.2       +9 -70     testbed/tbsetup/ipassign/src/ConservativeAssigner.cc
+  1.2       +4 -2      testbed/tbsetup/ipassign/src/ConservativeAssigner.h
+  1.2       +52 -71    testbed/tbsetup/ipassign/src/Framework.cc
+  1.2       +16 -7     testbed/tbsetup/ipassign/src/Framework.h
+  1.4       +33 -16    testbed/tbsetup/ipassign/src/GNUmakefile.in
+  1.2       +1 -1      testbed/tbsetup/ipassign/src/HostRouter.cc
+  1.2       +1 -1      testbed/tbsetup/ipassign/src/LanRouter.cc
+  1.2       +1 -1      testbed/tbsetup/ipassign/src/NetRouter.cc
+  1.2       +6 -0      testbed/tbsetup/ipassign/src/difference.cc
+  1.4       +3 -1      testbed/tbsetup/ipassign/src/ipassign.cc
+  1.3       +28 -10    testbed/tbsetup/ipassign/src/routestat.cc
+
+stoller     2004/02/09 16:21:02 MST
+
+  Modified files:
+    www                  newimageid_ez.php3 newosid.php3 
+                         newosid_form.php3 
+  Added files:
+    www                  osiddefs.php3 
+  Log:
+  Minor cleanup of how we do features, osnames, and op_modes. Moved the
+  lists to a common "header" file, and change newosid and newimageid_ez
+  to grab from there. Also add notion of admin-only features (veths,
+  mlinks) and op_modes (NORMALv2) while I transition to new stuff.
+  
+  Revision  Changes    Path
+  1.29      +43 -43    testbed/www/newimageid_ez.php3
+  1.14      +45 -28    testbed/www/newosid.php3
+  1.9       +38 -25    testbed/www/newosid_form.php3
+
+stoller     2004/02/09 10:31:16 MST
+
+  Modified files:
+    os/syncd             emulab-sync.c 
+  Log:
+  Add SIGALRM handling to cut the connection timeout from usual 60
+  seconds it takes the kernel to decide the other machine is not
+  responding (as will happens as machines are rebooting), down to 5
+  seconds, using a SIGARLM.
+  
+  Revision  Changes    Path
+  1.4       +37 -3     testbed/os/syncd/emulab-sync.c
+
+stoller     2004/02/09 09:38:16 MST
+
+  Modified files:
+    os/syncd             emulab-syncd.c 
+  Log:
+  Add proper daemonization, which is turned off when -d (debug) flag
+  used. Add .pid file creation in /var/run to kill daemon from the new
+  rc.syncserver script in tmcd client code.  Add -v flag to increase
+  server verbosity. Add -l argument to specify where to write the log
+  file.
+  
+  Revision  Changes    Path
+  1.3       +34 -20    testbed/os/syncd/emulab-syncd.c
+
+duerig      2004/02/06 11:52:48 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup/ipassign     compile.sh 
+    tbsetup/ipassign/src Assigner.cc Assigner.h 
+                         ConservativeAssigner.cc 
+                         ConservativeAssigner.h Framework.cc 
+                         Framework.h difference.cc ipassign.cc 
+                         routestat.cc 
+  Added files:           (Branch: commvirtsig-branch)
+    tbsetup/ipassign/src FixedPartition.h Partition.h 
+                         SearchPartition.h SquareRootPartition.h 
+  Log:
+  * Fixed netmask calculation bug.
+  * Added the option to search for a good partitioning
+  * Set up a pluggable partition framework for future changes
+  
+  Revision  Changes    Path
+  1.4.2.2   +10 -10    testbed/tbsetup/ipassign/compile.sh
+  1.1.2.2   +0 -4      testbed/tbsetup/ipassign/src/Assigner.cc
+  1.1.2.2   +3 -3      testbed/tbsetup/ipassign/src/Assigner.h
+  1.1.2.2   +9 -70     testbed/tbsetup/ipassign/src/ConservativeAssigner.cc
+  1.1.2.2   +4 -2      testbed/tbsetup/ipassign/src/ConservativeAssigner.h
+  1.1.2.2   +52 -71    testbed/tbsetup/ipassign/src/Framework.cc
+  1.1.2.2   +16 -7     testbed/tbsetup/ipassign/src/Framework.h
+  1.1.2.2   +6 -0      testbed/tbsetup/ipassign/src/difference.cc
+  1.2.6.2   +3 -1      testbed/tbsetup/ipassign/src/ipassign.cc
+  1.2.2.2   +28 -10    testbed/tbsetup/ipassign/src/routestat.cc
+
+stoller     2004/02/05 18:46:15 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              os_setup.in tbswap.in 
+  Log:
+  Hacky changes for node reconfiguration, committed to branch only.
+  When reboot not selected for swapmod, set the nodes to RES_RECONFIG in
+  tbswap. In os_setup, nodes in RES_RECONFIG get a reconfig instead of
+  the reboot. Note that if reconfig fails (say, cause the image has no
+  reconfig script in it!), it node_reboot falls back to plain reboot
+  (note, node_reboot -r does the reconfig).
+  
+  Problem: Not sure that pcvm nodes will always be moved out of ISUP and
+  so the wait for ISUP might terminate too soon.
+  
+  Also some minor changes to make os_setup see the cancel flag and
+  hopefully end a lot sooner. These could go into the main branch if
+  desired
+  
+  Revision  Changes    Path
+  1.88.2.2  +34 -30    testbed/tbsetup/os_setup.in
+  1.32.6.2  +11 -5     testbed/tbsetup/tbswap.in
+
+ricci       2004/02/05 15:09:32 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              tbprerun.in 
+  Log:
+  Add the ability to run ipassign instead of staticroutes for route
+  calculation.
+  
+  Revision  Changes    Path
+  1.44.6.1  +28 -4     testbed/tbsetup/tbprerun.in
+
+ricci       2004/02/05 10:42:14 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_prepass.in 
+  Log:
+  Several changes:
+  
+  Take a '-m' option to take the multiplexing factor given by the user,
+  instead of my lame hardcoded default.
+  
+  Handle node-hints - not totally slick, we just pick one hint for the
+  conglomerate and go with it.
+  
+  Make binpack_sort() aware of CPU and memory - this should help out
+  with Tim's experiments, in which that's what he's tweaking.
+  
+  Data structure changes for desires so that we can do the above.
+  
+  Some bufixes for the parser so that we can do node-hints.
+  
+  Revision  Changes    Path
+  1.1.2.5   +103 -49   testbed/tbsetup/assign_prepass.in
+
+stoller     2004/02/05 09:57:15 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_wrapper.in 
+  Log:
+  Change bogus check against FBSD-STD, to a check of the osfeature list.
+  The point is determine if the osid a user has selected support
+  mulitplexed links and veths. This needs more work; I am currently
+  requiring both veth/mlink support whenever a nonvirt node is in a link
+  or lan with a virt node. This is pretty much what the code did before;
+  I just changed how the support is determined. Needs more work,
+  obviously.
+  
+  Revision  Changes    Path
+  1.154.2.17 +20 -9     testbed/tbsetup/assign_wrapper.in
+
+stoller     2004/02/05 09:14:02 MST
+
+  Modified files:
+    sql                  database-create.sql database-migrate.txt 
+  Log:
+  Add 'veths' and 'mlinks' to the list of possible osfeatures in
+  is_info table.
+  
+  Revision  Changes    Path
+  1.225     +1 -1      testbed/sql/database-create.sql
+  1.118     +6 -0      testbed/sql/database-migrate.txt
+
+kwebb       2004/02/04 20:36:52 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup/ipassign     ipassign_wrapper.in 
+  Log:
+  ipassign_wrapper is now ready for prime time.
+  
+  Fixed the nasty underconstrained clause in the virt_nodes ips column update
+  SQL clause that bit me yesterday/today.
+  
+  Added logic to find the src ip address for a route, and fixed up a few more
+  things to prepare the script for integration.
+  
+  Revision  Changes    Path
+  1.1.2.2   +49 -16    testbed/tbsetup/ipassign/Attic/ipassign_wrapper.in
+
+ricci       2004/02/04 17:33:56 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_prepass.in 
+  Log:
+  Handle fixed nodes. The main rule regarding fixed nodes is that we can
+  fix each conglomerate to at most one physical node. So, we can
+  combine:
+  1) Nodes that are not fixed
+  2) Nodes that are fixed, as long as they are fixed to the same place
+  3) Nodes that are fixed with nodes that are not fixed
+  
+  Revision  Changes    Path
+  1.1.2.4   +20 -5     testbed/tbsetup/assign_prepass.in
+
+stoller     2004/02/04 17:14:41 MST
+
+  Modified files:
+    tbsetup              node_reboot.in 
+  Log:
+  Minor whackery. Add "-r" option to node_reboot to "reconfig" a pnode
+  instead of rebooting. If the reconfig fails, fail through to reboot.
+  A reconfig will "halt" the current vnodes (or remove ones that are no
+  longer assigned to the node) reconfig the pnode, and then restart the
+  vnodes that are still assigned to the node (or create new ones for
+  newly assigned vnodes). A halt stops the vnode, but leaves the
+  vnode filesystem intact.
+  
+  Not bothering to reconfig individual vnodes yet since thats pretty
+  much like a reboot of a vnode. Difference in time is tiny.
+  
+  Revision  Changes    Path
+  1.49      +49 -6     testbed/tbsetup/node_reboot.in
+
+shash       2004/02/04 15:42:49 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    www                  modifyexp.php3 
+  Log:
+  Added -e option to web modify to restart event system. Checked on by
+  default if the experiment is active.
+  
+  Revision  Changes    Path
+  1.11.6.1  +7 -1      testbed/www/modifyexp.php3
+
+shash       2004/02/04 02:39:58 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_wrapper.in 
+  Log:
+  Yet another fix which causes trouble when vnodes move around pnodes
+  arbitrarily. The code even though was written a long time back wasn't
+  tested coz of doing fix-node during modify. Without fix-node, vnodes
+  move around like crazy even if the ns file never changes in any way
+  during a modify. With this fix, as many vnodes that were previously
+  reserved, as possible, will be reused as long as assign ends up
+  using the same PCs as were reserved before.
+  
+  Revision  Changes    Path
+  1.154.2.14 +75 -22    testbed/tbsetup/assign_wrapper.in
+
+kwebb       2004/02/03 16:16:30 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup/ipassign     GNUmakefile.in 
+    tbsetup/ipassign/src GNUmakefile.in HostRouter.cc LanRouter.cc 
+                         NetRouter.cc 
+  Log:
+  Fixes to build/install of ipassign and related tools.
+  
+  Revision  Changes    Path
+  1.1.6.2   +2 -4      testbed/tbsetup/ipassign/GNUmakefile.in
+  1.2.6.2   +33 -16    testbed/tbsetup/ipassign/src/GNUmakefile.in
+  1.1.2.2   +1 -1      testbed/tbsetup/ipassign/src/HostRouter.cc
+  1.1.2.2   +1 -1      testbed/tbsetup/ipassign/src/LanRouter.cc
+  1.1.2.2   +1 -1      testbed/tbsetup/ipassign/src/NetRouter.cc
+
+ricci       2004/02/03 14:29:02 MST
+
+  Modified files:
+    tbsetup              assign_prepass.in 
+  Log:
+  Add conglomeration of links as well as LANs - this can help assign's
+  runtime quite a bit, because it has less scoring work to do.
+  
+  Add METIS as a coarsening algorithm - we shoot for making
+  conglomerates of size 10.
+  
+  Revision  Changes    Path
+  1.2       +397 -36   testbed/tbsetup/assign_prepass.in
+
+ricci       2004/02/03 11:37:35 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_wrapper.in 
+  Log:
+  Two changes when doing a swap-update:
+  
+  Give all virtnodes the desire 'already_reserved' so that assign will
+  try to place them onto nodes the experimenter already has allocated.
+  
+  Give assign 'node-hint's for nodes that were mapped before, so that
+  we can start from something that is presumably a pretty good
+  solution. Hopefully this will make assign converge faster and/or
+  improve the solution.
+  
+  Revision  Changes    Path
+  1.154.2.4 +19 -0     testbed/tbsetup/assign_wrapper.in
+
+ricci       2004/02/03 11:04:30 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              ptopgen.in 
+  Log:
+  Add an 'already_reserved' feature to nodes we already have reserved
+  if an $exempt_eid was given - this is so that assign can use them in
+  preference to allocating new nodes.
+  
+  Revision  Changes    Path
+  1.53.6.1  +15 -2     testbed/tbsetup/ptopgen.in
+
+stoller     2004/02/03 10:46:14 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_wrapper.in 
+  Log:
+  Two changes for the commvirtsig branch only.
+  
+  * Set the node cmd_line to the appropriate kernel when selecting a
+    jail or delay node host. Currently, jail (and sim) phosts get
+    /kernel.jail, and delay nodes get /kernel.delay. This is passed to
+    pxeboot via bootinfo, which boots the proper kernel, thus avoiding
+    the double reboot we all know and loathe.
+  
+    WARNING: You have to use new (FBSD47-UPDATE) images for this to
+    actually work right, since the current default inage does not rename
+    the kernel after reboot. Mostly this will not be a problem, but it
+    might be.
+  
+    Be sure to use tb-set-jail-os and tb-set-delay-os in your NS files
+    too (to FBSD47-UPDATE at least) for the same reason.
+  
+  * My requires_delay() change from many weeks ago that needs more
+    testing before committing to main branch. Have faith all ye little
+    guinea pigs.
+  
+  Revision  Changes    Path
+  1.154.2.3 +126 -36   testbed/tbsetup/assign_wrapper.in
+
+stoller     2004/02/03 09:46:31 MST
+
+  Modified files:
+    tbsetup/ns2ir        nstb_compat.tcl parse.tcl.in sim.tcl.in 
+                         tb_compat.tcl.in 
+  Log:
+  Add tb-set-jail-os and tb-set-delay-os to set the experiment wide
+  jail and delay node OSIDs. When set, will override anything in the
+  node_types table. Use with caution.
+  
+  Revision  Changes    Path
+  1.16      +3 -0      testbed/tbsetup/ns2ir/nstb_compat.tcl
+  1.47      +4 -0      testbed/tbsetup/ns2ir/parse.tcl.in
+  1.63      +11 -0     testbed/tbsetup/ns2ir/sim.tcl.in
+  1.62      +28 -0     testbed/tbsetup/ns2ir/tb_compat.tcl.in
+
+shash       2004/02/02 17:51:08 MST
+
+  Modified files:        (Branch: commvirtsig-branch)
+    tbsetup              assign_wrapper.in 
+    tbsetup/ns2ir        tb_compat.tcl.in sim.tcl.in parse.tcl.in 
+    db                   libdb.pm.in nalloc.in nfree.in 
+                         xmlconvert.in 
+  Log:
+  A new tb-* command tb-fix-current-resources 0/1 tells assign_wrapper
+  whether to do a fix-node of current resources or not. This is useful
+  when virtual node weights are changed during a swap modify. For
+  example, when a virtual node had a CPU desire of 10 and it became
+  800 during a swap modify, doing a fix-node on previous allocation
+  won't let assign do the correct thing and will sometimes cause
+  violations.
+  
+  In order to support this, we need to move current reserved
+  pnodes/virtnodes to a holding experiment emulab-ops/oldreserved
+  and then back to current experiment. This was the solution that
+  worked best in the face of UNIQUE KEY issues in the reserved
+  table. The reserved table needs the combination pid-eid-vname
+  to be unique.
+  
+  Revision  Changes    Path
+  1.154.2.1 +66 -5     testbed/tbsetup/assign_wrapper.in
+  1.61.2.1  +11 -0     testbed/tbsetup/ns2ir/tb_compat.tcl.in
+  1.62.2.1  +3 -2      testbed/tbsetup/ns2ir/sim.tcl.in
+  1.46.2.1  +3 -0      testbed/tbsetup/ns2ir/parse.tcl.in
+  1.151.6.1 +80 -2     testbed/db/libdb.pm.in
+  1.25.10.1 +10 -3     testbed/db/nalloc.in
+  1.72.6.1  +40 -11    testbed/db/nfree.in
+  1.16.2.1  +1 -0      testbed/db/xmlconvert.in
+
+duerig      2004/02/02 13:59:57 MST
+
+  Modified files:
+    tbsetup/ipassign     INSTALL compile.sh 
+    tbsetup/ipassign/src routestat.cc 
+  Log:
+  Modified routecalc, adding a command line option to dump all route lengths to a file for statistical analysis.
+  
+  Revision  Changes    Path
+  1.5       +4 -0      testbed/tbsetup/ipassign/INSTALL
+  1.3       +1 -1      testbed/tbsetup/ipassign/compile.sh
+  1.2       +57 -1     testbed/tbsetup/ipassign/src/routestat.cc
+
+mike        2004/02/02 10:42:57 MST
+
+  Modified files:
+    doc                  vnode-impl.txt 
+  Log:
+  Integrate some text I had elsewhere about the virtual control net.
+  
+  Revision  Changes    Path
+  1.7       +82 -1     testbed/doc/vnode-impl.txt
+
+duerig      2004/02/02 08:34:12 MST
+
+  Modified files:
+    tbsetup/ipassign     GNUmakefile.in INSTALL README 
+    tbsetup/ipassign/graph kgraph3.graph kgraph4.graph 
+    tbsetup/ipassign/src Exception.h GNUmakefile.in ipassign.cc 
+                         lib.h top2graph.cc 
+  Added files:
+    tbsetup/ipassign     compile.sh 
+    tbsetup/ipassign/src Assigner.cc Assigner.h 
+                         ConservativeAssigner.cc 
+                         ConservativeAssigner.h Framework.cc 
+                         Framework.h HostRouter.cc HostRouter.h 
+                         LanRouter.cc LanRouter.h NetRouter.cc 
+                         NetRouter.h Router.cc Router.h bitmath.cc 
+                         bitmath.h brite2graph.cc coprocess.cc 
+                         coprocess.h graph2lan.cc inet2graph.cc 
+                         route2lan.cc routecalc.cc routestat.cc 
+  Removed files:
+    tbsetup/ipassign/etc autocheck.conf 
+    tbsetup/ipassign/src Graph.cc Graph.h autocheck.cc boolcmp.cc 
+  Log:
+  Added a more flexible framework surrounding routing and ip assignment. Added routing.
+  
+  Revision  Changes    Path
+  1.2       +2 -1      testbed/tbsetup/ipassign/GNUmakefile.in
+  1.3       +4 -1      testbed/tbsetup/ipassign/INSTALL
+  1.3       +125 -64   testbed/tbsetup/ipassign/README
+  1.2       +3 -3      testbed/tbsetup/ipassign/graph/kgraph3.graph
+  1.2       +6 -6      testbed/tbsetup/ipassign/graph/kgraph4.graph
+  1.3       +71 -9     testbed/tbsetup/ipassign/src/Exception.h
+  1.3       +12 -3     testbed/tbsetup/ipassign/src/GNUmakefile.in
+  1.3       +24 -176   testbed/tbsetup/ipassign/src/ipassign.cc
+  1.3       +16 -0     testbed/tbsetup/ipassign/src/lib.h
+  1.3       +1 -1      testbed/tbsetup/ipassign/src/top2graph.cc
+
+mike        2004/01/30 17:28:13 MST
+
+  Modified files:
+    tmcd/freebsd/jail    mkjail.pl 
+  Log:
+  Setup routes inside jail in the "correct" order to avoid ARP whining.
+  From the code:
+          # N.B. privnet is setup first even before the default route.
+          # This is because the gateway for the default route is on the
+          # privnet, but our control net interface is not (because it has
+          # a 255.255.255.255 netmask by virtue of being an alias on the
+          # real control interface).  Thus there is no way to use the
+          # default route until the privnet route is up (ARP complains
+          # about "host is not on local network").
+  
+  Revision  Changes    Path
+  1.29      +21 -6     testbed/tmcd/freebsd/jail/mkjail.pl
+
+mike        2004/01/30 13:05:41 MST
+
+  Modified files:
+    doc                  vnode-impl.txt 
+  Log:
+  Document:
+  - the problem with broadcast when using fake MACs instead of encapsulation
+  - why ARP is hard in our environment
+  
+  Revision  Changes    Path
+  1.6       +58 -2     testbed/doc/vnode-impl.txt
+
+stoller     2004/01/30 10:59:53 MST
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+  Log:
+  Fix for when multiple vnodes in the same lan wind up on on the same
+  pnode. Used to no be allowed, but with multiple routing tables this is
+  now possible. My code to construct link names on the fly when delay
+  nodes are inserted, was generating non-unique names which was causing
+  vlans to be dropped.
+  
+  Revision  Changes    Path
+  1.153     +9 -1      testbed/tbsetup/assign_wrapper.in
+
+shash       2004/01/29 18:41:50 MST
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+  Log:
+  Fixes the bug unearthed by Tim. When a link is created between a jail
+  vnode and a PC node, under normal circumstances, a real physical link
+  is used. However, a user can use tb-set-multiplexed on the link that
+  allows assign to map multiple vlinks over the same physical link.
+  This is fine when the PC is running FBSD-STD which can use veth
+  interfaces. Not so if it is running Linux or a non-standard BSD.
+  This fix forces EMULATED links and VETH devices when the PC is running
+  FBSD-STD and turns those attributes off otherwise so that assign
+  will not give a mapping that cannot be realized on the client side.
+  For the gory details of this problem, look at testbed-ops email thread
+  "pcvm route problem" dated 29th Jan 2004.
+  
+  A problem still exists in the non-BSD router + jail vnodes in a delayed
+  LAN. VLANs table is not getting the correct entries. A fix will come
+  soon. Follow the testbed-ops email thread "fix for the pcvm route problem"
+  dated 29th Jan 2004 for the gory details.
+  
+  Revision  Changes    Path
+  1.152     +49 -13    testbed/tbsetup/assign_wrapper.in
+
+ricci       2004/01/29 15:57:05 MST
+
+  Modified files:
+    .                    configure configure.in 
+  Added files:
+    tbsetup              assign_prepass.in 
+  Log:
+  New script: assign_prepass
+  
+  Acts as a transparent filter for assign - parses the top file given to
+  assign, coarsens the graph in it, then feeds that to assign.
+  Translates assign's output back into context of the original graph,
+  and spits that out for parsing.
+  
+  Right now, only includes a single coarsening algorithm - conglomerates
+  the nodes in leaf lans. Hopefully, it will soon include other
+  algorithms, such as running METIS to partition the graph.
+  
+  Still needs a fair amount of work to be general - only works on
+  certain types of topologies right now.
+  
+  Not called yet, but that will be trivial - just need to change
+  assign_wrapper to call assign_prepass instead of assign.
+  
+  Revision  Changes    Path
+  1.198     +1 -0      testbed/configure
+  1.205     +1 -0      testbed/configure.in
+
+mike        2004/01/29 14:30:18 MST
+
+  Modified files:
+    tmcd/common          libsetup.pm 
+    tmcd/freebsd         liblocsetup.pm 
+    tmcd/linux           liblocsetup.pm 
+  Log:
+  Changes to support optional no-encapsulation mode on veth devices.
+  tmcd passes back an encapsulation flag to inform this.
+  NOTE: new version (15) for tmcd!
+  
+  Revision  Changes    Path
+  1.95      +23 -8     testbed/tmcd/common/libsetup.pm
+  1.41      +11 -3     testbed/tmcd/freebsd/liblocsetup.pm
+  1.23      +2 -2      testbed/tmcd/linux/liblocsetup.pm
+
+ricci       2004/01/29 13:25:36 MST
+
+  Modified files:
+    tbsetup/ns2ir        lanlink.tcl tb_compat.tcl.in 
+  Log:
+  Allow tb-set-multiplexed, tb-set-noshaping, and tb-set-useveth on LANs
+  as well as links.
+  
+  Revision  Changes    Path
+  1.32      +3 -3      testbed/tbsetup/ns2ir/lanlink.tcl
+  1.61      +13 -13    testbed/tbsetup/ns2ir/tb_compat.tcl.in
+
+stoller     2004/01/29 13:19:48 MST
+
+  Modified files:
+    event/linktest       GNUmakefile.in run_linktest.pl.in 
+  Log:
+  Redo run_linktest.pl so that it is okay to run on boss/ops. Note that
+  I am not using paperbag to run it on ops, but just installing the two
+  programs that are needed. Eventually should paperbag it.
+  
+  This same script runs on both boss/ops and on experimental nodes to
+  fire off the linktest daemon on the nodes and wait. This is icky as
+  some crufty stuff has to be done so that it will run in both
+  environments. ltevent is of course not needed on boss, but do not want
+  to bother it now since it *is* needed on the nodes.
+  
+  To run it on boss script needed severe cleanup and taint checking.
+  Also added the use of event keyfile, which is currently optional, but
+  needs to be mandatory once the images are updated.
+  
+  The current problem is that run_linktest can hang waiting for the
+  clients to finish?. We can use quick mode in the experiment setup
+  path, but maybe we need a cancel operation?
+  
+  Revision  Changes    Path
+  1.8       +6 -1      testbed/event/linktest/GNUmakefile.in
+  1.8       +193 -69   testbed/event/linktest/run_linktest.pl.in
+
+stoller     2004/01/28 18:03:39 MST
+
+  Modified files:
+    db                   xmlconvert.in 
+    tbsetup/ns2ir        parse.tcl.in sim.tcl.in tb_compat.tcl.in 
+    tmcd                 decls.h tmcd.c 
+  Log:
+  Add veth_encapsulate for Mike. Per experiment flag, returned for
+  each veth from tmcd cause that is easy. Defaults to 1 for now.
+  Add tb-set-encapsulate to front end so Mike can play with it.
+  
+  Revision  Changes    Path
+  1.16      +2 -1      testbed/db/xmlconvert.in
+  1.46      +4 -1      testbed/tbsetup/ns2ir/parse.tcl.in
+  1.62      +3 -2      testbed/tbsetup/ns2ir/sim.tcl.in
+  1.60      +14 -0     testbed/tbsetup/ns2ir/tb_compat.tcl.in
+  1.22      +2 -2      testbed/tmcd/decls.h
+  1.206     +13 -4     testbed/tmcd/tmcd.c
+
+ricci       2004/01/28 16:19:26 MST
+
+  Modified files:
+    assign               anneal.cc 
+  Log:
+  Add additional criteria to pnode_is_match to take into account
+  local features/desires - turns out, we are using them in a manner
+  similar to types, so can save ourselves from looking at a lot of
+  bad solutions by being careful about going too far over on local
+  features.
+  
+  Revision  Changes    Path
+  1.27      +37 -0     testbed/assign/anneal.cc
+
+ricci       2004/01/28 16:16:51 MST
+
+  Modified files:
+    assign               score.cc common.h 
+  Log:
+  Bugfix for 'loopback' links.
+  
+  Do some scoring, not just violations, for stateful features and
+  desires - this does a better job of nudging assign towards good
+  solutions.
+  
+  Revision  Changes    Path
+  1.49      +17 -11    testbed/assign/score.cc
+  1.21      +2 -0      testbed/assign/common.h
+
+stoller     2004/01/28 11:10:06 MST
+
+  Modified files:
+    tmcd/common          rc.setup 
+  Log:
+  Add startup of new linktest daemon.
+  
+  Revision  Changes    Path
+  1.15      +14 -0     testbed/tmcd/common/rc.setup
+
+davidand    2004/01/26 15:07:03 MST
+
+  Modified files:
+    event/linktest       GNUmakefile.in linktest.pl.in 
+                         run_linktest.pl.in 
+  Added files:
+    event/linktest       tb_compat.tcl.in 
+  Removed files:
+    event/linktest       tb_compat.tcl 
+  Log:
+  Updated makefile to install tb_compat to client_bindir
+  Removed hardcoded "boss" from linktest.pl and run_linktest.pl
+  Changed historical log location.
+  
+  Revision  Changes    Path
+  1.7       +4 -1      testbed/event/linktest/GNUmakefile.in
+  1.13      +26 -11    testbed/event/linktest/linktest.pl.in
+  1.6       +8 -1      testbed/event/linktest/run_linktest.pl.in
+
+davidand    2004/01/24 21:18:22 MST
+
+  Modified files:
+    event/linktest       linktest.pl.in ltevent.c 
+                         run_linktest.pl.in 
+  Added files:
+    event/linktest       ROADMAP 
+  Log:
+  Added taint checking to arguments in linktest.pl and run_linktest.pl.
+  Modified ltevent.c to use keyfiles.
+  Added a ROADMAP.
+  Linktest is now ready for first deploy.
+  
+  Revision  Changes    Path
+  1.12      +155 -79   testbed/event/linktest/linktest.pl.in
+  1.2       +7 -4      testbed/event/linktest/ltevent.c
+  1.4       +52 -15    testbed/event/linktest/run_linktest.pl.in
+
+kwebb       2004/01/23 17:59:55 MST
+
+  Modified files:
+    www                  faq.html 
+  Log:
+  Added detail on setting up the last DOS partition for use as extra space
+  on experimental nodes.  The Linux section was updated and expanded, and a
+  FreeBSD section was written.
+  
+  Revision  Changes    Path
+  1.94      +62 -7     testbed/www/faq.html
+
+ricci       2004/01/23 10:18:34 MST
+
+  Modified files:
+    tbsetup              ptopgen.in 
+  Log:
+  When including virt goo, include the nodes' CPU speeds and RAM, which
+  we can use for fine-tuning packing in assign.
+  
+  Revision  Changes    Path
+  1.53      +13 -2     testbed/tbsetup/ptopgen.in
+
+ricci       2004/01/21 13:06:08 MST
+
+  Modified files:
+    ssl                  GNUmakefile.in 
+  Log:
+  Add a 'remote-site' target and a 'remote-site-boss-install' target
+  that only generate the certificates needed at remote sites.
+  
+  Revision  Changes    Path
+  1.15      +10 -0     testbed/ssl/GNUmakefile.in
+
+ricci       2004/01/21 11:22:11 MST
+
+  Modified files:
+    doc                  UPDATING 
+    rc.d                 3.plab.sh.in 3.testbed.sh.in 
+  Log:
+  Update our rc.d scripts to handle the 'start' and 'stop' arguments -
+  we were attempting to start up duplicate copies of everything as boss
+  went down.
+  
+  Revision  Changes    Path
+  1.4       +5 -0      testbed/doc/UPDATING
+  1.2       +25 -10    testbed/rc.d/3.plab.sh.in
+  1.16      +94 -73    testbed/rc.d/3.testbed.sh.in
+
+stoller     2004/01/21 10:12:41 MST
+
+  Modified files:
+    tbsetup              node_reboot.in 
+  Log:
+  Minor change to RebootNode; do not fork a child until *after*
+  determining if a bootinfo wakeup will suffice. This avoids a flurry
+  of children trying to connect to the DB. Also, move the TBdbfork()
+  until after the DoesPing() test, so that the connection flurry is
+  spaced out a bit more. DoesPing() does not talk to the DB, as its name
+  might not imply.
+  
+  Bump batchcount to 12.
+  
+  Revision  Changes    Path
+  1.47      +35 -17    testbed/tbsetup/node_reboot.in
+
+stoller     2004/01/21 09:37:29 MST
+
+  Modified files:
+    pxe                  bootinfo_mysql.c 
+  Log:
+  If none of def_boot_osid,temp_boot_osid,next_boot_osid is set, return
+  PXEWAIT to node (if version >= 1, older pxeboot gets an error code).
+  Free nodes still get PXEWAIT; have not done those changes yet.
+  
+  Revision  Changes    Path
+  1.19      +10 -0     testbed/pxe/bootinfo_mysql.c
+
+ricci       2004/01/20 18:03:53 MST
+
+  Modified files:
+    doc                  UPDATING 
+    install              boss-install.in 
+  Log:
+  Up the buffer sizes for UNIX domain sockets to help syslogd scale
+  better.
+  
+  Revision  Changes    Path
+  1.3       +8 -0      testbed/doc/UPDATING
+  1.21      +10 -0     testbed/install/boss-install.in
+
+ricci       2004/01/20 17:22:37 MST
+
+  Modified files:
+    doc                  setup-db.txt 
+    utils                firstuser.in 
+  Log:
+  New operation for firstuser. Now creates the 'elabman' user and
+  'emulab-ops' project, instead of an account for the user running
+  it. The elabman user is then used to bootstrap other accounts.
+  
+  Also include a list of things to do to admin's accounts on boss, like
+  giving them shells.
+  
+  Revision  Changes    Path
+  1.18      +97 -40    testbed/doc/setup-db.txt
+  1.7       +62 -64    testbed/utils/firstuser.in
+
+ricci       2004/01/20 15:07:39 MST
+
+  Modified files:
+    www                  joinproject.php3 newproject.php3 
+  Log:
+  Check for an account on boss with the submitted username - this will
+  prevent people from asking for 'root', 'toor', etc. as usernames, and
+  will hopefully help with new installations, which may have created
+  accounts by hand. Note that this checks boss only, not ops.
+  
+  Also fixed a bug in newproject.php3 that was incorrectly letting
+  through duplicate usernames.
+  
+  Revision  Changes    Path
+  1.40      +2 -1      testbed/www/joinproject.php3
+  1.88      +2 -1      testbed/www/newproject.php3
+
+mike        2004/01/20 13:03:20 MST
+
+  Modified files:
+    tmcd/freebsd         chipset.awk control_interface nodetype 
+  Log:
+  Hacks to recognize rutgers node (pc2400-orbit)
+  
+  Revision  Changes    Path
+  1.5       +27 -3     testbed/tmcd/freebsd/chipset.awk
+  1.13      +4 -1      testbed/tmcd/freebsd/control_interface
+  1.10      +14 -4     testbed/tmcd/freebsd/nodetype
+
+mike        2004/01/20 12:59:58 MST
+
+  Modified files:
+    tmcd/linux           chipset.awk control_interface 
+                         modules.conf nodetype 
+  Log:
+  Hacks to recognize rutgers node (pc2400-orbit)
+  
+  Revision  Changes    Path
+  1.5       +17 -3     testbed/tmcd/linux/chipset.awk
+  1.13      +4 -3      testbed/tmcd/linux/control_interface
+  1.7       +3 -0      testbed/tmcd/linux/modules.conf
+  1.11      +13 -3     testbed/tmcd/linux/nodetype
+
+mike        2004/01/20 12:23:23 MST
+
+  Modified files:
+    tmcd/common          rc.setup 
+  Log:
+  Start up evproxy with an explicit server argument.
+  Currently the default bossnode seems to be compiled in as "boss.emulab.net"
+  which doesn't work so well at other testbeds.
+  
+  Revision  Changes    Path
+  1.14      +7 -1      testbed/tmcd/common/rc.setup
+	
+ricci       2004/01/20 11:49:18 MST
+
+  Modified files:
+    install              boss-install.in 
+  Log:
+  Set the kernel Hz to 1000 in /boot/loader.conf .
+  
+  Revision  Changes    Path
+  1.20      +9 -0      testbed/install/boss-install.in
+
+mike        2004/01/20 10:27:30 MST
+
+  Modified files:
+    tbsetup              frisbeelauncher.in 
+  Log:
+  Add an explicit bandwidth param to the frisbeed startup.  This way we don't
+  rely on the HZ rate of the boss kernel.
+  
+  Revision  Changes    Path
+  1.16      +3 -1      testbed/tbsetup/frisbeelauncher.in
+
 stoller     2004/01/20 08:21:20 MST
 
   Modified files:
@@ -22,6 +1154,183 @@ stoller     2004/01/20 08:21:20 MST
   1.11      +127 -20   testbed/pxe/bootinfo.c
   1.7       +1 -1      testbed/pxe/bootwhat.h
 
+davidand    2004/01/20 02:41:23 MST
+
+  Modified files:
+    event/linktest       linktest.pl.in 
+  Log:
+  Enhancements to the process control, control over send speeds,
+  better support for experiment failures (99% on latency and loss),
+  better error messages.
+  
+  Revision  Changes    Path
+  1.11      +477 -267  testbed/event/linktest/linktest.pl.in
+
+davidand    2004/01/17 21:09:25 MST
+
+  Modified files:
+    event/linktest       GNUmakefile.in linktest.c linktest.h.in 
+                         linktest.pl.in 
+  Added files:
+    event/linktest       ltevent.c 
+  Removed files:
+    event/linktest       run_linktest.pl.in 
+  Log:
+  Checkpoint commit. I've added the static-linked program "ltevent" to send
+  and wait for linktest events, and integrated it into the perl scripts.
+  
+  At this point I'm working on small potatoes such as the rc.setup script
+  to invoke linktest daemon and nailing down where to put platform-specific
+  stuff such as the ns-linktest build and the customized tb-compat.
+  
+  Also am testing linktest in cases where I've deliberately inserted an error
+  to make sure it catches it.
+  
+  Revision  Changes    Path
+  1.6       +14 -1     testbed/event/linktest/GNUmakefile.in
+  1.7       +6 -34     testbed/event/linktest/linktest.c
+  1.3       +4 -0      testbed/event/linktest/linktest.h.in
+  1.10      +69 -89    testbed/event/linktest/linktest.pl.in
+
+shash       2004/01/16 18:55:51 MST
+
+  Modified files:
+    event/nsetrafgen     nse.patch 
+  Log:
+  Before this commit, a simulator packet that crosses pnodes was being
+  decapsulated if it was determinted that the packet was destined to some
+  sim node on the same pnode. This was done at the entry point of the
+  packet from the live network. However, in the case of disconnected
+  partitions, the packet may have to exit the pnode one or more times
+  before reaching the final destination. In this case, the decapsulation
+  of it early is a waste. This commit remedies that by performing the
+  decapsulation in the port classifier of a node just before the packet
+  is given to a traffic agent that will consume the packet.
+  
+  Revision  Changes    Path
+  1.19      +175 -127  testbed/event/nsetrafgen/nse.patch
+
+newbold     2004/01/15 17:21:33 MST
+
+  Modified files:
+    db                   libdb.pm.in 
+    event/stated         stated.in 
+    sql                  database-fill.sql 
+  Log:
+  libdb changes:
+  
+  - add functions to recursively dump hashes and arrays into a string
+    suitable for printing as debugging output (great for data structures)
+  
+  - add three new trigger strings
+  
+  - add 'use strict', do corresponding cleanup
+  
+  stated changes:
+  
+  - move special-cased stuff in handleEvent for PXEBOOTING and BOOTING into
+    triggers (PXEBOOTING, BOOTING, and CHECKGENISUP)
+  
+  - clarify (via comments) the existing kinds of triggers and which ones run
+    when, and add a new kind (global "any-mode" triggers). We already had
+    per-node mode-specific, per-node any-mode, and global mode-specific
+    triggers. Now you can have a trigger that is good for any mode in a
+    given state, that can be overridden on a mode-specific basis. This is
+    great for PXEBOOTING, BOOTING, and ISUP, since they each have a trigger
+    list that should be run regardless of what mode you're in. Now they only
+    require 3 entries instead of 3*N that have to be maintained per mode.
+  
+       # A note about triggers:
+       #
+       # "per-node" triggers only affect their specific node in a
+       # particular mode/state, and are run first of all. "global"
+       # triggers are triggers for a given mode/state that affect all
+       # nodes, and are run after any per-node triggers. "Any-mode"
+       # triggers are tied to a state, and occur in that state in any
+       # mode. The any-mode triggers are over-ridden by global triggers,
+       # and if an "Any-mode" trigger for state XYZ exists as well as a
+       # global trigger for mode FOOBAR state XYZ, then when I arrive in
+       # XYZ any per-node triggers will be run. Then, if I'm in mode
+       # FOOBAR, only the global trigger will run. If I'm in any other
+       # mode, only the any-mode trigger will run.
+  
+       # (our "*" is stored as $TBANYMODE)
+       # Per-node triggers have a specific node_id
+       # Global triggers have "*" as the node_id
+       # Any-mode triggers have "*" as the mode, and can be global or per-node
+  
+    The updated table looks like this in the accompanying change to
+    database-fill.sql:
+  
+  +---------+----------+------------+-----------------------+
+  | node_id | op_mode  | state      | trigger               |
+  +---------+----------+------------+-----------------------+
+  | *       | *        | BOOTING    | BOOTING, CHECKGENISUP |
+  | *       | *        | ISUP       | RESET                 |
+  | *       | *        | PXEBOOTING | PXEBOOT               |
+  | *       | RELOAD   | RELOADDONE | RESET, RELOADDONE     |
+  | *       | ALWAYSUP | SHUTDOWN   | ISUP                  |
+  +---------+----------+------------+-----------------------+
+  
+  - I also cleaned up the functions that add, get, and delete triggers.
+    Before, the get function didn't include global triggers. Now it does,
+    and has an option to just get the per-node triggers. Add and delete are
+    still just per-node, of course.
+  
+  - Also found and fixed some little bugs while I was in there. (global
+    triggers not taking a list,
+  
+  These changes are me getting ready to re-add all the changes I made months
+  ago in order to do a before-and-after experiment for my thesis. Between
+  now and the end of next week I'll be working on taking before numbers,
+  patching stated with the changes, and getting after numbers.
+  
+  The problems I'm trying to replicate are the problems and slowdowns we
+  used to get when os_{load,setup} would reboot a node, thinking it had
+  timed out, when it really didn't know whether it was making progress or
+  not. The fix includes making os_{load,setup} depend on stated to watch for
+  progress and timeouts, and do any appropriate retries. Part of that is the
+  StateWait stuff, that lets programs watch for events easily, and the
+  node_reboot-with-events stuff that puts stated in control of nodes as they
+  reboot.
+  
+  Revision  Changes    Path
+  1.148     +250 -182  testbed/db/libdb.pm.in
+  1.57      +216 -138  testbed/event/stated/stated.in
+  1.53      +5 -8      testbed/sql/database-fill.sql
+
+shash       2004/01/15 14:53:48 MST
+
+  Modified files:
+    event/nsetrafgen     nse.patch 
+  Log:
+  One more bugfix. sendpkt() was being called with a wrong length even though
+  the RAW_IP packet being sent had a different ip_len. This happened in the
+  case of a nse topology that is disconnected due to how assign maps it. The
+  encapsulated simulator packet was decapsulated even though it has to leave
+  the physical node again. Under this circumstance, the decapsulated simulator
+  packet size was used for RAW_IP send() instead of the size of the encapsulated
+  packet.
+  
+  Revision  Changes    Path
+  1.18      +8 -7      testbed/event/nsetrafgen/nse.patch
+
+stoller     2004/01/15 14:45:45 MST
+
+  Modified files:
+    www                  beginexp_html.php3 beginexp_xml.php3 
+  Log:
+  Change beginexp_html.php3 to invoke xml backend with a POST instead of
+  GET to avoid GET size limitations. This should have been easy, but PHP
+  has no native support for doing this, so takes a bit of mucking around
+  with a direct socket connection to the server, and sending it the
+  right headers, blah, blah, blah.
+  
+  Will make this live soon!
+  
+  Revision  Changes    Path
+  1.3       +50 -14    testbed/www/beginexp_html.php3
+  1.3       +2 -2      testbed/www/beginexp_xml.php3
 
 stoller     2004/01/15 09:18:41 MST
 	
@@ -48,6 +1357,223 @@ stoller     2004/01/15 09:18:41 MST
   1.7       +7 -1      testbed/www/deleteimageid.php3
   1.125     +19 -0     testbed/www/showstuff.php3
 
+newbold     2004/01/15 10:15:50 MST
+
+  Modified files:
+    db                   stategraph.in 
+  Log:
+  Minor update - nocluster option to print as one big machine.
+  
+  Revision  Changes    Path
+  1.7       +12 -5     testbed/db/stategraph.in
+
+davidand    2004/01/14 19:45:09 MST
+
+  Modified files:
+    event/linktest       GNUmakefile.in linktest.c linktest.pl.in 
+  Added files:
+    event/linktest       run_linktest.pl.in 
+  Log:
+  Updates to Linktest for a caller script, run_linktest.pl.
+  This includes an updated client-install.
+  
+  However, this is not yet ready for builds due to certain libraries not
+  present on the nodes and ops. For those I will be writing a static
+  linked c program to handle the linktest "done" event in both linktest.pl
+  and run_linktest.pl.
+  
+  Revision  Changes    Path
+  1.5       +4 -1      testbed/event/linktest/GNUmakefile.in
+  1.6       +11 -5     testbed/event/linktest/linktest.c
+  1.9       +120 -78   testbed/event/linktest/linktest.pl.in
+
+mike        2004/01/14 17:13:02 MST
+
+  Modified files:
+    os/frisbee.redux     network.c 
+  Log:
+  Exit if we fail to bind to the target multicast port!
+  
+  Revision  Changes    Path
+  1.9       +4 -2      testbed/os/frisbee.redux/network.c
+
+mike        2004/01/14 14:07:56 MST
+
+  Modified files:
+    www/tutorial         nscommands.html 
+  Log:
+  Document the various linkdelay related commands and tb-set-noshaping
+  
+  Revision  Changes    Path
+  1.41      +132 -1    testbed/www/tutorial/nscommands.html
+
+ricci       2004/01/14 12:58:40 MST
+
+  Modified files:
+    assign               anneal.cc score.cc 
+  Log:
+  Fix a bug that was causing problem when multiplexed nodes were being
+  combined with non-multiplexed nodes.
+  
+  Also clear up the sense of the 'is_fixed' parameter to add_node() -
+  it was being handled correctly, but was confusing because it was non-
+  intuitive.
+  
+  Revision  Changes    Path
+  1.25      +6 -6      testbed/assign/anneal.cc
+  1.48      +6 -7      testbed/assign/score.cc
+
+stoller     2004/01/14 12:12:35 MST
+
+  Modified files:
+    tmcd/common          rc.setup 
+  Log:
+  Add call to rc.kname to rename the kernel, if appropriate. Currently
+  used on FreeBSD nodes when the boot loader boots something other then
+  the default kernel.
+  
+  Revision  Changes    Path
+  1.13      +6 -1      testbed/tmcd/common/rc.setup
+
+stoller     2004/01/14 11:50:51 MST
+
+  Modified files:
+    www                  dbdefs.php3.in showexp.php3 
+                         showstuff.php3 
+  Log:
+  Minor sorting changes for Mike.
+  
+  Revision  Changes    Path
+  1.74      +1 -0      testbed/www/dbdefs.php3.in
+  1.76      +8 -2      testbed/www/showexp.php3
+  1.124     +57 -53    testbed/www/showstuff.php3
+
+ricci       2004/01/12 15:41:07 MST
+
+  Modified files:
+    assign               anneal.cc anneal.h assign.cc physical.h 
+                         score.cc solution.cc solution.h 
+  Log:
+  Several changes, mostly targeted at jail and simulation-type
+  topologies.
+  
+  First, added a new 'summary' of the solution, when the '-u' option is
+  given. It's a view of things from the physical side - prints out how
+  many vnodes were mapped to each pnode, as well as how much bandwidth
+  (trivial and non-trivial) was used on each node. For 'normal' nodes,
+  we also print out all links used and how much bandwidth was used on
+  each of them. For switches, we print only inter-switch links. This is
+  amazingly helpful in getting an intuitive feel for how well assign is
+  doing.
+  
+  Added a SIGINFO handler for the impatient (like me) to see things such
+  as the current temperature, and current and best scores, while assign
+  is running.
+  
+  Fixed a bug in which emulated links could get over-subscribed, as well
+  as a few other misc. bugfixes.
+  
+  Changed the way assign goes through the list of a node's pclasses in
+  random order - there were problems with the old way in which you could
+  end up with a situation in which some pnodes were chosen with a much
+  higher probability than others. Now, rather than treating the list as
+  a ring and starting at a random place, we make a randomly-ordered list
+  of the pclasseses, and go through it from start to finish.
+  
+  Did some work on dynamic pclasses so that we adjust the estimate of
+  the neighborhood size to account for disabled pclasses (ie. pnodes
+  that have nothing mapped to them yet.)
+  
+  Changed the way that find_link_to_switch() decides on the best link to
+  use - the old method was doing very poorly at bin-packing emulated
+  links into plinks. I now use a simple first-fit algorithm. This made a
+  pretty big difference. I may try some other fast bin-packing
+  approximation algorithm, but my main fear is that all of the good ones
+  (such as the 'sort from largest to smallest, then do first-fit'
+  algorithm) may require re-mapping other links. This might be slow,
+  and/or it might make it difficult, if not impossible, to keep
+  add_node() and remove_node() symmetric.
+  
+  Combinded direct_link() and find_link_to_switch() into
+  find_best_link(), since they really do the same thing.
+  
+  Standardized on std::random() to get random numbers - previosuly, some
+  calls were using std::rand().
+  
+  The big one: I added a find_pnode_connected() function that finds a
+  random pnode that one of the vnode's neighbors in the virtual graph is
+  assigned to. Then, with a random probability (given with the -c option
+  on the command line), we try that function to find a pnode first (if
+  it fails, we still call find_pnode() ). Of course, this is only really
+  applicable when you have a reasonable degree of vnode-to-pnode
+  multiplexing. In the test case I'm using, this managed to get 3x as
+  much bandwidth into trivial links as just using find_pnode().
+  
+  Revision  Changes    Path
+  1.24      +81 -11    testbed/assign/anneal.cc
+  1.7       +1 -1      testbed/assign/anneal.h
+  1.69      +40 -4     testbed/assign/assign.cc
+  1.22      +4 -2      testbed/assign/physical.h
+  1.47      +59 -71    testbed/assign/score.cc
+  1.4       +68 -0     testbed/assign/solution.cc
+  1.3       +4 -0      testbed/assign/solution.h
+
+stoller     2004/01/12 13:44:39 MST
+
+  Modified files:
+    .                    configure configure.in 
+    pxe                  GNUmakefile.in bootinfo.c bootwhat.h 
+  Removed files:
+    pxe                  proxydhcp.c proxydhcp.conf 
+                         proxydhcp.restart.in proxydhcp_cdir.c 
+                         proxydhcp_cfile.c proxydhcp_mysql.c 
+  Log:
+  Remove all trace of proxydhcp!
+  
+  Revision  Changes    Path
+  1.196     +1 -1      testbed/configure
+  1.203     +1 -1      testbed/configure.in
+  1.14      +3 -24     testbed/pxe/GNUmakefile.in
+  1.10      +3 -0      testbed/pxe/bootinfo.c
+  1.6       +1 -1      testbed/pxe/bootwhat.h
+
+mike        2004/01/12 10:20:38 MST
+
+  Modified files:
+    doc                  vnode-impl.txt 
+  Log:
+  Incorporate description of jail changes from Leigh's jail.html file.
+  Fix a few nits.
+  
+  Revision  Changes    Path
+  1.4       +137 -41   testbed/doc/vnode-impl.txt
+
+mike        2004/01/12 10:23:00 MST
+
+  Modified files:
+    www/doc              jail.html 
+  Log:
+  I set out to make this the definitive document on vnodes, but aborted that.
+  Basically, I just updated it and changed it from a chronology to a summary
+  (i.e., collected all the jail features into one list).
+  
+  Revision  Changes    Path
+  1.4       +119 -103  testbed/www/doc/jail.html
+
+stoller     2004/01/12 09:58:11 MST
+
+  Modified files:
+    event/stated         stated.in 
+  Log:
+  Hmm, this file dropped from previous commit. Added support for
+  handling PXEWAKUP timeouts, retrying 3 times and then forcing a power
+  cycle.  Changed BOOTING event action to auto switch in and out of the
+  special PXEKERNEL state machine that all local nodes use since all
+  local nodes boot the same pxeboot kernel and talk to bootinfo (as
+  directed to by dhcp).
+  
+  Revision  Changes    Path
+  1.56      +158 -114  testbed/event/stated/stated.in
 
 stoller     2004/01/12 09:18:41 MST
 
@@ -161,6 +1687,220 @@ stoller     2004/01/12 09:18:41 MST
   1.25      +44 -21    testbed/www/nodecontrol_form.php3
   1.123     +13 -16    testbed/www/showstuff.php3
   1.56      +158 -114  testbed/event/stated/stated.in
+
+shash       2004/01/12 02:17:12 MST
+
+  Modified files:
+    event/nsetrafgen     nse.patch 
+  Log:
+  Another bug fix. The newly added $ns ip-connect instproc had a bug. The
+  code originally tried to do a normal $ns connect between traffic agents
+  attached to simnodes on the same pnode. The problem that I forgot of course
+  is that partitioned topology is quite disconnected which means that a
+  packet is forced to exit the pnode and come back to it (in many cases).
+  In other words, a direct intra pnode path does not exist. The fix is
+  to just use the IP address based routes always. A similar problem
+  is encountered in pdns as well. However, since IP address based routing
+  is not used, there is no simple fix unless I work on it!
+  
+  The 416 node topology testbed/nse416 is working alright. It mapped to
+  20 pnodes and as soon as a whole bunch of traffic started up, 7 pnodes
+  couldn't track real-time and caused a modify. Expt modify happened 3
+  times but eventually max_retries in my re-swapping code was reached. Need
+  more measuring, tuning as well as eventrate based re-swapping.
+  
+  Revision  Changes    Path
+  1.17      +13 -23    testbed/event/nsetrafgen/nse.patch
+
+shash       2004/01/09 00:23:39 MST
+
+  Modified files:
+    event/nsetrafgen     nseinput.tcl.in tbevent.cc tbevent.h 
+    event/sched          event-sched.c 
+    tbsetup              assign_wrapper.in nseswap.in ptopgen.in 
+                         tbswap.in 
+    tbsetup/ns2ir        sim.tcl.in 
+    tbsetup/nseparse     nse.parse.tcl.in 
+  Log:
+  Changes to do auto re-swap of expts with simnodes when an nse on a simhost
+  (or more than one simhost) is unable to keep up with real-time. It includes
+  changes to assign_wrapper to handle swap modify for simnodes, the simple
+  algorithm in nseswap that bumps up the nodeweight of simnodes being hosted
+  on a simhost that reports "can't keep up with real-time" (aka nse violation),
+  ptopgen and sim.tcl to prefer nodes that already have the FBSD-NSE image.
+  Also, changes to other files to send out NSESWAP event.
+  
+  One unrelated change: We now have per-swapin .top files and assign.log
+  files along with .ptop files. This helps in debugging across multiple
+  swapins since files remain in the form of
+  <pid>-<eid>-<process_id>.{top,ptop} and assign-<pid>-<eid>-<process_id>.log
+  Also useful for archiving.
+  
+  Revision  Changes    Path
+  1.19      +4 -1      testbed/event/nsetrafgen/nseinput.tcl.in
+  1.5       +39 -19    testbed/event/nsetrafgen/tbevent.cc
+  1.4       +3 -0      testbed/event/nsetrafgen/tbevent.h
+  1.28      +4 -1      testbed/event/sched/event-sched.c
+  1.149     +112 -21   testbed/tbsetup/assign_wrapper.in
+  1.2       +168 -4    testbed/tbsetup/nseswap.in
+  1.52      +15 -3     testbed/tbsetup/ptopgen.in
+  1.32      +8 -5      testbed/tbsetup/tbswap.in
+  1.60      +4 -0      testbed/tbsetup/ns2ir/sim.tcl.in
+  1.2       +3 -1      testbed/tbsetup/nseparse/nse.parse.tcl.in
+
+shash       2004/01/08 16:30:24 MST
+
+  Modified files:
+    tbsetup              swapexp.in tbswap.in 
+  Log:
+  Added -e option to swapexp which says "restart event system". Similarly
+  added -eventsys_restart option to tbswap. These options are allowed
+  only with swapexp -s modify and correspondingly for tbswap with update.
+  Tested with a 1 node experiment and things seem to work fine.
+  
+  Revision  Changes    Path
+  1.50      +12 -2     testbed/tbsetup/swapexp.in
+  1.31      +7 -3      testbed/tbsetup/tbswap.in
+
+shash       2004/01/08 12:31:54 MST
+
+  Added files:
+    www                  ssh-mime.c 
+  Log:
+  Since I could never get ssh-mime-windows.pl to work for me and I got tired
+  of typing to log in to nodes, I wrote the same code in C.
+  Compile on cygwin with gcc -mwindows -mno-cygwin -o ssh-mime ssh-mime.c .
+  Set the env PUTTY_CMD to the path of where you have put putty. The compiled
+  exe is in http://www.emulab.net/ssh-mime.exe
+
+stoller     2004/01/07 13:27:12 MST
+
+  Modified files:
+    event/stated         stated.in 
+  Log:
+  A set of debugging changes to allow running multiple stateds. This is
+  probably imperfect, but better then nothing. New option, "-t tag"
+  allows you to specify an arbitrary tag to match against the stated_tag
+  of the nodes table. The stated invocation will only operate on nodes
+  that match the tag, ignoring all events for other nodes. If
+  unspecified, stated will operate on all nodes with a NULL tag. This is
+  setup up at the beginning of time (or during a reload) saving the
+  per-node tag in the $nodes hash. Each time an event arrives, check the
+  tag in the table, ignoring the event if not a match.
+  
+  On signaled reload() must also be careful to throw away timeouts from
+  the queue (and be careful not to set up new timeouts for ignored
+  nodes).  So, this allows you to set the tag for a node in the DB, and
+  then HUP stated so that it reloads it tables. That node will now be
+  ignored by that stated.
+  
+  Also made some changes to debug mode. In debug mode, don't worry about
+  the pidfile or the lockfile or checking for other running stated
+  (which causes my debug version to exit! right away). Also, added a new
+  -l option to turn of syslog output and just send it all to stdout with
+  the debug output. -l can be only be used with -d of course.
+  
+  So what can I do with all this:
+  
+  	update nodes set stated_tag='lbs' where node_id='pc5';
+  	sudo kill -HUP `cat /var/run/stated.pid`
+  	sudo stated -d -l -t lbs
+  
+  Which tells the main stated to ignore pc5. Then I run a debugging
+  stated that operates only on pc5. Later when done:
+  
+  	update nodes set stated_tag=NULL where node_id='pc5';
+  	sudo kill -HUP `cat /var/run/stated.pid`
+  
+  Which tells the main stated to operate on pc5 again.
+  
+  Revision  Changes    Path
+  1.55      +131 -44   testbed/event/stated/stated.in
+
+shash       2004/01/07 02:17:03 MST
+
+  Modified files:
+    event/nsetrafgen     nse.patch 
+  Log:
+  Yet another bugfix + code to call a function that sends NSESWAP event
+  when it cannot keep up with real-time.
+  
+  bug: This affected encapsulated simulator packets that had to cross
+  multiple physical nodes before arriving at the destination simulator
+  traffic agent. This bug didnt affect live packets from traffic sources
+  on real PCs.
+  
+  The NSESWAP event is now sent via the tevc command. The nse scheduler
+  waits for the slop factor (diff between clock and event dispatch time
+  that exceeds a threshold) to be crossed multiple times in a second
+  before sending the NSESWAP event. Currently 5 times in 1 second.
+  However, this needs more careful thought and will get modified later.
+  When is it really necessary to declare that an nse is overloaded?
+  i.e. what is the right slop factor? How many times can we tolerate
+  that the slop factor is exceeded to ensure end-to-end performance
+  is within a certain percentage of the expected?
+  
+  Revision  Changes    Path
+  1.16      +58 -23    testbed/event/nsetrafgen/nse.patch
+
+ricci       2004/01/06 18:24:23 MST
+
+  Modified files:
+    tbsetup              assign_wrapper.in 
+    assign               anneal.cc pclass.cc pclass.h score.cc 
+  Log:
+  Fix dynamic pclasses, and make them the default for virtual nodes
+  again.
+  
+  One of the fixes changes the way in which we iterate through pclasses
+  in find_pnode(). We used to treat the vector like a ring buffer, and
+  start (randomly) someplace in the middle. This turns out to give some
+  bad statistical properties when doing dynamic pclasses, since long
+  chains of disabled pclasses will cause some pclasses to be selected
+  more often. My old hack of just hopping around randomly in the
+  disabled-pclass case was bad, because it's hard to tell when you've
+  actually tried all the pclasses - so, we were getting false negatives
+  where it was looking like there was no place available where we could
+  map a vnode, which turned out to have worse effects than I had
+  thought.
+  
+  So, now, we make a list of all the indices and randomize the order,
+  then just iterate through that list.
+  
+  We also now count the number of pclasses that are enabled at every
+  temperature step, and adjust the neighborhood size to remove them.
+  This makes dynamic pclasses quite a bit faster - it cuts the time
+  by 30% - 50% for my test case.
+  
+  Cleaned up find_pnode() by removing some #ifdef's that we don't use,
+  and probably will never want to again - this makes the function almost
+  readable!
+  
+  Revision  Changes    Path
+  1.148     +1 -1      testbed/tbsetup/assign_wrapper.in
+  1.23      +36 -89    testbed/assign/anneal.cc
+  1.22      +13 -0     testbed/assign/pclass.cc
+  1.15      +2 -0      testbed/assign/pclass.h
+  1.46      +1 -1      testbed/assign/score.cc
+
+shash       2004/01/06 00:46:08 MST
+
+  Modified files:
+    event/nsetrafgen     nseinput.tcl.in 
+  Log:
+  Fixed a simple but showstopper bug. This script would flush the routes
+  in every routing table except the main before inserting new ones
+  obtained from tmcc. The problem was that even the interface routes
+  that were added when the interfaces were brought up are flushed.
+  Unfortunately these routes weren't getting added again.
+  
+  The solution is to toggle the interfaces i.e. disabling and re-enabling
+  them again. It has the desired effect of flushing all the routes as well.
+  I'm not sure how things worked until now. In all my previous mappings
+  of the testbed/nse10 straight-line topology, things mysteriously worked!
+  
+  Revision  Changes    Path
+  1.18      +5 -6      testbed/event/nsetrafgen/nseinput.tcl.in
 
 stoller     2003/12/18 9:30:36 MST
 	    
