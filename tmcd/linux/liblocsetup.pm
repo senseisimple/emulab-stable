@@ -9,7 +9,7 @@ use Exporter;
 @EXPORT =
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
-	 os_setup os_groupadd os_useradd os_userdel os_usermod
+	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line
        );
 
@@ -48,6 +48,7 @@ my $IFC_FDUPLEX = "FD";
 my $IFC_HDUPLEX = "HD";
 my $RPMINSTALL  = "/bin/rpm -i %s";
 my @LOCKFILES   = ("/etc/group.lock", "/etc/gshadow.lock");
+my $MKDIR	= "/bin/mkdir";
 
 #
 # OS dependent part of cleanup node state.
@@ -199,6 +200,19 @@ sub os_rpminstall_line($)
     my ($rpm) = @_;
     
     return sprintf($RPMINSTALL, $rpm);
+}
+
+#
+# Create a directory including all intermediate directories.
+#
+sub os_mkdir($$)
+{
+    my ($dir, $mode) = @_;
+
+    if (system("$MKDIR -p -m $mode $dir")) {
+	return 0;
+    }
+    return 1;
 }
 
 #

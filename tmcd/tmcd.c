@@ -18,8 +18,10 @@
  * XXX This needs to be localized!
  */
 #define FSPROJDIR	"fs.emulab.net:/q/proj"
+#define FSGROUPDIR	"fs.emulab.net:/q/groups"
 #define FSUSERDIR	"fs.emulab.net:/users"
 #define PROJDIR		"/proj"
+#define GROUPDIR	"/groups"
 #define USERDIR		"/users"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
@@ -1845,6 +1847,16 @@ domounts(int sock, struct in_addr ipaddr, char *rdata, int tcp)
 	sprintf(buf, "REMOTE=%s/%s LOCAL=%s/%s\n",
 		FSPROJDIR, pid, PROJDIR, pid);
 	client_writeback(sock, buf, strlen(buf), tcp);
+
+	/*
+	 * If pid!=gid, then this is group experiment, and we return
+	 * a mount for the group directory too.
+	 */
+	if (strcmp(pid, gid)) {
+		sprintf(buf, "REMOTE=%s/%s/%s LOCAL=%s/%s/%s\n",
+			FSGROUPDIR, pid, gid, GROUPDIR, pid, gid);
+		client_writeback(sock, buf, strlen(buf), tcp);
+	}
 
 	/*
 	 * Now check for aux project access. Return a list of mounts for

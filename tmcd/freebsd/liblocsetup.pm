@@ -9,7 +9,7 @@ use Exporter;
 @EXPORT =
     qw ( $CP $EGREP $MOUNT $UMOUNT $TMPASSWD
 	 os_cleanup_node os_ifconfig_line os_etchosts_line
-	 os_setup os_groupadd os_useradd os_userdel os_usermod
+	 os_setup os_groupadd os_useradd os_userdel os_usermod os_mkdir
 	 os_rpminstall_line update_delays
        );
 
@@ -46,6 +46,7 @@ my $IFC_100MBS  = "media 100baseTX";
 my $IFC_10MBS   = "media 10baseT/UTP";
 my $IFC_FDUPLEX = "mediaopt full-duplex";
 my $RPMINSTALL  = "/usr/local/bin/rpm -i %s";
+my $MKDIR	= "/bin/mkdir";
 
 #
 # Delay node configuration goop.
@@ -213,6 +214,19 @@ sub os_rpminstall_line($)
     my ($rpm) = @_;
     
     return sprintf($RPMINSTALL, $rpm);
+}
+
+#
+# Create a directory including all intermediate directories.
+#
+sub os_mkdir($$)
+{
+    my ($dir, $mode) = @_;
+
+    if (system("$MKDIR -p -m $mode $dir")) {
+	return 0;
+    }
+    return 1;
 }
 
 #

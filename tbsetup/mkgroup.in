@@ -25,6 +25,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $CONTROL     = "@USERNODE@";
 my $PROJROOT    = "/proj";
+my $GRPROOT     = "/groups";
 my $SSH         = "$TB/bin/sshtb";
 my $GROUPADD    = "/usr/sbin/pw groupadd";
 
@@ -34,7 +35,6 @@ my $dbuid;
 my @db_row;
 my $query_result;
 my $leader;
-my $groupdir;
 my $logname;
 my $user_name;
 my $user_email;
@@ -169,7 +169,8 @@ if (! ($leader = GroupLeader($pid, $gid))) {
 #
 # The group directory lives here.
 # 
-$groupdir = "$PROJROOT/$pid/groups/$gid";
+my $groupdir  = "$GRPROOT/$pid/$gid";
+my $grouplink = "$PROJROOT/$pid/groups/$gid";
 
 #
 # Unix info for the group
@@ -273,6 +274,11 @@ if (! -e $groupdir && $pid ne $gid) {
 
     if (! chown($unix_uid, $unix_gid, "$groupdir")) {
 	fatal("*** Could not chown $groupdir to $leader/$gid: $!");
+    }
+
+    if (! -e $grouplink) {
+	symlink($groupdir, $grouplink) or
+	    fatal("*** Could not symlink($groupdir, $grouplink): $!");
     }
 }
 

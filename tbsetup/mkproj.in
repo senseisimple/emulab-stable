@@ -19,6 +19,7 @@ my $MKGROUP  = "$TB/sbin/mkgroup";
 my $MKACCT   = "$TB/sbin/mkacct";
 
 my $PROJROOT = "/proj";
+my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
 		"groups", "tiplogs");
@@ -174,6 +175,19 @@ if (! chmod(0777, "$TFTPROOT/proj/$pid")) {
 }
 if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
     fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+}
+
+#
+# Create groups directory.
+# 
+if (! mkdir("$GRPROOT/$pid", 0770)) {
+    fatal("Could not make directory $GRPROOT/$pid: $!");
+}
+if (! chmod(0777, ""$GRPROOT/$pid")) {
+    fatal("Could not chmod directory $GRPROOT/$pid: $!");
+}
+if (! chown($uid, $gid, "$GRPROOT/$pid")) {
+    fatal("Could not chown $GRPROOT/$pid to $uid/$gid: $!");
 }
 
 exit(0);

@@ -244,7 +244,7 @@ sub domounts()
 	}
 
 	if (! -e $local) {
-	    if (! mkdir($local, 0770)) {
+	    if (! os_mkdir($local, 0770)) {
 		warn "*** WARNING: Could not make directory $local: $!\n";
 		next;
 	    }

@@ -17,6 +17,7 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
 
 my $PROJROOT = "/proj";
+my $GRPROOT  = "/groups";
 my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
 my $errors   = 0;
@@ -94,19 +95,21 @@ if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
 #
 # Rename the group directory.
 # 
-my $newname = "$gid-" . TBDateTimeFSSafe();
-my $olddir  = "$PROJROOT/$pid/groups";
+my $groupdir  = "$GRPROOT/$pid";
+my $oldname   = "$groupdir/$gid";
+my $newname   = "$oldname-" . TBDateTimeFSSafe();
+my $grouplink = "$PROJROOT/$pid/groups/$gid";
 
-if (! chdir($olddir)) {
-    die("*** Could not chdir to $olddir: $!\n");
+if (-e $grouplink) {
+    unlink($grouplink) or
+	die("*** Could not unlink $grouplink: $!\n");
 }
 
-if (-e $gid) {
-    print "Renaming $gid to $newname in $olddir.\n";
+if (-e $oldname) {
+    print "Renaming $oldname to $newname.\n";
     
-    if (! rename($gid, $newname)) {
-	die("*** Could not rename group directory $olddir/$gid to ".
-	    "$newname: $!\n");
+    if (! rename($oldname, $newname)) {
+	die("*** Could not rename $oldname to $newname: $!\n");
     }
 
     #
