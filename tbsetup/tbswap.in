@@ -228,6 +228,13 @@ if (! $errors) {
 	    }
 	} else {	    
 	    print STDERR "Cleaning up after errors.\n";
+
+	    #
+	    # Set retry to 0; even though swapin indicated we _could_ retry,
+            # we want swapout to do a full cleanup.
+	    #
+	    $retry = 0;
+
 	    doSwapout();
 
 	    #
