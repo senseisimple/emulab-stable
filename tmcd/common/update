@@ -4,7 +4,6 @@
 # Copyright (c) 2000-2002 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use Getopt::Std;
 use English;
 use Fcntl ':flock';
@@ -23,17 +22,13 @@ my $optlist   = "i";
 my $batchmode = 1;
 my $immediate = 0;
 
-#
-# Untaint path
-#
-$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/local/bin:/usr/local/etc/emulab';
-delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
 #
 # Load the OS independent support library. It will load the OS dependent
 # library and initialize itself. 
 # 
-use lib "/usr/local/etc/emulab";
 use libsetup;
 
 #
@@ -87,12 +82,12 @@ if ($UID) {
 #
 # Local config.
 #
-my $lockfile  = "/var/tmp/node_update_lockfile";
+my $lockfile  = "$LOCKDIR/node_update_lockfile";
 
 #
 # Reuse the same log file so we can track errors.
 #
-my $logname = "/tmp/account_update.debug";
+my $logname   = "$LOGDIR/account_update.debug";
 
 #
 # Put this into the background so that the ssh can return immediately.
@@ -134,7 +129,7 @@ while (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
     sleep(5);
 }
 
-my $failed = remotenodeupdate();
+my $failed = nodeupdate();
 
 close(LOCK);
 exit($failed);
