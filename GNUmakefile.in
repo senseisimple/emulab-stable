@@ -64,6 +64,7 @@ ops-install:
 	@$(MAKE) -C db control-install
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C utils control-install
+	@$(MAKE) -C lib control-install
 	@$(MAKE) -C event control-install
 	@$(MAKE) -C xmlrpc control-install
 	@$(MAKE) -C tmcd control-install

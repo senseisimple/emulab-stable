@@ -17,6 +17,11 @@ client:	libtb-nodb.a
 	cmp -s libtb-nodb.a libtb.a || cp -pf libtb-nodb.a libtb.a
 client-install: client
 
+# The point of this is to make sure a nodb version of the library is
+# built during the ops-install target when installing a new emulab.
+# This is done on ops of course.
+control-install: client
+
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS		= log.o tbdefs.o

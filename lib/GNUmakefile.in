@@ -23,6 +23,9 @@ libtb:
 install: 
 	@$(MAKE) -C libtb install
 
+control-install: 
+	@$(MAKE) -C libtb control-install
+
 clean:		subdir-clean
 
 subdir-clean:
