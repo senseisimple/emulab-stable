@@ -22,7 +22,7 @@ use Exporter;
 	 dorouterconfig jailsetup dojailconfig JailedMounts findiface
 	 tmccdie tmcctimeout libsetup_getvnodeid dotrafficconfig
 
-	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED LOCALROOTFS
+	 OPENTMCC CLOSETMCC RUNTMCC MFS REMOTE JAILED PLAB LOCALROOTFS
 
 	 CONFDIR TMCC TMIFC TMDELAY TMRPM TMTARBALLS TMHOSTS TMJAILNAME
 	 TMNICKNAME HOSTSFILE TMSTARTUPCMD FINDIF TMTUNNELCONFIG
@@ -111,6 +111,7 @@ BEGIN
 	mkdir("$VARDIR/db", 0755);
 	mkdir("$VARDIR/logs", 0775);
 	mkdir("$VARDIR/boot", 0775);
+	mkdir("$VARDIR/lock", 0775);
     }
 }
 
