@@ -1,6 +1,6 @@
-diff -ru dist-ntfsprogs-1.7.1/configure.in ntfsprogs-1.7.1/configure.in
---- dist-ntfsprogs-1.7.1/configure.in	Thu Feb 13 03:25:45 2003
-+++ ntfsprogs-1.7.1/configure.in	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/configure.in ntfsprogs-1.7.1-utah/configure.in
+--- ntfsprogs-1.7.1/configure.in	Thu Feb 13 03:25:45 2003
++++ ntfsprogs-1.7.1-utah/configure.in	Wed Mar 31 16:37:25 2004
 @@ -74,7 +74,7 @@
  if test ! -z "$CC"; then
  	_cc="$CC"
@@ -10,9 +10,9 @@ diff -ru dist-ntfsprogs-1.7.1/configure.in ntfsprogs-1.7.1/configure.in
  fi
  
  dnl Check for gcc version being >= 2.96.
-diff -ru dist-ntfsprogs-1.7.1/include/debug.h ntfsprogs-1.7.1/include/debug.h
---- dist-ntfsprogs-1.7.1/include/debug.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/debug.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/debug.h ntfsprogs-1.7.1-utah/include/debug.h
+--- ntfsprogs-1.7.1/include/debug.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/debug.h	Wed Mar 31 16:37:25 2004
 @@ -22,6 +22,7 @@
  #ifndef _NTFS_DEBUG_H
  #define _NTFS_DEBUG_H
@@ -21,9 +21,9 @@ diff -ru dist-ntfsprogs-1.7.1/include/debug.h ntfsprogs-1.7.1/include/debug.h
  #include "config.h"
  
  #ifdef HAVE_STDIO_H
-diff -ru dist-ntfsprogs-1.7.1/include/disk_io.h ntfsprogs-1.7.1/include/disk_io.h
---- dist-ntfsprogs-1.7.1/include/disk_io.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/disk_io.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/disk_io.h ntfsprogs-1.7.1-utah/include/disk_io.h
+--- ntfsprogs-1.7.1/include/disk_io.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/disk_io.h	Wed Mar 31 16:37:25 2004
 @@ -22,6 +22,7 @@
  #ifndef _NTFS_DISK_IO_H
  #define _NTFS_DISK_IO_H
@@ -32,9 +32,9 @@ diff -ru dist-ntfsprogs-1.7.1/include/disk_io.h ntfsprogs-1.7.1/include/disk_io.
  #include "volume.h"
  
  extern s64 ntfs_pread(const int fd, const s64 pos, s64 count, const void *b);
-diff -ru dist-ntfsprogs-1.7.1/include/endians.h ntfsprogs-1.7.1/include/endians.h
---- dist-ntfsprogs-1.7.1/include/endians.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/endians.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/endians.h ntfsprogs-1.7.1-utah/include/endians.h
+--- ntfsprogs-1.7.1/include/endians.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/endians.h	Wed Mar 31 16:37:25 2004
 @@ -33,8 +33,9 @@
   * architectures requirering aligned memory accesses...
   */
@@ -47,9 +47,9 @@ diff -ru dist-ntfsprogs-1.7.1/include/endians.h ntfsprogs-1.7.1/include/endians.
  /* Unsigned from LE to CPU conversion. */
  
  #define le16_to_cpu(x)		(u16)__le16_to_cpu((u16)(x))
-diff -ru dist-ntfsprogs-1.7.1/include/inode.h ntfsprogs-1.7.1/include/inode.h
---- dist-ntfsprogs-1.7.1/include/inode.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/inode.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/inode.h ntfsprogs-1.7.1-utah/include/inode.h
+--- ntfsprogs-1.7.1/include/inode.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/inode.h	Wed Mar 31 16:37:25 2004
 @@ -25,6 +25,7 @@
  /* Forward declaration */
  typedef struct _ntfs_inode ntfs_inode;
@@ -58,9 +58,158 @@ diff -ru dist-ntfsprogs-1.7.1/include/inode.h ntfsprogs-1.7.1/include/inode.h
  #include "types.h"
  #include "support.h"
  #include "runlist.h"
-diff -ru dist-ntfsprogs-1.7.1/include/mft.h ntfsprogs-1.7.1/include/mft.h
---- dist-ntfsprogs-1.7.1/include/mft.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/mft.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/layout.h ntfsprogs-1.7.1-utah/include/layout.h
+--- ntfsprogs-1.7.1/include/layout.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/layout.h	Wed Mar 31 16:55:30 2004
+@@ -292,7 +292,11 @@
+  */
+ typedef struct {
+ /*Ofs*/
+-/*  0*/	NTFS_RECORD;		/* Usually the magic is "FILE". */
++/*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
++	NTFS_RECORD_TYPES magic;/* Usually the magic is "FILE". */
++	u16 usa_ofs;		/* See NTFS_RECORD definition above. */
++	u16 usa_count;		/* See NTFS_RECORD definition above. */
++
+ /*  8*/	u64 lsn;		/* $LogFile sequence number for this record.
+ 				   Changed every time the record is modified. */
+ /* 16*/	u16 sequence_number;	/* Number of times this mft record has been
+@@ -475,8 +479,8 @@
+ 					   FIXME: What does it mean? (AIA) */
+ /* 88*/ COLLATION_RULES collation_rule;	/* Default collation rule. */
+ /* 8c*/	ATTR_DEF_FLAGS flags;		/* Flags describing the attribute. */
+-/* 90*/	u64 min_size;			/* Optional minimum attribute size. */
+-/* 98*/	u64 max_size;			/* Maximum size of attribute. */
++/* 90*/	s64 min_size;			/* Optional minimum attribute size. */
++/* 98*/	s64 max_size;			/* Maximum size of attribute. */
+ /* sizeof() = 0xa0 or 160 bytes */
+ } __attribute__ ((__packed__)) ATTR_DEF;
+ 
+@@ -593,8 +597,8 @@
+ /* 12*/	ATTR_FLAGS flags;	/* Flags describing the attribute. */
+ /* 14*/	u16 instance;		/* The instance of this attribute record. This
+ 				   number is unique within this mft record (see
+-				   MFT_RECORD/next_attribute_instance notes in
+-				   in mft.h for more details). */
++				   MFT_RECORD/next_attribute_instance notes
++				   above for more details). */
+ /* 16*/	union {
+ 		/* Resident attributes. */
+ 		struct {
+@@ -1428,9 +1432,13 @@
+  * ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE, SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE
+  */
+ typedef struct {
+-	ACE_HEADER;		/* The ACE header. */
+-	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
+-	SID sid;		/* The SID associated with the ACE. */
++/*  0	ACE_HEADER; -- Unfolded here as gcc doesn't like unnamed structs. */
++	ACE_TYPES type;		/* Type of the ACE. */
++	ACE_FLAGS flags;	/* Flags describing the ACE. */
++	u16 size;		/* Size in bytes of the ACE. */
++
++/*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
++/*  8*/	SID sid;		/* The SID associated with the ACE. */
+ } __attribute__ ((__packed__)) ACCESS_ALLOWED_ACE, ACCESS_DENIED_ACE,
+ 			       SYSTEM_AUDIT_ACE, SYSTEM_ALARM_ACE;
+ 
+@@ -1443,12 +1451,16 @@
+ } OBJECT_ACE_FLAGS;
+ 
+ typedef struct {
+-	ACE_HEADER;		/* The ACE_HEADER. */
+-	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
+-	OBJECT_ACE_FLAGS flags;	/* Flags describing the object ACE. */
+-	GUID object_type;
+-	GUID inherited_object_type;
+-	SID sid;		/* The SID associated with the ACE. */
++/*  0	ACE_HEADER; -- Unfolded here as gcc doesn't like unnamed structs. */
++	ACE_TYPES type;		/* Type of the ACE. */
++	ACE_FLAGS flags;	/* Flags describing the ACE. */
++	u16 size;		/* Size in bytes of the ACE. */
++
++/*  4*/	ACCESS_MASK mask;	/* Access mask associated with the ACE. */
++/*  8*/	OBJECT_ACE_FLAGS object_flags;	/* Flags describing the object ACE. */
++/* 12*/	GUID object_type;
++/* 28*/	GUID inherited_object_type;
++/* 44*/	SID sid;		/* The SID associated with the ACE. */
+ } __attribute__ ((__packed__)) ACCESS_ALLOWED_OBJECT_ACE,
+ 			       ACCESS_DENIED_OBJECT_ACE,
+ 			       SYSTEM_AUDIT_OBJECT_ACE,
+@@ -1692,8 +1704,13 @@
+  * $SDS data stream and the second copy will be at offset 0x451d0.
+  */
+ typedef struct {
+-	SECURITY_DESCRIPTOR_HEADER;	  /* The security descriptor header. */
+-	SECURITY_DESCRIPTOR_RELATIVE sid; /* The self-relative security
++/*  0	SECURITY_DESCRIPTOR_HEADER; -- Unfolded here as gcc doesn't like
++				       unnamed structs. */
++	u32 hash;	   /* Hash of the security descriptor. */
++	u32 security_id;   /* The security_id assigned to the descriptor. */
++	u64 offset;	   /* Byte offset of this entry in the $SDS stream. */
++	u32 length;	   /* Size in bytes of this entry in $SDS stream. */
++/* 20*/	SECURITY_DESCRIPTOR_RELATIVE sid; /* The self-relative security
+ 					     descriptor. */
+ } __attribute__ ((__packed__)) SDS_ENTRY;
+ 
+@@ -1867,7 +1884,11 @@
+  * index entries (INDEX_ENTRY structures), as described by the INDEX_HEADER.
+  */
+ typedef struct {
+-/*  0*/	NTFS_RECORD;		/* Magic is "INDX". */
++/*  0	NTFS_RECORD; -- Unfolded here as gcc doesn't like unnamed structs. */
++	NTFS_RECORD_TYPES magic;/* Magic is "INDX". */
++	u16 usa_ofs;		/* See NTFS_RECORD definition. */
++	u16 usa_count;		/* See NTFS_RECORD definition. */
++
+ /*  8*/	s64 lsn;		/* $LogFile sequence number of the last
+ 				   modification of this index block. */
+ /* 16*/	VCN index_block_vcn;	/* Virtual cluster number of the index block. */
+@@ -2018,7 +2039,30 @@
+  * NOTE: Before NTFS 3.0 only filename attributes were indexed.
+  */
+ typedef struct {
+-/*  0*/ INDEX_ENTRY_HEADER;	/* The index entry header (see above). */
++/*  0	INDEX_ENTRY_HEADER; -- Unfolded here as gcc dislikes unnamed structs. */
++	union {
++		struct { /* Only valid when INDEX_ENTRY_END is not set. */
++			MFT_REF indexed_file;	/* The mft reference of the file
++						   described by this index
++						   entry. Used for directory
++						   indexes. */
++		} __attribute__ ((__packed__));
++		struct { /* Used for views/indexes to find the entry's data. */
++			u16 data_offset;	/* Data byte offset from this
++						   INDEX_ENTRY. Follows the
++						   index key. */
++			u16 data_length;	/* Data length in bytes. */
++			u32 reservedV;		/* Reserved (zero). */
++		} __attribute__ ((__packed__));
++	} __attribute__ ((__packed__));
++	u16 length;		 /* Byte size of this index entry, multiple of
++				    8-bytes. */
++	u16 key_length;		 /* Byte size of the key value, which is in the
++				    index entry. It follows field reserved. Not
++				    multiple of 8-bytes. */
++	INDEX_ENTRY_FLAGS flags; /* Bit field of INDEX_ENTRY_* flags. */
++	u16 reserved;		 /* Reserved/align to 8-byte boundary. */
++
+ /* 16*/	union {		/* The key of the indexed attribute. NOTE: Only present
+ 			   if INDEX_ENTRY_END bit in flags is not set. NOTE: On
+ 			   NTFS versions before 3.0 the only valid key is the
+@@ -2030,7 +2074,8 @@
+ 		GUID object_id;		/* $O index in FILE_Extend/$ObjId: The
+ 					   object_id of the mft record found in
+ 					   the data part of the index. */
+-		REPARSE_INDEX_KEY;	/* $R index in FILE_Extend/$Reparse. */
++		REPARSE_INDEX_KEY reparse;	/* $R index in
++						   FILE_Extend/$Reparse. */
+ 		SID sid;		/* $O index in FILE_Extend/$Quota:
+ 					   SID of the owner of the user_id. */
+ 		u32 owner_id;		/* $Q index in FILE_Extend/$Quota:
+diff -ru ntfsprogs-1.7.1/include/mft.h ntfsprogs-1.7.1-utah/include/mft.h
+--- ntfsprogs-1.7.1/include/mft.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/mft.h	Wed Mar 31 16:37:25 2004
 @@ -25,6 +25,7 @@
  #include "volume.h"
  #include "inode.h"
@@ -69,9 +218,9 @@ diff -ru dist-ntfsprogs-1.7.1/include/mft.h ntfsprogs-1.7.1/include/mft.h
  
  extern int ntfs_mft_records_read(const ntfs_volume *vol, const MFT_REF mref,
  		const s64 count, MFT_RECORD *b);
-diff -ru dist-ntfsprogs-1.7.1/include/types.h ntfsprogs-1.7.1/include/types.h
---- dist-ntfsprogs-1.7.1/include/types.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/types.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/types.h ntfsprogs-1.7.1-utah/include/types.h
+--- ntfsprogs-1.7.1/include/types.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/types.h	Wed Mar 31 16:37:25 2004
 @@ -23,9 +23,9 @@
  #ifndef _NTFS_TYPES_H
  #define _NTFS_TYPES_H
@@ -84,9 +233,9 @@ diff -ru dist-ntfsprogs-1.7.1/include/types.h ntfsprogs-1.7.1/include/types.h
  
  typedef uint8_t  u8;			/* Unsigned types of an exact size */
  typedef uint16_t u16;
-diff -ru dist-ntfsprogs-1.7.1/include/volume.h ntfsprogs-1.7.1/include/volume.h
---- dist-ntfsprogs-1.7.1/include/volume.h	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/include/volume.h	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/include/volume.h ntfsprogs-1.7.1-utah/include/volume.h
+--- ntfsprogs-1.7.1/include/volume.h	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/include/volume.h	Wed Mar 31 16:37:25 2004
 @@ -22,6 +22,7 @@
  #ifndef _NTFS_VOLUME_H
  #define _NTFS_VOLUME_H
@@ -95,9 +244,9 @@ diff -ru dist-ntfsprogs-1.7.1/include/volume.h ntfsprogs-1.7.1/include/volume.h
  #include "config.h"
  
  #include <sys/mount.h>
-diff -ru dist-ntfsprogs-1.7.1/libntfs/attrib.c ntfsprogs-1.7.1/libntfs/attrib.c
---- dist-ntfsprogs-1.7.1/libntfs/attrib.c	Thu Feb 13 03:25:30 2003
-+++ ntfsprogs-1.7.1/libntfs/attrib.c	Thu Mar 20 19:40:22 2003
+diff -ru ntfsprogs-1.7.1/libntfs/attrib.c ntfsprogs-1.7.1-utah/libntfs/attrib.c
+--- ntfsprogs-1.7.1/libntfs/attrib.c	Thu Feb 13 03:25:30 2003
++++ ntfsprogs-1.7.1-utah/libntfs/attrib.c	Wed Mar 31 16:37:25 2004
 @@ -24,7 +24,7 @@
  #include <string.h>
  #include <stdlib.h>
@@ -118,10 +267,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/attrib.c ntfsprogs-1.7.1/libntfs/attrib.c
  	free(na);
  	return;
  }
-Only in ntfsprogs-1.7.1/libntfs: attrib.c~
-diff -ru dist-ntfsprogs-1.7.1/libntfs/bitmap.c ntfsprogs-1.7.1/libntfs/bitmap.c
---- dist-ntfsprogs-1.7.1/libntfs/bitmap.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/bitmap.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/bitmap.c ntfsprogs-1.7.1-utah/libntfs/bitmap.c
+--- ntfsprogs-1.7.1/libntfs/bitmap.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/bitmap.c	Wed Mar 31 16:37:25 2004
 @@ -23,7 +23,7 @@
  #include <stdio.h>
  #include <string.h>
@@ -131,9 +279,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/bitmap.c ntfsprogs-1.7.1/libntfs/bitmap.c
  #include "types.h"
  #include "attrib.h"
  #include "bitmap.h"
-diff -ru dist-ntfsprogs-1.7.1/libntfs/bootsect.c ntfsprogs-1.7.1/libntfs/bootsect.c
---- dist-ntfsprogs-1.7.1/libntfs/bootsect.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/bootsect.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/bootsect.c ntfsprogs-1.7.1-utah/libntfs/bootsect.c
+--- ntfsprogs-1.7.1/libntfs/bootsect.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/bootsect.c	Wed Mar 31 16:37:25 2004
 @@ -23,7 +23,7 @@
  #include <stdlib.h>
  #include <string.h>
@@ -143,9 +291,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/bootsect.c ntfsprogs-1.7.1/libntfs/bootsec
  #include "compat.h"
  
  #include "bootsect.h"
-diff -ru dist-ntfsprogs-1.7.1/libntfs/dir.c ntfsprogs-1.7.1/libntfs/dir.c
---- dist-ntfsprogs-1.7.1/libntfs/dir.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/dir.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/dir.c ntfsprogs-1.7.1-utah/libntfs/dir.c
+--- ntfsprogs-1.7.1/libntfs/dir.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/dir.c	Wed Mar 31 16:37:25 2004
 @@ -22,6 +22,7 @@
  #include <stdlib.h>
  #include <errno.h>
@@ -183,9 +331,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/dir.c ntfsprogs-1.7.1/libntfs/dir.c
  		goto put_err_out;
  	}
  	index_end = (u8*)&ir->index + le32_to_cpu(ir->index.index_length);
-diff -ru dist-ntfsprogs-1.7.1/libntfs/disk_io.c ntfsprogs-1.7.1/libntfs/disk_io.c
---- dist-ntfsprogs-1.7.1/libntfs/disk_io.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/disk_io.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/disk_io.c ntfsprogs-1.7.1-utah/libntfs/disk_io.c
+--- ntfsprogs-1.7.1/libntfs/disk_io.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/disk_io.c	Wed Mar 31 16:37:25 2004
 @@ -26,6 +26,7 @@
  #include <string.h>
  #include <errno.h>
@@ -225,9 +373,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/disk_io.c ntfsprogs-1.7.1/libntfs/disk_io.
  		br = read(fd, (char*)b + total, count);
  		/* If everything ok, continue. */
  		if (br > 0)
-diff -ru dist-ntfsprogs-1.7.1/libntfs/lcnalloc.c ntfsprogs-1.7.1/libntfs/lcnalloc.c
---- dist-ntfsprogs-1.7.1/libntfs/lcnalloc.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/lcnalloc.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/lcnalloc.c ntfsprogs-1.7.1-utah/libntfs/lcnalloc.c
+--- ntfsprogs-1.7.1/libntfs/lcnalloc.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/lcnalloc.c	Wed Mar 31 16:37:25 2004
 @@ -101,8 +101,8 @@
  	int err = 0, rlpos, rlsize, buf_size;
  	u8 pass, done_zones, search_zone, need_writeback, bit;
@@ -239,9 +387,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/lcnalloc.c ntfsprogs-1.7.1/libntfs/lcnallo
  			(long long)start_lcn,
  			zone == MFT_ZONE ? "MFT" : "DATA");
  	if (!vol || count < 0 || start_lcn < -1 || !vol->lcnbmp_na ||
-diff -ru dist-ntfsprogs-1.7.1/libntfs/mft.c ntfsprogs-1.7.1/libntfs/mft.c
---- dist-ntfsprogs-1.7.1/libntfs/mft.c	Thu Feb 13 03:02:28 2003
-+++ ntfsprogs-1.7.1/libntfs/mft.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/mft.c ntfsprogs-1.7.1-utah/libntfs/mft.c
+--- ntfsprogs-1.7.1/libntfs/mft.c	Thu Feb 13 03:02:28 2003
++++ ntfsprogs-1.7.1-utah/libntfs/mft.c	Wed Mar 31 16:37:25 2004
 @@ -59,7 +59,8 @@
  	s64 br;
  	VCN m;
@@ -252,9 +400,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/mft.c ntfsprogs-1.7.1/libntfs/mft.c
  	if (!vol || !vol->mft_na || !b || count < 0) {
  		errno = EINVAL;
  		return -1;
-diff -ru dist-ntfsprogs-1.7.1/libntfs/unistr.c ntfsprogs-1.7.1/libntfs/unistr.c
---- dist-ntfsprogs-1.7.1/libntfs/unistr.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/unistr.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/unistr.c ntfsprogs-1.7.1-utah/libntfs/unistr.c
+--- ntfsprogs-1.7.1/libntfs/unistr.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/unistr.c	Wed Mar 31 16:37:25 2004
 @@ -21,13 +21,21 @@
  
  #include <stdio.h>
@@ -278,9 +426,9 @@ diff -ru dist-ntfsprogs-1.7.1/libntfs/unistr.c ntfsprogs-1.7.1/libntfs/unistr.c
  
  /*
   * IMPORTANT
-diff -ru dist-ntfsprogs-1.7.1/libntfs/volume.c ntfsprogs-1.7.1/libntfs/volume.c
---- dist-ntfsprogs-1.7.1/libntfs/volume.c	Thu Feb  6 08:24:56 2003
-+++ ntfsprogs-1.7.1/libntfs/volume.c	Mon Mar 10 17:22:32 2003
+diff -ru ntfsprogs-1.7.1/libntfs/volume.c ntfsprogs-1.7.1-utah/libntfs/volume.c
+--- ntfsprogs-1.7.1/libntfs/volume.c	Thu Feb  6 08:24:56 2003
++++ ntfsprogs-1.7.1-utah/libntfs/volume.c	Wed Mar 31 16:37:25 2004
 @@ -27,6 +27,7 @@
  #include <sys/stat.h>
  #include <limits.h>
