@@ -27,11 +27,14 @@ linux: islinux slothd
 fbsd: isfbsd slothd
 	$(CP) slothd fbsd/slothd
 
-slothd: slothd.o slothd.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o $(LIBS)
+slothd: slothd.o slothd.h version.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
 
-sdcollectd: sdcollectd.o sdcollectd.h
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o $(SDLIBS)
+sdcollectd: sdcollectd.o sdcollectd.h version.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o version.o $(SDLIBS)
+
+version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h
+	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 islinux:
 	@uname -s | grep inux > /dev/null
@@ -42,5 +45,5 @@ isfbsd:
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS))
 
 clean:
-	rm -f *.o $(PROGS) *~ core *.core
+	rm -f *.o $(PROGS) *~ core *.core version.c
 

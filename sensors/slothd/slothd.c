@@ -51,7 +51,7 @@ void usage(void) {
   printf("\tslothd [-a] [-d] [-i <interval>] [-p <port>] [-s <server>]\n");
   printf("\t -h\t This message.\n");
   printf("\t -a\t Only scan active terminal special files.\n");
-  printf("\t -f\t Send first idle data report immediately on startup.\n");
+  printf("\t -f\t Do not send idle data report immediately on startup.\n");
   printf("\t -d\t Debug mode; do not fork into background.\n");
   printf("\t -i <interval>\t Run interval, in seconds. (default is 10 min.)\n");
   printf("\t -p <port>\t Send on port <port> (default is %d).\n", SLOTHD_DEF_PORT);
@@ -67,6 +67,8 @@ int main(int argc, char **argv) {
   static SLOTHD_OPTS mopts;
   static SLOTHD_PACKET mpkt;
 
+  extern char build_info[];
+
   /* pre-init */
   bzero(&mopts, sizeof(SLOTHD_OPTS));
   bzero(&mpkt, sizeof(SLOTHD_PACKET));
@@ -75,6 +77,7 @@ int main(int argc, char **argv) {
 
   /* Try to get lock.  If can't, then bail out. */
   if ((pfd = open(PIDFILE, O_EXCL | O_CREAT | O_RDWR)) < 0) {
+    lerror("Can't create lock file, quiting.");
     exit(1);
   }
   fchmod(pfd, S_IRUSR | S_IRGRP | S_IROTH);
@@ -92,6 +95,7 @@ int main(int argc, char **argv) {
     else {
       exitcode = 0;
       lnotice("Slothd started");
+      lnotice(build_info);
       for (;;) {
         if (!opts->first) {
           sleep(mopts.interval);
@@ -120,7 +124,7 @@ int parse_args(int argc, char **argv) {
   opts->interval = DEF_INTVL;
   opts->port = SLOTHD_DEF_PORT;
   opts->servname = SLOTHD_DEF_SERV;
-  opts->first = 0;
+  opts->first = 1;
 
   while ((ch = getopt(argc, argv, "ai:dp:s:hf")) != -1) {
     switch (ch) {
@@ -143,7 +147,7 @@ int parse_args(int argc, char **argv) {
       break;
 
     case 'f':
-      opts->first = 1;
+      opts->first = 0;
       break;
 
     case 'p':
@@ -208,6 +212,15 @@ int init_slothd(void) {
     }
     opts->ttys[opts->numttys] = strdup("/dev/console");
     opts->numttys++;
+#ifdef __linux__  
+    /* 
+       Include the pts mux device to check for activity on
+       dynamically allocated linux pts devices:
+       (/dev/pts/<num>)
+    */
+    opts->ttys[opts->numttys] = strdup("/dev/ptmx");
+    opts->numttys++;
+#endif
     while (opts->numttys < MAXTTYS && (dptr = readdir(devs))) {
       if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
         snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
@@ -260,7 +273,8 @@ void get_min_tty_idle(void) {
       mintime = wtmp_get_last();
     }
   }
-#ifdef __linux__
+
+#ifdef COMMENT
   /* Linux uses dynamically allocated UNIX98 ptys */
   else {
     DIR *ptsdir;

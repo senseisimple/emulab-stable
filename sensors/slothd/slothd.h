@@ -34,7 +34,7 @@
 #define SLOTHD_PATH_ENV "/bin:/usr/bin:/sbin:/usr/sbin:/etc/testbed"
 #define UTMP_PATH "/var/run/utmp"
 #define WTMP_PATH "/var/log/wtmp"
-#define PIDFILE "/tmp/.sdpid"
+#define PIDFILE "/var/run/slothd"
 #define MACADDRLEN 18
 #define MAXNUMIFACES 10
 #define MAXIFNAMELEN 10

@@ -71,6 +71,8 @@ int main(int argc, char **argv) {
   static IDLE_DATA iddata;
   static SDCOLLECTD_OPTS gopts;
 
+  extern char build_info[];
+
   opts = &gopts;
 
   /* Foo on SIGPIPE & SIGHUP. */
@@ -122,7 +124,8 @@ int main(int argc, char **argv) {
       lerror("Couldn't become daemon");
       exit(1);
     }
-    lnotice("Daemon started successfully");
+    lnotice("sdcollectd started successfully");
+    lnotice(build_info);
   }
 
   /* do our thing - just loop collecting data from clients, and insert into
