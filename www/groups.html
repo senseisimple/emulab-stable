@@ -27,7 +27,17 @@ via the generally well understood unix group protection mechanism.
 </p>
 
 <p>
-As project leader, you may create and destroy groups, and add and
+As a convenience, all new projects are created with one new group,
+termed the <em>default group</em>. All project members are in the
+default group, and as its name implies, whenever the group is left
+unspecified in a form, it defaults to the project group (this allows
+you to create a project without any sub groups at all; new members
+join the default group, new experiments are created in the default
+group, etc.).
+</p>
+
+<p>
+As project leader, you may create and destroy subgroups, and add or
 remove project members from your groups. You are automatically a
 member of new groups you create; even though you are not the
 designated leader of the group, you still retain all of the same
@@ -59,12 +69,89 @@ groups via a web form; the Project Leader must do it on the Edit Group
 page.
 </p>
 
+<a NAME="SECURITY"></a>
 <p>
-As mentioned above, unix groups are used to protect members one group
-from members of another group. User may create shared directories by
-using the unix "chgrp" command. When accounts are created on the
-experimental nodes after a new experiment is started, only those
-members of the group will get accounts on the nodes; other members of
-the same project, not in the group, will not get accounts.
-</p>
+<b>
+These are some important security issues to keep in mind:
+</b>
 
+<ul>
+<li>
+Unix groups are used to protect members of one group from members of
+another group. Users may create shared directories by using the unix
+<tt>chgrp</tt> command. When accounts are created on the experimental
+nodes after a new experiment is started, only those members of the
+group will get accounts on the nodes; other members of the same
+project, not in the group, will not get accounts.
+
+<li>
+Emulab uses NFS mounted filesystems for <tt>/users</tt> and
+<tt>/proj</tt> on the experimental nodes. Because of the nature of
+NFS, giving root privledges to a user will allow them to read/write
+any files on any filesystems that are mounted, since root access
+allows them to <em>su</em> as any other user. Thus, any files in the
+project directory and in the home directories of other members of the
+group, can be can be "compromised" by a group member. Please note that
+no other directories are NFS mounted; other projects and users on
+Emulab are safe.
+
+<li>
+It is important to remember that granting "root" permissions to a user
+in the project (or default group) and "user" permissions in a
+subgroup, is inconsistent and can result in a breech of privacy.
+Consider this example; user Joe has "root" permissions in the default
+group, and "user" permissions in a subgroup. Another user Bob is in
+the same subgroup as Joe, and since Joe has "user" permissions, it was
+probably intended that Joe would not be able to read Bob's files.  Joe
+now creates an experiment, specifying the default group in the web
+form. The nodes in Joe's experiment would get NFS mounts for all of
+the members in the project (including Bob), and since Joe has "root"
+permission in the default group, would be granted root access on his
+nodes. Joe can now access the files of all members of the project,
+including Bob. The correct approach is to specify "user" permissions
+in the default group, and either "user" or "root" in the subgroup
+(depending on whether subgroup members are mutually trust each other
+and need to create experiments).
+
+<li>
+Equally dangerous is specifying different levels of trust for a user
+that is in multiple subgroups of a project. In this case, any
+<em>other</em> users that are in the same groups (overlapping) are
+potentially at risk. For example, if Joe has "root" permissions in one
+subgroup, and "user" permissions in a second subgroup, and there is
+another user Bob who is in both subgroups, then Joe can access Bob's
+files when creating an experiment in one of the subgroups, but not the
+other. If Joe is really not supposed to access Bob's files, then Joe
+should not have "root" permission in a subgroup that contains Bob.
+
+</ul>
+
+<table cellspacing=2 border=0>
+        <tr>
+            <td colspan=4>
+                <h4>You have the following choices for <b>Trust</b>:</td>
+        <tr>
+        <tr>
+            <td>&nbsp</td>
+            <td>User</td>
+            <td>-</td>
+            <td>User may log into machines in your experiments</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td nowrap=1>Local Root</td>
+            <td>-</td>
+            <td>User may create/destroy experiments in your project and
+                has root privileges on machines in your experiments</td>
+        </tr>
+        <tr>
+            <td>&nbsp</td>
+            <td nowrap=1>Group Root</td>
+            <td>-</td>
+            <td>In addition to Local Root privileges, user may also
+                approve new group members and 
+                modify user info for other users within the group. This
+                level of trust is typically given only to TAs and the
+                like.</td>
+        </tr>
+      </table>
