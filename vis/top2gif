@@ -1,7 +1,7 @@
 #!/usr/local/bin/perl -w
 
 $TOPPER = "~barb/bin/topper";
-$NEATO  = "~barb/bin/neato"; 
+$NEATO  = "/usr/local/bin/neato"; 
 
 while ($_ = shift) {
     if (/\-o(.*)/) {
