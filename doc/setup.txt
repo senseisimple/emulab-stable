@@ -75,7 +75,13 @@ SNMP MIBs - MIBs go in /usr/local/share/snmp/mibs. In addition to the ones
 installed by the ucd-snmp package, you'll need MIBs for Cisco and Intel
 switches. You can grab the Cisco MIBs from:
 ftp.cisco.com/pub/mibs
-I'm not sure where to grab the INTEL ones. 
+The Intel ones can be found from the site for the 510T switches at:
+http://www.intel.com/network/connectivity/products/exp510t.htm
+Now, a step that involves some voodoo I don't quite understand: make sure that
+/usr/local/share/snmp/mibs/.index exists (touch it if it doesn't), and chmod it
+to 666. Now, do an snmpwalk of some device (eg. 'snmpwalk cisco1 public') -
+this will force the .index file to get rebuilt. Suggestions of better ways to
+rebuild this file are welcome!
 
 DNS zones - Make sure to include the DNS configuration files from /etc/named/
 Stick:
@@ -169,9 +175,7 @@ FreeBSD port)
 Cron jobs: We currently have two cron jobs running for the testbed. Both can be
 run out of /etc/crontab
 45	1	*	*	*	root	/usr/testbed/sbin/backup
-*/5	*	*	*	*	tbroot	/usr/testbed/sbin/node_status
-(note that the second one is run as the 'tbroot' user, but can be run as any
-user that has read/write access to the database.)
+*/5	*	*	*	*	root	/usr/testbed/sbin/node_status
 Don't forget to HUP cron!
 
 ntpd: The boss node should be running ntpd. In FreeBSD, you can enable this with
@@ -179,13 +183,21 @@ the line
 xntpd_enable="YES"
 in /etc/rc.conf. Check out the ntpd man page for configuration information.
 
-You may want a program to allow administraor-types to run stuff easily as root.
+You may want a program to allow administrator-types to run stuff easily as root.
 Here at Utah, we have two: su1 (developed locally) and sudo (installed from
-FreeBSD ports) - don't forget to get it set up!
+FreeBSD ports) - don't forget to get it set up! Our strategy on boss was to
+give everyone in the weel group unrestricted sudo access with:
+%wheel  ALL=(ALL) NOPASSWD: ALL
 
 checkpass - Need to get a copy of the dictionary that checkpass uses to check
 for bad passwords when creating a new account. I'll fill out this section
 soon when I figure out the best way to handle this...
+
+syslogd - Normally, sylogd on FreeBSD is run with the '-s' flag to prevent
+logging to it over the network. We use network logging, so we need this
+feature. Re-enable it by putting:
+syslogd_flags=""
+in /etc/rc.conf
 
 ##### Step 6 - Stuff to copy from an old boss node
 
