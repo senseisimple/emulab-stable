@@ -55,7 +55,9 @@ use Exporter;
 	 BATCHSTATE_ACTIVATING
 	 TBBatchState TBSetBatchState
 
-	 TB_NODELOGTYPES
+	 TB_NODELOGTYPE_MISC TB_NODELOGTYPES TB_DEFAULT_NODELOGTYPE 
+
+	 TB_DEFAULT_RELOADTYPE TB_RELOADTYPE_FRISBEE TB_RELOADTYPE_NETDISK
 
 	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
@@ -64,6 +66,7 @@ use Exporter;
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
 	 ExpNodes DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
+	 TBSetSchedReload
 	 );
 
 # Must come after package declaration!
@@ -188,7 +191,14 @@ sub TB_IMAGEID_MIN()		{ TB_IMAGEID_READINFO; }
 sub TB_IMAGEID_MAX()		{ TB_IMAGEID_ACCESS; }
 
 # Node Log Types
-sub TB_NODELOGTYPES()		{ ("misc") ; }
+sub TB_NODELOGTYPE_MISC		{ "misc"; }
+sub TB_NODELOGTYPES()		{ ( TB_NODELOGTYPE_MISC ) ; }
+sub TB_DEFAULT_NODELOGTYPE()	{ TB_NODELOGTYPE_MISC; }
+
+# Reload Types.
+sub TB_RELOADTYPE_NETDISK()	{ "netdisk"; }
+sub TB_RELOADTYPE_FRISBEE()	{ "frisbee"; }
+sub TB_DEFAULT_RELOADTYPE()	{ TB_RELOADTYPE_NETDISK; }
 
 #
 # We should list all of the DB limits.
@@ -1072,6 +1082,30 @@ sub TBValidNodeName($)
 	return 0;
     }
     return 1;
+}
+
+#
+# Set the scheduled_reloads for a node. Type is optional and defaults to
+# testbed default load type. See above.
+#
+# usage: TBSetSchedReload(char *node, char *imageid, [char *reload_type])
+#        Returns 1 if okay.
+#        Returns 0 if failed.
+#
+sub TBSetSchedReload($$;$)
+{
+    my ($node, $imageid, $type) = @_;
+
+    if (!defined($type)) {
+	$type = TB_DEFAULT_RELOADTYPE;
+    }
+
+    if (DBQueryWarn("replace into scheduled_reloads ".
+		    "(node_id, image_id, reload_type) values ".
+		    "('$node', '$imageid', '$type')")) {
+	return 1;
+    }
+    return 0;
 }
 
 #

@@ -52,6 +52,7 @@ my $NETDISKOSID = "NETDISK-STD";
 my $FRISBEEPATH = "$BOSSADDR:/tftpboot/pxeboot.frisbee";
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $nodereboot	= "$TB/bin/node_reboot";
+my $schedreload	= "$TB/bin/sched_reload";
 my $ping	= "/sbin/ping";
 my $dbg		= 0;
 my @row;
@@ -134,7 +135,7 @@ if ($UID && !TBAdmin($UID)) {
     $mereuser = 1;
 
     if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
-	die("You do not have permission to load images on one (or more) ".
+	die("*** You do not have permission to load images on one (or more) ".
 	    "of the nodes!\n");
     }
 }
@@ -157,18 +158,23 @@ foreach my $node (@nodes) {
     #
     
     #
-    # Get default imageid for this node if none specified on comand line.
+    # Get default imageid for this node.
     #
-    if ($usedefault) {
-	if (! ($imageid = DefaultImageID($node))) {
-	    die("*** No default imageid is defined for $node!\n");
-	}
+    my $default_imageid;
+    if (! ($default_imageid = DefaultImageID($node))) {
+	die("*** $0:\n".
+	    "    No default imageid is defined for $node!\n");
     }
+    if ($usedefault) {
+	$imageid = $default_imageid;
+    }
+    
     my $db_result =
 	DBQueryFatal("select * from images where imageid='$imageid'");
     
     if ($db_result->numrows < 1) {
-	die("*** No such imageid $imageid is defined in the DB!\n");
+	die("*** $0:\n".
+	    "    No such imageid $imageid is defined in the DB!\n");
     }
     %imageid_row = $db_result->fetchhash();
     
@@ -195,7 +201,8 @@ foreach my $node (@nodes) {
     my $cmdline = "";
     if (defined($imageid_row{'pid'})) {
 	if (! ($imagepath =~ /^\/proj\//)) {
-	    die("*** Your image must reside in /proj\n");
+	    die("*** $0:\n".
+		"    Your image must reside in /proj\n");
 	}
 	$cmdline = "${USERADDR}:$imagepath $diskpart";    
     }
@@ -214,6 +221,19 @@ foreach my $node (@nodes) {
     # OS to load
     DBQueryFatal("replace into current_reloads ".
 		 "(node_id, image_id) values ('$node', '$imageid')");
+
+    #
+    # If a mereuser is loading an image (which is not the default) then
+    # schedule a reload for it so that when the experiment is terminated
+    # it will get a fresh default image before getting reallocated to
+    # another experiment.
+    #
+    if ($mereuser && $imageid ne $default_imageid) {
+	if (! TBSetSchedReload($node, $default_imageid)) {
+	    print "*** $0:\n".
+		  "    WARNING: Could not schedule default reload for $node!";
+	}
+    }
 
     #
     # Assign partition table entries for each partition in the image.

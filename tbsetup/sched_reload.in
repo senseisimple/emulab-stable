@@ -14,13 +14,15 @@ sub usage()
 {
     print STDOUT "Usage: sched_reload [-f | -p] [-r] [-i <imageid>] ".
 	         "<node> [node ...]\n".
+		 "       sched_reload <options> -e pid,eid\n".
 	"Use -i to specify an imageid. Use node default otherwise.\n".
 	"Use -f to force reload. Fail if node cannot be reserved.\n".
 	"Use -p to pend reload for the reload daemon.\n".
+	"Use -e to schedule a reload for all nodes in an experiment.\n".
 	"Use -r to use Frisbee rather than netdisk (experimental).\n";
     exit(-1);
 }
-my  $optlist = "fpri:";
+my  $optlist = "fpri:e:";
 
 #
 # Configure variables
@@ -53,6 +55,9 @@ my $usedefault  = 1;
 my $imageid;
 my %imagenodes  = ();
 my @row;
+my $eidmode     = 0;
+my $pid;
+my $eid;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
@@ -66,9 +71,6 @@ $| = 1; #Turn off line buffering on output
 #
 %options = ();
 if (! getopts($optlist, \%options)) {
-    usage();
-}
-if (@ARGV < 1) {
     usage();
 }
 if (defined($options{"f"})) {
@@ -95,28 +97,56 @@ if (defined($options{"i"})) {
 	die("Bad data in $imageid.");
     }
 }
+if (defined($options{"e"})) {
+    if (@ARGV) {
+	usage();
+    }
+    
+    $eidmode = $options{"e"};
+    if ($eidmode =~ /([-\w]*),([-\w]*)/) {
+	$pid = $1;
+	$eid = $2;
+    }
+    else {
+	print STDOUT "Invalid argument to -e option: $eidmode\n";
+	usage();
+    }
+}
+else {
+    if (@ARGV < 1) {
+	usage();
+    }
+}
 
 # This type will be put into the database, to allow programs 
 # such as nfree to figure out what kind of reload is supposed
 # to occur
 if ($frisbee) {
-	$type = "frisbee";
+    $type = TB_RELOADTYPE_FRISBEE;
 } else {
-	$type = "netdisk";
+    $type = TB_RELOADTYPE_NETDISK;
 }
 
-#
-# Untaint nodes.
-#
-foreach my $node ( @ARGV ) {
-    if ($node =~ /^([-\@\w]+)$/) {
-	$node = $1;
+if ($eidmode) {
+    if (! (@nodes = ExpNodes($pid, $eid))) {
+	die("*** $0:\n".
+	    "    There are no nodes allocated to experiment $pid/$eid!");
     }
-    else {
-	die("Bad node name: $node.");
-    }
+}
+else {
+    #
+    # Untaint nodes.
+    #
+    foreach my $node ( @ARGV ) {
+	if ($node =~ /^([-\@\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("Bad node name: $node.");
+	}
     
-    push(@nodes, $node);
+	push(@nodes, $node);
+    }
 }
 
 #
@@ -124,7 +154,8 @@ foreach my $node ( @ARGV ) {
 # Mere users cannot schedule reloads.
 #
 if ($UID && !TBAdmin($UID)) {
-    die("*** Only root or TB administrators can schedule disk reloads.\n");
+    die("*** $0:\n".
+	"     Only root or TB administrators can schedule disk reloads.\n");
 }
 
 #
@@ -136,7 +167,8 @@ if (defined($imageid)) {
 	DBQueryFatal("select * from images where imageid='$imageid'");
     
     if ($query_result->numrows < 1) {
-	die("*** No such imageid $imageid is registered in the DB!");
+	die("*** $0:\n".
+	    "    No such imageid $imageid is registered in the DB!");
     }
 }
 
@@ -159,7 +191,8 @@ foreach my $node (@nodes) {
     #
     if ($usedefault) {
 	if (! ($imageid = DefaultImageID($node))) {
-	    die("*** No default imageid is defined for $node!\n");
+	    die("*** $0:\n".
+		"    No default imageid is defined for $node!\n");
 	}
     }
     
@@ -200,11 +233,11 @@ foreach my $node (@nodes) {
     }
 
     # Put it in the reloads table so TMCD knows to free it.
-    print STDERR "Scheduling reload of $imageid for $pc:\n";
-    DBQueryFatal("replace into scheduled_reloads ".
-		 "(node_id, image_id, reload_type) values ".
-		 "('$pc', '$imageid','$type')");
-
+    if (! TBSetSchedReload($pc, $imageid, $type)) {
+	die("*** $0:\n".
+	    "    Could not set scheduled reload for $pc!"); 
+    }
+    
     #
     # The point of this hash table is so that we can gather up all the
     # nodes per imageid and issue single requests to os_load, so that it
