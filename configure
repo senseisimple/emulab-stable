@@ -1213,6 +1213,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/webmkacct tbsetup/mkacct tbsetup/eventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
 	tbsetup/portstats \
+	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
 	tip/GNUmakefile \
 	tmcd/GNUmakefile tmcd/freebsd/GNUmakefile tmcd/linux/GNUmakefile \
 	tmcd/netbsd/GNUmakefile \
