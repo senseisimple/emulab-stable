@@ -155,6 +155,8 @@ function SHOWPROJECT($pid, $thisuid) {
 # A Group
 #
 function SHOWGROUP($pid, $gid) {
+    global $OURDOMAIN;
+    
     $query_result =
 	DBQueryFatal("SELECT * FROM groups WHERE pid='$pid' and gid='$gid'");
     $row = mysql_fetch_array($query_result);
@@ -171,6 +173,11 @@ function SHOWGROUP($pid, $gid) {
     $expt_last  = $row[expt_last];
     $unix_gid   = $row[unix_gid];
     $unix_name  = $row[unix_name];
+
+    if (strcmp($pid,$gid))
+	$mail = "$pid-$gid" . "-users@" . $OURDOMAIN;
+    else
+	$mail = "$pid" . "-users@" . $OURDOMAIN;
 
     if (!$expt_last) {
 	$expt_last = "&nbsp";
@@ -210,6 +217,11 @@ function SHOWGROUP($pid, $gid) {
               <td>Group Leader: </td>
               <td class=\"left\">
                 <A href='showuser.php3?target_uid=$leader'>$leader</A></td>
+          </tr>\n";
+    
+    echo "<tr>
+              <td>Email List: </td>
+              <td class=\"left\">$mail</td>
           </tr>\n";
     
     echo "<tr>
