@@ -70,6 +70,33 @@ struct packet {
 	struct packet *next;
 };
 
+struct bufq {
+	struct bufq* next;
+};
+
+struct bufq *bufhead = NULL;
+int bufq_size = 0;
+
+void dump_stats() {
+	printf("At exit, bufq contains %d buffers\n", bufq_size);
+}
+
+/* Buffer management */
+void *getbuf() {
+	struct bufq *nextbuf;
+	if (!bufhead) { return malloc(MAXPACKET); }
+	nextbuf = bufhead;
+	bufhead = bufhead->next;
+	bufq_size--;
+	return nextbuf;
+}
+
+void freebuf(void *freeme) {
+	((struct bufq *)freeme)->next = bufhead;
+	bufhead = (struct bufq *)freeme;
+	bufq_size++;
+}
+
 /*
  * Put a packet at the end of the waiting queue.
  *
@@ -156,7 +183,7 @@ int pq_run(struct timeval *curtime) {
 			if (tmp == ptail) {
 				ptail = NULL;
 			}
-			free(tmp->data);
+			freebuf(tmp->data);
 			free(tmp);
 			tmp = NULL;
 		} else {
@@ -179,6 +206,7 @@ int pq_run(struct timeval *curtime) {
 
 void cleanup(int sig) {
 	DPRINTF("Sig %d caught\n", sig);
+	dump_stats();
 	free_socket(msock);
 	exit(0);
 }
@@ -233,7 +261,7 @@ int main(int argc, char **argv) {
 	char *packetbuf = NULL;
 	unsigned long granularity; /* Kind of */
 	unsigned long delay = 1000000;
-	struct timeval mytv, time_prev, time_now, exptime;
+	struct timeval mytv, time_now, exptime;
 	int rc;
 	int proto = IPPROTO_UDP;
 
@@ -274,8 +302,6 @@ int main(int argc, char **argv) {
 		usage();
 		exit(-1);
 	}
-
-	time_prev.tv_sec = time_prev.tv_usec = 0;
 
 	signal(SIGTERM, cleanup);
 	signal(SIGQUIT, cleanup);
@@ -352,7 +378,7 @@ int main(int argc, char **argv) {
 		long addusec;
 
 		if (!packetbuf) {
-			packetbuf = (char *)malloc(MAXPACKET);
+			packetbuf = getbuf();
 		}
 
 		if (granularity < MIN_USEC) {
@@ -386,12 +412,12 @@ int main(int argc, char **argv) {
 		
 		pq_run(&time_now);
 
-		time_prev = time_now;
 		if (len <= 0) {
 			continue;
 		}
 
 		exptime = time_now;
+		/* XXX:  Cheap hack alert.  Beware of this one */
 		addusec = delay - DELAY_COMPENSATION;
 		exptime.tv_sec += addusec / 1000000;
 		addusec %= 1000000;
