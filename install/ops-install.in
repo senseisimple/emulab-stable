@@ -55,6 +55,8 @@ my $PWD        = "/bin/pwd";
 # Some files we edit/create
 #
 my $RCCONF          = "/etc/rc.conf";
+my $RCLOCAL         = "/etc/rc.local";
+my $RCCAPTURE       = "$PREFIX/etc/rc.capture";
 my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
 my $ALIASES_FILE    = "/etc/mail/aliases";
 my $EXPORTS_FILE    = "/etc/exports";
@@ -79,7 +81,9 @@ my @LOCAL_HOSTS       = ($OURDOMAIN,$BOSSNODE,$USERNODE,$FSNODE);
 my @LOGFILES          = ("/var/log/logins","/var/log/tiplogs/capture.log",
     "/var/log/mountd.log");
 my @MAILING_LIST_NAMES = map { /^([\w-]+)\@/ } @MAILING_LISTS;
-my @TESTBED_DIRS       = ($PREFIX,"/users","/proj","/groups","/share");
+
+my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
+    ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
 
 #
 # Make sure they know what they're getting into...
@@ -105,19 +109,23 @@ Phase "groups", "Creating admin group", sub {
 };
 
 Phase "dirs", "Setting directory permissions", sub {
-    foreach my $dir (@TESTBED_DIRS) {
+    foreach my $dirref (@TESTBED_DIRS) {
+	my ($dir, $newmode) = @$dirref;
 	Phase $dir, $dir, sub {
 	    if (!-d $dir) {
 		PhaseFail("Directory $dir does not exist");
 	    }
-	    my ($mode,$group) = (stat($dir))[2,5];
+	    # Use the real path, to avoid symlink problems
+	    my $realdir = `realpath $dir`;
+	    chomp $realdir;
+	    my ($mode,$group) = (stat($realdir))[2,5];
 	    # Fix up the mode (strip file type)
 	    $mode = $mode & 0777;
-	    if ($mode == 0775 && $group eq getgrnam("tbadmin")) {
+	    if ($mode == eval $newmode && $group eq getgrnam("tbadmin")) {
 		PhaseSkip("Already done");
 	    }
-	    ExecQuietFatal("$CHGRP tbadmin $dir");
-	    ExecQuietFatal("$CHMOD 0775 $dir");
+	    ExecQuietFatal("$CHGRP tbadmin $realdir");
+	    ExecQuietFatal("$CHMOD $newmode $realdir");
 	};
     }
 };
@@ -128,7 +136,7 @@ Phase "ports", "Installing ports", sub {
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Installing ports (may take a while)", sub {
-	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.0")) {
+	if (!ExecQuiet("$PKG_INFO -e emulab-ops-1.1")) {
 	    PhaseSkip("Ports already installed");
 	}
 
@@ -147,10 +155,10 @@ Phase "ports", "Installing ports", sub {
 Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     DoneIfEdited($RCCONF);
     AppendToFileFatal($RCCONF,
-		      qq|sendmail_enable   = "YES"|,
-		      qq|nfs_server_enable = "YES"|,
-		      qq|nfs_server_flags  = "-u -t -n 16"|,
-		      qq|syslogd_flags     = ""|);
+		      qq|sendmail_enable="YES"|,
+		      qq|nfs_server_enable="YES"|,
+		      qq|nfs_server_flags="-u -t -n 16"|,
+		      qq|syslogd_flags=""|);
 };
 
 Phase "sendmail","Configuring sendmail", sub {
@@ -194,7 +202,7 @@ Phase "exports", "Setting up exports", sub {
 	# Figure out which of these directories are on the same
 	# filesystems
 	#
-	my @dirs = ('/users','/groups','/proj','/var');
+	my @dirs = ('/users','/groups','/proj','/share','/var');
 	@dirs = map {`realpath $_`} @dirs;
 	chomp @dirs;
 	my %filesystems;
@@ -209,7 +217,7 @@ Phase "exports", "Setting up exports", sub {
 	my @exports_lines;
 	foreach my $key (keys %filesystems) {
 	    push @exports_lines,
-		join(" ",@{$filesystems{$key}}) . "\t$BOSSNODE -alldirs -maproot=root";
+		join(" ",@{$filesystems{$key}}) . "\t$BOSSNODE -maproot=root";
 	}
 
 	#
@@ -305,9 +313,34 @@ Phase "sudoers", "Editing $SUDOERS", sub {
     AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
 };
 
-Phase "ssh", "Allowing root ssh from boss", sub {
+Phase "ssh", "Allowing root ssh", sub {
     DoneIfEdited($SSHD_CONFIG);
-    AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin Yes");
+    AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+};
+
+Phase "capture", "Setting up capture", sub {
+    Phase "rc.local", "Creating $RCLOCAL", sub {
+	DoneIfExists($RCLOCAL);
+	CreateFileFatal($RCLOCAL,
+	    "if [ -f /etc/defaults/rc.conf ]; then",
+	    "\t. /etc/defaults/rc.conf",
+	    "fi",
+	    "",
+	    "if [ -x $RCCAPTURE ]; then",
+	    "\techo -n \" capture\"",
+	    "\t$RCCAPTURE",
+	    "fi");
+    };
+    Phase "etc", "Creating $PREFIX/etc", sub {
+	DoneIfExists("$PREFIX/etc");
+	mkdir("$PREFIX/etc",0755) or
+	    PhaseFail("Unable to create $PREFIX/etc: $!");
+    };
+    Phase "rc.capture", "Creating empty $RCCAPTURE", sub {
+	DoneIfExists($RCCAPTURE);
+	CreateFileFatal($RCCAPTURE,"#!/bin/sh");
+	ExecQuietFatal("$CHMOD a+rx $RCCAPTURE");
+    };
 };
 
 print "----------------------------------------------------------------------\n";
