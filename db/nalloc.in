@@ -114,7 +114,7 @@ if ($debug) { print "List Ready: @vals\nError=$error\n"; }
 ######################################################################
 
 if (!$error && @vals) {
-  print "Reserving nodes...";
+  print "Reserving nodes...\n";
   my $cmd = "insert into reserved (node_id,pid,eid) values ".join(",",@vals);
   if (!DBQueryWarn($cmd)) { $error++; }
 }
