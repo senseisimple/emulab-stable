@@ -377,13 +377,25 @@ while (1) {
 	}
 
 	#
+	# If the oldest has already expried, just kill it off right now, and go
+	# back around the loop
+	#
+	my $now = time();
+	my $waittime = ($oldest + 120) - time();
+
+	#
 	# Kill of the oldest if he gets too old while we're waiting
 	#
 	local $SIG{ALRM} = sub { kill("TERM", $oldestpid); };
-	alarm(($oldest + 120) - time());
+	if ($waittime <= 0) {
+	    kill("TERM",$oldestpid);
+	} else {
+	    alarm($waittime);
+	}
 
 	my $childpid = wait();
 	my $exitstatus = $?;
+
 	alarm 0;
 
 	#
