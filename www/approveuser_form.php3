@@ -17,7 +17,7 @@ echo "
       Use this page to approve new members of your Project or Group.  Once
       approved, they will be able to log into machines in your Project's 
       experiments. Be sure to toggle the menu options appropriately for
-      each pending user. 
+      each pending user.
 
       <p>
       <table cellspacing=2 border=0>
@@ -83,6 +83,15 @@ echo "
                 like.</td>
         </tr>
       </table>
+
+      <center>
+      <b>Important group
+       <a href='docwrapper.php3?docname=groups.html#SECURITY'>
+       security issues</a> are discussed in the
+       <a href='docwrapper.php3?docname=groups.html'>Groups Tutorial</a>
+      </b>
+      </center><br>
+
       \n";
 
 #
@@ -111,7 +120,8 @@ $query_result =
 		 "   g.uid!='$auth_usr' and g.trust='none' ".
 		 "WHERE authed.uid='$auth_usr' and ".
 		 "      (authed.trust='group_root' or ".
-		 "       authed.trust='project_root')");
+		 "       authed.trust='project_root') ".
+		 "ORDER BY g.uid,g.pid,g.gid");
 
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("You have no new project members who need approval.", 1);
@@ -204,18 +214,18 @@ while ($usersrow = mysql_fetch_array($query_result)) {
               <td rowspan=2>$date_applied</td>
               <td rowspan=2>
                   <select name=\"$newuid\$\$approval-$pid/$gid\">
-                          <option value='postpone'>Postpone</option>
-                          <option value='approve'>Approve</option>
-                          <option value='deny'>Deny</option>
-                          <option value='nuke'>Nuke</option>
+                          <option value='postpone'>Postpone </option>
+                          <option value='approve'>Approve </option>
+                          <option value='deny'>Deny </option>
+                          <option value='nuke'>Nuke </option>
                   </select>
               </td>
               <td rowspan=2>
                   <select name=\"$newuid\$\$trust-$pid/$gid\">
-                          <option value='user'>User</option>
-                          <option value='local_root'>Local Root</option>\n";
+                          <option value='user'>User </option>
+                          <option value='local_root'>Local Root </option>\n";
     if ($isleader) {
-	    echo "        <option value='group_root'>Group Root</option>\n";
+	    echo "        <option value='group_root'>Group Root </option>\n";
     }
     echo "        </select>
               </td>\n";
