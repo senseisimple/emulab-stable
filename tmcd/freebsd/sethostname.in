@@ -44,6 +44,7 @@ use libtmcc;
 #
 my $curname = `hostname -s`;
 if (! ($curname =~ /.+/)) {
+    print STDERR "Hostname not set, ignoring...\n";
     exit 0;
 }
 
