@@ -205,7 +205,14 @@ else {
     if (system("$USERMOD $user -c \"$fullname\" ")) {
 	fatal("Could not modify user $user on local node.");
     }
+
+    #
+    # Temp Hack!
+    # 
+    FirstTime();
 }
+
+exit(0);
 
 #
 # Make user account on control node. We do the password setup as separate
@@ -290,6 +297,13 @@ sub FirstTime()
 	
 	$dossh = 1;
     }
+
+    #
+    # Check for missing identity file
+    # 
+    if (! -e "$HOMEDIR/$user/.ssh/identity") {
+	$dossh = 1;
+    }
     
     #
     # The rest of this needs to be done as the user, so fork a child.
@@ -310,11 +324,22 @@ sub FirstTime()
 	if (system("$KEYGEN -P '' -f $HOMEDIR/$user/.ssh/identity")) {
 	    fatal("Failure in ssh-keygen");
 	}
-	if (system("/bin/cp $HOMEDIR/$user/.ssh/identity.pub ".
-		   "$HOMEDIR/$user/.ssh/authorized_keys")) {
-	    fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub ".
-		  "to authorized_keys");
+
+	if (! -e "$HOMEDIR/$user/.ssh/authorized_keys") {
+	    if (system("/bin/cp $HOMEDIR/$user/.ssh/identity.pub ".
+		       "$HOMEDIR/$user/.ssh/authorized_keys")) {
+		fatal("Copying over $HOMEDIR/$user/.ssh/identity.pub ".
+		      "to authorized_keys");
+	    }
 	}
+	else {
+	    if (system("/bin/cat $HOMEDIR/$user/.ssh/identity.pub >> ".
+		       "$HOMEDIR/$user/.ssh/authorized_keys")) {
+		fatal("Catting $HOMEDIR/$user/.ssh/identity.pub ".
+		      "to authorized_keys");
+	    }
+	}
+
 	if (defined($user_pubkey)) {
 	    system("echo \"$user_pubkey\" >> ".
 		   "$HOMEDIR/$user/.ssh/authorized_keys");
