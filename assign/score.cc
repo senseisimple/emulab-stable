@@ -266,14 +266,14 @@ int add_node(node n,int ploc)
   if (!pnoder.typed) {
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  virgin pnode\n");
+    cerr << "    vtype = " << vnoder.type << "\n";
 #endif
     
     // Remove check assuming at higher level?
     // Remove higher level checks?
     pnoder.max_load=0;
-    pnoder.current_type=vnoder.type;
-    pnoder.typed=true;
-    pnoder.max_load = pnoder.types.access(vnoder.type);
+    if (pnoder.types.lookup(vnoder.type) != nil)
+      pnoder.max_load = pnoder.types.access(vnoder.type);
     
     if (pnoder.max_load == 0) {
       // didn't find a type
@@ -282,6 +282,10 @@ int add_node(node n,int ploc)
 #endif
       return 1;
     }
+
+    pnoder.current_type=vnoder.type;
+    pnoder.typed=true;
+
 #ifdef SCORE_DEBUG
     fprintf(stderr,"  matching type found (");
     cerr << pnoder.current_type << ", max = " << pnoder.max_load;
