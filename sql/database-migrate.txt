@@ -2395,3 +2395,19 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (uid,policy,auxdata)
 	) TYPE=MyISAM;
 
+1.308: Add a table for the robot tracking cameras.
+
+	CREATE TABLE cameras (
+	  name varchar(32) NOT NULL default '',
+	  building varchar(32) NOT NULL default '',
+	  floor varchar(32) NOT NULL default '',
+	  hostname varchar(255) default NULL,
+	  port smallint(5) unsigned NOT NULL default '6100',
+	  device varchar(64) NOT NULL default '',
+	  loc_x float NOT NULL default '0',
+	  loc_y float NOT NULL default '0',
+	  width float NOT NULL default '0',
+	  height float NOT NULL default '0',
+	  config tinytext,
+	  PRIMARY KEY  (name,building,floor)
+	) TYPE=MyISAM;

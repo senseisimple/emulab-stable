@@ -16,6 +16,25 @@ CREATE TABLE buildings (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `cameras`
+--
+
+CREATE TABLE cameras (
+  name varchar(32) NOT NULL default '',
+  building varchar(32) NOT NULL default '',
+  floor varchar(32) NOT NULL default '',
+  hostname varchar(255) default NULL,
+  port smallint(5) unsigned NOT NULL default '6100',
+  device varchar(64) NOT NULL default '',
+  loc_x float NOT NULL default '0',
+  loc_y float NOT NULL default '0',
+  width float NOT NULL default '0',
+  height float NOT NULL default '0',
+  config tinytext,
+  PRIMARY KEY  (name,building,floor)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `cdroms`
 --
 
@@ -1317,8 +1336,8 @@ CREATE TABLE plab_slice_nodes (
   eid varchar(32) NOT NULL default '',
   slicename varchar(64) NOT NULL default '',
   node_id varchar(32) NOT NULL default '',
-  nodemeta text,
   leaseend datetime default NULL,
+  nodemeta text,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 
