@@ -83,9 +83,9 @@ my $LOCALMNTPNT = "/local";
 my $TMCC	= "$BINDIR/tmcc";
 my $JAILCONFIG  = "jailconfig";
 my @ROOTCPDIRS	= ("etc", "root");
-my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", "opt",
-		   "bin", "sbin", "home", "compat", $LOCALMNTPNT);
-my @ROOTMNTDIRS = ("bin", "sbin", "usr", "compat");
+my @ROOTMKDIRS  = ("dev", "tmp", "var", "usr", "proc", "users", 
+		   "bin", "sbin", "home", $LOCALMNTPNT);
+my @ROOTMNTDIRS = ("bin", "sbin", "usr");
 my @EMUVARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $VNFILESECT  = 64 * ((1024 * 1024) / 512); # 64MB in 512b sectors.
 my $MAXVNDEVS	= 100;
@@ -445,6 +445,7 @@ sub mkrootfs($)
     mysystem("cp -p $ETCJAIL/rc.local $path/root/etc");
     mysystem("cp -p $ETCJAIL/crontab $path/root/etc");
     mysystem("cp /dev/null $path/root/etc/fstab");
+    mysystem("ln -s /usr/compat $path/root/compat");
 
     # No X11 forwarding. 
     mysystem("cat $path/root/etc/ssh/sshd_config | ".
@@ -509,6 +510,11 @@ sub mkrootfs($)
 		     "      $path/root/$LOCALMNTPNT/$PID");
 	}
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
+
+	mysystem("ln -s $LOCALMNTPNT/$PID/$EID/$vnodeid $path/root/opt");
+    }
+    else {
+	mkdir("$path/root/opt", 0775);
     }
 
     #
