@@ -15,11 +15,7 @@ tb-set-ip $node0 192.168.14.52
 tb-set-ip-interface $node2 $node1 192.168.5.1
 tb-set-hardware $node2 shark-shelf
 
-tb-create-os MY-OS my-os.img 1
 tb-set-node-os $node1 FBSD40-STD
-tb-set-dnard-os $node2 1-8 MY-OS
-
-# Node 0 should have the default
 
 $ns run
 
