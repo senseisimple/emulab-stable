@@ -107,7 +107,7 @@ is running, the experiment (and its associated researchers) get
 exclusive use of the assigned machines, including root access.  </p>
 
 <p>
-We provide default OS software (Redhat Linux 7.1 and FreeBSD 4.5);
+We provide default OS software (Redhat Linux 7.3 and FreeBSD 4.7);
 the default configuration on your nodes includes accounts for project members,
 root access, DNS service, and standard compilers, linkers, and editors.
 Fundamentally, however,
