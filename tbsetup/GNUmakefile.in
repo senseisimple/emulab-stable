@@ -45,10 +45,10 @@ all:	$(BIN_STUFF) $(SBIN_STUFF) $(LIBEXEC_STUFF) $(LIB_STUFF) $(SUBDIRS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-CXXFLAGS += -Wall -O3
+CXXFLAGS += -Wall -O2
 
 wanlinksolve: wanlinksolve.cc
-	${CXX} $< -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
+	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
 routecalc: routecalc.cc
 	${CXX} $< -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
