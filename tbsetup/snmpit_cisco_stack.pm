@@ -35,7 +35,7 @@ use libdb;
 # usage: new(string name, string stack_id, int debuglevel, list of devicenames)
 # returns a new object blessed into the snmpit_cisco_stack class
 #
-sub new($$#@) {
+sub new($$$#@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -43,6 +43,7 @@ sub new($$#@) {
 
     my $stack_id = shift;
     my $debuglevel = shift;
+    my $community = shift;
     my @devicenames = @_;
 
     #
@@ -93,7 +94,8 @@ sub new($$#@) {
 	SWITCH: for ($type) {
 	    (/cisco6509/ || /cisco4006/) && do {
 		use snmpit_cisco;
-		$device = new snmpit_cisco($devicename,$self->{DEBUG});
+		$device = new snmpit_cisco($devicename,$self->{DEBUG},$type,
+			$community);
 		if (!$device) {
 		    die "Failed to create a device object for $devicename\n";
 		} else {

@@ -59,7 +59,7 @@ my $PORT_FORMAT_NODEPORT = 3;
 # usage: new($classname,$devicename,$debuglevel)
 #        returns a new object, blessed into the snmpit_cisco class.
 #
-sub new($$;$) {
+sub new($$$$;$) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -67,6 +67,8 @@ sub new($$;$) {
 
     my $name = shift;
     my $debugLevel = shift;
+    my $switchtype = shift;
+    my $community = shift;
 
     #
     # Create the actual object
@@ -84,6 +86,16 @@ sub new($$;$) {
     $self->{BLOCK} = 1;
     $self->{BULK} = 1;
     $self->{NAME} = $name;
+    $self->{COMMUNITY} = $community;
+
+    # Figure out some stuff about this switch
+    $switchtype =~ /^(\w+)(-ios)?$/;
+    $self->{SWITHCTYPE} = $1;
+    if ($2) {
+	$self->{OSTYPE} = "IOS";
+    } else {
+	$self->{OSTYPE} = "CatOS";
+    }
 
     if ($self->{DEBUG}) {
 	print "snmpit_cisco module initializing... debug level $self->{DEBUG}\n";
@@ -95,10 +107,23 @@ sub new($$;$) {
     $SNMP::debugging = ($self->{DEBUG} - 2) if $self->{DEBUG} > 2;
     my $mibpath = '/usr/local/share/snmp/mibs';
     &SNMP::addMibDirs($mibpath);
-    &SNMP::addMibFiles("$mibpath/CISCO-STACK-MIB.txt",
-	"$mibpath/CISCO-VTP-MIB.txt",
-	"$mibpath/CISCO-PAGP-MIB.txt",
-	"$mibpath/RMON-MIB.txt");
+    # We list all MIBs we use, so that we don't depend on a correct .index file
+    my @mibs = ("$mibpath/SNMPv2-SMI.txt", "$mibpath/SNMPv2-TC.txt",
+	    "$mibpath/SNMPv2-MIB.txt", "$mibpath/IANAifType-MIB.txt",
+	    "$mibpath/IF-MIB.txt", "$mibpath/RMON-MIB.txt",
+	    "$mibpath/CISCO-SMI.txt", "$mibpath/CISCO-TC.txt",
+	    "$mibpath/CISCO-VTP-MIB.txt", "$mibpath/CISCO-PAGP-MIB.txt");
+	    
+    if ($self->{OSTYPE} eq "CatOS") {
+	push @mibs, "$mibpath/CISCO-STACK-MIB.txt";
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	push @mibs, "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt";
+    } else {
+	warn "ERROR: Unsupported switch OS $self->{OSTYPE}\n";
+	return undef;
+    }
+
+    &SNMP::addMibFiles(@mibs);
     
     $SNMP::save_descriptions = 1; # must be set prior to mib initialization
     SNMP::initMib();		  # parses default list of Mib modules 
@@ -106,7 +131,8 @@ sub new($$;$) {
 
     warn ("Opening SNMP session to $self->{NAME}...") if ($self->{DEBUG});
     $self->{SESS} =
-	    new SNMP::Session(DestHost => $self->{NAME},Version => "2c");
+	    new SNMP::Session(DestHost => $self->{NAME},Version => "2c",
+		    Community => $self->{COMMUNITY});
     if (!$self->{SESS}) {
 	#
 	# Bomb out if the session could not be established
@@ -574,7 +600,12 @@ sub setPortVlan($$@) {
     my $vlan_id = shift;
     my @ports = @_;
 
-    my $PortVlanMemb = "vlanPortVlan"; #index is ifIndex
+    my $PortVlanMemb;
+    if ($self->{OSTYPE} eq "CatOS") {
+	$PortVlanMemb = "vlanPortVlan"; #index is ifIndex
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	$PortVlanMemb = "vmVlan"; #index is ifIndex
+    }
 
     my $errors = 0;
 
@@ -589,9 +620,16 @@ sub setPortVlan($$@) {
     $self->debug("Found VLAN with ID $vlan_id: $vlan_number\n");
 
     #
-    # Convert ports from the format the were passed in to IfIndex format
+    # Convert ports from the format the were passed in to the correct format
     #
-    my @portlist = $self->convertPortFormat($PORT_FORMAT_MODPORT,@ports);
+    my $format;
+    if ($self->{OSTYPE} eq "CatOS") {
+	$format = $PORT_FORMAT_MODPORT;
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	$format = $PORT_FORMAT_IFINDEX;
+    }
+
+    my @portlist = $self->convertPortFormat($format,@ports);
 
     #
     # We'll keep track of which ports suceeded, so that we don't try to
@@ -674,7 +712,12 @@ sub removePortsFromVlan($@) {
     #
     # Get a list of the ports in the VLAN
     #
-    my $VlanPortVlan = ["vlanPortVlan"]; # index by module.port, gives vlan
+    my $VlanPortVlan;
+    if ($self->{OSTYPE} eq "CatOS") {
+	$VlanPortVlan = "vlanPortVlan"; #index is ifIndex
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	$VlanPortVlan = "vmVlan"; #index is ifIndex
+    }
     my @ports;
 
     #
@@ -831,7 +874,13 @@ sub listVlans($) {
     $self->debug("Getting VLAN info...\n");
     # We don't need VlanIndex really...
     my $VlanName = ["vtpVlanName"]; # index by 1.vlan #
-    my $VlanPortVlan = ["vlanPortVlan"]; # index by module.port, gives vlan #
+
+    my $VlanPortVlan;
+    if ($self->{OSTYPE} eq "CatOS") {
+	$VlanPortVlan = "vlanPortVlan"; #index is ifIndex
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	$VlanPortVlan = "vmVlan"; #index is ifIndex
+    }
 
     #
     # Walk the tree to find the VLAN names
@@ -860,8 +909,10 @@ sub listVlans($) {
     foreach my $rowref (@$rows) {
 	my ($name,$modport,$vlan_number) = @$rowref;
 	$self->debug("Got $name $modport $vlan_number\n",3);
-	my $node;
-	($node = portnum("$self->{NAME}:$modport")) || ($node = "port$modport");
+	my ($node) = $self->convertPortFormat($PORT_FORMAT_NODEPORT,$modport);
+	if (!$node) {
+	    $node = "port$modport";
+	}
 	push @{$Members{$vlan_number}}, $node;
     }
 
@@ -1064,15 +1115,40 @@ sub readifIndex($) {
     my $self = shift;
 
     #
-    # Walk the tree for portIfIndex
+    # How we fill this table is highly dependant on which OS the switch
+    # is running - CatOS provides a convenient table to convert from
+    # node/port to ifindex, but under IOS, we have to infer it from the
+    # port description
     #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,["portIfIndex"]);
-   
-    foreach my $rowref (@$rows) {
-	my ($name,$modport,$ifindex) = @$rowref;
 
-	$self->{IFINDEX}{$modport} = $ifindex;
-	$self->{IFINDEX}{$ifindex} = $modport;
+    if ($self->{OSTYPE} eq "CatOS") {
+	my ($rows) = $self->{SESS}->bulkwalk(0,32,["portIfIndex"]);
+
+	foreach my $rowref (@$rows) {
+	    my ($name,$modport,$ifindex) = @$rowref;
+
+	    $self->{IFINDEX}{$modport} = $ifindex;
+	    $self->{IFINDEX}{$ifindex} = $modport;
+	}
+    } elsif ($self->{OSTYPE} eq "IOS") {
+	my ($rows) = $self->{SESS}->bulkwalk(0,32,["ifDescr"]);
+   
+	foreach my $rowref (@$rows) {
+	    my ($name,$iid,$descr) = @$rowref;
+	    if ($descr =~ /(\d+)\/(\d+)$/) {
+		my $modport = "$1.$2";
+		my $ifindex;
+		if (defined($iid) && ($iid ne "")) {
+		    $ifindex = $iid;
+		} else {
+		    $name =~ /(\d+)$/;
+		    $ifindex = $1;
+		}
+
+		$self->{IFINDEX}{$modport} = $ifindex;
+		$self->{IFINDEX}{$ifindex} = $modport;
+	    }
+	}
     }
 }
 

@@ -59,6 +59,7 @@ sub new {
 
     my $name = shift;
     my $debugLevel = shift;
+    my $community = shift;
 
     #
     # Create the actual object
@@ -76,6 +77,7 @@ sub new {
     $self->{BLOCK} = 1;
     $self->{CONFIRM} = 1;
     $self->{NAME} = $name;
+    $self->{COMMUNITY} = $community;
 
     if ($self->{DEBUG}) {
 	print "snmpit_intel module initializing... debug level $self->{DEBUG}\n"
@@ -105,7 +107,8 @@ sub new {
 
     warn ("Opening SNMP session to $self->{NAME}...") if ($self->{DEBUG});
 
-    $self->{SESS} = new SNMP::Session(DestHost => $self->{NAME});
+    $self->{SESS} = new SNMP::Session(DestHost => $self->{NAME},
+	Community => $self->{COMMUNITY});
 
     if (!$self->{SESS}) {
 	#

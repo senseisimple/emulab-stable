@@ -37,7 +37,7 @@ use libdb;
 # returns a new object blessed into the snmpit_intel_stack class
 #
 
-sub new($$#@) {
+sub new($$$#@) {
 
     # The next two lines are some voodoo taken from perltoot(1)
     my $proto = shift;
@@ -45,6 +45,7 @@ sub new($$#@) {
 
     my $stack_id = shift;
     my $debuglevel = shift;
+    my $community = shift;
     my @devicenames = @_; # Devicenames are not presently needed for Intel
 			  # stacks
 
@@ -73,7 +74,7 @@ sub new($$#@) {
     # talk to one (for now) to do all the setup we need.
     #
     use snmpit_intel;
-    $self->{LEADER} = new snmpit_intel($stack_id,$self->{DEBUG});
+    $self->{LEADER} = new snmpit_intel($stack_id,$self->{DEBUG},$community);
 
 	#
 	# Check for failed object creation
