@@ -9,7 +9,7 @@ include("defs.php3");
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Delete User Account");
+PAGEHEADER("Remove User");
 
 #
 # Only known and logged in users allowed.
@@ -186,7 +186,7 @@ if (!$confirmed) {
 
     if (isset($target_pid)) {
 	echo "Are you <b>REALLY</b> sure you want to remove user
-              '$target_uid' from project '$target_pid?'\n";
+              '$target_uid' from project '$target_pid'?\n";
     }
     else {
 	echo "Are you <b>REALLY</b> sure you want to delete user 
@@ -209,11 +209,11 @@ if (!$confirmed) {
 
 if (!$confirmed_twice) {
     echo "<center><br>
-	  Okay, lets be sure.<br>\n";
+	  Okay, let's be sure.<br>\n";
 
     if (isset($target_pid)) {
 	echo "Are you <b>REALLY REALLY</b> sure you want to remove user
-              '$target_uid' from project '$target_pid?'\n";
+              '$target_uid' from project '$target_pid'?\n";
     }
     else {
 	echo "Are you <b>REALLY REALLY</b> sure you want to delete user 
@@ -280,7 +280,7 @@ if (isset($target_pid)) {
 	    echo "You can 
                   <A href='deleteuser.php3?target_uid=$target_uid&request=1'>
                      request</a>
-                     that we delete this user from the testbed?</a></b>\n";
+                     that we delete this user from the testbed</a></b>\n";
 	}
     }
 }
