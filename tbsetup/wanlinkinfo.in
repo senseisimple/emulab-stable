@@ -10,12 +10,13 @@ use Getopt::Std;
 sub usage()
 {
     print STDOUT
-	"Usage: wanlinkinfo [-d] [-m] [-b]\n".
+	"Usage: wanlinkinfo [-d] [-m] [-b] [-l]\n".
 	"       Use -m to output virtual node counts per phys node.\n".
-        "       Use -b to output bandwidth matrix.\n";
+        "       Use -b to output bandwidth matrix.\n".
+        "       Use -l to use the latest data instead of aged data.\n";
     exit(-1);
 }
-my  $optlist = "dmb";
+my  $optlist = "dmbl";
 
 #
 # Configure variables
@@ -33,6 +34,7 @@ use libtestbed;
 my $debug	= 0;
 my $dobw	= 0;
 my $dovirt	= 0;
+my $dolatest	= 0;
 
 #
 # Turn off line buffering on output
@@ -63,10 +65,14 @@ if (defined($options{"m"})) {
 if (defined($options{"b"})) {
     $dobw= 1;
 }
+if (defined($options{"l"})) {
+    $dolatest= 1;
+}
 
 my $result =
     DBQueryFatal("SELECT node_id1,iface1,node_id2,iface2,time,bandwidth " .
-		 "FROM widearea_delays");
+		 "FROM " .
+		 ($dolatest ? "widearea_recent" : "widearea_delays"));
 
 my %nodename = ();
 my %speeds   = ();

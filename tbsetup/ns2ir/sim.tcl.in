@@ -284,6 +284,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::DB
     var_import ::GLOBALS::impotent
     var_import ::GLOBALS::vtypes
+    var_import ::TBCOMPAT::uselatestwadata
 
     # Fill out IPs
     foreach obj [concat [array names lanlink_list]] {
@@ -347,6 +348,9 @@ Simulator instproc run {} {
     foreach prog [array names prog_list] {
 	$prog updatedb $DB
     }
+
+    sql exec $DB "update experiments set uselatestwadata=$uselatestwadata where pid='$pid' and eid='$eid'"
+    sql endquery $DB
     
     foreach event $event_list {
 	sql exec $DB "insert into eventlist (pid,eid,time,vnode,vname,objecttype,eventtype,arguments,atstring) values (\"$pid\",\"$eid\",[lindex $event 0],\"[lindex $event 1]\",\"[lindex $event 2]\",$objtypes([lindex $event 3]),$eventtypes([lindex $event 4]),\"[lindex $event 5]\",\"[lindex $event 6]\")"

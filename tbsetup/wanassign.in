@@ -112,6 +112,9 @@ my $remotecount		= 0;
 my @toreserve;
 my %mappings;
 
+# Use latest data flag. From the experiments table.
+my $uselatestwadata	 = 0;
+
 #
 # A node record (poor man struct). We create a hashed array of these,
 # indexed by the vnode name.
@@ -157,6 +160,14 @@ sub newvlan ($) {
 	PARAMS   => {},
     };
 }
+
+#
+# Get the flag
+#
+$query_result =
+    DBQueryFatal("select uselatestwadata from experiments ".
+		 "where pid='$pid' and eid='$eid'");
+($uselatestwadata) = $query_result->fetchrow_array();
 
 #
 # Get type map.
@@ -514,6 +525,9 @@ sub runwansolver() {
     # the fixed nodes, but I'm not gonna worry about that right now since the
     # solver will just croak anyway. 
     #
+    if ($uselatestwadata) {
+	$waninfoargs .= " -l";
+    }
     open(INFO, "$waninfo $waninfoargs | tee wanlinkinfo.output |") or
 	die("*** $0:\n".
 	    "    Could not start $waninfo: $!\n");

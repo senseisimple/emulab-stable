@@ -21,6 +21,9 @@ namespace eval TBCOMPAT {
     # This is the default weight for a hard vtype.
     variable default_hard_vtype_weight 1.0
 
+    # For remote nodes. Use latest info.
+    variable uselatestwadata 0
+
     # This is a general procedure that takes a node, an object (lan or link)
     # it is connected to, and an IP address, and sets the IP address
     # for the node on that object.  It checks both the validity of the
@@ -488,4 +491,15 @@ proc tb-set-lan-simplex-params {lan node todelay tobw toloss fromdelay frombw fr
     $lan set rloss([list $node $port]) $fromloss
     $lan set bandwidth([list $node $port]) $realtobw
     $lan set rbandwidth([list $node $port]) $realfrombw
+}
+
+proc tb-set-uselatestwadata {onoff} {
+    var_import ::TBCOMPAT::uselatestwadata
+
+    if {$onoff != 0 && $onoff != 1} {
+	perror "\[tb-set-uselatestwadata] $onoff must be 0/1"
+	return
+    }
+
+    set uselatestwadata $onoff
 }
