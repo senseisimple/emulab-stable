@@ -339,7 +339,7 @@ while ($row = mysql_fetch_array($query_result)) {
 ?>
 
 <tr>
-    <td align="center" colspan=10>
+    <td align="center" colspan=11>
     <input type="button" name="SelectAll" value="Select All"
 	onClick="selectAll(document.nodeform.elements['selected[]'])">
     &nbsp;
