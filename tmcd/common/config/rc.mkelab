@@ -688,7 +688,7 @@ sub SetupBossNode()
     mysystem("cd ${TBDIR}/testbed/obj/testbed; ".
 	     "   ../../src/testbed/configure ".
 	     "      --with-TBDEFS=../../src/testbed/defs-elabinelab ".
-	     ($WINSUPPORT ? "--enable-windows" : ""));
+	     ($WINSUPPORT ? "" : "--disable-windows"));
 
     #
     # Create the boss node. This will also install the software.
