@@ -56,7 +56,8 @@ bool find_link_to_switch(pvertex pv,pvertex switch_pv,tb_vlink *vlink,
 int find_interswitch_path(pvertex src_pv,pvertex dest_pv,
 			  int bandwidth,pedge_path &out_path,
 			  pvertex_list &out_switches);
-double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &out_fd_violated);
+double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &out_fd_violated,
+	bool include_violations);
 inline void add_global_fds(tb_vnode *vnode,tb_pnode *pnode);
 inline void remove_global_fds(tb_vnode *vnode,tb_pnode *pnode);
 void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode,
@@ -462,7 +463,7 @@ void remove_node(vvertex vv)
    * Scoring for features and desires
    */
   int fd_violated;
-  double fds=fd_score(vnode,pnode,fd_violated);
+  double fds=fd_score(vnode,pnode,fd_violated,true);
   remove_global_fds(vnode,pnode);
   SSUB(fds);
   violated -= fd_violated;
@@ -593,7 +594,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
  * is true then it deterministically solves the link problem for best
  * score.  Note: deterministic takes considerably longer.
  */
-int add_node(vvertex vv,pvertex pv, bool deterministic)
+int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 {
   // Get the vnode and pnode associated with the passed vertices
   tb_vnode *vnode = get(vvertex_pmap,vv);
@@ -1024,7 +1025,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic)
   // features/desires
   add_global_fds(vnode,pnode);
   int fd_violated;
-  double fds = fd_score(vnode,pnode,fd_violated);
+  double fds = fd_score(vnode,pnode,fd_violated,is_fixed);
   SADD(fds);
   violated += fd_violated;
   vinfo.desires += fd_violated;
@@ -1460,7 +1461,8 @@ UNSCORE_TRIVIAL:
   vlink->link_info.type = tb_link_info::LINK_UNKNOWN;
 }
 
-double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
+double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated,
+	bool include_violations)
 {
   double fd_score=0;
   fd_violated=0;
@@ -1483,7 +1485,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 	SDEBUG(cerr << "    unmatched" << endl);
 	value = (*desire_it).second;
 	fd_score += SCORE_DESIRE*value;
-	if (value >= FD_VIOLATION_WEIGHT) {
+	if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
 	  fd_violated++;
 	}
       } else {
@@ -1494,7 +1496,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 	  value = (*desire_it).second + (*feature_it).second;
 	  SDEBUG(cerr << "    additive - total " << value << endl);
 	  fd_score += SCORE_DESIRE*value;
-	  if (value >= FD_VIOLATION_WEIGHT) {
+	  if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
 	    fd_violated++;
 	  }
 	}
@@ -1523,7 +1525,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 	      if (global_fd_set[feature_name] > 1) {
 		SDEBUG(cerr << "      but more than one" << endl);
 		fd_score+=SCORE_FEATURE*value;
-		if (value >= FD_VIOLATION_WEIGHT) {
+		if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
 		  fd_violated++;
 		}
 	      }
@@ -1534,7 +1536,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 	      if (global_fd_set[feature_name] == 1) {
 		SDEBUG(cerr << "      but only one" << endl);
 		fd_score+=SCORE_FEATURE*value;
-		if (value >= FD_VIOLATION_WEIGHT) {
+		if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
 		  fd_violated++;
 		}
 	      }
@@ -1550,7 +1552,7 @@ double fd_score(tb_vnode *vnode,tb_pnode *pnode,int &fd_violated)
 	  // Unused feature.  Add weight
 	  SDEBUG(cerr << "    unused" << endl);
 	  fd_score+=SCORE_FEATURE*value;
-	  if (value >= FD_VIOLATION_WEIGHT) {
+	  if ((value >= FD_VIOLATION_WEIGHT) && include_violations) {
 	    fd_violated++;
 	  }
 	}
