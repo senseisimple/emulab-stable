@@ -86,8 +86,10 @@ else {
 # 
 print STDOUT "Mounting the project directory on $PROJDIR/$project ... \n";
 
-if (! mkdir("$PROJDIR/$project", 0770)) {
-    print STDERR "Could not make directory $PROJDIR/$project: $!\n";
+if (! -e "$PROJDIR/$project") {
+    if (! mkdir("$PROJDIR/$project", 0770)) {
+	print STDERR "Could not make directory $PROJDIR/$project: $!\n";
+    }
 }
 
 if (system("$MOUNTCMD/$project $PROJDIR/$project") != 0) {
