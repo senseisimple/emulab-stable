@@ -36,7 +36,7 @@ set nfree "$updir/db/nfree"
 set libir "$scriptdir/ir/libir.tcl"
 set resetvlans "$scriptdir/resetvlans.tcl"
 
-load $updir/lib/sql.so
+load $updir/sql.so
 
 if {$argc != 3 && $argc != 2} {
     puts stderr "Syntax: $argv0 <pid> <eid>"
