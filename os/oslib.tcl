@@ -120,6 +120,7 @@ proc querynode {node} {
 	    }
 	}
     }
+    sql endquery $DB
 
     # calculate deltas
     if {[catch "exec ssh -n -x $node rpm -qa" result]} {
