@@ -48,8 +48,9 @@ if (isset($os_version) &&
 #
 # Check osid for sillyness.
 #
-if (! ereg("^[-_a-zA-Z0-9]+$", $osid)) {
-    USERERROR("The OSID must be alphanumeric characters only!", 1);
+if (! ereg("^[\.-_a-zA-Z0-9]+$", $osid)) {
+    USERERROR("The OSID must consist of alphanumeric characters and ".
+	      "dash, dot, or underscore!", 1);
 }
 
 if (isset($os_path)) {

@@ -53,7 +53,7 @@ if (strcmp($status, "unverified") == 0) {
 
     echo "<h3>Because your project leader has already approved ".
 	 "your membership in the project, you are now an active user ".
-	 "of emulab.  Reload the frame at your left, and any options ".
+	 "of emulab.  Click on the 'Home' link at your left, and any options ".
 	 "that are now available to you will appear.</h3>\n";
 }
 elseif (strcmp($status, "newuser") == 0) {
