@@ -6,14 +6,15 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: sched.c,v 1.2 2001-11-06 17:31:07 imurdock Exp $";
+static char rcsid[] = "$Id: event-sched.c,v 1.1 2001-12-04 15:15:32 imurdock Exp $";
 
 #include <stdio.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <sched.h>
+
+#include <event-sched.h>
 
 static void sched_seed_event_queue(void);
 #ifdef TEST_SCHED

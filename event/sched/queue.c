@@ -6,13 +6,14 @@
  * @COPYRIGHT@
  */
 
-static char rcsid[] = "$Id: queue.c,v 1.1 2001-11-02 05:40:53 imurdock Exp $";
+static char rcsid[] = "$Id: queue.c,v 1.2 2001-12-04 15:17:09 imurdock Exp $";
 
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <sched.h>
+
+#include <event-sched.h>
 
 /* The size of the event queue (i.e., the number of events that can be
    pending at any given time). */
