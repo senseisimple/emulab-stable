@@ -37,6 +37,7 @@ my $BOSSNODE   = '@BOSSNODE@';
 my $SH         = "/bin/sh";
 my $CHMOD      = "/bin/chmod";
 my $CHGRP      = "/usr/bin/chgrp";
+my $CHOWN      = "/usr/bin/chown";
 my $PWD        = "/bin/pwd";
 my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
@@ -53,7 +54,7 @@ my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
 
 my $GMAKE      = "/usr/local/bin/gmake";
 
-my $RNDC_CONFGEN = "/usr/local/bin/rndc-confgen";
+my $RNDC_CONFGEN = "/usr/local/sbin/rndc-confgen";
 
 #
 # Some files we edit/create
@@ -75,7 +76,6 @@ my $PHP_INI         = "/usr/local/etc/php.ini";
 my $CRACKLIB_DICT   = "/usr/local/lib/pw_dict.pwd";
 
 my $STL_PATCH       = "$TOP_SRCDIR/patches/g++.patch";
-my $BOOST_PATCH     = "$TOP_SRCDIR/patches/boost.patch";
 
 my $SSH_CONFIG      = "/etc/ssh/ssh_config";
 
@@ -215,12 +215,6 @@ Phase "patches", "Applying patches", sub {
 	}
 	ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
     };
-    Phase "boostpatch", "Patching boost headers", sub {
-	if (!ExecQuiet("$PATCH -C -f -R -p0 -i $BOOST_PATCH")) {
-	    PhaseSkip("$BOOST_PATCH already applied");
-	}
-	ExecQuietFatal("$PATCH -f -p0 -i $BOOST_PATCH");
-    };
 };
 
 Phase "cracklib", "Installing cracklib", sub {
@@ -302,6 +296,17 @@ Phase "database", "Setting up database", sub {
 	    PhaseSkip("Already done");
 	}
 	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/database-fill.sql");
+    };
+    Phase "sitevars", "Setting sitevars to default values", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "sitevariables' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/sitevars-create.sql");
     };
 };
 
@@ -397,7 +402,7 @@ Phase "syslog", "Setting up syslog", sub {
 	DoneIfExists($MYSQL_LOGDIR);
 	mkdir $MYSQL_LOGDIR, 0775 or
 	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
-	ExecQuietFatal("$CHGRP mysql:mysql $LOGDIR");
+	ExecQuietFatal("$CHOWN mysql:mysql $LOGDIR");
     };
 
     Phase "logfiles", "Creating log files", sub {
