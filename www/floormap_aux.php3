@@ -12,7 +12,7 @@ include("defs.php3");
 #
 
 #
-# Only admin people for now.
+# Only logged in people at the moment; might open up at some point.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
