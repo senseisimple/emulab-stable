@@ -453,8 +453,9 @@ sub ddijkstra ($)
 
     #
     # Now run the dijkstra program on the input. 
+    # --compress generates "net" routes
     # 
-    if (!open(DIJK, "cat $linkmap | $BINDIR/dijkstra $myname |")) {
+    if (!open(DIJK, "cat $linkmap | $BINDIR/dijkstra --compress --source=$myname |")) {
 	warn("*** WARNING: Could not invoke dijkstra on linkmap!\n");
 	@$rptr  = ();
 	return -1;
