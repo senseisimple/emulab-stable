@@ -1,3 +1,9 @@
+#
+# Insert Copyright Here.
+#
+include ../Makeconf
+include ../GNUmakerules
+
 OBJS=get_ifi_info.o get_rtaddrs.o net_rt_iflist.o sock_ntop.o util.o
 SOBJS=serv_listen.o recvfromflags.o if_indextoname.o reply.o serv.o forw_requests.o
 COBJS=cli.o 
@@ -12,6 +18,8 @@ cli: ${OBJS} ${COBJS}
 
 serv: ${OBJS} ${SOBJS}
 	$(CC) $(OBJS) $(SOBJS) ${LIBS} -o serv
+
+install:	all $(INSTALL_BINDIR)/cli $(INSTALL_BINDIR)/serv
 
 clean: 
 	/bin/rm -rf $(OBJS) $(SOBJS) $(COBJS) cli serv

@@ -11,3 +11,8 @@ $(INSTALL_BINDIR)/%: %.tcl
 	-mkdir -p $(INSTALL_BINDIR)
 	$(INSTALL) $< $@
 
+$(INSTALL_LIBDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)
+	$(INSTALL) $< $@
+

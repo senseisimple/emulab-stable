@@ -1,3 +1,9 @@
+#
+# Insert Copyright Here.
+#
+include ../Makeconf
+include ../GNUmakerules
+
 CXX=/usr/gnu/bin/g++
 CC=/usr/gnu/bin/gcc 
 LEDA=/n/paria/z/dga/LEDA-4.0
@@ -20,6 +26,8 @@ assign_p: assign.po $(DEPLIBS) $(POBJS)
 
 assign.po: assign.cc
 	${CXX} -c -pg -g -o assign.po assign.cc ${CXXFLAGS}
+
+install: $(INSTALL_BINDIR)/assign $(INSTALL_LIBDIR)/assign 
 
 clean:
 	/bin/rm -f *.o assign 
