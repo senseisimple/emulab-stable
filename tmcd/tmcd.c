@@ -5045,8 +5045,7 @@ COMMAND_PROTOTYPE(dodoginfo)
 	/*
 	 * XXX adjust for local policy
 	 * - vnodes and plab nodes do not send NTP drift or cvsup
-	 * - vnodes and plab nodes (except for plab service slice)
-	 *   do not report host keys
+	 * - vnodes do not report host keys
 	 * - widearea nodes do not record drift
 	 * - local nodes do not cvsup
 	 * - only a plab node service slice reports rusage
@@ -5054,7 +5053,7 @@ COMMAND_PROTOTYPE(dodoginfo)
 	 */
 	if ((reqp->islocal && reqp->isvnode) || reqp->isplabdslice) {
 		iv_ntpdrift = iv_cvsup = 0;
-		if (!reqp->isplabsvc)
+		if (!reqp->isplabdslice)
 			iv_hkeys = 0;
 	}
 	if (!reqp->islocal)
@@ -5092,7 +5091,9 @@ COMMAND_PROTOTYPE(dohostkeys)
 	char	*bp, rsav1[2*MAXKEY], rsav2[2*MAXKEY], dsav2[2*MAXKEY];
 	char	buf[MAXKEY];
 
+#if 0
 	printf("%s\n", rdata);
+#endif
 
 	/*
 	 * The maximum key length we accept is 1024 bytes, but after we
@@ -5126,8 +5127,11 @@ COMMAND_PROTOTYPE(dohostkeys)
 			bp += strlen(DSAV2_STR);
 		}
 		else {
-			error("HOSTKEYS: %s: Unexpected data (0) '%s'!\n",
+			error("HOSTKEYS: %s: "
+			      "Unrecognized key type '%.8s ...'\n",
 			      reqp->nodeid, bp);
+			if (verbose)
+				error("HOSTKEYS: %s\n", rdata);
 			return 1;
 		}
 		kp = buf;
@@ -5137,8 +5141,12 @@ COMMAND_PROTOTYPE(dohostkeys)
 		while (*bp && *bp != '\'' && kp < ep)
 			*kp++ = *bp++;
 		if (*bp != '\'') {
-			error("HOSTKEYS: %s: Unexpected data (1) '%s'!\n",
-			      reqp->nodeid, bp);
+			error("HOSTKEYS: %s: %s key data too long!\n",
+			      reqp->nodeid,
+			      thiskey == rsav1 ? "RSA v1" :
+			      (thiskey == rsav2 ? "RSA v2" : "DSA v2"));
+			if (verbose)
+				error("HOSTKEYS: %s\n", rdata);
 			return 1;
 		}
 		bp++;
