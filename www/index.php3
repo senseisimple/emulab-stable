@@ -44,7 +44,7 @@ if (mysql_num_rows($query_result) != 1) {
 
 <center>
 <table align="right">
-<tr><th colspan=2" class="contentheader" align="center">
+<tr><th nowrap colspan=2" class="contentheader" align="center">
 	Current Experiments</th></tr>
 <tr><td align="right" class="menuopt"><?php echo $active_expts ?></td> 
     <td align="left" class="menuopt">Active</td></tr>
