@@ -672,8 +672,10 @@ sub step_test {
 	    }
 	}
 
-	if (! kill(15, $statedpid) ) {
-	    prints "WARNING: Unable to kill stated process ($statedpid)\n";
+	if ($type eq "full") {
+	    if (! kill(15, $statedpid) ) {
+		prints "WARNING: Unable to kill stated process ($statedpid)\n";
+	    }
 	}
 	
 	close(TESTLOG);
