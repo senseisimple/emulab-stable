@@ -769,6 +769,7 @@ CREATE TABLE location_info (
   contact tinytext,
   phone tinytext,
   room varchar(32) default NULL,
+  stamp int(10) unsigned default NULL,
   PRIMARY KEY  (node_id)
 ) TYPE=MyISAM;
 

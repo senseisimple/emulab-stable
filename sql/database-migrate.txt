@@ -2459,3 +2459,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
          alter table webcams add URL tinytext;
 
+1.315: Add timestamp (in unixtime) to location_info table.
+
+	alter table location_info add stamp int(10) unsigned default NULL;
+
