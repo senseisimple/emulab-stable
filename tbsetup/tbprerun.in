@@ -28,6 +28,12 @@ my $state;
 # Configure variables
 #
 my $TBROOT   = "@prefix@";
+my $TESTMODE = @TESTMODE@;
+my $wrapper  = "$TBROOT/libexec/assign_wrapper";
+my $batchexp = "$TBROOT/bin/batchexp";
+my $template = "$TBROOT/lib/ns2ir/elabinelab.ns";
+my $endexp   = "$TBROOT/bin/endexp";
+my $exptidx;
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -103,6 +109,22 @@ sub cleanup {
     TBExptRemoveVirtualState($pid, $eid );
 }
 
+#
+# Fatal error.
+#
+sub fatal($)
+{
+    my ($mesg) = @_;
+    
+    cleanup();
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+
+# Need this below.
+TBExptIDX($pid, $eid, \$exptidx)
+    or fatal("Failed to get experiment index for $pid/$eid!");
+
 # Must kill any prerender process first!
 system("prerender -r $pid $eid");
 
@@ -114,9 +136,7 @@ TBExptRemoveVirtualState($pid, $eid);
 print "Running parser ... " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("parser started");
 if (system("parse-ns $pid $gid $eid $nsfile")) {
-    cleanup();
-    die("*** $0:\n".
-	"    Parsing failed!\n");
+    fatal("Parsing failed!");
 }
 TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
@@ -130,16 +150,12 @@ if ($nsfile_string) {
     $nsfile_string = DBQuoteSpecial($nsfile_string);
 
     if (length($nsfile_string) >= DBLIMIT_NSFILESIZE()) {
-	cleanup();
-	die("*** $0:\n".
-	    "    NS File is way too big!\n");
+	fatal("NS File is way too big!");
     }
     if (!DBQueryWarn("delete from nsfiles where eid='$eid' and pid='$pid'") ||
 	!DBQueryWarn("insert into nsfiles (pid, eid, nsfile) ".
 		     "VALUES('$pid', '$eid', $nsfile_string)")) {
-	cleanup();
-	die("*** $0:\n".
-	    "    Error storing the NS file into the database!\n");
+	fatal("Error storing the NS file into the database!");
     }
 }
 
@@ -161,9 +177,7 @@ my $query_result =
 		"from experiments where pid='$pid' and eid='$eid'");
 
 if (!$query_result || ($query_result->num_rows() != 1)) {
-	cleanup();
-	die("*** $0:\n".
-	    "    Error getting ipassign arguments!\n");
+    fatal("Error getting ipassign arguments!");
 }
 my ($use_ipassign, $ipassign_args) = $query_result->fetchrow();
 if ($use_ipassign) {
@@ -174,9 +188,7 @@ if ($use_ipassign) {
     print "Doing IP assignment ...\n";
     
     if (system("ipassign_wrapper $ipassign_args $pid $eid")) {
-	cleanup();
-	die("*** $0:\n".
-	    "    ipassign_wrapper failed!\n");
+	fatal("ipassign_wrapper failed!");
     }
 }
 
@@ -187,9 +199,7 @@ TBDebugTimeStamp("static route calculator started");
 print "Setting up static routes (if requested) ... \n";
 
 if (system("staticroutes $pid $eid")) {
-    cleanup();
-    die("*** $0:\n".
-	"    Static route calculation failed!\n");
+    fatal("Static route calculation failed!");
 }
 
 #
@@ -200,9 +210,116 @@ TBDebugTimeStamp("gentopofile started");
 print "Generating topomap ...\n";
 
 if (system("gentopofile $pid $eid")) {
-    cleanup();
-    die("*** $0:\n".
-	"    gentopofile failed!\n");
+    fatal("gentopofile failed!");
+}
+
+#
+# Do an assign_prerun to set the min/max nodes. Generates a top file too.
+# This is the only DB state that is modified during a top only run.
+#
+TBDebugTimeStamp("assign prerun started");
+print "Doing a pre-assign ...\n";
+if (system("$wrapper -t $pid $eid")) {
+    fatal("assign prerun failed!");
+}
+
+#
+# If security level indicates that the experiment needs to be run ElabInElab
+# then must generate a parallel experiment for the container. When the user
+# swaps in the original experiment, it will really be this experiment that
+# is swapped in. Its sorta bogus, but hey its a prototype.
+#
+my $security_level;
+if (! TBExptSecurityLevel($pid, $eid, \$security_level)) {
+    fatal("Could not get security_level from DB!");
+}
+
+if ($security_level >= TBDB_SECLEVEL_ORANGE()) {
+    my $elabinelab_eid = $eid . "-" . "elabinelab";
+    my $tempnsfile     = "/tmp/$pid-$elabinelab_eid-$$.nsfile";
+    my $maxnodes;
+    my $elabinelab_exptidx;
+
+    if (! TBExptMinMaxNodes($pid, $eid, undef, \$maxnodes)) {
+	fatal("Could not get max nodes from DB!");
+    }
+
+    #
+    # Munge the template.
+    #
+    system("cat $template | sed -e 's/\@MAXPCS\@/$maxnodes/' ".
+	   "                    -e 's/\@SECURITY_LEVEL\@/$security_level/' ".
+	   "    >$tempnsfile");
+
+    TBDebugTimeStamp("recursive batchexp started");
+    print "Creating elabinelab container experiment.\n";
+    if (system("$batchexp -q -i -w -f -n ".
+	       "  -L 'ElabInElab Container for $eid' ".
+	       "  -E 'ElabInElab Container for $eid - DO NOT DELETE' ".
+	       "  -p $pid -e $elabinelab_eid $tempnsfile")) {
+	fatal("Could not create elabinelab container experiment!");
+    }
+    TBDebugTimeStamp("recursive batchexp finished");
+
+    #
+    # Link the two experiments together.
+    #
+    if (! (DBQueryWarn("update experiments set ".
+		       " elabinelab_eid='$eid' ".
+		       "where pid='$pid' and eid='$elabinelab_eid'") &&
+	   DBQueryWarn("update experiments set ".
+		       "  elabinelab_eid='$elabinelab_eid' ".
+		       "where pid='$pid' and eid='$eid'"))) {
+	system("$endexp -w -q $pid $elabinelab_eid");
+	fatal("Could not update DB for cross linking experiments!");
+    }
+    #
+    # This stats stuff is not done in testmode.
+    # 
+    if (! $TESTMODE) {
+	# IDX for newly created elabinelab experiment.
+	TBExptIDX($pid, $elabinelab_eid, \$elabinelab_exptidx)
+	    or fatal("Failed to get experiment index for $pid/$elabinelab_eid!");
+
+	# Cross link the other experiment (code below is for this experiment).
+	DBQueryWarn("update experiment_stats set ".
+		    "   elabinelab_exptidx=$exptidx ".
+		    "where pid='$pid' and eid='$elabinelab_eid' and ".
+		    "      exptidx='$elabinelab_exptidx'");
+    }
+}
+
+#
+# This stats stuff is not done in testmode.
+# 
+if (! $TESTMODE) {
+    #
+    # Deal with ElabInElab stuff, which is updated after the parse and prerun.
+    # Want to move this to the stats records. Ditto for the security stuff,
+    # which was handled above.
+    #
+    my $elabinelab = 0;
+    my $elabinelab_eid;
+    my $elabinelab_exptidx;
+
+    TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
+	or fatal("Failed to get ElabInElab attributes!");
+
+    if ($elabinelab || $security_level) {
+	DBQueryWarn("update experiment_stats set ".
+		    "   elabinelab=$elabinelab, ".
+		    "   security_level=$security_level ".
+		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
+    }
+
+    if ($elabinelab_eid) {
+	TBExptIDX($pid, $elabinelab_eid, \$elabinelab_exptidx)
+	    or fatal("Failed to get experiment index for $pid/$elabinelab_eid!");
+    
+	DBQueryWarn("update experiment_stats set ".
+		    "   elabinelab_exptidx=$elabinelab_exptidx ".
+		    "where pid='$pid' and eid='$eid' and exptidx='$exptidx'");
+    }
 }
 
 TBDebugTimeStamp("tbprerun finished");
