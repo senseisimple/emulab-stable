@@ -255,7 +255,7 @@ tb-set-ip-interface $node2 $node1 142.3.4.6
 
 <p>Notes:
 <ul>
-  <li>This commands can not be mixed on the same node with
+  <li>This command can not be mixed on the same node with
       <code>tb-set-ip</code>.  (See above)
   <li>In the case of multiple links between the same pair of nodes
       there is no way to distinguish which link to the set the IP
@@ -444,7 +444,7 @@ tb-set-node-lan-delay $lan0 $node0 40ms
 
 <p>Notes:
 <ul>
-  <li>This commands changes to the delay between the node and the
+  <li>This command changes the delay between the node and the
       switch of the LAN.  This is only half of the trip a packet must
       take.  The packet will also traverse the switch to the
       destination node, possibly incurring additional latency from any
@@ -475,7 +475,7 @@ tb-set-node-lan-bandwidth $lan0 $node0 20Mb
 
 <p>Notes:
 <ul>
-  <li>This commands changes to the bandwidth between the node and the
+  <li>This command changes the bandwidth between the node and the
       switch of the LAN.  This is only half of the trip a packet must
       take.  The packet will also traverse the switch to the
       destination node which may have a lower bandwidth.
@@ -502,7 +502,7 @@ tb-set-node-lan-loss $lan0 $node0 0.05
 
 <p>Notes:
 <ul>
-  <li>This commands changes to the loss between the node and the
+  <li>This command changes the loss probability between the node and the
       switch of the LAN.  This is only half of the trip a packet must
       take.  The packet will also traverse the switch to the
       destination node which may also have a loss chance.  Thus for
@@ -527,7 +527,7 @@ tb-set-node-lan-loss $lan0 $node0 0.05
 <pre>
 tb-set-node-lan-params <i>node</i> <i>lan</i> <i>delay</i> <i>bandwidth</i> <i>loss</i>
 
-tb-set-node-lan-params $lan0 $node0 40ms 20Mb 0.05
+tb-set-node-lan-params $node0 $lan0 40ms 20Mb 0.05
 </pre>
 
 <dl>
