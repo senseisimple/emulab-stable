@@ -1,0 +1,36 @@
+*** cvsupd. - Sep 17 2001 - Needs to be fixed
+
+The old version of cvsupd had the billenium bug, whereby number of
+seconds since the epoc is greater than 1billion, and thus breaking
+cvsupd. Upgrading was a disaster on Linux. It appears the new version
+was trashing the boot block in Linux, and so nodes were not booting
+after a cvsupd run.
+
+
+*** mountd/exports - Sep 17 2001 - Needs to be fixed
+
+Reported by Matt on Sep 17 2001, but actually a known bug with the
+exports_setup script and the current mountd/kernel impl, which wipes
+out all mounts before installing the new set.  This causes transient
+failures in NFS access from the testbed nodes since the mounts become
+momentarily invalid.
+
+
+*** Batch Mode Nots - Sep 18 2001 - Needs to be fixed
+
+Reported by Mike.
+
+Nit: experiment create date in Experiment Info "header" is not set.
+Is this field meaningless or just not filled in correctly?
+
+Nit: there are two "header" tables shown
+I assume this is bacause the batch code prints out a header and then calls
+the regular experiment info script to do the rest.  Anyway, the second table
+is missing lots of date info as well.
+
+Nit: web page for expr takes forever to show the nodes that were allocated.
+For a regular experiment, the allocated nodes show up almost immediately,
+presumably as soon as assign is done.  For a batch experiment, it seems to
+take minutes.  I can go out and look at assign.log and see that nodes have
+been assigned almost right away, they just doesn't wind up in the report
+(the DB?) for awhile.
