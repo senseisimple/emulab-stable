@@ -1,5 +1,112 @@
 [This file is not kept entirely up to date.]
 
+*  Fix capserver to require reserved port number. It was always
+   supposed to be that (its why I picked port 855) but I forgot to
+   actually finish it! 
+
+*  Look at using CISCO NAM modules.
+
+*  Beef up ntpstart to deal with timesys version.
+
+*  Add cron job to poll db for unverified users.
+
+*  Fix length of osname and osid to equal imageid and imagename. The
+   EZ image page assumes they are the same, and they aren't. They should
+   be. 
+
+*  Fix /opt and software install inside a jail. Perhaps point /opt to
+   /local (outside the jail).
+
+*  Allow bw=0 in delay_config for unlimited bw.
+
+*  Fix staticroutes for 2000x2000 topos! Too many giant hashes.
+
+*  Eric wants to be able to specify units of `rate' in events to trafgen.
+
+*  Get experiment restart released, also with batch experiments. 
+
+*  Tiptunnel build environment for windows.
+
+*  Analyze mysqld usage wuth swapping in big vnode experiment (using 50% CPU
+   as reported by Jay).
+
+*  Upgrade SFS to version 7. Try with rexd only in jails. Work with DM?
+   Use DNS SRV records for port?
+
+*  Windows version of ssh-mime.pl and instructions for installing.
+
+*  Fix tbacl files with IE (Jay says they do not work).
+
+*  Fix sshdport in nodes table to default to 22 instead of 11000, even
+   though the port is not used unless its a jailed node without its
+   own IP address.
+
+*  From: Mike Hibler <mike@flux.utah.edu>
+   To: testbed-ops@flux.utah.edu
+   Subject: "hardware off" experiment
+   Date: Fri, 17 Oct 2003 09:35:34 -0600 (MDT)
+    
+   Chad Lake sent some mail today about high-temp alarms in the machine room
+   and how they need to adjust the threshold that triggers an alert to the
+   campus police.
+    
+   Anyway, that got me thinking about ways that we can help out if temps
+   start to climb and we need to start shutting things down.  While I know
+   that our heat generation pales compared to the SCI cluster, and that
+   shutting it down is a prerequisite to lowering the temps in that room,
+   it still wouldn't hurt to at least put this on the todo list.
+    
+   One easy, not too invasive way would be to shutdown all free nodes.
+   At the same time, we would want to remove them from the free list so that
+   experiment setup didn't power cycle them and have them wind up on again.
+    
+   With a couple of options it seems we could do this.  At some level of
+   allocation (nalloc?) we have an option to allocate all free nodes to an
+   experiment.  Then we add an option to power to work on all nodes in an
+   experiment (currently this is only an option in node_reboot).
+   Then we could do something like:
+    
+   	nalloc -A emulab-ops hwoff
+    	power off emulab-ops/hwoff
+    
+   Another useful, but more invasive, alternative is to shutdown all
+   experimental nodes.  We could do this by adding an option to power
+   to operate on all nodes, for some appropriate definition of "all":
+    
+    	power -A off
+    
+   which of course would prompt out the yazoo to make sure you really
+   mean it.  Or maybe more explicitly, a "type" option which tells power
+   to interpret its arguments as types of machines:
+    
+    	power -T off pc600 pc850 pc1500 pc2000
+    
+    
+   This is mostly so that, if I get a call at 3am sometime about how
+   temps-are-rising-can-you-shut-stuff-down-quick, I can login and do something
+   quick without having to try to figure out a query to list all free nodes
+   or how to construct a list of all nodes and then do it.  Ideally, we would
+   have some command that someone (not us) in the machine room could run to
+   do it.  Maybe they login to snake's console as "killswitch" and it takes
+   everything down.
+
+
+*  Fix problem Eric reported with instance limited images and swapmod:
+
+    	Eric> *** Update aborted; old state restored.
+    
+    This appears to have happened because I wanted to move the instance-limited
+    image UAV-TSL31-NET from one node of this experiment to another.  This
+    experiment has only one instance of UAV-TSL31-NET; the other is currently
+    allocated by another experiment, so there are no spares lying around.
+    
+    	Eric> *** /usr/testbed/libexec/assign_wrapper:
+    	Eric>     Cannot load pces-UAV-TSL31-NET on one or more nodes.
+    	Eric>     Too many nodes are already running this OSID!
+    	Eric> *** Failed (67) to map to reality.
+    
+
+
 *  From: Robert P Ricci <ricci@cs.utah.edu>
    Subject: Re: Disabled Web
    Date: Fri, 8 Aug 2003 11:12:35 -0600
@@ -93,12 +200,6 @@
 
 *  Adjust web page width to actual display width the user is using. 
 
-*  From: Mike Hibler <mike@flux.utah.edu>
-   Date: Tue, 8 Jul 2003 11:01:00 -0600 (MDT)
-    
-   BTW: shouldn't we have a "node types" page where people can find out info
-   about the various machine types (CPU, memory, etc.)?
-    
 *  From: Mac Newbold <newbold@flux.utah.edu>
    Date: Tue, 8 Jul 2003 10:57:22 -0600 (MDT)
     
