@@ -617,6 +617,8 @@ sub dofloor($$)
 	my $y1       = $obrow{"y1"};
 	my $y2       = $obrow{"y2"};
 	my $descr    = $obrow{"description"};
+	my $label    = $obrow{"label"};
+	my $drawit   = $obrow{"draw"};
 	my $props  = {};
 
 	$props->{"X1"}    = $x1;
@@ -626,6 +628,40 @@ sub dofloor($$)
 	$props->{"DESCR"} = $descr;
 	$props->{"ISOBS"} = 1;
 	$areamap->{"$id"} = $props;
+
+	if ($drawit) {
+	    $err = $baseimage->Draw(primitive=>'rectangle',
+				    points=>"$x1,$y1 $x2,$y2",
+				    stroke=>'Black',
+				    strokewidth=>'2');
+	    warn "$err" if "$err";
+	}
+
+	if (defined($label) && $label ne "" && ($drawit || $show_exclusion)) {
+	    my $pointsize = 12;
+	    my $strlen    = length($label);
+	    my $pointlen  = (($pointsize * 0.45) * $strlen);
+
+	    #
+	    # Initially, lets try to put the label right in the middle.
+	    # 
+	    my $dlx = $x1 + (($x2-$x1)/2) - ($pointlen / 2);
+	    my $dly = $y1 + (($y2-$y1)/2);
+
+	    #
+	    # If the label looks too big along the X axis, then
+	    # move it below the box. Yep, very simplistic ...
+	    # 
+	    if ($dlx <= $x1 || ($dlx + $pointlen) >= $x2) {
+		$dly = $y2 + $pointsize;
+	    }
+	    
+	    $err = $baseimage->Annotate(fill=>'black',
+					x=>$dlx, y=>$dly,
+					pointsize=>$pointsize,
+					text=>"$label");
+	    warn "$err" if "$err";
+	}
 
 	if ($show_exclusion) {
 	    my $obstacle_buffer = 23; # XXX
