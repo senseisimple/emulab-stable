@@ -153,7 +153,10 @@ main(int argc, char **argv)
 
 		switch (boot_whatp->type) {
 		case BIBOOTWHAT_TYPE_PART:
-			printf("partition:%d\n", boot_whatp->what.partition);
+			printf("partition:%d", boot_whatp->what.partition);
+			if (boot_whatp->cmdline[0])
+				printf(" %s", boot_whatp->cmdline);
+			printf("\n");
 			goto done;
 			break;
 		case BIBOOTWHAT_TYPE_WAIT:
