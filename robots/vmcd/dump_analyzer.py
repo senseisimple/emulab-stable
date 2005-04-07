@@ -1,5 +1,9 @@
 #!/usr/local/bin/python
-
+# 
+#   EMULAB-COPYRIGHT
+#   Copyright (c) 2005 University of Utah and the Flux Group.
+#   All rights reserved.
+# 
 import sys
 import getopt
 import string
@@ -286,7 +290,7 @@ fpnum = "\s*(\-*\d+\.\d+)\s*"
 re_section = re.compile("section:\s*\("+fpnum+","+fpnum+"\)")
 re_section_sep = re.compile("\+\+\+")
 re_frame_title = re.compile("frame (\d+) \(timestamp"+fpnum+"\):")
-re_frame_data_line = re.compile("a\("+fpnum+","+fpnum+"\)\s*"
+re_frame_data_line = re.compile("\[[0-9]+\] a\("+fpnum+","+fpnum+"\)\s*"
                                 "b\("+fpnum+","+fpnum+"\)\s*"
                                 "-- wc\("+fpnum+","+fpnum+","+fpnum+"\)\s*")
 
