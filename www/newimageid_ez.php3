@@ -690,7 +690,7 @@ if (! $submit) {
     if ($nodetype == "mote") {
 	# Defaults for mote-type nodes
 	$defaults[loadpart]    = "1";
-	$defaults[op_mode]     = TBDB_MINIMAL_OPMODE;
+	$defaults[op_mode]     = TBDB_ALWAYSUP_OPMODE;
 	$defaults[os_name]     = "TinyOS";
 	$defaults[os_version]  = "1.1.0";
 

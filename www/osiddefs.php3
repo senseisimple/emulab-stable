@@ -35,6 +35,7 @@ $osid_opmodes["NORMAL"]		= 1;
 
 define("TBDB_DEFAULT_OSID_OPMODE",	"NORMALv2");
 define("TBDB_MINIMAL_OPMODE",		"MINIMAL");
+define("TBDB_ALWAYSUP_OPMODE",		"ALWAYSUP");
 
 # Default OSID boot wait timeouts. User is not allowed to edit this.
 $osid_reboot_waitlist			= array();
