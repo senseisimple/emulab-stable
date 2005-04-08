@@ -14,8 +14,27 @@ import random
 import re
 import math
 
+# Parse options and (perhaps multiple) filename args.
+DEBUG = False
+world_offset = False
+opts,args = getopt.getopt(sys.argv[1:], 'wd')
+printTris = False
+debug = False
+for o,a in opts:
+    if o == "-w":
+        world_offset = True
+        pass
+    if o == "-d":
+        DEBUG = True
+        pass
+    pass
+if len(args) < 1:
+    print "Usage: dump_analyzer.py [-w] [-d] dump_file..."
+    sys.exit(1)
+    pass
+
 ###############
-## Structure:
+## Structure per file:
 ##  - read config info
 ##  - for each section:
 ##     - read all data per frame
@@ -26,7 +45,6 @@ import math
 ###############
 
 # Quick and dirty debug.
-DEBUG = False
 
 def debug(msg):
     if DEBUG:
@@ -120,37 +138,28 @@ options = dict({ 'x_offset': 0.0,
                  'frame interval': 0,
                  'camera_x': 0.0,     # Camera offset, in meters.
                  'camera_y': 0.0,
+                 'world_x': 0.0,      # World offset, in meters.
+                 'world_y': 0.0,
                  })
 
 def mean(list):
-    retval = 0.0
     if len(list) == 0:
-        pass
+        return 0.0
     else:
-        sum = 0.0
-        for n in list:
-            sum += n
-            pass
-        retval = sum / len(list)
-        pass
-    return retval
-    
+        return sum(list) / len(list)
+
+# Mean-square-error of a deviation list.
+def msqerr(dev_list):
+    return mean([n*n for n in dev_list])
+
+# Root-Mean-Square: Sqrt of variance of the error between real and expected values.
+def rmserr(dev_list):
+    return math.sqrt(msqerr(dev_list))
+
+# Standard deviation: square root of the variance of a value list from its mean.
 def stddev(list):
     m = mean(list)
-    deviation_list = []
-    for n in list:
-        deviation_list.append(n - m)
-        pass
-    sum_of_squared_deviations = 0.0
-    for n in deviation_list:
-        sum_of_squared_deviations += math.pow(n,2)
-        pass
-    if len(list) == 1:
-        stddev = -1.0
-    else:
-        stddev = math.sqrt(sum_of_squared_deviations / (len(list) - 1))
-        pass
-    return stddev
+    return math.sqrt(msqerr([n-m for n in list]))
 
 def analyze(section):
     # takes a Section, and does crap on it, and puts the result of the crap
@@ -261,8 +270,10 @@ def analyze(section):
     tr['wy_errors'].append(sr['mean_wy_error'])
     sr['stddev_wy_error'] = stddev(temp['wy_error'])
     sr['mean_wxy_error'] = mean(temp['wxy_error'])
-    tr['wxy_errors'].append(sr['mean_wxy_error'])
+    sr['rmserr_wxy_error'] = rmserr(temp['wxy_error'])
     sr['stddev_wxy_error'] = stddev(temp['wxy_error'])
+    # Accumulate the per-point deviations for total stats.
+    tr['wxy_errors'].append(sr['mean_wxy_error'])
 
     sr['mean_wa'] = mean(temp['wa'])
     sr['stddev_wa'] = stddev(temp['wa'])
@@ -270,17 +281,6 @@ def analyze(section):
     # store results
     results.append(["("+str(section.lx)+", "+str(section.ly)+")", sr])
     pass
-
-# start reading the file:
-if len(sys.argv) == 2:
-    datafile = file(sys.argv[1])
-    pass
-else:
-    usage()
-    pass
-
-in_section = False
-in_config = True
 
 # set up the regexes
 re_config_option_float = re.compile("  \- ([ \w]+): (\-*\d+\.\d+)")
@@ -290,20 +290,11 @@ fpnum = "\s*(\-*\d+\.\d+)\s*"
 re_section = re.compile("section:\s*\("+fpnum+","+fpnum+"\)")
 re_section_sep = re.compile("\+\+\+")
 re_frame_title = re.compile("frame (\d+) \(timestamp"+fpnum+"\):")
-re_frame_data_line = re.compile("\[[0-9]+\] a\("+fpnum+","+fpnum+"\)\s*"
+re_frame_data_line = re.compile("(\[[0-9]+\] )*a\("+fpnum+","+fpnum+"\)\s*"
                                 "b\("+fpnum+","+fpnum+"\)\s*"
                                 "-- wc\("+fpnum+","+fpnum+","+fpnum+"\)\s*")
 
-# a Section obj
-current_section = None
-# a FrameData obj
-current_frame = None
-# ObjectData objs
-current_objs = []
-
-line = datafile.readline()
-
-# Totals over sections handled in analyze().
+# Totals over the data point sections handled in analyze(), print at the end.
 tr = dict([])
 tr['wx_offsets'] = []              # Bias.
 tr['wy_offsets'] = []
@@ -311,95 +302,116 @@ tr['wx_errors'] = []               # Deviation.
 tr['wy_errors'] = []
 tr['wxy_errors'] = []
 
-while line != "":
-    # chop the newline
-    line = line.strip('\n')
-    #print "line = "+line
+def doFile(fname):
+    # start reading the file:
+    datafile = file(fname)
 
-    # Ignore null lines and lines commented-out by pound-signs.
-    if line == "" or line[0] == '#':
-        in_config = False
-        pass
-    elif in_config:
-        # look for the following regexes:
-        m1 = re_config_option_float.match(line)
-        m2 = re_config_option_int.match(line)
-        m3 = re_config_option_string.match(line)
-        if m1 != None:
-            options[m1.group(1)] = float(m1.group(2))
-            pass
-        elif m2 != None:
-            options[m2.group(1)] = int(m2.group(2))
-            pass
-        elif m3 != None:
-            options[m3.group(1)] = str(m3.group(2))
-            pass
-        else:
-            debug("unrecognizable option line '"+str(line))
-            pass
-        pass
-    elif not in_section:
-        # we have to find the next section
-        #print "not in section"
-        #print "blah = "+line
-        m = re_section.match(line)
-        if m != None:
-            debug("found sect")
-            current_section = Section(float(m.group(1)),
-                                      float(m.group(2)),
-                                      []
-                                      )
-            in_section = True
-            pass
-        pass
-    elif in_section and (not in_config):
-        m1 = re_frame_data_line.match(line)
-        m2 = re_frame_title.match(line)
-        m3 = re_section_sep.match(line)
-        if m1 != None:
-            debug("found frame data")
-            current_objs.append(ObjectData( *[float(d) for d in m1.groups()] ))
-            pass
-        elif m2 != None:
-            # new frame; if old frame != 0, add it
-            debug("found frame title")
-            if current_frame != None:
-                current_frame.objects = current_objs
-                current_objs = []
-                current_section.addFrameData(current_frame)
-                pass
-            current_frame = FrameData(int(m2.group(1)),
-                                      float(m2.group(2)),
-                                      []
-                                      )
-            pass
-        elif m3 != None:
-            debug("found section sep")
-            # end of this section; if there is a current frame,
-            #   add current_objs to frame.objects
-            if current_frame != None:
-                current_frame.objects = current_objs
-                current_objs = []
-                current_section.addFrameData(current_frame)
-                current_frame = None
-                pass
+    in_section = False
+    in_config = True
 
-            #### analyze the section data:
-            analyze(current_section)
+    # a Section obj
+    current_section = None
+    # a FrameData obj
+    current_frame = None
+    # ObjectData objs
+    current_objs = []
 
-            current_section = None
-            in_section = False
-            pass
-        pass
-    # grab the next line...
     line = datafile.readline()
+
+    while line != "":
+        # chop the newline
+        line = line.strip('\n')
+        #print "line = "+line
+
+        # Ignore null lines and lines commented-out by pound-signs.
+        if line == "" or line[0] == '#':
+            in_config = False
+            pass
+        elif in_config:
+            # look for the following regexes:
+            m1 = re_config_option_float.match(line)
+            m2 = re_config_option_int.match(line)
+            m3 = re_config_option_string.match(line)
+            if m1 != None:
+                options[m1.group(1)] = float(m1.group(2))
+                pass
+            elif m2 != None:
+                options[m2.group(1)] = int(m2.group(2))
+                pass
+            elif m3 != None:
+                options[m3.group(1)] = str(m3.group(2))
+                pass
+            else:
+                debug("unrecognizable option line '"+str(line))
+                pass
+            pass
+        elif not in_section:
+            # we have to find the next section
+            #print "not in section"
+            #print "blah = "+line
+            m = re_section.match(line)
+            if m != None:
+                debug("found sect")
+                current_section = Section(float(m.group(1)),
+                                          float(m.group(2)),
+                                          []
+                                          )
+                in_section = True
+                pass
+            pass
+        elif in_section and (not in_config):
+            m1 = re_frame_data_line.match(line)
+            m2 = re_frame_title.match(line)
+            m3 = re_section_sep.match(line)
+            if m1 != None:
+                debug("found frame data")
+                # The fields in the regex are what we want, after the optional obj num.
+                current_objs.append(ObjectData( *[float(d) for d in m1.groups()[1:]] ))
+                pass
+            elif m2 != None:
+                # new frame; if old frame != 0, add it
+                debug("found frame title")
+                if current_frame != None:
+                    current_frame.objects = current_objs
+                    current_objs = []
+                    current_section.addFrameData(current_frame)
+                    pass
+                current_frame = FrameData(int(m2.group(1)),
+                                          float(m2.group(2)),
+                                          []
+                                          )
+                pass
+            elif m3 != None:
+                debug("found section sep")
+                # end of this section; if there is a current frame,
+                #   add current_objs to frame.objects
+                if current_frame != None:
+                    current_frame.objects = current_objs
+                    current_objs = []
+                    current_section.addFrameData(current_frame)
+                    current_frame = None
+                    pass
+
+                #### analyze the section data:
+                analyze(current_section)
+
+                current_section = None
+                in_section = False
+                pass
+            pass
+        # grab the next line...
+        line = datafile.readline()
+        pass
+
+    datafile.close()
     pass
-# finis!
+
+# Process each of the files.
+for fname in args:
+    doFile(fname)
 
 # dump results:
-
 debug(options)
-
 for k,v in results:
     print "section "+str(k)+" results:"
     # individual stats:
@@ -436,6 +448,7 @@ for k,v in results:
     print "  stddev_wy_error = "+str(v['stddev_wy_error'])
     print "  mean_wxy_error = "+str(v['mean_wxy_error'])
     print "  stddev_wxy_error = "+str(v['stddev_wxy_error'])
+    print "  rmserr_wxy_error = "+str(v['rmserr_wxy_error'])
     
 #    for k2,v2 in v.iteritems():
 #        print "  "+str(k2)+" = "+str(v2)
@@ -444,7 +457,7 @@ for k,v in results:
     pass
 
 print "\ntotal results:"
-
+print ""
 print "  max_wx_offset = "+str(max(tr['wx_offsets']))
 print "  min_wx_offset = "+str(min(tr['wx_offsets']))
 print "  mean_wx_offset = "+str(mean(tr['wx_offsets']))
@@ -465,7 +478,9 @@ print "  min_wy_error = "+str(min(tr['wy_errors']))
 print "  mean_wy_error = "+str(mean(tr['wy_errors']))
 print "  stddev_wy_error = "+str(stddev(tr['wy_errors']))
 print ""
+print "  num_pts = "+str(len(tr['wxy_errors']))
 print "  max_wxy_error = "+str(max(tr['wxy_errors']))
 print "  min_wxy_error = "+str(min(tr['wxy_errors']))
 print "  mean_wxy_error = "+str(mean(tr['wxy_errors']))
 print "  stddev_wxy_error = "+str(stddev(tr['wxy_errors']))
+print "  rmserr_wxy_error = "+str(rmserr(tr['wxy_errors']))
