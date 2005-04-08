@@ -32,6 +32,7 @@ $osid_opmodes["NORMALv2"]	= 1;
 $osid_opmodes["NORMALv1"]	= 0;
 $osid_opmodes["MINIMAL"]	= 1;
 $osid_opmodes["NORMAL"]		= 1;
+$osid_opmodes["ALWAYSUP"]	= 1;
 
 define("TBDB_DEFAULT_OSID_OPMODE",	"NORMALv2");
 define("TBDB_MINIMAL_OPMODE",		"MINIMAL");
