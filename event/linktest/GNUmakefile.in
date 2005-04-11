@@ -95,6 +95,9 @@ install: weblinktest $(SCRIPT_CONTROL) $(SCRIPT_RUN) $(SCRIPT_PROXY) $(LOCAL_BIN
 	$(INSTALL_PROGRAM) weblinktest $(INSTALL_LIBEXECDIR)
 	$(INSTALL_PROGRAM) $(SCRIPT_CONTROL) $(INSTALL_SBINDIR)
 	$(INSTALL_DATA) $(SRCDIR)/linktest.html $(INSTALL_WWWDIR)/doc
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) \
 			$(INSTALL_DIR)/opsdir/bin/$(SCRIPT_RUN)
 	$(INSTALL_PROGRAM) $(SCRIPT_PROXY) \
