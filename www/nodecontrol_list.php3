@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -289,7 +289,7 @@ if (! strcmp($showtype, "summary")) {
 # Suck out info for all the nodes.
 # 
 $query_result =
-    DBQueryFatal("select n.node_id,n.phys_nodeid,n.type,ns.status, ".
+    DBQueryFatal("select distinct n.node_id,n.phys_nodeid,n.type,ns.status, ".
 		 "   n.def_boot_osid,r.pid,r.eid,nt.class,r.vname ".
 		 "$additionalVariables ".
 		 "from nodes as n ".
