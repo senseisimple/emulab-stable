@@ -2608,3 +2608,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	      NOT NULL default '';
 	alter table location_info drop primary key;
 	alter table location_info add primary key(node_id,building,floor);
+
+1.332: Add an inner_elab_boot flag to the reserved table so that we
+       know when and if the dhcpd config file needs special entries
+       for those nodes.
+
+       alter table reserved add inner_elab_boot tinyint(1) default '0' \
+              after inner_elab_role;
+

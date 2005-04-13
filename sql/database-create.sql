@@ -1513,6 +1513,7 @@ CREATE TABLE reserved (
   old_eid varchar(32) NOT NULL default '',
   cnet_vlan int(11) default NULL,
   inner_elab_role enum('boss','ops','node') default NULL,
+  inner_elab_boot tinyint(1) default '0',
   mustwipe tinyint(4) NOT NULL default '0',
   PRIMARY KEY  (node_id),
   UNIQUE KEY vname (pid,eid,vname),
