@@ -12,13 +12,15 @@
 #
 # The output of this script is supposed to be machine-readable, rather than
 # human-readable. The output is:
-# <mac>,<switch>/<module>.<port>,<vlan>,<interface>
+# <mac>,<switch>/<module>.<port>,<vlan>,<interface>,<class>
 #
 # <mac> is the learned MAC address, no puncuation, in lowercase.
 # <switch>, <module>, and <port> are what they sound like.
 # <vlan> indicates which VLAN the MAC was learned in
 # <interface> is the <node>:<iface> of the interface that matches the MAC
 #     address, if any. 'unknown' if the MAC is not in our database
+# <class> is 'experimental' or 'control', depending on the primary function
+#     of the switch the MAC address was learned from
 #
 
 use lib '@prefix@/lib';
@@ -120,7 +122,7 @@ SWITCH:
 	$community = $MASTER_COMMUNITY;
     }
 
-    my $stack = getSwitchStack($switch);
+    my $stack = getSwitchPrimaryStack($switch);
     if (!$stack) {
 	die "No stack found for switch $switch\n";
     }
