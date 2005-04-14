@@ -721,7 +721,8 @@ sub SetupBossNode()
 
     # Create the compressed versions of the files
     mysystem("cd /tftpboot/frisbee/boot; ./prepare; ".
-	     "cd /tftpboot/freebsd/boot; ./prepare");
+	     "cd /tftpboot/freebsd/boot; ./prepare;
+	     "cd /tftpboot/freebsd.newnode/boot; ./prepare");
 
     #
     # Copy the creators ssl certificate into place. This allows the
