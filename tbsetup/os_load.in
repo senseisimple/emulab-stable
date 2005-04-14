@@ -203,11 +203,13 @@ if (defined($options{"m"})) {
     }
 }
 
-# VIRTNODE HACK: Virtual nodes are special. Do not reload! 
+#
+# Weed out non-imageable nodes (e.g., virtnodes, emotes, etc.)
+#
 my @temp = ();
 foreach my $node ( @nodes ) {
-    if (TBIsNodeVirtual($node)) {
-	print "*** reload ($node): Skipping virtual node.\n";
+    if (!TBIsNodeImageable($node)) {
+	print "*** reload ($node): cannot image node, skipped.\n";
 	next;
     }
     push(@temp, $node);

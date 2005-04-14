@@ -351,10 +351,17 @@ foreach my $n (@freed_nodes) {
     $result =
 	DBQueryFatal("select node_id,image_id from scheduled_reloads " .
 		     "where node_id='$n'");
+    my $inreloads = $result->numrows();
+
+    # XXX
+    if ($inreloads && !$isimageable) {
+	print "WARNING: non-imageable node $n in scheduled_reloads\n";
+	$inreloads = 0;
+    }
 
     if (!$TESTMODE &&
 	((!$isvirt && $imageable) || # XXX force reload hack!
-	 $result->numrows() || $mustzero{$n} ||
+	 $inreloads || $mustzero{$n} ||
 	 TBNodeType($n) eq "garcia")) { # XXX Garcia hack
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	

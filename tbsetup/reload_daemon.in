@@ -234,7 +234,7 @@ while (1) {
     my $CLASSCLAUSE = "(n.class='pc' or n.class='pct')";
     
     $query_result =
-	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe ".
+	DBQueryWarn("select a.node_id,b.pid,b.eid,b.mustwipe,n.imageable ".
 		    "from reserved as b ".
 		    "left join nodes as a on a.node_id=b.node_id ".
 		    "left join last_reservation as l on l.node_id=a.node_id ".
@@ -262,14 +262,33 @@ while (1) {
 	$pid  = $hrow{'pid'};
 	$eid  = $hrow{'eid'};
 	$mustwipe = $hrow{'mustwipe'};
+	$imageable = $hrow{'imageable'};
+
+	# XXX Garcia Hack
+	if (!$imageable && TBNodeType($node) eq "garcia") {
+	    $imageable = 1;
+	}
+	# XXX End Garcia Hack
+
+	#
+	# If any non-imageable nodes made it this far, just free them now
+	#
+	if (!$imageable) {
+	    print "Skipping non-imageable node $node\n";
+	    freefromreloading($node);
+	    next;
+	}
 	if ($pid eq $RELOADPID && $eid eq $PENDINGEID) {
 	    push(@pending_list, [$node,$mustwipe]);
 	} else {
 	    push(@other_list, [$node,$mustwipe]);
 	}
     }
-
     my $nodes = join(" ", map { $_->[0] } @pending_list, @other_list);
+    if (!$nodes) {
+	next;
+    }
+
     print "Trying to reload $nodes at ".`date`;
 
     #
@@ -422,7 +441,7 @@ while (1) {
 		#
 		# This should not fail, but it does when the DB gets busy.
 		#
-		notify("$os_load failed on $nodelist. ".
+		notify("$os_load $os_load_flags failed on $nodelist. ".
 		       "That is not supposed to happen.\n".
 		       "Attempting to recover from this unfortunate ".
 		       "situation!\n");
@@ -486,7 +505,7 @@ sub freefromreloading($) {
     DBQueryFatal("delete from current_reloads where node_id='$node'");  
     my ($pid,$eid);
     NodeidToExp($node,\$pid,\$eid);
-    if (($pid eq NODERELOADING_PID) && ($eid eq NODERELOADING_EID)) {
+    if ($pid eq $RELOADPID && ($eid eq $RELOADEID || $eid eq $PENDINGEID)) {
         DBQueryFatal("delete from scheduled_reloads ".
                      "where node_id='$node'");
         DBQueryFatal("delete from reserved where node_id='$node'");
