@@ -354,7 +354,7 @@ foreach my $n (@freed_nodes) {
     my $inreloads = $result->numrows();
 
     # XXX
-    if ($inreloads && !$isimageable) {
+    if ($inreloads && !$imageable) {
 	print "WARNING: non-imageable node $n in scheduled_reloads\n";
 	$inreloads = 0;
     }
