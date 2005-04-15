@@ -802,10 +802,12 @@ sub CreateDefsFile($)
     my $opsnode_ip      = $emulabconfig{"OPSIP"};
     my $control_network = inet_ntoa(inet_aton($opsnode_ip) &
 				    inet_aton("255.255.255.0"));
+    # Put dynrange at the top.
     my $dynrange_low    = inet_ntoa(inet_aton($control_network) |
-				    inet_aton("0.0.0.200"));
+				    inet_aton("0.0.0.230"));
+    # Note that boss/ops are hardwired to .252 and .253
     my $dynrange_high   = inet_ntoa(inet_aton($control_network) |
-				    inet_aton("0.0.0.249"));
+				    inet_aton("0.0.0.250"));
     my ($a,$b,$c,$d)    = ($bossnode_ip =~ /(\d+).(\d+).(\d+).(\d+)/);
     my $frismcastaddr   = "235.${d}.${c}";
 
