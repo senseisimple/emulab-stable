@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -70,7 +70,7 @@ if (!defined($password)) {
 my @salt_chars = ('a'..'z','A'..'Z','0'..'9');
 my $salt = $salt_chars[rand(@salt_chars)] .
 	   $salt_chars[rand(@salt_chars)];
-my $encpass = crypt($password, $salt);
+my $encpass = crypt($password, "\$1\$${salt}");
 
 # Get uid for the user and a gid for the project
 my $uid = 10000;
