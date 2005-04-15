@@ -2366,7 +2366,7 @@ CREATE TABLE widearea_updates (
 CREATE TABLE wires (
   cable smallint(3) unsigned default NULL,
   len tinyint(3) unsigned NOT NULL default '0',
-  type enum('Node','Serial','Power','Dnard','Control','Trunk') NOT NULL default 'Node',
+  type enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl') NOT NULL default 'Node',
   node_id1 char(32) NOT NULL default '',
   card1 tinyint(3) unsigned NOT NULL default '0',
   port1 tinyint(3) unsigned NOT NULL default '0',

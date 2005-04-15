@@ -2616,3 +2616,7 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table reserved add inner_elab_boot tinyint(1) default '0' \
               after inner_elab_role;
 
+1.333: Some minor changes for elabinelab support of newnodes.
+
+       alter table wires change column type type enum('Node','Serial','Power','Dnard','Control','Trunk','OuterControl') NOT NULL default 'Node';
+
