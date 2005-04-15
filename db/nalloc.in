@@ -83,7 +83,8 @@ TBDebugTimeStamp("nalloc started");
 # Experiment must exist.
 # 
 if (!ExpState($pid,$eid)) {
-    die "There is no experiment $eid in project $pid\n";
+    warn "There is no experiment $eid in project $pid\n";
+    exit -1;
 }
 TBDebugTimeStamp("nalloc checked exp state");
 
@@ -92,7 +93,8 @@ TBDebugTimeStamp("nalloc checked exp state");
 #
 if ($UID) {
     if (!TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-        die("*** You not have permission to allocate nodes in $pid/$eid!\n");
+        warn("*** You not have permission to allocate nodes in $pid/$eid!\n");
+        exit -1;
     }
 }
 TBDebugTimeStamp("nalloc checked exp permission");
@@ -104,14 +106,16 @@ TBDebugTimeStamp("nalloc checked exp permission");
 foreach my $n (@node_names) {
     # Make sure a valid node name first!
     if (! TBValidNodeName($n)) {
-	die("*** $0:\n".
-	    "    No such node $n!\n");
+	warn("*** $0:\n".
+	     "    No such node $n!\n");
+        exit -1;
     }
 
     # Project allowed to allocated this node type/class?
     if (! TBNodeAllocCheck($pid, $n)) {
-	die("*** $0:\n".
-	    "    You are not allowed to allocate $n to project $pid!\n");
+	warn("*** $0:\n".
+	     "    You are not allowed to allocate $n to project $pid!\n");
+        exit -1;
     }
 
     # XXX
