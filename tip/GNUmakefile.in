@@ -66,8 +66,13 @@ $(OBJS): tipconf.h tip.h
 client-install: client
 	$(INSTALL_PROGRAM) tippty$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/tippty$(EXE)
 
-control-install tipserv-install install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console
+control-install tipserv-install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console
+
+install:	control-install
+	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL_PROGRAM) tiptunnel $(INSTALL_DIR)/opsdir/bin/tiptunnel
+	$(INSTALL_PROGRAM) tip $(INSTALL_DIR)/opsdir/bin/tip
+	$(INSTALL_PROGRAM) console $(INSTALL_DIR)/opsdir/bin/console
 
 clean:
 	rm -f $(OBJS) tiptunnel.o console.o tip tiptunnel console tippty.o tippty
