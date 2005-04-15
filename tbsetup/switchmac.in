@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -20,11 +20,12 @@
 # <interface> is the <node>:<iface> of the interface that matches the MAC
 #     address, if any. 'unknown' if the MAC is not in our database
 # <class> is 'experimental' or 'control', depending on the primary function
-#     of the switch the MAC address was learned from
+#     of the switch the MAC address was learned from. 
 #
 
 use lib '@prefix@/lib';
 use libdb;
+use libxmlrpc;
 use snmpit_lib;
 use snmpit_cisco;
 use snmpit_foundry;
@@ -33,6 +34,10 @@ use SNMP;
 use strict;
 
 my $MASTER_COMMUNITY = "@SNMP_RW_COMMUNITY@";
+my $ELABINELAB = @ELABINELAB@;
+my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
+my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
+my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
 
 #
 # We use SNMP directly, because we have to use some pretty dumb tricks that I
@@ -42,8 +47,6 @@ my $mibpath = "/usr/local/share/snmp/mibs";
 my @mibs = ("$mibpath/SNMPv2-SMI.txt", "$mibpath/SNMPv2-TC.txt",
     "$mibpath/SNMPv2-MIB.txt", "$mibpath/IANAifType-MIB.txt",
     "$mibpath/IF-MIB.txt", "$mibpath/BRIDGE-MIB.txt");
-&SNMP::addMibFiles(@mibs);
-&SNMP::initMib();
 
 #
 # Don't know what damage users could do with this script, but why not, let's be
@@ -56,6 +59,40 @@ if (!TBAdmin($>)) {
 if (@ARGV) {
     die "usage: $0\n";
 }
+
+#
+# ElabinElab is special; Ask outer boss for the info.
+#
+if ($ELABINELAB) {
+    libxmlrpc::Config({"server"  => $RPCSERVER,
+		       "verbose" => 0,
+		       "cert"    => $RPCCERT,
+		       "portnum" => $RPCPORT});
+
+    my $rval = libxmlrpc::CallMethod("elabinelab", "switchmac", {});
+
+    if (!defined($rval)) {
+	exit(-1);
+    }
+      
+    #
+    # Convert the stuff the RPC server back into the proper string format.
+    #
+    foreach my $mac (keys(%{ $rval })) {
+	my $aref        = $rval->{$mac};
+	my $iface       = $aref->{"iface"};
+	my $role        = $aref->{"role"};
+	my $switch_id   = $aref->{"switch_id"};
+	my $switch_card = $aref->{"switch_card"};
+	my $switch_port = $aref->{"switch_port"};
+
+	print "${mac},${switch_id}/${switch_card}.${switch_port},".
+	    "elabinelab,${iface},${role}\n";
+    }
+    exit(0);
+}
+&SNMP::addMibFiles(@mibs);
+&SNMP::initMib();
 
 #
 # Yeah, it's slow, but we want to use all the test switches so that we don't
@@ -92,6 +129,9 @@ SWITCHLOOP:
 foreach my $switchref (@switches) {
     my ($switch, $class) = @$switchref;
     DEBUG "Looking at switch $switch, class $class\n";
+
+    my $class_str = (($class eq "experimental") ?
+		     TBDB_IFACEROLE_EXPERIMENT() : TBDB_IFACEROLE_CONTROL());
 
     #
     # I have _no_ idea if this will work on other switches!
@@ -344,7 +384,7 @@ SWITCH:
 	    next if ((!$realports{$index}) ||
 		     ($realports{$index} =~ /ifIndex/));
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
-		"$interfaces{$index},$class\n";
+		"$interfaces{$index},$class_str\n";
 	}
     }
 }
