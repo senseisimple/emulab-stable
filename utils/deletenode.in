@@ -1,14 +1,16 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
-#
-
 #
 # deletenode - a script for deleting a node from the database
 #
+
+#
+# Configure variables
+#
+my $TB  = "@prefix@";
 
 use lib '@prefix@/lib';
 use libdb;
@@ -98,4 +100,19 @@ while (my ($table, $clist) = each %clean_tables) {
     }
 }
 
+#
+# Need to run a bunch of stuff to really kill off the node.
+#
+print "Regenerating exports file and restarting daemon.\n";
+if (system("$TB/sbin/exports_setup")) {
+    print STDERR "*** Failed to reset mountpoints.\n";
+}
+print "Regenerating named maps and restarting daemon.\n";
+if (system("$TB/sbin/named_setup")) {
+    print STDERR "*** Failed to reset named maps.\n";
+}
+print "Regenerating DHCPD config file and restarting daemon.\n";
+if (system("$TB/sbin/dhcpd_makeconf -i -r")) {
+    print STDERR "*** Failed to reset DHCPD config file.\n";
+}
 exit 0;
