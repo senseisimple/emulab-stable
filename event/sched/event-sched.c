@@ -84,6 +84,8 @@ static timeline_agent_t ns_timeline;
 
 static void sigpass(int sig)
 {
+	info("event-sched: received signal %d, exiting\n", sig);
+	
 	if (emcd_pid != -1)
 		kill(emcd_pid, sig);
 	if (vmcd_pid != -1)
@@ -92,6 +94,13 @@ static void sigpass(int sig)
 		kill(rmcd_pid, sig);
 
 	exit(0);
+}
+
+static void sigpanic(int sig)
+{
+	info("event-sched: sigpanic %d\n", sig);
+
+	abort();
 }
 
 static void sigchld(int sig)
@@ -298,6 +307,9 @@ main(int argc, char *argv[])
 	signal(SIGINT, sigpass);
 	signal(SIGQUIT, sigpass);
 	
+	signal(SIGSEGV, sigpanic);
+	signal(SIGBUS, sigpanic);
+	
 	signal(SIGCHLD, sigchld);
 	signal(SIGHUP, sighup);
 	
@@ -308,7 +320,7 @@ main(int argc, char *argv[])
 	 */
 	if (!server)
 		server = "localhost";
-
+	
 	snprintf(buf, sizeof(buf), "elvin://%s%s%s",
 		 server,
 		 (port ? ":"  : ""),
