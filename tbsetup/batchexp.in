@@ -126,6 +126,7 @@ my $autoswaptime = 10 * 60;
 my $idleignore   = 0;
 my $priority     = TB_EXPTPRIORITY_LOW;
 my $exptstate    = EXPTSTATE_NEW();
+my $batchstate   = BATCHSTATE_UNLOCKED();
 my $now          = localtime();
 my $committed    = 0;
 
@@ -291,13 +292,14 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
 		  " idle_ignore, keyhash, expt_locked, eventkey,".
 		  " noswap_reason, noidleswap_reason, batchmode, ".
-		  " linktest_level) ".
+		  " batchstate, linktest_level) ".
 		  "VALUES ($exptidx, '$eid', '$pid', '$gid', now(), ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
 		  "now(), '$eventkey', $noswap_reason, ".
-		  "$noidleswap_reason, $batchmode, $linktest)")) {
+		  "$noidleswap_reason, $batchmode, '$batchstate', ".
+		  "$linktest)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    DB error inserting experiment record for $pid/$eid!\n");
