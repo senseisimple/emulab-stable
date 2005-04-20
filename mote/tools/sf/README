@@ -1,0 +1,13 @@
+Modified version of the TinyOS tools for dealing with mote serial communication.
+
+In order to build ARM versions of these tools, you need arm-linux-gcc
+in your path. At the time of writing, this can be found on the
+RHL90-XSCALE-CROSS disk image, in /usr/local/arm/bin .
+
+The one I've added is rssi_cnt_listen, which parses packets from the
+RobTransparentBase app, which in turn receives them from any of the
+CntToLedsAndRfm apps (either the standard one, or any of my modified ones.). It
+understands enough of the packet formay of this app to print out the count
+received and the associated RSSI.
+
+-- Robert Ricci <ricci@cs.utah.edu>

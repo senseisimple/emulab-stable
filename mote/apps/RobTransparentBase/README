@@ -1,0 +1,9 @@
+README for RobTransparetBase
+
+Modified from the standard TransparentBase by ricci@cs.utah.edu
+
+Forwards packets from the radio to the serial port, and vice versa. My
+main modifications were: to use the GenericComm component for UART I/O
+rather then Framer, to make it easier for my own scripts to process the
+packets, and to stuff the received RSSI into packets that are resent on
+the serial port.

@@ -1,0 +1,26 @@
+README for CntToLedsAndRfm.Power
+
+Modified from the standard CntToLedsAndRfm by ricci@cs.utah.edu
+Orignal README below.
+
+Simply calls SetRFPower to set transmit power in its initialization code.
+
+----------------------------------------------------------------------
+
+README for CntToLedsAndRfm
+Author/Contact: tinyos-help@millennium.berkeley.edu
+
+Description:
+
+CntToLeds maintains a counter on a 4Hz timer; it displays the lowest
+three bits of the counter value on its LEDS. The red LED is the least
+significant of the bits, while the yellow is the most significant. It
+also sends out each counter value in an IntMsg AM packet.
+
+Tools:
+
+None.
+
+Known bugs/limitations:
+
+None.
