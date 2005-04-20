@@ -15,7 +15,7 @@ use Exporter;
 @ISA = ("Exporter");
 @EXPORT = qw( macport portnum Dev vlanmemb vlanid
 		getTestSwitches getControlSwitches getSwitchesInStack
-		getVlanPorts
+		getVlanPorts convertPortsFromIfaces convertPortFromIface
 		getExperimentVlans getDeviceNames getDeviceType
 		getInterfaceSettings mapPortsToDevices getSwitchPrimaryStack
 		getSwitchStacks
@@ -156,28 +156,50 @@ sub getVlanPorts (@) {
 	my $members = $row[0];
 	# $members is a space-seprated list
 	foreach my $port (split /\s+/,$members) {
-	    # Due to the inconsistent nature of our tables (curses!), we
-	    # have to do some conversion here
-	    $port =~ /^(.+):(.+)/;
-	    my ($node,$iface) = ($1,$2);
-	    if (!defined($node) || !defined($iface)) {
-		warn "WARNING: Bad node in VLAN: $port - skipping\n";
-		next;
-	    }
-	    my $result = DBQueryFatal("SELECT card FROM interfaces " .
-	    	"WHERE node_id='$node' AND iface='$iface'");
-	    if (!$result->num_rows()) {
-		warn "WARNING: Bad node/iface pair in VLAN: $port - skipping\n";
-		next;
-	    }
-
-	    my $card = ($result->fetchrow())[0];
-
-	    # OK, finally have the info we need
-	    push @ports, $node . ":" . $card;
+	    push @ports, $port;
 	}
     }
-    return @ports;
+
+    # Convert from the DB format to the one used by the snmpit modules
+    return convertPortsFromIfaces(@ports);
+}
+
+#
+# Convert an entire list of ports in port:iface format to into port:card -
+# returns other port forms unchanged.
+#
+sub convertPortsFromIfaces(@) {
+    my @ports = @_;
+    return map {
+        if (/(.+):([A-Za-z].*)/) {
+            # Seems to be a node:iface line
+            convertPortFromIface($_);
+        } else {
+            $_;
+        }
+    } @ports;
+
+}
+
+#
+# Convert a port in port:iface format to port:card
+#
+sub convertPortFromIface($) {
+    my ($port) = $_;
+    if ($port =~ /(.+):(.+)/) {
+        my ($node,$iface) =  ($1,$2);
+        my $result = DBQueryFatal("SELECT card FROM interfaces " .
+            "WHERE node_id='$node' AND iface='$iface'");
+        if (!$result->num_rows()) {
+            warn "WARNING: convertPortFromIface($port) - Unable to get card\n";
+            return $port;
+        }
+        my $card = ($result->fetchrow())[0];
+        return "$node:$card";
+    } else {
+        warn "WARNING: convertPortFromIface($port) - Bad port format\n";
+        return $port;
+    }
 }
 
 #

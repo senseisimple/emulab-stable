@@ -232,7 +232,7 @@ if ($opt{B}) {
             die "ERROR: No port given in status string\n";
         }
         if ($args{port}) {
-            push @ports, $args{port};
+            push @ports, convertPortsFromIfaces($args{port});
         }
     }
 }
@@ -361,6 +361,11 @@ if ($pid && $eid) {
 # access to the nodes that the ports are on
 #
 
+# Convert ports into the correct format
+if (@ports) {
+    @ports = convertPortsFromIfaces(@ports);
+}
+
 if (@ports) {
     #
     # Allow ports to be given in one of two forms: node:port, or switch.port.
@@ -480,7 +485,7 @@ foreach my $command (@commands) {
             if (!$args{port}) {
                 die "ERROR: No port given in status string\n";
             }
-            @ports = ($args{port});
+            @ports = convertPortsFromIfaces($args{port});
             if ($args{vlan}) {
                 @vlans = ($args{vlan});
             }
