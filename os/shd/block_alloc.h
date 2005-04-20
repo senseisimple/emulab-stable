@@ -1,4 +1,7 @@
 /* Change to correct value */
+#ifndef INCLUDE_BLOCK_ALLOC_H
+#define INCLUDE_BLOCK_ALLOC_H
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -21,9 +24,9 @@
 #define SRC_TO_SHADOW 1
 #define SHADOW_TO_SRC 2
 
-int first_checkpoint;
 int reclaim_method;
 long shadow_size;
+long shadow_start;
 
 struct CurrentFreeBlockRange
 { 
@@ -36,15 +39,12 @@ struct FreeSpaceQueue
 {  
     long start;
     long end;
+    long size;
     struct FreeSpaceQueue *next;
-    struct FreeSpaceQueue *prev;
-} *head, *tail;
+} *shd_fs_head;
 
 void SetShadowSize (long size);
 void InitBlockAllocator (int method, long range_start, long range_size);
-void DeleteCheckpoint (int version);
-void CopyTree (Trie * trie, long size);
-long GetLastBlock ();
 long CurrentFreeBlockSize ();
 int BlockFree (long start, long end);
 long BlockAlloc (int size);
@@ -54,8 +54,10 @@ int AddFreeSpaceToQueue (long start, long end);
 struct FreeSpaceQueue* GetNextFreeSpaceFromQueue (void);
 int PrintFreeSpaceQueue();
 int DeleteFreeSpace (struct FreeSpaceQueue* temp);
+void SetShadowSize (long size);
+void SetShadowStart (long start);
 
-
+#endif
 
 
 

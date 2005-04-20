@@ -147,4 +147,5 @@ struct shd_softc {
 #define SHDREADBLOCK _IOWR('S', 27, struct shd_readbuf)
 #define SHDSETREBOOTVERSION _IOWR('S', 28, struct shd_ioctl)
 #define SHDGETMODIFIEDRANGES _IOWR('S', 29, struct shd_modinfo)
+#define SHDCRASH _IOWR('S', 30, int)
 

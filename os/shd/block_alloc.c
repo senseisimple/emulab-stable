@@ -1,53 +1,40 @@
 #include "trie.h"
 #include "block_alloc.h"
+#include "shd.h"
+
+int bPrintBlocks;
 
 void SetShadowSize (long size)
 {
     shadow_size = size;
 }
 
+void SetShadowStart (long start)
+{
+    shadow_start = start;
+}
+
 void InitBlockAllocator (int method, long range_start, long range_size)
 {
     reclaim_method = method;
     block_range.start = range_start;
-    /*range_size = 200;*/
+    /*range_size = 2000;*/
+    bPrintBlocks = 0;
     block_range.end = range_start + range_size;
     block_range.ptr = range_start;
     printf ("Initialized block allocator to start = %ld, end = %ld\n", block_range.ptr, block_range.end);
+    SetShadowStart (range_start);
     SetShadowSize (range_size);
 }
  
-void DeleteCheckpoint (int version)
-{
-    /* dummy function. write code to merge checkpoints */
-    return;
-}
-
-void CopyTree (Trie * trie, long size)
-{
-  /* dummy function. Iterate through the trie and adjust each block 
-     number by "size". Also Copy the blocks to new locations respectively */
-      
-     if (0 != trie)
-     {
-         TrieIterator pos;
-         
-     } 
-}
-
-long GetLastBlock ()
-{
-    /* dummy function. Returns the largest block number allocated to 
-       a given checkpoint */
-    return 0;
-}
-
 long CurrentFreeBlockSize ()
 {
     if (block_range.end < block_range.ptr)
-        return (block_range.ptr + shadow_size - block_range.end);
-    else
-        return (block_range.end - block_range.ptr);
+    {
+        printf ("Error in free block list\n");
+        return -1;
+    }
+    return (block_range.end - block_range.ptr);
 }
 
 int BlockFree (long start, long size)
@@ -56,31 +43,42 @@ int BlockFree (long start, long size)
 /* called only for EXPLICIT_CKPT_DELETE. Shouldn't be called for 
    LAST_CKPT_AUTO_DELETE at all */
 
-    struct FreeSpaceQueue* temp = head;
-    long end = (start + size) % shadow_size;
-    /*printf ("Free space queue before deleting block = \n");
-    PrintFreeSpaceQueue ();  
-    printf ("Freeing blocks %ld to %ld\n", start, end);*/
+    struct FreeSpaceQueue* temp = shd_fs_head;
+    long end;
+    long next_to_end;
+    long prev_to_start;
+
+    if ((start + size) > shadow_size)
+        end = (start + size) - shadow_size + shadow_start; 
+    else
+        end = start + size;   
+    if ((end == shadow_size) || (start == shadow_start))
+    {
+        AddFreeSpaceToQueue (start, end);
+        return 0;
+    }
+    next_to_end = end + 1;
+    prev_to_start = start - 1;
     while (temp != 0)
     {
-        if ((temp->start == (end + 1) % shadow_size)
-            || (temp->start == end)) 
+        if (temp->start == next_to_end)     
         {
             temp->start = start;
+            /*printf ("Merging ranges (%ld, %ld) and (%ld, %ld)\n", start, end, temp->start, temp->end);*/
+           temp->size += size;
             return 0;
         }
         else 
-        if (((temp->end + 1) % shadow_size == start)
-            || (temp->end == start))
+        if (temp->end == prev_to_start)
         {
             temp->end = end;
+            /*printf ("Merging ranges (%ld, %ld) and (%ld, %ld)\n", start, end, temp->start, temp->end);*/
+            temp->size += size;
             return 0;
         }
         temp = temp->next;
     }
     AddFreeSpaceToQueue (start, end);
-    /*printf ("Free space queue after deleting block = \n");
-    PrintFreeSpaceQueue ();*/
     return 0;
 }
 
@@ -88,97 +86,99 @@ long BlockAlloc (int size)
 {
     struct FreeSpaceQueue* temp = 0;
     long retVal;
-    /*printf ("Free space queue before allocating block = \n");
-    PrintFreeSpaceQueue ();*/
-    switch (reclaim_method)
-    {
-     case LAST_CKPT_AUTO_DELETE:
-         while (CurrentFreeBlockSize () < size)
-         {
-             DeleteCheckpoint (first_checkpoint);
-             block_range.end = GetLastBlock (first_checkpoint);
-             /* Delete the corresponding trie and merge changes with
-                next checkpoint */ 
-             first_checkpoint++;
-         }    
-         break;
-     case EXPLICIT_CKPT_DELETE:
-         while (CurrentFreeBlockSize () < size)
-         {
-             if (-1 == MergeWithNextFreeBlockRange ( CurrentFreeBlockSize() ))
+    /*if (bPrintBlocks) 
+    {  
+        printf ("Free space queue before allocating block = \n");
+        PrintFreeSpaceQueue ();
+    }
+    printf ("CurrentFreeBlockSize = %ld, Requested size = %ld\n", CurrentFreeBlockSize(), size);*/
+    if (CurrentFreeBlockSize () < size) {
+        switch (reclaim_method)
+        {
+         case LAST_CKPT_AUTO_DELETE:
+             /* Not implemented yet */
+             break;
+         case EXPLICIT_CKPT_DELETE:
+             if (SHD_DISK_FULL == MergeWithNextFreeBlockRange (size))
              {
                  printf ("Error! No more free space on disk\n");     
-                 return -1;
+                 return SHD_DISK_FULL;
              }
-         }
-         break;
+             break;
+        }
     }
     retVal = block_range.ptr;
     block_range.ptr += size;
-    /*printf ("Allocating %d blocks starting %d\n", size, retVal);
-    printf ("Free space queue after allocating block = \n");
-    PrintFreeSpaceQueue ();*/
+    /*if (bPrintBlocks)
+    {
+        printf ("Allocating %d blocks starting %d\n", size, retVal);
+        PrintFreeSpaceQueue ();
+    }*/
     return retVal;
 }
 
 long MergeWithNextFreeBlockRange (long size)
 {
     int done = 0;
-    Trie * trie;
-    struct FreeSpaceQueue* temp = GetNextFreeSpaceFromQueue ();
-    if (0 == temp)
-        return -1;
-    while (1)
+    struct FreeSpaceQueue* shd_temp, *shd_prev;
+    shd_temp = shd_prev = shd_fs_head;
+    while (shd_temp != 0)
     {
-        CopyTree (trie, size);
-        if ((GetLastBlock() + size) % shadow_size  >= temp->start)
+        if (shd_temp->size >= size)
         {
-            block_range.start = block_range.ptr = GetLastBlock();
-            block_range.end = temp->end;
-            DeleteFreeSpace (temp);
-            break;
+            if (CurrentFreeBlockSize() > 0)
+                AddFreeSpaceToQueue (block_range.ptr, block_range.end);
+            /*printf ("Old range = (%ld, %ld) New range = (%ld, %ld)\n", block_range.ptr, block_range.end, shd_temp->start, shd_temp->end);*/
+            block_range.start = block_range.ptr = shd_temp->start;
+            block_range.end = shd_temp->end;
+
+            /* Delete shd_temp from queue */
+            if (shd_temp == shd_fs_head)
+            {
+                shd_fs_head = shd_fs_head->next;
+                free (shd_temp, M_DEVBUF);
+            }
+            else 
+            {
+                shd_prev->next = shd_temp->next;
+                free (shd_temp, M_DEVBUF);
+            }
+            return 0;
         }
+        shd_prev = shd_temp;
+        shd_temp = shd_temp->next;
     }
-    return (size + temp->end - temp->start);
+    return SHD_DISK_FULL;
 }
 
 int initFreeSpaceQueue (void)
 {
-    head = tail = 0;
+    shd_fs_head = 0;
 }
 
 int AddFreeSpaceToQueue (long start, long end)
 {
     struct FreeSpaceQueue* new = malloc (sizeof (struct FreeSpaceQueue),  M_DEVBUF, M_NOWAIT);
+    struct FreeSpaceQueue* temp;
     new->start = start;
     new->end = end;
-    if (0 == head)
-        head = tail = new;
+    new->next = 0;
+    new->size = end - start;
+    if (0 == shd_fs_head)
+        shd_fs_head = new;
     else
     {
-        new->next = head;
-        head->prev = new;
-        head = new;
+        temp = shd_fs_head;
+        while (temp->next != 0)
+            temp = temp->next;
+        temp->next = new;
     } 
     return 0;
 }     
 
-struct FreeSpaceQueue* GetNextFreeSpaceFromQueue (void)
-{
-    struct FreeSpaceQueue* temp = 0;
-    if (0 == tail)
-        return 0;
-    else
-    {
-        temp = tail;
-        tail = tail->prev; 
-    } 
-    return temp;
-}
-
 int PrintFreeSpaceQueue()
 {
-    struct FreeSpaceQueue* current = head;
+    struct FreeSpaceQueue* current = shd_fs_head;
     while (current != 0)
     {
         printf ("%ld<->%ld  ", current->start, current->end);
@@ -188,16 +188,7 @@ int PrintFreeSpaceQueue()
     return 0;
 }
 
-int DeleteFreeSpace (struct FreeSpaceQueue* temp)
-{
-    if (head == temp)
-        head = 0;
-    free (temp, M_DEVBUF);
-    temp = temp->next = temp->prev = 0;
-    return 0;
-}
-
-int main ()
+/*int main ()
 {
     struct FreeSpaceQueue* temp;
     AddFreeSpaceToQueue (10, 15);
@@ -212,4 +203,4 @@ int main ()
     PrintFreeSpaceQueue();
     return 0;
 }
-
+*/

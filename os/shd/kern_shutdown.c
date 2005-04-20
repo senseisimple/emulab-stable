@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.12 2002/02/21 19:15:10 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.14 2003/12/11 21:33:43 jhb Exp $
  */
 
 #include "opt_ddb.h"
@@ -185,75 +185,34 @@ print_uptime()
 	printf("Uptime: ");
 	f = 0;
 	if (ts.tv_sec >= 86400) {
-		printf("%ldd", ts.tv_sec / 86400);
+		printf("%ldd", (long)ts.tv_sec / 86400);
 		ts.tv_sec %= 86400;
 		f = 1;
 	}
 	if (f || ts.tv_sec >= 3600) {
-		printf("%ldh", ts.tv_sec / 3600);
+		printf("%ldh", (long)ts.tv_sec / 3600);
 		ts.tv_sec %= 3600;
 		f = 1;
 	}
 	if (f || ts.tv_sec >= 60) {
-		printf("%ldm", ts.tv_sec / 60);
+		printf("%ldm", (long)ts.tv_sec / 60);
 		ts.tv_sec %= 60;
 		f = 1;
 	}
-	printf("%lds\n", ts.tv_sec);
+	printf("%lds\n", (long)ts.tv_sec);
 }
 
-void (*shdrebootp)(void); 
+void (*shdrebootp)(void);
 
 int checkpt_flag = 0;
-int checkpt_process_sleep_variable = 0; 
+int checkpt_process_sleep_variable = 0;
 
 extern int getmntinfo(struct statfs **mntbufp, int flags);
 
-void sync_before_checkpoint (void)
+int sync_entry ()
 {
-    register struct buf *bp;
-    int iter, nbusy, pbusy;
     struct nameidata nd[5];
-    /*struct nameidata nd;*/
-    int i;
     int error;
-
-    /*register struct mount *mp, *nmp;
-    struct statfs *sp, sb;
-    char mntonname[128];*/
-
-    waittime = 0;
-    printf("\nsyncing disks... ");
-
-    checkpt_flag = 1;
-
-    /*for (mp = TAILQ_FIRST(&mountlist); mp != NULL; mp = nmp)
-    {
-      if (prison_valid_mount(curproc->p_prison, mp, mntonname)) 
-      {
-        sp = &mp->mnt_stat;
-        error = VFS_STATFS(mp, sp, curproc);
-        if (error)
-        {
-            printf ("error calling VFS_STATFS\n");
-        } 
-        if (*mntonname)
-        {
-            bcopy((caddr_t)sp, (caddr_t)&sb, sizeof(sb));
-            if (sb.f_fstypename[0] == 'u' && sb.f_fstypename[1] == 'f' && sb.f_fstypename[2] == 's')
-            {
-                printf ("Found %s\n", sb.f_mntonname);
-                NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, sb.f_mntonname, curproc);
-                if ((error = namei(&nd)) != 0)
-                 printf ("Error = %d\n", error);
-                while (nd.ni_vp->v_mount->mnt_ops_in_progress)
-                 tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-                NDFREE(&nd, NDF_ONLY_PNBUF);
-            }
-        }
-      }
-      nmp = TAILQ_NEXT(mp, mnt_list);
-    }*/
 
     NDINIT(&nd[0], LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
     if ((error = namei(&nd[0])) != 0)
@@ -264,9 +223,6 @@ void sync_before_checkpoint (void)
     NDINIT(&nd[2], LOOKUP, FOLLOW, UIO_SYSSPACE, "/var", curproc);
     if ((error = namei(&nd[2])) != 0)
         printf ("Error = %d\n", error);
-    /*NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
-    if ((error = namei(&nd[3])) != 0)
-        printf ("Error = %d\n", error);*/
 
     while (nd[0].ni_vp->v_mount->mnt_ops_in_progress)
            tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
@@ -274,26 +230,27 @@ void sync_before_checkpoint (void)
            tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
     while (nd[2].ni_vp->v_mount->mnt_ops_in_progress)
            tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-/*    while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
-           tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);*/
 
     NDFREE(&nd[0], NDF_ONLY_PNBUF);
     NDFREE(&nd[1], NDF_ONLY_PNBUF);
     NDFREE(&nd[2], NDF_ONLY_PNBUF);
-    /*NDFREE(&nd[3], NDF_ONLY_PNBUF);*/
 
-    vrele(nd[0].ni_vp);
-    vrele(nd[1].ni_vp);
-    vrele(nd[2].ni_vp);
-/*    vrele(nd[3].ni_vp);*/
+    vput(nd[0].ni_vp);
+    vput(nd[1].ni_vp);
+    vput(nd[2].ni_vp);
+    return error;
+}
 
-    sync(&proc0, NULL);
+int sync_blocks ()
+{
+    register struct buf *bp;
+    int iter, nbusy, pbusy;
 
-                /*
-                 * With soft updates, some buffers that are
-                 * written will be remarked as dirty until other
-                 * buffers are written.
-                 */
+    /*
+     * With soft updates, some buffers that are
+     * written will be remarked as dirty until other
+     * buffers are written.
+     */
 
     for (iter = pbusy = 0; iter < 20; iter++) {
         nbusy = 0;
@@ -319,10 +276,11 @@ void sync_before_checkpoint (void)
         DELAY(50000 * iter);
     }
 
-                /*
-                 * Count only busy local buffers to prevent forcing
-                 * a fsck if we're just a client of a wedged NFS server
-                 */
+    /*
+     * Count only busy local buffers to prevent forcing
+     * a fsck if we're just a client of a wedged NFS server
+     */
+
     nbusy = 0;
     for (bp = &buf[nbuf]; --bp >= buf; ) {
                 if (((bp->b_flags&B_INVAL) == 0 && BUF_REFCNT(bp)) ||
@@ -335,20 +293,39 @@ void sync_before_checkpoint (void)
                         nbusy++;
                 }
     }
+#if defined(SHOW_BUSYBUFS) || defined(DIAGNOSTIC)
+    printf(
+          "%p %d: dev:%s, flags:%08lx, blkno:%ld, lblkno:%ld\n",
+           bp, nbusy, devtoname(bp->b_dev),
+           bp->b_flags, (long)bp->b_blkno,
+           (long)bp->b_lblkno);
+#endif
+    return nbusy;
+}
 
+void sync_before_checkpoint (void)
+{
+    int nbusy;
+
+    waittime = 0;
+    printf("\nsyncing disks... ");
+
+    checkpt_flag = 1;
+
+    sync_entry();
+    sync(&proc0, NULL);
+
+    nbusy = sync_blocks();
     if (nbusy) {
-                        /*
-                         * Failed to sync all blocks. Indicate this and don't
-                         * unmount filesystems (thus forcing an fsck on reboot).
-                         */
                 printf("giving up on %d buffers\n", nbusy);
-                printf ("Will force fsck on reboot\n");
                 DELAY(5000000); /* 5 seconds */
-    } 
+    }
 
     checkpt_flag = 0;
     wakeup ((caddr_t)&checkpt_flag);
-} 
+}
+
+
 /*
  *  Go through the rigmarole of shutting down..
  * this used to be in machdep.c but I'll be dammned if I could see
@@ -375,75 +352,22 @@ boot(howto)
 	/* 
 	 * Now sync filesystems
 	 */
-
 	/*if (!cold && (howto & RB_NOSYNC) == 0 && waittime < 0) {*/
           if (1) {
-		register struct buf *bp;
-		int iter, nbusy, pbusy;
+		int nbusy;
 
 		waittime = 0;
 		printf("\nsyncing disks... ");
 
 		sync(&proc0, NULL);
 
-		/*
-		 * With soft updates, some buffers that are
-		 * written will be remarked as dirty until other
-		 * buffers are written.
-		 */
-		for (iter = pbusy = 0; iter < 20; iter++) {
-			nbusy = 0;
-			for (bp = &buf[nbuf]; --bp >= buf; ) {
-				if ((bp->b_flags & B_INVAL) == 0 &&
-				    BUF_REFCNT(bp) > 0) {
-					nbusy++;
-				} else if ((bp->b_flags & (B_DELWRI | B_INVAL))
-						== B_DELWRI) {
-					/* bawrite(bp);*/
-					nbusy++;
-				}
-			}
-			if (nbusy == 0)
-				break;
-			printf("%d ", nbusy);
-			if (nbusy < pbusy)
-				iter = 0;
-			pbusy = nbusy;
-			if (iter > 5 && bioops.io_sync)
-				(*bioops.io_sync)(NULL);
-			sync(&proc0, NULL);
-			DELAY(50000 * iter);
-		}
-		printf("\n");
-		/*
-		 * Count only busy local buffers to prevent forcing 
-		 * a fsck if we're just a client of a wedged NFS server
-		 */
-		nbusy = 0;
-		for (bp = &buf[nbuf]; --bp >= buf; ) {
-			if (((bp->b_flags&B_INVAL) == 0 && BUF_REFCNT(bp)) ||
-			    ((bp->b_flags & (B_DELWRI|B_INVAL)) == B_DELWRI)) {
-				if (bp->b_dev == NODEV) {
-					TAILQ_REMOVE(&mountlist,
-					    bp->b_vp->v_mount, mnt_list);
-					continue;
-				}
-				nbusy++;
-#if defined(SHOW_BUSYBUFS) || defined(DIAGNOSTIC)
-				printf(
-			    "%p %d: dev:%s, flags:%08lx, blkno:%ld, lblkno:%ld\n",
-				    bp, nbusy, devtoname(bp->b_dev),
-				    bp->b_flags, (long)bp->b_blkno,
-				    (long)bp->b_lblkno);
-#endif
-			}
-		}
+                nbusy = sync_blocks();
+
 		if (nbusy) {
 			/*
 			 * Failed to sync all blocks. Indicate this and don't
 			 * unmount filesystems (thus forcing an fsck on reboot).
 			 */
-                        printf ("failed to sync all blocks. Will fsck on reboot\n");
 			printf("giving up on %d buffers\n", nbusy);
 			DELAY(5000000);	/* 5 seconds */
 		} else {
@@ -451,75 +375,26 @@ boot(howto)
 			/*
 			 * Unmount filesystems
 			 */
-
 			if (panicstr == 0)
                         {
-                                /* struct nameidata nd;
-                                 int mnt_cnt;
-                                 struct statfs *mntbuf;
-                                 int i;
-                                 int error;
-
-                                 mnt_cnt = getmntinfo(&mntbuf, MNT_NOWAIT);
-                                 if (mnt_cnt > 0) 
-                                 {            
-                                     for (i = 0; i < mnt_cnt; i++)
-                                         if (strcmp (mntbuf[i].f_fstypename, "ufs") == 0)
-                                         {
-                                             NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, mntbuf[i].f_mntonname, curproc);
-                                             if ((error = namei(&nd)) != 0)
-                                                 printf ("Error = %d\n", error);
-                                             while (nd.ni_vp->v_mount->mnt_ops_in_progress)
-                                                 tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-                                             NDFREE(&nd, NDF_ONLY_PNBUF);
-                                         }       
-                                }  */              
-                                struct nameidata nd[5];
-                                int error;
-
-                                NDINIT(&nd[0], LOOKUP, FOLLOW, UIO_SYSSPACE, "/", curproc);
-                                if ((error = namei(&nd[0])) != 0) 
-                                    printf ("Error = %d\n", error);
-
-                                NDINIT(&nd[1], LOOKUP, FOLLOW, UIO_SYSSPACE, "/usr", curproc);
-                                if ((error = namei(&nd[1])) != 0)
-                                    printf ("Error = %d\n", error); 
-
-                                NDINIT(&nd[2], LOOKUP, FOLLOW, UIO_SYSSPACE, "/var", curproc);
-                                if ((error = namei(&nd[2])) != 0)
-                                    printf ("Error = %d\n", error);
-/*
-                                NDINIT(&nd[3], LOOKUP, FOLLOW, UIO_SYSSPACE, "/tmp", curproc);
-                                if ((error = namei(&nd[3])) != 0)
-                                    printf ("Error = %d\n", error);*/
-
-                                while (nd[0].ni_vp->v_mount->mnt_ops_in_progress)
-                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-                                while (nd[1].ni_vp->v_mount->mnt_ops_in_progress)
-                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-                                while (nd[2].ni_vp->v_mount->mnt_ops_in_progress)
-                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);
-/*                                while (nd[3].ni_vp->v_mount->mnt_ops_in_progress)
-                                    tsleep(&checkpt_process_sleep_variable,  PINOD, "mountpointlock", 0);*/
-           
-                                NDFREE(&nd[0], NDF_ONLY_PNBUF);
-                                NDFREE(&nd[1], NDF_ONLY_PNBUF);
-                                NDFREE(&nd[2], NDF_ONLY_PNBUF);
-                           /*     NDFREE(&nd[3], NDF_ONLY_PNBUF);*/
-
-                                vrele(nd[0].ni_vp);
-                                vrele(nd[1].ni_vp);
-                                vrele(nd[2].ni_vp);
+                                sync_entry();
 
                                 DELAY (10000000);
                                 printf ("Unmounting filesystems...");
                                 vfs_unmountall();
                                 printf ("Done!\n");
 
+                                nbusy = sync_blocks();
+                                if (nbusy) {
+                                    printf ("failed to sync all blocks. Will fsck on reboot\n");
+                                    printf("giving up on %d buffers\n", nbusy);
+                                    DELAY(5000000); /* 5 seconds */
+                                }
+
                                 DELAY(10000000);
                                 printf ("Copying blocks\n");
                                 (*shdrebootp)();
-                                printf ("Done!\n"); 
+                                printf ("Done!\n");
                         }
 		}
 		DELAY(100000);		/* wait for console output to finish */
@@ -527,7 +402,6 @@ boot(howto)
 
 	print_uptime();
 
-        /*DELAY(10000000);*/
 	/*
 	 * Ok, now do things that assume all filesystem activity has
 	 * been completed.
@@ -704,6 +578,7 @@ static void
 dumpsys(void)
 {
 	int	error;
+        printf ("Sid: Dumping sys\n");
 
 	savectx(&dumppcb);
 	if (dumping++) {
@@ -759,7 +634,7 @@ dumpsys(void)
 }
 
 int
-dumpstatus(vm_offset_t addr, off_t count)
+dumpstatus(vm_paddr_t addr, off_t count)
 {
 	int c;
 
@@ -791,6 +666,11 @@ panic(const char *fmt, ...)
 	va_list ap;
 	static char buf[256];
 
+        printf ("Dumping core in panic\n");
+        dumpsys();
+        printf ("Done\n");
+        (*shdrebootp)();
+
 	bootopt = RB_AUTOBOOT | RB_DUMP;
 	if (panicstr)
 		bootopt |= RB_NOSYNC;
@@ -809,6 +689,12 @@ panic(const char *fmt, ...)
 	printf("cpuid = %d; ", cpuid);
 	printf("lapic.id = %08x\n", lapic.id);
 #endif
+
+        EVENTHANDLER_INVOKE(shutdown_post_sync, bootopt);
+        splhigh();
+
+        /* Now that we're going to really halt the system... */
+        EVENTHANDLER_INVOKE(shutdown_final, bootopt);
 
 #if defined(DDB)
 	if (debugger_on_panic)

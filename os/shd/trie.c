@@ -1,6 +1,9 @@
 
 #include "trie.h"
 
+#define SHD_NO_MEM -1
+#define SHD_DISK_FULL -2
+
 static void TrieNodeInit(TrieNode * node);
 static void TrieNodeCleanup(TrieNode * node);
 static int extract(char inDepth, TrieKey key);
@@ -107,7 +110,7 @@ int TrieInit(Trie ** trieOutPtr, BlockAllocateFunction blockAlloc,
         if (trie == 0)
         {
             printf ("Error allocating memory for TrieInit\n");
-            result = 0;
+            result = SHD_NO_MEM;
         }
         else
         {
@@ -150,7 +153,7 @@ void TrieCleanup(Trie * triePtr)
 {
     if (triePtr != 0)
     {
-        TrieNodeCleanup(&(triePtr->root));
+        freeChildren(triePtr, &(triePtr->root), DEFAULT_OVERLAP);
         free(triePtr
 #ifdef KERNEL
 , M_DEVBUF
@@ -266,7 +269,7 @@ int TrieInsertWeak(Trie * triePtr, TrieKey key, int size, FirstPtrT first,
                                     sizeToDepth(blockSize));
             if (temp < 0)
             {
-                copyCount = -1;
+                copyCount = temp;
                 break;
             }
             else
@@ -365,7 +368,7 @@ static int insertWeak(Trie * triePtr, TrieNode * node, TrieKey key,
             }
             else
             {
-                total = -1;
+                total = SHD_DISK_FULL;
             }
             done = 1;
         }
@@ -447,7 +450,7 @@ static int addChild(Trie * triePtr, TrieNode * parent, TrieKey key,
     else
     {
         printf ("Error allocating memory for addChild\n");
-        result = -1;
+        result = SHD_NO_MEM;
     }
     return result;
 }
@@ -602,7 +605,7 @@ static TrieNode * pushDown(Trie * triePtr, TrieNode * node)
     else
     {
         printf ("Error allocating memory for pushDown\n");
-        middle = 0;
+        middle = SHD_NO_MEM;
     }
     return middle;
 }

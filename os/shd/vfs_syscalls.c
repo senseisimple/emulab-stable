@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.16 2002/04/26 00:46:04 iedowse Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.19 2004/02/19 14:02:30 pjd Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -126,6 +126,8 @@ mount(p, uap)
 	struct nameidata nd;
 	char fstypename[MFSNAMELEN];
 
+	if (p->p_prison != NULL)
+		return (EPERM);
 	if (usermount == 0 && (error = suser(p)))
 		return (error);
 	/*
@@ -290,6 +292,7 @@ mount(p, uap)
 	bzero((char *)mp, (u_long)sizeof(struct mount));
 	TAILQ_INIT(&mp->mnt_nvnodelist);
 	TAILQ_INIT(&mp->mnt_reservedvnlist);
+	mp->mnt_nvnodelistsize = 0;
 	lockinit(&mp->mnt_lock, PVFS, "vfslock", 0, LK_NOPAUSE);
 	(void)vfs_busy(mp, LK_NOWAIT, 0, p);
 	mp->mnt_op = vfsp->vfc_vfsops;
@@ -446,6 +449,10 @@ unmount(p, uap)
 	int error;
 	struct nameidata nd;
 
+	if (p->p_prison != NULL)
+		return (EPERM);
+	if (usermount == 0 && (error = suser(p)))
+		return (error);
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
 	    SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
@@ -1220,14 +1227,15 @@ ocreat(p, uap)
         }
         vp = nd.ni_dvp;
         shd_write_entry (vp, "create");
-	retVal = open(p, &nuap);
+        retVal = open(p, &nuap);
         if (retVal)
         {
             printf ("open returned error %d in ocreat\n", retVal);
         }
         shd_write_exit (vp, "create");
         NDFREE(&nd, NDF_ONLY_PNBUF);
-        return retVal; 
+        return retVal;
+
 }
 #endif /* COMPAT_43 */
 
@@ -1302,7 +1310,7 @@ mknod(p, uap)
 	if (!error) {
 		VOP_LEASE(nd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
 		if (whiteout)
-                { 
+                {
                         shd_write_entry (nd.ni_dvp, "mknod");
 			error = VOP_WHITEOUT(nd.ni_dvp, &nd.ni_cnd, CREATE);
                         shd_write_exit (nd.ni_dvp, "mknod");
@@ -1422,7 +1430,7 @@ link(p, uap)
 				VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
                                 shd_write_entry (vp, "link");
 				error = VOP_LINK(nd.ni_dvp, vp, &nd.ni_cnd);
-                                shd_write_entry (vp, "link");
+                                shd_write_exit (vp, "link");
 			}
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			if (nd.ni_dvp == nd.ni_vp)
@@ -2786,14 +2794,10 @@ rename(p, uap)
 	if (fvp == tdvp)
 		error = EINVAL;
 	/*
-	 * If source is the same as the destination (that is the
-	 * same inode number with the same name in the same directory),
-	 * then there is nothing to do.
+	 * If the source is the same as the destination (that is, if they
+	 * are links to the same vnode), then there is nothing to do.
 	 */
-	if (fvp == tvp && fromnd.ni_dvp == tdvp &&
-	    fromnd.ni_cnd.cn_namelen == tond.ni_cnd.cn_namelen &&
-	    !bcmp(fromnd.ni_cnd.cn_nameptr, tond.ni_cnd.cn_nameptr,
-	      fromnd.ni_cnd.cn_namelen))
+	if (fvp == tvp)
 		error = -1;
 out:
 	if (!error) {

@@ -28,7 +28,7 @@ static const char rcsid[] =
 
 extern struct proc *curproc;
 
-#define MAXBUF 65316
+#define MAXBUF 262144 
 #define BLOCKSIZE 512
 
 static	int lineno = 0;
@@ -75,7 +75,7 @@ static	void print_shd_info __P((struct shd_softc *, kvm_t *));
 static	char *resolve_shdname __P((char *));
 static	void usage __P((void));
 int save_checkpoint (char * shd, int version);
-int load_checkpoint (char * shd, int version, int newversion);
+int load_checkpoint (int version);
 
 int
 main(argc, argv)
@@ -84,7 +84,20 @@ main(argc, argv)
 {
 	int ch, options = 0, action = SHD_CONFIG;
 	int flags = 0;
+        int version, maxversion;
+        int old_ver;
 
+        if (strcmp (argv[1], "-l") == 0)
+        {
+            version = atoi(argv[2]); 
+            maxversion = atoi(argv[3]); 
+            printf ("Loading version %d\n", version);
+            for (old_ver = maxversion; old_ver >= version; old_ver-- )
+            {
+                load_checkpoint (old_ver);
+            }
+            return (0);
+        }
 	if (modfind("shd") < 0) {
 		/* Not present in kernel, try loading it */
 		if (kldload("shd") < 0 || modfind("shd") < 0)
@@ -106,7 +119,7 @@ do_single(argc, argv, action, flags)
 	char *shd, *cp, *cp2, *srcdisk, *copydisk;
 	int noflags = 0, i, ileave, j;
         int version, maxversion;
-        int old_ver, new_ver;
+        int old_ver;
 
 
 	bzero(&shio, sizeof(shio));
@@ -194,7 +207,10 @@ do_single(argc, argv, action, flags)
             if (do_io(shd, SHDDELETECHECKPOINTS, &shio))
                 return (1);
         }
-
+        else
+        if (strcmp (cp, "-crash") == 0)
+            if (do_io(shd, SHDCRASH, &shio))
+                return (1);
         else
         if (strcmp (cp, "-r") == 0)
         {       
@@ -233,37 +249,48 @@ do_single(argc, argv, action, flags)
         else
         if (strcmp (cp, "-l") == 0)
         {
-            off_t off;
-            long metadata_block [128];
-            int fd_write_mdata = open ("/dev/ad0s4", O_RDWR);
-            if (fd_write_mdata < 0)
-            {
-                perror ("error");
-                return;
-            }
             version = atoi(*argv++); --argc;
             maxversion = atoi(*argv++); --argc;
-            off = lseek (fd_write_mdata, 2 * BLOCKSIZE, SEEK_SET);
-            for (i = 0; i < 128; i++)
-                metadata_block[i] = 0;
-            write (fd_write_mdata, &metadata_block, 512);
-            close (fd_write_mdata);
             printf ("Loading version %d\n", version);
-            new_ver = 1;
-            for (old_ver = version; old_ver <= maxversion; old_ver++ )
+            for (old_ver = maxversion; old_ver >= version; old_ver-- )
             {
-                load_checkpoint (shd, old_ver, new_ver);
-                new_ver++; 
+                load_checkpoint (old_ver);
             }
-            if (do_io(shd, SHDLOADCHECKPOINTMAP, &shio))
-                return (1);
         }   
         else
         if (strcmp (cp, "-gm") == 0)
         {
+            struct shd_range {
+               u_int32_t start;
+               u_int32_t end;
+            };
+
+            struct shd_modinfo sm;
+            sm.bufsiz = 64;
+            sm.buf = malloc(sm.bufsiz * sizeof(struct shd_range));
+            sm.command = 1;
+            if (do_io(shd, SHDGETMODIFIEDRANGES, &sm))
+                return (1); 
+            while (sm.retsiz > 0) {
+                struct shd_range *sr = sm.buf;
+               
+                for (sr = sm.buf; sm.retsiz > 0; sr++, sm.retsiz--) {
+                    printf ("%ld<->%ld\n", sr->start, sr->end);
+                }
+                sm.command = 2;
+                if (do_io(shd, SHDGETMODIFIEDRANGES, &sm) < 0) {
+                        /* XXX should flush the valid table */
+                        return 1;
+                }
+            } 
+            sm.command = 3;
+            do_io(shd, SHDGETMODIFIEDRANGES, &sm);
+            free (sm.buf);
+ 
+            /* 
             long buf[512];
             struct shd_modinfo mod;
-            mod.command = 1; /* To initialize iterator */
+            mod.command = 1; 
             mod.buf = buf;
             mod.bufsiz = 512;
 
@@ -273,6 +300,11 @@ do_single(argc, argv, action, flags)
             if (do_io(shd, SHDGETMODIFIEDRANGES, &mod))
                 return (1);
             printf ("retsize = %d\n", mod.retsiz);
+            if (mod.retsiz == -1)
+            {
+                printf ("Error getting modified blocks\n");
+                return (1);
+            }
             for (i = 0; i < mod.retsiz; i++)
             {
                 printf ("%ld <-> %ld\n", buf[i*2], buf[i*2+1]);
@@ -286,15 +318,22 @@ do_single(argc, argv, action, flags)
                 if (do_io(shd, SHDGETMODIFIEDRANGES, &mod))
                     return (1);
                 printf ("retsize = %d\n", mod.retsiz);
+                if (mod.retsiz == -1)
+                {
+                    printf ("Error getting modified blocks\n");
+                    return (1);
+                }
                 for (i = 0; i < mod.retsiz; i++)
                 {
                     printf ("%ld <-> %ld\n", buf[i*2], buf[i*2+1]);
                 }
             } 
-
-            mod.command = 3; /* Close iterator */
+            for (i = 0; i < 512; i++)
+                buf[i] = 0;
+            mod.retsiz = 0;
+            mod.command = 3; 
             if (do_io(shd, SHDGETMODIFIEDRANGES, &mod))
-                return (1);
+                return (1);*/
         }
 
 	/*printf("shd%d: ", shio.shio_unit);
@@ -748,13 +787,14 @@ int save_checkpoint (char * shd, int version)
     char ver_buf[2]; 
     char *ver = &ver_buf; 
     ver = itoa (version);
-    strcpy (path, "/users/saggarwa/image");
+    strcpy (path, "/proj/tbres/images/image");
     strcat (path, ver);
     strcat (path, ".data");
     
     fd_read = open ("/dev/ad0s4", O_RDWR);
     if (fd_read < 0)
     {
+        printf ("Error opening /dev/ad0s4\n");
         perror ("error");
         return;
     }
@@ -764,6 +804,7 @@ int save_checkpoint (char * shd, int version)
     fd_write_data = open (path, O_CREAT);
     if (fd_write_data < 0)
     {
+        printf ("Error opening %s O_CREAT\n", path);
         perror ("error");
         return;
     }
@@ -771,19 +812,21 @@ int save_checkpoint (char * shd, int version)
     fd_write_data = open (path, O_WRONLY);
     if (fd_write_data < 0)
     {
+        printf ("Error opening %s O_WRONLY\n", path);
         perror ("error");
         return;
     }
 
     /* Open the metadata file to write to */
 
-    strcpy (path, "/users/saggarwa/image");
+    strcpy (path, "/proj/tbres/images/image");
     strcat (path, ver);
     strcat (path, ".mdata");
 
     fd_write_mdata = open (path, O_CREAT);
     if (fd_write_mdata < 0)
     {
+        printf ("Error opening %s O_CREAT\n", path);
         perror ("error");
         return;
     }
@@ -791,6 +834,7 @@ int save_checkpoint (char * shd, int version)
     fd_write_mdata = open (path, O_WRONLY);
     if (fd_write_mdata < 0)
     {
+        printf ("Error opening %s O_WRONLY\n", path);
         perror ("error");
         return;
     }
@@ -799,6 +843,7 @@ int save_checkpoint (char * shd, int version)
     shread.buf = &block;
     if (do_io(shd, SHDREADBLOCK, &shread))
     {
+        printf ("Error SHDREADBLOCK block 2\n");
         perror ("error");
         return (1); 
     }
@@ -819,10 +864,16 @@ int save_checkpoint (char * shd, int version)
              off = lseek (fd_read,  block[i+1] * BLOCKSIZE, SEEK_SET);
              size = read (fd_read, &buffer, block[i+2] * BLOCKSIZE);
              if (size < 0)
+             { 
+                 printf ("Error reading block %ld\n", block[i+1]);
                  perror ("error");
+             }
              size = write (fd_write_data, &buffer, size);
              if (size < 0)
+             {
+                 printf ("Error writing block %ld\n", block[i+1]);
                  perror ("error");
+             }
              for (j = 0; j < MAXBUF; j++)
                  buffer[j] = 0;
              write (fd_write_mdata, &block[i], sizeof (long));
@@ -837,10 +888,10 @@ int save_checkpoint (char * shd, int version)
     close (fd_write_mdata);
 }
 
-int load_checkpoint (char * shd, int version, int newversion)
+int load_checkpoint (int version)
 {
+    unsigned long int setpos = 0;
     char buffer [MAXBUF];
-    long block [BLOCKSIZE/4 + 1];
     long metadata_block [128];
     off_t off;
     int i;   
@@ -848,7 +899,6 @@ int load_checkpoint (char * shd, int version, int newversion)
     int fd_read_data; 
     int fd_read_mdata;
     int fd_write_data;
-    int fd_write_mdata; 
     int size;    
     int write_start; 
     int num_blocks;
@@ -861,21 +911,16 @@ int load_checkpoint (char * shd, int version, int newversion)
     char ver_buf[2];
     char *ver = &ver_buf;
     ver = itoa (version); 
-    strcpy (path, "/users/saggarwa/image");
+    strcpy (path, "/proj/tbres/images/image");
     strcat (path, ver);
     strcat (path, ".data");
 
     for (i = 0; i < 128; i++)
         metadata_block[i] = 0;
-    fd_write_data = open ("/dev/ad0s4", O_RDWR);
+    fd_write_data = open ("/dev/ad0s1", O_RDWR);
     if (fd_write_data < 0)
     {        
-        perror ("error");
-        return;
-    }
-    fd_write_mdata = open ("/dev/ad0s4", O_RDWR);
-    if (fd_write_mdata < 0)
-    {
+        printf ("Error opening file /dev/ad0s1 O_RDWR\n");
         perror ("error");
         return;
     }
@@ -885,77 +930,51 @@ int load_checkpoint (char * shd, int version, int newversion)
     fd_read_data = open (path, O_RDWR);
     if (fd_read_data < 0)
     {
+        printf ("Error opening file %s O_RDWR\n", path);
         perror ("error");
         return;
     }
 
     /* Open the metadata file to read from */
 
-    strcpy (path, "/users/saggarwa/image");
+    strcpy (path, "/proj/tbres/images/image");
     strcat (path, ver);
     strcat (path, ".mdata");
-
 
     fd_read_mdata = open (path, O_RDWR);
     if (fd_read_mdata < 0)
     {
+        printf ("Error opening file %s O_RDWR\n", path);
         perror ("error");
         return;
     }
-
-    for (i = 0; i < 128; i++)
-        block[i] = 0;
 
     for (i = 0; i < MAXBUF; i++)
         buffer[i] = 0;
 
     read (fd_read_mdata, &write_start, sizeof (long)); 
     read (fd_read_mdata, &num_blocks, sizeof (long));
-    off = lseek (fd_write_mdata, 2 * BLOCKSIZE, SEEK_SET);
-    read (fd_write_mdata, &metadata_block, 512); 
-    metadata_block[2*newversion - 2] = write_start;
-    metadata_block[2*newversion - 1] = num_blocks;
-    off = lseek (fd_write_mdata, 2 * BLOCKSIZE, SEEK_SET);
-    write (fd_write_mdata, &metadata_block, 512);
     
-    off = lseek (fd_write_mdata, write_start * BLOCKSIZE, SEEK_SET);
     while (read (fd_read_mdata, &key, sizeof (long))) 
     {
         read (fd_read_mdata, &value, sizeof (long));
         read (fd_read_mdata, &chunk_size, sizeof (long)); 
-        off = lseek (fd_write_data, value * BLOCKSIZE, SEEK_SET); 
+        setpos = key * BLOCKSIZE;
+        off = lseek (fd_write_data, setpos, SEEK_SET); 
         size = read (fd_read_data, &buffer, chunk_size * BLOCKSIZE);
         if (size < 0)
+        {
+            printf ("Error reading block %ld\n", key);
             perror ("error"); 
+        } 
         size = write (fd_write_data, &buffer, size);
         if (size < 0)
-            perror ("error"); 
-        for (i = 0; i < MAXBUF; i++)
-            buffer[i] = 0;
-        block[byte_count++] = key;
-        block[byte_count++]= value;
-        block[byte_count++] = chunk_size; 
-
-        if (byte_count >= 125)
         {
-            byte_count = 0;
-            off = lseek (fd_write_mdata, write_start * BLOCKSIZE, SEEK_SET); 
-            write (fd_write_mdata, &block, BLOCKSIZE);
-            for (i=0; i<128; i++)
-                block[i] = 0; 
-            write_start++;
-            block_count++;
-            if (block_count >= num_blocks) 
-                break; 
-        } 
-    }
-    if (byte_count > 0)
-    {
-        off = lseek (fd_write_mdata, write_start * BLOCKSIZE, SEEK_SET);
-        write (fd_write_mdata, &block, BLOCKSIZE);
+            perror ("error"); 
+            printf ("Error writing block %ld\n", key);
+        }  
     }
     close (fd_write_data);
-    close (fd_write_mdata);
     close (fd_read_data);
     close (fd_read_mdata);
 }
