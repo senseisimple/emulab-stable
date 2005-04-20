@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -34,9 +34,10 @@ else {
 }
 
 #
-# Only Admins can enter log entries.
+# Only Admins can enter log entries. Or members of emulab-ops project
+# if the node is free or reserved to emulab-ops.
 #
-if (! $isadmin) {
+if (! ($isadmin || OPSGUY())) {
     USERERROR("You do not have permission to enter log entries!", 1);
 }
 

@@ -143,18 +143,20 @@ if (($isadmin || TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_READINFO)) &&
 		       "telemetry");
 }
 
-if ($isadmin) {
+if ($isadmin || OPSGUY()) {
     WRITESUBMENUBUTTON("Show Node Log",
 		       "shownodelog.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Show Node History",
 		       "shownodehistory.php3?node_id=$node_id");
+}
+if ($isadmin) {
     WRITESUBMENUBUTTON("Free Node",
 		       "freenode.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Set Node Location",
 		       "setnodeloc.php3?node_id=$node_id");
 }
 
-if ($isadmin || STUDLY()) {
+if ($isadmin || STUDLY() || OPSGUY()) {
     WRITESUBMENUBUTTON("Update Power State",
 		       "powertime.php3?node_id=$node_id");
 }

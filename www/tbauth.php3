@@ -45,6 +45,7 @@ define("CHECKLOGIN_WEBONLY",		0x040000);
 define("CHECKLOGIN_PLABUSER",		0x080000);
 define("CHECKLOGIN_STUDLY",		0x100000);
 define("CHECKLOGIN_WIKIONLY",		0x200000);
+define("CHECKLOGIN_OPSGUY",		0x400000);	# member of emulab-ops
 
 #
 # Constants for tracking possible login attacks.
@@ -127,7 +128,7 @@ function GETUID() {
 function CHECKLOGIN($uid) {
     global $TBAUTHCOOKIE, $TBLOGINCOOKIE, $HTTP_COOKIE_VARS, $TBAUTHTIMEOUT;
     global $CHECKLOGIN_STATUS, $CHECKLOGIN_UID, $CHECKLOGIN_NODETYPES;
-    global $CHECKLOGIN_WIKINAME;
+    global $CHECKLOGIN_WIKINAME, $TBOPSPID;
     global $nocookieauth;
     #
     # If we already figured this out, do not duplicate work!
@@ -153,7 +154,7 @@ function CHECKLOGIN($uid) {
 	DBQueryFatal("select NOW()>=u.pswd_expires,l.hashkey,l.timeout, ".
 		     "       status,admin,cvsweb,g.trust,adminoff,webonly, " .
 		     "       user_interface,n.type,u.stud,u.wikiname, ".
-		     "       u.wikionly " .
+		     "       u.wikionly,g.pid " .
 		     " from users as u ".
 		     "left join login as l on l.uid=u.uid ".
 		     "left join group_membership as g on g.uid=u.uid ".
@@ -171,6 +172,7 @@ function CHECKLOGIN($uid) {
     # values and the pid. pid is a hack.
     #
     $trusted = 0;
+    $opsguy  = 0;
     
     while ($row = mysql_fetch_array($query_result)) {
 	$expired = $row[0];
@@ -193,6 +195,11 @@ function CHECKLOGIN($uid) {
 	$wikiname = $row[12];
 	$wikionly = $row[13];
 
+	# Check for an ops guy.
+	$pid = $row[14];
+	if ($pid == $TBOPSPID) {
+	    $opsguy = 1;
+	}
 	$CHECKLOGIN_NODETYPES[$type] = 1;
     }
 
@@ -319,6 +326,8 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS |= CHECKLOGIN_ACTIVE;
     if (isset($wikiname) && $wikiname != "")
 	$CHECKLOGIN_WIKINAME = $wikiname;
+    if ($opsguy)
+	$CHECKLOGIN_STATUS |= CHECKLOGIN_OPSGUY;
 
     #
     # Set the magic enviroment variable, if appropriate, for the sake of
@@ -439,6 +448,19 @@ function STUDLY() {
     return (($CHECKLOGIN_STATUS &
 	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_STUDLY)) ==
 	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_STUDLY));
+}
+
+function OPSGUY() {
+    global $CHECKLOGIN_STATUS;
+    
+    if ($CHECKLOGIN_STATUS == CHECKLOGIN_NOSTATUS) {
+	$uid=GETUID();
+	TBERROR("OPSGUY: $uid is not logged in!", 1);
+    }
+
+    return (($CHECKLOGIN_STATUS &
+	     (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_OPSGUY)) ==
+	    (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_OPSGUY));
 }
 
 function WIKIONLY() {

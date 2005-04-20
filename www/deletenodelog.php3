@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -35,7 +35,7 @@ if (!isset($log_id) ||
 #
 # Only Admins can delete log entries.
 #
-if (! $isadmin) {
+if (! ($isadmin || OPSGUY())) {
     USERERROR("You do not have permission to delete log entries!", 1);
 }
 

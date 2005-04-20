@@ -19,7 +19,7 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
-if (!$isadmin) {
+if (! ($isadmin || OPSGUY())) {
     USERERROR("Cannot view node history.", 1);
 }
 

@@ -459,7 +459,8 @@ while ($row = mysql_fetch_array($query_result)) {
     echo "<tr>";
 
     # Admins get a link to expand the node.
-    if ($isadmin) {
+    if ($isadmin ||
+	(OPSGUY() && (!$pid || $pid == $TBOPSPID))) {
 	echo "<td><A href='shownode.php3?node_id=$node_id'>$node_id</a> " .
 	    (!strcmp($node_id, $phys_nodeid) ? "" :
 	     "(<A href='shownode.php3?node_id=$phys_nodeid'>$phys_nodeid</a>)")

@@ -140,6 +140,7 @@ define("TBDB_IFACEROLE_JAIL",		"jail");
 define("TBDB_IFACEROLE_FAKE",		"fake");
 define("TBDB_IFACEROLE_GW",		"gw");
 define("TBDB_IFACEROLE_OTHER",		"other");
+define("TBDB_IFACEROLE_OUTER_CONTROL",  "outer_ctrl");
 
 # Node states that the web page cares about.
 define("TBDB_NODESTATE_ISUP",		"ISUP");
@@ -444,7 +445,7 @@ function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
     else {
 	#
 	# Setting default group.
-	# Don't verify anything (yet.)
+	# Do not verify anything (yet.)
 	#
 	$projtrustisroot = $newtrustisroot;
     }
@@ -462,14 +463,14 @@ function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
 	$ogid     = $row[1];
 	
 	# 
-	# Get what the user's trust level is in the 
+	# Get what the users trust level is in the 
 	# current subgroup we're looking at.
 	#
 	$grptrustisroot = 
 	    TBTrustConvert( $grptrust ) > $TBDB_TRUST_USER ? 1 : 0;
 
 	#
-	# If user's trust level is higher in the default group than in the
+	# If users trust level is higher in the default group than in the
 	# subgroup we are looking at, this is wrong.
 	#
 	if ($projtrustisroot > $grptrustisroot) {
@@ -481,8 +482,8 @@ function TBCheckGroupTrustConsistency($user, $pid, $gid, $newtrust, $fail)
 
 	if (strcmp($pid, $gid)) {
             #
-	    # Iff we're modifying a subgroup, 
-	    # Make sure that the trust we're setting is as
+	    # Iff we are modifying a subgroup, 
+	    # Make sure that the trust we are setting is as
 	    # rootful as the trust we already have set in
 	    # every other subgroup.
 	    # 
@@ -594,6 +595,7 @@ function TBNodeAccessCheck($uid, $node_id, $access_type)
     global $TBDB_TRUST_USER;
     global $TBDB_TRUST_GROUPROOT;
     global $TBDB_TRUST_LOCALROOT;
+    global $TBOPSPID;
     $mintrust;
 
     if ($access_type < $TB_NODEACCESS_MIN ||
@@ -608,6 +610,14 @@ function TBNodeAccessCheck($uid, $node_id, $access_type)
 		     "where r.node_id='$node_id'");
 
     if (mysql_num_rows($query_result) == 0) {
+	#
+	# If the current user is in the emulab-ops project and has sufficient
+	# privs, then he can muck with free nodes as if he were an admin type.
+	#
+	if ($uid == GETUID() && OPSGUY()) {
+	    return(TBMinTrust(TBGrpTrust($uid, $TBOPSPID, $TBOPSPID),
+			      $TBDB_TRUST_LOCALROOT));
+	}
 	return 0;
     }
     $row = mysql_fetch_array($query_result);

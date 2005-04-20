@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -37,10 +37,9 @@ if (mysql_num_rows($query_result) == 0) {
 }
 
 #
-# Admin users can look at any node, but normal users can only control
-# nodes in their own experiments.
+# Perm check.
 #
-if (! $isadmin) {
+if (! ($isadmin || OPSGUY())) {
     USERERROR("You do not have permission to view log for node $node_id!", 1);
 }
 
