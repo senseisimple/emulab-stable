@@ -247,6 +247,12 @@ MOTE: foreach my $mote (@motes) {
                 }
             }
         }
+
+        #
+        # Flip to the user's ID before running these things
+        #
+        my $oldEUID = $EUID;
+        $EUID = $UID;
         if (exists $moteIDs{$mote}) {
             print "Setting id for $mote to $moteIDs{$mote}\n";
             if (system "$SETID --exe $filename $tmpexe $moteIDs{$mote}") {
@@ -260,6 +266,10 @@ MOTE: foreach my $mote (@motes) {
             next MOTE;
         }
         $uploadfile = $tmpfile;
+        #
+        # And then flip back
+        #
+        $EUID = $oldEUID;
 
         if ($processedfile eq $tmpexe) {
             unlink $tmpexe;
@@ -434,7 +444,7 @@ MOTE: foreach my $mote (@motes) {
     # Clean up the tempfile
     #
     if ($tmpfile) {
-        unlink $tmpfile;
+        system "rm -f $tmpfile";
     }
 
     # XXX - We have to reboot stargates after loading the mote. Disgusting,
