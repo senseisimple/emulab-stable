@@ -146,7 +146,7 @@ use vars qw(@ISA @EXPORT);
 
 	 TBDB_PHYSICAL_NODE_TABLES
 
-	 TBAdmin TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
+	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
@@ -859,6 +859,31 @@ sub TBAdmin(;$)
 	return 1;
     }
     return 0;
+}
+
+#
+# Test whether current user is a member of the emulab-ops project.
+# 
+sub TBOpsGuy(;$)
+{
+    my($uid) = @_;
+    my($name);
+
+    if (!defined($uid)) {
+	$uid = $UID;
+    }
+
+    #
+    # Test if numeric. Map to name if it is.
+    #
+    if ($uid =~ /^[0-9]+$/) {
+	($name) = getpwuid($uid)
+	    or die "$uid not in passwd file\n";
+    }
+    else {
+	$name = $uid;
+    }
+    return TBMinTrust(TBProjTrust($name, $TBOPSPID), PROJMEMBERTRUST_USER());
 }
 
 #

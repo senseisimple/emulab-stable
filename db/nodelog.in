@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -36,7 +36,7 @@ if (!$UID) {
     die("*** $0:\n".
 	"    Please do not run this script as root!\n");
 }
-if (!TBAdmin($UID)) {
+if (! (TBAdmin($UID) || TBOpsGuy($UID))) {
     die("*** $0:\n".
 	"    You must be a TB administrator to enter a log entry\n");
 }
