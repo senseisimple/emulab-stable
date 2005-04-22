@@ -601,6 +601,15 @@ public class RoboTrack extends JApplet {
 		    if (robbie == mary)
 			continue;
 
+		    /*
+		     * Check the Z axis first. If the objects are on
+		     * different "planes" then no collision is possible.
+		     * Okay, so this is really a hack instead, until we
+		     * need something smarter.
+		     */
+		    if (Math.abs(robbie.z - mary.z) > 0.25)
+			continue;
+
 		    if (mary.gotdest) {
 			ox1 = ox2 = mary.dx;
 			oy1 = oy2 = mary.dy;
