@@ -736,6 +736,15 @@ sub setVlanOnTrunks($$$;@) {
     my $errors = 0;
     foreach my $trunk (@trunks) {
 	my ($src,$dst) = @$trunk;
+
+        #
+        # For now - ignore trunks that leave the stack. We may have to revisit
+        # this at some point.
+        #
+        if (!$self->{DEVICES}{$src} || !$self->{DEVICES}{$dst}) {
+            next;
+        }
+
 	if (!$self->{DEVICES}{$src}) {
 	    warn "ERROR - Bad device $src found in setVlanOnTrunks!\n";
 	    $errors++;
