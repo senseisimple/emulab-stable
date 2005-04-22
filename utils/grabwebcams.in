@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
 # Copyright (c) 2005 University of Utah and the Flux Group.
@@ -6,34 +6,59 @@
 #
 use English;
 use Getopt::Std;
+use Errno;
+use POSIX ":sys_wait_h";
+use BSD::Resource;
 
 #
 # Grab webcam images daemon. 
 #
 sub usage()
 {
-    print STDOUT "Usage: grabwebcams [-d]\n" .
-	"Use the -d option to prevent daemonization\n";
+    print(STDOUT
+	  "Usage: grabwebcams [-d] [-v] [-m] [-t timeout]\n" .
+	  "       grabwebcams [-d] [-v] [-t timeout] [-k] pid eid\n" .
+	  "switches and arguments:\n".
+	  "-d      - Debug mode, use to prevent daemonization\n".
+	  "-v      - Verbose mode (causes vlc to spit lots of goo)\n".
+	  "-m      - Movie option; create a 10fps movie from each camera\n".
+	  "-t <N>  - Terminate automatically and N seconds\n".
+	  "-k      - Kill a daemonized grabwebcams (only use with pid/eid)\n".
+	  "pid eid - Project and Experiment (for use with swapin)\n");
     exit(-1);
 }
-my $optlist = "d";
-my $debug   = 0;
-
-#
-# Must be runs as root, from boot.
-#
-if ($UID != 0) {
-    die("*** $0:\n".
-	"    Only root can run this script!\n");
-}
+my $optlist  = "dt:vkm";
+my $debug    = 0;
+my $verbose  = 0;
+my $timeout  = 0;
+my $killmode = 0;
+my $movie    = 0;
+my $pid;
+my $eid;
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
-my $WEBCAMDIR   = "$TB/webcams";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
+my $VLC		= "/usr/X11R6/bin/vlc";
+my $WGET	= "/usr/local/bin/wget";
+my $PIDDIR	= "/var/run/emulab/grabwebcams";
+
+# We don't want to run this script unless its the real version.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+#
+# Please do not run as root. Hard to track what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root!\n");
+}
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -55,8 +80,10 @@ $libdb::DBQUERY_MAXTRIES = 30;
 #
 # Locals
 # 
-my $logfile	= "$TB/log/webcams.log";
-my $SCP		= "/usr/bin/scp";
+my $PIDFILE;
+my $logfile;
+my %webcams     = ();
+my %children    = ();
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -66,67 +93,273 @@ my $SCP		= "/usr/bin/scp";
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 0) {
-    usage();
-}
 if (defined($options{"d"})) {
-    $debug = $options{"d"};
+    $debug = 1;
+}
+if (defined($options{"v"})) {
+    $verbose = 1;
+}
+if (defined($options{"t"})) {
+    $timeout = $options{"t"};
+}
+if (defined($options{"m"})) {
+    $movie = 1;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
+    usage()
+	if (! @ARGV);
+}
+if (@ARGV) {
+    usage()
+	if (scalar(@ARGV) != 2 || $movie);
+    
+    ($pid,$eid) = @ARGV;
+
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("Bad data in argument: $pid.");
+    }
+    if ($eid =~ /^([-\w]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die("Bad data in argument: $eid.");
+    }
+    $PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
+}
+
+#
+# Deal with stopping a running webcam script, as when an experiment is
+# swapped out.
+#
+if ($killmode) {
+    if (-e $PIDFILE) {    
+	my $epid = `cat $PIDFILE`;
+	# untaint
+	if ($epid =~ /^(\d*)$/) {
+	    $epid = $1;
+	}
+	else {
+	    fatal("Bad data in pid: $epid!\n");
+	}
+	unlink($PIDFILE);
+
+	if (kill($epid, 0) == 0 || $Errno::errno != $Errno::ESRCH) {
+	    if (! kill('TERM', $epid)) {
+		fatal("Failed to stop webcam capture ($epid) for $pid/$eid!\n");
+	    }
+	}
+    }
+    exit(0);
+}
+
+# Making a movie for an experiment ...
+if (defined($pid)) {
+    #
+    # Chdir into the project directory
+    #
+    my $moviedir = PROJROOT() . "/$pid/movies";
+    if (! -d $moviedir) {
+	if (! mkdir($moviedir, 0775)) {
+	    die("*** $0:\n".
+		"    Could not make directory $moviedir: $!");
+	}
+    }
+    chdir($moviedir) or
+	die("*** $0:\n".
+	    "    Could not chdir to $moviedir!\n");
+
+    #
+    # Make a subdir and chdir into that.
+    #
+    my $dirname = $eid . "-" . TBDateTimeFSSafe();
+    mkdir($dirname, 0777);
+    chdir($dirname) or
+	die("*** $0:\n".
+	    "    Could not chdir to $dirname!\n");
+}
+
+#
+# Grab the webcam data from the DB to see if we even need to continue.
+#
+my $query_result = DBQueryFatal("select * from webcams");
+if (!$query_result->numrows) {
+    print "There are no webcams!\n";
+    exit(0);
+}
+# Okay, parse the camera data.
+while (my %row = $query_result->fetchhash()) {
+    my $id       = $row{"id"};
+    my $server   = $row{"server"};
+
+    $webcams{$id} = $server;
+}
+
+#
+# Make sure the pid directory exists.
+#
+if (! -d $PIDDIR) {
+    if (system("mkdir -p -m 775 $PIDDIR")) {
+	die("*** $0:\n".
+	    "    Could not mkdir $PIDDIR\n");
+    }
 }
 
 # Go to ground.
 if (! $debug) {
+    $logfile = TBMakeLogname("grabwebcams");
+    
     if (TBBackGround($logfile)) {
 	exit(0);
     }
 }
 
 #
-# Grab the webcams from the DB and get the images.
+# Write out the pid file and then drop privs. 
 #
-while (1) {
-    my $query_result = DBQueryWarn("select * from webcams");
+if (defined($PIDFILE) &&
+    system("echo '$PID' > $PIDFILE")) {
+    fatal("Could not create $PIDFILE!");
+}
+if (! $movie) {
+    setpriority(PRIO_PROCESS, 0, -1);
+}
+$EUID = $UID;
 
-    goto skip
-	if (!$query_result);
+#
+# First, get the video.sdp files for each camera, which we feed to vlc.
+#
+foreach my $id (keys(%webcams)) {
+    my $server = $webcams{$id};
+    my $URL    = "http://${server}/mpeg4/video.sdp";
+    my $file   = "video-${id}.sdp";
 
-    while (my %row = $query_result->fetchhash()) {
-	my $id       = $row{"id"};
-	my $server   = $row{"server"};
-	my $filename = "/var/tmp/camera-${id}.jpg";
+    unlink($file);
+    print "Getting $URL ...\n";
+    system("$WGET -T 30 --non-verbose -O $file $URL");
+    if ($?) {
+	fatal("Could not get video.sdp from camera $id ($server)");
+    }
+}
 
-	print "Grabbing image ${server}:${filename}\n"
-	    if ($debug);
+#
+# Handler to catch signal and kill children.
+#
+sub handler ($) {
+    print "Caught a signal. Killing children ...\n";
+    
+    foreach my $id (keys(%children)) {
+	my $pid = $children{$id};
 
-	#
-	# ssh to server, protected by timeout.
-	# 
-	my $syspid = fork();
-
-	if ($syspid) {
-	    local $SIG{ALRM} = sub { kill("TERM", $syspid); };
-	    alarm 5;
-	    waitpid($syspid, 0);
-	    alarm 0;
-
-	    #
-	    # Any failure, skip to next one.
-	    #
-	    if ($?) {
-		print "Failed to get webcam image $id from $server\n";
-
-		SENDMAIL($TBOPS, "Grab WebCam Image Failure",
-			 "Failed to webcam $id from $server: $?\n");
-		next;
+	if (kill($pid, 0) == 0 || $Errno::errno != $Errno::ESRCH) {
+	    if (! kill('TERM', $pid)) {
+		notify("Failed to stop vlc process $pid!");
 	    }
 	}
-	else {
-	    exec("$SCP -q ${server}:${filename} $WEBCAMDIR");
-	    exit(0);
-	}
-	DBQueryWarn("update webcams set last_update=now() ".
-		    "where $id='$id'");
     }
-  skip:
-    sleep(5);
+    return 0;
 }
+$SIG{TERM} = \&handler;
+
+#
+# Now fire off vlc to capture the multicast output. 
+# 
+foreach my $id (keys(%webcams)) {
+    my $server = $webcams{$id};
+    my $file   = "video-${id}.mpg";
+    my $sdp    = "video-${id}.sdp";
+    my $URL;
+    my $syspid;
+
+    if ($syspid = fork()) {
+	#
+	# Parent. Just record the pid and go on.
+	#
+	$children{$id} = $syspid;
+    }
+    else {
+	my $cmdstr = "$VLC " . ($verbose ? "-v -v " : "-q ") .
+	    "-I dummy --no-sap-parse ";
+
+	if ($movie) {
+	    $URL = "http://${server}/axis-cgi/mjpg/video.cgi?".
+		"fps=24&compression=50&date=1&clock=1";
+
+	    $cmdstr .= "--mjpeg-fps 24  --sout ".
+		"#transcode{vcodec=mp2v,fps=24,scale=1}:".
+		"duplicate{dst=std{access=file,mux=ps,url=\"$file\"}} $URL";
+	}
+	else {
+	    $URL = "rtsp://${server}/mpeg4/1/media.amp";
+	    $cmdstr .= "--sout ".
+		"#duplicate{dst=std{access=file,mux=ts,url=\"$file\"}} $URL";
+	}
+
+	print "Running '$cmdstr'\n";
+	my @cmdargs = split(" ", $cmdstr);
+	exec(@cmdargs);
+	exit(69);
+    }
+    sleep(1);
+}
+
+if ($timeout) {
+    $SIG{ALRM} = \&handler;
+    alarm($timeout);
+}
+
+#
+# Now wait for children.
+#
+my $kid;
+do {
+    $kid = waitpid(-1, &WNOHANG);
+    sleep(1);
+} until ($kid == -1);
+
+unlink($logfile)
+    if (defined($logfile) && -e $logfile);
 exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print "*** $0:\n".
+	  "    $mesg\n";
+
+    #
+    # Send a message to the testbed list. 
+    #
+    if (defined($logfile)) {
+	SENDMAIL($TBOPS,
+		 "Webcam capture failure",
+		 $mesg,
+		 $TBOPS,
+		 undef,
+		 ($logfile));
+	unlink($logfile);
+    }
+    exit(1);
+}
+
+sub notify($)
+{
+    my($mesg) = $_[0];
+
+    print "*** $0:\n".
+	  "    $mesg\n";
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "Webcam capture problem",
+	     $mesg,
+	     $TBOPS);
+}
+
+

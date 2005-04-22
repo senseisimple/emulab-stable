@@ -41,8 +41,13 @@ install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 		$(INSTALL_DIR)/opsdir/man/man1/loghole.1
 	rm -f $(INSTALL_SBINDIR)/wap
 	ln -s withadminprivs $(INSTALL_SBINDIR)/wap
+	@echo "Don't forget to do a post-install as root"
 
 boss-install: install
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/grabwebcams
+	chmod u+s $(INSTALL_SBINDIR)/grabwebcams
 
 #
 # Control node installation (okay, plastic)
