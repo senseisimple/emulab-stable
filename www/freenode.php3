@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -26,14 +26,6 @@ if (!isset($node_id) || !strcmp($node_id, "") || !TBValidNodeName($node_id)) {
 }
 
 #
-# Only admin users can do this.
-#
-if (! $isadmin) {
-    USERERROR("Only administrators can free nodes from the web interface!",
-	      1);
-}
-
-#
 # Has to be reserved of course!
 #
 $query_result =
@@ -45,6 +37,13 @@ if (mysql_num_rows($query_result) == 0) {
 $row = mysql_fetch_array($query_result);
 $pid = $row[pid];
 $eid = $row[eid];
+
+#
+# Perm check.
+#
+if (! ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
+    USERERROR("Not enough permission to free nodes from the web interface!", 1);
+}
 
 #
 # We run this twice. The first time we are checking for a confirmation

@@ -149,14 +149,14 @@ if ($isadmin || OPSGUY()) {
     WRITESUBMENUBUTTON("Show Node History",
 		       "shownodehistory.php3?node_id=$node_id");
 }
-if ($isadmin) {
+if (isset($pid) && ($isadmin || (OPSGUY()) && $pid == $TBOPSPID)) {
     WRITESUBMENUBUTTON("Free Node",
 		       "freenode.php3?node_id=$node_id");
-    WRITESUBMENUBUTTON("Set Node Location",
-		       "setnodeloc.php3?node_id=$node_id");
 }
 
 if ($isadmin || STUDLY() || OPSGUY()) {
+    WRITESUBMENUBUTTON("Set Node Location",
+		       "setnodeloc.php3?node_id=$node_id");
     WRITESUBMENUBUTTON("Update Power State",
 		       "powertime.php3?node_id=$node_id");
 }
