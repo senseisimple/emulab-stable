@@ -1,7 +1,12 @@
 #! /usr/bin/awk -f
+# 
+#   EMULAB-COPYRIGHT
+#   Copyright (c) 2005 University of Utah and the Flux Group.
+#   All rights reserved.
+# 
 # analysis_w_plot.awk - Make gnuplot data files from dump_analyzer output.
 # 
-# std input : an analysis_camera* file.
+# std input: an analysis_camera* file.
 # Option vars, set with -v var=arg:
 #  -v file=base. - Base name of output files, null string by default.
 #  -v mag=10 - Magnification factor on error line length, 1 by default.

@@ -16,13 +16,12 @@ import math
 
 # Parse options and (perhaps multiple) filename args.
 DEBUG = False
-world_offset = False
+world_coords = False
 opts,args = getopt.getopt(sys.argv[1:], 'wd')
-printTris = False
-debug = False
 for o,a in opts:
     if o == "-w":
-        world_offset = True
+        # Apply world_x, world_y, and world_theta from config in input file.
+        world_coords = True
         pass
     if o == "-d":
         DEBUG = True
@@ -63,11 +62,14 @@ class ObjectData:
         self.bx = bx
         self.by = by
 
-        # Apply camera offset to world coords.
-        self.wx = wx + options['camera_x']
-        self.wy = wy + options['camera_y']
-        self.wa = wa
-
+        if world_coords:
+            # Match up grid points with other cameras globally.
+            self.wx, self.wy, self.wa = worldTransform(wx, wy, wa)
+        else:
+            # Subtract local camera offset to match nominal grid point coords.
+            self.wx = wx - options['camera_x']
+            self.wy = wy - options['camera_y']
+            self.wa = wa
         pass
     
     def toString(self):
@@ -103,10 +105,18 @@ class FrameData:
 class Section:
 
     def __init__(self,lx,ly,frames):
-        self.lx = lx
-        self.ly = ly
-        # we assume PI/2 for now...
-        self.lt = 1.570796
+        if world_coords:
+            # Match up nominal grid points with other cameras globally.
+            # Add in the local offset from camera center to surveyed grid point.
+            self.lx, self.ly, self.lt = worldTransform(
+                lx + options['camera_x'], ly + options['camera_y'], 0)
+        else:
+            # Leave the nominal grid point coords alone.
+            self.lx = lx
+            self.ly = ly
+            self.lt = options['world_theta']
+            pass
+
         self.frames = frames
         pass
 
@@ -138,8 +148,9 @@ options = dict({ 'x_offset': 0.0,
                  'frame interval': 0,
                  'camera_x': 0.0,     # Camera offset, in meters.
                  'camera_y': 0.0,
-                 'world_x': 0.0,      # World offset, in meters.
+                 'world_x': 0.0,      # Offset in meters to camera center.
                  'world_y': 0.0,
+                 'world_theta': 0.0,  # Rotation of camera in radians CW.
                  })
 
 def mean(list):
@@ -160,6 +171,30 @@ def rmserr(dev_list):
 def stddev(list):
     m = mean(list)
     return math.sqrt(msqerr([n-m for n in list]))
+
+# Transform a point from camera-local into global world coords.
+# (Same logic as local2global_posit_trans in vmc-client.c)
+def worldTransform(cx, cy, ca):
+    ct = math.cos(options['world_theta'])
+    st = math.sin(options['world_theta'])
+    # Notice this is a left-handed rotation, followed by an offset.
+    wx = ct * cx + st * -cy + options['world_x']
+    wy = ct * -cy + st * -cx + options['world_y']
+    # Rotate 90 more degrees because the fiducials are now mounted crosswise.
+    wa = mtp_theta(ca + options['world_theta'] + math.pi/2);
+    return wx, wy, wa
+
+# Put orientation into the +-PI radians range.
+# (Same logic as mtp_theta in mtp.c)
+def mtp_theta(theta):
+    if theta < -math.pi:
+	retval = theta + (2.0 * math.pi)
+    elif theta > math.pi:
+	retval = theta - (2.0 * math.pi)
+    else:
+	retval = theta
+        pass
+    return retval
 
 def analyze(section):
     # takes a Section, and does crap on it, and puts the result of the crap

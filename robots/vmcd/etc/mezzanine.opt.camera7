@@ -1,4 +1,4 @@
- 
+
 # Image size to work with
 fgrab.offline = 0
 fgrab.norm = ntsc
@@ -6,7 +6,7 @@ fgrab.width = 640
 fgrab.height = 480
 fgrab.fps = 30
 
-fgrab.device = /dev/video0
+fgrab.device = /dev/video3
 
 # Image mask
 classify.mask.poly[0] = (0, 0)
@@ -21,29 +21,29 @@ classify.class[0].vupoly[0] = (111, 95)
 classify.class[0].vupoly[1] = (137, 178)
 classify.class[0].vupoly[2] = (68, 161)
 classify.class[0].vupoly[3] = (71, 92)
-classify.class[0].yupoly[0] = (19, 139)
-classify.class[0].yupoly[1] = (206, 130)
+classify.class[0].yupoly[0] = (55, 139)
+classify.class[0].yupoly[1] = (205, 125)
 classify.class[0].yupoly[2] = (235, 169)
-classify.class[0].yupoly[3] = (73, 165)
+classify.class[0].yupoly[3] = (62, 167)
 classify.class[0].vypoly[0] = (92, 17)
 classify.class[0].vypoly[1] = (119, 12)
-classify.class[0].vypoly[2] = (123, 242)
+classify.class[0].vypoly[2] = (116, 245)
 classify.class[0].vypoly[3] = (65, 227)
 
 classify.class[1].name = pink
 classify.class[1].color = (255, 105, 180)
-classify.class[1].vupoly[0] = (217, 40)
+classify.class[1].vupoly[0] = (193, 62)
 classify.class[1].vupoly[1] = (198, 161)
-classify.class[1].vupoly[2] = (138, 160)
-classify.class[1].vupoly[3] = (145, 98)
-classify.class[1].yupoly[0] = (214, 110)
-classify.class[1].yupoly[1] = (69, 118)
-classify.class[1].yupoly[2] = (42, 57)
-classify.class[1].yupoly[3] = (153, 36)
-classify.class[1].vypoly[0] = (186, 186)
-classify.class[1].vypoly[1] = (203, 100)
-classify.class[1].vypoly[2] = (156, 58)
-classify.class[1].vypoly[3] = (142, 230)
+classify.class[1].vupoly[2] = (146, 162)
+classify.class[1].vupoly[3] = (135, 118)
+classify.class[1].yupoly[0] = (197, 153)
+classify.class[1].yupoly[1] = (72, 112)
+classify.class[1].yupoly[2] = (91, 73)
+classify.class[1].yupoly[3] = (197, 89)
+classify.class[1].vypoly[0] = (206, 181)
+classify.class[1].vypoly[1] = (173, 28)
+classify.class[1].vypoly[2] = (135, 17)
+classify.class[1].vypoly[3] = (152, 232)
 
 
 # Blob finder
@@ -54,41 +54,41 @@ blobfind.max_sizex = 30
 blobfind.min_sizey = 4
 blobfind.max_sizey = 30
 
+# Dewarp parameters
+dewarp.cameraCenter = (295,195)
+dewarp.ocHeight = 2.3075
+dewarp.scaleFactor = (179.0,185.0)
+dewarp.warpFactor = 0.865
+dewarp.gridoff = (-0.008,-0.266)
 
-dewarp.cameraCenter = (296,201)
-dewarp.ocHeight = 2.30
-dewarp.scaleFactor = (174.0,180.0)
-dewarp.warpFactor = 0.870
-dewarp.gridoff = (0.040,0.003)
 
 # Dewarp calibration points
-dewarp.wpos[0] = (-1.000, -1.500)
-dewarp.ipos[0] = (154, 427)
+dewarp.wpos[0] = (-1.000, -1.000)
+dewarp.ipos[0] = (140, 398)
 
-dewarp.wpos[1] = (0.000, -1.500)
-dewarp.ipos[1] = (302, 437)
+dewarp.wpos[1] = (0.000, -1.000)
+dewarp.ipos[1] = (294, 408)
 
-dewarp.wpos[2] = (2.000, -1.500)
-dewarp.ipos[2] = (562, 401)
+dewarp.wpos[2] = (1.500, -1.000)
+dewarp.ipos[2] = (515, 389)
 
-dewarp.wpos[3] = (-1.500, 0.000)
-dewarp.ipos[3] = (71, 199)
+dewarp.wpos[3] = (-1.000, 0.000)
+dewarp.ipos[3] = (127, 241)
 
 dewarp.wpos[4] = (0.000, 0.000)
-dewarp.ipos[4] = (301, 199)
+dewarp.ipos[4] = (293, 244)
 
-dewarp.wpos[5] = (2.000, 0.000)
-dewarp.ipos[5] = (583, 200)
+dewarp.wpos[5] = (1.500, 0.000)
+dewarp.ipos[5] = (530, 240)
 
-dewarp.wpos[6] = (-2.000, 1.000)
-dewarp.ipos[6] = (27, 58)
+dewarp.wpos[6] = (-1.000, 1.000)
+dewarp.ipos[6] = (131, 73)
 
 dewarp.wpos[7] = (0.000, 1.000)
-dewarp.ipos[7] = (302, 31)
+dewarp.ipos[7] = (294, 65)
 
-dewarp.wpos[8] = (1.000, 1.000)
-dewarp.ipos[8] = (455, 41)
-
+dewarp.wpos[8] = (1.500, 1.000)
+dewarp.ipos[8] = (526, 81)
 
 
 # Object identification
@@ -113,3 +113,4 @@ classify.mask.poly[14] = (0, 0)
 classify.mask.poly[15] = (0, 0)
 classify.mask.poly[16] = (0, 0)
 classify.mask.poly[17] = (0, 0)
+
