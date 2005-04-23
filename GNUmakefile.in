@@ -8,6 +8,8 @@ TESTBED_SRCDIR  = @top_srcdir@
 DISTCLEAN_FILES = @DISTCLEAN_FILES@ 
 EVENTSYS	= @EVENTSYS@
 
+SYSTEM	       := $(shell uname -s)
+
 include Makeconf
 
 #
@@ -114,8 +116,10 @@ ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client
 endif
 	@$(MAKE) -C os client
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client
 	@$(MAKE) -C tip client
+endif
 	@$(MAKE) -C sensors client
 	@$(MAKE) -C tmcd client
 
@@ -124,8 +128,10 @@ ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event client-install
 endif
 	@$(MAKE) -C os client-install
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
+endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
 
