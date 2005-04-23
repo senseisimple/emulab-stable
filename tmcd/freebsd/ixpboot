@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "*** IXPs not supported under FreeBSD, ignored"
+exit 0
