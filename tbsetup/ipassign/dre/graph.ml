@@ -99,6 +99,11 @@ let map_nodes graph visitor =
     List.map visitor graph.nodes
 ;;
 
+(* fold_nodes: ('a, 'b) t -> ('c -> ('a, 'b) node -> 'c) -> 'c list *)
+let fold_nodes graph visitor base =
+    List.fold_left visitor base graph.nodes
+;;
+
 (* iterate_edges: ('a, 'b) t -> (('a, 'b) edge -> unit) -> unit *)
 let iterate_edges graph visitor =
     List.iter visitor graph.edges
@@ -107,6 +112,12 @@ let iterate_edges graph visitor =
 (* map_edges: ('a, 'b) t -> (('a, 'b) edge -> 'c) -> 'c list *)
 let map_edges graph visitor =
     List.map visitor graph.edges
+;;
+
+(* count_nodes: ('a, 'b) t -> int *)
+let count_nodes graph =
+    (* We should probably make this faster by storing the size in the graph *)
+    List.length graph.nodes
 ;;
 
 (* More operations will be added later, of course... *)

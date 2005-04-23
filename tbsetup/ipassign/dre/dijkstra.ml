@@ -81,6 +81,22 @@ let run_dijkstra (graph : ('a, 'b) Graph.t) (node : ('a, 'b) Graph.node)
 
 type ('a,'b) internal_first_hop = INoHop | INoHopYet | INodeHop of ('a,'b) Graph.node;;
 type ('a,'b) first_hop = NoHop | NodeHop of ('a,'b) Graph.node;;
+let string_of_fh (fh : (int, 'b) first_hop) : string =
+    match fh with
+      NoHop -> "NoHop"
+    | NodeHop(n) -> string_of_int n.Graph.node_contents
+;;
+(* XXX - there has got to be a better way to do this, I'm sure *)
+let fh_equal (a : ('a, 'b) first_hop) (b : ('a, 'b) first_hop) : bool =
+    match a with
+      NoHop ->
+          (match b with NoHop -> true | _ -> false)
+    | NodeHop(x) ->
+            (match b with
+               NoHop -> false
+             | NodeHop(y) -> x.Graph.node_contents == y.Graph.node_contents)
+;;
+
 exception HopInternalError;;
 let get_first_hops (graph : ('a, 'b) Graph.t)
                    (pred : ('a, 'b) Graph.node array)
@@ -94,7 +110,7 @@ let get_first_hops (graph : ('a, 'b) Graph.t)
         | INodeHop(hop) -> INodeHop(hop) (* We've already found the first hop *)
         | INoHopYet ->
                (let parent = pred.(node.Graph.node_contents) in
-                let hop = if parent.Graph.node_contents = root.Graph.node_contents
+                let hop = if parent.Graph.node_contents == root.Graph.node_contents
                     then INodeHop(node) else hop_helper parent in
                 hops.(node.Graph.node_contents) <- hop;
                 hop)
@@ -106,13 +122,31 @@ let get_first_hops (graph : ('a, 'b) Graph.t)
     in
     let rec copy_hops (i : int) : unit =
         if i >= Array.length hops then () else
-            match hops.(i) with
-              INoHop -> out_hops.(i) <- NoHop
-            | INodeHop(h) -> out_hops.(i) <- NodeHop(h)
-            | INoHopYet -> raise HopInternalError
+            begin
+                (match hops.(i) with
+                  INoHop -> out_hops.(i) <- NoHop
+                | INodeHop(h) -> out_hops.(i) <- NodeHop(h)
+                | INoHopYet -> raise HopInternalError);
+                copy_hops (i+1)
+            end
+            
     in
     all_hops graph.Graph.nodes;
     copy_hops 0;
     out_hops
 ;;
 
+(*
+let get_all_first_hops (graph : ('a, 'b) Graph.t)
+                       (pred : ('a, 'b) Graph.node array)
+                     : ('a, 'b) first_hop array array =
+    let all_hops = Array.make_matrix (Graph.count_nodes graph) 0 NoHop in
+    let fill_array (base : unit) (node : (int, 'a) Graph.node) : unit =
+        let node_id = node.Graph.node_contents in
+        all_hops.(node_id) <- get_first_hops graph pred node;
+        base
+    in
+    Graph.fold_nodes graph fill_array ();
+    all_hops
+;;
+*)

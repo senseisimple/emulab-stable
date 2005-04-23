@@ -62,19 +62,16 @@ let rec print_pred (channel : out_channel) (preds : (int, 'b) Graph.node array)
         print_pred channel preds (index + 1))
 ;;
 
-let rec dijk_all_nodes (g : ('a, 'b) Graph.t) (nodes : ('a, 'b) Graph.node list)
-: unit =
-    match nodes with
-      [] -> ()
-    | (x :: xs) ->
-            (* print_endline ("On " ^ string_of_int x.Graph.node_contents); *)
-            match Dijkstra.run_dijkstra g x with (_,pred) ->
-            (* XXX - return this somehow *)
-            let _ = Dijkstra.get_first_hops g pred x in
-            (*
-            let res = Dijkstra.run_dijkstra g x in
-            match res with (weights,_) -> print_weights stdout weights 0; *)
-            dijk_all_nodes g xs
+let rec compute_all_dre (g : ('a, 'b) Graph.t) : float array array =
+    let hops = Array.make_matrix (Graph.count_nodes g) (Graph.count_nodes g) Dijkstra.NoHop in
+    let fill_array (base : unit) (node : (int, 'a) Graph.node) : unit =
+        let node_id = node.Graph.node_contents in
+        match (Dijkstra.run_dijkstra g node) with (_,pred) ->
+        hops.(node_id) <- Dijkstra.get_first_hops g pred node;
+        base
+    in
+    Graph.fold_nodes g fill_array ();
+    Dre.compute_dre hops
 ;;
 
 exception NeedArg;;
@@ -88,8 +85,14 @@ let g = make_graph_from_edges edges in
 let node = Graph.find_node g 0 in
 (* print_endline "Here 4"; *)
 (* let res = Dijkstra.run_dijkstra g node in (); *)
-let _ = dijk_all_nodes g g.Graph.nodes in
-();
+let dre_table = compute_all_dre g in
+let print_cell (cell : float) : unit =
+    print_float cell; print_string "\t" in
+let print_row (row : float array) : unit =
+    Array.iter print_cell row; print_newline() in
+let print_dre_table (table : float array array) : unit =
+    Array.iter print_row table in
+print_dre_table dre_table
 (* print_endline "Here 5"; *)
 (* match res with (weights,preds) ->
 print_weights stdout weights 0;

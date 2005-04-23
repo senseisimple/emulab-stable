@@ -1,4 +1,4 @@
-all: test-heap graph2dot test-dijk test-dijk.opt
+all: test-heap graph2dot test-dijk test-dijk.opt test-dre test-dre.opt
 
 %.cmx: %.ml
 	ocamlopt -c $<
@@ -24,8 +24,11 @@ test-dijk: test-dijk.ml heap.cmo heap.cmi graph.cmo dijkstra.cmo
 test-dijk.opt: heap.cmx graph.cmx dijkstra.cmx test-dijk.ml
 	ocamlopt -o $@ /usr/local/lib/ocaml/str.cmxa $^
 
-test-dre: test-dre.ml heap.cmo graph.cmo dijkstra.cmo dre.cmo
-	ocamlc -g -o $0 $^ /usr/local/lib/ocaml/str.cma
+test-dre: heap.cmo graph.cmo dijkstra.cmo dre.cmo test-dre.ml
+	ocamlc -g -o $@ /usr/local/lib/ocaml/str.cma $^
+
+test-dre.opt: heap.cmx graph.cmx dijkstra.cmx dre.cmx test-dre.ml
+	ocamlopt -o $@ /usr/local/lib/ocaml/str.cmxa $^
 
 clean:
 	-rm *.cmo *.cmx *.cmi graph2dot test-heap test-dijk test-dijk.opt

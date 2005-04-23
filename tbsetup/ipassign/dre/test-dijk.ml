@@ -62,6 +62,15 @@ let rec print_pred (channel : out_channel) (preds : (int, 'b) Graph.node array)
         print_pred channel preds (index + 1))
 ;;
 
+let rec print_fhop (channel : out_channel) (fhops : (int, 'a) Dijkstra.first_hop array)
+                   (index : int) : unit =
+    if index >= Array.length fhops then ()
+    else (output_string channel (string_of_int index ^ ": " ^ (match fhops.(index) with
+      Dijkstra.NoHop -> "X"
+    | Dijkstra.NodeHop(x) -> (string_of_int x.Graph.node_contents)) ^ "\n");
+    print_fhop channel fhops (index + 1))
+;;
+
 let rec dijk_all_nodes (g : ('a, 'b) Graph.t) (nodes : ('a, 'b) Graph.node list)
 : unit =
     match nodes with
@@ -70,7 +79,9 @@ let rec dijk_all_nodes (g : ('a, 'b) Graph.t) (nodes : ('a, 'b) Graph.node list)
             (* print_endline ("On " ^ string_of_int x.Graph.node_contents); *)
             match Dijkstra.run_dijkstra g x with (_,pred) ->
             (* XXX - return this somehow *)
-            let _ = Dijkstra.get_first_hops g pred x in
+            let fhops = Dijkstra.get_first_hops g pred x in
+            print_endline ("FHops for " ^ (string_of_int x.Graph.node_contents));
+            print_fhop stdout fhops 0;
             (*
             let res = Dijkstra.run_dijkstra g x in
             match res with (weights,_) -> print_weights stdout weights 0; *)
@@ -87,10 +98,12 @@ let g = make_graph_from_edges edges in
 (* print_endline "Here 3"; *)
 let node = Graph.find_node g 0 in
 (* print_endline "Here 4"; *)
-(* let res = Dijkstra.run_dijkstra g node in (); *)
 let _ = dijk_all_nodes g g.Graph.nodes in
 ();
 (* print_endline "Here 5"; *)
-(* match res with (weights,preds) ->
-print_weights stdout weights 0;
-print_pred stdout preds 0;; *)
+(*
+let res = Dijkstra.run_dijkstra g node in
+match res with (weights,preds) ->
+(* print_weights stdout weights 0; *)
+print_pred stdout preds 0;;
+*)
