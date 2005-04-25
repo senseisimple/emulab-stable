@@ -94,6 +94,9 @@ sub doboot()
 	}
 	else {
 	    system("$BINDIR/tippty $tiptunnel");
+	    if ($?) {
+		fatal("Could not start tippty for $tiptunnel!");
+	    }
 	}
     }
 
