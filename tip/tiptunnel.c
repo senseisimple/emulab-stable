@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 #include "config.h"
 
@@ -112,11 +117,18 @@ static void pack_buffer(buffer_t *buffer, int amount);
 static void dotippty(char *nodename);
 
 static char pidfilename[1024] = "";
+static char linkpath[128] = "";
 
-static void sigquit(int sig)
+static void cleanup_atexit(void)
 {
   if (strlen(pidfilename) > 0)
     unlink(pidfilename);
+  if (strlen(linkpath) > 0)
+    unlink(linkpath);
+}
+
+static void sigquit(int sig)
+{
   exit(0);
 }
 #endif
@@ -128,9 +140,12 @@ int main( int argc, char ** argv )
 
 #if defined(LOCALBYDEFAULT) || defined(TIPPTY)
   localmode++;
+#if defined(TIPPTY)
+  atexit(cleanup_atexit);
+#endif
 #endif
 
-  while ((op = getopt( argc, argv, "hlsp:rdu:c:" )) != -1) {
+  while ((op = getopt( argc, argv, "hlp:rdu:c:" )) != -1) {
     switch (op) {
       case 'h':
         usage(name);
@@ -197,32 +212,18 @@ int main( int argc, char ** argv )
     doConnect();
   }
 
-#if defined(TIPPTY)
-  if (!debug) {
-    FILE *file;
-    
-    daemon(0, 0);
-    signal(SIGINT, sigquit);
-    signal(SIGTERM, sigquit);
-    signal(SIGQUIT, sigquit);
-    snprintf(pidfilename, sizeof(pidfilename),
-	     "%s/tippty.%s.pid",
-	     _PATH_VARRUN, argv[0]);
-    if ((file = fopen(pidfilename, "w")) != NULL) {
-      fprintf(file, "%d\n", getpid());
-      fclose(file);
-    }
-  }
-#endif
-
   if (user && (getuid() == 0)) {
     struct passwd *pw;
     struct group *gr;
     uid_t uid;
     int rc;
     
-    if ((sscanf(user, "%d", &uid) == 1 && (pw = getpwuid(uid)) == NULL) &&
-	(pw = getpwnam(user)) == NULL) {
+    if (sscanf(user, "%d", &uid) == 1)
+      pw = getpwuid(uid);
+    else
+      pw = getpwnam(user);
+
+    if (pw == NULL) {
       fprintf(stderr, "invalid user: %s %d\n", user, uid);
       exit(1);
     }
@@ -244,7 +245,7 @@ int main( int argc, char ** argv )
   }
 
   if (uploadmode) {
-    int fd = 0;
+    int fd = STDIN_FILENO;
 
     if ((strcmp(argv[1], "-") != 0) && (fd = open(argv[1], O_RDONLY)) < 0) {
       fprintf(stderr, "Cannot open file: %s\n", argv[1]);
@@ -258,6 +259,7 @@ int main( int argc, char ** argv )
 	writeFunc(buf, rc);
       }
       close(fd);
+      fd = -1;
     }
     exit(0);
   }
@@ -265,6 +267,22 @@ int main( int argc, char ** argv )
   doAuthenticate();
 
 #if defined(TIPPTY)
+  if (!debug) {
+    FILE *file;
+    
+    daemon(0, 0);
+    signal(SIGINT, sigquit);
+    signal(SIGTERM, sigquit);
+    signal(SIGQUIT, sigquit);
+    snprintf(pidfilename, sizeof(pidfilename),
+	     "%s/tippty.%s.pid",
+	     _PATH_VARRUN, argv[0]);
+    if ((file = fopen(pidfilename, "w")) != NULL) {
+      fprintf(file, "%d\n", getpid());
+      fclose(file);
+    }
+  }
+
   dotippty(argv[0]);
 #else
   doCreateTunnel();
@@ -289,7 +307,7 @@ int main( int argc, char ** argv )
       char * foo;
 
       for (foo = programToLaunch; *foo; foo++) {
-	if (*foo == '@') { *foo = '%'; }
+	if (*foo == '@') { *foo = '%'; break; }
       }
 
       sprintf(runString, programToLaunch, portString);
@@ -836,7 +854,6 @@ static void dotippty(char *nodename)
     buffer_t from_pty = { .inuse = 0 }, to_pty = { .inuse = 0 };
     int tweaked = 0, fd_count = 2;
     struct timeval now, before;
-    char linkpath[128];
     
     fcntl(master, F_SETFL, O_NONBLOCK);
     fcntl(sock, F_SETFL, O_NONBLOCK);
@@ -865,7 +882,7 @@ static void dotippty(char *nodename)
 	/* No slave connection. */
 	if (pf[0].revents & POLLIN) // Drain the input side.
 	  rc = readFunc(to_pty.data, sizeof(to_pty.data));
-	if (rc < 0)
+	if (rc <= 0)
 	  exit(0);
 	if ((pf[0].revents & POLLOUT) && from_pty.inuse > 0) {
 	  // Drain our buffer to the output.
@@ -888,6 +905,11 @@ static void dotippty(char *nodename)
       }
       else {
 	if (!tweaked) {
+	  /*
+	   * XXX This next bit is a brutal hack to forcefully turn off echo on
+	   * the pseudo terminal.  Otherwise we get a nasty loop of data
+	   * echoing back and forth.
+	   */
 	  if ((slave = open(path, O_RDONLY)) >= 0) {
 	    struct termios tio;
 	    
