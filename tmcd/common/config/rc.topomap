@@ -147,6 +147,12 @@ sub dotopomap()
 	    unlink("$tempmap");
 	}
     }
+    #
+    # Make sure we always try to fetch it fresh
+    #
+    else {
+	unlink("$tempmap");
+    }
     
     if (! -e $tempmap) {
 	#
@@ -166,6 +172,7 @@ sub dotopomap()
 	if ($?) {
 	    fatal("Could not unzip topomap");
 	}
+	unlink("$tempmap");
     }
     else {
 	fatal("Could not get topomap");
