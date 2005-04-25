@@ -55,6 +55,9 @@
  */
 #define MAXAGENTS	250
 
+/**
+ * Maximum size of a tag name.
+ */
 #define MAX_TAG_SIZE	32
 
 /**
@@ -178,7 +181,7 @@ static void	start_callback(event_handle_t handle,
  * @param token The unique event token corresponding to this start event.
  * @param args The event arguments in "KEY=VALUE" form.
  */
-static void	start_program(struct proginfo *pinfo,
+static int	start_program(struct proginfo *pinfo,
 			      unsigned long token,
 			      char *args);
 
@@ -284,6 +287,8 @@ dump_proginfos(void)
 		printf("Agent: %s\n"
 		       "  dir: %s\n"
 		       "  cmdline: %s\n"
+		       "  tag: %s\n"
+		       "  timeout: %ld\n"
 		       "  pid: %d\n"
 		       "  started: %s"
 		       "  expected_exit_code: %d\n"
@@ -291,6 +296,8 @@ dump_proginfos(void)
 		       pi->name,
 		       pi->dir ? pi->dir : _PATH_TMP,
 		       pi->cmdline ? pi->cmdline : "(not set)",
+		       pi->tag ? pi->tag : "(not set)",
+		       pi->timeout,
 		       pi->pid,
 		       (pi->pid != 0) ?
 		       ctime(&pi->started.tv_sec) : "(not running)\n",
@@ -734,7 +741,6 @@ find_agent(char *name)
 {
 	struct proginfo *pinfo, *retval = NULL;
 	
-	/* Find the agent and */
 	pinfo = proginfos;
 	while (pinfo) {
 		if (! strcmp(pinfo->name, name)) {
@@ -819,7 +825,18 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	/* ... dispatch the event. */
 	if (strcmp(event, TBDB_EVENTTYPE_START) == 0 ||
 	    strcmp(event, TBDB_EVENTTYPE_RUN) == 0) {
-		start_program(pinfo, token, args);
+		if (start_program(pinfo, token, args) != 0) {
+			event_do(handle,
+				 EA_Experiment, pideid,
+				 EA_Type, TBDB_OBJECTTYPE_PROGRAM,
+				 EA_Name, pinfo->name,
+				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+				 EA_ArgInteger, "ERROR", -1,
+				 EA_ArgInteger, "CTOKEN", token,
+				 EA_TAG_DONE);
+			pinfo->token = ~0;
+			pinfo->flags &= ~(PIF_TIMEOUT_FIRED);
+		}
 	}
 	else if (strcmp(event, TBDB_EVENTTYPE_STOP) == 0) {
 		stop_program(pinfo, args);
@@ -836,29 +853,37 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	}
 }
 
+/**
+ * Find the file extension of the given path while ignoring any numerical
+ * extensions.  For example, calling this function with "foo.zip.1" and
+ * "foo.zip" will return a pointer to "zip.1" and "zip" respectively.
+ *
+ * @param path The path to search for a file extension within.
+ * @return NULL if no extension could be found, otherwise a pointer to the
+ * first character of the extension.
+ */
 static char *fileext(char *path)
 {
-    int has_token = 0, lpc, len;
-    char *retval = NULL;
-    
-    assert(path != NULL);
-
-    len = strlen(path);
-    for (lpc = len - 1; lpc > 0; lpc--) {
-	if (path[lpc] == '.') {
-	    if (has_token) {
-		retval = &path[lpc + 1];
-	    }
-	    else if (sscanf(&path[lpc + 1], "%*d") == 1) {
-		has_token = 1;
-	    }
-	    else {
-		retval = &path[lpc + 1];
-	    }
+	int has_token = 0, lpc, len;
+	char *retval = NULL;
+	
+	assert(path != NULL);
+	
+	len = strlen(path);
+	for (lpc = len - 1; (lpc > 0) && (retval == NULL); lpc--) {
+		if (path[lpc] == '.') {
+			int dummy;
+			
+			if (has_token)
+				retval = &path[lpc + 1];
+			else if (sscanf(&path[lpc + 1], "%d", &dummy) == 1)
+				has_token = 1;
+			else
+				retval = &path[lpc + 1];
+		}
 	}
-    }
-
-    return retval;
+	
+	return retval;
 }
 
 static void
@@ -907,12 +932,16 @@ start_callback(event_handle_t handle,
 		}
 		else {
 			struct dirent *de;
-			char path[1024];
 
 			while ((de = readdir(dir)) != NULL) {
 				char *ext = NULL;
+				char path[1024];
+				int len;
 
-				if ((strlen(de->d_name) < sizeof(path)) &&
+				len = strlen(de->d_name);
+				if (((de->d_type == DT_REG) ||
+				     (de->d_type == DT_LNK)) &&
+				    (len > 0) && (len < sizeof(path)) &&
 				    (sscanf(de->d_name,
 					    "%1024[^.].",
 					    path) == 1) &&
@@ -956,7 +985,7 @@ static int
 open_logfile(struct proginfo *pinfo, const char *type)
 {
 	char buf[BUFSIZ], buf2[BUFSIZ];
-	int retval;
+	int error = 0, retval;
 
 	assert(pinfo != NULL);
 	assert(type != NULL);
@@ -969,7 +998,10 @@ open_logfile(struct proginfo *pinfo, const char *type)
 	snprintf(buf, sizeof(buf),
 		 "%s/%s.%s.%lu",
 		 LOGDIR, pinfo->name, type, pinfo->token);
-	if ((retval = open(buf, O_WRONLY|O_CREAT|O_APPEND, 0640)) >= 0) {
+	if ((retval = open(buf, O_WRONLY|O_CREAT|O_TRUNC, 0640)) < 0) {
+		errorc("could not create log file %s\n", buf);
+	}
+	else {
 		/*
 		 * We've successfully created the file, now create the
 		 * symlinks to that refer to the last run and a tagged run.
@@ -980,17 +1012,37 @@ open_logfile(struct proginfo *pinfo, const char *type)
 		snprintf(buf2, sizeof(buf2),
 			 "%s/%s.%s",
 			 LOGDIR, pinfo->name, type);
-		unlink(buf2);
-		symlink(buf, buf2);
+		if ((unlink(buf2) < 0) && (errno != ENOENT)) {
+			error = 1;
+			errorc("could not unlink old last run link %s\n",
+			       buf2);
+		}
+		else if (symlink(buf, buf2) < 0) {
+			error = 1;
+			errorc("could not symlink last run %s\n", buf);
+		}
 		if (pinfo->tag != NULL) {
 			snprintf(buf2, sizeof(buf2),
 				 "%s/%s.%s.%s",
 				 LOGDIR, pinfo->name, pinfo->tag, type);
-			unlink(buf2);
-			symlink(buf, buf2);
+			if ((unlink(buf2) < 0) && (errno != ENOENT)) {
+				error = 1;
+				errorc("could not unlink old tag link %s\n",
+				       buf2);
+			}
+			else if (symlink(buf, buf2) < 0) {
+				error = 1;
+				errorc("could not symlink tagged run %s\n",
+				       buf);
+			}
 		}
 	}
-	
+
+	if (error) {
+		close(retval);
+		retval = -1;
+	}
+
 	return retval;
 }
 
@@ -1067,7 +1119,7 @@ set_program(struct proginfo *pinfo, char *args)
 	}
 }
 
-static void
+static int
 start_program(struct proginfo *pinfo, unsigned long token, char *args)
 {
 	int		pid, in_fd, out_fd = -1, err_fd = -1;
@@ -1075,7 +1127,7 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 	if (pinfo->pid != 0) {
 		warning("start_program: %s is still running: %d\n",
 			pinfo->name, pinfo->pid);
-		return;
+		return 0;
 	}
 
 	set_program(pinfo, args);
@@ -1091,6 +1143,7 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 				    pinfo,
 				    elvin_error)) == NULL) {
 		error("Could not add timeout for %s!", pinfo->name);
+		return -1;
 	}
 
 	/*
@@ -1108,7 +1161,7 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 			close(err_fd);
 		
 		errorc("could not setup log files");
-		return;
+		return -1;
 	}
 
 	/*
@@ -1117,14 +1170,14 @@ start_program(struct proginfo *pinfo, unsigned long token, char *args)
 	 */
 	if ((pid = fork()) < 0) {
 		error("fork() failed: %s\n", strerror(errno));
-		return;
+		return -1;
 	}
 	if (pid) {
 		info("start_program: %s (pid:%d) starting\n", pinfo->name,pid);
 		pinfo->pid = pid;
 		close(out_fd);
 		close(err_fd);
-		return;
+		return 0;
 	}
 
 	if (out_fd != STDOUT_FILENO) {
@@ -1546,6 +1599,8 @@ child_callback(elvin_io_handler_t handler,
 		}
 		else if (!WIFSTOPPED(status)) {
 			char path[MAXPATHLEN], path2[MAXPATHLEN];
+			struct stat outst = { .st_size = -1 };
+			struct stat errst = { .st_size = -1 };
 			int exit_code;
 			FILE *file;
 			
@@ -1566,9 +1621,19 @@ child_callback(elvin_io_handler_t handler,
 					exit_code = status;
 			}
 
+			snprintf(path, sizeof(path),
+				 "%s/%s.out.%lu",
+				 LOGDIR, pi->name, pi->token);
+			outst.st_mtime = -1;
+			stat(path, &outst);
+			snprintf(path, sizeof(path),
+				 "%s/%s.err.%lu",
+				 LOGDIR, pi->name, pi->token);
+			errst.st_mtime = -1;
+			stat(path, &errst);
+			
 			/* Dump a status file and */
-			snprintf(path,
-				 sizeof(path),
+			snprintf(path, sizeof(path),
 				 "%s/%s.status.%lu",
 				 LOGDIR,
 				 pi->name,
@@ -1592,6 +1657,10 @@ child_callback(elvin_io_handler_t handler,
 					"COMMAND=%s\n"
 					"TAG=%s\n"
 					"TOKEN=%lu\n"
+					"OUTMTIME=%ld\n"
+					"ERRMTIME=%ld\n"
+					"OUTSIZE=%lld\n"
+					"ERRSIZE=%lld\n"
 					"START_TIME_SECS=%ld\n"
 					"START_TIME=%s"
 					"END_TIME_SECS=%ld\n"
@@ -1605,8 +1674,12 @@ child_callback(elvin_io_handler_t handler,
 					pi->timeout,
 					(pi->flags & PIF_TIMEOUT_FIRED) != 0,
 					pi->cmdline,
-					pi->tag,
+					pi->tag ? pi->tag : "",
 					pi->token,
+					outst.st_mtime,
+					errst.st_mtime,
+					(long long)outst.st_size,
+					(long long)errst.st_size,
 					pi->started.tv_sec,
 					ctime(&pi->started.tv_sec),
 					now.tv_sec,
@@ -1617,6 +1690,7 @@ child_callback(elvin_io_handler_t handler,
 					total_cpu_time.tv_usec,
 					ru.ru_maxrss);
 				fclose(file);
+				file = NULL;
 			}
 			snprintf(path,
 				 sizeof(path),

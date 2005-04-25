@@ -92,7 +92,7 @@ section for more information about the file format.  (Default:
 /var/emulab/boot/progagents)
 .SH FILES
 .TP
-/local/logs/\fIagent\fR.\fItoken\fR.(out|err)
+/local/logs/\fIagent\fR.(out|err)\fR.\fItoken
 The standard out and standard error for a particular invocation of a program.
 The
 .I token
@@ -105,7 +105,12 @@ Symbolic links to the standard out and error of the last invocation of a
 particular program agent.  These links make it easy to monitor the output of a
 particular program, even through multiple invocations (using "tail -F").
 .TP
-/local/logs/\fIagent\fR.\fItoken\fR.status
+/local/logs/\fIagent\fR.\fItag\fR.(out|err)
+Symbolic links to the standard out and error of the last invocation of a
+particular program agent that had a symbolic tag attached.  Using symbolic tags
+can be useful for uniquely identifying a particular invocation.
+.TP
+/local/logs/\fIagent\fR.status\fR.\fItoken
 Exit status information for a particular invocation of a program.  The file
 contains the following details about the invocation.
 .RS
@@ -130,6 +135,18 @@ The command line that was executed.
 .B TOKEN
 The unique identifier for this invocation.
 .TP
+.B OUTMTIME
+The modification time of the standard output file when the program exited.
+.TP
+.B ERRMTIME
+The modification time of the standard error file when the program exited.
+.TP
+.B OUTSIZE
+The size of the standard output file when the program exited.
+.TP
+.B ERRSIZE
+The size of the standard error file when the program exited.
+.TP
 .B START_TIME_SECS
 The time that the program was started, in seconds.
 .TP
@@ -145,7 +162,8 @@ The time that the program finished, in human-readable form as returned by
 .B ctime(3)\fR.
 .TP
 .B EXIT_CODE
-The command's exit code.
+The command's exit code if it did not match the EXPECTED_EXIT_CODE or zero if
+it did.
 .TP
 .B EXPECTED_EXIT_CODE
 The expected exit code, as specified by the user.  If this value is the same as
@@ -162,6 +180,10 @@ The maximum resident set size, in kilobytes.
 .TP
 /local/logs/\fIagent\fR.status
 Symbolic link to the status information for the last invocation of a program.
+.TP
+/local/logs/\fIagent\fR.\fItag\fR.status
+Symbolic link to the status information for the last tagged invocation of a
+program.
 .TP
 /var/emulab/logs/program-agent.debug
 The program-agent daemon's log file.
@@ -182,7 +204,7 @@ containing Emulab specific binaries.
 The experiment's directory in NFS space (e.g. /proj/foo/exp/bar).
 .TP
 .B LOGDIR
-The preferred directory for log files.
+The preferred directory for log files on the local machine.
 .TP
 .B USER
 The name of the user that swapped in this experiment.
@@ -224,7 +246,7 @@ option will override this value.  There are no other attributes on this line.
 .TP
 .B AGENT
 An individual program agent, possible attributes include COMMAND, TIMEOUT,
-EXPECTED_EXIT_CODE, and DIR.
+EXPECTED_EXIT_CODE, TAG, and DIR.
 .SH EVENTS
 .TP
 .B TIME START
@@ -257,6 +279,11 @@ directory that was specified, the directory in the NS file, or "/tmp".
 Specifies the timeout, in seconds, for the command or zero for no timeout.  If
 the command does not complete before the timeout, it will be stopped
 forcefully.  Defaults to the last timeout used for this agent or no timeout.
+.TP
+.I TAG
+Specifies the symbolic tag to be attached to this invocation of the agent.  The
+tag will be used in the file names of symbolic links to this invocation's
+output files.
 .TP
 .I EXPECTED_EXIT_CODE
 The expected exit code for the command, this value is compared against the
