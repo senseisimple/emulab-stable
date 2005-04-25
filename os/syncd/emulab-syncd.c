@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -33,7 +33,7 @@ static int      readall(int socket, void *buffer, size_t len);
 static int      writeall(int socket, void *buffer, size_t len);
 static int      handle_request(int, struct sockaddr_in *, barrier_req_t *,int);
 static int	makesockets(int portnum, int *udpsockp, int *tcpsockp);
-static int	maxtcpsocket(fd_set *fs, int current_max);
+static int	maxtcpsocket(fd_set *fs, unsigned int current_max);
 static void     remove_tcpclient(int sock);
 static void     release_client(int sock, struct in_addr ip, int istcp,
 			       int result);
@@ -121,7 +121,8 @@ handle_sighup(int sig)
 int
 main(int argc, char **argv)
 {
-	int			tcpsock, udpsock, i, maxfd, ch;
+	int			tcpsock, udpsock, i, ch;
+	unsigned int		maxfd;
 	FILE			*fp;
 	char			buf[BUFSIZ];
 	extern char		build_info[];
@@ -572,16 +573,17 @@ makesockets(int portnum, int *udpsockp, int *tcpsockp)
  * Find the maximum TCP socket descriptor number.
  */
 static int
-maxtcpsocket(fd_set *fs, int current_max)
+maxtcpsocket(fd_set *fs, unsigned int current_max)
 {
-	int		retval;
+	int		lpc, retval = 0;
 
-	for (retval = current_max;
-	     (tcpsockets[retval].barrier != (barrier_ctrl_t *)-1) &&
-		     (tcpsockets[retval].barrier == NULL);
-	     retval--) {
-		FD_CLR(retval, fs);
+	for (lpc = 0; lpc <= current_max; lpc++) {
+		if (tcpsockets[lpc].barrier != NULL)
+			retval = lpc;
+		else
+			FD_CLR(lpc, fs);
 	}
+
 	return retval;
 }
 
