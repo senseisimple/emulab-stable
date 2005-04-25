@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,8 +13,10 @@ include $(OBJDIR)/Makeconf
 
 SYSTEM	       := $(shell uname -s)
 
-SUBDIRS		= lib tbgen trafgen program-agent proxy example linktest \
-		  link-agent
+SUBDIRS		= lib tbgen program-agent proxy example linktest link-agent
+ifneq ($(SYSTEM),CYGWIN_NT-5.1)
+SUBDIRS	       += trafgen
+endif
 ifeq ($(SYSTEM),FreeBSD)
 SUBDIRS	       += sched delay-agent nsetrafgen stated
 endif
