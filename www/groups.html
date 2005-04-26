@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2003 University of Utah and the Flux Group.
+   Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -126,8 +126,8 @@ group will get accounts on the nodes; other members of the same
 project, not in the group, will not get accounts.
 </li>
 <li>
-Emulab uses NFS mounted filesystems for <tt>/users</tt> and
-<tt>/proj</tt> on the experimental nodes. Because of the nature of
+Emulab uses NFS mounted filesystems for <tt>/users</tt>, <tt>/proj</tt>, 
+and <tt>/groups</tt> on the experimental nodes. Because of the nature of
 NFS, giving root privileges to a user will allow them to read/write
 any files on any filesystems that are mounted, since root access
 allows them to <em>su</em> as any other user. Thus, any files in the
@@ -135,6 +135,20 @@ project directory and in the home directories of other members of the
 group, can be can be "compromised" by a group member. Please note that
 no other directories are NFS mounted; other projects and users on
 Emulab are safe.
+</li>
+<li>
+For each group, a separate directory is created, named
+<tt>/groups/projname/groupname</tt>. This, and only this directory in
+/groups, is exported to the nodes of experiments created within the
+group (the group option in the Begin Experiment page). Thus, even
+though users might have root access on the experimental nodes, the
+only directory in <tt>/groups/projname</tt> they will have access to
+is their own group directory. <em>Any files that need to be private
+to the group, should be placed under <tt>/groups/projname/groupname</tt></em>.
+This ensures that each group has a private place in which to store
+files that group members want to share with each other. <em>Remember,
+tell your project members that they should not use <tt>/proj</tt> or
+their home directory to store files they want to keep private.</em>
 </li>
 <li>
 It is forbidden to grant root (<code>project_root</code>, 
