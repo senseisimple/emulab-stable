@@ -1,0 +1,217 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+sub usage()
+{
+    print "Usage: mysqld_watchdog\n";
+    exit(1);
+}
+my $optlist    = "";
+my $debug      = 0;
+
+#
+# Configure variables.
+#
+my $TB	       = "@prefix@";
+my $TBOPS      = "@TBOPSEMAIL@";
+
+# Locals.
+my $PIDFILE    = "/var/run/mysqld_watchdog.pid";
+my $LOGFILE    = "$TB/log/mysqld_watchdog.log";
+my $MYSQLD     = "/usr/local/etc/rc.d/2.mysql-server.sh";
+my $KILLALL    = "/usr/bin/killall";
+my $paused     = 0;
+
+# Turn off line buffering on output
+$| = 1;
+
+# Only root.
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed support libs.
+# 
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Daemonize;
+if (!$debug) {
+    system("mv -f $LOGFILE ${LOGFILE}.old")
+	if (-e $LOGFILE);
+    
+    if (TBBackGround($LOGFILE)) {
+	sleep(1);
+	exit(0);
+    }
+}
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Write our pid into the pid file so we can be killed later. 
+#
+system("echo '$PID' > $PIDFILE") == 0 or
+    die("*** $0:\n".
+	"    Could not create $PIDFILE!");
+
+# Fully disconnect from bootup. 
+setsid();
+
+# Loop forever ...
+while (1) {
+    if (TryQuery() < 0) {
+	RestartMysqld()
+	    if (!$paused);
+    }
+    else {
+	$paused = 0;
+    }
+
+    sleep(60);
+}
+
+#
+# Try a query, protected by a timeout.
+#
+# Returns: 0 if everything is fine.
+#          1 if timed out or otherwise unresponsive.
+#         -1 if mysqld is not even running (child calls die()).
+#
+sub TryQuery()
+{
+    my $rval     = 0;
+
+    print "Trying to query the DB\n"
+	if ($debug);
+
+    my $childpid = fork();
+    if ($childpid) {
+	#
+	# Parent waits for child to complete query.
+	#
+	local $SIG{ALRM} = sub { kill("USR1", $childpid); };
+	alarm 60;
+	waitpid($childpid, 0);
+	alarm 0;
+
+	# An exit value of 30 is the USR1 signal. 
+	if ($?) {
+	    if ($? == 30 || ($? >> 8) == 1) {
+		$rval = 1;
+	    }
+	    # 15 is TERM. Do nothing. 
+	    elsif ($? == 15) {
+		$rval = 0;
+	    }
+	    else {
+		$rval = -1;
+	    }
+	}
+	else {
+	    $rval = 0;
+	}
+	print "Query is returning $rval\n"
+	    if ($debug);
+	
+	return $rval;
+    }
+    else {
+	#
+	# Query DB and exit. 
+	#
+	$libdb::DBQUERY_MAXTRIES = 3;
+	$libdb::DBCONN_MAXTRIES  = 2;
+	TBdbfork();
+	
+	if (!DBQueryWarn("show full processlist")) {
+	    exit(1);
+	}
+	exit(0);
+    }
+}
+
+#
+# Restart mysqld ...
+#
+sub RestartMysqld()
+{
+    my $status;
+    
+    notify("Mysqld has gone catatonic at " . TBTimeStamp() . "; ".
+	   "attempting to restart ...");
+    
+    #
+    # Send it a normal kill. It does not matter what is returned.
+    #
+    system("$KILLALL mysqld");
+
+    #
+    # Wait for a little while, and then try another query. 
+    #
+    sleep(30);
+
+    $status = TryQuery();
+
+    # Everything okay now? Not likely to happen of course, since if the TERM
+    # is accepted, mysqld will not come back (its a normal exit). The child
+    # will not be able to connect and will exit with a -1.
+    return
+	if ($status == 0);
+
+    #
+    # Okay, its still dead. If the status was -1, we can just start mysqld
+    # the usual way. Otherwise kill it first.
+    #
+    if ($status == 1) {
+	system("$KILLALL -9 mysqld");
+	sleep(15);
+    }
+    system("$MYSQLD start");
+    print "\n";
+	
+    #
+    # Wait for a little while, and then try another query. 
+    #
+    sleep(5);
+
+    $status = TryQuery();
+
+    return
+	if ($status == 0);
+
+    #
+    # Ick. Notify and set the "paused" bit to keep from retrying. At some
+    # point a person will fix it, and the main loop above will be able to
+    # query, which will unset the paused bit.
+    #
+    $paused = 1;
+    notify("Could not restart mysqld; someone will have to do it by hand!");
+}
+
+sub notify($)
+{
+    my($mesg) = $_[0];
+
+    print "*** $0:\n".
+	  "    $mesg\n";
+
+    #
+    # Send a message to the testbed list. 
+    #
+    SENDMAIL($TBOPS,
+	     "Mysqld Watchdog Message",
+	     $mesg,
+	     $TBOPS);
+}
