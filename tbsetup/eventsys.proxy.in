@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -123,11 +123,9 @@ if ($action eq "stop" || $action eq "replay") {
 	}
 	unlink($PIDFILE);
 
-	if (kill($epid, 0) == 0 || $Errno::errno != $Errno::ESRCH) {
-	    if (! kill('TERM', $epid)) {
-		die("*** $0:\n".
-		    "Failed to stop event system for $pid/$eid!\n");
-	    }
+	if (! kill('TERM', $epid)) {
+	    die("*** $0:\n".
+		"Failed to stop event system for $pid/$eid! - $! $epid\n");
 	}
     }
     
