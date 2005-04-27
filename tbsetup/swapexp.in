@@ -448,7 +448,7 @@ else {
 			   "ACTIVE to modify. Currently $estate.")
 		if (($estate ne EXPTSTATE_SWAPPED &&
 		     $estate ne EXPTSTATE_ACTIVATING) ||
-		    $batchstate != BATCHSTATE_UNLOCKED());
+		    $batchstate ne BATCHSTATE_UNLOCKED());
 
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
