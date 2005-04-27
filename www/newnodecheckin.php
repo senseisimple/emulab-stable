@@ -1,17 +1,18 @@
 e<?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
 require("newnode-defs.php3");
+include("xmlrpc.php3");
 
 #
 # Note - this script is not meant to be called by humans! It returns no useful
 # information whatsoever, and expects the client to fill in all fields
 # properly.
-# Since this script does not cause any action to actually happen, so it's save
+# Since this script does not cause any action to actually happen, so its save
 # to leave 'in the open' - the worst someone can do is annoy the testbed admins
 # with it!
 #
@@ -52,8 +53,8 @@ if (count($interfaces)) {
     $testmac = $interfaces[0]["mac"];
 
     #
-    # First, make sure it isn't a 'real boy' - we should let the operators know
-    # about this, because there may be some problem.
+    # First, make sure it is not a 'real boy' - we should let the operators 
+    # know about this, because there may be some problem.
     #
     $query_result = DBQueryFatal("select n.node_id from " .
 	"nodes as n left join interfaces as i " .
@@ -86,7 +87,7 @@ if (count($interfaces)) {
 	echo "Node ID is $id\n";
 
 	#
-	# Keep the temp. IP address around in case it's gotten a new one
+	# Keep the temp. IP address around in case its gotten a new one
 	#
 	DBQueryFatal("update new_nodes set temporary_IP='$tmpIP' " .
 	    "where new_node_id=$id");
@@ -116,11 +117,11 @@ if ($use_temp_IP) {
 }
 
 #
-# Handle the node's type
+# Handle the node type
 #
 if ($type) {
     #
-    # If they gave us a type, let's see if that type exists or not
+    # If they gave us a type, lets see if that type exists or not
     #
     if (TBValidNodeType($type)) {
 	#
@@ -198,6 +199,36 @@ function check_node_exists($node_id) {
 }
 
 function find_free_id($prefix) {
+    global $ELABINELAB, $TBADMINGROUP, $interfaces;
+
+    #
+    # When inside an inner emulab, we have to ask the outer emulab for
+    # our nodeid; we cannot just pick one out of a hat, at least not yet.
+    #
+    if ($ELABINELAB) {
+	$arghash = array();
+	$arghash["mac"] = $interfaces[0]["mac"];
+
+	$results = XMLRPC("nobody", $TBADMINGROUP,
+			  "elabinelab.newnode_info", $arghash);
+
+	if (!$results || ! isset($results{'nodeid'})) {
+	    echo "Could not get nodeid from XMLRPC server; quitting.\n";
+	    exit;
+	}
+	elseif (preg_match("/^(.*[^\d])(\d+)$/",
+			   $results{'nodeid'}, $matches)) {
+	    $base   = $matches[1];
+	    $number = $matches[2];
+	    return array($base, intval($number));
+	}
+	else {
+	    $nodeid = $results{'nodeid'};
+	    
+	    echo "Improper nodeid ($nodeid) from XMLRPC server; quitting.\n";
+	    exit;
+	}
+    }
 
     #
     # First, check to see if there's a recent entry in new_nodes we can name

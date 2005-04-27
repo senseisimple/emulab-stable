@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@
 
 function find_switch_macs(&$mac_list) {
 
-    global $uid, $gid, $TBSUEXEC_PATH;
+    global $uid, $gid, $TBSUEXEC_PATH, $ELABINELAB;
 
     #
     # Avoid SIGPROF in child.
@@ -40,11 +40,17 @@ function find_switch_macs(&$mac_list) {
 	$switch = $matches[1];
 	$card = $matches[2];
 	$port = $matches[3];
-	if ($mac_list[$MAC] && (!$mac_list[$MAC]["class"] ||
-	    ($mac_list[$MAC]["class"] == $class))) {
+	if ($mac_list[$MAC] &&
+	    (is_null($mac_list[$MAC]["class"]) ||
+	     !isset($mac_list[$MAC]["class"]) ||
+	     ($mac_list[$MAC]["class"] == $class))) {
 	    $mac_list[$MAC]["switch"] = $switch;
 	    $mac_list[$MAC]["switch_card"] = $card;
 	    $mac_list[$MAC]["switch_port"] = $port;
+	    if ($ELABINELAB) {
+		# We let switchmac tell us.
+		$mac_list[$MAC]["class"] = $class;
+	    }
 	}
 	$line = fgets($macs);
     }
@@ -122,11 +128,12 @@ function make_node_type($type,$proc,$disk) {
 }
 
 function guess_IP ($prefix, $number) {
+    global $CONTROL_NETWORK;
 
     $hostname = $prefix . $number;
 
     #
-    # First, let's see if they've already added to to DNS - the PHP
+    # First, lets see if they've already added to to DNS - the PHP
     # gethostbyname has a really dumb way to return failure - it just
     # gives you the hostname back.
     #
@@ -181,8 +188,11 @@ function guess_IP ($prefix, $number) {
 	$i--;
     }
 
+    #
+    # Lets start out as the first address on the given control network.
+    # 
     if ($i <= 0) {
-    	return 0;
+    	$IP = $CONTROL_NETWORK;
     }
 
     #

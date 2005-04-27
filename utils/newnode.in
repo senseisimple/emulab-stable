@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,12 +13,17 @@
 use lib '@prefix@/lib';
 
 use libdb;
+use libxmlrpc;
 use English;
 use Getopt::Std;
 
 use strict;
 
-my $TB = "@prefix@";
+my $TB         = "@prefix@";
+my $ELABINELAB = @ELABINELAB@;
+my $RPCSERVER  = "@OUTERBOSS_NODENAME@";
+my $RPCPORT    = "@OUTERBOSS_XMLRPCPORT@";
+my $RPCCERT    = "@OUTERBOSS_SSLCERTNAME@";
 
 my $switchmac = "$TB/sbin/switchmac";
 my $os_load = "$TB/bin/os_load";
@@ -184,7 +189,7 @@ NODE: foreach my $node_id (@node_ids) {
     # Grab the node's MACs from the new_interfaces table
     #
     $query_result = DBQueryFatal("SELECT card, MAC, interface_type, " .
-	"switch_id, switch_card, switch_port, cable, len " .
+	"switch_id, switch_card, switch_port, cable, len, role " .
 	"FROM new_interfaces WHERE new_node_id='$new_node_id'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: Must have at least one interface!\n";
@@ -193,7 +198,7 @@ NODE: foreach my $node_id (@node_ids) {
 
     my %interfaces;
     while (my ($card, $MAC, $iface_type, $switch_id, $switch_card,
-	    $switch_port, $cable, $len) = $query_result->fetchrow()) {
+	    $switch_port, $cable, $len, $role) = $query_result->fetchrow()) {
 	#
 	# Get some more information about this interface type
 	#
@@ -225,7 +230,7 @@ NODE: foreach my $node_id (@node_ids) {
 	# Stash it away...
 	#
 	$interfaces{$card} = [$MAC, $iface_type, $max_speed, $full_duplex,
-		$switch_id, $switch_card, $switch_port, $cable, $len];
+		$switch_id, $switch_card, $switch_port, $cable, $len, $role];
 
     }
 
@@ -281,6 +286,49 @@ NODE: foreach my $node_id (@node_ids) {
 	$state = $STATE_OPSNODE;
     } else {
 	$state = $STATE_INITIAL;
+    }
+
+    #
+    # When operating inside an inner elab, we need an extra bit of information
+    # from the outer boss; which the IP of the outer control network. This is
+    # strictly for bootinfo which has some really gross hacks in it.
+    #
+    my $outer_control_ip;
+    
+    if ($ELABINELAB) {
+        libxmlrpc::Config({"server"  => $RPCSERVER,
+			   "verbose" => 0,
+			   "cert"    => $RPCCERT,
+			   "portnum" => $RPCPORT});
+
+	my $rval = libxmlrpc::CallMethod("elabinelab", "newnode_info",
+					 {"mac" => $interfaces{0}[0]});
+
+	if (!defined($rval)) {
+	    print "XMPRPC server did not return control iface info!\n";
+	    next NODE;
+	}
+	else {
+	    #
+	    # Grab what we need by searching the interface marked as
+	    # the outer control network.
+	    #
+	    my %iface_array = %{ $rval->{"interfaces"} };
+		
+	    foreach my $mac (keys(%iface_array)) {
+		my $aref = $iface_array{$mac};
+		my $role = $aref->{"role"};
+
+		if ($role eq TBDB_IFACEROLE_OUTER_CONTROL()) {
+		    $outer_control_ip = $aref->{"IP"};
+		    last;
+		}
+	    }
+	}
+	if (!defined($outer_control_ip)) {
+	    print "Could not determine outer control interface IP!\n";
+	    next NODE;
+	}
     }
 
     #
@@ -348,20 +396,39 @@ NODE: foreach my $node_id (@node_ids) {
 
     while (my ($card, $aref) = each %interfaces) {
 	my ($MAC, $iface_type, $max_speed, $duplex, $switch_id, $switch_card,
-	    $switch_port, $cable, $len) = @$aref;
+	    $switch_port, $cable, $len, $role) = @$aref;
 	my $iface = "eth$card";
-	my $iface_IP = "";
-	my $wire_type = "Node";
-	my $iface_role = TBDB_IFACEROLE_EXPERIMENT();
-	if ($iface eq $control_iface) {
-	    $iface_IP = $IP;
-	    $wire_type = "Control";
+	my $iface_IP;
+	my $wire_type;
+	my $iface_role;
+
+	# Role from new_interfaces overrides anything we decide here.
+	if (defined($role)) {
+	    $iface_role = $role;
+	}
+	elsif ($iface eq $control_iface) {
 	    $iface_role = TBDB_IFACEROLE_CONTROL();
+	}
+	else {
+	    $iface_role = TBDB_IFACEROLE_EXPERIMENT();
+	}
+
+	# Okay, now set up some stuff for the inserts.
+	if ($iface_role eq TBDB_IFACEROLE_CONTROL()) {
+	    $iface_IP  = $IP;
+	    $wire_type = "Control";
+	}
+	elsif ($iface_role eq TBDB_IFACEROLE_OUTER_CONTROL()) {
+	    $iface_IP  = $outer_control_ip;
+	    $wire_type = "OuterControl";
 	}
 	else {
 	    # Experimental interfaces start with no speed set. 
 	    $max_speed = 0;
+	    $iface_IP  = "";
+	    $wire_type = "Node";
 	}
+
 	DBQueryFatal("INSERT INTO interfaces SET node_id='$node_id', " .
 	    "card=$card, port=1, mac='$MAC', IP='$iface_IP', " .
 	    "interface_type='$iface_type', iface='$iface', " .

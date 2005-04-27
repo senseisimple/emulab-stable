@@ -3684,6 +3684,172 @@ class elabinelab:
                                   argdict["imageid"])
         
         return EmulabResponse(RESPONSE_SUCCESS, str(res[0][0]), output=output)
+    
+    #
+    # Return the equivalent of what switchmac does. This is used so that
+    # nodes can be added to an inner emulab in mostly the same fashion as
+    # the outer emulab, but without having to talk to the switch directly.
+    # 
+    def switchmac(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+        
+        #
+        # Okay, lets grab what we need. This code is going to return the
+        # equiv of what the switchmac script does, but with a few minor
+        # changes.
+        #
+        dbres = DBQueryFatal("select r.node_id,i.mac,i.iface,i.role,"
+                             "  s.node_id2,s.card2,s.port2,i.IP "
+                             "from reserved as r "
+                             "left join interfaces as i on "
+                             "   i.node_id=r.node_id "
+                             "left join wires as s on s.node_id1=i.node_id "
+                             "   and s.card1=i.card "
+                             "where r.pid=%s and r.eid=%s and "
+                             "   r.inner_elab_role='node' "
+                             "order by r.node_id,iface",
+                             (self.pid,self.eid,))
+        
+        result = {}
+        for res in dbres:
+            tmp = {}
+
+            #
+            # The current control network becomes the outer control network.
+            # The experimental network with an IP assigned becomes the
+            # inner control network.
+            #
+            role = res[3]
+            IP   = res[7]
+            
+            if role == "ctrl":
+                role = "outer_ctrl"
+                pass
+            elif role == "expt" and IP != "":
+                role = "ctrl"
+                pass
+            
+            tmp["mac"]         = res[1]
+            tmp["iface"]       = res[2]
+            tmp["role"]        = role
+            tmp["switch_id"]   = res[4]
+            tmp["switch_card"] = res[5]
+            tmp["switch_port"] = res[6]
+            result[res[1]]     = tmp;
+            pass
+        return EmulabResponse(RESPONSE_SUCCESS, result, output=str(result))
+    
+    #
+    # Return some stuff about a newnode so that the inner newnode path
+    # can operate properly
+    #
+    def newnode_info(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+        
+        argerror = CheckRequiredArgs(argdict, ("mac",))
+        if (argerror):
+            return argerror
+
+        if not re.match("^[\w]*$", str(argdict["mac"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed mac value!")
+        
+        verifyerror = self.verifystuff();
+        if (verifyerror):
+            return verifyerror
+
+        #
+        # First map the mac to a node by looking in the interfaces table.
+        #
+        dbres = DBQueryFatal("select node_id from interfaces "
+                             "where mac=%s",
+                             (argdict["mac"],))
+        
+        # Hmm, something went wrong?
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Cannot map MAC to nodeid")
+        nodeid = dbres[0][0]
+        
+        #
+        # Okay, lets grab what we need. This code is going to return the
+        # equiv of what the switchmac script does, but with a few minor
+        # changes.
+        #
+        dbres = DBQueryFatal("select r.node_id,i.mac,i.iface,i.role,i.IP, "
+                             "  i.card,i.interface_type, "
+                             "  s.node_id2,s.card2,s.port2, "
+                             "  n.type " 
+                             "from reserved as r "
+                             "left join nodes as n on n.node_id=r.node_id "
+                             "left join interfaces as i on "
+                             "   i.node_id=r.node_id "
+                             "left join wires as s on s.node_id1=i.node_id "
+                             "   and s.card1=i.card "
+                             "where r.node_id=%s "
+                             "order by r.node_id,iface",
+                             (nodeid,))
+        
+        result = {}
+        result["nodeid"] = nodeid
+        result["type"]   = ""
+        interfaces       = {}
+        
+        for res in dbres:
+            tmp = {}
+
+            #
+            # The current control network becomes the outer control network.
+            # The experimental network with an IP assigned becomes the
+            # inner control network.
+            #
+            role  = res[3]
+            IP    = res[4]
+            ntype = res[10]
+            
+            if role == "ctrl":
+                role = "outer_ctrl"
+                pass
+            elif role == "expt" and IP != "":
+                role = "ctrl"
+                pass
+            result["type"] = ntype
+            
+            tmp["mac"]         = res[1]
+            tmp["iface"]       = res[2]
+            tmp["role"]        = role
+            tmp["IP"]          = IP
+            tmp["card"]        = res[5]
+            tmp["type"]        = res[6]
+            tmp["switch_id"]   = res[7]
+            tmp["switch_card"] = res[9]
+            tmp["switch_port"] = res[9]
+            interfaces[res[1]] = tmp
+            pass
+        
+        result["interfaces"] = interfaces
+        
+        return EmulabResponse(RESPONSE_SUCCESS, result, output=str(result))
     pass
 
 #

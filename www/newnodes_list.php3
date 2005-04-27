@@ -1,7 +1,7 @@
 <?PHP
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -117,7 +117,7 @@ if ($create) {
 #
 if ($research) {
     #
-    # Get the MACs we're supposed to be looking for
+    # Get the MACs we are supposed to be looking for
     #
     $query_result = DBQueryFatal("SELECT i.mac, i.new_node_id, n.node_id, " .
 	"i.card, i.card=t.control_net AS is_control " .
@@ -127,10 +127,15 @@ if ($research) {
 	"WHERE $whereclause_qualified");
     $mac_list = array();
     while ($row = mysql_fetch_array($query_result)) {
-        if ($row["is_control"]) {
-	    $class = "control";
-	} else {
-	    $class = "experimental";
+        if ($ELABINELAB) {
+            # See find_switch_macs().
+            $class = NULL;
+        }
+        elseif ($row["is_control"]) {
+	    $class = TBDB_IFACEROLE_CONTROL;
+	}
+	else {
+	    $class = TBDB_IFACEROLE_EXPERIMENT;
 	}
         $mac_list[$row["mac"]] = array( "new_node_id" => $row["new_node_id"],
 	    "node_id" => $row["node_id"], "card" => $row["card"],
@@ -141,7 +146,22 @@ if ($research) {
     find_switch_macs($mac_list);
     foreach ($mac_list as $mac => $switchport) {
         if ($switchport["switch"]) {
-	    DBQueryFatal("UPDATE new_interfaces SET " .
+	    $extra_set = "";
+	    
+            if ($ELABINELAB) {
+                #
+                # The reason for these ELABINELAB tests is that we cannot
+		# use the node_types table to determine which interface is
+		# the control network, since assign can pick any old interface
+		# for each inner node. Generally speaking, we should not do
+		# this at all, but rely on an outside mechanism to tell us
+		# which interface is the control network. Anyway, I am using
+		# the "role" slot of the new_interfaces table to override
+		# what utils/newnode is going to set them too. 
+		#
+		$extra_set = "role='$switchport[class]', ";
+            }
+	    DBQueryFatal("UPDATE new_interfaces SET $extra_set " .
 		"switch_id='$switchport[switch]', " .
 		"switch_card='$switchport[switch_card]', " .
 		"switch_port='$switchport[switch_port]' ".
