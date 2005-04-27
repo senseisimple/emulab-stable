@@ -61,6 +61,7 @@ endif
 	@$(MAKE) -C mote post-install
 	@$(MAKE) -C tools post-install
 	@$(MAKE) -C wiki post-install
+	@$(MAKE) -C utils post-install
 
 #
 # For installation on the 'ops' or 'users' node (okay, plastic)
