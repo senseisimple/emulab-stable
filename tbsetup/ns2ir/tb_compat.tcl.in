@@ -114,6 +114,7 @@ namespace eval TBCOMPAT {
     variable elabinelab_maxpcs
     variable elabinelab_hardware
     variable elabinelab_fixnodes
+    variable elabinelab_nodeos
     variable elabinelab_source_tarfile ""
 
     # Mapping of "resource classes" and "reservation types" to bootstrap
