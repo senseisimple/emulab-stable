@@ -245,3 +245,11 @@ ID  Name                            Members of VLAN
    To turn on fastport (disable spanning tree) and turn off channeling
    (combining multiple ports to make a fast link) and trunking (a single
    port serving multiple VLANs).
+
+14. Good reference for how IGMP snooping (used for multicast) works:
+
+    http://www.cisco.com/warp/public/473/22.html
+
+    The most interesting bits are near the bottom in the part with the
+    heading "IGMP Snooping", and some more in "Practical Example of IGMP
+    Snooping"
