@@ -20,7 +20,16 @@
 # corners and origin above are part of the fine grid, you can extract a subset
 # of this file_dumper data and analyze it to make the above file.)
 #
-# Usage: There are two filename args:
+# Usage: test_lin_blend2.py [-t [-g]] [-d] ptAnal gridData
+#
+# Dash option flags:
+#  -t - Output only gnuplot lines for the triangles.
+#  -g - Output triangle lines in global world coordinates for composite plots.
+#       The world_{x,y,theta} in the gridData file are applied.
+#       Otherwise the "world" coords here are local to the camera.
+#  -d - Enable debugging output.
+#
+# There are two filename args:
 #
 # ptAnal - The dump_analyzer output file for the center and corner points.
 #          The order must be as above.  The section headers give the target
@@ -44,13 +53,19 @@ import re
 import geom
 import blend_tris
 import read_analysis
+import worldTransform
 
-opts,args = getopt.getopt(sys.argv[1:], 'td')
+opts,args = getopt.getopt(sys.argv[1:], 'tgd')
 printTris = False
 debug = False
+globalCoords = False
 for o,a in opts:
     if o == "-t":
         printTris = True
+        pass
+    if o == "-g":
+        # Global coords: apply offsets from config data in input file.
+        globalCoords = True
         pass
     if o == "-d":
         debug = True
@@ -108,20 +123,17 @@ def mkTri(i0, i1, i2):
 triangles = [ mkTri(4,2,1), mkTri(4,1,0), mkTri(4,0,3), mkTri(4,3,6),
               mkTri(4,6,7), mkTri(4,7,8), mkTri(4,8,5), mkTri(4,5,2) ]
 
-# Optionally output only gnuplot lines for the triangles.
-if printTris:                       
-    for tri in triangles:
-        for v in tri.target:
-            print '%f, %f'%tuple(v)
-        print "%f, %f\n"%tuple(tri.target[0])
-        pass
-    sys.exit(0)
-    pass
-
 #================================================================
 
 # Regexes for parsing file_dumper output.
 fpnum = "\s*(\-*\d+\.\d+)\s*"
+re_config_option_float = re.compile("  \- ([ \w]+):"+fpnum)
+options = dict({ 'camera_x': 0.0,     # Camera offset, in meters.
+                 'camera_y': 0.0,
+                 'world_x': 0.0,      # Offset in meters to camera center.
+                 'world_y': 0.0,
+                 'world_theta': 0.0,  # Rotation of camera in radians CW.
+                 })
 reDumperSection = re.compile("section:\s*\("+fpnum+","+fpnum+"\)")
 reFrameData_line = re.compile("(\[[0-9]+\] a\("+fpnum+","+fpnum+"\)\s*"
                               "b\("+fpnum+","+fpnum+"\)\s*-- wc)"
@@ -137,11 +149,39 @@ while gridLine != "":
     m1 = reFrameData_line.match(gridLine)
     if m1 == None:
         # Everything else streams straight through.
-        print gridLine
+        if not printTris:
+            print gridLine
+
+        # Pick off the world coord offset and rotation parameters.
+        m2 = re_config_option_float.match(gridLine)
+        if m2 != None:
+            options[m2.group(1)] = float(m2.group(2))
+            pass
+        pass
     else:
         # Frame data.
         lineHead = m1.group(1)
         data = [float(f) for f in m1.groups()[1:]]
+
+        # Optionally output only gnuplot lines for the triangles.
+        # Moved here from above because we first need world params for -t -g.
+        if printTris:                       
+            for tri in triangles:
+                for v in tri.target:
+                    if globalCoords:
+                        wc = worldTransform.worldTransform(
+                            options,
+                            v[0] + options['camera_x'],
+                            v[1] + options['camera_y'], 0.0)
+                        print '%f, %f'%(wc[0], wc[1])
+                    else:
+                        print '%f, %f'%tuple(v)
+                # No need to output first vertex again in this triangle pattern.
+                # (And doing so messes up dashed triangle lines in the plot.)
+                print ""         # Blank line separates line chains in gnuplot.
+                pass
+            sys.exit(0)
+            pass
 
         # XXX Horrid Hack Warning - We need right-handed coordinates,
         # but the image Y coordinate goes down from 0 at the top.

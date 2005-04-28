@@ -13,6 +13,7 @@ import os.path
 import random
 import re
 import math
+import worldTransform
 
 # Parse options and (perhaps multiple) filename args.
 DEBUG = False
@@ -64,7 +65,8 @@ class ObjectData:
 
         if world_coords:
             # Match up grid points with other cameras globally.
-            self.wx, self.wy, self.wa = worldTransform(wx, wy, wa)
+            self.wx, self.wy, self.wa = worldTransform.worldTransform(
+                options, wx, wy, wa)
         else:
             # Subtract local camera offset to match nominal grid point coords.
             self.wx = wx - options['camera_x']
@@ -108,8 +110,8 @@ class Section:
         if world_coords:
             # Match up nominal grid points with other cameras globally.
             # Add in the local offset from camera center to surveyed grid point.
-            self.lx, self.ly, self.lt = worldTransform(
-                lx + options['camera_x'], ly + options['camera_y'], 0)
+            self.lx, self.ly, self.lt = worldTransform.worldTransform(
+                options, lx + options['camera_x'], ly + options['camera_y'], 0)
         else:
             # Leave the nominal grid point coords alone.
             self.lx = lx
@@ -171,30 +173,6 @@ def rmserr(dev_list):
 def stddev(list):
     m = mean(list)
     return math.sqrt(msqerr([n-m for n in list]))
-
-# Transform a point from camera-local into global world coords.
-# (Same logic as local2global_posit_trans in vmc-client.c)
-def worldTransform(cx, cy, ca):
-    ct = math.cos(options['world_theta'])
-    st = math.sin(options['world_theta'])
-    # Notice this is a left-handed rotation, followed by an offset.
-    wx = ct * cx + st * -cy + options['world_x']
-    wy = ct * -cy + st * -cx + options['world_y']
-    # Rotate 90 more degrees because the fiducials are now mounted crosswise.
-    wa = mtp_theta(ca + options['world_theta'] + math.pi/2);
-    return wx, wy, wa
-
-# Put orientation into the +-PI radians range.
-# (Same logic as mtp_theta in mtp.c)
-def mtp_theta(theta):
-    if theta < -math.pi:
-	retval = theta + (2.0 * math.pi)
-    elif theta > math.pi:
-	retval = theta - (2.0 * math.pi)
-    else:
-	retval = theta
-        pass
-    return retval
 
 def analyze(section):
     # takes a Section, and does crap on it, and puts the result of the crap
@@ -318,10 +296,10 @@ def analyze(section):
     pass
 
 # set up the regexes
-re_config_option_float = re.compile("  \- ([ \w]+): (\-*\d+\.\d+)")
+fpnum = "\s*(\-*\d+\.\d+)\s*"
+re_config_option_float = re.compile("  \- ([ \w]+):"+fpnum)
 re_config_option_int = re.compile("  \- ([ \w]+): (\-*\d+)")
 re_config_option_string = re.compile("  \- ([ \w]+): (.*)")
-fpnum = "\s*(\-*\d+\.\d+)\s*"
 re_section = re.compile("section:\s*\("+fpnum+","+fpnum+"\)")
 re_section_sep = re.compile("\+\+\+")
 re_frame_title = re.compile("frame (\d+) \(timestamp"+fpnum+"\):")

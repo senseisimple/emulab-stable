@@ -3,12 +3,22 @@ The camera_data directory contains camera calibration files and data.
 ----------------------------------------------------------------
 	GNU Makefile targets
 
-plots (default): Does all analysis and plotting for the raw data.
-show: Runs gv on the plots, both per-camera and composite.
+figs: Does just the first paper figure, and some more composite figures.
+  camera1_blend8_tris_mag50.eps # Camera 1 only, grid pts, error vecs, tris.
+  all_mag50.eps                 # All cameras "before" (cos dewarp only.)
+  all_blend8_mag50.eps          # All cameras "after" (pts and error vecs.)
+  all_blend8_tris_mag50.eps     # All "after", (pts, vecs, and triangles.)
+show-figs (default): Runs gv on the above figs.
       You can use "killall gv", or just type "q" in each gv to quit.
+
+plots: Does analysis and plotting for all raw cosine-dewarped data.
+show-plots: Runs gv on the plots, both per-camera and composite.
 
 blend8: Pushes the raw data through error blending, both analysis and plots.
 show-blend8: gv.
+
+blend8-tris: Adds error cancellation blending triangles to the plots.
+show-blend8-tris: gv.
 
 calpts: Extracts the calibration points in mezzanine.opt format.
 
@@ -58,13 +68,14 @@ output_camera[012367] - Measured grid points (file_dumper output).
 
 analysis_{camera*,all} - Output from dump_analyzer on output_camera files.
 
-*_mag*.eps - Gnuplot figures, corresponding to the analysis*
+*_mag*.eps - Gnuplot figures, corresponding to the analysis_* files.
 
-camera*_calpts - Calibration points in mezzanine.opt format
+camera*_calpts - Calibration points in mezzanine.opt format.
 
-*.{grid_points,error_lines} - Data for gnuplot.
+*.{grid_points,error_lines} - Plot data in gnuplot format.
 
-*.tri_lines - Blending triangles for gnuplot.
+*.tri_lines - Per-camera Error cancellation blending triangles for gnuplot.
+camera*.tri_lines_world - Ditto, in global coords for all_blend8_tris_mag50.eps.
 
 ----------------------------------------------------------------
 	Processing camera data gathered at measured grid points
