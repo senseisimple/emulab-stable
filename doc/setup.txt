@@ -159,7 +159,7 @@ sure:
 	/etc/named/named.conf
 
 If you have more than one class-C subnet for your testbed, you'll need a
-copy of the reverse zone file for each one. You want to out boss, ops, and
+copy of the reverse zone file for each one. You want to put boss, ops, and
 any 'infrastructure' equipment (such as routers and switches) into the zone
 files.  These zone files do not need to include the nodes - the nodes will
 be added to them automatically. Be sure to edit /etc/named/named.conf if
@@ -214,7 +214,16 @@ to boss's domain name).
 
 boss-install already generated a temporary no-passhrase certificate for you
 and placed them in the locations specified above. However, we recommend
-that you get a "real" certificate from Verisign (or one of the others). 
+that you get a "real" certificate from Verisign (or one of the
+others).
+
+DHCPD - boss-install generated a dhcpd.conf.template and installed it in
+/usr/local/etc (the template is derived from information you provided in
+defs file). It then generated an actual dhcpd.conf file and started up
+dhcpd for you. Do not edit the dhcpd.conf file directly! If you need need to
+make changes, change the template instead and then run:
+
+	/usr/testbed/sbin/dhcpd_makeconf -i -r
 
 tftpboot - There are a few bootloaders, mini-kernels, and MFSes that are used
 to boot, reload, etc. testbed machines, which live in /tftpboot . For the time

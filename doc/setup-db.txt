@@ -12,9 +12,10 @@ with local nodes - they can be skipped in a widearea-only testbed.
 
 In order to proceed, you should have the following working (from the boss and
 ops setup documentation):
-NFS mounts between boss and ops
-Root ssh keys (so that root on boss can ssh to ops without a password)
-The web interface (you don't need to be able to log in yet)
+
+   NFS mounts between boss and ops
+   Root ssh keys (so that root on boss can ssh to ops without a password)
+   The web interface (you don't need to be able to log in yet)
 
 Run the 'firstuser' script on boss. This will get put in the utils subdirectory
 of your object tree. (Note: configure will not set the executable bit on the
@@ -88,7 +89,8 @@ Just as you need to go 'red dot' to use admin privileges on the web interface,
 you must also explicitly enable them on the command line. To do this, prefix
 the command you want to run with 'withadminprivs'. For example, I might invoke
 unixgroups like this:
-withadminprivs unixgroups -a ricci tbadmin wheel
+
+   withadminprivs unixgroups -a ricci tbadmin wheel
 
 (Note: withadminprivs and many other admin-type commands live in
 /usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your

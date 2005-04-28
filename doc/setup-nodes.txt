@@ -88,34 +88,13 @@ We'll start by bringing up the first node in the testbed, to make sure things
 are working, and so that you can set some initial values. If we haven't already
 given it to you, ask Utah for the 'newnode' MFS.
 
-Setting up dhcpd -
-We use dhcpd to assign addresses to nodes when they boot. We don't normally do
-this in a dynamic way (the D in dhcp) - we hardwire MAC addresses to IP
-addresses. However, at this point, we don't know those MAC and IP addresses, so
-we have to set up DHCP to actually do some dynamic stuff. Copy
-dhcpd.conf.template from the dhcpd/ directory of the source tree into
-/usr/local/etc . Edit it to get your actual boss IP, domain, control network
-subnet and mask, etc. into it.  For things to function properly, boss will need
-to be listed as the nameserver in this file. Now, see that line that says
-'range ...'?  Uncomment that line, and put in a range of IP addresses that is
-in the control network, but is _not_ going to be used by nodes. Ideally, this
-range should be large enough to fit all the nodes into it. If it's smaller,
-remember this for later, when we get to bringing up the rest of the nodes. Make
-the config file from the template with:
-/usr/testbed/sbin/dhcpd.makeconf dhcpd.conf.template > dhcp.conf
-... then (re) start dhcpd with:
-/usr/local/etc/rc.d/2.dhcpd.sh restart
-If you have more than one interface in boss, dhcpd might complain that it has
-nothing to do on some of them. That's fine - just make sure there are no other
-errors.
-
-Okay, now we're ready to try to boot the first node. What's going to happen as
-we bring nodes up is that they should boot into the 'newnode' MFS, which is a
-stripped down version of FreeBSD that runs out of a memory filesystem. This MFS
-reports in to boss, informing it of it's existence and key things such as it's
-MAC addresses. Do the BIOS setup detailed above on this node, and fire it up.
-By the time it's got a FreeBSD login prompt on the console, it should have
-reported in. This will send mail to the local testbed-ops list.
+What's going to happen as we bring nodes up is that they should boot into
+the 'newnode' MFS, which is a stripped down version of FreeBSD that runs
+out of a memory filesystem. This MFS reports in to boss, informing it of
+it's existence and key things such as it's MAC addresses. Do the BIOS setup
+detailed above on this node, and fire it up.  By the time it's got a
+FreeBSD login prompt on the console, it should have reported in. This will
+send mail to the local testbed-ops list.
 
 Now, let's take a look at the web page where nodes that have checked in, and
 are awaiting creation as 'real' nodes, show up. Log into the web interface as
@@ -172,9 +151,9 @@ very painful! If there are some nodes you simply can't bring up, because of bad
 hardware, etc. write these down, and we'll fix things up later.
 
 Important note: Remember the size of the dynamic range you picked for dhcp
-above? Well, that will limit how many of these node you can bring up at a time.
-If you run out of IP addresses, continue on with the nodes you have up, and
-repeat these steps later with the remainder.
+in the defs file? Well, that will limit how many of these node you can
+bring up at a time.  If you run out of IP addresses, continue on with the
+nodes you have up, and repeat these steps later with the remainder.
 
 Okay, got all the nodes up? Good. At this point, you can fix things up for any
 you had to skip, using the 'Add to Node ID suffix' box. If, for example, you
