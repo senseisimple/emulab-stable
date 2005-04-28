@@ -108,28 +108,27 @@ This works the same as it did on ops:
 cd ~/tbobj
 ~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
 
-##### Step 3 - Running the boss installation script
+##### Step 3 - Installing packages
+
+Again, almost the same as on ops. Download the same tarball, and follow
+the same pkg_add procedure, excepth this time, you're going to install
+the emulab-boss-1.8 package instead of emulab-ops .
+
+##### Step 4 - Running the boss installation script
 
 Again, this works the same as it did on ops, except that you run
 install/boss-install in the object tree, instead of ops-install.
 
-Part way through, this script will bail out and prompt you to install some
-ports. This can take a long time (hours), and you want to be able to see what's
-going on, right?
-
-So, just cd to /usr/ports/misc/emulab-boss/ and run (as root) a 'make install'.
-When you're done, re-run the boss-install script.
-
 Like the ops-install script, boss-install sets up paswordless sudo for anyone
 in the wheel group.
 
-##### Step 4 - Installing from source.
+##### Step 5 - Installing from source.
 
 In your object directory, do a 'gmake && gmake boss-install'. Then, as root, do
 a 'gmake post-install'. The post-install target needs to run as root, so that
 it can make certain scripts setuid, etc.
 
-##### Step 5 - Setting up root ssh from boss to ops
+##### Step 6 - Setting up root ssh from boss to ops
 
 This step is now done as part of boss-install/ops-install. To confirm
 this, make sure this works:
@@ -140,7 +139,7 @@ If this *FAILS*, you will need to do this by hand, typing a password:
 
 	scp /root/.ssh/identity.pub ops:/root/.ssh/authorized_keys
 	
-##### Step 6 - Setting up named
+##### Step 7 - Setting up named
 
 The testbed software manipulates DNS zone files for two reasons. First, it
 adds your nodes to them so that you don't have to. Second, it creates CNAMEs
@@ -202,7 +201,7 @@ basically, you'll want to put the public addresses for boss, ops, etc.  into
 OURDOMAIN.db.head, and their private addresses into
 OURDOMAIN.internal.db.head . 
 
-##### Step 7 - Other miscellaneous things to set up
+##### Step 8 - Other miscellaneous things to set up
 
 There are a few things we haven't been able to completely automate just yet,
 though we hope to soon. 
@@ -240,11 +239,11 @@ find files as you're learning the system. This normally happends nightly, but
 you can force it to happen now by running 'locate.updatedb' as root. This will
 take several minutes. You can then find foo.conf by running 'locate foo.conf'.
 
-##### Step 8 - Reboot boss
+##### Step 9 - Reboot boss
 
 Okay, go ahead and reboot boss now, and make sure it comes up okay.
 
-##### Step 9 - Filling the database
+##### Step 10 - Filling the database
 
 See the file setup-db.txt in this directory for instructions on getting the
 proper information about your site and nodes into the database.

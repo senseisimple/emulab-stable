@@ -80,9 +80,25 @@ in:
 cd ~/tbobj
 ~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
 
-##### Step 2 - Running the ops installation script
+##### Step 2 - Installing packages
 
-This part is brand-new, so please report any problems with it.
+To make sure that you're running with versions of software from the ports
+collection that are known to work with our software, and to save you hours
+of compile time, we provide pre-built binary packages of the ports required
+by Emulab.
+
+Download the packages tarball from:
+http://www.emulab.net/downloads/FreeBSD-4.10-20041102.tar.gz
+
+(You can use the FreeBSD 'fetch' command to download the file.)
+
+Now, untar this someplace (you need about 70MB of space, so don't use /tmp).
+Let's say you untarred it into /usr/tmp. You would then run:
+env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 pkg_add emulab-ops-1.4
+
+Of course, if you untarred it somewhere else, put in the correct path.
+
+##### Step 3 - Running the ops installation script
 
 In the object tree you've configured (in my example above, ~/tbobj), there's an
 'install' subdirectory, with a script called 'ops-install'. Just run this
@@ -102,7 +118,7 @@ sets up password-less 'sudo' for anyone in the 'wheel' group. If you don't want
 these for security reasons, you can undo them after the installation script is
 finished.
 
-##### Step 3 - Installing from source
+##### Step 4 - Installing from source
 
 To install the actual testbed software, simply do a 'gmake ops-install' in your
 object directory.
@@ -116,7 +132,7 @@ addition, you'll need to build a custom kernel with the appropriate driver (you
 may even need to get patches from Utah for some boards). You'll also need to
 set up a few things (not yet automated), described in doc/adding_nodes.txt .
 
-##### Step 4 - Setting up mailing lists
+##### Step 5 - Setting up mailing lists
 
 Optional. The ops-install script set up some mailing lists for the email
 addresses you set up in the defs file, in /etc/mail/lists . If you want to run
@@ -126,7 +142,7 @@ archive files, one per line. If you chose to use archive files, give a path
 to the file you'd like sendmail to stick all correspondance in, and create
 this file.
 
-##### Step 5 - Other miscellaneous things to set up
+##### Step 6 - Other miscellaneous things to set up
 
   [Nothing at this time]
 
