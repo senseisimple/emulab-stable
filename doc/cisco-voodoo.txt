@@ -253,3 +253,7 @@ ID  Name                            Members of VLAN
     The most interesting bits are near the bottom in the part with the
     heading "IGMP Snooping", and some more in "Practical Example of IGMP
     Snooping"
+
+15. IOS for guys who know CatOS: (ie. me)
+
+    http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/tech/cat65_wp.htm
