@@ -53,21 +53,7 @@ ln -s /z/proj /proj
 It's simplest if you don't create any users yet, and just log in a root for the
 time being. Our software will create users later, once you get boss set up.
 
-##### Step 1 - Unpacking and running configure
-
-At this point, you'll need to make a 'defs' file - see setup.txt for
-instructions for doing so. You'll use the same defs file on boss and ops.
-
-Unpack the testbed source, and run it's configure script. Use the --with-TBDEFS
-option to configure to give it the path to your defs file.
-
-For example, I have the testbed source in ~/testbed, my defs file in
-/users/ricci/testbed/defs-ricci, and use the ~/tbobj directory to do my builds
-in:
-cd ~/tbobj
-~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
-
-##### Step 2 - Installing packages
+##### Step 1 - Installing packages
 
 To make sure that you're running with versions of software from the ports
 collection that are known to work with our software, and to save you hours
@@ -93,6 +79,21 @@ installation media, we use one that we've tested against. You can grab our
 http://www.emulab.net/downloads/ports-20041102.tar.gz
 Untar it, move it into place as /usr/ports, and install whatever ports you
 want to make ops feel like 'home'...
+
+##### Step 2 - Unpacking and running configure
+
+At this point, you'll need to make a 'defs' file - see setup.txt for
+instructions for doing so. You'll use the same defs file on boss and ops.
+
+Unpack the testbed source, and run it's configure script. Use the --with-TBDEFS
+option to configure to give it the path to your defs file.
+
+For example, I have the testbed source in ~/testbed, my defs file in
+/users/ricci/testbed/defs-ricci, and use the ~/tbobj directory to do my builds
+in:
+cd ~/tbobj
+~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
+
 
 ##### Step 3 - Running the ops installation script
 
