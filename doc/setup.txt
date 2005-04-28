@@ -66,32 +66,20 @@ Follow the instructions in the setup-ops.txt file before the ones in this file!
 
 Install FreeBSD on the machine you'll be using for your boss node, using the
 standard FreeBSD installation process.  When asked by the installer, it's best
-to choose the 'Developer' distribution set - this gets you full sources. The
-'X-Developer' distribution set would be fine too, if you want to be able to run
-X clients from the boss node.  When it asks if you want to install the ports
-collection, answer yes.  You don't need to worry about which packages to
-install (of course, grab your favorite editors, etc.) - the ones our software
-needs will be installed automatically later.  You, will, however, have to make
+to choose the 'Developer' distribution set - this gets you full sources.  When
+it asks if you want to install the ports collection, answer no.
+   You, will, however, have to make
 sure that you create a partition large enough to hold /usr/testbed - in
 addition to the testbed software, this is where many disk images will get
 stored. The /var partition will need to be large enough to hold the database -
-100MB extra for the database should be sufficient. Also, since we'll be building
-and installing a lot of software from the ports tree, you'll want to make sure
-that /usr is at least 2 GB.
+100MB extra for the database should be sufficient. Also, since we'll be
+installing a lot of packages, you'll want to make sure that /usr is at least 2
+GB.
 
 If you want, you can go ahead and create an account for yourself on boss. For
 now, just stick the home directory somewhere local, and move it to /users/ once
 you've got it mounted from ops (the boss-install script will set this up). In
 general, it's probably simpler to just use 'root' for now.
-
-We occasionally run into problems with certain FreeBSD ports. Also, you're going
-to want the latest security updates. So, you should at the very least bring
-your ports collection up to date using:
-http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/cvsup.html
-
-It is also a good idea to bring your base system up to date with the -STABLE
-branch.  Instructions for doing this can be found at:
-http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/cutting-edge.html
 
 ##### Step 1 - Create a defs file
 
@@ -113,6 +101,9 @@ cd ~/tbobj
 Again, almost the same as on ops. Download the same tarball, and follow
 the same pkg_add procedure, excepth this time, you're going to install
 the emulab-boss-1.8 package instead of emulab-ops .
+
+You can download our approved ports tree and install ports at this point
+if you wish.
 
 ##### Step 4 - Running the boss installation script
 
