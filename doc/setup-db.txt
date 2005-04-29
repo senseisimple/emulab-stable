@@ -180,7 +180,9 @@ each of them.  Use the interface types you created above for them, and be sure
 to get the correct card and port numbers. In modular switches, such as the
 Cisco Cat6500 series, use the switch's 'native' module and port numbers.  For
 switches that do not have expansion modules, the card number is assumed to be
-0. Make sure to get the current_speed (this time, in Mbps) and duplex correct.
+0. Make sure to get the current_speed (this time, in Mbps, and note, this is
+an enumerated type, not an integer, so you need to put quotes around the
+speed) and duplex correct.
 
 Now, go into the wires table and add wires connecting the switch interfaces you
 just created. Make sure to set the type to 'Trunk'. In this case, it doesn't
