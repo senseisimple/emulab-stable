@@ -153,13 +153,22 @@ columns aren't important for switches (so you can leave them blank), but
 putting in max_cards (if the switch is expandable) and max_ports can be useful
 for your own information.
 
-2) Create interface types for switch interconnects (if any)
+2a) Create interface types for switch interconnects (if any)
 
 If you'll be connecting the experimental switches together, you'll add
 interface types for the ports you'll be using to link them together.  These go
 into the interface_types table. Make up something descriptive for the 'type'
 column (no spaces.) Make sure to set the max_speed (in Kbps) and full_duplex
 (1 for full duplex, 0 for half duplex) columns correctly.
+
+2b) Create interface capabilities entries for switch interconnects (if any)
+    
+If you added any entries to interface_types in the previous step, you also
+need to add entries to the interface_capabilities table. Using the same
+type name you used above, add a capkey for "protocols", usually set to
+"ethernet" and another capkey for "ethernet_defspeed" to the same value you
+used in the interface_types table. Do this for each type you entered in
+step 2a above.
 
 3) Create switches in nodes table
 
