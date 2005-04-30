@@ -81,20 +81,23 @@ now, just stick the home directory somewhere local, and move it to /users/ once
 you've got it mounted from ops (the boss-install script will set this up). In
 general, it's probably simpler to just use 'root' for now.
 
-##### Step 1 -  Unpacking and running configure
+##### Step 1 -  Unpacking source and creating a defs file
+
+Unpack the source tarball somwhere with at least a few dozen megs free.
+root's home directory is probably best for this.
+
+Now, you'll need to create a 'defs file', which is used by the configure
+script to describe your enviroment, such as the hostnames of your boss and ops
+nodes, and email addresses that certain types of mail will be sent to.
+
+Use the 'defs-example' file in the root of our source distribution as a
+template. It contains comments explaining the important variables to set.
+
+##### Step 2 - Configuring an object tree
 
 This works the same as it did on ops:
 cd ~/tbobj
 ~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
-
-##### Step 2 - Create a defs file
-
-The defs file will describe some of your setup, such as the hostnames of your
-boss and ops nodes, and email addresses that certain types of mail will be sent
-to.
-
-Use the 'defs-example' file in the root of our source distribution as a
-template. It contains comments explaining the important variables to set.
 
 ##### Step 3 - Installing packages
 
