@@ -198,7 +198,7 @@ NODE: foreach my $node_id (@node_ids) {
 
     my %interfaces;
     while (my ($card, $MAC, $iface_type, $switch_id, $switch_card,
-	    $switch_port, $cable, $len, $role) = $query_result->fetchrow()) {
+	    $switch_port, $cable, $len, $ifrole) = $query_result->fetchrow()) {
 	#
 	# Get some more information about this interface type
 	#
@@ -230,7 +230,7 @@ NODE: foreach my $node_id (@node_ids) {
 	# Stash it away...
 	#
 	$interfaces{$card} = [$MAC, $iface_type, $max_speed, $full_duplex,
-		$switch_id, $switch_card, $switch_port, $cable, $len, $role];
+		$switch_id, $switch_card, $switch_port, $cable, $len, $ifrole];
 
     }
 
@@ -316,10 +316,10 @@ NODE: foreach my $node_id (@node_ids) {
 	    my %iface_array = %{ $rval->{"interfaces"} };
 		
 	    foreach my $mac (keys(%iface_array)) {
-		my $aref = $iface_array{$mac};
-		my $role = $aref->{"role"};
+		my $aref   = $iface_array{$mac};
+		my $ifrole = $aref->{"role"};
 
-		if ($role eq TBDB_IFACEROLE_OUTER_CONTROL()) {
+		if ($ifrole eq TBDB_IFACEROLE_OUTER_CONTROL()) {
 		    $outer_control_ip = $aref->{"IP"};
 		    last;
 		}
@@ -396,15 +396,15 @@ NODE: foreach my $node_id (@node_ids) {
 
     while (my ($card, $aref) = each %interfaces) {
 	my ($MAC, $iface_type, $max_speed, $duplex, $switch_id, $switch_card,
-	    $switch_port, $cable, $len, $role) = @$aref;
+	    $switch_port, $cable, $len, $ifrole) = @$aref;
 	my $iface = "eth$card";
 	my $iface_IP;
 	my $wire_type;
 	my $iface_role;
 
 	# Role from new_interfaces overrides anything we decide here.
-	if (defined($role)) {
-	    $iface_role = $role;
+	if (defined($ifrole)) {
+	    $iface_role = $ifrole;
 	}
 	elsif ($iface eq $control_iface) {
 	    $iface_role = TBDB_IFACEROLE_CONTROL();
