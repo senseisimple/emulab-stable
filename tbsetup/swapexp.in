@@ -297,6 +297,12 @@ if ($waitmode) {
 }
 
 #
+# Temp fix; Disallow swapmod to firewalled experiments. This will come
+# out later.
+#
+my $firewalled = TBExptFirewall($pid, $eid);
+
+#
 # We have to protect against trying to end an experiment that is currently
 # in the process of being terminated. We use a "wrapper" state (actually
 # a timestamp so we can say when termination was requested) since
@@ -450,6 +456,9 @@ else {
 		     $estate ne EXPTSTATE_ACTIVATING) ||
 		    $batchstate ne BATCHSTATE_UNLOCKED());
 
+	    ExitWithStatus(1, "Cannot modify a firewalled experiment (yet).")
+		if ($firewalled);
+
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
 	    # locked below, and so it cannot be injected or otherwise messed
@@ -556,6 +565,10 @@ else {
 				     "Experiment $pid/$eid must be ACTIVE or\n".
 				     "SWAPPED to modify!\n");
 		  }
+		  ExitWithStatus(1,
+				 "Cannot modify a firewalled experiment (yet).")
+		      if ($firewalled);
+		  
 		  last SWITCH;
 	      };
 	      die("*** $0:\n".
