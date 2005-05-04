@@ -209,6 +209,7 @@ while (<IF>) {
 		    my $node_id;
 		    my $next_server = "";
 		    my $hostname = "";
+		    my $dns = "";
 
 		    if ($vnames && defined($row{"vname"})) {
 			$node_id = $row{"vname"};
@@ -224,6 +225,7 @@ while (<IF>) {
 			
 			$next_server = "${spaces}\tnext-server " .
 			    $bossnodes{$tag} . ";\n";
+			$dns = "${spaces}\toption domain-name-servers 1.1.1.1;\n";
 		    }
 		    else {
 			$hostname =
@@ -235,6 +237,7 @@ while (<IF>) {
 
 		    print $OUT "${spaces}host $ip {\n";
 		    print $OUT $next_server;
+		    print $OUT $dns;
 		    print $OUT "${spaces}\thardware ethernet $mac;\n";
 		    print $OUT $hostname;
 		    print $OUT "${spaces}\tfixed-address $ip;\n";
