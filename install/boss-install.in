@@ -76,6 +76,7 @@ my $FSTAB           = "/etc/fstab";
 my $RCCONF          = "/etc/rc.conf";
 my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+my $INETD_CONF      = "/etc/inetd.conf";
 
 my $ROOT_PRIVKEY    = "/root/.ssh/identity";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
@@ -304,6 +305,12 @@ Phase "dirs", "Setting directory permissions", sub {
 };
 
 Phase "tftp", "Setting up directories for tftp", sub {
+    Phase "tftpoff", "Disabling BSD tftpd", sub {
+	PhaseSkip("no inetd.conf!?") unless (-e $INETD_CONF);
+	PhaseSkip("already disabled") unless `grep '^tftp' $INETD_CONF`;
+	ExecQuietFatal("sed -i .orig -e '/^tftp/s/^/#/' $INETD_CONF");
+	HUPDaemon("inetd");
+    };
     Phase "tftpboot", "Creating $TFTP_DIR", sub {
 	DoneIfExists($TFTP_DIR);
 	mkdir $TFTP_DIR,0775 or
