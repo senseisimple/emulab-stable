@@ -156,6 +156,12 @@ sub getVlanPorts (@) {
 	my $members = $row[0];
 	# $members is a space-seprated list
 	foreach my $port (split /\s+/,$members) {
+            # XXX: Temp hack - work around another bug which sometimes
+            # puts '(null)' in the table
+            if ($port eq "(null)") {
+                warn "WARNING: (null) found in VLANS table!\n";
+                next;
+            }
 	    push @ports, $port;
 	}
     }
