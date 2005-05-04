@@ -60,6 +60,7 @@ RUN_DEPENDS=	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
 	cvsup:${PORTSDIR}/net/cvsup-without-gui \
 	fping:${PORTSDIR}/net/fping \
+	rsync:${PORTSDIR}/net/rsync \
 	neato:${PORTSDIR}/graphics/graphviz \
         swish-e:${PORTSDIR}/www/swish-e \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql323-server \
