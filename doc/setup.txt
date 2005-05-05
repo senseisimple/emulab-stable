@@ -68,22 +68,31 @@ Install FreeBSD on the machine you'll be using for your boss node, using the
 standard FreeBSD installation process.  When asked by the installer, it's best
 to choose the 'Developer' distribution set - this gets you full sources.  When
 it asks if you want to install the ports collection, answer no.
-   You, will, however, have to make
-sure that you create a partition large enough to hold /usr/testbed - in
-addition to the testbed software, this is where many disk images will get
-stored. The /var partition will need to be large enough to hold the database -
-100MB extra for the database should be sufficient. Also, since we'll be
-installing a lot of packages, you'll want to make sure that /usr is at least 2
-GB.
+
+You, will, however, have to make sure that you create a partition large
+enough to hold /usr/testbed - in addition to the testbed software, this is
+where many disk images will get stored. The /var partition will need to be
+large enough to hold the database - 100MB extra for the database should be
+sufficient. Also, since we'll be installing a lot of packages, you'll want
+to make sure that /usr is at least 8GB and at least a million inodes.
 
 If you want, you can go ahead and create an account for yourself on boss. For
 now, just stick the home directory somewhere local, and move it to /users/ once
 you've got it mounted from ops (the boss-install script will set this up). In
 general, it's probably simpler to just use 'root' for now.
 
-##### Step 1 -  Unpacking source and creating a defs file
+##### Step 1 - Installing packages
 
-Unpack the source tarball somwhere with at least a few dozen megs free.
+Again, almost the same as on ops. Download the same tarball, and follow
+the same pkg_add procedure, except this time, you're going to install
+the emulab-boss-1.8 package instead of emulab-ops.
+
+Also grab a copy og our approved ports tree and install it, the same as
+described in setup-ops.txt.
+
+##### Step 2 -  Unpacking source and creating a defs file
+
+Unpack the source tarball somewhere with at least a few dozen MB free.
 root's home directory is probably best for this.
 
 Now, you'll need to create a 'defs file', which is used by the configure
@@ -93,20 +102,12 @@ nodes, and email addresses that certain types of mail will be sent to.
 Use the 'defs-example' file in the root of our source distribution as a
 template. It contains comments explaining the important variables to set.
 
-##### Step 2 - Configuring an object tree
+##### Step 3 - Configuring an object tree
 
 This works the same as it did on ops:
-cd ~/tbobj
-~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
 
-##### Step 3 - Installing packages
-
-Again, almost the same as on ops. Download the same tarball, and follow
-the same pkg_add procedure, excepth this time, you're going to install
-the emulab-boss-1.8 package instead of emulab-ops .
-
-You can download our approved ports tree and install ports at this point
-if you wish.
+	cd ~/tbobj
+	~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
 
 ##### Step 4 - Running the boss installation script
 
