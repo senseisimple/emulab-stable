@@ -144,6 +144,7 @@ AC_SUBST(SSLCERT_LOCALITY)
 AC_SUBST(SSLCERT_ORGNAME)
 AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
+AC_SUBST(WINSUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -192,6 +193,7 @@ PLABSUPPORT=0
 PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
 WIKISUPPORT=0
+WINSUPPORT=0
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
@@ -543,23 +545,26 @@ AC_SUBST(EVENTSYS)
 # Enable Windows support.
 # Right now this means NTFS support in imagezip, maybe more things later.
 # Relies on Linux NTFS library.
-# Off by default.
 # 
 AC_ARG_ENABLE(windows,
 [  --enable-windows      Enable Windows XP support (default)])
 
 if test "$enable_windows" = "no"; then
-	winfiles="";
 	WINSUPPORT=0;
+elif test "$enable_windows" = "yes"; then
+	WINSUPPORT=1;
+fi
+
+if test $WINSUPPORT -eq 0; then
+	winfiles="";
 else
 	winfiles="os/imagezip/ntfs/GNUmakefile \
 		  os/imagezip/ntfs/liblocale/GNUmakefile \
 		  os/imagezip/ntfs/libntfs/GNUmakefile \
 		  os/imagezip/fat/GNUmakefile"
 	optional_subdirs="$optional_subdirs";
-	WINSUPPORT=1;
 fi
-AC_SUBST(WINSUPPORT)
+
 
 #
 # Check for ulsshxmlrpc header

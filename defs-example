@@ -172,6 +172,7 @@ SFSSUPPORT=0
 DISABLE_NSE=1
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
+WINSUPPORT=0
 
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!
