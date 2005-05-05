@@ -25,6 +25,7 @@ my $protouser       = 'elabman';
 my $protouser_name  = 'Emulab Manager';
 my $protouser_email = '@TBOPSEMAIL@';
 my $protouser_shell = 'tcsh';
+my $HOMEDIR         = "/users";
 my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
@@ -100,7 +101,7 @@ if (!$batchmode) {
 
 print "Creating user on boss...\n";
 if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G $Ggid -h - " .
-       "-s /bin/nologin -c \"$protouser_name\"\n") {
+    "-m -d $HOMEDIR/$protouser -s /bin/nologin -c \"$protouser_name\"\n") {
        die "Unable to add user to the password file!\n";
 }
 
