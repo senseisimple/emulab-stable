@@ -42,6 +42,7 @@ CREATE TABLE os_info (
 
 INSERT INTO os_info VALUES ('RHL-STD','emulab-ops','emulab-ops-RHL-STD','root',NULL,'Default version of RedHat Linux','Linux','',NULL,'','','ping,ssh,ipod,isup',0,1,1,'NORMALv1','emulab-ops-RHL90-STD',NULL,0);
 INSERT INTO os_info VALUES ('FBSD-STD','emulab-ops','emulab-ops-FBSD-STD','root',NULL,'Default version of FreeBSD','FreeBSD','',NULL,'','','ping,ssh,ipod,isup',0,1,1,'NORMALv1','emulab-ops-FBSD410-STD',NULL,0);
+INSERT INTO os_info VALUES ('FBSD-JAIL','emulab-ops','emulab-ops-FBSD-JAIL','root',NULL,'Generic OSID for jailed nodes','FreeBSD','',NULL,'','','ping,ssh,isup',0,1,0,'PCVM','emulab-ops-FBSD-STD',NULL,0);
 INSERT INTO os_info VALUES ('FBSD410-STD','emulab-ops','emulab-ops-FBSD410-STD','root','2004-11-09 00:00:00','Testbed version of FreeBSD 4.10','FreeBSD','4.10',NULL,'','','ping,ssh,ipod,isup',0,1,1,'NORMALv1',NULL,NULL,0);
 INSERT INTO os_info VALUES ('RHL90-STD','emulab-ops','emulab-ops-RHL90-STD','root','2004-11-09 00:00:00','Testbed Version of RedHat Linux 9.0','Linux','9.0',NULL,'','','ping,ssh,ipod,isup',0,1,1,'NORMALv1',NULL,NULL,0);
 
