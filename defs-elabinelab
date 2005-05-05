@@ -35,6 +35,7 @@ SFSSUPPORT=0
 DISABLE_NSE=1
 # This means it is an inner elab!
 ELABINELAB=1
+WINSUPPORT=0
 # The name of the outer boss for inner boss to request services from.
 OUTERBOSS_NODENAME=changeme
 #
