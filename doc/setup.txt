@@ -79,7 +79,11 @@ to make sure that /usr is at least 8GB and at least a million inodes.
 If you want, you can go ahead and create an account for yourself on boss. For
 now, just stick the home directory somewhere local, and move it to /users/ once
 you've got it mounted from ops (the boss-install script will set this up). In
-general, it's probably simpler to just use 'root' for now.
+general, it's probably simpler to just use 'root' for now. BE SURE to
+give root a password and REMEMBER it! You are going to need it later.  To
+set the root password:
+
+	passwd root
 
 ##### Step 1 - Installing packages
 

@@ -250,6 +250,25 @@ Phase "ports", "Installing ports", sub {
     };
 };
 
+# XXX Temporary.
+Phase "portfixup", "Fixing up packages", sub {
+    Phase "rsync", "Looking for rsync", sub {
+	if (!ExecQuiet("$PKG_INFO -x rsync")) {
+	    PhaseSkip("rsync already installed");
+	}
+
+	#
+	# This port is dead-simple, so it's safe to do it from this script
+	#
+ 	my $pwd = `$PWD`;
+	chomp $pwd;
+	chdir "$PORTSDIR/net/rsync" or
+ 	 	PhaseFail "Unable to change to $PORTSDIR/net/rsync: $!";
+	ExecQuietFatal("make -DBATCH install");
+	chdir $pwd;
+    };
+};
+
 Phase "patches", "Applying patches", sub {
     Phase "m2cryptopatch", "Patching m2crypto", sub {
         if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $M2CRYPTO_PATCH")) {

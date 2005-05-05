@@ -360,6 +360,25 @@ Phase "ports", "Installing ports", sub {
 	      "then re-run this script.");
 };
 
+# XXX Temporary.
+Phase "portfixup", "Fixing up packages", sub {
+    Phase "rsync", "Looking for rsync", sub {
+	if (!ExecQuiet("$PKG_INFO -x rsync")) {
+	    PhaseSkip("rsync already installed");
+	}
+
+	#
+	# This port is dead-simple, so it's safe to do it from this script
+	#
+ 	my $pwd = `$PWD`;
+	chomp $pwd;
+	chdir "$PORTSDIR/net/rsync" or
+ 	 	PhaseFail "Unable to change to $PORTSDIR/net/rsync: $!";
+	ExecQuietFatal("make -DBATCH install");
+	chdir $pwd;
+    };
+};
+
 Phase "patches", "Applying patches", sub {
     Phase "g++patch", "Patching g++'s STL", sub {
 	if (!ExecQuiet("$PATCH -C -f -R -p0 -i $STL_PATCH")) {
@@ -894,10 +913,7 @@ Phase "named", "Setting up initial named configuration", sub {
 Phase "firstuser", "Setting up initial user (elabman)", sub {
     PhaseSkip("elabman already created")
 	if (-d "/users/elabman");
-    PhaseSkip("Not needed unless in batch mode")
-	if (!$batchmode);
-    ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser ".
-		   ($batchmode ? " -b" : "") .
+    ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
 		   (defined($password) ? " -p $password" : ""));
 };
 

@@ -30,6 +30,7 @@ my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
 my $password;
+my $encpass;
 my %opts;
 
 #
@@ -64,14 +65,26 @@ print "meta-project.\n\n";
 
 # Get a password for the user
 if (!defined($password)) {
-    print "Pick a password for $protouser (warning, will be echoed): ";
-    $password = <>;
-    chomp($password);
+    #
+    # In batch mode, we get it from the root user password entry.
+    # Otherwise prompt user for it.
+    #
+    if ($batchmode) {
+	(undef,$encpass) = getpwnam("root") or
+	    die("No root user!\n");
+    }
+    else {
+	print "Pick a password for $protouser (warning, will be echoed): ";
+	$password = <>;
+	chomp($password);
+    }
 }
-my @salt_chars = ('a'..'z','A'..'Z','0'..'9');
-my $salt = $salt_chars[rand(@salt_chars)] .
-	   $salt_chars[rand(@salt_chars)];
-my $encpass = crypt($password, "\$1\$${salt}");
+if (!defined($encpass)) {
+    my @salt_chars = ('a'..'z','A'..'Z','0'..'9');
+    my $salt = $salt_chars[rand(@salt_chars)] .
+	       $salt_chars[rand(@salt_chars)];
+    $encpass = crypt($password, "\$1\$${salt}");
+}
 
 # Get uid for the user and a gid for the project
 my $uid = 10000;
