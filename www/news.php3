@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -211,12 +211,14 @@ else {
 ?>
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
-<tr><td class=stealth align=center>
-    <a href = 'doc/docwrapper.php3?docname=ChangeLog.txt'>
-    (Changelog/Technical Details)</a></td></tr>
-</table>
-<br />
 <?php
+if ($TBMAINSITE) {
+    echo "<tr><td class=stealth align=center>
+                  <a href = 'doc/docwrapper.php3?docname=ChangeLog.txt'>
+                     (Changelog/Technical Details)</a></td></tr>\n";
+}
+echo "</table>
+      <br />\n";
 
 # Allow admin caller to flip the archive bit. 
 $show_archive_clause = "where archived=0";
