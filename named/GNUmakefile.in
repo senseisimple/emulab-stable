@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -29,7 +29,7 @@ USERTOKEN       = $(shell echo @USERNODE@ | sed -e 's/\..*//')
 NAMED_FILES	= named.conf.template named_makeconf named_makerev reverse.head \
 		 resolv.conf localhost.rev forward.head named_makeforw \
 		 $(REVFILES) $(OURDOMAIN).db.head $(OURDOMAIN).internal.db.head \
-		 named.conf
+		 named.conf resolv.conf.ops
 
 include $(OBJDIR)/Makeconf
 

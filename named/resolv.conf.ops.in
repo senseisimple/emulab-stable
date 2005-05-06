@@ -1,0 +1,3 @@
+domain @OURDOMAIN@
+search @OURDOMAIN@
+nameserver @BOSSNODE_IP@
