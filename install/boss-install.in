@@ -909,6 +909,10 @@ Phase "named", "Setting up initial named configuration", sub {
     Phase "starting", "Starting named", sub {
 	ExecQuietFatal("$RCDIR/1.named.sh start");
     };
+    Phase "copying", "Copying resolv.conf over to ops", sub {
+ 	ExecQuietFatal("$SCP $TOP_OBJDIR/named/resolv.conf.ops ".
+		       "     ${USERNODE}:/etc/resolv.conf");
+    };
 };
 
 Phase "firstuser", "Setting up initial user (elabman)", sub {
