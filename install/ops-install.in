@@ -33,6 +33,7 @@ my $BOSSNODE    = '@BOSSNODE@';
 my $BOSSNODE_IP = '@BOSSNODE_IP@';
 my $USERNODE_IP = '@USERNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
+my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 
 # For /share export below.
@@ -539,6 +540,11 @@ if ($WINSUPPORT) {
 	    DoneIfDoesntExist("$RCDIR/samba.sh.sample");
 	    ExecQuietFatal("$MV -f $RCDIR/samba.sh.sample $RCDIR/samba.sh");
 	};
+	if ($ELABINELAB) {	
+	    Phase "starting", "Starting Samba", sub {
+		ExecQuietFatal("$RCDIR/samba.sh start");
+	    };
+	}
     };
 }
 
