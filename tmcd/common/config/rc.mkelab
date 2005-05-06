@@ -325,6 +325,10 @@ sub SetupOpsNode()
     print "Installing the ops metaport.\n";
     $ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
     mysystem("pkg_add $emulabconfig{OPS_PKG} >/tmp/perrs 2>&1");
+    if ($WINSUPPORT) {
+	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
+	mysystem("pkg_add samba-3.0.7,1 >/tmp/perrs.samba 2>&1");
+    }
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
@@ -605,6 +609,9 @@ sub SetupBossNode()
     print "Installing the boss metaport.\n";
     $ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
     mysystem("pkg_add -f -v $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
+    if ($WINSUPPORT) {
+	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
+    }
 
     #
     # Extra stuff to fix up php package stuff. Ask Rob!
