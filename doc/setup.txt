@@ -55,6 +55,7 @@ use an external machines (other than ops) as a fileserver - talk to Utah abut
 this if you'd like to try.
 
 ##### Other docs:
+
 Useful summary info and diagrams can be found in "build-operate.ppt" and
 "security-all.ppt" in http://www.cs.utah.edu/flux/testbed-docs/internals/
 
@@ -67,23 +68,24 @@ Follow the instructions in the setup-ops.txt file before the ones in this file!
 Install FreeBSD on the machine you'll be using for your boss node, using the
 standard FreeBSD installation process.  When asked by the installer, it's best
 to choose the 'Developer' distribution set - this gets you full sources.  When
-it asks if you want to install the ports collection, answer no.
+it asks if you want to install the ports collection, answer *no*. You will
+be able to install ports later.
 
-You, will, however, have to make sure that you create a partition large
-enough to hold /usr/testbed - in addition to the testbed software, this is
-where many disk images will get stored. The /var partition will need to be
-large enough to hold the database - 100MB extra for the database should be
-sufficient. Also, since we'll be installing a lot of packages, you'll want
-to make sure that /usr is at least 8GB and at least a million inodes.
+As with setting up ops, you need to create partitions large enough:
 
-If you want, you can go ahead and create an account for yourself on boss. For
-now, just stick the home directory somewhere local, and move it to /users/ once
-you've got it mounted from ops (the boss-install script will set this up). In
-general, it's probably simpler to just use 'root' for now. BE SURE to
+/usr	      - Needs space for the ports tree and a system object tree.
+	                At least 10GB. Be sure to build with plenty of
+			inodes (the ports tree itself uses about 200000, so
+			be safe and build with at least a million).
+/usr/testbed  - Needs space for testbed software and logs, as well as
+			many disk images. At least 10GB, but more is better!
+/var          - Holds the database, so at least a few hundred MB. 
+
+
+Do *not* create any users yet, and just log in a root for the time being.
+Our software will create users later, once you get boss set up. BE SURE to
 give root a password and REMEMBER it! You are going to need it later.  To
-set the root password:
-
-	passwd root
+set the root password use "passwd root".
 
 ##### Step 1 - Installing packages
 
@@ -96,8 +98,12 @@ described in setup-ops.txt.
 
 ##### Step 2 -  Unpacking source and creating a defs file
 
-Unpack the source tarball somewhere with at least a few dozen MB free.
-root's home directory is probably best for this.
+Unpack the source tarball:
+
+	mkdir -p /usr/testbed/src/testbed
+	mkdir -p /usr/testbed/obj/testbed
+	cd /usr/testbed/src/testbed
+	tar ....
 
 Now, you'll need to create a 'defs file', which is used by the configure
 script to describe your enviroment, such as the hostnames of your boss and ops
@@ -110,16 +116,17 @@ template. It contains comments explaining the important variables to set.
 
 This works the same as it did on ops:
 
-	cd ~/tbobj
-	~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
+	cd /usr/testbed/obj/testbed
+	/usr/testbed/src/testbed/configure \
+		--with-TBDEFS=/path/to/your/defs-file
 
 ##### Step 4 - Running the boss installation script
 
 Again, this works the same as it did on ops, except that you run
 install/boss-install in the object tree, instead of ops-install.
 
-Like the ops-install script, boss-install sets up paswordless sudo for anyone
-in the wheel group.
+Like the ops-install script, boss-install sets up passwordless sudo for
+anyone in the wheel group.
 
 ##### Step 5 - Installing from source.
 
@@ -157,7 +164,7 @@ the addresses reside (ie. 10.0.0.db). This value is defined in the defs
 file created above, as TESTBED_NETWORK.
 
 boss-install makes a reasonable attempt to create a set of named config
-files for your, placing them in /etc/named. If your testbed consists of
+files for your, placing them in /etc/namedb. If your testbed consists of
 a single class-C network, then these files will most likely be correct,
 although you want to look at them to make sure. Look at these files to make
 sure:
@@ -170,7 +177,7 @@ If you have more than one class-C subnet for your testbed, you'll need a
 copy of the reverse zone file for each one. You want to put boss, ops, and
 any 'infrastructure' equipment (such as routers and switches) into the zone
 files.  These zone files do not need to include the nodes - the nodes will
-be added to them automatically. Be sure to edit /etc/named/named.conf if
+be added to them automatically. Be sure to edit /etc/named/namedb.conf if
 you add any reverse map files (follow the format for the existing entry).
 
 Once you think you've got things set up, run /usr/testbed/sbin/named_setup,
@@ -222,8 +229,7 @@ to boss's domain name).
 
 boss-install already generated a temporary no-passhrase certificate for you
 and placed them in the locations specified above. However, we recommend
-that you get a "real" certificate from Verisign (or one of the
-others).
+that you get a "real" certificate from Verisign (or one of the others).
 
 DHCPD - boss-install generated a dhcpd.conf.template and installed it in
 /usr/local/etc (the template is derived from information you provided in

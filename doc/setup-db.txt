@@ -17,25 +17,21 @@ ops setup documentation):
    Root ssh keys (so that root on boss can ssh to ops without a password)
    The web interface (you don't need to be able to log in yet)
 
-Run the 'firstuser' script on boss. This will get put in the utils subdirectory
-of your object tree. (Note: configure will not set the executable bit on the
-script, so you'll need to set it yourself, or run 'perl firstuser'.) This
-script will create a dummy user, which will be used only to bootstrap 'real'
-users. The firstuser script will prompt you for a password for this user, named
-'elabman'.
+Make sure you can log into the web interface using the 'elabman' account.
+The password for the elabman account is the same as the root password on
+your boss node (see, we told you to remember it!).
 
-Make sure you can log into the web interface using the 'elabman' account. This
-account is created as a testbed administrator, but there is one thing you will
-need to do in order to use your admin powers. For the same reason that you use
-'su' and/or 'sudo' on your UNIX boxes instead of logging in as root, you must
-explicitly enable admin privileges after you log in. When logged in as a user
-who is allowed to become an admin, you will see a green dot one the left side
-of the header above the main page content. The green dot means that although
-you are allowed admin powers, they are currently turned off, and you see the
-same web pages that a regular user sees, and can use the sam actions. If you
-click on the dot, it will turn red, and you will have full administrator
-privileges; we call this 'going red dot'.  Many of the procedures in this file
-require you to be in red dot mode.
+This account is created as a testbed administrator, but there is one thing
+you will need to do in order to use your admin powers. For the same reason
+that you use 'su' and/or 'sudo' on your UNIX boxes instead of logging in as
+root, you must explicitly enable admin privileges after you log in. When
+logged in as a user who is allowed to become an admin, you will see a green
+dot one the left side of the header above the main page content. The green
+dot means that although you are allowed admin powers, they are currently
+turned off, and you see the same web pages that a regular user sees, and
+can use the sam actions. If you click on the dot, it will turn red, and you
+will have full administrator privileges; we call this 'going red dot'.
+Many of the procedures in this file require you to be in red dot mode.
 
 Now, we'll use the elabman user to bootstrap your own account. Log out of the
 web interface, and use the 'Request Account' button to start a new project.
@@ -69,28 +65,35 @@ accounts get created:
 1) Set your 'admin bit' - set the 'admin' column for your account in the users
    table to '1' - you can do this, on boss, with:
    
-   echo 'update users set admin=1 where uid="<username>"' | mysql tbdb
+	echo 'update users set admin=1 where uid="<username>"' | mysql tbdb
 
 2) Give yourself the ability to log in to boss - most users have a restricted
    shell on boss, and are not allowed to log in using a password. Edit the
    password file (use 'vipw', FreeBSD requires some special processing on the
    password file after editing). Give yourself a real shell, and paste in your
-   encrypted password string from ops.
+   encrypted password string from ops (although in general, it is safer to
+   have a different password on boss then on ops!)
 
-3) Add yourself to important groups - If you want to be a member of any UNIX groups
-   on boss, use the 'unixgroups' command (our automated account tools may wipe
-   out groups added by hand.) You will need to be logged in as yourself (not
-   root) on boss to run this command. You will want to be a member of at least
-   the 'tbadmin' and 'wheel' groups. The syntax for this command is:
+3) If you were logged into boss as root, go ahead and log out and then back
+   in as yourself. In general, it is safer and better to not do things as
+   root. In fact, many testbed programs will complain if you invoke them as
+   root cause then it makes accounting and auditing more difficult.
 
-   unixgroups -a <username> <groupname> ...
+4) Add yourself to important groups - If you want to be a member of any
+   UNIX groups on boss, use the 'unixgroups' command (our automated account
+   tools may wipe out groups added by hand.)  You will need to be logged in
+   as yourself (not root) on boss to run this command. You will want to be
+   a member of at least the 'tbadmin' and 'wheel' groups. The syntax for
+   this command is:
+
+	unixgroups -a <username> <groupname> ...
 
 Just as you need to go 'red dot' to use admin privileges on the web interface,
 you must also explicitly enable them on the command line. To do this, prefix
 the command you want to run with 'withadminprivs'. For example, I might invoke
 unixgroups like this:
 
-   withadminprivs unixgroups -a ricci tbadmin wheel
+	withadminprivs unixgroups -a ricci tbadmin wheel
 
 (Note: withadminprivs and many other admin-type commands live in
 /usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your
@@ -99,7 +102,7 @@ $PATH.)
 Now that you are an admin, you don't need the elabman account anymore. Log into
 the web interface as yourself, go red dot, and go to the user list. Find
 elabman (you may need to click on 'Show: all' a the top of the page). Go to
-elabman's profile page  (by clicking on the uid) and freeze the user.
+elabman's profile page  (by clicking on the uid) and "freeze" the user.
 
 Others at your site can now apply to join your project, or start their own.
 
@@ -120,46 +123,64 @@ software. If you plan to use the former method, you can skip this step.
 First, you'll want to protect the webdb script from outside browsers. Because
 of its flexibility, it would be quite dangerous if it were broken into. So, we
 add an additional layer of protection by limiting the IP addresses it may be
-used from. Open your httpd.conf file (created as part of the boss
-installation), and find the 'Directory' directives. Add a section such as
-this:
-<Directory /usr/testbed/www/webdb>
-	AllowOverride None
-	order deny,allow
-	deny from all
-	allow from 155.99.212.
-</Directory>
+used from. Open your httpd.conf file (located in /usr/local/etc/apache)
+and find the 'Directory' directives. Add a section such as this:
+
+	<Directory /usr/testbed/www/webdb>
+		AllowOverride None
+		order deny,allow
+		deny from all
+		allow from 155.99.212.
+	</Directory>
+	
 If you installed the testbed tree somewhere other than /usr/testbed, fix the
 directory. Change the 'allow from' line to match your IP subnet (note the '.'
 on the end of the address, to match the entire subnet). You can have as
-many 'allow' lines as you want. Restart apache.
+many 'allow' lines as you want. Restart apache:
+
+	sudo /usr/local/etc/rc.d/apache.sh stop
+	sudo /usr/local/etc/rc.d/apache.sh start
 
 Next, you'll need to specify which users have the ability to edit the database.
 This is done with the 'dbedit' column in the users table. You can turn on
 a user's dbedit bit like so:
 
-   echo 'update users set dbedit=1 where uid="<username>"' | mysql tbdb
+	echo 'update users set dbedit=1 where uid="<username>"' | mysql tbdb
 
 ##### Step 3 - Setup switches
 ##### Local Only
 
 1) Create node types for switches
 
-Add entries to the node_types table for each type of switch you'll be using.
-The class column should be 'switch'. The type for Cisco switches should be
-something like 'cisco6509', or 'catalyst2950'. If the switch is running IOS
-(rather than CatOS), then append '-ios' to the switch's type. Most of the other
-columns aren't important for switches (so you can leave them blank), but
-putting in max_cards (if the switch is expandable) and max_ports can be useful
-for your own information.
+Add entries to the node_types table for each type of switch you'll be
+using. You can do this by talking to mysql directly, but is more easily
+accomplished using the web interface. In 'red dot' mode, go to:
+
+	https://<yourbossnode>/editnodetype.php3?new_type=1
+
+Set the "type" to something like 'cisco6509', or 'catalyst2950'. If the
+switch is running IOS (rather than CatOS), then append '-ios' to the
+switch's type. Set the "class" to 'switch' and set "processor" to whatever
+you used for the "type" field. 
+
+Most of the other columns are not important for switches (so you can set
+them to 0), but putting in "Max Interfaces" (if the switch is expandable)
+can be useful for your own information.
+
 
 2a) Create interface types for switch interconnects (if any)
 
 If you'll be connecting the experimental switches together, you'll add
 interface types for the ports you'll be using to link them together.  These go
 into the interface_types table. Make up something descriptive for the 'type'
-column (no spaces.) Make sure to set the max_speed (in Kbps) and full_duplex
-(1 for full duplex, 0 for half duplex) columns correctly.
+column (no spaces). Make sure to set the max_speed (in Kbps) and full_duplex
+(1 for full duplex, 0 for half duplex) columns correctly. As an example:
+
+	insert into interface_types set
+	    type='cisco_gigE',max_speed=1000000,full_duplex=1,
+	    manufacturuer='Cisco',model='WS-X6316-GE-TX',ports=16,
+	    connector='RJ45';
+
 
 2b) Create interface capabilities entries for switch interconnects (if any)
     
@@ -168,7 +189,10 @@ need to add entries to the interface_capabilities table. Using the same
 type name you used above, add a capkey for "protocols", usually set to
 "ethernet" and another capkey for "ethernet_defspeed" to the same value you
 used in the interface_types table. Do this for each type you entered in
-step 2a above.
+step 2a above. For example:
+
+	insert into interface_capabilities set
+	    type='cisco_gigE',capkey='ethernet_defspeed',capval='1000000';
 
 3) Create switches in nodes table
 
@@ -176,11 +200,15 @@ Next, add the switches to the nodes table. The only necessary fields here are
 node_id (choose one appropriate to the switch), type (use one of the ones you
 created earlier,) and role. Role, for switches, should be either 'testswitch'
 or 'controlswitch', depending on whether you're using it for the experimental
-or control network. If it's used for both, call it a 'testswitch'.
+or control network. If it's used for both, call it a 'testswitch'. Example:
+
+	insert into nodes set
+	    node_id='cisco1',phys_nodeid='cisco1',
+	    type='cisco6509',role='testswitch';
 
 The node_id you select must resolve in DNS and/or boss's /etc/host file - we'll
 use this name to contact the switch for SNMP. Ie., you must be able to ping the
-name you select as the switch's node_id.
+name you select as the switch's node_id. 
 
 4) Add state for switch interconnects
 
@@ -211,6 +239,7 @@ node_id of the master switch in the stack.  The stack_type column is used by
 snmpit to determine which module to use to talk to the stack. The currently
 supported values are 'cisco' and 'intel'. Making a control network stack is
 optional. There are a few columns in this table that you will need to set:
+
 supports_private: (Cisco only) This switch can make private VLANs - probably
     best to leave it as 0
 single_domain: (Cisco only) Means that all switches in the stack use VTP to
@@ -243,7 +272,7 @@ The only two supported power controllers at this time are the APC AP9210 and
 the BayTech RPC27. Theoretically, other SNMP and serial-controlled power
 controllers should not be hard to support.
 
-If your power controllers are controlled via IP and SNMP, add a node type ander
+If your power controllers are controlled via IP and SNMP, add a node type andor
 interface type for them. Then, give them an entries in the nodes, interfaces,
 and wires tables. Make sure to get the IP address correct in the interfaces
 table. The role listed in the nodes table should be 'powerctrl'.

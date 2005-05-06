@@ -8,10 +8,10 @@
 Install FreeBSD on the machine you'll be using for your ops node, using the
 standard FreeBSD installation process. When asked by the installer, it's best
 to choose the 'Developer' distribution set - this gets you full sources. When
-it asks if you want to install the ports collection, answer no.  Don't install
-any packages at this time - you'll get a chance to later.  You'll need to
-partition your filesystems so that you have the proper amount of space for
-certain directories - see below for details.
+it asks if you want to install the ports collection, answer *no*.  Do not
+install any packages at this time - you'll get a chance to later.  You'll
+need to partition your filesystems so that you have the proper amount of
+space for certain directories - see below for details.
 
 Make sure that you have the network correctly configured.
 
@@ -22,8 +22,8 @@ space to hold them:
 	                At least 10GB. Be sure to build with plenty of
 			inodes (the ports tree itself uses about 200000, so
 			be safe and build with at least a million).
-/usr/testbed/ - Needs space for testbed software and logs. A few gigs should be
-			plenty.
+/usr/testbed/ - Needs space for testbed software and logs. Several (3-4) GB
+			should be enough.
 /users/       - Needs space for user home directories. Amount of space required 
 			depends on how many users you expect to have.
 			Generally, though, we suggest that users store large
@@ -55,8 +55,8 @@ symlinks to the appropriate places. ie., if you make one big filesystem called
 	ln -s /z/proj /proj
 	... etc.
 
-It's simplest if you don't create any users yet, and just log in a root for the
-time being. Our software will create users later, once you get boss set up.
+Do *not* create any users yet, and just log in a root for the time being. Our
+software will create users later, once you get boss set up.
 
 ##### Step 1 - Installing packages
 
@@ -84,31 +84,37 @@ grab our 'approved' copy of the ports tree from:
 
 	http://www.emulab.net/downloads/ports-20041102.tar.gz
 	
-Untar it, move it into place as /usr/ports (rename the old directory
-to ports.old), and install whatever ports you want to make ops feel
-like 'home' (like emacs, jove, or whatever). NOTE: You must download and
-copy the ports tree into place, even if you do not intend to install any
-packages yourself. 
+Untar it, move it into place as /usr/ports (rename the old directory to
+ports.old, or just remove it), and install whatever ports you want to make
+ops feel like 'home' (like emacs, jove, or whatever). NOTE: You must
+download and copy the ports tree into place, even if you do not intend to
+install any packages yourself.
 
 ##### Step 2 - Unpacking and running configure
 
 At this point, you'll need to make a 'defs' file - see setup.txt for
 instructions for doing so. You'll use the same defs file on boss and ops.
+You will use the --with-TBDEFS option to configure to give it the path to
+your defs file.
 
-Unpack the testbed source, and run it's configure script. Use the --with-TBDEFS
-option to configure to give it the path to your defs file.
+Unpack the testbed source, and run it's configure script. A good place to
+unpack the source code is /usr/testbed/src/testbed:
 
-For example, I have the testbed source in ~/testbed, my defs file in
-/users/ricci/testbed/defs-ricci, and use the ~/tbobj directory to do my
-builds in:
+	mkdir -p /usr/testbed/src/testbed
+	mkdir -p /usr/testbed/obj/testbed
+	cd /usr/testbed/src/testbed
+	tar ....
+	cd /usr/testbed/obj/testbed
+	/usr/testbed/src/testbed/configure \
+		--with-TBDEFS=/path/to/your/defs-file
 
-	cd ~/tbobj
-	~/testbed/configure --with-TBDEFS=/users/ricci/testbed/defs-ricci
+Typically, you would store your defs file in the source tree along with 
+the other defs files that came in the tarball.
 
 ##### Step 3 - Running the ops installation script
 
-In the object tree you've configured (in my example above, ~/tbobj), there's an
-'install' subdirectory, with a script called 'ops-install'. Just run this
+In the object tree you've configured (say, /usr/testbed/obj/testbed), there's
+an 'install' subdirectory, with a script called 'ops-install'. Just run this
 script as root. It will take care of installing ports, and doing various other
 configuration of FreeBSD required to make it into an ops node. The script is
 designed so that you can run it as many times as you want, and it'll just skip
