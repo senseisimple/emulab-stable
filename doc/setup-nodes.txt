@@ -39,48 +39,71 @@ the 'Node Status' link on the menu, and use the 'Create a new type' link. The
 important things on this page to fill out are: (You can leave the defaults for
 the rest)
 
-Type: We typically name types 'pcXXX', where XXX is a short (a few characters)
-	string describing the nodes (such as processor speed, chipset, etc.)
-	eg. pc600 for 600-MHz nodes
-Processor: Class of processor (ie. 'Pentium IV')
-Speed: CPU speed in MHz
-RAM: Amount of RAM in MB
-HD: Hard disk size in GB
-Max Interfaces: Maximum number of NIC ports (eg. dual port cards count as 2)
-Control Network: Interface number (described below) of the control network
-	interface
-Control Network Iface: Name of the control network interface under Linux -
+* Type - We typically name types 'pcXXX', where XXX is a short (a few
+	characters) string describing the nodes (such as processor
+	speed, chipset, etc.) eg. pc600 for 600-MHz nodes
+  
+* Processor -  Class of processor (eg. 'Pentium IV')
+
+* Speed - CPU speed in MHz (eg. 3000)
+
+* RAM - Amount of RAM in MB (eg. 256)
+
+* HD - Hard disk size in GB (eg. 20)
+
+* Max Interfaces - Maximum number of NIC ports (eg. dual port cards
+	count as 2)
+		   
+* Control Network - Interface number (described below) of the control network
+	interface.
+
+* Control Network Iface - Name of the control network interface under Linux -
 	usually, just a concatenation of 'eth' and the Control Network number
 	you entered above. (eg. 'eth0')
-OSIDs: If Utah has already given you disk images (and their associated database
-	state), then select those at this stage. You should have only one choice
-	for the ImageID. For the Default OSID, select either Linux or FreeBSD,
-	depending on what you think your users are likely to want by default.
-	For the time being, both the delay and jail OSIDs need to be FreeBSD.
-	If Utah has not given you images yet, come back and set the OSIDs once
-	they have.
-Delay Capacity: How many delay nodes this node can be. For example, nodes with
-	2 experimental interfaces can be 1 delay node, nodes with 4 experimental
-	interfaces can be 2 delay nodes, etc.
-Disk Type: FreeBSD-style disk name for the primary hard drive.
+
+* OSIDs - If Utah has already given you disk images (and their
+	associated database state), then select those at this stage. You
+	should have only one choice for the ImageID. For the Default OSID,
+	select either Linux or FreeBSD, depending on what you think your
+	users are likely to want by default.  For the time being, both the
+	delay and jail OSIDs need to be FreeBSD.  If Utah has not given you
+	images yet, come back and set the OSIDs once they have.
+	
+* Delay Capacity - How many delay nodes this node can be. For example,
+	nodes with 2 experimental interfaces can be 1 delay node, nodes
+	with 4 experimental interfaces can be 2 delay nodes, etc. If your
+	nodes are not especially "beefy" then you might not want to set
+	this number to the maximum it could be.
+	
+* Disk Type - FreeBSD-style disk name for the primary hard drive.
 	Choices are 'ad' (IDE), 'sd' (SCSI), or 'ar' (IDE RAID).
 
 You'll also need to add entries to the interface_types table (using the web
 SQL editor, or SQL directly) for each type of network card you are using. Notes
 on the columns:
 
-type: Name of the FreeBSD driver for the card (common ones are 'fxp' for Intel
-	EtherExpress Pro 100 and 'xl' for Tulip-based cards)
-max_speed: The maximum speed of the interface, in Kbps
-full_duplex: 1 if the card can operate in full duplex, 0 otherwise
+* type - Name of the FreeBSD driver for the card (common ones are 'fxp' for
+	Intel EtherExpress Pro 100 and 'xl' for Tulip-based cards)
+	
+* max_speed - The maximum speed of the interface, in Kbps.
 
-Once you have all of the interfaces specified, you should run the
-following sql commands:
+* full_duplex - 1 if the card can operate in full duplex, 0 otherwise.
 
-	insert into interface_capabilities (type, capkey, capval) \
-	    select type,"protocols","ethernet" from interface_types;
-	insert into interface_capabilities (type, capkey, capval) \
-	    select type,"ethernet_defspeed",max_speed from interface_types;
+As an example, to insert an entry for an "fxp" interface:
+
+	insert into interface_types set
+	    type='fxp',max_speed=100000,full_duplex=1,
+	    manufacturuer='Intel',model='EtherExpress Pro',ports=1,
+	    connector='RJ45';
+
+Once you have all of the interfaces specified, you need to insert the
+following interface_capabilities table entries, *foreach* new interface
+type you entered above:
+
+	insert into interface_capabilities set
+	    type='fxp',capkey='protocols',capval='ethernet';
+	insert into interface_capabilities set
+	    type='fxp',capkey='ethernet_defspeed',capval='100000';
 
 ##### Bringing up the first node
 
@@ -111,8 +134,9 @@ On this page, you should now see the first node you booted up, which should
 have gotten the name 'pc1'. Click on the ID number (which is probably '1') to
 see more detail. Make sure that the number of interfaces reported is correct.
 Note that the 'Temporary IP' shown on this page is the dynamic one assigned to
-the node by DHCP, from the dynamic range you set up. If you need to SSH into to
-it to check things out, until it's be really added to the testbed, use this IP.
+the node by DHCP, from the dynamic range you set up in the defs file. If
+you need to SSH into to it to check things out, until it's be really added
+to the testbed, use this IP.
 
 Next, make sure that the 'Type' column is filled in with the one you entered
 into the types table earlier. If it isn't, fix that now using the 'Set Type'
@@ -138,7 +162,9 @@ from Knoppix, or some distribution's install floppy/CD to determine the Linux
 order - use MAC addresses to map this to the FreeBSD one.)
 
 If you somehow make a mistake and need to delete a node that's been created,
-use the 'deletenode' script on boss.
+use the 'deletenode' script on boss. For example, to delete pc1 from the DB:
+
+	withadminprivs /usr/testbed/sbin/deletenode pc1
 
 ##### Bringing up the rest of the nodes
 
@@ -151,7 +177,7 @@ very painful! If there are some nodes you simply can't bring up, because of bad
 hardware, etc. write these down, and we'll fix things up later.
 
 Important note: Remember the size of the dynamic range you picked for dhcp
-in the defs file? Well, that will limit how many of these node you can
+in the defs file? Well, that will limit how many of nodes you can
 bring up at a time.  If you run out of IP addresses, continue on with the
 nodes you have up, and repeat these steps later with the remainder.
 
@@ -170,11 +196,12 @@ detected correctly, just select them all, and use the 'set type' button.
 
 If you found earlier that the FreeBSD and Linux ordering for interfaces was
 different, we'll fix that up now.  Use the boxes right above the 'Re-number
-interfaces' button to do this. Just leave blank any interface numbers your nodes don't
-have. For example, if you have two interfaces, and what FreeBSD detects as eth0
-is eth1 under Linux, and vice versa for eth1, you'd enter '1' and '0' in the
-first two boxes. Select all nodes, and hit the 're-number' button. Once you've
-got this sorted out, the 'Control MAC' column should be correct.
+interfaces' button to do this. Just leave blank any interface numbers your
+nodes don't have. For example, if you have two interfaces, and what FreeBSD
+detects as eth0 is eth1 under Linux, and vice versa for eth1, you'd enter
+'1' and '0' in the first two boxes. Select all nodes, and hit the
+'re-number' button. Once you've got this sorted out, the 'Control MAC'
+column should be correct.
 
 Now, we're going to figure out where the interfaces are plugged into your
 switches - you should have entered your switches into the database as part of

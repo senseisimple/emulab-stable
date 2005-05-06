@@ -192,6 +192,8 @@ used in the interface_types table. Do this for each type you entered in
 step 2a above. For example:
 
 	insert into interface_capabilities set
+	    type='cisco_gigE',capkey='protocols',capval='ethernet';
+	insert into interface_capabilities set
 	    type='cisco_gigE',capkey='ethernet_defspeed',capval='1000000';
 
 3) Create switches in nodes table
