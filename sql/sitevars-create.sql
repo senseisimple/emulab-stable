@@ -54,3 +54,4 @@ INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg',NULL,'','Name of boss no
 INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'','Path from which to fetch boss packages');
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'','Name of ops node install package');
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'','Path from which to fetch ops packages');
+INSERT INTO sitevariables VALUES ('elabinelab/windows',NULL,'0','Turn on Windows support in inner Emulab');
