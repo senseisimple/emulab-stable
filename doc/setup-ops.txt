@@ -115,13 +115,18 @@ the other defs files that came in the tarball.
 
 In the object tree you've configured (say, /usr/testbed/obj/testbed), there's
 an 'install' subdirectory, with a script called 'ops-install'. Just run this
-script as root. It will take care of installing ports, and doing various other
-configuration of FreeBSD required to make it into an ops node. The script is
-designed so that you can run it as many times as you want, and it'll just skip
-stuff it's already done. If it fails, send the output to Utah so that we can
-fix it up. If it succeeds, follow any other instructions it may have. The
-script will tell you to reboot the machine, but you can wait until after you do
-the next step to do so, if you want.
+script as root (note the same package directory argument as above).
+
+	cd install
+	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 perl ops-install
+
+It will take care of installing any additional ports, and doing various
+other configuration of FreeBSD required to make it into an ops node. The
+script is designed so that you can run it as many times as you want, and
+it'll just skip stuff it's already done. If it fails, send the output to
+Utah so that we can fix it up. If it succeeds, follow any other
+instructions it may have. The script will tell you to reboot the machine,
+but you can wait until after you do the next step to do so, if you want.
 
 (You may have to set the executable bit on this script, since configure won't -
 I'd like to get this solved at some point.)

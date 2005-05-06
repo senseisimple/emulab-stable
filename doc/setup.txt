@@ -91,7 +91,9 @@ set the root password use "passwd root".
 
 Again, almost the same as on ops. Download the same tarball, and follow
 the same pkg_add procedure, except this time, you're going to install
-the emulab-boss-1.8 package instead of emulab-ops.
+the emulab-boss-1.8 package instead of emulab-ops:
+
+	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 pkg_add emulab-boss-1.8
 
 Also grab a copy og our approved ports tree and install it, the same as
 described in setup-ops.txt.
@@ -123,7 +125,11 @@ This works the same as it did on ops:
 ##### Step 4 - Running the boss installation script
 
 Again, this works the same as it did on ops, except that you run
-install/boss-install in the object tree, instead of ops-install.
+boss-install in the object tree, instead of ops-install. Just run this
+script as root (note the same package directory argument as above).
+
+	cd install
+	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 perl boss-install
 
 Like the ops-install script, boss-install sets up passwordless sudo for
 anyone in the wheel group.
