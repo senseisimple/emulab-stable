@@ -368,15 +368,20 @@ Phase "portfixup", "Fixing up packages", sub {
 	    PhaseSkip("rsync already installed");
 	}
 
-	#
-	# This port is dead-simple, so it's safe to do it from this script
-	#
- 	my $pwd = `$PWD`;
-	chomp $pwd;
-	chdir "$PORTSDIR/net/rsync" or
+	if (exists($ENV{"PKG_PATH"})) {
+	    ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
+	}
+	else {
+	    #
+	    # This port is dead-simple, so it's safe to do it from this script
+	    #
+	    my $pwd = `$PWD`;
+	    chomp $pwd;
+	    chdir "$PORTSDIR/net/rsync" or
  	 	PhaseFail "Unable to change to $PORTSDIR/net/rsync: $!";
-	ExecQuietFatal("make -DBATCH install");
-	chdir $pwd;
+	    ExecQuietFatal("make -DBATCH install");
+	    chdir $pwd;
+	}
     };
 };
 

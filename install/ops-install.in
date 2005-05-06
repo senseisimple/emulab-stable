@@ -253,21 +253,46 @@ Phase "ports", "Installing ports", sub {
 
 # XXX Temporary.
 Phase "portfixup", "Fixing up packages", sub {
-    Phase "rsync", "Looking for rsync", sub {
+    Phase "rsync", "Looking for rsync and installing", sub {
 	if (!ExecQuiet("$PKG_INFO -x rsync")) {
 	    PhaseSkip("rsync already installed");
 	}
 
-	#
-	# This port is dead-simple, so it's safe to do it from this script
-	#
- 	my $pwd = `$PWD`;
-	chomp $pwd;
-	chdir "$PORTSDIR/net/rsync" or
+	if (exists($ENV{"PKG_PATH"})) {
+	    ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
+	}
+	else {
+	    #
+	    # This port is dead-simple, so it's safe to do it from this script
+	    #
+	    my $pwd = `$PWD`;
+	    chomp $pwd;
+	    chdir "$PORTSDIR/net/rsync" or
  	 	PhaseFail "Unable to change to $PORTSDIR/net/rsync: $!";
-	ExecQuietFatal("make -DBATCH install");
-	chdir $pwd;
+	    ExecQuietFatal("make -DBATCH install");
+	    chdir $pwd;
+	}
     };
+    if ($WINSUPPORT) {
+	Phase "samba", "Looking for Samba and installing", sub {
+	    if (!ExecQuiet("$PKG_INFO -x samba")) {
+		PhaseSkip("samba already installed");
+	    }
+
+	    if (exists($ENV{"PKG_PATH"})) {
+		ExecQuietFatal("$PKG_ADD samba-3.0.7,1");
+	    }
+	    else {
+		my $pwd = `$PWD`;
+		chomp $pwd;
+		chdir "$PORTSDIR/net/samba3" or
+		    PhaseFail "Unable to change to $PORTSDIR/net/samba3: $!";
+		ExecQuietFatal("make -DBATCH -DSAMBA_SUBPORT install");
+		ExecQuietFatal("make -k post-install");
+		chdir $pwd;
+	    }
+	};
+    }
 };
 
 Phase "patches", "Applying patches", sub {
