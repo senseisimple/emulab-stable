@@ -5552,6 +5552,9 @@ COMMAND_PROTOTYPE(doemulabconfig)
 		} else if (strcmp(row[0], "elabinelab/ops_pkg") == 0) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPS_PKG=%s\n",
 				       row[1]);
+		} else if (strcmp(row[0], "elabinelab/windows") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "WINSUPPORT=%s\n",
+				       row[1]);
 		}
 	}
 	mysql_free_result(res);
