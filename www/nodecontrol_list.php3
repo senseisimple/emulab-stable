@@ -303,6 +303,7 @@ $query_result =
 if (mysql_num_rows($query_result) == 0) {
     echo "<center>Oops, no nodes to show you!</center>";
     PAGEFOOTER();
+    exit();
 }
 
 #
