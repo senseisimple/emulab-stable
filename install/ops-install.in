@@ -284,7 +284,7 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     AppendToFileFatal($RCCONF,
 		      qq|sendmail_enable="YES"|,
 		      qq|nfs_server_enable="YES"|,
-		      ($WINSUPPORT ? qq|enable_smbd="YES"| : ()),
+		      ($WINSUPPORT ? qq|smbd_enable="YES"| : ()),
 		      qq|nfs_server_flags="-u -t -n 16"|,
 		      qq|syslogd_flags=""|);
 };
