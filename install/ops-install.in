@@ -130,12 +130,13 @@ my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
 #
 # Some directories we care about
 #
-my $LIST_DIR   = "/etc/mail/lists";
-my $TIPLOG_DIR = "/var/log/tiplogs";
-my $PORTSDIR   = "/usr/ports/misc";
-my $SRCDIR     = '@srcdir@';
-my $TOP_SRCDIR = "@top_srcdir@";
-my $RCDIR      = "/usr/local/etc/rc.d";
+my $LIST_DIR      = "/etc/mail/lists";
+my $TIPLOG_DIR    = "/var/log/tiplogs";
+my $PORTSDIR      = "/usr/ports";
+my $PORTSMISCDIR  = "$PORTSDIR/misc";
+my $SRCDIR        = '@srcdir@';
+my $TOP_SRCDIR    = "@top_srcdir@";
+my $RCDIR         = "/usr/local/etc/rc.d";
 
 #
 # And some lists that we use
@@ -227,7 +228,7 @@ Phase "ports", "Installing ports", sub {
 	if ($packagedir) {
 	    PhaseSkip("Package directory provided");
 	}
-	DoneIfExists("$PORTSDIR/emulab-ops");
+	DoneIfExists("$PORTSMISCDIR/emulab-ops");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     Phase "pinstall", "Installing ports (may take a while)", sub {
@@ -243,8 +244,8 @@ Phase "ports", "Installing ports", sub {
 	#
 	my $pwd = `$PWD`;
 	chomp $pwd;
-	chdir "$PORTSDIR/emulab-ops" or
-		PhaseFail "Unable to change to $PORTSDIR/emulab-ops: $!";
+	chdir "$PORTSMISCDIR/emulab-ops" or
+		PhaseFail "Unable to change to $PORTSMISCDIR/emulab-ops: $!";
 	ExecQuietFatal("make -DBATCH install");
 	chdir $pwd;
     };

@@ -125,7 +125,8 @@ my $MYSQL_LOGDIR  = "$LOGDIR/mysql";
 my $RCDIR         = "/usr/local/etc/rc.d";
 my $USERSVAR_DIR  = "$PREFIX/usersvar";
 my $OPSDIR_DIR    = "$PREFIX/opsdir";
-my $PORTSDIR      = "/usr/ports/misc";
+my $PORTSDIR      = "/usr/ports";
+my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $MIBPATH       = "/usr/local/share/snmp/mibs";
 my $TFTP_DIR      = "$PREFIX/tftpboot";
 my $TFTP_PROJ_DIR = "$TFTP_DIR/proj";
@@ -343,7 +344,7 @@ Phase "ports", "Installing ports", sub {
 	PhaseSkip("Packages installed okay");
     }
     Phase "pcopy", "Copying ports into place", sub {
-	DoneIfExists("$PORTSDIR/emulab-boss");
+	DoneIfExists("$PORTSMISCDIR/emulab-boss");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
     # Ick. The php4 port is broken with SSL, so we have to patch it - hopefully
@@ -356,7 +357,7 @@ Phase "ports", "Installing ports", sub {
     };
     PhaseFail("Please install ports manually, since some\n of them are " .
 	      "interactive. Run: \n" .
-	      "cd $PORTSDIR/emulab-boss && make install\n" .
+	      "cd $PORTSMISCDIR/emulab-boss && make install\n" .
 	      "then re-run this script.");
 };
 
