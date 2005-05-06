@@ -563,6 +563,7 @@ else
 		  os/imagezip/ntfs/libntfs/GNUmakefile \
 		  os/imagezip/fat/GNUmakefile"
 	optional_subdirs="$optional_subdirs";
+        AC_DEFINE_UNQUOTED(WINSUPPORT, 1)
 fi
 
 
