@@ -161,6 +161,19 @@ DHCPD_DYNRANGE="155.98.36.200 155.98.36.249"
 NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
 
 #
+# Windows support. Turn this on if you think you might want to use windows
+# XP images on your experimental nodes. Note though, that Utah cannot
+# provide those images to you (because of obvious licensing issues), so it
+# will be up to you to generate an XP image yourself and install the
+# Emulab client side that enables XP to work inside your testbed. Turning
+# Windows support will install and enable Samba on your ops node, so there 
+# are firewall issues to be aware of (you want to block the appropriate ports
+# so that your ops samba server can be accessed from *only* your control
+# subnet!).
+#
+WINSUPPORT=0
+
+#
 # You shouldn't have to change anything below this point
 #
 
@@ -172,7 +185,6 @@ SFSSUPPORT=0
 DISABLE_NSE=1
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
-WINSUPPORT=0
 
 # Sometimes the main page is down in a directory on WWWHOST
 # No trailing '/'!

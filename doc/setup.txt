@@ -116,7 +116,9 @@ template. It contains comments explaining the important variables to set.
 
 ##### Step 3 - Configuring an object tree
 
-This works the same as it did on ops:
+This works the same as it did on ops. Remember, you have to use the same
+defs file on boss that you used on ops!
+
 
 	cd /usr/testbed/obj/testbed
 	/usr/testbed/src/testbed/configure \

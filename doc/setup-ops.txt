@@ -92,13 +92,15 @@ install any packages yourself.
 
 ##### Step 2 - Unpacking and running configure
 
-At this point, you'll need to make a 'defs' file - see setup.txt for
-instructions for doing so. You'll use the same defs file on boss and ops.
-You will use the --with-TBDEFS option to configure to give it the path to
-your defs file.
+At this point, you'll need to make a 'defs' file - You will use the same
+defs file on boss and ops. See defs-example in the top level directory
+as a starting point. You want to make sure each of the variables has a
+definition that makes sense in your environment. Feel free to ask Utah if
+something is not clear.
 
 Unpack the testbed source, and run it's configure script. A good place to
-unpack the source code is /usr/testbed/src/testbed:
+unpack the source code is /usr/testbed/src/testbed. You will use the
+--with-TBDEFS option to configure to give it the path to your defs file:
 
 	mkdir -p /usr/testbed/src/testbed
 	mkdir -p /usr/testbed/obj/testbed
