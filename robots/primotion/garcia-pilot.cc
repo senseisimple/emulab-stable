@@ -148,7 +148,11 @@ int main(int argc, char *argv[])
     const char *batteryfile = BATTERY_LOG_PATH;
     const char *sfile = DEFAULT_SFILE;
     int retval = EXIT_SUCCESS;
-    unsigned long now;
+    unsigned long now, t_offset, t_elapsed, ti_start;
+    unsigned long ti_list[1000]; /* list of iteration elapsed times */
+    
+    float ti_mean, ti_var;
+    
     FILE *batterylog;
     FILE *sdata_in;
     aIOLib ioRef;
@@ -293,6 +297,10 @@ int main(int argc, char *argv[])
                     sfile);
             exit(1);
           }
+          
+          aIO_GetMSTicks(ioRef, &t_offset, NULL);
+          
+          
         
           nullb = garcia.createNamedBehavior("null", NULL);
           av.set(0.2f);
@@ -305,7 +313,8 @@ int main(int argc, char *argv[])
           /* These states will come from the RMCD/EMCD in the future */
           while (3 == fscanf(sdata_in, "%f %f %f\n", &e_in, &alpha_in, &theta_in)) {
           
-            lcount++;
+
+            aIO_GetMSTicks(ioRef, &ti_start, NULL);
             
             /* controller: */
             C_u = 0.8 * tanh(K_gamma * cos(alpha_in) * e_in);
@@ -337,21 +346,22 @@ int main(int argc, char *argv[])
             garcia.setNamedValue("damped-speed-left", &av_L);
             garcia.setNamedValue("damped-speed-right", &av_R);
             
-            vleft = garcia.getNamedValue("damped-speed-left")->getFloatVal();
-            vright = garcia.getNamedValue("damped-speed-right")->getFloatVal();
+//             vleft = garcia.getNamedValue("damped-speed-left")->getFloatVal();
+//             vright = garcia.getNamedValue("damped-speed-right")->getFloatVal();
             
-            if (debug) {
+/*            if (debug) {
               fprintf(stderr, "L/R velocities: %f %f\n", vleft, vright);
-            }
+            }*/
             
             
             /* wait 0.033 (1/30) seconds */
             garcia.handleCallbacks(33);
+            aIO_GetMSTicks(ioRef, &now, NULL);
+            ti_list[lcount] = now - ti_start;
+            
+            lcount++;          
+          }
           
-          }
-          if (debug) {
-            fprintf(stderr, "Done with file: read %d lines\n", lcount);
-          }
           
           /* abort the null primitive: */
           av.set(aGARCIA_ERRFLAG_ABORT);
@@ -363,7 +373,27 @@ int main(int argc, char *argv[])
               sdata_in = NULL;
           }
         
-        
+          aIO_GetMSTicks(ioRef, &now, NULL);
+          t_elapsed = now - t_offset;
+          
+          
+          
+          ti_mean = 0.0f;
+          ti_var = 0.0f;
+          for (int incr_i = 0; incr_i < lcount; incr_i++) {
+            ti_mean += (float)(ti_list[incr_i]);
+            ti_var += (float)(ti_list[incr_i]) * (float)(ti_list[incr_i]);
+          }
+          ti_var = (ti_var - ti_mean*ti_mean / ((float)(lcount))) / ((float)(lcount));
+          ti_mean = ti_mean / ((float)(lcount));
+          
+          
+          if (debug) {
+            fprintf(stderr, "Done with file: read %d lines\n", lcount);
+            fprintf(stderr, "Elapsed time: %d\n", t_elapsed);
+            fprintf(stderr, "Iteration times:\n mean: %f, variance: %f\n", ti_mean, ti_var);
+          }
+          
         
         }
         else {
