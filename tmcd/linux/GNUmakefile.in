@@ -38,6 +38,9 @@ INSTALL		?= /usr/bin/install -c
 COMMON		?= $(SRCDIR)/../common
 DEFRUNLVLDIR	?= $(RCDIR)/rc3.d
 
+# without DESTDIR, used for the value of symlinks
+RRCDIR		?= $(CLIENT_ETCDIR)/rc.d
+
 install client-install:	common-install etc-install \
 			sup-install script-install bin-install
 	@echo "Remember to install the PEM files if necessary"
@@ -94,9 +97,9 @@ sysetc-install:	dir-install ifcfgs
 	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 755 $(SRCDIR)/ntpd.sh $(RCDIR)/init.d/ntpd
 	$(INSTALL) -m 755 $(SRCDIR)/testbed $(RCDIR)/init.d/testbed
-	-ln -sf $(RCDIR)/init.d/testbed $(DEFRUNLVLDIR)/S96testbed
-	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
-	-ln -sf $(RCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
+	-ln -sf $(RRCDIR)/init.d/testbed $(DEFRUNLVLDIR)/S96testbed
+	-ln -sf $(RRCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
+	-ln -sf $(RRCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
 	if [ -e $(SYSETCDIR)/cron.daily/slocate.cron ]; then \
 		mv -f $(SYSETCDIR)/cron.daily/slocate.cron \
@@ -107,11 +110,11 @@ sysetc-install:	dir-install ifcfgs
 				$(SYSETCDIR)/cron.pend; \
 	fi
 	$(INSTALL) -m 755 $(SRCDIR)/elvin.sh $(RCDIR)/init.d/elvin
-	-ln -sf $(RCDIR)/init.d/elvin $(DEFRUNLVLDIR)/S96elvin
-	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
-	-ln -sf $(RCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
+	-ln -sf $(RRCDIR)/init.d/elvin $(DEFRUNLVLDIR)/S96elvin
+	-ln -sf $(RRCDIR)/init.d/elvin $(RCDIR)/rc1.d/K12elvin
+	-ln -sf $(RRCDIR)/init.d/elvin $(RCDIR)/rc6.d/K12elvin
 	$(INSTALL) -m 755 $(SRCDIR)/rc.local $(RCDIR)/rc.local
-	-ln -sf $(RCDIR)/rc.local $(SYSETCDIR)/rc.local
+	-ln -sf $(RRCDIR)/rc.local $(SYSETCDIR)/rc.local
 
 sysetc-remove:
 	-rm -f $(RCDIR)/*/S95anacron $(RCDIR)/*/K05anacron 
@@ -136,8 +139,8 @@ script-install:	dir-install $(SCRIPTS)
 sfs-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(DESTDIR)/etc/sfs
 	$(INSTALL) -m 755 $(SRCDIR)/sfs.sh $(RCDIR)/init.d/sfs
-	-ln -sf $(RCDIR)/init.d/nfs $(DEFRUNLVLDIR)/S20nfs
-	-ln -sf $(RCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
+	-ln -sf $(RRCDIR)/init.d/nfs $(DEFRUNLVLDIR)/S20nfs
+	-ln -sf $(RRCDIR)/init.d/sfs $(RCDIR)/rc6.d/K19sfs
 	$(INSTALL) -m 644 $(SRCDIR)/exports $(ETCDIR)/exports
 	$(INSTALL) -m 644 $(SRCDIR)/sfsrwsd_config $(ETCDIR)/sfs/sfsrwsd_config
 	$(INSTALL) -m 644 $(SRCDIR)/sfssd_config $(ETCDIR)/sfs/sfssd_config
