@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -28,7 +28,6 @@ all:	supfile ifcfgs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DESTDIR		=
 SYSETCDIR	= $(DESTDIR)/etc
 ETCDIR		= $(DESTDIR)$(CLIENT_ETCDIR)
 BINDIR		= $(DESTDIR)$(CLIENT_BINDIR)
@@ -46,10 +45,10 @@ simple-install:	common-install script-install bin-install
 dir-install:
 
 baselinux-install: dir-install
-	(cd ../linux; $(MAKE) client-install)
+	(cd ../linux; $(MAKE) DESTDIR=$(DESTDIR) client-install)
 
 common-install:	dir-install
-	(cd ../common; $(MAKE) local-install)
+	(cd ../common; $(MAKE) DESTDIR=$(DESTDIR) local-install)
 
 sup-install:	dir-install supfile
 	$(INSTALL) -m 755 ./supfile $(ETCDIR)/supfile

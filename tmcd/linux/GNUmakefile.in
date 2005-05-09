@@ -28,7 +28,6 @@ all:	supfile $(SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-DESTDIR		=
 SYSETCDIR	?= $(DESTDIR)/etc
 ETCDIR		?= $(DESTDIR)$(CLIENT_ETCDIR)
 BINDIR		?= $(DESTDIR)$(CLIENT_BINDIR)
