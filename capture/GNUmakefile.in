@@ -22,8 +22,6 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 DBFLAGS	+= -I/usr/local/include
 
-DESTDIR=
-
 #
 # Define LOG_DROPS to record warnings in syslog whenever chars were dropped
 # due to the output device/pty being full.
