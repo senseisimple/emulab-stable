@@ -35,14 +35,21 @@ A. Things to understand up front:
    is how I expect you to do it.
 
 3. To do an Emulab client software install, certain other software packages
-   must be installed.  If you are updating a recent Emulab image, these
-   should all be in place.  But if you are updating a really old image,
+   must be installed before you even try to configure the Emulab software.
+   If you are updating a recent Emulab image, these should all be in place.
+   But if you are updating a really old image,
    or you are installing the software for the first time, you will need
    these things:
 
+   - GNU make.  On Linux it is the standard make.  On FreeBSD, you must
+     install the port: /usr/ports/devel/gmake.
+
+   - Python.  Needs to be Python 2.3 right now.  For FreeBSD, go to
+     /usr/ports/lang/python23 and do a "make install".
+
    - Elvin headers and libraries.  Check for the existance of "libvin4.a"
      in your library path (probably in /usr/local/lib).  If it doesn't
-     exist, you will need to download:
+     exist, you will need to download (wget or fetch):
 
        http://www.emulab.net/downloads/libelvin-4.0.3.tar.gz
        http://www.emulab.net/downloads/libelvin-4.0.3.patch
@@ -54,7 +61,7 @@ A. Things to understand up front:
 
      then build, and install it.  For FreeBSD:
        cd libelvin-4.0.3
-       ./configure
+       ./configure --enable-threads
        make
        sudo make install
      for Linux, at least RedHat 9:
@@ -115,6 +122,15 @@ A. Things to understand up front:
      provide the boot time rc boilerplate to call dhclient, we have our
      own and don't need it).
 
+   - BPF devices.  Under FreeBSD, the DHCP client uses /dev/bpf* devices.
+     In FreeBSD 4, there are only 4 devices by default so if you have more
+     than 4 interfaces in the system, DHCP will fail.  So you may need to
+     go out to /dev and:
+
+         sudo ./MAKEDEV bpf5 bpf6 ...
+
+     For FreeBSD 5 and Linux, you should not have to do this.
+
    - Perl.  On FreeBSD 5, perl is not installed by default.  Make sure you
      have a version of perl5 installed.
 
@@ -126,6 +142,43 @@ A. Things to understand up front:
    - Ethtool.  On Linux, with certain NICs, you will need ethtool (instead
      of mii-tool) so that the Emulab software can change link speed/duplex.
      Just install an RPM.
+    
+4. Another "first time, one time" thing to do is to setup the serial console
+   in the OSes (if you are planning on using serial consoles).  We use 115200
+   baud as the typical default of 9600 is too painful.
+
+   For FreeBSD you need to rebuild a new boot loader if you intend to use
+   115200 baud (which is what our PXE boot loader and MFSes expect).  To
+   do that first add the line:
+
+      BOOT_COMCONSOLE_SPEED=115200
+
+   to /usr/src/sys/boot/i386/Makefile.inc.  Then:
+
+      cd /usr/src/sys/boot
+      sudo make obj
+      sudo make
+      sudo make install
+      sudo disklabel -B ad0  # where "ad0" is your boot device
+
+   and to /boot/loader.conf add:
+
+      console="comconsole"
+
+   Hang on, you're not done yet!  One last thing: change the "console" line
+   in /etc/ttys to look like:
+
+      console "/usr/libexec/getty std.115200"   unknown on secure
+
+   Linux and lilo are a little simpler.  In /etc/lilo.conf add:
+
+      serial=0,115200n8
+
+   at the top and, for each kernel listed add:
+
+      append="console=tty0 console=ttyS0,115200"
+
+   the run /sbin/lilo to record the changes.
 
 
 B. Now we can begin the process:
