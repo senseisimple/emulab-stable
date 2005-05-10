@@ -1,4 +1,10 @@
 /*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
  *  RTK2 : A GUI toolkit for robotics
  *  Copyright (C) 2001  Andrew Howard  ahoward@usc.edu
  *
@@ -21,7 +27,7 @@
 /*
  * Desc: Rtk table functions
  * Author: Andrew Howard
- * CVS: $Id: rtk_table.c,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: rtk_table.c,v 1.2 2005-05-10 15:25:17 johnsond Exp $
  */
 
 #include <assert.h>

@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 /* 
  *  Mezzanine - an overhead visual object tracker.
  *  Copyright (C) Andrew Howard 2002
@@ -21,7 +27,7 @@
  * Desc: Mezzanine IPC wrapper
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezz.c,v 1.3 2005-02-17 08:24:18 johnsond Exp $ 
+ * CVS: $Id: mezz.c,v 1.4 2005-05-10 15:25:08 johnsond Exp $ 
  **************************************************************************/
 
 #include <errno.h>

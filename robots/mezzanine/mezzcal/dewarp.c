@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 /* 
  *  Mezzanine - an overhead visual object tracker.
  *  Copyright (C) Andrew Howard 2002
@@ -21,7 +27,7 @@
  * Desc: Dewarping interface
  * Author: Andrew Howard
  * Date: 11 Apr 2002
- * CVS: $Id: dewarp.c,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: dewarp.c,v 1.2 2005-05-10 15:25:17 johnsond Exp $
  ***************************************************************************/
 
 #include <assert.h>

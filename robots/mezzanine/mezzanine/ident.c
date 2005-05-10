@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 /* 
  *  Mezzanine - an overhead visual object tracker.
  *  Copyright (C) Andrew Howard 2002
@@ -21,7 +27,7 @@
  * Desc: Assign identities to blobs
  * Author: Andrew Howard
  * Date: 21 Apr 2002
- * CVS: $Id: ident.c,v 1.2 2004-12-15 07:28:29 johnsond Exp $
+ * CVS: $Id: ident.c,v 1.3 2005-05-10 15:25:16 johnsond Exp $
  ***************************************************************************/
 
 #include <assert.h>
