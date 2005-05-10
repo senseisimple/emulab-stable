@@ -1,4 +1,45 @@
 
+/*
+ * Copyright (c) 1997, 1998, 2005 Carnegie Mellon University.  All Rights
+ * Reserved. 
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation is hereby granted (including for
+ * commercial or for-profit use), provided that both the copyright notice
+ * and this permission notice appear in all copies of the software,
+ * derivative works, or modified versions, and any portions thereof, and
+ * that both notices appear in supporting documentation, and that credit
+ * is given to Carnegie Mellon University in all publications reporting
+ * on direct or indirect use of this code or its derivatives.
+ * 
+ * ALL CODE, SOFTWARE, PROTOCOLS, AND ARCHITECTURES DEVELOPED BY THE CMU
+ * MONARCH PROJECT ARE EXPERIMENTAL AND ARE KNOWN TO HAVE BUGS, SOME OF
+ * WHICH MAY HAVE SERIOUS CONSEQUENCES. CARNEGIE MELLON PROVIDES THIS
+ * SOFTWARE OR OTHER INTELLECTUAL PROPERTY IN ITS ``AS IS'' CONDITION,
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
+ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE OR
+ * INTELLECTUAL PROPERTY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+ * DAMAGE.
+ * 
+ * Carnegie Mellon encourages (but does not require) users of this
+ * software or intellectual property to return any improvements or
+ * extensions that they make, and to grant Carnegie Mellon the rights to
+ * redistribute these changes without encumbrance.
+ */
+
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef __tbsetdest_h__
 #define __tbsetdest_h__
 

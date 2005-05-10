@@ -1,4 +1,11 @@
 #! /usr/bin/awk -f
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 # 
 # cam-sim.awk - Simulate imaging of a floor grid into an overhead wide-angle camera.
 # The default output is rows and then columns of grid points for gnuplot.
