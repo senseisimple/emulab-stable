@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 Rough steps for upgrading your existing Emulab.
 
 0. "Shutdown" the testbed.  Disable the web interface and prevent user

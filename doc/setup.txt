@@ -1,6 +1,12 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2001-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #####
 ##### Setting up the Utah Network Testbed software on a boss node
-##### Tested on FreeBSD 4.9
+##### Tested on FreeBSD 4.11
 #####
 
 ##### Important notes

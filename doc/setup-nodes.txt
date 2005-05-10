@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2002-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 #####
 ##### Setting up nodes for use in the testbed
 #####

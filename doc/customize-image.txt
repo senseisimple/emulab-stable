@@ -1,3 +1,8 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
 Instructions for creating a site-customized image from a "generic" image
 provided by Utah.  The basic procedure is:
 

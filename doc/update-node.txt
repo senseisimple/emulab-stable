@@ -1,3 +1,9 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
 How to update the client-side Emulab software on a node and make new images.
 This is still a bit ugly at the moment.
 
