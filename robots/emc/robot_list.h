@@ -1,3 +1,9 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef __ROBOT_LIST_H__
 #define __ROBOT_LIST_H__
 

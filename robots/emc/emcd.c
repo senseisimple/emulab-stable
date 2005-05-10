@@ -1,3 +1,8 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 /* emc sets up an interface for accepting commands over an internet socket;
  * listens on a well-known port for instances of vmc and rmc;
