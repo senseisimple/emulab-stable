@@ -20,7 +20,8 @@ dollar = $
 # A selected subset.
 figs = camera1_blend8_tris_mag50.eps \
        all_mag50.eps all_blend8_mag50.eps all_blend8_tris_mag50.eps
-show-figs: figs
+figs: $(figs)
+show-figs: $(figs)
 	for f in $(figs); do gv $(value dollar)f & sleep 1; done
 
 # Raw pixel data with cosine dewarping.
@@ -65,8 +66,6 @@ cam_blw := $(foreach cam, $(cams), camera$(cam)_blend8_tris.tri_lines_world )
 cam_blt := $(foreach cam, $(cams), camera$(cam)_blend8_tris_$(mag).eps )
 blend8-tris: all_blend8_tris_$(mag).eps $(cam_anl) $(cam_bll) $(cam_blt)
 
-figs: $(figs)
-
 # Per-camera analysis.
 analysis_camera%: output_camera%
 	$(analyze) $^ > $@
@@ -78,10 +77,17 @@ analysis_all_blend8: $(cam_blo)
 	$(analyze) -w $^ > $@
 
 # Detailed, but optional, control of plot bounds.  
-# The Y axis is reversed in world coords.  (Grumble.)
-all_bounds := [3:14] [15:5]
-all_blend8_bounds := [3:14] [15:5]
-all_blend8_tris_bounds := [3:14] [15:5]
+# Transpose X and Y for a taller, narrower plot.
+bounds := [6:15] [3:13]
+all_bounds := $(bounds)
+all_blend8_bounds := $(bounds)
+all_blend8_tris_bounds := $(bounds)
+aspect := 1.1
+
+# Point and line styles.
+grid_pts = title "Grid points" with points pt 7 ps 1
+err_lines = title "Error lines" with lines lt 1 lw 5
+tri_lines = title "Blend triangles" with lines lt 3 lw 7
 
 # Generate plots through gnuplot.  
 # "w_plot -v file=base." makes base.grid_points and base.error_lines .
@@ -89,9 +95,11 @@ all_blend8_tris_bounds := [3:14] [15:5]
 	$(w_plot) -v file=$(@:eps=) -v mag=$(magval) < $<
 	echo 'set output "$@"; \
 	      set terminal postscript eps color; \
+	      set size ratio $(aspect); \
+	      set ytics 1; \
 	      plot $(value $(subst _$(mag).eps,,$@)_bounds) \
-		"$(@:eps=grid_points)" with points pt 7 ps 1, \
-		"$(@:eps=error_lines)" with lines lt 1 lw 3' | gnuplot
+		"$(@:eps=grid_points)" using 2:1 $(grid_pts), \
+		"$(@:eps=error_lines)" using 2:1 $(err_lines)' | gnuplot
 
 # Extract a subset of ground truth as calibration points for error blending.
 output_camera%_calpts: input_camera%_cal
@@ -123,8 +131,10 @@ all_blend8_tris.tri_lines: $(cam_blw)
 	$(w_plot) -v file=$(@:eps=) -v mag=$(magval) < $<
 	echo 'set output "$@"; \
 	      set terminal postscript eps color; \
+	      set size ratio $(aspect); \
+	      set ytics 1; \
 	      plot $(value $(subst _$(mag).eps,,$@)_bounds) \
-		"$(@:eps=grid_points)" with points pt 7 ps 1, \
-		"$(@:eps=error_lines)" with lines lt 1 lw 3, \
-		"$(@:_tris_$(mag).eps=_tris.tri_lines)" with lines lt 3 lw 1' \
-	  | gnuplot
+		"$(@:eps=grid_points)" using 2:1 $(grid_pts), \
+		"$(@:eps=error_lines)" using 2:1 $(err_lines), \
+		"$(@:_tris_$(mag).eps=_tris.tri_lines)" \
+		  using 2:1 $(tri_lines)' | gnuplot
