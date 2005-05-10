@@ -3,6 +3,12 @@
  * algorthm
  *)
 
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
 type ('a,'b) dijk_state = {
     graph : ('a, 'b) Graph.t;
     visited : bool array; (* Not yet used - ditch? *)

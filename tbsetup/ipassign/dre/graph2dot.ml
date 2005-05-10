@@ -8,6 +8,12 @@
  * ... verticies exist only implicitly, as referenced by edges.
  *)
 
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
 (* Hmm, this is awkward, I have to declare all of these types even though they
  * are related. There's probably some better way to do this *)
 type mygraph = (int, unit) Graph.t;;

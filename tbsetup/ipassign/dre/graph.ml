@@ -3,6 +3,13 @@
  * Note: tests are commented out, since this module gets included by other
  * files
  *)
+
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
 type ('a, 'b) node = { node_contents : 'a;
                        mutable node_edges : ('a, 'b) edge_list }
 and ('a, 'b) edge_list = ('a, 'b) edge list

@@ -1,6 +1,13 @@
 (*
  * heap.ml - simple heap module
  *)
+
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
 (* Types used by this module *)
 type location = int;;
 type weight = int;;

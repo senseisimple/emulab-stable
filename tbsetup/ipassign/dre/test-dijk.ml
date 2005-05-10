@@ -3,6 +3,12 @@
  * Test functions for my Dijkstra's shortest path implementation
  *)
 
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
 (* Hmm, this is awkward, I have to declare all of these types even though they
  * are related. There's probably some better way to do this *)
 type mygraph = (int, int) Graph.t;;

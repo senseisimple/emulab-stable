@@ -1,5 +1,11 @@
 // RatioCutPartition.h
 
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2004 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
 #ifndef RATIO_CUT_PARTITION_H_IP_ASSIGN_2
 #define RATIO_CUT_PARTITION_H_IP_ASSIGN_2
 

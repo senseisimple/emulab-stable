@@ -1,7 +1,11 @@
 (*
  * Core of a genetic algorithm
- * Copyright 2005 Robert Ricci for the University of Utah
- * ricci@cs.utah.edu, testbed-ops@emulab.net
+ *)
+
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
  *)
 
 type individual = int array;;

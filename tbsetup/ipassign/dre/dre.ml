@@ -2,6 +2,12 @@
  * Functions for computing DRE
  *)
 
+(*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ *)
+
 (* let compute_dre (graph : ('a, 'b) Graph.t) : float array array = *)
 let compute_dre (hops : ('a, 'b) Dijkstra.first_hop array array) : float array array =
     (* Initialize the array of results *)
