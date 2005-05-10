@@ -955,6 +955,13 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 	    }
 	    resolutions[resolution_index].switches.push_front(*switch_it);
 	    resolution_index++;
+            if (resolution_index <= resolutions.size()) {
+                if (resolutions.capacity() > resolutions.size()) {
+                    resolutions.resize(resolutions.capacity());
+                } else {
+                    resolutions.resize(resolutions.size() * 2);
+                }
+            }
 	    total_weight += LINK_RESOLVE_INTRASWITCH;
 	    SDEBUG(cerr << "    intraswitch " << first << " and " << second << endl);
 	  }
@@ -1028,6 +1035,13 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 		}
 	      }
 	      resolution_index++;
+              if (resolution_index <= resolutions.size()) {
+                  if (resolutions.capacity() > resolutions.size()) {
+                      resolutions.resize(resolutions.capacity());
+                  } else {
+                      resolutions.resize(resolutions.size() * 2);
+                  }
+              }
 	      total_weight += LINK_RESOLVE_INTERSWITCH;
 	      SDEBUG(cerr << "    interswitch " <<
 		     get(pvertex_pmap,*source_switch_it)->name << " and " <<
