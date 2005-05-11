@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -247,14 +247,22 @@ if ($EUID == 0) {
     $EUID = $UID;
 }
 
+my $args = "-i $BOSSNODE_IP";
+
 #
 # Select the appropriate bandwidth
 #
-my $BW;
 if ($filename =~ /^$TB\/images/ && !$ELABINELAB) {
-    $BW = $STD_BW;
+    $args .= " -W $STD_BW";
 } else {
-    $BW = $USR_BW;
+    $args .= " -W $USR_BW";
+}
+
+#
+# Force multicast keepalives if necessary
+#
+if ($ELABINELAB) {
+    $args .= " -K 15";
 }
 
 # Now, we actually launch Frisbee
@@ -298,8 +306,7 @@ while (1) {
 			my $addr = $1;
 			my $port = $2;
 
-			if (!exec("$FRISBEED -W $BW -m $addr -i $BOSSNODE_IP ".
-				  "-p $port $filename")) {
+			if (!exec("$FRISBEED $args -m $addr -p $port $filename")) {
 				die("$$: Unable to exec $FRISBEED\n");
 			}
 		}
