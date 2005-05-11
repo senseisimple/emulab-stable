@@ -1,11 +1,12 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
 use Getopt::Std;
+use POSIX qw(strftime);
 
 #
 # Audit the DB, looking for things we want to catch. Run once a day from cron.
@@ -113,6 +114,39 @@ if ($query_result->numrows) {
 
 	printf("%-12s %-8s %-12s %-12s %-22s %s\n",
 	       $pid, $hours, $eid, $creator, $swapped, $count);
+    }
+}
+
+#
+# Once a week (Sunday) look for anyone that has used the wireless nodes.
+#
+my $today = POSIX::strftime("%u", localtime());
+if ($today == 7) {
+    my $query_result =
+	DBQueryWarn("select e.exptidx,pid,eid,swapin_last,wirelesslans ".
+		    "   from experiment_resources as r ".
+		    "left join experiment_stats as e on e.exptidx=r.exptidx ".
+		    "where wirelesslans!=0 and swapin_last is not null and ".
+		    "UNIX_TIMESTAMP(swapin_last) > ".
+		    "  UNIX_TIMESTAMP(now()) - (7 * 60 * 60 * 24) ".
+		    "order by e.exptidx");
+    fatal("Could not get wireless experiment stats")
+	if (!$query_result);
+
+    if ($query_result->numrows) {
+	print "\n";
+	print "Experiments that have used wireless nodes in the last week\n";
+	printf("%-10s %-12s %-14s %-22s %-5s\n",
+	       "ExptIDX", "PID", "EID", "Swapin Last", "Wlans");
+	print "---------- ------------ -------------- ".
+	    "---------------------- -----\n";
+    
+	while (my ($exptidx,$pid,$eid,$swapin_last,$wlans) =
+	       $query_result->fetchrow()) {
+
+	    printf("%-10s %-12s %-14s %-22s %-5s\n",
+		   $exptidx, $pid, $eid, $swapin_last, $wlans);
+	}
     }
 }
 
