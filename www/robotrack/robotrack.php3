@@ -46,6 +46,21 @@ else {
 }
 
 #
+# If adding in the webcams, get that stuff too.
+#
+$webcams = array();
+
+if ($withwebcams) {
+  $query_result = DBQueryFatal("select * from webcams");
+
+  while ($row = mysql_fetch_array($query_result)) {
+      $id      = $row["id"];
+      $camurl  = "../webcamimg.php3?webcamid=${id}&applet=1&fromtracker=1";
+      $webcams[] = $camurl;
+  }
+}
+
+#
 # Draw the legend and some explanatory text.
 #
 echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
@@ -121,8 +136,29 @@ echo "<applet name='tracker' code='RoboTrack.class'
             <param name='auth' value='$auth'>
             <param name='ppm' value='$ppm'>
             <param name='building' value='$building'>
-            <param name='floor' value='$floor'>
-          </applet>\n";
+            <param name='floor' value='$floor'>";
+if (count($webcams)) {
+    $camcount = count($webcams);
+    $x = 400;
+    $y = 460;
+    
+    echo "<param name='WebCamCount' value='$camcount'>";
+
+    for ($i = 0; $i < $camcount; $i++) {
+	$camurl = $webcams[$i];
+
+	echo "<param name='WebCam${i}' value='$camurl'>
+              <param name='WebCam${i}XY' value='$x,$y'>";
+
+	$x += 260;
+
+	if ($x > 700) {
+	    $x = 400;
+	    $y = $y + 200;
+	}
+    }
+}
+echo "</applet>\n";
 
 echo "<br>
      <blockquote><blockquote>

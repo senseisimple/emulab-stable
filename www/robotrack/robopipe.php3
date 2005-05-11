@@ -133,6 +133,10 @@ while (1) {
 	    $dy  = "";
 	    $dor = "";
 	}
+	else {
+	    $dx = (int) $dx;
+	    $dy = (int) $dy;
+	}
 	if (!isset($bvolts))
 	    $bvolts = "";
 	if (!isset($bper))

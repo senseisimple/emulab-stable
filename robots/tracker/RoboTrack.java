@@ -21,11 +21,13 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.net.URLConnection;
 import java.text.DecimalFormat;
+import com.sun.image.codec.jpeg.*;
 
 /*
  * Draw the floormap and put little dots on it. 
  */
 public class RoboTrack extends JApplet {
+    int myHeight, myWidth;
     Map map;
     JTable maptable;
     JPopupMenu LeftMenuPopup, RightMenuPopup;
@@ -40,6 +42,8 @@ public class RoboTrack extends JApplet {
     static final Date now = new Date();
     String uid, auth, building, floor;
     boolean shelled = false;
+    WebCam WebCamWorkers[] = null;
+    int WebCamCount = 0;
     
     /*
      * The connection to boss that will provide robot location info.
@@ -50,7 +54,13 @@ public class RoboTrack extends JApplet {
     public void init() {
 	try
 	{
-	    URL urlServer = this.getCodeBase(), robopipe, floorurl;
+	    if (! shelled) {
+		Dimension appletSize = this.getSize();
+		
+		myHeight = appletSize.height;
+		myWidth  = appletSize.width;
+	    }
+	    URL urlServer = this.getCodeBase(), robopipe, floorurl, camurl;
 	    String pipeurl, baseurl;
 	    URLConnection uc;
 
@@ -62,6 +72,40 @@ public class RoboTrack extends JApplet {
 	    building = this.getParameter("building");
 	    floor    = this.getParameter("floor");
 	    pixels_per_meter = Double.parseDouble(this.getParameter("ppm"));
+
+	    if (this.getParameter("WebCamCount") != null) {
+		int count =
+		    Integer.parseInt(this.getParameter("WebCamCount").trim());
+		WebCamWorkers = new WebCam[count];
+		System.out.println("There are " + count + " webcams");
+		
+		for (int i = 0; i < count; i++) {
+		    String camname   = "WebCam" + i;
+		    String coordname = "WebCam" + i + "XY";
+		    int x, y;
+
+		    if (this.getParameter(camname) == null ||
+			this.getParameter(coordname) == null)
+			continue;
+
+		    camurl = new URL(urlServer,
+				     this.getParameter(camname)
+				     + "&nocookieuid="
+				     + URLEncoder.encode(uid)
+				     + "&nocookieauth="
+				     + URLEncoder.encode(auth));
+
+		    StringTokenizer tokens =
+			new StringTokenizer(this.getParameter(coordname), ",");
+
+		    x = Integer.parseInt(tokens.nextToken().trim());
+		    y = Integer.parseInt(tokens.nextToken().trim());
+
+		    WebCamWorkers[WebCamCount] =
+			new WebCam(WebCamCount, camurl, x, y);
+		    WebCamCount++;
+		}
+	    }
 
 	    // form the URL that we use to get the background image
 	    floorurl = new URL(urlServer,
@@ -105,24 +149,61 @@ public class RoboTrack extends JApplet {
 	    });	
 	 */
 
-	// This is used below for the listeners. 
-	MyMouseAdaptor mymouser = new MyMouseAdaptor();
-	
 	/*
-	 * Vertical placement of Components in the pane. 
+	 * Going to use the layered pane so that we can put the cameras
+	 * in front of the map. But first I need to create a JPanel to
+	 * contain the map and table. Why? Cause a layeredPane has no
+	 * real layout management, and I do not want to use absolute
+	 * positioning for that. So, put everything inside a JPanel, and
+	 * then put the JPanel inside the root layeredPane. The put the
+	 * webcams on top of that.
 	 */
-	getContentPane().setLayout(new BoxLayout(getContentPane(),
-						 BoxLayout.PAGE_AXIS));
-        getContentPane().add(map = new Map());
+	JLayeredPane MyLPane  = getLayeredPane();
+	JPanel       MyJPanel = new JPanel(true);
+
+	/*
+	 * Specify vertical placement of components inside my JPanel.
+	 */
+	MyJPanel.setLayout(new BoxLayout(MyJPanel, BoxLayout.Y_AXIS));
+
+	/*
+	 * Now add the basic objects to the JPanel.
+	 */
+	map = new Map();
+        MyJPanel.add(map);
 
 	/*
 	 * This sillyness is how you get the column headers to show
 	 * when you do not put the Jtable inside a scroll thingy.
 	 */
 	maptable = new JTable(new MyTableModel());
-	getContentPane().add(maptable.getTableHeader(), BorderLayout.NORTH);
-	getContentPane().add(maptable, BorderLayout.CENTER);
+	MyJPanel.add(maptable.getTableHeader());
+	MyJPanel.add(maptable);
 
+	/*
+	 * Add the JPanel to the layeredPane, but give its size since
+	 * there is no layout manager.
+	 */
+	MyLPane.add(MyJPanel, JLayeredPane.DEFAULT_LAYER);
+	MyJPanel.setBounds(0, 0, myWidth, myHeight);
+
+	/*
+	 * Now, if we have webcams, put them on the layered pane, on top
+	 * of the the JPanel that holds the other stuff.
+	 */
+	if (WebCamCount > 0) {
+	    for (int i = 0; i < WebCamCount; i++) {
+		WebCam cam = WebCamWorkers[i];
+
+		MyLPane.add(cam, JLayeredPane.PALETTE_LAYER);
+		
+		cam.setBounds(cam.X, cam.Y, cam.W, cam.H);
+	    }
+	}
+
+	// This is used below for the listeners. 
+	MyMouseAdaptor mymouser = new MyMouseAdaptor();
+	
 	/*
 	 * Create the popup menu that will be used to fire off
 	 * robot moves. We use the mouseadaptor for this too. 
@@ -172,9 +253,16 @@ public class RoboTrack extends JApplet {
 
     public void start() {
         map.start();
+
+	for (int i = 0; i < WebCamCount; i++) {
+	    WebCamWorkers[i].start();
+	}
     }
   
     public void stop() {
+	for (int i = 0; i < WebCamCount; i++) {
+	    WebCamWorkers[i].stop();
+	}
         map.stop();
     }
 
@@ -193,7 +281,11 @@ public class RoboTrack extends JApplet {
 	    MediaTracker tracker = new MediaTracker(this);
 	    tracker.addImage(img, 0);
 	    tracker.waitForID(0);
-	} catch (Exception e) {}
+	}
+	catch(Throwable th)
+	{
+	    th.printStackTrace();
+	}
 	return img;
     }
 
@@ -677,7 +769,7 @@ public class RoboTrack extends JApplet {
 	    }
 	    
 	    /*
-	     * If there is a orientation, add an orientation stick
+	     * If there is an orientation, add an orientation stick
 	     * to it.
 	     */
 	    if (or != 500.0) {
@@ -788,12 +880,19 @@ public class RoboTrack extends JApplet {
 	    int w = dim.width;
 
 	    //System.out.println(w + " D " + h);
-	    //System.out.println(rect.width + " R " + rect.height);
-	    
-            Graphics2D g2 = createGraphics2D(w, h);
 
-            drawMap(w, h, g2);
-            g.drawImage(bimg, 0, 0, this);
+	    if (true) {
+		Graphics2D g2 = (Graphics2D)g;
+		
+		g2.clearRect(0, 0, w, h);
+		drawMap(w, h, g2);
+	    }
+	    else {
+		Graphics2D g2 = createGraphics2D(w, h);
+		
+		drawMap(w, h, g2);
+		g.drawImage(bimg, 0, 0, this);
+	    }
         }
     
         public void start() {
@@ -1702,14 +1801,210 @@ public class RoboTrack extends JApplet {
 				      JOptionPane.ERROR_MESSAGE);
     }
 
+    public class WebCam extends JPanel implements Runnable {
+	private BufferedImage	curimage = null;
+	private URL		myurl;
+        private Thread		camthread;
+	private int		myid = 0;
+	private InputStream	is = null;
+	public  int		X, Y, W, H;
+	
+        public WebCam(int id, URL webcamurl, int x, int y) {
+	    myid  = id;
+	    myurl = webcamurl;
+	    X     = x;
+	    Y     = y;
+	    W     = 240;
+	    H     = 180;
+
+	    System.out.println("Creating a WebCam class: " +
+			       id + "," + X + "," + Y);
+
+	    super.setDoubleBuffered(true);
+        }
+
+        public void start() {
+            camthread = new Thread(this);
+            camthread.start();
+        }
+    
+        public synchronized void stop() {
+            camthread = null;
+        }
+    
+	/*
+	 * This is the callback to paint the map. 
+	 */
+        public void paint(Graphics g) {
+            Dimension dim  = getSize();
+	    int h = dim.height;
+	    int w = dim.width;
+
+	    if (curimage == null)
+		return;
+	    
+	    g.drawImage(curimage, 0, 0, this);
+        }
+
+        public void run() {
+            Thread me = Thread.currentThread();
+	    String lenhdr = "content-length: ";
+	    byte imageBytes[] = new byte[100000];
+	    ByteArrayInputStream imageinput;
+	    String str;
+	    int size;
+
+	    try
+	    {
+		// And connect to it.
+		URLConnection uc = myurl.openConnection();
+		uc.setDoInput(true);
+		uc.setUseCaches(false);
+		this.is = uc.getInputStream();
+	    }
+	    catch(Throwable th)
+	    {
+	        th.printStackTrace();
+		camthread = null;
+		return;
+	    }
+	    BufferedInputStream input = new BufferedInputStream(this.is);
+
+            while (camthread == me) {
+		try
+		{
+		    // First line is the boundry marker
+		    if ((str = readLine(input).trim()) == null)
+			break;
+
+		    if (!str.equals("--myboundary")) {
+			System.out.println("Sync error at boundry");
+			break;
+		    }
+
+		    // Next line is the Content-type. Skip it.
+		    if ((str = readLine(input)) == null)
+			break;
+
+		    // Next line is the Content-length. We need this. 
+		    if ((str = readLine(input)) == null)
+			break;
+		    str = str.toLowerCase();
+
+		    if (! str.startsWith(lenhdr)) {
+			System.out.println("Sync error at content length");
+			break;
+		    }
+		    str  = str.substring(lenhdr.length(), str.length());
+		    size = Integer.parseInt(str.trim());
+		    
+		    if (size < 0) {
+			System.out.println("Bad content length: " + size);
+			break;
+		    }
+		    //System.out.println("content length: " + size);
+		    
+		    // Next line is a blank line. Skip it.
+		    if ((str = readLine(input)) == null)
+			break;
+
+		    // Now we have the data. Buffer that up.
+		    int count = 0;
+		    while (count < size) {
+			int cc = input.read(imageBytes, count, size - count);
+			if (cc == -1)
+			    break;
+
+			count += cc;
+		    }
+		    if (count != size) {
+			System.out.println("Not enough image data");
+			break;
+		    }
+		    // For the jpeg decoder.
+		    imageinput = new ByteArrayInputStream(imageBytes);
+		    
+		    JPEGImageDecoder decoder =
+			JPEGCodec.createJPEGDecoder(imageinput);
+		    
+		    curimage = decoder.decodeAsBufferedImage();
+
+		    //System.out.println("Got the image");
+		    
+		    // Next line is a blank line. Skip it.
+		    if ((str = readLine(input)) == null)
+			break;
+		    
+		    repaint();
+		    me.yield();
+		}
+		catch(IOException e)
+		{
+		    e.printStackTrace();
+		    break;
+		}
+            }
+            camthread = null;
+	    destroy();
+        }
+
+	/*
+	 * Catch termination.
+	 */
+	public void destroy() {
+	    try
+	    {
+	        if (is != null) {
+		    is.close();
+		    is = null;
+		}
+	    }
+	    catch(IOException e)
+	    {
+		e.printStackTrace();
+	    }
+	}
+
+	/*
+	 * A utility function since a BufferedInputStream has no readline().
+	 */
+	private byte[] buf = new byte[1024];
+	
+	private String readLine(BufferedInputStream input) {
+	    int		index = 0;
+	    int		ch;
+
+	    try
+	    {
+		while ((ch = input.read()) != -1) {
+		    buf[index++] = (byte) ch;
+		    if (ch == '\n')
+			break;
+		}
+	    }
+	    catch(IOException e)
+	    {
+		e.printStackTrace();
+	    }
+	    if (index == 0)
+		return "";
+	    return new String(buf, 0, index);
+	}
+    }
+    
     public static void main(String argv[]) {
+	int W = 900;
+	int H = 600;
+	
         final RoboTrack robomap = new RoboTrack();
 	try
 	{
-	    URL url = new URL("file://robots-4.jpg");
+	    URL url = new URL("file:///tmp/robots-4.jpg");
+	    robomap.floorimage = robomap.getImage(url);
+	    robomap.myWidth = W;
+	    robomap.myHeight = H;
 	    robomap.init(true);
 	    robomap.is = System.in;
-	    robomap.floorimage = robomap.getImage(url);
 	    robomap.uid = "stoller";
 	    robomap.auth = "xyz";
 	}
@@ -1727,7 +2022,7 @@ public class RoboTrack extends JApplet {
         });
         f.add(robomap);
         f.pack();
-        f.setSize(new Dimension(900,600));
+        f.setSize(new Dimension(W,H));
         f.show();
         robomap.start();
     }

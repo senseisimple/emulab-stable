@@ -51,6 +51,9 @@ if (!$query_result || !mysql_num_rows($query_result)) {
 }
 $row = mysql_fetch_array($query_result);
 $URL = (isset($applet) ? $row["URL"] : $row["stillimage_URL"]);
+if (isset($fromtracker)) {
+    $URL .= "&resolution=240x180&fps=2";
+}
 
 #
 # Check sitevar to make sure mere users are allowed to peek at us.
