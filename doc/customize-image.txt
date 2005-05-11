@@ -315,9 +315,9 @@ G. Installing the images
    and record these initial images in the Emulab database.
 
    The image tarball includes sample SQL INSERT commands in the
-   setup-images.sql and setup-osids.sql files to make this easier.
-   Note however, that the database schema occasionally changes, so it
-   is important to ensure that your DB matches the INSERT commands in
+   setup-images.sql, setup-osids.sql and setup-o2i.sql files to make this
+   easier.  Note however, that the database schema occasionally changes,
+   so it is important to ensure that your DB matches the INSERT commands in
    those files before doing them.  The table formats for the file commands
    are listed at the beginning of the files.  Compare those formats to the
    current schema in your database by doing:
@@ -325,8 +325,11 @@ G. Installing the images
        mysql tbdb
        describe images;
        describe osids;
+       describe osidtoimageid;
 
-   Tweak the .sql files as necessary, and apply the commands.
+   setup-o2i.sql is just a template and will have to be modified to use.
+   Tweak the other .sql files as necessary for schema changes, and apply
+   the commands.
 
 
 Dealing with SCSI disks (or RAID).
