@@ -81,13 +81,22 @@ $lockdown   = $row["lockdown"];
 # Get a list of node types and classes in this experiment
 #
 $query_result =
-    DBQueryFatal("select distinct t.type,t.class from reserved as r " .
-		 "       left join nodes as n on r.node_id=n.node_id ".
-		 "       left join node_types as t on n.type=t.type ".
-		 "where r.eid='$eid' and r.pid='$pid'");
+    DBQueryFatal("select distinct v.type,t1.class,v.fixed,".
+		 "   t2.type as ftype,t2.class as fclass from virt_nodes as v ".
+		 "left join node_types as t1 on v.type=t1.type ".
+		 "left join nodes as n on v.fixed is not null and ".
+		 "     v.fixed=n.node_id ".
+		 "left join node_types as t2 on t2.type=n.type ".
+		 "where v.eid='$eid' and v.pid='$pid'");
 while ($row = mysql_fetch_array($query_result)) {
-    $classes[$row['class']] = 1;
-    $types[$row['type']] = 1;
+    if (isset($row['ftype'])) {
+	$classes[$row['fclass']] = 1;
+	$types[$row['ftype']] = 1;
+    }
+    else {
+	$classes[$row['class']] = 1;
+	$types[$row['type']] = 1;
+    }
 }
 
 
@@ -222,16 +231,29 @@ if ($wireless) {
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
-if ($types['garcia']) {
-    WRITESUBMENUBUTTON("Robot Map",
+if ($types['garcia'] || $types['static-mica2']) {
+    SUBMENUSECTION("Robot/Mote Options");
+    WRITESUBMENUBUTTON("Robot/Mote Map",
 		       "robotmap.php3".
 		       ($expstate == $TB_EXPTSTATE_ACTIVE ?
 			"?pid=$exp_pid&eid=$exp_eid" : ""));
+    if ($expstate == $TB_EXPTSTATE_SWAPPED) {
+	if ($types['static-mica2']) {
+	    WRITESUBMENUBUTTON("Selector Applet",
+			       "robotrack/selector.php3?".
+			       "pid=$exp_pid&eid=$exp_eid");
+	}
+    }
+    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
+	    $expstate == $TB_EXPTSTATE_ACTIVATING) {
+	WRITESUBMENUBUTTON("Tracker Applet",
+			   "robotrack/robotrack.php3?");
+    }
 }
 
 # Blinky lights - but only if they have nodes of the correct type in their
 # experiment
-if ($classes['mote']) {
+if ($classes['mote'] && $expstate == $TB_EXPTSTATE_ACTIVE) {
     WRITESUBMENUBUTTON("Show Blinky Lights",
 		   "moteleds.php3?pid=$exp_pid&eid=$exp_eid","moteleds");
 }
