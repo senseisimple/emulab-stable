@@ -39,7 +39,10 @@ can use the sam actions. If you click on the dot, it will turn red, and you
 will have full administrator privileges; we call this 'going red dot'.
 Many of the procedures in this file require you to be in red dot mode.
 
-Now, we'll use the elabman user to bootstrap your own account. Log out of the
+Now, we'll use the elabman user to bootstrap your own account. Note that
+it is IMPORTANT that you create another account at this time since the
+elabman account does not have the power to perform certain actions that
+are required later (such as adding nodes to the testbed). So log out of the
 web interface, and use the 'Request Account' button to start a new project.
 Create a project that you can use for the faculty/students/staff involved in
 running your testbed - you can name it anything you'd like. Fill in your own
