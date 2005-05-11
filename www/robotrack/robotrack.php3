@@ -88,7 +88,10 @@ echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
                          zones where robots are not allowed to go. You can
                          <b>right click</b> on a robot to bring up its
                          info page. See below for instructions on how to
-                         use the <b>drag and drop</b> features.
+                         use the <b>drag and drop</b> features. If you are on
+                         a <b>high speed</b> connection, you can try the
+                         <a href=${REQUEST_URI}&withwebcams=1>WithWebCams</a>
+                         option.
         </td>
       </tr>
       </table><hr>\n";
