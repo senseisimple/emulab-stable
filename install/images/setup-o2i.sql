@@ -22,7 +22,8 @@ CREATE TABLE osidtoimageid (
 
 --
 -- Change PCTYPE to an actual node_type in your database (e.g., "pc2800").
--- You will need a set of these lines for every node_type that can run BSD or Linux.
+-- You will need a set of these lines for every node_type that can run
+-- BSD or Linux.
 --
 INSERT INTO osidtoimageid VALUES ('emulab-ops-FBSD410-STD','PCTYPE','emulab-ops-FBSD410-STD');
 INSERT INTO osidtoimageid VALUES ('emulab-ops-RHL90-STD','PCTYPE','emulab-ops-RHL90-STD');

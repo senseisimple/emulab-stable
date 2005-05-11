@@ -15,7 +15,7 @@ CREATE TABLE os_info (
   creator varchar(8) default NULL,
   created datetime default NULL,
   description tinytext NOT NULL,
-  OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Other') NOT NULL default 'Unknown',
+  OS enum('Unknown','Linux','FreeBSD','NetBSD','OSKit','Windows','TinyOS','Other') default 'Unknown',
   version varchar(12) default '',
   path tinytext,
   magic tinytext,
@@ -28,6 +28,7 @@ CREATE TABLE os_info (
   nextosid varchar(35) default NULL,
   max_concurrent int(11) default NULL,
   mfs tinyint(4) NOT NULL default '0',
+  reboot_waittime int(10) unsigned default NULL,
   PRIMARY KEY  (osname,pid),
   KEY osid (osid),
   KEY OS (OS),
@@ -40,6 +41,6 @@ CREATE TABLE os_info (
 -- WHERE:  osid like "%MFS%"
 
 
-INSERT INTO os_info VALUES ('FREEBSD-MFS','emulab-ops','FREEBSD-MFS','root',NULL,'FreeBSD in an MFS','FreeBSD','4.10','boss:/tftpboot/freebsd',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1);
-INSERT INTO os_info VALUES ('FRISBEE-MFS','emulab-ops','FRISBEE-MFS','root',NULL,'Frisbee (FreeBSD) in an MFS','FreeBSD','4.10','boss:/tftpboot/frisbee',NULL,'','ping,ssh,ipod,isup',0,1,0,'RELOAD',NULL,NULL,1);
-INSERT INTO os_info VALUES ('NEWNODE-MFS','emulab-ops','NEWNODE-MFS','root',NULL,'NewNode (FreeBSD) in an MFS','FreeBSD','4.10','boss:/tftpboot/freebsd.newnode',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1);
+INSERT INTO os_info VALUES ('FREEBSD-MFS','emulab-ops','FREEBSD-MFS','root',NULL,'FreeBSD in an MFS','FreeBSD','4.10','boss:/tftpboot/freebsd',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1,150);
+INSERT INTO os_info VALUES ('FRISBEE-MFS','emulab-ops','FRISBEE-MFS','root',NULL,'Frisbee (FreeBSD) in an MFS','FreeBSD','4.10','boss:/tftpboot/frisbee',NULL,'','ping,ssh,ipod,isup',0,1,0,'RELOAD',NULL,NULL,1,150);
+INSERT INTO os_info VALUES ('NEWNODE-MFS','emulab-ops','NEWNODE-MFS','root',NULL,'NewNode (FreeBSD) in an MFS','FreeBSD','4.10','boss:/tftpboot/freebsd.newnode',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1,150);
