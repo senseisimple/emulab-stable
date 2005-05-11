@@ -6,7 +6,7 @@
 #
 use English;
 use Getopt::Std;
-use Errno;
+use Errno qw(ESRCH);
 use POSIX ":sys_wait_h";
 use BSD::Resource;
 
@@ -27,10 +27,11 @@ sub usage()
 	  "pid eid - Project and Experiment (for use with swapin)\n");
     exit(-1);
 }
-my $optlist  = "dt:vkm";
+my $optlist  = "dt:vkmf:";
 my $debug    = 0;
 my $verbose  = 0;
 my $timeout  = 0;
+my $fps      = 0;
 my $killmode = 0;
 my $movie    = 0;
 my $pid;
@@ -44,7 +45,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $VLC		= "/usr/X11R6/bin/vlc";
 my $WGET	= "/usr/local/bin/wget";
-my $PIDDIR	= "/var/run/emulab/grabwebcams";
+my $PIDFILE	= "/var/run/emulab/grabwebcams.pid";
 
 # We don't want to run this script unless its the real version.
 if ($EUID != 0) {
@@ -80,7 +81,6 @@ $libdb::DBQUERY_MAXTRIES = 30;
 #
 # Locals
 # 
-my $PIDFILE;
 my $logfile;
 my %webcams     = ();
 my %children    = ();
@@ -102,13 +102,14 @@ if (defined($options{"v"})) {
 if (defined($options{"t"})) {
     $timeout = $options{"t"};
 }
+if (defined($options{"f"})) {
+    $fps = $options{"f"};
+}
 if (defined($options{"m"})) {
     $movie = 1;
 }
 if (defined($options{"k"})) {
     $killmode = 1;
-    usage()
-	if (! @ARGV);
 }
 if (@ARGV) {
     usage()
@@ -128,7 +129,6 @@ if (@ARGV) {
     else {
 	die("Bad data in argument: $eid.");
     }
-    $PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
 }
 
 #
@@ -147,13 +147,22 @@ if ($killmode) {
 	}
 	unlink($PIDFILE);
 
-	if (kill($epid, 0) == 0 || $Errno::errno != $Errno::ESRCH) {
+	if (kill(0, $epid) || ! $!{ESRCH}) {
 	    if (! kill('TERM', $epid)) {
-		fatal("Failed to stop webcam capture ($epid) for $pid/$eid!\n");
+		fatal("Failed to stop webcam capture ($epid)!\n");
 	    }
 	}
     }
     exit(0);
+}
+
+#
+# XXX Since we change the frame rate, do not allow this script to be
+# run more then once at a time ... I'll change this later to support
+# running multiple versions as long as the frame rate is the same.
+#
+if (-e $PIDFILE) {
+    fatal("Another grabwebcams is in progress. Must stop that one first!");
 }
 
 # Making a movie for an experiment ...
@@ -198,16 +207,6 @@ while (my %row = $query_result->fetchhash()) {
     $webcams{$id} = $server;
 }
 
-#
-# Make sure the pid directory exists.
-#
-if (! -d $PIDDIR) {
-    if (system("mkdir -p -m 775 $PIDDIR")) {
-	die("*** $0:\n".
-	    "    Could not mkdir $PIDDIR\n");
-    }
-}
-
 # Go to ground.
 if (! $debug) {
     $logfile = TBMakeLogname("grabwebcams");
@@ -220,30 +219,13 @@ if (! $debug) {
 #
 # Write out the pid file and then drop privs. 
 #
-if (defined($PIDFILE) &&
-    system("echo '$PID' > $PIDFILE")) {
+if (system("echo '$PID' > $PIDFILE")) {
     fatal("Could not create $PIDFILE!");
 }
 if (! $movie) {
     setpriority(PRIO_PROCESS, 0, -1);
 }
 $EUID = $UID;
-
-#
-# First, get the video.sdp files for each camera, which we feed to vlc.
-#
-foreach my $id (keys(%webcams)) {
-    my $server = $webcams{$id};
-    my $URL    = "http://${server}/mpeg4/video.sdp";
-    my $file   = "video-${id}.sdp";
-
-    unlink($file);
-    print "Getting $URL ...\n";
-    system("$WGET -T 30 --non-verbose -O $file $URL");
-    if ($?) {
-	fatal("Could not get video.sdp from camera $id ($server)");
-    }
-}
 
 #
 # Handler to catch signal and kill children.
@@ -254,7 +236,7 @@ sub handler ($) {
     foreach my $id (keys(%children)) {
 	my $pid = $children{$id};
 
-	if (kill($pid, 0) == 0 || $Errno::errno != $Errno::ESRCH) {
+	if (kill(0, $pid) || ! $!{ESRCH}) {
 	    if (! kill('TERM', $pid)) {
 		notify("Failed to stop vlc process $pid!");
 	    }
@@ -265,14 +247,33 @@ sub handler ($) {
 $SIG{TERM} = \&handler;
 
 #
+# Set the frame rate. This is why we only allow one at a time for now.
+# I am hoping for a better solution at some point, cause this causes
+# an update to the flash, which the Axis people say is only good for
+# 100000 writes. I suppose I could ask the camera what the framerate is
+# and then change it if needed, but thats too much considering how little
+# the robot testbed is currently used. 
+#
+if (!$fps) {
+    $fps = ($movie ? 24 : 2);
+}
+foreach my $id (keys(%webcams)) {
+    my $server = $webcams{$id};
+
+    SetFrameRate($server, $fps);
+}
+
+#
 # Now fire off vlc to capture the multicast output. 
 # 
 foreach my $id (keys(%webcams)) {
     my $server = $webcams{$id};
     my $file   = "video-${id}.mpg";
-    my $sdp    = "video-${id}.sdp";
-    my $URL;
+    my $URL    = "rtsp://${server}/mpeg4/1/media.amp";
     my $syspid;
+    my $cmdstr = "$VLC " . ($verbose ? "-v -v " : "-q ") .
+	"-I dummy --no-sap-parse --sout ".
+	"#duplicate{dst=std{access=file,mux=ts,url=\"$file\"}} $URL";
 
     if ($syspid = fork()) {
 	#
@@ -281,23 +282,6 @@ foreach my $id (keys(%webcams)) {
 	$children{$id} = $syspid;
     }
     else {
-	my $cmdstr = "$VLC " . ($verbose ? "-v -v " : "-q ") .
-	    "-I dummy --no-sap-parse ";
-
-	if ($movie) {
-	    $URL = "http://${server}/axis-cgi/mjpg/video.cgi?".
-		"fps=24&compression=50&date=1&clock=1";
-
-	    $cmdstr .= "--mjpeg-fps 24  --sout ".
-		"#transcode{vcodec=mp2v,fps=24,scale=1}:".
-		"duplicate{dst=std{access=file,mux=ps,url=\"$file\"}} $URL";
-	}
-	else {
-	    $URL = "rtsp://${server}/mpeg4/1/media.amp";
-	    $cmdstr .= "--sout ".
-		"#duplicate{dst=std{access=file,mux=ts,url=\"$file\"}} $URL";
-	}
-
 	print "Running '$cmdstr'\n";
 	my @cmdargs = split(" ", $cmdstr);
 	exec(@cmdargs);
@@ -322,6 +306,7 @@ do {
 
 unlink($logfile)
     if (defined($logfile) && -e $logfile);
+unlink($PIDFILE);
 exit(0);
 
 sub fatal($)
@@ -343,6 +328,7 @@ sub fatal($)
 		 ($logfile));
 	unlink($logfile);
     }
+    unlink($PIDFILE);
     exit(1);
 }
 
@@ -362,4 +348,35 @@ sub notify($)
 	     $TBOPS);
 }
 
+#
+# Set the frame rate. This affects the camera globably, but in our context
+# that is not too bad, since the robot lab is currently single use. 
+#
+sub SetFrameRate($$)
+{
+    my ($server, $rate) = @_;
 
+    my $BASEURL = "http://operator:Frazzle69\@${server}/axis-cgi";
+    my $FPSURL  = "${BASEURL}/admin/setparam.cgi?".
+	"root.Image.I0.Stream.FPS=${rate}";
+    my $RESTART = "${BASEURL}/mpeg4/restart_stream.cgi";
+
+    print "Setting $server frame rate to $rate fps.\n";
+    print "Using URL '$FPSURL'\n"
+	if ($debug);
+
+    system("$WGET -T 30 --non-verbose -O /dev/null $FPSURL");
+    if ($?) {
+	fatal("Could not change framerate on camera $server");
+    }
+
+    print "Restarting mpeg stream on camera $server\n";
+    print "Using URL '$RESTART'\n"
+	if ($debug);
+
+    system("$WGET -T 30 --non-verbose -O /dev/null $RESTART");
+    if ($?) {
+	fatal("Could not restart mpeg stream on camera $server");
+    }
+    return 0;
+}
