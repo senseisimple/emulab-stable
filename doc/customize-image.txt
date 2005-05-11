@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 Instructions for creating a site-customized image from a "generic" image
@@ -37,6 +37,10 @@ So hit the space bar (quick, quick!) and you go into interactive mode
 where you can tell it to boot from the admin MFS:
 
 	loader:/tftpboot/freebsd
+
+Another option is to use this command on your boss node:
+	node_admin on pc1
+(Where pc1 is replaced with the name of the actual testbed pc...)
 
 Now on with the show.
 
@@ -83,15 +87,15 @@ We will assume the machine is called "pc1" in the following directions.
   from boss:
 
       sudo ssh pc1 imageunzip - /dev/$DSK \
-	< /usr/testbed/images/FBSD410+RHL90-GENERIC.ndz
+	< /usr/testbed/images/FBSD410-RHL90-GENERIC.ndz
 
   Image loading should take anywhere from 45 seconds, to several minutes.
 
   If the ssh returns with "Killed" then imageunzip ran out of memory.
   By default, imageunzip will consume memory without bound for buffering
-  of pending disk writes.  If it grow too big, the system will kill it.
-  In this case, retry the imageunzip with "-W <num-MB>" where <num-MB>
-  is a number of MB maximum to use for disk buffering.  If the node you
+  of pending disk writes.  If imageunzip grows too big, the system will
+  kill it.  In this case, retry the imageunzip with "-W <num-MB>" where
+  <num-MB> is a number of MB maximum to use for disk buffering.
   Using about half of the available physical memory should be safe
   (e.g., if the machine are loading has 512MB of memory, try "-W 256").
 
@@ -117,7 +121,7 @@ The MFS has a much scaled-down set of binaries.  To get access to a more
 full-featured system, you can run binaries from the disk image itself:
 
      ldconfig /mnt/usr/lib /mnt/usr/X11R6/lib /mnt/usr/local/lib
-     set path=($path /mnt/sbin /mnt/bin /mnt/usr/sbin /mnt/usr/bin)
+     set path=($path /mnt/sbin /mnt/bin /mnt/usr/sbin /mnt/usr/bin /mnt/usr/local/bin)
 
 Now update the following files:
 
@@ -197,9 +201,13 @@ Now you can update the necessary files as follows.
 
 * /mnt2/etc/shadow
 
-  Copy in the password hash for root from the FreeBSD password file
-  (/mnt/etc/master.passwd) to /mnt2/etc/shadow.  Then copy that file to
-   the emulab subdirectory:
+  Using your favorite editor, copy in the password hash for root from
+  the FreeBSD password file (/mnt/etc/master.passwd) to /mnt2/etc/shadow.
+  The password hash is the second colon-separated field in the "root"
+  password file line.  Note that these two files are not the same format
+  just the password hash field of the file, so do NOT just copy the FreeBSD
+  password file to /mnt2/etc/shadow.  Finally copy the newly modified file
+  to the emulab subdirectory:
 
       cp -p /mnt2/etc/shadow /mnt2/etc/emulab/
 
@@ -232,10 +240,13 @@ the time stamp that forces a periodic fsck:
 D. Saving the customized image
 
    The "whole disk" image is the one used most frequently, but we also
-   create single partition images of FreeBSD and Linux as well.
+   create single partition images of FreeBSD and Linux as well.  Put the
+   images onto a test area at first, and install them permanently later
+   (in step G.)
+
    From boss do:
 
-       cd /usr/testbed/images
+       cd /proj/emulab-ops/images
        sudo ssh pc1 imagezip /dev/$DSK - > FBSD410+RHL90-STD.ndz
        sudo ssh pc1 imagezip -s 1 /dev/$DSK - > FBSD410-STD.ndz
        sudo ssh pc1 imagezip -s 2 /dev/$DSK - > RHL90-STD.ndz
@@ -301,12 +312,21 @@ G. Installing the images
 
        mv /proj/emulab-ops/images/*.ndz /usr/testbed/images/
 
-   and record these initial images in the Emulab database using the
-   SQL INSERT commands in setup-images.sql and setup-osids.sql.
-   As the database schema occasionally changes, it is important to
-   ensure that your DB matches the INSERT commands before doing them.
-   The table formats are listed at the beginning of those files.
+   and record these initial images in the Emulab database.
 
+   The image tarball includes sample SQL INSERT commands in the
+   setup-images.sql and setup-osids.sql files to make this easier.
+   Note however, that the database schema occasionally changes, so it
+   is important to ensure that your DB matches the INSERT commands in
+   those files before doing them.  The table formats for the file commands
+   are listed at the beginning of the files.  Compare those formats to the
+   current schema in your database by doing:
+
+       mysql tbdb
+       describe images;
+       describe osids;
+
+   Tweak the .sql files as necessary, and apply the commands.
 
 
 Dealing with SCSI disks (or RAID).
@@ -346,4 +366,4 @@ Dealing with SCSI disks (or RAID).
   If you don't have a Linux machine to do this with, contact us.
 
 [ This file is a copy of doc/customize-image.txt in the Emulab source tree. ]
-[ Last updated 11/11/04 ]
+[ Last updated 05/10/05 ]
