@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Wicked sleezy script for turning write-cache-enable (WCE) on and off
+# for a SCSI drive.  It is sleezy because it acts both as the user interface
+# and as a back-end editor for camcontrol depending on how it is called.
+#
+# Why is this needed?  We need to make up for the lack of a batch mode
+# style of operation in camcontrol coupled with a desire not to install
+# "ed" (rather the 1MB crypto library it depends on but would never use)
+# in the MFS just to edit the camcontrol tmp file and change 1 bit.
+#
+# Note that we are only changing the "current" state so the previous WCE
+# state will be restored on a machine reset.
+#
+
+if [ -r /etc/emulab/paths.sh ]; then
+	. /etc/emulab/paths.sh
+else
+	BINDIR=/etc/testbed
+fi
+
+if [ $# -lt 1 ]; then
+    echo 'usage: camwce <on|off> <dev>'
+    exit 1
+fi
+cof=$1
+case $cof in
+on|off)
+    if [ $# -lt 2 ]; then
+	echo 'usage: camwce <on|off> <dev>'
+	exit 1
+    fi
+    dev=$2
+    case $dev in
+    da*)
+	;;
+    *)
+        echo "$dev: not a SCSI device"
+        exit 1
+	;;
+    esac
+    wce=`camcontrol modepage $dev -m8 | grep 'WCE:' | sed 's/WCE:[ 	]*\([01]\)/\1/'`
+    if [ $cof = "on" -a "$wce"x = "0x" -o $cof = "off" -a "$wce"x = "1x" ]
+    then
+	echo "${dev}: turning write-cache $cof"
+	EDITOR=$BINDIR/camwce camcontrol modepage $dev -m8 -e
+    else
+	echo "${dev}: write-cache already $cof"
+	exit 1
+    fi
+    ;;
+*)
+    #
+    # sleezy: when invoked with one arg, we are being called as an
+    # editor and need to toggle the WCE bit in the given file using an
+    # obscure sed invocation.
+    #
+    if [ $# -ne 1 ]; then
+	echo 'usage: camwce <on|off> <dev>'
+	exit 1
+    fi
+    sed -i '' -e '/WCE:[ 	]*[01]/y/01/10/' $cof
+    ;;
+esac
+exit $?

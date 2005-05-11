@@ -7,7 +7,6 @@
 # Optional flag argument says "do not reboot"
 #
 reboot=1
-
 if [ $# -eq 1 -a "$1" = "-noreboot" ]; then
     reboot=0
 fi
@@ -133,11 +132,36 @@ if [ x"$ADDRESS" != x ]; then
 	    ZFILL=""
 	fi
 
+	#
+	# Make sure the write-cache is enabled on SCSI disks.  It makes a
+	# huge difference.  We don't worry about data corruption in the
+	# case of a crash, because we will just reload the disk again anyway
+	# in that situation.
+	#
+	turncacheoff=0
+	case $DISK in
+	da*)
+	    if [ -x $BINDIR/camwce ] && $BINDIR/camwce on $DISK; then
+		turncacheoff=1;
+	    fi
+	    ;;
+	esac
+
 	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
 	$BINDIR/tmcc state RELOADING
 
 	$BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK
-	case $? in
+	fstat=$?
+
+	#
+	# Turn the cache back off if we turned it on.
+	# Is this sufficient to ensure the cache gets flushed?
+	#
+	if [ $turncacheoff -eq 1 ]; then
+	    $BINDIR/camwce off $DISK
+	fi
+
+	case $fstat in
 	0)
 		echo "Frisbee run finished"
 		echo "Resizing final disk partition"
