@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -35,7 +35,7 @@ unsigned long nonetbufs;
 /* Max number of hops multicast hops. */
 #define MCAST_TTL		5
 
-static int		sock;
+static int		sock = -1;
 struct in_addr		myipaddr;
 static int		nobufdelay = -1;
 int			broadcast = 0;
@@ -182,6 +182,40 @@ ServerNetInit(void)
 	CommonInit();
 
 	return 1;
+}
+
+/*
+ * XXX hack.
+ *
+ * Cisco switches without a multicast router defined have an unfortunate
+ * habit of losing our IGMP membership.  This function allows us to send
+ * a report message to remind the switch we are still around.
+ *
+ * We need a better way to do this!
+ */
+int
+ServerNetMCKeepAlive(void)
+{
+	struct ip_mreq mreq;
+
+	if (broadcast || (ntohl(mcastaddr.s_addr) >> 28) != 14)
+		return 0;
+
+	if (sock == -1)
+		return 1;
+
+	mreq.imr_multiaddr.s_addr = mcastaddr.s_addr;
+	if (mcastif.s_addr)
+		mreq.imr_interface.s_addr = mcastif.s_addr;
+	else
+		mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+
+	if (setsockopt(sock, IPPROTO_IP, IP_DROP_MEMBERSHIP,
+		       &mreq, sizeof(mreq)) < 0 ||
+	    setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+		       &mreq, sizeof(mreq)) < 0)
+		return 1;
+	return 0;
 }
 
 /*

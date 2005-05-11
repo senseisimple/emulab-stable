@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -34,6 +34,7 @@ int		debug = 0;
 int		tracing = 0;
 int		dynburst = 0;
 int		timeout = SERVER_INACTIVE_SECONDS;
+int		keepalive = 0;
 int		readsize = SERVER_READ_SIZE;
 volatile int	burstsize = SERVER_BURST_SIZE;
 int		maxburstsize = SERVER_DYNBURST_SIZE;
@@ -542,16 +543,39 @@ void *
 ServerRecvThread(void *arg)
 {
 	Packet_t	packet, *p = &packet;
+	int		idles = 0, kafails = 0;
 	static int	gotone;
 
 	if (debug > 1)
 		log("Server pthread starting up ...");
 	
+	/*
+	 * Recalculate keepalive interval in terms of packet receive
+	 * timeouts for simplicity.
+	 */
+	if (keepalive)
+		keepalive = (int)(((unsigned long long)keepalive * 1000000) /
+				  PKTRCV_TIMEOUT);
 	while (1) {
 		pthread_testcancel();
 		if (PacketReceive(p) != 0) {
+			if (keepalive && ++idles > keepalive) {
+				if (ServerNetMCKeepAlive()) {
+					warning("Multicast keepalive failed");
+					if (++kafails > 5) {
+						warning("too many failures, disabled");
+						keepalive = 0;
+					}
+				} else {
+					kafails = 0;
+					idles = 0;
+					if (debug > 1)
+						log("Ping...");
+				}
+			}
 			continue;
 		}
+		idles = 0;
 		DOSTAT(msgin++);
 
 		if (! PacketValid(p, FileInfo.chunks)) {
@@ -794,7 +818,7 @@ main(int argc, char **argv)
 	off_t		fsize;
 	void		*ignored;
 
-	while ((ch = getopt(argc, argv, "dhp:m:i:tbDT:R:B:G:L:W:")) != -1)
+	while ((ch = getopt(argc, argv, "dhp:m:i:tbDT:R:B:G:L:W:K:")) != -1)
 		switch(ch) {
 		case 'b':
 			broadcast++;
@@ -836,6 +860,11 @@ main(int argc, char **argv)
 		case 'W':
 			bandwidth = atol(optarg);
 			break;
+		case 'K':
+			keepalive = atoi(optarg);
+			if (keepalive < 0)
+				keepalive = 0;
+			break;
 		case 'h':
 		case '?':
 		default:
@@ -848,6 +877,11 @@ main(int argc, char **argv)
 
 	if (!portnum || ! mcastaddr.s_addr)
 		usage();
+
+	if (timeout > 0 && keepalive > timeout) {
+		warning("keepalive > timeout, disabling keepalive");
+		keepalive = 0;
+	}
 
 	signal(SIGINT, quit);
 	signal(SIGTERM, quit);
