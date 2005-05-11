@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -103,20 +103,7 @@ if ($mounted =~ /^${fsdevice} on (\S*)/) {
 	"    $fsdevice is already mounted on $1\n");
 }
 
-my $slicesetup= `fdisk -s $disk | grep '^[ ]*${slice}:'`;
-my $sstart;
-my $ssize;
-my $stype;
-
-if ($slicesetup =~ /^[ ]*${slice}:\s*(\d*)\s*(\d*)\s*(0x\S\S)\s*/) {
-    $sstart = $1;
-    $ssize = $2;
-    $stype = hex($3);
-}
-else {
-    die("*** $0:\n".
-	"    Could not parse slice $slice fdisk entry!\n");
-}
+my ($sstart, $ssize, $stype) = getslicestuff($disk, $slice);
 
 #
 # Fail if not forcing and the partition type is non-zero.
@@ -132,10 +119,41 @@ if (!$forceit) {
 }
 
 #
-# Set the partition type to BSD and create a disk label
+# Set the partition type to BSD
 #
 my $tmpfile = "/tmp/disklabel";
 mysystem("echo \"p $slice 165 $sstart $ssize\" | fdisk -f - $disk");
+
+#
+# Hmm...fdisk may choose to quietly modify the size downward from what we
+# gave it, to ensure "cylinder alignment".  (It may also change the start,
+# but we are going to ignore that case as we are completely screwed if
+# that happens...)  Unfortunately, the modified size doesn't show up
+# "in kernel" til we reboot, so the "disklabel auto" command below will
+# create a label based on the incorrect larger size.  We of course, create
+# our filesystem based on the disklabel size, so the result is a filesystem
+# that works until you reboot, at which point some of it is outside the
+# slice and partition boundary.  Bad news.
+#
+# We use fdisk to reread the partition size.  At least fdisk is internally
+# consistant and will report the size that it truncated the partition to.
+# If fdisk reports a different value than it did originally, we record the
+# smaller size which is used later when we edit the disklabel.
+#
+my ($nsstart, $nssize, $nstype) = getslicestuff($disk, $slice);
+if ($nsstart != $sstart || $nstype != 165) {
+    die("*** $0:\n".
+	"    fdisk changed type or start?!\n");
+}
+if ($nssize < $ssize) {
+    warn("*** $0: WARNING: lowered partition size from $ssize to $nssize\n");
+} else {
+    $nssize = $ssize;
+}
+
+#
+# Now create the disklabel
+#
 mysystem("disklabel -w -r $slicedev auto");
 mysystem("disklabel -r $slicedev > $tmpfile");
 
@@ -161,10 +179,16 @@ foreach my $line (@dl) {
     my $pat = q(^  a: );
     if (!$done && $line =~ /$pat/) {
 	$line =~ s/$pat/  e: /;
+	if ($ssize != $nssize) {
+	    $line =~ s/$ssize/$nssize/;
+	}
 	$done = 1;
     }
     $pat = q(^  c: );
     if (!$done && $line =~ /$pat/) {
+	if ($ssize != $nssize) {
+	    $line =~ s/$ssize/$nssize/;
+	}
 	print DL $line;
 	$line =~ s/$pat/  e: /;
 	$done = 1;
@@ -202,3 +226,24 @@ sub mysystem($)
     }
     return 0
 }
+
+sub getslicestuff($$) {
+    my ($_disk, $_slice) = @_;
+
+    my $slicesetup = `fdisk -s ${_disk} | grep '^[ ]*${_slice}:'`;
+    my $sstart;
+    my $ssize;
+    my $stype;
+
+    if ($slicesetup =~ /^[ ]*${_slice}:\s*(\d*)\s*(\d*)\s*(0x\S\S)\s*/) {
+	$sstart = $1;
+	$ssize = $2;
+	$stype = hex($3);
+    }
+    else {
+	die("*** $0:\n".
+	    "    Could not parse slice $slice fdisk entry!\n");
+    }
+    return ($sstart, $ssize, $stype);
+}
+
