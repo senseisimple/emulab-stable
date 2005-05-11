@@ -660,7 +660,7 @@ sub SetupReloadFrisbee($$$$)
 	if (!$query_result);
 
     my ($type) = $query_result->fetchrow_array();
-    if ($type eq "pc3000" || $type eq "pc3000c") {
+    if ($type =~ /^pc3000/) {
 	$osid = "emulab-ops-FRISBEE-MFS-NEW";
     }
 
