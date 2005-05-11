@@ -167,6 +167,8 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 
 post-install:
 
+boss-install:	install
+
 $(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/LICENSE
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
