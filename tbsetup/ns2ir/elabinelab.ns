@@ -63,8 +63,6 @@ for {set i 1} {$i <= $maxpcs} {incr i} {
 	    namespace eval TBCOMPAT {
         	tb-set-node-os [set $name] $elabinelab_nodeos($name)
 	    }
-	} else {
-	    tb-set-node-os [set $name] FBSD-STD
 	}
 
 	if {[info exists ::TBCOMPAT::elabinelab_fixnodes($name)]} {
