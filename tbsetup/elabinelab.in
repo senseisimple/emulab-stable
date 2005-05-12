@@ -15,16 +15,19 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: elabinelab [-d] [-g] pid eid\n";
+    print STDOUT "Usage: elabinelab [-d] [-g] [-u] pid eid\n";
     print STDOUT "       elabinelab [-d] [-k | -f] pid eid\n";
+    print STDOUT "       elabinelab [-d] -r pid eid [node ...]\n";
  
     exit(-1);
 }
-my $optlist  = "dgkf";
+my $optlist  = "dgkfur";
 my $debug    = 1;
 my $killmode = 0;
 my $fwboot   = 0;
 my $dbgooonly= 0;
+my $update   = 0;
+my $remove   = 0;
 
 #
 # Configure variables
@@ -37,6 +40,7 @@ my $SSH		= "$TB/bin/sshtb";
 my $nodereboot  = "$TB/bin/node_reboot";
 my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $nodewait    = "$TB/sbin/node_statewait";
+my $snmpit      = "$TB/bin/snmpit";
 
 # Locals
 my $elabinelab;
@@ -103,6 +107,12 @@ if (defined($options{"k"})) {
 }
 if (defined($options{"f"})) {
     $fwboot = 1;
+}
+if (defined($options{"u"})) {
+    $update = 1;
+}
+if (defined($options{"r"})) {
+    $remove = 1;
 }
 if (! @ARGV) {
     usage();
@@ -234,6 +244,12 @@ while (my ($node_id,$role) = $query_result->fetchrow_array()) {
 if ($killmode) {
     exit(TearDownEmulab());
 }
+elsif ($remove) {
+    exit(RemoveNodes());
+}
+elsif ($update) {
+    exit(UpdateEmulab());
+}
 
 if (1) {
 #
@@ -315,9 +331,13 @@ $UID  = $SAVEUID;
 $EUID = $UID;
 
 #
-# Restart DHCPD before going into os_setup, since DHCPD must be ready
-# before nodes come back up and start sending out DHCP requests.
-# 
+# Restart DHCPD, but first mark the nodes as being ready to boot inside
+# the inner emulab, so that dhcpd_makeconf knows what nodes to change
+# the entries for.
+#
+DBQueryFatal("update reserved set inner_elab_boot=1 ".
+	     "where pid='$pid' and eid='eid'");
+
 print "Regenerating DHCPD config file and restarting daemon.\n";
 system("$makeconf -i -r");
 if ($?) {
@@ -771,7 +791,8 @@ sub DumpDBGoo()
 }
 
 #
-# Tear down an inner Emulab as cleanly as possible to avoid power cycling nodes.
+# Tear down an inner Emulab as cleanly as possible to avoid power cycling
+# nodes.
 # 
 sub TearDownEmulab()
 {
@@ -795,7 +816,7 @@ sub TearDownEmulab()
     # nodes, and that would be bad. So, munge the DB and clear the "role" slot
     # for inner nodes. 
     #
-    DBQueryFatal("update reserved set inner_elab_role=NULL ".
+    DBQueryFatal("update reserved set inner_elab_role=NULL,inner_elab_boot=0 ".
 		 "where pid='$pid' and eid='$eid'");
 
     #
@@ -819,6 +840,15 @@ sub TearDownEmulab()
 	    "    Failed to reconfig/restart DHCPD.\n");
     }
     $EUID = 0;
+
+    #
+    # Kill inner vlans table entries; this is the table that maps
+    # inner to outer vlans. We do not care about that anymore since
+    # all of the vlans are going to be torn down (using the outer
+    # ids).
+    #
+    DBQueryFatal("delete from elabinelab_vlans ".
+		 "where pid='$pid' and eid='$eid'");
 
     #
     # If panic set, just return; nodes are going to be powered down.
@@ -868,7 +898,12 @@ sub TearDownEmulab()
     #
     # Now we ask inner boss to reboot all of the testnodes. Maybe need an
     # option to node_reboot, but for now just pass them on the command line.
-    # 
+    #
+    if (! @expnodes) {
+	$UID = $SAVEUID;
+	return 0;
+    }
+    
     print "Asking inner boss ($bossnode) to reboot inner nodes\n";
     system("$SSH -host $bossnode $wap $nodereboot -b @expnodes");
     if ($?) {
@@ -896,5 +931,292 @@ sub TearDownEmulab()
 	             "    Some machines did not reboot properly!\n".
 		     "    Continuing anyway; outer boss will use power cycle.\n";
     }
+    return 0;
+}
+
+#
+# Remove nodes from an inner Emulab.
+# 
+sub RemoveNodes()
+{
+    my $tbdir      = "/usr/testbed";
+    my $wap        = "$tbdir/sbin/withadminprivs";
+    my $nodereboot = "$tbdir/bin/node_reboot";
+    my $deletenode = "$tbdir/sbin/deletenode";
+    my @nodes	   = ();
+    my $paniced;
+
+    #
+    # If firewalled, check to see if paniced. Right now that means the nodes
+    # are going to be powered off, so need to do the clean shutdown dance.
+    # 
+    if ($firewalled) {
+	TBExptGetPanicBit($pid, $eid, \$paniced);
+    }
+
+    #
+    # Actually, this should not even happen; a paniced experiment cannot be
+    # modified at all.
+    #
+    if ($firewalled and $paniced) {
+	print "An paniced experiment cannot be modified! What happened?\n";
+	return -1;
+    }
+
+    #
+    # Grab the list of nodes. We want to clear the reserved table bits so
+    # that we can regen the DHCPD file. 
+    #
+    shift(@ARGV);	# pid
+    shift(@ARGV);	# eid
+
+    foreach my $node (@ARGV) {
+	# Untaint the nodes.
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	}
+	else {
+	    die("*** Tainted node name: $node\n");
+	}
+	push(@nodes, $node);
+    }
+    return 0
+	if (!@nodes);
+
+    #
+    # Grab the vlans table. We need to find any ports used by the nodes
+    # getting deleted, and move them back to the default vlan. 
+    #
+    my %newvlans = ();
+    my @todelete = ();
+    
+    my $query_result =
+	DBQueryWarn("select v.*,e.inner_id from vlans as v ".
+		    "left join elabinelab_vlans as e on ".
+		    "   e.outer_id=v.id ".
+		    "where v.pid='$pid' and v.eid='$eid'");
+    return -1
+	if (!$query_result);
+
+    while (my (%row) = $query_result->fetchhash()) {
+	my $members  = $row{"members"};
+	my $id       = $row{"id"};
+	my $inner_id = $row{"inner_id"};
+	my @newports = ();
+	my $changed  = 0;
+
+	foreach my $port (split(/\s+/, $members)) {
+	    my ($node,$eth) = split(":", $port);
+
+	    # If this node is not in the list of nodes to be deleted,
+	    # the node:port stays in the port list.
+	    if (! grep {$_ eq $node} @nodes) {
+		push(@newports, $port);
+	    }
+	    else {
+		push(@todelete, $port);
+		$changed = 1;
+	    }
+	}
+	$newvlans{$id} = [ @newports ]
+	    if ($changed);
+    }
+
+    # Remove ports from the vlans.
+    if (@todelete) {
+	print "Removing ports from deleted nodes: @todelete\n";
+	system("$snmpit -m default @todelete");
+	if ($?) {
+	    return -1;
+	}
+    }
+
+    # Only if the above succeeds, do we update the vlans table.
+    foreach $id (keys(%newvlans)) {
+	my $members = join(" ", @{ $newvlans{$id} });
+
+	DBQueryWarn("update vlans set members='$members' ".
+		    "where id=$id")
+	    or return -1;
+    }
+    
+    #
+    # We want to rebuild the DHCPD file so that when we reboot the inner nodes
+    # they come back to the outer emulab. We cannot just free the nodes, cause
+    # then the reload daemon might beat us to it, and end up power cycling the
+    # nodes, and that would be bad. So, munge the DB and clear the "role" and
+    # boot slots for nodes about to be released (by tbswap).
+    #
+    DBQueryWarn("update reserved set inner_elab_role=NULL,inner_elab_boot=0 ".
+		"where pid='$pid' and eid='$eid' and (".
+		join(" or ", map("node_id='$_'", @nodes)) . ")")
+	or return -1;
+
+    #
+    # Now regen the DHCPD file.
+    #
+    # Run as real user since script is setuid.
+    $EUID = $UID;
+    
+    print "Regenerating DHCPD config file and restarting daemon.\n";
+    system("$makeconf -i -r");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Failed to reconfig/restart DHCPD.\n");
+    }
+    $EUID = 0;
+
+    #
+    # When the nodes reboot, we want them to do something reasonable. We
+    # have no idea what is loaded on the disk, so they should go into an
+    # MFS and wait, but then a bunch of nodes will all try to load the big
+    # MFS at once, and that could wreak havoc. So, clear the boot osids
+    # so they go into PXEWAIT. I could use os_select, but clearing all the
+    # OSIDs for a node is apparently a bad thing and generates warnings and
+    # emails. Why is that? So just clear the DB state until I figure out
+    # why that is.
+    #
+    DBQueryFatal("update nodes set ".
+		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
+		 "where " .
+		   join(" or ", map("node_id='$_'", @nodes)));
+    
+    #
+    # SSH in and kill the inner DHCPD daemon so that it does not reply
+    # to rebooting nodes along the inner control network.
+    #
+    $UID = 0;
+
+    #
+    # We are going to do this in a loop, one node at a time. I do not like
+    # doing it this way, but its the only reasonable thing to do until we
+    # can reboot the inner nodes ourselves (via the outer control network).
+    # The reason for doing it one node at a time, is that I cannot delete the
+    # node from the inner testbed until its been rebooted. Note that the
+    # delete node script regens the dhcpd.conf file, so no need to do that
+    # explicitly.
+    #
+    foreach my $node (@nodes) {
+	print "Asking inner boss ($bossnode) to reboot $node\n";
+	system("$SSH -host $bossnode $wap $nodereboot -b $node");
+	if ($?) {
+	    #
+	    # This error is non-fatal;
+	    # Outer boss will just resort to power cycle.
+	    #
+	    print STDERR "*** $0:\n".
+		         "    Could not reboot $node! Continuing anyway.\n".
+			 "    Outer boss will use power cycle.\n";
+	}
+	print "Asking inner boss ($bossnode) to delete $node\n";
+	system("$SSH -host $bossnode sudo -u elabman ".
+	       "     $wap $deletenode -b $node");
+	if ($?) {
+	    #
+	    # This error is bad. 
+	    #
+	    print STDERR "*** $0:\n".
+		         "    Could not delete $node! Modify will fail!\n";
+	    return -1;
+	}
+    }
+    $UID = $SAVEUID;
+
+    #
+    # Now we wait for them to reach PXEWAIT. Again, use our utility script
+    # instead of stated stuff.
+    #
+    $EUID = $UID;
+    print "Waiting for inner nodes to reach PXEWAIT\n";
+    system("$nodewait @nodes");
+    if ($?) {
+	#
+	# This error is non-fatal; Outer boss will just resort to power cycle.
+	#
+	print STDERR "*** $0:\n".
+	             "    Some machines did not reboot properly!\n".
+		     "    Continuing anyway; outer boss will use power cycle.\n";
+    }
+    return 0;
+}
+
+#
+# Update an Emulab (add nodes).
+# 
+sub UpdateEmulab()
+{
+    my $tbdir      = "/usr/testbed";
+    my $wap        = "$tbdir/sbin/withadminprivs";
+    my $nodereboot = "$tbdir/bin/node_reboot";
+    my $nodewait   = "$tbdir/sbin/node_statewait";
+    my @nodes      = ();
+    my $paniced;
+
+    #
+    # If firewalled, check to see if paniced. Right now that means the nodes
+    # are going to be powered off, so need to do the clean shutdown dance.
+    # 
+    if ($firewalled) {
+	TBExptGetPanicBit($pid, $eid, \$paniced);
+    }
+
+    #
+    # Actually, this should not even happen; a paniced experiment cannot be
+    # modified at all.
+    #
+    if ($firewalled and $paniced) {
+	print "An paniced experiment cannot be modified! What happened?\n";
+	return -1;
+    }
+
+    #
+    # Grab the list of nodes that have been added to the inner elab.
+    #
+    my $query_result =
+	DBQueryFatal("select node_id from reserved ".
+		     "where pid='$pid' and eid='$eid' and ".
+		     "      inner_elab_boot=0 and inner_elab_role='node'");
+    
+    while (my ($node) = $query_result->fetchrow_array()) {
+	push(@nodes, $node);	
+    }
+    return 0
+	if (!@nodes);
+
+    # Run as real user for the next few scripts, which are setuid.
+    $EUID = $UID;
+
+    #
+    # Restart DHCPD, but first mark the nodes as being ready to boot inside
+    # the inner emulab, so that dhcpd_makeconf knows what nodes to change
+    # the entries for.
+    #
+    DBQueryFatal("update reserved set inner_elab_boot=1 ".
+		 "where pid='$pid' and eid='$eid' and ".
+		 "      inner_elab_boot=0 and inner_elab_role='node'");
+
+    print "Regenerating DHCPD config file and restarting daemon.\n";
+    system("$makeconf -i -r");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Failed to reconfig/restart DHCPD.\n");
+    }
+
+    # Reboot the experimental nodes. They will come up inside the inner elab.
+    # DO NOT WAIT! They are not going to report ISUP from this point on. 
+    print "Rebooting inner new experimental nodes.\n";
+    TBDebugTimeStamp("Rebooting experimental nodes");
+    system("$nodereboot @nodes");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the nodes (@nodes)!\n");
+    }
+    $EUID = 0;
+
+    #
+    # At this point, not much I can think of do. The nodes will reboot and
+    # enter the newnode MFS. I could add a script to wait for that in the
+    # inner elab, but not going to bother yet. 
+    # 
     return 0;
 }
