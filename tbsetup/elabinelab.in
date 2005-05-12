@@ -336,7 +336,7 @@ $EUID = $UID;
 # the entries for.
 #
 DBQueryFatal("update reserved set inner_elab_boot=1 ".
-	     "where pid='$pid' and eid='eid'");
+	     "where pid='$pid' and eid='$eid'");
 
 print "Regenerating DHCPD config file and restarting daemon.\n";
 system("$makeconf -i -r");
