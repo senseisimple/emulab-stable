@@ -10,7 +10,9 @@
 #
 # Configure variables
 #
-my $TB  = "@prefix@";
+my $TB         = "@prefix@";
+my $ELABINELAB = @ELABINELAB@;
+my $KILL       = "/bin/kill";
 
 use lib '@prefix@/lib';
 use libdb;
@@ -34,11 +36,11 @@ if (!TBAdmin()) {
 # Handle command-line arguments
 #
 sub usage {
-    die "usage: deletenode <node>\n";
+    die "usage: deletenode [-b] [-f] [-q] <node>\n";
 }
 
 my %options = ();
-if (!getopts("b",\%options)) {
+if (!getopts("bfq",\%options)) {
     usage();
 }
 
@@ -64,13 +66,20 @@ if ($role ne "testnode") {
 }
 
 #
-# Don't let 'em delete a node that is allocated, except to hwdown
+# Don't let 'em delete a node that is allocated, except to hwdown. Override
+# with force option though (for ElabInElab).
 #
 my ($pid, $eid);
 my $allocated = NodeidToExp($node,\$pid,\$eid);
 if ($allocated && (($pid ne NODEDEAD_PID) || ($eid ne NODEDEAD_EID))) {
-    die "Node must be free, or in the " . NODEDEAD_PID . "/" . NODEDEAD_EID .
-	"experiment!\n";
+    print "Node is not free or in the " .
+	NODEDEAD_PID . "/" . NODEDEAD_EID . "experiment!\n";
+    if (defined($options{"f"}) && $ELABINELAB) {
+	print "WARNING: Continuing anyway!\n";
+    }
+    else {
+	exit(-1);
+    }
 }
 
 #
@@ -95,7 +104,9 @@ unless ($options{b}) {
 #
 while (my ($table, $clist) = each %clean_tables) {
     foreach my $column (@$clist) {
-	print "Removing from table $table, column $column\n";
+	print "Removing from table $table, column $column\n"
+	    if (! defined($options{"q"}));
+	
 	DBQueryFatal("DELETE FROM $table WHERE $column='$node';");
     }
 }
@@ -103,16 +114,24 @@ while (my ($table, $clist) = each %clean_tables) {
 #
 # Need to run a bunch of stuff to really kill off the node.
 #
-print "Regenerating exports file and restarting daemon.\n";
+print "Regenerating exports file and restarting daemon.\n"
+    if (! defined($options{"q"}));
 if (system("$TB/sbin/exports_setup")) {
     print STDERR "*** Failed to reset mountpoints.\n";
 }
-print "Regenerating named maps and restarting daemon.\n";
+print "Regenerating named maps and restarting daemon.\n"
+    if (! defined($options{"q"}));
 if (system("$TB/sbin/named_setup")) {
     print STDERR "*** Failed to reset named maps.\n";
 }
-print "Regenerating DHCPD config file and restarting daemon.\n";
+print "Regenerating DHCPD config file and restarting daemon.\n"
+    if (! defined($options{"q"}));
 if (system("$TB/sbin/dhcpd_makeconf -i -r")) {
     print STDERR "*** Failed to reset DHCPD config file.\n";
+}
+print "Hupping stated so that it will reload its tables\n"
+    if (! defined($options{"q"}));
+if (system("sudo $KILL -HUP `cat /var/run/stated.pid`")) {
+    print STDERR "*** Failed to HUP stated.\n";
 }
 exit 0;
