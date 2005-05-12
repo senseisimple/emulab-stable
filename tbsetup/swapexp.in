@@ -456,11 +456,13 @@ else {
 		     $estate ne EXPTSTATE_ACTIVATING) ||
 		    $batchstate ne BATCHSTATE_UNLOCKED());
 
-	    ExitWithStatus(1, "Cannot modify a firewalled experiment (yet).")
-		if ($firewalled && !$isadmin);
+	    ExitWithStatus(1,
+			"Cannot modify an active firewalled experiment (yet).")
+		if ($firewalled && $estate ne EXPTSTATE_SWAPPED && !$isadmin);
 
-	    ExitWithStatus(1, "Cannot modify an ElabInElab experiment (yet).")
-		if ($elabinelab && !$isadmin);
+	    ExitWithStatus(1,
+			"Cannot modify an active ElabInElab experiment (yet).")
+		if ($elabinelab && $estate ne EXPTSTATE_SWAPPED && !$isadmin);
 		  
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
@@ -559,12 +561,14 @@ else {
 				     "SWAPPED to modify!\n");
 		  }
 		  ExitWithStatus(1,
-			 "Cannot modify a firewalled experiment (yet).")
-		      if ($firewalled && !$isadmin);
-		  
+			"Cannot modify an active firewalled experiment (yet).")
+		      if ($firewalled &&
+			  $estate ne EXPTSTATE_SWAPPED && !$isadmin);
+
 		  ExitWithStatus(1,
-			 "Cannot modify an ElabInElab experiment (yet).")
-		      if ($elabinelab && !$isadmin);
+			"Cannot modify an active ElabInElab experiment (yet).")
+		      if ($elabinelab &&
+			  $estate ne EXPTSTATE_SWAPPED && !$isadmin);
 		  
 		  last SWITCH;
 	      };
