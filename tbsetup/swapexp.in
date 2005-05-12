@@ -457,8 +457,11 @@ else {
 		    $batchstate ne BATCHSTATE_UNLOCKED());
 
 	    ExitWithStatus(1, "Cannot modify a firewalled experiment (yet).")
-		if ($firewalled);
+		if ($firewalled && !$isadmin);
 
+	    ExitWithStatus(1, "Cannot modify an ElabInElab experiment (yet).")
+		if ($elabinelab && !$isadmin);
+		  
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
 	    # locked below, and so it cannot be injected or otherwise messed
@@ -488,16 +491,6 @@ else {
 		       "You must wait for that to clear before you can swap\n".
 		       "or modify the experiment.\n")
 	    if ($canceled);
-
-  	#
- 	# Cannot swapmod an active elabinelab experiment, yet.
- 	# 
- 	ExitWithStatus(1,
- 		       "Experiment $pid/$eid is an active ElabInElab.\n".
- 		       "You cannot modify this type of experiment while it\n".
- 		       "is swapped in. We hope to support this soon.\n")
- 	    if ($inout eq "modify" && $elabinelab &&
- 		$estate ne EXPTSTATE_SWAPPED());
 
  	ExitWithStatus(1,
 		       "Experiment $pid/$eid is locked down; cannot swap!\n")
@@ -566,8 +559,12 @@ else {
 				     "SWAPPED to modify!\n");
 		  }
 		  ExitWithStatus(1,
-				 "Cannot modify a firewalled experiment (yet).")
-		      if ($firewalled);
+			 "Cannot modify a firewalled experiment (yet).")
+		      if ($firewalled && !$isadmin);
+		  
+		  ExitWithStatus(1,
+			 "Cannot modify an ElabInElab experiment (yet).")
+		      if ($elabinelab && !$isadmin);
 		  
 		  last SWITCH;
 	      };
@@ -814,6 +811,11 @@ elsif ($inout eq "modify") {
     GatherSwapStats($pid, $eid, $dbuid,
 		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
 
+    # Gather up some firewall state for later comparison.
+    if (GatherFWinfo() < 0) {
+	fatal("Could not gather firewall info; cannot safely continue!");
+    }
+
     print "Backing up old experiment state ... " . TBTimeStamp() . "\n";
     if (TBExptBackupVirtualState($pid, $eid)) {
 	fatal("Could not backup experiment state; cannot safely continue!");
@@ -828,6 +830,7 @@ elsif ($inout eq "modify") {
 	print STDOUT "Running 'tbprerun $pid $eid $modnsfile'\n";
 	if (system("$tbdir/tbprerun $pid $eid $modnsfile") != 0) {
 	    print STDOUT "Modify Error: tbprerun failed.\n";
+	  FWHOSED:
 	    print STDOUT "Recovering experiment state...\n";
 
 	    if (TBExptRemoveVirtualState($pid, $eid) ||
@@ -846,6 +849,15 @@ elsif ($inout eq "modify") {
 
 	    fatal("Update aborted; old virtual state restored.");
 	    # Never returns;
+	}
+	#
+	# Okay, whenever a new NS file is presented, we need to do some
+	# checks on the firewall to make sure the user is not trying to
+	# do something "unsafe". 
+	#
+	if (CheckFWinfo($estate) != 0) {
+	    # All the stuff for recovering is right above, so go there. 
+	    goto FWHOSED;
 	}
     }
 
@@ -1207,6 +1219,139 @@ sub cleanup()
 	TBExptDestroy($pid, $eid);
     }
     return;
+}
+
+#
+# Some firewall related stuff. There are special rules governing the
+# modification of a firewalled experiment, and this is the easiest place
+# to deal with it. We need to compare the virtual firewall info before
+# and after the parse, and disallow some changes. Maybe move this someplace
+# else at some point.
+#
+my $wasfirewalled;
+my $fwname;
+my $fwtype;
+my $fwstyle;
+
+sub GatherFWinfo()
+{
+    $wasfirewalled = 0;
+
+    my $query_result =
+	DBQueryWarn("select fwname,type,style from virt_firewalls ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return -1
+	if (!$query_result);
+
+    # Not firewalled.
+    return 0
+	if (!$query_result->numrows);
+
+    $wasfirewalled = 1;
+    ($fwname,$fwtype,$fwstyle) = $query_result->fetchrow_array();
+    return 0;
+}
+
+sub CheckFWinfo($)
+{
+    my ($curstate)    = @_;
+    my $msg           = "";
+    my $nowfirewalled = 0;
+    
+    my %fwstyle_mapping = ("open" => 0, "basic" => 1,
+			   "closed" => 2, "emulab" => 3);
+    
+    my $query_result =
+	DBQueryWarn("select fwname,type,style from virt_firewalls ".
+		    "where pid='$pid' and eid='$eid'");
+
+    return -1
+	if (!$query_result);
+    $nowfirewalled = $query_result->numrows;
+
+    # Do nothing if not firewalled before or after!
+    goto okay
+	if (!$wasfirewalled && !$nowfirewalled);
+
+    # Experiment cannot go from firewalled to not firewalled, in either the
+    # swapped or active state.
+    if ($wasfirewalled && !$nowfirewalled) {
+	$msg = "Not allowed to turn off firewalling!";
+	goto noway;
+    }
+
+    #
+    # Make sure there is at least one other node besides the firewalled node.
+    # Rob sez we could eat too many VLANs if we allowed this, so only admin
+    # users, not mere users. 
+    #
+    if (!$isadmin && $nowfirewalled) {
+	my $virt_result =
+	    DBQueryWarn("select vname from virt_nodes ".
+			"where pid='$pid' and eid='$eid'");
+	return -1
+	    if (!$virt_result);
+
+	if (! ($virt_result->numrows > $query_result->numrows)) {
+	    $msg = "Must have at least one firewalled node!";
+	    goto noway;
+	}
+    }
+
+    # Experiment cannot go from not firewalled to firewalled while in the 
+    # active state. We will allow this later.
+    if (!$wasfirewalled && $nowfirewalled) {
+	if ($curstate eq EXPTSTATE_ACTIVE()) {
+	    $msg = "Not allowed to turn on firewalling while active!";
+	    goto noway;
+	}
+	goto okay;
+    }
+    my ($new_fwname,$new_fwtype,$new_fwstyle) =
+	$query_result->fetchrow_array();
+
+    # Not allowed to change the name of the firewall while active.
+    if ($curstate eq EXPTSTATE_ACTIVE() && $fwname ne $new_fwname) {
+	$msg = "Not allowed to change the name of the firewall!";
+	goto noway;
+    }
+
+    # Not allowed to change the type of the firewall at all yet.
+    if ($fwtype ne $new_fwtype) {
+	$msg = "Not allowed to change the type of the firewall!";
+	goto noway;
+    }
+    
+    # Dealing with the style is harder. First off, while active we do not
+    # allow the style to be changed.
+    if ($curstate eq EXPTSTATE_ACTIVE() && $fwstyle ne $new_fwstyle) {
+	$msg = "Not allowed to change the style (level) of the firewall!";
+	goto noway;
+    }
+
+    # Okay, while experiment is swapped, can only go from less firewalled
+    # to more firewalled.
+    if ($curstate eq EXPTSTATE_SWAPPED() && $fwstyle ne $new_fwstyle) {
+	if (!exists($fwstyle_mapping{$new_fwstyle})) {
+	    $msg = "Unknown firewall style (level): '$new_fwstyle'!";
+	    goto noway;
+	}
+	if (!exists($fwstyle_mapping{$fwstyle})) {
+	    $msg = "Unknown firewall style (level): '$fwstyle'!";
+	    goto noway;
+	}
+	if ($fwstyle_mapping{$new_fwstyle} < $fwstyle_mapping{$fwstyle}) {
+	    $msg = "Not allowed to reduce the firewall level!";
+	    goto noway;
+	}
+    }
+  okay:
+    return 0;
+
+  noway:
+    print STDOUT "*** $msg\n";
+    return 1;
 }
 
 #

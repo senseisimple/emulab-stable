@@ -817,7 +817,7 @@ if ($showevents) {
 #
 if ($showfwinfo) {
     my $result_fw =
-	DBQueryFatal("select fwname,type,style from firewalls ".
+	DBQueryFatal("select fwname,type,style from virt_firewalls ".
 		     "where pid='$pid' and eid='$eid' ");
     if ($result_fw->numrows) {
 	print "Firewall information:\n";

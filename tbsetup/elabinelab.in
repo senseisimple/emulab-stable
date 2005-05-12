@@ -1110,7 +1110,7 @@ sub RemoveNodes()
 	}
 	print "Asking inner boss ($bossnode) to delete $node\n";
 	system("$SSH -host $bossnode sudo -u elabman ".
-	       "     $wap $deletenode -b $node");
+	       "     $wap $deletenode -b -q -f $node");
 	if ($?) {
 	    #
 	    # This error is bad. 

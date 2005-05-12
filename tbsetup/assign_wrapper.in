@@ -310,6 +310,7 @@ my $multiplex_factor;
 my $experiment_idx;
 my $useprepass;
 my $delaycap_override;
+my $elabinelab = 0;
 
 # For admission control. Not well defined yet.
 my $cpu_usage;
@@ -597,6 +598,8 @@ sub RunAssign ()
     my $ptopargs = "-p $pid ";
     $ptopargs   .= "-e $eid "
 	if ($updating);
+    $ptopargs   .= "-u "
+	if ($updating && $elabinelab);
     $ptopargs   .= "-m $multiplex_factor "
 	if (defined($multiplex_factor));
     $ptopargs   .= "-v "
@@ -3753,12 +3756,12 @@ sub LoadExperiment()
 		     "       multiplex_factor,usewatunnels, ".
 		     "       cpu_usage,mem_usage,allowfixnode, ".
 		     "       jail_osname,delay_osname,idx, " .
-		     "       useprepass,delay_capacity " .
+		     "       useprepass,delay_capacity,elab_in_elab " .
 		     " from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     
-    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,
-	$idx,$o8,$delay_capacity) = $query_result->fetchrow_array();
+    my ($o1,$o2,$o3,$o4,$o5,$o6,$o7,$jail_osname,$delay_osname,$idx,
+	$o8,$delay_capacity,$eine) = $query_result->fetchrow_array();
 
     # Do not override settings if already defined above. 
     $uselinkdelays = $o1
@@ -3796,6 +3799,7 @@ sub LoadExperiment()
 	$expt_stats{"delay_capacity"} = $delay_capacity;
     }
     $experiment_idx = $idx;
+    $elabinelab     = $eine;
 
     #
     # Command line option from tbswap overrides user.

@@ -168,6 +168,7 @@ use vars qw(@ISA @EXPORT);
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
 	 TBExptFirewall TBNodeFirewall TBSetExptFirewallVlan
+	 TBClearExptFirewallVlan
 
 	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
 
@@ -3193,7 +3194,7 @@ sub TBRobotLabExpt($$)
 		   "nseconfigs",
 		   "eventlist",
 		   "event_groups",
-		   "firewalls",
+		   "virt_firewalls",
 		   "firewall_rules",
 		   "virt_tiptunnels",
 		   "ipsubnets",
@@ -3201,7 +3202,6 @@ sub TBRobotLabExpt($$)
 
 @physicalTables = ("delays",
 		   "vlans",
-		   "elabinelab_vlans",
 		   "tunnels",
 		   "ipport_ranges",
 		   "v2pmap",
@@ -3812,13 +3812,12 @@ sub TBExptFirewall ($$;$$$) {
     my $query_result;
 
     #
-    # Short form: is there a firewall?
-    # Only check the firewalls table so that we can be called for a swapped
-    # experiment (swapped experiments don't have reserved table info).
+    # Short form: is there a firewall? Use the virt_firewalls table so can
+    # be called for a swapped or active experiment.
     #
     if (!defined($fwnodep)) {
 	$query_result =
-	    DBQueryWarn("SELECT eid FROM firewalls ".
+	    DBQueryWarn("SELECT eid FROM virt_firewalls ".
 			"WHERE pid='$pid' and eid='$eid' ".
 			"AND type LIKE '%-vlan'");
 	if (!$query_result || $query_result->num_rows == 0) {
@@ -3833,10 +3832,12 @@ sub TBExptFirewall ($$;$$$) {
     # will be NULL.
     #
     $query_result =
-	DBQueryWarn("SELECT r.node_id,f.vlan,f.vlanid FROM firewalls AS f ".
-		    "LEFT JOIN reserved AS r ".
-		    "  ON f.pid=r.pid AND f.eid=r.eid AND f.fwname=r.vname ".
-		    "WHERE f.pid='$pid' and f.eid='$eid'");
+	DBQueryWarn("select r.node_id,f.vlan,f.vlanid from ".
+		    "   virt_firewalls as v ".
+		    "left join firewalls as f on f.pid=v.pid and f.eid=v.eid ".
+		    "left join reserved as r on r.pid=v.pid and ".
+		    "     r.eid=v.eid and r.vname=v.fwname ".
+		    "where v.pid='$pid' and v.eid='$eid'");
     if (!$query_result || $query_result->num_rows == 0) {
 	return 0;
     }
@@ -3859,8 +3860,7 @@ sub TBExptFirewall ($$;$$$) {
 }
 
 #
-# Set (fwvlan!=undef) or clear (fwvlan==undef) the firewall VLAN number
-# for an experiment.
+# Set the firewall VLAN number for an experiment.
 #
 # XXX this will need to change if we support multiple firewalls per experiment.
 #
@@ -3872,29 +3872,51 @@ sub TBSetExptFirewallVlan($$$$) {
 	return 0;
     }
 
-    if (!defined($fwvlanid)) {
-	$fwvlanid = "NULL";
-    }
-    if (!defined($fwvlan)) {
-	$fwvlan = "NULL";
-    }
+    #
+    # Need the virtual name since we use that to ensure uniqness in the
+    # firewalls table.
+    #
+    my $query_result =
+	DBQueryWarn("select fwname from virt_firewalls ".
+		    "WHERE pid='$pid' AND eid='$eid'");
+
+    return -1
+	if (!$query_result || $query_result->num_rows == 0);
+
+    my ($fwname) = $query_result->fetchrow_array();
 
     #
     # Change the firewalls table entry to reflect the VLAN
     #
-    DBQueryWarn("UPDATE firewalls set vlan=$fwvlan,vlanid=$fwvlanid ".
-		"WHERE pid='$pid' AND eid='$eid'");
+    DBQueryWarn("replace into firewalls (pid,eid,fwname,vlan,vlanid) ".
+		"values ('$pid', '$eid', '$fwname', $fwvlan, $fwvlanid)");
 
     #
     # Change the reserved table entries for all firewalled nodes to reflect it.
     #
-    # XXX when clearing, we don't bother with reserved since the row may
+    DBQueryWarn("UPDATE reserved set cnet_vlan=$fwvlan ".
+		"WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'");
+}
+
+#
+# Clear the firewall VLAN number for an experiment.
+#
+# XXX this will need to change if we support multiple firewalls per experiment.
+#
+sub TBClearExptFirewallVlan($$)
+{
+    my ($pid, $eid) = @_;
+
+    #
+    # Clear entry from the firewalls table.
+    #
+    DBQueryWarn("delete from firewalls ".
+		"where pid='$pid' and eid='$eid'");
+
+    #
+    # XXX when clearing, do not bother with reserved since the row may
     # already be gone.
     #
-    if (defined($fwvlan)) {
-	DBQueryWarn("UPDATE reserved set cnet_vlan=$fwvlan ".
-		    "WHERE pid='$pid' AND eid='$eid' AND node_id!='$fwnode'");
-    }
 }
 
 #

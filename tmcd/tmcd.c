@@ -5280,14 +5280,18 @@ COMMAND_PROTOTYPE(dofwinfo)
 	 *
 	 * XXX will only work if there is one firewall per experiment.
 	 */
-	res = mydb_query("select r.node_id,f.type,f.style,f.fwname,i.IP,i.mac,f.vlan "
+	res = mydb_query("select r.node_id,v.type,v.style,f.fwname,i.IP, "
+			 "  i.mac,f.vlan "
 			 "from firewalls as f "
 			 "left join reserved as r on"
 			 "  f.pid=r.pid and f.eid=r.eid and f.fwname=r.vname "
+			 "left join virt_firewalls as v on "
+			 "  v.pid=f.pid and v.eid=f.eid and v.fwname=f.fwname "
 			 "left join interfaces as i on r.node_id=i.node_id "
 			 "where f.pid='%s' and f.eid='%s' "
 			 "and i.role='ctrl'",	/* XXX */
 			 7, reqp->pid, reqp->eid);
+	
 	if (!res) {
 		error("FWINFO: %s: DB Error getting firewall info!\n",
 		      reqp->nodeid);

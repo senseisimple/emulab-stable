@@ -21,11 +21,12 @@ sub usage()
 	  "       -s Include stuff for topologies with simulated nodes\n".
 	  "       -a Include even reserved nodes\n".
 	  "       -m Override multiplex_factor\n".
+	  "       -u Prune unused interfaces of allocated nodes (-e)\n".
 	  "       -c Delay capacity override\n".
 	  "       -n Add in modelnet core and edge node features\n");
     exit(-1);
 }
-my $optlist = "s:e:m:vp:rSan:c:";
+my $optlist = "s:e:m:vp:rSan:c:u";
 my $mfactor;
 my $virtstuff = 0;
 my $widearea  = 0;
@@ -33,6 +34,7 @@ my $simstuff  = 0;
 my $allnodes  = 0;
 my $mnetcores = 0;
 my $mnetedges = 0;
+my $prune     = 0;
 my $delaycap_override;
 
 #
@@ -112,6 +114,9 @@ if (defined($options{"p"})) {
 if (defined($options{"a"})) {
     $allnodes = 1;
 }
+if (defined($options{"u"})) {
+    $prune = 1;
+}
 if (defined($options{"c"})) {
     $delaycap_override = $options{"c"};
 }
@@ -129,6 +134,8 @@ if (defined($options{"e"})) {
     usage()
 	if (!defined($pid));
 }
+usage()
+    if ($prune && !defined($exempt_eid));
 
 # Read class/type maps
 my $result =
@@ -666,8 +673,13 @@ while (($node,$iface,$switch) = $result->fetchrow_array) {
 }
 
 # Read interface cards and ports
-$result = DBQueryFatal("SELECT node_id, iface, card, port FROM interfaces");
-while (($node,$iface,$card,$port) = $result->fetchrow_array) {
+$result = DBQueryFatal("SELECT node_id, iface, card, port, IP ".
+		       "FROM interfaces");
+
+while (($node,$iface,$card,$port,$IP) = $result->fetchrow_array) {
+    next
+	if ($prune && $is_reserved{$node} && (!defined($IP) || $IP eq ""));
+
     $interfacecardports{"$node:$iface"} = [$card,$port];
 }
 
@@ -681,6 +693,10 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	$iface2 = get_iface($node2,$card2,$port2);
 	$iface1bw = get_ifacebw($node1,$card1,$port1,"ethernet");
 	$iface2bw = get_ifacebw($node2,$card2,$port2,"ethernet");
+
+	next
+	    if (! exists($interfacecardports{"$node1:$iface1"}));
+	
 	# XXX - This is a bad, bad hack - we  use our knowledge that in the
 	# wires table links to the switch always come as node2. We also assume
 	# that node interfaces are plugged into switch ports of the same speed.

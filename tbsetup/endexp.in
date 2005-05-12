@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -88,6 +88,7 @@ my $dbuid;
 my $user_name;
 my $user_email;
 my @row;
+my $isadmin;
     
 #
 # Untaint the path
@@ -150,6 +151,7 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
     die("*** $0:\n".
 	"    You do not exist in the Emulab Database.\n");
 }
+$isadmin = TBAdmin($UID);
 
 #
 # Get email info for user.
@@ -163,7 +165,7 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 # Verify that this person is allowed to end the experiment.
 # Note that any script down the line has to do an admin check also. 
 #
-if ($UID && !TBAdmin($UID) &&
+if ($UID && !$isadmin &&
     !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
     die("*** $0:\n".
 	"    You do not have permission to end this experiment!\n");
@@ -202,6 +204,8 @@ my $expt_path       = $hashrow{'path'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $cancelflag      = $hashrow{'canceled'};
 my $expt_locked     = $hashrow{'expt_locked'};
+my $elabinelab      = $hashrow{'elab_in_elab'};
+my $lockdown        = $hashrow{'lockdown'};
 
 #
 # Batch experiments get a different protocol to avoid races with the
@@ -226,6 +230,10 @@ if ($batch) {
 	    $batchstate ne BATCHSTATE_LOCKED());
 	
     die("*** $0:\n".
+	"    Batch experiment $pid/$eid is locked down; cannot be swapped!\n")
+	if ($lockdown);
+
+    die("*** $0:\n".
 	"    Batch experiment $pid/$eid is not in the correct state!\n".
 	"    Currently $estate, but should be SWAPPED,QUEUED, or ACTIVE\n")
 	if ($estate ne EXPTSTATE_ACTIVE &&
@@ -244,6 +252,9 @@ else {
 	#
 	ExitWithStatus(1, "Batch experiment $pid/$eid is still canceling!")
 	    if ($cancelflag);
+
+	ExitWithStatus(1, "Batch experiment $pid/$eid is locked down!")
+	    if ($lockdown);
 
 	#
 	# Set the canceled flag. This will prevent the batch_daemon
@@ -267,8 +278,8 @@ else {
     }
     else {
 	#
-	# If the cancel flag is set, then user must wait for that to clear before
-	# we can do anything else.
+	# If the cancel flag is set, then user must wait for that to clear 
+	# before we can do anything else.
 	#
 	ExitWithStatus(1,
 		       "Experiment $pid/$eid has its cancel flag set!\n".
@@ -276,6 +287,10 @@ else {
 		       "terminate the experiment.\n")
 	    if ($cancelflag);
 	
+ 	ExitWithStatus(1,
+		       "Experiment $pid/$eid is locked down; cannot swap!\n")
+	    if ($lockdown);
+
 	#
 	# Must be unlocked if called by the user.
 	#
@@ -297,6 +312,18 @@ else {
 		$estate ne EXPTSTATE_NEW() &&
 		$estate ne EXPTSTATE_TERMINATED() &&
 		$estate ne EXPTSTATE_ACTIVE());
+	
+	#
+	# Must be an admin person to swap out an experiment that
+	# has had its panic button pressed.
+	#
+	if ($estate eq EXPTSTATE_PANICED() && !$isadmin) {
+	    ExitWithStatus(1,
+			   "Experiment $pid/$eid had its panic ".
+			   "button pressed!\n".
+			   "Only a testbed administrator can swap ".
+			   "this experiment out.");
+	}
     }
 }
 

@@ -684,11 +684,11 @@ REPLACE INTO table_regex VALUES ('event_groups','agent_name','text','redirect','
 REPLACE INTO table_regex VALUES ('virt_lan_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('firewalls','pid','text','redirect','projects:pid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('firewalls','eid','text','redirect','experimenets:eid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('firewalls','type','text','regex','^(ipfw|ipfw2|ipchains|ipfw2-vlan)$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','eid','text','redirect','experimenets:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|ipfw2|ipchains|ipfw2-vlan)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','eid','text','redirect','experimenets:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);

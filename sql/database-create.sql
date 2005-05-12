@@ -451,8 +451,6 @@ CREATE TABLE firewalls (
   pid varchar(12) NOT NULL default '',
   eid varchar(32) NOT NULL default '',
   fwname varchar(32) NOT NULL default '',
-  type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
-  style enum('open','closed','basic','emulab') NOT NULL default 'basic',
   vlan int(11) default NULL,
   vlanid int(11) default NULL,
   PRIMARY KEY  (pid,eid,fwname),
@@ -1940,6 +1938,19 @@ CREATE TABLE virt_agents (
   vnode varchar(32) NOT NULL default '',
   objecttype smallint(5) unsigned NOT NULL default '0',
   PRIMARY KEY  (pid,eid,vname,vnode)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_firewalls`
+--
+
+CREATE TABLE virt_firewalls (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  fwname varchar(32) NOT NULL default '',
+  type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
+  style enum('open','closed','basic','emulab') NOT NULL default 'basic',
+  PRIMARY KEY  (pid,eid,fwname)
 ) TYPE=MyISAM;
 
 --

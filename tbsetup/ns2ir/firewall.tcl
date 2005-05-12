@@ -151,7 +151,7 @@ Firewall instproc updatedb {DB} {
     # XXX add the firewall to the virt_nodes table to avoid assign hacking
     $sim spitxml_data "virt_nodes" [list "vname" "type" "ips" "osname" "cmd_line" "rpms" "startupcmd" "tarfiles" "fixed" ] [list "$self" "pc" "" $osid $cmdline "" "" "" "" ]
 
-    $sim spitxml_data "firewalls" [list "fwname" "type" "style"] [list $self $type $style]
+    $sim spitxml_data "virt_firewalls" [list "fwname" "type" "style"] [list $self $type $style]
     foreach rule [array names rules] {
 	set names [list "fwname" "ruleno" "rule"]
 	set vals  [list $self $rule $rules($rule)]
