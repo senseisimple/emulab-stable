@@ -893,8 +893,40 @@ sub dofloor($$)
                                     font=>"/usr/testbed/lib/arial.ttf", 
 				    pointsize=>$head_pointsize,
                                     text=>"$floor_label");
-	warn "$err" if "$err";            
+	warn "$err" if "$err";
 
+	#
+	# Stick in a very primitive scale bar.
+	#
+	my $fac = ($scale <= 2.0 ? 2 : 1);
+	my $lab = ($scale <= 2.0 ? "10 Meters" : "5 Meters");
+	my $dis = int($baseimages{$building}->{"ppm"} * (5.0 * $fac));
+	my $sx1 = $this_width - ($dis + 10);
+	my $sx2 = $this_width - 10;
+	my $lx  = $sx1 + (($dis / 2) - ((length($lab) * 8) / 2));
+	$err = $baseimage->Draw(stroke=>'black', primitive=>'line',
+				strokewidth=>'1.5',
+				points=>"$sx1,10, $sx2,10");
+	warn "$err" if "$err";
+
+	$err = $baseimage->Draw(stroke=>'black', primitive=>'line',
+				strokewidth=>'1.0',
+				points=>"$sx1,5, $sx1,15");
+	warn "$err" if "$err";
+
+	$err = $baseimage->Draw(stroke=>'black', primitive=>'line',
+				strokewidth=>'1.0',
+				points=>"$sx2,5, $sx2,15");
+	warn "$err" if "$err";
+
+        $err = $baseimage->Annotate(fill=>'black',
+				    x=>$lx,
+				    y=>30, 
+                                    font=>"/usr/testbed/lib/arial.ttf", 
+				    pointsize=>$thumb_head_pointsize,
+                                    text=>"$lab");
+	warn "$err" if "$err";
+	
         # Border adds to both the top and the bottom.  Crop some of it away.
         my $y1 = $head_height + $this_height;
         my $y2 = $y1 + $tail_height;
