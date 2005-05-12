@@ -357,15 +357,16 @@ public class RoboTrack extends JApplet {
     }
     Vector	Cameras = new Vector(10, 10);
 
+    // The font width/height adjustment, for drawing labels.
+    int FONT_HEIGHT = 14;
+    int FONT_WIDTH  = 6;
+    Font OurFont    = null;
+
+    // A little bufferedimage to hold (cache) the scale bar.
+    private BufferedImage scalebar_bimg;
+    
     private class Map extends JPanel implements Runnable {
         private Thread thread;
-        private BufferedImage bimg;
-	private Graphics2D G2 = null;
-	private Font OurFont = null;
-
-	// The font width/height adjustment, for drawing labels.
-	int FONT_HEIGHT = 14;
-	int FONT_WIDTH  = 6;
 
         public Map() {
 	    /*
@@ -378,6 +379,7 @@ public class RoboTrack extends JApplet {
 	    }
 
 	    OurFont = new Font("Arial", Font.PLAIN, 14);
+	    createScale();
         }
 
 	/*
@@ -394,26 +396,6 @@ public class RoboTrack extends JApplet {
 				Math.sin(-angle * 3.1415926536 / 180.0));
     
 	    return retvals;	    
-	}
-
-	/*
-	 * I stole this from some demo programs. Not really sure what
-	 * it does exactly, but has something to do with double buffering.
-	 */
-	public Graphics2D createGraphics2D(int w, int h) {
-	    //System.out.println("createGraphics2D");
-
-	    if (G2 == null) {
-		bimg = (BufferedImage) createImage(w, h);
-		
-		G2 = bimg.createGraphics();
-		G2.setFont(OurFont);
-		G2.setBackground(getBackground());
-		G2.setRenderingHint(RenderingHints.KEY_RENDERING,
-				    RenderingHints.VALUE_RENDER_QUALITY);
-	    }
-	    G2.clearRect(0, 0, w, h);
-	    return G2;
 	}
 
 	/*
@@ -812,6 +794,32 @@ public class RoboTrack extends JApplet {
 	    }
 	}
 
+	/*
+	 * Create a scalebar. Eventually, this will be in the base image,
+	 * or I can make a layered jpanel for it.
+	 */
+	public void createScale() {
+	    String	label = "1 Meter";
+	    int		dis   = (int) (pixels_per_meter == 1.0 ?
+				       100 : pixels_per_meter);
+	    int		sx1   = myWidth - (dis + 10);
+	    int		sx2   = myWidth - 10;
+	    int		dlx   = ((dis / 2) -
+				 ((FONT_WIDTH * label.length()) / 2));
+	    
+	    scalebar_bimg = new BufferedImage(dis, 30,
+					      BufferedImage.TYPE_INT_ARGB);
+	    Graphics2D G2 = scalebar_bimg.createGraphics();
+	    G2.setFont(OurFont);
+
+	    G2.setBackground(Color.white);
+	    G2.setColor(Color.black);
+	    G2.drawLine(0, 10, dis - 1, 10);
+	    G2.drawLine(0, 5,  0, 15);
+	    G2.drawLine(dis - 1, 5,  dis - 1, 15);
+	    G2.drawString(label, dlx, 30);
+	}
+
 	public void drawMap(int w, int h, Graphics2D g2) {
 	    int fw, fh;
 	    
@@ -819,9 +827,10 @@ public class RoboTrack extends JApplet {
 	    fh = floorimage.getHeight(this);
 
 	    /*
-	     * The base image is the floormap.
+	     * The base image is the floormap and the scalebar.
 	     */
 	    g2.drawImage(floorimage, 0, 0, fw, fh, this);
+	    g2.drawImage(scalebar_bimg, myWidth - 125, 0, this);
 
 	    /*
 	     * Then we draw a bunch of stuff on it, like the robots.
@@ -881,22 +890,14 @@ public class RoboTrack extends JApplet {
 
 	    //System.out.println(w + " D " + h);
 
-	    if (true) {
-		Graphics2D g2 = (Graphics2D)g;
+	    Graphics2D g2 = (Graphics2D)g;
 		
-		g2.clearRect(0, 0, w, h);
-		drawMap(w, h, g2);
-	    }
-	    else {
-		Graphics2D g2 = createGraphics2D(w, h);
-		
-		drawMap(w, h, g2);
-		g.drawImage(bimg, 0, 0, this);
-	    }
+	    g2.setFont(OurFont);
+	    g2.clearRect(0, 0, w, h);
+	    drawMap(w, h, g2);
         }
     
         public void start() {
-	    G2     = null;
             thread = new Thread(this);
             thread.start();
         }
