@@ -73,7 +73,8 @@ my @node_names	= @ARGV;
 # 
 my $error	  = 0;
 my $noalloc	  = 0;
-my @vals	  = ();
+my @newvals	  = ();
+my @oldnodes	  = ();
 my @nodes	  = ();
 my @need_consetup = 0;
 my @need_history  = ();
@@ -151,6 +152,8 @@ foreach my $n (@node_names) {
 	elsif (NodeidToExpOldReserved($n, \$r_pid, \$r_eid) &&
 	       (($r_pid eq $pid) && ($r_eid eq $eid))) {
 	    print "Already reserved in holding reservation: '$n'\n";
+	    push(@oldnodes, $n);
+	    next;
 	}
 	else {
 	    print "Someone else has already reserved node '$n'.\n";
@@ -166,24 +169,36 @@ foreach my $n (@node_names) {
     #
     # Add info the list of nodes to reserve; done in a single query below.
     # 
-    push(@vals,  "('$n','$pid','$eid','$n','','')");
+    push(@newvals,  "('$n','$pid','$eid','$n','','')");
     push(@nodes, "$n");
 }
 TBDebugTimeStamp("nalloc checked all nodes");
 
 if ($debug) {
-    print "List Ready: @vals\nError=$error\n";
+    print "List Ready: @newvals\nError=$error\n";
 }
 
 # Now make the reservations in the DB.
-if ((!$noalloc || $partial) && @vals) {
+if ((!$noalloc || $partial) && (@newvals || @oldnodes)) {
     print "Reserving nodes...\n"
 	if ($debug);
 
-    if (! DBQueryWarn("replace into reserved ".
+    if (@newvals &&
+	! DBQueryWarn("replace into reserved ".
 		      "  (node_id,pid,eid,vname,old_pid,old_eid) ".
-		      "values ". join(",",@vals))) {
+		      "values ". join(",",@newvals))) {
 	$error++;
+    }
+    # Do this instead of creating new entries so as not to lose any
+    # other info in the reserved table entries. I think this might be;
+    # wrong; might need to rethink this.
+    foreach my $node (@oldnodes) {
+	if (!DBQueryWarn("update reserved " .
+			 "set pid='$pid',eid='$eid', ".
+			 "    old_pid='', old_eid='' ".
+			 "where node_id='$node'")) {
+	    $error++;
+	}
     }
 }
 TBDebugTimeStamp("nalloc allocated all nodes");
