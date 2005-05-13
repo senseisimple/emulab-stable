@@ -28,10 +28,12 @@ import com.sun.image.codec.jpeg.*;
  */
 public class RoboTrack extends JApplet {
     int myHeight, myWidth;
+    URL robopipeurl = null;
     Map map;
     JTable maptable;
     JPopupMenu LeftMenuPopup, RightMenuPopup;
     JMenuItem CancelMovesMenuItem, SubmitMenuItem;
+    JMenuItem StopMenuItem, RestartMenuItem;
     JMenuItem CancelDragMenuItem, ShowNodeMenuItem, SetOrientationMenuItem;
     Image floorimage;
     double pixels_per_meter = 1.0;
@@ -60,7 +62,7 @@ public class RoboTrack extends JApplet {
 		myHeight = appletSize.height;
 		myWidth  = appletSize.width;
 	    }
-	    URL urlServer = this.getCodeBase(), robopipe, floorurl, camurl;
+	    URL urlServer = this.getCodeBase(), floorurl, camurl;
 	    String pipeurl, baseurl;
 	    URLConnection uc;
 
@@ -122,17 +124,12 @@ public class RoboTrack extends JApplet {
 	    floorimage = getImage(floorurl);
 
 	    /* ... form the URL that we will connect to. */
-	    robopipe = new URL(urlServer,
-			       pipeurl
-			       + "&nocookieuid="
-			       + URLEncoder.encode(uid)
-			       + "&nocookieauth="
-			       + URLEncoder.encode(auth));
-
-	    uc = robopipe.openConnection();
-	    uc.setDoInput(true);
-	    uc.setUseCaches(false);
-	    this.is = uc.getInputStream();
+	    robopipeurl = new URL(urlServer,
+				  pipeurl
+				  + "&nocookieuid="
+				  + URLEncoder.encode(uid)
+				  + "&nocookieauth="
+				  + URLEncoder.encode(auth));
 	}
 	catch(Throwable th)
 	{
@@ -209,7 +206,7 @@ public class RoboTrack extends JApplet {
 	 * robot moves. We use the mouseadaptor for this too. 
 	 */
         LeftMenuPopup = new JPopupMenu("Tracker");
-        JMenuItem menuitem = new JMenuItem("   Motion Menu   ");
+        JMenuItem menuitem = new JMenuItem("    Main Menu    ");
         LeftMenuPopup.add(menuitem);
 	LeftMenuPopup.addSeparator();
         SubmitMenuItem = new JMenuItem("Submit All Moves");
@@ -218,6 +215,12 @@ public class RoboTrack extends JApplet {
         CancelMovesMenuItem = new JMenuItem("Cancel All Moves");
         CancelMovesMenuItem.addActionListener(mymouser);
         LeftMenuPopup.add(CancelMovesMenuItem);
+        StopMenuItem = new JMenuItem("Stop Applet");
+        StopMenuItem.addActionListener(mymouser);
+        LeftMenuPopup.add(StopMenuItem);
+        RestartMenuItem = new JMenuItem("Restart Applet");
+        RestartMenuItem.addActionListener(mymouser);
+        LeftMenuPopup.add(RestartMenuItem);
         menuitem = new JMenuItem("Close This Menu");
         menuitem.addActionListener(mymouser);
         LeftMenuPopup.add(menuitem);
@@ -908,10 +911,28 @@ public class RoboTrack extends JApplet {
     
         public void run() {
             Thread me = Thread.currentThread();
-	    BufferedReader input
-		= new BufferedReader(new InputStreamReader(is));
 	    String str;
 	    long start_time = System.currentTimeMillis();
+
+	    if (! shelled) {
+		System.out.println("Opening URL: " + robopipeurl.toString());
+		
+		try
+	        {
+		    URLConnection uc = robopipeurl.openConnection();
+		    uc.setDoInput(true);
+		    uc.setUseCaches(false);
+		    is = uc.getInputStream();
+		}
+		catch(Throwable th)
+	        {
+		    th.printStackTrace();
+		    thread = null;
+		    return;
+		}
+	    }
+	    BufferedReader input
+		= new BufferedReader(new InputStreamReader(is));
 	    
             while (thread == me) {
 		try
@@ -943,6 +964,7 @@ public class RoboTrack extends JApplet {
 		}
             }
             thread = null;
+	    destroy();
         }
 
 	/*
@@ -951,7 +973,7 @@ public class RoboTrack extends JApplet {
 	public void destroy() {
 	    try
 	    {
-	        if (is != null)
+	        if (!shelled && is != null)
 		    is.close();
 	    }
 	    catch(IOException e)
@@ -1144,7 +1166,7 @@ public class RoboTrack extends JApplet {
 
 		    if (node_id == "") {
 			node_id = null;
-			MaybeLeftShowMenu(e);
+			ShowLeftMenu(e);
 			return;
 		    }
 		    Robot robbie = (Robot) robots.get(node_id);
@@ -1192,21 +1214,6 @@ public class RoboTrack extends JApplet {
 
 		    maptable.setRowSelectionInterval(robbie.index,
 						     robbie.index);
-		}
-	    }
-	    else if (button == e.BUTTON2) {
-		/*
-		 * Middle mouse button starts and stop the applet.
-		 */
-		if (frozen) {
-		    frozen = false;
-		    System.out.println("Restarting applet ...");
-		    start();
-		}
-		else {
-		    frozen = true;
-		    System.out.println("Stopping applet ...");
-		    stop();
 		}
 	    }
 	    else if (button == e.BUTTON3) {
@@ -1368,26 +1375,39 @@ public class RoboTrack extends JApplet {
 
 
 	/*
-	 * Decide if we want to actually show the popupmenu; only if
-	 * there are robots involved in a drag. Scan the list.
+	 * Show left popup.
 	 */
-	public void MaybeLeftShowMenu(MouseEvent e) {
-	    Enumeration enum = robots.elements();
+	public void ShowLeftMenu(MouseEvent e) {
+	    boolean     dragging = false;
+	    Enumeration enum     = robots.elements();
 
+	    /*
+	     * See if any nodes being dragged. Activate/Inactivate options
+	     */
 	    while (enum.hasMoreElements()) {
 		Robot robbie  = (Robot)enum.nextElement();
 
 		if (robbie.dragging) {
-		    /*
-		     * Use "map" (us) as the invoking component so that the 
-		     * menu is fully contained within the applet; this avoids
-		     * the "Java Applet Window" warning so that tells people
-		     * a window has just been popped up.
-		     */
-		    LeftMenuPopup.show(map, e.getX(), e.getY());
-		    return;
+		    dragging = true;
+		    break;
 		}
 	    }
+	    if (dragging) {
+		SubmitMenuItem.setEnabled(true);
+		CancelMovesMenuItem.setEnabled(true);
+	    }
+	    else {
+		SubmitMenuItem.setEnabled(false);
+		CancelMovesMenuItem.setEnabled(false);
+	    }
+	    
+	    /*
+	     * Use "map" (us) as the invoking component so that the 
+	     * menu is fully contained within the applet; this avoids
+	     * the "Java Applet Window" warning that tells people
+	     * a window has just been popped up.
+	     */
+	    LeftMenuPopup.show(map, e.getX(), e.getY());
 	}
 
 	/*
@@ -1402,7 +1422,27 @@ public class RoboTrack extends JApplet {
 	    /*
 	     * Figuring out which item was selected is silly.
 	     */
-	    if (source == CancelMovesMenuItem) {
+	    if (source == StopMenuItem) {
+		if (!frozen) {
+		    frozen = true;
+		    StopMenuItem.setEnabled(false);		    
+		    System.out.println("Stopping applet ...");
+		    stop();
+		}
+	    }
+	    else if (source == RestartMenuItem) {
+		if (!frozen) {
+		    frozen = true;
+		    StopMenuItem.setEnabled(false);		    
+		    System.out.println("Stopping applet ...");
+		    stop();
+		}
+		frozen = false;
+		StopMenuItem.setEnabled(true);
+		System.out.println("Restarting applet ...");
+		start();
+	    }
+	    else if (source == CancelMovesMenuItem) {
 		/*
 		 * Clear all the dragging bits.
 		 */
@@ -1854,6 +1894,8 @@ public class RoboTrack extends JApplet {
 	    ByteArrayInputStream imageinput;
 	    String str;
 	    int size;
+
+	    System.out.println("Opening URL: " + myurl.toString());
 
 	    try
 	    {
