@@ -108,3 +108,30 @@ Failed to add port 2/1 to multicast router port list.
 What I finally did to resolve this was to tear down the trunk link and
 EtherChannel that port was a part of, run the command on it (which succeeded
 this time), and then build the EtherChannel and trunk back up.
+
+##### IOS commands
+
+The above commands are given under the assummption that your switches are
+running CatOS. If you are running IOS, here are a few notes that may help you
+'translate' the above commands.
+
+Interfaces in CatOS are named as module/port, while interfaces in IOS are named
+as TypeModule/Port - For example, if module 1 has gigabit interfaces, what you
+call 1/1 in CatOS is Gi1/1 in IOS. 100Mbit Ethernet is 'Fa'. (Really, these are
+'GigabitEthernet' and 'FastEthernet' respectively, but you can abbreviate them.)
+
+In order to operate on many interfaces at once, you can issue configuration
+commands like this:
+range gi1/1 - 48, gi2/1 - 48, gi3/1 - 48
+... which would configure all 48 Gigabit interfaces on modules 1, 2, and 3.
+
+The equivalent of 'set port host' (which sets portfast, disabled BPDU guard,
+etc.) is:
+switchport host
+... applied to an interface or a range of interfaces. As in:
+range gi1/1 - 48, gi2/1 - 48, gi3/1 - 48
+switchport host
+exit
+
+In order to disable spanning tree, you would use:
+no spanning-tree vlan 1-1005
