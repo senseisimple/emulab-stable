@@ -184,6 +184,17 @@ sub doboot()
     }
     
     #
+    # XXX defaults for things that may or may not be passed in.
+    # Will be overridden if values are actually passed in.
+    #
+    $emulabconfig{"JAILIPBASE"} = "172.16.0.0";
+    $emulabconfig{"JAILIPMASK"} = "255.240.0.0";
+    $emulabconfig{"MFSTARBALL"} = "tftpboot-elabinelab.tar.gz";
+    $emulabconfig{"MFSVERSION"} = "53";
+    $emulabconfig{"MFSCONSOLE"} = "sio";
+    $emulabconfig{"WINSUPPORT"} = 0;
+
+    #
     # Turn the tmcc results into a hash first. Then call the boss or ops
     # setup function.
     #
@@ -201,16 +212,9 @@ sub doboot()
     system("sysctl vfs.nfs.eacces_retry_count=20 >/dev/null 2>&1");
 
     # Turn on windows support.
-    if (exists($emulabconfig{"WINSUPPORT"}) && $emulabconfig{"WINSUPPORT"}) {
+    if ($emulabconfig{"WINSUPPORT"}) {
 	$WINSUPPORT = 1;
     }
-
-    #
-    # Temp hack; make sure control iface in full duplex mode! pc2000 problem.
-    #
-#    my $outer_controlif = `cat $BOOTDIR/controlif`;
-#    chomp($outer_controlif);
-#    mysystem("ifconfig $outer_controlif media 100baseTX mediaopt full-duplex");
 
     if ($emulabconfig{"ROLE"} eq "ops") {
 	SetupOpsNode();
@@ -395,8 +399,11 @@ sub SetupOpsNode()
     print RC "ifconfig_${inner_controlif}=".
 	"\"inet $inner_ip netmask $inner_netmask ".
 	"media 100baseTX mediaopt full-duplex\"\n";
-    print RC "static_routes=\"outerboss\"\n";
+    print RC "static_routes=\"outerboss vnodes\"\n";
     print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
+    print RC "route_vnodes=\"-net ". $emulabconfig{"JAILIPBASE"} .
+	" -netmask " . $emulabconfig{"JAILIPMASK"} .
+	    " -iface $inner_controlif\"\n";
 
     print RC "defaultrouter=\"$bossnode_ip\"\n";
     print RC "hostname=\"" . $emulabconfig{"OPSNODE"} . "." . $domain . "\"\n";
@@ -653,8 +660,11 @@ sub SetupBossNode()
     print RC "ifconfig_${inner_controlif}=".
 	"\"inet $inner_ip netmask $inner_netmask ".
 	"media 100baseTX mediaopt full-duplex\"\n";
-    print RC "static_routes=\"outerboss\"\n";
+    print RC "static_routes=\"outerboss vnodes\"\n";
     print RC "route_outerboss=\"$outer_bossip $outer_routerip\"\n";
+    print RC "route_vnodes=\"-net ". $emulabconfig{"JAILIPBASE"} .
+	" -netmask " . $emulabconfig{"JAILIPMASK"} .
+	    " -iface $inner_controlif\"\n";
 
     #
     # Use natd so that internal control network can talk to outside world.
@@ -717,14 +727,40 @@ sub SetupBossNode()
     #
     print "Copying over tftpboot tar file from web server and unpacking\n";
     mysystem("wget -q -O ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
-	     "http://www.emulab.net/downloads/tftpboot-elabinelab.tar.gz");
+	     "http://www.emulab.net/downloads/".
+	     $emulabconfig{"MFSTARBALL"});
 
     mysystem("tar xzf ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
 	     "    -C /tftpboot");
 
+    #
     # Its the generic stuff; must localize.
-    mysystem("cd /tftpboot; mv pxeboot.emu-sio pxeboot.emu; ".
-	     "              mv freebsd47 freebsd ; mv frisbee47 frisbee");
+    #
+    my $cons = $emulabconfig{"MFSCONSOLE"};
+    if (! -e "/tftpboot/pxeboot.emu-${cons}") {
+	$cons = "sio";
+    }
+    mysystem("cd /tftpboot; mv pxeboot.emu-${cons} pxeboot.emu");
+    print "Using ${cons} version of pxeboot...\n";
+
+    my $fv = $emulabconfig{"MFSVERSION"};
+    if (! -e "/tftpboot/freebsd${fv}") {
+	$fv = "47";
+    }
+    mysystem("cd /tftpboot; mv freebsd${fv} freebsd");
+    print "Using freebsd${fv} version of admin MFS...\n";
+
+    $fv = $emulabconfig{"MFSVERSION"};
+    if (! -e "/tftpboot/frisbee${fv}") {
+	$fv = "47";
+    }
+    mysystem("cd /tftpboot; mv frisbee${fv} frisbee");
+    print "Using frisbee${fv} version of disk load MFS...\n";
+
+    # XXX frisbee-53 appears in the os_info table for some images still
+    # XXX note: must copy, symlink won't work
+    mysystem("cd /tftpboot; cp -rp frisbee frisbee-53")
+	if ($fv eq "53");
 
     # Create the compressed versions of the files
     mysystem("cd /tftpboot/frisbee/boot; ./prepare; ".
