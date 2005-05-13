@@ -38,7 +38,7 @@ COMMON		?= $(SRCDIR)/../common
 DEFRUNLVLDIR	?= $(RCDIR)/rc3.d
 
 # without DESTDIR, used for the value of symlinks
-RRCDIR		?= $(CLIENT_ETCDIR)/rc.d
+RRCDIR		?= /etc/rc.d
 
 install client-install:	common-install etc-install \
 			sup-install script-install bin-install
