@@ -29,6 +29,7 @@ use libxmlrpc;
 use snmpit_lib;
 use snmpit_cisco;
 use snmpit_foundry;
+use snmpit_nortel;
 use SNMP;
 
 use strict;
@@ -330,15 +331,8 @@ SWITCH:
 		my $bridgeport = $bridgeports{$index};
 		my $ifIndex = $ifIndexMap{$bridgeport};
 		if (!$ifIndex) {
-		    if ($switchtype eq "nortel") {
-			#
-			# Bad hack for Nortel switches
-			#
-			$ifIndex = $bridgeport - 47;
-		    } else  {
 			DEBUG "ifIndex conversion failed for $bridgeport!\n";
 			next;
-		    }
 		}
 
 		#
@@ -347,7 +341,8 @@ SWITCH:
 		# have only one module, and require no ifindex conversion.
 		#
 		my $modport;
-		if (($switchtype eq "cisco") || ($switchtype eq "foundry")) {
+		if (($switchtype eq "cisco") || ($switchtype eq "foundry") ||
+		    ($switchtype eq "nortel" ) {
 		    ($modport) = $device->convertPortFormat(2, $ifIndex);
 		} else {
 		    $modport = "1.$ifIndex";
