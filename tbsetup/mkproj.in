@@ -23,6 +23,7 @@ use English;
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $MKGROUP  = "$TB/sbin/mkgroup";
+my $SETGROUPS= "$TB/sbin/setgroups";
 my $MKACCT   = "$TB/sbin/tbacct add";
 my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
 my $WIKISUPPORT = @WIKISUPPORT@;
@@ -134,6 +135,9 @@ if ($WIKISUPPORT) {
 
 system("$MKACCT $projhead") == 0 or
     fatal("$MKACCT $projhead failed!");
+
+system("$SETGROUPS $projhead") == 0 or
+    fatal("$SETGROUPS $projhead failed!");
 
 $EUID = 0;
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -10,21 +10,32 @@ require("defs.php3");
 # The point of this is to redirect logged in users to their My Emulab
 # page. 
 #
-if (!isset($stayhome) && ($uid = GETUID())) {
+if ($uid = GETUID()) {
     $check_status = CHECKLOGIN($uid) & CHECKLOGIN_STATUSMASK;
 
-    if (!isset($stayhome) && $check_status == CHECKLOGIN_LOGGEDIN) {
-	# Zap to My Emulab page.
-	header("Location: $TBBASE/showuser.php3?target_uid=$uid");
-	return;
+    if (($firstinitstate = TBGetFirstInitState())) {
+	unset($stayhome);
     }
-    elseif (isset($SSL_PROTOCOL)) {
-	# Fall through; display the page.
-	;
-    }
-    elseif ($check_status == CHECKLOGIN_MAYBEVALID) {
-	# Not in SSL mode, so reload using https to see if really logged in.
-	header("Location: $TBBASE/index.php3");
+    if (!isset($stayhome)) {
+	if ($check_status == CHECKLOGIN_LOGGEDIN) {
+	    if ($firstinitstate == "createproject") {
+	        # Zap to NewProject Page,
+ 	        header("Location: $TBBASE/newproject.php3");
+	    }
+	    else {
+		# Zap to My Emulab page.
+		header("Location: $TBBASE/showuser.php3?target_uid=$uid");
+	    }
+	    return;
+	}
+	elseif (isset($SSL_PROTOCOL)) {
+            # Fall through; display the page.
+	    ;
+	}
+	elseif ($check_status == CHECKLOGIN_MAYBEVALID) {
+            # Not in SSL mode, so reload using https to see if logged in.
+	    header("Location: $TBBASE/index.php3");
+	}
     }
     # Fall through; display the page.
 }

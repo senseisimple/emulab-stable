@@ -93,6 +93,9 @@ Our software will create users later, once you get boss set up. BE SURE to
 give root a password and REMEMBER it! You are going to need it later.  To
 set the root password use "passwd root".
 
+If you already created users, then delete them with the "pw" command
+and make sure the home directories for them are removed as well!
+
 ##### Step 1 - Installing packages
 
 Again, almost the same as on ops. Download the same tarball, and follow

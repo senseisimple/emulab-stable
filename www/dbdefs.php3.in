@@ -8,6 +8,7 @@ $TBDBNAME       = "@TBDBNAME@";
 $TBOPSPID	= "emulab-ops";
 $NODEDEAD_PID   = $TBOPSPID;
 $NODEDEAD_EID   = "hwdown";
+$FIRSTUSER      = "elabman";
 
 # All these constants need to go at some point, replaced by data from
 # the regex table. 
@@ -1965,6 +1966,33 @@ function TBExptLockedDown($pid, $eid)
 
     $row = mysql_fetch_array($query_result);
     return $row[0];
+}
+
+#
+# Return firstinit state.
+#
+function TBGetFirstInitState()
+{
+    $firstinit = TBGetSiteVar("general/firstinit/state");
+    if ($firstinit == "Ready")
+	return null;
+    return $firstinit;
+}
+function TBSetFirstInitState($newstate)
+{
+    $query_result = 
+	DBQueryFatal("update sitevariables set value='$newstate' ".
+		     "where name='general/firstinit/state'");
+}
+function TBGetFirstInitPid()
+{
+    return TBGetSiteVar("general/firstinit/pid");
+}
+function TBSetFirstInitPid($pid)
+{
+    $query_result = 
+	DBQueryFatal("update sitevariables set value='$pid' ".
+		     "where name='general/firstinit/pid'");
 }
 
 #

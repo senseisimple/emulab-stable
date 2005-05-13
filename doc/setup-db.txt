@@ -21,7 +21,7 @@ ops setup documentation):
 
    NFS mounts between boss and ops
    Root ssh keys (so that root on boss can ssh to ops without a password)
-   The web interface (you don't need to be able to log in yet)
+   The web interface
 
 Make sure you can log into the web interface using the 'elabman' account.
 The password for the elabman account is the same as the root password on
@@ -35,83 +35,85 @@ logged in as a user who is allowed to become an admin, you will see a green
 dot one the left side of the header above the main page content. The green
 dot means that although you are allowed admin powers, they are currently
 turned off, and you see the same web pages that a regular user sees, and
-can use the sam actions. If you click on the dot, it will turn red, and you
+can use the same actions. If you click on the dot, it will turn red, and you
 will have full administrator privileges; we call this 'going red dot'.
-Many of the procedures in this file require you to be in red dot mode.
+If you click on the dot again, it will go back to green, thus you can
+easily flip back and forth between normal privs and admin privs. Note
+that most of the procedures in this file require you to be in red dot mode.
 
-Now, we'll use the elabman user to bootstrap your own account. Note that
-it is IMPORTANT that you create another account at this time since the
-elabman account does not have the power to perform certain actions that
-are required later (such as adding nodes to the testbed). So log out of the
-web interface, and use the 'Request Account' button to start a new project.
-Create a project that you can use for the faculty/students/staff involved in
-running your testbed - you can name it anything you'd like. Fill in your own
-information in the 'Project Head Information' section.  If you have created an
-account for yourself by hand on boss and/or ops, it is important that you
-either user a different username on this form, or delete your handmade account
-(using 'pw userdel <username>') on BOTH boss AND ops. Shortly after submitting
-this form, you should get email at the address you included on the form -
-follow the instructions it gives for verifying your email address. After
-entering your password, while still logged in to your new account, use the
-'Join project' link in the menu to join the 'emulab-ops' project (leave the
-'group' field blank.)
+Now, we will use the elabman user to bootstrap your first real account and
+project. Note that while you will use the elabman account to do this, the
+elabman account should not be considered a real account; it is intended to
+help bootstrap only and as such, does not have the power to perform many
+actions that are required later (such as adding nodes to the testbed).
 
-Okay, now log out of the web interface, log back on as elabman, and go 'red
-dot'.  Use the 'Approve New Projects' link on the menu to approve the project
-you just started. Also, use the 'New User Approval' page to approve your new
-account in the the 'emulab-ops' project - give yourself trust 'group root', so
-that you can approve others into this project too.
+Login as user 'elabman' if you have not already done so. Go into 'red dot'
+mode by clicking on the green dot. You should see the "Start New Project"
+page.  Fill in your own information in the 'Project Head Information'
+section.  It is important that you provide a working email address! Select
+your initial Project Name in the 'Project Information' section (we call
+ours 'testbed', but you can call yours whatever you call your project or
+research group).  Also specify a *working* URL (it is required) for the
+project. Submit the form using the Submit button at the bottom of the page.
 
-Go to the web interface, and log in as the admin account you created. Create a
-project for the administrators at your site (we call ours 'testbed', you can
-call yours whatever you call your project or group).  As soon as you've sent
-the request to sart the project, you can use the 'New Project Approval' link to
-make it active.
+The web interface will grind along for a minute or so. DO NOT CLICK THE
+STOP BUTTON! When it is done, you will see a message that invites you to
+login as the user you just created. Do this now so that you can continue
+with setting up your testbed. Note that the elabman account has been
+deactivated during this process to avoid problems later on (and potential
+security breaches). 
 
-Now, that you have an account, there a few things you're going to want to do -
-you'll also want to do these things to other admin-types too, when their
-accounts get created:
-1) Set your 'admin bit' - set the 'admin' column for your account in the users
-   table to '1' - you can do this, on boss, with:
-   
+Before we continue. lets explain a few more important items:
+
+* Project Membership: In addition to the project you just created, you have
+  automatically been added to the "emulab-ops" project with trust value
+  "group_root". This allows you to approve new members to that project as
+  well as your own project.
+
+* Admin Mode: Your new account has been given "administrator" mode, as
+  described above. To change that value for other users after their
+  accounts are created, you can do this on boss:
+
 	echo 'update users set admin=1 where uid="<username>"' | mysql tbdb
 
-2) Give yourself the ability to log in to boss - most users have a restricted
-   shell on boss, and are not allowed to log in using a password. Edit the
-   password file (use 'vipw', FreeBSD requires some special processing on the
-   password file after editing). Give yourself a real shell, and paste in your
-   encrypted password string from ops (although in general, it is safer to
-   have a different password on boss then on ops!)
+* Shell on Boss: Give yourself the ability to login to boss - most users
+  have a restricted shell on boss, and are not allowed to log in using a
+  password. Login to boss as root, and edit the password file (use 'vipw',
+  FreeBSD requires some special processing on the password file after
+  editing). Give yourself a real shell (say, /bin/csh) and then exit the
+  editor. Then give yourself a password (in general, it is safer to have a
+  different password on boss then on ops!). Use this command:
 
-3) If you were logged into boss as root, go ahead and log out and then back
-   in as yourself. In general, it is safer and better to not do things as
-   root. In fact, many testbed programs will complain if you invoke them as
-   root cause then it makes accounting and auditing more difficult.
+	passwd <your username>
 
-4) Add yourself to important groups - If you want to be a member of any
-   UNIX groups on boss, use the 'unixgroups' command (our automated account
-   tools may wipe out groups added by hand.)  You will need to be logged in
-   as yourself (not root) on boss to run this command. You will want to be
-   a member of at least the 'tbadmin' and 'wheel' groups. The syntax for
-   this command is:
+  NOTE: See doc/shelloboss.txt for important security issues wrt giving
+  real shells on boss. Before you give a real shell to someone, it is a
+  good idea for them to read this file!
 
-	unixgroups -a <username> <groupname> ...
+* Now logout and back in as yourself. In general, it is safer and better to
+  not do things as root. In fact, many testbed programs will complain if
+  you invoke them as root cause then it makes accounting and auditing more
+  difficult.
 
-Just as you need to go 'red dot' to use admin privileges on the web interface,
-you must also explicitly enable them on the command line. To do this, prefix
-the command you want to run with 'withadminprivs'. For example, I might invoke
-unixgroups like this:
+* Unix Group Membership: The Emulab account system manages both the
+  password file and the group file (/etc/group) on both boss and ops. If
+  you edit it directly, those changes will likely be lost. If you want to be
+  a member of any UNIX groups on boss, use our 'unixgroups' command. For
+  example, to add yourself to the "operator" group, do this on boss (as
+  yourself, not root):
 
-	withadminprivs unixgroups -a ricci tbadmin wheel
+	withadminprivs unixgroups -a <username> operator
 
-(Note: withadminprivs and many other admin-type commands live in
-/usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your
-$PATH.)
+  NOTE: Your initial account created above was already placed in the wheel
+  and tbadmin groups.
 
-Now that you are an admin, you don't need the elabman account anymore. Log into
-the web interface as yourself, go red dot, and go to the user list. Find
-elabman (you may need to click on 'Show: all' a the top of the page). Go to
-elabman's profile page  (by clicking on the uid) and "freeze" the user.
+  NOTE: Just as you need to go 'red dot' to use admin privileges on the web
+  interface, you must also explicitly enable them on the command line. To
+  do this, prefix the command you want to run with 'withadminprivs'.
+
+* Set you path: withadminprivs and many other admin-type commands live in
+  /usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your
+  $PATH.
 
 Others at your site can now apply to join your project, or start their own.
 

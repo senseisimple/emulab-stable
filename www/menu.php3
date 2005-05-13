@@ -224,6 +224,7 @@ function WRITESIDEBAR() {
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $WIKIURL;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
+    $firstinitstate = TBGetFirstInitState();
 
     #
     # The document base cannot be a mix of secure and nonsecure.
@@ -352,7 +353,21 @@ function WRITESIDEBAR() {
     }
 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-	if ($login_status & CHECKLOGIN_ACTIVE) {
+	if ($firstinitstate != null) {    
+	    if ($firstinitstate == "createproject") {
+		WRITESIDEBARBUTTON("Create First Project",
+				   $TBBASE, "newproject.php3");
+	    }
+	    elseif ($firstinitstate == "approveproject") {
+		$firstinitpid = TBGetFirstInitPid();
+		
+		WRITESIDEBARBUTTON("Approve First Project",
+				   $TBBASE,
+				   "approveproject.php3?pid=$firstinitpid".
+				   "&approval=approve");
+	    }
+	}
+	elseif ($login_status & CHECKLOGIN_ACTIVE) {
 	    if ($login_status & CHECKLOGIN_PSWDEXPIRED) {
 		WRITESIDEBARBUTTON("Change Your Password",
 				   $TBBASE, "moduserinfo.php3");
@@ -499,11 +514,13 @@ function WRITESIDEBAR() {
 	}
 	#
 	# Standard options for logged in users!
-	# 
-	WRITESIDEBARDIVIDER();
-	SIDEBARCELL("<a href=\"$TBBASE/newproject.php3\">Start</a> or " .
-	            "<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project",
-		    1);
+	#
+	if (!$firstinitstate) {
+	    WRITESIDEBARDIVIDER();
+	    SIDEBARCELL("<a href=\"$TBBASE/newproject.php3\">Start</a> or " .
+	             "<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project",
+			1);
+	}
     }
 
     #WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
@@ -552,20 +569,22 @@ function WRITESIDEBAR() {
       echo "</td></tr>\n";
     }
     elseif (!NOLOGINS()) {
-      echo "<tr>";
-      echo "<td class=\"menufooter\" align=center valign=center>";
+	echo "<tr>";
+	echo "<td class=\"menufooter\" align=center valign=center>";
 
-      echo "<a href=\"$TBBASE/reqaccount.php3\">";
-      echo "<img alt=\"Request Account\" border=0 ";
-      echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
+	if (!$firstinitstate) {
+	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
+	    echo "<img alt=\"Request Account\" border=0 ";
+	    echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
 
-      echo "<br /><b>or</b><br />";
+	    echo "<br /><b>or</b><br />";
+	}
 
-      echo "<a href=\"$TBBASE/login.php3\">";
-      echo "<img alt=\"logon\" border=0 ";
-      echo "src=\"$BASEPATH/logon.gif\"></a>\n";
+	echo "<a href=\"$TBBASE/login.php3\">";
+	echo "<img alt=\"logon\" border=0 ";
+	echo "src=\"$BASEPATH/logon.gif\"></a>\n";
 
-      echo "</td></tr>\n";
+	echo "</td></tr>\n";
     }
 
     #

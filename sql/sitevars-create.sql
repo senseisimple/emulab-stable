@@ -10,6 +10,8 @@
 
 
 INSERT INTO sitevariables VALUES ('general/testvar',NULL,'43','A test variable');
+INSERT INTO sitevariables VALUES ('general/firstinit/state',NULL,'Ready','Indicates that a new emulab is not setup yet. Moves through several states.');
+INSERT INTO sitevariables VALUES ('general/firstinit/pid',NULL,'testbed','The Project Name of the first project.');
 INSERT INTO sitevariables VALUES ('web/nologins',NULL,'0','Non-zero value indicates that no user may log into the Web Interface; non-admin users are auto logged out.');
 INSERT INTO sitevariables VALUES ('web/message',NULL,'','Message to place in large lettering under the login message on the Web Interface.');
 INSERT INTO sitevariables VALUES ('web/banner',NULL,'','Message to place in large lettering at top of home page (typically a special message)');

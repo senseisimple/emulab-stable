@@ -61,8 +61,10 @@ symlinks to the appropriate places. ie., if you make one big filesystem called
 	ln -s /z/proj /proj
 	... etc.
 
-Do *not* create any users yet, and just log in a root for the time being. Our
-software will create users later, once you get boss set up.
+Do *not* create any users yet, and just log in a root for the time being.
+Our software will create users later, once you get boss set up. If you
+already created users, then delete them with the "pw" command and make sure
+the home directories for them are removed as well. 
 
 ##### Step 1 - Installing packages
 

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -24,6 +24,11 @@ $isadmin = ISADMIN($uid);
 if (! $isadmin) {
     USERERROR("You do not have admin privileges to approve projects!", 1);
 }
+
+#
+# See if we are in an initial Emulab setup.
+#
+$FirstInitState = (TBGetFirstInitState() == "approveproject");
 
 echo "<center><h1>
       Approving Project '$pid' ...
@@ -252,11 +257,33 @@ elseif (strcmp($approval, "approve") == 0) {
           a reasonable amount of time, please contact $TBMAILADDR.\n";
     flush();
 
-    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", 1); 
+    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", SUEXEC_ACTION_DIE); 
 
-    echo "<p><b>
-             Project $pid (User: $headuid) has been approved.
-          </b>\n";
+    if (!$FirstInitState) {
+	echo "<p><b>
+                 Project $pid (User: $headuid) has been approved.
+                </b>\n";
+    }
+    else {
+	echo "<br><br><font size=+1>\n";
+	echo "Congratulations! You have successfully setup your initial Emulab
+              Project. You should now ".
+	      "<a href=login.php3?vuid=$headuid>login</a>
+              using the account you just
+              created so that you can continue setting up your new Emulab!
+              </font><br>\n";
+        #
+ 	# Freeze the initial user.
+        #
+        DBQueryFatal("update users set ".
+                     "  status='" . TBDB_USERSTATUS_FROZEN . "' ".
+	             "where uid='$FIRSTUSER'");
+
+        #
+        # Move to next phase. 
+        # 
+        TBSetFirstInitState("Ready");
+    }
 }
 else {
     TBERROR("Invalid approval value $approval in approveproject.php3.", 1);

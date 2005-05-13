@@ -16,11 +16,16 @@ include("defs.php3");
 $uid = GETLOGIN();
 
 #
+# See if we are in an initial Emulab setup.
+#
+$FirstInitState = (TBGetFirstInitState() == "createproject");
+
+#
 # If a uid came in, then we check to see if the login is valid.
 # If the login is not valid. We require that the user be logged in
 # to start a second project.
 #
-if ($uid) {
+if ($uid && !$FirstInitState) {
     # Allow unapproved users to create multiple projects ...
     # Must be verified though.
     LOGGEDINORDIE($uid, CHECKLOGIN_UNAPPROVED|CHECKLOGIN_WEBONLY);
@@ -50,26 +55,38 @@ $EMAILWARNING =
 function SPITFORM($formfields, $returning, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDOCBASE, $WWWHOST;
-    global $usr_keyfile;
+    global $usr_keyfile, $FirstInitState;
     global $ACCOUNTWARNING, $EMAILWARNING;
     global $WIKISUPPORT, $WIKIURL;
     
     PAGEHEADER("Start a New Testbed Project");
 
-    echo "<center><font size=+1>
-             If you are a <font color=red>student
-             (undergrad or graduate)</font>, please
-             do not try to start a project! <br>Your advisor must do it.
-             <a href=docwrapper.php3?docname=auth.html>
-             Read this for more info.</a>
-          </font></center><br>\n";
-
-    if (! $returning) {
+    #
+    # First initialization gets different text
+    #
+    if ($FirstInitState == "createproject") {
 	echo "<center><font size=+1>
-               If you already have an Emulab account,
-               <a href=login.php3?refer=1>
-               <font color=red>please log on first!</font></a>
+	      Please create your initial project.<br> A good Project Name
+              for your first project is probably 'testbed', but you can
+              choose anything you like.
               </font></center><br>\n";
+    }
+    else {
+	echo "<center><font size=+1>
+                 If you are a <font color=red>student
+                 (undergrad or graduate)</font>, please
+                 do not try to start a project! <br>Your advisor must do it.
+                 <a href=docwrapper.php3?docname=auth.html>
+                 Read this for more info.</a>
+              </font></center><br>\n";
+
+	if (! $returning) {
+	    echo "<center><font size=+1>
+                   If you already have an Emulab account,
+                   <a href=login.php3?refer=1>
+                   <font color=red>please log on first!</font></a>
+                   </font></center><br>\n";
+	}
     }
 
     if ($errors) {
@@ -584,6 +601,16 @@ if (! isset($_POST['submit'])) {
     $defaults[proj_plabpcs] = "0";
     $defaults[proj_public] = "checked";
     $defaults[proj_linked] = "checked";
+
+    if ($FirstInitState == "createproject") {
+	$defaults[pid]          = "testbed";
+	$defaults[proj_pcs]     = "256";
+	$defaults[proj_members] = "256";
+	$defaults[proj_funders] = "none";
+	$defaults[proj_name]    = "Your Testbed Project";
+	$defaults[proj_why]     = "This project is used for testbed ".
+	    "administrators to develop and test new software. ";
+    }
     
     SPITFORM($defaults, $returning, 0);
     PAGEFOOTER();
@@ -999,7 +1026,7 @@ if (mysql_num_rows($query_result)) {
 # * Generate a mail message to the user with the verification key.
 # 
 if (! $returning) {
-    $encoding = crypt("$password1");
+    $encoding    = crypt("$password1");
 
     #
     # Must be done before user record is inserted!
@@ -1023,27 +1050,29 @@ if (! $returning) {
 	 "date_add(now(), interval 1 year), now(), '$wikiname')");
 
     DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$proj_head_uid')");
-    
-    $key = TBGenVerificationKey($proj_head_uid);
 
-    TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
-      "Your New User Key",
-      "\n".
-      "Dear $usr_name:\n\n".
-      "This is your account verification key: $key\n\n".
-      "Please use this link to verify your user account:\n".
-      "\n".
-      "    ${TBBASE}/login.php3?vuid=$proj_head_uid&key=$key\n".
-      "\n".
-      "You will then be verified as a user. When you have been both\n".
-      "verified and approved by Testbed Operations, you will be marked\n".
-      "as an active user and granted full access to your account.\n".
-      "\n".
-      "Thanks,\n".
-      "Testbed Operations\n",
-      "From: $TBMAIL_APPROVAL\n".
-      "Bcc: $TBMAIL_AUDIT\n".
-      "Errors-To: $TBMAIL_WWW");
+    if (! $FirstInitState) {
+	$key = TBGenVerificationKey($proj_head_uid);
+
+	TBMAIL("$usr_name '$proj_head_uid' <$usr_email>",
+	   "Your New User Key",
+	   "\n".
+	   "Dear $usr_name:\n\n".
+	   "This is your account verification key: $key\n\n".
+	   "Please use this link to verify your user account:\n".
+	   "\n".
+	   "    ${TBBASE}/login.php3?vuid=$proj_head_uid&key=$key\n".
+	   "\n".
+	   "You will then be verified as a user. When you have been both\n".
+	   "verified and approved by Testbed Operations, you will be marked\n".
+	   "as an active user and granted full access to your account.\n".
+	   "\n".
+	   "Thanks,\n".
+	   "Testbed Operations\n",
+	   "From: $TBMAIL_APPROVAL\n".
+	   "Bcc: $TBMAIL_AUDIT\n".
+	   "Errors-To: $TBMAIL_WWW");
+    }
 }
 
 #
@@ -1079,7 +1108,7 @@ DBQueryFatal("insert into group_membership ".
 #
 # If a new user, do not send the full blown message until verified.
 #
-if ($returning) {
+if ($returning || $FirstInitState) {
     #
     # Grab the unix GID that was assigned.
     #
@@ -1138,6 +1167,38 @@ else {
 	   "From: $usr_name '$proj_head_uid' <$usr_email>\n".
 	   "Reply-To: $TBMAIL_APPROVAL\n".
 	   "Errors-To: $TBMAIL_WWW");
+}
+
+if ($FirstInitState) {
+    #
+    # The first user gets admin status and some extra groups, etc.
+    #
+    DBQueryFatal("update users set ".
+		 "  admin=1,status='". TBDB_USERSTATUS_UNAPPROVED . "' " .
+		 "where uid='$proj_head_uid'");
+
+    DBQueryFatal("insert into unixgroup_membership set ".
+		 "uid='$proj_head_uid', gid='wheel'");
+    
+    DBQueryFatal("insert into unixgroup_membership set ".
+		 "uid='$proj_head_uid', gid='$TBADMINGROUP'");
+    
+    DBQueryFatal("insert into group_membership ".
+		 "(uid, gid, pid, trust, date_applied) ".
+		 "values ('$proj_head_uid','$TBOPSPID','$TBOPSPID', ".
+		 "'" . TBDB_TRUSTSTRING_GROUPROOT . "', now())");
+
+    DBQueryFatal("update group_membership set ".
+		 "  trust='" . TBDB_TRUSTSTRING_PROJROOT . "' ".
+		 "where uid='$proj_head_uid' and pid='$pid'");
+
+    #
+    # Move to next phase. 
+    # 
+    TBSetFirstInitPid($pid);
+    TBSetFirstInitState("approveproject");
+    header("Location: approveproject.php3?pid=$pid&approval=approve");
+    return;
 }
 
 #
