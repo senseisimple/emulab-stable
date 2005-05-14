@@ -333,12 +333,14 @@ elsif (@ARGV == 1) {
 # Scale_arg 0 means to use the 40% size thumbnail images.
 my $path_col = ($scale_arg == 0 ? "thumb_path" : "image_path");
 my $db_scale = max($scale_arg, 1);
+# Nozoom signals a call by robotmap.  Don't use robots "building" otherwise.
+my $robo_bldg = "b.building ". ($nozoom ? "" : "not "). "like '%ROBOTS%'";
 my $query_result =
     DBQueryFatal("select b.building,b.title,f.floor,f.$path_col,".
 		 "f.pixels_per_meter ".
 		 "   from buildings as b ".
 		 "left join floorimages as f on f.building=b.building ".
-		 "where f.scale=$db_scale");
+		 "where $robo_bldg and f.scale=$db_scale");
 
 if (!$query_result->numrows) {
     die("*** $0:\n".
@@ -898,12 +900,18 @@ sub dofloor($$)
 	#
 	# Stick in a very primitive scale bar.
 	#
-	my $fac = ($scale <= 2.0 ? 2 : 1);
-	my $lab = ($scale <= 2.0 ? "10 Meters" : "5 Meters");
-	my $dis = int($baseimages{$building}->{"ppm"} * (5.0 * $fac));
+	# Scale_arg 0 means to use the 40% size thumbnail images.
+	my $fac = ($scale <= 2.0 ? ($scale_arg == 0 ? 3 : 2) : 1);
+	my $fac2 = ($scale_arg == 0 ? 2 : 5) * $fac;
+	my $lab = sprintf("%d Meters", 5 * $fac);
+	dprint "scale bar fac $fac fac2 $fac2 lab $lab\n";
+
+	my $dis = int($baseimages{$building}->{"ppm"} * $fac2);
 	my $sx1 = $this_width - ($dis + 10);
 	my $sx2 = $this_width - 10;
 	my $lx  = $sx1 + (($dis / 2) - ((length($lab) * 8) / 2));
+	dprint "dis $dis sx1 $sx1 sx2 $sx2 lx $lx\n";
+
 	$err = $baseimage->Draw(stroke=>'black', primitive=>'line',
 				strokewidth=>'1.5',
 				points=>"$sx1,10, $sx2,10");
