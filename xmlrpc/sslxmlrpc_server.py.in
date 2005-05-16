@@ -1,7 +1,7 @@
 #!/usr/local/bin/python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 import sys
@@ -230,10 +230,10 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
         return int(userQuery[0][0])
 
     #
-    # Check if the user is an admin.
+    # Check if the user is an stud.
     #
-    def isadminuser(self, uid):
-        res = DBQueryFatal("select admin from users where uid=%s", (uid,))
+    def isstuduser(self, uid):
+        res = DBQueryFatal("select stud from users where uid=%s", (uid,))
 
         if len(res) == 0:
             return 0
@@ -293,8 +293,8 @@ class MyServer(SSL.ForkingSSLServer, SimpleXMLRPCDispatcher):
             self.logit('User "%s" is not active' % self.user)
             raise Exception('User "%s" is not active' % self.user)
 
-        self.admin = self.isadminuser(self.user)
-        if self.admin:
+        self.stud = self.isstuduser(self.user)
+        if self.stud:
             try:
                 ALLOWED_PATHS.extend(map(lambda x:
                                          os.path.join(STD_DEVEL_PATH, x),
