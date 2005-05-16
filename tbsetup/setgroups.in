@@ -202,6 +202,13 @@ foreach my $uid (@userlist) {
     my $groupargument;
     my $project;
 
+    $query_result = DBQueryFatal("select webonly from users ".
+				 "where uid='$uid' and webonly=1");
+    if ($query_result->numrows) {
+	print "Skipping $uid; webonly account!\n";
+	next;
+    }
+
     #
     # Form a list of project (group) membership names. We do this in two
     # steps to ensure that we get the default group membership since we
