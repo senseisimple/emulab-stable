@@ -1,0 +1,45 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+all:	libntfs.a
+
+NTFSDIR		= ntfsprogs-1.7.1.linux
+INCLUDES        = -I${NTFSDIR}/include
+CFLAGS	        = -O2 -g -static -Wall $(INCLUDES)
+
+OBJS=	attrib.o \
+	bitmap.o \
+	bootsect.o \
+	compat.o \
+	debug.o \
+	dir.o \
+	disk_io.o \
+	inode.o \
+	lcnalloc.o \
+	mft.o \
+	mst.o \
+	runlist.o \
+	unistr.o \
+	volume.o
+
+%.o:	$(NTFSDIR)/libntfs/%.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+libntfs.a: configureit $(OBJS)
+	ar crv $@ $(OBJS)
+	ranlib $@
+
+configureit:
+	wget -q -N http://www.emulab.net/ntfsprogs-1.7.1.tar.gz
+	tar zxf ntfsprogs-1.7.1.tar.gz
+	mv ntfsprogs-1.7.1 $(NTFSDIR)
+	patch -sN -d $(NTFSDIR) -p1 < ntfs.linuxpatch
+	$(NTFSDIR)/configure
+	mv config.h $(NTFSDIR)/include
+	touch configureit
+
+clean:
+	rm -f $(OBJS) libntfs.a

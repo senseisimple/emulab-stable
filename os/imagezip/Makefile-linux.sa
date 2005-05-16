@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -16,7 +16,7 @@ BINDIR=	/usr/local/bin
 WITH_EXTFS	= 1
 WITH_FFS	= 1
 WITH_FAT	= 0
-WITH_NTFS	= 0	# needs work
+WITH_NTFS	= 0
 
 PTHREADCFLAGS	= -D_THREAD_SAFE -pthread
 #PTHREADLIBS	= -L/usr/local/lib -llgcc_r
@@ -45,10 +45,16 @@ FSOBJS		+= fat/fat_fat.o fat/fat_boot.o fat/fat_glue.o
 CFLAGS		+= -DWITH_FAT -Ifat
 endif
 
+ifdef WITH_NTFS
+FSOBJS		+= ntfs/ntfs_glue.o
+FSLIBS		+= ntfs/libntfs/libntfs.a
+CFLAGS		+= -DWITH_NTFS -Intfs/libntfs/ntfsprogs-1.7.1.linux/include
+endif
+
 all:	imagezip imageunzip imagedump
 
-imagezip: imagezip.o version.o $(FSOBJS)
-	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(LIBS) -o imagezip
+imagezip: imagezip.o version.o $(FSOBJS) $(FSLIBS)
+	$(CC) $(CFLAGS) imagezip.o version.o $(FSOBJS) $(FSLIBS) $(LIBS) -o imagezip
 
 imageunzip: imageunzip.o crc.o version.o
 	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
@@ -61,6 +67,11 @@ imagedump: imagedump.o version.o
 
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
+
+ntfs/libntfs/libntfs.a:
+	(cd ntfs/libntfs; make -f Makefile-linux.sa)
+
+ntfs/ntfs_glue.o: ntfs/libntfs/libntfs.a
 
 install:
 	$(INSTALL) imagezip $(DESTDIR)$(BINDIR)/imagezip
