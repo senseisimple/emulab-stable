@@ -316,6 +316,33 @@ foreach my $n (@freed_nodes) {
     # Clean the interface_settings table for this node.
     DBQueryWarn("delete from interface_settings where node_id='$n'") || $error++;
 
+    # If it's a robot, we need to reset its physical location.
+    $result =
+	DBQueryFatal("select building,floor,loc_x,loc_y,orientation ".
+		     "from node_startloc where node_id='$n'");
+    if ($result->num_rows()) {
+	while (my ($bldg,$floor,$x,$y,$o) = $result->fetchrow_array()) {
+	    my $subresult = 
+		DBQueryFatal("select pixels_per_meter from floorimages ".
+			     "where building='$bldg'");
+	    if ($subresult->num_rows()) {
+		my ($pixels_per_meter) = $subresult->fetchrow_array();
+
+		$x = int($x * $pixels_per_meter);
+		$y = int($y * $pixels_per_meter);
+		DBQueryWarn("update location_info set ".
+			    "loc_x=$x,loc_y=$y,orientation=$o ".
+			    "where node_id='$n' and building='$bldg' ".
+			    "and floor=$floor") || $error++;
+	    }
+	    else {
+		warn "No building named $bldg in floorimages";
+	    }
+	}
+    }
+    DBQueryWarn("update nodes set destination_x=NULL,destination_y=NULL,".
+		"destination_orientation=NULL where node_id='$n'") || $error++;
+
     # Now its safe to change the reservation.
 
     # If the node has a next_reserve entry, change the reservation.
