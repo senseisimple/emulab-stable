@@ -2638,3 +2638,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table firewalls drop type;
 	alter table firewalls drop style;
 
+1.135: Add elabinelab_cvstag to experiments table so people can
+       specify a specific tag to use when building the inner elab.
+
+       alter table experiments add elabinelab_cvstag varchar(64) \
+                  default NULL after elabinelab_eid;
+

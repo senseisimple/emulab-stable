@@ -5532,7 +5532,7 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	mysql_free_result(res);
 
 	/*
-	 * Finally, some package info
+	 * Some package info and other stuff from sitevars.
 	 */
 	res = mydb_query("select name,value from sitevariables "
 			 "where name like 'elabinelab/%%'", 2);
@@ -5560,6 +5560,27 @@ COMMAND_PROTOTYPE(doemulabconfig)
 			bufp += OUTPUT(bufp, ebufp - bufp, "WINSUPPORT=%s\n",
 				       row[1]);
 		}
+	}
+	mysql_free_result(res);
+
+	/*
+	 * Stuff from the experiments table.
+	 */
+	res = mydb_query("select elabinelab_cvstag from experiments "
+			 "where pid='%s' and eid='%s'",
+			 1, reqp->pid, reqp->eid);
+	if (!res) {
+		error("EMULABCONFIG: %s: DB Error getting experiments info\n",
+		      reqp->nodeid);
+		return 1;
+	}
+	if ((int)mysql_num_rows(res)) {
+	    row = mysql_fetch_row(res);
+
+	    if (row[0] && row[0][0]) {
+		bufp += OUTPUT(bufp, ebufp - bufp, "CVSSRCTAG=%s\n",
+			       row[0]);
+	    }
 	}
 	mysql_free_result(res);
 	client_writeback(sock, buf, strlen(buf), tcp);

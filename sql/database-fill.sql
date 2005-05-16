@@ -700,6 +700,7 @@ REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9]
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','vname','text','redirect','virt_nodes:vname',0,0,NULL);

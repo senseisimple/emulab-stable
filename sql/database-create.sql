@@ -399,6 +399,7 @@ CREATE TABLE experiments (
   modelnetedge_osname varchar(20) default NULL,
   elab_in_elab tinyint(1) NOT NULL default '0',
   elabinelab_eid varchar(32) default NULL,
+  elabinelab_cvstag varchar(64) default NULL,
   security_level tinyint(1) NOT NULL default '0',
   lockdown tinyint(1) NOT NULL default '0',
   paniced tinyint(1) NOT NULL default '0',

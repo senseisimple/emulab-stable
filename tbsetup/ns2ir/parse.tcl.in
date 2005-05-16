@@ -260,6 +260,7 @@ namespace eval GLOBALS {
     # Is an inner elab experiment.
     variable elab_in_elab 0
     variable elabinelab_eid {}
+    variable elabinelab_cvstag {}
 
     # Security level. Defaults to green
     variable security_level 0

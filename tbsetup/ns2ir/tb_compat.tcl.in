@@ -1444,6 +1444,11 @@ proc tb-set-inner-elab-eid {eid} {
 
     set elabinelab_eid $eid
 }
+proc tb-set-elabinelab-cvstag {cvstag} {
+    var_import ::GLOBALS::elabinelab_cvstag
+
+    set elabinelab_cvstag $cvstag
+}
 
 #
 # Set the inner elab role for a node.
