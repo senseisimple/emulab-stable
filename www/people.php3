@@ -56,7 +56,7 @@ echo "</ul>\n";
 
 echo "<h3>Alumni:</h3>\n";
 echo "<ul>\n";
-PARTFLUXPERSON("barb", "Chad Barb", "Sensory Sweep");
+PARTFLUXPERSON("barb", "Chad Barb", "Infinity Ward (Activision)");
 PARTFLUXPERSON("sclawson", "Steve Clawson", "Alcatel");
 PARTFLUXPERSON("abhijeet", "Abhijeet Joglekar", "Intel");
 PARTFLUXPERSON("ikumar", "Indrajeet Kumar", "Qualcomm");
