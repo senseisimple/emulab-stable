@@ -14,7 +14,7 @@ sub usage()
     exit(1);
 }
 my $optlist    = "";
-my $debug      = 0;
+my $debug      = 1;
 
 #
 # Configure variables.
@@ -40,7 +40,7 @@ if ($UID != 0) {
 
 #
 # Testbed support libs.
-# 
+#
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
@@ -102,14 +102,17 @@ sub TryQuery()
 	# Parent waits for child to complete query.
 	#
 	local $SIG{ALRM} = sub { kill("USR1", $childpid); };
-	alarm 60;
+	alarm 30;
 	waitpid($childpid, 0);
 	alarm 0;
 
 	# An exit value of 30 is the USR1 signal. 
 	if ($?) {
-	    if ($? == 30 || ($? >> 8) == 1) {
-		$rval = 1;
+	    if ($? == 30) {
+		$rval = -1;
+	    }
+	    elsif (($? >> 8) == 1) {
+		$rval = -1;
 	    }
 	    # 15 is TERM. Do nothing. 
 	    elsif ($? == 15) {
@@ -147,49 +150,66 @@ sub TryQuery()
 #
 sub RestartMysqld()
 {
-    my $status;
-    
     notify("Mysqld has gone catatonic at " . TBTimeStamp() . "; ".
 	   "attempting to restart ...");
     
     #
-    # Send it a normal kill. It does not matter what is returned.
+    # Send it a normal kill.
     #
+    print "Sending a -TERM to mysqld\n";
     system("$KILLALL mysqld");
-
-    #
-    # Wait for a little while, and then try another query. 
-    #
-    sleep(30);
-
-    $status = TryQuery();
-
-    # Everything okay now? Not likely to happen of course, since if the TERM
-    # is accepted, mysqld will not come back (its a normal exit). The child
-    # will not be able to connect and will exit with a -1.
-    return
-	if ($status == 0);
-
-    #
-    # Okay, its still dead. If the status was -1, we can just start mysqld
-    # the usual way. Otherwise kill it first.
-    #
-    if ($status == 1) {
-	system("$KILLALL -9 mysqld");
-	sleep(15);
+    if ($?) {
+	#
+	# Must not have been running. Restart it. 
+	# 
+	print "mysqld was not running; restarting.\n";
+	system("$MYSQLD start");
+	print "\n";
+	goto retry;
     }
-    system("$MYSQLD start");
-    print "\n";
-	
+
+    #
+    # Wait for a little while.
+    #
+    sleep(15);
+
+    #
+    # See if its still running. If mysqld was behaving normally, then a
+    # -TERM would cause it to exit. If it is still running, its hung and
+    # ignoring signals. 
+    #
+    print "Sending a -0 to mysqld\n";
+    system("$KILLALL -0 mysqld");
+    if ($?) {
+	#
+	# Must not have been running. Restart it. 
+	# 
+	print "mysqld exited normally; restarting.\n";
+	system("$MYSQLD start");
+	print "\n";
+	goto retry;
+    }
+
+    #
+    # Okay, really kill it now. If the wrapper (safe_mysqld) is doing its
+    # job, it will restart mysqld when it exits abnormally. 
+    # 
+    print "Sending a -KILL to mysqld\n";
+    system("$KILLALL -9 mysqld");
+
     #
     # Wait for a little while, and then try another query. 
     #
-    sleep(5);
+  retry:
+    sleep(15);
 
-    $status = TryQuery();
+    print "Trying another query ...\n";
 
-    return
-	if ($status == 0);
+    if (TryQuery() == 0) {
+        notify("Mysqld has been brought back from its coma at " .
+	       TBTimeStamp());
+	return;
+    }
 
     #
     # Ick. Notify and set the "paused" bit to keep from retrying. At some
