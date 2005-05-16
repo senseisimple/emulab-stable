@@ -6,6 +6,10 @@
 
 /**
  * @file mtp.h
+ *
+ * Header file for the mtp library.
+ *
+ * @see mtp.x
  */
 
 #ifndef __MTP_H__
@@ -86,11 +90,60 @@ int mtp_packet_invariant(mtp_packet_t *packet);
  */
 mtp_handle_t mtp_create_handle(int fd);
 
+/**
+ * Create and initialize an mtp_handle structure.
+ *
+ * @param host The hostname of the server.  If NULL, the "path" parameter is
+ * used.
+ * @param port The port the server is listening on.
+ * @param path The path of the unix-domain socket to connect to.
+ * @return An initialized mtp_handle object or NULL if there was error.
+ */
 mtp_handle_t mtp_create_handle2(char *host, int port, char *path);
 
+/**
+ * Create and initialize an mtp_handle structure.
+ *
+ * @param host The hostname of the server.  If NULL, the "path" parameter is
+ * used.
+ * @param port The port the server is listening on.
+ * @param path The path of the unix-domain socket to connect to.
+ * @param nb True if the socket and connection should be non-blocking.
+ * @return An initialized mtp_handle object or NULL if there was error.
+ */
+mtp_handle_t mtp_create_handle3(char *host, int port, char *path, int nb);
+
+/**
+ * Bind a socket to the given host/port specification.
+ *
+ * @see mtp_create_handle3
+ *
+ * @param host The hostname to bind to.  If NULL, the "path" parameter is used.
+ * @param port The port number to bind to.
+ * @param path The unix-domain path to bind to.
+ * @return The newly created and bound socket file descriptor or -1 if there
+ * was an error.
+ */
 int mtp_bind(char *host, int port, char *path);
 
+/**
+ * Perform a hostname lookup and fill out the given socket address structure.
+ *
+ * @param host_addr The socket address structure to fill out with the host and
+ * port values.
+ * @param host The hostname to lookup.
+ * @param port The port number, in host order.
+ * @return True if the lookup succeeded, false otherwise.
+ */
 int mtp_gethostbyname(struct sockaddr_in *host_addr, char *host, int port);
+
+/**
+ * Initialize the socket address structure with the given path.
+ *
+ * @param host_addr The socket address structure to fill out with the path.
+ * @param path The path of the unix-domain socket.
+ * @return True if the path is valid, false otherwise.
+ */
 int mtp_initunixpath(struct sockaddr_un *host_addr, char *path);
 
 /**
@@ -119,7 +172,8 @@ mtp_error_t mtp_receive_packet(mtp_handle_t mh, struct mtp_packet *packet);
 mtp_error_t mtp_send_packet(mtp_handle_t mh, struct mtp_packet *packet);
 
 /**
- * Tags for the mtp_init_packet function.
+ * Tags for the mtp_init_packet and mtp_send_packet2 functions.  These tags are
+ * used to specify the fields of the packet that you wish to initialize.
  */
 typedef enum {
     MA_TAG_DONE,	 /*< () Terminator tag. */
@@ -155,10 +209,10 @@ typedef enum {
 } mtp_tag_t;
 
 /**
- * Initialize an MTP packet from the given taglist.  The taglist consists of
- * any number of tag/value pairs passed to the function followed by the
- * terminator tag, MA_TAG_DONE.  For example, to initialize a request position
- * packet:
+ * Initialize an MTP packet to zero and then set any fields given in the
+ * taglist.  The taglist consists of any number of tag/value pairs passed to
+ * the function followed by the terminator tag, MA_TAG_DONE.  For example, to
+ * initialize a request position packet:
  *
  * @code
  *   mtp_init_packet(&mp,
@@ -175,49 +229,179 @@ typedef enum {
 mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...);
 
 /**
+ * Construct, marshal, and send a packet over an MTP connection.
+ *
+ * @see mtp_init_packet
+ *
+ * @param mh An initialized mtp_handle on which to send the packet.
+ * @param tag The first tag in the sequence.
+ * @return An mtp_error_t code.
+ */
+mtp_error_t mtp_send_packet2(mtp_handle_t mh, mtp_tag_t tag, ...);
+
+/**
  * Free any memory allocated by the XDR code when unmarshalling a packet.
  *
  * @param mp A packet received by mtp_receive_packet.
  */
 void mtp_free_packet(struct mtp_packet *mp);
 
+/**
+ * Convert a given angle to be between -PI and +PI.
+ *
+ * @param theta The angle, in radians, to convert.
+ * @return The converted angle.
+ */
 float mtp_theta(float theta);
 
+/**
+ * Convert a cartesian coordinate into polar coordinates relative to a given
+ * origin (the "current" parameter).
+ *
+ * @param current The current position of the object.
+ * @param dest The destination position of the object.
+ * @param r_out The distance from the current position to the destination.
+ * @param theta_out The angle, in radians, from the current position to the
+ * destination.
+ */
 void mtp_polar(struct robot_position *current,
 	       struct robot_position *dest,
 	       float *r_out,
 	       float *theta_out);
 
+/**
+ * Convert a polar coordinate relative to a given origin into a cartesian
+ * coordinate.
+ *
+ * @param current The current position of the object.
+ * @param r The distance to the destination position.
+ * @param theta The angle, in radians, to the destination position.
+ * @param dest_out The destination position in cartesian coordinates.
+ */
 void mtp_cartesian(struct robot_position *current,
 		   float r,
 		   float theta,
 		   struct robot_position *dest_out);
 
+/**
+ * Convert a move in world coordinates into a local coordinate move.
+ *
+ * @param local_out The structure to fill out with the move in local
+ * coordinates.
+ * @param world_start The starting position/posture.
+ * @param world_finish The ending position/posture.
+ * @return local_out
+ */
 struct robot_position *mtp_world2local(struct robot_position *local_out,
 				       struct robot_position *world_start,
 				       struct robot_position *world_finish);
 
+/**
+ * Tags for the mtp_dispatch function.  These tags are used to describe what
+ * packets to match and what to do with them.
+ */
 typedef enum {
-    MD_TAG_DONE,
+    MD_TAG_DONE,	/*< Terminator tag. */
 
-    MD_Integer,
+    MD_OnOpcode,	/*< (mtp_opcode_t) */
+    MD_OnStatus,	/*< (mtp_status_t) */
+    MD_OnWiggleType,	/*< (mtp_wiggle_t) */
+    MD_OnCommandID,	/*< (int) */
+
+    MD_Integer,		/*< (int) Specify an integer to compare against. */
     
-    MD_SkipInteger,
-    MD_OnInteger,
-    MD_OnFlags,
-    MD_OnOpcode,
-    MD_OnStatus,
-    MD_OnWiggleType,
-    MD_OnCommandID,
+    MD_OnInteger,	/*< (int) Check an MD_Integer. */
+    MD_OnFlags,		/*< (int) Bitwise check of an MD_Integer. */
+    MD_SkipInteger,	/*< (void) Skip checking an MD_Integer. */
+    
+    MD_Return,		/*< (void) On match, return immediately. */
+    MD_Call,		/*<
+			 * (mtp_dispatcher_t) On match, call function and
+			 * return.
+			 */
+    MD_AlsoCall,	/*<
+			 * (mtp_dispatcher_t) On match, call function and
+			 * continue.
+			 */
 
-    MD_Return,
-    MD_Call,
-    MD_AlsoCall,
-
-    MD_OR = (0x80000000)
+    MD_OR = (0x80000000)	/*<
+				 * When bitwise or'd with the other tags, they
+				 * become optional conditions.  Note that the
+				 * last condition passed should not be or'd
+				 * with this tag.  For example:
+				 *
+				 * @code
+				 *   MD_OR | MD_OnStatus, ...,
+				 *   MD_OR | MD_OnStatus, ...,
+				 *   MD_OnStatus, ...,
+				 * @endcode
+				 */
 } mtp_dispatch_tag_t;
 
+/**
+ * Type for handler functions passed to mtp_dispatch.
+ *
+ * @param userdata The userdata value passed to mtp_dispatch.
+ * @param mp The packet to dispatch.
+ */
 typedef int (*mtp_dispatcher_t)(void *userdata, mtp_packet_t *mp);
+
+/**
+ * Dispatches an mtp_packet_t to one or more handler functions based on certain
+ * criteria.  The function takes a large taglist that describes what packets
+ * you are interested in and what functions should be called to handle them.
+ * For example, to pass a packet to the do_goto and do_stop functions for the
+ * corresponding packet types, you would call:
+ *
+ * @code
+ *   mtp_distach(foo, mp,
+ *
+ *               MD_OnOpcode, MTP_COMMAND_GOTO,
+ *               MD_Call, do_goto,
+ *
+ *               MD_OnOpcode, MTP_COMMAND_STOP,
+ *               MD_Call, do_stop,
+ *
+ *               MD_TAG_DONE);
+ * @endcode
+ *
+ * The function works by comparing any requirements against the given packet
+ * (e.g. opcode == GOTO) until it reaches the MD_Call tag.  If the all of the
+ * requirements are met, the handler function is called and mtp_dispatch
+ * returns.  Otherwise, the next set of requirements is checked for a match.
+ * If no match is found, the packet will be dumped to standard error.
+ *
+ * Besides the opcode, the function can also match other parts of the packet.
+ * The next example passes update-position packets with an error status to the
+ * "handle_error" function and everything else to the "handle_update" function.
+ *
+ * @code
+ *   mtp_distach(foo, mp,
+ *
+ *               MD_OnOpcode, MTP_UPDATE_POSITION,
+ *               MD_OR | MD_OnStatus, MTP_POSITION_STATUS_ERROR,
+ *               MD_OnStatus, MTP_POSITION_STATUS_ABORT,
+ *               MD_Call, handle_error,
+ *
+ *               MD_OnOpcode, MTP_UPDATE_POSITION,
+ *               MD_Call, handle_update,
+ *
+ *               MD_TAG_DONE);
+ * @endcode
+ *
+ * Notice the use of the MD_OR flag, which causes the function to match one
+ * value or another.  Without this flag, the first MD_OnStatus would fail to
+ * match and cause the function to not be called.
+ *
+ *
+ * This is mostly just me experimenting and having fun... -tss
+ *
+ * @see mtp_dispatch_tag_t, mtp_dispatcher_t
+ *
+ * @param userdata The value to pass to any handler functions.
+ * @param mp The packet to dispatch.
+ * @param tag The first tag in the sequence.
+ */
 int mtp_dispatch(void *userdata, mtp_packet_t *mp,
 		 mtp_dispatch_tag_t tag,
 		 ...);
@@ -236,6 +420,13 @@ enum {
     MCF_SOUTH = (1L << MCB_SOUTH),
 };
 
+/**
+ * Convert a compass bitmask containing MCF_ values into a human readable
+ * string.
+ *
+ * @param x The compass bitmask.
+ * @return A static string that represents the given compass value.
+ */
 #define MTP_COMPASS_STRING(x) ( \
     (x) == (MCF_NORTH|MCF_WEST) ? "nw" : \
     (x) == (MCF_NORTH) ? "n" : \
@@ -246,8 +437,19 @@ enum {
     (x) == (MCF_SOUTH|MCF_WEST) ? "sw" : \
     (x) == (MCF_WEST) ? "w" : "u")
 
+/**
+ * Reduce an angle in radians to a compass direction.
+ *
+ * @param theta The angle to reduce.
+ * @return The compass bitmask made up of MCF_ values.
+ */
 int mtp_compass(float theta);
 
+/**
+ * Convert a relative coordinate system into absolute.
+ *
+ * @param _dst The destination 
+ */
 #define REL2ABS(_dst, _theta, _rpoint, _apoint) { \
     float _ct, _st; \
     \
@@ -258,12 +460,32 @@ int mtp_compass(float theta);
 }
 
 /**
+ * Check the sanity of an obstacle object.
+ *
+ * @param oc An initialized obstacle structure.
+ * @return true
+ */
+int mtp_obstacle_config_invariant(struct obstacle_config *oc);
+
+/**
  * Print the contents of the given packet to the given FILE object.
  *
  * @param file The file to print to.
  * @param mp The initialized packet to print.
  */
 void mtp_print_packet(FILE *file, struct mtp_packet *mp);
+
+#ifndef min
+#define min(x, y) ((x) < (y)) ? (x) : (y)
+#endif
+
+#ifndef max
+#define max(x, y) ((x) > (y)) ? (x) : (y)
+#endif
+
+#ifndef abs
+#define abs(x) ((x) < 0) ? -(x) : (x)
+#endif
 
 #ifdef __cplusplus
 }

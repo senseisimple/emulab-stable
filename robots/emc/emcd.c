@@ -344,6 +344,11 @@ int main(int argc, char *argv[])
       break;
     }
   }
+
+  if (!config_file) {
+      fprintf(stderr, "error: no config file specified\n");
+      exit(1);
+  }
   
   argc -= optind;
   argv += optind;
@@ -1726,6 +1731,12 @@ int vmc_callback(elvin_io_handler_t handler,
         }
         else {
           error("rmc unavailable; cannot forward wiggle-request\n");
+	  mtp_send_packet2(vmc_data.handle,
+			   MA_Opcode, MTP_WIGGLE_STATUS,
+			   MA_Role, MTP_ROLE_EMC,
+			   MA_RobotID, my_id,
+			   MA_Status, MTP_POSITION_STATUS_ERROR,
+			   MA_TAG_DONE);
         }
 
 	retval = 1;

@@ -16,10 +16,9 @@
 #include <errno.h>
 #include <stdio.h>
 
+#include "garciaUtil.hh"
 #include "dashboard.hh"
 #include "wheelManager.hh"
-
-extern int debug;
 
 /**
  * An "execute" callback for a garcia behavior.
@@ -123,7 +122,7 @@ startCallback::~startCallback()
 
 aErr startCallback::call()
 {
-    this->sc_wheel_manager.motionStarted();
+    this->sc_wheel_manager.motionStarted(this->sc_behavior);
     
     return aErrNone;
 }
@@ -161,6 +160,7 @@ aErr endCallback::call()
 wheelManager::wheelManager(acpGarcia &garcia)
     : wm_garcia(garcia),
       wm_last_status(aGARCIA_ERRFLAG_NORMAL),
+      wm_speed(DEFAULT_SPEED),
       wm_dashboard(NULL),
       wm_moving_notice(LED_PRI_MOVE, LED_PATTERN_MOVING),
       wm_error_notice(LED_PRI_ERROR, LED_PATTERN_ERROR)
@@ -175,9 +175,10 @@ void wheelManager::setSpeed(float speed)
 {
     acpValue av;
     
-    if ((speed < 0.1) || (speed > 0.4))
-	speed = 0.2;
-
+    if ((speed < MINIMUM_SPEED) || (speed > MAXIMUM_SPEED))
+	speed = DEFAULT_SPEED;
+    
+    this->wm_speed = speed;
     av.set(speed);
     this->wm_garcia.setNamedValue("speed", &av);
 }
@@ -192,6 +193,8 @@ acpObject *wheelManager::createPivot(float angle, wmCallback *callback)
     if (angle > (2 * M_PI)) {
 	angle = fmodf(angle, 2 * M_PI);
     }
+
+    angle = floorf(angle * 1000.0) / 1000.0;
 
     /* ... then reduce to the smallest movement. */
     if (angle > M_PI) {
@@ -227,6 +230,8 @@ acpObject *wheelManager::createMove(float distance, wmCallback *callback)
 
     assert(this->invariant());
 
+    distance = floorf(distance * 1000.0) / 1000.0;
+
     if (fabsf(distance) < SMALLEST_MOVE_DISTANCE) {
 	errno = EINVAL;
     }
@@ -261,7 +266,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
      * Check if we can make the move by backing up instead of turning all the
      * way around and moving forward.
      */
-    if ((distance <= 0.25f) && fabsf(angle) > M_PI_2) {
+    if ((distance <= 0.60f) && fabsf(angle) > M_PI_2) {
 	if (angle >= 0.0)
 	    angle -= M_PI;
 	else
@@ -335,12 +340,21 @@ bool wheelManager::stop(void)
     return this->wm_moving;
 }
 
-void wheelManager::motionStarted(void)
+void wheelManager::motionStarted(acpObject *behavior)
 {
+    float distance;
+    acpValue *av;
+    
     if (debug) {
 	fprintf(stderr, "debug: motion started\n");
     }
 
+    if ((av = behavior->getNamedValue("distance")) != NULL)
+	distance = av->getFloatVal();
+    else
+	distance = 1.0f; // XXX pivot, just assume a meter for now.
+    this->wm_dashboard->setDistanceLimit(distance * 1.1);
+    this->wm_dashboard->setVelocityLimit(this->wm_speed * 1.1);
     this->wm_moving = true;
 
     if ((this->wm_last_status != aGARCIA_ERRFLAG_NORMAL) &&
@@ -403,6 +417,9 @@ void wheelManager::motionFinished(acpObject *behavior,
 	
 	this->wm_last_status = status;
     }
+
+    this->wm_dashboard->setVelocityLimit(faultDetection::IDLE_VELOCITY_LIMIT);
+    this->wm_dashboard->setDistanceLimit(faultDetection::IDLE_DISTANCE_LIMIT);
     
     if (callback != NULL) {
 	this->wm_moving = false; // XXX This assumes callbacks on the last move

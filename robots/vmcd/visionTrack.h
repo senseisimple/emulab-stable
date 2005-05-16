@@ -7,6 +7,11 @@
 #ifndef _vision_track_h
 #define _vision_track_h
 
+/**
+ * @file visionTrack.h
+ *
+ */
+
 #include "mtp.h"
 #include "listNode.h"
 
@@ -29,6 +34,18 @@
  * lost.
  */
 #define MAX_TRACK_AGE 5
+
+/**
+ * The maximum distance, in meters, that will be tolerated between an initial
+ * wiggle frame and the final.
+ */
+#define WIGGLE_TOLERANCE 0.05
+
+/**
+ * The maximum distance, in meters, that will be tolerated between an initial
+ * wiggle frame in one camera and the final frame in a different camera.
+ */
+#define WIGGLE_DIFFCAM_TOLERANCE 0.10
 
 /**
  * Structure used to manage fiducials detected by the vision system.

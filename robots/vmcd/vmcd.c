@@ -70,8 +70,9 @@ static unsigned long long frame_count = 0;
 
 static struct robot_object ro_pool_nodes[16];
 
-static struct lnMinList known_bots, unknown_bots, wiggling_bots, lost_bots;
 static struct lnMinList last_frame, current_frame, wiggle_frame;
+
+static struct robot_object *wiggle_bot = NULL;
 
 /**
  * Here's how the algorithm will lay out: when we get update_position packets
@@ -153,7 +154,10 @@ static void dump_robot(struct robot_object *ro)
 {
     assert(ro != NULL);
     
-    info("  %d: %s; flags=%x\n", ro->ro_id, ro->ro_name, ro->ro_flags);
+    info("  %d: %s; status=%s\n",
+	 ro->ro_id,
+	 ro->ro_name,
+	 ro_status_names[ro->ro_status]);
 }
 
 static void dump_robot_list(struct lnMinList *list)
@@ -222,13 +226,15 @@ static void dump_info(void)
 	     vc->vc_top,
 	     vc->vc_bottom);
     }
-    
-    info(" Unknown robots:\n");
-    dump_robot_list(&unknown_bots);
-    info(" Wiggling robots:\n");
-    dump_robot_list(&wiggling_bots);
-    info(" Lost robots:\n");
-    dump_robot_list(&lost_bots);
+
+    for (lpc = 0; lpc < ROS_MAX; lpc++) {
+	struct lnMinList *list = &ro_data.rd_lists[lpc];
+	
+	if (!lnEmptyList(list)) {
+	    info(" %s robots:\n", ro_status_names[lpc]);
+	    dump_robot_list(list);
+	}
+    }
 
     info(" Wiggle frame:\n");
     dump_vision_list(&wiggle_frame);
@@ -331,11 +337,115 @@ static int parse_client_options(int *argcp, char **argvp[])
     return retval;
 }
 
+static int wiggle_idle(struct robot_object *ro, mtp_packet_t *mp)
+{
+    int retval = 0;
+    
+    assert(ro != NULL);
+    assert(mp != NULL);
+
+    roMoveRobot(ro, ROS_WIGGLE_QUEUE);
+    
+    return retval;
+}
+
+static int wiggle_complete(struct robot_object *ro, mtp_packet_t *mp)
+{
+    struct vision_track *vt;
+    int retval = 0;
+    
+    assert(ro != NULL);
+    assert(mp != NULL);
+
+    if (wiggle_bot == NULL) {
+	warning("received spurious wiggle complete from %d\n", ro->ro_id);
+    }
+    else if ((vt = vtFindWiggle(&wiggle_frame, &last_frame)) == NULL) {
+	roMoveRobot(ro, ROS_LOST);
+    }
+    else {
+	vt->vt_userdata = wiggle_bot;
+	roMoveRobot(ro, ROS_KNOWN);
+    }
+    lnAppendList(&vt_pool, &wiggle_frame);
+
+    wiggle_bot = NULL;
+    
+    return retval;
+}
+
+static int wiggle_error(struct robot_object *ro, mtp_packet_t *mp)
+{
+    int retval = 0;
+    
+    assert(ro != NULL);
+    assert(mp != NULL);
+
+    if (ro->ro_status == ROS_WIGGLING) {
+	lnAppendList(&vt_pool, &wiggle_frame);
+	wiggle_bot = NULL;
+    }
+    roMoveRobot(ro, ROS_LOST);
+    
+    return retval;
+}
+
+static int handle_robot_packet(void *arg, mtp_packet_t *mp)
+{
+    struct mtp_wiggle_status *mws;
+    struct robot_object *ro;
+    int retval = -1;
+
+    mws = &mp->data.mtp_payload_u.wiggle_status;
+    if ((ro = roFindRobot(mws->robot_id)) == NULL) {
+	error("unknown robot %d\n", mws->robot_id);
+    }
+    else {
+	retval = mtp_dispatch(ro, mp,
+
+			      MD_Integer, ro->ro_status,
+
+			      MD_OnInteger, ROS_STARTED_WIGGLING,
+			      MD_OnStatus, MTP_POSITION_STATUS_IDLE,
+			      MD_Call, wiggle_idle,
+
+			      MD_OnInteger, ROS_WIGGLING,
+			      MD_OnStatus, MTP_POSITION_STATUS_COMPLETE,
+			      MD_Call, wiggle_complete,
+
+			      MD_OR | MD_OnStatus, MTP_POSITION_STATUS_ERROR,
+			      MD_OnStatus, MTP_POSITION_STATUS_ABORTED,
+			      MD_Call, wiggle_error,
+
+			      MD_TAG_DONE);
+    }
+    
+    return retval;
+}
+
+static int handle_emc_packet(mtp_packet_t *mp)
+{
+    int rc, retval = 0;
+
+    if (debug > 0)
+	mtp_print_packet(stdout, mp);
+    
+    rc = mtp_dispatch(NULL, mp,
+		      
+		      MD_OnOpcode, MTP_WIGGLE_STATUS,
+		      MD_Call, handle_robot_packet,
+		      
+		      MD_TAG_DONE);
+    
+    return retval;
+}
+
 int main(int argc, char *argv[])
 {
     int lpc, current_client = 0, retval = EXIT_SUCCESS;
-    struct robot_object *wiggle_bot = NULL;
     fd_set readfds;
+
+    roInit();
     
     FD_ZERO(&readfds);
 
@@ -347,11 +457,6 @@ int main(int argc, char *argv[])
     lnNewList(&last_frame);
     lnNewList(&current_frame);
     lnNewList(&wiggle_frame);
-    
-    lnNewList(&known_bots);
-    lnNewList(&unknown_bots);
-    lnNewList(&wiggling_bots);
-    lnNewList(&lost_bots);
     
     do {
         retval = parse_client_options(&argc, &argv);
@@ -420,16 +525,18 @@ int main(int argc, char *argv[])
             vmc_config = rmp.data.mtp_payload_u.config_vmc;
             
             for (lpc = 0; lpc < vmc_config.robots.robots_len; lpc++) {
+		struct robot_object *ro = &ro_pool_nodes[lpc];
+		
                 info(" robot[%d] = %d %s\n",
                      lpc,
                      vmc_config.robots.robots_val[lpc].id,
                      vmc_config.robots.robots_val[lpc].hostname);
 
-		ro_pool_nodes[lpc].ro_name =
-		    vmc_config.robots.robots_val[lpc].hostname;
-		ro_pool_nodes[lpc].ro_id =
-		    vmc_config.robots.robots_val[lpc].id;
-		lnAddTail(&unknown_bots, &ro_pool_nodes[lpc].ro_link);
+		ro->ro_name = vmc_config.robots.robots_val[lpc].hostname;
+		ro->ro_id = vmc_config.robots.robots_val[lpc].id;
+		lnAddTail(&ro_data.rd_lists[ROS_UNKNOWN], &ro->ro_link);
+		ro->ro_next = ro_data.rd_all;
+		ro_data.rd_all = ro;
             }
 	    
             for (lpc = 0; lpc < vmc_config.cameras.cameras_len; lpc++) {
@@ -552,7 +659,8 @@ int main(int argc, char *argv[])
 	    vtMatch(&vt_pool, &last_frame, &current_frame);
 
 	    /* Reset the list of known/unknown bots. */
-	    lnAppendList(&unknown_bots, &known_bots);
+	    lnAppendList(&ro_data.rd_lists[ROS_UNKNOWN],
+			 &ro_data.rd_lists[ROS_KNOWN]);
 
 	    /*
 	     * Detect the robots that have references in the current frame and
@@ -563,9 +671,8 @@ int main(int argc, char *argv[])
 	    while (vt->vt_link.ln_Succ != NULL) {
 		if ((ro = vt->vt_userdata) != NULL) {
 		    struct mtp_packet ump;
-		    
-		    lnRemove(&ro->ro_link);
-		    lnAddTail(&known_bots, &ro->ro_link);
+
+		    roMoveRobot(ro, ROS_KNOWN);
 		    mtp_init_packet(&ump,
 				    MA_Opcode, MTP_UPDATE_POSITION,
 				    MA_Role, MTP_ROLE_VMC,
@@ -596,25 +703,26 @@ int main(int argc, char *argv[])
 	     * them and cause an IDLE wiggle_status to come back.
 	     */
 
-	    ro = (struct robot_object *)unknown_bots.lh_Head;
+	    ro = (struct robot_object *)ro_data.rd_lists[ROS_UNKNOWN].lh_Head;
 	    while (ro->ro_link.ln_Succ != NULL) {
-		if (!(ro->ro_flags & RF_WIGGLING)) {
-		    struct mtp_packet wmp;
-
-		    info("sending wiggle request for %d\n", ro->ro_id);
-		    dump_info();
-		    
-		    mtp_init_packet(&wmp,
-				    MA_Opcode, MTP_WIGGLE_REQUEST,
-				    MA_Role, MTP_ROLE_VMC,
-				    MA_RobotID, ro->ro_id,
-				    MA_WiggleType, MTP_WIGGLE_START,
-				    MA_TAG_DONE);
-		    mtp_send_packet(emc_handle, &wmp);
-
-		    ro->ro_flags |= RF_WIGGLING;
-		}
-		ro = (struct robot_object *)ro->ro_link.ln_Succ;
+		struct robot_object *ro_next;
+		struct mtp_packet wmp;
+		
+		ro_next = (struct robot_object *)ro->ro_link.ln_Succ;
+		
+		info("sending wiggle request for %d\n", ro->ro_id);
+		dump_info();
+		
+		mtp_init_packet(&wmp,
+				MA_Opcode, MTP_WIGGLE_REQUEST,
+				MA_Role, MTP_ROLE_VMC,
+				MA_RobotID, ro->ro_id,
+				MA_WiggleType, MTP_WIGGLE_START,
+				MA_TAG_DONE);
+		mtp_send_packet(emc_handle, &wmp);
+		
+		roMoveRobot(ro, ROS_STARTED_WIGGLING);
+		ro = ro_next;
 	    }
 
 	    /* Throw any frames left from the last frame in the pool and */
@@ -636,21 +744,18 @@ int main(int argc, char *argv[])
 	 * will be rewiggled once the next set of updates comes from the
 	 * vision system.
 	 */
-	if (!lnEmptyList(&lost_bots)) {
+	if (!lnEmptyList(&ro_data.rd_lists[ROS_LOST])) {
 	    struct robot_object *ro = NULL;
 	    struct robot_object *ro_next = NULL;
 	    struct timeval current;
 
 	    gettimeofday(&current,NULL);
 
-	    ro = (struct robot_object *)lost_bots.lh_Head;
+	    ro = (struct robot_object *)ro_data.rd_lists[ROS_LOST].lh_Head;
 	    while (ro->ro_link.ln_Succ != NULL) {
 		if ((current.tv_sec - ro->ro_lost_timestamp.tv_sec) > 10) {
-		    // remove this guy
 		    ro_next = (struct robot_object *)ro->ro_link.ln_Succ;
-		    lnRemove(&ro->ro_link);
-		    // add him to unknown list
-		    lnAddTail(&unknown_bots,&ro->ro_link);
+		    roMoveRobot(ro, ROS_UNKNOWN);
 		    info("robot %d exceeded the lost timeout, trying to "
 			 "reacquire.\n",
 			 ro->ro_id
@@ -670,7 +775,8 @@ int main(int argc, char *argv[])
 	 * Check if we need to identify any bots, assuming we're not in the
 	 * process of finding one.
 	 */
-	if ((wiggle_bot == NULL) && !lnEmptyList(&wiggling_bots)) {
+	if ((wiggle_bot == NULL) &&
+	    !lnEmptyList(&ro_data.rd_lists[ROS_WIGGLE_QUEUE])) {
 	    /*
 	     * Take a snapshot of the tracks with no robot attached from the
 	     * last frame so we can compare it against the frame when the robot
@@ -680,8 +786,8 @@ int main(int argc, char *argv[])
 
 	    if (!lnEmptyList(&wiggle_frame)) {
 		struct mtp_packet wmp;
-
-		wiggle_bot = (struct robot_object *)lnRemHead(&wiggling_bots);
+		
+		wiggle_bot = roDequeueRobot(ROS_WIGGLE_QUEUE, ROS_WIGGLING);
 		
 		info("starting wiggle for %s\n", wiggle_bot->ro_name);
 		dump_info();
@@ -711,107 +817,7 @@ int main(int argc, char *argv[])
 			fatal("bad packet from emc %d\n", rc);
 		    }
 		    else {
-			struct mtp_wiggle_status *mws;
-			struct vision_track *vt;
-			struct robot_object *ro;
-			
-			if (debug > 0) {
-			    mtp_print_packet(stdout, &mp);
-			}
-
-			switch (mp.data.opcode) {
-			case MTP_WIGGLE_STATUS:
-			    mws = &mp.data.mtp_payload_u.wiggle_status;
-			    ro = roFindRobot(&unknown_bots, mws->robot_id);
-			    switch (mws->status) {
-			    case MTP_POSITION_STATUS_IDLE:
-				/* Got a response to an MTP_WIGGLE_START. */
-				if (ro == NULL) {
-				    error("unknown bot %d\n", mws->robot_id);
-				}
-				else {
-				    /*
-				     * Add him to the list of robots ready
-				     * to be wiggled.
-				     */
-				    lnRemove(&ro->ro_link);
-				    lnAddTail(&wiggling_bots, &ro->ro_link);
-				    ro->ro_flags &= ~RF_WIGGLING;
-				}
-				break;
-				
-			    case MTP_POSITION_STATUS_COMPLETE:
-				/*
-				 * The robot finished his wiggle, check the
-				 * current frame against the snapshot we took
-				 * to find a robot in the same position, but
-				 * with a 180 degree difference in orientation.
-				 */
-				if ((vt = vtFindWiggle(&wiggle_frame,
-						       &last_frame)) == NULL) {
-				    if (wiggle_bot == NULL) {
-					lnAppendList(&vt_pool, &wiggle_frame);
-					break;
-				    }
-				    
-				    /*
-				     * Couldn't locate the robot, add him to
-				     * the list of "lost" robots which we'll
-				     * try to rediscover after a short time.
-				     */
-				    lnAddTail(&lost_bots,
-					      &wiggle_bot->ro_link);
-
-				    gettimeofday(&(wiggle_bot->ro_lost_timestamp),
-						 NULL);
-				    info("took a lost timestamp for robot"
-					 " %d\n",
-					 wiggle_bot->ro_id
-					 );
-				    dump_info();
-
-				    wiggle_bot = NULL;
-				}
-				else {
-				    info("found wiggle ! %p\n", vt);
-				    vt->vt_userdata = wiggle_bot;
-				    lnAddTail(&known_bots,
-					      &wiggle_bot->ro_link);
-				    wiggle_bot = NULL;
-				}
-				/*
-				 * Return the frame we snapshotted awhile ago
-				 * to the pool.
-				 */
-				lnAppendList(&vt_pool, &wiggle_frame);
-				break;
-				
-			    default:
-				info("got an unknown wiggle status!\n");
-
-				if ((wiggle_bot != NULL) &&
-				    (wiggle_bot->ro_id == mws->robot_id)) {
-				    ro = wiggle_bot;
-				    wiggle_bot = NULL;
-				    lnAppendList(&vt_pool, &wiggle_frame);
-				}
-				else if (ro != NULL) {
-				    lnRemove(&ro->ro_link);
-				}
-				else if ((ro = roFindRobot(&wiggling_bots,
-							   mws->robot_id)) != NULL) {
-				    lnRemove(&ro->ro_link);
-				}
-				if (ro != NULL) {
-				    gettimeofday(&(ro->ro_lost_timestamp), NULL);
-				    lnAddTail(&lost_bots, &ro->ro_link);
-				}
-				break;
-			    }
-			    break;
-			default:
-			    break;
-			}
+			handle_emc_packet(&mp);
 		    }
 		    
 		    mtp_free_packet(&mp);
@@ -827,44 +833,37 @@ int main(int argc, char *argv[])
 						 &mp)) != MTP_PP_SUCCESS) {
 			fatal("bad packet from vmc-client %d\n", rc);
 		    }
-		    else {
-			if (debug > 2) {
-			    mtp_print_packet(stdout, &mp);
-			    fflush(stdout);
-			}
+		    else if (vtUpdate(&vc->vc_frame, vc, &mp, &vt_pool)) {
+			vc->vc_frame_count += 1;
 			
-			if (vtUpdate(&vc->vc_frame, vc, &mp, &vt_pool)) {
-			    vc->vc_frame_count += 1;
+			if (vc->vc_handle->mh_remaining > 0) {
+			    lnAppendList(&vt_pool, &vc->vc_frame);
+			}
+			else {
+			    if (debug > 2) {
+				info("debug: "
+				     "got frame from client %s:%d\n",
+				     vc->vc_hostname,
+				     vc->vc_port);
+			    }
 			    
-			    if (vc->vc_handle->mh_remaining > 0) {
-				lnAppendList(&vt_pool, &vc->vc_frame);
-			    }
-			    else {
-				if (debug > 2) {
-				    info("debug: "
-					 "got frame from client %s:%d\n",
-					 vc->vc_hostname,
-					 vc->vc_port);
-				}
-
-				vtAgeTracks(&vc->vc_frame,
-					    &vc->vc_last_frame,
-					    &vt_pool);
-				vtCopyTracks(&vc->vc_last_frame,
-					     &vc->vc_frame,
-					     &vt_pool);
-				lnAppendList(&current_frame, &vc->vc_frame);
-				
-				/*
-				 * Got all of the tracks from this client,
-				 * clear his bit and
-				 */
-				FD_CLR(vc->vc_handle->mh_fd, &readfds);
-				/* ... try to wait for the next one. */
-				current_client += 1;
-				if (current_client < vmc_client_count)
-				    FD_SET(vc[1].vc_handle->mh_fd, &readfds);
-			    }
+			    vtAgeTracks(&vc->vc_frame,
+					&vc->vc_last_frame,
+					&vt_pool);
+			    vtCopyTracks(&vc->vc_last_frame,
+					 &vc->vc_frame,
+					 &vt_pool);
+			    lnAppendList(&current_frame, &vc->vc_frame);
+			    
+			    /*
+			     * Got all of the tracks from this client, clear
+			     * his bit and
+			     */
+			    FD_CLR(vc->vc_handle->mh_fd, &readfds);
+			    /* ... try to wait for the next one. */
+			    current_client += 1;
+			    if (current_client < vmc_client_count)
+				FD_SET(vc[1].vc_handle->mh_fd, &readfds);
 			}
 		    }
 		    

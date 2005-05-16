@@ -22,6 +22,8 @@ install control-install:
 client-install: client
 	$(INSTALL) -m 755 -d $(DESTDIR)$(CLIENT_BINDIR)
 	$(INSTALL) -m 755 -d $(DESTDIR)$(CLIENT_ETCDIR)
+	$(INSTALL_PROGRAM) pilot-wrapper.sh \
+		$(DESTDIR)$(CLIENT_BINDIR)/pilot-wrapper.sh
 	$(INSTALL_PROGRAM) garcia-pilot \
 		$(DESTDIR)$(CLIENT_BINDIR)/garcia-pilot
 	$(INSTALL_DATA) $(SRCDIR)/garcia.config \
@@ -79,6 +81,7 @@ test_gorobot.sh: gorobot
 PILOT_OBJS = \
 	buttonManager.o \
 	dashboard.o \
+	faultDetection.o \
 	garcia-pilot.o \
 	garciaUtil.o \
 	ledManager.o \
@@ -86,7 +89,9 @@ PILOT_OBJS = \
 	pilotClient.o \
 	wheelManager.o
 
-garcia-pilot-debug: $(PILOT_OBJS)
+garcia-pilot-version.c: $(PILOT_OBJS)
+
+garcia-pilot-debug: garcia-pilot-version.c $(PILOT_OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 garcia-pilot: garcia-pilot-debug

@@ -60,7 +60,7 @@ public:
      *
      * @see createPivot
      */
-    static const float SMALLEST_PIVOT_ANGLE = 0.01f;
+    static const float SMALLEST_PIVOT_ANGLE = 0.003f;
 
     /**
      * The smallest distance that will be tolerated when creating a move
@@ -68,7 +68,28 @@ public:
      *
      * @see createMove
      */
-    static const float SMALLEST_MOVE_DISTANCE = 0.02f;
+    static const float SMALLEST_MOVE_DISTANCE = 0.001f;
+
+    /**
+     * The minimum allowed speed in meters per second.
+     *
+     * @see setSpeed
+     */
+    static const float MINIMUM_SPEED = 0.10;
+
+    /**
+     * The default speed in meters per second.
+     *
+     * @see setSpeed
+     */
+    static const float DEFAULT_SPEED = 0.20;
+    
+    /**
+     * The maximum allowed speed in meters per second.
+     *
+     * @see setSpeed
+     */
+    static const float MAXIMUM_SPEED = 0.40;
 
     /**
      * Construct a wheelManager object for a garcia.
@@ -88,6 +109,11 @@ public:
     void setDashboard(dashboard *dashboard)
     { this->wm_dashboard = dashboard; };
 
+    /**
+     * @param speed The wheel speed to use when moving.  Value is in meters per
+     * second.  If the value is not between the min and max the default speed
+     * will be used.
+     */
     void setSpeed(float speed);
 
     /**
@@ -153,7 +179,7 @@ public:
      * Internal callback method used to update the dashboard when a pivot/move
      * starts.
      */
-    void motionStarted(void);
+    void motionStarted(acpObject *behavior);
     
     /**
      * Internal callback method used to update the dashboard when a pivot/move
@@ -189,7 +215,12 @@ private:
      */
     int wm_last_status;
 
+    /**
+     * Indicates that the robot is currently in motion.
+     */
     bool wm_moving;
+
+    float wm_speed;
 
     /**
      * Pointer to the dashboard that should be updated when doing pivots/moves.

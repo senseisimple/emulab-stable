@@ -18,7 +18,7 @@ JARS = $(TESTBED_SRCDIR)/www/robotrack/tracker.jar \
 	$(TESTBED_SRCDIR)/www/robotrack/selector.jar
 endif
 
-all:	robopipe
+all:
 jar: $(JARS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -37,7 +37,8 @@ $(TESTBED_SRCDIR)/www/robotrack/selector.jar: NodeSelect.class
 	echo '$(filter-out NodeSelect.class, $(shell echo Node*.class))'
 	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out NodeSelect.class, $(shell echo Node*.class)))
 
-install:	$(INSTALL_LIBEXECDIR)/robopipe
+install:
+client:
 
 clean:
 	/bin/rm -f *.class *.jar

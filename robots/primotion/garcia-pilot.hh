@@ -11,4 +11,6 @@
 #include "buttonManager.hh"
 #include "wheelManager.hh"
 
+extern char build_info[];
+
 #endif

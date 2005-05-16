@@ -10,22 +10,41 @@
 #include "mtp.h"
 #include "listNode.h"
 
-enum {
-    RB_WIGGLING,
-};
+typedef enum {
+    ROS_MIN,
+    
+    ROS_KNOWN,
+    ROS_UNKNOWN,
+    ROS_STARTED_WIGGLING,
+    ROS_WIGGLE_QUEUE,
+    ROS_WIGGLING,
+    ROS_LOST,
 
-enum {
-    RF_WIGGLING = (1L << RB_WIGGLING),
-};
+    ROS_MAX
+} ro_status_t;
 
 struct robot_object {
     struct lnMinNode ro_link;
-    unsigned long ro_flags;
+    struct robot_object *ro_next;
+    ro_status_t ro_status;
     char *ro_name;
     int ro_id;
     struct timeval ro_lost_timestamp;
 };
 
-struct robot_object *roFindRobot(struct lnMinList *list, int id);
+void roInit(void);
+
+void roMoveRobot(struct robot_object *ro, ro_status_t new_status);
+struct robot_object *roDequeueRobot(ro_status_t old_status,
+				    ro_status_t new_status);
+struct robot_object *roFindRobot(int id);
+
+struct robot_data {
+    struct lnMinList rd_lists[ROS_MAX];
+    struct robot_object *rd_all;
+};
+
+extern struct robot_data ro_data;
+extern char *ro_status_names[];
 
 #endif

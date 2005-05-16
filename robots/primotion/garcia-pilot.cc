@@ -32,6 +32,7 @@
 #include "acpGarcia.h"
 #include "acpValue.h"
 
+#include "garcia-pilot.hh"
 #include "pilotClient.hh"
 #include "dashboard.hh"
 #include "wheelManager.hh"
@@ -42,12 +43,10 @@
  */
 #define PILOT_PORT 2531
 
-static const char *DEFAULT_LOG_PATH = "/tmp/garcia-pilot.log";
-
 /**
  * Default path to the battery log.
  */
-static const char *BATTERY_LOG_PATH = "/var/log/battery.log";
+static const char *BATTERY_LOG_PATH = "/var/emulab/logs/battery.log";
 
 
 /**
@@ -141,6 +140,24 @@ static void usage(void)
             BATTERY_LOG_PATH);
 }
 
+class pilotFaultCallback : public faultCallback
+{
+    
+public:
+    
+    pilotFaultCallback(wheelManager &wm) : pfc_wheel_manager(wm) { };
+
+    void faultDetected(unsigned long faults)
+    {
+	this->pfc_wheel_manager.stop();
+    };
+
+private:
+
+    wheelManager &pfc_wheel_manager;
+    
+};
+
 int main(int argc, char *argv[])
 {
     int c, port = PILOT_PORT, serv_sock, on_off = 1, ol_demo = 0;
@@ -203,6 +220,18 @@ int main(int argc, char *argv[])
         daemon(1, 0);
     }
 
+#if 0
+    /* Bump the priority so it has a good chance of receiving packets. */
+    {
+	struct sched_param sp;
+	
+	sp.sched_priority = sched_get_priority_min(SCHED_RR);
+	if (sched_setscheduler(0, SCHED_RR, &sp) < 0) {
+	    fprintf(stderr, "warning: cannot set real-time priority\n");
+	}
+    }
+#endif
+    
     if (logfile) {
         int logfd;
         
@@ -229,6 +258,8 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    fprintf(stderr, "info: %s\n", build_info);
+
     acpGarcia garcia;
     
     signal(SIGHUP, sigdebug);
@@ -254,23 +285,33 @@ int main(int argc, char *argv[])
         struct sockaddr_in saddr;
         acpValue av;
 
-        if (debug) {
-            fprintf(stderr, "debug: connected to brainstem\n");
-        }
+	if (debug)
+	    fprintf(stderr, "debug: connected to brainstem\n");
 
-        /* Make sure the units used by the robot are what we expect. */
-        av.set("radians");
-        garcia.setNamedValue("angle-units-string", &av);
+	/* Make sure the units used by the robot are what we expect. */
+	av.set("radians");
+	garcia.setNamedValue("angle-units-string", &av);
 
-        av.set("meters");
-        garcia.setNamedValue("distance-units-string", &av);
+	av.set("meters");
+	garcia.setNamedValue("distance-units-string", &av);
 
-        /* turn off fall sensors */
-        av.set(0);
-        garcia.setNamedValue("down-ranger-enable", &av);
-        
-      
-      
+    	/* turn off fall sensors */
+    	av.set(0);
+     	garcia.setNamedValue("down-ranger-enable", &av);
+
+	/*
+	 * XXX Clear these values since they can be left in a funny state
+	 * sometimes...
+	 */
+    	av.set(0);
+     	garcia.setNamedValue("distance-left", &av);
+     	garcia.setNamedValue("distance-right", &av);
+	av.set(aGARCIA_ERRFLAG_ABORT);
+	garcia.setNamedValue("status", &av);
+	
+	memset(&saddr, 0, sizeof(saddr));
+
+	
         if (1 == ol_demo) {
           /* open loop demonstration mode */
           
@@ -394,173 +435,156 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Iteration times:\n mean: %f, variance: %f\n", ti_mean, ti_var);
           }
           
-        
+	  exit(0);
         }
-        else {
-          /* normal mode */
-      
-      
-          memset(&saddr, 0, sizeof(saddr));
+	
+	memset(&saddr, 0, sizeof(saddr));
 #if !defined(linux)
-          saddr.sin_len = sizeof(saddr);
+	saddr.sin_len = sizeof(saddr);
 #endif
-          saddr.sin_family = AF_INET;
-          saddr.sin_port = htons(port);
-          saddr.sin_addr.s_addr = INADDR_ANY;
-        
-          if ((serv_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-            perror("socket");
-          }
-          else if (setsockopt(serv_sock,
-                            SOL_SOCKET,
-                            SO_REUSEADDR,
-                            &on_off,
-                            sizeof(on_off)) == -1) {
-            perror("setsockopt");
-          }
-          else if (bind(serv_sock,
-                      (struct sockaddr *)&saddr,
-                      sizeof(saddr)) == -1) {
-            perror("bind");
-          }
-          else if (listen(serv_sock, 5) == -1) {
-            perror("listen");
-          }
-          else {
-            int rmc_telemetry_timeout = 60;
-            pilotClient::list clients;
-            fd_set readfds, writefds;
-            
-            dashboard db(garcia, batterylog);
-            wheelManager wm(garcia);
-            pilotButtonCallback pbc(db, wm);
-            
-            FD_ZERO(&readfds);
-            FD_ZERO(&writefds);
-            FD_SET(serv_sock, &readfds);
+	saddr.sin_family = AF_INET;
+	saddr.sin_port = htons(port);
+	saddr.sin_addr.s_addr = INADDR_ANY;
+	
+	if ((serv_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+	    perror("socket");
+	}
+	else if (setsockopt(serv_sock,
+			    SOL_SOCKET,
+			    SO_REUSEADDR,
+			    &on_off,
+			    sizeof(on_off)) == -1) {
+	    perror("setsockopt");
+	}
+	else if (bind(serv_sock,
+		      (struct sockaddr *)&saddr,
+		      sizeof(saddr)) == -1) {
+	    perror("bind");
+	}
+	else if (listen(serv_sock, 5) == -1) {
+	    perror("listen");
+	}
+	else {
+	    pilotClient::list clients;
+	    fd_set readfds, writefds;
+	    
+	    dashboard db(garcia, batterylog);
+	    wheelManager wm(garcia);
+	    pilotButtonCallback pbc(db, wm);
+	    pilotFaultCallback pfc(wm);
+	    
+	    FD_ZERO(&readfds);
+	    FD_ZERO(&writefds);
+	    FD_SET(serv_sock, &readfds);
 
-            wm.setDashboard(&db);
-            do {
-                fd_set rreadyfds = readfds, wreadyfds = writefds;
-                struct timeval tv_zero = { 0, 0 };
-                int rc;
+	    db.setFaultCallback(&pfc);
+	    wm.setDashboard(&db);
+	    do {
+		fd_set rreadyfds = readfds, wreadyfds = writefds;
+		struct timeval tv_zero = { 0, 0 };
+		int rc;
 
-                /* Poll the file descriptors, don't block */
-                rc = select(FD_SETSIZE,
-                            &rreadyfds,
-                            &wreadyfds,
-                            NULL,
-                            &tv_zero);
-                if (rc > 0) {
-                    bool do_telem = db.wasTelemetryUpdated();
-                    pilotClient::iterator i, j;
-                    struct mtp_packet tmp;
-                    
-                    if (FD_ISSET(serv_sock, &rreadyfds)) {
-                        struct sockaddr_in peer_sin;
-                        socklen_t slen;
-                        int cfd;
-                        
-                        slen = sizeof(peer_sin);
-                        if ((cfd = accept(serv_sock,
-                                          (struct sockaddr *)&peer_sin,
-                                          &slen)) == -1) {
-                            perror("accept");
-                        }
-                        else {
-                            pilotClient *pc = new pilotClient(cfd, wm, db);
-                            
-                            if (debug) {
-                                fprintf(stderr,
-                                        "debug: connect from %s:%d\n",
-                                        inet_ntoa(peer_sin.sin_addr),
-                                        ntohs(peer_sin.sin_port));
-                            }
-                            
-                            pc->setFD(&readfds);
-                            pc->setFD(&writefds);
-                            clients.push_back(pc);
-                        }
-                    }
-                    
-                    if (do_telem) {
-                        mtp_init_packet(&tmp,
-                                        MA_Opcode, MTP_TELEMETRY,
-                                        MA_Role, MTP_ROLE_RMC,
-                                        MA_GarciaTelemetry, db.getTelemetry(),
-                                        MA_TAG_DONE);
+		/* Poll the file descriptors, don't block */
+		rc = select(FD_SETSIZE,
+			    &rreadyfds,
+			    &wreadyfds,
+			    NULL,
+			    &tv_zero);
+		if (rc > 0) {
+		    bool do_telem = db.wasTelemetryUpdated();
+		    pilotClient::iterator i, j;
+		    struct mtp_packet tmp;
+		    
+		    if (FD_ISSET(serv_sock, &rreadyfds)) {
+			struct sockaddr_in peer_sin;
+			socklen_t slen;
+			int cfd;
+			
+			slen = sizeof(peer_sin);
+			if ((cfd = accept(serv_sock,
+					  (struct sockaddr *)&peer_sin,
+					  &slen)) == -1) {
+			    perror("accept");
+			}
+			else {
+			    pilotClient *pc = new pilotClient(cfd, wm, db);
+			    
+			    if (debug) {
+				fprintf(stderr,
+					"debug: connect from %s:%d\n",
+					inet_ntoa(peer_sin.sin_addr),
+					ntohs(peer_sin.sin_port));
+			    }
+			    
+			    pc->setFD(&readfds);
+			    pc->setFD(&writefds);
+			    clients.push_back(pc);
+			}
+		    }
+		    
+		    if (do_telem) {
+			mtp_init_packet(&tmp,
+					MA_Opcode, MTP_TELEMETRY,
+					MA_Role, MTP_ROLE_RMC,
+					MA_GarciaTelemetry, db.getTelemetry(),
+					MA_TAG_DONE);
+		    }
 
-                        if (pilotClient::pc_rmc_client != NULL) {
-                            rmc_telemetry_timeout -= 1;
-                            if (rmc_telemetry_timeout <= 0) {
-                                pilotClient *pc = pilotClient::pc_rmc_client;
-                                
-                                rmc_telemetry_timeout = 60;
-                                if (mtp_send_packet(pc->getHandle(), &tmp) !=
-                                    MTP_PP_SUCCESS) {
-                                    fprintf(stderr,
-                                            "error: cannot send telemetry to "
-                                            "rmcd\n");
-                                }
-                            }
-                        }
-                    }
+		    for (i = clients.begin(); i != clients.end(); ) {
+			bool bad_client = false;
+			pilotClient *pc = *i;
+			
+			j = i++;
+			if (pc->isFDSet(&rreadyfds)) {
+			    do {
+				struct mtp_packet mp;
+				
+				if ((mtp_receive_packet(pc->getHandle(),
+							&mp) !=
+				     MTP_PP_SUCCESS) ||
+				    !pc->handlePacket(&mp, clients)) {
+				    bad_client = true;
+				}
+				
+				mtp_free_packet(&mp);
+			    } while (!bad_client &&
+				     pc->getHandle()->mh_remaining);
+			}
 
-                    for (i = clients.begin(); i != clients.end(); ) {
-                        bool bad_client = false;
-                        pilotClient *pc = *i;
-                        
-                        j = i++;
-                        if (pc->isFDSet(&rreadyfds)) {
-                            do {
-                                struct mtp_packet mp;
-                                
-                                if ((mtp_receive_packet(pc->getHandle(),
-                                                        &mp) !=
-                                     MTP_PP_SUCCESS) ||
-                                    !pc->handlePacket(&mp, clients)) {
-                                    bad_client = true;
-                                }
-                                
-                                mtp_free_packet(&mp);
-                            } while (pc && pc->getHandle()->mh_remaining);
-                        }
+			if (!bad_client &&
+			    (pc->getRole() == MTP_ROLE_EMULAB) &&
+			    pc->isFDSet(&wreadyfds)) {
+			    if (do_telem &&
+				mtp_send_packet(pc->getHandle(), &tmp) !=
+				MTP_PP_SUCCESS) {
+				fprintf(stderr,
+					"error: cannot send telemetry to "
+					"client\n");
 
-                        if (!bad_client &&
-                            (pc->getRole() == MTP_ROLE_EMULAB) &&
-                            pc->isFDSet(&wreadyfds)) {
-                            if (do_telem &&
-                                mtp_send_packet(pc->getHandle(), &tmp) !=
-                                MTP_PP_SUCCESS) {
-                                fprintf(stderr,
-                                        "error: cannot send telemetry to "
-                                        "client\n");
+				bad_client = true;
+			    }
+			}
+			
+			if (bad_client) {
+			    clients.erase(j);
+			    
+			    pc->clearFD(&readfds);
+			    pc->clearFD(&writefds);
+			    
+			    delete pc;
+			    pc = NULL;
+			}
+		    }
+		}
+		
+		garcia.handleCallbacks(50);
+		aIO_GetMSTicks(ioRef, &now, NULL);
+	    } while (looping && db.update(now));
 
-                                bad_client = true;
-                            }
-                        }
-                        
-                        if (bad_client) {
-                            clients.erase(j);
-                            
-                            pc->clearFD(&readfds);
-                            pc->clearFD(&writefds);
-                            
-                            delete pc;
-                            pc = NULL;
-                        }
-                    }
-                }
-                
-                garcia.handleCallbacks(50);
-                aIO_GetMSTicks(ioRef, &now, NULL);
-            } while (looping && db.update(now));
-
-            garcia.flushQueuedBehaviors();
-            
-            garcia.handleCallbacks(1000);
-        }
-      }
+	    garcia.flushQueuedBehaviors();
+	    
+	    garcia.handleCallbacks(1000);
+	}
     }
 
     aIO_ReleaseLibRef(ioRef, &err);

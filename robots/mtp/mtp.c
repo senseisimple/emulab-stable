@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <fcntl.h>
 #include <inttypes.h>
 #include <string.h>
 #include <stdlib.h>
@@ -175,7 +176,7 @@ int mtp_initunixpath(struct sockaddr_un *host_addr, char *path)
     return( retval );
 }
 
-mtp_handle_t mtp_create_handle2(char *host, int port, char *path)
+mtp_handle_t mtp_create_handle3(char *host, int port, char *path, int nonblock)
 {
     mtp_handle_t retval = NULL;
     int family, fd;
@@ -194,10 +195,14 @@ mtp_handle_t mtp_create_handle2(char *host, int port, char *path)
 	      !mtp_gethostbyname(&saddr.sin, host, port)) ||
 	     ((family == AF_UNIX) && !mtp_initunixpath(&saddr.sun, path))) {
     }
-    else if (connect(fd,
-		     &saddr.s,
-		     (family == AF_INET) ?
-		     sizeof(saddr.sin) : sizeof(saddr.sun)) == -1) {
+    else if (nonblock && (fcntl(fd, F_SETFL, O_NONBLOCK) < 0)) {
+	perror("fcntl");
+    }
+    else if ((connect(fd,
+		      &saddr.s,
+		      (family == AF_INET) ?
+		      sizeof(saddr.sin) : sizeof(saddr.sun)) == -1) &&
+	     (errno != EINPROGRESS)) {
 	perror("connect");
     }
     else if ((retval = mtp_create_handle(fd)) == NULL) {
@@ -211,6 +216,11 @@ mtp_handle_t mtp_create_handle2(char *host, int port, char *path)
 	close(fd);
     
     return retval;
+}
+
+mtp_handle_t mtp_create_handle2(char *host, int port, char *path)
+{
+    return mtp_create_handle3(host, port, path, 0);
 }
 
 int mtp_bind(char *host, int port, char *path)
@@ -293,6 +303,7 @@ mtp_error_t mtp_receive_packet(mtp_handle_t mh, struct mtp_packet *packet)
     }
     else if (mh->mh_flags & MHF_EOF) {
 	fprintf(stderr, "mtp: EOF for %d\n", mh->mh_fd);
+	mh->mh_remaining = 0;
 	retval = MTP_PP_ERROR_EOF;
     }
     else {
@@ -311,24 +322,28 @@ mtp_error_t mtp_send_packet(mtp_handle_t mh, struct mtp_packet *packet)
     assert(mtp_packet_invariant(packet));
 
     mh->mh_xdr.x_op = XDR_ENCODE;
-    if (!xdr_mtp_packet(&mh->mh_xdr, packet))
+    if (!xdr_mtp_packet(&mh->mh_xdr, packet)) {
+	perror("xdr_mtp_packet");
 	retval = MTP_PP_ERROR_WRITE;
-    else if (!xdrrec_endofrecord(&mh->mh_xdr, 1))
+    }
+    else if (!xdrrec_endofrecord(&mh->mh_xdr, 1)) {
+	perror("xdrrec_endofrecord");
 	retval = MTP_PP_ERROR_WRITE;
-    else
+    }
+    else {
 	retval = MTP_PP_SUCCESS;
+    }
     
     return retval;
 }
 
-mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
+mtp_error_t mtp_init_packetv(struct mtp_packet *mp,
+			     mtp_tag_t tag,
+			     va_list args)
 {
     mtp_error_t retval = MTP_PP_SUCCESS;
-    va_list args;
 
     assert(mp != NULL);
-
-    va_start(args, tag);
 
     memset(mp, 0, sizeof(struct mtp_packet));
     mp->vers = MTP_VERSION;
@@ -615,8 +630,33 @@ mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
 	tag = va_arg(args, mtp_tag_t);
     }
     
-    va_end(args);
+    return retval;
+}
+
+mtp_error_t mtp_init_packet(struct mtp_packet *mp, mtp_tag_t tag, ...)
+{
+    mtp_error_t retval;
+    va_list args;
     
+    va_start(args, tag);
+    retval = mtp_init_packetv(mp, tag, args);
+    va_end(args);
+
+    return retval;
+}
+
+mtp_error_t mtp_send_packet2(mtp_handle_t mh, mtp_tag_t tag, ...)
+{
+    struct mtp_packet mp;
+    mtp_error_t retval;
+    va_list args;
+    
+    va_start(args, tag);
+    mtp_init_packetv(&mp, tag, args);
+    va_end(args);
+
+    retval = mtp_send_packet(mh, &mp);
+
     return retval;
 }
 
@@ -852,9 +892,24 @@ int mtp_dispatch(void *userdata, mtp_packet_t *mp, mtp_dispatch_tag_t tag, ...)
 	tag = va_arg(args, mtp_dispatch_tag_t);
     }
 
+    if (!done) {
+	fprintf(stderr, "Unhandled packet:\n");
+	mtp_print_packet(stderr, mp);
+    }
+
     va_end(args);
     
     return retval;
+}
+
+int mtp_obstacle_config_invariant(struct obstacle_config *oc)
+{
+    assert(oc != NULL);
+    assert(oc->xmin <= oc->xmax);
+    assert(oc->ymin <= oc->ymax);
+    assert(oc->zmin <= oc->zmax);
+
+    return 1;
 }
 
 void mtp_print_packet(FILE *file, struct mtp_packet *mp)

@@ -4,6 +4,11 @@
  * All rights reserved.
  */
 
+/**
+ * @file visionTrack.c
+ *
+ */
+
 #include "config.h"
 
 #include <math.h>
@@ -25,10 +30,13 @@ static float curvy(float x)
 
 /**
  * Find the track in a list that is the minimum distance from a given track.
+ * This is primarily used for matching tracks between frames, since we want to
+ * always prefer the closest one.
  *
  * @param vt The track to compare against the other tracks in the list.
  * @param curr The track in a list where the search should start.  The function
- * will continue the search until it reaches the end of the list.
+ * will continue the search until it reaches the end of the list.  If NULL, the
+ * function just returns NULL.
  * @param distance_out Reference to a float where the minimum distance found
  * should be stored.
  * @return The closest track found to the given track.
@@ -66,7 +74,8 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
 }
 
 /**
- * Extract tracks from a frame that are near the given track.
+ * Extract tracks from a frame that are near the given track.  Used when
+ * finding tracks from different cameras that need to be merged.
  *
  * @param list_out The list of tracks found to be within the distance
  * tolerance.
@@ -115,6 +124,8 @@ static int vtExtractNear(struct lnMinList *list_out,
 
 /**
  * Scan a frame for the next set of tracks that are in a different camera.
+ * Often used to avoid merging tracks from the same camera, even though they
+ * may be really close.
  *
  * @param vt The track in a list where the search should start.
  * @return The first vision track in the remainder of the list that was
@@ -147,8 +158,15 @@ int vtUpdate(struct lnMinList *now,
     int retval = 0;
     
     assert(now != NULL);
+    assert(vc != NULL);
     assert(mp != NULL);
+    assert(pool != NULL);
 
+    if (debug > 2) {
+	mtp_print_packet(stdout, mp);
+	fflush(stdout);
+    }
+    
     switch (mp->data.opcode) {
     case MTP_CONTROL_ERROR:
 	retval = 1;
@@ -430,9 +448,9 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
 				  &distance)) == NULL) {
 	}
 	else if (((vt->vt_client == vt_start->vt_client) &&
-		  (distance < 0.05)) ||
+		  (distance < WIGGLE_TOLERANCE)) ||
 		 ((vt->vt_client != vt_start->vt_client) &&
-		  (distance < 0.22))) {
+		  (distance < WIGGLE_DIFFCAM_TOLERANCE))) {
 	    float diff;
 
 	    diff = mtp_theta(mtp_theta(vt_start->vt_position.theta) -

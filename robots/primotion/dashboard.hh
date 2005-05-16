@@ -22,6 +22,7 @@
 #include "mtp.h"
 #include "ledManager.hh"
 #include "buttonManager.hh"
+#include "faultDetection.hh"
 
 /**
  * LED priority for an acknowledgment of user input.
@@ -86,7 +87,7 @@ public:
      * High battery level threshold, in percent points.
      */
     static const float BATTERY_HIGH_THRESHOLD = 20.0f;
-
+    
     /**
      * The length of time between "short" updates, which record the readings on
      * the various sensors.
@@ -134,6 +135,15 @@ public:
     void setUserButtonCallback(buttonCallback *bc)
     { this->db_user_button.setCallback(bc); };
 
+    void setFaultCallback(faultCallback *fc)
+    { this->db_fault.setCallback(fc); };
+
+    void setDistanceLimit(float limit)
+    { this->db_fault.setDistanceLimit(limit); };
+    
+    void setVelocityLimit(float limit)
+    { this->db_fault.setVelocityLimit(limit); };
+
     /**
      * Signal the start of a movement.
      */
@@ -141,6 +151,9 @@ public:
 
     /**
      * Signal the end of a movement and update the odometers accordingly.
+     *
+     * @param left_odometer Set to the distance the left wheel moved.
+     * @param right_odometer Set to the distance the right wheel moved.
      */
     void endMove(float &left_odometer, float &right_odometer);
 
@@ -197,6 +210,7 @@ private:
     enum {
 	DBC_USER_LED,	 /*< Index of db_user_led in db_poll_callbacks. */
 	DBC_USER_BUTTON, /*< Index of db_user_button in db_poll_callbacks. */
+	DBC_FAULT,	 /*< Index of db_fault in db_poll_callbacks. */
 
 	DBC_MAX		 /*< Maximum number of objects in db_poll_callbacks. */
     };
@@ -215,6 +229,8 @@ private:
      * The manager for the "user-button" property.
      */
     buttonManager db_user_button;
+    
+    faultDetection db_fault;
 
     /**
      * The current telemetry for this object, most of the fields are updated
@@ -227,6 +243,8 @@ private:
      * about every second.
      */
     bool db_telemetry_updated;
+
+    bool db_update_velocity;
 
     /**
      * The last value read from the left wheel's odometer, used to update the
@@ -250,6 +268,8 @@ private:
      * the user LED.
      */
     ledClient *db_battery_warning;
+
+    unsigned long db_last_tick;
 
     /**
      * The next time the telemetry should be updated, in milliseconds.

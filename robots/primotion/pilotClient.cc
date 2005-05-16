@@ -232,6 +232,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    mcg->position.theta);
 		}
 		
+		this->pc_wheel_manager.setSpeed(mcg->speed);
 		this->pc_wheel_manager.setOrientation(
 			mcg->position.theta,
 			new pilotMoveCallback(notify_list,
