@@ -309,6 +309,7 @@ foreach my $power_id (keys %outlets) {
 	    print "Control of $nodestr failed.\n"; $exitval++;
 	    $errors++;
 	}
+	$sendevent = 0; # power_mail sends this itself.
     } else {
 	print "power: Unknown power type '$type'\n";
 	$errors++;

@@ -132,6 +132,7 @@ use vars qw(@ISA @EXPORT);
 
 	 TBDB_EXPT_WORKDIR
 	 TBSetNodeEventState TBGetNodeEventState
+	 TBNodeEventStateUpdated
 	 TBSetNodeAllocState TBGetNodeAllocState
 	 TBSetNodeOpMode TBGetNodeOpMode TBSetNodeNextOpMode
 	 TB_OSID_MBKERNEL TB_OSID_PXEBOOT TB_OSID_FRISBEE
@@ -2472,6 +2473,29 @@ sub TBGetNodeEventState($$)
 	$$state = TBDB_NODESTATE_UNKNOWN;
     }
     return 1;
+}
+
+#
+# Check if the event state for a node was updated recently.
+#
+# usage: TBNodeEventStateUpdated(char *node, int tolerance)
+#        Returns 1 if the state was updated.
+#        Returns 0 if failed.
+#
+sub TBNodeEventStateUpdated($$)
+{
+    my ($node, $tol) = @_;
+
+    my $query_result =
+	DBQueryFatal("select UNIX_TIMESTAMP(now()) - state_timestamp < $tol ".
+		     "from nodes where node_id='$node'");
+
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my ($under) = $query_result->fetchrow_array();
+
+    return $under;
 }
 
 #

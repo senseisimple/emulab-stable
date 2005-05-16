@@ -20,8 +20,9 @@ use libtestbed;
 
 my $WWW      = "@WWW@";
 my $TBOPS      = "@TBOPSEMAIL@";
-my $default_tries = 10;
-my $time_tolerance = 2 * 60;
+my $default_tries = 40;
+my $time_tolerance = 2 * 60; # seconds
+my $state_update_tolerance = 45; # seconds
 
 # Turn off line buffering on output
 $| = 1;
@@ -36,20 +37,38 @@ sub mailctrl($@) {
     my ($cmd, @nodes) = @_;
 
     my %actual = ();
+    my $open = 1;
+
+    # XXX Hack so that we only send mail if the robotlab is open, which ought
+    # to be the only time this script gets run.  Otherwise, noone is around to
+    # do anything about it.
+    TBGetSiteVar("robotlab/open", \$open);
+    if (!$open) {
+	print "Lab not open, no operators available to power $cmd nodes.\n";
+	return 1;
+    }
 
     # Check to see if we have to send mail first.
     foreach my $node (@nodes) {
 
 	my $dbres = DBQueryFatal(
 		"select (UNIX_TIMESTAMP(NOW()) - UNIX_TIMESTAMP(last_power)) ".
-		" < $time_tolerance from outlets where node_id='$node'");
+		" < $time_tolerance,r.pid,r.eid from outlets as o ".
+		"left join reserved as r on r.node_id=o.node_id ".
+		"where o.node_id='$node'");
 	
 	if ($dbres->num_rows() == 0) {
 	    print "Unknown node $node";
 	    next;
 	}
 	
-	($ok) = $dbres->fetchrow();
+	my ($ok, $pid, $eid) = $dbres->fetchrow();
+
+	if (defined($pid) && defined($eid) &&
+	    $pid eq NODEDEAD_PID() && $eid eq NODEDEAD_EID()) {
+	    print "Can't power nodes that are dead.\n";
+	    return 1;
+	}
 
 	if (!$ok) {
 	    $actual{$node} = 1;
@@ -86,7 +105,21 @@ sub mailctrl($@) {
 		
 		($ok) = $dbres->fetchrow();
 		
-		if ($tries == 0) {
+		if (($cmd eq "on" || $cmd eq "cycle") &&
+		    TBNodeEventStateUpdated($node, $state_update_tolerance)) {
+		    # This is something of a hack...  We don't want to wait
+		    # forever if someone forgets to update the webpage, so we
+		    # check if the event state was updated recently.  And, we
+		    # DO NOT send the shutdown event since the thing is already
+		    # going.
+		    $ok = 1;
+		}
+		elsif ($ok) {
+		    # The operator notified via the web page.
+		    my $state = TBDB_NODESTATE_SHUTDOWN;
+		    TBSetNodeEventState($node,$state);
+		}
+		elsif ($tries == 0) {
 		    print "No more tries left for $node...";
 		    return 1;
 		}
