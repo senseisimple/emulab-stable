@@ -62,6 +62,9 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 %.o: %.cc
 	$(CXX) -c -o $@ $(CXXFLAGS) $<
 
+%.o: %.C
+	$(CXX) -c -o $@ $(CXXFLAGS) $<
+
 %_xdr.h: %.x
 	rpcgen -h $< > $@
 
@@ -70,6 +73,9 @@ vpath %     $(SRCDIR) $(MOSTLY_SRCDIRS)
 
 %: %-debug
 	$(STRIP) -o $@$(EXE) $<$(EXE)
+
+%-version.c:
+	echo >$@ "char build_info[] = \"Built on `date` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
 #
 # Rules to regen configure written files.
