@@ -79,6 +79,25 @@ if (strcmp($row["keyhash"], $key)) {
 }
 
 #
+# A cleanup function to keep the child from becoming a zombie, since
+# the script is terminated, but the children are left to roam.
+#
+$fp = 0;
+
+function SPEWCLEANUP()
+{
+    global $fp;
+
+    if (!$fp || !connection_aborted()) {
+	exit();
+    }
+    pclose($fp);
+    exit();
+}
+ignore_user_abort(1);
+register_shutdown_function("SPEWCLEANUP");
+
+#
 # Special case. If requesting elab source code, the experiment must
 # be an elabinelab experiment. 
 #
@@ -97,37 +116,49 @@ if (isset($elabinelab_source)) {
     if ($row["elab_in_elab"] != "1") {
 	SPITERROR(403, "Not an elabinelab experiment!");
     }
-    
-    if (!is_readable("/usr/testbed/src/emulab-src.tar.gz")) {
-	SPITERROR(404, "Could not find $file!");
+
+    #
+    # If a specific tag is requested, call out to the spewsource program.
+    # Otherwise send it the usual file.
+    #
+    if (isset($cvstag)) {
+	if (! preg_match("/^[-\w\@\/\.]+$/", $cvstag)) {
+	    SPITERROR(400, "Invalid characters in cvstag!");
+	}
+
+	# Do it anyway.
+	$cvstag = escapeshellarg($cvstag);
+
+	if ($fp = popen("$TBSUEXEC_PATH $creator $pid,$unix_gid ".
+			"spewsource -t $cvstag", "r")) {
+	    header("Content-Type: application/x-gzip");
+	    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+	    header("Cache-Control: no-cache, must-revalidate");
+	    header("Pragma: no-cache");
+
+	    flush();
+	    fpassthru($fp);
+	    $fp = 0;
+	    flush();
+	    return;
+	}
+	else {
+	    SPITERROR(404, "Could not find $file!");
+	}
     }
-    header("Content-Type: application/octet-stream");
-    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
-    header("Cache-Control: no-cache, must-revalidate");
-    header("Pragma: no-cache");
-    flush();
-    readfile("/usr/testbed/src/emulab-src.tar.gz");
-    exit(0);
-}
-
-#
-# A cleanup function to keep the child from becoming a zombie, since
-# the script is terminated, but the children are left to roam.
-#
-$fp = 0;
-
-function SPEWCLEANUP()
-{
-    global $fp;
-
-    if (!$fp || !connection_aborted()) {
-	exit();
+    else {
+	if (!is_readable("/usr/testbed/src/emulab-src.tar.gz")) {
+	    SPITERROR(404, "Could not find $file!");
+	}
+	header("Content-Type: application/octet-stream");
+	header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+	header("Cache-Control: no-cache, must-revalidate");
+	header("Pragma: no-cache");
+	flush();
+	readfile("/usr/testbed/src/emulab-src.tar.gz");
+	exit(0);
     }
-    pclose($fp);
-    exit();
 }
-ignore_user_abort(1);
-register_shutdown_function("SPEWCLEANUP");
 
 #
 # MUST DO THIS!

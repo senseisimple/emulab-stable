@@ -1104,9 +1104,12 @@ sub GetEmulabSource($)
 	my $keyhash = `cat $keyfile`;
 	chomp($keyhash);
 
+	my $cvstag = (! defined($emulabconfig{"CVSSRCTAG"}) ? "" :
+		      "&cvstag=" . $emulabconfig{"CVSSRCTAG"});
+
 	mysystem("fetch -q -o /tmp/foo.tar.gz ".
-		 "'https://${bossname}/spewrpmtar.php3?nodeid=${nodeid}&".
-		 "key=${keyhash}&elabinelab_source=1'");
+		 "'https://${bossname}/spew.php3?nodeid=${nodeid}&".
+		 "key=${keyhash}&elabinelab_source=1${cvstag}'");
 
 	mysystem("tar xzf /tmp/foo.tar.gz -C $destdir/testbed");
     }

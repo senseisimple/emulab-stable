@@ -21,7 +21,7 @@ SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
-                  websetdest
+                  websetdest spewsource
 
 #
 # Force dependencies on the scripts so that they will be rerun through
