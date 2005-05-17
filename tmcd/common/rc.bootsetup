@@ -6,7 +6,6 @@
 #
 use English;
 use Getopt::Std;
-use IO::Handle;
 
 #
 # This script is run directly from boot. It should NOT be run after
@@ -80,7 +79,7 @@ if ($action eq "boot" || $action eq "reconfig") {
     #
     open(LOG, "> $LOGFILE") or
 	BootFatal(-1, "Could not open $LOGFILE!");
-    LOG->autoflush(1);
+    autoflush(LOG, 1);
     
     #
     # This open implicitly forks a child, which goes on to execute the rest
@@ -343,7 +342,7 @@ sub doboot()
 	system("$BINDIR/bootvnodes -f");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootvnodes");
-	}
+`	}
     }
     if (-x "$BINDIR/bootsubnodes") {
 	print("Booting up subnodes\n");
