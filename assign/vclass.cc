@@ -31,6 +31,11 @@ void tb_vclass::add_type(crope type)
   }
 }
 
+bool tb_vclass::has_type(crope type) {
+    return (members.find(type) != members.end());
+}
+
+
 double tb_vclass::assign_node(crope type)
 {
   double new_score = score;

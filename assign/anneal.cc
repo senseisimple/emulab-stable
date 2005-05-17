@@ -372,8 +372,32 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     tb_vnode *vn = get(vvertex_pmap,vv);
     tb_pnode *pn = get(pvertex_pmap,pv);
     if (vn->vclass != NULL) {
-      cout << "Can not have fixed nodes be in a vclass!.\n";
-      exit(EXIT_FATAL);
+      // Find a type on this physical node that can satisfy something in the
+      // virtual class
+      if (pn->typed) {
+        if (vn->vclass->has_type(pn->current_type)) {
+          vn->type = pn->current_type;
+        }
+      } else {
+        for (tb_pnode::types_list::iterator i = pn->type_list.begin();
+            i != pn->type_list.end(); i++) {
+          // For now, if we find more than one match, we pick the first. It's
+          // possible that picking some other type would give us a better
+          // score, but let's noty worry about that
+          if (vn->vclass->has_type((*i)->ptype->name())) {
+            vn->type = (*i)->ptype->name();
+            break;
+          }
+        }
+      }
+      if (vn->type.empty()) {
+        cout << "Unable to find a type for fixed, vtyped, node " << vn->name
+          << endl;
+        exit(EXIT_FATAL);
+      } else {
+        cout << "Setting type of vclass node " << vn->name << " to "
+          << vn->type << "\n";
+      }
     }
     if (add_node(vv,pv,false,true) == 1) {
       cout << "Fixed node: Could not map " << vn->name <<
@@ -381,6 +405,12 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       exit(EXIT_UNRETRYABLE);
     }
     vn->fixed = true;
+    /*
+    if (vn->vclass != NULL) {
+      vn->type = vn->vclass->choose_type();
+      cout << "Picked type " << vn->type << " for " << vn->name << endl;
+    }
+    */
     num_fixed++;
   }
 

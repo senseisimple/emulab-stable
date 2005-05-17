@@ -49,6 +49,8 @@ public:
   void add_type(crope type);	// Add a member of a certain type to the
 				// vclass
 
+  bool has_type(crope type);     // Does the vclass contain the given type?
+
   crope dominant;		// Current dominant type
 
   // The next two routines report the *change* in score.  The score
