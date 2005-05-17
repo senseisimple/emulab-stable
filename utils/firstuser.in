@@ -14,7 +14,8 @@ use Getopt::Std;
 use lib '@prefix@/lib';
 use libdb;
 
-my $tbadmin = '@TBADMINGROUP@';
+my $tbadmin    = '@TBADMINGROUP@';
+my $ELABINELAB = @ELABINELAB@;
 
 my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
@@ -152,6 +153,14 @@ system "$wap $mkgroup $protoproj $protoproj";
 
 print "Running mkacct...\n";
 system "$wap $mkacct $protouser";
+
+#
+# Okay, if not ELABINELAB, then set the firstinitstate so that the web
+# interface will take the user through his first project setup.
+#
+if (!$ELABINELAB) {
+    TBSetSiteVar("general/firstinit/state", "createproject");
+}
 
 print "User created. Once the web page is up, you should be able to log in\n";
 print "as '$protouser' with the password you just entered. Refer to\n";
