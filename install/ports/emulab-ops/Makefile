@@ -17,6 +17,17 @@ MAINTAINER=	ricci@cs.utah.edu
 #
 .MAKEFLAGS+=	SWIG_LANGUAGES="perl python tcl"
 
+#
+# For samba, so that it doesn't suck in everything under the sun
+#
+.MAKEFLAGS+=	-DWITHOUT_WINBIND -DWITHOUT_LDAP -DWITHOUT_POPT
+
+#
+# This prevents any ports from trying to run interactively - some, ask silly
+# questions without this option.
+#
+.MAKEFLAGS+=	-DBATCH
+
 LIB_DEPENDS= lthread.2:${PORTSDIR}/devel/linuxthreads \
 	vin4.2:${PORTSDIR}/misc/libelvin \
 	ulsshxmlrpcpp.0:${PORTSDIR}/misc/ulsshxmlrpcpp
