@@ -342,7 +342,7 @@ sub doboot()
 	system("$BINDIR/bootvnodes -f");
 	if ($?) {
 	    fatal("Error running $BINDIR/bootvnodes");
-`	}
+	}
     }
     if (-x "$BINDIR/bootsubnodes") {
 	print("Booting up subnodes\n");
