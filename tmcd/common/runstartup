@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -74,7 +74,7 @@ my $runcmd;
 my $login;
 
 while (<CMD>) {
-    if ($_ =~ /CMD=\'([-\@\w.\/\+ ]+)\' UID=([0-9a-z]+)/) {
+    if ($_ =~ /^CMD=\'(.*)\' UID=(.*)$/) {
 	$runcmd = $1;
 	$login  = $2;
     }
