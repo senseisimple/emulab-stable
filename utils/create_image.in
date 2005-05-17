@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -390,6 +390,8 @@ $needcleanup = 1;
 while ($tries) {
     system("$osselect -t $ADMINOSID $node") and
 	fatal("*** Failed to set temp boot to $ADMINOSID for $node!");
+
+    print "Setting startupcmd to '${command}'\n";
 
     if (! DBQueryWarn("update nodes set ".
 		      "startupcmd='$command', startstatus='none' ".
