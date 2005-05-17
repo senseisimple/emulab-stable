@@ -1,10 +1,12 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
+
+echo "${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
 
 if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
 then
@@ -14,15 +16,21 @@ fi
 #
 # ElabinElab support
 #
-if [ "$new_host_name" = "" ]; then
-    #
-    # If no hostname provided, it means that its an outer emulab
-    # returning DHCPD info, in which case all we want to do is configure the
-    # interface, but not allow dhclient to think it has finished its job.
-    # So, exit with non-zero status and dhclient will keep trying to configure
-    # another interface (the inner control network).
-    #
+# The enter-hooks script should weed out outer boss calls, so there
+# should be nothing to do here.  However, just in case we smack em down
+# again here.
+#
+if [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
+    exit_status=1
     exit 1
+fi
+
+#
+# If this is a newnode boot, boss (inner or outer) will have returned with
+# no hostname.  We don't need to record anything in this case, so skip it.
+#
+if [ x"$new_host_name" = x ]; then
+    exit 0
 fi
 
 #
@@ -38,9 +46,26 @@ if [ -n "$interface" ]; then
 fi
 
 #
+# We have observed problems where changing the speed/duplex of a link
+# leaves DNS a little wonky.  So we whack on it til it responds so that
+# the sethostname script won't fail.
+#
+if [ "$new_network_number" = "10.200.1.0" ]; then
+    for i in 0 1 2; do
+        if `$BINDIR/tmcc bossinfo >/dev/null 2>&1`; then
+	    break
+	fi
+        echo "${interface}: waiting for DNS.." >>$LOGDIR/dhclient-exit.log 2>&1
+        sleep $i
+    done
+fi
+
+#
 # See if the Testbed configuration software wants to change the hostname.
-# 
+#
 $BINDIR/sethostname.dhclient >$LOGDIR/dhclient.log 2>&1
+
+echo "${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
 
 #
 # The killing of dhclient and shutdown of other interfaces is handled

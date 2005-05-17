@@ -6,15 +6,43 @@
 #
 . /etc/emulab/paths.sh
 
-if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW ]
-then
-    return 0
-fi
+echo "${interface}: ${reason}" >>$LOGDIR/dhclient-enter.log 2>&1
 
 #
-# ElabinElab support.
+# XXX Hack to force the duplex on interfaces
 #
-if [ -e "$ETCDIR/outer_bossnode" ]; then
+setduplex() {
+    _if=$1
+    _rc=0
+
+    _out=`ifconfig $_if`
+    _hmb=`echo $_out | grep -c '100baseTX'`
+    _fdx=`echo $_out | grep -c 'full-duplex'`
+
+    if [ $_hmb -ne 0 -a $_fdx -ne 0 ]; then
+	echo "$_if: speed/duplex correct"
+    else
+        # If we are fixing the current interface, just let dhclient do it
+        if [ x$_if = x$interface ]; then
+	    echo "$_if: telling dhclient to fix speed/duplex"
+	    medium="media 100baseTX mediaopt full-duplex"
+        else
+	    echo -n "$_if: fixing speed/duplex..."
+	    ifconfig $_if media 100baseTX mediaopt full-duplex
+	    _rc=$?
+	    echo "returns $_rc"
+	fi
+    fi
+    return $_rc
+}
+
+if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
+then
+    # do nothing
+    true
+elif [ -e "$ETCDIR/outer_bossnode" ]; then
+    #
+    # ElabinElab support.
     #
     # On inner boss/ops, we do not accept the following from the DHCPD
     # server on outer boss. This stuff has been setup in /etc/rc.conf
@@ -24,29 +52,43 @@ if [ -e "$ETCDIR/outer_bossnode" ]; then
     unset new_domain_name_servers
     unset new_domain_name
     unset new_routers
-elif [ "$new_host_name" = "" ]; then
+elif [ x"$new_domain_name_servers" = "x1.1.1.1" ]; then
     #
-    # Otherwise, if no hostname provided, it means that its an outer emulab
-    # returning DHCPD info, in which case we want to again ignore most of the
-    # info since all we want to do is configure the interface. 
+    # ElabinElab support.
     #
-    new_static_routes="$new_dhcp_server_identifier $new_routers"
-    unset new_domain_name_servers
-    unset new_domain_name
-    unset new_routers
-    new_subnet_mask="255.255.255.0"
+    # XXX oh so hacky.  Real boss is set to return 1.1.1.1 as a name server
+    # for nodes in inner elabs.  This is the hack de jour for determining
+    # who has responded to our DHCP request.  If it is outer boss and we are
+    # an inner node, we want to decline this offer and not configure the
+    # interface
+    #
+    exit_status=1
 
     #
-    # Ack, changed my mind. This is a pain in the ass. For now do not
-    # configure the outer interface; worry about it later.
+    # XXX since we now know that we are in an inner elab and we know which
+    # interface is the real control net, we force 100Mb full-duplex on all
+    # other (experimental) interfaces.  This is necessary to ensure a
+    # response from the inner control net.
+    #
+    for _if in `ifconfig -lu`
+    do
+	if [ $_if != "lo0" -a x$_if != x$interface ]; then
+	    setduplex $_if >>$LOGDIR/dhclient-enter.log 2>&1
+	fi
+    done
+
+    #
     # XXX sleep here so we don't pummel boss with REQUEST/DECLINE pairs.
-    # 
+    #
     sleep 5
-    exit_status=1
 elif [ "$new_network_number" = "10.200.1.0" ]; then
     #
-    # I am inside an inner elab, force 100Mb full-duplex
-    # since that is what the switch does
+    # XXX sometime we can get a reply even if the duplex is wrong.
+    # If we get such a reply and we are inside an inner elab, again
+    # force 100Mb full-duplex to make sure we continue to communicate
+    # with the server.
     #
-    medium="media 100baseTX mediaopt full-duplex"
+    setduplex $interface >>$LOGDIR/dhclient-enter.log 2>&1
 fi
+
+echo "${interface}: ${reason}: done" >>$LOGDIR/dhclient-enter.log 2>&1
