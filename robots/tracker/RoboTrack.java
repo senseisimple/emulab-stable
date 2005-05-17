@@ -596,6 +596,9 @@ public class RoboTrack extends JApplet {
 	public boolean CheckOutOfBounds() {
 	    Enumeration robot_enum = robots.elements();
 
+	    if (Cameras.size() == 0)
+	        return false;
+
 	    while (robot_enum.hasMoreElements()) {
 		Robot robbie  = (Robot)robot_enum.nextElement();
 		int   index;
@@ -687,13 +690,13 @@ public class RoboTrack extends JApplet {
 		    if (Math.abs(robbie.z - mary.z) > 0.25)
 			continue;
 
-		    if (mary.gotdest) {
-			ox1 = ox2 = mary.dx;
-			oy1 = oy2 = mary.dy;
-		    }
-		    else if (mary.dragging) {
+		    if (mary.dragging) {
 			ox1 = ox2 = mary.drag_x;
 			oy1 = oy2 = mary.drag_y;
+		    }
+		    else if (mary.gotdest) {
+			ox1 = ox2 = mary.dx;
+			oy1 = oy2 = mary.dy;
 		    }
 		    else {
 			ox1 = ox2 = mary.x;
@@ -866,7 +869,7 @@ public class RoboTrack extends JApplet {
 		    g2.setColor(Color.gray);
 		    g2.drawLine(x, y, dx, dy);
 		}
-		else if (robbie.dragging) {
+		if (robbie.dragging) {
 		    int dx = robbie.drag_x;
 		    int dy = robbie.drag_y;
 		    
@@ -1179,15 +1182,6 @@ public class RoboTrack extends JApplet {
 			return;
 		    }
 
-		    /*
-		     * Do not allow robots with current destinations
-		     * to be dragged. Not yet, maybe later.
-		     */
-		    if (robbie.gotdest) {
-			node_id = null;
-			return;
-		    }
-		    
 		    robbie.drag_x   = e.getX();
 		    robbie.drag_y   = e.getY();
 
@@ -1372,7 +1366,6 @@ public class RoboTrack extends JApplet {
 
 	public void mouseMoved(MouseEvent e) {
 	}
-
 
 	/*
 	 * Show left popup.
