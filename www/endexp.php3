@@ -80,10 +80,12 @@ if ($lockdown) {
 # browser back up a level.
 #
 if (!$confirmed) {
-    echo "<center><h2><br>
+    echo "<center><br><font size=+2>
           Are you <b>REALLY</b>
           sure you want to terminate Experiment '$exp_eid?'
-          </h2>\n";
+          </font>\n";
+    echo "<br>(This will <b>completely</b> destroy all trace of the
+           experiment)<br><br>\n";
 
     SHOWEXP($exp_pid, $exp_eid, 1);
     
