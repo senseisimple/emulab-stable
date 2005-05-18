@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -9,6 +9,10 @@ use Getopt::Std;
 use Fcntl;
 use IO::Handle;
 use Socket;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+my $DOSTYPE = "$BINDIR/dostype";
 
 sub mysystem($);
 
@@ -127,10 +131,10 @@ if (!$forceit) {
 # I cannot find the source for sfdisk.
 #
 if ($stype != 131) {
-    mysystem("dd if=/dev/hda1 of=/var/tmp/part1.bb bs=8192 count=1");
-    mysystem("sfdisk --change-id $diskdev $slice 83");
-    mysystem("dd if=/var/tmp/part1.bb of=/dev/hda1 bs=8192 count=1");
-    mysystem("rm -f /var/tmp/part1.bb");
+    die("*** $0:\n".
+	"    No $DOSTYPE program, cannot set type of DOS partition\n")
+	if (! -e "$DOSTYPE");
+    mysystem("$DOSTYPE -f /dev/$disk $slice 131");
 }
 
 mysystem("mkfs $fsdevice");

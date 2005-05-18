@@ -13,7 +13,7 @@ include $(OBJDIR)/Makeconf
 
 all:	server fullclient client
 fullclient: tmcc
-client: tmcc-nossl findif
+client: tmcc-nossl findif dostype
 server: tmcd tmcd.restart
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -91,6 +91,9 @@ tmcc-nossl-debug: tmcc.c decls.h
 findif-debug: findif.o
 	$(CC) $(CFLAGS) -g -o $@ findif.o $(LFLAGS) -static
 
+dostype-debug: dostype.o
+	$(CC) $(CFLAGS) -g -o $@ dostype.o $(LFLAGS)
+
 ssl.o:	ssl.c ssl.h decls.h
 
 version.c: tmcd.c
@@ -134,7 +137,7 @@ ${OBJDIR}/lib/libtb/%:
 	cd ${OBJDIR}/lib/tbdb && gmake $<
 
 clean:	subdir-clean
-	rm -f *.o core tmcd tmcc tmcc-nossl findif version.c
+	rm -f *.o core tmcd tmcc tmcc-nossl findif dostype version.c
 
 subdir-clean:
 	@$(MAKE) -C $(MDSUBDIR) clean
