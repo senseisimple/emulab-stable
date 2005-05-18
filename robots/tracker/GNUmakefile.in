@@ -38,6 +38,7 @@ $(TESTBED_SRCDIR)/www/robotrack/selector.jar: NodeSelect.class
 	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out NodeSelect.class, $(shell echo Node*.class)))
 
 install:
+control-install:
 client:
 
 clean:

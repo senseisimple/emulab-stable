@@ -70,5 +70,9 @@ else
 	$(INSTALL_PROGRAM) vmcd $(INSTALL_DIR)/opsdir/sbin/vmcd
 endif
 
+control-install: all
+	-mkdir -p $(INSTALL_DIR)/sbin
+	$(INSTALL_PROGRAM) vmcd $(INSTALL_DIR)/sbin/vmcd
+
 clean:
 	rm -f *.o

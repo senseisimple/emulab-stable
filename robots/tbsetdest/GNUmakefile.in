@@ -34,5 +34,9 @@ install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL_PROGRAM) tbsetdest $(INSTALL_DIR)/opsdir/bin/tbsetdest
 
+control-install: all
+	-mkdir -p $(INSTALL_DIR)/bin
+	$(INSTALL_PROGRAM) tbsetdest $(INSTALL_DIR)/bin/tbsetdest
+
 clean:
 	rm -f *.o

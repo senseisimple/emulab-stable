@@ -39,5 +39,9 @@ install: all
 	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/opsdir/sbin/emcd
 	$(INSTALL_PROGRAM) loclistener $(INSTALL_SBINDIR)/loclistener
 
+control-install: all
+	-mkdir -p $(INSTALL_DIR)/sbin
+	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/sbin/emcd
+
 clean:
 	rm -f *.o
