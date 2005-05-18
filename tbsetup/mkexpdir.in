@@ -2,10 +2,9 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
 use Getopt::Std;
 
@@ -40,6 +39,7 @@ use libtestbed;
 
 my $tbdata   = "tbdata";
 my @dirlist  = ($tbdata, "bin", "tmp", "logs", "tftpboot");
+my $exitval;
 
 #
 # Turn off line buffering on output
@@ -109,26 +109,30 @@ if (! chdir($expdir)) {
 }
 
 if (! mkdir($eid, 0770)) {
+    $exitval = $ERRNO;
     print "Could not mkdir $eid in $expdir: $!\n";
-    exit(-1);
+    exit($exitval);
 }
 
 if (! chmod(0770, "$eid")) {
+    $exitval = $ERRNO;
     print "Could not chmod $eid to 0770 in $expdir: $!\n";
     rmdir($eid);
-    exit(-1);
+    exit($exitval);
 }
 
 if (! chown($UID, $unix_gid, "$eid")) {
+    $exitval = $ERRNO;
     print "Could not chown $eid to $UID/$unix_gid in $expdir: $!\n";
     rmdir($eid);
-    exit(-1);
+    exit($exitval);
 }
 
 if (! chdir($eid)) {
+    $exitval = $ERRNO;
     print "Could not chdir to $eid in $expdir: $!\n";
     rmdir($eid);
-    exit(-1);
+    exit($exitval);
 }
 
 #
@@ -155,7 +159,7 @@ DBQueryFatal("update experiments set path='$eiddir' ".
 # Create the working directory.
 #
 if (-e $workdir) {
-    fatal("$workdir already exists!");
+    fatal("$workdir already exists!", -1);
 }
 if (! mkdir($workdir, 0775)) {
     fatal("Could not create $workdir: $!");
@@ -179,16 +183,21 @@ if ($pid ne $gid) {
 
 exit(0);
 
-sub fatal($)
+sub fatal($;$)
 {
-    my ($msg) = @_;
+    my ($msg, $exitval) = @_;
+
+    $exitval = $ERRNO
+	if (!defined($exitval));
 
     system("/bin/rm -rf $eiddir");
     system("/bin/rm -rf $workdir");
     unlink($eidlink)
 	if ($pid ne $gid && -l $eidlink);
 
-    die("*** $0:\n".
-	"    $msg\n");
+    print STDERR "*** $0:\n".
+	         "    $msg\n";
+
+    exit($exitval);
 }
 

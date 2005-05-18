@@ -352,8 +352,32 @@ $justexit = 0;
 # Create a directory structure for the experiment.
 #
 if (system("$mkexpdir $pid $gid $eid") != 0) {
+    if (($? >> 8) == EDQUOT()) {
+	# Obey exit status protocol for web page; User should see this.
+	$errorstat = 1;
+    }
     fatal("$mkexpdir failed");
 }
+
+#
+# Grab the working directory path, and thats where we work.
+# The user's experiment directory is off in /proj space.
+#
+my $workdir = TBExptWorkDir($pid, $eid);
+my $userdir = TBExptUserDir($pid, $eid);
+
+chdir("$workdir") or
+    fatal("Could not chdir to $workdir: $!");
+
+#
+# It would be nice to check for overquota during the rest of this
+# setup, but thats going to be a pain. Besides, its very unlikely
+# that someone goes overquota at this point. Typically, the person
+# is already overquota at this point. If this turns out to be wrong,
+# it will be easy to add a little test to make sure there is at least
+# a reasonable amount of room to proceed (create temp file and stick
+# some data in it).
+# 
 
 #
 # Dump the eventkey into a file in the experiment directory. 
@@ -380,16 +404,6 @@ if (!defined($tempnsfile)) {
     TBUnLockExp($pid, $eid, EXPTSTATE_NEW());
     exit(0);
 }
-
-#
-# Grab the working directory path, and thats where we work.
-# The user's experiment directory is off in /proj space.
-#
-my $workdir = TBExptWorkDir($pid, $eid);
-my $userdir = TBExptUserDir($pid, $eid);
-
-chdir("$workdir") or
-    fatal("Could not chdir to $workdir: $!");
 
 #
 # Now we can get the NS file!
