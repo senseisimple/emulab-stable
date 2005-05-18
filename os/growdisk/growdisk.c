@@ -128,7 +128,7 @@ void
 getdiskinfo(char *disk)
 {
 	int fd;
-	unsigned long chs = 1;
+	unsigned long chs;
 	struct sector0 {
 		char stuff[DOSPARTOFF];
 		char parts[512-2-DOSPARTOFF];
@@ -143,10 +143,34 @@ getdiskinfo(char *disk)
 	if (ioctl(fd, BLKGETSIZE, &diskinfo.disksize) < 0)
 		err(1, "%s: BLKGETSIZE", disk);
 	diskinfo.cpu = diskinfo.tpc = diskinfo.spt = 0;
+	chs = diskinfo.disksize;
 #else
 #ifdef DIOCGMEDIASIZE
+	/*
+	 * FreeBSD 5.
+	 *
+	 * Note we still use the contrived geometry here rather than the
+	 * simple "gimme the disk size" DIOCGMEDIASIZE.  Why?  I'm glad you
+	 * asked...
+	 *
+	 * FreeBSD fdisk is adamant about DOS partitions starting/ending
+	 * on "cylinder" boundaries.  If we try to resize the final partition
+	 * here so that it is not a multiple of the cylinder size and later
+	 * run fdisk, fdisk will automatically resize the rogue partition.
+	 * However, the new size will only appear on disk and not "in core"
+	 * until after a reboot.  So after running fdisk and before rebooting,
+	 * there is an inconsisency that can create chaos.  For example,
+	 * the mkextrafs script will use fdisk info to create a BSD disklabel.
+	 * If it uses the older, larger size it will work, but will suddenly
+	 * be too large for the DOS partition after rebooting.  If we try to
+	 * use the newer, smaller size disklabel will complain about trying
+	 * to shrink the 'c' partition and will fail.  If we only create a
+	 * new 'e' partition that is the smaller size and don't try to resize
+	 * 'c', then after reboot the 'c' partition will be too big and the
+	 * kernel will reject the whole disklabel.
+	 */
 	{
-		unsigned ssize;
+		unsigned nsect, nhead, ssize;
 		off_t dsize;
 
 		if (ioctl(fd, DIOCGSECTORSIZE, &ssize) < 0)
@@ -154,7 +178,14 @@ getdiskinfo(char *disk)
 		if (ioctl(fd, DIOCGMEDIASIZE, &dsize) < 0)
 			err(1, "%s: DIOCGMEDIASIZE", disk);
 		diskinfo.disksize = (unsigned long)(dsize / ssize);
-		diskinfo.cpu = diskinfo.tpc = diskinfo.spt = 0;
+		if (ioctl(fd, DIOCGFWSECTORS, &nsect) < 0)
+			err(1, "%s: DIOCGFWSECTORS", disk);
+		diskinfo.spt = nsect;
+		if (ioctl(fd, DIOCGFWHEADS, &nhead) < 0)
+			err(1, "%s: DIOCGFWHEADS", disk);
+		diskinfo.tpc = nhead;
+		diskinfo.cpu = diskinfo.disksize / (nsect * nhead);
+		chs = diskinfo.cpu * diskinfo.tpc * diskinfo.spt;
 	}
 #else
 #ifdef GIOCGDINFO
@@ -164,25 +195,24 @@ getdiskinfo(char *disk)
 		if (ioctl(fd, DIOCGDINFO, &label) < 0)
 			err(1, "%s: DIOCGDINFO", disk);
 		diskinfo.cpu = label.d_ncylinders;
-		chs *= diskinfo.cpu;
 		diskinfo.tpc = label.d_ntracks;
-		chs *= diskinfo.tpc;
 		diskinfo.spt = label.d_nsectors;
-		chs *= diskinfo.spt;
 		diskinfo.disksize = label.d_secperunit;
-		if (diskinfo.disksize < chs)
-			errx(1, "%s: secperunit (%lu) < CxHxS (%lu)",
-			     disk, diskinfo.disksize, chs);
-		else if (diskinfo.disksize > chs) {
-			if (verbose)
-				warnx("%s: only using %lu of %lu reported sectors",
-				      disk, chs, diskinfo.disksize);
-			diskinfo.disksize = chs;
-		}
+		chs = diskinfo.cpu * diskinfo.tpc * diskinfo.spt;
 	}
 #endif
 #endif
 #endif
+	if (diskinfo.disksize < chs)
+		errx(1, "%s: secperunit (%lu) < CxHxS (%lu)",
+		     disk, diskinfo.disksize, chs);
+	else if (diskinfo.disksize > chs) {
+		if (verbose)
+			warnx("%s: only using %lu of %lu reported sectors",
+			      disk, chs, diskinfo.disksize);
+		diskinfo.disksize = chs;
+	}
+
 	if (read(fd, diskinfo.bootblock, sizeof(diskinfo.bootblock)) < 0)
 		err(1, "%s: error reading bootblock", disk);
 	s0 = (struct sector0 *)diskinfo.bootblock;
