@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -13,11 +13,12 @@ require 'ctime.pl';
 #
 my $DUMPDATES   = "/etc/dumpdates";
 my @DBFILES     = ();
-my @VARDIRS	= ("logs", "db", "jails", "boot", "lock", "lib/dhcp");
+my @SYSVARDIRS  = ("lib/dhcp", "spool/clientmqueue");
+my @VARDIRS	= ("logs", "db", "jails", "boot", "lock");
 my $FSTAB       = "/etc/fstab";
 my $LOGDIR      = "/var/log";
 my $RUNDIR      = "/var/run";
-my $HISTORY     = "/.bash_history";
+my $HISTORY     = ".bash_history";
 my $MAILFILE    = "/var/spool/mail/root";
 my $NTPDRIFT    = "/etc/ntp/drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
@@ -151,9 +152,13 @@ if (-d $VARACCTDIR) {
 }
 
 print "Removing root's history ...\n";
-if (-f $HISTORY) {
-    unlink($HISTORY) or
-        die("Could not unlink $HISTORY: $!");
+if (-f "/$HISTORY") {
+    unlink("/$HISTORY") or
+        die("Could not unlink /$HISTORY: $!");
+}
+if (-f "/root/$HISTORY") {
+    unlink("/root/$HISTORY") or
+        die("Could not unlink /root/$HISTORY: $!");
 }
 
 print "Removing root's mailfile ...\n";
@@ -188,6 +193,13 @@ if (-f $SFSUSERS) {
 }
 if (-f $SFSHOSTKEY) {
     system("rm -f $SFSHOSTKEY");
+}
+
+print "Clearing out directories in /var ...\n";
+foreach my $dir (@SYSVARDIRS) {
+    if (-d "/var/$dir") {
+	system("rm -rf /var/$dir/*");
+    }
 }
 
 print "Clearing out directories in $VARDIR ...\n";
