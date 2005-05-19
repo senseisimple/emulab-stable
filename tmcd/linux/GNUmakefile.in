@@ -80,6 +80,7 @@ sup-install:	dir-install supfile
 bin-install:	dir-install
 	$(INSTALL) -m 755 ../tmcc-nossl$(EXE) $(BINDIR)/tmcc.bin$(EXE)
 	$(INSTALL) -m 755 ../findif$(EXE) $(BINDIR)/findif$(EXE)
+	$(INSTALL) -m 755 ../dostype$(EXE) $(BINDIR)/dostype$(EXE)
 
 etc-install:	dir-install sysetc-remove sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group

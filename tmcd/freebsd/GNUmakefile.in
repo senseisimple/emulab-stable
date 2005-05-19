@@ -164,6 +164,7 @@ sup-install:	dir-install supfile
 bin-install:	dir-install
 	$(INSTALL) -m 755 -s ../tmcc-nossl $(BINDIR)/tmcc.bin
 	$(INSTALL) -m 755 -s ../findif $(BINDIR)/findif
+	$(INSTALL) -m 755 -s ../dostype $(BINDIR)/dostype
 
 etc-install:	dir-install sysetc-install
 	$(INSTALL) -m 644 $(SRCDIR)/group $(ETCDIR)/group
