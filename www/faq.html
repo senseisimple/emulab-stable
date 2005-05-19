@@ -79,6 +79,7 @@
      <ul>
      <li> <a href="#SWS-1">What OS do the nodes run?</a>
      <li> <a href="#SWS-2">How do I select which OS to run on each node?</a>
+     <li> <a href="#SWS-WIN2K">Is Windows 2000 supported as well as Windows XP?</a>
      <li> <a href="#SWS-3">Can I load my own software (RPMs/Tarballs)
 			     on my nodes?</a> 
      <li> <a href="#SWS-4">Can I schedule programs to run
@@ -1077,11 +1078,26 @@
     </p>
     <p>
     Please see the
-    <a href="tutorial/docwrapper.php3?docname=nscommands.html">Extensions</a>
+    <a href="tutorial/docwrapper.php3?docname=nscommands.html#OS">Extensions</a>
     page for a summary of all Emulab NS extensions, and the
-    <a href = "tutorial/tutorial.php3">Emulab Tutorial</a> for an
+    <a href = "tutorial/tutorial.php3#OsChoices">Emulab Tutorial</a> for an
     example. 
     </p>    
+    
+<li><a NAME="SWS-WIN2K"></a>
+    <font size='+1'><b>Is Windows 2000 supported as well as Windows XP?</b></font>
+    <p>
+    We have no existing support for Win2k.  Given our experience in bringing
+    Windows XP into the Emulab fold, it could easily be an enormous
+    undertaking to get Win2k going.
+    </p>
+    <p>
+    We suggest switching to XP if at all possible.
+    </p>
+    <p>
+    Please see the <a href="doc/docwrapper.php3?docname=windows.html">
+    Windows&nbsp;XP</a> page for more information.
+    </p>
     
 <li><a NAME="SWS-3"></a>
     <font size='+1'><b>Can I load my own software (RPMs/Tarballs) on
@@ -1475,11 +1491,11 @@
     <code>tb-set-node-os</code>, then make sure you have specified
     a valid image (e.g., did you spell the OS identifier correctly?)
     Again, the log output should include an error if the OSID was
-    invalid.  Try:
-    <pre>
-    os_load -l
-    </pre>
-    on users.emulab.net to get a list of OSIDs that you can use.
+    invalid.
+    <p>
+    Click <a href="https://www.emulab.net/showosid_list.php3">List ImageIDs and
+    OSIDs</a> in the Emulab web interface "Interaction" pane to see the
+    current list of Emulab-supplied OSs.
     <p>
     If the OSID is correct, but the log contains messages of the form:
     <pre>

@@ -18,8 +18,10 @@
   <li> <a href="#Differences">Differences from FreeBSD and Linux in Emulab </a></li>
   <ul>
     <li> <a href="#Windows_Passwords"> Windows Passwords </a></li>
-    <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes. </a></li>
-    <li> <a href="#Login_connections"> Login connections to Windows. </a></li>
+    <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes </a></li>
+    <li> <a href="#Routing"> Routing </a></li>
+    <li> <a href="#Boots_twice"> Windows nodes boot twice </a></li>
+    <li> <a href="#Login_connections"> Login connections to Windows </a></li>
     <li> <a href="#RDP_details"> RDP details </a></li>
   </ul>
   <li> <a href="#Cygwin"> Cygwin </a> </li>
@@ -37,6 +39,7 @@
 
 Microsoft <i>Windows XP</i> is now supported as one of the operating system
 types for experiment nodes in Emulab, in addition to FreeBSD and Linux.
+<a href="../faq.php3?#SWS-WIN2K">Windows 2000</a> is not supported. <p>
 
 Before booting the node at swap-in time, Emulab loads a fresh image of Windows
 XP onto the experiment nodes in parallel, using our Frisbee service.  Emulab
@@ -101,41 +104,66 @@ password, the account information including passwords will be updated at the
 next Emulab watchdog daemon isalive interval.  This should be in 3 to 6
 minutes. <p>
 
-<h4><a name="Experiment_setup"> </a> Experiment setup for Windows nodes. </h4>
+<h4><a name="Experiment_setup"> </a> Experiment setup for Windows nodes </h4>
 
 All you have to do is put a line specifying a WINXP OS image in your
 experiment .ns file, like this: <br>
-<pre>    tb-set-node-os $node WINXP-02-16</pre>
+<pre>    tb-set-node-os $node WINXP-UPDATE</pre>
 
-Currently available images are:
+Currently available Windows XP images are:
 
 <ul>
 
-  <li><b>WINXP-02-11</b> - Windows XP-SP1, pc600 and pc850, release
-  candidate.</li>
+  <li><b>WINXP-UPDATE</b> - Windows XP-SP2+, pc600 and pc850.  This will be
+  updated periodically from Windows Update with critical and security fixes up
+  through the date we pull the image file. <p>
 
-  <li><b>WINXP-02-16</b> - Windows XP-SP2+, pc600 and pc850, release
-  candidate.  This incorporates SP2, as well as all "critical" and "security"
-  updates as of the date of the image. </li>
+  The Windows Firewall is disabled by default (as it will inform you
+  repeatedly!) <p>
+
+  This image fixes the problem that was causing Windows experiments created
+  with Netbuild to fail.  Netbuild creates all experiments with "Static"
+  routing enabled, and that form of route is now supported. <p>
+
+  There was also a problem with Windows not finding all the interfaces when it
+  booted.  Hopefully that is fixed as well.
+  </li>
+
+  <li><b>WINXP-02-16</b> - Windows XP-SP2+, pc600 and pc850, first release.
+  This incorporates SP2, as well as all "critical" and "security" updates as
+  of the date of the image. <p>
+
+  If you use WINXP-02-16 and built your experiment .ns file with the
+  <i>NetBuild</i> GUI, be aware that it puts in a <code>rtproto Static</code>
+  statement, which you will need to modify to <code>rtproto Static-old</code>.
+  </li>
+
+  <li><b>WINXP-02-11</b> - Windows XP-SP1, pc600 and pc850, early release
+  candidate.
+  </li>
 
 </ul>
 
-<div style="margin-left: 40px;"> <b>NOTE:</b> Router nodes can not run Windows
-at present.  The only form of routing that is currently supported on Windows
-is <b><code>rtproto Static-old</code></b>.  <code>rtproto Manual</code> should
-work too.  Don't put any other <code>rtproto</code> statements in your .ns
-file. <p>
+<h4><a name="Routing"> </a> Routing </h4>
 
-If you built your experiment .ns file with the <i>NetBuild</i> GUI, be aware
-that it puts in a <code>rtproto Static</code> statement, which you will need
-to modify to <code>rtproto Static-old</code>. <p>
+Router nodes can not run Windows, i.e. <b><code>rtproto Session</code></b> is
+not supported.<p>
+
+<b><code>rtproto Static</code></b> is supported in WINXP-UPDATE, but not in
+WINXP-02-16 or before. <p>
+
+<b><code>rtproto Static-old</code></b> or <b><code>rtproto Manual</code></b>
+will work in any image.<p>
 
 There is more information on routing in the <a
 href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#Routing">
-Routing Section of the Emulab Tutorial. </a><p> </div>
+Routing Section of the Emulab Tutorial. </a><p>
+
+<h4><a name="Boots_twice"> </a> Windows nodes boot twice </h4>
 
 Notice that Windows reboots an extra time after first swap-in on a node, after
-changing the node name, to set up the network stack properly.   <p>
+changing the node name, to set up the network stack properly.  
+Be patient, Windows doesn't boot fast. <p>
 
 <div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen Windows
 XP fail to do the second reboot.  We're working on it.  If you try to login
@@ -146,7 +174,7 @@ If you are able to log in but your remote home directory isn't mounted, you
 have the additional option of executing this command on
 the node itself: <pre>    /sbin/reboot</pre> </div>
 
-<h4><a name="Login_connections"> </a> Login connections to Windows. </h4>
+<h4><a name="Login_connections"> </a> Login connections to Windows </h4>
 
 You can manually start up SSH or RDP client programs to connect and log in to
 nodes in your experiment, using your Windows password. <p>

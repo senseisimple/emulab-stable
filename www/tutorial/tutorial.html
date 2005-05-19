@@ -34,8 +34,8 @@
             How do I know when all my nodes are ready?</a>
     <li> <a href="#Routing">
             Setting up IP routing between nodes</a>
-    <li> <a href="../doc/docwrapper.php3?docname=windows_in_emulab_user.html">
-    	   Using Windows XP on test nodes</a>
+    <li> <a href="../doc/docwrapper.php3?docname=windows.html">
+    	   Using Windows XP on experiment nodes</a>
 	   <img src="../new.gif" alt="&lt;NEW&gt;">
     <li> <a href="docwrapper.php3?docname=nse.html">
            Hybrid Experiments with Simulation and Emulation</a>
@@ -186,17 +186,28 @@ node A to B.
 In addition to the standard NS syntax above, a number of
 <a href="docwrapper.php3?docname=nscommands.html">
 extensions</a> have been added that allow you
-to better control your experiment. For example, you may specify what
+to better control your experiment.  <p>
+
+<a NAME="OsChoices"></a>
+For example, you may specify what
 Operating System is booted on your nodes. We currently support FreeBSD
-4.10, Linux RedHat 9.0, and Windows&nbsp;XP.  Fedora Core 2 (Linux 2.6)
+4.10, Linux RedHat 9.0, and 
+<a href="../doc/docwrapper.php3?docname=windows.html"> Windows&nbsp;XP</a>.
+<a href="../faq.php3?#SWS-WIN2K">Windows 2000</a> is not supported.  
+Fedora Core 2 (Linux 2.6)
 is available but unsupported.  We also support
 <a href="http://www.cs.utah.edu/flux/oskit/">OSKit</a> kernels on the
-Emulab PCs.
-By default, our most recent Linux image is selected.
+Emulab PCs. <p>
+
+Click <a href="https://www.emulab.net/showosid_list.php3">List ImageIDs and
+OSIDs</a> in the Emulab web interface "Interaction" pane to see the current
+list of Emulab-supplied OS. By default, our most recent Linux image is
+selected.<p>
 
 	<code><pre>
 	tb-set-node-os $nodeA FBSD-STD
-	tb-set-node-os $nodeC RHL-STD</code></pre>
+	tb-set-node-os $nodeC RHL-STD
+	tb-set-node-os $nodeC WINXP-UPDATE</code></pre>
 
 <p>
 In a topology like this, you will likely want to communicate between
@@ -385,7 +396,8 @@ here</a>.)
 By the time you receive the email message listing your nodes, the
 Emulab configuration system will have ensured that your nodes are
 fully configured and ready to use. If you have selected one of the
-Emulab-supported operating system images (FreeBSD or Linux),
+Emulab-supported operating system images (FreeBSD, Linux, or
+<a href="../doc/docwrapper.php3?docname=windows.html">Windows&nbsp;XP</a>),
 this configuration process includes:
 
 <p>
@@ -442,7 +454,10 @@ Testbed Ops</a> for help or more information.
 <p>
 If you need to customize the configuration, or perhaps reboot nodes,
 you can use the "sudo" command, located in <code>/usr/local/bin</code>
-on FreeBSD and Linux, and <code>/usr/pkg/bin</code> on NetBSD. Our
+on FreeBSD and Linux, and <code>/usr/pkg/bin</code> on NetBSD. 
+All users are added to the Administrators group on
+<a href="../doc/docwrapper.php3?docname=windows.html">Windows&nbsp;XP</a>
+nodes.  Our
 policy is very liberal; you can customize the configuration in any way
 you like, provided it does not violate Emulab's
 <a href="../docwrapper.php3?docname=policies.html">
@@ -580,9 +595,9 @@ Again, please feel free to contact us.
 <li> <a href="#Startupcmd">Starting your application automatically</a>
 <li> <a href="#SyncServer">How do I know when all my nodes are ready?</a>
 <li> <a href="#Routing">Setting up IP routing between nodes</a>
-    <li> <a href="../doc/docwrapper.php3?docname=windows_in_emulab_user.html">
-    	   Using Windows XP on test nodes</a>
-	   <img src="../new.gif" alt="&lt;NEW&gt;">
+<li> <a href="../doc/docwrapper.php3?docname=windows.html">
+	Using Windows XP on test nodes</a>
+	<img src="../new.gif" alt="&lt;NEW&gt;">
 <li> <a href="docwrapper.php3?docname=nse.html">Hybrid Experiments with Simulation and Emulation</a> 
 <li> <a href="docwrapper.php3?docname=vnodes.html">Multiplexed Virtual Nodes</a>
 <li> <a href="docwrapper.php3?docname=ixp.html">Using IXP network processors</a>
@@ -741,11 +756,13 @@ nodes when it boots:
 
 <code><pre>
 tb-set-node-rpms $nodeA /proj/myproj/rpms/silly-freebsd.rpm
-tb-set-node-rpms $nodeB /proj/myproj/rpms/silly-linux.rpm	</code></pre>
+tb-set-node-rpms $nodeB /proj/myproj/rpms/silly-linux.rpm
+tb-set-node-rpms $nodeC /proj/myproj/rpms/silly-windows.rpm	</code></pre>
 
 The above NS code says to install the <tt>silly-freebsd.rpm</tt> file
-on <tt>nodeA</tt>, and the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>.
-RPMs are installed as root, must reside in either the project's
+on <tt>nodeA</tt>, the <tt>silly-linux.rpm</tt> on <tt>nodeB</tt>,
+and the <tt>silly-windows.rpm</tt> on <tt>nodeC</tt>.
+RPMs are installed as root, and must reside in either the project's
 <tt>/proj</tt> directory, or if the experiment has been created in a
 subgroup, in the <tt>/groups</tt> directory. You may not place your
 rpms in your home directory.
@@ -919,7 +936,8 @@ by default.
 However, many users are more interested in end-to-end aspects and don't
 want to be bothered with setting up routes.  For those users we provide
 an option to automatically set up routes on nodes which run one of our
-provided FreeBSD or Linux disk images.
+provided FreeBSD, Linux or <a href="../doc/docwrapper.php3?docname=windows.html">
+Windows&nbsp;XP</a> disk images.
 
 <p>
 You can use the NS <tt>rtproto</tt> syntax in your NS file to enable
@@ -933,7 +951,9 @@ or <code>Manual</code>. <p>
 
 <code>Session</code> routing provides fully automated routing support, 
 and is implemented by enabling <code>gated</code> running the OSPF protocol
-on all nodes in the experiment.  <p>
+on all nodes in the experiment.  This is not supported on 
+<a href="../doc/docwrapper.php3?docname=windows.html#Routing">
+Windows&nbsp;XP</a> nodes. <p>
 
 <code>Static</code> routing also provides automatic routing support, but
 rather than computing the routes dynamically, the routes are precomputed by a
