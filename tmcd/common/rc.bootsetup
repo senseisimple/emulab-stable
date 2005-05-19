@@ -79,7 +79,9 @@ if ($action eq "boot" || $action eq "reconfig") {
     #
     open(LOG, "> $LOGFILE") or
 	BootFatal(-1, "Could not open $LOGFILE!");
-    autoflush(LOG, 1);
+    my $ofh = select(LOG);
+    $| = 1;
+    select($ofh);
     
     #
     # This open implicitly forks a child, which goes on to execute the rest
