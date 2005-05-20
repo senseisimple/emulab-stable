@@ -2644,3 +2644,11 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table experiments add elabinelab_cvstag varchar(64) \
                   default NULL after elabinelab_eid;
 
+1.136: Add a process id and local port number fields for the location
+       piper. 
+
+	alter table experiments add locpiper_pid int(11) default '0' \
+		after delay_capacity;
+	alter table experiments add locpiper_port int(11) default '0' \
+		after locpiper_pid;
+

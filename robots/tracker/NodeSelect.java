@@ -410,6 +410,9 @@ public class NodeSelect extends JApplet {
 	     */
 	    g2.drawImage(floorimage, 0, 0, fw, fh, this);
 
+	    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+				RenderingHints.VALUE_ANTIALIAS_ON);
+	    
 	    /*
 	     * Then we draw a bunch of stuff on it, like the robots.
 	     */

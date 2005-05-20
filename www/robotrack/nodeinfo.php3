@@ -87,11 +87,8 @@ while ($row = mysql_fetch_array($query_result)) {
     if (!isset($selector)) {
 	echo "$vname, ";
     }
-    echo "$type, $alloc, $mobile, $size, $radius";
-
-    if (isset($selector)) {
-	echo ", $loc_x, $loc_y, $loc_z, $or";
-    }
+    echo "$type, $alloc, $mobile, $size, $radius, ";
+    echo "$loc_x, $loc_y, $loc_z, $or";
     echo "\n";
 }
 

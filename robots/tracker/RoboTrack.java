@@ -406,98 +406,115 @@ public class RoboTrack extends JApplet {
 	 * should create an XML representation of it!
 	 */
 	public void parseRobot(String str) {
-	    StringTokenizer tokens = new StringTokenizer(str, ",");
-	    String tmp;
+	    StringTokenizer tokens;
+	    String nodeid;
 	    Robot robbie;
-	    int index;
+	    int index, ch;
 
 	    System.out.println(str);
 
-	    tmp = tokens.nextToken().trim();	    
+	    //
+	    // nodeid X=1,Y=2, ...
+	    //
+	    ch = str.indexOf(' ');
+	    nodeid = str.substring(0, ch);
+	    str    = str.substring(ch+1);
+	    tokens = new StringTokenizer(str, ",");
 
-	    if ((robbie = (Robot) robots.get(tmp)) == null) {
+	    if ((robbie = (Robot) robots.get(nodeid)) == null) {
 		// For testing from the shell.
 		if (!shelled)
 		    return;
 		
-		robbie        = new Robot();
-		index         = robotcount++;
-		robbie.index  = index;
-		robbie.pname  = tmp;
-		robbie.radius = 18;
-		robbie.size   = 27;
-		robbie.type   = "garcia";
-		robbie.mobile = true;
+		robbie           = new Robot();
+		index            = robotcount++;
+		robbie.index     = index;
+		robbie.pname     = nodeid;
+		robbie.vname     = nodeid;
+		robbie.radius    = 18;
+		robbie.size      = 27;
+		robbie.type      = "garcia";
+		robbie.z         = 1.0;
+		robbie.z_meters  = "1.0";
+		robbie.or        = 90.0;
+		robbie.or_string = "90.0";
+		robbie.battery_percentage = "0.0";
+		robbie.battery_voltage    = "0.0";
+		robbie.mobile    = true;
 		robbie.allocated = true;
-		robots.put(tmp, robbie);
+		robots.put(nodeid, robbie);
 		robotmap.insertElementAt(robbie, index);
 	    }
-	    robbie.vname = tokens.nextToken().trim();
-	    robbie.x     = Integer.parseInt(tokens.nextToken().trim());
-	    robbie.y     = Integer.parseInt(tokens.nextToken().trim());
-	    robbie.x_meters = FORMATTER.format(robbie.x / pixels_per_meter);
-	    robbie.y_meters = FORMATTER.format(robbie.y / pixels_per_meter);
 
-	    str = tokens.nextToken().trim();
-	    if (str.length() > 0) {
-		robbie.z = Double.parseDouble(str);
-		robbie.z_meters = FORMATTER.format(robbie.z);
-	    }
-	    else {
-		robbie.z        = 0.0;
-		robbie.z_meters = "";
-	    }
+	    while (tokens.hasMoreTokens()) {
+		String tmp = tokens.nextToken().trim();
+		int delim  = tmp.indexOf('=');
 
-	    str = tokens.nextToken().trim();
-	    if (str.length() > 0) {
-		robbie.or = Double.parseDouble(str);
-		robbie.or_string = FORMATTER.format(robbie.or);
-	    }
-	    else {
-		robbie.or        = 500.0;
-		robbie.or_string = "";
-	    }
+		if (delim < 0)
+		    continue;
 
-	    str = tokens.nextToken().trim();
-	    if (str.length() > 0) {
-		robbie.dx  = Integer.parseInt(str);
-		robbie.dy  = Integer.parseInt(tokens.nextToken().trim());
-		robbie.dor = Double.parseDouble(tokens.nextToken().trim());
-		robbie.dx_meters  = FORMATTER.format(robbie.dx /
-						    pixels_per_meter);
-		robbie.dy_meters  = FORMATTER.format(robbie.dy /
-						    pixels_per_meter);
-		robbie.dor_string = FORMATTER.format(robbie.dor);
-		robbie.gotdest = true;
+		String key = tmp.substring(0, delim);
+		String val = tmp.substring(delim+1);
+
+		if (key.equals("X")) {
+		    robbie.x = Integer.parseInt(val);
+		    robbie.x_meters = FORMATTER.format(robbie.x /
+						       pixels_per_meter);
+		}
+		else if (key.equals("Y")) {
+		    robbie.y = Integer.parseInt(val);
+		    robbie.y_meters = FORMATTER.format(robbie.y /
+						       pixels_per_meter);
+		}
+		else if (key.equals("OR")) {
+		    robbie.or = Double.parseDouble(val);
+		    robbie.or_string = FORMATTER.format(robbie.or);
+		}
+		else if (key.equals("DX")) {
+		    if (val.equals("NULL")) {
+			robbie.dx = 0;
+			robbie.dx_meters  = "";
+			robbie.gotdest = false;
+		    }
+		    else {
+			robbie.dx  = Integer.parseInt(val);
+			robbie.dx_meters  = FORMATTER.format(robbie.dx /
+							     pixels_per_meter);
+			robbie.gotdest = true;
+		    }
+		}
+		else if (key.equals("DY")) {
+		    if (val.equals("NULL")) {
+			robbie.dy = 0;
+			robbie.dy_meters  = "";
+		    }
+		    else {
+			robbie.dy  = Integer.parseInt(val);
+			robbie.dy_meters  = FORMATTER.format(robbie.dy /
+							     pixels_per_meter);
+		    }
+		}
+		else if (key.equals("DOR")) {
+		    if (val.equals("NULL")) {
+			robbie.dor = 500.0;
+			robbie.dor_string = "";
+		    }
+		    else {
+			robbie.dor = Double.parseDouble(val);
+			robbie.dor_string = FORMATTER.format(robbie.dor);
+		    }
+		}
+		else if (key.equals("BATV")) {
+		    // Store these as strings for easy display.
+		    robbie.battery_voltage = 
+			FORMATTER.format(Float.parseFloat(val));
+		}
+		else if (key.equals("BAT%")) {
+		    // Store these as strings for easy display.
+		    robbie.battery_percentage =
+			FORMATTER.format(Float.parseFloat(val));
+		}
 	    }
-	    else {
-		// Consume next two tokens and clear strings/values.
-		str = tokens.nextToken();
-		str = tokens.nextToken();
-		robbie.dx  = 0;
-		robbie.dy  = 0;
-		robbie.dor = 500.0;
-		robbie.dx_meters  = "";
-		robbie.dy_meters  = "";
-		robbie.dor_string = "";
-		robbie.gotdest = false;
-	    }
-
-	    // Store these as strings for easy display.
-	    str = tokens.nextToken().trim();
-	    if (str.length() > 0)
-		robbie.battery_percentage =
-		    FORMATTER.format(Float.parseFloat(str));
-	    else
-		robbie.battery_percentage = "";
-
-	    str = tokens.nextToken().trim();
-	    if (str.length() > 0)
-		robbie.battery_voltage = 
-		    FORMATTER.format(Float.parseFloat(str));
-	    else
-		robbie.battery_voltage = "";
-
 	    robbie.last_update   = System.currentTimeMillis();
 	    now.setTime(robbie.last_update);
 	    robbie.update_string = TIME_FORMAT.format(now);
@@ -949,7 +966,7 @@ public class RoboTrack extends JApplet {
 			long now  = System.currentTimeMillis();
 			long diff = (now - start_time) / 1000;
 
-			System.out.println("" + diff);
+			//System.out.println("" + diff);
 			
 			parseRobot(str);
 			repaint();
@@ -1566,7 +1583,7 @@ public class RoboTrack extends JApplet {
 		System.out.println(str);
 
 		StringTokenizer tokens = new StringTokenizer(str, ",");
-		String		nodeid;
+		String		nodeid, tmp;
 		Robot		robbie;
 
 		nodeid = tokens.nextToken().trim();
@@ -1591,6 +1608,33 @@ public class RoboTrack extends JApplet {
 		robbie.radius    = (int)
 		    (Float.parseFloat(tokens.nextToken().trim()) *
 				      pixels_per_meter);
+		
+		robbie.x     = Integer.parseInt(tokens.nextToken().trim());
+		robbie.y     = Integer.parseInt(tokens.nextToken().trim());
+		robbie.x_meters = FORMATTER.format(robbie.x /
+						   pixels_per_meter);
+		robbie.y_meters = FORMATTER.format(robbie.y /
+						   pixels_per_meter);
+
+		tmp = tokens.nextToken().trim();
+		if (tmp.length() > 0) {
+		    robbie.z = Double.parseDouble(tmp);
+		    robbie.z_meters = FORMATTER.format(robbie.z);
+		}
+		else {
+		    robbie.z        = 0.0;
+		    robbie.z_meters = "";
+		}
+
+		tmp = tokens.nextToken().trim();
+		if (tmp.length() > 0) {
+		    robbie.or = Double.parseDouble(tmp);
+		    robbie.or_string = FORMATTER.format(robbie.or);
+		}
+		else {
+		    robbie.or        = 500.0;
+		    robbie.or_string = "";
+		}
 	    }
 	    is.close();
 	}

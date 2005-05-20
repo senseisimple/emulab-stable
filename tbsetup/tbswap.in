@@ -34,6 +34,7 @@ sub usage()
 my $TBROOT         = "@prefix@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
+my $piper          = "$TBROOT/sbin/locpiper";
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -386,6 +387,17 @@ sub doSwapout($) {
 		if (system("eventsys_control stop $pid $eid")) {
 		    print STDERR "*** Failed to stop the event system.\n";
 		    $swapout_errors = 1;
+		}
+
+		#
+		# Stop the location piper.
+		#
+		if (-x $piper) {
+		    print "Stopping the location piper\n";
+		    if (system("$piper -k $pid $eid")) {
+			print STDERR "*** Failed to stop location piper.\n";
+			$swapout_errors = 1;
+		    }
 		}
 	    }
 	}
@@ -1079,6 +1091,18 @@ sub doSwapin($) {
     # event system previously, so starting it again will fail!
     # 
     if (! ($DISABLE_EVENTS || $elabinelab)) {
+	#
+	# For the robot testbed, start the location piper *before* the event
+	# system.
+	#
+	if (-x $piper && ($type != UPDATE && $type != UPDATE_RECOVER)) {
+	    print "Starting the location piper.\n";
+	    if (system("$piper $pid $eid")) {
+		print STDERR "*** Failed to start the location piper.\n";
+		return 1;
+	    }
+	}
+	
 	if ( $update_Eventsys_restart || 
 	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
 	    print "Starting the event system.\n";

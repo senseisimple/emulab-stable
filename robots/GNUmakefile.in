@@ -35,9 +35,15 @@ all:		robomonitord all-subdirs
 client:		client-subdirs
 client-install:	client-install-subdirs
 check:		check-subdirs
+
 install:	install-subdirs install-scripts
+	@echo "Don't forget to do a post-install as root"
+
 boss-install:   install
 control-install:	control-install-subdirs
+
+post-install: 
+	@$(MAKE) -C emc post-install
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

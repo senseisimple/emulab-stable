@@ -1,0 +1,510 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use IO::Socket;
+use IO::Handle;
+use Fcntl;
+use Errno qw(ESRCH);
+use Time::HiRes qw(gettimeofday);
+
+#
+# Piper
+#
+sub usage()
+{
+    print(STDOUT
+	  "Usage: locpiper [-d] [-k] pid eid\n" .
+	  "switches and arguments:\n".
+	  "-d      - Debug mode, use to prevent daemonization\n");
+    exit(-1);
+}
+my $optlist  = "dk";
+my $debug    = 0;
+my $impotent = 0;
+my $daemon   = 1;
+my $killmode = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $USERNODE    = "@USERNODE@";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use event;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Locals
+# 
+my $logfile;
+my %nodeids    = ();    # Map vnames to nodeid to avoid lookup later.
+my %clients    = ();
+my $PPM	       = 100.0;	# XXX Pixels Per Meter.
+my $loop_count = 0;
+my $query_result;
+my $locpiperpid;
+my $starttime  = 0;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+if (defined($options{"k"})) {
+    $killmode = 1;
+}
+usage()
+    if (@ARGV != 2);
+
+my ($pid,$eid) = @ARGV;
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\@\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\@\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+# Kill a running piper, as at swapout.
+exit(KillThePiper())
+    if ($killmode);
+
+#
+# Get a list of nodes to avoid lookups at each event. 
+#
+if ($debug) {
+    $query_result =
+	DBQueryFatal("select r.node_id,r.vname from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "where n.node_id=n.phys_nodeid");
+}
+else { 
+    $query_result =
+	DBQueryFatal("select r.node_id,r.vname from reserved as r ".
+		     "left join nodes as n on n.node_id=r.node_id ".
+		     "left join location_info as loc on ".
+		     "     loc.node_id=r.node_id ".
+		     "left join node_types as nt on nt.type=n.type " .
+		     "where r.pid='$pid' and r.eid='$eid' and ".
+		     "      nt.class='robot'");
+}
+if (!$query_result->numrows) {
+    print "No nodes will be sending location info; exiting ...\n";
+    exit(0);
+}
+while (my ($nodeid,$vname) = $query_result->fetchrow_array()) {
+    $nodeids{$vname} = $nodeid;
+}
+
+#
+# Need the experiment rsrcidx to name the output event file. 
+#
+$query_result =
+    DBQueryFatal("select rsrcidx from experiments as e ".
+		 "left join experiment_stats as s on e.idx=s.exptidx ".
+		 "where e.pid='$pid' and e.eid='$eid'");
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    Cannot find experiment record for $pid/$eid!\n");
+}
+my ($rsrcidx) = $query_result->fetchrow_array();
+my $eventfile = TBExptWorkDir($pid, $eid) . "/motionevents." . $rsrcidx;
+
+print "Opening $eventfile\n"
+    if ($debug);
+
+#
+# Make sure we can open the event stream file.
+#
+open(EVFILE, ">$eventfile") or
+    die("*** $0:\n".
+	"    Could not open $eventfile: $!");
+
+# For process handling, below.
+sub handler ($) {
+    my ($signame) = @_;
+
+    Cleanup();
+    exit(0);
+}
+
+# Go to ground.
+if ($daemon) {
+    $logfile = TBMakeLogname("locpiper");
+    
+    if (TBBackGround($logfile)) {
+	exit(0);
+    }
+
+    #
+    # Enter our pid into the DB.
+    #
+    $locpiperpid = $PID;
+
+    fatal("Could not enter locpiper process ID into DB!")
+	if (!DBQueryWarn("update experiments set ".
+			 "locpiper_pid=$locpiperpid ".
+			 "where pid='$pid' and eid='$eid'"));
+}
+#
+# Setup a handler so we can be killed later and so we can flush and close
+# the event file.
+#
+$SIG{TERM} = \&handler;
+$SIG{INT}  = \&handler;
+
+#
+# Subscribe to the events that describe robot motion.
+#
+my $handle = event_register("elvin://$USERNODE", 0);
+if (!$handle) {
+    fatal("Could not register with event server on $USERNODE!");
+}
+
+my $tuple = address_tuple_alloc();
+if (!$tuple) {
+    fatal("Could not allocate an address tuple!");
+}
+%$tuple = ( objtype   => 'NODE',
+	    eventtype => 'SETDEST,MODIFY' );
+
+if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
+    fatal("Could not subscribe to SETDEST,MODIFY events!");
+}
+
+%$tuple = ( objtype   => 'NODE',
+	    eventtype => 'COMPLETE',
+	    scheduler => 1);
+
+if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
+    fatal("Could not subscribe to COMPLETE event!");
+}
+
+#
+# Create a socket that listens for connections from the web server.
+# We spit out the events in a rational form to these listeners.
+# Perhaps we do it as XML someday, but for now do something much
+# more adhoc. We set the main socket to non-blocking so that we can
+# just query it for new connections. 
+# 
+my $sock = IO::Socket::INET->new(Listen    => 10,
+				 LocalAddr => 'localhost',
+				 LocalPort => 9005,
+				 Reuse     => 1,
+				 Proto     => 'tcp');
+
+fcntl($sock, F_SETFL, O_NONBLOCK) 
+    or fatal("Cannot set non blocking on socket: $!");
+
+while (1) {
+    my ($newsock,$peeraddr) = $sock->accept();
+    if (defined($newsock)) {
+	my $tag = $newsock->peerhost . ":" . $newsock->peerport();
+
+	print "Connection from $tag at " . TBTimeStamp() . "\n";
+	$clients{$tag} = $newsock;
+	$newsock->autoflush(1);
+    }
+    event_poll_blocking($handle, 1000);
+
+    #
+    # Every minute or so, lets grab the battery values from the DB
+    # and send them as an event. I might end up changing things so that
+    # tmcd generates a real event when these come in, but sending the
+    # battery data in real time is not quite so important.
+    # 
+    $loop_count++;
+    if ($loop_count > 60) {
+	$query_result =
+	    DBQueryWarn("select r.node_id,n.battery_voltage, ".
+			"       n.battery_percentage ".
+			" from reserved as r ".
+			"left join nodes as n on n.node_id=r.node_id ".
+			"where ".
+			($debug ? "" :
+			 " r.pid='$pid' and r.eid='$eid' and ") .
+			"      n.battery_voltage is not NULL ");
+	if ($query_result) {
+	    #
+	    # Get a (relative) timestamp for the event.
+	    # 
+	    my ($seconds, $microseconds) = gettimeofday();
+	    if (! $starttime) {
+		$starttime = $seconds;
+	    }
+	    $seconds -= $starttime;
+	    
+	    while (my ($nodeid,$voltage,$percentage) =
+		   $query_result->fetchrow_array()) {
+	    
+		ForwardEvent($nodeid, "$seconds:$microseconds",
+			     "BATV=$voltage,BAT%=$percentage");
+	    }
+	}
+	$loop_count = 0;
+    }
+}
+
+#
+# The event callback.
+# 
+sub callbackFunc($$$) {
+    my ($handle,$notification,$data) = @_;
+
+    my $vname  = event_notification_get_objname($handle, $notification);
+    my $evtype = event_notification_get_eventtype($handle, $notification);
+
+    print "Got event for $vname\n"
+	if ($debug);
+
+    return
+	if (! exists($nodeids{$vname}));
+    
+    my $nodeid = $nodeids{$vname};
+
+    #
+    # Get a (relative) timestamp for the event.
+    # 
+    my ($seconds, $microseconds) = gettimeofday();
+    if (! $starttime) {
+	$starttime = $seconds;
+    }
+    $seconds -= $starttime;
+
+    if ($evtype eq "COMPLETE") {
+	DBQueryWarn("update nodes set ".
+		    "  destination_x=NULL,".
+		    "  destination_y=NULL,".
+		    "  destination_orientation=NULL ".
+		    "where node_id='$nodeid'")
+	    if (!$impotent);
+	
+	ForwardEvent($nodeid, "$seconds:$microseconds",
+		     "DX=NULL,DY=NULL,DOR=NULL");
+	return;
+    }
+    if ($evtype eq "SETDEST") {
+	my $args = event_notification_get_arguments($handle, $notification);
+	my @sets  = ();
+	my @event = ();
+	my $or    = 0;
+	
+	foreach my $keyval (split(' ', $args)) {
+	    my ($key, $val) = split('=', $keyval);
+
+	    return
+		if (! ($val =~ /^[-\d\.]+$/));
+
+	    if ($key eq "X" || $key eq "x") {
+		$val = $val * $PPM;
+		push(@sets,  "destination_x='$val'");
+		$val = int($val);
+		push(@event, "DX=$val");
+	    }
+	    elsif ($key eq "Y" || $key eq "y") {
+		$val = $val * $PPM;
+		push(@sets, "destination_y='$val'");
+		$val = int($val);
+		push(@event, "DY=$val");
+	    }
+	    elsif ($key eq "ORIENTATION" || $key eq "orientation") {
+		push(@sets, "destination_orientation='$val'");
+		push(@event, "DOR=$val");
+		$or = 1;
+	    }
+	}
+	return
+	    if (! @sets);
+
+	# Tim says this happens (x,y but no orientation); set it to 0.0.
+	if (!$or) {
+	    push(@sets, "destination_orientation='0.0'");
+	    push(@event, "DOR=0.0");
+	}
+
+	DBQueryWarn("update nodes set " .
+		    join(",", @sets) . " " .
+		    "where node_id='$nodeid'")
+	    if (!$impotent);
+	
+	ForwardEvent($nodeid, "$seconds:$microseconds", join("," ,@event));
+	return;
+    }
+    if ($evtype eq "MODIFY") {
+	my $args = event_notification_get_arguments($handle, $notification);
+	my @sets  = ();
+	my @event = ();
+	
+	foreach my $keyval (split(' ', $args)) {
+	    my ($key, $val) = split('=', $keyval);
+
+	    return
+		if (! ($val =~ /^[-\d\.]+$/));
+
+	    if ($key eq "X" || $key eq "x") {
+		$val = $val * $PPM;
+		push(@sets,  "loc_x='$val'");
+		$val = int($val);
+		push(@event, "X=$val");
+	    }
+	    elsif ($key eq "Y" || $key eq "y") {
+		$val = $val * $PPM;
+		push(@sets, "loc_y='$val'");
+		$val = int($val);
+		push(@event, "Y=$val");
+	    }
+	    elsif ($key eq "ORIENTATION" || $key eq "orientation") {
+		push(@sets, "orientation='$val'");
+		push(@event, "OR=$val");
+	    }
+	}
+	return
+	    if (! @sets);
+	
+	DBQueryWarn("update location_info set stamp=UNIX_TIMESTAMP(now()), ".
+		    join(",", @sets) . " " .
+		    "where node_id='$nodeid'")
+	    if (!$impotent);
+	
+	ForwardEvent($nodeid, "$seconds:$microseconds", join("," ,@event));
+	return;
+    }
+}
+
+#
+# Send the translated event to all of the clients that are listening.
+#
+sub ForwardEvent($$$)
+{
+    my ($nodeid, $stamp, $event) = @_;
+    $eventstr = "${nodeid} ${event}\n";
+
+    print "Forwarding event: '$nodeid $stamp $event'\n"
+	if ($debug > 1);
+    
+    foreach my $client (keys(%clients)) {
+	my $sock = $clients{$client};
+
+	if (! $sock->write($eventstr, length($eventstr))) {
+	    print "Dropped $client at " . TBTimeStamp() . "\n";
+	    delete($clients{$client});
+	}
+    }
+    #
+    # Now dump it to the file.
+    #
+    print EVFILE "$stamp $nodeid $event\n";
+}
+
+#
+# Cleanup things.
+#
+sub Cleanup()
+{
+    EVFILE->flush();
+    close(EVFILE);
+
+    # Clear our pid from the DB since we are about to exit.
+    if (defined($locpiperpid)) {
+	DBQueryWarn("update experiments set locpiper_pid=0 ".
+		    "where pid='$pid' and eid='$eid'");
+    }
+}
+
+#
+# Send email if we die (since its running in the background).
+# 
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    print "*** $0:\n";
+    print "    $mesg\n";
+
+    Cleanup();
+
+    if ($daemon) {
+	SENDMAIL(TBOPS,
+		 "Location Piper for $pid/$eid Died",
+		 $mesg,
+		 undef, undef, ($logfile));
+	unlink($logfile);
+    }
+    exit(-1);
+}
+
+#
+# Kill a running locpiper, as when swapping out.
+# 
+sub KillThePiper()
+{
+    DBQueryFatal("lock tables experiments write");
+
+    my $query_result =
+	DBQueryFatal("select locpiper_pid from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+
+    DBQueryFatal("update experiments set ".
+		 "locpiper_pid=0 ".
+		 "where pid='$pid' and eid='$eid'");
+
+    DBQueryWarn("unlock tables");
+
+    my ($procid) = $query_result->fetchrow_array();
+
+    if ($procid > 0 &&
+	! kill('TERM', $procid)) {
+	my $err = $!;
+
+	if ($err == ESRCH) {
+	    print "*** WARNING:".
+		"Prerender process $procid for $pid/$eid already dead\n";
+	}
+	else {
+	    SENDMAIL($TBOPS,
+		     "Failed to stop locpiper for $pid/$eid",
+		     "Could not kill(TERM) process $procid: $? $err");
+
+	    print("*** $0:\n".
+		  "Failed to stop locpiper for $pid/$eid!\n");
+	    return -1;
+	}
+    }
+    return 0;
+}

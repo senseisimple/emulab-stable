@@ -405,6 +405,8 @@ CREATE TABLE experiments (
   paniced tinyint(1) NOT NULL default '0',
   panic_date datetime default NULL,
   delay_capacity tinyint(3) unsigned default NULL,
+  locpiper_pid int(11) default '0',
+  locpiper_port int(11) default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)

@@ -11,7 +11,7 @@ SUBDIR		= robots/emc
 
 include $(OBJDIR)/Makeconf
 
-PROGS = emcd loclistener
+PROGS = locpiper emcd
 TESTS = test_emcd.sh
 
 all: $(PROGS)
@@ -37,11 +37,19 @@ emcd: $(OBJS) ../mtp/libmtp.a
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/opsdir/sbin/emcd
-	$(INSTALL_PROGRAM) loclistener $(INSTALL_SBINDIR)/loclistener
+	$(INSTALL_PROGRAM) locpiper $(INSTALL_SBINDIR)/locpiper
+	@echo "Don't forget to do a post-install as root"
+
+post-install: 
+	chmod 775 $(INSTALL_SBINDIR)
+	chown root $(INSTALL_SBINDIR)/locpiper
+	chmod u+s $(INSTALL_SBINDIR)/locpiper
 
 control-install: all
 	-mkdir -p $(INSTALL_DIR)/sbin
 	$(INSTALL_PROGRAM) emcd $(INSTALL_DIR)/sbin/emcd
+
+boss-install: install
 
 clean:
 	rm -f *.o

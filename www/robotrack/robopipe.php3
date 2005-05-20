@@ -38,34 +38,22 @@ header("Cache-Control: no-cache, must-revalidate");
 header("Pragma: no-cache");
 flush();
 
-#
-# Clean up when the remote user disconnects
-#
-function SPEWCLEANUP()
-{
-    exit(0);
-}
-register_shutdown_function("SPEWCLEANUP");
-
 if (isset($fake)) {
     #
     # Just loop forever writing out some stuff.
     #
     $x1 = 100;
     $y1 = 100;
-    $z1 = 0.5;
 
     $x2 = 700;
     $y2 = 200;
-    $z2 = 1.5;
 
     $i = 0;
     do {
-	echo "garcia1, robbie, $x1, $y1, $z1, 90.0, 700, 300, -90.0, 10, 20\n";
-	echo "garcia2, mary,   $x2, $y2, $z2, 0.0,  , , , 50, 60\n";
-	echo "garcia3, robin,  300, 300, 0.2, 0.0, , , , 90, 95\n";
+	echo "garcia1 X=$x1,Y=$y1,OR=-90.0,DX=700,DY=300,DOR=-90.0\n";
+	echo "garcia2 X=$x2,Y=$y2,OR=-5.66424,BATV=50.34567,BAT%=100.0\n";
+	echo "garcia3 X=300,Y=300,OR=0.0,BATV=90,BAT%=95\n";
 	flush();
-
 	sleep(1);
 
 	$x1 +=2;
@@ -76,77 +64,34 @@ if (isset($fake)) {
     return;
 }
 
-$last_stamp   = 0;
-$loop_count   = 0;
+#
+# Clean up when the remote user disconnects
+#
+$socket = 0;
 
-# Loop forever.
-while (1) {
-    if ($loop_count == 30) {
-	# The point is to update everything every 30 seconds.
-	$stamp_clause = "";
-	$loop_count   = 0;
+function SPEWCLEANUP()
+{
+    global $socket;
+
+    if (!$socket || !connection_aborted()) {
+	exit();
     }
-    elseif ($last_stamp) 
-	$stamp_clause = " and stamp>$last_stamp ";
-    else
-	$stamp_clause = "";
-
-    $query_string =
-	"select loc.*,r.pid,r.eid,r.vname, ".
-	"  n.battery_voltage,n.battery_percentage, ".
-	"  n.destination_x,n.destination_y, ".
-	"  n.destination_orientation ".
-	"  from location_info as loc ".
-	"left join reserved as r on r.node_id=loc.node_id ".
-	"left join nodes as n on n.node_id=loc.node_id ".
-	"where loc.building='$building' and ".
-	"      loc.floor='$floor' $stamp_clause ".
-	"order by n.type,n.node_id";
-
-    $query_result = DBQueryFatal($query_string);
-
-    while ($row = mysql_fetch_array($query_result)) {
-	$pname = $row["node_id"];
-	$vname = $row["vname"];
-	$x     = $row["loc_x"];
-	$y     = $row["loc_y"];
-	$z     = $row["loc_z"];
-	$or    = $row["orientation"];
-	$dx    = $row["destination_x"];
-	$dy    = $row["destination_y"];
-	$dor   = $row["destination_orientation"];
-	$bvolts= $row["battery_voltage"];
-	$bper  = $row["battery_percentage"];
-	$stamp = $row["stamp"];
-
-	if ($stamp > $last_stamp)
-	    $last_stamp = $stamp;
-
-	if (!isset($vname))
-	    $vname = $pname;
-	if (!isset($z))
-	    $z = "";
-	if (!isset($or))
-	    $or = "";
-	if (!isset($dx)) {
-	    $dx  = "";
-	    $dy  = "";
-	    $dor = "";
-	}
-	else {
-	    $dx = (int) $dx;
-	    $dy = (int) $dy;
-	}
-	if (!isset($bvolts))
-	    $bvolts = "";
-	if (!isset($bper))
-	    $bper = "";
-	    
-	echo "$pname, $vname, $x, $y, $z, $or, $dx, $dy, $dor, $bper, $bvolts\n";
-    }
-    $loop_count++;
-    flush();
-    sleep(1);
+    fclose($socket);
+    exit();
 }
+# ignore_user_abort(1);
+register_shutdown_function("SPEWCLEANUP");
+
+$socket = fsockopen("localhost", 9005);
+if (!$socket) {
+    TBERROR("Error opening locpiper socket - $errstr",1);
+}
+
+while (! feof($socket)) {
+    $buffer = fgets($socket, 1024);
+    echo $buffer;
+    flush();
+}
+fclose($socket);
 
 ?>
