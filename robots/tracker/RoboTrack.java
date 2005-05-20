@@ -818,6 +818,8 @@ public class RoboTrack extends JApplet {
 	    Graphics2D G2 = scalebar_bimg.createGraphics();
 	    G2.setFont(OurFont);
 
+	    G2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+				RenderingHints.VALUE_ANTIALIAS_ON);
 	    G2.setBackground(Color.white);
 	    G2.setColor(Color.black);
 	    G2.drawLine(0, 10, dis - 1, 10);
@@ -838,6 +840,9 @@ public class RoboTrack extends JApplet {
 	    g2.drawImage(floorimage, 0, 0, fw, fh, this);
 	    g2.drawImage(scalebar_bimg, myWidth - 125, 0, this);
 
+	    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+				RenderingHints.VALUE_ANTIALIAS_ON);
+	    
 	    /*
 	     * Then we draw a bunch of stuff on it, like the robots.
 	     */
