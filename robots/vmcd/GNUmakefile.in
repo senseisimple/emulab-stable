@@ -16,7 +16,7 @@ include $(OBJDIR)/Makeconf
 PROGS = vmc-client vmcd
 
 ifeq ($(HAVE_MEZZANINE),yes)
-PROGS += file_dumper
+PROGS += file_dumper camera_checker
 endif
 
 TESTS =
@@ -61,10 +61,15 @@ vmcd: vmcd.o visionTrack.o robotObject.o ../mtp/libmtp.a
 file_dumper: file_dumper.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
 
+camera_checker: camera_checker.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+
 install: all
 ifeq ($(HAVE_MEZZANINE),yes)
 	-mkdir -p $(INSTALL_SBINDIR)
 	$(INSTALL_PROGRAM) vmc-client $(INSTALL_SBINDIR)/vmc-client
+	$(INSTALL_PROGRAM) file_dumper $(INSTALL_SBINDIR)/file_dumper
+	$(INSTALL_PROGRAM) camera_checker $(INSTALL_SBINDIR)/camera_checker
 else
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) vmcd $(INSTALL_DIR)/opsdir/sbin/vmcd
