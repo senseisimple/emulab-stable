@@ -146,16 +146,6 @@ if (!$query_result->numrows) {
 my ($rsrcidx) = $query_result->fetchrow_array();
 my $eventfile = TBExptWorkDir($pid, $eid) . "/motionevents." . $rsrcidx;
 
-print "Opening $eventfile\n"
-    if ($debug);
-
-#
-# Make sure we can open the event stream file.
-#
-open(EVFILE, ">$eventfile") or
-    die("*** $0:\n".
-	"    Could not open $eventfile: $!");
-
 # For process handling, below.
 sub handler ($) {
     my ($signame) = @_;
@@ -182,6 +172,18 @@ if ($daemon) {
 			 "locpiper_pid=$locpiperpid ".
 			 "where pid='$pid' and eid='$eid'"));
 }
+$EUID = $UID;
+
+print "Opening $eventfile\n"
+    if ($debug);
+
+#
+# Make sure we can open the event stream file.
+#
+open(EVFILE, ">$eventfile") or
+    die("*** $0:\n".
+	"    Could not open $eventfile: $!");
+
 #
 # Setup a handler so we can be killed later and so we can flush and close
 # the event file.
@@ -464,6 +466,7 @@ sub fatal($)
 		 "Location Piper for $pid/$eid Died",
 		 $mesg,
 		 undef, undef, ($logfile));
+	$EUID = 0;
 	unlink($logfile);
     }
     exit(-1);
