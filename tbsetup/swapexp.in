@@ -797,9 +797,10 @@ if ($inout eq "out") {
     TBExptClearPanicBit($pid, $eid);
 }
 elsif ($inout eq "in") {
-    my $optarg = "";
+    GatherSwapStats($pid, $eid, $dbuid,
+		    TBDB_STATS_SWAPIN, 0, TBDB_STATS_FLAGS_PRESWAPIN);
     
-    print STDOUT "Running 'tbswap in $optarg $pid $eid'\n";
+    print STDOUT "Running 'tbswap in $pid $eid'\n";
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
 	$errorstat = $? >> 8;
 	fatal("tbswap in failed!");
