@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -34,7 +34,7 @@ if (isset($record) && strcmp($record, "")) {
 	$wclause = "and s.creator='$uid'";
     }
     $query_result =
-	DBQueryFatal("select s.*,r.* from experiment_stats as s ".
+	DBQueryFatal("select s.*,'foo',r.* from experiment_stats as s ".
 		     "left join experiment_resources as r on ".
 		     " r.exptidx=s.exptidx ".
 		     "where s.exptidx=$record $wclause ".
@@ -50,7 +50,7 @@ else {
 	$wclause = "where s.creator='$uid'";
     }
     $query_result =
-	DBQueryFatal("select s.*,r.* from experiment_stats as s ".
+	DBQueryFatal("select s.*,'foo',r.* from experiment_stats as s ".
 		     "left join experiment_resources as r on ".
 		     " r.exptidx=s.exptidx ".
 		     "$wclause ".
@@ -70,6 +70,9 @@ echo "<table align=center border=1>\n";
 echo "<tr>\n";
 foreach($row as $key => $value) {
     $key = str_replace("_", " ", $key);
+
+    if ($key == "foo")
+	continue;
     
     echo "<th><font size=-1>$key</font></th>\n";
 }
@@ -77,9 +80,20 @@ echo "</tr>\n";
 
 mysql_data_seek($query_result, 0);
 
+$print_header = 0;
+$last_exptidx = 0;
+
 while ($row = mysql_fetch_assoc($query_result)) {
     $rsrcidx = $row[idx];
-    
+    $exptidx = $row[exptidx];
+
+    $skipping = 1;
+
+    if ($last_exptidx != $exptidx) {
+	$print_header  = 1;
+	$last_exptidx = $exptidx;
+    }
+
     echo "<tr>\n";
     foreach($row as $key => $value) {
 	if ($key == "thumbnail") {
@@ -88,9 +102,21 @@ while ($row = mysql_fetch_assoc($query_result)) {
                   </td>\n";
 	}
 	else {
+	    if (!$print_header && $skipping) {
+		if ($key == "foo") {
+		    $skipping = 0;
+		    continue;
+		}
+		echo "<td nowrap>&nbsp</td>\n";		
+		continue;
+	    }
+	    if ($key == "foo")
+		continue;
+	    
 	    echo "<td nowrap>$value</td>\n";
 	}
     }
+    $print_header = 0;
     echo "</tr>\n";
 }
 echo "</table>\n";
