@@ -46,7 +46,7 @@ space to hold them:
 			on what you want to make available.
 			
 You may want to enforce quotas on the user-writable filesystems. This is the
-main reason you'd want to keep them in separate filesystems (ie. so people can
+main reason you'd want to keep them in separate filesystems (i.e., so people can
 have different /users/ and /proj/ quotas.)
 
 Note also since /share is exported read-only, FreeBSD requires that it be on
@@ -61,9 +61,9 @@ symlinks to the appropriate places. ie., if you make one big filesystem called
 	ln -s /z/proj /proj
 	... etc.
 
-Do *not* create any users yet, and just log in a root for the time being.
-Our software will create users later, once you get boss set up. If you
-already created users, then delete them with the "pw" command and make sure
+Do *not* create any user accounts yet, and just log in as root for the time being.
+Our software will create user accounts later, once you get boss set up. If you
+already created any users, then delete them with the "pw" command and make sure
 the home directories for them are removed as well. 
 
 ##### Step 1 - Installing packages
@@ -71,7 +71,14 @@ the home directories for them are removed as well.
 To make sure that you're running with versions of software from the ports
 collection that are known to work with our software, and to save you hours
 of compile time, we provide pre-built binary packages of the ports required
-by Emulab. Download the packages tarball from:
+by Emulab. 
+
+(Do not let the names of the following tar files bother you, e.g.
+"FreeBSD-4.10" or the apparent 20041102 date stamp.  These are indeed
+the correct files to use with FreeBSD 4.11 and with the current (May 2005)
+Emulab distribution.)
+
+Download the packages tarball from:
 
 	http://www.emulab.net/downloads/FreeBSD-4.10-20041102.tar.gz
 
@@ -138,8 +145,8 @@ Utah so that we can fix it up. If it succeeds, follow any other
 instructions it may have. The script will tell you to reboot the machine,
 but you can wait until after you do the next step to do so, if you want.
 
-(You may have to set the executable bit on this script, since configure won't -
-I'd like to get this solved at some point.)
+(You may have to set the executable bit on this script, since configure won't;
+we'd like to get this fixed at some point.)
 
 You should be aware that, among other things, this script sets up sendmail, and
 sets up password-less 'sudo' for anyone in the 'wheel' group. If you don't want
@@ -154,7 +161,7 @@ object directory.
 (Note: If you're logged in as root, /usr/local/bin, where gmake lives on
 FreeBSD, may not be in your path.)
 
-If you'll be using Cyclades boards to use the ops as a serial console server,
+If you'll be using Cyclades or similar boards to use 'ops' as a serial console server,
 you'll also want to do a 'gmake tipserv-install' in the object directory. In
 addition, you'll need to build a custom kernel with the appropriate driver (you
 may even need to get patches from Utah for some boards). You'll also need to
@@ -165,7 +172,7 @@ set up a few things (not yet automated), described in doc/adding_nodes.txt .
 Optional. The ops-install script set up some mailing lists for the email
 addresses you set up in the defs file, in /etc/mail/lists . If you want to run
 these mailing lists off your ops node, you can put some people in them now.
-These are just standard sendmail list files - a list of addresses and/or
+These are just standard sendmail list files: a list of addresses and/or
 archive files, one per line. If you chose to use archive files, give a path
 to the file you'd like sendmail to stick all correspondance in, and create
 this file.
