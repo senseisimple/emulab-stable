@@ -42,7 +42,7 @@ BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 # library and initialize itself. 
 # 
 use libsetup;
-use libtmcc
+use libtmcc;
 
 # Locals
 my $logname = "$LOGDIR/emulab-boot.debug";
