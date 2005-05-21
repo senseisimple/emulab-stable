@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Kernel, jail, netstat, route, ifconfig, ipfw, header files.
@@ -1071,6 +1071,15 @@ sub setjailoptions() {
 		}
 		last SWITCH;
 	    };
+	    /^IPDIVERT$/ && do {
+		if ($val) {
+		    $jailoptions .= " -o ipdivert";
+		}
+		else {
+		    $jailoptions .= " -o noipdivert";
+		}
+		last SWITCH;
+	    };
 	    /^DEVMEM$/ && do {
 		$jailflags |= $JAIL_DEVMEM;
 		last SWITCH;
@@ -1108,6 +1117,7 @@ sub setjailoptions() {
     system("sysctl jail.inaddrany_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.multiip_allowed=1 >/dev/null 2>&1");
     system("sysctl jail.ipfw_allowed=1 >/dev/null 2>&1");
+    system("sysctl jail.ipdivert_allowed=1 >/dev/null 2>&1");
     system("sysctl net.link.ether.inet.useloopback=0 >/dev/null 2>&1");
 
     if ($?) {
