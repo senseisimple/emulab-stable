@@ -203,14 +203,16 @@ my $tuple = address_tuple_alloc();
 if (!$tuple) {
     fatal("Could not allocate an address tuple!");
 }
-%$tuple = ( objtype   => 'NODE',
+%$tuple = ( expt      => "$pid/$eid",
+	    objtype   => 'NODE',
 	    eventtype => 'SETDEST,MODIFY' );
 
 if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
     fatal("Could not subscribe to SETDEST,MODIFY events!");
 }
 
-%$tuple = ( objtype   => 'NODE',
+%$tuple = ( expt      => "$pid/$eid",
+	    objtype   => 'NODE',
 	    eventtype => 'COMPLETE',
 	    scheduler => 1);
 
