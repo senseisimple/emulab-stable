@@ -33,9 +33,6 @@
 
 static int looping = 1;
 
-#define min(x, y) ((x) < (y)) ? (x) : (y)
-#define max(x, y) ((x) > (y)) ? (x) : (y)
-
 /**
  * Signal handler for SIGINT, SIGQUIT, and SIGTERM that sets looping to zero.
  *

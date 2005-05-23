@@ -124,6 +124,9 @@ enum mtp_opcode_t {
     
     MTP_CONTACT_REPORT		= 81,
     
+    MTP_CREATE_OBSTACLE		= 90,
+    MTP_UPDATE_OBSTACLE		= 91,
+    MTP_REMOVE_OBSTACLE		= 92,
 
     MTP_OPCODE_MAX
 };
@@ -349,6 +352,9 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_WIGGLE_STATUS:	mtp_wiggle_status	wiggle_status;
  case MTP_REQUEST_REPORT:	mtp_request_position	request_report;
  case MTP_CONTACT_REPORT:	mtp_contact_report	contact_report;
+ case MTP_CREATE_OBSTACLE:	obstacle_config		create_obstacle;
+ case MTP_UPDATE_OBSTACLE:	obstacle_config		update_obstacle;
+ case MTP_REMOVE_OBSTACLE:	int			remove_obstacle;
 };
 
 /**

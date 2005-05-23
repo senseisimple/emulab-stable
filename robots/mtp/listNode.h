@@ -98,6 +98,14 @@ void lnMoveList(struct lnMinList *dest, struct lnMinList *src);
 void lnAppendList(struct lnMinList *dest, struct lnMinList *src);
 
 /**
+ * Prepend the nodes from src to dest.
+ *
+ * @param dest The destination list object.
+ * @param src The source list object.
+ */
+void lnPrependList(struct lnMinList *dest, struct lnMinList *src);
+
+/**
  * Add a node to the head of the list.
  *
  * @param list The list object the node is to be added to.

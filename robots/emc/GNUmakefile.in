@@ -31,7 +31,7 @@ LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
 
 test_emcd.sh: emcd
 
-emcd: $(OBJS) ../mtp/libmtp.a
+emcd: $(OBJS) ../mtp/libmtp.a emcd.h ../mtp/mtp_xdr.h ../mtp/mtp.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
 install: all

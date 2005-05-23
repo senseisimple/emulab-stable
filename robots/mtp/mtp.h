@@ -476,15 +476,15 @@ int mtp_obstacle_config_invariant(struct obstacle_config *oc);
 void mtp_print_packet(FILE *file, struct mtp_packet *mp);
 
 #ifndef min
-#define min(x, y) ((x) < (y)) ? (x) : (y)
+#define min(x, y) (((x) < (y)) ? (x) : (y))
 #endif
 
 #ifndef max
-#define max(x, y) ((x) > (y)) ? (x) : (y)
+#define max(x, y) (((x) > (y)) ? (x) : (y))
 #endif
 
 #ifndef abs
-#define abs(x) ((x) < 0) ? -(x) : (x)
+#define abs(x) (((x) < 0) ? -(x) : (x))
 #endif
 
 #ifdef __cplusplus

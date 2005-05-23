@@ -21,8 +21,6 @@
 
 extern int debug;
 
-#define min(x, y) ((x) < (y)) ? (x) : (y)
-
 static float curvy(float x)
 {
     return (1.0f / (x * 2.0f - 2.8f)) + 1.35f;

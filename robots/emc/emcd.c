@@ -887,7 +887,7 @@ void ev_callback(event_handle_t handle,
     error("no match for host\n");
   }
   else {
-    float x, y, orientation = 0.0, speed = 0.1;
+    float x, y, orientation = 0.0, speed = 0.2;
     char *value, args[BUFSIZ];
     struct mtp_packet mp;
     
@@ -1333,7 +1333,63 @@ int rmc_callback(elvin_io_handler_t handler,
 	  retval = 1;
       }
       break;
+
+    case MTP_CREATE_OBSTACLE:
+	{
+	    struct obstacle_config *oc;
+
+	    oc = &mp->data.mtp_payload_u.update_obstacle;
+	    /* XXX Hack */
+	    event_do(handle,
+		     EA_Experiment, pideid,
+		     EA_Type, "AREA",
+		     EA_Event, "CREATE",
+		     EA_Name, "MEB-ROBOTS",
+		     EA_ArgInteger, "ID", oc->id,
+		     EA_ArgFloat, "XMIN", oc->xmin + 0.25,
+		     EA_ArgFloat, "YMIN", oc->ymin + 0.25,
+		     EA_ArgFloat, "XMAX", oc->xmax - 0.25,
+		     EA_ArgFloat, "YMAX", oc->ymax - 0.25,
+		     EA_TAG_DONE);
+	    
+	    retval = 1;
+	}
+	break;
+	
+    case MTP_UPDATE_OBSTACLE:
+	{
+	    struct obstacle_config *oc;
+
+	    oc = &mp->data.mtp_payload_u.update_obstacle;
+	    /* XXX Hack */
+	    event_do(handle,
+		     EA_Experiment, pideid,
+		     EA_Type, "AREA",
+		     EA_Event, TBDB_EVENTTYPE_MODIFY,
+		     EA_Name, "MEB-ROBOTS",
+		     EA_ArgInteger, "ID", oc->id,
+		     EA_ArgFloat, "XMIN", oc->xmin + 0.25,
+		     EA_ArgFloat, "YMIN", oc->ymin + 0.25,
+		     EA_ArgFloat, "XMAX", oc->xmax - 0.25,
+		     EA_ArgFloat, "YMAX", oc->ymax - 0.25,
+		     EA_TAG_DONE);
+	    
+	    retval = 1;
+	}
+	break;
       
+    case MTP_REMOVE_OBSTACLE:
+	event_do(handle,
+		 EA_Experiment, pideid,
+		 EA_Type, "AREA",
+		 EA_Event, TBDB_EVENTTYPE_CLEAR,
+		 EA_Name, "MEB-ROBOTS",
+		 EA_ArgInteger, "ID", mp->data.mtp_payload_u.remove_obstacle,
+		 EA_TAG_DONE);
+	
+	retval = 1;
+	break;
+	
     case MTP_TELEMETRY:
       retval = 1;
       break;

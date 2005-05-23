@@ -414,8 +414,24 @@ mtp_error_t mtp_init_packetv(struct mtp_packet *mp,
 		va_arg(args, int);
 	    break;
 	case MA_ObstacleVal:
-	    mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_val =
-		va_arg(args, struct obstacle_config *);
+	    switch (mp->data.opcode) {
+	    case MTP_CONFIG_RMC:
+		mp->data.mtp_payload_u.config_rmc.obstacles.obstacles_val =
+		    va_arg(args, struct obstacle_config *);
+		break;
+	    case MTP_CREATE_OBSTACLE:
+	    case MTP_UPDATE_OBSTACLE:
+		mp->data.mtp_payload_u.update_obstacle =
+		    *(va_arg(args, struct obstacle_config *));
+		break;
+	    case MTP_REMOVE_OBSTACLE:
+		mp->data.mtp_payload_u.remove_obstacle =
+		    (va_arg(args, struct obstacle_config *))->id;
+		break;
+	    default:
+		assert(0);
+		break;
+	    }
 	    break;
 	case MA_RobotID:
 	    switch (mp->data.opcode) {
@@ -916,6 +932,7 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 {
     struct mtp_garcia_telemetry *mgt;
     struct mtp_contact_report *mcr;
+    struct obstacle_config *oc;
     int lpc;
 
     assert(mp != NULL);
@@ -1264,6 +1281,26 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		    mcr->points[lpc].x,
 		    mcr->points[lpc].y);
 	}
+	break;
+
+    case MTP_CREATE_OBSTACLE:
+    case MTP_UPDATE_OBSTACLE:
+	oc = &mp->data.mtp_payload_u.update_obstacle;
+	fprintf(file,
+		" opcode:\t%s\n"
+		"  id: %d\n"
+		"  bounds: %.2f %.2f %.2f %.2f\n",
+		mp->data.opcode == MTP_CREATE_OBSTACLE ?
+		"create-obstacle" : "update-obstacle",
+		oc->id,
+		oc->xmin, oc->ymin, oc->xmax, oc->ymax);
+	break;
+	
+    case MTP_REMOVE_OBSTACLE:
+	fprintf(file,
+		" opcode:\tremove-obstacle\n"
+		"  id: %d\n",
+		mp->data.mtp_payload_u.remove_obstacle);
 	break;
 	
     default:

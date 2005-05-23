@@ -61,6 +61,18 @@ void lnAppendList(struct lnMinList *dest, struct lnMinList *src)
     }
 }
 
+void lnPrependList(struct lnMinList *dest, struct lnMinList *src)
+{
+    if( !lnEmptyList(src) )
+    {
+	src->lh_TailPred->ln_Succ = dest->lh_Head;
+	dest->lh_Head->ln_Pred = src->lh_TailPred;
+	src->lh_Head->ln_Pred = (struct lnMinNode *)&dest->lh_Head;
+	dest->lh_Head = src->lh_Head;
+	lnNewList(src);
+    }
+}
+
 void lnAddHead(struct lnMinList *list, struct lnMinNode *node)
 {
     node->ln_Succ = list->lh_Head;
