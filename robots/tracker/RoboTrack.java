@@ -1176,7 +1176,7 @@ public class RoboTrack extends JApplet {
 		    if (robbie.last_update == 0)
 			continue;
 
-		    if (now - robbie.last_update >= 10000) {
+		    if (now - robbie.last_update >= (5 * 60 * 1000)) {
 			System.out.println(robbie.pname + " has gone stale");
 			robbie.last_update = 0;
 		    }
