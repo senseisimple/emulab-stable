@@ -31,6 +31,7 @@
  *  - Log failures, reporting the closest out-of-tolerance fiducial, if any.
  *
  *  - E-mail to testbed-robocops after failing solidly for some time.
+ *    Only send during weekday operation hours, and back off exponentially.
  *
  *  - Log a successful sample once an hour for history. 
  *
@@ -91,13 +92,17 @@ static int error_threshold = 5;		/* Pixel error before alarm. */
 static int check_secs = 60;		/* Delay between checks. */
 static int log_skip = 60;		/* Good checks to skip between logs. */
 static int alarm_threshold = 10;	/* How many bad checks before alarm. */
+static int alarm_start_hour = 8;	/* Beginning of daily operation time. */
+static int alarm_end_hour = 18;		/* End of daily operation time. */
+static float alarm_backoff_exponent=3.0; /* Multiplier for alarm threshold. */
 
 void usage() {
     printf("camera_checker [-d] -C cam_num -f mezz_opt_file [-F logfile]\n");
   printf("	[-i skip_frames] [-n num_frames]\n");
   printf("	[-e error_threshold] [-c check_secs] [-l log_skip]\n");
   printf("	[-a alarm_threshold] [-m alarm_mail_addr]\n");
-  printf("	mezz_ipc_file\n");
+  printf("	[-S alarm_start_hour] [-E alarm_end_hour]\n");
+  printf("	[-B alarm_backoff_exponent] mezz_ipc_file\n");
 }
 
 static char tsbuff[256];
@@ -116,7 +121,7 @@ int main(int argc, char *argv[])
     mezz_mmap_t *mezzmap = NULL;
     struct sigaction sa;
 
-    while ((c = getopt(argc, argv, "dC:f:F:n:i:e:c:l:a:m:")) != -1) {
+    while ((c = getopt(argc, argv, "dC:f:F:n:i:e:c:l:a:m:S:E:B:")) != -1) {
         switch (c) {
         case 'd':
             debug = 1;
@@ -171,13 +176,34 @@ int main(int argc, char *argv[])
             break;
         case 'a':
             if (sscanf(optarg, "%d", &alarm_threshold) != 1) {
-                error("error: -laoption is not a number: %s\n", optarg);
+                error("error: -a option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
             }
             break;
         case 'm':
             alarm_addr = optarg;
+            break;
+        case 'S':
+            if (sscanf(optarg, "%d", &alarm_start_hour) != 1) {
+                error("error: -S option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+            }
+            break;
+        case 'E':
+            if (sscanf(optarg, "%d", &alarm_end_hour) != 1) {
+                error("error: -E option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+            }
+            break;
+        case 'B':
+            if (sscanf(optarg, "%f", &alarm_backoff_exponent) != 1) {
+                error("error: -laoption is not a real number: %s\n", optarg);
+                usage();
+                exit(1);
+            }
             break;
         case '?':
 	    usage();
@@ -277,8 +303,9 @@ int main(int argc, char *argv[])
     sigaction(SIGUSR1, &sa, NULL);
 
     int obj_warned = 0;
-    int checks_skipped = 0;
+    int checks_skipped = log_skip;	/* Print the first one. */
     int bad_checks = 0;
+    int alarm_delay = alarm_threshold;
     int last_frame;
     while (1) { /* The main loop. */
 	/* get frame data */
@@ -398,7 +425,7 @@ int main(int argc, char *argv[])
 	    /* Log every Nth successful check. */
 	    if (checks_skipped++ >= log_skip) {
 		fprintf(log_FILE,
-			"%s fiducial (%f, %f), distance %f.\n",
+			"%s fiducial (%f, %f), distance %f pixels.\n",
 			timestamp(),fid_x,fid_y,dist);
 		checks_skipped = 0;
 	    }
@@ -409,7 +436,7 @@ int main(int argc, char *argv[])
 	    char msg_buff[256];
 	    if (closest != FAR)
 		snprintf(msg_buff,256,
-			 "%s *** MISSED: closest (%f, %f), distance %f.",
+			 "%s *** MISSED: closest (%f, %f), distance %f pixels.",
 			 timestamp(),close_x,close_y,closest);
 	    else
 		snprintf(msg_buff,256,
@@ -417,18 +444,31 @@ int main(int argc, char *argv[])
 			 timestamp());
 	    fprintf(log_FILE,"%s\n",msg_buff);
 
+	    /* No alarms except during operating hours on week days. */
+	    char *now = timestamp();  /* E.g. "Thu Nov 24 18:22:48 1986\0" */
+	    int hour;
+	    if (sscanf(now,"%*s %*s %*d %d:", &hour) != 1)
+		fprintf(log_FILE,"***** Failed to parse hour from %s\n", now);
+	    int early = hour<alarm_start_hour, late = hour>=alarm_end_hour;
+	    int op_hr = now[0]!='S' && !early && !late;	/* No weekends. */
+	    if (debug) printf("now %s, hour %d, early %d, late %d, op_hr %d\n",
+			      now,hour,early,late,op_hr);
+	    if (early || late) alarm_delay = alarm_threshold; /* Reset. */
+
 	    /* Don't raise the alarm unless things have been bad for a while. */
-	    if (bad_checks++ >= alarm_threshold) {
+	    if (op_hr && bad_checks++ >= alarm_delay) {
 		char mail_buff[256];
 		char *to = (debug?dbg_addr:alarm_addr);
 		snprintf(mail_buff,256,
 			 "mail %s -s '[Robocops] Camera check %s' %s </dev/null",
-			 (debug?"-v":""),msg_buff, to);
-		fprintf(log_FILE,"%s ***** Alarm mail sent, status %d.\n",
-			timestamp(),system(mail_buff));
+			 (0 && debug?"-v":""),msg_buff, to);
 
-		/* Don't whine constantly. */
+		/* Don't whine constantly, and back off exponentially. */
 		bad_checks = 0;
+		alarm_delay = (int)powf(alarm_delay, alarm_backoff_exponent);
+		fprintf(log_FILE,
+			"%s ***** Alarm mail sent, status %d, next delay %d.\n",
+			timestamp(),system(mail_buff), alarm_delay);
 	    }
 	}
 
