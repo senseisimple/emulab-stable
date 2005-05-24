@@ -98,6 +98,8 @@ static elvin_error_t elvin_error;
 static struct mtp_packet config_rmc;
 static struct mtp_packet config_vmc;
 
+static char *topography_name;
+
 /* 
  * these are for some global bounds checking on user-requested
  * positions
@@ -588,6 +590,19 @@ void parse_config_file(char *config_file) {
 
     if (directive[0] == '#' || directive[0] == '\0') {
       // Comment or empty line.
+    }
+    else if (strcmp(directive, "topography") == 0) {
+      char area[32];
+
+      if (sscanf(line, "%16s %32s", directive, area) != 2) {
+	fprintf(stderr,
+		"error:%d: syntax error in config file - %s\n",
+		line_no,
+		line);
+      }
+      else {
+	topography_name = strdup(area);
+      }
     }
     else if (strcmp(directive, "robot") == 0) {
       char area[32], hostname[MAXHOSTNAMELEN], vname[TBDB_FLEN_EVOBJNAME];
@@ -1338,13 +1353,13 @@ int rmc_callback(elvin_io_handler_t handler,
 	{
 	    struct obstacle_config *oc;
 
-	    oc = &mp->data.mtp_payload_u.update_obstacle;
+	    oc = &mp->data.mtp_payload_u.create_obstacle;
 	    /* XXX Hack */
 	    event_do(handle,
 		     EA_Experiment, pideid,
-		     EA_Type, "AREA",
-		     EA_Event, "CREATE",
-		     EA_Name, "MEB-ROBOTS",
+		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+		     EA_Event, TBDB_EVENTTYPE_CREATE,
+		     EA_Name, topography_name,
 		     EA_ArgInteger, "ID", oc->id,
 		     EA_ArgFloat, "XMIN", oc->xmin + 0.25,
 		     EA_ArgFloat, "YMIN", oc->ymin + 0.25,
@@ -1364,9 +1379,9 @@ int rmc_callback(elvin_io_handler_t handler,
 	    /* XXX Hack */
 	    event_do(handle,
 		     EA_Experiment, pideid,
-		     EA_Type, "AREA",
+		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
 		     EA_Event, TBDB_EVENTTYPE_MODIFY,
-		     EA_Name, "MEB-ROBOTS",
+		     EA_Name, topography_name,
 		     EA_ArgInteger, "ID", oc->id,
 		     EA_ArgFloat, "XMIN", oc->xmin + 0.25,
 		     EA_ArgFloat, "YMIN", oc->ymin + 0.25,
@@ -1381,9 +1396,9 @@ int rmc_callback(elvin_io_handler_t handler,
     case MTP_REMOVE_OBSTACLE:
 	event_do(handle,
 		 EA_Experiment, pideid,
-		 EA_Type, "AREA",
+		 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
 		 EA_Event, TBDB_EVENTTYPE_CLEAR,
-		 EA_Name, "MEB-ROBOTS",
+		 EA_Name, topography_name,
 		 EA_ArgInteger, "ID", mp->data.mtp_payload_u.remove_obstacle,
 		 EA_TAG_DONE);
 	

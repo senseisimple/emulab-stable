@@ -84,6 +84,9 @@ Simulator instproc init {args} {
     $self instvar tiptunnel_list;
     set tiptunnel_list {}
 
+    $self instvar topography_list;
+    array set topography_list {}
+
     var_import ::GLOBALS::last_class
     set last_class $self
 
@@ -327,6 +330,7 @@ Simulator instproc run {} {
     $self instvar sequence_list
     $self instvar console_list
     $self instvar tiptunnel_list
+    $self instvar topography_list
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -516,6 +520,9 @@ Simulator instproc run {} {
     }
     foreach tt $tiptunnel_list {
 	$self spitxml_data "virt_tiptunnels" [list "host" "vnode"] $tt
+    }
+    foreach tg [array names topography_list] {
+	$tg updatedb "sql"
     }
 
     set fields [list "mem_usage" "cpu_usage" "forcelinkdelays" "uselinkdelays" "usewatunnels" "uselatestwadata" "wa_delay_solverweight" "wa_bw_solverweight" "wa_plr_solverweight" "veth_encapsulate" "allowfixnode"]
@@ -829,6 +836,12 @@ Simulator instproc rename_console {old new} {
     set console_list($new) {}
 }
 
+Simulator instproc rename_topography {old new} {
+    $self instvar topography_list
+    unset topography_list($old)
+    set topography_list($new) {}
+}
+
 # find_link <node1> <node2>
 # This is just an accesor to the link_map datastructure.  If no
 # link is known between <node1> and <node2> the empty list is returned.
@@ -1009,6 +1022,14 @@ Simulator instproc add_firewall {fw} {
     }
 
     set firewall_list($fw) {}
+    return 0
+}
+
+Simulator instproc add_topography {tg} {
+    $self instvar topography_list
+
+    set topography_list($tg) {}
+
     return 0
 }
 

@@ -14,6 +14,7 @@ namespace eval GLOBALS {
 Topography instproc init {} {
     global ::GLOBALS::last_class
 
+    $self set sim {}
     $self set area_name {}
     $self set width {}
     $self set height {}
@@ -22,6 +23,11 @@ Topography instproc init {} {
 }
 
 Topography instproc rename {old new} {
+    $self instvar sim
+
+    if {$sim != {}} {
+	$sim rename_topography $old $new
+    }
 }
 
 ## Topography instproc load_flatgrid {width height} {
@@ -124,4 +130,14 @@ Topography instproc checkdest {obj x y args} {
 	}
     }
     return 1
+}
+
+Topography instproc updatedb {DB} {
+    var_import ::TBCOMPAT::objtypes
+    $self instvar sim
+
+    if {$sim != {}} {
+	$sim spitxml_data "virt_agents" [list "vnode" "vname" "objecttype" ] \
+		[list "*" $self $objtypes(TOPOGRAPHY)]
+    }
 }

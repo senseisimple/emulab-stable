@@ -52,6 +52,8 @@ extern struct r_rpc_data rpc_data;
 extern "C" {
 #endif
 
+extern const char *topography_name; // XXX temporary
+
 int RPC_init(const char *certpath, const char *host, unsigned short port);
 int RPC_grab(void);
 void RPC_drop(void);
@@ -63,8 +65,7 @@ int RPC_notifystart(char *pid, char *eid, char *timeline, int set_or_clear);
 int RPC_agentlist(event_handle_t handle, char *pid, char *eid);
 int RPC_grouplist(event_handle_t handle, char *pid, char *eid);
 int RPC_eventlist(char *pid, char *eid,
-		  event_handle_t handle, address_tuple_t tuple,
-		  long basetime);
+		  event_handle_t handle, address_tuple_t tuple);
 
 extern int SetExpPath(const char *path);
 extern int AddUserEnv(char *name, char *value);
@@ -76,7 +77,6 @@ extern int AddAgent(event_handle_t handle,
 extern int AddGroup(event_handle_t handle, char *groupname, char *agentname);
 
 extern int AddEvent(event_handle_t handle, address_tuple_t tuple,
-		    long basetime,
 		    char *exidx, char *ftime, char *objname, char *exargs,
 		    char *objtype, char *evttype, char *parent);
 

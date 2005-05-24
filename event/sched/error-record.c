@@ -107,7 +107,7 @@ static int dump_agent_status(error_record_t er, FILE *out)
 	 * The format of the path for the status file:
 	 *   logs/<node>/<LOGDIR>/<agent>.<token>.status
 	 */
-	static char *file_format = "logs/%s" LOGDIR "/%s.%lu.status";
+	static char *file_format = "logs/%s" LOGDIR "/%s.status.%lu";
 
 	/*
 	 * A map of status file 'keys' that people may be interested in and
@@ -252,8 +252,8 @@ int dump_error_record(error_record_t er, FILE *out)
 		 * be sent back to the user.
 		 */
 		static char *filename_formats[] = {
-			"logs/%s" LOGDIR "/%s.%lu.out",
-			"logs/%s" LOGDIR "/%s.%lu.err",
+			"logs/%s" LOGDIR "/%s.out.%lu",
+			"logs/%s" LOGDIR "/%s.err.%lu",
 			NULL
 		};
 

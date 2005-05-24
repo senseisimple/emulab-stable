@@ -545,6 +545,8 @@ Node instproc program-agent {args} {
 }
 
 Node instproc topography {topo} {
+    $self instvar sim
+
     if {$topo == ""} {
 	$self set topo ""
 	return
@@ -557,6 +559,9 @@ Node instproc topography {topo} {
     }
 
     $self set topo $topo
+
+    $topo set sim $sim; # Need to link the topography to the simulator here.
+    $sim add_topography $topo
 
     if {[$self set type] == "pc"} {
 	$self set type "robot"

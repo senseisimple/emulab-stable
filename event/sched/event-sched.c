@@ -105,17 +105,21 @@ static void sigpanic(int sig)
 
 static void sigchld(int sig)
 {
-	pid_t child_pid;
 	int status;
-
-	child_pid = wait(&status);
-	if (child_pid == rmcd_pid) {
-		if (vmcd_pid != -1)
-			kill(vmcd_pid, SIGTERM);
-
-		vmcd_pid = -1;
-		rmcd_pid = -1;
+	
+	if (vmcd_pid != -1) {
+		if (waitpid(vmcd_pid, &status, WNOHANG) != -1) {
+			vmcd_pid = -1;
+		}
 	}
+	if (rmcd_pid != -1) {
+		if (waitpid(rmcd_pid, &status, WNOHANG) != -1) {
+			rmcd_pid = -1;
+			if (vmcd_pid != -1)
+				kill(vmcd_pid, SIGTERM);
+		}
+	}
+
 }
 
 static char emc_path[256];
@@ -536,6 +540,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_TIMELINE, run_completes },
 		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
 		{ TBDB_OBJECTTYPE_CONSOLE, NULL },
+		{ TBDB_OBJECTTYPE_TOPOGRAPHY, NULL },
 		{ NULL, NULL }
 	};
 
@@ -590,6 +595,10 @@ sched_event_prepare(event_handle_t handle, sched_event_t *se)
 {
 	int retval;
 
+	if (se->length > 1) {
+		return 0;
+	}
+	
 	if (se->agent.s == NULL) {
 		event_notification_insert_hmac(handle, se->notification);
 		return 0;
@@ -764,6 +773,9 @@ handle_event(event_handle_t handle, sched_event_t *se)
 		static int did_start = 0;
 
 		if (!did_start) {
+			gettimeofday(&primary_simulator_agent->sa_time_start,
+				     NULL);
+			primary_simulator_agent->sa_flags |= SAF_TIME_STARTED;
 			RPC_notifystart(pid, eid, "", 1);
 			RPC_drop();
 		}
@@ -846,7 +858,7 @@ AddUserEnv(char *name, char *path)
 	}
 	else {
 		char buf[BUFSIZ];
-		
+
 		if (fgets(buf, sizeof(buf), file) != NULL) {
 			char *idx;
 			
@@ -855,7 +867,12 @@ AddUserEnv(char *name, char *path)
 			if ((idx = strchr(buf, '=')) != NULL) {
 				add_report_data(primary_simulator_agent,
 						SA_RDK_CONFIG,
-						buf);
+						"  ",
+						0);
+				add_report_data(primary_simulator_agent,
+						SA_RDK_CONFIG,
+						buf,
+						1);
 				*idx = '\0';
 				retval = setenv(strdup(buf), idx + 1, 1);
 			}
@@ -963,6 +980,9 @@ AddAgent(event_handle_t handle,
 			agentp->handler = &ca->ca_local_agent;
 		}
 	}
+	else if (strcmp(type, TBDB_OBJECTTYPE_TOPOGRAPHY) == 0) {
+		topography_name = agentp->name;
+	}
 
 	if (agentp->handler != NULL) {
 		agentp->handler->la_handle = handle;
@@ -1044,7 +1064,7 @@ AddGroup(event_handle_t handle, char *groupname, char *agentname)
 }
 
 int
-AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
+AddEvent(event_handle_t handle, address_tuple_t tuple,
 	 char *exidx, char *ftime, char *objname, char *exargs,
 	 char *objtype, char *evttype, char *parent)
 {
@@ -1104,9 +1124,6 @@ AddEvent(event_handle_t handle, address_tuple_t tuple, long basetime,
 	if (time.tv_usec >= 1000000) {
 		time.tv_sec  += 1;
 		time.tv_usec -= 1000000;
-	}
-	if (ta == NULL) {
-		time.tv_sec  += basetime;
 	}
 	event.time = time;
 	event.agent.s = agentp;
@@ -1176,7 +1193,6 @@ static int
 get_static_events(event_handle_t handle)
 {
 	struct timeval	now;
-	long            basetime;
 	address_tuple_t tuple;
 	event_notification_t notification;
 	sched_event_t	event;
@@ -1192,6 +1208,24 @@ get_static_events(event_handle_t handle)
 	}
 	tuple->expt = pideid;
 
+	event.agent.s = primary_simulator_agent->sa_local_agent.la_agent;
+	event.notification = event_notification_create(
+		handle,
+		EA_Experiment, pideid,
+		EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
+		EA_Event, TBDB_EVENTTYPE_LOG,
+		EA_Name, event.agent.s->name,
+		EA_Arguments, "Time started",
+		EA_TAG_DONE);
+	event.time.tv_sec = 0;
+	event.time.tv_usec = 1;
+	event.length = 1;
+	event.flags = SEF_SINGLE_HANDLER;
+	
+	sched_event_prepare(handle, &event);
+	timeline_agent_append(ns_sequence, &event);
+
+	
 	/*
 	 * Generate a TIME starts message.
 	 */
@@ -1208,27 +1242,10 @@ get_static_events(event_handle_t handle)
 	event_notification_insert_hmac(handle, notification);
 	event.notification = notification;
 	event.time.tv_sec  = 0;
-	event.time.tv_usec = 0;
+	event.time.tv_usec = 2;
 	event.agent.s = NULL;
 	event.length = 1;
 	event.flags = SEF_TIME_START;
-	timeline_agent_append(ns_sequence, &event);
-
-	
-	event.agent.s = primary_simulator_agent->sa_local_agent.la_agent;
-	event.notification = event_notification_create(
-		handle,
-		EA_Experiment, pideid,
-		EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
-		EA_Event, TBDB_EVENTTYPE_DEBUG,
-		EA_Name, event.agent.s->name,
-		EA_Arguments, "Time started",
-		EA_TAG_DONE);
-	memset(&event.time, 0, sizeof(event.time));
-	event.length = 1;
-	event.flags = SEF_SINGLE_HANDLER;
-	
-	sched_event_prepare(handle, &event);
 	timeline_agent_append(ns_sequence, &event);
 
 	
@@ -1240,7 +1257,8 @@ get_static_events(event_handle_t handle)
 		EA_Event, TBDB_EVENTTYPE_START,
 		EA_Name, ns_timeline_agent.name,
 		EA_TAG_DONE);
-	memset(&event.time, 0, sizeof(event.time));
+	event.time.tv_sec = 0;
+	event.time.tv_usec = 3;
 	event.length = 1;
 	event.flags = SEF_SENDS_COMPLETE | SEF_SINGLE_HANDLER;
 	
@@ -1269,12 +1287,7 @@ get_static_events(event_handle_t handle)
 	gettimeofday(&now, NULL);
 	info(" Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
 	
-	/*
-	 * XXX Pad the start time out a bit to give this code a chance to run.
-	 */
-	basetime = now.tv_sec + 3;
-	
-	if (RPC_eventlist(pid, eid, handle, tuple, basetime)) {
+	if (RPC_eventlist(pid, eid, handle, tuple)) {
 		error("Could not get eventlist from RPC server\n");
 		return -1;
 	}
@@ -1306,6 +1319,7 @@ sched_event_enqueue_copy(event_handle_t handle,
 		event_notification_clone(handle, se->notification);
 	if (new_time != NULL)
 		se_copy.time = *new_time;
+	sched_event_prepare(handle, se);
 	sched_event_enqueue(se_copy);
 	
 	return retval;

@@ -34,6 +34,8 @@ struct r_rpc_data rpc_data = {
 	PTHREAD_MUTEX_INITIALIZER
 };
 
+const char *topography_name;
+
 int RPC_init(const char *certpath, const char *host, unsigned short port)
 {
 	struct passwd *pwd;
@@ -435,6 +437,8 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 	emulab::EmulabResponse er;
 	int lpc, rc, retval = 0;
 	FILE *emcd_config;
+
+	unlink("tbdata/emcd.config");
 	
 	rc = RPC_invoke("experiment.virtual_topology",
 			&er,
@@ -463,6 +467,10 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 	if ((emcd_config = fopen("tbdata/emcd.config", "w")) == NULL) {
 		error("Cannot create emcd.config!\n");
 		return -1;
+	}
+
+	if (topography_name != NULL) {
+		fprintf(emcd_config, "topography %s\n", topography_name);
 	}
 	
 	for (lpc = 0; lpc < locs.size(); lpc++) {
@@ -595,7 +603,7 @@ RPC_grouplist(event_handle_t handle, char *pid, char *eid)
 
 int
 RPC_eventlist(char *pid, char *eid,
-	      event_handle_t handle, address_tuple_t tuple, long basetime)
+	      event_handle_t handle, address_tuple_t tuple)
 {
 	emulab::EmulabResponse er;
 	int i, foo = RPC_invoke(pid, eid, "experiment.event_eventlist", &er);
@@ -626,7 +634,7 @@ RPC_eventlist(char *pid, char *eid,
 		tmp = event.getItem(6);
 		parent = (char *) tmp.getString().c_str();
 		
-		if (AddEvent(handle, tuple, basetime, exidx,
+		if (AddEvent(handle, tuple, exidx,
 			     extime, objname, exargs, objtype, evttype,
 			     parent) < 0) {
 			return -1;

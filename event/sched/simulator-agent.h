@@ -36,10 +36,20 @@ typedef enum {
 } sa_report_data_kind_t;
 
 enum {
+	SA_RDB_NEWLINE,
+};
+
+enum {
+	SA_RDF_NEWLINE = (1L << SA_RDB_NEWLINE),
+};
+
+enum {
+	SAB_TIME_STARTED,
 	SAB_STABLE,
 };
 
 enum {
+	SAF_TIME_STARTED = (1L << SAB_TIME_STARTED),
 	SAF_STABLE = (1L << SAB_STABLE),
 };
 
@@ -54,6 +64,7 @@ struct _simulator_agent {
 						  course of the experiment. */
 	char *sa_report_data[SA_RDK_MAX];	/*< Different kinds of text to
 						 include in the report. */
+	struct timeval sa_time_start;		/*< */
 };
 
 /**
@@ -79,9 +90,22 @@ simulator_agent_t create_simulator_agent(void);
  */
 int simulator_agent_invariant(simulator_agent_t sa);
 
+/**
+ * Add some message/log data that should be included in the generated report
+ * for this simulator.  The data is appended to any previous additions along
+ * with a newline if it does not have one.
+ *
+ * @param sa The simulator agent object where the data is kept.
+ * @param rdk The type of data being added.
+ * @param data The data to add, should just be ASCII text.
+ * @return Zero on success, -1 otherwise.
+ *
+ * @see send_report
+ */
 int add_report_data(simulator_agent_t sa,
 		    sa_report_data_kind_t rdk,
-		    char *data);
+		    char *data,
+		    unsigned long flags);
 
 #ifdef __cplusplus
 }
