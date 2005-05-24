@@ -899,6 +899,10 @@ sub doPortStatus($@) {
 	my ($port,$enabled,$up,$speed,$duplex) = @$portrecord;
         if (exists $ports{$port}) {
             $ports{$port} = "enabled=$enabled";
+            $ports{$port} .= ";speed=$speed";
+            if ($speed ne "autoDetect") {
+                $ports{$port} .= ";duplex=$duplex";
+            }
         }
     }
 
@@ -983,6 +987,36 @@ sub doRestorePortStatus($@) {
         $errors = $stack->portControl("disable",$port);
     }
 
+    #
+    # Set the speed and duplex on the port if given
+    #
+    my $speed = $params{speed};
+    if ($speed) {
+        if ($speed eq "autoDetect") {
+            $errors = $stack->portControl("auto",$port);
+        } else {
+            #
+            # Check for a valid speed - convert Mbps to mbit if necessary
+            #
+            if ($speed =~ /(\d+)(Mbps|mbit)/) {
+                $errors = $stack->portControl("${1}mbit",$port);
+            } else {
+                warn "*** WARNING: Bad speed given for $port: $speed\n";
+                $errors++;
+            }
+        }
+    }
+    my $duplex = $params{duplex};
+    if ($duplex) {
+        if ($duplex eq "half") {
+            $errors = $stack->portControl("half",$port);
+        } elsif ($duplex eq "full") {
+            $errors = $stack->portControl("full",$port);
+        } else {
+            warn "*** WARNING: Bad duplex given for $port: $duplex\n";
+            $errors++;
+        }
+    }
     return $errors;
 }
 
