@@ -107,6 +107,7 @@ REPLACE INTO event_objecttypes VALUES (10,'NODE');
 REPLACE INTO event_objecttypes VALUES (11,'SEQUENCE');
 REPLACE INTO event_objecttypes VALUES (12,'TIMELINE');
 REPLACE INTO event_objecttypes VALUES (13,'CONSOLE');
+REPLACE INTO event_objecttypes VALUES (14,'TOPOGRAPHY');
 
 --
 -- Dumping data for table `exported_tables`
@@ -588,7 +589,6 @@ REPLACE INTO table_regex VALUES ('virt_nodes','type','text','regex','^[-\\w]*$',
 REPLACE INTO table_regex VALUES ('virt_nodes','failureaction','text','regex','^(fatal|nonfatal|ignore)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','routertype','text','regex','^(none|ospf|static|manual|static-ddijk|static-old)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','fixed','text','regex','^[-\\w]*$',0,32,NULL);
-REPLACE INTO table_regex VALUES ('virt_nodes','numeric_id','int','redirect','default:int',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_programs','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -684,11 +684,6 @@ REPLACE INTO table_regex VALUES ('event_groups','agent_name','text','redirect','
 REPLACE INTO table_regex VALUES ('virt_lan_lans','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lan_lans','vname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_firewalls','pid','text','redirect','projects:pid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_firewalls','eid','text','redirect','experimenets:eid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|ipfw2|ipchains|ipfw2-vlan)$',0,0,NULL);
-REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','eid','text','redirect','experimenets:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('firewall_rules','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -696,11 +691,11 @@ REPLACE INTO table_regex VALUES ('firewall_rules','ruleno','int','redirect','def
 REPLACE INTO table_regex VALUES ('firewall_rules','rule','text','regex','^\\w[-\\w \\t,/\\{\\}\\(\\)!:\\.]*$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('virt_nodes','inner_elab_role','text','regex','^(boss|ops|node)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elab_in_elab','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('images','imageid','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',0,45,NULL);
 REPLACE INTO table_regex VALUES ('images','imagename','text','regex','^[a-zA-Z0-9][-\\w\\.+]+$',2,30,NULL);
 REPLACE INTO table_regex VALUES ('experiments','security_level','int','redirect','default:tinyuint',0,4,NULL);
 REPLACE INTO table_regex VALUES ('experiments','elabinelab_eid','text','redirect','experiments:eid',0,0,NULL);
-REPLACE INTO table_regex VALUES ('experiments','elabinelab_cvstag','text','regex','^[-\\w\\@\\/\\.]+$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_startloc','vname','text','redirect','virt_nodes:vname',0,0,NULL);
@@ -723,6 +718,12 @@ REPLACE INTO table_regex VALUES ('virt_tiptunnels','pid','text','redirect','proj
 REPLACE INTO table_regex VALUES ('virt_tiptunnels','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_tiptunnels','host','text','redirect','virt_nodes:vname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_tiptunnels','vnode','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_nodes','numeric_id','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','eid','text','redirect','experimenets:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','fwname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|ipfw2|ipchains|ipfw2-vlan)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
