@@ -379,7 +379,7 @@ public class RoboTrack extends JApplet {
     private BufferedImage scalebar_bimg;
     
     private class Map extends JPanel implements Runnable {
-        private Thread thread;
+        private Thread thread, daemon;
 
         public Map() {
 	    /*
@@ -562,6 +562,11 @@ public class RoboTrack extends JApplet {
 		    // Store these as strings for easy display.
 		    robbie.battery_voltage = 
 			FORMATTER.format(Float.parseFloat(val));
+
+		    // This causes a robot to look alive. 
+		    robbie.last_update   = System.currentTimeMillis();
+		    now.setTime(robbie.last_update);
+		    robbie.update_string = TIME_FORMAT.format(now);
 		}
 		else if (key.equals("BAT%")) {
 		    // Store these as strings for easy display.
@@ -569,9 +574,6 @@ public class RoboTrack extends JApplet {
 			FORMATTER.format(Float.parseFloat(val));
 		}
 	    }
-	    robbie.last_update   = System.currentTimeMillis();
-	    now.setTime(robbie.last_update);
-	    robbie.update_string = TIME_FORMAT.format(now);
 	}
 
         /*
@@ -713,14 +715,18 @@ public class RoboTrack extends JApplet {
 		if (!robbie.dragging)
 		    continue;
 
-		// Bounding box.
-		int rx1 = robbie.drag_x - (robbie.radius);
-		int ry1 = robbie.drag_y - (robbie.radius);
-		int rx2 = robbie.drag_x + (robbie.radius);
-		int ry2 = robbie.drag_y + (robbie.radius);
+		/*
+		 * Tim says that we only want to look to see if the
+		 * center of the circle the robot sweeps, overlaps
+		 * with an exclusion zone around an obstacle.
+		 */
+		int rx1 = robbie.drag_x;
+		int ry1 = robbie.drag_y;
+		int rx2 = robbie.drag_x;
+		int ry2 = robbie.drag_y;
 
-		//System.out.println("CheckforObstacles: " + rx1 + "," +
-		//                   ry1 + "," + rx2 + "," + ry2);
+		System.out.println("CheckforObstacles: " + rx1 + "," +
+		                   ry1 + "," + rx2 + "," + ry2);
 
 		/*
 		 * Check for overlap of this robot with each obstacle.
@@ -760,8 +766,8 @@ public class RoboTrack extends JApplet {
 			int ox2 = obstacle.x2 + OBSTACLE_BUFFER;
 			int oy2 = obstacle.y2 + OBSTACLE_BUFFER;
 
-			//System.out.println("  " + ox1 + "," +
-			//		   oy1 + "," + ox2 + "," + oy2);
+			System.out.println("  " + ox1 + "," +
+					   oy1 + "," + ox2 + "," + oy2);
 
 			if (! (oy2 < ry1 ||
 			       ry2 < oy1 ||
@@ -930,13 +936,17 @@ public class RoboTrack extends JApplet {
 	
 	public void drawRobot(Graphics2D g2,
 			      int x, int y, double or, String label,
-			      int dot_radius, int which) {
+			      int dot_radius, int which, boolean stale) {
 	    /*
 	     * An allocated robot is a filled circle.
 	     * A destination is an unfilled circle. So is a dragging robot.
 	     */
 	    if (which == DRAWROBOT_LOC) {
-		g2.setColor(Color.green);
+		if (stale)
+		    g2.setColor(Color.blue);
+		else
+		    g2.setColor(Color.green);
+		    
 		g2.fillOval(x - dot_radius, y - dot_radius,
 			    dot_radius * 2, dot_radius * 2);
 	    }
@@ -1077,9 +1087,10 @@ public class RoboTrack extends JApplet {
 
 		int x = robbie.x;
 		int y = robbie.y;
+		boolean stale = (robbie.last_update == 0);
 
 		drawRobot(g2, x, y, robbie.or, robbie.pname,
-			  (int) (robbie.size/2), DRAWROBOT_LOC);
+			  (int) (robbie.size/2), DRAWROBOT_LOC, stale);
 
 		/*
 		 * Okay, if the robot has a destination, draw that too
@@ -1090,7 +1101,7 @@ public class RoboTrack extends JApplet {
 		    int dy = robbie.dy;
 		    
 		    drawRobot(g2, dx, dy, robbie.dor, robbie.pname,
-			      robbie.size/2, DRAWROBOT_DST);
+			      robbie.size/2, DRAWROBOT_DST, false);
 
 		    /*
 		     * And draw a light grey line from source to dest.
@@ -1103,7 +1114,7 @@ public class RoboTrack extends JApplet {
 		    int dy = robbie.drag_y;
 		    
 		    drawRobot(g2, dx, dy, robbie.drag_or, robbie.pname,
-			      robbie.size/2, DRAWROBOT_DRAG);
+			      robbie.size/2, DRAWROBOT_DRAG, false);
 
 		    /*
 		     * And draw a red line from source to drag.
@@ -1133,18 +1144,58 @@ public class RoboTrack extends JApplet {
         }
     
         public void start() {
+            daemon = new Thread(this);
+            daemon.start();
             thread = new Thread(this);
             thread.start();
         }
     
         public synchronized void stop() {
             thread = null;
+            daemon = null;
         }
+
+	public void Daemon() {
+            Thread me = Thread.currentThread();
+	    
+	    System.out.println("Daemon Starting");
+	    while (me == daemon) {
+                try {
+                    me.sleep(1000);
+                }
+		catch (InterruptedException e)
+		{
+		    break;
+		}
+		long now = System.currentTimeMillis();
+		Enumeration e = robots.elements();
+
+		while (e.hasMoreElements()) {
+		    Robot robbie  = (Robot)e.nextElement();
+
+		    if (robbie.last_update == 0)
+			continue;
+
+		    if (now - robbie.last_update >= 10000) {
+			System.out.println(robbie.pname + " has gone stale");
+			robbie.last_update = 0;
+		    }
+		}
+		repaint();
+		maptable.repaint(10);
+	    }
+	    System.out.println("Daemon Stopping");
+	}
     
         public void run() {
             Thread me = Thread.currentThread();
 	    String str;
-	    long start_time = System.currentTimeMillis();
+
+	    // See if we are the daemon thread.
+	    if (me == daemon) {
+		Daemon();
+		return;
+	    }
 
 	    if (! shelled) {
 		System.out.println("Opening URL: " + robopipeurl.toString());
@@ -1170,11 +1221,6 @@ public class RoboTrack extends JApplet {
 		try
 		{
 		    while (null != ((str = input.readLine()))) {
-			long now  = System.currentTimeMillis();
-			long diff = (now - start_time) / 1000;
-
-			//System.out.println("" + diff);
-			
 			parseEvent(str);
 			repaint();
 			maptable.repaint(10);
@@ -1188,7 +1234,7 @@ public class RoboTrack extends JApplet {
 		    break;
 		}
                 try {
-                    thread.sleep(1000);
+                    me.sleep(1000);
                 }
 		catch (InterruptedException e)
 		{
