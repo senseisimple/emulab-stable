@@ -16,8 +16,12 @@ OURDOMAIN       = @OURDOMAIN@
 # This is silly. Needs to be done properly.
 TESTBED_NETWORK          = @TESTBED_NETWORK@
 EXTERNAL_TESTBED_NETWORK = @EXTERNAL_TESTBED_NETWORK@
-REVERSE_MAPNAME          = $(subst .0,,$(TESTBED_NETWORK))
-EXTERNAL_REVERSE_MAPNAME = $(subst .0,,$(EXTERNAL_TESTBED_NETWORK))
+
+REVERSE_MAPNAME          = \
+		$(shell echo @TESTBED_NETWORK@ | sed -e 's,.0$$,,')
+EXTERNAL_REVERSE_MAPNAME = \
+		$(shell echo @EXTERNAL_TESTBED_NETWORK@ | sed -e 's,.0$$,,')
+
 REVFILES                 = $(REVERSE_MAPNAME).db.head
 ifneq ($(REVERSE_MAPNAME), $(EXTERNAL_REVERSE_MAPNAME))
     REVFILES            .= $(REVFILES) $(EXTERNAL_REVERSE_MAPNAME).db.head
@@ -38,6 +42,7 @@ include $(OBJDIR)/Makeconf
 # configure if the .in file is changed.
 # 
 all: $(NAMED_FILES)
+	echo $(REVFILES)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
