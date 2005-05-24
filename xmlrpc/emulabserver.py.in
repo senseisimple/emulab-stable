@@ -3263,7 +3263,7 @@ class node:
 
         argstr = escapeshellarg(argdict["op"])
         argstr += " " + filename
-        argstr += " " + escapeshellarg(" ".join(argdict["nodes"]))
+        argstr += " " + " ".join(map(escapeshellarg,argdict["nodes"]))
 
         (exitval, output) = runcommand(TBDIR + "/bin/tbuisp " + argstr)
         if exitval:
