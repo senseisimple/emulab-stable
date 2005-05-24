@@ -358,7 +358,7 @@ sub callbackFunc($$$) {
 	    }
 	    elsif ($key eq "ROBOT" || $key eq "robot") {
 		if (exists($nodeids{$val})) {
-		    // Convert to phys nodeid.
+		    # Convert to phys nodeid.
 		    $val = $nodeids{$val};
 		}
 		push(@event, "ROBOT=$val");
