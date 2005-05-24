@@ -29,6 +29,7 @@
  *    point.
  *
  *  - Log failures, reporting the closest out-of-tolerance fiducial, if any.
+ *    Don't log "No Fiducial Visible" at night when the lights may be off.
  *
  *  - E-mail to testbed-robocops after failing solidly for some time.
  *    Only send during weekday operation hours, and back off exponentially.
@@ -432,6 +433,17 @@ int main(int argc, char *argv[])
 	    bad_checks = 0;
 	}
 	else {
+	    /* No alarms except during operating hours on week days. */
+	    char *now = timestamp();  /* E.g. "Thu Nov 24 18:22:48 1986\0" */
+	    int hour;
+	    if (sscanf(now,"%*s %*s %*d %d:", &hour) != 1)
+		fprintf(log_FILE,"***** Failed to parse hour from %s\n", now);
+	    int early = hour<alarm_start_hour, late = hour>=alarm_end_hour;
+	    int op_hrs = now[0]!='S' && !early && !late;	/* No weekends. */
+	    if (debug) printf("now %s, hour %d, early %d, late %d, op_hrs %d\n",
+			      now,hour,early,late,op_hrs);
+	    if (early || late) alarm_delay = alarm_threshold; /* Reset. */
+
 	    /* Log all errors. */
 	    char msg_buff[256];
 	    if (closest != FAR)
@@ -439,24 +451,15 @@ int main(int argc, char *argv[])
 			 "%s *** MISSED: closest (%f, %f), distance %f pixels.",
 			 timestamp(),close_x,close_y,closest);
 	    else
-		snprintf(msg_buff,256,
-			 "%s *** NO FIDUCIAL VISIBLE.",
-			 timestamp());
+		/* Don't log no fiducial at night when the lights may be off. */
+		if (op_hrs) 
+		    snprintf(msg_buff,256,
+			     "%s *** NO FIDUCIAL VISIBLE.",
+			     timestamp());
 	    fprintf(log_FILE,"%s\n",msg_buff);
 
-	    /* No alarms except during operating hours on week days. */
-	    char *now = timestamp();  /* E.g. "Thu Nov 24 18:22:48 1986\0" */
-	    int hour;
-	    if (sscanf(now,"%*s %*s %*d %d:", &hour) != 1)
-		fprintf(log_FILE,"***** Failed to parse hour from %s\n", now);
-	    int early = hour<alarm_start_hour, late = hour>=alarm_end_hour;
-	    int op_hr = now[0]!='S' && !early && !late;	/* No weekends. */
-	    if (debug) printf("now %s, hour %d, early %d, late %d, op_hr %d\n",
-			      now,hour,early,late,op_hr);
-	    if (early || late) alarm_delay = alarm_threshold; /* Reset. */
-
 	    /* Don't raise the alarm unless things have been bad for a while. */
-	    if (op_hr && bad_checks++ >= alarm_delay) {
+	    if (op_hrs && bad_checks++ >= alarm_delay) {
 		char mail_buff[256];
 		char *to = (debug?dbg_addr:alarm_addr);
 		snprintf(mail_buff,256,
