@@ -349,7 +349,8 @@ public class RoboTrack extends JApplet {
 	String  description;
 	boolean   dynamic   = false;	// A dynamically created Obstacle.
 	Rectangle rectangle = null;	// Only for dynamic obstacles.
-	Rectangle exclusion = null;	// Ditto, for the grey area. 
+	Rectangle exclusion = null;	// Ditto, for the grey area.
+	String    robbie    = null;     // Set to nodeid if a robot obstacle.
     }
     Vector	Obstacles = new Vector(10, 10);
     Dictionary  ObDynMap  = new Hashtable();	// Temp Obstacles only.
@@ -585,6 +586,7 @@ public class RoboTrack extends JApplet {
 	    int		index;
 	    String	action = "";
 	    int		x1 = 0, y1 = 0, x2 = 0, y2 = 0, id;
+	    String      robotag = null;
 
 	    id = Integer.parseInt(obid);
 
@@ -616,6 +618,9 @@ public class RoboTrack extends JApplet {
 		else if (key.equals("YMAX")) {
 		    y2 = Integer.parseInt(val);
 		}
+		else if (key.equals("ROBOT")) {
+		    robotag = val;
+		}
 	    }
 	    if (action.equals("CREATE")) {
 		// Is this (left over ID) going to happen? Remove old one.
@@ -625,13 +630,14 @@ public class RoboTrack extends JApplet {
 		}
 		// Must delay insert until the new Obstacle is initialized
 		oby = new Obstacle();
-		
+
 		oby.id = id;
 		oby.x1 = x1;
 		oby.y1 = y1;
 		oby.x2 = x2;
 		oby.y2 = y2;
 		oby.description = "Dynamic Obstacle";
+		oby.robbie      = robotag;
 		oby.dynamic     = true;
 		oby.rectangle   = new Rectangle(x1, y1, x2-x1, y2-y1);
 		oby.exclusion   = new Rectangle(x1 - OBSTACLE_BUFFER,
@@ -725,8 +731,8 @@ public class RoboTrack extends JApplet {
 		int rx2 = robbie.drag_x;
 		int ry2 = robbie.drag_y;
 
-		System.out.println("CheckforObstacles: " + rx1 + "," +
-		                   ry1 + "," + rx2 + "," + ry2);
+		//System.out.println("CheckforObstacles: " + rx1 + "," +
+		//                   ry1 + "," + rx2 + "," + ry2);
 
 		/*
 		 * Check for overlap of this robot with each obstacle.
@@ -761,13 +767,23 @@ public class RoboTrack extends JApplet {
 		    while (e.hasMoreElements()) {
 			Obstacle obstacle = (Obstacle)e.nextElement();
 
+			/*
+			 * Skip this Obstacle if its a robot Obstacle
+			 * that was generated on the fly, and it refers
+			 * to our self.
+			 */
+			if (obstacle.robbie != null &&
+			    obstacle.robbie.equals(robbie.pname)) {
+			    continue;
+			}
+
 			int ox1 = obstacle.x1 - OBSTACLE_BUFFER;
 			int oy1 = obstacle.y1 - OBSTACLE_BUFFER;
 			int ox2 = obstacle.x2 + OBSTACLE_BUFFER;
 			int oy2 = obstacle.y2 + OBSTACLE_BUFFER;
 
-			System.out.println("  " + ox1 + "," +
-					   oy1 + "," + ox2 + "," + oy2);
+			//System.out.println("  " + ox1 + "," +
+			//		   oy1 + "," + ox2 + "," + oy2);
 
 			if (! (oy2 < ry1 ||
 			       ry2 < oy1 ||

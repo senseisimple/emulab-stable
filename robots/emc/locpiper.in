@@ -356,6 +356,13 @@ sub callbackFunc($$$) {
 		$val = int($val * $PPM);
 		push(@event, "YMAX=$val");
 	    }
+	    elsif ($key eq "ROBOT" || $key eq "robot") {
+		if (exists($nodeids{$val})) {
+		    // Convert to phys nodeid.
+		    $val = $nodeids{$val};
+		}
+		push(@event, "ROBOT=$val");
+	    }
 	}
 	my $evstr = "TYPE=AREA,ID=$id,ACTION=$evtype";
 	$evstr .= "," . join("," ,@event)
