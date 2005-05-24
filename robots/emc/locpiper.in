@@ -18,13 +18,18 @@ use Time::HiRes qw(gettimeofday);
 sub usage()
 {
     print(STDOUT
-	  "Usage: locpiper [-d] [-k] pid eid\n" .
+	  "Usage: locpiper [-d] [-k] [-n] [-f] pid eid\n" .
 	  "switches and arguments:\n".
-	  "-d      - Debug mode, use to prevent daemonization\n");
+	  "-k      - Kill running locpiper for experiment pid/eid (swapout)\n".
+	  "-d      - Debug mode, turns on lots of output.\n".
+	  "-n      - Impotent mode, do not update the DB as events arrive.\n".
+	  "-f      - Foreground mode, turns off daemonization.\n".
+	  "<pid>   - The project the experiment belongs to\n".
+	  "<eid>   - The experiment name (id)\n");
     exit(-1);
 }
-my $optlist  = "dk";
-my $debug    = 0;
+my $optlist  = "dkfn";
+my $debug    = 3;
 my $impotent = 0;
 my $daemon   = 1;
 my $killmode = 0;
@@ -65,6 +70,7 @@ my $loop_count = 0;
 my $query_result;
 my $locpiperpid;
 my $starttime  = 0;
+my $sock;
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -76,6 +82,12 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug++;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (defined($options{"f"})) {
+    $daemon = 0;
 }
 if (defined($options{"k"})) {
     $killmode = 1;
@@ -212,6 +224,14 @@ if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
 }
 
 %$tuple = ( expt      => "$pid/$eid",
+	    objtype   => 'TOPOGRAPHY',
+	    eventtype => 'CREATE,MODIFY,CLEAR');
+
+if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
+    fatal("Could not subscribe to TOPOGRAPHY events!");
+}
+
+%$tuple = ( expt      => "$pid/$eid",
 	    objtype   => 'NODE',
 	    eventtype => 'COMPLETE',
 	    scheduler => 1);
@@ -227,24 +247,41 @@ if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
 # more adhoc. We set the main socket to non-blocking so that we can
 # just query it for new connections. 
 # 
-my $sock = IO::Socket::INET->new(Listen    => 10,
-				 LocalAddr => 'localhost',
-				 LocalPort => 9005,
-				 Reuse     => 1,
-				 Proto     => 'tcp');
+$sock = IO::Socket::INET->new(Listen    => 10,
+			      LocalAddr => 'localhost',
+			      LocalPort => 9006,
+			      Reuse     => 1,
+			      Proto     => 'tcp');
+fatal("Could not create socket!")
+    if (!defined($sock));
+
+DBQueryWarn("update experiments set ".
+	    "locpiper_port='" . $sock->sockport() . "' ".
+	    "where pid='$pid' and eid='$eid'")
+    or fatal("Cannot update DB with locpiper_port!");
 
 fcntl($sock, F_SETFL, O_NONBLOCK) 
     or fatal("Cannot set non blocking on socket: $!");
 
 while (1) {
-    my ($newsock,$peeraddr) = $sock->accept();
-    if (defined($newsock)) {
+    my $newsock;
+    my $newconn = 0;
+    
+    while (($newsock = $sock->accept())) {
 	my $tag = $newsock->peerhost . ":" . $newsock->peerport();
 
 	print "Connection from $tag at " . TBTimeStamp() . "\n";
 	$clients{$tag} = $newsock;
 	$newsock->autoflush(1);
+	$newconn++;
     }
+    #
+    # We need to *something* to brand new connections to keep the client
+    # from timing out (happens on my desktop).
+    #
+    SendBatteryData()
+	if ($newconn);
+    
     event_poll_blocking($handle, 1000);
 
     #
@@ -252,35 +289,10 @@ while (1) {
     # and send them as an event. I might end up changing things so that
     # tmcd generates a real event when these come in, but sending the
     # battery data in real time is not quite so important.
-    # 
+    #
     $loop_count++;
     if ($loop_count > 60) {
-	$query_result =
-	    DBQueryWarn("select r.node_id,n.battery_voltage, ".
-			"       n.battery_percentage ".
-			" from reserved as r ".
-			"left join nodes as n on n.node_id=r.node_id ".
-			"where ".
-			($debug ? "" :
-			 " r.pid='$pid' and r.eid='$eid' and ") .
-			"      n.battery_voltage is not NULL ");
-	if ($query_result) {
-	    #
-	    # Get a (relative) timestamp for the event.
-	    # 
-	    my ($seconds, $microseconds) = gettimeofday();
-	    if (! $starttime) {
-		$starttime = $seconds;
-	    }
-	    $seconds -= $starttime;
-	    
-	    while (my ($nodeid,$voltage,$percentage) =
-		   $query_result->fetchrow_array()) {
-	    
-		ForwardEvent($nodeid, "$seconds:$microseconds",
-			     "BATV=$voltage,BAT%=$percentage");
-	    }
-	}
+	SendBatteryData();
 	$loop_count = 0;
     }
 }
@@ -291,16 +303,12 @@ while (1) {
 sub callbackFunc($$$) {
     my ($handle,$notification,$data) = @_;
 
-    my $vname  = event_notification_get_objname($handle, $notification);
-    my $evtype = event_notification_get_eventtype($handle, $notification);
+    my $vname   = event_notification_get_objname($handle, $notification);
+    my $objtype = event_notification_get_objtype($handle, $notification);
+    my $evtype  = event_notification_get_eventtype($handle, $notification);
 
-    print "Got event for $vname\n"
+    print "Got event ($objtype,$evtype) for $vname\n"
 	if ($debug);
-
-    return
-	if (! exists($nodeids{$vname}));
-    
-    my $nodeid = $nodeids{$vname};
 
     #
     # Get a (relative) timestamp for the event.
@@ -311,6 +319,51 @@ sub callbackFunc($$$) {
     }
     $seconds -= $starttime;
 
+    if ($objtype eq "TOPOGRAPHY") {
+	my $args = event_notification_get_arguments($handle, $notification);
+	my @event = ();
+	my $id;
+
+	foreach my $keyval (split(' ', $args)) {
+	    my ($key, $val) = split('=', $keyval);
+
+	    return
+		if (! ($val =~ /^[-\w\.]+$/));
+
+	    if ($key eq "ID" || $key eq "is") {
+		$id = $val;
+	    }
+	    elsif ($key eq "XMIN" || $key eq "xmin") {
+		$val = int($val * $PPM);
+		push(@event, "XMIN=$val");
+	    }
+	    elsif ($key eq "XMAX" || $key eq "xmax") {
+		$val = int($val * $PPM);
+		push(@event, "XMAX=$val");
+	    }
+	    elsif ($key eq "YMIN" || $key eq "ymin") {
+		$val = int($val * $PPM);
+		push(@event, "YMIN=$val");
+	    }
+	    elsif ($key eq "YMAX" || $key eq "ymax") {
+		$val = int($val * $PPM);
+		push(@event, "YMAX=$val");
+	    }
+	}
+	my $evstr = "TYPE=AREA,ID=$id,ACTION=$evtype";
+	$evstr .= "," . join("," ,@event)
+	    if (@event);
+	
+	ForwardEvent("$seconds:$microseconds", $evstr);
+	return;
+    }
+
+    # Must be for a node then.
+    return
+	if (! exists($nodeids{$vname}));
+    
+    my $nodeid = $nodeids{$vname};
+
     if ($evtype eq "COMPLETE") {
 	DBQueryWarn("update nodes set ".
 		    "  destination_x=NULL,".
@@ -319,8 +372,8 @@ sub callbackFunc($$$) {
 		    "where node_id='$nodeid'")
 	    if (!$impotent);
 	
-	ForwardEvent($nodeid, "$seconds:$microseconds",
-		     "DX=NULL,DY=NULL,DOR=NULL");
+	ForwardEvent("$seconds:$microseconds",
+		     "TYPE=NODE,ID=$nodeid,DX=NULL,DY=NULL,DOR=NULL");
 	return;
     }
     if ($evtype eq "SETDEST") {
@@ -367,7 +420,8 @@ sub callbackFunc($$$) {
 		    "where node_id='$nodeid'")
 	    if (!$impotent);
 	
-	ForwardEvent($nodeid, "$seconds:$microseconds", join("," ,@event));
+	ForwardEvent("$seconds:$microseconds",
+		     "TYPE=NODE,ID=$nodeid," . join("," ,@event));
 	return;
     }
     if ($evtype eq "MODIFY") {
@@ -406,26 +460,61 @@ sub callbackFunc($$$) {
 		    "where node_id='$nodeid'")
 	    if (!$impotent);
 	
-	ForwardEvent($nodeid, "$seconds:$microseconds", join("," ,@event));
+	ForwardEvent("$seconds:$microseconds",
+		     "TYPE=NODE,ID=$nodeid," . join("," ,@event));
 	return;
+    }
+}
+
+#
+# Send battery data.
+#
+sub SendBatteryData()
+{
+    my $query_result =
+	DBQueryWarn("select r.node_id,n.battery_voltage, ".
+		    "       n.battery_percentage ".
+		    " from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "where ".
+		    ($debug ? "" :
+		     " r.pid='$pid' and r.eid='$eid' and ") .
+		    "      n.battery_voltage is not NULL ");
+    if ($query_result) {
+	#
+	# Get a (relative) timestamp for the event.
+	# 
+	my ($seconds, $microseconds) = gettimeofday();
+	if (! $starttime) {
+	    $starttime = $seconds;
+	}
+	$seconds -= $starttime;
+	    
+	while (my ($nodeid,$voltage,$percentage) =
+	       $query_result->fetchrow_array()) {
+	    
+	    ForwardEvent("$seconds:$microseconds",
+		"TYPE=NODE,ID=$nodeid,BATV=$voltage,BAT%=$percentage");
+	}
     }
 }
 
 #
 # Send the translated event to all of the clients that are listening.
 #
-sub ForwardEvent($$$)
+sub ForwardEvent($$)
 {
-    my ($nodeid, $stamp, $event) = @_;
-    $eventstr = "${nodeid} ${event}\n";
+    my ($stamp, $event) = @_;
 
-    print "Forwarding event: '$nodeid $stamp $event'\n"
+    print "Forwarding event: '$stamp $event'\n"
 	if ($debug > 1);
+
+    $event .= "\n";
     
     foreach my $client (keys(%clients)) {
 	my $sock = $clients{$client};
 
-	if (! $sock->write($eventstr, length($eventstr))) {
+	if (! $sock->write($event, length($event))) {
 	    print "Dropped $client at " . TBTimeStamp() . "\n";
 	    delete($clients{$client});
 	}
@@ -433,7 +522,7 @@ sub ForwardEvent($$$)
     #
     # Now dump it to the file.
     #
-    print EVFILE "$stamp $nodeid $event\n";
+    print EVFILE "$stamp $event\n";
 }
 
 #

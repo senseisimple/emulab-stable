@@ -79,10 +79,11 @@ function SPEWCLEANUP()
     fclose($socket);
     exit();
 }
-# ignore_user_abort(1);
+#ignore_user_abort(1);
+set_time_limit(0);
 register_shutdown_function("SPEWCLEANUP");
 
-$socket = fsockopen("localhost", 9005);
+$socket = fsockopen("localhost", 9006);
 if (!$socket) {
     TBERROR("Error opening locpiper socket - $errstr",1);
 }

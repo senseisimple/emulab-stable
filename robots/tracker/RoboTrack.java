@@ -347,8 +347,14 @@ public class RoboTrack extends JApplet {
         int	x1, y1;			// Upper left x,y coords in pixels.
         int	x2, y2;			// Lower right x,y coords in pixels.
 	String  description;
+	boolean   dynamic   = false;	// A dynamically created Obstacle.
+	Rectangle rectangle = null;	// Only for dynamic obstacles.
+	Rectangle exclusion = null;	// Ditto, for the grey area. 
     }
     Vector	Obstacles = new Vector(10, 10);
+    Dictionary  ObDynMap  = new Hashtable();	// Temp Obstacles only.
+    int		ObCount   = 0;
+    int		OBSTACLE_BUFFER = 23;	// XXX
 
     /*
      * A container for camera information. 
@@ -364,6 +370,10 @@ public class RoboTrack extends JApplet {
     int FONT_HEIGHT = 14;
     int FONT_WIDTH  = 6;
     Font OurFont    = null;
+
+    // For exclusion zone.
+    Composite ExclusionComposite;
+    Stroke    ExclusionStroke;
 
     // A little bufferedimage to hold (cache) the scale bar.
     private BufferedImage scalebar_bimg;
@@ -383,6 +393,11 @@ public class RoboTrack extends JApplet {
 
 	    OurFont = new Font("Arial", Font.PLAIN, 14);
 	    createScale();
+
+	    ExclusionComposite = AlphaComposite.
+		getInstance(AlphaComposite.SRC_OVER, 0.15f);
+
+	    ExclusionStroke = new BasicStroke(1.5f);
         }
 
 	/*
@@ -403,30 +418,64 @@ public class RoboTrack extends JApplet {
 
 	/*
 	 * Parse the data returned by the web server. This is bogus; we
-	 * should create an XML representation of it!
+	 * should create an XML representation of it, but thats a lot of
+	 * extra overhead, and I anticipate a lot of events!
 	 */
-	public void parseRobot(String str) {
-	    StringTokenizer tokens;
-	    String nodeid;
-	    Robot robbie;
-	    int index, ch;
+	public void parseEvent(String str) {
+	    StringTokenizer	tokens;
+	    String		id, type, tmp, key;
+	    int			ch, delim;
 
 	    System.out.println(str);
 
 	    //
-	    // nodeid X=1,Y=2, ...
+	    // TYPE=XXX,ID=YYY,X=1,Y=2, ...
 	    //
-	    ch = str.indexOf(' ');
-	    nodeid = str.substring(0, ch);
-	    str    = str.substring(ch+1);
 	    tokens = new StringTokenizer(str, ",");
+
+	    tmp   = tokens.nextToken().trim();
+	    delim = tmp.indexOf('=');
+
+	    if (delim < 0)
+		return;
+	    
+	    key  = tmp.substring(0, delim);
+	    type = tmp.substring(delim+1);
+	    if (! key.equals("TYPE"))
+		return;
+
+	    tmp   = tokens.nextToken().trim();
+	    delim = tmp.indexOf('=');
+
+	    if (delim < 0)
+		return;
+	    
+	    key  = tmp.substring(0, delim);
+	    id   = tmp.substring(delim+1);
+	    if (! key.equals("ID"))
+		return;
+
+	    if (type.equals("NODE")) {
+		parseRobot(id, tokens);
+	    }
+	    else if (type.equals("AREA")) {
+		parseObstacle(id, tokens);
+	    }
+	}
+
+        /*
+	 * Parse a robot event.
+	 */
+	public void parseRobot(String nodeid, StringTokenizer tokens) {
+	    Robot robbie;
+	    int index;
 
 	    if ((robbie = (Robot) robots.get(nodeid)) == null) {
 		// For testing from the shell.
 		if (!shelled)
 		    return;
 		
-		robbie           = new Robot();
+ 		robbie           = new Robot();
 		index            = robotcount++;
 		robbie.index     = index;
 		robbie.pname     = nodeid;
@@ -450,8 +499,9 @@ public class RoboTrack extends JApplet {
 		String tmp = tokens.nextToken().trim();
 		int delim  = tmp.indexOf('=');
 
-		if (delim < 0)
+		if (delim < 0) {
 		    continue;
+		}
 
 		String key = tmp.substring(0, delim);
 		String val = tmp.substring(delim+1);
@@ -474,6 +524,10 @@ public class RoboTrack extends JApplet {
 		    if (val.equals("NULL")) {
 			robbie.dx = 0;
 			robbie.dx_meters  = "";
+			robbie.dy = 0;
+			robbie.dy_meters  = "";
+			robbie.dor = 500.0;
+			robbie.dor_string = "";
 			robbie.gotdest = false;
 		    }
 		    else {
@@ -520,6 +574,103 @@ public class RoboTrack extends JApplet {
 	    robbie.update_string = TIME_FORMAT.format(now);
 	}
 
+        /*
+	 * Parse an obstacle event. We create, destroy, and modify temp
+	 * obstacles so that the user notices them.
+	 */
+	public void parseObstacle(String obid, StringTokenizer tokens) {
+	    Obstacle	oby;
+	    int		index;
+	    String	action = "";
+	    int		x1 = 0, y1 = 0, x2 = 0, y2 = 0, id;
+
+	    id = Integer.parseInt(obid);
+
+	    // We either know about it, or we do not ...
+	    oby = (Obstacle) ObDynMap.get(obid);
+
+	    while (tokens.hasMoreTokens()) {
+		String tmp = tokens.nextToken().trim();
+		int delim  = tmp.indexOf('=');
+
+		if (delim < 0)
+		    continue;
+
+		String key = tmp.substring(0, delim);
+		String val = tmp.substring(delim+1);
+
+		if (key.equals("ACTION")) {
+		    action = val;
+		}
+		else if (key.equals("XMIN")) {
+		    x1 = Integer.parseInt(val);
+		}
+		else if (key.equals("XMAX")) {
+		    x2 = Integer.parseInt(val);
+		}
+		else if (key.equals("YMIN")) {
+		    y1 = Integer.parseInt(val);
+		}
+		else if (key.equals("YMAX")) {
+		    y2 = Integer.parseInt(val);
+		}
+	    }
+	    if (action.equals("CREATE")) {
+		// Is this (left over ID) going to happen? Remove old one.
+		// We do not want a partly initialized Obstacle in the list!
+		if (oby != null) {
+		    ObDynMap.remove(obid);
+		}
+		// Must delay insert until the new Obstacle is initialized
+		oby = new Obstacle();
+		
+		oby.id = id;
+		oby.x1 = x1;
+		oby.y1 = y1;
+		oby.x2 = x2;
+		oby.y2 = y2;
+		oby.description = "Dynamic Obstacle";
+		oby.dynamic     = true;
+		oby.rectangle   = new Rectangle(x1, y1, x2-x1, y2-y1);
+		oby.exclusion   = new Rectangle(x1 - OBSTACLE_BUFFER,
+					y1 - OBSTACLE_BUFFER,
+					(x2 + OBSTACLE_BUFFER) -
+						(x1 - OBSTACLE_BUFFER),
+					(y2 + OBSTACLE_BUFFER) -
+						(y1 - OBSTACLE_BUFFER));
+
+		System.out.println("Creating Obstacle: " + id);
+		ObDynMap.put(obid, oby);
+	    }
+	    else if (action.equals("CLEAR")) {
+		if (oby != null) {
+		    System.out.println("Clearing Obstacle: " + id);
+		    
+		    ObDynMap.remove(obid);
+		}
+	    }
+	    else if (action.equals("MODIFY")) {
+		// Can this happen?
+		if (oby == null) {
+		    return;
+		}
+
+		oby.x1 = x1;
+		oby.y1 = y1;
+		oby.x2 = x2;
+		oby.y2 = y2;
+		oby.rectangle = new Rectangle(x1, y1, x2-x1, y2-y1);
+		oby.exclusion = new Rectangle(x1 - OBSTACLE_BUFFER,
+					y1 - OBSTACLE_BUFFER,
+					(x2 + OBSTACLE_BUFFER) -
+						(x1 - OBSTACLE_BUFFER),
+					(y2 + OBSTACLE_BUFFER) -
+						(y1 - OBSTACLE_BUFFER));
+
+		System.out.println("Modifying Obstacle: " + id);
+	    }
+	}
+
 	/*
 	 * Given an x,y from a button click, try to map the coords
 	 * to a robot that has been drawn on the screen. There are
@@ -550,11 +701,9 @@ public class RoboTrack extends JApplet {
 	 *
 	 * XXX I am treating the robot as a square! Easier to calculate.
 	 *
-	 * XXX The value below (OBSTACLE_BUFFER) is hardwired in floormap
+	 * XXX The value of OBSTACLE_BUFFER is hardwired in floormap
 	 *     code (where the base image is generated).
 	 */
-	int OBSTACLE_BUFFER = 23;
-	
 	public boolean CheckforObstacles() {
 	    Enumeration robot_enum = robots.elements();
 
@@ -585,7 +734,7 @@ public class RoboTrack extends JApplet {
 		    int oy2 = obstacle.y2 + OBSTACLE_BUFFER;
 
 		    //System.out.println("  " + ox1 + "," +
-		    //		       oy1 + "," + ox2 + "," + cy2);
+		    //		       oy1 + "," + ox2 + "," + oy2);
 
 		    if (! (oy2 < ry1 ||
 			   ry2 < oy1 ||
@@ -594,6 +743,35 @@ public class RoboTrack extends JApplet {
 			MyDialog("Collision",
 				 robbie.pname + " overlaps with an obstacle");
 			return true;
+		    }
+		}
+
+		/*
+		 * Check Dynamic obstacles also.
+		 */
+		if (ObDynMap.size() > 0) {
+		    Enumeration e = ObDynMap.elements();
+
+		    while (e.hasMoreElements()) {
+			Obstacle obstacle = (Obstacle)e.nextElement();
+
+			int ox1 = obstacle.x1 - OBSTACLE_BUFFER;
+			int oy1 = obstacle.y1 - OBSTACLE_BUFFER;
+			int ox2 = obstacle.x2 + OBSTACLE_BUFFER;
+			int oy2 = obstacle.y2 + OBSTACLE_BUFFER;
+
+			//System.out.println("  " + ox1 + "," +
+			//		   oy1 + "," + ox2 + "," + oy2);
+
+			if (! (oy2 < ry1 ||
+			       ry2 < oy1 ||
+			       ox2 < rx1 ||
+			       rx2 < ox1)) {
+			    MyDialog("Collision",
+				     robbie.pname +
+				     " overlaps with a dynamic obstacle");
+			    return true;
+			}
 		    }
 		}
 	    }
@@ -859,6 +1037,35 @@ public class RoboTrack extends JApplet {
 
 	    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 				RenderingHints.VALUE_ANTIALIAS_ON);
+
+	    /*
+	     * Dyamnic obstacles first
+	     */
+	    if (ObDynMap.size() > 0) {
+		Enumeration e = ObDynMap.elements();
+		Composite   savedcomposite = g2.getComposite();
+		Stroke      savedstroke    = g2.getStroke();
+
+		g2.setPaint(Color.black);
+		g2.setComposite(ExclusionComposite);
+		g2.setStroke(ExclusionStroke);
+		g2.setColor(Color.blue);
+
+		while (e.hasMoreElements()) {
+		    Obstacle  oby  = (Obstacle)e.nextElement();
+		    Rectangle rectangle = oby.rectangle;
+		    Rectangle exclusion = oby.exclusion;
+
+		    if (rectangle != null) {
+			g2.draw(rectangle);
+		    }
+		    if (exclusion != null) {
+			g2.fill(exclusion);
+		    }
+		}
+		g2.setComposite(savedcomposite);
+		g2.setStroke(savedstroke);
+	    }
 	    
 	    /*
 	     * Then we draw a bunch of stuff on it, like the robots.
@@ -968,7 +1175,7 @@ public class RoboTrack extends JApplet {
 
 			//System.out.println("" + diff);
 			
-			parseRobot(str);
+			parseEvent(str);
 			repaint();
 			maptable.repaint(10);
 			if (thread == null)
@@ -1666,7 +1873,6 @@ public class RoboTrack extends JApplet {
 	    URLConnection	urlConn;
 	    InputStream		is;
 	    String		str;
-	    int			index = 0;
 	    
 	    urlConn = url.openConnection();
 	    urlConn.setDoInput(true);
@@ -1706,7 +1912,7 @@ public class RoboTrack extends JApplet {
 		     * pixels_per_meter);
 		obstacle.description = tokens.nextToken().trim();
 
-		Obstacles.insertElementAt(obstacle, index++);
+		Obstacles.insertElementAt(obstacle, ObCount++);
 	    }
 	    is.close();
 	}
