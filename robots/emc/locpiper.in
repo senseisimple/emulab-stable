@@ -29,7 +29,7 @@ sub usage()
     exit(-1);
 }
 my $optlist  = "dkfn";
-my $debug    = 3;
+my $debug    = 0;
 my $impotent = 0;
 my $daemon   = 1;
 my $killmode = 0;
