@@ -1,0 +1,39 @@
+#! /bin/sh
+
+# chkconfig: 2345 30 90
+# description: Vision master control client software.
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+PORTBASE=6100
+CAMERAS="0 1 2 3"
+
+case "$1" in
+start)
+	for cam in $CAMERAS; do
+		/usr/testbed/sbin/vmc-client -d -p $PORTBASE \
+			`cat /etc/vmc-client/client.$cam` \
+			/tmp/mezz_instance/dev/video${cam}.ipc \
+			> /var/log/vmc-client.$cam.log 2>&1 &
+		echo $! > /var/run/vmc-client.$cam.pid
+		PORTBASE=`expr $PORTBASE + 1`
+	done
+        ;;
+stop)
+	for cam in $CAMERAS; do
+		kill `cat /var/run/vmc-client.$cam.pid`
+		rm /var/run/vmc-client.$cam.pid
+	done
+        ;;
+restart)
+	$0 stop
+	$0 start
+	;;
+*)
+        echo "Usage: `basename $0` {start|stop|restart}" >&2
+        ;;
+esac
+
+exit 0
+

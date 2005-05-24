@@ -1,0 +1,40 @@
+#! /bin/sh
+
+# chkconfig: 2345 30 90
+# description: Vision camera checker software.
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+PORTBASE=6100
+CAMERAS="0 1 2 3"
+
+case "$1" in
+start)
+	for cam in $CAMERAS; do
+		mezzopt=/etc/mezzanine/mezzanine.opt.camera$cam
+        	mezzvid=/tmp/mezz_instance/dev/video$cam.ipc
+        	checklog=/var/log/check.camera$cam.log
+		/usr/testbed/sbin/camera_checker \
+		 -C $cam -f $mezzopt -F $checklog $mezzvid -m fish@cs.utah.edu 2>&1 &
+		echo $! > /var/run/camera_checker.$cam.pid
+		PORTBASE=`expr $PORTBASE + 1`
+	done
+        ;;
+stop)
+	for cam in $CAMERAS; do
+		kill `cat /var/run/camera_checker.$cam.pid`
+		rm /var/run/camera_checker.$cam.pid
+	done
+        ;;
+restart)
+	$0 stop
+	$0 start
+	;;
+*)
+        echo "Usage: `basename $0` {start|stop|restart}" >&2
+        ;;
+esac
+
+exit 0
+
