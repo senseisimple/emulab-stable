@@ -75,46 +75,63 @@ static void sigusr1(int signal)
 }
 
 static char *alarm_addr = "testbed-robocops@flux.utah.edu";
-static char *dbg_addr = "$USER@flux.cs.utah.edu";
+/* Can't use $USER while debugging, sudo sets it to root. */
+static char *dbg_addr = "fish@cs.utah.edu";
+
+int got_ctr = 0;	    /* Required camera center pt from option file. */
+int got_chk = 0;	    /* Optional camera check pt from option file. */
+#define NPTS 2
+char *pt_names[NPTS] = {"Center point","Check point"} ;
+#define CTR_PT 0
+#define CHK_PT 1
+int pts[NPTS][2];		    /* Pixel coords of option file points. */
+#define X 0
+#define Y 1
 
 /* Command-line args. */
 static int debug = 0;
-static char *cam_num = NULL;		/* Camera number for messages. */
+static int show_all_fids = 0;	    /* Print all visible fiducial locs. */
 
-static char *option_file = NULL;	/* Mezzanine option file for camera. */
-int ctr_x = 0, ctr_y = 0;	/* Camera center pt in pixels from optfile. */
-static char *log_file = NULL;		/* Logfile to append to. */
+static char *cam_num = NULL;	    /* Camera number for messages. */
+static char *option_file = NULL;    /* Mezzanine option file for camera. */
+static char *log_file = NULL;	    /* Logfile to append to. */
 static FILE *option_FILE, *log_FILE;
-static char *mezz_file = NULL;		/* Mezzanine IPC file  */
+static char *mezz_file = NULL;	    /* Mezzanine IPC file  */
 
-static int num_frames = 5;		/* Number of frames to average. */
-static int frame_interval = 1;		/* Frames to skip in between. */
-static int error_threshold = 5;		/* Pixel error before alarm. */
-static int check_secs = 60;		/* Delay between checks. */
-static int log_skip = 60;		/* Good checks to skip between logs. */
-static int alarm_threshold = 10;	/* How many bad checks before alarm. */
-static int alarm_start_hour = 8;	/* Beginning of daily operation time. */
-static int alarm_end_hour = 18;		/* End of daily operation time. */
+static int num_frames = 5;	    /* Number of frames to average. */
+static int frame_interval = 1;	    /* Frames to skip in between. */
+static int error_threshold = 5;	    /* Pixel error before alarm. */
+static int check_secs = 60;	    /* Delay between checks. */
+static int log_skip = 60;	    /* Good checks to skip between logs. */
+
+static int alarm_threshold = 10;    /* How many bad checks before alarm. */
+static int alarm_start_hour = 8;    /* Beginning of daily operation time. */
+static int alarm_end_hour = 18;	    /* End of daily operation time. */
 static float alarm_backoff_exponent=3.0; /* Multiplier for alarm threshold. */
 
 void usage() {
-    printf("camera_checker [-d] -C cam_num -f mezz_opt_file [-F logfile]\n");
+    printf("camera_checker [-da] -C cam_num -f mezz_opt_file [-F logfile]\n");
   printf("	[-i skip_frames] [-n num_frames]\n");
   printf("	[-e error_threshold] [-c check_secs] [-l log_skip]\n");
-  printf("	[-a alarm_threshold] [-m alarm_mail_addr]\n");
+  printf("	[-A alarm_threshold] [-M alarm_mail_addr]\n");
   printf("	[-S alarm_start_hour] [-E alarm_end_hour]\n");
   printf("	[-B alarm_backoff_exponent] mezz_ipc_file\n");
 }
 
-static char tsbuff[256];
+#define LITTLE_BUFSIZ 256
+static char tsbuff[LITTLE_BUFSIZ];
 char *timestamp() {
     time_t now;
     time(&now);
     char * t = ctime(&now);	/* Fixed format: Thu Nov 24 18:22:48 1986\n\0 */
     t[24] = '\0';			/* Kill the newline. */
-    snprintf(tsbuff,256,(cam_num?"[%s camera %s]":"[%s]"),t,cam_num);
+    snprintf(tsbuff,LITTLE_BUFSIZ,(cam_num?"[%s camera %s]":"[%s]"),t,cam_num);
     return tsbuff;
 }
+
+/* Last-known-good time for e-mail. */
+static char *good_ts = "[Never]";
+static char good_ts_buff[LITTLE_BUFSIZ];
 
 int main(int argc, char *argv[])
 {
@@ -122,19 +139,23 @@ int main(int argc, char *argv[])
     mezz_mmap_t *mezzmap = NULL;
     struct sigaction sa;
 
-    while ((c = getopt(argc, argv, "dC:f:F:n:i:e:c:l:a:m:S:E:B:")) != -1) {
+    while ((c = getopt(argc, argv, "daC:f:F:i:n:e:c:l:A:M:S:E:B:")) != -1) {
         switch (c) {
         case 'd':
             debug = 1;
 	    check_secs = 1;
 	    log_skip = 1;
-	case 'f':
-	    // mezzanine.opt.cameraN file, to get dewarp.cameraCenter parameters.
-	    option_file = optarg;
+	    break;
+        case 'a':
+	    show_all_fids = 1;
 	    break;
         case 'C':
             cam_num = optarg;
             break;
+	case 'f':
+	    // mezzanine.opt.cameraN file, to get dewarp.cameraCenter parameters.
+	    option_file = optarg;
+	    break;
 	case 'F':
 	    // Log file name for this camera.
 	    log_file = optarg;
@@ -175,14 +196,14 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             break;
-        case 'a':
+        case 'A':
             if (sscanf(optarg, "%d", &alarm_threshold) != 1) {
                 error("error: -a option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
             }
             break;
-        case 'm':
+        case 'M':
             alarm_addr = optarg;
             break;
         case 'S':
@@ -252,30 +273,48 @@ int main(int argc, char *argv[])
     if (debug) printf("Mezzmap %x\n",(unsigned int)mezzmap);
     
     unsigned int frames_needed;
-    int i = 0, j = 0;
+    int i = 0, j = 0, k = 0;
 
     /* Read the camera center coordinates from the mezzanine option file. */
     if (option_file != NULL) {
 	option_FILE = fopen(option_file,"r");
 	if (option_FILE != NULL) {
 	    do {
-		static char line[BUFSIZ];
+		/* Looking for dewarp.cameraCenter and dewarp.cameraCheck */
+		static char line[BUFSIZ], name[BUFSIZ];
+		int coords[2], pt = -1;
 		if (fgets(line,BUFSIZ,option_FILE)) {
-		    i = sscanf(line,"dewarp.cameraCenter = ( %d, %d )",
-			       &ctr_x,&ctr_y);
+		    i = sscanf(line,"dewarp.%s = ( %d, %d )",
+			       name,&coords[X],&coords[Y]);
 		    // if (debug) printf("%d %s\n", i, line);
 		}
-	    } while (!feof(option_FILE) && i != 2);
+		if ( i != 3 )
+		    continue;
+		if (strcmp(name,"cameraCenter")==0) {
+		    /* Required camera center pt from optfile, pixel coords. */
+		    got_ctr = 1;
+		    pt = CTR_PT;
+		}
+		else if (strcmp(name,"cameraCheck")==0) {
+		    /* Optional camera check pt from optfile, pixel coords. */
+		    got_chk = 1;
+		    pt = CHK_PT;
+		}
+		if (pt != -1) {
+		    for (k=0; k<2; k++) 
+			pts[pt][k] = coords[k];
+		    printf("%s (%d, %d)\n",
+			   pt_names[pt],pts[pt][X],pts[pt][Y]);
+		}
+	    } while (!feof(option_FILE));
 	    fclose(option_FILE);
-	    if ( i != 2 ) {
-		    error("Couldn't find dewarp.cameraCenter in %s.\n",
-			  option_file);
-		    exit(1);
-	    }
-	    printf("ctr_x %d, ctr_y %d\n",ctr_x,ctr_y);
 	}
     }
-
+    if (!got_ctr) {
+	error("Couldn't find dewarp.cameraCenter in %s.\n", option_file);
+	exit(1);
+    }
+    
     if (log_file != NULL) {
 	log_FILE = fopen(log_file,"a");
 	if (log_FILE == NULL) {
@@ -289,9 +328,11 @@ int main(int argc, char *argv[])
     }
 
     fprintf(log_FILE,
-	    "%s Starting, center (%d, %d), n %d, i %d, e %d, c %d, l %d\n", 
-	    timestamp(),ctr_x,ctr_y,num_frames,frame_interval,
-	    error_threshold, check_secs, log_skip);
+	    "%s Starting, pts (%d, %d) (%d, %d), n %d, i %d, e %d, c %d, l %d\n", 
+	    timestamp(),
+	    pts[CTR_PT][X],pts[CTR_PT][Y],
+	    pts[CHK_PT][X],pts[CHK_PT][Y],
+	    num_frames,frame_interval, error_threshold, check_secs, log_skip);
 
     /*
      * Install our own SIGUSR1 handler _over_ the one installed by mezz_init,
@@ -394,85 +435,114 @@ int main(int argc, char *argv[])
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGUSR1,&sa,NULL);
 
-	/* Look for a fiducial within tolerance of the center point.  This is
-	 * meant to be a small number of pixels, so there will be one or none.
+	/* No alarms except during operating hours on week days. */
+	char *now = timestamp();  /* E.g. "Thu Nov 24 18:22:48 1986\0" */
+	int hour;
+	if (sscanf(now,"%*s %*s %*d %d:", &hour) != 1)
+	    fprintf(log_FILE,"***** Failed to parse hour from %s\n", now);
+	int early = hour<alarm_start_hour, late = hour>=alarm_end_hour;
+	int op_hrs = now[0]!='S' && !early && !late;	/* No weekends. */
+	if (debug) printf("now %s, hour %d, early %d, late %d, op_hrs %d\n",
+			  now,hour,early,late,op_hrs);
+	if (early || late) alarm_delay = alarm_threshold; /* Reset. */
+
+	/* Look for fiducials within tolerance of the center and check points.
+	 * The tolerance is meant to be a small number of pixels, so there
+	 * will be one or none matching each.
 	 */
-	int got_fid = 0;
-	float fid_x = 0, fid_y = 0, dist = 0;
-#	define FAR 99999.0
-	float close_x = 0, close_y = 0, closest = FAR;
-	if (debug) printf("n_objs %d\n",n_objs);
-	for (j = 0; j < n_objs; j++) {
-	    fid_x = total_x[j] / n_samples[j];
-	    fid_y = total_y[j] / n_samples[j];
-	    dist = sqrt(pow(fid_x - ctr_x,2) + pow(fid_y - ctr_y,2));
-	    if (dist < closest) {
-		closest = dist;
-		close_x = fid_x;
-		close_y = fid_y;
+	int got_fid, fid_cnt = 0, do_log = 0, n_msgs = 0;
+	static char msgs[NPTS+1][LITTLE_BUFSIZ];
+	for (i=0; i<=got_chk; i++) {
+	    float fid_x = 0, fid_y = 0, dist = 0;
+#	    define FAR 99999.0
+	    float close_x = 0, close_y = 0, closest = FAR;
+	    got_fid = 0;
+	    if (debug) printf("n_objs %d\n",n_objs);
+	    for (j = 0; j < n_objs; j++) {
+		fid_x = total_x[j] / n_samples[j];
+		fid_y = total_y[j] / n_samples[j];
+		if (show_all_fids && i==0)
+		    printf("Obj %d coords (%f, %f)\n",j,fid_x,fid_y);
+		dist = sqrt(pow(fid_x - pts[i][X],2) + 
+			    pow(fid_y - pts[i][Y],2));
+		if (dist < closest) {
+		    closest = dist;
+		    close_x = fid_x;
+		    close_y = fid_y;
+		}
+		if (dist < error_threshold) {
+		    got_fid = 1;
+		    fid_cnt++;
+		    if (debug) printf(
+			"%s %s at (%f, %f), dist %f, %d samples.\n",
+			"Good fiducial for",pt_names[i],
+			fid_x,fid_y,dist,n_samples[j]);
+		    break;
+		}
 	    }
-	    if (dist < error_threshold) {
-		got_fid = 1;
-		if (debug) 
-		    printf("Good fiducial at (%f, %f), distance %f, %d samples.\n",
-			   fid_x,fid_y,dist,n_samples[j]);
-		break;
+	    if (debug) 
+		printf("i %d, got_fid %d, fid %f %f, closest %f, close %f %f\n",
+		       i,got_fid,fid_x,fid_y,closest,close_x,close_y);
+
+	    if (got_fid) {
+		/* Log every Nth successful check. */
+		if (i==0 || !do_log)    /* Only increment the counter once. */
+		    do_log = ++checks_skipped >= log_skip;
+		if (do_log) {
+		    fprintf(log_FILE,
+			    "%s %s (%f, %f), distance %f pixels.\n",
+			    timestamp(),pt_names[i],fid_x,fid_y,dist);
+		    checks_skipped = 0;
+		}
+	    }
+	    else if (closest != FAR) { /* Log all misses. */
+		snprintf(msgs[n_msgs],LITTLE_BUFSIZ,
+			 "%s *** MISSED %s: closest (%f, %f), distance %f.\n",
+			 timestamp(),pt_names[i],close_x,close_y,closest);
+		fputs(msgs[n_msgs],log_FILE);
+		n_msgs++;
 	    }
 	}
-	if (debug) printf("got_fid %d, fid %f %f, closest %f, close %f %f\n",
-			  got_fid,fid_x,fid_y,closest,close_x,close_y);
 
-	if (got_fid) {
-	    /* Log every Nth successful check. */
-	    if (checks_skipped++ >= log_skip) {
-		fprintf(log_FILE,
-			"%s fiducial (%f, %f), distance %f pixels.\n",
-			timestamp(),fid_x,fid_y,dist);
-		checks_skipped = 0;
-	    }
+	/* Don't log no-fiducial at night when the lights may be off. */
+	if (op_hrs && fid_cnt == 0 && n_msgs == 0 ) {
+	    snprintf(msgs[n_msgs],LITTLE_BUFSIZ,
+		     "%s *** NO FIDUCIAL VISIBLE.\n",
+		     timestamp());
+	    fputs(msgs[n_msgs],log_FILE);
+	    n_msgs++;
+	}
+
+	/* Don't raise the alarm unless things have been bad for a while. */
+	if (debug) 
+	    printf("fid_cnt %d, got_ctr %d, got_chk %d, bad_checks %d\n",
+		   fid_cnt, got_ctr, got_chk, bad_checks);
+	if (fid_cnt == (got_ctr + got_chk)) {
+	    /* Got to have all points present to be good. */
 	    bad_checks = 0;
+	    strncpy(good_ts_buff,timestamp(),LITTLE_BUFSIZ);
+	    good_ts = good_ts_buff;
 	}
-	else {
-	    /* No alarms except during operating hours on week days. */
-	    char *now = timestamp();  /* E.g. "Thu Nov 24 18:22:48 1986\0" */
-	    int hour;
-	    if (sscanf(now,"%*s %*s %*d %d:", &hour) != 1)
-		fprintf(log_FILE,"***** Failed to parse hour from %s\n", now);
-	    int early = hour<alarm_start_hour, late = hour>=alarm_end_hour;
-	    int op_hrs = now[0]!='S' && !early && !late;	/* No weekends. */
-	    if (debug) printf("now %s, hour %d, early %d, late %d, op_hrs %d\n",
-			      now,hour,early,late,op_hrs);
-	    if (early || late) alarm_delay = alarm_threshold; /* Reset. */
+	else if (op_hrs && n_msgs && ++bad_checks >= alarm_delay) {
+	    char mail_buff[LITTLE_BUFSIZ];
+	    char *to = (debug?dbg_addr:alarm_addr);
+	    snprintf(mail_buff,LITTLE_BUFSIZ,
+		     "mail %s -s '[Robocops] Camera %s problem' %s",
+		     (0 && debug?"-v":""),cam_num,to);
+	    if (debug) printf("%s\n",mail_buff);
+	    FILE *mailer = popen(mail_buff,"w");
+	    for (i=0; i<n_msgs; i++)
+		fputs(msgs[i],mailer);
+	    fprintf(mailer, 
+		    "\n The last known good timestamp was %s.\n", good_ts);
+	    int status = pclose(mailer);
 
-	    /* Log all errors. */
-	    char msg_buff[256];
-	    if (closest != FAR)
-		snprintf(msg_buff,256,
-			 "%s *** MISSED: closest (%f, %f), distance %f pixels.",
-			 timestamp(),close_x,close_y,closest);
-	    else
-		/* Don't log no fiducial at night when the lights may be off. */
-		if (op_hrs) 
-		    snprintf(msg_buff,256,
-			     "%s *** NO FIDUCIAL VISIBLE.",
-			     timestamp());
-	    fprintf(log_FILE,"%s\n",msg_buff);
-
-	    /* Don't raise the alarm unless things have been bad for a while. */
-	    if (op_hrs && bad_checks++ >= alarm_delay) {
-		char mail_buff[256];
-		char *to = (debug?dbg_addr:alarm_addr);
-		snprintf(mail_buff,256,
-			 "mail %s -s '[Robocops] Camera check %s' %s </dev/null",
-			 (0 && debug?"-v":""),msg_buff, to);
-
-		/* Don't whine constantly, and back off exponentially. */
-		bad_checks = 0;
-		alarm_delay = (int)powf(alarm_delay, alarm_backoff_exponent);
-		fprintf(log_FILE,
-			"%s ***** Alarm mail sent, status %d, next delay %d.\n",
-			timestamp(),system(mail_buff), alarm_delay);
-	    }
+	    /* Don't whine constantly, and back off exponentially. */
+	    bad_checks = 0;
+	    alarm_delay = (int)powf(alarm_delay, alarm_backoff_exponent);
+	    fprintf(log_FILE,
+		    "%s ***** Alarm mail sent, status %d, next delay %d.\n",
+		    timestamp(),status,alarm_delay);
 	}
 
 	sleep(check_secs);
@@ -481,7 +551,9 @@ int main(int argc, char *argv[])
     mezz_term(0);
 
     fprintf(log_FILE,
-	    "%s Stopping, center (%d, %d), n %d, i %d, e %d, c %d, l %d\n", 
-	    timestamp(),ctr_x,ctr_y,num_frames,frame_interval,
-	    error_threshold, check_secs, log_skip);
+	    "%s Stopping, pts (%d, %d) (%d, %d), n %d, i %d, e %d, c %d, l %d\n", 
+	    timestamp(),
+	    pts[CTR_PT][X],pts[CTR_PT][Y],
+	    pts[CHK_PT][X],pts[CHK_PT][Y],
+	    num_frames,frame_interval, error_threshold, check_secs, log_skip);
 }

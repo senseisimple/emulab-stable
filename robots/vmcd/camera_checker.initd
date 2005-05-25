@@ -16,7 +16,7 @@ start)
         	mezzvid=/tmp/mezz_instance/dev/video$cam.ipc
         	checklog=/var/log/check.camera$cam.log
 		/usr/testbed/sbin/camera_checker \
-		 -C $cam -f $mezzopt -F $checklog $mezzvid -m fish@cs.utah.edu 2>&1 &
+		 -C $cam -f $mezzopt -F $checklog $mezzvid -M fish@cs.utah.edu 2>&1 &
 		echo $! > /var/run/camera_checker.$cam.pid
 		PORTBASE=`expr $PORTBASE + 1`
 	done
