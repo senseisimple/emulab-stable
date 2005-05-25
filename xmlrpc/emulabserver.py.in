@@ -3465,8 +3465,8 @@ class elabinelab:
                                   output="Not an elabinelab experiment: " +
                                   res[0][1] + "/" + res[0][2]);
         
-        # Experiment must be active (not swapping say).
-        if res[0][4] != "active":
+        # Experiment must be active (not swapping out).
+        if (not (res[0][4] == "active" or res[0][4] == "activating")):
             return EmulabResponse(RESPONSE_ERROR,
                                   output="Experiment is not active: " +
                                   res[0][1] + "/" + res[0][2]);
