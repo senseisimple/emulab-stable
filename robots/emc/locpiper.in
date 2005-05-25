@@ -280,8 +280,9 @@ while (1) {
 	$newconn++;
     }
     #
-    # We need to *something* to brand new connections to keep the client
-    # from timing out (happens on my desktop).
+    # We need to send *something* to brand new connections to keep the
+    # client from timing out on the initial reply from the server
+    # (this happens on my desktop; firefox).
     #
     if ($newconn) {
 	SendBatteryData(1);

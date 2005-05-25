@@ -83,9 +83,13 @@ function SPEWCLEANUP()
 set_time_limit(0);
 register_shutdown_function("SPEWCLEANUP");
 
+# Avoid PHP error reporting in sockopen that confuse the headers.
+error_reporting(0);
+
 $socket = fsockopen("localhost", 9005);
 if (!$socket) {
-    TBERROR("Error opening locpiper socket - $errstr",1);
+    header("HTTP/1.0 404 Error opening locpiper socket - $errstr");
+    exit();
 }
 
 while (! feof($socket)) {

@@ -1226,7 +1226,11 @@ public class RoboTrack extends JApplet {
 		catch(Throwable th)
 	        {
 		    th.printStackTrace();
+		    daemon = null;
 		    thread = null;
+		    MyDialog("RoboPipe",
+			     "Could not connect to pipe; " +
+			     "is there an experiment running?");
 		    return;
 		}
 	    }
@@ -1243,6 +1247,8 @@ public class RoboTrack extends JApplet {
 			if (thread == null)
 			    break;
 		    }
+		    if (str == null)
+		        break;
 		}
 		catch(IOException e)
 		{
@@ -1257,6 +1263,7 @@ public class RoboTrack extends JApplet {
 		    break;
 		}
             }
+	    System.out.println("Returning from main thread");
             thread = null;
 	    destroy();
         }
