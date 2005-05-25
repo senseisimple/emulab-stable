@@ -116,6 +116,7 @@ namespace eval TBCOMPAT {
     variable elabinelab_fixnodes
     variable elabinelab_nodeos
     variable elabinelab_source_tarfile ""
+    variable elabinelab_tarfiles
 
     # Mapping of "resource classes" and "reservation types" to bootstrap
     # values, where a resource class is a symbolic string provided by the user
@@ -384,6 +385,10 @@ proc tb-set-node-rpms {node args} {
 	perror "\[tb-set-node-rpms] No rpms given."
 	return
     }
+    # Lets assume that a single argument is a string and break it up.
+    if {[llength $args] == 1} {
+	set args [split [lindex $args 0] " "]
+    }
     $node set rpms [join $args ";"]
 }
 proc tb-set-node-startup {node cmd} {
@@ -393,6 +398,10 @@ proc tb-set-node-tarfiles {node args} {
     if {$args == {}} {
 	perror "\[tb-set-node-tarfiles] tb-set-node-tarfiles <node> (<dir> <tar>)+"
 	return
+    }
+    # Lets assume that a single argument is a string and break it up.
+    if {[llength $args] == 1} {
+	set args [split [lindex $args 0] " "]
     }
     if {[expr [llength $args] % 2] != 0} {
 	perror "\[tb-set-node-tarfiles] Arguments should be node and series of pairs."
