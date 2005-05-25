@@ -34,6 +34,38 @@ if {[info exists ::TBCOMPAT::elabinelab_fixnodes("ops")]} {
     }
 }
 
+# Deal with tarfiles
+set myboss_tarfiles ""
+set myops_tarfiles  ""
+
+if {${::TBCOMPAT::elabinelab_source_tarfile} != ""} {
+    append myboss_tarfiles "/usr/src ${::TBCOMPAT::elabinelab_source_tarfile}"
+    append myops_tarfiles  "/usr/src ${::TBCOMPAT::elabinelab_source_tarfile}"
+}
+
+if {[info exists ::TBCOMPAT::elabinelab_tarfiles("boss")]} {
+    if {$myboss_tarfiles != ""} {
+	append myboss_tarfiles " "
+    }
+    namespace eval TBCOMPAT {
+	append myboss_tarfiles $elabinelab_tarfiles("boss")
+    }
+}
+if {[info exists ::TBCOMPAT::elabinelab_tarfiles("ops")]} {
+    if {$myops_tarfiles != ""} {
+	append myops_tarfiles " "
+    }
+    namespace eval TBCOMPAT {
+	append myops_tarfiles $elabinelab_tarfiles("ops")
+    }
+}
+if {$myboss_tarfiles != ""} {
+    tb-set-node-tarfiles $myboss $myboss_tarfiles
+}
+if {$myops_tarfiles != ""} {
+    tb-set-node-tarfiles $myops $myops_tarfiles
+}
+
 tb-make-soft-vtype pcslow {pc600 pc850}
 
 #
@@ -45,11 +77,6 @@ if { ${::TBCOMPAT::elabinelab_maxpcs} != 0 } {
     set maxpcs ${::TBCOMPAT::elabinelab_maxpcs}
 } else {
     set maxpcs 0
-}
-
-if { ${::TBCOMPAT::elabinelab_source_tarfile} != "" } {
-    tb-set-node-tarfiles $myboss /usr/src ${::TBCOMPAT::elabinelab_source_tarfile}
-    tb-set-node-tarfiles $myops /usr/src ${::TBCOMPAT::elabinelab_source_tarfile}
 }
 
 set lanstr "myboss myops "
