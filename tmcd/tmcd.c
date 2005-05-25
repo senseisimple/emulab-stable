@@ -5567,9 +5567,10 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	/*
 	 * Stuff from the experiments table.
 	 */
-	res = mydb_query("select elabinelab_cvstag from experiments "
+	res = mydb_query("select elabinelab_cvstag,elabinelab_nosetup "
+			 "   from experiments "
 			 "where pid='%s' and eid='%s'",
-			 1, reqp->pid, reqp->eid);
+			 2, reqp->pid, reqp->eid);
 	if (!res) {
 		error("EMULABCONFIG: %s: DB Error getting experiments info\n",
 		      reqp->nodeid);
@@ -5581,6 +5582,9 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	    if (row[0] && row[0][0]) {
 		bufp += OUTPUT(bufp, ebufp - bufp, "CVSSRCTAG=%s\n",
 			       row[0]);
+	    }
+	    if (row[1] && strcmp(row[1], "0")) {
+	        bufp += OUTPUT(bufp, ebufp - bufp, "NOSETUP=1\n");
 	    }
 	}
 	mysql_free_result(res);

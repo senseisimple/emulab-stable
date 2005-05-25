@@ -400,6 +400,7 @@ CREATE TABLE experiments (
   elab_in_elab tinyint(1) NOT NULL default '0',
   elabinelab_eid varchar(32) default NULL,
   elabinelab_cvstag varchar(64) default NULL,
+  elabinelab_nosetup tinyint(1) NOT NULL default '0',
   security_level tinyint(1) NOT NULL default '0',
   lockdown tinyint(1) NOT NULL default '0',
   paniced tinyint(1) NOT NULL default '0',

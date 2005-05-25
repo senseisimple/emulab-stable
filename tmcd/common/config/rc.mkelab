@@ -97,6 +97,9 @@ my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
 # This gets turned on/off below
 my $WINSUPPORT = 0;
 
+# This also gets turned on/off below
+my $NOSETUP    = 0;
+
 #
 # Find out our domain name, so that we can qualify the localhost entry
 #
@@ -193,6 +196,7 @@ sub doboot()
     $emulabconfig{"MFSVERSION"} = "53";
     $emulabconfig{"MFSCONSOLE"} = "sio";
     $emulabconfig{"WINSUPPORT"} = 0;
+    $emulabconfig{"NOSETUP"}    = 0;
 
     #
     # Turn the tmcc results into a hash first. Then call the boss or ops
@@ -214,6 +218,10 @@ sub doboot()
     # Turn on windows support.
     if ($emulabconfig{"WINSUPPORT"}) {
 	$WINSUPPORT = 1;
+    }
+    # Ditto nosetup.
+    if ($emulabconfig{"NOSETUP"}) {
+	$NOSETUP = 1;
     }
 
     if ($emulabconfig{"ROLE"} eq "ops") {
@@ -404,8 +412,13 @@ sub SetupOpsNode()
     print RC "route_vnodes=\"-net ". $emulabconfig{"JAILIPBASE"} .
 	" -netmask " . $emulabconfig{"JAILIPMASK"} .
 	    " -iface $inner_controlif\"\n";
-
-    print RC "defaultrouter=\"$bossnode_ip\"\n";
+    # Leave default route pointing to control network until setup complete.
+    if ($NOSETUP) {
+	print RC "defaultrouter=\"$outer_routerip\"\n";
+    }
+    else {
+	print RC "defaultrouter=\"$bossnode_ip\"\n";
+    }
     print RC "hostname=\"" . $emulabconfig{"OPSNODE"} . "." . $domain . "\"\n";
     close(RC);
 
@@ -420,6 +433,9 @@ sub SetupOpsNode()
     # Create a defs file. Note that this will move to boss at some point.
     #
     CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
+
+    goto skipsetup
+	if ($NOSETUP);
 
     #
     # Configure an object tree. 
@@ -480,6 +496,7 @@ sub SetupOpsNode()
     print RC "nameserver $bossnode_ip\n";
     close(RC);
 
+  skipsetup:
     #
     # Hmm, need to run this at startup though.
     # 
@@ -489,6 +506,9 @@ sub SetupOpsNode()
     # Ack, still waiting for new images.
     mysystem("cp ${TBDIR}/testbed/src/testbed/tmcd/common/rc.inelab ".
 	     "   /usr/local/etc/emulab/rc/rc.inelab");
+
+    return
+	if ($NOSETUP);
 
     #
     # Remove source code from ops so that mere users do not get access to it.
@@ -698,6 +718,9 @@ sub SetupBossNode()
     #
     CreateDefsFile("${TBDIR}/testbed/src/testbed/defs-elabinelab");
 
+    goto skipsetup
+	if ($NOSETUP);
+
     #
     # Configure an object tree. 
     #
@@ -813,6 +836,7 @@ sub SetupBossNode()
     #
     mysystem("/usr/testbed/sbin/named_setup");
 
+  skipsetup:    
     #
     # Tack the frisbee mcast addr ipfw rule onto end of /etc/rc.local.
     #
