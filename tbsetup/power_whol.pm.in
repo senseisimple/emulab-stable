@@ -148,6 +148,37 @@ sub whacksome($@) {
     }
 
     #
+    # Divide the nodes up into used and unused based on the status of
+    # their WhOL experimental interface:
+    #
+    # enabled=yes	port in use
+    # enabled=no	not used
+    #
+    # If a port is "in use" we assume it has talked to the switch and
+    # no speed/duplex changes are needed.
+    #
+    # If the port is unused, we assume that the port will try to auto
+    # negotiate with the switch when enabled.  In this case we set
+    # auto-negotiation on the switch to maximize the chance that we will
+    # sucessfully communicate with the card.
+    #
+    my $autoneg = "";
+    for my $key (keys(%portinfo)) {
+	if ($portinfo{$key}{status} &&
+	    $portinfo{$key}{status} =~ /enabled=no/) {
+	    $autoneg .= "$key ";
+	}
+    }
+    if ($autoneg ne "") {
+	print STDERR "Setting autonegotiate on ports: $autoneg\n"
+	    if ($debug);
+	if (system("$SNMPIT -a $portstr")) {
+	    warn "WhOL: could not set autoconfig for $portstr\n";
+	    $failed++;
+	}
+    }
+
+    #
     # Put all ports in the WhOL VLAN, snmpit will enable them.
     #
     if (system("$SNMPIT -m $whollan $portstr")) {
