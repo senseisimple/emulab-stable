@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,6 +21,7 @@ use Exporter;
 		getSwitchStacks
 		getStackType getStackLeader
 		getDeviceOptions getTrunks getTrunksFromSwitches
+                getTrunkHash
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
 		snmpitSet snmpitSetWarn snmpitSetFatal snmpitWarn snmpitFatal
 		printVars tbsort );
@@ -682,6 +683,28 @@ sub getTrunksFromSwitches($@) {
 
     return @trunks;
 
+}
+
+#
+# Make a hash of all trunk ports for easy checking - the keys into the hash are
+# in the form "switch/mod.port" - the contents are 1 if the port belongs to a
+# trunk, and undef if not
+#
+# ('cisco1' => { 'cisco3' => ['1.1','1.2'] },
+#  'cisco3' => { 'cisco1' => ['2.1','2.2'] } )
+#
+sub getTrunkHash() {
+    my %trunks = getTrunks();
+    my %trunkhash = ();
+    foreach my $switch1 (keys %trunks) {
+        foreach my $switch2 (keys %{$trunks{$switch1}}) {
+            foreach my $port (@{$trunks{$switch1}{$switch2}}) {
+                my $portstr = "$switch1/$port";
+                $trunkhash{$portstr} = 1;
+            }
+        }
+    }
+    return %trunkhash;
 }
 
 #
