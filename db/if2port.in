@@ -46,9 +46,9 @@ my %wires = ( Node => 'yellow', Control => 'red', Power => 'green',
 	Serial => 'white' );
 
 # Options: v = verbose, d = debug, m = show mac
-my %opt = ( v => 0, d => 0, m => 0);
+my %opt = ( v => 0, d => 0, m => 0, I => 0);
 
-getopts('vdm',\%opt);
+getopts('vdmI',\%opt);
 $opt{m} = 0 if ($opt{v});
 
 
@@ -62,12 +62,16 @@ while (my $arg = shift @ARGV) {
 	&debug("Card is $card") if (defined $card);
 
 	my $query;
-	if ($opt{m}) {
-	    $query = "SELECT w.node_id1,w.card1,i.mac,w.node_id2,".
-		     "w.card2,w.port2,w.cable,w.len,w.type,n.type ".
-		     "FROM wires AS w,nodes AS n,interfaces AS i ".
-		     "WHERE w.node_id1=n.node_id AND ".
-		     "w.node_id1=i.node_id AND w.card1=i.card";
+	if ($opt{m} || $opt{I}) {
+	    $query = "SELECT w.node_id1,w.card1,";
+	    $query .= "i.IP,"
+		if ($opt{I});
+	    $query .= "i.mac,"
+		if ($opt{m});
+	    $query .= "w.node_id2,w.card2,w.port2,w.cable,w.len,w.type,n.type".
+		     " FROM wires AS w,nodes AS n,interfaces AS i".
+		     " WHERE w.node_id1=n.node_id AND".
+		     " w.node_id1=i.node_id AND w.card1=i.card";
 	} else {
 	    $query = "SELECT w.node_id1,w.card1,w.node_id2,w.card2,w.port2,".
 		     "w.cable,w.len,w.type,n.type ".
@@ -103,5 +107,6 @@ sub usage {
 	print "-v: Verbose, prose, output\n";
 	print "-d: Enable debugging output\n";
 	print "-m: Show MAC addresses\n";
+	print "-I: Show any assigned IP addresses\n";
 	return -1;
 }
