@@ -107,6 +107,11 @@ if (!@test_switches) {
 	"table!\n";
 }
 
+#
+# Get trunk ports so that we can skip MACs learned on them
+#
+my %trunks = getTrunkHash();
+
 my @control_switches = map {[$_,"control"]} getControlSwitches();
 if (!@control_switches) {
     warn "Warning - No control switches found - you probably want to add them " .
@@ -342,7 +347,7 @@ SWITCH:
 		#
 		my $modport;
 		if (($switchtype eq "cisco") || ($switchtype eq "foundry") ||
-		    ($switchtype eq "nortel" ) {
+		    ($switchtype eq "nortel")) {
 		    ($modport) = $device->convertPortFormat(2, $ifIndex);
 		} else {
 		    $modport = "1.$ifIndex";
@@ -378,6 +383,12 @@ SWITCH:
 	    #
 	    next if ((!$realports{$index}) ||
 		     ($realports{$index} =~ /ifIndex/));
+            #
+            # Skip ports that belong to known trunks - we only want to learn
+            # about nodes that are directly connected to each switch
+            #
+            next if ($trunks{$realports{$index}});
+
 	    print "$MACs{$index},$realports{$index},$vlan_number,". 
 		"$interfaces{$index},$class_str\n";
 	}
