@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -41,6 +41,8 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $INPUTLOG    = "/usr/testbed/scratch/CVS/CVSROOT/commitlogs/testbed";
 my $OUTPUTLOG   = "$TB/www/doc/ChangeLog.txt";
+my $MONTHROOT   = "$TB/www/doc/ChangeLog";
+my $HTMLFILE    = "$TB/www/doc/changelog-months.html";
 my $STARTDATE   = "2003/10";
 my $tempname    = "/tmp/import.$$";
 my @entries     = ();
@@ -94,24 +96,39 @@ while (<INPUT>) {
 my $entry = $_;
 
 #
-# Reverse the rest of the entries, saving them up.
+# Reverse the rest of the entries, saving them up, month by month
 #
+my $this_month  = $STARTDATE;
+my $index       = 0;
+my @month_index = ($STARTDATE);
+my %month_data  = ($STARTDATE => []);
+
 while (<INPUT>) {
     if ($_ =~ /^\w*\s*(\d\d\d\d\/\d\d)\/\d\d\s*\d\d:\d\d:\d\d\s*\w\w\w$/) {
-	unshift(@entries, $entry);
+	unshift(@{ $month_data{$this_month} }, $entry);
 	$entry = $_;
+	if ($1 ne $this_month) {
+	    $this_month = $1;
+	    $index++;
+	    $month_index[$index] = $this_month;
+	    $month_data{$this_month} = [];
+	}
 	next;
     }
     $entry .= $_;
 }
+close(INPUT);
 
 #
-# Write out the list!
+# Write out the list in one file (reverse order of course).
 # 
-foreach my $entry (@entries) {
-    print OUTPUT $entry;
+for (my $i = $index; $i >= 0; $i--) {
+    my @entries = @{ $month_data{$month_index[$i]} };
+
+    foreach my $entry (@entries) {
+	print OUTPUT $entry;
+    }
 }
-close(INPUT);
 close(OUTPUT);
 
 #
@@ -120,8 +137,60 @@ close(OUTPUT);
 if (system("mv -f $tempname $OUTPUTLOG")) {
     fatal("Could not mv $tempname to $OUTPUTLOG");
 }
+unlink($tempname)
+    if (-e $tempname);
 
-unlink($tempname);
+#
+# Now write a bunch of per-month files.
+#
+for (my $i = 0; $i <= $index; $i++) {
+    my @entries = @{ $month_data{$month_index[$i]} };
+    my $month   = $month_index[$i];
+    $month =~ s/\//-/g;
+    my $target  = $MONTHROOT . "-" . $month . ".txt";
+
+    if (!open(OUTPUT, "> $tempname")) {
+	fatal("Could not open $tempname for writing!");
+    }
+
+    foreach my $entry (@entries) {
+	print OUTPUT $entry;
+    }
+    close(OUTPUT);
+
+    if (system("mv -f $tempname $target")) {
+	fatal("Could not mv $tempname to $target");
+    }
+    
+}
+unlink($tempname)
+    if (-e $tempname);
+
+#
+# Now write a little html file to include.
+#
+if (!open(OUTPUT, "> $tempname")) {
+    fatal("Could not open $tempname for writing!");
+}
+
+for (my $i = $index; $i >= 0; $i--) {
+    my $month   = $month_index[$i];
+    $month =~ s/\//-/g;
+    my $target  = "ChangeLog-" . $month . ".txt";
+
+    print OUTPUT "<tr><td class=stealth align=center>";
+    print OUTPUT "<a href='docwrapper.php3?docname=$target'>";
+    print OUTPUT $month_index[$i];
+    print OUTPUT "</a></td></tr>\n";
+}
+close(OUTPUT);
+
+if (system("mv -f $tempname $HTMLFILE")) {
+    fatal("Could not mv $tempname to $HTMLFILE");
+}
+unlink($tempname)
+    if (-e $tempname);
+
 exit(0);
 
 sub fatal($)

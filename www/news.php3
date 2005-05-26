@@ -212,9 +212,9 @@ else {
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
 <?php
-if ($TBMAINSITE) {
+if (1 || $TBMAINSITE) {
     echo "<tr><td class=stealth align=center>
-                  <a href = 'doc/docwrapper.php3?docname=ChangeLog.txt'>
+                  <a href = 'doc/changelog.php3'>
                      (Changelog/Technical Details)</a></td></tr>\n";
 }
 echo "</table>
