@@ -109,8 +109,10 @@ if (defined($hostname)) {
 	$hostname = $1;
 
 	my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($hostname);
-	$IP = inet_ntoa($ipaddrs[0]);
-	$webpage .= "?IP=$IP";
+        if (@ipaddrs) {
+	    $IP = inet_ntoa($ipaddrs[0]);
+	    $webpage .= "?IP=$IP";
+        }
     }
 }
 
