@@ -564,6 +564,9 @@ Phase "ssh", "Allowing root ssh", sub {
        PhaseFail("Could not read $IDENTPUB")
 	   if ($?);
        chomp($ident);
+       if (! -e $AUTHKEYS) {
+	   CreateFileFatal($AUTHKEYS);
+       }
        AppendToFileFatal($AUTHKEYS,
 			 "from=\"${BOSSNODE}\" $ident");
    };
