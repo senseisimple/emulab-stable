@@ -143,10 +143,10 @@ function guess_IP ($prefix, $number) {
     }
 
     #
-    # We want to be able to handle both numeric and character 'number's - figure
-    # out which we have
+    # We want to be able to handle both numeric and character 'number's 
+    # Figure out which we have
     #
-    if (is_string($number)) {
+    if (! is_numeric($number)) {
 	$using_char = 1;
 	$number = ord($number);
     } else {
@@ -166,10 +166,10 @@ function guess_IP ($prefix, $number) {
 	} else {
 	    $node = $prefix . $i;
 	}
-        $query_result = DBQueryFatal("select IP from interfaces as i " .
-		"left join nodes as n on i.node_id = n.node_id left join " .
-		"node_types as nt on n.type = nt.type " .
-		"where n.node_id='$node' and i.iface = nt.control_iface");
+        $query_result =
+	    DBQueryFatal("select IP from interfaces as i " .
+			 "where i.node_id='$node' and ".
+			 "      i.role='" . TBDB_IFACEROLE_CONTROL . "'");
         if (mysql_num_rows($query_result)) {
 	    $row = mysql_fetch_array($query_result);
 	    $IP = $row[IP];
