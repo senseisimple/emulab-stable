@@ -8,6 +8,7 @@ use English;
 use Getopt::Std;
 use POSIX qw(isatty setsid);
 use POSIX qw(strftime);
+use Errno;
 
 #
 # Create an experiment. The experiment is either run immediately, or
