@@ -39,6 +39,7 @@ my $TBLOGS  = "@TBLOGSEMAIL@";
 my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
 my $ADMINGRP= "@TBADMINGROUP@";
+my $ELABINELAB    = @ELABINELAB@;
 my $WIKISUPPORT   = @WIKISUPPORT@;
 my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
 
@@ -241,7 +242,12 @@ foreach my $uid (@userlist) {
     }
     else {
 	while (@db_row = $query_result->fetchrow_array() ) {
-	    push(@groupnames, $db_row[0]);
+	    my $groupname = $db_row[0];
+
+	    next
+		if ($ELABINELAB && !getgrnam($groupname));
+
+	    push(@groupnames, $groupname);
 	}
     }
 
