@@ -74,6 +74,13 @@ static struct lnMinList last_frame, current_frame, wiggle_frame;
 
 static struct robot_object *wiggle_bot = NULL;
 
+#define DEFAULT_SMOOTH_WINDOW 10
+ 
+/* by default, smoothing is off */
+static int smoothing = 1;
+static int smoothing_window = DEFAULT_SMOOTH_WINDOW;
+
+
 /**
  * Here's how the algorithm will lay out: when we get update_position packets
  * from a vmc-client, we will attempt to find a preexisting track for the given
@@ -247,20 +254,24 @@ static void dump_info(void)
 static void usage(void)
 {
     fprintf(stderr,
-            "Usage: vmcd [-hd] [-l logfile] [-e emchost] [-p emcport]\n"
-            "            [-c clienthost] [-P clientport]\n"
+            "Usage: vmcd [-hdS] [-l logfile] [-e emchost] [-p emcport]\n"
+            "            [-c clienthost] [-P clientport] [-s #samples]\n"
             "Vision master control daemon\n"
             "  -h\tPrint this message\n"
             "  -d\tTurn on debugging messages and do not daemonize\n"
+	    "  -S\tTurn on position smoothing\n"
             "  -l logfile\tSpecify the log file to use\n"
             "  -i pidfile\tSpecify the pid file name\n"
             "  -e emchost\tSpecify the host name where emc is running\n"
             "  -p emcport\tSpecify the port that emc is listening on\n"
             "  -c clienthost\tSpecify the host name where a vmc-client is\n"
             "  -P clientport\tSpecify the port the client is listening on\n"
+	    "  -w #samples\tSmooth over the last #samples positions (default "
+	    "             \tis %d)\n"
             "\n"
             "Example:\n"
-            "  $ vmcd -c foo -P 7070 -- -c foo -P 7071\n");
+            "  $ vmcd -c foo -P 7070 -- -c foo -P 7071\n",
+	    DEFAULT_SMOOTH_WINDOW);
 }
 
 static int parse_client_options(int *argcp, char **argvp[])
@@ -274,8 +285,22 @@ static int parse_client_options(int *argcp, char **argvp[])
     argc = *argcp;
     argv = *argvp;
     
-    while ((c = getopt(argc, argv, "hdp:U:l:i:e:c:P:")) != -1) {
+    while ((c = getopt(argc, argv, "hdSp:U:l:i:e:c:P:w:")) != -1) {
         switch (c) {
+	case 'S':
+	    smoothing = 1;
+	    fprintf(stdout,"DATA WILL BE SMOOTHED!\n");
+	    break;
+	case 'w':
+	    smoothing_window = atoi(optarg);
+	    if (smoothing_window < 2) {
+		fprintf(stdout,
+			"WARNING: smoothing window must be at least 2; setting"
+			" to default of %d.\n",
+			DEFAULT_SMOOTH_WINDOW);
+		smoothing_window = DEFAULT_SMOOTH_WINDOW;
+	    }
+	    break;
         case 'h':
             usage();
             exit(0);
@@ -364,6 +389,14 @@ static int wiggle_complete(struct robot_object *ro, mtp_packet_t *mp)
 	roMoveRobot(ro, ROS_LOST);
     }
     else {
+
+	/* zero out the smoothing data for this 
+	 * track!
+	 */
+	info("WC: RESET ma data\n");
+	vt->ma.oldest_index = 0;
+	vt->ma.number_valid_positions = 0;
+
 	vt->vt_userdata = wiggle_bot;
 	roMoveRobot(ro, ROS_KNOWN);
     }
@@ -462,6 +495,21 @@ int main(int argc, char *argv[])
         retval = parse_client_options(&argc, &argv);
     } while ((argc > 0) && strcmp(argv[0], "--") == 0);
     
+ 
+    /* set up smoothing */
+    if (smoothing) {
+	
+	for (lpc = 0; lpc < TRACK_POOL_SIZE; ++lpc) {
+	    vt_pool_nodes[lpc].ma.positions = (struct robot_position *)
+		malloc(sizeof(struct robot_position)*smoothing_window);
+	    bzero(vt_pool_nodes[lpc].ma.positions,
+		  sizeof(struct robot_position)*smoothing_window);
+	    vt_pool_nodes[lpc].ma.positions_len = smoothing_window;
+	    vt_pool_nodes[lpc].ma.number_valid_positions = 0;
+	    vt_pool_nodes[lpc].ma.oldest_index = 0;
+	}
+    }
+
     if (debug) {
         loginit(0, logfile);
     }
@@ -657,6 +705,13 @@ int main(int argc, char *argv[])
 
 	    /* Match the current frame to the last frame. */
 	    vtMatch(&vt_pool, &last_frame, &current_frame);
+
+
+	    /* (maybe) Smooth the matched bot posits */
+  	    if (smoothing) { 
+  		vtSmooth(&current_frame); 
+	    }
+
 
 	    /* Reset the list of known/unknown bots. */
 	    lnAppendList(&ro_data.rd_lists[ROS_UNKNOWN],

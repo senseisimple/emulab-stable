@@ -34,6 +34,18 @@
  * lost.
  */
 #define MAX_TRACK_AGE 5
+/**
+ * Structure used to keep a moving average of last N positions.
+ */
+struct moving_average {
+    struct robot_position *positions;  /*< ring buffer of most recent posits */
+    int positions_len;                 /*< length of buffer */
+    int number_valid_positions;        /*< the buffer may not be full... */
+    
+    /* don't want to shift the contents of the buffer every time, doh */
+    int oldest_index;                  /*< this is the one we should replace */
+    struct robot_position current_avg; /*< the last calc'd avg */
+};
 
 /**
  * The maximum distance, in meters, that will be tolerated between an initial
@@ -56,6 +68,7 @@ struct vision_track {
     struct vmc_client *vt_client;	/*< Camera that detected the track. */
     int vt_age;				/*< Age of the track (lower=younger) */
     void *vt_userdata;			/*< Data attached to the track. */
+    struct moving_average ma;           /*< smooth out the positions... */
 };
 
 /**
@@ -151,5 +164,13 @@ void vtUnknownTracks(struct lnMinList *unknown, struct lnMinList *mixed);
  */
 struct vision_track *vtFindWiggle(struct lnMinList *start,
 				  struct lnMinList *now);
+
+/**
+ * Taking the latest position, augment the moving average for each track.  This
+ * should be done AFTER a vtMatch so that we only avg on valid data.  Doing 
+ * smoothing after everything else will allow the current matching algorithms 
+ * to continue to work.
+ */
+void vtSmooth(struct lnMinList *tracks);
 
 #endif

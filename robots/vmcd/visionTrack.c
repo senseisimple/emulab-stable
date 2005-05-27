@@ -17,6 +17,7 @@
 
 #include "log.h"
 
+#include "robotObject.h"
 #include "visionTrack.h"
 
 extern int debug;
@@ -182,6 +183,15 @@ int vtUpdate(struct lnMinList *now,
 	    vt->vt_client = vc;
 	    vt->vt_age = 0;
 	    vt->vt_userdata = NULL;
+
+
+	    /* zero out the smoothing data for this 
+	     * track!
+	     */
+	    //vt->ma.oldest_index = 0;
+	    //vt->ma.number_valid_positions = 0;
+
+
 	    lnAddTail(now, &vt->vt_link);
 
 	    /* Adjust the cameras viewable area based on this track. */
@@ -376,6 +386,8 @@ void vtMatch(struct lnMinList *pool,
 				 &distance)) != NULL) {
 	    if (distance <= 0.06) {
 		vt->vt_userdata = vt_prev->vt_userdata;
+		//info("COPIED old moving avg data\n");
+		vt->ma = vt_prev->ma;
 		lnRemove(&vt_prev->vt_link);
 		lnAddHead(pool, &vt_prev->vt_link);
 	    }
@@ -475,4 +487,114 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
     }
     
     return retval;
+}
+
+ 
+/** 
+ * Given a moving average, updates it with the data in new and outputs the 
+ * calculated average in avg.
+ * 
+ * @param ma The moving average metadata.
+ * @param new The data to add to the moving average.
+ * @param avg The output from this function; contains the latest moving avg.
+ */
+static void updateMovingAverage(struct moving_average *ma,
+				struct robot_position *new) {
+    int i;
+    int vp;
+    
+    assert(ma != NULL);
+    assert(ma->positions != NULL);
+    assert(new != NULL);
+    
+    /* update data samples array */
+    ma->positions[ma->oldest_index] = *new;
+    /* point to the next piece of data to be replaced */
+    ma->oldest_index = (ma->oldest_index + 1) % ma->positions_len;
+    /* if the ring buffer isn't full yet, incr the number of valid data pts */
+    if (ma->number_valid_positions < ma->positions_len) {
+	++(ma->number_valid_positions);
+    }
+    
+    ma->current_avg.x = 0.0f;
+    ma->current_avg.y = 0.0f;
+    ma->current_avg.theta = 0.0f;
+    
+    vp = ma->number_valid_positions;
+    for (i = 0; i < vp; ++i) {
+	ma->current_avg.x += ma->positions[i].x;
+	ma->current_avg.y += ma->positions[i].y;
+	ma->current_avg.theta += ma->positions[i].theta;
+    }
+    
+    if (debug > 2) {
+	info("UPDATING moving avg: %d valid positions\n",vp);
+    }
+
+    ma->current_avg.x = ma->current_avg.x / vp;
+    ma->current_avg.y = ma->current_avg.y / vp;
+    ma->current_avg.theta = ma->current_avg.theta / vp;
+    
+    return;
+}
+
+void vtSmooth(struct lnMinList *tracks) {
+    struct vision_track *vt = NULL;
+    struct robot_object *ro = NULL;
+    struct moving_average *ma = NULL;
+    float distance_delta = 0.0f;
+    float theta_delta = 0.0f;
+    
+    assert(tracks != NULL);
+    
+    vt = (struct vision_track *)tracks->lh_Head;
+    while (vt->vt_link.ln_Succ != NULL) {
+	if ((ro = vt->vt_userdata) != NULL) {
+	    ma = &(vt->ma);
+	    
+	    /* using the latest position in ro->position, calc moving avg */
+	    updateMovingAverage(ma,
+				&(vt->vt_position));
+
+	    if (debug > 2) {
+		info("SMOOTHED position for robot %d from (%f,%f,%f) to "
+		     "(%f,%f,%f)\n",
+		     ro->ro_id,
+		     vt->vt_position.x,
+		     vt->vt_position.y,
+		     vt->vt_position.theta,
+		     ma->current_avg.x,
+		     ma->current_avg.y,
+		     ma->current_avg.theta
+		     );
+	    }
+
+	    /* figure out how much the posit will change from the last
+	     * one reported... this is important so we know if we mess up
+	     * wiggles
+	     */
+	    distance_delta = hypotf(vt->vt_position.x - ma->current_avg.x,
+				    vt->vt_position.y - ma->current_avg.y);
+	    theta_delta = (float)abs(vt->vt_position.theta - 
+				     ma->current_avg.theta);
+	    if (debug > 2) {
+		info("  DELTAS were %f dist and %f angle.\n",
+		     distance_delta,
+		     theta_delta);
+	    }
+
+	    /*  update the position... this is a bit sneaky... but this way
+	     * we don't have to change oodles of code.
+	     */
+	    vt->vt_position.x = ma->current_avg.x;
+	    vt->vt_position.y = ma->current_avg.y;
+	    vt->vt_position.theta = ma->current_avg.theta;
+	    // don't update the timestamp!
+	    
+	}
+	
+	vt = (struct vision_track *)vt->vt_link.ln_Succ;
+    }
+    
+    return;
 }
