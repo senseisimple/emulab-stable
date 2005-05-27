@@ -1,4 +1,4 @@
-// $Id: TOSBaseM.nc,v 1.1 2005-04-20 20:47:23 ricci Exp $
+// $Id: ElabRadioDumpM.nc,v 1.1 2005-05-27 21:42:23 johnsond Exp $
 
 /*									tab:4
  * "Copyright (c) 2000-2003 The Regents of the University  of California.  
@@ -30,7 +30,7 @@
  */
 /* 
  * Author:	Phil Buonadonna
- * Revision:	$Id: TOSBaseM.nc,v 1.1 2005-04-20 20:47:23 ricci Exp $
+ * Revision:	$Id: ElabRadioDumpM.nc,v 1.1 2005-05-27 21:42:23 johnsond Exp $
  *
  *
  */
@@ -45,7 +45,7 @@
  */
 
 
-module TOSBaseM {
+module ElabRadioDumpM {
   provides interface StdControl;
   uses {
     interface StdControl as UARTControl;
@@ -57,6 +57,8 @@ module TOSBaseM {
     interface StdControl as RadioControl;
     interface BareSendMsg as RadioSend;
     interface ReceiveMsg as RadioReceive;
+
+    interface Timer;
 
     interface Leds;
   }
@@ -82,11 +84,30 @@ implementation
   uint8_t    gTxPendingToken;
   uint8_t    gfTxFlags;
 
+//     uint8_t timer_going = 0;
+
   task void RadioRcvdTask() {
     TOS_MsgPtr pMsg;
     result_t   Result;
+//     int st = 0;
 
-    dbg (DBG_USR1, "TOSBase forwarding Radio packet to UART\n");
+    /* blink yellow leds */
+//     atomic {
+// 	if (!timer_going) {
+// 	    timer_going = 1;
+// 	    st = 1;
+// 	}
+//     }
+
+//     if (st) {
+// 	call Timer.start(TIMER_ONE_SHOT,128);
+// 	call Leds.yellowOn();
+//     }
+
+    // we just use a toggle, in hopes that this will better illustrate speed:
+    call Leds.yellowToggle();
+    
+    dbg (DBG_USR1, "ElabRadioDump forwarding Radio packet to UART\n");
     atomic {
       pMsg = gRxBufPoolTbl[gRxTailIndex];
       gRxTailIndex++; gRxTailIndex %= QUEUE_SIZE;
@@ -94,27 +115,32 @@ implementation
     //*(pMsg->data) = 1;
     pMsg->data[1] = pMsg->strength;
     pMsg->data[2] = pMsg->strength >> 8;
-    pMsg->length = 3;
+    pMsg->data[3] = pMsg->type;
+    pMsg->data[4] = pMsg->addr;
+    pMsg->data[5] = pMsg->addr >> 8;
+
+    pMsg->length = (pMsg->length > 5)?pMsg->length:5;
+
     Result = call UARTSend.send(TOS_UART_ADDR,pMsg->length,pMsg);
     if (Result != SUCCESS) {
       pMsg->length = 0;
     }
     else {
-      call Leds.redToggle();
+	//call Leds.redToggle();
     }
   }
 
   task void UARTRcvdTask() {
     result_t Result;
 
-    dbg (DBG_USR1, "TOSBase forwarding UART packet to Radio\n");
+    dbg (DBG_USR1, "ElabRadioDump forwarding UART packet to Radio\n");
     Result = call RadioSend.send(gpTxMsg);
 
     if (Result != SUCCESS) {
       atomic gfTxFlags = 0;
     }
     else {
-      call Leds.greenToggle();
+	//call Leds.greenToggle();
     }
   }
 
@@ -148,7 +174,7 @@ implementation
     ok2 = call RadioControl.init();
     ok3 = call Leds.init();
 
-    dbg(DBG_BOOT, "TOSBase initialized\n");
+    dbg(DBG_BOOT, "ElabRadioDump initialized\n");
 
     return rcombine3(ok1, ok2, ok3);
   }
@@ -158,6 +184,10 @@ implementation
     
     ok1 = call UARTControl.start();
     ok2 = call RadioControl.start();
+
+
+    call Leds.greenOn();
+    call Timer.start(TIMER_REPEAT,1024);
 
     return rcombine(ok1, ok2);
   }
@@ -174,7 +204,7 @@ implementation
   event TOS_MsgPtr RadioReceive.receive(TOS_MsgPtr Msg) {
     TOS_MsgPtr pBuf;
 
-    dbg(DBG_USR1, "TOSBase received radio packet.\n");
+    dbg(DBG_USR1, "ElabRadioDump received radio packet.\n");
 
     if (Msg->crc) {
       atomic {
@@ -205,7 +235,7 @@ implementation
   event TOS_MsgPtr UARTReceive.receive(TOS_MsgPtr Msg) {
     TOS_MsgPtr  pBuf;
 
-    dbg(DBG_USR1, "TOSBase received UART packet.\n");
+    dbg(DBG_USR1, "ElabRadioDump received UART packet.\n");
 
     atomic {
       if (gfTxFlags & TXFLAG_BUSY) {
@@ -233,7 +263,7 @@ implementation
   event TOS_MsgPtr UARTTokenReceive.receive(TOS_MsgPtr Msg, uint8_t Token) {
     TOS_MsgPtr  pBuf;
     
-    dbg(DBG_USR1, "TOSBase received UART token packet.\n");
+    dbg(DBG_USR1, "ElabRadioDump received UART token packet.\n");
 
     atomic {
       if (gfTxFlags & TXFLAG_BUSY) {
@@ -281,4 +311,10 @@ implementation
     }
     return SUCCESS;
   }
+
+    event result_t Timer.fired() {
+	call Leds.redToggle();
+	return SUCCESS;
+    }
+
 }  

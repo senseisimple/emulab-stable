@@ -1,4 +1,4 @@
-// $Id: TOSBase.nc,v 1.1 2005-04-20 20:47:23 ricci Exp $
+// $Id: ElabRadioDump.nc,v 1.1 2005-05-27 21:42:23 johnsond Exp $
 
 /*									tab:4
  * "Copyright (c) 2000-2003 The Regents of the University  of California.  
@@ -29,38 +29,41 @@
  * 94704.  Attention:  Intel License Inquiry.
  */
 /* Author:	Phil Buonadonna
- * Revision:	$Id: TOSBase.nc,v 1.1 2005-04-20 20:47:23 ricci Exp $
+ * Revision:	$Id: ElabRadioDump.nc,v 1.1 2005-05-27 21:42:23 johnsond Exp $
  */
 
 /**
  * @author Phil Buonadonna
  */
 
-configuration TOSBase {
+configuration ElabRadioDump {
 }
 implementation {
-  components Main, TOSBaseM, RadioCRCPacket as Comm,
+  components Main, ElabRadioDumpM, RadioCRCPacket as Comm,
   //UARTNoCRCPacket as UART,
   GenericComm as UART,
-  LedsC;
+      LedsC,
+      TimerC;
   //FramerM, UART
 
-  Main.StdControl -> TOSBaseM;
+  Main.StdControl -> ElabRadioDumpM;
 
-  //TOSBaseM.UARTControl -> FramerM;
-  //TOSBaseM.UARTSend -> FramerM;
-  //TOSBaseM.UARTReceive -> FramerM;
-  //TOSBaseM.UARTTokenReceive -> FramerM;
-  TOSBaseM.UARTControl -> UART;
-  //TOSBaseM.UARTSend -> UART;
-  //TOSBaseM.UARTReceive -> UART;
-  TOSBaseM.UARTSend -> UART.SendMsg[42];
-  TOSBaseM.UARTReceive -> UART.ReceiveMsg[42];
-  TOSBaseM.RadioControl -> Comm;
-  TOSBaseM.RadioSend -> Comm;
-  TOSBaseM.RadioReceive -> Comm;
+    ElabRadioDumpM.Timer -> TimerC.Timer[unique("Timer")];
 
-  TOSBaseM.Leds -> LedsC;
+  //ElabRadioDumpM.UARTControl -> FramerM;
+  //ElabRadioDumpM.UARTSend -> FramerM;
+  //ElabRadioDumpM.UARTReceive -> FramerM;
+  //ElabRadioDumpM.UARTTokenReceive -> FramerM;
+  ElabRadioDumpM.UARTControl -> UART;
+  //ElabRadioDumpM.UARTSend -> UART;
+  //ElabRadioDumpM.UARTReceive -> UART;
+  ElabRadioDumpM.UARTSend -> UART.SendMsg[4];
+  ElabRadioDumpM.UARTReceive -> UART.ReceiveMsg[4];
+  ElabRadioDumpM.RadioControl -> Comm;
+  ElabRadioDumpM.RadioSend -> Comm;
+  ElabRadioDumpM.RadioReceive -> Comm;
+
+  ElabRadioDumpM.Leds -> LedsC;
 
   //FramerM.ByteControl -> UART;
   //FramerM.ByteComm -> UART;
