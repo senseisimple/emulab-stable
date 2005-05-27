@@ -393,6 +393,15 @@ if (@expnodes) {
 	exit(($debug ? 0 : -1));
     }
     $UID  = $SAVEUID;
+
+    #
+    # To avoid confusion later (with swapmod, which wants them to be ISUP),
+    # and so the web interface does not show the nodes as down, set the 
+    # state to ISUP.
+    #
+    foreach my $node (@expnodes) {
+	TBSetNodeEventState($node, TBDB_NODESTATE_ISUP());
+    }
 }
 }
 
@@ -1217,6 +1226,13 @@ sub UpdateEmulab()
     # At this point, not much I can think of do. The nodes will reboot and
     # enter the newnode MFS. I could add a script to wait for that in the
     # inner elab, but not going to bother yet. 
-    # 
+    #
+    # To avoid confusion later (with swapmod, which wants them to be ISUP),
+    # and so the web interface does not show the nodes as down, set the 
+    # state to ISUP.
+    #
+    foreach my $node (@nodes) {
+	TBSetNodeEventState($node, TBDB_NODESTATE_ISUP());
+    }
     return 0;
 }
