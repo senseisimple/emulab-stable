@@ -198,6 +198,21 @@ sub RestartMysqld()
     system("$KILLALL -9 mysqld");
 
     #
+    # But apparently, it sometimes exits anyway!
+    # 
+    sleep(10);
+    print "Sending another -0 to mysqld\n";
+    system("$KILLALL -0 mysqld");
+    if ($?) {
+	#
+	# Must have stopped. Restart it. 
+	# 
+	print "mysqld exited abnormally; restarting.\n";
+	system("$MYSQLD start");
+	print "\n";
+    }
+
+    #
     # Wait for a little while, and then try another query. 
     #
   retry:
