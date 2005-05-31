@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
@@ -15,14 +16,19 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
+#include <zlib.h>
+
 #include "log.h"
 #include "mtp.h"
 #include <math.h>
+
+#define RECORD_FRAME_COUNT 30
 
 #define MAX_CLIENT_COUNT 10
 
@@ -51,6 +57,7 @@ typedef struct {
 
 typedef struct {
     double time;
+    int calibrate;
     mezz_objectlist_t objectlist;
 } mezz_mmap_t;
 
@@ -76,6 +83,10 @@ static int debug = 0;
  */
 static volatile int looping = 1;
 
+static volatile int do_snapshot = 0;
+static int snapshot_start;
+static int snapshot_frame = 0;
+
 /**
  * Counter used to track when a new frame was received from mezzanine.
  */
@@ -88,6 +99,10 @@ static volatile unsigned int mezz_frame_count = 0;
 static struct robot_position offsets;
 
 static double z_offset = 0.0;
+
+static mezz_mmap_t *recorded_frames[RECORD_FRAME_COUNT];
+
+static char *recordpath = "/var/log/mezzframe";
 
 static XDR xdr;
 static char packet_buffer[2048];
@@ -190,6 +205,23 @@ void local2global_posit_trans(struct robot_position *p_inout)
     rp.y = ct * -p_inout->y + st * -p_inout->x + offsets.y;
     rp.theta = mtp_theta(p_inout->theta + offsets.theta + M_PI_2);
     *p_inout = rp;
+}
+
+static void record_frame(mezz_mmap_t *mm)
+{
+    int frame_number;
+    
+    assert(mm != NULL);
+
+    frame_number = (mezz_frame_count - 1) % RECORD_FRAME_COUNT;
+    memcpy(recorded_frames[frame_number], mm, sizeof(mezz_mmap_t));
+    recorded_frames[frame_number]->calibrate = -1;
+}
+
+static void sighup(int sig)
+{
+    snapshot_start = mezz_frame_count;
+    do_snapshot = 1;
 }
 
 /**
@@ -344,7 +376,7 @@ int main(int argc, char *argv[])
 
     xdrrec_create(&xdr, 0, 0, NULL, NULL, mem_write);
     
-    while ((c = getopt(argc, argv, "hdp:l:i:f:x:y:z:o:")) != -1) {
+    while ((c = getopt(argc, argv, "hdr:p:l:i:f:x:y:z:o:")) != -1) {
         switch (c) {
         case 'h':
             usage();
@@ -359,6 +391,9 @@ int main(int argc, char *argv[])
         case 'i':
             pidfile = optarg;
             break;
+	case 'r':
+	    recordpath = optarg;
+	    break;
         case 'p':
             if (sscanf(optarg, "%d", &port) != 1) {
                 error("error: -p option is not a number: %s\n", optarg);
@@ -420,6 +455,8 @@ int main(int argc, char *argv[])
     signal(SIGQUIT, sigquit);
     signal(SIGTERM, sigquit);
     signal(SIGINT, sigquit);
+    
+    signal(SIGHUP, sighup);
 
     signal(SIGPIPE, SIG_IGN);
     
@@ -445,6 +482,8 @@ int main(int argc, char *argv[])
             exit(2);
         }
         mezzmap = mezz_mmap();
+	// We want mezzanine to copy the image data over.
+	mezzmap->calibrate += 1;
     }
 #else
     {
@@ -510,14 +549,21 @@ int main(int argc, char *argv[])
     }
     else {
 	mtp_handle_t mh[MAX_CLIENT_COUNT];
+        int lpc, last_mezz_frame = 0;
         fd_set readfds, clientfds;
-        int last_mezz_frame = 0;
         
         FD_ZERO(&readfds);
         FD_ZERO(&clientfds); /* We'll track clients using this fd_set. */
         
         FD_SET(serv_sock, &readfds);
 
+	for (lpc = 0; lpc < RECORD_FRAME_COUNT; lpc++) {
+	    if ((recorded_frames[lpc] = malloc(sizeof(mezz_mmap_t))) == NULL) {
+		fatal("cannot allocate space for recorded frames\n");
+	    }
+	    mlock(recorded_frames[lpc], sizeof(mezz_mmap_t));
+	}
+	
         while (looping) { /* The main loop. */
             fd_set rreadyfds;
             int rc;
@@ -592,11 +638,20 @@ int main(int argc, char *argv[])
 			    error("invalid client %d %p\n", rc, mp);
 			}
 			else {
-			    if (mp.data.opcode == MTP_CONFIG_VMC_CLIENT) {
+			    switch (mp.data.opcode) {
+			    case MTP_CONFIG_VMC_CLIENT:
 				offsets.x = mp.data.mtp_payload_u.
 				    config_vmc_client.fixed_x;
 				offsets.y = mp.data.mtp_payload_u.
 				    config_vmc_client.fixed_y;
+				break;
+			    case MTP_SNAPSHOT:
+				info("doing snapshot\n");
+				snapshot_start = mezz_frame_count;
+				do_snapshot = 1;
+				break;
+			    default:
+				break;
 			    }
 			    good = 1;
 			}
@@ -616,32 +671,69 @@ int main(int argc, char *argv[])
 		     * Check the current frame count against the last one so we
 		     * can tell if there really is a new frame ready.
                      */
-                    if (mezz_frame_count != last_mezz_frame) {
-			if (debug > 1) {
-			    info("vmc-client: new frame\n");
-			}
-                        
-                        if ((rc = encode_packets(mezzmap)) == -1) {
-                            errorc("error: unable to encode packets");
-                        }
-                        else if (rc == 0) {
-			    if (debug) {
-				info("vmc-client: nothing to send %d\n",
-				     mezz_frame_count);
+		    do {
+			if (mezz_frame_count != last_mezz_frame) {
+			    if (debug > 1) {
+				info("vmc-client: new frame\n");
 			    }
+			    
+			    record_frame(mezzmap);
+                        
+			    if ((rc = encode_packets(mezzmap)) == -1) {
+				errorc("error: unable to encode packets");
+			    }
+			    else if (rc == 0) {
+				if (debug) {
+				    info("vmc-client: nothing to send %d\n",
+					 mezz_frame_count);
+				}
+			    }
+			    else {
+				int lpc;
+				
+				for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+				    if (FD_ISSET(lpc, &clientfds)) {
+					write(lpc, packet_buffer, rc);
+				    }
+				}
+			    }
+			    
+			    last_mezz_frame = mezz_frame_count;
 			}
-			else {
-                            int lpc;
-                            
-                            for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
-                                if (FD_ISSET(lpc, &clientfds)) {
-                                    write(lpc, packet_buffer, rc);
-                                }
-                            }
-                        }
-			
-                        last_mezz_frame = mezz_frame_count;
-                    }
+
+			if (snapshot_frame >= RECORD_FRAME_COUNT) {
+			    snapshot_frame = 0;
+			    do_snapshot = 0;
+			}
+			else if (do_snapshot) {
+			    char filename[128];
+			    int fd;
+			    
+			    snprintf(filename, sizeof(filename),
+				     "%s.%03d",
+				     recordpath, snapshot_frame);
+			    if ((fd = open(filename,
+					   O_WRONLY|O_CREAT|O_TRUNC,
+					   0644)) == -1) {
+				error("cannot open snapshot file %s\n",
+				      filename);
+			    }
+			    else {
+				int frame_number;
+				
+				frame_number =
+				    (snapshot_start + snapshot_frame) %
+				    RECORD_FRAME_COUNT;
+				write(fd,
+				      recorded_frames[frame_number],
+				      sizeof(mezz_mmap_t));
+				close(fd);
+				fd = -1;
+			    }
+			    
+			    snapshot_frame += 1;
+			}
+		    } while (do_snapshot);
                     break;
                 default:
                     errorc("unhandled select error\n");
@@ -652,6 +744,7 @@ int main(int argc, char *argv[])
     }
     
 #if defined(HAVE_MEZZANINE)
+    mezzmap->calibrate -= 1;
     mezz_term(0);
 #endif
 
