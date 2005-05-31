@@ -13,6 +13,46 @@ LOGGEDINORDIE($uid);
 PAGEHEADER("Real Time Robot Tracking Applet");
 
 #
+# Optional pid,eid. Without a building/floor, show all the nodes for the
+# experiment in all buildings/floors. Without pid,eid show all wireless
+# nodes in the specified building/floor.
+#
+if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
+    if (!TBvalid_pid($pid)) {
+	PAGEARGERROR("Invalid project ID.");
+    }
+    if (!TBvalid_eid($eid)) {
+	PAGEARGERROR("Invalid experiment ID.");
+    }
+
+    if (! TBValidExperiment($pid, $eid)) {
+	USERERROR("The experiment $pid/$eid is not a valid experiment!", 1);
+    }
+    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view experiment $pid/$eid!",
+		  1);
+    }
+}
+else {
+    #
+    # Else, we need to find whatever experiment is running. What if there
+    # is more then one? Good question; I do not have a plan for that yet!
+    #
+    $query_result =
+	DBQueryFatal("select pid,eid from experiments ".
+		     "where locpiper_pid!=0 and locpiper_port!=0");
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_array($query_result);
+	$pid = $row["pid"];
+	$eid = $row["eid"];
+    }
+    else {
+	unset($pid);
+	unset($eid);
+    }
+}
+
+#
 # Verify page arguments. Allow user to optionally specify building/floor.
 #
 if (isset($building) && $building != "") {
@@ -127,7 +167,10 @@ $baseurl = "../floormap_aux.php3?prefix=$uniqueid";
 
 # Temp for debugging.
 if (isset($fake))
-     $pipeurl .= "&fake=yes";
+    $pipeurl .= "&fake=yes";
+if (isset($pid) && isset($eid)) {
+    $pipeurl .= "&pid=$pid&eid=$eid";
+}
      
 echo "<applet name='tracker' code='RoboTrack.class'
               archive='tracker.jar'

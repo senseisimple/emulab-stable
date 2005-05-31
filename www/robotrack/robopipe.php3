@@ -7,11 +7,46 @@
 chdir("..");
 include("defs.php3");
 
+function SPITERROR($code, $msg)
+{
+    header("HTTP/1.0 $code $msg");
+    exit();
+}
+
 #
 # Only known and logged in users can watch LEDs
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
+
+$status = CHECKLOGIN($uid);
+if (($status & CHECKLOGIN_LOGGEDIN) != CHECKLOGIN_LOGGEDIN) {
+    SPITERROR(401, "Not logged in");
+}
+
+#
+# Optional pid,eid. Without a building/floor, show all the nodes for the
+# experiment in all buildings/floors. Without pid,eid show all wireless
+# nodes in the specified building/floor.
+#
+if (isset($pid) && $pid != "" && isset($eid) && $eid != "") {
+    if (!TBvalid_pid($pid)) {
+	SPITERROR(400, "Invalid project ID.");
+    }
+    if (!TBvalid_eid($eid)) {
+	SPITERROR(400, "Invalid experiment ID.");
+    }
+
+    if (! TBValidExperiment($pid, $eid)) {
+	SPITERROR(400, "The experiment $pid/$eid is not a valid experiment!");
+    }
+    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	USERERROR(401,
+		  "You do not have permission to view experiment $pid/$eid!");
+    }
+}
+else {
+    SPITERROR(400, "Must supply pid and eid arguments");
+}
 
 #
 # Verify page arguments. Allow user to optionally specify building/floor.
@@ -19,16 +54,30 @@ LOGGEDINORDIE($uid);
 if (isset($building) && $building != "") {
     # Sanitize for the shell.
     if (!preg_match("/^[-\w]+$/", $building)) {
-	PAGEARGERROR("Invalid building argument.");
+	SPITERROR(400, "Invalid building argument.");
     }
     # Optional floor argument. Sanitize for the shell.
     if (isset($floor) && !preg_match("/^[-\w]+$/", $floor)) {
-	PAGEARGERROR("Invalid floor argument.");
+	SPITERROR(400, "Invalid floor argument.");
     }
 }
 else {
     $building = "MEB-ROBOTS";
     $floor    = 4;
+}
+
+#
+# Need the locpiper port for this experiment.
+#
+$query_result =
+    DBQueryFatal("select locpiper_port from experiments ".
+	         "where pid='$pid' and eid='$eid'");
+if (!mysql_num_rows($query_result)) {
+    SPITERROR(400, "No such experiment!");
+}
+else {
+    $row = mysql_fetch_array($query_result);
+    $locpiper_port = $row["locpiper_port"];
 }
 
 # Initial goo.
@@ -86,10 +135,9 @@ register_shutdown_function("SPEWCLEANUP");
 # Avoid PHP error reporting in sockopen that confuse the headers.
 error_reporting(0);
 
-$socket = fsockopen("localhost", 9005);
+$socket = fsockopen("localhost", $locpiper_port);
 if (!$socket) {
-    header("HTTP/1.0 404 Error opening locpiper socket - $errstr");
-    exit();
+    SPITERROR(404, "Error opening locpiper socket - $errstr");
 }
 
 while (! feof($socket)) {

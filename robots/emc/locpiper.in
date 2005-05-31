@@ -253,7 +253,6 @@ if (!event_subscribe($handle, \&callbackFunc, $tuple)) {
 # 
 $sock = IO::Socket::INET->new(Listen    => 10,
 			      LocalAddr => 'localhost',
-			      LocalPort => 9005,
 			      Reuse     => 1,
 			      Proto     => 'tcp');
 fatal("Could not create socket!")

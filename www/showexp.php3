@@ -247,7 +247,8 @@ if ($types['garcia'] || $types['static-mica2']) {
     elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
 	    $expstate == $TB_EXPTSTATE_ACTIVATING) {
 	WRITESUBMENUBUTTON("Tracker Applet",
-			   "robotrack/robotrack.php3?");
+			   "robotrack/robotrack.php3?".
+			   "pid=$exp_pid&eid=$exp_eid");
     }
 }
 
