@@ -489,7 +489,7 @@ if (!@succeeded_nodes) {
 # Re-generate dhcpd.conf
 #
 print "Re-generating dhcpd.conf\n";
-if (system("$dhcpd_makeconf -i")) {
+if (system("$dhcpd_makeconf -i -r")) {
     die "Unable to open regenerate dhcpd config file\n";
 }
 
