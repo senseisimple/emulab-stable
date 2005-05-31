@@ -111,6 +111,11 @@ enum mtp_opcode_t {
     MTP_TELEMETRY		= 60,
 
     /**
+     * Snapshot the state of a daemon.
+     */
+    MTP_SNAPSHOT		= 61,
+
+    /**
      * vmcd tells emcd to wiggle a robot (for id purposes).
      */
     MTP_WIGGLE_REQUEST		= 70,
@@ -192,6 +197,11 @@ struct obstacle_config {
     float xmax;
     float ymax;
     float zmax;
+};
+
+struct dyn_obstacle_config {
+    int robot_id;
+    obstacle_config config;
 };
 
 struct box {
@@ -352,9 +362,10 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_WIGGLE_STATUS:	mtp_wiggle_status	wiggle_status;
  case MTP_REQUEST_REPORT:	mtp_request_position	request_report;
  case MTP_CONTACT_REPORT:	mtp_contact_report	contact_report;
- case MTP_CREATE_OBSTACLE:	obstacle_config		create_obstacle;
+ case MTP_CREATE_OBSTACLE:	dyn_obstacle_config	create_obstacle;
  case MTP_UPDATE_OBSTACLE:	obstacle_config		update_obstacle;
  case MTP_REMOVE_OBSTACLE:	int			remove_obstacle;
+ case MTP_SNAPSHOT:		int			snapshot;
 };
 
 /**

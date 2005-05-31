@@ -420,6 +420,9 @@ mtp_error_t mtp_init_packetv(struct mtp_packet *mp,
 		    va_arg(args, struct obstacle_config *);
 		break;
 	    case MTP_CREATE_OBSTACLE:
+		mp->data.mtp_payload_u.create_obstacle.config =
+		    *(va_arg(args, struct obstacle_config *));
+		break;
 	    case MTP_UPDATE_OBSTACLE:
 		mp->data.mtp_payload_u.update_obstacle =
 		    *(va_arg(args, struct obstacle_config *));
@@ -465,6 +468,10 @@ mtp_error_t mtp_init_packetv(struct mtp_packet *mp,
 		break;
 	    case MTP_REQUEST_REPORT:
 		mp->data.mtp_payload_u.request_report.robot_id = 
+		    va_arg(args, int);
+		break;
+	    case MTP_CREATE_OBSTACLE:
+		mp->data.mtp_payload_u.create_obstacle.robot_id =
 		    va_arg(args, int);
 		break;
 	    default:
@@ -644,6 +651,19 @@ mtp_error_t mtp_init_packetv(struct mtp_packet *mp,
 	}
 	
 	tag = va_arg(args, mtp_tag_t);
+    }
+
+    if (mp->data.opcode == MTP_UPDATE_POSITION) {
+	struct mtp_update_position *mup;
+
+	mup = &mp->data.mtp_payload_u.update_position;
+	if (mup->position.timestamp == 0.0) {
+	    struct timeval tv;
+	    
+	    gettimeofday(&tv, NULL);
+	    mup->position.timestamp = (double)tv.tv_sec +
+		(((double)tv.tv_usec) / 100000);
+	}
     }
     
     return retval;
