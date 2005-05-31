@@ -104,6 +104,8 @@ static mezz_mmap_t *recorded_frames[RECORD_FRAME_COUNT];
 
 static char *recordpath = "/var/log/mezzframe";
 
+static int maxfd;
+
 static XDR xdr;
 static char packet_buffer[2048];
 static char *cursor;
@@ -213,9 +215,11 @@ static void record_frame(mezz_mmap_t *mm)
     
     assert(mm != NULL);
 
-    frame_number = (mezz_frame_count - 1) % RECORD_FRAME_COUNT;
-    memcpy(recorded_frames[frame_number], mm, sizeof(mezz_mmap_t));
-    recorded_frames[frame_number]->calibrate = -1;
+    if (mm->calibrate != 0) {
+	frame_number = (mezz_frame_count - 1) % RECORD_FRAME_COUNT;
+	memcpy(recorded_frames[frame_number], mm, sizeof(mezz_mmap_t));
+	recorded_frames[frame_number]->calibrate = -1;
+    }
 }
 
 static void sighup(int sig)
@@ -482,8 +486,8 @@ int main(int argc, char *argv[])
             exit(2);
         }
         mezzmap = mezz_mmap();
-	// We want mezzanine to copy the image data over.
-	mezzmap->calibrate += 1;
+	if (debug > 1)
+	    mezzmap->calibrate += 1;
     }
 #else
     {
@@ -557,6 +561,9 @@ int main(int argc, char *argv[])
         
         FD_SET(serv_sock, &readfds);
 
+	if (serv_sock > maxfd)
+	    maxfd = serv_sock;
+
 	for (lpc = 0; lpc < RECORD_FRAME_COUNT; lpc++) {
 	    if ((recorded_frames[lpc] = malloc(sizeof(mezz_mmap_t))) == NULL) {
 		fatal("cannot allocate space for recorded frames\n");
@@ -575,7 +582,7 @@ int main(int argc, char *argv[])
 	     * become read-ready.  Technically, we could miss a signal and a
 	     * frame, but I'm too lazy to fix it at the moment.
 	     */
-            rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, NULL);
+            rc = select(maxfd + 1, &rreadyfds, NULL, NULL, NULL);
 	    
             if (rc > 0) {
                 int lpc;
@@ -606,6 +613,8 @@ int main(int argc, char *argv[])
 				 fd);
 			}
 			
+			// We want mezzanine to copy the image data over.
+			mezzmap->calibrate += 1;
 			if (setsockopt(fd,
 				       IPPROTO_TCP,
 				       TCP_NODELAY,
@@ -616,6 +625,9 @@ int main(int argc, char *argv[])
                         FD_SET(fd, &readfds);
                         FD_SET(fd, &clientfds);
 
+			if (fd > maxfd)
+			    maxfd = fd;
+			
 			fd = -1;
                     }
 
@@ -657,6 +669,7 @@ int main(int argc, char *argv[])
 			}
 
 			if (!good) {
+			    mezzmap->calibrate -= 1;
 			    close(lpc);
 			    FD_CLR(lpc, &readfds);
 			    FD_CLR(lpc, &clientfds);
@@ -691,7 +704,7 @@ int main(int argc, char *argv[])
 			    else {
 				int lpc;
 				
-				for (lpc = 0; lpc < FD_SETSIZE; lpc++) {
+				for (lpc = 0; lpc <= maxfd; lpc++) {
 				    if (FD_ISSET(lpc, &clientfds)) {
 					write(lpc, packet_buffer, rc);
 				    }
@@ -744,7 +757,8 @@ int main(int argc, char *argv[])
     }
     
 #if defined(HAVE_MEZZANINE)
-    mezzmap->calibrate -= 1;
+    if (debug > 1)
+	mezzmap->calibrate -= 1;
     mezz_term(0);
 #endif
 
