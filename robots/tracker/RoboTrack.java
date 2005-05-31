@@ -1458,7 +1458,39 @@ public class RoboTrack extends JApplet {
 	public void mousePressed(MouseEvent e) {
 	    int button = e.getButton();
 
-	    if (button == e.BUTTON1) {
+	    if (e.isPopupTrigger()) {
+		/*
+		 * Right mouse button will bring up a context menu.
+		 */
+		if (! dragging) {
+		    node_id = map.pickRobot(e.getX(), e.getY());
+
+		    if (node_id == "") {
+			node_id = null;
+			return;
+		    }
+		    Robot robbie = (Robot) robots.get(node_id);
+		    
+		    /*
+		     * Set whether the cancel move button is enabled.
+		     */
+		    if (robbie.dragging)
+			CancelDragMenuItem.setEnabled(true);
+		    else
+			CancelDragMenuItem.setEnabled(false);
+
+		    /*
+		     * And set whether the orientation option is enabled.
+		     */
+		    if (robbie.mobile)
+			SetOrientationMenuItem.setEnabled(true);
+		    else
+			SetOrientationMenuItem.setEnabled(false);
+
+		    RightMenuPopup.show(map, e.getX(), e.getY());
+		}
+	    }
+	    else if (button == e.BUTTON1) {
 		/*
 		 * Left button pressed. This starts a drag operation.
 		 */
@@ -1508,44 +1540,24 @@ public class RoboTrack extends JApplet {
 						     robbie.index);
 		}
 	    }
-	    else if (button == e.BUTTON3) {
-		/*
-		 * Right mouse button will bring up a context menu.
-		 */
-		if (! dragging) {
-		    node_id = map.pickRobot(e.getX(), e.getY());
-
-		    if (node_id == "") {
-			node_id = null;
-			return;
-		    }
-		    Robot robbie = (Robot) robots.get(node_id);
-		    
-		    /*
-		     * Set whether the cancel move button is enabled.
-		     */
-		    if (robbie.dragging)
-			CancelDragMenuItem.setEnabled(true);
-		    else
-			CancelDragMenuItem.setEnabled(false);
-
-		    /*
-		     * And set whether the orientation option is enabled.
-		     */
-		    if (robbie.mobile)
-			SetOrientationMenuItem.setEnabled(true);
-		    else
-			SetOrientationMenuItem.setEnabled(false);
-
-		    RightMenuPopup.show(map, e.getX(), e.getY());
-		}
-	    }
 	}
 	
 	public void mouseReleased(MouseEvent e) {
 	    int button = e.getButton();
 
-	    if (button == e.BUTTON1) {
+	    if (e.isPopupTrigger()) {
+		/*
+		 * Right mouse button brought up the context menu.
+		 * It seems that this event will fire before the menu popup
+		 * event fires, so nothing to do since we need to maintain
+		 * the state (the selected node) for the popup event below.
+		 */
+		if (node_id == null) {
+		    return;
+		}
+		System.out.println("Click finished: " + node_id);
+	    }
+	    else if (button == e.BUTTON1) {
 		if (dragging) {
 		    /*
 		     * Left button released. This terminates the dragging
@@ -1585,18 +1597,6 @@ public class RoboTrack extends JApplet {
 		    }
 		    repaint();
 		}
-	    }
-	    else if (button == e.BUTTON3) {
-		/*
-		 * Right mouse button brought up the context menu.
-		 * It seems that this event will fire before the menu popup
-		 * event fires, so nothing to do since we need to maintain
-		 * the state (the selected node) for the popup event below.
-		 */
-		if (node_id == null) {
-		    return;
-		}
-		System.out.println("Click finished: " + node_id);
 	    }
 	}
 
