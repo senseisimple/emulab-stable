@@ -16,6 +16,9 @@ my %OTHER_KERNELS = ("TESTBED-DELAY"     => ["kernel.delay", "kernel.10000HZ"],
 		     "TESTBED-LINKDELAY" => ["kernel.linkdelay",
 			 "kernel.1000HZ"]); 
 
+sub build_kernel($;$);
+sub install_kernel($$$);
+
 $| = 1;
 
 #

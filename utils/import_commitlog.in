@@ -23,6 +23,9 @@ sub usage()
     print STDERR "Usage: import_commitlog\n";
     exit(-1);
 }
+
+sub fatal($);
+
 my $optlist  = "d";
 my $debug    = 0;
 

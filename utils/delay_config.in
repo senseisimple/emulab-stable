@@ -83,6 +83,13 @@ if (defined($options{"d"})) {
     $debug = 1;
 }
 
+# Functions
+
+sub ChangeDelayConfig();
+sub ChangeLinkDelayConfig();
+sub ChangeVirtLans();
+
+# Locals
 my $pid    = shift(@ARGV);
 my $eid    = shift(@ARGV);
 my $link   = shift(@ARGV);

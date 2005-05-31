@@ -18,6 +18,7 @@ sub usage()
 }
 my $optlist = "d";
 my $debug   = 0;
+sub mysystem($);
 
 #
 # Configure variables

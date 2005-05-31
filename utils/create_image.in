@@ -58,6 +58,9 @@ $| = 1;
 $ENV{'PATH'} = "/bin:/sbin:/usr/bin:";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+sub cleanup();
+sub fatal($);
+
 my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
 my $friskiller  = "$TB/sbin/frisbeelauncher";

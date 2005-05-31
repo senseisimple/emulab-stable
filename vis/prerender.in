@@ -37,7 +37,11 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $NEATO_CMD = "neato -Gstart=rand -Gepsilon=0.005 -Gmaxiter=20000 -Gpack=true";
 my $THUMB_CMD = "render -t 160";
 
+sub mungeName($);
 sub dprint($);
+sub cleanup();
+sub fatal($);
+sub KillOldRender();
 
 sub usage {
     die "Usage:\nprerender [-v] [-r] [-t] [-f] <pid> <eid>\n" .

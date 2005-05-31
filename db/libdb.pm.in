@@ -4721,11 +4721,13 @@ sub min ( $$ ) {
     return ($_[0] < $_[1] ? $_[0] : $_[1]);
 }
 
+sub hash_recurse2($%);
 sub hash_recurse(%) {
     my (%hash) = @_;
     return hash_recurse2("",%hash);
 }
 
+sub array_recurse2($%);
 sub array_recurse(%) {
     my (%array) = @_;
     return array_recurse2("",%array);

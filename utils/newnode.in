@@ -79,6 +79,9 @@ if (!TBAdmin()) {
 #
 # Handle command-line options
 #
+sub usage() {
+    die "Usage: $0 [-f] <node_id> ...\n";
+}
 my $force_unconnected_interfaces = 0;
 my %options = ();
 if (! getopts("f", \%options)) {
@@ -87,10 +90,6 @@ if (! getopts("f", \%options)) {
 
 if ($options{f}) {
     $force_unconnected_interfaces = 1;
-}
-
-sub usage() {
-    die "Usage: $0 [-f] <node_id> ...\n";
 }
 
 #

@@ -26,7 +26,7 @@ sub usage()
 my $optlist = "r";
 my $reset   = 0;
 
-sub Fatal($);
+sub fatal($);
 
 #
 # Exit codes are important; they tell the web page what has happened so

@@ -17,6 +17,11 @@ use strict;
 #
 
 #
+# Function prototypes
+#
+sub fatal(@);
+
+#
 # Configure variables
 #
 my $testbed_srcdir = "@top_srcdir@";

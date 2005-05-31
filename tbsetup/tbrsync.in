@@ -50,6 +50,8 @@ sub usage() {
     return 1;
 }
 
+sub dprint(@);
+
 my %opt = ();
 GetOptions(\%opt, 'p=s','e=s','dry','nodelete');
 

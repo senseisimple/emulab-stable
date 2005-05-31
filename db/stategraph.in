@@ -13,6 +13,8 @@ require "ctime.pl";
 # Turn off line buffering
 $| = 1;
 
+sub doformats($$);
+
 my $datetag = `date +%Y%m%d%H%M%S`;
 chomp($datetag);
 my $date = &ctime(time);
@@ -251,7 +253,7 @@ exit(0);
 # * stategraph: add options for making png/gif output via pstopnm,
 #   pnmtopng, and ppmtogif
 
-sub doformats() {
+sub doformats($$) {
     my ($in,$out) = @_;
     if ($ps) {
 	print "ps ";

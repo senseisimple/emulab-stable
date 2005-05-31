@@ -166,6 +166,7 @@ if (!$TESTMODE) {
 }
 
 # Create the defs files.
+sub GenDefsFile($);
 GenDefsFile($infile);
 
 # Now append the NS file to. This part is hokey. Fix later.

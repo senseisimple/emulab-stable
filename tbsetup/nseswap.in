@@ -38,6 +38,7 @@ my $TESTMODE = @TESTMODE@;
 my $TBLOGS = "@TBLOGSEMAIL@";
 
 # Locals
+sub swapout_on_max_retries();
 my $pid;
 my $eid;
 my $eventargs;

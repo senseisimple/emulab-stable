@@ -117,6 +117,8 @@ sub handler () {
 }
 $SIG{INT}  = \&handler;
 
+sub BootFromCD();
+
 # Do it.
 BootFromCD();
 exit(0);

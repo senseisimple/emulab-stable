@@ -20,6 +20,13 @@ use Fcntl ':flock';
 #
 
 #
+# Function phototypes
+#
+
+sub fsinit();
+sub fsof($);
+
+#
 # Configure variables
 #
 my $TB		= "@prefix@";

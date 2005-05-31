@@ -52,6 +52,8 @@ if (@ARGV != 2) {
     exit &usage
 }
 
+sub read_sitevars($$);
+
 my ($file1,$file2) = @ARGV;
 
 my %sitevars1 = ();

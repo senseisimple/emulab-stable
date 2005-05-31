@@ -16,6 +16,7 @@ sub usage() {
 	"Use the -d option to see debugging output instead of emailing it.\n";
     exit(-1);
 }
+sub fatal($);
 my $optlist = "d";
 my $debug   = 0;
 

@@ -22,6 +22,8 @@ sub usage()
     print STDOUT "Usage: mkgroup <pid> <gid>\n";
     exit(-1);
 }
+sub fatal($);
+
 my  $optlist = "";
 
 #

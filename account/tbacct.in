@@ -112,6 +112,20 @@ use libdb;
 use libtestbed;
 
 #
+# Function prototypes
+#
+sub AddUser();
+sub DelUser();
+sub UpdatePassword();
+sub UpdateWindowsPassword();
+sub UpdateUser(;$);
+sub FreezeUser();
+sub ThawUser();
+sub CheckDotFiles();
+sub GenerateSFSKey();
+sub fatal($);
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #

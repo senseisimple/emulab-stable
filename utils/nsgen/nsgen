@@ -23,6 +23,15 @@ sub usage() {
 }
 
 #
+# Functions
+#
+
+sub readTemplate($);
+sub processOptions($@);
+sub substitute($$);
+sub fatal($);
+
+#
 # Process command-line args
 #
 my $debug = 0;
@@ -63,6 +72,10 @@ exit 0;
 #
 # Read the template XML file
 #
+sub startElement();
+sub endElement();
+sub processElement();
+
 sub readTemplate($) {
     my ($template_file) = @_;
     open TF,"<$template_file" or fatal("Unable to open $template_file: $!");
@@ -112,7 +125,7 @@ sub processOptions($@) {
 #
 # Replace variables embedded in the template
 #
-sub substitute($s) {
+sub substitute($$) {
     my ($template,$variables) = @_;
     my $nsfile = "";
 
@@ -266,7 +279,7 @@ sub fatal($)
 #
 # Debug
 #
-sub debug(@_) {
+sub debug(@) {
     if ($debug) {
 	print STDERR @_;
     }

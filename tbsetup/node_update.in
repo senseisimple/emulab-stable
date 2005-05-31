@@ -38,6 +38,13 @@ my  $optlist = "b";
 #
 
 #
+# Function phototypes
+#
+
+sub NotifyUser($$);
+sub fatal($);
+
+#
 # Configure variables
 #
 my $TB		= "@prefix@";

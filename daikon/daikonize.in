@@ -1,0 +1,12 @@
+#!/bin/bash
+
+ENVSETUP=/usr/local/daikon/bin/daikon.bashrc
+PREFIX=@prefix@
+
+export ENVSETUP PREFIX
+
+. $ENVSETUP
+exec perl $PREFIX/bin/daikonize.pl "$@"
+
+
+

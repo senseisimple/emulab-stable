@@ -10,6 +10,11 @@ use Getopt::Std;
 use strict;
 
 #
+# Function prototypes
+#
+sub checkGroup ($$);
+
+#
 # Configure variables
 #
 use lib '@prefix@/lib';

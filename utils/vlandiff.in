@@ -30,6 +30,8 @@ if (@ARGV) {
     die "Usage: $0 [-v]\n";
 }
 
+sub debug(@);
+
 my %table = ();
 my %switch= ();
 my %id = ();

@@ -19,6 +19,11 @@ use lib '@prefix@/lib';
 use libdb;
 use libtestbed;
 
+sub get_ipmap();
+sub get_bandwidths();
+sub upload_times($$$);
+sub get_times($);
+
 my $TB = '@prefix@';
 
 #
@@ -37,7 +42,7 @@ if (@ARGV != 1) {
     die "Usage: $0 <url>\n";
 }
 my ($url) = @ARGV;
-if (! ($url =~ /^http:\/\/([\w-.]+)\/(.*)$/) ) {
+if (! ($url =~ /^http:\/\/([\w.-]+)\/(.*)$/) ) {
     die "URL must be in the form http://host/path\n";
 }
 my ($host,$path) = ($1,$2);

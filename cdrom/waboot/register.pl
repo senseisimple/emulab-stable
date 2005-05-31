@@ -64,6 +64,13 @@ my $sigfile     = "/tmp/netbed-setup.pl.sig";
 my $tmpfile	= "/tmp/foo.$$";
 
 #
+# Function prototypes
+#
+sub fatal($);
+sub mysystem($);
+sub Prompt($$;$);
+
+#
 # Locals. 
 # 
 my $cdkey;

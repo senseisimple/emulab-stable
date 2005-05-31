@@ -47,6 +47,13 @@ use libtestbed;
 $libdb::DBQUERY_MAXTRIES = 30;
 
 #
+# Function phototypes
+#
+
+sub SwapWarn($$$);
+sub SwapIt($$$);
+
+#
 # Locals
 # 
 my $TBOPSPID	= TBOPSPID();

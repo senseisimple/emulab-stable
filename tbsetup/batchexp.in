@@ -52,6 +52,9 @@ sub usage()
     exit(-1);
 }
 
+sub ParseArgs();
+sub fatal($);
+
 my $optlist = "iE:g:e:p:S:L:a:l:fwqt:n";
 my $batchmode= 1;
 my $frontend = 0;

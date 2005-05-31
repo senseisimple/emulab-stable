@@ -19,6 +19,10 @@ sub usage()
 	"Spew a tar/rpm for an experiment.\n";
     exit(-1);
 }
+
+sub SpewFile();
+sub VerifyFile();
+
 my $optlist   = "vt:";
 my $debug     = 1;
 my $doverify  = 0;

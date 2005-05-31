@@ -434,7 +434,7 @@ sub clear_pid {
 }
 
 # Bump the busy indicator to keep the frisbeed going.
-sub keepbusy($imageid) {
+sub keepbusy($) {
 	my ($imageid) = @_;
 
 	DBQueryFatal("UPDATE images SET load_busy=GREATEST(load_busy,1) " .
@@ -444,7 +444,7 @@ sub keepbusy($imageid) {
 }
 
 # Test the busy indicator, and set to zero.
-sub testbusy($imageid) {
+sub testbusy($) {
 	my ($imageid) = @_;
 
 	my $query_result =

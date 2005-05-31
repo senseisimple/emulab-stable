@@ -64,6 +64,15 @@ use libdb;
 use libtestbed;
 
 #
+# Function prototypes
+#
+sub ParseKey($);
+sub InitUser();
+sub GenerateKeyFiles();
+sub GenerateKeyFile($@);
+sub fatal($);
+
+#
 # Turn off line buffering on output
 #
 $| = 1;
@@ -423,7 +432,7 @@ sub GenerateKeyFiles()
 # Returns 0 on success, -1 on failure.
 #
 #
-sub GenerateKeyFile($$)
+sub GenerateKeyFile($@)
 {
     my ($protocol, @pkeys) = @_;
     my $sshdir  = "$HOMEDIR/$user/.ssh";

@@ -107,6 +107,8 @@ sub handler () {
 $SIG{INT}  = \&handler;
 
 # Do it.
+sub BootFromCD();
+
 BootFromCD();
 exit(0);
 

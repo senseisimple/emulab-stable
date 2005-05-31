@@ -33,6 +33,13 @@ sub usage()
         "       -b file  - Process bandwidth info file\n";
     exit(-1);
 }
+
+sub InsertLinkData();
+sub ParseLatency($);
+sub ParseBW($);
+sub DownLoadURL($$);
+sub daemonize();
+
 my $optlist = "l:b:dnf";
 my $debug   = 0;
 my $daemon  = 1;

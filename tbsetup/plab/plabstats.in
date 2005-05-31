@@ -79,6 +79,9 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+# Functions
+sub ShowMetrics();
+
 # Locals
 my $LOADMETRIC;
 my $MAXLOAD;

@@ -17,6 +17,8 @@ use English;
 # usage: mkproj <pid>
 #
 
+sub fatal($);
+
 #
 # Configure variables
 #

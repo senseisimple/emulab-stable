@@ -20,6 +20,14 @@ use strict;
 #
 
 #
+# Function phototypes
+#
+
+sub assemble_zonefile($);
+sub make_forward_zonefile($$$);
+sub isroutable($);
+
+#
 # Configure variables
 #
 my $TB		= "@prefix@";

@@ -37,6 +37,9 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+# Functions
+sub runwansolver();
+
 # Locals
 my $debug	= 0;
 my $failed	= 0;

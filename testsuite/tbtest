@@ -26,6 +26,7 @@
 #   -exitonfail - Exit on the first failure.
 #   -session <sessionid> - Specify an alternate session id.
 #   -flest - Generate flest.log file for flest runs.
+#   -daikon - 
 #
 # <mode> is one of:
 #    run <db> <testlist> [<pid> <eid> <num>] - Do everything.
@@ -95,6 +96,7 @@ sub show_help {
     print STDERR "  -exitonfail - Exit on any failure.\n";
     print STDERR "  -session <sessionid> - Specify an alternate session id.\n";
     print STDERR "  -flest - Generate flest.log for flest runs.\n";
+    print STDERR "  -daikon\n";
     print STDERR "Mode:\n";
     print STDERR "  run <db> <testlist> [<pid> <eid> <num>]\n";
     print STDERR "  init <db> [<pid> <eid> <num>]\n";
@@ -114,6 +116,7 @@ $mode = "";
 $leavedb = 0;
 $exitonfail = 0;
 $flestlog = 0;
+$daikon = 0;
 $user=`whoami`;
 chop $user;
 
@@ -135,6 +138,8 @@ while (($#ARGV > -1) && ($mode eq "")) {
 	$user = shift;
     } elsif ($arg eq "-flest") {
 	$flestlog = 1;
+    } elsif ($arg eq "-daikon") {
+	$daikon = 1;
     } else {
 	$mode = $arg;
     }
@@ -568,9 +573,7 @@ sub step_init {
     prints "END INIT\n";
 }
 
-sub step_test {
-    open(LOG,">> $logfile");
-
+sub test_pass {
     prints "START TEST\n";
 
     if ($flestlog) {
@@ -710,6 +713,57 @@ sub step_test {
 	close FLESTLOG;
     }
     prints "END TEST\n";
+}
+
+sub step_test {
+    open(LOG,">> $logfile");
+
+    if (!$daikon) {
+
+	test_pass;
+
+    } else {
+
+	prints "DAIKONIZING: STAGE 1 ... ";
+	system("$TB/bin/daikonize clean > daikon-clean.log 2>&1");
+	if (($? >> 8) != 0 && ($? >> 8) != 1) {
+	    prints "FAIL - see \"daikon-clean.log\" for why.\n";
+	    prints "EXITING.\n";
+	    return;
+	}
+	system("$TB/bin/daikonize stage1 > daikon-stage1.log 2>&1");
+	if (($? >> 8) != 0 && ($? >> 8) != 1) {
+	    prints "FAIL - see \"daikon-stage1.log\" for why.\n";
+	    prints "EXITING.\n";
+	    return;
+	} else {
+	    prints "PASS\n";
+	}
+
+	test_pass;
+
+	prints "DAIKONIZING: STAGE 2 ... ";
+	system("$TB/bin/daikonize stage2 > daikon-stage2.log 2>&1");
+	if (($? >> 8) != 0 && ($? >> 8) != 1) {
+	    prints "FAIL - see \"daikon-stage2.log\" for why.\n";
+	    prints "EXITING.\n";
+	    return;
+	} else {
+	    prints "PASS\n";
+	}
+
+	test_pass;
+
+	prints "DAIKONIZING: ANALYZE ... ";
+	system("$TB/bin/daikonize analyze > daikon-analyze.log 2>&1");
+	if (($? >> 8) != 0 && ($? >> 8) != 1) {
+	    prints "FAIL - see \"daikon-analyze.log\" for why.\n";
+	    prints "EXITING.\n";
+	    return;
+	} else {
+	    prints "PASS\n";
+	}
+    }
 }
 
 sub step_cleanup {

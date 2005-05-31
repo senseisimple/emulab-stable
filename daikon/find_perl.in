@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+
+$prefix = "@prefix@";
+
+$subdirs = "bin/ sbin/ libexec/";
+
+chdir $prefix;
+
+$files = `find $subdirs -type f -maxdepth 1 -print0`;
+
+foreach my $f (split /\0/, $files) 
+{
+    die "Already in daikonized state, run \"daikonize restore\" first. (File $f)\n" 
+	if $f =~ /real\.pl$/;
+    open F, $f;
+    $_ = <F>;
+    next unless /\#.+\/perl( .+|)/ || $f =~ /.pl$/;
+    next if /\/daikonize\.pl$/; # don't daikonize daikoze script as that 
+                                # causes all sorts of problems
+    $_ = defined $1 ? $1 : '';
+    next if /-\S*T/; # skip chroot scripts for now
+    print "$f\n";
+}

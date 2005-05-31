@@ -13,6 +13,9 @@ sub usage()
 	"Use the -p option to remove user from a specific project\n";
     exit(-1);
 }
+
+sub fatal($);
+
 my  $optlist = "p:n";
 
 #

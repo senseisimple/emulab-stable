@@ -32,6 +32,9 @@ sub usage()
 	  "<eid>    - The experiment name (id)\n");
     exit(-1);
 }
+
+sub fatal($);
+
 my $optlist = "bwq";
 my $waitmode = 0;
 my $batch    = 0;

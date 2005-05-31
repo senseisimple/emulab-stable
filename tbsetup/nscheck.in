@@ -27,6 +27,11 @@ sub usage()
 my  $optlist = "";
 
 #
+# Function phototype(s)
+#
+sub fatal($);
+
+#
 # Configure variables
 #
 my $TB       = "@prefix@";

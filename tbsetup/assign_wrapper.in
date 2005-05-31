@@ -10,6 +10,40 @@ use POSIX qw(setsid ceil);
 use POSIX ":sys_wait_h";
 
 #
+# Function phototypes
+#
+sub RunAssign();
+sub getbandwidth($$$);
+sub InitPnode($$);
+sub nextipportnum($);
+sub AddVlan($$$;$);
+sub UploadVlans();
+sub CheckMaxConcurrent();
+sub UploadStats();
+sub NewVethIface($$$;$);
+sub AddVethPatch($$);
+sub PatchVeths();
+sub newvname($$);
+sub newvname_simhost($);
+sub LoadPhysInfo();
+sub interfacespeedmbps($$);
+sub requires_delay($$$);
+sub LoadVirtNodes();
+sub LoadVirtNodeDesires();
+sub LoadVirtNodeStartLoc();
+sub LoadVirtLans();
+sub LoadVirtTypes();
+sub LoadExperiment();
+sub CreateTopFile();
+sub LoadPhysNode($);
+sub LoadPhysNodeInterfaces($);
+sub LoadPhysResources();
+sub physnodenextrtabid($);
+sub getrtabid($$);
+sub array_diff($$);
+sub LoadCurrent();
+
+#
 # This function as the main assign loop.  It converts the virtual
 # topology into a top input including LAN and delay translation.  It
 # then snapshots the current testbed physical state and runs assign,
@@ -35,7 +69,7 @@ my  $WRAPPER_FAILED_CANRECOVER   = 0x40;        # Can recover from update
 my  $WRAPPER_FAILED_FATALLY      = 0x80;	# Do not use this.
 # Set this once we modify DB state; forces no recover in fatal().
 my $NoRecover = 0;
-    
+
 sub usage ()
 {
     print STDERR "Usage: $0 [-v] [-u [-f] | -n] pid eid\n";
@@ -212,6 +246,54 @@ TBDebugTimeStamp("assign_wrapper started");
 my %virt_nodes = ();
 
 #
+# Helper functions to get virt_node info. Because of internally created
+# nodes (tbdelay, vhost, sim), we need a virtnodeisvnode() test to prevent
+# entries getting stuck into $virt_nodes when calling, say, virtnodeisvirt.
+# Should we create entries for these nodes instead?
+#
+sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
+sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
+sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
+sub virtnodeelabrole($) { return $virt_nodes{$_[0]}->{"inner_elab_role"}; }
+sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
+sub virtnodesetosid($$) { return $virt_nodes{$_[0]}->{"__osid"} = $_[1]; }
+sub virtnodeparent($)   { return $virt_nodes{$_[0]}->{"__parent"}; }
+sub virtnodepnode($)    { return $virt_nodes{$_[0]}->{"__physnode"}; }
+sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
+sub virtnodeusewan($)   { return $virt_nodes{$_[0]}->{"__usewanassign"}; }
+sub virtnodesetusewan($){ return $virt_nodes{$_[0]}->{"__usewanassign"} = 1;}
+sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
+sub virtnodestartloc($) { return $virt_nodes{$_[0]}->{"__startloc"}; }
+sub virtnodeisremote($) {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isremotenode"};
+}
+sub virtnodeisvirt($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isvirtnode"};
+}
+sub virtnodeissubnode($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issubnode"};
+}
+sub virtnodeissim($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issimnode"};
+}
+sub virtnodeisdynamic($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isdynamic"};
+}
+sub virtnodeisplabnode($)   {
+    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isplabnode"};
+}
+sub virtnodeisjailed($) {
+    return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
+}
+sub virtnodedesires     {
+    my @desires;
+    while (my ($desire, $weight) = each %{$virt_nodes{$_[0]}->{"__desires"}}) {
+	push @desires, $desire . ":" . sprintf("%f",$weight);
+    }
+    return join(" ",@desires);
+}
+
+#
 # virt_lans: The equivalent of virt_nodes; the virt_lans table in the DB.
 # Since there are multiple rows per lan (one for each node), this is a
 # multilevel structure. The first slot is another hash, one for each node.
@@ -232,6 +314,28 @@ my %virt_nodes = ();
 #
 my %virt_lans = ();
 
+sub virtlanexists($)	{ return exists($virt_lans{$_[0]}); }
+sub virtlanname($)	{ return $virt_lans{$_[0]}->{"VNAME"}; }
+sub virtlanmembers($)	{ return @{$virt_lans{$_[0]}->{"MEMBERLIST"}}; }
+sub virtlanmustdelay($)	{ return $virt_lans{$_[0]}->{"MUSTDELAY"}; }
+sub virtlanemulated($)	{ return $virt_lans{$_[0]}->{"EMULATED"}; }
+sub virtlanlinkdelay($) { return $virt_lans{$_[0]}->{"USELINKDELAY"}; }
+sub virtlannobwshape($)	{ return $virt_lans{$_[0]}->{"NOBWSHAPING"}; }
+sub virtlantrivok($)	{ return $virt_lans{$_[0]}->{"TRIVIAL_OK"}; }
+sub virtlanuseveth($)	{ return $virt_lans{$_[0]}->{"USEVETH"}; }
+sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
+sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
+sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
+sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
+sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
+sub virtlanallsim($)    { return $virt_lans{$_[0]}->{"ALLSIM"}; }
+sub virtlanprotocol($)  { return $virt_lans{$_[0]}->{"PROTOCOL"}; }
+sub virtlanAP($)        {
+    return $virt_lans{$_[0]}->{"ACCESSPOINT"}
+        if (defined($virt_lans{$_[0]}->{"ACCESSPOINT"}));
+    return undef;
+}
+
 #
 # virt_vtypes: The virt_vtypes table in the DB, indexed by the vtype
 # name (user chosen name).
@@ -242,6 +346,20 @@ my %virt_vtypes = ();
 # node_types: The node_types table from the DB, indexed by the type name.
 #
 my %node_types = ();
+
+sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
+sub nodetypetype($)     { return $node_types{$_[0]}->{"type"}; }
+sub nodetypeclass($)    { return $node_types{$_[0]}->{"class"}; }
+sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
+sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
+sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
+sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
+sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
+sub nodetypeisdynamic($){ return $node_types{$_[0]}->{"isdynamic"}; }
+sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
+sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
+sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
+sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
 
 # 
 # interface_capabilities: We need this to find out the bandwidths of the devices
@@ -264,6 +382,40 @@ my %node_type_linkbw = ();
 # to the the corresponding physnode entry. 
 # 
 my %phys_nodes = ();
+
+sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
+sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
+sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailflag"}; }
+sub physnodeissubnode($) { return $phys_nodes{$_[0]}->{"issubnode"}; }
+sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{"phys_nodeid"}; }
+sub physnodecontroliface($){ return $phys_nodes{$_[0]}->{"control_iface"}; }
+sub physnodetype($)      { return $phys_nodes{$_[0]}->{"type"}; }
+sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
+sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
+sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
+sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
+sub physnodenextpipe($)  {
+    my $pipeno = $phys_nodes{$_[0]}->{"__pipeno"} += 10;
+
+    fatal("Too many ipfw pipes on node $pnode!")
+	if ($pipeno >= 65535);
+    
+    return $pipeno;
+}
+sub physnodenextrtabid($)  {
+    my $rtabid = $phys_nodes{$_[0]}->{"__rtabid"} += 1;
+    return $rtabid;
+}
+
+
+#
+# phys_node_interfaces: ???
+#
+
+sub physnodeinterface($$) { return $phys_node_interfaces{$_[0]}{$_[1]}; }
+sub physinterfacetype($$) {
+    return $phys_node_interfaces{$_[0]}{$_[1]}{"interface_type"};
+}
 
 #
 # More physical side data structures.
@@ -2377,7 +2529,7 @@ sub getnodeport {
     }
 };
 
-sub InitPnode($pnode, $vnode)
+sub InitPnode($$)
 {
     my ($pnode,$vnode) = @_;
     my $vname;
@@ -3145,19 +3297,6 @@ sub LoadPhysInfo()
 sub interfacespeedmbps($$) {
     return $interface_capabilities{$_[0]}->{$_[1] . "_defspeed"} / 1000.0;
 }
-sub nodetypeistype($)   { return exists($node_types{$_[0]}); }
-sub nodetypetype($)     { return $node_types{$_[0]}->{"type"}; }
-sub nodetypeclass($)    { return $node_types{$_[0]}->{"class"}; }
-sub nodedelayosid($)    { return $node_types{$_[0]}->{"delay_osid"}; }
-sub nodejailosid($)     { return $node_types{$_[0]}->{"jail_osid"}; }
-sub nodedefaultosid($)  { return $node_types{$_[0]}->{"osid"}; }
-sub nodetypeisremote($) { return $node_types{$_[0]}->{"isremotenode"}; }
-sub nodetypeisvirt($)   { return $node_types{$_[0]}->{"isvirtnode"}; }
-sub nodetypeisdynamic($){ return $node_types{$_[0]}->{"isdynamic"}; }
-sub nodetypeissub($)    { return $node_types{$_[0]}->{"issubnode"}; }
-sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
-sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
-sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
 
 # requires_delay()
 # Returns 1 if the given bandwidth requires that a delay node be inserted, 0
@@ -3433,54 +3572,6 @@ sub LoadVirtNodeStartLoc()
 }
 
 #
-# Helper functions to get virt_node info. Because of internally created
-# nodes (tbdelay, vhost, sim), we need a virtnodeisvnode() test to prevent
-# entries getting stuck into $virt_nodes when calling, say, virtnodeisvirt.
-# Should we create entries for these nodes instead?
-#
-sub virtnodeisvnode($)  { return exists($virt_nodes{$_[0]}); }
-sub virtnodetype($)	{ return $virt_nodes{$_[0]}->{"type"}; }
-sub virtnodename($)	{ return $virt_nodes{$_[0]}->{"vname"}; }
-sub virtnodeelabrole($) { return $virt_nodes{$_[0]}->{"inner_elab_role"}; }
-sub virtnodeosid($)     { return $virt_nodes{$_[0]}->{"__osid"}; }
-sub virtnodesetosid($$) { return $virt_nodes{$_[0]}->{"__osid"} = $_[1]; }
-sub virtnodeparent($)   { return $virt_nodes{$_[0]}->{"__parent"}; }
-sub virtnodepnode($)    { return $virt_nodes{$_[0]}->{"__physnode"}; }
-sub virtnodesetpnode($$){ return $virt_nodes{$_[0]}->{"__physnode"} = $_[1]; }
-sub virtnodeusewan($)   { return $virt_nodes{$_[0]}->{"__usewanassign"}; }
-sub virtnodesetusewan($){ return $virt_nodes{$_[0]}->{"__usewanassign"} = 1;}
-sub virtnodesettings($) { return @{$virt_nodes{$_[0]}->{"__settings"}}; }
-sub virtnodestartloc($) { return $virt_nodes{$_[0]}->{"__startloc"}; }
-sub virtnodeisremote($) {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isremotenode"};
-}
-sub virtnodeisvirt($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isvirtnode"};
-}
-sub virtnodeissubnode($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issubnode"};
-}
-sub virtnodeissim($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__issimnode"};
-}
-sub virtnodeisdynamic($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isdynamic"};
-}
-sub virtnodeisplabnode($)   {
-    return virtnodeisvnode($_[0]) && $virt_nodes{$_[0]}->{"__isplabnode"};
-}
-sub virtnodeisjailed($) {
-    return virtnodeisvirt($_[0]) && physnodeisjailed(virtnodepnode($_[0]));
-}
-sub virtnodedesires     {
-    my @desires;
-    while (my ($desire, $weight) = each %{$virt_nodes{$_[0]}->{"__desires"}}) {
-	push @desires, $desire . ":" . sprintf("%f",$weight);
-    }
-    return join(" ",@desires);
-}
-
-#
 # Load up the virt_nodes info, which includes the type info for each
 # node. Since the user can define vtypes, it is possible that there
 # will not be anything in the node_types table.
@@ -3654,27 +3745,6 @@ sub LoadVirtLans()
 	    "$rdelay $rbandwidth $rlossrate\n";
 	printdb "   $port:$vname is a lan of $node\n";
     }
-}
-sub virtlanexists($)	{ return exists($virt_lans{$_[0]}); }
-sub virtlanname($)	{ return $virt_lans{$_[0]}->{"VNAME"}; }
-sub virtlanmembers($)	{ return @{$virt_lans{$_[0]}->{"MEMBERLIST"}}; }
-sub virtlanmustdelay($)	{ return $virt_lans{$_[0]}->{"MUSTDELAY"}; }
-sub virtlanemulated($)	{ return $virt_lans{$_[0]}->{"EMULATED"}; }
-sub virtlanlinkdelay($) { return $virt_lans{$_[0]}->{"USELINKDELAY"}; }
-sub virtlannobwshape($)	{ return $virt_lans{$_[0]}->{"NOBWSHAPING"}; }
-sub virtlantrivok($)	{ return $virt_lans{$_[0]}->{"TRIVIAL_OK"}; }
-sub virtlanuseveth($)	{ return $virt_lans{$_[0]}->{"USEVETH"}; }
-sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
-sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
-sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
-sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
-sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
-sub virtlanallsim($)    { return $virt_lans{$_[0]}->{"ALLSIM"}; }
-sub virtlanprotocol($)  { return $virt_lans{$_[0]}->{"PROTOCOL"}; }
-sub virtlanAP($)        {
-    return $virt_lans{$_[0]}->{"ACCESSPOINT"}
-        if (defined($virt_lans{$_[0]}->{"ACCESSPOINT"}));
-    return undef;
 }
 
 # Return the (bandwidth, rbandwidth) to put into a top file for this link -
@@ -4444,10 +4514,6 @@ sub LoadPhysNodeInterfaces($)
     }
     return $phys_node_interfaces{$pnode};
 }
-sub physnodeinterface($$) { return $phys_node_interfaces{$_[0]}{$_[1]}; }
-sub physinterfacetype($$) {
-    return $phys_node_interfaces{$_[0]}{$_[1]}{"interface_type"};
-}
 
 sub LoadPhysResources()
 {
@@ -4499,29 +4565,6 @@ sub LoadPhysResources()
 	}
     }
     TBDebugTimeStamp("LoadPhysResources finished");
-}
-sub physnodeallocated($) { return exists($phys_nodes{$_[0]}); }
-sub physnodeisvirtnode($){ return $phys_nodes{$_[0]}->{"isvirtnode"}; }
-sub physnodeisjailed($)  { return $phys_nodes{$_[0]}->{"jailflag"}; }
-sub physnodeissubnode($) { return $phys_nodes{$_[0]}->{"issubnode"}; }
-sub physnodephysnode($)  { return $phys_nodes{$_[0]}->{"phys_nodeid"}; }
-sub physnodecontroliface($){ return $phys_nodes{$_[0]}->{"control_iface"}; }
-sub physnodetype($)      { return $phys_nodes{$_[0]}->{"type"}; }
-sub physnodesetvnode($$) { return $phys_nodes{$_[0]}->{"__vname"} = $_[1]; }
-sub physnodevnode($$)    { return $phys_nodes{$_[0]}->{"__vname"}; }
-sub physnodereuse($)     { return $phys_nodes{$_[0]}->{"__reuse"}; }
-sub physnodesetreuse($$) { return $phys_nodes{$_[0]}->{"__reuse"} = $_[1]; }
-sub physnodenextpipe($)  {
-    my $pipeno = $phys_nodes{$_[0]}->{"__pipeno"} += 10;
-
-    fatal("Too many ipfw pipes on node $pnode!")
-	if ($pipeno >= 65535);
-    
-    return $pipeno;
-}
-sub physnodenextrtabid($)  {
-    my $rtabid = $phys_nodes{$_[0]}->{"__rtabid"} += 1;
-    return $rtabid;
 }
 
 #

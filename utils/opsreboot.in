@@ -16,6 +16,7 @@ sub usage()
     print(STDERR "Usage: opsreboot [-d]\n");
     exit(1);
 }
+sub fatal($);
 my $optlist = "d";
 my $debug   = 0;
 

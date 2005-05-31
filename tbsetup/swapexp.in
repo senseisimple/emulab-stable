@@ -32,6 +32,9 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
+
+sub fatal($);
+
 my  $optlist = "biafres:wq";
 
 #

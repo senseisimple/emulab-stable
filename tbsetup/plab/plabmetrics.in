@@ -25,6 +25,9 @@ sub usage()
 	"Usage: plabmetrics [-d] [-n]\n";
     exit(-1);
 }
+
+sub InsertMetrics($%);
+
 my $optlist = "dn";
 my $debug   = 0;
 my $impotent= 0;

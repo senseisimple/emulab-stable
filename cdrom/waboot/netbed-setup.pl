@@ -60,6 +60,24 @@ my $ifconfig    = "ifconfig";
 my $logfile     = "/tmp/netbed-setup.log";
 
 #
+# Function prototypes
+#
+sub GetInstructions();
+sub FinishedInstructions();
+sub MakeFS($$);
+sub LocalizeRoot();
+sub WritePrivKey();
+sub MountRoot();
+sub UnMountMnt();
+sub WriteConfigBlock();
+sub GetRootTag();
+sub fatal($);
+sub mysystem($);
+sub mypopen($);
+sub Prompt($$;$);
+sub VerifySig($$);
+
+#
 # Locals
 #
 my $tempdevice  = "s2c";

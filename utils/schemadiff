@@ -17,6 +17,17 @@ use strict;
 use Getopt::Std; 
 
 #
+# Functions
+#
+sub read_schema($);
+sub compare_tables($$);
+sub compare_keys($$@);
+sub compare_columns($$@);
+sub diff_keys($$);
+sub usage();
+sub debug(@);
+
+#
 # Default settings for the options
 #
 my $debug = 0;

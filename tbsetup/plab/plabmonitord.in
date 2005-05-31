@@ -83,6 +83,14 @@ if (defined($options{"d"})) {
 }
 
 #
+# Functions
+#
+sub nodepostalloc($);
+sub nodeprecheck($);
+sub fatal($);
+sub search($@);
+
+#
 # Local vars
 #
 my $logfile = "$TB/log/plabmonitord";

@@ -16,6 +16,7 @@ sub usage()
 	"newwanode [-w] [-n nickname] -t <nodetype> -i <ip address>\n";
     exit(1);
 }
+sub fatal($);
 my  $optlist = "wt:i:a:n:";
 
 #

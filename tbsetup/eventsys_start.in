@@ -63,6 +63,8 @@ $| = 1;
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
+sub failed($$$);
+
 my $uid;
 my $gid;
 my $pid;

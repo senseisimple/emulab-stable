@@ -48,6 +48,12 @@ open STDERR, ">&STDOUT";
 #
 # The basic step we have to go through - all functions die() if they fail
 #
+sub CreateDirectories();
+sub CopySource($);
+sub FillDatabase($);
+sub RunTestsuite();
+sub CopyResults($);
+
 CreateDirectories();
 CopySource($source_location);
 FillDatabase($database_dump);
@@ -62,7 +68,7 @@ sub CreateDirectories() {
     }
 }
 
-sub CopySource($$) {
+sub CopySource($) {
     print "##### Copying source code\n";
     my ($source_location) = @_;
     ReliableCopy("$source_location/*",$LOCAL_SRC_DIR);
@@ -87,6 +93,8 @@ sub RunTestsuite() {
     # We accept failure here, because we want to still copy the logs out
     system "$LOCAL_SRC_DIR/testsuite/tbtest -flest run tbdb frontend";
 }
+
+sub ReliableCopy($$;$);
 
 sub CopyResults($) {
     print "##### Copying back results\n";

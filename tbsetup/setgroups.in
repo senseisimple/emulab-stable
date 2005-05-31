@@ -28,6 +28,9 @@ sub usage()
 
     exit(-1);
 }
+
+sub fatal($);
+
 my  $optlist = "p:";
 
 #

@@ -26,6 +26,7 @@ sub usage()
  
     exit(-1);
 }
+sub GenDefsFile($);
 my $optlist  = "nqp";
 my $passmode = 0;
 my $impotent = 0;

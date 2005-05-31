@@ -87,6 +87,29 @@ my $NFSMOUNT_LOCAL  = 1;
 my $NFSMOUNT_REMOTE = 0;	# too much load on NFS server
 
 #
+# Functions
+#
+
+sub mkrootfs($);
+sub restorerootfs($);
+sub cleanmess($);
+sub startproxy($);
+sub cleanup();
+sub fatal($);
+sub mysystem($);
+sub getjailconfig($);
+sub setjailoptions();
+sub addcontrolroutes();
+sub removevnodedir($);
+sub getnextrtabid();
+sub jailcnetaliases();
+sub setcnethostalias($);
+sub clearcnethostalias($);
+sub getcnetrouter($);
+sub getcnetmask($);
+sub CheckFreeVN($$);
+
+#
 # Locals
 #
 my $JAILPATH	= "/var/emulab/jails";

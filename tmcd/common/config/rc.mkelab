@@ -863,7 +863,7 @@ sub CreateDefsFile($)
 {
     my ($defsfile) = @_;
     
-    print "Creating defs file from stub defs file\m";
+    print "Creating defs file from stub defs file\n";
     
     my $bossnode_ip     = $emulabconfig{"BOSSIP"};
     my $opsnode_ip      = $emulabconfig{"OPSIP"};

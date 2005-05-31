@@ -24,6 +24,11 @@ sub usage()
 	"Use the -d option to prevent daemonization\n";
     exit(-1);
 }
+
+sub dosomething($$);
+sub isexpdone($);
+sub TBBatchUnLockExp($$;$);
+
 my  $optlist = "d";
 
 #

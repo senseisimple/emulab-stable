@@ -51,6 +51,11 @@ use lib "@prefix@/lib";
 use libtestbed;
 
 #
+# Function prototypes
+#
+sub fatal($);
+
+#
 # Only real root can call this.
 # 
 if ($UID != 0) {

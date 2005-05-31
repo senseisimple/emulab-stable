@@ -58,6 +58,10 @@ my $PENDINGEID	= NODERELOADPENDING_EID;
 my $NODEDEAD_PID= NODEDEAD_PID;
 my $NODEDEAD_EID= NODEDEAD_EID;
 
+sub fatal($);
+sub notify($);
+sub daemonize();
+
 my $os_load	= "$TB/bin/os_load -s";
 my $sched_reload= "$TB/sbin/sched_reload";
 my $reboot	= "$TB/bin/node_reboot";

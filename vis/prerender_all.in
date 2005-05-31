@@ -25,7 +25,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 my $PRERENDER_CMD = "@prefix@/libexec/vis/prerender -f ";
 
 sub usage {
-    die "Usage:\prerender_all [-v] [-t]";
+    die "Usage: prerender_all [-v] [-t]";
 }
 
 my $optlist = "vt";

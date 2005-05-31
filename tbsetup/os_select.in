@@ -48,6 +48,17 @@ my $MBKERNEL = TB_OSID_MBKERNEL;
 my %osidmap = # Map some magic OSIDs to op_modes
     ( $MBKERNEL => "MINIMAL");
 
+# Functions
+
+sub set_nextmode($;$);
+sub set_boot_osid($);
+sub node_opmode($);
+sub debug($;$);
+sub notify($);
+sub info($);
+sub fatal($);
+sub warning($);
+
 # Global vars
 my $debug	= 0; # debug/verbose
 my $oneshot	= 0; # apply change to next_boot_osid.

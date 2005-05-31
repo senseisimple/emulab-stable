@@ -23,6 +23,16 @@ sub usage() {
 	  "  -a    - Generate all email lists; careful ...\n");
     exit(-1);
 }
+
+sub ActiveUsers();
+sub RecentUsers();
+sub RecentProjects();
+sub Users();
+sub WideAreaPeople();
+sub ProjectLeaders();
+sub ProjectLists($$);
+sub genelist($$$);
+
 my $optlist = "anu:p:tdm";
 my $debug   = 0;
 my $all     = 0;

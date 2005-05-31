@@ -22,6 +22,8 @@ sub usage() {
     print "Usage: $0 [-a] | [-e <pid> <eid>] | [vnode ...]\n";
 }
 
+sub InstallSlothd($);
+
 my %opts = ();
 my $pid;
 my $eid;

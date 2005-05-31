@@ -10,6 +10,14 @@ use Getopt::Std;
 use Fcntl ':flock';
 
 #
+# Load the Testbed support stuff.
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
 # Create user SSL certificates.
 # 
 sub usage()
@@ -73,12 +81,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 $| = 1;
 
 #
-# Load the Testbed support stuff.
+# Function prototypes
 #
-use lib "@prefix@/lib";
-use libaudit;
-use libdb;
-use libtestbed;
+sub fatal($);
 
 #
 # Rewrite audit version of ARGV to prevent password in mail logs.

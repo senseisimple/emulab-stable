@@ -69,6 +69,8 @@ if ($opt{e}) {
     $pid = $opt{p};
 }
 
+sub dprint(@);
+
 my $operation = shift @ARGV;
 my $filename;
 if (!$operation) {
