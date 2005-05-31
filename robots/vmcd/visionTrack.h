@@ -9,7 +9,6 @@
 
 /**
  * @file visionTrack.h
- *
  */
 
 #include "mtp.h"
@@ -27,13 +26,14 @@
  * The maximum distance in meters for which a track is considered the same from
  * one frame to the next.
  */
-#define MERGE_TOLERANCE 0.03
+#define MERGE_TOLERANCE 0.075
 
 /**
  * The maximum number of frames that a track can miss before it is considered
  * lost.
  */
 #define MAX_TRACK_AGE 5
+
 /**
  * Structure used to keep a moving average of last N positions.
  */

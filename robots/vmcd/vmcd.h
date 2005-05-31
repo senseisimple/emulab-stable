@@ -22,4 +22,9 @@ struct vmc_client {
     float vc_bottom;
 };
 
+/**
+ * Version information.
+ */
+extern char build_info[];
+
 #endif

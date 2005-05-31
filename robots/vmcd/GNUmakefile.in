@@ -40,7 +40,7 @@ CFLAGS	       += -I${SRCDIR}/../../lib/libtb
 
 LDFLAGS		= -L../mtp -L${OBJDIR}/lib/libtb -L${OBJDIR}/event/lib 
 
-LIBS	 += -lmtp -ltb -lm 
+LIBS	 += -lmtp -ltb -lm -lz
 
 ifeq ($(HAVE_MEZZANINE),yes)
 CFLAGS	 += -I${SRCDIR}/../mezzanine/libmezz
@@ -48,15 +48,30 @@ LDFLAGS	 += -L../mezzanine/libmezz
 LIBS     += -lmezz
 endif
 
+DEPS = \
+	../mtp/mtp.h \
+	../mtp/mtp_xdr.h \
+	visionTrack.h \
+	robotObject.h \
+	vmcd.h
+
+visionTrack.o: $(DEPS)
+robotObject.o: $(DEPS)
+vmcd.o: $(DEPS)
+
 test_vmc-client.sh: vmc-client
 
 test_vmcd.sh: vmcd
 
-vmc-client: vmc-client.o
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+vmc-client-version.c: vmc-client.o
 
-vmcd: vmcd.o visionTrack.o robotObject.o ../mtp/libmtp.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ vmcd.o visionTrack.o robotObject.o $(LIBS)
+vmc-client: vmc-client.o vmc-client-version.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< vmc-client-version.c $(LIBS)
+
+vmcd-version.c: vmcd.o visionTrack.o robotObject.o ../mtp/libmtp.a
+vmcd: vmcd.o visionTrack.o robotObject.o ../mtp/libmtp.a vmcd-version.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ \
+		vmcd.o visionTrack.o robotObject.o vmcd-version.c $(LIBS)
 
 file_dumper: file_dumper.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)

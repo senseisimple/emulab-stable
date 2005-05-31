@@ -7,6 +7,7 @@
 #include "config.h"
 
 #include <math.h>
+#include <time.h>
 #include <float.h>
 #include <stdio.h>
 #include <errno.h>
@@ -196,7 +197,7 @@ static void dump_vision_track(struct vision_track *vt)
 	 ((struct robot_object *)vt->vt_userdata)->ro_name);
 }
 
- void dump_vision_list(struct lnMinList *list)
+void dump_vision_list(struct lnMinList *list)
 {
     struct vision_track *vt;
 
@@ -473,12 +474,33 @@ static int handle_emc_packet(mtp_packet_t *mp)
     return retval;
 }
 
+static void send_snapshots(void)
+{
+    int lpc;
+
+    for (lpc = 0; lpc < vmc_client_count; lpc++) {
+        struct vmc_client *vc = &vmc_clients[lpc];
+
+	mtp_send_packet2(vc->vc_handle,
+			 MA_Opcode, MTP_SNAPSHOT,
+			 MA_Role, MTP_ROLE_VMC,
+			 MA_TAG_DONE);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int lpc, current_client = 0, retval = EXIT_SUCCESS;
+    time_t start_time;
     fd_set readfds;
 
     roInit();
+    
+    time(&start_time);
+    info("VMCD %s\n"
+	 "  start:\t%s",
+	 build_info,
+	 ctime(&start_time));
     
     FD_ZERO(&readfds);
 
@@ -617,6 +639,7 @@ int main(int argc, char *argv[])
 
     /* connect to all specified clients */
     for (lpc = 0; lpc < vmc_client_count; lpc++) {
+	struct camera_config *cc = &vmc_config.cameras.cameras_val[lpc];
         struct vmc_client *vc = &vmc_clients[lpc];
         
         if ((vc->vc_handle = mtp_create_handle2(vc->vc_hostname,
@@ -624,16 +647,12 @@ int main(int argc, char *argv[])
 						NULL)) == NULL) {
 	    pfatal("mtp_create_handle");
 	}
-	else {
-	    struct mtp_packet mp;
-
-	    mtp_init_packet(&mp,
-			    MA_Opcode, MTP_CONFIG_VMC_CLIENT,
-			    MA_Role, MTP_ROLE_VMC,
-			    MA_X, vmc_config.cameras.cameras_val[lpc].fixed_x,
-			    MA_Y, vmc_config.cameras.cameras_val[lpc].fixed_y,
-			    MA_TAG_DONE);
-	    if (mtp_send_packet(vc->vc_handle, &mp) != MTP_PP_SUCCESS)
+	else if (mtp_send_packet2(vc->vc_handle,
+				  MA_Opcode, MTP_CONFIG_VMC_CLIENT,
+				  MA_Role, MTP_ROLE_VMC,
+				  MA_X, cc->fixed_x,
+				  MA_Y, cc->fixed_y,
+				  MA_TAG_DONE) != MTP_PP_SUCCESS) {
 		pfatal("could not configure vmc-client");
 	}
     }
@@ -687,6 +706,7 @@ int main(int argc, char *argv[])
 	if (current_client == vmc_client_count) {
 	    struct vision_track *vt;
 	    struct robot_object *ro;
+	    int sent_snapshot = 0;
 
 	    /* We've got all of the camera tracks, start processing. */
 	    frame_count += 1;
@@ -767,6 +787,11 @@ int main(int argc, char *argv[])
 		
 		info("sending wiggle request for %d\n", ro->ro_id);
 		dump_info();
+
+		if (!sent_snapshot) {
+		    send_snapshots();
+		    sent_snapshot = 1;
+		}
 		
 		mtp_init_packet(&wmp,
 				MA_Opcode, MTP_WIGGLE_REQUEST,
