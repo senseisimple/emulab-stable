@@ -312,6 +312,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 	
 	this->wm_garcia.queueBehavior(move);
 	move = NULL;
+	this->wm_moving = true;
     }
 }
 
@@ -330,6 +331,7 @@ void wheelManager::setOrientation(float orientation, wmCallback *callback)
     else {
 	this->wm_garcia.queueBehavior(pivot);
 	pivot = NULL;
+	this->wm_moving = true;
     }
 }
 
@@ -355,7 +357,6 @@ void wheelManager::motionStarted(acpObject *behavior)
 	distance = 1.0f; // XXX pivot, just assume a meter for now.
     this->wm_dashboard->setDistanceLimit(distance * 1.1);
     this->wm_dashboard->setVelocityLimit(this->wm_speed * 1.1);
-    this->wm_moving = true;
 
     if ((this->wm_last_status != aGARCIA_ERRFLAG_NORMAL) &&
 	(this->wm_last_status != aGARCIA_ERRFLAG_ABORT)) {
