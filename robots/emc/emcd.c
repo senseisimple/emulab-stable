@@ -1351,21 +1351,38 @@ int rmc_callback(elvin_io_handler_t handler,
 
     case MTP_CREATE_OBSTACLE:
 	{
-	    struct obstacle_config *oc;
+	    struct dyn_obstacle_config *doc;
+	    struct emc_robot_config *erc;
 
-	    oc = &mp->data.mtp_payload_u.create_obstacle;
-	    /* XXX Hack */
-	    event_do(handle,
-		     EA_Experiment, pideid,
-		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
-		     EA_Event, TBDB_EVENTTYPE_CREATE,
-		     EA_Name, topography_name,
-		     EA_ArgInteger, "ID", oc->id,
-		     EA_ArgFloat, "XMIN", oc->xmin + 0.25,
-		     EA_ArgFloat, "YMIN", oc->ymin + 0.25,
-		     EA_ArgFloat, "XMAX", oc->xmax - 0.25,
-		     EA_ArgFloat, "YMAX", oc->ymax - 0.25,
-		     EA_TAG_DONE);
+	    doc = &mp->data.mtp_payload_u.create_obstacle;
+	    erc = robot_list_search(hostname_list, doc->robot_id);
+	    if (erc != NULL) {
+		event_do(handle,
+			 EA_Experiment, pideid,
+			 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+			 EA_Event, TBDB_EVENTTYPE_CREATE,
+			 EA_Name, topography_name,
+			 EA_ArgInteger, "ID", doc->config.id,
+			 EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
+			 EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
+			 EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
+			 EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
+			 EA_ArgString, "ROBOT", erc->vname,
+			 EA_TAG_DONE);
+	    }
+	    else {
+		event_do(handle,
+			 EA_Experiment, pideid,
+			 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+			 EA_Event, TBDB_EVENTTYPE_CREATE,
+			 EA_Name, topography_name,
+			 EA_ArgInteger, "ID", doc->config.id,
+			 EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
+			 EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
+			 EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
+			 EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
+			 EA_TAG_DONE);
+	    }
 	    
 	    retval = 1;
 	}
