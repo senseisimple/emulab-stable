@@ -143,7 +143,44 @@ if ($research) {
     }
 
     echo "<h3>Looking for MACs, this could take a while...</h3>";
-    find_switch_macs($mac_list);
+    $retval = find_switch_macs($mac_list);
+    if ($ELABINELAB && $retval == 0) {
+	#
+	# Ick, Ick, Ick. Must reorder the interfaces so that they are
+	# the same as the outside Emulab, so that when we request the
+	# outer emulab to create a vlan, both are talking about the same
+	# interface. This is of course, bogus. I think I will have to
+	# change it so that we use the MACs instead of the iface name.
+	# That should be an easy change to snmpit_remote and the xmlrpc
+	# server stub (or the proxy I guess).
+	#
+	#  Move them out of the way
+	#
+	foreach ($mac_list as $mac => $switchport) {
+	    DBQueryFatal("update new_interfaces set card = card + 100 " .
+			 "where new_node_id='$switchport[new_node_id]' and " .
+			 "      card=$switchport[card]");
+	}
+	#
+	# Now move them back to proper location, as specifed by the iface
+	# that the outer emulab return to us. 
+	# 
+	foreach ($mac_list as $mac => $switchport) {
+	    $iface = $switchport["iface"];
+
+	    if (preg_match("/^(.*\D)(\d+)$/", $iface, $matches)) {
+		$newcard = $matches[2];
+		$oldcard = $switchport["card"] + 100;
+
+		DBQueryFatal("update new_interfaces set card = $newcard " .
+			     "where new_node_id='$switchport[new_node_id]' " .
+			     "  and card=$oldcard");
+
+		# Remember, $switchport is a *copy*, so must change $mac_list
+		$mac_list[$mac]["card"] = $newcard;
+	    }
+	}
+    }
     foreach ($mac_list as $mac => $switchport) {
         if ($switchport["switch"]) {
 	    $extra_set = "";

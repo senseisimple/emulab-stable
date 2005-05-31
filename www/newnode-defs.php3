@@ -50,15 +50,15 @@ function find_switch_macs(&$mac_list) {
 	    if ($ELABINELAB) {
 		# We let switchmac tell us.
 		$mac_list[$MAC]["class"] = $class;
+		# Need this to reorder the interfaces.
+		$mac_list[$MAC]["iface"] = $iface;
 	    }
 	}
 	$line = fgets($macs);
     }
 
-    pclose($macs);
-
-    return 1;
-
+    # Return exit status to caller! 
+    return pclose($macs);
 }
 
 function guess_node_type($proc,$disk) {
