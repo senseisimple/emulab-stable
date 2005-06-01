@@ -210,6 +210,39 @@ void dump_vision_list(struct lnMinList *list)
     }
 }
 
+static void dump_smoothing_info(struct lnMinList *list) {
+    struct vision_track *vt;
+    int i;
+    
+    assert(list != NULL);
+    
+    vt = (struct vision_track *)(list->lh_Head);
+    
+    while (vt->vt_link.ln_Succ != NULL) {
+	if (vt->vt_userdata != NULL) {
+	    struct robot_object *ro;
+	    struct moving_average *ma;
+
+	    ro = (struct robot_object *)vt->vt_userdata;
+	    ma = &(vt->ma);
+
+	    info("smooth buffer for robot id %d:\n",ro->ro_id);
+
+	    /* print the valid positions first */
+	    for (i = 0; i < ma->number_valid_positions; ++i) {
+		info("(%f,%f,%f),",
+		     ma->positions[i].x,
+		     ma->positions[i].y,
+		     ma->positions[i].theta);
+	    }
+	    
+	    info("\n");
+	}
+
+	vt = (struct vision_track *)vt->vt_link.ln_Succ;
+    }
+}
+
 static void dump_info(void)
 {
     static unsigned long long last_frame_count = 0;
@@ -250,6 +283,10 @@ static void dump_info(void)
     dump_vision_list(&last_frame);
     info(" Current frame:\n");
     dump_vision_list(&current_frame);
+
+    info("Smoothing info:\n");
+    dump_smoothing_info(&current_frame);
+
 }
 
 static void usage(void)
