@@ -328,6 +328,12 @@ sub SetupOpsNode()
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
 
     #
+    # And clear some other stuff.
+    # 
+    mysystem("rm -f /usr/testbed/lib");
+    mysystem("rm -f /usr/testbed/bin");
+
+    #
     # Do this as a separate step cause we need the NFS mounts, but
     # must do the unmounts before running ops-install. 
     # 
@@ -618,6 +624,12 @@ sub SetupBossNode()
     # See new code in dhclient-exit-hooks
     #
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
+
+    #
+    # And clear some other stuff.
+    # 
+    mysystem("rm -f /usr/testbed/lib");
+    mysystem("rm -f /usr/testbed/bin");
 
     #
     # Create a bigger /var/db/mysql (before installing mysql!)
