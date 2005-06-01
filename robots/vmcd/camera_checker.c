@@ -348,6 +348,7 @@ int main(int argc, char *argv[])
     int checks_skipped = log_skip;	/* Print the first one. */
     int bad_checks = 0;
     int alarm_delay = alarm_threshold;
+    int no_fid_msg_count = 0;
     int last_frame;
     while (1) { /* The main loop. */
 	/* get frame data */
@@ -441,7 +442,7 @@ int main(int argc, char *argv[])
 	if (sscanf(now,"%*s %*s %*d %d:", &hour) != 1)
 	    fprintf(log_FILE,"***** Failed to parse hour from %s\n", now);
 	int early = hour<alarm_start_hour, late = hour>=alarm_end_hour;
-	int op_hrs = now[0]!='S' && !early && !late;	/* No weekends. */
+	int op_hrs = now[1]!='S' && !early && !late;	/* No weekends. */
 	if (debug) printf("now %s, hour %d, early %d, late %d, op_hrs %d\n",
 			  now,hour,early,late,op_hrs);
 	if (early || late) alarm_delay = alarm_threshold; /* Reset. */
@@ -461,7 +462,7 @@ int main(int argc, char *argv[])
 	    for (j = 0; j < n_objs; j++) {
 		fid_x = total_x[j] / n_samples[j];
 		fid_y = total_y[j] / n_samples[j];
-		if (show_all_fids && i==0)
+		if (show_all_fids)
 		    printf("Obj %d coords (%f, %f)\n",j,fid_x,fid_y);
 		dist = sqrt(pow(fid_x - pts[i][X],2) + 
 			    pow(fid_y - pts[i][Y],2));
@@ -485,6 +486,14 @@ int main(int argc, char *argv[])
 		       i,got_fid,fid_x,fid_y,closest,close_x,close_y);
 
 	    if (got_fid) {
+		/* Just log repeats for no-fiducial. (Probably lights out.) */
+		if (no_fid_msg_count) {
+		    fprintf(log_FILE,
+			     "%s *** NO FIDUCIAL was repeated %d times.\n",
+			     timestamp(), no_fid_msg_count);
+		    no_fid_msg_count = 0;
+		}
+
 		/* Log every Nth successful check. */
 		if (i==0 || !do_log)    /* Only increment the counter once. */
 		    do_log = ++checks_skipped >= log_skip;
@@ -504,13 +513,15 @@ int main(int argc, char *argv[])
 	    }
 	}
 
-	/* Don't log no-fiducial at night when the lights may be off. */
+	/* Don't log no-fiducial at night or on weekends when lights are off. */
 	if (op_hrs && fid_cnt == 0 && n_msgs == 0 ) {
-	    snprintf(msgs[n_msgs],LITTLE_BUFSIZ,
-		     "%s *** NO FIDUCIAL VISIBLE.\n",
-		     timestamp());
-	    fputs(msgs[n_msgs],log_FILE);
-	    n_msgs++;
+	    if (no_fid_msg_count++ == 0){ /* Don't be repetitive. */
+		snprintf(msgs[n_msgs],LITTLE_BUFSIZ,
+			 "%s *** NO FIDUCIAL VISIBLE.\n",
+			 timestamp());
+		fputs(msgs[n_msgs],log_FILE);
+		n_msgs++;
+	    }
 	}
 
 	/* Don't raise the alarm unless things have been bad for a while. */
@@ -535,11 +546,15 @@ int main(int argc, char *argv[])
 		fputs(msgs[i],mailer);
 	    fprintf(mailer, 
 		    "\n The last known good timestamp was %s.\n", good_ts);
+	    fprintf(mailer, "\n %s %s %s",
+		    "If you need to stop the camera checkers, use this command:\n",
+		    "    sudo /etc/init.d/camera_checker stop\n",
+		    "They run on the computers named 'trash' and 'junk'.\n");
 	    int status = pclose(mailer);
 
 	    /* Don't whine constantly, and back off exponentially. */
 	    bad_checks = 0;
-	    alarm_delay = (int)powf(alarm_delay, alarm_backoff_exponent);
+	    alarm_delay = (int)(alarm_delay * alarm_backoff_exponent);
 	    fprintf(log_FILE,
 		    "%s ***** Alarm mail sent, status %d, next delay %d.\n",
 		    timestamp(),status,alarm_delay);

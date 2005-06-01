@@ -14,6 +14,8 @@ start)
 	for cam in $CAMERAS; do
 		mezzopt=/etc/mezzanine/mezzanine.opt.camera$cam
         	mezzvid=/tmp/mezz_instance/dev/video$cam.ipc
+                # The Mezzanine camera numbers are 2&3 on trash, but ours are 6&7.
+        	if [[ `hostname` == trash ]]; then cam=`expr $cam + 4`; fi
         	checklog=/var/log/check.camera$cam.log
 		/usr/testbed/sbin/camera_checker \
 		 -C $cam -f $mezzopt -F $checklog $mezzvid -M fish@cs.utah.edu 2>&1 &
@@ -23,6 +25,7 @@ start)
         ;;
 stop)
 	for cam in $CAMERAS; do
+        	if [[ `hostname` == trash ]]; then cam=`expr $cam + 4`; fi
 		kill `cat /var/run/camera_checker.$cam.pid`
 		rm /var/run/camera_checker.$cam.pid
 	done

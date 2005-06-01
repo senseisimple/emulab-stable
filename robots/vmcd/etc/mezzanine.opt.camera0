@@ -54,8 +54,9 @@ blobfind.max_sizex = 30
 blobfind.min_sizey = 4
 blobfind.max_sizey = 30
 
-
+# Dewarp parameters
 dewarp.cameraCenter = (296,201)
+dewarp.cameraCheck = (27,58)
 dewarp.ocHeight = 2.30
 dewarp.scaleFactor = (174.0,180.0)
 dewarp.warpFactor = 0.870
