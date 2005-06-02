@@ -328,8 +328,8 @@ int main(int argc, char *argv[])
     }
 
     fprintf(log_FILE,
-	    "%s Starting, pts (%d, %d) (%d, %d), n %d, i %d, e %d, c %d, l %d\n", 
-	    timestamp(),
+	    "\n%s %s (%d, %d) (%d, %d), n %d, i %d, e %d, c %d, l %d\n", 
+	    timestamp(), "Starting, pts",
 	    pts[CTR_PT][X],pts[CTR_PT][Y],
 	    pts[CHK_PT][X],pts[CHK_PT][Y],
 	    num_frames,frame_interval, error_threshold, check_secs, log_skip);
@@ -451,8 +451,9 @@ int main(int argc, char *argv[])
 	 * The tolerance is meant to be a small number of pixels, so there
 	 * will be one or none matching each.
 	 */
-	int got_fid, fid_cnt = 0, do_log = 0, n_msgs = 0;
+	int got_fid, fid_cnt = 0, n_msgs = 0;
 	static char msgs[NPTS+1][LITTLE_BUFSIZ];
+	checks_skipped++;	/* Don't double-increment the counter. */
 	for (i=0; i<=got_chk; i++) {
 	    float fid_x = 0, fid_y = 0, dist = 0;
 #	    define FAR 99999.0
@@ -495,13 +496,10 @@ int main(int argc, char *argv[])
 		}
 
 		/* Log every Nth successful check. */
-		if (i==0 || !do_log)    /* Only increment the counter once. */
-		    do_log = ++checks_skipped >= log_skip;
-		if (do_log) {
+		if (checks_skipped >= log_skip) {
 		    fprintf(log_FILE,
 			    "%s %s (%f, %f), distance %f pixels.\n",
 			    timestamp(),pt_names[i],fid_x,fid_y,dist);
-		    checks_skipped = 0;
 		}
 	    }
 	    else if (closest != FAR) { /* Log all misses. */
@@ -512,6 +510,8 @@ int main(int argc, char *argv[])
 		n_msgs++;
 	    }
 	}
+	if (checks_skipped >= log_skip)
+	  checks_skipped = 0;
 
 	/* Don't log no-fiducial at night or on weekends when lights are off. */
 	if (op_hrs && fid_cnt == 0 && n_msgs == 0 ) {
