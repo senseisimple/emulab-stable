@@ -1220,6 +1220,8 @@ int rmc_callback(elvin_io_handler_t handler,
 		 void *rock,
 		 elvin_error_t eerror)
 {
+  
+  
   mtp_packet_t mp_data, *mp = &mp_data;
   struct rmc_client *rmc = rock;
   int rc, retval = 0;
@@ -1244,7 +1246,10 @@ int rmc_callback(elvin_io_handler_t handler,
 	//     from rmc_data or vmc_data
 	int my_id = mp->data.mtp_payload_u.request_position.robot_id;
 	struct mtp_update_position *up;
-	
+        struct emc_robot_config *erc;	
+ 
+        erc = robot_list_search(hostname_list, my_id);
+        
 	up = (struct mtp_update_position *)
 	  robot_list_search(vmc_data.position_list, my_id);
 
@@ -1252,6 +1257,7 @@ int rmc_callback(elvin_io_handler_t handler,
 	  struct mtp_packet mp_reply;
 	  
 	  // since VMC isn't hooked in, we simply write back the rmc posit
+          /* DAN: what?? */
 	  mtp_init_packet(&mp_reply,
 			  MA_Opcode, MTP_UPDATE_POSITION,
 			  MA_Role, MTP_ROLE_EMC,
@@ -1263,7 +1269,17 @@ int rmc_callback(elvin_io_handler_t handler,
 			   */
 			  MA_Status, MTP_POSITION_STATUS_UNKNOWN,
 			  MA_TAG_DONE);
-	  mtp_send_packet(rmc->handle, &mp_reply);
+   
+          /* DAN */
+          /* Ignore position requests from RMCD if ERF_HAS_GOAL is set,
+           * for nonlinear controller
+           */
+          if (erc->flags & ERF_HAS_GOAL) {
+              info("(In NL mode): Ignoring position request for %d\n", my_id);
+          }
+          else {
+	      mtp_send_packet(rmc->handle, &mp_reply);
+          }
 	}
 	else if (up == NULL) {
 	  up = (struct mtp_update_position *)
@@ -1279,7 +1295,7 @@ int rmc_callback(elvin_io_handler_t handler,
 
     case MTP_UPDATE_POSITION:
       {
-	// store the latest data in teh robot position/status list
+	// store the latest data in the robot position/status list
 	// in rmc_data
 	int my_id = mp->data.mtp_payload_u.update_position.robot_id;
 	struct mtp_update_position *up = (struct mtp_update_position *)
@@ -1318,7 +1334,14 @@ int rmc_callback(elvin_io_handler_t handler,
 		     EA_TAG_DONE);
 #endif
 	    erc->token = ~0;
-	  }
+          }
+          
+          /* unset ERF_HAS_GOAL flag */
+          erc->flags &= ~ERF_HAS_GOAL;
+            
+          info("Received STATUS COMPLETE from %d\n", my_id);
+            
+	  
 	  break;
 	default:
 	  assert(0);
@@ -1470,6 +1493,10 @@ int emulab_callback(elvin_io_handler_t handler,
   mtp_packet_t mp_data, *mp = &mp_data;
   int rc, retval = 0;
 
+  struct emc_robot_config *match = NULL;
+  robot_list_item_t *rli;
+
+  
   do {
   if (((rc = mtp_receive_packet(emulab_handle, mp)) != MTP_PP_SUCCESS) ||
       (mp->vers != MTP_VERSION)) {
@@ -1502,7 +1529,23 @@ int emulab_callback(elvin_io_handler_t handler,
 	    else {
 		info("forwarded goto\n");
 		
-		retval = 1;
+  		/* DAN */
+                /* set ERF_HAS_GOAL flag for this robot */
+  
+  
+  		/* go through robot list */
+  		for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
+                    struct emc_robot_config *erc = rli->data;
+    
+                    if (erc->id == mp->data.mtp_payload_u.request_position.robot_id) {
+                        match = erc;
+                        break;
+                    }
+                }
+  
+                match->flags |= ERF_HAS_GOAL;
+                
+		retval = 1;		
 	    }
 	}
 	else {
@@ -1611,6 +1654,10 @@ int vmc_callback(elvin_io_handler_t handler,
   mtp_packet_t mp_data, *mp = &mp_data;
   struct vmc_client *vmc = rock;
   int rc, retval = 0;
+  
+  
+  struct emc_robot_config *match = NULL;
+  robot_list_item_t *rli;
 
   do {
   if (((rc = mtp_receive_packet(vmc->handle, mp)) != MTP_PP_SUCCESS) ||
@@ -1626,31 +1673,72 @@ int vmc_callback(elvin_io_handler_t handler,
     switch (mp->data.opcode) {
     case MTP_UPDATE_POSITION:
       {
-        // store the latest data in teh robot position/status list
+        // store the latest data in the robot position/status list
         // in vmc_data
         int my_id = mp->data.mtp_payload_u.update_position.robot_id;
         struct mtp_update_position *up = (struct mtp_update_position *)
           robot_list_remove_by_id(vmc->position_list, my_id);
         struct mtp_update_position *up_copy, *up_in;
 
-	up_in = &mp->data.mtp_payload_u.update_position;
-	if (up && (up->status == MTP_POSITION_STATUS_ERROR) &&
-	    (up_in->status != MTP_POSITION_STATUS_ERROR)) {
-	  struct mtp_packet mp_reply;
+        
+
+        /* DAN */
+               
+        for (rli = hostname_list->head; rli != NULL; rli = rli->next) {
+            struct emc_robot_config *erc = rli->data;
+
+            if (erc->id == my_id) {
+                match = erc;
+                break;
+            }
+        }
+        
+        
+        up_in = &mp->data.mtp_payload_u.update_position;
+        
+        if (match->flags & ERF_HAS_GOAL) {
+            /* if ERF_HAS_GOAL is set for this robot
+             * set status to 'MOVING'
+             * If status is 'MOVING', the nonlinear controller will be used
+             */
+
+            mtp_send_packet2(rmc_data.handle,
+                	    MA_Opcode, MTP_UPDATE_POSITION,
+                            MA_Role, MTP_ROLE_EMC,
+                            MA_RobotID, up->robot_id,
+                            MA_Position, &up_in->position,
+                            MA_Status, MTP_POSITION_STATUS_MOVING,
+                            MA_TAG_DONE);            
+          }
+        
+        
+        if (up && (up->status == MTP_POSITION_STATUS_ERROR) &&
+            (up_in->status != MTP_POSITION_STATUS_ERROR)) {
+                struct mtp_packet mp_reply;
 	  
-	  mtp_init_packet(&mp_reply,
-			  MA_Opcode, MTP_UPDATE_POSITION,
-			  MA_Role, MTP_ROLE_EMC,
-			  MA_RobotID, up->robot_id,
-			  MA_Position, &up_in->position,
-			  /*
-			   * The status field has no meaning when this packet
-			   * is being sent.
-			   */
-			  MA_Status, MTP_POSITION_STATUS_UNKNOWN,
-			  MA_TAG_DONE);
-	  mtp_send_packet(rmc_data.handle, &mp_reply);
-	}
+        
+ 
+
+            /* unknown status */
+            mtp_init_packet(&mp_reply,
+                	    MA_Opcode, MTP_UPDATE_POSITION,
+                            MA_Role, MTP_ROLE_EMC,
+                            MA_RobotID, up->robot_id,
+                            MA_Position, &up_in->position,
+                            /*
+                             * The status field has no meaning when this packet
+                             * is being sent.
+                             */
+                            MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+                            MA_TAG_DONE);
+          
+  
+  
+          /* forward packet along -- fly my pretty! */
+          mtp_send_packet(rmc_data.handle, &mp_reply);
+        
+        
+        }
 	
         free(up);
         up = NULL;
