@@ -411,6 +411,7 @@ function SHOWUSER($uid) {
     $failcount   = $row['weblogin_failcount'];
     $failstamp   = $row['weblogin_failstamp'];
     $wikiname    = $row['wikiname'];
+    $cvsweb      = $row['cvsweb'];
 
     if (!strcmp($usr_addr2, ""))
 	$usr_addr2 = "&nbsp";
@@ -564,6 +565,14 @@ function SHOWUSER($uid) {
           </tr>\n";
 
     if (ISADMIN()) {
+	$cvswebflip = ($cvsweb ? 0 : 1);
+
+	echo "<tr>
+                  <td>CVSWeb Access:</td>
+                  <td>$cvsweb (<a href=toggle.php?target_uid=$uid".
+	                      "&type=cvsweb&value=$cvswebflip>Toggle</a>)
+              </tr>\n";
+	
 	$freezeflip = ($frozen ? 0 : 1);
 	
 	echo "<tr>

@@ -23,16 +23,18 @@ LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
 # List of valid toggles
-$toggles = array("adminoff", "webfreeze", "lockdown");
+$toggles = array("adminoff", "webfreeze", "cvsweb", "lockdown");
 
 # list of valid values for each toggle
 $values  = array("adminoff"  => array(0,1),
 		 "webfreeze" => array(0,1),
+		 "cvsweb"    => array(0,1),
 		 "lockdown"  => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
 $optargs = array("adminoff"  => array("target_uid" => 0),
 		 "webfreeze" => array("target_uid" => 1),
+		 "cvsweb"    => array("target_uid" => 1),
 		 "lockdown"  => array("pid" => 1, "eid" => 1));
 
 # Mandatory page arguments.
@@ -93,6 +95,17 @@ elseif ($type == "webfreeze") {
 	PAGEARGERROR("Target user '$target_uid' is not a valid user!");
     }
     DBQueryFatal("update users set weblogin_frozen='$value' ".
+		 "where uid='$target_uid'");
+}
+elseif ($type == "cvsweb") {
+    # must be admin
+    if (! $isadmin) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    if (!TBCurrentUser($target_uid)) {
+	PAGEARGERROR("Target user '$target_uid' is not a valid user!");
+    }
+    DBQueryFatal("update users set cvsweb='$value' ".
 		 "where uid='$target_uid'");
 }
 elseif ($type == "lockdown") {
