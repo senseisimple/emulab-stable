@@ -104,7 +104,16 @@ enum mtp_opcode_t {
      */
     MTP_COMMAND_STOP		= 51,
 
+    /**
+     * Send left/right wheel speeds directly to robot
+     */
+     MTP_COMMAND_WHEELS		= 52,
 
+    /**
+     * Start NULL primitive on robot
+     */
+     MTP_COMMAND_STARTNULL	= 53,
+     
     /**
      * Telemetry from a robot.
      */
@@ -238,6 +247,15 @@ struct robot_position {
     double timestamp;
 };
 
+
+struct robot_position_states {
+   float e;
+   float alpha;
+   float theta;
+   double timestamp;
+};
+
+
 struct mtp_update_position {
     int robot_id;
     robot_position position;
@@ -266,6 +284,19 @@ struct mtp_command_stop {
     int command_id;
     int robot_id;
 };
+
+struct mtp_command_wheels {
+    int command_id;
+    int robot_id;
+    float vleft;
+    float vright;
+}; /* DAN */
+
+struct mtp_command_startnull {
+    int command_id;
+    int robot_id;
+    int acceleration;
+}; /* DAN */
 
 /**
  * The different types of robots that support telemetry.
@@ -357,6 +388,8 @@ union mtp_payload switch (mtp_opcode_t opcode) {
  case MTP_UPDATE_ID:		mtp_update_id		update_id;
  case MTP_COMMAND_GOTO:		mtp_command_goto	command_goto;
  case MTP_COMMAND_STOP:		mtp_command_stop	command_stop;
+ case MTP_COMMAND_WHEELS:	mtp_command_wheels	command_wheels;
+ case MTP_COMMAND_STARTNULL:	mtp_command_startnull	command_startnull;
  case MTP_TELEMETRY:		mtp_telemetry		telemetry;
  case MTP_WIGGLE_REQUEST:	mtp_wiggle_request	wiggle_request;
  case MTP_WIGGLE_STATUS:	mtp_wiggle_status	wiggle_status;

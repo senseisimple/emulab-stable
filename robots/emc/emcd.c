@@ -11,10 +11,10 @@
 
 /* so emc reads config data, sets up data structures, listens on main port
  * every connecting client is configured or rejected, then is placed in
- * a working set to select() on.  Then commands are processed from either a 
+ * a working set to select() on.  Then commands are processed from either a
  * file, or from an active user interface; requests/data are processed from
  * RMC and VMC, and appropriate responses are generated if necessary (whether
- * the response be to the requesting client, or to somebody else (i.e., if 
+ * the response be to the requesting client, or to somebody else (i.e., if
  * VMC pushes a position update, EMC does not need to respond to VMC -- but it
  * might need to push data to RMC!)
  */
@@ -26,7 +26,7 @@
 //   orientation
 //   status
 
-// for the initial configuration of rmc, we need to send a list of id -> 
+// for the initial configuration of rmc, we need to send a list of id ->
 // hostname pairs (later we will also need to send a bounding box, but not
 // until the vision system is a long ways along).
 
@@ -35,7 +35,7 @@
 // emc with known positions/orientations to get matching ids)
 
 // so the emc config file is a bunch of lines with id number, hostname, initial
-// position (x, y, and r floating point vals).  We read this file into the 
+// position (x, y, and r floating point vals).  We read this file into the
 // initial position data structure, as well as a list of id to hostname
 // mappings.
 
@@ -71,6 +71,8 @@
 #define __XSTRING(x) __STRING(x)
 #endif
 
+// #define USE_POSTURE_REG
+
 static event_handle_t handle;
 
 static char *pideid;
@@ -100,7 +102,7 @@ static struct mtp_packet config_vmc;
 
 static char *topography_name;
 
-/* 
+/*
  * these are for some global bounds checking on user-requested
  * positions
  */
@@ -115,7 +117,7 @@ static struct vmc_client vmc_data;
 static mtp_handle_t emulab_handle = NULL;
 
 
-/* 
+/*
  * returns 1 if x,y are inside the union of the boxes defined
  * in the camera_config struct; 0 if not.
  */
@@ -203,12 +205,12 @@ static void dump_info(void)
     struct robot_list_enum *e;
 
     info("info: vision position list\n");
-    
+
     e = robot_list_enum(vmc_data.position_list);
     while ((mup = (struct mtp_update_position *)
 	    robot_list_enum_next_element(e)) != NULL) {
       struct emc_robot_config *erc;
-      
+
       erc = robot_list_search(hostname_list, mup->robot_id);
       info("  %s: %.2f %.2f %.2f\n",
 	   erc->hostname,
@@ -276,7 +278,7 @@ int main(int argc, char *argv[])
   FILE *fp;
 
   progname = argv[0];
-  
+
   while ((c = getopt(argc, argv, "hde:k:p:c:f:s:P:U:l:i:")) != -1) {
     switch (c) {
     case 'h':
@@ -348,13 +350,13 @@ int main(int argc, char *argv[])
   }
 
   if (!config_file) {
-      fprintf(stderr, "error: no config file specified\n");
-      exit(1);
+    fprintf(stderr, "error: no config file specified\n");
+    exit(1);
   }
-  
+
   argc -= optind;
   argv += optind;
-  
+
   // initialize the global lists
   hostname_list = robot_list_create();
   initial_position_list = robot_list_create();
@@ -362,18 +364,18 @@ int main(int argc, char *argv[])
 
   g_camera_config = NULL;
   g_obstacle_config = NULL;
-  
+
   /* read config file into the above lists*/
   parse_config_file(config_file);
   /* read movement file into the position queue */
   parse_movement_file(movement_file);
 
-  if (debug) 
+  if (debug)
     loginit(0, logfile);
   else {
     /* Become a daemon */
     daemon(0, 0);
-    
+
     if (logfile)
       loginit(0, logfile);
     else
@@ -387,10 +389,10 @@ int main(int argc, char *argv[])
   signal(SIGINT, sigquit);
   signal(SIGTERM, sigquit);
   signal(SIGQUIT, sigquit);
-  
+
   signal(SIGSEGV, sigpanic);
   signal(SIGBUS, sigpanic);
-  
+
   if (pidfile)
     strcpy(buf, pidfile);
   else
@@ -400,7 +402,7 @@ int main(int argc, char *argv[])
     fprintf(fp, "%d\n", getpid());
     (void) fclose(fp);
   }
-  
+
   // first, EMC server sock:
   emc_sock = mtp_bind("0.0.0.0", port, unix_path);
   if (emc_sock == -1) {
@@ -411,11 +413,11 @@ int main(int argc, char *argv[])
 #if defined(SIGINFO)
   signal(SIGINFO, siginfo);
 #endif
-  
+
   /*
    * Convert server/port to elvin thing.
    *
-   * XXX This elvin string stuff should be moved down a layer. 
+   * XXX This elvin string stuff should be moved down a layer.
    */
   if (server) {
     snprintf(buf, sizeof(buf), "elvin://%s%s%s",
@@ -429,9 +431,9 @@ int main(int argc, char *argv[])
     snprintf(buf2, sizeof(buf2), "/proj/%s/exp/%s/tbdata/eventkey", pid, eid);
     keyfile = buf2;
   }
-  
+
   /*
-   * Register with the event system. 
+   * Register with the event system.
    */
   handle = event_register_withkeyfile(server, 0, keyfile);
   if (handle == NULL) {
@@ -446,24 +448,24 @@ int main(int argc, char *argv[])
     if (tuple == NULL) {
       fatal("could not allocate an address tuple");
     }
-    
+
     /*
-     * Ask for just the SETDEST event for NODEs we care about. 
+     * Ask for just the SETDEST event for NODEs we care about.
      */
     tuple->expt      = pideid;
     tuple->objtype   = TBDB_OBJECTTYPE_NODE;
     tuple->eventtype = TBDB_EVENTTYPE_SETDEST;
-    
+
     if (!event_subscribe(handle, ev_callback, tuple, NULL)) {
       fatal("could not subscribe to event");
     }
 
   }
-  
+
   if ((elvin_error = elvin_error_alloc()) == NULL) {
     fatal("could not allocate elvin error");
   }
-  
+
   if ((eih = elvin_sync_add_io_handler(NULL,
 				       emc_sock,
 				       ELVIN_READ_MASK,
@@ -491,7 +493,7 @@ int main(int argc, char *argv[])
     }
 #endif
   }
-  
+
   return retval;
 }
 
@@ -500,18 +502,18 @@ static int position_in_camera(struct camera_config *cc,
                               float x,
                               float y
                               ) {
-    int i;
-    int retval = 0;
+  int i;
+  int retval = 0;
 
-    for (i = 0; i < cc_size; ++i) {
-	if (x >= cc[i].x && y >= cc[i].y && 
-	    x <= (cc[i].x + cc[i].width) && y <= (cc[i].y + cc[i].height)) {
-	    retval = 1;
-	    break;
-	}
+  for (i = 0; i < cc_size; ++i) {
+    if (x >= cc[i].x && y >= cc[i].y &&
+	x <= (cc[i].x + cc[i].width) && y <= (cc[i].y + cc[i].height)) {
+      retval = 1;
+      break;
     }
+  }
 
-    return retval;
+  return retval;
 }
 
 static int position_in_obstacle(struct obstacle_config *oc,
@@ -519,32 +521,32 @@ static int position_in_obstacle(struct obstacle_config *oc,
                                 float x,
                                 float y
                                 ) {
-    int i;
-    int retval = 0;
+  int i;
+  int retval = 0;
 
-    for (i = 0; i < oc_size; ++i) {
-	if (x >= (oc[i].xmin - 0.25) && y >= (oc[i].ymin - 0.25) &&
-	    x <= (oc[i].xmax + 0.25) && y <= (oc[i].ymax + 0.25)) {
-	    retval = 1;
-	    break;
-	}
+  for (i = 0; i < oc_size; ++i) {
+    if (x >= (oc[i].xmin - 0.25) && y >= (oc[i].ymin - 0.25) &&
+	x <= (oc[i].xmax + 0.25) && y <= (oc[i].ymax + 0.25)) {
+      retval = 1;
+      break;
     }
+  }
 
-    return retval;
+  return retval;
 }
 
 int have_camera_config(char *hostname, int port,
 		       struct camera_config *cc, int cc_size)
 {
-    int lpc, retval = 0;
+  int lpc, retval = 0;
 
-    for (lpc = 0; lpc < cc_size; lpc++) {
-	if (strcmp(hostname, cc[lpc].hostname) == 0 && port == cc[lpc].port) {
-	    return 1;
-	}
+  for (lpc = 0; lpc < cc_size; lpc++) {
+    if (strcmp(hostname, cc[lpc].hostname) == 0 && port == cc[lpc].port) {
+      return 1;
     }
-    
-    return retval;
+  }
+
+  return retval;
 }
 
 void parse_config_file(char *config_file) {
@@ -630,7 +632,7 @@ void parse_config_file(char *config_file) {
       else {
 	struct emc_robot_config *rc;
 	struct hostent *he;
-	
+
 	// now we save this data to the lists:
 	rc = (struct emc_robot_config *)
 	  malloc(sizeof(struct emc_robot_config));
@@ -738,61 +740,61 @@ void parse_config_file(char *config_file) {
   }
 
   {
-      struct robot_config *robot_val, *rc;
-      struct robot_list_enum *e;
-      struct box *boxes_val;
-      int boxes_len;
-      int lpc = 0;
+    struct robot_config *robot_val, *rc;
+    struct robot_list_enum *e;
+    struct box *boxes_val;
+    int boxes_len;
+    int lpc = 0;
 
-      if (hostname_list->item_count == 0) {
-	fatal("no robots have been specified!");
-      }
-      
-      robot_val = malloc(sizeof(robot_config) * hostname_list->item_count);
-      e = robot_list_enum(hostname_list);
-      while ((rc = (struct robot_config *)
-	      robot_list_enum_next_element(e)) != NULL) {
-	  robot_val[lpc] = *rc;
-	  lpc += 1;
-      }
-      robot_list_enum_destroy(e);
+    if (hostname_list->item_count == 0) {
+      fatal("no robots have been specified!");
+    }
 
-      if (cc_size == 0) {
-	fatal("no cameras have been specified!");
-      }
-      
-      boxes_len = cc_size;
-      boxes_val = (struct box *)malloc(sizeof(struct box) * boxes_len);
-      for (lpc = 0; lpc < boxes_len; ++lpc) {
-	  boxes_val[lpc].x = cc[lpc].x;
-	  boxes_val[lpc].y = cc[lpc].y;
-	  boxes_val[lpc].width = cc[lpc].width;
-	  boxes_val[lpc].height = cc[lpc].height;
-      }
-      
-      mtp_init_packet(&config_rmc,
-		      MA_Opcode, MTP_CONFIG_RMC,
-		      MA_Role, MTP_ROLE_EMC,
-		      MA_RobotLen, hostname_list->item_count,
-		      MA_RobotVal, robot_val,
-		      MA_BoundsLen, boxes_len,
-		      MA_BoundsVal, boxes_val,
-		      MA_ObstacleLen, oc_size,
-		      MA_ObstacleVal, oc,
-		      MA_TAG_DONE);
-      mtp_init_packet(&config_vmc,
-		      MA_Opcode, MTP_CONFIG_VMC,
-		      MA_Role, MTP_ROLE_EMC,
-		      MA_RobotLen, hostname_list->item_count,
-		      MA_RobotVal, robot_val,
-		      MA_CameraLen, cc_size,
-		      MA_CameraVal, cc,
-		      MA_TAG_DONE);
-      /* don't free cc or oc! */
-      g_camera_config = cc;
-      g_camera_config_size = cc_size;
-      g_obstacle_config = oc;
-      g_obstacle_config_size = oc_size;
+    robot_val = malloc(sizeof(robot_config) * hostname_list->item_count);
+    e = robot_list_enum(hostname_list);
+    while ((rc = (struct robot_config *)
+	    robot_list_enum_next_element(e)) != NULL) {
+      robot_val[lpc] = *rc;
+      lpc += 1;
+    }
+    robot_list_enum_destroy(e);
+
+    if (cc_size == 0) {
+      fatal("no cameras have been specified!");
+    }
+
+    boxes_len = cc_size;
+    boxes_val = (struct box *)malloc(sizeof(struct box) * boxes_len);
+    for (lpc = 0; lpc < boxes_len; ++lpc) {
+      boxes_val[lpc].x = cc[lpc].x;
+      boxes_val[lpc].y = cc[lpc].y;
+      boxes_val[lpc].width = cc[lpc].width;
+      boxes_val[lpc].height = cc[lpc].height;
+    }
+
+    mtp_init_packet(&config_rmc,
+		    MA_Opcode, MTP_CONFIG_RMC,
+		    MA_Role, MTP_ROLE_EMC,
+		    MA_RobotLen, hostname_list->item_count,
+		    MA_RobotVal, robot_val,
+		    MA_BoundsLen, boxes_len,
+		    MA_BoundsVal, boxes_val,
+		    MA_ObstacleLen, oc_size,
+		    MA_ObstacleVal, oc,
+		    MA_TAG_DONE);
+    mtp_init_packet(&config_vmc,
+		    MA_Opcode, MTP_CONFIG_VMC,
+		    MA_Role, MTP_ROLE_EMC,
+		    MA_RobotLen, hostname_list->item_count,
+		    MA_RobotVal, robot_val,
+		    MA_CameraLen, cc_size,
+		    MA_CameraVal, cc,
+		    MA_TAG_DONE);
+    /* don't free cc or oc! */
+    g_camera_config = cc;
+    g_camera_config_size = cc_size;
+    g_obstacle_config = oc;
+    g_obstacle_config_size = oc_size;
   }
 }
 
@@ -830,7 +832,7 @@ void parse_movement_file(char *movement_file) {
     char *delim = " \t";
     char *state = NULL;
     struct robot_position *p;
-    
+
     ++line_no;
 
     token = strtok_r(line,delim,&state);
@@ -846,7 +848,7 @@ void parse_movement_file(char *movement_file) {
       continue;
     }
     init_x = (float)atof(token);
-	  
+
     token = strtok_r(NULL,delim,&state);
     if (token == NULL) {
       fprintf(stdout,"Syntax error in movement file, line %d.\n",line_no);
@@ -882,22 +884,22 @@ void ev_callback(event_handle_t handle,
   char objname[TBDB_FLEN_EVOBJNAME];
   robot_list_item_t *rli;
   int in_obstacle, in_camera;
-  
+
   if (! event_notification_get_objname(handle, notification,
 				       objname, sizeof(objname))) {
     error("Could not get objname from notification!\n");
     return;
   }
-  
+
   for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
     struct emc_robot_config *erc = rli->data;
-    
+
     if (strcmp(erc->vname, objname) == 0) {
       match = erc;
       break;
     }
   }
-  
+
   if (match == NULL) {
     error("no match for host\n");
   }
@@ -905,7 +907,7 @@ void ev_callback(event_handle_t handle,
     float x, y, orientation = 0.0, speed = 0.2;
     char *value, args[BUFSIZ];
     struct mtp_packet mp;
-    
+
     event_notification_get_arguments(handle, notification, args, sizeof(args));
 
     /* XXX copy the current X, Y, and orientation! */
@@ -915,28 +917,28 @@ void ev_callback(event_handle_t handle,
 	return;
       }
     }
-    
+
     if (event_arg_get(args, "Y", &value) > 0) {
       if (sscanf(value, "%f", &y) != 1) {
 	error("Y argument in event is not a float: %s\n", value);
 	return;
       }
     }
-    
+
     if (event_arg_get(args, "ORIENTATION", &value) > 0) {
       if (sscanf(value, "%f", &orientation) != 1) {
 	error("ORIENTATION argument in event is not a float: %s\n", value);
 	return;
       }
     }
-    
+
     if (event_arg_get(args, "SPEED", &value) > 0) {
       if (sscanf(value, "%f", &speed) != 1) {
 	error("SPEED argument in event is not a float: %s\n", value);
 	return;
       }
     }
-    
+
     event_notification_get_int32(handle, notification,
 				 "TOKEN", (int32_t *)&match->token);
 
@@ -948,69 +950,69 @@ void ev_callback(event_handle_t handle,
 					     g_obstacle_config_size,
 					     x,y))
 	) {
-	
 
-	mtp_init_packet(&mp,
-			MA_Opcode, MTP_COMMAND_GOTO,
-			MA_Role, MTP_ROLE_EMC,
-			MA_CommandID, 1,
-			MA_RobotID, match->id,
-			MA_X, x,
-			MA_Y, y,
-			MA_Theta, orientation,
-			MA_Speed, speed,
-			MA_TAG_DONE);
 
-	match->flags |= ERF_HAS_GOAL;
-	match->last_goal_pos = mp.data.mtp_payload_u.command_goto.position;
+      mtp_init_packet(&mp,
+		      MA_Opcode, MTP_COMMAND_GOTO,
+		      MA_Role, MTP_ROLE_EMC,
+		      MA_CommandID, 1,
+		      MA_RobotID, match->id,
+		      MA_X, x,
+		      MA_Y, y,
+		      MA_Theta, orientation,
+		      MA_Speed, speed,
+		      MA_TAG_DONE);
 
-	if (rmc_data.handle != NULL) {
-	    mtp_send_packet(rmc_data.handle, &mp);
-	}
+      match->flags |= ERF_HAS_GOAL;
+      match->last_goal_pos = mp.data.mtp_payload_u.command_goto.position;
+
+      if (rmc_data.handle != NULL) {
+	mtp_send_packet(rmc_data.handle, &mp);
+      }
 #if 0
-	else {
-	    mtp_print_packet(stdout, &mp);
-	    
-#if defined(TBDB_EVENTTYPE_COMPLETE)
-	    event_do(handle,
-		     EA_Experiment, pideid,
-		     EA_Type, TBDB_OBJECTTYPE_NODE,
-		     EA_Name, match->vname,
-		     EA_Event, TBDB_EVENTTYPE_COMPLETE,
-		     EA_ArgInteger, "ERROR", 0,
-		     EA_ArgInteger, "CTOKEN", match->token,
-		     EA_TAG_DONE);
-#endif
-	}
-#endif
-	
-	mtp_free_packet(&mp);
-    }
-    else {
-	int which_err_num;
+      else {
+	mtp_print_packet(stdout, &mp);
 
-	which_err_num = (in_camera == 0)?1:2;
-
-	info("requested position either outside camera bounds or inside"
-	     " an obstacle!\n"
-	     );
 #if defined(TBDB_EVENTTYPE_COMPLETE)
 	event_do(handle,
 		 EA_Experiment, pideid,
 		 EA_Type, TBDB_OBJECTTYPE_NODE,
 		 EA_Name, match->vname,
 		 EA_Event, TBDB_EVENTTYPE_COMPLETE,
-		 EA_ArgInteger, "ERROR", which_err_num,
+		 EA_ArgInteger, "ERROR", 0,
 		 EA_ArgInteger, "CTOKEN", match->token,
-		 EA_TAG_DONE
-		 );
+		 EA_TAG_DONE);
+#endif
+      }
+#endif
+
+      mtp_free_packet(&mp);
+    }
+    else {
+      int which_err_num;
+
+      which_err_num = (in_camera == 0)?1:2;
+
+      info("requested position either outside camera bounds or inside"
+	   " an obstacle!\n"
+	   );
+#if defined(TBDB_EVENTTYPE_COMPLETE)
+      event_do(handle,
+	       EA_Experiment, pideid,
+	       EA_Type, TBDB_OBJECTTYPE_NODE,
+	       EA_Name, match->vname,
+	       EA_Event, TBDB_EVENTTYPE_COMPLETE,
+	       EA_ArgInteger, "ERROR", which_err_num,
+	       EA_ArgInteger, "CTOKEN", match->token,
+	       EA_TAG_DONE
+	       );
 #endif
     }
-    
+
     // XXX What to do with the data?
-    
+
     // construct a COMMAND_GOTO packet and send to rmc.
-    
+
   }
 }
 
@@ -1036,7 +1038,7 @@ int acceptor_callback(elvin_io_handler_t handler,
 				     NULL,
 				     eerror) == NULL) {
     error("could not add handler for %d\n", client_sock);
-    
+
     close(client_sock);
     client_sock = -1;
   }
@@ -1047,7 +1049,7 @@ int acceptor_callback(elvin_io_handler_t handler,
 	   ntohs(client_sin.sin_port));
     }
   }
-  
+
   return 1;
 }
 
@@ -1066,7 +1068,7 @@ int unknown_client_callback(elvin_io_handler_t handler,
    * set by the add.
    */
   elvin_sync_remove_io_handler(handler, eerror);
-  
+
   if ((mh = mtp_create_handle(fd)) == NULL) {
     error("mtp_create_handle\n");
   }
@@ -1094,7 +1096,7 @@ int unknown_client_callback(elvin_io_handler_t handler,
       }
       else {
 	robot_list_item_t *rli;
-	
+
 	if (debug) {
 	  info("established rmc connection\n");
 	}
@@ -1129,14 +1131,14 @@ int unknown_client_callback(elvin_io_handler_t handler,
 	  }
 	  mtp_send_packet(mh, &gmp);
 	}
-	
+
 	rmc_data.handle = mh;
 	mh = NULL;
-	
+
 	if (rmc_data.handle->mh_remaining > 0) {
-	    // XXX run the callbacks here to catch any queued data.
+	  // XXX run the callbacks here to catch any queued data.
 	}
-	
+
 	retval = 1;
       }
       break;
@@ -1159,7 +1161,7 @@ int unknown_client_callback(elvin_io_handler_t handler,
 
 	emulab_handle = mh;
 	mh = NULL;
-	
+
 	retval = 1;
       }
       break;
@@ -1185,11 +1187,11 @@ int unknown_client_callback(elvin_io_handler_t handler,
 
 	vmc_data.handle = mh;
 	mh = NULL;
-	
+
 	// add descriptor to list, etc:
 	if (vmc_data.position_list == NULL)
 	  vmc_data.position_list = robot_list_create();
-	
+
 	retval = 1;
       }
       break;
@@ -1201,17 +1203,17 @@ int unknown_client_callback(elvin_io_handler_t handler,
 
   mtp_free_packet(mp);
   mp = NULL;
-  
+
   mtp_delete_handle(mh);
   mh = NULL;
-  
+
   if (!retval) {
     info("dropping bad connection %d\n", fd);
-    
+
     close(fd);
     fd = -1;
   }
-  
+
   return retval;
 }
 
@@ -1220,220 +1222,220 @@ int rmc_callback(elvin_io_handler_t handler,
 		 void *rock,
 		 elvin_error_t eerror)
 {
-  
-  
+
+
   mtp_packet_t mp_data, *mp = &mp_data;
   struct rmc_client *rmc = rock;
   int rc, retval = 0;
 
   do {
-  if (((rc = mtp_receive_packet(rmc->handle, mp)) != MTP_PP_SUCCESS) ||
-      (mp->vers != MTP_VERSION)) {
-    error("invalid rmc client %d %p\n", rc, mp);
-  }
-  else {
-    if (0 || debug) {
-      fprintf(stderr, "rmc_callback: ");
-      mtp_print_packet(stderr, mp);
+    if (((rc = mtp_receive_packet(rmc->handle, mp)) != MTP_PP_SUCCESS) ||
+	(mp->vers != MTP_VERSION)) {
+      error("invalid rmc client %d %p\n", rc, mp);
     }
-    
-    switch (mp->data.opcode) {
-    case MTP_REQUEST_POSITION:
-      {
-	// find the latest position data for the robot:
-	//   supply init pos if no positions in rmc_data or vmc_data;
-	//   otherwise, take the position with the most recent timestamp
-	//     from rmc_data or vmc_data
-	int my_id = mp->data.mtp_payload_u.request_position.robot_id;
-	struct mtp_update_position *up;
-        struct emc_robot_config *erc;	
- 
-        erc = robot_list_search(hostname_list, my_id);
-        
-	up = (struct mtp_update_position *)
-	  robot_list_search(vmc_data.position_list, my_id);
+    else {
+      if (0 || debug) {
+	fprintf(stderr, "rmc_callback: ");
+	mtp_print_packet(stderr, mp);
+      }
 
-	if (up != NULL && up->status != MTP_POSITION_STATUS_ERROR) {
-	  struct mtp_packet mp_reply;
-	  
-	  // since VMC isn't hooked in, we simply write back the rmc posit
-          /* DAN: what?? */
-	  mtp_init_packet(&mp_reply,
-			  MA_Opcode, MTP_UPDATE_POSITION,
-			  MA_Role, MTP_ROLE_EMC,
-			  MA_RobotID, up->robot_id,
-			  MA_Position, &up->position,
-			  /*
-			   * The status field has no meaning when this packet
-			   * is being sent.
-			   */
-			  MA_Status, MTP_POSITION_STATUS_UNKNOWN,
-			  MA_TAG_DONE);
-   
-          /* DAN */
-          /* Ignore position requests from RMCD if ERF_HAS_GOAL is set,
-           * for nonlinear controller
-           */
-          if (erc->flags & ERF_HAS_GOAL) {
-              info("(In NL mode): Ignoring position request for %d\n", my_id);
-          }
-          else {
-	      mtp_send_packet(rmc->handle, &mp_reply);
-          }
-	}
-	else if (up == NULL) {
+      switch (mp->data.opcode) {
+      case MTP_REQUEST_POSITION:
+	{
+	  // find the latest position data for the robot:
+	  //   supply init pos if no positions in rmc_data or vmc_data;
+	  //   otherwise, take the position with the most recent timestamp
+	  //     from rmc_data or vmc_data
+	  int my_id = mp->data.mtp_payload_u.request_position.robot_id;
+	  struct mtp_update_position *up;
+	  struct emc_robot_config *erc;
+
+	  erc = robot_list_search(hostname_list, my_id);
+
 	  up = (struct mtp_update_position *)
-	    calloc(1, sizeof(struct mtp_update_position));
-	  up->robot_id = my_id;
-	  up->status = MTP_POSITION_STATUS_ERROR;
-	  robot_list_append(vmc_data.position_list, my_id, up);
-	}
-	
-	retval = 1;
-      }
-      break;
+	    robot_list_search(vmc_data.position_list, my_id);
 
-    case MTP_UPDATE_POSITION:
-      {
-	// store the latest data in the robot position/status list
-	// in rmc_data
-	int my_id = mp->data.mtp_payload_u.update_position.robot_id;
-	struct mtp_update_position *up = (struct mtp_update_position *)
-	  robot_list_remove_by_id(rmc->position_list, my_id);
-	struct emc_robot_config *erc;
-	
-	free(up);
-	up = NULL;
+	  if (up != NULL && up->status != MTP_POSITION_STATUS_ERROR) {
+	    struct mtp_packet mp_reply;
 
-	up = (struct mtp_update_position *)
-	  malloc(sizeof(struct mtp_update_position));
-	*up = mp->data.mtp_payload_u.update_position;
-	robot_list_append(rmc->position_list, my_id, up);
+	    // since VMC isn't hooked in, we simply write back the rmc posit
+	    /* DAN: what?? */
+	    mtp_init_packet(&mp_reply,
+			    MA_Opcode, MTP_UPDATE_POSITION,
+			    MA_Role, MTP_ROLE_EMC,
+			    MA_RobotID, up->robot_id,
+			    MA_Position, &up->position,
+			    /*
+			     * The status field has no meaning when this packet
+			     * is being sent.
+			     */
+			    MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+			    MA_TAG_DONE);
 
-	erc = robot_list_search(hostname_list, my_id);
-
-	info("update %d\n", my_id);
-	
-	switch (mp->data.mtp_payload_u.update_position.status) {
-	case MTP_POSITION_STATUS_ERROR:
-	case MTP_POSITION_STATUS_COMPLETE:
-	  if (emulab_handle != NULL) {
-	    mtp_send_packet(emulab_handle, mp);
+	    /* DAN */
+	    /* Ignore position requests from RMCD if ERF_HAS_GOAL is set,
+	     * for nonlinear controller
+	     */
+	    if (erc->flags & ERF_HAS_GOAL) {
+              info("(In NL mode): Ignoring position request for %d\n", my_id);
+	    }
+	    else {
+	      mtp_send_packet(rmc->handle, &mp_reply);
+	    }
 	  }
-	  if (erc->token != ~0) {
-#if defined(TBDB_EVENTTYPE_COMPLETE)
-	    event_do(handle,
-		     EA_Experiment, pideid,
-		     EA_Type, TBDB_OBJECTTYPE_NODE,
-		     EA_Name, erc->vname,
-		     EA_Event, TBDB_EVENTTYPE_COMPLETE,
-		     EA_ArgInteger, "ERROR",
-		     mp->data.mtp_payload_u.update_position.status ==
-		     MTP_POSITION_STATUS_ERROR ? 1 : 0,
-		     EA_ArgInteger, "CTOKEN", erc->token,
-		     EA_TAG_DONE);
-#endif
-	    erc->token = ~0;
-          }
-          
-          /* unset ERF_HAS_GOAL flag */
-          erc->flags &= ~ERF_HAS_GOAL;
-            
-          info("Received STATUS COMPLETE from %d\n", my_id);
-            
-	  
-	  break;
-	default:
-	  assert(0);
-	  break;
+	  else if (up == NULL) {
+	    up = (struct mtp_update_position *)
+	      calloc(1, sizeof(struct mtp_update_position));
+	    up->robot_id = my_id;
+	    up->status = MTP_POSITION_STATUS_ERROR;
+	    robot_list_append(vmc_data.position_list, my_id, up);
+	  }
+
+	  retval = 1;
 	}
-	
-	// also, if status is MTP_POSITION_STATUS_COMPLETE || 
-	// MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
-	// command to rmc from the movement list.
+	break;
 
-	// later ....
+      case MTP_UPDATE_POSITION:
+	{
+	  // store the latest data in the robot position/status list
+	  // in rmc_data
+	  int my_id = mp->data.mtp_payload_u.update_position.robot_id;
+	  struct mtp_update_position *up = (struct mtp_update_position *)
+	    robot_list_remove_by_id(rmc->position_list, my_id);
+	  struct emc_robot_config *erc;
 
-	retval = 1;
-      }
-      break;
+	  free(up);
+	  up = NULL;
 
-    case MTP_WIGGLE_STATUS:
-      {
+	  up = (struct mtp_update_position *)
+	    malloc(sizeof(struct mtp_update_position));
+	  *up = mp->data.mtp_payload_u.update_position;
+	  robot_list_append(rmc->position_list, my_id, up);
+
+	  erc = robot_list_search(hostname_list, my_id);
+
+	  info("update %d\n", my_id);
+
+	  switch (mp->data.mtp_payload_u.update_position.status) {
+	  case MTP_POSITION_STATUS_ERROR:
+	  case MTP_POSITION_STATUS_COMPLETE:
+	    if (emulab_handle != NULL) {
+	      mtp_send_packet(emulab_handle, mp);
+	    }
+	    if (erc->token != ~0) {
+#if defined(TBDB_EVENTTYPE_COMPLETE)
+	      event_do(handle,
+		       EA_Experiment, pideid,
+		       EA_Type, TBDB_OBJECTTYPE_NODE,
+		       EA_Name, erc->vname,
+		       EA_Event, TBDB_EVENTTYPE_COMPLETE,
+		       EA_ArgInteger, "ERROR",
+		       mp->data.mtp_payload_u.update_position.status ==
+		       MTP_POSITION_STATUS_ERROR ? 1 : 0,
+		       EA_ArgInteger, "CTOKEN", erc->token,
+		       EA_TAG_DONE);
+#endif
+	      erc->token = ~0;
+	    }
+
+	    /* unset ERF_HAS_GOAL flag */
+	    erc->flags &= ~ERF_HAS_GOAL;
+
+	    info("Received STATUS COMPLETE from %d\n", my_id);
+
+
+	    break;
+	  default:
+	    assert(0);
+	    break;
+	  }
+
+	  // also, if status is MTP_POSITION_STATUS_COMPLETE ||
+	  // MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
+	  // command to rmc from the movement list.
+
+	  // later ....
+
+	  retval = 1;
+	}
+	break;
+
+      case MTP_WIGGLE_STATUS:
+	{
 	  /* simply forward this to vmc */
 	  /* actually, we'll also ack it back to rmc */
 	  mp->role = MTP_ROLE_EMC;
-	  
+
 	  if (mtp_send_packet(vmc_data.handle,mp) != MTP_PP_SUCCESS) {
-	      error("vmc unavailable; cannot forward wiggle-status\n");
+	    error("vmc unavailable; cannot forward wiggle-status\n");
 	  }
-	  
+
 	  retval = 1;
-      }
-      break;
-
-    case MTP_CREATE_OBSTACLE:
-	{
-	    struct dyn_obstacle_config *doc;
-	    struct emc_robot_config *erc;
-
-	    doc = &mp->data.mtp_payload_u.create_obstacle;
-	    erc = robot_list_search(hostname_list, doc->robot_id);
-	    if (erc != NULL) {
-		event_do(handle,
-			 EA_Experiment, pideid,
-			 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
-			 EA_Event, TBDB_EVENTTYPE_CREATE,
-			 EA_Name, topography_name,
-			 EA_ArgInteger, "ID", doc->config.id,
-			 EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
-			 EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
-			 EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
-			 EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
-			 EA_ArgString, "ROBOT", erc->vname,
-			 EA_TAG_DONE);
-	    }
-	    else {
-		event_do(handle,
-			 EA_Experiment, pideid,
-			 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
-			 EA_Event, TBDB_EVENTTYPE_CREATE,
-			 EA_Name, topography_name,
-			 EA_ArgInteger, "ID", doc->config.id,
-			 EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
-			 EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
-			 EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
-			 EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
-			 EA_TAG_DONE);
-	    }
-	    
-	    retval = 1;
 	}
 	break;
-	
-    case MTP_UPDATE_OBSTACLE:
-	{
-	    struct obstacle_config *oc;
 
-	    oc = &mp->data.mtp_payload_u.update_obstacle;
-	    /* XXX Hack */
+      case MTP_CREATE_OBSTACLE:
+	{
+	  struct dyn_obstacle_config *doc;
+	  struct emc_robot_config *erc;
+
+	  doc = &mp->data.mtp_payload_u.create_obstacle;
+	  erc = robot_list_search(hostname_list, doc->robot_id);
+	  if (erc != NULL) {
 	    event_do(handle,
 		     EA_Experiment, pideid,
 		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
-		     EA_Event, TBDB_EVENTTYPE_MODIFY,
+		     EA_Event, TBDB_EVENTTYPE_CREATE,
 		     EA_Name, topography_name,
-		     EA_ArgInteger, "ID", oc->id,
-		     EA_ArgFloat, "XMIN", oc->xmin + 0.25,
-		     EA_ArgFloat, "YMIN", oc->ymin + 0.25,
-		     EA_ArgFloat, "XMAX", oc->xmax - 0.25,
-		     EA_ArgFloat, "YMAX", oc->ymax - 0.25,
+		     EA_ArgInteger, "ID", doc->config.id,
+		     EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
+		     EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
+		     EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
+		     EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
+		     EA_ArgString, "ROBOT", erc->vname,
 		     EA_TAG_DONE);
-	    
-	    retval = 1;
+	  }
+	  else {
+	    event_do(handle,
+		     EA_Experiment, pideid,
+		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+		     EA_Event, TBDB_EVENTTYPE_CREATE,
+		     EA_Name, topography_name,
+		     EA_ArgInteger, "ID", doc->config.id,
+		     EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
+		     EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
+		     EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
+		     EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
+		     EA_TAG_DONE);
+	  }
+
+	  retval = 1;
 	}
 	break;
-      
-    case MTP_REMOVE_OBSTACLE:
+
+      case MTP_UPDATE_OBSTACLE:
+	{
+	  struct obstacle_config *oc;
+
+	  oc = &mp->data.mtp_payload_u.update_obstacle;
+	  /* XXX Hack */
+	  event_do(handle,
+		   EA_Experiment, pideid,
+		   EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+		   EA_Event, TBDB_EVENTTYPE_MODIFY,
+		   EA_Name, topography_name,
+		   EA_ArgInteger, "ID", oc->id,
+		   EA_ArgFloat, "XMIN", oc->xmin + 0.25,
+		   EA_ArgFloat, "YMIN", oc->ymin + 0.25,
+		   EA_ArgFloat, "XMAX", oc->xmax - 0.25,
+		   EA_ArgFloat, "YMAX", oc->ymax - 0.25,
+		   EA_TAG_DONE);
+
+	  retval = 1;
+	}
+	break;
+
+      case MTP_REMOVE_OBSTACLE:
 	event_do(handle,
 		 EA_Experiment, pideid,
 		 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
@@ -1441,33 +1443,33 @@ int rmc_callback(elvin_io_handler_t handler,
 		 EA_Name, topography_name,
 		 EA_ArgInteger, "ID", mp->data.mtp_payload_u.remove_obstacle,
 		 EA_TAG_DONE);
-	
+
 	retval = 1;
 	break;
-	
-    case MTP_TELEMETRY:
-      retval = 1;
-      break;
-      
-    default:
-      {
-	struct mtp_packet mp_reply;
-	
-	error("received bogus opcode from RMC: %d\n", mp->data.opcode);
 
-	mtp_init_packet(&mp_reply,
-			MA_Opcode, MTP_CONTROL_ERROR,
-			MA_Role, MTP_ROLE_EMC,
-			MA_Message, "protocol error: bad opcode",
-			MA_TAG_DONE);
+      case MTP_TELEMETRY:
+	retval = 1;
+	break;
 
-	mtp_send_packet(rmc->handle, &mp_reply);
+      default:
+	{
+	  struct mtp_packet mp_reply;
+
+	  error("received bogus opcode from RMC: %d\n", mp->data.opcode);
+
+	  mtp_init_packet(&mp_reply,
+			  MA_Opcode, MTP_CONTROL_ERROR,
+			  MA_Role, MTP_ROLE_EMC,
+			  MA_Message, "protocol error: bad opcode",
+			  MA_TAG_DONE);
+
+	  mtp_send_packet(rmc->handle, &mp_reply);
+	}
+	break;
       }
-      break;
     }
-  }
 
-  mtp_free_packet(mp);
+    mtp_free_packet(mp);
   } while (retval && (rmc->handle->mh_remaining > 0));
 
   if (!retval) {
@@ -1477,11 +1479,11 @@ int rmc_callback(elvin_io_handler_t handler,
 
     mtp_delete_handle(rmc->handle);
     rmc->handle = NULL;
-    
+
     close(fd);
     fd = -1;
   }
-  
+
   return retval;
 }
 
@@ -1496,20 +1498,20 @@ int emulab_callback(elvin_io_handler_t handler,
   struct emc_robot_config *match = NULL;
   robot_list_item_t *rli;
 
-  
+
   do {
-  if (((rc = mtp_receive_packet(emulab_handle, mp)) != MTP_PP_SUCCESS) ||
-      (mp->vers != MTP_VERSION)) {
-    error("invalid client %p\n", mp);
-  }
-  else {
-    if (debug) {
-      fprintf(stderr, "emulab_callback: ");
-      mtp_print_packet(stderr, mp);
+    if (((rc = mtp_receive_packet(emulab_handle, mp)) != MTP_PP_SUCCESS) ||
+	(mp->vers != MTP_VERSION)) {
+      error("invalid client %p\n", mp);
     }
-    
-    switch (mp->data.opcode) {
-    case MTP_COMMAND_GOTO:
+    else {
+      if (debug) {
+	fprintf(stderr, "emulab_callback: ");
+	mtp_print_packet(stderr, mp);
+      }
+
+      switch (mp->data.opcode) {
+      case MTP_COMMAND_GOTO:
 	if (position_in_camera(g_camera_config,g_camera_config_size,
 			       mp->data.mtp_payload_u.command_goto.position.x,
 			       mp->data.mtp_payload_u.command_goto.position.y
@@ -1518,112 +1520,114 @@ int emulab_callback(elvin_io_handler_t handler,
 				  mp->data.mtp_payload_u.command_goto.position.x,
 				  mp->data.mtp_payload_u.command_goto.position.y)
 	    ) {
-	  
-	    /* forward the packet on to rmc... */
-	    if (rmc_data.handle == NULL) {
-		error("no rmcd yet\n");
+
+	  /* forward the packet on to rmc... */
+	  if (rmc_data.handle == NULL) {
+	    error("no rmcd yet\n");
+	  }
+	  else if (mtp_send_packet(rmc_data.handle, mp) != MTP_PP_SUCCESS) {
+	    error("could not forward packet to rmcd\n");
+	  }
+	  else {
+	    info("forwarded goto\n");
+
+
+	    /* DAN */
+	    /* set ERF_HAS_GOAL flag for this robot */
+
+
+	    /* go through robot list */
+	    for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
+	      struct emc_robot_config *erc = rli->data;
+
+	      if (erc->id == mp->data.mtp_payload_u.request_position.robot_id) {
+		match = erc;
+		break;
+	      }
 	    }
-	    else if (mtp_send_packet(rmc_data.handle, mp) != MTP_PP_SUCCESS) {
-		error("could not forward packet to rmcd\n");
-	    }
-	    else {
-		info("forwarded goto\n");
-		
-  		/* DAN */
-                /* set ERF_HAS_GOAL flag for this robot */
-  
-  
-  		/* go through robot list */
-  		for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
-                    struct emc_robot_config *erc = rli->data;
-    
-                    if (erc->id == mp->data.mtp_payload_u.request_position.robot_id) {
-                        match = erc;
-                        break;
-                    }
-                }
-  
-                match->flags |= ERF_HAS_GOAL;
-                
-		retval = 1;		
-	    }
+
+	    match->flags |= ERF_HAS_GOAL;
+
+
+	    retval = 1;
+	  }
 	}
 	else {
-	    error("invalid position request (outside camera bounds or in"
-		  " an obstacle\n"
-		  );
+	  error("invalid position request (outside camera bounds or in"
+		" an obstacle\n"
+		);
 	}
-      break;
-    case MTP_REQUEST_POSITION:
-      {
-	// find the latest position data for the robot:
-	//   supply init pos if no positions in rmc_data or vmc_data;
-	//   otherwise, take the position with the most recent timestamp
-	//     from rmc_data or vmc_data
-	int my_id = mp->data.mtp_payload_u.request_position.robot_id;
-	struct mtp_update_position *vmc_up, *rmc_up, *up;
-	struct mtp_packet mp_reply;
-	
-	vmc_up = (struct mtp_update_position *)
-	  robot_list_search(vmc_data.position_list, my_id);
-	rmc_up = (struct mtp_update_position *)
-	  robot_list_search(rmc_data.position_list, my_id);
+	break;
+      case MTP_REQUEST_POSITION:
+	{
+	  // find the latest position data for the robot:
+	  //   supply init pos if no positions in rmc_data or vmc_data;
+	  //   otherwise, take the position with the most recent timestamp
+	  //     from rmc_data or vmc_data
+	  int my_id = mp->data.mtp_payload_u.request_position.robot_id;
+	  struct mtp_update_position *vmc_up, *rmc_up, *up;
+	  struct mtp_packet mp_reply;
 
-	if (vmc_up != NULL)
-	  up = vmc_up; // XXX prefer vmc?
-	else
-	  up = rmc_up;
-	
-	if (up != NULL) {
-	  // since VMC isn't hooked in, we simply write back the rmc posit
-	  mtp_init_packet(&mp_reply,
-			  MA_Opcode, MTP_UPDATE_POSITION,
-			  MA_Role, MTP_ROLE_EMC,
-			  MA_RobotID, up->robot_id,
-			  MA_Position, &up->position,
-			  /*
-			   * The status field has no meaning when this packet
-			   * is being sent.
-			   */
-			  MA_Status, MTP_POSITION_STATUS_UNKNOWN,
-			  MA_TAG_DONE);
-	  mtp_send_packet(emulab_handle, &mp_reply);
+	  vmc_up = (struct mtp_update_position *)
+	    robot_list_search(vmc_data.position_list, my_id);
+	  rmc_up = (struct mtp_update_position *)
+	    robot_list_search(rmc_data.position_list, my_id);
+
+	  if (vmc_up != NULL)
+	    up = vmc_up; // XXX prefer vmc?
+	  else
+	    up = rmc_up;
+
+	  if (up != NULL) {
+	    // since VMC isn't hooked in, we simply write back the rmc posit
+	    mtp_init_packet(&mp_reply,
+			    MA_Opcode, MTP_UPDATE_POSITION,
+			    MA_Role, MTP_ROLE_EMC,
+			    MA_RobotID, up->robot_id,
+			    MA_Position, &up->position,
+			    /*
+			     * The status field has no meaning when this packet
+			     * is being sent.
+			     */
+			    MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+			    MA_TAG_DONE);
+	    mtp_send_packet(emulab_handle, &mp_reply);
+	  }
+	  else {
+	    info("no updates for %d\n", my_id);
+
+	    mtp_init_packet(&mp_reply,
+			    MA_Role, MTP_ROLE_EMC,
+			    MA_Opcode, MTP_CONTROL_ERROR,
+			    MA_Message, "position not updated yet",
+			    MA_TAG_DONE);
+
+	    mtp_send_packet(emulab_handle, &mp_reply);
+	  }
+
+	  retval = 1;
 	}
-	else {
-	  info("no updates for %d\n", my_id);
+	break;
+
+      default:
+	{
+	  struct mtp_packet mp_reply;
+
+	  error("received bogus opcode from RMC: %d\n", mp->data.opcode);
 
 	  mtp_init_packet(&mp_reply,
-			  MA_Role, MTP_ROLE_EMC,
 			  MA_Opcode, MTP_CONTROL_ERROR,
-			  MA_Message, "position not updated yet",
+			  MA_Role, MTP_ROLE_EMC,
+			  MA_Message, "protocol error: bad opcode",
 			  MA_TAG_DONE);
 
 	  mtp_send_packet(emulab_handle, &mp_reply);
 	}
-	
-	retval = 1;
+	break;
       }
-      break;
-
-    default:
-      {
-	struct mtp_packet mp_reply;
-	
-	error("received bogus opcode from RMC: %d\n", mp->data.opcode);
-
-	mtp_init_packet(&mp_reply,
-			MA_Opcode, MTP_CONTROL_ERROR,
-			MA_Role, MTP_ROLE_EMC,
-			MA_Message, "protocol error: bad opcode",
-			MA_TAG_DONE);
-
-	mtp_send_packet(emulab_handle, &mp_reply);
-      }
-      break;
     }
-  }
-  
-  mtp_free_packet(mp);
+
+    mtp_free_packet(mp);
   } while (retval && (emulab_handle->mh_remaining > 0));
 
   if (!retval) {
@@ -1633,11 +1637,11 @@ int emulab_callback(elvin_io_handler_t handler,
 
     mtp_delete_handle(emulab_handle);
     emulab_handle = NULL;
-    
+
     close(fd);
     fd = -1;
   }
-  
+
   return retval;
 }
 
@@ -1654,70 +1658,77 @@ int vmc_callback(elvin_io_handler_t handler,
   mtp_packet_t mp_data, *mp = &mp_data;
   struct vmc_client *vmc = rock;
   int rc, retval = 0;
-  
-  
+
+
   struct emc_robot_config *match = NULL;
   robot_list_item_t *rli;
 
   do {
-  if (((rc = mtp_receive_packet(vmc->handle, mp)) != MTP_PP_SUCCESS) ||
-      (mp->vers != MTP_VERSION)) {
-    error("invalid client %p\n", mp);
-  }
-  else {
-    if (debug > 1) {
-      fprintf(stderr, "vmc_callback: ");
-      mtp_print_packet(stderr, mp);
+    if (((rc = mtp_receive_packet(vmc->handle, mp)) != MTP_PP_SUCCESS) ||
+	(mp->vers != MTP_VERSION)) {
+      error("invalid client %p\n", mp);
     }
-    
-    switch (mp->data.opcode) {
-    case MTP_UPDATE_POSITION:
-      {
-        // store the latest data in the robot position/status list
-        // in vmc_data
-        int my_id = mp->data.mtp_payload_u.update_position.robot_id;
-        struct mtp_update_position *up = (struct mtp_update_position *)
-          robot_list_remove_by_id(vmc->position_list, my_id);
-        struct mtp_update_position *up_copy, *up_in;
+    else {
+      if (debug > 1) {
+	fprintf(stderr, "vmc_callback: ");
+	mtp_print_packet(stderr, mp);
+      }
 
-        
+      switch (mp->data.opcode) {
+      case MTP_UPDATE_POSITION:
+	{
+	  // store the latest data in the robot position/status list
+	  // in vmc_data
+	  int my_id = mp->data.mtp_payload_u.update_position.robot_id;
+	  struct mtp_update_position *up = (struct mtp_update_position *)
+	    robot_list_remove_by_id(vmc->position_list, my_id);
+	  struct mtp_update_position *up_copy, *up_in;
 
-        /* DAN */
-               
-        for (rli = hostname_list->head; rli != NULL; rli = rli->next) {
+
+
+	  /* DAN */
+#ifdef USE_POSTURE_REG
+	  for (rli = hostname_list->head; rli != NULL; rli = rli->next) {
             struct emc_robot_config *erc = rli->data;
 
             if (erc->id == my_id) {
-                match = erc;
-                break;
+	      match = erc;
+	      break;
             }
-        }
-        
-        
-        up_in = &mp->data.mtp_payload_u.update_position;
-        
-        if (match->flags & ERF_HAS_GOAL) {
+	  }
+
+
+
+
+	  if (match->flags & ERF_HAS_GOAL) {
             /* if ERF_HAS_GOAL is set for this robot
              * set status to 'MOVING'
              * If status is 'MOVING', the nonlinear controller will be used
              */
 
+
+
             mtp_send_packet2(rmc_data.handle,
-                	    MA_Opcode, MTP_UPDATE_POSITION,
-                            MA_Role, MTP_ROLE_EMC,
-                            MA_RobotID, up->robot_id,
-                            MA_Position, &up_in->position,
-                            MA_Status, MTP_POSITION_STATUS_MOVING,
-                            MA_TAG_DONE);            
+			     MA_Opcode, MTP_UPDATE_POSITION,
+			     MA_Role, MTP_ROLE_EMC,
+			     MA_RobotID, up->robot_id,
+			     MA_Position, &up_in->position,
+			     MA_Status, MTP_POSITION_STATUS_MOVING,
+			     MA_TAG_DONE);
+
+
           }
-        
-        
-        if (up && (up->status == MTP_POSITION_STATUS_ERROR) &&
-            (up_in->status != MTP_POSITION_STATUS_ERROR)) {
-                struct mtp_packet mp_reply;
-	  
-        
- 
+#endif
+
+
+	  up_in = &mp->data.mtp_payload_u.update_position;
+
+	  if (up && (up->status == MTP_POSITION_STATUS_ERROR) &&
+	      (up_in->status != MTP_POSITION_STATUS_ERROR)) {
+	    struct mtp_packet mp_reply;
+
+
+
 
             /* unknown status */
             mtp_init_packet(&mp_reply,
@@ -1725,224 +1736,217 @@ int vmc_callback(elvin_io_handler_t handler,
                             MA_Role, MTP_ROLE_EMC,
                             MA_RobotID, up->robot_id,
                             MA_Position, &up_in->position,
-                            /*
-                             * The status field has no meaning when this packet
-                             * is being sent.
-                             */
                             MA_Status, MTP_POSITION_STATUS_UNKNOWN,
                             MA_TAG_DONE);
-          
-  
-  
-          /* forward packet along -- fly my pretty! */
-          mtp_send_packet(rmc_data.handle, &mp_reply);
-        
-        
-        }
-	
-        free(up);
-        up = NULL;
-        
-        up_copy = (struct mtp_update_position *)
-          malloc(sizeof(struct mtp_update_position));
-        *up_copy = mp->data.mtp_payload_u.update_position;
-        robot_list_append(vmc->position_list, my_id, up_copy);
-        
-        // also, if status is MTP_POSITION_STATUS_COMPLETE || 
-        // MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
-        // command to vmc from the movement list.
-        
-        // later ....
-        
-        retval = 1;
-      }
-      break;
-    case MTP_REQUEST_ID:
-      {
-        struct mtp_request_id *rid = (struct mtp_request_id *)
-          &mp->data.mtp_payload_u.request_id;
-        // we need to search all the positions in the rmc_data.position_list
-        // and find the closest match.  if this match is within the threshold,
-        // we return it immediately.  if not, we search the initial_position
-        // list and return the closest match, whatever it may be...
-        // later we will want to change this to give an operator the chance 
-        // to associate ids with unknown positions themselves, if we can't
-        // do it automatically.
 
-        double best_dist_delta = DIST_THRESHOLD;
-        double best_pose_delta = POSE_THRESHOLD;
-        int robot_id = -1;
+	    mtp_send_packet(rmc_data.handle, &mp_reply);
 
-        double dx = 0.0, dy = 0.0, dtheta, ddist;
 
-	struct mtp_packet mp_reply;
-
-	int my_retval;
-
-        int id = -1;
-        struct robot_position *p;
-	struct robot_list_item *i;
-
-	mtp_print_packet(stdout, mp);
-	fflush(stdout);
-	
-	if (rmc_data.position_list == NULL) {
-	  info("no robot positions yet\n");
-	}
-	else {
-	  i = rmc_data.position_list->head;
-	  while (i != NULL) {
-	    p = (struct robot_position *)(i->data);
-	    id = i->id;
-	    
-	    dx = rid->position.x - p->x;
-	    dy = rid->position.y - p->y;
-	    ddist = sqrt(dx*dx + dy*dy);
-	    dtheta = rid->position.theta - p->theta;
-	    
-	    if (fabsf(ddist) > best_dist_delta) {
-	      i = i->next;
-	      continue;
-	    }
-	    
-	    if (fabsf(dtheta) > best_pose_delta) {
-	      i = i->next;
-	      continue;
-	    }
-	    
-	    best_dist_delta = ddist;
-	    best_pose_delta = dtheta;
-	    robot_id = id;
-	    
-	    i = i->next;
 	  }
+
+	  free(up);
+	  up = NULL;
+
+	  up_copy = (struct mtp_update_position *)
+	    malloc(sizeof(struct mtp_update_position));
+	  *up_copy = mp->data.mtp_payload_u.update_position;
+	  robot_list_append(vmc->position_list, my_id, up_copy);
+
+	  // also, if status is MTP_POSITION_STATUS_COMPLETE ||
+	  // MTP_POSITION_STATUS_ERROR, notify emulab, or issue the next
+	  // command to vmc from the movement list.
+
+	  // later ....
+
+	  retval = 1;
 	}
+	break;
+      case MTP_REQUEST_ID:
+	{
+	  struct mtp_request_id *rid = (struct mtp_request_id *)
+	    &mp->data.mtp_payload_u.request_id;
+	  // we need to search all the positions in the rmc_data.position_list
+	  // and find the closest match.  if this match is within the threshold,
+	  // we return it immediately.  if not, we search the initial_position
+	  // list and return the closest match, whatever it may be...
+	  // later we will want to change this to give an operator the chance
+	  // to associate ids with unknown positions themselves, if we can't
+	  // do it automatically.
 
-        // we really ought to not search teh initial posit list AFTER vmc has
-        // initialized completely (that is, associated IDs for all objects
-        // it found).  I'll hack this in later if there's time.
+	  double best_dist_delta = DIST_THRESHOLD;
+	  double best_pose_delta = POSE_THRESHOLD;
+	  int robot_id = -1;
 
-        if (robot_id == -1) {
-          // need to search the initial posit list -- only this time, we
-          // take the closest match without regard for threshold and pose
-          // -- just distance!
-          id = -1;
-          p = NULL;
-          i = initial_position_list->head;
-          best_dist_delta = 10000000000.0;
-          best_pose_delta = 100000000000.0;
+	  double dx = 0.0, dy = 0.0, dtheta, ddist;
 
-          while (i != NULL) {
-            p = (struct robot_position *)(i->data);
-            id = i->id;
+	  struct mtp_packet mp_reply;
 
-            dx = rid->position.x - p->x;
-            dy = rid->position.y - p->y;
-	    if (dx == 0 && dy == 0)
-		ddist = 0;
-	    else
-		ddist = sqrt(dx*dx + dy*dy);
-            dtheta = rid->position.theta - p->theta;
+	  int my_retval;
 
-	    info("dx %f %f %f %f\n", dx, dy, ddist, dtheta);
-            if (fabsf(ddist) > best_dist_delta) {
-		info("pass ? %f %f\n", ddist, best_dist_delta);
+	  int id = -1;
+	  struct robot_position *p;
+	  struct robot_list_item *i;
+
+	  mtp_print_packet(stdout, mp);
+	  fflush(stdout);
+
+	  if (rmc_data.position_list == NULL) {
+	    info("no robot positions yet\n");
+	  }
+	  else {
+	    i = rmc_data.position_list->head;
+	    while (i != NULL) {
+	      p = (struct robot_position *)(i->data);
+	      id = i->id;
+
+	      dx = rid->position.x - p->x;
+	      dy = rid->position.y - p->y;
+	      ddist = sqrt(dx*dx + dy*dy);
+	      dtheta = rid->position.theta - p->theta;
+
+	      if (fabsf(ddist) > best_dist_delta) {
+		i = i->next;
+		continue;
+	      }
+
+	      if (fabsf(dtheta) > best_pose_delta) {
+		i = i->next;
+		continue;
+	      }
+
+	      best_dist_delta = ddist;
+	      best_pose_delta = dtheta;
+	      robot_id = id;
+
 	      i = i->next;
-              continue;
-            }
+	    }
+	  }
 
-	    if (0) {
+	  // we really ought to not search teh initial posit list AFTER vmc has
+	  // initialized completely (that is, associated IDs for all objects
+	  // it found).  I'll hack this in later if there's time.
+
+	  if (robot_id == -1) {
+	    // need to search the initial posit list -- only this time, we
+	    // take the closest match without regard for threshold and pose
+	    // -- just distance!
+	    id = -1;
+	    p = NULL;
+	    i = initial_position_list->head;
+	    best_dist_delta = 10000000000.0;
+	    best_pose_delta = 100000000000.0;
+
+	    while (i != NULL) {
+	      p = (struct robot_position *)(i->data);
+	      id = i->id;
+
+	      dx = rid->position.x - p->x;
+	      dy = rid->position.y - p->y;
+	      if (dx == 0 && dy == 0)
+		ddist = 0;
+	      else
+		ddist = sqrt(dx*dx + dy*dy);
+	      dtheta = rid->position.theta - p->theta;
+
+	      info("dx %f %f %f %f\n", dx, dy, ddist, dtheta);
+	      if (fabsf(ddist) > best_dist_delta) {
+		info("pass ? %f %f\n", ddist, best_dist_delta);
+		i = i->next;
+		continue;
+	      }
+
+	      if (0) {
 		if (fabsf(dtheta) > best_pose_delta) {
-		    i = i->next;
-		    continue;
+		  i = i->next;
+		  continue;
 		}
+	      }
+
+	      info("match %d\n", id);
+	      best_dist_delta = ddist;
+	      best_pose_delta = dtheta;
+	      robot_id = id;
+
+	      i = i->next;
 	    }
 
-	    info("match %d\n", id);
-            best_dist_delta = ddist;
-            best_pose_delta = dtheta;
-            robot_id = id;
-	    
-	    i = i->next;
-          }
+	    info("just using initial pos %f %f\n", dx, dy);
+	    // now send whatever we got to the caller as we fall through:
+	  }
 
-	  info("just using initial pos %f %f\n", dx, dy);
-          // now send whatever we got to the caller as we fall through:
-        }
-        
-	info("match %f %f -> %d\n",
-	     rid->position.x, rid->position.y, robot_id);
-        // we want to return whichever robot id immediately to the caller:
+	  info("match %f %f -> %d\n",
+	       rid->position.x, rid->position.y, robot_id);
+	  // we want to return whichever robot id immediately to the caller:
 
-	mtp_init_packet(&mp_reply,
-			MA_Opcode, MTP_UPDATE_ID,
-			MA_Role, MTP_ROLE_EMC,
-			MA_RequestID, rid->request_id,
-			MA_RobotID, robot_id,
-			MA_TAG_DONE);
-	
-        my_retval = mtp_send_packet(vmc->handle, &mp_reply);
-        if (my_retval != MTP_PP_SUCCESS) {
-          fprintf(stdout,"Could not send update_id packet!\n");
-        }
+	  mtp_init_packet(&mp_reply,
+			  MA_Opcode, MTP_UPDATE_ID,
+			  MA_Role, MTP_ROLE_EMC,
+			  MA_RequestID, rid->request_id,
+			  MA_RobotID, robot_id,
+			  MA_TAG_DONE);
 
-	retval = 1;
-      }
-      break;
+	  my_retval = mtp_send_packet(vmc->handle, &mp_reply);
+	  if (my_retval != MTP_PP_SUCCESS) {
+	    fprintf(stdout,"Could not send update_id packet!\n");
+	  }
 
-    case MTP_WIGGLE_REQUEST:
-      {
-	int my_id = mp->data.mtp_payload_u.request_position.robot_id;
-	struct mtp_update_position *up;
-	
-	up = (struct mtp_update_position *)
-	  robot_list_search(vmc_data.position_list, my_id);
-	if (up != NULL)
+	  retval = 1;
+	}
+	break;
+
+      case MTP_WIGGLE_REQUEST:
+	{
+	  int my_id = mp->data.mtp_payload_u.request_position.robot_id;
+	  struct mtp_update_position *up;
+
+	  up = (struct mtp_update_position *)
+	    robot_list_search(vmc_data.position_list, my_id);
+	  if (up != NULL)
 	    up->status = MTP_POSITION_STATUS_ERROR;
-	
-        /* simply forward this to rmc */
-        if (rmc_data.handle != NULL) {
-          mp->role = MTP_ROLE_EMC;
-          mtp_send_packet(rmc_data.handle,mp);
-        }
-        else {
-          error("rmc unavailable; cannot forward wiggle-request\n");
-	  mtp_send_packet2(vmc_data.handle,
-			   MA_Opcode, MTP_WIGGLE_STATUS,
-			   MA_Role, MTP_ROLE_EMC,
-			   MA_RobotID, my_id,
-			   MA_Status, MTP_POSITION_STATUS_ERROR,
-			   MA_TAG_DONE);
-        }
 
-	retval = 1;
+	  /* simply forward this to rmc */
+	  if (rmc_data.handle != NULL) {
+	    mp->role = MTP_ROLE_EMC;
+	    mtp_send_packet(rmc_data.handle,mp);
+	  }
+	  else {
+	    error("rmc unavailable; cannot forward wiggle-request\n");
+	    mtp_send_packet2(vmc_data.handle,
+			     MA_Opcode, MTP_WIGGLE_STATUS,
+			     MA_Role, MTP_ROLE_EMC,
+			     MA_RobotID, my_id,
+			     MA_Status, MTP_POSITION_STATUS_ERROR,
+			     MA_TAG_DONE);
+	  }
+
+	  retval = 1;
+	}
+	break;
+
+      default:
+	{
+	  struct mtp_packet mp_reply;
+
+	  error("received bogus opcode from VMC: %d\n", mp->data.opcode);
+
+	  mtp_init_packet(&mp_reply,
+			  MA_Opcode, MTP_CONTROL_ERROR,
+			  MA_Role, MTP_ROLE_EMC,
+			  MA_Message, "protocol error: bad opcode",
+			  MA_TAG_DONE);
+
+	  mtp_send_packet(vmc->handle, &mp_reply);
+	}
+	break;
       }
-      break;
-      
-    default:
-      {
-	struct mtp_packet mp_reply;
-	
-	error("received bogus opcode from VMC: %d\n", mp->data.opcode);
-
-	mtp_init_packet(&mp_reply,
-			MA_Opcode, MTP_CONTROL_ERROR,
-			MA_Role, MTP_ROLE_EMC,
-			MA_Message, "protocol error: bad opcode",
-			MA_TAG_DONE);
-
-	mtp_send_packet(vmc->handle, &mp_reply);
-      }
-      break;
     }
-  }
-  
-  mtp_free_packet(mp);
+
+    mtp_free_packet(mp);
   } while (retval && (vmc->handle->mh_remaining > 0));
-  
+
   if (!retval) {
     info("dropping vmc connection %d\n", fd);
-    
+
     elvin_sync_remove_io_handler(handler, eerror);
 
     mtp_delete_handle(vmc->handle);
@@ -1950,11 +1954,11 @@ int vmc_callback(elvin_io_handler_t handler,
 
     robot_list_destroy(vmc->position_list);
     vmc->position_list = NULL;
-    
+
     close(fd);
     fd = -1;
   }
-  
+
   return retval;
 }
 
@@ -1966,8 +1970,8 @@ int vmc_callback(elvin_io_handler_t handler,
  * @param tol The amount of tolerance to take into account when doing the
  * comparison.
  */
-#define cmp_fuzzy(x1, x2, tol) \
-    ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
+#define cmp_fuzzy(x1, x2, tol)				\
+  ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
 
 int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
 {
@@ -1989,7 +1993,7 @@ int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
 	    robot_list_enum_next_element(e)) != NULL) {
       struct emc_robot_config *erc;
       float orientation;
-      
+
       erc = robot_list_search(hostname_list, mup->robot_id);
       orientation = mtp_theta(mup->position.theta) * 180.0 / M_PI;
       if (!cmp_fuzzy(erc->last_update_pos.x, mup->position.x, 0.02) ||
@@ -2004,12 +2008,12 @@ int update_callback(elvin_timeout_t timeout, void *rock, elvin_error_t eerror)
 		 EA_ArgFloat, "Y", mup->position.y,
 		 EA_ArgFloat, "ORIENTATION", orientation,
 		 EA_TAG_DONE);
-	
+
 	erc->last_update_pos = mup->position;
       }
     }
     robot_list_enum_destroy(e);
   }
-  
+
   return retval;
 }
