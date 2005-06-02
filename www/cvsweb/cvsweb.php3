@@ -42,41 +42,25 @@ $name = preg_replace("/ /","\\ ",$name);
 $agent = preg_replace("/ /","\\ ",$agent);
 $encoding = preg_replace("/ /","\\ ",$encoding);
 
-$output = `env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path SCRIPT_NAME=$name HTTP_USER_AGENT=$agent HTTP_ACCEPT_ENCODING=$encoding $script`;
+$fp = popen("env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
+            "SCRIPT_NAME=$name HTTP_USER_AGENT=$agent " .
+            "HTTP_ACCEPT_ENCODING=$encoding $script",'r');
 
 #
 # Yuck. Since we can't tell php to shut up and not print headers, we have to
-# 'merge' headers from cvsweb with PHP's. And, since preg_match returns
-# totally unhelpful results, we have to split it up into lines and iterate
-# through them. Again, yuck!
+# 'merge' headers from cvsweb with PHP's.
 #
-$array = split("\n",$output);
-$i = 0;
-for ($i = 0; $i < count($array); $i++) {
-	#
-	# A blank line signifies the end of headers
-	#
-	if (!preg_match("/\w+/",$array[$i])) {
-		#
-		# We're done with the headers, we can stop and finish printing
-		# in the loop below
-		#
-		break;
-	} else {
-		#
-		# It's a header, we use the PHP header() function to add it
-		# to the list of headers that PHP maintains.
-		#
-		header($array[$i]);
-	}
+while ($line = fgets($fp)) {
+    # This indicates the end of headers
+    if ($line == "\r\n") { break; }
+    header(rtrim($line));
 }
 
 #
-# Just print the rest of the output (the $i++ skips the blank line that
-# seperate the headers from the body of the document)
+# Just pass through the rest of cvsweb.cgi's output
 #
-for ($i++; $i < count($array); $i++) {
-	echo "$array[$i]\n";
-}
+fpassthru($fp);
+
+fclose($fp);
 
 ?>
