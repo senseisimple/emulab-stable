@@ -18,6 +18,11 @@ case "$1" in
                 /sbin/insmod -f $ETCDIR/regmon.o
         fi
 
+	# Enable the sg's onboard watchdog timer.
+	if [ -x $BINDIR/wagthedog ]; then
+		$BINDIR/wagthedog
+	fi
+
         # Start the mote -> sg LEDS mirror
         # Probably ought to move this to $BINDIR, but I'm not
         #  sure it's even installed from client-install yet!
@@ -26,7 +31,9 @@ case "$1" in
         fi
 
         # Start the robot control process
-        (cd /etc/emulab; $BINDIR/garcia-pilot -d -l /tmp/pilot.log &)
+	if [ -x $BINDIR/pilot-wrapper.sh ]; then
+		$BINDIR/pilot-wrapper.sh
+	fi
         ;;
   stop)
         # nothing yet..
