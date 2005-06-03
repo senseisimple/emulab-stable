@@ -10,13 +10,13 @@ include $(OBJDIR)/Makeconf
 
 RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh 2.elvind.sh 1.named.sh \
 		  2.dhcpd.sh
-OPS_SCRIPTS     = 2.elvind.sh
+OPS_SCRIPTS     = 2.elvind.sh 3.and.sh
 
 #
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: $(RC_SCRIPTS)
+all: $(RC_SCRIPTS) $(OPS_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
