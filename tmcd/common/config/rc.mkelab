@@ -330,8 +330,8 @@ sub SetupOpsNode()
     #
     # And clear some other stuff.
     # 
-    mysystem("rm -f /usr/testbed/lib");
-    mysystem("rm -f /usr/testbed/bin");
+    mysystem("rm -rf /usr/testbed/lib");
+    mysystem("rm -rf /usr/testbed/bin");
 
     #
     # Do this as a separate step cause we need the NFS mounts, but
@@ -628,8 +628,8 @@ sub SetupBossNode()
     #
     # And clear some other stuff.
     # 
-    mysystem("rm -f /usr/testbed/lib");
-    mysystem("rm -f /usr/testbed/bin");
+    mysystem("rm -rf /usr/testbed/lib");
+    mysystem("rm -rf /usr/testbed/bin");
 
     #
     # Create a bigger /var/db/mysql (before installing mysql!)
