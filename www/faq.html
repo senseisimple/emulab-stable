@@ -73,6 +73,9 @@
                            parameters on my links?</a>
      <li> <a href="#HDS-7">Are there other traffic shaping parameters
                            besides latency, bandwidth, and PLR?</a>
+     <li> <a href="#HDS-9">Do any Emulab nodes have wifi (802.11) 
+                           interfaces?</a>
+     <li> <a href="#HDS-10">What kind of wifi cards are used in Emulab?</a>
      </ul>
 
 <li> <a href="#SWS">Software setup</a>
@@ -1052,6 +1055,34 @@
     the advanced tutorial).
     </p>    
 
+<li><a NAME="HDS-9"></a>
+    <font size='+1'><b>Do any Emulab nodes have wifi (802.11) 
+    interfaces?</b></font>
+    <p>
+    Yes!  We currently have several Pentium IV, 3GHz nodes scattered around 
+    our building with two wifi interfaces each.  There are also a handful of
+    older Pentium III, 850MHz systems with wifi interfaces.  Please refer
+    to the <a href="tutorial/docwrapper.php3?docname=wireless.html">
+    wireless tutorial</a> for more info.
+
+
+<li><a NAME="HDS-10"></a>
+    <font size='+1'><b>What kind of wifi cards are used in Emulab?</b></font>
+    <p>
+    We use Netgear WAG311 cards which contain the Atheros 5212
+    chipset. The Madwifi driver and its branches provide support in Linux or
+    FreeBSD.  The default RHL90-WIRELESS image utilizes the unstripped
+    madwifi driver (second link below) by default.
+    </p>
+    <a href="http://netgear.com/products/details/WAG311.php">
+    WAG311 product info</a>
+    <br>
+    <a href="http://madwifi.sourceforge.net">Madwifi Atheros driver</a>
+    <br>
+    <a href="http://pdos.csail.mit.edu/~jbicket/madwifi.stripped/">
+    Stripped madwifi driver</a> - <i>Primarily for use with
+    <a href="http://pdos.csail.mit.edu/click/">click</a></i>
+    
 </ul>
 
 <hr>

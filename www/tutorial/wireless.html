@@ -7,9 +7,9 @@
 <h2>Emulab Tutorial - Using Wireless Networking</h2>
 </center>
 
-Some Emulab nodes may contain wireless interfaces, and those nodes may
-be scattered around at various locations. To find out where those
-nodes are located and what their node IDs are, see the <a
+Some Emulab nodes contain 802.11 a/b/g wifi interfaces (Atheros 5212 chipset),
+and are scattered around at various locations. To find out where they
+are located and what their node IDs are, see the <a
 href=https://www.emulab.net/floormap.php3>wireless floormaps</a> page.
 When you click on one of the colored dots, you will be taken to a page
 describing the node and what type of interfaces the node has installed
@@ -158,6 +158,24 @@ A few points should be noted:
 <li> You must use Redhat 9.0 to take advantage of wireless interfaces. Be
      sure to set the OSID for all of your wireless nodes to
      <tt>RHL90-WIRELESS</tt>.
+
+<li> The wifi nodes contain Netgear WAG311 cards, which use the
+     Atheros 5212 802.11a/b/g chipset.  This chipset is quite flexible
+     since most of the 802.11 MAC layer is handled in software. Emulab
+     provides the standard madwifi Atheros driver by default, but
+     there are alternatives such as the madwifi stripped driver from
+     the MIT roofnet project and SoftMAC from the Universtiy of
+     Colorado at Boulder. Here are some useful links:
+     <br>
+     <a href="http://netgear.com/products/details/WAG311.php">
+     Netgear WAG311 product info</a>
+     <br>
+     <a href="http://madwifi.sourceforge.net">Madwifi Atheros driver</a>
+     <br>
+     <a href="http://pdos.csail.mit.edu/~jbicket/madwifi.stripped/">
+     Stripped madwifi driver</a> - <i>Primarily for use with
+     <a href="http://pdos.csail.mit.edu/click/">click</a></i>
+
 </ul>
 
 Numerous interface settings are possible using <tt>tb-set-lan-setting</tt>
