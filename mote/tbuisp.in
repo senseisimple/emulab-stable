@@ -43,6 +43,7 @@ my $SETID  = "$TB/bin/set-mote-id";
 my $TMPDIR = "/tmp";
 my $USERS  = "@USERNODE@";
 my $DEBUG  = 1;
+my $OBJDUMP= "/usr/local/bin/avr-objdump";
 
 #
 # Handle command-line arguments
@@ -194,11 +195,62 @@ if ($filename) {
 #
 my $tmpfile;
 my $isexe = 0;
-if ($filename =~ /\.exe$/) {
-    print "exe file, extra processing will be done\n";
-    $tmpfile = "$TMPDIR/tbuisp.$$.srec";
-    $isexe = 1;
+
+# this is only broken because when an exe is uploaded via the xmlrpc stuff, 
+# a tmp file is created WITHOUT the .exe extension.  Consequently, we check
+# using avr-objcopy.
+
+# to figure out what format it is, we look for the string 'file format', 
+# followed by a another string.
+# currently, 'srec' corresponds to an srec, and 'elf32-avr' corresponds to an
+# exe.  THIS WILL CHANGE for different mote archs!
+
+my @exe_strs = ("elf32-avr");
+my $srec_str = "srec";
+
+my @output = `$OBJDUMP -f $filename`;
+my $line;
+
+my $check = 0;
+
+foreach $line (@output) {
+    if ($line =~ /file format\s+(.+)$/) {
+	$check = 1;
+
+	# match srec
+	if ($srec_str eq $1) {
+	    $isexe = 0;
+	    print "Binary is format $srec_str!\n";
+	}
+	else {
+	    my $type;
+	    foreach $type (@exe_strs) {
+		if ($type eq $1) {
+		    $isexe = 1;
+		    print "exe file, extra processing will be done\n";
+		    $tmpfile = "$TMPDIR/tbuisp.$$.srec";
+		    print "Binary is format $type.\n";
+		}
+	    }
+	    
+	    # oops, found unsupported binary!
+	    if (!$isexe) {
+		die "Unsupported .exe format $1!\n";
+	    }
+		
+	}
+    }
 }
+
+if (!$check) {
+    die "$OBJDUMP did not provide any information about your binary!\n";
+}
+
+#if ($filename =~ /\.exe$/) {
+#    print "exe file, extra processing will be done\n";
+#    $tmpfile = "$TMPDIR/tbuisp.$$.srec";
+#    $isexe = 1;
+#}
 
 #
 # Program each mote
