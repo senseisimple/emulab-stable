@@ -29,7 +29,7 @@ endif
 ## `ACTIONS' is the set of actions that may be taken on a subdirectory or on
 ## the current directory.  These become phony targets.
 ##
-ACTIONS = all install client client-install clean distclean
+ACTIONS = all install client client-install control-install clean distclean
 
 ## `TARGETS' is the set of all `<subdir>.<action>' targets.
 ##

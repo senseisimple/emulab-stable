@@ -78,6 +78,7 @@ ops-install:
 ifeq ($(EVENTSYS),1)
 	@$(MAKE) -C event control-install
 endif
+	@$(MAKE) -C sensors control-install
 	@$(MAKE) -C xmlrpc control-install
 	@$(MAKE) -C tmcd control-install
 

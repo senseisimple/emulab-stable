@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This is the Emulab specific makefile.
@@ -182,6 +182,33 @@ endif
 	$(INSTALL) -m 0644 and.8 $(DESTDIR)$(INSTALL_MAN)/man8
 	$(INSTALL) -m 0644 and.conf.5 $(DESTDIR)$(INSTALL_MAN)/man5
 	$(INSTALL) -m 0644 and.priorities.5 $(DESTDIR)$(INSTALL_MAN)/man5
+
+control-install: all
+	strip and
+#-mkdir $(PREFIX)
+	-mkdir -p $(INSTALL_DIR)/sbin
+	-mkdir -p $(INSTALL_DIR)/etc
+	-mkdir -p $(INSTALL_DIR)/etc/rc.d
+	-mkdir -p $(INSTALL_DIR)/man/man5
+	-mkdir -p $(INSTALL_DIR)/man/man8
+	$(INSTALL) -m 0755 and $(INSTALL_DIR)/sbin/and
+	$(INSTALL) -m 0644 and-emulab.conf $(INSTALL_DIR)/etc/and.conf
+	$(INSTALL) -m 0644 $(SRCDIR)/and-emulab.priorities \
+		$(INSTALL_DIR)/etc/and.priorities
+ifneq (${INITSCRIPT},)
+ifneq (${INSTALL_INITD},)
+	@echo "Installing SysV script in $(INSTALL_DIR)/etc/rc.d"
+	$(INSTALL) -m 0755 $(INITSCRIPT) $(INSTALL_DIR)/etc/rc.d/and
+else
+	@echo "Installing SysV script in $(INSTALL_DIR)/sbin"
+	$(INSTALL) -m 0755 $(INITSCRIPT) $(INSTALL_DIR)/sbin
+	@echo "Installing SysV init.d finder in $(INSTALL_DIR)/sbin"
+	$(INSTALL) -m 0755 and-find-init.d $(INSTALL_DIR)/sbin
+endif
+endif
+	$(INSTALL) -m 0644 and.8 $(INSTALL_DIR)/man/man8
+	$(INSTALL) -m 0644 and.conf.5 $(INSTALL_DIR)/man/man5
+	$(INSTALL) -m 0644 and.priorities.5 $(INSTALL_DIR)/man/man5
 
 simpleinstall: and and.init
 	strip and
