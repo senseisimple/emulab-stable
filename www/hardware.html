@@ -64,18 +64,26 @@ Antec IPC3480B, with 300W PS and extra fan.
 </ul>
 <p>
 
-<a name="tbshark"></a>
-<li><em>(Currently unavailable)</em><br>
-	160 diskless <a href = "http://www.research.digital.com/SRC/iag/">
-	Compaq DNARD "Sharks"</a> edge nodes (<b>sh[1-20]-[1-8]</b>),
-	consisting of:
-
+<a name="tbpc3000"></a>
+<li>18 <a href=shownodetype.php3?node_type=pc3000>pc3000</a>
+        wireless PC nodes (<b>pcwf1-18</b>), consisting of:
 <ul>
-<li> 233 Mhz StrongARM processors.
-<li> 32MB RAM.
-<li> 1 10Mbps ethernet interface.
+<li> 3.0GHz Intel Pentium 4 processors.
+<li> 1GB DDR-400MHz (PC3200) SDRAM.
+<li> 2 <a href="http://netgear.com/products/details/WAG311.php">Netgear WAG311
+802.11a/b/g</a> (Atheros) wifi cards.
+<li> 2 Ethernet ports:
+<ul>
+	<li>1 <a href="http://support.intel.com/support/network/adapter/index.htm">Intel
+	Pro 1000</a> 10/100/1000Mbps builtin on the motherboard.
+	<li>1 <a
+	href="http://support.intel.com/support/network/adapter/pro100/index.htm">Intel
+	EtherExpress Pro/100 S</a> 10/100Mbps Ethernet card.
 </ul>
-<p>
+<li> 2 Western Digital WDXL80 120GB 7200RPM Serial ATA hard drives.
+<li> Floppy and CD-ROM drive.
+</ul>
+
 
 </ul>
 <h3>Servers</h3>
@@ -196,12 +204,5 @@ The fifth ethernet port on each PC is connected to the
       the experimental interfaces. The only impact on the node is
       processor and disk use, and bandwidth on the PCI bus.
 <p>
-
-The DNARD Sharks are arranged by "shelves."  A shelf holds 8 sharks
-      each of which is connected by a 10Mbps link to an
-      8+2 10/100 ethernet switch from Asante.  The Asante switches
-      are connected via a 100Mbps link to the testbed backplane.
-      Thus each shelf of 8 sharks
-      is capable of generating up to 80Mbps to the backplane.
 
 
