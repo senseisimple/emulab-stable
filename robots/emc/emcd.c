@@ -523,10 +523,12 @@ static int position_in_obstacle(struct obstacle_config *oc,
                                 ) {
   int i;
   int retval = 0;
-
+  
   for (i = 0; i < oc_size; ++i) {
-    if (x >= (oc[i].xmin - 0.25) && y >= (oc[i].ymin - 0.25) &&
-	x <= (oc[i].xmax + 0.25) && y <= (oc[i].ymax + 0.25)) {
+    if (x >= (oc[i].xmin - OBSTACLE_BUFFER) &&
+	y >= (oc[i].ymin - OBSTACLE_BUFFER) &&
+	x <= (oc[i].xmax + OBSTACLE_BUFFER) &&
+	y <= (oc[i].ymax + OBSTACLE_BUFFER)) {
       retval = 1;
       break;
     }
@@ -1256,32 +1258,13 @@ int rmc_callback(elvin_io_handler_t handler,
 	    robot_list_search(vmc_data.position_list, my_id);
 
 	  if (up != NULL && up->status != MTP_POSITION_STATUS_ERROR) {
-	    struct mtp_packet mp_reply;
-
-	    // since VMC isn't hooked in, we simply write back the rmc posit
-	    /* DAN: what?? */
-	    mtp_init_packet(&mp_reply,
-			    MA_Opcode, MTP_UPDATE_POSITION,
-			    MA_Role, MTP_ROLE_EMC,
-			    MA_RobotID, up->robot_id,
-			    MA_Position, &up->position,
-			    /*
-			     * The status field has no meaning when this packet
-			     * is being sent.
-			     */
-			    MA_Status, MTP_POSITION_STATUS_UNKNOWN,
-			    MA_TAG_DONE);
-
-	    /* DAN */
-	    /* Ignore position requests from RMCD if ERF_HAS_GOAL is set,
-	     * for nonlinear controller
-	     */
-	    if (erc->flags & ERF_HAS_GOAL) {
-              info("(In NL mode): Ignoring position request for %d\n", my_id);
-	    }
-	    else {
-	      mtp_send_packet(rmc->handle, &mp_reply);
-	    }
+	    mtp_send_packet2(rmc->handle,
+			     MA_Opcode, MTP_UPDATE_POSITION,
+			     MA_Role, MTP_ROLE_EMC,
+			     MA_RobotID, up->robot_id,
+			     MA_Position, &up->position,
+			     MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+			     MA_TAG_DONE);
 	  }
 	  else if (up == NULL) {
 	    up = (struct mtp_update_position *)
@@ -1371,45 +1354,50 @@ int rmc_callback(elvin_io_handler_t handler,
 	  }
 
 	  retval = 1;
-	}
-	break;
+      }
+      break;
 
-      case MTP_CREATE_OBSTACLE:
+    case MTP_CREATE_OBSTACLE:
 	{
-	  struct dyn_obstacle_config *doc;
-	  struct emc_robot_config *erc;
+	    struct dyn_obstacle_config *doc;
+	    struct emc_robot_config *erc;
 
-	  doc = &mp->data.mtp_payload_u.create_obstacle;
-	  erc = robot_list_search(hostname_list, doc->robot_id);
-	  if (erc != NULL) {
-	    event_do(handle,
-		     EA_Experiment, pideid,
-		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
-		     EA_Event, TBDB_EVENTTYPE_CREATE,
-		     EA_Name, topography_name,
-		     EA_ArgInteger, "ID", doc->config.id,
-		     EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
-		     EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
-		     EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
-		     EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
-		     EA_ArgString, "ROBOT", erc->vname,
-		     EA_TAG_DONE);
-	  }
-	  else {
-	    event_do(handle,
-		     EA_Experiment, pideid,
-		     EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
-		     EA_Event, TBDB_EVENTTYPE_CREATE,
-		     EA_Name, topography_name,
-		     EA_ArgInteger, "ID", doc->config.id,
-		     EA_ArgFloat, "XMIN", doc->config.xmin + 0.25,
-		     EA_ArgFloat, "YMIN", doc->config.ymin + 0.25,
-		     EA_ArgFloat, "XMAX", doc->config.xmax - 0.25,
-		     EA_ArgFloat, "YMAX", doc->config.ymax - 0.25,
-		     EA_TAG_DONE);
-	  }
+	    doc = &mp->data.mtp_payload_u.create_obstacle;
+	    erc = robot_list_search(hostname_list, doc->robot_id);
 
-	  retval = 1;
+	    doc->config.xmin += OBSTACLE_BUFFER;
+	    doc->config.ymin += OBSTACLE_BUFFER;
+	    doc->config.xmax -= OBSTACLE_BUFFER;
+	    doc->config.ymax -= OBSTACLE_BUFFER;
+	    if (erc != NULL) {
+		event_do(handle,
+			 EA_Experiment, pideid,
+			 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+			 EA_Event, TBDB_EVENTTYPE_CREATE,
+			 EA_Name, topography_name,
+			 EA_ArgInteger, "ID", doc->config.id,
+			 EA_ArgFloat, "XMIN", doc->config.xmin,
+			 EA_ArgFloat, "YMIN", doc->config.ymin,
+			 EA_ArgFloat, "XMAX", doc->config.xmax,
+			 EA_ArgFloat, "YMAX", doc->config.ymax,
+			 EA_ArgString, "ROBOT", erc->vname,
+			 EA_TAG_DONE);
+	    }
+	    else {
+		event_do(handle,
+			 EA_Experiment, pideid,
+			 EA_Type, TBDB_OBJECTTYPE_TOPOGRAPHY,
+			 EA_Event, TBDB_EVENTTYPE_CREATE,
+			 EA_Name, topography_name,
+			 EA_ArgInteger, "ID", doc->config.id,
+			 EA_ArgFloat, "XMIN", doc->config.xmin,
+			 EA_ArgFloat, "YMIN", doc->config.ymin,
+			 EA_ArgFloat, "XMAX", doc->config.xmax,
+			 EA_ArgFloat, "YMAX", doc->config.ymax,
+			 EA_TAG_DONE);
+	    }
+	    
+	    retval = 1;
 	}
 	break;
 
