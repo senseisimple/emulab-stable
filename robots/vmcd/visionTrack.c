@@ -368,7 +368,6 @@ void vtMatch(struct lnMinList *pool,
 	     struct lnMinList *now)
 {
     struct vision_track *vt;
-    int i;
 
     assert(pool != NULL);
     assert(prev != NULL);
@@ -389,21 +388,8 @@ void vtMatch(struct lnMinList *pool,
 				 &distance)) != NULL) {
 	    if (distance <= 0.06) {
 		vt->vt_userdata = vt_prev->vt_userdata;
-		info("\nCOPIED old moving avg data\n\n");
-
-
-		//vt->ma = vt_prev->ma;
-
-		/* copy the static data by hand to not overwrite ptr */
-		vt->ma.positions_len = vt_prev->ma.positions_len;
-	        vt->ma.number_valid_positions = 
-		    vt_prev->ma.number_valid_positions;
-		vt->ma.oldest_index = vt_prev->ma.oldest_index;
-		vt->ma.current_avg = vt_prev->ma.current_avg;
-		/* copy the positions data w/o overwriting the pointer */
-		for (i = 0; i < vt->ma.positions_len; ++i) {
-		    vt->ma.positions[i] = vt_prev->ma.positions[i];
-		}
+		
+		vt->ma = vt_prev->ma;
 
 		lnRemove(&vt_prev->vt_link);
 		lnAddHead(pool, &vt_prev->vt_link);
@@ -677,9 +663,9 @@ static void updateMovingAverage(struct moving_average *ma,
     }
 
 #if 1
-    //if (debug > 2) {
+    if (debug > 2) {
 	info("UPDATING moving avg: %d valid positions\n",vp);
-	//}
+    }
 
 #endif
 
@@ -704,7 +690,7 @@ void vtSmooth(struct lnMinList *tracks) {
 	    updateMovingAverage(ma,
 				&(vt->vt_position));
 
-	    //if (debug > 2) {
+	    if (debug > 2) {
 		info("SMOOTHED position for robot %d from (%f,%f,%f) to "
 		     "(%f,%f,%f)\n",
 		     ro->ro_id,
@@ -715,7 +701,7 @@ void vtSmooth(struct lnMinList *tracks) {
 		     ma->current_avg.y,
 		     ma->current_avg.theta
 		     );
-		//}
+	    }
 
 	    /* figure out how much the posit will change from the last
 	     * one reported... this is important so we know if we mess up

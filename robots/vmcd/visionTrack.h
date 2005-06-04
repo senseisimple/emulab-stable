@@ -38,7 +38,7 @@
  * Structure used to keep a moving average of last N positions.
  */
 struct moving_average {
-    struct robot_position *positions;  /*< ring buffer of most recent posits */
+    struct robot_position positions[15];   /*< ring buffer of most recent posits */
     int positions_len;                 /*< length of buffer */
     int number_valid_positions;        /*< the buffer may not be full... */
     

@@ -8,6 +8,7 @@
 
 #include <math.h>
 #include <time.h>
+#include <fcntl.h>
 #include <float.h>
 #include <stdio.h>
 #include <errno.h>
@@ -78,9 +79,11 @@ static struct robot_object *wiggle_bot = NULL;
 #define DEFAULT_SMOOTH_WINDOW 10
  
 /* by default, smoothing is off */
-static int smoothing = 1;
+static int smoothing = 0;
 static int smoothing_window = DEFAULT_SMOOTH_WINDOW;
 
+static mtp_handle_t client_dump_handle = NULL;
+static mtp_handle_t frame_dump_handle = NULL;
 
 /**
  * Here's how the algorithm will lay out: when we get update_position packets
@@ -183,6 +186,8 @@ static void dump_robot_list(struct lnMinList *list)
 
 static void dump_vision_track(struct vision_track *vt)
 {
+    int lpc;
+    
     assert(vt != NULL);
     
     info("  %d: %.2f %.2f %.2f; age=%d; ts=%f; %s\n",
@@ -195,6 +200,13 @@ static void dump_vision_track(struct vision_track *vt)
 	 (vt->vt_userdata == NULL) ?
 	 "(unknown)" :
 	 ((struct robot_object *)vt->vt_userdata)->ro_name);
+    for (lpc = 0; lpc < vt->ma.positions_len; lpc++) {
+	struct robot_position *rp;
+
+	rp = &vt->ma.positions[lpc];
+	info("\t%.2f %.2f %.2f %.3f\n",
+	     rp->x, rp->y, rp->theta, rp->timestamp);
+    }
 }
 
 void dump_vision_list(struct lnMinList *list)
@@ -314,7 +326,7 @@ static void usage(void)
 
 static int parse_client_options(int *argcp, char **argvp[])
 {
-    int c, argc, retval = EXIT_SUCCESS;
+    int c, fd, argc, retval = EXIT_SUCCESS;
     char **argv;
     
     assert(argcp != NULL);
@@ -323,7 +335,7 @@ static int parse_client_options(int *argcp, char **argvp[])
     argc = *argcp;
     argv = *argvp;
     
-    while ((c = getopt(argc, argv, "hdSp:U:l:i:e:c:P:w:")) != -1) {
+    while ((c = getopt(argc, argv, "hdSp:U:l:i:e:c:P:w:f:F:")) != -1) {
         switch (c) {
 	case 'S':
 	    smoothing = 1;
@@ -377,6 +389,28 @@ static int parse_client_options(int *argcp, char **argvp[])
                 exit(1);
             }
             break;
+	case 'f':
+	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1) {
+		errorc("-f option is not a valid file name: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    else if ((client_dump_handle = mtp_create_handle(fd)) == NULL) {
+		errorc("unable to create MTP handle\n");
+		exit(1);
+	    }
+	    break;
+	case 'F':
+	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1) {
+		errorc("-F option is not a valid file name: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    else if ((frame_dump_handle = mtp_create_handle(fd)) == NULL) {
+		errorc("unable to create MTP handle\n");
+		exit(1);
+	    }
+	    break;
         default:
             break;
         }
@@ -559,8 +593,10 @@ int main(int argc, char *argv[])
     if (smoothing) {
 	
 	for (lpc = 0; lpc < TRACK_POOL_SIZE; ++lpc) {
+#if 0
 	    vt_pool_nodes[lpc].ma.positions = (struct robot_position *)
 		malloc(sizeof(struct robot_position)*smoothing_window);
+#endif
 	    bzero(vt_pool_nodes[lpc].ma.positions,
 		  sizeof(struct robot_position)*smoothing_window);
 	    vt_pool_nodes[lpc].ma.positions_len = smoothing_window;
@@ -793,6 +829,8 @@ int main(int argc, char *argv[])
 				    MA_Status, MTP_POSITION_STATUS_UNKNOWN,
 				    MA_TAG_DONE);
 		    mtp_send_packet(emc_handle, &ump);
+		    if (frame_dump_handle)
+			mtp_send_packet(frame_dump_handle, &ump);
 		}
 		
 		if (debug > 2) {
@@ -818,7 +856,6 @@ int main(int argc, char *argv[])
 	    ro = (struct robot_object *)ro_data.rd_lists[ROS_UNKNOWN].lh_Head;
 	    while (ro->ro_link.ln_Succ != NULL) {
 		struct robot_object *ro_next;
-		struct mtp_packet wmp;
 		
 		ro_next = (struct robot_object *)ro->ro_link.ln_Succ;
 		
@@ -830,13 +867,12 @@ int main(int argc, char *argv[])
 		    sent_snapshot = 1;
 		}
 		
-		mtp_init_packet(&wmp,
-				MA_Opcode, MTP_WIGGLE_REQUEST,
-				MA_Role, MTP_ROLE_VMC,
-				MA_RobotID, ro->ro_id,
-				MA_WiggleType, MTP_WIGGLE_START,
-				MA_TAG_DONE);
-		mtp_send_packet(emc_handle, &wmp);
+		mtp_send_packet2(emc_handle,
+				 MA_Opcode, MTP_WIGGLE_REQUEST,
+				 MA_Role, MTP_ROLE_VMC,
+				 MA_RobotID, ro->ro_id,
+				 MA_WiggleType, MTP_WIGGLE_START,
+				 MA_TAG_DONE);
 		
 		roMoveRobot(ro, ROS_STARTED_WIGGLING);
 		ro = ro_next;
@@ -982,6 +1018,12 @@ int main(int argc, char *argv[])
 			    if (current_client < vmc_client_count)
 				FD_SET(vc[1].vc_handle->mh_fd, &readfds);
 			}
+		    }
+
+		    if (client_dump_handle) {
+			mp.data.mtp_payload_u.update_position.command_id =
+			    vc - vmc_clients;
+			mtp_send_packet(client_dump_handle, &mp);
 		    }
 		    
 		    mtp_free_packet(&mp);
