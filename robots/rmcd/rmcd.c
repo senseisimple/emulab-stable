@@ -5,34 +5,12 @@
  */
 
 /* Robot Master Control Daemon
- *
- * Dan Flickinger
- * ***
- *
- * RMCD will immediately try to connect to EMCD, get configuration data,
- * and then open connections to all robots as sent by EMCD. RMCD only heeds
- * one master; in other words, it will connect to only a single EMCD.
- *
- * Once connections are open, RMCD will wait for commands from EMCD.
- *
- * After a command is received, RMCD will wait for EMCD to send the
- * current position for the robot commanded to move by EMCD.  Once the
- * current position is received, the move command is relayed to the
- * appropriate robot after converting the coordinates into the local
- * robot's reference frame.
- *
- * Upon completion of a command, RMCD will send notice to EMCD, along
- * with a position update sent from the robot and converted into the
- * global coordinate frame.
- *
- *
- * 2004/12/01
- * 2004/12/14
  */
 
 #include <stdio.h>
 #include <assert.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -51,9 +29,13 @@
 #include "mtp.h"
 #include "rclip.h"
 #include "rmcd.h"
+#include "obstacles.h"
 #include "pilotConnection.h"
 
-#define OBSTACLE_BUFFER 0.25
+#define DEFAULT_MAX_REFINE_RETRIES 4
+#define DEFAULT_METER_TOLERANCE 0.02f
+#define DEFAULT_RADIAN_TOLERANCE 0.09f
+#define DEFAULT_MAX_DISTANCE 1.5f
 
 /**
  * Do a fuzzy comparison of two values.
@@ -63,19 +45,53 @@
  * @param tol The amount of tolerance to take into account when doing the
  * comparison.
  */
-#define cmp_fuzzy(x1, x2, tol) \
-    ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
+#define cmp_fuzzy(x1, x2, tol)				\
+  ((((x1) - (tol)) < (x2)) && (x2 < ((x1) + (tol))))
 
 int debug = 0;
 
+/**
+ *
+ */
 static volatile int looping = 1;
 
 static struct mtp_config_rmc *rmc_config = NULL;
 
+extern char *statsfile;
+
+FILE *plogfilep = NULL;
+
+/**
+ * Print the usage message for rmcd.
+ */
 static void usage(void)
 {
     fprintf(stderr,
-	    "Usage: rmcd [-hd] [-l logfile] [-i pidfile] [-e emchost] [-p emcport]\n");
+	    "Usage: rmcd [OPTIONS]\n"
+	    "Options:\n"
+	    "  -h\t\tPrint this message\n"
+	    "  -d\t\tIncrease debugging level and do not daemonize\n"
+	    "  -n enable nonlinear controller for posture regulation\n"
+	    "  -l logfile\tLog file name\n"
+	    "  -k packet logfile\tPacket Log file name\n"
+	    "  -i pidfile\tPid file name\n"
+	    "  -s statsfile\tStatistics file name\n"
+	    "  -e host\tThe hostname where emcd is running\n"
+	    "  -p port\tThe port where emcd is listening\n"
+	    "  -U path\tPath to unix domain socket where emcd is listening\n"
+	    "  -t tries\tMax number of times to retry reaching a point "
+	    "(Default: %d)\n"
+	    "  -m tolerance\tDistance tolerance in meters (Default: %.2f)\n"
+	    "  -r tolerance\tRotation tolerance in radians (Default: %.2f)\n"
+	    "  -a distance\tMax distance for a single line segment "
+	    "(Default: %.2f)\n"
+	    "\n"
+	    "Version: %s\n",
+	    DEFAULT_MAX_REFINE_RETRIES,
+	    DEFAULT_METER_TOLERANCE,
+	    DEFAULT_RADIAN_TOLERANCE,
+	    DEFAULT_MAX_DISTANCE,
+	    build_info);
 }
 
 #if defined(SIGINFO)
@@ -98,6 +114,10 @@ static void siginfo(int sig)
 }
 #endif
 
+struct timeval tv_last = {0,0};
+struct timeval tv_cur = {0,0};
+
+
 /**
  * Handle an mtp packet from emcd.
  *
@@ -106,9 +126,12 @@ static void siginfo(int sig)
 static void handle_emc_packet(mtp_handle_t emc_handle)
 {
     struct mtp_packet mp;
-    
+    double tf_last, tf_cur, tf_diff, tf_lat;
+
+
+
     assert(emc_handle != NULL);
-    
+
     if (mtp_receive_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
 	fatal("bad packet from emc!\n");
     }
@@ -117,60 +140,61 @@ static void handle_emc_packet(mtp_handle_t emc_handle)
 	struct mtp_update_position *mup =
 	    &mp.data.mtp_payload_u.update_position;
 	struct mtp_wiggle_request *mwr = &mp.data.mtp_payload_u.wiggle_request;
-	struct pilot_connection *pc;
-	
+	struct pilot_connection *pc = NULL;
+
 	if (debug > 1) {
 	    fprintf(stderr, "emc packet: ");
 	    mtp_print_packet(stderr, &mp);
 	}
-	
+
+
+
+
+
+
 	switch (mp.data.opcode) {
 	case MTP_COMMAND_GOTO:
-	    if ((pc = pc_find_pilot(mcg->robot_id)) == NULL) {
-		error("uknnown robot %d\n", mcg->robot_id);
-	    }
-	    else {
-		pc_set_goal(pc, &mcg->position);
-	    }
+	    pc = pc_find_pilot(mcg->robot_id);
 	    break;
-
 	case MTP_WIGGLE_REQUEST:
-	    if ((pc = pc_find_pilot(mwr->robot_id)) == NULL) {
-		error("unknown robot %d\n", mwr->robot_id);
-		// also need to send crap back to VMCD so that it doesn't
-		// wait for a valid wiggle complete msg
-		
-		mtp_init_packet(&mp,
-				MA_Opcode, MTP_WIGGLE_STATUS,
-				MA_Role, MTP_ROLE_RMC,
-				MA_RobotID, mwr->robot_id,
-				MA_Status, MTP_POSITION_STATUS_ERROR,
-				MA_TAG_DONE);
-		if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
-		    error("cannot send reply packet\n");
-		}
-	    }
-	    else {
-		pc_wiggle(pc, mwr->wiggle_type);
-	    }
-	    break;
-	case MTP_COMMAND_STOP:
-	    assert(0);
+	    pc = pc_find_pilot(mwr->robot_id);
 	    break;
 	case MTP_UPDATE_POSITION:
-	    if ((pc = pc_find_pilot(mup->robot_id)) == NULL) {
-		error("uknnown robot %d\n", mup->robot_id);
+	    pc = pc_find_pilot(mup->robot_id);
+
+	    /* timestamp */
+	    tv_last = tv_cur;
+	    gettimeofday(&tv_cur, NULL);
+
+	    tf_last = (double)(tv_last.tv_sec) + (double)(tv_last.tv_usec) / 1000000.0;
+	    tf_cur = (double)(tv_cur.tv_sec) + (double)(tv_cur.tv_usec) / 1000000.0;
+
+	    tf_diff = tf_cur - tf_last;
+	    tf_lat = tf_cur - mup->position.timestamp;
+
+	    if (plogfilep != NULL) {
+		fprintf(plogfilep, "%f %f\n", tf_diff, tf_lat);
 	    }
-	    else {
-		pc_set_actual(pc, &mup->position);
-	    }
+
+
+	    break;
+
+	case MTP_COMMAND_STOP:
+	    assert(0);
 	    break;
 	default:
 	    warning("unhandled emc packet %d\n", mp.data.opcode);
 	    break;
 	}
+
+
+
+
+	if (pc != NULL) {
+	    pc_handle_emc_packet(pc, &mp);
+	}
     }
-    
+
     mtp_free_packet(&mp);
 }
 
@@ -178,78 +202,21 @@ int main(int argc, char *argv[])
 {
     char *emc_hostname = NULL, *emc_path = NULL;
     int c, emc_port = 0, retval = EXIT_SUCCESS;
-    char *logfile = NULL, *pidfile = NULL;
+    char *logfile = NULL, *plogfile = NULL, *pidfile = NULL;
     mtp_handle_t emc_handle = NULL;
-    struct timeval last_time;
+    struct timeval tv, next_time;
     struct mtp_packet rmp;
-    fd_set readfds;
+    time_t start_time;
 
-#if 0
-    {
-	struct robot_config rc = { 1, "fakegarcia" };
-	struct pilot_connection *pc;
-	struct mtp_config_rmc rmc;
+    ob_init();
 
-	debug = 3;
+    /* set default tolerances */
+    mc_data.mcd_max_refine_retries = DEFAULT_MAX_REFINE_RETRIES;
+    mc_data.mcd_meter_tolerance = DEFAULT_METER_TOLERANCE;
+    mc_data.mcd_radian_tolerance = DEFAULT_RADIAN_TOLERANCE;
+    pp_data.ppd_max_distance = DEFAULT_MAX_DISTANCE;
 
-	memset(&rmc, 0, sizeof(rmc));
-	pc_data.pcd_config = &rmc;
-	
-	pc = pc_add_robot(&rc);
-
-	pc->pc_obstacles[0].id = 1;
-	pc->pc_obstacles[0].xmin = 2.0;
-	pc->pc_obstacles[0].ymin = 2.0;
-	pc->pc_obstacles[0].xmax = 3.0;
-	pc->pc_obstacles[0].ymax = 3.0;
-
-	pc->pc_obstacle_count += 1;
-
-	pc->pc_actual_pos.x = 2.0;
-	pc->pc_actual_pos.y = 2.7;
-	pc->pc_goal_pos.x = 2.5;
-	pc->pc_goal_pos.y = 3.3;
-
-	pc_plot_waypoint(pc);
-
-	pc->pc_flags &= ~PCF_WAYPOINT;
-	pc->pc_actual_pos.x = 3.2;
-	pc->pc_actual_pos.y = 2.5;
-	pc->pc_goal_pos.x = 2.5;
-	pc->pc_goal_pos.y = 3.3;
-
-	pc_plot_waypoint(pc);
-
-	pc->pc_flags &= ~PCF_WAYPOINT;
-	pc->pc_actual_pos.x = 3.2;
-	pc->pc_actual_pos.y = 2.5;
-	pc->pc_goal_pos.x = 2.5;
-	pc->pc_goal_pos.y = 1.3;
-
-	pc_plot_waypoint(pc);
-
-	pc->pc_flags &= ~PCF_WAYPOINT;
-	pc->pc_actual_pos.x = 2.5;
-	pc->pc_actual_pos.y = 1.9;
-	pc->pc_goal_pos.x = 1.5;
-	pc->pc_goal_pos.y = 2.7;
-
-	pc_plot_waypoint(pc);
-
-	pc->pc_flags &= ~PCF_WAYPOINT;
-	pc->pc_actual_pos.x = 2.5;
-	pc->pc_actual_pos.y = 1.3;
-	pc->pc_goal_pos.x = 2.5;
-	pc->pc_goal_pos.y = 3.7;
-
-	pc_plot_waypoint(pc);
-
-	exit(0);
-    }
-#else
-    FD_ZERO(&readfds);
-
-    while ((c = getopt(argc, argv, "hdp:l:i:e:c:U:")) != -1) {
+    while ((c = getopt(argc, argv, "hdnp:l:k:i:e:c:U:t:m:r:a:s:")) != -1) {
 	switch (c) {
 	case 'h':
 	    usage();
@@ -258,8 +225,14 @@ int main(int argc, char *argv[])
 	case 'd':
 	    debug += 1;
 	    break;
+	case 'n':
+	    /* nonlinear posture regulator */
+	    break;
 	case 'l':
 	    logfile = optarg;
+	    break;
+	case 'k':
+	    plogfile = optarg;
 	    break;
 	case 'i':
 	    pidfile = optarg;
@@ -274,31 +247,68 @@ int main(int argc, char *argv[])
 		exit(1);
 	    }
 	    break;
+	case 't':
+	    if (sscanf(optarg, "%d", &mc_data.mcd_max_refine_retries) != 1) {
+		error("-t option is not a number: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'm':
+	    if (sscanf(optarg, "%f", &mc_data.mcd_meter_tolerance) != 1) {
+		error("-m option is not a float: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'r':
+	    if (sscanf(optarg, "%f", &mc_data.mcd_radian_tolerance) != 1) {
+		error("-r option is not a float: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'a':
+	    if (sscanf(optarg, "%f", &pp_data.ppd_max_distance) != 1) {
+		error("-a option is not a float: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
 	case 'U':
 	    emc_path = optarg;
 	    break;
+	case 's':
+	    statsfile = optarg;
+	    break;
 	}
     }
-  
+
     if (debug) {
 	loginit(0, logfile);
     }
     else {
 	/* Become a daemon */
 	daemon(0, 0);
-    
+
 	if (logfile)
 	    loginit(0, logfile);
 	else
 	    loginit(1, "vmcclient");
     }
-    
+
     if (pidfile) {
 	FILE *fp;
-    
+
 	if ((fp = fopen(pidfile, "w")) != NULL) {
 	    fprintf(fp, "%d\n", getpid());
 	    (void) fclose(fp);
+	}
+    }
+
+    if (plogfile) {
+	if ((plogfilep = fopen(plogfile, "w")) == NULL) {
+	    fprintf(stderr, "ERROR: could not open packet log file, %s\n", plogfile);
 	}
     }
 
@@ -306,22 +316,34 @@ int main(int argc, char *argv[])
     signal(SIGINFO, siginfo);
 #endif
 
-    if (emc_hostname != NULL || emc_path != NULL) {
-	struct mtp_packet mp;
-	
-	mtp_init_packet(&mp,
-			MA_Opcode, MTP_CONTROL_INIT,
-			MA_Role, MTP_ROLE_RMC,
-			MA_Message, "rmcd init",
-			MA_TAG_DONE);
+    signal(SIGPIPE, SIG_IGN);
 
+    time(&start_time);
+    info("RMCD %s\n"
+	 "  start:\t%s"
+	 "  max_refine_retries:\t%d\n"
+	 "  meter_tolerance:\t%.2f\n"
+	 "  radian_tolerance:\t%.2f\n"
+	 "  max_distance:\t%.2f\n",
+	 build_info,
+	 ctime(&start_time),
+	 mc_data.mcd_max_refine_retries,
+	 mc_data.mcd_meter_tolerance,
+	 mc_data.mcd_radian_tolerance,
+	 pp_data.ppd_max_distance);
+
+    if (emc_hostname != NULL || emc_path != NULL) {
 	/* Connect to emcd and get the configuration. */
 	if ((emc_handle = mtp_create_handle2(emc_hostname,
 					     emc_port,
 					     emc_path)) == NULL) {
 	    pfatal("mtp_create_handle");
 	}
-	else if (mtp_send_packet(emc_handle, &mp) != MTP_PP_SUCCESS) {
+	else if (mtp_send_packet2(emc_handle,
+				  MA_Opcode, MTP_CONTROL_INIT,
+				  MA_Role, MTP_ROLE_RMC,
+				  MA_Message, "rmcd init",
+				  MA_TAG_DONE) != MTP_PP_SUCCESS) {
 	    pfatal("could not configure with emc");
 	}
 	else if (mtp_receive_packet(emc_handle, &rmp) != MTP_PP_SUCCESS) {
@@ -332,14 +354,17 @@ int main(int argc, char *argv[])
 
 	    mtp_print_packet(stderr, &rmp);
 
-	    FD_SET(emc_handle->mh_fd, &readfds);
+	    FD_SET(emc_handle->mh_fd, &pc_data.pcd_read_fds);
 	    rmc_config = &rmp.data.mtp_payload_u.config_rmc;
 
-	    info("bounds %d\n", rmc_config->bounds.bounds_len);
-	    
+	    ob_data.od_emc_handle = emc_handle;
+
 	    pc_data.pcd_emc_handle = emc_handle;
 	    pc_data.pcd_config = rmc_config;
-	    
+
+	    pp_data.ppd_bounds = rmc_config->bounds.bounds_val;
+	    pp_data.ppd_bounds_len = rmc_config->bounds.bounds_len;
+
 	    /*
 	     * Walk through the robot list and connect to the pilot daemons
 	     * running on the robots.
@@ -347,46 +372,41 @@ int main(int argc, char *argv[])
 	    for (lpc = 0; lpc < rmc_config->robots.robots_len; lpc++) {
 		struct robot_config *rc = &rmc_config->robots.robots_val[lpc];
 		struct pilot_connection *pc;
-		
+
 		info(" robot[%d] = %d %s\n", lpc, rc->id, rc->hostname);
 
 		if ((pc = pc_add_robot(rc)) == NULL) {
 		    fatal("eh?");
 		}
-		else {
-		    FD_SET(pc->pc_handle->mh_fd, &readfds);
-		}
 	    }
 
 	    for (lpc = 0; lpc < rmc_config->obstacles.obstacles_len; lpc++) {
-		struct obstacle_config *oc;
-
-		oc = &rmc_config->obstacles.obstacles_val[lpc];
-		oc->xmin -= OBSTACLE_BUFFER;
-		oc->ymin -= OBSTACLE_BUFFER;
-		oc->xmax += OBSTACLE_BUFFER;
-		oc->ymax += OBSTACLE_BUFFER;
+		ob_add_obstacle(&rmc_config->obstacles.obstacles_val[lpc]);
 	    }
 	}
     }
 
+    gettimeofday(&tv, NULL);
+    next_time = tv;
+    next_time.tv_sec += 1;
+
     while (looping) {
-	fd_set rreadyfds = readfds;
-	struct timeval tv, diff;
+	fd_set rreadyfds = pc_data.pcd_read_fds;
+	fd_set wreadyfds = pc_data.pcd_write_fds;
+	struct timeval select_timeout;
 	int rc;
 
 #if defined(SIGINFO)
 	if (got_siginfo) {
 	    pc_dump_info();
+	    ob_dump_info();
 	    got_siginfo = 0;
 	}
 #endif
 
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
-	rc = select(FD_SETSIZE, &rreadyfds, NULL, NULL, &tv);
-	gettimeofday(&tv, NULL);
-	
+	timersub(&next_time, &tv, &select_timeout);
+	rc = select(FD_SETSIZE, &rreadyfds, &wreadyfds, NULL, &select_timeout);
+
 	if (rc > 0) {
 	    if (FD_ISSET(emc_handle->mh_fd, &rreadyfds)) {
 		do {
@@ -394,19 +414,19 @@ int main(int argc, char *argv[])
 		} while (emc_handle->mh_remaining > 0);
 	    }
 
-	    pc_handle_signal(&rreadyfds, NULL);
+	    pc_handle_signal(&rreadyfds, &wreadyfds);
 	}
 	else if (rc == -1 && errno != EINTR) {
 	    errorc("select\n");
 	}
 
-	timersub(&tv, &last_time, &diff);
-	if (diff.tv_sec > 1) {
+	gettimeofday(&tv, NULL);
+	if (timercmp(&tv, &next_time, >)) {
 	    pc_handle_timeout(&tv);
-	    last_time = tv;
+	    next_time = tv;
+	    next_time.tv_sec += 1;
 	}
     }
-  
+
     return retval;
-#endif
 }

@@ -11,8 +11,8 @@ SUBDIR		= robots/rmcd
 
 include $(OBJDIR)/Makeconf
 
-PROGS = rmcd
-TESTS = test_rmcd.sh test_rmcd2.sh
+PROGS = rmcd simple_path multi_path
+TESTS = test_simple_path.sh test_multi_path.sh
 
 all: $(PROGS)
 client client-install:
@@ -29,14 +29,63 @@ LIBS	 += -lmtp -ltb -lm
 
 test_rmcd.sh: rmcd
 
-OBJS = rclip.o obstacles.o pilotConnection.o rmcd.o
+DEPS = \
+	../mtp/mtp.h \
+	../mtp/mtp_xdr.h \
+	masterController.h \
+	obstacles.h \
+	pathPlanning.h \
+	pilotConnection.h \
+	rclip.h \
+	rmcd.h \
+	slaveController.h
 
-rmcd: $(OBJS) ../mtp/libmtp.a
-	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
+masterController.o: $(DEPS)
+obstacles.o: $(DEPS)
+pathPlanning.o: $(DEPS)
+pilotConnection.o: $(DEPS)
+rclip.o: $(DEPS)
+rmcd.o: $(DEPS)
+slaveController.o: $(DEPS)
+
+OBJS = \
+	rclip.o \
+	obstacles.o \
+	pilotConnection.o \
+	rmcd.o \
+	pathPlanning.o \
+	slaveController.o \
+	masterController.o
+
+TEST_PATH_OBJS = \
+	pathPlanning.o \
+	obstacles.o \
+	rclip.o
+
+rmcd-version.c: $(OBJS)
+
+rmcd: $(OBJS) rmcd-version.c ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(OBJS) rmcd-version.c $(LIBS)
+
+simple_path.o: test_path.c $(DEPS)
+	$(CC) -c $(CFLAGS) -DSIMPLE_PATH -o $@ $<
+
+multi_path.o: test_path.c $(DEPS)
+	$(CC) -c $(CFLAGS) -DMULTI_PATH -o $@ $<
+
+simple_path: simple_path.o $(TEST_PATH_OBJS) ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(TEST_PATH_OBJS) $(LIBS)
+
+multi_path: multi_path.o $(TEST_PATH_OBJS) ../mtp/libmtp.a
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(TEST_PATH_OBJS) $(LIBS)
 
 install: all
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL_PROGRAM) rmcd $(INSTALL_DIR)/opsdir/sbin/rmcd
+
+control-install: all
+	-mkdir -p $(INSTALL_DIR)/sbin
+	$(INSTALL_PROGRAM) rmcd $(INSTALL_DIR)/sbin/rmcd
 
 clean:
 	rm -f *.o
