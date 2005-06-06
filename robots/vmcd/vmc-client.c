@@ -614,7 +614,8 @@ int main(int argc, char *argv[])
 			}
 			
 			// We want mezzanine to copy the image data over.
-			mezzmap->calibrate += 1;
+			if (debug > 1)
+			    mezzmap->calibrate += 1;
 			if (setsockopt(fd,
 				       IPPROTO_TCP,
 				       TCP_NODELAY,
@@ -658,9 +659,11 @@ int main(int argc, char *argv[])
 				    config_vmc_client.fixed_y;
 				break;
 			    case MTP_SNAPSHOT:
-				info("doing snapshot\n");
-				snapshot_start = mezz_frame_count;
-				do_snapshot = 1;
+				if (debug > 1) {
+				    info("doing snapshot\n");
+				    snapshot_start = mezz_frame_count;
+				    do_snapshot = 1;
+				}
 				break;
 			    default:
 				break;
@@ -669,7 +672,8 @@ int main(int argc, char *argv[])
 			}
 
 			if (!good) {
-			    mezzmap->calibrate -= 1;
+			    if (debug > 1)
+				mezzmap->calibrate -= 1;
 			    close(lpc);
 			    FD_CLR(lpc, &readfds);
 			    FD_CLR(lpc, &clientfds);
@@ -686,16 +690,18 @@ int main(int argc, char *argv[])
                      */
 		    do {
 			if (mezz_frame_count != last_mezz_frame) {
+			    int plen;
+			    
 			    if (debug > 1) {
 				info("vmc-client: new frame\n");
 			    }
 			    
 			    record_frame(mezzmap);
-                        
-			    if ((rc = encode_packets(mezzmap)) == -1) {
+			    
+			    if ((plen = encode_packets(mezzmap)) == -1) {
 				errorc("error: unable to encode packets");
 			    }
-			    else if (rc == 0) {
+			    else if (plen == 0) {
 				if (debug) {
 				    info("vmc-client: nothing to send %d\n",
 					 mezz_frame_count);
@@ -706,7 +712,15 @@ int main(int argc, char *argv[])
 				
 				for (lpc = 0; lpc <= maxfd; lpc++) {
 				    if (FD_ISSET(lpc, &clientfds)) {
-					write(lpc, packet_buffer, rc);
+					int rc;
+					
+					do {
+					    rc = write(lpc,
+						       packet_buffer,
+						       plen);
+					} while (rc == -1 && errno == EINTR);
+					if (rc == -1)
+					    errorc("error: network write\n");
 				    }
 				}
 			    }
