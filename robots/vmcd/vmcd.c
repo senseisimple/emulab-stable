@@ -390,7 +390,7 @@ static int parse_client_options(int *argcp, char **argvp[])
             }
             break;
 	case 'f':
-	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1) {
+	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0664)) == -1) {
 		errorc("-f option is not a valid file name: %s\n", optarg);
 		usage();
 		exit(1);
@@ -401,7 +401,7 @@ static int parse_client_options(int *argcp, char **argvp[])
 	    }
 	    break;
 	case 'F':
-	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0644)) == -1) {
+	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0664)) == -1) {
 		errorc("-F option is not a valid file name: %s\n", optarg);
 		usage();
 		exit(1);
