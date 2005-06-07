@@ -64,7 +64,8 @@ else
 
     # Last resort!!!  tsshutdn
     datehost="`date`: Host name '$hostname'"
-    msg="$datehost didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
+#    msg="$datehost didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
+    msg="$datehost didn't reboot changing to '$nodeid'!  Trying reboot."
     echo "$msg" >> $logfile
     echo "$msg"
     tsshutdn 1 /REBOOT /DELAY:1
@@ -83,7 +84,7 @@ fi
 netsh interface reset all
 
 # Windows DHCP doesn't make a /etc/resolv.h, which tmcc needs for bossinfo.
-# Make one from nslookup output.
+# Make one from ipconfig output.
 ipconfig /all | awk \
     '/^ *Connection-specific DNS Suffix/{print "search", $NF} \
      /^ *DNS Servers/{print "nameserver", $NF}' > /etc/resolv.conf

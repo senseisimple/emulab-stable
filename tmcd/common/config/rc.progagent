@@ -22,12 +22,6 @@ $| = 1;
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-# Only root.
-if ($EUID != 0) {
-    die("*** $0:\n".
-	"    Must be root to run this script!\n");
-}
-
 # Script specific goo
 my $LOGFILE = "$LOGDIR/progagent.debug";
 my $PIDFILE = "/var/run/progagent.pid";
@@ -41,6 +35,15 @@ my $PAGENT  = "$BINDIR/program-agent";
 use libsetup;
 use libtmcc;
 use librc;
+
+# This runs as a separate Local System service on XP.  Change to root.
+if (WINDOWS()) { $EUID = $UID = 0; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
 
 #
 # Not all clients support this.
