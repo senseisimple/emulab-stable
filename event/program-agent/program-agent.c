@@ -39,6 +39,7 @@
 #include "tbdefs.h"
 #include "log.h"
 #include "popenf.h"
+#include "systemf.h"
 #include "event.h"
 #include <elvin/elvin.h>
 
@@ -586,7 +587,8 @@ main(int argc, char **argv)
 	}
 	setenv("NODE", buf, 1);
 	if ((he = gethostbyname(buf)) == NULL) {
-	    warning("cannot get hostname for %s\n", buf);
+	    warning("warning: cannot get hostname for '%s', "
+		    "assuming no network links available\n", buf);
 	}
 	else {
 	    struct in_addr ia;
@@ -1063,10 +1065,12 @@ set_program(struct proginfo *pinfo, char *args)
 
 		if ((rc = event_arg_get(args, "COMMAND", &value)) > 0) {
 			if (pinfo->cmdline != NULL) {
-				if (pinfo->cmdline != pinfo->initial_cmdline)
+				if (pinfo->cmdline != pinfo->initial_cmdline) {
 					free(pinfo->cmdline);
+					pinfo->cmdline = NULL;
+				}
 			}
-			pinfo->cmdline = strdup(value);
+			asprintf(&pinfo->cmdline, "exec %s", value);
 			value = NULL;
 		}
 		if ((rc = event_arg_dup(args, "DIR", &value)) >= 0) {
@@ -1256,8 +1260,12 @@ stop_program(struct proginfo *pinfo, char *args)
 		return;
 	}
 	if (killpg(pinfo->pid, SIGTERM) < 0 &&
-	    killpg(pinfo->pid, SIGKILL) < 0) {
-		error("stop_program: kill() failed: %s!\n", strerror(errno));
+	    killpg(pinfo->pid, SIGKILL) < 0 &&
+	    /* The program might've been started with 'sudo'. */
+	    systemf("sudo kill -- -%d", pinfo->pid) != 0) {
+		error("stop_program: killpg(%d) failed: %s!\n",
+		      pinfo->pid,
+		      strerror(errno));
 	}
 }
 
@@ -1373,7 +1381,8 @@ signal_program(struct proginfo *pinfo, char *args)
 		return;
 	}
 	
-	if (kill(pinfo->pid, i) < 0) {
+	if (kill(pinfo->pid, i) < 0 &&
+	    systemf("sudo kill -%d %d", i, pinfo->pid) != 0) {
 		error("signal_program: kill(%d) failed: %s!\n", i,
 		      strerror(errno));
 	}
@@ -1439,7 +1448,10 @@ parse_configfile(char *filename)
 						&pinfo->cmdline)) >= 0) {
 				pinfo->cmdline[strlen(pinfo->cmdline) - 1] =
 					'\0'; // remove trailing single quote
-				pinfo->cmdline = strdup(pinfo->cmdline);
+				/* Prepend exec to replace the 'csh' */
+				asprintf(&pinfo->cmdline,
+					 "exec %s",
+					 pinfo->cmdline);
 			}
 			else {
 				errorc("parse_configfile: "
