@@ -323,18 +323,21 @@ convenience.  These packages are currently agetty, bison, cvs, cygrunsrv, ed,
 file, flex, gcc, gdb, make, nano, openssh, openssl-devel, patch, perl,
 perl-libwin32, python, rpm, rsync, shutdown, tcsh, vim, wget, and zip. <p>
 
+The Cygwin command <pre> cygcheck -c</pre> lists the packages that are
+installed, and their current version number and status.
+
 The <a href="http://www.cygwin.com/packages/"> Cygwin package site </a> lists
 the available pre-compiled packages and provides a search engine. <p>
 
 If you want to install more Cygwin pre-compiled packages, run the graphical
 installer: <pre>    C:/Software/Cygwin/cygwin-setup.exe</pre>  <p>
 
-The Cygwin command <pre>    cygcheck -l <i>package-name</i></pre> lists the
-contents of an installed package, which may help you to make a tarfile from a
-package you have installed, which will then installed automatically by Emulab
-into all of the nodes of your experiment.  See the <a
+The Cygwin command <pre> cygcheck -l <i>package-name</i></pre> lists the
+contents of an installed package, which may help you to make a tarfile or rpm
+from a package you have installed.  You can then cause it to be installed
+automatically by Emulab into all of the nodes of your experiment.  See the <a
 href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#TARBALLS">
-Tutorial  </a> for more information. <p>
+Tutorial </a> for more information. <p>
 
 Watch out for post-install scripts in:
 <pre>    /etc/postinstall/<i>package-name</i>.sh{,.done}</pre><p>
