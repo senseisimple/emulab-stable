@@ -488,7 +488,6 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 		y = ((ulxr::Double)loc.getMember("loc_y")).getDouble();
 		orientation = ((ulxr::Double)loc.getMember("orientation")).
 			getDouble();
-		orientation *= M_PI/ 180.0;
 		if ((agent = (struct agent *)
 		     lnFindName(&agents, vname)) == NULL) {
 			error("unknown robot %s\n", vname);
@@ -514,7 +513,7 @@ RPC_waitforrobots(event_handle_t handle, char *pid, char *eid)
 				agent->nodeid,
 				x,
 				y,
-				orientation,
+				orientation * M_PI / 180.0,
 				agent->name);
 			buildings.insert(bldg.getString());
 
