@@ -6,106 +6,10 @@
  * All rights reserved.
  */
 
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <list>
-#include <map>
-
-#include <cstdlib>
-
-#include "coprocess.h"
+#include "prepass.h"
+#include "Partition.h"
 
 using namespace std;
-
-struct Lan
-{
-    Lan() : number(0),
-            partition(-1),
-            isNamingPoint(false),
-            isTreeRoot(false),
-            parentIndex(0),
-            assignment(0),
-            time (0) {}
-    // This is the index of the LAN in the great LAN array.
-    int number;
-    // The partition index number of the LAN.
-    int partition;
-    // A list of host keys used by the LAN.
-    list<string> hosts;
-    // Whether this LAN names a partition or not.
-    bool isNamingPoint;
-    // Whether this LAN is part of a tree or a cycle.
-    bool isTreeRoot;
-    // The index of the parent of this LAN in the DFS tree.
-    int parentIndex;
-    // The address assigned to this LAN. Used as part of the IP address.
-    int assignment;
-    // The time that this LAN was visited in the DFS tree.
-    int time;
-    // This is the hostname that is the edge currently being explored
-    // in the DFS tree. We must keep track of this to prevent the same
-    // edge being used more than once in a cycle.
-    //
-    // After finishing the sub-tree rooted at a host, we can ignore
-    // this because no other host can touch it to check the
-    // forwardEdge. Likewise, we need only concern ourselves with the
-    // current host we are exploring. Previously explored hosts will
-    // never be touched again.
-    string forwardEdge;
-};
-
-struct Host
-{
-    Host() {}
-    string name;
-    list<int> lans;
-};
-
-// The partition is a collection of all the information needed to
-// output a sub-graph to a pipe and interpret the results.
-class Partition
-{
-public:
-    Partition(int newNumber = 0);
-    void setNumber(int newNumber);
-    int getNumber(void) const;
-    void setAddress(int newAddress);
-    int getAddress(void) const;
-    // Add a lan to the information. This increases the count and adds
-    // the lan number to the mappings.
-    void addLan(int lanNumber);
-    void dispatch(void);
-private:
-    struct OrderCount
-    {
-        OrderCount() : order(0), count(0) {}
-        int order;
-        int count;
-    };
-private:
-    void mapHosts(void);
-    void printGraph(ostream & output);
-    void getNumbering(istream & input);
-private:
-    int number;
-    int address;
-    bool isTree;
-    int lanCount;
-    int hostCount;
-    // This provides a mappings back and forth from sub-program
-    // concepts to user concepts. We process our pipe output and then
-    // input based on these mappings.
-    map<int, int> lanToOrder;
-    map<int, int> orderToLan;
-    // The hostToOrder thing is a little different from the other
-    // mappings. In order to determine whether we want to count a host
-    // at all, we have to check to make sure that it touches two or
-    // more hosts. That is what the count attached to this is.
-    map<string, OrderCount> hostToOrder;
-    map<int, string> orderToHost;
-};
 
 //-----------------------------------------------------------------------------
 
@@ -116,161 +20,15 @@ namespace g
     vector<Partition> allPartitions;
     vector<char*> treeCommand;
     vector<char*> generalCommand;
+
+    bool useNeato = false;
 }
 
 //-----------------------------------------------------------------------------
-
-Partition::Partition(int newNumber)
-    : address(0)
-    , isTree(true)
-    , lanCount(0)
-    , hostCount(0)
-{
-    setNumber(newNumber);
-}
-
-void Partition::setNumber(int newNumber)
-{
-    // TODO: Assign a real address. Not just the LAN number.
-    address = newNumber;
-    number = newNumber;
-}
-
-int Partition::getNumber(void) const
-{
-    return number;
-}
-
-void Partition::setAddress(int newAddress)
-{
-    address = newAddress;
-}
-
-int Partition::getAddress(void) const
-{
-    return address;
-}
-
-void Partition::addLan(int lanNumber)
-{
-    // Have we already added this LAN in the past?
-    map<int, int>::iterator lanSearch = lanToOrder.find(lanNumber);
-    if (lanSearch == lanToOrder.end())
-    {
-        // If not, add a mapping for the LAN.
-        lanToOrder[lanNumber] = lanCount;
-        orderToLan[lanCount] = lanNumber;
-        ++lanCount;
-        isTree = isTree && g::allLans[lanNumber].isTreeRoot;
-        g::allLans[lanNumber].partition = number;
-        // Add one to the count of every host we touch. If two or more
-        // LANs touch a host, then that host is sent to the children
-        // as a hyper-edge. We just keep track of the count for
-        // now. Later we'll worry about filtering them.
-        list<string>::iterator pos = g::allLans[lanNumber].hosts.begin();
-        list<string>::iterator limit = g::allLans[lanNumber].hosts.end();
-        for (; pos != limit; ++pos)
-        {
-            ++(hostToOrder[*pos].count);
-        }
-    }
-}
-
-template <class T>
-void auto_assign(auto_ptr<T> & left, auto_ptr<T> right)
-{
-    left = right;
-}
-
-void Partition::dispatch(void)
-{
-    mapHosts();
-    auto_ptr<FileT> pipe;
-    if (isTree)
-    {
-        auto_assign(pipe, coprocess(g::treeCommand[0], &(g::treeCommand[0]),
-                                    NULL));
-    }
-    else
-    {
-        auto_assign(pipe, coprocess(g::generalCommand[0],
-                                    &(g::generalCommand[0]), NULL));
-    }
-    printGraph(pipe->input());
-    pipe->closeIn();
-    getNumbering(pipe->output());
-}
-
-void Partition::printGraph(ostream & output)
-{
-    output << "vertex-count " << lanCount << endl;
-    output << "edge-count " << hostCount << endl;
-    output << "total-bits " << 32 << endl;
-    output << "%%" << endl;
-    map<int, int>::iterator lanPos = orderToLan.begin();
-    map<int, int>::iterator lanLimit = orderToLan.end();
-    for (; lanPos != lanLimit; ++lanPos)
-    {
-        output << "8 1 ";
-        list<string>::iterator hostPos =
-            g::allLans[lanPos->second].hosts.begin();
-        list<string>::iterator hostLimit =
-            g::allLans[lanPos->second].hosts.end();
-        for (; hostPos != hostLimit; ++hostPos)
-        {
-            OrderCount oc = hostToOrder[*hostPos];
-            if (oc.count > 1)
-            {
-                output << oc.order << " ";
-            }
-        }
-        output << endl;
-    }
-}
-
-void Partition::getNumbering(istream & input)
-{
-    int assignedNumber = 0;
-    int order = 0;
-    input >> assignedNumber;
-    while (input)
-    {
-        g::allLans[orderToLan[order]].assignment = assignedNumber;
-        input >> assignedNumber;
-        ++order;
-    }
-}
-
-void Partition::mapHosts(void)
-{
-    // For every host we've touched. If it has been touched by more
-    // than two LANs, then set up mapping information.
-    map<string, OrderCount>::iterator pos = hostToOrder.begin();
-    map<string, OrderCount>::iterator limit = hostToOrder.end();
-    for ( ; pos != limit; ++pos)
-    {
-        if (pos->second.count > 1)
-        {
-            pos->second.order = hostCount;
-            orderToHost[hostCount] = pos->first;
-            ++hostCount;
-        }
-    }
-}
-
-//-----------------------------------------------------------------------------
-
-void parseArgs(int argc, char * argv[]);
-void parseInput(void);
-void addLan(int bits, int weights, vector<string> const & nodes);
-
-void breakGraph(void);
-
-void findNumbers(void);
-void ouputAddresses(void);
 
 int main(int argc, char * argv[])
 {
+    init();
     parseArgs(argc, argv);
     parseInput();
     breakGraph();
@@ -278,6 +36,17 @@ int main(int argc, char * argv[])
     ouputAddresses();
     return 0;
 }
+
+//-----------------------------------------------------------------------------
+
+void init(void)
+{
+    // Disable SIGPIPE. We will write to our child process regardless
+    // and recover later.
+    signal(SIGPIPE, SIG_IGN);
+}
+
+//-----------------------------------------------------------------------------
 
 // If there are no args, use trivial-assign as the assigner.
 // Otherwise, take all the arguments up to the first dash as a command
@@ -287,42 +56,64 @@ int main(int argc, char * argv[])
 void parseArgs(int argc, char * argv[])
 {
     static char * defaultCommand = "./trivial-ipassign";
-    if (argc <= 1)
+    int dashCount = 0;
+    int index = 1;
+    while (argv[index] != NULL)
+    {
+        if (argv[index] == string("-"))
+        {
+            ++dashCount;
+        }
+        else if (dashCount == 0)
+        {
+            // Arguments meant for us
+            parseSingleArg(argv[index]);
+        }
+        else if (dashCount == 1)
+        {
+            // Arguments meant for running the general command.
+            g::generalCommand.push_back(argv[index]);
+        }
+        else
+        {
+            // Arguments meant for running the tree command.
+            g::treeCommand.push_back(argv[index]);
+        }
+        ++index;
+    }
+    if (dashCount == 0)
     {
         g::generalCommand.push_back(defaultCommand);
         g::generalCommand.push_back(NULL);
         g::treeCommand = g::generalCommand;
     }
+    else if (dashCount == 1)
+    {
+        g::generalCommand.push_back(NULL);
+        g::treeCommand = g::generalCommand;
+    }
     else
     {
-        bool foundDash;
-        int index = 1;
-        while (argv[index] != NULL)
-        {
-            if (!foundDash && argv[index] == string("-"))
-            {
-                foundDash = true;
-            }
-            else if (foundDash)
-            {
-                g::treeCommand.push_back(argv[index]);
-            }
-            else
-            {
-                g::generalCommand.push_back(argv[index]);
-            }
-        }
-        g::generalCommand.push_back(NULL);
-        if (foundDash)
-        {
-            g::treeCommand.push_back(NULL);
-        }
-        else
-        {
-            g::treeCommand = g::generalCommand;
-        }
+        g::treeCommand.push_back(NULL);
     }
 }
+
+//-----------------------------------------------------------------------------
+
+void parseSingleArg(char * arg)
+{
+    if (arg == string("--neato"))
+    {
+        g::useNeato = true;
+    }
+    else
+    {
+        cerr << "Invalid argument" << endl;
+        throw;
+    }
+}
+
+//-----------------------------------------------------------------------------
 
 void parseInput(void)
 {
@@ -346,6 +137,8 @@ void parseInput(void)
         getline(cin, bufferString);
     }
 }
+
+//-----------------------------------------------------------------------------
 
 void addLan(int bits, int weights, vector<string> const & nodes)
 {
@@ -585,8 +378,6 @@ public:
             ++(result.partitionCount);
             currentLan.isNamingPoint = true;
         }
-        cerr << lan << " partitionCount: " << result.partitionCount
-             << " treeChildren: " << treeChildrenCount << endl;
         return result;
     }
 
@@ -595,18 +386,6 @@ public:
         usedPartitionCount = 0;
         for (size_t i = 0; i < g::allLans.size(); ++i)
         {
-            if (g::allLans[i].isTreeRoot)
-            {
-                cerr << i << " = Tree" << endl;
-            }
-            else if (g::allLans[i].isNamingPoint)
-            {
-                cerr << i << " = Naming" << endl;
-            }
-            else
-            {
-                cerr << i << " = Zip" << endl;
-            }
             findRoot(static_cast<int>(i));
         }
         int maxPartitionCount = static_cast<int>(g::allPartitions.size());
@@ -663,75 +442,20 @@ public:
         ++usedPartitionCount;
         return result;
     }
-
-/*
-    void calculate(void)
-    {
-        now = 0;
-        val.resize(hostCount);
-        fill(val.begin(), val.end(), 0);
-        rootChildren = 0;
-        visit(0);
-        if (rootChildren > 1)
-        {
-            g::allHosts[0].isBorder = true;
-        }
-    }
-
-    int visit (int k)
-    {
-        list<int>::iterator linkPos;
-        list<int>::iterator linkLimit;
-        int m;
-        int min;
-        now = now + 1;
-        val[k] = now;
-        min = now;
-        linkPos = g::allHosts[k].lans.begin();
-        linkLimit = g::allHosts[k].lans.end();
-        for ( ; linkPos != linkLimit; ++linkPos)
-        {
-            list<int>::iterator t = g::allLans[*linkPos].hosts.begin();
-            list<int>::iterator z = g::allLans[*linkPos].hosts.end();
-            for ( ; t != z; ++t)
-            {
-                if (val[*t] == 0)
-                {
-                    if (k == 0) // root
-                    {
-                        ++rootChildren;
-                    }
-                    m = visit(*t);
-                    if (m < min)
-                    {
-                        min = m;
-                    }
-                    if (m >= val[k])
-                    {
-                        g::allHosts[k].isBorder = true;
-                    }
-                }
-                else if (val[*t] < min)
-                {
-                    min = val[*t];
-                }
-            }
-        }
-        return min;
-    }
-*/
 private:
-//    vector<int> val;
     int now;
     int usedPartitionCount;
-//    int rootChildren;
 };
+
+//-----------------------------------------------------------------------------
 
 void breakGraph(void)
 {
     BiconnectAlgorithm bi;
     bi.calculate();
 }
+
+//-----------------------------------------------------------------------------
 
 void findNumbers(void)
 {
@@ -741,7 +465,23 @@ void findNumbers(void)
     }
 }
 
+//-----------------------------------------------------------------------------
+
 void ouputAddresses(void)
+{
+    if (!g::useNeato)
+    {
+        normalOutput();
+    }
+    else
+    {
+        neatoOutput();
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void normalOutput(void)
 {
     for (size_t i = 0; i < g::allLans.size(); ++i)
     {
@@ -758,3 +498,45 @@ void ouputAddresses(void)
         }
     }
 }
+
+//-----------------------------------------------------------------------------
+
+void neatoOutput(void)
+{
+    cout << "digraph foo {" << endl;
+    cout << "\tnodesep=0.01" << endl;
+    cout << "\tranksep=0.5" << endl;
+    for (size_t i = 0; i < g::allLans.size(); ++i)
+    {
+        cout << "\tlan" << i << " [color=blue,label="
+             << g::allPartitions[g::allLans[i].partition].getAddress()
+             << ",style=filled,shape=box];" << endl;
+    }
+
+    map<string, Host>::iterator pos = g::allHosts.begin();
+    map<string, Host>::iterator limit = g::allHosts.end();
+    for (; pos != limit; ++pos)
+    {
+        cout << "\tnode" << pos->first << " [color=red,label="
+             << pos->first << ",style=filled,shape=circle];" << endl;
+    }
+
+    pos = g::allHosts.begin();
+    limit = g::allHosts.end();
+    for (; pos != limit; ++pos)
+    {
+        Host & current = pos->second;
+        list<int>::iterator lanPos = current.lans.begin();
+        list<int>::iterator lanLimit = current.lans.end();
+        for (; lanPos!= lanLimit; ++lanPos)
+        {
+            cout << "\tnode" << current.name << " -> "
+                 << "lan" << *lanPos
+                 << " [arrowhead=none,color=black,style=bold];"
+                 << endl;
+        }
+    }
+    cout << "}" << endl;
+}
+
+//-----------------------------------------------------------------------------

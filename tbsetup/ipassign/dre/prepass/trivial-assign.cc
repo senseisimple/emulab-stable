@@ -1,4 +1,10 @@
-// trivial-ipassign.cc
+// trivial-assign.cc
+
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
 
 #include <iostream>
 #include <string>
