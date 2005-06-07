@@ -134,10 +134,10 @@ struct obstacle_node *ob_add_robot(struct robot_position *rp, int id)
      * XXX We don't compute the actual bounding box, we just construct a square
      * with the longest side of the robot.
      */
-    retval->on_natural.xmin = rp->x - ROBOT_OBSTACLE_SIZE;
-    retval->on_natural.ymin = rp->y - ROBOT_OBSTACLE_SIZE;
-    retval->on_natural.xmax = rp->x + ROBOT_OBSTACLE_SIZE;
-    retval->on_natural.ymax = rp->y + ROBOT_OBSTACLE_SIZE;
+    retval->on_natural.xmin = rp->x - ROBOT_OBSTACLE_SIZE / 2;
+    retval->on_natural.ymin = rp->y - ROBOT_OBSTACLE_SIZE / 2;
+    retval->on_natural.xmax = rp->x + ROBOT_OBSTACLE_SIZE / 2;
+    retval->on_natural.ymax = rp->y + ROBOT_OBSTACLE_SIZE / 2;
     ob_expand_obstacle(&retval->on_expanded,
 		       &retval->on_natural,
 		       OBSTACLE_BUFFER);
