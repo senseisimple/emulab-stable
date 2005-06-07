@@ -1354,14 +1354,23 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 	break;
 
     case MTP_CREATE_OBSTACLE:
+	oc = &mp->data.mtp_payload_u.create_obstacle.config;
+	fprintf(file,
+		" opcode:\tcreate-obstacle\n"
+		"  robot-id: %d\n"
+		"  id: %d\n"
+		"  bounds: %.2f %.2f %.2f %.2f\n",
+		mp->data.mtp_payload_u.create_obstacle.robot_id,
+		oc->id,
+		oc->xmin, oc->ymin, oc->xmax, oc->ymax);
+	break;
+	
     case MTP_UPDATE_OBSTACLE:
 	oc = &mp->data.mtp_payload_u.update_obstacle;
 	fprintf(file,
-		" opcode:\t%s\n"
+		" opcode:\tupdate-obstacle\n"
 		"  id: %d\n"
 		"  bounds: %.2f %.2f %.2f %.2f\n",
-		mp->data.opcode == MTP_CREATE_OBSTACLE ?
-		"create-obstacle" : "update-obstacle",
 		oc->id,
 		oc->xmin, oc->ymin, oc->xmax, oc->ymax);
 	break;
