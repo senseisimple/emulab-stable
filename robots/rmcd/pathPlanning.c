@@ -145,8 +145,8 @@ static int pp_point_reachable(struct path_plan *pp, struct robot_position *rp)
 	}
 	
 	if (debug > 1) {
-	    info("reachable %.2f %.2f %.2f %.2f\n",
-		 oc.xmin, oc.ymin, oc.xmax, oc.ymax);
+	    info("reachable %.2f %.2f - %.2f %.2f %.2f %.2f\n",
+		 rp->x, rp->y, oc.xmin, oc.ymin, oc.xmax, oc.ymax);
 	}
 
 	/*
@@ -167,6 +167,7 @@ pp_plot_code_t pp_plot_waypoint(struct path_plan *pp)
     struct lnMinList dextra, sextra, intersections;
     float distance, cross, theta;
     pp_plot_code_t retval;
+    int in_ob = 0;
     
     assert(pp != NULL);
 
@@ -204,12 +205,31 @@ pp_plot_code_t pp_plot_waypoint(struct path_plan *pp)
 	 * First we find all of the obstacles that intersect with this path
 	 * and locate the minimum distance to an obstacle.
 	 */
+	if (debug)
+	    info("wp %.2f %.2f\n", pp->pp_waypoint.x, pp->pp_waypoint.y);
 	while ((on = ob_find_intersect2(&pp->pp_actual_pos,
 					&pp->pp_waypoint,
 					&distance,
 					&cross)) != NULL) {
+#if 0
+	    info("intr %d %.2f %.2f\n",
+		 on->on_natural.id,
+		 distance,
+		 cross);
+#endif
+	    
 	    if (on->on_type == OBT_ROBOT)
 		robot_ob = 1;
+
+	    switch (pp_point_identify(&pp->pp_actual_pos, &on->on_expanded)) {
+	    case PPT_INTERNAL:
+	    case PPT_CORNERPOINT:
+	    case PPT_OUTOFBOUNDS:
+		in_ob = 1;
+		break;
+	    default:
+		break;
+	    }
 	    
 	    lnRemove(&on->on_link);
 	    /* Record the intersection and */
@@ -290,18 +310,19 @@ pp_plot_code_t pp_plot_waypoint(struct path_plan *pp)
 	    }
 	}
 
+	/* Restore the active obstacle list.  XXX Shouldn't do this here. */
+	lnPrependList(&ob_data.od_active, &dextra); // dynamics first
+	lnAppendList(&ob_data.od_active, &sextra); // statics last
+	
 	/* Check for obstacles on the path to our new waypoint. */
 	cross = PP_MIN_OBSTACLE_CROSS;
     } while ((retval == PPC_WAYPOINT) &&
 	     (ob_find_intersect2(&pp->pp_actual_pos,
 				 &pp->pp_waypoint,
 				 &distance,
-				 &cross) != NULL));
-
-    /* Restore the active obstacle list.  XXX Shouldn't do this here. */
-    lnPrependList(&ob_data.od_active, &dextra); // dynamics first
-    lnAppendList(&ob_data.od_active, &sextra); // statics last
-
+				 &cross) != NULL) &&
+	     !in_ob);
+    
     /* And make sure it is still sane. */
     assert(ob_data_invariant());
     

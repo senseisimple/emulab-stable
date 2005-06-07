@@ -180,7 +180,7 @@ void ob_rem_obstacle(struct obstacle_node *on)
 struct obstacle_node *ob_find_intersect(rc_line_t rl_inout, float *cross_inout)
 {
     struct obstacle_node *on, *retval = NULL;
-    float _cross = FLT_MAX;
+    float _cross = 0.0f;
     
     assert(rl_inout != NULL);
 
@@ -194,7 +194,7 @@ struct obstacle_node *ob_find_intersect(rc_line_t rl_inout, float *cross_inout)
 	if (rc_clip_line(&rl, &on->on_expanded)) {
 	    float cross = hypotf(rl.x0 - rl.x1, rl.y0 - rl.y1);
 	    
-	    if (cross > *cross_inout) {
+	    if (cross >= *cross_inout) {
 		*cross_inout = cross;
 		*rl_inout = rl;
 		retval = on;
