@@ -110,10 +110,16 @@ sub new($$$;$) {
     #
     # We have to change our behavior depending on what OS the switch runs
     #
-    $options->{'type'} =~ /^(\w+)(-ios)?$/;
+    $options->{'type'} =~ /^(\w+)(-modhack(-?))?(-ios)?$/;
     $self->{SWITCHTYPE} = $1;
 
     if ($2) {
+        $self->{NON_MODULAR_HACK} = 1;
+    } else {
+        $self->{NON_MODULAR_HACK} = 0;
+    }
+
+    if ($4) {
 	$self->{OSTYPE} = "IOS";
     } else {
 	$self->{OSTYPE} = "CatOS";
@@ -1548,8 +1554,22 @@ sub readifIndex($) {
    
 	foreach my $rowref (@$rows) {
 	    my ($name,$iid,$descr) = @$rowref;
-	    if ($descr =~ /(\d+)\/(\d+)$/) {
-		my $modport = "$1.$2";
+	    if ($descr =~ /(\w*)(\d+)\/(\d+)$/) {
+                my $type = $1;
+                my $module = $2;
+                my $port = $3;
+                if ($self->{NON_MODULAR_HACK}) {
+                    #
+                    # Hack for non-modular switches with both 100Mbps and
+                    # gigabit ports - consider gigabit ports to be on module 1
+                    #
+                    if (($module == 0) && ($type =~ /^gi/i)) {
+                        $module = 1;
+                        $self->debug("NON_MODULAR_HACK: Moving $descr to mod
+                            $module");
+                    }
+                }
+		my $modport = "$module.$port";
 		my $ifindex;
 		if (defined($iid) && ($iid ne "")) {
 		    $ifindex = $iid;
