@@ -816,6 +816,7 @@ int main (int argc, char **argv) {
 		client_connected[0] = 1;
 		active = 1;
 		pthread_create(&thread,NULL,feedclient,args);
+                pthread_cond_broadcast(&cond);
 	}
 
 	/*
