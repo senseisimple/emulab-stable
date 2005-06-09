@@ -1,9 +1,3 @@
-(*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- *)
-
 type h = int Heap.heap;;
 
 let h1 = Heap.make_heap 0;;

@@ -3,55 +3,6 @@
  * Test functions for my Dijkstra's shortest path implementation
  *)
 
-(*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- *)
-
-(* Hmm, this is awkward, I have to declare all of these types even though they
- * are related. There's probably some better way to do this *)
-type mygraph = (int, int) Graph.t;;
-type mynode = (int, int) Graph.node;;
-type myedge = (int, int) Graph.edge;;
-
-type edge = int * int;;
-
-(* Get a list of edges from a channel *)
-let rec (get_edges : in_channel -> edge list) = function channel ->
-    try
-        let line = input_line channel in
-        let parts = Str.split (Str.regexp " +") line in
-        (int_of_string (List.nth parts 2), int_of_string (List.nth parts 3))
-            :: get_edges channel
-    with
-        End_of_file -> []
-;;
-
-(* Read in one of Jon's graph files *)
-let (read_graph_file : string -> edge list) = function filename ->
-    let channel = open_in filename in
-    get_edges channel
-;;
-
-(* Make a graph from and edge_list *)
-let rec (make_graph_from_edges : edge list -> mygraph) = function edges ->
-    match edges with
-      [] -> Graph.empty_graph()
-    | x::xs -> let g = make_graph_from_edges xs in
-        (match x with (first, second) -> 
-            (* Add the verticies to the graph if they are not in there
-             * already *)
-            let src =
-                if not (Graph.is_member g first) then Graph.add_node g first
-                    else Graph.find_node g first in
-            let dst =
-                if not (Graph.is_member g second) then Graph.add_node g second
-                    else Graph.find_node g second in
-            let edge = Graph.add_edge g src dst 1 in
-        g)
-;;
-
 let rec print_weights (channel : out_channel) (weights : int array)
                       (index : int) : unit =
     if index >= Array.length weights then ()
@@ -98,9 +49,7 @@ exception NeedArg;;
 if Array.length Sys.argv < 2 then raise NeedArg;;
 (* print_endline "Here 1"; *)
 
-let edges = read_graph_file Sys.argv.(1) in
-(* print_endline "Here 2"; *)
-let g = make_graph_from_edges edges in
+let g = Graph.read_graph_file Sys.argv.(1) in
 (* print_endline "Here 3"; *)
 let node = Graph.find_node g 0 in
 (* print_endline "Here 4"; *)
