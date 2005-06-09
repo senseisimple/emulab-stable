@@ -813,7 +813,7 @@ int main (int argc, char **argv) {
 		args->fd = fd;
 		args->cli = 0;
 		args->interval = filetime;
-		client_connected[0] = 1;
+		client_connected[i] = 1;
 		active = 1;
 		pthread_create(&thread,NULL,feedclient,args);
                 pthread_cond_broadcast(&cond);
@@ -830,7 +830,7 @@ int main (int argc, char **argv) {
 		exit(1);
 	}
 
-	i = 1;
+	//i++;
 	if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &i, sizeof(int)) < 0)
 		perror("SO_REUSEADDR");
 
