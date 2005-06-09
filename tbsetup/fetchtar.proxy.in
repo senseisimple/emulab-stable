@@ -32,6 +32,7 @@ my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
 # Locals
 my $WGET = "/usr/local/bin/wget";
 my $REALPATH = "/bin/realpath";
+my $CHMOD = "/bin/chmod";
 
 #
 # Turn off line buffering on output
@@ -176,6 +177,13 @@ if (($exit_status & 0xff) == SIGKILL) {
     print STDERR "$msg\n";
     exit(15);
 }
+
+#
+# Change the permissions on the file so that other group members can overwrite
+# it
+#
+system("$CHMOD g+w $localfile")
+    or die ("*** ERROR - Unable to change permissions on $localfile!");
 
 exit($exit_status >> 8);
 
