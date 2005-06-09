@@ -3,12 +3,6 @@
  * algorthm
  *)
 
-(*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- *)
-
 type ('a,'b) dijk_state = {
     graph : ('a, 'b) Graph.t;
     visited : bool array; (* Not yet used - ditch? *)
@@ -130,7 +124,7 @@ let get_first_hops (graph : ('a, 'b) Graph.t)
         if i >= Array.length hops then () else
             begin
                 (match hops.(i) with
-                  INoHop -> out_hops.(i) <- NoHop
+                  INoHop -> out_hops.(i) <- NodeHop(Graph.find_node graph i) (* NoHop *)
                 | INodeHop(h) -> out_hops.(i) <- NodeHop(h)
                 | INoHopYet -> raise HopInternalError);
                 copy_hops (i+1)
@@ -140,6 +134,18 @@ let get_first_hops (graph : ('a, 'b) Graph.t)
     all_hops graph.Graph.nodes;
     copy_hops 0;
     out_hops
+;;
+
+let rec get_all_first_hops (g : ('a, 'b) Graph.t) =
+    let hops = Array.make_matrix (Graph.count_nodes g) (Graph.count_nodes g) NoHop in
+    let fill_array (base : unit) (node : (int, 'a) Graph.node) : unit =
+        let node_id = node.Graph.node_contents in
+        match (run_dijkstra g node) with (_,pred) ->
+        hops.(node_id) <- get_first_hops g pred node;
+        base
+    in
+    Graph.fold_nodes g fill_array ();
+    hops
 ;;
 
 (*
@@ -156,3 +162,20 @@ let get_all_first_hops (graph : ('a, 'b) Graph.t)
     all_hops
 ;;
 *)
+let score_ordering_transitions (hops : ('a,'b) first_hop array array)
+        (ordering : int array) : float =
+    let size = Array.length hops in
+    let score = ref 0.0 in
+    for i = 0 to (size - 1) do
+        let current_color = ref NoHop in
+        for j = 0 to (size - 1) do
+            let a = ordering.(i) in
+            let b = ordering.(j) in
+            if not (fh_equal !current_color hops.(a).(b)) then begin
+                score := !score +. 1.0;
+                current_color := hops.(a).(b)
+            end
+        done
+    done; 
+    !score
+;;
