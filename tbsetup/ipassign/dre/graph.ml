@@ -3,13 +3,6 @@
  * Note: tests are commented out, since this module gets included by other
  * files
  *)
-
-(*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- *)
-
 type ('a, 'b) node = { node_contents : 'a;
                        mutable node_edges : ('a, 'b) edge_list }
 and ('a, 'b) edge_list = ('a, 'b) edge list
@@ -127,4 +120,36 @@ let count_nodes graph =
     List.length graph.nodes
 ;;
 
-(* More operations will be added later, of course... *)
+(* Read in one of Jon's graph files *)
+let read_graph_file (filename : string) : ('a,'b) t =
+    let channel = open_in filename in
+    let rec get_edges () : ('a * 'a) list =
+        try
+            let line = input_line channel in
+            let parts = Str.split (Str.regexp " +") line in
+            (int_of_string (List.nth parts 2), int_of_string (List.nth parts 3))
+            :: get_edges ()
+        with
+            End_of_file -> []
+    in
+    let edges = get_edges () in
+    let rec make_graph_from_edges (edges : ('a * 'a) list) : ('a,'b) t =
+        match edges with
+          [] -> empty_graph()
+        | x::xs -> let g = make_graph_from_edges xs in
+            (match x with (first, second) -> 
+                (* Add the verticies to the graph if they are not in there
+                 * already *)
+                let src =
+                    if not (is_member g first) then add_node g first
+                    else find_node g first in
+                let dst =
+                    if not (is_member g second) then add_node g second
+                    else find_node g second in
+                let edge = add_edge g src dst 1 in
+                g)
+    in
+    make_graph_from_edges edges
+;;
+
+(* More operations will be added... *)
