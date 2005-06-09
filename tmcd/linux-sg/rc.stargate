@@ -11,18 +11,6 @@ case "$1" in
   start)
         echo "Executing Stargate-specific startup.."
 
-        # Replace new regmon with old since our code doesn't
-        # work with the new one yet..
-        if [ -r $ETCDIR/regmon.o ]; then
-                /sbin/rmmod regmon
-                /sbin/insmod -f $ETCDIR/regmon.o
-        fi
-
-	# Enable the sg's onboard watchdog timer.
-	if [ -x $BINDIR/wagthedog ]; then
-		$BINDIR/wagthedog
-	fi
-
         # Start the mote -> sg LEDS mirror
         # Probably ought to move this to $BINDIR, but I'm not
         #  sure it's even installed from client-install yet!
