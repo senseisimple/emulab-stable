@@ -63,8 +63,8 @@ General:
                   experimental network
 
 VLAN Control:
-  -t <pid> <eid>    Create all VLANs from database tables for an experiment
-  -r <pid> <eid>    Remove all VLANs from database tables for an experiment
+  -t <pid> <eid>    Create all VLANs for an experiment
+  -r <pid> <eid>    Remove all VLANs for an experiment
                         (you can provide an optional list of vlan ids)
   -l                List all VLANs
   -w                Used with -l, includes device-specific VLAN number
