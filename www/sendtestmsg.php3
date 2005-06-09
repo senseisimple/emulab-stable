@@ -33,10 +33,6 @@ if (! TBCurrentUser($target_uid)) {
 
 # Get email info and Key,
 TBUserInfo($target_uid, $usr_name, $usr_email);
-$key = TBGetVerificationKey($target_uid);
-if (!$key || !strcmp($key, "")) {
-    USERERROR("$target_uid does not have a valid verification key!", 1);
-}
 
 # Send the email.
 TBMAIL("$usr_name '$target_uid' <$usr_email>",
