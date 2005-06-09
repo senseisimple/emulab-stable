@@ -210,6 +210,10 @@ if ($isadmin) {
 	WRITESUBMENUBUTTON("Resend Verification Key",
 			   "resendkey.php3?target_uid=$target_uid");
     }
+    else {
+	WRITESUBMENUBUTTON("Send Test Email Message",
+			   "sendtestmsg.php3?target_uid=$target_uid");
+    }
 }
 SUBMENUEND();
 
