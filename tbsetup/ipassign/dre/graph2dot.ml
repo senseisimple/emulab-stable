@@ -8,62 +8,39 @@
  * ... verticies exist only implicitly, as referenced by edges.
  *)
 
-(*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- *)
+let namemap = Hashtbl.create 127;;
 
-(* Hmm, this is awkward, I have to declare all of these types even though they
- * are related. There's probably some better way to do this *)
-type mygraph = (int, unit) Graph.t;;
-type mynode = (int, unit) Graph.node;;
-type myedge = (int, unit) Graph.edge;;
-
-type edge = int * int;;
-
-(* Get a list of edges from a channel *)
-let rec (get_edges : in_channel -> edge list) = function channel ->
+let rec (fill_hash_map : in_channel -> int -> unit) = function channel ->
+    function i ->
     try
         let line = input_line channel in
         let parts = Str.split (Str.regexp " +") line in
-        (int_of_string (List.nth parts 2), int_of_string (List.nth parts 3))
-            :: get_edges channel
+        let mapped_to = int_of_string (List.nth parts 0) in
+        (* print_endline ("Mapping " ^ (string_of_int i) ^ " to " ^ (string_of_int
+        mapped_to)); *)
+        Hashtbl.add namemap i mapped_to;
+        fill_hash_map channel (i + 1)
     with
-        End_of_file -> []
+        End_of_file -> ()
 ;;
 
-(* Read in one of Jon's graph files *)
-let (read_graph_file : string -> edge list) = function filename ->
+let (fill_map : string -> unit) = function filename ->
     let channel = open_in filename in
-    get_edges channel
+    fill_hash_map channel 0
 ;;
 
-(* Make a graph from and edge_list *)
-let rec (make_graph_from_edges : edge list -> mygraph) = function edges ->
-    match edges with
-      [] -> Graph.empty_graph()
-    | x::xs -> let g = make_graph_from_edges xs in
-        (match x with (first, second) -> 
-            (* Add the verticies to the graph if they are not in there
-             * already *)
-            let src =
-                if not (Graph.is_member g first) then Graph.add_node g first
-                    else Graph.find_node g first in
-            let dst =
-                if not (Graph.is_member g second) then Graph.add_node g second
-                    else Graph.find_node g second in
-            let edge = Graph.add_edge g src dst () in
-        g)
-;;
-
-let (dot_print_vertex : out_channel -> mynode -> unit) =
+let (dot_print_vertex : out_channel -> ('a,'b) Graph.node -> unit) =
         function channel -> function vertex ->
-    output_string channel ("\t" ^ (string_of_int vertex.Graph.node_contents)
-        ^ " [color=red" ^ ",style=filled,shape=point];\n")
+    let node_id = vertex.Graph.node_contents in
+    let name = if Hashtbl.mem namemap node_id then ((*print_endline "Mapped"; *) Hashtbl.find namemap node_id)
+    else node_id in
+    let str_name = string_of_int name in
+    output_string channel ("\t" ^ (string_of_int node_id)
+        ^ " [color=red,label=\"" ^ str_name ^
+        "\",style=filled,shape=plaintext,fontcolor=black,height=.01,width=.01,fontsize=8];\n")
 ;;
 
-let (dot_print_edge : out_channel -> myedge -> unit) =
+let (dot_print_edge : out_channel -> ('a,'b) Graph.edge -> unit) =
         function channel -> function edge ->
     output_string channel ("\t" ^ (string_of_int
         (edge.Graph.src.Graph.node_contents)) ^ " -> " ^ (string_of_int
@@ -71,8 +48,9 @@ let (dot_print_edge : out_channel -> myedge -> unit) =
         " [arrowhead=none,color=black];\n")
 ;;
 
-let (dot_print : mygraph -> string -> unit) = function g -> function filename ->
-    let channel = open_out filename in
+let (dot_print : ('a,'b) Graph.t -> string -> unit) = function g -> function filename ->
+    (* let channel = open_out filename in *)
+    let channel = stdout in
     (* Preamble *)
     output_string channel "digraph foo {\n";
     output_string channel "\tnodesep=0.01\n";
@@ -95,6 +73,11 @@ let show g =
     Sys.remove tmp2
 ;;
 
-let edges = read_graph_file "test.graph" in
-let g = make_graph_from_edges edges in
+exception NeedArg;;
+if Array.length Sys.argv < 2 then raise NeedArg;;
+let g = Graph.read_graph_file Sys.argv.(1) in
+let mapfile = if Array.length Sys.argv > 2 then Some Sys.argv.(2) else None in
+match mapfile with
+  None -> ()
+| Some(x) -> fill_map x;
 dot_print g "graph.dot"
