@@ -2322,6 +2322,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	install/GNUmakefile install/ops-install install/boss-install \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
+	mote/sgtools/GNUmakefile \
 	robots/GNUmakefile robots/tbsetdest/GNUmakefile \
 	robots/mtp/GNUmakefile robots/emc/GNUmakefile \
 	robots/emc/test_emcd.sh robots/emc/loclistener \
