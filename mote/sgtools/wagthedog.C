@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <paths.h>
+#include <signal.h>
 #include <sys/resource.h>
 
 #include "SGGPIO.h"
@@ -50,7 +51,7 @@ int main(int argc, char **argv)
     unsigned int elapsed = 0;
     SGGPIO_PORT sggpio;
     
-    while ((c = getopt(argc, argv, "h")) != -1) {
+    while ((c = getopt(argc, argv, "dhi")) != -1) {
 	switch (c) {
 	case 'd':
 	    debug += 1;
@@ -72,6 +73,8 @@ int main(int argc, char **argv)
 	daemon(0, 0);
     }
 
+    signal(SIGTERM, SIG_IGN);
+
     setpriority(PRIO_PROCESS, 0, 20);
     openlog("wagthedog", LOG_PID, LOG_DAEMON);
     syslog(LOG_INFO, "wagthedog started");
@@ -90,14 +93,14 @@ int main(int argc, char **argv)
     sggpio.setDir(WDT_SET2, 1);
 
     sggpio.setPin(WDT_INPUT, wiggle);
-    sggpio.setPin(WDT_SET1, 1);
+    sggpio.setPin(WDT_SET1, 0);
     sggpio.setPin(WDT_SET2, 1);
     
     while (looping) {
 	wiggle = !wiggle;
 	sggpio.setPin(WDT_INPUT, wiggle);
 	
-	sleep(1);
+	usleep(500);
 	
 	elapsed += 1;
 	if (elapsed == WDT_STARTUP_DELAY)
