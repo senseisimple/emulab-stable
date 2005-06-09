@@ -71,7 +71,7 @@
 #define __XSTRING(x) __STRING(x)
 #endif
 
-// #define USE_POSTURE_REG
+#define USE_POSTURE_REG
 
 static event_handle_t handle;
 
@@ -523,7 +523,7 @@ static int position_in_obstacle(struct obstacle_config *oc,
                                 ) {
   int i;
   int retval = 0;
-  
+
   for (i = 0; i < oc_size; ++i) {
     if (x >= (oc[i].xmin - OBSTACLE_BUFFER) &&
 	y >= (oc[i].ymin - OBSTACLE_BUFFER) &&
@@ -1252,19 +1252,35 @@ int rmc_callback(elvin_io_handler_t handler,
 	  struct mtp_update_position *up;
 	  struct emc_robot_config *erc;
 
+
 	  erc = robot_list_search(hostname_list, my_id);
 
 	  up = (struct mtp_update_position *)
 	    robot_list_search(vmc_data.position_list, my_id);
 
-	  if (up != NULL && up->status != MTP_POSITION_STATUS_ERROR) {
-	    mtp_send_packet2(rmc->handle,
-			     MA_Opcode, MTP_UPDATE_POSITION,
-			     MA_Role, MTP_ROLE_EMC,
-			     MA_RobotID, up->robot_id,
-			     MA_Position, &up->position,
-			     MA_Status, MTP_POSITION_STATUS_UNKNOWN,
-			     MA_TAG_DONE);
+      if (0 || debug) {
+          if (erc->flags & ERF_HAS_GOAL) {
+              info("ERF_HAS_GOAL is set for this robot\n");
+          }
+          else {
+              info("ERF_HAS_GOAL is not set for this robot\n");
+          }
+      }
+
+	  if ((up != NULL && up->status != MTP_POSITION_STATUS_ERROR) &&
+          !(erc->flags & ERF_HAS_GOAL)) {
+
+          if (0 || debug) {
+              info("Sending STATUS_UNKNOWN UPDATE_POSITION (ERF_HAS_GOAL not set)\n");
+          }
+
+          mtp_send_packet2(rmc->handle,
+                           MA_Opcode, MTP_UPDATE_POSITION,
+                           MA_Role, MTP_ROLE_EMC,
+                           MA_RobotID, up->robot_id,
+                           MA_Position, &up->position,
+                           MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+                           MA_TAG_DONE);
 	  }
 	  else if (up == NULL) {
 	    up = (struct mtp_update_position *)
@@ -1396,7 +1412,7 @@ int rmc_callback(elvin_io_handler_t handler,
 			 EA_ArgFloat, "YMAX", doc->config.ymax,
 			 EA_TAG_DONE);
 	    }
-	    
+
 	    retval = 1;
 	}
 	break;
@@ -1523,7 +1539,7 @@ int emulab_callback(elvin_io_handler_t handler,
 	    /* DAN */
 	    /* set ERF_HAS_GOAL flag for this robot */
 
-
+#ifdef USE_POSTURE_REG
 	    /* go through robot list */
 	    for (rli = hostname_list->head; rli != NULL && !match; rli = rli->next) {
 	      struct emc_robot_config *erc = rli->data;
@@ -1535,7 +1551,8 @@ int emulab_callback(elvin_io_handler_t handler,
 	    }
 
 	    match->flags |= ERF_HAS_GOAL;
-
+        info("set ERF_HAS_GOAL flag for this robot\n");
+#endif
 
 	    retval = 1;
 	  }
@@ -1646,6 +1663,7 @@ int vmc_callback(elvin_io_handler_t handler,
   mtp_packet_t mp_data, *mp = &mp_data;
   struct vmc_client *vmc = rock;
   int rc, retval = 0;
+  int sent_up_posture = 0;
 
 
   struct emc_robot_config *match = NULL;
@@ -1672,7 +1690,7 @@ int vmc_callback(elvin_io_handler_t handler,
 	    robot_list_remove_by_id(vmc->position_list, my_id);
 	  struct mtp_update_position *up_copy, *up_in;
 
-
+      up_in = &mp->data.mtp_payload_u.update_position;
 
 	  /* DAN */
 #ifdef USE_POSTURE_REG
@@ -1694,7 +1712,7 @@ int vmc_callback(elvin_io_handler_t handler,
              * If status is 'MOVING', the nonlinear controller will be used
              */
 
-
+            printf("posture reg (HAS_GOAL)\n");
 
             mtp_send_packet2(rmc_data.handle,
 			     MA_Opcode, MTP_UPDATE_POSITION,
@@ -1704,12 +1722,13 @@ int vmc_callback(elvin_io_handler_t handler,
 			     MA_Status, MTP_POSITION_STATUS_MOVING,
 			     MA_TAG_DONE);
 
+            sent_up_posture = 1;
 
           }
 #endif
 
 
-	  up_in = &mp->data.mtp_payload_u.update_position;
+
 
 	  if (up && (up->status == MTP_POSITION_STATUS_ERROR) &&
 	      (up_in->status != MTP_POSITION_STATUS_ERROR)) {
@@ -1719,15 +1738,17 @@ int vmc_callback(elvin_io_handler_t handler,
 
 
             /* unknown status */
-            mtp_init_packet(&mp_reply,
-                	    MA_Opcode, MTP_UPDATE_POSITION,
-                            MA_Role, MTP_ROLE_EMC,
-                            MA_RobotID, up->robot_id,
-                            MA_Position, &up_in->position,
-                            MA_Status, MTP_POSITION_STATUS_UNKNOWN,
-                            MA_TAG_DONE);
+            if (0 == sent_up_posture) {
+                mtp_init_packet(&mp_reply,
+                                MA_Opcode, MTP_UPDATE_POSITION,
+                                MA_Role, MTP_ROLE_EMC,
+                                MA_RobotID, up->robot_id,
+                                MA_Position, &up_in->position,
+                                MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+                                MA_TAG_DONE);
 
-	    mtp_send_packet(rmc_data.handle, &mp_reply);
+                mtp_send_packet(rmc_data.handle, &mp_reply);
+            }
 
 
 	  }
