@@ -29,6 +29,7 @@ char *tbdb_objecttypes[] = {
         TBDB_OBJECTTYPE_SEQUENCE,
         TBDB_OBJECTTYPE_CONSOLE,
         TBDB_OBJECTTYPE_TOPOGRAPHY,
+        TBDB_OBJECTTYPE_LINKTRACE,
 	0,
 };
 

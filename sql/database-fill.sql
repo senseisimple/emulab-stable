@@ -108,6 +108,7 @@ REPLACE INTO event_objecttypes VALUES (11,'SEQUENCE');
 REPLACE INTO event_objecttypes VALUES (12,'TIMELINE');
 REPLACE INTO event_objecttypes VALUES (13,'CONSOLE');
 REPLACE INTO event_objecttypes VALUES (14,'TOPOGRAPHY');
+REPLACE INTO event_objecttypes VALUES (15,'LINKTRACE');
 
 --
 -- Dumping data for table `exported_tables`
