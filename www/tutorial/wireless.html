@@ -123,8 +123,11 @@ A few points should be noted:
      as long as the nodes have enough wired interfaces. If you try to
      create an experiment that uses more links (wired or wireless) on a
      node than are available in Emulab, the experiment will fail to map.
-     Of the current 9 nodes with one wifi card, the 4 pc600 nodes
-     also have 4 wired experimental net interfaces, while the 5 pc2Uwifi have none.
+     Of the current 28 wifi nodes, the 18 pc3000 wifi nodes 
+     (pcwf1-18) contain two wifi cards and one wired experimental interface, 
+     the four pc600 nodes (pc2,9,31,40) contain one wifi card and four 
+     experimental interfaces, and the four pc2Uwifi (pc180,182,183,184) 
+     nodes have one wifi card and no wired experimental interfaces.
 
 <li> In the example above, we let Emulab decide what wireless nodes to
      use for the lan. This is not an ideal approach, as Emulab does
