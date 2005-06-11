@@ -47,8 +47,16 @@ export USER
 #  3) from HOMEDRIVE/HOMEPATH
 #  4) / (root)
 
+### Try to get a connection to the Samba host.
+##/usr/local/etc/emulab/rc/rc.cygwinxp-user
+
+### Use a local dir under sshd if the mount failed.
+if [ ! -d "$HOME" ]; then
+        HOME=/home/$USER
+fi
 # If the home directory doesn't exist, create it.
-if [ ! -d "${HOME}" ]; then
+if [ ]; then
+###if [ ! -d "${HOME}" ]; then
 	mkdir -p "${HOME}"
 	echo "Copying skeleton files."
 	echo "These files are for the user to personalise"
