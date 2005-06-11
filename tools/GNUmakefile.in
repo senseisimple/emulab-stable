@@ -17,6 +17,12 @@ all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+client:
+	$(MAKE) -C pcapper client
+
+client-install: client
+	$(MAKE) -C pcapper client-install
+
 post-install:
 	@$(MAKE) -C whol post-install
 

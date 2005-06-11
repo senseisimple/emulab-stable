@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -22,7 +22,7 @@ ELVINFLAGS    = `elvin-config --cflags vin4c`
 ELVINLIBS     = `elvin-config --libs vin4c`
 EVENTFLAGS    = -DEVENTSYS -I$(TESTBED_SRCDIR)/event/lib $(ELVINFLAGS)
 EVENTOBJS     = $(OBJDIR)/event/lib/event.o $(OBJDIR)/event/lib/util.o
-EVENTLIBS     = $(ELVINLIBS)
+EVENTLIBS     = $(ELVINLIBS) -lcrypto
 
 TBCFLAGS      = $(EVENTFLAGS) -I$(TESTBED_SRCDIR)/lib/libtb
 TBLIBS        = $(EVENTOBJS) $(OBJDIR)/lib/libtb/libtb.a $(EVENTLIBS)
@@ -71,3 +71,8 @@ pcapper-noevents.o: pcapper.c
 pcapper.linux: pcapper.c GNUmakefile
 	$(CC) $(CFLAGS_LINUX) $(CPPFLAGS_LINUX) $(LIBS_LINUX) pcapper.c \
 		-o pcapper.linux
+
+client:	pcapper
+
+client-install: client
+	$(INSTALL_PROGRAM) pcapper $(DESTDIR)$(CLIENT_BINDIR)/pcapper
