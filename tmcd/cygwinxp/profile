@@ -1,4 +1,12 @@
-# base-files version 3.1-4
+# base-files version 3.4-2
+
+# WARNING
+#
+# IF THIS FILE IS MODIFIED IT WILL NOT BE UPDATED BY THE CYGWIN
+# SETUP PROGRAM.  IT BECOMES YOUR RESPONSIBILITY.
+
+# The latest version as installed by the Cygwin Setup program can
+# always be found at /etc/defaults/etc/profile
 
 # Some resources...
 
@@ -39,16 +47,8 @@ export USER
 #  3) from HOMEDRIVE/HOMEPATH
 #  4) / (root)
 
-### Try to get a connection to the Samba host.
-##/usr/local/etc/emulab/rc/rc.cygwinxp-user
-
-### Use a local dir under sshd if the mount failed.
-if [ ! -d "$HOME" ]; then
-        HOME=/home/$USER
-fi
 # If the home directory doesn't exist, create it.
-if [ ]; then
-###if [ ! -d "${HOME}" ]; then
+if [ ! -d "${HOME}" ]; then
 	mkdir -p "${HOME}"
 	echo "Copying skeleton files."
 	echo "These files are for the user to personalise"
@@ -65,18 +65,7 @@ if [ ]; then
 	done
 fi
 
-# Run all of the profile.d scripts
-# Note that these are supplied by separate packages
-# Ascending alphanumerical order enforced
-if [ -d "/etc/profile.d" ]; then
-	while read f; do
-		if [ -f "${f}" ]; then
-			. "${f}"
-		fi
-	done <<- EOF
-	`/bin/find /etc/profile.d -iname '*.sh' -type f | sort`
-	EOF
-fi
+chmod 1777 /tmp 2>/dev/null
 
 # Default to unix make mode
 MAKE_MODE=unix
@@ -91,7 +80,7 @@ export CVS_RSH
 # export CVSROOT
 
 # Shell dependent settings
-case "`echo "$0" | /usr/bin/tr [:upper:] [:lower:]`" in
+case "`echo "_$0" | /usr/bin/tr '[:upper:]' '[:lower:]' | /usr/bin/sed -e 's/^_//'`" in
 bash     | -bash     | */bash | \
 bash.exe | -bash.exe | */bash.exe )
 	# Set a HOSTNAME variable
@@ -99,18 +88,10 @@ bash.exe | -bash.exe | */bash.exe )
 	export HOSTNAME
 
 	# Set a default prompt of: user@host and current_directory
-	PS1='\[\033]0;\w\007
-\033[32m\]\u@\h \[\033[33m\w\033[0m\]
-$ '
-
-	if tty --quiet ; then
-		stty erase '^?'
-	fi
+	PS1='\[\e]0;\w\a\]\n\[\e[32m\]\u@\h \[\e[33m\]\w\[\e[0m\]\n\$ '
 	;;
 ksh*     | -ksh*     | */ksh* | \
-ksh*.exe | -ksh*.exe | */ksh*.exe | \
-zsh*	 | -zsh*     | */zsh* | \
-zsh*.exe | -zsh*.exe | */zsh*.exe )
+ksh*.exe | -ksh*.exe | */ksh*.exe )
 	# Set a HOSTNAME variable
 	typeset -l HOSTNAME
 
@@ -119,10 +100,21 @@ zsh*.exe | -zsh*.exe | */zsh*.exe )
 ^[[32m${USER}@${HOSTNAME} ^[[33m${PWD}^[[0m
 $ '
 	;;
+zsh*     | -zsh*     | */zsh* | \
+zsh*.exe | -zsh*.exe | */zsh*.exe )
+	# Set a default prompt of: user@host, a command counter, and current_directory
+	PS1='(%n@%m)[%h] %~ %% '
+	
+	# Set SHELL if not set
+	if [ ! -z "${ZSH_NAME}" -a -z "${SHELL}" ]; then
+		SHELL="/bin/zsh"
+		export SHELL	
+	fi
+	;;
 sh     | -sh     | */sh | \
 sh.exe | -sh.exe | */sh.exe )
 	# Set a simple prompt
-	PS1='$ '	
+	PS1='$ '
 	;;
 * )
 	# Sorry, this shell has no defaults in /etc/profile,
@@ -140,8 +132,21 @@ esac
 
 export PS1
 
+# Run all of the profile.d scripts
+# Note that these are supplied by separate packages
+# Ascending alphanumerical order enforced
+if [ -d "/etc/profile.d" ]; then
+	while read f; do
+		if [ -f "${f}" ]; then
+			. "${f}"
+		fi
+	done <<- EOF
+	`/bin/find /etc/profile.d -type f -iname '*.sh' -or -iname '*.zsh' | LC_ALL=C sort`
+	EOF
+fi
+
 # Uncomment to use the terminal colours set in DIR_COLOR
-# eval `dircolors -b /etc/DIR_COLORS`
+# eval "`dircolors -b /etc/DIR_COLORS`"
 
 # Default to removing the write permission for group and other
 #  (files normally created with mode 777 become 755; files created with
@@ -150,7 +155,7 @@ umask 022
 
 # Define default printer
 PRINTER=""
-case "`uname -s`" in
+case `uname -s` in
 CYGWIN_NT-*)
 	PRINTER="`regtool -q get '\user\Software\Microsoft\Windows NT\CurrentVersion\Windows\Device' | sed 's/,.*$//'`"
 	;;
@@ -171,23 +176,23 @@ fi
 #   about this on the lists!
 # If this message keeps appearing and you are sure it's a mistake (ie, don't
 #   email about it!), comment out the test below.
-case "`id -ng`" in
+case `id -ng` in
 mkpasswd )
   echo "Your group is currently \"mkpasswd\".  This indicates that"
   echo "the /etc/passwd (and possibly /etc/group) files should be rebuilt."
   echo "See the man pages for mkpasswd and mkgroup then, for example, run"
   echo "mkpasswd -l [-d] > /etc/passwd"
   echo "mkgroup  -l [-d] > /etc/group"
-  echo "Note that the -d switch is necessary for domain users."  
+  echo "Note that the -d switch is necessary for domain users."
   ;;
 
 mkgroup )
-  echo "Your group is currently \"mkgroup\".  This indicates that"  
+  echo "Your group is currently \"mkgroup\".  This indicates that"
   echo "the /etc/group (and possibly /etc/passwd) files should be rebuilt."
   echo "See the man pages for mkpasswd and mkgroup then, for example, run"
   echo "mkpasswd -l [-d] > /etc/passwd"
   echo "mkgroup  -l [-d] > /etc/group"
-  echo "Note that the -d switch is necessary for domain users."  
+  echo "Note that the -d switch is necessary for domain users."
   ;;
 
 mkgroup_l_d )
@@ -202,10 +207,10 @@ mkgroup_l_d )
   echo "and can be safely ignored."
 
   # only display the above once
-  cp -f /etc/group ${HOME}/group.mkgroup_l_d \
+  cp -f /etc/group "${HOME}/group.mkgroup_l_d" \
   && ( [ -w /etc/group ] || chmod --silent a+w /etc/group ; )\
-  && sed -e 's/^mkgroup_l_d/mkgroup-l-d/' ${HOME}/group.mkgroup_l_d > /etc/group \
+  && sed -e 's/^mkgroup_l_d/mkgroup-l-d/' "${HOME}/group.mkgroup_l_d" > /etc/group \
   && chmod --silent --reference=/etc/passwd /etc/group
-  rm -f ${HOME}/group.mkgroup_l_d
+  rm -f "${HOME}/group.mkgroup_l_d"
   ;;
 esac
