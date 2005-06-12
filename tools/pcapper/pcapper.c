@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -232,6 +232,14 @@ int no_zero = 0;
  */
 int include_ipless_interfaces = 0;
 
+/*
+ * For "capture" mode (-c option).
+ */
+int capture_mode    = 0;
+int capture_snaplen = 64;
+volatile int stop   = 0;
+volatile int reload = 0;
+
 #ifdef EVENTSYS
 /*
  * Time to subtract out of each timestamp reported to clients - this allows
@@ -288,14 +296,27 @@ struct interface_counter counters[MAX_CLIENTS][MAX_INTERFACES];
 pcap_t *pcap_devs[MAX_INTERFACES];
 
 /*
+ * Also keep track of packet reader threads so we can kill them.
+ */
+pthread_t getpacket_threads[MAX_INTERFACES];
+
+/*
  * An array of 'bools', indicating if any client is using that number.
  */
 int client_connected[MAX_CLIENTS];
 
 /*
+ * An array of output filenames.
+ */
+char *filenames[MAX_FILES];
+
+/*
  * Number of active clients.  When count is zero, the device is closed.
  */
 volatile int active;
+
+/* A debugging flag */
+int debug = 0;
 
 int MAX(int a, int b) { if ((a) > (b)) return (a); else return (b); }
 
@@ -321,12 +342,20 @@ void usage(char *progname) {
 #ifdef EVENTSYS
 		       "-e pid/eid    Wait for a time start for experiment\n"
 		       "-s server     Use <server> for event server\n"
+	               "-L objname    Link/Lan object name\n"
 #endif
+	               "-c            Capture mode; capture packets\n"
+                       "-l            Capture snaplen (only with -c)\n"	    
 		       "interfaces... A list of interfaces to monitor\n";
 
     fprintf(stderr,short_usage,progname,progname);
     fprintf(stderr,long_usage);
     exit(-1);
+}
+
+static void cleanup(int sig)
+{
+	stop = 1;
 }
 
 /*
@@ -345,7 +374,7 @@ int main (int argc, char **argv) {
 	struct ifconf ifc;
 	void  *ptr;
 	char lastname[IFNAMSIZ];
-	char *filenames[MAX_FILES];
+	int filename_count = 0;
 	int filetime;
 	char ch;
 	char *event_server;
@@ -354,6 +383,7 @@ int main (int argc, char **argv) {
 	int interface_it;
 #ifdef EVENTSYS
 	char *exp;
+	char *objname;
 	address_tuple_t tuple;
 #endif
 #ifdef EMULAB
@@ -376,6 +406,7 @@ int main (int argc, char **argv) {
 
 #ifdef EVENTSYS
 	exp = 0;
+	objname = 0;
 #endif
 
 	tcpdump_mode = 0;
@@ -384,12 +415,13 @@ int main (int argc, char **argv) {
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:I")) != -1)
+	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:Icl:L:d")) != -1)
 		switch(ch) {
+		case 'd':
+			debug++;
+			break;
 		case 'f':
-			/* Find the first empty slot */
-			for (i = 0; filenames[i] != NULL; i++) {}
-			filenames[i] = optarg;
+			filenames[filename_count++] = optarg;
 			break;
 		case 'i':
 			filetime = atoi(optarg);
@@ -406,6 +438,12 @@ int main (int argc, char **argv) {
 		case 'z':
 			no_zero = 1;
 			break;
+		case 'c':
+			capture_mode = 1;
+			break;
+		case 'l':
+			capture_snaplen = atoi(optarg);
+			break;
 		case 't':
 			tcpdump_mode = 1;
 			break;
@@ -413,20 +451,19 @@ int main (int argc, char **argv) {
 			global_bpf_filter = optarg;
 			break;
 		case 'o':
-			/* Find the first empty slot */
-			for (i = 0; filenames[i] != NULL; i++) {}
-			filenames[i] = "-";
+			filenames[filename_count++] = "-";
 			break;
-
 #ifdef EVENTSYS
 		case 'e':
 			adjust_time = 1;
 			exp = optarg;
 			break;
+		case 'L':
+			objname = optarg;
+			break;
 		case 's':
 			event_server = optarg;
 			break;
-
 #endif
 		case 'h':
 			usage(argv[0]);
@@ -699,7 +736,8 @@ int main (int argc, char **argv) {
 				args->bpf_filter = bpf_filter;
 				strcpy(args->devname,name);
 				args->index = interfaces;
-				if (pthread_create(&thread,NULL,readpackets,args)) {
+				if (pthread_create(&getpacket_threads[interfaces],
+						   NULL,readpackets,args)) {
 					fprintf(stderr,"Unable to start thread!\n");
 					exit(1);
 				}
@@ -723,6 +761,16 @@ int main (int argc, char **argv) {
 
 	if (interfaces <= 0) {
 		fprintf(stderr,"No interfaces to monitor!\n");
+		exit(-1);
+	}
+
+	/*
+	 * In capture mode, there must be as many files as interfaces.
+	 * Each interface goes to its own file.
+	 */
+	if (capture_mode && interfaces != filename_count) {
+		fprintf(stderr,
+			"Must supply a unique filename per interface!\n");
 		exit(-1);
 	}
 
@@ -770,6 +818,18 @@ int main (int argc, char **argv) {
 	    if (!event_subscribe(ehandle, callback, tuple, NULL)) {
 		fatal("could not subscribe to TIME events");
 	    }
+
+	    tuple->objtype   = TBDB_OBJECTTYPE_LINKTRACE;
+	    tuple->objname   = (objname ? objname : ADDRESSTUPLE_ANY);
+	    tuple->eventtype = TBDB_EVENTTYPE_START ","
+	                       TBDB_EVENTTYPE_STOP ","
+	                       TBDB_EVENTTYPE_RELOAD ","
+	                       TBDB_EVENTTYPE_KILL;
+
+	    if (!event_subscribe(ehandle, callback, tuple, NULL)) {
+		fatal("could not subscribe to LINKTRACE events");
+	    }
+	    
 	    address_tuple_free(tuple);
 
 	    /*
@@ -788,35 +848,38 @@ int main (int argc, char **argv) {
 	/*
 	 * If they gave us filenames to log to, open them up.
 	 */
-	for (i = 0; filenames[i] != NULL; i++) {
-		int fd;
-		struct feedclient_args *args;
+	if (! capture_mode) {
+		for (i = 0; filenames[i] != NULL; i++) {
+			int fd;
+			struct feedclient_args *args;
 
-		/*
-		 * Allow use the of '-' for stdout
-		 */
-		if (!strcmp(filenames[i],"-")) {
-		    fd = 1;
-		} else {
-		    fd = open(filenames[i],O_WRONLY | O_CREAT | O_TRUNC);
-		    if (fd < 0) {
-			perror("Opening savefile");
-			exit(1);
-		    }
+			/*
+			 * Allow use the of '-' for stdout
+			 */
+			if (!strcmp(filenames[i],"-")) {
+				fd = 1;
+			} else {
+				fd = open(filenames[i],
+					  O_WRONLY | O_CREAT | O_TRUNC);
+				if (fd < 0) {
+					perror("Opening savefile");
+					exit(1);
+				}
+			}
+
+			/*
+			 * Start a new thread to feed the file
+			 */
+			args = (struct feedclient_args*)
+				malloc(sizeof(struct feedclient_args));
+			args->fd = fd;
+			args->cli = 0;
+			args->interval = filetime;
+			client_connected[i] = 1;
+			active = 1;
+			pthread_create(&thread,NULL,feedclient,args);
+			pthread_cond_broadcast(&cond);
 		}
-
-		/*
-		 * Start a new thread to feed the file
-		 */
-		args = (struct feedclient_args*)
-			malloc(sizeof(struct feedclient_args));
-		args->fd = fd;
-		args->cli = 0;
-		args->interval = filetime;
-		client_connected[i] = 1;
-		active = 1;
-		pthread_create(&thread,NULL,feedclient,args);
-                pthread_cond_broadcast(&cond);
 	}
 
 	/*
@@ -854,6 +917,33 @@ int main (int argc, char **argv) {
 	 */
 	action.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE,&action,NULL);
+
+	/*
+	 * In capture mode we just wait for a signal
+	 */
+	if (capture_mode) {
+		void *foo;
+
+		/*
+		 * Insert a handler to kill the threads cleanly.
+		 */
+		action.sa_handler = cleanup;
+		sigaction(SIGTERM, &action, NULL);
+		sigaction(SIGINT, &action, NULL);
+
+		active = 1;
+
+		while (! stop)
+			sleep(1);
+
+		/*
+		 * Wait for the packet readers to exit.
+		 */
+		for (i = 0; i < interfaces; i++) {
+			pthread_join(getpacket_threads[i], &foo);
+		}
+		exit(0);
+	}
 
 	/*
 	 * Loop forever, so that we can handle multiple clients connecting
@@ -1131,7 +1221,11 @@ void *readpackets(void *args) {
 	bpf_u_int32 mask, net;
 	struct bpf_program filter;
 	char *bpf_filter;
+	void *readpackets_capturemode(void * args);
 
+	if (capture_mode)
+		return readpackets_capturemode(args);
+	
 	/*
 	 * How much of the packet we want to grab.
 	 */
@@ -1155,7 +1249,7 @@ void *readpackets(void *args) {
 	 * don't get to see packets until a certain number have been buffered
 	 * up, for some reason.
 	 */
-	dev = pcap_open_live(sargs->devname, size, 1, 1, ebuf);
+	dev = pcap_open_live(sargs->devname, size, 1, 1000, ebuf);
 	if (!dev) {
 		fprintf(stderr, "Failed to open %s: %s\n",
 			sargs->devname, ebuf);
@@ -1197,14 +1291,116 @@ void *readpackets(void *args) {
 	 * immediately after, we do an extra open/close of the device.
 	 * Neither case is life threatening.
 	 */
-	while (active > 0) {
+	while (active && !stop) {
 		if (pcap_dispatch(dev, -1, got_packet, &sargs->index) < 0) {
 			pcap_perror(dev,"pcap_dispatch failed: ");
 			exit(1);
 		}
 	}
 	pcap_close(dev);
+	if (stop)
+		return 0;
 	goto again;
+}
+
+/*
+ * Special version for just capturing packets.
+ */
+void *readpackets_capturemode(void *args)
+{
+	struct readpackets_args *sargs = (struct readpackets_args*) args;
+	char ebuf[1024];
+	pcap_t *dev;
+	int size;
+	bpf_u_int32 mask, net;
+	struct bpf_program filter;
+	char *bpf_filter;
+	pcap_dumper_t *pdumper;
+	void dump_packet(u_char *, const struct pcap_pkthdr *, const u_char *);
+
+	/*
+	 * How much of the packet we want to grab.
+	 */
+	size = capture_snaplen;
+
+	/*
+	 * NOTE: We set the timeout to a full second - if we set it lower, we
+	 * don't get to see packets until a certain number have been buffered
+	 * up, for some reason.
+	 */
+	dev = pcap_open_live(sargs->devname, size, 1, 1000, ebuf);
+	if (!dev) {
+		fprintf(stderr, "Failed to open %s: %s\n",
+			sargs->devname, ebuf);
+		exit(1);
+	}
+	bpf_filter = sargs->bpf_filter;
+
+	/*
+	 * Put an empty filter on the device, or we get nothing (but only
+	 * in Linux) - how frustrating!
+	 */
+#ifdef __linux__
+	if (!bpf_filter) {
+	    bpf_filter = "";
+	}
+#endif
+
+	if (bpf_filter) {
+	    pcap_lookupnet(sargs->devname, &net, &mask, ebuf);
+	    if (pcap_compile(dev, &filter, bpf_filter, 0, net)) {
+		    fprintf(stderr,"Error compiling BPF filter '%s'\n",
+				    bpf_filter);
+		    exit(1);
+	    }
+	    pcap_setfilter(dev, &filter);
+	    pcap_freecode(&filter);
+	}
+	
+	/*
+	 * In capture mode, we need to open up the dump file for this
+	 * interface.
+	 */
+ again:
+	pdumper = pcap_dump_open(dev, filenames[sargs->index]);
+	if (pdumper == NULL) {
+		fprintf(stderr, "%s\n", pcap_geterr(dev));
+		exit(1);
+	}
+
+	while (!stop && !reload) {
+		if (debug) {
+			fprintf(stderr, "packet(%d, %d)\n", active, getpid());
+			fflush(stderr);
+		}
+		if (pcap_dispatch(dev, -1, dump_packet, (u_char *)pdumper)
+		    < 0) {
+			pcap_perror(dev,"pcap_dispatch failed: ");
+			fflush(stderr);
+			exit(1);
+		}
+	}
+	pcap_dump_close(pdumper);
+	if (reload) {
+		reload = 0;
+		goto again;
+	}
+	pcap_close(dev);
+	return 0;
+}
+
+/*
+ * Callback for above; simply dumps the packet. 
+ */
+void dump_packet(u_char *args, const struct pcap_pkthdr *header,
+		const u_char *packet)
+{
+	if (debug) {
+		fprintf(stderr, "packet(%d)\n", active);
+		fflush(stderr);
+	}
+	if (active)
+		pcap_dump(args, header, packet);
 }
 
 /*
@@ -1439,6 +1635,23 @@ callback(event_handle_t handle,
 	    pthread_cond_signal(&time_started);
 	    printf("Event time started at UNIX time %lu.%lu\n",
 		    start_time.tv_sec, start_time.tv_usec);
+	    return;
+	}
+	if (!strcmp(objtype,TBDB_OBJECTTYPE_LINKTRACE)) {
+		if (!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
+			active = 1;
+			pthread_cond_broadcast(&cond);			
+		}
+		else if (!strcmp(eventtype,TBDB_EVENTTYPE_STOP)) {
+			active = 0;
+		}
+		else if (!strcmp(eventtype,TBDB_EVENTTYPE_KILL)) {
+			stop = 1;
+		}
+		else if (!strcmp(eventtype,TBDB_EVENTTYPE_RELOAD)) {
+			reload = 1;
+		}
+		return;
 	}
 	return;
 }
