@@ -611,6 +611,10 @@ function SPITFORM($formfields, $errors)
 			<li> if you customized one of our standard BSD
 			     images (FBSD-*) then it is partition 1.
 			</li>
+			<li> if you customized one of our standard WINDOWS
+			     images then it is partition 1, and make sure
+                             you check the <em>Whole Disk Image</em> box.
+			</li>
 			<li> otherwise, feel free to ask us!
 			</li>
 		     </ul>
