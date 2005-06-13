@@ -965,7 +965,9 @@ void ev_callback(event_handle_t handle,
 		      MA_Speed, speed,
 		      MA_TAG_DONE);
 
+#ifdef USE_POSTURE_REG
       match->flags |= ERF_HAS_GOAL;
+#endif
       match->last_goal_pos = mp.data.mtp_payload_u.command_goto.position;
 
       if (rmc_data.handle != NULL) {
