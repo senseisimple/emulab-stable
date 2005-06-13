@@ -1711,9 +1711,6 @@ int vmc_callback(elvin_io_handler_t handler,
              * set status to 'MOVING'
              * If status is 'MOVING', the nonlinear controller will be used
              */
-
-            printf("posture reg (HAS_GOAL)\n");
-
             mtp_send_packet2(rmc_data.handle,
 			     MA_Opcode, MTP_UPDATE_POSITION,
 			     MA_Role, MTP_ROLE_EMC,
