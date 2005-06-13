@@ -22,6 +22,8 @@
 
 /**
  * Base class for button callbacks.
+ *
+ * @see buttonManager
  */
 class buttonCallback
 {

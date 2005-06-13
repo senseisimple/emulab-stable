@@ -21,6 +21,8 @@
 
 /**
  * Helper class that encodes an LED pattern and priority.
+ *
+ * @see ledManager
  */
 class ledClient
 {

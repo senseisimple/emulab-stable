@@ -210,7 +210,7 @@ private:
     enum {
 	DBC_USER_LED,	 /*< Index of db_user_led in db_poll_callbacks. */
 	DBC_USER_BUTTON, /*< Index of db_user_button in db_poll_callbacks. */
-	DBC_FAULT,	 /*< Index of db_fault in db_poll_callbacks. */
+	// DBC_FAULT,	 /*< Index of db_fault in db_poll_callbacks. */
 
 	DBC_MAX		 /*< Maximum number of objects in db_poll_callbacks. */
     };

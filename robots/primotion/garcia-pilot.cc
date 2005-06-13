@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
     
     FILE *batterylog;
     FILE *sdata_in;
-    FILE *plogfilep;
+    FILE *plogfilep = NULL;
     aIOLib ioRef;
     aErr err;
 
@@ -505,7 +505,7 @@ int main(int argc, char *argv[])
 	    wm.setDashboard(&db);
 	    do {
 		fd_set rreadyfds = readfds, wreadyfds = writefds;
-		struct timeval tv_zero = { 0, 10000 };
+		struct timeval tv_zero = { 0, 5000 };
 		int rc;
 
 		/* Poll the file descriptors, don't block */
@@ -618,7 +618,7 @@ int main(int argc, char *argv[])
 		    }
 		}
 		
-		garcia.handleCallbacks(23);
+		garcia.handleCallbacks(5);
 		aIO_GetMSTicks(ioRef, &now, NULL);
 	    } while (looping && db.update(now));
 

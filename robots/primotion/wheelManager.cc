@@ -22,6 +22,16 @@
 
 #define MAX_WHEELSPEED 1.0f
 
+const float wheelManager::FRONT_RANGER_THRESHOLDS[] = {
+    0.27f,
+    0.36f
+};
+
+const float wheelManager::REAR_RANGER_THRESHOLDS[] = {
+    0.189f,
+    0.217f,
+};
+
 /**
  * An "execute" callback for a garcia behavior.
  */
@@ -260,7 +270,9 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
     struct mtp_garcia_telemetry *mgt;
     float diff, angle, distance;
     acpObject *move, *pivot;
-    
+    threshold_level_t tl;
+    acpValue av;
+
     angle = atan2f(y, x);
     distance = hypot(x, y);
 
@@ -275,6 +287,15 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 	    angle += M_PI;
 	distance = -distance;
     }
+
+    if (distance <= 0.60f)
+	tl = THRESH_LOW;
+    else
+	tl = THRESH_HIGH;
+    av.set(FRONT_RANGER_THRESHOLDS[tl]);
+    this->wm_garcia.setNamedValue("front-ranger-threshold", &av);
+    av.set(REAR_RANGER_THRESHOLDS[tl]);
+    this->wm_garcia.setNamedValue("rear-ranger-threshold", &av);
     
     mgt = this->wm_dashboard->getTelemetry();
     diff = fabsf(mgt->rear_ranger_left - mgt->rear_ranger_right);

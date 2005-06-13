@@ -105,7 +105,17 @@ public:
      * The maximum allowed acceleration in meters per second squared.
      */
     static const float MAXIMUM_ACCELERATION = 4.0;
+
+    typedef enum {
+	THRESH_LOW,
+	THRESH_HIGH,
+
+	THRESH_COUNT
+    } threshold_level_t;
+
+    static const float FRONT_RANGER_THRESHOLDS[THRESH_COUNT];
     
+    static const float REAR_RANGER_THRESHOLDS[THRESH_COUNT];
 
     /**
      * Construct a wheelManager object for a garcia.
@@ -229,6 +239,11 @@ public:
 	assert(this->wm_dashboard != NULL);
 
 	return true;
+    };
+
+    bool isMoving(void)
+    {
+	return this->wm_moving;
     };
 
 private:

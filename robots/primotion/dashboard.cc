@@ -17,6 +17,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "aGarciaGeom.h"
 #include "aGarciaDefs.tea"
 
 #include "dashboard.hh"
@@ -63,7 +64,7 @@ dashboard::dashboard(acpGarcia &garcia, FILE *battery_log)
 
     this->db_poll_callbacks[DBC_USER_LED] = &this->db_user_led;
     this->db_poll_callbacks[DBC_USER_BUTTON] = &this->db_user_button;
-    this->db_poll_callbacks[DBC_FAULT] = &this->db_fault;
+    // XXX this->db_poll_callbacks[DBC_FAULT] = &this->db_fault;
 }
 
 dashboard::~dashboard()
@@ -147,14 +148,11 @@ void dashboard::dump(FILE *file)
 
 bool dashboard::update(unsigned long now)
 {
-  
-
     bool retval = true;
-#if 0
-    
     float lo, ro;
     int lpc;
 
+#if 0
     /*
      * Note, these queries need to come first so that we can get an accurate
      * velocity measure.  Otherwise, the time difference from the queries below
@@ -178,15 +176,10 @@ bool dashboard::update(unsigned long now)
 	(1000.0f / (float)(now - this->db_last_tick));
     this->db_telemetry.right_velocity = (ro - this->db_last_right_odometer) *
 	(1000.0f / (float)(now - this->db_last_tick));
-#if 0
-    printf("%f %f %d -- %f %f\n",
-	   lo, ro, now - this->db_last_tick,
-	   this->db_telemetry.left_velocity,
-	   this->db_telemetry.right_velocity);
-#endif
 
     this->db_last_left_odometer = lo;
     this->db_last_right_odometer = ro;
+#endif
     
     if (now > this->db_next_long_tick) {
 	float battVoltage;
@@ -201,8 +194,7 @@ bool dashboard::update(unsigned long now)
 	else {
 	    this->db_telemetry.battery_voltage = battVoltage;
 	    this->db_telemetry.battery_level =
-		this->db_garcia.getNamedValue("battery-level")->
-		getFloatVal() * 100.0;
+		aGarciaGeom_VoltageToCapacity(battVoltage) * 100.0;
 
 	    if (this->db_telemetry.battery_level < BATTERY_LOW_THRESHOLD) {
 		if (this->db_battery_warning == NULL) {
@@ -239,21 +231,10 @@ bool dashboard::update(unsigned long now)
 		    this->db_telemetry.move_time_usec);
 	    fflush(this->db_battery_log);
 	}
-
-	this->db_telemetry.speed =
-	    this->db_garcia.getNamedValue("speed")->getFloatVal();
-	
-	this->db_telemetry.side_ranger_threshold = this->db_garcia.
-	    getNamedValue("side-ranger-threshold")->getFloatVal();
-	
-	this->db_telemetry.front_ranger_threshold = this->db_garcia.
-	    getNamedValue("front-ranger-threshold")->getFloatVal();
-	
-	this->db_telemetry.rear_ranger_threshold = this->db_garcia.
-	    getNamedValue("rear-ranger-threshold")->getFloatVal();
     }
 
-    if (now > this->db_next_short_tick) {
+    if ((now > this->db_next_short_tick) &&
+	(this->db_move_start_time.tv_sec == 0)) {
 #if 0
 	this->db_telemetry.down_ranger_left =
 	    this->db_garcia.getNamedValue("down-ranger-left")->getIntVal();
@@ -295,8 +276,5 @@ bool dashboard::update(unsigned long now)
 
     this->db_last_tick = now;
 
-#endif
-        
     return retval;
-
 }
