@@ -73,7 +73,7 @@ my $locpiper	= "$TB/sbin/locpiper";
 my $logfile	= "$TB/log/repositionlog";
 my $debug	= 0;
 my $cleanup	= 1;
-my $retry_time  = 2;              # in minutes
+my $retry_time  = 10;              # in minutes
 my $max_attempts= 4;
 my %retried     = ();
 my %warned	= ();
@@ -241,7 +241,7 @@ MAINLOOP: while (1) {
 	    $node = $hrow{'node_id'};
 	    my $xdist = $hrow{'loc_x'} - $hrow{'destination_x'};
 	    my $ydist = $hrow{'loc_y'} - $hrow{'destination_y'};
-	    my $dist = sqrt(($xdist * $xdist) + ($ydist + $ydist));
+	    my $dist = sqrt(($xdist * $xdist) + ($ydist * $ydist));
 	    if (!DBQueryWarn("UPDATE reposition_status set ".
 			     "distance_remaining=$dist ".
 			     "where node_id='$node'")) {
