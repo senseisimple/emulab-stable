@@ -1500,6 +1500,17 @@ CREATE TABLE projects (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `reposition_status`
+--
+
+CREATE TABLE reposition_status (
+  node_id varchar(32) NOT NULL default '',
+  attempts tinyint(4) NOT NULL default '0',
+  distance_remaining float default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `reserved`
 --
 

@@ -2658,3 +2658,12 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table experiments add elabinelab_nosetup tinyint(1) \
             NOT NULL default '0' after elabinelab_cvstag;
 
+1.138: Add a table to track the progress of moving the robots back to
+       their pens.
+
+	CREATE TABLE reposition_status (
+	  node_id varchar(32) NOT NULL default '',
+	  attempts tinyint(4) NOT NULL default '0',
+	  distance_remaining float default NULL,
+	  PRIMARY KEY  (node_id)
+	) TYPE=MyISAM;

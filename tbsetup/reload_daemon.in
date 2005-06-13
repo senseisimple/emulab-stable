@@ -41,6 +41,10 @@ my $TB       = "@prefix@";
 my $DBNAME   = "@TBDBNAME@";
 my $TBOPS    = "@TBOPSEMAIL@";
 
+# XXX
+my $BUILDING = "MEB-ROBOTS";
+my $FLOOR = 4;
+
 # Testbed Support library
 use lib "@prefix@/lib";
 use libdb;
@@ -55,6 +59,8 @@ $libdb::DBQUERY_MAXTRIES = 30;
 my $RELOADPID	= NODERELOADING_PID;
 my $RELOADEID	= NODERELOADING_EID;
 my $PENDINGEID	= NODERELOADPENDING_EID;
+my $REPOSPID	= NODEREPOSITIONING_PID;
+my $RPPENDINGEID= NODEREPOSPENDING_EID;
 my $NODEDEAD_PID= NODEDEAD_PID;
 my $NODEDEAD_EID= NODEDEAD_EID;
 
@@ -506,15 +512,36 @@ while (1) {
 sub freefromreloading($) {
     my $node = shift;
 
-    DBQueryFatal("delete from current_reloads where node_id='$node'");  
+    DBQueryFatal("delete from current_reloads where node_id='$node'");
     my ($pid,$eid);
     NodeidToExp($node,\$pid,\$eid);
     if ($pid eq $RELOADPID && ($eid eq $RELOADEID || $eid eq $PENDINGEID)) {
-        DBQueryFatal("delete from scheduled_reloads ".
-                     "where node_id='$node'");
-        DBQueryFatal("delete from reserved where node_id='$node'");
-        TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
-                         $UID, $pid, $eid);
+	DBQueryFatal("delete from scheduled_reloads where node_id='$node'");
+
+	# Check if the robot is back in its pen, otherwise we have to throw it
+	# back to repositionpending.
+	my $loc_result =
+	    DBQueryWarn("SELECT * FROM reposition_status ".
+			"WHERE node_id='$node'");
+
+	if ($loc_result->numrows) {
+	    if (!DBQueryWarn("update reserved set ".
+			     "rsrv_time=now(),eid='$RPPENDINGEID' ".
+			     "where node_id='$node'")) {
+		print "Could not update EID for $node. Waiting a bit.\n";
+	    } else {
+		print "Reposition pending nodes moved to $RPPENDINGEID at ".
+		    `date`;
+		
+		TBSetNodeHistory($node, TB_NODEHISTORY_OP_MOVE, $UID,
+				 $REPOSPID, $RPPENDINGEID);
+	    }
+	}
+	else {
+	    DBQueryFatal("delete from reserved where node_id='$node'");
+	    TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
+			     $UID, $pid, $eid);
+	}
     }
 }
 

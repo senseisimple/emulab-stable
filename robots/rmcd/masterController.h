@@ -48,6 +48,7 @@ struct master_controller {
 };
 
 #define DEFAULT_PAUSE_TIME 10
+#define MAX_CONTACT_DISTANCE 0.36
 
 /**
  * Dispatch a packet received from the pilot.  We expect to only receive

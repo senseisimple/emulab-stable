@@ -637,7 +637,7 @@ sub KillThePiper()
 
 	if ($err == ESRCH) {
 	    print "*** WARNING:".
-		"Prerender process $procid for $pid/$eid already dead\n";
+		"Locpiper process $procid for $pid/$eid already dead\n";
 	}
 	else {
 	    SENDMAIL($TBOPS,

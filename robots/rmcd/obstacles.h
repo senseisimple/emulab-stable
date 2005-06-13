@@ -182,6 +182,8 @@ void ob_obstacle_location(struct contact_point *dst_out,
 			  struct robot_position *actual,
 			  struct contact_point *cp_local);
 
+void ob_cancel_obstacle(struct robot_position *actual);
+
 /**
  * Construct a dynamic obstacle that was detected by a robot.  If the robot
  * detects an obstacle that overlaps with an existing dynamic obstacle, the

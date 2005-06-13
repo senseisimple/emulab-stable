@@ -415,6 +415,8 @@ static int mc_process_report(struct master_controller *mc, mtp_packet_t *mp)
     assert(mc_invariant(mc));
     assert(mp != NULL);
 
+    ob_cancel_obstacle(&mc->mc_plan.pp_actual_pos);
+
     mc->mc_pilot->pc_flags &= ~PCF_EXPECTING_RESPONSE;
     mcr = &mp->data.mtp_payload_u.contact_report;
 
@@ -425,6 +427,10 @@ static int mc_process_report(struct master_controller *mc, mtp_packet_t *mp)
 	float local_bearing;
 
 	local_bearing = atan2f(mcr->points[lpc].y, mcr->points[lpc].x);
+	if (hypotf(mcr->points[lpc].x, mcr->points[lpc].y) >
+	    MAX_CONTACT_DISTANCE) {
+	    continue;
+	}
 	compass |= (mtp_compass(local_bearing) & (MCF_EAST|MCF_WEST));
 
 	ob_obstacle_location(&cp,
@@ -446,6 +452,7 @@ static int mc_process_report(struct master_controller *mc, mtp_packet_t *mp)
     case MCF_EAST|MCF_WEST:
 	info("%s cannot move!\n", mc->mc_pilot->pc_robot->hostname);
 	mc->mc_pause_time = DEFAULT_PAUSE_TIME;
+	mc->mc_flags &= ~MCF_CONTACT;
 	mc->mc_self_obstacle = ob_add_robot(&mc->mc_plan.pp_actual_pos,
 					    mc->mc_pilot->pc_robot->id);
 	break;

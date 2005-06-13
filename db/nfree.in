@@ -41,6 +41,7 @@ my $nodereboot  = "$TB/bin/node_reboot";
 my $reloadpid	= "emulab-ops";
 my $pendingeid  = "reloadpending";
 my $reloadeid   = "reloading";
+my $rppendingeid= "repositionpending";
 my $oldreserved_pid = OLDRESERVED_PID;
 my $oldreserved_eid = OLDRESERVED_EID;
 my $lockedpid   = NFREELOCKED_PID();
@@ -386,10 +387,29 @@ foreach my $n (@freed_nodes) {
 	$inreloads = 0;
     }
 
-    if (!$TESTMODE &&
-	((!$isvirt && $imageable) || # XXX force reload hack!
-	 $inreloads || $mustzero{$n} ||
-	 TBNodeType($n) eq "garcia")) { # XXX Garcia hack
+    if (TBNodeType($n) eq "garcia") {
+	print "Moving $n to $reloadpid/$rppendingeid.\n";
+	
+	DBQueryWarn("update reserved set pid='$reloadpid',".
+		    "eid='$rppendingeid',vname='$n' where node_id='$n'") ||
+	    $error++;
+
+	DBQueryWarn("REPLACE INTO scheduled_reloads set node_id='$n'") || 
+	    $error++;
+
+	TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
+			 $reloadpid, $rppendingeid);
+
+	# This little sillyness is for disk reloading.
+	# Kill the last reservation since this path is special.
+	DBQueryWarn("delete from last_reservation where node_id='$n'") ||
+	    $error++;
+
+	next;
+    }
+    elsif (!$TESTMODE &&
+	   ((!$isvirt && $imageable) || # XXX force reload hack!
+	    $inreloads || $mustzero{$n})) { # XXX Garcia hack
 	print "Moving $n to $reloadpid/$pendingeid.\n";
 	
 	DBQueryWarn("update reserved set pid='$reloadpid',eid='$pendingeid',".

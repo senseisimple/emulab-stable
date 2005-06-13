@@ -291,6 +291,33 @@ void ob_obstacle_location(struct contact_point *dst,
     REL2ABS(dst, actual->theta, cp_local, actual);
 }
 
+void ob_cancel_obstacle(struct robot_position *rp)
+{
+    struct obstacle_node *on;
+    
+    assert(rp != NULL);
+
+    on = (struct obstacle_node *)ob_data.od_active.lh_Head;
+    while (on->on_link.ln_Succ != NULL) {
+	struct obstacle_node *on_succ;
+	
+	on_succ = (struct obstacle_node *)on->on_link.ln_Succ;
+	if ((on->on_type == OBT_DYNAMIC) &&
+	    (rc_compute_code(rp->x, rp->y, &on->on_natural) == 0)) {
+	    lnRemove(&on->on_link);
+	    lnAddHead(&ob_data.od_free_list, &on->on_link);
+	    if (ob_data.od_emc_handle != NULL) {
+		mtp_send_packet2(ob_data.od_emc_handle,
+				 MA_Opcode, MTP_REMOVE_OBSTACLE,
+				 MA_Role, MTP_ROLE_RMC,
+				 MA_ObstacleVal, &on->on_expanded,
+				 MA_TAG_DONE);
+	    }
+	}
+	on = on_succ;
+    }
+}
+
 struct obstacle_node *ob_found_obstacle(struct robot_position *actual,
 					struct contact_point *cp_world)
 {
@@ -315,6 +342,9 @@ struct obstacle_node *ob_found_obstacle(struct robot_position *actual,
 	opcode = MTP_UPDATE_OBSTACLE;
 	retval->on_decay_seconds = OB_DECAY_START;
 	ob_merge_obstacles(&retval->on_expanded, &oc);
+	ob_expand_obstacle(&retval->on_natural,
+			   &retval->on_expanded,
+			   -OBSTACLE_BUFFER);
 	
 	info("expanding existing obstacle: %d %.2f %.2f %.2f %.2f\n"
 	     " --> %.2f %.2f %.2f %.2f\n",
@@ -338,6 +368,7 @@ struct obstacle_node *ob_found_obstacle(struct robot_position *actual,
 	retval->on_expanded.ymin = oc.ymin;
 	retval->on_expanded.xmax = oc.xmax;
 	retval->on_expanded.ymax = oc.ymax;
+	ob_expand_obstacle(&retval->on_natural, &oc, -OBSTACLE_BUFFER);
 
 	/* Put dynamics at the front of the list. */
 	lnAddHead(&ob_data.od_active, &retval->on_link);
@@ -378,7 +409,6 @@ void ob_expand_obstacle(struct obstacle_config *dst,
     assert(dst != NULL);
     assert(src != NULL);
     assert(mtp_obstacle_config_invariant(src));
-    assert(amount > 0.0f);
 
     dst->xmin = src->xmin - amount;
     dst->ymin = src->ymin - amount;

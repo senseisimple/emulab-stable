@@ -1,0 +1,573 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+#
+# This should run as root to make sure that it has permission to reboot nodes
+# (since only root is allowed to power cycle nodes at any time - it's time-
+# limited for anyone else)
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Only root can run this script!\n");
+}
+
+#
+# Look for nodes to reposition.
+#
+#	usage: repos_daemon [-d]
+#
+# TODO: Use "logger" instead of writing a log file.
+#
+sub usage()
+{
+    print STDOUT "Usage: repos_daemon [-dc]\n" .
+	"Use the -d option to prevent daemonization\n";
+    exit(-1);
+}
+my  $optlist = "dc";
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $DBNAME   = "@TBDBNAME@";
+my $TBOPS    = "@TBOPSEMAIL@";
+
+# XXX
+my $BUILDING = "MEB-ROBOTS";
+my $FLOOR = 4;
+
+# Testbed Support library
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+#
+# These come from the library.
+# 
+my $REPOSPID	= NODEREPOSITIONING_PID;
+my $REPOSEID	= NODEREPOSITIONING_EID;
+my $PENDINGEID	= NODEREPOSPENDING_EID;
+my $RLPENDINGEID= NODERELOADPENDING_EID;
+my $NODEDEAD_PID= NODEDEAD_PID;
+my $NODEDEAD_EID= NODEDEAD_EID;
+
+sub fatal($);
+sub notify($);
+sub daemonize();
+
+my $reboot	= "$TB/bin/node_reboot";
+my $evsys	= "$TB/bin/eventsys_control";
+my $locpiper	= "$TB/sbin/locpiper";
+my $logfile	= "$TB/log/repositionlog";
+my $debug	= 0;
+my $cleanup	= 1;
+my $retry_time  = 2;              # in minutes
+my $max_attempts= 4;
+my %retried     = ();
+my %warned	= ();
+my %failed	= ();
+
+#
+# Turn off line buffering on output (dots ...).
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 0) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = $options{"d"};
+}
+if (defined($options{"c"})) {
+    $cleanup = $options{"c"};
+}
+
+if ($cleanup) {
+    # For testing purposes mostly, cleanup any leftovers...
+    DBQueryFatal("delete from reserved ".
+		 "where pid='$REPOSPID' and eid='$REPOSEID'");
+    DBQueryFatal("delete from virt_node_startloc ".
+		 "where pid='$REPOSPID' and eid='$REPOSEID'");
+    DBQueryFatal("delete from virt_agents ".
+		 "where pid='$REPOSPID' and eid='$REPOSEID'");
+}
+
+# Go to ground.
+if (! $debug) {
+    daemonize();
+}
+
+print "Repositioning Daemon starting... pid $$, at ".`date`;
+
+# XXX Need to get an emulab-ops user to run the event system as.
+$query_result = 
+    DBQueryFatal("select u.unix_uid from group_membership as gm ".
+		 "left join users as u on u.uid=gm.uid ".
+		 "where gm.pid='$REPOSPID' and gm.gid='$REPOSPID' and ".
+		 "gm.uid!='elabman'");
+
+if (! $query_result || $query_result->numrows == 0) {
+    fatal("Cannot get experiment head for $REPOSEID\n");
+}
+
+my ($ev_uid) = $query_result->fetchrow;
+
+my ($unix_gid, $unix_gidname);
+if (! TBGroupUnixInfo($REPOSPID, $REPOSPID, \$unix_gid, \$unix_gidname)) {
+    die("*** $0:\n".
+	"    Could not get unix group info for $REPOSPID!\n");
+}
+
+print "Experiment head: $ev_uid\n"
+    if ($debug);
+
+#
+# Loop, looking for nodes to reposition.
+# 
+my $idle=0;
+MAINLOOP: while (1) {
+    my($count, $which, @row, %hrow, $node, $retry, $attempts, $stamp);
+    my($pid, $eid);
+
+    # Partial delay between loops in case of an error.
+    if ($idle) { sleep(10); } # Wait longer if we're not doing anything
+    else { sleep(1); }
+
+    $idle=1; # Assume we're going to be idle this iteration
+    #
+    # We use this to figure out when to delete nodes from the retried and
+    # warned hashes
+    #
+    my $time = time();
+
+    #
+    # First, look for nodes that have been in the repositioning experiment for
+    # longer than $retry_time, and try reloading them
+    #
+    $query_result =
+	DBQueryWarn("select r.node_id,rs.attempts from reserved as r " .
+		    "left join reposition_status as rs on rs.node_id=r.node_id ".
+		    "where pid='$REPOSPID' and eid='$REPOSEID' and " .
+		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time MINUTE)".
+		    "  > rsrv_time");
+
+    if (! $query_result) {
+	print "DB Error. Waiting a bit.\n";
+	next;
+    }
+
+    while (($node,$attempts) = $query_result->fetchrow) {
+	$idle=0;
+	if (!$retried{$node}) {
+	    print "\nReposition appears wedged at ".`date`."\n";
+	    
+	    if ($attempts >= $max_attempts) {
+		# The node has passed through reloading/repositioning too many
+		# times, move to hwdown.
+		DBQueryFatal("delete from reposition_status ".
+			     "where node_id='$node'");
+		notify("$node is wedged... literally.\n".
+		       "Moved to $NODEDEAD_PID/$NODEDEAD_EID\n");
+
+		MarkPhysNodeDown($node);
+		TBSetNodeLogEntry($node, "daemon",
+				  TB_DEFAULT_NODELOGTYPE(),
+				  "'Moved to hwdown; reposition failed'");
+	    }
+	    else {
+		# Try reloading the node and restarting pilot.
+		movetoreloading($node);
+	    }
+	}
+	$retried{$node} = $time;
+    }
+
+    #
+    # We can pull out all nodes that were not 'touched' (matched by the
+    # select above) during this pass
+    #
+    foreach $node (keys %retried) {
+	if ($retried{$node} != $time) {
+	    delete $retried{$node};
+	}
+    }
+
+    # Now we check the status of the rest of the nodes in repositioning.
+    $query_result =
+	DBQueryWarn("select n.node_id,li.loc_x,li.loc_y,".
+		    "n.destination_x,n.destination_y from nodes as n ".
+		    "left join reserved as r on r.node_id=n.node_id ".
+		    "left join location_info as li on li.node_id=n.node_id ".
+		    "and li.building='$BUILDING' ".
+		    "where r.pid='$REPOSPID' and r.eid='$REPOSEID' and ".
+		    "(n.destination_x is not NULL or ".
+		    "n.destination_y is not NULL) order by node_id");
+
+    if (! $query_result) {
+	print "DB Error. Waiting a bit.\n";
+	next;
+    }
+
+    if ($query_result->numrows) {
+	print "Robots are still in motion\n";
+	$idle = 1;
+	while (%hrow = $query_result->fetchhash()) {
+	    $node = $hrow{'node_id'};
+	    my $xdist = $hrow{'loc_x'} - $hrow{'destination_x'};
+	    my $ydist = $hrow{'loc_y'} - $hrow{'destination_y'};
+	    my $dist = sqrt(($xdist * $xdist) + ($ydist + $ydist));
+	    if (!DBQueryWarn("UPDATE reposition_status set ".
+			     "distance_remaining=$dist ".
+			     "where node_id='$node'")) {
+		print "DB Error. Waiting a bit.\n";
+		next MAINLOOP;
+	    }
+	}
+	next;
+    }
+    else {
+	$query_result =
+	    DBQueryWarn("select node_id from reserved where ".
+			"pid='$REPOSPID' and eid='$REPOSEID' ".
+			"order by node_id");
+	
+	if (! $query_result) {
+	    print "DB Error. Waiting a bit.\n";
+	    next;
+	}
+
+	if ($query_result->numrows) {
+	    # Robots are back in their pens...
+	    if (evsysctrl("stop")) {
+		print "Failed to stop the event system...\n"; # XXX fatal?
+	    }
+	    while (my ($node) = $query_result->fetchrow_array()) {
+		freefromrepositioning($node);
+	    }
+	}
+	else {
+	    # No robots, make sure the event-system and locpiper are really
+	    # dead.  The daemons can be left over if the nodes are all moved
+	    # over to reloading.
+	    $query_result =
+		DBQueryWarn("select locpiper_pid from experiments where ".
+			    "pid='$REPOSPID' and eid='$REPOSEID' and ".
+			    "locpiper_pid!=0");
+
+	    if ($query_result->numrows) {
+		if (evsysctrl("stop")) {
+		    print "Failed to stop the event system...\n"; # XXX fatal?
+		}
+	    }
+	}
+    }
+
+    # Grab any pending nodes that are up or have failed and need to be reloaded
+    # first.  Only take nodes that are up or have definitely failed.
+    # XXX We should check for nodes that have been in TBSETUP too long...
+    $query_result =
+	DBQueryWarn("select r.node_id,n.eventstate from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "where r.pid='$REPOSPID' and r.eid='$PENDINGEID' ".
+		    "and (n.eventstate='". TBDB_NODESTATE_ISUP ."' or ".
+		    "n.eventstate='" . TBDB_NODESTATE_TBFAILED ."') ".
+		    "order by node_id");
+
+    if (! $query_result) {
+	print "DB Error. Waiting a bit.\n";
+	next;
+    }
+    $count = $query_result->numrows;
+
+    if (!$count) {
+	print "Nothing to do, sleeping for a bit...\n"
+	    if ($debug);
+	next;
+    } else {
+	$idle=0;
+    }
+
+    # Grab all the nodes that match
+    my @pending_list = ();
+    while (%hrow = $query_result->fetchhash()) {
+	$node = $hrow{'node_id'};
+
+	my $subresult =
+	    DBQueryWarn("SELECT * FROM reposition_status ".
+			"WHERE node_id='$node'");
+	if ($subresult->numrows == 0) {
+	    if (!DBQueryWarn("REPLACE INTO reposition_status SET ".
+			     "node_id='$node'")) {
+		print "DB Error. Waiting a bit.\n";
+		next MAINLOOP;
+	    }
+	}
+
+	if ($hrow{'eventstate'} eq TBDB_NODESTATE_TBFAILED) {
+	    movetoreloading($node);
+	}
+	else {
+	    push(@pending_list, $node);
+	}
+    }
+    my $nodes = join(" ", @pending_list);
+    if (!$nodes) {
+	$idle=1;
+	next;
+    }
+
+    print "Trying to reposition $nodes at ".`date`;
+
+    #
+    # What we do depends on whether its a free node or a node reserved
+    # into the repositioning pending experiment.
+    #
+    if (@pending_list > 0) {
+	my $cond = "node_id in (" .
+	    join(",", map("'$_'", @pending_list)) . ")";
+
+	$query_result =
+	    DBQueryWarn("SELECT node_id,loc_x,loc_y,orientation ".
+			"FROM node_startloc ".
+			"WHERE $cond and building='$BUILDING'");
+
+	if (! $query_result) {
+	    print "DB Error. Waiting a bit.\n";
+	    next;
+	}
+
+	while (my ($node,$loc_x,$loc_y,$o) = $query_result->fetchrow_array()) {
+	    # Setup some tables for the event scheduler.
+	    if (!DBQueryWarn("UPDATE reposition_status set ".
+			     "attempts=attempts+1 where node_id='$node'")) {
+		print "DB Error. Waiting a bit.\n";
+		next MAINLOOP;
+	    }
+	    if (!DBQueryWarn("REPLACE virt_node_startloc set ".
+			     "pid='$REPOSPID',eid='$REPOSEID',".
+			     "vname='$node',building='$BUILDING',".
+			     "floor=$FLOOR,loc_x=$loc_x,loc_y=$loc_y,".
+			     "orientation=$o")) {
+		print "DB Error. Waiting a bit.\n";
+		next MAINLOOP;
+	    }
+	    if (!DBQueryWarn("UPDATE nodes set ".
+			     "destination_x=$loc_x,destination_y=$loc_y,".
+			     "destination_orientation=$o ".
+			     "where node_id='$node'")) {
+		print "DB Error. Waiting a bit.\n";
+		next MAINLOOP;
+	    }
+	    if (!DBQueryWarn("REPLACE virt_agents set ".
+			     "pid='$REPOSPID',eid='$REPOSEID',".
+			     "vname='$node',vnode='$node',objecttype=10")) {
+		print "DB Error. Waiting a bit.\n";
+		next MAINLOOP;
+	    }
+	}
+
+	# Add a topography object so the locpiper will get updates for dynamic
+	# obstacles.
+	if (!DBQueryWarn("REPLACE virt_agents set ".
+			 "pid='$REPOSPID',eid='$REPOSEID',".
+			 "vname='topo',vnode='*',objecttype=14")) {
+	    print "DB Error. Waiting a bit.\n";
+	    next MAINLOOP;
+	}
+	
+	# Commit here.
+	if (!DBQueryWarn("update reserved set ".
+			 "rsrv_time=now(),eid='$REPOSEID' ".
+			  "where $cond")) {
+	    print "Could not update EID for " . join(" ", @pending_list) .
+		". Waiting a bit.\n";
+	    next;
+	} else {
+	    print "Pending nodes moved to $REPOSEID at ".`date`;
+
+	    foreach my $n (@pending_list) {
+		TBSetNodeHistory($n, TB_NODEHISTORY_OP_MOVE, $UID,
+				 $REPOSPID, $REPOSEID);
+	    }
+	}
+
+	# The node might need the full vnames to exist in DNS...
+	if (system("$TB/sbin/named_setup")) {
+	    print "*** WARNING: Failed to reset named map.\n";
+	}
+	if (evsysctrl("start")) {
+	    foreach $node (@pending_list) {
+		MarkPhysNodeDown($node);
+		TBSetNodeLogEntry($node, "daemon",
+				  TB_DEFAULT_NODELOGTYPE(),
+				  "'Moved to hwdown; event system failed'");
+	    }
+	}
+    }
+    
+    $stamp = DBDateTime();
+	
+    print "Reposition of $nodes has started at $stamp.\n";
+
+    next;
+}
+
+
+#
+# free up the node and clear any assocaited repositioning DB state.
+# (code stolen from stated).
+#
+sub freefromrepositioning($) {
+    my $node = shift;
+
+    DBQueryFatal("delete from reposition_status where node_id='$node'");
+
+    my $result =
+	DBQueryFatal("select node_id from scheduled_reloads ".
+		     "where node_id='$node'");
+
+    if ($result->numrows) {
+	# Need to reload before releasing into the free pool.
+	movetoreloading($node);
+    }
+    else {
+	my ($pid,$eid);
+	NodeidToExp($node,\$pid,\$eid);
+	if ($pid eq $REPOSPID && ($eid eq $REPOSEID || $eid eq $PENDINGEID)) {
+	    print "Freeing $node\n";
+	    DBQueryFatal("delete from reserved where node_id='$node'");
+	    DBQueryFatal("delete from virt_node_startloc ".
+			 "where pid='$REPOSPID' and eid='$REPOSEID' ".
+			 "and vname='$node'");
+	    DBQueryFatal("delete from virt_agents where pid='$REPOSPID' ".
+			 "and eid='$REPOSEID' and vname='$node'");
+	    TBSetNodeHistory($node, TB_NODEHISTORY_OP_FREE,
+			     $UID, $pid, $eid);
+	}
+    }
+}
+
+sub movetoreloading($) {
+    my $node = shift;
+
+    print "Reloading $node\n";
+    DBQueryWarn("update nodes set destination_x=NULL,destination_y=NULL, ".
+		"destination_orientation=NULL where node_id='$node'");
+    DBQueryFatal("delete from virt_node_startloc where pid='$REPOSPID' ".
+		 "and eid='$REPOSEID' and vname='$node'");
+    DBQueryFatal("delete from virt_agents where pid='$REPOSPID' ".
+		 "and eid='$REPOSEID' and vname='$node'");
+    if (!DBQueryWarn("update reserved set ".
+		     "rsrv_time=now(),eid='$RLPENDINGEID' ".
+		     "where node_id='$node'")) {
+	print "Could not update EID for $node. Waiting a bit.\n";
+    } else {
+	print "Reload pending nodes moved to $RLPENDINGEID at ".
+	    `date`;
+	
+	TBSetNodeHistory($node, TB_NODEHISTORY_OP_MOVE, $UID,
+			 $REPOSPID, $RLPENDINGEID);
+    }
+}
+
+sub fatal($)
+{
+    local($msg) = $_[0];
+
+    SENDMAIL($TBOPS, "Repositioning Daemon Died", $msg, $TBOPS);
+    die($msg);
+}
+
+sub notify($)
+{
+    my($mesg) = $_[0];
+
+    print "$mesg\n";
+    SENDMAIL($TBOPS, "Repositioning Daemon Message", $mesg, $TBOPS);
+}
+
+sub evsysctrl($)
+{
+    my ($action) = shift;
+
+    print "Event system: $action\n";
+    my $childpid = fork();
+    if ($childpid == 0) {
+	my $lpflag = "";
+	my $retval = 1;
+
+	$GID = $unix_gid;
+	$EGID = "$unix_gid";
+	$EUID = $UID = $ev_uid;
+	if ($action eq "stop") {
+	    $lpflag = "-k";
+	}
+	if (system("$locpiper $lpflag $REPOSPID $REPOSEID")) {
+	    notify("Failed to $action locpiper\n");
+	}
+	elsif (system("$evsys $action $REPOSPID $REPOSEID")) {
+	    notify("Failed to $action event system\n");
+	}
+	else {
+	    $retval = 0;
+	}
+
+	exit($retval);
+    }
+    waitpid($childpid, 0);
+
+    return $?;
+}
+
+#
+# Become a daemon.
+# 
+sub daemonize()
+{
+    my $mypid = fork();
+    if ($mypid) {
+	exit(0);
+    }
+
+    #
+    # We have to disconnect from the caller by redirecting both STDIN and
+    # STDOUT away from the pipe. Otherwise the caller will continue to wait
+    # even though the parent has exited. 
+    #
+    open(STDIN, "< /dev/null") or
+	die("opening /dev/null for STDIN: $!");
+
+    #
+    # Open the batch log and start writing to it. 
+    #
+    open(STDERR, ">> $logfile") or die("opening $logfile for STDERR: $!");
+    open(STDOUT, ">> $logfile") or die("opening $logfile for STDOUT: $!");
+
+    return 0;
+}

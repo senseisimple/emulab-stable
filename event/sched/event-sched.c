@@ -1215,22 +1215,24 @@ get_static_events(event_handle_t handle)
 	tuple->expt = pideid;
 
 	event.agent.s = primary_simulator_agent->sa_local_agent.la_agent;
-	event.notification = event_notification_create(
-		handle,
-		EA_Experiment, pideid,
-		EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
-		EA_Event, TBDB_EVENTTYPE_LOG,
-		EA_Name, event.agent.s->name,
-		EA_Arguments, "Time started",
-		EA_TAG_DONE);
-	event.time.tv_sec = 0;
-	event.time.tv_usec = 1;
-	event.length = 1;
-	event.flags = SEF_SINGLE_HANDLER;
+	if (event.agent.s != NULL) {
+		// XXX emulab-ops experiments
+		event.notification = event_notification_create(
+			handle,
+			EA_Experiment, pideid,
+			EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
+			EA_Event, TBDB_EVENTTYPE_LOG,
+			EA_Name, event.agent.s->name,
+			EA_Arguments, "Time started",
+			EA_TAG_DONE);
+		event.time.tv_sec = 0;
+		event.time.tv_usec = 1;
+		event.length = 1;
+		event.flags = SEF_SINGLE_HANDLER;
 	
-	sched_event_prepare(handle, &event);
-	timeline_agent_append(ns_sequence, &event);
-
+		sched_event_prepare(handle, &event);
+		timeline_agent_append(ns_sequence, &event);
+	}
 	
 	/*
 	 * Generate a TIME starts message.

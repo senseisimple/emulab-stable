@@ -396,7 +396,7 @@ int main(int argc, char *argv[])
   if (pidfile)
     strcpy(buf, pidfile);
   else
-    sprintf(buf, "%s/progagent.pid", _PATH_VARRUN);
+    sprintf(buf, "%s/emcd.pid", _PATH_VARRUN);
   fp = fopen(buf, "w");
   if (fp != NULL) {
     fprintf(fp, "%d\n", getpid());
