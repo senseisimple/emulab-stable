@@ -71,7 +71,7 @@
 #define __XSTRING(x) __STRING(x)
 #endif
 
-#define USE_POSTURE_REG
+// #define USE_POSTURE_REG
 
 static event_handle_t handle;
 
