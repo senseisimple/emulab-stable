@@ -27,7 +27,7 @@
  * Desc: Dewarp the blobs (i.e. transform form image -> world cs)
  * Author: Andrew Howard
  * Date: 17 Apr 2002
- * CVS: $Id: dewarp.c,v 1.2 2005-05-10 15:25:16 johnsond Exp $
+ * CVS: $Id: dewarp.c,v 1.3 2005-06-13 14:32:40 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -144,16 +144,16 @@ void dewarp_update_trans()
   gsl_matrix *cov; double chi;
   gsl_multifit_linear_workspace *work;
   
-  a[0] = gsl_matrix_alloc(dewarp->def->points, 8);
-  x[0] = gsl_vector_alloc(8);
+  a[0] = gsl_matrix_alloc(dewarp->def->points, 10);
+  x[0] = gsl_vector_alloc(10);
   b[0] = gsl_vector_alloc(dewarp->def->points);
 
-  a[1] = gsl_matrix_alloc(dewarp->def->points, 8);
-  x[1] = gsl_vector_alloc(8);
+  a[1] = gsl_matrix_alloc(dewarp->def->points, 10);
+  x[1] = gsl_vector_alloc(10);
   b[1] = gsl_vector_alloc(dewarp->def->points);
 
-  cov = gsl_matrix_alloc(8, 8);
-  work = gsl_multifit_linear_alloc(dewarp->def->points, 8);
+  cov = gsl_matrix_alloc(10, 10);
+  work = gsl_multifit_linear_alloc(dewarp->def->points, 10);
   
   // Solve for the forward transform
   // image -> world
@@ -168,8 +168,10 @@ void dewarp_update_trans()
     gsl_matrix_set(a[0], i, 3, ii * ii);
     gsl_matrix_set(a[0], i, 4, jj * jj);
     gsl_matrix_set(a[0], i, 5, ii * jj);
-    gsl_matrix_set(a[0], i, 6, ii * fabs(ii));
-    gsl_matrix_set(a[0], i, 7, ii * jj * jj);
+    gsl_matrix_set(a[0], i, 6, ii * ii * ii);
+    gsl_matrix_set(a[0], i, 7, jj * jj * jj);
+    gsl_matrix_set(a[0], i, 8, ii * ii * jj);
+    gsl_matrix_set(a[0], i, 9, jj * jj * ii);
     gsl_vector_set(b[0], i, dewarp->def->wpos[i][0]);
 
     gsl_matrix_set(a[1], i, 0, 1);
@@ -178,8 +180,10 @@ void dewarp_update_trans()
     gsl_matrix_set(a[1], i, 3, jj * jj);
     gsl_matrix_set(a[1], i, 4, ii * ii);
     gsl_matrix_set(a[1], i, 5, jj * ii);
-    gsl_matrix_set(a[1], i, 6, jj * fabs(jj));
-    gsl_matrix_set(a[1], i, 7, jj * ii * ii);
+    gsl_matrix_set(a[1], i, 6, jj * jj * jj);
+    gsl_matrix_set(a[1], i, 7, ii * ii * ii);
+    gsl_matrix_set(a[1], i, 8, jj * jj * ii);
+    gsl_matrix_set(a[1], i, 9, ii * ii * jj);
     gsl_vector_set(b[1], i, dewarp->def->wpos[i][1]);
   }
 
@@ -188,7 +192,7 @@ void dewarp_update_trans()
   gsl_multifit_linear(a[1], b[1], x[1], cov, &chi, work);
   
   // Copy the new results back into the mmap
-  for (i = 0; i < 8; i++)
+  for (i = 0; i < 10; i++)
   {
     dewarp->def->iwtrans[0][i] = gsl_vector_get(x[0], i);
     dewarp->def->iwtrans[1][i] = gsl_vector_get(x[1], i);
@@ -207,8 +211,10 @@ void dewarp_update_trans()
     gsl_matrix_set(a[0], i, 3, xx * xx);
     gsl_matrix_set(a[0], i, 4, yy * yy);
     gsl_matrix_set(a[0], i, 5, xx * yy);
-    gsl_matrix_set(a[0], i, 6, xx * fabs(xx));
-    gsl_matrix_set(a[0], i, 7, xx * yy * yy);
+    gsl_matrix_set(a[0], i, 6, xx * xx * xx);
+    gsl_matrix_set(a[0], i, 7, yy * yy * yy);
+    gsl_matrix_set(a[0], i, 8, xx * xx * yy);
+    gsl_matrix_set(a[0], i, 9, yy * yy * xx);
     gsl_vector_set(b[0], i, dewarp->def->ipos[i][0]);
 
     gsl_matrix_set(a[1], i, 0, 1);
@@ -217,9 +223,12 @@ void dewarp_update_trans()
     gsl_matrix_set(a[1], i, 3, yy * yy);
     gsl_matrix_set(a[1], i, 4, xx * xx);
     gsl_matrix_set(a[1], i, 5, yy * xx);
-    gsl_matrix_set(a[1], i, 6, yy * fabs(yy));
-    gsl_matrix_set(a[1], i, 7, yy * xx * xx);
+    gsl_matrix_set(a[1], i, 6, yy * yy * yy);
+    gsl_matrix_set(a[1], i, 7, xx * xx * xx);
+    gsl_matrix_set(a[1], i, 8, yy * yy * xx);
+    gsl_matrix_set(a[1], i, 9, xx * xx * yy);
     gsl_vector_set(b[1], i, dewarp->def->ipos[i][1]);
+    
   }
   
   // Do the fit
@@ -227,7 +236,7 @@ void dewarp_update_trans()
   gsl_multifit_linear(a[1], b[1], x[1], cov, &chi, work);
 
   // Copy the new results back into the mmap
-  for (i = 0; i < 8; i++)
+  for (i = 0; i < 10; i++)
   {
     dewarp->def->witrans[0][i] = gsl_vector_get(x[0], i);
     dewarp->def->witrans[1][i] = gsl_vector_get(x[1], i);
@@ -260,12 +269,14 @@ void dewarp_image2world(double i, double j, double *x, double *y)
   *x = dewarp->def->iwtrans[0][0] + dewarp->def->iwtrans[0][1] * i +
     + dewarp->def->iwtrans[0][2] * j + dewarp->def->iwtrans[0][3] * i * i
     + dewarp->def->iwtrans[0][4] * j * j + dewarp->def->iwtrans[0][5] * i * j
-    + dewarp->def->iwtrans[0][6] * i * fabs(i) + dewarp->def->iwtrans[0][7] * i * j * j;
+    + dewarp->def->iwtrans[0][6] * i * i * i + dewarp->def->iwtrans[0][7] * j * j * j
+    + dewarp->def->iwtrans[0][8] * i * i * j + dewarp->def->iwtrans[0][9] * j * j * i;
 
   *y = dewarp->def->iwtrans[1][0] + dewarp->def->iwtrans[1][1] * j
     + dewarp->def->iwtrans[1][2] * i + dewarp->def->iwtrans[1][3] * j * j
     + dewarp->def->iwtrans[1][4] * i * i + dewarp->def->iwtrans[1][5] * j * i
-    + dewarp->def->iwtrans[1][6] * j * fabs(j) + dewarp->def->iwtrans[1][7] * j * i * i;
+    + dewarp->def->iwtrans[1][6] * j * j * j + dewarp->def->iwtrans[1][7] * i * i * i
+    + dewarp->def->iwtrans[1][8] * j * j * i + dewarp->def->iwtrans[1][9] * i * i * j;
 }
 
 

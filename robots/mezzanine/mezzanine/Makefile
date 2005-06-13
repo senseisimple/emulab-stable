@@ -2,14 +2,21 @@
 # Desc: Makefile for Mezzanine
 # Author: Andrew Howard
 # Date: 21 Mar 2001
-# CVS: $Id: Makefile,v 1.2 2004-12-15 05:06:17 johnsond Exp $
+# CVS: $Id: Makefile,v 1.3 2005-06-13 14:32:40 stack Exp $
 # Notes:
 # - Requires the gtk+ 1.2.X library (gui toolkit), which is pretty standard.
 # - Requires the gsl library (Gnu Scientific Library) which is in most
 #   Linux distros.  You can also get it at http://sources.redhat.com/gsl
 ###########################################################################
 
-include ../Makefile.opt
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= robots/mezzanine/mezzanine
+
+include $(OBJDIR)/Makeconf
+
+VERSION=0.00-emulab
 
 .SUFFIXES: .c .o
 
@@ -37,6 +44,8 @@ MAKEDEP = makedepend
 ###########################################################################
 
 all: $(EXE)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
 
 $(EXE) : $(OBS)
 	$(LINKER) $(OBS) $(LFLAGS) -o $(EXE)
