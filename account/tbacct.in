@@ -41,6 +41,7 @@ my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
+my $PROTOUSER   = 'elabman';
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
 my $SMBPASSWD	= "/usr/local/bin/smbpasswd";
@@ -350,7 +351,7 @@ sub AddUser()
 
     # And to the wiki if enabled.
     system("$ADDWIKIUSER $user")
-	if ($WIKISUPPORT && !$batch);
+	if ($WIKISUPPORT && !$batch && $user ne $PROTOUSER);
 
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
@@ -446,6 +447,7 @@ sub UpdatePassword()
 {
     # shell escape.
     $pswd     =~ s/\$/\\\$/g;
+    $pswd     =~ s/\*/\\\*/g;
 
     #
     # Check status. Ignore if user is not active.
@@ -468,7 +470,7 @@ sub UpdatePassword()
     $EUID = $UID;
     # And to the wiki if enabled.
     system("$ADDWIKIUSER -u $user")
-	if ($WIKISUPPORT);
+	if ($WIKISUPPORT && $user ne $PROTOUSER);
     $EUID = 0;
     
     return 0;
@@ -525,7 +527,7 @@ sub UpdateUser(;$)
     }
 
     # Shell is different on local vs control node.
-    if (defined($freezeopt) && $freezeopt) {
+    if ((defined($freezeopt) && $freezeopt) || $user eq $PROTOUSER) {
 	$locshellarg = "-s $NOLOGIN";
 	$remshellarg = "-s $NOLOGIN";
     }
