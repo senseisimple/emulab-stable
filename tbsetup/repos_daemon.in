@@ -127,13 +127,10 @@ print "Repositioning Daemon starting... pid $$, at ".`date`;
 
 # XXX Need to get an emulab-ops user to run the event system as.
 $query_result = 
-    DBQueryFatal("select u.unix_uid from group_membership as gm ".
-		 "left join users as u on u.uid=gm.uid ".
-		 "where gm.pid='$REPOSPID' and gm.gid='$REPOSPID' and ".
-		 "gm.uid!='elabman'");
+    DBQueryFatal("select unix_uid from users where uid='elabman'");
 
 if (! $query_result || $query_result->numrows == 0) {
-    fatal("Cannot get experiment head for $REPOSEID\n");
+    fatal("Cannot get elabman uid\n");
 }
 
 my ($ev_uid) = $query_result->fetchrow;
@@ -172,8 +169,11 @@ MAINLOOP: while (1) {
     #
     $query_result =
 	DBQueryWarn("select r.node_id,rs.attempts from reserved as r " .
+		    "left join nodes as n on n.node_id=r.node_id ".
 		    "left join reposition_status as rs on rs.node_id=r.node_id ".
 		    "where pid='$REPOSPID' and eid='$REPOSEID' and " .
+		    "(n.destination_x is not NULL or ".
+		    "n.destination_y is not NULL) and ".
 		    "(CURRENT_TIMESTAMP - INTERVAL $retry_time MINUTE)".
 		    "  > rsrv_time");
 
