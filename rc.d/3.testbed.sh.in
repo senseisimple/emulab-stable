@@ -71,6 +71,11 @@ case "$1" in
 			@prefix@/sbin/reload_daemon
 		fi
 
+		if [ -x @prefix@/sbin/repos_daemon  ]; then
+			echo -n " reposd"
+			@prefix@/sbin/repos_daemon
+		fi
+
 		if [ -x @prefix@/sbin/robomonitord  ]; then
 			echo -n " robomonitord"
 			@prefix@/sbin/robomonitord
