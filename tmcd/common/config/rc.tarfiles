@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -108,8 +108,11 @@ sub doboot()
     # to get the file via NFS, but avoid the stupid changing-exports-file
     # server race (install-tarfile knows how to deal with said race).
     # Remote nodes get the tarfile via the network (-t) option.
+    #
+    # Note: Windows also uses the -t option since root does not have access
+    # to NFS mounted FSes.
     # 
-    my $installoption = (REMOTE() ? "-t" : "-c");
+    my $installoption = ((REMOTE() || WINDOWS()) ? "-t" : "-c");
 
     foreach my $tarball (@tarballs) {
 	if ($tarball =~ /DIR=(.+)\s+TARBALL=(.+)/) {
