@@ -458,7 +458,7 @@ sub GetMD5($)
     my ($file) = @_;
     my $md5;
 
-    if ($OSNAME eq "linux") {
+    if ($OSNAME eq "linux" || $OSNAME eq "cygwin") {
 	$md5 = `md5sum $file`;
     
 	if ($md5 =~ /^([\w]*)\s*.*$/) {
