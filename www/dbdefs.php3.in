@@ -1996,6 +1996,31 @@ function TBSetFirstInitPid($pid)
 }
 
 #
+# Get the build and source version numbers, as for the banner.
+#
+function TBGetVersionInfo(&$major, &$minor, &$build)
+{
+    $query_result = 
+	DBQueryFatal("select name,value from sitevariables ".
+		     "where name='general/version/major' or ".
+		     "      name='general/version/minor' or ".
+		     "      name='general/version/build'");
+
+    while (($row = mysql_fetch_row($query_result))) {
+	$name  = $row[0];
+	$value = $row[1];
+
+	if ($name == "general/version/major")
+	    $major = $value;
+	elseif ($name == "general/version/minor")
+	    $minor = $value;
+	elseif ($name == "general/version/build")
+	    $build = $value;
+    }
+    return 1;
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
