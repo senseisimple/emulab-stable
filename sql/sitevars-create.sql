@@ -57,3 +57,6 @@ INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir',NULL,'','Path from w
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg',NULL,'','Name of ops node install package');
 INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir',NULL,'','Path from which to fetch ops packages');
 INSERT INTO sitevariables VALUES ('elabinelab/windows',NULL,'0','Turn on Windows support in inner Emulab');
+INSERT INTO sitevariables VALUES ('general/version/major',NULL,'','Source code major revision number');
+INSERT INTO sitevariables VALUES ('general/version/minor',NULL,'','Source code minor revision number');
+INSERT INTO sitevariables VALUES ('general/version/build',NULL,'','Build version number');
