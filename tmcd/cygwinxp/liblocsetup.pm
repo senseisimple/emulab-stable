@@ -118,7 +118,7 @@ sub os_account_cleanup()
     # directory as truth.
     if (opendir(DIRHANDLE, "/users")) {
 	while ($name = readdir(DIRHANDLE)) {
-	    if ($name =~ m/^\.+/) {
+	    if ($name =~ m/^\.+/ || $name =~ m/^Administrator$/) {
 		next;
 	    }
 	    print "Removing user: $name\n";
@@ -127,15 +127,17 @@ sub os_account_cleanup()
 	    mysystem("$NET user $name /delete > /dev/null");
 
 	    # There will only be an NT homedir if the user has logged in sometime.
-	    mysystem("$CHOWN -Rf root C:/'Documents and Settings'/$name");
-	    mysystem("$RM -rf C:/'Documents and Settings'/$name");
+	    system("$CHMOD -R 777 C:/'Documents and Settings'/$name");
+	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name");
+	    system("$RM -rf C:/'Documents and Settings'/$name");
 	    # It sometimes also makes user.PCnnn, user.PCnnn.000, etc.
-	    mysystem("$CHOWN -Rf root C:/'Documents and Settings'/$name.*");
-	    mysystem("$RM -rf C:/'Documents and Settings'/$name.*");
+	    system("$CHMOD -R 777 C:/'Documents and Settings'/$name.*");
+	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name.*");
+	    system("$RM -rf C:/'Documents and Settings'/$name.*");
 
 	    # Unmount the homedir so we can get to the mount point.
-	    mysystem("$UMOUNT /users/$name");
-	    mysystem("$RMDIR /users/$name");
+	    system("$UMOUNT /users/$name");
+	    system("$RMDIR /users/$name");
 	}
 	closedir(DIRHANDLE);
 
@@ -150,6 +152,9 @@ sub os_account_cleanup()
 		next;
 	    }
 
+	    # Open up an existing key dir to the root user.  Even though root
+	    # is in the Administrators group, it's locked out by permissions.
+	    mysystem("$CHMOD 777 /sshkeys/$name");
 	    mysystem("$CHOWN -Rf root /sshkeys/$name");
 	    mysystem("$RM -rf /sshkeys/$name");
 	}

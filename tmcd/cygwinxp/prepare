@@ -67,6 +67,8 @@ foreach my $dbfile (@DBFILES) {
 # Stop anything holding a logfile open which we will want to remove below.
 print "Stopping the watchdog ...\n";
 system("$BINDIR/watchdog stop");
+print "Stopping the program-agent ...\n";
+system("$BINDIR/rc/rc.progagent shutdown");
 
 print "Cleaning logfiles ...\n";
 opendir(LOG,$LOGDIR) or
@@ -82,7 +84,9 @@ while ($dirent = readdir(LOG)) {
         } elsif (-s $file) {
             # Truncate other logfiles - many do not get re-created
             truncate($file,0) or
-                die("Could not truncate $file: $!");
+		system("chown root $file") and system("chmod 666 $file") 
+		    and truncate($file,0) or
+			warn("Could not truncate $file: $!");
         }
     }
 }
@@ -123,6 +127,7 @@ print "Clearing out $RUNDIR ...\n";
 system("rm -rf $RUNDIR/*.pid");
 
 print "Clearing out /tmp ...\n";
+system("chmod -R 777 /tmp/* /tmp/.??*");
 system("chown -R root /tmp");
 system("rm -rf /tmp/* /tmp/.??*");
 

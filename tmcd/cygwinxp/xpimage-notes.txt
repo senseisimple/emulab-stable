@@ -1,0 +1,590 @@
+# Directions for setting up an XP image from scratch.
+# These are raw notes and commands to paste into a shell on Windows.
+# Further-indented stuff is optional, for checking or debugging.
+# Some (most?) of it could be scriptified with some work. 
+
+alias v 'ls -lsF'		# "Verbose" listing
+setenv en emulab.net
+alias rootpc 'sudo ssh pc\!^.$en \!:2*'
+
+    . Start with a clean XP image, without all of the freight from Russ C's work.
+
+      - Swap in experiment Windows-1-base, log in as Administrator.
+
+      - Set the Windows "w32time" NTP client to connect to the Emulab NTP host.
+
+         . Runs as a service, periodically contacts the time server.
+	   Need to restart w32time before it sees the setsntp configuration. (?)
+	     net time /querysntp
+	     net stop w32time
+	     net time /setsntp:ntp1
+	     net time /querysntp
+	     net start w32time
+	     # May take a couple of minutes to take effect.
+	     date
+	     
+        . Need an NTP client, or at least the semblence of one.
+            cat /etc/ntp.drift
+          echo 0.000 > /etc/ntp.drift
+
+      - Set the workgroup name to EMULAB in Control Panel/System/Computer Name/Change...
+        No need to reboot yet.
+
+      - Make a "root" account in Control Panel/Administrative Tools/Computer Management/
+        System Tools/Local Users and Groups/Users, put it in the Administrators and Users groups.
+
+	. Also go into Services and Applications/Services and stop SSDP Discovery Service
+	  and Remote Registry.  Go into their Properties/Startup type and disable them as well.
+
+	. While you're there, Right-click Start/"Explore All Users" and copy the Computer Management
+	  shortcut to the All Users/Desktop folder.
+
+      - Start IE, make "blank" the home page. Click Tools/Internet Options/Home page/Use Blank.
+
+      - Show My Computer.  (Desktop Properties/Desktop/Customize Desktop...)
+        Turn off "Run Desktop Cleanup Wizard every 60 days".
+
+      - Create C:/Temp, C:/Software/CygWin
+      - Install CygWin
+        . Download setup from www.cygwin.com/setup.exe to C:/Software/CygWin (in /share/windows, too.)
+	. Run it.  Install dir is C:\cygwin, package dir is C:\Software\CygWin .
+	. Mirror is http://mirrors.xmission.com .
+	. Click [View] to "Not Installed" (alphabetical.)  
+	  Click on the Skip in the "New" column to add a binary version of:
+	    agetty, bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, make, minires-devel, nano,
+	    openssh, openssl-devel, patch, perl, perl-libwin32, python, rpm, rpm-build,
+	    rsync, shutdown, tcsh, vim, wget, zip .
+	. Don't "Create an icon on the Desktop", do "Add icon to Start Menu".
+
+	. Add ;C:\cygwin\bin to the end of the System PATH in 
+	  Control Panel/System/Advanced/Environment Variables.
+
+	. Start up a Cygwin shell and fix the shell properties:
+	    Options QuickEdit Mode on, Layout/screen buffer height 3000, window height 55.
+	    Check "Modify shortcut that started this window".
+	  - Might as well fix the Start/Programs/Accessories/Command Prompt properties, too.
+	  - Copy the bash shortcut to the All Users/Desktop.  
+ 	  - Copy it to a tcsh icon as well, changing the path to c:\cygin\cygwin-tcsh.bat .
+	  - Copy the tcsh icon into All Users/Start Menu/Programs/Cygwin.
+	  - Create c:\cygin\cygwin-tcsh.bat as a copy of c:\cygin\cygwin.bat with
+	      bash --login -i
+	    changed to
+	      tcsh -l
+
+	. Set up local homedirs under /home as a symlink.  ~root is already there.
+	    cd /tmp
+	    mv /home{,.orig}
+	    ln -s /cygdrive/c/Documents\ and\ Settings/ /home
+
+	. Create a proper group file.  Make wheel an alias for Administrators.
+            mkgroup -l | \
+              awk '/^Administrators:/{print "wheel" substr($0, index($0,":"))} \
+            	   {print}' > /etc/group.new
+            diff /etc/group{,.new}
+            cp -p /etc/group{,.prev}
+            mv /etc/group{.new,}
+
+        . Update the passwd file after creating new accounts.  Make root uid 0 with /home/root.
+            mkpasswd -l | awk -F: 'BEGIN{ OFS=":" } \
+               { if ($1=="root") $3="0"; else sub("/home/", "/users/"); print }' > /etc/passwd.new
+            diff /etc/passwd{,.new}
+            cp -p /etc/passwd{,.prev}
+            cp -p /etc/passwd{.new,}
+	    chown root /etc/{passwd,group}*
+
+        . Set up sshd.  
+	  - Edit /bin/ssh-host-config to add a -i argument to the "cygrunsrv -I sshd" lines.
+	      ed /bin/ssh-host-config
+	      /cygrunsrv -I sshd/s//& -i/p
+	      /cygrunsrv -I sshd/s//& -i/p
+	      w
+	      q
+          - Then start a cygwin shell and say:
+	      ssh-host-config -y -c "ntsec tty"
+	    or run ssh-host-config and answer the following interactive questions:
+	      Select privilege separation = yes, sshd user = yes, install as service = yes, 
+		CYGWIN=ntsec tty
+	  - Check for -i flag: look for Interactive = 0x00000001 (1)
+	      regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/sshd/Parameters
+
+	  - Edit /etc/sshd_config
+	    . Add this line: AuthorizedKeysFile /sshkeys/%u/authorized_keys
+	        ed /etc/sshd_config
+		/AuthorizedKeysFile
+		a
+AuthorizedKeysFile /sshkeys/%u/authorized_keys
+.
+w
+q
+	    . LogLevel defaults to INFO, can be set to VERBOSE, DEBUG1, etc.
+	      Debug events are logged under Event View / Application / sshd,
+	      One line per event (ugh.)  Refresh to see new events with F5.
+	        ls -l /etc/sshd_config
+	      # Check.
+              grep LogLevel /etc/sshd_config
+	      chmod g+w /etc/sshd_config
+	      nano /etc/sshd_config
+	      chmod g-w /etc/sshd_config
+	        kill -HUP `cat /var/run/sshd.pid`
+
+	  - Start sshd.
+	      cygrunsrv -S sshd
+
+          - Set up for root ssh access from Boss.
+            chown root.wheel /home/root
+	    chmod 755 /home/root
+	    passwd root
+daFluxGroup
+daFluxGroup
+	    mkdir ~root/.ssh
+	    chown root.wheel ~root/.ssh
+	    # On boss.
+	    set pc=73
+	    set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
+	    eval sudo ssh "$ssh_args" root@pc$pc id
+daFluxGroup
+	    eval sudo scp "$ssh_args" ~root/.ssh/{id_dsa,identity}.pub root@pc$pc":".ssh
+daFluxGroup
+	    eval sudo ssh "$ssh_args" root@pc$pc
+daFluxGroup
+	    # On the target.
+	      id
+	      cd ~root/.ssh
+	      cat {id_dsa,identity}.pub > authorized_keys
+	      chmod 644 *
+	      ls -ld /home /home/root /home/root/.ssh /home/root/.ssh/auth*
+	      mkdir -p /sshkeys/root
+	      v -d /sshkeys
+	      chmod 700 /sshkeys/root
+	      cp -p /home/root/.ssh/authorized_keys /sshkeys/root
+	      ls -lR /sshkeys/root
+	      exit
+	    # Check back on Boss.
+    	    eval sudo ssh "$ssh_args" pc$pc id
+	    # The following will likely complain due to nonstandard host keys.
+	    rootpc $pc id
+
+	  - Install the standard host keys, dated Jun 21  2001.
+	    ls -l /etc/ssh*
+	    # On boss.
+	    set pc=73
+	    set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
+	    eval sudo scp -rp "$ssh_args" /proj/testbed/fish/elab-host-keys root@pc$pc":"
+
+	    eval sudo ssh "$ssh_args" root@pc$pc
+	    # On the target.
+              ls -l ~/elab-host-keys
+              ls -l /etc/ssh*key*
+              ls -l /etc/orig-ssh-keys
+
+              mkdir /etc/orig-ssh-keys
+              chown root /etc/ssh*key*
+              cp -p /etc/ssh*key* /etc/orig-ssh-keys
+              chown SYSTEM /etc/orig-ssh-keys/*
+              ls -l /etc/orig-ssh-keys
+
+              cp -p ~/elab-host-keys/* /etc
+              chown SYSTEM /etc/ssh*key*
+              ls -l /etc/ssh*key*
+
+	    # The following should no longer complain due to nonstandard host keys.
+	    rootpc $pc id
+
+      - Install tools: WinZip and Emacs.
+              # On boss:
+	      sudo scp -rp /share/windows/emacs-21.3-fullbin-i386.tar.gz root@pc$pc":"/tmp
+	      sudo scp -rp /share/windows/winzip90.exe root@pc$pc":"/tmp
+
+	    # Log in as root via RDP.
+	    # Graphical installer.  Start with WinZip Classic, custon setup, no desktop icon.
+	    /tmp/winzip90.exe
+
+	    cd C:
+	    # Don't worry about a plethora of "Cannot change ownership" warnings.
+	    tar xfz /tmp/emacs-21.3-fullbin-i386.tar.gz
+	    # Graphical, set up the registry, start menu, etc.
+	      C:/emacs-21.3/bin/addpm.exe
+	      Copy the Emacs shortcut to the All Users/Desktop folder.
+	    # Make "emacs" be the NTEmacs runemacs starter, with "emacs-exe" for a compiler.
+	    ln -s /cygdrive/c/emacs-21.3/bin/runemacs.exe /usr/local/bin/emacs
+	    ln -s /cygdrive/c/emacs-21.3/bin/emacs.exe /usr/local/bin/emacs-exe
+
+      - Get other stuff that "make client" depends on.
+	        # Include files for mysql and the Boost Graph Library.
+	        cd $uli
+	        tar cfz /share/windows/mysql-include.tgz mysql
+	        tar cfz /share/windows/boost-include.tgz boost
+	    # On Boss.
+	    sudo scp -rp /share/windows/{mysql,boost}-include.tgz root@pc$pc":"/tmp
+	    sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx}.exe root@pc$pc":"/tmp
+	    # On the target.
+	    uli=/usr/local/include
+	    mkdir $uli
+	    cd $uli
+	    tar xfz /tmp/mysql-include.tgz
+	    tar xfz /tmp/boost-include.tgz
+
+	    # Build Elvin libs with GCC for testbed client programs.  
+	      sudo scp -p /usr/testbed/www/distributions/*elvin*-4.0.3.tar.gz root@pc$pc":"/tmp
+	    # (Need a path without embedded spaces for the make actions to work.)
+	    mkdir C:/elvin
+	    cd C:/elvin
+	    # Don't worry about a plethora of "Cannot change ownership" warnings.
+	    tar xfz /tmp/libelvin-4.0.3.tar.gz
+	    tar xfz /tmp/elvind-4.0.3.tar.gz
+
+	    cd C:/elvin/libelvin-4.0.3
+	      # configure: error: Elvin requires that doubles be IEEE 754 compliant
+	      # On XP w/ no SP's, edit configure, line 3547, add exit(0); to patch around it.
+	    ./configure >& configure.trace 
+	      tail configure.trace
+
+	    # Comment out #elif defined(HAVE_WINBASE_H)
+			      FreeLibrary(cat);
+	      in c:/elvin/libelvin-4.0.3/src/lib/i18n.c
+	    make >& make.log1
+	      tail make.log1
+	    make install >& install.log1
+	      tail install.log1
+	      make clean
+
+SKIP[
+	    # Build Elvin for Windows on Coke, and tar it up for later installation.
+	    scp -p bos:"/usr/testbed/www/distributions/*elvin*-4.0.3.tar.gz" /tmp
+	    mkdir C:/elvin
+	    cd C:/elvin
+	    tar xfz /tmp/libelvin-4.0.3.tar.gz
+	    tar xfz /tmp/elvind-4.0.3.tar.gz
+	    # Rename lib dir for makefiles in elvind.
+	    mv libelvin-4.0.3 elvin4
+
+	    cd C:/elvin/elvin4
+	    nmake /k /f Makefile.win >& lib-make.winlog1
+	    mkdir -p C:/Program\ Files/elvin4/{bin,lib,doc}
+	    cp -p win32/bin/*.exe C:/Program\ Files/elvin4/bin
+	    cp -p win32/lib/{,*/}*.{dll,lib} C:/Program\ Files/elvin4/lib
+	    mkdir C:/Program\ Files/elvin4/include
+	    cp -p src/include/elvin/*.h C:/Program\ Files/elvin4/include
+
+	    cd C:/elvin/elvind-4.0.3	    
+	    nmake /k /f Makefile.win >& program-make.winlog1
+	    cp -p *.exe *.pem C:/Program\ Files/elvin4/bin
+	    cp -p [A-Z][A-Z]* C:/Program\ Files/elvin4/doc
+	      scp -p ../*/*.winlog* ops:/proj/testbed/fish/elvin
+	    scp -p ops:/proj/testbed/fish/elvin-config /cygdrive/c/Program\ Files/elvin4/bin
+
+	    # Install dll's in the system so the server can be run.
+	    v C:/Program\ Files/elvin4/lib
+	    chmod -R g-w C:/Program\ Files/elvin4
+	    chmod a+x C:/Program\ Files/elvin4/lib/*
+	    cp -p C:/Program\ Files/elvin4/lib/* $nts
+
+	    elvin="C:/Program Files/elvin4/bin/elvinsvc.exe"
+	      v "$elvin"
+	    "$elvin" --help
+	    # Application Error - The application failed to initialize properly (0xc0000022).
+
+	    tar cfz /tmp/elvin4-windows.tar.gz -C /cygdrive/c Program\ Files/elvin4
+	    scp -p /tmp/elvin4-windows.tar.gz ops:/share/windows
+SKIP]
+
+	    # Install the Windows Elvin, built on Coke above.
+	    # On Boss.
+	    sudo scp -p /share/windows/elvin4-windows.tar.gz root@pc$pc":"/tmp
+	    sudo scp -p /share/windows/elvind.conf.windows root@pc$pc":"/tmp/elvind.conf
+
+	    # On the experiment node as root (Bash shell):
+	    rootpc $pc
+	      cd C:
+		ls -ld Program\ Files/elvin*
+	      tar xvfz /tmp/elvin4-windows.tar.gz
+	      chown -R root Program\ Files/elvin4
+	      cp -p C:/Program\ Files/elvin4/lib/* C:/WINDOWS/system32
+	      cp -p C:/Program\ Files/elvin4/lib/* /usr/local/lib
+		diff /usr/local/etc/elvind_ssl.pem C:/Program\ Files/elvin4/bin/elvind_ssl.pem
+	      cp -p C:/Program\ Files/elvin4/bin/elvind_ssl.pem /usr/local/etc/elvind_ssl.pem
+
+	      elvind="C:/Program Files/elvin4"
+	      elvin="$elvind/bin/elvinsvc.exe"
+		ls -l "$elvind/bin"
+	      chmod -R g-w "C:/Program Files/elvin4"
+	        "$elvin" --help &
+	      # Install as a service.
+	      "$elvin" -r
+	      # Install a config file and set the path for the server.
+	        diff /usr/local/etc/elvind.conf /tmp/elvind.conf
+	      cp /tmp/elvind.conf /usr/local/etc/elvind.conf
+	        ls -l /usr/local/etc/elvind.conf
+	      "$elvin" -c `cygpath -w /usr/local/etc/elvind.conf`
+		  ## Testing: start elvinsvc from the Services Manager now.
+              # Make elvinsvc automatic in services manager.
+
+		  ## Remove "&& ! WINDOWS()" from $ftcc/rc.bootsetup.
+		  pid=testbed eid=Windows-1
+		  $BINDIR/evproxy -s event-server -e $pid/$eid
+
+		  ## Uncomment rc.progagent in $ftcc/rc.config
+		    ps -Welf | grep program-agent
+		    $rc/rc.progagent shutdown
+		  $rc/rc.progagent boot
+		    tail $LOGDIR/progagent.debug
+		    # Could not become user: fish
+		    # setuid(pw->pw_uid) $ftep/program-agent.c:560.
+		    program-agent -d -e $pid/$eid -s localhost -c /var/emulab/boot/progagents
+
+              # Root must have these rights: Create a token object; Replace a
+              # process level token; and Increase Quota rights.
+              # http://cygwin.com/cygwin-ug-net/ntsec.html#ntsec-switch,
+              # http://msdn.microsoft.com/library/en-us/secauthz/security/authorization_constants.asp
+              editrights -u root -l
+              editrights -u root -a SeCreateTokenPrivilege -l
+              editrights -u root -a SeAssignPrimaryTokenPrivilege -l
+              editrights -u root -a SeIncreaseQuotaPrivilege -l
+
+              # C:\cygwin\bin\tcsh.exe (2504): *** couldn't create window, Win32 error 5
+              # See http://comments.gmane.org/gmane.os.cygwin.patches/2559
+              # This is at cygwin-1.5.17-1-winsup/cygwin/window.cc:wininfo::winthread():96
+              # Try starting rc.progagent as a separate service with -i for a desktop.
+                cygrunsrv -R ProgAgent
+              cygrunsrv -I ProgAgent -d "Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
+                --dep elvinsvc.exe \
+                -a "--norc --noprofile -c '/usr/local/etc/emulab/rc/rc.progagent >& /var/log/progagent.log'"
+		  regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/ProgAgent/Parameters
+                  cygrunsrv -Q ProgAgent
+                  cygrunsrv -S ProgAgent
+                  cygrunsrv -E ProgAgent
+
+		  tail /var/log/{progagent,ProgAgent}.log
+		touch /var/log/{progagent,ProgAgent}.log
+		chmod 777 /var/log/{progagent,ProgAgent}.log
+
+
+		# Little problem: "Must be root to run this script!"
+		# Add this: 
+		  # This runs as a separate Local System service on XP.  Change to root.
+		  if (WINDOWS()) { $EUID = $UID = 0; }
+
+		# Testing on ops.
+		tevc -e testbed/bsd-1 now prog0 start
+		tevc -e testbed/bsd-1 now prog0 start COMMAND='hostname >>& /users/fish/test.out'
+
+		tevc -e testbed/Windows-1 now prog0 start COMMAND='hostname>>&/users/fish/test.out'
+		  v /users/fish/test.out
+		  tail /users/fish/test.out
+		tevc -e testbed/Windows-1 now prog0 run COMMAND='touch /tmp/foo'
+		tevc -e testbed/Windows-1 now prog0 run COMMAND='id'
+		tevc -e testbed/Windows-1 now prog0 run COMMAND='ls -l /users/fish'
+		tevc -e testbed/Windows-1 now prog0 run COMMAND='ls -l /proj/testbed/fish'
+
+		# On the node.
+		cat /local/logs/prog0.status
+		cat /local/logs/prog0.err
+		cat /local/logs/prog0.out
+	      
+
+      - Get the testbed client code via CVS, build, and install it.
+            rootpc $pc
+	    # Start an agent and go get my Ops, Boss and Flux DSA/Bas(CVS) keys.
+	    eval `ssh-agent -s`
+	      ssh-add -l
+	    ssh -A fish@kzin.flux.utah.edu
+	      ssh-add -l
+	    kops
+	    kbos
+	    kdsa
+	    exit
+	      ssh -v fish@cvs.flux.utah.edu id
+
+	      mkdir ~/flux
+	    cd ~/flux
+	      mkdir CVS; touch CVS/Entries; echo . > CVS/Repository
+	    export CVSROOT=fish@cvs.flux.utah.edu:/usr/flux/CVS CVS_RSH=ssh
+	      cat CVS/Entries
+	    # The first time
+	    cvs co testbed
+	      # After that.
+	        cvs -n -q update testbed
+	      cvs -Q update -d testbed
+
+            # Some dotfiles for Root.
+            cp -p testbed/tmcd/cygwinxp/cygwin.root.bashrc ~root/.bashrc
+            cp -p testbed/tmcd/cygwinxp/cygwin.root.bash_profile ~root/.bash_profile
+            cp -p testbed/tmcd/cygwinxp/cygwin.root.emacs ~root/.emacs
+	    # No HOME envar set for root desktop, Emacs defaults it to C:/ .
+            cp -p ~root/.emacs C:/.emacs
+
+	    # Site-lisp files for Emacs.
+	    cp -rp testbed/tmcd/cygwinxp/site-lisp/* c:/emacs-21.3/site-lisp
+	    ls -l c:/emacs-21.3/site-lisp
+
+	    # Need a resolv.conf before tmcc will work.
+	      cat /etc/resolv.conf
+	    cp -p ~/flux/testbed/tmcd/cygwinxp/resolv.conf /etc/resolv.conf
+	     
+>>	    # Back-rev program_agent.c until I fix Tim's new additions for Cygwin.
+	    cvs update -r 1.11 testbed/event/program-agent/program-agent.c
+	    mkdir /usr/local/man/man8
+	      
+	      ls -l ~/flux/testbed/tmcd/cygwinxp/*.exe
+	      # On boss:
+	      sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx}.exe root@pc$pc":"/tmp
+	    # Back on the client:
+	    cp -p /tmp/{WSName,addusers,usrtogrp,setx}.exe ~/flux/testbed/tmcd/cygwinxp
+
+	      mkdir ~/flux/obj-real
+	    cd ~/flux/obj-real
+	      mv configure.trace{,.1}
+	    ../testbed/configure --enable-windows --enable-windowsclient >& configure.trace
+	      tail configure.trace
+	    make client-install >& make.log1
+	      tail make.log1
+	    # First make fails with "Cannot change ownership" warnings unpacking tg2.0 .
+	    # Patch it explicitly, since the patch action gets skipped.
+	    (cd ~/flux/testbed/event/trafgen; patch -p0 < tg.patch)
+	    make client-install >& make.log2
+	      tail make.log2
+	        # Only needed if there are problems...
+	        make client-install >& make.log3
+	        make -k client-install >& make.log4
+	        make -k client-install >& make.log5
+	        make client-install >& make.log6
+	        make client-install >& make.log7
+	        make client-install >& make.log8
+	        make client-install >& make.log9
+
+      . Patch the /etc/profile file to use /home dirs if the /users mounts are down.
+        Remember that /etc/profile may get stepped on when you upgrade CygWin!
+          diff /etc/profile ~/flux/testbed/tmcd/cygwinxp
+	    (cd ~/flux; cvs update testbed/tmcd/cygwinxp/profile)
+          cp ~/flux/testbed/tmcd/cygwinxp/profile /etc
+
+      . Set up the tbshutdown script to run as a service, to get a shutdown signal.
+	    editrights -u root -l
+	  editrights -u root -a SeServiceLogonRight -l
+	  # Don't forget to set the root password to this.
+	  rootpwd='daFluxGroup'
+	      ###cygrunsrv -R EmulabShutdown
+          # EmulabShutdown is started manually later on from rc.cygwinxp .
+	  echo "$rootpwd"
+            cygrunsrv -R EmulabShutdown
+          cygrunsrv -I EmulabShutdown -u root -w "$rootpwd" -p /cygdrive/c/cygwin/bin/bash \
+              --shutdown --type manual \
+              -a "--norc --noprofile -c '/usr/local/etc/emulab/tbshutdown'"
+
+	  ##cygrunsrv: Error installing a service: CreateService:  Win32 error 1057:
+	  ##The account name is invalid or does not exist, or the password is invalid 
+	  ##for the account name specified.
+	  # If you see this, try running rc.accounts or rc.bootsetup below to clear it up.
+
+	  touch /var/log/EmulabShutdown.log
+	  chmod 666 /var/log/EmulabShutdown.log
+	  regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabShutdown/Parameters
+          cygrunsrv -Q EmulabShutdown
+          cygrunsrv -S EmulabShutdown
+
+      . See if rc.bootsetup works.
+	  ##Running os dependent initialization script rc.cygwin
+	  ##chmod: cannot access `/var/log/EmulabStartup.log': No such file or directory
+	  ##chmod: cannot access `/etc/emulab/iscygwin': No such file or directory
+          touch /var/log/EmulabStartup.log
+          chmod 666 /var/log/EmulabStartup.log
+	    tmcc nodeid
+	      # Missing /etc/resolv.conf .
+	      tmcc -d nodeid
+		    nodeid 
+		    /usr/local/etc/emulab/tmcc.bin  -d nodeid 
+		    Connection to TMCD refused. Waiting ...
+            # Should reboot, the first time.
+            $rc/rc.cygwin
+	  v -d /sshkeys
+	  mkdir /sshkeys
+          chmod 777 /sshkeys
+	    $rc/rc.accounts
+          $rc/rc.bootsetup
+
+      . Set up the boot script to run as a service.
+
+	  # Better: with dependency on Elvin and running rc.cygwin separately first.
+	      cygrunsrv -R EmulabStartup 
+
+          cygrunsrv -I EmulabStartup -u root -w $rootpwd -p /cygdrive/c/cygwin/bin/bash \
+           --dep elvinsvc.exe \
+           -a "--norc --noprofile -c '/usr/local/etc/emulab/rc/rc.cygwin; /usr/local/etc/emulab/rc/rc.bootsetup >& /var/log/bootsetup.log'"
+
+	      cygrunsrv -Q EmulabStartup 
+	    cygrunsrv -S EmulabStartup 
+	    cygrunsrv --help
+	  regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabStartup/Parameters
+	  sc query EmulabStartup
+
+      . Make a $HOME envar for everybody so Emacs works on startup.
+   	- Set a user environment variable: HOME = /users/%USERNAME%
+   	- Stored in HKCU/Environment, which is HKU/*/Environment based on the user SIDs.
+   	- The user registry key (folder) is created at first login, doesn't exist before that.
+   	  Run setx after that at login time to set the HOME environment variable value.
+	        # Check.
+	        regtool get /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME
+	  # Use the Windows command prompt rather than a script.
+          regtool -s set /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME \
+            'cmd /C "if not %USERNAME% == root if not %USERNAME% == Administrator setx HOME //fs/%USERNAME%"'
+	        # Undo.
+	        regtool unset /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME
+ 	  # Check that setx.exe is in system32.
+          v C:/WINDOWS/system32/setx.exe
+
+================================================================
+Making images
+
+     . Run prepare to clear out experiment-specific state.
+	rootpc $pc
+	  # Ignore complaints about all of the C:/Documents and Settings directories
+	  # that were never created because the user didn't log in...
+	  prepare
+	  exit
+
+    . Add an entry at the beginning of xpimage-log.txt, and create the image descriptor.
+
+    . Capture the image with imagezip.  (How come wap create_image doesn't work?)
+        # On boss.
+	set pc=73
+	set image=SP0
+	df /proj/testbed/images /usr/testbed/images
+	  # Verify SSH working.
+          rootpc $pc id
+
+	# Boot into the MFS.  The serial console will show you when it's open for business.
+        wap node_admin on pc$pc &
+	      # Should no longer be necessary.
+	      rootpc $pc /sbin/reboot
+
+	# Make WINXP-TMP on /proj, then move it to /usr/testbed/images with the right name.
+	rootpc $pc
+	  cd /proj/testbed/images
+	  df /proj/testbed/images
+	  ls -l WINXP*
+	  imagezip -o -I 2 -I 3 -I 4 /dev/ad0 WINXP-TMP.ndz
+	  ls -l WINXP*
+	  exit
+
+	# Reboots the source node back into Windows.
+	wap node_admin off pc$pc
+
+	# Move the image to /usr/testbed/images to avoid NFS reads, for faster swap-in.
+	ls -l /proj/testbed/images/WINXP-TMP.ndz
+	df /usr/testbed/images
+	cp /proj/testbed/images/WINXP-TMP.ndz /usr/testbed/images
+	ls -l /proj/testbed/images/WINXP-TMP.ndz /usr/testbed/images/WINXP-$image.ndz
+	cksum /usr/testbed/images/WINXP-$image.ndz & ssh ops cksum /proj/testbed/images/WINXP-TMP.ndz
+	df /proj/testbed/images
+	rm -f /proj/testbed/images/WINXP-TMP.ndz
+	df /proj/testbed/images
+	
+    . DEMOTING an image to /proj/testbed/images (edit the image descriptor.)
+	ls -l /usr/testbed/images/WINXP-$image.ndz
+	df /proj/testbed/images
+	cp /usr/testbed/images/WINXP-$image.ndz /proj/testbed/images
+	ls -l /{usr,proj}/testbed/images/WINXP-$image.ndz
+	ssh ops cksum /proj/testbed/images/WINXP-$image.ndz & cksum /usr/testbed/images/WINXP-$image.ndz
+	df /usr/testbed/images
+	rm -f /usr/testbed/images/WINXP-$image.ndz
+	df /usr/testbed/images

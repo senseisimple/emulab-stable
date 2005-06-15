@@ -484,6 +484,10 @@ sub doboot()
 
 		# Open up an existing key dir to the root user.  Even though root
 		# is in the Administrators group, it's locked out by permissions.
+		$cmd = "$CHMOD 777 $sshdir";
+		if (-e $sshdir && system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
 		$cmd = "$CHOWN -R root $sshdir";
 		if (-e $sshdir && system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
@@ -501,6 +505,10 @@ sub doboot()
 		    warning("Failed $cmd: $!");
 		}
 		$cmd = "$CHOWN $login $sshdir";
+		if (system($cmd) != 0) {
+		    warning("Failed $cmd: $!");
+		}
+		$cmd = "$CHMOD 700 $sshdir";
 		if (system($cmd) != 0) {
 		    warning("Failed $cmd: $!");
 		}

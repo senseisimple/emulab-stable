@@ -1,0 +1,53 @@
+Log of XP images produced (most recent first.)
+
+    . emulab-ops/WINXP-SP0 - Windows XP with no SP's, pc600 and pc850.
+      6/14/05
+      prtn 1, whole disk[1], OS Windows, 5.1.0, node pc26, ping/ssh/isup, NORMALv2, pc600 and pc850.
+	4293596160 input (1640514560 compressed) bytes in 512.770 seconds
+	Image size: 819986432 bytes
+	3.051MB/second compressed
+
+    . emulab-ops/WINXP-UPDATE - Windows XP-SP2+, pc600 and pc850.
+      Created by Mike, 2005-04-22.
+
+    . WINXP-02-16 - Windows XP-SP2+, pc600 and pc850, release candidate.
+      prtn 1, whole disk[1], OS Windows, 5.1.2, node pc26, ping/ssh/isup, NORMALv2, pc600 and pc850.
+	4293596160 input (2775278592 compressed) bytes in 1096.485 seconds
+	Image size: 1463812096 bytes
+	2.414MB/second compressed
+      After removing the SP2 and Windows Update backup directories:
+	4293596160 input (2565563392 compressed) bytes in 987.167 seconds
+	Image size: 1299185664 bytes
+	2.479MB/second compressed
+
+    . WINXP-02-11 - Windows XP-SP1, pc600 and pc850, release candidate.
+      prtn 1, whole disk[1], OS Windows, 5.1.1, node pc26, ping/ssh/isup, NORMALv2, pc600 and pc850.
+	4293596160 input (2142913536 compressed) bytes in 804.105 seconds
+	Image size: 1026555904 bytes
+	2.542MB/second compressed
+
+    . WINXP-02-08 - Windows XP-SP1, pc600 only, release candidate.
+      prtn 1, whole disk[1], OS Windows, 5.1.1, node pc62, ping/ssh/isup, NORMALv2, pc600.
+	4293596160 input (2113422336 compressed) bytes in 643.544 seconds
+	Image size: 1001390080 bytes
+	3.132MB/second compressed
+
+    . WINXP-01-25 - Windows XP-SP1, pc850, cleaned and with Windows password support.
+      prtn 1, whole disk, OS Windows, 5.1.1, node pc80, ping/ssh/isup, MINIMAL, pc850.
+	4293596160 input (1957200896 compressed) bytes in 607.873 seconds
+	Image size: 946864128 bytes
+
+    . WINXP-12-08w - Windows XP-SP1, with networking and most other startup scripts.
+      prtn 1, whole disk, OS Windows, 5.1.1, node pc174, ping/ssh/isup, MINIMAL, pc2000.
+    . WINXP-12-08 - Windows XP SP1, with networking and most other startup scripts.
+      - From pc170 on 12-07 to hopefully lose the New Hardware wizard.
+    . WINXP-12-07 - Windows XP SP1, networking and most other startup scripts.
+      - Grumble.  ./ missing from getmac in findif.c .
+    . WINXP-12-03 - Windows XP SP1, Samba /users, no networking yet.
+      - Z: comes up disconnected, okay in autologin but sshd loses out.
+      - Need to install pro2kxp.exe drivers.
+      - Install Cygwin rpm package.
+
+    . WINXP-10-24 - Windows XP SP1, host rename at boot, user dir mounts.
+      prtn 1, whole disk, OS other, 5.1.2, node pc174, ping/ssh, MINIMAL, pc2000.
+      Leave shared and global bits off until production images are being done.
