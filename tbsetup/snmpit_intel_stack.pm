@@ -70,21 +70,29 @@ sub new($$$@) {
 
     #
     # We only need to create 1 snmpit_intel object, since we only have to
-    # talk to one (for now) to do all the setup we need.
+    # talk to one (for now) to do all the setup we need. We fall back on the
+    # old behavior of using the stack name as the leader if the leader is not
+    # set
     #
-    use snmpit_intel;
-    $self->{LEADER} = new snmpit_intel($stack_id,$self->{DEBUG});
+    my $leader_name = getStackLeader($stack_id);
+    if (!$leader_name) {
+        $leader_name = $stack_id;
+    }
+    $self->{LEADERNAME} = $leader_name;
 
-	#
-	# Check for failed object creation
-	#
-	if (!$self->{LEADER}) {
-		#
-		# The snmpit_intel object has already printed an error message,
-		# so we'll just return an error
-		#
-		return undef;
-	}
+    use snmpit_intel;
+    $self->{LEADER} = new snmpit_intel($leader_name,$self->{DEBUG});
+
+    #
+    # Check for failed object creation
+    #
+    if (!$self->{LEADER}) {
+        #
+        # The snmpit_intel object has already printed an error message,
+        # so we'll just return an error
+        #
+        return undef;
+    }
 
     bless($self,$class);
     return $self;
