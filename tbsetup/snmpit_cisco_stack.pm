@@ -83,6 +83,19 @@ sub new($$$$@) {
     $self->{VTP} = $uses_vtp;
 
     #
+    # We'll use this to store any special arguments for VLAN creation
+    #
+    $self->{VLAN_SPECIALARGS} = {};
+
+    #
+    # Set by default now - don't create VLANs on switches that don't need
+    # them. We always create VLANs on the leader, so that it can be used as a
+    # sort of global list of what VLANs are available, and is atomically
+    # lockable.
+    #
+    $self->{PRUNE_VLANS} = 1;
+
+    #
     # Make a device-dependant object for each switch
     #
     foreach my $devicename (@devicenames) {
@@ -240,6 +253,83 @@ sub setPortVlan($$@) {
     # Split up the ports among the devices involved
     #
     my %map = mapPortsToDevices(@ports);
+
+    if ($self->{PRUNE_VLANS}) {
+        #
+        # Use this hash like a set to find out what switches might be involved
+        # in this VLAN
+        #
+        my %switches;
+        foreach my $switch (keys %map) {
+            $switches{$switch} = 1;
+        }
+
+	#
+	# Find out which ports are already in this VLAN - we might be adding
+        # to an existing VLAN
+        # TODO - provide a way to bypass this check for new VLANs, to speed
+        # things up a bit
+	#
+        foreach my $switch ($self->switchesWithPortsInVlan($vlan_number)) {
+            $switches{$switch} = 1;
+        }
+
+        #
+        # Find out every switch which might have to transit this VLAN through
+        # its trunks
+        #
+        my %trunks = getTrunks();
+        my @trunks = getTrunksFromSwitches(\%trunks, keys %switches);
+        foreach my $trunk (@trunks) {
+            my ($src,$dst) = @$trunk;
+            $switches{$src} = $switches{$dst} = 1;
+        }
+
+        #
+        # Create the VLAN (if it doesn't exist) on every switch involved
+        #
+        foreach my $switch (keys %switches) {
+            #
+            # Check to see if the VLAN already exists on this switch
+            #
+            my $dev = $self->{DEVICES}{$switch};
+            if (!$dev) {
+                warn "ERROR: VLAN uses switch $switch, which is not in ".
+                    "this stack\n";
+                $errors++;
+                next;
+            }
+            if ($dev->vlanNumberExists($vlan_number)) {
+                if ($self->{DEBUG}) {
+                    print "Vlan $vlan_id already exists on $dev\n";
+                }
+            } else {
+                #
+                # Check to see if we had any special arguments saved up for
+                # this VLAN
+                #
+                my @otherargs = ();
+                if (exists $self->{VLAN_SPECIALARGS}{$vlan_id}) {
+                    @otherargs = @{$self->{VLAN_SPECIALARGS}{$vlan_id}}
+                }
+
+                #
+                # Create the VLAN
+                #
+                my $res = $dev->createVlan($vlan_id,$vlan_number);
+                if ($res == 0) {
+                    warn "Error: Failed to create VLAN $vlan_id ($vlan_number)".
+                         " on $switch\n";
+                    $errors++;
+                    next;
+                }
+            }
+        }
+    }
+
+    #
+    # Perform the operation on each switch
+    #
     foreach my $devicename (keys %map) {
 	my $device = $self->{DEVICES}{$devicename};
     	if (!defined($device)) {
@@ -278,12 +368,16 @@ sub createVlan($$$;$$$) {
     my @ports = @{shift()};
     my @otherargs = @_;
 
+    if (@otherargs) {
+        $self->{VLAN_SPECIALARGS}{$vlan_id} = @otherargs;
+    }
+
     #
     # What we do here depends on whether this stack uses VTP to synchronize
     # VLANs or not
     #
     my $okay = 1;
-    if ($self->{VTP}) {
+    if ($self->{VTP} || $self->{PRUNE_VLANS}) {
 	#
 	# We just need to create the VLAN on the stack leader
 	#
@@ -711,15 +805,7 @@ sub setVlanOnTrunks($$$;@) {
 	# only way we can figure out which swtiches this VLAN spans is to
 	# ask them all.
 	#
-	foreach my $devicename (keys %{$self->{DEVICES}}) {
-	    my $device = $self->{DEVICES}{$devicename};
-	    foreach my $line ($device->listVlans()) {
-		my ($vlan_id, $vlan, $memberRef) = @$line;
-		if (($vlan == $vlan_number)){
-		    push @switches, $devicename;
-		}
-	    }
-	}
+        @switches = $self->switchesWithPortsInVlan($vlan_number);
     }
 
     #
@@ -772,6 +858,31 @@ sub setVlanOnTrunks($$$;@) {
     }
 
     return (!$errors);
+}
+
+#
+# Not a 'public' function - only needs to get called by other functions in
+# this file, not external functions.
+#
+# Get a list of all switches that have at least one port in the given
+# VLAN - note that is take a VLAN number, not a VLAN ID
+#
+# Returns a possibly-empty list of switch names
+#
+sub switchesWithPortsInVlan($$) {
+    my $self = shift;
+    my $vlan_number = shift;
+    my @switches = ();
+    foreach my $devicename (keys %{$self->{DEVICES}}) {
+        my $device = $self->{DEVICES}{$devicename};
+        foreach my $line ($device->listVlans()) {
+            my ($vlan_id, $vlan, $memberRef) = @$line;
+            if (($vlan == $vlan_number) && (@$memberRef > 0)) {
+                push @switches, $devicename;
+            }
+        }
+    }
+    return @switches;
 }
 
 # End with true
