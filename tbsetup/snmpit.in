@@ -553,6 +553,12 @@ foreach my $command (@commands) {
 		    @{$stacks{$stack_id}});
 		last;
 	    };
+	    /nortel/ && do {
+		require snmpit_nortel;
+		$stack = new snmpit_nortel($stack_id,$debug,
+		    @{$stacks{$stack_id}});
+		last;
+	    };
 	    /generic/ && do {
 		require snmpit_stack;
 		$stack = new snmpit_stack($stack_id,$debug,
