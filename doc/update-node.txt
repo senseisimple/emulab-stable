@@ -276,16 +276,8 @@ B. Now we can begin the process:
 	# wait for pxeboot prompt
 	loader:/tftpboot/freebsd
 
-   This will boot into the MFS.  Now you can ssh in as root from boss.
-   Before making the whole disk image, it is a good idea to invalidate
-   anything in the 4th DOS partition (assuming the layout described in
-   section A1).  From my experience we only need to worry about BSD
-   disklabels and Linux superblocks.  So just whack the first 8k
-   (don't forget to replace "ad0" as necessary):
-
-	dd if=/dev/zero of=/dev/ad0s4 bs=8k count=1  
-
-   Now we can proceed to make the images:
+   This will boot into the MFS.  Now you can ssh in as root from boss
+   and make the images:
  
 	cd /proj/emulab-ops/images
 	imagezip -o /dev/ad0 FBSD410+RHL90-STD.ndz
