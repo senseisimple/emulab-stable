@@ -531,100 +531,11 @@ int main(int argc, char *argv[])
 		/* see if we want to reset the brainstem modules */
 		if (brainstemResetRequested) {
 		    unsigned char modules[2] = { 4,2 };
-//  		    acpValue *v;
-//  		    acpValue sv(0.2f);
-		    
-		    
-//  		    v = garcia.getNamedValue("distance-left");
-//  		    if (v != NULL) {
-//  			fprintf(stderr,
-//  				"left odometry: %f\n",
-//  				v->getFloatVal());
-//  		    }
-
-//  		    v = garcia.getNamedValue("acceleration");
-//  		    if (v != NULL) {
-//  			fprintf(stderr,
-//  				"acceleration: %f\n",
-//  				v->getFloatVal());
-//  		    }
-
-//  		    v = garcia.getNamedValue("distance-units-string");
-//  		    if (v != NULL) {
-//  			fprintf(stderr,
-//  				"dist units: %s\n",
-//  				v->getStringVal());
-//  		    }
-
-//  		    garcia.setNamedValue("damped-speed-left", &sv);
-
-//  		    v = garcia.getNamedValue("damped-speed-left");
-//  		    if (v != NULL) {
-//  			fprintf(stderr,
-//  				"damped-speed-left: %s\n",
-//  				v->getFloatVal());
-//  		    }
 
 		    /* can't do this in the usr2 handler cause it sleeps */
 		    brainstem_reset(ioRef,modules,2);
 		    
 		    brainstemResetRequested = 0;
-
-//  		    v = garcia.getNamedValue("distance-left");
-//  		    if (v != NULL) {
-//  			fprintf(stderr,
-//  				"left odometry: %f\n",
-//  				v->getFloatVal());
-//  		    }
-
-//  		    v = garcia.getNamedValue("heartbeat-status");
-//  		    if (v != NULL) {
-//  			fprintf(stderr,
-//  				"heartbeat-status: %d\n",
-//  				v->getBoolVal());
-//  		    }
-		    
-//  		    {
-//  			acpObject *b;
-//  			acpValue av;
-
-//  			if (!wait_for_brainstem_link(ioRef, garcia)) {
-//  			    fprintf(stderr,
-//  				    "error: could not connect to robot %d\n",
-//  				    garcia.getNamedValue("status")->getIntVal());
-//  			    exit(1);
-//  			}
-
-//  			garcia.flushQueuedBehaviors();
-
-//  			av.set("radians");
-//  			garcia.setNamedValue("angle-units-string", &av);
-			
-//  			av.set("meters");
-//  			garcia.setNamedValue("distance-units-string", &av);
-			
-//  			/* turn off fall sensors */
-//  			/* WHY?? -- Dan */
-//  			av.set(0);
-//  			garcia.setNamedValue("down-ranger-enable", &av);
-			
-//  			/* set the stall threshhold high */
-//  			av.set(12.0f);
-//  			garcia.setNamedValue("stall-threshhold", &av);
-			
-//  			av.set(0);
-//  			garcia.setNamedValue("distance-left", &av);
-//  			garcia.setNamedValue("distance-right", &av);
-//  			av.set(aGARCIA_ERRFLAG_ABORT);
-//  			garcia.setNamedValue("status", &av);
-
-//  			b = garcia.createNamedBehavior("move", NULL);
-//  			av.set(0.2f);
-//  			b->setNamedValue("distance", &av);
-          
-//  			garcia.queueBehavior(b);
-//  		    }
-
 
 		}
 
