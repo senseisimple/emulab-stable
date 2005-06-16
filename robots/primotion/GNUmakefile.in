@@ -26,6 +26,8 @@ client-install: client
 		$(DESTDIR)$(CLIENT_BINDIR)/pilot-wrapper.sh
 	$(INSTALL_PROGRAM) garcia-pilot \
 		$(DESTDIR)$(CLIENT_BINDIR)/garcia-pilot
+	$(INSTALL_PROGRAM) brainstem-reset \
+		$(DESTDIR)$(CLIENT_BINDIR)/brainstem-reset
 	$(INSTALL_DATA) $(SRCDIR)/garcia.config \
 		$(DESTDIR)$(CLIENT_ETCDIR)/garcia.config
 

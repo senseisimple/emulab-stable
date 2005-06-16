@@ -5,9 +5,9 @@
  */
 
 /**
- * @file garcia-pilot.cc
+ * @file brainstem-reset.cc
  *
- * The main body of the daemon that runs on the garcia robot.
+ * Simple utility to reset the brainstem.
  */
 
 #include "config.h"
