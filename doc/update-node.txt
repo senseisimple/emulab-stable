@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,8 +11,11 @@ A. Things to understand up front:
 
 1. The disk image I am talking about updating here, is one which has both
    a FreeBSD partition and a Linux partition.  So obviously, you will need
-   to update both parts before creating a new whole-disk image.  By
-   convention FreeBSD is in DOS partition #1 and Linux in DOS partition #2.
+   to update both parts before creating a new whole-disk image.  By Utah
+   convention, FreeBSD is in DOS partition #1 and Linux in DOS partition #2.
+   For the record, partition #3 is a Linux swap partition and partition #4
+   is defined to contain the remaining space on the hard drive (curtesy of
+   "growdisk" that is run after frisbee is run) and is available for users.
 
 2. Since you will need to boot both the BSD and Linux partitions as well
    as the Emulab "admin MFS" (a scaled-down, PXE-loaded, memory filesystem
@@ -34,7 +37,11 @@ A. Things to understand up front:
    speak of "rebooting into Linux" or "rebooting into the admin MFS", this
    is how I expect you to do it.
 
-3. To do an Emulab client software install, certain other software packages
+3. When running in the admin MFS, use "ad0" if you have an IDE disk,
+   "da0" if you have a SCSI disk, or "ad4" if you have SATA.  All of the
+   following examples specify "ad0", replace as necessary.
+
+4. To do an Emulab client software install, certain other software packages
    must be installed before you even try to configure the Emulab software.
    If you are updating a recent Emulab image, these should all be in place.
    But if you are updating a really old image,
@@ -47,7 +54,7 @@ A. Things to understand up front:
    - Python.  Needs to be Python 2.3 right now.  For FreeBSD, go to
      /usr/ports/lang/python23 and do a "make install".
 
-   - Elvin headers and libraries.  Check for the existance of "libvin4.a"
+   - Elvin headers and libraries.  Check for the existence of "libvin4.a"
      in your library path (probably in /usr/local/lib).  If it doesn't
      exist, you will need to download (wget or fetch):
 
@@ -143,7 +150,7 @@ A. Things to understand up front:
      of mii-tool) so that the Emulab software can change link speed/duplex.
      Just install an RPM.
     
-4. Another "first time, one time" thing to do is to setup the serial console
+5. Another "first time, one time" thing to do is to setup the serial console
    in the OSes (if you are planning on using serial consoles).  We use 115200
    baud as the typical default of 9600 is too painful.
 
@@ -219,7 +226,7 @@ B. Now we can begin the process:
 
    and it will build the necessary client-side binaries.  If something
    doesn't build, most likely it is because of a missing software
-   package, see A3 above.  After successfully building, install the
+   package, see A4 above.  After successfully building, install the
    binaries and scripts with:
 
 	sudo gmake client-install
@@ -269,23 +276,31 @@ B. Now we can begin the process:
 	# wait for pxeboot prompt
 	loader:/tftpboot/freebsd
 
-   This will boot into the MFS.  Now you can ssh in as root from boss
-   and make the images:
+   This will boot into the MFS.  Now you can ssh in as root from boss.
+   Before making the whole disk image, it is a good idea to invalidate
+   anything in the 4th DOS partition (assuming the layout described in
+   section A1).  From my experience we only need to worry about BSD
+   disklabels and Linux superblocks.  So just whack the first 8k
+   (don't forget to replace "ad0" as necessary):
 
+	dd if=/dev/zero of=/dev/ad0s4 bs=8k count=1  
+
+   Now we can proceed to make the images:
+ 
 	cd /proj/emulab-ops/images
-	imagezip -o /dev/da0 FBSD47+RHL73-STD.ndz
-	imagezip -o -s 1 /dev/da0 FBSD47-STD.ndz
-	imagezip -o -s 2 /dev/da0 RHL73-STD.ndz
+	imagezip -o /dev/ad0 FBSD410+RHL90-STD.ndz
+	imagezip -o -s 1 /dev/ad0 FBSD410-STD.ndz
+	imagezip -o -s 2 /dev/ad0 RHL90-STD.ndz
 
 10. Move the new images into place.  The only trick here is to make sure
     frisbeed isn't currently serving up the image.  This is another hack.
     On boss:
 
 	cd /proj/emulab-ops/images
-	sudo cp -p FBSD47+RHL73-STD.ndz FBSD47-STD.ndz RHL73-STD.ndz /usr/testbed/images/N/
+	sudo cp -p FBSD410+RHL90-STD.ndz FBSD410-STD.ndz RHL90-STD.ndz /usr/testbed/images/N/
 
 	cd /usr/testbed/images
-	sudo mv FBSD47+RHL73-STD.ndz FBSD47-STD.ndz RHL73-STD.ndz O/
+	sudo mv FBSD410+RHL90-STD.ndz FBSD410-STD.ndz RHL90-STD.ndz O/
 	sudo mv N/* .
 
     Now the images are in place.  If there is no currently active frisbeed
@@ -311,4 +326,3 @@ B. Now we can begin the process:
     and it will reload the node, and bring it back up in what ever OS is
     the default.  Make sure it comes up, and then use your pxeboot prowess
     to boot into the other OS and make sure it works.
-    
