@@ -68,4 +68,33 @@ public:
     
 };
 
+/** 
+ * got this info from
+ * http://www.acroname.com/brainstem/ref/ref.html#Hardware/stemnetwork.html ;
+ * if you string multiple GPs or Motos, then I'm sure it's wrong.  If anybody
+ * ever changes the bus addrs for our GP/Motos, THIS CODE WILL NOT WORK!!!
+ */
+#define BUS_ADDR_GP    2
+#define BUS_ADDR_MOTO  4
+
+/** this is valid for both the GP and Moto. */
+#define CMD_RESET_CODE 24
+
+/** this resets first module 4 (the moto), then module 2 (the gp) */
+#define BRESET_DEFAULT_MOD      "42"
+#define BRESET_DEFAULT_MOD_LEN  2
+
+/**
+ * reset code for the brainstem GP/Moto modules.  Will work IF the router 
+ * hasn't gotten slammed.  This could be called whenever the garcia won't
+ * accept commands, or if it gets into a bad state that we can identify...
+ *
+ * @param ioRef The garcia IO lib reference.
+ * @param modules A char array of module addresses to be reset.
+ * @param modules_length Length of modules array.
+ * @return 0 if all modules successfully reset; -1 if could not connect to 
+ *         the brainstem; otherwise number of first failed module.
+ */
+int brainstem_reset(aIOLib &ioRef,unsigned char *modules,int modules_length);
+
 #endif

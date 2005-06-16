@@ -89,6 +89,13 @@ while (1) {
 	if ($childpid < 0);
 
     if ($childpid == 0) {
+	$retval = system("$BINDIR/brainstem-reset");
+	if ($retval != 0) {
+	    print "WARNING: brainstem reset failed ($retval)!!!\n";
+	}
+
+	sleep(1);
+
 	exec("$BINDIR/garcia-pilot -d -l /var/emulab/logs/pilot.log");
 	die("*** $0:\n".
 	    "    Could not exec garcia-pilot!\n");

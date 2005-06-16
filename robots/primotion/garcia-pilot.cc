@@ -31,12 +31,15 @@
 
 #include "acpGarcia.h"
 #include "acpValue.h"
+/* necessary to reset brainstem mods */
+#include "aStem.h"
 
 #include "garcia-pilot.hh"
 #include "pilotClient.hh"
 #include "dashboard.hh"
 #include "wheelManager.hh"
 #include "pilotButtonCallback.hh"
+#include "garciaUtil.hh"
 
 /**
  * The default port to listen for client connections.
@@ -62,6 +65,12 @@ static const char *DEFAULT_SFILE = "sdata.txt";
  * @see sigquit
  */
 static volatile int looping = 1;
+
+/**
+ * If set, the top of the main loop will reset the brainstem modules.
+ * Is set from the sigusr2 handler.
+ */
+static volatile int brainstemResetRequested = 0;
 
 /**
  * Signal handler for SIGINT, SIGTERM, and SIGQUIT signals.  Sets looping to
@@ -140,6 +149,14 @@ static void usage(void)
 	    BATTERY_LOG_PATH);
 }
 
+/** 
+ * sighandler for USR2 -- reboots the stem modules
+ */
+static void sigusr2(int sig) {
+    brainstemResetRequested = 1;
+}
+
+
 class pilotFaultCallback : public faultCallback
 {
     
@@ -150,6 +167,9 @@ public:
     void faultDetected(unsigned long faults)
     {
 	this->pfc_wheel_manager.stop();
+
+	/* may wish to call the above function in here, or something */
+
     };
 
 private:
@@ -157,8 +177,6 @@ private:
     wheelManager &pfc_wheel_manager;
     
 };
-
-
 
 int main(int argc, char *argv[])
 {
@@ -291,6 +309,8 @@ int main(int argc, char *argv[])
     signal(SIGBUS, sigpanic);
     
     signal(SIGPIPE, SIG_IGN);
+
+    signal(SIGUSR2, sigusr2);
     
     aIO_GetLibRef(&ioRef, &err);
 
@@ -507,6 +527,106 @@ int main(int argc, char *argv[])
 		fd_set rreadyfds = readfds, wreadyfds = writefds;
 		struct timeval tv_zero = { 0, 5000 };
 		int rc;
+
+		/* see if we want to reset the brainstem modules */
+		if (brainstemResetRequested) {
+		    unsigned char modules[2] = { 4,2 };
+//  		    acpValue *v;
+//  		    acpValue sv(0.2f);
+		    
+		    
+//  		    v = garcia.getNamedValue("distance-left");
+//  		    if (v != NULL) {
+//  			fprintf(stderr,
+//  				"left odometry: %f\n",
+//  				v->getFloatVal());
+//  		    }
+
+//  		    v = garcia.getNamedValue("acceleration");
+//  		    if (v != NULL) {
+//  			fprintf(stderr,
+//  				"acceleration: %f\n",
+//  				v->getFloatVal());
+//  		    }
+
+//  		    v = garcia.getNamedValue("distance-units-string");
+//  		    if (v != NULL) {
+//  			fprintf(stderr,
+//  				"dist units: %s\n",
+//  				v->getStringVal());
+//  		    }
+
+//  		    garcia.setNamedValue("damped-speed-left", &sv);
+
+//  		    v = garcia.getNamedValue("damped-speed-left");
+//  		    if (v != NULL) {
+//  			fprintf(stderr,
+//  				"damped-speed-left: %s\n",
+//  				v->getFloatVal());
+//  		    }
+
+		    /* can't do this in the usr2 handler cause it sleeps */
+		    brainstem_reset(ioRef,modules,2);
+		    
+		    brainstemResetRequested = 0;
+
+//  		    v = garcia.getNamedValue("distance-left");
+//  		    if (v != NULL) {
+//  			fprintf(stderr,
+//  				"left odometry: %f\n",
+//  				v->getFloatVal());
+//  		    }
+
+//  		    v = garcia.getNamedValue("heartbeat-status");
+//  		    if (v != NULL) {
+//  			fprintf(stderr,
+//  				"heartbeat-status: %d\n",
+//  				v->getBoolVal());
+//  		    }
+		    
+//  		    {
+//  			acpObject *b;
+//  			acpValue av;
+
+//  			if (!wait_for_brainstem_link(ioRef, garcia)) {
+//  			    fprintf(stderr,
+//  				    "error: could not connect to robot %d\n",
+//  				    garcia.getNamedValue("status")->getIntVal());
+//  			    exit(1);
+//  			}
+
+//  			garcia.flushQueuedBehaviors();
+
+//  			av.set("radians");
+//  			garcia.setNamedValue("angle-units-string", &av);
+			
+//  			av.set("meters");
+//  			garcia.setNamedValue("distance-units-string", &av);
+			
+//  			/* turn off fall sensors */
+//  			/* WHY?? -- Dan */
+//  			av.set(0);
+//  			garcia.setNamedValue("down-ranger-enable", &av);
+			
+//  			/* set the stall threshhold high */
+//  			av.set(12.0f);
+//  			garcia.setNamedValue("stall-threshhold", &av);
+			
+//  			av.set(0);
+//  			garcia.setNamedValue("distance-left", &av);
+//  			garcia.setNamedValue("distance-right", &av);
+//  			av.set(aGARCIA_ERRFLAG_ABORT);
+//  			garcia.setNamedValue("status", &av);
+
+//  			b = garcia.createNamedBehavior("move", NULL);
+//  			av.set(0.2f);
+//  			b->setNamedValue("distance", &av);
+          
+//  			garcia.queueBehavior(b);
+//  		    }
+
+
+		}
 
 		/* Poll the file descriptors, don't block */
 		rc = select(FD_SETSIZE,

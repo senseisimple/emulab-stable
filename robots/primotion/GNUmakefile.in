@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 ifeq ($(BRAINSTEM_DIR),)
 PROGS = 
 else
-PROGS = garcia-pilot
+PROGS = garcia-pilot brainstem-reset
 endif
 
 all client: $(PROGS)
@@ -89,6 +89,8 @@ PILOT_OBJS = \
 	pilotClient.o \
 	wheelManager.o
 
+BSTEM_OBJS = garciaUtil.o
+
 garcia-pilot-version.c: $(PILOT_OBJS)
 
 garcia-pilot-debug: garcia-pilot-version.c $(PILOT_OBJS)
@@ -96,6 +98,9 @@ garcia-pilot-debug: garcia-pilot-version.c $(PILOT_OBJS)
 
 garcia-pilot: garcia-pilot-debug
 	$(STRIP) -o $@ $<
+
+brainstem-reset: brainstem-reset.cc $(BSTEM_OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 flash-user-led: flash-user-led.o ledManager.o garciaUtil.o
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
