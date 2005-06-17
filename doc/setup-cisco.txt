@@ -175,3 +175,5 @@ switchport trunk native vlan 1
 To set the read-write SNMP community string to 'public':
 snmp-server community public rw
 
+To globally disable the Cisco Router Discovery (cdp) protocol:
+no cdp run
