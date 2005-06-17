@@ -186,6 +186,9 @@ system("rm -rf $RUNDIR/*.pid $RUNDIR/sudo/* $RUNDIR/pump.sock");
 print "Clearing out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
 
+print "Cleaning out /local/logs ...\n";
+system("rm -rf /local/logs/* /local/logs/.??*");
+
 print "Removing SFS files ...\n";
 if (-f $SFSUSERS) {
     system("rm -f $SFSUSERS ${SFSUSERS}.pub");

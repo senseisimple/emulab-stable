@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -170,6 +170,9 @@ system("rm -rf $RUNDIR/utmp");
 
 print "Cleaning out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
+
+print "Cleaning out /local/logs ...\n";
+system("rm -rf /local/logs/* /local/logs/.??*");
 
 print "Removing dhclient leases ...\n";
 system("rm -f $LEASES");

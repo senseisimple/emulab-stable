@@ -131,6 +131,10 @@ system("chmod -R 777 /tmp/* /tmp/.??*");
 system("chown -R root /tmp");
 system("rm -rf /tmp/* /tmp/.??*");
 
+print "Cleaning out /local/logs ...\n";
+system("chown -R root /local/logs");
+system("rm -rf /local/logs/* /local/logs/.??*");
+
 print "Clearing out C:/TEMP ...\n";
 system("chown -R root C:/TEMP");
 system("rm -rf C:/TEMP/* C:/TEMP/.??*");
