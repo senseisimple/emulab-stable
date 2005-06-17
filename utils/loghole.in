@@ -35,6 +35,7 @@ XMLRPC_SERVER = "@BOSSNODE@"
 XMLRPC_PORT   = 3069
 
 RSYNC = "@RSYNC@"
+ACCEPTABLE_RSYNC_STATUS = [ 0 ]
 
 DIRS = {
     "proj" : "proj",
@@ -45,8 +46,22 @@ EXPDIR_FMT = os.path.join("/", DIRS["proj"], "%(PID)s", "exp", "%(EID)s")
 
 GLOBAL_LOGS = [
     "event-sched.log", "feedback.log", "../tbdata/feedback_data.tcl",
-    "digest.out", "report.mail"
+    "digest.out", "report.mail", "../tbdata/%(EID)s.report"
     ]
+
+EXTENSIONS = [ ".zip" ]
+
+LINK_DUMP_FMT = [ "%s.xmit", "%s.recv" ]
+
+DOT_LOGHOLES = """+ /var/
++ /var/emulab/
++ /var/emulab/logs/
++ /var/emulab/logs/**
++ /local/
++ /local/logs/
++ /local/logs/**
+- *
+"""
 
 PID = None
 EID = None
@@ -74,6 +89,8 @@ VERBOSITY_HUMAN = 2
 VERBOSITY = VERBOSITY_HUMAN
 
 SERVER = None
+
+OSIDS = {}
 
 if len(XMLRPC_SERVER) == 0:
     sys.stderr.write("internal error: XMLRPC_SERVER is empty\n")
@@ -150,7 +167,7 @@ def get_explist():
 # Print the top level usage statement for the whole tool.
 #
 def usage():
-    print "Usage: loghole [-hV] [-e pid/eid|-a] [OPTIONS] action [...]"
+    print "Usage: loghole [-hV] [-e pid/eid|-a] [OPTIONS] <action> [...]"
     print
     print "Manage an experiment's log hole."
     print
@@ -173,12 +190,14 @@ def usage():
     print "  sync      Synchronize the experiment's log holes with the"
     print "            experiment's log directory."
     print "  archive   Archive the contents of the experiment's log directory."
+    print "  change    Change the metadata of an existing archive."
     print "  list      Print a brief listing of the archives in the"
     print "            experiment's log directory."
     print "  show      Show a detailed listing of the archive(s) in the"
     print "            experiment directory."
-    print "  clean     Clean the experiment log directory by removing any"
-    print "            subdirectories."
+    #print "  validate  Validate the contents of an archive."
+    print "  clean     Clean the experiment log directory and node local"
+    print "            directories."
     print "  gc        Garbage collect old archives."
     print
     print "Environment:"
@@ -311,12 +330,67 @@ def show_usage():
     return
 
 ##
+# Print the usage statement for the "change" action.
+#
+def change_usage():
+    print ("Usage: loghole change [-k (i-delete|space-is-needed)] "
+           "[-a days] [-c comment] <archive-name1> [archive-name2 ...]")
+    print
+    print "Change the metadata of an existing archive."
+    print
+    print "Optional arguments:"
+    print "  -k, --keep-until=(i-delete|space-is-needed)"
+    print "                         Keep the archive until you decide to"
+    print "                         delete it manually or space is needed."
+    print "                         (Default: space-is-needed)"
+    print "  -a, --keep-atleast=N   Keep the archive atleast N days after"
+    print "                         creation.  This value keeps the archive "
+    print "                         from being garbage collected when more "
+    print "                         space is needed. (Default: 3 days)"
+    print "  -c, --comment=COMMENT  Add a comment to the archive. This comment"
+    print "                         will be displayed in the listing generated"
+    print "                         by the 'show' action.  Use a single dash "
+    print "                         (-) to read the comment from standard in."
+    print
+    print "Required arguments:"
+    print "  archive-name  The name of the archive to change."
+    print
+    print "Files:"
+    print "  /proj/<pid>/exp/<eid>/logs/<archive-name>.<instance>.zip"
+    print
+    print "Examples:"
+    print "  $ loghole change -c 'Results bad...' foobar"
+    return
+
+##
+# Print the usage statement for the "validate" action.
+#
+def validate_usage():
+    print "Usage: loghole validate <archive-name>"
+    print
+    print "Validate the contents of an archive."
+    print
+    print "Required arguments:"
+    print "  archive-name  The name of the archive to validate."
+    print
+    print "Examples:"
+    print "  $ loghole validate foobar.0"
+    return
+
+##
 # Print the usage statement for the "clean" action.
 #
 def clean_usage():
-    print "Usage: loghole clean"
+    print "Usage: loghole clean [-fne] [node1 ...]"
     print
-    print "Clean the experiment log directory by removing any subdirectories."
+    print "Clean the experiment log directory by removing any subdirectories"
+    print "and/or clean the log holes on the nodes.  The default behavior is"
+    print "to clean both."
+    print
+    print "Optional arguments:"
+    print "  -f, --force         Do not ask for confirmation."
+    print "  -n, --nodes         Clean only the nodes log directories."
+    print "  -e, --experiment    Clean only the experiment log directory."
     print
     print "Examples:"
     print "  $ loghole clean"
@@ -387,10 +461,10 @@ def infer_pid_eid(*args):
 # @return A pair containing the ZipFile object referring to the archive and a
 # ConfigParser object that contains the archive's metadata.
 #
-def open_loghole(path):
+def open_loghole(path, mode='r'):
     retval = None, None
     if zipfile.is_zipfile(path):
-        zf = zipfile.ZipFile(path, 'r')
+        zf = zipfile.ZipFile(path, mode)
         if "loghole.cfg" in zf.namelist():
             cio = cStringIO.StringIO(zf.read("loghole.cfg"))
             cp = ConfigParser.ConfigParser()
@@ -640,8 +714,9 @@ def do_archive(args):
 
     # ... any global log files (e.g. event-sched.log).
     for log in GLOBAL_LOGS:
-        if os.path.exists(log):
-            zf.write(log)
+        formatted_log = log % { "PID" : PID, "EID" : EID }
+        if os.path.exists(formatted_log):
+            zf.write(formatted_log)
             pass
         pass
 
@@ -742,7 +817,11 @@ def do_show(args):
                         pass
                     pass
                 print "=" * 79
-                lh.printdir()
+                try:
+                    lh.printdir()
+                    pass
+                except IOError:
+                    pass
                 lh.close()
                 print
                 pass
@@ -770,7 +849,10 @@ def rsync(host, base, *args):
             pass
         except OSError:
             pass
-        cmd = [RSYNC, "-rptgoDlz"]
+        cmd = [RSYNC,
+               "-rptgoDlz",
+               "--copy-unsafe-links",
+               "--include-from=" + os.path.join(base, os.pardir, ".logholes")]
         if VERBOSITY > VERBOSITY_HUMAN:
             cmd.append("-v")
             pass
@@ -797,20 +879,60 @@ def rsync(host, base, *args):
     
     return retval
 
+def rmstar(host, *args):
+    global HOME, DEBUG
+
+    retval = 0
+    for path in args:
+        cmd = ["/usr/bin/ssh",
+               "-o", "StrictHostKeyChecking=no",
+               "-o", ("UserKnownHostsFile=" +
+                      os.path.join(HOME, ".ssh", "emulab_known_hosts")),
+               host,
+               "rm",
+               "-rf",
+               path]
+        if DEBUG:
+            print `cmd`
+            retval = -1
+            pass
+        else:
+            retval = os.fork()
+            if retval != 0:
+                # Parent
+                pass
+            else:
+                os.execve("/usr/bin/ssh", cmd, os.environ)
+                os._exit(127)
+                pass
+            pass
+        pass
+    
+    return retval
+    
+
 ##
 # Performs the "sync" action, which synchronizes the logholes for a group of
 # nodes.
 #
 # @param args Action-specific command line arguments.
 #
-def do_sync(args):
+def do_sync(args, mode="pull", must_be_active=1):
     from emulabclient import RESPONSE_SUCCESS
+    global OSIDS, SERVER
     
     retval = 0
 
     init_server()
     
     state_method = getattr(SERVER, "experiment.state")
+    
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+
+    fp = open(os.path.join(logdir, ".logholes"), "w")
+    os.chmod(fp.name, 0664)
+    fp.write(DOT_LOGHOLES)
+    fp.close()
 
     state = state_method(PACKAGE_VERSION, { "proj" : PID, "exp" : EID })
     if state["code"] != RESPONSE_SUCCESS:
@@ -818,29 +940,45 @@ def do_sync(args):
         retval = 1
         pass
     elif state["value"] != "active":
-        sys.stderr.write("error: %s/%s is not an active experiment!\n" %
-                         (PID, EID))
-        retval = 2
+        if must_be_active:
+            sys.stderr.write("error: %s/%s is not an active experiment!\n" %
+                             (PID, EID))
+            retval = 2
+            pass
+        else:
+            retval = 0
+            pass
         pass
     else:
         info_method = getattr(SERVER, "experiment.info")
-        
+        osinfo_method = getattr(SERVER, "osid.info")
+
         physical = info_method(PACKAGE_VERSION, {
             "proj" : PID,
             "exp" : EID,
             "aspect" : "mapping",
             })
+
+        delays = info_method(PACKAGE_VERSION, {
+            "proj" : PID,
+            "exp" : EID,
+            "aspect" : "delays",
+            })
         
-        if physical["code"] != RESPONSE_SUCCESS:
+        if ((physical["code"] != RESPONSE_SUCCESS) or
+            (delays["code"] != RESPONSE_SUCCESS)):
             sys.stderr.write("error: xmlrpc failed - %s\n" %
                              (physical["output"],))
             retval = 1
             pass
         else:
             physical = physical["value"]
-
+            delays = delays["value"]
+            
             hosts = [(x["node"], x["name"]) for x in physical.values()
-                     if ((x["erole"] == "virthost" or x["erole"] == "node") and
+                     if ((x["erole"] == "virthost" or
+                          x["erole"] == "node" or
+                          x["erole"] == "delaynode") and
                          (x["status"] == "up" and x["eventstatus"] == "ISUP"))]
 
             phosts = sets.Set([x[0] for x in hosts])
@@ -852,37 +990,86 @@ def do_sync(args):
             known_nodes = sets.Set(args) & (phosts | vhosts)
             unknown_nodes = known_nodes ^ sets.Set(args)
 
-            jobs = []
+            jobs = {}
+            hoststatus = {}
             for phost, vhost in hosts:
                 if (vhost in args) or (phost in args):
-                    pid = rsync(phost,
-                                os.path.join(EXPDIR_FMT % { "PID" : PID,
-                                                            "EID" : EID },
-                                             "logs",
-                                             vhost),
-                                "/var/emulab/logs/",
-                                "/local/logs/")
-                    jobs.append(pid)
-
-                    while len(jobs) == PARALLELIZATION:
-                        pid, sts = os.waitpid(0, 0)
-                        if pid in jobs:
-                            jobs.remove(pid)
+                    osid = physical[vhost]["osid"]
+                    if osid not in OSIDS:
+                        oi = osinfo_method(PACKAGE_VERSION, {
+                            "osid" : physical[vhost]["osid"] })
+                        if oi["code"] == RESPONSE_SUCCESS:
+                            OSIDS[osid] = oi["value"]
                             pass
+                        else:
+                            OSIDS[osid] = None
+                            pass
+                        pass
+                    
+                    if not OSIDS[osid]:
+                        sys.stderr.write("warning: unknown OSID %s for %s\n" %
+                                         (physical[vhost]["osid"], vhost))
+                        continue
+                    else:
+                        vos = OSIDS[physical[vhost]["osid"]]
+                        if "ssh" not in vos["osfeatures"]:
+                            if VERBOSITY > VERBOSITY_HUMAN:
+                                sys.stderr.write("warning: %s OS, %s, does "
+                                                 "not support ssh, skipping\n"
+                                                 % (vhost, vos["osname"]))
+                                pass
+                            continue
+                        pass
+
+                    if mode == "pull":
+                        pid = rsync(phost, os.path.join(logdir, vhost), "/")
+                        pass
+                    elif mode == "clean":
+                        pid = rmstar(phost, "/local/logs/*")
+                        pass
+                    else:
+                        assert 0
+                    
+                    jobs[pid] = vhost
+
+                    try:
+                        while len(jobs) == PARALLELIZATION:
+                            pid, sts = os.waitpid(0, 0)
+                            if pid in jobs:
+                                hoststatus[jobs[pid]] = sts
+                                del jobs[pid]
+                                pass
+                            pass
+                        pass
+                    except OSError:
                         pass
                     pass
                 pass
 
-            for job in jobs:
-                pid, sts = os.waitpid(job, 0)
+            try:
+                for job in jobs:
+                    pid, sts = os.waitpid(job, 0)
+                    hoststatus[jobs[pid]] = sts
+                    pass
                 pass
-            
+            except OSError:
+                pass
+
             if len(unknown_nodes) > 0:
                 for vhost in unknown_nodes:
                     sys.stderr.write("error: unknown node - %s\n" % vhost)
                     pass
                 retval = 2
                 pass
+
+            for vhost, sts in hoststatus.items():
+                if sts not in ACCEPTABLE_RSYNC_STATUS:
+                    sys.stderr.write("error: failed to sync with node '%s'\n" %
+                                     vhost)
+                    retval = 3
+                    pass
+                pass
+            
             pass
         pass
 
@@ -1031,6 +1218,168 @@ def do_list(args):
     return retval
 
 ##
+# Performs the "change" action, which involves updating the metadata for an
+# existing archive.
+#
+# @param args Action-specific command line arguments.
+#
+def do_change(args):
+    retval = 0
+
+    keep_until = None
+    keep_atleast = None
+    comments = []
+
+    # Parse action-specific options and arguments.
+    try:
+        opts, args = getopt.getopt(args, "k:a:c:", [
+            "keep-until=", "keep-atleast=", "comment=", ])
+        for opt, val in opts:
+            if opt in ("-k", "--keep-until"):
+                if val == "i-delete" or val == "space-is-needed":
+                    keep_until = val
+                    pass
+                else:
+                    raise getopt.error(
+                        'error: expecting "i-delete" or "space-is-needed" for '
+                        'keep until value, got - ' + val)
+                pass
+            elif opt in ("-a", "--keep-atleast"):
+                try:
+                    keep_atleast = int(val)
+                    pass
+                except:
+                    raise getopt.error(
+                        'error: expecting integer for keep atleast value, '
+                        'got - ' + val)
+                pass
+            elif opt in ("-c", "--comment"):
+                if val == "-":
+                    comments.append(sys.stdin.read())
+                    pass
+                else:
+                    comments.append(val)
+                    pass
+                pass
+            pass
+        
+        if len(args) == 0:
+            raise getopt.error(
+                'error: not enough arguments for "change" action.')
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        change_usage()
+        return 2
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    for archive_name in args:
+        if os.path.exists(archive_name):
+            full_archive_name = archive_name
+            pass
+        else:
+            full_archive_name = os.path.join(logdir, archive_name)
+            pass
+        if (not archive_name.endswith(".zip") and
+            not os.path.exists(full_archive_name)):
+            for ext in EXTENSIONS:
+                tmp_name = full_archive_name + ext
+                if os.path.exists(tmp_name):
+                    full_archive_name = tmp_name
+                    break
+                pass
+            if full_archive_name != tmp_name:
+                print "error: bad archive name - " + archive_name
+                continue
+            pass
+
+        lh, cp = open_loghole(full_archive_name, mode='a')
+
+        if not lh:
+            sys.stderr.write("error: %s is not a loghole archive\n" %
+                             (archive_name,))
+            continue
+
+        try:
+            lh.infolist().remove(lh.getinfo("loghole.cfg"))
+            pass
+        except:
+            sys.stderr.write("warning: loghole.cfg is missing from %s\n" %
+                             (archive_name,))
+            pass
+
+        # Change the meta-data.
+        if keep_until:
+            cp.set("MAIN", "keep-until", keep_until)
+            pass
+        if keep_atleast:
+            cp.set("MAIN", "keep-atleast", keep_atleast)
+            pass
+
+        if keep_until or keep_atleast:
+            cio = cStringIO.StringIO()
+            cp.write(cio)
+            
+            loghole_zi = zipfile.ZipInfo()
+            loghole_zi.filename = "loghole.cfg"
+            ct = time.localtime(time.time())
+            loghole_zi.date_time = (ct[0], ct[1], ct[2], ct[3], ct[4], ct[5])
+            loghole_zi.compress_type = zipfile.ZIP_STORED
+            loghole_zi.comment = "Log hole meta-data"
+            
+            lh.writestr(loghole_zi, cio.getvalue())
+            pass
+        
+        # Add any comments.
+        ct = time.localtime(time.time())
+        for comment in comments:
+            loghole_zi = zipfile.ZipInfo()
+            loghole_zi.filename = uniquish_name(
+                "loghole-comment",
+                "txt",
+                [x.filename for x in lh.infolist()])
+            loghole_zi.date_time = (ct[0], ct[1], ct[2], ct[3], ct[4], ct[5])
+            loghole_zi.compress_type = zipfile.ZIP_DEFLATED
+            loghole_zi.comment = "Loghole comment"
+            
+            lh.writestr(loghole_zi, comment)
+            pass
+    
+        if DEBUG:
+            try:
+                lh.printdir()
+                pass
+            except IOError:
+                pass
+            pass
+    
+        lh.close()
+        
+        if VERBOSITY >= VERBOSITY_HUMAN:
+            print "Changed log hole archive: " + archive_name
+            pass
+        pass
+    
+    return retval
+
+##
+# Performs the "validate" action, which XXX
+#
+# @param args Action-specific command line arguments.
+#
+def do_validate(args):
+    retval = 0
+
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
+
+    
+
+    return retval
+
+##
 # Performs the "clean" action, which deletes logs from the experiment
 # directory.
 #
@@ -1039,6 +1388,44 @@ def do_list(args):
 def do_clean(args):
     retval = 0
 
+    force = 0
+    do_nodes = 1
+    do_experiment = 1
+    confirm_msg = "Are you sure you want to remove ALL log files? [y/N] "
+
+    # Parse action-specific options and arguments.
+    try:
+        opts, args = getopt.getopt(args, "fne", [
+            "force", "nodes", "experiment", ])
+        for opt, val in opts:
+            if opt in ("-f", "--force"):
+                force = 1
+                pass
+            elif opt in ("-n", "--nodes"):
+                do_nodes = 1
+                do_experiment = 0
+                confirm_msg = ("Are you sure you want to remove log files on "
+                               "the nodes? [y/N] ")
+                pass
+            elif opt in ("-e", "--experiment"):
+                do_nodes = 0
+                do_experiment = 1
+                confirm_msg = ("Are you sure you want to remove log files "
+                               "from the experiment log directory? [y/N] ")
+                pass
+            pass
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        archive_usage()
+        return 2
+
+    if not force:
+        line = raw_input(confirm_msg)
+        if not (line.startswith("y") or line.startswith("Y")):
+            return 0
+        pass
+    
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
     os.chdir(logdir)
 
@@ -1056,6 +1443,8 @@ def do_clean(args):
             os.rmdir(entry)
             pass
         pass
+
+    do_sync(args, mode="clean", must_be_active=0)
 
     return retval
 
@@ -1139,6 +1528,7 @@ ACTIONS = {
     "archive" : (do_archive, archive_usage),
     "list" : (do_list, list_usage),
     "show" : (do_show, show_usage),
+    "change" : (do_change, change_usage),
     "clean" : (do_clean, clean_usage),
     "gc" : (do_gc, gc_usage),
     }

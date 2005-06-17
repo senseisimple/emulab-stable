@@ -3,7 +3,7 @@
 .\" Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 .\" All rights reserved.
 .\"
-.TH LOGHOLE 1 "November 11, 2004" "Emulab" "Emulab Commands Manual"
+.TH LOGHOLE 1 "June 16, 2005" "Emulab" "Emulab Commands Manual"
 .OS
 .SH NAME
 loghole \- Log management tool for experiments.
@@ -29,6 +29,14 @@ loghole \- Log management tool for experiments.
 [\fIarchive-name\fR]
 .P
 .BI loghole
+.BI change
+[\fB-k \fR(\fBi-delete\fR|\fBspace-is-needed\fR)]
+[\fB-a \fIdays\fR]
+[\fB-c \fIcomment\fR]
+.I archive-name1
+[\fIarchive-name2 ...\fR]
+.P
+.BI loghole
 .BI list
 [\fB-O1!Xo\fR]
 [\fB-m \fIatmost\fR]
@@ -40,6 +48,8 @@ loghole \- Log management tool for experiments.
 .P
 .BI loghole
 .BI clean
+[\fB-fne\fR]
+[\fInode1 node2 ...\fR]
 .P
 .BI loghole
 .BI gc
@@ -49,25 +59,26 @@ loghole \- Log management tool for experiments.
 .SH DESCRIPTION
 The
 .B loghole
-utility is used to download log files from the experimental nodes to the Emulab
-users machine and assist in managing archives of these logs.  Using this
+utility downloads log files from certain directories on the experimental nodes
+(e.g. "/local/logs") to the Emulab users machine.  After downloading, it can
+also be used to produce and manage archives of the log files.  Using this
 utility to manage an experiment's log files is encouraged because it will
 transfer the logs in a network-friendly manner and is already integrated with
-the rest of the system.  For example, any programs executed using the Emulab
-event-system will have their standard output/error automatically gathered up by
-this tool.  The tool can also be used to preserve multiple runs of an
-experiment by producing and managing zip archives of the logs.
+the rest of Emulab.  For example, any programs executed using the Emulab
+event-system will have their standard output/error automatically placed in the
+"/local/logs" directory.  The tool can also be used to preserve multiple trials
+of an experiment by producing and managing zip archives of the logs.
 .P
 The set of logs that are actually downloaded by the tool are those located in
 .I logholes
 on the nodes, where a loghole is simply a well-known directory that acts like a
 blackhole for log files.  Any files found in these directories are downloaded
-to the experiment's log directory and placed under separate directories for
-each node and loghole.  The referent of symbolic links are also downloaded, so
-if you do not want an entire directory downloaded, you can create links in a
-loghole to those files of interest.
+to the experiment's log directory (i.e. "/proj/<pid>/exp/<eid>/logs") and
+placed under separate directories for each node and loghole.  The referent of
+symbolic links are also downloaded, so if you do not want an entire directory
+downloaded, you can create links in a loghole to those files of interest.
 .P
-To perform all of these tasks, the
+To perform its various tasks, the
 .B loghole
 utility is broken up into several sub-actions that you can apply to an
 experiment's log holes or log archives.  As a quick example, to synchronize the
@@ -92,6 +103,9 @@ directory.
 .B archive
 Archive the contents of the experiment's log directory into a zip file.
 .TP
+.B change
+Change the metadata of an existing archive.
+.TP
 .B list
 Print a brief listing of the archives in the experiment's log directory.
 .TP
@@ -99,7 +113,8 @@ Print a brief listing of the archives in the experiment's log directory.
 Print a detailed listing of the archives in the experiment's log directory.
 .TP
 .B clean
-Clean out the experiment log directory by removing any subdirectories.
+Clean out the experiment log directory by removing any subdirectories and/or
+clean the log directories on the nodes.
 .TP
 .B gc
 Garbage collect old archives to free up disk space.
@@ -223,6 +238,15 @@ dash (\fB-\fR) the comment will be read from standard in.
 \fB-d\fR, \fB--delete
 Delete the files in the log directory after producing the archive.  The default
 action is to leave the files in place until the user is ready to delete them.
+.SH CHANGE
+The
+.B change
+action is used to change the metadata of an existing archive.  For example, if
+after analyzing the log files, you decide that they represent "good" data, you
+can add a comment stating that fact and mark the archive as not garbage
+collectable.  The action takes the same set of options as the
+.B archive
+action.
 .SH LIST
 The
 .B list
@@ -275,6 +299,25 @@ Optional arguments:
 The full or partial name of the archive to display.  If a partial name is
 given, any archive names that start with the argument are displayed.  The
 default behavior is to display all of the archives in an experiment.
+.SH CLEAN
+The
+.B clean
+action is used to clean out log files from the experiment's log directory and
+the log directories on the nodes.  The default action is to ask confirmation
+and then clean out all of the log files.
+.P
+Available
+.B clean
+options:
+.TP
+\fB-f\fR, \fB--force
+Do not prompt for confirmation.
+.TP
+\fB-n\fR, \fB--nodes
+Only remove log files on the nodes.
+.TP
+\fB-e\fR, \fB--experiment
+Only remove log directories in the experiment's log directory.
 .SH GC
 The
 .B gc
@@ -315,11 +358,14 @@ experiment.  (Default: 3.0 MB)
 .SH ENVIRONMENT
 By default, the project and experiment ID will be inferred from the current
 working directory, if it is inside the experiment's directory
-(e.g. /proj/\fIpid\fR/exp/\fIeid\fR).  This behavior can be overridden using
+(i.e. /proj/\fIpid\fR/exp/\fIeid\fR).  This behavior can be overridden using
 the
 .B -e
 option.
 .SH RETURN VALUES
+.TP
+3
+If rsync reports an error.
 .TP
 2
 If there was an error processing the command line arguments.
@@ -345,6 +391,15 @@ file:
 .TP
 /proj/\fIpid\fR/exp/\fIeid\fR/logs
 The log directory for an experiment.
+.TP
+/local/logs
+One of the log directories on experimental nodes that is automatically sync'd.
+Users should place any logs/data they want transferred back in this directory.
+.TP
+/var/emulab/logs
+Another log directory on experimental nodes that is automatically sync'd.  This
+directory usually holds logs generated by the Emulab software running on the
+node.
 .SH SEE ALSO
 event-sched(8), tevc(1), zip(1), rsync(1)
 .SH AUTHOR

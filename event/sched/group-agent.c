@@ -183,6 +183,8 @@ int group_agent_handle_complete(event_handle_t handle,
 			
 			ga->ga_token = ~0;
 			ga->ga_remaining = -1;
+
+			retval += 1;
 		}
 		else {
 #if 0

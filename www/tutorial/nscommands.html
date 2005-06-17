@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2004 University of Utah and the Flux Group.
+   Copyright (c) 2000-2005 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -12,6 +12,7 @@
 <ul>
   <li><a href="#INTRO">Introduction</a>
   <li><a href="#TCL">TCL, NS, and node names</a>
+  <li><a href="#PARAMETERS">Captured NS file parameters</a>
   <li><a href="#ORDER">Ordering issues</a>
   <li><a href="#HARD">Hardware Commands</a>
   <li><a href="#IP">IP Address Commands</a>
@@ -115,6 +116,57 @@ set link1 [$ns duplex-link $node0 $node1 100Mb 0ms DropTail]
 tb-set-link-loss $link1 0.05
 tb-set-ip-link $node0 $link1 10.1.0.128
 </pre>
+
+<hr>
+
+<a name="PARAMETERS"></a><h3>Captured NS file parameters</h3>
+
+<p>A common convention when writing NS files is to place any parameters in an
+array named "opt" at the beginning of the file.  For example:
+
+<code><pre>
+    set opt(CLIENT_COUNT) 5
+    set opt(BW) 10mb;    Link bandwidth
+    set opt(LAT) 10ms;   Link latency
+
+   ...
+
+    $ns duplex-link $server $router $opt(BW) $opt(LAT) DropTail
+
+    for {set i 0} {$i < $opt(CLIENT_COUNT)} {incr i} {
+        set nodes($i) [$ns node]
+	...
+    }
+
+    set serverprog [$server program-agent -command "starter.sh"]
+</pre></code>
+
+Normally, this convention is only used to help organize the parameters.  In
+Emulab, however, the contents of the "opt" array are captured and made
+available to the emulated environment.  For instance, the parameters are added
+as environment variables to any commands run by <a
+href="docwrapper.php3?docname=eventsystem.html#PROGRAM">program-agents</a>
+(only available on recent FBSD410-STD and RHL90-STD images).  So, in the above
+example of NS code, the "starter.sh" script will be able to reference
+parameters by name, like so:
+
+<code><pre>
+    #! /bin/sh
+
+    echo "Testing with $CLIENT_COUNT clients."
+    ...
+</pre></code>
+
+Note that the contents of the "opt" array are not ordered, so you should not
+reference other parameters and expect the shell to expand them appropriately:
+
+<code><pre>
+    set opt(prefix) "/foo/bar"
+    set opt(BINDIR) '$prefix/bin'; # BAD
+
+    set opt(prefix) "/foo/bar"
+    set opt(BINDIR) "$opt(prefix)/bin"; # Good
+</pre></code>
 
 <hr>
 

@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2004 University of Utah and the Flux Group.
+   Copyright (c) 2000-2005 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -505,13 +505,9 @@ to be started and stopped with NS <tt>at</tt> statements. To define a
 program object:
 
 	<code><pre>
-	set prog0 [new Program $ns]
-	$prog0 set node $nodeA
-	$prog0 set command "/bin/ls -lt >& /users/joe/logs/prog0"
+	set prog0 [$nodeA program-agent -command "/bin/ls -lt"]
 
-	set prog1 [new Program $ns]
-	$prog1 set node $nodeB
-	$prog1 set command "/bin/sleep 60 >& /tmp/sleep.debug"</pre></code>
+	set prog1 [$nodeB program-agent -command "/bin/sleep 60"]</pre></code>
 
 Then in your NS file a set of static events to run these commands:
 
@@ -525,13 +521,13 @@ If you want to schedule starts and stops using dynamic events:
 	<code><pre>
 	tevc -e testbed/myexp now prog0 start
 	tevc -e testbed/myexp now prog1 start
-	tevc -e testbed/myexp +20 prog1 stop</code></pre>
+	tevc -e testbed/myexp +20 prog1 stop</pre></code>
 
 If you want to change the command that is run (override the command
 you specified in your NS file), then:
 
 	<code><pre>
-	tevc -e testbed/myexp now prog0 start COMMAND='ls >/tmp/foo'</code></pre>
+	tevc -e testbed/myexp now prog0 start COMMAND='ls'</pre></code>
 	
 Some points worth mentioning:
 

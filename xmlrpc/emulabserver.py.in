@@ -814,6 +814,42 @@ class osid:
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
+    
+    def info(self, version, argdict):
+        # Check for valid arguments.
+        argerror = CheckRequiredArgs(argdict, ("osid",))
+        if (argerror):
+            return argerror
+
+        if not re.match("^[-\w]*$", argdict["osid"]):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed osid!")
+
+        # Get the listing that is accessible to this user and
+        res = DBQueryFatal("SELECT distinct "
+                           "o.* FROM "
+                           "os_info as o "
+                           "left join group_membership as g on g.pid=o.pid "
+                           "where g.uid=%s or o.shared=1 and "
+                           "(o.osname=%s or o.osid=%s)",
+                           (self.uid, argdict["osid"], argdict["osid"]),
+                           True)
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="Unknown OS ID?")
+
+        osid = res[0]
+        osid["fullosid"] = osid["osid"]
+        osid["osid"] = osid["osname"]
+        
+        if not osid["OS"] or len(osid["OS"]) == 0:
+            osid["OS"] = "(None)"
+            pass
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=scrubdict(osid),
+                              output=str(osid))
 
     pass
 

@@ -263,6 +263,11 @@ static int do_snapshot(node_agent_t na, char *nodeids, char *args)
 		    nodeids) != 0) {
 		warning("failed to sync log hole for node %s\n", nodeids);
 	}
+	else if (systemf("loghole --port=%d --quiet clean -fn %s",
+			 DEFAULT_RPC_PORT,
+			 nodeids) != 0) {
+		warning("failed to clean log hole on node(s): %s\n", nodeids);
+	}
 
 	if ((rc = event_arg_get(args, "IMAGE", &image_name)) < 0) {
 		warning("no image name given: %s\n", nodeids);

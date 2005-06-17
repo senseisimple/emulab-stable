@@ -526,9 +526,14 @@ int sends_complete(struct agent *agent, const char *evtype)
 		TBDB_EVENTTYPE_REBOOT,
 		TBDB_EVENTTYPE_RELOAD,
 		TBDB_EVENTTYPE_SETDEST,
+		TBDB_EVENTTYPE_SNAPSHOT,
 		NULL
 	};
 
+	/*
+	 * Map of object types to events that send back COMPLETEs.  If no
+	 * events send a COMPLETE, just use a NULL for the evtypes slot.
+	 */
 	static struct {
 		char *objtype;
 		char **evtypes;
@@ -547,6 +552,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_SEQUENCE, run_completes },
 		{ TBDB_OBJECTTYPE_CONSOLE, NULL },
 		{ TBDB_OBJECTTYPE_TOPOGRAPHY, NULL },
+		{ TBDB_OBJECTTYPE_LINKTRACE, NULL },
 		{ NULL, NULL }
 	};
 
@@ -1353,7 +1359,7 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 	char *value, argsbuf[BUFSIZ] = "";
 	char objname[TBDB_FLEN_EVOBJNAME];
 	char objtype[TBDB_FLEN_EVOBJTYPE];
-	int rc, ctoken = ~0, agerror = 0;
+	int rc, ctoken = ~0, agerror = 0, handled = 0;
 	
 	event_notification_get_objname(handle, eventp->notification,
 				       objname, sizeof(objname));
@@ -1397,23 +1403,32 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 		}
 	}
 
-	sequence_agent_handle_complete(handle,
-				       &sequences,
-				       eventp->agent.s,
-				       ctoken,
-				       agerror);
+	handled = sequence_agent_handle_complete(handle,
+						 &sequences,
+						 eventp->agent.s,
+						 ctoken,
+						 agerror);
 
-	group_agent_handle_complete(handle,
-				    &groups,
-				    eventp->agent.s,
-				    ctoken,
-				    agerror);
+	handled += group_agent_handle_complete(handle,
+					       &groups,
+					       eventp->agent.s,
+					       ctoken,
+					       agerror);
 
 	if ((strcmp(objtype, TBDB_OBJECTTYPE_TIMELINE) == 0) ||
 	    (strcmp(objtype, TBDB_OBJECTTYPE_SEQUENCE) == 0)) {
 		RPC_grab();
 		RPC_notifystart(pid, eid, objname, 0);
 		RPC_drop();
+
+	}
+	
+	if ((primary_simulator_agent != NULL) &&
+	    (agerror != 0) &&
+	    ((strcmp(objtype, TBDB_OBJECTTYPE_SEQUENCE) == 0) ||
+	     (strcmp(objtype, TBDB_OBJECTTYPE_GROUP) == 0)) &&
+	    !handled) {
+		send_report(primary_simulator_agent, "");
 	}
 	
 	return 1;

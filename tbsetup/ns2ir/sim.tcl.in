@@ -1035,6 +1035,7 @@ Simulator instproc add_topography {tg} {
 
 Simulator instproc make_event {outer event} {
     var_import ::GLOBALS::simulated
+    var_import ::TBCOMPAT::osids
     var_import ::TBCOMPAT::hwtype_class
 
     set obj [lindex $event 0]
@@ -1047,7 +1048,7 @@ Simulator instproc make_event {outer event} {
     set args {}
     set atstring ""
 
-    if {$obj == "#"} {
+    if {[string index $obj 0] == "#"} {
 	return {}
     }
 
@@ -1225,6 +1226,12 @@ Simulator instproc make_event {outer event} {
 			return
 		    }
 		    set image [lindex $evargs 0]
+		    if {! ${GLOBALS::anonymous} && ! ${GLOBALS::passmode}} {
+			if {![info exists osids($image)]} {
+			    perror "Unknown image in snapshot-to event: $image"
+			    return
+			}
+		    }
 		    set args "IMAGE=${image}"
 		}
 		"reload" {
@@ -1233,6 +1240,12 @@ Simulator instproc make_event {outer event} {
 			-image {}
 		    }
 		    if {$(-image) != {}} {
+			if {! ${GLOBALS::anonymous} && 
+			    ! ${GLOBALS::passmode} &&
+			    ! [info exists osids($image)]} {
+			    perror "Unknown image in reload event: $(-image)"
+			    return
+			}
 			set args "IMAGE=$(-image)"
 		    }
 		}
@@ -1331,13 +1344,17 @@ Simulator instproc make_event {outer event} {
 	    
 	    switch -- $cmd {
 		"set" -
-		"run" {
+		"run" -
+		"start" {
 		    switch -- $cmd {
 			"set" {
 			    set etype MODIFY
 			}
 			"run" {
 			    set etype RUN
+			}
+			"start" {
+			    set etype START
 			}
 		    }
 		    if {[$obj info class] == "EventGroup"} {
@@ -1372,12 +1389,6 @@ Simulator instproc make_event {outer event} {
 		    }
 		    if {$(-command) != {}} {
 			set args "${args}COMMAND=$(-command)"
-		    }
-		}
-		"start" {
-		    set etype START
-		    if {[$obj info class] != "EventGroup"} {
-			set args "COMMAND=[$obj set command]"
 		    }
 		}
 		"stop" {

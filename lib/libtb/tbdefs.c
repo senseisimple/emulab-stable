@@ -30,6 +30,10 @@ char *tbdb_objecttypes[] = {
         TBDB_OBJECTTYPE_CONSOLE,
         TBDB_OBJECTTYPE_TOPOGRAPHY,
         TBDB_OBJECTTYPE_LINKTRACE,
+	/*
+	 * NOTE: Add the object type and any events that send back COMPLETEs to
+	 * the objtype2complete array in event-sched.c:sends_complete().
+	 */
 	0,
 };
 

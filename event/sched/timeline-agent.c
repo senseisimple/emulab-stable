@@ -252,6 +252,8 @@ int sequence_agent_handle_complete(event_handle_t handle,
 #endif
 			sa->ta_current_event += 1;
 			sequence_agent_enqueue_next(sa);
+
+			retval += 1;
 		}
 		else {
 			event_do(handle,
@@ -263,6 +265,8 @@ int sequence_agent_handle_complete(event_handle_t handle,
 				 EA_ArgInteger, "CTOKEN", sa->ta_token,
 				 EA_TAG_DONE);
 			sa->ta_current_event = -1;
+
+			retval += 1;
 		}
 		sa = (sequence_agent_t)sa->ta_local_agent.la_link.ln_Succ;
 	}
