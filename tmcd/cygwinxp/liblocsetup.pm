@@ -72,8 +72,8 @@ $NET		= "$NTS/net";
 $NETSH		= "$NTS/netsh";
 $NTE		= "$NTS/drivers/etc";
 
-#$HOSTSFILE	= "$NTE/hosts";
-$HOSTSFILE	= "/etc/hosts";
+$HOSTSFILE	= "$NTE/hosts";
+#$HOSTSFILE	= "/etc/hosts";
 
 #
 # These are not exported
