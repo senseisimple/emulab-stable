@@ -24,6 +24,41 @@ else
 	BOOTDIR=/etc/testbed
 fi
 
+#
+# Function to zero all potential superblocks in the DOS partitions that
+# could interfere with the OSes on the image being loaded.
+#
+# FreeBSD 4 or 5 goes out of its way to make this hard.  In FBSD4, we
+# cannot overwrite the beginning of partitions that have a legit superblock.
+# In FBSD5, DOS partitions that have a zero type cannot even be accessed.
+# So we have to use the whole-disk special file using offsets extracted
+# via fdisk.
+#
+zapsuperblocks() {
+    DSK=$1
+
+    #
+    # Note we are not overly concerned about the consequences of misparsing
+    # the fdisk output.  If we whack random blocks, it doesn't hurt anything.
+    #
+    offs=`fdisk -s $DSK 2>/dev/null | sed -n -e 's/^[ 0-9]*: *\([0-9]*\).*$/\1/p'`
+
+    if [ x"$offs" = x ]; then
+        return
+    fi
+
+    echo -n "Invalidating old potential superblocks: "
+    for off in $offs; do
+        echo -n "$off "
+	dd if=/dev/zero of=/dev/${DISK} oseek=$off count=16 >/dev/null 2>&1 || {
+	    echo "WARNING: failed to invalidate $off"
+	}
+    done
+    echo ""
+
+    return
+}
+
 $BINDIR/tmcc state RELOADSETUP
 
 BOSSINFO=`$BINDIR/tmcc bossinfo`
@@ -146,6 +181,22 @@ if [ x"$ADDRESS" != x ]; then
 	    fi
 	    ;;
 	esac
+
+	#
+	# If not zeroing the disk and we are loading a full disk image
+	# we need to ensure that we at least invalidate any old superblocks
+	# that might leak through (most likely in partition 4 which isn't
+	# touched by our current image).  We do this before running frisbee
+	# so that any legit filesystems loaded from the image work.
+	#
+	# Since we do it before frisbee, we are counting on the current
+	# MBR being the same as the MBR being layed down.  While not
+	# a reasonable assumption in general, it mostly works in our
+	# environment and at least won't hurt anything if not true.
+	#
+	if [ x"$ZFILL" = x -a "$PARTITION" = "0" ]; then
+	    zapsuperblocks $DISK
+	fi
 
 	echo "Running $BINDIR/frisbee $LOADIP $MEMARGS $ZFILL $SLICE $MCASTIF $MCASTADDR /dev/$DISK at `date`"
 	$BINDIR/tmcc state RELOADING
