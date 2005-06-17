@@ -146,6 +146,11 @@ interface vlan 10
 ip address 10.11.13.183 255.255.255.0
 exit
 
+In order to enable an interface:
+interface vlan10
+no shutdown
+exit
+
 In order to remove a VLAN:
 no vlan 1000
 
