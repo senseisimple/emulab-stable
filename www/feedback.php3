@@ -233,7 +233,7 @@ else if (strcmp($mode, "clear") == 0) {
 				     "where pid='$pid' and eid='$eid'");
 	if (mysql_num_rows($query_result)) {
 	    $row    = mysql_fetch_array($query_result);
-	    $nsdata = stripslashes($row[nsfile]);
+	    $nsdata = $row[nsfile];
 	}
 	else {
 	    $nsdata = ""; # XXX what to do...

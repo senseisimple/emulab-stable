@@ -125,7 +125,7 @@ if (! isset($go)) {
 		     "where pid='$pid' and eid='$eid'");
     if (mysql_num_rows($query_result)) {
 	$row    = mysql_fetch_array($query_result);
-	$nsfile = stripslashes($row[nsfile]);
+	$nsfile = $row[nsfile];
 	    
 	echo "$nsfile";
     }

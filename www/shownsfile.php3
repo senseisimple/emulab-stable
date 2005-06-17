@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -80,7 +80,7 @@ if ($justns) {
 	DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
     if (mysql_num_rows($query_result)) {
 	$row    = mysql_fetch_array($query_result);
-	$nsfile = stripslashes($row[nsfile]);
+	$nsfile = $row[nsfile];
 	
 	echo "$nsfile\n";
 	# flush();
@@ -198,7 +198,7 @@ $query_result =
     DBQueryFatal("SELECT nsfile from nsfiles where pid='$pid' and eid='$eid'");
 if (mysql_num_rows($query_result)) {
     $row    = mysql_fetch_array($query_result);
-    $nsfile = stripslashes($row[nsfile]);
+    $nsfile = $row[nsfile];
 
     echo "<XMP>$nsfile</XMP>\n";
     flush();
