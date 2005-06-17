@@ -608,8 +608,8 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
     global $TBDOCBASE;
     global $autorefresh;
 
-    $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/"); 
-  
+    $MAINPAGE = !strcmp($TBDIR, "/usr/testbed/");
+
     echo "<!DOCTYPE HTML PUBLIC '-//W3C//DTD HTML 4.01 Transitional//EN' 
           'http://www.w3.org/TR/html4/loose.dtd'>
 	<html>
@@ -653,10 +653,10 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
                        href='$TBDOCBASE/index.php3'>
               </map>
             <table cellpadding='0' cellspacing='0' width='100%'>
-            <tr>
-              <td valign='top' class='bannercell' 
-              background='$BASEPATH/headerbgbb.jpg'
-              bgcolor=#3D627F>
+            <tr valign='top'>
+              <td valign='top' class='bannercell'
+                  background='$BASEPATH/headerbgbb.jpg'
+                  bgcolor=#3D627F
               <img width=369 height=100 border=0 usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
@@ -666,10 +666,10 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
 	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
 	}
 	echo "alt='$THISHOMEBASE - the network testbed'>\n";
-	      if (!$MAINPAGE) {
-		  echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
-	      }
-	      echo "</td></tr></table>\n";
+        if (!$MAINPAGE) {
+	     echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
+	}
+	echo "</td></tr></table>\n";
     }
 
     echo "<table cellpadding='8' cellspacing='0' height='100%' width='100%'>
@@ -787,15 +787,29 @@ function PAGEHEADER($title, $view = NULL) {
                           border=0 alt='Admin Off'></a>\n";
 	}
     }
+    $major = "";
+    $minor = "";
+    $build = "";
+    TBGetVersionInfo($major, $minor, $build);
+    
     $now = date("D M d g:ia T");
     echo "$title</h2></td>\n";
     echo "<td class=contentheader align=right>\n";
+    echo "<table border='0' cellpadding='0' cellspacing='0'>";
+    echo "  <tr>";
+    echo "  <td class=contentheader>".
+	"<font size=-1><b>Vers: $major.$minor Build: $build</b></font></td>";
+    echo "  <td class=contentheader>&nbsp&nbsp</td>";
+    echo "  <td class=contentheader align=right>";
     if ($login_uid) {
 	echo "<font size=-1>'<b>$login_uid</b>' Logged in.<br>$now</font>\n";
     }
     else {
 	echo "$now";
     }
+    echo "</td>";
+    echo "</tr>";
+    echo "</table>";
     echo "</td>";
     echo "</tr>\n";
     echo "<tr><td colspan=3 class=\"contentbody\" width=*>";
