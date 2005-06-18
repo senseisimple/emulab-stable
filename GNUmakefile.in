@@ -38,13 +38,13 @@ install:
 # For installation on boss node (okay, paper).
 # 
 boss-install:	install-schemacheck install-sitevarscheck install-dbfillcheck \
-		install-subdirs install-mkdirs 
+		install-subdirs install-mkdirs install-setbuildinfo
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 #
 # Same target, with the install-schemacheck dependency omitted
 # 
-boss-install-force:	install-subdirs install-mkdirs 
+boss-install-force:	install-subdirs install-mkdirs install-setbuildinfo
 	@echo "DON'T FORGET TO RUN A POST-INSTALL AS ROOT"
 
 post-install:
@@ -121,6 +121,7 @@ endif
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client
 	@$(MAKE) -C tip client
+	@$(MAKE) -C tools client
 endif
 	@$(MAKE) -C sensors client
 	@$(MAKE) -C tmcd client
@@ -133,6 +134,7 @@ endif
 ifneq ($(SYSTEM),CYGWIN_NT-5.1)
 	@$(MAKE) -C capture client-install
 	@$(MAKE) -C tip client-install
+	@$(MAKE) -C tools client-install
 endif
 	@$(MAKE) -C sensors client-install
 	@$(MAKE) -C tmcd client-install
@@ -203,6 +205,15 @@ endif
 install-dbfillcheck:
 	@echo "Checking Initial DB Fill ..."
 	$(DBFILLCHECK)
+
+ifeq ($(TBROOT),/usr/testbed)
+SETBUILDINFO= cd $(OBJDIR)/utils && perl setbuildinfo
+else
+SETBUILDINFO= @echo "Skipping setbuildinfo, since prefix isn't /usr/testbed"
+endif
+install-setbuildinfo:
+	@echo "Setting the Build and Version info"
+	$(SETBUILDINFO)
 
 clean:		clean-subdirs
 distclean:	distclean-subdirs
