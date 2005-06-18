@@ -798,7 +798,7 @@ function PAGEHEADER($title, $view = NULL) {
     echo "<table border='0' cellpadding='0' cellspacing='0'>";
     echo "  <tr>";
     echo "  <td class=contentheader>".
-	"<font size=-1><b>Vers: $major.$minor Build: $build</b></font></td>";
+	"<font size=-2>Vers: $major.$minor Build: $build</font></td>";
     echo "  <td class=contentheader>&nbsp&nbsp</td>";
     echo "  <td class=contentheader align=right>";
     if ($login_uid) {
