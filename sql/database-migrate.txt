@@ -2638,13 +2638,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table firewalls drop type;
 	alter table firewalls drop style;
 
-1.135: Add elabinelab_cvstag to experiments table so people can
+1.335: Add elabinelab_cvstag to experiments table so people can
        specify a specific tag to use when building the inner elab.
 
        alter table experiments add elabinelab_cvstag varchar(64) \
                   default NULL after elabinelab_eid;
 
-1.136: Add a process id and local port number fields for the location
+1.336: Add a process id and local port number fields for the location
        piper. 
 
 	alter table experiments add locpiper_pid int(11) default '0' \
@@ -2652,13 +2652,13 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table experiments add locpiper_port int(11) default '0' \
 		after locpiper_pid;
 
-1.137: Add a boolean to the experiments table to turn off full
+1.337: Add a boolean to the experiments table to turn off full
        elabinelab setup.
 
 	alter table experiments add elabinelab_nosetup tinyint(1) \
             NOT NULL default '0' after elabinelab_cvstag;
 
-1.138: Add a table to track the progress of moving the robots back to
+1.338: Add a table to track the progress of moving the robots back to
        their pens.
 
 	CREATE TABLE reposition_status (
