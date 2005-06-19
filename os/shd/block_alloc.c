@@ -3,6 +3,7 @@
 #include "shd.h"
 
 int bPrintBlocks;
+long int log_size_used = 0;
 
 void SetShadowSize (long size)
 {
@@ -114,6 +115,7 @@ long BlockAlloc (int size)
         printf ("Allocating %d blocks starting %d\n", size, retVal);
         PrintFreeSpaceQueue ();
     }*/
+    log_size_used += size;
     return retVal;
 }
 

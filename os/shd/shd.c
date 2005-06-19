@@ -2016,6 +2016,9 @@ shdioctl(dev, cmd, data, flag, p)
 	shd.shd_unit = unit;
 
 	switch (cmd) {
+        case SHDGETLOGSIZEUSED:
+                printf ("Log size used = %ld\n", log_size_used);
+                break;
         case SHDADDUSEDBLOCK:
                 record_used_block (((struct shd_used_block *) data)->key, ((struct shd_used_block *) data)->size);
                 break;

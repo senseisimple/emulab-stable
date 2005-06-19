@@ -154,4 +154,5 @@ struct shd_softc {
 #define SHDGETMODIFIEDRANGES _IOWR('S', 29, struct shd_modinfo)
 #define SHDCRASH _IOWR('S', 30, int)
 #define SHDADDUSEDBLOCK _IOWR('S', 31, struct shd_used_block)
+#define SHDGETLOGSIZEUSED _IOWR('S', 32, int) 
 

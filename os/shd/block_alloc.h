@@ -27,6 +27,7 @@
 int reclaim_method;
 long shadow_size;
 long shadow_start;
+extern long int log_size_used;
 
 struct CurrentFreeBlockRange
 { 
