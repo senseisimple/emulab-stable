@@ -4,40 +4,6 @@
 #define SHD_NO_MEM -1
 #define SHD_DISK_FULL -2
 
-static void TrieNodeInit(TrieNode * node);
-static void TrieNodeCleanup(TrieNode * node);
-static int extract(char inDepth, TrieKey key);
-static void logStructure(TrieNode * current, int tableSize, int isYoungest);
-
-/* Change the leaf property on a TrieNode. */
-static void setLeaf(TrieNode * current);
-static void clearLeaf(TrieNode * current);
-
-/* Returns 1 if the node is a leaf, 0 otherwise. */
-static int isLeaf(TrieNode * current);
-static int isBranch(TrieNode * current);
-
-static int roundDownToPow2(int num);
-static int sizeToDepth(int num);
-static int getBlockSize(TrieKey key, int size);
-static int insertWeak(Trie * triePtr, TrieNode * node, TrieKey key,
-                      int maxDepth);
-static int insertStrong(Trie * triePtr, TrieNode * node, TrieKey key,
-                        int maxDepth, TrieValue value, OverlapT overlap);
-static int addChild(Trie * triePtr, TrieNode * parent, TrieKey key,
-                    int maxDepth, TrieValue value);
-static int replace(Trie * triePtr, TrieNode * node, TrieKey key,
-                   int maxDepth, TrieValue value, OverlapT overlap);
-static void freeChildren(Trie * triePtr, TrieNode * node, OverlapT overlap);
-static int strongOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
-                         int maxDepth, TrieValue value, OverlapT overlap);
-static int weakOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
-                       int maxDepth);
-static TrieNode * search(TrieNode * node, TrieKey key, int maxDepth);
-static TrieNode * pushDown(Trie * triePtr, TrieNode * node);
-static void addToList(Trie * triePtr, TrieNode * node);
-static void removeFromList(Trie * triePtr, TrieNode * node);
-
 TrieKey getDefaultTrieKey(void)
 {
     return 0;
@@ -187,7 +153,7 @@ static int roundDownToPow2(int num)
 
 /* This is the number of leading zeroes algorithm from 'Hacker's Delight'
    I modified it to print the ceiling of the log. */
-static int sizeToDepth(int num)
+int sizeToDepth(int num)
 {
     int total = 0;
     if (num == 1 || num == 0)
@@ -228,7 +194,7 @@ int depthToSize(int num)
     return 1 << (TOTAL_BITS - num);
 }
 
-static int getBlockSize(TrieKey key, int size)
+int getBlockSize(TrieKey key, int size)
 {
     /* Get the rightmost '1' in the key. */
     int biggestKeyBlock = key & (~key + 1);
@@ -564,7 +530,7 @@ static int weakOverlap(Trie * triePtr, TrieNode * node, TrieKey key,
     return total;
 }
 
-static TrieNode * search(TrieNode * node, TrieKey key, int maxDepth)
+TrieNode * search(TrieNode * node, TrieKey key, int maxDepth)
 {
     int index = extract(node->depth, key);
     if (node == 0)

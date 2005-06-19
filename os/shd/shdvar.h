@@ -35,6 +35,11 @@ struct shd_modinfo {
         long bufsiz;
         long retsiz;
 };
+
+struct shd_used_block {
+    long int key;
+    long int size;
+};
  
 struct shd_readbuf {
         long block_num;
@@ -148,4 +153,5 @@ struct shd_softc {
 #define SHDSETREBOOTVERSION _IOWR('S', 28, struct shd_ioctl)
 #define SHDGETMODIFIEDRANGES _IOWR('S', 29, struct shd_modinfo)
 #define SHDCRASH _IOWR('S', 30, int)
+#define SHDADDUSEDBLOCK _IOWR('S', 31, struct shd_used_block)
 
