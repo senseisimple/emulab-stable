@@ -130,6 +130,7 @@ int global_dev;
 int latest_version;
 int reboot_version = 0;
 
+static Trie *used_block_trie = 0;
 static Trie *mod_trie = 0;
 static TrieIterator mod_pos = 0;
 static int mod_ok = 0;
@@ -202,6 +203,41 @@ void set_trie_at_pos (int pos, Trie * trie)
        current = current->next; 
    } 
    printf ("Error ! Position %d not found in list\n", pos);
+}
+
+/* Function to check if the given block is useful or not. If it is not 
+   useful, no COW needs to be done */
+
+int search_used_block (long int key, long int size)
+{
+    if (!used_block_trie)
+    {
+        printf ("No trie for used blocks found \n");
+        return 0;
+    }
+    else
+    if (search(&used_block_trie->root, key, sizeToDepth (getBlockSize (key, size))))
+        return 1;
+    else
+        return 0;
+}
+
+/* Function used by SHDADDUSEDBLOCK ioctl, called by Frisbee
+   to inform the driver about all the useful blocks on the disk
+   for which COW needs to be done */
+
+int record_used_block (long int key, long int size)
+{
+    if (!used_block_trie)
+    {
+        if (TrieInit (&used_block_trie, BlockAlloc, BlockFree, block_copy) == 0)
+        {
+            printf ("Error initializing new trie\n");
+            return 0;
+        }
+    }
+    /* We don't care about value, hence 0 */
+    TrieInsertStrong (used_block_trie, key, size, 0, DEFAULT_OVERLAP);
 }
  
 Trie * create_new_trie (int version)
@@ -1526,11 +1562,11 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
 
         if (SRC_TO_SHADOW == direction)
         {
-            error = (*devsw(ss->sc_srcdisk.ci_dev)->d_read) (ss->sc_srcdisk.ci_dev, &auio, IO_DIRECT);
+ /*           error = (*devsw(ss->sc_srcdisk.ci_dev)->d_read) (ss->sc_srcdisk.ci_dev, &auio, IO_DIRECT); */
         }
         else
         {
-            error = (*devsw(ss->sc_copydisk.ci_dev)->d_read) (ss->sc_copydisk.ci_dev, &auio, IO_DIRECT);
+ /*           error = (*devsw(ss->sc_copydisk.ci_dev)->d_read) (ss->sc_copydisk.ci_dev, &auio, IO_DIRECT);*/
         }
         if (error) {
             printf("shd%d: error %d on %s block %d \n",
@@ -1554,11 +1590,11 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
 
         if (SRC_TO_SHADOW == direction)
         {
-         error = (*devsw(ss->sc_copydisk.ci_dev)->d_write) (ss->sc_copydisk.ci_dev, &auio, IO_NOWDRAIN);
+ /*        error = (*devsw(ss->sc_copydisk.ci_dev)->d_write) (ss->sc_copydisk.ci_dev, &auio, IO_NOWDRAIN);*/
         }
         else
         {
-         error = (*devsw(ss->sc_srcdisk.ci_dev)->d_write) (ss->sc_srcdisk.ci_dev, &auio, IO_NOWDRAIN);
+ /*        error = (*devsw(ss->sc_srcdisk.ci_dev)->d_write) (ss->sc_srcdisk.ci_dev, &auio, IO_NOWDRAIN);*/
         }
          if (error) {
              printf("shd%d: error %d on %s block %d \n",
@@ -1572,21 +1608,25 @@ long block_copy (struct shd_softc *ss, struct proc *p, long src_block, long dest
          return 0;
 }
 
-int findblock (int version, long src, long *copy, long *size, struct shd_softc *ss, struct proc *p)
+int findblock (int version, long src, long src_size, long *copy, long *copy_size, struct shd_softc *ss, struct proc *p)
 {
     TrieIterator pos;
     int ok;
     Trie *current_trie = get_trie_for_version (ss, p, version);
+    *copy = -1;
     ok = TrieIteratorInit(current_trie, &pos);
     if (ok)
     {
         for ( ; TrieIteratorIsValid(pos); TrieIteratorAdvance(&pos))
         {
              if ((src >= pos->key) && (src < (pos->key + depthToSize(pos->maxDepth))))
+             /* if ((src == pos->key) && (src_size == (BLOCK_SIZE * depthToSize (pos->maxDepth)))) */
              {
-                 *copy = pos->value + src - pos->key;
-                 *size = BLOCK_SIZE * (depthToSize(pos->maxDepth) - (src - pos->key));
-                 /*printf ("Found src = %ld, copy = %ld, size = %ld\n", src, *copy, *size); */
+                 *copy = pos->value + (src - pos->key);
+                 *copy_size = BLOCK_SIZE * (depthToSize (pos->maxDepth) - (src - pos->key));
+                 if (*copy_size > src_size)
+                     *copy_size = src_size;
+                 printf ("Found src = %ld, copy = %ld, size = %ld\n", src, *copy, *copy_size); 
                  TrieIteratorCleanup(&pos);
                  return 0;
              }
@@ -1597,40 +1637,46 @@ int findblock (int version, long src, long *copy, long *size, struct shd_softc *
     return -1;
 }
 
+
 int read_from_checkpoint (struct shd_softc *ss, struct buf *bp, struct proc *p, int version)
 {
+    int tmp_version;
     int error = 0;
     TrieIterator pos;
     int ok;
     long size;
     struct uio auio;
     struct iovec aiov;
-    long src_bn, copy_bn;
-    long offset;
+    long src_bn = -1;
+    long copy_bn = -1;
+    long offset = -1;
     caddr_t addr = bp->b_data;
     long rcount = bp->b_bcount;
     long bytesleft = bp->b_bcount;
     src_bn = bp->b_blkno;
-    printf ("src_bn = %ld\n", src_bn);
-    /*src_bn += global_ss->sc_label.d_partitions[shdpart(global_dev)].p_offset;*/
     src_bn += ss->sc_label.d_partitions[shdpart(bp->b_dev)].p_offset;
-    printf ("src_bn = %ld\n", src_bn);
-    if (-1 == findblock (version, src_bn, &copy_bn, &size, ss, p))
-    {
-        return -1;
-    }
+    printf ("Orig request %ld bytes starting at block = %ld\n",  bp->b_bcount, bp->b_blkno);
 
-        /* Record the transaction start  */
-    devstat_start_transaction(&ss->device_stats);
-
+    printf ("Number of versions = %d\n", latest_version);
     while (bytesleft > 0)
     {
-        if (-1 == findblock (version, src_bn, &copy_bn, &size, ss, p))
+        tmp_version = version;
+        while ((tmp_version <= latest_version) &&(findblock (tmp_version, src_bn, bytesleft, &copy_bn, &size, ss, p) == -1))
+            tmp_version++;
+        if (copy_bn == -1)
         {
-            printf ("Error finding block %ld in version %d. Will try shdio now\n", src_bn, version);
-            devstat_end_transaction_buf(&ss->device_stats, bp);
-            return -1;
+            bp->b_data = addr;
+            bp->b_bcount =  bp->b_resid = bytesleft;
+            bp->b_blkno = src_bn;
+            printf ("Doing normal shdio for %ld bytes starting block %ld\n", 
+                     bp->b_bcount, bp->b_blkno);
+            bp->b_blkno -= ss->sc_label.d_partitions[shdpart(bp->b_dev)].p_offset;
+            shdio(ss, bp, p);
+            return 0;
         }
+        printf ("size in trie = %ld, size of request = %ld, %ld\n", size, bp->b_bcount, bp->b_resid);
+        devstat_start_transaction(&ss->device_stats);
+        bp->b_resid = size;
         bzero(&auio, sizeof(auio));
         aiov.iov_base = addr;
         aiov.iov_len = size;
@@ -1639,7 +1685,6 @@ int read_from_checkpoint (struct shd_softc *ss, struct buf *bp, struct proc *p, 
         offset = (vm_ooffset_t)copy_bn * ss->sc_secsize;
         printf ("offset = %ld copy bn = %ld size = %ld sector size = %ld\n", offset, copy_bn, size, ss->sc_secsize);
         auio.uio_offset = offset;
-        /* (vm_ooffset_t)copy_bn * ss->sc_secsize; */
         auio.uio_segflg = UIO_SYSSPACE;
         auio.uio_rw = UIO_READ;
         auio.uio_resid = size;
@@ -1654,10 +1699,14 @@ int read_from_checkpoint (struct shd_softc *ss, struct buf *bp, struct proc *p, 
         bytesleft -= size;    
         addr += size;
         src_bn += (size/BLOCK_SIZE);
+        bp->b_resid -= size;
+        bp->b_data = addr;
+        bp->b_bcount = bytesleft;
+        bp->b_blkno = src_bn; 
+        devstat_end_transaction_buf(&ss->device_stats, bp);
     }
-    bp->b_resid = 0;
-    devstat_end_transaction_buf(&ss->device_stats, bp);
     biodone(bp);
+    printf ("Calling biodone\n");
     return 0;
 }
 
@@ -1688,16 +1737,18 @@ shdio(struct shd_softc *ss, struct buf *bp, struct proc *p)
 	bn = bp->b_blkno;
 	if (shdpart(bp->b_dev) != RAW_PART)
 		bn += ss->sc_label.d_partitions[shdpart(bp->b_dev)].p_offset;
-	/* Record the transaction start  */
 
-	devstat_start_transaction(&ss->device_stats);
+        /* Record the transaction start  */
+        devstat_start_transaction(&ss->device_stats);
 
 	/*
 	 * Loop performing contiguous IOs from source and copy.
 	 */
 	addr = bp->b_data;
 	bp->b_resid = bp->b_bcount;
-        if (!(bp->b_flags & B_READ) && bCheckpoint != 0)
+        if (!(bp->b_flags & B_READ) && 
+             (bCheckpoint != 0) && 
+             (!search_used_block (bn, (bp->b_bcount)/512)))
         {
             /* Search in Trie and do a copy on write */
             int failed;
@@ -1745,9 +1796,12 @@ try_inserting_again:
                     goto try_inserting_again;
                 }
             }
-
         } /* end of if flags & B_BREAD */
 
+        /* Save this block number in used block trie, because future COWs need to be done*/
+        if (!(bp->b_flags & B_READ))
+            record_used_block (bn, (bp->b_bcount)/512);
+ 
         rcount = bp->b_bcount;
 	/*
 	 * VNODE I/O
@@ -1962,6 +2016,9 @@ shdioctl(dev, cmd, data, flag, p)
 	shd.shd_unit = unit;
 
 	switch (cmd) {
+        case SHDADDUSEDBLOCK:
+                record_used_block (((struct shd_used_block *) data)->key, ((struct shd_used_block *) data)->size);
+                break;
         case SHDGETMODIFIEDRANGES:
                 shmod = (struct shd_modinfo *) data;
                 shmod->retsiz = get_mod_blocks (ss, p, shmod->command, shmod->buf, shmod->bufsiz);
