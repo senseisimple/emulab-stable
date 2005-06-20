@@ -129,7 +129,7 @@ of the heterogeneity of the three approaches.
 </p>
 
 <p>
-Netbed's emulation testbed consists of three sub-testbed
+Netbed's emulation testbed consists of three sub-testbeds
 (nodes from each can be mixed and matched), each catering to a
 different research target:  
 
