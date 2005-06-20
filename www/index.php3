@@ -129,7 +129,7 @@ of the heterogeneity of the three approaches.
 </p>
 
 <p>
-Netbed's emulation testbed consists of three sub-testbed's
+Netbed's emulation testbed consists of three sub-testbed
 (nodes from each can be mixed and matched), each catering to a
 different research target:  
 
@@ -139,7 +139,7 @@ external use, a small
 <a href="tutorial/mobilewireless.php3">robotic testbed</a> that will
 grow into a large mobile robotic wireless testbed. The small version
 (5 Motes and 5 Stargates on 5 robots, all remotely controllable, plus
-20 static Motes) is in an open area within our offices.  
+25 static Motes) is in an open area within our offices.  
 <br><br>
 <li> <b>Fixed 802.11 Wireless</b>: Netbed's
 <a href="tutorial/docwrapper.php3?docname=wireless.html">Fixed Wireless</a>
@@ -149,7 +149,7 @@ locations on multiple floors. Experimentors can pick what nodes they
 want to use, and as with other fixed nodes, can replace the software
 that runs on the nodes, all the way down to operating system.
 <br><br>
-<li> <b>Emulab Classic</b>: a universally-available
+<li> <b>Emulab Classic</b>: a universally available
 time- and space-shared network emulator which achieves new levels of
 ease of use. Several hundred PCs in racks, combined with secure,
 user-friendly web-based tools, and driven by <it>ns</it>-compatible
@@ -163,7 +163,7 @@ minutes.
 <br><br>
 Utah's local installation features high-speed Cisco switches connecting 5
 100Mbit interfaces on each of 168 PCs (soon to be
-<b>328 nodes</b> with the addition of 160 3GHZ Dell PowerEdge 2850s).
+<b>328 nodes</b> with the addition of 160 3GHz Dell PowerEdge 2850s).
 The PC nodes can be used as
 edge nodes running arbitrary programs, simulated routers,
 traffic-shaping nodes, or traffic generators.  While an "experiment"

@@ -857,11 +857,11 @@ function PAGEFOOTER($view = NULL) {
 	        <center>
                 <font size=-1>
 		[ <a href=http://www.cs.utah.edu/flux/>
-                    The&nbsp;Flux&nbsp;Research&nbsp;Group</a> ]
+                    Flux&nbsp;Research&nbsp;Group</a> ]
 		[ <a href=http://www.cs.utah.edu/>
                     School&nbsp;of&nbsp;Computing</a> ]
 		[ <a href=http://www.utah.edu/>
-                    The&nbsp;University&nbsp;of&nbsp;Utah</a> ]
+                    University&nbsp;of&nbsp;Utah</a> ]
 		</font>
 		<br>
                 <!-- begin copyright -->
