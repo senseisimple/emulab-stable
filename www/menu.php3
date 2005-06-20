@@ -632,7 +632,8 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
 
     if ($TBMAINSITE) {
 	echo "<meta NAME=\"keywords\" ".
-	           "CONTENT=\"network, emulation, internet, emulator\">\n";
+	           "CONTENT=\"network, emulation, internet, emulator, ".
+	           "mobile, wireless, robotic\">\n";
 	echo "<meta NAME=\"robots\" ".
 	           "CONTENT=\"NOARCHIVE\">\n";
 	echo "<meta NAME=\"description\" ".
