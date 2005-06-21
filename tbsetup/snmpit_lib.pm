@@ -126,12 +126,12 @@ sub ReadTranslationTable {
     print "FILLING %Ports\n" if $debug;
     $result = DBQueryFatal("select node_id1,card1,port1,node_id2,card2,port2 ".
 	    "from wires;");
-    while ( @_ = $result->fetchrow_array()) {
-	$name = "$_[0]:$_[1]";
+    while ( my @row = $result->fetchrow_array()) {
+        my ($node_id1, $card1, $port1, $node_id2, $card2, $port2) = @row;
+	$name = "$node_id1:$card1";
 	print "Name='$name'\t" if $debug > 2;
-	print "Dev='$_[3]'\t" if $debug > 2;
-	$switchport = join(":",($_[3],$_[4]));
-	$switchport .=".$_[5]";
+	print "Dev='$node_id2'\t" if $debug > 2;
+	$switchport = "$node_id2:$card2.$port2";
 	print "switchport='$switchport'\n" if $debug > 2;
 	$Ports{$name} = $switchport;
 	$Ports{$switchport} = $name;
