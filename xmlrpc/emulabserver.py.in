@@ -830,7 +830,7 @@ class osid:
                            "o.* FROM "
                            "os_info as o "
                            "left join group_membership as g on g.pid=o.pid "
-                           "where g.uid=%s or o.shared=1 and "
+                           "where (g.uid=%s or o.shared=1) and "
                            "(o.osname=%s or o.osid=%s)",
                            (self.uid, argdict["osid"], argdict["osid"]),
                            True)
