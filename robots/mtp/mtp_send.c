@@ -110,10 +110,13 @@ static int interpret_options(int *argcp, char ***argvp)
 	float orientation;
 	float horizontal;
 	float vertical;
+	float speed;
 	double timestamp;
 	int status;
 	char *message;
 	int role;
+	double vleft;
+	double vright;
 
 	int port;
       int wiggle_type;
@@ -128,10 +131,13 @@ static int interpret_options(int *argcp, char ***argvp)
 	DBL_MIN,	/* orientation */
 	DBL_MIN,	/* horizontal */
 	DBL_MIN,	/* vertical */
+	0.2,		/* speed */
 	-1.0,		/* timestamp */
 	-1,		/* status */
 	NULL,		/* message */
 	MTP_ROLE_RMC,	/* role */
+	DBL_MIN,
+	DBL_MIN,
 	-1,		/* port */
     -1,     /* wiggle type */
     };
@@ -146,7 +152,7 @@ static int interpret_options(int *argcp, char ***argvp)
     /* Loop through the current set of command-line flags. */
     while ((c = getopt(argc,
 		       argv,
-		       "hdwi:c:C:n:U:x:y:o:H:V:t:s:m:r:P:W:")) != -1) {
+		       "hdwi:c:C:n:U:x:y:o:H:V:t:s:m:r:P:S:W:L:R:D:")) != -1) {
 	switch (c) {
 	case 'h':
 	    usage();
@@ -308,28 +314,70 @@ static int interpret_options(int *argcp, char ***argvp)
 		exit(1);
 	    }
 	    break;
-    case 'W':
-      if (strcasecmp(optarg,"180r") == 0) {
-        args.wiggle_type = MTP_WIGGLE_180_R;
-      }
-      else if (strcasecmp(optarg,"180rl") == 0) {
-        args.wiggle_type = MTP_WIGGLE_180_R_L;
-      }
-      else if (strcasecmp(optarg,"360r") == 0) {
-        args.wiggle_type = MTP_WIGGLE_360_R;
-      }
-      else if (strcasecmp(optarg,"360rl") == 0) {
-        args.wiggle_type = MTP_WIGGLE_360_R_L;
-      }
-      else {
-        fprintf(stderr,
-                "error: W option must be one of: 180r, 180rl, 360r, 360rl\n"
-                );
-        usage();
-        exit(1);
-      }
-      break;
+	case 'S':
+	    if (sscanf(optarg, "%f", &args.speed) != 1) {
+		fprintf(stderr,
+			"error: S option is not a number: %s\n",
+			optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'W':
+	    if (strcasecmp(optarg,"180r") == 0) {
+		args.wiggle_type = MTP_WIGGLE_180_R;
+	    }
+	    else if (strcasecmp(optarg,"180rl") == 0) {
+		args.wiggle_type = MTP_WIGGLE_180_R_L;
+	    }
+	    else if (strcasecmp(optarg,"360r") == 0) {
+		args.wiggle_type = MTP_WIGGLE_360_R;
+	    }
+	    else if (strcasecmp(optarg,"360rl") == 0) {
+		args.wiggle_type = MTP_WIGGLE_360_R_L;
+	    }
+	    else {
+		fprintf(stderr,
+			"error: W option must be one of: 180r, 180rl, 360r, 360rl\n"
+			);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'L':
+	    if (sscanf(optarg, "%lf", &args.vleft) != 1) {
+		fprintf(stderr,
+			"error: L option is not a number: %s\n",
+			optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'R':
+	    if (sscanf(optarg, "%lf", &args.vright) != 1) {
+		fprintf(stderr,
+			"error: R option is not a number: %s\n",
+			optarg);
+		usage();
+		exit(1);
+	    }
+	    break;
+	case 'D':
+	    {
+		int delay;
+		
+		if (sscanf(optarg, "%d", &delay) != 1) {
+		    fprintf(stderr,
+			    "error: S option is not a number: %s\n",
+			    optarg);
+		    usage();
+		    exit(1);
+		}
+		sleep(delay);
+	    }
+	    break;
 	default:
+	    fprintf(stderr, "error: bad option -- %c\n", c);
 	    usage();
 	    exit(1);
 	    break;
@@ -385,6 +433,8 @@ static int interpret_options(int *argcp, char ***argvp)
 	opcode = MTP_WIGGLE_STATUS;
     else if (strcasecmp(argv[0], "request-report") == 0)
 	opcode = MTP_REQUEST_REPORT;
+    else if (strcasecmp(argv[0], "command-wheels") == 0)
+	opcode = MTP_COMMAND_WHEELS;
     else {
 	fprintf(stderr, "error: unknown command: %s\n", argv[0]);
 	usage();
@@ -406,7 +456,7 @@ static int interpret_options(int *argcp, char ***argvp)
 		"  status:\t%d\n"
 		"  message:\t%s\n"
 		"  port:\t\t%d\n"
-        "  wiggle-type:\t\t%d\n",
+		"  wiggle-type:\t\t%d\n",
 		opcode,
 		args.id,
 		args.code,
@@ -538,6 +588,7 @@ static int interpret_options(int *argcp, char ***argvp)
 			MA_Y, args.y,
 			MA_Theta, args.orientation,
 			MA_Timestamp, args.timestamp,
+			MA_Speed, args.speed,
 			MA_TAG_DONE);
 	break;
 
@@ -588,6 +639,23 @@ static int interpret_options(int *argcp, char ***argvp)
 			MA_Opcode, opcode,
 			MA_Role, args.role,
 			MA_RobotID, args.id,
+			MA_TAG_DONE);
+	break;
+
+    case MTP_COMMAND_WHEELS:
+	if (args.id == -1)
+	    required_option("i");
+	if (args.vleft == DBL_MIN)
+	    required_option("L");
+	if (args.vright == DBL_MIN)
+	    required_option("R");
+	
+	mtp_init_packet(&mp,
+			MA_Opcode, opcode,
+			MA_Role, args.role,
+			MA_RobotID, args.id,
+			MA_vleft, args.vleft,
+			MA_vright, args.vright,
 			MA_TAG_DONE);
 	break;
 	
