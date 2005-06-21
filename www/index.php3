@@ -162,8 +162,9 @@ minutes.
 
 <br><br>
 Utah's local installation features high-speed Cisco switches connecting 5
-100Mbit interfaces on each of 168 PCs (soon to be
-<b>328 nodes</b> with the addition of 160 3GHz Dell PowerEdge 2850s).
+100Mbit interfaces on each of 168 PCs (soon to be <b>328 PCs</b>
+with the addition of <b>160</b>
+<a href=docwrapper.php3?docname=hardware.html>3GHz Dell PowerEdge 2850s</a>).
 The PC nodes can be used as
 edge nodes running arbitrary programs, simulated routers,
 traffic-shaping nodes, or traffic generators.  While an "experiment"
