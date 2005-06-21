@@ -997,7 +997,7 @@ def do_sync(args, mode="pull", must_be_active=1):
                     osid = physical[vhost]["osid"]
                     if osid not in OSIDS:
                         oi = osinfo_method(PACKAGE_VERSION, {
-                            "osid" : physical[vhost]["osid"] })
+                            "osid" : osid })
                         if oi["code"] == RESPONSE_SUCCESS:
                             OSIDS[osid] = oi["value"]
                             pass
@@ -1005,7 +1005,7 @@ def do_sync(args, mode="pull", must_be_active=1):
                             OSIDS[osid] = None
                             pass
                         pass
-                    
+
                     if not OSIDS[osid]:
                         sys.stderr.write("warning: unknown OSID %s for %s\n" %
                                          (physical[vhost]["osid"], vhost))
@@ -1429,22 +1429,26 @@ def do_clean(args):
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
     os.chdir(logdir)
 
-    for entry in os.listdir(logdir):
-        entry = os.path.join(logdir, entry)
-        if os.path.isdir(entry):
-            for root, dirs, files in os.walk(entry, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
+    if do_experiment:
+        for entry in os.listdir(logdir):
+            entry = os.path.join(logdir, entry)
+            if os.path.isdir(entry):
+                for root, dirs, files in os.walk(entry, topdown=False):
+                    for name in files:
+                        os.remove(os.path.join(root, name))
+                        pass
+                    for name in dirs:
+                        os.rmdir(os.path.join(root, name))
+                        pass
                     pass
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
-                    pass
+                os.rmdir(entry)
                 pass
-            os.rmdir(entry)
             pass
         pass
-
-    do_sync(args, mode="clean", must_be_active=0)
+    
+    if do_nodes:
+        do_sync(args, mode="clean", must_be_active=0)
+        pass
 
     return retval
 
