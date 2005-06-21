@@ -31,8 +31,8 @@ functionality, such as running programs or generating traffic, and a scheduler
 that triggers the events at the appropriate time.  When your experiment is
 swapped in, any agents specified in your NS file are automatically setup on the
 experimental nodes and the ops node.  A short time after the experiment becomes
-"active", event time begins to flow.  As event time progresses, any events
-scheduled in the NS file for a particular time offset are sent to the
+<i>active</i>, "event time" begins to flow.  As event time progresses, any
+events scheduled in the NS file for a particular time offset are sent to the
 appropriate agents.  Alternatively, events can be sent at runtime using the
 <b>tevc</b> command from ops or an experimental node.  For a detailed
 walkthrough of using the event system, see the <a
@@ -154,12 +154,12 @@ sent by the <b>report</b> event.
     $thisway run
     $thatway run
     $ns report
-    $ns swapout
  }]
 </pre></code>
 </blockquote>
 <center>
-<font size="-2">Example 1: .</font>
+<font size="-2">Example 1: Adds some text to the report e-mail, runs an
+application twice, and then sends a report to the user.</font>
 </center>
 
 
