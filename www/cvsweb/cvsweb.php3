@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -41,6 +41,29 @@ $query = preg_replace("/ /","\\ ",$query);
 $name = preg_replace("/ /","\\ ",$name);
 $agent = preg_replace("/ /","\\ ",$agent);
 $encoding = preg_replace("/ /","\\ ",$encoding);
+
+#
+# A cleanup function to keep the child from becoming a zombie, since
+# the script is terminated, but the children are left to roam.
+#
+$fp = 0;
+
+function SPEWCLEANUP()
+{
+    global $fp;
+
+    if (!$fp || !connection_aborted()) {
+	exit();
+    }
+    while ($line = fgets($fp)) {
+        # Suck it all up.
+        ;
+    }
+    pclose($fp);
+    exit();
+}
+set_time_limit(0);
+register_shutdown_function("SPEWCLEANUP");
 
 $fp = popen("env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
             "SCRIPT_NAME=$name HTTP_USER_AGENT=$agent " .
