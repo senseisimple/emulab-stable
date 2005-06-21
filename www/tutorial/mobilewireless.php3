@@ -130,6 +130,16 @@ small version (4 Motes and 4 Stargates on 4 robots, all remotely
 controllable, plus 2 static Motes) is in an open area within our offices;
 the big one will be elsewhere.
 
+<p>
+This manual is broken up into the following sections:
+
+<ol>
+<li><a href="#INTRO">Introduction</a>
+<li><a href="#MOBILE">Mobile Experiments</a>
+<li><a href="#WIRELESS">Wireless Traffic</a>
+<li><a href="#FAQ">Frequently Asked Questions</a>
+</ol>
+
 <?php NLCBODYEND() ?>
 
 <?php NLCEMPTY() ?>
@@ -143,6 +153,7 @@ the big one will be elsewhere.
 <?php NLCBODYBEGIN() ?>
 <!-- Center -->
 
+<a name="INTRO"></a>
 In addition to <a href="docwrapper.php3?docname=wireless.html">fixed wireless
 nodes</a> (currently predominantly 802.11), Emulab also features wireless nodes attached
 to robots that can move
@@ -241,6 +252,7 @@ their feedback.
 
 <?php NLCBODYBEGIN() ?>
 
+<a name="MOBILE"></a>
 Creating a mobile wireless experiment is very similar to creating a regular
 Emulab experiment: you construct an NS file, swap in the experiment, and then
 you can log into the nodes to run your programs.  There are, of course, some
@@ -565,6 +577,7 @@ IDs.</font>
 
 <?php NLCBODYBEGIN() ?>
 
+<a name="WIRELESS"></a>
 Now that you are getting the hang of the mobility part of this testbed, we can
 move on to working with wireless network traffic.  As stated earlier, each of
 the robots carries a Mica2 mote (pictured on the right), which is a popular
@@ -681,6 +694,37 @@ our servers.
 
 <tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
+<tr>
+
+<?php NLCH1("Frequently Asked Questions") ?>
+
+<?php NLCBODYBEGIN() ?>
+
+<table class="stealth">
+
+<a name="FAQ"></a>
+<tr><th>How do the robots keep from running into each other/objects?</th></tr>
+<tr><td>
+The robots are equipped with proximity sensors that can sense objects in their
+path.  We use these to detect and navigate around other robots and obstacles
+that aren't known ahead of time.
+</td></tr>
+
+<tr><th>Do the robots follow the lines on the floor?</th></tr>
+<tr><td>
+No, the lines on the floor are used to calibrate the overhead cameras that
+track the position of the robot.
+</td></tr>
+
+</table>
+
+<?php NLCBODYEND() ?>
+
+<?php NLCEMPTY() ?>
+
+</tr>
+
+<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
 </table>
 
