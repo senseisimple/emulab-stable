@@ -140,6 +140,15 @@ This manual is broken up into the following sections:
 <li><a href="#FAQ">Frequently Asked Questions</a>
 </ol>
 
+<p>
+If you are interested in how the mobile testbed works, you can read the
+following tech report:
+
+<blockquote>
+<a href="http://www.cs.utah.edu/flux/papers/truemobile-ftn2005-02.pdf">A Mobile
+Robotic Wireless and Sensor Network Testbed</a>
+</blockquote>
+
 <?php NLCBODYEND() ?>
 
 <?php NLCEMPTY() ?>
