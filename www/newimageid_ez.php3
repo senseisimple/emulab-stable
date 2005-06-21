@@ -611,7 +611,7 @@ function SPITFORM($formfields, $errors)
 			<li> if you customized one of our standard BSD
 			     images (FBSD-*) then it is partition 1.
 			</li>
-			<li> if you customized one of our standard WINDOWS
+			<li> if you customized one of our standard Windows XP
 			     images then it is partition 1, and make sure
                              you check the <em>Whole Disk Image</em> box.
 			</li>
@@ -631,9 +631,10 @@ function SPITFORM($formfields, $errors)
 		      </li>
 		      <li> If you use one of our standard Linux or FreeBSD
 			   kernels, or started from our kernel configs, mark ipod.
+			   ipod is not supported on Windows XP.
 		      </li>
-		      <li> If it is based on one of our standard Linux or
-			   FreeBSD images (or otherwise
+		      <li> If it is based on one of our standard Linux,
+			   FreeBSD, or Windows XP images (or otherwise
 			   sends its own ISUP notification), mark isup.
 		      </li>
 		    </ul>
