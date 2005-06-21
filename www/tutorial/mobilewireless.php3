@@ -127,7 +127,7 @@ function NLCEMPTY()
 We have deployed and opened to public external use a small version of
 what will grow into a large mobile robotic wireless testbed.  The
 small version (4 Motes and 4 Stargates on 4 robots, all remotely
-controllable, plus 2 static Motes) is in an open area within our offices;
+controllable, plus 25 static Motes) is in an open area within our offices;
 the big one will be elsewhere.
 
 <p>
@@ -204,14 +204,20 @@ The current features of the mobile wireless testbed are:
 <li><a href="http://www.xbow.com/Products/XScale.htm">Intel Stargate</a> single
 board computers for each robot. (<b><a href="<?php echo $TBBASE?>/doc/docwrapper.php3?docname=stargatenotes.html">Important Notes!</a></b>)
 <li>Roaming an area about 8 x 3.5 meters with a sheetrock-covered steel pillar in the middle.
-<li>Two statically-placed
-<a href="http://www.xbow.com/Products/productsdetails.aspx?sid=90">E-Mote</a>
-Ethernet gateways for Berkeley Motes.
-<li><a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">900MHz Mica2 
-motes</a> attached to each Stargate and E-Mote.
-<li>Four overhead cameras for vision-based position tracking of the robots.
-<li>Two <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> for viewing the
-robots in their habitat.
+<li>Each robot has its own
+    <a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">
+    900MHz Mica2 mote</a> attached to the Stargate.
+<li>25 statically-placed
+    <a href="http://www.xbow.com/Products/productsdetails.aspx?sid=72">
+    900MHz Mica2 motes</a>, two of which are attached to
+    <a href="http://www.xbow.com/Products/productsdetails.aspx?sid=90">
+    E-Mote</a> Ethernet gateways for Berkeley Motes.
+<li><a href=http://www.xbow.com/Products/productsdetails.aspx?sid=75>
+    Mica2 Multi-Sensor Module</a> boards attached to 10 floor level Motes,
+    and to each Robot (Stargate) Mote.
+<li>Six overhead cameras for vision-based position tracking of the robots.
+<li>Three <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> for viewing 
+the robots in their habitat.
 <li>An <a href="<?php echo $TBBASE ?>/robotmap.php3">abstract map</a> of the
 current locations of the robots.
 <li>Open for public use weekdays 8am-6pm MST, with operations support.
