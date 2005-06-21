@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1223,8 +1223,13 @@ sub listPorts($) {
 	    @data = @{$ifTable};
 	}
 	if (! defined $self->{IFINDEX}{$data[1]}) { next; }
-	my $port = portnum("$self->{NAME}:$data[1]")
-	    || portnum("$self->{NAME}:".$self->{IFINDEX}{$data[1]});
+	my $port;
+	if ($data[1] =~ /\d+\.\d+/) {
+	    $port = portnum("$self->{NAME}:$data[1]")
+		|| portnum("$self->{NAME}:".$self->{IFINDEX}{$data[1]});
+	} else {
+	    $port = portnum("$self->{NAME}:".$self->{IFINDEX}{$data[1]});
+	}
 	if (! defined $port) { next; }
 	$self->debug("$port\t$data[0]\t$data[2]\n",2);
 	if    ($data[0]=~/AdminStatus/) {$Able{$port}=($data[2]=~/up/?"yes":"no");}
@@ -1565,8 +1570,8 @@ sub readifIndex($) {
                     #
                     if (($module == 0) && ($type =~ /^gi/i)) {
                         $module = 1;
-                        $self->debug("NON_MODULAR_HACK: Moving $descr to mod
-                            $module");
+                        $self->debug("NON_MODULAR_HACK: ".
+				     "Moving $descr to mod $module\n");
                     }
                 }
 		my $modport = "$module.$port";
