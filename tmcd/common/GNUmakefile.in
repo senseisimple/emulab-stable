@@ -47,6 +47,7 @@ other-install:
 	(cd ../../os; $(MAKE) client-install)
 	(cd ../../event; $(MAKE) client-install)
 	(cd ../../sensors/slothd; $(MAKE) client-install)
+	(cd ../../tools; $(MAKE) client-install)
 
 dir-install:
 	$(INSTALL) -m 755 -o root -g wheel -d $(ETCDIR)
