@@ -192,6 +192,8 @@ Testbed.
 
 <a href='pix/side-crop-big.jpg'>
    <img src='pix/side-crop-smaller.jpg' align=right /></a>
+<a href='tutorial/webcam-ss.gif'>
+   <img src='pix/robots-small.jpg' align=right /></a>
 
 <h3>Links to help you get started:</h3>
 <ul>
