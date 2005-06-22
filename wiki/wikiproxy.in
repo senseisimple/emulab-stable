@@ -103,6 +103,9 @@ elsif ($action eq "setgroups") {
 elsif ($action eq "xlogin") {
     exit(WikixLogin(@ARGV));
 }
+elsif ($action eq "remap") {
+    exit(WikiRemap(@ARGV));
+}
 else {
     die("*** $0:\n".
 	"    Do not know what to do with '$action'!\n");
@@ -751,6 +754,32 @@ sub WikixLogin(@)
     print KEY "$secretkey\n";
     print KEY time() . "\n";
     close(KEY);
+    return 0;
+}
+     
+#
+# Remap user.
+#
+sub WikiRemap(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $wikiname) = @_;
+
+    #
+    # Remap user in the user map. 
+    #
+    dbmopen(%MAPDB, $USERMAPDB, 0644) or
+	fatal("Cannot open $USERMAPDB: $!");
+
+    print "Current mapping is ". $MAPDB{$user} . "\n";
+
+    $MAPDB{$user} = $wikiname;
+
+    # Write the DB back out.
+    dbmclose(%MAPDB);	
+
     return 0;
 }
      
