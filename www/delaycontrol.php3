@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -179,10 +179,12 @@ if ($dochange == "1") {
 # Okay, even if changes were made, keep going and report again.
 # 
 $result_delays =
-    DBQueryFatal("SELECT * FROM delays WHERE eid='$eid' AND pid='$pid' " .
+    DBQueryFatal("select * from delays ".
+		 "where eid='$eid' and pid='$pid' and noshaping=0 " .
 		 "order by vname,vnode0,vnode1");
 $result_linkdelays =
-    DBQueryFatal("SELECT * FROM linkdelays WHERE eid='$eid' AND pid='$pid' ".
+    DBQueryFatal("select * from linkdelays ".
+		 "where eid='$eid' and pid='$pid' " .
 		 "order by vlan,vnode");
 
 if (mysql_num_rows($result_delays) == 0 &&

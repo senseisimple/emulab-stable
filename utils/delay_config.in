@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -329,7 +329,7 @@ sub ChangeDelayConfig() {
     my $query_string;
 
     $query_string = "select * from delays ".
-	"where pid='$pid' and eid='$eid' and vname='$link' ";
+	"where pid='$pid' and eid='$eid' and vname='$link' and noshaping=0 ";
 
     $query_string .= "and (vnode0='$srcvnode' or vnode1='$srcvnode')"
 	if (defined($srcvnode));

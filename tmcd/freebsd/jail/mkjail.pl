@@ -674,6 +674,23 @@ sub mkrootfs($)
     }
 
     #
+    # Mount up a local logs directory. 
+    #
+    mysystem("mkdir -p $path/logs")
+	if (! -e "$path/logs");
+    mkdir("$path/root/$LOCALMNTPNT/logs", 0775);
+    
+    if ($NFSMOUNT_REMOTE) {
+	mysystem("mount localhost:$path/logs ".
+		 "      $path/root/$LOCALMNTPNT/logs");
+    }
+    else {
+	mysystem("mount -t null $path/logs ".
+		 "      $path/root/$LOCALMNTPNT/logs");
+    }
+    push(@mntpoints, "$path/root/$LOCALMNTPNT/logs");
+
+    #
     # Ug. Until we have SFS working the way I want it, NFS mount the
     # usual directories inside the jail. This duplicates a lot of mounts,
     # but not sure what to do about that. 
@@ -791,6 +808,22 @@ sub restorerootfs($)
 	}
 	push(@mntpoints, "$path/root/$LOCALMNTPNT/$PID");
     }
+
+    #
+    # Mount up a local logs directory. 
+    #
+    mysystem("mkdir -p $path/logs")
+	if (! -e "$path/logs");
+    
+    if ($NFSMOUNT_REMOTE) {
+	mysystem("mount localhost:$path/logs ".
+		 "      $path/root/$LOCALMNTPNT/logs");
+    }
+    else {
+	mysystem("mount -t null $path/logs ".
+		 "      $path/root/$LOCALMNTPNT/logs");
+    }
+    push(@mntpoints, "$path/root/$LOCALMNTPNT/logs");
 
     #
     # Ug. Until we have SFS working the way I want it, NFS mount the

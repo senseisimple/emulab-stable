@@ -2667,3 +2667,39 @@ last_net_act,last_cpu_act,last_ext_act);
 	  distance_remaining float default NULL,
 	  PRIMARY KEY  (node_id)
 	) TYPE=MyISAM;
+
+1.339: Add stuff for tracing links and lans.
+
+        alter table virt_lans add traced tinyint(1) default '0' \
+                after is_accesspoint;
+        alter table virt_lans add trace_type \
+	        enum('header','packet','monitor') NOT NULL default 'header' \
+		after traced;
+        alter table virt_lans add trace_expr tinytext \
+	        after trace_type;
+        alter table virt_lans add trace_snaplen \
+                int(11) NOT NULL default '0' \
+	        after trace_expr;
+        alter table virt_lans add trace_endnode \
+               tinyint(1) NOT NULL default '0' \
+               after trace_snaplen;
+
+        alter table delays add noshaping tinyint(1) default '0' \
+                after card1;
+
+	CREATE TABLE traces (
+	  node_id varchar(32) NOT NULL default '',
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  iface0 varchar(8) NOT NULL default '',
+	  iface1 varchar(8) NOT NULL default '',
+	  pid varchar(32) default NULL,
+	  eid varchar(32) default NULL,
+	  linkvname varchar(32) default NULL,
+	  vnode varchar(32) default NULL,
+	  trace_type tinytext,
+	  trace_expr tinytext,
+	  trace_snaplen int(11) NOT NULL default '0',
+	  PRIMARY KEY  (node_id,idx),
+	  KEY pid (pid,eid)
+	) TYPE=MyISAM;
+

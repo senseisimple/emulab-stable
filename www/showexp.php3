@@ -175,6 +175,9 @@ if ($expstate) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Modify Traffic Shaping",
 			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
+
+	WRITESUBMENUBUTTON("Link Tracing/Monitoring",
+			   "linkmon_list.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
 

@@ -3236,6 +3236,7 @@ sub TBRobotLabExpt($$)
 		   "ipport_ranges",
 		   "v2pmap",
 		   "linkdelays",
+		   "traces",
 		   "portmap");
 
 #

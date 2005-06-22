@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,6 +42,7 @@ my $ROUTECONFIG   = "$BINDIR/rc/rc.route";
 my $TUNCONFIG     = "$BINDIR/rc/rc.tunnels";
 my $DELAYCONFIG   = "$BINDIR/rc/rc.delays";
 my $KEYCONFIG     = "$BINDIR/rc/rc.keys";
+my $TRACECONFIG   = "$BINDIR/rc/rc.trace";
 
 #
 # Load the OS independent support library. It will load the OS dependent

@@ -1,0 +1,192 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+#
+# Control tracing/monitoring on links.
+#
+sub usage()
+{
+    print(STDERR
+	  "Usage: linkmon_ctl [-d] [-s vnode] <pid> <eid> <link> <action>\n".
+	  "  pid = Project ID\n".
+	  "  eid = Experiment ID\n".
+	  " link = link name from ns file, ie. 'link1' in\n".
+	  "        'set link1 [\$ns duplex-link \$A \$B 10Kb 0ms DropTail]'\n".
+	  "action= One of pause, restart, kill\n".
+	  "Options:\n".
+	  "   -d = turn on debugging\n".
+	  "   -s = Select the source of the link to determine which pipe\n");
+    # Web interface cares about this return value!
+    exit(2);
+}
+my  $optlist = "ds:";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TEVC        = "$TB/bin/tevc";
+my $debug	= 0;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 4) {
+    usage();
+}
+# Locals
+my $pid    = shift(@ARGV);
+my $eid    = shift(@ARGV);
+my $link   = shift(@ARGV);
+my $action = shift(@ARGV);
+my $srcvnode;
+
+if (defined($options{"s"})) {
+    $srcvnode = $options{"s"};
+
+    if ($srcvnode =~ /^([-\w]+)$/) {
+	$srcvnode = $1;
+    }
+    else {
+	die("*** Bad srcvnode name: $srcvnode.\n");
+    }
+}
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("*** Bad data in pid: $pid.\n");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("*** Bad data in eid: $eid.\n");
+}
+if ($link =~ /^([-\w]+)$/) {
+    $link = $1;
+}
+else {
+    die("*** Bad data in link: $link.\n");
+}
+if ($action =~ /^([\w]+)$/) {
+    $action = $1;
+}
+else {
+    die("*** Bad data in action: $action\n");
+}
+usage()
+    if ($action ne "pause" &&
+	$action ne "restart" &&
+	$action ne "kill" &&
+	$action ne "snapshot");
+
+# Permission check.
+#
+if ($UID && !TBAdmin($UID) &&
+    ! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
+    die("*** $0:\n".
+	"    You do not have permission to modify the delay parameters!\n");
+}
+
+#
+# No transitional experiments.
+#
+my $estate = ExpState($pid, $eid);
+if (! $estate) {
+    die("*** $0:\n".
+	"    No such experiment $pid/$eid exists!\n");
+}
+if ($estate ne EXPTSTATE_ACTIVE) {
+    die("*** $0:\n".
+	"    Experiment $pid/$eid must be ACTIVE\n".
+	"    to control its tracing/monitoring\n");
+}
+
+#
+# Link or Lan!
+# 
+$query_result =
+    DBQueryFatal("select member from virt_lans ".
+		 "where pid='$pid' and eid='$eid' and vname='$link'");
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    $link is not a link in $pid/$eid!\n");
+}
+my $islink = ($query_result->numrows == 2 ? 1 : 0);
+
+#
+# Inject an event. 
+#
+my $inject_string = "$TEVC -e $pid/$eid now $link";
+
+# Direct the event to the whoever is handling this particular delay.
+$inject_string .= "-${srcvnode}"
+    if (defined($srcvnode));
+
+# XXX The actual agent name. Yuck!
+$inject_string .= "-tracemon";
+
+#
+# Map action
+#
+if ($action eq "pause") {
+    $action = "STOP";
+}
+elsif ($action eq "restart") {
+    $action = "START";
+}
+elsif ($action eq "stop") {
+    $action = "KILL";
+}
+elsif ($action eq "snapshot") {
+    $action = "SNAPSHOT";
+}
+$inject_string .= " $action";
+
+if ($debug) {
+    print "$inject_string\n";
+}
+
+system($inject_string) &&
+    die("*** $0:\n".
+	"    Failed to inject delay update event!\n");
+    
+exit(0);

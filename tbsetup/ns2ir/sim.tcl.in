@@ -1169,6 +1169,9 @@ Simulator instproc make_event {outer event} {
 	"Link" -
 	"Lan" {
 	    set otype LINK
+	    set vnode {}
+	    set vname $obj
+	    
 	    switch -- $cmd {
 		"up"	    {set etype UP}
 		"down"	    {set etype DOWN}
@@ -1204,13 +1207,28 @@ Simulator instproc make_event {outer event} {
 		    set args  "PLR=$plr"
 		    set etype MODIFY
 		}
+		"trace" {
+		    set otype LINKTRACE
+		    set vname "${obj}-tracemon"
+
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set action [lindex $event 2]
+
+		    switch -- $action {
+			"pause"	    {set etype STOP}
+			"restart"   {set etype START}
+			"kill"	    {set etype KILL}
+			"snapshot"  {set etype SNAPSHOT}
+		    }
+		}
 		unknown {
 		    punsup "at $time $event"
 		    return
 		}
 	    }
-	    set vnode {}
-	    set vname $obj
 	    $obj mustdelay
 	}
 	"Node" {
@@ -1287,6 +1305,8 @@ Simulator instproc make_event {outer event} {
 	    set otype LINK
 	    set node [$obj get_node]
 	    set lanlink [$obj get_link]
+	    set vnode {}
+	    set vname "$lanlink-$node"
 	    $lanlink mustdelay
 	    switch -- $cmd {
 		"set" {
@@ -1325,13 +1345,28 @@ Simulator instproc make_event {outer event} {
 			}
 		    }
 		}
+		"trace" {
+		    set otype LINKTRACE
+		    set vname "${vname}-tracemon"
+
+		    if {[llength $event] < 3} {
+			perror "Wrong number of arguments: at $time $event"
+			return
+		    }
+		    set action [lindex $event 2]
+
+		    switch -- $action {
+			"pause"	    {set etype STOP}
+			"restart"   {set etype START}
+			"kill"	    {set etype KILL}
+			"snapshot"  {set etype SNAPSHOT}
+		    }
+		}
 		unknown {
 		    punsup "at $time $event"
 		    return
 		}
 	    }
-	    set vnode {}
-	    set vname "$lanlink-$node"
 	}
 	"Program" {
 	    set otype PROGRAM

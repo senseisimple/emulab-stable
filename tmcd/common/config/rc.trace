@@ -1,0 +1,377 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . " [-j vnodeid] [-r rtabid] ".
+	               "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $optlist = "j:r:";
+my $action  = "boot";
+my $vnodeid;
+my $rtabid;		# Currently ignored.
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# Script specific goo.
+my $PCAPPER    = "/usr/local/etc/emulab/pcapper";
+my @childpids  = ();
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#
+# Not all clients support this.
+#
+exit(0)
+    if (MFS() || PLAB());
+
+# Now safe to do this since MFS does not have full perl install.
+require Socket;
+import Socket;
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+
+# Parse command line.
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'j'})) {
+    $vnodeid = $options{'j'};
+    libsetup_setvnodeid($vnodeid);
+}
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Local goo
+# After libsetup include; tcpdumps run outside vnodes.
+my $PIDFILE  = (defined($vnodeid) ? CONFDIR() : "/var/run") . "/trace.pid";
+my $LOGFILE  = (defined($vnodeid) ? CONFDIR() : $LOGDIR)    . "/trace.debug";
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+# Signal handler to initiate cleanup in parent and the children.
+sub Pcleanup($)
+{
+    my ($signame) = @_;
+
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+    $SIG{HUP}  = 'IGNORE';
+
+    foreach my $pid (@childpids) {
+	print "Send a kill to $pid\n";
+	system("kill $pid");
+	waitpid($pid, 0);
+    }
+
+    unlink $PIDFILE;
+    exit(0);
+}
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my @traces;
+
+    print STDOUT "Checking Testbed trace configuration ... \n";
+
+    if (gettraceconfig(\@traces)) {
+	fatal("Could not get trace configuration from libsetup!");
+    }
+
+    return
+	if (!@traces);
+
+    #
+    # Create the /local partition to hold the logs, and mkdir the log
+    # directory. This works on Linux too!
+    #
+    if (! JAILED()) {
+	if (! -d "/local") {
+	    system("mkdir /local") == 0
+		or fatal("Could not mkdir /local");
+	    system("$BINDIR/mkextrafs.pl -f /local");
+	}
+	if (! -d "/local/local") {
+	    fatal("Could not create the /local filesystem");
+	}
+    }
+    if (! -d "/local/logs") {
+	system("mkdir /local/logs") == 0
+	    or fatal("Could not mkdir /local/logs");
+    }
+
+    #
+    # Need this for setting up the event sys arguments.
+    # 
+    my ($pid, $eid, $vname) = check_nickname();
+
+    #
+    # Now daemonize and let the boot continue. We have to disconnect and
+    # change our session id so that we do not get killed off (nor the tcpdump
+    # children) when boot script terminates. 
+    #
+    if (TBBackGround($LOGFILE)) {
+	sleep(1);
+	exit(0);
+    }
+    # Fully disconnect from bootup. 
+    setsid();
+
+    #
+    # Write our pid to a file so we can be killed later.
+    # 
+    system("echo '$PID' > $PIDFILE") == 0
+	or fatal("Could not create $PIDFILE!");
+    
+    $SIG{TERM} = \&Pcleanup;
+    $SIG{INT}  = \&Pcleanup;
+    $SIG{HUP}  = \&Pcleanup;
+
+    foreach my $trace (@traces) {
+	my $linkname      = $trace->{"LINKNAME"};
+	my $idx           = $trace->{"IDX"};
+	my $mac0          = $trace->{"MAC0"};
+	my $mac1          = $trace->{"MAC1"};
+	my $vnode         = $trace->{"VNODE"};
+	my $vnode_mac     = $trace->{"VNODE_MAC"};
+	my $trace_type    = $trace->{"TRACE_TYPE"};
+	my $trace_expr    = $trace->{"TRACE_EXPR"};
+	my $trace_snaplen = $trace->{"TRACE_SNAPLEN"};
+	my $log           = "$LOGDIR/trace_${linkname}-${vnode}.debug";
+ 	my $optargs	  = "";
+	my $eventargs     = "-e $pid/$eid -s localhost";
+	my $expr          = "";
+
+	#
+	# For the event system, listen for events to the entire link/lan,
+	# and for this node on the link/lan.
+	#
+	$eventargs .= " -L ${linkname}-${vnode}-tracemon,${linkname}-tracemon";
+
+	#
+	# User can specify a snaplen. Otherwise, If the trace type is
+	# "packet" then want a big enough snaplen to get an entire
+	# ethernet packet. 
+	#
+	if ($trace_snaplen > 0) {
+	    $optargs .= "-l $trace_snaplen";
+	}
+	elsif ($trace_type eq "packet") {
+	    $optargs .= "-l 1518";
+	}
+	if ($trace_type eq "packet" || $trace_type eq "header") {
+	    $optargs .= " -c";
+	}
+	if (defined($idx)) {
+	    #
+	    # Construct a local port argument that is known by boss.
+	    #
+	    $optargs .= " -P " . (4442 + $idx);
+	}
+
+	if (! JAILED()) {
+	    #
+	    # Need the ethernet address for the vnode so we can create an ether
+	    # rule for tcpdump. We want to make sure that we get the correct
+	    # packets. We want to capture just the packets from the source node
+	    # for the link, both before the pipe and after the pipe.  In this
+	    # way, we prevent too much duplication of packets, but we also get
+	    # to see how the dummynet pipes have affected te packets, since an
+	    # packet will end up in the output twice; once before the pipe and
+	    # again after the pipe. At the same time, we can also support
+	    # asymmetric rules (remember, a duplex link has two queues).
+	    #
+	    if ($vnode_mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+		$vnode_mac = "$1:$2:$3:$4:$5:$6";
+	    }
+	    else {
+		fatal("Bad mac in trace config: $vnode_mac\n");
+	    }
+	    $expr = "ether src $vnode_mac";
+	}
+
+	#
+	# If the user supplied their own rules, then combine it with the
+	# above expression. 
+	#
+	if (defined($trace_expr) and $trace_expr ne "") {
+	    if ($expr eq "") {
+		$expr = $trace_expr;
+	    }
+	    else {
+		$expr = "($expr) and ($trace_expr)";
+	    }
+	}
+
+	# Do this sillyness to avoid a wrapper sh, provided by perl.
+	# See perl manpage topic on exec ...
+	my @cmd  = split('\s+', "$PCAPPER -I $optargs $eventargs -t");
+	my @args = ();
+
+	foreach my $dir ("recv", "xmit") {
+	    my $file = "/local/logs/trace_${vnode}-${linkname}.${dir}";
+	    my $iface;
+	    my $mac;
+
+	    #
+	    # Need the proper iface.
+	    #
+	    if ($dir eq "recv") {
+		$mac = $mac0;
+	    }
+	    else {
+		$mac = $mac1;
+	    }
+
+	    #
+	    # If the iface is not there, then the tcpdump is getting
+	    # run on the end node (as in a linkdelay or jail). In this case
+	    # there is no input interface to bolt the tcpdump to; we just
+	    # capture packets as they leave (after the ipfw dummynet pipe).
+	    #
+	    next
+		if (!defined($mac) || $mac eq "");
+
+	    # convert to iface.
+	    if (! ($iface = findiface($mac))) {
+		print "*** WARNING: Could not map MAC $mac to an interface!\n";
+		next;
+	    }
+	    push(@cmd, "-f");
+	    push(@cmd, $file);
+	    push(@args, $iface);
+	    push(@args, "$expr");
+	}
+	my @cmdargs = (@cmd, @args);
+	print "Starting tcpdump: '@cmdargs'\n";
+
+	#
+	# Fork a child to run tcpdump. The parent saves up all the
+	# pids so that we can react to a shutdown later. We do this cause
+	# tcpdump is 3rd party and we do not have very good control
+	# over its output, and we want to avoid a shell wrapper around it
+	# by using a redirect. 
+	#
+	my $childpid = fork();
+	if ($childpid) {
+	    #
+	    # Parent. Save pid and keep going.
+	    #
+	    push(@childpids, $childpid);
+	    sleep(1);
+	}
+	else {
+	    $SIG{TERM} = 'DEFAULT';
+	    $SIG{INT}  = 'IGNORE';
+	    $SIG{HUP}  = 'DEFAULT';
+
+	    open(STDIN, "</dev/null") or
+		fatal("opening /dev/null for STDIN: $!");
+
+	    # Redirect stdout/stderr to log file.
+	    open(STDOUT, ">>$log")
+		or fatal("Could not redirect STDOUT");
+	    open(STDERR, ">&STDOUT")
+		    or fatal("Could not redirect STDERR");
+
+	    exec(@cmdargs);
+	    die("*** $0:\n".
+		"    Could not exec '@cmdargs'\n");
+	}
+    }
+
+    #
+    # Just wait. We will die via the signal handler above.
+    #
+    while (1) {
+	sleep(10000);
+    }
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    if (-e $PIDFILE) {
+	system("kill `cat $PIDFILE`");
+	sleep(1);
+	# Wait for it to die.
+	while (-e $PIDFILE) {
+	    print "Waiting for $PIDFILE to die ...\n";
+	    sleep(10);
+	}
+    }
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Shutdown tunnels before doing reconfig.
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}

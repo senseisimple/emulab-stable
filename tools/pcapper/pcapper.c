@@ -121,6 +121,7 @@ struct readpackets_args {
 	u_char index;
 	char *devname;
 	char *bpf_filter;
+	pcap_dumper_t *pdumper;
 };
 
 /*
@@ -237,6 +238,11 @@ int include_ipless_interfaces = 0;
  */
 int capture_mode    = 0;
 int capture_snaplen = 64;
+
+/*
+ * For the event system control function.
+ */
+volatile int killme = 0;
 volatile int stop   = 0;
 volatile int reload = 0;
 
@@ -274,10 +280,9 @@ extern int optreset;
 pthread_mutex_t lock;
 
 /*
- * Looks like libpcap has some re-entrance problems - let's only call dispatch
- * on one at a time
+ * A libc and libpcap lock, since we are using linuxthreads and plain libc.
  */
-pthread_mutex_t dispatch_lock;
+pthread_mutex_t lib_lock;
 
 /*
  * Condition variable for device threads to wait on for activity.
@@ -343,9 +348,11 @@ void usage(char *progname) {
 		       "-e pid/eid    Wait for a time start for experiment\n"
 		       "-s server     Use <server> for event server\n"
 	               "-L objname    Link/Lan object name\n"
+	               "-a            Adjust timestamps for start event\n"
 #endif
 	               "-c            Capture mode; capture packets\n"
-                       "-l            Capture snaplen (only with -c)\n"	    
+                       "-l            Capture snaplen (only with -c)\n"
+	               "-P portnum    Port to listen on\n"
 		       "interfaces... A list of interfaces to monitor\n";
 
     fprintf(stderr,short_usage,progname,progname);
@@ -355,7 +362,7 @@ void usage(char *progname) {
 
 static void cleanup(int sig)
 {
-	stop = 1;
+	killme = 1;
 }
 
 /*
@@ -369,6 +376,7 @@ int main (int argc, char **argv) {
 	struct in_addr ifaddr;
 	struct hostent *host;
 	int i;
+	int port = PORT;
 	struct sigaction action;
 	int limit_interfaces;
 	struct ifconf ifc;
@@ -415,7 +423,7 @@ int main (int argc, char **argv) {
 	/*
 	 * Process command-line arguments
 	 */
-	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:Icl:L:d")) != -1)
+	while ((ch = getopt(argc, argv, "f:i:e:hpnNzs:otb:Icl:L:dP:a")) != -1)
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -455,8 +463,10 @@ int main (int argc, char **argv) {
 			break;
 #ifdef EVENTSYS
 		case 'e':
-			adjust_time = 1;
 			exp = optarg;
+			break;
+		case 'a':
+			adjust_time = 1;
 			break;
 		case 'L':
 			objname = optarg;
@@ -470,6 +480,9 @@ int main (int argc, char **argv) {
 			break;
 		case 'I':
 			include_ipless_interfaces = 1;
+			break;
+		case 'P':
+			port = atoi(optarg);
 			break;
 		default:
 			fprintf(stderr,"Bad argument\n");
@@ -501,7 +514,7 @@ int main (int argc, char **argv) {
 	bzero(client_connected,sizeof(client_connected));
 
 	pthread_mutex_init(&lock,NULL);
-	pthread_mutex_init(&dispatch_lock,NULL);
+	pthread_mutex_init(&lib_lock,NULL);
 	pthread_cond_init(&cond,NULL);
 
 #ifdef EMULAB
@@ -680,6 +693,9 @@ int main (int argc, char **argv) {
 					if (!matched) {
 						continue;
 					}
+					fprintf(stderr, "F:%s\n", bpf_filter);
+					fflush(stderr);
+					
 					/*
 					 * Copy it into the global interfaces list
 					 */
@@ -688,6 +704,8 @@ int main (int argc, char **argv) {
 					strcat(interface_names[interfaces],bpf_filter);
 					strcat(interface_names[interfaces],"'");
 					strcat(interface_names[interfaces],"\n");
+					fprintf(stderr, "F:%s\n", bpf_filter);
+					fflush(stderr);
 					
 					printf("watched ");
 
@@ -727,13 +745,17 @@ int main (int argc, char **argv) {
 
 
 				/*
-				 * Start up a new thread to read packets from this
-				 * interface.
+				 * Start up a new thread to read packets from 
+				 * this interface.
 				 */
+				pthread_mutex_lock(&lib_lock);
 				args = (struct readpackets_args*)
 					malloc(sizeof(struct  readpackets_args));
 				args->devname = (char*)malloc(strlen(name) + 1);
 				args->bpf_filter = bpf_filter;
+				fprintf(stderr, "F:%s\n", bpf_filter);
+				fflush(stderr);
+				
 				strcpy(args->devname,name);
 				args->index = interfaces;
 				if (pthread_create(&getpacket_threads[interfaces],
@@ -741,6 +763,7 @@ int main (int argc, char **argv) {
 					fprintf(stderr,"Unable to start thread!\n");
 					exit(1);
 				}
+				pthread_mutex_unlock(&lib_lock);
 
 				interfaces++;
 			} while (tcpdump_mode && (interface_it < argc));
@@ -785,10 +808,11 @@ int main (int argc, char **argv) {
 	 * Wait for time to start
 	 */
 #ifdef EVENTSYS
-	if (adjust_time) {
+	if (exp) {
 	    event_handle_t ehandle;
 	    char server_string[1024];
 
+	    pthread_mutex_lock(&lib_lock);
 	    printf("Waiting for time start in experiment %s\n",exp);
 	    tuple = address_tuple_alloc();
 	    if (tuple == NULL) {
@@ -840,6 +864,7 @@ int main (int argc, char **argv) {
 		fprintf(stderr,"Unable to start thread!\n");
 		exit(1);
 	    }
+	    pthread_mutex_unlock(&lib_lock);
 	    pthread_cond_wait(&time_started,&lock);
 	    pthread_mutex_unlock(&lock);
 	}
@@ -870,6 +895,7 @@ int main (int argc, char **argv) {
 			/*
 			 * Start a new thread to feed the file
 			 */
+			pthread_mutex_lock(&lib_lock);
 			args = (struct feedclient_args*)
 				malloc(sizeof(struct feedclient_args));
 			args->fd = fd;
@@ -878,6 +904,7 @@ int main (int argc, char **argv) {
 			client_connected[i] = 1;
 			active = 1;
 			pthread_create(&thread,NULL,feedclient,args);
+			pthread_mutex_unlock(&lib_lock);
 			pthread_cond_broadcast(&cond);
 		}
 	}
@@ -898,7 +925,7 @@ int main (int argc, char **argv) {
 		perror("SO_REUSEADDR");
 
 	address.sin_family = AF_INET;
-	address.sin_port = htons(PORT);
+	address.sin_port = htons(port);
 	address.sin_addr.s_addr = INADDR_ANY;
 
 	if (bind(sock,(struct sockaddr*)(&address),sizeof(address))) {
@@ -922,33 +949,18 @@ int main (int argc, char **argv) {
 	 * In capture mode we just wait for a signal
 	 */
 	if (capture_mode) {
-		void *foo;
-
 		/*
 		 * Insert a handler to kill the threads cleanly.
 		 */
 		action.sa_handler = cleanup;
 		sigaction(SIGTERM, &action, NULL);
 		sigaction(SIGINT, &action, NULL);
-
-		active = 1;
-
-		while (! stop)
-			sleep(1);
-
-		/*
-		 * Wait for the packet readers to exit.
-		 */
-		for (i = 0; i < interfaces; i++) {
-			pthread_join(getpacket_threads[i], &foo);
-		}
-		exit(0);
 	}
 
 	/*
 	 * Loop forever, so that we can handle multiple clients connecting
 	 */
-	while (1) {
+	while (!killme) {
 		int fd;
 		struct feedclient_args *args;
 		struct sockaddr client_addr;
@@ -957,7 +969,10 @@ int main (int argc, char **argv) {
 		fd = accept(sock,&client_addr,&client_addrlen);
 
 		if (fd < 0) {
+			if (errno == EINTR)
+				break;
 			perror("accept");
+			fflush(stderr);
 			continue;
 		}
 		/*
@@ -997,7 +1012,15 @@ int main (int argc, char **argv) {
 			pthread_create(&thread,NULL,feedclient,args);
 		}
 	}
-
+	if (capture_mode) {
+		/*
+		 * Wait for the packet readers to exit.
+		 */
+		for (i = 0; i < interfaces; i++) {
+			pthread_join(getpacket_threads[i], NULL);
+		}
+	}
+	exit(0);
 }
 
 /*
@@ -1122,6 +1145,11 @@ void *feedclient(void *args) {
 		    timersub(&now,&start_time,&timestamp);
 		}
 #endif
+		/*
+		 * If tracing was paused, pause this too.
+		 */
+		if (stop)
+		    continue;
 
 		/*
 		 * Put a timestamp on the beginning of each line
@@ -1240,7 +1268,7 @@ void *readpackets(void *args) {
 
  again:
 	pthread_mutex_lock(&lock);
-	while (active == 0)
+	while (active == 0 || stop)
 		pthread_cond_wait(&cond, &lock);
 	pthread_mutex_unlock(&lock);
 
@@ -1291,14 +1319,14 @@ void *readpackets(void *args) {
 	 * immediately after, we do an extra open/close of the device.
 	 * Neither case is life threatening.
 	 */
-	while (active && !stop) {
-		if (pcap_dispatch(dev, -1, got_packet, &sargs->index) < 0) {
+	while (active && !(stop || killme)) {
+		if (pcap_dispatch(dev, -1, got_packet, args) < 0) {
 			pcap_perror(dev,"pcap_dispatch failed: ");
 			exit(1);
 		}
 	}
 	pcap_close(dev);
-	if (stop)
+	if (killme)
 		return 0;
 	goto again;
 }
@@ -1323,6 +1351,9 @@ void *readpackets_capturemode(void *args)
 	 */
 	size = capture_snaplen;
 
+	/* Lock the pcap stuff */
+	pthread_mutex_lock(&lib_lock);
+
 	/*
 	 * NOTE: We set the timeout to a full second - if we set it lower, we
 	 * don't get to see packets until a certain number have been buffered
@@ -1335,6 +1366,8 @@ void *readpackets_capturemode(void *args)
 		exit(1);
 	}
 	bpf_filter = sargs->bpf_filter;
+	fprintf(stderr, "F:%s\n", bpf_filter);
+	fflush(stderr);
 
 	/*
 	 * Put an empty filter on the device, or we get nothing (but only
@@ -1356,24 +1389,28 @@ void *readpackets_capturemode(void *args)
 	    pcap_setfilter(dev, &filter);
 	    pcap_freecode(&filter);
 	}
+	pthread_mutex_unlock(&lib_lock);
 	
 	/*
 	 * In capture mode, we need to open up the dump file for this
 	 * interface.
 	 */
  again:
+	pthread_mutex_lock(&lib_lock);
 	pdumper = pcap_dump_open(dev, filenames[sargs->index]);
+	pthread_mutex_unlock(&lib_lock);
 	if (pdumper == NULL) {
 		fprintf(stderr, "%s\n", pcap_geterr(dev));
 		exit(1);
 	}
+	sargs->pdumper = pdumper;
 
-	while (!stop && !reload) {
+	while (!killme && !reload) {
 		if (debug) {
-			fprintf(stderr, "packet(%d, %d)\n", active, getpid());
+			fprintf(stderr, "packet(%d)\n", getpid());
 			fflush(stderr);
 		}
-		if (pcap_dispatch(dev, -1, dump_packet, (u_char *)pdumper)
+		if (pcap_dispatch(dev, -1, dump_packet, (u_char *)sargs)
 		    < 0) {
 			pcap_perror(dev,"pcap_dispatch failed: ");
 			fflush(stderr);
@@ -1382,7 +1419,31 @@ void *readpackets_capturemode(void *args)
 	}
 	pcap_dump_close(pdumper);
 	if (reload) {
-		reload = 0;
+		/*
+		 * Save off the current file.
+		 */
+		char buf[BUFSIZ];
+
+		sprintf(buf, "%s.0", filenames[sargs->index]);
+		rename(filenames[sargs->index], buf);
+
+		fprintf(stderr, "reload=%d (%d)\n", reload, getpid());
+		fflush(stderr);
+
+		pthread_mutex_lock(&lock);
+		reload--;
+		if (reload == 0) {
+			pthread_mutex_unlock(&lock);
+			stop = 0;
+			pthread_cond_broadcast(&cond);
+		}
+		else {
+			while (reload)
+				pthread_cond_wait(&cond, &lock);
+			pthread_mutex_unlock(&lock);
+		}
+		fprintf(stderr, "reload=%d (%d)\n", reload, getpid());
+		fflush(stderr);
 		goto again;
 	}
 	pcap_close(dev);
@@ -1395,12 +1456,16 @@ void *readpackets_capturemode(void *args)
 void dump_packet(u_char *args, const struct pcap_pkthdr *header,
 		const u_char *packet)
 {
+	struct readpackets_args *sargs = (struct readpackets_args*) args;
+	
 	if (debug) {
-		fprintf(stderr, "packet(%d)\n", active);
+		fprintf(stderr, "got packet\n");
 		fflush(stderr);
 	}
+	if (!stop)
+		pcap_dump((u_char *)(sargs->pdumper), header, packet);
 	if (active)
-		pcap_dump(args, header, packet);
+	        got_packet(args, header, packet);
 }
 
 /*
@@ -1408,8 +1473,9 @@ void dump_packet(u_char *args, const struct pcap_pkthdr *header,
  * adds its byte count to the total.
  */
 void got_packet(u_char *args, const struct pcap_pkthdr *header,
-	const u_char *packet) {
+		const u_char *packet) {
 
+	struct readpackets_args *sargs = (struct readpackets_args*) args;
 	struct sniff_ethernet *ether_pkt;
 	struct ip *ip_pkt; 
 	int length;
@@ -1457,11 +1523,12 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header,
 		type = ip_pkt->ip_p;
 
 #if 0
-	printf("got type %d(0x%x), len=%d(0x%x)\n",
-	       type, type, length, length);
+	fprintf(stderr, "got type %d(0x%x), len=%d(0x%x)\n",
+		type, type, length, length);
+	fflush(stderr);
 #endif
 
-	index = *args;
+	index = sargs->index;
 
 	pthread_mutex_lock(&lock);
 	/*
@@ -1624,7 +1691,8 @@ callback(event_handle_t handle,
 	char objtype[256], eventtype[256];
 	int len = 256;
 
-	printf("Received an event\n");
+	printf("Received an event (%d)\n", getpid());
+	fflush(stdout);
 	event_notification_get_objtype(handle, notification, objtype, len);
 	event_notification_get_eventtype(handle, notification, eventtype, len);
 
@@ -1639,17 +1707,19 @@ callback(event_handle_t handle,
 	}
 	if (!strcmp(objtype,TBDB_OBJECTTYPE_LINKTRACE)) {
 		if (!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
-			active = 1;
+			stop = 0;
 			pthread_cond_broadcast(&cond);			
 		}
 		else if (!strcmp(eventtype,TBDB_EVENTTYPE_STOP)) {
-			active = 0;
-		}
-		else if (!strcmp(eventtype,TBDB_EVENTTYPE_KILL)) {
 			stop = 1;
 		}
-		else if (!strcmp(eventtype,TBDB_EVENTTYPE_RELOAD)) {
-			reload = 1;
+		else if (!strcmp(eventtype,TBDB_EVENTTYPE_KILL)) {
+			killme = 1;
+		}
+		else if (!strcmp(eventtype,TBDB_EVENTTYPE_RELOAD) ||
+			 !strcmp(eventtype,TBDB_EVENTTYPE_SNAPSHOT)) {
+			stop   = 1;
+			reload = interfaces;
 		}
 		return;
 	}
@@ -1661,6 +1731,8 @@ callback(event_handle_t handle,
  * an argument to pthread_create .
  */
 void *runeventsys(void *args) {
+    pthread_mutex_lock(&lib_lock);
+    pthread_mutex_unlock(&lib_lock);
     event_main(*((event_handle_t*)args));
     return NULL;
 }

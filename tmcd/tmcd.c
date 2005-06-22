@@ -238,6 +238,7 @@ COMMAND_PROTOTYPE(dotopomap);
 COMMAND_PROTOTYPE(douserenv);
 COMMAND_PROTOTYPE(dotiptunnels);
 COMMAND_PROTOTYPE(dorelayconfig);
+COMMAND_PROTOTYPE(dotraceconfig);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -321,6 +322,8 @@ struct command {
 	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
 	{ "userenv",      FULLCONFIG_NONE, F_ALLOCATED, douserenv},
 	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
+	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
+	
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -2086,14 +2089,14 @@ COMMAND_PROTOTYPE(dodelay)
 		 "q0_droptail,q0_gentle, "
 		 "q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm, "
 		 "q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit, "
-		 "q1_droptail,q1_gentle,vnode0,vnode1 "
+		 "q1_droptail,q1_gentle,vnode0,vnode1,noshaping "
                  " from delays as d "
 		 "left join interfaces as i on "
 		 " i.node_id=d.node_id and i.iface=iface0 "
 		 "left join interfaces as j on "
 		 " j.node_id=d.node_id and j.iface=iface1 "
 		 " where d.node_id='%s'",	 
-		 39, reqp->nodeid);
+		 40, reqp->nodeid);
 	if (!res) {
 		error("DELAY: %s: DB Error getting delays!\n", reqp->nodeid);
 		return 1;
@@ -2132,7 +2135,9 @@ COMMAND_PROTOTYPE(dodelay)
 			"LIMIT1=%s MAXTHRESH1=%s MINTHRESH1=%s WEIGHT1=%s "
 			"LINTERM1=%s QINBYTES1=%s BYTES1=%s "
 			"MEANPSIZE1=%s WAIT1=%s SETBIT1=%s " 
-			"DROPTAIL1=%s GENTLE1=%s",
+			"DROPTAIL1=%s GENTLE1=%s "
+			"VNODE0=%s VNODE1=%s "
+			"NOSHAPING=%s\n",
 			row[0], row[1],
 			row[2], row[3], row[4], row[5],
 			row[7], row[8], row[9], row[10],
@@ -2145,20 +2150,11 @@ COMMAND_PROTOTYPE(dodelay)
 			row[25], row[26], row[27], row[28],
 			row[29], row[30], row[31],
 			row[32], row[33], row[34],
-			row[35], row[36]);
+			row[35], row[36],
+			(row[37] ? row[37] : "foo"),
+			(row[38] ? row[38] : "bar"),
+			row[39]);
 
-		if (vers >= 8) {
-			/*
-			 * Temp. This is so current experiments with delay
-			 * entries continues to work okay with the new image.
-			 */
-			bufp += OUTPUT(bufp, ebufp - bufp,
-				       " VNODE0=%s VNODE1=%s",
-				       (row[37] ? row[37] : "foo"),
-				       (row[38] ? row[38] : "bar"));
-		}
-		OUTPUT(bufp, ebufp - bufp, "\n");
-			
 		client_writeback(sock, buf, strlen(buf), tcp);
 		nrows--;
 		if (verbose)
@@ -6018,3 +6014,96 @@ COMMAND_PROTOTYPE(dorelayconfig)
 	mysql_free_result(res);
 	return 0;
 }
+
+/*
+ * Return trace config
+ */
+COMMAND_PROTOTYPE(dotraceconfig)
+{
+	MYSQL_RES	*res;	
+	MYSQL_ROW	row;
+	char		buf[2*MYBUFSIZE], *ebufp = &buf[sizeof(buf)];
+	int		nrows;
+
+	/*
+	 * Get delay parameters for the machine. The point of this silly
+	 * join is to get the type out so that we can pass it back. Of
+	 * course, this assumes that the type is the BSD name, not linux.
+	 */
+	if (! reqp->isvnode) {
+	  res = mydb_query("select linkvname,i0.MAC,i1.MAC,t.vnode,i2.MAC, "
+			   "       t.trace_type,t.trace_expr,t.trace_snaplen, "
+			   "       t.idx "
+			   "from traces as t "
+			   "left join interfaces as i0 on "
+			   " i0.node_id=t.node_id and i0.iface=t.iface0 "
+			   "left join interfaces as i1 on "
+			   " i1.node_id=t.node_id and i1.iface=t.iface1 "
+			   "left join reserved as r on r.vname=t.vnode and "
+			   "     r.pid='%s' and r.eid='%s' "
+			   "left join virt_lans as v on v.vname=t.linkvname  "
+			   " and v.pid=r.pid and v.eid=r.eid and "
+			   "     v.vnode=t.vnode "
+			   "left join interfaces as i2 on "
+			   "     i2.node_id=r.node_id and i2.IP=v.ip "
+			   " where t.node_id='%s'",	 
+			   9, reqp->pid, reqp->eid, reqp->nodeid);
+	}
+	else {
+	  res = mydb_query("select linkvname,i0.mac,i1.mac,t.vnode,'', "
+			   "       t.trace_type,t.trace_expr,t.trace_snaplen, "
+			   "       t.idx "
+			   "from traces as t "
+			   "left join veth_interfaces as i0 on "
+			   " i0.vnode_id=t.node_id and "
+			   " i0.veth_id=SUBSTRING(t.iface0, 5) "
+			   "left join veth_interfaces as i1 on "
+			   " i1.vnode_id=t.node_id and "
+			   " i1.veth_id=SUBSTRING(t.iface1, 5) "
+			   "left join reserved as r on r.vname=t.vnode and "
+			   "     r.pid='%s' and r.eid='%s' "
+			   "left join virt_lans as v on v.vname=t.linkvname  "
+			   " and v.pid=r.pid and v.eid=r.eid and "
+			   "     v.vnode=t.vnode "
+			   "left join interfaces as i2 on "
+			   "     i2.node_id=r.node_id and i2.IP=v.ip "
+			   " where t.node_id='%s'",	 
+			   9, reqp->pid, reqp->eid, reqp->nodeid);
+	}
+			 
+	if (!res) {
+		error("TRACEINFO: %s: DB Error getting trace table!\n",
+		      reqp->nodeid);
+		return 1;
+	}
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+	while (nrows) {
+		char	*bufp = buf;
+		
+		row = mysql_fetch_row(res);
+
+		bufp += OUTPUT(bufp, ebufp - bufp,
+			       "TRACE LINKNAME=%s IDX=%s MAC0=%s MAC1=%s "
+			       "VNODE=%s VNODE_MAC=%s "
+			       "TRACE_TYPE=%s TRACE_EXPR='%s' "
+			       "TRACE_SNAPLEN=%s\n",
+			       row[0], row[8],
+			       (row[1] ? row[1] : ""),
+			       (row[2] ? row[2] : ""),
+			       row[3], row[4], 
+			       row[5], row[6], row[7]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("TRACEINFO: %s", buf);
+	}
+	mysql_free_result(res);
+
+	return 0;
+}
+

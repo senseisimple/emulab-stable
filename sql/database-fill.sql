@@ -571,6 +571,11 @@ REPLACE INTO table_regex VALUES ('virt_lans','uselinkdelay','int','redirect','de
 REPLACE INTO table_regex VALUES ('virt_lans','nobwshaping','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','usevethiface','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_lans','trivial_ok','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','traced','int','redirect','default:boolean',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','trace_type','text','regex','^(header|packet|monitor)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','trace_expr','text','redirect','default:text',1,255,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','trace_snaplen','int','redirect','default:int',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_lans','trace_endnode','int','redirect','default:tinyint',0,1,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','pid','text','redirect','projects:pid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','eid','text','redirect','experiments:eid',0,0,NULL);
 REPLACE INTO table_regex VALUES ('virt_node_desires','vname','text','redirect','virt_nodes:vname',0,0,NULL);

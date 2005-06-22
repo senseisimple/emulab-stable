@@ -20,6 +20,7 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
+	 gettraceconfig
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -30,7 +31,7 @@ use Exporter;
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
-	 TMCREATOR TMSWAPPER
+	 TMCREATOR TMSWAPPER 
        );
 
 # Must come after package declaration!
@@ -802,6 +803,48 @@ sub gettrafgenconfig($)
 	}
     }
     @$rptr = @trafgens;
+    return 0;
+}
+
+#
+# Get trace configuration.
+#
+sub gettraceconfig($)
+{
+    my ($rptr)    = @_;
+    my @traceinfo = ();
+
+    if (tmcc(TMCCCMD_TRACEINFO, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get trace config from server!\n");
+	return -1;
+    }
+    
+    my $pat = q(TRACE LINKNAME=([-\d\w]+) IDX=(\d*) MAC0=(\w*) MAC1=(\w*) );
+    $pat   .= q(VNODE=([-\d\w]+) VNODE_MAC=(\w*) );
+    $pat   .= q(TRACE_TYPE=([-\d\w]+) );
+    $pat   .= q(TRACE_EXPR='(.*)' );
+    $pat   .= q(TRACE_SNAPLEN=(\d*));
+
+    foreach my $str (@tmccresults) {
+	if ($str =~ /$pat/) {
+	    my $trace = {};
+	    
+	    $trace->{"LINKNAME"}      = $1;
+	    $trace->{"IDX"}           = $2;
+	    $trace->{"MAC0"}          = $3;
+	    $trace->{"MAC1"}          = $4;
+	    $trace->{"VNODE"}         = $5;
+	    $trace->{"VNODE_MAC"}     = $6;
+	    $trace->{"TRACE_TYPE"}    = $7;
+	    $trace->{"TRACE_EXPR"}    = $8;
+	    $trace->{"TRACE_SNAPLEN"} = $9;
+	    push(@traceinfo, $trace);
+	}
+	else {
+	    warn("*** WARNING: Bad traceinfo line: $str\n");
+	}
+    }
+    @$rptr = @traceinfo;
     return 0;
 }
 

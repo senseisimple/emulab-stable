@@ -15,19 +15,20 @@ include $(OBJDIR)/Makeconf
 SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
-                  setdest loghole webcopy
+                  setdest loghole webcopy linkmon_ctl
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
 		  grabswitchconfig backupswitches
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
-                  websetdest spewsource
+                  websetdest spewsource weblinkmon_ctl
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(SUBDIRS) firstuser
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(SUBDIRS) \
+	firstuser setbuildinfo
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

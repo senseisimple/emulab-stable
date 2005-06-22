@@ -145,6 +145,7 @@ CREATE TABLE delays (
   vnode1 varchar(32) default NULL,
   card0 tinyint(3) unsigned default NULL,
   card1 tinyint(3) unsigned default NULL,
+  noshaping tinyint(1) default '0',
   PRIMARY KEY  (node_id,iface0,iface1),
   KEY pid (pid,eid)
 ) TYPE=MyISAM;
@@ -1710,6 +1711,26 @@ CREATE TABLE tmcd_redirect (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `traces`
+--
+
+CREATE TABLE traces (
+  node_id varchar(32) NOT NULL default '',
+  idx int(10) unsigned NOT NULL auto_increment,
+  iface0 varchar(8) NOT NULL default '',
+  iface1 varchar(8) NOT NULL default '',
+  pid varchar(32) default NULL,
+  eid varchar(32) default NULL,
+  linkvname varchar(32) default NULL,
+  vnode varchar(32) default NULL,
+  trace_type tinytext,
+  trace_expr tinytext,
+  trace_snaplen int(11) NOT NULL default '0',
+  PRIMARY KEY  (node_id,idx),
+  KEY pid (pid,eid)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `tunnels`
 --
 
@@ -2052,6 +2073,11 @@ CREATE TABLE virt_lans (
   trivial_ok tinyint(4) default '1',
   protocol varchar(30) NOT NULL default 'ethernet',
   is_accesspoint tinyint(4) default '0',
+  traced tinyint(1) default '0',
+  trace_type enum('header','packet','monitor') NOT NULL default 'header',
+  trace_expr tinytext,
+  trace_snaplen int(11) NOT NULL default '0',
+  trace_endnode tinyint(1) NOT NULL default '0',
   KEY pid (pid,eid,vname),
   KEY vnode (pid,eid,vnode)
 ) TYPE=MyISAM;

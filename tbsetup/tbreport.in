@@ -416,6 +416,31 @@ if ($showlinks) {
 	print "\n";
     }
 
+    # Trace info.
+    $result =
+	DBQueryFatal("select vname,member,trace_type,trace_expr, ".
+		     "  trace_snaplen ".
+		     "  from virt_lans ".
+		     "where pid='$pid' and eid='$eid' and traced!=0 ".
+		     "order by vname,member");
+
+    if ($result->numrows) {
+	print  "Trace/Monitoring Info:\n";
+	printf "%-15s %-15s %-10s %-7s %s\n",
+	       "ID", "Member", "Type", "Snap", "Expression";
+	print  "--------------- --------------- ---------- ".
+	       "------- ----------------------------\n";
+
+	while (($vname,$member,$trace_type,$trace_expr,
+		$trace_snaplen) = $result->fetchrow_array()) {
+
+	    printf("%-15s %-15s %-10s %-7s %s\n", $vname, $member,
+		   $trace_type, $trace_snaplen,
+		   (defined($trace_expr) ? $trace_expr : ""));
+	}
+	print "\n";
+    }
+
     #
     # Settings.
     #

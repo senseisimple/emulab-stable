@@ -288,3 +288,7 @@ function TBvalid_imagename($token) {
     return TBcheck_dbslot($token, "images", "imagename",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_linklanname($token) {
+    return TBcheck_dbslot($token, "virt_lans", "vname",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}

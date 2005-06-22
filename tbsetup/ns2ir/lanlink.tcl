@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -60,6 +60,12 @@ Queue instproc init {link type node} {
     $self set gentle_ 0
     $self set red_ 0
 
+    $self set traced 0
+    $self set trace_type "header"
+    $self set trace_expr {}
+    $self set trace_snaplen 0
+    $self set trace_endnode 0
+
     #
     # These are NS variables for queues (with NS defaults).
     #
@@ -115,6 +121,21 @@ Queue instproc agent_name {} {
     $self instvar mynode
 
     return "$mylink-$mynode"
+}
+
+# Turn on tracing.
+Queue instproc trace {{ttype "header"} {texpr ""}} {
+    $self instvar traced
+    $self instvar trace_expr
+    $self instvar trace_type
+    
+    if {$texpr == ""} {
+	set texpr {}
+    }
+
+    set traced 1
+    set trace_type $ttype
+    set trace_expr $texpr
 }
 
 #
@@ -268,6 +289,64 @@ LanLink instproc mustdelay {} {
     $self instvar mustdelay
     set mustdelay 1
 }
+
+#
+# Set up tracing.
+#
+Lan instproc trace {{ttype "header"} {texpr ""}} {
+    $self instvar nodelist
+    $self instvar linkq
+
+    foreach nodeport $nodelist {
+	set linkqueue $linkq($nodeport)
+	$linkqueue trace $ttype $texpr
+    }
+}
+
+Link instproc trace {{ttype "header"} {texpr ""}} {
+    $self instvar toqueue
+    $self instvar fromqueue
+    
+    $toqueue trace $ttype $texpr
+    $fromqueue trace $ttype $texpr
+}
+
+Lan instproc trace_snaplen {len} {
+    $self instvar nodelist
+    $self instvar linkq
+
+    foreach nodeport $nodelist {
+	set linkqueue $linkq($nodeport)
+	$linkqueue set trace_snaplen $len
+    }
+}
+
+Link instproc trace_snaplen {$len} {
+    $self instvar toqueue
+    $self instvar fromqueue
+    
+    $toqueue set trace_snaplen $len
+    $fromqueue set trace_snaplen $len
+}
+
+Lan instproc trace_endnode {onoff} {
+    $self instvar nodelist
+    $self instvar linkq
+
+    foreach nodeport $nodelist {
+	set linkqueue $linkq($nodeport)
+	$linkqueue set trace_endnode $onoff
+    }
+}
+
+Link instproc trace_endnode {$onoff} {
+    $self instvar toqueue
+    $self instvar fromqueue
+    
+    $toqueue set trace_endnode $onoff
+    $fromqueue set trace_endnode $onoff
+}
+
 
 # get_port <node>
 # This takes a node and returns the port that the node is connected
@@ -633,6 +712,15 @@ Link instproc updatedb {DB} {
 	    lappend fields "rest_bandwidth"
 	}
 	
+	# Tracing.
+	if {[$linkqueue set traced] == 1} {
+	    lappend fields "traced"
+	    lappend fields "trace_type"
+ 	    lappend fields "trace_expr"
+ 	    lappend fields "trace_snaplen"
+ 	    lappend fields "trace_endnode"
+	}
+
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $node $port $ip $mustdelay]
 
 	if { [info exists ebandwidth($nodeport)] } {
@@ -641,6 +729,15 @@ Link instproc updatedb {DB} {
 
 	if { [info exists rebandwidth($nodeport)] } {
 	    lappend values $rebandwidth($nodeport)
+	}
+
+	# Tracing.
+	if {[$linkqueue set traced] == 1} {
+	    lappend values [$linkqueue set traced]
+	    lappend values [$linkqueue set trace_type]
+	    lappend values [$linkqueue set trace_expr]
+	    lappend values [$linkqueue set trace_snaplen]
+	    lappend values [$linkqueue set trace_endnode]
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values
@@ -761,6 +858,15 @@ Lan instproc updatedb {DB} {
 	if { [info exists rebandwidth($nodeport)] } {
 	    lappend fields "rest_bandwidth"
 	}
+
+	# Tracing.
+	if {[$linkqueue set traced] == 1} {
+	    lappend fields "traced"
+	    lappend fields "trace_type"
+ 	    lappend fields "trace_expr"
+ 	    lappend fields "trace_snaplen"
+ 	    lappend fields "trace_endnode"
+	}
 	
 	set values [list $self $nodeportraw $netmask $delay($nodeport) $rdelay($nodeport) $bandwidth($nodeport) $rbandwidth($nodeport) $loss($nodeport) $rloss($nodeport) $cost($nodeport) $widearea $emulated $uselinkdelay $nobwshaping $useveth $limit_  $maxthresh_ $thresh_ $q_weight_ $linterm_ ${queue-in-bytes_}  $bytes_ $mean_pktsize_ $wait_ $setbit_ $droptail_ $red_ $gentle_ $trivial_ok $protocol $is_accesspoint $node $port $ip $mustdelay]
 
@@ -770,6 +876,15 @@ Lan instproc updatedb {DB} {
 
 	if { [info exists rebandwidth($nodeport)] } {
 	    lappend values $rebandwidth($nodeport)
+	}
+
+	# Tracing.
+	if {[$linkqueue set traced] == 1} {
+	    lappend values [$linkqueue set traced]
+	    lappend values [$linkqueue set trace_type]
+	    lappend values [$linkqueue set trace_expr]
+	    lappend values [$linkqueue set trace_snaplen]
+	    lappend values [$linkqueue set trace_endnode]
 	}
 
 	$sim spitxml_data "virt_lans" $fields $values

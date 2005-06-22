@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -176,7 +176,6 @@ sub DelaySetup
  	    print DEL "sysctl -w kern.polling.enable=1\n";
  	}
 
-	$count = 69;
 	foreach $delay (@delays) {
 	    my $pat  = q(DELAY INT0=([\d\w]+) INT1=([\d\w]+) );
 	    $pat .= q(PIPE0=(\d+) DELAY0=([\d\.]+) BW0=(\d+) PLR0=([\d\.]+) );
@@ -193,7 +192,8 @@ sub DelaySetup
 	    $pat .= q(LINTERM1=(\d+) QINBYTES1=(\d+) BYTES1=(\d+) );
 	    $pat .= q(MEANPSIZE1=(\d+) WAIT1=(\d+) SETBIT1=(\d+) );
 	    $pat .= q(DROPTAIL1=(\d+) GENTLE1=(\d+) );
-	    $pat .= q(VNODE0=([-\d\w]+) VNODE1=([-\d\w]+));
+	    $pat .= q(VNODE0=([-\d\w]+) VNODE1=([-\d\w]+) );
+	    $pat .= q(NOSHAPING=(\d+));
 
 	    $delay =~ /$pat/;
 
@@ -244,6 +244,15 @@ sub DelaySetup
 	    my $gentle2    = $37;
 	    my $vnode0     = $38;
 	    my $vnode1     = $39;
+	    my $noshaping  = $40;
+
+	    #
+	    # Noshaping. All we wanted was to set up the bridge (above).
+	    # We do not want to actually delay the packets via a pipe,
+	    # and we do not want a queuing!
+	    #
+	    next
+		if ($noshaping);
 
 	    #
 	    # Delays are floating point numbers (unit is ms). ipfw does not
@@ -335,8 +344,6 @@ sub DelaySetup
 
 	    print MAP "$linkname duplex $vnode0 $vnode1 ".
 		"$iface1 $iface2 $p1 $p2\n";
-
-	    $count++;
 	}
 	#
 	# If a delay node, then lets report status and ready in so that batch

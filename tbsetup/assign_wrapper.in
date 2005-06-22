@@ -42,6 +42,7 @@ sub physnodenextrtabid($);
 sub getrtabid($$);
 sub array_diff($$);
 sub LoadCurrent();
+sub SetUpTracing($$$$$);
 
 #
 # This function as the main assign loop.  It converts the virtual
@@ -326,6 +327,9 @@ sub virtlanuseveth($)	{ return $virt_lans{$_[0]}->{"USEVETH"}; }
 sub virtlantunnel($)	{ return $virt_lans{$_[0]}->{"TUNNEL"}; }
 sub virtlandelayinfo($$){ return @{$virt_lans{$_[0]}->{"DELAYINFO"}->{$_[1]}};}
 sub virtlanqueueinfo($$){ return @{$virt_lans{$_[0]}->{"QUEUEINFO"}->{$_[1]}};}
+sub virtlantraceinfo($$){ return @{$virt_lans{$_[0]}->{"TRACEINFO"}->{$_[1]}};}
+sub virtlanshaped($$)	{ return $virt_lans{$_[0]}->{"SHAPED"}->{$_[1]};}
+sub virtlansetshaped($$){ $virt_lans{$_[0]}->{"SHAPED"}->{$_[1]} = 1; }
 sub virtlannetmask($)	{ return $virt_lans{$_[0]}->{"MASK"}; }
 sub virtlanwidearea($)  { return $virt_lans{$_[0]}->{"WIDEAREA"}; }
 sub virtlanallsim($)    { return $virt_lans{$_[0]}->{"ALLSIM"}; }
@@ -1649,6 +1653,12 @@ foreach $plink (keys(%plinks)) {
 	printdb "  Portmap:\n";
 	printdb "    $virtA = $portA\n";
 	printdb "    $virtC = $portC\n";
+
+ 	#
+ 	# Set up tracing across the delay node (both directions).
+ 	#
+ 	SetUpTracing($lan, $member0, $nodeB, $portB, $portD);
+ 	SetUpTracing($lan, $member1, $nodeB, $portD, $portB);
     }
     elsif (($lan,$virtA) = ($plink =~ m|^linkdelaysrc/([^/]+)/(.+)$|)) {
 	# trivial links do not have physical links, so no delay nodes.
@@ -1691,6 +1701,11 @@ foreach $plink (keys(%plinks)) {
 	$portmap{$virtA} = $portA;
 	printdb "  Portmap:\n";
 	printdb "    $virtA = $portA\n";
+
+ 	#
+ 	# Set up tracing across the delay node (one direction cause its a lan).
+ 	#
+ 	SetUpTracing($lan, $member0, $nodeB, $portB, $portD);
     }
     elsif (($lan,$virtA,$virtB) = ($plink =~ m|^linksimple/(.+)/(.+),(.+)$|)) {
 	#
@@ -1718,8 +1733,8 @@ foreach $plink (keys(%plinks)) {
 	    # If the trivial link has all simulated members, we
 	    # don't want a veth interface
 	    if (! virtlanallsim($lan) ) {
-		# No phys mapping. We create a veth, but there is no phys mapping
-		# for the port.
+		# No phys mapping. We create a veth, but there is no
+		# phys mapping for the port.
 		$nodeA = $v2pmap{(split(":", $virtA))[0]};
 		$nodeB = $v2pmap{(split(":", $virtB))[0]};
 		$portA = NewVethIface($lan, $virtA, $nodeA);
@@ -1760,6 +1775,12 @@ foreach $plink (keys(%plinks)) {
 		    "$rbandwidth,$rloss,$trivonly\]\n";
 	    }
 	}
+ 	#
+ 	# Set up tracing across the link. There is trace on each end node,
+	# on the output (after the linkdelay above).
+ 	#
+ 	SetUpTracing($lan, $virtA, $nodeA, undef, $portA);
+ 	SetUpTracing($lan, $virtB, $nodeB, undef, $portB);
     }
     elsif (($lan,$virtA) = ($plink =~ m|^linklan/([^/]+)/(.+)$|)) {
 	# node may be in the LAN multiple times.
@@ -1827,6 +1848,10 @@ foreach $plink (keys(%plinks)) {
 		    "$rbandwidth,$rloss,$trivonly\]\n";
 	    }
 	}
+ 	#
+ 	# Set up tracing on the end node (one direction cause its a lan).
+ 	#
+ 	SetUpTracing($lan, $virtA, $nodeA, undef, $portA);
     }
     elsif (($lan,$virtA) = ($plink =~ m|^fakelan/([^/]+)/(.+)$|)) {
 	# node is attached to a fake switch (LAN).
@@ -1841,6 +1866,11 @@ foreach $plink (keys(%plinks)) {
 	$portmap{$virtA} = $portA;
 	printdb "  Portmap:\n";
 	printdb "    $virtA = $portA\n";
+
+ 	#
+ 	# Set up tracing on the end node (one direction cause its a lan).
+ 	#
+ 	SetUpTracing($lan, $virtA, $nodeA, undef, $portA);
     }
     elsif ($plink =~ m|^linkdelaydst/([^/]+)/(.+)$| ||
 	   $plink =~ m|^linksdelaydst/(.+)/(.+),(.+)$|) {
@@ -1892,6 +1922,12 @@ foreach my $lan (keys(%virt_lans)) {
 		 "   idx from event_objecttypes where ".
 		 "   event_objecttypes.type='LINK'");
 
+    DBQueryFatal("replace into virt_agents ".
+		 " (pid, eid, vname, vnode, objecttype) ".
+		 " select '$pid', '$eid', '$lan-tracemon', '*', ".
+		 "   idx from event_objecttypes where ".
+		 "   event_objecttypes.type='LINKTRACE'");
+
     foreach my $member (virtlanmembers($lan)) {
 	my ($vnode) = split(":", $member);
 	
@@ -1900,6 +1936,13 @@ foreach my $lan (keys(%virt_lans)) {
 		     " select '$pid', '$eid', '${lan}-${vnode}', '*', ".
 		     "   idx from event_objecttypes where ".
 		     "   event_objecttypes.type='LINK'");
+
+	DBQueryFatal("replace into virt_agents ".
+		     " (pid, eid, vname, vnode, objecttype) ".
+		     " select '$pid', '$eid', '${lan}-${vnode}-tracemon', ".
+		     "   '*', ".
+		     "   idx from event_objecttypes where ".
+		     "   event_objecttypes.type='LINKTRACE'");
     }
 }
 
@@ -1935,9 +1978,15 @@ foreach $delayid (keys(%nodedelays)) {
 	    $q1_qinbytes,$q1_bytes,$q1_meanpsize,$q1_wait,$q1_setbit,
 	    $q1_droptail,$q1_red,$q1_gentle) =
 		virtlanqueueinfo($vname, $member1);
+
+	#
+	# See if this delaynode was inserted strictly for tracing/monitoring.
+	#
+	my $noshaping = ((virtlanshaped($vname, $member0) ||
+			  virtlanshaped($vname, $member1)) ? 0 : 1);
     
 	DBQueryFatal("insert into delays " .
-	     " (pid,eid,node_id,vname,iface0,iface1" .
+	     " (pid,eid,node_id,vname,noshaping,iface0,iface1" .
 	     ",vnode0,pipe0,delay0,bandwidth0,lossrate0" .
 	     ",vnode1,pipe1,delay1,bandwidth1,lossrate1" .
 	     ",q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm" .
@@ -1946,7 +1995,8 @@ foreach $delayid (keys(%nodedelays)) {
 	     ",q1_limit,q1_maxthresh,q1_minthresh,q1_weight,q1_linterm" .
 	     ",q1_qinbytes,q1_bytes,q1_meanpsize,q1_wait,q1_setbit" .
 	     ",q1_droptail,q1_red,q1_gentle)" .
-	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1'".
+	     " values ('$pid','$eid','$pnode','$vname',$noshaping ".
+	     ",'$int0','$int1'".
 	     ",'$vnode0',$pipe0,$delay,$bandwidth,$lossrate".
 	     ",'$vnode1',$pipe1,$rdelay,$rbandwidth,$rlossrate".
 	     ",$q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm".
@@ -1963,6 +2013,11 @@ foreach $delayid (keys(%nodedelays)) {
 		virtlanqueueinfo($vname, $member0);
 
 	#
+	# See if this delaynode was inserted strictly for tracing/monitoring.
+	#
+	my $noshaping = (virtlanshaped($vname, $member0) ? 0 : 1);
+    
+	#
 	# Obviously, its implied that the q0 params are towards the lan,
 	# For the reverse side, force the queue to 2 slots (should be 1
 	# but dummynet not quite precise enough) to avoid excess queuing
@@ -1970,13 +2025,14 @@ foreach $delayid (keys(%nodedelays)) {
 	# when it gets to the node.
 	#
 	DBQueryFatal("insert into delays" .
-	     " (pid,eid,node_id,vname,iface0,iface1," .
+	     " (pid,eid,node_id,vname,noshaping,iface0,iface1," .
 	     "  vnode0,pipe0,delay0,bandwidth0,lossrate0," .
 	     "  vnode1,pipe1,delay1,bandwidth1,lossrate1," .
 	     "  q0_limit,q0_maxthresh,q0_minthresh,q0_weight,q0_linterm," .
 	     "  q0_qinbytes,q0_bytes,q0_meanpsize,q0_wait,q0_setbit," .
 	     "  q0_droptail,q0_red,q0_gentle,q1_limit,q1_qinbytes) " .
-	     " values ('$pid','$eid','$pnode','$vname','$int0','$int1',".
+	     " values ('$pid','$eid','$pnode','$vname',$noshaping, ".
+	     "  '$int0','$int1',".
 	     "  '$vnode0',$pipe0,$delay,$bandwidth,$lossrate,".
 	     "  '$vnode1',$pipe1,$rdelay,$rbandwidth,$rlossrate,".
 	     "  $q0_limit,$q0_maxthresh,$q0_minthresh,$q0_weight,$q0_linterm,".
@@ -3039,6 +3095,45 @@ sub NewVethIface($$$;$)
 }
 
 #
+# Setup tracing on a link.
+#
+sub SetUpTracing($$$$$)
+{
+    my ($lan, $member, $pnode, $iface0, $iface1) = @_;
+    my ($vnode) = split(":", $member);
+
+    if (virtnodeisjailed($vnode)) {
+	$pnode = "$v2vmap{$vnode}";
+    }
+
+    #
+    # First see if this member of the lan wanted tracing. 
+    #
+    my ($traced, $endnode, $trace_type, $trace_expr, $trace_snaplen) =
+	virtlantraceinfo($lan, $member);
+
+    return
+	if (!$traced);
+
+    # This means its on an end node.
+    $iface0 = ""
+	if (!defined($iface0));
+
+    if ($impotent) {
+	printdb "Trace: $lan, $member, $endnode, $pnode, $iface0, $iface1\n";
+	return;
+    }
+
+    DBQueryFatal("insert into traces ".
+		 " (node_id, idx, iface0, iface1, pid, eid, linkvname, ".
+		 "  vnode, trace_type, trace_expr, trace_snaplen) ".
+		 "values ".
+		 "  ('$pnode', 0, '$iface0', '$iface1', '$pid', '$eid', ".
+		 "   '$lan', '$vnode', ".
+		 "   '$trace_type', '$trace_expr', $trace_snaplen)");
+}
+
+#
 # XXX Temporary until we figure out a solution.
 #
 sub AddVethPatch($$)
@@ -3712,7 +3807,27 @@ sub LoadVirtLans()
 	      $rowref->{"q_setbit"},
 	      $rowref->{"q_droptail"},
 	      $rowref->{"q_red"},
-	      $rowref->{"q_gentle"} ];
+	      $rowref->{"q_gentle"},
+	    ];
+
+	#
+	# The trace info is stored along with the QUEUEINFO, but its
+	# easier if I split it out.
+	#
+	$virt_lans{$vname}->{"TRACEINFO"}->{$member} =
+	    [ $rowref->{"traced"},
+ 	      $rowref->{"trace_endnode"},
+ 	      $rowref->{"trace_type"},
+ 	      $rowref->{"trace_expr"},
+ 	      $rowref->{"trace_snaplen"},
+	    ];
+
+	#
+	# This will get set on a per-member basis when it is determined
+	# that the link is getting a delaynode cause its really being
+	# shaped, or because it is being traced or monitored.
+	#  
+	$virt_lans{$vname}->{"SHAPED"}->{$member} = 0;
 
 	#
 	# XXX - Whenever a delay node is inserted, port speeds are set to
@@ -4161,6 +4276,11 @@ sub CreateTopFile()
 	    $bandwidth = &getbandwidth($node0,$lan,$bw);
 	    $rbandwidth = &getbandwidth($node1,$lan,$rbw);
 
+	    # Need to know about tracing on a per queue basis, since the
+	    # user can specify tracing asymmetrically.
+	    my ($traced,$trace_endnode)  = virtlantraceinfo($lan, $nodeport0);
+	    my ($rtraced,$rtrace_endnode) = virtlantraceinfo($lan, $nodeport1);
+
 	    #
 	    # Get the bandwidth we're supposed to put into the top file, which
 	    # may be different that what we're limiting the link to
@@ -4170,6 +4290,12 @@ sub CreateTopFile()
 
 	    $top_bw  = &min($top_bw0,$top_rbw1);
 	    $top_rbw = &min($top_rbw0, $top_bw1);
+
+	    #
+	    # See if the link is really being shaped, or if the we just
+	    # need a delay node cause of tracing/monitoring.
+	    #
+	    my $shaped = 0;
 
 	    if (((($delay >= $delaythresh) ||
 		  (!$nobwshaping && (requires_delay($node0, $lan, $bw) ||
@@ -4182,22 +4308,32 @@ sub CreateTopFile()
 		 # Link must be shaped for other reasons (q_red).
 		 $mustdelay ||
 		 # Global force, or per-link force. 
-		 $forcelinkdelays || $uselinkdelay) &&
+		 $forcelinkdelays || $uselinkdelay)) {
+		# Need a delay node and its really a shaped link.
+		$shaped = 1;
+		# Mark the links as shaped for later.
+		virtlansetshaped($lan, $nodeport0);
+		virtlansetshaped($lan, $nodeport1);
+	    }
+
+	    if (($shaped ||
+		 (($traced || $rtraced) &&
+		  !($trace_endnode && $rtrace_endnode))) &&
 		# XXX simulated nodes hack. We don't want to put delay nodes
 		# between simulated nodes. If there is a link between a
 		# simulated and a real node, we might need to put in delay
-		# nodes
+		# nodes.
 		($realnodes != 0)) {
-
 		$expt_stats{"shapedlinks"} += 1;
+		
 		#
 		# We use a linkdelay if the link is emulated, globally forced,
 		# globally preferred if the link is shaped, or if the per-link
 		# flag was set (which means to put in a link delay regardless
 		# of whether the link is shaped).
 		#
-		if ($emulated ||
-		    $forcelinkdelays || $uselinkdelays || $uselinkdelay) {
+		if ($emulated || $forcelinkdelays ||
+		    ($uselinkdelays && $shaped) || $uselinkdelay) {
 		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 
 		    print(TOPFILE "link $plink $node0 $node1 ".
@@ -4296,6 +4432,15 @@ sub CreateTopFile()
 		$bandwidth = &getbandwidth($node,$lan,$bw);
 		$rbandwidth = &getbandwidth($node,$lan,$rbw);
 
+		# Need to know about tracing on a per queue basis, since the
+		# user can specify tracing asymmetrically.
+		my ($traced,$trace_endnode)  = virtlantraceinfo($lan, $member);
+		
+		#
+		# See if the link is really being shaped, or if the we just
+		# need a delay node cause of tracing/monitoring.
+		#
+		my $shaped = 0;
 
                 # XXX The expression below should be modified for
                 # better bandwidth support.  Probably needs to happen
@@ -4309,7 +4454,12 @@ sub CreateTopFile()
 		     # Link must be shaped for other reasons (q_red).
 		     $mustdelay ||
 		     # Global force, or per-lan force. 
-		     $forcelinkdelays || $uselinkdelay) &&
+		     $forcelinkdelays || $uselinkdelay)) {
+		    $shaped = 1;
+		    virtlansetshaped($lan, $member);
+		}
+
+		if (($shaped || ($traced && !$trace_endnode)) &&
 		    # if we have 1 real node in the LAN, we may need to create
 		    # a lan
 		    ($realnodes != 0)) {
@@ -4321,16 +4471,16 @@ sub CreateTopFile()
 		    # (which means to put in a link delay regardless
 		    # of whether the link is shaped).
 		    #
-		    if ($emulated ||
-			$forcelinkdelays || $uselinkdelays || $uselinkdelay) {
+		    if ($emulated || $forcelinkdelays ||
+			($uselinkdelays && $shaped) || $uselinkdelay) {
 			my $plink = "linklan/$lan/$member";
 			
 			#
 			# We allow users to oversubscribe by letting them turn
-			# off the bandwidth shaping. If however, if the link was
-			# shaped for some other reason (like a delay), then
-			# turn off just the bw shaping part by setting them to 0.
-			# This is special; means no limits in ipfw.
+			# off the bandwidth shaping. If however, if the link 
+			# was shaped for some other reason (like a delay), then
+			# turn off just the bw shaping part by setting them to
+			# 0. This is special; means no limits in ipfw.
 			#
 			if ($nobwshaping) {
 			    $bw = $rbw = 0;
