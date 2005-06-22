@@ -139,7 +139,8 @@ external use, a small
 <a href="tutorial/mobilewireless.php3">robotic testbed</a> that will
 grow into a large mobile robotic wireless testbed. The small version
 (5 Motes and 5 Stargates on 5 robots, all remotely controllable, plus
-25 static Motes) is in an open area within our offices.  
+25 static Motes, many with attached sensor boards) is in an open area
+within our offices.  
 <br><br>
 <li> <b>Fixed 802.11 Wireless</b>: Netbed's
 <a href="tutorial/docwrapper.php3?docname=wireless.html">Fixed Wireless</a>
@@ -189,9 +190,6 @@ and the <a href = "http://www.netlab.cc.gatech.edu">Georgia Tech</a>
 Testbed. 
 </p>
 
-
-</p>
-<br /><br />
 <a href='pix/side-crop-big.jpg'>
    <img src='pix/side-crop-smaller.jpg' align=right /></a>
 
