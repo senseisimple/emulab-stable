@@ -848,6 +848,7 @@ int main (int argc, char **argv) {
 	    tuple->eventtype = TBDB_EVENTTYPE_START ","
 	                       TBDB_EVENTTYPE_STOP ","
 	                       TBDB_EVENTTYPE_RELOAD ","
+	                       TBDB_EVENTTYPE_SNAPSHOT ","
 	                       TBDB_EVENTTYPE_KILL;
 
 	    if (!event_subscribe(ehandle, callback, tuple, NULL)) {
