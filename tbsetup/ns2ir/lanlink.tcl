@@ -339,7 +339,7 @@ Lan instproc trace_endnode {onoff} {
     }
 }
 
-Link instproc trace_endnode {$onoff} {
+Link instproc trace_endnode {onoff} {
     $self instvar toqueue
     $self instvar fromqueue
     
