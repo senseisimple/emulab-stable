@@ -1,4 +1,4 @@
-README for RobTransparetBase
+README for ElabRadioDump
 
 Modified from the standard TransparentBase by ricci@cs.utah.edu
 
@@ -7,3 +7,9 @@ main modifications were: to use the GenericComm component for UART I/O
 rather then Framer, to make it easier for my own scripts to process the
 packets, and to stuff the received RSSI into packets that are resent on
 the serial port.
+
+Actually, now it dumps sender, crc, AM type, and RSSI.  Tools for listening can
+be built by a 'gmake -f Makefile.tools' ... the resulting binaries in
+tools/src should include a C serial forwarder, sf listener, and a raw serial
+listener.  Both listeners dump the same output.
+

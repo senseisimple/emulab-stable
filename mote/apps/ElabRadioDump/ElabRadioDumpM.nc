@@ -1,4 +1,4 @@
-// $Id: ElabRadioDumpM.nc,v 1.1 2005-05-27 21:55:55 johnsond Exp $
+// $Id: ElabRadioDumpM.nc,v 1.2 2005-06-23 16:46:32 johnsond Exp $
 
 /*									tab:4
  * "Copyright (c) 2000-2003 The Regents of the University  of California.  
@@ -30,7 +30,7 @@
  */
 /* 
  * Author:	Phil Buonadonna
- * Revision:	$Id: ElabRadioDumpM.nc,v 1.1 2005-05-27 21:55:55 johnsond Exp $
+ * Revision:	$Id: ElabRadioDumpM.nc,v 1.2 2005-06-23 16:46:32 johnsond Exp $
  *
  *
  */
@@ -118,8 +118,10 @@ implementation
     pMsg->data[3] = pMsg->type;
     pMsg->data[4] = pMsg->addr;
     pMsg->data[5] = pMsg->addr >> 8;
+    pMsg->data[6] = pMsg->crc;
+    pMsg->data[7] = pMsg->crc >> 8;
 
-    pMsg->length = (pMsg->length > 5)?pMsg->length:5;
+    pMsg->length = (pMsg->length > 8)?pMsg->length:8;
 
     Result = call UARTSend.send(TOS_UART_ADDR,pMsg->length,pMsg);
     if (Result != SUCCESS) {
@@ -186,7 +188,7 @@ implementation
     ok2 = call RadioControl.start();
 
 
-    call Leds.greenOn();
+    //call Leds.greenOn();
     call Timer.start(TIMER_REPEAT,1024);
 
     return rcombine(ok1, ok2);
@@ -207,26 +209,29 @@ implementation
     dbg(DBG_USR1, "ElabRadioDump received radio packet.\n");
 
     if (Msg->crc) {
-      atomic {
-	pBuf = gRxBufPoolTbl[gRxHeadIndex];
-	if (pBuf->length == 0) {
-	  gRxBufPoolTbl[gRxHeadIndex] = Msg;
-	  gRxHeadIndex++; gRxHeadIndex %= QUEUE_SIZE;
-	}
-	else {
-	  pBuf = NULL;
-	}
-      }
-      
-      if (pBuf) {
-	post RadioRcvdTask();
-      }
-      else {
-	pBuf = Msg;
-      }
+      /* turn off cause passed the crc */
+	call Leds.redOff();
     }
     else {
-      pBuf = Msg;
+	call Leds.redOn();
+    }
+
+    atomic {
+	pBuf = gRxBufPoolTbl[gRxHeadIndex];
+	if (pBuf->length == 0) {
+	    gRxBufPoolTbl[gRxHeadIndex] = Msg;
+	    gRxHeadIndex++; gRxHeadIndex %= QUEUE_SIZE;
+	}
+	else {
+	    pBuf = NULL;
+	}
+    }
+      
+    if (pBuf) {
+	post RadioRcvdTask();
+    }
+    else {
+	pBuf = Msg;
     }
 
     return pBuf;
@@ -313,7 +318,7 @@ implementation
   }
 
     event result_t Timer.fired() {
-	call Leds.redToggle();
+	call Leds.greenToggle();
 	return SUCCESS;
     }
 

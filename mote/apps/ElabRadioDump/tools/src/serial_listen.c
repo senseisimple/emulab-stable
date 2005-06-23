@@ -42,30 +42,29 @@ int main(int argc, char **argv)
       int len, i;
       const unsigned char *packet = read_serial_packet(src, &len);
 
+      if (!packet)
+	exit(0);
+
       int rssi_val;
       int am_type;
       int orig_sender;
       float real_rssi;
       float vdc = 3.0f;
-
-
-      if (!packet)
-	exit(0);
-      //for (i = 0; i < len; i++)
-//	printf("%02x ", packet[i]);
-      //printf("counter: %d RSSI: %d\n",packet[5],((packet[6] & 0xff) << 8) | (packet[7] & 0xff));
+      int crc;
 
       rssi_val = ((packet[7] & 0xff) << 8) | (packet[6] & 0xff);
       am_type = packet[8];
       orig_sender = ((packet[10] & 0xff) << 8) | (packet[9] & 0xff);
+      crc = ((packet[12] & 0xff) << 8) | (packet[11] & 0xff);
 
       /* for mica 2, ALSO depends on the value of vdc; which for wall plugin
        * is 3 VDC; for 1.5V batts it's something else
        */ 
       real_rssi = -50.0f * (vdc * (rssi_val/1024.0f)) - 45.5f;
       
-      printf("original sender: %d; AM type: %d; RSSI: %f dBm\n",
+      printf("original sender: %d; crc: %d; AM type: %d; RSSI: %f dBm\n",
 	     orig_sender,
+	     crc,
 	     am_type,
 	     real_rssi);
       fflush(stdout);
