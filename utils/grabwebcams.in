@@ -16,12 +16,13 @@ use BSD::Resource;
 sub usage()
 {
     print(STDOUT
-	  "Usage: grabwebcams [-d] [-v] [-m] [-t timeout]\n" .
+	  "Usage: grabwebcams [-d] [-v] [-m] [-f fps] [-t timeout]\n" .
 	  "       grabwebcams [-d] [-v] [-t timeout] [-k] pid eid\n" .
 	  "switches and arguments:\n".
 	  "-d      - Debug mode, use to prevent daemonization\n".
 	  "-v      - Verbose mode (causes vlc to spit lots of goo)\n".
-	  "-m      - Movie option; create a 10fps movie from each camera\n".
+	  "-m      - Movie option; create a 24fps movie from each camera\n".
+	  "-f <N>  - Set the frame rate for your movie\n".
 	  "-t <N>  - Terminate automatically and N seconds\n".
 	  "-k      - Kill a daemonized grabwebcams (only use with pid/eid)\n".
 	  "pid eid - Project and Experiment (for use with swapin)\n");
