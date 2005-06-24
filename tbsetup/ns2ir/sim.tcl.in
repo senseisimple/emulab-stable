@@ -1260,7 +1260,7 @@ Simulator instproc make_event {outer event} {
 		    if {$(-image) != {}} {
 			if {! ${GLOBALS::anonymous} && 
 			    ! ${GLOBALS::passmode} &&
-			    ! [info exists osids($image)]} {
+			    ! [info exists osids($(-image))]} {
 			    perror "Unknown image in reload event: $(-image)"
 			    return
 			}
