@@ -9,6 +9,7 @@
 import re
 import pwd
 import sys
+import glob
 import sets
 import stat
 import time
@@ -51,7 +52,7 @@ GLOBAL_LOGS = [
 
 EXTENSIONS = [ ".zip" ]
 
-LINK_DUMP_FMT = [ "%s.xmit", "%s.recv" ]
+LINK_DUMP_FMT = [ "trace_%s-%s.xmit", "trace_%s-%s.recv" ]
 
 DOT_LOGHOLES = """+ /var/
 + /var/emulab/
@@ -917,7 +918,7 @@ def rmstar(host, *args):
 #
 # @param args Action-specific command line arguments.
 #
-def do_sync(args, mode="pull", must_be_active=1):
+def do_sync(args, mode="sync", must_be_active=1):
     from emulabclient import RESPONSE_SUCCESS
     global OSIDS, SERVER
     
@@ -928,6 +929,7 @@ def do_sync(args, mode="pull", must_be_active=1):
     state_method = getattr(SERVER, "experiment.state")
     
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+    os.chdir(logdir)
 
     fp = open(os.path.join(logdir, ".logholes"), "w")
     os.chmod(fp.name, 0664)
@@ -959,21 +961,21 @@ def do_sync(args, mode="pull", must_be_active=1):
             "aspect" : "mapping",
             })
 
-        delays = info_method(PACKAGE_VERSION, {
+        traces = info_method(PACKAGE_VERSION, {
             "proj" : PID,
             "exp" : EID,
-            "aspect" : "delays",
+            "aspect" : "traces",
             })
         
         if ((physical["code"] != RESPONSE_SUCCESS) or
-            (delays["code"] != RESPONSE_SUCCESS)):
+            (traces["code"] != RESPONSE_SUCCESS)):
             sys.stderr.write("error: xmlrpc failed - %s\n" %
                              (physical["output"],))
             retval = 1
             pass
         else:
             physical = physical["value"]
-            delays = delays["value"]
+            traces = traces["value"]
             
             hosts = [(x["node"], x["name"]) for x in physical.values()
                      if ((x["erole"] == "virthost" or
@@ -1021,7 +1023,7 @@ def do_sync(args, mode="pull", must_be_active=1):
                             continue
                         pass
 
-                    if mode == "pull":
+                    if mode == "sync":
                         pid = rsync(phost, os.path.join(logdir, vhost), "/")
                         pass
                     elif mode == "clean":
@@ -1064,9 +1066,40 @@ def do_sync(args, mode="pull", must_be_active=1):
 
             for vhost, sts in hoststatus.items():
                 if sts not in ACCEPTABLE_RSYNC_STATUS:
-                    sys.stderr.write("error: failed to sync with node '%s'\n" %
-                                     vhost)
+                    sys.stderr.write("error: failed to %s node '%s'\n" %
+                                     (mode, vhost))
                     retval = 3
+                    pass
+                pass
+
+            # Add symbolic links to the trace files.
+            linkdirs = {}
+            for trace in traces:
+                fullpath = os.path.join(logdir, trace["linkvname"])
+                try:
+                    os.makedirs(fullpath)
+                    pass
+                except OSError:
+                    pass
+                for fmt in LINK_DUMP_FMT:
+                    src = os.path.join(trace["delayvname"],
+                                       "local/logs",
+                                       fmt % (trace["vnode"],
+                                              trace["linkvname"]))
+                    for filename in glob.glob(src + "*"):
+                        dst = os.path.split(filename)
+                        dst = dst[len(dst) - 1].split('.')
+                        comp = [trace["vnode"]]
+                        comp.extend(dst[1:])
+                        dst = ".".join(comp)
+                        dst = os.path.join(fullpath, dst)
+                        try:
+                            os.unlink(dst)
+                            pass
+                        except OSError:
+                            pass
+                        os.symlink(os.path.join(os.pardir, filename), dst)
+                        pass
                     pass
                 pass
             

@@ -1751,6 +1751,18 @@ class experiment:
                 pass
 
             pass
+        elif argdict["aspect"] == "traces":
+            result = []
+            dbres = DBQuery("SELECT t.*,r.vname as delayvname "
+                            "FROM traces as t "
+                            "left join reserved as r on t.node_id=r.node_id "
+                            "WHERE r.pid=%s and r.eid=%s",
+                            (argdict["proj"], argdict["exp"]),
+                            asDict=True)
+            for trace in dbres:
+                result.append(scrubdict(trace))
+                pass
+            pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=result, output="")
 
