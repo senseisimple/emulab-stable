@@ -727,8 +727,10 @@ void parse_config_file(char *config_file) {
 	oc[oc_size].id = id;
 	oc[oc_size].xmin = x1;
 	oc[oc_size].ymin = y1;
+	oc[oc_size].zmin = 0.0;
 	oc[oc_size].xmax = x2;
 	oc[oc_size].ymax = y2;
+	oc[oc_size].zmax = 0.0;
 	oc_size += 1;
       }
     }
