@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -182,7 +182,7 @@ if (($exit_status & 0xff) == SIGKILL) {
 # Change the permissions on the file so that other group members can overwrite
 # it
 #
-system("$CHMOD g+w $localfile")
+system("$CHMOD g+w $localfile") == 0
     or die ("*** ERROR - Unable to change permissions on $localfile!");
 
 exit($exit_status >> 8);
