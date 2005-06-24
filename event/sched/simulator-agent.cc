@@ -245,10 +245,20 @@ int send_report(simulator_agent_t sa, char *args)
 		retval = -1;
 	}
 	else {
+		int rc, lpc, error_count;
 		char *digester;
-		int rc, lpc;
 		
 		retval = 0;
+
+		error_count = lnCountNodes(&error_records);
+		if (error_count > 0) {
+			fprintf(file,
+				"\n"
+				"  *** %d error(s) were detected!\n"
+				"      Details should be below in the logs.\n"
+				"\n",
+				error_count);
+		}
 
 		/* Dump user supplied stuff first, */
 		dump_report_data(file, sa, SA_RDK_MESSAGE, 1);
@@ -285,7 +295,7 @@ int send_report(simulator_agent_t sa, char *args)
 		fprintf(file, "Configuration:\n");
 		dump_report_data(file, sa, SA_RDK_CONFIG, 0);
 
-		fprintf(file, "Log:\n");
+		fprintf(file, "\nLog:\n");
 		dump_report_data(file, sa, SA_RDK_LOG, 1);
 		
 		/* ... dump the error records. */

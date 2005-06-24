@@ -271,6 +271,27 @@ int dump_error_record(error_record_t er, FILE *out)
 			retval = tail_file(path, out);
 		}
 	}
+	else if (strcmp(er->er_agent->objtype, TBDB_OBJECTTYPE_NODE) == 0) {
+		/**
+		 * NULL-terminated array of log file name formats that should
+		 * be sent back to the user.
+		 */
+		static char *filename_formats[] = {
+			"logs/%s/node-control.%lu",
+			NULL
+		};
+
+		/* Pass the logs through. */
+		for (lpc = 0; filename_formats[lpc] && (retval == 0); lpc++) {
+			snprintf(path,
+				 sizeof(path),
+				 filename_formats[lpc],
+				 er->er_agent->vnode,
+				 er->er_token);
+
+			retval = tail_file(path, out);
+		}
+	}
 	
 	return retval;
 }

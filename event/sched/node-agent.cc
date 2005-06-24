@@ -61,7 +61,8 @@ static char *expand_nodeids(sched_event_t *se);
  *
  * @see expand_nodeids
  */
-static int reload_with(node_agent_t na, char *nodeids, char *args);
+static int reload_with(node_agent_t na, struct agent **agent_array, int aa_len,
+		       int token, char *nodeids, char *args);
 
 /**
  * Handler for the REBOOT event of the node object.  First, the function will
@@ -76,7 +77,8 @@ static int reload_with(node_agent_t na, char *nodeids, char *args);
  *
  * @see expand_nodeids
  */
-static int do_reboot(node_agent_t na, char *nodeids);
+static int do_reboot(node_agent_t na, struct agent **agent_array, int aa_len,
+		     int token, char *nodeids);
 
 node_agent_t create_node_agent(void)
 {
@@ -154,7 +156,31 @@ static char *expand_nodeids(sched_event_t *se)
 	return retval;
 }
 
-static int reload_with(node_agent_t na, char *nodeids, char *args)
+static void dump_node_logs(int token, struct agent **agent_array, int aa_len,
+			   EmulabResponse *er)
+{
+	const char *output;
+	FILE *file;
+	int lpc;
+	
+	output = er->getOutput().c_str();
+
+	for (lpc = 0; lpc < aa_len; lpc++) {
+		char filename[1024];
+		FILE *file;
+		
+		snprintf(filename, sizeof(filename),
+			 NODE_DUMP_FILE,
+			 agent_array[lpc]->name, token);
+		if ((file = fopen(filename, "w")) != NULL) {
+			fprintf(file, "%s", output);
+			fclose(file);
+		}
+	}
+}
+
+static int reload_with(node_agent_t na, struct agent **agent_array, int aa_len,
+		       int token, char *nodeids, char *args)
 {
 	event_handle_t handle;
 	EmulabResponse er;
@@ -188,6 +214,7 @@ static int reload_with(node_agent_t na, char *nodeids, char *args)
 					 SPA_Boolean, "bootwait", true,
 					 SPA_TAG_DONE)) != 0) {
 			warning("could not reload: %s\n", nodeids);
+			dump_node_logs(token, agent_array, aa_len, &er);
 		}
 	}
 	/* ... a user-specified image. */
@@ -202,6 +229,7 @@ static int reload_with(node_agent_t na, char *nodeids, char *args)
 					 SPA_Boolean, "bootwait", true,
 					 SPA_TAG_DONE)) != 0) {
 			warning("could not reload: %s\n", nodeids);
+			dump_node_logs(token, agent_array, aa_len, &er);
 		}
 	}
 
@@ -210,7 +238,8 @@ static int reload_with(node_agent_t na, char *nodeids, char *args)
 	return retval;
 }
 
-static int do_reboot(node_agent_t na, char *nodeids)
+static int do_reboot(node_agent_t na, struct agent **agent_array, int aa_len,
+		     int token, char *nodeids)
 {
 	event_handle_t handle;
 	EmulabResponse er;
@@ -223,7 +252,7 @@ static int do_reboot(node_agent_t na, char *nodeids)
 	handle = na->na_local_agent.la_handle;
 
 	/* Sync the logholes in case the OS clears out /tmp, then */
-	if (0 && systemf("loghole --port=%d --quiet sync %s",
+	if (systemf("loghole --port=%d --quiet sync %s",
 		    DEFAULT_RPC_PORT,
 		    nodeids) != 0) {
 		warning("failed to sync log hole for node %s\n", nodeids);
@@ -238,12 +267,14 @@ static int do_reboot(node_agent_t na, char *nodeids)
 				 SPA_Boolean, "wait", true,
 				 SPA_TAG_DONE)) != 0) {
 		warning("could not reboot: %s\n", nodeids);
+		dump_node_logs(token, agent_array, aa_len, &er);
 	}
 	
 	return retval;
 }
 
-static int do_snapshot(node_agent_t na, char *nodeids, char *args)
+static int do_snapshot(node_agent_t na, struct agent **agent_array, int aa_len,
+		       int token, char *nodeids, char *args)
 {
 	event_handle_t handle;
 	EmulabResponse er;
@@ -258,7 +289,7 @@ static int do_snapshot(node_agent_t na, char *nodeids, char *args)
 
 	handle = na->na_local_agent.la_handle;
 
-	if (systemf("loghole --port=%d --quiet sync %s",
+	if (systemf("loghole --port=%d -vvv sync %s",
 		    DEFAULT_RPC_PORT,
 		    nodeids) != 0) {
 		warning("failed to sync log hole for node %s\n", nodeids);
@@ -285,6 +316,8 @@ static int do_snapshot(node_agent_t na, char *nodeids, char *args)
 					 SPA_Boolean, "bootwait", true,
 					 SPA_TAG_DONE)) != 0) {
 			warning("could not snapshot: %s\n", nodeids);
+			dump_node_logs(token, agent_array, aa_len, &er);
+			
 		}
 		/* XXX Kinda hacky way to wait for the node to come up. */
 		else if ((retval =
@@ -295,6 +328,7 @@ static int do_snapshot(node_agent_t na, char *nodeids, char *args)
 				     SPA_String, "state", "ISUP",
 				     SPA_TAG_DONE)) != 0) {
 			warning("timeout waiting for node: %s\n", nodeids);
+			dump_node_logs(token, agent_array, aa_len, &er);
 		}
 	}
 
@@ -345,15 +379,28 @@ static void *node_agent_looper(void *arg)
 						     (int32_t *)&token);
 			argsbuf[sizeof(argsbuf) - 1] = '\0';
 
+			if (se.length == 0) {
+			}
+			else if (se.length == 1) {
+				agent_singleton[0] = se.agent.s;
+				agent_array = agent_singleton;
+			}
+			else {
+				agent_array = &se.agent.m[1];
+			}
+			
 			if (strcmp(evtype, TBDB_EVENTTYPE_REBOOT) == 0) {
-				rc = do_reboot(na, nodeids);
+				rc = do_reboot(na, agent_array, se.length,
+					       token, nodeids);
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_RELOAD) == 0) {
-				rc = reload_with(na, nodeids, argsbuf);
+				rc = reload_with(na, agent_array, se.length,
+						 token, nodeids, argsbuf);
 			}
 			else if (strcmp(evtype,
 					TBDB_EVENTTYPE_SNAPSHOT) == 0) {
-				rc = do_snapshot(na, nodeids, argsbuf);
+				rc = do_snapshot(na, agent_array, se.length,
+						 token, nodeids, argsbuf);
 			}
 			else if (strcmp(evtype, TBDB_EVENTTYPE_SETDEST) == 0) {
 				event_notify(handle, en);
@@ -368,22 +415,13 @@ static void *node_agent_looper(void *arg)
 				rc = -1;
 			}
 
-			if (se.length == 0) {
-			}
-			else if (se.length == 1) {
-				agent_singleton[0] = se.agent.s;
-				agent_array = agent_singleton;
-			}
-			else {
-				agent_array = &se.agent.m[1];
-			}
 			for (lpc = 0; lpc < se.length; lpc++) {
 				event_do(handle,
 					 EA_Experiment, pideid,
 					 EA_Type, TBDB_OBJECTTYPE_NODE,
 					 EA_Name, agent_array[lpc]->name,
 					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
-					 EA_ArgInteger, "ERROR", retval,
+					 EA_ArgInteger, "ERROR", rc,
 					 EA_ArgInteger, "CTOKEN", token,
 					 EA_TAG_DONE);
 			}

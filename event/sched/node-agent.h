@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -17,6 +17,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define NODE_DUMP_FILE "logs/%s/node-control.%d"
 
 /**
  * A local agent structure for Node objects.
