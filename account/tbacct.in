@@ -267,7 +267,7 @@ CheckDotFiles();
 #
 # Invoke as real user for auditing (and cause of perl).
 #
-if ($sfsupdate) {
+if ($WITHSFS && $sfsupdate) {
     $EUID = $UID;
     system($SFSUPDATE) == 0
 	or fatal("$SFSUPDATE failed!");
