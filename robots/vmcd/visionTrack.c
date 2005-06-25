@@ -26,7 +26,7 @@ extern int debug;
 
 static float curvy(float x)
 {
-    return (1.0f / (x * 2.0f - 2.8f)) + 1.35f;
+    return (1.0f - tanh(x * M_PI));
 }
 
 /**
@@ -327,21 +327,35 @@ void vtCoalesce(struct lnMinList *extra,
 				    vt,
 				    vtNextCamera(vt),
 				    COALESCE_TOLERANCE)) > 0) {
-		struct robot_position rp = vt->vt_position;
+		float weight, total_weight = 0.0;
 		struct vision_track *vt_near;
+		struct robot_position rp;
 		
 		if (debug > 2) {
 		    printf("start %.2f %.2f\n", vt->vt_position.x,
 			   vt->vt_position.y);
 		}
+		
+		weight = curvy((float)vt->vt_age /
+			       (float)MAX_TRACK_AGE);
+		total_weight += weight;
+		rp.x = vt->vt_position.x * weight;
+		rp.y = vt->vt_position.y * weight;
+		rp.theta = vt->vt_position.theta;
+		rp.timestamp = vt->vt_position.timestamp;
+		
 		vt_near = (struct vision_track *)near.lh_Head;
 		while (vt_near->vt_link.ln_Succ != NULL) {
 		    if (debug > 2) {
 			printf("merge %.2f %.2f\n", vt_near->vt_position.x,
 			       vt_near->vt_position.y);
 		    }
-		    rp.x += vt_near->vt_position.x;
-		    rp.y += vt_near->vt_position.y;
+		    
+		    weight = curvy((float)vt_near->vt_age /
+				   (float)MAX_TRACK_AGE);
+		    total_weight += weight;
+		    rp.x += vt_near->vt_position.x * weight;
+		    rp.y += vt_near->vt_position.y * weight;
 		    // rp.theta += vt_near->vt_position.theta;
 		    vt->vt_age = min(vt->vt_age, vt_near->vt_age);
 		    
@@ -349,8 +363,8 @@ void vtCoalesce(struct lnMinList *extra,
 		}
 		lnAppendList(extra, &near);
 
-		rp.x /= rc + 1;
-		rp.y /= rc + 1;
+		rp.x /= total_weight;
+		rp.y /= total_weight;
 		if (debug > 2) {
 		    printf("final %.2f %.2f\n", rp.x, rp.y);
 		}
