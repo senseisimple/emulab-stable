@@ -38,21 +38,23 @@ static float curvy(float x)
  * @param curr The track in a list where the search should start.  The function
  * will continue the search until it reaches the end of the list.  If NULL, the
  * function just returns NULL.
- * @param distance_out Reference to a float where the minimum distance found
- * should be stored.
+ * @param distance_inout Reference to a float that on input contains the
+ * maximum allowed distance and on ouput contains the minimum distance found.
  * @return The closest track found to the given track.
  */
 static struct vision_track *vtFindMin(struct vision_track *vt,
 				      struct vision_track *curr,
-				      float *distance_out)
+				      float *distance_inout)
 {
     struct vision_track *retval = NULL;
-
+    int min_age = MAX_TRACK_AGE;
+    float max_distance;
+    
     assert(vt != NULL);
-    assert(distance_out != NULL);
+    assert(distance_inout != NULL);
 
-    *distance_out = FLT_MAX;
-
+    max_distance = *distance_inout;
+    
     if (curr == NULL)
 	return retval;
     
@@ -61,15 +63,19 @@ static struct vision_track *vtFindMin(struct vision_track *vt,
 
 	distance = hypotf(vt->vt_position.x - curr->vt_position.x,
 			  vt->vt_position.y - curr->vt_position.y);
-	if (distance < *distance_out) {
-	    retval = curr;
-	    *distance_out = distance;
+	if (distance < max_distance) {
+	    if ((curr->vt_age < min_age) ||
+		((curr->vt_age <= min_age) && (distance < *distance_inout))) {
+		retval = curr;
+		*distance_inout = distance;
+		min_age = curr->vt_age;
+	    }
 	}
 	
 	curr = (struct vision_track *)curr->vt_link.ln_Succ;
     }
 
-    assert((retval == NULL) || (*distance_out != FLT_MAX));
+    assert((retval == NULL) || (*distance_inout != max_distance));
     
     return retval;
 }
@@ -228,12 +234,11 @@ void vtAgeTracks(struct lnMinList *now,
 
     while ((vt = (struct vision_track *)lnRemHead(old)) != NULL) {
 	if (vt->vt_age < MAX_TRACK_AGE) {
-	    float distance;
+	    float distance = MERGE_TOLERANCE;
 	    
-	    if ((vtFindMin(vt,
-			   (struct vision_track *)now->lh_Head,
-			   &distance) == NULL) ||
-		(distance > MERGE_TOLERANCE)) {
+	    if (vtFindMin(vt,
+			  (struct vision_track *)now->lh_Head,
+			  &distance) == NULL) {
 		vt->vt_age += 1;
 		lnAddHead(now, &vt->vt_link);
 		vt = NULL;
@@ -358,6 +363,9 @@ void vtCoalesce(struct lnMinList *extra,
 		    rp.y += vt_near->vt_position.y * weight;
 		    // rp.theta += vt_near->vt_position.theta;
 		    vt->vt_age = min(vt->vt_age, vt_near->vt_age);
+		    vt->vt_position.timestamp =
+			max(vt->vt_position.timestamp,
+			    vt_near->vt_position.timestamp);
 		    
 		    vt_near = (struct vision_track *)vt_near->vt_link.ln_Succ;
 		}
@@ -393,26 +401,22 @@ void vtMatch(struct lnMinList *pool,
      */
     vt = (struct vision_track *)now->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
+	float distance = MERGE_TOLERANCE, dummy = MERGE_TOLERANCE;
 	struct vision_track *vt_prev;
-	float distance;
 	void dump_vision_list(struct lnMinList *list);
 	
-	if ((vt_prev = vtFindMin(vt,
-				 (struct vision_track *)prev->lh_Head,
-				 &distance)) != NULL) {
-	    if (distance <= 0.06) {
+	if (((vt_prev = vtFindMin(vt,
+				  (struct vision_track *)prev->lh_Head,
+				  &distance)) != NULL) &&
+	    (vtFindMin(vt_prev,
+		       (struct vision_track *)now->lh_Head,
+		       &dummy) == vt)) {
 		vt->vt_userdata = vt_prev->vt_userdata;
 		
 		vt->ma = vt_prev->ma;
-
+		
 		lnRemove(&vt_prev->vt_link);
 		lnAddHead(pool, &vt_prev->vt_link);
-	    }
-	    else {
-#if 0
-		info("too far %.2f\n", distance);
-#endif
-	    }
 	}
 	else {
 #if 0
@@ -464,7 +468,7 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
     vt = (struct vision_track *)now->lh_Head;
     while ((vt->vt_link.ln_Succ != NULL) && (retval == NULL)) {
 	struct vision_track *vt_start;
-	float distance;
+	float distance = FLT_MAX;
 
 	info("check %f %f %f\n",
 	     vt->vt_position.x,
