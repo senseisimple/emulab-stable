@@ -1,4 +1,4 @@
-// $Id: ElabRadioDumpFH.nc,v 1.1 2005-06-27 17:49:21 johnsond Exp $
+// $Id: ElabRadioDumpFH.nc,v 1.3 2005-06-27 22:11:57 johnsond Exp $
 
 /*									tab:4
  * "Copyright (c) 2000-2003 The Regents of the University  of California.  
@@ -29,7 +29,7 @@
  * 94704.  Attention:  Intel License Inquiry.
  */
 /* Author:	Phil Buonadonna
- * Revision:	$Id: ElabRadioDumpFH.nc,v 1.1 2005-06-27 17:49:21 johnsond Exp $
+ * Revision:	$Id: ElabRadioDumpFH.nc,v 1.3 2005-06-27 22:11:57 johnsond Exp $
  */
 
 /**
@@ -40,11 +40,11 @@ configuration ElabRadioDumpFH {
 }
 implementation {
   components Main, ElabRadioDumpFHM, RadioCRCPacket as Comm,
-  //UARTNoCRCPacket as UART,
-  GenericComm as UART,
+      //UARTNoCRCPacket as UART,
+      GenericComm as UART,
       LedsC,
-      TimerC;
-      // CC1000ControlM;
+      TimerC,
+      CC1000ControlM;
   //FramerM, UART
 
   Main.StdControl -> ElabRadioDumpFHM;
@@ -67,7 +67,7 @@ implementation {
 
   ElabRadioDumpFHM.Leds -> LedsC;
 
-    ElabRadioDumpFHM.CC1000Control -> Comm;
+    ElabRadioDumpFHM.CC1000Control -> CC1000ControlM;
 
   //FramerM.ByteControl -> UART;
   //FramerM.ByteComm -> UART;
