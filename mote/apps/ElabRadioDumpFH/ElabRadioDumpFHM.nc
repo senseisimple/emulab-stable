@@ -1,4 +1,4 @@
-// $Id: ElabRadioDumpFHM.nc,v 1.2 2005-06-27 22:02:37 johnsond Exp $
+// $Id: ElabRadioDumpFHM.nc,v 1.3 2005-06-27 22:11:57 johnsond Exp $
 
 /*									tab:4
  * "Copyright (c) 2000-2003 The Regents of the University  of California.  
@@ -30,7 +30,7 @@
  */
 /* 
  * Author:	Phil Buonadonna
- * Revision:	$Id: ElabRadioDumpFHM.nc,v 1.2 2005-06-27 22:02:37 johnsond Exp $
+ * Revision:	$Id: ElabRadioDumpFHM.nc,v 1.3 2005-06-27 22:11:57 johnsond Exp $
  *
  *
  */
@@ -259,6 +259,21 @@ implementation
 #ifndef FH_INTERVAL
 #define FH_INTERVAL 1024
 #endif
+
+    atomic {
+        call Leds.greenOn();
+        // freqIdx starts out at -1, so this works.
+        freqIdx = (++freqIdx)%freqTableLength;
+        call RadioControl.stop();
+        if (call CC1000Control.TuneManual(freqTable[freqIdx]) == 916710218) {
+            call Leds.redOn();
+        }
+        else {
+            call Leds.redOff();
+        }
+        call RadioControl.start();
+        call Leds.greenOff();
+    }
 
     call TimerFH.start(TIMER_REPEAT,FH_INTERVAL);
 
