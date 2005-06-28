@@ -1932,6 +1932,24 @@ function SHOWNODE($node_id, $flags = 0) {
   	          <A href='shownodetype.php3?node_type=$type'>$type</td>
           </tr>\n";
 
+    $feat_result =
+	    DBQueryFatal("select * from node_features ".
+			 "where node_id='$node_id'");
+
+    if (mysql_num_rows($feat_result) > 0) {
+	    $features = "";
+	    $count = 0;
+	    while ($row = mysql_fetch_array($feat_result)) {
+		    if (($count > 0) && ($count % 2) == 0) {
+			$features .= "<br>";
+		    }
+		    $features .= " $row[feature]";
+		    $count += 1;
+	    }
+
+	    echo "<tr><td>Features:</td><td class=left>$features</td></tr>";
+    }
+
     if (!$short && !$noperm) {
 	echo "<tr>
                   <td>Def Boot OS:</td>
