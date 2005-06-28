@@ -47,7 +47,14 @@ echo "<font size=+2>".
 if (! $isadmin &&
     ! TBNodeAccessCheck($uid, $node_id, $TB_NODEACCESS_MODIFYINFO)) {
 
-    if (STUDLY()) {
+    $power_id = "";
+    $query_result = DBQueryFatal("select power_id from outlets ".
+				 "where node_id='$node_id'");
+    if (mysql_num_rows($query_result) > 0) {
+	$row = mysql_fetch_array($query_result);
+	$power_id = $row[power_id];
+    }
+    if (STUDLY() && ($power_id == "mail")) {
 	    SUBPAGESTART();
 	    
 	    SUBMENUSTART("Node Options");
