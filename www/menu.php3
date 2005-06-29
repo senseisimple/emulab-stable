@@ -79,7 +79,8 @@ function WRITESIDEBARDIVIDER() {
 # link looks different. Not sure its really necessary.
 #
 function WRITESIDEBARBUTTON($text, $base, $link ) {
-    $link = "$base/$link";
+    if ($base)
+	$link = "$base/$link";
     SIDEBARCELL("<a href=\"$link\">$text</a>");
 }
 
@@ -599,6 +600,26 @@ function WRITESIDEBAR() {
 }
 
 #
+# Simple version of above, that just writes the given menu.
+# 
+function WRITESIMPLESIDEBAR($menudefs) {
+    $menutitle = $menudefs['title'];
+    
+    echo "<table class=menu width=210 cellpadding=0 cellspacing=0>
+           <tr><td class=menuheader>\n";
+
+    echo "<b>$menutitle</b>";
+    echo " </td>";
+    echo "</tr>\n";
+
+    each($menudefs);    
+    while (list($key, $val) = each($menudefs)) {
+	WRITESIDEBARBUTTON("$key", null, "$val");
+    }
+    echo "</table>\n";
+}
+
+#
 # spits out beginning part of page
 #
 function PAGEBEGINNING( $title, $nobanner = 0 ) {
@@ -773,6 +794,9 @@ function PAGEHEADER($title, $view = NULL) {
     if (!isset($view['hide_sidebar'])) {
 	WRITESIDEBAR();
     }
+    elseif (isset($view['menu'])) {
+	WRITESIMPLESIDEBAR($view['menu']);
+    }
     FINISHSIDEBAR();
     echo "<h2 class=\"nomargin\">\n";
 
@@ -792,14 +816,17 @@ function PAGEHEADER($title, $view = NULL) {
     $minor = "";
     $build = "";
     TBGetVersionInfo($major, $minor, $build);
+    if ($view['hide_versioninfo'] == 1)
+	$versioninfo = "";
+    else
+	$versioninfo = "Vers: $major.$minor Build: $build";
     
     $now = date("D M d g:ia T");
     echo "$title</h2></td>\n";
     echo "<td class=contentheader align=right>\n";
     echo "<table border='0' cellpadding='0' cellspacing='0'>";
     echo "  <tr>";
-    echo "  <td class=contentheader>".
-	"<font size=-2>Vers: $major.$minor Build: $build</font></td>";
+    echo "  <td class=contentheader><font size=-2>$versioninfo</font></td>";
     echo "  <td class=contentheader>&nbsp&nbsp</td>";
     echo "  <td class=contentheader align=right>";
     if ($login_uid) {

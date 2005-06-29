@@ -100,7 +100,7 @@ HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.html)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.jpg)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.gif)
 
-USRPFILES  = $(wildcard $(SRCDIR)/usrp/*.php)
+USRPFILES  = $(wildcard $(SRCDIR)/usrp/*.php3)
 USRPFILES += $(wildcard $(SRCDIR)/usrp/*.html)
 
 # need to make it *.gz; with simply "*", 
