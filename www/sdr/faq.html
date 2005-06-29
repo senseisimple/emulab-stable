@@ -9,13 +9,56 @@
 
 <h2>Contents</h2>
 <ul>
-<li> <a href="#WhatIsThis">What is a software-defined radio?</a>
+<li> <a href="#WhatIsSDR">What is software defined radio (SDR)?</a>
+<li> <a href="#WhatIsGNURadio">What is GNU Radio?</a>
+<li> <a href="#WhatIsUSRP">What is the Universal Software Radio Peripheral (USRP)?</a>
 </ul>
 
 <hr>
 
 <ul>
-<li><a NAME="WhatIsThis"></a>
-    <font size='+1'><b>What is a software-defined radio?</b></font>
-    <p>Tell me more, tell me more
+<li><a NAME="WhatIsSDR"></a>
+    <font size='+1'><b>What is software defined radio (SDR)?</b></font>
+    <p>Software defined radio (SDR) is a system where changeable
+       software is used to process digital signals sent and/or
+       received by accompanying radio frequency hardware.  This is in
+       contrast to traditional radios, where the signal processing
+       logic is mainly hardcoded into custom hardware with only
+       limited control over how the signal is handled.
+    </p>
+
+<li><a NAME="WhatIsGNURadio"></a>
+    <font size='+1'><b>What is GNU Radio?</b></font>
+    <p>Gnu Radio is a free extensible software kit for experimenting
+       with software defined radio (SDR) that runs on a general
+       purpose computer, such as a PC or a Mac.  This software suite
+       is normally coupled with hardware (such as the USRP) that
+       captures radio frequency (RF) signals and converts them from
+       analog to digital.  The GNU Radio software operates on this
+       digital representation of the radio signal.
+    </p>
+
+<li><a NAME="WhatIsUSRP"></a>
+    <font size='+1'><b>What is the Universal Software Radio Peripheral (USRP)?</b></font>
+    <p>The Universal Software Radio Peripheral, or USRP for short, is
+       a hardware platform designed to work with the GNU Radio
+       software kit.  It is comprised of an extensible motherboard
+       that can accomodate up to four peripheral daughtercards.
+       Digital to Analog (D/A) and analog to digital (A/D) converters
+       on the motherboard change the signal to and from digital as it
+       passes between the the motherboard and daughtercards.  A
+       programmable FPGA on the motherboard can perform mathematical
+       transforms on the digital signals quickly.  Data is shuttled to
+       and from the motherboard and general purpose computer through a
+       USB 2.0 connection.
+    </p>
+    <p>Several USRP daughtercards are already available, with many more
+       planned.  These include a UHF receiver (50MHz - 800MHz), basic
+       transmit and receive boards for use with external equipment, and
+       ISM band transmiters and receivers (e.g. 2.4GHz band).
+    </p>
+    <p>Sales and other technical information can be found on the Ettus
+       Research webpage: <a href="http://www.ettus.com">
+       http://www.ettus.com</a>
+
 </ul>
