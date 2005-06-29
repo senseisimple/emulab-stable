@@ -15,7 +15,7 @@ $USRP_MENU['Recent News']   = "docwrapper.php3?docname=news.html&title=".
                                "'Recent News'";
 $USRP_MENU['USRP Users']    = "docwrapper.php3?docname=users.html&title=".
                                "'USRP Users'";
-$USRP_MENU['Public Wiki']   = "https://${USERNODE}/twiki/bin/view/GnuRadio";
+$USRP_MENU['Public Wiki']   = "https://${USERNODE}/twiki/bin/view/SDR";
 
 $USRP_MENUDEFS = array('hide_sidebar'     => 1,
 		       'hide_banner'      => 1,
