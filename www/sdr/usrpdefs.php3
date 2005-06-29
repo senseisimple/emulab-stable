@@ -4,7 +4,7 @@
 #
 chdir("..");
 require("defs.php3");
-chdir("usrp");
+chdir("sdr");
 
 $USRP_MENU		    = array();
 $USRP_MENU['title']	    = "USRP Menu";

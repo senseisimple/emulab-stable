@@ -100,8 +100,8 @@ HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.html)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.jpg)
 HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.gif)
 
-USRPFILES  = $(wildcard $(SRCDIR)/usrp/*.php3)
-USRPFILES += $(wildcard $(SRCDIR)/usrp/*.html)
+SDRFILES  = $(wildcard $(SRCDIR)/sdr/*.php3)
+SDRFILES += $(wildcard $(SRCDIR)/sdr/*.html)
 
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
@@ -137,7 +137,7 @@ ALLCVSWEB = $(notdir $(CVSWEBFILES))
 ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
-ALLUSRP   = $(notdir $(USRPFILES))
+ALLSDR   = $(notdir $(SDRFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 
 install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
@@ -150,7 +150,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/buildui/, $(ALLBUI)) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
-	$(addprefix $(INSTALL_WWWDIR)/usrp/, $(ALLUSRP)) \
+	$(addprefix $(INSTALL_WWWDIR)/sdr/, $(ALLSDR)) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
