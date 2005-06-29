@@ -6,9 +6,9 @@
 #
 require("usrpdefs.php3");
 
-PAGEHEADER("GNU Radio Project", $USRP_MENUDEFS);
+PAGEHEADER("Software-Defined Radio Project", $USRP_MENUDEFS);
 
-echo "Hi, I am a GNU radio<br>\n";
+echo "Hi, I am a software-defined radio<br>\n";
 echo "Tell me more, tell me more<br>\n";
 
 #
