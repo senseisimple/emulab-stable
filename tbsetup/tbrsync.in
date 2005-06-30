@@ -246,7 +246,7 @@ NODE: foreach my $node (@nodes) {
 			time,
 			(60*6),
 			\$actual_state,
-			(TBDB_NODESTATE_ISUP,))) {
+			(TBDB_NODESTATE_ISUP,TBDB_NODESTATE_TBFAILED))) {
 	$errors++;
 	warn "$node is not up.";
 	next NODE;
