@@ -51,7 +51,7 @@ if ($printable) {
     echo "<html>
           <head>
   	  <link rel='stylesheet' href='../tbstyle-plain.css' type='text/css'>
-	  <style type="text/css">
+	  <style type=\"text/css\">
 	  <!--
 div.question { 
   font-weight: bold;
