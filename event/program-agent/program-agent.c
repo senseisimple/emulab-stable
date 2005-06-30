@@ -1070,7 +1070,7 @@ set_program(struct proginfo *pinfo, char *args)
 					pinfo->cmdline = NULL;
 				}
 			}
-			asprintf(&pinfo->cmdline, "exec %s", value);
+			asprintf(&pinfo->cmdline, "%s", value);
 			value = NULL;
 		}
 		if ((rc = event_arg_dup(args, "DIR", &value)) >= 0) {
@@ -1450,7 +1450,7 @@ parse_configfile(char *filename)
 					'\0'; // remove trailing single quote
 				/* Prepend exec to replace the 'csh' */
 				asprintf(&pinfo->cmdline,
-					 "exec %s",
+					 "%s",
 					 pinfo->cmdline);
 			}
 			else {
