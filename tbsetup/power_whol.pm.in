@@ -174,7 +174,8 @@ sub whacksome($@) {
 	    if ($debug);
 	if (system("$SNMPIT -a $portstr")) {
 	    warn "WhOL: could not set autoconfig for $portstr\n";
-	    $failed++;
+# not fatal for now til we fix autoneg on cisco2950s
+#	    $failed++;
 	}
     }
 

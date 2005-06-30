@@ -93,7 +93,7 @@ if (@ARGV < 2) {
 # Read in ARGV
 #
 $op = shift (@ARGV);
-if ($op =~ /^(on|off|cycle)$/) {
+if ($op =~ /^(on|off|cycle|status)$/) {
     $op = $1;
 } else {
     exit &usage;
