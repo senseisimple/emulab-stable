@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -23,3 +23,11 @@ body, html {
 	margin: 0; 
 	color: #000000; 
 	font-family: arial, helvetica, sans-serif; }
+
+/* FAQ questions and answers. */
+div.question {
+	font-weight: bold;
+	text-indent: 0em;
+	margin-bottom: 1em; }
+div.answer {
+	margin-bottom: 2em; }

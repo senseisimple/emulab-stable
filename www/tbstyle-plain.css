@@ -28,3 +28,9 @@ H4 { color: #000000; font-weight: bold; font-size: 12pt; }
 
 PRE { margin-left: 20pt; }
 
+/* FAQ questions and answers. */
+div.question {
+	font-weight: bold;
+	margin-bottom: 1em; }
+div.answer {
+	margin-bottom: 2em; }

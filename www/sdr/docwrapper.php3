@@ -51,18 +51,6 @@ if ($printable) {
     echo "<html>
           <head>
   	  <link rel='stylesheet' href='../tbstyle-plain.css' type='text/css'>
-	  <style type=\"text/css\">
-	  <!--
-div.question { 
-  font-weight: bold;
-  text-indent: 0em;
-  margin-bottom: 1em;
-}
-div.answer { 
-  margin-bottom: 2em;
-}
-	  -->
-	  </style>
           </head>
           <body>\n";
 }
