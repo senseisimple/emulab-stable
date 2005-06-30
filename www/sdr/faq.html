@@ -7,58 +7,253 @@
 <h2>Frequently Asked Questions</h2>
 </center>
 
-<h2>Contents</h2>
-<ul>
-<li> <a href="#WhatIsSDR">What is software defined radio (SDR)?</a>
-<li> <a href="#WhatIsGNURadio">What is GNU Radio?</a>
-<li> <a href="#WhatIsUSRP">What is the Universal Software Radio Peripheral (USRP)?</a>
-</ul>
-
-<hr>
+<h3>General</h3>
 
 <ul>
-<li><a NAME="WhatIsSDR"></a>
-    <font size='+1'><b>What is software defined radio (SDR)?</b></font>
-    <p>Software defined radio (SDR) is a system where changeable
-       software is used to process digital signals sent and/or
-       received by accompanying radio frequency hardware.  This is in
-       contrast to traditional radios, where the signal processing
-       logic is mainly hardcoded into custom hardware with only
-       limited control over how the signal is handled.
-    </p>
+  <li><a href="#WhatIsSDR">What is software-defined radio (SDR)?</a></li>
 
-<li><a NAME="WhatIsGNURadio"></a>
-    <font size='+1'><b>What is GNU Radio?</b></font>
-    <p>Gnu Radio is a free extensible software kit for experimenting
-       with software defined radio (SDR) that runs on a general
-       purpose computer, such as a PC or a Mac.  This software suite
-       is normally coupled with hardware (such as the USRP) that
-       captures radio frequency (RF) signals and converts them from
-       analog to digital.  The GNU Radio software operates on this
-       digital representation of the radio signal.
-    </p>
+  <li><a href="#WhatIsGNURadio">What is GNU Radio?</a></li>
 
-<li><a NAME="WhatIsUSRP"></a>
-    <font size='+1'><b>What is the Universal Software Radio Peripheral (USRP)?</b></font>
-    <p>The Universal Software Radio Peripheral, or USRP for short, is
-       a hardware platform designed to work with the GNU Radio
-       software kit.  It is comprised of an extensible motherboard
-       that can accomodate up to four peripheral daughtercards.
-       Digital to Analog (D/A) and analog to digital (A/D) converters
-       on the motherboard change the signal to and from digital as it
-       passes between the the motherboard and daughtercards.  A
-       programmable FPGA on the motherboard can perform mathematical
-       transforms on the digital signals quickly.  Data is shuttled to
-       and from the motherboard and general purpose computer through a
-       USB 2.0 connection.
-    </p>
-    <p>Several USRP daughtercards are already available, with many more
-       planned.  These include a UHF receiver (50MHz - 800MHz), basic
-       transmit and receive boards for use with external equipment, and
-       ISM band transmiters and receivers (e.g. 2.4GHz band).
-    </p>
-    <p>Sales and other technical information can be found on the Ettus
-       Research webpage: <a href="http://www.ettus.com">
-       http://www.ettus.com</a>
+  <li><a href="#WhatIsUSRP">What is the Universal Software Radio Peripheral
+  (USRP)?</a></li>
 
+  <li><a href="#WhereToBuyUSRP">Where can I buy USRPs?</a></li>
+
+  <li><a href="#WhereToTestUSRP">If I can't afford to buy a bunch of USRPs, can
+  I "borrow" some for my research and/or my class?</a></li>
 </ul>
+
+<h3>Using USRPs in Netbed</h3>
+
+<ul>
+  <li><a name="#NetbedUSRPs">How many USRPs are in Netbed?  Where are they
+  located?  What are their characteristics?</a></li>
+
+  <li><a name="#NetbedAccess">How do I get access to the USRPs in
+  Netbed?</a></li>
+
+  <li><a name="#NetbedGNuRadio">Is the GNU Radio software already installed on
+  Netbed?</a></li>
+
+  <li><a name="#NetbedExperiment">How do I create an experiment that uses
+  Netbed's USRPs?</a></li>
+
+  <li><a name="#NetbedUSRPConfigure">How that I've created an experiment, how
+  should I configure and use the USRPs?</a></li>
+
+  <li><a name="#NetbedChoosingNodes">Can I choose USRP-enabled nodes based on
+  their observed wireless properties with respect to each other, e.g., signal
+  strength?</a></li>
+
+  <li><a name="#NetbedPhysical">How do I make sure that I get the same physical
+  USRP nodes every time I run my experiment?</a></li>
+
+  <li><a name="#NetbedSamples">Are there any sample experiments that I can play
+  with?</a></li>
+</ul>
+
+<hr/><!--===================================================================-->
+
+<h3>General</h3>
+
+<div class="question">
+<p>
+  <a name="WhatIsGNURadio"><b>What is software-defined radio (SDR)?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  Software-defined radio (SDR) is a system in which changeable
+  software is used to process digital signals sent and/or
+  received by accompanying radio frequency hardware.  This is in
+  contrast to traditional radios, in which the signal processing
+  logic is mainly hard-coded into custom hardware with only
+  limited control over how the signal is handled.
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="WhatIsGNURadio"><b>What is GNU Radio?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  GNU Radio is a free, extensible software kit for experimenting
+  with software defined radio (SDR) that runs on a general-purpose
+  computer, such as a PC or a Mac.  This software suite
+  is normally coupled with hardware (such as the USRP) that
+  captures radio frequency (RF) signals and converts them from
+  analog to digital.  The GNU Radio software operates on this
+  digital representation of the radio signal.
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="WhatIsUSRP"><b>What is the Universal Software Radio Peripheral
+  (USRP)?</b></a>
+</p>
+
+<div class="answer">
+<p>
+  The Universal Software Radio Peripheral, or USRP for short, is
+  a hardware platform designed to work with the GNU Radio
+  software kit.  It is comprised of an extensible motherboard
+  that can accommodate up to four peripheral daughtercards.
+  digital to analog (D/A) and analog to digital (A/D) converters
+  on the motherboard change the signal to and from digital as it
+  passes between the the motherboard and daughtercards.  A
+  programmable FPGA on the motherboard can perform mathematical
+  transforms on the digital signals quickly.  Data is shuttled to
+  and from the motherboard and general purpose computer through a
+  USB&nbsp;2.0 connection.
+</p>
+
+<p>
+  Several USRP daughtercards are already available, with many more
+  planned.  These include a UHF receiver (50MHz&ndash;800MHz), basic
+  transmit and receive boards for use with external equipment, and
+  ISM band transmitters and receivers (e.g. 2.4GHz band).
+</p>
+
+<p>
+  Other technical information can be found on the Ettus Research Web page at <a
+  href="http://www.ettus.com/">http://www.ettus.com/</a>.
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="WhereToBuyUSRP"><b>Where can I buy USRPs?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  The USRP is now available for purchase from <a
+  href="http://www.ettus.com/">Ettus Research</a>.
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="WhereToTestUSRP"><b>If I can't afford to buy a bunch of USRPs, can
+  I "borrow" some for my research and/or my class?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<hr/><!--===================================================================-->
+
+<h3>Using USRPs in Netbed</h3>
+
+<div class="question">
+<p>
+  <a name="NetbedUSRPs"><b>How many USRPs are in Netbed?  Where are they
+  located?  What are their characteristics?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedAccess"><b>How do I get access to the USRPs in Netbed?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedGnuRadio"><b>Is the GNU Radio software already installed on
+  Netbed?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedExperiment"><b>How do I create an experiment that uses
+  Netbed's USRPs?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedUSRPConfigure"><b>How that I've created an experiment, how
+  should I configure and use the USRPs?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedChoosingNodes"><b>Can I choose USRP-enabled nodes based on
+  their observed wireless properties with respect to each other, e.g., signal
+  strength?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedPhysical"><b>How do I make sure that I get the same physical
+  USRP nodes every time I run my experiment?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
+
+<div class="question">
+<p>
+  <a name="NetbedSamples"><b>Are there any sample experiments that I can play
+  with?</b></a>
+</p>
+</div>
+
+<div class="answer">
+<p>
+  <em>To be written.</em>
+</p>
+</div>
