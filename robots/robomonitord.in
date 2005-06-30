@@ -21,7 +21,7 @@ sub usage()
 }
 my $optlist     = "d";
 my $debug	= 0;
-my $impotent    = 1;
+my $impotent    = 0;
 
 #
 # Must be runs as root, from boot.
