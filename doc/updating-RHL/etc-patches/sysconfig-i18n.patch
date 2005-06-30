@@ -1,0 +1,7 @@
+--- /etc/sysconfig/i18n~	2005-06-14 18:12:59.000000000 -0600
++++ /etc/sysconfig/i18n	2005-06-28 01:19:10.000000000 -0600
+@@ -1,3 +1,3 @@
+-LANG="en_US.UTF-8"
++LANG="C"
+ SYSFONT="latarcyrheb-sun16"
+ SUPPORTED="en_US.UTF-8:en_US:en"

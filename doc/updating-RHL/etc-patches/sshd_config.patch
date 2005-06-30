@@ -1,0 +1,13 @@
+--- /etc/ssh/sshd_config~	2005-05-16 11:36:13.000000000 -0600
++++ /etc/ssh/sshd_config	2005-06-24 23:31:26.000000000 -0600
+@@ -11,8 +11,8 @@
+ # default value.
+ 
+ #Port 22
+-#Protocol 2,1
+-Protocol 2
++Protocol 2,1
++#Protocol 2
+ #AddressFamily any
+ #ListenAddress 0.0.0.0
+ #ListenAddress ::

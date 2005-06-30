@@ -1,0 +1,18 @@
+--- /etc/profile~	2005-04-15 14:49:52.000000000 -0600
++++ /etc/profile	2005-06-30 03:35:05.000000000 -0600
+@@ -13,12 +13,9 @@
+ 	fi
+ }
+ 
+-# Path manipulation
+-if [ $EUID = 0 ]; then
+-	pathmunge /sbin
+-	pathmunge /usr/sbin
+-	pathmunge /usr/local/sbin
+-fi
++pathmunge /sbin
++pathmunge /usr/sbin
++pathmunge /usr/local/sbin
+ 
+ pathmunge /usr/X11R6/bin after
+ 

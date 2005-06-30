@@ -1,0 +1,13 @@
+--- /etc/syslog.conf	2005-05-19 09:07:48.000000000 -0700
++++ /z/image/etc/syslog.conf	2004-02-19 17:13:59.000000000 -0700
+@@ -2,6 +2,10 @@
+ # Logging much else clutters up the screen.
+ #kern.*							/dev/console
+ 
++# For the testbed. Log ssh logins to ops.
++local5.err						/dev/console
++auth.info						@users.emulab.net
++
+ # Log anything (except mail) of level info or higher.
+ # Don't log private authentication messages!
+ *.info;mail.none;authpriv.none;cron.none		/var/log/messages

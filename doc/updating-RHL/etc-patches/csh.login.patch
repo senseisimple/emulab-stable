@@ -1,0 +1,15 @@
+--- /etc/csh.login~	2004-11-18 13:12:54.000000000 -0700
++++ /etc/csh.login	2005-06-30 03:37:42.000000000 -0600
+@@ -7,11 +7,7 @@
+ 		setenv PATH "${PATH}:/usr/X11R6/bin"
+         endif
+ else
+-	if ( $uid == 0 ) then
+-		setenv PATH "/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+-	else
+-		setenv PATH "/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+-	endif
++	setenv PATH "/sbin:/usr/sbin:/usr/local/sbin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+ endif
+ 
+ limit coredumpsize 0

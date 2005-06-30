@@ -1,0 +1,5 @@
+--- /etc/ld.so.conf~	2005-05-30 05:15:10.000000000 -0600
++++ /etc/ld.so.conf	2005-06-28 00:23:57.000000000 -0600
+@@ -1 +1,2 @@
+ include ld.so.conf.d/*.conf
++/usr/local/lib
