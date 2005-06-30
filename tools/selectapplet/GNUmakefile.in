@@ -1,0 +1,43 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tools/selectapplet
+
+include $(OBJDIR)/Makeconf
+
+ifeq ($(JAVAC),)
+JARS =
+else
+JARS = $(TESTBED_SRCDIR)/www/robotrack/NodeSelect.jar
+endif
+
+all:
+jar: $(JARS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+NodeSelect.class: $(SRCDIR)/NodeSelect.java
+	$(JAVAC) -deprecation -d . -classpath . $<
+
+ScrollablePicture.class: $(SRCDIR)/ScrollablePicture.java
+	$(JAVAC) -deprecation -d . $^
+
+$(TESTBED_SRCDIR)/www/robotrack/NodeSelect.jar: NodeSelect.class
+	echo '$(filter-out NodeSelect.class, $(shell echo *.class))'
+	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out NodeSelect.class, $(shell echo *.class)))
+
+install:
+
+clean:
+	/bin/rm -f *.class *.jar
+
+$(INSTALL_WWWDIR)/%: %
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
