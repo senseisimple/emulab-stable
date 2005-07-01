@@ -276,9 +276,9 @@ static int group_agent_immediate(local_agent_t la, sched_event_t *se)
 		ga->ga_remaining = ga->ga_count;
 	}
 
-	if (se->agent.m[1]->handler != NULL) {
-		if (se->agent.m[1]->handler->la_flags & LAF_MULTIPLE) {
-			local_agent_queue(se->agent.m[1]->handler, se);
+	if (ga->ga_agents[1]->handler != NULL) {
+		if (ga->ga_agents[1]->handler->la_flags & LAF_MULTIPLE) {
+			local_agent_queue(ga->ga_agents[1]->handler, se);
 		}
 		else {
 			int lpc;
