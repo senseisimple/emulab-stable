@@ -105,13 +105,6 @@ if ($op =~ /^(on|off|cycle|status)$/) {
 @machines = @ARGV;
 foreach my $n (0..$#ARGV) {
     $machines[$n] =~ s/^([-\@\w.]+)$/$1/;
-
-    # Shark hack
-    if ($machines[$n] =~ /^(sh\d+)-[1-8]$/) {
-	print "WARNING: Rebooting $machines[$n] will reboot all of shelf $1!\n";
-	$machines[$n] = $1;
-    }
-    # End shark hack
 }
 
 #
@@ -127,6 +120,16 @@ foreach my $n (0..$#machines) {
 # Dump the args
 #
 print "do \"$op\" to @machines\n" if $verbose > 1;
+
+#
+# Handle the status command which is not a per-node operation and not
+# allowed by anyone except admins.
+#
+if ($op eq "status") {
+    die("Only admins are allowed to query status\n")
+	if ($UID != 0 && !TBAdmin($UID));
+    exit(dostatus(@machines));
+}
 
 #
 # ElabinElab is special; Do local permission checks, build up a node list
@@ -331,3 +334,92 @@ foreach my $power_id (keys %outlets) {
 
 # Return 0 on success. Return non-zero number of nodes that failed.
 exit $exitval;
+
+sub byname() {
+    my ($as, $an, $bs, $bn);
+
+    if ($a =~ /(.*[^\d])(\d+)$/) {
+	$as = $1; $an = $2;
+    } else {
+	$as = $a;
+    }
+    if ($b =~ /(.*[^\d])(\d+)$/) {
+	$bs = $1; $bn = $2;
+    } else {
+	$bs = $b;
+    }
+    $as cmp $bs || $an <=> $bn;
+}
+
+#
+# Query the given controllers for their status
+#
+sub dostatus(@) {
+    my @wanted = @_;
+    my %ctrls = ();
+    my $errors = 0;
+
+    if ($ELABINELAB) {
+	warn "Cannot get status from inner elab\n";
+	return 1;
+    }
+
+    my $doall = (@wanted == 1 && $wanted[0] eq "all");
+
+    #
+    # Fetch all possible power controllers
+    #
+    my $result = DBQueryFatal("select n.node_id,t.type ". 
+			      "from nodes as n " .
+			      "left join node_types as t on n.type=t.type " .
+			      "where n.role='powerctrl'");
+    while (my ($ctrl, $type) = $result->fetchrow()) {
+	$ctrls{$ctrl} = $type;
+    }
+
+    @wanted = sort byname keys(%ctrls)
+	if ($doall);
+
+    #
+    # Loop through desired controllers getting status
+    #
+    for my $ctrl (@wanted) {
+	my %status;
+
+	if (!defined($ctrls{$ctrl})) {
+	    warn "No such power controller '$ctrl', ignored\n";
+	    $errors++;
+	    next;
+	}
+	if ($ctrls{$ctrl} =~ /^RPC/) {
+	    if (rpc27status($ctrl,\%status)) {
+		print "Could not get status for $ctrl.\n";
+		$errors++;
+		next;
+	    }
+	    print "$ctrl: ";
+	    print $status{current}, " Amps, "
+		if $status{current};
+	    print $status{power}, " Watts, "
+		if $status{power};
+	    if (defined($status{tempF}) || defined($status{tempC})) {
+		my $temp = $status{tempF};
+		if (!defined($temp)) {
+		    $temp = $status{tempC} * 9 / 5 + 32;
+		}
+		printf "%.1f F", $temp;
+	    }
+	    print "\n";
+	    for my $outlet (1..20) {
+		my $ostr = "outlet$outlet";
+		print "  Outlet $outlet: ", $status{$ostr}, "\n"
+		    if (defined($status{$ostr}));
+	    }
+	} elsif (!$doall) {
+	    warn "Cannot get status for $ctrl (type " .
+		$ctrls{$ctrl} . ") yet\n";
+	    $errors++;
+	}
+    }
+    return $errors;
+}

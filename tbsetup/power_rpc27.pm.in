@@ -11,7 +11,7 @@ package power_rpc27;
 
 use Exporter;
 @ISA = ("Exporter");
-@EXPORT = qw( rpc27ctrl );
+@EXPORT = qw( rpc27status rpc27ctrl );
 
 use Socket;
 use IO::Handle;
@@ -37,14 +37,40 @@ my $debug = 0;
 
 # RPC27 Prompt string
 my $RPC27_PROMPT = 'RPC-\d+>';
+
+# RPC help message.  Used as terminator for status fetch.
+my $RPC27_HELPMSG = 'Type "Help" for a list of commands';
+
 my %RPC27_CMD =
-  ("cycle"=>"reboot",
-   "on"    =>"on",
-   "off"   =>"off");
+  ("cycle"  => "reboot",
+   "on"     => "on",
+   "off"    => "off");
+
+sub rpc27status {
+    my ($controller, $statusp) = @_;
+
+    my($TIP, $i, $insync);
+
+    #
+    # Form the connection to the controller via a "tip" line to the
+    # capture process. Once we have that, we can just talk to the
+    # controller directly.
+    #
+    if (!($TIP = tipconnect($controller))) {
+	print STDERR "*** Could not form TIP connection to $controller\n";
+	return 1;
+    }
+
+    if (syncandsend($controller, $TIP, "status", $statusp)) {
+	return 1;
+    }
+
+    return 0;
+}
 
 # Main routine.
 # usage: rpc27ctrl(cmd, controller, outlet)
-# cmd = { "cycle" | "on" | "off" }
+# cmd = { "cycle" | "on" | "off" | "status" }
 # controller = <node_id>
 # outlet = int, 1 <= outlet <= 20
 #
@@ -52,7 +78,6 @@ my %RPC27_CMD =
 # 
 sub rpc27ctrl {
     my($cmd, $controller, @outlets) = @_;
-    my($TIP, $i, $insync);
 
     #
     # Check parameters
@@ -95,7 +120,7 @@ sub rpc27ctrl {
 
     foreach my $outlet (@outlet_strings) {
 	my $command = "$RPC27_CMD{$cmd} $outlet";
-	if (syncandsend($controller,$TIP,$command)) {
+	if (syncandsend($controller,$TIP,$command,undef)) {
 	    #
 	    # On failure, syncandsend has already closed $TIP
 	    #
@@ -114,8 +139,8 @@ sub rpc27ctrl {
 # the controller opened with tipconnect, and $command is the whole command
 # (ie. 'reboot 20,40') to send.
 #
-sub syncandsend($$) {
-    my ($controller,$TIP,$cmd) = @_;
+sub syncandsend($$$) {
+    my ($controller,$TIP,$cmd,$statusp) = @_;
 
     #
     # Send a couple of newlines to get the command prompt, and then wait
@@ -135,17 +160,13 @@ sub syncandsend($$) {
 	    return 1;
 	}
 
-	my $cc = 0;
-	while (1) {
-	    if (sysread($TIP, $line, 1, $cc) == 0) {
-		print STDERR
-		    "*** Power control sync read failed ".
-			"($controller/$outlet)\n";
-		close($TIP);
-		return 1;
-	    }
-	    $cc++;
-	    last if ($line =~ /\n/ || $cc > 1023);
+	$line = rpc_readline($TIP);
+	if (!defined($line)) {
+	    print STDERR
+		"*** Power control sync read failed ".
+		    "($controller/$outlet)\n";
+	    close($TIP);
+	    return 1;
 	}
 	if ($debug) {
 	    print "Read: $line";
@@ -187,6 +208,42 @@ sub syncandsend($$) {
     	return 1;
     }
 
+    # If status is desired, slurp and parse everything up to the next prompt
+    if ($statusp) {
+	my %status = ();
+
+	print "Getting status\n"
+	    if ($debug);
+	while (my $line = rpc_readline($TIP)) {
+	    print "Read: $line"
+		if ($debug);
+	    # skip echoed prompt+command
+	    if ($line =~ /status/) {
+		next;
+	    }
+	    # XXX cannot look for final prompt because there is no newline
+	    if ($line =~ /$RPC27_HELPMSG/) {
+		last;
+	    }
+	    if ($line =~ /Temperature:\s+(\d+\.\d+) C/) {
+		$status{tempC} = $1;
+	    } elsif ($line =~ /Average Power:\s+(\d+) Watts/) {
+		$status{power} = $1;
+	    } elsif ($line =~ /True RMS Current:\s+(\d+\.\d+) Amps/) {
+		$status{current} = $1;
+	    }
+	    # note the /g, controllers with 20 ports put two outlets per line
+	    elsif (my %ohash = $line =~ /Outlet\s+(\d+)\s+:\s+(On|Off)/g) {
+		for my $o (keys(%ohash)) {
+		    my $outlet = "outlet$o";
+		    $status{$outlet} = $ohash{$o};
+		}
+	    }
+	}
+	%$statusp = %status;
+	print "Returning status\n"
+	    if ($debug);
+    }
     return 0;
 }
 
@@ -292,6 +349,22 @@ sub tipconnect($) {
     print STDERR
 	"*** $controller on $server($portnum) was busy for too long\n";
     return 0;
+}
+
+sub rpc_readline($)
+{
+    my ($TIP) = @_;
+    my $line;
+
+    my $cc = 0;
+    while (1) {
+	if (sysread($TIP, $line, 1, $cc) == 0) {
+	    return undef;
+	}
+	$cc++;
+	last if ($line =~ /\n/ || $cc > 1023);
+    }
+    return $line;
 }
 
 1;
