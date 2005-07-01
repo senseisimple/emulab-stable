@@ -11,12 +11,33 @@
 
 ##### Important notes
 
-In order to be able to help you debug any problems you run into or answer
-certain questions, we'll need have accounts, preferably with root access if
-allowed by your institution's AUP, on your boss and ops nodes, and will need to
-be able to access the webserver on boss.
-This is crucial during testbed installation and bringup; after that it's not
-so important, except when you are upgrading to a new version of our software.
+In order to save your time and ours when building and installing an
+Emulab, we make some up-front requirements.  We need explicit
+agreement to these conditions, in advance.
+
+1. We need to be satisfied that you have appropriate technical
+expertise, that those who have it will be directly involved, and that
+"management" will exercise appropriate supervision.  This may take the
+form of some sort of teleconference "interview" procedure with the
+project lead and your people.  The ideal people to bring up an Emulab
+are quality system and network administrators; good student versions
+of such people can work.
+
+2. We must be closely involved in designing the overall network
+architecture of your Emulab, and approve the planned hardware.  This
+aspect is not as simple technically as it appears, and includes
+financial, security, and support tradeoffs.
+
+3. To be able to help you debug any problems you run into or answer
+certain questions, we'll need to have accounts, preferably with root
+access if allowed by your institution's AUP, on your Emulab's two
+servers ('boss' and 'ops'), and will need to be able to access the
+webserver on boss.  This is crucial during testbed installation and
+bringup; after that it's not so important, except when you are
+upgrading to a new version of our software.
+
+4. Serial line consoles and remote power controllers must be connected
+to at least two experimental nodes, so we can help debug.
 
 
 Supported environment:
@@ -26,12 +47,21 @@ the resources to adapt it to every possible environment. So, you will need to
 either work out a way to match the environment outlined below, or be willing to
 invest some work in adapting the software.
 
-(1) You will need at least two network interfaces on each node - one for the
-control network, and one for the experimental network. The experimental network
-needs to be one on which we can make VLANs with SNMP. Currently, we support
-Cisco 6500 and 4000 series switches (though not all switches in these lines
-have been tested). The control net must have full multicast support, including
-IGMP snooping. Nodes' control network interfaces must support PXE.
+(1) You will need at least two network interfaces on each node: one for the
+control network and one for the experimental network. The experimental network
+needs to be one on which we can make VLANs with SNMP. Currently, Emulab supports
+* Cisco 6500 and 4000 series switches (though not all switches in these lines
+  have been tested)
+* many Nortel switches (those with RAPID-CITY Nortel mibs, ie, 5510-24T 5510-48T
+  5520-24T 5520-48T, and reasonably recent Accellars).
+* some Foundry switches
+* Intel 510T (probably a bit bit-rotted since we haven't used it in a long time,
+  but likely easy to fix)
+* HP Procurve switch support has been written (by Cornell) but not yet
+  fully tested.
+Emulab's Cisco support is the best, because those are the switches we have.
+The control net must have full multicast support, including IGMP
+snooping. Nodes' control network interfaces must support PXE.
 
 (2) We highly, highly recommend that boss, ops, and all the nodes be in
 publicly routed IP space. If this is not possible, then boss and ops should be
