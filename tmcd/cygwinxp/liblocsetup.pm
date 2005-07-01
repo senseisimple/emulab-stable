@@ -345,25 +345,45 @@ sub os_userdel($)
 }
 
 #
-# Modify user group membership.
+# Modify user group membership and password.
+# Changing the login shell is unimplemented.
 # 
 sub os_usermod($$$$$$)
 {
     my($login, $gid, $glist, $pswd, $root, $shell) = @_;
 
-    # Unimplemented.
-    return -1;
+    if ($root) {
+	$glist .= ",0";
+    }
+    if ($glist ne "") {
+	##print "glist '$glist'\n";
+	my $gname;
+	foreach my $grp (split(/,/, $glist)) {
+	    if ( $grp eq "0" ) {
+		$gname = "Administrators";
+	    }
+	    else {
+		$gname = $groupsByGid{$grp};
+	    }
+	    ##print "login $login, grp $grp, gname '$gname'\n";
+	    my $cmd = "$NET localgroup $gname | tr -d '\\r' | grep -q '^$login\$'";
+	    ##print "    $cmd\n";
+	    if (system($cmd)) {
+		# Add members into groups using the "net localgroup /add" command.
+		$cmd = "$NET localgroup $gname $login /add";
+		##print "    $cmd\n";
+		if (system($cmd) != 0) {
+		    warning("os_usermod error ($cmd)\n");
+		}
+	    }
+	}
+    }
 
-    ##if ($root) {
-    ##	  $glist = join(',', split(/,/, $glist), "root");
-    ##}
-    ##if ($glist ne "") {
-    ##	  $glist = "-G $glist";
-    ##}
-    ### Map the shell into a full path.
-    ##$shell = MapShell($shell);
-    ##
-    ##return system("$USERMOD -s $shell -g $gid $glist -p '$pswd' $login");
+    $cmd = "echo -e '$pswd\\n$pswd' | passwd $login > /dev/null 2>&1";
+    ##print "    $cmd\n";
+    if (system($cmd) != 0) {
+	warning("os_usermod error ($cmd)\n");
+    }
 }
 
 #

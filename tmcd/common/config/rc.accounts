@@ -193,7 +193,7 @@ sub doboot()
     goto bad
 	if (WINDOWS() && os_accounts_start());
 
-    if (! MFS() && ! WINDOWS()) {
+    if (! MFS()) {
 	#
 	# These will just start out as empty hashes so everything is added.
 	# 
@@ -260,7 +260,7 @@ sub doboot()
     %deletes = ();
 
     # Write the DB back out!
-    if (! MFS() && ! WINDOWS()) {
+    if (! MFS()) {
 	dbmclose(%GRPDB);
     }
 
@@ -345,6 +345,7 @@ sub doboot()
     $pat   .= q(ROOT=(\d) NAME="(.*)" HOMEDIR=(.*) GLIST="(.*)" );
     $pat   .= q(SERIAL=(\d+) EMAIL="([-\w\@\.\+]+)" SHELL=([-\w]*));
 
+    my @addedUsers = ();
     while (($login, $info) = each %newaccounts) {
 	if ($info =~ /$pat/) {
 	    $pswd  = $2;
@@ -377,7 +378,8 @@ sub doboot()
 		    warning("Skipping since $login existed before EmulabMan!");
 		    next;
 		}
-		if ($curuid != $uid) {
+		# Windows uses its own UID and GID numbers. 
+		if ($curuid != $uid  && ! WINDOWS()) {
 		    warning("$login/$uid uid mismatch with existing login!");
 		    next;
 		}
@@ -395,7 +397,7 @@ sub doboot()
 	    }
 	    else {
 		print "Adding: $login/$uid/$gid/$root/$name/$hdir/$glist\n";
-
+		push(@addedUsers, $login);
 		if (os_useradd($login, $uid, $gid, $pswd, 
 			       "$glist", $hdir, $name, $root, $shell)) {
 		    warning("Error adding new user $login");
@@ -451,7 +453,7 @@ sub doboot()
 	}
     }
     # Write the DB back out!
-    if (! MFS() && ! WINDOWS()) {
+    if (! MFS()) {
 	dbmclose(%PWDDB);
     }
 
@@ -460,8 +462,14 @@ sub doboot()
 	os_accounts_end();
 
 	# We couldn't do chown'ing before new users were in the /etc/passwd file.
-	print "Filling in ssh authorized_keys files.\n";
-	while (($login, $info) = each %newaccounts) {
+	if (scalar(@addedUsers) == 0) {
+	    print "No new users needing ssh authorized_keys files.\n";
+	}
+	else {
+	    print "Filling in ssh authorized_keys files for new users.\n";
+	}
+	foreach my $login (@addedUsers) {
+	    $info = $newaccounts{$login};
 	    if ($info =~ /$pat/) {
 		$pswd  = $2;
 		$uid   = $3;
@@ -481,6 +489,7 @@ sub doboot()
 		# This matches a line like this in /etc/sshd_config:
 		# AuthorizedKeysFile /sshkeys/%u/authorized_keys
 		my $sshdir = "/sshkeys/$login";
+		print "    $sshdir\n";
 
 		# Open up an existing key dir to the root user.  Even though root
 		# is in the Administrators group, it's locked out by permissions.
