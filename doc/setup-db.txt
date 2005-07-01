@@ -32,7 +32,7 @@ you will need to do in order to use your admin powers. For the same reason
 that you use 'su' and/or 'sudo' on your UNIX boxes instead of logging in as
 root, you must explicitly enable admin privileges after you log in. When
 logged in as a user who is allowed to become an admin, you will see a green
-dot one the left side of the header above the main page content. The green
+dot on the left side of the header above the main page content. The green
 dot means that although you are allowed admin powers, they are currently
 turned off, and you see the same web pages that a regular user sees, and
 can use the same actions. If you click on the dot, it will turn red, and you
@@ -63,7 +63,7 @@ with setting up your testbed. Note that the elabman account has been
 deactivated during this process to avoid problems later on (and potential
 security breaches). 
 
-Before we continue. lets explain a few more important items:
+Before we continue, lets explain a few more important items:
 
 * Project Membership: In addition to the project you just created, you have
   automatically been added to the "emulab-ops" project with trust value
@@ -76,28 +76,29 @@ Before we continue. lets explain a few more important items:
 
 	echo 'update users set admin=1 where uid="<username>"' | mysql tbdb
 
-* Shell on Boss: Give yourself the ability to login to boss - most users
-  have a restricted shell on boss, and are not allowed to log in using a
-  password. Login to boss as root, and edit the password file (use 'vipw',
-  FreeBSD requires some special processing on the password file after
-  editing). Give yourself a real shell (say, /bin/csh) and then exit the
+* Shell on Boss: Give yourself the special ability to login to boss;
+  in contrast, most (normal) users have a restricted shell on boss,
+  and are not allowed to log in using a password. Login to boss as root,
+  and edit the password file using the 'vipw' command (FreeBSD requires
+  some special processing on the password file after editing, which vipw
+  does.). Give yourself a real shell (say, /bin/csh) and then exit the
   editor. Then give yourself a password (in general, it is safer to have a
   different password on boss then on ops!). Use this command:
 
 	passwd <your username>
 
-  NOTE: See doc/shelloboss.txt for important security issues wrt giving
+  NOTE: See doc/shelloboss.txt for important security issues w.r.t. giving
   real shells on boss. Before you give a real shell to someone, it is a
   good idea for them to read this file!
 
 * Now logout and back in as yourself. In general, it is safer and better to
   not do things as root. In fact, many testbed programs will complain if
-  you invoke them as root cause then it makes accounting and auditing more
+  you invoke them as root because it makes accounting and auditing more
   difficult.
 
 * Unix Group Membership: The Emulab account system manages both the
   password file and the group file (/etc/group) on both boss and ops. If
-  you edit it directly, those changes will likely be lost. If you want to be
+  you edit them directly, those changes will likely be lost. If you want to be
   a member of any UNIX groups on boss, use our 'unixgroups' command. For
   example, to add yourself to the "operator" group, do this on boss (as
   yourself, not root):
@@ -109,9 +110,10 @@ Before we continue. lets explain a few more important items:
 
   NOTE: Just as you need to go 'red dot' to use admin privileges on the web
   interface, you must also explicitly enable them on the command line. To
-  do this, prefix the command you want to run with 'withadminprivs'.
+  do this, prefix the command you want to run with 'withadminprivs',
+  which can be abbreviated as 'wap'.
 
-* Set you path: withadminprivs and many other admin-type commands live in
+* Set your path: withadminprivs and many other admin-type commands live in
   /usr/testbed/sbin - you'll want to put this and /usr/testbed/bin in your
   $PATH.
 
