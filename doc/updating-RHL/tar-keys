@@ -1,5 +1,8 @@
 cd /
-tar cfvz /emulab-keys.tar.gz /root/.cvsup/auth \
+tar cfvz /emulab-keys.tar.gz \
+	/root/.ssh/authorized_keys \
+	/root/.ssh/authorized_keys2 \
+	/root/.cvsup/auth \
 	/etc/ssh/ssh_host_dsa_key /etc/ssh/ssh_host_dsa_key.pub\
 	/etc/ssh/ssh_host_key /etc/ssh/ssh_host_key.pub\
 	/etc/ssh/ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key.pub\
