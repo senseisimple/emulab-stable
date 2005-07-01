@@ -1,0 +1,60 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= sensors/powermon
+
+include $(OBJDIR)/Makeconf
+
+SBIN_STUFF	= powermon
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: all script-install
+	@echo "Don't forget to do a post-install as root"
+
+boss-install: install
+
+#
+# Automate this part at some point.
+# 
+script-install:	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF))
+
+post-install: 
+	chmod 775 $(INSTALL_SBINDIR)
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:
+
+#
+# Tip server installation
+#
+tipserv-install:
+
+#
+# Client side
+#
+client:
+client-install: client
+
+clean:	subdir-clean
+	rm -f $(SBIN_STUFF)
+
+subdir-clean:
+
+distclean:	subdir-distclean
+
+subdir-distclean:

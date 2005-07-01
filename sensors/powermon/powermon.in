@@ -1,0 +1,179 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Testbed Power controller monitor
+#
+# powermon [-TPC] [type...]
+#
+# -T monitor temperature
+# -P monitor power consumed
+# -C monitor current used
+#
+# "type" is the types of power controllers to monitor.
+#
+# The default is to monitor TPC on all controllers in the DB that
+# support a status call.
+#
+
+#
+# Configure variables
+#
+my $TB         = "@prefix@";
+my $TBOPS      = "@TBOPSEMAIL@";
+my $ELABINELAB = @ELABINELAB@;
+
+use lib "@prefix@/lib";
+use libdb;
+use power_rpc27;
+use power_sgmote;
+use power_mail;
+use power_whol;
+use snmpit_apc;
+use libtestbed;
+use strict;
+use English;
+use Getopt::Std;
+use POSIX qw(strftime);
+
+sub usage() {
+    print << "END";
+Usage: $0 [-TPC] [ <type> ... ]
+ -T turn on temperature (in degrees F) monitoring
+ -P turn on power (watts) consumption monitoring
+ -C turn on current (amps) used monitoring
+
+ -A turn on all monitoring
+ -N turn off all monitoring
+
+ <type> is the types of power controllers to monitor.
+ The default is to monitor temps on all controllers that support status.
+END
+}
+
+my $optlist = "ANTPC";
+my $dotemps = 1;
+my $dopower = 0;
+my $docurrent = 0;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"A"})) {
+    $dotemps = $dopower = $docurrent = 1;
+}
+if (defined($options{"N"})) {
+    $dotemps = $dopower = $docurrent = 0;
+}
+if (defined($options{"T"})) {
+    $dotemps = 1;
+}
+if (defined($options{"P"})) {
+    $dopower = 1;
+}
+if (defined($options{"C"})) {
+    $docurrent = 1;
+}
+die("Only admins are allowed to query status\n")
+    if ($UID != 0 && !TBAdmin($UID));
+exit(dostatus(@ARGV));
+
+sub byname() {
+    my ($as, $an, $bs, $bn);
+
+    if ($a =~ /(.*[^\d])(\d+)$/) {
+	$as = $1; $an = $2;
+    } else {
+	$as = $a;
+    }
+    if ($b =~ /(.*[^\d])(\d+)$/) {
+	$bs = $1; $bn = $2;
+    } else {
+	$bs = $b;
+    }
+    $as cmp $bs || $an <=> $bn;
+}
+
+#
+# Query the given controllers for their status
+#
+sub dostatus(@) {
+    my @wanted = @_;
+    my %ctrls = ();
+    my $errors = 0;
+
+    if ($ELABINELAB) {
+	warn "Cannot get status from inner elab\n";
+	return 1;
+    }
+
+    my $doall = (@wanted == 0);
+
+    #
+    # Fetch all possible power controllers
+    #
+    my $result = DBQueryFatal("select n.node_id,t.type ". 
+			      "from nodes as n " .
+			      "left join node_types as t on n.type=t.type " .
+			      "where n.role='powerctrl'");
+    while (my ($ctrl, $type) = $result->fetchrow()) {
+	$ctrls{$ctrl} = $type;
+    }
+
+    @wanted = sort byname keys(%ctrls)
+	if ($doall);
+
+    #
+    # Loop through desired controllers getting status
+    #
+    for my $ctrl (@wanted) {
+	my %status;
+
+	if (!defined($ctrls{$ctrl})) {
+	    warn "No such power controller '$ctrl', ignored\n";
+	    $errors++;
+	    next;
+	}
+	if ($ctrls{$ctrl} =~ /^RPC/) {
+	    if (rpc27status($ctrl,\%status)) {
+		warn "Could not get status for $ctrl.\n";
+		$errors++;
+		next;
+	    }
+	    my $msg = "$ctrl: ";
+	    $msg .= $status{current} . "A, "
+		if ($docurrent && $status{current});
+	    $msg .= $status{power} . "W, "
+		if ($dopower && $status{power});
+	    if ($dotemps &&
+		defined($status{tempF}) || defined($status{tempC})) {
+		my $temp = $status{tempF};
+		if (!defined($temp)) {
+		    $temp = $status{tempC} * 9 / 5 + 32;
+		}
+		$msg .= ${temp} . "F";
+	    }
+	    logit($msg);
+	} elsif (!$doall) {
+	    warn "Cannot get status for $ctrl (type " .
+		$ctrls{$ctrl} . ") yet\n";
+	    $errors++;
+	}
+    }
+    return $errors;
+}
+
+sub logit($) {
+    my ($msg) = @_;
+
+    print strftime("%b %e %H:%M:%S", localtime)." powermon[$$]: $msg\n";
+}
