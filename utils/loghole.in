@@ -54,6 +54,8 @@ EXTENSIONS = [ ".zip" ]
 
 LINK_DUMP_FMT = [ "trace_%s-%s.xmit", "trace_%s-%s.recv" ]
 
+CLEANFILE = ".cleanonsync"
+
 DOT_LOGHOLES = """+ /var/
 + /var/emulab/
 + /var/emulab/logs/
@@ -258,8 +260,8 @@ def archive_usage():
     print "                         will be displayed in the listing generated"
     print "                         by the 'show' action.  Use a single dash "
     print "                         (-) to read the comment from standard in."
-    print "  -d, --delete           Delete the files in the log directory"
-    print "                         after producing the archive."
+    print "  -d, --delete           Mark the experiment as clean-on-sync to"
+    print "                         remove stale data before another sync."
     print
     print "Required arguments:"
     print "  archive-name  The name of the archive to create."
@@ -765,11 +767,7 @@ def do_archive(args):
     zf.close()
 
     if delete_dir:
-        for entry in os.listdir(logdir):
-            if os.path.isdir(entry):
-                os.rmdir(entry)
-                pass
-            pass
+        open(CLEANFILE, 'w')
         pass
 
     if VERBOSITY == VERBOSITY_MACHINE:
@@ -930,6 +928,11 @@ def do_sync(args, mode="sync", must_be_active=1):
     
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
     os.chdir(logdir)
+
+    if os.path.exists(CLEANFILE):
+        do_clean(["-f", "-e"])
+        os.unlink(CLEANFILE)
+        pass
 
     fp = open(os.path.join(logdir, ".logholes"), "w")
     os.chmod(fp.name, 0664)

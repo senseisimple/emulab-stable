@@ -308,7 +308,7 @@ int send_report(simulator_agent_t sa, char *args)
 		file = NULL;
 	}
 
-	if ((file = popenf("loghole --port=%d --quiet archive", "r",
+	if ((file = popenf("loghole --port=%d --quiet archive --delete", "r",
 			   DEFAULT_RPC_PORT)) == NULL) {
 		strcpy(loghole_name, eid);
 		error("failed to archive log holes\n");

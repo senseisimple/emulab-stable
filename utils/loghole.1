@@ -238,8 +238,12 @@ example, the input parameters.  If the argument to this option is is a single
 dash (\fB-\fR) the comment will be read from standard in.
 .TP
 \fB-d\fR, \fB--delete
-Delete the files in the log directory after producing the archive.  The default
-action is to leave the files in place until the user is ready to delete them.
+After creating the archive, mark the experiment as
+.I clean-on-sync
+so that any stale data is cleaned out before performing the next
+.B sync
+operation.  Currently, the mark is a file named ".cleanonsync" in the
+experiment log directory.
 .SH CHANGE
 The
 .B change
