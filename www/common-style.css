@@ -27,7 +27,8 @@ body, html {
 /* FAQ questions and answers. */
 div.question {
 	font-weight: bold;
-	text-indent: 0em;
 	margin-bottom: 1em; }
+div.question p {
+	text-indent: 0em; }
 div.answer {
 	margin-bottom: 2em; }
