@@ -7,6 +7,7 @@
  */
 
 #include "prepass.h"
+#include "coprocess.h"
 #include "Partition.h"
 
 using namespace std;
@@ -17,11 +18,14 @@ namespace g
 {
     map<string, Host> allHosts;
     vector<Lan> allLans;
-    vector<Partition> allPartitions;
+    map<int, Partition> allPartitions;
+//    map<int, ComponentVertex> partitionGraph;
+    map< pair<int, int>, int > partitionEdges;
     vector<char*> treeCommand;
     vector<char*> generalCommand;
 
     bool useNeato = false;
+    bool printSize = false;
 }
 
 //-----------------------------------------------------------------------------
@@ -55,7 +59,7 @@ void init(void)
 // command line for both trees and generally.
 void parseArgs(int argc, char * argv[])
 {
-    static char * defaultCommand = "./trivial-ipassign";
+    static char * defaultCommand = "./trivial-assign";
     int dashCount = 0;
     int index = 1;
     while (argv[index] != NULL)
@@ -94,6 +98,7 @@ void parseArgs(int argc, char * argv[])
     }
     else
     {
+        g::generalCommand.push_back(NULL);
         g::treeCommand.push_back(NULL);
     }
 }
@@ -105,6 +110,12 @@ void parseSingleArg(char * arg)
     if (arg == string("--neato"))
     {
         g::useNeato = true;
+        g::printSize = false;
+    }
+    else if (arg == string("--size"))
+    {
+        g::printSize = true;
+        g::useNeato = false;
     }
     else
     {
@@ -153,6 +164,7 @@ void addLan(int bits, int weights, vector<string> const & nodes)
     }
 }
 
+/*
 class BiconnectAlgorithm
 {
     static const int NO_INDEX = -1;
@@ -173,6 +185,7 @@ public:
         {
             VisitResult data = visit(0, NO_INDEX);
             int partitionCount = data.partitionCount;
+            cerr << partitionCount;
             g::allPartitions.resize(partitionCount);
             for (int i = 0; i < partitionCount; ++i)
             {
@@ -286,14 +299,10 @@ public:
         list<string>::iterator linkLimit = currentLan.hosts.end();
         for (; linkPos != linkLimit; ++linkPos)
         {
-            // The currentHost is our hyperedge. If it is currently
-            // used, then we don't want to traverse it because this
-            // would violate our edge-unique definition of
-            // biconnectivity. Therefore, we ignore it if used, and
-            // bracket the scope of the traversal with used and unused
-            // notifications.
             Host & currentHost = g::allHosts[*linkPos];
-            currentLan.forwardEdge = currentHost.name;
+            bool touched = currentHost.touched;
+            currentHost.touched = true;
+//            currentLan.forwardEdge = currentHost.name;
             list<int>::iterator pos = currentHost.lans.begin();
             list<int>::iterator limit = currentHost.lans.end();
             for (; pos != limit; ++pos)
@@ -301,8 +310,30 @@ public:
                 Lan & child = g::allLans[*pos];
                 // Make sure we're not doubling back on ourselves
                 // immediately.
-                if (child.number != lan)
+//                if (child.number != lan)
+//                if (parent == -1
+//                    || currentHost.name != g::allLans[parent].forwardEdge)
+
+                // If the host has been touched, only look at LANs
+                // which have been visited before, but not sourced.
+                // If the host hasn't been touched, anything but a
+                // source will do.
+//                cerr << "  " << touched << " "
+//                  << (currentHost.sources[child.number].value == Pred::VISIT)
+//                  << " "
+//                  << (currentHost.sources[child.number].value != Pred::SOURCE)
+//                  << endl;
+                if (currentLan.number != child.number &&
+                    ((touched &&
+                     currentHost.sources[child.number].value == Pred::VISIT)
+                    ||
+                    (!touched &&
+                     currentHost.sources[child.number].value != Pred::SOURCE)))
                 {
+                cerr << currentLan.number << " -" << currentHost.name
+                     << "> " << child.number << endl;
+                   currentHost.sources[currentLan.number].value = Pred::SOURCE;
+                   currentHost.sources[child.number].value = Pred::VISIT;
                     // child.time is zero if we've not visited that
                     // vertex before.
                     if (child.time == 0)
@@ -342,25 +373,20 @@ public:
                     {
                         // We have encountered a back edge.
 
-                        // We need to make sure we are not doubling
-                        // back and double-dipping from the same LAN.
-                        if (currentHost.name != child.forwardEdge)
+                        // We still update our min time to reflect the
+                        // childs knowledge.
+                        result.minTime = min(result.minTime,
+                                             child.time);
+                        // A back edge means that we are definitely
+                        // not part of a tree.
+                        currentLan.isTreeRoot = false;
+                        // If the time of the child is less than our
+                        // time, this means that we've looped back on
+                        // some parent. We are part of that parents
+                        // cycle and therefore are not a naming point.
+                        if (child.time < currentLan.time)
                         {
-                            // We still update our min time to reflect the
-                            // childs knowledge.
-                            result.minTime = min(result.minTime,
-                                                 child.time);
-                            // A back edge means that we are definitely
-                            // not part of a tree.
-                            currentLan.isTreeRoot = false;
-                            // If the time of the child is less than our
-                            // time, this means that we've looped back on
-                            // some parent. We are part of that parents
-                            // cycle and therefore are not a naming point.
-                            if (child.time < currentLan.time)
-                            {
-                                currentLan.isNamingPoint = false;
-                            }
+                            currentLan.isNamingPoint = false;
                         }
                     }
                 }
@@ -446,6 +472,306 @@ private:
     int now;
     int usedPartitionCount;
 };
+*/
+
+class BiconnectAlgorithm
+{
+private:
+    static const int NO_LAN = -1;
+    static const string NO_HOST;
+public:
+    void calculate(void)
+    {
+        now = 0;
+        if (g::allHosts.size() > 0)
+        {
+            visit(g::allHosts.begin()->second, NO_LAN, NO_HOST);
+
+            map<string, Host>::iterator pos = g::allHosts.begin();
+            map<string, Host>::iterator limit = g::allHosts.end();
+//            for (; pos != limit; ++pos)
+//            {
+//                cerr << pos->first << ": ";
+//                enumerateEquivalenceClasses(pos->second);
+//                cerr << endl;
+//            }
+
+            assignComponents();
+        }
+    }
+
+    // Returns the minimum time encountered.
+    int visit(Host & current, int parentLanNumber,
+              string const & parentHostName)
+    {
+        // now is used to keep track of when vertices are first
+        // visited. Those visited later have greater timestamps. These
+        // timestamps are used to detect cycles. A cycle happens when
+        // a vertex is visited that already has a time stamp less than
+        // now.
+        ++now;
+        current.time = now;
+        int minTime = current.time;
+
+        initEquivalenceClasses(current);
+        list<int>::iterator lanPos = current.lans.begin();
+        list<int>::iterator lanLimit = current.lans.end();
+        for (; lanPos != lanLimit; ++lanPos)
+        {
+            current.forwardEdge = *lanPos;
+            Lan & lan = g::allLans[*lanPos];
+            list<string>::iterator childPos = lan.hosts.begin();
+            list<string>::iterator childLimit = lan.hosts.end();
+            for (; childPos != childLimit; ++childPos)
+            {
+                Host & child = g::allHosts[*childPos];
+                if (child.name != parentHostName
+                    && child.name != current.name)
+                {
+                    if (child.time == 0)
+                    {
+                        // Initial visit for the child.
+                        int childMin = visit(child, current.forwardEdge,
+                                             current.name);
+                        minTime = min(minTime, childMin);
+                        if (childMin < current.time
+                            && parentLanNumber != NO_LAN)
+                        {
+                            // I only have to worry about merging on
+                            // the current host because if my min
+                            // value is low enough, then my parent
+                            // host will take care of merging itself
+                            // as well.
+                            mergeEquivalenceClasses(current, parentLanNumber,
+                                                    current.forwardEdge);
+                        }
+                        // if childMin == current.time
+                        // Then some ancestor of that child has encountered
+                        // current at some time in the past. And this case
+                        // has already been taken care of below.
+                    }
+                    else
+                    {
+                        // A later visit for the child.
+                        // This is a back edge.
+                        minTime = min(minTime, child.time);
+
+                        // If child.time < current.time, then current
+                        // is a descendent and child is an
+                        // ancestor. The child is somewhere in the
+                        // stack above me because if it weren't, then
+                        // I would have already been visited. And
+                        // running this function means that I am
+                        // visiting this node for the first time.
+                        if (child.time < current.time)
+                        {
+                            // The child's forwardEdge and the return
+                            // edge are both part of the same
+                            // component.
+                            mergeEquivalenceClasses(child, child.forwardEdge,
+                                                    current.forwardEdge);
+                            // My parent and my forwardEdge are part
+                            // of the same component. See ancestor
+                            // argument above. Except when no parent
+                            // exists. In theory, because the parent
+                            // has the least visit time, no other time
+                            // is going to be less than it. But best
+                            // to be on the safe side.
+                            if (parentLanNumber != NO_LAN)
+                            {
+                                mergeEquivalenceClasses(current,
+                                                        parentLanNumber,
+                                                        current.forwardEdge);
+                            }
+                        }
+                        else
+                        {
+                            // Do nothing. This is because we have
+                            // already traversed this edge from the
+                            // descendant side and all the work has
+                            // been done.
+                        }
+                    }
+                }
+            }
+        }
+        return minTime;
+    }
+
+    void initEquivalenceClasses(Host & current)
+    {
+        current.edgeLabels.clear();
+        current.partitionLists.clear();
+        list<int>::iterator lanPos = current.lans.begin();
+        list<int>::iterator lanLimit = current.lans.end();
+        for (; lanPos != lanLimit; ++lanPos)
+        {
+            // We don't care whether there is already a key for that
+            // LAN or not. The only situation in which that is
+            // possible is if a host were incident on a LAN multiple
+            // times. And that case is ignorable.
+            Host::EdgeIterator edge = current.edgeLabels
+                .insert(make_pair(*lanPos, *lanPos)).first;
+
+            list<Host::EdgeIterator> partitionList;
+            partitionList.push_back(edge);
+
+            current.partitionLists.insert(make_pair(*lanPos, partitionList));
+        }
+    }
+
+    void mergeEquivalenceClasses(Host & current, int leftIndex, int rightIndex)
+    {
+        int leftLabel = current.edgeLabels[leftIndex];
+        Host::PartitionIterator leftPos
+                                     = current.partitionLists.find(leftLabel);
+        int rightLabel = current.edgeLabels[rightIndex];
+        Host::PartitionIterator rightPos
+                                     = current.partitionLists.find(rightLabel);
+        Host::PartitionIterator smallPos;
+        Host::PartitionIterator bigPos;
+
+        // Figure out which list has more elements.
+        if (leftPos->second.size() < rightPos->second.size())
+        {
+            smallPos = leftPos;
+            bigPos = rightPos;
+        }
+        else
+        {
+            smallPos = rightPos;
+            bigPos = leftPos;
+        }
+
+        // Iterate through smallPos, changing the number to that of bigPos.
+        list<Host::EdgeIterator>::iterator edgePos = smallPos->second.begin();
+        list<Host::EdgeIterator>::iterator edgeLimit = smallPos->second.end();
+        for (; edgePos != edgeLimit; ++edgePos)
+        {
+            // The label of this edge is set to bigPos.
+            (*edgePos)->second = bigPos->first;
+        }
+
+        // splice smallPos to the end of bigPos.
+        bigPos->second.splice(bigPos->second.end(), smallPos->second);
+
+        // remove smallPos from the map.
+        current.partitionLists.erase(smallPos);
+    }
+
+    void enumerateEquivalenceClasses(Host & current)
+    {
+        Host::PartitionIterator pos = current.partitionLists.begin();
+        Host::PartitionIterator limit = current.partitionLists.end();
+        for (; pos != limit; ++pos)
+        {
+            list<Host::EdgeIterator>::iterator edgePos = pos->second.begin();
+            list<Host::EdgeIterator>::iterator edgeLimit = pos->second.end();
+            for (; edgePos != edgeLimit; ++edgePos)
+            {
+                cerr << (*edgePos)->first << " ";
+            }
+            cerr << "-- ";
+        }
+    }
+
+    void assignComponents(void)
+    {
+        int nextNumber = 0;
+        vector<Lan>::iterator lanPos = g::allLans.begin();
+        vector<Lan>::iterator lanLimit = g::allLans.end();
+        for (; lanPos != lanLimit; ++lanPos)
+        {
+            if (lanPos->partition == -1)
+            {
+                Partition & component = g::allPartitions[nextNumber];
+                component.setNumber(nextNumber);
+//                ComponentVertex & node = g::partitionGraph[nextNumber];
+//                node.number = nextNumber;
+                if (isSingleton(*lanPos))
+                {
+                    component.setTree();
+                    treeFill(*lanPos, component);
+                }
+                else
+                {
+                    floodFill(*lanPos, component);
+                }
+                ++nextNumber;
+            }
+        }
+    }
+
+    void treeFill(Lan & source, Partition & component)
+    {
+        component.addLan(source.number);
+        list<string>::iterator hostPos = source.hosts.begin();
+        list<string>::iterator hostLimit = source.hosts.end();
+        for (; hostPos != hostLimit; ++hostPos)
+        {
+            Host & hop = g::allHosts[*hostPos];
+            list<int>::iterator lanPos = hop.lans.begin();
+            list<int>::iterator lanLimit = hop.lans.end();
+            for (; lanPos != lanLimit; ++lanPos)
+            {
+                Lan & dest = g::allLans[*lanPos];
+                if (dest.partition == -1 && isSingleton(dest))
+                {
+                    treeFill(dest, component);
+                }
+            }
+        }
+    }
+
+    void floodFill(Lan & source, Partition & component)
+    {
+        component.addLan(source.number);
+        list<string>::iterator hostPos = source.hosts.begin();
+        list<string>::iterator hostLimit = source.hosts.end();
+        for (; hostPos != hostLimit; ++hostPos)
+        {
+            Host & hop = g::allHosts[*hostPos];
+            list<int>::iterator lanPos = hop.lans.begin();
+            list<int>::iterator lanLimit = hop.lans.end();
+            for (; lanPos != lanLimit; ++lanPos)
+            {
+                Lan & dest = g::allLans[*lanPos];
+                // Now we have a source and a dest through a hop. What
+                // we want is to figure out whether source and dest
+                // are in the same equivalancy class on the hop. If
+                // they are, then it means that they are part of the
+                // same biconnected component.  We recurse if source
+                // and dest are in the same biconnected component and
+                // dest hasn't already been labeled.
+                int sourceEquiv = hop.edgeLabels[source.number];
+                int destEquiv = hop.edgeLabels[dest.number];
+                if (sourceEquiv == destEquiv && dest.partition == -1)
+                {
+                    floodFill(dest, component);
+                }
+            }
+        }
+    }
+
+    bool isSingleton(Lan & source)
+    {
+        bool result = true;
+        list<string>::iterator hostPos = source.hosts.begin();
+        list<string>::iterator hostLimit = source.hosts.end();
+        for (; hostPos != hostLimit && result; ++hostPos)
+        {
+            Host & hop = g::allHosts[*hostPos];
+            int label = hop.edgeLabels[source.number];
+            result = result && hop.partitionLists[label].size() < 2;
+        }
+        return result;
+    }
+
+private:
+    int now;
+};
+
+const string BiconnectAlgorithm::NO_HOST = "";
 
 //-----------------------------------------------------------------------------
 
@@ -453,15 +779,141 @@ void breakGraph(void)
 {
     BiconnectAlgorithm bi;
     bi.calculate();
+    makePartitionGraph();
+}
+
+//-----------------------------------------------------------------------------
+
+void makePartitionGraph(void)
+{
+    int edgeNumber = 0;
+    vector<Lan>::iterator lanPos = g::allLans.begin();
+    vector<Lan>::iterator lanLimit = g::allLans.end();
+    for (; lanPos != lanLimit; ++lanPos)
+    {
+        Lan & source = *lanPos;
+        list<string>::iterator hostPos = source.hosts.begin();
+        list<string>::iterator hostLimit = source.hosts.end();
+        for (; hostPos != hostLimit; ++hostPos)
+        {
+            Host & host = g::allHosts[*hostPos];
+            list<int>::iterator destPos = host.lans.begin();
+            list<int>::iterator destLimit = host.lans.end();
+            for (; destPos != destLimit; ++destPos)
+            {
+                Lan & dest = g::allLans[*destPos];
+                if (source.partition != dest.partition)
+                {
+                    insertPartitionEdge(source.partition, dest.partition,
+                                        edgeNumber);
+                    ++edgeNumber;
+                }
+            }
+        }
+    }
+}
+
+void insertPartitionEdge(int source, int dest, int edgeNumber)
+{
+    g::partitionEdges.insert(make_pair(make_pair(source, dest), edgeNumber));
+    g::partitionEdges.insert(make_pair(make_pair(dest, source), edgeNumber));
+//    g::partitionGraph[source].neighbors.insert(dest);
+//    g::partitionGraph[dest].neighbors.insert(source);
 }
 
 //-----------------------------------------------------------------------------
 
 void findNumbers(void)
 {
-    for (size_t i = 0; i < g::allPartitions.size(); ++i)
+    map<int, Partition>::iterator pos = g::allPartitions.begin();
+    map<int, Partition>::iterator limit = g::allPartitions.end();
+    for (; pos != limit; ++pos)
     {
-        g::allPartitions[i].dispatch();
+        pos->second.dispatch();
+    }
+    if (g::allPartitions.size() > 1)
+    {
+        numberPartitions();
+    }
+}
+
+void numberPartitions(void)
+{
+    auto_ptr<FileT> pipe;
+    auto_assign(pipe, coprocess(g::treeCommand[0], &(g::treeCommand[0]),
+                                NULL));
+//    cerr << "---BEGIN_PARTITIONG---" << endl;
+    printPartitionGraph(pipe->input());
+    pipe->closeIn();
+    getPartitionAddresses(pipe->output());
+    int childReturn = 0;
+    int error = wait3(&childReturn, 0, NULL);
+    if (error == -1)
+    {
+        cerr << "Waiting for child in prepass failed: " << strerror(errno)
+             << endl;
+    }
+    if (childReturn != 0)
+    {
+        cerr << "Error in supergraph: ";
+        printError(pipe->error());
+    }
+//    cerr << "---END_PARTITIONG---" << endl;
+}
+
+void printError(std::istream & error)
+{
+    string line;
+    getline(error, line);
+    while (error)
+    {
+        cerr << line << endl;
+        getline(error, line);
+    }
+}
+
+void printPartitionGraph(std::ostream & output)
+{
+    // preamble
+    output << "%%";
+    // Print out all of the vertices.
+    int last = -1;
+    map< pair<int, int>, int >::iterator pos = g::partitionEdges.begin();
+    map< pair<int, int>, int >::iterator limit = g::partitionEdges.end();
+    for (; pos != limit; ++pos)
+    {
+        if (last != pos->first.first)
+        {
+            last = pos->first.first;
+            output << endl << "8 1 ";
+        }
+        output << pos->second << " ";
+    }
+    output << endl;
+}
+
+void getPartitionAddresses(std::istream & input)
+{
+    string temp;
+    input >> temp;
+    input >> temp;
+    input >> temp;
+    input >> temp;
+    map<int, Partition>::iterator pos = g::allPartitions.begin();
+    map<int, Partition>::iterator limit = g::allPartitions.end();
+    int address = 0;
+    for (; pos != limit; ++pos)
+    {
+        input >> address;
+        if (!input)
+        {
+            cerr << "Insufficient partition input" << endl;
+//            throw;
+        }
+        else
+        {
+            pos->second.setAddress(address);
+        }
     }
 }
 
@@ -469,13 +921,17 @@ void findNumbers(void)
 
 void ouputAddresses(void)
 {
-    if (!g::useNeato)
+    if (g::useNeato)
     {
-        normalOutput();
+        neatoOutput();
+    }
+    else if (g::printSize)
+    {
+        sizeOutput();
     }
     else
     {
-        neatoOutput();
+        normalOutput();
     }
 }
 
@@ -528,7 +984,7 @@ void neatoOutput(void)
         Host & current = pos->second;
         list<int>::iterator lanPos = current.lans.begin();
         list<int>::iterator lanLimit = current.lans.end();
-        for (; lanPos!= lanLimit; ++lanPos)
+        for (; lanPos != lanLimit; ++lanPos)
         {
             cout << "\tnode" << current.name << " -> "
                  << "lan" << *lanPos
@@ -537,6 +993,29 @@ void neatoOutput(void)
         }
     }
     cout << "}" << endl;
+}
+
+//-----------------------------------------------------------------------------
+
+void sizeOutput(void)
+{
+    cerr << "Total Lan Count: " << g::allLans.size() << endl;
+    cerr << "Supergraph Size: " << g::allPartitions.size() << endl;
+    // One entry for the supergraph. This goes at the top.
+    cout << g::allPartitions.size() << endl;
+    map<int,Partition>::iterator pos = g::allPartitions.begin();
+    map<int,Partition>::iterator limit = g::allPartitions.end();
+    for (; pos != limit; ++pos)
+    {
+        cout << pos->second.getLanCount() << endl;
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+void auto_assign(std::auto_ptr<FileT> & left, std::auto_ptr<FileT> right)
+{
+    left = right;
 }
 
 //-----------------------------------------------------------------------------

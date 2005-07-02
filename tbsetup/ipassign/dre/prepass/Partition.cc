@@ -14,7 +14,7 @@
 
 Partition::Partition(int newNumber)
     : address(0)
-    , isTree(true)
+    , isTree(false)
     , lanCount(0)
     , hostCount(0)
 {
@@ -25,8 +25,8 @@ Partition::Partition(int newNumber)
 
 void Partition::setNumber(int newNumber)
 {
-    // TODO: Assign a real address. Not just the LAN number.
-    address = newNumber;
+    // TODO: Assign a real address. Not just the partition number.
+//    address = newNumber;
     number = newNumber;
 }
 
@@ -63,7 +63,7 @@ void Partition::addLan(int lanNumber)
         lanToOrder[lanNumber] = lanCount;
         orderToLan[lanCount] = lanNumber;
         ++lanCount;
-        isTree = isTree && g::allLans[lanNumber].isTreeRoot;
+//        isTree = isTree && g::allLans[lanNumber].isTreeRoot;
         g::allLans[lanNumber].partition = number;
         // Add one to the count of every host we touch. If two or more
         // LANs touch a host, then that host is sent to the children
@@ -80,28 +80,57 @@ void Partition::addLan(int lanNumber)
 
 //-----------------------------------------------------------------------------
 
-template <class T>
-void auto_assign(auto_ptr<T> & left, auto_ptr<T> right)
-{
-    left = right;
-}
-
-//-----------------------------------------------------------------------------
-
 void Partition::dispatch(void)
 {
+    if (lanCount <= 1)
+    {
+        map<int, int>::iterator pos = lanToOrder.begin();
+        map<int, int>::iterator limit = lanToOrder.end();
+        for (; pos != limit; ++pos)
+        {
+            g::allLans[pos->first].assignment = pos->second;
+        }
+        return;
+    }
     mapHosts();
     auto_ptr<FileT> pipe;
+    ostringstream saver;
+    string commandLine;
     if (isTree)
     {
         auto_assign(pipe, coprocess(g::treeCommand[0], &(g::treeCommand[0]),
                                     NULL));
+        for (int i = 0; i < g::treeCommand.size(); ++i)
+        {
+            if (g::treeCommand[i] == NULL)
+            {
+                commandLine += "(null)";
+            }
+            else
+            {
+                commandLine += g::treeCommand[i];
+                commandLine += ' ';
+            }
+        }
     }
     else
     {
         auto_assign(pipe, coprocess(g::generalCommand[0],
                                     &(g::generalCommand[0]), NULL));
+        for (int i = 0; i < g::generalCommand.size(); ++i)
+        {
+            if (g::treeCommand[i] == NULL)
+            {
+                commandLine += "(null)";
+            }
+            else
+            {
+                commandLine += g::generalCommand[i];
+                commandLine += ' ';
+            }
+        }
     }
+    printGraph(saver);
     printGraph(pipe->input());
     pipe->closeIn();
     getNumbering(pipe->output());
@@ -109,20 +138,41 @@ void Partition::dispatch(void)
     int error = wait3(&childReturn, 0, NULL);
     if (error == -1)
     {
+//        throw StringError(string("Waiting for child failed: ")
+//                          + strerror(errno));
         cerr << "Waiting for child failed: " << strerror(errno) << endl;
         throw;
     }
     if (childReturn != 0)
     {
+        cerr << "Error in partition " << number << ": ";
         parseError(pipe->error());
+        cerr << endl << "Command line: " << commandLine << endl;
+        cerr << "---Begin subfile---" << endl;
+        cerr << saver.str();
+        cerr << "---End subfile---" << endl;
+        throw;
     }
+}
+
+//-----------------------------------------------------------------------------
+
+int Partition::getLanCount(void)
+{
+    return lanCount;
+}
+
+//-----------------------------------------------------------------------------
+
+void Partition::setTree(void)
+{
+    isTree = true;
 }
 
 //-----------------------------------------------------------------------------
 
 void Partition::parseError(istream & error)
 {
-    cerr << "Error in partition " << number << ": ";
     string outside;
     string inside;
     bool done;
@@ -191,7 +241,7 @@ void Partition::parseError(istream & error)
         getline(error, outside, '$');
         done = !error;
     }
-    throw;
+//    throw;
 }
 
 //-----------------------------------------------------------------------------
@@ -227,6 +277,11 @@ void Partition::printGraph(ostream & output)
 
 void Partition::getNumbering(istream & input)
 {
+    string temp;
+    input >> temp;
+    input >> temp;
+    input >> temp;
+    input >> temp;
     int assignedNumber = 0;
     int order = 0;
     input >> assignedNumber;

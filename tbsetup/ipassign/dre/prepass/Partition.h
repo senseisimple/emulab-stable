@@ -23,6 +23,8 @@ public:
     // the lan number to the mappings.
     void addLan(int lanNumber);
     void dispatch(void);
+    int getLanCount(void);
+    void setTree(void);
 private:
     struct OrderCount
     {
@@ -31,10 +33,10 @@ private:
         int count;
     };
 private:
+    void parseError(std::istream & input);
     void mapHosts(void);
     void printGraph(std::ostream & output);
     void getNumbering(std::istream & input);
-    void parseError(std::istream & error);
 private:
     int number;
     int address;
