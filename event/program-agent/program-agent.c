@@ -938,15 +938,24 @@ start_callback(event_handle_t handle,
 			while ((de = readdir(dir)) != NULL) {
 				char *ext = NULL;
 				char path[1024];
-				int len;
-
-				len = strlen(de->d_name);
-				if (((de->d_type == DT_REG) ||
-				     (de->d_type == DT_LNK)) &&
-				    (len > 0) && (len < sizeof(path)) &&
-				    (sscanf(de->d_name,
-					    "%1024[^.].",
-					    path) == 1) &&
+				int len = strlen(de->d_name);
+				int got_path = 0, file_or_link = 0;
+				if ((len > 0) && (len < sizeof(path)))
+				    got_path = sscanf(de->d_name,
+						      "%1024[^.].",
+						      path) == 1;
+#ifndef __CYGWIN__
+				file_or_link = (de->d_type == DT_REG) ||
+				  (de->d_type == DT_LNK);
+#else  /* __CYGWIN__ */
+				/* Cygwin struct dirent doesn't have d_type. */
+				struct stat st;		/* Use stat instead. */
+				file_or_link = got_path && 
+				  (stat(path, &st) == 0) &&
+				  ((st.st_mode == S_IFREG) ||
+				    (st.st_mode == S_IFLNK));
+#endif /* __CYGWIN__ */
+				if ((file_or_link) &&
 				    (find_agent(path) != NULL) &&
 				    ((ext = fileext(de->d_name)) != NULL) &&
 				    ((strncmp(ext, "out", 3) == 0) ||
