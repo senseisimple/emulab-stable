@@ -852,6 +852,12 @@ sub RunAssign ()
 	return -1;
     }
 
+    # Check for possible full filesystem ...
+    if (-z "assign.log") {
+	print("assign.log is zero length! Stopping ...\n");
+	return -1;
+    }
+
     # Saving up assign.log coz each swapin/modify is
     # different and it is nice to have every mapping
     # for debugging and archiving purposes
