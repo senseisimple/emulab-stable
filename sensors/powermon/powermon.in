@@ -134,7 +134,25 @@ sub dostatus(@) {
 
     #
     # Loop through desired controllers getting status
+    # We do this in a child process so we can time it out if
+    # one of the controllers is not responding.
     #
+    my $syspid = fork();
+    if ($syspid) {
+	#
+	# Allow 5 seconds per controller
+	#
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	my $to = 5 * scalar(@wanted);
+	alarm $to;
+	waitpid($syspid, 0);
+	alarm 0;
+	if ($?) {
+	    logit("*** Status fetch failed after $to seconds with exit val $?");
+	}
+	return $?;
+    }
+
     for my $ctrl (@wanted) {
 	my %status;
 
@@ -169,7 +187,7 @@ sub dostatus(@) {
 	    $errors++;
 	}
     }
-    return $errors;
+    exit($errors);
 }
 
 sub logit($) {
