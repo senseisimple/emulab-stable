@@ -17,8 +17,31 @@ require("defs.php3");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
-if (! TBCvswebAllowed($uid)) {
+# Just for project specific 
+$scriptargs = "";
+
+#
+# Verify form arguments.
+#
+if (isset($pid) && $pid != "") {
+    if (!$CVSSUPPORT) {
+	USERERROR("Project CVS support is not enabled!", 1);
+    }
+    if (!TBvalid_pid($pid)) {
+	PAGEARGERROR("Invalid project ID.");
+    }
+    if (! TBValidProject($pid)) {
+	USERERROR("The project '$pid' is not a valid project.", 1);
+    }
+    if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
+	USERERROR("You are not a member of Project $pid.", 1);
+    }
+}
+else {
+    if (! TBCvswebAllowed($uid)) {
         USERERROR("You do not have permission to use cvsweb!", 1);
+    }
+    unset($pid);
 }
 
 $script = "cvsweb.cgi";
@@ -34,7 +57,7 @@ $agent = escapeshellcmd($HTTP_USER_AGENT);
 $encoding = escapeshellcmd($HTTP_ACCEPT_ENCODING);
 
 #
-# Helpfully enough, escapeshellcmd doesn't escape spaces. Sigh.
+# Helpfully enough, escapeshellcmd does not escape spaces. Sigh.
 #
 $script = preg_replace("/ /","\\ ",$script);
 $query = preg_replace("/ /","\\ ",$query);
@@ -65,9 +88,20 @@ function SPEWCLEANUP()
 set_time_limit(0);
 register_shutdown_function("SPEWCLEANUP");
 
-$fp = popen("env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
+$shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
             "SCRIPT_NAME=$name HTTP_USER_AGENT=$agent " .
-            "HTTP_ACCEPT_ENCODING=$encoding $script",'r');
+            "HTTP_ACCEPT_ENCODING=$encoding ";
+
+if (isset($pid)) {
+  # I know, I added an argument to a script that is not supposed to
+  # take any. So be it; it was easy.
+  $shellcmd .= "$TBSUEXEC_PATH $uid $pid webcvsweb -repo /proj/$pid/CVS";
+}
+else {
+  $shellcmd .= "$script";
+}
+
+$fp = popen($shellcmd, 'r');
 
 #
 # Yuck. Since we can't tell php to shut up and not print headers, we have to

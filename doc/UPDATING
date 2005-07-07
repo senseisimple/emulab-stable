@@ -18,6 +18,22 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20050707: Before build
+
+	Decide if you want CVS support turned on. This is some simple
+        support for per-project CVS trees, stored as /proj/$pid/CVS.
+        The main thing is that you can use the cvsweb interface. If you
+        want it, in your defs file:
+
+		CVSSUPPORT=1
+
+	After your build and install:
+
+		sudo /usr/testbed/sbin/cvsinit
+
+        which creates the initial CVS trees in all of the existing project
+        trees.
+
 20041108: Anytime
 
 	* Update sql/database-fill-suplement.sql stuff.

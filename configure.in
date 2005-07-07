@@ -145,6 +145,7 @@ AC_SUBST(SSLCERT_ORGNAME)
 AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
 AC_SUBST(WINSUPPORT)
+AC_SUBST(CVSSUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -194,6 +195,7 @@ PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
 WIKISUPPORT=0
 WINSUPPORT=0
+CVSSUPPORT=0
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
@@ -747,6 +749,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tools/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
         tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
+        tools/selectapplet/GNUmakefile \
 	$eventfiles \
 	$winfiles \
 	apache/GNUmakefile apache/httpd.conf \

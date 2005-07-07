@@ -27,15 +27,18 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $MKGROUP  = "$TB/sbin/mkgroup";
 my $SETGROUPS= "$TB/sbin/setgroups";
 my $MKACCT   = "$TB/sbin/tbacct add";
+my $CVSBIN   = "/usr/bin/cvs";
+my $CHOWN    = "/usr/sbin/chown";
 my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
 my $WIKISUPPORT = @WIKISUPPORT@;
+my $CVSSUPPORT  = @CVSSUPPORT@;
 my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
-		"groups", "tiplogs");
+		"groups", "tiplogs", "CVS");
 my $projhead;
 
 #
@@ -198,6 +201,23 @@ if (! -e "$TFTPROOT/proj/$pid") {
     }
     if (! chown($uid, $gid, "$TFTPROOT/proj/$pid")) {
 	fatal("Could not chown $TFTPROOT/proj/$pid to $uid/$gid: $!");
+    }
+}
+
+#
+# Do the CVS stuff if its turned on.
+#
+my $CVSDIR = "$PROJROOT/$pid/CVS";
+
+if ($CVSSUPPORT && -e $CVSDIR) {
+    system("$CVSBIN -d $CVSDIR init");
+    if ($?) {
+	fatal("Could not cvs init $CVSDIR!");
+    }
+    # Chown the tree.
+    system("$CHOWN -R ${uid}:${gid} $CVSDIR");
+    if ($?) {
+	fatal("Could not chown ${uid}:${gid} $CVSDIR!");
     }
 }
 

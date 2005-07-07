@@ -14,7 +14,7 @@
 # A project
 #
 function SHOWPROJECT($pid, $thisuid) {
-    global $WIKISUPPORT;
+    global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR;
 
     $query_result =
 	DBQueryFatal("select p.*,g.wikiname from projects as p ".
@@ -98,6 +98,16 @@ function SHOWPROJECT($pid, $thisuid) {
                   <td>Project Wiki:</td>
                   <td class=\"left\">
                       <A href='$wikiurl'>$wikiname</A></td>
+              </tr>\n";
+    }
+    if ($CVSSUPPORT) {
+	$cvsdir = "$TBPROJ_DIR/$pid/CVS";
+	$cvsurl = "cvsweb/cvsweb.php3?pid=$pid";
+	
+	echo "<tr>
+                  <td>Project CVS Repository:</td>
+                  <td class=\"left\">
+                      $cvsdir <A href='$cvsurl'>(cvsweb)</A></td>
               </tr>\n";
     }
     

@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.2 2004-03-12 00:44:45 ricci Exp $
+# $Id: cvsweb.cgi,v 1.3 2005-07-07 21:36:00 stoller Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -310,7 +310,7 @@ $maycompress =
 # to hold our state - they will be added (with
 # their current value) to any link/query string
 # you construct
-@stickyvars = qw(cvsroot hideattic sortby logsort f only_with_tag);
+@stickyvars = qw(cvsroot hideattic sortby logsort f only_with_tag pid);
 @unsafevars = qw(logsort only_with_tag r1 r2 rev sortby tr1 tr2);
 
 if (-f $config) {
@@ -357,6 +357,11 @@ if (defined($input{"content-type"})) {
 	    if ($input{"content-type"} !~ /^[-0-9A-Za-z]+\/[-0-9A-Za-z]+$/);
 }
 
+if (@ARGV && $ARGV[0] eq "-repo") {
+    @CVSrepositories = (
+	'top'   => [$ARGV[1], $ARGV[1]],
+    );
+}
 $DEFAULTVALUE{'cvsroot'} = $cvstreedefault;
 
 foreach (keys %DEFAULTVALUE) {

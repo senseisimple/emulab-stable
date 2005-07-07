@@ -37,6 +37,7 @@ PLAB_ROOTBALL="plabroot-10.tar.bz2"
 WIKISUPPORT=1
 WINSUPPORT=1
 SFSSUPPORT=0
+CVSSUPPORT=1
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.
