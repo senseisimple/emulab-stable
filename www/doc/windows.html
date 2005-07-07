@@ -20,12 +20,14 @@
     <li> <a href="#Windows_Passwords"> Windows Passwords </a></li>
     <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes </a></li>
     <li> <a href="#Routing"> Routing </a></li>
+    <li> <a href="#Network_config"> Network config </a></li>
     <li> <a href="#Boots_twice"> Windows nodes boot twice </a></li>
     <li> <a href="#Login_connections"> Login connections to Windows </a></li>
     <li> <a href="#RDP_details"> RDP details </a></li>
   </ul>
   <li> <a href="#Cygwin"> Cygwin </a> </li>
   <ul>
+    <li> <a href="#Cygwin_documentation"> Cygwin documentation </a></li>
     <li> <a href="#Cygwin_packages"> Cygwin packages </a></li>
     <li> <a href="#SMB_mounts"> SMB mounts and Samba </a></li>
     <li> <a href="#Cygwin_arcana"> Cygwin arcana </a></li>
@@ -158,6 +160,27 @@ will work in any image.<p>
 There is more information on routing in the <a
 href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#Routing">
 Routing Section of the Emulab Tutorial. </a><p>
+
+<h4><a name="Network_config"> </a> Network config </h4>
+
+Normally, the Windows <b><code>ipconfig /all</code></b> command shows the
+configuration information for each of the 5 network interfaces.  There will
+always be a configured control net interface on the 155.98.36 network. <p>
+
+Notice that the Windows names of the interfaces start with <code>Local Area
+Connection</code> and have a number appended.  You can't count on what this
+number is, since it depends on the order the NIC's are probed as Windows
+boots. <p>
+
+If you specified links or lans in your experiment topology, the other
+interfaces will show a configuration, with an IP address, subnet mask, and
+gateway that you can specify in the NS file.  Otherwise ipconfig will show a
+Media State of <code>Media disconnected</code>. <p>
+
+<div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen
+<code>ipconfig</code> report an ip address and mask of <code>0.0.0.0</code>,
+while the TCP/IP properties dialog boxes show the proper values.
+<code>ipconfig</code> is wrong.  </div>
 
 <h4><a name="Boots_twice"> </a> Windows nodes boot twice </h4>
 
@@ -315,6 +338,22 @@ Cygwin is <a href="http://www.cygwin.com/"> GNU + Cygnus + Windows </a>,
 providing Linux-like functionality at the API, command-line, and package
 installation levels. <p>
 
+<h4><a name="Cygwin_documentation"> </a> Cygwin documentation </h4>
+
+Cygwin is well documented.  Here are some links to get you started:
+<ul>
+  <li> <a href="http://cygwin.com/cygwin-ug-net/cygwin-ug-net.html"> 
+    Users guide </a>
+  <li> <a href="http://cygwin.com/cygwin-ug-net/highlights.html"> 
+    Cygwin highlights </a>
+  <li> <a href="http://cygwin.com/cygwin-ug-net/using-utils.html"> 
+    Cygwin-added utilities </a>
+  <li> <a href="http://cygwin.com/faq.html"> 
+    FAQ </a>
+  <li> <a href="http://cygwin.com/cygwin-api/cygwin-api.html"> 
+    API compatibility and Cygwin functions </a>
+</ul>
+
 <h4><a name="Cygwin_packages"> </a> Cygwin packages </h4>
 
 A number of optional Cygwin packages are installed in the image due to our
@@ -325,6 +364,10 @@ perl-libwin32, python, rpm, rsync, shutdown, tcsh, vim, wget, and zip. <p>
 
 The Cygwin command <pre> cygcheck -c</pre> lists the packages that are
 installed, and their current version number and status.
+
+Package-specific notes and/or documentation for installed packages are in
+<code>/usr{,/share}/doc/Cygwin/*.README</code> and
+<code>/usr/share/doc/*/README</code> files.
 
 The <a href="http://www.cygwin.com/packages/"> Cygwin package site </a> lists
 the available pre-compiled packages and provides a search engine. <p>
