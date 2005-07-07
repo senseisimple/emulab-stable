@@ -217,14 +217,8 @@ if [ x"$ADDRESS" != x ]; then
 		echo "Frisbee run finished"
 		echo "Resizing final disk partition"
 		$BINDIR/growdisk -vW /dev/$DISK
-		#
-		# XXX limit the use of slicefix for now to just
-		# those machines with SATA/SCSI as their root disk
-		#
-		if [ -x $BINDIR/slicefix -a "$DISK" != "ad0" ]; then
-			echo "Adjusting slice-related files";
-			$BINDIR/slicefix $PARTITION $DISK
-		fi
+		echo "Adjusting slice-related files"
+		$BINDIR/slicefix $PARTITION $DISK
 		echo "Image load complete"
 		$BINDIR/tmcc state RELOADDONE
 		
