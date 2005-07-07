@@ -76,6 +76,11 @@ alias rootpc 'sudo ssh pc\!^.$en \!:2*'
 	    mv /home{,.orig}
 	    ln -s /cygdrive/c/Documents\ and\ Settings/ /home
 
+	. Symlink the Windows hosts file.
+	    ln -s /cygdrive/c/WINDOWS/system32/drivers/etc/hosts /etc/hosts
+	      ### Patch until liblocsetup HOSTSFILE is updated.
+              cp /etc/hosts /cygdrive/c/WINDOWS/system32/drivers/etc/hosts
+
 	. Create a proper group file.  Make wheel an alias for Administrators.
             mkgroup -l | \
               awk '/^Administrators:/{print "wheel" substr($0, index($0,":"))} \
@@ -167,7 +172,7 @@ daFluxGroup
 	  - Install the standard host keys, dated Jun 21  2001.
 	    ls -l /etc/ssh*
 	    # On boss.
-	    set pc=73
+	    set pc=136
 	    set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
 	    eval sudo scp -rp "$ssh_args" /proj/testbed/fish/elab-host-keys root@pc$pc":"
 
@@ -321,6 +326,8 @@ SKIP]
 
 		  ## Remove "&& ! WINDOWS()" from $ftcc/rc.bootsetup.
 		  pid=testbed eid=Windows-1
+		    pid=testbed eid=Windows-1b
+		    pid=testbed eid=Windows-1c
 		  $BINDIR/evproxy -s event-server -e $pid/$eid
 
 		  ## Uncomment rc.progagent in $ftcc/rc.config
@@ -332,6 +339,14 @@ SKIP]
 		    # setuid(pw->pw_uid) $ftep/program-agent.c:560.
 		    program-agent -d -e $pid/$eid -s localhost -c /var/emulab/boot/progagents
 
+		    # On ops.
+                    tevc -e testbed/Windows-1c now prog0 start \
+                        COMMAND="bash -c 'date; hostname' > /tmp/host.txt"
+		    # On the node.
+		    tail /tmp/host.txt
+		    cat /local/logs/prog0.status
+
+
               # Root must have these rights: Create a token object; Replace a
               # process level token; and Increase Quota rights.
               # http://cygwin.com/cygwin-ug-net/ntsec.html#ntsec-switch,
@@ -341,23 +356,32 @@ SKIP]
               editrights -u root -a SeAssignPrimaryTokenPrivilege -l
               editrights -u root -a SeIncreaseQuotaPrivilege -l
 
+	      # program-agent
               # C:\cygwin\bin\tcsh.exe (2504): *** couldn't create window, Win32 error 5
               # See http://comments.gmane.org/gmane.os.cygwin.patches/2559
               # This is at cygwin-1.5.17-1-winsup/cygwin/window.cc:wininfo::winthread():96
-              # Try starting rc.progagent as a separate service with -i for a desktop.
-                cygrunsrv -R ProgAgent
-              cygrunsrv -I ProgAgent -d "Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
+              ## Try starting rc.progagent as a separate service with -i for a desktop.
+	        ## Started up and stopped immediately.  Needs something else in rc.bootsetup.
                 --dep elvinsvc.exe \
-                -a "--norc --noprofile -c '/usr/local/etc/emulab/rc/rc.progagent >& /var/log/progagent.log'"
+		## Depend on EmulabStartup (rc.bootsetup), which depends on the elvin service,
+		## and also starts evproxy.  But it stops rather than staying running...
+                --dep EmulabStartup \
+	      ## Make it manual, and explicitly start it after rc.bootsetup in EmulabStartup.
+	      ## Works, but stays in "starting" state, err in bootsetup.log:
+	      ##  cygrunsrv: Error starting a service: QueryServiceStatus:  Win32 error 1053:
+	      ##  The service did not respond to the start or control request in a timely fashion.
+                cygrunsrv -R ProgAgent
+              cygrunsrv -I ProgAgent -d "Emulab Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
+	        --type manual \
+                -a "--norc --noprofile -c '/usr/local/etc/emulab/rc/rc.progagent >& /var/log/program-agent.log'"
 		  regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/ProgAgent/Parameters
                   cygrunsrv -Q ProgAgent
                   cygrunsrv -S ProgAgent
                   cygrunsrv -E ProgAgent
 
-		  tail /var/log/{progagent,ProgAgent}.log
-		touch /var/log/{progagent,ProgAgent}.log
-		chmod 777 /var/log/{progagent,ProgAgent}.log
-
+		  tail /var/log/{program-agent,ProgAgent}.log
+		touch /var/log/{program-agent,ProgAgent}.log
+		chmod 777 /var/log/{program-agent,ProgAgent}.log
 
 		# Little problem: "Must be root to run this script!"
 		# Add this: 
@@ -384,25 +408,26 @@ SKIP]
 
       - Get the testbed client code via CVS, build, and install it.
             rootpc $pc
-	    # Start an agent and go get my Ops, Boss and Flux DSA/Bas(CVS) keys.
+	    # Start an agent and go get my Flux DSA/Bas(CVS) key.
 	    eval `ssh-agent -s`
 	      ssh-add -l
 	    ssh -A fish@kzin.flux.utah.edu
 	      ssh-add -l
-	    kops
-	    kbos
 	    kdsa
 	    exit
 	      ssh -v fish@cvs.flux.utah.edu id
 
 	      mkdir ~/flux
 	    cd ~/flux
-	      mkdir CVS; touch CVS/Entries; echo . > CVS/Repository
 	    export CVSROOT=fish@cvs.flux.utah.edu:/usr/flux/CVS CVS_RSH=ssh
+
+              # First time only
+              mkdir CVS; touch CVS/Entries; echo . > CVS/Repository
+	    # Any time the testbed tree needs to be re-created.
+            cvs -Q co testbed
+
+	      # Updates After that.
 	      cat CVS/Entries
-	    # The first time
-	    cvs co testbed
-	      # After that.
 	        cvs -n -q update testbed
 	      cvs -Q update -d testbed
 
@@ -425,24 +450,34 @@ SKIP]
 	    cvs update -r 1.11 testbed/event/program-agent/program-agent.c
 	    mkdir /usr/local/man/man8
 	      
+	    # Get the binary programs into the source tree for install.
 	      ls -l ~/flux/testbed/tmcd/cygwinxp/*.exe
 	      # On boss:
 	      sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx}.exe root@pc$pc":"/tmp
 	    # Back on the client:
 	    cp -p /tmp/{WSName,addusers,usrtogrp,setx}.exe ~/flux/testbed/tmcd/cygwinxp
 
-	      mkdir ~/flux/obj-real
+	    mkdir ~/flux/obj-real
 	    cd ~/flux/obj-real
+	      v configure.trace*
 	      mv configure.trace{,.1}
 	    ../testbed/configure --enable-windows --enable-windowsclient >& configure.trace
+	      # Should end with "creating config.h".
 	      tail configure.trace
+
+	    # The first make fails with "Cannot change ownership" warnings unpacking tg2.0 .
 	    make client-install >& make.log1
 	      tail make.log1
-	    # First make fails with "Cannot change ownership" warnings unpacking tg2.0 .
 	    # Patch it explicitly, since the patch action gets skipped.
 	    (cd ~/flux/testbed/event/trafgen; patch -p0 < tg.patch)
+
+	    # If this is an update, evproxy is run by rc.bootsetup and nothing stops it.
+	    # The install of evproxy in the make will fail unless we stop it first.
+	    ps -Welf | grep evproxy
+	      kill `ps -Welf | grep evproxy | awk '{print $2}'`
 	    make client-install >& make.log2
 	      tail make.log2
+
 	        # Only needed if there are problems...
 	        make client-install >& make.log3
 	        make -k client-install >& make.log4
@@ -504,12 +539,12 @@ SKIP]
 
       . Set up the boot script to run as a service.
 
-	  # Better: with dependency on Elvin and running rc.cygwin separately first.
+	  # Better: with dependency on Elvin, run rc.cygwin separately first, ProgAgent after.
 	      cygrunsrv -R EmulabStartup 
-
+	  rootpwd='daFluxGroup'
           cygrunsrv -I EmulabStartup -u root -w $rootpwd -p /cygdrive/c/cygwin/bin/bash \
            --dep elvinsvc.exe \
-           -a "--norc --noprofile -c '/usr/local/etc/emulab/rc/rc.cygwin; /usr/local/etc/emulab/rc/rc.bootsetup >& /var/log/bootsetup.log'"
+           -a "--norc --noprofile -c '( /usr/local/etc/emulab/rc/rc.cygwin; /usr/local/etc/emulab/rc/rc.bootsetup; cygrunsrv -S ProgAgent ) >& /var/log/bootsetup.log'"
 
 	      cygrunsrv -Q EmulabStartup 
 	    cygrunsrv -S EmulabStartup 
@@ -535,6 +570,13 @@ SKIP]
 ================================================================
 Making images
 
+     . Make the final image from a pc600.
+       Uninstall the experimental net devices in Computer Management/Device Manager.
+       Select non-control net interface, hit delete, enter.  Takes about 15 seconds per interface.
+       This is so it will configure properly on both 600's and 850's on the way back up.
+         # Check which one is the control net interface.
+	 ipconfig /all
+
      . Run prepare to clear out experiment-specific state.
 	rootpc $pc
 	  # Ignore complaints about all of the C:/Documents and Settings directories
@@ -546,9 +588,10 @@ Making images
 
     . Capture the image with imagezip.  (How come wap create_image doesn't work?)
         # On boss.
-	set pc=73
-	set image=SP0
-	df /proj/testbed/images /usr/testbed/images
+	set pc=136 image=SP1
+	set pc=73 image=SP0a
+	set pc=2 image=SP0
+	df -m /proj/testbed/images /usr/testbed/images
 	  # Verify SSH working.
           rootpc $pc id
 
@@ -560,7 +603,7 @@ Making images
 	# Make WINXP-TMP on /proj, then move it to /usr/testbed/images with the right name.
 	rootpc $pc
 	  cd /proj/testbed/images
-	  df /proj/testbed/images
+	  df -m /proj/testbed/images
 	  ls -l WINXP*
 	  imagezip -o -I 2 -I 3 -I 4 /dev/ad0 WINXP-TMP.ndz
 	  ls -l WINXP*
@@ -570,21 +613,34 @@ Making images
 	wap node_admin off pc$pc
 
 	# Move the image to /usr/testbed/images to avoid NFS reads, for faster swap-in.
-	ls -l /proj/testbed/images/WINXP-TMP.ndz
-	df /usr/testbed/images
-	cp /proj/testbed/images/WINXP-TMP.ndz /usr/testbed/images
+	  ls -l /{proj,usr}/testbed/images/WIN*
 	ls -l /proj/testbed/images/WINXP-TMP.ndz /usr/testbed/images/WINXP-$image.ndz
-	cksum /usr/testbed/images/WINXP-$image.ndz & ssh ops cksum /proj/testbed/images/WINXP-TMP.ndz
-	df /proj/testbed/images
+	df -m /usr/testbed/images
+	cp /{proj,usr}/testbed/images/WINXP-TMP.ndz
+	# Check.
+	ls -l /{proj,usr}/testbed/images/WINXP-TMP.ndz
+	cksum /usr/testbed/images/WINXP-TMP.ndz & ssh ops cksum /proj/testbed/images/WINXP-TMP.ndz
+	  # May want to save a version or two along the way.
+	  v /usr/testbed/images/WINXP-$image*.ndz
+	  df -m /usr/testbed/images
+	  mv /usr/testbed/images/WINXP-$image{,-7-05}.ndz
+	# Install with mv.  Frisbee might have the old inode still open.
+	mv /usr/testbed/images/WINXP-{TMP,$image}.ndz
+	ls -l /usr/testbed/images/WINXP-$image.ndz
+	df -m /usr/testbed/images
+	# Clear the temp from /proj.
 	rm -f /proj/testbed/images/WINXP-TMP.ndz
-	df /proj/testbed/images
+	df -m /proj/testbed/images
+	  ls -l /{proj,usr}/testbed/images/WIN*
 	
     . DEMOTING an image to /proj/testbed/images (edit the image descriptor.)
 	ls -l /usr/testbed/images/WINXP-$image.ndz
-	df /proj/testbed/images
+	df -m /proj/testbed/images
 	cp /usr/testbed/images/WINXP-$image.ndz /proj/testbed/images
+	# Check.
 	ls -l /{usr,proj}/testbed/images/WINXP-$image.ndz
 	ssh ops cksum /proj/testbed/images/WINXP-$image.ndz & cksum /usr/testbed/images/WINXP-$image.ndz
-	df /usr/testbed/images
+	# Clear the old copy.
+	df -m /usr/testbed/images
 	rm -f /usr/testbed/images/WINXP-$image.ndz
-	df /usr/testbed/images
+	df -m /usr/testbed/images

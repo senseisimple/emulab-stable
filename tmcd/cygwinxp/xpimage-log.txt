@@ -1,11 +1,29 @@
 Log of XP images produced (most recent first.)
 
+    . WINXP-SP1 - Windows XP with SP1a, pc850 only.
+      6/20/05, 7/5/05, 7/7/05
+      prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc73, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc600 and pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	4293596160 input (1877455872 compressed) bytes in 581.004 seconds
+	Image size: 896532480 bytes
+	3.082MB/second compressed
+
     . emulab-ops/WINXP-SP0 - Windows XP with no SP's, pc600 and pc850.
-      6/14/05
-      prtn 1, whole disk[1], OS Windows, 5.1.0, node pc26, ping/ssh/isup, NORMALv2, pc600 and pc850.
-	4293596160 input (1640514560 compressed) bytes in 512.770 seconds
-	Image size: 819986432 bytes
-	3.051MB/second compressed
+      6/15/05
+      prtn 1, whole disk[1], OS Windows, 5.1.0, node pc73, ping/ssh/isup, 
+      NORMALv2, pc600 and pc850, global yes, reboot waittime 240
+      pc850 6/14
+	4293596160 input (1700680704 compressed) bytes in 522.949 seconds
+	Image size: 837812224 bytes
+	3.101MB/second compressed
+      pc600 6/15 (pc2)
+	4293596160 input (1701409792 compressed) bytes in 647.434 seconds
+	Image size: 837812224 bytes
+	2.506MB/second compressed
+      pc850 6/16:
+	4293596160 input (1722602496 compressed) bytes in 541.862 seconds
+	Image size: 842006528 bytes
+	3.032MB/second compressed
 
     . emulab-ops/WINXP-UPDATE - Windows XP-SP2+, pc600 and pc850.
       Created by Mike, 2005-04-22.
