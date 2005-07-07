@@ -52,7 +52,14 @@ if (!$query_result || !mysql_num_rows($query_result)) {
 $row = mysql_fetch_array($query_result);
 $URL = (isset($applet) ? $row["URL"] : $row["stillimage_URL"]);
 if (isset($fromtracker)) {
-    $URL .= "&resolution=240x180&fps=2";
+    $URL .= "&resolution=240x180";
+
+    if (preg_match("/fps=\d*/", $URL)) {
+	$URL = preg_replace("/fps=\d*/", "fps=2", $URL);
+    }
+    else {
+	$URL .= "&fps=2";
+    }
 }
 
 #
