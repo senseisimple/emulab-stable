@@ -28,6 +28,43 @@ case $# in
 esac
 
 dofreebsd() {
+	#
+	# ARGH!  FreeBSD 5, which primarily uses UFS2, internally converts
+	# UFS1 filesystems to an updated, UFS2 compatible form.  However,
+	# some of the converted fields leak back to disk when the filesystem
+	# is unmounted, creating the potential for corruption in the following
+	# scenerio:
+	#
+	# 1. mount, update, and unmount a UFS1 FS under FBSD5
+	# 2. mount, update, and unmount the FS under FBSD4
+	# 3. go back and access the FS under FBSD5
+	#
+	# #2 will update the old version of the csum structure.  At step
+	# #3, the mount will see some of the leaked info from the unmount
+	# in #1 and determine that it has already "upgraded" this FS and
+	# thus doesn't need to copy the old csum into the new one.  The
+	# result is that it will use stale csum info.
+	#
+	# In theory we could encounter this problem when we slicefix
+	# a newly loaded FBSD image (#1), boot up and update stuff on
+	# the image (#2), and then create a new image with imagezip
+	# (#3, as imagezip uses the FBSD5 filesystem logic).
+	#
+	# How do we deal with this?  What we will have to do is either
+	# fix the FBSD5 filesystem code or we will have to run a little
+	# hack after the slicefix unmount to undo the damage that FBSD5
+	# does.  Currently I have not done either.  Instead we avoid the
+	# problem as follows.  Before making any change to the FS with
+	# slicefix, we first RO-mount the FS to see if anything needs to
+	# be done.  If not, we just leave it alone.  Since I currently
+	# create all new images on machines with "ad" disks and that is
+	# what the default fstab contains for its root device, we avoid
+	# making any mods with slicefix and thus avoid #1 above.
+	#
+	# This is clearly not a solution.
+	#
+	version=`uname -v | sed -e 's/FreeBSD \([0-9]\).*/\1/'`
+
 	# see if there is a root ('a') partition on this BSD slice
 	`disklabel ${disk}s${part} 2>&1 | grep -s -E '^[ ]+a:' >/dev/null` || {
 		return 1
@@ -39,6 +76,19 @@ dofreebsd() {
 		echo "Fsck of $rootdev failed"
 		return 1
 	}
+	mount -o ro $rootdev /mnt || {
+		echo "RO-mount of $rootdev failed"
+		return 1
+	}
+
+	# If our disk appears anywhere in fstab, assume we are good to go
+	if `grep "^/dev/${disk}s" /mnt/etc/fstab >/dev/null 2>&1`; then
+		umount $rootdev
+		return 0
+	fi
+
+	# We need to change something, remount RW and change it
+	umount $rootdev
 	mount $rootdev /mnt || {
 		echo "Mount of $rootdev failed"
 		return 1
@@ -54,6 +104,12 @@ dofreebsd() {
 		return 1
 	}
 	umount $rootdev
+
+	# XXX need to fixup FS, see big comment above
+	if [ "x$version" = "x5" ]; then
+		echo "WARNING: FBSD5 may have modified the UFS1 root FS"
+	fi
+
 	return 0
 }
 
