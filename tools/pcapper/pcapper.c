@@ -1045,7 +1045,9 @@ void *feedclient(void *args) {
 	fd = s_args->fd;
 	interval = s_args->interval;
 
+	pthread_mutex_lock(&lib_lock);
 	free(args);
+	pthread_mutex_unlock(&lib_lock);
 
 	dropped = 0;
 	
@@ -1273,6 +1275,7 @@ void *readpackets(void *args) {
 		pthread_cond_wait(&cond, &lock);
 	pthread_mutex_unlock(&lock);
 
+	pthread_mutex_lock(&lib_lock);
 	/*
 	 * NOTE: We set the timeout to a full second - if we set it lower, we
 	 * don't get to see packets until a certain number have been buffered
@@ -1313,6 +1316,7 @@ void *readpackets(void *args) {
 	    pcap_setfilter(dev, &filter);
 	    pcap_freecode(&filter);
 	}
+	pthread_mutex_unlock(&lib_lock);
 
 	/*
 	 * We don't bother to lock the access to active.  If it gets cleared
