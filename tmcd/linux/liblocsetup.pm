@@ -46,7 +46,7 @@ BEGIN
 # 
 $CP		= "/bin/cp";
 $EGREP		= "/bin/egrep -q";
-$NFSMOUNT	= "/bin/mount -o vers=2"; # Use NFS Version 2, and not 3
+$NFSMOUNT	= "/bin/mount -o vers=2,udp"; # Force NFS Version 2 over UDP
 $UMOUNT		= "/bin/umount";
 $TMPASSWD	= "$ETCDIR/passwd";
 $SFSSD		= "/usr/local/sbin/sfssd";
