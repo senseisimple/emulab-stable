@@ -1,0 +1,121 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+    
+#
+# Parse an ns file. Since the parser runs arbitrary NS file for the user,
+# this cannot be safely done on boss without jumping through huge hoops
+# to secure tcl and the DB. Yuck! So, instead of running the parser on boss,
+# we run it over on ops. This first version operates like this:
+#
+# NB: This script is setuid.
+#
+sub usage()
+{
+    print STDOUT "Usage: checkquota [-d] <user>\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
+my $TESTMODE = @TESTMODE@;
+
+my $QUOTACMD = "/usr/bin/quota";
+my $SSHTB    = "/usr/testbed/bin/sshtb";
+
+# Locals
+my $user;
+my $dbuid;
+my $overquota = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+exit(0)
+    if ($TESTMODE);
+
+if ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+$user = $ARGV[0];
+
+#
+# Must taint check!
+#
+if ($user =~ /^([-\w]+)$/) {
+    $user = $1;
+}
+else {
+    die("Bad data in argument: $user");
+}
+   
+#
+# Must flip to real root for the ssh.
+# 
+$UID = 0;
+
+#
+# We invoke the quota command and look at the results.
+# 
+open(QUOTA, "$SSHTB -host $CONTROL $QUOTACMD -q -l $user |") or
+    die("*** $0:\n".
+	"    Could not invoke $QUOTACMD on $CONTROL!\n");
+
+while (<QUOTA>) {
+    if ($_ =~ /limit reached on ([-\w\/]*)$/) {
+	print STDOUT "*** Disk Quota exceeded on $1\n";
+	$overquota++;
+    }
+}
+close(QUOTA);
+exit($overquota);

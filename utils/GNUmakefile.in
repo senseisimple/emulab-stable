@@ -19,7 +19,7 @@ BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
-		  grabswitchconfig backupswitches cvsinit
+		  grabswitchconfig backupswitches cvsinit checkquota
 LIBEXEC_SCRIPTS	= webcreateimage newnode webdeletenode spewleds webcopy \
                   websetdest spewsource weblinkmon_ctl webcvsweb
 
@@ -49,6 +49,8 @@ boss-install: install
 post-install: 
 	chown root $(INSTALL_SBINDIR)/grabwebcams
 	chmod u+s $(INSTALL_SBINDIR)/grabwebcams
+	chown root $(INSTALL_SBINDIR)/checkquota
+	chmod u+s $(INSTALL_SBINDIR)/checkquota
 
 #
 # Control node installation (okay, plastic)
