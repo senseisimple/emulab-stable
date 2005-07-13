@@ -414,7 +414,7 @@ Some details remain to be documented: <br>
        </ul> </li>
 
   <li> Shared directories: <code>/share</code>,
-       <code>/project/&lt;pid&gt;</code>, 
+       <code>/proj/&lt;pid&gt;</code>, 
        <code>/group/&lt;pid&gt;/&lt;gid&gt;</code>. </li> 
 
   <li> Bug: One protection mask for everything in a whole mount/share under
@@ -508,29 +508,18 @@ There are still some things left to do: <br>
 
 <ul>
 
-  <li>The <i>Elvin</i> event system, and hence <code>progagent</code>, is
-      not yet running. </li>
+  <li> Access to shares under ssh without having to type a password. </li>
 
-  <li> <code>syncerver</code>, <code>slothd</code> and
-       <code>healthd</code>. </li> 
+  <li> Emulab <code>syncerver</code> and <code>slothd</code>. </li>
 
-  <li> <code>linktest</code> </li>
-
-  <li> Add a topomap distribution option to NFS for <code>rtproto
-       Static</code>.  </li>
-
-  <li> <code>gated</code> or equivelant OSPF daemon for <code>rtproto
-       Session</code>.  </li>
-
-  <li> Password and ssh keys both working (hopefully.) </li>
+  <li> Use Sysprep (MS WADS) for multi-hardware XP images. </li>
 
   <li> Console support (<code>agetty</code> serial line speed 115.2kb doesn't
-       work.) </li> 
-
-  <li> No such thing as load averages, see the Task Manager/Performance
-       tab. </li> 
+       work?) </li> 
 
   <li> Automate production of <i>Windows XP</i> images for Emulab. </li>
+
+  <li> Dynamic routing support for <code>rtproto Session</code>?  </li>
 
 </ul>
 
