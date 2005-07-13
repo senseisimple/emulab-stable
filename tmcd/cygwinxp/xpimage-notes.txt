@@ -114,9 +114,9 @@ alias rootpc 'sudo ssh pc\!^.$en \!:2*'
 
 	  - Edit /etc/sshd_config
 	    . Add this line: AuthorizedKeysFile /sshkeys/%u/authorized_keys
-	        ed /etc/sshd_config
-		/AuthorizedKeysFile
-		a
+                ed /etc/sshd_config
+                /AuthorizedKeysFile
+                a
 AuthorizedKeysFile /sshkeys/%u/authorized_keys
 .
 w

@@ -22,7 +22,16 @@ chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
 # Make sure the computer name is right, reboots to change it if necessary.
-nodeid=`tmcc nodeid`
+nodeid=
+while [ -z $nodeid ]; do
+    nodeid=`tmcc nodeid`
+    if [ -z $nodeid ]; then
+        msg="`date`: Null nodeid returned from tmcc.  Trying again."
+        echo "$msg" >> $logfile
+        echo "$msg"
+        sleep 5
+    fi
+done
 hostname=`/bin/hostname`
 datehost="`date`: Host name '$hostname'"
 if [ $nodeid = $hostname ]; then
