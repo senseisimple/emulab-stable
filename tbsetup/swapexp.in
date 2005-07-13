@@ -70,6 +70,7 @@ my $TBLOGS = "@TBLOGSEMAIL@";
 my $TBINFO = "$TB/expinfo";
 my $TBDOCBASE = "@TBDOCBASE@";
 my $TBBASE = "@TBBASE@";
+my $CONTROL  = "@USERNODE@";
 
 #
 # Testbed Support libraries
@@ -88,6 +89,7 @@ my $signaled = 0;
 
 my $tbdir    = "$TB/bin";
 my $tbdata   = "tbdata";
+my $checkquota = "$TB/sbin/checkquota";
 my $batch    = 0;
 my $idleswap = 0;
 my $autoswap = 0;
@@ -300,6 +302,17 @@ if ($waitmode) {
 }
 
 #
+# Check for overquota; we deal with it below, cause of the batch system.
+#
+my $overquota = system("$checkquota $dbuid");
+
+if ($overquota) {
+    print STDERR
+	"*** $0:\n".
+	"    You are over your disk quota on $CONTROL; please cleanup!\n";
+}
+
+#
 # Temp fix; Disallow swapmod to firewalled experiments. This will come
 # out later.
 #
@@ -392,6 +405,11 @@ if ($batch) {
 	die("*** $0:\n".
 	    "    Batch experiment $pid/$eid has been canceled! Aborting.\n")
 	    if ($canceled);
+
+	# Do not allow it to swap in. What about swapout? 
+	die("*** $0:\n".
+	    "    Batch experiment cannot swap in when over quota! Aborting.\n")
+	    if ($overquota);
     }
     elsif ($inout eq "out") {
 	die("*** $0:\n".
@@ -422,6 +440,12 @@ else {
 			   "Batch experiment $pid/$eid must be SWAPPED to\n".
 			   "QUEUE. Currently $estate.")
 		if ($estate ne EXPTSTATE_SWAPPED);
+
+	    ExitWithStatus(1,
+			   "Batch experiment $pid/$eid cannot swap in when ".
+			   "over quota!\n")
+		if ($overquota);
+	    
 	    SetExpState($pid, $eid, EXPTSTATE_QUEUED);
 	}
 	elsif ($inout eq "out") {
@@ -466,7 +490,12 @@ else {
 	    ExitWithStatus(1,
 			"Cannot modify an active ElabInElab experiment (yet).")
 		if ($elabinelab && $estate ne EXPTSTATE_SWAPPED && !$isadmin);
-		  
+
+	    ExitWithStatus(1,
+			   "Cannot modify batch experiment $pid/$eid when ".
+			   "over quota!\n")
+		if ($overquota);
+	    
 	    #
 	    # Otherwise, proceed with the modify. The experiment will be
 	    # locked below, and so it cannot be injected or otherwise messed
@@ -511,6 +540,11 @@ else {
 		      ExitWithStatus(1,
 				     "Experiment $pid/$eid is not swapped out!");
 		  }
+		  ExitWithStatus(1,
+				 "Experiment $pid/$eid cannot swap in when ".
+				 "over quota!\n")
+		      if ($overquota);
+		  
 		  last SWITCH;
 	      };
 	      /^out$/i && do {
@@ -572,6 +606,11 @@ else {
 			"Cannot modify an active ElabInElab experiment (yet).")
 		      if ($elabinelab &&
 			  $estate ne EXPTSTATE_SWAPPED && !$isadmin);
+
+		  ExitWithStatus(1,
+				 "Experiment $pid/$eid cannot be modified ".
+				 "when over quota!\n")
+		      if ($overquota);
 		  
 		  last SWITCH;
 	      };

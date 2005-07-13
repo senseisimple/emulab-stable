@@ -72,6 +72,7 @@ my $TBOPS    = "@TBOPSEMAIL@";
 my $TBLOGS   = "@TBLOGSEMAIL@";
 my $TBDOCBASE = "@TBDOCBASE@";
 my $TBBASE   = "@TBBASE@";
+my $CONTROL  = "@USERNODE@";
 
 #
 # Testbed Support libraries
@@ -82,6 +83,7 @@ use libtestbed;
 
 my $parser   = "$TB/libexec/parse-ns";
 my $mkexpdir = "$TB/libexec/mkexpdir";
+my $checkquota = "$TB/sbin/checkquota";
 my $tbbindir = "$TB/bin/";
 my $errorstat=-1;
 my $user_name;
@@ -148,6 +150,17 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
     die("*** $0:\n".
         "    Cannot determine your name and email address.\n");
+}
+
+#
+# Before doing anything else, check for overquota ... lets not waste
+# our time. Make sure user sees the error by exiting with 1.
+#
+if (system("$checkquota $dbuid") != 0) {
+    print STDERR
+	"*** $0:\n".
+	"    You are over your disk quota on $CONTROL; please cleanup!\n";
+    exit(1);
 }
 
 #

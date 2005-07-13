@@ -38,6 +38,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $BOSSNODE	= "@BOSSNODE@";
+my $CONTROL     = "@USERNODE@";
 my $TFTPDIR     = "/tftpboot";
 
 #
@@ -65,6 +66,7 @@ my $nodereboot	= "$TB/bin/node_reboot";
 my $createimage = "/usr/local/bin/create-image";
 my $friskiller  = "$TB/sbin/frisbeelauncher";
 my $osselect    = "$TB/bin/os_select";
+my $checkquota  = "$TB/sbin/checkquota";
 my $devtype	= "ad";
 my $devnum	= 0;
 my $mereuser    = 0;
@@ -153,6 +155,15 @@ if ($UID && !TBAdmin($UID)) {
 	die("*** $0:\n".
 	    "    You do not have permission to create an image from $node\n");
     }
+}
+
+#
+# Before doing anything else, check for overquota ... lets not waste
+# our time. Make sure user sees the error by exiting with 1.
+#
+if (system("$checkquota $dbuid") != 0) {
+    die("*** $0:\n".
+	"    You are over your disk quota on $CONTROL; please cleanup!\n");
 }
 
 #
