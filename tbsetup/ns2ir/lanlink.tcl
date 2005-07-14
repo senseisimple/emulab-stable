@@ -321,7 +321,7 @@ Lan instproc trace_snaplen {len} {
     }
 }
 
-Link instproc trace_snaplen {$len} {
+Link instproc trace_snaplen {len} {
     $self instvar toqueue
     $self instvar fromqueue
     
