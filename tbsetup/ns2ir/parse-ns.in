@@ -500,6 +500,26 @@ sub GenDefsFile($)
 	print TCL "set physnodes($node_id) \"$type\"\n";
     }
 
+    print TCL "# Location info\n";
+    $query_result =
+	DBQueryFatal("select li.node_id,li.building,li.loc_x,li.loc_y,".
+		     "li.loc_z,fi.pixels_per_meter ".
+		     "from location_info as li ".
+		     "left join floorimages as fi on fi.building=li.building");
+
+    while (my ($node_id,$building,$loc_x,$loc_y,$loc_z,$ppm) =
+	   $query_result->fetchrow_array()) {
+	print TCL "set location_info($node_id,$building,x) ". 
+	    $loc_x / $ppm ."\n";
+	print TCL "set location_info($node_id,$building,y) ". 
+	    $loc_y / $ppm ."\n";
+	if (!defined($loc_z)) {
+	    $loc_z = 0.0;
+	}
+	print TCL "set location_info($node_id,$building,z) ". 
+	    $loc_z / $ppm ."\n";
+    }
+
     #
     # ElabInElab stuff.
     # 

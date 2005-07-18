@@ -167,6 +167,7 @@ Node instproc updatedb {DB} {
     var_import ::GLOBALS::eid
     var_import ::GLOBALS::default_ip_routing_type
     var_import ::GLOBALS::enforce_user_restrictions
+    var_import ::TBCOMPAT::hwtype_class
     
     # If we haven't specified a osid so far then we should fill it
     # with the id from the node_types table now.
@@ -265,7 +266,7 @@ Node instproc updatedb {DB} {
 
     $sim spitxml_data "virt_nodes" $fields $values
 
-    if {$topo != ""} {
+    if {$topo != "" && ($type == "robot" || $hwtype_class($type) == "robot")} {
 	if {$X_ == "" || $Y_ == ""} {
 	    perror "node \"$self\" has no initial position"
 	    return
@@ -402,6 +403,10 @@ Node instproc set_hwtype {hwtype isrem isv issub} {
 # Fix a node. Watch for fixing a node to another node.
 #
 Node instproc set_fixed {pnode} {
+    var_import ::TBCOMPAT::location_info
+    var_import ::TBCOMPAT::physnodes
+    $self instvar type
+    $self instvar topo
     $self instvar fixed
     $self instvar issubnode
 
@@ -414,8 +419,22 @@ Node instproc set_fixed {pnode} {
 	    perror "\[set-fixed] Improper fix-node $self to $pnode!"
 	    return
 	}
-    }    
+    }
     set fixed $pnode
+
+    if {[info exists physnodes($pnode)]} {
+	set type $physnodes($pnode)
+	
+	if {$topo != ""} {
+	    set building [$topo set area_name]
+	    if {$building != {} && 
+	    [info exists location_info($fixed,$building,x)]} {
+		$self set X_ $location_info($fixed,$building,x)
+		$self set Y_ $location_info($fixed,$building,y)
+		$self set Z_ $location_info($fixed,$building,z)
+	    }
+	}
+    }
 }
 
 #
@@ -545,7 +564,9 @@ Node instproc program-agent {args} {
 }
 
 Node instproc topography {topo} {
+    var_import ::TBCOMPAT::location_info
     $self instvar sim
+    $self instvar fixed
 
     if {$topo == ""} {
 	$self set topo ""
@@ -563,7 +584,15 @@ Node instproc topography {topo} {
     $topo set sim $sim; # Need to link the topography to the simulator here.
     $sim add_topography $topo
 
-    if {[$self set type] == "pc"} {
+    if {$fixed != ""} {
+	set building [$topo set area_name]
+	if {$building != {} && 
+	    [info exists location_info($fixed,$building,x)]} {
+	    $self set X_ $location_info($fixed,$building,x)
+	    $self set Y_ $location_info($fixed,$building,y)
+	    $self set Z_ $location_info($fixed,$building,z)
+	}
+    } elseif {[$self set type] == "pc"} {
 	$self set type "robot"
     }
 }
