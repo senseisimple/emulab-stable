@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -203,7 +203,8 @@ requested by the user.
 <?php NLCBODYBEGIN() ?>
 <!-- Center -->
 
-The client is currently distributed as a self-contained JAR file:
+The client is currently distributed as a self-contained JAR file and a source
+tar ball:
 
 <blockquote>
 <table class="stealth" border=0 cellspacing=0 cellpadding=0 width="100%">
@@ -212,6 +213,14 @@ The client is currently distributed as a self-contained JAR file:
 <a href="/downloads/netlab-client.jar">netlab-client.jar</a>
 </td>
 <td align="center">(370K)</td>
+<td align="center">v0.1.0b</td>
+<td align="right">May 12, 2004</td>
+</tr>
+<tr>
+<td>
+<a href="/downloads/netlab-client-0.1.0b.tar.gz">netlab-client-0.1.0b.tar.gz</a>
+</td>
+<td align="center">(787K)</td>
 <td align="center">v0.1.0b</td>
 <td align="right">May 12, 2004</td>
 </tr>

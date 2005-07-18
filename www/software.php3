@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -18,7 +18,8 @@ PAGEHEADER("Emulab Software Distributions");
 <ul>
 <li> <img src="/new.gif" alt="&lt;NEW&gt;">
      <a href="/downloads/netlab-client.jar">
-     Emulab GUI Client JAR v0.1.0b</a>.
+     Emulab GUI Client JAR v0.1.0b</a> (<a
+     href="/downloads/netlab-client-0.1.0b.tar.gz">source</a>).
      This is the initial release of a new GUI client for creating and
      interacting with experiments.  The GUI provides an alternative to using
      the web-based interface or logging into users.emulab.net and using the
