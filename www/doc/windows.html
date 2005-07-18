@@ -33,6 +33,7 @@
     <li> <a href="#Cygwin_arcana"> Cygwin arcana </a></li>
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
+  <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
   <li> <a href="#Future"> Future work </a></li>
 </ol>
 
@@ -500,6 +501,27 @@ crashed <i>Windows XP</i> when I tried it. <p>
 
        </ul>
 </ul>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="DotNet"> </a> Microsoft .Net Runtime </h3>
+
+We have not included the <a
+href="http://msdn.microsoft.com/netframework/downloads/framework1_1/">
+Microsoft .NET Framework </a> runtime in the standard WINXP images in an
+attempt to keep the image size down.  If you need it, it's easy to
+install. <p>
+
+The installer for the <a
+href="http://www.microsoft.com/downloads/details.aspx?familyid=262D25E3-F589-4842-8157-034D1E7CF3A3&displaylang=en">
+Microsoft Framework Version 1.1 Redistributable Package </a> is downloaded to
+<b><code>/share/windows/dotnetfx.exe</code></b>.  Run it to download the
+runtime, agreeing to the EULA.  It takes a few minutes, and uses 104 meg of
+disk. <p>
+
+If you want to develop .NET code as well as run it, you will need to install
+the <a
+href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-4070-9F41-A333C6B9181D&displaylang=en">
+.NET Framework SDK Version 1.1 </a>.
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Future"> </a> Future work </h3>
