@@ -1324,8 +1324,15 @@ sub CheckFWinfo($)
     # Experiment cannot go from firewalled to not firewalled, in either the
     # swapped or active state.
     if ($wasfirewalled && !$nowfirewalled) {
-	$msg = "Not allowed to turn off firewalling!";
-	goto noway;
+	if (! $isadmin) {
+	    $msg = "Not allowed to turn off firewalling!";
+	    goto noway;
+	}
+	if ($curstate eq EXPTSTATE_ACTIVE()) {
+	    $msg = "Not allowed to turn off firewalling while active!";
+	    goto noway;
+	}
+	goto okay;
     }
 
     #
