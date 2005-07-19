@@ -2314,6 +2314,52 @@ class experiment:
                               output="ok")
 
     #
+    # Return the nsfile for the experiment.
+    #
+    def nsfile(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        # Check for valid arguments.
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        if not (re.match("^[-\w]*$", argdict["proj"]) and
+                re.match("^[-\w]*$", argdict["exp"])):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(self.uid,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        dbres = DBQueryFatal(
+            "select nsfile from nsfiles where pid=%s and eid=%s",
+            (argdict["proj"], argdict["exp"]))
+
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        
+        result = dbres[0][0]
+        
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output="ok")
+
+    #
     # Control the event system.
     #
     def eventsys_control(self, version, argdict):
