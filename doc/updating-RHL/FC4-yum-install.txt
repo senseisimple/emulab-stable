@@ -1,0 +1,33 @@
+yum install compat-gcc-32 compat-gcc-32-c++
+make -f RHL90-yum-install.mk install
+
+From "make .. install":
+
+No Match for argument: bash-doc
+No Match for argument: cproto
+No Match for argument: pine
+No Match for argument: perl-CGI
+
+=============================================================================
+ Package                 Arch       Version          Repository        Size
+=============================================================================
+Installing:
+ arpwatch                i386       14:2.1a13-13.FC4  updates-released  178 k
+ expect                  i386       5.43.0-1         base              147 k
+ glib-devel              i386       1:1.2.10-16      base              116 k
+ gtk+-devel              i386       1:1.2.10-39      base              1.1 M
+ hexedit                 i386       1.2.10-4         base               32 k
+ lm_sensors              i386       2.8.8-5          base              445 k
+ lm_sensors-devel        i386       2.8.8-5          base               59 k
+ lynx                    i386       2.8.5-23         base              1.7 M
+ ncftp                   i386       2:3.1.9-1        extras            507 k
+ pcre-devel              i386       5.0-4            base              107 k
+ tftp                    i386       0.40-6           base               20 k
+Installing for dependencies:
+ dmidecode               i386       1:2.6-1.14       base               29 k
+ fontconfig-devel        i386       2.2.3-13         base              236 k
+ freetype-devel          i386       2.1.9-2          base              527 k
+ gdk-pixbuf              i386       1:0.22.0-18      base              226 k
+ gtk+                    i386       1:1.2.10-39      base              885 k
+ xorg-x11-devel          i386       6.8.2-37         updates-released  5.0 M
+

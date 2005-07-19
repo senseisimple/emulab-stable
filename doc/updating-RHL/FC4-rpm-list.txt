@@ -1,4 +1,4 @@
-Here is the final list of installed rpms on the FC4 image:
+Here is the final list of installed rpms on the FC4 image as of 2005-07-13:
 
 4Suite-1.0-8.b1
 MAKEDEV-3.19-1
@@ -29,7 +29,7 @@ bc-1.06-18
 beecrypt-4.1.2-8
 bind-libs-9.3.1-4
 bind-utils-9.3.1-4
-binutils-2.15.94.0.2.2-2
+binutils-2.15.94.0.2.2-2.1
 bison-2.0-6
 bitmap-fonts-0.3-4
 bluez-hcidump-1.18-1
@@ -141,7 +141,7 @@ gnupg-1.4.1-3
 gpg-pubkey-1ac70ce6-41bebeef
 gpg-pubkey-4f2a6fd2-3f9d9d3b
 gpm-1.20.1-71
-grep-2.5.1-48
+grep-2.5.1-48.2
 groff-1.18.1.1-5
 gtk+-1.2.10-39
 gtk+-devel-1.2.10-39
@@ -152,8 +152,6 @@ hdparm-5.9-1
 hesiod-3.0.2-31
 hexedit-1.2.10-4
 hotplug-2004_09_23-7
-howl-0.9.8-3
-howl-libs-0.9.8-3
 hwdata-0.158.1-1
 indent-2.2.9-8
 info-4.8-4
@@ -166,8 +164,7 @@ iputils-20020927-22
 joe-3.1-8
 jpackage-utils-1.6.3-1jpp_1rh
 jwhois-3.2.2-14
-kernel-2.6.11-1.1369_FC4
-kernel-devel-2.6.11-1.1369_FC4
+kernel-2.6.12-1.1390_FC4
 krb5-devel-1.4-3
 krb5-libs-1.4-3
 krb5-workstation-1.4-3
@@ -202,9 +199,9 @@ libusb-0.1.10a-1
 libusb-devel-0.1.10a-1
 libuser-0.53.7-1
 libuser-devel-0.53.7-1
-libxml2-2.6.19-1
-libxml2-devel-2.6.19-1
-libxml2-python-2.6.19-1
+libxml2-2.6.20-1.FC4
+libxml2-devel-2.6.20-1.FC4
+libxml2-python-2.6.20-1.FC4
 libxslt-1.1.14-2
 lm_sensors-2.8.8-5
 lm_sensors-devel-2.8.8-5
@@ -298,7 +295,7 @@ popt-1.10.1-21
 portmap-4.0-65
 prelink-0.3.4-3
 procmail-3.22-16
-procps-3.2.5-6
+procps-3.2.5-6.3
 psacct-6.3.2-37
 psmisc-21.5-4
 pstack-1.2-4
@@ -328,7 +325,7 @@ rsync-2.6.4-3
 schedutils-1.4.0-4
 screen-4.0.2-9
 sed-4.1.4-1
-selinux-policy-targeted-1.23.18-12
+selinux-policy-targeted-1.25.1-7
 sendmail-8.13.4-2
 setarch-1.7-3
 setools-2.1.0-5
@@ -401,6 +398,6 @@ xorg-x11-xfs-6.8.2-37
 xterm-200-6
 yum-2.3.2-7
 zip-2.3-30
-zlib-1.2.2.2-3
-zlib-devel-1.2.2.2-3
+zlib-1.2.2.2-4.fc4
+zlib-devel-1.2.2.2-4.fc4
 zsh-4.2.1-2

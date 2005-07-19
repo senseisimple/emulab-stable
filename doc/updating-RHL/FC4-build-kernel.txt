@@ -1,0 +1,39 @@
+# Make sure you are using Bash
+
+# Copy and replace each line and be sure to manually fix any errors
+
+# Adjust These Variables As Approate
+
+export SRC=/z/src TESTBED=/z/testbed
+export VER=2.6.12 EXTRA=1.1390_FC4-emulab-1
+export IPOD=patch-linux-2.6.12-1.1387_FC4
+
+# chdir
+cd $SRC
+
+# copy 
+cp -r linux-$VER-1.1390_FC4 linux-$VER-$EXTRA
+
+# chdir
+cd linux-$VER-$EXTRA
+
+# patch ipod
+patch -p1 < $TESTBED/ipod/$IPOD
+
+# copy config
+cp $TESTBED/doc/updating-RHL/FC4-config-$VER .config
+
+# update kernel version
+perl -i.orig -p -e "s/^EXTRAVERSION\s*=.+/EXTRAVERSION = -$EXTRA/" Makefile
+
+# config
+make oldconfig
+make bzImage && make modules
+sudo make modules_install
+sudo make install 
+# fix lilo.conf
+sudo lilo
+sudo cp .config /boot/config-$VER-$EXTRA
+
+# Now Reboot to make sure everything works
+
