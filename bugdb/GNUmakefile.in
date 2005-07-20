@@ -1,0 +1,53 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ..
+SUBDIR		= bugdb
+
+include $(OBJDIR)/Makeconf
+
+SBIN_SCRIPTS		= addbugdbproj addbugdbuser setbugdbgroups \
+			  bugdbsetup
+LIBEXEC_SCRIPTS		= 
+
+CTRL_SBIN_SCRIPTS	= bugdbproxy
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRL_SBIN_SCRIPTS))
+
+boss-install: install
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/addbugdbproj
+	chmod u+s $(INSTALL_SBINDIR)/addbugdbproj
+	chown root $(INSTALL_SBINDIR)/addbugdbuser
+	chmod u+s $(INSTALL_SBINDIR)/addbugdbuser
+	chown root $(INSTALL_SBINDIR)/setbugdbgroups
+	chmod u+s $(INSTALL_SBINDIR)/setbugdbgroups
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRL_SBIN_SCRIPTS))
+
+clean:
+	rm -f *.o core
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@

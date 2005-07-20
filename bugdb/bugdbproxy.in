@@ -1,0 +1,578 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+    
+#
+# A wrapper for messing with the Bug DB from boss.
+#
+sub usage()
+{
+    print "Usage: bugdbproxy adduser [-m] <uid> <passhash> or\n";
+    print "       bugdbproxy deluser [-f] <uid> or\n";
+    print "       bugdbproxy addproject <pid> or\n";
+    print "       bugdbproxy addgroup <pid> <gid> or\n";
+    print "       bugdbproxy setgroups <uid> <pid/gid> ...\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $OURDOMAIN= "@OURDOMAIN@";
+my $FLYCONF  = "/usr/local/etc/flyspray.conf.php";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname;
+my $dbuser;
+my $dbpass;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+
+#
+# The DB user/passwd are stored in the flyspray config file, which is
+# hopefully not group readable. Open and parse that file, then open a
+# connection to the DB.
+#
+open(FLY, $FLYCONF) or
+    die("*** $0:\n".
+	"    Could not open $FLYCONF for reading!\n");
+
+while (<FLY>) {
+    if ($_ =~ /^([-\w]*)\s*=\s*"([-\w]*)"$/) {
+	if ($1 eq "dbname") {
+	    $dbname = $2;
+	}
+	elsif ($1 eq "dbuser") {
+	    $dbuser = $2;
+	}
+	elsif ($1 eq "dbpass") {
+	    $dbpass = $2;
+	}
+    }
+}
+close(FLY);
+
+# Make sure we have everything we need.
+if (!defined($dbname) ||
+    !defined($dbuser) ||
+    !defined($dbpass)) {
+    fatal("Could not find db parameters in $FLYCONF!");
+}
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal("Could not connect to flyspray database!");
+}
+
+my $action = shift(@ARGV);
+
+if ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
+elsif ($action eq "addproject") {
+    exit(AddProject(@ARGV));
+}
+elsif ($action eq "addgroup") {
+    exit(AddGroup(@ARGV));
+}
+elsif ($action eq "setgroups") {
+    exit(SetGroups(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Utility function to get the flyspray user_id for an Emulab user.
+#
+sub FlysprayUserid($)
+{
+    my ($user) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select user_id from flyspray_users ".
+		     "where user_name='$user'");
+
+    return -1
+	if (!$query_result->numrows);
+    
+    my ($user_id) = $query_result->fetchrow_array();
+    return $user_id;
+}
+
+#
+# And the flyspray project id for an Emulab pid.
+# 
+sub FlysprayProjectid($)
+{
+    my ($pid) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select flyspray_id from emulab_project_mapping ".
+		     "where pid='$pid'");
+
+    return -1
+	if (!$query_result->numrows);
+    
+    my ($project_id) = $query_result->fetchrow_array();
+    return $project_id;
+}
+
+#
+# And the flyspray group id for an Emulab pid/gid.
+# 
+sub FlysprayGroupid($$)
+{
+    my ($project_id, $gname) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select group_id from flyspray_groups ".
+		     "where belongs_to_project='$project_id' and ".
+		     "      group_name='$gname'");
+
+    return -1
+	if (!$query_result->numrows);
+    
+    my ($group_id) = $query_result->fetchrow_array();
+    return $group_id;
+}
+
+#
+# Create a new flyspray group in a project. Return the new ID.
+# Note that "is_admin" is set *only* for global admin group (group 0).
+#
+sub NewFlySprayGroup($$$$)
+{
+    my ($name, $title, $project_id, $isadmin) = @_;
+
+    #
+    # The only bit that twiddles for the "admin" group for a project,
+    # is the bit that says the user can "manage" the project. Otherwise,
+    # all users get all permissions. Might need to revisit this later.
+    # 
+    DBQueryFatal("insert into flyspray_groups set ".
+		 "    group_id=NULL, ".
+		 "    group_name='$name' ,".
+		 "    group_desc='$title' ,".
+		 "    belongs_to_project='$project_id', ".
+		 "    is_admin=0, ".
+		 "    manage_project='$isadmin', ".
+		 "    view_tasks='1', ".
+		 "    open_new_tasks='1', ".
+		 "    modify_own_tasks='1', ".
+		 "    modify_all_tasks='1', ".
+		 "    view_comments='1', ".
+		 "    add_comments='1', ".
+		 "    edit_comments='1', ".
+		 "    delete_comments='1', ".
+		 "    view_attachments='1', ".
+		 "    create_attachments='1', ".
+		 "    delete_attachments='1', ".
+		 "    view_history='1', ".
+		 "    close_own_tasks='1', ".
+		 "    close_other_tasks='1', ".
+		 "    assign_to_self='1', ".
+		 "    assign_others_to_self='1', ".
+		 "    view_reports='$isadmin', ".
+		 "    group_open=1");
+
+    my $query_result =
+	DBQueryFatal("select group_id from flyspray_groups ".
+		     "where group_name='$name'");
+
+    fatal("Error creating new flyspray group!")
+	if (!$query_result->numrows);    
+    
+    my ($group_id) = $query_result->fetchrow_array();
+    return $group_id;
+}
+
+#
+# Add entry (or update password) for a user.
+#
+sub AddUser(@)
+{
+    my ($user, $passhash);
+    my $user_id;
+    my $modify = 0;
+    
+    usage()
+	if (@_ < 2 || @_ > 3);
+
+    if (@_ == 2) {
+	($user, $passhash) = @_;
+	$user_id = FlysprayUserid($user);
+	
+	if ($user_id >= 0) {
+	    print("*** $user already exists in the flyspray DB! Skipping\n");
+	    return 0;
+	}
+    }
+    else {
+	($flag, $user, $passhash) = @_;
+
+	fatal("Unknown option '$flag' to AddUser!")
+	    if ($flag ne "-m");
+
+	$user_id = FlysprayUserid($user);
+	
+	if ($user_id < 0) {
+	    print("*** $user does not exist in the flyspray DB! Skipping\n");
+	    return 0;
+	}
+	$modify = 1;
+    }
+
+    #
+    # Grab the gcos field from the password file.
+    #
+    my (undef, undef, undef, undef, undef, undef, $gcos) = getpwnam($user);
+
+    fatal("Could not gcos field for user $user!")
+	if (!defined($gcos));
+    $gcos  = DBQuoteSpecial($gcos);
+    $email = "${user}\@${OURDOMAIN}";
+
+    # Currently just the passhash and the gcos are modified. 
+    if ($modify) {
+	DBQueryFatal("update flyspray_users set ".
+		     "    user_pass='$passhash' ,".
+		     "    real_name=$gcos ".
+		     "where user_id=$user_id");
+	return 0;
+    }
+
+    # Easy ...
+    my $query_result =
+	DBQueryFatal("insert into flyspray_users set ".
+		     "    user_id=NULL, ".
+		     "    user_name='$user' ,".
+		     "    user_pass='$passhash' ,".
+		     "    real_name=$gcos ,".
+		     "    group_in=0 ,".
+		     "    jabber_id='' ,".
+		     "    email_address='$email' ,".
+		     "    notify_type=1 ,".
+		     "    account_enabled=1 ,".
+		     "    dateformat='' ,".
+		     "    dateformat_extended='' ,".
+		     "    magic_url='' ");
+
+    # Get the ID assigned. 
+    $user_id = $query_result->insertid;
+
+    if ($user_id <= 0) {
+	fatal("Failed to create flyspray user table entry!");
+    }
+
+    #
+    # Insert user into the "basic" authentication group. All users
+    # must be members of this group in order to do anything at all.
+    #
+    SetGroups($user);
+    
+    return 0;
+}
+
+#
+# Delete entry for a user. Okay, cannot really delete a user cause there
+# might be entries in other tables cross referenced (say, a bug report).
+# Instead, just rename the user and disable the account. Allow for a -force
+# option though, to totally get rid of it.
+#
+sub DelUser(@)
+{
+    my $user;
+    my $force = 0;
+    
+    usage()
+	if (@_ < 1 || @_ > 2);
+
+    if (@_ == 1) {
+	($user) = @_;
+    }
+    else {
+	my ($arg1, $arg2) = @_;
+
+	fatal("Unknown option '$arg1' to DelUser!")
+	    if ($arg1 ne "-f");
+	
+	$force = 1;
+	$user  = $arg2;
+    }
+
+    my $user_id = FlysprayUserid($user);
+
+    if ($user_id < 0) {
+	print("*** DelUser: $user is not in the flyspray DB! Skipping\n");
+	return 0;
+    }
+
+    if (! $force) {
+	# Rename by appending user_id, so its obvious what happened.
+	my $newuser = "${user}-${user_id}";
+	
+	DBQueryFatal("update flyspray_users set ".
+		     "  user_name='$newuser', ".
+		     "  account_enabled=0 ".
+		     "where user_id='$user_id'");
+	return 0;
+    }
+
+    my @tables = ("flyspray_comments",
+		  "flyspray_history",
+		  "flyspray_notifications",
+		  "flyspray_users",
+		  "flyspray_users_in_groups");
+
+    foreach my $table (@tables) {
+	DBQueryFatal("delete from $table where user_id=$user_id");
+    }
+    return 0;
+}
+
+#
+# Create a new project.
+#
+sub AddProject(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($pid) = @_;
+    my $project_id = FlysprayProjectid($pid);
+
+    if ($project_id >= 0) {
+	print("*** $pid already exists in the flyspray DB! Skipping\n");
+	return 0;
+    }
+    my $intro = "This is the Emulab Bug DB for the $pid project";
+
+    # Easy ...
+    my $query_result =
+	DBQueryFatal("insert into flyspray_projects set ".
+		 "    project_id=NULL, ".
+		 "    project_title='$pid' ,".
+		 "    theme_style='Bluey', ".
+		 "    show_logo='1', ".
+		 "    inline_images='0', ".
+		 "    default_cat_owner='0', ".
+		 "    intro_message='$intro', ".
+		 "    project_is_active='1', ".
+		 "    visible_columns='".
+		 "id tasktype severity summary status dueversion progress', ".
+		 "    others_view='0', ".
+		 "    anon_open='0', ".
+		 "    notify_email='', ".
+		 "    notify_email_when='0', ".
+		 "    notify_jabber='', ".
+		 "    notify_jabber_when='0'");
+
+    # Get the ID assigned. 
+    $project_id = $query_result->insertid;
+
+    if ($project_id < 0) {
+	fatal("Failed to create flyspray project table entry!");
+    }
+
+    # Add the emulab mapping.
+    DBQueryFatal("insert into emulab_project_mapping set ".
+		 "  flyspray_id=$project_id, ".
+		 "  pid='$pid'");
+
+    # Now create a project managers group for the new project.
+    NewFlySprayGroup("admin", "Project Administrators", $project_id, 1);
+
+    # And a regular users group for the new project.
+    NewFlySprayGroup($pid, "Project Members", $project_id, 0);
+    return 0;
+}
+
+#
+# Create a new group. Okay, FlySpray groups are nearly useless for what we
+# want them to do, so the above code should not actually be used. We are
+# to need to create a FlySpray "project" for each group ... Maybe later.
+#
+sub AddGroup(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($pid, $gid) = @_;
+    my $project_id = FlysprayProjectid($pid);
+
+    fatal("Project $pid does not exist in the flyspray DB!\n")
+	if ($project_id < 0);
+
+    my $group_id = FlysprayGroupid($project_id, $gid);
+    
+    if ($group_id >= 0) {
+	print("*** $pid/$gid already exists in the flyspray DB! Skipping.\n");
+	return 0;
+    }
+
+    # And a regular users group for the new group.
+    NewFlySprayGroup($gid, "Group Members", $project_id, 0);
+    
+    return 0;
+}
+
+#
+# Set the groups for a user.
+#
+sub SetGroups(@)
+{
+    usage()
+	if (@_ < 1);
+
+    my $user      = shift(@_);
+    my @groups    = @_;
+    my %ghash     = ();
+    my $user_id   = FlysprayUserid($user);
+
+    if ($user_id < 0) {
+	print("*** SetGroups: $user is not in the flyspray DB! Skipping\n");
+	return 0;
+    }
+
+    #
+    # All users go into the "basic" authentication group. All users
+    # must be members of this group in order to do anything at all.
+    #
+    my $query_result =
+	DBQueryFatal("select group_id from flyspray_groups ".
+		     "where group_name='Basic'");
+    
+    fatal("Could not find Basic authentication group in flyspray DB!")
+	if (!$query_result->numrows);    
+    
+    my ($basic_id) = $query_result->fetchrow_array();
+
+    #
+    # First some error checking ...
+    # 
+    foreach my $pidgid (@groups) {
+	my ($pid, $gid) = ($pidgid =~ /^([-\w]+)\/([-\w]+)$/);
+
+	fatal("Improper pid/gid '$pidgid'")
+	    if (! (defined($pid) && defined($gid)));
+
+	my $project_id = FlysprayProjectid($pid);
+
+	if ($project_id < 0) {
+	    print("*** Project $pid does not exist in the flyspray DB!\n");
+	    next;
+	}
+
+	my $group_id = FlysprayGroupid($project_id, $gid);
+    
+	if ($group_id < 0) {
+	    fatal("Group $pid/$gid does not exist in the flyspray DB!\n");
+	    next;
+	}
+	
+	if (exists($ghash{$pid})) {
+	    print("*** $user cannot be in multiple groups\n".
+		  "    $pid/$gid ($ghash{$pid}). Ignoring $gid\n");
+	    next;
+	}
+	$ghash{$pid} = $gid;
+    }
+
+    #
+    # Delete the current set of groups the user belongs to, since we
+    # reconstruct the entire thing below.
+    #
+    DBQueryFatal("delete from flyspray_users_in_groups ".
+		 "where user_id=$user_id");
+    
+    #
+    # Now do it for real, including the Basic group.
+    #
+    DBQueryFatal("insert into flyspray_users_in_groups set ".
+		 "  record_id=NULL, ".
+		 "  user_id='$user_id', ".
+		 "  group_id='$basic_id'");
+
+    foreach my $pid (keys(%ghash)) {
+	my $gid = $ghash{$pid};
+    
+	my $project_id = FlysprayProjectid($pid);
+
+	fatal("Project $pid does not exist in the flyspray DB!\n")
+	    if ($project_id < 0);
+
+	my $group_id = FlysprayGroupid($project_id, $gid);
+    
+	fatal("Group $pid/$gid does not exist in the flyspray DB!\n")
+	    if ($group_id < 0);
+	
+	DBQueryFatal("insert into flyspray_users_in_groups set ".
+		     "  record_id=NULL, ".
+		     "  user_id='$user_id', ".
+		     "  group_id='$group_id'");
+    }
+    
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

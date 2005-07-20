@@ -1,0 +1,132 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Add a project to the wiki on ops.
+#
+sub usage()
+{
+    print STDOUT "Usage: addbugdbproj <pid>\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $BUGDBPROXY  = "$TB/sbin/bugdbproxy";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no wiki support, just exit. 
+#
+if (! $BUGDBSUPPORT) {
+    print "Bug DB support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $pid = $ARGV[0];
+
+#
+# Untaint args.
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid");
+}
+
+# Valid project?
+if (! ProjLeader($pid)) {
+    fatal("No such project $pid!");
+}
+
+#
+# This script always does the right thing, so no permission checks.
+# In fact, all it does it call over to ops to run a script over there.
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    my $optarg = ($debug ? "-d" : "");
+	
+    print "Adding project $pid to the Bug DB on $CONTROL.\n";
+
+    if (system("$SSH -host $CONTROL $BUGDBPROXY ".
+	       "  $optarg addproject $pid")) {
+	fatal("$BUGDBPROXY failed on $CONTROL!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

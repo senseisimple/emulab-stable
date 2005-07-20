@@ -22,19 +22,23 @@ LIB_SCRIPTS     = libdb.pm Node.pm libdb.py libadminctrl.pm
 
 # Stuff installed on plastic.
 USERSBINS	= genelists.proxy
+USERLIBS	= libtbdb.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
-all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS)
+all:	$(BIN_SCRIPTS) $(SBIN_SCRIPTS) $(LIBEXEC_SCRIPTS) $(LIB_SCRIPTS) \
+	$(USERSBINS) $(USERLIBS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_BINDIR)/, $(BIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 	$(addprefix $(INSTALL_LIBDIR)/, $(LIB_SCRIPTS)) \
-	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS))
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+        $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(USERSBINS)) \
+        $(addprefix $(INSTALL_DIR)/opsdir/lib/, $(USERLIBS))
 
 boss-install: install
 
@@ -49,6 +53,18 @@ post-install:
 #
 # Control node installation (okay, plastic)
 #
-control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS))
+control-install: $(addprefix $(INSTALL_SBINDIR)/, $(USERSBINS)) \
+	$(addprefix $(INSTALL_LIBDIR)/, $(USERLIBS))
 
 clean:
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib
+	$(INSTALL_DATA) $< $@
+

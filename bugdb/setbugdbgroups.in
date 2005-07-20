@@ -1,0 +1,169 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Set the bugdb groups for a user. Currently we just do the projects.
+#
+sub usage()
+{
+    print STDOUT "Usage: setbugdbgroups <uid>\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+my @glist   = ();
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $BUGDBPROXY  = "$TB/sbin/bugdbproxy";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no wiki support, just exit. 
+#
+if (! $BUGDBSUPPORT) {
+    print "BUGDB support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $user = $ARGV[0];
+
+#
+# Untaint args.
+#
+if ($user =~ /^([-\w]+)$/) {
+    $user = $1;
+}
+else {
+    die("Bad data in user: $user.");
+}
+
+#
+# This script always does the right thing, so no permission checks.
+# In fact, all it does is call over to ops to run a script over there.
+#
+# Flyspray groups are not really what I want yet. Each user can only be
+# in one group per project, which means users are either in the project
+# admin group or not. 
+#
+my $query_result =
+    DBQueryFatal("select p.pid,p.trust from group_membership as p ".
+		 "left join groups as g on g.pid=p.pid and g.gid=p.gid ".
+		 "where uid='$user' and p.pid=g.gid and trust!='none'");
+
+while (my ($pid,$trust) = $query_result->fetchrow_array()) {
+    #
+    # Add to the root group for the project if proj/group root.
+    # This root project name is hardwired in the wikiproxy. Sorry.
+    #
+    if ($trust eq "project_root" || $trust eq "group_root") {
+	push(@glist, "$pid/admin");
+    }
+    else {
+	push(@glist, "$pid/$pid");
+    }
+}
+# Not a member of any projects!
+exit(0)
+    if (! @glist);
+
+#
+# All users are part of the Emulab project. This is where they get to
+# report bugs about Emulab!
+#
+# Admin users ... TBAdmin() test does not work for this test ...
+$query_result =
+    DBQueryFatal("select admin from users where uid='$user'");
+my ($isadmin) = $query_result->fetchrow_array();
+if ($isadmin) {
+    push(@glist, "Emulab/admin");
+}
+else {
+    push(@glist, "Emulab/Emulab");
+}
+
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    my $optarg = ($debug ? "-d" : "");
+	
+    print "Setting bugdbgroups for $user on $CONTROL to @glist.\n";
+
+    if (system("$SSH -host $CONTROL $BUGDBPROXY ".
+	       "  $optarg setgroups $user @glist")) {
+	fatal("$BUGDBPROXY failed on $CONTROL!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

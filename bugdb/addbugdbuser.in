@@ -1,0 +1,152 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Add a user to the bugdb on ops.
+#
+sub usage()
+{
+    print STDOUT "Usage: addbugdbuser [-m] <uid>\n";
+    exit(-1);
+}
+my $optlist = "dm";
+my $debug   = 0;
+my $modify  = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $BUGDBPROXY  = "$TB/sbin/bugdbproxy";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no wiki support, just exit. 
+#
+if (! $BUGDBSUPPORT) {
+    print "Bug DB support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"m"})) {
+    $modify = 1;
+}
+if (@ARGV != 1) {
+    usage();
+}
+my $uid = $ARGV[0];
+
+#
+# Untaint args.
+#
+if ($uid =~ /^([-\w]+)$/) {
+    $uid = $1;
+}
+else {
+    die("Bad data in uid: $uid");
+}
+
+# Need the password hash ...
+$query_result =
+    DBQueryFatal("select u.usr_pswd from users as u ".
+		 "where u.uid='$uid'");
+
+if ($query_result->numrows == 0) {
+    fatal("No such user $uid!");
+}
+my ($passhash) = $query_result->fetchrow_array();
+
+# shell escape.
+$passhash =~ s/\$/\\\$/g;
+$passhash =~ s/\*/\\\*/g;
+
+#
+# This script always does the right thing, so no permission checks.
+# In fact, all it does it call over to ops to run a script over there.
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    my $optarg = ($debug ? "-d" : "");
+    my $addarg = "";
+
+    if ($modify) {
+	print "Changing user $uid info in the Bug DB on $CONTROL.\n";
+	$addarg = "-m";
+    }
+    else {
+	print "Adding user $uid to the Bug DB on $CONTROL.\n";
+    }
+
+    if (system("$SSH -host $CONTROL $BUGDBPROXY ".
+	       "  $optarg adduser $addarg $uid '$passhash'")) {
+	fatal("$BUGDBPROXY failed on $CONTROL!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
