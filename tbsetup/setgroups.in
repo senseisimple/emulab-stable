@@ -44,7 +44,9 @@ my $BOSSNODE= "@BOSSNODE@";
 my $ADMINGRP= "@TBADMINGROUP@";
 my $ELABINELAB    = @ELABINELAB@;
 my $WIKISUPPORT   = @WIKISUPPORT@;
+my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
 my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
+my $SETBUGDBGROUPS= "$TB/sbin/setbugdbgroups";
 
 my $SSH     = "$TB/bin/sshtb";
 my $GENELISTS="$TB/sbin/genelists";
@@ -85,7 +87,7 @@ use libdb;
 use libtestbed;
 
 #
-# We don't want to run this script unless its the real version.
+# We do not want to run this script unless its the real version.
 #
 if ($EUID != 0) {
     die("*** $0:\n".
@@ -388,13 +390,19 @@ else {
 }
 
 # and the twiki.
-if ($WIKISUPPORT) {
+if ($WIKISUPPORT || $BUGDBSUPPORT) {
     $UID  = $SAVEUID;
     $EUID = $UID;
 
     foreach $user (@userlist) {
-	system("$SETWIKIGROUPS $user") == 0 or
-	    fatal("$SETWIKIGROUPS $user failed!");
+	if ($WIKISUPPORT) {
+	    system("$SETWIKIGROUPS $user") == 0 or
+		fatal("$SETWIKIGROUPS $user failed!");
+	}
+	if ($BUGDBSUPPORT) {
+	    system("$SETBUGDBGROUPS $user") == 0 or
+		fatal("$SETBUGDBGROUPS $user failed!");
+	}
     }
 }
 

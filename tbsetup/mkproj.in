@@ -31,8 +31,10 @@ my $CVSBIN   = "/usr/bin/cvs";
 my $CHOWN    = "/usr/sbin/chown";
 my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
 my $WIKISUPPORT = @WIKISUPPORT@;
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $CVSSUPPORT  = @CVSSUPPORT@;
 my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
+my $ADDBUGDBPROJ= "$TB/sbin/addbugdbproj";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
@@ -136,6 +138,10 @@ system("$MKGROUP $pid $pid") == 0 or
 if ($WIKISUPPORT) {
     system("$ADDWIKIPROJ $pid") == 0 or
 	fatal("$ADDWIKIPROJ $pid failed!");
+}
+if ($BUGDBSUPPORT) {
+    system("$ADDBUGDBPROJ $pid") == 0 or
+	fatal("$ADDBUGDBPROJ $pid failed!");
 }
 
 system("$MKACCT $projhead") == 0 or

@@ -26,7 +26,7 @@ include Makeconf
 SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 		pxe tbsetup account tmcd utils tip capture ipod vis \
 		sensors os xmlrpc install/newnode_sshkeys mote tools/whol \
-		wiki
+		wiki bugdb
 
 all:		all-subdirs 
 
@@ -61,12 +61,17 @@ endif
 	@$(MAKE) -C mote post-install
 	@$(MAKE) -C tools post-install
 	@$(MAKE) -C wiki post-install
+	@$(MAKE) -C bugdb post-install
 	@$(MAKE) -C utils post-install
 
 #
 # For installation on the 'ops' or 'users' node (okay, plastic)
 # 
 ops-install:
+	-mkdir -p $(INSTALL_TOPDIR)/log
+	-mkdir -p $(INSTALL_TOPDIR)/log/mysql
+	-chmod 770 $(INSTALL_TOPDIR)/log/mysql
+	-chown mysql.mysql $(INSTALL_TOPDIR)/log/mysql
 	@$(MAKE) -C tbsetup control-install
 	@$(MAKE) -C security control-install
 	@$(MAKE) -C tip control-install
