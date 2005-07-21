@@ -553,6 +553,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     global $TBNAMECOOKIE, $TBLOGINCOOKIE, $TBSECURECOOKIES;
     global $TBMAIL_OPS, $TBMAIL_AUDIT, $TBMAIL_WWW;
     global $WIKISUPPORT, $WIKICOOKIENAME;
+    global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
     
     # Caller makes these checks too.
     if ((!TBvalid_uid($token) && !TBvalid_email($token)) ||
@@ -720,6 +721,16 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	}
 	
 	#
+	# Ditto for bugdb
+	# 
+	if ($BUGDBSUPPORT) {
+	    $flushtime = time() - 1000000;
+	    
+	    setcookie($BUGDBCOOKIENAME, "", $flushtime, "/",
+		      $TBAUTHDOMAIN, $TBSECURECOOKIES);
+	}
+	
+	#
 	# Set adminoff on new logins, unless user requested to be
 	# logged in as admin (and is an admin of course!). This is
 	# primarily to bypass the nologins directive which makes it
@@ -820,6 +831,7 @@ function VERIFYPASSWD($uid, $password) {
 function DOLOGOUT($uid) {
     global $CHECKLOGIN_STATUS, $TBAUTHCOOKIE, $TBLOGINCOOKIE, $TBAUTHDOMAIN;
     global $WIKISUPPORT, $WIKICOOKIENAME;
+    global $BUGDBSUPPORT, $BUGDBCOOKIENAME;
 
     # Pedantic check.
     if (!TBvalid_uid($uid)) {
@@ -848,6 +860,9 @@ function DOLOGOUT($uid) {
     setcookie($TBLOGINCOOKIE, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     if ($WIKISUPPORT) {
 	setcookie($WIKICOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
+    }
+    if ($BUGDBSUPPORT) {
+	setcookie($BUGDBCOOKIENAME, "", $timeout, "/", $TBAUTHDOMAIN, 0);
     }
 
     return 0;

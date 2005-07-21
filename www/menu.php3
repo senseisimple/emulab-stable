@@ -223,6 +223,7 @@ function WRITEPLABBOTTOMBAR() {
 function WRITESIDEBAR() {
     global $login_status, $login_uid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $WIKIURL;
+    global $BUGDBSUPPORT, $BUGDBURL;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
     $firstinitstate = TBGetFirstInitState();
@@ -386,6 +387,11 @@ function WRITESIDEBAR() {
 			       "gotowiki.php3?redurl=Main/$wikiname");
 		}
 	    
+		if ($BUGDBSUPPORT) {
+		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
+			       "gotobugdb.php3", "gotobugdb.php3");
+		}
+	    
 		WRITESIDEBARBUTTON("Update User Information",
 				   $TBBASE, "moduserinfo.php3");
 
@@ -409,6 +415,11 @@ function WRITESIDEBAR() {
 		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
 			       "gotowiki.php3?redurl=Main/$wikiname",
 			       "gotowiki.php3?redurl=Main/$wikiname");
+		}
+
+		if ($BUGDBSUPPORT) {
+		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
+			       "gotobugdb.php3", "gotobugdb.php3");
 		}
 	    
                 # Since a user can be a member of more than one project,

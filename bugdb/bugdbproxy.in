@@ -129,6 +129,9 @@ elsif ($action eq "addgroup") {
 elsif ($action eq "setgroups") {
     exit(SetGroups(@ARGV));
 }
+elsif ($action eq "xlogin") {
+    exit(xLogin(@ARGV));
+}
 else {
     die("*** $0:\n".
 	"    Do not know what to do with '$action'!\n");
@@ -569,6 +572,27 @@ sub SetGroups(@)
     return 0;
 }
 
+#
+# Backdoor Login
+#
+sub xLogin(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $secretkey) = @_;
+    my $user_id = FlysprayUserid($user);
+	
+    if ($user_id < 0) {
+	print("*** $user does not exist in the flyspray DB! Skipping\n");
+	return 0;
+    }
+    DBQueryFatal("update flyspray_users set ".
+		 "    cred='$secretkey'".
+		 "where user_id=$user_id");
+    return 0;
+}
+     
 sub fatal($)
 {
     my($mesg) = $_[0];
