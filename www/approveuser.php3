@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -455,6 +455,10 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
             # Create user account on control node.
             #
 	    SUEXEC($uid, $TBADMINGROUP, "webtbacct add $user", 1);
+            #
+            # Add user to wiki/bugdb groups.
+            #
+	    SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 1);
 	}
 	else {
 	    #
