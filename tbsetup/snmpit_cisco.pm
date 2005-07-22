@@ -379,7 +379,7 @@ sub vlanLock($) {
 	    # Only print this message every five tries
 	    #
 	    if (!($tries % 5)) {
-		print STDERR "VLAN edit buffer request failed - " .
+		print STDERR "$self->{NAME}: VLAN edit buffer request failed - " .
 			     "try $tries of $max_tries.\n";
 	    }
 	} else {
@@ -1194,12 +1194,58 @@ sub listVlans($) {
 }
 
 #
+# Walk a table that's indexed by ifindex. Convert the ifindex to a port, and
+# stuff the value into the given hash
+#
+# usage: walkTableIfIndex($self,$tableID,$hash,$procfun)
+#        $tableID is the name of the table to walk
+#        $hash is a reference to the hash we will be updating
+#        $procfun is a function run on the data for pre-processing
+# returns: nothing
+# Internal-only function
+#
+sub walkTableIfIndex($$$;$) {
+    my $self = shift;
+    my ($table,$hash,$fun) = @_;
+    if (!$fun) {
+        $fun = sub { $_[0]; }
+    }
+
+    #
+    # Grab the whole table in one fell swoop
+    #
+    my @table = $self->{SESS}->bulkwalk(0,32,$table);
+
+    foreach my $table (@table) {
+        foreach my $row (@$table) {
+            my ($oid,$index,$data) = @$row;
+
+            #
+            # Convert the ifindex we got into a port
+            # XXX - Should use convertPortFormat(), right? I've preserved the
+            # historical code in case it has some special behavior we depend on
+            #
+            if (! defined $self->{IFINDEX}{$index}) { next; }
+            my $port = portnum("$self->{NAME}:$index")
+                || portnum("$self->{NAME}:".$self->{IFINDEX}{$index});
+            if (! defined $port) { next; } # Skip if we don't know about it
+            
+            #
+            # Apply the user's processing function
+            #
+            my $pdata = &$fun($data);
+            ${$hash}{$port} = $pdata;
+        }
+    }
+}
+
+
+#
 # List all ports on the device
 #
 # usage: listPorts($self)
 # see snmpit_cisco_stack.pm for a description of return value format
 #
-# TODO: convert to bulkwalk
 #
 sub listPorts($) {
     my $self = shift;
@@ -1208,38 +1254,15 @@ sub listPorts($) {
     my %Link = ();
     my %speed = ();
     my %duplex = ();
-    my $ifTable = ["ifAdminStatus",0];
-    my @data=();
 
-    # TODO: Clean up this section and convert to bulkwalk
-    #do one to get the first field...
     $self->debug("Getting port information...\n");
-    do {{
-	$self->{SESS}->getnext($ifTable);
-	@data = @{$ifTable};
-	if ($data[0] eq "ifLastChange") {
-	    $ifTable = ["portAdminSpeed",0];
-	    $self->{SESS}->getnext($ifTable);
-	    @data = @{$ifTable};
-	}
-	if (! defined $self->{IFINDEX}{$data[1]}) { next; }
-	my $port;
-	if ($data[1] =~ /\d+\.\d+/) {
-	    $port = portnum("$self->{NAME}:$data[1]")
-		|| portnum("$self->{NAME}:".$self->{IFINDEX}{$data[1]});
-	} else {
-	    $port = portnum("$self->{NAME}:".$self->{IFINDEX}{$data[1]});
-	}
-	if (! defined $port) { next; }
-	$self->debug("$port\t$data[0]\t$data[2]\n",2);
-	if    ($data[0]=~/AdminStatus/) {$Able{$port}=($data[2]=~/up/?"yes":"no");}
-	elsif ($data[0]=~/ifOperStatus/)         {  $Link{$port}=$data[2];}
-	elsif ($data[0]=~/AdminSpeed/)           { $speed{$port}=$data[2];}
-	elsif ($data[0]=~/Duplex/)               {$duplex{$port}=$data[2];}
-	# Insert stuff here to get ifSpeed if necessary... AdminSpeed is the
-	# _desired_ speed, and ifSpeed is the _real_ speed it is using
-	}} while ( $data[0] =~
-	    /(i(f).*Status)|(port(AdminSpeed|Duplex))/) ;
+    $self->walkTableIfIndex('ifAdminStatus',\%Able,
+        sub { if ($_[0] =~ /up/) { "yes" } else { "no" } });
+    $self->walkTableIfIndex('ifOperStatus',\%Link);
+    $self->walkTableIfIndex('portAdminSpeed',\%speed);
+    $self->walkTableIfIndex('portDuplex',\%duplex);
+    # Insert stuff here to get ifSpeed if necessary... AdminSpeed is the
+    # _desired_ speed, and ifSpeed is the _real_ speed it is using
 
     #
     # Put all of the data gathered in the loop into a list suitable for
@@ -1570,8 +1593,7 @@ sub readifIndex($) {
                     #
                     if (($module == 0) && ($type =~ /^gi/i)) {
                         $module = 1;
-                        $self->debug("NON_MODULAR_HACK: ".
-				     "Moving $descr to mod $module\n");
+                        $self->debug("NON_MODULAR_HACK: Moving $descr to mod $module\n");
                     }
                 }
 		my $modport = "$module.$port";
