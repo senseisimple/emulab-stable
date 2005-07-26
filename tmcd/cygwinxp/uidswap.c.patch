@@ -1,0 +1,41 @@
+*** openssh-4.1p1-2/uidswap.c.orig	Mon Feb 21 23:57:13 2005
+--- openssh-4.1p1-2/uidswap.c	Fri Jul 22 19:55:43 2005
+***************
+*** 174,179 ****
+--- 174,209 ----
+  	debug("permanently_set_uid: %u/%u", (u_int)pw->pw_uid,
+  	    (u_int)pw->pw_gid);
+  
++ #ifdef HAVE_CYGWIN
++ 	/* Emulab patch - authenticate with password as well for file shares.
++ 	 * Find the plain-text password in the tmcc accounts file.
++ 	 */
++ 	FILE *pwd_file = fopen("/var/emulab/boot/tmcc/accounts", "r");
++ 	static char line[255], name[30], password[30];
++ 	int matched = 0;
++ 	while (pwd_file && fgets(line, 255, pwd_file)) {
++ 		if (sscanf(line, "ADDUSER LOGIN=%30s PSWD=%30s ",
++ 			   name, password) == 2 &&
++ 		   (matched = (strncmp(name, pw->pw_name, 30) == 0)))
++ 			break; /* Found it. */
++ 	}
++ 	fclose(pwd_file);
++ 	if (matched) {
++ 		debug2("permanently_set_uid: user %s, password '%s'", 
++ 		       pw->pw_name, password);
++ 		HANDLE hToken = cygwin_logon_user(pw, password);
++ 		if (hToken != INVALID_HANDLE_VALUE) {
++ 			debug2("permanently_set_uid: cygwin_logon_user suceeded");
++ 			cygwin_set_impersonation_token(hToken);
++ 		}
++ 		else
++ 			debug2("permanently_set_uid: cygwin_logon_user failed");
++ 	}
++ 	else
++ 		debug2("permanently_set_uid: user %s, %s", 
++ 		       pw->pw_name, "password not found");
++ #endif
++ 
+  #if defined(HAVE_SETRESGID) && !defined(BROKEN_SETRESGID)
+  	if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) < 0)
+  		fatal("setresgid %u: %.100s", (u_int)pw->pw_gid, strerror(errno));
