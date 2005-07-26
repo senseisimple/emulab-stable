@@ -5,9 +5,13 @@
 
 # Notice that this file has spaces instead of tabs at the beginning of lines.
 # A tab in either Bash or tcsh causes it to display all of the possible command completions!
+# Here's a little Emacs keyboard macro to ease the copy-and-paste business:
+    ; Copy a command line, leaving off the whitespace on the beginning of the line.
+    (fset 'copy-command-line [?\M-m ?\C-  ?\C-e ?\C-f C-insert])
+    (global-set-key "\^C\^E" 'copy-command-line)
 
-# By convention, "informational" commands are indented a couple of spaces more.
-## Debugging and problem-solving stuff is double-commented.
+# By convention, optional "informational" commands are indented a couple of spaces more.
+## Debugging and problem-solving stuff is double-# commented.
 
 alias v 'ls -lsF'               # "Verbose" listing
 setenv en emulab.net
@@ -37,18 +41,23 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
           echo 0.000 > /etc/ntp.drift
 
       - Disable the Messenger Service to keep annoying pop-ups away.
-            regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/Messenger
-          regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/Messenger/Start 4
+            cygrunsrv -VQ  Messenger
+          sc config Messenger start= disabled
+          sc stop Messenger
 
       - Disable the SSDP Discovery Service and Universal Plug and Play Device Host.
-        This closes port 5000 to attacks.  Also the Remote Registry service.
-            regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/SSDPSRV
-            regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/upnphost
-            regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/RemoteRegistry
-          # (4 is Disabled, 3 is Manual, 2 is Automatic, 1 is only used for System services.)
-          regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/SSDPSRV/Start 4
-          regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/upnphost/Start 4
-          regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/RemoteRegistry/Start 4
+        This closes port 5000 to attacks.  Also disable the Remote Registry service.
+            cygrunsrv -VQ  SSDPSRV
+            cygrunsrv -VQ  upnphost
+            cygrunsrv -VQ  RemoteRegistry
+
+          sc config SSDPSRV start= disabled
+          sc config upnphost start= disabled
+          sc config RemoteRegistry start= disabled
+
+          sc stop SSDPSRV
+          sc stop upnphost
+          sc stop RemoteRegistry
 
       - Set the workgroup name to EMULAB in Control Panel/System/Computer Name/Change...
         No need to reboot yet.
@@ -120,40 +129,72 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 
         . Set up sshd.  
           - Edit /bin/ssh-host-config to add a -i argument to the "cygrunsrv -I sshd" lines.
+                grep cygrunsrv /bin/ssh-host-config
               ed /bin/ssh-host-config
               /cygrunsrv -I sshd/s//& -i/p
               /cygrunsrv -I sshd/s//& -i/p
               w
               q
-          - Then start a cygwin shell and say:
+          - Then start a cygwin shell, stop sshd and remove its entry, run ssh-host-config:
+	        cygrunsrv -VQ sshd
+	      cygrunsrv -E sshd
+	      cygrunsrv -R sshd
+              # Make sure /etc is writable by root.
+                v -d /etc
+              chown root /etc
               ssh-host-config -y -c "ntsec tty"
-            or run ssh-host-config and answer the following interactive questions:
+                v /etc/ssh*_config
+              chown SYSTEM /etc/ssh*_config
+              chmod 644 /etc/ssh*_config
+
+            or run ssh-host-config without args and answer the following interactive questions:
               Select privilege separation = yes, sshd user = yes, install as service = yes, 
                 CYGWIN=ntsec tty
+              chown SYSTEM /etc/ssh*_config
+              chmod 644 /etc/ssh*_config
+
           - Check for -i flag: look for Interactive = 0x00000001 (1)
               regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/sshd/Parameters
 
           - Edit /etc/sshd_config
             . Add this line: AuthorizedKeysFile /sshkeys/%u/authorized_keys
+                  grep AuthorizedKeysFile /etc/sshd_config
+                # Make it writable to edit, then change it back.
+                chmod g+w /etc/sshd_config
                 ed /etc/sshd_config
-                /AuthorizedKeysFile
-                a
+/AuthorizedKeysFile
+a
 AuthorizedKeysFile /sshkeys/%u/authorized_keys
 .
 w
 q
+                chmod g-w /etc/sshd_config
+
             . LogLevel defaults to INFO, can be set to VERBOSE, DEBUG1, etc.
               Debug events are logged under Event View / Application / sshd,
               One line per event (ugh.)  Refresh to see new events with F5.
+              ## sshd service debugging.
                 ls -l /etc/sshd_config
                 # Check.
                 grep LogLevel /etc/sshd_config
-	        # Make it writable to edit, then change it back.
+                # Make it writable to edit, then change it back.
                 chmod g+w /etc/sshd_config
-                nano /etc/sshd_config
+                ed /etc/sshd_config
+/#LogLevel/a
+LogLevel DEBUG3
+.
+w
+q
                 chmod g-w /etc/sshd_config
                 # Get a running sshd to read the config file with SIGHUP.
                 kill -HUP `cat /var/run/sshd.pid`
+
+          - Check /var/empty to avoid this error:
+              /var/empty must be owned by root and not group or world-writable.
+            Actually, it must be owned by SYSTEM.
+              v -d /var/empty
+            chown SYSTEM /var/empty
+            chmod go-w /var/empty
 
           - Start sshd.
               cygrunsrv -S sshd
@@ -169,8 +210,8 @@ daFluxGroup
               # [On boss.]
               set pc=73
               set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
-	      # This password isn't used for anything else, and doesn't need to be
-	      # very secure because all users are in the Administrators group on the node.
+              # This password isn't used for anything else, and doesn't need to be
+              # very secure because all users are in the Administrators group on the node.
               eval sudo ssh "$ssh_args" root@pc$pc id
 daFluxGroup
               eval sudo scp "$ssh_args" ~root/.ssh/{id_dsa,identity}.pub root@pc$pc":".ssh
@@ -219,7 +260,7 @@ daFluxGroup
               ls -l /etc/ssh*key*
 
             # The following should no longer complain due to nonstandard host keys.
-	    # [On Boss.] 
+            # [On Boss.] 
             rootpc $pc id
 
       - Install tools: WinZip and Emacs.
@@ -228,8 +269,8 @@ daFluxGroup
             sudo scp -rp /share/windows/winzip90.exe root@pc$pc":"/tmp
 
             # Log in as root via RDP.
-	    rootrd $pc
-	    # [On the node, as root.]
+            rootrd $pc
+            # [On the node, as root.]
             # Graphical installer.  Start with WinZip Classic, custon setup, no desktop icon.
             /tmp/winzip90.exe
 
@@ -259,9 +300,9 @@ daFluxGroup
             tar xfz /tmp/boost-include.tgz
 
             # Build Elvin libs with GCC for testbed client programs.  
-	    # [On Boss.]
+            # [On Boss.]
             sudo scp -p /usr/testbed/www/distributions/*elvin*-4.0.3.tar.gz root@pc$pc":"/tmp
-	    # [On the node.]
+            # [On the node.]
             # Need a path without embedded spaces for the make actions to work.
             mkdir C:/elvin
             cd C:/elvin
@@ -354,7 +395,7 @@ daFluxGroup
               "$elvin" -c `cygpath -w /usr/local/etc/elvind.conf`
                   ## Testing: start elvinsvc from the Services Manager now.
               # Make elvinsvc automatic in services manager, or use these commands:
-            	regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/elvinsvc.exe
+                regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/elvinsvc.exe
               # (4 is Disabled, 3 is Manual, 2 is Automatic, 1 is only used for System services.)
               regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/elvinsvc.exe/Start 2
 
@@ -364,8 +405,8 @@ daFluxGroup
                 pid=testbed eid=Windows-1b
                 pid=testbed eid=Windows-1c
               $BINDIR/evproxy -s event-server -e $pid/$eid
-	      
-	      ## program-agent debugging.
+              
+              ## program-agent debugging.
                 ps -Welf | grep program-agent
                 $rc/rc.progagent shutdown
               $rc/rc.progagent boot
@@ -378,19 +419,19 @@ daFluxGroup
                 # [On the node.]
                 tail /tmp/host.txt
                 cat /local/logs/prog0.status
-	      
+              
                 ## C:\cygwin\bin\tcsh.exe (2504): *** couldn't create window, Win32 error 5
                 ## See http://comments.gmane.org/gmane.os.cygwin.patches/2559
                 ## This is at cygwin-1.5.17-1-winsup/cygwin/window.cc:wininfo::winthread():96
                 ## Try starting rc.progagent as a separate service with -i for a desktop.
-	        
+                
                   ## Started up and stopped immediately.  Needs something else in rc.bootsetup.
                   --dep elvinsvc.exe \
-	        
+                
                   ## Depend on EmulabStartup (rc.bootsetup), which depends on the elvin service,
                   ## and also starts evproxy.  But it stops rather than staying running...
                   --dep EmulabStartup \
-	        
+                
                 ## Make it manual, and explicitly start it after rc.bootsetup in EmulabStartup.
                 ## Works, but stays in "starting" state, err in bootsetup.log:
                 ##  cygrunsrv: Error starting a service: QueryServiceStatus:  Win32 error 1053:
@@ -447,7 +488,7 @@ daFluxGroup
       - Get the testbed client code via CVS, build, and install it.
             rootpc $pc
             # [As root, on the node.]
-	    set ws_login=fish@kzin.flux.utah.edu
+            set ws_login=fish@kzin.flux.utah.edu
             # Start an agent and go to your workstation to get your ssh keys for the cvs server.
             eval `ssh-agent -s`
               ssh-add -l
@@ -495,7 +536,7 @@ daFluxGroup
             # [Back on the client:]
             cp -p /tmp/{WSName,addusers,usrtogrp,setx}.exe ~/flux/testbed/tmcd/cygwinxp
 
-	    # Finally ready to do the Emulab makes!
+            # Finally ready to do the Emulab makes!
             mkdir ~/flux/obj-real
             cd ~/flux/obj-real
               v configure.trace*
@@ -559,7 +600,7 @@ if [ ]; then
               -a "--norc --noprofile -c '/usr/local/etc/emulab/tbshutdown'"
 
           # If you see the following, try running rc.accounts or rc.bootsetup below to 
-	  # clear it up.  Haven't figured this out yet...
+          # clear it up.  Haven't figured this out yet...
           ##cygrunsrv: Error installing a service: CreateService:  Win32 error 1057:
           ##The account name is invalid or does not exist, or the password is invalid 
           ##for the account name specified.
@@ -568,7 +609,7 @@ if [ ]; then
           chmod 666 /var/log/EmulabShutdown.log
           regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabShutdown/Parameters
           cygrunsrv -Q EmulabShutdown
-	    # Manual start-up.
+            # Manual start-up.
             cygrunsrv -S EmulabShutdown
 
       . See if rc.bootsetup works.
