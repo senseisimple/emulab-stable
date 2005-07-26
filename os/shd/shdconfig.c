@@ -209,8 +209,10 @@ do_single(argc, argv, action, flags)
         }
         else
         if (strcmp (cp, "-crash") == 0)
+        {
             if (do_io(shd, SHDCRASH, &shio))
                 return (1);
+        }
         else
         if (strcmp (cp, "-r") == 0)
         {       
