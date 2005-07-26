@@ -62,6 +62,41 @@
 
 ;================================================================
 
+;; Compilation key bindings.
+(global-set-key "\^CE" 'compile)                        ; ^C shift-e
+(global-set-key "\^CN" 'next-error)                     ; ^C shift-n
+(global-set-key "\^CP" 'previous-error)                 ; ^C shift-p
+;(global-set-key "\^CK" 'kill-compilation)              ; ^C shift-k
+(global-set-key "\^C}"   'compilation-next-file)        ; ^C shift-[
+(global-set-key "\^C{"   'compilation-previous-file)    ; ^C shift-]
+
+(defun make-this-file-writable ()
+  "Use this when you want to edit a read-only file.  Changes the file permissions,
+   and marks the read-only buffer writable."
+  (interactive)
+  (if (not (file-writable-p buffer-file-name))
+      (set-file-modes buffer-file-name (logior 146   ; 0222, writable file mode.
+                                               (file-modes buffer-file-name))))
+  (setq buffer-read-only nil))
+(global-set-key "\^Cw" 'make-this-file-writable)  ; Bind to ^C-w.
+
+(defun set-c-basic-offset (arg)
+  "Set the amount of C indentation to the prefix arg."
+  (interactive "NC indentation step: ")
+  (setq c-basic-offset arg))
+
+(setq c-mode-common-hook
+      (function (lambda ()
+                  ; ^C-^B for rename-buffer, don't need c-submit-bug-report.
+		  (local-set-key "\^C\^B" 'rename-buffer)
+		  (local-set-key "\^CO" 'set-c-basic-offset) ; Bind to ^C shift-O.
+		  (modify-syntax-entry ?_ "w")  ; Treat underscore as a word char in C.
+                  )))
+(setq auto-mode-alist (append '(("\\.h\\'" . c++-mode)) ; .h files are C++ by default.
+                              auto-mode-alist))
+
+;================================================================
+
 ;; Electric help, avoids mucking up the window layout with the *Help* buffer.
 (require 'ehelp)
 (global-set-key "\C-h" 'ehelp-command)
