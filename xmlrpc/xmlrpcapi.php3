@@ -631,6 +631,53 @@ experiments.
   </table>
 
   <br>
+  <li><tt><b>metadata</b></tt>: Get any metadata associated with the given
+  experiment.  The return value is a hashtable containing fields such as the
+  experiment's description and creation date.
+  <br>
+  <br>
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab experiment ID</td>
+  </tr>
+  </table>
+
+  <br>
+  <li><tt><b>nsfile</b></tt>: Get the NS file associated with the given
+  experiment.
+  <br>
+  <br>
+  The required arguments are:<br><br>
+  <table cellpadding=2>
+  <tr>
+    <th>Name</th><th>Type</th><th>Description</th>
+  </tr>
+  <tr></tr>
+  <tr>
+    <td><tt>proj</tt></td>
+    <td>string</td>
+    <td>The Emulab project ID of the experiment</td>
+  </tr>
+  <tr>
+    <td><tt>exp</tt></td>
+    <td>string</td>
+    <td>The Emulab experiment ID</td>
+  </tr>
+  </table>
+
+  <br>
   <li><tt><b>swapexp</b></tt>: Swap an experiment in or out. The experiment
   must, of course, be in the proper state for requested operation.
   <br>

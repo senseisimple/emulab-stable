@@ -1382,7 +1382,18 @@ class experiment:
             "keyhash",
             "eventkey",
             "sim_reswap_count",
-            "elab_in_elab"
+            "elab_in_elab",
+            "locpiper_port",
+            "locpiper_pid",
+            "usemodelnet",
+            "priority",
+            "modelnet_edges",
+            "modelnet_cores",
+            "elabinelab_nosetup",
+            "event_sched_pid",
+            "wa_bw_solverweight",
+            "wa_plr_solverweight",
+            "wa_delay_solverweight",
             ])
         
         vue = DBQueryFatal("SELECT name,value FROM virt_user_environment "
