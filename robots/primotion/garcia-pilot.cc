@@ -41,6 +41,8 @@
 #include "pilotButtonCallback.hh"
 #include "garciaUtil.hh"
 
+#define DEFAULT_STALL_THRESHHOLD 48.0f
+
 /**
  * The default port to listen for client connections.
  */
@@ -82,15 +84,15 @@ static volatile int brainstemResetRequested = 0;
 static void sigquit(int sig)
 {
     static int quit_count = 3;
-    
+
     if (quit_count == 0) {
 	static char *msg = "error: wedged, aborting...\n";
-        
+
 	write(2, msg, strlen(msg));
 
 	abort();
     }
-    
+
     looping = 0;
     quit_count -= 1;
 }
@@ -115,7 +117,7 @@ static void sigdebug(int sig)
 static void sigpanic(int signum)
 {
     char msg[128];
-    
+
     snprintf(msg, sizeof(msg), "panic: %d; reexec'ing\n", signum);
     write(1, msg, strlen(msg));
 
@@ -125,6 +127,8 @@ static void sigpanic(int signum)
     snprintf(msg, sizeof(msg), "reexec failed %s\n", strerror(errno));
     write(1, msg, strlen(msg));
 #endif
+
+    /* XXX need to stop wheels here */
 
     abort();
 }
@@ -149,7 +153,7 @@ static void usage(void)
 	    BATTERY_LOG_PATH);
 }
 
-/** 
+/**
  * sighandler for USR2 -- reboots the stem modules
  */
 static void sigusr2(int sig) {
@@ -159,9 +163,9 @@ static void sigusr2(int sig) {
 
 class pilotFaultCallback : public faultCallback
 {
-    
+
 public:
-    
+
     pilotFaultCallback(wheelManager &wm) : pfc_wheel_manager(wm) { };
 
     void faultDetected(unsigned long faults)
@@ -175,7 +179,7 @@ public:
 private:
 
     wheelManager &pfc_wheel_manager;
-    
+
 };
 
 int main(int argc, char *argv[])
@@ -187,14 +191,14 @@ int main(int argc, char *argv[])
     int retval = EXIT_SUCCESS;
     unsigned long now, t_offset, t_elapsed, ti_start;
     unsigned long ti_list[1000]; /* list of iteration elapsed times */
-    
+
     float ti_mean, ti_var;
-    
+
     struct timeval tv_last = {0,0};
     struct timeval tv_cur = {0,0};
-    
+
     double tf_last, tf_cur, tf_diff;
-    
+
     FILE *batterylog;
     FILE *sdata_in;
     FILE *plogfilep = NULL;
@@ -253,17 +257,17 @@ int main(int argc, char *argv[])
     /* Bump the priority so it has a good chance of receiving packets. */
     {
 	struct sched_param sp;
-	
+
 	sp.sched_priority = sched_get_priority_min(SCHED_RR);
 	if (sched_setscheduler(0, SCHED_RR, &sp) < 0) {
 	    fprintf(stderr, "warning: cannot set real-time priority\n");
 	}
     }
 #endif
-    
+
     if (logfile) {
 	int logfd;
-        
+
 	if ((logfd = open(logfile, O_CREAT|O_WRONLY|O_APPEND, 0644)) != -1) {
 	    dup2(logfd, 1);
 	    dup2(logfd, 2);
@@ -271,10 +275,10 @@ int main(int argc, char *argv[])
 		close(logfd);
 	}
     }
-    
+
     if (pidfile) {
 	FILE *fp;
-        
+
 	if ((fp = fopen(pidfile, "w")) != NULL) {
 	    (void) fclose(fp);
 	}
@@ -292,13 +296,13 @@ int main(int argc, char *argv[])
 	    fprintf(stderr, "ERROR: cannot open packet log file, %s\n", plogfile);
 	}
     }
-    
-    
-    
+
+
+
     fprintf(stderr, "info: %s\n", build_info);
 
     acpGarcia garcia;
-    
+
     signal(SIGHUP, sigdebug);
 
     signal(SIGQUIT, sigquit);
@@ -307,11 +311,11 @@ int main(int argc, char *argv[])
 
     signal(SIGSEGV, sigpanic);
     signal(SIGBUS, sigpanic);
-    
+
     signal(SIGPIPE, SIG_IGN);
 
     signal(SIGUSR2, sigusr2);
-    
+
     aIO_GetLibRef(&ioRef, &err);
 
     if (!wait_for_brainstem_link(ioRef, garcia)) {
@@ -340,9 +344,9 @@ int main(int argc, char *argv[])
 	garcia.setNamedValue("down-ranger-enable", &av);
 
 	/* set the stall threshhold high */
-	av.set(12.0f);
+	av.set(DEFAULT_STALL_THRESHHOLD);
 	garcia.setNamedValue("stall-threshhold", &av);
-      
+
 	/*
 	 * XXX Clear these values since they can be left in a funny state
 	 * sometimes...
@@ -352,64 +356,64 @@ int main(int argc, char *argv[])
 	garcia.setNamedValue("distance-right", &av);
 	av.set(aGARCIA_ERRFLAG_ABORT);
 	garcia.setNamedValue("status", &av);
-	
+
 	memset(&saddr, 0, sizeof(saddr));
 
-	
+
 	if (1 == ol_demo) {
 	    /* open loop demonstration mode */
-          
+
 	    float e_in = 0.0f, alpha_in = 0.0f, theta_in = 0.0f; /* states */
 	    float C_u, C_omega; /* controller outputs */
-          
+
 	    /* controller parameters: */
 	    float K_gamma = 1.0f, K_h = 1.0f, K_k = 1.0f;
-          
+
 	    float K_radius = 0.0889f;
 	    float vleft, vright;
 	    acpValue av_L;
 	    acpValue av_R;
-          
-	    acpObject *nullb;  
-          
+
+	    acpObject *nullb;
+
 	    int lcount = 0;
-          
-          
-          
+
+
+
 	    if ((sdata_in = fopen(sfile, "r")) == NULL) {
 		fprintf(stderr,
 			"FATAL: Error opening state input file:  %s\n",
 			sfile);
 		exit(1);
 	    }
-          
+
 	    aIO_GetMSTicks(ioRef, &t_offset, NULL);
-          
-          
-        
+
+
+
 	    nullb = garcia.createNamedBehavior("null", NULL);
 	    av.set(0.2f);
 	    nullb->setNamedValue("acceleration", &av);
-          
+
 	    garcia.queueBehavior(nullb);
-          
+
 
 	    /* read states (e,alpha,theta) in from file: */
 	    /* These states will come from the RMCD/EMCD in the future */
 	    while (3 == fscanf(sdata_in, "%f %f %f\n", &e_in, &alpha_in, &theta_in)) {
-          
+
 
 		aIO_GetMSTicks(ioRef, &ti_start, NULL);
-            
+
 		/* controller: */
 		C_u = 0.8 * tanh(K_gamma * cos(alpha_in) * e_in);
-            
+
 		if (0 == alpha_in) {
 		    C_omega = 0.0f;
 		}
 		else {
 		    C_omega = K_k * alpha_in + K_gamma * ((cos(alpha_in)*sin(alpha_in)) / alpha_in) * (alpha_in + K_h * theta_in);
-              
+
 		    if (C_omega > 26.25f) {
 			C_omega = 26.25f;
 		    }
@@ -418,51 +422,51 @@ int main(int argc, char *argv[])
 		    }
 		}
 		/* end controller */
-            
+
 		/* wheel velocity translator: */
 		vleft = C_u - K_radius * C_omega;
 		vright = C_u + K_radius * C_omega;
 		/* end wheel velocity translator */
-            
-            
+
+
 		av_L.set(vleft);
 		av_R.set(vright);
-            
+
 		garcia.setNamedValue("damped-speed-left", &av_L);
 		garcia.setNamedValue("damped-speed-right", &av_R);
-            
+
 		//             vleft = garcia.getNamedValue("damped-speed-left")->getFloatVal();
 		//             vright = garcia.getNamedValue("damped-speed-right")->getFloatVal();
-            
+
 		/*            if (debug) {
 			      fprintf(stderr, "L/R velocities: %f %f\n", vleft, vright);
 			      }*/
-            
-            
+
+
 		/* wait 0.033 (1/30) seconds */
 		garcia.handleCallbacks(33);
 		aIO_GetMSTicks(ioRef, &now, NULL);
 		ti_list[lcount] = now - ti_start;
-            
-		lcount++;          
+
+		lcount++;
 	    }
-          
-          
+
+
 	    /* abort the null primitive: */
 	    av.set(aGARCIA_ERRFLAG_ABORT);
 	    garcia.setNamedValue("status", &av);
-          
-          
+
+
 	    if (sdata_in != NULL) {
 		fclose(sdata_in);
 		sdata_in = NULL;
 	    }
-        
+
 	    aIO_GetMSTicks(ioRef, &now, NULL);
 	    t_elapsed = now - t_offset;
-          
-          
-          
+
+
+
 	    ti_mean = 0.0f;
 	    ti_var = 0.0f;
 	    for (int incr_i = 0; incr_i < lcount; incr_i++) {
@@ -471,17 +475,17 @@ int main(int argc, char *argv[])
 	    }
 	    ti_var = (ti_var - ti_mean*ti_mean / ((float)(lcount))) / ((float)(lcount));
 	    ti_mean = ti_mean / ((float)(lcount));
-          
-          
+
+
 	    if (debug) {
 		fprintf(stderr, "Done with file: read %d lines\n", lcount);
 		fprintf(stderr, "Elapsed time: %d\n", t_elapsed);
 		fprintf(stderr, "Iteration times:\n mean: %f, variance: %f\n", ti_mean, ti_var);
 	    }
-          
+
 	    exit(0);
 	}
-	
+
 	memset(&saddr, 0, sizeof(saddr));
 #if !defined(linux)
 	saddr.sin_len = sizeof(saddr);
@@ -489,7 +493,7 @@ int main(int argc, char *argv[])
 	saddr.sin_family = AF_INET;
 	saddr.sin_port = htons(port);
 	saddr.sin_addr.s_addr = INADDR_ANY;
-	
+
 	if ((serv_sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
 	    perror("socket");
 	}
@@ -511,12 +515,12 @@ int main(int argc, char *argv[])
 	else {
 	    pilotClient::list clients;
 	    fd_set readfds, writefds;
-	    
+
 	    dashboard db(garcia, batterylog);
 	    wheelManager wm(garcia);
 	    pilotButtonCallback pbc(db, wm);
 	    pilotFaultCallback pfc(wm);
-	    
+
 	    FD_ZERO(&readfds);
 	    FD_ZERO(&writefds);
 	    FD_SET(serv_sock, &readfds);
@@ -534,7 +538,7 @@ int main(int argc, char *argv[])
 
 		    /* can't do this in the usr2 handler cause it sleeps */
 		    brainstem_reset(ioRef,modules,2);
-		    
+
 		    brainstemResetRequested = 0;
 
 		}
@@ -549,12 +553,12 @@ int main(int argc, char *argv[])
 		    bool do_telem = db.wasTelemetryUpdated();
 		    pilotClient::iterator i, j;
 		    struct mtp_packet tmp;
-		    
+
 		    if (FD_ISSET(serv_sock, &rreadyfds)) {
 			struct sockaddr_in peer_sin;
 			socklen_t slen;
 			int cfd;
-			
+
 			slen = sizeof(peer_sin);
 			if ((cfd = accept(serv_sock,
 					  (struct sockaddr *)&peer_sin,
@@ -563,20 +567,20 @@ int main(int argc, char *argv[])
 			}
 			else {
 			    pilotClient *pc = new pilotClient(cfd, wm, db);
-			    
+
 			    if (debug) {
 				fprintf(stderr,
 					"debug: connect from %s:%d\n",
 					inet_ntoa(peer_sin.sin_addr),
 					ntohs(peer_sin.sin_port));
 			    }
-			    
+
 			    pc->setFD(&readfds);
 			    pc->setFD(&writefds);
 			    clients.push_back(pc);
 			}
 		    }
-		    
+
 		    if (do_telem) {
 			mtp_init_packet(&tmp,
 					MA_Opcode, MTP_TELEMETRY,
@@ -588,36 +592,36 @@ int main(int argc, char *argv[])
 		    for (i = clients.begin(); i != clients.end(); ) {
 			bool bad_client = false;
 			pilotClient *pc = *i;
-			
+
 			j = i++;
 			if (pc->isFDSet(&rreadyfds)) {
 			    do {
 				struct mtp_packet mp;
-				
+
 				if ((mtp_receive_packet(pc->getHandle(),
 							&mp) !=
 				     MTP_PP_SUCCESS) ||
 				    !pc->handlePacket(&mp, clients)) {
 				    bad_client = true;
 				} else {
-      
+
 				    if (MTP_COMMAND_WHEELS == mp.data.opcode) {
 					/* timestamp */
-                                        
+
 					tv_last = tv_cur;
 					gettimeofday(&tv_cur, NULL);
-            
+
 					tf_last = (double)(tv_last.tv_sec) + (double)(tv_last.tv_usec) / 1000000.0;
 					tf_cur = (double)(tv_cur.tv_sec) + (double)(tv_cur.tv_usec) / 1000000.0;
-            
+
 					tf_diff = tf_cur - tf_last;
-            
+
 					if (plogfilep != NULL) {
 					    fprintf(plogfilep, "%f\n", tf_diff);
 					}
 				    }
 				}
-				
+
 				mtp_free_packet(&mp);
 			    } while (!bad_client &&
 				     pc->getHandle()->mh_remaining);
@@ -636,25 +640,25 @@ int main(int argc, char *argv[])
 				bad_client = true;
 			    }
 			}
-			
+
 			if (bad_client) {
 			    clients.erase(j);
-			    
+
 			    pc->clearFD(&readfds);
 			    pc->clearFD(&writefds);
-			    
+
 			    delete pc;
 			    pc = NULL;
 			}
 		    }
 		}
-		
+
 		garcia.handleCallbacks(5);
 		aIO_GetMSTicks(ioRef, &now, NULL);
 	    } while (looping && db.update(now));
 
 	    garcia.flushQueuedBehaviors();
-	    
+
 	    garcia.handleCallbacks(1000);
 	}
     }
@@ -665,6 +669,16 @@ int main(int argc, char *argv[])
 	fclose(batterylog);
 	batterylog = NULL;
     }
-    
+
+    if (sdata_in != NULL) {
+    fclose(sdata_in);
+    sdata_in = NULL;
+    }
+
+    if (plogfilep != NULL) {
+    fclose(plogfilep);
+    plogfilep = NULL;
+    }
+
     return retval;
 }

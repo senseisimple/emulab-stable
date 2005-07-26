@@ -57,7 +57,7 @@ public:
      * Method called when the behavior starts.
      */
     aErr call();
-    
+
 private:
 
     /**
@@ -69,7 +69,7 @@ private:
      * The behavior this callback is attached to.
      */
     acpObject *sc_behavior;
-    
+
 };
 
 /**
@@ -88,7 +88,7 @@ public:
      * @param callback The wheelManager callback that should be triggered.
      */
     endCallback(wheelManager &wm, acpObject *behavior, wmCallback *callback);
-    
+
     /**
      * Destructor.
      */
@@ -98,24 +98,24 @@ public:
      * Method called when the behavior finishes.
      */
     aErr call();
-    
+
 private:
 
     /**
      * The wheelManager to notify when some motion has finished.
      */
     wheelManager &ec_wheel_manager;
-    
+
     /**
      * The behavior this callback is attached to.
      */
     acpObject *ec_behavior;
-    
+
     /**
      * The wheelManager callback that should be triggered.
      */
     wmCallback *ec_callback;
-    
+
 };
 
 wmCallback::~wmCallback()
@@ -135,7 +135,7 @@ startCallback::~startCallback()
 aErr startCallback::call()
 {
     this->sc_wheel_manager.motionStarted(this->sc_behavior);
-    
+
     return aErrNone;
 }
 
@@ -156,7 +156,7 @@ endCallback::~endCallback()
 aErr endCallback::call()
 {
     int status;
-    
+
     status = this->ec_behavior->
 	getNamedValue("completion-status")->getIntVal();
 
@@ -165,7 +165,11 @@ aErr endCallback::call()
 					  this->ec_callback);
 
     this->ec_callback = NULL;
-    
+
+//     if (debug) {
+//         printf("COMPLETION CALLBACK\n");
+//     }
+
     return aErrNone;
 }
 
@@ -186,10 +190,10 @@ wheelManager::~wheelManager()
 void wheelManager::setSpeed(float speed)
 {
     acpValue av;
-    
+
     if ((speed < MINIMUM_SPEED) || (speed > MAXIMUM_SPEED))
 	speed = DEFAULT_SPEED;
-    
+
     this->wm_speed = speed;
     av.set(speed);
     this->wm_garcia.setNamedValue("speed", &av);
@@ -198,7 +202,7 @@ void wheelManager::setSpeed(float speed)
 acpObject *wheelManager::createPivot(float angle, wmCallback *callback)
 {
     acpObject *retval = NULL;
-    
+
     assert(this->invariant());
 
     /* First, reduce to a single rotation, */
@@ -228,11 +232,11 @@ acpObject *wheelManager::createPivot(float angle, wmCallback *callback)
 
 	av.set(new startCallback(*this, retval));
 	retval->setNamedValue("execute-callback", &av);
-	
+
 	av.set(new endCallback(*this, retval, callback));
 	retval->setNamedValue("completion-callback", &av);
     }
-    
+
     return retval;
 }
 
@@ -257,11 +261,11 @@ acpObject *wheelManager::createMove(float distance, wmCallback *callback)
 
 	av.set(new startCallback(*this, retval));
 	retval->setNamedValue("execute-callback", &av);
-	
+
 	av.set(new endCallback(*this, retval, callback));
 	retval->setNamedValue("completion-callback", &av);
     }
-    
+
     return retval;
 }
 
@@ -296,7 +300,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
     this->wm_garcia.setNamedValue("front-ranger-threshold", &av);
     av.set(REAR_RANGER_THRESHOLDS[tl]);
     this->wm_garcia.setNamedValue("rear-ranger-threshold", &av);
-    
+
     mgt = this->wm_dashboard->getTelemetry();
     diff = fabsf(mgt->rear_ranger_left - mgt->rear_ranger_right);
     if (diff > 0.08f) {
@@ -319,7 +323,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 	/* Skipping everything. */
 	if (callback != NULL) {
 	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE, 0);
-	    
+
 	    delete callback;
 	    callback = NULL;
 	}
@@ -332,7 +336,7 @@ void wheelManager::setDestination(float x, float y, wmCallback *callback)
 	    this->wm_garcia.queueBehavior(pivot);
 	    pivot = NULL;
 	}
-	
+
 	this->wm_garcia.queueBehavior(move);
 	move = NULL;
 	this->wm_moving = true;
@@ -346,7 +350,7 @@ void wheelManager::setOrientation(float orientation, wmCallback *callback)
     if ((pivot = this->createPivot(orientation, callback)) == NULL) {
 	if (callback != NULL) {
 	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE, 0);
-	    
+
 	    delete callback;
 	    callback = NULL;
 	}
@@ -359,19 +363,18 @@ void wheelManager::setOrientation(float orientation, wmCallback *callback)
 }
 
 
-/* DAN */
 void wheelManager::startNULL(float accel, wmCallback *callback) {
     /* Start the NULL primitive only if the garcia is idle */
-    
+
     assert(this->invariant());
-  
+
     if (this->wm_garcia.getNamedValue("idle")->getBoolVal()) {
-  
+
 	acpValue av;
 	acpObject *nullb = NULL;
-  
+
 	nullb = this->wm_garcia.createNamedBehavior("null", NULL);
-  
+
 	av.set((float)(accel)); /* Do I really need to force it to a float? */
 	nullb->setNamedValue("acceleration", &av);
 
@@ -383,69 +386,69 @@ void wheelManager::startNULL(float accel, wmCallback *callback) {
 
 	if (nullb == NULL && callback != NULL) {
 	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE, 0);
-        
+
 	    delete callback;
 	    callback = NULL;
 	}
 	else {
-	    this->wm_garcia.queueBehavior(nullb);    
+	    this->wm_garcia.queueBehavior(nullb);
 	    nullb = NULL;
 	}
     }
-    
-    
+
+
 }
-    
-    
-    
+
+
+
 void wheelManager::setWheels(float vl, float vr) {
 
     acpValue av_L;
     acpValue av_R;
-    
+
     float maxspeed = 0.0f;
-    
+
     if (fabsf(vl) >= fabsf(vr)) {
 	maxspeed = fabsf(vl) * 100.0;
     }
     else {
 	maxspeed = fabsf(vr) * 100.0;
     }
-  
+
     if (fabsf(vl) < 0.01) {
 	vl = 0.0f;
     }
-    
+
     if (fabsf(vr) < 0.01) {
 	vr = 0.0f;
     }
-    
+
     if (vl > MAX_WHEELSPEED) {
 	vl = MAX_WHEELSPEED;
     }
     if (vl < -MAX_WHEELSPEED) {
 	vl = -MAX_WHEELSPEED;
     }
-    
+
     if (vr > MAX_WHEELSPEED) {
 	vr = MAX_WHEELSPEED;
     }
     if (vr < -MAX_WHEELSPEED) {
 	vr = -MAX_WHEELSPEED;
     }
-    
+
     av_L.set((float)(vl));
     av_R.set((float)(vr));
-            
+
     this->wm_garcia.setNamedValue("damped-speed-left", &av_L);
     this->wm_garcia.setNamedValue("damped-speed-right", &av_R);
-    
-    
+
+
     /* handle fault detection */
     this->wm_dashboard->setDistanceLimit(10000.0f);
     this->wm_dashboard->setVelocityLimit(maxspeed);
     this->wm_moving = true;
-    
+
 }
 
 
@@ -453,18 +456,18 @@ void wheelManager::setWheels(float vl, float vr) {
 bool wheelManager::stop(void)
 {
     acpValue av;
-    
+
     av.set((float)(0.0));
     this->wm_garcia.setNamedValue("damped-speed-left", &av);
     this->wm_garcia.setNamedValue("damped-speed-right", &av);
-  
-  
+
+
     this->wm_garcia.flushQueuedBehaviors();
 
     if (debug) {
 	fprintf(stderr, "debug: STOP WHEELS\n");
     }
-    
+
     return this->wm_moving;
 }
 
@@ -472,7 +475,7 @@ void wheelManager::motionStarted(acpObject *behavior)
 {
     float distance;
     acpValue *av;
-    
+
     if (debug) {
 	fprintf(stderr, "debug: motion started\n");
     }
@@ -489,7 +492,7 @@ void wheelManager::motionStarted(acpObject *behavior)
 	if (debug) {
 	    fprintf(stderr, "debug: clear error LED\n");
 	}
-	
+
 	this->wm_dashboard->remUserLEDClient(&this->wm_error_notice);
 	this->wm_last_status = 0;
     }
@@ -503,13 +506,17 @@ void wheelManager::motionFinished(acpObject *behavior,
 				  wmCallback *callback)
 {
     float odometer = 0.0f;
-    
+
     if (debug) {
-	fprintf(stderr, "debug: motion finished -- %d\n", status);
+	fprintf(stderr, "debug: motion finished with status %d\n", status);
     }
 
     if (status == aGARCIA_ERRFLAG_STALL) {
 	float distance = behavior->getNamedValue("distance")->getFloatVal();
+
+    if (debug) {
+        fprintf(stderr, "debug: STALL at %f\n", distance);
+    }
 
 	this->wm_dashboard->getTelemetry()->stall_contact =
 	    (distance < 0) ? -1 : 1;
@@ -517,19 +524,19 @@ void wheelManager::motionFinished(acpObject *behavior,
     else {
 	this->wm_dashboard->getTelemetry()->stall_contact = 0;
     }
-    
+
     if (status != aGARCIA_ERRFLAG_WONTEXECUTE) {
 	float left_odometer, right_odometer;
-	
+
 	if ((status != aGARCIA_ERRFLAG_NORMAL) &&
 	    (status != aGARCIA_ERRFLAG_ABORT)) {
 	    if (debug) {
 		fprintf(stderr, "debug: set error LED\n");
 	    }
-	    
+
 	    this->wm_dashboard->addUserLEDClient(&this->wm_error_notice);
 	}
-	
+
 	this->wm_dashboard->endMove(left_odometer, right_odometer);
 	if ((left_odometer / fabsf(left_odometer)) ==
 	    (right_odometer / fabsf(right_odometer))) {
@@ -539,20 +546,20 @@ void wheelManager::motionFinished(acpObject *behavior,
 		   right_odometer / right_odometer);
 	    odometer = left_odometer;
 	}
-	
+
 	this->wm_dashboard->remUserLEDClient(&this->wm_moving_notice);
-	
+
 	this->wm_last_status = status;
     }
 
     this->wm_dashboard->setVelocityLimit(faultDetection::IDLE_VELOCITY_LIMIT);
     this->wm_dashboard->setDistanceLimit(faultDetection::IDLE_DISTANCE_LIMIT);
-    
+
     if (callback != NULL) {
 	this->wm_moving = false; // XXX This assumes callbacks on the last move
-	
+
 	callback->call(this->wm_last_status, odometer);
-	
+
 	delete callback;
 	callback = NULL;
     }

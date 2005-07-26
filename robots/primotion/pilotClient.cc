@@ -18,7 +18,7 @@
 #include "garciaUtil.hh"
 #include "pilotClient.hh"
 
-
+#define DEFAULT_ROBOT_ACCELERATION 0.4f
 
 /**
  * Callback passed to the wheelManager when performing movements.
@@ -108,7 +108,7 @@ void pilotMoveCallback::call(int status, float odometer)
 	 i != this->pmc_notify_list.end();
 	 i++) {
 	pilotClient *pc = *i;
-	
+
 	mtp_send_packet(pc->getHandle(), &mp);
     }
 }
@@ -134,7 +134,7 @@ pilotClient::~pilotClient()
 	if (debug) {
 	    fprintf(stderr, "debug: rmc client disconnected\n");
 	}
-	
+
 	this->pc_wheel_manager.stop();
 	pc_rmc_client = NULL;
     }
@@ -176,9 +176,9 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    "debug: rmc client connected - %s\n",
 			    mp->data.mtp_payload_u.init.msg);
 		}
-		
+
 		pilotClient::pc_rmc_client = this;
-		
+
 		retval = true;
 	    }
 	    break;
@@ -188,33 +188,33 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			"debug: emulab client connected - %s\n",
 			mp->data.mtp_payload_u.init.msg);
 	    }
-	    
+
 	    retval = true;
 	    break;
 	}
 	break;
-	
+
     case MTP_COMMAND_GOTO:
 	if (this->pc_role == MTP_ROLE_RMC) {
 	    pilotClient::iterator i;
 	    struct mtp_packet cmp;
-	    
+
 	    mcg = &mp->data.mtp_payload_u.command_goto;
-	    
+
 	    cmp = *mp;
 	    cmp.role = MTP_ROLE_ROBOT;
 	    for (i = notify_list.begin(); i != notify_list.end(); i++) {
 		pilotClient *pc = *i;
-		
+
 		if (pc->getRole() == MTP_ROLE_EMULAB) {
 		    mtp_send_packet(pc->getHandle(), &cmp);
 		}
 	    }
-	    
+
 	    if ((mcg->position.x != 0.0) || (mcg->position.y != 0.0)) {
 		acpValue av;
 		float theta;
-		
+
 		if (debug) {
 		    fprintf(stderr,
 			    "debug: move to %f %f\n",
@@ -239,7 +239,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    "debug: reorient to %f\n",
 			    mcg->position.theta);
 		}
-		
+
 		this->pc_wheel_manager.setSpeed(mcg->speed);
 		this->pc_wheel_manager.setOrientation(
 						      mcg->position.theta,
@@ -247,7 +247,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 									    mcg->command_id,
 									    mcg->position.theta));
 	    }
-	    
+
 	    retval = true;
 	}
 	break;
@@ -257,13 +257,13 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    struct mtp_packet cmp, rmp;
 	    pilotClient::iterator i;
 	    bool send_idle = false;
-	    
+
 	    mcs = &mp->data.mtp_payload_u.command_stop;
-	    
+
 	    if (debug) {
 		fprintf(stderr, "debug: full stop\n");
 	    }
-	    
+
 	    if (!this->pc_wheel_manager.stop()) {
 		mtp_init_packet(&rmp,
 				MA_Opcode, MTP_UPDATE_POSITION,
@@ -285,38 +285,38 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		if (send_idle)
 		    mtp_send_packet(pc->getHandle(), &rmp);
 	    }
-	    
+
 	    retval = true;
 	}
 	break;
 	/* DAN */
     case MTP_COMMAND_WHEELS:
 	if (this->pc_role == MTP_ROLE_RMC) {
-            
+
 	    mcw = &mp->data.mtp_payload_u.command_wheels;
-          
+
 	    if (debug > 1) {
 		fprintf(stderr,
 			"debug: set wheels to: %f %f\n",
 			mcw->vleft,
 			mcw->vright);
 	    }
-            
+
 	    /* start NULL command (if needed) */
 	    /* FIXME: need to configure acceleration here */
 	    /* I don't care about command_id or theta! */
-	    this->pc_wheel_manager.startNULL(0.2f, 
+	    this->pc_wheel_manager.startNULL(DEFAULT_ROBOT_ACCELERATION,
 					     new pilotMoveCallback(notify_list,
 								   mcw->command_id, 0.0f));
-            
+
 	    this->pc_wheel_manager.setWheels(mcw->vleft, mcw->vright);
 	    retval = true;
-            
-	}      
-	break; 
+
+	}
+	break;
 
 
-        
+
     case MTP_REQUEST_REPORT:
 	{
 	    struct mtp_garcia_telemetry *mgt;
@@ -324,7 +324,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	    pilotClient::iterator i;
 	    struct mtp_packet cmp;
 	    int count = 0;
-	    
+
 	    mgt = this->pc_dashboard.getTelemetry();
 
 	    if ((mgt->front_ranger_left != 0.0) &&
@@ -355,13 +355,13 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		points[count].y = sin(M_PI_2) * mgt->side_ranger_left;
 		count += 1;
 	    }
-	    
+
 	    if (mgt->side_ranger_right != 0.0) {
 		points[count].x = cos(-M_PI_2) * mgt->side_ranger_right;
 		points[count].y = sin(-M_PI_2) * mgt->side_ranger_right;
 		count += 1;
 	    }
-	    
+
 	    if ((mgt->rear_ranger_left != 0.0) &&
 		(mgt->rear_ranger_right != 0.0)) {
 		float min_range;
@@ -396,13 +396,13 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 			    MA_ContactPointCount, count,
 			    MA_ContactPoints, points,
 			    MA_TAG_DONE);
-	    
+
 	    for (i = notify_list.begin(); i != notify_list.end(); i++) {
 		pilotClient *pc = *i;
 
 		mtp_send_packet(pc->getHandle(), &cmp);
 	    }
-	    
+
 	    retval = true;
 	}
 	break;
@@ -411,6 +411,6 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	fprintf(stderr, "warning: unhandled opcode - %d\n", mp->data.opcode);
 	break;
     }
-    
+
     return retval;
 }
