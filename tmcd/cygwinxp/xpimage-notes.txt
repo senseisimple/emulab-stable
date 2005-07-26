@@ -139,17 +139,26 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 	        cygrunsrv -VQ sshd
 	      cygrunsrv -E sshd
 	      cygrunsrv -R sshd
+
+              # May need to do some unmounts before running ssh-host-config.
+              # It does a mount, and there's a hard-wired limit of 31 mount table entries.
+              mount | wc -l
+                ## mount: /ssh-host-config.3048: Too many mount entries
+                for s in /users/s*; do umount $s; done
+
+              # Should be NO ssh processes running.
+              ps -Welf | grep ssh
+
               # Make sure /etc is writable by root.
                 v -d /etc
               chown root /etc
-              ssh-host-config -y -c "ntsec tty"
-                v /etc/ssh*_config
-              chown SYSTEM /etc/ssh*_config
-              chmod 644 /etc/ssh*_config
 
-            or run ssh-host-config without args and answer the following interactive questions:
-              Select privilege separation = yes, sshd user = yes, install as service = yes, 
-                CYGWIN=ntsec tty
+              ssh-host-config -y -c "ntsec tty"
+              # or run ssh-host-config without args and answer the following interactive questions:
+              # Select privilege separation = yes, sshd user = yes, install as service = yes, 
+              # CYGWIN=ntsec tty
+
+                v /etc/ssh*_config
               chown SYSTEM /etc/ssh*_config
               chmod 644 /etc/ssh*_config
 
@@ -157,7 +166,7 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
               regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/sshd/Parameters
 
           - Edit /etc/sshd_config
-            . Add this line: AuthorizedKeysFile /sshkeys/%u/authorized_keys
+            . Add AuthorizedKeysFile paths under /sshkeys/%u .
                   grep AuthorizedKeysFile /etc/sshd_config
                 # Make it writable to edit, then change it back.
                 chmod g+w /etc/sshd_config
@@ -165,10 +174,13 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 /AuthorizedKeysFile
 a
 AuthorizedKeysFile /sshkeys/%u/authorized_keys
+AuthorizedKeysFile2 /sshkeys/%u/authorized_keys2
 .
 w
 q
                 chmod g-w /etc/sshd_config
+                # Get a running sshd to read the config file with SIGHUP.
+                kill -HUP `cat /var/run/sshd.pid`
 
             . LogLevel defaults to INFO, can be set to VERBOSE, DEBUG1, etc.
               Debug events are logged under Event View / Application / sshd,
@@ -181,7 +193,7 @@ q
                 chmod g+w /etc/sshd_config
                 ed /etc/sshd_config
 /#LogLevel/a
-LogLevel DEBUG3
+LogLevel DEBUG2
 .
 w
 q
@@ -488,7 +500,10 @@ daFluxGroup
       - Get the testbed client code via CVS, build, and install it.
             rootpc $pc
             # [As root, on the node.]
-            set ws_login=fish@kzin.flux.utah.edu
+            login_name=fish ws_name=kzin domain=flux.utah.edu
+            ws_login=$login_name@$ws_name.$domain
+            cvs_login=$login_name@cvs.$domain
+
             # Start an agent and go to your workstation to get your ssh keys for the cvs server.
             eval `ssh-agent -s`
               ssh-add -l
@@ -496,11 +511,13 @@ daFluxGroup
               ssh-add -l
             kdsa
             exit
-              ssh -v $ws_login id
+
+            ssh $cvs_login id
+              ssh -v $cvs_login id
 
               mkdir ~/flux
             cd ~/flux
-            export CVSROOT=$ws_login:/usr/flux/CVS CVS_RSH=ssh
+            export CVSROOT=$cvs_login:/usr/flux/CVS CVS_RSH=ssh
 
               # First time only
               mkdir CVS; touch CVS/Entries; echo . > CVS/Repository
@@ -661,6 +678,49 @@ if [ ]; then
                 regtool unset /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME
           # Check that setx.exe is in system32.
           v C:/WINDOWS/system32/setx.exe
+
+      . Patch sshd so that shares (including /users homedirs) work with public-key logins.
+
+        - RDP into a node as root and shut down all ssh processes before update.
+            net stop sshd
+            ps -Welf | grep ssh
+
+        - Go through Cygwin setup and make sure everything is updated.
+          Also select src for openssh, which goes under /usr/src .
+            /cygdrive/c/software/cygwin/setup.exe &
+          When base dll's are updated, it will tell you to reboot.  Do it.
+
+        - Install the source patch.
+            (cd ~/flux; cvs update testbed/tmcd/cygwinxp)
+              (cd ~/flux; cvs co testbed/tmcd/cygwinxp)
+          cd /usr/src/openssh*
+          cp -p uidswap.c{,.orig}
+            patch -p1 --dry-run < ~/flux/testbed/tmcd/cygwinxp/uidswap.c.patch
+          patch -p1 -b < ~/flux/testbed/tmcd/cygwinxp/uidswap.c.patch
+
+        - Configure.  Takes a while.
+            # These are the options that contrib/cygwin/README specifies:
+            prefix=/usr sbindir=/usr/sbin datadir=$prefix/share
+            ./configure > configure.trace 2>&1 \
+                --prefix=/usr \
+                --sysconfdir=/etc \
+                --libexecdir=${sbindir} \
+                --localstatedir=/var \
+                --datadir=${prefix}/share \
+                --mandir=${datadir}/man \
+                --infodir=${datadir}/info
+              tail configure.trace
+
+        - Just make and install sshd.exe, assuming everything else is up-to-date.
+            make sshd.exe > make.log.1 2>&1
+              tail make.log.1
+
+            # Make sure sshd is closed down while installing.
+            ps -Welf | grep sshd
+            net stop sshd
+            /usr/bin/install -c -m 0755 -s sshd /usr/sbin/sshd.exe
+            net start sshd
+
 
 ================================================================
 Making images
