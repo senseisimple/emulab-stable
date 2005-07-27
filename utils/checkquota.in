@@ -112,7 +112,10 @@ open(QUOTA, "$SSHTB -host $CONTROL $QUOTACMD -q -l $user |") or
 	"    Could not invoke $QUOTACMD on $CONTROL!\n");
 
 while (<QUOTA>) {
-    if ($_ =~ /limit reached on ([-\w\/]*)$/) {
+    if (($_ =~ /limit reached on ([-\w\/]*)$/) ||
+	($_ =~ /grace period on ([-\w\/]*)$/) ||
+	($_ =~ /Over file quota on ([-\w\/]*)$/) ||
+	($_ =~ /Over block quota on ([-\w\/]*)$/)) {
 	print STDOUT "*** Disk Quota exceeded on $1\n";
 	$overquota++;
     }
