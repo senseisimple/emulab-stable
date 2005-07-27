@@ -221,7 +221,7 @@ function WRITEPLABBOTTOMBAR() {
 # sees depends on the login status and the DB status.
 #
 function WRITESIDEBAR() {
-    global $login_status, $login_uid;
+    global $login_status, $login_uid, $pid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $WIKIURL;
     global $BUGDBSUPPORT, $BUGDBURL;
     global $CHECKLOGIN_WIKINAME;
@@ -388,8 +388,26 @@ function WRITESIDEBAR() {
 		}
 	    
 		if ($BUGDBSUPPORT) {
+		    if (isset($pid) && !empty($pid)) {
+			$bugdburl = "gotobugdb.php3?project_title=$pid";
+		    }
+		    else {
+			$query_result = DBQueryFatal(
+			    "select pid from group_membership where ".
+			    "uid='$login_uid' and pid=gid and trust!='none' ".
+			    "order by date_approved asc limit 1");
+			if (mysql_num_rows($query_result) == 0) {
+			    $bugdburl = "gotobugdb.php3";
+			}
+			else {
+			    $row = mysql_fetch_array($query_result);
+			    $bugdburl = "gotobugdb.php3?project_title=" .
+				$row[pid];
+			}
+		    }
 		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
-			       "gotobugdb.php3", "gotobugdb.php3");
+					       $bugdburl,
+					       $bugdburl);
 		}
 	    
 		WRITESIDEBARBUTTON("Update User Information",
@@ -418,8 +436,26 @@ function WRITESIDEBAR() {
 		}
 
 		if ($BUGDBSUPPORT) {
+		    if (isset($pid) && !empty($pid)) {
+			$bugdburl = "gotobugdb.php3?project_title=$pid";
+		    }
+		    else {
+			$query_result = DBQueryFatal(
+			    "select pid from group_membership where ".
+			    "uid='$login_uid' and pid=gid and trust!='none' ".
+			    "order by date_approved asc limit 1");
+			if (mysql_num_rows($query_result) == 0) {
+			    $bugdburl = "gotobugdb.php3";
+			}
+			else {
+			    $row = mysql_fetch_array($query_result);
+			    $bugdburl = "gotobugdb.php3?project_title=" .
+				$row[pid];
+			}
+		    }
 		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
-			       "gotobugdb.php3", "gotobugdb.php3");
+					       $bugdburl,
+					       $bugdburl);
 		}
 	    
                 # Since a user can be a member of more than one project,

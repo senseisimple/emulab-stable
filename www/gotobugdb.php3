@@ -14,16 +14,24 @@ if (!$BUGDBSUPPORT) {
 # No Pageheader since we spit out a redirection below.
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|
-	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY);
+	      CHECKLOGIN_WEBONLY|CHECKLOGIN_WIKIONLY); # XXX BUGDBONLY ?
+
+#
+# The project to zap to on the other side
+#
+if (isset($project_title) && $project_title == "") {
+    unset($project_title);
+}
 
 #
 # Look for our cookie. If the browser has it, then there is nothing
-# more to do; just redirect the user over to the wiki.
+# more to do; just redirect the user over to the bugdb.
 #
 if (isset($_COOKIE[$BUGDBCOOKIENAME])) {
     $myhash = $_COOKIE[$BUGDBCOOKIENAME];
     
-    header("Location: ${BUGDBURL}?username=${uid}&bosscred=${myhash}");
+    header("Location: ${BUGDBURL}?username=${uid}&bosscred=${myhash}" .
+	   (isset($project_title) ? "&project_title=${project_title}" : ""));
     return;
 }
 
@@ -36,5 +44,6 @@ $myhash = GENHASH();
 SUEXEC("nobody", "nobody", "bugdbxlogin $uid $myhash", SUEXEC_ACTION_DIE);
 
 setcookie($BUGDBCOOKIENAME, $myhash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
-header("Location: ${BUGDBURL}?do=authenticate&username=${uid}&bosscred=${myhash}&prev_page=${BUGDBURL}");
+header("Location: ${BUGDBURL}?do=authenticate&username=${uid}&bosscred=${myhash}&prev_page=${BUGDBURL}" .
+       (isset($project_title) ? "&project_title=${project_title}" : ""));
 ?>
