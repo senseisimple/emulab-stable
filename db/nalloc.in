@@ -78,6 +78,7 @@ my @oldnodes	  = ();
 my @nodes	  = ();
 my @need_consetup = 0;
 my @need_history  = ();
+my @need_clearbl  = ();
 
 TBDebugTimeStamp("nalloc started");
 #
@@ -164,6 +165,8 @@ foreach my $n (@node_names) {
     else {
 	# Freshly allocated nodes need a history entry.
 	push(@need_history, $n);
+        # ... and need to have their bootlogs purged.
+        push(@need_clearbl, $n);
     }
 
     #
@@ -222,6 +225,14 @@ if (!$error && (!$noalloc || $partial) && @nodes) {
 
     foreach my $n (@need_history) {
 	TBSetNodeHistory($n, TB_NODEHISTORY_OP_ALLOC, $UID, $pid, $eid);
+    }
+
+    # Clear boot logs - maybe this should be done before alloc?
+    #  - only a small window of opportunity at any rate.
+    # This is sort of wasteful as it should be the same set of nodes
+    # as in the node history loop above, but that could change at some point.
+    foreach my $n (@need_clearbl) {
+        DBQueryWarn("delete from node_bootlogs where node_id='$n'");
     }
 }
 
