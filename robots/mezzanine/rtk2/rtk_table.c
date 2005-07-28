@@ -1,12 +1,6 @@
 /*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- */
-
-/*
  *  RTK2 : A GUI toolkit for robotics
- *  Copyright (C) 2001  Andrew Howard  ahoward@usc.edu
+ *  Copyright (C) 2001, 2005  Andrew Howard  ahoward@usc.edu
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -27,7 +21,7 @@
 /*
  * Desc: Rtk table functions
  * Author: Andrew Howard
- * CVS: $Id: rtk_table.c,v 1.2 2005-05-10 15:25:17 johnsond Exp $
+ * CVS: $Id: rtk_table.c,v 1.3 2005-07-28 20:54:21 stack Exp $
  */
 
 #include <assert.h>
@@ -139,5 +133,58 @@ int rtk_tableitem_get_int(rtk_tableitem_t *item)
   if (item->table->destroyed)
     return item->value;
   item->value = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(item->spin));
+  return item->value;
+}
+
+
+
+// Create a new item in the table
+rtk_tableitem_t *rtk_tableitem_create_float(rtk_table_t *table,
+                                          const char *label, float low, float high, float incr)
+{
+  rtk_tableitem_t *item;
+  
+  item = malloc(sizeof(rtk_tableitem_t));
+  item->table = table;
+  RTK_LIST_APPEND(table->item, item);
+
+  // Create the gtk objects
+  item->label = gtk_label_new(label);
+  item->adj = gtk_adjustment_new(0, low, high, incr, 10, 10);
+  item->spin = gtk_spin_button_new(GTK_ADJUSTMENT(item->adj), incr, 3);
+  // gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(item->spin), TRUE); 
+
+  // Resize the table to make it big enough
+  if (table->item_count >= table->row_count)
+    gtk_table_resize(GTK_TABLE(table->table), ++table->row_count, 2);
+  
+  // Now stick the item in the table
+  gtk_table_attach(GTK_TABLE(table->table), item->label,
+                   0, 1, table->item_count, table->item_count + 1,
+                   GTK_FILL, GTK_FILL, 0, 0);
+  gtk_table_attach(GTK_TABLE(table->table), item->spin,
+                   1, 2, table->item_count, table->item_count + 1,
+                   GTK_EXPAND | GTK_FILL, GTK_FILL, 0, 0);
+  table->item_count++;
+
+  return item;
+}
+
+
+// Set the value of a table item
+void rtk_tableitem_set_float(rtk_tableitem_t *item, float value)
+{
+  if (item->table->destroyed)
+    return;
+  gtk_spin_button_set_value(GTK_SPIN_BUTTON(item->spin), value);
+}
+
+
+// Get the value of a table item
+float rtk_tableitem_get_float(rtk_tableitem_t *item)
+{
+  if (item->table->destroyed)
+    return item->value;
+  item->value = gtk_spin_button_get_value_as_float(GTK_SPIN_BUTTON(item->spin));
   return item->value;
 }

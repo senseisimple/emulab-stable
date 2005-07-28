@@ -1,9 +1,3 @@
-/*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- */
-
 /* 
  *  Mezzanine - an overhead visual object tracker.
  *  Copyright (C) Andrew Howard 2002
@@ -27,7 +21,7 @@
  * Desc: Assign identities to blobs
  * Author: Andrew Howard
  * Date: 21 Apr 2002
- * CVS: $Id: ident.c,v 1.3 2005-05-10 15:25:16 johnsond Exp $
+ * CVS: $Id: ident.c,v 1.4 2005-07-28 20:54:19 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -37,7 +31,7 @@
 #include "geom.h"
 #include "opt.h"
 #include "mezzanine.h"
-
+#include <stdio.h>
 
 // Find the nearest blob
 mezz_blob_t *ident_get_nearest(mezz_bloblist_t *bloblist, int class,
@@ -46,6 +40,7 @@ mezz_blob_t *ident_get_nearest(mezz_bloblist_t *bloblist, int class,
 // Ident information
 typedef struct
 {
+    mezz_mmap_t *mmap;
   mezz_objectlist_t *objectlist;     // List of objects in the current frame
 } ident_t;
 
@@ -60,9 +55,11 @@ int ident_init(mezz_mmap_t *mmap)
   //char key[64];
   //const char *value;
   mezz_object_t *object;
-  
+
   ident = malloc(sizeof(ident_t));
   memset(ident, 0, sizeof(ident_t));
+
+  ident->mmap = mmap;
 
   // Use the mmap'ed object list
   ident->objectlist = &mmap->objectlist;
@@ -102,49 +99,80 @@ mezz_objectlist_t *ident_update(mezz_bloblist_t *bloblist)
   mezz_blob_t *ablob, *bblob;
   double mx, my, dx, dy;
 
+  //printf("b\n");
+
   for (i = 0; i < ident->objectlist->count; i++)
   {
-    object = ident->objectlist->objects + i;
-    object->missed++;
-	object->valid = 0;
+      object = ident->objectlist->objects + i;
+      object->missed++;
+      object->valid = 0;
+      ablob = bblob = NULL;
 
-    if (object->missed <= object->max_missed)
-      ablob = ident_get_nearest(bloblist, object->class[0],
-                                object->max_disp, object->px, object->py);
-    else
-      ablob = ident_get_nearest(bloblist, object->class[0],
-                                1e16, object->px, object->py);
-    if (ablob == NULL)
-      continue;
-    bblob = ident_get_nearest(bloblist, object->class[1],
-                              object->max_sep, ablob->wox, ablob->woy);
-    if (bblob == NULL)
-      continue;
-
-    mx = (bblob->wox + ablob->wox)/ 2;
-    my = (bblob->woy + ablob->woy)/ 2;
-    dx = (bblob->wox - ablob->wox);
-    dy = (bblob->woy - ablob->woy);
-
-	object->valid = 1;
-
-    object->missed = 0;
-    object->px = mx;
-    object->py = my;
-    object->pa = atan2(dy, dx);
-    // we're seeing 0 to 180 and -1 to -179: fix:
-    if (object->pa < 0.0) {
-        object->pa += 2.0*M_PI;
-    }
-
-    // Assign the blobs to this object
-    ablob->object = i;
-    bblob->object = i;
+      if (object->missed <= object->max_missed) {
+/* 	  printf("x: %d\n",i); */
+	  ablob = ident_get_nearest(bloblist, object->class[0],
+				    object->max_disp, object->px, object->py);
+      }
+      else {
+	  ablob = ident_get_nearest(bloblist, object->class[0],
+				    1e16, object->px, object->py);
+      }
+      if (ablob == NULL) {
+	  continue;
+      }
+      bblob = ident_get_nearest(bloblist, object->class[1],
+				object->max_sep, ablob->wox, ablob->woy);
+      if (bblob == NULL) {
+/* 	  printf("y\n"); */
+	  continue;
+      }
+      
+      mx = (bblob->wox + ablob->wox)/ 2;
+      my = (bblob->woy + ablob->woy)/ 2;
+      dx = (bblob->wox - ablob->wox);
+      dy = (bblob->woy - ablob->woy);
+      
+#if 0
+      printf("a(%f,%f) b(%f,%f) -- %f %f\n",
+ 	     ablob->ox, ablob->oy,
+ 	     bblob->ox, bblob->oy,
+ 	     mx,my);
+#endif
+      
+      object->valid = 1;
+/*       printf("went valid on %d\n",i); */
+      object->ablob = *ablob;
+      object->bblob = *bblob;
+      
+      object->missed = 0;
+      object->px = mx;
+      object->py = my;
+      object->pa = atan2(dy, dx);
+      // we're seeing 0 to 180 and -1 to -179: fix:
+      if (object->pa < 0.0) {
+	  object->pa += 2.0*M_PI;
+      }
+      
+      // Assign the blobs to this object
+      //printf("assigned %d to a/b blobs; bloblist == 0x%x\n",i,bloblist);
+      ablob->object = i;
+      bblob->object = i;
   }
 
+  // this code is no longer necessary
+  
+  // copy the bloblist to ipc seg
+  // this saves the blobs
+  /*   if (bloblist == NULL) { */
+  /*       printf("bloblist == null\n"); */
+  /*   } */
+  /*   else { */
+  /*       ident->mmap->bloblist = *bloblist; */
+  /*   } */
+  
   return ident->objectlist;
 }
-  
+
 
 // Find the nearest blob
 mezz_blob_t *ident_get_nearest(mezz_bloblist_t *bloblist, int class,
@@ -175,6 +203,9 @@ mezz_blob_t *ident_get_nearest(mezz_bloblist_t *bloblist, int class,
       min_blob = blob;
       min_dr = dr;
     }
+/*     else { */
+/* 	printf("not good: %f %f %f, on %f\n",dx,dy,dr,min_dr); */
+/*     } */
   }
   
   return min_blob;

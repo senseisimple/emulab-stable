@@ -21,7 +21,7 @@
  * Desc: Display the both raw and processed frame data
  * Author: Andrew Howard
  * Date: 11 Apr 2002
- * CVS: $Id: image.c,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: image.c,v 1.2 2005-07-28 20:54:20 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -65,10 +65,15 @@ int image_init(imagewnd_t *imagewnd, mezz_mmap_t *mmap)
 // Update the image interface
 void image_update()
 {
+  static int did_static_update = 0;
+  
   // Draw in the color-classified image,
   // But dont do it for every image (hammers the machine).
-  if (image->mmap->count % 5 == 0)
+  if (((image->mmap->calibrate != -1) && (image->mmap->count % 5 == 0)) ||
+      ((image->mmap->calibrate == -1) &&
+       (did_static_update != image->mmap->count)))
   {
+    did_static_update = image->mmap->count;
     // Create the image to display
     image_make_image();
     

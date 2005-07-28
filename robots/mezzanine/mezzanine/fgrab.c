@@ -21,7 +21,7 @@
  * Desc: Frame grabber interface
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: fgrab.c,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ * CVS: $Id: fgrab.c,v 1.2 2005-07-28 20:54:19 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -112,7 +112,7 @@ int fgrab_init(mezz_mmap_t *mmap)
 
   // Get the color depth
   fgrab->mmap->depth = opt_get_int("fgrab", "depth", 16);
-  if (fgrab->mmap->depth != 16 && fgrab->mmap->depth != 32)
+  if (fgrab->mmap->depth != 16 && fgrab->mmap->depth != 32 && fgrab->mmap->depth != 24)
   {
     PRINT_ERR1("depth must be 16 or 32; [%d] is not supported", fgrab->mmap->depth);
     return -1;
@@ -145,15 +145,32 @@ int fgrab_init(mezz_mmap_t *mmap)
   else
   {
     fgrab->image_count = 0;
+
+    char *image_file = opt_get_string("fgrab","image","testimage.ppm");
+    printf("test image filename: %s\n",image_file);
+
     if (fgrab->mmap->depth == 32)
     {
-      if (fgrab_loadfile(fgrab->image_count++, 0, "testdata/frame_0.ppm") != 0)
+      if (fgrab_loadfile(fgrab->image_count++, 0, image_file) != 0)
         return -1;
+      else 
+	  printf("loaded ppm32 successfully\n");
     }
     else if (fgrab->mmap->depth == 16)
     {
-      if (fgrab_loadfile(fgrab->image_count++, 1, "testdata/frame_0.rgb16") != 0)
+      if (fgrab_loadfile(fgrab->image_count++, 0, image_file) != 0)
         return -1;
+      else 
+	  printf("loaded ppm16 successfully\n");
+    }
+/*     else if (fgrab->mmap->depth == 24) { */
+/* 	if (fgrab_loadfile(fgrab->image_count++, 1, image_file) != 0) */
+/*         return -1; */
+/*       else  */
+/* 	  printf("loaded ppm24 successfully\n"); */
+/*     } */
+    else {
+	printf("oops\n");
     }
   }
   
@@ -200,6 +217,8 @@ int *fgrab_get()
     // Update the gui
     if (fgrab->mmap->calibrate)
       fgrab_gui(fgrab->images[fgrab->mmap->count % fgrab->image_count]);
+
+    //printf("c: %d\n",fgrab->mmap->count % fgrab->image_count);
 
     fgrab->mmap->count++;
     return fgrab->images[fgrab->mmap->count % fgrab->image_count];

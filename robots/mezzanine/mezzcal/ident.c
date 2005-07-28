@@ -21,7 +21,7 @@
  * Desc: Display identified objects and set object definitions.
  * Author: Andrew Howard
  * Date: 11 Apr 2002
- * CVS: $Id: ident.c,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: ident.c,v 1.2 2005-07-28 20:54:20 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -74,17 +74,23 @@ void ident_update()
   {
     object = ident->objectlist->objects + i;
 
+    if (!object->valid)
+      continue;
+    
     r = object->max_sep;
     
     dewarp_world2image(object->px, object->py, &ax, &ay);
-    dewarp_world2image(object->px + r * cos(object->pa),
-                       object->py + r * sin(object->pa), &bx, &by);
+    dewarp_world2image(object->px + r * cos(object->pa+M_PI_2),
+                       object->py + r * sin(object->pa+M_PI_2), &bx, &by);
 
     rtk_fig_color(ident->fig, COLOR_IDENT);
-    rtk_fig_arrow_ex(ident->fig, ax, ay, bx, by, 5);        
+    rtk_fig_arrow_ex(ident->fig, ax, ay, bx, by, 5);
 
-    snprintf(text, sizeof(text), "object [%d]", i);    
-    rtk_fig_text(ident->fig, ax + 10, ay, 0, text);
+    snprintf(text, sizeof(text), "obj [%d] (%.2f, %.2f)\n    (%.0f, %.0f)",
+	     i, object->px, object->py,
+	     (object->ablob.ox + object->bblob.ox) / 2.0,
+	     (object->ablob.oy + object->bblob.oy) / 2.0);
+    rtk_fig_text(ident->fig, ax + 10, ay - 20, 0, text);
 
     for (j = 0; j < 4; j++)
     {

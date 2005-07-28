@@ -1,6 +1,6 @@
 /*
  *  RTK2 : A GUI toolkit for robotics
- *  Copyright (C) 2001  Andrew Howard  ahoward@usc.edu
+ *  Copyright (C) 2001, 2005  Andrew Howard  ahoward@usc.edu
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 /*
  * Desc: Combined Rtk functions
  * Author: Andrew Howard
- * CVS: $Id: rtk.h,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: rtk.h,v 1.2 2005-07-28 20:54:21 stack Exp $
  */
 
 #ifndef RTK_H
@@ -532,6 +532,17 @@ void rtk_tableitem_set_int(rtk_tableitem_t *item, int value);
 
 // Get the value of a table item (as an integer)
 int rtk_tableitem_get_int(rtk_tableitem_t *item);
+
+
+// Create a new item in the table
+rtk_tableitem_t *rtk_tableitem_create_float(rtk_table_t *table,
+                                          const char *label, float low, float high, float incr);
+
+// Set the value of a table item (as an floateger)
+void rtk_tableitem_set_float(rtk_tableitem_t *item, float value);
+
+// Get the value of a table item (as an floateger)
+float rtk_tableitem_get_float(rtk_tableitem_t *item);
 
 
 #ifdef __cplusplus

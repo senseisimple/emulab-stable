@@ -1,9 +1,3 @@
-/*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- */
-
 /* 
  *  Mezzanine - an overhead visual object tracker.
  *  Copyright (C) Andrew Howard 2002
@@ -27,7 +21,7 @@
  * Desc: Dewarp the blobs (i.e. transform form image -> world cs)
  * Author: Andrew Howard
  * Date: 17 Apr 2002
- * CVS: $Id: dewarp.c,v 1.4 2005-06-13 14:35:58 stack Exp $
+ * CVS: $Id: dewarp.c,v 1.5 2005-07-28 20:54:19 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -38,6 +32,15 @@
 #include <gsl/gsl_multifit.h>
 #include "opt.h"
 #include "mezzanine.h"
+
+
+#define WARP_SCALE		// Apply scaling.
+#define WARP_COS		// Plus cosine lens distortion correction.
+#define WARP_CANCEL		// Plus blended error vector cancellation.
+
+#if defined(WARP_CANCEL)
+# include "blend_tris.h"
+#endif
 
 // Update the coordinate transforms
 void dewarp_update_trans();
@@ -51,18 +54,52 @@ void dewarp_world2image(double x, double y, double *i, double *j);
 // Dewarp information
 typedef struct
 {
-  mezz_mmap_t *mmap;       // Pointer th the mmap
+  mezz_mmap_t *mmap;       // Pointer to the mmap
   mezz_dewarpdef_t *def;   // Pointer to the mmaped dewarp stuff
 } dewarp_t;
 
 // The one and only instance of the dewarper
 static dewarp_t *dewarp;
 
+#if defined(WARP_CANCEL)
+
+/* Lay out the triangles for error cancellation.
+ *
+ * The required point order is left-to-right, bottom-to-top, so the lower-left
+ * corner comes first on the bottom row, then the middle and top rows.
+ * Triangles are generated clockwise from the bottom row.  Vertices are listed
+ * clockwise from the center in each triangle, so edges will have the inside on
+ * the right.
+ *
+ *  p6 ------ p7 ----- p8
+ *   | \      |      / |
+ *   |  \     |     /  |
+ *   |   \ t4 | t5 /   |
+ *   |    \   |   /    |
+ *   | t3  \  |  /  t6 |
+ *   |      \ | /      |
+ *  p3 ------ p4 ----- p5
+ *   |      / | \      |
+ *   | t2  /  |  \  t7 |
+ *   |    /   |   \    |
+ *   |   / t1 | t0 \   |
+ *   |  /     |     \  |
+ *   | /      |      \ |
+ *  p0 ------ p1 ----- p2
+ */
+#define N_BLEND_TRIS 8
+#define N_CAL_PTS (N_BLEND_TRIS+1)	// One more point than triangle.
+static int tri_pattern[N_BLEND_TRIS][3] = { 
+  {4,2,1}, {4,1,0}, {4,0,3}, {4,3,6}, {4,6,7}, {4,7,8}, {4,8,5}, {4,5,2}
+};
+static int gotTris = 0;
+static blendTriObj triangles[N_BLEND_TRIS];
+#endif
 
 // Initialise the dewarper
 int dewarp_init(mezz_mmap_t *mmap)
 {
-  int i;
+  int i, j, k;
   char key[64];
 
   dewarp = malloc(sizeof(dewarp_t));
@@ -76,14 +113,87 @@ int dewarp_init(mezz_mmap_t *mmap)
   for (i = 0; i < MEZZ_MAX_DEWARP; i++)
   {
     snprintf(key, sizeof(key), "wpos[%d]", i);
-    if (opt_get_double2("dewarp", key, &dewarp->def->wpos[i][0], &dewarp->def->wpos[i][1]) < 0)
+    if (opt_get_double2("dewarp", key, 
+			&dewarp->def->wpos[i][0], &dewarp->def->wpos[i][1]) < 0)
       break;
     snprintf(key, sizeof(key), "ipos[%d]", i);
     opt_get_int2("dewarp", key, &dewarp->def->ipos[i][0], &dewarp->def->ipos[i][1]);
     dewarp->def->points++;
   }
 
-  // Generate the transfomr values
+  dewarp->def->warpFactor = opt_get_double("dewarp","warpFactor",1.414);
+  dewarp->def->ocHeight = opt_get_double("dewarp","ocHeight",2.500);
+
+  dewarp->def->scaleFactorX = (dewarp->mmap->width - 1)/2.0;
+  dewarp->def->scaleFactorY = (dewarp->mmap->height - 1)/2.0;
+
+  i = opt_get_double2("dewarp","scaleFactor",
+		      &dewarp->def->scaleFactorX,
+		      &dewarp->def->scaleFactorY);
+
+  dewarp->def->ocX = (dewarp->mmap->width - 1)/2;
+  dewarp->def->ocY = (dewarp->mmap->height - 1)/2;
+
+  i = opt_get_double2("dewarp","cameraCenter",
+		      &dewarp->def->ocX,
+		      &dewarp->def->ocY);
+  
+  dewarp->def->gridX = 0.0;
+  dewarp->def->gridY = 0.0;
+
+  i = opt_get_double2("dewarp","gridoff",
+		      &dewarp->def->gridX,
+		      &dewarp->def->gridY);
+  
+# if defined(WARP_CANCEL)
+
+  // Calculate error between nominal and actual world coords of calibration pts.
+  double iwpos[N_CAL_PTS][2], epos[N_CAL_PTS][2];
+  for ( i = 0; i < N_CAL_PTS; i++ )
+  {
+    // World coords calculated from image coords, with triangle blending off.
+    dewarp_image2world(dewarp->def->ipos[i][0], dewarp->def->ipos[i][1], 
+		       &iwpos[i][0], &iwpos[i][1]);
+    // Difference between actual measured and ideal target world coordinates.
+    epos[i][0] = iwpos[i][0] - (dewarp->def->wpos[i][0] + dewarp->def->gridX);
+    epos[i][1] = iwpos[i][1] - (dewarp->def->wpos[i][1] + dewarp->def->gridY);
+  }
+
+  // Create triangles for piecewise linear blending of error corrections.
+  for ( i = 0; i < N_BLEND_TRIS; i++ )
+  {
+    int validTri = 0;
+    for ( j = 0; j < 3; j++ )
+    {
+      int validPt = 0;
+      for ( k = 0; k < 2; k++ )
+      {
+	// Assumption: valid points have >= one non-zero image (pixel) coord.
+	int pixCoord;
+	triangles[i].verts[j][k] =  
+	  pixCoord = dewarp->def->ipos[ tri_pattern[i][j] ][k];
+	validPt |= pixCoord;
+
+	triangles[i].target[j][k] = dewarp->def->wpos[ tri_pattern[i][j] ][k];
+	triangles[i].error[j][k] =  epos[ tri_pattern[i][j] ][k];
+      }
+      if ( validPt ) validTri++;
+
+      // XXX Horrid Hack Warning - We need right-handed coordinates, but the
+      // image Y coordinate goes down from 0 at the top.  Negate it internally.
+      triangles[i].verts[j][1] *= -1.0;
+    }
+    if ( validTri ) gotTris++;
+
+    initBlendTri(&triangles[i]);    // Fill in the rest of the blend triangle.
+  }
+
+  if ( gotTris != N_BLEND_TRIS )
+    printf("*** Only %d valid triangles, error cancellation is turned off.\n"
+	   gotTris);
+# endif
+
+  // Generate the transform values
   dewarp_update_trans();
   
   return 0;
@@ -125,9 +235,13 @@ mezz_bloblist_t *dewarp_update(mezz_bloblist_t *bloblist)
   for (i = 0; i < bloblist->count; i++)
   {
     blob = bloblist->blobs + i;
+    //printf("blob %d %d %d\n",i,blob->ox,blob->oy);
     dewarp_image2world(blob->ox, blob->oy,
                        &blob->wox, &blob->woy);
   }
+
+  dewarp->mmap->bloblist = *bloblist;
+
   return bloblist;
 }
 
@@ -135,6 +249,7 @@ mezz_bloblist_t *dewarp_update(mezz_bloblist_t *bloblist)
 // Update the coordinate transforms
 void dewarp_update_trans()
 {
+#if !defined(WARP_IDENTITY) && !defined(WARP_SCALE) && !defined(WARP_COS)
   int i;
   double xx, yy;
   double ii, jj;
@@ -251,37 +366,84 @@ void dewarp_update_trans()
   gsl_matrix_free(a[1]);
   gsl_vector_free(x[1]);
   gsl_vector_free(b[1]);
+#endif
 }
 
+double dewarp_cos(double x, double y, mezz_dewarpdef_t *mmap)
+{
+    return cos(mmap->warpFactor * atan2(hypot(x,y), mmap->ocHeight));
+}
 
 // Convert point from image to world coords
 void dewarp_image2world(double i, double j, double *x, double *y)
 {
+
+#ifdef WARP_IDENTITY
+  // World coords are the same as pixel coords.
+  *x = i;
+  *y = j;
+
+#elif defined(WARP_SCALE)
+  // Pixels are  to [0 ... 639, 0 ... 479], with the origin in the upper-left.
+  // World coordinates are [-1 ... 1, -1 ... 1], with the origin in the center.
+  *x = (i - dewarp->def->ocX) / dewarp->def->scaleFactorX;
+  *y = -(j - dewarp->def->ocY) / dewarp->def->scaleFactorY;
+
+# if defined(WARP_COS)
+  // Apply cosine dewarping.
+  double f = 1.0;
+  int lpc;
+  
+  for (lpc = 0; lpc < 8; lpc++) {
+      f = dewarp_cos(*x / f, *y / f, dewarp->def);
+  }
+
+  *x /= f;
+  *y /= f;
+
+#   if defined(WARP_CANCEL)
+  // Apply piecewise triangular linear blended error cancellation.
+  int iTri;
+  geomPt imPt;
+  double bcs[3];
+  geomVec cancelVec;
+
+  // Find the triangle by looking at the center edges of the triangles.
+  // We can actually blend linearly past the outer edges if necessary...
+  if ( gotTris == N_BLEND_TRIS )   // Don't do it until triangles are initialized.
+  {
+    imPt[0] = i; imPt[1] = -j;	   // XXX Horrid Hack Warning - negate Y.
+    for ( iTri = 0; iTri < N_BLEND_TRIS; iTri++ )
+    {
+      // Get the barycentric coords of the image point in the triangle.
+      // Positive on the inside of an edge, reaching 1.0 at the opposing vertex.
+      baryCoords(&triangles[iTri], imPt, bcs);
+      if ( bcs[1] >= 0.0 && bcs[2] >= 0.0 )
+      {
+	// This is the triangle containing this image point.
+	errorBlend(&triangles[iTri], bcs, cancelVec);
+	*x += cancelVec[0];
+	*y += cancelVec[1];
+
+	break;
+      }  
+    }
+  }
+#   endif // WARP_CANCEL
+# endif   // WARP_COS
+
+#else
   *x = dewarp->def->iwtrans[0][0] + dewarp->def->iwtrans[0][1] * i +
     + dewarp->def->iwtrans[0][2] * j + dewarp->def->iwtrans[0][3] * i * i
     + dewarp->def->iwtrans[0][4] * j * j + dewarp->def->iwtrans[0][5] * i * j
-    + dewarp->def->iwtrans[0][6] * i * fabs(i) + dewarp->def->iwtrans[0][7] * i * j * j;
+    + dewarp->def->iwtrans[0][6] * i * fabs(i) 
+    + dewarp->def->iwtrans[0][7] * i * j * j;
 
   *y = dewarp->def->iwtrans[1][0] + dewarp->def->iwtrans[1][1] * j
     + dewarp->def->iwtrans[1][2] * i + dewarp->def->iwtrans[1][3] * j * j
     + dewarp->def->iwtrans[1][4] * i * i + dewarp->def->iwtrans[1][5] * j * i
-    + dewarp->def->iwtrans[1][6] * j * fabs(j) + dewarp->def->iwtrans[1][7] * j * i * i;
+    + dewarp->def->iwtrans[1][6] * j * fabs(j) 
+    + dewarp->def->iwtrans[1][7] * j * i * i;
+#endif
+
 }
-
-
-// Convert point from world to image coords
-void dewarp_world2image(double x, double y, double *i, double *j)
-{
-  *i = dewarp->def->witrans[0][0] + dewarp->def->witrans[0][1] * x +
-    + dewarp->def->witrans[0][2] * y + dewarp->def->witrans[0][3] * x * x
-    + dewarp->def->witrans[0][4] * y * y + dewarp->def->witrans[0][5] * x * y
-    + dewarp->def->witrans[0][6] * x * fabs(x) + dewarp->def->witrans[0][7] * x * y * y;
-
-  *j = dewarp->def->witrans[1][0] + dewarp->def->witrans[1][1] * y
-    + dewarp->def->witrans[1][2] * x + dewarp->def->witrans[1][3] * y * y
-    + dewarp->def->witrans[1][4] * x * x + dewarp->def->witrans[1][5] * y * x
-    + dewarp->def->witrans[1][6] * y * fabs(y) + dewarp->def->witrans[1][7] * y * x * x;
-}
-
-
-

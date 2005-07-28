@@ -21,7 +21,7 @@
  * Desc: Blob finder
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: blobfind.c,v 1.1 2004-12-12 23:36:33 johnsond Exp $
+ * CVS: $Id: blobfind.c,v 1.2 2005-07-28 20:54:19 stack Exp $
  ***************************************************************************/
 
 #include <assert.h>
@@ -130,11 +130,11 @@ mezz_bloblist_t *blobfind_update(uint8_t *class)
   }
 
   // If the gui is enabled, copy our results there
-  if (blobfind->mmap->calibrate)
-  {
+  //  if (blobfind->mmap->calibrate)
+  //  {
     memcpy(&blobfind->mmap->bloblist, &blobfind->bloblist,
            sizeof(blobfind->mmap->bloblist));
-  }
+    //  }
 
   return &blobfind->bloblist;
 

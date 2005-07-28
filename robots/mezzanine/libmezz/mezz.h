@@ -21,7 +21,7 @@
  * Desc: Mezzanine IPC interface
  * Author: Andrew Howard
  * Date: 28 Mar 2002
- * CVS: $Id: mezz.h,v 1.2 2005-01-20 15:07:43 johnsond Exp $
+ * CVS: $Id: mezz.h,v 1.3 2005-07-28 20:54:18 stack Exp $
  * Notes:
  *
  *  This library sets up a shared, memory-mapped object for exchanging
@@ -66,6 +66,16 @@ typedef struct
   double wpos[MEZZ_MAX_DEWARP][2]; // The world coords of the calibration points.
   double iwtrans[2][8];   // Parameters for the image-to-world transform.
   double witrans[2][8];   // Parameters for the world-to-image transform.
+
+  double warpFactor;
+  double ocHeight;        // Height of the optical center of the lens in meters
+  double scaleFactorX;
+  double scaleFactorY;
+  double ocX;
+  double ocY;
+
+  double gridX;
+  double gridY;
 } mezz_dewarpdef_t;
 
 
@@ -130,6 +140,9 @@ typedef struct
   int max_missed;     // Max frames we can miss before we look for a new match.
   int missed;         // Number of missed frames (object not seen)
   double px, py, pa;  // Object pose (world cs).
+    // additional info to make reporting blob pixel positions easier
+    mezz_blob_t ablob;
+    mezz_blob_t bblob;
 } mezz_object_t;
 
 /* // structure describing a "track" -- essentially, this just does a higher-level */

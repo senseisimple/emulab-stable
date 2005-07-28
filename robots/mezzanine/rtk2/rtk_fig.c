@@ -1,6 +1,6 @@
 /*
  *  RTK2 : A GUI toolkit for robotics
- *  Copyright (C) 2001  Andrew Howard  ahoward@usc.edu
+ *  Copyright (C) 2001, 2005  Andrew Howard  ahoward@usc.edu
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 /*
  * Desc: Rtk fig functions
  * Author: Andrew Howard
- * CVS: $Id: rtk_fig.c,v 1.1 2004-12-12 23:36:34 johnsond Exp $
+ * CVS: $Id: rtk_fig.c,v 1.2 2005-07-28 20:54:21 stack Exp $
  */
 
 #include <assert.h>
@@ -942,8 +942,10 @@ void rtk_fig_text_draw(rtk_fig_t *fig, rtk_stroke_t *stroke)
                     data->point.x, oy, data->text + i, len);
 
       i += len + 1;
-      dy = gdk_text_height(fig->canvas->font, data->text + i, len);
-      oy += 14 * dy / 10;
+      if (i < strlen(data->text)) {
+	dy = gdk_text_height(fig->canvas->font, data->text + i, len);
+	oy += 14 * dy / 10;
+      }
     }
 }
 
