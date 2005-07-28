@@ -70,6 +70,7 @@ main(int argc, char **argv)
 {
 	int			n, ch, errval = 0;
 	struct hostent		*he;
+	unsigned char		**hal;
 	FILE			*fp;
 	struct in_addr		serverip;
 	int			portnum = SERVER_PORTNUM;
@@ -228,16 +229,7 @@ main(int argc, char **argv)
 			"experiment.\n\n");
 		usage();
 	}
-	if (mastercheck) {
-		char nodename[BUFSIZ];
 
-		gethostname(nodename, sizeof(nodename));
-		if (strcmp(server, nodename) == 0)
-			exit(0);
-		else
-			exit(1);
-	}
-	
 	/*
 	 * Map server to IP.
 	 */
@@ -248,7 +240,37 @@ main(int argc, char **argv)
 		fprintf(stderr, "gethostbyname(%s) failed\n", server); 
 		exit(68);
 	}
+	if (debug) {
+		printf( "server name %s, addr(s)", server);
+		for (hal = (unsigned char **)he->h_addr_list; *hal; hal++)
+			printf(" %u.%u.%u.%u\n", 
+			       (*hal)[0], (*hal)[1],(*hal)[2], (*hal)[3]);
+	}
 
+	if (mastercheck) {
+		/* Compare server IP with the current host IP addresses.
+		 * (Windows nodes all have the physical node name.)
+		 */
+		char nodename[BUFSIZ];
+		gethostname(nodename, sizeof(nodename));
+		he = gethostbyname(nodename); /* Internal retval storage. */
+		if (!he) {
+			fprintf(stderr, "gethostbyname(%s) failed\n", nodename); 
+			exit(68);
+		}
+		if (debug) {
+			printf( "node name %s, addr(s)", nodename);
+			for (hal = (unsigned char **)he->h_addr_list; *hal; hal++)
+				printf(" %u.%u.%u.%u\n",
+				       (*hal)[0], (*hal)[1],(*hal)[2], (*hal)[3]);
+		}
+		/* Host is multi-homed.  Compare to ALL of its addresses. */
+		for (hal = (unsigned char **)he->h_addr_list; *hal; hal++)
+			if (memcmp((char *)&serverip, *hal, he->h_length) == 0)
+				exit(0);
+		exit(1);
+	}
+	
 	/*
 	 * Build up the request structure to send to the server.
 	 */
