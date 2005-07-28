@@ -6,7 +6,7 @@
  
 +# For the testbed. Log ssh logins to ops.
 +local5.err						/dev/console
-+auth.info						@users.emulab.net
++auth.info						@users
 +
  # Log anything (except mail) of level info or higher.
  # Don't log private authentication messages!
