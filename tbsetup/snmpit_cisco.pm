@@ -130,6 +130,19 @@ sub new($$$;$) {
     }
 
     #
+    # Find the class of switch - look for 4 digits in the switch type
+    #
+    if ($self->{SWITCHTYPE} =~ /(\d{2})\d{2}/) {
+       $self->{SWITCHCLASS} = "${1}00";
+    } else {
+        warn "snmpit: Unable to determine switch class for $name\n";
+        $self->{SWITCHCLASS} = "6500";
+    }
+    if ($self->{DEBUG}) {
+	print "snmpit_cisco picked class $self->{SWITCHCLASS}\n";
+    }
+
+    #
     # Set up SNMP module variables, and connect to the device
     #
     $SNMP::debugging = ($self->{DEBUG} - 2) if $self->{DEBUG} > 2;
@@ -146,10 +159,16 @@ sub new($$$;$) {
     if ($self->{OSTYPE} eq "CatOS") {
 	push @mibs, "$mibpath/CISCO-STACK-MIB.txt";
     } elsif ($self->{OSTYPE} eq "IOS") {
-	push @mibs, "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt";
+	push @mibs, "$mibpath/CISCO-STACK-MIB.txt",
+                    "$mibpath/CISCO-VLAN-MEMBERSHIP-MIB.txt";
     } else {
 	warn "ERROR: Unsupported switch OS $self->{OSTYPE}\n";
 	return undef;
+    }
+
+    if ($self->{SWITCHCLASS} == 2900) {
+        # There is a special MIB with some 2900 stuff in it
+	push @mibs, "$mibpath/CISCO-C2900-MIB.txt";
     }
 
     &SNMP::addMibFiles(@mibs);
@@ -198,23 +217,6 @@ sub portControl ($$@) {
 
     $self->debug("portControl: $cmd -> (@ports)\n");
 
-    $self->debug("portControl: Checking supported for $cmd on " .
-	    "$self->{OSTYPE}\n");
-
-    #
-    # Check right up front for unsupported operations
-    #
-    if ($self->{OSTYPE} eq "IOS" && ($cmd !~ /(en|dis)able/)) {
-	#
-	# XXX - Do we silently exit, in which case the caller doesn't know
-	# we failed, or do we exit with an error, in which case the caller has
-	# to know what we support before calling us? We'll go with the latter
-	# for now.
-	#
-	$self->debug("portControl: unsupported\n");
-	return -1;
-    }
-
     #
     # Find the command in the %cmdOIDs hash (defined at the top of this file)
     #
@@ -241,6 +243,23 @@ sub portControl ($$@) {
 	while (@oid) {
 	    my $myoid = shift @oid;
 	    my $myval = shift @oid;
+
+            # 
+            # We have to do some translation to a different mib for 2900
+            # switches
+            #
+            if ($self->{SWITCHCLASS} == 2900) {
+                if ($myoid eq "portAdminSpeed") {
+                    $myoid = "c2900PortAdminSpeed";
+                } elsif ($myoid eq "portDuplex") {
+                    $myoid = "c2900PortDuplexState";
+                    # Have to translate the value too
+                    if ($myval eq "full") { $myval = "fullduplex"; }
+                    elsif ($myval eq "half") { $myval = "halfduplex"; }
+                    elsif ($myval eq "auto") { $myval = "autoNegotiate"; }
+                }
+            }
+
 	    $errors += $self->UpdateField($myoid,$myval,@portlist);
 	}
 	return $errors;
@@ -1259,8 +1278,24 @@ sub listPorts($) {
     $self->walkTableIfIndex('ifAdminStatus',\%Able,
         sub { if ($_[0] =~ /up/) { "yes" } else { "no" } });
     $self->walkTableIfIndex('ifOperStatus',\%Link);
-    $self->walkTableIfIndex('portAdminSpeed',\%speed);
-    $self->walkTableIfIndex('portDuplex',\%duplex);
+
+    #
+    # For some silly reason, these next two things are in a different MIB on
+    # 2900s
+    #
+    if ($self->{SWITCHCLASS} == 2900) {
+        $self->walkTableIfIndex('c2900PortAdminSpeed',\%speed);
+        $self->walkTableIfIndex('c2900PortDuplexState',\%duplex,
+            # Have to translate some values that differ from the other MIB
+            sub { if    ($_[0] =~ /auto/) { "auto" }
+                  elsif ($_[0] =~ /full/) { "full" }
+                  elsif ($_[0] =~ /half/) { "half" }
+                  else                    { $_[0] } });
+    } else {
+        $self->walkTableIfIndex('portAdminSpeed',\%speed);
+        $self->walkTableIfIndex('portDuplex',\%duplex);
+    }
+
     # Insert stuff here to get ifSpeed if necessary... AdminSpeed is the
     # _desired_ speed, and ifSpeed is the _real_ speed it is using
 
