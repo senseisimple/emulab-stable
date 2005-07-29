@@ -173,6 +173,7 @@ use vars qw(@ISA @EXPORT);
 	 TBExptFirewall TBNodeFirewall TBSetExptFirewallVlan
 	 TBClearExptFirewallVlan
 
+	 TBNodeSubNodes
 	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState
@@ -3252,6 +3253,42 @@ sub TBExptClearBackupState($$)
 	if (-e $pstateDir);
     system("/bin/rm -rf $vstateDir")
 	if (-e $vstateDir);
+}
+
+#
+# Return the list of subnodes for the given node.
+#
+sub TBNodeSubNodes($)
+{
+    my ($node) = @_;
+    my (@row);
+    my (@nodes);
+
+    my $result = DBQueryFatal("SELECT n.node_id FROM nodes AS n " .
+			      "LEFT JOIN node_types " .
+			      "    AS nt ON n.type = nt.type " .
+			      "WHERE n.phys_nodeid='$node' and nt.issubnode");
+    
+    if (! $result or $result->numrows == 0) {
+	return ();
+    }
+    while (@row = $result->fetchrow_array()) {
+	my $node = $row[0];
+
+	#
+	# Taint check. I do not understand this sillyness, but if I
+	# taint check these node names, I avoid warnings throughout.
+	#
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+
+	    push(@nodes, $node);
+	}
+	else {
+	    print "*** $0: WARNING: Bad node name: $node.\n";
+	}
+    }
+    return @nodes;
 }
 
 #

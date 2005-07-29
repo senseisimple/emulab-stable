@@ -224,7 +224,7 @@ while (my %row = $db_result->fetchhash()) {
 	    next;
 	}
     }
-    elsif ($subnode) {
+    elsif ($subnode && !$imageable) {
 	print "Will skip subnode $node ISUP wait.\n";
     }
     else {
@@ -517,18 +517,6 @@ if (!$TESTMODE) {
 	    delete $reboots{$node};
 	    delete $reconfigs{$node};
 	    $rebooted{$node} = 1;
-
-
-	    # XXX BEGIN Robot hack
-	    my $host;
-
-	    TBPhysNodeID($node, \$host);
-	    if ($host ne $node) {
-		delete $reboots{$host};
-		delete $reconfigs{$host};
-		$rebooted{$host} = 1;
-	    }
-	    # XXX END Robot hack
 	}
 
 	my %reload_args     = ();

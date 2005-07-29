@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -606,6 +606,37 @@ sub RebootNode {
 	    exec("$ssh -host $pc ".
 		 "/usr/local/etc/emulab/rc/rc.bootsetup -b reconfig");
 	    exit(0);
+	}
+    }
+
+    #
+    # If any of the node's subnodes are being reloaded, wait for the operation
+    # to finish before doing the reboot.
+    #
+    my @subnodes = TBNodeSubNodes($pc);
+    foreach my $subnode (@subnodes) {
+	my $opmode;
+	
+	if (TBGetNodeOpMode($subnode, \$opmode) &&
+	    defined($opmode) &&
+	    (($opmode eq TBDB_NODEOPMODE_RELOADING) ||
+	     ($opmode eq TBDB_NODEOPMODE_RELOAD) ||
+	     ($opmode eq TBDB_NODEOPMODE_RELOADMOTE))) {
+	    my $startwait = time;
+	    my $actual_state;
+
+	    print "reboot ($pc): waiting for subnode '$subnode' to finish ".
+		"reloading...\n";
+	    sleep(5);
+	    if (TBNodeStateWait($subnode,
+				$startwait,
+				(60*10),
+				\$actual_state,
+				(TBDB_NODESTATE_TBFAILED,
+				 TBDB_NODESTATE_ISUP))) {
+		print "reboot ($pc): subnode has not finished reloading, ".
+		    "rebooting anyways...\n";
+	    }
 	}
     }
 
