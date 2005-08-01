@@ -257,11 +257,6 @@ struct timeval start_time;
  * 1 if we're adjusting timestamps by start_time, 0 otherwise
  */
 int adjust_time = 0;
-
-/*
- * A barrier, so that the main thread can wait for time to start
- */
-pthread_cond_t time_started;
 #endif
 
 /*
@@ -826,8 +821,6 @@ int main (int argc, char **argv) {
 	    tuple->objname   = ADDRESSTUPLE_ANY;
 	    tuple->eventtype = TBDB_EVENTTYPE_START;
 
-	    pthread_cond_init(&time_started,NULL);
-
 	    if (event_server) {
 		snprintf(server_string,sizeof(server_string),"elvin://%s",
 			event_server);
@@ -866,8 +859,6 @@ int main (int argc, char **argv) {
 		exit(1);
 	    }
 	    pthread_mutex_unlock(&lib_lock);
-	    pthread_cond_wait(&time_started,&lock);
-	    pthread_mutex_unlock(&lock);
 	}
 #endif
 
@@ -1705,7 +1696,8 @@ callback(event_handle_t handle,
 		!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
 	    /* OK, time has started */
 	    gettimeofday(&start_time,NULL);
-	    pthread_cond_signal(&time_started);
+	    stop = 1;
+	    reload = interfaces;
 	    printf("Event time started at UNIX time %lu.%lu\n",
 		    start_time.tv_sec, start_time.tv_usec);
 	    return;
