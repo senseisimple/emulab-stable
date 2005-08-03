@@ -403,6 +403,7 @@ sub AddProject(@)
 	return 0;
     }
     my $intro = "This is the Emulab Bug DB for the $pid project";
+    my $project_email = "${pid}-users\@${OURDOMAIN}";
 
     # Easy ...
     my $query_result =
@@ -419,7 +420,7 @@ sub AddProject(@)
 		 "id tasktype severity summary status dueversion progress', ".
 		 "    others_view='0', ".
 		 "    anon_open='0', ".
-		 "    notify_email='', ".
+		 "    notify_email='$project_email', ".
 		 "    notify_email_when='0', ".
 		 "    notify_jabber='', ".
 		 "    notify_jabber_when='0'");
