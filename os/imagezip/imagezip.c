@@ -48,6 +48,7 @@ long	dev_bsize = 1;
 int	oldstyle  = 0;
 int	frangesize= 64;	/* 32k */
 int	forcereads= 0;
+int	badsectors= 0;
 int	retrywrites= 1;
 int	dorelocs  = 1;
 off_t	datawritten;
@@ -65,8 +66,8 @@ char	*chkpointdev;
  *
  * These numbers are in sectors.
  */
-long	inputminsec	= 0;
-long    inputmaxsec	= 0;	/* 0 means the entire input image */
+unsigned long inputminsec	= 0;
+unsigned long inputmaxsec	= 0;	/* 0 means the entire input image */
 
 /*
  * A list of data ranges. 
@@ -141,7 +142,46 @@ getslicemap(int stype)
 	return 0;
 }
 
-#define IORETRIES	10
+#define READ_RETRIES	1
+#define WRITE_RETRIES	10
+
+ssize_t
+slowread(int fd, void *buf, size_t nbytes, off_t startoffset)
+{
+	int cc, i, count;
+
+	fprintf(stderr, "read failed: will retry by sector %d more times\n",
+		READ_RETRIES);
+	
+	count = 0;
+	for (i = 0; i < READ_RETRIES; i++) {
+		if (lseek(fd, startoffset, SEEK_SET) < 0) {
+			perror("devread: seeking to set file ptr");
+			exit(1);
+		}
+		while (nbytes > 0) {
+			cc = read(fd, buf, nbytes);
+			if (cc == 0) {
+				nbytes = 0;
+				continue;
+			}
+			if (cc > 0) {
+				nbytes -= cc;
+				buf     = (void *)((char *)buf + cc);
+				count  += cc;
+				continue;
+			}
+
+			nbytes += count;
+			buf     = (void *)((char *)buf - count);
+			count   = 0;
+			break;
+		}
+		if (nbytes == 0)
+			break;
+	}
+	return count;
+}
 
 /*
  * Assert the hell out of it...
@@ -163,58 +203,51 @@ devlseek(int fd, off_t off, int whence)
 ssize_t
 devread(int fd, void *buf, size_t nbytes)
 {
-	int		cc, i, count;
+	int		cc, count;
 	off_t		startoffset;
+	size_t		onbytes;
 
 #ifndef linux
 	assert((nbytes & (DEV_BSIZE-1)) == 0);
 #endif
-	if (!forcereads)
-		return read(fd, buf, nbytes);
+	cc = read(fd, buf, nbytes);
+	if (!forcereads || cc >= 0)
+		return cc;
 
+	/*
+	 * Got an error reading the range.
+	 * Retry one sector at a time, replacing any bad sectors with
+	 * zeroed data.
+	 */
 	if ((startoffset = lseek(fd, (off_t) 0, SEEK_CUR)) < 0) {
 		perror("devread: seeking to get input file ptr");
 		exit(1);
 	}
+	assert((startoffset & (DEV_BSIZE-1)) == 0);
 
-	count = 0;
-	for (i = 0; i < IORETRIES; i++) {
-		while (nbytes) {
-			cc = read(fd, buf, nbytes);
-			if (cc == 0)
-				break;
-
-			if (cc > 0) {
-				nbytes -= cc;
-				buf     = (void *)((char *)buf + cc);
-				count  += cc;
-				continue;
-			}
-
-			if (i == 0) 
-				fprintf(stderr, "read failed: %s, "
-					"will retry %d more times\n",
-					strerror(errno), IORETRIES-1);
-	
-			nbytes += count;
-			buf     = (void *)((char *)buf - count);
-			count   = 0;
-			goto again;
+	onbytes = nbytes;
+	while (nbytes > 0) {
+		if (nbytes > DEV_BSIZE)
+			count = DEV_BSIZE;
+		else
+			count = nbytes;
+		cc = slowread(fd, buf, count, startoffset);
+fprintf(stderr, "slowread(fd, buf, %d, %llu) -> %d\n", count, startoffset, cc);
+		if (cc != count) {
+			fprintf(stderr, "devread: read failed on sector %u, "
+				"returning zeros\n",
+				bytestosec(startoffset));
+			if (cc < 0)
+				cc = 0;
+			memset(buf, 0, count-cc);
+			badsectors++;
+			cc = count;
 		}
-		return count;
-
-	again:
-		if (lseek(fd, startoffset, SEEK_SET) < 0) {
-			perror("devread: seeking to set file ptr");
-			exit(1);
-		}
+		nbytes -= cc;
+		buf = (void *)((char *)buf + cc);
+		startoffset += cc;
 	}
-
-	fprintf(stderr, "devread: read failed in sector range [%u-%u], "
-		"returning zeros\n",
-		bytestosec(startoffset), bytestosec(startoffset+nbytes));
-	memset(buf, 0, nbytes);
-	return nbytes;
+	return onbytes;
 }
 
 /*
@@ -233,7 +266,7 @@ devwrite(int fd, const void *buf, size_t nbytes)
 		exit(1);
 	}
 
-	for (i = 0; i < IORETRIES; i++) {
+	for (i = 0; i < WRITE_RETRIES; i++) {
 		while (nbytes) {
 			cc = write(fd, buf, nbytes);
 
@@ -1511,6 +1544,8 @@ compress_status(int sig)
 	fprintf(stderr,
 		"%llu input (%llu compressed) bytes in %u.%03u seconds\n",
 		inputoffset, bytescompressed, ms / 1000, ms % 1000);
+	if (badsectors)
+		fprintf(stderr, "%d bad input sectors skipped\n", badsectors);
 	if (sig == 0) {
 		fprintf(stderr, "Image size: %llu bytes\n", datawritten);
 		bps = (bytescompressed * 1000) / ms;
