@@ -114,7 +114,13 @@ EXTERNAL_USERNODE_IP=$USERNODE_IP
 EXTERNAL_FSNODE_IP=$USERNODE_IP
 
 #
-# The overall control network range
+# Network definitions - see doc/setup-network.txt for a description of how
+# we recommend laying out your network
+#
+
+#
+# The overall control network range - this subnet should cover the
+# CONTROL, PRIVATE, and PUBLIC networks below.
 #
 TESTBED_NETWORK=155.98.32.0
 TESTBED_NETMASK=255.255.240.0
