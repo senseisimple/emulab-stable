@@ -180,6 +180,25 @@ NAMED_FORWARDERS="1.1.1.1 1.1.2.1"
 WINSUPPORT=0
 
 #
+# Virtual node network configuration (if you don't want virtual nodes,
+# just leave this as is)
+#
+# Needs at least a /16 network.  For a /16 the layout of an IP is:
+#	X.Y.<pnode>.<vnode>
+# where <pnode> is the physical host node and <vnode> is the virtual
+# node on that host.  Both are between 1 and 254.  If you have more than
+# 254 physical nodes then the assignment code will increment Y, meaning
+# that you had better have larger than a /16 network.  If you are using
+# the default 172.16/12, then you can have up to 16 * 254 physical hosts.
+# If you want more than 254 vnodes per pnode, you are screwed.
+#
+VIRTNODE_NETWORK=172.16.0.0
+VIRTNODE_NETMASK=255.240.0.0
+# XXX compat
+JAILIPBASE=$VIRTNODE_NETWORK
+JAILIPMASK=$VIRTNODE_NETMASK
+
+#
 # You shouldn't have to change anything below this point
 #
 
