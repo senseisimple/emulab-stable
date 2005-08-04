@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -34,6 +34,9 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use English;
 use libdb;
+
+# XXX stinky hack detection
+my $ISUTAH = @TBMAINSITE@;
 
 #
 # Cache the node structures to avoid repeated lookups. It is up to the
@@ -251,8 +254,11 @@ sub CreateVnodes($$)
     # Need IP for jailed nodes.
     # 
     my $IPBASE = TBDB_JAILIPBASE();
+    my $IPBASE1;
+    my $IPBASE2;
     if ($IPBASE =~ /^(\d+).(\d+).(\d+).(\d+)/) {
-	$IPBASE = "$1.$2";
+	$IPBASE1 = $1;
+	$IPBASE2 = $2;
     }
     else {
 	print STDERR "*** CreateVnodes: Bad IPBASE '$IPBASE'\n";
@@ -311,8 +317,26 @@ sub CreateVnodes($$)
     #
     foreach my $i (@tocreate) {
 	my $vpriority = 10000000 + ($nodenum * 1000) + $i;
-	my $jailip    = "${IPBASE}." . int(${nodenum}) . ".${i}";
 	my $vnodeid   = $nodeprefix . "vm" . $nodenum . "-" . $i;
+
+	#
+	# Construct the vnode IP.  The general form is:
+	#	<IPBASE1>.<IPBASE2>.<pnode>.<vnode>
+	# but if <pnode> is greater than 254 we have to increment
+	# IPBASE2.
+	#
+	# XXX at Utah our second big cluster of nodes starts at
+	# nodenum=201 and I would like our vnode IPs to align
+	# at that boundary, so 254 becomes 200.
+	#
+	my $nodenumlimit = $ISUTAH ? 200 : 254;
+	my $pnet = $IPBASE2;
+	my $pnode2 = $nodenum;
+	while ($pnode2 > $nodenumlimit) {
+	    $pnet++;
+	    $pnode2 -= $nodenumlimit;
+	}
+	my $jailip = "${IPBASE1}.${pnet}.${pnode2}.${i}";
 
 	if ($verbose) {
 	    if ($impotent) {
