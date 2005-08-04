@@ -364,6 +364,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::modelnet_cores
     var_import ::GLOBALS::modelnet_edges
     var_import ::GLOBALS::elab_in_elab
+    var_import ::GLOBALS::elabinelab_topo
     var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::elabinelab_cvstag
     var_import ::GLOBALS::security_level
@@ -374,7 +375,12 @@ Simulator instproc run {} {
     }
 
     if {$elab_in_elab && [llength [array names node_list]] == 0} {
-	uplevel 1 source "@prefix@/lib/ns2ir/elabinelab.ns"
+	if {$elabinelab_topo == ""} {
+	    set nsfilename "elabinelab.ns"
+	} else {
+	    set nsfilename "elabinelab-${elabinelab_topo}.ns"
+	}
+	uplevel 1 source "@prefix@/lib/ns2ir/${nsfilename}"
     }
     if {$security_level} {
 	uplevel 1 source "@prefix@/lib/ns2ir/fw.ns"

@@ -1448,6 +1448,14 @@ proc tb-elab-in-elab {onoff} {
 	set elab_in_elab 0
     }
 }
+#
+# Change the default topography.
+#
+proc tb-elab-in-elab-topology {topo} {
+    var_import ::GLOBALS::elabinelab_topo
+
+    set elabinelab_topo $topo
+}
 proc tb-set-inner-elab-eid {eid} {
     var_import ::GLOBALS::elabinelab_eid
 
