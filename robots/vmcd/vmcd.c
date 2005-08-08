@@ -84,6 +84,7 @@ static int smoothing_window = DEFAULT_SMOOTH_WINDOW;
 
 static mtp_handle_t client_dump_handle = NULL;
 static mtp_handle_t frame_dump_handle = NULL;
+static mtp_handle_t coalesce_dump_handle = NULL;
 
 /**
  * Here's how the algorithm will lay out: when we get update_position packets
@@ -335,7 +336,7 @@ static int parse_client_options(int *argcp, char **argvp[])
     argc = *argcp;
     argv = *argvp;
     
-    while ((c = getopt(argc, argv, "hdSp:U:l:i:e:c:P:w:f:F:")) != -1) {
+    while ((c = getopt(argc, argv, "hdSp:U:l:i:e:c:P:w:f:F:C:")) != -1) {
         switch (c) {
 	case 'S':
 	    smoothing = 1;
@@ -407,6 +408,17 @@ static int parse_client_options(int *argcp, char **argvp[])
 		exit(1);
 	    }
 	    else if ((frame_dump_handle = mtp_create_handle(fd)) == NULL) {
+		errorc("unable to create MTP handle\n");
+		exit(1);
+	    }
+	    break;
+	case 'C':
+	    if ((fd = open(optarg, O_WRONLY|O_CREAT|O_TRUNC, 0664)) == -1) {
+		errorc("-C option is not a valid file name: %s\n", optarg);
+		usage();
+		exit(1);
+	    }
+	    else if ((coalesce_dump_handle = mtp_create_handle(fd)) == NULL) {
 		errorc("unable to create MTP handle\n");
 		exit(1);
 	    }
@@ -789,6 +801,21 @@ int main(int argc, char *argv[])
 		       vmc_clients,
 		       vmc_client_count); // Get rid of duplicates
 
+	    vt = (struct vision_track *)current_frame.lh_Head;
+	    while (vt->vt_link.ln_Succ != NULL) {
+		if (coalesce_dump_handle) {
+		    mtp_send_packet2(coalesce_dump_handle,
+				     MA_Opcode, MTP_UPDATE_POSITION,
+				     MA_Role, MTP_ROLE_VMC,
+				     MA_RobotID, -1,
+				     MA_Position, &vt->vt_position,
+				     MA_Timestamp, (double)frame_count,
+				     MA_Status, MTP_POSITION_STATUS_UNKNOWN,
+				     MA_TAG_DONE);
+		}
+		vt = (struct vision_track *)vt->vt_link.ln_Succ;
+	    }
+	    
 	    /**
 	     * Remove any unknown tracks before doing the match so that they
 	     * are not candidates for matching against tracks in the current
@@ -829,8 +856,11 @@ int main(int argc, char *argv[])
 				    MA_Status, MTP_POSITION_STATUS_UNKNOWN,
 				    MA_TAG_DONE);
 		    mtp_send_packet(emc_handle, &ump);
-		    if (frame_dump_handle)
+		    if (frame_dump_handle) {
+			ump.data.mtp_payload_u.update_position.position.
+			    timestamp = frame_count;
 			mtp_send_packet(frame_dump_handle, &ump);
+		    }
 		}
 		
 		if (debug > 2) {
@@ -1023,6 +1053,8 @@ int main(int argc, char *argv[])
 		    if (client_dump_handle) {
 			mp.data.mtp_payload_u.update_position.command_id =
 			    vc - vmc_clients;
+			mp.data.mtp_payload_u.update_position.position.
+			    timestamp = frame_count + 1;
 			mtp_send_packet(client_dump_handle, &mp);
 		    }
 		    
