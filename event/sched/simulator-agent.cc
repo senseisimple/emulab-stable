@@ -247,6 +247,7 @@ int send_report(simulator_agent_t sa, char *args)
 	else {
 		int rc, lpc, error_count;
 		char *digester;
+		FILE *vfile;
 		
 		retval = 0;
 
@@ -260,6 +261,29 @@ int send_report(simulator_agent_t sa, char *args)
 				error_count);
 		}
 
+		if ((vfile = popenf("loghole --port=%d validate",
+				    "r",
+				    DEFAULT_RPC_PORT)) == NULL) {
+			fprintf(file, "[unable to validate logs]\n");
+		}
+		else {
+			char buf[BUFSIZ];
+			int total = 0;
+			
+			while ((rc = fread(buf,
+					   1,
+					   sizeof(buf),
+					   vfile)) > 0) {
+				fwrite(buf, 1, rc, file);
+				total += rc;
+			}
+			pclose(vfile);
+			vfile = NULL;
+
+			if (total > 0)
+				fprintf(file, "\n");
+		}
+		
 		/* Dump user supplied stuff first, */
 		dump_report_data(file, sa, SA_RDK_MESSAGE, 1);
 

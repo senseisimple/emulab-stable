@@ -21,6 +21,9 @@ loghole \- Log management tool for experiments.
 [\fInode1 node2 ...\fR]
 .P
 .BI loghole
+.BI validate
+.P
+.BI loghole
 .BI archive
 [\fB-k \fR(\fBi-delete\fR|\fBspace-is-needed\fR)]
 [\fB-a \fIdays\fR]
@@ -99,6 +102,9 @@ more detail can be found in later sections of this manual:
 .B sync
 Synchronize the experiment's log holes on the nodes with the experiment's log
 directory.
+.TP
+.B validate
+Validate that the logs were sync'd correctly by performing some sanity checks.
 .TP
 .B archive
 Archive the contents of the experiment's log directory into a zip file.
@@ -208,6 +214,18 @@ Optional arguments:
 .I node1 ...
 Specify a subset of virtual or physical nodes that should be synchronized,
 otherwise all of the nodes will be synchronized.
+.SH VALIDATE
+The
+.B validate
+action is used to check that the logs were sync'd correctly.  Currently, the
+following checks are performed:
+.TP
+program-agent logs
+The stdout and stderr logs from program agents are checked by comparing their
+metadata against that saved in the accompanying ".status" files.
+.TP
+valid soft links
+All soft links are checked to ensure the referent exists.
 .SH ARCHIVE
 The
 .B archive

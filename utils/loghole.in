@@ -198,7 +198,7 @@ def usage():
     print "            experiment's log directory."
     print "  show      Show a detailed listing of the archive(s) in the"
     print "            experiment directory."
-    #print "  validate  Validate the contents of an archive."
+    print "  validate  Validate the experiment logs."
     print "  clean     Clean the experiment log directory and node local"
     print "            directories."
     print "  gc        Garbage collect old archives."
@@ -369,15 +369,16 @@ def change_usage():
 # Print the usage statement for the "validate" action.
 #
 def validate_usage():
-    print "Usage: loghole validate <archive-name>"
+    print "Usage: loghole validate"
     print
-    print "Validate the contents of an archive."
+    print "Validate the experiment logs.  Currently, this action will:"
     print
-    print "Required arguments:"
-    print "  archive-name  The name of the archive to validate."
+    print "  1. Examine the log files from individual logs from the "
+    print "     program-agent to verify that the files are intact."
+    print "  2. Check that the referent of any soft-links exist."
     print
     print "Examples:"
-    print "  $ loghole validate foobar.0"
+    print "  $ loghole validate"
     return
 
 ##
@@ -1400,6 +1401,59 @@ def do_change(args):
     
     return retval
 
+def validate_visitor(arg, dirname, names):
+    for name in names:
+        fname = os.path.join(dirname, name)
+        
+        mo = re.match(r'[^\.]+\.status\.([0-9]+)', name)
+        if mo:
+            try:
+                token = int(mo.group(1))
+                
+                status = {}
+                for line in open(os.path.join(dirname, name)):
+                    (key, value) = line.split("=")
+                    status[key] = value
+                    pass
+                
+                if token != int(status.get("TOKEN", "-1")):
+                    print "warning: ignoring %s" % name
+                    continue
+                
+                base, ext = os.path.splitext(name)
+                base, ext = os.path.splitext(base)
+                
+                st = os.stat(os.path.join(dirname, base + ".out." + `token`))
+                if st[stat.ST_SIZE] != long(status.get("OUTSIZE", "-1")):
+                    print "warning: '%s' size doesn't match status" % fname
+                    arg["retval"] = 1
+                    pass
+                if st[stat.ST_MTIME] != long(status.get("OUTMTIME", "-1")):
+                    print "warning: '%s' mtime doesn't match status" % fname
+                    arg["retval"] = 1
+                    pass
+                
+                st = os.stat(os.path.join(dirname, base + ".err." + `token`))
+                if st[stat.ST_SIZE] != long(status.get("ERRSIZE", "-1")):
+                    print "warning: '%s' size doesn't match status" % fname
+                    arg["retval"] = 1
+                    pass
+                if st[stat.ST_MTIME] != long(status.get("ERRMTIME", "-1")):
+                    print "warning: '%s' mtime doesn't match status" % fname
+                    arg["retval"] = 1
+                    pass
+                pass
+            except OSError:
+                pass
+            pass
+
+        if not os.path.exists(fname):
+            print "warning: '%s' references nonexistent file!" % fname
+            pass
+        pass
+    
+    return
+
 ##
 # Performs the "validate" action, which XXX
 #
@@ -1411,7 +1465,9 @@ def do_validate(args):
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
     os.chdir(logdir)
 
-    
+    rc = { "retval" : 0 }
+    os.path.walk(os.path.curdir, validate_visitor, rc)
+    retval = rc["retval"]
 
     return retval
 
@@ -1565,6 +1621,7 @@ def notimplemented():
 ACTIONS = {
     "get" : (do_sync, sync_usage),
     "sync" : (do_sync, sync_usage),
+    "validate" : (do_validate, validate_usage),
     "archive" : (do_archive, archive_usage),
     "list" : (do_list, list_usage),
     "show" : (do_show, show_usage),
