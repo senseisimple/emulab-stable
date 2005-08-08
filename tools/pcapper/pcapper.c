@@ -1696,8 +1696,10 @@ callback(event_handle_t handle,
 		!strcmp(eventtype,TBDB_EVENTTYPE_START)) {
 	    /* OK, time has started */
 	    gettimeofday(&start_time,NULL);
-	    stop = 1;
-	    reload = interfaces;
+	    if (capture_mode) {
+	        stop = 1;
+		reload = interfaces;
+	    }
 	    printf("Event time started at UNIX time %lu.%lu\n",
 		    start_time.tv_sec, start_time.tv_usec);
 	    return;
@@ -1715,8 +1717,10 @@ callback(event_handle_t handle,
 		}
 		else if (!strcmp(eventtype,TBDB_EVENTTYPE_RELOAD) ||
 			 !strcmp(eventtype,TBDB_EVENTTYPE_SNAPSHOT)) {
-			stop   = 1;
-			reload = interfaces;
+			if (capture_mode) {
+				stop   = 1;
+				reload = interfaces;
+			}
 		}
 		return;
 	}
