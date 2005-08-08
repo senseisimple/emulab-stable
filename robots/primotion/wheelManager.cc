@@ -372,7 +372,12 @@ void wheelManager::startNULL(float accel, wmCallback *callback) {
 
 	acpValue av;
 	acpObject *nullb = NULL;
-
+	
+	av.set(FRONT_RANGER_THRESHOLDS[THRESH_HIGH]);
+	this->wm_garcia.setNamedValue("front-ranger-threshold", &av);
+	av.set(REAR_RANGER_THRESHOLDS[THRESH_HIGH]);
+	this->wm_garcia.setNamedValue("rear-ranger-threshold", &av);
+	
 	nullb = this->wm_garcia.createNamedBehavior("null", NULL);
 
 	av.set((float)(accel)); /* Do I really need to force it to a float? */
@@ -384,22 +389,14 @@ void wheelManager::startNULL(float accel, wmCallback *callback) {
 	av.set(new endCallback(*this, nullb, callback));
 	nullb->setNamedValue("completion-callback", &av);
 
-	if (nullb == NULL && callback != NULL) {
-	    callback->call(aGARCIA_ERRFLAG_WONTEXECUTE, 0);
-
-	    delete callback;
-	    callback = NULL;
-	}
-	else {
-	    this->wm_garcia.queueBehavior(nullb);
-	    nullb = NULL;
-	}
+	this->wm_garcia.queueBehavior(nullb);    
+	nullb = NULL;
+	
+	this->wm_moving = true;
     }
 
 
 }
-
-
 
 void wheelManager::setWheels(float vl, float vr) {
 
@@ -408,6 +405,9 @@ void wheelManager::setWheels(float vl, float vr) {
 
     float maxspeed = 0.0f;
 
+    if (!this->wm_moving)
+	return;
+    
     if (fabsf(vl) >= fabsf(vr)) {
 	maxspeed = fabsf(vl) * 100.0;
     }
@@ -442,13 +442,10 @@ void wheelManager::setWheels(float vl, float vr) {
 
     this->wm_garcia.setNamedValue("damped-speed-left", &av_L);
     this->wm_garcia.setNamedValue("damped-speed-right", &av_R);
-
-
+    
     /* handle fault detection */
     this->wm_dashboard->setDistanceLimit(10000.0f);
     this->wm_dashboard->setVelocityLimit(maxspeed);
-    this->wm_moving = true;
-
 }
 
 

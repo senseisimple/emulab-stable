@@ -150,6 +150,7 @@ pilotClient::~pilotClient()
 
 bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 {
+    struct mtp_command_startnull *mcsn;
     struct mtp_command_goto *mcg;
     struct mtp_command_stop *mcs;
     struct mtp_command_wheels *mcw;
@@ -290,31 +291,34 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 	}
 	break;
 	/* DAN */
+    case MTP_COMMAND_STARTNULL:
+	if (this->pc_role == MTP_ROLE_RMC) {
+	    mcsn = &mp->data.mtp_payload_u.command_startnull;
+	                
+	    /* start NULL command */
+	    this->pc_wheel_manager.
+		startNULL(mcsn->acceleration, 
+			  new pilotMoveCallback(notify_list,
+						mcsn->command_id, 0.0f));
+            
+	    retval = true;
+	}
+	break;
     case MTP_COMMAND_WHEELS:
 	if (this->pc_role == MTP_ROLE_RMC) {
 
 	    mcw = &mp->data.mtp_payload_u.command_wheels;
-
 	    if (debug > 1) {
 		fprintf(stderr,
 			"debug: set wheels to: %f %f\n",
 			mcw->vleft,
 			mcw->vright);
 	    }
-
-	    /* start NULL command (if needed) */
-	    /* FIXME: need to configure acceleration here */
-	    /* I don't care about command_id or theta! */
-	    this->pc_wheel_manager.startNULL(DEFAULT_ROBOT_ACCELERATION,
-					     new pilotMoveCallback(notify_list,
-								   mcw->command_id, 0.0f));
-
 	    this->pc_wheel_manager.setWheels(mcw->vleft, mcw->vright);
 	    retval = true;
-
+            
 	}
 	break;
-
 
 
     case MTP_REQUEST_REPORT:
