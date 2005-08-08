@@ -295,7 +295,7 @@ struct mtp_command_wheels {
 struct mtp_command_startnull {
     int command_id;
     int robot_id;
-    int acceleration;
+    float acceleration;
 }; /* DAN */
 
 /**
