@@ -2703,4 +2703,19 @@ last_net_act,last_cpu_act,last_ext_act);
 	  KEY pid (pid,eid)
 	) TYPE=MyISAM;
 
-4.1:
+4.1: Add mailman passwords. One to the groups table to hold the admin
+     password for each project/group list, and another to the users
+     table to hold each users password.
+
+     These passwords are stored in cleartext. This is okay since the
+     mailman password is deemed to be throw away since the mailman
+     system is happy to mail them out to people in cleartext.
+
+     We initially set them to a random value, and will provide a web
+     interface on the Emulab side to change them. This is done in the
+     mailman setup script though.
+
+          alter table groups add mailman_password tinytext;
+          alter table users add mailman_password tinytext;
+
+4.2:

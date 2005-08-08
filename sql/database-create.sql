@@ -573,6 +573,7 @@ CREATE TABLE groups (
   expt_count mediumint(8) unsigned default '0',
   expt_last date default NULL,
   wikiname tinytext,
+  mailman_password tinytext,
   PRIMARY KEY  (pid,gid),
   KEY unix_gid (unix_gid),
   KEY gid (gid),
@@ -1899,6 +1900,7 @@ CREATE TABLE users (
   chpasswd_expires int(10) unsigned NOT NULL default '0',
   wikiname tinytext,
   wikionly tinyint(1) default '0',
+  mailman_password tinytext,
   PRIMARY KEY  (uid),
   KEY unix_uid (unix_uid),
   KEY status (status)
