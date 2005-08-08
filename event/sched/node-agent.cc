@@ -7,6 +7,8 @@
 #include "config.h"
 
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "systemf.h"
 #include "rpc.h"
@@ -169,6 +171,10 @@ static void dump_node_logs(int token, struct agent **agent_array, int aa_len,
 		char filename[1024];
 		FILE *file;
 		
+		snprintf(filename, sizeof(filename),
+			 NODE_DUMP_DIR,
+			 agent_array[lpc]->name);
+		mkdir(filename, 0664);
 		snprintf(filename, sizeof(filename),
 			 NODE_DUMP_FILE,
 			 agent_array[lpc]->name, token);

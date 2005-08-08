@@ -18,6 +18,7 @@
 extern "C" {
 #endif
 
+#define NODE_DUMP_DIR "logs/%s"
 #define NODE_DUMP_FILE "logs/%s/node-control.%d"
 
 /**
