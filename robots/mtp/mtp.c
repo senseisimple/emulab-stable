@@ -597,7 +597,7 @@ mtp_error_t mtp_init_packetv(struct mtp_packet *mp,
 		break;
 	    }
 	    break;
-	case MA_acceleration:
+	case MA_Acceleration:
 	    switch (mp->data.opcode) {
 	    case MTP_COMMAND_STARTNULL:
 		mp->data.mtp_payload_u.command_startnull.acceleration =
@@ -896,6 +896,14 @@ int mtp_dispatch(void *userdata, mtp_packet_t *mp, mtp_dispatch_tag_t tag, ...)
 
 	    flags = va_arg(args, int);
 	    match_curr = ((values[value_curr].i & flags) == flags);
+	    if (!(tag & MD_OR))
+		value_curr += 1;
+	    break;
+	case MD_OnClearedFlags:
+	    assert(value_curr < value_count);
+
+	    flags = va_arg(args, int);
+	    match_curr = ((values[value_curr].i & flags) == 0);
 	    if (!(tag & MD_OR))
 		value_curr += 1;
 	    break;
@@ -1213,6 +1221,30 @@ void mtp_print_packet(FILE *file, struct mtp_packet *mp)
 		"  id:\t%d\n",
 		mp->data.mtp_payload_u.command_stop.command_id,
 		mp->data.mtp_payload_u.command_stop.robot_id);
+	break;
+
+    case MTP_COMMAND_STARTNULL:
+	fprintf(file,
+		" opcode:\tcommand-startnull\n"
+		"  commid:\t%d\n"
+		"  id:\t%d\n"
+		"  accel:\t%.3f\n",
+		mp->data.mtp_payload_u.command_startnull.command_id,
+		mp->data.mtp_payload_u.command_startnull.robot_id,
+		(double)mp->data.mtp_payload_u.command_startnull.acceleration);
+	break;
+
+    case MTP_COMMAND_WHEELS:
+	fprintf(file,
+		" opcode:\tcommand-wheels\n"
+		"  commid:\t%d\n"
+		"  robot:\t%d\n"
+		"  vleft:\t%.3f\n"
+		"  vright:\t%.3f\n",
+		mp->data.mtp_payload_u.command_wheels.command_id,
+		mp->data.mtp_payload_u.command_wheels.robot_id,
+		mp->data.mtp_payload_u.command_wheels.vleft,
+		mp->data.mtp_payload_u.command_wheels.vright);
 	break;
 
     case MTP_TELEMETRY:

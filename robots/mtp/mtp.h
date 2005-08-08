@@ -197,7 +197,7 @@ typedef enum {
     MA_Theta,	 	 /*< (double) */
     MA_vleft,		 /*< (float) */
     MA_vright,		 /*< (float) */
-    MA_acceleration,	 /*< (float) */
+    MA_Acceleration,	 /*< (float) */
     MA_Timestamp,	 /*< (double) */
     MA_Status,	 	 /*< (mtp_status_t) */
     MA_RequestID,	 /*< (int) */
@@ -315,6 +315,7 @@ typedef enum {
     
     MD_OnInteger,	/*< (int) Check an MD_Integer. */
     MD_OnFlags,		/*< (int) Bitwise check of an MD_Integer. */
+    MD_OnClearedFlags,	/*< (int) Bitwise check of an MD_Integer. */
     MD_SkipInteger,	/*< (void) Skip checking an MD_Integer. */
     
     MD_Return,		/*< (void) On match, return immediately. */
