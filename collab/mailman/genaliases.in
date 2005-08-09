@@ -1,0 +1,104 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+    
+#
+# Generate a new aliases database from the existing mailman lists.
+#
+sub usage()
+{
+    print "Usage: genaliases\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB         = "@prefix@";
+my $TBOPS      = "@TBOPSEMAIL@";
+my $MAILMANDIR = "/usr/local/mailman";
+my $MMBINDIR   = "$MAILMANDIR/bin";
+my $MMALIASES  = "/etc/mail/aliases.mailman";
+my $NEWALIASES = "/usr/bin/newaliases";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+# Protos
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Generate the new aliases into a temp file. If that works, move it
+# to /etc/mail and then run newaliases
+#
+my $tempfile = "/tmp/mailman-aliases.$$";
+
+# Run the config script.
+system("$MMBINDIR/genaliases -q > $tempfile") == 0 or
+    fatal("Could not generate new mailman aliases file!");
+
+system("/bin/mv -f $tempfile $MMALIASES") == 0 or
+    fatal("Could not mv $tempfile to $MMALIASES!");
+
+system("$NEWALIASES") == 0 or
+    fatal("Could not regenerate the aliases database!");
+
+unlink($tempfile);
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    unlink($tempfile)
+	if (defined($tempfile) && -e $tempfile);
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

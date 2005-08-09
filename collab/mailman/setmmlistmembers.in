@@ -1,0 +1,144 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Set the mailman list members for either a project/group mailing list
+# or one of the admin lists. Rather then duplicate all of what
+# db/genelists does, I have that script generate slightly different files
+# when MAILMANSUPPORT=1, and then just pass in the file to this script, 
+# which invokes the right thing over on boss. 
+#
+sub usage()
+{
+    print STDOUT "Usage: setmmlistmembers [-d] <listname> <listfile>\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+my $listname;
+my $listfile;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $MMPROXY     = "$TB/sbin/mailmanproxy";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no mailman support, just exit. 
+#
+if (! $MAILMANSUPPORT) {
+    print "MailMan support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+usage()
+    if (@ARGV != 2);
+
+$listname = $ARGV[0];
+$listfile = $ARGV[1];
+
+#
+# Untaint args.
+#
+if ($listname =~ /^([-\w]+)$/) {
+    $listname = $1;
+}
+else {
+    die("Bad data in listname: $listname");
+}
+if ($listfile =~ /^([-\w\.\/]+)$/) {
+    $listfile = $1;
+}
+else {
+    die("Bad data in listfile: $listfile");
+}
+
+#
+# This script always does the right thing, so no permission checks.
+# In fact, all it does it call over to ops to run a script over there.
+# Note that since we are sending cleartext passwords over, pipe the info
+# into its STDIN so that the passwords are not visible in a ps listing.
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    my $optarg = ($debug ? "-d" : "");
+
+    if (system("$SSH -host $CONTROL $MMPROXY setlistmembers $listname ".
+	       "< $listfile")) {
+	fatal("$MMPROXY failed on $CONTROL!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

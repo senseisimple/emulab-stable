@@ -1,0 +1,161 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Initial mailman setup.
+#
+sub usage()
+{
+    print STDOUT "Usage: mmsetup\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+my $impotent = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $ADDMMLIST   = "$TB/sbin/addmmlist";
+my $GENELISTS	= "$TB/sbin/genelists";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# If no bugdb support, just exit. 
+#
+if (! $MAILMANSUPPORT) {
+    print "Mailman support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Only testbed admins.
+#
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Must be a testbed admin to run this script\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# Initialize a mailman password for all users. 
+#
+my $query_result =
+    DBQueryFatal("select uid from users where mailman_password is NULL");
+
+while (my ($uid) = $query_result->fetchrow_array()) {
+    print "Setting initial mailman password for $uid\n"
+	if ($debug);
+
+    my $password = TBGenSecretKey();
+    $password = substr($password, 0, 10);
+
+    DBQueryFatal("update users set mailman_password='$password' ".
+		 "where uid='$uid'");
+}
+
+my $optarg = ($debug ? "-d" : "");
+
+#
+# Add "system" lists.
+#
+system("$ADDMMLIST $optarg -a emulab-users") == 0
+    or fatal("Could not create emulab-users list");
+system("$ADDMMLIST $optarg -a emulab-project-leaders") == 0
+    or fatal("Could not create emulab-project-leaders list");
+system("$ADDMMLIST $optarg -a emulab-widearea-users") == 0
+    or fatal("Could not create emulab-widearea-users list");
+
+#
+# Add project (and group) lists.
+#
+my @projects = ();
+
+$query_result =
+    DBQueryFatal("select pid,gid from groups where 1 ".
+		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
+		 "     pid='utahstud')" .
+		 "");
+
+while (my ($pid,$gid) = $query_result->fetchrow_array()) {
+    my $listname;
+    
+    print "Creating mailing list for $pid/$gid\n"
+	if ($debug);
+
+    if ($pid ne $gid) {
+	$listname = "$pid-$gid" . "-users";
+    }
+    else {
+	$listname = "$pid" . "-users";
+    }
+
+    system("$ADDMMLIST $optarg -a $listname") == 0
+	or fatal("Could not create $listname list");
+
+    push(@projects, $pid);
+}
+
+#
+# And populate all the lists!
+#
+foreach my $pid (@projects) {
+    system("$GENELISTS $optarg -p $pid") == 0
+	or fatal("Could not populate lists for project $pid!");
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

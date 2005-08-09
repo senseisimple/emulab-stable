@@ -1,0 +1,67 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= collab/mailman
+
+include $(OBJDIR)/Makeconf
+
+SBIN_SCRIPTS		= addmmlist setmmlistmembers mmsetup
+CTRL_LIBEXEC_SCRIPTS	= genaliases
+CTRL_LIB_FILES		= mmscript.py
+
+CTRL_SBIN_SCRIPTS	= mailmanproxy
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIBEXEC_SCRIPTS) \
+	$(CTRL_LIB_FILES)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/libexec/mailman/, $(CTRL_LIBEXEC_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRL_SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/lib/mailman/, $(CTRL_LIB_FILES))
+
+boss-install: install
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/addmmlist
+	chmod u+s $(INSTALL_SBINDIR)/addmmlist
+	chown root $(INSTALL_SBINDIR)/setmmlistmembers
+	chmod u+s $(INSTALL_SBINDIR)/setmmlistmembers
+
+#
+# Control node installation (okay, plastic)
+#
+control-install:	\
+	$(addprefix $(INSTALL_SBINDIR)/, $(CTRL_SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBDIR)/mailman/, $(CTRL_LIB_FILES)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/mailman/, $(CTRL_LIBEXEC_FILES))
+
+clean:
+	rm -f *.o core
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/mailman/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib/mailman
+	$(INSTALL_DATA) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/mailman/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec/mailman
+	$(INSTALL) $< $@
+

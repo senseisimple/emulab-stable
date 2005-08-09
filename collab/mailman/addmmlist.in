@@ -1,0 +1,197 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Add a mailman list, say for a project or other reason. If for a project
+# the admin password comes from the groups table. Otherwise it comes from
+# the sitevars table cause its assumed to be an admins list of some kind.
+#
+sub usage()
+{
+    print STDOUT "Usage: addmmlist -a <listname> or\n";
+    print STDOUT "       addmmlist -u <listname> <listowner> <listpassword>\n";
+    exit(-1);
+}
+my $optlist = "dau";
+my $debug   = 0;
+my $listtype;
+my $listname;
+my $listowner;
+my $listowner_email;
+my $listpasswd;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $MMPROXY     = "$TB/sbin/mailmanproxy";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no mailman support, just exit. 
+#
+if (! $MAILMANSUPPORT) {
+    print "MailMan support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Only testbed admins.
+#
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Must be a testbed admin to run this script\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"a"})) {
+    $listtype = "admin";
+
+    usage()
+	if (@ARGV != 1);
+    
+    $listname = $ARGV[0];
+}
+if (defined($options{"u"})) {
+    my $listowner;
+    
+    $listtype = "user";
+
+    usage()
+	if (@ARGV != 3);
+    
+    $listname   = $ARGV[0];
+    $listowner  = $ARGV[1];
+    $listpasswd = $ARGV[2];
+
+    #
+    # Untaint args.
+    #
+    if ($listowner =~ /^([-\w]+)$/) {
+	$listowner = $1;
+    }
+    else {
+	die("Bad data in listowner: $listowner");
+    }
+    if ($listpasswd =~ /^([-\w]+)$/) {
+	$listpasswd = $1;
+    }
+    else {
+	die("Bad data in listpasswd: $listpasswd");
+    }
+}
+
+usage()
+    if (! (defined($options{"a"}) || defined($options{"u"})));
+usage()
+    if (defined($options{"a"}) && defined($options{"u"}));
+    
+#
+# Untaint args.
+#
+if ($listname =~ /^([-\w]+)$/) {
+    $listname = $1;
+}
+else {
+    die("Bad data in listname: $listname");
+}
+
+if ($listtype eq "admin") {
+    # An admins list of some kind.
+    $listowner_email  = $TBOPS;
+
+    if (! TBGetSiteVar("general/mailman/password", \$listpasswd)) {
+	fatal("Could not mailman admin password from sitevars!");
+    }
+}
+else {
+    # A user created list. 
+    $listowner_email = "${listowner}\@${OURDOMAIN}";
+}
+
+#
+# Note that since we are sending cleartext passwords over, pipe the info
+# into its STDIN so that the passwords are not visible in a ps listing.
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    my $optarg = ($debug ? "-d" : "");
+
+    print "Adding mailman list $listname ($listtype) on $CONTROL.\n";
+
+    if (system("echo '$listowner_email $listpasswd' | ".
+	       "$SSH -host $CONTROL $MMPROXY addlist $listname $listtype")) {
+	fatal("$MMPROXY failed on $CONTROL!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

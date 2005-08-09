@@ -1,0 +1,491 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+    
+#
+# A wrapper for messing with Mailman from boss.
+#
+sub usage()
+{
+    print "Usage: mailmanproxy addlist <listname> <listtype> or\n";
+    print "       mailmanproxy setlistmembers <listname> or\n";
+    print "       mailmanproxy modifymember <email>\n";
+    exit(-1);
+}
+my $optlist  = "dn";
+my $debug    = 1;
+my $impotent = 0;
+
+#
+# Configure variables
+#
+my $TB         = "@prefix@";
+my $TBOPS      = "@TBOPSEMAIL@";
+my $OURDOMAIN  = "@OURDOMAIN@";
+my $MAILMANDIR = "/usr/local/mailman";
+my $MMBINDIR   = "$MAILMANDIR/bin";
+my $MMLISTDIR  = "$MAILMANDIR/lists";
+my $GENALIASES = "$TB/libexec/mailman/genaliases";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# For Mailman withlist wrapper
+$ENV{'PYTHONPATH'} = "$TB/lib/mailman";
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+
+# Protos
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"n"})) {
+    $impotent = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+
+#
+# Before we continue, flip to mailman user/group.
+#
+my (undef,undef,$unix_uid) = getpwnam("mailman") or
+    fatal("No such user mailman!");
+my (undef,undef,$unix_gid) = getgrnam("mailman") or
+    fatal("No such group mailman!");
+
+$GID            = $unix_gid;
+$EGID           = $unix_gid;
+$EUID = $UID    = $unix_uid;
+$ENV{'USER'}    = "mailman";
+$ENV{'LOGNAME'} = "mailman";
+
+#
+# Lets work from the mailman dir ...
+#
+chdir($MAILMANDIR) or
+    fatal("Could not chdir to $MAILMANDIR!");
+
+my $action = shift(@ARGV);
+
+if ($action eq "addlist") {
+    exit(AddList(@ARGV));
+}
+elsif ($action eq "setlistmembers") {
+    exit(SetListMembers(@ARGV));
+}
+elsif ($action eq "modifymember") {
+    exit(ModifyMember(@ARGV));
+}
+elsif ($action eq "xlogin") {
+    exit(xLogin(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Create a new project mailing list. 
+#
+sub AddList(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($name, $listtype) = @_;
+    my ($owneremail, $password) = ();
+
+    # Other info for list comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*) (.*)$/) {
+	$owneremail = $1;
+	$password   = $2;
+    }
+    else {
+	fatal("AddList: Bad line in input: $_");
+    }
+
+    # Step 1: Create the list.
+    if (! -d "$MMLISTDIR/" . lc($name)) {
+	system("$MMBINDIR/newlist -q $name $owneremail $password") == 0 or
+	    fatal("AddList: Could not create mailing list!");
+    }
+
+    # Step 2: Config the list. We just need to alter a few of the defaults.
+    my $tempfile = "/tmp/config.$$";
+
+    open(CONFIG, "> $tempfile") or
+	fatal("Could not open $tempfile for writing!");
+
+    #
+    # These options are described in gory detail in the listconfig file
+    # in the source directory. 
+    # 
+    print CONFIG "real_name = '$name'\n";
+    print CONFIG "owner = ['$owneremail']\n";
+    print CONFIG "description = 'Emulab Mail list: $name'\n";
+    print CONFIG "subject_prefix = '[Emulab Mail List: $name] '\n";
+    print CONFIG "reply_goes_to_list = 1\n";
+    print CONFIG "send_reminders = False\n";
+    print CONFIG "send_welcome_msg = False\n";
+    print CONFIG "send_goodbye_msg = False\n";
+    if ($listtype eq "admin") {
+	# No need for tbops to see any of this.
+	print CONFIG "admin_notify_mchanges = 0\n";
+	# Users may not unsubscribe from our lists. Only their own.
+	print CONFIG "unsubscribe_policy = 0\n";
+    }
+    else {
+	print CONFIG "admin_notify_mchanges = 1\n";
+	print CONFIG "unsubscribe_policy = 1\n";
+    }
+    print CONFIG "max_message_size = 500\n";
+    print CONFIG "host_name = '$OURDOMAIN'\n";
+    print CONFIG "advertised = 0\n";
+    print CONFIG "subscribe_policy = 3\n";
+    print CONFIG "obscure_addresses = 0\n";
+    print CONFIG "archive = True\n";
+    print CONFIG "archive_private = 1\n";
+    print CONFIG "digestable = 0\n";
+    # Be default, lists are closed unless the mail originates in the domain.
+    # The point is to allow admin people to post to the lists, but this will
+    # do for now, since we do not expect spammers from within ...
+    print CONFIG "generic_nonmember_action = 2\n";
+    print CONFIG "accept_these_nonmembers = ['^.*\@.*${OURDOMAIN}\$', ".
+	"'^.*\@.*utah.edu\$']\n";
+    close(CONFIG);
+
+    # Run the config script.
+    system("$MMBINDIR/config_list -i $tempfile $name") == 0 or
+	fatal("AddList: Could not configure mailing list!");
+    unlink($tempfile);
+
+    # Step 3: Regen the aliases. We use an external script for this.
+#    $EUID = $UID = 0;
+#    system("$GENALIASES") == 0 or
+#	fatal("AddList: Could not generate a new aliases file!");
+
+    return 0;
+}
+
+#
+# Set the membership for a list; this mirrors how genelists operates.
+# The main difference is that we have to deal with the passwd.
+# 
+sub SetListMembers(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($listname) = @_;
+
+    if ($debug) {
+	print "Setting members for list: $listname\n";
+    }
+
+    #
+    # The list of users and their passwords is going to come from stdin.
+    # The actual format looks like:
+    #
+    #	email-addr password 'full name'
+    #
+    # All of these are indexed by the email-addr.
+    #
+    my %members      = ();	# Stores the password.
+    my %fullnames    = ();
+    my %curmembers   = ();
+
+    while (<STDIN>) {
+	# Allow for comments
+	if ($_ =~ /^\#/) {
+	    next;
+	}
+	elsif ($_ =~ /^(.*) (.*) '(.*)'$/) {
+	    $members{$1}   = $2;
+	    $fullnames{$1} = $3;
+	}
+	else {
+	    print STDERR "Bad line in input: $_";
+	}
+    }
+
+    #
+    # Lets find out which members are already subscribed. We also want their
+    # fullname info.
+    #
+    open(MEMBERS, "$MMBINDIR/list_members -f -p $listname |") or
+	fatal("SetListMembers: Could not start up list_members script!");
+
+    while (<MEMBERS>) {
+	if ($_ =~ /^\"(.*)\" \<(.*)\>$/ ||
+	    $_ =~ /^(.*) \<(.*)\>$/) {
+	    $curmembers{$2} = $1;
+	    
+	    if ($debug) {
+		print "Current list member: $1 <$2>\n";
+	    }
+	}
+	elsif ($_ =~ /^(.*)$/) {
+	    $curmembers{$1} = "";
+	    
+	    if ($debug) {
+		print "Current list member: $1\n";
+	    }
+	}
+	else {
+	    fatal("Could not parse current member: $_");
+	}
+	
+    }
+    close(MEMBERS) or
+	fatal("SetListMembers: Error running list_members script!");
+
+    #
+    # First remove any members that are no longer supposed to be in the list.
+    # Build up a list to pass to a single call to remove_members.
+    #
+    my @toremove = ();
+
+    foreach my $member (keys(%curmembers)) {
+	push(@toremove, $member)
+	    if (! exists($members{$member}));
+    }
+    if (@toremove) {
+	if ($impotent) {
+	    print "Would remove '@toremove'\n";
+	}
+	else {
+	    if ($debug) {
+		print "Removing members: @toremove\n";
+	    }
+	    system("$MMBINDIR/remove_members -N -n $listname @toremove") == 0
+		or fatal("SetListMembers: ".
+			 "Could not remove members from $listname:@toremove!");
+	}
+    }
+
+    #
+    # Okay, now add any members that are not in the current set.
+    #
+    foreach my $member (keys(%members)) {
+	if (! exists($curmembers{$member})) {
+	    my $email    = $member;
+	    my $password = $members{$member};
+	    my $fullname = $fullnames{$member};
+
+	    if ($impotent) {
+		print "Would add: $fullname <$email>\n";
+	    }
+	    else {
+		if ($debug) {
+		    print "Adding: $fullname <$email>\n";
+		}
+
+		# Shell escape sillyness.
+		$fullname =~ s/\"/\'/g;
+		$fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+		
+		#
+		# Use withlist script and our own little function that
+		# adds the user and sets the password. The existing
+		# add_members script does not set the password, and there
+		# is no script to do that for a person per list anyway.
+		#
+		system("$MMBINDIR/withlist -l -q ".
+		       "-r mmscript.addmember $listname ".
+		       "$email \"$fullname\" $password") == 0
+			   or fatal("SetListMembers: ".
+				    "Could not add member to $listname: ".
+				    "$fullname <$email>");
+	    }
+	}
+    }
+
+    #
+    # And then lets reset fullnames for any that are now different. Reset
+    # the password at the same time, just for the hell of it.
+    # 
+    foreach my $member (keys(%members)) {
+	if (exists($curmembers{$member}) &&
+	    $fullnames{$member} ne $curmembers{$member}) {
+
+	    my $email    = $member;
+	    my $password = $members{$member};
+	    my $fullname = $fullnames{$member};
+
+		# Shell escape sillyness.
+		$fullname =~ s/\"/\'/g;
+		$fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+
+	    if ($impotent) {
+		print "Would reset: $fullname <$email>\n";
+	    }
+	    else {
+		if ($debug) {
+		    print "Resetting: $fullname <$email>\n";
+		}
+
+		#
+		# Use withlist script and our own little function that
+		# modifies the user and sets the password. There is no
+		# no exiting script to do that for a person per list.
+		#
+		system("$MMBINDIR/withlist -l -q ".
+		       "-r mmscript.modmember $listname ".
+		       "$email \"$fullname\" $password") == 0
+			   or fatal("SetListMembers: ".
+				    "Could not modify member in $listname: ".
+				    "$fullname <$email>");
+	    }
+	}
+    }
+}
+
+#
+# Modify the password and fullname for a particular user. This will change
+# all lists to which the user is subscribed. Note that the fullname and
+# password come in from stdin to avoid having the password show up in a ps
+# listing.
+# 
+sub ModifyMember(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($email) = @_;
+
+    if ($debug) {
+	print "Modifying info for: $email\n";
+    }
+
+    #
+    # The fullname and password come from stdin.
+    # The actual format looks like:
+    #
+    #	password 'full name'
+    #
+    my $fullname;
+    my $password;
+    my @listnames = ();
+
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*) '(.*)'$/) {
+	$password = $1;
+	$fullname = $2;
+    }
+    else {
+	fatal("Bad line in input: $_");
+    }
+
+    #
+    # Find the current subscription list for the user.
+    #
+    open(LISTS, "$MMBINDIR/withlist -q -a -r mmscript.findmember $email |") or
+	fatal("ModifyMember: Could not start up withlist script!");
+
+    while (<LISTS>) {
+	if ($_ = /^(.*)$/) {
+	    push(@listnames, $1);
+	}
+    }
+    close(LISTS) or
+	fatal("ModifyMember: Error running withlist script!");
+
+    if ($debug) {
+	print "$email is a member of @listnames\n";
+    }
+
+    # Shell escape sillyness.
+    $fullname =~ s/\"/\'/g;
+    $fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
+
+    foreach my $listname (@listnames) {
+	if ($impotent) {
+	    print "Would reset in $listname: $fullname <$email>\n";
+	}
+	else {
+	    if ($debug) {
+		print "Resetting in $listname: $fullname <$email>\n";
+	    }
+	    
+	    #
+	    # Use withlist script and our own little function that
+	    # modifies the user and sets the password. There is no
+	    # no exiting script to do that for a person per list.
+	    #
+	    system("$MMBINDIR/withlist -l -q ".
+		   "-r mmscript.modmember $listname ".
+		   "$email \"$fullname\" $password") == 0
+		       or fatal("ModifyMember: ".
+				"Could not modify member in $listname: ".
+				"$fullname <$email>");
+	}
+    }
+}
+
+#
+# Backdoor Login
+#
+sub xLogin(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $secretkey) = @_;
+
+    return 0;
+}
+     
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
