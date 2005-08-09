@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -288,7 +288,7 @@ function newexptcmp ($a, $b) {
 }
 
 function showrange ($showby, $sortby, $range) {
-    global $TBOPSPID, $TB_EXPTSTATE_ACTIVE, $debug;
+    global $TBOPSPID, $TB_EXPTSTATE_ACTIVE, $debug, $debug2, $debug3;
     $now   = time();
     unset($rangematches);
     
@@ -398,7 +398,8 @@ function showrange ($showby, $sortby, $range) {
     $query_result =
 	DBQueryFatal("select s.pid,s.eid,t.uid,t.action,t.exptidx,t.exitcode,".
 		     "  r1.pnodes as pnodes1,r2.pnodes as pnodes2, ".
-		     "  UNIX_TIMESTAMP(t.end_time) as ttstamp ".
+		     "  UNIX_TIMESTAMP(t.end_time) as ttstamp, ".
+		     "  t.idx as statidx ".
 		     " from testbed_stats as t ".
 		     "left join experiment_stats as s on ".
 		     "  s.exptidx=t.exptidx ".
@@ -419,6 +420,7 @@ function showrange ($showby, $sortby, $range) {
 	$eid     = $row["eid"];
 	$uid     = $row["uid"];
 	$idx	 = $row["exptidx"];
+	$statidx = $row["statidx"];
 	$tstamp  = $row["ttstamp"];
 	$action  = $row["action"];
 	$pnodes  = $row["pnodes1"];
@@ -457,6 +459,36 @@ function showrange ($showby, $sortby, $range) {
 	    
 	    if ($debug)
 		echo "M $pid $eid $idx $saction<br>\n";
+	}
+
+	#
+	# If a swapout, and there is no record, one of two things. Either
+	# it was swapped in before the interval, or something screwed up!
+	# Look at the previous record.
+	# 
+	if ($action == "swapout" &&
+	    ! isset($expt_start["$pid:$eid"])) {
+	    $swapper_result =
+		DBQueryFatal("select action,exitcode from testbed_stats ".
+			     "where exptidx=$idx and ".
+			     "      UNIX_TIMESTAMP(end_time)<$tstamp ".
+			     "order by end_time desc limit 1");
+
+	    if (mysql_num_rows($swapper_result)) {
+		$srow    = mysql_fetch_assoc($swapper_result);
+		$saction = $srow["action"];
+		$secode  = $srow["exitcode"];
+
+		if ($saction == "swapout" ||
+		    ($saction == "swapin" && $secode)) {
+		    if ($debug3)
+			echo "SO dropped $pid $eid $idx ($statidx)<br>\n";
+		    
+		    continue;
+		}
+	    }
+	    if ($debug3)
+		echo "SO $pid $eid $idx ($statidx)<br>\n";
 	}
 
 	if (!isset($pid_summary[$pid])) {
@@ -529,9 +561,13 @@ function showrange ($showby, $sortby, $range) {
 		    $pid_summary[$pid]["swapins"]++;
 		    $uid_summary[$uid]["swapins"]++;
 		}
+
+		if ($debug2) 
+		    echo "S1 $pid $eid $idx $uid $action $diff $pnodes<br>\n";
+		
 	    }
 	    if ($debug) 
-		echo "S $pid $eid $uid $action $diff $pnodes $pnodes2<br>\n";
+		echo "S $pid $eid $idx $uid $action $diff $pnodes $pnodes2<br>\n";
 	    
 	    $pid_summary[$pid]["pnodes"]   += $pnodes;
 	    $pid_summary[$pid]["pseconds"] += $pnodes * $diff;
