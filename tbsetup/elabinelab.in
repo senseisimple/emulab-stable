@@ -613,15 +613,29 @@ sub DumpDBGoo()
 
     foreach my $table (@USERTABLES) {
 	unlink("$statedir/$table");
-	DBQueryWarn("select t.* from group_membership as gm ".
+
+	DBQueryWarn("create temporary table temp_$table ".
+		    "select t.* from group_membership as gm ".
 		    "left join users as u on u.uid=gm.uid ".
 		    "left join $table as t on t.uid=u.uid ".
 		    "where gm.pid='$pid' and gm.gid=gm.pid ".
 		    " and t.uid is not NULL and ".
-		    " u.status='" . USERSTATUS_ACTIVE() . "' ".
+		    " u.status='" . USERSTATUS_ACTIVE() . "'")
+	    or die("*** $0:\n".
+		   "    Could not create table temp_$table\n");
+
+	if ($table eq "users") {
+	    $creator = ExpLeader($pid, $eid);
+	    
+	    DBQueryFatal("update temp_${table} set ".
+			 " admin=1 ".
+			 "where uid='$creator'");
+	}
+
+	DBQueryWarn("select * from temp_$table ".
 		    "into outfile '$statedir/$table'")
 	    or die("*** $0:\n".
-		   "    Could not dump table $table\n");
+		   "    Could not dump table temp_$table\n");
     }
 
     # The group_membership is also special.
