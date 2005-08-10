@@ -686,6 +686,7 @@ if ($toponly) {
 
 my $currentrun = 1;
 my $canceled   = 0;
+my $tried_precheck = 0;
 
 # XXX plab hack - only run assign once on plab topologies, since they're easy
 # to map and the physical topology does not change frequently.
@@ -712,6 +713,22 @@ while (1) {
     # Success!
     last
 	if ($retval == 0);
+
+    if (!$precheck && !$tried_precheck) {
+	my $impotent0 = $impotent;
+	print("Trying assign on an empty testbed.\n");
+	$impotent = 1;
+	$precheck = 1;
+	my $retval = RunAssign();
+	if ($retval != 0) {
+	    fatal("Experiment can not be run on an empty testbed.  Please fix the experiment.");
+	}
+	print("Assign succeeded on an empty testbed.\n");
+	$precheck = 0;
+	$impotent = $impotent0;
+	$tried_precheck = 1;
+    }
+
 
     if ($currentrun >= $maxrun) {
 	fatal("Reached run limit. Giving up.");
