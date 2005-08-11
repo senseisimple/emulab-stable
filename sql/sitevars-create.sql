@@ -60,4 +60,4 @@ INSERT INTO sitevariables VALUES ('general/firstinit/pid',NULL,'testbed','The Pr
 INSERT INTO sitevariables VALUES ('general/version/minor','456','','Source code minor revision number');
 INSERT INTO sitevariables VALUES ('general/version/build','06/17/2005','','Build version number');
 INSERT INTO sitevariables VALUES ('general/version/major','1','','Source code major revision number');
-
+INSERT INTO sitevariables VALUES ('general/mailman/password','','','Admin password for Emulab generated lists');
