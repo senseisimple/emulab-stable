@@ -399,9 +399,9 @@ sub dostatus(@) {
 	    }
 	    print "$ctrl: ";
 	    print $status{current}, " Amps, "
-		if $status{current};
+		if defined($status{current});
 	    print $status{power}, " Watts, "
-		if $status{power};
+		if defined($status{power});
 	    if (defined($status{tempF}) || defined($status{tempC})) {
 		my $temp = $status{tempF};
 		if (!defined($temp)) {

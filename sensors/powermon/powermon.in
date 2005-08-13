@@ -169,9 +169,9 @@ sub dostatus(@) {
 	    }
 	    my $msg = "$ctrl: ";
 	    $msg .= $status{current} . "A, "
-		if ($docurrent && $status{current});
+		if ($docurrent && defined($status{current}));
 	    $msg .= $status{power} . "W, "
-		if ($dopower && $status{power});
+		if ($dopower && defined($status{power}));
 	    if ($dotemps &&
 		defined($status{tempF}) || defined($status{tempC})) {
 		my $temp = $status{tempF};
