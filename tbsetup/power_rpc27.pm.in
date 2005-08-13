@@ -361,8 +361,9 @@ sub rpc_readline($)
 	if (sysread($TIP, $line, 1, $cc) == 0) {
 	    return undef;
 	}
+	print "got: =$line=\n" if ($debug > 1);
 	$cc++;
-	last if ($line =~ /\n/ || $cc > 1023);
+	last if ($line =~ /\n/ || $line =~ /$RPC27_PROMPT/ || $cc > 1023);
     }
     return $line;
 }
