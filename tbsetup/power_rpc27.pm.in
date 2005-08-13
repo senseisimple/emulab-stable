@@ -61,11 +61,15 @@ sub rpc27status {
 	return 1;
     }
 
-    if (syncandsend($controller, $TIP, "status", $statusp)) {
-	return 1;
+    #
+    # Send the command.  Try again one time if there is a retryable error.
+    #
+    my $status = syncandsend($controller, $TIP, "status", $statusp);
+    if ($status == -1) {
+	$status = syncandsend($controller, $TIP, "status", $statusp);
     }
-
-    return 0;
+    close($TIP);
+    return $status ? 1 : 0;
 }
 
 # Main routine.
@@ -120,10 +124,12 @@ sub rpc27ctrl {
 
     foreach my $outlet (@outlet_strings) {
 	my $command = "$RPC27_CMD{$cmd} $outlet";
-	if (syncandsend($controller,$TIP,$command,undef)) {
-	    #
-	    # On failure, syncandsend has already closed $TIP
-	    #
+	my $status = syncandsend($controller,$TIP,$command,undef);
+	if ($status == -1) {
+	    $status = syncandsend($controller,$TIP,$command,undef);
+	}
+	if ($status) {
+	    close($TIP);
 	    return 1;
 	}
     }
@@ -138,6 +144,9 @@ sub rpc27ctrl {
 # controller name, for error message purposes, $TIP is the connection to
 # the controller opened with tipconnect, and $command is the whole command
 # (ie. 'reboot 20,40') to send.
+#
+# Returns 0 if successful, -1 if the caller should try again,
+# 1 on an unexpected error.
 #
 sub syncandsend($$$) {
     my ($controller,$TIP,$cmd,$statusp) = @_;
@@ -156,7 +165,6 @@ sub syncandsend($$$) {
 	if (syswrite($TIP, "\r\n") == 0) {
 	    print STDERR
 		"*** Power control sync write failed ($controller/$outlet)\n";
-	    close($TIP);
 	    return 1;
 	}
 
@@ -165,7 +173,6 @@ sub syncandsend($$$) {
 	    print STDERR
 		"*** Power control sync read failed ".
 		    "($controller/$outlet)\n";
-	    close($TIP);
 	    return 1;
 	}
 	if ($debug) {
@@ -182,7 +189,6 @@ sub syncandsend($$$) {
     if (! $insync) {
 	print STDERR "*** Could not sync with power controller! ".
 	    "($controller/$outlet)\n";
-	close($TIP);
 	return 1;
     }
 
@@ -204,7 +210,6 @@ sub syncandsend($$$) {
     # Okay, got a prompt. Send it the string:
     if (syswrite($TIP, "$cmd\r\n") == 0) {
     	print STDERR "*** Power control write failed ($controller/$outlet)\n";
-    	close($TIP);
     	return 1;
     }
 
@@ -238,6 +243,10 @@ sub syncandsend($$$) {
 		    my $outlet = "outlet$o";
 		    $status{$outlet} = $ohash{$o};
 		}
+	    }
+	    # didn't recognize our command for some reason
+	    elsif ($line =~ /Input error/) {
+		return -1;
 	    }
 	}
 	%$statusp = %status;
