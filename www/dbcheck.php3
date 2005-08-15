@@ -292,3 +292,7 @@ function TBvalid_linklanname($token) {
     return TBcheck_dbslot($token, "virt_lans", "vname",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_mailman_listname($token) {
+    return TBcheck_dbslot($token, "mailman_listnames", "listname",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}

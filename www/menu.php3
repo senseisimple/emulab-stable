@@ -221,8 +221,8 @@ function WRITEPLABBOTTOMBAR() {
 # sees depends on the login status and the DB status.
 #
 function WRITESIDEBAR() {
-    global $login_status, $login_uid, $pid;
-    global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $WIKIURL;
+    global $login_status, $login_uid, $pid, $gid;
+    global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
     global $BUGDBSUPPORT, $BUGDBURL;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
@@ -386,24 +386,50 @@ function WRITESIDEBAR() {
 			       "gotowiki.php3?redurl=Main/$wikiname",
 			       "gotowiki.php3?redurl=Main/$wikiname");
 		}
-	    
-		if ($BUGDBSUPPORT) {
-		    if (isset($pid) && !empty($pid)) {
-			$bugdburl = "gotobugdb.php3?project_title=$pid";
-		    }
-		    else {
+
+		if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
+		    if (!isset($pid) || $pid == "") {
 			$query_result = DBQueryFatal(
 			    "select pid from group_membership where ".
 			    "uid='$login_uid' and pid=gid and trust!='none' ".
 			    "order by date_approved asc limit 1");
-			if (mysql_num_rows($query_result) == 0) {
-			    $bugdburl = "gotobugdb.php3";
-			}
-			else {
+			if (mysql_num_rows($query_result)) {
 			    $row = mysql_fetch_array($query_result);
-			    $bugdburl = "gotobugdb.php3?project_title=" .
-				$row[pid];
+			    $firstpid = $row[pid];
 			}
+		    }
+		}
+
+		if (MAILMANSUPPORT) {
+		    $showit = 0;
+		    $mmurl  = "gotommlist.php3";
+		    
+		    if (isset($pid) && !empty($pid)) {
+		        $mmurl .= "?pid=$pid";
+
+			if (isset($gid) && !empty($gid)) {
+			    $mmurl .= "&gid=$gid";
+			}
+			$showit = 1;
+		    }
+		    elseif (isset($firstpid)) {
+		        $mmurl .= "?pid=$firstpid";
+			$showit = 1;
+		    }
+		    if ($showit) {
+			WRITESIDEBARBUTTON_ABSCOOL("My Mailing Lists",
+						   $mmurl, $mmurl);
+		    }
+		}
+
+		if ($BUGDBSUPPORT) {
+		    $bugdburl = "gotobugdb.php3";
+		    
+		    if (isset($pid) && !empty($pid)) {
+			$bugdburl .= "?project_title=$pid";
+		    }
+		    elseif (isset($firstpid)) {
+			$bugdburl .= "?project_title=$firstpid";
 		    }
 		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
 					       $bugdburl,
@@ -435,23 +461,49 @@ function WRITESIDEBAR() {
 			       "gotowiki.php3?redurl=Main/$wikiname");
 		}
 
-		if ($BUGDBSUPPORT) {
-		    if (isset($pid) && !empty($pid)) {
-			$bugdburl = "gotobugdb.php3?project_title=$pid";
-		    }
-		    else {
+		if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
+		    if (!isset($pid) || $pid == "") {
 			$query_result = DBQueryFatal(
 			    "select pid from group_membership where ".
 			    "uid='$login_uid' and pid=gid and trust!='none' ".
 			    "order by date_approved asc limit 1");
-			if (mysql_num_rows($query_result) == 0) {
-			    $bugdburl = "gotobugdb.php3";
-			}
-			else {
+			if (mysql_num_rows($query_result)) {
 			    $row = mysql_fetch_array($query_result);
-			    $bugdburl = "gotobugdb.php3?project_title=" .
-				$row[pid];
+			    $firstpid = $row[pid];
 			}
+		    }
+		}
+
+		if (MAILMANSUPPORT) {
+		    $showit = 0;
+		    $mmurl  = "gotommlist.php3";
+		    
+		    if (isset($pid) && !empty($pid)) {
+		        $mmurl .= "?pid=$pid";
+
+			if (isset($gid) && !empty($gid)) {
+			    $mmurl .= "&gid=$gid";
+			}
+			$showit = 1;
+		    }
+		    elseif (isset($firstpid)) {
+		        $mmurl .= "?pid=$firstpid";
+			$showit = 1;
+		    }
+		    if ($showit) {
+			WRITESIDEBARBUTTON_ABSCOOL("My Mailing Lists",
+						   $mmurl, $mmurl);
+		    }
+		}
+
+		if ($BUGDBSUPPORT) {
+		    $bugdburl = "gotobugdb.php3";
+		    
+		    if (isset($pid) && !empty($pid)) {
+			$bugdburl .= "?project_title=$pid";
+		    }
+		    elseif (isset($firstpid)) {
+			$bugdburl .= "?project_title=$firstpid";
 		    }
 		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
 					       $bugdburl,

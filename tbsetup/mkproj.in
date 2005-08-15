@@ -30,11 +30,13 @@ my $MKACCT   = "$TB/sbin/tbacct add";
 my $CVSBIN   = "/usr/bin/cvs";
 my $CHOWN    = "/usr/sbin/chown";
 my $GRANTTYPE= "$TB/sbin/grantnodetype -d";
-my $WIKISUPPORT = @WIKISUPPORT@;
-my $BUGDBSUPPORT= @BUGDBSUPPORT@;
-my $CVSSUPPORT  = @CVSSUPPORT@;
+my $WIKISUPPORT   = @WIKISUPPORT@;
+my $BUGDBSUPPORT  = @BUGDBSUPPORT@;
+my $CVSSUPPORT    = @CVSSUPPORT@;
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $ADDWIKIPROJ = "$TB/sbin/addwikiproj";
 my $ADDBUGDBPROJ= "$TB/sbin/addbugdbproj";
+my $ADDMMLIST   = "$TB/sbin/addmmlist";
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
@@ -142,6 +144,10 @@ if ($WIKISUPPORT) {
 if ($BUGDBSUPPORT) {
     system("$ADDBUGDBPROJ $pid") == 0 or
 	fatal("$ADDBUGDBPROJ $pid failed!");
+}
+if ($MAILMANSUPPORT) {
+    system("$ADDMMLIST -a ${pid}-users") == 0 or
+	fatal("$ADDMMLIST -a ${pid}-users failed!");
 }
 
 system("$MKACCT $projhead") == 0 or

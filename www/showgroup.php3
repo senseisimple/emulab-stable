@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -95,7 +95,7 @@ if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||
     SUBMENUEND();
 }
 
-SHOWGROUP($pid, $gid);
+SHOWGROUP($pid, $gid, $uid);
 SHOWGROUPMEMBERS($pid, $gid, $prived);
 
 if (TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_EDITGROUP) ||

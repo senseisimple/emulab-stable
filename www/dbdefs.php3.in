@@ -20,6 +20,7 @@ $TBDB_NODEIDLEN = 10;
 $TBDB_PHONELEN  = 32;
 $TBDB_USRNAMELEN= 64;
 $TBDB_EMAILLEN  = 64;
+$TBDB_MMLENGTH  = 64;
 
 #
 # Current policy is to prefix the EID with the PID. Make sure it is not

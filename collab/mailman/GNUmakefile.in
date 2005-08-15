@@ -11,7 +11,9 @@ SUBDIR		= collab/mailman
 
 include $(OBJDIR)/Makeconf
 
-SBIN_SCRIPTS		= addmmlist setmmlistmembers mmsetup
+SBIN_SCRIPTS		= addmmlist delmmlist setmmlistmembers mmsetup \
+			  setmmpasswd 
+LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin
 CTRL_LIBEXEC_SCRIPTS	= genaliases
 CTRL_LIB_FILES		= mmscript.py
 
@@ -22,11 +24,12 @@ CTRL_SBIN_SCRIPTS	= mailmanproxy
 # configure if the .in file is changed.
 # 
 all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIBEXEC_SCRIPTS) \
-	$(CTRL_LIB_FILES)
+	$(CTRL_LIB_FILES) $(LIBEXEC_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/libexec/mailman/, $(CTRL_LIBEXEC_SCRIPTS)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRL_SBIN_SCRIPTS)) \
 	 $(addprefix $(INSTALL_DIR)/opsdir/lib/mailman/, $(CTRL_LIB_FILES))
@@ -36,8 +39,14 @@ boss-install: install
 post-install: 
 	chown root $(INSTALL_SBINDIR)/addmmlist
 	chmod u+s $(INSTALL_SBINDIR)/addmmlist
+	chown root $(INSTALL_SBINDIR)/delmmlist
+	chmod u+s $(INSTALL_SBINDIR)/delmmlist
 	chown root $(INSTALL_SBINDIR)/setmmlistmembers
 	chmod u+s $(INSTALL_SBINDIR)/setmmlistmembers
+	chown root $(INSTALL_SBINDIR)/setmmpasswd
+	chmod u+s $(INSTALL_SBINDIR)/setmmpasswd
+	chown root $(INSTALL_LIBEXECDIR)/mmxlogin
+	chmod u+s $(INSTALL_LIBEXECDIR)/mmxlogin
 
 #
 # Control node installation (okay, plastic)

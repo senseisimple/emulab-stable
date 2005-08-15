@@ -1035,19 +1035,22 @@ if (! $returning) {
     if (isset($addpubkeyargs)) {
 	ADDPUBKEY($proj_head_uid, "webaddpubkey $addpubkeyargs");
     }
+    # Initial mailman_password.
+    $mailman_password = substr(GENHASH(), 0, 10);
 
     DBQueryFatal("INSERT INTO users ".
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
 	 " usr_URL,usr_title,usr_affil,usr_phone,usr_shell,usr_pswd,unix_uid,".
-	 " status,pswd_expires,usr_modified,wikiname) ".
+	 " status,pswd_expires,usr_modified,wikiname,mailman_password) ".
 	 "VALUES ('$proj_head_uid', now(), '$proj_expires', '$usr_name', ".
          "'$usr_email', ".
 	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
 	 "'$usr_country', ".
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
 	 "'$usr_phone', 'tcsh', '$encoding', NULL, 'newuser', ".
-	 "date_add(now(), interval 1 year), now(), '$wikiname')");
+	 "date_add(now(), interval 1 year), now(), '$wikiname', ".
+	 "'$mailman_password')");
 
     DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$proj_head_uid')");
 

@@ -377,6 +377,9 @@ foreach my $uid (@userlist) {
     TBNodeUpdateAccountsByUID($uid);
 }
 
+$UID  = $SAVEUID;
+$EUID = $UID;
+
 if (defined($pid)) {
     print "Updating email lists for project $pid\n";
     system("$GENELISTS -p $pid");
@@ -391,9 +394,6 @@ else {
 
 # and the twiki.
 if ($WIKISUPPORT || $BUGDBSUPPORT) {
-    $UID  = $SAVEUID;
-    $EUID = $UID;
-
     foreach $user (@userlist) {
 	if ($WIKISUPPORT) {
 	    system("$SETWIKIGROUPS $user") == 0 or

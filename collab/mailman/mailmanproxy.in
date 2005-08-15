@@ -15,7 +15,9 @@ sub usage()
 {
     print "Usage: mailmanproxy addlist <listname> <listtype> or\n";
     print "       mailmanproxy setlistmembers <listname> or\n";
-    print "       mailmanproxy modifymember <email>\n";
+    print "       mailmanproxy modifymember <email> or\n";
+    print "       mailmanproxy setadminpassword <listname>\n";
+    print "       mailmanproxy dellist <listname>\n";
     exit(-1);
 }
 my $optlist  = "dn";
@@ -111,8 +113,14 @@ if ($action eq "addlist") {
 elsif ($action eq "setlistmembers") {
     exit(SetListMembers(@ARGV));
 }
+elsif ($action eq "dellist") {
+    exit(DeleteList(@ARGV));
+}
 elsif ($action eq "modifymember") {
     exit(ModifyMember(@ARGV));
+}
+elsif ($action eq "setadminpassword") {
+    exit(SetAdminPassword(@ARGV));
 }
 elsif ($action eq "xlogin") {
     exit(xLogin(@ARGV));
@@ -148,9 +156,15 @@ sub AddList(@)
 	fatal("AddList: Bad line in input: $_");
     }
 
-    # Step 1: Create the list.
+    # Step 1: Create the list. For a "user" list, we want to mail out
+    # the welcome message to the list admin. But, the silly script wants
+    # a carriage return!
+    #
     if (! -d "$MMLISTDIR/" . lc($name)) {
-	system("$MMBINDIR/newlist -q $name $owneremail $password") == 0 or
+	my $optarg = ($listtype eq "admin" ? "-q" : "");
+	
+	system("echo '' | ".
+	       "$MMBINDIR/newlist $optarg $name $owneremail $password") == 0 or
 	    fatal("AddList: Could not create mailing list!");
     }
 
@@ -166,8 +180,8 @@ sub AddList(@)
     # 
     print CONFIG "real_name = '$name'\n";
     print CONFIG "owner = ['$owneremail']\n";
-    print CONFIG "description = 'Emulab Mail list: $name'\n";
-    print CONFIG "subject_prefix = '[Emulab Mail List: $name] '\n";
+    print CONFIG "description = 'Emulab Mailman List: $name'\n";
+    print CONFIG "subject_prefix = '[$name] '\n";
     print CONFIG "reply_goes_to_list = 1\n";
     print CONFIG "send_reminders = False\n";
     print CONFIG "send_welcome_msg = False\n";
@@ -204,9 +218,9 @@ sub AddList(@)
     unlink($tempfile);
 
     # Step 3: Regen the aliases. We use an external script for this.
-#    $EUID = $UID = 0;
-#    system("$GENALIASES") == 0 or
-#	fatal("AddList: Could not generate a new aliases file!");
+    $EUID = $UID = 0;
+    system("$GENALIASES") == 0 or
+	fatal("AddList: Could not generate a new aliases file!");
 
     return 0;
 }
@@ -470,15 +484,90 @@ sub ModifyMember(@)
 }
 
 #
+# Set admin password (and email) for a list. Data comes from STDIN
+#
+sub SetAdminPassword(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($listname) = @_;
+    my ($owneremail, $password) = ();
+
+    # Other info for list comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*) (.*)$/) {
+	$owneremail = $1;
+	$password   = $2;
+    }
+    else {
+	fatal("SetAdminPassword: Bad line in input: $_");
+    }
+
+    system("$MMBINDIR/withlist -l -q ".
+	   "-r mmscript.setadmin $listname $owneremail $password") == 0
+	       or fatal("SetAdminPassword: ".
+			"Could not modify admin password for $listname!");
+
+    return 0;
+}
+
+#
+# Delete a list.
+#
+sub DeleteList(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($listname) = @_;
+    my $lcname = lc($listname);
+
+    #
+    # We want to back up the mbox file just in case. We can regen the
+    # archive from the mbox if needed later ... Use bin/arch command.
+    #
+    my $pubarchive  = "$MAILMANDIR/archives/public/${lcname}.mbox";
+    my $privarchive = "$MAILMANDIR/archives/private/${lcname}.mbox";
+    my $extension   = TBDateTimeFSSafe();
+
+    if (-e $pubarchive) {
+	system("/bin/mv $pubarchive ${pubarchive}.${extension}") == 0 or
+	    fatal("DeleteList: Could not rename $pubarchive!");
+    }
+    if (-e $privarchive) {
+	system("/bin/mv $privarchive ${privarchive}.${extension}") == 0 or
+	    fatal("DeleteList: Could not rename $privarchive!");
+    }
+
+    if (-d "$MMLISTDIR/$lcname") {
+	system("$MMBINDIR/rmlist -a $listname") == 0 or
+	    fatal("DeleteList: Could not delete mailing list!");
+    }
+    return 0;
+}
+
+#
 # Backdoor Login
 #
 sub xLogin(@)
 {
     usage()
-	if (@_ != 2);
+	if (@_ != 3);
 
-    my ($user, $secretkey) = @_;
+    my ($email, $cookietype, $listname) = @_;
 
+    #
+    # Generate a cookie and send it back.
+    # 
+    system("$MMBINDIR/withlist -l -q ".
+	   "-r mmscript.getcookie $listname $email $cookietype") == 0
+	       or fatal("xlogin: ".
+			"Could not get xlogin cookie for $email/$listname!");
     return 0;
 }
      

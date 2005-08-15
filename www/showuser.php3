@@ -147,9 +147,16 @@ if (mysql_num_rows($query_result)) {
 		echo "<td>$name</td>\n";
 		$mail  = $pid . "-users@" . $OURDOMAIN;
 	    }
-	    echo "<td>$trust</td>
-                  <td nowrap><a href=mailto:$mail>$mail</a></td>
-                 </tr>\n";
+	    echo "<td>$trust</td>\n";
+
+	    if ($MAILMANSUPPORT) {
+		# Not sure what I want to do here ...
+		echo "<td nowrap><a href=mailto:$mail>$mail</a></td>";
+	    }
+	    else {
+		echo "<td nowrap><a href=mailto:$mail>$mail</a></td>";
+	    }
+	    echo "</tr>\n";
         }
     }
     echo "</table>\n";
@@ -172,6 +179,13 @@ echo "<center>
       <h3>User Profile</h3>
       </center>\n";
 
+#
+# See if any mailman lists owned by the user. If so we add a menu item.
+#
+$mm_result =
+    DBQueryFatal("select owner_uid from mailman_listnames ".
+		 "where owner_uid='$target_uid'");
+
 SUBPAGESTART();
 SUBMENUSTART("User Options");
 #
@@ -191,6 +205,11 @@ if (!$wikionly && ($isadmin || !strcmp($uid, $target_uid))) {
 
     WRITESUBMENUBUTTON("Show History",
 		       "showstats.php3?showby=user&which=$target_uid");
+
+    if ($MAILMANSUPPORT && mysql_num_rows($mm_result)) {
+	WRITESUBMENUBUTTON("Show Mailman Lists",
+			   "showmmlists.php3?target_uid=$target_uid");
+    }
 }
 
 if ($isadmin) {

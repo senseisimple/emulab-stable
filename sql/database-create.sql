@@ -817,6 +817,17 @@ CREATE TABLE loginmessage (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `mailman_listnames`
+--
+
+CREATE TABLE mailman_listnames (
+  listname varchar(64) NOT NULL default '',
+  owner_uid varchar(8) NOT NULL default '',
+  created datetime default NULL,
+  PRIMARY KEY  (listname)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `mode_transitions`
 --
 

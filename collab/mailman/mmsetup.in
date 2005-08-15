@@ -107,10 +107,6 @@ my $optarg = ($debug ? "-d" : "");
 #
 system("$ADDMMLIST $optarg -a emulab-users") == 0
     or fatal("Could not create emulab-users list");
-system("$ADDMMLIST $optarg -a emulab-project-leaders") == 0
-    or fatal("Could not create emulab-project-leaders list");
-system("$ADDMMLIST $optarg -a emulab-widearea-users") == 0
-    or fatal("Could not create emulab-widearea-users list");
 
 #
 # Add project (and group) lists.
@@ -119,8 +115,8 @@ my @projects = ();
 
 $query_result =
     DBQueryFatal("select pid,gid from groups where 1 ".
-		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
-		 "     pid='utahstud')" .
+#		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
+#		 "     pid='utahstud')" .
 		 "");
 
 while (my ($pid,$gid) = $query_result->fetchrow_array()) {

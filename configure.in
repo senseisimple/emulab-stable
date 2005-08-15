@@ -112,6 +112,7 @@ AC_SUBST(OUTERBOSS_XMLRPCPORT)
 AC_SUBST(OUTERBOSS_SSLCERTNAME)
 AC_SUBST(PLABSUPPORT)
 AC_SUBST(WIKISUPPORT)
+AC_SUBST(MAILMANSUPPORT)
 AC_SUBST(BUGDBSUPPORT)
 AC_SUBST(TBLOGFACIL)
 AC_SUBST(PLAB_ROOTBALL)
@@ -196,6 +197,7 @@ PLAB_ROOTBALL="change.me"
 PLAB_SLICEPREFIX="utah_elab"
 WIKISUPPORT=0
 BUGDBSUPPORT=0
+MAILMANSUPPORT=0
 WINSUPPORT=0
 CVSSUPPORT=0
 TBLOGFACIL="local5"
@@ -783,6 +785,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	wiki/usertemplate wiki/webhometemplate \
         wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
         bugdb/GNUmakefile bugdb/bugdbproxy \
+        collab/GNUmakefile \
+        collab/mailman/GNUmakefile \
 	daikon/GNUmakefile daikon/daikonize daikon/find_perl "
 
 #

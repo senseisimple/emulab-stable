@@ -15,9 +15,12 @@
 #
 function SHOWPROJECT($pid, $thisuid) {
     global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR;
-
+    global $MAILMANSUPPORT;
+    global $TBDB_TRUST_GROUPROOT;
+    
     $query_result =
-	DBQueryFatal("select p.*,g.wikiname from projects as p ".
+	DBQueryFatal("select p.*,g.wikiname ".
+		     "  from projects as p ".
 		     "left join groups as g on g.pid=p.pid and g.gid=g.pid ".
 		     "where p.pid='$pid'");
     $row = mysql_fetch_array($query_result);
@@ -110,7 +113,22 @@ function SHOWPROJECT($pid, $thisuid) {
                       $cvsdir <A href='$cvsurl'>(cvsweb)</A></td>
               </tr>\n";
     }
-    
+
+    if ($MAILMANSUPPORT) {
+	$mmurl   = "gotommlist.php3?pid=$pid";
+
+	echo "<tr>
+                  <td>Project Mailing List:</td>
+                  <td class=\"left\">
+                      <A href='$mmurl'>${pid}-users</A> ";
+	if (ISADMIN()) {
+	    $mmurl .= "&wantadmin=1";
+	    echo "<A href='$mmurl'>(admin)</A>";
+	}
+	echo "    </td>
+              </tr>\n";
+    }
+
     echo "<tr>
               <td>Publicly Visible: </td>
               <td class=\"left\">$proj_public</td>
@@ -190,8 +208,10 @@ function SHOWPROJECT($pid, $thisuid) {
 #
 # A Group
 #
-function SHOWGROUP($pid, $gid) {
+function SHOWGROUP($pid, $gid, $thisuid) {
     global $OURDOMAIN;
+    global $MAILMANSUPPORT;
+    global $TBDB_TRUST_GROUPROOT;
     
     $query_result =
 	DBQueryFatal("SELECT * FROM groups WHERE pid='$pid' and gid='$gid'");
@@ -255,11 +275,28 @@ function SHOWGROUP($pid, $gid) {
                 <A href='showuser.php3?target_uid=$leader'>$leader</A></td>
           </tr>\n";
     
-    echo "<tr>
-              <td>Email List: </td>
-              <td class=\"left\">$mail</td>
-          </tr>\n";
-    
+    if ($MAILMANSUPPORT) {
+	$mmurl   = "gotommlist.php3?pid=$pid&gid=$gid";
+
+	echo "<tr>
+                  <td>Email List:</td>
+                  <td class=\"left\">
+                      <A href='$mmurl'>$mail</A> ";
+
+	if (ISADMIN()) {
+	    $mmurl .= "&wantadmin=1";
+	    echo "<A href='$mmurl'>(admin)</A>";
+	}
+	echo "    </td>
+              </tr>\n";
+    }
+    else {
+	echo "<tr>
+                  <td>Email List: </td>
+                  <td class=\"left\">$mail</td>
+              </tr>\n";
+    }
+
     echo "<tr>
               <td>Created: </td>
               <td class=\"left\">$created</td>
@@ -472,7 +509,7 @@ function SHOWUSER($uid) {
               <td>Email Address:</td>
               <td>$usr_email</td>
           </tr>\n";
-    
+
     echo "<tr>
               <td>Home Page URL:</td>
               <td><A href='$usr_URL'>$usr_URL</A></td>

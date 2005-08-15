@@ -2718,4 +2718,11 @@ last_net_act,last_cpu_act,last_ext_act);
           alter table groups add mailman_password tinytext;
           alter table users add mailman_password tinytext;
 
-4.2:
+4.2: Add a table to track user created mailman lists.
+
+	CREATE TABLE mailman_listnames (
+	  listname varchar(64) NOT NULL default '',
+	  owner_uid varchar(8) NOT NULL default '',
+	  created datetime default NULL,
+	  PRIMARY KEY  (listname)
+	) TYPE=MyISAM;

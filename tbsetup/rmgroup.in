@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,11 +47,13 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
 my $BOSSNODE = "@BOSSNODE@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
 my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
+my $DELMMLIST= "$TB/sbin/delmmlist";
 
 #
 # Untaint the path
@@ -187,6 +189,14 @@ if (system("$GROUPDEL $unix_name")) {
     if (($? >> 8) != 65) {
 	fatal("Could not remove group $unix_name from local node!");
     }
+}
+
+if ($MAILMANSUPPORT) {
+    # For perl
+    $EUID = $UID;
+    system("$DELMMLIST -a ${pid}-${gid}-users") == 0 or
+	fatal("$DELMMLIST -a ${pid}-${gid}-users failed!");
+    $EUID = 0;
 }
 
 #

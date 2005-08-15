@@ -8,14 +8,13 @@ use English;
 use Getopt::Std;
 
 #
-# Add a mailman list, say for a project or other reason. If for a project
-# the admin password comes from the groups table. Otherwise it comes from
-# the sitevars table cause its assumed to be an admins list of some kind.
+# Change the admin password for a list. Change the list owner email at
+# the same time. 
 #
 sub usage()
 {
-    print STDOUT "Usage: addmmlist -a <listname> or\n";
-    print STDOUT "       addmmlist -u <listname> <listowner> <listpassword>\n";
+    print STDOUT "Usage: setmmpasswd -u <listname> <uid> <password> or\n";
+    print STDOUT "       setmmpasswd -a <listname>\n";
     exit(-1);
 }
 my $optlist = "dau";
@@ -139,11 +138,12 @@ if (defined($options{"u"})) {
 	die("Bad data in listpasswd: $listpasswd");
     }
 }
+
 usage()
     if (! (defined($options{"a"}) || defined($options{"u"})));
 usage()
     if (defined($options{"a"}) && defined($options{"u"}));
-
+    
 #
 # Untaint args.
 #
@@ -178,23 +178,16 @@ $UID = $EUID;
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
 
-    print "Adding mailman list $listname ($listtype) on $CONTROL.\n";
+    print "Resetting password for list $listname ($listtype) on $CONTROL.\n";
 
     if (system("echo '$listowner_email $listpasswd' | ".
-	       "$SSH -host $CONTROL $MMPROXY addlist $listname $listtype")) {
+	       "$SSH -host $CONTROL $MMPROXY setadminpassword $listname")) {
 	fatal("$MMPROXY failed on $CONTROL!");
     }
-    
-    SENDMAIL($TBAUDIT, "Mailman list created",
-	     "Mailman list '$listname' has been created by '$dbuid'",
-	     $TBOPS);
 
-    #
-    # Generate an initial message to the list so that the archive is not
-    # empty.
-    #
-    SENDMAIL("${listname}\@${OURDOMAIN}", "Mailman list created",
-	     "Mailman list '$listname' has been created by '$dbuid'",
+    SENDMAIL($TBAUDIT, "Mailman list password changed",
+	     "The mailman list password for list '$listname' has been ".
+	     "changed by '$dbuid'",
 	     $TBOPS);
 }
 exit(0);
