@@ -2,7 +2,7 @@
 
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -835,25 +835,43 @@ sub setVlanOnTrunks($$$;@) {
 	    warn "ERROR - Bad device $src found in setVlanOnTrunks!\n";
 	    $errors++;
 	} else {
+	    my $found = 0;
+
 	    #
 	    # On ciscos, we can use any port in the trunk, so we'll use the
 	    # first
 	    #
-	    my $modport = $trunks{$src}{$dst}[0];
-	    $errors += !($self->{DEVICES}{$src}->setVlansOnTrunk($modport,
-		    $value,$vlan_number));
+	    foreach my $modport (@{ $trunks{$src}{$dst} }) {
+		if ($self->{DEVICES}{$src}->
+		    setVlansOnTrunk($modport,$value,$vlan_number)) {
+		    $found = 1;
+		    last;
+		}
+	    }
+	    if (!$found) {
+		$errors += 1;
+	    }
 	}
 	if (!$self->{DEVICES}{$dst}) {
 	    warn "ERROR - Bad device $dst found in setVlanOnTrunks!\n";
 	    $errors++;
 	} else {
+	    my $found = 0;
+
 	    #
 	    # On ciscos, we can use any port in the trunk, so we'll use the
 	    # first
 	    #
-	    my $modport = $trunks{$dst}{$src}[0];
-	    $errors += !($self->{DEVICES}{$dst}->setVlansOnTrunk($modport,
-		    $value,$vlan_number));
+	    foreach my $modport (@{ $trunks{$dst}{$src} }) {
+		if ($self->{DEVICES}{$dst}->
+		    setVlansOnTrunk($modport,$value,$vlan_number)) {
+		    $found = 1;
+		    last;
+		}
+	    }
+	    if (!$found) {
+		$errors += 1;
+	    }
 	}
     }
 

@@ -1390,6 +1390,10 @@ sub setVlansOnTrunk($$$$) {
     # this is _always_ beneficial, though
     #
     my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
+    if (!($channel =~ /^\d+$/) || ($channel == 0)) {
+	print "WARNING: setVlansOnTrunk got zero channel for $self->{NAME}.$modport\n";
+	return 0;
+    }
     if (($channel =~ /^\d+$/) && ($channel != 0)) {
 	$ifIndex = $channel;
     }
