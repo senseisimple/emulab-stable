@@ -1,5 +1,8 @@
 #
 # Firewall rule template.
+# The bulk of the line is the body of an IPFW rule, a '#' denoted "comment"
+# at the end of the line indicates a rule number to use, and a comma
+# separated list of styles to which the rule applies.
 #
 # Styles:
 #
@@ -19,7 +22,7 @@
 # and "ntp2" as they are all guaranteed to resolve (assuming an earlier
 # rule exists to allow DNS traffic to/from EMULAB_NS).
 #
-# Remaining questions:
+# Questions, comments and warnings:
 #
 # 1. Anti-spoofing?  The real firewall will do spoofing checks, should
 #    we do them also?  It won't protect the rest of the control net from
@@ -27,12 +30,20 @@
 #
 # 2. How much should we protect the firewall itself?  We disallow complete
 #    access from inside.  From outside, we treat the firewall pretty much
-#    like a firewalled node, excpet that we always allow infrastructure
+#    like a firewalled node, except that we always allow infrastructure
 #    services (e.g. NFS).
 #
 # 3. Watch out for VLAN tagged packets.  We don't want to process them
 #    when they come in off the phys interface, we want to process them
 #    when they have been untagged.
+#
+# 4. Currently we assume vlan0 is the inside interface on the firewall
+#    and "not vlan0" is the outside interface.
+#
+# 5. For ELABINELAB, many of the rules should allow traffic with only
+#    the inner boss/ops nodes.  But we don't currently distinguish them
+#    from other nodes inside, so those rules are more permissive than
+#    desirable.
 #
 
 # Let through anything
@@ -131,9 +142,9 @@ allow icmp from any to boss icmptypes 0		# 60091:
 # SSH (2222) into nodes
 # rdesktop (3389) to nodes
 # no blaster (135,4444) or slammer (1434) please!
-allow tcp from any to fs 445 in via vlan0 setup keep-state # 60100: WINDOWS
+allow tcp from any to fs 445 in via vlan0 setup keep-state # 60100: WINDOWS,BASIC
 allow tcp from any to any 2222 in not recv vlan0 setup keep-state # 60101: WINDOWS
-allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60102: WINDOWS
+allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60102: WINDOWS,BASIC
 deny tcp from any to any 135,4444				  # 60110: WINDOWS
 deny udp from any to any 1434					  # 60111: WINDOWS
 
