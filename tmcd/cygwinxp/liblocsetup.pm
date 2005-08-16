@@ -230,7 +230,10 @@ sub os_ifconfig_line($$$$$$$;$$)
 
     if ($inet ne "") {
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
-	$downlines = "$IFCONFIGBIN $iface down";
+
+	# No $downlines... Can't disable an interface???
+	# The command "netsh interface set interface name=... DISABLED"
+	# is specified as only for non-LAN interfaces.
     }
     
     return ($uplines, $downlines);

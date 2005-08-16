@@ -42,7 +42,7 @@ if [ -z "$pswd" ]; then
 fi
 
 echo "Connecting Z: to //$host as $user."
-if ! net use Z: '\\'$host'\'$user "$pswd" /user:$user /persistent:no; then
+if ! net use Z: '\\'$host'\'$user "$pswd" /user:$host'\'$user /persistent:no; then
     echo "Connection failed."
 else
     # Show network mount status.

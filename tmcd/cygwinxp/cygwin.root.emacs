@@ -63,13 +63,14 @@
 ;================================================================
 
 ;; Compilation key bindings.
-(global-set-key "\^CE" 'compile)                        ; ^C shift-e
-(global-set-key "\^CN" 'next-error)                     ; ^C shift-n
-(global-set-key "\^CP" 'previous-error)                 ; ^C shift-p
-;(global-set-key "\^CK" 'kill-compilation)              ; ^C shift-k
-(global-set-key "\^C}"   'compilation-next-file)        ; ^C shift-[
-(global-set-key "\^C{"   'compilation-previous-file)    ; ^C shift-]
-
+(global-set-key "\^CE"  'compile)                      ; ^C shift-e
+(global-set-key "\^CN"  'next-error)                   ; ^C shift-n
+(global-set-key "\^CP"  'previous-error)               ; ^C shift-p
+;(global-set-key "\^CK" 'kill-compilation)             ; ^C shift-k
+(global-set-key "\^C}"  'compilation-next-file)        ; ^C shift-[
+(global-set-key "\^C{"  'compilation-previous-file)    ; ^C shift-]
+(global-set-key "\^CG"  'gdb)                          ; ^C shift-g for debugger, then
+                                                       ; ^X space to set breakpoints.
 (defun make-this-file-writable ()
   "Use this when you want to edit a read-only file.  Changes the file permissions,
    and marks the read-only buffer writable."

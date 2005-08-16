@@ -400,13 +400,20 @@ Some details remain to be documented: <br>
 
 <ul>
 
-  <li> Home dirs are on <code>//fs</code> via SMB(Windows Client, Samba server)
+  <li> Home dirs and other shared directories are on <code>//fs</code> 
+       via SMB(Windows Client, Samba server)
 
        <ul>
 
          <li> Cygwin/UNC mounts of Windows Shares under <code>/users</code>,
-              <code>/proj</code>, <code>/share</code>. The Cygwin
+              <code>/proj/&lt;pid&gt;</code>,
+	      <code>/group/&lt;pid&gt;/&lt;gid&gt;</code>,
+	      <code>/share</code>.  The Cygwin
               <code>mount</code> command shows what you can access. </li> 
+
+         <li> <code>/share/windows</code> contains Windows software.
+              See <code>/share/windows/README.bin</code> for descriptions
+              of binary packages available for installation. </li> 
 
          <li> Can put <code>\\fs\&lt;share_name&gt;</code> into the Windows
               Explorer "Address".  These shares are marked not browsable, so
@@ -414,12 +421,10 @@ Some details remain to be documented: <br>
 
        </ul> </li>
 
-  <li> Shared directories: <code>/share</code>,
-       <code>/proj/&lt;pid&gt;</code>, 
-       <code>/group/&lt;pid&gt;/&lt;gid&gt;</code>. </li> 
-
-  <li> Bug: One protection mask for everything in a whole mount/share under
-       SMB. </li>
+  <li> Misfeature: There is only protection mask for everything in a whole
+       mount/share under SMB.  It's set in the "share properties" on the
+       server (Samba config file in this case) so chmod will do you no
+       good. </li>
 
 </ul>
 
