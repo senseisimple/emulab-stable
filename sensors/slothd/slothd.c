@@ -37,7 +37,8 @@ void sigunkhandler(int signum) {
 
   sprintf(message, "Unhandled signal: %d.  Exiting.", signum);
   lerror(message);
-  unlink(PIDFILE);
+  if (!opts->debug)
+    unlink(PIDFILE);
   while (wait(&status) != -1);
   exit(signum);
 }
@@ -198,7 +199,7 @@ int parse_args(int argc, char **argv) {
     case 'g':
       if ((opts->agg_interval = atol(optarg)) < MIN_AINTVL) {
         lwarn("Warning! Aggressive interval set too low, defaulting.");
-        opts->reg_interval = MIN_AINTVL;
+        opts->agg_interval = MIN_AINTVL;
       }
       break;
 
@@ -254,11 +255,14 @@ int parse_args(int argc, char **argv) {
 
 int init_slothd(void) {
 
-DIR *devs;
-  int pfd;
-  char pidbuf[10];
+#ifndef __CYGWIN__
+  DIR *devs;
   char bufstr[MAXDEVLEN];
   struct dirent *dptr;
+#endif /* __CYGWIN__ */
+
+  int pfd;
+  char pidbuf[10];
   struct hostent *hent;
   char *ciprog[] = {"control_interface", NULL};
 
@@ -302,13 +306,26 @@ DIR *devs;
   parms->ifd = socket(PF_INET, SOCK_DGRAM, 0);
 #endif
 
+#ifndef __CYGWIN__
   /* enum tty special files */
   if ((devs = opendir("/dev")) == 0) {
     lerror("Can't open directory /dev for processing");
     return -1;
   }
+
   parms->ttys[parms->numttys] = strdup("/dev/console");
   parms->numttys++;
+
+#else /* __CYGWIN__ */
+  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
+   * However, stat on anything under /dev always returns the current time, so
+   * it's no help detecting user input.  Instead, we patch sshd to change the
+   * modtime on a file when input is received and stat that.
+   */
+  parms->ttys[parms->numttys] = strdup("/var/run/ssh_input");
+  parms->numttys++;
+#endif /* __CYGWIN__ */
+
 #ifdef __linux__  
   /* 
      Include the pts mux device to check for activity on
@@ -318,6 +335,7 @@ DIR *devs;
   parms->ttys[parms->numttys] = strdup("/dev/ptmx");
   parms->numttys++;
 #endif
+#ifndef __CYGWIN__
   while (parms->numttys < MAXTTYS && (dptr = readdir(devs))) {
     if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
       snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
@@ -327,6 +345,7 @@ DIR *devs;
     }
   }
   closedir(devs);
+#endif /* __CYGWIN__ */
 
   /* prepare UDP connection to server */
   if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -370,8 +389,8 @@ DIR *devs;
 
 void do_exit(void) {
   int status;
-
-  unlink(PIDFILE);
+  if (!opts->debug)
+    unlink(PIDFILE);
   while (wait(&status) != -1);
   lnotice("exiting.");
   exit(0);
@@ -383,10 +402,25 @@ int grab_cifname(char *buf, void *data) {
   char *tmpptr;
   SLOTHD_PARAMS *myparms = (SLOTHD_PARAMS*) data;
 
+#ifdef __CYGWIN__
+  if (buf && isalnum(buf[0])) {
+
+    /* The MAC addr precedes the cifname on Cygwin. */
+    tmpptr = myparms->cifaddr = strdup(buf);
+    strsep(&tmpptr, " ");
+
+    /* Allow embedded spaces in the cifname on Cygwin. */    
+    myparms->cifname = tmpptr;
+    while ( isalnum(*tmpptr) || *tmpptr == ' ') tmpptr++;
+    *tmpptr = '\0';
+#else
+    /* Trim trailing whitespace from the cifname. */
   if (buf && isalpha(buf[0])) {
     tmpptr = myparms->cifname = strdup(buf);
-    while (isalnum(*tmpptr))  tmpptr++;
+    while (isalnum(*tmpptr)) tmpptr++;
     *tmpptr = '\0';
+#endif /* __CYGWIN__ */
+
     retval = 0;
   }
   else {
@@ -466,16 +500,7 @@ void get_min_tty_idle(SLOTHD_PACKET *pkt) {
   return;
 }
 
-#ifdef __CYGWIN__
-int
-getloadavg(double loadavg[], int nelem)
-{
-  FILE *f = fopen("/proc/loadavg", "r");
-  fscanf(f, "%lf %lf %lf", &loadavg[0],  &loadavg[1],  &loadavg[2]);
-  fclose(f);
-  return 3;
-}
-#endif /* __CYGWIN__ */
+#ifndef __CYGWIN__
 
 void get_load(SLOTHD_PACKET *pkt) {
 
@@ -492,6 +517,36 @@ void get_load(SLOTHD_PACKET *pkt) {
   return;
 }
 
+#else /* ifndef __CYGWIN__ */
+
+/* A perfmon log is dribbling out the processor load once a minute. */
+char *ldavg_prog[] = {"tail", "-1", "/var/run/ldavg.csv", NULL};
+int get_ldavg(char *, void *);
+
+void get_load(SLOTHD_PACKET *pkt) {
+  pkt->loadavg[0] = pkt->loadavg[1] = pkt->loadavg[2] = -1.0;
+  if (procpipe(ldavg_prog, &get_ldavg, (void*)pkt))
+    lwarn("get_ldavg exec failed.");
+}
+
+int get_ldavg(char *buf, void *data) {
+  SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
+  double load = -1.0;
+
+  if (sscanf(buf, "%*[^,],\"%lf\"", &load) != 1) {
+    lerror("unable to obtain processor load.");
+    return -1;
+  }
+
+  /* NT reports load as a percent, e.g. 44.5; we want a fraction, e.g. 0.445 */
+  pkt->loadavg[0] = pkt->loadavg[1] = pkt->loadavg[2] = load / 100.0;
+  if (opts->debug)
+    printf("load averages: %f, %f, %f\n", 
+           pkt->loadavg[0], pkt->loadavg[1], pkt->loadavg[2]);
+  return 0;
+}
+  
+#endif /* __CYGWIN__ */
 
 int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
 
@@ -518,26 +573,30 @@ int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
    * Have the packet counters exceeded the threshold?  Make sure we don't
    * count the incoming packets on the control net interface.
    */
+  u_long od, id;
   for (i = 0; i < pkt->ifcnt; ++i) {
     if (strcmp(parms->cifname, pkt->ifaces[i].ifname) == 0) {
-      if ((pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
+      if ((od = pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
           opts->cif_thresh) {
+        if (opts->debug) {
+          printf ("Packet threshold exceeded on %s interface %s, %lu>=%lu\n",
+                  "ctl net", pkt->ifaces[i].ifname, od, opts->cif_thresh);
+        }
         break;
       }
     }
-    else if (((pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
+    else if (((od = pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
               opts->pkt_thresh) || 
-             ((pkt->ifaces[i].ipkts - opkt->ifaces[i].ipkts) >= 
+             ((id = pkt->ifaces[i].ipkts - opkt->ifaces[i].ipkts) >= 
               opts->pkt_thresh)) {
+      printf ("Packet threshold exceeded on %s interface %s, %lu|%lu>=%lu\n",
+              "exp net", pkt->ifaces[i].ifname, od, id, opts->pkt_thresh);
       break;
     }
   }
 
   if (i < pkt->ifcnt) {
     pkt->actbits |= PKTACT;
-    if (opts->debug) {
-      printf ("Packet threshold exceeded on %s\n", pkt->ifaces[i].ifname);
-    }
   }
   else {
     pkt->actbits &= ~PKTACT;
@@ -550,16 +609,15 @@ int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
   return pkt->actbits;
 }
 
-void get_packet_counts(SLOTHD_PACKET *pkt) {
 
 #ifndef __CYGWIN__
+
+void get_packet_counts(SLOTHD_PACKET *pkt) {
   int i;
   char *niprog[] = {"netstat", "-ni", NULL};
-#endif /* __CYGWIN__ */
 
   pkt->ifcnt = 0;
 
-#ifndef __CYGWIN__
   if (procpipe(niprog, &get_counters, (void*)pkt)) {
     lwarn("Netinfo exec failed.");
     pkt->ifcnt = 0;
@@ -572,44 +630,54 @@ void get_packet_counts(SLOTHD_PACKET *pkt) {
              pkt->ifaces[i].opkts);
     }
   }
-#endif /* __CYGWIN__ */
   return;
 }
 
-#ifndef __CYGWIN__
+#ifdef __FreeBSD__
 int get_counters(char *buf, void *data) {
 
   SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
-#ifdef __linux__
-  struct ifreq ifr;
-  bzero(&ifr, sizeof(struct ifreq));
-#endif
 
   if (pkt->ifcnt < MAXNUMIFACES
       && !strstr(buf, "lo")
-#ifdef __FreeBSD__
 #if __FreeBSD__ >= 5
       && !strstr(buf, "plip")
 #endif
       && !strstr(buf, "*")
       && strstr(buf, "<Link"))
-#endif
-#ifdef __linux__
-      && (strstr(buf, "eth") || strstr(buf, "wlan") || strstr(buf, "ath")))
-#endif
   {
-
-    if (sscanf(buf, CNTFMTSTR,
+    if (sscanf(buf, "%s %*s %*s %s %lu %*s %lu",
                pkt->ifaces[pkt->ifcnt].ifname,
-#ifdef __FreeBSD__
                pkt->ifaces[pkt->ifcnt].addr,
-#endif
                &pkt->ifaces[pkt->ifcnt].ipkts,
-               &pkt->ifaces[pkt->ifcnt].opkts) != NUMSCAN) {
+               &pkt->ifaces[pkt->ifcnt].opkts) != 4) {
       printf("Failed to parse netinfo output.\n");
       return -1;
     }
+    pkt->ifcnt++;
+  }
+  return 0;
+}
+#endif  /* __FreeBSD__ */
+
 #ifdef __linux__
+int get_counters(char *buf, void *data) {
+
+  SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
+  struct ifreq ifr;
+  bzero(&ifr, sizeof(struct ifreq));
+
+  if (pkt->ifcnt < MAXNUMIFACES
+      && !strstr(buf, "lo")
+      && (strstr(buf, "eth") || strstr(buf, "wlan") || strstr(buf, "ath"))) {
+
+    if (sscanf(buf, "%s %*s %*s %lu %*s %*s %*s %lu",
+               pkt->ifaces[pkt->ifcnt].ifname,
+               &pkt->ifaces[pkt->ifcnt].ipkts,
+               &pkt->ifaces[pkt->ifcnt].opkts) != 3) {
+      printf("Failed to parse netinfo output.\n");
+      return -1;
+    }
     strcpy(ifr.ifr_name, pkt->ifaces[pkt->ifcnt].ifname);
     if (ioctl(parms->ifd, SIOCGIFHWADDR, &ifr) < 0) {
       perror("error getting HWADDR");
@@ -622,12 +690,75 @@ int get_counters(char *buf, void *data) {
     if (opts->debug) {
       printf("macaddr: %s\n", pkt->ifaces[pkt->ifcnt].addr);
     }
-#endif
     pkt->ifcnt++;
   }
   return 0;
 }
+#endif  /* __linux__ */
+
+#else /* __CYGWIN__ */
+#include <windows.h>
+#include <iphlpapi.h>
+
+void get_packet_counts(SLOTHD_PACKET *pkt) {
+  static DWORD dwSize;
+  DWORD ret;
+  int i;
+
+  /* Call GetIfTable(), an MS IP Helper Function, to get packet counters. */
+  PMIB_IFTABLE iftable;
+  PMIB_IFROW ifrow;
+  dwSize = sizeof(MIB_IFTABLE);
+  iftable = (PMIB_IFTABLE) malloc(dwSize);
+  while ((ret = GetIfTable(iftable, &dwSize, 0)) == ERROR_INSUFFICIENT_BUFFER)
+     iftable = (PMIB_IFTABLE) realloc(iftable, dwSize);
+  if (ret != NO_ERROR) {
+    char msg[LINEBUFLEN];
+    sprintf(msg, "get_packet_counts: GetIfTable error %lu", ret);
+    free(iftable);
+    lerror(msg);
+  }
+
+  /* Scan through the interface table. */
+  pkt->ifcnt = 0;
+  for (i = 0; i < min(iftable->dwNumEntries, MAXNUMIFACES); i++) {
+    ifrow = &(iftable->table[i]);
+
+    if (ifrow->dwType != MIB_IF_TYPE_LOOPBACK && /* Exclude loopback. */
+        ifrow->dwOperStatus == MIB_IF_OPER_STATUS_OPERATIONAL) {
+
+      /* Format the MAC address.  We don't have ether_ntoa(). */
+      snprintf(pkt->ifaces[pkt->ifcnt].addr, MACADDRLEN, 
+               "%02x:%02x:%02x:%02x:%02x:%02x", 
+               ifrow->bPhysAddr[0], ifrow->bPhysAddr[1], ifrow->bPhysAddr[2],
+               ifrow->bPhysAddr[3], ifrow->bPhysAddr[4], ifrow->bPhysAddr[5]);
+      if (opts->debug)
+        printf("macaddr: %s\n", pkt->ifaces[pkt->ifcnt].addr);
+
+      /* Grumble.  ifrow->wszName is empty.  
+       * Recognize the control interface by its MAC address.
+       */
+      if (strncmp(pkt->ifaces[pkt->ifcnt].addr, parms->cifaddr, MACADDRLEN)==0)
+        strncpy(pkt->ifaces[pkt->ifcnt].ifname, parms->cifname, MAXIFNAMELEN);
+      else
+        /* If it isn't the control interface, just show the MAC address. */
+        strncpy(pkt->ifaces[pkt->ifcnt].ifname, parms->cifaddr, MAXIFNAMELEN);
+      if (opts->debug)
+        printf("ifname: %s\n", pkt->ifaces[pkt->ifcnt].ifname);
+
+      /* Packet counters, including unicast, broadcast, and multicast. */
+      pkt->ifaces[pkt->ifcnt].ipkts = 
+        ifrow->dwInUcastPkts + ifrow->dwInNUcastPkts;
+      pkt->ifaces[pkt->ifcnt].opkts = 
+        ifrow->dwOutUcastPkts + ifrow->dwOutNUcastPkts;
+
+      pkt->ifcnt++;
+    }
+  }
+  free (iftable);
+}
 #endif /* __CYGWIN__ */
+
 
 /* XXX change to combine last return value of procfunc with exec'ed process'
    exit status & write macros for access.

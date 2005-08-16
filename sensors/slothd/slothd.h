@@ -45,7 +45,7 @@
 #define PIDFILE "/var/run/slothd.pid"
 #define MACADDRLEN 18
 #define MAXNUMIFACES 10
-#define MAXIFNAMELEN 10
+#define MAXIFNAMELEN 30  /* On Windows, "Local Area Connection 16". */
 #define LINEBUFLEN 256
 #define MAXTTYS 2000
 #define MAXDEVLEN 50
@@ -65,16 +65,6 @@
 #define LOG_TESTBED	LOG_DAEMON
 #endif
 
-#ifdef __FreeBSD__
-#define CNTFMTSTR "%s %*s %*s %s %lu %*s %lu"
-#define NUMSCAN 4
-#endif
-
-#ifdef __linux__
-#define CNTFMTSTR "%s %*s %*s %lu %*s %*s %*s %lu"
-#define NUMSCAN 3
-#endif
-
 #define TTYACT  (1<<0)
 #define LOADACT (1<<1)
 #define PKTACT  (1<<2)
@@ -86,6 +76,9 @@ typedef struct {
 #endif
   u_int cnt;
   char *cifname;
+#ifdef __CYGWIN__
+  char *cifaddr;
+#endif /* __CYGWIN__ */
   u_char dolast;
   time_t lastrpt;
   time_t startup;

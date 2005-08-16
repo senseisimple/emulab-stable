@@ -21,7 +21,17 @@ uname -r > $iscygwin
 chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
-# Make sure the computer name is right, reboots to change it if necessary.
+# NetBT (Netbios over TCP) chatters, messes up slothd, and is not needed for
+# SMB, so disable it.  This doesn't take effect until TCP/IP is restarted, so
+# do it before the computer name change below, which reboots the first time.
+svcs=/HKLM/SYSTEM/CurrentControlSet/Services pi=Parameters/Interfaces
+nbtif=$svcs/NetBT/$pi
+for ifc in `regtool list $nbtif`; do
+     # Set the NetBT interface NetbiosOptions to Disable (2.)
+     regtool set -i $nbtif/$ifc/NetbiosOptions 2
+done
+
+# Make sure the computer name is right.  Reboots to change it if necessary.
 nodeid=
 while [ -z $nodeid ]; do
     nodeid=`tmcc nodeid`
@@ -74,7 +84,7 @@ else
     # Last resort!!!  tsshutdn
     datehost="`date`: Host name '$hostname'"
 #    msg="$datehost didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
-    msg="$datehost didn't reboot changing to '$nodeid'!  Trying reboot."
+    msg="$datehost didn't reboot changing to '$nodeid'!  Trying tsshutdn."
     echo "$msg" >> $logfile
     echo "$msg"
     tsshutdn 1 /REBOOT /DELAY:1
@@ -97,6 +107,16 @@ netsh interface reset all
 ipconfig /all | awk \
     '/^ *Connection-specific DNS Suffix/{print "search", $NF} \
      /^ *DNS Servers/{print "nameserver", $NF}' > /etc/resolv.conf
+
+# Remember the control net interface MAC address and Local Area Connection name for
+# slothd.  It's the one whose IP address is returned by looking up the nodeid (pc%d).
+cif=/var/emulab/boot/controlif
+nodeid=`cat /var/emulab/boot/nodeid`
+ipaddr=`nslookup $nodeid | awk 'NR>2 && /Address:/{print $2}'`
+ipconfig /all | tr -d '\r' | awk \
+    '/^Ethernet adapter/{ ifc = gensub("Ethernet adapter (.*):", "\\1", 1); next }\
+     /Physical Address/{ gsub("-", ":"); mac = tolower($NF); next}\
+     /IP Address/ && $NF=="'$ipaddr'"{ print mac, ifc > "'$cif'"; exit }'
 
 # Start up the service which will deliver a SHUTDOWN state event on reboot.
 cygrunsrv -S EmulabShutdown

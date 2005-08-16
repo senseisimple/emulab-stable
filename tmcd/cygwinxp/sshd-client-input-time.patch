@@ -1,0 +1,76 @@
+*** openssh-4.1p1-2/channels.h.orig	Tue Mar  1 03:24:33 2005
+--- openssh-4.1p1-2/channels.h	Thu Aug 11 14:43:12 2005
+***************
+*** 183,188 ****
+--- 183,193 ----
+  void	 channel_input_port_open(int, u_int32_t, void *);
+  void	 channel_input_window_adjust(int, u_int32_t, void *);
+  
++ #ifdef HAVE_CYGWIN
++ /* Emulab patch - Touch a file so we know when input happens. */
++ void	 input_occurred();
++ #endif
++ 
+  /* file descriptor handling (read/write) */
+  
+  void	 channel_prepare_select(fd_set **, fd_set **, int *, u_int*, int);
+*** openssh-4.1p1-2/channels.c.orig	Mon Mar 14 05:22:26 2005
+--- openssh-4.1p1-2/channels.c	Thu Aug 11 17:13:33 2005
+***************
+*** 1896,1902 ****
+--- 1896,1936 ----
+  	packet_check_eom();
+  	buffer_append(&c->output, data, data_len);
+  	xfree(data);
++ #ifdef HAVE_CYGWIN
++ 	input_occurred();
++ #endif
+  }
++ 
++ #ifdef HAVE_CYGWIN
++ /* Emulab patch - Touch a file so we know when input happens. */
++ char *ssh_time_file = "/var/run/ssh_input";
++ int input_occurred_fd = 0;
++ time_t last_time = 0;
++ void
++ input_occurred()
++ {
++ 	if (input_occurred_fd == 0)
++ 		/* No init yet. */
++ 		input_occurred_fd = open(
++ 			ssh_time_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
++ 	if (input_occurred_fd == -1) {
++ 		logit("Failed to open ssh_time_file %s.", ssh_time_file);
++ 		input_occurred_fd = -2;
++ 	}
++ 	if (input_occurred_fd > 0 
++ 	    /* Don't do it more than once a second. */
++ 	    && time(NULL) != last_time) {
++ 		last_time = time(NULL);
++ 
++ 		/* It would be nice to use futimes(), but there's not one
++ 		 * on Cygwin.  Instead, use ftruncate() to set the modtime.
++ 		 */
++ 		if (ftruncate(input_occurred_fd, 0))
++ 			logit("Error touching ssh input time file, %s.",
++ 				strerror(errno));
++ 	}
++ }
++ #endif
+  
+  void
+  channel_input_extended_data(int type, u_int32_t seq, void *ctxt)
+*** openssh-4.1p1-2/serverloop.c.orig	Fri Aug 13 05:18:01 2004
+--- openssh-4.1p1-2/serverloop.c	Thu Aug 11 15:52:45 2005
+***************
+*** 821,826 ****
+--- 821,829 ----
+  	buffer_append(&stdin_buffer, data, data_len);
+  	memset(data, 0, data_len);
+  	xfree(data);
++ #ifdef HAVE_CYGWIN
++ 	input_occurred();
++ #endif
+  }
+  
+  static void
