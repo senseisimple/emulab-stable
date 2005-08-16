@@ -629,7 +629,7 @@ REPLACE INTO table_regex VALUES ('virt_vtypes','weight','float','redirect','defa
 REPLACE INTO table_regex VALUES ('virt_vtypes','members','text','regex','^([-\\w]+ ?)+$',0,1024,NULL);
 REPLACE INTO table_regex VALUES ('default','tinytext','text','regex','^[\\040-\\176]*$',0,256,NULL);
 REPLACE INTO table_regex VALUES ('default','text','text','regex','^[\\040-\\176]*$',0,65535,NULL);
-REPLACE INTO table_regex VALUES ('projects','why','text','regex','^[\\040-\\176\\012\\015]*$',0,4096,NULL);
+REPLACE INTO table_regex VALUES ('projects','why','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,4096,NULL);
 REPLACE INTO table_regex VALUES ('default','tinyint','int','regex','^[\\d]+$',-128,127,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
 REPLACE INTO table_regex VALUES ('default','boolean','int','regex','^(0|1)$',0,1,'Default regex for tiny int fields that are int booleans. Allow any 0 or 1');
 REPLACE INTO table_regex VALUES ('default','tinyuint','int','regex','^[\\d]+$',0,255,'Default regex for tiny int fields. Allow any standard ascii integer, but no binary data');
