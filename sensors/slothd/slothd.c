@@ -550,6 +550,7 @@ int get_ldavg(char *buf, void *data) {
 
 int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
 
+  u_long od, id;
   int i;
 
   pkt->actbits = 0;
@@ -573,7 +574,6 @@ int get_active_bits(SLOTHD_PACKET *pkt, SLOTHD_PACKET *opkt) {
    * Have the packet counters exceeded the threshold?  Make sure we don't
    * count the incoming packets on the control net interface.
    */
-  u_long od, id;
   for (i = 0; i < pkt->ifcnt; ++i) {
     if (strcmp(parms->cifname, pkt->ifaces[i].ifname) == 0) {
       if ((od = pkt->ifaces[i].opkts - opkt->ifaces[i].opkts) >= 
