@@ -778,7 +778,7 @@ if (!isset($formfields[pid]) ||
     $errors["Project Name"] = "Missing Field";
 }
 else {
-    if (!TBvalid_pid($formfields[pid])) {
+    if (!TBvalid_newpid($formfields[pid])) {
 	$errors["Project Name"] = TBFieldErrorString();
     }
     elseif (TBValidProject($formfields[pid])) {

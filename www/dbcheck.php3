@@ -180,8 +180,18 @@ function TBvalid_uid($token) {
     return TBcheck_dbslot($token, "users", "uid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+#
+# Used to allow _ (underscore), but no more.
+# 
 function TBvalid_pid($token) {
     return TBcheck_dbslot($token, "projects", "pid",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+#
+# So, *new* projects disallow it, but old projects need the above test.
+#
+function TBvalid_newpid($token) {
+    return TBcheck_dbslot($token, "projects", "newpid",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
 function TBvalid_gid($token) {
@@ -294,5 +304,9 @@ function TBvalid_linklanname($token) {
 }
 function TBvalid_mailman_listname($token) {
     return TBcheck_dbslot($token, "mailman_listnames", "listname",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_fulltext($token) {
+    return TBcheck_dbslot($token, "default", "fulltext",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
