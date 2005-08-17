@@ -83,10 +83,10 @@ common-script-install:	dir-install
 	(cd config; $(MAKE) script-install)
 
 symlinks:	dir-install
-	rm -f $(TBBINDIR)/tevc
-	ln -s $(CLIENT_BINDIR)/tevc $(TBBINDIR)/tevc
-	rm -f $(TBBINDIR)/emulab-sync
-	ln -s $(CLIENT_BINDIR)/emulab-sync $(TBBINDIR)/emulab-sync
+	rm -f $(TBBINDIR)/tevc$(EXE)
+	ln -s $(CLIENT_BINDIR)/tevc$(EXE) $(TBBINDIR)/tevc$(EXE)
+	rm -f $(TBBINDIR)/emulab-sync$(EXE)
+	ln -s $(CLIENT_BINDIR)/emulab-sync$(EXE) $(TBBINDIR)/emulab-sync$(EXE)
 	rm -f $(TBLIBDIR)
 	ln -s $(CLIENT_BINDIR) $(TBLIBDIR)
 
