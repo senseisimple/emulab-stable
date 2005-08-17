@@ -123,7 +123,7 @@ my %commandset =
       "status"		=> {TAG => "status"},
       "state"		=> {TAG => "state"},
       "ifconfig"	=> {TAG => "ifconfig"},
-      "accounts"	=> {TAG => "accounts", PERM => "0600"},
+      "accounts"	=> {TAG => "accounts"},
       "delay"		=> {TAG => "delay"},
       "hostnames"	=> {TAG => "hostnames"},
       "rpms"		=> {TAG => "rpms"},
