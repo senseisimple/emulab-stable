@@ -77,7 +77,7 @@ sub firewallee();
 # from boss so we can pick up changes without rebooting using
 # "/usr/local/etc/emulab/rc/rc.firewall reconfig"
 #
-configtmcc("nocache", 1);
+#configtmcc("nocache", 1);
 
 # Allow default above.
 if (@ARGV) {
