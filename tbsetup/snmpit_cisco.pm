@@ -1239,6 +1239,17 @@ sub walkTableIfIndex($$$;$) {
         foreach my $row (@$table) {
             my ($oid,$index,$data) = @$row;
 
+	    #
+	    # Some generic MIBs return just a port number on the 2900.
+	    # Convert those to module.port format
+	    #
+	    $self->debug("  $oid: $index: $data\n", 2);
+	    if ($self->{SWITCHCLASS} == 2900 &&
+		$index =~ /^\d+$/) {
+		$index = "0.$index";
+		$self->debug("    index rewritten to $index\n", 2);
+	    }
+
             #
             # Convert the ifindex we got into a port
             # XXX - Should use convertPortFormat(), right? I've preserved the
