@@ -73,12 +73,11 @@ sub firewallee();
 #configtmcc("portnum", 7778);
 
 #
-# XXX At the moment, rc.firewall is run before bootsetup(), so we need to clear
-# the cache manually or we might get bad config data.  Note that nother side
-# effect of running before bootsetup() is that we don't get the config through
-# the 'fullconfig' call, it is a separate connection.
+# XXX for debugging default rules: make sure we always fetch
+# from boss so we can pick up changes without rebooting using
+# "/usr/local/etc/emulab/rc/rc.firewall reconfig"
 #
-configtmcc("nocache", 1);
+#configtmcc("nocache", 1);
 
 # Allow default above.
 if (@ARGV) {

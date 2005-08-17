@@ -123,7 +123,7 @@ my %commandset =
       "status"		=> {TAG => "status"},
       "state"		=> {TAG => "state"},
       "ifconfig"	=> {TAG => "ifconfig"},
-      "accounts"	=> {TAG => "accounts"},
+      "accounts"	=> {TAG => "accounts", PERM => "0600"},
       "delay"		=> {TAG => "delay"},
       "hostnames"	=> {TAG => "hostnames"},
       "rpms"		=> {TAG => "rpms"},
@@ -149,6 +149,7 @@ my %commandset =
       "syncserver"	=> {TAG => "syncserver"},
       "keyhash"		=> {TAG => "keyhash"},
       "nodeid"		=> {TAG => "nodeid"},
+      "ipodinfo"	=> {TAG => "ipodinfo", PERM => "0600"},
       "ntpinfo"		=> {TAG => "ntpinfo"},
       "ntpdrift"	=> {TAG => "ntpdrift"},
       "sdparams"	=> {TAG => "sdparams"},
@@ -561,6 +562,20 @@ sub tmccgetconfig()
 	    my $param = $1;
 	    
 	    if (open(TD, "> $cdir/$param")) {
+		#
+		# Set the permission on the file first if necessary
+		# XXX the commandset hash is odd
+		#
+		foreach my $key (keys(%commandset)) {
+		    my $tag = $commandset{$key}->{TAG};
+		    if ($param eq $tag) {
+			if (defined($commandset{$key}->{PERM})) {
+			    chmod(oct($commandset{$key}->{PERM}),
+				  "$cdir/$param");
+			}
+			last;
+		    }
+		}
 		while (@tmccresults) {
 		    $str = shift(@tmccresults);
 		    

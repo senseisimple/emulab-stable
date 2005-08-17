@@ -187,28 +187,12 @@ sub doboot()
 	}
     }
 
-    #
-    # Get the firewall up
-    #
-    if (-x "$RCDIR/rc.firewall") {
-	system("$RCDIR/rc.firewall");
-	if ($?) {
-	    fatal("Error running $RCDIR/rc.firewall");
-	}
-    }
-
     if (-x "$BINDIR/tbshutdown" && ! WINDOWS()) {
         print("Starting up shutdown notification daemon\n");
         system("$BINDIR/tbshutdown");
 	if ($?) {
 	    fatal("Error running $BINDIR/tbshutdown");
 	}
-    }
-
-    if (-x "$RCDIR/rc.ipod" && ! WINDOWS()) {
-	print("Setting up Ping of Death\n");
-	system("$RCDIR/rc.ipod");
-	# This is allowed to fail; ipod might not be supported.
     }
 
     print("Informing Emulab Control that we have rebooted\n");
@@ -223,6 +207,12 @@ sub doboot()
     #
     # This stuff is run regardless of reservation status.
     #
+    if (-x "$RCDIR/rc.ipod" && ! WINDOWS()) {
+	print("Setting up Ping of Death\n");
+	system("$RCDIR/rc.ipod");
+	# This is allowed to fail; ipod might not be supported.
+    }
+
     if (-x "$RCDIR/rc.healthd" && ! WINDOWS()) {
 	print("Starting node health monitoring daemon\n");
 	system("$RCDIR/rc.healthd start");

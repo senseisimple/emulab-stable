@@ -398,8 +398,13 @@ sub setintervals($)
 	logmsg("setintervals: refetching intervals, retry=$retry{check}\n", 1);
     }
 
+    #
+    # Note that the first watchdoginfo call will use the cache.  The info
+    # should be fresh and it helps reduce the boottime load on the tmcd
+    # server.
+    #
     my %tmccargs = ();
-    $tmccargs{nocache} = 1;
+    $tmccargs{nocache} = !$firsttime;
     $tmccargs{timeout} = 3;
     $tmccargs{useudp} = 1
 	if (!$trytcp || $retry{check} != $maxretries);
