@@ -320,7 +320,7 @@ struct command {
 	{ "bootlog",      FULLCONFIG_NONE, 0, dobootlog},
 	{ "battery",      FULLCONFIG_NONE, F_REMUDP|F_MINLOG, dobattery},
 	{ "topomap",      FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, dotopomap},
-	{ "userenv",      FULLCONFIG_NONE, F_ALLOCATED, douserenv},
+	{ "userenv",      FULLCONFIG_ALL,  F_ALLOCATED, douserenv},
 	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
 	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
 	
