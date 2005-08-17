@@ -219,7 +219,7 @@ sub doboot()
 	# If it fails, that is okay. Keep going.
     }
     
-    if (-x "$RCDIR/rc.slothd" && ! WINDOWS()) {
+    if (-x "$RCDIR/rc.slothd") {
 	print("Starting slothd usage detector\n");
 	system("$RCDIR/rc.slothd start");
 	if ($?) {
