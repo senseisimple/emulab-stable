@@ -4711,7 +4711,14 @@ sub GatherSwapStats($$$$$;$)
 		" action, exitcode) ".
 		"values (0, '$uid', $starttime, now(), $exptidx, $rsrcidx, ".
 		"        '$mode', $ecode)");
-    DBQueryWarn("update user_stats set last_activity=now() where uid='$uid'");
+
+    # We do these here since even failed operations implies activity
+    DBQueryWarn("update user_stats set last_activity=now() ".
+		"where uid='$uid'");
+    DBQueryWarn("update project_stats set last_activity=now() ".
+		"where pid='$pid'");
+    DBQueryWarn("update group_stats set last_activity=now() ".
+		"where pid='$pid' and gid='$gid'");
 }
 
 #

@@ -2742,4 +2742,27 @@ last_net_act,last_cpu_act,last_ext_act);
                                    UNIX_TIMESTAMP(exptswapout_last),
                                    UNIX_TIMESTAMP(exptswapmod_last)));
 
-4.4:
+4.4: Ditto last revision for project_stats and group_stats
+
+	alter table project_stats add last_activity datetime \
+               default NULL after exptswapmod_last;
+	alter table group_stats add last_activity datetime \
+               default NULL after exptswapmod_last;
+
+      To seed these:
+
+	update group_stats set last_activity =
+	    FROM_UNIXTIME(GREATEST(UNIX_TIMESTAMP(exptstart_last),
+	                           UNIX_TIMESTAMP(exptpreload_last),
+                                   UNIX_TIMESTAMP(exptswapin_last),
+                                   UNIX_TIMESTAMP(exptswapout_last),
+                                   UNIX_TIMESTAMP(exptswapmod_last)));
+
+	update project_stats set last_activity =
+	    FROM_UNIXTIME(GREATEST(UNIX_TIMESTAMP(exptstart_last),
+	                           UNIX_TIMESTAMP(exptpreload_last),
+                                   UNIX_TIMESTAMP(exptswapin_last),
+                                   UNIX_TIMESTAMP(exptswapout_last),
+                                   UNIX_TIMESTAMP(exptswapmod_last)));
+
+4.5:
