@@ -314,15 +314,11 @@ sub RecentUsers()
     my $limit = (60 * 60 * 24) * TBGetSiteVar("general/recently_active");
     print "Getting Recently Active Users\n" if $debug;
 
-    if (! DBQuery("create temporary table tstat1 ".
-		  "select distinct exptidx,uid from testbed_stats as t ".
-		  "where ((UNIX_TIMESTAMP(now()) - ".
-		  "UNIX_TIMESTAMP(t.end_time)) <= $limit)")) {
-	DBFatal("Making Recently Active Temp Table!");
-    }
     if (! ($query_result =
-	   DBQuery("select distinct u.usr_email from tstat1 as t ".
-		   "left join users as u on u.uid=t.uid ".
+	   DBQuery("select distinct u.usr_email from user_stats as s ".
+		   "left join users as u on u.uid=s.uid ".
+		   "where ((UNIX_TIMESTAMP(now()) - ".
+		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
 		   "order by u.usr_email"))) {
 	DBFatal("Getting Recently Active Users!");
     }
@@ -344,13 +340,13 @@ sub RecentProjects()
     print "Getting Recently Active Projects (members)\n" if $debug;
 
     if (! ($query_result =
-	   DBQuery("select distinct u.usr_email from tstat1 as t ".
-		   "left join experiment_stats as s on ".
-		   "     s.exptidx=t.exptidx ".
-		   "left join group_membership as p ".
-		   "     on s.pid=p.pid and p.pid=p.gid ".
-		   "left join users as u on u.uid=p.uid ".
-		   "where u.status='active' ".
+	   DBQuery("select distinct u.usr_email from project_stats as s ".
+		   "left join group_membership as g on ".
+		   "  g.pid=s.pid and g.gid=g.pid ".
+		   "left join users as u on u.uid=g.uid ".
+		   "where u.status='active' and ".
+		   "      ((UNIX_TIMESTAMP(now()) - ".
+		   "       UNIX_TIMESTAMP(s.last_activity)) <= $limit) ".
 		   "order by u.usr_email"))) {
 	DBFatal("Getting Recently Active Projects!");
     }
