@@ -4711,6 +4711,7 @@ sub GatherSwapStats($$$$$;$)
 		" action, exitcode) ".
 		"values (0, '$uid', $starttime, now(), $exptidx, $rsrcidx, ".
 		"        '$mode', $ecode)");
+    DBQueryWarn("update user_stats set last_activity=now() where uid='$uid'");
 }
 
 #

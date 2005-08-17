@@ -2726,3 +2726,20 @@ last_net_act,last_cpu_act,last_ext_act);
 	  created datetime default NULL,
 	  PRIMARY KEY  (listname)
 	) TYPE=MyISAM;
+
+4.3: Add a last_activity field to user_stats to make it easier to
+     determine recent users (in genelists).
+
+	alter table user_stats add last_activity datetime \
+               default NULL after exptswapmod_last;
+
+      To seed this table:
+
+	update user_stats set last_activity =
+	    FROM_UNIXTIME(GREATEST(UNIX_TIMESTAMP(exptstart_last),
+	                           UNIX_TIMESTAMP(exptpreload_last),
+                                   UNIX_TIMESTAMP(exptswapin_last),
+                                   UNIX_TIMESTAMP(exptswapout_last),
+                                   UNIX_TIMESTAMP(exptswapmod_last)));
+
+4.4:

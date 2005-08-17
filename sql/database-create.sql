@@ -1855,6 +1855,7 @@ CREATE TABLE user_stats (
   exptswapout_last datetime default NULL,
   exptswapmod_count int(11) unsigned default '0',
   exptswapmod_last datetime default NULL,
+  last_activity datetime default NULL,
   allexpt_duration int(11) unsigned default '0',
   allexpt_vnodes int(11) unsigned default '0',
   allexpt_vnode_duration int(11) unsigned default '0',
