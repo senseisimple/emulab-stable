@@ -718,6 +718,28 @@ CREATE TABLE ipsubnets (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `knowledge_base_entries`
+--
+
+CREATE TABLE knowledge_base_entries (
+  idx int(11) NOT NULL auto_increment,
+  creator_uid varchar(8) NOT NULL default '',
+  date_created datetime default NULL,
+  section tinytext,
+  title tinytext,
+  body text,
+  xref_tag tinytext,
+  faq_entry tinyint(1) NOT NULL default '0',
+  date_modified datetime default NULL,
+  modifier_uid varchar(8) default NULL,
+  archived tinyint(1) NOT NULL default '0',
+  date_archived datetime default NULL,
+  archiver_uid varchar(8) default NULL,
+  PRIMARY KEY  (idx),
+  UNIQUE KEY  (xref_tag)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `last_reservation`
 --
 

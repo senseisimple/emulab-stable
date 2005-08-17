@@ -102,7 +102,7 @@ echo "<br><br>\n";
 # Put up the modify form on first load.
 # 
 if (! isset($go)) {
-    echo "<a href='faq.php3#UTT-Modify'>".
+    echo "<a href='faq.php3#swapmod'>".
 	 "Modify Experiment Documentation (FAQ)</a></h3>";
     echo "<br>";
 

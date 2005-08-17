@@ -182,12 +182,12 @@ if (!$confirmed) {
     
     if (!strcmp($inout, "restart")) {
 	echo "<p>
-              <a href='$TBDOCBASE/faq.php3#UTT-Restart'>
+              <a href='$TBDOCBASE/faq.php3#restart'>
                  (Information on experiment restart)</a>\n";
     }
     else {
 	echo "<p>
-              <a href='$TBDOCBASE/faq.php3#UTT-Swapping'>
+              <a href='$TBDOCBASE/faq.php3#swapping'>
                  (Information on experiment swapping)</a>\n";
     }
     echo "</center>\n";

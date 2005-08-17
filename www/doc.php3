@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -32,7 +32,7 @@ PAGEHEADER("Documentation");
 </dl><br>
 
 <li><dl>
-<dt><b><a href="docwrapper.php3?docname=faq.html">
+<dt><b><a href="faq.php3">
               Frequently Asked Questions (FAQ)</a></b></dt>
     <dd>Probably our most important reference document. Check here before
         asking for help. Includes sections on "Getting Started" on Emulab,

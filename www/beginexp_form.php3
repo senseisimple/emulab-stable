@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -197,7 +197,7 @@ function SPITFORM($formfields, $errors)
 	    <li><b>If you do not have an NS file:</b><br> You may want to
 		<b><a href='buildui/bui.php3'>go to the NetBuild GUI</a></b>
 		to graphically create one online<font size=-2>
-		(<a href='$TBDOCBASE/faq.php3#UTT-NETBUILD'>Additional 
+		(<a href='$TBDOCBASE/faq.php3#netbuild'>Additional 
 		information</a>)</font>.<br>
                 Or, you can download the Emulab
                 <a href='netlab/client.php3'><b>client</b></a> and graphically

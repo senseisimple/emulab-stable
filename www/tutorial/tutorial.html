@@ -351,8 +351,8 @@ A few points should be noted:
      perspective, except for the fact that it adds latency, error,
      or reduced bandwidth. However, the information for the delay links
      are included so that you can
-     <a href="../faq.php3?#HDS-6">modify the delay parameters</a>
-     after the experiment has been created. 
+     <a href="../faq.php3?#modify-traffic-shaping">modify the delay
+     parameters</a> after the experiment has been created. 
 
 <li> Delays of less than 2ms (per trip) are too small to be
      accurately modeled at this time, and will be silently ignored.
@@ -380,9 +380,9 @@ A few points should be noted:
      experiment, since it will contact them over the control network,
      bypassing the link shaping we configured.
      (See also these two FAQ entries: 
-<a href="../docwrapper.php3?docname=faq.html#TR-2">
+<a href="../faq.php3#no-traffic-shaping">
 here</a> and
-<a href="../docwrapper.php3?docname=faq.html#Naming">
+<a href="../faq.php3#node-naming">
 here</a>.)
 
 </ul>
@@ -433,9 +433,9 @@ the node mapping, since the Emulab names refer to the control network
 LAN that is shared amongst all nodes in all experiments. It is only
 the experimental interfaces that are entirely private to your
 experiment. (See also these two FAQ entries: 
-<a href="../docwrapper.php3?docname=faq.html#TR-2">
+<a href="../faq.php3#no-traffic-shaping">
 here</a> and
-<a href="../docwrapper.php3?docname=faq.html#Naming">
+<a href="../faq.php3#node-naming">
 here</a>.)
 
 <p>
@@ -1330,7 +1330,7 @@ of your images or with one of the default images, you can use the
 This program will run in the foreground, waiting until the image has
 been loaded. At that point you should log in and make sure everything
 is working okay. You might want to watch the console line as well (see
-the <a href="../faq.php3?#UTT-3">FAQ</a>). If you want to load the
+the <a href="../faq.php3?#node-consoles">FAQ</a>). If you want to load the
 default image, then simply run:
 
 	<code><pre>

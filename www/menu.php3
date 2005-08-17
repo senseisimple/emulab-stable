@@ -588,6 +588,9 @@ function WRITESIDEBAR() {
 		    WRITESIDEBARBUTTON("Edit Site Variables",
 				       $TBBASE, "editsitevars.php3");
 
+		    WRITESIDEBARBUTTON("Edit Knowledge Base",
+				       $TBBASE, "kb-manage.php3");
+		    
 		    $query_result
 		      = DBQUeryFatal("select new_node_id from new_nodes");
                     if (mysql_num_rows($query_result) > 0) {

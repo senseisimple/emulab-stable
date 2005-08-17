@@ -32,12 +32,15 @@ db-fill:
 	@/usr/testbed/sbin/wap /usr/testbed/sbin/export_tables \
 	  > database-fill.sql
 
-db-fill-dist:
+db-fill-dist: knowlbase
 	@/usr/testbed/sbin/wap /usr/testbed/sbin/export_tables -i \
 	  > database-fill.sql
 
 sitevars:
 	@mysqldump -t tbdb sitevariables > sitevars-create.sql 
+
+knowlbase:
+	@mysqldump -c -t tbdb knowledge_base_entries | sed -e 's,^INSERT,REPLACE,' > knowlbase-create.sql 
 
 fwrules:
 	@echo "*** Use 'gmake insertrules' in the firewall subdir to do this"

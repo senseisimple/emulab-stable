@@ -106,7 +106,7 @@ SUBMENUSTART("Node Options");
 #
 if (TBHasSerialConsole($node_id)) {
     WRITESUBMENUBUTTON("Connect to Serial Line</a> " . 
-	"<a href=\"faq.php3#UTT-TUNNEL\">(howto)",
+	"<a href=\"faq.php3#tiptunnel\">(howto)",
 	"nodetipacl.php3?node_id=$node_id");
 }
 

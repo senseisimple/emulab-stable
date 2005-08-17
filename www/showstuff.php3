@@ -1201,7 +1201,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 		    <th>Last Log Message</th>\n";
 	}
         echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
-                <th><a href=\"faq.php3#UTT-TUNNEL\">Console</a></th>";
+                <th><a href=\"faq.php3#tiptunnel\">Console</a></th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
 	$windows_query_result = DBQueryFatal("SELECT r.pid,r.eid,n.node_id,oi.OS ".

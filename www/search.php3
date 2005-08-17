@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -15,7 +15,7 @@ PAGEHEADER("Search Emulab Documentation");
 # We no longer support an advanced search option. We might bring it back
 # someday.
 #
-function SPITFORM($query)
+function SPITSEARCHFORM($query)
 {
     echo "<table align=center border=1>
           <form action=search.php3 method=get>\n";
@@ -43,14 +43,14 @@ function SPITFORM($query)
 }
 
 if (!isset($query) || $query == "") {
-    SPITFORM("");
+    SPITSEARCHFORM("");
     PAGEFOOTER();
     return;
 }
 
 # Sanitize for the shell. Be fancy later.
 if (!preg_match("/^[-\w\ \"]+$/", $query)) {
-    SPITFORM("");
+    SPITSEARCHFORM("");
     PAGEFOOTER();
     return;
 }
@@ -77,8 +77,19 @@ function CLEANUP()
 ignore_user_abort(1);
 register_shutdown_function("CLEANUP");
 
-SPITFORM($query);
+SPITSEARCHFORM($query);
 flush();
+
+#
+# First the Knowledge Base
+#
+$embedded    = 1;
+$query_type  = "and";
+$query_which = "both";
+include("kb-search.php3");
+
+echo "<br>\n";
+echo "<font size=+2>Documentation search results</font><br>\n";
 
 if ($fp = popen("$TBSUEXEC_PATH nobody nobody websearch '$query'", "r")) {
     while (!feof($fp)) {

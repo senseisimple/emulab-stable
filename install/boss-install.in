@@ -620,6 +620,18 @@ Phase "database", "Setting up database", sub {
 	}
 	ExecQuietFatal("$MYSQL $DBNAME < $TOP_SRCDIR/sql/sitevars-create.sql");
     };
+    Phase "knowlbase", "Filling knowledge_base_entries table", sub {
+	my ($exitval, @rows) = ExecQuiet("echo 'select * from " .
+	    "knowledge_base_entries' | $MYSQL -s $DBNAME");
+	if ($exitval) {
+	    PhaseFail("Error running query");
+	}
+	if (scalar @rows) {
+	    PhaseSkip("Already done");
+	}
+	ExecQuietFatal("$MYSQL $DBNAME < ".
+		       "$TOP_SRCDIR/sql/knowlbase-create.sql");
+    };
 };
 
 Phase "rc.conf", "Adding testbed content to $RCCONF", sub {

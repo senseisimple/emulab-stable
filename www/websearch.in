@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -133,7 +133,10 @@ while (<AGREP>) {
 }
 close(AGREP);
 
-print "Rank, filename, modification date, matching lines<br>\n";
+if (@order) {
+    print "Rank, filename, modification date, matching lines<br><br>\n";
+    print "<ul>\n";
+}
 foreach my $hit (@order) {
     my ($rank, $path, $size, $mod) = @{ $hits{$hit} };
     $dir  = dirname($path);
@@ -148,7 +151,7 @@ foreach my $hit (@order) {
     }
 
     print "<hr>\n";
-    print "$rank - <b><a href=$url>$path</a></b>, $mod<br>\n";
+    print "<li> $rank - <b><a href=$url>$path</a></b>, $mod<br>\n";
     print "<ul>\n";
     foreach my $line (@{ $lines{$hit} }) {
 	$line =~ s/<li>//ig;
@@ -158,6 +161,10 @@ foreach my $hit (@order) {
     }
     print "</ul>\n";
 }
+if (@order) {
+    </ul>
+}
+
 print "<hr><br><br>".
       "Web Search powered by <a href=\"http://swish-e.org/\"><b>Swish-e</b></a>".
       "\n";
