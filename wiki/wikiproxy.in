@@ -97,6 +97,9 @@ elsif ($action eq "deluser") {
 elsif ($action eq "addproject") {
     exit(AddWikiProject(@ARGV));
 }
+elsif ($action eq "addgroup") {
+    exit(AddWikiGroup(@ARGV));
+}
 elsif ($action eq "setgroups") {
     exit(SetWikiGroups(@ARGV));
 }
@@ -105,6 +108,9 @@ elsif ($action eq "xlogin") {
 }
 elsif ($action eq "remap") {
     exit(WikiRemap(@ARGV));
+}
+elsif ($action eq "fixproject") {
+    exit(FixWikiProject(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -408,13 +414,13 @@ sub AddWikiProject(@)
     #
     # We also need a group for this project to restrict who can access it.
     #
-    AddWikiGroup($pid, "${wikiname}Group");
+    AddWikiGroup($pid, "${wikiname}Group", "${wikiname}Group");
 
     #
     # And another group for the project leaders and group roots, who are
     # allowed to change the preferences for the web.
     #
-    AddWikiGroup("${pid}Root", "${wikiname}RootGroup");
+    AddWikiGroup("${pid}Root", "${wikiname}RootGroup", "${wikiname}Group");
 
     #
     # Now finish up in the new web directory.
@@ -484,16 +490,18 @@ sub AddWikiProject(@)
 sub AddWikiGroup(@)
 {
     usage()
-	if (@_ != 2);
+	if (@_ < 2 || @_ > 3);
 
-    my ($group, $wikiname) = @_;
+    my ($group, $wikiname, $allowed) = @_;
+    $allowed = $wikiname
+	if (!defined($allowed));
 
     chdir("$WIKIGROUPDIR") or
 	fatal("Could not chdir to $WIKIGROUPDIR");
 
     # Skip if already there. 
     return 0
-	if (-d "${wikiname}.txt");
+	if (-e "${wikiname}.txt");
 
     print "Creating ${WIKIGROUPDIR}/${wikiname}.txt\n"
 	if ($debug);
@@ -504,6 +512,8 @@ sub AddWikiGroup(@)
     print GRP "*Project/Group Members for ${wikiname}*\n";
     print GRP "\n";
     print GRP "\t* Set GROUP = \n";
+    print GRP "\t* Set ALLOWTOPICVIEW = %MAINWEB%.TWikiAdminGroup, ".
+	"%MAINWEB%.${allowed}\n";
     print GRP "\t* Set ALLOWTOPICCHANGE = %MAINWEB%.TWikiAdminGroup\n";
     print GRP "\t* Set ALLOWTOPICRENAME = %MAINWEB%.TWikiAdminGroup\n";
     print GRP "\n";
@@ -515,6 +525,78 @@ sub AddWikiGroup(@)
     CI("${wikiname}.txt", "AddWikiGroup $group $wikiname") == 0
         or fatal("Could not ci ${wikiname}.txt");
 
+    return 0;
+}
+
+#
+# Fix a wiki group. 
+#
+sub FixWikiProject(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($pid, $wikiname) = @_;
+
+    FixWikiGroup($pid, "${wikiname}Group", "${wikiname}Group");
+
+    #
+    # And another group for the project leaders and group roots, who are
+    # allowed to change the preferences for the web.
+    #
+    FixWikiGroup("${pid}Root", "${wikiname}RootGroup", "${wikiname}Group");
+
+    return 0;
+}
+
+#
+# Fix a wiki group. 
+#
+sub FixWikiGroup(@)
+{
+    usage()
+	if (@_ != 3);
+
+    my ($group, $wikiname, $allowed) = @_;
+
+    chdir("$WIKIGROUPDIR") or
+	fatal("Could not chdir to $WIKIGROUPDIR");
+
+    return 0
+	if (! -e "${wikiname}.txt");
+
+    if (system("egrep -q -s 'ALLOWTOPICVIEW' ${wikiname}.txt")) {
+	my @lines = ();
+	
+	print "Fixing ${WIKIGROUPDIR}/${wikiname}.txt\n";
+	
+	open(GRP, "< ${wikiname}.txt") or
+	    fatal("Could not open ${WIKIGROUPDIR}/${wikiname}.txt");
+	while (<GRP>) {
+	    push(@lines, $_);
+
+	    if ($_ =~ /ALLOWTOPICCHANGE/) {
+		push(@lines,
+		     "\t* Set ALLOWTOPICVIEW = %MAINWEB%.TWikiAdminGroup, ".
+		     "%MAINWEB%.${allowed}\n");
+	    }
+	}
+	close(GRP);
+
+	open(GRP, "> ${wikiname}.txt") or
+	    fatal("Could not open ${WIKIGROUPDIR}/${wikiname}.txt");
+	
+	foreach my $line (@lines) {
+	    print GRP $line
+	}
+	close(GRP);
+
+	#
+	# Check it in (locked).
+	#
+	CI("${wikiname}.txt", "FixWikiGroup $group $wikiname") == 0
+	    or fatal("Could not ci ${wikiname}.txt");
+    }
     return 0;
 }
 
