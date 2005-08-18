@@ -30,6 +30,7 @@ my $osselect = "$TB/bin/os_select";
 my $nodereboot = "$TB/bin/node_reboot";
 my $rebootlog  = "$TB/log/nodereboot.log";
 my $power = "$TB/bin/power";
+my $apod = "$TB/sbin/apod";
 my $TBLOG = "@TBLOGFACIL@";
 
 $| = 1;
@@ -929,6 +930,9 @@ sub handleCtrlEvent($$) {
 				 $UID, $pid, $eid);
 		info("Released $node from $pid/$eid\n");
 	    }
+	    info("Sending an apod to $node\n");
+	    system("$apod $node") == 0 or
+		notify("Could not apod $node after $TBRELOADDONE!\n");
 	    next;
 	};
 	/^$TBTIMEOUT$/ && do {
@@ -990,7 +994,7 @@ sub handleCtrlEvent($$) {
 		debug("$cmd\n");
 		system("date 2>&1 >> $rebootlog");
 		system("$cmd 2>&1 >> $rebootlog &") and
-		    notify("PXEWAKEUP retry: ".
+		    notify("$PXEWAKEUP retry: ".
 			   "Command '$cmd' failed, error $?: $!\n");
 
 		next;
