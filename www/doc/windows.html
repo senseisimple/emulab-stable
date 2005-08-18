@@ -29,8 +29,8 @@
   <ul>
     <li> <a href="#Cygwin_documentation"> Cygwin documentation </a></li>
     <li> <a href="#Cygwin_packages"> Cygwin packages </a></li>
-    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a></li>
-    <li> <a href="#Cygwin_arcana"> Cygwin arcana </a></li>
+    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a><img src="../new.gif" alt="&lt;NEW&gt;"></li>
+    <li> <a href="#Cygwin_arcana"> Cygwin arcana </a><img src="../new.gif" alt="&lt;NEW&gt;"></li>
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
   <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
@@ -44,11 +44,18 @@ Microsoft <i>Windows XP</i> is now supported as one of the operating system
 types for experiment nodes in Emulab, in addition to FreeBSD and Linux.
 <a href="../faq.php3?#SWS-WIN2K">Windows 2000</a> is not supported. <p>
 
+As much as possible, we have left Windows XP "stock".  Some Windows services
+are shut down: Messenger, SSDP Discovery Service, Universal Plug and Play
+Device Host, and Remote Registry.  NetBT (NetBios over TCP) is disabled to
+allow network idle detection by <code>slothd</code>. <p>
+
 Before booting the node at swap-in time, Emulab loads a fresh image of Windows
-XP onto the experiment nodes in parallel, using our Frisbee service.  Emulab
-software automatically configures each <i>Windows XP</i> node, providing the
+XP onto the experiment nodes in parallel, using our <code>frisbee</code> service.
+Emulab software automatically configures each Windows XP node, providing the
 expected experiment user environment including: user accounts and Emulab SSH
 keys; remote home, project, and shared directories; and network connections.
+All of the Emulab experiment automation and monitoring services have been ported
+to run on Windows.
 <p>
 
 The Cygwin GNU environment is provided, including Bash and TCSH shells, the
@@ -61,39 +68,42 @@ Remote Desktop Protocol service supports Windows Desktop logins from the
 user's workstation screen to the experiment node.  <p>
 
 <i>Windows XP</i> installations are more hardware dependent than Linux or
-FreeBSD.  At first, this <i>Windows XP</i> image only runs on the pc850 and
-pc600 Emulab node types.  <p>
+FreeBSD.  At first, this <i>Windows XP</i> image only runs on the pc850
+Emulab node type.  <p>
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Differences"></a> Differences from FreeBSD and Linux in Emulab </h3>
 
 The biggest difference of course, is that this is <b>Windows</b> (!), with
-Cygwin layered on top, in an Emulab context.  In particular, this is Windows
-XP (NT 5.1), with various levels of service packs and updates (see <a
-href="#Experiment_setup">below</a>.) <p>
+Cygwin layered on top, and Emulab management services added.  In particular,
+this is Windows XP (NT 5.1), with various levels of service packs and updates
+(see <a href="#Experiment_setup">below</a>.) <p>
 
 The second-biggest difference is that shared directories are provided not by
 the NFS (Network File System) protocol, but instead by the <b>SMB</b> (Server
 Message Block) protocol, otherwise known as Windows File Sharing.  The Client
 for Microsoft Networks software contacts the SMB server, in this case
-<b>Samba</b> running on the file server known as <b>Fs</b>.  The SMB protocol
+<b>Samba</b> running on the file server known as <b>Fs</b> (an alias for
+<b>Users</b>.)  The SMB protocol
 authenticates using a plain-text user name and password, encrypted as they go
 across the network.  (These Windows Shares are then accessed by UNC paths
-under Cygwin mounts, described below.) <p>
+under Cygwin mounts, <a href="#SMB_mounts">described below</a>.) <p>
 
 <h4><a name="Windows_Passwords"> </a> Windows Passwords </h4>
 
 A separate <b>Windows password</b> is kept for use only with experiment nodes
-running Windows.  It is presented behind-the-scenes to rdesktop for RDP logins
-by our Web interface.  However, we still haven't figured out how to present it
-to Windows for the Samba mount of your home directory under an ssh login, so
-you will still need to type it on each ssh connection. <p>
+running Windows.  It is presented behind-the-scenes to <code>rdesktop</code>
+for RDP logins by our Web interface under Unix, and for the Samba mount of
+shared directories like your home directory under an ssh login, so you don't
+have to type it in those cases.  You <u>will</u> have to type it each time if
+you use the <a href="#Login_connections"> Microsoft RDC (Remote Desktop
+Connector) client program</a> from a Windows machine.<p>
 
 The default Windows password is randomly generated.  It's easy to change it to
 something easier to remember. <p>
 
 To see or edit your Windows password, log in to Emulab, and click <b>Manage
-User Profile</b> and then <b>Edit Profile under User Options</b>.  You
+User Profile</b> and then <b>Edit Profile</b> under <b>User Options</b>.  You
 will see <b>Windows Password</b> fields in addition to the regular Emulab
 <b>Password</b> fields. <p>
 
@@ -104,8 +114,8 @@ with the new password. <p>
 
 If you have already swapped-in experiment nodes and change your Windows
 password, the account information including passwords will be updated at the
-next Emulab watchdog daemon isalive interval.  This should be in 3 to 6
-minutes. <p>
+next Emulab watchdog daemon <code>isalive</code> interval.  This should be in
+3 to 6 minutes. <p>
 
 <h4><a name="Experiment_setup"> </a> Experiment setup for Windows nodes </h4>
 
@@ -117,32 +127,20 @@ Currently available Windows XP images are:
 
 <ul>
 
-  <li><b>WINXP-UPDATE</b> - Windows XP-SP2+, pc600 and pc850.  This will be
+  <li><b>WINXP-UPDATE</b> - Windows XP-SP2+, pc850.  This will be
   updated periodically from Windows Update with critical and security fixes up
   through the date we pull the image file. <p>
 
   The Windows Firewall is disabled by default (as it will inform you
-  repeatedly!) <p>
-
-  This image fixes the problem that was causing Windows experiments created
-  with Netbuild to fail.  Netbuild creates all experiments with "Static"
-  routing enabled, and that form of route is now supported. <p>
-
-  There was also a problem with Windows not finding all the interfaces when it
-  booted.  Hopefully that is fixed as well.
+  repeatedly!)
   </li>
 
-  <li><b>WINXP-02-16</b> - Windows XP-SP2+, pc600 and pc850, first release.
-  This incorporates SP2, as well as all "critical" and "security" updates as
-  of the date of the image. <p>
-
-  If you use WINXP-02-16 and built your experiment .ns file with the
-  <i>NetBuild</i> GUI, be aware that it puts in a <code>rtproto Static</code>
-  statement, which you will need to modify to <code>rtproto Static-old</code>.
+  <li><b>WINXP-SP1</b> - Windows XP-SP1a, pc850.
+  This is intended for (in)security work, and has only SP1(a) on it.
   </li>
 
-  <li><b>WINXP-02-11</b> - Windows XP-SP1, pc600 and pc850, early release
-  candidate.
+  <li><b>WINXP-SP0</b> - Windows XP with no service packs, pc850.
+  This is intended for (in)security work, and has no service packs at all.
   </li>
 
 </ul>
@@ -212,27 +210,36 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
 
 <ul>
        
-  <li> <a href="https://www.emulab.net/docwrapper.php3?docname=ssh-mime.html">
-       <b>SSH</b> </a> - The <b>SSH</b> connection button gives a Bash or TCSH
-       shell, as usual.  Although your Emulab ssh keys are installed on the
-       node in a /sshkeys subdirectory, you have to type your password to SSH
-       logins to enable remote directory mounts through SMB.  </li>
+  <li> <b>SSH</b> <a href="https://www.emulab.net/docwrapper.php3?docname=ssh-mime.html">
+       (setup) </a> - The <b>SSH</b> connection button gives a Bash or TCSH
+       shell, as usual.  Your Emulab ssh keys are installed on the
+       node in a /sshkeys subdirectory.  </li>
 
-  <li> <a href="https://www.emulab.net/faq.php3#tiptunnel"> <b>Console</b>
-       </a> - The <b>Console</b> button won't do much good now, because
+  <li> <b>Console</b> <a href="https://www.emulab.net/faq.php3#tiptunnel">
+       (setup) </a> - The <b>Console</b> button won't do much good now, because
        Windows doesn't normally provide logins on the com serial device.
        (This will be remedied with <i>agetty</i> eventually.)  An exception is
        that you can monitor the Frisbee loading of the Windows image on the
        console.  </li>
 
-  <li> <a href="https://www.emulab.net/docwrapper.php3?docname=rdp-mime.html">
-       <b>RDP</b> </a> - The <b>RDP</b> button starts up a Remote Desktop
+  <li> <b>RDP</b> <a href="https://www.emulab.net/docwrapper.php3?docname=rdp-mime.html">
+       (setup) </a> - The <b>RDP</b> button starts up a Remote Desktop
        Protocol connection, giving a Windows Desktop login from the user's
-       workstation screen to the experiment node.  The "rdesktop" client
-       software is used from Linux and Unix client workstations.  A Microsoft
-       RDC (Remote Desktop Connector) client program is included in Windows
-       XP, and may be installed onto other versions of Windows as well.  </li> 
+       workstation screen to the experiment node.  
+       <ul>
 
+	 <li> The "rdesktop" client software is used from Linux and Unix 
+	      client workstations. </li>
+
+	 <li> A Microsoft RDC (Remote Desktop Connector) client program is
+	      included in Windows XP, and may be installed onto other versions
+	      of Windows as well.  It has the cute feature that you can make
+	      it full-screen without (too much) confusion, since it hangs a
+	      little tab at the top of the screen to switch back.
+	      Unfortunately, we have no way to present your Emulab Windows
+	      password to RDC, so you'll have to type it on each login.  </li>
+
+       </ul>
 </ul>
 
 <h4><a name="RDP_details"> </a> RDP details </h4>
@@ -252,9 +259,9 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        without losing anything. <p>
 
        SSH doesn't count as a desktop, so you can ssh in and use this command:
-       <pre> qwinsta</pre> (Query WINdows STAtion) command to show existing
+       <b><code>qwinsta</code></b> (Query WINdows STAtion) to show existing
        winstation sessions and their session ID's, and this one to reset
-       (kill) a session by ID: <pre> rwinsta</pre> </li>
+       (kill) a session by ID: <b><code>rwinsta</code></b> </li>
 
   <li> We rename <b>My Computer</b> to show the PCxxx physical node name, but
        it doesn't appear on the <i>Windows XP</i> desktop by default.  The XP
@@ -291,7 +298,7 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        confusing. <p>
 
        In a Windows Terminal window on your RDP remote desktop, the
-       cut-and-paste mouse clicks are:
+       quick-edit cut-and-paste mouse clicks are:
 
        <ul>
 
@@ -309,7 +316,7 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        </ul> <br>
 
   <li> On the <b>first login by a user</b>, Windows creates the user's <i>Windows
-       profile directory</i> under "C:\Documents and Settings", and creates
+       profile directory</i> under <code>C:\Documents and Settings</code>, and creates
        the <i>registry key</i> (folder) for persistent settings for that user. <p>
 
        We arrange that early in the user's login process, a user <b>HOME</b>
@@ -360,8 +367,9 @@ Cygwin is well documented.  Here are some links to get you started:
 A number of optional Cygwin packages are installed in the image due to our
 building and running the Emulab client software, plus some editors for
 convenience.  These packages are currently agetty, bison, cvs, cygrunsrv, ed,
-file, flex, gcc, gdb, make, nano, openssh, openssl-devel, patch, perl,
-perl-libwin32, python, rpm, rsync, shutdown, tcsh, vim, wget, and zip. <p>
+file, flex, gcc, gdb, inetutils, make, minires-devel, nano, openssh,
+openssl-devel, patch, perl, perl-libwin32, python, rpm, rsync, shutdown, tcsh,
+vim, wget, and zip. <p>
 
 The Cygwin command <pre> cygcheck -c</pre> lists the packages that are
 installed, and their current version number and status.
@@ -389,79 +397,155 @@ Watch out for post-install scripts in:
 Many packages not in the Cygwin package site have also been ported to Cygwin
 already.  Download the sources to an experiment node and try
 <pre>
-    configure
+    ./configure
     make
     make install
 </pre> as usual. <p>
 
 <h4><a name="SMB_mounts"> </a> SMB mounts and Samba </h4>
 
-Some details remain to be documented: <br>
+User home directories and other shared directories are served by <b>fs</b>,
+another alias for Ops/Users, via the SMB protocol (Server Message Block, also
+known as Windows File Sharing) with the Windows Client connecting to the Samba
+server. <p>
 
-<ul>
+UNC paths with leading double-slashes <b><code>//fs</code></b> are used to
+access the SMB Shares under Cygwin.  They are then further mounted to the
+usual Unix paths for the shared directories:
+<code>/users/&lt;username&gt;</code>, <code>/proj/&lt;pid&gt;</code>,
+<code>/group/&lt;pid&gt;/&lt;gid&gt;</code>, and <code>/share</code>.
+<p>
 
-  <li> Home dirs and other shared directories are on <code>//fs</code> 
-       via SMB(Windows Client, Samba server)
+The Cygwin <b><code>mount</code></b> command lists what you could access on
+the Samba server, with the UNC path in the first column.  Unix file
+permissions may further limit your access on the Samba server.  Log in to Ops
+to investigate.<p>
 
-       <ul>
+<b><code>/share/windows</code></b> contains Windows software.  See
+<code>/share/windows/README.bin</code> for descriptions of binary packages
+available for installation. <p>
 
-         <li> Cygwin/UNC mounts of Windows Shares under <code>/users</code>,
-              <code>/proj/&lt;pid&gt;</code>,
-	      <code>/group/&lt;pid&gt;/&lt;gid&gt;</code>,
-	      <code>/share</code>.  The Cygwin
-              <code>mount</code> command shows what you can access. </li> 
+In Windows GUI programs, you can just type the UNC path into the Address bar
+or a file-open dialog with <b>backslashes</b>, e.g. <code>\\fs\share</code> or
+<code>\\fs\&lt;username&gt;</code>.  User and project shares are marked "not
+browsable", so just <code>\\fs</code> shows only <code>share</code>. <p>
 
-         <li> <code>/share/windows</code> contains Windows software.
-              See <code>/share/windows/README.bin</code> for descriptions
-              of binary packages available for installation. </li> 
-
-         <li> Can put <code>\\fs\&lt;share_name&gt;</code> into the Windows
-              Explorer "Address".  These shares are marked not browsable, so
-              just <code>\\fs</code> shows little.  </li>
-
-       </ul> </li>
-
-  <li> Misfeature: There is only protection mask for everything in a whole
-       mount/share under SMB.  It's set in the "share properties" on the
-       server (Samba config file in this case) so chmod will do you no
-       good. </li>
-
-</ul>
+Windows limitation: There is only one protection mask for everything in a
+whole mount/share under SMB.  It's set in the "share properties" on the server
+(Samba config file in this case) so <b><code>chmod</code></b> will do you no
+good across SMB.
 
 <h4><a name="Cygwin_arcana"> </a> Cygwin arcana </h4>
 
 <ul>
 
-  <li> Paths 
-       <ul>
+  <li> Paths <p>
 
-         <li> <code><b>\</b> == <b>/</b></code>, modulo quoting </li>
+       Cygwin accepts either flavor of slashes in paths, Unix/POSIX-style
+       forward-slashes, or Windows-style back-slashes.  In Unix shell
+       commands, backslashes need to be quoted. <p>
 
-         <li> <code>cygpath -w</code>, <code>cygpath -u</code> </li>
+       Single-quotes work best.  Doubling each backslash also works.  This
+       must also be done inside double-quotes.  Examples:
+       <code>'\single\quoted'</code>, <code>"\\double\\quoted"</code>,
+       <code>\\un\\quoted</code>.  (The difference between double and single
+       quotes is that $variable references and back-quoted command execution
+       are expanded in double-quotes.) <p>
 
-         <li> UNC paths: <code>//machine</code> </li>
+       When you invoke Windows (as opposed to Cygwin) commands, for example
+       <code>net use</code>, they will know nothing about Unix-style paths in
+       their arguments. The <a
+       href="http://cygwin.com/cygwin-ug-net/using-utils.html#cygpath">
+       <b><code>cygpath</code></b> </a> utility is an aid to converting paths
+       between the Unix and Windows conventions. <p>
 
-       </ul> </li>
+       <code>cygpath -w</code> converts its arguments to Windows format, where <code>cygpath
+       -u</code> converts its arguments to Unix format, e.g. <pre>
+	 $ cygpath -w /cygdrive/c/WINDOWS
+	 c:\WINDOWS
 
-  <li> Cygwin mounts
-       <ul>
+	 $ cygpath -u 'c:\WINDOWS'
+	 /cygdrive/c/WINDOWS
+	 </pre> <p>  </li>
 
-         <li> Shown in the <code>mount</code> and <code>df</code> commands. </li>
+  <li> Cygwin mounts <p>
 
-         <li> <code><b>/</b> == C:/cygwin</code> </li>
+       <a href="http://cygwin.com/cygwin-ug-net/using-utils.html#mount">
+       Cygwin mount points </a> are shown by the <code>mount</code> and
+       <code>df</code> commands.   <p>
 
-         <li> <code>/cygdrive/c == C:</code> </li>
+       Note that there is a hard-coded limit of 30 mount points in Cygwin.
+       Attempts to use the Cygwin <code>mount</code> command after that will
+       fail. <p>
 
-         <li> </code>//fs/...</code> all Emulab directories. </li>
+       We discussed UNC <code>//machine</code> paths to SMB shares <a
+       href="#SMB_mounts"> above </a>. <p>
 
-       </ul> </li>
+       Another special case is the <b>Unix root</b>, "<code>/</code>".  It's
+       mounted to <code>C:\cygwin</code> in the Windows filesystem. </li>
 
-  <li> <code>/etc/passwd</code> and <code>/etc/group</code> contain Windows
-  SID's as UID's and GID's. </li>
+  <li> Windows drive letter mounts <p>
 
-  <li> No suid, but everybody is in group wheel==Administrators. </li>
+       Cygwin knows about drive letter prefixes like
+       <b><code>C:</code></b><nbsp>, which are equivalent to
+       <code>/cygdrive/&lt;drive-letter&gt;</code><nbsp>.  However,
+       <code>/cygdrive</code>, like <code>/dev</code>, isn't a real directory,
+       so you can't <code>ls</code> it.  <p>
 
-  <li> File protections can lock out root, Administrator, or SYSTEM. </li>
+       Some Windows software requires drive-letter mounts to be created for
+       its use. <p>
+
+       You can use the Windows <b><code>net use</code></b> command to
+       associate drive letters with UNC paths to SMB shares, e.g. <code>net
+       use W: '\\fs\share\windows'</code> <p>
+
+       You can use the Windows <b><code>subst</code></b> command to associate
+       drive letters with local paths, e.g. <code>subst T: 'C:\Temp'</code> <p>
+
+       Filename completion in Cygwin shells with <code>&lt;Tab&gt;</code>
+       doesn't work following a drive-letter prefix, but it works normally
+       after a <code>/cygdrive/</code> prefix.  Also, filename completion is
+       case-sensitive, although the underlying Windows is case-insensitive, so
+       a filename in the wrong case is still opened properly. </li>
+
+  <li> Cygwin is running in <a
+       href="http://cygwin.com/cygwin-ug-net/ntsec.html"> <b>NTSEC</b> </a>
+       (NT Security) mode, so <code>/etc/passwd</code> and
+       <code>/etc/group</code> contain Windows SID's as user and group ID's.
+       Your Windows UID is the computer SID with a user number appended,
+       something like
+       <code>S-1-5-21-2000478354-436374069-1060284298-1334</code>. <p>
+
+       Cygwin commands, such as <code>id</code>, <code>ls -ln</code>, and
+       <code>chown/chgrp</code>, use the numeric suffix as the uid,
+       e.g. <code>1334</code>.  This is different from your normal Emulab Unix
+       user ID number, and the Samba server takes care of the
+       difference. </li>
+
+  <li> There is no direct equivalent of the Unix <b>setuid</b> programs under
+       Windows, and hence no <code>su</code> or <code>sudo</code> commands. <p>
+
+       Everybody is in group <b><code>wheel</code></b>, an alias for the
+       Windows <code>Administrators</code> group.  The Emulab notion of
+       non-local-root members of a project is not implemented. </li>
+
+  <li> Cygwin does a pretty good job of mapping Unix user-group-other file
+       permissions to Windows NT security ACLs.  <p>
+
+       One difference is that on windows, file protections can lock out root,
+       Administrator, or SYSTEM user access.  Many Unix scripts don't bother
+       with permissions if they're running as root. <p>
+
+       There is not usually a Windows account named <b><code>root</code></b>,
+       but we create one as part of the Emulab setup. </li>
+
+       Cygwin tries to treat <code>.exe</code> files the same as executable
+       files without the <code>.exe</code> suffix, but with execute
+       permissions turned on.  This breaks down in Makefile actions and
+       scripts, where <code>rm</code>, <code>ls -l</code>, and
+       <code>install</code> commands may need an explicit <code>.exe</code>
+       added. </li>
+
 </ul>
 
 <hr style="width: 100%; height: 2px;">
@@ -471,7 +555,8 @@ We don't include the Cygwin X server in our XP images to keep the bulk and
 complexity down.  So <a
 href="http://www.gnu.org/software/emacs/windows/ntemacs.html"> <i>NtEmacs</i>
 21.3 </a> is provided instead of the Cygwin <b>X</b> Emacs.  <i>NtEmacs</i>
-"frames" are windows on the Windows Desktop. <p>
+"frames" are windows on the Windows Desktop, e.g. <code>^X-5-2</code> makes
+another one. <p>
 
 The <code>/usr/local/bin/emacs</code> executable is a symlink to
 <code>/cygdrive/c/emacs-21.3/bin/runemacs.exe</code>, which starts up an Emacs
@@ -535,9 +620,7 @@ There are still some things left to do: <br>
 
 <ul>
 
-  <li> Access to shares under ssh without having to type a password. </li>
-
-  <li> Emulab <code>syncerver</code> and <code>slothd</code>. </li>
+  <li> Make Windows images for the new pc3000's. </li>
 
   <li> Use Sysprep (MS WADS) for multi-hardware XP images. </li>
 
