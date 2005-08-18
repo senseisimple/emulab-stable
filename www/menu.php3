@@ -400,7 +400,7 @@ function WRITESIDEBAR() {
 		    }
 		}
 
-		if (MAILMANSUPPORT) {
+		if ($MAILMANSUPPORT) {
 		    $showit = 0;
 		    $mmurl  = "gotommlist.php3";
 		    
@@ -474,7 +474,7 @@ function WRITESIDEBAR() {
 		    }
 		}
 
-		if (MAILMANSUPPORT) {
+		if ($MAILMANSUPPORT) {
 		    $showit = 0;
 		    $mmurl  = "gotommlist.php3";
 		    
