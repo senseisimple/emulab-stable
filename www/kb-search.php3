@@ -155,7 +155,8 @@ if (! TBvalid_userdata($query)) {
 #
 # Look for special "*" query; just get everything and list it. 
 #
-if ($query == "*") {
+if ($query == "*" ||
+    preg_match("/^\s+$/", $query)) {
     $search_result =
 	DBQueryFatal("select * from knowledge_base_entries ".
 		     "order by section,date_created");
