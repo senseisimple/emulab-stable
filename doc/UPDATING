@@ -18,6 +18,14 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20050818: Anytime after the DB schema is updated
+
+	Load the initial contents of the new knowledge_base_entries table
+        from sql/knowlbase-create.sql
+
+		cat sql/knowlbase-create.sql | mysql tbdb
+
+
 20050707: Before build
 
 	Decide if you want CVS support turned on. This is some simple
