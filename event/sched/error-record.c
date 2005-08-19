@@ -292,6 +292,39 @@ int dump_error_record(error_record_t er, FILE *out)
 			retval = tail_file(path, out);
 		}
 	}
+	else if (strcmp(er->er_agent->objtype,
+			TBDB_OBJECTTYPE_LINKTEST) == 0) {
+		FILE *pfile;
+
+		if ((pfile = popen("cat tbdata/linktest/*.error",
+				   "r")) == NULL) {
+			fprintf(out,
+				"warning: unable to read linktest error "
+				"files\n");
+		}
+		else {
+			char buffer[1024];
+			int rc;
+
+			fprintf(out, ">> Linktest Errors <<\n");
+			/* ... the tail of the file, and */
+			while ((rc = fread(buffer,
+					   1,
+					   sizeof(buffer),
+					   pfile)) > 0) {
+				fwrite(buffer, 1, rc, out);
+			}
+			if (pclose(pfile) == -1) {
+				warning("linktest pclose failed\n");
+			}
+			pfile = NULL;
+			
+			/* ... a separator footer. */
+			memset(buffer, '=', 79);
+			buffer[79] = '\0';
+			fprintf(out, "%s\n\n", buffer);
+		}
+	}
 	
 	return retval;
 }

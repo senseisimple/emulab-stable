@@ -1534,6 +1534,19 @@ Simulator instproc make_event {outer event} {
 		    set etype RESET
 		    set args "ASPECT=LOGHOLE"
 		}
+		"linktest" {
+		    set otype LINKTEST
+		    set etype START
+		    set stopat 3
+		    set vname "linktest"
+		    ::GLOBALS::named-args $evargs {
+			-bw 0
+		    }
+		    if {$(-bw) != 0} {
+			set stopat 4
+		    }
+		    set args "STARTAT=1 STOPAT=$stopat"
+		}
 		unknown {
 		    punsup "$obj $cmd $evargs"
 		    return

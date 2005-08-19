@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -17,7 +17,7 @@ use POSIX;
 sub usage()
 {
     print "Usage: run_linktest.pl ".
-	  "[-q] [-d] [-t] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
+	  "[-q] [-d level] [-t timeout] [-v] [-s server] [-p port] [-k keyfile] [-l level] [-o logfile] -e pid/eid\n".
 	  "Use -q for quick termination mode, which skips the Bandwidth test\n".
           "Use -v for verbose feedback messages\n" .
 	  "Use -t <time> to set a timeout in seconds\n";
@@ -43,7 +43,8 @@ my $TB          = "@prefix@";
 my $TMCC	= "@CLIENT_BINDIR@/tmcc";
 my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
 my $LTEVENTOPS  = "$TB/libexec/ltevent";
-my $STOPEVENT   = "STOP";
+my $STOPEVENT   = "STOP"; # XXX Left in here for backwards compat.
+my $COMPLETEEVENT = "COMPLETE";
 my $KILLEVENT   = "KILL";
 my $REPORTEVENT   = "REPORT";
 
@@ -67,9 +68,11 @@ $| = 1; #Turn off line buffering on output
 #
 my %options = ();
 if (! getopts($optlist, \%options)) {
+    print "error: cannot parse options\n";
     usage();
 }
 if (@ARGV) {
+    print "error: extra arguments\n";
     usage();
 }
 if (defined($options{"d"})) {
@@ -245,7 +248,7 @@ sub handler($)
 #
 # Now that linktest has started, wait for events to be reported
 # by ltevent. It will print out the event followed by args,
-# which are informational. The events sent are KILL, STOP and REPORT.
+# which are informational. The events sent are KILL, STOP, COMPLETE and REPORT.
 #
 $args = starter();
 $args .= " -w";
@@ -283,7 +286,7 @@ else {
 	    exit(0);
 	}
     };
-    
+
     $ltpid = open(LTC, "$args |");
     if (! $ltpid) {
 	die("*** $0:\n".
@@ -291,10 +294,11 @@ else {
     }
     while(<LTC>) {
 	chomp;
-	if(/(\w+)\s(.*)/) {
+	if(/(\w+)\s?(.*)/) {
 	    my $eventtype = $1;
 	    my $eventargs = $2;
-	    if ($eventtype eq $STOPEVENT) {
+	    if (($eventtype eq $STOPEVENT) ||
+		($eventtype eq $COMPLETEEVENT)) {
 		print "Linktest completed normally.\n"
 		    if($verbose);
 		last;
@@ -308,7 +312,7 @@ else {
 		#
 		# Print out report messages if in verbose mode.
 		#
-		print lc($eventargs) . "\n"
+		print $eventargs . "\n"
 		    if ($verbose);
 	    }
 	} else {

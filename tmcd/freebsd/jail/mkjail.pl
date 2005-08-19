@@ -16,7 +16,7 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(REMOTE LOCALROOTFS TMTOPOMAP TBDebugTimeStamp);
+use libsetup qw(REMOTE LOCALROOTFS TMTOPOMAP TMLTMAP TBDebugTimeStamp);
 use libtmcc;
 
 #
@@ -566,6 +566,9 @@ sub mkrootfs($)
     if (-e TMTOPOMAP()) {
 	mysystem("cp -fp " . TMTOPOMAP() . " $path/root/var/emulab/boot");
     }
+    if (-e TMLTMAP()) {
+	mysystem("cp -fp " . TMLTMAP() . " $path/root/var/emulab/boot");
+    }
 
     #
     # Stash the control net IP if not the same as the host IP
@@ -755,6 +758,9 @@ sub restorerootfs($)
     tmcccopycache($vnodeid, "$path/root");
     if (-e TMTOPOMAP()) {
 	mysystem("cp -fp " . TMTOPOMAP() . " $path/root/var/emulab/boot");
+    }
+    if (-e TMLTMAP()) {
+	mysystem("cp -fp " . TMLTMAP() . " $path/root/var/emulab/boot");
     }
 
     #

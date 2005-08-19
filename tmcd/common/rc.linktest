@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -55,6 +55,7 @@ if (@ARGV) {
 
 my $logfile = "$LOGDIR/linktest.debug";
 my $pidfile = "/var/run/linktest.pid";
+my $swapper = `cat $BOOTDIR/swapper`;
 
 # Stop.
 if ($action eq "stop") {
@@ -82,5 +83,5 @@ my ($pid, $eid, $vname) = check_nickname();
 print("Starting linktest daemon\n");
 
 system("linktest -e $pid/$eid ".
-       "-s localhost -l $logfile -i $pidfile -k $keyfile");
+       "-s localhost -l $logfile -i $pidfile -k $keyfile -u $swapper");
 exit($? >> 0);

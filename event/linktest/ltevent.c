@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -128,6 +128,10 @@ main(int argc, char **argv)
 	}
 
 	if(send_event) {
+	  struct timeval when;
+
+	  gettimeofday(&when, NULL);
+	  
 	  /*
 	   * Construct an address tuple for generating the event.
 	   */
@@ -140,6 +144,7 @@ main(int argc, char **argv)
 	  tuple->eventtype= send_event;
 	  tuple->host	= ADDRESSTUPLE_ALL;
 	  tuple->expt = pideid;
+	  tuple->objname   = "linktest";
 	  
 	  /* Generate the event */
 	  notification = event_notification_alloc(handle, tuple);
@@ -157,7 +162,7 @@ main(int argc, char **argv)
 	  }
 
 	  /* Send Event */
-	  if (event_notify(handle, notification) == 0) {
+	  if (event_schedule(handle, notification, &when) == 0) {
 	    fatal("could not send test event notification");
 	  }
 
@@ -177,7 +182,7 @@ main(int argc, char **argv)
 	    fatal("could not allocate an address tuple");
 	  }
 
-	  tuple->host	 = ADDRESSTUPLE_ALL;
+	  tuple->host	   = ADDRESSTUPLE_ALL;
 	  tuple->site      = ADDRESSTUPLE_ANY;
 	  tuple->group     = ADDRESSTUPLE_ANY;
 	  tuple->expt      = pideid;
@@ -188,6 +193,12 @@ main(int argc, char **argv)
 	  /*
 	 * Subscribe to the event we specified above.
 	 */
+	  if (! event_subscribe(handle, callback, tuple, NULL)) {
+	    fatal("could not subscribe to event");
+	  }
+
+	  tuple->scheduler = 1;
+	  tuple->eventtype = TBDB_EVENTTYPE_COMPLETE;
 	  if (! event_subscribe(handle, callback, tuple, NULL)) {
 	    fatal("could not subscribe to event");
 	  }

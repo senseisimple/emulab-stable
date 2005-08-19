@@ -133,7 +133,9 @@ sub dotopomap()
     # get this via a tarfile instead of NFS.
     #
     my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap.gz";
+    my $ltmap = "/proj/$pid/exp/$eid/tbdata/ltmap.gz";
     my $tempmap = "/tmp/topomap.gz";
+    my $templt = "/tmp/ltmap.gz";
 
     #
     # Try a couple of times to get the file cause of NFS sillyness.
@@ -146,12 +148,18 @@ sub dotopomap()
 		if (system("cp -fp $topomap $tempmap") == 0);
 	    unlink("$tempmap");
 	}
+	for (my $i = 0; $i < 5; $i++) {
+	    last
+		if (system("cp -fp $ltmap $templt") == 0);
+	    unlink("$templt");
+	}
     }
     #
     # Make sure we always try to fetch it fresh
     #
     else {
 	unlink("$tempmap");
+	unlink("$templt");
     }
     
     if (! -e $tempmap) {
@@ -176,5 +184,16 @@ sub dotopomap()
     }
     else {
 	fatal("Could not get topomap");
+    }
+
+    if (-s $templt) {
+	system("cat ${templt} | gunzip > " . TMLTMAP());
+	if ($?) {
+	    fatal("Could not unzip ltmap");
+	}
+	unlink("$templt");
+    }
+    else {
+	warning("Could not get ltmap");
     }
 }

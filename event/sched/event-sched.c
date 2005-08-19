@@ -516,6 +516,11 @@ int sends_complete(struct agent *agent, const char *evtype)
 		NULL
 	};
 
+	static char *start_completes[] = {
+		TBDB_EVENTTYPE_START,
+		NULL
+	};
+
 	static char *simulator_completes[] = {
 		TBDB_EVENTTYPE_REPORT,
 		TBDB_EVENTTYPE_MODIFY,
@@ -543,7 +548,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_TIME, NULL },
 		{ TBDB_OBJECTTYPE_PROGRAM, run_completes },
 		{ TBDB_OBJECTTYPE_SIMULATOR, simulator_completes },
-		{ TBDB_OBJECTTYPE_LINKTEST, NULL },
+		{ TBDB_OBJECTTYPE_LINKTEST, start_completes },
 		{ TBDB_OBJECTTYPE_NSE, NULL },
 		{ TBDB_OBJECTTYPE_CANARYD, NULL },
 		{ "SLOTHD", NULL }, // XXX
@@ -1360,7 +1365,7 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 	char objname[TBDB_FLEN_EVOBJNAME];
 	char objtype[TBDB_FLEN_EVOBJTYPE];
 	int rc, ctoken = ~0, agerror = 0, handled = 0;
-	
+
 	event_notification_get_objname(handle, eventp->notification,
 				       objname, sizeof(objname));
 
@@ -1388,7 +1393,7 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 		warning("completion event is missing CTOKEN argument\n");
 	}
 
-	if (agerror != 0) {
+	if (agerror != 0 && agerror != ~0) {
 		error_record_t er;
 		
 		if ((er = create_error_record()) == NULL) {

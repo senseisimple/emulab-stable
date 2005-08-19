@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -19,19 +19,25 @@
 #include "tbdefs.h"
 #include "log.h"
 #include "event.h"
-#include "linktest.h"
 
-#define TRUE    1;
-#define FALSE   0;
+#define TRUE    1
+#define FALSE   0
+#define LINKTEST_SCRIPT CLIENT_BINDIR "/linktest.pl"
+#define MAX_ARGS 10
 
 static int	      debug;
 static volatile int   locked;
 static pid_t          linktest_pid;
 static char           *pideid;
+static char           *swapper;
 static event_handle_t handle;
+static unsigned long  token = ~0;
 
 static void	      callback(event_handle_t handle,
 			       event_notification_t notification, void *data);
+static void	      start_callback(event_handle_t handle,
+				     event_notification_t notification,
+				     void *data);
 static void           exec_linktest(char *args, int);
 static void           sigchld_handler(int sig);
 static void           send_group_kill();
@@ -42,7 +48,7 @@ usage(char *progname)
 {
 	fprintf(stderr,
 		"Usage: %s [-d] "
-		"[-s server] [-p port] [-k keyfile] [-l logfile] -e pid/eid\n",
+		"[-s server] [-p port] [-k keyfile] [-l logfile] [-u user] -e pid/eid\n",
 		progname);
 	exit(-1);
 }
@@ -59,11 +65,12 @@ main(int argc, char **argv) {
 	char *progname;
 	char c;
 	char buf[BUFSIZ];
+	extern char build_info[];
 	pideid = NULL;
 	
 	progname = argv[0];
 
-	while ((c = getopt(argc, argv, "s:p:e:l:dk:i:")) != -1) {
+	while ((c = getopt(argc, argv, "s:p:e:l:dk:i:Vu:")) != -1) {
 	  switch (c) {
 	  case 'd':
 	    debug++;
@@ -85,6 +92,13 @@ main(int argc, char **argv) {
 	    break;
 	  case 'k':
 	    keyfile = optarg;
+	    break;
+	  case 'u':
+	    swapper = optarg;
+	    break;
+	  case 'V':
+	    fprintf(stderr, "%s\n", build_info);
+	    exit(0);
 	    break;
 	  default:
 	    usage(progname);
@@ -130,7 +144,9 @@ main(int argc, char **argv) {
 	 */
 	tuple->expt      = pideid;
 	tuple->objtype   = TBDB_OBJECTTYPE_LINKTEST;
-	tuple->eventtype = ADDRESSTUPLE_ANY;
+	tuple->eventtype =
+		TBDB_EVENTTYPE_START ","
+		TBDB_EVENTTYPE_KILL;
 
 	/*
 	 * Register with the event system. 
@@ -144,6 +160,17 @@ main(int argc, char **argv) {
 	 * Subscribe to the event we specified above.
 	 */
 	if (! event_subscribe(handle, callback, tuple, NULL)) {
+		fatal("could not subscribe to event");
+	}
+
+	tuple->objtype   = TBDB_OBJECTTYPE_TIME;
+	tuple->objname   = ADDRESSTUPLE_ANY;
+	tuple->eventtype = TBDB_EVENTTYPE_START;
+
+	/*
+	 * Subscribe to the TIME start event we specified above.
+	 */
+	if (! event_subscribe(handle, start_callback, tuple, NULL)) {
 		fatal("could not subscribe to event");
 	}
 
@@ -218,6 +245,9 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		return;
 	}
 
+	event_notification_get_int32(handle, notification,
+				     "TOKEN", (int32_t *)&token);
+
 	event_notification_get_arguments(handle,
 					 notification, args, sizeof(args));
 
@@ -258,11 +288,9 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 		 exec_linktest(args, sizeof(args));
 	    }
 	  }
-	} else if(!strcmp(event, TBDB_EVENTTYPE_STOP)) {
-	  /*
-	   * STOP is informational and may be ignored.
-	   */
-
+	  else {
+	    info("linktest already in progress\n");
+	  }
 	} else if (!strcmp(event, TBDB_EVENTTYPE_KILL)) {
 
 	  /*
@@ -281,13 +309,40 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	}
 }
 
+static void
+start_callback(event_handle_t handle,
+	       event_notification_t notification,
+	       void *data)
+{
+	char		event[TBDB_FLEN_EVEVENTTYPE];
+
+	if (! event_notification_get_eventtype(handle, notification,
+					       event, sizeof(event))) {
+		error("Could not get event from notification!\n");
+		return;
+	}
+
+	if (strcmp(event, TBDB_EVENTTYPE_START) == 0) {
+	  /*
+	   * Ignore unless we are running.
+	   */
+	  if(locked) {
+	    /*
+	     * Reset to a clean state.
+	     */
+	    send_group_kill();
+	  }
+	  token = ~0;
+	}
+}
+
 /*
  * Executes Linktest with arguments received from the Linktest
  * start event. Does not return.
  */ 
 static void
 exec_linktest(char *args, int buflen) {
-	char	   *word, *argv[MAX_ARGS];
+	char	   *word, *argv[MAX_ARGS], swapperarg[128], tokenarg[32];
 	int	   i,res;
 
 	/*
@@ -296,6 +351,10 @@ exec_linktest(char *args, int buflen) {
 	 */
 	word = strtok(args," \t");
 	i=1;
+	sprintf(swapperarg, "SWAPPER=%s", swapper);
+	argv[i++] = swapperarg;
+	sprintf(tokenarg, "TOKEN=%lu", token);
+	argv[i++] = tokenarg;
 	do {
 	  argv[i++] = word;
 	} while ((word = strtok(NULL," \t"))
@@ -403,18 +462,21 @@ void send_group_kill() {
 
 static
 void send_kill_event() {
-	/*
-	 * Invoke external program; The local elvind is read-only, so to
-	 * send events we have to contact boss, but do not want a zillion
-	 * linktest daemons keeping a connection to boss open. tevc will
-	 * connect, send event, and exit. 
-	 */
-	char	buf[BUFSIZ];
-
-	sprintf(buf, "%s/tevc -e %s now %s %s",
-		CLIENT_BINDIR, pideid, "linktest", TBDB_EVENTTYPE_KILL);
-
-	if (system(buf) != 0) {
-		error("Could not invoke tevc to send KILL event\n");
+	event_do(handle,
+		 EA_Experiment, pideid,
+		 EA_Type, TBDB_OBJECTTYPE_LINKTEST,
+		 EA_Name, "linktest",
+		 EA_Event, TBDB_EVENTTYPE_KILL,
+		 EA_TAG_DONE);
+	if (token != ~0) {
+		event_do(handle,
+			 EA_Experiment, pideid,
+			 EA_Type, TBDB_OBJECTTYPE_LINKTEST,
+			 EA_Name, "linktest",
+			 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+			 EA_ArgInteger, "ERROR", 1,
+			 EA_ArgInteger, "CTOKEN", token,
+			 EA_TAG_DONE);
+		token = ~0;
 	}
 }

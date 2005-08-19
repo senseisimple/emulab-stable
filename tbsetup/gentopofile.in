@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -10,22 +10,21 @@ use Getopt::Std;
 #
 # usage: gentopofile <pid> <eid>
 #
-# This little program generates a topology file that is given to the physical
-# nodes in an experiment, so that they may generates the /etc/hosts files and
-# their routes. We used to do this centrally, but that solution does not scale
-# at all to 1000s of nodes. 
+# This little program generates two topology files that are given to the
+# physical nodes in an experiment.  The first one is used to generate the
+# /etc/hosts files and their routes.  The second one is used by linktest to
+# figure out what tests to run.
 #
 sub usage()
 {
     print("Usage: gentopofile [-d] [-n] <pid> <eid>\n".
-	  "       Use -n to print to stdout, but leave the file alone.\n".
-	  "       Use -d to turn on debugging output.\n");
+	  "  Use -n to print to stdout/stderr, but leave the file alone.\n");
     exit(-1);
 }
-my $optlist  = "dn";
-my $debug    = 0;
+my $optlist  = "n";
 my $impotent = 0;
 my $toponame = "topomap";
+my $ltname   = "ltmap";
 
 #
 # Configure variables
@@ -55,9 +54,6 @@ $| = 1;
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
-}
-if (defined($options{"d"})) {
-    $debug = 1;
 }
 if (defined($options{"n"})) {
     $impotent = 1;
@@ -89,12 +85,18 @@ my $OUT;
 
 if ($impotent) {
     $OUT = *STDOUT;
+    $LTOUT = *STDERR;
 }
 else {
     open(MAP, "> ${toponame}.new") or
 	die("Could not create ${toponame}.new: $!\n");
 
     $OUT = *MAP;
+
+    open(LTMAP, "> ${ltname}.new") or
+	die("Could not create ${ltname}.new: $!\n");
+
+    $LTOUT = *LTMAP;
 }
 
 my %nodes = ();
@@ -119,11 +121,52 @@ my $query_result =
 while (my ($vname,$ips) = $query_result->fetchrow_array()) {
     $nodes{$vname} = {};
     
+    print $LTOUT "h $vname\n";
     foreach my $ipinfo (split(" ", $ips)) {
 	my ($port,$ip) = split(":", $ipinfo);
 	
 	$ips{"$vname:$port"} = $ip;
     }
+}
+
+#
+# Generate the linktest config for links, which looks like:
+#
+#   l node0 node1 100000 0.0 0.0
+#
+$query_result =
+    DBQueryFatal("select l1.vnode,l2.vnode,l1.bandwidth*1000,".
+		 "  l1.delay/1000+l2.delay/1000,l1.lossrate ".
+		 "from virt_lans as l1 ".
+		 "left join virt_lans as l2 ".
+		 "  on l2.vname=l1.vname and l2.pid=l1.pid and ".
+		 "     l2.eid=l1.eid and l2.vnode!=l1.vnode ".
+		 "where l1.pid='$pid' and l1.eid='$eid'");
+
+while (my ($vn1,$vn2,$bw,$delay,$lr) = $query_result->fetchrow_array) {
+    print $LTOUT "l $vn1 $vn2 $bw $delay $lr\n";
+}
+
+#
+# Generate the linktest config for the routing type.
+#
+$query_result =
+    DBQueryFatal("select distinct routertype from virt_nodes ".
+		 "where pid='$pid' and eid='$eid'");
+
+while (my ($rt) = $query_result->fetchrow_array) {
+    print $LTOUT "r $rt\n";
+}
+
+#
+# Generate the linktest config for the simulator agent's name.
+#
+$query_result =
+    DBQueryFatal("select distinct vname from virt_agents ".
+		 "where pid='$pid' and eid='$eid' and objecttype=6");
+
+while (my ($sim) = $query_result->fetchrow_array) {
+    print $LTOUT "s $sim\n";
 }
 
 #
@@ -174,14 +217,17 @@ foreach my $lan (sort keys(%lans)) {
 
 if (! $impotent) {
     close(MAP);
+    close(LTMAP);
 
     system("mv -f ${toponame}.new $toponame");
+    system("mv -f ${ltname}.new $ltname");
 
     #
     # Create a compressed copy of the file. The experiment nodes will look
     # for this first, so as to reduce the amount of data served up via NFS.
     #
     system("rm -f ${toponame}.gz ; cat $toponame | gzip > ${toponame}.gz");
+    system("rm -f ${ltname}.gz ; cat $ltname | gzip > ${ltname}.gz");
 
     #
     # Now copy over to the user exp directory since in a normal create/modify
@@ -192,5 +238,6 @@ if (! $impotent) {
     my $userdir = TBExptUserDir($pid, $eid);
 
     system("cp -fp $toponame ${toponame}.gz $userdir/tbdata");
+    system("cp -fp $ltname ${ltname}.gz $userdir/tbdata");
 }
 exit(0);

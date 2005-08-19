@@ -23,10 +23,10 @@ use English;
 #
 sub usage() 
 {
-    print "Usage: linktest.pl\n".
-	" [STARTAT=<test step, 1-4>]\n".
-	    " [STOPAT=<test step, 1-4>]\n".
-		" [DEBUG=<debugging level. 1=on, 0=off>]\n";
+    print("Usage: linktest.pl\n".
+	  " [STARTAT=<test step, 1-4>]\n".
+	  " [STOPAT=<test step, 1-4>]\n".
+	  " [DEBUG=<debugging level. 1=on, 0=off>]\n");
     exit(0);
 }
 
@@ -49,6 +49,7 @@ use constant PATH_PATHRATE_SND => "/usr/local/bin/pathrate_snd";
 use constant PATH_PATHRATE_RCV => "/usr/local/bin/pathrate_rcv";
 use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
 use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
+use constant PATH_TEVC => "@CLIENT_BINDIR@/tevc";
 use constant RUN_PATH => "@CLIENT_BINDIR@"; # where the linktest-ns runs.
 use constant EVENTSERVER => "@EVENTSERVER@";
 
@@ -64,7 +65,7 @@ use constant LIMIT_BW_LOSS => 0;
 
 # Make sure that we dont get bogged down in being too accurate! 
 # Make sure the error is a certain significance before we start reporting it.
-use constant INSIGNIFICANT_LAT_ERROR => 0.50;  # ms
+use constant INSIGNIFICANT_LAT_ERROR => 2.50;  # ms
 use constant INSIGNIFICANT_BW_ERROR  => 1.00;  # mb
 
 # latency must be corrected for xmit delay under this speed.
@@ -79,8 +80,9 @@ use constant FAST_SEND => 1002;
 use constant BSD => "FreeBSD";
 use constant LINUX => "Linux";
 use constant RTPROTO_STATIC => "Static";
-use constant EVENT_STOP => "STOP";
+use constant EVENT_COMPLETE => "COMPLETE";
 use constant EVENT_REPORT => "REPORT";
+use constant EVENT_LOG => "LOG";
 use constant PING_SEND_COUNT => 10;
 use constant SYNC_NAMESPACE => "linktest";
 
@@ -98,11 +100,11 @@ use constant NAME_BW => "Bandwidth";
 
 # error suffix for logs
 use constant SUFFIX_ERROR => ".error";
-use constant SUFFIX_TOPO =>  ".topology";
 use constant DEBUG_ALL => 2; # debug level for all debug info, not just msgs.
 
 # exit codes
 use constant EXIT_ABORTED => -1;
+use constant EXIT_NOT_OK => 1;
 use constant EXIT_OK => 0;
 
 
@@ -114,8 +116,13 @@ struct ( edge => {
     delay => '$',
     loss => '$'});
 
+struct ( host => {
+    name => '$',
+    visited => '$',
+    links => '@'});
+
 # fixes emacs colorization woes introduced by above struct definition.
-struct ( unused => { foo => '$'});
+# struct ( unused => { foo => '$'});
 
 use constant TRUE => 1;
 use constant FALSE => 0;
@@ -124,7 +131,6 @@ use constant FALSE => 0;
 # Globals
 ##############################################################################
 
-my $ns_file;          # location of the customized ns for Linktest
 my $topology_file;    # location of the topology input file.
 my $synserv;    # synch server node
 my $rtproto;    # routing protocol
@@ -145,14 +151,20 @@ my $log_file;    # common logfile for information saved over time.
 
 my @hosts; # hosts: list of text strings containing host names.
            # sorted alphabetically
+my %hostmap;
 my @links; # links: list of edge structs.
            # sorted alphabetically by src . dst
                                   
 my $expt_path;  # experiment path (ie, tbdata) set by init.
 my $linktest_path;   # log path (ie tbdata/linktest) set by init.
-
-# full path to custom NS build. 
-my $ns_cmd; 
+my $simname = "ns";
+my $swapper = "";
+my $swapperid = 0;
+my $swappergid = 0;
+my $token = -1;
+my $error_count = 0;
+my $stage_error_count = 0;
+my $total_error_count = 0;
 
 ##############################################################################
 # Main control
@@ -180,6 +192,13 @@ foreach my $arg (@ARGV) {
     }
     if($arg =~ /DEBUG=(\d)/) {
 	$debug_level=$1;
+    }
+    if($arg =~ /TOKEN=(\d+)/) {
+	$token=$1;
+    }
+    if($arg =~ /SWAPPER=(\w+)/) {
+	$swapper=$1;
+	(undef,undef,$swapperid,$swappergid) = getpwnam($swapper);
     }
 }
 
@@ -210,26 +229,12 @@ $gid = $proj_id;
 #
 $expt_path = "/proj/$proj_id/exp/$exp_id/tbdata";
 $linktest_path = "$expt_path/linktest";
-$topology_file = "$linktest_path/$exp_id" . SUFFIX_TOPO;
-if(-e "$expt_path/$exp_id-modify.ns") {
-    $ns_file = "$expt_path/$exp_id-modify.ns";
-} elsif (-e "$expt_path/$exp_id.ns") {
-    $ns_file = "$expt_path/$exp_id.ns";
-} else {
-    die("Could not locate an ns file.\n");
-}
+$topology_file = "@CLIENT_VARDIR@/boot/ltmap";
 
 #
 # Determine location of the customized ns binary for Linktest.
 #
 ($platform) = POSIX::uname();
-if($platform eq BSD) {
-    $ns_cmd = LINKTEST_NSPATH . "/fbsd/ns";
-} elsif ($platform eq LINUX) {
-    $ns_cmd = LINKTEST_NSPATH . "/" . linux_version() . "/ns";
-} else {
-    die ("Platform $platform is not currently supported.\n");
-}
 
 #
 # Parse the syncserver file to find out which node is the sync server.
@@ -270,24 +275,8 @@ if(&is_special_node()) {
 	#
 	mkdir (&check_filename($linktest_path),0777) 
 	    || die("Could not create directory $linktest_path: $!");
+	chown($swapperid, $swappergid, $linktest_path);
     }
-
-    # 
-    # Now, run ns in the same path where the nstb_compat.tcl and
-    # tb_compat.tcl files are located. Store the output from 
-    # the linktest-modified ns for use in generating the topology file.
-    #
-    chdir(RUN_PATH);
-    @results = &my_tick($ns_cmd,
-			&check_filename($ns_file));
-    
-    die("Linktest-NS could not parse $ns_file\n") unless @results;
-
-    #
-    # Use results of ns to write the topology input file
-    #
-    &write_file($topology_file,@results);
-
 
     #
     # Call get_topo before the other nodes because
@@ -345,11 +334,17 @@ sleep(int(rand(5)));
 &get_topo($topology_file) unless &is_special_node();
 &debug_top();
 
+my $msg = "Linktest Starting";
+&sim_event(EVENT_LOG,$msg);
+&debug("\n$msg\n\n");
+
 if(&dotest(TEST_LATENCY)) {
     my $msg = "Testing Single Hop Connectivity and Latency...";
     &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
     &debug("\n$msg\n\n");
     &latency_test;
+    &report_status;
 }
 
 if(&dotest(TEST_RT_STATIC)
@@ -357,34 +352,42 @@ if(&dotest(TEST_RT_STATIC)
     && $rtproto eq RTPROTO_STATIC) {
     my $msg = "Testing Static Routing...";
     &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
     &debug("\n$msg\n\n");
     &static_rt_test; # nodes not covered by 1hop test
+    &report_status;
 }
 
 if(&dotest(TEST_LOSS)) {
     my $msg = "Testing Loss...";
     &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
     &debug("\n$msg\n\n");
     &loss_test; 
+    &report_status;
 }
 
 if(&dotest(TEST_BW)){
     my $msg = "Testing Bandwidth...";
     &post_event(EVENT_REPORT,$msg);
+    &sim_event(EVENT_LOG,$msg);
     &debug("\n$msg\n\n");
     &bw_test;
+    &report_status;
 }
 
 &cleanup;
 
 &barrier();
 
+$msg = "Linktest Done";
+&sim_event(EVENT_LOG,$msg);
+&debug("\n$msg\n\n");
+
 #
 # Send an event indicating that Linktest has completed normally.
 #
-&post_event(EVENT_STOP,"");
-
-&debug("Done\n");
+&post_event(EVENT_COMPLETE,"ERROR=$total_error_count CTOKEN=$token");
 
 exit(EXIT_OK);
 
@@ -605,7 +608,7 @@ sub ping_node {
 
 # For directly connected hosts, checks latency using Ping.
 sub latency_test {
-    my @waitlist;
+    my %waitlist;
     my @edge_copy = @links;
 
     while(&has_elems(\@edge_copy)) {
@@ -627,6 +630,7 @@ sub latency_test {
 			if($result_cnt == 0) {
 			    my $errmsg = "No packets were received (n=$n)\n";
 			    &error(NAME_LATENCY, $edge, $errmsg);
+			    exit(EXIT_NOT_OK);
 			} else {
 
 # facts from analysis in /users/davidand/public/calibrate.
@@ -685,6 +689,7 @@ sub latency_test {
 			    if($denominator == 0) {
 				my $errmsg = "Invalid sample standard deviation (possible parse problem, please report). (n=$n, u=$u, x_bar=$x_bar, S=$S)";
 				&error(NAME_LATENCY, $edge, $errmsg);
+				exit(EXIT_NOT_OK);
 			    } else {
 				my $z = $numerator / $denominator;
 
@@ -697,6 +702,7 @@ sub latency_test {
 				   ) {
 				    my $errmsg = "Probable latency misconfiguration (expected=$u, measured mean=$x_bar).";
 				    &error(NAME_LATENCY, $edge, $errmsg);
+				    exit(EXIT_NOT_OK);
 				}
 			    }
 
@@ -704,7 +710,7 @@ sub latency_test {
 			exit(EXIT_OK);
 
 		    } else {
-			push @waitlist, $pid;
+			$waitlist{$pid} = 1;
 		    }
 		} else {
 		    &debug("Skipping latency test for " . &print_link($edge) . " to " . &print_link($other_edge) . "\n");
@@ -714,7 +720,7 @@ sub latency_test {
 	}
     }
 
-    &wait_all(\@waitlist);
+    &wait_all(%waitlist);
     # wait for completion before next test.
     &barrier();
 }
@@ -809,59 +815,62 @@ sub bw_test {
 # Static Routing Connectivity Test Functions
 ##############################################################################
 
+# Traverse the links between nodes to figure out which nodes are actually
+# reachable.  First parameter is a reference to an array that should be filled
+# out with node names.  The second parameter contains the name of the node to
+# visit.
+sub reachable_nodes {
+    my ($nodes_ref, $currnode) = @_;
+
+    $hostmap{$currnode}->visited(1);
+    foreach my $edge (@{ $hostmap{$currnode}->links }) {
+	my $nextnode;
+
+	if ($edge->src eq $currnode) {
+	    $nextnode = $edge->dst;
+	} 
+	else {
+	    $nextnode = $edge->src;
+	}
+	if ($hostmap{$nextnode}->visited == 0) {
+	    if (!($currnode eq $hostname)) { # Don't add 1st hop nodes.
+		push @{$nodes_ref}, $nextnode;
+	    }
+	    &reachable_nodes($nodes_ref, $nextnode);
+	}
+    }
+    $hostmap{$currnode}->visited(2);
+}
+
 # Attempts to reach nodes that are not on a direct link
 # with this host. IE, use TTL > 1. Pings are in parallel.
 sub static_rt_test {
-    my @host_copy = @hosts; # copy of all hosts.
-    my @this_1hops; # 1hop destinations from this host.
+    my @nodes = ();
 
-    foreach my $edge(@links) {
-	if($edge->src eq $hostname) {
-	    push @this_1hops, $edge->dst;
-	} elsif ($edge->dst eq $hostname) {
-	    push @this_1hops, $edge->src;
-	}
-    }
+    &reachable_nodes(\@nodes, $hostname);
+    &debug("Static route test nodes: @nodes\n");
 
-    for(my $i=0;$i<@host_copy;$i++) {
-	if($host_copy[$i] eq $hostname) {
-	    $host_copy[$i] = undef;
-	} else {
-	    # zap any host in the dst list.
-	    foreach my $dst( @this_1hops ) {
-		if(defined($host_copy[$i])
-		   && ($dst eq $host_copy[$i])) {
-		    $host_copy[$i] = undef;
-		} 
-	    }
-	}
-    }
-
-    my @waitlist;
+    my %waitlist;
     # fork processes to run the pings in parallel.
-    for(my $i=0;$i<@host_copy;$i++) {
-	if(defined($host_copy[$i])
-           && linked_node($host_copy[$i])
-           ) {
-	    my $dst = $host_copy[$i];
-	    my $pid = fork();
-	    if(!$pid) {
-		my ($recv_cnt,$ignored1, $ignored2) = &ping_node($dst,0);
-		if(!$recv_cnt) {
-		    my $newEdge = new edge;
-		    $newEdge->src($hostname);
-		    $newEdge->dst($dst);
-		    &error(NAME_RT_STATIC,$newEdge , "$hostname could not ping $dst");
-		} else {
-		    &debug("Attempting to reach $dst... OK\n");
-		}
-		exit(EXIT_OK);
+    foreach my $dst (@nodes) {
+	my $pid = fork();
+	if(!$pid) {
+	    my ($recv_cnt,$ignored1, $ignored2) = &ping_node($dst,0);
+	    if(!$recv_cnt) {
+		my $newEdge = new edge;
+		$newEdge->src($hostname);
+		$newEdge->dst($dst);
+		&error(NAME_RT_STATIC,$newEdge , "$hostname could not ping $dst");
+		exit(EXIT_NOT_OK);
 	    } else {
-		push @waitlist,$pid;
+		&debug("Attempting to reach $dst... OK\n");
 	    }
+	    exit(EXIT_OK);
+	} else {
+	    $waitlist{$pid} = 1;
 	}
     }
-    &wait_all(\@waitlist);
+    &wait_all(%waitlist);
     # wait for completion before next test.
     &barrier();
 }
@@ -883,18 +892,6 @@ sub print_link {
     return $str;
 }
 
-# returns whether the current node has a link.
-sub linked_node {
-    my $node = shift @_;
-    foreach my $edge (@links) {
-        if($node eq $edge->src
-           || $node eq $edge->dst) {
-            return TRUE;
-        }
-    }
-    return FALSE;
-}
-
 # Handles reading NS output.
 sub get_topo {
     my $ns_outfile = shift(@_);
@@ -907,8 +904,12 @@ sub get_topo {
 	# expr := h <node name>
 	#      || l <src node> <dst node> <bw (Mb/s)> <latency (s)> <loss (%)>
 	if( /^h (\S+)/ ) {
-	    push @hosts, $1
-	} elsif ( /^l (\S+)\s+(\S+)\s+(\d+)\s+(\d\.\d+)\s+(\d\.\d+)/) {
+	    push @hosts, $1;
+	    my $newHost = new host;
+	    $newHost->name($1);
+	    $newHost->visited(0);
+	    $hostmap{$1} = $newHost;
+	} elsif ( /^l (\S+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)/) {
 	    my $newEdge = new edge;
 	    $newEdge->src($1);
 	    $newEdge->dst($2);
@@ -916,10 +917,16 @@ sub get_topo {
 	    $newEdge->delay($4 * 1000); # units of ms
 	    $newEdge->loss($5);
 	    push @links, $newEdge;
+	    push @{ $hostmap{$newEdge->src}->links }, $newEdge;
+	    push @{ $hostmap{$newEdge->dst}->links }, $newEdge;
 
 	# currently recognize only Static routing
-	} elsif (/^r Static/i) {
+	} elsif (/^r [Ss]tatic/i) {
 	    $rtproto = RTPROTO_STATIC;
+	} elsif (/^s ([-\w\(\)]+)/i) {
+	    $simname = $1;
+	} else {
+	    print "Bad line in map: $_\n";
 	}
     }
 
@@ -932,7 +939,6 @@ sub get_topo {
 
 # prints out the topology read in from the NS file
 sub debug_top {
-    &debug("ns script: $ns_file\n");
     &debug("nodes:\n");
     foreach my $vert (@hosts) {
 	&debug( " " . $vert . "\n");
@@ -950,6 +956,8 @@ sub debug_top {
 sub error {
     my($test,$edge,$msg) = @_;
 
+    $error_count += 1;
+
     my $output = "$test\n";
     $output .= "  Link:  " . &print_link($edge) . "\n";
     $output .=     "  Error: $msg\n\n";
@@ -959,15 +967,40 @@ sub error {
 		 $output);
 }
 
+sub report_status {
+    if ($hostname eq $synserv) {
+	if ($stage_error_count) {
+	    my $msg = "  Some tests had errors!";
+	    &post_event(EVENT_REPORT,$msg);
+	    &sim_event(EVENT_LOG,$msg);
+	    &debug("\n$msg\n");
+	}
+	else {
+	    my $msg = "  All tests were successful!";
+	    &post_event(EVENT_REPORT,$msg);
+	    &sim_event(EVENT_LOG,$msg);
+	    &debug("\n$msg\n");
+	}
+    }
+    $total_error_count += $stage_error_count;
+    $error_count = 0;
+    $stage_error_count = 0;
+}
+
 sub barrier {
     if($hostname eq $synserv) {
 	if($barr_count) {
-	    &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,"-n",SYNC_NAMESPACE);
+	    my $rc = &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,
+				"-n",SYNC_NAMESPACE,
+				"-e",$error_count);
+	    
+	    if ($rc) {
+		$stage_error_count += 1;
+	    }
 	}
     } else {
-	&my_system(PATH_EMULAB_SYNC,"-n",SYNC_NAMESPACE);
+	&my_system(PATH_EMULAB_SYNC,"-n",SYNC_NAMESPACE,"-e",$error_count);
     }
-
 }
 
 sub debug {
@@ -1087,29 +1120,49 @@ sub round {
 
 # wait for all procs in the list argument to exit
 sub wait_all {
-    my ($list_ref) = @_;
-    foreach my $pid ( @{$list_ref}) {
-	waitpid($pid,0);
+    my (%list_ref) = @_;
+    while (scalar(%list_ref)) {
+	my $pid = wait();
+	$error_count += $? >> 8;
+	delete $list_ref{$pid};
     }
 }
 
 #
 # The special node sends a signal to run_linktest, in case it is listening.
-# Mainly informational, but the STOP message informs run_linktest.pl
+# Mainly informational, but the COMPLETE message informs run_linktest.pl
 # that all exited properly.
 #
 sub post_event {
     my ($event,$args) = map { $1 if (/(.*)/) } @_;
     if($hostname eq $synserv) {
 	system(PATH_LTEVENT,
-		   "-s",
-		   EVENTSERVER,
-		   "-e",
-		   "$proj_id/$exp_id",
-		   "-k", 
-		   PATH_KEYFILE,
-		   "-x",
-		   "$event $args");
+	       "-s",
+	       EVENTSERVER,
+	       "-e",
+	       "$proj_id/$exp_id",
+	       "-k", 
+	       PATH_KEYFILE,
+	       "-x",
+	       "$event",
+	       "$args");
+    }
+}
+
+#
+# The special node sends a signal to run_linktest, in case it is listening.
+# Mainly informational, but the COMPLETE message informs run_linktest.pl
+# that all exited properly.
+#
+sub sim_event {
+    my ($event,$args) = map { $1 if (/(.*)/) } @_;
+    if($hostname eq $synserv) {
+	system(PATH_TEVC,
+	       "-e", "$proj_id/$exp_id",
+	       "now",
+	       $simname,
+	       "$event",
+	       "$args");
     }
 }
 
@@ -1174,6 +1227,8 @@ sub read_file {
 #
 # @param: accepts a list of arguments for exec.
 sub my_system {
+    my $retval = 0;
+
     &check_filename($_[0]);
 
     foreach my $param (@_) {
@@ -1183,6 +1238,7 @@ sub my_system {
     if(my $pid =fork) {
 	push @kill_list, $pid;
 	waitpid($pid,0);
+	$retval = $? >> 8;
 	pop(@kill_list);
     } else {
 	if($debug_level < DEBUG_ALL) {
@@ -1192,6 +1248,7 @@ sub my_system {
 	my @args = map { $1 if (/(.*)/) } @_;
 	exec(@args);
     }
+    return $retval;
 }
 # permutation of my_system to start but not wait for child procs.
 sub my_system_initonly {
@@ -1259,6 +1316,9 @@ sub append_file {
     my $fname = &check_filename(shift @_);
     open FILE,">>$fname" 
 	|| die ("Could not append to $fname: $!");
+    if ($swapperid) {
+	chown($swapperid, $swappergid, $fname);
+    }
     print FILE "@_";
     close FILE;
 }
