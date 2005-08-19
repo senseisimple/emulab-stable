@@ -735,7 +735,7 @@ CREATE TABLE knowledge_base_entries (
   archived tinyint(1) NOT NULL default '0',
   date_archived datetime default NULL,
   archiver_uid varchar(8) default NULL,
-  PRIMARY KEY  (idx),
+  PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
 --

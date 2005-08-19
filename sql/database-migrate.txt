@@ -2781,9 +2781,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	  archived tinyint(1) NOT NULL default '0',
 	  date_archived datetime default NULL,
 	  archiver_uid varchar(8) default NULL,
-	  PRIMARY KEY  (idx),
+	  PRIMARY KEY  (idx)
 	) TYPE=MyISAM;
 
 4.6: Fix up previous revision; skip to next entry.
+4.7: Ditto.
 
-4.7:
+4.8:
+
