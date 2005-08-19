@@ -220,12 +220,31 @@ if [ x"$ADDRESS" != x ]; then
 		echo "Adjusting slice-related files"
 		$BINDIR/slicefix $PARTITION $DISK
 		echo "Image load complete"
-		$BINDIR/tmcc state RELOADDONE
-		
+
+		#
+		# If requested to reboot, do so.
+		#
+		# Note: there is a race condition with stated here.
+		# If we reboot immediately after sending RELOADDONE,
+		# it is possible that, under heavy server load, we will
+		# finish the reboot and reach the bootinfo stage before
+		# stated gets and processes our RELOADDONE.  So now we
+		# wait around after sending the RELOADDONE.  stated should
+		# force us to reboot when the transition takes place.
+		# For backward compatibility we use a new state: RELOADDONEV2.
+		# For paranoia we just wait around for awhile and then
+		# reboot anyway, just in case stated's reboot fails for
+		# some reason.
+		#
 		if [ $reboot -eq 1 ]; then
-		    echo "Rebooting ..."
+		    $BINDIR/tmcc state RELOADDONEV2
+		    echo "Waiting for server to reboot us ..."
+		    sleep 120
+		    echo "No response from server, rebooting myself ..."
 		    /sbin/reboot
 		    sleep 100
+		else
+		    $BINDIR/tmcc state RELOADDONE
 		fi
 	        exit 0
 		;;
