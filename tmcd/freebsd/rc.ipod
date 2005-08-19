@@ -1,7 +1,7 @@
 #/bin/sh -
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -19,15 +19,20 @@ else
 	BINDIR=/etc/testbed
 fi
 
+#
 # Grotesque sed/awk converts IP addrs into an integer for sysctl
+# XXX update: only semi-grotesque now, we convert to hex strings since
+# BSD sysctl takes hex numbers (and one-true-awk botches integers close
+# to MAXINT)!
+#
 IPODINFO=`$BINDIR/tmcc ipodinfo`
 if [ x"$IPODINFO" != x ]; then
 	IPODHOST=`echo $IPODINFO | \
 		sed -e 's/.*HOST=\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1 \2 \3 \4/' | \
-		awk '{ printf "%d\n", $1*16777216+$2*65536+$3*256+$4 }'`
+		awk '{ printf "0x%02x%02x%02x%02x\n", $1, $2, $3, $4 }'`
 	IPODMASK=`echo $IPODINFO | \
 		sed -e 's/.*MASK=\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\)\.\([0-9]*\).*/\1 \2 \3 \4/' | \
-		awk '{ printf "%d\n", $1*16777216+$2*65536+$3*256+$4 }'`
+		awk '{ printf "0x%02x%02x%02x%02x\n", $1, $2, $3, $4 }'`
 	IPODKEY=`echo $IPODINFO | \
 		sed -e 's/.*HASH=\(.*\)/\1/'`
 
