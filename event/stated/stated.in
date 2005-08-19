@@ -127,7 +127,6 @@ if ($opt{d}) {
 # Grab some constants into variables
 my $TBANYMODE    = TBDB_NODEOPMODE_ANY;
 my $TBRESET      = TBDB_TBCONTROL_RESET;
-my $TBRELOADDONE = TBDB_TBCONTROL_RELOADDONE;
 my $TBTIMEOUT    = TBDB_TBCONTROL_TIMEOUT;
 my $PXEBOOT      = TBDB_TBCONTROL_PXEBOOT;
 my $BOOTING      = TBDB_TBCONTROL_BOOTING;
@@ -145,6 +144,8 @@ my $TBISUP       = TBDB_NODESTATE_ISUP;
 my $PXEWAIT      = TBDB_NODESTATE_PXEWAIT;
 my $PXEWAKEUP    = TBDB_NODESTATE_PXEWAKEUP;
 my $PXEBOOTING   = TBDB_NODESTATE_PXEBOOTING;
+my $TBRELOADDONEV1    = TBDB_TBCONTROL_RELOADDONE;
+my $TBRELOADDONEV2    = TBDB_TBCONTROL_RELOADDONE_V2;
 my $TBTIMEOUTREBOOT   = TBDB_STATED_TIMEOUT_REBOOT;
 my $TBTIMEOUTNOTIFY   = TBDB_STATED_TIMEOUT_NOTIFY;
 my $TBTIMEOUTCMDRETRY = TBDB_STATED_TIMEOUT_CMDRETRY;
@@ -807,7 +808,7 @@ sub stateTransition($$) {
 		}
 		next;
 	    };
-	    /^$TBRELOADDONE$/ && do {
+	    (/^$TBRELOADDONEV1$/ || /^$TBRELOADDONEV2$/) && do {
 		handleCtrlEvent($node,$trig);
 		next;
 	    };
@@ -917,7 +918,7 @@ sub handleCtrlEvent($$) {
 	    info("Performed $TBRESET for $node\n");
 	    next;
 	};
-	/^$TBRELOADDONE$/ && do {
+	(/^$TBRELOADDONEV1$/ || /^$TBRELOADDONEV2$/) && do {
 	    info("Clearing reload info for $node\n");
 	    DBQueryFatal("delete from current_reloads where node_id='$node'");
 	    my ($pid,$eid);
@@ -930,9 +931,11 @@ sub handleCtrlEvent($$) {
 				 $UID, $pid, $eid);
 		info("Released $node from $pid/$eid\n");
 	    }
-	    info("Sending an apod to $node\n");
-	    system("$apod $node") == 0 or
-		notify("Could not apod $node after $TBRELOADDONE!\n");
+	    if ($event eq $TBRELOADDONEV2) {
+		info("Sending an apod to $node\n");
+		system("$apod $node") == 0 or
+		    notify("Could not apod $node after $TBRELOADDONEV2!\n");
+	    }
 	    next;
 	};
 	/^$TBTIMEOUT$/ && do {
