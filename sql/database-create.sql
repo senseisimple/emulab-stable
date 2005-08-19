@@ -728,7 +728,7 @@ CREATE TABLE knowledge_base_entries (
   section tinytext,
   title tinytext,
   body text,
-  xref_tag tinytext,
+  xref_tag varchar(64) default NULL,
   faq_entry tinyint(1) NOT NULL default '0',
   date_modified datetime default NULL,
   modifier_uid varchar(8) default NULL,
@@ -736,7 +736,6 @@ CREATE TABLE knowledge_base_entries (
   date_archived datetime default NULL,
   archiver_uid varchar(8) default NULL,
   PRIMARY KEY  (idx),
-  UNIQUE KEY  (xref_tag)
 ) TYPE=MyISAM;
 
 --

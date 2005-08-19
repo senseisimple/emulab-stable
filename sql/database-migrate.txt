@@ -2774,7 +2774,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  section tinytext,
 	  title tinytext,
 	  body text,
-	  xref_tag tinytext,
+	  xref_tag varchar(64) default NULL,
 	  faq_entry tinyint(1) NOT NULL default '0',
 	  date_modified datetime default NULL,
 	  modifier_uid varchar(8) default NULL,
@@ -2782,5 +2782,8 @@ last_net_act,last_cpu_act,last_ext_act);
 	  date_archived datetime default NULL,
 	  archiver_uid varchar(8) default NULL,
 	  PRIMARY KEY  (idx),
-	  UNIQUE KEY  (xref_tag)
 	) TYPE=MyISAM;
+
+4.6: Fix up previous revision; skip to next entry.
+
+4.7:
