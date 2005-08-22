@@ -378,8 +378,10 @@ if ($tarlist =~ /^([-\@\w\.\/]+)$/) {
 else {
     die("Bad data in tarlist name: $tarlist");
 }
+my $oumask = umask(0);
 system("tar $decompressflag -xvf $tarfile > $tarlist");
 $exit_status = $? >> 8;
+umask($oumask);
 if ($copymode) {
     unlink($copyfile);
 }

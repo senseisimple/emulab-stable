@@ -224,8 +224,10 @@ push(@identlines, "$rpm $filestamp $filemd5");
 if ($copymode) {
     $rpm = $copyfile;
 }
+my $oumask = umask(0);
 system("rpm -U --force --nodeps $rpm");
 $exit_status = $? >> 8;
+umask($oumask);
 if ($copymode) {
     unlink($copyfile);
 }
