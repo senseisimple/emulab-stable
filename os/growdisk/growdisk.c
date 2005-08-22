@@ -128,7 +128,7 @@ void
 getdiskinfo(char *disk)
 {
 	int fd;
-	unsigned long chs;
+	unsigned long chs = 0;
 	struct sector0 {
 		char stuff[DOSPARTOFF];
 		char parts[512-2-DOSPARTOFF];
@@ -140,6 +140,8 @@ getdiskinfo(char *disk)
 	if (fd < 0)
 		err(1, "%s: opening for read", disk);
 #ifdef __linux__
+	if (verbose)
+		warnx("using BLKGETSIZE to determine size");
 	if (ioctl(fd, BLKGETSIZE, &diskinfo.disksize) < 0)
 		err(1, "%s: BLKGETSIZE", disk);
 	diskinfo.cpu = diskinfo.tpc = diskinfo.spt = 0;
@@ -173,6 +175,8 @@ getdiskinfo(char *disk)
 		unsigned nsect, nhead, ssize;
 		off_t dsize;
 
+		if (verbose)
+			warnx("using DIOCG* to determine size/geometry");
 		if (ioctl(fd, DIOCGSECTORSIZE, &ssize) < 0)
 			err(1, "%s: DIOCGSECTORSIZE", disk);
 		if (ioctl(fd, DIOCGMEDIASIZE, &dsize) < 0)
@@ -188,10 +192,12 @@ getdiskinfo(char *disk)
 		chs = diskinfo.cpu * diskinfo.tpc * diskinfo.spt;
 	}
 #else
-#ifdef GIOCGDINFO
+#ifdef DIOCGDINFO
 	{
 		struct disklabel label;
 
+		if (verbose)
+			warnx("using DIOCGDINFO to determine size/geometry");
 		if (ioctl(fd, DIOCGDINFO, &label) < 0)
 			err(1, "%s: DIOCGDINFO", disk);
 		diskinfo.cpu = label.d_ncylinders;
@@ -203,6 +209,8 @@ getdiskinfo(char *disk)
 #endif
 #endif
 #endif
+	if (chs == 0)
+		errx(1, "%s: could not get disk size/geometry!?", disk);
 	if (diskinfo.disksize < chs)
 		errx(1, "%s: secperunit (%lu) < CxHxS (%lu)",
 		     disk, diskinfo.disksize, chs);
