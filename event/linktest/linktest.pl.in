@@ -65,7 +65,7 @@ use constant LIMIT_BW_LOSS => 0;
 
 # Make sure that we dont get bogged down in being too accurate! 
 # Make sure the error is a certain significance before we start reporting it.
-use constant INSIGNIFICANT_LAT_ERROR => 2.50;  # ms
+use constant INSIGNIFICANT_LAT_ERROR => 0.50;  # ms
 use constant INSIGNIFICANT_BW_ERROR  => 1.00;  # mb
 
 # latency must be corrected for xmit delay under this speed.
