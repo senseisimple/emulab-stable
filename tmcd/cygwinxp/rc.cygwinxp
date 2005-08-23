@@ -32,6 +32,7 @@ for ifc in `regtool list $nbtif`; do
 done
 
 # Make sure the computer name is right.  Reboots to change it if necessary.
+# There is a swap-in race condition where tmcc nodeid returns nothing.
 nodeid=
 while [ -z $nodeid ]; do
     nodeid=`tmcc nodeid`
@@ -105,14 +106,18 @@ netsh interface reset all
 # Windows DHCP doesn't make a /etc/resolv.h, which tmcc needs for bossinfo.
 # Make one from ipconfig output.
 ipconfig /all | awk \
-    '/^ *Connection-specific DNS Suffix/{print "search", $NF} \
+    '/^ *Connection-specific DNS Suffix.*: ./{print "search", $NF} \
      /^ *DNS Servers/{print "nameserver", $NF}' > /etc/resolv.conf
+
+# Set the primary domain, so the Windows resolver won't be confused when there are
+# multiple interfaces.
+domain=`tmcc bossinfo | sed -n 's/[^.]*\.\([^ ]*\) .*/\1/p'`
+regtool set -s /HKLM/SYSTEM/CurrentControlSet/Services/Tcpip/Parameters/Domain $domain
 
 # Remember the control net interface MAC address and Local Area Connection name for
 # slothd.  It's the one whose IP address is returned by looking up the nodeid (pc%d).
 cif=/var/emulab/boot/controlif
-nodeid=`cat /var/emulab/boot/nodeid`
-ipaddr=`nslookup $nodeid | awk 'NR>2 && /Address:/{print $2}'`
+ipaddr=`nslookup $nodeid.$domain | awk 'NR>2 && /Address:/{print $2}'`
 ipconfig /all | tr -d '\r' | awk \
     '/^Ethernet adapter/{ ifc = gensub("Ethernet adapter (.*):", "\\1", 1); next }\
      /Physical Address/{ gsub("-", ":"); mac = tolower($NF); next}\
