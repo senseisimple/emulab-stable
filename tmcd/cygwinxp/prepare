@@ -67,9 +67,22 @@ foreach my $dbfile (@DBFILES) {
 # Stop anything holding a logfile open which we will want to remove below.
 print "Stopping the watchdog ...\n";
 system("$BINDIR/watchdog stop");
+
 print "Stopping the program-agent ...\n";
 system("$BINDIR/rc/rc.progagent shutdown");
 
+print "Stopping emulab-syncd ...\n";
+system("$BINDIR/rc/rc.syncserver shutdown");
+
+print "Stopping slothd ...\n";
+system("$BINDIR/rc/rc.slothd stop");
+
+print "Stopping evproxy ...\n";
+my $file = "/var/run/evproxy.pid";
+system("kill `cat $file`")
+    if (-f $file && -s $file);
+
+# Logfiles.
 print "Cleaning logfiles ...\n";
 opendir(LOG,$LOGDIR) or
     die("Could not open directory $LOGDIR: $!");
@@ -169,3 +182,21 @@ while ($dirent = readdir(ETC)) {
     }
 }
 closedir(ETC);
+
+print "Updating /etc/motd.\n";
+if (open(MOTD, ">/etc/motd")) {
+    open(UNAME, "uname -sr |");
+    my $uname = <UNAME>;
+    chomp $uname;
+    close(UNAME);
+    print MOTD "Windows-XP + " . $uname . " updated " . localtime();
+    print MOTD "\n\nWelcome to Windows in Emulab!\n\n";
+}
+else {
+    warn("Could not open /etc/motd!\n");
+}
+
+print "Cleaning out sp2 & Windows Update dirs.\n";
+system("du -s -m C:/WINDOWS/\\\$*");
+system("rm -rf C:/WINDOWS/\\\$*");
+
