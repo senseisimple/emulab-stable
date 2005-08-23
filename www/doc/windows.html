@@ -29,8 +29,10 @@
   <ul>
     <li> <a href="#Cygwin_documentation"> Cygwin documentation </a></li>
     <li> <a href="#Cygwin_packages"> Cygwin packages </a></li>
-    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a><img src="../new.gif" alt="&lt;NEW&gt;"></li>
-    <li> <a href="#Cygwin_arcana"> Cygwin arcana </a><img src="../new.gif" alt="&lt;NEW&gt;"></li>
+    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a>
+         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
+    <li> <a href="#Cygwin_arcana"> Cygwin arcana </a>
+         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
   <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
@@ -47,10 +49,19 @@ types for experiment nodes in Emulab, in addition to FreeBSD and Linux.
 As much as possible, we have left Windows XP "stock".  Some Windows services
 are shut down: Messenger, SSDP Discovery Service, Universal Plug and Play
 Device Host, and Remote Registry.  NetBT (NetBios over TCP) is disabled to
-allow network idle detection by <code>slothd</code>. <p>
+allow network <a href="../docwrapper.php3?docname=swapping.html#idleness">
+idle detection </a> by the <code>slothd</code> service. <p>
 
-Before booting the node at swap-in time, Emulab loads a fresh image of Windows
-XP onto the experiment nodes in parallel, using our <code>frisbee</code> service.
+Emulab.net is outside the University of Utah firewall, to allow free network
+experimentation.  Even though we have closed some holes, your Windows XP
+experiment nodes are exposed to the wider Internet.  If your experiment does
+not require that full freedom, consider adding a <a
+href="../tutorial/docwrapper.php3?docname=firewall.html"> firewall </a> to
+your experiment ns file.
+
+Before booting the node at swap-in time, Emulab loads a 
+<a href="#Experiment_setup"> fresh image of Windows XP </a>
+onto the experiment nodes in parallel, using our <code>frisbee</code> service.
 Emulab software automatically configures each Windows XP node, providing the
 expected experiment user environment including: user accounts and Emulab SSH
 keys; remote home, project, and shared directories; and network connections.
@@ -58,12 +69,15 @@ All of the Emulab experiment automation and monitoring services have been ported
 to run on Windows.
 <p>
 
-The Cygwin GNU environment is provided, including Bash and TCSH shells, the
+The <a href="#Cygwin"> Cygwin GNU </a> environment is provided, 
+including Bash and TCSH shells, the
 C/C++, Perl and Python programming languages, and several editors including
 Emacs, vim, nano and ed.  <p>
 
-The Emulab web interface manages a separate Windows password in the user
-profile, as well as making SSH and RDP login connections to the experiment nodes.
+The Emulab web interface manages a separate <a href="#Windows_Passwords"> 
+Windows password </a> in the user
+profile, as well as making <a href="#Login_connections"> SSH and RDP login
+connections </a> to the experiment nodes.
 Remote Desktop Protocol service supports Windows Desktop logins from the
 user's workstation screen to the experiment node.  <p>
 
@@ -157,7 +171,7 @@ WINXP-02-16 or before. <p>
 will work in any image.<p>
 
 There is more information on routing in the <a
-href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#Routing">
+href="../tutorial/docwrapper.php3?docname=tutorial.html#Routing">
 Routing Section of the Emulab Tutorial. </a><p>
 
 <h4><a name="Network_config"> </a> Network config </h4>
@@ -210,19 +224,19 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
 
 <ul>
        
-  <li> <b>SSH</b> <a href="https://www.emulab.net/docwrapper.php3?docname=ssh-mime.html">
+  <li> <b>SSH</b> <a href="../docwrapper.php3?docname=ssh-mime.html">
        (setup) </a> - The <b>SSH</b> connection button gives a Bash or TCSH
        shell, as usual.  Your Emulab ssh keys are installed on the
        node in a /sshkeys subdirectory.  </li>
 
-  <li> <b>Console</b> <a href="https://www.emulab.net/faq.php3#tiptunnel">
+  <li> <b>Console</b> <a href="../kb-show.php3?xref_tag=tiptunnel">
        (setup) </a> - The <b>Console</b> button won't do much good now, because
        Windows doesn't normally provide logins on the com serial device.
        (This will be remedied with <i>agetty</i> eventually.)  An exception is
        that you can monitor the Frisbee loading of the Windows image on the
        console.  </li>
 
-  <li> <b>RDP</b> <a href="https://www.emulab.net/docwrapper.php3?docname=rdp-mime.html">
+  <li> <b>RDP</b> <a href="../docwrapper.php3?docname=rdp-mime.html">
        (setup) </a> - The <b>RDP</b> button starts up a Remote Desktop
        Protocol connection, giving a Windows Desktop login from the user's
        workstation screen to the experiment node.  
@@ -241,6 +255,13 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
 
        </ul>
 </ul>
+
+<div style="margin-left: 40px;"> <b>NOTE:</b> If your dot-files replace the
+execution search path entirely, you will not be able to execute Windows in
+shells.  In that case, you should add
+<b><code>/cygdrive/c/WINDOWS/system32</code></b> and 
+<b><code>/cygdrive/c/WINDOWS</code></b>
+to your <code>$PATH</code>. </div>
 
 <h4><a name="RDP_details"> </a> RDP details </h4>
 
@@ -388,7 +409,7 @@ The Cygwin command <pre> cygcheck -l <i>package-name</i></pre> lists the
 contents of an installed package, which may help you to make a tarfile or rpm
 from a package you have installed.  You can then cause it to be installed
 automatically by Emulab into all of the nodes of your experiment.  See the <a
-href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html#TARBALLS">
+href="../tutorial/docwrapper.php3?docname=tutorial.html#TARBALLS">
 Tutorial </a> for more information. <p>
 
 Watch out for post-install scripts in:
