@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -200,7 +200,7 @@ $nodes_result =
 		 "left join interfaces as i on r.node_id=i.node_id ".
 		 " where i.IP!='NULL' and ".
 		 "       i.role='" . TBDB_IFACEROLE_CONTROL() . "' ".
-		 "       and r.node_id not like 'sh%' ".
+		 "       and nodes.role='testnode' ".
 		 "       and node_types.isvirtnode=0 ".
 		 "       and node_types.isremotenode=0 ".
 		 "order by r.pid,e.gid,r.eid,nodes.priority");
