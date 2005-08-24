@@ -19,9 +19,19 @@ alias rootpc 'sudo ssh pc\!^.$en \!:2*'
 alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 
 
-    . Start with a clean XP image, without all of the freight from Russ C's work.
+    . Start with a clean XP image, as it comes from the CD.
 
       - Swap in experiment Windows-1-base, log in as Administrator.
+
+         . The experiment should be behind a firewall, to avoid contamination.
+
+            # Firewall while making Windows images.
+            set fw [new Firewall $ns]
+            $fw set-type ipfw2-vlan
+            $fw set-style basic
+
+            # Allow Cygwin setup and Windows Update to work.
+            $fw add-rule "allow tcp from any to any 80,443 in via vlan0 setup keep-state"
 
       - Set the Windows "w32time" NTP client to connect to the Emulab NTP host.
 
@@ -65,11 +75,8 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
       - Make a "root" account in Control Panel/Administrative Tools/Computer Management/
         System Tools/Local Users and Groups/Users, put it in the Administrators and Users groups.
 
-        . Also go into Services and Applications/Services and stop SSDP Discovery Service
-          and Remote Registry.  Go into their Properties/Startup type and disable them as well.
-
         . While you're there, Right-click Start/"Explore All Users" and copy the Computer Management
-          shortcut to the All Users/Desktop folder.
+          shortcut from Administrative Tools into the All Users/Desktop folder.
 
       - Start IE, make "blank" the home page. Click Tools/Internet Options/Home page/Use Blank.
 
@@ -78,15 +85,23 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 
       - Create C:/Temp, C:/Software/CygWin
       - Install CygWin
-        . Download setup from www.cygwin.com/setup.exe to C:/Software/CygWin (in /share/windows, too.)
+        . (Try copying /etc/setup/* from an existing image to save the selection work.)
+        . Download setup from www.cygwin.com/setup.exe to C:/Software/CygWin, OR:
+           # [On ops.]
+           set pc=109
+           scp /share/windows/cygwin-setup.exe $pc":"/tmp/setup.exe
         . Run it.  Install dir is C:\cygwin, package dir is C:\Software\CygWin .
+            # Ensure that upgrading SSH won't hang.
+            net stop sshd
+            C:/Software/CygWin/setup.exe &
         . Mirror is http://mirrors.xmission.com .
         . Click [View] to "Not Installed" (alphabetical.)  
           Click on the Skip in the "New" column to add a binary version of:
             agetty, bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
             make, minires-devel, nano, openssh, openssl-devel, 
-            patch, perl, perl-libwin32, python, rpm, rpm-build, rsync, 
+            patch, perl, perl-libwin32, python, rpm, rsync, 
             shutdown, tcsh, vim, wget, zip .
+          Click in the "src" column for openssh, so patches can be applied.
         . Don't "Create an icon on the Desktop", do "Add icon to Start Menu".
 
         . Add ;C:\cygwin\bin to the end of the System PATH in 
@@ -140,14 +155,14 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 
         . Set up sshd.  
           - Edit /bin/ssh-host-config to add a -i argument to the "cygrunsrv -I sshd" lines.
-                grep cygrunsrv /bin/ssh-host-config
+                grep cygrunsrv /bin/ssh-host-config | grep -e -I
               ed /bin/ssh-host-config
               /cygrunsrv -I sshd/s//& -i/p
               /cygrunsrv -I sshd/s//& -i/p
               w
               q
-          - Then start a cygwin shell, stop sshd and remove its entry, run ssh-host-config:
-            (You must be logged in as root over RDP, not ssh when you do this.)
+          - Then start a Cygwin shell, stop sshd and remove its entry, run ssh-host-config:
+            (You must be logged in as root over RDP, not ssh when you do this!)
                 cygrunsrv -VQ sshd
               cygrunsrv -E sshd
               cygrunsrv -R sshd
@@ -264,12 +279,14 @@ daFluxGroup
           - Install the standard host keys, dated Jun 21  2001.
             ls -l /etc/ssh*
             # [On boss.]
-            set pc=136
+            set pc=109
             set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
             eval sudo scp -rp "$ssh_args" /proj/testbed/fish/elab-host-keys root@pc$pc":"
+            # Get the standard ssl certificates while we're at it.
+            eval sudo scp -rp "$ssh_args" /proj/testbed/fish/elab-ssl-certs root@pc$pc":"
 
             eval sudo ssh "$ssh_args" root@pc$pc
-            # [On the target.]
+            # [As root on the target.]
               ls -l ~/elab-host-keys
               ls -l /etc/ssh*key*
               ls -l /etc/orig-ssh-keys
@@ -283,6 +300,9 @@ daFluxGroup
               cp -p ~/elab-host-keys/* /etc
               chown SYSTEM /etc/ssh*key*
               ls -l /etc/ssh*key*
+
+              ls -l ~/elab-ssl-certs/* /etc/emulab/*.pem
+              cp -p ~/elab-ssl-certs/* /etc/emulab
 
             # The following should no longer complain due to nonstandard host keys.
             # [On Boss.] 
@@ -337,13 +357,26 @@ daFluxGroup
 
             cd C:/elvin/libelvin-4.0.3
               # configure: error: Elvin requires that doubles be IEEE 754 compliant
-              # On XP w/ no SP's, edit configure, line 3547, add exit(0); to patch around it.
+              # Edit configure, line 3547, add exit(0); to patch around it.
+              ed configure
+3546p
+a
+exit(0);
+.
+w
+q
             ./configure >& configure.trace 
               tail configure.trace
 
             # Comment out #elif defined(HAVE_WINBASE_H)
                               FreeLibrary(cat);
-              in c:/elvin/libelvin-4.0.3/src/lib/i18n.c
+                  in c:/elvin/libelvin-4.0.3/src/lib/i18n.c
+            ed c:/elvin/libelvin-4.0.3/src/lib/i18n.c
+            /HAVE_WINBASE/p
+            .,.+1s|^|//|p
+            w
+            q
+
             make >& make.log1
               tail make.log1
             make install >& install.log1
@@ -417,6 +450,7 @@ daFluxGroup
                 diff /usr/local/etc/elvind.conf /tmp/elvind.conf
               cp /tmp/elvind.conf /usr/local/etc/elvind.conf
                 ls -l /usr/local/etc/elvind.conf
+              # Do once to register the config file.
               "$elvin" -c `cygpath -w /usr/local/etc/elvind.conf`
                   ## Testing: start elvinsvc from the Services Manager now.
               # Make elvinsvc automatic in services manager, or use these commands:
@@ -474,11 +508,12 @@ daFluxGroup
 
               # program-agent service start-up.
                 cygrunsrv -R ProgAgent
+              progagent=/usr/local/etc/emulab/rc/rc.progagent
               cygrunsrv -I ProgAgent -d "Emulab Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
                   --type manual \
-                  -a "--norc --noprofile -c '/usr/local/etc/emulab/rc/rc.progagent >& /var/log/program-agent.log'"
+                  -a "--norc --noprofile -c '$progagent >& /var/log/program-agent.log'"
                 regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/ProgAgent/Parameters
-                cygrunsrv -Q ProgAgent
+                cygrunsrv -VQ ProgAgent
                 cygrunsrv -S ProgAgent
                 cygrunsrv -E ProgAgent
 
@@ -533,12 +568,12 @@ daFluxGroup
             cd ~/flux
               # First time only
               mkdir CVS; touch CVS/Entries; echo . > CVS/Repository
-            # Any time the testbed tree needs to be re-created.
+            # Any time the testbed tree needs to be re-created.  (Takes a while.)
             cvs -Q co testbed
               # Updates After that.
               cat CVS/Entries
                 cvs -n -q update testbed
-              cvs -Q update -d testbed
+              cvs -q update -d testbed
 
             # Install some dotfiles for Root.
             cp -p testbed/tmcd/cygwinxp/cygwin.root.bashrc ~root/.bashrc
@@ -548,6 +583,8 @@ daFluxGroup
             cp -p ~root/.emacs C:/.emacs
 
             # Install site-lisp files for Emacs.
+              v -t testbed/tmcd/cygwinxp/site-lisp
+              v -t c:/emacs-21.3/site-lisp
             cp -rp testbed/tmcd/cygwinxp/site-lisp/* c:/emacs-21.3/site-lisp
             ls -l c:/emacs-21.3/site-lisp
 
@@ -557,7 +594,7 @@ daFluxGroup
              
             mkdir /usr/local/man/man8
               
-            # Get the binary programs into the source tree for install.
+            # Get the downloaded binary programs into the source tree for install.
               ls -l ~/flux/testbed/tmcd/cygwinxp/*.exe
             # [On boss:]
             sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx}.exe root@pc$pc":"/tmp
@@ -567,11 +604,13 @@ daFluxGroup
             # Finally ready to do the Emulab makes!
             mkdir ~/flux/obj-real
             cd ~/flux/obj-real
+
+            # Configure takes a while...
               v configure.trace*
               mv configure.trace{,.1}
             ../testbed/configure --enable-windows --enable-windowsclient >& configure.trace
               # Should end with "creating config.h".
-              tail configure.trace
+              tail -f configure.trace
 
             # The first make fails with "Cannot change ownership" warnings unpacking tg2.0 .
             make client-install >& make.log1
@@ -583,25 +622,35 @@ daFluxGroup
             # The install of evproxy in the make will fail unless we stop it first.
             ps -Welf | grep evproxy
               kill `ps -Welf | grep evproxy | awk '{print $2}'`
+            # Ditto emulab-syncd and slothd.
+            $rc/rc.syncserver shutdown
+            $rc/rc.slothd stop
+
             make client-install >& make.log2
-              tail make.log2
+              tail -f make.log2
 
                 # Only needed if there are problems...
+                  v -t make.log*
                 make client-install >& make.log3
-                make -k client-install >& make.log4
-                make -k client-install >& make.log5
+                make client-install >& make.log4
+                make client-install >& make.log5
                 make client-install >& make.log6
                 make client-install >& make.log7
                 make client-install >& make.log8
                 make client-install >& make.log9
 
       . Patch the /etc/profile file to use /home dirs if the /users mounts are down.
-        Remember that /etc/profile may get stepped on when you upgrade CygWin!
+        # IF THIS FILE IS MODIFIED IT WILL NOT BE UPDATED BY THE CYGWIN
+        # SETUP PROGRAM.  IT BECOMES YOUR RESPONSIBILITY.
+        #
+        # The latest version as installed by the Cygwin Setup program can
+        # always be found at /etc/defaults/etc/profile
             (cd ~/flux; cvs update testbed/tmcd/cygwinxp/profile)
-          diff /etc/profile ~/flux/testbed/tmcd/cygwinxp
+          diff /etc/defaults/etc/profile ~/flux/testbed/tmcd/cygwinxp
             # If the diffs are right, just copy the Emulab one.
             cp ~/flux/testbed/tmcd/cygwinxp/profile /etc
           # Otherwise, edit the file.
+          cp /etc/defaults/etc/profile /etc
           ed /etc/profile
   /^# If the home directory doesn't exist, create it./,/^if \[ ! -d "\${HOME}" \]; then/p
 /^# If the home directory doesn't exist, create it./,/^if \[ ! -d "\${HOME}" \]; then/c
@@ -614,6 +663,8 @@ if [ ]; then
 ###if [ ! -d "${HOME}" ]; then
 .
   .-10,.+5p
+  w
+  q
 
       . Set up the tbshutdown script to run as a service, to get a shutdown signal.
             editrights -u root -l
@@ -626,6 +677,7 @@ if [ ]; then
           cygrunsrv -I EmulabShutdown -u root -w "$rootpwd" -p /cygdrive/c/cygwin/bin/bash \
               --shutdown --type manual \
               -a "--norc --noprofile -c '/usr/local/etc/emulab/tbshutdown'"
+          cygrunsrv -VQ EmulabShutdown
 
           # If you see the following, try running rc.accounts or rc.bootsetup below to 
           # clear it up.  Haven't figured this out yet...
@@ -636,7 +688,7 @@ if [ ]; then
           touch /var/log/EmulabShutdown.log
           chmod 666 /var/log/EmulabShutdown.log
           regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabShutdown/Parameters
-          cygrunsrv -Q EmulabShutdown
+          cygrunsrv -VQ EmulabShutdown
             # Manual start-up.
             cygrunsrv -S EmulabShutdown
 
@@ -662,14 +714,18 @@ if [ ]; then
 
       . Set up the boot script to run as a service.
 
-          # Better: with dependency on Elvin, run rc.cygwin separately first, ProgAgent after.
+          # Start up after DHCP and Elvin, run ProgAgent afterwards.
               cygrunsrv -R EmulabStartup 
           rootpwd='daFluxGroup'
-          cygrunsrv -I EmulabStartup -u root -w $rootpwd -p /cygdrive/c/cygwin/bin/bash \
-           --dep elvinsvc.exe \
-           -a "--norc --noprofile -c '( /usr/local/etc/emulab/rc/rc.cygwin; /usr/local/etc/emulab/rc/rc.bootsetup; cygrunsrv -S ProgAgent ) >& /var/log/bootsetup.log'"
+          cygwinrc=/usr/local/etc/emulab/rc/rc.cygwin
+          bootsetup=/usr/local/etc/emulab/rc/rc.bootsetup
+          progagent="cygrunsrv -S ProgAgent"
+          bootlog=/var/log/bootsetup.log
+          cygrunsrv -I EmulabStartup -u root -w $rootpwd --dep DHCP --dep elvinsvc.exe \
+            -p /cygdrive/c/cygwin/bin/bash \
+            -a "--norc --noprofile -c '( $cygwinrc; $bootsetup; $progagent ) >& $bootlog'"
+          cygrunsrv -VQ EmulabStartup 
 
-              cygrunsrv -Q EmulabStartup 
             cygrunsrv -S EmulabStartup 
             cygrunsrv --help
           regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabStartup/Parameters
@@ -694,28 +750,33 @@ if [ ]; then
         Also touches a file when client input is received, so slothd will know.
 
         - RDP into a node as root and shut down all ssh processes before update.
+          (Otherwise, installation of an openssh update can hang mysteriously.)
             net stop sshd
             ps -Welf | grep ssh
 
-        - Go through Cygwin setup and make sure everything is updated.
-          Also select src for openssh, which goes under /usr/src .
-            /cygdrive/c/software/cygwin/setup.exe &
-          When base dll's are updated, it will tell you to reboot.  Do it.
+        - Go through Cygwin setup and make sure everything is updated.  
+              cygcheck -c openssh
+              /cygdrive/c/software/cygwin/setup.exe &
+              cygcheck -c openssh
+          . View "Partial" will show what it wants to download and install.
+          . Also select src for openssh, which goes under /usr/src .
+          . When base dll's are updated, it will tell you to reboot.  Do it.
 
-        - Install the source patches.
+        - Install the source patches.  (Go get CVSROOT and agent keys set above first.)
             (cd ~/flux; cvs update testbed/tmcd/cygwinxp)
               (cd ~/flux; cvs co testbed/tmcd/cygwinxp)
           cd /usr/src/openssh*
+            v -t *.[ch] | head -30
 
           # Enable no-password ssh logins which can access shared homedirs.
           cp -p uidswap.c{,.orig}
             patch -p1 --dry-run < ~/flux/testbed/tmcd/cygwinxp/uidswap.c.patch
           patch -p1 -b < ~/flux/testbed/tmcd/cygwinxp/uidswap.c.patch
+            diff uidswap.c{.orig,}
 
           # Enable slothd to know of the last SSH client input time.
-          foreach f ( channels.{h,c} serverloop.c )
-             cp -p $f{,.orig}
-          end
+          for f in channels.{h,c} serverloop.c; do cp -p $f{,.orig}; done
+            v *.orig
             patch -p1 --dry-run < ~/flux/testbed/tmcd/cygwinxp/sshd-client-input-time.patch
           patch -p1 -b < ~/flux/testbed/tmcd/cygwinxp/sshd-client-input-time.patch
 
@@ -730,11 +791,11 @@ if [ ]; then
                 --datadir=${prefix}/share \
                 --mandir=${datadir}/man \
                 --infodir=${datadir}/info
-              tail configure.trace
+              tail -f configure.trace
 
         - Just make and install sshd.exe, assuming everything else is up-to-date.
             make sshd.exe > make.log.1 2>&1
-              tail make.log.1
+              tail -f make.log.1
 
             # Make sure sshd is closed down while installing.
             ps -Welf | grep sshd
@@ -742,7 +803,7 @@ if [ ]; then
             /usr/bin/install -c -m 0755 -s sshd /usr/sbin/sshd.exe
             net start sshd
 
-      . Make a load average log, averaged over a 1 minute period, for slothd's use.
+      . Make a load average log for slothd, averaged over a 1 minute period.
 
         - /proc/loadavg is hard-wired to "0.00 0.00 0.00" on Cygwin now.
 
@@ -763,26 +824,56 @@ if [ ]; then
 
           Log Files tab, 
             Log file type: "Text File (Comma delimited)", 
-            Uncheck "End file names with" so the result goes into C:\cygwin\var\run\ldavg.csv .
-            Configure... Log file size: "Limit of: 1 MB", OK.
+            Uncheck "End file names with" so the result goes into ldavg.csv .
+            Configure... 
+              Location: "C:\cygwin\var\run",
+              Log file size: "Limit of: 1 MB", OK.
 
           Schedule tab, 
             Start Log: Click "At" (which defaults to the current time, as well as the future.) 
             Stop Log: Click "When the 1-MB log file is full.",
-              When a log file closes: "Start a new log file", OK.
+              When a log file closes: "Start a new log file".
 
-          OK.
+          Check all three tabs, click OK.
 
-          # ldavg should start out red (stopped) and turn green (stated.)
-          # It will start again after reboot.
+          # ldavg should start out red (stopped) and then turn green (started) if you
+          # refresh with F5.  It will start again after reboot.
           # You can turn it off and on with the right-click menu on "ldavg" in the logs pane.  
             tail -f /var/run/ldavg.csv
+          # The first one is always 99.999, etc.
+
+      . Reboot to make sure it all works right.
+          prepare
+          /sbin/reboot
 
 
 ================================================================
 Making images
 
+    . Windows Update
+      - This might be needed after each Microsoft "Patch Tuesday" (second tues of the month.)
+      - Start up Internet Explorer and go to:
+        . http://update.microsoft.com
+           - The first time, just installs/updates the updater and asks to reboot.
+           - I just choose the EXPRESS update, installing all high-priority updates.
+           - Don't turn on Automatic Updates.
+
+           - After rebooting, check again if there's more to install.
+
+             To install SP2, you must have access to a console screen, because the
+             Windows Firewall defaults to block both SSH and RDP.  Disable it.
+
+             . You may need to free disk space to install SP2, or allocate a partition.
+                   du -sm C:/WINDOWS/SoftwareDistribution/Download
+                 rm -rf C:/WINDOWS/SoftwareDistribution/Download/*
+                   du -sm C:/WINDOWS/ServicePackFiles/i386
+                 find C:/WINDOWS/ServicePackFiles/i386 -type f | xargs rm -f
+
+      - Could be a good time to update Cygwin as well.  
+        . Beware of stepping on the sshd.exe patches.
+
      . Uninstall the experimental net devices in Computer Management/Device Manager.
+       (This was from our attempts to make a pc850/pc600 image.  Is it needed?)
          # Check which one is the control net interface.
          ipconfig /all
        Select a non-control net interface, hit delete, enter.
@@ -791,40 +882,45 @@ Making images
      . Run prepare to clear out experiment-specific state.
         rootpc $pc
           # Ignore complaints about all of the C:/Documents and Settings directories
-          # that were never created because the user didn't log in...
+          # that were never created because the users didn't log in...
           prepare
+
           exit
 
-    . Add an entry at the beginning of xpimage-log.txt, and create the image descriptor.
+    . Add an entry at the beginning of xpimage-log.txt, and create the image
+      descriptor if it's not an existing image.
 
     . Capture the image with imagezip.  
       You can specify the PC from which to grab the image when you create an image-id.
+      Do it in red-dot mode so you can set the Reboot Waittime to 240 seconds.
       When updating existing images, I do it by hand in two stages, as below.
     
         # [On boss.]
-        set pc=136 image=SP1
-        set pc=73 image=SP0a
-        set pc=2 image=SP0
+        set pc=61 img=SP1 image=SP1_2005-08-22
+        set pc=72 img=SP0 image=SP0_2005-08-22
+        set pc=109 img=UPDATE image=UPDATE_2005-08-22
+
         df -m /proj/testbed/images /usr/testbed/images
           # Verify SSH working.
           rootpc $pc id
 
         # Boot into the MFS.  The serial console will show you when it's open for business.
         wap node_admin on pc$pc &
-              # Should no longer be necessary.
+              # Should not be necessary if ssh from root@boss to the node is working.
               rootpc $pc /sbin/reboot
+        # Wait until the node is in the MFS.
 
         # Make WINXP-TMP on /proj, then move it to /usr/testbed/images with the right name.
         rootpc $pc
-          cd /proj/testbed/images
-          df -m /proj/testbed/images
-          ls -l WINXP*
-          imagezip -o -I 2 -I 3 -I 4 /dev/ad0 WINXP-TMP.ndz
-          ls -l WINXP*
+            cd /proj/testbed/images
+            df -m /proj/testbed/images
+            ls -l WINXP*
+          imagezip -o -I 2 -I 3 -I 4 /dev/ad0 /proj/testbed/images/WINXP-TMP.ndz
+            ls -l WINXP*
           exit
 
-        # Reboots the source node back into Windows.
-        wap node_admin off pc$pc
+        # Reboot the source node back into Windows.
+        wap node_admin off pc$pc &
 
         # Move the image to /usr/testbed/images to avoid NFS reads, for faster swap-in.
           ls -l /{proj,usr}/testbed/images/WIN*
@@ -834,11 +930,8 @@ Making images
         # Check.
         ls -l /{proj,usr}/testbed/images/WINXP-TMP.ndz
         cksum /usr/testbed/images/WINXP-TMP.ndz & ssh ops cksum /proj/testbed/images/WINXP-TMP.ndz
-          # May want to save a version or two along the way.
-          v /usr/testbed/images/WINXP-$image*.ndz
-          df -m /usr/testbed/images
-          mv /usr/testbed/images/WINXP-$image{,-7-05}.ndz
         # Install with mv.  Frisbee might have the old inode still open.
+          ls -l /usr/testbed/images/WINXP-{TMP,$image}.ndz
         mv /usr/testbed/images/WINXP-{TMP,$image}.ndz
         ls -l /usr/testbed/images/WINXP-$image.ndz
         df -m /usr/testbed/images
@@ -847,6 +940,23 @@ Making images
         df -m /proj/testbed/images
           ls -l /{proj,usr}/testbed/images/WIN*
         
+        # Make symlinks without the date suffix, corresponding to the Image ID's.
+        ls -l /usr/testbed/images/WINXP-$img*
+          # -new images for testing, before we commit.
+          rm /usr/testbed/images/WINXP-$img-new.ndz
+          ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img-new.ndz
+        rm /usr/testbed/images/WINXP-$img.ndz
+        ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img.ndz
+
+      - Explorer/Help/About Windows says this for SP2: 
+               Version 5.1 (Build 2600.xpsp_sp2_gdr.050301-1519: Service Pack 2)
+             vs. for SP1, partially updated to SP2:
+               Version 5.1 (Build 2600.xpsp2.050301-1526: Service Pack 1)
+             vs. for SP1:
+               Version 5.1 (Build 2600.xpsp1.020828-1920: Service Pack 1)
+             vs. for SP0 (no SP's):
+               Version 5.1 (Build 2600.xpclient.010817-1148)
+
     . DEMOTING an image to /proj/testbed/images (edit the image descriptor.)
         ls -l /usr/testbed/images/WINXP-$image.ndz
         df -m /proj/testbed/images

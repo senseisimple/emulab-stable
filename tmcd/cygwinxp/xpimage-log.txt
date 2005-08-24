@@ -1,9 +1,35 @@
 Log of XP images produced (most recent first.)
 
+    . WINXP-SP1_2005-08-22 - Windows XP with SP1a, everything working, pc850 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc61, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    4293596160 input (2162828288 compressed) bytes in 684.186 seconds
+	    Image size: 1065353216 bytes
+	    3.015MB/second compressed
+    . WINXP-SP0_2005-08-22 - Windows XP with SP0, everything working, pc850 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.0, node pc61, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    4293596160 input (1840440320 compressed) bytes in 574.706 seconds
+	    Image size: 907018240 bytes
+	    3.054MB/second compressed
+    . WINXP-UPDATE_2005-08-22 - Windows XP with SP2+, everything working, pc850 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.2+, node pc61, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    4293596160 input (1757856768 compressed) bytes in 549.595 seconds
+	    Image size: 855638016 bytes
+	    3.050MB/second compressed
+        . Created behind a firewall.
+	. Patched sshd to support public-key login with Samba shares, and slothd.
+	. Emulab program-agent, syncserver and slothd idle detection all work now.
+	. NetBT (NetBios over TCP) is disabled to allow network idle detection by slothd.
+        . Cygwin syslog now goes into /var/log/messages rather than Event Log.
+	. Some Windows services are shut down: Messenger, SSDP Discovery Service,
+	  Universal Plug and Play Device Host, and Remote Registry.
+
     . WINXP-SP1 - Windows XP with SP1a, pc850 only.
       6/20/05, 7/5/05, 7/7/05
       prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc73, ping/ssh/isup (no IPOD), 
-      NORMALv2, pc600 and pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
+      NORMALv2, pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
 	4293596160 input (1877455872 compressed) bytes in 581.004 seconds
 	Image size: 896532480 bytes
 	3.082MB/second compressed
