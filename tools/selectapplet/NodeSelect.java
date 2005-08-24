@@ -34,10 +34,6 @@ public class NodeSelect extends JApplet {
     URL				urlServer;
     static final DecimalFormat  FORMATTER = new DecimalFormat("0.00");
     
-    /* Constants for virt image link */
-    int ZOOM   = 3;
-    int DETAIL = 2;
-
     /* From the floormap generation code. */
     int X_ADJUST = 60;
     int Y_ADJUST = 60;
@@ -51,7 +47,6 @@ public class NodeSelect extends JApplet {
     int LISTBOX_WIDTH = 150;
 
     public void init() {
-	URL		expURL = null;
 	URL		phyURL = null;
 	String		phyurl;
 
@@ -69,23 +64,9 @@ public class NodeSelect extends JApplet {
 	    phyurl   = this.getParameter("floorurl");
 	    pixels_per_meter = Double.parseDouble(this.getParameter("ppm"));
 	    
-	    // form the URL that we use to get the virtual experiment icon
-	    expURL = new URL(this.getCodeBase(),
-			     "../top2image.php3"
-			     + "?zoom=" + ZOOM
-			     + "&detail=" + DETAIL
-			     + "&pid=" + pid
-			     + "&eid=" + eid
-			     + "&nocookieuid="
-			     + URLEncoder.encode(uid)
-			     + "&nocookieauth="
-			     + URLEncoder.encode(auth));
-
 	    // form the URL that we use to get the physical layout icon
 	    phyURL = new URL(this.getCodeBase(),
 			     phyurl
-	 		     + "&pid=" + pid
-			     + "&eid=" + eid
 			     + "&nocookieuid="
 			     + URLEncoder.encode(uid)
 			     + "&nocookieauth="
@@ -95,7 +76,7 @@ public class NodeSelect extends JApplet {
 	{
 	    th.printStackTrace();
 	}
-	init(false, expURL, phyURL);
+	init(false, phyURL);
     }
 
     public void start() {
@@ -105,7 +86,7 @@ public class NodeSelect extends JApplet {
     }
 
     // For the benefit of running from the shell for testing.
-    public void init(boolean fromshell, URL expURL, URL phyURL) {
+    public void init(boolean fromshell, URL phyURL) {
 	shelled = fromshell;
 
 	if (!shelled) {
@@ -126,7 +107,7 @@ public class NodeSelect extends JApplet {
 	/*
 	 * Now add the basic objects to the JPanel.
 	 */
-	selector = new Selector(null, phyURL);
+	selector = new Selector(phyURL);
         MyJPanel.add(selector);
 
 	/*
@@ -167,9 +148,6 @@ public class NodeSelect extends JApplet {
 	    this.y = y;
 	    this.y_meters = FORMATTER.format(y / pixels_per_meter);
 	}
-	public String toString() {
-	    return this.pname;
-	}
     }
 
     /*
@@ -191,6 +169,16 @@ public class NodeSelect extends JApplet {
 	boolean		mobile;		// A robot or a fixed node (mote).
 	boolean		allocated;	// Node is allocated or free.
 	boolean		selected;	// Node has been selected for inclusion
+
+	public String toString() {
+	    String label = this.pname;
+
+	    // This is to avoid writing my own JList cell renderer!
+	    if (this.vname != null)
+		label = label + " (" + this.vname +")";
+
+	    return label;
+	}
     }
 
     /*
@@ -199,6 +187,19 @@ public class NodeSelect extends JApplet {
      * mousehandler fires.
      */
     private class MenuHandler {
+	JMenuItem menuitem;
+	
+	public MenuHandler() {
+	}
+	
+	public MenuHandler(JMenuItem menuitem) {
+	    this.menuitem = menuitem;
+	}
+
+	public void enable(boolean which) {
+	    this.menuitem.setEnabled(which);
+	}
+	
 	public void handler(String action) {
 	    MyDialog("MenuHandler", "No handler specified!");
 	}
@@ -207,18 +208,19 @@ public class NodeSelect extends JApplet {
     /*
      * The actual object.
      */
-    private class Selector extends JPanel implements MouseListener,
-						     ActionListener {
+    private class Selector extends JPanel implements ActionListener {
 	JLabel		MessageArea;
 	// Indexed by the virtual name, points to VirtNode struct above.
 	Dictionary	VirtNodes;
+	// Indexed by the physical name, points to PhysNode struct above.
+	Dictionary	AllPhysNodes = new Hashtable();
 	// A list of the ActiveMaps.
 	Vector		PhysMaps = new Vector(10, 10);
 	// For the menu items.
 	Dictionary	MenuHandlers = new Hashtable();
 
 	// Not sure how I am going to use this yet. Zooming eventually ...
-	double		scale = 1.0;
+	double		scale = 0.5;
 
 	// The lists boxes, one for all nodes and one for selected nodes.
 	JList		AllPhysList;
@@ -226,9 +228,14 @@ public class NodeSelect extends JApplet {
 
 	// The physmap scroll pane.
 	JScrollPane	PhysMapScrollPane;
+	// The panel behind the scroll pane.
 
 	// The root menu.
 	JPopupMenu	RootPopupMenu;
+	// The node menu.
+	JPopupMenu	NodePopupMenu;
+	// For the node menu, need to know what the node was!
+	Node		PopupNode;
 
 	/*
 	 * This is a subclass of Icon, that draws the nodes in where they
@@ -250,10 +257,10 @@ public class NodeSelect extends JApplet {
 		iconHeight = icon.getIconHeight();
 	    }
 	    public int getIconHeight() {
-		return iconHeight;
+		return (int) (iconHeight * scale);
 	    }
 	    public int getIconWidth() {
-		return iconWidth;
+		return (int) (iconWidth * scale);
 	    }
 
 	    /*
@@ -272,15 +279,8 @@ public class NodeSelect extends JApplet {
 		Enumeration e = NodeList.elements();
 
 		while (e.hasMoreElements()) {
-		    Node	node = (Node)e.nextElement();
-		    String      label;
-
-		    if (node instanceof VirtNode) {
-			label = node.vname;
-		    }
-		    else {
-			label = node.pname;
-		    }
+		    Node	node  = (Node)e.nextElement();
+		    String      label = node.pname;
 
 		    /*
 		     * Draw a little circle where the node lives.
@@ -313,19 +313,21 @@ public class NodeSelect extends JApplet {
 	 * A little class that creates an active map for clicking on.
 	 */
 	private class ActiveMap extends JLabel implements MouseListener {
-	    int		width, height, xoff, yoff;
+	    int		width, height, xoff = 0, yoff = 0;
 	    boolean     isvirtmap;
 	    Dictionary  NodeList;
+	    FloorIcon   flooricon;
 	    
-	    public ActiveMap(ImageIcon icon, Dictionary nodelist,
+	    public ActiveMap(FloorIcon flooricon, Dictionary nodelist,
 			     int thiswidth, int thisheight, boolean virtmap) {
-		super(new FloorIcon(icon, nodelist));
+		super(flooricon);
+		this.flooricon = flooricon;
 		this.addMouseListener(this);
 
 		NodeList  = nodelist;
 		isvirtmap = virtmap;
-		width  = icon.getIconWidth();
-		height = icon.getIconHeight();
+		width  = flooricon.getIconWidth();
+		height = flooricon.getIconHeight();
 
 		// Set the back pointer.
 		Enumeration e = nodelist.elements();
@@ -335,22 +337,43 @@ public class NodeSelect extends JApplet {
 		    node.map = this;
 		}
 
+		if (false) {
 		if (width < thiswidth)
 		    xoff = -((thiswidth / 2) - (width / 2));
 		if (height < (thisheight / 2))
 		    yoff = ((thisheight / 2) / 2) - (height / 2);
+		}
+	    }
+
+	    public void rescale() {
+		// Pick up new scale.
+		width  = flooricon.getIconWidth();
+		height = flooricon.getIconHeight();
+
+		this.setPreferredSize(new Dimension(width, height));
+		this.revalidate();
 	    }
 	    public void mousePressed(MouseEvent e) {
 		int button   = e.getButton();
 		int modifier = e.getModifiersEx();
-		int x      = e.getX() + xoff;
-		int y      = e.getY() - yoff;
+		int x        = e.getX() + xoff;
+		int y        = e.getY() - yoff;
+		Node node    = null;
 
 		System.out.println("Clicked on " + e.getX() + "," + e.getY());
 		System.out.println("Clicked on " + x + "," + y);
 
 		if (x > 0 && y > 0 && x <= width && y <= height)
-		    FindNode(this, x, y, modifier);
+		    node = FindNode(this, (int)(x / scale), (int)(y / scale));
+		
+		if (!e.isPopupTrigger()) {
+		    if (node != null) {
+			SelectNode(node, modifier);
+			return;
+		    }
+		}
+		// Forward to outer event handler, including the node
+		selector.doPopupMenu(e, node);
 	    }
 	    public void mouseReleased(MouseEvent e) {
 	    }	
@@ -365,7 +388,7 @@ public class NodeSelect extends JApplet {
 	    }
 	}
 
-        public Selector(URL expURL, URL phyURL) {
+        public Selector(URL phyURL) {
 	    ActiveMap   activemap;
 	    Dictionary  PhysNodes;
 	    
@@ -375,8 +398,6 @@ public class NodeSelect extends JApplet {
 	     */
 	    int mapwidth  = myWidth - LISTBOX_WIDTH;
 	    int mapheight = myHeight;
-	    if (expURL != null)
-		mapheight = mapheight / 2;
 
 	    /*
 	     * Okay, need some panels so that we do not have to do 
@@ -410,10 +431,9 @@ public class NodeSelect extends JApplet {
 	    SelectList  = new JList(new DefaultListModel());
 
 	    // Set the selection listener so we know what the user picked.
-	    AllPhysList.getSelectionModel().addListSelectionListener(
-			new AllPhysListSelectionHandler());
-	    SelectList.getSelectionModel().addListSelectionListener(
-			new SelectListSelectionHandler());
+	    ListSelectionHandler mylsh = new ListSelectionHandler();
+	    AllPhysList.getSelectionModel().addListSelectionListener(mylsh);
+	    SelectList.getSelectionModel().addListSelectionListener(mylsh);
  
 	    AllPhysList.setLayoutOrientation(JList.VERTICAL);
 	    SelectList.setLayoutOrientation(JList.VERTICAL);
@@ -433,26 +453,6 @@ public class NodeSelect extends JApplet {
 
 	    // And add the lower listbox.
 	    ListPanel.add(BotlistScroller);
-
-	    /*
-	     * Get the virtnodes info, but this part is optional. 
-	     */
-	    if (expURL != null) {
-		if ((VirtNodes = GetVirtInfo()) == null) {
-		    MyDialog("GetVirtInfo",
-			     "Failed to get virtnode list from server");
-		}
-		activemap = new ActiveMap(getImageIcon(expURL), VirtNodes,
-					  mapwidth, mapheight, true);
-
-		/*
-		 * The upper scrollpane holds the virtual experiment image.
-		 */
-		JScrollPane scrollPane = new JScrollPane(activemap);
-		scrollPane.setPreferredSize(new Dimension(mapwidth,
-							  mapheight));
-		MapPanel.add(scrollPane);
-	    }
 
 	    /*
 	     * Create a message area to use for displaying messages
@@ -481,18 +481,12 @@ public class NodeSelect extends JApplet {
 			     "Failed to get physical node list from server");
 		}
 
-		/*
-		 * Add each physnode to the the listbox of phys nodes.
-		 */
-		DefaultListModel model =
-		    (DefaultListModel) AllPhysList.getModel();
-
 		Enumeration e = PhysNodes.elements();
 		while (e.hasMoreElements()) {
-		    Node pnode = (PhysNode) e.nextElement();
-		    model.addElement(pnode);
-		    // Get back its index so we know where it landed.
-		    pnode.listindex = model.indexOf(pnode);
+		    PhysNode pnode = (PhysNode) e.nextElement();
+
+		    // Add to global Dict so we can easily find it.
+		    AllPhysNodes.put(pnode.pname, pnode);
 		}
 
 		/*
@@ -503,17 +497,66 @@ public class NodeSelect extends JApplet {
 		TitleArea.setAlignmentX(Component.CENTER_ALIGNMENT);
 		ScrolledPanel.add(TitleArea);
 
-		activemap = new ActiveMap(getImageIcon(phyURL), PhysNodes,
-					  mapwidth, mapheight, false);
+		activemap = new
+		    ActiveMap(new FloorIcon(getImageIcon(phyURL), PhysNodes),
+			      PhysNodes, mapwidth, mapheight, false);
 		activemap.setAlignmentX(Component.CENTER_ALIGNMENT);
 		ScrolledPanel.add(activemap);
-
-		// So popup trigger is seen over maps too.
-		activemap.addMouseListener(this);
 
 		// Remember them all in a list.
 		PhysMaps.insertElementAt(activemap, i);
 	    }
+
+	    /*
+	     * Get the virtnodes info. 
+	     */
+	    if (pid != null && eid != null) {
+		if ((VirtNodes = GetVirtInfo()) == null) {
+		    MyDialog("GetVirtInfo",
+			     "Failed to get virtnode list from server");
+		}
+
+		/*
+		 * Go through the virtlist, and assign any fixed nodes. Fixed
+		 * nodes start out as being selected; it is up to the user to
+		 * unselect them.
+		 */
+		Enumeration e = VirtNodes.elements();
+		while (e.hasMoreElements()) {
+		    VirtNode vnode = (VirtNode) e.nextElement();
+
+		    if (vnode.fixed != null) {
+			PhysNode pnode = (PhysNode)
+			    AllPhysNodes.get(vnode.fixed);
+
+			if (pnode != null) {
+			    pnode.vname    = vnode.vname;
+			    pnode.selected = true;
+			}
+		    }
+		}
+	    }
+	    
+	    /*
+	     * Now we can assign the nodes to one of the listboxes. "fixed"
+	     * nodes start out in the selected list, as mentioned above.
+	     */
+	    Enumeration a = AllPhysNodes.elements();
+	    
+	    while (a.hasMoreElements()) {
+		DefaultListModel model;
+		PhysNode	 pnode = (PhysNode) a.nextElement();
+
+		if (pnode.selected)
+		    model = (DefaultListModel) SelectList.getModel();
+		else
+		    model = (DefaultListModel) AllPhysList.getModel();
+		
+		model.addElement(pnode);
+		// Get back its index so we know where it landed.
+		pnode.listindex = model.indexOf(pnode);
+	    }
+
 	    /*
 	     * Create a surrounding scroll pane.
 	     */
@@ -534,29 +577,69 @@ public class NodeSelect extends JApplet {
 	    RootPopupMenu.add(menuitem);
 	    RootPopupMenu.addSeparator();
 
-	    menuitem = new JMenuItem("Add Nodes");
+	    menuitem = new JMenuItem("Add selected nodes to list");
 	    menuitem.setActionCommand("AddNodes");
 	    menuitem.addActionListener(this);
-	    MenuHandlers.put("AddNodes", new AddDelNodeMenuHandler());
+	    MenuHandlers.put("AddNodes", new AddDelNodeMenuHandler(menuitem));
 	    RootPopupMenu.add(menuitem);
 
-	    menuitem = new JMenuItem("Remove Nodes");
+	    menuitem = new JMenuItem("Remove selected nodes from list");
 	    menuitem.setActionCommand("DelNodes");
 	    menuitem.addActionListener(this);
-	    MenuHandlers.put("DelNodes", new AddDelNodeMenuHandler());
+	    MenuHandlers.put("DelNodes", new AddDelNodeMenuHandler(menuitem));
 	    RootPopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Create NS File");
 	    menuitem.setActionCommand("NSFile");
 	    menuitem.addActionListener(this);
-	    MenuHandlers.put("NSFile", new NSFileMenuHandler());
+	    MenuHandlers.put("NSFile", new NSFileMenuHandler(menuitem));
 	    RootPopupMenu.add(menuitem);
-	    
+
+	    RootPopupMenu.addSeparator();
+	    if (pid != null) {
+		menuitem = new JMenuItem("Clear Virtual Node Names");
+		menuitem.setActionCommand("ClearVirt");
+		menuitem.addActionListener(this);
+		MenuHandlers.put("ClearVirt",
+				 new ClearVirtMenuHandler(menuitem));
+		RootPopupMenu.add(menuitem);
+	    }
+	    menuitem = new JMenuItem("Zoom In");
+	    menuitem.setActionCommand("ZoomIn");
+	    menuitem.addActionListener(this);
+	    MenuHandlers.put("ZoomIn", new ZoomMenuHandler(menuitem));
+	    RootPopupMenu.add(menuitem);
+
+	    menuitem = new JMenuItem("Zoom Out");
+	    menuitem.setActionCommand("ZoomOut");
+	    menuitem.addActionListener(this);
+	    MenuHandlers.put("ZoomOut", new ZoomMenuHandler(menuitem));
+	    RootPopupMenu.add(menuitem);
+
+	    RootPopupMenu.addSeparator();
 	    menuitem = new JMenuItem("Close This Menu");
 	    RootPopupMenu.add(menuitem);
 	    RootPopupMenu.setBorder(
 			BorderFactory.createLineBorder(Color.black));
-	    this.addMouseListener(this);	    
+
+	    /*
+	     * And now create the node menu.
+	     */
+	    NodePopupMenu = new JPopupMenu("Node Context Menu");
+	    menuitem = new JMenuItem("    Node Menu    ");
+	    NodePopupMenu.add(menuitem);
+	    NodePopupMenu.addSeparator();
+
+	    menuitem = new JMenuItem("Set Virtual Name");
+	    menuitem.setActionCommand("SetVname");
+	    menuitem.addActionListener(this);
+	    MenuHandlers.put("SetVname", new SetVnameMenuHandler(menuitem));
+	    NodePopupMenu.add(menuitem);
+	    
+	    menuitem = new JMenuItem("Close This Menu");
+	    NodePopupMenu.add(menuitem);
+	    NodePopupMenu.setBorder(
+			BorderFactory.createLineBorder(Color.black));
         }
 
 	/*
@@ -581,9 +664,9 @@ public class NodeSelect extends JApplet {
 	}
 
 	/*
-	 * Made a selection on the map. Figure out what it was.
+	 * Made a selection on the map. Figure out what it was and return.
 	 */
-	public void FindNode(ActiveMap Map, int x, int y, int modifier) {
+	public Node FindNode(ActiveMap Map, int x, int y) {
 	    /*
 	     * Find the node.
 	     */
@@ -599,9 +682,13 @@ public class NodeSelect extends JApplet {
 		    break;
 		}
 	    }
-	    if (curnode == null)
-		return;
+	    return curnode;
+	}
 
+	/*
+	 * Select the node, once we have found it.
+	 */
+	public void SelectNode(Node curnode, int modifier) {
 	    // Clear current selection if no modifier.
 	    if ((modifier &
 		 (InputEvent.SHIFT_DOWN_MASK|InputEvent.CTRL_DOWN_MASK))
@@ -610,30 +697,20 @@ public class NodeSelect extends JApplet {
 	    }
 	    curnode.picked = true;
 	    
-	    /*
-	     * Physical or virtual node?
-	     */
-	    if (! Map.isvirtmap) {
-		// Highlight in the appropriate listbox.
-		PhysNode pnode = (PhysNode) curnode;
+	    // Highlight in the appropriate listbox.
+	    PhysNode pnode = (PhysNode) curnode;
 		
-		if (pnode.selected) {
-		    SelectList.addSelectionInterval(pnode.listindex,
-						    pnode.listindex);
-		}
-		else {
-		    AllPhysList.addSelectionInterval(pnode.listindex,
-						     pnode.listindex);
-		}
-
-	    }
-	    // Say something in the message area at the top.
-	    if (Map.isvirtmap) {
-		SetTitle("Virtual node " + curnode.vname + " selected");
+	    if (pnode.selected) {
+		SelectList.addSelectionInterval(pnode.listindex,
+						pnode.listindex);
 	    }
 	    else {
-		SetTitle("Physical node " + curnode.pname + " selected");
+		AllPhysList.addSelectionInterval(pnode.listindex,
+						 pnode.listindex);
 	    }
+
+	    // Say something in the message area at the top.
+	    SetTitle("Physical node " + curnode.pname + " selected");
 	    repaint();
 	}
 
@@ -650,6 +727,54 @@ public class NodeSelect extends JApplet {
             map.scrollRectToVisible(new Rectangle(thisnode.x - 100,
 						  thisnode.y - 100,
 						  200, 200));
+	}
+
+	/*
+	 * Zap the scroll pane so that the x,y coords are centered.
+	 * Well, as centered as they can be!
+	 */
+	public void ZapTo(MouseEvent e) {
+	    /*
+	     * Must convert the event to proper coordinate system, since
+	     * event comes from an ActiveMap, and we want the x,y in the
+	     * space of the entire panel underlying the scrollpane, so that
+	     * we can tell the viewport to go to the right place. 
+	     */
+	    JViewport	viewport = PhysMapScrollPane.getViewport();
+	    Component	Map      = viewport.getView();
+	    
+	    e = javax.swing.SwingUtilities.convertMouseEvent(e.getComponent(),
+							     e, Map);
+
+	    int x = e.getX();
+	    int y = e.getY();
+	    System.out.println("Zapto: " + x + "," + y);
+	    
+	    /*
+	     * Form a new Point. Start with the point we want to zap to.
+	     */
+	    Point	P = new Point(x, y);
+
+	    /*
+	     * This gives us the size of view (not the underlying panel).
+	     */
+	    Dimension   D = viewport.getExtentSize();
+
+	    /*
+	     * Subtract 1/2 the width/height of the visible port.
+	     */
+	    P.translate(- (int)(D.getWidth() / 2), - (int)(D.getHeight() / 2));
+
+	    System.out.println("Zapto: " + D.getWidth() + "," + D.getHeight());
+
+	    /*
+	     * Form a rectangle that is centered around the point.
+	     * Sheesh, you would think there would be a builtin for this!
+	     */
+	    System.out.println("Zapto: " + P.getX() + "," + P.getY());
+
+	    viewport.setViewPosition(P);
+	    repaint();
 	}
 
 	/*
@@ -672,18 +797,27 @@ public class NodeSelect extends JApplet {
 	}
 
 	/*
-	 * Event listeners for the listboxes. We use one for each of the
-	 * boxes
+	 * The handler for both JLists (list boxes).
 	 */
-	class AllPhysListSelectionHandler implements ListSelectionListener {
+	class ListSelectionHandler implements ListSelectionListener {
 	    public void valueChanged(ListSelectionEvent e) { 
 		// If still adjusting, do nothing.
 		if (e.getValueIsAdjusting())
 		    return;
 
 		ListSelectionModel lsm = (ListSelectionModel) e.getSource();
-		DefaultListModel   lm  =
-		    (DefaultListModel) AllPhysList.getModel();
+		JList		   jlist;
+		
+		/*
+		 * Figure out which list box fired. 
+		 */
+		if (lsm == SelectList.getSelectionModel())
+		    jlist = SelectList;
+		else
+		    jlist = AllPhysList;
+
+		// And now we know the data model.
+		DefaultListModel   lm = (DefaultListModel) jlist.getModel();
 
 		/*
 		 * Go through each of the items, and if the item is in
@@ -692,42 +826,10 @@ public class NodeSelect extends JApplet {
 		int max = lm.getSize();
 
 		for (int idx = 0; idx < max; idx++) {
-		    Node thisnode = (Node) lm.getElementAt(idx);
+		    PhysNode thisnode = (PhysNode) lm.getElementAt(idx);
 		    
                     if (lsm.isSelectedIndex(idx)) {
-			System.out.println("AllPhysListSelectionHandler: " +
-					   "Selected index " + idx);
-
-			PickNode(thisnode);
-		    }
-		    else {
-			thisnode.picked = false;
-		    }
-		}
-		repaint();
-	    }
-	}
-	class SelectListSelectionHandler implements ListSelectionListener {
-	    public void valueChanged(ListSelectionEvent e) { 
-		// If still adjusting, do nothing.
-		if (e.getValueIsAdjusting())
-		    return;
-
-		ListSelectionModel lsm = (ListSelectionModel) e.getSource();
-		DefaultListModel   lm  =
-		    (DefaultListModel) SelectList.getModel();
-
-		/*
-		 * Go through each of the items, and if the item is in
-		 * the selection list, then mark it. Otherwise clear it.
-		 */
-		int max = lm.getSize();
-
-		for (int idx = 0; idx < max; idx++) {
-		    Node thisnode = (Node) lm.getElementAt(idx);
-		    
-                    if (lsm.isSelectedIndex(idx)) {
-			System.out.println("SelectListSelectionHandler: " +
+			System.out.println("ListSelectionHandler: " +
 					   "Selected index " + idx);
 
 			PickNode(thisnode);
@@ -741,22 +843,59 @@ public class NodeSelect extends JApplet {
 	}
 
 	/*
-	 * Mouse listener stuff.
+	 * Mouse listener upcall from the ActiveMap.
 	 */
-	public void mousePressed(MouseEvent e) {
-	    System.out.println("Clicked(B) on " + e.getX() + "," + e.getY());
-	    
-	    if (e.isPopupTrigger()) {
-		RootPopupMenu.show(selector, e.getX(), e.getY());
+	public void doPopupMenu(MouseEvent e, Node node) {
+	    MenuHandler handler;
+
+	    /*
+	     * Click to center ...
+	     */
+	    if (!e.isPopupTrigger()) {
+		ZapTo(e);
+		return;
 	    }
-	}
-	public void mouseReleased(MouseEvent e) {
-	}	
-	public void mouseEntered(MouseEvent e) {
-	}
-	public void mouseExited(MouseEvent e) {
-	}
-	public void mouseClicked(MouseEvent e) {
+
+	    /*
+	     * Must convert the event to proper coordinate system, since
+	     * event comes from an ActiveMap, and we want the x,y in the
+	     * space of the entire applet, so that when the popup is
+	     * generated, its where the mouse is, not 5 inches away!
+	     */
+	    e = javax.swing.SwingUtilities.convertMouseEvent(e.getComponent(),
+							     e,
+							     selector);
+
+	    int x = e.getX();
+	    int y = e.getY();
+	    System.out.println("doPopupMenu: " + x + "," + y);
+
+	    /*
+	     * Otherwise show the menus. 
+	     */
+	    if (node == null) {
+		// Toggle various menu options so not to confuse users.
+		handler = (MenuHandler) MenuHandlers.get("AddNodes");
+		handler.enable(! AllPhysList.isSelectionEmpty());
+
+		handler = (MenuHandler) MenuHandlers.get("DelNodes");
+		handler.enable(! SelectList.isSelectionEmpty());
+		
+		handler = (MenuHandler) MenuHandlers.get("NSFile");
+		handler.enable(SelectList.getModel().getSize() != 0);
+		
+		RootPopupMenu.show(selector, x, y);
+	    }
+	    else {
+		// So the menu handlers know what Node to mess with (later).
+		PopupNode = node;
+
+		// Toggle various menu options so not to confuse users.
+		handler = (MenuHandler) MenuHandlers.get("SetVname");
+		handler.enable(((PhysNode)node).selected);
+		
+		NodePopupMenu.show(selector, x, y);
+	    }
 	}
 
 	/*
@@ -767,13 +906,14 @@ public class NodeSelect extends JApplet {
 	    MessageArea.setText(message);
 	}
 
-
 	/*
 	 * The handler for adding and removing nodes (menu item).
 	 */
 	private class AddDelNodeMenuHandler extends MenuHandler {
+	    public AddDelNodeMenuHandler(JMenuItem menuitem) {
+		super(menuitem);
+	    }
 	    public void handler(String action) {
-	    
 		/*
 		 * move nodes between the selected list and the all nodes list.
 		 */
@@ -808,14 +948,15 @@ public class NodeSelect extends JApplet {
 
 		    if (action.compareTo("AddNodes") == 0)
 			pnode.selected  = true;
-		    else
+		    else {
 			pnode.selected  = false;
+			// clear the vname if the user decides not to use it.
+			pnode.vname     = null;
+		    }
 		}
 		ClearSelection();
 	    }
 	}
-
-	
 
 	/*
 	 * A class that constructs some NS code, then "pops" up a new
@@ -823,7 +964,11 @@ public class NodeSelect extends JApplet {
 	 * the easiest thing to do.
 	 */
 	private class NSFileMenuHandler extends MenuHandler
-	    implements ActionListener {
+	                                implements ActionListener {
+
+	    public NSFileMenuHandler(JMenuItem menuitem) {
+		super(menuitem);
+	    }
 	    /*
 	     * Use an internal frame so that I do not have to deal with
 	     * buttons and crap.
@@ -846,10 +991,14 @@ public class NodeSelect extends JApplet {
 
 		for (int idx = 0; idx < lsm.getSize(); idx++) {
 		    PhysNode pnode = (PhysNode) lsm.getElementAt(idx);
+		    String   vname = pnode.pname;
 
-		    NSText.append("set " + pnode + " [$ns node]");
+		    if (pnode.vname != null)
+			vname = pnode.vname;
+
+		    NSText.append("set " + vname + " [$ns node]");
 		    NSText.append("\n");
-		    NSText.append("tb-fix-node $" + pnode + " " + pnode);
+		    NSText.append("tb-fix-node $" + vname + " " + pnode);
 		    NSText.append("\n");
 		    NSText.append("\n");
 		}
@@ -877,6 +1026,72 @@ public class NodeSelect extends JApplet {
 	    public void actionPerformed(ActionEvent e) {
 	    }
 	}
+
+	/*
+	 * Clear any virtual node name assigments.
+	 */
+	private class ClearVirtMenuHandler extends MenuHandler {
+	    public ClearVirtMenuHandler(JMenuItem menuitem) {
+		super(menuitem);
+	    }
+	    public void handler(String action) {
+		Enumeration a = AllPhysNodes.elements();
+	    
+		while (a.hasMoreElements()) {
+		    PhysNode	 pnode = (PhysNode) a.nextElement();
+
+		    pnode.vname = null;
+		}
+		repaint();
+	    }
+	}
+
+	/*
+	 * Enter a vnode name to a popup window.
+	 */
+	private class SetVnameMenuHandler extends MenuHandler {
+	    public SetVnameMenuHandler(JMenuItem menuitem) {
+		super(menuitem);
+	    }
+	    public void handler(String action) {
+		PhysNode pnode = (PhysNode) PopupNode;
+
+		String str = (String)
+		    JOptionPane.showInputDialog(selector,
+				"Enter name for " + pnode.pname,
+				(pnode.selected ? pnode.vname : null));
+		
+		str = str.trim();
+		System.out.println("New Vname: " + str);
+		if (str.compareTo("") == 0)
+		    pnode.vname = null;
+		else
+		    pnode.vname = str;
+		repaint();
+	    }
+	}
+
+	/*
+	 * Handle Zooming
+	 */
+	private class ZoomMenuHandler extends MenuHandler {
+	    public ZoomMenuHandler(JMenuItem menuitem) {
+		super(menuitem);
+	    }
+	    public void handler(String action) {
+		if (action.compareTo("ZoomIn") == 0)
+		    scale = scale * 1.2;
+		else
+		    scale = scale * 0.8;
+
+		for (int index = 0; index < PhysMaps.size(); index++) {
+		    ActiveMap map = (ActiveMap) PhysMaps.elementAt(index);
+
+		    map.rescale();
+		}
+		repaint();
+	    }
+	}
     }
 
     /*
@@ -896,9 +1111,7 @@ public class NodeSelect extends JApplet {
 
 	    vnode.index = index++;
 	    vnode.vname = vname;
-	    vnode.fixed = null;
-	    vnode.setX(100);
-	    vnode.setY(100);
+	    vnode.fixed = "pc1";
 	    virtnodes.put(vname, vnode);
 
 	    return virtnodes;
@@ -918,8 +1131,6 @@ public class NodeSelect extends JApplet {
 
 		String vname = tokens.nextToken().trim();
 		String fixed = tokens.nextToken().trim();
-		int    vis_x = Integer.parseInt(tokens.nextToken().trim());
-		int    vis_y = Integer.parseInt(tokens.nextToken().trim());
 
 		if (fixed.length() == 0) {
 		    fixed = null;
@@ -928,36 +1139,9 @@ public class NodeSelect extends JApplet {
 		vnode.vname = vname;
 		vnode.fixed = fixed;
 		vnode.pname = fixed;
-		vnode.setX(vis_x);
-		vnode.setY(vis_y);
-
 		virtnodes.put(vname, vnode);
-
-		if (vis_x < min_x) { min_x = vis_x; }
-		if (vis_y < min_y) { min_y = vis_y; }
-		if (vis_x > max_x) { max_x = vis_x; }
-		if (vis_y > max_y) { max_y = vis_y; }
 	    }
 	    myreader.close();
-
-	    System.out.println(min_x + "," + min_y+ "," +
-			       max_x + "," + max_y + "," );
-
-	    /*
-	     * Now adjust for zoom and offset. This mirrors the calculation
-	     * done in vis/render.in. Bogus, I know. But I do not want to
-	     * change that part yet.
-	     */
-	    Enumeration e = virtnodes.elements();
-
-	    while (e.hasMoreElements()) {
-		VirtNode vnode  = (VirtNode) e.nextElement();
-
-		vnode.x = ((vnode.x - min_x) * ZOOM) + X_ADJUST;
-		vnode.y = ((vnode.y - min_y) * ZOOM) + Y_ADJUST;
-
-		System.out.println(vnode.vname + " " + vnode.x + "," + vnode.y);
-	    }
 	}
 	catch(Throwable th)
 	{
@@ -1052,12 +1236,16 @@ public class NodeSelect extends JApplet {
  	String urlstring = page
             + "?fromapplet=1"
 	    + arguments
-	    + "&pid=" + pid
-	    + "&eid=" + eid
 	    + "&nocookieuid="
 	    + URLEncoder.encode(uid)
 	    + "&nocookieauth="
 	    + URLEncoder.encode(auth);
+
+	if (pid != null && eid != null) {
+	    urlstring = urlstring
+		+ "&pid=" + pid
+		+ "&eid=" + eid;
+	}
 
 	try
 	{
@@ -1112,14 +1300,16 @@ public class NodeSelect extends JApplet {
 
     public static void main(String argv[]) {
 	int myHeight = 800;
-	int myWidth  = 1000;
+	int myWidth  = 1200;
         final NodeSelect selector = new NodeSelect();
 	try
 	{
 	    URL url = new URL("file:///tmp/robots-4.jpg");
+	    selector.pid      = "testbed";
+	    selector.eid      = "one-node";
 	    selector.myWidth  = myWidth;
 	    selector.myHeight = myHeight;
-	    selector.init(true, url, url);
+	    selector.init(true, url);
 	}
 	catch(Throwable th)
 	{
