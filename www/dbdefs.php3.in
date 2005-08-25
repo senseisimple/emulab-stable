@@ -147,6 +147,8 @@ define("TBDB_IFACEROLE_OUTER_CONTROL",  "outer_ctrl");
 # Node states that the web page cares about.
 define("TBDB_NODESTATE_ISUP",		"ISUP");
 define("TBDB_NODESTATE_PXEWAIT",	"PXEWAIT");
+define("TBDB_NODESTATE_POWEROFF",	"POWEROFF");
+define("TBDB_NODESTATE_ALWAYSUP",	"ALWAYSUP");
 
 # User Interface types
 define("TBDB_USER_INTERFACE_EMULAB",	"emulab");

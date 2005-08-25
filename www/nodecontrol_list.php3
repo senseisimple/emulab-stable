@@ -193,8 +193,10 @@ if (! strcmp($showtype, "summary")) {
 
     $alltotal  = 0;
     $allfree   = 0;
+    $allunknown = 0;
     $totals    = array();
-    $freecount = array();
+    $freecounts = array();
+    $unknowncounts = array();
 
     while ($row = mysql_fetch_array($query_result)) {
 	$type  = $row[0];
@@ -202,24 +204,33 @@ if (! strcmp($showtype, "summary")) {
 
 	$totals[$type]    = $count;
 	$freecounts[$type] = 0;
+	$unknowncounts[$type] = 0;
     }
 
     # Get free totals by type.
     $query_result =
-	DBQueryFatal("select n.type,count(*) from nodes as n ".
+	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
 		     "left join node_types as nt on n.type=nt.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
 		     "where (role='testnode') and ".
 		     "      (nt.class!='shark' and nt.class!='pcRemote' ".
 		     "      and nt.class!='pcplabphys') ".
 		     "      and r.pid is null ".
-		     "group BY n.type");
+		     "group BY n.eventstate,n.type");
 
     while ($row = mysql_fetch_array($query_result)) {
-	$type  = $row[0];
-	$count = $row[1];
-
-	$freecounts[$type] = $count;
+	$type  = $row[1];
+	$count = $row[2];
+        # XXX Yeah, I'm a doofus and can't figure out how to do this in SQL.
+	if (($row[0] == TBDB_NODESTATE_ISUP) ||
+	    ($row[0] == TBDB_NODESTATE_PXEWAIT) ||
+	    ($row[0] == TBDB_NODESTATE_ALWAYSUP) ||
+	    ($row[0] == TBDB_NODESTATE_POWEROFF)) {
+	    $freecounts[$type] += $count;
+	}
+	else {
+	    $unknowncounts[$type] += $count;
+	}
     }
 
     $projlist = TBProjList($target_uid, $TB_PROJECT_CREATEEXPT);
@@ -255,7 +266,13 @@ if (! strcmp($showtype, "summary")) {
 	    continue;
 
 	$allfree   += $freecount;
+	$allunknown += $unknowncounts[$key];
 	$alltotal  += $value;
+
+	if ($unknowncounts[$key])
+	    $ast = "*";
+	else
+	    $ast = "";
 	
 	echo "<tr>\n";
 	if ($isadmin)
@@ -263,7 +280,7 @@ if (! strcmp($showtype, "summary")) {
 	else
 	    echo "<td><a href=shownodetype.php3?node_type=$key>\n";
 	echo "           $key</a></td>
-              <td align=center>$freecount</td>
+              <td align=center>${freecount}${ast}</td>
               <td align=center>$value</td>
               </tr>\n";
     }
@@ -273,6 +290,7 @@ if (! strcmp($showtype, "summary")) {
               <td align=center>$allfree</td>
               <td align=center>$alltotal</td>
               </tr>\n";
+
     if ($isadmin) {
 	# Give admins the option to create a new type
 	echo "<tr></tr>\n";
@@ -281,6 +299,10 @@ if (! strcmp($showtype, "summary")) {
               </th>\n";
     }
     echo "</table>\n";
+    if ($allunknown > 0) {
+	    echo "<br><font size=-1><b>*</b> - Some nodes ($allunknown) are ".
+		    "free, but currently in an unallocatable state.</font>";
+    }
     PAGEFOOTER();
     exit();
 }

@@ -165,7 +165,7 @@ echo "</table>\n";
 # just a list of dots, in two color mode.
 # 
 $query_result =
-    DBQueryFatal("select n.node_id,r.pid ".
+    DBQueryFatal("select n.node_id,n.eventstate,r.pid ".
 		 "from nodes as n ".
 		 "left join node_types as nt on n.type=nt.type ".
 		 "left join reserved as r on n.node_id=r.node_id ".
@@ -184,6 +184,7 @@ if (mysql_num_rows($query_result)) {
     
     while ($row = mysql_fetch_array($query_result)) {
 	$node_id = $row["node_id"];
+	$es      = $row["eventstate"];
 	$pid     = $row["pid"];
 
 	if ($column == 0) {
@@ -194,7 +195,15 @@ if (mysql_num_rows($query_result)) {
 	echo "<td align=left><nobr>\n";
 
 	if (!$pid) {
-	    echo "<img src=\"/autostatus-icons/greenball.gif\" alt=free>\n";
+	    if (($es == TBDB_NODESTATE_ISUP) ||
+		($es == TBDB_NODESTATE_ALWAYSUP) ||
+		($es == TBDB_NODESTATE_POWEROFF) ||
+		($es == TBDB_NODESTATE_PXEWAIT)) {
+		echo "<img src=\"/autostatus-icons/greenball.gif\" alt=free>\n";
+	    }
+	    else {
+		echo "<img src=\"/autostatus-icons/yellowball.gif\" alt='unusable free'>\n";
+	    }
 	}
 	else {
 	    echo "<img src=\"/autostatus-icons/redball.gif\" alt=reserved>\n";
