@@ -1692,7 +1692,7 @@ int event_arg_get(char *args, char *key, char **value_out)
 			errno = EINVAL;
 			break;
 		}
-		else if (strncasecmp(args, key, (key_end - args)) != 0) {
+		else if ((strlen(key) != (key_end-args)) || (strncasecmp(args, key, (key_end - args)) != 0)) {
 			errno = ESRCH;
 		}
 		else if (key_end[1] == '{') {
