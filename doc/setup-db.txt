@@ -171,10 +171,10 @@ accomplished using the web interface. In 'red dot' mode, go to:
 
 	https://<yourbossnode>/editnodetype.php3?new_type=1
 
-Set the "type" to something like 'cisco6509', or 'catalyst2950'. If the
-switch is running IOS (rather than CatOS), then append '-ios' to the
-switch's type. Set the "class" to 'switch' and set "processor" to whatever
-you used for the "type" field. 
+Set the "type" to something like 'cisco6509'. If the switch is running
+IOS (rather than CatOS), then append '-ios' to the switch's type. Set
+the "class" to 'switch' and set "processor" to whatever you used for
+the "type" field.
 
 Most of the other columns are not important for switches (so you can set
 them to 0), but putting in "Max Interfaces" (if the switch is expandable)
