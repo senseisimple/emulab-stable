@@ -370,13 +370,26 @@ public:
   // NOTE: should probably use a helper function in delay_info, but right now,
   // we only care about bandwidth
   const bool is_equiv(const tb_plink& link) {
-      if (types == link.types) {
+#ifdef PCLASS_DEBUG_TONS
+      cerr << "        Comparing " << delay_info.bandwidth 
+          << " and " << link.delay_info.bandwidth << endl;
+#endif
+      if (types != link.types) {
+#ifdef PCLASS_DEBUG_TONS
+          cerr << "            No, types" << endl;
+#endif
 	  return false;
       }
       if (delay_info.bandwidth != link.delay_info.bandwidth) {
+#ifdef PCLASS_DEBUG_TONS
+          cerr << "            No, bandwidth" << endl;
+#endif
 	  return false;
       }
 
+#ifdef PCLASS_DEBUG_TONS
+          cerr << "            Yes" << endl;
+#endif
       return true;
   }
 };

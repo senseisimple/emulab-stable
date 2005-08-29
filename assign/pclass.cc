@@ -62,12 +62,18 @@ extern pclass_types type_table;
 // mapping between links that preserves bw, and destination.
 int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 {
+#ifdef PCLASS_DEBUG_MORE
+  cerr << "pclass_equiv: a=" << a->name << " b=" << b->name << endl;
+#endif
   // The unique flag is used to signify that there is some reason that assign
   // is not aware of that the node is unique, and shouldn't be put into a
   // pclass. The usual reason for doing this is for scoring purposes - ie.
   // don't prefer one just because it's the same pclass over another that, in
   // reality, is very different.
   if (a->unique || b->unique) {
+#ifdef PCLASS_DEBUG_MORE
+      cerr << "    no, unique" << endl;
+#endif
       return 0;
   }
   
@@ -78,8 +84,12 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
     tb_pnode::type_record *a_type_record = (*it).second;
     
     tb_pnode::types_map::iterator bit = b->types.find(a_type);
-    if ((bit == b->types.end()) || ! ( *(*bit).second == *a_type_record) )
+    if ((bit == b->types.end()) || ! ( *(*bit).second == *a_type_record) ) {
+#ifdef PCLASS_DEBUG_MORE
+      cerr << "    no, a has type " << a_type << endl;
+#endif
       return 0;
+    }
   }
   // We have to check in both directions, or b might have a type that a does
   // not
@@ -89,15 +99,25 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
     tb_pnode::type_record *b_type_record = (*it).second;
     
     tb_pnode::types_map::iterator bit = a->types.find(b_type);
-    if ((bit == a->types.end()) || ! ( *(*bit).second == *b_type_record) )
+    if ((bit == a->types.end()) || ! ( *(*bit).second == *b_type_record) ) {
+#ifdef PCLASS_DEBUG_MORE
+      cerr << "    no, b has type " << b_type << endl;
+#endif
       return 0;
+    }
   }
 
   // check subnode information
   if (a->subnode_of != b->subnode_of) {
+#ifdef PCLASS_DEBUG_MORE
+      cerr << "    no, parent nodes difer" << endl;
+#endif
       return 0;
   }
   if (a->has_subnode || b->has_subnode) {
+#ifdef PCLASS_DEBUG_MORE
+      cerr << "    no, subnodes nodes difer" << endl;
+#endif
       return 0;
   }
 
@@ -110,10 +130,16 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 	  // Great, we've got a feature that's in both, just make sure that
 	  // the two are equivalent (score, etc.)
 	  if (!fdit.both_equiv()) {
+#ifdef PCLASS_DEBUG_MORE
+              cerr << "    no, different weights for feature " << fdit->name() << endl;
+#endif
 	      return 0;
 	  }
       } else {
 	  // Got a feature that's in one but not the other
+#ifdef PCLASS_DEBUG_MORE
+              cerr << "    no, only one has " << fdit->name() << endl;
+#endif
 	  return 0;
       }
 
@@ -154,18 +180,32 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
       // If links are equivalent, remove this link in b from further
       // consideration, and go to the next link in a
       if ((dest_pv_a == dest_pv_b) && plink_a->is_equiv(*plink_b)) {
+#ifdef PCLASS_DEBUG_TONS
+        cerr << "    mached link " << plink_a->name << endl;
+#endif
 	b_links.erase(bit);
 	break;
       }
     }
     // If we never found a match, these nodes aren't equivalent
     if (bit == b_links.end()) {
+#ifdef PCLASS_DEBUG_MORE
+              cerr << "    no, a has unmached link " << plink_a->name << endl;
+#endif
       return 0;
     }
   }
 
   // Make sure node b has no extra links
-  if (b_links.size() != 0) return 0;
+  if (b_links.size() != 0) {
+#ifdef PCLASS_DEBUG_MORE
+              cerr << "    no, b has unmached link " << endl;
+#endif
+      return 0;
+  }
+#ifdef PCLASS_DEBUG_MORE
+              cerr << "    yes" << endl;
+#endif
   return 1;
 }
 
