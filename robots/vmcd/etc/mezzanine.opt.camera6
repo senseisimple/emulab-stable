@@ -21,28 +21,28 @@ classify.class[0].vupoly[0] = (112, 94)
 classify.class[0].vupoly[1] = (137, 178)
 classify.class[0].vupoly[2] = (68, 161)
 classify.class[0].vupoly[3] = (71, 92)
-classify.class[0].yupoly[0] = (14, 109)
-classify.class[0].yupoly[1] = (222, 130)
-classify.class[0].yupoly[2] = (235, 169)
-classify.class[0].yupoly[3] = (9, 145)
-classify.class[0].vypoly[0] = (94, 73)
-classify.class[0].vypoly[1] = (117, 72)
-classify.class[0].vypoly[2] = (123, 242)
+classify.class[0].yupoly[0] = (42, 133)
+classify.class[0].yupoly[1] = (233, 130)
+classify.class[0].yupoly[2] = (225, 167)
+classify.class[0].yupoly[3] = (47, 148)
+classify.class[0].vypoly[0] = (91, 70)
+classify.class[0].vypoly[1] = (118, 48)
+classify.class[0].vypoly[2] = (125, 239)
 classify.class[0].vypoly[3] = (65, 227)
 
 classify.class[1].name = pink
 classify.class[1].color = (255, 105, 180)
-classify.class[1].vupoly[0] = (205, 55)
+classify.class[1].vupoly[0] = (197, 37)
 classify.class[1].vupoly[1] = (198, 161)
 classify.class[1].vupoly[2] = (146, 157)
 classify.class[1].vupoly[3] = (144, 99)
-classify.class[1].yupoly[0] = (209, 132)
-classify.class[1].yupoly[1] = (143, 145)
-classify.class[1].yupoly[2] = (27, 87)
-classify.class[1].yupoly[3] = (156, 48)
+classify.class[1].yupoly[0] = (201, 116)
+classify.class[1].yupoly[1] = (108, 131)
+classify.class[1].yupoly[2] = (93, 63)
+classify.class[1].yupoly[3] = (170, 65)
 classify.class[1].vypoly[0] = (197, 190)
 classify.class[1].vypoly[1] = (212, 61)
-classify.class[1].vypoly[2] = (138, 37)
+classify.class[1].vypoly[2] = (143, 14)
 classify.class[1].vypoly[3] = (142, 230)
 
 
@@ -56,6 +56,7 @@ blobfind.max_sizey = 30
 
 # Dewarp parameters
 dewarp.cameraCenter = (295,217)
+# (?)
 dewarp.cameraCheck = (515,384)
 dewarp.ocHeight = 2.305
 dewarp.scaleFactor = (179.0,184.0)
@@ -92,7 +93,7 @@ dewarp.ipos[8] = (521, 77)
 
 
 # Object identification
-ident.object_count = 6
+ident.object_count = 10
 ident.max_disp = 0.10
 ident.max_sep = 0.15
 ident.max_missed = 1

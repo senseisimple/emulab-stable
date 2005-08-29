@@ -93,7 +93,7 @@ dewarp.ipos[8] = (458, 94)
 
 
 # Object identification
-ident.object_count = 6
+ident.object_count = 10
 ident.max_disp = 0.20
 ident.max_sep = 0.100
 ident.max_missed = 1

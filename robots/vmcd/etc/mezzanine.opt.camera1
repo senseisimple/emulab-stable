@@ -36,14 +36,14 @@ classify.class[1].vupoly[0] = (209, 37)
 classify.class[1].vupoly[1] = (189, 176)
 classify.class[1].vupoly[2] = (151, 164)
 classify.class[1].vupoly[3] = (133, 83)
-classify.class[1].yupoly[0] = (218, 115)
-classify.class[1].yupoly[1] = (92, 125)
+classify.class[1].yupoly[0] = (217, 120)
+classify.class[1].yupoly[1] = (56, 123)
 classify.class[1].yupoly[2] = (54, 77)
 classify.class[1].yupoly[3] = (201, 66)
 classify.class[1].vypoly[0] = (198, 206)
 classify.class[1].vypoly[1] = (190, 54)
-classify.class[1].vypoly[2] = (133, 4)
-classify.class[1].vypoly[3] = (163, 203)
+classify.class[1].vypoly[2] = (124, -5)
+classify.class[1].vypoly[3] = (164, 199)
 
 
 # Blob finder
@@ -93,7 +93,7 @@ dewarp.ipos[8] = (503, 52)
 
 
 # Object identification
-ident.object_count = 6
+ident.object_count = 10
 ident.max_disp = 0.10
 #ident.max_sep = 0.20
 ident.max_sep = 0.095

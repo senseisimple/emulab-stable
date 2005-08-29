@@ -100,6 +100,9 @@ static struct robot_position offsets;
 
 static double z_offset = 0.0;
 
+/* This is a fiducial offset, perpendicular to robot axis. */
+static double fiducial_offset = 0.0;
+
 static mezz_mmap_t *recorded_frames[RECORD_FRAME_COUNT];
 
 static char *recordpath = "/var/log/mezzframe";
@@ -128,6 +131,7 @@ static void usage(void)
             "  -y offset\ty offset from real world y = 0 to our local y = 0\n"
 	    "  -z offset\tz offset from\n"
 	    "  -o orientation\tcamera orientation\n"
+	    "  -H offset\tFiducial offset, perpendicular to robot axis\n"
 #if !defined(HAVE_MEZZANINE)
 	    "  -f file\tFile to read simulated positions from.\n"
 #endif
@@ -174,7 +178,19 @@ static void sigusr1(int signal)
     mezz_frame_count += 1;
 }
 
-#define ROBOT_HEIGHT 0.12f
+#define ROBOT_HEIGHT 0.16f
+
+void fiducial_offset_trans(struct robot_position *pio) {
+/*      float hyp, theta; */
+/*      struct robot_position rp; */
+
+/*      rp = *pio; */
+
+/*      mtp_polar(NULL,&rp,&hyp,&theta); */
+
+    pio->x = pio->x + fiducial_offset*cosf(pio->theta);
+    pio->y = pio->y - fiducial_offset*sinf(pio->theta);
+}
 
 void radial_trans(struct robot_position *p_inout)
 {
@@ -309,7 +325,11 @@ static int encode_packets(mezz_mmap_t *mm)
 
 	    /* ... transform them into global coordinates. */
             local2global_posit_trans(&(mup->position));
-
+	    
+	    if (fiducial_offset != 0.0f) {
+		fiducial_offset_trans(&(mup->position));
+	    }
+	    
             if (lpc == last_idx_set) {
                 /*
 		 * Mark the end of updates for this frame so that vmcd can
@@ -380,7 +400,7 @@ int main(int argc, char *argv[])
 
     xdrrec_create(&xdr, 0, 0, NULL, NULL, mem_write);
     
-    while ((c = getopt(argc, argv, "hdr:p:l:i:f:x:y:z:o:")) != -1) {
+    while ((c = getopt(argc, argv, "hdr:p:l:i:f:x:y:z:o:H:")) != -1) {
         switch (c) {
         case 'h':
             usage();
@@ -438,6 +458,13 @@ int main(int argc, char *argv[])
 	case 'o':
 	    if (sscanf(optarg, "%f", &offsets.theta) != 1) {
                 error("error: -o option is not a number: %s\n", optarg);
+                usage();
+                exit(1);
+	    }
+	    break;
+	case 'H':
+	    if (sscanf(optarg,"%lf",&fiducial_offset) != 1) {
+		error("error: -H option is not a number: %s\n", optarg);
                 usage();
                 exit(1);
 	    }
