@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -40,17 +40,30 @@ if (-e $kernel) {
     }
 
     if (system("cmp -s /kernel $kernel") != 0) {
+	my $failed = 0;
+
 	if (system("cp -f /kernel /kernel.save")) {
+	    $failed = 1;
 	    print "Could not backup /kernel! Aborting kernel change\n";
 	}
 	elsif (! unlink("/kernel")) {
-	    print "Could not unlink /kernel! Aborting kernel change\n";
+	    $failed = 1;
+	    if (-x "/usr/bin/chflags") {
+		system("/usr/bin/chflags noschg /kernel");
+		if (! unlink("/kernel")) {
+		    print "Could not unlink /kernel! Aborting kernel change\n";
+		} else {
+		    $failed = 0;
+		}
+	    }
 	}
-	elsif (system("cp -f $kernel /kernel")) {
-	    print "Could not cp $kernel to /kernel!\n";
-	}
-	else {
-	    print "Copied $kernel to /kernel.\n";
+	if ($failed == 0) {
+	    if (system("cp -f $kernel /kernel")) {
+		print "Could not cp $kernel to /kernel!\n";
+	    }
+	    else {
+		print "Copied $kernel to /kernel.\n";
+	    }
 	}
     }
 }
