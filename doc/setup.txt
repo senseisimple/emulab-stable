@@ -51,7 +51,8 @@ invest some work in adapting the software.
 control network and one for the experimental network. The experimental network
 needs to be one on which we can make VLANs with SNMP. Currently, Emulab supports
 * Cisco 6500 and 4000 series switches (though not all switches in these lines
-  have been tested)
+  have been tested).  Cisco 2950's have been partially tested and probably work.
+  Cisco 3750's probably work but have not been tested.
 * many Nortel switches (those with RAPID-CITY Nortel mibs, ie, 5510-24T 5510-48T
   5520-24T 5520-48T, and reasonably recent Accellars).
 * some Foundry switches
