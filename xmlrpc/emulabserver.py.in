@@ -228,6 +228,20 @@ def CheckNodePermission(uid, node):
     return CheckExptPermission(uid, res[0][0], res[0][1])
 
 #
+# Check if user is an admin person
+# 
+def CheckIsAdmin(uid):
+    res = DBQueryFatal("SELECT admin FROM users "
+                       "WHERE uid=%s",
+                       (uid,))
+    
+    if len(res) == 0:
+        return EmulabResponse(RESPONSE_ERROR,
+                              output="No such user: " + uid)
+
+    return res[0][0];
+
+#
 # This is a wrapper class so that you can invoke methods in dotted form.
 # For example experiment.swapexp(...).
 #
@@ -2948,27 +2962,30 @@ class node:
         if not re.match("^[-\w]*$", str(argdict["node"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed node value!")
-        
-        # XXX Refactor the trust stuff
-        res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
-                           "left join experiments as e on "
-                           "     e.pid=r.pid and e.eid=r.eid "
-                           "WHERE r.node_id=%s",
-                           (argdict["node"],))
 
-        if len(res) == 0:
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No such node: " + argdict["node"])
+        if not CheckIsAdmin(self.uid):
+            # XXX Refactor the trust stuff
+            res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
+                               "left join experiments as e on "
+                               "     e.pid=r.pid and e.eid=r.eid "
+                               "WHERE r.node_id=%s",
+                               (argdict["node"],))
 
-        trust = DBQueryFatal("SELECT trust FROM group_membership "
-                             "WHERE uid=%s and pid=%s and gid=%s",
-                             (self.uid, res[0][0], res[0][1]))
+            if len(res) == 0:
+                return EmulabResponse(RESPONSE_ERROR,
+                                      output="No permission to access node: " +
+                                      argdict["node"])
 
-        if len(trust) == 0:
-            return EmulabResponse(
-                RESPONSE_FORBIDDEN,
-                output=("You do not have permission to access: "
-                        + argdict["node"]))
+            trust = DBQueryFatal("SELECT trust FROM group_membership "
+                                 "WHERE uid=%s and pid=%s and gid=%s",
+                                 (self.uid, res[0][0], res[0][1]))
+
+            if len(trust) == 0:
+                return EmulabResponse(
+                    RESPONSE_FORBIDDEN,
+                    output=("You do not have permission to access: "
+                            + argdict["node"]))
+            pass
 
         res = DBQueryFatal("SELECT server,portnum,keylen,keydata "
                            "FROM tiplines WHERE node_id=%s",
