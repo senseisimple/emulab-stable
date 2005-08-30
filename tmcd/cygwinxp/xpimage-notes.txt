@@ -18,10 +18,40 @@ setenv en emulab.net
 alias rootpc 'sudo ssh pc\!^.$en \!:2*'
 alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 
+# In Bash,
+alias v='ls -lsF'
 
     . Start with a clean XP image, as it comes from the CD.
 
-      - Swap in experiment Windows-1-base, log in as Administrator.
+      - How to do the Windows XP installation and make a WINXP-BASE image:
+
+        . Swap in a firewalled experiment with a FBSD-STD image.
+        . Do "node_admin on" so PXE throws it into the FBSD MFS.
+        . Hook up a console, reboot and modify the boot order to boot from the Windows XP CD.
+
+        . Do the Windows installation, adding whatever drivers are needed.
+          - 6 gig is a good size for the XP NTFS partition, of which 3-4 will be user space.
+            (They can always allocate more later with Disk Manager.)
+          - You'll save some work later if you make the first admin user account named "root".
+            It asks whether to make the root files private.  I've been saying "no".
+
+        . Set the usual password for root in Control Panel / User Accounts.
+          - While you're there, click "Change the way users log on or off" and make
+            sure "Use Fast User Switching" is turned on.
+
+        . Make sure you turn on Remote Desktop logins under Control Panel / System / Remote (!)
+
+        . Go into Control Panel / Power Options, and make sure Hibernate is off.
+          This will gives you an extra gigs of disk space on C: equal to your RAM size .
+
+        . Set the workgroup name to EMULAB in Control Panel/System/Computer Name/Change...
+          No need to reboot yet if you have more to do.
+
+        . On reboot, restore the boot order so PXE goes back into the FBSD MFS, and make an image.
+          (See imagezip commands below.)  
+          Make the management MINIMAL in the image_id, rather than NORMALv2.
+
+      - Make a firewalled experiment using the WINXP-BASE image above, log in as "root".
 
          . The experiment should be behind a firewall, to avoid contamination.
 
@@ -33,23 +63,21 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
             # Allow Cygwin setup and Windows Update to work.
             $fw add-rule "allow tcp from any to any 80,443 in via vlan0 setup keep-state"
 
+         . Note that it takes a couple of minutes after booting for the RDP service to start,
+           so don't worry if you can't log in at first.
+
       - Set the Windows "w32time" NTP client to connect to the Emulab NTP host.
-
-         . Runs as a service, periodically contacts the time server.
-           ntp1 is a DNS alias for Ops.
-           Need to restart w32time before it sees the setsntp configuration. (?)
-             net time /querysntp
-             net stop w32time
-             net time /setsntp:ntp1
-             net time /querysntp
-             net start w32time
-             # May take a couple of minutes to take effect.
-             date
+        Runs as a service, periodically contacts the time server.
+          # ntp1 is a DNS alias for Ops.
+          # Do this in a Windows CMD shell, since you don't have Cygwin shells yet.
+          net time /querysntp
+          # Need to restart w32time before it sees the setsntp configuration. (?)
+          net stop w32time
+          net time /setsntp:ntp1
+          net time /querysntp
+          net start w32time
+          # May take a minute to take effect.
              
-        . Need an NTP client, or at least the semblence of one.
-            cat /etc/ntp.drift
-          echo 0.000 > /etc/ntp.drift
-
       - Disable the Messenger Service to keep annoying pop-ups away.
             cygrunsrv -VQ  Messenger
           sc config Messenger start= disabled
@@ -69,10 +97,8 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
           sc stop upnphost
           sc stop RemoteRegistry
 
-      - Set the workgroup name to EMULAB in Control Panel/System/Computer Name/Change...
-        No need to reboot yet.
-
-      - Make a "root" account in Control Panel/Administrative Tools/Computer Management/
+      - If you haven't already made a "root" account, 
+        go into Control Panel/Administrative Tools/Computer Management/
         System Tools/Local Users and Groups/Users, put it in the Administrators and Users groups.
 
         . While you're there, Right-click Start/"Explore All Users" and copy the Computer Management
@@ -83,26 +109,41 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
       - Show My Computer.  (Desktop Properties/Desktop/Customize Desktop...)
         Turn off "Run Desktop Cleanup Wizard every 60 days".
 
-      - Create C:/Temp, C:/Software/CygWin
-      - Install CygWin
-        . (Try copying /etc/setup/* from an existing image to save the selection work.)
-        . Download setup from www.cygwin.com/setup.exe to C:/Software/CygWin, OR:
+      - Create C:/Temp, C:/Software/Cygwin
+          # [Windows cmd prompt, there's no Cygwin shell yet...]
+          mkdir C:\Temp
+          mkdir C:\Software\Cygwin
+
+      - Install Cygwin
+        . (Try copying /etc/setup/* from an existing image to script the selection work.)
+           # There's no scp to copy them with, so use Windows SMB File Sharing to get it
+           # from \\fs\share\windows\cygwin-etc-setup.)
+             mkdir C:\cygwin
+           # Hm.  Still didn't come up with the added packages selected.
+           # When C:\Software\Cygwin/http... is copied, it thinks everything is already installed.
+           # Removing the /etc/setup/installed.db file seems not to help.
+           # Nothing relevant to install in HKLM/SOFTWARE/Cygnus Solutions/Cygwin, either...
+
+        . Download setup from www.cygwin.com/setup.exe to C:/Software/Cygwin.
+          Once you have a Cygwin, you can update the setup.exe by:
            # [On ops.]
            set pc=109
            scp /share/windows/cygwin-setup.exe $pc":"/tmp/setup.exe
-        . Run it.  Install dir is C:\cygwin, package dir is C:\Software\CygWin .
-            # Ensure that upgrading SSH won't hang.
+
+        . Run Cygwin setup.exe .
+            # After Cygwin in installed, ensure that upgrading SSH won't hang.
             net stop sshd
-            C:/Software/CygWin/setup.exe &
-        . Mirror is http://mirrors.xmission.com .
+            C:/Software/Cygwin/setup.exe &
+        . Install dir is C:\cygwin, package dir is C:\Software\Cygwin .
+        . Download site mirror is http://mirrors.xmission.com .
         . Click [View] to "Not Installed" (alphabetical.)  
           Click on the Skip in the "New" column to add a binary version of:
             agetty, bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
-            make, minires-devel, nano, openssh, openssl-devel, 
+            make, minires-devel, more, nano, openssh, openssl-devel, 
             patch, perl, perl-libwin32, python, rpm, rsync, 
             shutdown, tcsh, vim, wget, zip .
           Click in the "src" column for openssh, so patches can be applied.
-        . Don't "Create an icon on the Desktop", do "Add icon to Start Menu".
+        . At the end, don't "Create an icon on the Desktop", do "Add icon to Start Menu".
 
         . Add ;C:\cygwin\bin to the end of the System PATH in 
           Control Panel/System/Advanced/Environment Variables.
@@ -112,7 +153,7 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
             Check "Modify shortcut that started this window".
           - Might as well fix the Start/Programs/Accessories/Command Prompt properties, too.
           - Copy the bash shortcut to the All Users/Desktop.  
-          - Copy it to a tcsh icon as well, changing the path to c:\cygin\cygwin-tcsh.bat .
+          - Copy it to a tcsh icon as well, changing the Target to c:\cygin\cygwin-tcsh.bat .
           - Copy the tcsh icon into All Users/Start Menu/Programs/Cygwin.
           - Create c:\cygin\cygwin-tcsh.bat as a copy of c:\cygin\cygwin.bat with
               bash --login -i
@@ -120,6 +161,7 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
               tcsh -l
 
         . Set up local homedirs under /home as a symlink.  ~root is already there.
+            # Now we can use Cygwin (Bash) shell commands...
             cd /tmp
             mv /home{,.orig}
             ln -s /cygdrive/c/Documents\ and\ Settings/ /home
@@ -137,11 +179,17 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
 
         . Update the passwd file after creating new accounts.  Make root uid 0 with /home/root.
             mkpasswd -l | awk -F: 'BEGIN{ OFS=":" } \
-               { if ($1=="root") $3="0"; else sub("/home/", "/users/"); print }' > /etc/passwd.new
+               { if ($1=="root") $3="0"; \
+                 else if ($1=="sshd") $NF="/bin/false"; \
+                      else sub("/home/", "/users/"); \
+                 print }' > /etc/passwd.new
             diff /etc/passwd{,.new}
             cp -p /etc/passwd{,.prev}
             cp -p /etc/passwd{.new,}
             chown root /etc/{passwd,group}*
+
+            ### Note: the root UID changed from 1003 to 0.
+            ### Restart your Bash shell to get the new one before going on!
 
         . Set up the syslog daemon.  (See usr/share/doc/Cygwin/inetutils-1.3.2.README)
             # Make sure /etc isn't owned by SYSTEM, which will prevent making syslogd.conf .
@@ -161,14 +209,14 @@ alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
               /cygrunsrv -I sshd/s//& -i/p
               w
               q
-          - Then start a Cygwin shell, stop sshd and remove its entry, run ssh-host-config:
+          - Then stop sshd and remove its entry (if previously installed), run ssh-host-config:
             (You must be logged in as root over RDP, not ssh when you do this!)
                 cygrunsrv -VQ sshd
               cygrunsrv -E sshd
               cygrunsrv -R sshd
 
               # May need to do some unmounts before running ssh-host-config.
-              # It does a mount, and there's a hard-wired limit of 31 mount table entries.
+              # (It does a mount, and there's a hard-wired limit of 31 mount table entries.)
               mount | wc -l
                 ## mount: /ssh-host-config.3048: Too many mount entries
                 for s in /users/s*; do umount $s; done
@@ -236,8 +284,15 @@ q
             chown SYSTEM /var/empty
             chmod go-w /var/empty
 
+          - You can avoid patching and rebuilding sshd.exe if there's one saved.
+              v /usr/sbin/sshd.exe
+              v //fs/share/windows/sshd.exe
+              mv /usr/sbin/sshd.exe{,.orig}
+              cp -p //fs/share/windows/sshd.exe /usr/sbin/sshd.exe
+
           - Start sshd.
               cygrunsrv -S sshd
+              tail /var/log/messages
 
           - Set up for root ssh access from Boss.
               chown root.wheel /home/root
@@ -248,7 +303,7 @@ daFluxGroup
               mkdir ~root/.ssh
               chown root.wheel ~root/.ssh
               # [On boss.]
-              set pc=73
+              set pc=201
               set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
               # This password isn't used for anything else, and doesn't need to be
               # very secure because all users are in the Administrators group on the node.
@@ -258,29 +313,30 @@ daFluxGroup
 daFluxGroup
               eval sudo ssh "$ssh_args" root@pc$pc
 daFluxGroup
-              # [On the target.]
-              id
-              cd ~root/.ssh
-              cat {id_dsa,identity}.pub > authorized_keys
-              chmod 644 *
-              ls -ld /home /home/root /home/root/.ssh /home/root/.ssh/auth*
-              mkdir -p /sshkeys/root
-              v -d /sshkeys
-              chmod 700 /sshkeys/root
-              cp -p /home/root/.ssh/authorized_keys /sshkeys/root
-              ls -lR /sshkeys/root
+                # [On the target.]
+                id
+                cd ~root/.ssh
+                cat {id_dsa,identity}.pub > authorized_keys
+                chmod 644 *
+                ls -ld /home /home/root /home/root/.ssh /home/root/.ssh/auth*
+                mkdir -p /sshkeys/root
+                v -d /sshkeys
+                chmod 777 /sshkeys
+                chmod 700 /sshkeys/root
+                cp -p /home/root/.ssh/authorized_keys /sshkeys/root
+                ls -lR /sshkeys/root
               exit
 
-            # [Check back on Boss.]
-            eval sudo ssh "$ssh_args" pc$pc id
-            # The following will likely complain due to nonstandard host keys.
-            rootpc $pc id
+              # [Check back on Boss.]
+              eval sudo ssh "$ssh_args" pc$pc id
+              # The following will likely complain due to nonstandard host keys.
+              rootpc $pc id
 
           - Install the standard host keys, dated Jun 21  2001.
             ls -l /etc/ssh*
             # [On boss.]
-            set pc=109
-            set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
+              set pc=201
+              set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
             eval sudo scp -rp "$ssh_args" /proj/testbed/fish/elab-host-keys root@pc$pc":"
             # Get the standard ssl certificates while we're at it.
             eval sudo scp -rp "$ssh_args" /proj/testbed/fish/elab-ssl-certs root@pc$pc":"
@@ -301,6 +357,7 @@ daFluxGroup
               chown SYSTEM /etc/ssh*key*
               ls -l /etc/ssh*key*
 
+              mkdir /etc/emulab
               ls -l ~/elab-ssl-certs/* /etc/emulab/*.pem
               cp -p ~/elab-ssl-certs/* /etc/emulab
 
@@ -316,21 +373,26 @@ daFluxGroup
             # Log in as root via RDP.
             rootrd $pc
             # [On the node, as root.]
-            # Graphical installer.  Start with WinZip Classic, custon setup, no desktop icon.
+            # Graphical installer.  Start with WinZip Classic, custom setup, no desktop icon.
             /tmp/winzip90.exe
 
             cd C:
             # Don't worry about a plethora of "Cannot change ownership" warnings.
             tar xfz /tmp/emacs-21.3-fullbin-i386.tar.gz
-            # Graphical, set up the registry, start menu, etc.
+            # Graphical; click OK to set up the registry, start menu, etc.
             C:/emacs-21.3/bin/addpm.exe
             # Then copy the Emacs shortcut to the All Users/Desktop folder.
+            allusers=/cygdrive/c/Documents\ and\ Settings/All\ Users
+            chown root "$allusers"/Desktop
+            cp "$allusers"/{Start\ Menu/Programs/Gnu\ Emacs,Desktop}/Emacs.lnk
+            chown SYSTEM "$allusers"/Desktop
 
             # Make "emacs" be the NTEmacs runemacs starter, with "emacs-exe" for a compiler.
             ln -s /cygdrive/c/emacs-21.3/bin/runemacs.exe /usr/local/bin/emacs
             ln -s /cygdrive/c/emacs-21.3/bin/emacs.exe /usr/local/bin/emacs-exe
 
       - Get other stuff that "make client" depends on.
+
                 ## Collect the include files for mysql and the Boost Graph Library.
                 cd /usr/local/include
                 tar cfz /share/windows/mysql-include.tgz mysql
@@ -366,6 +428,7 @@ exit(0);
 w
 q
             ./configure >& configure.trace 
+              # Ends with "creating src/include/elvin/config.h"
               tail configure.trace
 
             # Comment out #elif defined(HAVE_WINBASE_H)
@@ -432,6 +495,7 @@ q
             rootpc $pc
               cd C:
                 ls -ld Program\ Files/elvin*
+              # Don't worry about a plethora of "Cannot change ownership" warnings.
               tar xvfz /tmp/elvin4-windows.tar.gz
               chown -R root Program\ Files/elvin4
               cp -p C:/Program\ Files/elvin4/lib/* C:/WINDOWS/system32
@@ -442,7 +506,8 @@ q
               elvind="C:/Program Files/elvin4"
               elvin="$elvind/bin/elvinsvc.exe"
                 ls -l "$elvind/bin"
-              chmod -R g-w "C:/Program Files/elvin4"
+              chmod -R g-w "$elvind"
+                ## Graphical help message.
                 "$elvin" --help &
               # Install as a service.
               "$elvin" -r
@@ -453,6 +518,7 @@ q
               # Do once to register the config file.
               "$elvin" -c `cygpath -w /usr/local/etc/elvind.conf`
                   ## Testing: start elvinsvc from the Services Manager now.
+                  net start elvinsvc.exe
               # Make elvinsvc automatic in services manager, or use these commands:
                 regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/elvinsvc.exe
               # (4 is Disabled, 3 is Manual, 2 is Automatic, 1 is only used for System services.)
@@ -514,6 +580,7 @@ q
                   -a "--norc --noprofile -c '$progagent >& /var/log/program-agent.log'"
                 regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/ProgAgent/Parameters
                 cygrunsrv -VQ ProgAgent
+                ## This won't work until you build the Emulab programs, including program-agent, below.
                 cygrunsrv -S ProgAgent
                 cygrunsrv -E ProgAgent
 
@@ -591,7 +658,8 @@ q
             # Need a resolv.conf before tmcc will work.
               cat /etc/resolv.conf
             cp -p ~/flux/testbed/tmcd/cygwinxp/resolv.conf /etc/resolv.conf
-             
+
+            # The Elvin and program-agent man pages get installed in man8.
             mkdir /usr/local/man/man8
               
             # Get the downloaded binary programs into the source tree for install.
@@ -610,7 +678,8 @@ q
               mv configure.trace{,.1}
             ../testbed/configure --enable-windows --enable-windowsclient >& configure.trace
               # Should end with "creating config.h".
-              tail -f configure.trace
+              tail configure.trace
+                tail -f configure.trace
 
             # The first make fails with "Cannot change ownership" warnings unpacking tg2.0 .
             make client-install >& make.log1
@@ -627,7 +696,8 @@ q
             $rc/rc.slothd stop
 
             make client-install >& make.log2
-              tail -f make.log2
+              tail make.log2
+                tail -f make.log2
 
                 # Only needed if there are problems...
                   v -t make.log*
@@ -640,6 +710,7 @@ q
                 make client-install >& make.log9
 
       . Patch the /etc/profile file to use /home dirs if the /users mounts are down.
+        ## Note their comment:
         # IF THIS FILE IS MODIFIED IT WILL NOT BE UPDATED BY THE CYGWIN
         # SETUP PROGRAM.  IT BECOMES YOUR RESPONSIBILITY.
         #
@@ -650,7 +721,8 @@ q
             # If the diffs are right, just copy the Emulab one.
             cp ~/flux/testbed/tmcd/cygwinxp/profile /etc
           # Otherwise, edit the file.
-          cp /etc/defaults/etc/profile /etc
+            diff /etc/defaults/etc/profile /etc/profile
+            cp /etc/defaults/etc/profile /etc
           ed /etc/profile
   /^# If the home directory doesn't exist, create it./,/^if \[ ! -d "\${HOME}" \]; then/p
 /^# If the home directory doesn't exist, create it./,/^if \[ ! -d "\${HOME}" \]; then/c
@@ -666,10 +738,14 @@ if [ ]; then
   w
   q
 
+      . Need an NTP client, or at least the semblence of one.
+            cat /etc/ntp.drift
+          echo 0.000 > /etc/ntp.drift
+
       . Set up the tbshutdown script to run as a service, to get a shutdown signal.
             editrights -u root -l
           editrights -u root -a SeServiceLogonRight -l
-          # Don't forget to set the root password to this.
+          # Don't forget to set the root password to the followint, if you haven't done it yet.
           rootpwd='daFluxGroup'
           # EmulabShutdown is started manually later on from rc.cygwinxp .
           echo "$rootpwd"
@@ -689,7 +765,7 @@ if [ ]; then
           chmod 666 /var/log/EmulabShutdown.log
           regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabShutdown/Parameters
           cygrunsrv -VQ EmulabShutdown
-            # Manual start-up.
+            # Manual start-up for testing.
             cygrunsrv -S EmulabShutdown
 
       . See if rc.bootsetup works.
@@ -698,19 +774,28 @@ if [ ]; then
           ##chmod: cannot access `/etc/emulab/iscygwin': No such file or directory
           touch /var/log/EmulabStartup.log
           chmod 666 /var/log/EmulabStartup.log
+              # May need to read .bashrc installed above if you haven't set up the path yet.
+              . ~/.bashrc
             tmcc nodeid
-              ## Missing /etc/resolv.conf .
+              ## If you have problems, you may be missing /etc/resolv.conf .
               tmcc -d nodeid
                     nodeid 
                     /usr/local/etc/emulab/tmcc.bin  -d nodeid 
                     Connection to TMCD refused. Waiting ...
             ## Should reboot, the first time, when it changes the node ID.
             $rc/rc.cygwin
+
+          # May need to make /sshkeys, if it hasn't been done above.
           v -d /sshkeys
-          mkdir /sshkeys
-          chmod 777 /sshkeys
-            $rc/rc.accounts
+            mkdir /sshkeys
+            chmod 777 /sshkeys
+
+          # Don't allow the sshd shell a shell login login in rc.accounts.
+          echo '/^sshd:/s|/bin/bash$|/bin/false|' >> /var/emulab/boot/usershells
+
+          # Try the boot-time script to see that all is well.
           $rc/rc.bootsetup
+
 
       . Set up the boot script to run as a service.
 
@@ -738,7 +823,7 @@ if [ ]; then
           Run setx after that at login time to set the HOME environment variable value.
                 # Check.
                 regtool get /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME
-          # Use the Windows command prompt rather than a script.
+          # Use a literal Windows command rather than a script.
           regtool -s set /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME \
             'cmd /C "if not %USERNAME% == root if not %USERNAME% == Administrator setx HOME //fs/%USERNAME%"'
                 # Undo.
@@ -791,11 +876,13 @@ if [ ]; then
                 --datadir=${prefix}/share \
                 --mandir=${datadir}/man \
                 --infodir=${datadir}/info
-              tail -f configure.trace
+              tail configure.trace
+                tail -f configure.trace
 
         - Just make and install sshd.exe, assuming everything else is up-to-date.
             make sshd.exe > make.log.1 2>&1
-              tail -f make.log.1
+              tail make.log.1
+                tail -f make.log.1
 
             # Make sure sshd is closed down while installing.
             ps -Welf | grep sshd
@@ -915,7 +1002,10 @@ Making images
             cd /proj/testbed/images
             df -m /proj/testbed/images
             ls -l WINXP*
+          # IDE disk.
           imagezip -o -I 2 -I 3 -I 4 /dev/ad0 /proj/testbed/images/WINXP-TMP.ndz
+          # SCSI disk.
+          imagezip -o -I 2 -I 3 -I 4 /dev/da0 /proj/testbed/images/WINXP-TMP.ndz
             ls -l WINXP*
           exit
 
@@ -948,7 +1038,7 @@ Making images
         rm /usr/testbed/images/WINXP-$img.ndz
         ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img.ndz
 
-      - Explorer/Help/About Windows says this for SP2: 
+      - Explorer/Help/About Windows (actually the 'winver' command) says this for SP2: 
                Version 5.1 (Build 2600.xpsp_sp2_gdr.050301-1519: Service Pack 2)
              vs. for SP1, partially updated to SP2:
                Version 5.1 (Build 2600.xpsp2.050301-1526: Service Pack 1)

@@ -1,5 +1,19 @@
 Log of XP images produced (most recent first.)
 
+    . WINXP-SP1-pc3000_2005-08-29 - Windows XP with SP1a, everything working, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc201, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    6432168960 input (1690672128 compressed) bytes in 276.606 seconds
+	    Image size: 888143872 bytes
+	    5.829MB/second compressed
+
+    . WINXP-BASE-pc3000 - Bare Windows XP-SP1, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc210, ping only.
+      MINIMAL, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    6432168960 input (1090788352 compressed) bytes in 193.299 seconds
+	    Image size: 625999872 bytes
+	    5.382MB/second compressed
+
     . WINXP-SP1_2005-08-22 - Windows XP with SP1a, everything working, pc850 only.
       prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc61, ping/ssh/isup (no IPOD), 
       NORMALv2, pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
@@ -18,13 +32,14 @@ Log of XP images produced (most recent first.)
 	    4293596160 input (1757856768 compressed) bytes in 549.595 seconds
 	    Image size: 855638016 bytes
 	    3.050MB/second compressed
-        . Created behind a firewall.
+        . Everything created behind control-net firewalls to avoid contamination.
 	. Patched sshd to support public-key login with Samba shares, and slothd.
 	. Emulab program-agent, syncserver and slothd idle detection all work now.
 	. NetBT (NetBios over TCP) is disabled to allow network idle detection by slothd.
         . Cygwin syslog now goes into /var/log/messages rather than Event Log.
 	. Some Windows services are shut down: Messenger, SSDP Discovery Service,
 	  Universal Plug and Play Device Host, and Remote Registry.
+	. Image creation time now put in /etc/motd.
 
     . WINXP-SP1 - Windows XP with SP1a, pc850 only.
       6/20/05, 7/5/05, 7/7/05
