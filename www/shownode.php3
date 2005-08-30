@@ -108,6 +108,9 @@ if (TBHasSerialConsole($node_id)) {
     WRITESUBMENUBUTTON("Connect to Serial Line</a> " . 
 	"<a href=\"faq.php3#tiptunnel\">(howto)",
 	"nodetipacl.php3?node_id=$node_id");
+
+    WRITESUBMENUBUTTON("Show Console Log",
+		       "showconlog.php3?node_id=$node_id");
 }
 
 #

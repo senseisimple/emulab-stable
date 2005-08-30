@@ -1,0 +1,149 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Spew a console log from the tipserver that hosts it.
+#
+sub usage()
+{
+    print(STDOUT "Usage: spewconlog node\n");
+    exit(-1);
+}
+my $optlist  = "";
+my $logdir   = "/var/log/tiplogs";
+my $logname;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $SSH		= "$TB/bin/sshtb";
+my $SAVEUID	= $UID;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Turn off line buffering on output. Very important for this script!
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+#
+# Locals
+# 
+my $logfile;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV != 1);
+my $node = $ARGV[0];
+
+# Untaint
+if ($node =~ /^([-\w]+)$/) {
+    $node = $1;
+}
+else {
+    die("*** Tainted node name: $node\n");
+}
+
+#
+# Check permission.
+#
+if (!TBAdmin($UID) &&
+    (! TBNodeAccessCheck($UID, TB_NODEACCESS_READINFO, ($node)))) {
+    die("*** $0:\n".
+	"    You not have permission to view console log for $node!\n");
+}
+
+#
+# Grab DB data. 
+#
+my $query_result =
+    DBQueryFatal("select server from tiplines where node_id='$node'");
+
+if (!$query_result->numrows) {
+    die("*** $0:\n".
+	"    No console log (tipline) available for $node!\n");
+}
+my ($tipserver) = $query_result->fetchrow_array();
+
+#
+# Form the logfile name; admin users get the .log while users get .run.
+#
+if (!TBAdmin($UID)) {
+    $logname = "$logdir/${node}.run"
+}
+else {
+    $logname = "$logdir/${node}.log"
+}
+
+#
+# Run an ssh command in a child process, protected by an alarm to
+# ensure that the ssh is not hung up forever if the machine is in
+# some funky state.
+#
+my $syspid = fork();
+
+#
+# Parent waits for ssh to complete.
+# 
+if ($syspid) {
+    local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+    alarm 20;
+    waitpid($syspid, 0);
+    my $exitstatus = $?;
+    alarm 0;
+
+    if ($exitstatus) {
+	exit(1);
+    }
+    exit(0);
+}
+
+#
+# Now we want to ssh over and cat the file.
+#
+$UID = 0;
+system("sshtb -host $tipserver cat $logname");
+$UID = $SAVEUID;
+exit(($? == 0 ? 0 : 1));
