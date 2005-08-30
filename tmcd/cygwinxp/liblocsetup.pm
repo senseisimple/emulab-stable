@@ -12,7 +12,7 @@ package liblocsetup;
 use Exporter;
 @ISA = "Exporter";
 @EXPORT =
-    qw ( $RM $CHOWN $MOUNT $UMOUNT $CP $LN $CHMOD $TOUCH $EGREP
+    qw ( $CP $LN $RM $MV $TOUCH $EGREP $CHOWN $CHMOD $MOUNT $UMOUNT
 	 $NTS $NET $HOSTSFILE
 	 $TMPASSWD $SFSSD $SFSCD $RPMCMD
 	 os_account_cleanup os_accounts_start os_accounts_end os_accounts_sync
@@ -53,12 +53,13 @@ use librc;
 $CP		= "/bin/cp";
 $LN		= "/bin/ln";
 $RM		= "/bin/rm";
+$MV		= "/bin/mv";
+$TOUCH		= "/bin/touch";
+$EGREP		= "/bin/egrep -q";
 $CHOWN		= "/bin/chown";
 $CHMOD		= "/bin/chmod";
-$TOUCH		= "/bin/touch";
 $MOUNT		= "/bin/mount";
 $UMOUNT		= "/bin/umount";
-$EGREP		= "/bin/egrep -q";
 
 # Cygwin.
 $MKPASSWD	= "/bin/mkpasswd";
@@ -198,10 +199,24 @@ sub os_accounts_sync()
     # Apply the users' shell preferences.
     $cmd   .= " | sed -f $usershellsfile"
 	if (-e $usershellsfile);
-    $cmd   .= " > /etc/passwd";
+    $cmd   .= " > /etc/passwd.new";
     ##print "$cmd\n";
     if (system("$cmd") != 0) {
-	warning("Could not generate /etc/password file: $!\n");
+	warning("Could not generate /etc/password.new file: $!\n");
+	return -1;
+    }
+
+    # Work around "/etc/passwd: Device or resource busy".
+    $cmd    = "$MV /etc/passwd /etc/passwd.prev";
+    ##print "$cmd\n";
+    if (system("$cmd") != 0) {
+	warning("Could not $cmd $!\n");
+	return -1;
+    }
+    $cmd    = "$MV /etc/passwd.new /etc/passwd";
+    ##print "$cmd\n";
+    if (system("$cmd") != 0) {
+	warning("Could not $cmd $!\n");
 	return -1;
     }
 
