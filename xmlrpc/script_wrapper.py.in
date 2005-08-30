@@ -125,6 +125,8 @@ API = {
                             "help" : "Upload code to a mote" },
     "expwait"           : { "func" : "expwait",
                             "help" : "Wait for experiment to reach a state" },
+    "tipacl"            : { "func" : "tipacl",
+                            "help" : "Get console acl" },
 };
 
 #
@@ -1696,6 +1698,57 @@ class expwait:
     pass
 
 #
+# tipacl (get console acl goo)
+#
+class tipacl:
+    def __init__(self, argv=None):
+        self.argv = argv;
+        return
+
+    def apply(self):
+        try:
+            opts, req_args = getopt.getopt(self.argv, "", [ "help" ]);
+            pass
+        except getopt.error, e:
+            print e.args[0]
+            self.usage();
+            return -1;
+        
+        params = {};
+        for opt, val in opts:
+            if opt in ("-h", "--help"):
+                self.usage()
+                return 0
+                pass
+            pass
+
+        # Do this after so --help is seen.
+        if len(req_args) != 1:
+            self.usage();
+            return -1;
+        
+        params["node"]  = req_args[0];
+
+        rval,response = do_method("node", "console", params);
+
+        if rval == 0:
+            for key in response["value"]:
+                val = response["value"][key];
+                print "%s: %s" % (key, val)
+                pass
+            pass
+        
+        return rval;
+
+    def usage(self):
+	print "tipacl node";
+	print "where:";
+	print "  node    - Node to get tipacl data for (pcXXX)";
+        wrapperoptions();
+        return
+    pass
+
+#
 # Process program arguments. There are two ways we could be invoked.
 # 1) as the wrapper, with the first required argument the name of the script.
 # 2) as the script, with the name of the script in argv[0].
@@ -1791,7 +1844,7 @@ else:
     token = sys.argv[len(wrapper_argv) + 1];
 
     if not API.has_key(token):
-        print "Unknown script command!"
+        print "Unknown script command, ", token
         usage();
         sys.exit(-1);
         pass

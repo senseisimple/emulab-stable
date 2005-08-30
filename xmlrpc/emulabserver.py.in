@@ -2994,8 +2994,7 @@ class node:
             }
 
         return EmulabResponse(RESPONSE_SUCCESS,
-                              value=result,
-                              output=str(result))
+                              value=result)
 
     def sshdescription(self, version, argdict):
         if version != self.VERSION:
