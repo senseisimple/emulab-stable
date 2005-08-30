@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -50,27 +50,6 @@ if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
     USERERROR("You are not a member of Project $pid.", 1);
 }
 
-echo "<font size=+2>".
-     "Project <b>$pid</b>".
-     "</font>\n";
-echo "<br /><br />\n";
-
-#
-# A list of project experiments.
-#
-SHOWEXPLIST("PROJ",$pid);
-
-#
-# A list of project members (from the default group).
-#
-SHOWGROUPMEMBERS($pid, $pid, 0);
-
-#
-# A list of project Groups
-#
-echo "<center>
-      <h3>Project Groups</h3>\n";
-
 SUBPAGESTART();
 SUBMENUSTART("Project Options");
 WRITESUBMENUBUTTON("Create Subgroup",
@@ -84,6 +63,24 @@ WRITESUBMENUBUTTON("Show Project History",
 WRITESUBMENUBUTTON("Free Node Summary",
 		   "nodecontrol_list.php3?showtype=summary&bypid=$pid");
 SUBMENUEND();
+SHOWPROJECT($pid, $uid);
+SUBPAGEEND();
+
+echo "<center>\n";
+echo "<table border=0 bgcolor=#000 color=#000 class=stealth>\n";
+echo "<tr valign=top><td class=stealth align=center>\n";
+
+#
+# A list of project members (from the default group).
+#
+SHOWGROUPMEMBERS($pid, $pid, 0);
+
+echo "</td><td align=center class=stealth>\n";
+
+#
+# A list of project Groups
+#
+echo "<h3>Project Groups</h3>\n";
 
 $query_result =
     DBQueryFatal("SELECT * FROM groups WHERE pid='$pid'");
@@ -106,10 +103,13 @@ while ($row = mysql_fetch_array($query_result)) {
           </tr>\n";
 }
 echo "</table>\n";
+echo "</td></table>\n";
 echo "</center>\n";
 
-SUBPAGEEND();
-SHOWPROJECT($pid, $uid);
+#
+# A list of project experiments.
+#
+SHOWEXPLIST("PROJ",$pid);
 
 if ($isadmin) {
     echo "<center>
