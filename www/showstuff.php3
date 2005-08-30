@@ -1143,7 +1143,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 	# every reserved node.
 	#
 	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS, ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS,tip.tipname, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime, ".
 		         "nl.reported,nl.entry ".
@@ -1152,6 +1152,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 		         "left join node_types as nt on nt.type=n.type ".
 		         "left join node_status as ns on ns.node_id=r.node_id ".
 		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
+			 "left join tiplines as tip on tip.node_id=r.node_id ".
 		         "inner join nodelogtemp as t on t.node_id=r.node_id ".
 		         "left join nodelog as nl on nl.node_id=r.node_id and nl.reported=t.reported ".
 
@@ -1161,7 +1162,7 @@ function SHOWNODES($pid, $eid, $sortby) {
     }
     else {
 	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS, ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS,tip.tipname, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 		         "from reserved as r ".
@@ -1169,6 +1170,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 		         "left join node_types as nt on nt.type=n.type ".
 		         "left join node_status as ns on ns.node_id=r.node_id ".
 		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
+			 "left join tiplines as tip on tip.node_id=r.node_id ".
 		         "WHERE r.eid='$eid' and r.pid='$pid' ".
 		         "ORDER BY $sortclause");
     }
@@ -1230,6 +1232,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
 	    $isvirtnode    = $row[isvirtnode];
+	    $tipname       = $row[tipname];
 	    $iswindowsnode = $row[OS]=='Windows';
 	    $idlehours = TBGetNodeIdleTime($node_id);
 	    $stale = TBGetNodeIdleStale($node_id);
@@ -1283,7 +1286,7 @@ function SHOWNODES($pid, $eid, $sortby) {
                         <img src=\"ssh.gif\" alt=s></A>
                     </td>\n";
 
-	    if ($isvirtnode) {
+	    if ($isvirtnode || !isset($tipname) || $tipname = '') {
 		echo "<td>&nbsp</td>\n";
 	    }
 	    else {
