@@ -50,6 +50,12 @@ destdircheck:
 install client-install:	basefbsd-install etc-install \
 			sup-install script-install bin-install # jail-install
 
+frisbee-mfs-install: destdircheck
+	(cd ../freebsd; $(MAKE) frisbee-mfs-install)
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
+	$(INSTALL) -m 444 $(SRCDIR)/rc.dhclient $(SYSETCDIR)/rc.conf.d/dhclient
+
 cdboot-install:	destdircheck basefbsdcdboot-install etc-install \
 			script-install bin-install
 	rm -f $(SYSETCDIR)/start_if.*

@@ -69,8 +69,8 @@ mfs-install:	destdircheck common-install etc-install \
 #   - no ismfs file since we don't run any perl scripts that need it
 #
 frisbee-mfs-install:	destdircheck
-	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.conf $(SYSETCDIR)/rc.conf
-	$(INSTALL) -m 644 $(SRCDIR)/mfs-frisbee-rc.local $(SYSETCDIR)/rc.local
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 644 $(SRCDIR)/frisbee/rc.local $(SYSETCDIR)/rc.local
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \

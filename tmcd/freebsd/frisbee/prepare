@@ -1,0 +1,133 @@
+#!/bin/sh
+#
+# Minimize the number of files downloaded via TFTP by the frisbee boot process.
+#
+# First, combine configuration files as much as possible.
+#
+# Second, create .gz versions of all files that pxeboot will ask for.
+# This prevents it from asking for the .gz, failing, and then asking
+# for the plain file and failing.
+#
+# As of 8/2005, the unchanged boot loader would ask for (after creating .gz's):
+#
+# /tftpboot/pxeboot.emu
+# /tftpboot/frisbee/boot/boot.4th.gz
+# /tftpboot/frisbee/boot/loader.rc.gz
+# /tftpboot/frisbee/boot/loader.4th.gz
+# /tftpboot/frisbee/boot/support.4th.gz
+# /tftpboot/frisbee/boot/defaults/loader.conf.gz
+# /tftpboot/frisbee/boot/device.hints.gz
+# /tftpboot/frisbee/boot/loader.conf.gz
+# /tftpboot/frisbee/boot/loader.conf.local.gz
+# /tftpboot/frisbee/boot/kernel.ko.gz
+# /tftpboot/frisbee/boot/kernel.ko.gz
+# /tftpboot/frisbee/boot/mfsroot.gz
+# /tftpboot/frisbee/boot/mfsroot.gz
+#
+# The loader code has been tweaked to eliminate the boot.4th read and
+# the stat calls on kernel and mfsroot which resulted in excess calls.
+# This script will combine defaults/loader.conf, device.hints and loader.conf
+# into a new defaults/loader.conf file.  loader.4th, support.4th and loader.rc
+# are combined into a single loader.rc file.  The combined files are also
+# stripped of all comments.  The resulting requests are now:
+#
+# /tftpboot/pxeboot.emu
+# /tftpboot/frisbee/boot/loader.rc.gz
+# /tftpboot/frisbee/boot/loader.conf.gz
+# /tftpboot/frisbee/boot/kernel.ko.gz
+# /tftpboot/frisbee/boot/mfsroot.gz
+#
+
+combinefiles() {
+    if [ ! -r loader.conf.orig -o ! -r loader.rc.orig ]; then
+        echo '*** loader.conf.orig or loader.rc.orig do not exist'
+	exit 1
+    fi
+    hdr="hdr$$"
+    tmp="tmp$$"
+    echo "#" > $hdr
+    echo "# Auto-generated from defaults/loader.conf device.hints loader.conf.orig" >> $hdr
+    echo '# DO NOT EDIT' >> $hdr
+    echo "#" >> $hdr
+    cat defaults/loader.conf device.hints loader.conf.orig > $tmp
+    ed $tmp >/dev/null << "    FOO"
+	/^loader_conf_files=/s/.*/loader_conf_files=""/
+	w
+	q
+    FOO
+    sed -i '' -e '/^#/d' $tmp
+    cat $tmp >> $hdr
+    cmp -s $hdr loader.conf || {
+	mv $hdr loader.conf
+    }
+
+    echo '\' > $hdr
+    echo '\ Auto-generated from loader.4th support.4th loader.rc.orig' >> $hdr
+    echo '\ DO NOT EDIT' >> $hdr
+    echo '\' >> $hdr
+    cat loader.rc.orig > $tmp
+    ed $tmp >/dev/null << "    FOO"
+        /^include \/boot\/loader\.4th/d
+	.r loader.4th
+	/^include \/boot\/support\.4th/d
+	.r support.4th
+	1,$s;/boot/defaults/loader.conf;/boot/loader.conf;
+	w
+	q
+    FOO
+    sed -i '' -e '/^\\/d' $tmp
+    cat $tmp >> $hdr
+    cmp -s $hdr loader.rc || {
+	mv $hdr loader.rc
+    }
+    rm -f $hdr $tmp
+}
+
+files="loader.conf loader.rc kernel mfsroot"
+
+# may not exist, and not fatal
+if [ -r acpi.ko ]; then
+    files="$files acpi.ko"
+fi
+
+# reduce the number of files needed
+combinefiles
+
+# and compress them all
+for file in ${files}; do
+	echo -n "${file}: "
+	if [ -f ${file} ]; then
+		if [ -f ${file}.gz ]; then
+			gzip -c ${file} > tmp$$
+			cmp -s tmp$$ ${file}.gz || {
+				cp tmp$$ ${file}.gz
+				echo -n "${file}.gz updated..."
+			}
+			rm -f tmp$$
+		else
+			gzip -c ${file} > ${file}.gz
+			chmod 644 ${file}.gz
+			echo -n "${file}.gz created..."
+		fi
+	else
+		echo "non-existant!"
+		exit 1
+	fi
+	echo ""
+done
+
+# hack: loader looks for kernel.ko before kernel, so make it happy
+cmp -s kernel.ko.gz kernel.gz || {
+	echo "linking kernel.gz to kernel.ko.gz"
+	rm -f kernel.ko kernel.ko.gz
+	ln kernel.gz kernel.ko.gz
+}
+
+# hack redux: if load of loader.rc fails, it looks for boot.conf, link em
+cmp -s boot.conf.gz loader.rc.gz || {
+	echo "linking boot.conf.gz to loader.rc.gz"
+	rm -f boot.conf boot.conf.gz
+	ln loader.rc.gz boot.conf.gz
+}
+
+exit 0
