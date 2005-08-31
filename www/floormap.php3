@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -439,6 +439,9 @@ echo "</td> </tr> </table>\n";
 echo "  Click on the dots below to see information about the node.\n";
 echo "  <br>\n";
 echo "  Click elsewhere on the map to set the center point for a zoomed-in view.\n";
+echo "  <br>\n";
+echo "  Check out the nifty new <a href=robotrack/selector.php3?building=MEB>";
+echo "Java Applet</a> for selecting wireless nodes\n";
 echo "  <br>\n";
 # Couldn't get JavaScript submit on checkbox to be portable to IE with map in form.
 # Just use image buttons to show and invert the checkbox state.  That works.

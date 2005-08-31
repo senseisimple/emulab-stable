@@ -30,9 +30,11 @@ public class NodeSelect extends JApplet {
     private Selector		selector;
     int				myHeight, myWidth;
     String			uid, auth, pid, eid;
-    double			pixels_per_meter = 1.0;
+    double			pixels_per_meter = 100.0;
     URL				urlServer;
     static final DecimalFormat  FORMATTER = new DecimalFormat("0.00");
+    static final int            INCH =
+	Toolkit.getDefaultToolkit().getScreenResolution();
     
     /* From the floormap generation code. */
     int X_ADJUST = 60;
@@ -43,6 +45,7 @@ public class NodeSelect extends JApplet {
     int FONT_WIDTH  = 10;
     Font OurFont    = null;
     Font BoldFont   = null;
+    Font RulerFont  = null;
 
     // The width of the list boxes.
     int LISTBOX_WIDTH = 150;
@@ -50,6 +53,10 @@ public class NodeSelect extends JApplet {
     // For zooming ...
     double scale = 1.0;
 
+    // rulers
+    int HORIZONTAL = 0;
+    int VERTICAL   = 1;
+    
     /*
      * A little class to hold info we need to get data from the server
      * about buildings, floors, nodes.
@@ -150,8 +157,9 @@ public class NodeSelect extends JApplet {
 	    myHeight = appletSize.height;
 	    myWidth  = appletSize.width;
 	}
-	OurFont  = new Font("Helvetica", Font.BOLD, 16);
-	BoldFont = new Font("Helvetica", Font.BOLD, 20);
+	OurFont   = new Font("Helvetica", Font.BOLD, 12);
+	BoldFont  = new Font("Helvetica", Font.BOLD, 20);
+	RulerFont = new Font("SansSerif", Font.PLAIN, 10);
 
 	/*
 	 * Now add my one object to the contentpane.
@@ -559,26 +567,28 @@ public class NodeSelect extends JApplet {
 		this.revalidate();
 	    }
 	    public void mousePressed(MouseEvent e) {
-		int button   = e.getButton();
-		int modifier = e.getModifiersEx();
-		int x        = e.getX() + xoff;
-		int y        = e.getY() - yoff;
-		Node node    = null;
+		int button     = e.getButton();
+		int modifier   = e.getModifiersEx();
+		int x          = e.getX() + xoff;
+		int y          = e.getY() - yoff;
+		PhysNode pnode = null;
 
 		System.out.println("Clicked on " + e.getX() + "," + e.getY());
 		System.out.println("Clicked on " + x + "," + y);
 
 		if (x > 0 && y > 0 && x <= width && y <= height)
-		    node = FindNode(this, (int)(x / scale), (int)(y / scale));
+		    pnode = (PhysNode)
+			FindNode(this, (int)(x / scale), (int)(y / scale));
 		
 		if (!e.isPopupTrigger()) {
-		    if (node != null) {
-			SelectNode(node, modifier);
+		    if (pnode != null) {
+			if (!pnode.allocated)
+			    SelectNode(pnode, modifier);
 			return;
 		    }
 		}
 		// Forward to outer event handler, including the node
-		selector.doPopupMenu(e, node);
+		selector.doPopupMenu(e, pnode);
 	    }
 	    public void mouseReleased(MouseEvent e) {
 		PhysMapPanel.mouseReleased(e);
@@ -688,7 +698,7 @@ public class NodeSelect extends JApplet {
 	    ListPanel.add(ToplistScroller);
 
 	    // add a label for the lower list box
-	    ListPanel.add(new JLabel("Selected Nodes"));
+	    ListPanel.add(new JLabel("Assigned Nodes"));
 
 	    // And add the lower listbox.
 	    ListPanel.add(BotlistScroller);
@@ -790,6 +800,9 @@ public class NodeSelect extends JApplet {
 		DefaultListModel model;
 		PhysNode	 pnode = (PhysNode) a.nextElement();
 
+		if (pnode.allocated)
+		    continue;
+
 		if (pnode.selected)
 		    model = (DefaultListModel) SelectList.getModel();
 		else
@@ -801,11 +814,33 @@ public class NodeSelect extends JApplet {
 	    }
 
 	    /*
-	     * Create a surrounding scroll pane.
+	     * We need to force the physmappanel to layout now, so we
+	     * figure out how big the ruler bars need to be. If we do not
+	     * do that, the rulers will be 0 sized, and really hard to see!
+	     */
+	    PhysMapPanel.getLayout().layoutContainer(PhysMapPanel);
+	    Dimension physmapdim =
+		PhysMapPanel.getLayout().minimumLayoutSize(PhysMapPanel);
+
+	    /*
+	     * Create a surrounding scroll pane.   
 	     */
 	    PhysMapScrollPane = new JScrollPane(PhysMapPanel);
 	    PhysMapScrollPane.setPreferredSize(new Dimension(mapwidth,
 							     mapheight));
+
+	    // Create the row and column headers (rulers, sortof).
+	    Ruler columnView = new Ruler(HORIZONTAL);
+	    Ruler rowView    = new Ruler(VERTICAL);
+
+	    // Make sure the rulers know how big they need to be.
+	    columnView.setPreferredWidth(physmapdim.width);
+	    rowView.setPreferredHeight(physmapdim.height);
+
+	    PhysMapScrollPane.setColumnHeaderView(columnView);
+	    PhysMapScrollPane.setRowHeaderView(rowView);
+
+	    // Now we can add the scrollpane.
 	    MapPanel.add(PhysMapScrollPane);
 
 	    // Add add our two inner panels to the outer panel
@@ -1487,11 +1522,23 @@ public class NodeSelect extends JApplet {
 
 		    map.rescale();
 		}
-		// Force everything to layout again before getSize().
+		// Force everything to layout again.
 		revalidate();
 		validate();
-		repaint();
 
+		// Tell rulers to recompute their size.
+		Ruler ruler =
+		    (Ruler) PhysMapScrollPane.getColumnHeader().getView();
+		ruler.reset();
+		
+		ruler =
+		    (Ruler) PhysMapScrollPane.getRowHeader().getView();
+		ruler.reset();
+
+		// Force everything to layout again.
+		revalidate();
+		validate();
+		    
 		/*
 		 * Okay scale P so that it moves (thereby keeping the
 		 * original position more or less centered). 
@@ -1541,6 +1588,118 @@ public class NodeSelect extends JApplet {
 
 		PhysMapPanel.scrollRectToVisible(LastCenter);
 		repaint();
+	    }
+	}
+
+	/*
+	 * This class and code comes from one of the examples on the Sun
+	 * Java site. 
+	 */
+	public class Ruler extends JComponent {
+	    private int SIZE       = 30;
+
+	    private int orientation;
+	    private int increment;
+	    private int units;
+
+	    public Ruler(int or) {
+		orientation = or;
+		// Tick every meter at any scale.
+		increment = (int) (pixels_per_meter * scale);
+		units = increment * 5;
+	    }
+	    public void reset () {
+		setsizes();
+		// Tick every meter at any scale.
+		increment = (int) (pixels_per_meter * scale);
+		units = increment * 5;
+	    }
+	    private void setsizes() {
+		int		width;
+		int		height;
+
+		if (orientation == HORIZONTAL) {
+		    width  = PhysMapPanel.getWidth();
+		    height = SIZE;
+		}
+		else {
+		    width  = SIZE;
+		    height = PhysMapPanel.getHeight();
+		}
+		System.out.println(orientation + ": " + width + "," + height);
+		setPreferredSize(new Dimension(width, height));
+	    }
+
+	    public int getIncrement() {
+		return increment;
+	    }
+
+	    public void setPreferredHeight(int ph) {
+		setPreferredSize(new Dimension(SIZE, ph));
+	    }
+	    
+	    public void setPreferredWidth(int pw) {
+		setPreferredSize(new Dimension(pw, SIZE));
+	    }
+	    
+	    protected void paintComponent(Graphics g) {
+		Rectangle drawHere = g.getClipBounds();
+		//System.out.println(drawHere);
+
+		// Fill clipping area with dirty brown/orange.
+		g.setColor(new Color(230, 163, 4));
+		g.fillRect(drawHere.x, drawHere.y,
+			   drawHere.width, drawHere.height);
+
+		// Do the ruler labels in a small font that's black.
+		g.setFont(RulerFont);
+		g.setColor(Color.black);
+
+		// Some vars we need.
+		int end        = 0;
+		int start      = 0;
+		int tickLength = 0;
+		String label   = null;
+
+		// Use clipping bounds to calculate first and last locations.
+		if (orientation == HORIZONTAL) {
+		    start = (drawHere.x / increment) * increment;
+		    end = (((drawHere.x + drawHere.width) / increment) + 1)
+			* increment;
+		}
+		else {
+		    start = (drawHere.y / increment) * increment;
+		    end = (((drawHere.y + drawHere.height) / increment) + 1)
+			* increment;
+		}
+
+		//System.out.println("Rulers Painting(" + orientation + "): " +
+		//		       start + "," + end);
+
+		// Draw ticks
+		for (int i = start; i < end; i += increment) {
+		    if (i != 0 && i % units == 0)  {
+			tickLength = 10;
+			label = Integer.toString(i/increment);
+		    }
+		    else {
+			tickLength = 7;
+			label = null;
+		    }
+		    
+		    if (tickLength != 0) {
+			if (orientation == HORIZONTAL) {
+			    g.drawLine(i, SIZE-1, i, SIZE-tickLength-1);
+			    if (label != null)
+				g.drawString(label, i-4, 15);
+			}
+			else {
+			    g.drawLine(SIZE-1, i, SIZE-tickLength-1, i);
+			    if (label != null)
+				g.drawString(label, 2, i+5);
+			}
+		    }
+		}
 	    }
 	}
     }

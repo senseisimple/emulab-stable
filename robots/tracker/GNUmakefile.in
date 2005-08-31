@@ -14,8 +14,7 @@ include $(OBJDIR)/Makeconf
 ifeq ($(JAVAC),)
 JARS =
 else
-JARS = $(TESTBED_SRCDIR)/www/robotrack/tracker.jar \
-	$(TESTBED_SRCDIR)/www/robotrack/selector.jar
+JARS = $(TESTBED_SRCDIR)/www/robotrack/tracker.jar
 endif
 
 all:

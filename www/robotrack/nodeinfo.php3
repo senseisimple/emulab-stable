@@ -72,8 +72,18 @@ while ($row = mysql_fetch_array($query_result)) {
     $or     = $row["orientation"];
     $mobile = ($class == "robot" ? 1 : 0);
     # In meters.
-    $size   = ($class == "robot" ? 0.27 : 0.07);
-    $radius = ($class == "robot" ? 0.18 : 0.04);
+    if ($class == "robot") {
+	$size   = 0.27;
+	$radius = 0.18;
+    }
+    elseif ($class == "pc" || $class == "pcwireless") {
+	$size   = 1.0;
+	$radius = 0.5;
+    }
+    else {
+	$size   = 0.07;
+	$radius = 0.04;
+    }
     $alloc  = (isset($pid) ? 1 : 0);
 
     if (!isset($vname))

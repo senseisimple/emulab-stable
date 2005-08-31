@@ -68,18 +68,22 @@ register_shutdown_function("SPEWCLEANUP");
 
 # Get the virtual node info
 $query_result =
-    DBQueryFatal("select vname,fixed from virt_nodes ".
-		 "where pid='$pid' and eid='$eid' ".
-		 "order by vname");
+    DBQueryFatal("select v.vname,fixed,vis.x,vis.y from virt_nodes as v ".
+		 "left join vis_nodes as vis on ".
+		 "     vis.pid=v.pid and vis.eid=v.eid and vis.vname=v.vname ".
+		 "where v.pid='$pid' and v.eid='$eid' ".
+		 "order by v.vname");
 
 while ($row = mysql_fetch_array($query_result)) {
     $vname  = $row["vname"];
     $fixed  = $row["fixed"];
+    $x      = (int) $row["x"];
+    $y      = (int) $row["y"];
 
     if (!isset($fixed))
 	$fixed = "";
 							      
-    echo "$vname, $fixed\n";
+    echo "$vname, $fixed, $x, $y\n";
 }
 
 ?>

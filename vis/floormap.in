@@ -334,13 +334,13 @@ elsif (@ARGV == 1) {
 my $path_col = ($scale_arg == 0 ? "thumb_path" : "image_path");
 my $db_scale = max($scale_arg, 1);
 # Nozoom signals a call by robotmap.  Don't use robots "building" otherwise.
-my $robo_bldg = "b.building ". ($nozoom ? "" : "not "). "like '%ROBOTS%'";
+my $robo_bldg = ($nozoom ? "" : "b.building not like '%ROBOTS%' and ");
 my $query_result =
     DBQueryFatal("select b.building,b.title,f.floor,f.$path_col,".
 		 "f.pixels_per_meter ".
 		 "   from buildings as b ".
 		 "left join floorimages as f on f.building=b.building ".
-		 "where $robo_bldg and f.scale=$db_scale");
+		 "where $robo_bldg f.scale=$db_scale");
 
 if (!$query_result->numrows) {
     die("*** $0:\n".

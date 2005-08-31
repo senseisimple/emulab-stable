@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -126,13 +126,13 @@ if (!(defined $min_x)) {
     
     # adjust each node's position so topleftmost node is at (60,60) * $zoom.
     foreach $i (keys %nodes) {
-	$nodes{$i}{"x"} = ($nodes{$i}{"x"} - $min_x + 60) * $zoom;
-	$nodes{$i}{"y"} = ($nodes{$i}{"y"} - $min_y + 60) * $zoom;
+	$nodes{$i}{"x"} = (($nodes{$i}{"x"} - $min_x) * $zoom) + 60;
+	$nodes{$i}{"y"} = (($nodes{$i}{"y"} - $min_y) * $zoom) + 60;
     }
     
     # adjust max x,y appropriately.
-    $max_x = ($max_x - $min_x + 120) * $zoom;
-    $max_y = ($max_y - $min_y + 120) * $zoom;
+    $max_x = (($max_x - $min_x) * $zoom) + 120;
+    $max_y = (($max_y - $min_y) * $zoom) + 120;
 }
 
 # get vlan list.
