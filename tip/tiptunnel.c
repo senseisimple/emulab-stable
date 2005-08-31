@@ -136,6 +136,7 @@ static void sigquit(int sig)
 int main( int argc, char ** argv )
 {
   const char * name = argv[0];
+  char * aclfile = (char *) NULL;
   int op;
 
 #if defined(LOCALBYDEFAULT) || defined(TIPPTY)
@@ -145,10 +146,13 @@ int main( int argc, char ** argv )
 #endif
 #endif
 
-  while ((op = getopt( argc, argv, "hlp:rdu:c:" )) != -1) {
+  while ((op = getopt( argc, argv, "hlp:rdu:c:a:" )) != -1) {
     switch (op) {
       case 'h':
         usage(name);
+        break;
+      case 'a':
+	aclfile = optarg;
         break;
       case 'l':
 	localmode++;
@@ -189,9 +193,13 @@ int main( int argc, char ** argv )
   }
 
   if (localmode) {
-    char localAclName[1024];
-    sprintf( localAclName, "%s/%s.acl", ACLDIR, argv[0] );
-    loadAcl( localAclName );
+    if (aclfile)
+      loadAcl( aclfile );
+    else {
+      char localAclName[1024];
+      sprintf( localAclName, "%s/%s.acl", ACLDIR, argv[0] );
+      loadAcl( localAclName );
+    }
   } else {
     loadAcl( argv[0] );
   }
@@ -400,15 +408,15 @@ void loadAcl( const char * filename )
   bzero( &key, sizeof( key ) );
 
   while (fscanf(aclFile, "%s %s\n", &b1, &b2) != EOF) {
-    if ( strcmp(b1, "host:") == 0 ) {
+    if ( strcmp(b1, "host:") == 0 || strcmp(b1, "server:") == 0 ) {
       if (!uploadmode)
 	hostname = strdup( b2 );
-    } else if ( strcmp(b1, "port:") == 0 ) {
+    } else if ( strcmp(b1, "port:") == 0 || strcmp(b1, "portnum:") == 0 ) {
       if (!uploadmode)
 	port = atoi( b2 );
     } else if ( strcmp(b1, "keylen:") == 0 ) {
       key.keylen = atoi( b2 );
-    } else if ( strcmp(b1, "key:") == 0 ) {
+    } else if ( strcmp(b1, "key:") == 0 || strcmp(b1, "keydata:") == 0) {
       strcpy( key.key, b2 );
 #ifdef WITHSSL
     } else if ( strcmp(b1, "uphost:") == 0 ) {
@@ -423,11 +431,15 @@ void loadAcl( const char * filename )
       usingSSL++;
 #endif /* WITHSSL */
     } else {
-      fprintf(stderr, "Ignored unknown ACL: %s %s\n", b1, b2);
+      /* fprintf(stderr, "Ignored unknown ACL: %s %s\n", b1, b2); */
     }
   }
+  fclose(aclFile);
 
-  if (!port || !hostname || !key.keylen || !strlen(key.key)) {
+  if (!key.keylen)
+    key.keylen = strlen(key.key);
+
+  if (!port || !hostname || !strlen(key.key)) {
     fprintf(stderr, "Incomplete ACL\n");
     exit(-1);
   }

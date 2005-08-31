@@ -5,7 +5,7 @@ SUBDIR		= tip
 
 include $(OBJDIR)/Makeconf
 
-all:	tip tiptunnel console tippty
+all:	tip tiptunnel console.bin console tippty
 client: tippty
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -49,11 +49,11 @@ tiptunnel: tiptunnel.o
 
 # 'console' is tiptunnel, without SSL, and with localmode on by default.
 
-console.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
-	$(CC) -DLOCALBYDEFAULT -o console.o -c $<
+console.bin.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
+	$(CC) -DLOCALBYDEFAULT -o console.bin.o -c $<
 
-console: console.o
-	$(CC) -o console console.o
+console.bin: console.bin.o
+	$(CC) -o console.bin console.bin.o
 
 tippty.o: tiptunnel.c $(TESTBED_SRCDIR)/capture/capdecls.h
 	$(CC) -DTIPPTY -o $@ -c $<
@@ -66,13 +66,14 @@ $(OBJS): tipconf.h tip.h
 client-install: client
 	$(INSTALL_PROGRAM) tippty$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/tippty$(EXE)
 
-control-install tipserv-install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console
+control-install tipserv-install:	all $(INSTALL_BINDIR)/tip $(INSTALL_BINDIR)/tiptunnel $(INSTALL_BINDIR)/console.bin $(INSTALL_BINDIR)/console
 
 install:	control-install
 	-mkdir -p $(INSTALL_DIR)/opsdir/bin
 	$(INSTALL_PROGRAM) tiptunnel $(INSTALL_DIR)/opsdir/bin/tiptunnel
 	$(INSTALL_PROGRAM) tip $(INSTALL_DIR)/opsdir/bin/tip
 	$(INSTALL_PROGRAM) console $(INSTALL_DIR)/opsdir/bin/console
+	$(INSTALL_PROGRAM) console.bin $(INSTALL_DIR)/opsdir/bin/console.bin
 
 clean:
-	rm -f $(OBJS) tiptunnel.o console.o tip tiptunnel console tippty.o tippty
+	rm -f $(OBJS) *.o tip tiptunnel console console.bin tippty

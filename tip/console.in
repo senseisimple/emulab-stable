@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+#
+# Wrapper for console program; grab tipacl from XMLRPC server, and feed it
+# to the console binary.
+#
+sub usage()
+{
+    print(STDOUT "Usage: console pcXXX\n");
+    exit(-1);
+}
+my $optlist  = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $WRAPPER     = "$TB/bin/script_wrapper.py";
+my $CONSOLEBIN  = "$TB/bin/console.bin";
+my $aclfile;
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output. Very important for this script!
+#
+$| = 1; 
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+usage()
+    if (@ARGV != 1);
+my $node = $ARGV[0];
+
+#
+# Make a temp file for the acl.
+#
+$ENV{'TMPDIR'} = "/tmp";
+
+my $tempfile = `mktemp -t tipacl`;
+if ($?) {
+    die("*** $0:\n".
+	"    Could not create a temporary file!\n");
+}
+if ($tempfile =~ /^([-\w\/\.]*)$/) {
+    $tempfile = $1;
+}
+else {
+    die("*** $0:\n".
+	"    Bad data in tag: $tempfile\n");
+}
+
+#
+# Ask the XMLRPC server for the tipacl. The current user has to have proper
+# permission of course.
+#
+system("$WRAPPER tipacl $node >> $tempfile");
+
+#
+# Do not want to leave the acl file around, and do not want to wait for
+# the user to quit the program, so fork a child to wait a moment and remove
+# the file. We have the child do it so as to avoid messing with the session
+# and tty goo.
+#
+my $syspid = fork();
+
+# Child delays a moment and exits. 
+if (!$syspid) {
+    sleep(1);
+    unlink($tempfile);
+    exit(0);
+}
+my @cmdargs = ($CONSOLEBIN, "-a", "$tempfile", "$node");
+exec(@cmdargs);
+die("*** $0:\n".
+    "    Exec failure: '@cmdargs'\n");

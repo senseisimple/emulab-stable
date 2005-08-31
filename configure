@@ -2283,7 +2283,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
 	tbsetup/panic tbsetup/webpanic \
         tbsetup/tbrsync \
-	tip/GNUmakefile \
+	tip/GNUmakefile tip/console \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
 	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
 	tmcd/freebsd/GNUmakefile \
@@ -2305,6 +2305,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/grabwebcams utils/loghole utils/webcopy \
 	utils/setdest utils/websetdest utils/grabswitchconfig \
         utils/backupswitches utils/setbuildinfo utils/checkquota \
+	utils/spewconlog utils/webspewconlog \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
 	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
