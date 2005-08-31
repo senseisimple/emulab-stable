@@ -1203,7 +1203,8 @@ function SHOWNODES($pid, $eid, $sortby) {
 		    <th>Last Log Message</th>\n";
 	}
         echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
-                <th><a href=\"faq.php3#tiptunnel\">Console</a></th>";
+                <th><a href=\"faq.php3#tiptunnel\">Console</a></th> .
+                <th>Log</th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
 	$windows_query_result = DBQueryFatal("SELECT r.pid,r.eid,n.node_id,oi.OS ".
@@ -1293,6 +1294,12 @@ function SHOWNODES($pid, $eid, $sortby) {
 		echo "  <td align=center>
                             <A href='nodetipacl.php3?node_id=$node_id'>
                             <img src=\"console.gif\" alt=c></A>
+                        </td>\n";
+
+		echo "  <td align=center>
+                            <A href='showconlog.php3?node_id=$node_id".
+		                  "&linecount=200'>
+                            <img src=\"/icons/f.gif\" alt='console log'></A>
                         </td>\n";
 	    }
 

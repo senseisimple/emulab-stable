@@ -12,12 +12,14 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print(STDOUT "Usage: spewconlog node\n");
+    print(STDOUT "Usage: spewconlog [-l linecount] node\n");
     exit(-1);
 }
-my $optlist  = "";
-my $logdir   = "/var/log/tiplogs";
+my $optlist   = "l:";
+my $linecount = 0;
+my $logdir    = "/var/log/tiplogs";
 my $logname;
+my $cmd;
 
 #
 # Configure variables
@@ -74,6 +76,18 @@ my $logfile;
 if (! getopts($optlist, \%options)) {
     usage();
 }
+if (defined($options{"l"})) {
+    $linecount = $options{"l"};
+
+    # Untaint of course.
+    if ($linecount =~ /^([\d]+)$/) {
+	$linecount = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in linecount: $linecount\n");
+    }
+}
 usage()
     if (@ARGV != 1);
 my $node = $ARGV[0];
@@ -117,6 +131,13 @@ else {
     $logname = "$logdir/${node}.log"
 }
 
+if ($linecount) {
+    $cmd = "tail -". $linecount
+}
+else {
+    $cmd = "cat";
+}
+
 #
 # Run an ssh command in a child process, protected by an alarm to
 # ensure that the ssh is not hung up forever if the machine is in
@@ -144,6 +165,6 @@ if ($syspid) {
 # Now we want to ssh over and cat the file.
 #
 $UID = 0;
-system("sshtb -host $tipserver cat $logname");
+system("sshtb -host $tipserver $cmd $logname");
 $UID = $SAVEUID;
 exit(($? == 0 ? 0 : 1));

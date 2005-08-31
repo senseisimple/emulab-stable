@@ -41,6 +41,19 @@ else {
 }
 
 #
+# Look for linecount argument
+#
+if (isset($linecount) && $linecount != "") {
+    if (! TBvalid_integer($linecount)) {
+	PAGEARGERROR("Illegal characters in linecount!");
+    }
+    $optarg = "-l $linecount";
+}
+else {
+    $optarg = "";
+}
+
+#
 # A cleanup function to keep the child from becoming a zombie.
 #
 $fp = 0;
@@ -56,7 +69,7 @@ function SPEWCLEANUP()
 }
 register_shutdown_function("SPEWCLEANUP");
 
-$fp = popen("$TBSUEXEC_PATH $uid nobody webspewconlog $node_id", "r");
+$fp = popen("$TBSUEXEC_PATH $uid nobody webspewconlog $optarg $node_id", "r");
 if (! $fp) {
     USERERROR("Spew console log failed!", 1);
 }
