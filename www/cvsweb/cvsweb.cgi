@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.3 2005-07-07 21:36:00 stoller Exp $
+# $Id: cvsweb.cgi,v 1.4 2005-09-01 18:11:43 stoller Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -95,6 +95,7 @@ use vars qw (
     $allow_tar @tar_options @gzip_options @zip_options @cvs_options
     @annotate_options $LOG_FILESEPARATOR $LOG_REVSEPARATOR
     $tmpdir $HTML_DOCTYPE $HTML_META
+    $long_tag $license
 );
 
 sub printDiffSelect($);
@@ -187,7 +188,7 @@ $cvstreedefault = $body_tag = $body_tag_for_src = $logo = $defaulttitle =
     $extern_window_width = $extern_window_height = $edit_option_form   =
     $show_subdir_lastmod = $show_log_in_markup = $v = $navigationHeaderColor =
     $tableBorderColor = $markupLogColor = $tabstop = $use_moddate = $moddate =
-    $gzip_open = $HTML_DOCTYPE = $HTML_META = undef;
+    $gzip_open = $HTML_DOCTYPE = $HTML_META = $long_tag = $license = undef;
 $tmpdir = defined($ENV{TMPDIR}) ? $ENV{TMPDIR} : "/var/tmp";
 
 $LOG_FILESEPARATOR = q/^={77}$/;
@@ -358,6 +359,7 @@ if (defined($input{"content-type"})) {
 }
 
 if (@ARGV && $ARGV[0] eq "-repo") {
+    $license = undef;
     @CVSrepositories = (
 	'top'   => [$ARGV[1], $ARGV[1]],
     );
@@ -624,7 +626,7 @@ if ($input{tarball}) {
 # View a directory
 ###############################
 if (-d $fullname) {
-	my $dh = do { local (*DH); };
+    	my $dh = do { local (*DH); };
 	opendir($dh, $fullname) or fatal("404 Not Found",
 					 '%s: %s',
 					 $where, $!);
@@ -639,8 +641,10 @@ if (-d $fullname) {
 		$long_intro =~ s/!!CVSROOTdescr!!/$CVSROOTdescr{$cvstree}/g;
 		print $long_intro;
 	} else {
-		html_header($where);
+    		html_header($where);
 		print $short_instruction;
+                print $license
+                   if (defined($license));
 	}
 
 	if ($use_descriptions && open(DESC, "<$cvsroot/CVSROOT/descriptions"))
@@ -658,7 +662,7 @@ if (-d $fullname) {
 	# give direct access to dirs
 	if ($where eq '/') {
 		chooseMirror ();
-		chooseCVSRoot ();
+		#chooseCVSRoot ();
 	} else {
 		print "<p>Current directory: <b>", &clickablePath($where, 0),
 		    "</b></p>\n";
@@ -1101,6 +1105,10 @@ if (-d $fullname) {
 		print "<tr>\n<td align=\"center\" colspan=\"2\">";
 		print "<input type=\"submit\" value=\"Change Options\" accesskey=\"C\">";
 		print "</td>\n</tr>\n</table>\n</center>\n</form>\n";
+	}
+	if ($where eq '/') {
+		$long_tag =~ s/!!CVSROOTdescr!!/$CVSROOTdescr{$cvstree}/g;
+		print $long_tag;
 	}
 	html_footer();
 }
