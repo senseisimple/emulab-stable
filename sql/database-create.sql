@@ -1528,6 +1528,7 @@ CREATE TABLE projects (
   pcremote_ok set('pcplabphys','pcron','pcwa') default NULL,
   default_user_interface enum('emulab','plab') NOT NULL default 'emulab',
   linked_to_us tinyint(4) NOT NULL default '0',
+  cvsrepo_public tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (pid),
   KEY unix_gid (unix_gid),
   KEY approved (approved),
