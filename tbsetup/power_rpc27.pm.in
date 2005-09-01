@@ -32,6 +32,9 @@ use POSIX qw(strftime);
 # Turn off line buffering on output
 $| = 1;
 
+# Number of times to try sending command in the face of "Input error"
+my $ntries = 3;
+
 # Set for more output.
 my $debug = 0;
 
@@ -62,11 +65,13 @@ sub rpc27status {
     }
 
     #
-    # Send the command.  Try again one time if there is a retryable error.
+    # Send the command.  Try again a few times if there is a retryable error.
     #
-    my $status = syncandsend($controller, $TIP, "status", $statusp);
-    if ($status == -1) {
+    my $status;
+    for my $try (1..$ntries) {
 	$status = syncandsend($controller, $TIP, "status", $statusp);
+	last
+	    if $status >= 0;
     }
     close($TIP);
     return $status ? 1 : 0;
@@ -124,9 +129,11 @@ sub rpc27ctrl {
 
     foreach my $outlet (@outlet_strings) {
 	my $command = "$RPC27_CMD{$cmd} $outlet";
-	my $status = syncandsend($controller,$TIP,$command,undef);
-	if ($status == -1) {
-	    $status = syncandsend($controller,$TIP,$command,undef);
+	my $status;
+	for my $try (1..$ntries) {
+	    $status = syncandsend($controller, $TIP, $command, undef);
+	    last
+		if $status >= 0;
 	}
 	if ($status) {
 	    close($TIP);
@@ -188,7 +195,7 @@ sub syncandsend($$$) {
     }
     if (! $insync) {
 	print STDERR "*** Could not sync with power controller! ".
-	    "($controller/$outlet)\n";
+	    "($controller)\n";
 	return 1;
     }
 
@@ -213,23 +220,31 @@ sub syncandsend($$$) {
     	return 1;
     }
 
-    # If status is desired, slurp and parse everything up to the next prompt
-    if ($statusp) {
-	my %status = ();
-
-	print "Getting status\n"
+    #
+    # Read and parse all the output until the next prompt to ensure that
+    # there was no read error.  We also collect status here if desired.
+    #
+    my %status = ();
+    my $gotcmd = 0;
+    print "Reading output following command\n"
+	if ($debug);
+    while (my $line = rpc_readline($TIP)) {
+	print "Read: $line"
 	    if ($debug);
-	while (my $line = rpc_readline($TIP)) {
-	    print "Read: $line"
-		if ($debug);
-	    # skip echoed prompt+command
-	    if ($line =~ /status/) {
-		next;
-	    }
-	    # XXX cannot look for final prompt because there is no newline
-	    if ($line =~ /$RPC27_HELPMSG/) {
-		last;
-	    }
+	# skip echoed prompt+command
+	if ($line =~ /$cmd/) {
+	    $gotcmd = 1;
+	    next;
+	}
+	# didn't recognize our command for some reason, return failure
+	if ($line =~ /Input error/) {
+	    return -1;
+	}
+	# got the following prompt, all done
+	if ($gotcmd && $line =~ $RPC27_PROMPT) {
+	    last;
+	}
+	if ($statusp) {
 	    if ($line =~ /Temperature:\s+(\d+\.\d+) C/) {
 		$status{tempC} = $1;
 	    } elsif ($line =~ /Average Power:\s+(\d+) Watts/) {
@@ -244,14 +259,11 @@ sub syncandsend($$$) {
 		    $status{$outlet} = $ohash{$o};
 		}
 	    }
-	    # didn't recognize our command for some reason
-	    elsif ($line =~ /Input error/) {
-		return -1;
-	    }
 	}
+    }
+
+    if ($statusp) {
 	%$statusp = %status;
-	print "Returning status\n"
-	    if ($debug);
     }
     return 0;
 }
