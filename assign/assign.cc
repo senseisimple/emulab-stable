@@ -859,11 +859,10 @@ int main(int argc,char **argv)
 #endif
 
   if ((!compare_scores(get_score(),absbest)) || (violated > absbestviolated)) {
-    cout << "Internal error: Invalid migration assumptions." << endl;
+    cout << "WARNING: Internal scoring inconsistency." << endl;
     cout << "score:" << get_score() << " absbest:" << absbest <<
       " violated:" << violated << " absbestviolated:" <<
       absbestviolated << endl;
-    cout << "  Contact calfeld" << endl;
   }
   
   cout << "   BEST SCORE:  " << get_score() << " in " << iters <<
