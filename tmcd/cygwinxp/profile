@@ -1,4 +1,4 @@
-# base-files version 3.4-2
+# base-files version 3.6-1
 
 # WARNING
 #
@@ -31,10 +31,10 @@
 PATH=/usr/local/bin:/usr/bin:/bin:/usr/X11R6/bin:$PATH
 export PATH
 
-MANPATH=/usr/local/man:/usr/man:/usr/share/man:/usr/autotool/devel/man:$MANPATH
+MANPATH=/usr/local/man:/usr/share/man:/usr/man:$MANPATH
 export MANPATH
 
-INFOPATH=/usr/local/info:/usr/info:/usr/share/info:/usr/autotool/devel/info:/usr/autotool/stable/info:$INFOPATH
+INFOPATH=/usr/local/info:/usr/share/info:/usr/info:$INFOPATH
 export INFOPATH
 
 # Set the user id
@@ -46,9 +46,6 @@ export USER
 #  2) from /etc/passwd, if there is an entry with a non empty directory field
 #  3) from HOMEDRIVE/HOMEPATH
 #  4) / (root)
-
-### Try to get a connection to the Samba host.
-##/usr/local/etc/emulab/rc/rc.cygwinxp-user
 
 ### Use a local dir under sshd if the mount failed.
 if [ ! -d "$HOME" ]; then
