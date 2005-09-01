@@ -1,5 +1,47 @@
 Log of XP images produced (most recent first.)
 
+    . WINXP-UPDATE-pc3000_2005-09-01 - Windows XP, SP2 and Windows Update, everything working, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.2, node pc201, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    8587192320 input (2033817600 compressed) bytes in 320.852 seconds
+	    Image size: 973078528 bytes
+	    6.045MB/second compressed
+
+    . WINXP-SP2-pc3000_2005-09-01 - Windows XP with SP2, everything working, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.2, node pc201, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    8587192320 input (2595006464 compressed) bytes in 432.415 seconds
+	    Image size: 1408237568 bytes
+	    5.723MB/second compressed
+
+    . WINXP-SP1-pc3000_2005-09-01 - Windows XP with SP1a, everything working, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc201, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    8587192320 input (2508974080 compressed) bytes in 399.521 seconds
+	    Image size: 1258291200 bytes
+	    5.989MB/second compressed
+
+    . WINXP-SP0-pc3000_2005-09-01 - Windows XP 2001, everything working, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.0, node pc201, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    8587192320 input (1711413248 compressed) bytes in 276.724 seconds
+	    Image size: 882900992 bytes
+	    5.898MB/second compressed
+
+    . WINXP-BASE-pc3000 - Bare MSDN Windows XP 2001, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.0, node pc210, ping only.
+      MINIMAL, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    8587192320 input (1117743104 compressed) bytes in 202.259 seconds
+	    Image size: 653262848 bytes
+	    5.270MB/second compressed
+
+    . WINXP-SP2-pc3000_2005-08-31 - Windows XP with SP2, everything working, pc3000 only.
+      prtn 1, whole disk[1], OS Windows, 5.1.2, node pc201, ping/ssh/isup (no IPOD), 
+      NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
+	    6432168960 input (2142280704 compressed) bytes in 337.426 seconds
+	    Image size: 1008730112 bytes
+	    6.055MB/second compressed
+
     . WINXP-SP1-pc3000_2005-08-29 - Windows XP with SP1a, everything working, pc3000 only.
       prtn 1, whole disk[1], OS Windows, 5.1.1a, node pc201, ping/ssh/isup (no IPOD), 
       NORMALv2, pc3000, global testbed:no/emulab-ops:yes, reboot_waittime 240
@@ -27,7 +69,7 @@ Log of XP images produced (most recent first.)
 	    Image size: 907018240 bytes
 	    3.054MB/second compressed
     . WINXP-UPDATE_2005-08-22 - Windows XP with SP2+, everything working, pc850 only.
-      prtn 1, whole disk[1], OS Windows, 5.1.2+, node pc61, ping/ssh/isup (no IPOD), 
+      prtn 1, whole disk[1], OS Windows, 5.1.2, node pc61, ping/ssh/isup (no IPOD), 
       NORMALv2, pc850, global testbed:no/emulab-ops:yes, reboot_waittime 240
 	    4293596160 input (1757856768 compressed) bytes in 549.595 seconds
 	    Image size: 855638016 bytes

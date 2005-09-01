@@ -30,26 +30,26 @@ alias v='ls -lsF'
         . Hook up a console, reboot and modify the boot order to boot from the Windows XP CD.
 
         . Do the Windows installation, adding whatever drivers are needed.
-          - 6 gig is a good size for the XP NTFS partition, of which 3-4 will be user space.
+          - 8 gig is a good size for the XP NTFS partition, of which 4-5 will be user space.
             (They can always allocate more later with Disk Manager.)
           - You'll save some work later if you make the first admin user account named "root".
-            It asks whether to make the root files private.  I've been saying "no".
 
         . Set the usual password for root in Control Panel / User Accounts.
+            It asks whether to make the root files private.  I've been saying "no".
           - While you're there, click "Change the way users log on or off" and make
             sure "Use Fast User Switching" is turned on.
 
         . Make sure you turn on Remote Desktop logins under Control Panel / System / Remote (!)
 
-        . Go into Control Panel / Power Options, and make sure Hibernate is off.
-          This will gives you an extra gigs of disk space on C: equal to your RAM size .
+        . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
+          This will gives you extra gigs of disk space on C: equal to your RAM size .
 
         . Set the workgroup name to EMULAB in Control Panel/System/Computer Name/Change...
           No need to reboot yet if you have more to do.
 
         . On reboot, restore the boot order so PXE goes back into the FBSD MFS, and make an image.
           (See imagezip commands below.)  
-          Make the management MINIMAL in the image_id, rather than NORMALv2.
+          Make sure the Operational Mode is MINIMAL in the Image Descriptor, rather than NORMALv2!
 
       - Make a firewalled experiment using the WINXP-BASE image above, log in as "root".
 
@@ -97,12 +97,16 @@ alias v='ls -lsF'
           sc stop upnphost
           sc stop RemoteRegistry
 
-      - If you haven't already made a "root" account, 
-        go into Control Panel/Administrative Tools/Computer Management/
-        System Tools/Local Users and Groups/Users, put it in the Administrators and Users groups.
+      - Go into Control Panel/Administrative Tools (it's under Performance and
+        Maintenance in the new Control Panel interface.)
 
-        . While you're there, Right-click Start/"Explore All Users" and copy the Computer Management
-          shortcut from Administrative Tools into the All Users/Desktop folder.
+        . Right-click Start/"Explore All Users" and drag a copy of the Computer
+          Management shortcut from Administrative Tools into the All Users/Desktop
+          folder.
+
+      - If you haven't already made a "root" account, go into Computer Management/
+        System Tools/Local Users and Groups/Users, put it in the Administrators group.
+        . Also make it a member of the Users groups.
 
       - Start IE, make "blank" the home page. Click Tools/Internet Options/Home page/Use Blank.
 
@@ -139,7 +143,7 @@ alias v='ls -lsF'
         . Click [View] to "Not Installed" (alphabetical.)  
           Click on the Skip in the "New" column to add a binary version of:
             agetty, bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
-            make, minires-devel, more, nano, openssh, openssl-devel, 
+            make, minires-devel, more, nano, openssh (with src), openssl-devel, 
             patch, perl, perl-libwin32, python, rpm, rsync, 
             shutdown, tcsh, vim, wget, zip .
           Click in the "src" column for openssh, so patches can be applied.
@@ -152,22 +156,27 @@ alias v='ls -lsF'
             Options QuickEdit Mode on, Layout/screen buffer height 3000, window height 55.
             Check "Modify shortcut that started this window".
           - Might as well fix the Start/Programs/Accessories/Command Prompt properties, too.
+          - Create c:\cygin\cygwin-tcsh.bat as a copy of c:\cygin\cygwin.bat with
+            "bash --login -i" changed to "tcsh -l".
+               ### Now we can use Cygwin (Bash) shell commands...  ###
+               alias v='ls -lsF'
+               cd C:/cygwin
+               sed 's/bash --login -i/tcsh -l/' < cygwin.bat > cygwin-tcsh.bat
+               chmod +x cygwin-tcsh.bat
           - Copy the bash shortcut to the All Users/Desktop.  
           - Copy it to a tcsh icon as well, changing the Target to c:\cygin\cygwin-tcsh.bat .
           - Copy the tcsh icon into All Users/Start Menu/Programs/Cygwin.
-          - Create c:\cygin\cygwin-tcsh.bat as a copy of c:\cygin\cygwin.bat with
-              bash --login -i
-            changed to
-              tcsh -l
+               cd C:/Documents\ and\ Settings/All\ Users
+               cp -p Desktop/Cygwin\ TCSH\ Shell.lnk Start\ Menu/Programs/Cygwin
 
         . Set up local homedirs under /home as a symlink.  ~root is already there.
-            # Now we can use Cygwin (Bash) shell commands...
             cd /tmp
             mv /home{,.orig}
             ln -s /cygdrive/c/Documents\ and\ Settings/ /home
 
-        . Symlink the Windows hosts file into the Cygwin /etc.
-            ln -s /cygdrive/c/WINDOWS/system32/drivers/etc/hosts /etc/hosts
+        . The Windows hosts file should already be symlinked into the Cygwin /etc.
+            ls -l /etc/hosts
+              ln -s /cygdrive/c/WINDOWS/system32/drivers/etc/hosts /etc/hosts
 
         . Create a proper group file.  Make wheel an alias for Administrators.
             mkgroup -l | \
@@ -188,8 +197,8 @@ alias v='ls -lsF'
             cp -p /etc/passwd{.new,}
             chown root /etc/{passwd,group}*
 
-            ### Note: the root UID changed from 1003 to 0.
-            ### Restart your Bash shell to get the new one before going on!
+            ### Note: the root UID changed from 1003 to 0.  ###
+            ### Restart your Bash shell to get the new one before going on!  ###
 
         . Set up the syslog daemon.  (See usr/share/doc/Cygwin/inetutils-1.3.2.README)
             # Make sure /etc isn't owned by SYSTEM, which will prevent making syslogd.conf .
@@ -279,14 +288,19 @@ q
 
           - Check /var/empty to avoid this error:
               /var/empty must be owned by root and not group or world-writable.
-            Actually, it must be owned by SYSTEM.
+            # Actually, it must be owned by SYSTEM.
               v -d /var/empty
             chown SYSTEM /var/empty
             chmod go-w /var/empty
 
           - You can avoid patching and rebuilding sshd.exe if there's one saved.
-              v /usr/sbin/sshd.exe
+              # Currently 4.1p1-2 .
+              cygcheck.exe -c openssh
+              # Either explore to \\fs\share, giving *your* login name and Windows password,
+              # or use the "net use" command to provide it.  Then UNC paths work.
               v //fs/share/windows/sshd.exe
+              v /usr/sbin/sshd.exe
+
               mv /usr/sbin/sshd.exe{,.orig}
               cp -p //fs/share/windows/sshd.exe /usr/sbin/sshd.exe
 
@@ -295,6 +309,7 @@ q
               tail /var/log/messages
 
           - Set up for root ssh access from Boss.
+                v -d /home/root
               chown root.wheel /home/root
               chmod 755 /home/root
               passwd root
@@ -381,6 +396,7 @@ daFluxGroup
             tar xfz /tmp/emacs-21.3-fullbin-i386.tar.gz
             # Graphical; click OK to set up the registry, start menu, etc.
             C:/emacs-21.3/bin/addpm.exe
+
             # Then copy the Emacs shortcut to the All Users/Desktop folder.
             allusers=/cygdrive/c/Documents\ and\ Settings/All\ Users
             chown root "$allusers"/Desktop
@@ -428,12 +444,12 @@ exit(0);
 w
 q
             ./configure >& configure.trace 
-              # Ends with "creating src/include/elvin/config.h"
-              tail configure.trace
+            # Ends with "creating src/include/elvin/config.h"
+            tail configure.trace
 
-            # Comment out #elif defined(HAVE_WINBASE_H)
+            # Comment this out in c:/elvin/libelvin-4.0.3/src/lib/i18n.c :
+                      #elif defined(HAVE_WINBASE_H)
                               FreeLibrary(cat);
-                  in c:/elvin/libelvin-4.0.3/src/lib/i18n.c
             ed c:/elvin/libelvin-4.0.3/src/lib/i18n.c
             /HAVE_WINBASE/p
             .,.+1s|^|//|p
@@ -441,12 +457,12 @@ q
             q
 
             make >& make.log1
-              tail make.log1
+            tail make.log1
             make install >& install.log1
-              tail install.log1
+            tail install.log1
               make clean
 
-# SKIP[
+# [ SKIP
             # Build Elvin for Windows on Coke, and tar it up for later installation.
             scp -p bos:"/usr/testbed/www/distributions/*elvin*-4.0.3.tar.gz" /tmp
             mkdir C:/elvin
@@ -484,7 +500,7 @@ q
 
             tar cfz /tmp/elvin4-windows.tar.gz -C /cygdrive/c Program\ Files/elvin4
             scp -p /tmp/elvin4-windows.tar.gz ops:/share/windows
-# SKIP]
+# SKIP ]
 
             # Install the Windows Elvin, built on Coke above.
             # [On Boss.]
@@ -524,7 +540,7 @@ q
               # (4 is Disabled, 3 is Manual, 2 is Automatic, 1 is only used for System services.)
               regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/elvinsvc.exe/Start 2
 
-# SKIP[
+# [ SKIP
               ## Use any Windows experiment with a Program object in it for testing.
               pid=testbed eid=Windows-1
                 pid=testbed eid=Windows-1b
@@ -561,7 +577,7 @@ q
                 ## Works, but stays in "starting" state, err in bootsetup.log:
                 ##  cygrunsrv: Error starting a service: QueryServiceStatus:  Win32 error 1053:
                 ##  The service did not respond to the start or control request in a timely fashion.
-# SKIP]
+# SKIP ]
 
               # For setuid() to work, Root must have these rights: Create a token object; Replace a
               # process level token; and Increase Quota rights.
@@ -572,7 +588,7 @@ q
               editrights -u root -a SeAssignPrimaryTokenPrivilege -l
               editrights -u root -a SeIncreaseQuotaPrivilege -l
 
-              # program-agent service start-up.
+              # Set up to run the program-agent service.
                 cygrunsrv -R ProgAgent
               progagent=/usr/local/etc/emulab/rc/rc.progagent
               cygrunsrv -I ProgAgent -d "Emulab Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
@@ -580,15 +596,15 @@ q
                   -a "--norc --noprofile -c '$progagent >& /var/log/program-agent.log'"
                 regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/ProgAgent/Parameters
                 cygrunsrv -VQ ProgAgent
-                ## This won't work until you build the Emulab programs, including program-agent, below.
-                cygrunsrv -S ProgAgent
-                cygrunsrv -E ProgAgent
-
+                  ## This won't work until you build the Emulab programs, including program-agent, below.
+                  cygrunsrv -S ProgAgent
+                  cygrunsrv -E ProgAgent
+                # Log files.
                   tail /var/log/{program-agent,ProgAgent}.log
                 touch /var/log/{program-agent,ProgAgent}.log
                 chmod 777 /var/log/{program-agent,ProgAgent}.log
 
-# SKIP[
+# [ SKIP
                 # Little problem: "Must be root to run this script!"
                 # Add this: 
                   # This runs as a separate Local System service on XP.  Change to root.
@@ -610,7 +626,7 @@ q
                 cat /local/logs/prog0.status
                 cat /local/logs/prog0.err
                 cat /local/logs/prog0.out
-# SKIP]
+# SKIP ]
 
       - Get the testbed client code via CVS, build, and install it.
             rootpc $pc
@@ -677,13 +693,13 @@ q
               v configure.trace*
               mv configure.trace{,.1}
             ../testbed/configure --enable-windows --enable-windowsclient >& configure.trace
-              # Should end with "creating config.h".
-              tail configure.trace
-                tail -f configure.trace
+            # Should end with "creating config.h".
+            tail configure.trace
+              tail -f configure.trace
 
             # The first make fails with "Cannot change ownership" warnings unpacking tg2.0 .
             make client-install >& make.log1
-              tail make.log1
+            tail make.log1
             # No worries.  Patch it explicitly, since the patch action gets skipped.
             (cd ~/flux/testbed/event/trafgen; patch -p0 < tg.patch)
 
@@ -696,8 +712,8 @@ q
             $rc/rc.slothd stop
 
             make client-install >& make.log2
-              tail make.log2
-                tail -f make.log2
+            tail make.log2
+              tail -f make.log2
 
                 # Only needed if there are problems...
                   v -t make.log*
@@ -716,6 +732,7 @@ q
         #
         # The latest version as installed by the Cygwin Setup program can
         # always be found at /etc/defaults/etc/profile
+            # If you need to check in a new version back in CVS land...
             (cd ~/flux; cvs update testbed/tmcd/cygwinxp/profile)
           diff /etc/defaults/etc/profile ~/flux/testbed/tmcd/cygwinxp
             # If the diffs are right, just copy the Emulab one.
@@ -745,7 +762,7 @@ if [ ]; then
       . Set up the tbshutdown script to run as a service, to get a shutdown signal.
             editrights -u root -l
           editrights -u root -a SeServiceLogonRight -l
-          # Don't forget to set the root password to the followint, if you haven't done it yet.
+          # Don't forget to set the root password to the following, if you haven't done it yet.
           rootpwd='daFluxGroup'
           # EmulabShutdown is started manually later on from rc.cygwinxp .
           echo "$rootpwd"
@@ -761,20 +778,30 @@ if [ ]; then
           ##The account name is invalid or does not exist, or the password is invalid 
           ##for the account name specified.
 
+          # Log files
           touch /var/log/EmulabShutdown.log
           chmod 666 /var/log/EmulabShutdown.log
           regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabShutdown/Parameters
-          cygrunsrv -VQ EmulabShutdown
             # Manual start-up for testing.
             cygrunsrv -S EmulabShutdown
 
       . See if rc.bootsetup works.
+          # Don't allow the sshd shell a shell login login in rc.accounts.
+            grep '\^sshd:' /var/emulab/boot/usershells
+          echo '/^sshd:/s|/bin/bash$|/bin/false|' >> /var/emulab/boot/usershells
+
           ##Running os dependent initialization script rc.cygwin
           ##chmod: cannot access `/var/log/EmulabStartup.log': No such file or directory
           ##chmod: cannot access `/etc/emulab/iscygwin': No such file or directory
           touch /var/log/EmulabStartup.log
           chmod 666 /var/log/EmulabStartup.log
-              # May need to read .bashrc installed above if you haven't set up the path yet.
+
+          # May need to make /sshkeys, if it hasn't been done above.
+          v -d /sshkeys
+            mkdir /sshkeys
+            chmod 777 /sshkeys
+
+              ## May need to read .bashrc installed above if you haven't set up the path yet.
               . ~/.bashrc
             tmcc nodeid
               ## If you have problems, you may be missing /etc/resolv.conf .
@@ -782,20 +809,13 @@ if [ ]; then
                     nodeid 
                     /usr/local/etc/emulab/tmcc.bin  -d nodeid 
                     Connection to TMCD refused. Waiting ...
-            ## Should reboot, the first time, when it changes the node ID.
+            ## You can test rc.cygwin separately.  It should reboot, the first time, 
+            ## when it changes the node ID.
             $rc/rc.cygwin
 
-          # May need to make /sshkeys, if it hasn't been done above.
-          v -d /sshkeys
-            mkdir /sshkeys
-            chmod 777 /sshkeys
-
-          # Don't allow the sshd shell a shell login login in rc.accounts.
-          echo '/^sshd:/s|/bin/bash$|/bin/false|' >> /var/emulab/boot/usershells
-
-          # Try the boot-time script to see that all is well.
-          $rc/rc.bootsetup
-
+            ## You can try the boot-time script to see that all is well.
+            ## If you run this, and the node name hasn't been changed yet, it will reboot.
+            $rc/rc.bootsetup
 
       . Set up the boot script to run as a service.
 
@@ -811,6 +831,7 @@ if [ ]; then
             -a "--norc --noprofile -c '( $cygwinrc; $bootsetup; $progagent ) >& $bootlog'"
           cygrunsrv -VQ EmulabStartup 
 
+            ## If you run this, and the node name hasn't been changed yet, it will reboot.
             cygrunsrv -S EmulabStartup 
             cygrunsrv --help
           regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/EmulabStartup/Parameters
@@ -831,6 +852,7 @@ if [ ]; then
           # Check that setx.exe is in system32.
           v C:/WINDOWS/system32/setx.exe
 
+# [ SKIP if patched sshd.exe installed above.
       . Patch sshd so that shares (including /users homedirs) work with public-key logins.
         Also touches a file when client input is received, so slothd will know.
 
@@ -889,6 +911,7 @@ if [ ]; then
             net stop sshd
             /usr/bin/install -c -m 0755 -s sshd /usr/sbin/sshd.exe
             net start sshd
+# SKIP ]
 
       . Make a load average log for slothd, averaged over a 1 minute period.
 
@@ -929,7 +952,8 @@ if [ ]; then
             tail -f /var/run/ldavg.csv
           # The first one is always 99.999, etc.
 
-      . Reboot to make sure it all works right.
+      . Reboot to make sure it all works right.  Note that prepare clears out the source
+        trees, so don't do it until you've booted once and know that everything else works.
           prepare
           /sbin/reboot
 
@@ -951,10 +975,10 @@ Making images
              Windows Firewall defaults to block both SSH and RDP.  Disable it.
 
              . You may need to free disk space to install SP2, or allocate a partition.
+                   du -sm C:/WINDOWS/ServicePackFiles/i386
+                 rm -rf C:/WINDOWS/ServicePackFiles/i386
                    du -sm C:/WINDOWS/SoftwareDistribution/Download
                  rm -rf C:/WINDOWS/SoftwareDistribution/Download/*
-                   du -sm C:/WINDOWS/ServicePackFiles/i386
-                 find C:/WINDOWS/ServicePackFiles/i386 -type f | xargs rm -f
 
       - Could be a good time to update Cygwin as well.  
         . Beware of stepping on the sshd.exe patches.
@@ -987,29 +1011,43 @@ Making images
         set pc=72 img=SP0 image=SP0_2005-08-22
         set pc=109 img=UPDATE image=UPDATE_2005-08-22
 
+        set pc=210 img=BASE-pc3000 image=BASE-pc3000_2005-08-31
+        set pc=201 img=SP0-pc3000 image=SP0-pc3000_2005-09-01
+        set pc=201 img=SP1-pc3000 image=SP1-pc3000_2005-09-01
+        set pc=242 img=SP2-pc3000 image=SP2-pc3000_2005-09-01
+        set pc=242 img=UPDATE-pc3000 image=UPDATE-pc3000_2005-09-01
+
         df -m /proj/testbed/images /usr/testbed/images
           # Verify SSH working.
           rootpc $pc id
 
         # Boot into the MFS.  The serial console will show you when it's open for business.
+        echo $pc $image
         wap node_admin on pc$pc &
               # Should not be necessary if ssh from root@boss to the node is working.
               rootpc $pc /sbin/reboot
-        # Wait until the node is in the MFS.
+          ## You may see:
+              shutdown: Couldn't reboot: Error 53 The network path was not found.
+          ## Try this command:
+            rootpc $pc 'tsshutdn 1 /REBOOT /DELAY:1'
+          ## Or you can shutdown/restart it from the task manager under RDP,
+          ## or just wait a while and Emulab will cycle power to force a reboot.
+        # Wait until the node is in the MFS, based on the serial console.
 
         # Make WINXP-TMP on /proj, then move it to /usr/testbed/images with the right name.
         rootpc $pc
             cd /proj/testbed/images
             df -m /proj/testbed/images
-            ls -l WINXP*
-          # IDE disk.
+            ls -lt /proj/testbed/images/WINXP*
+          # IDE disk (pc1 - pc178)
           imagezip -o -I 2 -I 3 -I 4 /dev/ad0 /proj/testbed/images/WINXP-TMP.ndz
-          # SCSI disk.
+          # SCSI disk. (pc201 - pc360)
           imagezip -o -I 2 -I 3 -I 4 /dev/da0 /proj/testbed/images/WINXP-TMP.ndz
-            ls -l WINXP*
+            ls -lt /proj/testbed/images/WINXP*
           exit
 
         # Reboot the source node back into Windows.
+        echo $pc $image
         wap node_admin off pc$pc &
 
         # Move the image to /usr/testbed/images to avoid NFS reads, for faster swap-in.
@@ -1020,6 +1058,7 @@ Making images
         # Check.
         ls -l /{proj,usr}/testbed/images/WINXP-TMP.ndz
         cksum /usr/testbed/images/WINXP-TMP.ndz & ssh ops cksum /proj/testbed/images/WINXP-TMP.ndz
+
         # Install with mv.  Frisbee might have the old inode still open.
           ls -l /usr/testbed/images/WINXP-{TMP,$image}.ndz
         mv /usr/testbed/images/WINXP-{TMP,$image}.ndz
@@ -1032,25 +1071,65 @@ Making images
         
         # Make symlinks without the date suffix, corresponding to the Image ID's.
         ls -l /usr/testbed/images/WINXP-$img*
-          # -new images for testing, before we commit.
+          ## -new images for testing, before we commit.
           rm /usr/testbed/images/WINXP-$img-new.ndz
           ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img-new.ndz
         rm /usr/testbed/images/WINXP-$img.ndz
         ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img.ndz
 
-      - Explorer/Help/About Windows (actually the 'winver' command) says this for SP2: 
+      - Installing service packs
+        Service packs are cumulative, so there's no point in installing both SP1 and SP2.
+
+        . SP1 
+          # [On boss:]
+          sudo scp -rp /share/windows/xpsp1a_en_x86.exe root@pc$pc":"/tmp
+          # [Log in as root via RDP.]
+          rootrd $pc
+            /tmp/xpsp1a_en_x86.exe &
+            # Options: Do Not Archive Files
+            # Reboot to finish.
+
+        . SP2 - http://www.microsoft.com/technet/prodtechnol/winxppro/maintain/winxpsp2.mspx
+          sudo scp -rp /share/windows/WindowsXP-KB835935-SP2-ENU.exe root@pc$pc":"/tmp
+          # [Log in as root via RDP.]
+          rootrd $pc
+                  # It unpacks the component files each time you run it...
+                  /tmp/WindowsXP-KB835935-SP2-ENU.exe /help &
+                  # Switches are /quiet (no interaction), /passive (progress bar),
+                  # /norestart (Don't boot), /n (no backup.)
+
+              # This takes a LONG TIME to install.
+              /tmp/WindowsXP-KB835935-SP2-ENU.exe /n /norestart  &
+
+          - Turn off the Windows Firewall by default.
+                netsh firewall show config
+              netsh firewall set opmode DISABLE
+              # The above netsh firewall commands won't work until after
+              # the reboot, and then you're locked out from ssh, RDP, and even ping.
+              # Gotta have console access after the reboot to turn off the firewall.
+
+        . Disk space cleanup.
+              du -sm C:/WINDOWS/ServicePackFiles/i386
+            rm -rf C:/WINDOWS/ServicePackFiles/i386
+              du -sm C:/WINDOWS/SoftwareDistribution/Download
+            rm -rf C:/WINDOWS/SoftwareDistribution/Download/*
+
+      - Explorer/Help/About Windows (actually the 'winver' command) says this:
+        . SP2 + Windows Update -
                Version 5.1 (Build 2600.xpsp_sp2_gdr.050301-1519: Service Pack 2)
-             vs. for SP1, partially updated to SP2:
+        . SP2 download, on top of SP1 with no Windows Update -
+               Version 5.1 (Build 2600.xpsp_sp2_rtm.040803-2158: Service Pack 2)
+        . SP1, partially updated to SP2 - 
                Version 5.1 (Build 2600.xpsp2.050301-1526: Service Pack 1)
-             vs. for SP1:
+        . SP1 -
                Version 5.1 (Build 2600.xpsp1.020828-1920: Service Pack 1)
-             vs. for SP0 (no SP's):
+        . SP0 (no SP's) -
                Version 5.1 (Build 2600.xpclient.010817-1148)
 
-    . DEMOTING an image to /proj/testbed/images (edit the image descriptor.)
+    . DEMOTING an image to /proj/testbed/images (edit the image descriptor unless it's symlinked.)
         ls -l /usr/testbed/images/WINXP-$image.ndz
         df -m /proj/testbed/images
-        cp /usr/testbed/images/WINXP-$image.ndz /proj/testbed/images
+        cp -p /usr/testbed/images/WINXP-$image.ndz /proj/testbed/images
         # Check.
         ls -l /{usr,proj}/testbed/images/WINXP-$image.ndz
         ssh ops cksum /proj/testbed/images/WINXP-$image.ndz & cksum /usr/testbed/images/WINXP-$image.ndz
