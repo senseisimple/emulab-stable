@@ -112,6 +112,9 @@ elsif ($action eq "remap") {
 elsif ($action eq "fixproject") {
     exit(FixWikiProject(@ARGV));
 }
+elsif ($action eq "fixuser") {
+    exit(FixWikiUser(@ARGV));
+}
 else {
     die("*** $0:\n".
 	"    Do not know what to do with '$action'!\n");
@@ -550,6 +553,61 @@ sub FixWikiProject(@)
 }
 
 #
+# Fix a wiki user home page,
+#
+sub FixWikiUser(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($user, $wikiname, $passwd) = @_;
+
+    chdir("$WIKIUSERDIR") or
+	fatal("Could not chdir to $WIKIUSERDIR");
+
+    if (! system("egrep -q -s ".
+		 "'<!-- Please leave this line here' ${wikiname}.txt")) {
+	return 0;
+    }
+
+    system("cp -p ${USERTEMPLATE} ${wikiname}.txt") == 0
+	or fatal("Could not copy ${USERTEMPLATE} to ${wikiname}.txt");
+
+    #
+    # Set the initial groups list to the user.
+    #
+    open(PREFS, "${wikiname}.txt") or
+	fatal("Could not open ${wikiname}.txt for reading");
+
+    while (<PREFS>) {
+	if ($_ =~ /^(.* Set ALLOWTOPIC.*)\r$/ ||
+	    $_ =~ /^(.* Set ALLOWTOPIC.*)$/) {
+	    $data .= $1 . "%MAINWEB%.${wikiname}\n";
+	}
+	else {
+	    $data .= $_;
+	}
+    }
+    close(PREFS);
+
+    #
+    # Now write the file out.
+    #
+    open(PREFS, "> ${wikiname}.txt") or
+	fatal("Could not open ${wikiname}.txt for writing");
+    print PREFS $data;
+    close(PREFS);
+    
+    #
+    # Check it in (locked).
+    #
+    CI("${wikiname}.txt", "FixWikiUser $user $wikiname") == 0
+        or fatal("Could not ci ${wikiname}.txt");
+    
+    return 0;
+}
+
+#
 # Fix a wiki group. 
 #
 sub FixWikiGroup(@)
@@ -740,18 +798,15 @@ sub SetWikiGroups(@)
 	fatal("Could not open ${wikiuser}.txt for reading");
 
     while (<PREFS>) {
-	if ($_ =~ /^(__These are your Projects\/Groups:__).*$/) {
-	    $data .= $1 . "\n";
+	if ($_ =~ /^__These are your Projects.*$/) {
+	    $data .= "__These are your Projects:__\n";
 
 	    #
-	    # Add a list of groups.
+	    # Add a list of just the Projects. 
 	    #
 	    foreach my $group (@groups) {
 		if (-d "../$group") {
 		    $data .= "\t* [[${group}.WebHome][${group}]]\n";
-		}
-		else {
-		    $data .= "\t* [[%MAINWEB%.${group}Group][${group}Group]]\n";
 		}
 	    }
 

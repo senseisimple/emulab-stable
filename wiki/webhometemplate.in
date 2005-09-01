@@ -11,12 +11,12 @@ information on how to write and create TWiki pages.
 __This project wiki can be accessed externally as:__ [[%SCRIPTURL%/view/%WEB%][%SCRIPTURL%/view/%WEB%]]
 
 
-%INCLUDE{"Emulab.GroupPermNotes"}%
-
-
 __TWiki groups that are relevant to your Project/Group__
 	* Other members of your project: [[%MAINWEB%.%WEB%Group][%WEB%Group]]
 	* Members with project root privs: [[%MAINWEB%.%WEB%RootGroup][%WEB%RootGroup]]
+
+
+%INCLUDE{"Emulab.GroupPermNotes"}%
 
 
 __Site Tools of the <nop>%WEB% Web__
