@@ -74,9 +74,33 @@ echo "<font size=+1>" . $row['title'] . "</font>\n";
 echo "<br><br>\n";
 echo $row['body'];
 
-echo "<br><br><br><br>\n";
+echo "<br><br>\n";
 echo "<font size=-2>Posted by " . $row['creator_uid'] . " on " .
-      $row['date_created'] . "</font><br><br>\n";
+      $row['date_created'] . "</font><br>\n";
+
+#
+# Get other similar topics and list the titles.
+#
+$query_result =
+    DBQueryFatal("select * from knowledge_base_entries ".
+		 "where section='". $row['section'] . "'");
+
+if (mysql_num_rows($query_result)) {
+    echo "<hr>";
+    echo "<b>Other similar topics</b>:<br>\n";
+    echo "<blockquote>\n";
+    echo "<ul>\n";
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$title    = $row['title'];
+	$idx      = $row['idx'];
+    
+	echo "<li>";
+	echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+    }
+    echo "</ul>\n";
+    echo "</blockquote>\n";
+}
 
 if ($isadmin) {
     echo "</blockquote>\n";
