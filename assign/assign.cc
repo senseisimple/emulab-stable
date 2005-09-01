@@ -784,6 +784,11 @@ int main(int argc,char **argv)
 
   read_physical_topology(argv[0]);
   calculate_switch_MST();
+
+  read_virtual_topology(argv[1]);
+
+  // Time while we make pclasses and do the type prechecks
+  timestart = used_time();
   
   cout << "Generating physical equivalence classes:";
   generate_pclasses(PG,disable_pclasses,dynamic_pclasses);
@@ -792,8 +797,6 @@ int main(int argc,char **argv)
 #ifdef PCLASS_DEBUG
   pclass_debug();
 #endif
-
-  read_virtual_topology(argv[1]);
 
   // Run the type precheck
   if (!type_precheck()) {
@@ -844,7 +847,7 @@ int main(int argc,char **argv)
     initial_temperature_pointer = NULL;
   }
  
-  timestart = used_time();
+  // Note, time is started earlier now, up by where we make pclasses
   anneal(scoring_selftest, scale_neighborhood, initial_temperature_pointer,
       use_connected_pnode_find);
   timeend = used_time();
