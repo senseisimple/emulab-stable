@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.4 2005-09-01 18:11:43 stoller Exp $
+# $Id: cvsweb.cgi,v 1.5 2005-09-02 22:07:23 stoller Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -358,11 +358,39 @@ if (defined($input{"content-type"})) {
 	    if ($input{"content-type"} !~ /^[-0-9A-Za-z]+\/[-0-9A-Za-z]+$/);
 }
 
+# Emulab Hacks!
 if (@ARGV && $ARGV[0] eq "-repo") {
     $license = undef;
     @CVSrepositories = (
 	'top'   => [$ARGV[1], $ARGV[1]],
     );
+    $cvstreedefault = $CVSrepositories[2 * 0];    # The first one
+}
+elsif (! -e @{$CVSrepositories[1]}[1] . "/CVSROOT") {
+    my $dh = do { local (*DH); };
+    my $topdir = @{$CVSrepositories[1]}[1];
+    
+    opendir($dh, $topdir) or
+	fatal("404 Not Found", '%s: %s', $topdir, $!);
+    my @dirfiles = readdir($dh);
+    closedir($dh);
+    
+    @CVSrepositories = ();
+
+    foreach my $dir (@dirfiles) {
+	my $rdir = "$topdir/$dir";
+
+	next
+	    if ($dir eq "." || $dir eq "..");
+
+	if (-r $rdir && -e "$rdir/CVSROOT") {
+	    push(@CVSrepositories, $dir => [$dir, $rdir]);
+	}
+    }
+    if (! @CVSrepositories) {
+	fatal("404 Not Found", '%s: %s', $topdir, $!);
+    }
+    $cvstreedefault = $CVSrepositories[2 * 0];    # The first one
 }
 $DEFAULTVALUE{'cvsroot'} = $cvstreedefault;
 
@@ -662,7 +690,7 @@ if (-d $fullname) {
 	# give direct access to dirs
 	if ($where eq '/') {
 		chooseMirror ();
-		#chooseCVSRoot ();
+                #chooseCVSRoot ();
 	} else {
 		print "<p>Current directory: <b>", &clickablePath($where, 0),
 		    "</b></p>\n";

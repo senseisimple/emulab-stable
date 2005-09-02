@@ -12,13 +12,10 @@ chdir("../");
 require("defs.php3");
 
 #
-# Only known and logged in users can do this.
+# We look for anon access, and if so, redirect to ops web server.
+# WARNING: See the LOGGEDINORDIE() calls below.
 #
 $uid = GETLOGIN();
-LOGGEDINORDIE($uid);
-
-# Just for project specific 
-$scriptargs = "";
 
 #
 # Verify form arguments.
@@ -30,14 +27,36 @@ if (isset($pid) && $pid != "") {
     if (!TBvalid_pid($pid)) {
 	PAGEARGERROR("Invalid project ID.");
     }
+    # Redirect now, to avoid phishing.
+    if ($uid) {
+	LOGGEDINORDIE($uid);
+    }
+    else {
+	$url = $OPSCVSURL . "?cvsroot=$pid";
+	
+	header("Location: $url");
+	return;
+    }
     if (! TBValidProject($pid)) {
 	USERERROR("The project '$pid' is not a valid project.", 1);
     }
-    if (! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
-	USERERROR("You are not a member of Project $pid.", 1);
+    if (! ISADMIN($uid) &&
+	! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
+	# Then check to see if the project cvs repo is public.
+	$query_result =
+	    DBQueryFatal("select cvsrepo_public from projects ".
+			 "where pid='$pid'");
+	if (!mysql_num_rows($query_result)) {
+	    TBERROR("Error getting cvsrepo_public bit", 1);
+	}
+ 	$row = mysql_fetch_array($query_result);
+	if ($row[0] == 0) {
+	    USERERROR("You are not a member of Project $pid.", 1);
+	}
     }
 }
 else {
+    LOGGEDINORDIE($uid);
     if (! TBCvswebAllowed($uid)) {
         USERERROR("You do not have permission to use cvsweb!", 1);
     }
@@ -95,7 +114,7 @@ $shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
 if (isset($pid)) {
   # I know, I added an argument to a script that is not supposed to
   # take any. So be it; it was easy.
-  $shellcmd .= "$TBSUEXEC_PATH $uid $pid webcvsweb -repo /proj/$pid/CVS";
+  $shellcmd .= "$TBSUEXEC_PATH $uid $pid webcvsweb -repo $TBCVSREPO_DIR/$pid";
 }
 else {
   $shellcmd .= "$script";
