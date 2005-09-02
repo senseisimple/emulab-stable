@@ -191,7 +191,7 @@ to better control your experiment.  <p>
 <a NAME="OsChoices"></a>
 For example, you may specify what
 Operating System is booted on your nodes. We currently support FreeBSD
-4.10, Linux RedHat 9.0, and 
+4.10, RedHat Linux 9.0, Fedora Core 4, and 
 <a href="../doc/docwrapper.php3?docname=windows.html"> Windows&nbsp;XP</a>.
 <a href="../faq.php3?#SWS-WIN2K">Windows 2000</a> is not supported.  
 Fedora Core 2 (Linux 2.6)
@@ -1228,7 +1228,7 @@ overkill to create your own disk image, we can assure you it is not!
 The most common approach is to use the
 <a href="https://www.emulab.net/newimageid_ez.php3">New Image Descriptor</a>
 form to create a disk image that contains a customized version of the
-standard Redhat Linux partition or the FreeBSD partition. Or, you can
+standard Linux partition or the FreeBSD partition. Or, you can
 start from scratch and load your own operating system in any of the
 DOS partitions, and then capture that partition when you are
 done. Either way, all you need to do is enter the node name in the
@@ -1264,8 +1264,8 @@ default images as a base, goes like this:
      running as you want it to when it comes up.
 
 <li> When we make global images for everybody (like WINXP-SP1,
-     FBSD410-STD, and RHL90-STD), the final thing we do before grabbing
-     the image is log in as root and run the 'prepare' script.  It
+     FBSD410-STD, RHL90-STD, and FC4-STD), the final thing we do before 
+     grabbing the image is log in as root and run the 'prepare' script.  It
      cleans out all of the other user accounts and per-experiment stuff
      so a clean image is saved.  Then at experiment swap-in time, the
      Emulab management scripts create all of the accounts with
