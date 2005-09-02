@@ -1199,9 +1199,11 @@ sub RunAssign ()
     #
     if ($exitval > 0) {
 	my @reserved = ExpNodes($pid, $eid);
+	my $rcount   = scalar(@reserved);
 
 	# We got only some. Need to figure out which.
-	print "Reserved some nodes ($exitval) we needed, but not all.\n";
+	print "Reserved some nodes ($rcount) we needed, ".
+	    "but not all ($exitval).\n";
 	
 	foreach my $node (@reserved) {
 	    if (exists($toreserve{$node})) {
