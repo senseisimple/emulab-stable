@@ -41,8 +41,9 @@ my $ADDMMLIST   = "$TB/sbin/addmmlist";
 my $PROJROOT = "/proj";
 my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
+my $CVSREPOS = "$PROJROOT/cvsrepos";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
-		"groups", "tiplogs", "CVS");
+		"groups", "tiplogs");
 my $projhead;
 
 #
@@ -219,12 +220,25 @@ if (! -e "$TFTPROOT/proj/$pid") {
 #
 # Do the CVS stuff if its turned on.
 #
-my $CVSDIR = "$PROJROOT/$pid/CVS";
+if ($CVSSUPPORT) {
+    my $CVSDIR = "$CVSREPOS/$pid";
 
-if ($CVSSUPPORT && -e $CVSDIR) {
-    system("$CVSBIN -d $CVSDIR init");
-    if ($?) {
-	fatal("Could not cvs init $CVSDIR!");
+    if (! -e "$CVSDIR") {
+	if (! mkdir("$CVSDIR", 0770)) {
+	    fatal("Could not make directory $CVSDIR: $!");
+	}
+    }
+    if (! chmod(0770, "$CVSDIR")) {
+	fatal("Could not chmod directory $CVSDIR: $!");
+    }
+    if (! chown($uid, $gid, "$CVSDIR")) {
+	fatal("Could not chown $CVSDIR to $uid/$gid: $!");
+    }
+    if (! -e "$CVSDIR/CVSROOT") {
+	system("$CVSBIN -d $CVSDIR init");
+	if ($?) {
+	    fatal("Could not cvs init $CVSDIR!");
+	}
     }
     # Chown the tree.
     system("$CHOWN -R ${uid}:${gid} $CVSDIR");
