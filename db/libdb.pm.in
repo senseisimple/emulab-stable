@@ -2135,22 +2135,36 @@ sub TBResolveNextOSID($;$$)
 	($next_osid) = $result->fetchrow();
 
 	#
-	# See if we need to resolve using a map
+	# See if we need to resolve using a map.
+	# Maps currently are only indexed by modification time;
+	# i.e., we look at the last modification time of the experiment to
+	# determine what OSID should be used.
+	#
+	# NOTE: mapping used to be done based on experiment *creation* time
+	# but that left no ability to "update" an experiment to use current
+	# images, at least short of creating a new experiment with the same
+	# ns file.
 	#
 	if ($next_osid && $next_osid =~ /^MAP:(\w+)/) {
 	    my $map = $1;
 
 	    my $timestr;
 	    if (defined($pid) && defined($eid)) {
-		my $m_result = DBQueryWarn("select expt_created ".
-					   "from experiments where ".
-					   "pid='$pid' and eid='$eid'");
+		my $m_result =
+		    DBQueryWarn("select e.expt_created, s.swapmod_last ".
+				"from experiments as e, experiment_stats as s ".
+				"where e.idx=s.exptidx and ".
+				"e.pid='$pid' and e.eid='$eid'");
 		if (!$m_result || $m_result->num_rows() == 0) {
 		    warn "Resolving $input_osid: no experiment $pid/$eid!\n";
 		    return undef;
 		}
-		my ($ctime) = $m_result->fetchrow();
-		$timestr = "'$ctime'";
+		my ($ctime,$mtime) = $m_result->fetchrow();
+		if (defined($mtime) && $mtime ne "") {
+		    $timestr = "'$mtime'";
+		} else {
+		    $timestr = "'$ctime'";
+		}
 	    } else {
 		$timestr = "now()";
 	    }
