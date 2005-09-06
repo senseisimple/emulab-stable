@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2004 University of Utah and the Flux Group.
+   Copyright (c) 2000-2005 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -81,7 +81,7 @@ That's it!  With few exceptions, every thing you use in an NS file for an
 Emulab experiment running on physical nodes, will work with virtual nodes.
 The most notable exception is that you cannot specify the operating system
 for a virtual node, they are limited to running our custom version of
-FreeBSD 4.7 (soon to be FreeBSD 4.9).
+FreeBSD 4.10.
 </p><p>
 As a simple example, we could take the <a href="basic.ns">basic NS script</a>
 used in the
@@ -402,7 +402,7 @@ virtual nodes you can colocate on a physical node, without affecting the
 fidelity of the experiment.  Ultimately, the experimenter must make
 this decision, based on the nature of the applications run and what exactly
 is being measured.  We provide some simple limits (e.g., network bandwidth
-caps) and coarse-grained agregate limits (e.g., the default colocation factor)
+caps) and coarse-grained aggregate limits (e.g., the default colocation factor)
 but these are hardly adequate.
 <p>
 One thing to try is to allocate a modest sized version of your experiment,
@@ -436,10 +436,14 @@ of the use of the custom encapsulation on virtual ethernet devices.  Note
 that this also implies that the physical nodes use virtual ethernet devices
 and thus the MTU is likewise reduced.
 <p>
-We have implemented, but not yet deployed, a non-encapsulating version of the
-virtual ethernet interface that will allow virtual nodes to talk directly to
-physical ethernet interfaces and thus remove the FreeBSD-only and reduced-MTU
-restrictions.
+We have also implemented, a non-encapsulating version of the
+virtual ethernet interface that allows virtual nodes to talk directly to
+physical ethernet interfaces and thus remove the reduced-MTU restriction.
+To use the non-encapsulating version, put:
+	<code><pre>
+	tb-set-encapsulate 0
+	</code></pre>
+in your NS file.
 <a NAME="Limitations"></a><h2>Limitations</h2>
 Following are the primary limitations of the Emulab virtual node
 implementation.
@@ -459,6 +463,12 @@ implementation.
      that use it.  The consequence is, that virtual nodes can spy on each
      other if they want.  But then, if you cannot trust yourself, who can
      you trust!
+<li> <b>Not a complete virtualization of the network.</b>
+     This is another aspect of the previous bullet, but bears special note.
+     While we have virtual interfaces and routing tables, much of the
+     network stack of a physical host remains shared, in particular all
+     the resources used by the higher level protocols.  For example, all
+     of the statistics reported by "netstat -s" are global to the node.
 <li> <b>No resource guarantees for CPU and memory on nodes.</b>
      We also don't provide complete performance isolation.  We currently
      have no virtual node aware CPU scheduling mechanisms.  Processes in
@@ -466,14 +476,12 @@ implementation.
      according to the standard BSD scheduler.  There are also no limits
      on virtual or physical memory consumption by a virtual node.
 <li> <b>Nodes must run a specific version of FreeBSD.</b>
-     We have hacked the FreeBSD 4.7 kernel mightily to support virtual nodes.
+     We have hacked the FreeBSD 4.10 kernel mightily to support virtual nodes.
      See
      <a href="../doc/docwrapper.php3?docname=jail.html">this document</a>
      for details, but suffice it to say, making these changes to Linux
-     or even other versions of FreeBSD would be a huge task.  That said,
-     the changes have been made to FreeBSD 4.9, which will become the default
-     "jail kernel" at some point.  We will also be providing a virtual node
-     environment for Linux, likely using Xen.
+     or even other versions of FreeBSD would be a huge task.  We will be
+     providing a virtual node environment for Linux, likely using Xen.
 <li> <b>Will only scale to low 1000s of nodes.</b>
      We currently have a number of scaling issues that make it impractical
      to run experiments of more than 1000-2000 nodes.  These range from
@@ -488,11 +496,11 @@ implementation.
      user-login server.
 <li> <b>Virtual ethernet encapsulation reduces the MTU.</b>
      This is a detail, but of possible importance to people since they
-     are doing network experiments.  The veth device reduces the MTU by
-     16 bytes to 1484.  As mentioned, we have a version of the interface
-     which does not use encapsulation. 
+     are doing network experiments.  By default, the veth device reduces
+     the MTU by 16 bytes to 1484.  As mentioned, we have a version of the
+     interface which does not use encapsulation. 
 <li> <b>Only 400Mb of internal "network" bandwidth.</b>
-     This falls in the rinky-dink node catagory.  As most of our nodes
+     This falls in the rinky-dink node category.  As most of our nodes
      are based on ancient 100Mhz FSB, sub-GHz technology, they cannot
      host many virtual nodes or high capacity virtual links.  The next
      wave of cluster machines will be much better in this regard.
@@ -505,8 +513,15 @@ implementation.
      traffic shaping rather than dedicated traffic shaping nodes.  This
      increases the overhead on the host machine slightly.   To improve
      the fidelity of delays and bandwidth shaping, virtual node hosts
-     run their kernel at 1000Hz rather than 100Hz.  This is unlikely to
-     affect anything, but is mentioned for completeness.
+     run their kernel at 1000Hz rather than 100Hz.
+     <p>
+     One potentially serious
+     side-effect of vnode traffic shaping, and linkdelays in general, is
+     that dummynet on FreeBSD induces a minimum one clock tick (1ms for
+     1000Hz kernel) delay for <i>any</i> form of traffic shaping.  For
+     example, if you had 10 machines connected point to point in a "line",
+     you would incur a 10ms delay from one end to the other, even if you
+     were only shaping the bandwidth of the links.
 </ul>
 <a NAME="KnownBugs"></a><h2>Known Bugs</h2>
 There is currently a problem with the "loopback" (nullfs) filesystem
