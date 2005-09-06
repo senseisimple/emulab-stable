@@ -1,0 +1,86 @@
+# This is the configuration file for cvsd.
+# See the manual page cvsd.conf(5) for more information.
+# See the "Password authentication server"
+# section in the cvs texinfo for more information
+# about running a pserver.
+
+# RootJail <path>
+#  This is the location of the chroot jail
+#  cvs should be run in.
+#  Specify 'none' (without quotes) to not use
+#  a chroot jail.
+#  This directory should be initialized with
+#  the cvsd-buildroot script.
+RootJail /var/cvsjail
+
+# Uid <uid>
+#  This specifies which user id cvs should be
+#  run as. This can be a numerical id or
+#  a symbolic value.
+Uid nobody
+
+# Gid <gid>
+#  This specifies which group id cvs should be
+#  run as. This can be a numerical id or
+#  a symbolic value.
+Gid nobody
+
+# CvsCommand <path>
+#  If you define this it should point to the cvs
+#  command to execute. Otherwise "/bin/cvs" will
+#  be used if a RootJail is configured and the
+#  cvs command found at compiletime otherwise.
+#  The path should be relative to the specified
+#  RootJail and should start with a `/'.
+
+# Nice <num>
+#  This specifies the nice value (on most systems
+#  ranging from -20 to 20) where the smaller the number
+#  (more negative) the higher the priority.
+Nice 1
+
+# Umask <mask>
+#  This specifies a umask used by the cvs pserver when
+#  creating files. Specify as an octal value.
+Umask 027
+
+# Limit <resource> <value>
+#  <resource> can be one of: coredumpsize, cputime, datasize, filesize,
+#  memorylocked, openfiles, maxproc, memoryuse, stacksize, virtmem.
+#  <value> maximum value for the given resource. For size values a suffix of
+#  'b', 'k' or 'm' can be specified ('k' is default). Time values can
+#  be formatted as 'mm:ss' or have 'm' or 's' suffixes ('s' is default).
+Limit coredumpsize 0
+
+# PidFile <file>
+#  This specifies the location the process id of the
+#  daemon is written.
+PidFile /var/run/cvsd.pid
+
+# Listen <address> <port>
+#  The addresses and ports to listen on for connections.
+#Listen * 2401
+
+# MaxConnections <num>
+#  The maximum number of connections that will
+#  be handled simultaneously. 0 is unlimited.
+MaxConnections 20
+
+# Log <scheme/file> [<loglevel>]
+#  The way logging is done. Either none, syslog or a
+#  filename may be specified, followed by an optional
+#  loglevel. Loglevel may be one of:
+#  crit, error, warning, notice, info (default) or debug.
+#  This option can be supplied multiple times.
+#  If this option is not specified syslog info is assumed.
+Log syslog info
+#Log /var/log/cvsd.log debug
+
+# Repos <path>
+#  This option specifies which repositories
+#  can be used. The value is passed as a
+#  --allow-root=<path> parameter to cvs.
+#  The path should be relative to the specified
+#  RootJail and should start with a `/'.
+#  This option can be supplied multiple times.
+Repos /testbed
