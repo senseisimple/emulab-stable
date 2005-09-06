@@ -1,0 +1,104 @@
+<!--
+   EMULAB-COPYRIGHT
+   Copyright (c) 2005 University of Utah and the Flux Group.
+   All rights reserved.
+  -->
+<center>
+<h1>The New "pc3000" Nodes</h1>
+</center>
+
+<h2>Contents</h2>
+<ul>
+<li> <a href="#machines">Machines and Interfaces</a>
+<li> <a href="#images">Images and Kernel Support</a>
+<li> <a href="#caveats">Caveats</a>
+</ul>
+
+<hr>
+<a NAME="machines"></a><h2>Machines and Interfaces</h2>
+<p>
+The new "pc3000" machines are
+<a href="http://www1.us.dell.com/content/products/productdetails.aspx/pedge_2850">
+Dell PowerEdge 2850s</a>
+with a single 3GHz processor, 2GB of RAM, and 2 146GB SCSI disks.
+Each has 4 available Gigabit experimental net interfaces,
+however due to lack of Gb switch ports, not all are usable at Gb speeds.
+Instead, they are a mix of 100Mb and 1Gb as follows:
+</p><p>
+<pre>
+Machines	Gb ports	100Mb ports
+40		4		0
+20		3		1
+40		2		2
+60		1		3
+</pre>
+Note that all 160 machines have at least 1 Gb interface and all can be
+used for 100Mb as well.
+</p><p>
+There is also a 5th Gb interface on each machine, that is used to pairwise
+connect adjacent machines.  For example, pc201 is connected directly to pc202
+via a cross over cable.  These interfaces are not yet available, pending
+further support in the resource mapper.
+</p><p>
+All machines have serial console lines accessible from users.emulab.net via
+the "console" command or remotely via the
+<a href="http://www.emulab.net/kb-show.php3?idx=25">tiptunnel</a> interface.
+
+</p><p>
+<a NAME="images"></a><h2>Images and Kernel Support</h2>
+<p>
+Currently, the Emulab standard FreeBSD (FBSD410-STD, FBSD54-STD),
+Linux (RHL90-STD, FC4-STD), and Windows (WINXP-SP1-pc3000, WINXP-SP2-pc3000)
+images will run on the new machines.
+</p><p>
+If you have built custom images based on our standard images before
+Sept 2 2005, they will likely not work on the new machines due to a lack
+of the correct disk driver.  You will either need to re-customize based
+on the current images or modify your existing image to add the correct
+SCSI driver.  For BSD you need:
+<code><pre>
+  device          mpt
+</code></pre>
+in your kernel config file, and for Linux you need:
+<code><pre>
+  CONFIG_FUSION=y
+  CONFIG_FUSION_BOOT=y
+  CONFIG_FUSION_MAX_SGE=40
+  CONFIG_FUSION_ISENSE=m
+</code></pre>
+in your .config.
+</p><p>
+For Windows you will need to re-customize based on our current -pc3000
+images.
+</p><p>
+<a NAME="caveats"></a><h2>Caveats</h2>
+<p>
+<ul>
+<li> <b>No bandwidth delays between 100Mb and 1000Mb.</b>
+     We have not yet looked at providing bandwidth delay values between
+     100Mb and 1000Mb. 
+<li> <b>The "direct connect" 5th interface is not usable.</b>
+     As mentioned, we need modifications to the resource mapper
+     and there are also security issues to be resolved.
+<li> <b>Interswitch bandwidth may limit topologies in non-intuitive ways.</b>
+     Since the Gb interfaces and the 100Mb interfaces are on different
+     switches, and the new machines are on different switches than the old
+     pc600 and pc850 machines, the bandwidth of the interswitch links can
+     have a significant impact on whether an experimental topology can map
+     or not.
+<li> <b>No vnode characterization has been done.</b>
+     The so-call "colocation factor" has been arbitrarily set to 75 right
+     now.  It will likely be clamped down considerably.
+<li> <b>There might be assorted failures due to scaling issues.</b>
+     Experiments of over 150 machines, which were hard to do before,
+     may reveal further scaling issues that will need to be addressed.
+     Expect an increase in unexpected swapin failures as a result.
+<li> <b>These machines are radically different than the old machines.</b>
+     Since these machines are so much faster, have so much more and faster
+     memory, have so much more and faster disk, results of your experiments
+     on these machines could be dramatically different.  That is, if your
+     applications were CPU, memory, or disk intensive.  If you are
+     interested in reproducing old results, you might want to
+     <a href="http://www.emulab.net/kb-show.php3?idx=39">
+     limit your experiments to using only pc600 and pc850 nodes</a>.
+</ul>
