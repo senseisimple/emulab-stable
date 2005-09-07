@@ -408,6 +408,16 @@ sub GenDefsFile($)
 	    if (defined($osid) && $osid ne "");
     }
     print TCL "\n";
+
+    print TCL "# Global Vtypes\n";
+    $query_result = 
+        DBQueryFatal("select vtype, weight, types ".
+                     " from global_vtypes");
+    while (my ($vtype, $weight, $types) = $query_result->fetchrow_array()) {
+        print TCL "set ::GLOBALS::vtypes($vtype) [Vtype $vtype $weight {$types}]\n";
+    }
+    print TCL "\n";
+
     
     print TCL "# Node Permissions\n";
     my %nodeperms = ();

@@ -1,4 +1,4 @@
--- MySQL dump 8.23 
+-- MySQL dump 8.23
 --
 -- Host: localhost    Database: tbdb
 ---------------------------------------------------------
@@ -502,6 +502,17 @@ CREATE TABLE global_policies (
   test varchar(32) NOT NULL default '',
   count int(10) NOT NULL default '0',
   PRIMARY KEY  (policy,auxdata)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `global_vtypes`
+--
+
+CREATE TABLE global_vtypes (
+  vtype varchar(30) NOT NULL default '',
+  weight float NOT NULL default '0.5',
+  types text NOT NULL,
+  PRIMARY KEY  (vtype)
 ) TYPE=MyISAM;
 
 --

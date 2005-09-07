@@ -2792,4 +2792,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table projects add cvsrepo_public tinyint(1) \
                 NOT NULL default '0' after linked_to_us;
 
-4.9:
+4.9: Add a 'global_vtypes' table to allow admins to create vtypes that apply
+    to all users:
+
+        create table global_vtypes (vtype varchar(30) primary key, \
+                                    weight float not null default 0.5, \
+                                    types text not null default "");
+
+4.10:
