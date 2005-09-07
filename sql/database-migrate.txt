@@ -2629,7 +2629,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  fwname varchar(32) NOT NULL default '',
 	  type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
 	  style enum('open','closed','basic','emulab') NOT NULL default 'basic',
-	  PRIMARY KEY  (pid,eid,fwname),
+	  PRIMARY KEY  (pid,eid,fwname)
 	) TYPE=MyISAM;
 
 	insert into virt_firewalls (pid,eid,fwname,type,style) \
