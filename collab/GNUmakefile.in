@@ -11,7 +11,7 @@ SUBDIR		= collab
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= mailman
+SUBDIRS	= mailman cvs
 
 all:	all-subdirs
 
@@ -19,6 +19,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 control-install: 
 	@$(MAKE) -C mailman control-install
+	@$(MAKE) -C cvs control-install
 
 install:	install-subdirs
 clean:		clean-subdirs
