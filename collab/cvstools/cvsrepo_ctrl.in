@@ -15,10 +15,13 @@ use Fcntl ':flock';
 #
 sub usage()
 {
-    print(STDOUT "Usage: cvsrepo_ctrl pid\n");
+    print(STDOUT "Usage: cvsrepo_ctrl pid\n" .
+	         "       cvsrepo_ctrl -b\n");
     exit(-1);
 }
-my $optlist   = "";
+my $optlist   = "b";
+my $booting   = 0;
+my $pid;
 
 #
 # Configure variables
@@ -29,6 +32,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
 my $PROJROOT    = "/proj";
 my $CVSREPOS    = "$PROJROOT/cvsrepos";
+my $CVSSUPPORT  = @CVSSUPPORT@;
 my $TESTMODE    = @TESTMODE@;
 
 my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
@@ -71,6 +75,14 @@ use libaudit;
 use libdb;
 use libtestbed;
 
+#
+# If no CVS support, just exit. 
+#
+if (! $CVSSUPPORT) {
+    print "CVS repo support is not enabled. Exit ...\n";
+    exit(0);
+}
+
 # Be careful not to exit on transient error
 $libdb::DBQUERY_MAXTRIES = 30;
 
@@ -82,22 +94,28 @@ $libdb::DBQUERY_MAXTRIES = 30;
 if (! getopts($optlist, \%options)) {
     usage();
 }
-usage()
-    if (@ARGV != 1);
-my $pid = $ARGV[0];
-
-# Untaint
-if ($pid =~ /^([-\w]+)$/) {
-    $pid = $1;
+if (defined($options{b})) {
+    $booting = 1;
 }
-else {
-    die("*** Tainted project name: $pid\n");
+usage()
+    if (@ARGV > 1);
+
+if (@ARGV) {
+    $pid = $ARGV[0];
+
+    # Untaint
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die("*** Tainted project name: $pid\n");
+    }
 }
 
 #
 # This script is always audited. Mail is sent automatically upon exit.
 #
-if (AuditStart(0)) {
+if (!$booting && AuditStart(0)) {
     #
     # Parent exits normally
     #
@@ -168,23 +186,25 @@ if (!$TESTMODE) {
 my $now = time;
 utime $now, $now, $lockfile;
 
-#
-# Grab DB data. 
-#
-my $query_result =
-    DBQueryFatal("select cvsrepo_public from projects where pid='$pid'");
+if (defined($pid)) {
+    #
+    # Grab DB data. 
+    #
+    my $query_result =
+	DBQueryFatal("select cvsrepo_public from projects where pid='$pid'");
 
-if (!$query_result->numrows) {
-    die("*** $0:\n".
-	"    DB error getting info for project $pid!\n");
-}
-my ($cvsrepo_public) = $query_result->fetchrow_array();
-my $prot = ($cvsrepo_public ? 0775 : 0770);
-printf("Setting permission on $CVSREPOS/$pid to %o\n", $prot);
+    if (!$query_result->numrows) {
+	die("*** $0:\n".
+	    "    DB error getting info for project $pid!\n");
+    }
+    my ($cvsrepo_public) = $query_result->fetchrow_array();
+    my $prot = ($cvsrepo_public ? 0775 : 0770);
+    printf("Setting permission on $CVSREPOS/$pid to %o\n", $prot);
 
-if (! chmod($prot, "$CVSREPOS/$pid")) {
-    die("*** $0:\n".
-	"    Could not chmod($prot) directory $CVSREPOS/$pid: $!");
+    if (! chmod($prot, "$CVSREPOS/$pid")) {
+	die("*** $0:\n".
+	    "    Could not chmod($prot) directory $CVSREPOS/$pid: $!");
+    }
 }
 
 #
@@ -206,9 +226,11 @@ close(CONF);
 # right into it.
 #
 if (!$TESTMODE) {
+    my $optarg = ($booting ? "-m" : "");
+    
     $UID = 0;
     
-    system("$SSH $PROG < $tailfile") == 0 or
+    system("$SSH $PROG $optarg < $tailfile") == 0 or
 	fatal("Failed: $SSH $PROG < $tailfile: $?");
     unlink("$tailfile");
     close(LOCK);
@@ -218,8 +240,8 @@ exit(0);
 sub fatal($) {
     my ($msg) = @_;
 
-    SENDMAIL($TBOPS, "CVSD Setup Failed", $msg);
-    die($msg);
+    die("*** $0:\n".
+	"    $msg\n");
 }
 
 

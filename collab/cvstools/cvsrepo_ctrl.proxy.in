@@ -14,10 +14,11 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print(STDOUT "Usage: cvsrepo_ctrl.proxy\n");
+    print(STDOUT "Usage: cvsrepo_ctrl.proxy [-m]\n");
     exit(-1);
 }
-my $optlist   = "";
+my $optlist   = "m";
+my $domounts  = 0;
 
 #
 # Configure variables
@@ -41,7 +42,8 @@ my %pubrepos    = ();
 # We don't want to run this script unless its the real version.
 #
 if ($UID != 0) {
-    die("Must be root!");
+    die("*** $0:\n".
+	"    Must be root to run this script!");
 }
 
 # un-taint path
@@ -59,6 +61,20 @@ sub fatal($);
 # 
 use lib "@prefix@/lib";
 use libtestbed;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+my %options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{m})) {
+    $domounts = 1;
+}
+usage()
+    if (@ARGV);
 
 #
 # Take our input and get the list of repos we need to make public.
@@ -117,6 +133,34 @@ system("mv $CVSDCONFNEW $CVSDCONF") == 0 or
 
 # Avoid accidental editing.
 chmod(0444, $CVSDCONF);
+
+#
+# In mounts mode, just do the NFS mounts and exit. This is intended to
+# be called at bootup, from boss.
+#
+if ($domounts) {
+    foreach my $repo (keys(%pubrepos)) {
+	my $dir = $repo;
+
+	if (! -d "$JAILREPODIR/$dir") {
+	    system("/bin/mkdir $JAILREPODIR/$dir") == 0 or
+		fatal("Could not mkdir $JAILREPODIR/$dir");
+	}
+
+	#
+	# Now mount it, if not already done so.
+	#
+	if (! -d "$JAILREPODIR/$dir/CVSROOT") {
+	    print "Mount: localhost:${PROJREPODIR}/$dir $JAILREPODIR/$dir\n";
+	    
+	    system("$MOUNT localhost:${PROJREPODIR}/$dir $JAILREPODIR/$dir");
+	    if ($?) {
+		fatal("Could not NFS mount localhost:${PROJREPODIR}/$dir");
+	    }
+	}
+    }
+    exit(0);
+}
 
 #
 # Must stop cvsd before doing the next step.
