@@ -83,6 +83,8 @@ my $workdir;
 my %noderoles	= ();
 my $opsnode;
 my $bossnode;
+my $fsnode;
+my $routernode;
 my @expnodes    = ();
 my $dbuid;
 my $user_name;
@@ -233,9 +235,13 @@ while (my ($node_id,$role) = $query_result->fetchrow_array()) {
 	
     $noderoles{$node_id} = $role;
     $bossnode = $node_id
-	if ($role eq 'boss');
+	if ($role eq 'boss' || $role eq 'boss+router');
+    $routernode = $node_id
+	if ($role eq 'router');
     $opsnode = $node_id
-	if ($role eq 'ops');
+	if ($role eq 'ops' || $role eq 'ops+fs');
+    $fsnode = $node_id
+	if ($role eq 'fs');
     push(@expnodes, $node_id)
 	if ($role eq 'node');
 }

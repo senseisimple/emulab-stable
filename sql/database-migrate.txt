@@ -2799,4 +2799,23 @@ last_net_act,last_cpu_act,last_ext_act);
                                     weight float not null default 0.5, \
                                     types text not null default "");
 
-4.10:
+4.10: New inner_elab roles to support separate ops and fs nodes.
+      While I'm here, add future roles for distinguishing boss and the router.
+      Then update the virt_nodes and reserved tables to map old values of
+      boss/ops to new values of boss+router/ops+fs.
+
+	alter table virt_nodes change inner_elab_role \
+	      inner_elab_role enum('boss','boss+router','router',\
+				   'ops','ops+fs','fs','node') default NULL;
+	alter table reserved change inner_elab_role \
+	      inner_elab_role enum('boss','boss+router','router',\
+				   'ops','ops+fs','fs','node') default NULL;
+
+	update virt_nodes set inner_elab_role='boss+router'
+		where inner_elab_role='boss';
+	update virt_nodes set inner_elab_role='ops+fs'
+		where inner_elab_role='ops';
+	update reserved set inner_elab_role='boss+router'
+		where inner_elab_role='boss';
+	update reserved set inner_elab_role='ops+fs'
+		where inner_elab_role='ops';

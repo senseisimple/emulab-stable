@@ -1475,8 +1475,8 @@ proc tb-set-node-inner-elab-role {node role} {
 	perror "\[tb-set-node-inner-elab-role] $node is not a node."
 	return
     }
-    if {[lsearch -exact {boss ops node} $role] == -1} {
-	perror "\[tb-set-node-inner-elab-role] type must be one of boss|ops|node"
+    if {[lsearch -exact {boss boss+router router ops ops+fs fs node} $role] == -1} {
+	perror "\[tb-set-node-inner-elab-role] type must be one of boss|boss+router|router|ops|ops+fs|fs|node"
 	return
     }
     $node set inner_elab_role $role
@@ -1523,4 +1523,3 @@ proc tb-set-node-id {vnode myid} {
     }
     $vnode set_numeric_id $myid
 }
-

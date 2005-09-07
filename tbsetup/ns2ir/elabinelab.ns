@@ -5,8 +5,8 @@
 set myboss [$ns node]
 set myops  [$ns node]
 
-tb-set-node-inner-elab-role $myboss boss
-tb-set-node-inner-elab-role $myops  ops
+tb-set-node-inner-elab-role $myboss boss+router
+tb-set-node-inner-elab-role $myops  ops+fs
 
 if {[info exists ::TBCOMPAT::elabinelab_hardware("boss")]} {
     namespace eval TBCOMPAT {
@@ -125,6 +125,3 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("ops")]} {
 } else {
     tb-set-node-os $myops  FBSD-STD
 }
-
-
-

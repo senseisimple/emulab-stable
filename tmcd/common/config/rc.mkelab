@@ -210,6 +210,14 @@ sub doboot()
     }
 
     #
+    # XXX temporary backward compat til these varients get implemented
+    #
+    $emulabconfig{"ROLE"} = "boss"
+	if ($emulabconfig{"ROLE"} eq "boss+router");
+    $emulabconfig{"ROLE"} = "ops"
+	if ($emulabconfig{"ROLE"} eq "ops+fs");
+
+    #
     # XXX To avoid NFS errors while copying goo from outer boss.
     # 
     system("sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1");    

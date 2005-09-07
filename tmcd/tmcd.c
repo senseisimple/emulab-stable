@@ -5513,13 +5513,13 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	while (nrows--) {
 		row = mysql_fetch_row(res);
 
-		if (!strcmp(row[1], "boss")) {
+		if (!strcmp(row[1], "boss") || !strcmp(row[1], "boss+router")) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "BOSSNODE=%s\n",
 				       row[3]);
 			bufp += OUTPUT(bufp, ebufp - bufp, "BOSSIP=%s\n",
 				       row[2]);
 		}
-		else if (!strcmp(row[1], "ops")) {
+		else if (!strcmp(row[1], "ops") || !strcmp(row[1], "ops+fs")) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPSNODE=%s\n",
 				       row[3]);
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPSIP=%s\n",
