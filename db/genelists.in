@@ -253,15 +253,19 @@ if ($all || defined($user) || defined($pid)) {
     my $query_result;
     
     if ($all) {
-	$query = "select pid,gid from groups";
+	$query = "select g.pid,g.gid from groups as g ".
+		 "left join projects as p on p.pid=g.pid ".
+		 "where p.approved=1 ";
+	$query .= "order by g.pid,g.gid";
     }
     elsif ($user) {
-	$query = "select pid,gid from group_membership where uid='$user'";
+	$query  = "select pid,gid from group_membership where uid='$user' ";
+	$query .= "order by pid,gid";
     }
     else {
-	$query = "select pid,gid from groups where pid='$pid'";
+	$query  = "select pid,gid from groups where pid='$pid' ";
+	$query .= "order by pid,gid";
     }
-    $query .= " order by pid,gid";
 
     if (! ($query_result = DBQuery($query))) {
 	DBFatal("Getting Project List!");
