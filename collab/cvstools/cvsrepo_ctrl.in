@@ -6,9 +6,12 @@
 #
 use English;
 use Getopt::Std;
+use Fcntl ':flock';
 
 #
-# Set the cvsrepo permission bits to make a CVS repo public.
+# Set the cvsrepo permission bits to make a CVS repo public or private.
+# Also regen the cvsd.conf file on ops.
+# This script always does the right thing ...
 #
 sub usage()
 {
@@ -16,16 +19,22 @@ sub usage()
     exit(-1);
 }
 my $optlist   = "";
-my $dbuid;
 
 #
 # Configure variables
 #
 my $TB		= "@prefix@";
+my $FSNODE      = "@FSNODE@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TBAUDIT     = "@TBAUDITEMAIL@";
 my $PROJROOT    = "/proj";
 my $CVSREPOS    = "$PROJROOT/cvsrepos";
+my $TESTMODE    = @TESTMODE@;
+
+my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
+my $PROG	= "$TB/sbin/cvsrepo_ctrl.proxy";
+my $tailfile    = "/var/tmp/cvsd.conf.tail";
+my $lockfile    = "/var/tmp/testbed_cvsrepo_lockfile";
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
@@ -51,7 +60,10 @@ if ($UID == 0) {
 #
 # Turn off line buffering on output. Very important for this script!
 #
-$| = 1; 
+$| = 1;
+
+# Protos
+sub fatal($);
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
@@ -83,14 +95,6 @@ else {
 }
 
 #
-# Verify user and get his DB uid.
-#
-if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
-}
-
-#
 # This script is always audited. Mail is sent automatically upon exit.
 #
 if (AuditStart(0)) {
@@ -101,13 +105,68 @@ if (AuditStart(0)) {
 }
 
 #
-# Check permission.
+# We need to serialize this script to avoid a trashed map file. Use
+# a dummy file in /var/tmp, opened for writing and flock'ed. 
 #
-if (!TBAdmin($UID) &&
-    !TBMinTrust(TBGrpTrust($dbuid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT)) {
-    die("*** $0:\n".
-	"    You do not have permission to set cvs permissions for $pid!\n");
+if (!$TESTMODE) {
+    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
+    $count = 0;
+    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
+	#
+	# If we don't get it the first time, we wait for:
+	# 1) The lock to become free, in which case we do our thing
+	# 2) The time on the lock to change, in which case we wait for that process
+	#    to finish
+	#
+	my $oldlocktime = (stat(LOCK))[9];
+	my $gotlock = 0;
+	while (1) {
+	    print "Another cvsrepo update in progress, ".
+		"waiting for it to finish\n";
+	    
+	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		# OK, got the lock, we can do what we're supposed to
+		$gotlock = 1;
+		last;
+	    }
+	    $locktime = (stat(LOCK))[9];
+	    if ($locktime != $oldlocktime) {
+		$oldlocktime = $locktime;
+		last;
+	    }
+	    if ($count++ > 20)  {
+		fatal("Could not get the lock after a long time!\n");
+	    }
+	    sleep(1);
+	}
+
+	$count = 0;
+	#
+	# If we didn't get the lock, wait for the processes that did to finish
+	#
+	if (!$gotlock) {
+	    while (1) {
+		if ((stat(LOCK))[9] != $oldlocktime) {
+		    exit(0);
+		}
+		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
+		    close(LOCK);
+		    exit(0);
+		}
+		if ($count++ > 20)  {
+		    fatal("Process with the lock didn't finish after a long time!\n");
+		}
+		sleep(1); 
+	    }
+	}
+    }
 }
+
+#
+# Perl-style touch(1)
+#
+my $now = time;
+utime $now, $now, $lockfile;
 
 #
 # Grab DB data. 
@@ -127,4 +186,40 @@ if (! chmod($prot, "$CVSREPOS/$pid")) {
     die("*** $0:\n".
 	"    Could not chmod($prot) directory $CVSREPOS/$pid: $!");
 }
+
+#
+# Okay, generate the public dir list and ship it over.
+#
+$query_result =
+    DBQueryFatal("select pid from projects where cvsrepo_public=1");
+
+open(CONF, ">$tailfile") ||
+    fatal("Could not open $tailfile!");
+
+while (my ($pid) = $query_result->fetchrow_array()) {
+    print CONF "$pid\n";
+}
+close(CONF);
+
+#
+# Fire the new tail file over to the fileserver to finish. We cat the file
+# right into it.
+#
+if (!$TESTMODE) {
+    $UID = 0;
+    
+    system("$SSH $PROG < $tailfile") == 0 or
+	fatal("Failed: $SSH $PROG < $tailfile: $?");
+    unlink("$tailfile");
+    close(LOCK);
+}
 exit(0);
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "CVSD Setup Failed", $msg);
+    die($msg);
+}
+
+

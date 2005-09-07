@@ -83,4 +83,6 @@ Log syslog info
 #  The path should be relative to the specified
 #  RootJail and should start with a `/'.
 #  This option can be supplied multiple times.
-Repos /testbed
+# Leave this here! cvsd barfs if there are no Repo statements. Ick.
+Repos /dummy
+
