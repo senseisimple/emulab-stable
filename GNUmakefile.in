@@ -62,7 +62,7 @@ endif
 	@$(MAKE) -C tools post-install
 	@$(MAKE) -C wiki post-install
 	@$(MAKE) -C bugdb post-install
-	@$(MAKE) -C collab/mailman post-install
+	@$(MAKE) -C collab post-install
 	@$(MAKE) -C utils post-install
 
 #

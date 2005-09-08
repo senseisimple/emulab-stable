@@ -25,6 +25,10 @@ install:	install-subdirs
 clean:		clean-subdirs
 boss-install:	install
 
+post-install:
+	@$(MAKE) -C mailman post-install
+	@$(MAKE) -C cvs post-install
+
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
 %.MAKE:
