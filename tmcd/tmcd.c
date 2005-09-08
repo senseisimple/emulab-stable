@@ -5505,7 +5505,7 @@ COMMAND_PROTOTYPE(doemulabconfig)
 	}
 
 	/*
-	 * Spit the names of the boss and ops nodes for everyones benefit.
+	 * Spit the names of the boss, ops and fs nodes for everyones benefit.
 	 */
 	mysql_data_seek(res, 0);
 	nrows = (int)mysql_num_rows(res);
@@ -5523,6 +5523,12 @@ COMMAND_PROTOTYPE(doemulabconfig)
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPSNODE=%s\n",
 				       row[3]);
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPSIP=%s\n",
+				       row[2]);
+		}
+		else if (!strcmp(row[1], "fs")) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "FSNODE=%s\n",
+				       row[3]);
+			bufp += OUTPUT(bufp, ebufp - bufp, "FSIP=%s\n",
 				       row[2]);
 		}
 	}
@@ -5552,6 +5558,12 @@ COMMAND_PROTOTYPE(doemulabconfig)
 				       row[1]);
 		} else if (strcmp(row[0], "elabinelab/ops_pkg") == 0) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "OPS_PKG=%s\n",
+				       row[1]);
+		} else if (strcmp(row[0], "elabinelab/fs_pkg_dir") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "FS_PKG_DIR=%s\n",
+				       row[1]);
+		} else if (strcmp(row[0], "elabinelab/fs_pkg") == 0) {
+			bufp += OUTPUT(bufp, ebufp - bufp, "FS_PKG=%s\n",
 				       row[1]);
 		} else if (strcmp(row[0], "elabinelab/windows") == 0) {
 			bufp += OUTPUT(bufp, ebufp - bufp, "WINSUPPORT=%s\n",
