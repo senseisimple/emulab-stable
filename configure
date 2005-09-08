@@ -2350,6 +2350,13 @@ outfiles="$outfiles Makeconf GNUmakefile \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         collab/GNUmakefile \
         collab/mailman/GNUmakefile collab/cvs/GNUmakefile \
+	collab/mailman/mmlistmembership \
+	collab/mailman/addmmlist collab/mailman/mmsetup \
+	collab/mailman/delmmlist collab/mailman/mmxlogin \
+	collab/mailman/genaliases collab/mailman/setmmlistmembers \
+	collab/mailman/mailmanproxy collab/mailman/setmmpasswd \
+	collab/cvs/cvsrepo_ctrl.proxy collab/cvs/cvsrepo_ctrl \
+	collab/cvs/webcvsrepo_ctrl \
 	daikon/GNUmakefile daikon/daikonize daikon/find_perl "
 
 #
