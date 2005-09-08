@@ -114,9 +114,11 @@ system("$ADDMMLIST $optarg -a emulab-users") == 0
 my @projects = ();
 
 $query_result =
-    DBQueryFatal("select pid,gid from groups where 1 ".
-#		 "and (pid='testbed' or pid='emulab-ops' or pid='tbres' or ".
-#		 "     pid='utahstud')" .
+    DBQueryFatal("select g.pid,g.gid from groups as g ".
+		 "left join projects as p on p.pid=g.pid ".
+		 "where p.approved=1 ".
+#		 "and (p.pid='testbed' or p.pid='emulab-ops' or ".
+#		 "     p.pid='tbres' or p.pid='utahstud') ".
 		 "");
 
 while (my ($pid,$gid) = $query_result->fetchrow_array()) {
@@ -132,8 +134,8 @@ while (my ($pid,$gid) = $query_result->fetchrow_array()) {
 	$listname = "$pid" . "-users";
     }
 
-    system("$ADDMMLIST $optarg -a $listname") == 0
-	or fatal("Could not create $listname list");
+#    system("$ADDMMLIST $optarg -a $listname") == 0
+#	or fatal("Could not create $listname list");
 
     push(@projects, $pid);
 }
@@ -142,7 +144,7 @@ while (my ($pid,$gid) = $query_result->fetchrow_array()) {
 # And populate all the lists!
 #
 foreach my $pid (@projects) {
-    system("$GENELISTS $optarg -p $pid") == 0
+    system("$GENELISTS $optarg -d -p $pid") == 0
 	or fatal("Could not populate lists for project $pid!");
 }
 

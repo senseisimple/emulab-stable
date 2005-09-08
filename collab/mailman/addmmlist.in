@@ -6,6 +6,7 @@
 #
 use English;
 use Getopt::Std;
+use Errno qw(EEXIST);
 
 #
 # Add a mailman list, say for a project or other reason. If for a project
@@ -159,7 +160,7 @@ if ($listtype eq "admin") {
     $listowner_email  = $TBOPS;
 
     if (! TBGetSiteVar("general/mailman/password", \$listpasswd)) {
-	fatal("Could not mailman admin password from sitevars!");
+	fatal("Could not get mailman admin password from sitevars!");
     }
 }
 else {
@@ -179,21 +180,18 @@ if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
 
     print "Adding mailman list $listname ($listtype) on $CONTROL.\n";
-
-    if (system("echo '$listowner_email $listpasswd' | ".
-	       "$SSH -host $CONTROL $MMPROXY addlist $listname $listtype")) {
+    
+    system("echo '$listowner_email $listpasswd' | ".
+	   "$SSH -host $CONTROL $MMPROXY addlist $listname $listtype");
+    if ($?) {
+	if ($? >> 8 == EEXIST()) {
+	    # Not an error.
+	    exit(0);
+	}
 	fatal("$MMPROXY failed on $CONTROL!");
     }
     
     SENDMAIL($TBAUDIT, "Mailman list created",
-	     "Mailman list '$listname' has been created by '$dbuid'",
-	     $TBOPS);
-
-    #
-    # Generate an initial message to the list so that the archive is not
-    # empty.
-    #
-    SENDMAIL("${listname}\@${OURDOMAIN}", "Mailman list created",
 	     "Mailman list '$listname' has been created by '$dbuid'",
 	     $TBOPS);
 }

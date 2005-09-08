@@ -14,8 +14,8 @@
 # A project
 #
 function SHOWPROJECT($pid, $thisuid) {
-    global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR;
-    global $MAILMANSUPPORT;
+    global $WIKISUPPORT, $CVSSUPPORT, $TBPROJ_DIR, $TBCVSREPO_DIR;
+    global $MAILMANSUPPORT, $OPSCVSURL, $USERNODE;
     global $TBDB_TRUST_GROUPROOT;
     
     $query_result =
@@ -48,6 +48,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $expt_count         = $row[expt_count];
     $expt_last          = $row[expt_last];
     $wikiname           = $row[wikiname];
+    $cvsrepo_public     = $row[cvsrepo_public];
 
     if ($proj_public) {
 	$proj_public = "Yes";
@@ -104,14 +105,38 @@ function SHOWPROJECT($pid, $thisuid) {
               </tr>\n";
     }
     if ($CVSSUPPORT) {
-	$cvsdir = "$TBPROJ_DIR/$pid/CVS";
+	$cvsdir = "$TBCVSREPO_DIR/$pid";
 	$cvsurl = "cvsweb/cvsweb.php3?pid=$pid";
 	
 	echo "<tr>
                   <td>Project CVS Repository:</td>
                   <td class=\"left\">
-                      $cvsdir <A href='$cvsurl'>(cvsweb)</A></td>
+                      $cvsdir <A href='$cvsurl'>(CVSweb)</A></td>
               </tr>\n";
+
+	$YesNo = ($cvsrepo_public ? "Yes" : "No");
+	$flip  = ($cvsrepo_public ? 0 : 1);
+	echo "<tr>
+              <td>CVS Repository Publically Readable?:</td>
+              <td><a href=toggle.php?pid=$pid&type=cvsrepo_public&value=$flip>
+                     $YesNo</a> (Click to toggle)</td>
+              </tr>\n";
+
+	if ($cvsrepo_public) {
+	    $puburl  = "$OPSCVSURL/?cvsroot=$pid";
+	    $pserver = ":pserver:anoncvs@$USERNODE:/cvsrepos/$pid";
+		
+	    echo "<tr>
+                      <td>Public CVSWeb Address:</td>
+                      <td><a href=$puburl>" .
+		            htmlspecialchars($puburl) . "</a></td>
+                  </tr>\n";
+
+	    echo "<tr>
+                      <td>CVS pserver Address:</td>
+                      <td>" . htmlspecialchars($pserver) . "</td>
+                  </tr>\n";
+	}
     }
 
     if ($MAILMANSUPPORT) {

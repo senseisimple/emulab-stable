@@ -92,30 +92,41 @@ elseif (isset($listname) && $listname != "") {
 	PAGEARGERROR("Invalid characters in $listname!");
     }
 
+    $optargs = "";
     #
     # Make sure the user is allowed! We must do a permission check since
     # we are asking mailman to generate a cookie without a password.
     #
-    if (!$isadmin) {
-	$mm_result = DBQueryFatal("select * from mailman_listnames ".
-				  "where listname='$listname'");
+    if (isset($wantadmin)) {
+	if (!$isadmin) {
+	    $mm_result = DBQueryFatal("select * from mailman_listnames ".
+				      "where listname='$listname'");
 
-	if (!mysql_num_rows($mm_result)) {
-	    USERERROR("No such list $listname!", 1);
-	}
-	$row = mysql_fetch_array($mm_result);
-	$owner_uid = $row['owner_uid'];
+	    if (!mysql_num_rows($mm_result)) {
+		USERERROR("No such list $listname!", 1);
+	    }
+	    $row = mysql_fetch_array($mm_result);
+	    $owner_uid = $row['owner_uid'];
 
-        #
-        # Verify permission.
-        #
-	if ($uid != $owner_uid) {
-	    USERERROR("You do not have permission to admin $listname!", 1);
+           #
+           # Verify permission.
+           #
+	    if ($uid != $owner_uid) {
+		USERERROR("You do not have permission to admin $listname!", 1);
+	    }
 	}
+	$cookietype = "admin";
+	$listiface  = "admin";
     }
-
-    $cookietype = "admin";
-    $listiface  = "admin";
+    elseif (isset($wantconfig)) {
+	$cookietype = "user";
+	$listiface  = "options";
+	$optargs    = "?email=${uid}@${OURDOMAIN}";
+    }
+    else {
+	$cookietype = "user";
+	$listiface  = "private";
+    }
 
     SUEXEC($uid, "nobody", "mmxlogin $uid $listname $cookietype",
 	   SUEXEC_ACTION_DIE);
@@ -132,7 +143,7 @@ elseif (isset($listname) && $listname != "") {
     }
     setcookie($matches[1], $matches[2], 0, $matches[3], $TBAUTHDOMAIN, 0);
 
-    $url = "${MAILMANURL}/$listiface/$listname/";
+    $url = "${MAILMANURL}/$listiface/$listname/$optargs";
 
     if (isset($link)) {
 	$url .= $link;

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -25,6 +25,7 @@ my $debug   = 0;
 #
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
+my $CVSSUPPORT  = @CVSSUPPORT@;
 
 # Locals
 my $lockfile    = "/var/tmp/testbed_opsreboot_lockfile";
@@ -102,6 +103,10 @@ SENDMAIL($TBOPS, "OPS has rebooted",
 # restart the event servers on ops.
 #
 system("$TB/sbin/eventsys_start");
+
+if ($CVSSUPPORT) {
+    system("$TB/sbin/cvsrepo_ctrl -b");
+}
 
 SENDMAIL($TBOPS, "OPS has rebooted",
 	 "OPS has rebooted. Services have been restarted.",

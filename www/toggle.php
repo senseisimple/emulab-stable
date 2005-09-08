@@ -23,19 +23,22 @@ LOGGEDINORDIE($uid, CHECKLOGIN_USERSTATUS|CHECKLOGIN_WEBONLY);
 $isadmin = ISADMIN($uid);
 
 # List of valid toggles
-$toggles = array("adminoff", "webfreeze", "cvsweb", "lockdown");
+$toggles = array("adminoff", "webfreeze", "cvsweb", "lockdown",
+		 "cvsrepo_public");
 
 # list of valid values for each toggle
-$values  = array("adminoff"  => array(0,1),
-		 "webfreeze" => array(0,1),
-		 "cvsweb"    => array(0,1),
-		 "lockdown"  => array(0,1));
+$values  = array("adminoff"       => array(0,1),
+		 "webfreeze"      => array(0,1),
+		 "cvsweb"         => array(0,1),
+		 "lockdown"       => array(0,1),
+		 "cvsrepo_public" => array(0,1));
 
 # list of valid extra variables for the each toggle, and mandatory flag.
-$optargs = array("adminoff"  => array("target_uid" => 0),
-		 "webfreeze" => array("target_uid" => 1),
-		 "cvsweb"    => array("target_uid" => 1),
-		 "lockdown"  => array("pid" => 1, "eid" => 1));
+$optargs = array("adminoff"       => array("target_uid" => 0),
+		 "webfreeze"      => array("target_uid" => 1),
+		 "cvsweb"         => array("target_uid" => 1),
+		 "lockdown"       => array("pid" => 1, "eid" => 1),
+		 "cvsrepo_public" => array("pid" => 1));
 
 # Mandatory page arguments.
 $type  = $_GET['type'];
@@ -118,6 +121,23 @@ elseif ($type == "lockdown") {
     }
     DBQueryFatal("update experiments set lockdown='$value' ".
 		 "where pid='$pid' and eid='$eid'");
+}
+elseif ($type == "cvsrepo_public") {
+    # Must validate the pid since we allow non-admins to do this.
+    if (! TBvalid_pid($pid)) {
+	PAGEARGERROR("Invalid characters in $pid");
+    }
+    if (!TBValidProject($pid)) {
+	PAGEARGERROR("Project $pid is not a valid project!");
+    }
+    # Must be admin or project/group root.
+    if (!$isadmin &&
+	! TBMinTrust(TBGrpTrust($uid, $pid, $pid), $TBDB_TRUST_GROUPROOT)) {
+	USERERROR("You do not have permission to toggle $type!", 1);
+    }
+    DBQueryFatal("update projects set cvsrepo_public='$value' ".
+		 "where pid='$pid'");
+    SUEXEC($uid, $pid, "webcvsrepo_ctrl $pid", SUEXEC_ACTION_DIE);
 }
 else {
     USERERROR("Nobody has permission to toggle $type!", 1);

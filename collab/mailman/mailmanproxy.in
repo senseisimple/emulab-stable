@@ -6,7 +6,7 @@
 #
 use English;
 use Getopt::Std;
-use Errno;
+use Errno qw(EEXIST);
     
 #
 # A wrapper for messing with Mailman from boss.
@@ -125,6 +125,9 @@ elsif ($action eq "setadminpassword") {
 elsif ($action eq "xlogin") {
     exit(xLogin(@ARGV));
 }
+elsif ($action eq "membership") {
+    exit(ListMembership(@ARGV));
+}
 else {
     die("*** $0:\n".
 	"    Do not know what to do with '$action'!\n");
@@ -166,6 +169,10 @@ sub AddList(@)
 	system("echo '' | ".
 	       "$MMBINDIR/newlist $optarg $name $owneremail $password") == 0 or
 	    fatal("AddList: Could not create mailing list!");
+    }
+    else {
+	print "List '$name' and already exists; exiting ...\n";
+	return EEXIST();
     }
 
     # Step 2: Config the list. We just need to alter a few of the defaults.
@@ -221,6 +228,24 @@ sub AddList(@)
     $EUID = $UID = 0;
     system("$GENALIASES") == 0 or
 	fatal("AddList: Could not generate a new aliases file!");
+
+    # Step 4: Inject an intro message so that the archive is non-empty.
+    $tempfile = "/tmp/intro.$$";
+
+    open(INTRO, "> $tempfile") or
+	fatal("Could not open $tempfile for writing!");
+    print INTRO "From: $TBOPS\n";
+    print INTRO "To: " . lc($name) . "\@" . "$OURDOMAIN\n";
+    print INTRO "Subject: Welcome!\n";
+    print INTRO "\n";
+    print INTRO "This is the Emulab Mailman archive for $name\n";
+    print INTRO "\n";
+    close(INTRO);
+    
+    # Run the injection.
+    system("$MMBINDIR/inject -l ". lc($name) . " $tempfile") == 0 or
+	fatal("AddList: Could not inject initial message to $name!");
+    unlink($tempfile);
 
     return 0;
 }
@@ -548,6 +573,33 @@ sub DeleteList(@)
 	system("$MMBINDIR/rmlist -a $listname") == 0 or
 	    fatal("DeleteList: Could not delete mailing list!");
     }
+    return 0;
+}
+
+#
+# Get the list membership for a person.
+# 
+sub ListMembership(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($email) = @_;
+
+    #
+    # Very convenient script provided by mailman ...
+    #
+    open(NAMES, "$MMBINDIR/find_member $email |") or
+	fatal("ListMembership: Could not start up find_member!");
+
+    while (<NAMES>) {
+	if ($_ =~ /^\s*([^\s]*)$/) {
+	    print "$1\n";
+	}
+    }
+    close(NAMES) or
+	fatal("ListMembership: Error running find_member script!");
+    
     return 0;
 }
 

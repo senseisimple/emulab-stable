@@ -18,11 +18,21 @@ LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
 #
+# See what projects the uid can do this in.
+#
+$projlist = TBProjList($uid, $TB_PROJECT_READINFO);
+
+if (! count($projlist)) {
+    USERERROR("You do not appear to be a member of any Projects in which ".
+	      "you have permission to create new mailing lists", 1);
+}
+
+#
 # Spit the form out using the array of data. 
 # 
 function SPITFORM($formfields, $errors)
 {
-    global $TBDB_MMLENGTH;
+    global $TBDB_MMLENGTH, $projlist, $OURDOMAIN;
 
     PAGEHEADER("Create a new MailMan list");
     
@@ -47,6 +57,43 @@ function SPITFORM($formfields, $errors)
 	}
 	echo "</table><br>\n";
     }
+    else {
+	echo "<blockquote><blockquote>
+              <center>
+               <font size=+1>
+                 Host your own project related mailing lists at $OURDOMAIN
+               </font>
+              </center><br>
+              Use the form below to create a new mailing list. You will
+              become the administrator for the new list, and are responsible
+              for the list configuration and management, including user
+              subscriptions, approval, etc. <b>Note that mailing lists
+              should be related to your project in some manner; please,
+              no lists discussing the latest episode of your favorite TV
+              show.</b>
+	      </blockquote></blockquote>\n";
+    }
+
+    echo "<SCRIPT LANGUAGE=JavaScript>
+              function Changed(theform) 
+              {
+                  var pidx   = theform['formfields[pid]'].selectedIndex;
+                  var pid    = theform['formfields[pid]'].options[pidx].value;
+                  var list   = theform['formfields[listname]'].value;
+
+                  if (pid == '') {
+                      theform['formfields[fullname]'].value = '';
+                  }
+                  else if (list == '') {
+                      theform['formfields[fullname]'].value = pid + '-';
+                  }
+                  else {
+                      theform['formfields[fullname]'].value =
+                        pid + '-' + theform['formfields[listname]'].value +
+                        '@' + '$OURDOMAIN';
+                  }
+              }
+          </SCRIPT>\n";
 
     echo "<br>
           <table align=center border=1> 
@@ -55,7 +102,28 @@ function SPITFORM($formfields, $errors)
                  <em>(Fields marked with * are required)</em>
              </td>
           </tr>
-          <form action='newmmlist.php3' method=post>\n";
+          <form action='newmmlist.php3' method=post name=myform>\n";
+
+    #
+    # Select Project
+    #
+    echo "<tr>
+              <td>*Select Project:</td>
+              <td><select name=\"formfields[pid]\"
+                          onChange='Changed(myform);'>
+                      <option value=''>Please Select &nbsp</option>\n";
+    
+    while (list($project) = each($projlist)) {
+	$selected = "";
+
+	if ($formfields[pid] == $project)
+	    $selected = "selected";
+	
+	echo "        <option $selected value='$project'>$project </option>\n";
+    }
+    echo "       </select>";
+    echo "    </td>
+          </tr>\n";
 
     #
     # Select List Name
@@ -64,8 +132,24 @@ function SPITFORM($formfields, $errors)
               <td>*List Name (no blanks):</td>
               <td class=left>
                   <input type=text
+                         onChange='Changed(myform);'
                          name=\"formfields[listname]\"
                          value=\"" . $formfields[listname] . "\"
+	                 size=$TBDB_MMLENGTH
+                         maxlength=$TBDB_MMLENGTH>
+              </td>
+          </tr>\n";
+
+    #
+    # This is auto filled in by the javascript above.
+    # 
+    echo "<tr>
+              <td>EMail Address (will be):</td>
+              <td class=left>
+                  <input type=text
+                         readonly 
+                         name=\"formfields[fullname]\"
+                         value=\"" . $formfields[fullname] . "\"
 	                 size=$TBDB_MMLENGTH
                          maxlength=$TBDB_MMLENGTH>
               </td>
@@ -134,34 +218,53 @@ if (! $submit) {
 $errors = array();
 
 #
-# List Name:
+# Project:
 # 
-if (!isset($formfields[listname]) ||
-    strcmp($formfields[listname], "") == 0) {
-    $errors["List Name"] = "Missing Field";
+if (!isset($formfields[pid]) ||
+    strcmp($formfields[pid], "") == 0) {
+    $errors["Project"] = "Not Selected";
+}
+elseif (!TBvalid_pid($formfields[pid])) {
+    $errors["Project"] = "Invalid Characters";
+}
+elseif (!TBValidProject($formfields[pid])) {
+    $errors["Project"] = "No such project";
+}
+elseif (!TBProjAccessCheck($uid, $formfields[pid],
+			   $formfields[pid], $TB_PROJECT_READINFO)) {
+    $errors["Project"] = "Not enough permission";
 }
 else {
-    if (! TBvalid_mailman_listname($formfields[listname])) {
-	$errors["List Name"] =
-	    "Must be alphanumeric and must begin with an alphanumeric";
-    }
-    elseif (strlen($formfields[listname]) > $TBDB_MMLENGTH) {
-	$errors["List  Name"] =
-	    "Too long! ".
-	    "Must be less than or equal to $TBDB_MMLENGTH";
+    #
+    # List Name, but only if pid was okay.
+    #
+    if (!isset($formfields[listname]) ||
+	strcmp($formfields[listname], "") == 0) {
+	$errors["List Name"] = "Missing Field";
     }
     else {
-        #
-        # Before we proceed, lets see if the list already exists.
-        #
-	$listname = $formfields[listname];
+	$listname = $formfields[pid] . "-" . $formfields[listname];
 	
-	$query_result =
-	    DBQueryFatal("select * from mailman_listnames ".
-			 "where listname='$listname'");
+	if (! TBvalid_mailman_listname($listname)) {
+	    $errors["List Name"] =
+		"Must be alphanumeric and must begin with an alphanumeric";
+	}
+	elseif (strlen($listname) > $TBDB_MMLENGTH) {
+	    $errors["List Name"] =
+		"Too long! ".
+		"Must be less than or equal to $TBDB_MMLENGTH";
+	}
+	else {
+            #
+            # Before we proceed, lets see if the list already exists.
+            #
+	    $query_result =
+		DBQueryFatal("select * from mailman_listnames ".
+			     "where listname='$listname'");
 	
-	if (mysql_num_rows($query_result)) {
-	    $errors["List Name"] = "Name already in use; pick another";
+	    if (mysql_num_rows($query_result)) {
+		$errors["List Name"] = "Name already in use; pick another";
+	    }
 	}
     }
 }
@@ -194,7 +297,7 @@ if (count($errors)) {
     return;
 }
 
-$listname = $formfields[listname];
+$listname = $formfields[pid] . "-" . $formfields[listname];
 $password = $formfields[password1];
 
 #

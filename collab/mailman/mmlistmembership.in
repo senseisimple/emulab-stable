@@ -1,0 +1,134 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Ask the mailman server for the list of lists a user belongs to.
+#
+sub usage()
+{
+    print STDOUT "Usage: mmlistmembership <uid>\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+my $user_uid;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT	= "@TBAUDITEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $MMPROXY     = "$TB/sbin/mailmanproxy";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# If no mailman support, just exit. 
+#
+if (! $MAILMANSUPPORT) {
+    print "MailMan support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+
+usage()
+    if (@ARGV != 1);
+    
+$user_uid = $ARGV[0];
+    
+#
+# Untaint args.
+#
+if ($user_uid =~ /^([-\w]+)$/) {
+    $user_uid = $1;
+}
+else {
+    die("Bad data in uid: $user_uid");
+}
+
+my $email = "${user_uid}\@${OURDOMAIN}";
+
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if ($CONTROL ne $BOSSNODE) {
+    open(LISTS, "$SSH -host $CONTROL $MMPROXY ".
+				 "membership $email |") or
+	fatal("$MMPROXY failed on $CONTROL!");
+    while (<LISTS>) {
+	# Send back to PHP.
+	print $_;
+    }
+    close(LISTS) or
+	fatal("$MMPROXY failed on $CONTROL!");
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

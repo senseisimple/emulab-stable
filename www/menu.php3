@@ -223,7 +223,7 @@ function WRITEPLABBOTTOMBAR() {
 function WRITESIDEBAR() {
     global $login_status, $login_uid, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
-    global $BUGDBSUPPORT, $BUGDBURL;
+    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
     $firstinitstate = TBGetFirstInitState();
@@ -300,8 +300,8 @@ function WRITESIDEBAR() {
 	WRITESIDEBARBUTTON("Papers (Jul 28)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software (Mar 12)",
 			       $TBDOCBASE, "software.php3");
-	WRITESIDEBARBUTTON("Add Widearea Node (CD)",
-				$TBDOCBASE, "cdrom.php");
+	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
+	#		    $TBDOCBASE, "cdrom.php");
 
 	SIDEBARCELL("<a href=\"$TBDOCBASE/people.php3\">People</a> and " .
 	            "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>");
@@ -312,28 +312,100 @@ function WRITESIDEBAR() {
 		    "docname=sponsors.html\">Sponsors</a>",1);
     } else {
 	# Link ALWAYS TO UTAH
-	WRITESIDEBARBUTTON_ABSCOOL("Add Widearea Node (CD)",
-			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
+	#WRITESIDEBARBUTTON_ABSCOOL("Add Widearea Node (CD)",
+	#		       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
 	WRITESIDEBARLASTBUTTON("Projects on Emulab", $TBDOCBASE,
 			       "projectlist.php3");
     }
 
-    # create the search bit, then the second table for the Web Interface.
-?>
-    <tr><td class="menuoptst"><b>Search Documentation:</b></td></tr>
-    <tr><td class="menuoptsb"><input name=query size = 15/>
-      <input type=submit style="font-size:10px;" value="Go" /><br>
-    </td></tr>
-<?php # BACK TO PHP
+    # The actual search box. Form starts above ...
+    echo "<tr><td class=menuoptst><b>".
+	"Search Documentation:</b></td></tr>".
+	"<tr><td class=menuoptsb><input name=query size = 15/>".
+	"<input type=submit style='font-size:10px;' value=Go /><br>".
+	"</td></tr>\n";
+
+    #
+    # Cons up a nice message.
+    # 
+    switch ($login_status & CHECKLOGIN_STATUSMASK) {
+    case CHECKLOGIN_LOGGEDIN:
+	$login_message = 0;
+	    
+	if ($login_status & CHECKLOGIN_PSWDEXPIRED)
+	    $login_message = "$login_message<br>(Password Expired!)";
+	elseif ($login_status & CHECKLOGIN_UNAPPROVED)
+	    $login_message = "$login_message<br>(Unapproved!)";
+	break;
+    case CHECKLOGIN_TIMEDOUT:
+	$login_message = "Login Timed out.";
+	break;
+    default:
+	$login_message = 0;
+	break;
+    }
+
+    if ($login_message) {
+      echo "<tr>";
+      echo "<td class=menuoptst style='padding-top: 6px;' ><center><b>";
+      echo "$login_message</b></center></td>";
+      echo "</tr>";
+    }
+
+    #
+    # Now the login/logout box. Remember, already inside a table.
+    # We want the links to the login/logout pages to always be https,
+    # but the images path depends on whether the page was loaded as
+    # http or https, since we do not want to mix them, since they
+    # cause warnings.
+    # 
+    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+      echo "<tr>";
+      echo "<td class=\"menuoptst\" align=center valign=center>";
+      echo "<a href=\"$TBBASE/logout.php3?target_uid=$login_uid\">";
+      echo "<img alt=\"logoff\" border=0 ";
+      echo "src=\"$BASEPATH/logoff.gif\"></a>\n";
+      echo "</td></tr>\n";
+    }
+    elseif (!NOLOGINS()) {
+	echo "<tr>";
+	echo "<td class=\"menuoptst\" align=center valign=center>";
+
+	if (!$firstinitstate) {
+	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
+	    echo "<img alt=\"Request Account\" border=0 ";
+	    echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
+
+	    echo "<br /><b>or</b><br />";
+	}
+
+	echo "<a href=\"$TBBASE/login.php3\">";
+	echo "<img alt=\"logon\" border=0 ";
+	echo "src=\"$BASEPATH/logon.gif\"></a>\n";
+
+	echo "</td></tr>\n";
+    }
+
+    #
+    # Login message. Set via 'web/message' site variable
+    #
+    $message = TBGetSiteVar("web/message");
+    if (0 != strcmp($message,"")) {
+	WRITESIDEBARNOTICE($message);    	
+    }
+
     echo "</table>\n";
     echo "</form>\n";
-?>
-<table class="menu" width=210 cellpadding="0" cellspacing="0">
-    <tr><td class="menuheader">
-      <b>Interaction</b>
-    </td></tr>
-<?php # BACK TO PHP
 
+    # Start Interaction section if going to spit out interaction options.
+    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
+	    "<tr><td class=menuheader>".
+	    "<b>Experimentation</b>".
+	    "</td></tr>\n";
+    }
+
+    # Free PCs. Silly.
     if ($login_status & CHECKLOGIN_LOGGEDIN) {
          $freepcs = TBFreePCs();
 	 WRITESIDEBARNOTICE( "($freepcs free PCs)" );
@@ -387,139 +459,59 @@ function WRITESIDEBAR() {
 			       "gotowiki.php3?redurl=Main/$wikiname");
 		}
 
-		if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
-		    if (!isset($pid) || $pid == "") {
-			$query_result = DBQueryFatal(
-			    "select pid from group_membership where ".
-			    "uid='$login_uid' and pid=gid and trust!='none' ".
-			    "order by date_approved asc limit 1");
-			if (mysql_num_rows($query_result)) {
-			    $row = mysql_fetch_array($query_result);
-			    $firstpid = $row[pid];
-			}
-		    }
-		}
-
-		if ($MAILMANSUPPORT) {
-		    $showit = 0;
-		    $mmurl  = "gotommlist.php3";
-		    
-		    if (isset($pid) && !empty($pid)) {
-		        $mmurl .= "?pid=$pid";
-
-			if (isset($gid) && !empty($gid)) {
-			    $mmurl .= "&gid=$gid";
-			}
-			$showit = 1;
-		    }
-		    elseif (isset($firstpid)) {
-		        $mmurl .= "?pid=$firstpid";
-			$showit = 1;
-		    }
-		    if ($showit) {
-			WRITESIDEBARBUTTON_ABSCOOL("My Mailing Lists",
-						   $mmurl, $mmurl);
-		    }
-		}
-
-		if ($BUGDBSUPPORT) {
-		    $bugdburl = "gotobugdb.php3";
-		    
-		    if (isset($pid) && !empty($pid)) {
-			$bugdburl .= "?project_title=$pid";
-		    }
-		    elseif (isset($firstpid)) {
-			$bugdburl .= "?project_title=$firstpid";
-		    }
-		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
-					       $bugdburl,
-					       $bugdburl);
-		}
-	    
 		WRITESIDEBARBUTTON("Update User Information",
 				   $TBBASE, "moduserinfo.php3");
-
-	        if (ISADMIN($login_uid)) {
-		    WRITESIDEBARBUTTON("Approve New Projects",
-				       $TBBASE, "approveproject_list.php3");
-		    WRITESIDEBARBUTTON("User List",
-				       $TBBASE, "showuser_list.php3");
-		    WRITESIDEBARBUTTON("New User Approval",
-				       $TBBASE, "approveuser_form.php3");
-		}
 	    }
 	    else {
 		WRITESIDEBARBUTTON("My Emulab",
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
 
-		if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
-		    $wikiname = $CHECKLOGIN_WIKINAME;
+                # And now the Collaboration menu.
+		if (! STUDLY()) {
+		    if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
+			$wikiname = $CHECKLOGIN_WIKINAME;
 		
-		    WRITESIDEBARBUTTON_ABSCOOL("My Wikis",
-			       "gotowiki.php3?redurl=Main/$wikiname",
+			WRITESIDEBARBUTTON("My Wikis", $TBBASE,
 			       "gotowiki.php3?redurl=Main/$wikiname");
-		}
-
-		if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
-		    if (!isset($pid) || $pid == "") {
-			$query_result = DBQueryFatal(
-			    "select pid from group_membership where ".
-			    "uid='$login_uid' and pid=gid and trust!='none' ".
-			    "order by date_approved asc limit 1");
-			if (mysql_num_rows($query_result)) {
-			    $row = mysql_fetch_array($query_result);
-			    $firstpid = $row[pid];
+		    }
+		    if ($BUGDBSUPPORT) {
+			if (!isset($pid) || $pid == "") {
+			    $query_result =
+				DBQueryFatal("select pid from ".
+					     " group_membership where ".
+				 "uid='$login_uid' and pid=gid and ".
+				 "trust!='none' ".
+				 "order by date_approved asc limit 1");
+			    if (mysql_num_rows($query_result)) {
+				$row = mysql_fetch_array($query_result);
+				$firstpid = $row[pid];
+			    }
 			}
 		    }
-		}
-
-		if ($MAILMANSUPPORT) {
-		    $showit = 0;
-		    $mmurl  = "gotommlist.php3";
+		    if ($BUGDBSUPPORT) {
+			$bugdburl = "gotobugdb.php3";
 		    
-		    if (isset($pid) && !empty($pid)) {
-		        $mmurl .= "?pid=$pid";
-
-			if (isset($gid) && !empty($gid)) {
-			    $mmurl .= "&gid=$gid";
+			if (isset($pid) && !empty($pid)) {
+			    $bugdburl .= "?project_title=$pid";
 			}
-			$showit = 1;
+			elseif (isset($firstpid)) {
+			    $bugdburl .= "?project_title=$firstpid";
+			}
+			WRITESIDEBARBUTTON("My Bug Databases", $TBBASE,
+					   $bugdburl);
 		    }
-		    elseif (isset($firstpid)) {
-		        $mmurl .= "?pid=$firstpid";
-			$showit = 1;
-		    }
-		    if ($showit) {
-			WRITESIDEBARBUTTON_ABSCOOL("My Mailing Lists",
-						   $mmurl, $mmurl);
-		    }
+		    WRITESIDEBARDIVIDER();
 		}
 
-		if ($BUGDBSUPPORT) {
-		    $bugdburl = "gotobugdb.php3";
-		    
-		    if (isset($pid) && !empty($pid)) {
-			$bugdburl .= "?project_title=$pid";
-		    }
-		    elseif (isset($firstpid)) {
-			$bugdburl .= "?project_title=$firstpid";
-		    }
-		    WRITESIDEBARBUTTON_ABSCOOL("My Bug Databases",
-					       $bugdburl,
-					       $bugdburl);
-		}
-	    
+		#
                 # Since a user can be a member of more than one project,
                 # display this option, and let the form decide if the 
                 # user is allowed to do this.
                 #
-
-		WRITESIDEBARDIVIDER();
-
  		WRITESIDEBARBUTTON("Begin an Experiment",
 				   $TBBASE, "beginexp_html.php3");
-
+	
 		# Put _NEW back when Plab is working again.
 		WRITESIDEBARBUTTON("Create a PlanetLab Slice",
 				       $TBBASE, "plab_ez.php3");
@@ -537,10 +529,13 @@ function WRITESIDEBAR() {
 	        	"ImageIDs</a> or <a " .
 	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a>");
 
-		if ($login_status & CHECKLOGIN_CVSWEB) {
+		if (!STUDLY() &&
+		    ($login_status & CHECKLOGIN_CVSWEB)) {
 		    WRITESIDEBARBUTTON("CVS Repository",
 				       $TBBASE, "cvsweb/cvsweb.php3");
 		}
+		
+
 		if ($login_status & CHECKLOGIN_TRUSTED) {
 		  WRITESIDEBARDIVIDER();
                   # Only project/group leaders can do these options
@@ -568,41 +563,6 @@ function WRITESIDEBAR() {
 				       $TBBASE, "approveuser_form.php3");
 		  }
 		}
-		if (ISADMIN($login_uid)) {
-		    WRITESIDEBARDIVIDER();
-
-		    SIDEBARCELL("List <a " .
-				" href=\"$TBBASE/showproject_list.php3\">" .
-		                "Projects</a> or <a " .
-		                "href=\"$TBBASE/showuser_list.php3\">Users</a>");
-
-		    WRITESIDEBARBUTTON("View Testbed Stats",
-				       $TBBASE, "showstats.php3");
-
-		    WRITESIDEBARBUTTON("Approve New Projects",
-				       $TBBASE, "approveproject_list.php3");
-
-		    WRITESIDEBARBUTTON("Approve Widearea User",
-				       $TBBASE, "approvewauser_form.php3");
-
-		    WRITESIDEBARBUTTON("Edit Site Variables",
-				       $TBBASE, "editsitevars.php3");
-
-		    WRITESIDEBARBUTTON("Edit Knowledge Base",
-				       $TBBASE, "kb-manage.php3");
-		    
-		    $query_result
-		      = DBQUeryFatal("select new_node_id from new_nodes");
-                    if (mysql_num_rows($query_result) > 0) {
-		        WRITESIDEBARBUTTON_NEW("Add Testbed Nodes",
-				           $TBBASE, "newnodes_list.php3");
-		    } else {
-		        WRITESIDEBARBUTTON("Add Testbed Nodes",
-				           $TBBASE, "newnodes_list.php3");
-		    }
-
-		}
-
 	    }
 	}
 	elseif ($login_status & (CHECKLOGIN_UNVERIFIED|CHECKLOGIN_NEWUSER)) {
@@ -629,76 +589,101 @@ function WRITESIDEBAR() {
     #WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
     #    $TBDOCBASE, "survey.php3");
 
-    #
-    # Cons up a nice message.
-    # 
-    switch ($login_status & CHECKLOGIN_STATUSMASK) {
-    case CHECKLOGIN_LOGGEDIN:
-	$login_message = "'$login_uid' Logged in.";
-	    
-	if ($login_status & CHECKLOGIN_PSWDEXPIRED)
-	    $login_message = "$login_message<br>(Password Expired!)";
-	elseif ($login_status & CHECKLOGIN_UNAPPROVED)
-	    $login_message = "$login_message<br>(Unapproved!)";
-	break;
-    case CHECKLOGIN_TIMEDOUT:
-	$login_message = "Login Timed out.";
-	break;
-    default:
-	$login_message = 0;
-	break;
-    }
-
-    if ($login_message) {
-      echo "<tr>";
-      echo "<td class=\"menufooter\" style='padding-top: 6px;' ><center><b>";
-      echo "$login_message</b></center></td>";
-      echo "</tr>";
-    }
-
-    #
-    # Now the login/logout box. Remember, already inside a table.
-    # We want the links to the login/logout pages to always be https,
-    # but the images path depends on whether the page was loaded as
-    # http or https, since we do not want to mix them, since they
-    # cause warnings.
-    # 
+    # Terminate Interaction menu.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-      echo "<tr>";
-      echo "<td class=\"menufooter\" align=center valign=center>";
-      echo "<a href=\"$TBBASE/logout.php3?target_uid=$login_uid\">";
-      echo "<img alt=\"logoff\" border=0 ";
-      echo "src=\"$BASEPATH/logoff.gif\"></a>\n";
-      echo "</td></tr>\n";
+	echo "</table>\n";
     }
-    elseif (!NOLOGINS()) {
-	echo "<tr>";
-	echo "<td class=\"menufooter\" align=center valign=center>";
 
-	if (!$firstinitstate) {
-	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
-	    echo "<img alt=\"Request Account\" border=0 ";
-	    echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
-
-	    echo "<br /><b>or</b><br />";
+    # And now the Collaboration menu.
+    if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
+	STUDLY()) {
+	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
+	    "<tr><td class=menuheader>".
+	    "<b>Collaboration</b>".
+	    "</td></tr>\n";
+     
+	if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
+	    $wikiname = $CHECKLOGIN_WIKINAME;
+		
+	    WRITESIDEBARBUTTON("My Wikis", $TBBASE,
+			       "gotowiki.php3?redurl=Main/$wikiname");
 	}
-
-	echo "<a href=\"$TBBASE/login.php3\">";
-	echo "<img alt=\"logon\" border=0 ";
-	echo "src=\"$BASEPATH/logon.gif\"></a>\n";
-
-	echo "</td></tr>\n";
+	if ($MAILMANSUPPORT || $BUGDBSUPPORT) {
+	    if (!isset($pid) || $pid == "") {
+		$query_result =
+		    DBQueryFatal("select pid from group_membership where ".
+				 "uid='$login_uid' and pid=gid and ".
+				 "trust!='none' ".
+				 "order by date_approved asc limit 1");
+		if (mysql_num_rows($query_result)) {
+		    $row = mysql_fetch_array($query_result);
+		    $firstpid = $row[pid];
+		}
+	    }
+	}
+	if ($MAILMANSUPPORT) {
+	    $mmurl  = "showmmlists.php3?target_uid=$login_uid";
+	    WRITESIDEBARBUTTON("My Mailing Lists", $TBBASE, $mmurl);
+	}
+	if ($BUGDBSUPPORT) {
+	    $bugdburl = "gotobugdb.php3";
+		    
+	    if (isset($pid) && !empty($pid)) {
+		$bugdburl .= "?project_title=$pid";
+	    }
+	    elseif (isset($firstpid)) {
+		$bugdburl .= "?project_title=$firstpid";
+	    }
+	    WRITESIDEBARBUTTON("My Bug Databases", $TBBASE, $bugdburl);
+	}
+	if ($CVSSUPPORT) {
+	    WRITESIDEBARLASTBUTTON("My CVS Repositories", $TBBASE,
+				   "listrepos.php3?target_uid=$login_uid");
+	}
+	echo "</table>\n";
     }
 
-    #
-    # Login message. Set via 'web/message' site variable
-    #
-    $message = TBGetSiteVar("web/message");
-    if (0 != strcmp($message,"")) {
-	WRITESIDEBARNOTICE($message);    	
-    }
+    # Optional ADMIN menu.
+    if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN($login_uid)) {
+	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
+	    "<tr><td class=menuheader>".
+	    "<b>Administration</b>".
+	    "</td></tr>\n";
+	
+	SIDEBARCELL("List <a " .
+		    " href=\"$TBBASE/showproject_list.php3\">" .
+		    "Projects</a> or <a " .
+		    "href=\"$TBBASE/showuser_list.php3\">Users</a>");
 
-    echo "</table>\n";
+	WRITESIDEBARBUTTON("View Testbed Stats",
+			   $TBBASE, "showstats.php3");
+
+	WRITESIDEBARBUTTON("Approve New Projects",
+			   $TBBASE, "approveproject_list.php3");
+
+	WRITESIDEBARBUTTON("Edit Site Variables",
+			   $TBBASE, "editsitevars.php3");
+
+	WRITESIDEBARBUTTON("Edit Knowledge Base",
+			   $TBBASE, "kb-manage.php3");
+		    
+	$query_result = DBQUeryFatal("select new_node_id from new_nodes");
+	if (mysql_num_rows($query_result) > 0) {
+	    WRITESIDEBARBUTTON_NEW("Add Testbed Nodes",
+				   $TBBASE, "newnodes_list.php3");
+	}
+	else {
+	    WRITESIDEBARBUTTON("Add Testbed Nodes",
+			       $TBBASE, "newnodes_list.php3");
+	}
+	WRITESIDEBARBUTTON("Approve Widearea User",
+			   $TBBASE, "approvewauser_form.php3");
+
+	# Link ALWAYS TO UTAH
+	WRITESIDEBARLASTBUTTON("Add Widearea Node (CD)",
+			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
+	echo "</table>\n";
+    }
 }
 
 #

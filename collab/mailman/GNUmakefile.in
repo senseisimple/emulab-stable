@@ -12,8 +12,9 @@ SUBDIR		= collab/mailman
 include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addmmlist delmmlist setmmlistmembers mmsetup \
-			  setmmpasswd 
-LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin
+			  setmmpasswd mmlistmembership
+LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin \
+			  webmmlistmembership
 CTRL_LIBEXEC_SCRIPTS	= genaliases
 CTRL_LIB_FILES		= mmscript.py
 
@@ -45,6 +46,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/setmmlistmembers
 	chown root $(INSTALL_SBINDIR)/setmmpasswd
 	chmod u+s $(INSTALL_SBINDIR)/setmmpasswd
+	chown root $(INSTALL_SBINDIR)/mmlistmembership
+	chmod u+s $(INSTALL_SBINDIR)/mmlistmembership
 	chown root $(INSTALL_LIBEXECDIR)/mmxlogin
 	chmod u+s $(INSTALL_LIBEXECDIR)/mmxlogin
 

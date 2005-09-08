@@ -58,11 +58,13 @@ def findmember(mlist, addr):
 
 def getcookie(mlist, addr, cookietype):
     # If we want the admin interface, we do not care if the addr is
-    # a member of the list.
+    # a member of the list, since the caller (boss) already verified
+    # the operation was allowed.
     if cookietype == "admin":
         print mlist.MakeCookie(mm_cfg.AuthListAdmin, addr)
         return
     
+    # But for a user cookie, must be a member.
     if mlist.isMember(addr):
         print mlist.MakeCookie(mm_cfg.AuthUser, addr)
         pass
