@@ -15,12 +15,13 @@ use Errno qw(EEXIST);
 #
 sub usage()
 {
-    print STDOUT "Usage: addmmlist -a <listname> or\n";
+    print STDOUT "Usage: addmmlist [-r] -a <listname> or\n";
     print STDOUT "       addmmlist -u <listname> <listowner> <listpassword>\n";
     exit(-1);
 }
-my $optlist = "dau";
-my $debug   = 0;
+my $optlist   = "daur";
+my $debug     = 0;
+my $reconfig  = 0;
 my $dbuid;
 my $listtype;
 my $listname;
@@ -106,6 +107,9 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"r"})) {
+    $reconfig = 1;
+}
 if (defined($options{"a"})) {
     $listtype = "admin";
 
@@ -119,6 +123,8 @@ if (defined($options{"u"})) {
 
     usage()
 	if (@ARGV != 3);
+    usage()
+	if (defined($options{"r"}));
     
     $listname   = $ARGV[0];
     $listowner  = $ARGV[1];
@@ -178,11 +184,13 @@ $UID = $EUID;
 
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
+    my $verb   = ($reconfig ? "Reconfiguring" : "Adding");
+    my $cmd    = ($reconfig ? "reconfig" : "addlist");
 
-    print "Adding mailman list $listname ($listtype) on $CONTROL.\n";
+    print "$verb mailman list $listname ($listtype) on $CONTROL.\n";
     
     system("echo '$listowner_email $listpasswd' | ".
-	   "$SSH -host $CONTROL $MMPROXY addlist $listname $listtype");
+	   "$SSH -host $CONTROL $MMPROXY $cmd $listname $listtype");
     if ($?) {
 	if ($? >> 8 == EEXIST()) {
 	    # Not an error.
@@ -190,10 +198,11 @@ if ($CONTROL ne $BOSSNODE) {
 	}
 	fatal("$MMPROXY failed on $CONTROL!");
     }
-    
-    SENDMAIL($TBAUDIT, "Mailman list created",
-	     "Mailman list '$listname' has been created by '$dbuid'",
-	     $TBOPS);
+    if (! $reconfig) {
+	SENDMAIL($TBAUDIT, "Mailman list created",
+		 "Mailman list '$listname' has been created by '$dbuid'",
+		 $TBOPS);
+    }
 }
 exit(0);
 

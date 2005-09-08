@@ -108,7 +108,7 @@ chdir($MAILMANDIR) or
 my $action = shift(@ARGV);
 
 if ($action eq "addlist") {
-    exit(AddList(@ARGV));
+    exit(AddList(0, @ARGV));
 }
 elsif ($action eq "setlistmembers") {
     exit(SetListMembers(@ARGV));
@@ -128,6 +128,9 @@ elsif ($action eq "xlogin") {
 elsif ($action eq "membership") {
     exit(ListMembership(@ARGV));
 }
+elsif ($action eq "reconfig") {
+    exit(AddList(1, @ARGV));
+}
 else {
     die("*** $0:\n".
 	"    Do not know what to do with '$action'!\n");
@@ -140,9 +143,9 @@ exit(0);
 sub AddList(@)
 {
     usage()
-	if (@_ != 2);
+	if (@_ != 3);
 
-    my ($name, $listtype) = @_;
+    my ($reconfig, $name, $listtype) = @_;
     my ($owneremail, $password) = ();
 
     # Other info for list comes in from STDIN.
@@ -165,12 +168,17 @@ sub AddList(@)
     #
     if (! -d "$MMLISTDIR/" . lc($name)) {
 	my $optarg = ($listtype eq "admin" ? "-q" : "");
-	
+
+	if ($reconfig) {
+	    print "List '$name' does not exist; exiting ...\n";
+	    return -1;
+	}
+
 	system("echo '' | ".
 	       "$MMBINDIR/newlist $optarg $name $owneremail $password") == 0 or
 	    fatal("AddList: Could not create mailing list!");
     }
-    else {
+    elsif (! $reconfig) {
 	print "List '$name' and already exists; exiting ...\n";
 	return EEXIST();
     }
@@ -223,6 +231,10 @@ sub AddList(@)
     system("$MMBINDIR/config_list -i $tempfile $name") == 0 or
 	fatal("AddList: Could not configure mailing list!");
     unlink($tempfile);
+
+    # Done if just doing a reconfig of the list.
+    return 0
+	if ($reconfig);
 
     # Step 3: Regen the aliases. We use an external script for this.
     $EUID = $UID = 0;
