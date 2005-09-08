@@ -189,6 +189,16 @@ function SPITFORM($formfields, $errors)
           After you click submit, the mailing list will be created on our
           server, and you will be automatically redirected to the list
           configuration page. Feel free to edit the configuration as you like.
+          <br><br>
+          Emulab mailing lists are maintained using the open source
+          <a href=http://www.gnu.org/software/mailman/index.html>Mailman</a>
+          package. You can find documentation for
+          <a href=http://www.gnu.org/software/mailman/users.html>Users</a>
+          and documentation for 
+          <a href=http://www.gnu.org/software/mailman/admins.html>
+          List Managers</a> on the Mailman
+          <a href=http://www.gnu.org/software/mailman/docs.html>
+          documentation</a> page.
           </blockquote></blockquote>\n";
 }
 
