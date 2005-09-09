@@ -257,3 +257,8 @@ ID  Name                            Members of VLAN
 15. IOS for guys who know CatOS: (ie. me)
 
     http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/tech/cat65_wp.htm
+
+16. For into on how the switches do load balancing on etherchannel
+    (aka "trunk") links:
+
+    http://www.cisco.com/warp/public/473/4.html
