@@ -28,7 +28,7 @@ Things to do for image*:
 
 7. Add an option to exclude (skip) disk blocks outside of any DOS partition.
    By default, we want to include these blocks in the image since some
-   systems stash magic info this way IBM laptops for instance).  But in
+   systems stash magic info this way (IBM laptops for instance).  But in
    some cases we want to ignore it.  Since the MBR often falls in the
    outside-of-any-partition catagory (e.g., DOS partition 1 starting at
    sector 63, aka cylinder 1), we may need to further break this down into
