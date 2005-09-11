@@ -84,8 +84,14 @@ while ($row = mysql_fetch_array($query_result)) {
 	$size   = 0.07;
 	$radius = 0.04;
     }
-    $alloc  = (isset($pid) ? 1 : 0);
-
+    $alloc  = 0;
+    $dead   = 0;
+    if (isset($pid)) {
+	$alloc = 1;
+	if ($pid == $NODEDEAD_PID && $eid == $NODEDEAD_EID) {
+	    $dead = 1;
+	}
+    }
     if (!isset($vname))
 	$vname = $pname;
     if (!isset($loc_z))
@@ -97,7 +103,7 @@ while ($row = mysql_fetch_array($query_result)) {
     if (!isset($selector)) {
 	echo "$vname, ";
     }
-    echo "$type, $alloc, $mobile, $size, $radius, ";
+    echo "$type, $alloc, $dead, $mobile, $size, $radius, ";
     echo "$loc_x, $loc_y, $loc_z, $or";
     echo "\n";
 }

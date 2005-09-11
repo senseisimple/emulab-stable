@@ -30,7 +30,7 @@ ScrollablePicture.class: $(SRCDIR)/ScrollablePicture.java
 
 $(TESTBED_SRCDIR)/www/robotrack/NodeSelect.jar: NodeSelect.class
 	echo '$(filter-out NodeSelect.class, $(shell echo *.class))'
-	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out NodeSelect.class, $(shell echo *.class)))
+	$(JAR) cvf $@ $^ $(patsubst %,'%',$(filter-out NodeSelect.class, $(shell echo *.class))) -C $(SRCDIR)/ up.gif -C $(SRCDIR)/ down.gif
 
 install:
 

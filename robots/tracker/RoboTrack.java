@@ -1876,6 +1876,8 @@ public class RoboTrack extends JApplet {
 		robbie.type      = tokens.nextToken().trim();
 		robbie.allocated =
 		    tokens.nextToken().trim().compareTo("1") == 0;
+		// Skip dead
+		tokens.nextToken();
 		robbie.mobile    =
 		    tokens.nextToken().trim().compareTo("1") == 0;
 		robbie.size      = (int)
