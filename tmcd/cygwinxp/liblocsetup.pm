@@ -79,10 +79,11 @@ $HOSTSFILE	= "$NTE/hosts";
 #
 # These are not exported
 #
-my $ADDUSERS     = "$BINDIR/addusers.exe";
+my $ADDUSERS	= "$BINDIR/addusers.exe";
+my $DEVCON	= "$BINDIR/devcon.exe";
 my $IFCONFIGBIN = "$NETSH interface ip set address";
-my $IFCONFIG    = "$IFCONFIGBIN name=\"%s\" source=static addr=%s mask=%s";
-my $IFC_1000MBS  = "1000baseTx";
+my $IFCONFIG	= "$IFCONFIGBIN name=\"%s\" source=static addr=%s mask=%s";
+my $IFC_1000MBS = "1000baseTx";
 my $IFC_100MBS  = "100baseTx";
 my $IFC_10MBS   = "10baseT";
 my $IFC_FDUPLEX = "FD";
@@ -96,6 +97,7 @@ my $SHELLS	= "/etc/shells";
 my $DEFSHELL	= "/bin/tcsh";
 my $winusersfile = "$BOOTDIR/winusers";
 my $usershellsfile = "$BOOTDIR/usershells";
+my $XIMAP	= "$BOOTDIR/xif_map";
 
 #
 # system() with error checking.
@@ -237,18 +239,38 @@ sub os_accounts_sync()
 # Generate and return an ifconfig line that is approriate for putting
 # into a shell script (invoked at bootup).
 #
+my %dev_map = ();
 sub os_ifconfig_line($$$$$$$;$$)
 {
     my ($iface, $inet, $mask, $speed, $duplex, $aliases,
 	$iface_type, $settings, $rtabid) = @_;
     my ($uplines, $downlines);
 
+    if (! $dev_map) {
+	# Map from non-control interface names, e.g. "Local Area Connection #4"
+	# to the Device Instance ID's used as devcon arguments, e.g.
+	# "@PCI\VEN_8086&DEV_1010&SUBSYS_10128086&REV_01\5&2FA58B96&0&210030".
+	if (! open(DEVMAP, $XIMAP)) {
+	    warning("Cannot open $XIMAP $!\n");
+	    {
+	else {
+	    while (my $dev_line = <DEVMAP>) {
+		chomp($dev_line);
+		my ($dev_name, $dev_inst) = split(":", $dev_line, 2);
+		$dev_map{$dev_name} = $dev_inst;
+	    }
+	    close(DEVMAP);
+	}
+    }
+    print "dev_map '$dev_map'\n";
+
     if ($inet ne "") {
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
+	$uplines  .= sprintf("\n    echo \"Enabling %s on %s\"", $iface, $inet);
+	$uplines  .= sprintf("\n    $DEVCON enable '%s'" , $dev_map{$iface});
 
-	# No $downlines... Can't disable an interface???
-	# The command "netsh interface set interface name=... DISABLED"
-	# is specified as only for non-LAN interfaces.
+	$downlines  .= sprintf("echo \"Disabling %s from %s\"", $iface, $inet);
+	$downlines  .= sprintf("\n    $DEVCON disable '%s'" , $dev_map{$iface});
     }
     
     return ($uplines, $downlines);

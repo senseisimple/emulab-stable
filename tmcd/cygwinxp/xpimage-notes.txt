@@ -42,7 +42,8 @@ alias v='ls -lsF'
         . Make sure you turn on Remote Desktop logins under Control Panel / System / Remote (!)
 
         . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
-          This will gives you extra gigs of disk space on C: equal to your RAM size .
+          This will give you extra gigs of disk space on C: equal to your RAM size .
+          Also set Power Options / Power Schemes to "Always On".
 
         . Set the workgroup name to EMULAB in Control Panel/System/Computer Name/Change...
           No need to reboot yet if you have more to do.
@@ -415,7 +416,7 @@ daFluxGroup
                 tar cfz /share/windows/boost-include.tgz boost
             # [On Boss.]
             sudo scp -rp /share/windows/{mysql,boost}-include.tgz root@pc$pc":"/tmp
-            sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx}.exe root@pc$pc":"/tmp
+            sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx,devcon}.exe root@pc$pc":"/tmp
             # [On the target.]
             mkdir /usr/local/include
             cd /usr/local/include
@@ -681,9 +682,9 @@ q
             # Get the downloaded binary programs into the source tree for install.
               ls -l ~/flux/testbed/tmcd/cygwinxp/*.exe
             # [On boss:]
-            sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx}.exe root@pc$pc":"/tmp
+            sudo scp -rp /share/windows/{WSName,addusers,usrtogrp,setx,devcon}.exe root@pc$pc":"/tmp
             # [Back on the client:]
-            cp -p /tmp/{WSName,addusers,usrtogrp,setx}.exe ~/flux/testbed/tmcd/cygwinxp
+            cp -p /tmp/{WSName,addusers,usrtogrp,setx,devcon}.exe ~/flux/testbed/tmcd/cygwinxp
 
             # Finally ready to do the Emulab makes!
             mkdir ~/flux/obj-real
@@ -951,6 +952,11 @@ if [ ]; then
           # You can turn it off and on with the right-click menu on "ldavg" in the logs pane.  
             tail -f /var/run/ldavg.csv
           # The first one is always 99.999, etc.
+
+      . Disable TCP/IP address autoconfiguration, so unswitched interfaces like the sixth NICs
+        on the pc3000's don't get Microsoft class B network 169.254 addresses assigned.
+          svcs=/HKLM/SYSTEM/CurrentControlSet/Services tcpp=$svcs/Tcpip/Parameters
+          regtool set -i $tcpp/IPAutoconfigurationEnabled 0
 
       . Reboot to make sure it all works right.  Note that prepare clears out the source
         trees, so don't do it until you've booted once and know that everything else works.

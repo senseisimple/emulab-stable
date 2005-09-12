@@ -189,19 +189,32 @@ while ($dirent = readdir(ETC)) {
 closedir(ETC);
 
 print "Updating /etc/motd.\n";
+my $vname = "";
+if (open(NICK, TMNICKNAME)) {
+    $vname = <NICK>;
+    $vname =~ s/\..*//;
+    close(NICK);
+}
 if (open(MOTD, ">/etc/motd")) {
     open(UNAME, "uname -sr |");
     my $uname = <UNAME>;
     chomp $uname;
     close(UNAME);
-    print MOTD "Windows-XP + " . $uname . " updated " . localtime();
+    printf MOTD "%s, Windows-XP + %s, %s\n", $vname, $uname, scalar(localtime());
     print MOTD "\n\nWelcome to Windows in Emulab!\n\n";
+    close(MOTD);
 }
 else {
     warn("Could not open /etc/motd!\n");
 }
 
 print "Cleaning out sp2 & Windows Update dirs.\n";
-system("du -s -m C:/WINDOWS/\\\$*");
+system("du -sm C:/WINDOWS/\\\$*");
 system("rm -rf C:/WINDOWS/\\\$*");
+system("du -sm C:/WINDOWS/ServicePackFiles/i386");
+system("rm -rf C:/WINDOWS/ServicePackFiles/i386");
+system("du -sm C:/WINDOWS/SoftwareDistribution/Download");
+system("rm -rf C:/WINDOWS/SoftwareDistribution/Download/*");
 
+print "Re-enable all network interfaces."
+devcon enable =net 'PCI*'
