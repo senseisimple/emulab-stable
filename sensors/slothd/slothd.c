@@ -152,7 +152,7 @@ int main(int argc, char **argv) {
         }
         
         if (opts->debug) {
-          printf("About to sleep for %u seconds.\n", span);
+          printf("About to sleep for %u seconds.\n\n", span);
           fflush(stdout);
         }
 
@@ -316,16 +316,6 @@ int init_slothd(void) {
   parms->ttys[parms->numttys] = strdup("/dev/console");
   parms->numttys++;
 
-#else /* __CYGWIN__ */
-  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
-   * However, stat on anything under /dev always returns the current time, so
-   * it's no help detecting user input.  Instead, we patch sshd to change the
-   * modtime on a file when input is received and stat that.
-   */
-  parms->ttys[parms->numttys] = strdup("/var/run/ssh_input");
-  parms->numttys++;
-#endif /* __CYGWIN__ */
-
 #ifdef __linux__  
   /* 
      Include the pts mux device to check for activity on
@@ -335,7 +325,7 @@ int init_slothd(void) {
   parms->ttys[parms->numttys] = strdup("/dev/ptmx");
   parms->numttys++;
 #endif
-#ifndef __CYGWIN__
+
   while (parms->numttys < MAXTTYS && (dptr = readdir(devs))) {
     if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
       snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
@@ -345,7 +335,7 @@ int init_slothd(void) {
     }
   }
   closedir(devs);
-#endif /* __CYGWIN__ */
+#endif /* not __CYGWIN__ */
 
   /* prepare UDP connection to server */
   if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -478,25 +468,71 @@ int send_pkt(SLOTHD_PACKET *pkt) {
 
 void get_min_tty_idle(SLOTHD_PACKET *pkt) {
   
-  int i;
   time_t mintime = 0;
   struct stat sb;
 
+#ifndef __CYGWIN__
+  int i;
   for (i = 0; i < parms->numttys; ++i) {
     if (stat(parms->ttys[i], &sb) < 0) {
       fprintf(stderr, "Can't stat %s:  %s\n", 
               parms->ttys[i], strerror(errno)); /* XXX change. */
     }
-    else if (sb.st_atime > mintime) {
-      mintime = sb.st_atime;
+    else {
+	/* The time of last reading keyboard input. */
+	time_t tty_time = sb.st_atime;
+	if (tty_time > mintime)
+	    mintime = tty_time;
     }
   }
+#else  /* __CYGWIN__ */
+  LASTINPUTINFO windows_input;
 
-  /* Assign TTY activity, ensuring we don't go older than initial startup */
-  pkt->minidle = (mintime > parms->startup) ? mintime : parms->startup;
-  if (opts->debug) {
-    printf("Minidle: %s", ctime(&mintime));
+  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
+   * However, stat on anything under /dev always returns the current time, so
+   * it's no help detecting user input.  Instead, we patch sshd to change the
+   * modtime on a file when input is received and stat that.
+   */
+  char *ssh_input = "/var/run/ssh_input";
+  if (stat(ssh_input, &sb) < 0) {
+    fprintf(stderr, "Can't stat %s:  %s\n", 
+	    ssh_input, strerror(errno)); /* XXX change. */
   }
+  else {
+    /* We're modding a time tag file from sshd on Cygwin, not reading it. */
+    time_t tty_time = sb.st_mtime;
+    if (opts->debug)
+      printf("sshd time: %s", ctime(&tty_time));
+    if (tty_time > mintime)
+      mintime = tty_time;
+  }
+
+  /* In a Remote Desktop Protocol login, look at keyboard and mouse input. */
+  windows_input.cbSize = sizeof(LASTINPUTINFO);
+  if (GetLastInputInfo(&windows_input) == 0) {
+    fprintf(stderr, "Failed GetLastInputInfo().\n");
+  }
+  else {
+    /* Windows keeps time in millisecond ticks since boot time. */
+    DWORD windows_ticks = GetTickCount() - windows_input.dwTime;
+    time_t windows_time = time(0) - windows_ticks/1000;
+
+    /* For debugging, run this under RDP.  It doesn't get anything useful
+     * under ssh.  It's normally started by rc.slothd under the EmulabStartup
+     * service, and that works too.
+     */
+    if (opts->debug)
+      printf("Windows input event time: %s", ctime(&windows_time));
+
+    if (windows_time > mintime)
+      mintime = windows_time;
+  }
+#endif /* __CYGWIN__ */
+
+  /* Assign TTY activity, ensuring we don't go older than initial startup. */
+  pkt->minidle = (mintime > parms->startup) ? mintime : parms->startup;
+  if (opts->debug)
+    printf("Minidle: %s", ctime(&mintime));
   return;
 }
 
@@ -519,16 +555,41 @@ void get_load(SLOTHD_PACKET *pkt) {
 
 #else /* ifndef __CYGWIN__ */
 
-/* A perfmon log is dribbling out the processor load once a minute. */
+/* A perfmon log is dribbling out the processor non-idle load average once a
+ * minute.  We would rather have something more like a Unix run-queue length,
+ * but the System/Processor Queue Length counter is sampled rather than
+ * averaged by system logging so it's no good for us.  As long as we set our
+ * threshold of CPU busyness below 1.0, this will work fine.
+ */
 char *ldavg_prog[] = {"tail", "-1", "/var/run/ldavg.csv", NULL};
 int get_ldavg(char *, void *);
+int ncpu = -1;
 
 void get_load(SLOTHD_PACKET *pkt) {
   pkt->loadavg[0] = pkt->loadavg[1] = pkt->loadavg[2] = -1.0;
+
+  if ( ncpu < 0 ) {
+    /* Hyper-threading on the pc3000's convinces NT that it has 2 processors,
+     * so it considers a busy process to be 50% utilization.  One busy process
+     * should be 100% load average for us.  Use "cpu count" in /proc/cpuinfo
+     * to get a multiplier.
+     */
+    FILE *cpuinfo = fopen("/proc/cpuinfo", "r");
+    char line[80];
+
+    while (ncpu < 0 && fgets(line, 80, cpuinfo) 
+	   && ! feof(cpuinfo) && ! ferror(cpuinfo))
+      sscanf(line, "cpu count : %d", &ncpu);
+
+    if (ncpu < 1)    /* One-cpu machines have a cpu count of zero. */
+      ncpu = 1;
+  }
+
   if (procpipe(ldavg_prog, &get_ldavg, (void*)pkt))
     lwarn("get_ldavg exec failed.");
 }
 
+/* Process the output of the ldavg_prog command. */
 int get_ldavg(char *buf, void *data) {
   SLOTHD_PACKET *pkt = (SLOTHD_PACKET*)data;
   double load = -1.0;
@@ -539,10 +600,11 @@ int get_ldavg(char *buf, void *data) {
   }
 
   /* NT reports load as a percent, e.g. 44.5; we want a fraction, e.g. 0.445 */
-  pkt->loadavg[0] = pkt->loadavg[1] = pkt->loadavg[2] = load / 100.0;
+  pkt->loadavg[0] = pkt->loadavg[1] = pkt->loadavg[2] = load * ncpu / 100.0;
   if (opts->debug)
     printf("load averages: %f, %f, %f\n", 
            pkt->loadavg[0], pkt->loadavg[1], pkt->loadavg[2]);
+
   return 0;
 }
   
@@ -697,8 +759,6 @@ int get_counters(char *buf, void *data) {
 #endif  /* __linux__ */
 
 #else /* __CYGWIN__ */
-#include <windows.h>
-#include <iphlpapi.h>
 
 void get_packet_counts(SLOTHD_PACKET *pkt) {
   static DWORD dwSize;

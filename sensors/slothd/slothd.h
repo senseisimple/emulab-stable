@@ -31,11 +31,17 @@
 #include <signal.h>
 #include <syslog.h>
 #include <utmp.h>
+
 #ifdef __linux__
 #include <net/if.h>
 #include <netinet/ether.h>
 #include <sys/ioctl.h>
 #endif
+
+#ifdef __CYGWIN__
+#include <windows.h>	/* For GetLastInputInfo() and GetTickCount(). */
+#include <iphlpapi.h>	/* For GetIfTable(). */
+#endif /* __CYGWIN__ */
 
 #define SDPROTOVERS "2"
 
