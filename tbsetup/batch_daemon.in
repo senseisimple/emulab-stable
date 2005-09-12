@@ -281,21 +281,21 @@ while (1) {
 	    if ($canceled) {
 		# Look at the cancel flag.
 		if ($canceled == EXPTCANCEL_TERM) {
-		    dosomething("cancel", %running_row);
+		    dosomething("cancel", \%running_row);
 		}
 		elsif ($canceled == EXPTCANCEL_SWAP) {
-		    dosomething("swap", %running_row);
+		    dosomething("swap", \%running_row);
 		}
 		else {
 		    print "Improper cancel flag: $canceled\n";
 		}
 	    }
 	    else {
-		if (isexpdone(%running_row)) {
+		if (isexpdone(\%running_row)) {
 		    #
 		    # Terminate the experiment. 
 		    # 
-		    dosomething("swap", %running_row);
+		    dosomething("swap", \%running_row);
 		}
 		else {
 		    #
@@ -310,7 +310,7 @@ while (1) {
     # Finally start an actual experiment!
     #
     if ($pending_result->numrows) {
-	dosomething("start", %pending_row);
+	dosomething("start", \%pending_row);
     }
   pause:
     sleep(15);
@@ -321,20 +321,19 @@ while (1) {
 #
 sub dosomething($$)
 {
-    my($dowhat)   = shift;
-    my(%exphash)  = @_;
+    my($dowhat,$exphash)   = @_;
     my($unix_uid, $unix_gid, $unix_gname, $row, $query_result);
 
     # Global vars
-    $eid     = $exphash{'eid'};
-    $pid     = $exphash{'pid'};
-    $gid     = $exphash{'gid'};
-    $userdir = $exphash{'path'};
+    $eid     = $exphash->{'eid'};
+    $pid     = $exphash->{'pid'};
+    $gid     = $exphash->{'gid'};
+    $userdir = $exphash->{'path'};
     $workdir = TBExptWorkDir($pid, $eid);
     $nsfile  = "$eid.ns";
     
     # Locals
-    my $creator = $exphash{'expt_head_uid'};
+    my $creator = $exphash->{'expt_head_uid'};
 
     print "Doing a '$dowhat' to batch experiment $pid/$eid\n";
 
@@ -428,13 +427,13 @@ sub dosomething($$)
     $ENV{'LOGNAME'} = $creator;
     
     if ($dowhat eq "start") {
-	startexp(%exphash);
+	startexp($exphash);
     }
     elsif ($dowhat eq "swap") {
-	swapexp(%exphash);
+	swapexp($exphash);
     }
     elsif ($dowhat eq "cancel") {
-	cancelexp(%exphash);
+	cancelexp($exphash);
     }
     exit(0);
 }
@@ -444,10 +443,10 @@ sub dosomething($$)
 # 
 sub startexp($)
 {
-    my(%exphash)  = @_;
+    my($exphash)  = @_;
     my($exit_status, $running, $query_result);
 
-    my $attempts  = $exphash{'attempts'};
+    my $attempts  = $exphash->{'attempts'};
 
     #
     # Try to swap the experiment in. 
@@ -469,19 +468,19 @@ sub startexp($)
 
     if ($query_result) {
 	my ($canceled) = $query_result->fetchrow_array();
-	$exphash{'canceled'} = $canceled;
+	$exphash->{'canceled'} = $canceled;
 
 	# Yuck: This is strictly for the benefit of swapexp() below.
-	$exphash{'state'} = EXPTSTATE_ACTIVE
+	$exphash->{'state'} = EXPTSTATE_ACTIVE
 	    if ($running);
 	
 	if ($canceled) {
 	    # Look at the cancel flag.
 	    if ($canceled == EXPTCANCEL_TERM) {
-		cancelexp(%exphash);
+		cancelexp($exphash);
 	    }
 	    elsif ($canceled == EXPTCANCEL_SWAP) {
-		swapexp(%exphash);
+		swapexp($exphash);
 	    }
 	    else {
 		print "Improper cancel flag: $canceled\n";
@@ -566,9 +565,9 @@ sub startexp($)
 #
 sub swapexp($;$)
 {
-    my(%exphash)  = @_;
-    my $canceled  = $exphash{'canceled'};
-    my $running   = ($exphash{'state'} eq EXPTSTATE_ACTIVE);
+    my($exphash)  = @_;
+    my $canceled  = $exphash->{'canceled'};
+    my $running   = ($exphash->{'state'} eq EXPTSTATE_ACTIVE);
 
     if ($running) {
 	system("$swapexp -b -s out $pid $eid");
@@ -604,7 +603,7 @@ sub swapexp($;$)
 #
 sub cancelexp($)
 {
-    my(%exphash) = @_;
+    my($exphash) = @_;
     
     #
     # It does not matter if the experiment is running; endexp does the
@@ -631,12 +630,12 @@ sub cancelexp($)
 #
 sub isexpdone($)
 {
-    my(%exphash)  = @_;
+    my($exphash)  = @_;
     my($query_result, @row);
     
     # Global vars
-    $eid = $exphash{'eid'};
-    $pid = $exphash{'pid'};
+    $eid = $exphash->{'eid'};
+    $pid = $exphash->{'pid'};
 
     print TBDateTimeFSSafe() . "\n";
     print "Checking to see if $pid/$eid has finished up yet\n";
