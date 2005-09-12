@@ -223,10 +223,18 @@ find_iface(char *macaddr)
 static int
 find_iface(char *macaddr)
 {
+#if 1
+	/* We cache the getmac output early on in rc.cygwin, while all of the
+	 * interfaces are still enabled.  Later, we get no MAC info.
+	 */
+	FILE *fp = fopen("/var/emulab/boot/getmac-cache", "r");
+#else
 	/* We copy the Windows getmac.exe and library framedyn.dll into $BINDIR
 	 * because our path gets "untainted" into a pure Unix form in rc scripts.
 	 */
-	FILE *fp = popen("bash -c 'cd /usr/local/etc/emulab; ./getmac /nh /v /fo csv'", "r");
+	FILE *fp = popen(
+		"bash -c 'cd /usr/local/etc/emulab; ./getmac /nh /v /fo csv'", "r");
+#endif
 	char buf[BUFSIZ];
 	
 	while (fgets(buf, BUFSIZ, fp) != NULL) {
