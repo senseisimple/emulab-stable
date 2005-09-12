@@ -285,7 +285,7 @@ public class NodeSelect extends JApplet {
     private class Selector extends JPanel implements ActionListener,
                                                      MouseListener
     {
-	JLabel		MessageArea;
+	JLabel		MessageArea, CoordsArea, MouseOverName;
 	// Indexed by the virtual name, points to VirtNode struct above.
 	Dictionary	VirtNodes;
 	// Indexed by the physical name, points to PhysNode struct above.
@@ -310,8 +310,9 @@ public class NodeSelect extends JApplet {
 	// For the node menu, need to know what the node was!
 	Node		PopupNode;
 
-	// Rulers
+	// Rulers and corner of the scrollpane.
 	Ruler		TopRuler, SideRuler;
+	MyCorner	Corner;
 
 	// Last centering target.
 	Rectangle	LastCenter = null;
@@ -648,6 +649,7 @@ public class NodeSelect extends JApplet {
 		 */
 		TopRuler.setMarker(e);
 		SideRuler.setMarker(e);
+		SetCoords(e);
 
 		node = FindNode(this, (int)(x / scale), (int)(y / scale));
 
@@ -660,6 +662,7 @@ public class NodeSelect extends JApplet {
 			mousedover.mouseover = false;
 		    }
 		    mousedover = node;
+		    SetMouseOver(node.pname);
 		    repaint();
 		    return;
 		}
@@ -667,6 +670,7 @@ public class NodeSelect extends JApplet {
 		if (mousedover != null) {
 		    mousedover.mouseover = false;
 		    mousedover = null;
+		    SetMouseOver(null);
 		    repaint();
 		}
 	    }
@@ -773,10 +777,33 @@ public class NodeSelect extends JApplet {
 	    ListPanel.add(BotlistScroller);
 
 	    /*
-	     * Create a message area to use for displaying messages
+	     * Create a message area to use for displaying messages. This
+	     * is another small panel with a couple of segments.
 	     */
+	    JPanel MessagePanel = new JPanel(true);
+	    MessagePanel.setLayout(new BoxLayout(MessagePanel,
+						 BoxLayout.X_AXIS));
+
+	    // Main message area.
 	    MessageArea = new JLabel("Pick a node, any node");
-	    MapPanel.add(MessageArea);
+	    MessagePanel.add(MessageArea);
+
+	    // Stretchy glue to keep things apart.
+	    MessagePanel.add(Box.createHorizontalGlue());
+
+	    // Moused Over node name.
+	    MouseOverName = new JLabel(" ");
+	    MessagePanel.add(MouseOverName);
+
+	    // More stretchy glue to keep things apart.
+	    MessagePanel.add(Box.createHorizontalGlue());
+	    
+	    // x,y coords area.
+	    CoordsArea = new JLabel(" ");
+	    MessagePanel.add(CoordsArea);
+	    MessagePanel.add(Box.createRigidArea(new Dimension(20,0)));
+
+	    MapPanel.add(MessagePanel);
 
 	    /*
 	     * And a panel to put all the little scroll panes in.
@@ -908,6 +935,7 @@ public class NodeSelect extends JApplet {
 	    // Create the row and column headers (rulers, sortof).
 	    TopRuler  = new Ruler(HORIZONTAL);
 	    SideRuler = new Ruler(VERTICAL);
+	    Corner    = new MyCorner();
 
 	    // Make sure the rulers know how big they need to be.
 	    TopRuler.setPreferredWidth(physmapdim.width);
@@ -915,9 +943,7 @@ public class NodeSelect extends JApplet {
 
 	    PhysMapScrollPane.setColumnHeaderView(TopRuler);
 	    PhysMapScrollPane.setRowHeaderView(SideRuler);
-
-	    PhysMapScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER,
-					new MyCorner());	    
+	    PhysMapScrollPane.setCorner(JScrollPane.UPPER_LEFT_CORNER, Corner);
 
 	    // Now we can add the scrollpane.
 	    MapPanel.add(PhysMapScrollPane);
@@ -1436,6 +1462,30 @@ public class NodeSelect extends JApplet {
 	public void SetTitle(String message) {
 	    MessageArea.setText(" ");
 	    MessageArea.setText(message);
+	}
+
+	/*
+	 * Change the the name of the currently moused over node.
+	 */
+	public void SetMouseOver(String message) {
+	    MouseOverName.setText(" ");
+	    if (message != null)
+		MouseOverName.setText(message);
+	}
+
+	/*
+	 * Change the coordinates text at the top of the applet.
+	 */
+	public void SetCoords(MouseEvent e) {
+	    String x_meters, y_meters;
+	    
+	    x_meters = FORMATTER.format((e.getX() / pixels_per_meter) *
+					scale);
+	    y_meters = FORMATTER.format((e.getY() / pixels_per_meter) *
+					scale);
+	    
+	    CoordsArea.setText(" ");
+	    CoordsArea.setText("X = " + x_meters + "    Y = " + y_meters);
 	}
 
 	/*
