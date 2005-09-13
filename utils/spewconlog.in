@@ -165,6 +165,6 @@ if ($syspid) {
 # Now we want to ssh over and cat the file.
 #
 $UID = 0;
-system("sshtb -host $tipserver $cmd $logname");
+system("$SSH -host $tipserver $cmd $logname");
 $UID = $SAVEUID;
 exit(($? == 0 ? 0 : 1));
