@@ -8,6 +8,7 @@ use Getopt::Std;
 use POSIX 'setsid'; # For &daemonize
 use Sys::Syslog;
 use English;
+use Socket;
 
 #
 # This also kills a running frisbee.
@@ -68,6 +69,8 @@ if (defined($options{"d"})) {
 if (defined($options{"k"})) {
     $killmode = 1;
 }
+usage()
+    if (! @ARGV);
 $imageid = shift @ARGV;
 
 #
@@ -366,7 +369,8 @@ sub get_filename {
 sub lock_tables {
 	while (1) {
 		&debug("Locking tables\n");
-		my $sth = DBQuery("LOCK TABLES images WRITE"); 
+		my $sth = DBQuery("LOCK TABLES images WRITE, ".
+				  "            emulab_indicies WRITE");
 		if (!$sth) {
 			print "DB Error locking tables. Waiting a bit ...\n";
 			sleep(10);
@@ -384,29 +388,48 @@ sub unlock_tables {
 
 # Pick out an address to use
 sub pick_address {
-	my $address_query = "SELECT load_address FROM images WHERE " .
-		"load_address IS NOT NULL and load_address != ''";
-	my $sth = DBQueryFatal($address_query);
-
-	my %used_addrs = (); # Loading addresses already taken
-	while (@row = $sth->fetchrow) {
-		$row[0] =~ /^$BASEADDR\.(\d+):(\d+)$/;
-		# $1 is the address, $2 the port number
-		if ($1 && $2) {
-			$used_addrs{$1} = $2;
-		}
+    my $idx;
+    my $baseaddr_query =
+	DBQueryFatal("select idx from emulab_indicies ".
+		     "where name='frisbee_mcastaddr'");
+    if (! $baseaddr_query->num_rows) {
+	$idx = unpack("N", inet_aton("${BASEADDR}.1"));
+	
+	DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		     "values ('frisbee_mcastaddr', $idx)");
+    }
+    else {
+	($idx) = $baseaddr_query->fetchrow_array();
+    }
+    my ($a,$b,$c,$d) = unpack('C4', pack('N', $idx));
+    # Bump to next address.
+    if (++$d >= 255) {
+	$d = 1;
+	if (++$c >= 255) {
+	    $c = 1;
+	    if (++$b >= 255) {
+		my $mesg = "No more multicast addresses!";
+		
+		SENDMAIL($TBOPS,
+			 "FrisbeeLauncher Failed!",
+			 "Imageid: $imageid\n".
+			 $mesg);
+	
+		die("*** $0:\n".
+		    "    $mesg\n");
+	    }
 	}
+    }
+    my $address = "${a}.${b}.${c}.${d}";
+    my $port    = $BASEPORT + ((($c << 8) | $d) & 0x7FFF);
+    
+    # Insert back into emulab_indicies for next time.
+    $idx = unpack("N", inet_aton($address));
 
-	my $address;
-	for (my $i = 1; $i < 255; $i++) {
-		if (!$used_addrs{$i}) {
-			my $port = $BASEPORT + ($i - 1);
-			$address = "${BASEADDR}.${i}:${port}";
-			last;
-		}
-	}
+    DBQueryFatal("update emulab_indicies set idx=$idx ".
+		 "where name='frisbee_mcastaddr'");
 
-	return $address;
+    return "${address}:${port}";
 }
 
 # Pass in an imageid, and an address
