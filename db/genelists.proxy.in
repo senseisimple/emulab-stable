@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -51,6 +51,9 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 # Turn off line buffering on output
 #
 $| = 1;
+
+# Protos
+sub fatal($);
 
 # Load the Testbed support stuff.
 use lib "@prefix@/lib";
@@ -110,8 +113,8 @@ if (system("egrep -q -s '^${listname}:' $aliasfile")) {
 
 exit(0);
 
-sub fatal {
-    local($msg) = $_[0];
+sub fatal($) {
+    my ($msg) = @_;
 
     SENDMAIL($TBOPS, "genelists.proxy failure", $msg);
     die("*** $0:\n".

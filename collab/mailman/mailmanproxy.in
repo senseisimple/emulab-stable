@@ -66,6 +66,13 @@ use libtestbed;
 
 # Protos
 sub fatal($);
+sub AddList(@);
+sub SetListMembers(@);
+sub ModifyMember(@);
+sub SetAdminPassword(@);
+sub DeleteList(@);
+sub ListMembership(@);
+sub xLogin(@);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -585,6 +592,12 @@ sub DeleteList(@)
 	system("$MMBINDIR/rmlist -a $listname") == 0 or
 	    fatal("DeleteList: Could not delete mailing list!");
     }
+
+    # Regen the aliases. We use an external script for this.
+    $EUID = $UID = 0;
+    system("$GENALIASES") == 0 or
+	fatal("AddList: Could not generate a new aliases file!");
+
     return 0;
 }
 

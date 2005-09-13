@@ -50,6 +50,20 @@ my $CI		 = "ci";
 #
 $| = 1;
 
+# Protos
+sub AddWikiUser(@);
+sub DelWikiUser(@);
+sub AddWikiProject(@);
+sub AddWikiGroup(@);
+sub FixWikiProject(@);
+sub FixWikiUser(@);
+sub FixWikiGroup(@);
+sub SetWikiGroups(@);
+sub CI($$);
+sub WikixLogin(@);
+sub WikiRemap(@);
+sub fatal($);
+
 #
 # Untaint the path
 # 

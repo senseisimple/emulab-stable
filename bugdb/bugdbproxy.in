@@ -63,6 +63,19 @@ my $dbname;
 my $dbuser;
 my $dbpass;
 
+# Protos
+sub FlysprayUserid($);
+sub FlysprayProjectid($);
+sub FlysprayGroupid($$);
+sub NewFlySprayGroup($$$$);
+sub AddUser(@);
+sub DelUser(@);
+sub AddProject(@);
+sub AddGroup(@);
+sub SetGroups(@);
+sub xLogin(@);
+sub fatal($);
+
 #
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
