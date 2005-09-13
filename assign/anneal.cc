@@ -358,13 +358,13 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   for (name_name_map::iterator fixed_it=fixed_nodes.begin();
        fixed_it!=fixed_nodes.end();++fixed_it) {
     if (vname2vertex.find((*fixed_it).first) == vname2vertex.end()) {
-      cout << "Fixed node: " << (*fixed_it).first <<
+      cout << "*** Fixed node: " << (*fixed_it).first <<
 	" does not exist." << endl;
       exit(EXIT_UNRETRYABLE);
     }
     vvertex vv = vname2vertex[(*fixed_it).first];
     if (pname2vertex.find((*fixed_it).second) == pname2vertex.end()) {
-      cout << "Fixed node: " << (*fixed_it).second <<
+      cout << "*** Fixed node: " << (*fixed_it).second <<
 	" not available." << endl;
       exit(EXIT_UNRETRYABLE);
     }
@@ -391,7 +391,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
         }
       }
       if (vn->type.empty()) {
-        cout << "Unable to find a type for fixed, vtyped, node " << vn->name
+        cout << "*** Unable to find a type for fixed, vtyped, node " << vn->name
           << endl;
         exit(EXIT_FATAL);
       } else {
@@ -400,7 +400,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       }
     }
     if (add_node(vv,pv,false,true) == 1) {
-      cout << "Fixed node: Could not map " << vn->name <<
+      cout << "*** Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
       exit(EXIT_UNRETRYABLE);
     }

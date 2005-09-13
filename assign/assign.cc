@@ -146,7 +146,7 @@ void read_physical_topology(char *filename)
   ifstream ptopfile;
   ptopfile.open(filename);
   if (!ptopfile.is_open()) {
-      cout << "Unable to open ptop file " << filename << endl;
+      cout << "*** Unable to open ptop file " << filename << endl;
       exit(EXIT_FATAL);
   }
   cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
@@ -255,7 +255,7 @@ void read_virtual_topology(char *filename)
   ifstream topfile;
   topfile.open(filename);
   if (!topfile.is_open()) {
-      cout << "Unable to open top file " << filename << endl;
+      cout << "*** Unable to open top file " << filename << endl;
       exit(EXIT_FATAL);
   }
   cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
@@ -401,7 +401,7 @@ int type_precheck() {
       cout << "Type precheck passed." << endl;
       return 1;
     } else {
-      cout << "Type precheck failed!" << endl;
+      cout << "*** Type precheck failed!" << endl;
       return 0;
     }
 }
@@ -623,7 +623,7 @@ nosuchtype:
 	cout << "Node mapping precheck succeeded" << endl;
 	return 1;
     } else {
-	cout << "Node mapping precheck failed!" << endl;
+	cout << "*** Node mapping precheck failed!" << endl;
 	return 0;
     }
 
@@ -636,7 +636,7 @@ nosuchtype:
 // Signal handler - add a convneint way to kill assign and make it return an
 // unretryable error
 void exit_unretryable(int signal) {
-  cout << "Killed with signal " << signal << " - exiting!" << endl;
+  cout << "*** Killed with signal " << signal << " - exiting!" << endl;
   _exit(EXIT_UNRETRYABLE);
 }
 

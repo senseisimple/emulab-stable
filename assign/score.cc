@@ -641,7 +641,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
     break;
 #endif
   case tb_link_info::LINK_UNMAPPED:
-    cout << "Internal error: Should not be here either." << endl;
+    cout << "*** Internal error: Should not be here either." << endl;
     exit(EXIT_FATAL);
     break;
   }
@@ -1088,7 +1088,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
 		choice -= LINK_RESOLVE_INTERSWITCH; break;
 	      case tb_link_info::LINK_UNMAPPED:
 	      case tb_link_info::LINK_TRIVIAL:
-		cerr << "Internal error: Should not be here." << endl;
+		cerr << "*** Internal error: Should not be here." << endl;
 		exit(EXIT_FATAL);
 		break;
 	      }
