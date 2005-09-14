@@ -101,4 +101,13 @@ images.
      interested in reproducing old results, you might want to
      <a href="http://www.emulab.net/kb-show.php3?idx=39">
      limit your experiments to using only pc600 and pc850 nodes</a>.
+<li> <b>Hyperthreading is available, but support is not currently compiled in.</b>
+     The stock Emulab images do not have SMP enabled.  If you want it, you
+     will have to compile your own kernel with SMP enabled and create a disk 
+     image.  Note that FreeBSD 4.x SMP kernels will panic on a uniprocessor
+     machine, so a combined 4.x image that runs on all Emulab nodes is not
+     currently possible.  We plan to upgrade our Linux and FreeBSD 5 images
+     to support SMP in the near future as well as address the 4.x SMP issue
+     for standard images.
 </ul>
+
