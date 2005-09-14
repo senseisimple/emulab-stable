@@ -297,8 +297,10 @@ function WRITESIDEBAR() {
     WRITESIDEBARBUTTON("Documentation", $TBDOCBASE, "doc.php3");
 
     if ($rootEmulab) {
-	WRITESIDEBARBUTTON("Papers (Jul 28)", $TBDOCBASE, "pubs.php3");
-	WRITESIDEBARBUTTON("Software (Mar 12)",
+	## Temp -- until papers get looked at.
+	WRITESIDEBARBUTTON_NEW("Papers (Sep 14)", $TBDOCBASE, "pubs.php3");
+	## WRITESIDEBARBUTTON("Papers (Sep 14)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Software (Jul 18)",
 			       $TBDOCBASE, "software.php3");
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
 	#		    $TBDOCBASE, "cdrom.php");
