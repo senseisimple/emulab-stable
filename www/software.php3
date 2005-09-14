@@ -16,10 +16,11 @@ PAGEHEADER("Emulab Software Distributions");
 ?>
 
 <ul>
-<li> <img src="/new.gif" alt="&lt;NEW&gt;">
-     <a href="/downloads/netlab-client.jar">
-     Emulab GUI Client JAR v0.1.0b</a> (<a
-     href="/downloads/netlab-client-0.1.0b.tar.gz">source</a>).
+<li> 
+     Emulab GUI Client v0.1.0b
+     <a href="/downloads/netlab-client.jar">(JAR</a>,
+     <a href="/downloads/netlab-client-0.1.0b.tar.gz">source tarball</a>
+     <img src="/new.gif" alt="&lt;NEW&gt;">).
      This is the initial release of a new GUI client for creating and
      interacting with experiments.  The GUI provides an alternative to using
      the web-based interface or logging into users.emulab.net and using the
