@@ -469,43 +469,6 @@ function WRITESIDEBAR() {
 				   $TBBASE,
 				   "showuser.php3?target_uid=$login_uid");
 
-                # And now the Collaboration menu.
-		if (! STUDLY()) {
-		    if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
-			$wikiname = $CHECKLOGIN_WIKINAME;
-		
-			WRITESIDEBARBUTTON("My Wikis", $TBBASE,
-			       "gotowiki.php3?redurl=Main/$wikiname");
-		    }
-		    if ($BUGDBSUPPORT) {
-			if (!isset($pid) || $pid == "") {
-			    $query_result =
-				DBQueryFatal("select pid from ".
-					     " group_membership where ".
-				 "uid='$login_uid' and pid=gid and ".
-				 "trust!='none' ".
-				 "order by date_approved asc limit 1");
-			    if (mysql_num_rows($query_result)) {
-				$row = mysql_fetch_array($query_result);
-				$firstpid = $row[pid];
-			    }
-			}
-		    }
-		    if ($BUGDBSUPPORT) {
-			$bugdburl = "gotobugdb.php3";
-		    
-			if (isset($pid) && !empty($pid)) {
-			    $bugdburl .= "?project_title=$pid";
-			}
-			elseif (isset($firstpid)) {
-			    $bugdburl .= "?project_title=$firstpid";
-			}
-			WRITESIDEBARBUTTON("My Bug Databases", $TBBASE,
-					   $bugdburl);
-		    }
-		    WRITESIDEBARDIVIDER();
-		}
-
 		#
                 # Since a user can be a member of more than one project,
                 # display this option, and let the form decide if the 
@@ -530,13 +493,6 @@ function WRITESIDEBAR() {
 			"href=\"$TBBASE/showimageid_list.php3\">" .
 	        	"ImageIDs</a> or <a " .
 	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a>");
-
-		if (!STUDLY() &&
-		    ($login_status & CHECKLOGIN_CVSWEB)) {
-		    WRITESIDEBARBUTTON("CVS Repository",
-				       $TBBASE, "cvsweb/cvsweb.php3");
-		}
-		
 
 		if ($login_status & CHECKLOGIN_TRUSTED) {
 		  WRITESIDEBARDIVIDER();
@@ -597,8 +553,7 @@ function WRITESIDEBAR() {
     }
 
     # And now the Collaboration menu.
-    if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
-	STUDLY()) {
+    if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID))) {
 	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
 	    "<tr><td class=menuheader>".
 	    "<b>Collaboration</b>".
