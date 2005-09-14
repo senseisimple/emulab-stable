@@ -14,10 +14,11 @@ use POSIX qw(setsid);
 #
 sub usage()
 {
-    print(STDOUT "Usage: console pcXXX\n");
+    print(STDOUT "Usage: console -d pcXXX\n");
     exit(-1);
 }
 my $optlist  = "";
+my @opts = ();
 
 #
 # Configure variables
@@ -45,6 +46,16 @@ $| = 1;
 if (! getopts($optlist, \%options)) {
     usage();
 }
+
+# pass through select options
+if (defined($options{"d"})) {
+    push @opts, "-d";
+}
+if (defined($options{"p"})) {
+    push @opts, "-p";
+    push @opts, $options{"p"};
+}
+
 usage()
     if (@ARGV != 1);
 my $node = $ARGV[0];
@@ -87,7 +98,7 @@ if (!$syspid) {
     unlink($tempfile);
     exit(0);
 }
-my @cmdargs = ($CONSOLEBIN, "-a", "$tempfile", "$node");
+my @cmdargs = ($CONSOLEBIN, "-a", "$tempfile", @opts, "$node");
 exec(@cmdargs);
 die("*** $0:\n".
     "    Exec failure: '@cmdargs'\n");
