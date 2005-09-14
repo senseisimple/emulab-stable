@@ -148,6 +148,8 @@ AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
 AC_SUBST(WINSUPPORT)
 AC_SUBST(CVSSUPPORT)
+AC_SUBST(MIN_UNIX_UID)
+AC_SUBST(MIN_UNIX_GID)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -206,6 +208,8 @@ BOSSEVENTPORT=2927
 UNIFIED_BOSS_AND_OPS=0
 FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
+MIN_UNIX_UID=10000
+MIN_UNIX_GID=6000
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -766,7 +770,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	cdrom/GNUmakefile cdrom/tbbootconfig/GNUmakefile \
 	cdrom/groklilo/GNUmakefile \
 	dhcpd/dhcpd.conf.template dhcpd/GNUmakefile \
-	install/GNUmakefile install/ops-install install/boss-install \
+	install/GNUmakefile \
+	install/ops-install install/boss-install install/fs-install \
 	install/newnode_sshkeys/GNUmakefile install/smb.conf.head \
 	mote/GNUmakefile mote/tbuisp mote/tbsgmotepower mote/newmote \
 	mote/sgtools/GNUmakefile \

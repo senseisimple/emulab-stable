@@ -1,0 +1,428 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# install-fs - Script to do the initial install of a filesystem node
+#
+# The main things it does not do yet:
+# * Figure out where to put directories such as /users /proj - they must
+#   already exist
+#
+
+#
+# Configure variables
+#
+my $PREFIX = '@prefix@';
+my $TOP_SRCDIR = '@top_srcdir@';
+
+my $OURDOMAIN   = '@OURDOMAIN@';
+my $USERNODE    = '@USERNODE@';
+my $FSNODE      = '@FSNODE@';
+my $BOSSNODE    = '@BOSSNODE@';
+my $BOSSNODE_IP = '@BOSSNODE_IP@';
+my $USERNODE_IP = '@USERNODE_IP@';
+my $FSNODE_IP   = '@FSNODE_IP@';
+my $LOGFACIL    = '@TBLOGFACIL@';
+my $ELABINELAB  = @ELABINELAB@;
+my $WINSUPPORT  = @WINSUPPORT@;
+
+# For /share export below.
+my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
+my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
+
+# Should be configure variable
+my $TBADMINGID  = 101;
+
+#
+# Allow this to work if the library is left in the source directory
+#
+use lib '@srcdir@';
+   
+use English;
+use libinstall;
+use Getopt::Std;
+
+#
+# Handle command-line options
+#
+sub usage {
+    print "Usage: fs-install [-b] [-p packagedir] [-P portname]\n";
+    exit(1);
+}
+
+#
+# The default meta-port (name and version) that drags in all the dependancies
+# for an fs node
+#
+my $FS_PORT = "emulab-fs-1.4";
+
+my $packagedir = "";
+my $batchmode  = 0;
+my %opts;
+if (! getopts("P:p:b", \%opts)) {
+    usage();
+}
+if (defined($opts{p})) {
+    $packagedir = $opts{p};
+}
+if (defined($opts{b})) {
+    $batchmode = 1;
+}
+if (defined($opts{P})) {
+    $FS_PORT = $opts{P};
+}
+
+if (@ARGV) {
+    usage();
+}
+
+#
+# Figure out which directory we live in, so that some stages can do thing
+# relative to it.
+#
+my $OBJDIR = `/usr/bin/dirname $0`;
+chomp $OBJDIR;
+my $TOP_OBJDIR = "$OBJDIR/..";
+
+#
+# Some programs we use
+#
+my $CHGRP      = "/usr/bin/chgrp";
+my $CHMOD      = "/bin/chmod";
+my $PW         = "/usr/sbin/pw";
+my $PATCH      = "/usr/bin/patch";
+my $NEWALIASES = "/usr/bin/newaliases";
+my $SH         = "/bin/sh";
+my $PKG_INFO   = "/usr/sbin/pkg_info";
+my $PKG_ADD    = "/usr/sbin/pkg_add";
+my $PWD        = "/bin/pwd";
+my $CP         = "/bin/cp";
+my $MV         = "/bin/mv";
+my $GMAKE      = "/usr/local/bin/gmake";
+my $ENV        = "/usr/bin/env";
+
+#
+# Some files we edit/create
+#
+my $RCCONF          = "/etc/rc.conf";
+my $HOSTS           = "/etc/hosts";
+my $RCLOCAL         = "/etc/rc.local";
+my $RCCAPTURE       = "$PREFIX/etc/rc.capture";
+my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
+my $ALIASES_FILE    = "/etc/mail/aliases";
+my $EXPORTS_FILE    = "/etc/exports";
+my $EXPORTS_HEAD    = "$EXPORTS_FILE.head";
+my $SYSLOG_CONF     = "/etc/syslog.conf";
+my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
+my $SUDOERS         = "/usr/local/etc/sudoers";
+my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
+my $CRONTAB         = "/etc/crontab";
+my $AUTHKEYS	    = "/root/.ssh/authorized_keys";
+my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
+my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
+my $SAMBA_PATCH     = "$TOP_SRCDIR/patches/samba.patch";
+
+#
+# Some directories we care about
+#
+my $LIST_DIR      = "/etc/mail/lists";
+my $TIPLOG_DIR    = "/var/log/tiplogs";
+my $PORTSDIR      = "/usr/ports";
+my $PORTSMISCDIR  = "$PORTSDIR/misc";
+my $SRCDIR        = '@srcdir@';
+my $RCDIR         = "/usr/local/etc/rc.d";
+my $VARRUN        = "/var/run";
+
+#
+# And some lists that we use
+#
+my @LOGFILES           = ("/var/log/logins","/var/log/tiplogs/capture.log",
+    "/var/log/mountd.log");
+
+my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
+    ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
+
+#
+# A few files we have to deal with
+#
+my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
+
+#
+# List of names that goes into $HOSTS and which must resolve.
+# 
+my @OPS_NAMES = ($USERNODE, "users", "ops");
+
+if ($USERNODE eq $FSNODE) {
+    die "This script is only for use on a separate FS node";
+}
+
+#
+# Make sure they know what they're getting into...
+#
+if (! $batchmode) {
+    print STDERR
+	"WARNING: This script is ONLY intended to be run on a machine\n";
+    print STDERR
+	"that is being set up as a dedicated fs node. Continue? [y/N] ";
+    my $response = <>;
+    die "Installation aborted!\n" unless ($response =~ /^y/i);
+}
+
+if ($UID != 0) {
+    die "This script must be run as root.\n";
+}
+
+#
+# The phases are fairly self-explanatory
+#
+
+Phase "dirs", "Setting directory permissions", sub {
+    foreach my $dirref (@TESTBED_DIRS) {
+	my ($dir, $newmode) = @$dirref;
+	Phase $dir, $dir, sub {
+	    if (!-d $dir) {
+		PhaseFail("Directory $dir does not exist");
+	    }
+	    # Use the real path, to avoid symlink problems
+	    my $realdir = `realpath $dir`;
+	    chomp $realdir;
+	    my ($mode,$group) = (stat($realdir))[2,5];
+	    # Fix up the mode (strip file type)
+	    $mode = $mode & 0777;
+	    if ($mode == eval $newmode && $group eq $TBADMINGID) {
+		PhaseSkip("Already done");
+	    }
+	    ExecQuietFatal("$CHGRP $TBADMINGID $realdir");
+	    ExecQuietFatal("$CHMOD $newmode $realdir");
+	};
+    }
+};
+
+Phase "ports", "Installing ports", sub {
+    if (!ExecQuiet("$PKG_INFO -e $FS_PORT")) {
+	PhaseSkip("Ports already installed");
+    }
+    Phase "packages", "Installing packages", sub {
+	if (!$packagedir) {
+	    PhaseSkip("No package directory provided");
+	}
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $FS_PORT");
+    };
+    if ($packagedir) {
+	PhaseSkip("Packages installed okay");
+    }
+    Phase "pcopy", "Copying ports into place", sub {
+	DoneIfExists("$PORTSMISCDIR/emulab-fs");
+	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
+    };
+    Phase "ppatch", "Patching ports", sub {
+	Phase "samba-patch", "Patching samba port", sub {
+	    if (!$WINSUPPORT) {
+		PhaseSkip("Windows support not enabled");
+	    }
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $SAMBA_PATCH")) {
+		PhaseSkip("$SAMBA_PATCH already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $SAMBA_PATCH");
+	};
+    };
+    Phase "pinstall", "Installing ports (may take a while)", sub {
+	#
+	# No interaction or options to worry about,
+	# so it's safe to install the port from this script
+	#
+	my $pwd = `$PWD`;
+	chomp $pwd;
+	chdir "$PORTSMISCDIR/emulab-fs" or
+		PhaseFail "Unable to change to $PORTSMISCDIR/emulab-fs: $!";
+	ExecQuietFatal("make -DBATCH install");
+	chdir $pwd;
+    };
+};
+
+# XXX Temporary.
+Phase "portfixup", "Fixing up packages", sub {
+    Phase "rsync", "Looking for rsync and installing", sub {
+	if (!ExecQuiet("$PKG_INFO -x rsync")) {
+	    PhaseSkip("rsync already installed");
+	}
+
+	PhaseFail("Must have PKG_PATH environment variable set")
+	    if (!exists($ENV{"PKG_PATH"}));
+	
+	ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
+    };
+    Phase "samba", "Looking for Samba and installing", sub {
+	if (!$WINSUPPORT) {
+	    PhaseSkip("Windows support not enabled");
+	}
+	if (!ExecQuiet("$PKG_INFO -x samba")) {
+	    PhaseSkip("samba already installed");
+	}
+	    
+	PhaseFail("Must have PKG_PATH environment variable set")
+	    if (!exists($ENV{"PKG_PATH"}));
+
+	ExecQuietFatal("$PKG_ADD samba-3.0.7,1");
+    };
+};
+
+Phase "rc.conf", "Adding testbed content to rc.conf", sub {
+    DoneIfEdited($RCCONF);
+    AppendToFileFatal($RCCONF,
+		      qq|nfs_server_enable="YES"|,
+		      qq|nfs_server_flags="-u -t -n 16"|,
+		      ($WINSUPPORT ? qq|smbd_enable="YES"| : ()),
+		      qq|syslogd_flags=""|);
+};
+
+Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
+    DoneIfEdited($HOSTS);
+    my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss".
+	      "\n${USERNODE_IP}\t@OPS_NAMES".
+	      "\n${FSNODE_IP}\t${FSNODE} fs";
+    AppendToFileFatal($HOSTS, $hstr);
+};
+
+Phase "resolve", "Checking to make sure names for boss/ops/fs resolve", sub {
+    my @hnames = (@OPS_NAMES, $BOSSNODE, "boss", $FSNODE, "fs");
+    foreach my $name (@hnames) {
+	Phase $name, $name, sub {
+	    if (gethostbyname($name)) {
+		PhaseSucceed("$name resolves");
+	    } else {
+		PhaseFail("$name does not resolve");
+	    }
+	};
+    }
+};
+
+Phase "exports", "Setting up exports", sub {
+    Phase "ex.head", "Creating $EXPORTS_HEAD", sub {
+	DoneIfExists($EXPORTS_HEAD);
+
+	#
+	# Figure out which of these directories are on the same
+	# filesystems.  Note: we cannot do /share on the same exports line
+	# as the other filesystems because of the RO mount below (trust me).
+	#
+	my @dirs = ('/users','/groups','/proj');
+	@dirs = map {`realpath $_`} @dirs;
+	chomp @dirs;
+	my %filesystems;
+	foreach my $dir (@dirs) {
+	    my ($dev,@junk) = stat $dir;
+	    push @{$filesystems{$dev}}, $dir;
+	}
+
+	#
+	# Use that knowledge to create lines for /etc/exports.head
+	#
+	my @exports_lines;
+	foreach my $key (keys %filesystems) {
+	    push @exports_lines,
+		join(" ",@{$filesystems{$key}}) .
+		    "\t$BOSSNODE $USERNODE -maproot=root";
+	}
+
+	#
+	# /share is special. We want to export to boss/ops read-write,
+	# but to the control network read-only.
+	#
+	my ($a,$b,$c,$d) = ($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+	my $realdir = `realpath /share`;
+	chomp($realdir);
+	push(@exports_lines,
+	    "$realdir\t$BOSSNODE $USERNODE -maproot=root");
+	push(@exports_lines,
+	     "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
+	     "-maproot=root -ro");
+
+	#
+	# Put them in exports.head, and copy that to /etc/exports
+	#
+	CreateFileFatal($EXPORTS_HEAD, @exports_lines);
+	ExecQuietFatal("cp $EXPORTS_HEAD $EXPORTS_FILE");
+    };
+
+    # XXX Newhup
+    Phase "mountd", "HUPing mountd", sub {
+	PhaseSkip("No new exports file") if PhaseWasSkipped("ex.head");
+	PhaseSkip("mountd not running") unless `ps -auxw | grep mountd | grep -v grep`;
+	ExecQuietFatal("killall -HUP mountd");
+    };
+};
+
+Phase "cron", "Adding cron jobs", sub {
+    Phase "crontab", "Editing $CRONTAB", sub {
+	DoneIfEdited($CRONTAB);
+	AppendToFileFatal($CRONTAB,
+	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamail");
+    };
+    Phase "cronhup", "HUPing cron", sub {
+	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
+	HUPDaemon("cron");
+    };
+};
+
+Phase "sudoers", "Editing $SUDOERS to allow wheel group", sub {
+    DoneIfEdited($SUDOERS);
+    AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
+};
+
+Phase "samba", "Setting up Samba", sub {
+    if (!$WINSUPPORT) {
+	PhaseSkip("Windows support not enabled");
+    }
+    Phase "smb.conf", "Installing smb.conf[.head]", sub {
+	DoneIfEdited($SMBCONF_HEAD);
+	ExecQuietFatal("$CP -pf $TOP_OBJDIR/install/smb.conf.head $SMBCONF_HEAD");
+	AppendToFileFatal($SMBCONF_HEAD,
+			  "# This file created by Emulab Control");
+	ExecQuietFatal("$CP -pf $SMBCONF_HEAD $SMBCONF_FILE");
+    };
+    Phase "samba.sh", "Installing samba.sh", sub {
+	DoneIfExists("$RCDIR/samba.sh");
+	DoneIfDoesntExist("$RCDIR/samba.sh.sample");
+	ExecQuietFatal("$MV -f $RCDIR/samba.sh.sample $RCDIR/samba.sh");
+    };
+    if ($ELABINELAB) {	
+	Phase "starting", "Starting Samba", sub {
+	    DoneIfExists("$VARRUN/smbd.pid");
+	    ExecQuietFatal("$RCDIR/samba.sh start");
+	};
+    }
+};
+
+Phase "ssh", "Allowing root ssh", sub {
+    Phase "sshdconfig", "Permitting root login through ssh", sub {
+	DoneIfEdited($SSHD_CONFIG);
+	AppendToFileFatal($SSHD_CONFIG,"PermitRootLogin yes");
+    };
+    Phase "dotssh", "Making root's .ssh directory", sub {
+	DoneIfExists("/root/.ssh");
+	mkdir("/root/.ssh",0700) or
+	    PhaseFail("Unable to create /root/.ssh: $!");
+    };
+    Phase "authkeys", "Adding stub identity to root authorized_keys", sub {
+	DoneIfEdited($AUTHKEYS);
+	my $ident = `cat $IDENTPUB`;
+	PhaseFail("Could not read $IDENTPUB")
+	    if ($?);
+	chomp($ident);
+	if (! -e $AUTHKEYS) {
+	    CreateFileFatal($AUTHKEYS);
+	}
+	AppendToFileFatal($AUTHKEYS,
+			  "from=\"${BOSSNODE}\" $ident");
+    };
+};
+
+print "----------------------------------------------------------------------\n";
+print "Installation completed succesfully!\n";
+print "Please reboot this machine before proceeding with ops and boss setup\n";

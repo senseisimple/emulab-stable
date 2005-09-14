@@ -28,8 +28,9 @@ my $debug    = 0;
 #
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
-my $CONTROL  = "@USERNODE@";
+my $FS       = "@FSNODE@";
 my $TESTMODE = @TESTMODE@;
+my $FSLIST   = "@FS_WITH_QUOTAS@";
 
 my $QUOTACMD = "/usr/bin/quota";
 my $SSHTB    = "/usr/testbed/bin/sshtb";
@@ -51,7 +52,7 @@ $ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 exit(0)
-    if ($TESTMODE);
+    if ($TESTMODE || $FSLIST eq "");
 
 if ($EUID != 0) {
     # We don't want to run this script unless its the real version.
@@ -100,6 +101,11 @@ else {
 }
    
 #
+# Convert to a uid since fs node may not have our user names
+#
+my $userid = getpwnam($user);
+
+#
 # Must flip to real root for the ssh.
 # 
 $UID = 0;
@@ -107,9 +113,9 @@ $UID = 0;
 #
 # We invoke the quota command and look at the results.
 # 
-open(QUOTA, "$SSHTB -host $CONTROL $QUOTACMD -q -l $user |") or
+open(QUOTA, "$SSHTB -host $FS $QUOTACMD -q -l $userid |") or
     die("*** $0:\n".
-	"    Could not invoke $QUOTACMD on $CONTROL!\n");
+	"    Could not invoke $QUOTACMD on $FS!\n");
 
 while (<QUOTA>) {
     if (($_ =~ /limit reached on ([-\w\/]*)$/) ||

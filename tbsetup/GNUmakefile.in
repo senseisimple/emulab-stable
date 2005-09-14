@@ -30,8 +30,10 @@ SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
 		  elabinelab snmpit.proxy panic repos_daemon
 
-CTRLBIN_STUFF   = console_setup.proxy exports_setup.proxy sfskey_update.proxy \
+CTRLBIN_STUFF   = console_setup.proxy sfskey_update.proxy \
 		  savelogs.proxy eventsys.proxy
+
+FSBIN_STUFF	= exports_setup.proxy
 
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
@@ -179,6 +181,12 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRLBIN_STUFF)) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
 	@$(MAKE) -C nseparse control-install
+
+#
+# FS install
+#
+fs-install:	$(addprefix $(INSTALL_SBINDIR)/, $(FSBIN_STUFF)) \
+		$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 
 #
 # Tip servers get very little

@@ -14,7 +14,7 @@ include $(OBJDIR)/Makeconf
 
 SBIN_STUFF	= tbacct addsfskey addpubkey mkusercert
 LIBEXEC_STUFF	= webtbacct webaddsfskey webaddpubkey webmkusercert
-FS_SBIN_STUFF	= quotamail
+FSBIN_STUFF	= quotamail
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -42,10 +42,9 @@ post-install:
 	chown root $(INSTALL_SBINDIR)/mkusercert
 	chmod u+s $(INSTALL_SBINDIR)/mkusercert
 
-# XXX ops == fs right now
-control-install: fs-install
+control-install:
 
-fs-script-install: $(addprefix $(INSTALL_SBINDIR)/, $(FS_SBIN_STUFF))
+fs-script-install: $(addprefix $(INSTALL_SBINDIR)/, $(FSBIN_STUFF))
 
 fs-install: fs-script-install
 

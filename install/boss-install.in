@@ -36,6 +36,7 @@ my $FSNODE     = '@FSNODE@';
 my $BOSSNODE   = '@BOSSNODE@';
 my $BOSSNODE_IP= '@BOSSNODE_IP@';
 my $USERNODE_IP= '@USERNODE_IP@';
+my $FSNODE_IP=   '@FSNODE_IP@';
 
 #
 # Some programs we use
@@ -179,8 +180,9 @@ my %EXPERIMENTS =
 # List of names that goes into $HOSTS and which must resolve.
 # 
 my @OPS_NAMES = ($USERNODE, "users", "ops");
-push(@OPS_NAMES, $FSNODE)
-    if ($USERNODE ne $FSNODE);
+if ($USERNODE eq $FSNODE) {
+    push(@OPS_NAMES, "fs");
+}
 
 #
 # The meta-port (name and version) that drags in all the dependancies for
@@ -654,18 +656,25 @@ Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
     ExecQuietFatal("$CHMOD u+s $SUIDPERL");
 };
 
-Phase "hosts", "Adding boss/ops IP addresses to $HOSTS", sub {
+Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
-    AppendToFileFatal($HOSTS,
-		      "${BOSSNODE_IP}\t${BOSSNODE} boss",
-		      "${USERNODE_IP}\t@OPS_NAMES");
+    my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss".
+	      "\n${USERNODE_IP}\t@OPS_NAMES";
+    if ($USERNODE ne $FSNODE) {
+	$hstr .= "\n${FSNODE_IP}\t${FSNODE} fs";
+    }
+    AppendToFileFatal($HOSTS, $hstr);
 };
 
-Phase "resolve", "Checking to make sure names for ops resolve", sub {
-    foreach my $name (@OPS_NAMES, ${BOSSNODE}, "boss") {
+Phase "resolve", "Checking to make sure names for boss/ops/fs resolve", sub {
+    my @hnames = (@OPS_NAMES, ${BOSSNODE}, "boss");
+    if ($USERNODE ne $FSNODE) {
+	push @hnames, ${FSNODE}, "fs";
+    }
+    foreach my $name (@hnames) {
 	Phase $name, $name, sub {
 	    if (gethostbyname($name)) {
-		PhaseSkip("$name resolves");
+		PhaseSucceed("$name resolves");
 	    } else {
 		PhaseFail("$name does not resolve - please see setup.txt\n" .
 		    "for further instructions!");
@@ -776,7 +785,7 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 	    "   StrictHostKeyChecking no",
 	    "   Protocol 1,2");
     };
-    Phase "keycopy", "Copy root ssh keys to ops", sub {
+    Phase "keycopy", "Copy root ssh keys to ops and fs", sub {
 	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
 	    PhaseSkip("Key already copied");
 	} else {
@@ -788,10 +797,32 @@ Phase "ssh", "Setting up root ssh from boss to ops", sub {
 			   "  '(cat > ${ETCSSH}/ssh_known_hosts)'");
 
 	    if (ExecQuiet("$SSH -o 'BatchMode=yes' root\@${USERNODE} pwd")) {
-		PhaseFail("You'll need to manually copy boss's public SSH key\n".
-			  "over to ops print so boss can get into ops without\n".
-			  "a password. Run the following print as root:\n" .
+		PhaseFail("You need to manually copy boss's public SSH key\n".
+			  "over to $USERNODE so boss can get into it without\n".
+			  "a password. Run the following as root:\n" .
 			  "scp $ROOT_PUBKEY ${USERNODE}:$ROOT_AUTHKEY");
+	    }
+	}
+    };
+    Phase "keycopy2", "Copy root ssh keys to fs", sub {
+	if ($USERNODE eq $FSNODE) {
+	    PhaseSkip("FS node is ops node");
+	}
+	if (! ExecQuiet("$SSH -o 'BatchMode=yes' root\@${FSNODE} pwd")) {
+	    PhaseSkip("Key already copied");
+	} else {
+	    ExecQuietFatal("$SCP -i $INIT_PRIVKEY ".
+			   "$ROOT_PUBKEY ${FSNODE}:$ROOT_AUTHKEY");
+
+	    # Copy hosts keys to fs.
+	    ExecQuietFatal("cat ${ETCSSH}/*.pub | $SSH ${FSNODE} ".
+			   "  '(cat > ${ETCSSH}/ssh_known_hosts)'");
+
+	    if (ExecQuiet("$SSH -o 'BatchMode=yes' root\@${FSNODE} pwd")) {
+		PhaseFail("You need to manually copy boss's public SSH key\n".
+			  "over to $FSNODE so boss can get into it without\n".
+			  "a password. Run the following as root:\n" .
+			  "scp $ROOT_PUBKEY ${FSNODE}:$ROOT_AUTHKEY");
 	    }
 	}
     };
@@ -933,6 +964,13 @@ Phase "named", "Setting up initial named configuration", sub {
     Phase "copying", "Copying resolv.conf over to ops", sub {
  	ExecQuietFatal("$SCP $TOP_OBJDIR/named/resolv.conf.ops ".
 		       "     ${USERNODE}:/etc/resolv.conf");
+    };
+    Phase "copying2", "Copying resolv.conf over to fs", sub {
+	if ($USERNODE eq $FSNODE) {
+	    PhaseSkip("FS node is ops node");
+	}
+ 	ExecQuietFatal("$SCP $TOP_OBJDIR/named/resolv.conf.ops ".
+		       "     ${FSNODE}:/etc/resolv.conf");
     };
 };
 

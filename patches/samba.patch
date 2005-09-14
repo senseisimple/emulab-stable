@@ -1,0 +1,13 @@
+--- /usr/ports/net/samba3/Makefile.orig	Tue Aug 23 23:31:08 2005
++++ /usr/ports/net/samba3/Makefile	Tue Aug 23 23:17:58 2005
+@@ -63,8 +63,8 @@
+ 
+ .if !defined(SAMBA_SUBPORT)
+ OPTIONS=	LDAP		"With LDAP support" on \
+-		ADS		"With Active Directory support" on \
+-		CUPS		"With CUPS printing support" on \
++		ADS		"With Active Directory support" off \
++		CUPS		"With CUPS printing support" off \
+ 		WINBIND		"With WinBIND support" on \
+ 		ACL_SUPPORT	"With ACL support" off \
+ 		SYSLOG		"With Syslog support" off \

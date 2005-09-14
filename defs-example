@@ -25,6 +25,17 @@ USERNODE=ops.example.emulab.net
 # as the ops node)
 FSNODE=fs.example.emulab.net
 
+#
+# Minimum Unix uid and gid values for Emulab users.
+# Emulab will create the initial user with these values and all additional
+# users will have values greater than these.  It would be unwise to make
+# these less than 1000 to avoid conflicts with "standard" BSD and Linux
+# users.  These can also be tweaked to avoid pre-existing accounts on the
+# fileserver machine.
+#
+MIN_UNIX_UID=10000
+MIN_UNIX_GID=6000
+
 # 
 # Addresses to which email will be sent - These are expected to go to mailing
 # lists. You can either host the lists on your ops node, send them off to
@@ -75,6 +86,14 @@ FSDIR_GROUPS=/groups
 FSDIR_PROJ=/q/proj
 FSDIR_USERS=/users
 FSDIR_SHARE=/share
+
+#
+# Filesystems on which quotas should be enforced.
+# Note that if multiple of the FSDIR_* vars above are on the same filesystem
+# (e.g., /q/proj and /q/users) then you should only specify the base of the
+# common filesystem on which they all reside here (e.g., /q).
+# Set to the empty string to turn off quota checking.
+#
 FS_WITH_QUOTAS="/q /groups /users"
 
 #

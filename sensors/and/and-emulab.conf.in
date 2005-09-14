@@ -55,5 +55,5 @@ mingid 1
 # core developers, comment out the above lines and uncomment the ones
 # below.
 #
-# minuid 10000
-# mingid 6000
+# minuid @MIN_UNIX_UID@
+# mingid @MIN_UNIX_GID@

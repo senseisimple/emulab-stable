@@ -16,6 +16,8 @@ use libdb;
 
 my $tbadmin    = '@TBADMINGROUP@';
 my $ELABINELAB = @ELABINELAB@;
+my $MINUID     = @MIN_UNIX_UID@;
+my $MINGID     = @MIN_UNIX_GID@;
 
 my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
@@ -88,10 +90,10 @@ if (!defined($encpass)) {
 }
 
 # Get uid for the user and a gid for the project
-my $uid = 10000;
+my $uid = $MINUID;
 while (getpwuid($uid)) { $uid++; }
 
-my $gid = 6000;
+my $gid = $MINGID;
 while (getgrgid($gid)) { $gid++; }
 
 my $ggid = $gid + 1;

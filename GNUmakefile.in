@@ -31,7 +31,8 @@ SUBDIRS = lib db assign www @optional_subdirs@ ipod security sensors \
 all:		all-subdirs 
 
 install:	
-	@echo "Choose either boss-install (paper) or ops-install (plastic)"
+	@echo "Choose either boss-install, ops-install or fs-install"
+	@echo "Choose opsfs-install instead of ops-install for a combined ops/fs machine"
 	@echo "Choose tipserv-install for dedicated tip server machines."
 
 #
@@ -88,6 +89,13 @@ endif
 	@$(MAKE) -C xmlrpc control-install
 	@$(MAKE) -C tmcd control-install
 	@$(MAKE) -C account control-install
+
+fs-install:
+	@$(MAKE) -C tbsetup fs-install
+	@$(MAKE) -C account fs-install
+
+opsfs-install: ops-install fs-install
+	@echo "Combined ops/fs install done."
 
 install-mkdirs:
 	-mkdir -p $(INSTALL_TOPDIR)/opsdir

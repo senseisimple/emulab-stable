@@ -7,7 +7,7 @@
 #
 
 #
-# install-ops.sh - Script to do the initial install of an ops node
+# install-ops - Script to do the initial install of an ops node
 #
 # The main things it does not do yet:
 # * Figure out where to put directories such as /users /proj - they must
@@ -32,13 +32,20 @@ my $FSNODE      = '@FSNODE@';
 my $BOSSNODE    = '@BOSSNODE@';
 my $BOSSNODE_IP = '@BOSSNODE_IP@';
 my $USERNODE_IP = '@USERNODE_IP@';
+my $FSNODE_IP   = '@FSNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 
+# True if we are also the FS node
+my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
+
 # For /share export below.
 my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
 my $CONTROL_NETMASK = "@CONTROL_NETMASK@";
+
+# Should be configure variable
+my $TBADMINGID  = 101;
 
 #
 # Allow this to work if the library is left in the source directory
@@ -62,6 +69,7 @@ sub usage {
 # for an ops node
 #
 my $OPS_PORT = "emulab-ops-1.4";
+my $FS_PORT = "emulab-fs-1.4";
 
 my $packagedir = "";
 my $batchmode  = 0;
@@ -107,12 +115,14 @@ my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
 my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
+my $MOUNT      = "/sbin/mount";
 
 #
 # Some files we edit/create
 #
 my $RCCONF          = "/etc/rc.conf";
 my $HOSTS           = "/etc/hosts";
+my $FSTAB           = "/etc/fstab";
 my $RCLOCAL         = "/etc/rc.local";
 my $RCCAPTURE       = "$PREFIX/etc/rc.capture";
 my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
@@ -138,6 +148,7 @@ my $PORTSMISCDIR  = "$PORTSDIR/misc";
 my $SRCDIR        = '@srcdir@';
 my $TOP_SRCDIR    = "@top_srcdir@";
 my $RCDIR         = "/usr/local/etc/rc.d";
+my $VARRUN        = "/var/run";
 
 #
 # And some lists that we use
@@ -151,6 +162,8 @@ my @MAILING_LIST_NAMES  = map { /^([\w-]+)\@/ } @LOCAL_MAILING_LISTS;
 my @TESTBED_DIRS       = ([$PREFIX, "0775"], ["/users", "0755"],
     ["/proj", "0755"], ["/groups", "0755"], ["/share", "0775"]);
 
+my @MOUNTPOINTS        = ("/users", "/proj", "/groups", "/share");
+
 #
 # A few files we have to deal with
 #
@@ -163,8 +176,9 @@ my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
 # List of names that goes into $HOSTS and which must resolve.
 # 
 my @OPS_NAMES = ($USERNODE, "users", "ops");
-push(@OPS_NAMES, $FSNODE)
-    if ($USERNODE ne $FSNODE);
+if ($ISFS) {
+    push(@OPS_NAMES, "fs");
+}
 
 #
 # Make sure they know what they're getting into...
@@ -173,7 +187,7 @@ if (! $batchmode) {
     print STDERR
 	"WARNING: This script is ONLY intended to be run on a machine\n";
     print STDERR
-	"that is being set up as a dedicated ops node. Continue? [y/N] ";
+	"that is being set up as a dedicated ops or ops+fs node. Continue? [y/N] ";
     my $response = <>;
     die "Installation aborted!\n" unless ($response =~ /^y/i);
 }
@@ -190,7 +204,7 @@ Phase "groups", "Creating admin group", sub {
     if (getgrnam("tbadmin")) {
 	PhaseSkip("tbadmin group already exists");
     }
-    ExecQuietFatal("$PW groupadd tbadmin -g 101");
+    ExecQuietFatal("$PW groupadd tbadmin -g $TBADMINGID");
 };
 
 Phase "dirs", "Setting directory permissions", sub {
@@ -225,6 +239,18 @@ Phase "ports", "Installing ports", sub {
 	}
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
     };
+    Phase "fs-packages", "Installing FS packages", sub {
+	if (!$ISFS) {
+	    PhaseSkip("Not FS Node");
+	}
+	if (!ExecQuiet("$PKG_INFO -e $FS_PORT")) {
+	    PhaseSkip("FS ports already installed");
+	}
+	if (!$packagedir) {
+	    PhaseSkip("No package directory provided");
+	}
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $FS_PORT");
+    };
     Phase "pcopy", "Copying ports into place", sub {
 	if ($packagedir) {
 	    PhaseSkip("Package directory provided");
@@ -232,6 +258,8 @@ Phase "ports", "Installing ports", sub {
 	DoneIfExists("$PORTSMISCDIR/emulab-ops");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
+    my $pwd = `$PWD`;
+    chomp $pwd;
     Phase "pinstall", "Installing ports (may take a while)", sub {
 	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT")) {
 	    PhaseSkip("Ports already installed");
@@ -243,13 +271,26 @@ Phase "ports", "Installing ports", sub {
 	#
 	# This port is dead-simple, so it's safe to do it from this script
 	#
-	my $pwd = `$PWD`;
-	chomp $pwd;
 	chdir "$PORTSMISCDIR/emulab-ops" or
 		PhaseFail "Unable to change to $PORTSMISCDIR/emulab-ops: $!";
 	ExecQuietFatal("make -DBATCH install");
-	chdir $pwd;
     };
+    Phase "fs-pinstall", "Installing FS ports (may take a while)", sub {
+	if (!$ISFS) {
+	    PhaseSkip("Not FS Node");
+	}
+	if (!ExecQuiet("$PKG_INFO -e $FS_PORT")) {
+	    PhaseSkip("Ports already installed");
+	}
+	if ($packagedir) {
+	    PhaseSkip("Package directory provided");
+	}
+	    
+	chdir "$PORTSMISCDIR/emulab-fs" or
+	    PhaseFail "Unable to change to $PORTSMISCDIR/emulab-fs: $!";
+	ExecQuietFatal("make -DBATCH install");
+    };
+    chdir $pwd;
 };
 
 # XXX Temporary.
@@ -259,20 +300,23 @@ Phase "portfixup", "Fixing up packages", sub {
 	    PhaseSkip("rsync already installed");
 	}
 
-	PhaseFail("Must have a PKG_PATH variable set in your environment")
+	PhaseFail("Must have PKG_PATH environment variable set")
 	    if (!exists($ENV{"PKG_PATH"}));
 	
 	ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
     };
     if ($WINSUPPORT) {
 	Phase "samba", "Looking for Samba and installing", sub {
+	    if (!$ISFS) {
+		PhaseSkip("Not FS Node");
+	    }
 	    if (!ExecQuiet("$PKG_INFO -x samba")) {
 		PhaseSkip("samba already installed");
 	    }
 	    
-	    PhaseFail("Must have a PKG_PATH variable set in your environment")
+	    PhaseFail("Must have PKG_PATH environment variable set")
 		if (!exists($ENV{"PKG_PATH"}));
-	
+		
 	    ExecQuietFatal("$PKG_ADD samba-3.0.7,1");
 	};
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
@@ -280,7 +324,7 @@ Phase "portfixup", "Fixing up packages", sub {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
 	    
-	    PhaseFail("Must have a PKG_PATH variable set in your environment")
+	    PhaseFail("Must have PKG_PATH environment variable set")
 		if (!exists($ENV{"PKG_PATH"}));
 	
 	    ExecQuietFatal("$PKG_ADD gcc30-3.0.4_1");
@@ -302,23 +346,31 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     AppendToFileFatal($RCCONF,
 		      qq|sendmail_enable="YES"|,
 		      qq|nfs_server_enable="YES"|,
-		      ($WINSUPPORT ? qq|smbd_enable="YES"| : ()),
 		      qq|nfs_server_flags="-u -t -n 16"|,
+		      (($ISFS && $WINSUPPORT) ? qq|smbd_enable="YES"| : ()),
 		      qq|syslogd_flags=""|);
 };
 
-Phase "hosts", "Adding boss/ops IP addresses to $HOSTS", sub {
+Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
-    AppendToFileFatal($HOSTS,
-		      "${BOSSNODE_IP}\t${BOSSNODE} boss",
-		      "${USERNODE_IP}\t@OPS_NAMES");
+    my $hstr = "${BOSSNODE_IP}\t${BOSSNODE} boss" .
+	"\n${USERNODE_IP}\t@OPS_NAMES";
+    if (!$ISFS) {
+	$hstr .= "\n${FSNODE_IP}\t${FSNODE} fs";
+    }
+    AppendToFileFatal($HOSTS, $hstr);
 };
 
-Phase "resolve", "Checking to make sure names for boss/ops resolve", sub {
-    foreach my $name (@OPS_NAMES, ${BOSSNODE}, "boss") {
+Phase "resolve", "Checking to make sure names for boss/ops/fs resolve", sub {
+    my @hnames = (@OPS_NAMES, $BOSSNODE, "boss");
+
+    if (!$ISFS) {
+	push @hnames, $FSNODE, "fs";
+    }
+    foreach my $name (@hnames) {
 	Phase $name, $name, sub {
 	    if (gethostbyname($name)) {
-		PhaseSkip("$name resolves");
+		PhaseSucceed("$name resolves");
 	    } else {
 		PhaseFail("$name does not resolve");
 	    }
@@ -360,16 +412,19 @@ Phase "sendmail","Configuring sendmail", sub {
     };
 };
 
-
 Phase "exports", "Setting up exports", sub {
     Phase "ex.head", "Creating $EXPORTS_HEAD", sub {
 	DoneIfExists($EXPORTS_HEAD);
 
 	#
 	# Figure out which of these directories are on the same
-	# filesystems
+	# filesystems.  Note: we cannot do /share on the same exports line
+	# as the other filesystems because of the RO mount below (trust me).
 	#
-	my @dirs = ('/users','/groups','/proj','/share','/var','/usr/testbed');
+	my @dirs = ('/var','/usr/testbed');
+	if ($ISFS) {
+	    @dirs = ('/users','/groups','/proj',@dirs);
+	}
 	@dirs = map {`realpath $_`} @dirs;
 	chomp @dirs;
 	my %filesystems;
@@ -384,19 +439,25 @@ Phase "exports", "Setting up exports", sub {
 	my @exports_lines;
 	foreach my $key (keys %filesystems) {
 	    push @exports_lines,
-		join(" ",@{$filesystems{$key}}) . "\t$BOSSNODE -maproot=root";
+		join(" ",@{$filesystems{$key}}) .
+		    "\t$BOSSNODE -maproot=root";
 	}
 
-	#
-	# /share is special. We want to export that to the control network
-	# read-only (it is exported to boss r/w, above).
-	#
-	my ($a,$b,$c,$d) = ($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
-	my $realdir = `realpath /share`;
-	chomp($realdir);
-	push(@exports_lines,
-	     "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
-	     "-maproot=root -ro");
+	if ($ISFS) {
+	    #
+	    # /share is special. We want to export to boss read-write,
+	    # but to the control network read-only.
+	    #
+	    my ($a,$b,$c,$d) =
+		($CONTROL_NETWORK =~ /^(\d*)\.(\d*)\.(\d*)\.(\d*)/);
+	    my $realdir = `realpath /share`;
+	    chomp($realdir);
+	    push(@exports_lines,
+		 "$realdir\t$BOSSNODE -maproot=root");
+	    push(@exports_lines,
+		 "$realdir\t-network ${a}.${b}.${c} -mask $CONTROL_NETMASK ".
+		 "-maproot=root -ro");
+	}
 
 	#
 	# Put them in exports.head, and copy that to /etc/exports
@@ -410,6 +471,38 @@ Phase "exports", "Setting up exports", sub {
 	PhaseSkip("No new exports file") if PhaseWasSkipped("ex.head");
 	PhaseSkip("mountd not running") unless `ps -auxw | grep mountd | grep -v grep`;
 	ExecQuietFatal("killall -HUP mountd");
+    };
+};
+
+Phase "NFSmounts", "Setting up NFS mounts", sub {
+    if ($ISFS) {
+	PhaseSkip("FSes are local");
+    }
+
+    Phase "mountpoints", "Creating mountpoints", sub {
+	foreach my $dir (@MOUNTPOINTS) {
+	    Phase $dir, $dir, sub {
+		DoneIfExists($dir);
+		mkdir $dir, 0777 or
+		    PhaseFail("Unable to create $dir : $!");
+	    };
+	}
+    };
+    Phase "fstab", "Adding NFS mounts to $FSTAB", sub {
+	DoneIfEdited($FSTAB);
+	AppendToFileFatal($FSTAB,
+		"$FSNODE:/users\t\t/users\tnfs\trw,nodev,nosuid\t0\t0",
+		"$FSNODE:/proj\t\t/proj\tnfs\trw,nodev,nosuid\t0\t0",
+		"$FSNODE:/groups\t\t/groups\tnfs\trw,nodev,nosuid\t0\t0",
+		"$FSNODE:/share\t\t/share\tnfs\trw,nodev,nosuid\t0\t0");
+    };
+    Phase "mounts", "Mounting NFS filesystems", sub {
+	foreach my $dir (@MOUNTPOINTS) {
+	    Phase $dir, $dir, sub {
+		DoneIfMounted($dir);
+		ExecQuietFatal("$MOUNT -o '-R 1' $dir");
+	    };
+	}
     };
 };
 
@@ -510,6 +603,9 @@ Phase "syslog", "Setting up syslog", sub {
 };
 
 Phase "cron", "Adding cron jobs", sub {
+    if (!$ISFS) {
+	PhaseSkip("Not FS node");
+    }
     Phase "crontab", "Editing $CRONTAB", sub {
 	DoneIfEdited($CRONTAB);
 	AppendToFileFatal($CRONTAB,
@@ -521,32 +617,37 @@ Phase "cron", "Adding cron jobs", sub {
     };
 };
 
-Phase "sudoers", "Editing $SUDOERS", sub {
+Phase "sudoers", "Editing $SUDOERS to allow wheel group", sub {
     DoneIfEdited($SUDOERS);
     AppendToFileFatal($SUDOERS,"%wheel    ALL=(ALL) NOPASSWD: ALL");
 };
 
-if ($WINSUPPORT) {
-    Phase "samba", "Setting up Samba", sub {
-	Phase "smb.conf", "Installing smb.conf[.head]", sub {
-	    DoneIfEdited($SMBCONF_HEAD);
-	    ExecQuietFatal("$CP -pf $TOP_OBJDIR/install/smb.conf.head $SMBCONF_HEAD");
-	    AppendToFileFatal($SMBCONF_HEAD,
-			      "# This file created by Emulab Control");
-            ExecQuietFatal("$CP -pf $SMBCONF_HEAD $SMBCONF_FILE");
-	};
-	Phase "samba.sh", "Installing samba.sh", sub {
-	    DoneIfExists("$RCDIR/samba.sh");
-	    DoneIfDoesntExist("$RCDIR/samba.sh.sample");
-	    ExecQuietFatal("$MV -f $RCDIR/samba.sh.sample $RCDIR/samba.sh");
-	};
-	if ($ELABINELAB) {	
-	    Phase "starting", "Starting Samba", sub {
-		ExecQuietFatal("$RCDIR/samba.sh start");
-	    };
-	}
+Phase "samba", "Setting up Samba", sub {
+    if (!$ISFS) {
+	PhaseSkip("Not FS node");
+    }
+    if (!$WINSUPPORT) {
+	PhaseSkip("Windows support not enabled");
+    }
+    Phase "smb.conf", "Installing smb.conf[.head]", sub {
+	DoneIfEdited($SMBCONF_HEAD);
+	ExecQuietFatal("$CP -pf $TOP_OBJDIR/install/smb.conf.head $SMBCONF_HEAD");
+	AppendToFileFatal($SMBCONF_HEAD,
+			  "# This file created by Emulab Control");
+	ExecQuietFatal("$CP -pf $SMBCONF_HEAD $SMBCONF_FILE");
     };
-}
+    Phase "samba.sh", "Installing samba.sh", sub {
+	DoneIfExists("$RCDIR/samba.sh");
+	DoneIfDoesntExist("$RCDIR/samba.sh.sample");
+	ExecQuietFatal("$MV -f $RCDIR/samba.sh.sample $RCDIR/samba.sh");
+    };
+    if ($ELABINELAB) {	
+	Phase "starting", "Starting Samba", sub {
+	    DoneIfExists("$VARRUN/smbd.pid");
+	    ExecQuietFatal("$RCDIR/samba.sh start");
+	};
+    }
+};
 
 Phase "ssh", "Allowing root ssh", sub {
     Phase "sshdconfig", "Permitting root login through ssh", sub {
@@ -558,18 +659,18 @@ Phase "ssh", "Allowing root ssh", sub {
 	mkdir("/root/.ssh",0700) or
 	    PhaseFail("Unable to create /root/.ssh: $!");
     };
-   Phase "authkeys", "Adding stub identity to /root/.ssh/authorized_keys", sub {
-       DoneIfEdited($AUTHKEYS);
-       my $ident = `cat $IDENTPUB`;
-       PhaseFail("Could not read $IDENTPUB")
-	   if ($?);
-       chomp($ident);
-       if (! -e $AUTHKEYS) {
-	   CreateFileFatal($AUTHKEYS);
-       }
-       AppendToFileFatal($AUTHKEYS,
-			 "from=\"${BOSSNODE}\" $ident");
-   };
+    Phase "authkeys", "Adding stub identity to root authorized_keys", sub {
+	DoneIfEdited($AUTHKEYS);
+	my $ident = `cat $IDENTPUB`;
+	PhaseFail("Could not read $IDENTPUB")
+	    if ($?);
+	chomp($ident);
+	if (! -e $AUTHKEYS) {
+	    CreateFileFatal($AUTHKEYS);
+	}
+	AppendToFileFatal($AUTHKEYS,
+			  "from=\"${BOSSNODE}\" $ident");
+    };
 };
 
 Phase "capture", "Setting up capture", sub {

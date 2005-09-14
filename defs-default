@@ -40,6 +40,8 @@ MAILMANSUPPORT=1
 WINSUPPORT=1
 SFSSUPPORT=0
 CVSSUPPORT=1
+MIN_UNIX_UID=10000
+MIN_UNIX_GID=6000
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.

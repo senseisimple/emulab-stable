@@ -9,9 +9,32 @@
 ##### Most recently tested on FreeBSD 4.11.
 #####
 
-##### Step 1 - OS installation and setup
+##### Step 0 - The Goal
 
-Install FreeBSD on the machine you'll be using for your ops node, using the
+In the past we have combined the filesystem function with the ops/users
+functions.  However, we recognize that people may have pre-existing, dedicated
+(and usually very expensive :-) file server machine that they would like to
+take advantage of.  Or for performance reasons, you may want to separate
+the filesystem service from user activities on the ops node.
+
+So we have made a start toward separating the two.  The general guiding
+principle is to keep modifications to the fileserver box to a minimum,
+since the ability to control the box may be greatly reduced; for example,
+the fileserver might be a NetApp box or running MacOS X or Windows.
+At a bare minimum however, we still require that you be able to manipulate
+the access control lists (e.g., the BSD "exports" file) from the boss node.
+Optionally, you may need to be able to monitor and manipulate disk quotas.
+
+But that is all theory right now.  In the current state of affairs, the
+fileserver box still has to run FreeBSD and is assumed to be dedicated to
+Emulab use (e.g., the Emulab boss node assigns uid/gids itself, with no
+attempt to synchronize with pre-existing uid/gids on the fileserver).
+
+With this caveat in mind, we can begin.
+
+##### Step 1 - OS installation and filesystem setup
+
+Install FreeBSD on the machine you'll be using for your fs node, using the
 standard FreeBSD installation process. When asked by the installer, it's best
 to choose the 'Developer' distribution set - this gets you full sources. When
 it asks if you want to install the ports collection, answer *no*.  Do not
@@ -28,21 +51,9 @@ space to hold them:
 	                At least 10GB. Be sure to build with plenty of
 			inodes (the ports tree itself uses about 200000, so
 			be safe and build with at least a million).
-/usr/testbed/ - Needs space for testbed software and logs. Several (3-4) GB
-			should be enough.
-
-Do *not* create any user accounts yet, and just log in as root for the time being.
-Our software will create user accounts later, once you get boss set up. If you
-already created any users, then delete them with the "pw" command and make sure
-the home directories for them are removed as well. 
-
-
-##### Step 1a - Shared filesystem setup for combined ops/fs machine.
-
-If you have a separate 'fs' node, you should have already setup your shared
-filesystems and can skip to Step 2.  If this node is also to be your file
-server, you will also need:
-
+/usr/testbed/ - Needs space for testbed software and logs. For a dedicated
+			fileserver machine, this won't be very much, 100MB
+			should be plenty.
 /users/       - Needs space for user home directories. Amount of space required 
 			depends on how many users you expect to have.
 			Generally, though, we suggest that users store large
@@ -78,6 +89,16 @@ symlinks to the appropriate places. ie., if you make one big filesystem called
 
 In other words, we assume the existence of /users, /proj, /group and /share.
 
+Do *not* create any user accounts, Emulab does not require that its users
+have login accounts on the fileserver.  For the purposes of this setup, just
+log in as root.  You can manually add login accounts for Emulab admins later
+if you desire.
+
+This would be a good time to reiterate that Emulab currently assumes that it
+has complete control of the uid/gid namespace.  However, it starts assigning
+uids at 10000 and gids at 6000, so pre-existing accounts with values lower
+than those should be ok.  Other accounts will have to be removed or manually
+synchronized with Emulab later.
 
 ##### Step 2 - Installing packages
 
@@ -100,7 +121,7 @@ Download the packages tarball from:
 Now, untar this someplace (you need about 70MB of space, so don't use /tmp).
 Let's say you untarred it into /usr/tmp. You would then run:
 
-	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 pkg_add emulab-ops-1.4
+	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 pkg_add emulab-fs-1.4
 
 Of course, if you untarred it somewhere else, put in the correct path.
 
@@ -113,10 +134,8 @@ grab our 'approved' copy of the ports tree from:
 	http://www.emulab.net/downloads/ports-20041102.tar.gz
 	
 Untar it, move it into place as /usr/ports (rename the old directory to
-ports.old, or just remove it), and install whatever ports you want to make
-ops feel like 'home' (like emacs, jove, or whatever). NOTE: You must
-download and copy the ports tree into place, even if you do not intend to
-install any packages yourself.
+ports.old, or just remove it).  NOTE: You must download and copy the ports
+tree into place, even if you do not intend to install any packages yourself.
 
 ##### Step 3 - Unpacking and running configure
 
@@ -124,7 +143,9 @@ At this point, you'll need to make a 'defs' file - You will use the same
 defs file on boss, ops and fs. See defs-example in the top level directory
 as a starting point. You want to make sure each of the variables has a
 definition that makes sense in your environment. Feel free to ask Utah if
-something is not clear.
+something is not clear.  Of particular note for the fs node is the setting
+of FSDIR_* to match the filesystem layout from Step 1, and the setting of
+FS_WITH_QUOTAS if you intend to use quotas on any filesystem.
 
 Unpack the testbed source, and run it's configure script. A good place to
 unpack the source code is /usr/testbed/src/testbed. You will use the
@@ -141,17 +162,17 @@ unpack the source code is /usr/testbed/src/testbed. You will use the
 Typically, you would store your defs file in the source tree along with 
 the other defs files that came in the tarball.
 
-##### Step 4 - Running the ops installation script
+##### Step 4 - Running the fs installation script
 
 In the object tree you've configured (say, /usr/testbed/obj/testbed), there's
-an 'install' subdirectory, with a script called 'ops-install'. Just run this
+an 'install' subdirectory, with a script called 'fs-install'. Just run this
 script as root (note the same package directory argument as above).
 
 	cd install
-	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 perl ops-install
+	env PKG_PATH=/usr/tmp/FreeBSD-4.10-20041102 perl fs-install
 
 It will take care of installing any additional ports, and doing various
-other configuration of FreeBSD required to make it into an ops node. The
+other configuration of FreeBSD required to make it into an fs node. The
 script is designed so that you can run it as many times as you want, and
 it'll just skip stuff it's already done. If it fails, send the output to
 Utah so that we can fix it up. If it succeeds, follow any other
@@ -161,37 +182,51 @@ but you can wait until after you do the next step to do so, if you want.
 (You may have to set the executable bit on this script, since configure won't;
 we'd like to get this fixed at some point.)
 
-You should be aware that, among other things, this script sets up sendmail, and
-sets up password-less 'sudo' for anyone in the 'wheel' group. If you don't want
-these for security reasons, you can undo them after the installation script is
-finished.
+You should be aware that, among other things, this script sets password-less
+'sudo' for anyone in the 'wheel' group. If you don't want this for security
+reasons, you can undo them after the installation script is finished.
 
 ##### Step 5 - Installing from source
 
-To install the actual testbed software, simply do a 'gmake ops-install' in your
+To install the actual testbed software, simply do a 'gmake fs-install' in your
 object directory.
 
 (Note: If you're logged in as root, /usr/local/bin, where gmake lives on
 FreeBSD, may not be in your path.)
 
-If you'll be using Cyclades or similar boards to use 'ops' as a serial console server,
-you'll also want to do a 'gmake tipserv-install' in the object directory. In
-addition, you'll need to build a custom kernel with the appropriate driver (you
-may even need to get patches from Utah for some boards). You'll also need to
-set up a few things (not yet automated), described in doc/adding_nodes.txt .
+##### Step 6 - Quotas (optional)
 
-##### Step 6 - Setting up mailing lists
+[ Note that this section is FreeBSD specific. ]
 
-Optional. The ops-install script set up some mailing lists for the email
-addresses you set up in the defs file, in /etc/mail/lists . If you want to run
-these mailing lists off your ops node, you can put some people in them now.
-These are just standard sendmail list files: a list of addresses and/or
-archive files, one per line. If you chose to use archive files, give a path
-to the file you'd like sendmail to stick all correspondence in, and create
-this file.
+It you are planning to run quotas for Emulab users on the fs node, you
+will need to establish a default quota value for all users.  Ideally,
+the quota would be configurable per-user, but for now all quotas are
+initialized from a "prototypical" user.  Note that you can change individual
+user quotas later by running edquota(8) on the 'fs' node.  To establish
+the default quota values, you will need a "prototype user" to which to
+apply the quotas.  You will probably want to add a special user, say
+'elabman', for this purpose.  The uid and gid for this user should be
+the MIN_UNIX_UID and MIN_UNIX_GID values specified in your defs file
+(10000 and 6000 by default).  Assuming those default values, you would do:
+
+  pw useradd elabman -u 10000 -g 6000 -m -d /users/elabman -h - -s /bin/nologin
+
+Now set the quota for that user on each quota-enabled filesystem, e.g.:
+
+edquota -e /proj:2000000:2000000 -e /users:1000000:1000000 elabman
+
+would set a 1GB quota on /proj and 512MB on /users for the prototype user.
+Once the prototype user quotas are established, you can do:
+
+edquota -p elabman 10000-15000
+
+which would automatically apply the elabman quotas to any user created with
+uids between 10000 and 15000, assuming that you wanted to allow up to 5000
+users.
+
 
 ##### Step 7 - Other miscellaneous things to set up
 
   [Nothing at this time]
 
-Once you're done with all of this, reboot ops.
+Once you're done with all of this, reboot fs.

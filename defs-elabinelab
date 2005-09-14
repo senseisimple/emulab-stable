@@ -31,11 +31,15 @@ WWWHOST=changeme
 TBMAINSITE=0
 THISHOMEBASE=changeme
 PLABSUPPORT=0
+WIKISUPPORT=0
+BUGDBSUPPORT=0
+MAILMANSUPPORT=0
+WINSUPPORT=0
 SFSSUPPORT=0
+CVSSUPPORT=0
 DISABLE_NSE=1
 # This means it is an inner elab!
 ELABINELAB=1
-WINSUPPORT=0
 # The name of the outer boss for inner boss to request services from.
 OUTERBOSS_NODENAME=changeme
 #
@@ -54,6 +58,7 @@ TESTBED_NETWORK=changeme
 TESTBED_NETMASK=changeme
 BOSSNODE_IP=changeme
 USERNODE_IP=changeme
+FSNODE_IP=changeme
 CONTROL_ROUTER_IP=changeme
 CONTROL_NETWORK=changeme
 CONTROL_NETMASK=changeme
@@ -69,3 +74,6 @@ NAMED_FORWARDERS=changeme
 # Must localize to avoid conflict with outer emulab frisbeed.
 #
 FRISEBEEMCASTADDR=changeme
+# testing
+MIN_UNIX_UID=500
+MIN_UNIX_GID=500

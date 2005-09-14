@@ -288,10 +288,33 @@ my $mkelab = "$TB/etc/rc.mkelab";
 if (-e "/proj/$pid/exp/$eid/rc.mkelab") {
     $mkelab = "/proj/$pid/exp/$eid/rc.mkelab";
 }
-print "Copying $mkelab to ${bossnode}/${opsnode}\n";
+print "Copying $mkelab to ${bossnode}/${opsnode}";
+print "/${fsnode}"
+    if (defined($fsnode));
+print "\n";
 system("scp $mkelab ${bossnode}:/tmp");
 system("scp $mkelab ${opsnode}:/tmp");
+system("scp $mkelab ${fsnode}:/tmp")
+    if (defined($fsnode));
 
+if (defined($fsnode)) {
+    TBDebugTimeStamp("Setting up fsnode");
+    print "Setting up fsnode on $fsnode\n";
+    system("$SSH -host $fsnode /tmp/rc.mkelab -s -d > /tmp/fsnode.$$ 2>&1");
+    if ($?) {
+	$UID = $SAVEUID;
+	SENDMAIL("$user_name <$user_email>",
+		 "ElabInElab Failure: $pid/$eid",
+		 "Error building the fs node ($fsnode)",
+		 $TBOPS,
+		 "Cc: $TBOPS",
+		 ("/tmp/fsnode.$$"));
+	system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
+	print STDERR "*** $0:\n".
+	    "    Error building the fsnode ($fsnode)!\n";
+	exit(($debug ? 0 : -1));
+    }
+}
 TBDebugTimeStamp("Setting up opsnode");
 print "Setting up opsnode on $opsnode\n";
 system("$SSH -host $opsnode /tmp/rc.mkelab -s -d > /tmp/opsnode.$$ 2>&1");
@@ -303,7 +326,7 @@ if ($?) {
 	     $TBOPS,
 	     "Cc: $TBOPS",
 	     ("/tmp/opsnode.$$"));
-    system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
+    system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
     print STDERR "*** $0:\n".
 	         "    Error building the opsnode ($opsnode)!\n";
     exit(($debug ? 0 : -1));
@@ -319,20 +342,29 @@ if ($?) {
 	     $TBOPS,
 	     "Cc: $TBOPS",
 	     ("/tmp/bossnode.$$"));
-    system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
+    system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
     print STDERR "*** $0:\n".
 	         "    Error building the bossnode ($bossnode)!\n";
     exit(($debug ? 0 : -1));
 }
 
 # Send these log files off now so that we can look at them.
-SENDMAIL("$user_name <$user_email>",
-	 "ElabInElab Setup Log: $pid/$eid",
-	 "Logs for building ops/boss ($opsnode/$bossnode)",
-	 $TBOPS,
-	 "Cc: $TBOPS",
-	 ("/tmp/opsnode.$$", "/tmp/bossnode.$$"));
-system("rm -f /tmp/opsnode.$$ /tmp/bossnode.$$");
+if (defined($fsnode)) {
+    SENDMAIL("$user_name <$user_email>",
+	     "ElabInElab Setup Log: $pid/$eid",
+	     "Logs for building fs/ops/boss ($fsnode/$opsnode/$bossnode)",
+	     $TBOPS,
+	     "Cc: $TBOPS",
+	     ("/tmp/fsnode.$$", "/tmp/opsnode.$$", "/tmp/bossnode.$$"));
+} else {
+    SENDMAIL("$user_name <$user_email>",
+	     "ElabInElab Setup Log: $pid/$eid",
+	     "Logs for building ops/boss ($opsnode/$bossnode)",
+	     $TBOPS,
+	     "Cc: $TBOPS",
+	     ("/tmp/opsnode.$$", "/tmp/bossnode.$$"));
+}
+system("rm -f /tmp/fsnode.$$ /tmp/opsnode.$$ /tmp/bossnode.$$");
 $UID  = $SAVEUID;
 
 # Run as real user for the next few scripts, which are setuid.
@@ -353,6 +385,16 @@ if ($?) {
 	"    Failed to reconfig/restart DHCPD.\n");
 }
 
+if (defined($fsnode)) {
+    # Reboot fs and wait for it to come back.
+    print "Rebooting fsnode ($fsnode).\n";
+    TBDebugTimeStamp("Rebooting fsnode");
+    system("$nodereboot -w $fsnode");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Error rebooting the fsnode ($fsnode)!\n");
+    }
+}
 # Reboot ops and wait for it to come back.
 print "Rebooting opsnode ($opsnode).\n";
 TBDebugTimeStamp("Rebooting opsnode");
@@ -516,8 +558,8 @@ sub DumpDBGoo()
 
     #
     # These tables are dumped by role (node/ops). For each one dump the table
-    # as is, unless its the ops node. For that one we want to change its
-    # node_id to "ops" and its type to ops.
+    # as is, unless its the fs or ops node. For those we want to change the
+    # node_id to "fs" or "ops" and their type to ops.
     #
     my @NODETABLES = ("node_auxtypes", "node_status", "nodes",
 		      "node_rusage", "node_hostkeys", "node_idlestats");
@@ -563,24 +605,26 @@ sub DumpDBGoo()
 		    "     v.pid=r.pid and v.eid=r.eid ".
 		    "where r.pid='$pid' and r.eid='$eid' and ".
 		    "      t.node_id is not null and ".
-		    "      (v.inner_elab_role='node' or ".
-		    "       v.inner_elab_role='ops')")
+		    "      v.inner_elab_role in ('node','fs','ops')")
 	    or die("*** $0:\n".
 		   "    Could not create temporary table temp_$table\n");
 	#
-	# Rename the ops node in each table. For the nodes table, there is a
-	# bunch of other stuff to do.
+	# Rename the fs and ops node in each table. For the nodes table,
+	# there is a bunch of other stuff to do.
 	#
+	DBQueryFatal("update temp_${table} set node_id='fs' ".
+		     "where node_id='$fsnode'")
+	    if (defined($fsnode));
 	DBQueryFatal("update temp_${table} set node_id='ops' ".
 		     "where node_id='$opsnode'");
 
 	if ($table eq "nodes") {
 	    DBQueryFatal("update temp_${table} set ".
 			 " type='ops', ".
-			 " phys_nodeid='ops', ".
+			 " phys_nodeid=node_id, ".
 			 " role='ctrlnode', ".
 			 " op_mode='OPSNODEBSD' ".
-			 "where node_id='ops'");
+			 "where node_id in ('fs','ops')");
 
 	    # Also add the nodes that correspond to the "trunk" wires.
 	    DBQueryFatal("insert into temp_${table} ".
@@ -706,7 +750,7 @@ sub DumpDBGoo()
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
 		"where r.pid='$pid' and r.eid='$eid' and ".
-		"      (v.inner_elab_role='node' or v.inner_elab_role='ops')")
+		"      v.inner_elab_role in ('node','ops','fs')")
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_interfaces\n");
 
@@ -724,7 +768,13 @@ sub DumpDBGoo()
 	or die("*** $0:\n".
 	       "    Could not update roles in temp_interfaces\n");
 
-    # And rename the ops node as above.
+    # And rename the fs/ops nodes as above.
+    if (defined($fsnode)) {
+	DBQueryWarn("update temp_interfaces set node_id='fs' ".
+		    "where node_id='$fsnode'")
+	    or die("*** $0:\n".
+		   "    Could not fs node_id in temp_interfaces\n");
+    }
     DBQueryWarn("update temp_interfaces set node_id='ops' ".
 		"where node_id='$opsnode'")
 	or die("*** $0:\n".
@@ -750,11 +800,17 @@ sub DumpDBGoo()
 		"left join wires as t on t.node_id1=r.node_id and ".
 		"     t.type='Node' ".
 		"where r.pid='$pid' and r.eid='$eid' and ".
-		"      (v.inner_elab_role='node' or v.inner_elab_role='ops') ")
+		"      v.inner_elab_role in ('node','ops','fs') ")
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_wires\n");
 
-    # And rename the ops node as above.
+    # And rename the fs/ops node as above.
+    if (defined($fsnode)) {
+	DBQueryWarn("update temp_wires set node_id1='fs' ".
+		    "where node_id1='$fsnode'")
+	    or die("*** $0:\n".
+		   "    Could not fs node_id in temp_wires\n");
+    }
     DBQueryWarn("update temp_wires set node_id1='ops' ".
 		"where node_id1='$opsnode'")
 	or die("*** $0:\n".
@@ -783,17 +839,26 @@ sub DumpDBGoo()
 	       "    Could not dump table wires\n");
 
     #
-    # Ack, we need to create a reservation for the opsnode, or else it will
-    # look free and it will not be able to check in.
+    # Ack, we need to create a reservation for the fs and ops nodes,
+    # or else they will look free and it will not be able to check in.
     #
     DBQueryWarn("create temporary table temp_reserved ".
 		"select r.* from reserved as r ".
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
 		"where r.pid='$pid' and r.eid='$eid' ".
-		"      and (v.inner_elab_role='ops')")
+		"      and v.inner_elab_role in ('fs','ops')")
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_reserved\n");
+    if (defined($fsnode)) {
+	DBQueryWarn("update temp_reserved set ".
+		    "   node_id='fs', ".
+		    "   pid='$TBOPSPID', ".
+		    "   eid='opsnodes' ".
+		    "where node_id='$fsnode'")
+	    or die("*** $0:\n".
+		   "    Could not update temporary table temp_reserved\n");
+    }
     DBQueryWarn("update temp_reserved set ".
 		"   node_id='ops', ".
 		"   pid='$TBOPSPID', ".
@@ -807,7 +872,7 @@ sub DumpDBGoo()
 	       "    Could not dump table reserved\n");
 
     #
-    # Tar up the directory and send it over to ops.
+    # Tar up the directory and send it over to (real) ops.
     #
     $UID = 0;
     system("tar cf - -C $statedir . | ".
@@ -903,7 +968,8 @@ sub TearDownEmulab()
 		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
 		 "where " .
 		    join(" or ", map("node_id='$_'",
-				     ($bossnode, $opsnode, @expnodes))));
+				     ($bossnode, $opsnode, $fsnode,
+				      @expnodes))));
     
     #
     # SSH in and kill the inner DHCPD daemon so that it does not reply
