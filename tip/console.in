@@ -14,10 +14,10 @@ use POSIX qw(setsid);
 #
 sub usage()
 {
-    print(STDOUT "Usage: console -d pcXXX\n");
+    print(STDOUT "Usage: console [-d] pcXXX\n");
     exit(-1);
 }
-my $optlist  = "";
+my $optlist  = "dp:";
 my @opts = ();
 
 #
@@ -82,7 +82,11 @@ else {
 # Ask the XMLRPC server for the tipacl. The current user has to have proper
 # permission of course.
 #
-system("$WRAPPER tipacl $node >> $tempfile");
+if (system("$WRAPPER tipacl $node >> $tempfile")) {
+    unlink($tempfile);
+    die("*** $0:\n".
+	"    $WRAPPER failed\n");
+}
 
 #
 # Do not want to leave the acl file around, and do not want to wait for
