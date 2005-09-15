@@ -190,10 +190,10 @@ and the <a href = "http://www.netlab.cc.gatech.edu">Georgia Tech</a>
 Testbed. 
 </p>
 
-<a href='pix/side-crop-big.jpg'>
-   <img src='pix/side-crop-smaller.jpg' align=right /></a>
-<a href='tutorial/webcam-ss.gif'>
-   <img src='pix/robots-small.jpg' align=right /></a>
+<a href='pix/pc3k-back.jpg'>
+   <img src='pix/pc3k-back-thumb.jpg' align=right /></a>
+<a href='pix/pc3k-front.jpg'>
+   <img src='pix/pc3k-front-thumb.jpg' align=right /></a>
 
 <h3>Links to help you get started:</h3>
 <ul>
