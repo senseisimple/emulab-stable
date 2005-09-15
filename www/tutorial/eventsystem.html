@@ -492,7 +492,7 @@ completion.
  set group [$ns event-group]
  for {set i 0} {$i < 4} {incr i} {
      set nodes($i) [$ns node]
-     set progs($i) [$ns program-agent]
+     set progs($i) [$nodes(i) program-agent]
      $group add $progs($i)
  }
 
