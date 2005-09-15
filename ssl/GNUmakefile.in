@@ -17,7 +17,8 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 	keys mksig
 
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
-	localnode.pem capture.sha1fingerprint apache.pem ctrlnode.pem
+	localnode.pem capture.sha1fingerprint apache.pem apache-ops.pem \
+	ctrlnode.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -95,21 +96,21 @@ apache.pem:	dirsmade apache.cnf ca.cnf
 #
 # This is for the secondary web server on users.
 # 
-apache2.pem:	dirsmade apache2.cnf ca.cnf
+apache-ops.pem:	dirsmade apache2.cnf ca.cnf
 	#
 	# Create the server side private key and certificate request.
 	#
 	openssl req -new -config apache2.cnf \
-		-keyout apache2_key.pem -out apache2_req.pem
+		-keyout apache-ops_key.pem -out apache-ops_req.pem
 	#
 	# Combine key and cert request.
 	#
-	cat apache2_key.pem apache2_req.pem > newreq.pem
+	cat apache-ops_key.pem apache-ops_req.pem > newreq.pem
 	#
 	# Sign the apache cert request, creating a apache certificate.
 	#
 	openssl ca -batch -policy policy_sslxmlrpc -config ca.cnf \
-		-out apache2_cert.pem \
+		-out apache-ops_cert.pem \
 		-cert cacert.pem -keyfile cakey.pem \
 		-infiles newreq.pem
 	#
@@ -118,7 +119,7 @@ apache2.pem:	dirsmade apache2.cnf ca.cnf
 	# installed into the apache cert/key directories by install/boss-install
 	# when the boss node is created.
 	#
-	cat apache2_key.pem apache2_cert.pem > apache2.pem
+	cat apache-ops_key.pem apache-ops_cert.pem > apache-ops.pem
 	rm -f newreq.pem
 
 capture.pem:	dirsmade capture.cnf ca.cnf
