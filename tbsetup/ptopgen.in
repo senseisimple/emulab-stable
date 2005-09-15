@@ -363,6 +363,31 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved)
     }
 }
 
+#
+# Find out which nodes are connected to which, so that we can add some special
+# features
+#
+$result = DBQueryFatal("SELECT DISTINCT node_id1, node_id2 " .
+                       "  FROM wires");
+my %connections = ();
+while (my ($node_id1, $node_id2) = $result->fetchrow()) {
+    foreach my $nodes ([$node_id1, $node_id2], [$node_id2, $node_id1]) {
+        my ($node1, $node2) = @$nodes;
+        if ($connections{$node1}) {
+            # Check to see if we've already added this one (possible if the
+            # nodes appeared in node1,node2 order, then node2,node1
+            if (!grep(/^$node2$/, @{$connections{$node1}})) {
+                push @{$connections{$node1}}, $node2;
+            }
+        } else {
+            $connections{$node1} = [$node2];
+        }
+    }
+}
+
+#
+# Loop through and print out all nodes
+#
 foreach $node (keys(%nodes)) {
     my $type  = $nodes{$node};
     my $class = $typemap{$type}->{'CLASS'};
@@ -452,8 +477,10 @@ foreach $node (keys(%nodes)) {
 	# This number can be use for fine-tuning packing
 	push @features, "?+virtpercent:100";
 	# Put this silly feature in so that we can try to keep vnodes
-	# on the same pnode they were before
-	push @features, "${node}:0.0";
+	# on the same pnode they were before - but only if updating
+        if ($exempt_eid) {
+            push @features, "${node}:0.0";
+        }
     }
 
     if ($simstuff && $simnode_capacity > 0) {
@@ -503,6 +530,14 @@ foreach $node (keys(%nodes)) {
 	# has selected, or the default OSID from the node_types table).
 	#
 	push @features, map "OS-$_:0", $typemap{$type}->{'OSID'};
+    }
+
+    # Add features indicating what this node has connections to
+    if ($connections{$node}) {
+        my @connected_to  = @{$connections{$node}};
+        foreach my $other_end (@connected_to) {
+            push(@features,"connected-to-$other_end:0.0");
+        }
     }
 
     # This is for the case that we are modifying an existing experiment - tell
