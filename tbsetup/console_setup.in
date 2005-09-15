@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -86,7 +86,8 @@ foreach my $node (@nodes) {
     #
     $tiplines_result =
 	DBQueryFatal("select tipname,server from tiplines ".
-		     "where node_id='$node'");
+		     "where node_id='$node' and ".
+		     "server!='' and keydata is not null");
 
     if (! $tiplines_result->numrows) {
 	next;
