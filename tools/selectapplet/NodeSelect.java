@@ -185,10 +185,15 @@ public class NodeSelect extends JApplet {
 	int		radius = 15;	// Radius of circle, in pixels
 	int		size   = 20;	// Actual size, in pixels
         int		x, y;		// Current x,y coords in pixels
+	double		z;		// Current z in meters
 	int		listindex;	// Where it sits in its listbox.
 	boolean		picked;		// Node is within a selection
 	boolean		mouseover;	// currently mousedover
 	Object		map;		// Pointer back to activemap.
+
+	// Where is the node.
+	String		building = null;
+	String		floor    = null;
 
 	/*
 	 * These are formatted as strings to avoid doing conversons
@@ -197,6 +202,7 @@ public class NodeSelect extends JApplet {
 	 */
 	String		x_meters           = "";
 	String		y_meters           = "";
+	String		z_meters           = "";
 	int		index;
 
 	public void setX(int x) {
@@ -207,12 +213,30 @@ public class NodeSelect extends JApplet {
 	    this.y = y;
 	    this.y_meters = FORMATTER.format(y / pixels_per_meter);
 	}
+	public void setZ(double z) {
+	    this.z = z;
+	    this.z_meters = FORMATTER.format(y);
+	}
+
+	public double metersX() {
+	    return (double) (x / pixels_per_meter);
+	}
+	public double metersY() {
+	    return (double) (y / pixels_per_meter);
+	}
+	public double metersZ() {
+	    return z;
+	}
 
 	public int scaledX() {
 	    return (int) (x * scale);
 	}
 	public int scaledY() {
 	    return (int) (y * scale);
+	}
+
+	public int floor () {
+	    return Integer.parseInt(floor);
 	}
 
 	// Comparator interface for sorting below.
@@ -486,25 +510,26 @@ public class NodeSelect extends JApplet {
 		Enumeration e = NodeList.elements();
 
 		while (e.hasMoreElements()) {
-		    PhysNode	node  = (PhysNode) e.nextElement();
-		    String      label = node.pname;
+		    PhysNode	node   = (PhysNode) e.nextElement();
+		    String      label  = node.pname;
+		    int		radius = node.radius;
 
 		    /*
 		     * Draw a little circle where the node lives.
 		     */
 		    if (node.dead)
 			G2.setColor(Color.red);
-		    else if (node.picked)
+		    else if (node.picked) {
 			G2.setColor(Color.yellow);
+			radius = (int) (radius * 2.0);
+		    }
 		    else if (node.selected)
 			G2.setColor(Color.blue);
 		    else
 			G2.setColor(Color.green);
 		    
-		    G2.fillOval(node.x - node.radius,
-			       node.y - node.radius,
-			       node.radius * 2,
-			       node.radius * 2);
+		    G2.fillOval(node.x - radius, node.y - radius,
+			       radius * 2, radius * 2);
 
 		    /*
 		     * Draw a label below the dot.
@@ -616,6 +641,10 @@ public class NodeSelect extends JApplet {
 		    if (pnode != null) {
 			if (!pnode.dead)
 			    SelectNode(pnode, modifier);
+			return;
+		    }
+		    else if (e.getButton() == e.BUTTON1) {
+			ClearSelection();
 			return;
 		    }
 		}
@@ -962,53 +991,59 @@ public class NodeSelect extends JApplet {
 
 	    menuitem = new JMenuItem("Add selected nodes to list");
 	    menuitem.setActionCommand("AddNodes");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("AddNodes", new AddDelNodeMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Remove selected nodes from list");
 	    menuitem.setActionCommand("DelNodes");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("DelNodes", new AddDelNodeMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Show NS Fragment");
 	    menuitem.setActionCommand("NSFile");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("NSFile", new NSFileMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
+	    RootPopupMenu.add(menuitem);
+
+	    menuitem = new JMenuItem("Compute distances between Nodes");
+	    menuitem.setActionCommand("Distances");
+	    MenuHandlers.put("Distances", new DistancesMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
 	    RootPopupMenu.addSeparator();
 	    if (pid != null) {
 		menuitem = new JMenuItem("Clear Virtual Node Names");
 		menuitem.setActionCommand("ClearVirt");
-		menuitem.addActionListener(this);
 		MenuHandlers.put("ClearVirt",
 				 new ClearVirtMenuHandler(menuitem));
+		menuitem.addActionListener(this);
 		RootPopupMenu.add(menuitem);
 	    }
 	    menuitem = new JMenuItem("Zoom In");
 	    menuitem.setActionCommand("ZoomIn");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("ZoomIn", new ZoomMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Zoom Out");
 	    menuitem.setActionCommand("ZoomOut");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("ZoomOut", new ZoomMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Recenter");
 	    menuitem.setActionCommand("Recenter");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("Recenter", new RecenterMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
-	    menuitem = new JMenuItem("Reset Zoom/Center");
+	    menuitem = new JMenuItem("Initial Zoom/Center");
 	    menuitem.setActionCommand("Reset");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("Reset", new ZoomMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    RootPopupMenu.add(menuitem);
 
 	    RootPopupMenu.addSeparator();
@@ -1016,6 +1051,7 @@ public class NodeSelect extends JApplet {
 	    RootPopupMenu.add(menuitem);
 	    RootPopupMenu.setBorder(
 			BorderFactory.createLineBorder(Color.black));
+
 
 	    /*
 	     * And now create the node menu.
@@ -1027,29 +1063,29 @@ public class NodeSelect extends JApplet {
 
 	    menuitem = new JMenuItem("Emulab ShowNode");
 	    menuitem.setActionCommand("ShowNode");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("ShowNode", new ShowNodeMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    NodePopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Set Virtual Name");
 	    menuitem.setActionCommand("SetVname");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("SetVname", new SetVnameMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    NodePopupMenu.add(menuitem);
 
 	    NodePopupMenu.addSeparator();
 	    menuitem = new JMenuItem("Add selected nodes to list");
 	    menuitem.setActionCommand("AddNodes");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("NodeMenu_AddNodes",
 			     new AddDelNodeMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    NodePopupMenu.add(menuitem);
 
 	    menuitem = new JMenuItem("Remove selected nodes from list");
 	    menuitem.setActionCommand("DelNodes");
-	    menuitem.addActionListener(this);
 	    MenuHandlers.put("NodeMenu_DelNodes",
 			     new AddDelNodeMenuHandler(menuitem));
+	    menuitem.addActionListener(this);
 	    NodePopupMenu.add(menuitem);
 	    NodePopupMenu.addSeparator();
 
@@ -1162,9 +1198,10 @@ public class NodeSelect extends JApplet {
 	 */
 	public void SelectNode(Node curnode, int modifier) {
 	    // Clear current selection if no modifier.
-	    if ((modifier &
+	    if (false &&
+		((modifier &
 		 (InputEvent.SHIFT_DOWN_MASK|InputEvent.CTRL_DOWN_MASK))
-		== 0) {
+		 == 0)) {
 		if (!curnode.picked) {
 		    /*
 		     * Do not clear selection since that messes up
@@ -1435,6 +1472,10 @@ public class NodeSelect extends JApplet {
 		
 		handler = (MenuHandler) MenuHandlers.get("NSFile");
 		handler.enable(SelectList.getModel().getSize() != 0);
+		
+		handler = (MenuHandler) MenuHandlers.get("Distances");
+		handler.enable(! (AllPhysList.isSelectionEmpty() &&
+				  SelectList.isSelectionEmpty()));
 		
 		RootPopupMenu.show(selector, x, y);
 	    }
@@ -1815,6 +1856,133 @@ public class NodeSelect extends JApplet {
 	    }
 	}
 
+	private class DistancesMenuHandler extends MenuHandler {
+	    public DistancesMenuHandler(JMenuItem menuitem) {
+		super(menuitem);
+	    }
+	    
+	    /*
+	     * Use an internal frame so that I do not have to deal with
+	     * buttons and crap.
+	     */
+	    JInternalFrame	myframe;
+	    
+	    public void handler(String action) {
+		int		count = 0;
+		String		stuff = "";
+		Enumeration	outer = AllPhysNodes.elements();
+
+		// Make sure more then one node is highlighted.
+		while (outer.hasMoreElements()) {
+		    PhysNode	 pnode = (PhysNode) outer.nextElement();
+		    if (pnode.picked)
+			count++;
+		}
+		if (count <= 1)
+		    return;
+
+		stuff =
+		    "<html><font size=+2>" +
+		    "  <table>" +
+		    "    <tr> " +
+		    "      <th>Node A</th> " +
+		    "      <th>Distance (Meters)</th> " +
+		    "      <th>Node B</th> " +
+		    "    </tr>" +
+		    "    <tr></tr>";
+
+		myframe = new JInternalFrame("Distances", true, true);
+		myframe.setVisible(true);
+
+		/*
+		 * Use one of them editorpane things.
+		 */
+		JEditorPane myedpane = new JEditorPane();
+		myedpane.setEditable(false);
+		myedpane.setContentType("text/html");
+
+		// Okay, start over and compute distances.
+		outer = AllPhysNodes.elements();
+
+		while (outer.hasMoreElements()) {
+		    PhysNode	 pnodeA = (PhysNode) outer.nextElement();
+
+		    if (! pnodeA.picked)
+			continue;
+
+		    Enumeration inner = AllPhysNodes.elements();
+
+		    // Skip up to pnodeA to avoid dups.
+		    while (inner.hasMoreElements()) {
+			PhysNode      pnodeB = (PhysNode) inner.nextElement();
+
+			if (pnodeA == pnodeB)
+			    break;
+		    }
+		    while (inner.hasMoreElements()) {
+			PhysNode      pnodeB = (PhysNode) inner.nextElement();
+
+			if (! pnodeB.picked || pnodeA == pnodeB)
+			    continue;
+
+			double	x1 = pnodeA.metersX();
+			double	y1 = pnodeA.metersY();
+			double  z1 = pnodeA.metersZ();
+			double	x2 = pnodeB.metersX();
+			double	y2 = pnodeB.metersY();
+			double  z2 = pnodeB.metersZ();
+			String  dst;
+
+			// Oh, this is sooooo bad.
+			if (pnodeA.building.compareTo("MEB") == 0 &&
+			    pnodeA.building.compareTo(pnodeB.building) == 0 &&
+			    pnodeA.floor.compareTo(pnodeB.floor) != 0) {
+
+			    /*
+			     * Different floor in MEB, add 14 feet! But, need
+			     * to know how many floors!
+			     */
+			    int floors = Math.abs(pnodeA.floor() -
+						  pnodeB.floor());
+
+			    System.out.println("floors = " + floors);
+				
+			    z2 = z2 + ((floors * 14.0) * 0.3048);
+			}
+			dst =
+			    FORMATTER.format(Math.sqrt(Math.pow(x2-x1, 2.0) +
+						       Math.pow(y2-y1, 2.0) +
+						       Math.pow(z2-z1, 2.0)));
+
+			stuff = stuff +
+			    "<tr> " +
+			    "  <td><b>" + pnodeA.pname + "</b></td>" +
+			    "  <td align=center>" + dst + "</td>" +
+			    "  <td><b>" + pnodeB.pname + "</b></td>" +
+			    "</tr>";
+		    }
+		}
+		stuff = stuff + "</table></html>";
+		myedpane.setText(stuff);
+
+		/*
+		 * JTextArea does not implement scrolling, so put it in
+		 * a scroll window.
+		 */
+		JScrollPane MyScroller = new JScrollPane(myedpane);
+
+		// Add the scroller to the new frame.
+		myframe.getContentPane().add(MyScroller);
+
+		/*
+		 * Okay, add ourselves to the outer layered pane, but
+		 * on top of the other stuff.
+		 */
+		getLayeredPane().add(myframe, JLayeredPane.PALETTE_LAYER);
+		myframe.setBounds(50, 50, 300, 500);
+	    }
+	}
+
 	/*
 	 * This class and code comes from one of the examples on the Sun
 	 * Java site. 
@@ -2149,6 +2317,16 @@ public class NodeSelect extends JApplet {
 				      pixels_per_meter);
 		pnode.setX(Integer.parseInt(tokens.nextToken().trim()));
 		pnode.setY(Integer.parseInt(tokens.nextToken().trim()));
+
+		String tmp = tokens.nextToken().trim();
+		if (tmp.length() > 0) {
+		    pnode.setZ(Double.parseDouble(tmp));
+		}
+		else {
+		    pnode.setZ(0.0);
+		}
+		pnode.building = building;
+		pnode.floor    = floor;
 		
 		pnode.index = index++;
 		physnodes.put(pnode.pname, pnode);

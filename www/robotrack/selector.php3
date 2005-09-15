@@ -99,7 +99,7 @@ echo "<table cellspacing=5 cellpadding=5 border=0 class=\"stealth\">
            </tr>
            <tr>
              <td><img src='/autostatus-icons/yellowball.gif' alt=selected></td>
-             <td nowrap=1>Selected Node</td>
+             <td nowrap=1>Highlighted Node</td>
            </tr>
          </table>
        </td>
@@ -150,13 +150,20 @@ echo "<br>
           lower list box.
      <li> Highlight nodes by selecting them in list boxes or clicking on them
           in the maps.
-          Shift-Click does the usual thing; adds to an existing selection.
-     <li> Right click over a node will bring up a node context menu.
+          <ul>
+             <li> Within a list box, Shift-Click extends a highlighted region,
+                  while, Control-Click adds to a highlighted region.
+             <li> Within the map window, clicking on a node adds to a
+                  highlighted region. Clicking on a highlighted node removes
+                  it from the highlighted region. Clicking over the background
+                  clears the highlighted selection.
+          </ul>
      <li> Right click anyplace else brings up the root context menu.
      <li> Move highlighted nodes between the upper and lower lists by choosing
-          the appropriate option in either context menu.
+          the appropriate option in either context menu, or by clicking on
+          the up/down arrows between the list boxes.
      <li> Once you have your nodes assigned (the lower list box), use the
-          'Create NS File' to menu option to popup an NS fragment that you
+          'Show NS Fragment' to menu option to popup an NS fragment that you
           can plug into an existing experiment.
      </ul>
      Notes:<br>
