@@ -248,8 +248,10 @@ sub DoneIfEdited($) {
     if (!$filename) { PhaseFail("Bad filename passed to DoneIfEdited"); }
     open(FH,$filename) or return;
     if (grep /$MAGIC_STRING/, <FH>) {
+        close(FH);
 	PhaseSkip("File $filename has already been edited\n");
     }
+    close(FH);
 }
 
 #
