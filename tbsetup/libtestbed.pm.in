@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -91,7 +91,7 @@ sub SENDMAIL($$$;$$@)
     print MAIL "$Message\n";
     print MAIL "\n";
 
-    if (defined(@Files)) {
+    if (@Files) {
 	foreach my $file ( @Files ) {
 	    if (open(IN, "$file")) {
 		print MAIL "\n--------- $file --------\n";
