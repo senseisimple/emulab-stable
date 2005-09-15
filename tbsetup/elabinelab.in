@@ -605,7 +605,7 @@ sub DumpDBGoo()
 		    "     v.pid=r.pid and v.eid=r.eid ".
 		    "where r.pid='$pid' and r.eid='$eid' and ".
 		    "      t.node_id is not null and ".
-		    "      v.inner_elab_role in ('node','fs','ops')")
+		    "      v.inner_elab_role in ('node','fs','ops','ops+fs')")
 	    or die("*** $0:\n".
 		   "    Could not create temporary table temp_$table\n");
 	#
@@ -750,7 +750,7 @@ sub DumpDBGoo()
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
 		"where r.pid='$pid' and r.eid='$eid' and ".
-		"      v.inner_elab_role in ('node','ops','fs')")
+		"      v.inner_elab_role in ('node','ops','fs','ops+fs')")
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_interfaces\n");
 
@@ -800,7 +800,7 @@ sub DumpDBGoo()
 		"left join wires as t on t.node_id1=r.node_id and ".
 		"     t.type='Node' ".
 		"where r.pid='$pid' and r.eid='$eid' and ".
-		"      v.inner_elab_role in ('node','ops','fs') ")
+		"      v.inner_elab_role in ('node','ops','fs','ops+fs') ")
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_wires\n");
 
@@ -847,7 +847,7 @@ sub DumpDBGoo()
 		"left join virt_nodes as v on v.vname=r.vname and ".
 		"     v.pid=r.pid and v.eid=r.eid ".
 		"where r.pid='$pid' and r.eid='$eid' ".
-		"      and v.inner_elab_role in ('fs','ops')")
+		"      and v.inner_elab_role in ('fs','ops','ops+fs')")
 	or die("*** $0:\n".
 	       "    Could not create temporary table temp_reserved\n");
     if (defined($fsnode)) {
@@ -870,6 +870,18 @@ sub DumpDBGoo()
 		"into outfile '$statedir/reserved'")
 	or die("*** $0:\n".
 	       "    Could not dump table reserved\n");
+
+    # Copy tiplines table for all nodes so web form gives us a console icon!
+    DBQueryWarn("select t.tipname,t.node_id,'',0,0,NULL ".
+		"from reserved as r ".
+		"left join virt_nodes as v on v.vname=r.vname and ".
+		"     v.pid=r.pid and v.eid=r.eid ".
+		"left join tiplines as t on t.node_id=r.node_id ".
+		"where r.pid='$pid' and r.eid='$eid' and ".
+		"      v.inner_elab_role='node' ".
+		"into outfile '$statedir/tiplines'")
+	or die("*** $0:\n".
+	       "    Could not dump table tiplines\n");
 
     #
     # Tar up the directory and send it over to (real) ops.
