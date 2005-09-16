@@ -21,6 +21,9 @@ uname -r > $iscygwin
 chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
+# Make sure there isn't a dangling slothd lock file.
+rm -f /var/run/slothd.pid
+
 # NetBT (Netbios over TCP) chatters, messes up slothd, and is not needed for
 # SMB, so disable it.  This doesn't take effect until TCP/IP is restarted, so
 # do it before the computer name change below, which reboots the first time.
