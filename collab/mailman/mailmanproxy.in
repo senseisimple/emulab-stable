@@ -21,7 +21,7 @@ sub usage()
     exit(-1);
 }
 my $optlist  = "dn";
-my $debug    = 1;
+my $debug    = 0;
 my $impotent = 0;
 
 #
