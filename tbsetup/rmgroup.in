@@ -54,6 +54,7 @@ my $GRPROOT  = "/groups";
 my $SSH      = "$TB/bin/sshtb";
 my $GROUPDEL = "/usr/sbin/pw groupdel";
 my $DELMMLIST= "$TB/sbin/delmmlist";
+my $MODGROUPS= "$TB/sbin/modgroups";
 
 #
 # Untaint the path
@@ -181,6 +182,27 @@ if ($pid ne $gid) {
 }
 
 #
+# Remove all members from the group.
+# If there was an error, the DB state is left so that this script can
+# be run again!
+#
+# Must find out what users/groups to delete so that we can pass off to
+# modgroups.
+#
+my $query_result =
+    DBQueryFatal("select uid from group_membership ".
+		 "where pid='$pid' and gid='$gid'");
+
+while (my ($uid) = $query_result->fetchrow_array()) {
+    # For perl
+    $EUID = $UID;
+    if (system("$MODGROUPS -r $pid:$gid $uid")) {
+	fatal("$MODGROUPS -r $pid:$gid $uid failed!");
+    }
+    $EUID = 0;
+}
+
+#
 # Now remove the group from the group file on both plastic and paper.
 #
 print "Removing group $unix_name ($unix_gid) on local node.\n";
@@ -227,14 +249,6 @@ foreach my $tipserver ( TBTipServers() ) {
     }
 }
 
-#
-# Now safe to delete all members of the group, then delete the group.
-# If there was an error, the DB state is left so that this script can
-# be run again!
-#
-DBQueryFatal("delete from group_membership ".
-	     "where pid='$pid' and gid='$gid'");
-    
 DBQueryFatal("delete from group_stats ".
 	     "where pid='$pid' and gid='$gid'");
 

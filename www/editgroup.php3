@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -188,10 +188,11 @@ if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
 }
 
 #
-# Now do the second pass, which makes the changes. Record the user IDs
-# that are changed so that we can pass that to setgroups below.
+# Now do the second pass, which makes the changes. 
 #
-$modusers = "";
+# Grab the unix GID for running scripts.
+#
+TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
 
 #
 # Go through the list of current members. For each one, check to see if
@@ -208,10 +209,7 @@ if (mysql_num_rows($curmembers_result)) {
 	$foo  = "change_$user";
 
 	if (!$defaultgroup && !isset($$foo)) {
-	    DBQueryFatal("delete from group_membership ".
-			 "where pid='$pid' and gid='$gid' and uid='$user'");
-
-	    $modusers = "$modusers $user";
+	    SUEXEC($uid, $unix_gid, "webmodgroups -r $pid:$gid $user", 1);
 	    continue;
 	}
         #
@@ -222,8 +220,8 @@ if (mysql_num_rows($curmembers_result)) {
 	$newtrust = $$foo;
 	
 	if (strcmp($oldtrust,$newtrust)) {
-	    DBQueryFatal("update group_membership set trust='$newtrust' ".
-			 "where pid='$pid' and gid='$gid' and uid='$user'");
+	    SUEXEC($uid, $unix_gid,
+		   "webmodgroups -m $pid:$gid:$newtrust $user", 1);
 	}
     }
 }
@@ -248,29 +246,12 @@ if ($grabusers && !$defaultgroup && mysql_num_rows($nonmembers_result)) {
 	    #
 	    $bar      = "$user\$\$trust";
 	    $newtrust = $$bar;
-	    
-	    DBQueryFatal("insert into group_membership ".
-			 "(uid, pid, gid, trust, ".
-			 " date_applied,date_approved) ".
-			 "values ('$user','$pid','$gid', '$newtrust', ".
-			 "        now(), now())");
-	    
-	    $modusers = "$modusers $user";
+
+	    SUEXEC($uid, $unix_gid,
+		   "webmodgroups -a $pid:$gid:$newtrust $user", 1);
 	}
     }
 }
-
-#
-# Grab the unix GID for running scripts.
-#
-TBGroupUnixInfo($pid, $pid, $unix_gid, $unix_name);
-
-#
-# Run the script. This will do the account stuff for all the people
-# in the group. This is the same script that gets run when the group
-# is first created.
-#
-SUEXEC($uid, $unix_gid, "websetgroups -p $pid $modusers", 1);
 
 #
 # Spit out a redirect so that the history does not include a post

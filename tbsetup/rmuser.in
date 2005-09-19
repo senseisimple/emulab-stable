@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -28,7 +28,7 @@ my $CONTROL = "@USERNODE@";
 my $BOSSNODE= "@BOSSNODE@";
 
 my $HOMEDIR	= "/users";
-my $SETGROUPS	= "$TB/sbin/setgroups";
+my $MODGROUPS	= "$TB/sbin/modgroups";
 my $DELACCT	= "$TB/sbin/tbacct del";
 
 my $dbuid;
@@ -235,16 +235,16 @@ else {
 TBNodeUpdateAccountsByUID($user);
 
 #
-# In pidmode, call setgroups to alter the users membership on boss/ops.
+# In pidmode, call modgroups to alter the users membership on boss/ops.
 # Thats all that needs to be done.
 #
 if ($pidmode && !$nuke) {
     #
-    # Drop root for calling setgroups since its setuid.
+    # Drop root for calling modgroups.
     #
     $EUID = $UID;
 
-    system("$SETGROUPS $user");
+    system("$MODGROUPS -r $pid:$pid $user");
     exit($? >> 8);
 }
 

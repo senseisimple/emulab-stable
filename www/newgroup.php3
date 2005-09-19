@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -123,11 +123,6 @@ DBQueryFatal("INSERT INTO group_stats ".
 	     "(pid, gid) ".
 	     "VALUES ('$group_pid', '$group_id')");
 
-DBQueryFatal("insert into group_membership ".
-	     "(uid, pid, gid, trust, date_applied, date_approved) ".
-	     "values ('$group_leader','$group_pid','$group_id', ".
-	     "        'group_root', now(), now())");
-
 #
 # Note, if the project leader wants to be in the subgroup, he/she has to
 # add themself via the edit page. 
@@ -139,12 +134,15 @@ DBQueryFatal("insert into group_membership ".
 TBGroupUnixInfo($group_pid, $group_pid, $unix_gid, $unix_name);
 
 #
-# Run the script. This will make the group directory, set the perms,
-# and do the account stuff for all of the people in the group. This
-# is the same script that gets run when the group membership changes.
+# Run the script. This will make the group directory, set the perms, etc.
 #
 SUEXEC($uid, $unix_gid, "webmkgroup $group_pid $group_id", 1);
-SUEXEC($uid, $unix_gid, "websetgroups $group_leader", 1);
+
+#
+# Now add the group leader to the group.
+# 
+SUEXEC($uid, $unix_gid,
+       "webmodgroups -a $group_pid:$group_id:group_root $group_leader", 1);
 
 #
 # Send an email message with a join link.

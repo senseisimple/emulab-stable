@@ -24,7 +24,7 @@ BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 SBIN_STUFF	= resetvlans console_setup.proxy sched_reload named_setup \
 		  batch_daemon exports_setup reload_daemon sched_reserve \
 		  console_reset db2ns bwconfig frisbeelauncher \
-		  frisbeeimage rmgroup mkgroup setgroups mkproj \
+		  frisbeeimage rmgroup mkgroup setgroups mkproj modgroups \
 		  exports_setup.proxy vnode_setup eventsys_start \
 		  sfskey_update sfskey_update.proxy rmuser idleswap \
 		  newnode_reboot savelogs.proxy eventsys.proxy \
@@ -41,7 +41,7 @@ LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  assign_wrapper assign_prepass ptopgen webnodeupdate \
 		  webdelay_config webnodehistory \
 		  webrmgroup webswapexp webnodecontrol webeventsys_control \
-		  webmkgroup websetgroups webmkproj \
+		  webmkgroup websetgroups webmkproj webmodgroups \
 		  spewlogfile staticroutes routecalc wanassign \
 		  webnodereboot webrmuser webidleswap switchmac \
 		  spewrpmtar webtarfiles_setup webfrisbeekiller gentopofile

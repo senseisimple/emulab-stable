@@ -416,15 +416,6 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
     }
     if (strcmp($approval, "approve") == 0) {
         #
-        # Change the trust value in group_membership accordingly.
-        #
-        $query_result =
-	    DBQueryFatal("UPDATE group_membership ".
-			 "set trust='$newtrust',date_approved=now() ".
-			 "WHERE uid='$user' and pid='$project' and ".
-			 "      gid='$group'");
-
-        #
         # Change the status if necessary. This only happens for new
 	# users being added to their first project. After this, the status is
         # going to be "active", and we just leave it that way.
@@ -455,17 +446,12 @@ while (list ($header, $value) = each ($POST_VARS_COPY)) {
             # Create user account on control node.
             #
 	    SUEXEC($uid, $TBADMINGROUP, "webtbacct add $user", 1);
-            #
-            # Add user to wiki/bugdb groups.
-            #
-	    SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 1);
 	}
-	else {
-	    #
-	    # Only need to add new membership.
-	    # 
-	    SUEXEC($uid, $TBADMINGROUP, "websetgroups $user", 1);
-	}
+        #
+	# Only need to add new membership.
+	# 
+	SUEXEC($uid, $TBADMINGROUP,
+	       "webmodgroups -a $project:$group:$newtrust $user", 1);
 
         TBMAIL("$user_name '$user' <$user_email>",
              "Membership Approved in '$project/$group' ",

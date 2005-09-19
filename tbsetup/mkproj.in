@@ -25,7 +25,7 @@ sub fatal($);
 my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $MKGROUP  = "$TB/sbin/mkgroup";
-my $SETGROUPS= "$TB/sbin/setgroups";
+my $MODGROUPS= "$TB/sbin/modgroups";
 my $MKACCT   = "$TB/sbin/tbacct add";
 my $CVSBIN   = "/usr/bin/cvs";
 my $CHOWN    = "/usr/sbin/chown";
@@ -154,8 +154,8 @@ if ($MAILMANSUPPORT) {
 system("$MKACCT $projhead") == 0 or
     fatal("$MKACCT $projhead failed!");
 
-system("$SETGROUPS $projhead") == 0 or
-    fatal("$SETGROUPS $projhead failed!");
+system("$MODGROUPS -a $pid:$pid:project_root $projhead") == 0 or
+    fatal("$MODGROUPS -a $pid:$pid:project_root $projhead failed!");
 
 $EUID = 0;
 

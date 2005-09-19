@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -26,7 +26,7 @@ my $CONTROL  = "@USERNODE@";
 
 my $PROJROOT = "/proj";
 my $RMGROUP  = "$TB/sbin/rmgroup";
-my $SETGROUPS= "$TB/sbin/setgroups";
+my $MODGROUPS= "$TB/sbin/modgroups";
 
 #
 # Untaint the path
@@ -163,6 +163,8 @@ if (-d $workdir) {
 #
 # Grab the group list. We need to delete all of the unix groups for the
 # project. We do this with a subscript, so need to flip UID for perl.
+# Note that rmgroups will handle deleting users from group_membership
+# table by calling modgroups for each user. 
 #
 my $query_result =
     DBQueryFatal("select gid from groups where pid='$pid' and pid!=gid");
@@ -177,28 +179,13 @@ while (my ($gid) = $query_result->fetchrow_array()) {
 }
 
 #
-# Grab the member list for the project before we kill it. We want to
-# run setgroups for them.
-# 
-$query_result =
-    DBQueryFatal("select uid from group_membership ".
-		 "where pid='$pid' and gid='$pid'");
-
+# Now remove the main project group. 
 #
-# Now remove the main project group.
-#
+print "Removing main project group ...\n";
 if (system("$RMGROUP $pid $pid")) {
     fatal("Could not remove main project group $pid!");
 }
 
-#
-# Now force a setgroups on all of the members. 
-#
-while (my ($uid) = $query_result->fetchrow_array()) {
-    if (system("$SETGROUPS $uid")) {
-	fatal("setgroups $uid failed!");
-    }
-}
 $EUID = 0;
 
 #

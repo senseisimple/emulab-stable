@@ -196,13 +196,8 @@ elseif (strcmp($approval, "approve") == 0) {
     }
 
     #
-    # Change the trust value in group_membership to group_root, and set the
-    # project "approved" field to true. 
+    # Set the project "approved" field to true. 
     #
-    DBQueryFatal("UPDATE group_membership ".
-		 "set trust='project_root',date_approved=now() ".
-		 "WHERE uid='$headuid' and pid='$pid' and gid='$pid'");
-
     DBQueryFatal("update projects set approved='1', ".
 		 "       default_user_interface='$user_interface' ".
 		 "where pid='$pid'");
