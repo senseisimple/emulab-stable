@@ -421,7 +421,6 @@ sub pick_address {
 	}
     }
     my $address = "${a}.${b}.${c}.${d}";
-    my $port    = $BASEPORT + ((($c << 8) | $d) & 0x7FFF);
     
     # Insert back into emulab_indicies for next time.
     $idx = unpack("N", inet_aton($address));
@@ -429,7 +428,7 @@ sub pick_address {
     DBQueryFatal("update emulab_indicies set idx=$idx ".
 		 "where name='frisbee_mcastaddr'");
 
-    return "${address}:${port}";
+    return "${address}:${BASEPORT}";
 }
 
 # Pass in an imageid, and an address
