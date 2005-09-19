@@ -139,7 +139,7 @@ main(int argc, char **argv)
 
 			for (p = 1; p <= 4; p++) {
 				snprintf(sstr, sizeof sstr, "%ss%d", disk, p);
-				fdw = open(sstr, O_RDONLY);
+				fdw = open(sstr, O_RDWR);
 				if (fdw >= 0)
 					break;
 			}
