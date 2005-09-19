@@ -259,6 +259,20 @@ sub SetupFsNode()
     $TBDIR = "/q";
 
     #
+    # XXX (hopefully) tmp hack for dealing with other FS OSes
+    #
+    my ($os, $rel) = split " ", `uname -sr`;
+    if ($os ne "FreeBSD") {
+	SetupFatal("FS node must run FreeBSD\n");
+    }
+    # XXXX brutal!
+    if ($rel =~ /^5\.4/) {
+	$emulabconfig{FS_PKG_DIR} =
+	    "/share/freebsd/packages/FreeBSD-5.4-20050508";
+	($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
+    }
+
+    #
     # Create a ${TBDIR} from the extra slice and put everything there.
     # 
     mysystem("mkdir ${TBFS}")
@@ -339,7 +353,6 @@ sub SetupFsNode()
 
     #
     # Remove the outer testbed startup script.
-    # See new code in dhclient-exit-hooks
     #
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
 
@@ -348,6 +361,8 @@ sub SetupFsNode()
     # 
     mysystem("rm -rf /usr/testbed/lib");
     mysystem("rm -rf /usr/testbed/bin");
+    unlink("/etc/rc.conf.d/dhclient")
+	if (-e "/etc/rc.conf.d/dhclient");
 
     # XXX fer now: if not set, derive from the OPS info
     if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
@@ -636,7 +651,6 @@ sub SetupOpsNode($)
 
     #
     # Remove the outer testbed startup script.
-    # See new code in dhclient-exit-hooks
     #
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
 
@@ -645,6 +659,8 @@ sub SetupOpsNode($)
     # 
     mysystem("rm -rf /usr/testbed/lib");
     mysystem("rm -rf /usr/testbed/bin");
+    unlink("/etc/rc.conf.d/dhclient")
+	if (-e "/etc/rc.conf.d/dhclient");
 
     #
     # Do this as a separate step because PKG_DIR might be an NFS path,
@@ -950,7 +966,6 @@ sub SetupBossNode()
   
     #
     # Remove the outer testbed startup script.
-    # See new code in dhclient-exit-hooks
     #
     mysystem("rm -f /usr/local/etc/rc.d/testbed.sh");
 
@@ -959,6 +974,8 @@ sub SetupBossNode()
     # 
     mysystem("rm -rf /usr/testbed/lib");
     mysystem("rm -rf /usr/testbed/bin");
+    unlink("/etc/rc.conf.d/dhclient")
+	if (-e "/etc/rc.conf.d/dhclient");
 
     #
     # Create a bigger /var/db/mysql (before installing mysql!)
