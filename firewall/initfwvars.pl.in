@@ -70,9 +70,14 @@ print "$str\n"
 DBQueryFatal($str)
     if ($doit);
 
-# Frisbee multicast info (XXX assumptions, assumptions!)
-$FRISBEE_MCASTADDR  = $FRISBEE_MCASTADDR . ".0/24";
-$FRISBEE_MCASTPORT  = $FRISBEE_MCASTPORT . "-" . ($FRISBEE_MCASTPORT + 255);
+#
+# Frisbee multicast info
+# XXX assumptions, assumptions (as of 9/05):
+#   * Use a /8.
+#   * Use a single port (no range).
+#
+my @mcaddr = split /\./, $FRISBEE_MCASTADDR, 4;
+$FRISBEE_MCASTADDR = $mcaddr[0] . ".0.0.0/8";
 
 $str = "replace into default_firewall_vars values ('EMULAB_MCADDR', '$FRISBEE_MCASTADDR')";
 print "$str\n"

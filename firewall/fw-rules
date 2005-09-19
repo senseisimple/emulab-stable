@@ -138,10 +138,12 @@ allow icmp from boss to any icmptypes 6,8	# 60090:
 allow icmp from any to boss icmptypes 0		# 60091: 
 
 # Windows
+# allow http, https (80,443) outbound for windows/cygwin updates
 # SMB (445) with fs
 # SSH (2222) into nodes
 # rdesktop (3389) to nodes
 # no blaster (135,4444) or slammer (1434) please!
+allow tcp from any to any 80,443 in via vlan0 setup keep-state # 60103: WINDOWS,BASIC
 allow tcp from any to fs 445 in via vlan0 setup keep-state # 60100: WINDOWS,BASIC
 allow tcp from any to any 2222 in not recv vlan0 setup keep-state # 60101: WINDOWS
 allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60102: WINDOWS,BASIC
