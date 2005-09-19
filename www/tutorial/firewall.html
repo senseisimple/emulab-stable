@@ -71,7 +71,8 @@ This gives you a hook for setting up custom firewall rules (below).
 the outside world.  Nodes can still communicate in a limited fashion with
 the Emulab infrastructure.
 <li><code>basic</code>: A mostly closed firewall allowing only <code>ssh</code>
-connections with the outside world.
+connections with the outside world, and <code>HTTP/HTTPS</code> connections
+from inside (for Windows Update).
 </ul>
 The firewall can be augmented with user-specified rules as well:
 	<code><pre>
