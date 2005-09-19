@@ -59,6 +59,7 @@ etc-install:	dir-install sysetc-remove sysetc-install
 
 sysetc-install:	ifcfgs dir-install
 	$(INSTALL) -m 644 $(SRCDIR)/modules.conf $(SYSETCDIR)/modules.conf
+	$(INSTALL) -m 644 $(SRCDIR)/ntp.conf $(SYSETCDIR)/ntp.conf
 	$(INSTALL) -m 644 $(SRCDIR)/ifcfg-eth99 $(SYSETCDIR)/sysconfig/network-scripts
 	$(INSTALL) -m 644 ifcfg-eth[0-9]* $(SYSETCDIR)/sysconfig/network-scripts
 
