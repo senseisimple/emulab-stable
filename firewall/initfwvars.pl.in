@@ -72,12 +72,17 @@ DBQueryFatal($str)
 
 #
 # Frisbee multicast info
-# XXX assumptions, assumptions (as of 9/05):
-#   * Use a /8.
-#   * Use a single port (no range).
+# XXX assumptions, assumptions (as of 9/05).  We could allow up to a /8 network
+# but we assign a unique port as well as address and a port is only 16 bits,
+# so use a /16.
 #
 my @mcaddr = split /\./, $FRISBEE_MCASTADDR, 4;
-$FRISBEE_MCASTADDR = $mcaddr[0] . ".0.0.0/8";
+if (@mcaddr < 2) {
+    $FRISBEE_MCASTADDR = $mcaddr[0] . ".0.0.0/16";
+} else {
+    $FRISBEE_MCASTADDR = $mcaddr[0] . "." . $mcaddr[1] . ".0.0/16";
+}
+$FRISBEE_MCASTPORT = $FRISBEE_MCASTPORT . "-65535";
 
 $str = "replace into default_firewall_vars values ('EMULAB_MCADDR', '$FRISBEE_MCASTADDR')";
 print "$str\n"
