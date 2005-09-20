@@ -53,15 +53,6 @@ if ($EUID != 0) {
 }
 
 #
-# This script is setuid, so please do not run it as root. Hard to track
-# what has happened.
-#
-if ($UID == 0) {
-    die("*** $0:\n".
-	"    Please do not run this as root! Its already setuid!\n");
-}
-
-#
 # Turn off line buffering on output. Very important for this script!
 #
 $| = 1;
@@ -110,6 +101,15 @@ if (@ARGV) {
     else {
 	die("*** Tainted project name: $pid\n");
     }
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if (!$booting && $UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
 }
 
 #
