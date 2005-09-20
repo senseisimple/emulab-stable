@@ -1122,7 +1122,7 @@ CREATE TABLE node_types (
   delay_capacity tinyint(4) NOT NULL default '0',
   virtnode_capacity tinyint(4) NOT NULL default '0',
   control_iface text,
-  disktype enum('ad','da','ar') default NULL,
+  disktype enum('ad','da','ar','amrd') default NULL,
   bootdisk_unit tinyint(3) unsigned NOT NULL default '0',
   delay_osid varchar(35) default NULL,
   jail_osid varchar(35) default NULL,

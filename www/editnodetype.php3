@@ -236,7 +236,7 @@ function SPITFORM($node_type, $formfields, $errors)
           </tr>\n";
 
     echo "<tr>
-             <td>Disktype (ad,da,ar):</td>
+             <td>Disktype (ad,da,ar,amrd):</td>
              <td class=left>
                  <input type=text
                         name=\"formfields[disktype]\"
@@ -611,8 +611,9 @@ if (isset($formfields[delay_capacity]) && $formfields[delay_capacity] != "") {
 if (isset($formfields[disktype]) && $formfields[disktype] != "") {
     if ($formfields[disktype] != "ad" &&
 	$formfields[disktype] != "da" &&
-	$formfields[disktype] != "ar") {
-	$errors["disktype"] = "Must be one of ad, da, ar";
+	$formfields[disktype] != "ar" &&
+	$formfields[disktype] != "amrd") {
+	$errors["disktype"] = "Must be one of ad, da, ar, amrd";
     }
     else {
 	$inserts["disktype"] = $formfields[disktype];

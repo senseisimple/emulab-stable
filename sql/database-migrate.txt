@@ -2819,3 +2819,8 @@ last_net_act,last_cpu_act,last_ext_act);
 		where inner_elab_role='boss';
 	update reserved set inner_elab_role='ops+fs'
 		where inner_elab_role='ops';
+
+4.11: Add 'amrd' as potential disk type in node_types.
+
+        alter table node_types change disktype \
+	        disktype enum('ad','da','ar','amrd') default NULL;
