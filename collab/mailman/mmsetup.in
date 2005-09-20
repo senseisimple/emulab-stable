@@ -103,12 +103,6 @@ while (my ($uid) = $query_result->fetchrow_array()) {
 my $optarg = ($debug ? "-d" : "");
 
 #
-# Add "system" lists.
-#
-system("$ADDMMLIST $optarg -a emulab-users") == 0
-    or fatal("Could not create emulab-users list");
-
-#
 # Add project (and group) lists.
 #
 my @projects = ();
@@ -134,8 +128,8 @@ while (my ($pid,$gid) = $query_result->fetchrow_array()) {
 	$listname = "$pid" . "-users";
     }
 
-#    system("$ADDMMLIST $optarg -a $listname") == 0
-#	or fatal("Could not create $listname list");
+    system("$ADDMMLIST $optarg -a $listname") == 0
+	or fatal("Could not create $listname list");
 
     push(@projects, $pid);
 }

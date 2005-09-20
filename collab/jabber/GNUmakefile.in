@@ -1,0 +1,70 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= collab/jabber
+
+include $(OBJDIR)/Makeconf
+
+SBIN_SCRIPTS		= jabbersetup addjabberuser deljabberuser \
+			  modjabberbuddies
+LIBEXEC_SCRIPTS		= 
+CTRL_LIBEXEC_SCRIPTS	= 
+CTRL_LIB_FILES		= 
+CTRL_SBIN_SCRIPTS	= jabberproxy
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIBEXEC_SCRIPTS) \
+	$(CTRL_LIB_FILES) $(LIBEXEC_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_LIBEXECDIR)/, $(LIBEXEC_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/libexec/jabber/, $(CTRL_LIBEXEC_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(CTRL_SBIN_SCRIPTS)) \
+	 $(addprefix $(INSTALL_DIR)/opsdir/lib/jabber/, $(CTRL_LIB_FILES))
+
+boss-install: install
+
+post-install: 
+	chown root $(INSTALL_SBINDIR)/addjabberuser
+	chmod u+s $(INSTALL_SBINDIR)/addjabberuser
+	chown root $(INSTALL_SBINDIR)/deljabberuser
+	chmod u+s $(INSTALL_SBINDIR)/deljabberuser
+	chown root $(INSTALL_SBINDIR)/modjabberbuddies
+	chmod u+s $(INSTALL_SBINDIR)/modjabberbuddies
+#
+# Control node installation (okay, plastic)
+#
+control-install:	\
+	$(addprefix $(INSTALL_SBINDIR)/, $(CTRL_SBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_LIBDIR)/jabber/, $(CTRL_LIB_FILES)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/jabber/, $(CTRL_LIBEXEC_FILES))
+
+clean:
+	rm -f *.o core
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/jabber/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib/jabber
+	$(INSTALL_DATA) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/jabber/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec/jabber
+	$(INSTALL) $< $@
+

@@ -1,0 +1,514 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use Errno;
+use XML::Simple;
+use Digest::SHA1 qw(sha1_hex);
+
+#
+# A wrapper for messing with the Bug DB from boss.
+#
+sub usage()
+{
+    print "Usage: jabberproxy adduser [-m] <uid> or\n";
+    print "       jabberproxy deluser <uid> or\n";
+    print "       jabberproxy addbuddies <uid> <buddy><group> ... or\n";
+    print "       jabberproxy delbuddies <uid> <buddy><group> ... or\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $REALM	= "jabber.${OURDOMAIN}";
+my $JABBERCONF  = "/usr/local/etc/jabberd/sm.xml";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Only real root, cause the script has to read/write a pid file that
+# cannot be accessed by the user.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libtbdb;
+
+# Locals
+my $dbname;
+my $dbuser;
+my $dbpass;
+
+# Protos
+sub JabberUser($;$);
+sub AddUser(@);
+sub DelUser(@);
+sub AddBuddies(@);
+sub DelBuddies(@);
+sub fatal($);
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (! @ARGV) {
+    usage();
+}
+
+#
+# The DB user/passwd are stored in this XML file. Parse it.
+#
+my $parse  = XMLin($JABBERCONF);
+
+$dbuser = $parse->{'storage'}->{'mysql'}->{'user'};
+$dbname = $parse->{'storage'}->{'mysql'}->{'dbname'};
+$dbpass = $parse->{'storage'}->{'mysql'}->{'pass'};
+
+# Make sure we have everything we need.
+if (!defined($dbname) ||
+    !defined($dbuser) ||
+    !defined($dbpass)) {
+    fatal("Could not find db parameters in $JABBERCONF!");
+}
+if (TBDBConnect($dbname, $dbuser, $dbpass) < 0) {
+    fatal("Could not connect to flyspray database!");
+}
+
+my $action = shift(@ARGV);
+
+if ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
+elsif ($action eq "addbuddies") {
+    exit(AddBuddies(@ARGV));
+}
+elsif ($action eq "delbuddies") {
+    exit(DelBuddies(@ARGV));
+}
+else {
+    die("*** $0:\n".
+	"    Do not know what to do with '$action'!\n");
+}
+exit(0);
+
+#
+# Utility function to get the flyspray user_id for an Emulab user.
+#
+sub JabberUser($;$)
+{
+    my ($user, $rowref) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select * from authreg where username='$user'");
+
+    return -1
+	if (!$query_result->numrows);
+
+    $$rowref = $query_result->fetchrow_hashref()
+	if (defined($rowref));
+    
+    return 0;
+}
+
+#
+# Add entry (or update password) for a user.
+#
+sub AddUser(@)
+{
+    my ($user) = @_;
+    my ($password, $rowref) = ();
+    
+    usage()
+	if (@_ != 1);
+
+
+    # Other info for list comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*)$/) {
+	$password = DBQuoteSpecial($1);
+    }
+    else {
+	fatal("AddUser: Bad line in input: $_");
+    }
+
+    #
+    # If user exists, we are done.
+    #
+    if (JabberUser($user, \$rowref) == 0) {
+	print "User '$user' already exists in Jabber user list!\n";
+	return 0;
+    }
+
+    #
+    # Grab the gcos field from the password file.
+    #
+    my (undef, undef, undef, undef, undef, undef, $gcos) = getpwnam($user);
+
+    fatal("Could not get gcos field for user $user!")
+	if (!defined($gcos));
+    $gcos  = DBQuoteSpecial($gcos);
+
+    my $seq   = 500;
+    my $token = sprintf "%X", time();
+    my $hash  = sha1_hex(sha1_hex($password) . $token);
+    for (my $i = 0; $i < $seq; $i++) {
+        $hash = sha1_hex($hash);
+    }
+
+    # And insert.
+    DBQueryFatal("insert into authreg set ".
+		 "   username='$user', ".
+		 "   realm='$REALM', ".
+		 "   password=$password, ".
+		 "   token='$token', ".
+		 "   sequence='$seq', ".
+		 "   hash='$hash'");
+
+    my $owner = "${user}\@${REALM}";
+    
+    if (! DBQueryWarn("insert into active set ".
+		      "   `collection-owner`='$owner', ".
+		      "   `object-sequence`=NULL, ".
+		      "   time=UNIX_TIMESTAMP(now())")) {
+	DBQueryFatal("delete from authreg where username='$user'");
+	return -1;
+    }
+    
+    return 0;
+}
+
+#
+# Delete entry for a user. Okay, cannot really delete a user cause there
+# might be entries in other tables cross referenced (say, a bug report).
+# Instead, just rename the user and disable the account. Allow for a -force
+# option though, to totally get rid of it.
+#
+sub DelUser(@)
+{
+    my ($user) = @_;
+    
+    usage()
+	if (@_ != 1);
+
+    if (JabberUser($user) != 0) {
+	print "User '$user' does not exist in Jabber user list!\n";
+	return 0;
+    }
+    my $owner = "${user}\@${REALM}";
+
+    my @tables = ("disco-items",
+		  "motd-message",
+		  "motd-times",
+		  "privacy-default",
+		  "privacy-items",
+		  "private",
+		  "queue",
+		  "roster-groups",
+		  "roster-items",
+		  "vacation-settings",
+		  "vcard",
+		  "logout",
+		  "active");
+
+    foreach my $table (@tables) {
+	DBQueryFatal("delete from `$table` where `collection-owner`='$owner'");
+    }
+    DBQueryFatal("delete from `roster-items` where jid='$owner'");
+    DBQueryFatal("delete from `roster-groups` where jid='$owner'");
+    
+    DBQueryFatal("delete from authreg where username='$user'");
+
+    return 0;
+}
+
+#
+# Set the buddy list for a user.
+#
+sub AddBuddies(@)
+{
+    usage()
+	if (@_ < 1);
+
+    my $user       = shift(@_);
+    my %curbuddies = ();
+    my %revbuddies = ();
+    my $newbuddies = ();
+
+    while (@_) {
+	my ($buddy,$pid,$gid) = split(":", shift(@_));
+	
+	# A user can be a buddy in more then group (project, subgroup).
+	$newbuddies{$buddy} = []
+	    if (!exists($newbuddies{$buddy}));
+
+	# Ignore subgroup for now. 
+	push(@{$newbuddies{$buddy}}, $pid);
+    }
+    
+    if (JabberUser($user) != 0) {
+	print "User '$user' does not exist in Jabber user list!\n";
+	return -1;
+    }
+    my $owner = "${user}\@${REALM}";
+
+    #
+    # Get the current list of buddies for this user so that we do not
+    # overwrite existing entries.
+    #
+    my $query_result =
+	DBQueryFatal("select jid from `roster-items` ".
+		     "where `collection-owner`='$owner'");
+    while (my ($uid) = $query_result->fetchrow_array()) {
+	if ($uid =~ /^(.*)\@(.*)$/) {
+	    $uid = $1;
+	}
+	$curbuddies{$uid} = undef;
+    }
+
+    # Now see what reverse entries exists, to avoid duplicates.
+    $query_result =
+	DBQueryFatal("select `collection-owner` from `roster-items` ".
+		     "where jid='$owner'");
+    while (my ($uid) = $query_result->fetchrow_array()) {
+	if ($uid =~ /^(.*)\@(.*)$/) {
+	    $uid = $1;
+	}
+	$revbuddies{$uid} = undef;
+    }
+
+    #
+    # Now do the mutual inserts.
+    # 
+    foreach my $buddy (keys(%newbuddies)) {
+	my $other_owner = "${buddy}\@${REALM}";
+
+	if (! exists($curbuddies{$buddy})) {
+	    DBQueryFatal("insert into `roster-items` ".
+			 " (`collection-owner`, `object-sequence`, jid, ".
+			 "  name, `to`, `from`, ask) ".
+			 " values ".
+			 "  ('$owner', NULL, '$other_owner', '$buddy',".
+			 "   1, 1, 0)");
+	}
+	if (! exists($revbuddies{$buddy})) {
+	    DBQueryFatal("insert into `roster-items` ".
+			 " (`collection-owner`, `object-sequence`, jid, ".
+			 "  name, `to`, `from`, ask) ".
+			 " values ".
+			 "  ('$other_owner', NULL, '$owner', '$user',  ".
+			 "   1, 1, 0)");
+	}
+    }
+
+    #
+    # Okay, do the same thing with the roster-groups table.
+    #
+    %curbuddies = ();
+    %revbuddies = ();
+    foreach my $buddy (keys(%newbuddies)) {
+	$curbuddies{$buddy} = [];
+	$revbuddies{$buddy} = [];
+    }
+    
+    $query_result =
+	DBQueryFatal("select jid,`group` from `roster-groups` ".
+		     "where `collection-owner`='$owner'");
+    while (my ($uid,$group) = $query_result->fetchrow_array()) {
+	if ($uid =~ /^(.*)\@(.*)$/) {
+	    $uid = $1;
+	}
+	# We do not care about other buddies the user has.
+	next
+	    if (!exists($curbuddies{$uid}));
+	
+	push(@{$curbuddies{$uid}}, $group);	
+    }
+
+    # Now see what reverse entries exists, to avoid duplicates.
+    $query_result =
+	DBQueryFatal("select `collection-owner`,`group` from `roster-groups` ".
+		     "where jid='$owner'");
+    while (my ($uid,$group) = $query_result->fetchrow_array()) {
+	if ($uid =~ /^(.*)\@(.*)$/) {
+	    $uid = $1;
+	}
+	# We do not care about other buddies the user has.
+	next
+	    if (!exists($revbuddies{$uid}));
+	
+	push(@{$revbuddies{$uid}}, $group);	
+    }
+    #
+    # Now do the mutual inserts.
+    # 
+    foreach my $buddy (keys(%newbuddies)) {
+	my $other_owner = "${buddy}\@${REALM}";
+	my @newgroups   = @{$newbuddies{$buddy}};
+	my @curgroups   = @{$curbuddies{$buddy}};
+	my @revgroups   = @{$curbuddies{$buddy}};
+
+	foreach my $group (@newgroups) {
+	    if (! grep {$_ eq $group} @curgroups) {
+		DBQueryFatal("insert into `roster-groups` ".
+			     " (`collection-owner`, `object-sequence`, jid, ".
+			     "  `group`) ".
+			     " values ".
+			     "  ('$owner', NULL, '$other_owner', '$group')");
+	    }
+
+	    if (! grep {$_ eq $group} @revgroups) {
+		DBQueryFatal("insert into `roster-groups` ".
+			     " (`collection-owner`, `object-sequence`, jid, ".
+			     "  `group`) ".
+			     " values ".
+			     "  ('$other_owner', NULL, '$owner', '$group')");
+	    }
+	}
+    }
+    return 0;
+}
+
+#
+# Remove buddies from a user.
+#
+sub DelBuddies(@)
+{
+    usage()
+	if (@_ < 1);
+
+    my $user       = shift(@_);
+    my %curbuddies = ();
+    my %revbuddies = ();
+    my $delbuddies = ();
+
+    while (@_) {
+	my ($buddy,$pid,$gid) = split(":", shift(@_));
+
+	# A user can be a buddy in more then group (project, subgroup).
+	$delbuddies{$buddy} = []
+	    if (!exists($delbuddies{$buddy}));
+
+	# Ignore subgroups for now.
+	push(@{$delbuddies{$buddy}}, $pid);
+    }
+    
+    if (JabberUser($user) != 0) {
+	print "User '$user' does not exist in Jabber user list!\n";
+	return -1;
+    }
+    my $owner = "${user}\@${REALM}";
+
+    #
+    # First remove the buddies from the roster-groups table, in both
+    # directions.
+    #
+    foreach my $buddy (keys(%delbuddies)) {
+	my $other_owner = "${buddy}\@${REALM}";
+	my @delgroups   = @{$delbuddies{$buddy}};
+
+	foreach my $group (@delgroups) {
+	    DBQueryFatal("delete from `roster-groups` ".
+			 "where `group`='$group' and ".
+			 "      `collection-owner`='$owner' and ".
+			 "      jid='$other_owner'");
+	    DBQueryFatal("delete from `roster-groups` ".
+			 "where `group`='$group' and ".
+			 "      `collection-owner`='$other_owner' and ".
+			 "      jid='$owner'");
+	}
+    }
+
+    #
+    # Figure out if the user and the list of buddies still have anything
+    # in common (another group). If there are no mutual groups left, need
+    # to delete the corresponding entries from the roster-items table.
+    #
+    %curbuddies = ();
+    foreach my $buddy (keys(%delbuddies)) {
+	$curbuddies{$buddy} = undef;
+    }
+    
+    $query_result =
+	DBQueryFatal("select jid,`group` from `roster-groups` ".
+		     "where `collection-owner`='$owner'");
+    while (my ($uid,$group) = $query_result->fetchrow_array()) {
+	if ($uid =~ /^(.*)\@(.*)$/) {
+	    $uid = $1;
+	}
+	# We do not care about other buddies the user has.
+	next
+	    if (!exists($curbuddies{$uid}));
+
+	# Just mark as not undef ...
+	$curbuddies{$uid} = $group;
+    }
+
+    #
+    # For anything in curbuddies that is still undef, remove the mutual
+    # entries from the roster-items table, since there is no longer a
+    # group in common. 
+    # 
+    foreach my $buddy (keys(%delbuddies)) {
+	my $other_owner = "${buddy}\@${REALM}";
+
+	next
+	    if (defined($curbuddies{$buddy}));
+
+	DBQueryFatal("delete from `roster-items` ".
+		     "where `collection-owner`='$owner' and ".
+		     "      jid='$other_owner'");
+	DBQueryFatal("delete from `roster-items` ".
+		     "where `collection-owner`='$other_owner' and ".
+		     "      jid='$owner'");
+    }
+
+    return 0;
+}
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

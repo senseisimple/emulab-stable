@@ -11,7 +11,7 @@ SUBDIR		= collab
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= mailman cvs
+SUBDIRS	= mailman cvs jabber
 
 all:	all-subdirs
 

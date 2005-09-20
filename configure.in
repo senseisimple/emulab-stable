@@ -148,6 +148,7 @@ AC_SUBST(FRISEBEEMCASTADDR)
 AC_SUBST(FRISEBEEMCASTPORT)
 AC_SUBST(WINSUPPORT)
 AC_SUBST(CVSSUPPORT)
+AC_SUBST(CHATSUPPORT)
 AC_SUBST(MIN_UNIX_UID)
 AC_SUBST(MIN_UNIX_GID)
 
@@ -202,6 +203,7 @@ BUGDBSUPPORT=0
 MAILMANSUPPORT=0
 WINSUPPORT=0
 CVSSUPPORT=0
+CHATSUPPORT=0
 TBLOGFACIL="local5"
 LINKTEST_NSPATH="/share/linktest-ns"
 BOSSEVENTPORT=2927
@@ -792,6 +794,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         collab/GNUmakefile \
+        collab/jabber/GNUmakefile \
         collab/mailman/GNUmakefile collab/cvs/GNUmakefile \
 	collab/mailman/mmlistmembership \
 	collab/mailman/addmmlist collab/mailman/mmsetup \

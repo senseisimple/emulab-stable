@@ -42,6 +42,7 @@ my $BOSSNODE	= "@BOSSNODE@";
 my $WITHSFS	= @SFSSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $CHATSUPPORT = @CHATSUPPORT@;
 my $PROTOUSER   = 'elabman';
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
@@ -65,6 +66,8 @@ my $ADDWIKIUSER = "$TB/sbin/addwikiuser";
 my $DELWIKIUSER = "$TB/sbin/delwikiuser";
 my $ADDBUGDBUSER= "$TB/sbin/addbugdbuser";
 my $DELBUGDBUSER= "$TB/sbin/delbugdbuser";
+my $ADDCHATUSER = "$TB/sbin/addjabberuser";
+my $DELCHATUSER = "$TB/sbin/deljabberuser";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -360,9 +363,13 @@ sub AddUser()
     system("$ADDWIKIUSER $user")
 	if ($WIKISUPPORT && !$batch && $user ne $PROTOUSER);
 
-    # And to the bugdn if enabled.
+    # And to the bugdb if enabled.
     system("$ADDBUGDBUSER $user")
 	if ($BUGDBSUPPORT && !$batch && $user ne $PROTOUSER);
+
+    # And to the chat server if enabled.
+    system("$ADDCHATUSER $user")
+	if ($CHATSUPPORT && !$batch && $user ne $PROTOUSER);
 
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
@@ -444,6 +451,10 @@ sub DelUser()
     system("$DELWIKIUSER $user")
 	if ($WIKISUPPORT);
     
+    # And the chat server if enabled.
+    system("$DELCHATUSER $user")
+	if ($CHATSUPPORT);
+    
     $EUID = 0;
 
     $sfsupdate = 1;
@@ -486,6 +497,7 @@ sub UpdatePassword()
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER -m $user")
 	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
+
     $EUID = 0;
     
     return 0;

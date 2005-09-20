@@ -1,0 +1,154 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Initial jabber setup.
+#
+sub usage()
+{
+    print STDOUT "Usage: jabbersetup\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+my $impotent = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $CONTROL     = "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
+my $CHATSUPPORT = @CHATSUPPORT@;
+my $SSH         = "$TB/bin/sshtb";
+my $ADDUSER     = "$TB/sbin/addjabberuser";
+my $MODBUDDIES  = "$TB/sbin/modjabberbuddies";
+
+# Protos
+sub fatal($);
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
+# If no jabber support, just exit. 
+#
+if (! $CHATSUPPORT) {
+    print "Chat support is not enabled. Exit ...\n";
+    exit(0);
+}
+
+#
+# Only testbed admins.
+#
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Must be a testbed admin to run this script\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV) {
+    usage();
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# First add the users.
+# 
+$query_result =
+    DBQueryFatal("select distinct u.uid ".
+		 "  from group_membership as g ".
+		 "left join users as u on u.uid=g.uid ".
+		 "where u.status='active' ".
+		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
+		 "       g.pid='tbres' or g.pid='utahstud' or ".
+		 "       g.pid='lbsbox')" .
+		 "order by u.admin");
+
+while (my ($uid) = $query_result->fetchrow_array()) {
+    system("$ADDUSER $uid") == 0
+	or fatal("Could not create jabber account for $uid");
+}
+
+#
+# Now add buddies for each user in each project.
+#
+$query_result =
+    DBQueryFatal("select g.pid,g.gid from groups as g ".
+		 "left join projects as p on p.pid=g.pid ".
+		 "where p.approved=1 ".
+		 "and (p.pid='testbed' or p.pid='emulab-ops' or ".
+		 "     p.pid='tbres' or p.pid='utahstud' or ".
+		 "       g.pid='lbsbox')" .
+		 "");
+
+while (my ($pid,$gid) = $query_result->fetchrow_array()) {
+    next
+	if ($pid ne $gid);
+    
+    print "Setting up buddy lists for members of $pid\n"
+	if ($debug);
+
+    my $users_results =
+	DBQueryFatal("select g.uid from group_membership as g ".
+		     "left join users as u on u.uid=g.uid ".
+		     "where g.pid='$pid' and g.gid='$gid' and ".
+		     "      u.status='active'");
+    
+    while (my ($uid) = $users_results->fetchrow_array()) {
+	system("$MODBUDDIES -a $pid:$gid $uid") == 0 or
+	    fatal("$MODBUDDIES '-a $pid:$gid $uid' failed!");
+    }
+}
+
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}

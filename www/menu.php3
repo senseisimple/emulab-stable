@@ -223,7 +223,7 @@ function WRITEPLABBOTTOMBAR() {
 function WRITESIDEBAR() {
     global $login_status, $login_uid, $pid, $gid;
     global $TBBASE, $TBDOCBASE, $BASEPATH, $WIKISUPPORT, $MAILMANSUPPORT;
-    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT;
+    global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
     $firstinitstate = TBGetFirstInitState();
@@ -594,9 +594,14 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("My Bug Databases", $TBBASE, $bugdburl);
 	}
 	if ($CVSSUPPORT) {
-	    WRITESIDEBARLASTBUTTON("My CVS Repositories", $TBBASE,
-				   "listrepos.php3?target_uid=$login_uid");
+	    WRITESIDEBARBUTTON("My CVS Repositories", $TBBASE,
+			       "listrepos.php3?target_uid=$login_uid");
 	}
+	if (STUDLY() && $CHATSUPPORT) {
+	    WRITESIDEBARBUTTON("My IM", $TBBASE,
+			       "mychat.php3?target_uid=$login_uid");
+	}
+	WRITESIDEBARDIVIDER();
 	echo "</table>\n";
     }
 

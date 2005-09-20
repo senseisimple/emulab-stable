@@ -19,6 +19,7 @@ $WIKISUPPORT    = @WIKISUPPORT@;
 $BUGDBSUPPORT   = @BUGDBSUPPORT@;
 $CVSSUPPORT     = @CVSSUPPORT@;
 $MAILMANSUPPORT = @MAILMANSUPPORT@;
+$CHATSUPPORT    = @CHATSUPPORT@;
 $CONTROL_NETWORK= "@CONTROL_NETWORK@";
 $WIKIURL        = "https://${USERNODE}/twiki/bin/newlogon";
 $WIKICOOKIENAME = "WikiCookie";
@@ -26,6 +27,7 @@ $BUGDBURL       = "https://${USERNODE}/flyspray";
 $BUGDBCOOKIENAME= "FlysprayCookie";
 $MAILMANURL     = "http://${USERNODE}/mailman";
 $OPSCVSURL      = "http://${USERNODE}/cvsweb/cvsweb.cgi";
+$OPSJETIURL     = "http://${USERNODE}/jabber/jeti.php";
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";
