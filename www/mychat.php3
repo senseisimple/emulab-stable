@@ -32,9 +32,8 @@ PAGEHEADER("My Instant Messaging");
 echo "<center><font size=+1>Your Emulab Jabber ID and Password</font>
       </center><br>\n";
 echo "<center><a href=gotochat.php3><b>$uid@jabber.{$OURDOMAIN}</b></a>
-      <br><b>$password</b>
-      </center>\n";
-echo "<br><br>\n";
+      <br><b>$password</b></center><br>\n";
+echo "<br>\n";
 echo "The Emulab <a href=http://jabberd.jabberstudio.org/2/>Jabber</a>
       server is an implementation of the popular
       <a href=http://www.jabber.org/>Jabber Instant Messaging Protocol.</a>
