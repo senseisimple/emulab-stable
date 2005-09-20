@@ -212,40 +212,32 @@ if (AuditStart(0)) {
 # Set the status to frozen if user being removed completely. This
 # prevents possible race conditions since the user is no longer able
 # to access the web interface and tmcd will no longer return account
-# info for the user. In pidmode, just remove the user from the specific
-# project (tmcd will return the new group membership). 
+# info for the user.
+#
+# In pidmode (removed from a project), hand the operation of too modgroups
+# to do the rest.
 #
 if ($pidmode) {
-    DBQueryFatal("delete from group_membership ".
-		 "where uid='$user' and pid='$pid'");
-}
-else {
-    DBQueryFatal("update users set status='" . TBDB_USERSTATUS_FROZEN . "'" .
-		 "where uid='$user'");
-}
-
-#
-# Now schedule account updates on all the nodes that this person has
-# an account on (remaining project/group membership).
-#
-# XXX This is broken. Once the user is removed from the group membership,
-# the list of nodes will change, and those nodes for which the user is
-# suddenly no longer allowed an account on, will not be updated. 
-# 
-TBNodeUpdateAccountsByUID($user);
-
-#
-# In pidmode, call modgroups to alter the users membership on boss/ops.
-# Thats all that needs to be done.
-#
-if ($pidmode && !$nuke) {
     #
     # Drop root for calling modgroups.
     #
     $EUID = $UID;
-
     system("$MODGROUPS -r $pid:$pid $user");
-    exit($? >> 8);
+
+    exit($? >> 8)
+	if (!$nuke);
+    
+    $EUID = 0;
+}
+else {
+    DBQueryFatal("update users set status='" . TBDB_USERSTATUS_FROZEN . "'" .
+		 "where uid='$user'");
+
+    #
+    # Now schedule account updates; Once the user is frozen, all accounts
+    # will be terminated.
+    #
+    TBNodeUpdateAccountsByUID($user);
 }
 
 #
