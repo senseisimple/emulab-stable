@@ -28,6 +28,7 @@ boss-install:	install
 post-install:
 	@$(MAKE) -C mailman post-install
 	@$(MAKE) -C cvs post-install
+	@$(MAKE) -C jabber post-install
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.
