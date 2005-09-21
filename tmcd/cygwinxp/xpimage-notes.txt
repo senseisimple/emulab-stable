@@ -132,8 +132,10 @@ alias v='ls -lsF'
         . Download setup from www.cygwin.com/setup.exe to C:/Software/Cygwin.
           Once you have a Cygwin, you can update the setup.exe by:
            # [On ops.]
-           set pc=109
-           scp /share/windows/cygwin-setup.exe $pc":"/tmp/setup.exe
+           set pc=325
+           scp /share/windows/cygwin-setup.exe pc$pc":"/tmp/setup.exe
+           # [On the machine.]
+           cp /tmp/setup.exe C:/Software/Cygwin
 
         . Run Cygwin setup.exe .
             # After Cygwin in installed, ensure that upgrading SSH won't hang.
@@ -145,9 +147,9 @@ alias v='ls -lsF'
           Click on the Skip in the "New" column to add a binary version of:
             agetty, bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
             make, minires-devel, more, nano, openssh (with src), openssl-devel, 
-            patch, perl, perl-libwin32, python, rpm, rsync, 
-            shutdown, tcsh, vim, wget, zip .
-          Click in the "src" column for openssh, so patches can be applied.
+            patch, perl, perl-libwin32, psmisc, python, rpm, rsync, 
+            shutdown, sysvinit, tcsh, vim, wget, zip .
+          Click in the "src" column for openssh and agetty, so patches can be applied.
         . At the end, don't "Create an icon on the Desktop", do "Add icon to Start Menu".
 
         . Add ;C:\cygwin\bin to the end of the System PATH in 
@@ -215,6 +217,7 @@ alias v='ls -lsF'
           - Edit /bin/ssh-host-config to add a -i argument to the "cygrunsrv -I sshd" lines.
                 grep cygrunsrv /bin/ssh-host-config | grep -e -I
               ed /bin/ssh-host-config
+              1
               /cygrunsrv -I sshd/s//& -i/p
               /cygrunsrv -I sshd/s//& -i/p
               w
@@ -708,8 +711,10 @@ q
             # The install of evproxy in the make will fail unless we stop it first.
             ps -Welf | grep evproxy
               kill `ps -Welf | grep evproxy | awk '{print $2}'`
-            # Ditto emulab-syncd and slothd.
+            # Ditto emulab-syncd, program-agent, and slothd.
+              ps -Welf | grep emulab
             $rc/rc.syncserver shutdown
+            $rc/rc.progagent shutdown
             $rc/rc.slothd stop
 
             make client-install >& make.log2
@@ -853,7 +858,7 @@ if [ ]; then
           # Check that setx.exe is in system32.
           v C:/WINDOWS/system32/setx.exe
 
-# [ SKIP if patched sshd.exe installed above.
+# [ SKIP if patched sshd.exe and agetty.exe installed above.
       . Patch sshd so that shares (including /users homedirs) work with public-key logins.
         Also touches a file when client input is received, so slothd will know.
 
@@ -873,20 +878,24 @@ if [ ]; then
         - Install the source patches.  (Go get CVSROOT and agent keys set above first.)
             (cd ~/flux; cvs update testbed/tmcd/cygwinxp)
               (cd ~/flux; cvs co testbed/tmcd/cygwinxp)
-          cd /usr/src/openssh*
+          ##cd /usr/src/openssh-4.1p1-2
+          cd /usr/src/openssh-4.2p1-1
             v -t *.[ch] | head -30
 
           # Enable no-password ssh logins which can access shared homedirs.
           cp -p uidswap.c{,.orig}
             patch -p1 --dry-run < ~/flux/testbed/tmcd/cygwinxp/uidswap.c.patch
           patch -p1 -b < ~/flux/testbed/tmcd/cygwinxp/uidswap.c.patch
-            diff uidswap.c{.orig,}
+            diff -c uidswap.c{.orig,}
 
           # Enable slothd to know of the last SSH client input time.
           for f in channels.{h,c} serverloop.c; do cp -p $f{,.orig}; done
             v *.orig
             patch -p1 --dry-run < ~/flux/testbed/tmcd/cygwinxp/sshd-client-input-time.patch
           patch -p1 -b < ~/flux/testbed/tmcd/cygwinxp/sshd-client-input-time.patch
+            diff -c channels.h{.orig,}
+            diff -c channels.c{.orig,}
+            diff -c serverloop.c{.orig,}
 
         - Configure.  Takes a while.
             # These are the options that contrib/cygwin/README specifies:
@@ -910,9 +919,65 @@ if [ ]; then
             # Make sure sshd is closed down while installing.
             ps -Welf | grep sshd
             net stop sshd
+            mv /usr/sbin/sshd.exe{,.prev}
             /usr/bin/install -c -m 0755 -s sshd /usr/sbin/sshd.exe
             net start sshd
+
+      . Patch agetty to support 115.2kbps serial line speed.
+
+        cd /usr/src/agetty-2.1-1
+        cp -p agetty.c{.orig}
+          patch -p1 --dry-run < ~/flux/testbed/tmcd/cygwinxp/agetty.c.patch
+        patch -p1 -b < ~/flux/testbed/tmcd/cygwinxp/agetty.c.patch
+        make
+          # Test.  If it exits after 10 seconds, turn off EMS below and reboot.
+          time ./agetty -L -T vt100 -n ttyS0 115200 ttyS0
+        make install
+          /usr/bin/install -s -m 755 -o administrator -g administrators agetty.exe /sbin
 # SKIP ]
+
+      . Set up agetty for console logins.
+
+        - Make sure Console Redirection is disabled after boot in the BIOS settings.
+
+        - Turn off Windows EMS, because it disables the serial console for agetty.
+          Windows "Emergency Management Services" is a second level of redirection.
+          If you see the "Starting Windows" progress bar on the serial port, it's on.
+          The result is that the serial port won't even show up in Device Manager.
+
+          # Look for the EMS "OS Load Options: /redirect" and turn it off.
+            bootcfg /query
+            # Assuming the Boot Entry you want is #1:
+            bootcfg /ems OFF /id 1
+            bootcfg /query
+
+        - Install the patched agetty, if not done above.
+            #[As the user:]
+            cp /share/windows/agetty.exe /tmp
+            #[As root:]
+              mv /sbin/agetty.exe{,.orig}
+            /usr/bin/install -s -m 755 -o administrator -g administrators /tmp/agetty.exe /sbin
+
+        - Set up the sysvinit package to run agetty.
+
+         . Uncomment the serial console line in /etc/inittab.
+           Set Com1 to 115.2kbps, which is determined by the serial concentrator.
+               cat /etc/inittab
+             ed /etc/inittab
+             /agetty/s/^#//p
+             /agetty/s/9600/115200/p
+             w
+             q
+
+         . The postinstall script does init with autoanswer=no.
+               v /etc/inittab
+             chown system.system /etc/inittab
+             chown system.system /etc/rc
+               cygrunsrv -VQ init
+               cygrunsrv -R init
+             # Init starts agetty from inittab.  Send it an interrupt signal at shutdown.
+             cygrunsrv -I init -d "Cygwin SysV init" -p /sbin/init -a -i -s INT
+             net start init
 
       . Make a load average log for slothd, averaged over a 1 minute period.
 
@@ -987,14 +1052,7 @@ Making images
                  rm -rf C:/WINDOWS/SoftwareDistribution/Download/*
 
       - Could be a good time to update Cygwin as well.  
-        . Beware of stepping on the sshd.exe patches.
-
-     . Uninstall the experimental net devices in Computer Management/Device Manager.
-       (This was from our attempts to make a pc850/pc600 image.  Is it needed?)
-         # Check which one is the control net interface.
-         ipconfig /all
-       Select a non-control net interface, hit delete, enter.
-       Takes about 15 seconds per interface.
+        . Beware of stepping on the sshd.exe and agetty.exe patches.
 
      . Run prepare to clear out experiment-specific state.
         rootpc $pc
@@ -1083,6 +1141,8 @@ Making images
         rm /usr/testbed/images/WINXP-$img.ndz
         ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img.ndz
 
+================================================================
+
       - Installing service packs
         Service packs are cumulative, so there's no point in installing both SP1 and SP2.
 
@@ -1143,3 +1203,162 @@ Making images
         df -m /usr/testbed/images
         rm -f /usr/testbed/images/WINXP-$image.ndz
         df -m /usr/testbed/images
+
+================================================================
+
+Updating a set of existing images.
+
+    . Build changes one place, make tarballs to update the others.
+        #[On the build node, as me.]
+        date=2005-09-19
+        updates=/proj/testbed/fish/winxp
+        cd /
+        # Work around a running sshd.
+        cp -p /usr/sbin/sshd.exe{,.new}
+        sysfiles="usr/sbin/sshd.exe.new bin/ssh-host-config etc/sshd_config \
+                  etc/profile sbin/agetty.exe etc/inittab"
+        v $sysfiles
+        tar cvfz $updates/sys_$date.tgz $sysfiles
+
+        cd /usr/local
+        elabpat="etc/emulab man/man{1/{install,emulab}-*,8/program-*}"
+        elabfiles=`eval "echo $elabpat"`
+        v -d $elabfiles
+          v /etc/emulab/paths.*
+        tar cvfz $updates/elab_$date.tgz $elabfiles
+
+        #[On Boss.]
+        set date=2005-09-19
+        set updates=/proj/testbed/fish/winxp
+        set nodes="SP0 SP1 SP2 UPDATE"
+          set hw=pc850 
+        set hw=pc3000 
+        set pid=testbed eid=new-windows-$hw
+        set exp=$eid.$pid.emulab.net
+          foreach node ( $nodes )
+            echo $node.$exp
+            ping -c 1 $node.$exp
+          end
+
+        # Copy the tarballs to /tmp as me, and unpack as root .
+        # (Could get them via Samba, except Root has no Samba access.)
+        foreach node ( $nodes )
+          scp -p $updates/*_$date.tgz $node.$exp\:/tmp
+        end
+
+        # First update Cygwin setup, then Cygwin itself.
+        foreach node ( $nodes )
+          echo $node.$exp
+          ssh $node.$exp cp -p /share/windows/cygwin-setup.exe /tmp/setup.exe
+          sudo ssh $node.$exp "cd C:/Software/Cygwin; cp /tmp/setup.exe .; " \
+                              "rm -f cygwin-setup.exe; ls -l"
+        end
+
+          # Gotta do this part under an RDP login, *as root*.
+          set rootpwd='daFluxGroup'
+          set rd=/proj/testbed/fish/rdesktop/rdesktop-1.3.1
+          set rdarg="-K -g 1280x1024-500+0"
+          foreach node ( $nodes )
+            echo $node.$exp
+            (cd $rd; ./rdesktop $rdarg -u root -p "$rootpwd" $node.$exp &)
+            sleep 1
+          end
+
+            #[On the node, as root, under RDP.]
+            echo $HOME
+            regtool get /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/SetHOME
+
+              # Installing OpenSSH hangs if you update it while it's running.
+              # Uninstall openssh first if it's being updated.
+              cygrunsrv -VQ sshd
+              cygcheck -c openssh
+              ls -l /etc/moduli
+              ps -Welf | grep ssh
+              net stop sshd
+              # Click the Keep button, then change the New column to Uninstall on net/openssh.
+              /cygdrive/c/software/cygwin/setup.exe &
+              # Re-install openssh again.
+              /cygdrive/c/software/cygwin/setup.exe &
+
+            # Now update everything else.
+            /cygdrive/c/software/cygwin/setup.exe &
+            # May need to reboot and run again before adding any new packages like sysvinit.
+            cygcheck -c sysvinit
+            /sbin/reboot
+
+            # Unpack the patched and edited system files.
+            net stop init
+            tar xvfz /tmp/sys_*.tgz -C /
+            net start init
+            # sshd.exe may be busy, move the busy executable aside.
+              ls -l /usr/sbin/sshd*
+            cd /usr/sbin
+            net stop sshd
+            mv sshd.exe{,.prev}
+            mv sshd.exe{.new,}
+              ls -l /usr/sbin/sshd*
+            net start sshd
+
+	    #[On Boss.]
+	    # Shut down the Emulab services.
+	    foreach node ( $nodes )
+	      echo $node.$exp
+	      sudo ssh $node.$exp 'ps -Welf | grep emulab; killall evproxy'
+	      sudo ssh $node.$exp '$rc/rc.syncserver shutdown; $rc/rc.progagent shutdown; '\
+				  '$rc/rc.slothd stop; sleep 5; ps -Welf | grep emulab; '
+	      sudo ssh $node.$exp 'killall emulab-sync program-agent slothd'
+
+	    end
+
+	    # Unpack the Emulab files.
+	    foreach node ( $nodes )
+	      echo $node.$exp
+	      sudo ssh $node.$exp "tar xfz /tmp/elab_*.tgz -C /usr/local"
+	      echo ""
+	      sleep 1
+	    end
+
+     . Do one-time updates
+         #[On Boss.]
+          foreach node ( $nodes )
+            echo $node.$exp
+            sudo ssh $node.$exp "bootcfg /query; bootcfg /ems OFF /id 1; bootcfg /query"
+            sudo ssh $node.$exp "chown system.system /etc/inittab /etc/rc; "\
+                                "cygrunsrv -I init -d 'Cygwin SysV init' -p /sbin/init -a -i -s INT; "\
+                                "net start init"
+          end
+
+       - Some things still have to be done through the GUI under RDP.
+	 . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
+	   Also set Power Options / Power Schemes to "Always On".
+
+     . Reboot and test.
+         #[On Boss.]
+         node_reboot -e $pid,$eid
+         # Network configs.
+          foreach node ( $nodes )
+            echo $node.$exp
+            sudo ssh $node.$exp "ipconfig /all"
+            echo ""
+         end
+
+         # Connectivity test.
+         foreach node1 ( $nodes )
+           foreach node2 ( $nodes )
+             if ( "$node1" != "$node2" ) then
+               echo $node1 pings $node2
+               sudo ssh $node1.$exp "ping $node2"
+             endif
+           end
+         end
+                 
+
+
+     . Update the dates in the image ID's.
+        # [On boss:]
+          mysql tbdb
+            select imagename, created, path from images where imagename like 'WINXP%';
+            select imagename, created, path from images where imagename like 'WINXP-SP_';
+          update images set created='2005-08-22 16:49' where imagename like 'WINXP-SP_';
+          update images set created='2005-08-22 16:49' where imagename like 'WINXP-UPDATE';
+
