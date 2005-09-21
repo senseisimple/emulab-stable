@@ -66,7 +66,7 @@ bin-install:	dir-install
 	# Setx is run under CMD early in the user login to make HOME for Emacs.
 	$(INSTALL) -m 755 $(SRCDIR)/setx.exe $(SYSTEM32)/setx.exe
 	# Devcon is used by rc.cygwin and rc.ifc to disable/enable NIC's.
-	$(INSTALL) -m 755 $(SRCDIR)/setx.exe $(BINDIR)/devcon.exe
+	$(INSTALL) -m 755 $(SRCDIR)/devcon.exe $(BINDIR)/devcon.exe
 	# These are used by tmcd/findif.
 	$(INSTALL) -m 755 $(SYSTEM32)/getmac.exe $(BINDIR)/getmac.exe
 	$(INSTALL) -m 755 $(WBEM)/framedyn.dll $(BINDIR)/framedyn.dll

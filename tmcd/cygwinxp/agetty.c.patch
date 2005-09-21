@@ -1,0 +1,25 @@
+*** agetty-2.1-1/agetty.c.orig	Thu Nov  7 10:55:57 2002
+--- agetty-2.1-1/agetty.c	Wed Jun  8 10:24:37 2005
+***************
+*** 1164,1170 ****
+  	9600,   B9600,
+  	19200,  B19200,
+  	38400,  B38400,
+! #if	defined(DIGI_EXT_BAUDS)
+  	/* note: baud extensions all in 2nd nibble */
+  	57600,  B38400 | (1 << XC_BAUDSHIFT),
+  	76800,  B38400 | (2 << XC_BAUDSHIFT),
+--- 1164,1176 ----
+  	9600,   B9600,
+  	19200,  B19200,
+  	38400,  B38400,
+! #ifdef __CYGWIN__
+! 	57600,  B57600, 
+! 	115200, B115200,
+! 	128000, B128000,
+! 	230400, B230400,
+! 	256000, B256000,
+! #elif	defined(DIGI_EXT_BAUDS)
+  	/* note: baud extensions all in 2nd nibble */
+  	57600,  B38400 | (1 << XC_BAUDSHIFT),
+  	76800,  B38400 | (2 << XC_BAUDSHIFT),

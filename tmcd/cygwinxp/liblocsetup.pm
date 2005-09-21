@@ -252,7 +252,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 	# "@PCI\VEN_8086&DEV_1010&SUBSYS_10128086&REV_01\5&2FA58B96&0&210030".
 	if (! open(DEVMAP, $XIMAP)) {
 	    warning("Cannot open $XIMAP $!\n");
-	    {
+	}
 	else {
 	    while (my $dev_line = <DEVMAP>) {
 		chomp($dev_line);
@@ -262,7 +262,6 @@ sub os_ifconfig_line($$$$$$$;$$)
 	    close(DEVMAP);
 	}
     }
-    print "dev_map '$dev_map'\n";
 
     if ($inet ne "") {
 	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);

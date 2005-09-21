@@ -24,6 +24,19 @@ chmod -f g-w /etc/emulab
 # Make sure there isn't a dangling slothd lock file.
 rm -f /var/run/slothd.pid
 
+# Get the desired node name from tmcc, and make sure we have a connection.
+# There is a swap-in race condition where tmcc nodeid at first returns nothing.
+nodeid=
+while [ -z $nodeid ]; do
+    nodeid=`tmcc nodeid`
+    if [ -z $nodeid ]; then
+        msg="`date`: Null nodeid returned from tmcc.  Trying again."
+        echo "$msg" >> $logfile
+        echo "$msg"
+        sleep 5
+    fi
+done
+
 # NetBT (Netbios over TCP) chatters, messes up slothd, and is not needed for
 # SMB, so disable it.  This doesn't take effect until TCP/IP is restarted, so
 # do it before the computer name change below, which reboots the first time.
@@ -36,18 +49,18 @@ for ifc in `regtool list $nbtif`; do
      regtool set -i $nbtif/$ifc/DisableDynamicUpdate 1
 done
 
-# Make sure the computer name is right.  Reboots to change it if necessary.
-# There is a swap-in race condition where tmcc nodeid returns nothing.
-nodeid=
-while [ -z $nodeid ]; do
-    nodeid=`tmcc nodeid`
-    if [ -z $nodeid ]; then
-        msg="`date`: Null nodeid returned from tmcc.  Trying again."
-        echo "$msg" >> $logfile
-        echo "$msg"
-        sleep 5
-    fi
-done
+# Turn on IP forwarding if there is more than one experimental net interface.
+# Also requires a reboot to take effect.
+tp=$svcs/Tcpip/Parameters
+if [ `tmcc ifconfig | wc -l` \> 1 ]; then
+    regtool set -i $tp/IPEnableRouter 1
+else
+    regtool set -i $tp/IPEnableRouter 0
+fi
+msg="IPEnableRouter set to `regtool get $tp/IPEnableRouter`"
+echo "$msg" >> $logfile
+echo "$msg"
+
 hostname=`/bin/hostname`
 datehost="`date`: Host name '$hostname'"
 if [ $nodeid = $hostname ]; then
@@ -55,7 +68,7 @@ if [ $nodeid = $hostname ]; then
     echo "$msg" >> $logfile
     echo "$msg"
 else
-    msg="$datehost differs from nodeid '$nodeid'." >> $logfile
+    msg="$datehost differs from nodeid '$nodeid'."
     echo "$msg" >> $logfile
     echo "$msg"
 
@@ -117,7 +130,7 @@ ipconfig /all | tr -d '\r' | awk \
 # Set the primary domain, so the Windows resolver won't be confused when there are
 # multiple interfaces.
 domain=`tmcc bossinfo | sed -n 's/[^.]*\.\([^ ]*\) .*/\1/p'`
-regtool set -s /HKLM/SYSTEM/CurrentControlSet/Services/Tcpip/Parameters/Domain $domain
+regtool set -s $tp/Domain $domain
 
 # Make sure all NIC's are up at the start, so they show up on ifconfig.
 devcon enable =net 'PCI*'
