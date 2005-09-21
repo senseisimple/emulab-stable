@@ -119,6 +119,47 @@ if ($query_result->numrows) {
 }
 
 #
+# Look for experiments stuck in transition
+#
+if (! ($query_result = 
+       DBQueryWarn("select e.pid,e.eid,e.expt_head_uid,expt_locked, ".
+		   "       count(r.node_id) as ncount, ".
+		   "      UNIX_TIMESTAMP(now()) - UNIX_TIMESTAMP(expt_locked)".
+		   "         as locksec ".
+		   "  from experiments as e ".
+		   "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
+		   "left join nodes as n on n.node_id=r.node_id ".
+		   "left join node_types as nt on nt.type=n.type ".
+		   "where e.expt_locked is not NULL and ".
+		   "      e.expt_locked < date_sub(now(), interval 1 day) ".
+#		   "      and nt.isvirtnode=0 and nt.isremotenode=0 ".
+		   "group by e.pid,e.eid ".
+		   "order by expt_locked desc"))) {
+    fatal("Error accessing the database.");
+}
+
+if ($query_result->numrows) {
+    print "\n";
+    print "----------------------------------------------------------------\n";
+    print "\n";
+    print "Experiments stuck in transition for more than 1 day\n";
+    printf("%-12s %-8s %-12s %-12s %-22s %s\n",
+           "PID", "Hours", "EID", "Creator", "Started", "PCs");
+    print "------------ -------- ------------ ------------ ".
+	  "---------------------- ----\n";
+    
+    while (my ($pid,$eid,$creator,$locked,$count,$seconds) =
+	   $query_result->fetchrow()) {
+	next
+	    if ($count == 0);
+	my $hours = int($seconds / (60 * 60));
+
+	printf("%-12s %-8s %-12s %-12s %-22s %s\n",
+	       $pid, $hours, $eid, $creator, $locked, $count);
+    }
+}
+
+#
 # Once a week (Sunday) look for anyone that has used the wireless nodes.
 #
 my $today = POSIX::strftime("%u", localtime());
