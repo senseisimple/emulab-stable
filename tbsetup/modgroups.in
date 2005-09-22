@@ -40,6 +40,7 @@ my $BOSSNODE       = "@BOSSNODE@";
 my $WIKISUPPORT    = @WIKISUPPORT@;
 my $BUGDBSUPPORT   = @BUGDBSUPPORT@;
 my $CHATSUPPORT    = @CHATSUPPORT@;
+my $ELABINELAB	   = @ELABINELAB@;
 my $MODBUDDIES     = "$TB/sbin/modjabberbuddies";
 my $SETGROUPS	   = "$TB/sbin/setgroups";
 my $SSH		   = "$TB/bin/sshtb";
@@ -191,7 +192,7 @@ foreach my $token (@addlist) {
 
 	fatal("Group membership table problem; ".
 	      "$user,$pid,$gid,$trust,$curtrust\n")
-	    if ($curtrust ne "none");
+	    if ($curtrust ne "none" && !$ELABINELAB);
 
 	DBQueryFatal("update group_membership set ".
 		     "     trust='$trust', ".
