@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -150,10 +150,10 @@ if (! $fp) {
     USERERROR("Reboot failed!", 1);
 }
 
-TBMAIL($TBMAIL_AUDIT,
-       $subject, $message,
-       "From: $uid_name <$uid_email>\n".
-       "Errors-To: $TBMAIL_WWW");
+#TBMAIL($TBMAIL_AUDIT,
+#       $subject, $message,
+#       "From: $uid_name <$uid_email>\n".
+#       "Errors-To: $TBMAIL_WWW");
 
 header("Content-Type: text/plain");
 header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
