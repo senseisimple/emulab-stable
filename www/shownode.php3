@@ -110,7 +110,7 @@ if (TBHasSerialConsole($node_id)) {
 	"nodetipacl.php3?node_id=$node_id");
 
     WRITESUBMENUBUTTON("Show Console Log",
-		       "showconlog.php3?node_id=$node_id");
+		       "showconlog.php3?node_id=$node_id&linecount=500");
 }
 
 #
