@@ -468,6 +468,33 @@ my $useprepass;
 my $delaycap_override;
 my $elabinelab = 0;
 
+#
+# Determine if a given link/lan uses linkdelays
+#
+sub virtlan_use_linkdelay($$) {
+    my ($virtlan,$shaped) = @_;
+    #
+    # Here are the conditions for using linkdelays on each link/lan
+    # Note: $forcelinkdelays and $uselinkdelays are global
+    #
+    if ( # linkdelays can be globally forced
+         $forcelinkdelays ||
+         # We use linkdelays on emulated virtlans
+         virtlanemulated($virtlan) ||
+         # The user requested linkdelays, and this is a virtlan that gets
+         # shaped (note - in this case, non-shaped virtlans don't get
+         # linkdelays)
+         ($uselinkdelays && $shaped) ||
+         # The user forced linkdelays for this specific virtlan
+         virtlanlinkdelay($virtlan)) {
+        # Yep, use linkdelays
+        return 1;
+    } else {
+        # No - either won't be delayed at all, or we'll use a delay node
+        return 0;
+    }
+}
+
 # For admission control. Not well defined yet.
 my $cpu_usage;
 my $mem_usage;
@@ -3903,10 +3930,12 @@ sub virtlantopbw($$) {
     if (defined($ebw)) {
 	$return_bw = $ebw;
     } else {
-	# If this is an emulated link, we put in only the reported bandwidth -
+	# If this is an emulated link, or one on which we are doing end node
+        # shaping we put in only the bandwidth from the virtual topology -
 	# otherwise, we put in the bandwidth of the type of physical interface
 	# it is likely to get mapped to
-	if (virtlanemulated($virtlan)) {
+        my $shaped = virtlanshaped($virtlan,$member);
+	if (virtlanemulated($virtlan) || virtlan_use_linkdelay($virtlan,$shaped)) {
 	    $return_bw = $bw;
 	} else {
 	    $return_bw = &getbandwidth($node, $virtlan, $bw);
@@ -4044,6 +4073,7 @@ sub CreateTopFile()
     open(TOPFILE,"> $topfile") or
 	fatal("Could not open $topfile: $!");
 
+    print "opened topfile\n";
     # Print out vtypes
     foreach my $vtype (keys(%virt_vtypes)) {
 	my $name   = virttypename($vtype);
@@ -4144,7 +4174,7 @@ sub CreateTopFile()
 	my $nonbsdnodes = 0;
 	my $trivial_ok = 0;
 	my $emulated = virtlanemulated($lan);
-	my $uselinkdelay = virtlanlinkdelay($lan);
+        my $uselinkdelay = virtlanlinkdelay($lan);
 	my $mustdelay = virtlanmustdelay($lan);
 	my $nobwshaping = virtlannobwshape($lan);
 	my $protocol = virtlanprotocol($lan);
@@ -4307,16 +4337,6 @@ sub CreateTopFile()
 	    my ($rtraced,$rtrace_endnode) = virtlantraceinfo($lan, $nodeport1);
 
 	    #
-	    # Get the bandwidth we're supposed to put into the top file, which
-	    # may be different that what we're limiting the link to
-	    #
-	    my ($top_bw0, $top_rbw0) = virtlantopbw($lan,$nodeport0);
-	    my ($top_bw1, $top_rbw1) = virtlantopbw($lan,$nodeport1);
-
-	    $top_bw  = &min($top_bw0,$top_rbw1);
-	    $top_rbw = &min($top_rbw0, $top_bw1);
-
-	    #
 	    # See if the link is really being shaped, or if the we just
 	    # need a delay node cause of tracing/monitoring.
 	    #
@@ -4341,6 +4361,16 @@ sub CreateTopFile()
 		virtlansetshaped($lan, $nodeport1);
 	    }
 
+	    #
+	    # Get the bandwidth we're supposed to put into the top file, which
+	    # may be different that what we're limiting the link to
+	    #
+	    my ($top_bw0, $top_rbw0) = virtlantopbw($lan,$nodeport0);
+	    my ($top_bw1, $top_rbw1) = virtlantopbw($lan,$nodeport1);
+
+	    $top_bw  = &min($top_bw0,$top_rbw1);
+	    $top_rbw = &min($top_rbw0, $top_bw1);
+
 	    if (($shaped ||
 		 (($traced || $rtraced) &&
 		  !($trace_endnode && $rtrace_endnode))) &&
@@ -4357,8 +4387,7 @@ sub CreateTopFile()
 		# flag was set (which means to put in a link delay regardless
 		# of whether the link is shaped).
 		#
-		if ($emulated || $forcelinkdelays ||
-		    ($uselinkdelays && $shaped) || $uselinkdelay) {
+		if (virtlan_use_linkdelay($lan,$shaped)) {
 		    my $plink = "linksimple/$lan/$nodeport0,$nodeport1";
 
 		    print(TOPFILE "link $plink $node0 $node1 ".
@@ -4452,11 +4481,6 @@ sub CreateTopFile()
 		 $rdelay,$rbw,$rebw,$rloss) = virtlandelayinfo($lan, $member);
 		($node) = (split(":",$member))[0];
 
-		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
-
-		$bandwidth = &getbandwidth($node,$lan,$bw);
-		$rbandwidth = &getbandwidth($node,$lan,$rbw);
-
 		# Need to know about tracing on a per queue basis, since the
 		# user can specify tracing asymmetrically.
 		my ($traced,$trace_endnode)  = virtlantraceinfo($lan, $member);
@@ -4484,6 +4508,12 @@ sub CreateTopFile()
 		    virtlansetshaped($lan, $member);
 		}
 
+		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
+
+		$bandwidth = &getbandwidth($node,$lan,$bw);
+		$rbandwidth = &getbandwidth($node,$lan,$rbw);
+
+
 		if (($shaped || ($traced && !$trace_endnode)) &&
 		    # if we have 1 real node in the LAN, we may need to create
 		    # a lan
@@ -4496,8 +4526,7 @@ sub CreateTopFile()
 		    # (which means to put in a link delay regardless
 		    # of whether the link is shaped).
 		    #
-		    if ($emulated || $forcelinkdelays ||
-			($uselinkdelays && $shaped) || $uselinkdelay) {
+		    if (virtlan_use_linkdelay($lan,$shaped)) {
 			my $plink = "linklan/$lan/$member";
 			
 			#
