@@ -2865,7 +2865,7 @@ function SHOWEXPTSTATS($pid, $eid) {
 #                      $HTTP_COOKIE_VARS[$TBAUTHCOOKIE],
 #                      "ledpipe.php3?node=em1");
 #
-function SHOWBLINKENLICHTEN($uid, $auth, $pipeurl, $width = 30, $height = 10) {
+function SHOWBLINKENLICHTEN($uid, $auth, $pipeurl, $width = 40, $height = 10) {
 	echo "
           <applet code='BlinkenLichten.class' width='$width' height='$height'>
             <param name='pipeurl' value='$pipeurl'>
