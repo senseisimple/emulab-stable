@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -27,6 +27,34 @@ public class BlinkenLichten
 	implements Runnable
 {
     /**
+     * Color sequence that simulates a "throbbing" blue light.  The subclass
+     * is expected to update the activity light with a new color whenever it
+     * makes progress doing some task.
+     */
+    protected static final Color ACTIVITY_SEQUENCE[] = new Color[17];
+
+    static {
+	int lpc = 0;
+
+	/* Create a gradient that transitions from a blue to a cyan and then */
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x3080ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x3088ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x3090ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x3098ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x30a0ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x30a8ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x30b0ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x30b8ff);
+	ACTIVITY_SEQUENCE[lpc++] = new Color(0x30c0ff);
+	/* ... back again. */
+	for( ; lpc < ACTIVITY_SEQUENCE.length; lpc++ )
+	{
+	    ACTIVITY_SEQUENCE[lpc] =
+		ACTIVITY_SEQUENCE[ACTIVITY_SEQUENCE.length - lpc];
+	}
+    }
+
+    /**
      * The connection to boss that will provide LED status values.
      */
     private InputStream is;
@@ -37,6 +65,9 @@ public class BlinkenLichten
     private boolean red_on;
     private boolean green_on;
     private boolean yellow_on;
+    private boolean lost;
+    private int update_index;
+    private int refresh;
     
     public BlinkenLichten()
     {
@@ -72,6 +103,28 @@ public class BlinkenLichten
 	    this.is = uc.getInputStream();
 	    
 	    new Thread(this).start();
+
+	    new Thread() {
+		public void run() {
+		    while (is != null) {
+			synchronized(BlinkenLichten.this) {
+			    if (refresh > 0) {
+				update_index = (update_index + 1) %
+				    ACTIVITY_SEQUENCE.length;
+				refresh -= 1;
+			    }
+			    else {
+				lost = true;
+			    }
+
+			    BlinkenLichten.this.repaint();
+			}
+
+			try { Thread.sleep(100); }
+			catch (InterruptedException e) {}
+		    }
+		}
+	    }.start();
 	}
 	catch(Throwable th)
 	{
@@ -94,7 +147,10 @@ public class BlinkenLichten
 		this.red_on = (buffer[0] == '1');
 		this.green_on = (buffer[2] == '1');
 		this.yellow_on = (buffer[4] == '1');
-		
+		synchronized(this) {
+		    this.refresh = 30;
+		}
+
 		repaint();
 	    }
 	}
@@ -104,6 +160,9 @@ public class BlinkenLichten
 	}
 	
 	this.is = null;
+
+	this.lost = true;
+	repaint();
     }
     
     public void update(Graphics g)
@@ -114,7 +173,7 @@ public class BlinkenLichten
     public void paint(Graphics g)
     {
 	Dimension size = getSize();
-	int width = size.width / 3;
+	int width = size.width / 4;
 	int height = size.height;
 
 	/*
@@ -136,7 +195,15 @@ public class BlinkenLichten
 	    g.setColor(Color.yellow);
 	else
 	    g.setColor(Color.yellow.darker().darker());
-	g.fillRect(width *2, 0, width, height);
+	g.fillRect(width * 2, 0, width, height);
+	
+	g.setColor(ACTIVITY_SEQUENCE[this.update_index]);
+	g.fillRect(width * 3 + 2, 2, width - 4, height - 4);
+
+	if (lost) {
+	    g.setColor(Color.black);
+	    g.fillRect(3, height / 2 - 1, size.width - 6, 2);
+	}
     }
     
     public void destroy()

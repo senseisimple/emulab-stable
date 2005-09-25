@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -231,6 +231,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < MAX_CLIENTS; i++) { clientfds[i] = -1; }
     bool newclient = false;
     int current_clients = 0;
+    int since_last_update = 0;
     while(1) {
 	// If we have a socket, try to accept connections
 	if ((mode & MODE_SOCKET) && sockfd) {
@@ -287,7 +288,9 @@ int main(int argc, char **argv) {
 	    }
 	}
 
-	if ((old_status != current_status) || newclient) {
+	if ((old_status != current_status) || 
+	    newclient || 
+	    (since_last_update > (naptime * 150))) {
 	    // If we have a socket, print on that
 	    if ((mode & MODE_SOCKET) && (current_clients > 0)) {
 		char outbuf[1024];
@@ -309,6 +312,10 @@ int main(int argc, char **argv) {
 		}
 	    }
 	    newclient = false;
+	    since_last_update = 0;
+	}
+	else {
+	    since_last_update += naptime;
 	}
 	old_status = current_status;
 
