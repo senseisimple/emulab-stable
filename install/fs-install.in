@@ -30,6 +30,7 @@ my $FSNODE_IP   = '@FSNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
+my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 
 # For /share export below.
 my $CONTROL_NETWORK = "@CONTROL_NETWORK@";
@@ -105,12 +106,14 @@ my $CP         = "/bin/cp";
 my $MV         = "/bin/mv";
 my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
+my $QUOTAON    = "/usr/sbin/quotaon";
 
 #
 # Some files we edit/create
 #
 my $RCCONF          = "/etc/rc.conf";
 my $HOSTS           = "/etc/hosts";
+my $FSTAB           = "/etc/fstab";
 my $RCLOCAL         = "/etc/rc.local";
 my $RCCAPTURE       = "$PREFIX/etc/rc.capture";
 my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
@@ -121,7 +124,7 @@ my $SYSLOG_CONF     = "/etc/syslog.conf";
 my $NEWSYSLOG_CONF  = "/etc/newsyslog.conf";
 my $SUDOERS         = "/usr/local/etc/sudoers";
 my $SSHD_CONFIG     = "/etc/ssh/sshd_config";
-my $CRONTAB         = "/etc/crontab";
+my $INETD_CONF      = "/etc/inetd.conf";
 my $AUTHKEYS	    = "/root/.ssh/authorized_keys";
 my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
 my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
@@ -358,15 +361,57 @@ Phase "exports", "Setting up exports", sub {
     };
 };
 
-Phase "cron", "Adding cron jobs", sub {
-    Phase "crontab", "Editing $CRONTAB", sub {
-	DoneIfEdited($CRONTAB);
-	AppendToFileFatal($CRONTAB,
-	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamail");
+Phase "quotas", "Setting up quotas", sub {
+    if ($QUOTA_FSLIST eq "") {
+	PhaseSkip("No filesystems with quotas");
+    }
+    Phase "fstab", "enabling quotas in $FSTAB", sub {
+	my @fs = split(' ', $QUOTA_FSLIST);
+	open(FT,"<$FSTAB") or
+	    PhaseFail("Unable to open $FSTAB : $!");
+	my @ft = <FT>;
+	close(FT);
+	my $changed = 0;
+	foreach my $fs (@fs) {
+	    my $found = 0;
+	    Phase $fs, $fs, sub {
+		foreach my $line (@ft) {
+		    if ($line =~ m((/dev/\S+\s+$fs\s+ufs\s+rw))) {
+			my $str = $1;
+			$found = 1;
+			PhaseSkip("already enabled")
+			    if ($line =~ /userquota/);
+			$line =~ s/$str/$str,userquota/;
+			$changed++;
+			last;
+		    }
+		}
+	    };
+	    print STDERR 
+		"WARNING: filesystem $fs not found, quotas not enabled\n"
+		    if (!$found);
+	}
+	open(FT,">$FSTAB.new") or
+	    PhaseFail("Unable to open $FSTAB.new : $!");
+	print FT @ft;
+	close(FT);
+	chmod(0644, "$FSTAB.new") or
+	    PhaseFail("Could not set permission of new fstab");
+	rename($FSTAB, "$FSTAB.orig") or
+	    PhaseFail("Could not save original fstab");
+	if (!rename("$FSTAB.new", $FSTAB)) {
+	    rename("$FSTAB.orig", $FSTAB);
+	    PhaseFail("Could not install new fstab, old version restored");
+	}
     };
-    Phase "cronhup", "HUPing cron", sub {
-	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
-	HUPDaemon("cron");
+    Phase "quotaon", "Turning quotas on", sub {
+	ExecQuietFatal("$QUOTAON -a");
+    };
+    Phase "rquotad", "Enabling rquotad", sub {
+	PhaseSkip("no inetd.conf!?") unless (-e $INETD_CONF);
+	PhaseSkip("already enabled") unless `grep '^#rquotad' $INETD_CONF`;
+	ExecQuietFatal("sed -i .orig -e '/^#rquotad/s/^#//' $INETD_CONF");
+	HUPDaemon("inetd");
     };
 };
 

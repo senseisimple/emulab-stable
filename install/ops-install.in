@@ -36,6 +36,7 @@ my $FSNODE_IP   = '@FSNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
+my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
@@ -603,10 +604,10 @@ Phase "syslog", "Setting up syslog", sub {
 };
 
 Phase "cron", "Adding cron jobs", sub {
-    if (!$ISFS) {
-	PhaseSkip("Not FS node");
-    }
     Phase "crontab", "Editing $CRONTAB", sub {
+	if ($QUOTA_FSLIST eq "") {
+	    PhaseSkip("No filesystem quotas");
+	}
 	DoneIfEdited($CRONTAB);
 	AppendToFileFatal($CRONTAB,
 	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamail");

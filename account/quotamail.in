@@ -11,10 +11,9 @@
 # Some sites may wish to change the CC to a different list, or 
 # possibly even remove it all together.
 #
-# One possible caveat regarding quotas: If FS_NODE != USERNODE, they don't  
-# have a login on the fs machine. So checking their quota won't work unless
-# the rpc.rquotad(8) daemon is running on FS_NODE, which we currently don't
-# do.
+# Note that if FS_NODE != USERNODE, having a user check their quota won't
+# work unless the rpc.rquotad(8) daemon is running on FS_NODE.  Our fs node
+# installation script/directions should take care of this now.
 #
 
 for i in `/usr/sbin/repquota -v @FS_WITH_QUOTAS@ | awk '$2 ~ /+/ {print $1}'`

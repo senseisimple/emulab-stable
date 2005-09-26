@@ -92,7 +92,6 @@ endif
 
 fs-install:
 	@$(MAKE) -C tbsetup fs-install
-	@$(MAKE) -C account fs-install
 
 opsfs-install: ops-install fs-install
 	@echo "Combined ops/fs install done."

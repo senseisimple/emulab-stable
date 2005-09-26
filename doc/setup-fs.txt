@@ -205,20 +205,23 @@ initialized from a "prototypical" user.  Note that you can change individual
 user quotas later by running edquota(8) on the 'fs' node.  To establish
 the default quota values, you will need a "prototype user" to which to
 apply the quotas.  You will probably want to add a special user, say
-'elabman', for this purpose.  The uid and gid for this user should be
-the MIN_UNIX_UID and MIN_UNIX_GID values specified in your defs file
-(10000 and 6000 by default).  Assuming those default values, you would do:
+'elabman', for this purpose.  The uid for this user should be the MIN_UNIX_UID
+value specified in your defs file (10000 by default).  The gid doesn't matter,
+but needs to be a value that already exists in the /etc/group file.  The
+prefered strategy is to first add the "tbadmin" group to /etc/group with
+gid 101, since this Emulab-specific group is used on the ops node as well.
+Assuming you have done this, you would do:
 
-  pw useradd elabman -u 10000 -g 6000 -m -d /users/elabman -h - -s /bin/nologin
+  pw useradd elabman -u 10000 -g tbadmin -m -d /users/elabman -h - -s /bin/nologin
 
 Now set the quota for that user on each quota-enabled filesystem, e.g.:
 
-edquota -e /proj:2000000:2000000 -e /users:1000000:1000000 elabman
+  edquota -e /proj:2000000:2000000 -e /users:1000000:1000000 elabman
 
 would set a 1GB quota on /proj and 512MB on /users for the prototype user.
 Once the prototype user quotas are established, you can do:
 
-edquota -p elabman 10000-15000
+  edquota -p elabman 10000-15000
 
 which would automatically apply the elabman quotas to any user created with
 uids between 10000 and 15000, assuming that you wanted to allow up to 5000
