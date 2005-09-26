@@ -48,6 +48,15 @@ $| = 1;
 # 
 use libsetup;
 
+# Capture the node name before cleaning out the config files.
+my $vname = "";
+if (open(NICK, TMNICKNAME)) {
+    $vname = <NICK>;
+    chomp $vname;
+    $vname =~ s/\..*//;
+    close(NICK);
+}
+
 #
 # First clean up the node as it would be if free.
 #
@@ -189,12 +198,6 @@ while ($dirent = readdir(ETC)) {
 closedir(ETC);
 
 print "Updating /etc/motd.\n";
-my $vname = "";
-if (open(NICK, TMNICKNAME)) {
-    $vname = <NICK>;
-    $vname =~ s/\..*//;
-    close(NICK);
-}
 if (open(MOTD, ">/etc/motd")) {
     open(UNAME, "uname -sr |");
     my $uname = <UNAME>;
@@ -216,5 +219,5 @@ system("rm -rf C:/WINDOWS/ServicePackFiles/i386");
 system("du -sm C:/WINDOWS/SoftwareDistribution/Download");
 system("rm -rf C:/WINDOWS/SoftwareDistribution/Download/*");
 
-print "Re-enable all network interfaces."
-devcon enable =net 'PCI*'
+print "Re-enable all network interfaces.";
+system ("devcon enable =net 'PCI*'");
