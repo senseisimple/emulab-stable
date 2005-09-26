@@ -151,6 +151,8 @@ if (! TBvalid_userdata($query)) {
     PAGEFOOTER();
     return;
 }
+# Strip leading and trailing whitespace to avoid confusion below.
+$query = trim($query);
 
 #
 # Look for special "*" query; just get everything and list it. 
