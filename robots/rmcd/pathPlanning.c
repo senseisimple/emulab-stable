@@ -191,8 +191,8 @@ pp_plot_code_t pp_plot_waypoint(struct path_plan *pp)
     
     do {
 	struct obstacle_node *on, *min_on = NULL;
+	int goal_in_ob = 0, robot_ob = 0;
 	float min_distance = FLT_MAX;
-	int robot_ob = 0;
 
 	/*
 	 * The path doesn't cross enough of the obstacle box for us to worry
@@ -229,6 +229,12 @@ pp_plot_code_t pp_plot_waypoint(struct path_plan *pp)
 		break;
 	    default:
 		break;
+	    }
+
+	    if (rc_compute_code(pp->pp_goal_pos.x,
+				pp->pp_goal_pos.y,
+				&on->on_expanded) == 0) {
+		goal_in_ob = 1;
 	    }
 	    
 	    lnRemove(&on->on_link);
@@ -271,9 +277,7 @@ pp_plot_code_t pp_plot_waypoint(struct path_plan *pp)
 			  &on->on_link);
 	    }
 	    
-	    if (rc_compute_code(pp->pp_goal_pos.x,
-				pp->pp_goal_pos.y,
-				&pp->pp_obstacle) == 0) {
+	    if (goal_in_ob) {
 		struct robot_position rp;
 		struct rc_line rl;
 		float r;
