@@ -134,7 +134,7 @@ usage()
 $user = $ARGV[0];
 
 # Untaint the user.
-if ($user =~ /^([\w]+)$/) {
+if ($user =~ /^([-\w]+)$/) {
     $user = $1;
 }
 else {
