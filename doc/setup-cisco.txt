@@ -168,6 +168,15 @@ interface gi0/1
 switchport mode access
 exit
 
+In order to put interfaces into an EtherChannel:
+interface range gi1/41 - 48
+channel-group 1 mode on
+exit
+
+(Notes: If you want to make more than one channel, give each set of ports
+a different channel number. And, now, you will configure the whole channel
+as 'interface port-channel 1')
+
 To set the native VLAN on a trunk:
 interface gi0/1
 switchport trunk native vlan 1
