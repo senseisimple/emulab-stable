@@ -86,18 +86,36 @@ else {
 }
 
 #
+# Some stuff to control the camera.
+#
+if (! isset($camheight) || !TBvalid_integer($camheight)) {
+    $camheight = 180;
+}
+if (! isset($camwidth) || !TBvalid_integer($camwidth)) {
+    $camwidth = 240;
+}
+if (! isset($camfps) || !TBvalid_integer($camfps)) {
+    $camfps = 2;
+}
+
+#
 # If adding in the webcams, get that stuff too.
 #
 $webcams = array();
 
 if ($withwebcams) {
-  $query_result = DBQueryFatal("select * from webcams");
+    if (isset($camera) && TBvalid_integer($camera)) {
+	$query_result = DBQueryFatal("select * from webcams ".
+				     "where id='$camera'");
+    }
+    else 
+	$query_result = DBQueryFatal("select * from webcams");
 
-  while ($row = mysql_fetch_array($query_result)) {
-      $id      = $row["id"];
-      $camurl  = "../webcamimg.php3?webcamid=${id}&applet=1&fromtracker=1";
-      $webcams[] = $camurl;
-  }
+    while ($row = mysql_fetch_array($query_result)) {
+	$id      = $row["id"];
+	$camurl  = "../webcamimg.php3?webcamid=${id}&applet=1&fromtracker=1";
+	$webcams[] = $camurl;
+    }
 }
 
 #
@@ -184,6 +202,10 @@ echo "<applet name='tracker' code='RoboTrack.class'
             <param name='building' value='$building'>
             <param name='floor' value='$floor'>";
 if (count($webcams)) {
+    echo "<param name='WebCamHeight' value=$camheight>
+          <param name='WebCamWidth' value=$camwidth>
+          <param name='WebCamFPS' value=$camfps>\n";
+    
     $camcount = count($webcams);
     $x = 400;
     $y = 460;
@@ -196,11 +218,11 @@ if (count($webcams)) {
 	echo "<param name='WebCam${i}' value='$camurl'>
               <param name='WebCam${i}XY' value='$x,$y'>";
 
-	$x += 260;
+	$x += ($camwidth + 20);
 
 	if ($x > 700) {
 	    $x = 400;
-	    $y = $y + 200;
+	    $y = $y + ($camheight + 20);
 	}
     }
 }

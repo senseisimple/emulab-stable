@@ -52,13 +52,25 @@ if (!$query_result || !mysql_num_rows($query_result)) {
 $row = mysql_fetch_array($query_result);
 $URL = (isset($applet) ? $row["URL"] : $row["stillimage_URL"]);
 if (isset($fromtracker)) {
-    $URL .= "&resolution=240x180";
+    #
+    # Some stuff to control the camera.
+    #
+    if (! isset($camheight) || !TBvalid_integer($camheight)) {
+	$camheight = 180;
+    }
+    if (! isset($camwidth) || !TBvalid_integer($camwidth)) {
+	$camwidth = 240;
+    }
+    if (! isset($camfps) || !TBvalid_integer($camfps)) {
+	$camfps = 2;
+    }
+    $URL .= "&resolution=${camwidth}x${camheight}";
 
     if (preg_match("/fps=\d*/", $URL)) {
-	$URL = preg_replace("/fps=\d*/", "fps=2", $URL);
+	$URL = preg_replace("/fps=\d*/", "fps=${camfps}", $URL);
     }
     else {
-	$URL .= "&fps=2";
+	$URL .= "&fps=${camfps}";
     }
 }
 

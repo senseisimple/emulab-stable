@@ -78,6 +78,13 @@ public class RoboTrack extends JApplet {
 	    if (this.getParameter("WebCamCount") != null) {
 		int count =
 		    Integer.parseInt(this.getParameter("WebCamCount").trim());
+		int height =
+		    Integer.parseInt(this.getParameter("WebCamHeight").trim());
+		int width =
+		    Integer.parseInt(this.getParameter("WebCamWidth").trim());
+		int fps =
+		    Integer.parseInt(this.getParameter("WebCamFPS").trim());
+		    
 		WebCamWorkers = new WebCam[count];
 		System.out.println("There are " + count + " webcams");
 		
@@ -92,6 +99,9 @@ public class RoboTrack extends JApplet {
 
 		    camurl = new URL(urlServer,
 				     this.getParameter(camname)
+				     + "&camheight=" + height
+				     + "&camwidth="  + width
+				     + "&camfps="    + fps
 				     + "&nocookieuid="
 				     + URLEncoder.encode(uid)
 				     + "&nocookieauth="
@@ -104,7 +114,7 @@ public class RoboTrack extends JApplet {
 		    y = Integer.parseInt(tokens.nextToken().trim());
 
 		    WebCamWorkers[WebCamCount] =
-			new WebCam(WebCamCount, camurl, x, y);
+			new WebCam(WebCamCount, camurl, width, height, x, y);
 		    WebCamCount++;
 		}
 	    }
@@ -2169,13 +2179,14 @@ public class RoboTrack extends JApplet {
 	private InputStream	is = null;
 	public  int		X, Y, W, H;
 	
-        public WebCam(int id, URL webcamurl, int x, int y) {
+        public WebCam(int id, URL webcamurl,
+		      int width, int height, int x, int y) {
 	    myid  = id;
 	    myurl = webcamurl;
 	    X     = x;
 	    Y     = y;
-	    W     = 240;
-	    H     = 180;
+	    W     = width;
+	    H     = height;
 
 	    System.out.println("Creating a WebCam class: " +
 			       id + "," + X + "," + Y);
