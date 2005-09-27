@@ -53,6 +53,19 @@ if (!$query_result || !mysql_num_rows($query_result)) {
     MyError("There are no webcams to view!");
 }
 
+$extra_url = "&fromtracker=1";
+if (!isset($camwidth) || !TBvalid_integer($camwidth)) {
+    $camwidth = "640";
+}
+$extra_url .= "&camwidth=$camwidth";
+if (!isset($camheight) || !TBvalid_integer($camheight)) {
+    $camheight = "480";
+}
+$extra_url .= "&camheight=$camheight";
+if (isset($camfps) && TBvalid_integer($camfps)) {
+    $extra_url .= "&camfps=$camfps";
+}
+
 if (isset($refreshrate)) {
     echo "<center>
           <a href=webcam.php3>Stop Auto-refresh.</a>
@@ -72,12 +85,14 @@ if (isset($applet)) {
     while ($row = mysql_fetch_array($query_result)) {
 	$id  = $row["id"];
 	$url = "webcamimg.php3?webcamid=${id}&nocookieuid=${uid}".
-	    "&nocookieauth=${auth}&applet=1";
+	    "&nocookieauth=${auth}&applet=1" . $extra_url;
 
-	echo "<applet archive=WebCamApplet.jar
-	              code=WebCamApplet.class height=480 width=640>
-                      <param name=URL value=$url>
-              </applet><br<br>\n";
+	if (!isset($camera) || $camera == $id) {
+	    echo "<applet archive=WebCamApplet.jar
+	                  code=WebCamApplet.class height=$camheight width=$camwidth>
+                          <param name=URL value=$url>
+                  </applet><br<br>\n";
+	}
     }
 }
 else {
@@ -87,11 +102,13 @@ else {
     while ($row = mysql_fetch_array($query_result)) {
 	$id      = $row["id"];
 
-	echo "<tr><td align=center>Web Cam $id</td></tr>
-              <tr><td align=center class='stealth'>
-                     <img src='webcamimg.php3?webcamid=$id'
-                          align=center></td></tr>
-              <tr><tr>\n";
+	if (!isset($camera) || $camera == $id) {
+	    echo "<tr><td align=center>Web Cam $id</td></tr>
+        	  <tr><td align=center class='stealth'>
+                	<img src='webcamimg.php3?webcamid=${id}${extra_url}'
+                        	align=center></td></tr>
+	          <tr><tr>\n";
+	}
     }
     echo "</table>\n";
 }
