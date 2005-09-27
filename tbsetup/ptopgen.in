@@ -8,6 +8,7 @@
 
 use English;
 use Getopt::Std;
+use Math::BigInt;
 
 sub usage()
 {
@@ -757,7 +758,7 @@ while (($node1,$card1,$port1,$node2,$card2,$port2) =
 	    if (defined($interconnects{"$node1:$node2"})) {
 		$interconnects{"$node1:$node2"} += $bw;
 	    } else {
-		$interconnects{"$node1:$node2"} = $bw;
+		$interconnects{"$node1:$node2"} = new Math::BigInt $bw;
 	    }
 	} else {
 	    # !!! - Here we use our knowledge that in the wires table links
@@ -819,8 +820,11 @@ if ($TRACK_INTERSWITCH_BANDWIDTH) {
 
 foreach $interconnect (keys(%interconnects)) {
     ($src,$dst) = split(":",$interconnect);
-    print "link link-$interconnect $src $dst $interconnects{$interconnect} " .
-	"0 0 1 ethernet\n";
+    my $speed = $interconnects{$interconnect};
+    # This is really dumb - BigInts like to print out with a leading '+',
+    # which we don't want. Stript it off.
+    $speed =~ s/^\+|-//;
+    print "link link-$interconnect $src $dst $speed 0 0 1 ethernet\n";
 }
 
 #
