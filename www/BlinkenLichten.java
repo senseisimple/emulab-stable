@@ -112,6 +112,7 @@ public class BlinkenLichten
 				update_index = (update_index + 1) %
 				    ACTIVITY_SEQUENCE.length;
 				refresh -= 1;
+				lost = false;
 			    }
 			    else {
 				lost = true;
