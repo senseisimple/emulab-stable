@@ -353,7 +353,7 @@ public class RoboTrack extends JApplet {
      * A container for obstacle information. 
      */
     private class Obstacle {
-	int	id;			// DB identifier; not actually used.
+	String	id;			// DB identifier; not actually used.
         int	x1, y1;			// Upper left x,y coords in pixels.
         int	x2, y2;			// Lower right x,y coords in pixels.
 	String  description;
@@ -595,10 +595,8 @@ public class RoboTrack extends JApplet {
 	    Obstacle	oby;
 	    int		index;
 	    String	action = "";
-	    int		x1 = 0, y1 = 0, x2 = 0, y2 = 0, id;
+	    int		x1 = 0, y1 = 0, x2 = 0, y2 = 0;
 	    String      robotag = null;
-
-	    id = Integer.parseInt(obid);
 
 	    // We either know about it, or we do not ...
 	    oby = (Obstacle) ObDynMap.get(obid);
@@ -641,7 +639,7 @@ public class RoboTrack extends JApplet {
 		// Must delay insert until the new Obstacle is initialized
 		oby = new Obstacle();
 
-		oby.id = id;
+		oby.id = obid;
 		oby.x1 = x1;
 		oby.y1 = y1;
 		oby.x2 = x2;
@@ -657,12 +655,12 @@ public class RoboTrack extends JApplet {
 					(y2 + OBSTACLE_BUFFER) -
 						(y1 - OBSTACLE_BUFFER));
 
-		System.out.println("Creating Obstacle: " + id);
+		System.out.println("Creating Obstacle: " + obid);
 		ObDynMap.put(obid, oby);
 	    }
 	    else if (action.equals("CLEAR")) {
 		if (oby != null) {
-		    System.out.println("Clearing Obstacle: " + id);
+		    System.out.println("Clearing Obstacle: " + obid);
 		    
 		    ObDynMap.remove(obid);
 		}
@@ -685,7 +683,7 @@ public class RoboTrack extends JApplet {
 					(y2 + OBSTACLE_BUFFER) -
 						(y1 - OBSTACLE_BUFFER));
 
-		System.out.println("Modifying Obstacle: " + id);
+		System.out.println("Modifying Obstacle: " + obid);
 	    }
 	}
 
@@ -1978,7 +1976,7 @@ public class RoboTrack extends JApplet {
 		/*
 		 * Convert from meters to pixels ...
 		 */
-		obstacle.id = Integer.parseInt(tokens.nextToken().trim());
+		obstacle.id = tokens.nextToken().trim();
 		obstacle.x1 = (int)
 		    (Double.parseDouble(tokens.nextToken().trim())
 		     * pixels_per_meter);
