@@ -870,6 +870,13 @@ foreach my $vnode (@vnodelist) {
 }
 
 #
+# Reset the failure lists. See above.
+#
+@informuser = ();
+@informtbopswarn = ();
+@informtbopsfatal = ();
+
+#
 # XXX - Don't bother if something above failed. A waste of time and
 # usually leads to cascading errors.
 #
@@ -982,21 +989,7 @@ elsif (@vnodelist) {
 
 	if ($canfail{$node}) {
 	    # Send mail to testbed-ops and to the user about it.
-	    my ($user) = getpwuid($UID);
-
-	    SENDMAIL($user_email_to, "Virtual Node $node is down",
-		 "Node $node in pid/eid $pid/$eid appears to be dead.\n\n".
-		 "Your experiment will continue to run since this failure\n".
-		 "is nonfatal, although you might encounter other problems\n".
-		 "if your experiment depends explicitly on this node.\n".
-		 "You should terminate this experiment if it cannot ".
-		 "tolerate this failure.\n\n".
-		 "Testbed Operations has also been notified.\n\n".
-		 "Thanks\n".
-		 "Testbed Operations\n",
-		 0,
-		 "Cc: $TBOPS");
-
+	    push(@informuser, $node);
 	    print "*** Continuing with experiment setup anyway ...\n";
 	    next;
 	}
@@ -1031,6 +1024,27 @@ elsif (@vnodelist) {
 	    }
 	}
     }
+}
+
+#
+# Spam time!  Send mail to the user and testbed-ops about failures.
+#
+$count = scalar(@informuser);
+if ($count > 0) {
+    SENDMAIL($user_email_to, "$count virtual nodes are down",
+	     "Virtual Nodes:\n".
+	     "  " . join(" ", @informuser) . "\n".
+	     "in pid/eid $pid/$eid appear to be dead.\n\n".
+	     "Your experiment will continue to run since these failures\n".
+	     "are nonfatal, although you might encounter other problems\n".
+	     "if your experiment depends explicitly on these nodes.\n".
+	     "You should terminate this experiment if it cannot ".
+	     "tolerate these failures.\n\n".
+	     "Testbed Operations has also been notified.\n\n".
+	     "Thanks\n".
+	     "Testbed Operations\n",
+	     0,
+	     "Cc: $TBOPS");
 }
 
 print "OS Setup Done.\n";
