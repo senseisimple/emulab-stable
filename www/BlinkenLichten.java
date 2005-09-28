@@ -148,7 +148,7 @@ public class BlinkenLichten
 		this.green_on = (buffer[2] == '1');
 		this.yellow_on = (buffer[4] == '1');
 		synchronized(this) {
-		    this.refresh = 30;
+		    this.refresh = 35;
 		}
 
 		repaint();
