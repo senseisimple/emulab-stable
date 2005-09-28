@@ -20,7 +20,7 @@
 The new "pc3000" machines are
 <a href="http://www1.us.dell.com/content/products/productdetails.aspx/pedge_2850">
 Dell PowerEdge 2850s</a>
-with a single 3GHz processor, 2GB of RAM, and 2 146GB SCSI disks.
+with a single 3GHz processor, 2GB of RAM, and 2 10,000&nbsp;RPM 146GB SCSI disks.
 Each has 4 available Gigabit experimental net interfaces,
 however due to lack of Gb switch ports, not all are usable at Gb speeds.
 Instead, they are a mix of 100Mb and 1Gb as follows:
@@ -48,25 +48,25 @@ the "console" command or remotely via the
 <a NAME="images"></a><h2>Images and Kernel Support</h2>
 <p>
 Currently, the Emulab standard FreeBSD (FBSD410-STD, FBSD54-STD),
-Linux (RHL90-STD, FC4-STD), and Windows (WINXP-UPDATE-pc3000, WINXP-SP{0,1,2}-pc3000)
+Linux (RHL90-STD, FC4-STD, "legacy" RHL73-STD),
+and Windows (WINXP-UPDATE-pc3000, WINXP-SP{0,1,2}-pc3000)
 images will run on the new machines.
 </p><p>
 If you have built custom images based on our standard images before
 Sept 2 2005, they will likely not work on the new machines due to a lack
 of the correct disk driver.  You will either need to re-customize based
 on the current images or modify your existing image to add the correct
-SCSI driver.  For BSD you need:
+SCSI driver.  For BSD, add the following to your kernel config file:
 <code><pre>
   device          mpt
 </code></pre>
-in your kernel config file, and for Linux you need:
+For Linux, add the following to your .config:
 <code><pre>
   CONFIG_FUSION=y
   CONFIG_FUSION_BOOT=y
   CONFIG_FUSION_MAX_SGE=40
   CONFIG_FUSION_ISENSE=m
 </code></pre>
-in your .config.
 </p><p>
 For Windows you will need to re-customize based on our current -pc3000
 images.
@@ -87,7 +87,7 @@ images.
      have a significant impact on whether an experimental topology can map
      or not.
 <li> <b>No vnode characterization has been done.</b>
-     The so-call "colocation factor" has been arbitrarily set to 75 right
+     The so-called "colocation factor" has been arbitrarily set to 75 right
      now.  It will likely be clamped down considerably.
 <li> <b>There might be assorted failures due to scaling issues.</b>
      Experiments of over 150 machines, which were hard to do before,
@@ -101,8 +101,9 @@ images.
      interested in reproducing old results, you might want to
      <a href="http://www.emulab.net/kb-show.php3?idx=39">
      limit your experiments to using only pc600 and pc850 nodes</a>.
-<li> <b>Hyperthreading is available, but support is not currently compiled in.</b>
-     The stock Emulab images do not have SMP enabled.  If you want it, you
+<li> <b>Hyperthreading is available, but SMP support is
+     not currently compiled in to the stock Emulab images</b> (with the
+     exception of RHL73-STD).  If you want it, you
      will have to compile your own kernel with SMP enabled and create a disk 
      image.  Note that FreeBSD 4.x SMP kernels will panic on a uniprocessor
      machine, so a combined 4.x image that runs on all Emulab nodes is not
@@ -110,4 +111,3 @@ images.
      to support SMP in the near future as well as address the 4.x SMP issue
      for standard images.
 </ul>
-
