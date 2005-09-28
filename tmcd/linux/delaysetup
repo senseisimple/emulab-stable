@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -75,8 +75,8 @@ my $KERNELJAIL  = "jail";
 my $KERNELLDELAY= "linkdelay";
 
 my $TMDELMAP	= TMDELMAP;	# Really comes from libloc.
-my $TC          = "tc";		# May be in /usr/local/{sbin,bin}
-my $IPTABLES    = "iptables";	# May be in /usr/local/{sbin,bin}
+my $TC          = "/usr/local/sbin/tc";		# This is the working version!
+my $IPTABLES    = "/usr/local/sbin/iptables";	# This is the working version!
 
 # This should never happen!
 if (REMOTE() || MFS()) {
