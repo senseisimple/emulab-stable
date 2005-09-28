@@ -183,6 +183,7 @@ int sequence_agent_enqueue_next(sequence_agent_t sa)
 			sa->ta_current_event += 1;
 		}
 		else {
+			sa->ta_current_event += 1;
 			done = 1;
 		}
 	}
