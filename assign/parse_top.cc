@@ -62,9 +62,10 @@ int bind_top_subnodes() {
     return errors;
 }
 
+extern name_vclass_map vclass_map;
+
 int parse_top(tb_vgraph &VG, istream& i)
 {
-  name_vclass_map vclass_map;
   string_vector parsed_line;
   int errors=0,line=0;
   int num_nodes = 0;

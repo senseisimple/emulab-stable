@@ -380,6 +380,19 @@ int type_precheck() {
     // Check the vclasses, too
     for (name_list_map::iterator vclass_it = vclasses.begin();
 	    vclass_it != vclasses.end(); ++vclass_it) {
+        // Make sure we actually use this vclass
+	name_vclass_map::iterator dit = vclass_map.find(vclass_it->first);
+        if (dit == vclass_map.end()) {
+            cout << "***: Internal error - unable to find vtype " <<
+                vclass_it->first << endl;
+            exit(EXIT_FATAL);
+        } else {
+            if (dit->second->empty()) {
+                // Nobody uses it, don't check
+                continue;
+            }
+        }
+
 	bool found_match = false;
 	for (vector<crope>::iterator vtype_it = vclass_it->second.begin();
 		vtype_it != vclass_it->second.end(); vtype_it++) {

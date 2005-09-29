@@ -53,6 +53,8 @@ public:
 
   crope dominant;		// Current dominant type
 
+  bool empty();                 // True if no vnodes use this vlcass
+
   // The next two routines report the *change* in score.  The score
   // for the vclass as a whole is 0 if all nodes are of the dominant
   // type and the weight if they aren't.
@@ -77,5 +79,6 @@ public:
 };
 
 typedef hash_map<crope,tb_vclass*> name_vclass_map;
+extern name_vclass_map vclass_map;
 
 #endif

@@ -22,6 +22,8 @@ using namespace boost;
 #include "physical.h"
 #include "virtual.h"
 
+name_vclass_map vclass_map;
+
 void tb_vclass::add_type(crope type)
 {
   members[type]=0;
@@ -94,3 +96,12 @@ crope tb_vclass::choose_type()
   return (*dit).first;
 }
 
+bool tb_vclass::empty() {
+  members_map::iterator dit;
+  for (dit=members.begin();dit != members.end();++dit) {
+      if ((*dit).second > 0) {
+          return false;
+      }
+  }
+  return true;
+}
