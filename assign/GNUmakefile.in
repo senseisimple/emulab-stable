@@ -81,23 +81,25 @@ clean:
 # All this crap generated with 'g++ -MM' - don't want to do all the makefile goo
 # to make this automatic, since none of it ever changes
 #
-anneal.o: anneal.cc anneal.h port.h common.h config.h delay.h \
- physical.h virtual.h vclass.h maps.h score.h pclass.h solution.h \
- ${MAKEFILE_IN}
+anneal.o: anneal.cc anneal.h port.h delay.h physical.h common.h \
+ config.h featuredesire.h pclass.h virtual.h maps.h score.h solution.h \
+ vclass.h ${MAKEFILE_IN}
 assign.o: assign.cc port.h common.h config.h delay.h physical.h \
- virtual.h vclass.h pclass.h score.h solution.h maps.h anneal.h \
- ${MAKEFILE_IN}
+ featuredesire.h virtual.h vclass.h pclass.h score.h solution.h maps.h \
+ anneal.h ${MAKEFILE_IN}
 config.o: config.cc config.h ${MAKEFILE_IN}
-parse_ptop.o: parse_ptop.cc port.h common.h config.h delay.h \
- physical.h parser.h ${MAKEFILE_IN}
+featuredesire.o: featuredesire.cc featuredesire.h common.h config.h \
+ ${MAKEFILE_IN}
+parse_ptop.o: parse_ptop.cc port.h delay.h physical.h common.h \
+ config.h featuredesire.h parser.h ${MAKEFILE_IN}
 parse_top.o: parse_top.cc port.h common.h config.h vclass.h delay.h \
- physical.h virtual.h parser.h ${MAKEFILE_IN}
-parser.o: parser.cc parser.h ${MAKEFILE_IN}
+ physical.h featuredesire.h virtual.h parser.h anneal.h pclass.h ${MAKEFILE_IN}
+parser.o: parser.cc parser.h port.h ${MAKEFILE_IN}
 pclass.o: pclass.cc port.h common.h config.h delay.h physical.h \
- virtual.h pclass.h ${MAKEFILE_IN}
+ featuredesire.h virtual.h pclass.h ${MAKEFILE_IN}
 score.o: score.cc port.h common.h config.h vclass.h delay.h physical.h \
- virtual.h pclass.h score.h /usr/include/math.h ${MAKEFILE_IN}
-solution.o: solution.cc solution.h port.h common.h config.h delay.h \
- physical.h virtual.h vclass.h maps.h ${MAKEFILE_IN}
+ featuredesire.h virtual.h pclass.h score.h /usr/include/math.h ${MAKEFILE_IN}
+solution.o: solution.cc solution.h port.h delay.h physical.h common.h \
+ config.h featuredesire.h virtual.h maps.h vclass.h ${MAKEFILE_IN}
 vclass.o: vclass.cc port.h common.h config.h vclass.h delay.h \
- physical.h virtual.h ${MAKEFILE_IN}
+ physical.h featuredesire.h virtual.h ${MAKEFILE_IN}
