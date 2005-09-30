@@ -539,7 +539,7 @@ REPLACE INTO table_regex VALUES ('os_info','osname','text','regex','^[-\\w\\.+]+
 REPLACE INTO table_regex VALUES ('projects','newpid','text','regex','^[a-zA-Z][-a-zA-Z0-9]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('projects','pid','text','regex','^[-\\w]+$',2,12,NULL);
 REPLACE INTO table_regex VALUES ('reserved','vname','text','redirect','virt_nodes:vname',1,32,NULL);
-REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][-\\w]+$',2,8,NULL);
+REPLACE INTO table_regex VALUES ('users','uid','text','regex','^[a-zA-Z][\\w]+$',2,8,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_phone','text','regex','^[-\\d\\(\\)\\+\\.x ]+$',7,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_name','text','regex','^[-\\w\\. ]+$',4,64,NULL);
 REPLACE INTO table_regex VALUES ('users','usr_email','text','regex','^([-\\w\\+\\.]+)\\@([-\\w\\.]+)$',3,64,NULL);
