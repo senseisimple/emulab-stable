@@ -9,16 +9,20 @@ use Getopt::Std;
 use Errno;
 use XML::Simple;
 use Digest::SHA1 qw(sha1_hex);
+use Data::Dumper;
 
 #
 # A wrapper for messing with the Bug DB from boss.
 #
 sub usage()
 {
-    print "Usage: jabberproxy adduser [-m] <uid> or\n";
+    print "Usage: jabberproxy adduser <uid> or\n";
     print "       jabberproxy deluser <uid> or\n";
-    print "       jabberproxy addbuddies <uid> <buddy><group> ... or\n";
-    print "       jabberproxy delbuddies <uid> <buddy><group> ... or\n";
+    print "       jabberproxy addchat <chatroom> or\n";
+    print "       jabberproxy delchat <chatroom> or\n";
+    print "       jabberproxy addbuddies <uid> <buddy>:<buddylist> ... or\n";
+    print "       jabberproxy delbuddies <uid> <buddy>:<buddylist> ... or\n";
+    print "       jabberproxy setchatmembers <chatroom>\n";
     exit(-1);
 }
 my $optlist = "d";
@@ -31,6 +35,9 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $OURDOMAIN   = "@OURDOMAIN@";
 my $REALM	= "jabber.${OURDOMAIN}";
+my $MUCHOST	= "conference.${OURDOMAIN}";
+my $MUCDIR      = "/var/jabberd/muc";
+my $MUCROOMS    = "$MUCDIR/rooms.xml";
 my $JABBERCONF  = "/usr/local/etc/jabberd/sm.xml";
 
 #
@@ -69,6 +76,8 @@ my $dbpass;
 sub JabberUser($;$);
 sub AddUser(@);
 sub DelUser(@);
+sub AddGroup(@);
+sub DelGroup(@);
 sub AddBuddies(@);
 sub DelBuddies(@);
 sub fatal($);
@@ -115,11 +124,20 @@ if ($action eq "adduser") {
 elsif ($action eq "deluser") {
     exit(DelUser(@ARGV));
 }
+elsif ($action eq "addchat") {
+    exit(AddChat(@ARGV));
+}
+elsif ($action eq "delchat") {
+    exit(DelChat(@ARGV));
+}
 elsif ($action eq "addbuddies") {
     exit(AddBuddies(@ARGV));
 }
 elsif ($action eq "delbuddies") {
     exit(DelBuddies(@ARGV));
+}
+elsif ($action eq "setchatmembers") {
+    exit(SetChatMembers(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -262,6 +280,378 @@ sub DelUser(@)
 }
 
 #
+# Create a new project/group chat room. People will be added later. 
+#
+sub AddChat(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($chatroom) = @_;
+    my ($owner, $password) = ();
+    my ($roomcfg, $noticecfg, $xdb, $xmlstr);
+
+    # Other info for list comes in from STDIN.
+    
+    $_ = <STDIN>;
+    usage()
+	if (!defined($_));
+	
+    if ($_ =~ /^(.*) (.*)$/) {
+	$owner     = $1;
+	$password  = $2;
+    }
+    else {
+	fatal("AddGroup: Bad line in input: $_");
+    }
+
+    #
+    # See if the room already exists ... 
+    #
+    my $jid  = "${chatroom}\@${MUCHOST}";
+    my $hash = sha1_hex($jid);
+
+    if (-e "$MUCDIR/${hash}.xml") {
+	print "Chat room '$jid' already exists ...\n";
+	return 0;
+    }
+    
+    #
+    # Create the configuration. This is turned into XML ...
+    #
+    $roomcfg->{"xdbns"}    = "muc:room:config";
+
+    #
+    # I added this timestamp so that my little hacks to the muc plugin
+    # can figure out when the room (membership) has changed.
+    #
+    $roomcfg->{ctime}      = [time()];
+    $roomcfg->{mtime}      = [time()];
+    
+    # General Options
+    $roomcfg->{name}       = [$chatroom];
+    $roomcfg->{secret}     = [$password];
+    $roomcfg->{description}= ["Chat Room for Project/Group $chatroom/$chatroom"];
+    $roomcfg->{subject}    = ["Discussion related to Project/Group $chatroom/$chatroom"];
+    $roomcfg->{creator}    = ["${owner}\@${REALM}"];
+    $roomcfg->{public}     = [0];
+    $roomcfg->{maxusers}   = [30];
+    $roomcfg->{persistent} = [1]; # Has to be persistent
+
+    # Permission Options
+    $roomcfg->{visible}     = [1];
+    $roomcfg->{subjectlock} = [0];
+    $roomcfg->{private}     = [0];
+
+    # Legacy Options
+    $roomcfg->{legacy}    = [0];
+    $noticecfg->{join}    = ["has become available"];
+    $noticecfg->{leave}   = ["has left"];
+    $noticecfg->{rename}  = ["is now known as"];
+    $roomcfg->{notice}    = [$noticecfg];
+
+    # Moderation Options
+    $roomcfg->{moderated}   = [0];
+    $roomcfg->{defaulttype} = [0];
+    $roomcfg->{privmsg}     = [0];
+    
+    # Member-Only Options
+    $roomcfg->{invitation}  = [1]; # Invitation only.
+    $roomcfg->{invites}     = [1]; # Allow members to send invites.
+
+    # Logging Options
+    $roomcfg->{logging}     = [0];
+    $roomcfg->{logformat}   = [0];
+
+    # Set up the initial lists
+    $xdb->{list} = [ { 'xdbns' => 'muc:list:owner',
+		       'item'  => [ { 'jid' => "${owner}\@${REALM}"} ], },
+		     { 'xdbns' => 'muc:list:admin' },
+		     { 'xdbns' => 'muc:list:member' },
+		     { 'xdbns' => 'muc:list:outcast' }
+		   ];
+    # And the root
+    $xdb->{room} = $roomcfg;
+
+    # Dump to the file.
+    $xmlstr = XMLout($xdb, RootName => 'xdb');
+    if (! defined($xmlstr) || $xmlstr eq "") {
+	print "Error creating XML for $hash.xml!\n";
+	goto bad;
+    }
+    if (! open(CONFIG, "> $MUCDIR/${hash}.xml")) {
+	print "Error creating $MUCDIR/${hash}.xml: $!\n";
+	goto bad;
+    }
+    print CONFIG $xmlstr;
+    close(CONFIG);
+
+    #
+    # Now update the master room list. 
+    #
+    my $roomsconfig = eval{ XMLin($MUCROOMS) };
+    if ($@) {
+	print $@;
+	goto bad;
+    }
+    # Add this config.
+    my $newstuff = { $jid => { 'jid' => "${hash}\@${MUCHOST}",
+			       'mtime' => time()
+			     }
+		   };
+
+    if (! exists($roomsconfig->{registered}->{item})) {
+	$roomsconfig->{registered}->{item} = [ $newstuff ];
+    }
+    else {
+	$roomsconfig->{registered}->{item} =
+	    [ $roomsconfig->{registered}->{item}, $newstuff ];
+    }
+    $xmlstr = XMLout($roomsconfig, RootName => 'xdb');
+    if (! defined($xmlstr) || $xmlstr eq "") {
+	print "Error creating XML for rooms.xml!\n";
+	goto bad;
+    }
+    # Always make a backup copy.
+    goto bad
+	if (system("/bin/cp $MUCROOMS ${MUCROOMS}.save"));
+
+    if (! open(CONFIG, "> ${MUCROOMS}.$$")) {
+	print "Error creating $MUCROOMS: $!\n";
+	goto bad;
+    }
+    print CONFIG $xmlstr;
+    close(CONFIG);
+    # Move into place and we are done.
+    goto bad
+	if (system("/bin/mv ${MUCROOMS}.$$ $MUCROOMS"));
+    return 0;
+
+  bad:
+    # Unlink the room config file too ...
+    unlink "$MUCDIR/${hash}.xml"
+	if (-e "$MUCDIR/${hash}.xml");
+    unlink "${MUCROOMS}.$$"
+	if (-e "${MUCROOMS}.$$");
+    return -1;
+}
+
+#
+# Delete a project/group chat room. 
+#
+sub DelChat(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($chatroom) = @_;
+    my ($xmlstr);
+
+    #
+    # See if the room exists ... 
+    #
+    my $jid  = "${chatroom}\@${MUCHOST}";
+    my $hash = sha1_hex($jid);
+
+    if (! -e "$MUCDIR/${hash}.xml") {
+	print "Chat room '$jid' does not exist ...\n";
+	return 0;
+    }
+    
+    #
+    # Update the master room list. 
+    #
+    my $roomsconfig = eval{ XMLin($MUCROOMS) };
+    if ($@) {
+	print $@;
+	return -1;
+    }
+    # Delete the configuration by building a new list of all the others.
+    my $newlist = {};
+    foreach my $key (keys(%{ $roomsconfig->{registered}->{item} })) {
+	my $value = $roomsconfig->{registered}->{item}->{$key};
+
+	next
+	    if ($key eq $jid);
+
+	$newlist->{$key} = $value;
+    }
+    if (scalar(keys(%{$newlist}))) {
+	$roomsconfig->{registered}->{item} = [ $newlist ];
+    }
+    else {
+	delete($roomsconfig->{registered}->{item});
+    }
+    
+    $xmlstr = XMLout($roomsconfig, RootName => 'xdb');
+    if (! defined($xmlstr) || $xmlstr eq "") {
+	print "Error creating XML for rooms.xml!\n";
+	goto bad;
+    }
+    # Always make a backup copy.
+    goto bad
+	if (system("/bin/cp $MUCROOMS ${MUCROOMS}.save"));
+
+    if (! open(CONFIG, "> ${MUCROOMS}.$$")) {
+	print "Error creating $MUCROOMS: $!\n";
+	goto bad;
+    }
+    print CONFIG $xmlstr;
+    close(CONFIG);
+    # Move into place.
+    goto bad
+	if (system("/bin/mv ${MUCROOMS}.$$ $MUCROOMS"));
+
+    # Now we can remove the room config file.
+    unlink "$MUCDIR/${hash}.xml";
+    return 0;
+
+  bad:
+    unlink "${MUCROOMS}.$$"
+	if (-e "${MUCROOMS}.$$");
+    return -1;
+}
+
+#
+# Set the allowed (no password required) members of a chatroom.
+# 
+sub SetChatMembers(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($chatroom) = @_;
+
+    if ($debug) {
+	print "Setting members for chatroom: $chatroom\n";
+    }
+
+    #
+    # The list of users comes from stdin; one uid per line.
+    #
+    my @newlist   = ();
+
+    while (<STDIN>) {
+	# Allow for comments
+	if ($_ =~ /^\#/) {
+	    next;
+	}
+	elsif ($_ =~ /^(.*)$/) {
+	    my %foo = ();
+	    
+	    # Form a jid ...
+	    my $jid = "${1}\@${REALM}";
+
+	    $foo{'jid'} = $jid;
+	    push(@newlist, \%foo);
+	}
+	else {
+	    print STDERR "Bad line in input: $_";
+	}
+    }
+
+    #
+    # See if the room exists ... 
+    #
+    my $jid  = "${chatroom}\@${MUCHOST}";
+    my $hash = sha1_hex($jid);
+
+    if (! -e "$MUCDIR/${hash}.xml") {
+	print "Chat room '$jid' does not exist!\n";
+	return -1;
+    }
+
+    #
+    # Now get the current config.
+    #
+    my $roomconfig = eval{ XMLin("$MUCDIR/${hash}.xml", ForceArray => 1) };
+    if ($@) {
+	print $@;
+	return -1;
+    }
+    #
+    # Replace the current member list with a new one. 
+    #
+    foreach my $ref (@{ $roomconfig->{'list'} }) {
+	if ($ref->{'xdbns'} eq 'muc:list:member') {
+	    $ref->{'item'} = [@newlist];
+	    last;
+	}
+    }
+    #
+    # I added this timestamp so that my little hacks to the muc plugin
+    # can figure out when the room (membership) has changed.
+    #
+    my $now = time();
+    $roomconfig->{room}[0]->{mtime} = [$now];
+
+    #
+    # And write out the new config.
+    #
+    # Always make a backup copy.
+    #
+    goto bad
+	if (system("/bin/cp $MUCDIR/${hash}.xml $MUCDIR/${hash}.xml.save"));
+    
+    my $xmlstr = XMLout($roomconfig, RootName => 'xdb');
+    
+    if (! defined($xmlstr) || $xmlstr eq "") {
+	print "Error creating XML for $hash.xml!\n";
+	goto bad;
+    }
+    if (! open(CONFIG, "> $MUCDIR/${hash}.xml.$$")) {
+	print "Error creating $MUCDIR/${hash}.xml.$$: $!\n";
+	goto bad;
+    }
+    print CONFIG $xmlstr;
+    close(CONFIG);
+    # Move into place.
+    goto bad
+	if (system("/bin/mv $MUCDIR/${hash}.xml.$$ $MUCDIR/${hash}.xml"));
+
+    #
+    # Update the modtime for this room in the master room list. 
+    #
+    my $roomsconfig = eval{ XMLin($MUCROOMS) };
+    if ($@) {
+	print $@;
+	return -1;
+    }
+    # Find the configuration and change it,
+    foreach my $key (keys(%{ $roomsconfig->{registered}->{item} })) {
+	my $value = $roomsconfig->{registered}->{item}->{$key};
+
+	if ($key eq $jid) {
+	    $value->{mtime} = $now;
+	    last;
+	}
+    }
+    
+    $xmlstr = XMLout($roomsconfig, RootName => 'xdb');
+    if (! defined($xmlstr) || $xmlstr eq "") {
+	print "Error creating XML for rooms.xml!\n";
+	goto bad;
+    }
+    # Always make a backup copy.
+    goto bad
+	if (system("/bin/cp $MUCROOMS ${MUCROOMS}.save"));
+
+    if (! open(CONFIG, "> ${MUCROOMS}.$$")) {
+	print "Error creating $MUCROOMS: $!\n";
+	goto bad;
+    }
+    print CONFIG $xmlstr;
+    close(CONFIG);
+    # Move into place.
+    goto bad
+	if (system("/bin/mv ${MUCROOMS}.$$ $MUCROOMS"));
+    return 0;
+
+  bad:
+    return -1;
+}
+
+#
 # Set the buddy list for a user.
 #
 sub AddBuddies(@)
@@ -275,14 +665,14 @@ sub AddBuddies(@)
     my $newbuddies = ();
 
     while (@_) {
-	my ($buddy,$pid,$gid) = split(":", shift(@_));
+	my ($buddy,$buddylist) = split(":", shift(@_));
 	
 	# A user can be a buddy in more then group (project, subgroup).
 	$newbuddies{$buddy} = []
 	    if (!exists($newbuddies{$buddy}));
 
 	# Ignore subgroup for now. 
-	push(@{$newbuddies{$buddy}}, $pid);
+	push(@{$newbuddies{$buddy}}, $buddylist);
     }
     
     if (JabberUser($user) != 0) {
@@ -422,14 +812,14 @@ sub DelBuddies(@)
     my $delbuddies = ();
 
     while (@_) {
-	my ($buddy,$pid,$gid) = split(":", shift(@_));
+	my ($buddy,$buddylist) = split(":", shift(@_));
 
 	# A user can be a buddy in more then group (project, subgroup).
 	$delbuddies{$buddy} = []
 	    if (!exists($delbuddies{$buddy}));
 
 	# Ignore subgroups for now.
-	push(@{$delbuddies{$buddy}}, $pid);
+	push(@{$delbuddies{$buddy}}, $buddylist);
     }
     
     if (JabberUser($user) != 0) {

@@ -9,15 +9,17 @@ use Getopt::Std;
 use Fcntl ':flock';
 
 #
-# Add a user to the jabber DB on ops. 
+# Add a chat room to the jabber DB on ops. 
 #
 sub usage()
 {
-    print STDOUT "Usage: addjabberuser <uid>\n";
+    print STDOUT "Usage: addjabberchat [-g <gid>] <pid>\n";
     exit(-1);
 }
-my $optlist = "d";
+my $optlist = "dg:";
 my $debug   = 0;
+my $pid;
+my $gid;
 
 #
 # Configure variables
@@ -84,20 +86,37 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"g"})) {
+    $gid = $options{"g"};
+    
+    #
+    # Untaint args.
+    #
+    if ($gid =~ /^([-\w]+)$/) {
+	$gid = $1;
+    }
+    else {
+	die("Bad data in gid: $gid");
+    }
+}
 if (@ARGV != 1) {
     usage();
 }
-my $user = $ARGV[0];
+$pid = $ARGV[0];
 
 #
 # Untaint args.
 #
-if ($user =~ /^([-\w]+)$/) {
-    $user = $1;
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
 }
 else {
-    die("Bad data in user: $user.");
+    die("Bad data in pid: $pid.");
 }
+$gid = $pid
+    if (!defined($gid));
+
+my $chatroom = (($pid eq $gid) ? "$pid" : "$pid/$gid");
 
 #
 # This script always does the right thing, so no permission checks.
@@ -107,20 +126,28 @@ else {
 #
 
 #
-# Look in the DB to see if there is already a wikiname defined. If
-# we use that. Otherwise have to form one from the user name. Ick.
+# We need the leader and the password from the DB. 
 #
 my $query_result =
-    DBQueryFatal("select mailman_password ".
-		 "from users where uid='$user'");
+    DBQueryFatal("select leader,mailman_password ".
+		 "from groups where pid='$pid' and gid='$gid'");
 
 if (!$query_result->numrows) {
-    fatal("No such user $user in the DB!");
+    fatal("No such project/group $pid/$gid in the DB!");
 }
-my ($password) = $query_result->fetchrow_array();
+my ($leader,$password) = $query_result->fetchrow_array();
 
 if (!defined($password)) {
-    fatal("No password defined for $user!");
+    $password = substr(TBGenSecretKey(), 0, 10);
+    # Must untaint;
+    if ($password =~ /^([-\w]+)$/) {
+	$password = $1;
+    }
+    else {
+	die("Bad data in password: $password.");
+    }
+    DBQueryFatal("update groups set mailman_password='$password' ".
+		 "where pid='$pid' and gid='$gid'");
 }
 
 #
@@ -131,24 +158,20 @@ $UID = $EUID;
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
 	
-    print "Adding user $user to the jabber DB on $CONTROL.\n";
+    print "Adding chatroom $chatroom to the jabber DB on $CONTROL.\n";
 
     # Must serialize all jabber stuff. Be sure to use the same token!
     TBScriptLock("jabber_update") == 0 or
 	fatal("Could not get the lock!");
 
-    system("echo '$password' | ".
-	   "$SSH -host $CONTROL $JABBERPROXY $optarg adduser $user");
-
+    system("echo '$leader $password' | ".
+	   "$SSH -host $CONTROL $JABBERPROXY $optarg addchat $chatroom");
+    
     my $status = $?;
     TBScriptUnlock();
     $? = $status;
 
     if ($?) {
-	if ($? >> 8 == EEXIST()) {
-	    # Not an error.
-	    exit(0);
-	}
 	fatal("$JABBERPROXY failed on $CONTROL!");
     }
 }

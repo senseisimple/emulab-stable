@@ -109,7 +109,15 @@ if ($CONTROL ne $BOSSNODE) {
 	
     print "Removing user $user from the jabber DB on $CONTROL.\n";
 
+    # Must serialize all jabber stuff. Be sure to use the same token!
+    TBScriptLock("jabber_update") == 0 or
+	fatal("Could not get the lock!");
+
     system("$SSH -host $CONTROL $JABBERPROXY $optarg deluser $user");
+
+    my $status = $?;
+    TBScriptUnlock();
+    $? = $status;
 
     if ($?) {
 	fatal("$JABBERPROXY failed on $CONTROL!");

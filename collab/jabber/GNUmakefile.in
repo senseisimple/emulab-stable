@@ -12,7 +12,8 @@ SUBDIR		= collab/jabber
 include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= jabbersetup addjabberuser deljabberuser \
-			  modjabberbuddies
+			  modjabberbuddies addjabberchat deljabberchat \
+			  setchatmembers
 LIBEXEC_SCRIPTS		= 
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= 
@@ -42,6 +43,13 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/deljabberuser
 	chown root $(INSTALL_SBINDIR)/modjabberbuddies
 	chmod u+s $(INSTALL_SBINDIR)/modjabberbuddies
+	chown root $(INSTALL_SBINDIR)/addjabberchat
+	chmod u+s $(INSTALL_SBINDIR)/addjabberchat
+	chown root $(INSTALL_SBINDIR)/deljabberchat
+	chmod u+s $(INSTALL_SBINDIR)/deljabberchat
+	chown root $(INSTALL_SBINDIR)/setchatmembers
+	chmod u+s $(INSTALL_SBINDIR)/setchatmembers
+
 #
 # Control node installation (okay, plastic)
 #

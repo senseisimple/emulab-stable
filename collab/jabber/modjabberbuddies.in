@@ -173,6 +173,8 @@ foreach my $token (@addlist) {
     next
 	if ($pid ne $gid);
 
+    my $buddylist = "$pid";
+
     #
     # Okay, whenever a user is added to a project, add all the members
     # of the target project to the users buddy list, under the project
@@ -182,7 +184,7 @@ foreach my $token (@addlist) {
  		     "where pid='$pid' and gid='$gid' and uid!='$user'");
 
     while (my ($uid) = $query_result->fetchrow_array()) {
-	$addargs = $addargs . " $uid:$pid:$gid";
+	$addargs = $addargs . " $uid:$buddylist";
     }
 }
 
@@ -196,6 +198,8 @@ foreach my $token (@remlist) {
     next
 	if ($pid ne $gid);
 
+    my $buddylist = "$pid";
+
     #
     # Okay, whenever a user is removed from a project, remove all the members
     # of the target project from the users buddy list, under the project.
@@ -205,7 +209,7 @@ foreach my $token (@remlist) {
  		     "where pid='$pid' and gid='$gid' and uid!='$user'");
 
     while (my ($uid) = $query_result->fetchrow_array()) {
-	$remargs = $remargs . " $uid:$pid:$gid";
+	$remargs = $remargs . " $uid:$buddylist";
     }
 }
 
@@ -214,7 +218,11 @@ foreach my $token (@remlist) {
 #
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
-	
+
+    # Must serialize all jabber stuff. Be sure to use the same token!
+    TBScriptLock("jabber_update") == 0 or
+	fatal("Could not get the lock!");
+
     #
     # For ssh.
     #
@@ -237,6 +245,8 @@ if ($CONTROL ne $BOSSNODE) {
 	    fatal("$JABBERPROXY '$optarg delbuddies $user $remargs' failed!");
 	}
     }
+
+    TBScriptUnlock();
 }
 exit(0);
 
