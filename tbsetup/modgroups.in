@@ -268,19 +268,23 @@ foreach my $token (@remlist) {
     # Tell chat subsystem to change groups ...
     #
     if ($CHATSUPPORT) {
-	my $chatargs = "";
+	my @optlist = ();
 
-	# Does not work yet.
-	if (0) {
-	    foreach my $group (@delgroups) {
-		$chatargs = "$chatargs $pid:$group";
+	foreach my $group (@delgroups) {
+	    push(@optlist, "$pid:$group");
 
+	    # Does not work yet.
+	    if (0) {
 		system("$SETCHATMEMBERS -g $group $pid") == 0 or
 		    fatal("$SETCHATMEMBERS '-g $group $pid' failed!");
 	    }
 	}
-	system("$MODBUDDIES -r $chatargs $user") == 0 or
-	    fatal("$MODBUDDIES '-r $chatargs $user' failed!");
+	if (@optlist) {
+	    my $chatargs = join(",", @optlist);
+	
+	    system("$MODBUDDIES -r $chatargs $user") == 0 or
+		fatal("$MODBUDDIES '-r $chatargs $user' failed!");
+	}
     }
 }
 
