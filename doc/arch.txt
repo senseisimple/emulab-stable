@@ -15,7 +15,7 @@ individual scripts should be sufficient explanation. The end of the
 file also has some overview-ish stuff about abstractions and things
 like that.
 
-[This file maintained by testbed-ops@emulab.net]
+[This file maintained by testbed-ops@flux.utah.edu]
 
 For big picture and some details, read the OSDI'02 paper, in
 doc/papers/netbed-osdi02* and on the Web.

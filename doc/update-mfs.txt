@@ -73,7 +73,7 @@ On occasion, you may need to update the Emulab software in the disk loader
    console).
 
 7. All done!  If there are any problems, copy back the saved mfsroot
-   file (and rerun prepare) and contact testbed-ops@emulab.net for
+   file (and rerun prepare) and contact testbed-ops@flux.utah.edu for
    help.
 
 

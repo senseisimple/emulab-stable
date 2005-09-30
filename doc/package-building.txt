@@ -105,7 +105,7 @@ cd /usr/ports/lang/ezm3 && make install
 If you run into any other problems, consult, in this order:
 (1) 'man 7 ports'
 (2) http://www.freebsd.org/doc/en_US.ISO8859-1/books/porters-handbook/
-(3) testbed-ops@emulab.net
+(3) testbed-ops@flux.utah.edu
 
 Now, just copy the contents of /usr/ports/packages/All/ into the directory you
 picked above!

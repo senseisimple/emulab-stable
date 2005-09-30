@@ -18,7 +18,7 @@ in DOS partition #2.
 You will need to have the Emulab network-booted, memory-filesystem-based,
 FreeBSD systems (hereafter known as the MFSes).  If you have not done this
 yet, do it now.  If you do not know what I am talking about, contact
-testbed-ops@emulab.net.
+testbed-ops@flux.utah.edu.
 
 In particular, the customization of the disk partitions is done using a
 node booted into the "admin" MFS.  If you have followed the Emulab setup
@@ -66,7 +66,7 @@ We will assume the machine is called "pc1" in the following directions.
   probably be "ad4".  RAID controllers are variously things like: "ar",
   "aacd", "twed", depending on the controller you have.  If you cannot
   find anything in the output that looks like a disk, you may have an
-  unsupported disk controller.  Contact testbed-ops@emulab.net if this
+  unsupported disk controller.  Contact testbed-ops@flux.utah.edu if this
   happens (and be sure to have your "dmesg" output handy!)
 
   If your disk is anything other than "ad0", there are several files
@@ -361,7 +361,7 @@ Dealing with SCSI disks (or RAID).
   Otherwise, you need to build your own kernels.  You can look at output from
   the admin MFS (aka GENERIC) kernel if necessary.  Add the necessary driver
   to the various TESTBED configs in the kernel source, and rebuild and install
-  the kernels in the image.  Mail testbed-ops@emulab.net for more info.
+  the kernels in the image.  Mail testbed-ops@flux.utah.edu for more info.
 
 * For Linux, it is even more of a PITA.  We currently don't even have a
   generic Linux kernel in the image.  So if Linux doesn't boot in the image,
