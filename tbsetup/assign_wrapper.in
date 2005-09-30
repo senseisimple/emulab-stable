@@ -733,7 +733,8 @@ while (1) {
     #
     # RunAssign returns  0 if successful.
     #           returns -1 if failure, but assign says to stop trying.
-    #           returns -1 if failure, but assign says to try again.
+    #           returns  1 if failure, but assign says to try again.
+    #           returns  2 if we made some forward progress.
     #
     my $retval = RunAssign();
 
@@ -757,7 +758,7 @@ while (1) {
     }
 
 
-    if ($currentrun >= $maxrun) {
+    if ($currentrun >= $maxrun && $retval != 2) {
 	fatal("Reached run limit. Giving up.");
     }
 
@@ -1227,6 +1228,7 @@ sub RunAssign ()
     if ($exitval > 0) {
 	my @reserved = ExpNodes($pid, $eid);
 	my $rcount   = scalar(@reserved);
+	my $tcount   = scalar(keys(%toreserve));
 
 	# We got only some. Need to figure out which.
 	print "Reserved some nodes ($rcount) we needed, ".
@@ -1263,7 +1265,14 @@ sub RunAssign ()
 	    }
 	}
 	CreateTopFile();
-	return 1;
+
+	#
+	# Return indicator that we made forward progress (got some nodes).
+	# Caller will decide if appropriate to keep trying. We made progress
+	# if the return value of nalloc (number of nodes not allocated) does
+	# not equal the number of nodes we tried to allocate.
+	#
+	return (($tcount == $exitval) ? 1 : 2);
     }
 
     #
