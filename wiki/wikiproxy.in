@@ -62,6 +62,7 @@ sub SetWikiGroups(@);
 sub CI($$);
 sub WikixLogin(@);
 sub WikiRemap(@);
+sub UserMapping(@);
 sub fatal($);
 
 #
@@ -126,8 +127,8 @@ elsif ($action eq "remap") {
 elsif ($action eq "fixproject") {
     exit(FixWikiProject(@ARGV));
 }
-elsif ($action eq "fixuser") {
-    exit(FixWikiUser(@ARGV));
+elsif ($action eq "mapping") {
+    exit(UserMapping(@ARGV));
 }
 else {
     die("*** $0:\n".
@@ -933,7 +934,28 @@ sub WikiRemap(@)
 
     return 0;
 }
-     
+
+#
+# Get user mapping
+#
+sub UserMapping(@)
+{
+    usage()
+	if (@_ != 1);
+
+    my ($user) = @_;
+
+    dbmopen(%MAPDB, $USERMAPDB, 0644) or
+	fatal("Cannot open $USERMAPDB: $!");
+
+    print "Current mapping is ". $MAPDB{$user} . "\n";
+
+    # Write the DB back out.
+    dbmclose(%MAPDB);	
+
+    return 0;
+}
+    
 sub fatal($)
 {
     my($mesg) = $_[0];
