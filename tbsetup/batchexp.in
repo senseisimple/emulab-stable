@@ -55,12 +55,14 @@ sub usage()
 sub ParseArgs();
 sub fatal($);
 
-my $optlist = "iE:g:e:p:S:L:a:l:fwqt:n";
+my $optlist = "iE:g:e:p:S:L:a:l:fwqt:nz";
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
 my $quiet    = 0;
 my $linktest = 0;	# non-zero means level to run at.
+my $zeemode  = 0;	# Hey, out of options.
+my $zeeopt   = "";	# To pass along.
 
 #
 # Configure variables
@@ -434,7 +436,7 @@ chmod(0664, "$nsfile");
 # Run parse in impotent mode on the NS file.  This has no effect but
 # will display any errors.
 #
-if (system("$parser -n $pid $gid $eid $nsfile") != 0) {
+if (system("$parser -n $zeeopt $pid $gid $eid $nsfile") != 0) {
     # Obey exit status protocol for web page.
     $errorstat = 1;
     fatal("NS Parse failed!");
@@ -551,8 +553,10 @@ $SIG{QUIT} = 'DEFAULT';
 #
 SetExpState($pid, $eid, EXPTSTATE_PRERUN)
     or fatal("Failed to set experiment state to " . EXPTSTATE_PRERUN());
-print "Running 'tbprerun $pid $eid $nsfile'\n";
-if (system("$tbbindir/tbprerun $pid $eid $nsfile") != 0) {
+$zeeopt = "-z"
+    if ($zeemode);
+print "Running 'tbprerun $zeeopt $pid $eid $nsfile'\n";
+if (system("$tbbindir/tbprerun $zeeopt $pid $eid $nsfile") != 0) {
     $errorstat = $? >> 8;
     fatal("tbprerun failed!");
 }
@@ -746,7 +750,8 @@ SENDMAIL("$user_name <$user_email>",
 	 $message,
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
-	 ($repfile, $logname, $nsfile));
+	 ($repfile, $logname, $nsfile))
+    if (!$zeemode);
 
 # Done!
 exit(0);
@@ -906,6 +911,7 @@ sub ParseArgs()
 	# since this script is invoked directly from web interface.
 	#
 	if (! ($tempnsfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
+	    ! ($tempnsfile =~ /^\/tmp\/\d+\.ns/) &&
 	    ! ($tempnsfile =~ /^\/var\/tmp\/php\w+/) &&
 	    ! ($tempnsfile =~ /^\/proj/) &&
 	    ! ($tempnsfile =~ /^\/groups/) &&
@@ -926,6 +932,10 @@ sub ParseArgs()
     }
     if (defined($options{"q"})) {
 	$quiet = 1;
+    }
+    if (defined($options{"z"})) {
+	$zeemode = 1;
+	$zeeopt  = "-p";
     }
     # This option should not be exported via the XMLRPC server. 
     if (defined($options{"n"})) {

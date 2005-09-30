@@ -1,12 +1,11 @@
 #!/usr/bin/perl -w
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
+use Getopt::Std;
 
 # tbprerun
 
@@ -18,10 +17,13 @@ use English;
 #
 sub usage()
 {
-    print STDERR "Usage: $0 [-force] pid eid nsfile\n";
+    print STDERR "Usage: $0 [-f] pid eid nsfile\n";
     exit(-1);
 }
-my $force  = 0;
+my $optlist = "fz";
+my $force   = 0;
+my $zeemode = 0;
+my $zeeopt  = "";
 my $state;
 
 #
@@ -52,16 +54,20 @@ use libtestbed;
 $| = 1;
 
 #
-# Parse args
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
 #
-if (!@ARGV) {
+%options = ();
+if (! getopts($optlist, \%options)) {
     usage();
 }
-if ($ARGV[0] eq "-force") {
+if (defined($options{"f"})) {
     $force = 1;
-    shift;
 }
-
+if (defined($options{"z"})) {
+    $zeemode = 1;
+    $zeeopt  = "-p";
+}
 if (@ARGV != 3) {
     usage();
 }
@@ -135,7 +141,7 @@ TBExptRemoveVirtualState($pid, $eid);
 # and tb-* handling.
 print "Running parser ... " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("parser started");
-if (system("parse-ns $pid $gid $eid $nsfile")) {
+if (system("parse-ns $zeeopt $pid $gid $eid $nsfile")) {
     fatal("Parsing failed!");
 }
 TBDebugTimeStamp("parser finished");
@@ -253,10 +259,12 @@ if (system("gentopofile $pid $eid")) {
 # Do an assign_prerun to set the min/max nodes. Generates a top file too.
 # This is the only DB state that is modified during a top only run.
 #
-TBDebugTimeStamp("assign prerun started");
-print "Doing a pre-assign ...\n";
-if (system("$wrapper -t $pid $eid")) {
-    fatal("assign prerun failed!");
+if (!$zeemode) {
+    TBDebugTimeStamp("assign prerun started");
+    print "Doing a pre-assign ...\n";
+    if (system("$wrapper -t $pid $eid")) {
+	fatal("assign prerun failed!");
+    }
 }
 
 #

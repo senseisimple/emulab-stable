@@ -431,6 +431,11 @@ proc tb-set-node-tarfiles {node args} {
 	    return
 	}
 
+	# Skip the rest in passmode.
+	if {${GLOBALS::anonymous} || ${GLOBALS::passmode}} {
+	    return
+	}
+
 	# Check the tar file to make sure it exists, is readable, etc...
 	if {[string match "*://*" $tarfile]} {
 	    # It is a URL, check for a valid protocol.
