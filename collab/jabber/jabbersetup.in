@@ -104,9 +104,9 @@ $query_result =
 		 "  from group_membership as g ".
 		 "left join users as u on u.uid=g.uid ".
 		 "where u.status='active' ".
-		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
-		 "       g.pid='tbres' or g.pid='utahstud' or ".
-		 "       g.pid='lbsbox')" .
+#		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
+#		 "       g.pid='tbres' or g.pid='utahstud' or ".
+#		 "       g.pid='lbsbox')" .
 		 "order by u.admin");
 
 while (my ($uid) = $query_result->fetchrow_array()) {
@@ -151,9 +151,9 @@ $query_result =
     DBQueryFatal("select g.pid,g.gid from groups as g ".
 		 "left join projects as p on p.pid=g.pid ".
 		 "where p.approved=1 ".
-		 "and (p.pid='testbed' or p.pid='emulab-ops' or ".
-		 "     p.pid='tbres' or p.pid='utahstud' or ".
-		 "       g.pid='lbsbox')" .
+#		 "and (p.pid='testbed' or p.pid='emulab-ops' or ".
+#		 "     p.pid='tbres' or p.pid='utahstud' or ".
+#		 "       g.pid='lbsbox')" .
 		 "");
 
 while (my ($pid,$gid) = $query_result->fetchrow_array()) {
