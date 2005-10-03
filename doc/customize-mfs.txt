@@ -9,14 +9,14 @@ README
 	This file
 
 freebsd*/
-	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 4.10 system
-	(no 5.3 yet).  We use this MFS for creating disk images and general
-	maintenance tasks on a node (e.g., when the node's disk is scrogged).
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 5.3 system.
+	We use this MFS for creating disk images and general maintenance
+	tasks on a node (e.g., when the node's disk is scrogged).
 	The MFS contains a pretty small set of utilities.
 
 frisbee*/
-	kernel/MFS for a PXE-booted memory based FreeBSD 4.7, 4.10 or
-	5.3 system.  This MFS is considerably smaller than the "freebsd" one.
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 5.3 system.
+	This MFS is considerably smaller than the "freebsd" one.
 	It is used to reload node disks with frisbee.  Since it may be loaded
 	simultaneously by many nodes to reload their disks, we wanted
 	this to be as small as possible.  Not intended as an interactive
@@ -49,19 +49,13 @@ If you are reading this file, then I guess you have succeeded in unpacking
 the tarball.  Hopefully, you have unpacked it into /tftpboot.  If not, go
 do that now, I'll wait...
 
-...ok.  First, you have to choose between using FreeBSD 4.7, FreeBSD 4.10
-or FreeBSD 5.3 MFSes.  For "frisbee", you almost certainly want to use 5.3
-since it supports more hardware.  For "freebsd" you would want to use 5.3,
-except...there isn't one yet.  Ok, so then you almost certainly want to
-use 4.10, but...we have machines with older Intel BX chipsets on which the
-4.10 kernel causes data corruption on IDE disks.  I have not tracked this
-down yet, but I do know that the 5.3 frisbee MFS doesn't show this problem
-so the ultimate solution will be to use 5.3 all around.  But in the meantime,
-if you don't have older machines, try the 4.10 "freebsd" MFS first [1].
+...ok.  First, you have to choose between using FreeBSD 4.7 or FreeBSD 5.3
+MFSes.  You almost certainly want to use the 5.3 versions since 5.3 supports
+more hardware.  If you have any problems with those, then try the 4.7 versions.
 Otherwise just use the 4.7 version.  In summary, I recommend:
 
 	frisbee53 (move it to "frisbee")
-	freebsd47 or freebsd410 (move one to "freebsd")
+	freebsd53 (move one to "freebsd")
 
 Anyway, after choosing your MFSes, you should have three generic MFSes
 (frisbee, freebsd, freebsd.newnode).  The three MFSes unloaded are "generic"
@@ -77,16 +71,5 @@ input from a non-existent serial line causing the -sio version of the boot
 loader to drop into interactive mode.  Make sure you replace the loader.conf
 file in the three subdirectories with the -null version as well.
 
-
-[1] To test whether 4.10 has problems on your machines, you will likely
-have to install the 4.10 version of frisbee (frisbee410) and use that for
-awhile.  You are more likely to see the problem with the frisbee MFS rather
-than the freebsd one, since the latter is not used as much.  Anyway, if
-you notice problems booting up a machine (doesn't boot, filesystem problems
-once it boots), then you are probably tickling the bug.  Switch to the 4.7
-versions (at least for freebsd, I still recommend 5.3 for frisbee).  Note
-that the corruption is sporadic, so you might have to load many disks before
-you see a problem.  This sucks.
-
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
-[ Last updated 05/17/05 ]
+[ Last updated 10/03/05 ]
