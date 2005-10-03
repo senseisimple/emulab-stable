@@ -117,22 +117,22 @@ echo "<blockquote><blockquote>
       <a href=http://www.freebsd.org/cgi/man.cgi?query=cvs&sektion=1>CVS</a>
       over
       <a href=http://www.freebsd.org/cgi/man.cgi?query=ssh&sektion=1>SSH</a>
-      to <tt>$USERNODE</tt>.<br>
+      to <tt>$CVSNODE</tt>.<br>
       <br>
       Project CVS repositories are initially <b>private</b>; only members
       of the project may access the repository. Repositories may also be
       set to <b>public</b> via a toggle on the project home page. When a
       repository is set to public, anyone on the Internet may access the
       repository (read-only), either with the CVSWeb interface, or with
-      anonymous CVS using CVS's pserver, both hosted on <tt>$USERNODE</tt>.
+      anonymous CVS using CVS's pserver, both hosted on <tt>$CVSNODE</tt>.
       <br><br>
       When a project repository <b>is</b> public, the CVSweb address is:
       <blockquote>
-      <tt>http://$USERNODE/cvsweb/cvsweb.cgi/?cvsroot=yourprojectname</tt>
+      <tt>http://$CVSNODE/cvsweb/cvsweb.cgi/?cvsroot=yourprojectname</tt>
       </blockquote>
       or you can use CVS pserver with:
       <blockquote>
-      <tt>cvs -R -d :pserver:anoncvs@$USERNODE:/cvsrepos/yourprojectname ...
+      <tt>cvs -R -d :pserver:anoncvs@$CVSNODE:/cvsrepos/yourprojectname ...
         </tt>
       </blockquote>
       just hit carriage return for the password.

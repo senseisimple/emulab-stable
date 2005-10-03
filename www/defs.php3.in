@@ -6,6 +6,7 @@ $TBDIR          = "@prefix@/";
 $OURDOMAIN      = "@OURDOMAIN@";
 $BOSSNODE       = "@BOSSNODE@";
 $USERNODE       = "@USERNODE@";
+$CVSNODE	= "cvs.${OURDOMAIN}";
 $TBADMINGROUP   = "@TBADMINGROUP@";
 $WWWHOST	= "@WWWHOST@";
 $WWW		= "@WWW@";
