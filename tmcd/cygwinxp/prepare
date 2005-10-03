@@ -90,9 +90,8 @@ unlink($pidfile) or
     warn("Could not unlink $pidfile");
 
 print "Stopping evproxy ...\n";
+system("killall evproxy")
 $pidfile = "/var/run/evproxy.pid";
-system("kill `cat $pidfile`")
-    if (-f $pidfile && -s $pidfile);
 unlink($pidfile) or
     warn("Could not unlink $pidfile");
 
@@ -220,4 +219,4 @@ system("du -sm C:/WINDOWS/SoftwareDistribution/Download");
 system("rm -rf C:/WINDOWS/SoftwareDistribution/Download/*");
 
 print "Re-enable all network interfaces.";
-system ("devcon enable =net 'PCI*'");
+system("devcon enable =net 'PCI*'");

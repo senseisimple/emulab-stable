@@ -12,6 +12,11 @@ export PATH
 # Enable logging.
 logfile=/var/log/EmulabStartup.log
 chmod -f g+w $logfile
+function logit () {
+    msg="`date`: $1"
+    echo "$msg" >> $logfile
+    echo "$msg"
+}
 
 # Enable WINDOWS() in libsetup.pm .
 iscygwin=/etc/emulab/iscygwin
@@ -30,12 +35,14 @@ nodeid=
 while [ -z $nodeid ]; do
     nodeid=`tmcc nodeid`
     if [ -z $nodeid ]; then
-        msg="`date`: Null nodeid returned from tmcc.  Trying again."
-        echo "$msg" >> $logfile
-        echo "$msg"
+        logit "Null nodeid returned from tmcc.  Trying again."
+        sleep 5
+    elif [ "$nodeid" == UNKNOWN ]; then
+        logit "UNKNOWN nodeid returned from tmcc.  Trying again."
         sleep 5
     fi
 done
+logit "nodeid = $nodeid"
 
 # NetBT (Netbios over TCP) chatters, messes up slothd, and is not needed for
 # SMB, so disable it.  This doesn't take effect until TCP/IP is restarted, so
@@ -57,64 +64,43 @@ if [ `tmcc ifconfig | wc -l` \> 1 ]; then
 else
     regtool set -i $tp/IPEnableRouter 0
 fi
-msg="IPEnableRouter set to `regtool get $tp/IPEnableRouter`"
-echo "$msg" >> $logfile
-echo "$msg"
+logit "IPEnableRouter set to `regtool get $tp/IPEnableRouter`."
 
 hostname=`/bin/hostname`
-datehost="`date`: Host name '$hostname'"
+host="Host name '$hostname'"
 if [ $nodeid = $hostname ]; then
-    msg="$datehost matches nodeid '$nodeid'."
-    echo "$msg" >> $logfile
-    echo "$msg"
+    logit "$host matches nodeid '$nodeid'."
 else
-    msg="$datehost differs from nodeid '$nodeid'."
-    echo "$msg" >> $logfile
-    echo "$msg"
+    logit "$host differs from nodeid '$nodeid'."
 
     # Change hostname and computername, rename My Computer, reboot on success.
     /usr/local/etc/emulab/WSName /N:$nodeid /REBOOT /MCN
     # Does WSName return to the shell?  Log it and give it a minute to take effect.
-    datehost="`date`: Host name '$hostname'"
     newhost=`/bin/hostname`
-    msg="$datehost WSName returned to shell as '$newhost' after WSName '$nodeid'."
-    echo "$msg" >> $logfile
-    echo "$msg"
+    logit "$host - WSName returned to shell as '$newhost' after WSName '$nodeid'."
     sleep 60
 
 #    # Should never get here!  Try /sbin/reboot.
-#    datehost="`date`: Host name '$hostname'"
-#    msg="$datehost didn't reboot changing to '$nodeid'!  Trying reboot."
-#    echo "$msg" >> $logfile
-#    echo "$msg"
+#    logit "$host - Didn't reboot changing to '$nodeid'!  Trying reboot."
 #    /sbin/reboot
 #    # Reboot returns to the shell.  Give it a few seconds to take effect.
 #    sleep 10
 #
 #    # Should never get here either!!  Try /bin/shutdown.
-#    datehost="`date`: Host name '$hostname'"
-#    msg="$datehost didn't /sbin/reboot changing to '$nodeid'!  Trying shutdown."
-#    echo "$msg" >> $logfile
-#    echo "$msg"
+#    logit "$host - Didn't /sbin/reboot changing to '$nodeid'!  Trying shutdown."
 #    /bin/shutdown -r -f now
 #    # Shutdown returns to the shell.  Give it a few seconds to take effect.
 #    sleep 10
 
     # Last resort!!!  tsshutdn
-    datehost="`date`: Host name '$hostname'"
-#    msg="$datehost didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
-    msg="$datehost didn't reboot changing to '$nodeid'!  Trying tsshutdn."
-    echo "$msg" >> $logfile
-    echo "$msg"
+#    logit "$host - Didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
+    logit "$host - Didn't reboot changing to '$nodeid'!  Trying tsshutdn."
     tsshutdn 1 /REBOOT /DELAY:1
     # Shutdown shouldn't return to the shell.  Give it a few seconds to take effect.
     sleep 10
 
     # Give up, log it, and go on.
-    datehost="`date`: Host name '$hostname'"
-    msg="$datehost failed to reboot changing to '$nodeid'."
-    echo "$msg" >> $logfile
-    echo "$msg"
+    logit "$host - Failed to reboot changing to '$nodeid'."
 fi
 
 # Sometimes the network stack gets out of sync: 'ipconfig /all' reports different
@@ -131,22 +117,23 @@ ipconfig /all | tr -d '\r' | awk \
 # multiple interfaces.
 domain=`tmcc bossinfo | sed -n 's/[^.]*\.\([^ ]*\) .*/\1/p'`
 regtool set -s $tp/Domain $domain
+logit "domain = $domain"
 
 # Make sure all NIC's are up at the start, so they show up on ifconfig.
 devcon enable =net 'PCI*'
 # Cache getmac output while all interfaces are still enabled.  Used by rc.ifconfig .
 bootdir=/var/emulab/boot
 getmac /nh /v /fo csv > $bootdir/getmac-cache
+nifc=`awk '/./{lines++} END{print lines}' $bootdir/getmac-cache` nxifc=0
+logit "number of interfaces = $nifc"
 
 # Remember the control net interface MAC address and Local Area Connection name for
 # slothd.  It's the one whose IP address is returned by looking up the nodeid (pc%d).
 cif=/var/emulab/boot/controlif
-ipaddr=`nslookup $nodeid.$domain | awk 'NR>2 && /Address:/{print $2}'`
+ipaddr=`nslookup $nodeid.$domain | awk '/Address:/{print $2}' | tail -1`
+logit "ipaddr = $ipaddr"
 if [ -z "$ipaddr" ]; then
-    datehost="`date`: Host name '$hostname'"
-    msg="$datehost No ip address found for '$nodeid.$domain'."
-    echo "$msg" >> $logfile
-    echo "$msg"
+    logit "$host- No ip address found for '$nodeid.$domain'."
 else
     # Remember the non-control net interface device descriptions, etc.
     xid=$bootdir/xif_descrs xim=$bootdir/xif_macs xin=$bootdir/xif_names
@@ -161,17 +148,24 @@ else
          function do_xif() {\
             print mac > "'$xim'"; print ifc > "'$xin'"; print descr > "'$xid'" }'
 
-    # Disable all NICs except the control net interface.  Experimental net interfaces
-    # will be enabled by $bootdir/rc.ifc later.  (Generated by rc.ifconfig .)
-    xii=$bootdir/xif_ids
-    # 'devcon find' returns device_instance_ID: device description.
-    # Make the device id order the same as ipconfig for pasting files together.
-    devcon find =net 'PCI*' | sed 's/ *: */:/' | awk -F : \
-        'BEGIN{ while ((getline descr < "'$xid'") > 0) descrs[++n] = descr }\
-         { ids[$2] = $1 }\
-         END { for (i=1; i<=n; i++) print "@"ids[descrs[i]] > "'$xii'" }'
-    # 'devcon disable' takes device_instance_ID args with leading @ signs.
-    devcon disable `cat $xii`
+    nxifc=`awk '/./{lines++} END{print lines}' $xim`
+    logit "number of experimental net interfaces = $nxifc"
+
+    if (( $nxifc >= $nifc )); then
+        logit "$host - Can't find control net interface.  Bad ip address '$ipaddr'?"
+    else
+        # Disable all NICs except the control net interface.  Experimental net interfaces
+        # will be enabled by $bootdir/rc.ifc later.  (Generated by rc.ifconfig .)
+        xii=$bootdir/xif_ids
+        # 'devcon find' returns device_instance_ID: device description.
+        # Make the device id order the same as ipconfig for pasting files together.
+        devcon find =net 'PCI*' | sed 's/ *: */:/' | awk -F : \
+            'BEGIN{ while ((getline descr < "'$xid'") > 0) descrs[++n] = descr }\
+             { ids[$2] = $1 }\
+             END { for (i=1; i<=n; i++) print "@"ids[descrs[i]] > "'$xii'" }'
+        # 'devcon disable' takes device_instance_ID args with leading @ signs.
+        devcon disable `cat $xii`
+    fi
 
     # Map from device names to instance id's for liblocsetup.pm:os_ifconfig_line().
     ximap=$bootdir/xif_map
