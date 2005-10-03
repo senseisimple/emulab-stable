@@ -592,7 +592,7 @@ q
               editrights -u root -a SeAssignPrimaryTokenPrivilege -l
               editrights -u root -a SeIncreaseQuotaPrivilege -l
 
-              # Set up to run the program-agent service.
+              # Set up to run the program-agent service.  Notice the -i (interactive) argument.
                 cygrunsrv -R ProgAgent
               progagent=/usr/local/etc/emulab/rc/rc.progagent
               cygrunsrv -I ProgAgent -d "Emulab Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
@@ -608,6 +608,9 @@ q
                 touch /var/log/{program-agent,ProgAgent}.log
                 chmod 777 /var/log/{program-agent,ProgAgent}.log
 
+                # Messages go to syslog.
+                tail /var/log/messages
+
 # [ SKIP
                 # Little problem: "Must be root to run this script!"
                 # Add this: 
@@ -618,13 +621,13 @@ q
                 tevc -e testbed/bsd-1 now prog0 start
                 tevc -e testbed/bsd-1 now prog0 start COMMAND='hostname >>& /users/fish/test.out'
 
-                tevc -e testbed/Windows-1 now prog0 start COMMAND='hostname>>&/users/fish/test.out'
+                tevc -e testbed/Windows-1b now prog0 start COMMAND='hostname>>&/users/fish/test.out'
                   v /users/fish/test.out
                   tail /users/fish/test.out
-                tevc -e testbed/Windows-1 now prog0 run COMMAND='touch /tmp/foo'
-                tevc -e testbed/Windows-1 now prog0 run COMMAND='id'
-                tevc -e testbed/Windows-1 now prog0 run COMMAND='ls -l /users/fish'
-                tevc -e testbed/Windows-1 now prog0 run COMMAND='ls -l /proj/testbed/fish'
+                tevc -e testbed/Windows-1b now prog0 run COMMAND='touch /tmp/foo'
+                tevc -e testbed/Windows-1b now prog0 run COMMAND='id'
+                tevc -e testbed/Windows-1b now prog0 run COMMAND='ls -l /users/fish'
+                tevc -e testbed/Windows-1b now prog0 run COMMAND='ls -l /proj/testbed/fish'
 
                 # [On the node.]
                 cat /local/logs/prog0.status
@@ -825,16 +828,15 @@ if [ ]; then
 
       . Set up the boot script to run as a service.
 
-          # Start up after DHCP and Elvin, run ProgAgent afterwards.
+          # Start up after DHCP and Elvin, run ProgAgent and SlothD afterwards.
               cygrunsrv -R EmulabStartup 
           rootpwd='daFluxGroup'
-          cygwinrc=/usr/local/etc/emulab/rc/rc.cygwin
           bootsetup=/usr/local/etc/emulab/rc/rc.bootsetup
-          progagent="cygrunsrv -S ProgAgent"
+          progrun="cygrunsrv -S ProgAgent"
           bootlog=/var/log/bootsetup.log
           cygrunsrv -I EmulabStartup -u root -w $rootpwd --dep DHCP --dep elvinsvc.exe \
             -p /cygdrive/c/cygwin/bin/bash \
-            -a "--norc --noprofile -c '( $cygwinrc; $bootsetup; $progagent ) >& $bootlog'"
+            -a "--norc --noprofile -c '( $bootsetup; $progrun ) >& $bootlog'"
           cygrunsrv -VQ EmulabStartup 
 
             ## If you run this, and the node name hasn't been changed yet, it will reboot.
@@ -1071,9 +1073,9 @@ Making images
       When updating existing images, I do it by hand in two stages, as below.
     
         # [On boss.]
-        set pc=61 img=SP1 image=SP1_2005-08-22
+        set pc=98 img=SP1 image=SP1-pc850_2005-09-30
         set pc=72 img=SP0 image=SP0_2005-08-22
-        set pc=109 img=UPDATE image=UPDATE_2005-08-22
+        set pc=91 img=UPDATE image=UPDATE-pc850_2005-09-30
 
         set pc=210 img=BASE-pc3000 image=BASE-pc3000_2005-08-31
         set pc=201 img=SP0-pc3000 image=SP0-pc3000_2005-09-01
@@ -1087,7 +1089,7 @@ Making images
 
         # Boot into the MFS.  The serial console will show you when it's open for business.
         echo $pc $image
-        wap node_admin on pc$pc &
+        node_admin on pc$pc &
               # Should not be necessary if ssh from root@boss to the node is working.
               rootpc $pc /sbin/reboot
           ## You may see:
@@ -1112,7 +1114,7 @@ Making images
 
         # Reboot the source node back into Windows.
         echo $pc $image
-        wap node_admin off pc$pc &
+        node_admin off pc$pc &
 
         # Move the image to /usr/testbed/images to avoid NFS reads, for faster swap-in.
           ls -l /{proj,usr}/testbed/images/WIN*
@@ -1156,6 +1158,7 @@ Making images
             # Reboot to finish.
 
         . SP2 - http://www.microsoft.com/technet/prodtechnol/winxppro/maintain/winxpsp2.mspx
+          set pc=161
           sudo scp -rp /share/windows/WindowsXP-KB835935-SP2-ENU.exe root@pc$pc":"/tmp
           # [Log in as root via RDP.]
           rootrd $pc
@@ -1210,54 +1213,78 @@ Updating a set of existing images.
 
     . Build changes one place, make tarballs to update the others.
         #[On the build node, as me.]
-        date=2005-09-19
+        date=2005-09-29
         updates=/proj/testbed/fish/winxp
+          v $updates/*$date*
+
         cd /
         # Work around a running sshd.
         cp -p /usr/sbin/sshd.exe{,.new}
         sysfiles="usr/sbin/sshd.exe.new bin/ssh-host-config etc/sshd_config \
                   etc/profile sbin/agetty.exe etc/inittab"
         v $sysfiles
+        rm /usr/local/etc/emulab/{*.exe.prev,*~}
         tar cvfz $updates/sys_$date.tgz $sysfiles
 
         cd /usr/local
         elabpat="etc/emulab man/man{1/{install,emulab}-*,8/program-*}"
         elabfiles=`eval "echo $elabpat"`
         v -d $elabfiles
+          v -t $elabfiles | grep '~'
+          v -t $elabfiles | head -20
           v /etc/emulab/paths.*
         tar cvfz $updates/elab_$date.tgz $elabfiles
 
         #[On Boss.]
-        set date=2005-09-19
+        set date=2005-09-29
         set updates=/proj/testbed/fish/winxp
         set nodes="SP0 SP1 SP2 UPDATE"
-          set hw=pc850 
-        set hw=pc3000 
+        # Choose ONE of the following hardware types:
+          # pc850, IDE disk (pc1 - pc178)
+          set hw=pc850 disk=/dev/ad0
+          # pc3000, SCSI disk. (pc201 - pc360)
+          set hw=pc3000 disk=/dev/da0
         set pid=testbed eid=new-windows-$hw
+          ## set pid=testbed eid=test-windows-$hw
         set exp=$eid.$pid.emulab.net
-          foreach node ( $nodes )
-            echo $node.$exp
-            ping -c 1 $node.$exp
-          end
 
-        # Copy the tarballs to /tmp as me, and unpack as root .
+        alias nping 'foreach node ( $nodes )\
+                echo ================  $node.$exp\
+                /sbin/ping -c 1 $node.$exp\
+                echo ""\
+              end'
+        # CSH is *so* bad at this...  Have to pull off the args first.  Quoting is nasty.
+        alias nodes 'set nodescmd='"'"'\!*'"'"';  foreach node ( $nodes )\
+                echo ================  $node.$exp\
+                ssh -n $node.$exp bash -c $nodescmd:q \
+                echo ""\
+              end'
+        alias su_nodes 'set nodescmd='"'"'\!*'"'"';  foreach node ( $nodes )\
+                echo ================  $node.$exp\
+                sudo ssh -n $node.$exp bash -c $nodescmd:q \
+                echo ""\
+              end'
+
+        nping
+        nodes id
+          su_nodes id
+
+        # Copy the tarballs to /tmp as me, and unpack as root later.
         # (Could get them via Samba, except Root has no Samba access.)
+        v -L $updates/*_$date.tgz
         foreach node ( $nodes )
+          echo ================  $node.$exp
           scp -p $updates/*_$date.tgz $node.$exp\:/tmp
         end
 
-        # First update Cygwin setup, then Cygwin itself.
-        foreach node ( $nodes )
-          echo $node.$exp
-          ssh $node.$exp cp -p /share/windows/cygwin-setup.exe /tmp/setup.exe
-          sudo ssh $node.$exp "cd C:/Software/Cygwin; cp /tmp/setup.exe .; " \
-                              "rm -f cygwin-setup.exe; ls -l"
-        end
+        # First update Cygwin setup, then run it to update Cygwin itself.
+        nodes "cp -p /share/windows/cygwin-setup.exe /tmp/setup.exe"
+        su_nodes "(cd C:/Software/Cygwin; cp /tmp/setup.exe .; rm -f cygwin-setup.exe; ls -l)"
 
-          # Gotta do this part under an RDP login, *as root*.
+          # Log in a bunch of RDP windows, *as root*.
           set rootpwd='daFluxGroup'
           set rd=/proj/testbed/fish/rdesktop/rdesktop-1.3.1
-          set rdarg="-K -g 1280x1024-500+0"
+          set rdarg="-K -g 1280x1024"
           foreach node ( $nodes )
             echo $node.$exp
             (cd $rd; ./rdesktop $rdarg -u root -p "$rootpwd" $node.$exp &)
@@ -1283,12 +1310,15 @@ Updating a set of existing images.
             # Now update everything else.
             /cygdrive/c/software/cygwin/setup.exe &
             # May need to reboot and run again before adding any new packages like sysvinit.
+            cygcheck -c openssh
             cygcheck -c sysvinit
+            cygcheck -c psmisc
             /sbin/reboot
 
             # Unpack the patched and edited system files.
+            set date=2005-09-29
             net stop init
-            tar xvfz /tmp/sys_*.tgz -C /
+            tar xvfz /tmp/sys_$date.tgz -C /
             net start init
             # sshd.exe may be busy, move the busy executable aside.
               ls -l /usr/sbin/sshd*
@@ -1299,66 +1329,182 @@ Updating a set of existing images.
               ls -l /usr/sbin/sshd*
             net start sshd
 
-	    #[On Boss.]
-	    # Shut down the Emulab services.
-	    foreach node ( $nodes )
-	      echo $node.$exp
-	      sudo ssh $node.$exp 'ps -Welf | grep emulab; killall evproxy'
-	      sudo ssh $node.$exp '$rc/rc.syncserver shutdown; $rc/rc.progagent shutdown; '\
-				  '$rc/rc.slothd stop; sleep 5; ps -Welf | grep emulab; '
-	      sudo ssh $node.$exp 'killall emulab-sync program-agent slothd'
+          #[On Boss.]
+          # Shut down the Emulab services so we can install new programs.
+          nodes "ps -Welf | grep emulab; killall evproxy"
+          su_nodes "/usr/local/etc/emulab/rc/rc.syncserver shutdown; \
+                    /usr/local/etc/emulab/rc/rc.progagent shutdown; \
+                    /usr/local/etc/emulab/rc/rc.slothd stop; \
+                    ps -Welf | grep emulab"
+          # Just in case...
+          su_nodes "killall emulab-sync program-agent slothd"
 
-	    end
-
-	    # Unpack the Emulab files.
-	    foreach node ( $nodes )
-	      echo $node.$exp
-	      sudo ssh $node.$exp "tar xfz /tmp/elab_*.tgz -C /usr/local"
-	      echo ""
-	      sleep 1
-	    end
+          # Unpack the Emulab files.
+          su_nodes "tar xfz /tmp/elab_2005-09-29.tgz -C /usr/local"
 
      . Do one-time updates
          #[On Boss.]
-          foreach node ( $nodes )
-            echo $node.$exp
-            sudo ssh $node.$exp "bootcfg /query; bootcfg /ems OFF /id 1; bootcfg /query"
-            sudo ssh $node.$exp "chown system.system /etc/inittab /etc/rc; "\
-                                "cygrunsrv -I init -d 'Cygwin SysV init' -p /sbin/init -a -i -s INT; "\
-                                "net start init"
-          end
+         su_nodes "bootcfg /query; bootcfg /ems OFF /id 1; bootcfg /query"
+         su_nodes "chown system.system /etc/inittab /etc/rc; \
+                  cygrunsrv -I init -d 'Cygwin SysV init' -p /sbin/init -a -i -s INT; \
+                  net start init"
+
+         ##su_nodes "regtool -s set /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle 'C:\cygwin\usr\local\etc\emulab\idlemon.vbs'"
+         ## The su_nodes alias just isn't up to handling complicated quoting...
+         foreach node ( $nodes )
+           echo ================  $node.$exp
+           sudo ssh -n $node.$exp "regtool -s set /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle '"'C:\cygwin\usr\local\etc\emulab\idlemon.vbs'"'"
+           echo ""
+         end
+         su_nodes "regtool get /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle"
 
        - Some things still have to be done through the GUI under RDP.
-	 . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
-	   Also set Power Options / Power Schemes to "Always On".
+         . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
+           Also set Power Options / Power Schemes to "Always On".
 
-     . Reboot and test.
+     . Prepare, reboot and test.
          #[On Boss.]
+           su_nodes "ls -l /var/log"
+         su_nodes "prepare"
+         su_nodes "cat /etc/motd"
          node_reboot -e $pid,$eid
+
          # Network configs.
-          foreach node ( $nodes )
-            echo $node.$exp
-            sudo ssh $node.$exp "ipconfig /all"
-            echo ""
-         end
+         su_nodes "ipconfig /all"
+         su_nodes "grep IPEnableRouter /var/log/bootsetup.log"
 
          # Connectivity test.
          foreach node1 ( $nodes )
            foreach node2 ( $nodes )
              if ( "$node1" != "$node2" ) then
+               echo ================================================================
                echo $node1 pings $node2
-               sudo ssh $node1.$exp "ping $node2"
+               sudo ssh $node1.$exp "ping -n 1 $node2"
              endif
            end
          end
                  
+     . Prepare again, go into admin mode, and pull the images.
+         su_nodes "prepare"
+         ##node_admin -e $pid,$eid on
+
+           ## node_admin -e might be broken.  (Or maybe the problem is that we don't want the firewall down...)
+           ## Do it by hand on just the Windows nodes in the experiment for now.
+           foreach node ( $nodes )
+             echo ================================ $node.$exp
+             set pc=`nslookup $node.$exp | sed -n '/^Name:/s/.*\(pc[0-9]*\).*/\1/p'`
+             node_admin on $pc
+           end
+
+           # Check that they're in the MFS (FreeBSD 4.7-RELEASE (TESTBED) #1: Tue Nov  5 16:03:29 MST 2002)
+           foreach node ( $nodes )
+             echo ================================ $node.$exp
+             set pc=`nslookup $node.$exp | sed -n '/^Name:/s/.*\(pc[0-9]*\).*/\1/p'`
+             sudo ssh $pc cat /etc/motd | head -1
+           end
+
+         nping
+         echo $date
+         v -t /{usr,proj}/testbed/images/WINXP-*$date*.ndz
+           v -t /{usr,proj}/testbed/images/WINXP*.ndz
+         df -m /{usr,proj}/testbed/images
+           echo $hw $disk
+         foreach node ( $nodes )
+           echo ================================  $node.$exp
+           set imagefile=/proj/testbed/images/WINXP-$node-$hw"_"$date.ndz
+           echo $hw $disk $imagefile
+           sudo ssh $node.$exp "imagezip -o -I 2 -I 3 -I 4 $disk $imagefile"
+           echo ""
+         end
+
+         ##node_admin -e $pid,$eid off
+           foreach node ( $nodes )
+             echo ================================ $node.$exp
+             set pc=`nslookup $node.$exp | sed -n '/^Name:/s/.*\(pc[0-9]*\).*/\1/p'`
+             node_admin off $pc
+           end
 
 
-     . Update the dates in the image ID's.
-        # [On boss:]
-          mysql tbdb
-            select imagename, created, path from images where imagename like 'WINXP%';
-            select imagename, created, path from images where imagename like 'WINXP-SP_';
-          update images set created='2005-08-22 16:49' where imagename like 'WINXP-SP_';
-          update images set created='2005-08-22 16:49' where imagename like 'WINXP-UPDATE';
+     . Move the images to /usr/testbed/images to avoid NFS reads, for faster swap-in.
+        df -m /{proj,usr}/testbed/images
+        v /{proj,usr}/testbed/images/WINXP-*-pc*_$date.ndz
+        set projimages=/proj/testbed/images/WINXP-*-pc*_$date.ndz
+          v $projimages
+            ##cp -p $projimages /usr/testbed/images
+        # NFS gets swamped on Ops, use scp instead.
+        foreach prjimg ( $projimages )
+          v $prjimg
+          set usrimg=/usr/testbed/images/$prjimg:t
+          scp -p ops:$prjimg $usrimg.new
+          # Install with mv.  Frisbee might have the old inode still open.
+          if ( -f $usrimg.prev ) rm -f $usrimg.prev
+          if ( -f $usrimg ) mv $usrimg{,.prev}
+          mv $usrimg{.new,}
+          v $usrimg
+          if ( -f $usrimg.prev ) rm -f $usrimg.prev
+        end
+
+        # Check that everything arrived correctly.
+        ssh -n ops cksum $projimages > ~/projimages.cksums &
+        set usrimages=/usr/testbed/images/WINXP-*-pc*_$date.ndz
+        cksum $usrimages > ~/usrimages.cksums &
+          diff ~/projimages.cksums ~/usrimages.cksums
+        sed 's/proj/usr/' ~/projimages.cksums | diff - ~/usrimages.cksums
+
+        # The ones on Ops:/proj are not needed anymore.
+        v $projimages
+        rm -f $projimages
+
+     . Make symlinks without the date suffix, corresponding to the Image ID's.
+         # First, -new symlinks for testing.
+         cd /usr/testbed/images
+         set pctype; if ( "$hw" != pc850 ) set pctype="-$hw"
+         v WINXP-{SP[012],UPDATE}$pctype-new.ndz
+         v WINXP-{SP[012],UPDATE}-$hw"_"$date.ndz
+         foreach node ( $nodes )
+           set link=WINXP-$node$pctype-new.ndz file=WINXP-$node-$hw"_"$date.ndz
+           echo "$link -> $file"
+           if ( -l $link ) rm -f $link
+           ln -s $file $link
+         end
+         v WINXP-{SP[012],UPDATE}$pctype-new.ndz           
+
+         # Update the dates in the image ID's.
+         ls -lLT WINXP-{SP[012],UPDATE}$pctype-new.ndz
+         ls -lLT WINXP-{SP[012],UPDATE}$pctype-new.ndz | awk '{ sq = "'"'"'"; \
+                # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
+                "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
+                image = gensub("\.ndz", "", 1, $NF); \
+                print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
+                | tee ~/imgdates.sql
+
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb
+         mysql tbdb < ~/imgdates.sql
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb
+
+         # Then the regular symlinks.
+         cd /usr/testbed/images
+         set pctype; if ( "$hw" != pc850 ) set pctype="-$hw"
+         v WINXP-{SP[012],UPDATE}$pctype.ndz
+         v WINXP-{SP[012],UPDATE}-$hw"_"$date.ndz
+         foreach node ( $nodes )
+           set link=WINXP-$node$pctype.ndz file=WINXP-$node-$hw"_"$date.ndz
+           echo "$link -> $file"
+           if ( -l $link ) rm -f $link
+           ln -s $file $link
+         end
+         v WINXP-{SP[012],UPDATE}$pctype.ndz           
+
+         # Update the dates in the image ID's.
+         ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz
+         ls -lLT WINXP-{SP[012],UPDATE}$pctype.ndz | awk '{ sq = "'"'"'"; \
+                # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
+                "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
+                image = gensub("\.ndz", "", 1, $NF); \
+                print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
+                | tee ~/imgdates.sql
+
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb
+         mysql tbdb < ~/imgdates.sql
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb
 
