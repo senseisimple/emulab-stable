@@ -32,6 +32,13 @@ CP= cp -pf
 ifeq ($(SYSTEM),CYGWIN_NT-5.1)
 # Cygwin on  Windows XP (a.k.a. NT 5.1).
 MLIBS += -liphlpapi
+
+WINCLIENT = idlemon
+WINCLIENTSRC = idlemon.c
+CVR = /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run
+IDLEKEY = $(CVR)/EmulabIdle
+IDLEMONEXE = $(DESTDIR)$(CLIENT_BINDIR)/idlemon$(EXE)
+
 endif
 
 all: $(SDPROGS) client
@@ -41,16 +48,20 @@ include ${TESTBED_SRCDIR}/GNUmakerules
 slothd-debug: slothd.o slothd.h version.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ slothd.o version.o $(LIBS)
 
+# This is started up at user login on Windows to monitor desktop events for slothd.
+idlemon-debug: idlemon.o version.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -static -o $@ idlemon.o version.o $(LIBS)
+
 sdcollectd: sdcollectd.o sdcollectd.h version.o $(TBLIB)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ sdcollectd.o version.o $(SDLIBS)
 
 $(TBLIB):
 	gmake -C $(OBJDIR)/lib
 
-version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h
+version.c: slothd.c slothd.h sdcollectd.c sdcollectd.h $(WINCLIENTSRC)
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-client: slothd
+client: slothd $(WINCLIENT)
 
 install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd) webfeedback
 	$(INSTALL_PROGRAM) $(SRCDIR)/digest-slothd $(INSTALL_LIBEXECDIR)
@@ -59,6 +70,18 @@ install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS) sdcollectd) webfeedbac
 
 client-install: client
 	$(INSTALL_PROGRAM) slothd$(EXE) $(DESTDIR)$(CLIENT_BINDIR)/slothd$(EXE)
+
+ifeq ($(SYSTEM),CYGWIN_NT-5.1)
+	# If there are any RDP logins active, idlemon will be busy.  Try moving it.
+	-mv $(IDLEMONEXE) $(IDLEMONEXE).prev
+	$(INSTALL_PROGRAM) idlemon$(EXE) $(IDLEMONEXE)
+
+	# Wrap the idlemon program in a VBS script to hide its window away.
+	$(INSTALL_PROGRAM) $(SRCDIR)/idlemon.vbs $(DESTDIR)$(CLIENT_BINDIR)/idlemon.vbs
+
+	# Run the wrapped idlemon as part of any Windows desktop login.
+	regtool -s set $(IDLEKEY) 'C:\cygwin\usr\local\etc\emulab\idlemon.vbs'
+endif
 
 control-install:
 

@@ -335,7 +335,23 @@ int init_slothd(void) {
     }
   }
   closedir(devs);
-#endif /* not __CYGWIN__ */
+
+#else /* __CYGWIN__ */
+
+  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
+   * However, stat on anything under /dev always returns the current time, so
+   * it's no help detecting user input.  Instead, we patch sshd to change the
+   * modtime on a file when input is received and stat that.
+   */
+  parms->ttys[0] = strdup("/var/run/ssh_input");
+
+  /* Likewise, idlemon is started up at user login on Windows to monitor
+   * desktop events for slothd under RDP logins and touches a time tag file.
+   */
+  parms->ttys[1] = strdup("/var/run/rdp_input");
+  parms->numttys = 2;
+
+#endif /* __CYGWIN__ */
 
   /* prepare UDP connection to server */
   if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -467,67 +483,30 @@ int send_pkt(SLOTHD_PACKET *pkt) {
 
 
 void get_min_tty_idle(SLOTHD_PACKET *pkt) {
-  
+  int i;
   time_t mintime = 0;
   struct stat sb;
 
-#ifndef __CYGWIN__
-  int i;
   for (i = 0; i < parms->numttys; ++i) {
     if (stat(parms->ttys[i], &sb) < 0) {
       fprintf(stderr, "Can't stat %s:  %s\n", 
               parms->ttys[i], strerror(errno)); /* XXX change. */
     }
     else {
-	/* The time of last reading keyboard input. */
-	time_t tty_time = sb.st_atime;
-	if (tty_time > mintime)
-	    mintime = tty_time;
+#ifndef __CYGWIN__
+      /* The time of last reading keyboard input. */
+      time_t tty_time = sb.st_atime;
+#else
+      /* We're modding time tag files Cygwin, not reading them. */
+      time_t tty_time = sb.st_mtime;
+#endif
+      if (tty_time > mintime) {
+	mintime = tty_time;
+	if (opts->debug)
+	  printf("Input on %s: %s", parms->ttys[i], ctime(&mintime));
+      }
     }
   }
-#else  /* __CYGWIN__ */
-  LASTINPUTINFO windows_input;
-
-  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
-   * However, stat on anything under /dev always returns the current time, so
-   * it's no help detecting user input.  Instead, we patch sshd to change the
-   * modtime on a file when input is received and stat that.
-   */
-  char *ssh_input = "/var/run/ssh_input";
-  if (stat(ssh_input, &sb) < 0) {
-    fprintf(stderr, "Can't stat %s:  %s\n", 
-	    ssh_input, strerror(errno)); /* XXX change. */
-  }
-  else {
-    /* We're modding a time tag file from sshd on Cygwin, not reading it. */
-    time_t tty_time = sb.st_mtime;
-    if (opts->debug)
-      printf("sshd time: %s", ctime(&tty_time));
-    if (tty_time > mintime)
-      mintime = tty_time;
-  }
-
-  /* In a Remote Desktop Protocol login, look at keyboard and mouse input. */
-  windows_input.cbSize = sizeof(LASTINPUTINFO);
-  if (GetLastInputInfo(&windows_input) == 0) {
-    fprintf(stderr, "Failed GetLastInputInfo().\n");
-  }
-  else {
-    /* Windows keeps time in millisecond ticks since boot time. */
-    DWORD windows_ticks = GetTickCount() - windows_input.dwTime;
-    time_t windows_time = time(0) - windows_ticks/1000;
-
-    /* For debugging, run this under RDP.  It doesn't get anything useful
-     * under ssh.  It's normally started by rc.slothd under the EmulabStartup
-     * service, and that works too.
-     */
-    if (opts->debug)
-      printf("Windows input event time: %s", ctime(&windows_time));
-
-    if (windows_time > mintime)
-      mintime = windows_time;
-  }
-#endif /* __CYGWIN__ */
 
   /* Assign TTY activity, ensuring we don't go older than initial startup. */
   pkt->minidle = (mintime > parms->startup) ? mintime : parms->startup;
