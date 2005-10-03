@@ -148,6 +148,30 @@ TBDebugTimeStamp("parser finished");
 print "Parser done! " . TBTimeStamp() . "\n";
 
 #
+# XXX Until link agent runs on linux.
+#
+my $events_result =
+    DBQueryFatal("select ev.pid,ev.eid,vl.vnode,vl.vname,vn.osname,o.OS ".
+		 "  from eventlist as ev ".
+		 "left join event_objecttypes as ev_ob on ".
+		 "  ev.objecttype=ev_ob.idx ".
+		 "left join virt_lans as vl on vl.vname=ev.vname and ".
+		 "  vl.pid=ev.pid and vl.eid=ev.eid ".
+		 "left join virt_nodes as vn on vn.pid=ev.pid and ".
+		 "  vn.eid=ev.eid and vn.vname=vl.vnode ".
+		 "left join os_info as o on o.osname=vn.osname and".
+		 "  (o.pid=ev.pid or o.pid='emulab-ops') ".
+		 "left join experiments as e on e.pid=ev.pid and ".
+		 "  e.eid=ev.eid ".
+		 "where ev.pid='$pid' and ev.eid='$eid' and ".
+		 "  (vl.uselinkdelay!=0 or e.uselinkdelays!=0 or ".
+		 "   e.forcelinkdelays!=0) and ev_ob.type='LINK' and ".
+		 "  (o.os is NULL or o.os='Linux')");
+if ($events_result->num_rows) {
+    fatal("Oops, cannot send static events to linkdelay agents on Linux!");
+}
+
+#
 # Need to know if wrapping an experiment.
 #
 my $elabinelab = 0;
