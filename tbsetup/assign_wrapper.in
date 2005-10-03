@@ -743,8 +743,10 @@ while (1) {
 	if ($retval == 0);
 
     if (!$precheck && !$tried_precheck) {
+	my $ptopfile0 = $ptopfile;
 	my $impotent0 = $impotent;
 	print("Trying assign on an empty testbed.\n");
+	$ptopfile = "$pid-$eid-$$-empty.ptop";
 	$impotent = 1;
 	$precheck = 1;
 	my $retval = RunAssign();
@@ -754,6 +756,7 @@ while (1) {
 	print("Assign succeeded on an empty testbed.\n");
 	$precheck = 0;
 	$impotent = $impotent0;
+	$ptopfile = $ptopfile0;
 	$tried_precheck = 1;
     }
 
