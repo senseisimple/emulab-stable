@@ -205,7 +205,7 @@ if ($nsfile_string) {
 # In update mode, do not start the renderer until later. If update fails we
 # want to try to restore old render info rather then rerunning. 
 # 
-if ($state eq EXPTSTATE_PRERUN) {
+if ($state eq EXPTSTATE_PRERUN && !$zeemode) {
     TBDebugTimeStamp("prerender started in background");
     print "Precomputing visualization ...\n";
     system("prerender -t $pid $eid");
@@ -236,12 +236,14 @@ if ($use_ipassign) {
 
 #
 # Fire up the route calculator. 
-# 
-TBDebugTimeStamp("static route calculator started");
-print "Setting up static routes (if requested) ... \n";
+#
+if (!$zeemode) {
+    TBDebugTimeStamp("static route calculator started");
+    print "Setting up static routes (if requested) ... \n";
 
-if (system("staticroutes $pid $eid")) {
-    fatal("Static route calculation failed!");
+    if (system("staticroutes $pid $eid")) {
+	fatal("Static route calculation failed!");
+    }
 }
 
 #
