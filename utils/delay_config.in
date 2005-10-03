@@ -423,10 +423,12 @@ sub ChangeLinkDelayConfig() {
     my @query_clauses;
     my $query_string;
 
-    $query_string = "select * from linkdelays ".
-	"where pid='$pid' and eid='$eid' and vlan='$link' ";
+    $query_string = "select l.*,o.OS from linkdelays as l ".
+	"left join nodes as n on n.node_id=l.node_id ".
+	"left join os_info as o on o.osid=n.def_boot_osid ".
+	"where l.pid='$pid' and l.eid='$eid' and l.vlan='$link' ";
 
-    $query_string .= "and vnode='$srcvnode'"
+    $query_string .= "and l.vnode='$srcvnode'"
 	if (defined($srcvnode));
 
     #
@@ -435,6 +437,19 @@ sub ChangeLinkDelayConfig() {
     my $query_result = DBQueryFatal($query_string);
     if (! $query_result->numrows) {
 	return -1;
+    }
+
+    #
+    # XXX Check for linux; temporary.
+    #
+    while (my $row = $query_result->fetchrow_hashref()) {
+	my $vnode = $row->{'vnode'};
+	my $OS    = $row->{'OS'};
+
+	if ($OS eq "Linux") {
+	    die("*** $0:\n".
+		"    Oops, dynamic events do not yet work on Linux!\n");
+	}
     }
 
     #
