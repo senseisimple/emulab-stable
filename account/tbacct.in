@@ -550,6 +550,14 @@ sub UpdateUser(;$)
 	return 0;
     }
     if (!defined($freezeopt) && ($status ne USERSTATUS_ACTIVE)) {
+	#
+	# If doing a modification to a frozen user, then just ignore
+	# it; the modification will happen later when the user is thawed.
+	#
+	if ($status eq USERSTATUS_FROZEN) {
+	    print "Ignoring update of frozen user $user\n";
+	    return 0;
+	}
 	fatal("$user is not active! Cannot update the account!");
     }
 
