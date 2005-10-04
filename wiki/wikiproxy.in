@@ -874,7 +874,7 @@ sub CI($$) {
 	return -1
 	    if ($?);
 	my $lockcmd = "rcs -l $file";
-	print "'$unlockcmd'\n"
+	print "'$lockcmd'\n"
 	    if ($debug);
 	system("sudo -u nobody $lockcmd");
 	return -1
