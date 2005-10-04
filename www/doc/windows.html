@@ -19,8 +19,10 @@
   <ul>
     <li> <a href="#Windows_Passwords"> Windows Passwords </a></li>
     <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes </a></li>
-    <li> <a href="#Routing"> Routing </a></li>
     <li> <a href="#Network_config"> Network config </a></li>
+    <li> <a href="#Routing"> Routing </a></li>
+    <li> <a href="#Firewalls"> Firewalls </a>
+         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
     <li> <a href="#Boots_twice"> Windows nodes boot twice </a></li>
     <li> <a href="#Login_connections"> Login connections to Windows </a></li>
     <li> <a href="#RDP_details"> RDP details </a></li>
@@ -44,20 +46,13 @@
 
 Microsoft <i>Windows XP</i> is now supported as one of the operating system
 types for experiment nodes in Emulab, in addition to FreeBSD and Linux.
-<a href="../faq.php3?#SWS-WIN2K">Windows 2000</a> is not supported. <p>
+<a href="../kb-show.php3?xref_tag=SWS-WIN2K">Windows 2000</a> is not supported. <p>
 
 As much as possible, we have left Windows XP "stock".  Some Windows services
 are shut down: Messenger, SSDP Discovery Service, Universal Plug and Play
-Device Host, and Remote Registry.  NetBT (NetBios over TCP) is disabled to
-allow network <a href="../docwrapper.php3?docname=swapping.html#idleness">
-idle detection </a> by the <code>slothd</code> service. <p>
-
-Emulab.net is outside the University of Utah firewall, to allow free network
-experimentation.  Even though we have closed some holes, your Windows XP
-experiment nodes are exposed to the wider Internet.  If your experiment does
-not require that full freedom, consider adding a <a
-href="../tutorial/docwrapper.php3?docname=firewall.html"> firewall </a> to
-your experiment ns file.
+Device Host, and Remote Registry.  Other setting changes are described under 
+<a href="#Network_config"> Network config </a> and
+<a href="#Routing"> Routing </a> below.  <p>
 
 Before booting the node at swap-in time, Emulab loads a 
 <a href="#Experiment_setup"> fresh image of Windows XP </a>
@@ -76,14 +71,16 @@ Emacs, vim, nano and ed.  <p>
 
 The Emulab web interface manages a separate <a href="#Windows_Passwords"> 
 Windows password </a> in the user
-profile, as well as making <a href="#Login_connections"> SSH and RDP login
+profile, as well as making <a href="#Login_connections"> login
 connections </a> to the experiment nodes.
 Remote Desktop Protocol service supports Windows Desktop logins from the
-user's workstation screen to the experiment node.  <p>
+user's workstation screen to the experiment node.  SSH and Serial Console
+command-line connections are also supported.  <p>
 
 <i>Windows XP</i> installations are more hardware dependent than Linux or
-FreeBSD.  At first, this <i>Windows XP</i> image only runs on the pc850
-Emulab node type.  <p>
+FreeBSD.  At present, this <i>Windows XP</i> image only runs on the Emulab <a
+href="../shownodetype.php3?node_type=pc850"> pc850 </a> and <a
+href="docwrapper.php3?docname=pc3000.html"> pc3000 </a>node types.  <p>
 
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Differences"></a> Differences from FreeBSD and Linux in Emulab </h3>
@@ -134,38 +131,111 @@ next Emulab watchdog daemon <code>isalive</code> interval.  This should be in
 <h4><a name="Experiment_setup"> </a> Experiment setup for Windows nodes </h4>
 
 All you have to do is put a line specifying a WINXP OS image in your
-experiment .ns file, like this: <br>
-<pre>    tb-set-node-os $node WINXP-UPDATE</pre>
+experiment .ns file, like this:
+<pre>
+    tb-set-node-os $node WINXP-UPDATE
+    tb-set-hardware $node pc850
+</pre>
+
+Notice that the above image only runs on the <a
+href="../shownodetype.php3?node_type=pc850"> pc850 </a> Emulab node type.  At
+present, you have to explicitly specify a different image name and hardware
+type to run on the <a href="docwrapper.php3?docname=pc3000.html"> pc3000's
+</a>.  For example:
+<pre>
+    tb-set-node-os $node WINXP-UPDATE-pc3000
+    tb-set-hardware $node pc3000
+</pre>
+
 
 Currently available Windows XP images are:
 
 <ul>
 
-  <li><b>WINXP-UPDATE</b> - Windows XP-SP2+, pc850.  This will be
-  updated periodically from Windows Update with critical and security fixes up
-  through the date we pull the image file. <p>
+  <li><b>WINXP-UPDATE</b> (pc850), and <b>WINXP-UPDATE-pc3000</b> - Windows
+  XP-SP2+.  These are updated periodically from Windows Update, typically after
+  a Microsoft "Patch Tuesday", the second Tuesday of each month.  All critical
+  and security fixes are installed, up through the date we pull the image
+  file. (See the date created field on the individual WINXP <a
+  href="https://www.emulab.net/showimageid_list.php3"> Image ID's </a>).  <p>
 
-  The Windows Firewall is disabled by default (as it will inform you
+  Note: The Windows Firewall is disabled by default (as it will inform you
   repeatedly!)
   </li>
 
-  <li><b>WINXP-SP1</b> - Windows XP-SP1a, pc850.
-  This is intended for (in)security work, and has only SP1(a) on it.
+  <li><b>WINXP-SP2(-pc3000)</b> - Windows XP-SP2.  This has the original SP2 on it,
+  with no Windows Update modifications beyond that.  (SP2 includes SP1.)
   </li>
 
-  <li><b>WINXP-SP0</b> - Windows XP with no service packs, pc850.
-  This is intended for (in)security work, and has no service packs at all.
+  <li><b>WINXP-SP1(-pc3000)</b> - Windows XP-SP1a.  This is intended for
+  software (in)security work, and has only the updated version of SP1
+  (a.k.a. SP1a) installed.
+  </li>
+
+  <li><b>WINXP-SP0(-pc3000)</b> - Windows XP, from the original 2001 MSDN CD,
+  with the Emulab client-side management code ported to it.  This is intended
+  for software (in)security work, and has no service packs at all.
+  </li>
+
+  <li><b>WINXP-BASE(-pc3000)</b> - Raw Windows XP, from the original 2001 MSDN
+  CD.  There is no Emulab client-side <a href="#Overview"> management code
+  </a> to set up and operate the node, or even Cygwin.  This is only useful
+  for building custom images completely from scratch.
   </li>
 
 </ul>
 
+<h4><a name="Network_config"> </a> Network config </h4>
+
+Some default Windows networking features are disabled.  <i>NetBT (NetBios over
+TCP)</i> (<a
+href="http://www.microsoft.com/technet/prodtechnol/windowsserver2003/library/DepKit/40c09844-a669-463c-94dc-7ccf7214083d.mspx">
+NetbiosOptions=2 </a>) and <i>DNS auto-registration</i> (<a
+href="http://support.microsoft.com/default.aspx?scid=kb;EN-US;q246804">
+DisableDynamicUpdate=1 </a>) are disabled to allow network <a
+href="../docwrapper.php3?docname=swapping.html#idleness"> idle detection </a>
+by the <code>slothd</code> service.  <i>TCP/IP address autoconfiguration</i>
+is disabled (<a
+href="http://www.microsoft.com/resources/documentation/Windows/2000/server/reskit/en-us/Default.asp?url=/resources/documentation/Windows/2000/server/reskit/en-us/regentry/58861.asp">
+IPAutoconfigurationEnabled=0 </a>) so that unswitched interfaces like the
+sixth NICs on the pc3000's don't get bogus Microsoft class B network
+169.254.0.0 addresses assigned.  <p>
+
+The Emulab pc850 node type has five network interfaces, and the pc3000 has
+six.  However, the Windows <b><code>ipconfig /all</code></b> command only
+shows the configuration information for the enabled network interfaces.  There
+will always be one enabled <a
+href="../tutorial/docwrapper.php3?docname=tutorial.html#ControlNet"> control net
+</a> interface on the 155.98.36 network.  The others are disabled if not used
+in your experiment.  <p>
+
+If you specified links or LANs in your experiment <a
+href="../tutorial/docwrapper.php3?docname=tutorial.html#Designing"> network
+topology </a>, other interfaces will be enabled, with an IP address, subnet
+mask, and gateway that you can specify in the NS file.
+
+Notice that the Windows names of the interfaces start with <b><code>Local Area
+Connection</code></b> and have a number appended.  You can't count on what this
+number is, since it depends on the order the NIC's are probed as Windows
+boots. <p>
+
+<div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen
+<code>ipconfig</code> report an ip address and mask of <code>0.0.0.0</code>,
+while the TCP/IP properties dialog boxes show the proper values.
+<code>ipconfig</code> is wrong.  </div>
+
 <h4><a name="Routing"> </a> Routing </h4>
 
-Router nodes can not run Windows, i.e. <b><code>rtproto Session</code></b> is
-not supported.<p>
+Full-blown router nodes can not run Windows, i.e. <b><code>rtproto
+Session</code></b> is not supported.  However, basic routing between connected
+network components of your experiment topology works.  The Windows command to
+see the routing tables is <b><code>route print</code></b>.  The <a
+href="http://www.microsoft.com/windows2000/en/advanced/help/default.asp?url=/windows2000/en/advanced/help/sag_TCPIP_pro_EnableForwarding.htm">
+IPEnableRouter=1 </a> registry key is set on multi-homed hosts in the
+experiment network, before they are rebooted to change the hostname.<p>
 
-<b><code>rtproto Static</code></b> is supported in WINXP-UPDATE, but not in
-WINXP-02-16 or before. <p>
+<b><code>rtproto Static</code></b> is supported in all recent WINXP images,
+but not in WINXP-02-16 or before. <p>
 
 <b><code>rtproto Static-old</code></b> or <b><code>rtproto Manual</code></b>
 will work in any image.<p>
@@ -174,26 +244,30 @@ There is more information on routing in the <a
 href="../tutorial/docwrapper.php3?docname=tutorial.html#Routing">
 Routing Section of the Emulab Tutorial. </a><p>
 
-<h4><a name="Network_config"> </a> Network config </h4>
+<h4><a name="Firewalls"> </a> Firewalls </h4>
 
-Normally, the Windows <b><code>ipconfig /all</code></b> command shows the
-configuration information for each of the 5 network interfaces.  There will
-always be a configured control net interface on the 155.98.36 network. <p>
+Emulab.net is outside the University of Utah firewall, with only a minimal <a
+href="../kb-show.php3?xref_tag=SI-FW"> outer firewall </a>, to allow free network
+experimentation.  Even though we have closed most low-numbered ports, your
+Windows XP experiment nodes are still exposed to the wider Internet on higher
+port numbers.  <p>
 
-Notice that the Windows names of the interfaces start with <code>Local Area
-Connection</code> and have a number appended.  You can't count on what this
-number is, since it depends on the order the NIC's are probed as Windows
-boots. <p>
+If your experiment does not require that full freedom, consider adding a <a
+href="../tutorial/docwrapper.php3?docname=firewall.html"> control net firewall
+node </a> statement to your experiment ns file.  This allows you to control
+the <a href="../tutorial/docwrapper.php3?docname=secure.html"> security level
+</a> of your connection to the Internet by a <a
+href="../tutorial/docwrapper.php3?docname=firewall.html#Use"> style keyword
+</a>, for example:
+<pre>
+    set fw [new Firewall $ns]
+    $fw set-type ipfw2-vlan
+    $fw set-style basic
+</pre>
 
-If you specified links or lans in your experiment topology, the other
-interfaces will show a configuration, with an IP address, subnet mask, and
-gateway that you can specify in the NS file.  Otherwise ipconfig will show a
-Media State of <code>Media disconnected</code>. <p>
-
-<div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen
-<code>ipconfig</code> report an ip address and mask of <code>0.0.0.0</code>,
-while the TCP/IP properties dialog boxes show the proper values.
-<code>ipconfig</code> is wrong.  </div>
+The <i>Windows Firewall</i> software is installed in WINXP-SP2 and
+WINXP-UPDATE images, but disabled to allow RDP and SSH access to Windows
+nodes.  <p>
 
 <h4><a name="Boots_twice"> </a> Windows nodes boot twice </h4>
 
@@ -212,11 +286,14 @@ the node itself: <pre>    /sbin/reboot</pre> </div>
 
 <h4><a name="Login_connections"> </a> Login connections to Windows </h4>
 
-You can manually start up SSH or RDP client programs to connect and log in to
-nodes in your experiment, using your Windows password. <p>
+You can manually start up the SSH or RDP client programs to connect and log in
+to nodes in your experiment, or use the <code>console</code> command on Ops.
+In all cases, you will have to type your <a href="#Windows_Passwords"> Windows
+Password </a> when logging in.
 
 Or you can set up your browser to automatically connect in one click from the
-Emulab web interface.  Once an experiment is swapped in, the Emulab Experiment
+Emulab web interface and pop up a connection window.
+Once an experiment is swapped in, the Emulab Experiment
 Information page contains a table of the physical node ID and logical node
 name, status, and connection buttons.  The captions of the button columns link
 to pages explaining how to set up up mime-types in your browser to make the
@@ -229,12 +306,12 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
        shell, as usual.  Your Emulab ssh keys are installed on the
        node in a /sshkeys subdirectory.  </li>
 
-  <li> <b>Console</b> <a href="../kb-show.php3?xref_tag=tiptunnel">
-       (setup) </a> - The <b>Console</b> button won't do much good now, because
-       Windows doesn't normally provide logins on the com serial device.
-       (This will be remedied with <i>agetty</i> eventually.)  An exception is
-       that you can monitor the Frisbee loading of the Windows image on the
-       console.  </li>
+  <li> <b>Console</b> <a href="../kb-show.php3?xref_tag=tiptunnel"> (setup)
+       </a> - The serial console is supported for Cygwin shell logins using
+       the <code>agetty</code> and <code>sysvinit</code> packages.  This is
+       the only way in when network connections are closed down!  You can
+       also monitor the Frisbee loading and booting of the Windows image on
+       the console.  </li>
 
   <li> <b>RDP</b> <a href="../docwrapper.php3?docname=rdp-mime.html">
        (setup) </a> - The <b>RDP</b> button starts up a Remote Desktop
@@ -242,10 +319,10 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
        workstation screen to the experiment node.  
        <ul>
 
-	 <li> The "rdesktop" client software is used from Linux and Unix 
+	 <li> The <b><code>rdesktop</code></b> client software is used from Linux and Unix 
 	      client workstations. </li>
 
-	 <li> A Microsoft RDC (Remote Desktop Connector) client program is
+	 <li> A Microsoft <b>RDC</b> (Remote Desktop Connector) client program is
 	      included in Windows XP, and may be installed onto other versions
 	      of Windows as well.  It has the cute feature that you can make
 	      it full-screen without (too much) confusion, since it hangs a
@@ -257,11 +334,13 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
 </ul>
 
 <div style="margin-left: 40px;"> <b>NOTE:</b> If your dot-files replace the
-execution search path entirely, you will not be able to execute Windows in
+execution search path entirely, you will not be able to execute Windows commands in
 shells.  In that case, you should add
 <b><code>/cygdrive/c/WINDOWS/system32</code></b> and 
 <b><code>/cygdrive/c/WINDOWS</code></b>
-to your <code>$PATH</code>. </div>
+to your <code>$PATH</code>.  Don't worry about your home directory dot-files
+being shared among Windows, FreeBSD, and Linux nodes.  Non-existent
+directories are ignored. </div>
 
 <h4><a name="RDP_details"> </a> RDP details </h4>
 
@@ -303,10 +382,10 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
   <li> There are several <b>Desktop icons</b> (i.e. "shortcuts") installed by
        default in the XP images: Computer Management, Bash and TCSH shells,
-       and <i>NtEmacs</i>.  </li> <br>
+       and <i>NtEmacs</i>.  </li>
        
   <li> The Bash and TCSH icons run their respective shells in a </b>Windows
-       Terminal</b>, just like the Windows cmd.exe .  <p>
+       Terminal</b>, just as the Windows cmd.exe does.  <p>
 
        <b>Quick-edit mode</b> is on by default, so you can cut-and-paste
        freely between your local workstation desktop and your remote RDP
@@ -351,12 +430,15 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
   <li> The <i>Windows XP</i> Start menu has no <b>Shutdown</b> button under
        RDP.  Instead, it is labeled <b>Disconnect</b> and only closes the RDP
-       client window, leaving the login session and the node running. <p>
+       client window, leaving the login session and the node running.  If you
+       simply close the window, or the RDP client network connection is lost,
+       you are also disconnected rather than logged out.  When you reconnect,
+       it comes right back, just as it was. <p>
 
        To restart the computer, run <b>/sbin/reboot</b>, or use the "Shut
        Down" menu of <b>Task Manager</b>.  One way to start Task Manager is to
        right-click on the background of the Taskbar at the bottom of the
-       screen and select it. </li>
+       screen and select "Task Manager". </li>
 
 </ul>
 
@@ -388,11 +470,11 @@ Cygwin is well documented.  Here are some links to get you started:
 A number of optional Cygwin packages are installed in the image due to our
 building and running the Emulab client software, plus some editors for
 convenience.  These packages are currently agetty, bison, cvs, cygrunsrv, ed,
-file, flex, gcc, gdb, inetutils, make, minires-devel, nano, openssh,
-openssl-devel, patch, perl, perl-libwin32, python, rpm, rsync, shutdown, tcsh,
-vim, wget, and zip. <p>
+file, flex, gcc, gdb, inetutils, make, minires-devel, more, nano, openssh,
+openssl-devel, patch, perl, perl-libwin32, psmisc, python, rpm, rsync,
+shutdown, sysvinit, tcsh, vim, wget, and zip. <p>
 
-The Cygwin command <pre> cygcheck -c</pre> lists the packages that are
+The Cygwin command <b><code>cygcheck -c</code></b> lists the packages that are
 installed, and their current version number and status.
 
 Package-specific notes and/or documentation for installed packages are in
@@ -403,14 +485,14 @@ The <a href="http://www.cygwin.com/packages/"> Cygwin package site </a> lists
 the available pre-compiled packages and provides a search engine. <p>
 
 If you want to install more Cygwin pre-compiled packages, run the graphical
-installer: <pre>    C:/Software/Cygwin/cygwin-setup.exe</pre>  <p>
+installer: <pre>    C:/Software/Cygwin/setup.exe</pre>  <p>
 
-The Cygwin command <pre> cygcheck -l <i>package-name</i></pre> lists the
+The Cygwin command <b><code>cygcheck -l <i>package-name</i></code></b> lists the
 contents of an installed package, which may help you to make a tarfile or rpm
 from a package you have installed.  You can then cause it to be installed
 automatically by Emulab into all of the nodes of your experiment.  See the <a
 href="../tutorial/docwrapper.php3?docname=tutorial.html#TARBALLS">
-Tutorial </a> for more information. <p>
+Tutorial </a> for more information about installing RPM's and tarballs. <p>
 
 Watch out for post-install scripts in:
 <pre>    /etc/postinstall/<i>package-name</i>.sh{,.done}</pre><p>
@@ -474,7 +556,7 @@ good across SMB.
        are expanded in double-quotes.) <p>
 
        When you invoke Windows (as opposed to Cygwin) commands, for example
-       <code>net use</code>, they will know nothing about Unix-style paths in
+       <b><code>net use</code></b>, they will know nothing about Unix-style paths in
        their arguments. The <a
        href="http://cygwin.com/cygwin-ug-net/using-utils.html#cygpath">
        <b><code>cygpath</code></b> </a> utility is an aid to converting paths
@@ -492,8 +574,8 @@ good across SMB.
   <li> Cygwin mounts <p>
 
        <a href="http://cygwin.com/cygwin-ug-net/using-utils.html#mount">
-       Cygwin mount points </a> are shown by the <code>mount</code> and
-       <code>df</code> commands.   <p>
+       Cygwin mount points </a> are shown by the <b><code>mount</code></b> and
+       <b><code>df</code></b> commands.   <p>
 
        Note that there is a hard-coded limit of 30 mount points in Cygwin.
        Attempts to use the Cygwin <code>mount</code> command after that will
@@ -517,8 +599,8 @@ good across SMB.
        its use. <p>
 
        You can use the Windows <b><code>net use</code></b> command to
-       associate drive letters with UNC paths to SMB shares, e.g. <code>net
-       use W: '\\fs\share\windows'</code> <p>
+       associate drive letters with UNC paths to SMB shares, e.g. <pre>net
+       use W: '\\fs\share\windows'</pre> <p>
 
        You can use the Windows <b><code>subst</code></b> command to associate
        drive letters with local paths, e.g. <code>subst T: 'C:\Temp'</code> <p>
@@ -586,7 +668,8 @@ desktop. <p>
 
 There is also a <code>/usr/local/bin/emacs-exe</code> executable, a symlink to
 <code>/cygdrive/c/emacs-21.3/bin/emacs.exe</code>, which is only useful as an
-Emacs compiler.  It could be used to run Emacs in an SSH window with the
+Emacs compiler.  It could be used to run Emacs in an SSH or Serial Console 
+login window with the
 <code>-nw</code> (no windows) flag, except that it exits with <code>emacs:
 standard input is not a tty</code>.  Another thing not to try is running
 <code>emacs-exe -nw</code> in a Bash or TCSH shell on the RDP desktop.  It
@@ -637,16 +720,11 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Future"> </a> Future work </h3>
 
-There are still some things left to do: <br>
+There are still some things undone: <br>
 
 <ul>
 
-  <li> Make Windows images for the new pc3000's. </li>
-
   <li> Use Sysprep (MS WADS) for multi-hardware XP images. </li>
-
-  <li> Console support (<code>agetty</code> serial line speed 115.2kb doesn't
-       work?) </li> 
 
   <li> Automate production of <i>Windows XP</i> images for Emulab. </li>
 
