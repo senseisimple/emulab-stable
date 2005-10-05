@@ -595,8 +595,8 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("My CVS Repositories", $TBBASE,
 			       "listrepos.php3?target_uid=$login_uid");
 	}
-	if (STUDLY() && $CHATSUPPORT) {
-	    WRITESIDEBARBUTTON("My IM", $TBBASE,
+	if ($CHATSUPPORT) {
+	    WRITESIDEBARBUTTON("My Chat Buddies", $TBBASE,
 			       "mychat.php3?target_uid=$login_uid");
 	}
 	WRITESIDEBARDIVIDER();

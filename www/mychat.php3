@@ -75,7 +75,9 @@ echo "<br><br>
 echo "<br><br>
       The Emulab Jabber server also supports multi user <em>chatrooms</em>.
       You are welcome to create chatrooms as needed. Simply use
-      <tt>conference.emulab.net</tt> as the server hostname when prompted.\n";
+      <tt>conference.emulab.net</tt> as the server hostname when prompted. ";
+echo "<em>(We plan to add automatic creation of per-project chatrooms in
+      the future)</em>\n";
 
 #
 # Standard Testbed Footer
