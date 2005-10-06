@@ -39,6 +39,21 @@ echo "The Emulab <a href=http://jabberd.jabberstudio.org/2/>Jabber</a>
       <a href=http://www.jabber.org/>Jabber Instant Messaging Protocol.</a>
       You can use your own Jabber client, or you can use the Jeti Java
       Applet by clicking on your Jabber ID above.\n";
+
+echo "<br><br>
+      Once you connect to Emulab's Jabber server, you will find an initial
+      set of buddy lists, one for each project you belong to. Emulab will
+      maintain those buddy lists for you, adding and removing project members
+      as needed. Of course you are welcome to add your own buddies and buddy
+      lists; Emulab will not interfere with them.\n";
+
+echo "<br>
+      The Emulab Jabber server also supports multi user <em>chatrooms</em>.
+      You are welcome to create chatrooms as needed. Simply use
+      <tt>conference.emulab.net</tt> as the server hostname when prompted. ";
+echo "<em>(We plan to add automatic creation of per-project chatrooms in
+      the future)</em>\n";
+
 echo "<br><br>\n";
 echo "If you decide to use your own Jabber client (which we recommend), then
       you should check out <a href=http://gaim.sourceforge.net/>Gaim</a>, 
@@ -60,24 +75,10 @@ echo "<blockquote><ul>
        <li><b>Proxy type</b>: Use Global Proxy Settings
       </ul></blockquote>\n";
 
-echo "Of course, any Jabber compatable IM client can be used. The Google
+echo "Of course, any Jabber compatible IM client can be used. The Google
       page mentioned above has a nice list of clients, along with
       instructions on how to configure them all. We suggest you use one of
       those clients.\n";
-
-echo "<br><br>
-      Once you connect to Emulab's Jabber server, you will find an initial
-      set of buddy lists, one for each project you belong too. Emulab will
-      maintain those buddy lists for you, adding and removing project members
-      as needed. Of course you are welcome to add your own buddies and buddy
-      lists; Emulab will not interfere with them.\n";
-
-echo "<br><br>
-      The Emulab Jabber server also supports multi user <em>chatrooms</em>.
-      You are welcome to create chatrooms as needed. Simply use
-      <tt>conference.emulab.net</tt> as the server hostname when prompted. ";
-echo "<em>(We plan to add automatic creation of per-project chatrooms in
-      the future)</em>\n";
 
 #
 # Standard Testbed Footer
