@@ -644,6 +644,12 @@ my %vnode2rtabid = ();
 #
 ########################################################################
 
+#
+# Grab global enable of linkdelays.
+#
+my $enablelinkdelays = TBGetSiteVar("general/enable_endnodeshaping");
+
+
 printdb "Generating TOP file.\n";
 TBDebugTimeStamp("TOP started");
 
@@ -4406,7 +4412,11 @@ sub CreateTopFile()
 			  max($top_bw,$top_rbw) . " 0 0 ethernet " .
 			  ($emulated ? " emulated" : "") .
 			  ($trivial_ok ? " trivial_ok\n" : "\n"));
-
+		    
+		    fatal("Endnodeshaping is disabled! ".
+			  "You must modify your experiment!\n")
+			if (! $enablelinkdelays);
+		    
 		    #
 		    # We allow users to oversubscribe by letting them turn
 		    # off the bandwidth shaping. If however, if the link was
@@ -4554,6 +4564,10 @@ sub CreateTopFile()
 			$delaylinks{$plink} =
 			    [$member,$delay,$bw,$loss,
 			     $member,$rdelay,$rbw,$rloss,0];
+
+			fatal("Endnodeshaping is disabled! ".
+			      "You must modify your experiment!\n")
+			    if (! $enablelinkdelays);
 			     
 			print(TOPFILE "link $plink $node lan/$lan " .
 			      max($top_bw,$top_rbw) . " 0 0 ethernet" .
