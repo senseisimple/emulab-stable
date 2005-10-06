@@ -77,6 +77,11 @@ sub UPDATE()  { return 1; }
 sub UPDATE_RECOVER()  { return 0; }
 
 #
+# Grab global enable of linkdelays.
+#
+my $enablelinkdelays = TBGetSiteVar("general/enable_endnodeshaping");
+
+#
 # Turn off line buffering on output
 #
 
@@ -731,6 +736,32 @@ sub doSwapin($) {
     #
 
     if ($type > UPDATE_RECOVER) {
+        #
+        # Hacky test to allow disabling of linkdelays if the node is going
+        # to run Linux. See sitevar above.
+        #
+	if (! $enablelinkdelays) {
+	    $db_result =
+		DBQueryFatal("select distinct e.pid,e.eid,vl.vnode,vn.osname ".
+			 "  from experiments as e ".
+			 "left join virt_lans as vl on vl.pid=e.pid and ".
+			 "     vl.eid=e.eid ".
+			 "left join virt_nodes as vn on vn.pid=e.pid and ".
+			 "     vn.eid=e.eid and vn.vname=vl.vnode ".
+			 "left join os_info as o on o.osname=vn.osname and ".
+			 "  (o.pid=vl.pid or o.pid='" . TBOPSPID() . "') ".
+			 "where (vl.uselinkdelay!=0 or e.uselinkdelays!=0 or ".
+			 "       e.forcelinkdelays!=0) and ".
+			 "     (o.os is NULL or o.os='Linux') and ".
+			 "     e.pid='$pid' and e.eid='$eid'");
+
+	    if ($db_result->numrows) {
+		print "*** Endnodeshaping is disabled on Linux Images!\n";
+		print "*** You must modify your experiment to swap it in.\n";
+		return 1;
+	    }
+	}
+	
 	print "Mapping to physical reality ...\n";
 	TBDebugTimeStamp("assign_wrapper started");
 
