@@ -79,7 +79,7 @@ sub UPDATE_RECOVER()  { return 0; }
 #
 # Grab global enable of linkdelays.
 #
-my $enablelinkdelays = TBGetSiteVar("general/enable_endnodeshaping");
+my $enablelinkdelays = TBGetSiteVar("general/linux_endnodeshaping");
 
 #
 # Turn off line buffering on output
