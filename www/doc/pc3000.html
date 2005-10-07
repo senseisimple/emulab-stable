@@ -26,11 +26,11 @@ however due to lack of Gb switch ports, not all are usable at Gb speeds.
 Instead, they are a mix of 100Mb and 1Gb as follows:
 </p><p>
 <pre>
-Machines	Gb ports	100Mb ports
-40		4		0
-20		3		1
-40		2		2
-60		1		3
+# of Machines	Gb ports	100Mb ports	Machine names
+40		4		0		pc201-pc240
+20		3		1		pc241-pc260
+40		2		2		pc281-pc320
+60		1		3		pc261-pc280, pc321-pc360
 </pre>
 Note that all 160 machines have at least 1 Gb interface and all can be
 used for 100Mb as well.
@@ -110,4 +110,13 @@ images.
      currently possible.  We plan to upgrade our Linux and FreeBSD 5 images
      to support SMP in the near future as well as address the 4.x SMP issue
      for standard images.
+<li> <b>The nodes run in 32-bit mode.</b>
+     The processors in these machines are the Intel EM64T Xeons, but we have
+     not yet created 64-bit native versions of FreeBSD, Linux or Windows.
+<li> <b>The network interfaces use "interrupt throttling."</b>
+     The Intel Pro1000 cards used for the experimental interfaces in
+     these machines default to using interrupt throttling.  This will
+     add latency to packet delivery and reception.  See the
+     <a href="http://www.emulab.net/kb-show.php3?idx=75">
+     knowledge base entry</a> for how to change or disable this feature.
 </ul>
