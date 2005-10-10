@@ -199,13 +199,13 @@ ID  Name                            Members of VLAN
    To stop cloning:
       Console> (enable) set span disable <monitor>
 
-   NOTE: as of 8/1/05 we have em0 on ops attached to the control net
+   NOTE: as of 10/10/05 we have bge0 on oboss attached to the control net
    so that it can be used for cloning.  Its cisco2 port is 2/13, use that
-   for <monitor>.  Also note that you will have to have em0 configured
-   in order to run tcpdump on it.  I just do:
-      ifconfig em0
+   for <monitor>.  Also note that you will have to have the interface
+   configured in order to run tcpdump on it.  I just do:
+      ifconfig bge0
    no IP info is necessary.  Then:
-      ifconfig em0 down
+      ifconfig bge0 down
    when I am done.
 
 10. Multiple span sessions
