@@ -498,7 +498,7 @@ CREATE TABLE foreign_keys (
 
 CREATE TABLE global_policies (
   policy varchar(32) NOT NULL default '',
-  auxdata varchar(64) NOT NULL default '',
+  auxdata varchar(128) NOT NULL default '',
   test varchar(32) NOT NULL default '',
   count int(10) NOT NULL default '0',
   PRIMARY KEY  (policy,auxdata)
