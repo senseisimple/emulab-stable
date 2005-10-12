@@ -331,7 +331,7 @@ sub CreateVnodes($$)
 	#
 	my $nodenumlimit = $ISUTAH ? 200 : 254;
 	my $pnet = $IPBASE2;
-	my $pnode2 = $nodenum;
+	my $pnode2 = int($nodenum);
 	while ($pnode2 > $nodenumlimit) {
 	    $pnet++;
 	    $pnode2 -= $nodenumlimit;
