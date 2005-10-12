@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -22,6 +22,20 @@ $clause      = 0;
 $having      = "";
 $active      = 0;
 $idle        = 0;
+
+#
+# Hack for NSDI deadline. Generalize later.
+#
+$openlist        = TBGetSiteVar("general/open_showexplist");
+$openlist_member = 0;
+if (!$isadmin && isset($openlist) && $openlist != "") {
+    $openlist_member =
+	TBMinTrust(TBProjTrust($uid,$openlist), $TBDB_TRUST_USER);
+    $openlist_join =
+	" left join group_membership as g on ".
+	"     g.uid=e.expt_swap_uid and g.pid='$openlist' and g.pid=g.gid ";
+    $openlist_clause = " and g.uid is not null ";
+}
 
 if (! isset($showtype))
     $showtype="active";
@@ -218,7 +232,7 @@ if ($clause) {
 # - idle is fudged by 121 seconds so that in the five minutes between 
 #   slothd reports we do not get active expts showing up as idle for 0.1 hrs
 
-if ($isadmin) {
+if ($isadmin || $openlist_member) {
     $experiments_result =
 	DBQueryFatal("
 select e.*, date_format(expt_swapped,'%Y-%m-%d') as d, 
@@ -234,7 +248,8 @@ left join reserved as r on e.pid=r.pid and e.eid=r.eid
 left join experiment_stats as s on e.idx=s.exptidx
 left join nodes as n on r.node_id=n.node_id
 left join node_activity as na on r.node_id=na.node_id
-where (n.type!='dnard' or n.type is null) $clause 
+$openlist_join
+where (n.type!='dnard' or n.type is null) $clause $openlist_clause
 group by e.pid,e.eid $having order by $order");
 }
 else {
@@ -452,11 +467,15 @@ if ($thumb && !$idle) {
 	echo "<th width=4% align=center>Swap Requests</th>\n";
     }
 
-    echo "    <th width=60%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=name$ni'>
-                  Description</a></th>
-              <th width=4%>
-               <a class='static' href='showexp_list.php3?showtype=$showtype&sortby=uid$ni'>
+    if (! $openlist_member) {
+	echo "<th width=60%>
+                  <a class='static' ".
+                     "href='showexp_list.php3?showtype=$showtype".
+                     "&sortby=name$ni'>Description</a></th>\n";
+    }
+    echo "  <th width=4%>
+               <a class='static' ".
+                  "href='showexp_list.php3?showtype=$showtype&sortby=uid$ni'>
                   Head UID</a></th>
             </tr>\n";
 
@@ -606,10 +625,12 @@ if ($thumb && !$idle) {
 	if ($showlastlogin) echo "$lastlogin\n";
 	if ($idle) echo "$foo\n";
 
-        echo "<td>$name</td>
-                <td><A href='showuser.php3?target_uid=$huid'>
-                       $huid</A></td>
-               </tr>\n";
+	if (! $openlist_member) {
+	    echo "<td>$name</td>\n";
+	}
+	
+        echo "<td><A href='showuser.php3?target_uid=$huid'>$huid</A></td>\n";
+	echo "</tr>\n";
     }
     echo "</table>\n";
 

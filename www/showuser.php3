@@ -102,8 +102,10 @@ $query_result =
 		 "left join groups as gr on gr.pid=g.pid and gr.gid=g.gid ".
 		 "left join experiments as e on g.pid=e.pid and g.gid=e.gid ".
 		 "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-		 "where uid='$target_uid' and ".
-		 "trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
+		 "left join group_membership as g2 on g2.pid=g.pid and ".
+		 "     g2.gid=g.gid and g2.uid='$uid' ".
+		 "where g.uid='$target_uid' and g2.uid is not null and ".
+		 "g.trust!='" . TBDB_TRUSTSTRING_NONE . "' ".
 		 "group by g.pid, g.gid ".
 		 "order by g.pid,gr.created");
 

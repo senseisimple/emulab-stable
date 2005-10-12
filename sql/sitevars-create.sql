@@ -62,3 +62,4 @@ INSERT INTO sitevariables VALUES ('general/version/build','06/17/2005','','Build
 INSERT INTO sitevariables VALUES ('general/version/major','1','','Source code major revision number');
 INSERT INTO sitevariables VALUES ('general/mailman/password','','','Admin password for Emulab generated lists');
 INSERT INTO sitevariables VALUES ('general/linux_endnodeshaping','1','1','Use this sitevar to disable endnodeshaping on linux globally on your testbed');
+INSERT INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this experiment to view all running experiments on the experiment list page');
