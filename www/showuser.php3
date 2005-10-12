@@ -89,7 +89,7 @@ echo "<h3><a href=\"#PROFILE\">Manage User Profile</a></h3>\n";
 #
 # Lets show Experiments.
 #
-SHOWEXPLIST("USER",$target_uid);
+SHOWEXPLIST("USER", $uid, $target_uid);
 
 #
 # Lets show project and group membership.

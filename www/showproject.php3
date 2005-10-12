@@ -109,7 +109,7 @@ echo "</center>\n";
 #
 # A list of project experiments.
 #
-SHOWEXPLIST("PROJ",$pid);
+SHOWEXPLIST("PROJ", $uid, $pid);
 
 if ($isadmin) {
     echo "<center>

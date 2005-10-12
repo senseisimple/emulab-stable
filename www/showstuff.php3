@@ -999,7 +999,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 #
 # Show a listing of experiments by user/pid/gid
 #
-function SHOWEXPLIST($type,$id,$gid = "") {
+function SHOWEXPLIST($type,$fromuid,$id,$gid = "") {
     global $TB_EXPTSTATE_SWAPPED, $TB_EXPTSTATE_SWAPPING;
     
     if ($type == "USER") {
@@ -1017,14 +1017,29 @@ function SHOWEXPLIST($type,$id,$gid = "") {
 	$where = "e.eid='$id'";
 	$title = "Bad id '$id'!";
     }
-    
-    $query_result =
-	DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
-		     "round(minimum_nodes+.1,0) as min_nodes ".
-		     "from experiments as e ".
-		     "left join reserved as r on e.pid=r.pid and e.eid=r.eid ".
-		     "where $where ".
-		     "group by e.pid,e.eid order by e.state,e.eid");
+
+    if (ISADMIN()) {
+	$query_result =
+	    DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
+			 "round(minimum_nodes+.1,0) as min_nodes ".
+			 "from experiments as e ".
+			 "left join reserved as r on e.pid=r.pid and ".
+			 "     e.eid=r.eid ".
+			 "where $where ".
+			 "group by e.pid,e.eid order by e.state,e.eid");
+    }
+    else {
+	$query_result =
+	    DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
+			 "round(minimum_nodes+.1,0) as min_nodes ".
+			 "from experiments as e ".
+			 "left join reserved as r on e.pid=r.pid and ".
+			 "     e.eid=r.eid ".
+			 "left join group_membership as g on g.pid=e.pid and ".
+			 "     g.gid=e.gid and g.uid='$fromuid' ".
+			 "where g.uid is not null and ($where) ".
+			 "group by e.pid,e.eid order by e.state,e.eid");
+    }
     
     if (mysql_num_rows($query_result)) {
 	echo "<center>
