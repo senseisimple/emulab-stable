@@ -530,7 +530,7 @@ sub TestGlobalPolicy($$$$$)
 
 	my $query_result =
 	    DBQueryWarn("select uid from group_membership ".
-			"where uid='$uid' and (".
+			"where uid='$uid' and trust!='none' and (".
 			join(" or ", map("pid='$_'", @pidlist)) . ")");
 	
 	return -1
