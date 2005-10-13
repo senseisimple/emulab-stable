@@ -171,10 +171,19 @@ accomplished using the web interface. In 'red dot' mode, go to:
 
 	https://<yourbossnode>/editnodetype.php3?new_type=1
 
-Set the "type" to something like 'cisco6509'. If the switch is running
-IOS (rather than CatOS), then append '-ios' to the switch's type. Set
-the "class" to 'switch' and set "processor" to whatever you used for
-the "type" field.
+These are the switch types currently supported:
+    cisco{65xx,40xx,45xx,29xx,55xx}
+        For example, if you had a 6509, you'd enter 'cisco6509'
+        If your switch runs IOS (instead of CatOS), append '-ios' to the
+        type.
+    intel
+        The supported type is the 510T (but just put 'intel' in the type field)
+    nortel1100, nortel5510
+    foundry1500, foundry9604
+(Note: Case sensitive!)
+
+Set the "class" to 'switch' and set "processor" to whatever you used for the
+"type" field.
 
 Most of the other columns are not important for switches (so you can set
 them to 0), but putting in "Max Interfaces" (if the switch is expandable)
