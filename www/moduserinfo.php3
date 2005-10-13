@@ -519,6 +519,9 @@ if (!isset($formfields[usr_email]) ||
 elseif (! TBvalid_email($formfields[usr_email])) {
     $errors["Email Address"] = TBFieldErrorString();
 }
+elseif (! TBUniqueEmail($target_uid, $formfields[usr_email])) {
+    $errors["Email Address"] = "Already in use by another user!";
+}
 if (!$isadmin && !$wikionly) {
     # Admins can leave these fields blank, but must error check them anyway.
     if (!isset($formfields[usr_addr]) ||

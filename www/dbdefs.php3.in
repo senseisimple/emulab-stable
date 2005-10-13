@@ -2024,6 +2024,20 @@ function TBGetVersionInfo(&$major, &$minor, &$build)
 }
 
 #
+# Is email address unique?
+#
+function TBUniqueEmail($uid, $email)
+{
+    $query_result =
+	DBQueryFatal("select usr_email from users where ".
+		     "usr_email='$email' and uid!='$uid'");
+
+    if (mysql_num_rows($query_result))
+	return 0;
+    return 1;
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;
