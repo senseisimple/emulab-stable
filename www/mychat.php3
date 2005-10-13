@@ -37,8 +37,8 @@ echo "<br>\n";
 echo "The Emulab <a href=http://jabberd.jabberstudio.org/2/>Jabber</a>
       server is an implementation of the popular
       <a href=http://www.jabber.org/>Jabber Instant Messaging Protocol.</a>
-      You can use your own Jabber client, or you can use the Jeti Java
-      Applet by clicking on your Jabber ID above.\n";
+      You can use your own Jabber client, or you can use the <b>Jeti Java
+      Applet by clicking on your Jabber ID above</b>.\n";
 
 echo "<br><br>
       Once you connect to Emulab's Jabber server, you will find an initial
