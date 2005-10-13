@@ -1369,17 +1369,59 @@ sub getStats ($) {
 }
 
 #
+# Get the ifindex for an EtherChannel (trunk given as a list of ports)
+#
+# usage: getChannelIfIndex(self, ports)
+#        Returns: undef if more than one port is given, and no channel is found
+#           an ifindex if a channel is found and/or only one port is given
+#
+#
+sub getChannelIfIndex($@) {
+    my $self = shift;
+    my @ports = @_;
+    my @ifIndexes = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@ports);
+
+    my $ifindex = undef;
+
+    #
+    # Try to get a channel number for each one of the ports in turn - we'll
+    # take the first one we get
+    #
+    foreach my $port (@ifIndexes) {
+        my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$port]);
+        if (($channel =~ /^\d+$/) && ($channel != 0)) {
+            $ifindex = $channel;
+            last;
+        }
+    }
+    
+    #
+    # If we didn't get a channel number, and we were only given a single port,
+    # we can return the ifIndex for that port. Note that we tried to get a
+    # channel number first, in case someone did something silly like give us a
+    # single port channel.
+    #
+    if (!$ifindex) {
+        if (@ifIndexes == 1) {
+            $ifindex = $ifIndexes[0];
+        }
+    }
+
+    return $ifindex;
+}
+
+#
 # Enable, or disable,  port on a trunk
 #
-# usage: setVlansOnTrunk(self, modport, value, vlan_numbers)
-#        modport: module.port of the trunk to operate on
+# usage: setVlansOnTrunk(self, ifindex, value, vlan_numbers)
+#        ifindex: ifindex of the trunk to operate on
 #        value: 0 to disallow the VLAN on the trunk, 1 to allow it
 #	 vlan_numbers: An array of cisco-native VLAN numbers operate on
 #        Returns 1 on success, 0 otherwise
 #
 sub setVlansOnTrunk($$$$) {
     my $self = shift;
-    my ($modport, $value, @vlan_numbers) = @_;
+    my ($port, $value, @vlan_numbers) = @_;
 
     #
     # Some error checking
@@ -1391,23 +1433,7 @@ sub setVlansOnTrunk($$$$) {
 	die "VLAN 1 passed to setVlanOnTrunk\n"
     }
 
-    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
-
-    #
-    # If this is part of an EtherChannel, we have to find the ifIndex for the
-    # channel.
-    # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
-    # the channel ifIndex the the port is in a channel. Not sure that
-    # this is _always_ beneficial, though
-    #
-    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
-    if (!($channel =~ /^\d+$/) || ($channel == 0)) {
-	print "WARNING: setVlansOnTrunk got zero channel for $self->{NAME}.$modport\n";
-	return 0;
-    }
-    if (($channel =~ /^\d+$/) && ($channel != 0)) {
-	$ifIndex = $channel;
-    }
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
 
     #
     # Get the exisisting bitfield for allowed VLANs on the trunk

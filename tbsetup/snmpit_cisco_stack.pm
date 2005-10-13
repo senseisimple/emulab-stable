@@ -835,42 +835,40 @@ sub setVlanOnTrunks($$$;@) {
 	    warn "ERROR - Bad device $src found in setVlanOnTrunks!\n";
 	    $errors++;
 	} else {
-	    my $found = 0;
-
 	    #
-	    # On ciscos, we can use any port in the trunk, so we'll use the
-	    # first
+	    # Trunks might be EtherChannels, find the ifIndex
 	    #
-	    foreach my $modport (@{ $trunks{$src}{$dst} }) {
-		if ($self->{DEVICES}{$src}->
-		    setVlansOnTrunk($modport,$value,$vlan_number)) {
-		    $found = 1;
-		    last;
-		}
-	    }
-	    if (!$found) {
-		$errors += 1;
+            my $trunkIndex = $self->{DEVICES}{$src}->
+                             getChannelIfIndex(@{ $trunks{$src}{$dst} });
+            if (!defined($trunkIndex)) {
+                warn "ERROR - unable to find channel information for $src\n";
+                $errors += 1;
+            } else {
+		if (!$self->{DEVICES}{$src}->
+                        setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
+                    warn "ERROR - unable to set trunk on swich $src\n";
+                    $errors += 1;
+                }
 	    }
 	}
 	if (!$self->{DEVICES}{$dst}) {
 	    warn "ERROR - Bad device $dst found in setVlanOnTrunks!\n";
 	    $errors++;
 	} else {
-	    my $found = 0;
-
 	    #
-	    # On ciscos, we can use any port in the trunk, so we'll use the
-	    # first
+	    # Trunks might be EtherChannels, find the ifIndex
 	    #
-	    foreach my $modport (@{ $trunks{$dst}{$src} }) {
-		if ($self->{DEVICES}{$dst}->
-		    setVlansOnTrunk($modport,$value,$vlan_number)) {
-		    $found = 1;
-		    last;
-		}
-	    }
-	    if (!$found) {
-		$errors += 1;
+            my $trunkIndex = $self->{DEVICES}{$dst}->
+                             getChannelIfIndex(@{ $trunks{$dst}{$src} });
+            if (!defined($trunkIndex)) {
+                warn "ERROR - unable to find channel information for $dst\n";
+                $errors += 1;
+            } else {
+		if (!$self->{DEVICES}{$dst}->
+                        setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
+                    warn "ERROR - unable to set trunk on swich $dst\n";
+                    $errors += 1;
+                }
 	    }
 	}
     }
