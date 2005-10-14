@@ -490,16 +490,18 @@ sub UpdatePassword()
 	return 0;
     }
 
-    $UID = 0;
-    if ($CONTROL ne $BOSSNODE) {
-	print "Updating user $user password on $CONTROL.\n";
-
-	if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
-	    fatal("Could not change password for user $user on $CONTROL!");
+    if (! $wikionly) {
+	$UID = 0;
+	if ($CONTROL ne $BOSSNODE) {
+	    print "Updating user $user password on $CONTROL.\n";
+	    
+	    if (system("$SSH -host $CONTROL $CHPASS -p '$pswd' $user")) {
+		fatal("Could not change password for user $user on $CONTROL!");
+	    }
 	}
+	$UID = $SAVEUID;
     }
-    $UID = $SAVEUID;
-
+    
     $EUID = $UID;
     # And to the wiki if enabled.
     system("$ADDWIKIUSER -u $user")
@@ -508,7 +510,6 @@ sub UpdatePassword()
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER -m $user")
 	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
-
     $EUID = 0;
     
     return 0;
