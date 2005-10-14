@@ -1132,7 +1132,7 @@ function SHOWEXPLIST($type,$fromuid,$id,$gid = "") {
 #
 # Show Node information for an experiment.
 #
-function SHOWNODES($pid, $eid, $sortby) {
+function SHOWNODES($pid, $eid, $sortby, $showclass) {
     global $SCRIPT_NAME;
     global $TBOPSPID;
     
@@ -1165,10 +1165,41 @@ function SHOWNODES($pid, $eid, $sortby) {
     # XXX
     if ($pid == "emulab-ops" && $eid == "hwdown") {
 	$showlastlog = 1;
+	if (empty($showclass)) {
+	    $showclass = "no-pcplabphys";
+	}
     }
     else {
 	$showlastlog = 0;
     }	
+
+    if (!empty($showclass)) {
+	$classclause = "";
+	$noclassclause = "";
+	$opts = explode(",", $showclass);
+	foreach ($opts as $opt) {
+	    if (preg_match("/^no-([-\w]+)$/", $opt, $matches)) {
+		if (!empty($noclassclause)) {
+		    $noclassclause .= ",";
+		}
+		$noclassclause .= "'$matches[1]'";
+	    } elseif ($opt == "all") {
+		$classclause = "";
+		$noclassclause = "";
+	    } else {
+		if (!empty($classclause)) {
+		    $classclause .= ",";
+		}
+		$classclause .= "'$opt'";
+	    }
+	}
+	if (!empty($classclause)) {
+	    $classclause = "and nt.class in (" . $classclause . ")";
+	}
+	if (!empty($noclassclause)) {
+	    $noclassclause = "and nt.class not in (" . $noclassclause . ")";
+	}
+    }
 
     if ($showlastlog) {
 	#
@@ -1205,6 +1236,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 		         "left join nodelog as nl on nl.node_id=r.node_id and nl.reported=t.reported ".
 
 		         "WHERE r.eid='$eid' and r.pid='$pid' ".
+			 "$classclause $noclassclause".
 		         "ORDER BY $sortclause");
 	DBQueryFatal("DROP table nodelogtemp");
     }
@@ -1220,6 +1252,7 @@ function SHOWNODES($pid, $eid, $sortby) {
 		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
 			 "left join tiplines as tip on tip.node_id=r.node_id ".
 		         "WHERE r.eid='$eid' and r.pid='$pid' ".
+			 "$classclause $noclassclause".
 		         "ORDER BY $sortclause");
     }
     
@@ -1230,15 +1263,17 @@ function SHOWNODES($pid, $eid, $sortby) {
               <table align=center border=1>
               <tr>
                 <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
-	                        "&sortby=nodeid\">Node ID</a></th>
+	                        "&sortby=nodeid&showclass=$showclass\">
+				Node ID</a></th>
                 <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
-	                 "&sortby=vname\">Name</a></th>\n";
+	                 "&sortby=vname&showclass=$showclass\">
+				Name</a></th>\n";
 	if ($pid == $TBOPSPID) {
 	    echo "<th>Reserved<br>
                       <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
-		         "&sortby=rsrvtime-up\">Up</a> or 
+		         "&sortby=rsrvtime-up&showclass=$showclass\">Up</a> or 
                       <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
-		         "&sortby=rsrvtime-down\">Down</a>
+		         "&sortby=rsrvtime-down&showclass=$showclass\">Down</a>
                   </th>\n";
 	}
 	echo "  <th>Type</th>

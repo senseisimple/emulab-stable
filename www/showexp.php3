@@ -327,7 +327,7 @@ SUBPAGEEND();
 #
 # Dump the node information.
 #
-SHOWNODES($exp_pid, $exp_eid, $sortby);
+SHOWNODES($exp_pid, $exp_eid, $sortby, $showclass);
 
 if ($isadmin) {
     echo "<center>
