@@ -128,8 +128,8 @@ $UID = $EUID;
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
 
-    if (system("$SSH -host $CONTROL $MMPROXY setlistmembers $listname ".
-	       "< $listfile")) {
+    if (system("$SSH -host $CONTROL $MMPROXY $optarg ".
+	       "setlistmembers $listname < $listfile")) {
 	fatal("$MMPROXY failed on $CONTROL!");
     }
 }

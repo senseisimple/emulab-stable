@@ -7,7 +7,7 @@
 use English;
 use Getopt::Std;
 use Errno qw(EEXIST);
-    
+
 #
 # A wrapper for messing with Mailman from boss.
 #
@@ -15,7 +15,7 @@ sub usage()
 {
     print "Usage: mailmanproxy addlist <listname> <listtype> or\n";
     print "       mailmanproxy setlistmembers <listname> or\n";
-    print "       mailmanproxy modifymember <email> or\n";
+    print "       mailmanproxy modifymember <uid> <email> or\n";
     print "       mailmanproxy setadminpassword <listname>\n";
     print "       mailmanproxy dellist <listname>\n";
     exit(-1);
@@ -34,6 +34,12 @@ my $MAILMANDIR = "/usr/local/mailman";
 my $MMBINDIR   = "$MAILMANDIR/bin";
 my $MMLISTDIR  = "$MAILMANDIR/lists";
 my $GENALIASES = "$TB/libexec/mailman/genaliases";
+my $IDHASH     = "/var/db/emulabid2email";
+my $EMAILHASH  = "/var/db/email2emulabid";
+
+# Locals.
+my %IDhash;
+my %EMAILhash;
 
 #
 # Turn off line buffering on output
@@ -93,6 +99,15 @@ if (! @ARGV) {
 }
 
 #
+# These will just start out as empty hashes so everything is added.
+# 
+dbmopen(%IDhash, $IDHASH, 0660) or
+    fatal("Cannot open $IDHASH: $!");
+	
+dbmopen(%EMAILhash, $EMAILHASH, 0660) or
+    fatal("Cannot open $EMAILHASH: $!");
+
+#
 # Before we continue, flip to mailman user/group.
 #
 my (undef,undef,$unix_uid) = getpwnam("mailman") or
@@ -135,14 +150,183 @@ elsif ($action eq "xlogin") {
 elsif ($action eq "membership") {
     exit(ListMembership(@ARGV));
 }
+elsif ($action eq "adduser") {
+    exit(AddUser(@ARGV));
+}
+elsif ($action eq "deluser") {
+    exit(DelUser(@ARGV));
+}
 elsif ($action eq "reconfig") {
     exit(AddList(1, @ARGV));
 }
 else {
-    die("*** $0:\n".
-	"    Do not know what to do with '$action'!\n");
+    fatal("Do not know what to do with '$action'!\n");
 }
 exit(0);
+
+#
+# Map between emulab id and user email address in the DB. Return 0 on
+# success, -1 is there is no mapping.
+#
+sub EmulabID2Email($$)
+{
+    my ($uid, $pemail) = @_;
+
+    return -1
+	if (!defined($IDhash{$uid}));
+
+    # Sanity check
+    if (!defined($EMAILhash{$IDhash{$uid}}) ||
+	$EMAILhash{$IDhash{$uid}} ne $uid) {
+	fatal("Inconsistent mapping for $uid!");
+    }
+
+    if ($debug) {
+	print "EmulabID2Email: $uid " . $IDhash{$uid} . "\n";
+    }
+
+    $$pemail = $IDhash{$uid};
+    return 0;
+}
+sub Email2EmulabID($$)
+{
+    my ($email, $puid) = @_;
+
+    return -1
+	if (!defined($EMAILhash{$email}));
+
+    # Sanity check
+    if (!defined($IDhash{$EMAILhash{$email}}) ||
+	$IDhash{$EMAILhash{$email}} ne $email) {
+	fatal("Inconsistent mapping for $email!");
+    }
+
+    if ($debug) {
+	print "Email2EmulabID: $email " . $EMAILhash{$email} . "\n";
+    }
+
+    $$puid = $EMAILhash{$email};
+    return 0;
+}
+
+#
+# Store the mapping in the dbm files.
+#
+sub StoreMapping($$)
+{
+    my ($ID, $email) = @_;
+    $IDhash{$ID} = $email;
+    $EMAILhash{$email} = $ID;
+    return 0;
+}
+
+# Delete a mapping.
+sub DeleteMapping($$)
+{
+    my ($ID, $email) = @_;
+    delete($IDhash{$ID});
+    delete($EMAILhash{$email});
+    return 0;
+}
+
+#
+# Add user.
+#
+sub AddUser(@)
+{
+    my ($uid, $email) = @_;
+
+    usage()
+	if (@_ != 2);
+    
+    # See if already exists.
+    my $oldemail;
+    my $olduid;
+    
+    # Map to EMAIL.
+    if (EmulabID2Email($uid, \$oldemail) == 0) {
+	fatal("AddUser: $uid already exists with another email: $oldemail!")
+	    if ($email ne $oldemail);
+	return EEXIST();
+    }
+    # Map to UID.
+    if (Email2EmulabID($email, \$olduid) == 0) {
+	fatal("AddUser: $email already exists with another uid: $olduid!")
+	    if ($uid ne $olduid);
+	return EEXIST();
+    }
+    StoreMapping($uid, $email);
+    
+    return 0;
+}
+
+#
+# Del user.
+#
+sub DelUser(@)
+{
+    usage()
+	if (@_ != 2);
+
+    my ($uid, $email) = @_;
+
+    # See if already exists.
+    my $oldemail;
+    
+    # Map to EMAIL.
+    if (EmulabID2Email($uid, \$oldemail) < 0) {
+	print "DelUser: No such user $uid in the mailman database!\n";
+	return 0;
+    }
+    fatal("DelUser: User $uid is in the DB with another email: $oldemail!")
+	if ($email ne $oldemail);
+
+    #
+    # If the user is still in any email lists owned by tbops, its an error.
+    #
+    my @listnames = ();
+
+    #
+    # Very convenient script provided by mailman ...
+    #
+    # The script we call expects regex, and embedded + signs mess things up.
+    #
+    my $emailcopy = $email;
+    $emailcopy    =~ s/([^\\])([\+])/$1\\$2/g;
+    
+    open(NAMES, "$MMBINDIR/find_member '$emailcopy' |") or
+	fatal("DelUser: Could not start up find_member!");
+
+    while (<NAMES>) {
+	if ($_ =~ /^\s*([^\s]*)$/) {
+	    push(@listnames, $1);
+	}
+    }
+    close(NAMES) or
+	fatal("DelUser: Error running find_member script!");
+
+    foreach my $listname (@listnames) {
+	#
+	# Another convenient script provided by mailman ...
+	#
+	open(OWNER, "$MMBINDIR/list_owners '$listname' |") or
+	    fatal("DelUser: Could not start up list_owners!");
+
+	$_ = <OWNER>;
+
+	close(OWNER) or
+	    fatal("DelUser: Error running list_owners script!");
+	
+	fatal("DelUser: Could not get owner for list $listname!")
+	    if (!defined($_));
+
+	chomp($_);
+	fatal("DelUser: $uid is still a member of admin list $listname!")
+	    if ($_ eq $TBOPS);
+    }
+    DeleteMapping($uid, $email);
+    return 0;
+}
 
 #
 # Create a new project mailing list. 
@@ -288,22 +472,25 @@ sub SetListMembers(@)
     # The list of users and their passwords is going to come from stdin.
     # The actual format looks like:
     #
-    #	email-addr password 'full name'
+    #	uid email-addr password 'full name'
     #
-    # All of these are indexed by the email-addr.
+    # All of these are indexed by the emulab uid.
     #
-    my %members      = ();	# Stores the password.
-    my %fullnames    = ();
-    my %curmembers   = ();
+    my %members      = ();	# Stores the email addr
+    my %passwords    = ();	# indexed by emulab uid, stores password.
+    my %fullnames    = ();	# indexed by emulab uid, stores fullname.
+    my %curmembers   = ();	# indexed by emulab uid, stores email.
+    my %curfullnames = ();	# indexed by emulab uid, stores fullname.
 
     while (<STDIN>) {
 	# Allow for comments
 	if ($_ =~ /^\#/) {
 	    next;
 	}
-	elsif ($_ =~ /^(.*) (.*) '(.*)'$/) {
+	elsif ($_ =~ /^(.*) (.*) (.*) '(.*)'$/) {
 	    $members{$1}   = $2;
-	    $fullnames{$1} = $3;
+	    $passwords{$1} = $3;
+	    $fullnames{$1} = $4;
 	}
 	else {
 	    print STDERR "Bad line in input: $_";
@@ -318,19 +505,32 @@ sub SetListMembers(@)
 	fatal("SetListMembers: Could not start up list_members script!");
 
     while (<MEMBERS>) {
+	my $uid;
+	
 	if ($_ =~ /^\"(.*)\" \<(.*)\>$/ ||
 	    $_ =~ /^(.*) \<(.*)\>$/) {
-	    $curmembers{$2} = $1;
+
+	    # Map to emulab ID.
+	    fatal("Error mapping $2 to emulab uid!")
+		if (Email2EmulabID($2, \$uid) < 0);
+	    
+	    $curmembers{$uid}   = $2;
+	    $curfullnames{$uid} = $1;
 	    
 	    if ($debug) {
-		print "Current list member: $1 <$2>\n";
+		print "Current list member: $1 <$2> ($uid)\n";
 	    }
 	}
 	elsif ($_ =~ /^(.*)$/) {
-	    $curmembers{$1} = "";
+	    # Map to emulab ID.
+	    fatal("Error mapping $1 to emulab uid!")
+		if (Email2EmulabID($1, \$uid) < 0);
+   
+	    $curmembers{$uid}   = $1;
+	    $curfullnames{$uid} = "";
 	    
 	    if ($debug) {
-		print "Current list member: $1\n";
+		print "Current list member: $1 ($uid)\n";
 	    }
 	}
 	else {
@@ -347,9 +547,9 @@ sub SetListMembers(@)
     #
     my @toremove = ();
 
-    foreach my $member (keys(%curmembers)) {
-	push(@toremove, $member)
-	    if (! exists($members{$member}));
+    foreach my $uid (keys(%curmembers)) {
+	push(@toremove, $curmembers{$uid})
+	    if (! exists($members{$uid}));
     }
     if (@toremove) {
 	if ($impotent) {
@@ -368,18 +568,18 @@ sub SetListMembers(@)
     #
     # Okay, now add any members that are not in the current set.
     #
-    foreach my $member (keys(%members)) {
-	if (! exists($curmembers{$member})) {
-	    my $email    = $member;
-	    my $password = $members{$member};
-	    my $fullname = $fullnames{$member};
+    foreach my $uid (keys(%members)) {
+	if (! exists($curmembers{$uid})) {
+	    my $email    = $members{$uid};
+	    my $password = $passwords{$uid};
+	    my $fullname = $fullnames{$uid};
 
 	    if ($impotent) {
-		print "Would add: $fullname <$email>\n";
+		print "Would add: $fullname <$email> ($uid)\n";
 	    }
 	    else {
 		if ($debug) {
-		    print "Adding: $fullname <$email>\n";
+		    print "Adding: $fullname <$email> ($uid)\n";
 		}
 
 		# Shell escape sillyness.
@@ -406,24 +606,24 @@ sub SetListMembers(@)
     # And then lets reset fullnames for any that are now different. Reset
     # the password at the same time, just for the hell of it.
     # 
-    foreach my $member (keys(%members)) {
-	if (exists($curmembers{$member}) &&
-	    $fullnames{$member} ne $curmembers{$member}) {
+    foreach my $uid (keys(%members)) {
+	if (exists($curmembers{$uid}) &&
+	    $fullnames{$uid} ne $curfullnames{$uid}) {
 
-	    my $email    = $member;
-	    my $password = $members{$member};
-	    my $fullname = $fullnames{$member};
+	    my $email    = $members{$uid};;
+	    my $password = $passwords{$uid};
+	    my $fullname = $fullnames{$uid};
 
 		# Shell escape sillyness.
 		$fullname =~ s/\"/\'/g;
 		$fullname =~ s/([^\\])([\'\"\(\)])/$1\\$2/g;
 
 	    if ($impotent) {
-		print "Would reset: $fullname <$email>\n";
+		print "Would reset: $fullname <$email> ($uid)\n";
 	    }
 	    else {
 		if ($debug) {
-		    print "Resetting: $fullname <$email>\n";
+		    print "Resetting: $fullname <$email> ($uid)\n";
 		}
 
 		#
@@ -433,7 +633,7 @@ sub SetListMembers(@)
 		#
 		system("$MMBINDIR/withlist -l -q ".
 		       "-r mmscript.modmember $listname ".
-		       "$email \"$fullname\" $password") == 0
+		       "$email $email \"$fullname\" $password") == 0
 			   or fatal("SetListMembers: ".
 				    "Could not modify member in $listname: ".
 				    "$fullname <$email>");
@@ -443,20 +643,21 @@ sub SetListMembers(@)
 }
 
 #
-# Modify the password and fullname for a particular user. This will change
-# all lists to which the user is subscribed. Note that the fullname and
-# password come in from stdin to avoid having the password show up in a ps
-# listing.
+# Modify the password, email and fullname for a particular user. This
+# will change all lists to which the user is subscribed. Note that the
+# fullname and password come in from stdin to avoid having the
+# password show up in a ps listing.
 # 
 sub ModifyMember(@)
 {
     usage()
-	if (@_ != 1);
+	if (@_ != 2);
 
-    my ($email) = @_;
+    my ($uid, $newemail) = @_;
+    my $oldemail;
 
     if ($debug) {
-	print "Modifying info for: $email\n";
+	print "Modifying info for $uid: $newemail\n";
     }
 
     #
@@ -481,11 +682,15 @@ sub ModifyMember(@)
 	fatal("Bad line in input: $_");
     }
 
+    # Get the current mapping, before we change anything (email).
+    fatal("Error mapping $uid to email address!")
+	if (EmulabID2Email($uid, \$oldemail) < 0);
+    
     #
     # Find the current subscription list for the user.
     #
-    open(LISTS, "$MMBINDIR/withlist -q -a -r mmscript.findmember $email |") or
-	fatal("ModifyMember: Could not start up withlist script!");
+    open(LISTS, "$MMBINDIR/withlist -q -a -r mmscript.findmember $oldemail |")
+	or fatal("ModifyMember: Could not start up withlist script!");
 
     while (<LISTS>) {
 	if ($_ = /^(.*)$/) {
@@ -496,7 +701,7 @@ sub ModifyMember(@)
 	fatal("ModifyMember: Error running withlist script!");
 
     if ($debug) {
-	print "$email is a member of @listnames\n";
+	print "$oldemail is a member of @listnames\n";
     }
 
     # Shell escape sillyness.
@@ -505,11 +710,11 @@ sub ModifyMember(@)
 
     foreach my $listname (@listnames) {
 	if ($impotent) {
-	    print "Would reset in $listname: $fullname <$email>\n";
+	    print "Would reset in $listname: $fullname <$oldemail>\n";
 	}
 	else {
 	    if ($debug) {
-		print "Resetting in $listname: $fullname <$email>\n";
+		print "Resetting in $listname: $fullname <$oldemail>\n";
 	    }
 	    
 	    #
@@ -519,12 +724,14 @@ sub ModifyMember(@)
 	    #
 	    system("$MMBINDIR/withlist -l -q ".
 		   "-r mmscript.modmember $listname ".
-		   "$email \"$fullname\" $password") == 0
+		   "$oldemail $newemail \"$fullname\" $password") == 0
 		       or fatal("ModifyMember: ".
 				"Could not modify member in $listname: ".
-				"$fullname <$email>");
+				"$fullname <$oldemail>");
 	}
     }
+    # Now safe to do this.
+    StoreMapping($uid, $newemail);
 }
 
 #
@@ -609,12 +816,24 @@ sub ListMembership(@)
     usage()
 	if (@_ != 1);
 
-    my ($email) = @_;
+    my ($uid) = @_;
+    my $email;
 
+    # Get the current mapping.
+    fatal("ListMembership: Error mapping $uid to email address!")
+	if (EmulabID2Email($uid, \$email) < 0);
+
+    if ($debug) {
+	print "Looking for membership of $uid ($email)\n";
+    }
+
+    # The script we call expects regex, and embedded + signs mess things up.
+    $email =~ s/([^\\])([\+])/$1\\$2/g;
+    
     #
     # Very convenient script provided by mailman ...
     #
-    open(NAMES, "$MMBINDIR/find_member $email |") or
+    open(NAMES, "$MMBINDIR/find_member '$email' |") or
 	fatal("ListMembership: Could not start up find_member!");
 
     while (<NAMES>) {
@@ -636,8 +855,13 @@ sub xLogin(@)
     usage()
 	if (@_ != 3);
 
-    my ($email, $cookietype, $listname) = @_;
+    my ($uid, $cookietype, $listname) = @_;
+    my $email;
 
+    # Get the current mapping.
+    fatal("xlogin: Error mapping $uid to email address!")
+	if (EmulabID2Email($uid, \$email) < 0);
+    
     #
     # Generate a cookie and send it back.
     # 
@@ -654,4 +878,20 @@ sub fatal($)
 
     die("*** $0:\n".
 	"    $mesg\n");
+}
+
+#
+# Make sure dbm files are closed
+#
+END {
+    my $saved_exitcode = $?;
+    if (defined(%IDhash)) {
+	dbmclose(%IDhash);
+	undef(%IDhash);
+    }
+    if (defined(%EMAILhash)) {
+	dbmclose(%EMAILhash);
+	undef(%EMAILhash);
+    }
+    $? = $saved_exitcode;
 }

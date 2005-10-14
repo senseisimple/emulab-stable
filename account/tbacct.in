@@ -43,6 +43,7 @@ my $WITHSFS	= @SFSSUPPORT@;
 my $WIKISUPPORT = @WIKISUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $CHATSUPPORT = @CHATSUPPORT@;
+my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $PROTOUSER   = 'elabman';
 
 my $SAMBANODE	= "fs";  # DNS makes this do the right thing in E-in-E.
@@ -56,7 +57,6 @@ my $USERDEL	= "/usr/sbin/pw userdel";
 my $USERMOD	= "/usr/sbin/pw usermod";
 my $CHPASS	= "/usr/bin/chpass";
 my $SFSKEYGEN	= "/usr/local/bin/sfskey gen";
-my $SETGROUPS	= "$TB/sbin/setgroups";
 my $GENELISTS	= "$TB/sbin/genelists";
 my $MKUSERCERT	= "$TB/sbin/mkusercert";
 my $SFSUPDATE	= "$TB/sbin/sfskey_update";
@@ -68,6 +68,9 @@ my $ADDBUGDBUSER= "$TB/sbin/addbugdbuser";
 my $DELBUGDBUSER= "$TB/sbin/delbugdbuser";
 my $ADDCHATUSER = "$TB/sbin/addjabberuser";
 my $DELCHATUSER = "$TB/sbin/deljabberuser";
+my $MMMODIFYUSER= "$TB/sbin/mmmodifymember";
+my $ADDMMUSER   = "$TB/sbin/addmmuser";
+my $DELMMUSER   = "$TB/sbin/delmmuser";
 my $NOLOGIN	= "/sbin/nologin";
 my $SSH		= "$TB/bin/sshtb";
 my $SAVEUID	= $UID;
@@ -371,6 +374,10 @@ sub AddUser()
     system("$ADDCHATUSER $user")
 	if ($CHATSUPPORT && !$batch && $user ne $PROTOUSER);
 
+    # And the mailman lists if enabled.
+    system("$ADDMMUSER $user")
+	if ($MAILMANSUPPORT);
+    
     # Generate the SSL cert for the user.
     system("$MKUSERCERT $user");
 
@@ -454,6 +461,10 @@ sub DelUser()
     # And the chat server if enabled.
     system("$DELCHATUSER $user")
 	if ($CHATSUPPORT);
+    
+    # And the mailman lists if enabled.
+    system("$DELMMUSER $user")
+	if ($MAILMANSUPPORT);
     
     $EUID = 0;
 
@@ -603,6 +614,10 @@ sub UpdateUser(;$)
     $UID = $SAVEUID;
 
     $EUID = $UID;
+    # Update elists in case email changed.
+    system("$MMMODIFYUSER $user")
+	if ($MAILMANSUPPORT && !$batch);
+    
     # Update elists in case email changed.
     system("$GENELISTS -m -u $user");
     $EUID = 0;

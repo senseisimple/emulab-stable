@@ -12,7 +12,8 @@ SUBDIR		= collab/mailman
 include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= addmmlist delmmlist setmmlistmembers mmsetup \
-			  setmmpasswd mmlistmembership
+			  setmmpasswd mmlistmembership mmmodifymember \
+			  addmmuser delmmuser
 LIBEXEC_SCRIPTS		= webaddmmlist webdelmmlist websetmmpasswd mmxlogin \
 			  webmmlistmembership
 CTRL_LIBEXEC_SCRIPTS	= genaliases
@@ -38,6 +39,10 @@ install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_SCRIPTS)) \
 boss-install: install
 
 post-install: 
+	chown root $(INSTALL_SBINDIR)/addmmuser
+	chmod u+s $(INSTALL_SBINDIR)/addmmuser
+	chown root $(INSTALL_SBINDIR)/delmmuser
+	chmod u+s $(INSTALL_SBINDIR)/delmmuser
 	chown root $(INSTALL_SBINDIR)/addmmlist
 	chmod u+s $(INSTALL_SBINDIR)/addmmlist
 	chown root $(INSTALL_SBINDIR)/delmmlist
@@ -50,6 +55,8 @@ post-install:
 	chmod u+s $(INSTALL_SBINDIR)/mmlistmembership
 	chown root $(INSTALL_LIBEXECDIR)/mmxlogin
 	chmod u+s $(INSTALL_LIBEXECDIR)/mmxlogin
+	chown root $(INSTALL_SBINDIR)/mmmodifymember
+	chmod u+s $(INSTALL_SBINDIR)/mmmodifymember
 
 #
 # Control node installation (okay, plastic)

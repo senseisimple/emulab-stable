@@ -55,12 +55,18 @@ if (isset($pid) && $pid != "") {
     # By default, we want the user interface to the archives. However, an
     # admin can request access to the list admin interface, and we need
     # a different cookie for that.
-    # 
+    #
+    TBUserInfo($uid, $user_name, $user_email);
+    $user_email = rawurlencode($user_email);
+    
     $cookietype = "user";
     $listiface  = "private";
+    $optargs    = "?username=${user_email}";
+    
     if (isset($wantadmin) && $isadmin) {
 	$cookietype = "admin";
 	$listiface  = "admin";
+	$optargs    = "";
     }
 
     SUEXEC($uid, "nobody", "mmxlogin $uid $listname $cookietype",
@@ -71,7 +77,7 @@ if (isset($pid) && $pid != "") {
     #
     # Set-Cookie: foo=2802; Path=/mailman/; Version=1;
     #
-    if (!preg_match("/^Set-Cookie: ([-\w\+\.]+)=(\w*); ".
+    if (!preg_match("/^Set-Cookie: ([-\w\+\.\%]+)=(\w*); ".
 		    "Path=(\/[\w]+\/); Version=1;$/",
 		    $suexec_output, $matches)) {
 	TBERROR($suexec_output, 1);
@@ -80,7 +86,7 @@ if (isset($pid) && $pid != "") {
 
     setcookie($matches[1], $matches[2], 0, $matches[3], $TBAUTHDOMAIN, 0);
 
-    $url = "${MAILMANURL}/$listiface/$listname/";
+    $url = "${MAILMANURL}/$listiface/$listname/$optargs";
 }
 elseif (isset($listname) && $listname != "") {
     #
@@ -91,7 +97,9 @@ elseif (isset($listname) && $listname != "") {
     if (! TBvalid_mailman_listname($listname)) {
 	PAGEARGERROR("Invalid characters in $listname!");
     }
-
+    TBUserInfo($uid, $user_name, $user_email);
+    $user_email = rawurlencode($user_email);
+	
     $optargs = "";
     #
     # Make sure the user is allowed! We must do a permission check since
@@ -121,22 +129,23 @@ elseif (isset($listname) && $listname != "") {
     elseif (isset($wantconfig)) {
 	$cookietype = "user";
 	$listiface  = "options";
-	$optargs    = "?email=${uid}@${OURDOMAIN}";
+	$optargs    = "?email=${user_email}";
     }
     else {
 	$cookietype = "user";
 	$listiface  = "private";
+	$optargs    = "?username=${user_email}";
     }
 
     SUEXEC($uid, "nobody", "mmxlogin $uid $listname $cookietype",
 	   SUEXEC_ACTION_DIE);
-
+    
     #
     # Parse the silly thing
     #
     # Set-Cookie: foo=2802; Path=/mailman/; Version=1;
     #
-    if (!preg_match("/^Set-Cookie: ([-\w\+\.]+)=(\w*); ".
+    if (!preg_match("/^Set-Cookie: ([-\w\+\.\%]+)=(\w*); ".
 		    "Path=(\/[\w]+\/); Version=1;$/",
 		    $suexec_output, $matches)) {
 	TBERROR($suexec_output, 1);

@@ -472,7 +472,7 @@ sub genelist($$$$)
 	    next;
 	}
 	if ($usemailman && $MAILMANSUPPORT) {
-	    print LIST "${uid}\@${OURDOMAIN} $mailman_password '$user_name'\n";
+	    print LIST "$uid $user_email $mailman_password '$user_name'\n";
 	}
 	else {
 	    print LIST "$user_email\n";

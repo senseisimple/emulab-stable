@@ -5,6 +5,7 @@ from Mailman import Message
 from Mailman import Errors
 from Mailman import UserDesc
 import sha
+import sys
 
 def addmember(mlist, addr, name, passwd):
     userdesc = UserDesc.UserDesc(address=addr, fullname=name, password=passwd)
@@ -25,13 +26,16 @@ def addmember(mlist, addr, name, passwd):
         pass
     pass
 
-def modmember(mlist, addr, name, passwd):
+def modmember(mlist, oldaddr, newaddr, name, passwd):
     try:
-        mlist.setMemberPassword(addr, passwd)
-        mlist.setMemberName(addr, name)
+        mlist.setMemberPassword(oldaddr, passwd)
+        mlist.setMemberName(oldaddr, name)
+        if oldaddr <> newaddr:
+            mlist.ApprovedChangeMemberAddress(oldaddr, newaddr, False)
+            pass
         mlist.Save()
     except Errors.NotAMemberError:
-        print 'Not a member:', addr
+        print 'Not a member:', oldaddr
         sys.exit(1);
     except:
         print 'Error resetting name/password'

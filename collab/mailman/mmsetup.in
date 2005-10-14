@@ -28,6 +28,7 @@ my $CONTROL     = "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $SSH         = "$TB/bin/sshtb";
+my $ADDMMUSER   = "$TB/sbin/addmmuser";
 my $ADDMMLIST   = "$TB/sbin/addmmlist";
 my $GENELISTS	= "$TB/sbin/genelists";
 
@@ -82,6 +83,7 @@ if (defined($options{"d"})) {
 if (@ARGV) {
     usage();
 }
+my $optarg = ($debug ? "-d" : "");
 
 #
 # Initialize a mailman password for all users. 
@@ -100,7 +102,22 @@ while (my ($uid) = $query_result->fetchrow_array()) {
 		 "where uid='$uid'");
 }
 
-my $optarg = ($debug ? "-d" : "");
+#
+# Now add all active users.
+# 
+$query_result =
+    DBQueryFatal("select distinct g.uid,u.usr_email ".
+		 "  from group_membership as g ".
+		 "left join users as u on u.uid=g.uid ".
+		 "where u.status='active' ".
+#		 "  and (g.pid='testbed' or g.pid='emulab-ops' or ".
+#		 "       g.pid='tbres' or g.pid='utahstud')" .
+		 "order by u.admin");
+
+while (my ($uid,$email) = $query_result->fetchrow_array()) {
+    system("$ADDMMUSER $optarg $uid") == 0
+	or fatal("Could not add user $uid to mailman DB!");
+}
 
 #
 # Add project (and group) lists.
@@ -138,7 +155,7 @@ while (my ($pid,$gid) = $query_result->fetchrow_array()) {
 # And populate all the lists!
 #
 foreach my $pid (@projects) {
-    system("$GENELISTS $optarg -d -p $pid") == 0
+    system("$GENELISTS $optarg -p $pid") == 0
 	or fatal("Could not populate lists for project $pid!");
 }
 

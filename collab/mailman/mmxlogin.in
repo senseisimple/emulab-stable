@@ -124,8 +124,6 @@ else {
     die("Bad data in xtype: $xtype");
 }
 
-my $email = "${user_uid}\@${OURDOMAIN}";
-
 #
 # For ssh.
 #
@@ -133,7 +131,7 @@ $UID = $EUID;
 
 if ($CONTROL ne $BOSSNODE) {
     open(COOKIE, "$SSH -host $CONTROL $MMPROXY ".
-				 "xlogin $email $xtype $listname |") or
+				 "xlogin $user_uid $xtype $listname |") or
 	fatal("$MMPROXY failed on $CONTROL!");
     my $cookie = <COOKIE>;
     close(COOKIE) or

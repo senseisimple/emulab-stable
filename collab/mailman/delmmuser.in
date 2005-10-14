@@ -6,18 +6,20 @@
 #
 use English;
 use Getopt::Std;
+use Errno qw(EEXIST);
 
 #
-# Ask the mailman server for the list of lists a user belongs to.
+# Add a mailman user.
 #
 sub usage()
 {
-    print STDOUT "Usage: mmlistmembership <uid>\n";
+    print STDOUT "Usage: delmmuser <uid>\n";
     exit(-1);
 }
-my $optlist = "d";
-my $debug   = 0;
-my $user_uid;
+my $optlist   = "d";
+my $debug     = 0;
+my $dbuid;
+my $target_uid;
 
 #
 # Configure variables
@@ -79,6 +81,14 @@ if (! $MAILMANSUPPORT) {
 }
 
 #
+# Get user DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+        "    You do not exist in the Emulab Database!\n");
+}
+
+#
 # Parse command arguments. Once we return from getopts, all that should be
 # left are the required arguments.
 #
@@ -89,22 +99,33 @@ if (! getopts($optlist, \%options)) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
-
 usage()
     if (@ARGV != 1);
-    
-$user_uid = $ARGV[0];
-    
+
+$target_uid = $ARGV[0];
+
 #
 # Untaint args.
 #
-if ($user_uid =~ /^([-\w]+)$/) {
-    $user_uid = $1;
+if ($target_uid =~ /^([-\w]+)$/) {
+    $target_uid= $1;
 }
 else {
-    die("Bad data in uid: $user_uid");
+    die("Bad data in uid: $target_uid");
 }
 
+my $query_result =
+    DBQueryFatal("select usr_email, mailman_password, usr_name ".
+		 "from users where uid='$target_uid'");
+
+fatal("No such user in DB: $target_uid!")
+    if (!$query_result->numrows);
+
+my ($email, $password, $fullname) = $query_result->fetchrow_array();
+
+#
+# Note that since we are sending cleartext passwords over, pipe the info
+# into its STDIN so that the passwords are not visible in a ps listing.
 #
 # For ssh.
 #
@@ -113,15 +134,21 @@ $UID = $EUID;
 if ($CONTROL ne $BOSSNODE) {
     my $optarg = ($debug ? "-d" : "");
 
-    open(LISTS, "$SSH -host $CONTROL $MMPROXY $optarg ".
-				 "membership $user_uid |") or
+    print "Removing user $target_uid from Mailman DB on $CONTROL.\n";
+
+    # Must serialize some of the mailman stuff. Be sure to use the same token!
+    TBScriptLock("mailman_update") == 0 or
+	fatal("Could not get the lock!");
+
+    system("$SSH -host $CONTROL $MMPROXY $optarg deluser $target_uid $email");
+
+    my $status = $?;
+    TBScriptUnlock();
+    $? = $status;
+
+    if ($?) {
 	fatal("$MMPROXY failed on $CONTROL!");
-    while (<LISTS>) {
-	# Send back to PHP.
-	print $_;
     }
-    close(LISTS) or
-	fatal("$MMPROXY failed on $CONTROL!");
 }
 exit(0);
 
