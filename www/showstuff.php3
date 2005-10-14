@@ -484,6 +484,7 @@ function SHOWUSER($uid) {
     $failstamp   = $row['weblogin_failstamp'];
     $wikiname    = $row['wikiname'];
     $cvsweb      = $row['cvsweb'];
+    $wikionly    = $row['wikionly'];
 
     if (!strcmp($usr_addr2, ""))
 	$usr_addr2 = "&nbsp";
@@ -609,6 +610,13 @@ function SHOWUSER($uid) {
               <td>Status:</td>
               <td>$status</td>
           </tr>\n";
+
+    if ($wikionly) {
+	echo "<tr>
+                  <td><b>Wikionly</b>:</td>
+                  <td>Yes</td>
+              </tr>\n";
+    }
 
     if ($admin) {
 	$onoff = ($adminoff ? "Off" : "On");
