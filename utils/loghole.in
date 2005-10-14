@@ -769,6 +769,7 @@ def do_archive(args):
 
     if delete_dir:
         open(CLEANFILE, 'w')
+        os.chmod(CLEANFILE, 0664)
         pass
 
     if VERBOSITY == VERBOSITY_MACHINE:
