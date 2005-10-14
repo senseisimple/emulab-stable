@@ -28,6 +28,7 @@ my $user;
 my @addlist = ();
 my @modlist = ();	# Just changing the trust value ...
 my @remlist = ();
+my $optarg  = "";
 
 #
 # Configure variables
@@ -41,6 +42,7 @@ my $WIKISUPPORT    = @WIKISUPPORT@;
 my $BUGDBSUPPORT   = @BUGDBSUPPORT@;
 my $CHATSUPPORT    = @CHATSUPPORT@;
 my $ELABINELAB	   = @ELABINELAB@;
+my $GENELISTS      = "$TB/sbin/genelists";
 my $MODBUDDIES     = "$TB/sbin/modjabberbuddies";
 my $SETCHATMEMBERS = "$TB/sbin/setchatmembers";
 my $SETGROUPS	   = "$TB/sbin/setgroups";
@@ -89,7 +91,8 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"d"})) {
-    $debug = 1;
+    $debug  = 1;
+    $optarg = "-d";
 }
 if (defined($options{"a"})) {
     my @tokens = split(",", $options{"a"});
@@ -213,12 +216,12 @@ foreach my $token (@addlist) {
     # Tell chat subsystem to change groups ...
     #
     if ($CHATSUPPORT) {
-	system("$MODBUDDIES -a $pid:$gid $user") == 0 or
+	system("$MODBUDDIES $optarg -a $pid:$gid $user") == 0 or
 	    fatal("$MODBUDDIES '-a $pid:$gid $user' failed!");
 
 	# Does not work yet.
 	if (0) {
-	    system("$SETCHATMEMBERS -g $gid $pid") == 0 or
+	    system("$SETCHATMEMBERS $optarg -g $gid $pid") == 0 or
 		fatal("$SETCHATMEMBERS '-g $gid $pid' failed!");
 	}
     }
@@ -265,6 +268,15 @@ foreach my $token (@remlist) {
 		 "      uid='$user'");
 
     #
+    # When deleting a user from a group, need to call genelists on the
+    # project, not the user, since that information is obviously gone from
+    # the DB, and genelists will not generate the right lists.
+    #
+    print "Updating email lists for project $pid\n";
+    system("$GENELISTS $optarg -p $pid") == 0 or
+	fatal("$GENELISTS -p $pid failed!");
+
+    #
     # Tell chat subsystem to change groups ...
     #
     if ($CHATSUPPORT) {
@@ -275,17 +287,28 @@ foreach my $token (@remlist) {
 
 	    # Does not work yet.
 	    if (0) {
-		system("$SETCHATMEMBERS -g $group $pid") == 0 or
+		system("$SETCHATMEMBERS $optarg -g $group $pid") == 0 or
 		    fatal("$SETCHATMEMBERS '-g $group $pid' failed!");
 	    }
 	}
 	if (@optlist) {
 	    my $chatargs = join(",", @optlist);
 	
-	    system("$MODBUDDIES -r $chatargs $user") == 0 or
+	    system("$MODBUDDIES $optarg -r $chatargs $user") == 0 or
 		fatal("$MODBUDDIES '-r $chatargs $user' failed!");
 	}
     }
+}
+
+#
+# Call genelists, but just when adding or modifying. For deletion, it
+# is handled above.
+#
+if (@addlist || @modlist) {
+    print "Updating email lists for user $user\n";
+    
+    system("$GENELISTS $optarg -u $user") == 0 or
+	fatal("$GENELISTS -u $user failed!");
 }
 
 #

@@ -31,7 +31,9 @@ sub usage()
 
 sub fatal($);
 
-my  $optlist = "p:";
+my $optlist = "dp:";
+my $debug   = 0;
+my $optarg  = "";
 
 #
 # Configure variables
@@ -49,7 +51,6 @@ my $SETWIKIGROUPS = "$TB/sbin/setwikigroups";
 my $SETBUGDBGROUPS= "$TB/sbin/setbugdbgroups";
 
 my $SSH     = "$TB/bin/sshtb";
-my $GENELISTS="$TB/sbin/genelists";
 my $USERMOD = "/usr/sbin/pw usermod";
 my $SAVEUID = $UID;
 
@@ -110,6 +111,10 @@ if ($UID == 0) {
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
+}
+if (defined($options{"d"})) {
+    $debug  = 1;
+    $optarg = "-d";
 }
 if (defined($options{"p"})) {
     $pid = $options{"p"};
@@ -380,27 +385,15 @@ foreach my $uid (@userlist) {
 $UID  = $SAVEUID;
 $EUID = $UID;
 
-if (defined($pid)) {
-    print "Updating email lists for project $pid\n";
-    system("$GENELISTS -p $pid");
-}
-else {
-    print "Updating email lists for: ".join(" ",@userlist)."\n";
-
-    foreach $u (@userlist) {
-	system("$GENELISTS -u $u");
-    }
-}
-
 # and the twiki.
 if ($WIKISUPPORT || $BUGDBSUPPORT) {
     foreach $user (@userlist) {
 	if ($WIKISUPPORT) {
-	    system("$SETWIKIGROUPS $user") == 0 or
+	    system("$SETWIKIGROUPS $optarg $user") == 0 or
 		fatal("$SETWIKIGROUPS $user failed!");
 	}
 	if ($BUGDBSUPPORT) {
-	    system("$SETBUGDBGROUPS $user") == 0 or
+	    system("$SETBUGDBGROUPS $optarg $user") == 0 or
 		fatal("$SETBUGDBGROUPS $user failed!");
 	}
     }
