@@ -824,7 +824,7 @@ sub DelBuddies(@)
     
     if (JabberUser($user) != 0) {
 	print "User '$user' does not exist in Jabber user list!\n";
-	return -1;
+	return 0;
     }
     my $owner = "${user}\@${REALM}";
 
