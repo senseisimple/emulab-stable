@@ -148,13 +148,19 @@ $EUID = $UID = $uid;
 $EGID = $GID = $gid;
 
 print "Running mkproj...\n";
-system "$wap $mkproj $protoproj";
+if (system "$wap $mkproj $protoproj") {
+    die "Unable to create initial project $protoproj\n";
+}
 
 print "Running mkgrp...\n";
-system "$wap $mkgroup $protoproj $protoproj";
+if (system "$wap $mkgroup $protoproj $protoproj") {
+    die "Unable to create group for initial project $protoproj\n";
+}
 
 print "Running mkacct...\n";
-system "$wap $mkacct $protouser";
+if (system "$wap $mkacct $protouser") {
+    die "Unable to create account for initial user $protouser\n";
+}
 
 #
 # Okay, if not ELABINELAB, then set the firstinitstate so that the web
