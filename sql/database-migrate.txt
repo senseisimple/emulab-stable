@@ -2829,3 +2829,10 @@ last_net_act,last_cpu_act,last_ext_act);
 
         alter table global_policies change auxdata \
                 auxdata varchar(128) NOT NULL default '';
+
+4.13: Add serial and service_tag columns to nodes table.
+
+      alter table nodes add serial varchar(64) \
+                default NULL after destination_orientation;
+      alter table nodes add service_tag varchar(64) \
+                default NULL after serial;

@@ -1238,6 +1238,8 @@ CREATE TABLE nodes (
   destination_x float default NULL,
   destination_y float default NULL,
   destination_orientation float default NULL,
+  serial varchar(32) default NULL,
+  service_tag varchar(32) default NULL,
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),
