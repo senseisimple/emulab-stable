@@ -1,6 +1,8 @@
 Thoughts and initial work on using digest/hashing techniques to improve
 frisbee performance.
 
+Last updated 10/7/05 with pc3000 numbers.
+
 Create a "signature" file for an image using a collision-resistant hash
 like MD5 or SHA-1.  When imageunzip (or frisbee) run, they first load
 in the signature file and use that information to check the current
@@ -19,12 +21,14 @@ we must meet two criteria:
    processor, memory and disk speeds but is in general true.  For our
    machines, here are some numbers (all MB/sec):
 
-      type	read(1/6)	write(1/6)	md5	inflate
+      type	read(1/6)	write(1/6)	md5	inflate	sha1
       pc600	22.1/18.4	19.6/19.6 	71.6	32.5
       pc850	26.7/28.0	21.4/21.4 	86.4	45.1
       pc2000	43.4/43.4	38.9/38.8	242.1	63.2
 
-   The two numbers for read/write are numbers for reading 1GB of data
+      pc3000	80.0/75.5	76.3/73.6 (WCE)	360.7	90.1	125.5
+
+   The two numbers for read/write are numbers for reading/writing 1GB of data
    starting at the beginning of the disk (i.e., the first GB) and starting
    at 5GB (i.e., the 6th GB).  They show a little of the slowdown as we
    get out further on the disk (We mostly live in the first 6GB).
@@ -33,6 +37,13 @@ we must meet two criteria:
    MD5 hashing is way faster than decompression, likely because the
    latter involves not only a memory read for every byte, but multiple
    writes as well.
+
+   Note that pc3000 reflects resonably current state of the art:
+   3Ghz processor, 2GB of 800MHz memory, 10000K RPM SCSI disk with the
+   write-cache enabled.  Note also the relative rate of hashing vs.
+   decompression gets considerably less favorable when using SHA-1 hash
+   instead of MD5.  Since MD5 has been "compromised" this may be a concern
+   at some point in the future.
 
 I have already written an "imagehash" utility, that can create the
 signature files (MD5 or SHA-1) and can be run to check the signature
@@ -48,14 +59,26 @@ time to load the disk (in seconds):
    pc850	82.3		65.4		20.5%	87.3 (68.5 + 18.1)
    pc2000	68.0		44.9		34.0%	55.8 (48.7 + 6.5)
 
+   pc3000	94.9		37.4		60.6%	37.5 (31.3 + 5.6)
+
 "imagehash serial" shows a run without overlapping reading with hashing
 along with the broken out time for those two phases.  Note that there are
 some bizarre effects here that I don't yet understand: 1) pc850s are slower
 than pc600s to read the disk when serially imagehashing, yet the disks
 are faster, 2) pc850s and pc2000s show extremely good overlap of IO with
-hashing, which pc600s show almost no improvement (85.1s to 81.1).
+hashing, which pc600s show almost no improvement (85.1s to 81.1).  Note
+that you cannot compare the pc3000 times with other node types since it
+was run with a much different image.  The 60% savings is probably exaggerated
+since it appears our server cannot keep frisbee fed and it goes idle:
 
-Anyway, we do see that imagehash is faster than frisbee by 13-34%.
+  net thread idle/blocked:        0/0
+  decompress thread idle/blocked: 34810/0
+  disk thread idle:        738
+
+Note that the net thread is never idle, so data is coming in, just not
+fast enough.  But that is another issue...
+
+Anyway, we do see that imagehash is faster than frisbee by 13-34+%.
 However, in that saved time, we need to be able to transfer over, decompress,
 and write any actual changes.  How much of this standard frisbee action
 we can overlap with the hashing is important.  If we have to do the
