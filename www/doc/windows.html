@@ -271,9 +271,20 @@ nodes.  <p>
 
 <h4><a name="Boots_twice"> </a> Windows nodes boot twice </h4>
 
-Notice that Windows reboots an extra time after first swap-in on a node, after
-changing the node name, to set up the network stack properly.  
-Be patient, Windows doesn't boot fast. <p>
+Notice that Windows reboots an extra time after being loaded onto a node
+during swap-in.  It has to reboot after changing the node name to set up the
+network stack properly.  Be patient, Windows doesn't boot fast. <p>
+
+It's best not to log in to the nodes until the experiment is fully swapped-in.
+(You may be able to log in briefly between the first two reboots; if you see
+the wrong pcXXX name, you'll know that a reboot is imminent.)  You can know
+that the swap-in process is finished by any of these methods:
+<ul>
+  <li> Waiting until you get the "experiment swapped in" email from Emulab.
+  <li> Checking the node status on the experiment status page in Emulab.
+       (You have to refresh the page to see node status change.)
+  <li> Watching the realtime swap-in log to monitor its progress.
+</ul>
 
 <div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen Windows
 XP fail to do the second reboot.  We're working on it.  If you try to login
@@ -288,14 +299,14 @@ the node itself: <pre>    /sbin/reboot</pre> </div>
 
 You can manually start up the SSH or RDP client programs to connect and log in
 to nodes in your experiment, or use the <code>console</code> command on Ops.
-In all cases, you will have to type your <a href="#Windows_Passwords"> Windows
-Password </a> when logging in.
+You will have to type your <a href="#Windows_Passwords"> Windows
+Password </a> when logging in, except for SSH when you have ssh-agent keys loaded. <p>
 
 Or you can set up your browser to automatically connect in one click from the
 Emulab web interface and pop up a connection window.
-Once an experiment is swapped in, the Emulab Experiment
+Once you start swapping in an experiment, the Emulab Experiment
 Information page contains a table of the physical node ID and logical node
-name, status, and connection buttons.  The captions of the button columns link
+name, status, and connection buttons.  The captions at the top of the button columns link
 to pages explaining how to set up up mime-types in your browser to make the
 buttons work, from FreeBSD, Linux, and Windows workstations:
 
