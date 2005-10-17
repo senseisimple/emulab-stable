@@ -2832,7 +2832,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.13: Add serial and service_tag columns to nodes table.
 
-      alter table nodes add serial varchar(64) \
+      alter table nodes add serial varchar(32) \
                 default NULL after destination_orientation;
-      alter table nodes add service_tag varchar(64) \
+      alter table nodes add service_tag varchar(32) \
                 default NULL after serial;
