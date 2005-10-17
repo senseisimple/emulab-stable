@@ -765,7 +765,11 @@ sub bw_test {
 		    &my_system(PATH_PATHRATE_RCV, "-Q","-s",$edge->src,"-q","-N", PATHRATE_DAT);
 		} else {
 		    &debug("Skipping bandwidth test for " . &print_link($edge) . "\n");
-
+		    &info("*** Skipping bandwidth test for " .
+			  &print_link($edge) . "\n");
+		    &info("*** Bandwidth is out of range ".
+			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
+			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
 		}
 	    } 
 	}
@@ -936,6 +940,13 @@ sub get_topo {
 
 }
 
+# Send an info message.
+sub info {
+    my($msg) = @_;
+    
+    &post_event(EVENT_REPORT, "    " . $msg);
+    &sim_event(EVENT_LOG, "    " . $msg);
+}
 
 # prints out the topology read in from the NS file
 sub debug_top {
