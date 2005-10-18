@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -271,24 +271,25 @@ if ($child_pid) {
 # We tell ssh to allocate a tty so that we can kill it with TERM and have
 # everything die off properly.
 #
-my $cmd = "$SSH -t -t -1 -F /dev/null " .
-    "-host $CONTROL $TB/sbin/linktest.proxy ";
-$cmd .= " -d $debug"
+my @cmdargs = ("$SSH", "-1", "-F", "/dev/null",
+	       "-host", $CONTROL, "$TB/sbin/linktest.proxy");
+push(@cmdargs, ("-d", "$debug"))
     if ($debug);
-$cmd .= " -t $timeout"
+push(@cmdargs, ("-t", "$timeout"))
     if (defined($timeout));
-$cmd .= " -o $output"
+push(@cmdargs, ("-o", "$output"))
     if (defined($output));
-$cmd .= " -l " . (defined($level) ? $level : $linktest_level);
-$cmd .= " -g " . $unix_gidname;
-$cmd .= " -u $dbuid";
-$cmd .= " -e $pid/$eid";
+push(@cmdargs, "-l");
+push(@cmdargs, (defined($level) ? $level : $linktest_level));
+push(@cmdargs, ("-g", $unix_gidname));
+push(@cmdargs, ("-u", $dbuid));
+push(@cmdargs, ("-e", "$pid/$eid"));
 
-print "Running '$cmd'\n"
+print "Running '@cmdargs'\n"
     if ($debug);
 
 # For sshtb
 $UID=0;
-exec($cmd);
+exec(@cmdargs);
 die("*** $0:\n".
     "    Could not exec run_linktest.pl\n");
