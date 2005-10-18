@@ -212,7 +212,7 @@ if ($?) {
 	"    Error running '$args'\n");
 }
 
-print "Linktest in progress...\n";
+print "Starting linktest at " . &TBTimeStamp() . "\n";
 print "Quick termination requested.\n"
     if (defined($options{"q"}));
 print "Debug mode requested.\n"
@@ -299,7 +299,7 @@ else {
 	    my $eventargs = $2;
 	    if (($eventtype eq $STOPEVENT) ||
 		($eventtype eq $COMPLETEEVENT)) {
-		print "Linktest completed.\n"
+		print "Linktest completed at " . &TBTimeStamp() . "\n"
 		    if($verbose);
 		last;
 	    }
@@ -404,4 +404,8 @@ sub kill_linktest_run {
 	die("*** $0:\n".
 	    "    Error running '$args'\n");
     }
+}
+
+sub TBTimeStamp {
+    return POSIX::strftime("%H:%M:%S", localtime());
 }
