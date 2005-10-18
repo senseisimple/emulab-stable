@@ -1,298 +1,406 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
 
 #
-# No PAGEHEADER since we spit out a Location header later. See below.
+# This script uses Sajax ... BEWARE!
 #
+require("Sajax.php");
+sajax_init();
+sajax_export("start_linktest", "stop_linktest");
 
+#
+# We need all errors to come back to us so that we can report the error
+# to the user even when its from within an exported sajax function.
+# 
+function handle_error($message, $death)
+{
+    echo "failed:$message";
+    # Always exit; ignore $death.
+    exit(1);
+}
+$session_errorhandler = 'handle_error';
 
-#
-# Only known and logged in users can do this.
-#
+# If this call is to client request function, then turn off interactive mode.
+# All errors will go to above function and get reported back through the
+# Sajax interface.
+if (sajax_client_request()) {
+    $session_interactive = 0;
+}
+
+# Now check login status.
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
 #
-# Check to make sure a valid experiment.
+# Need this argument checking in a function so it can called from the
+# request handlers.
 #
-if (isset($pid) && strcmp($pid, "") &&
-    isset($eid) && strcmp($eid, "")) {
-    if (! TBvalid_eid($eid)) {
-	PAGEARGERROR("$eid is contains invalid characters!");
+function CHECKPAGEARGS() {
+    global $uid, $TB_EXPTSTATE_ACTIVE, $TB_EXPT_MODIFY;
+    
+    #
+    # Check to make sure a valid experiment.
+    #
+    $pid = $_GET['pid'];
+    $eid = $_GET['eid'];
+    
+    if (isset($pid) && strcmp($pid, "") &&
+	isset($eid) && strcmp($eid, "")) {
+	if (! TBvalid_eid($eid)) {
+	    PAGEARGERROR("$eid is contains invalid characters!");
+	}
+	if (! TBvalid_pid($pid)) {
+	    PAGEARGERROR("$pid is contains invalid characters!");
+	}
+	if (! TBValidExperiment($pid, $eid)) {
+	    USERERROR("$pid/$eid is not a valid experiment!", 1);
+	}
+	if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
+	    USERERROR("$pid/$eid is not currently swapped in!", 1);
+	}
+	if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
+	    USERERROR("You do not have permission to run linktest on ".
+		      "$pid/$eid!", 1);
+	}
     }
-    if (! TBvalid_pid($pid)) {
-	PAGEARGERROR("$pid is contains invalid characters!");
-    }
-    if (! TBValidExperiment($pid, $eid)) {
-	USERERROR("$pid/$eid is not a valid experiment!", 1);
-    }
-    if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
-	USERERROR("$pid/$eid is not currently swapped in!", 1);
-    }
-    if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-	USERERROR("You do not have permission to run linktest on $pid/$eid!",
-		  1);
+    else {
+	PAGEARGERROR("Must specify pid and eid!");
     }
 }
-else {
-    PAGEARGERROR("Must specify pid and eid!");
-}
-
-# Need the GID, plus current level and the pid.
-$query_result =
-    DBQueryFatal("select gid,linktest_level,linktest_pid from experiments ".
-		 "where pid='$pid' and eid='$eid'");
-$row = mysql_fetch_array($query_result);
-$gid            = $row[0];
-$linktest_level = $row[1];
-$linktest_pid   = $row[2];
-
-# For backend script calls below!
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 #
-# If we already have a linktest pid, then do not want to start another
-# one. This is going to happen if someone loads this page directly; if
-# we come in from the frameset below, then $frame will be set and we do
-# not want put up this menu.
+# Grab DB data we need.
+#
+function GRABDBDATA() {
+    global $pid, $eid;
+    global $gid, $linktest_level, $linktest_pid;
+    
+    # Need the GID, plus current level and the pid.
+    $query_result =
+	DBQueryFatal("select gid,linktest_level,linktest_pid ".
+		     "  from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    $row = mysql_fetch_array($query_result);
+    $gid            = $row[0];
+    $linktest_level = $row[1];
+    $linktest_pid   = $row[2];
+}
+
+#
+# Stop a running linktest.
 # 
-if ($linktest_pid && !isset($frame)) {
-    if (isset($killit) && $killit == "Stop Linktest") {
-	#
-	# Form submitted. Kill running linktest and zap back to the initial 
-	# page to redisplay the menu. 
-	# 
-	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
-	       SUEXEC_ACTION_DIE);
-	header("Location: linktest.php3?pid=$pid&eid=$eid");
-	return;
+function stop_linktest() {
+    global $linktest_pid;
+    global $uid, $pid, $gid, $eid, $suexec_output;
+
+    # Must do this!
+    CHECKPAGEARGS();
+    GRABDBDATA();
+
+    if (! $linktest_pid) {
+	return "stopped:Linktest is not running on experiment $pid/$eid!";
     }
-    PAGEHEADER("Kill running Linktest");
+    # For backend script call.
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    
+    $retval = SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
+		     SUEXEC_ACTION_IGNORE);
 
-    echo "<font size=+2>Experiment <b>".
-	"<a href='showproject.php3?pid=$pid'>$pid</a>/".
-	"<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
-
-    echo "<center><font size=+2><br>
-              A Linktest is already running; click to stop it!
-              </font><br><br>\n";
-
-    echo "<form action=linktest.php3 method=post>";
-    echo "<input type=hidden name=pid value=$pid>\n";
-    echo "<input type=hidden name=eid value=$eid>\n";
-    echo "<b><input type=submit name=killit value='Stop Linktest'></b>\n";
-    echo "</form>\n";
-    echo "</center>\n";
-
-    PAGEFOOTER();
-    return;
-}
-
-#
-# See if a level came in. If not, then get the default from the DB.
-#
-if (!isset($level) || $level == "") {
-    $level = $linktest_level;
-}
-elseif (! TBvalid_tinyint($level) ||
-	$level < 0 || $level > TBDB_LINKTEST_MAX) {
-    PAGEARGERROR("Linktest level must be an integer 0 <= level <= ".
-		 TBDB_LINKTEST_MAX);
+    if ($retval < 0) {
+	return "failed:$suexec_output";
+    }
+    return "stopped:Linktest has been stopped.";
 }
 
 #
 # If user hits stop button in the output side, stop linktest.
 #
-$fp = 0;
+$process = 0;
 
 function SPEWCLEANUP()
 {
-    global $fp;
+    global $pid, $gid;
+    $process = $GLOBALS["process"];
 
-    if (connection_aborted() && $fp) {
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    if (connection_aborted() && $process) {
 	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
 	       SUEXEC_ACTION_IGNORE);
-	pclose($fp);
-	exit();
+	proc_close($process);
     }
 }
 
 #
-# Respond to the frame requests that are set up below. 
-#
-if (isset($frame)) {
-    if ($frame == "stopbutton") {
-	if (isset($submit) && $submit == "Stop") {
-	    SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
-		   SUEXEC_ACTION_IGNORE);
-	    
-	    echo "<html>
-                  <center>
-                   <font size=+1><b>Linktest is shutting down</b></font>
-                  </center>
-                  </html>\n";
+# Start linktest running.
+# 
+function start_linktest($level) {
+    global $linktest_pid;
+    global $uid, $pid, $gid, $eid, $suexec_output, $TBSUEXEC_PATH;
 
-	    return;
-	}
+    # Must do this!
+    CHECKPAGEARGS();
+    GRABDBDATA();
 
-	#
-	# Throw up a simple form to stop the linktest run.
-	#
-	echo "<html>
-              <center>
-              <font size=+1><b>Click to stop linktest run</b></font>
-              <br>
-              <form action=linktest.php3 method=post target=stopbutton>\n";
-	echo "   <input type=hidden name=pid value=$pid>\n";
-	echo "   <input type=hidden name=eid value=$eid>\n";
-	echo "   <input type=hidden name=frame value=stopbutton>\n";
-	echo "<b><input type=submit name=submit value='Stop'></b>\n";
-	echo "</form>
-              </center>
-              </html>\n";
-	return;
+    if ($linktest_pid) {
+	return "failed:Linktest is already running on experiment $pid/$eid!";
     }
-    # Else must be the content side.
+    if (! TBvalid_tinyint($level) ||
+	$level < 0 || $level > TBDB_LINKTEST_MAX) {
+	return "failed:Linktest level ($level) must be an integer ".
+	    "1 <= level <= ". TBDB_LINKTEST_MAX;
+    }
+    
+    # For backend script call.
+    TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+
+    # Make sure we shutdown if client goes away.
     register_shutdown_function("SPEWCLEANUP");
     ignore_user_abort(1);
     set_time_limit(0);
-    
-    $fp = popen("$TBSUEXEC_PATH ".
-		"$uid $pid,$unix_gid weblinktest -l $level $pid $eid",
-		"r");
-    if (! $fp) {
-	USERERROR("Linktest failed!", 1);
-    }
 
-    header("Content-Type: text/plain");
-    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
-    header("Cache-Control: no-cache, must-revalidate");
-    header("Pragma: no-cache");
-    flush();
+    #
+    # Having problems with popen reporting the proper exit status,
+    # so switched to proc_open instead. Obtuse, I know.
+    #
+    $descriptorspec = array(0 => array("pipe", "r"),
+			    1 => array("pipe", "w"));
 
-    for ($i = 0; $i < 1025; $i++) {
-	echo " ";
-    }
-    echo "\n";
+    $process = proc_open("$TBSUEXEC_PATH ".
+		 "$uid $pid,$unix_gid weblinktest -l $level $pid $eid",
+			 $descriptorspec, $pipes);
 
-    # See if we can get the browser to say something. 
-    echo date("D M d G:i:s T");
-    echo "\n";
-    echo "Starting linktest run at level $level\n";
-    flush();
-    while (!feof($fp)) {
-	$string = fgets($fp, 1024);
-	echo "$string";
-	flush();
+    if (! is_resource($process)) {
+	return "failed:Linktest failed!";
     }
-    $retval = pclose($fp);
+    $GLOBALS["process"] = $process;
+    fclose($pipes[0]);
+
+    # Build up an output string to return to caller.
+    $output = "Starting linktest run at level $level on " .
+	date("D M d G:i:s T") . "\n";
+
+    while (!feof($pipes[1])) {
+	$string  = fgets($pipes[1], 1024);
+	$output .= $string;
+    }
+    fclose($pipes[1]);
+    $retval = proc_close($process);
     $fp = 0;
-    if ($retval == 0)
-	echo "Linktest run was successful!\n";
-    echo date("D M d G:i:s T");
-    echo "\n";
-    return;
+    if ($retval > 0) {
+	$output .= "Linktest reported errors! Stopped at " .
+	    date("D M d G:i:s T") . "\n";
+	return "error:$output";
+    }
+    elseif ($retval < 0) {
+	return "failed:$output";
+    }
+    # Success.
+    $output .= "Linktest run was successful! Stopped at " .
+	date("D M d G:i:s T") . "\n";
+    return "stopped:$output";
 }
 
+# See if this request is to one of the above functions. Does not return
+# if it is. Otherwise return and continue on.
+sajax_handle_client_request();
+
 #
-# We run this twice. The first time we are checking for a confirmation
-# by putting up a form. The next time through the confirmation will be
-# set. Or, the user can hit the cancel button, in which case we should
-# probably redirect the browser back up a level.
+# In plain kill mode, just use the stop_linktest function and then
+# redirect back to the showexp page.
 #
-if ($canceled) {
-    PAGEHEADER("Run Linktest");
-	
-    echo "<center><h3><br>
-          Operation canceled!
-          </h3></center>\n";
+if (isset($kill) && $kill == 1) {
+    stop_linktest();
     
-    PAGEFOOTER();
+    header("Location: showexp.php3?pid=$pid&eid=$eid");
     return;
 }
 
-if (!$confirmed) {
-    PAGEHEADER("Run Linktest at level $level");
+#
+# Okay, this is the initial page.
+# 
+PAGEHEADER("Run Linktest");
 
-    echo "<font size=+2>Experiment <b>".
+# Must do this!
+CHECKPAGEARGS();
+GRABDBDATA();
+
+echo "<script>\n";
+sajax_show_javascript();
+if ($linktest_pid) {
+    echo "var curstate    = 'running';";
+}
+else {
+    echo "var curstate    = 'stopped';";
+}
+?>
+function do_start_cb(msg) {
+    if (msg == '') {
+	return;
+    }
+
+    //
+    // The first part of the message is an indicator whether linktest
+    // really started. The rest of it (after the ":" is the text itself).
+    //
+    var offset = msg.indexOf(":");
+    if (offset == -1) {
+	return;
+    }
+    var status = msg.substring(0, offset);
+    var output = msg.substring(offset + 1);
+
+    curstate = 'stopped';
+    getObjbyName('action').value = 'Start';
+
+    // Display the data, even if error.
+    var stuff = "";
+
+    if (status == 'error') {
+	stuff = "<font size=+1 color=red><blink>" +
+	    "Linktest has reported errors! Please examine log below." +
+	    "</blink></font>";
+    }
+
+    stuff = stuff + 
+	'<textarea id=outputarea rows=15 cols=90 readonly>' +
+	output + '</textarea>';
+
+    getObjbyName('output').innerHTML = stuff;
+
+    // If we got an error; disable the button. 
+    if (status == 'failed') {
+	getObjbyName('action').disabled = true;    
+    }
+}
+
+// Linktest stopped. No need to do anything since if a request was running,
+// it will have returned to do_start_cb() above, prematurely. 
+function do_stop_cb(msg) {
+    if (msg == '') {
+	return;
+    }
+
+    //
+    // The first part of the message is an indicator whether command
+    // was sucessful. The rest of it (after the ":" is the text itself).
+    //
+    var offset = msg.indexOf(":");
+    if (offset == -1) {
+	return;
+    }
+    var status = msg.substring(0, offset);
+    var output = msg.substring(offset + 1);
+
+    // If we got an error; throw up something useful.
+    if (status != 'stopped') {
+	alert("Linktest Stop: " + output);
+    }
+}
+
+function heartbeat() {
+    var today=new Date();
+    var h=today.getHours();
+    var m=today.getMinutes();
+    var s=today.getSeconds();
+    
+    // add a zero in front of numbers<10
+    if (m < 10)
+	m = "0" + 1;
+    if (s < 10)
+	s = "0" + 1;
+
+    if (curstate == 'running') {
+	getObjbyName('outputarea').value =
+	    "Linktest starting up ... please be patient: " + h+":"+m+":"+s;
+	setTimeout('heartbeat()', 500);
+    }
+}
+
+function doaction(theform) {
+    var levelx = theform['level'].selectedIndex;
+    var level  = theform['level'].options[levelx].value;
+    var action = theform['action'].value;
+
+    if (curstate == 'stopped') {
+	if (level == '0')
+	    return;
+
+	// Display something so that users activity.
+	getObjbyName('output').innerHTML =
+	    '<textarea id=outputarea rows=15 cols=90 readonly>' +
+	    "Linktest starting up ... please be patient. " + '</textarea>';
+	
+	curstate = "running";
+	theform['action'].value = "Stop Linktest";
+	heartbeat();
+	x_start_linktest(level, do_start_cb);
+    }
+    else {
+	x_stop_linktest(do_stop_cb);
+    }
+}
+<?php
+echo "</script>\n";
+
+echo "<font size=+2>Experiment <b>".
 	"<a href='showproject.php3?pid=$pid'>$pid</a>/".
 	"<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 
-    echo "<center><font size=+2><br>
-              Are you <b>sure</b> you want to run linktest?
-              </font><br><br>\n";
+echo "<center><font size=+2><br>
+         Are you <b>sure</b> you want to run linktest?
+         </font><br><br>\n";
 
-    SHOWEXP($pid, $eid, 1);
+SHOWEXP($pid, $eid, 1);
 
-    echo "<br>\n";
-    echo "<form action=linktest.php3 method=post
+echo "<br>\n";
+echo "<form action=linktest.php3 method=post name=myform
                 target=Linktest_${pid}_${eid}>";
-    echo "<input type=hidden name=pid value=$pid>\n";
-    echo "<input type=hidden name=eid value=$eid>\n";
+echo "<input type=hidden name=pid value=$pid>\n";
+echo "<input type=hidden name=eid value=$eid>\n";
 
-    echo "<table align=center border=1>\n";
-    echo "<tr>
-              <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
-	                  "docname=linktest.html'>Linktest</a> Option:</td>
-              <td><select name=level>
-                          <option value=0>Skip Linktest </option>\n";
+echo "<table align=center border=1>\n";
+echo "<tr>
+          <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
+                 "docname=linktest.html'>Linktest</a> Option:</td>
+          <td><select name=level>
+                 <option value=0>Skip Linktest </option>\n";
 
-    for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
-	$selected = "";
+for ($i = 1; $i <= TBDB_LINKTEST_MAX; $i++) {
+    $selected = "";
 
-	if (strcmp("$level", "$i") == 0)
-	    $selected = "selected";
+    if (strcmp("$level", "$i") == 0)
+	$selected = "selected";
 	
-	echo "        <option $selected value=$i>Level $i - " .
-	    $linktest_levels[$i] . "</option>\n";
-    }
-    echo "       </select>";
-    echo "    </td>
+    echo "        <option $selected value=$i>Level $i - " .
+	$linktest_levels[$i] . "</option>\n";
+}
+echo "       </select>";
+echo "    </td>
           </tr>
           </table><br>\n";
 
-    echo "<b><input type=submit name=confirmed value=Confirm></b>\n";
-    echo "<b><input type=submit name=canceled value=Cancel></b>\n";
-    echo "</form>\n";
-    echo "</center>\n";
-
-    PAGEFOOTER();
-    return;
+if ($linktest_pid) {
+    echo "<input type=button name=action id=action value='Stop Linktest' ".
+	         "onclick=\"doaction(myform); return false;\">\n";
+}
+else {
+    echo "<input type=button name=action id=action value=Start ".
+	         "onclick=\"doaction(myform); return false;\">\n";
 }
 
-#
-# Throw up a simple frameset.
-#
-echo "<html>
-      <title>Linktest for $pid/$eid</title>
-      <script language=JavaScript>
-          <!--
-          function LinktestDone() {
-              var html = '<html><center>' +
-                         '<font size=+1><b>Linktest has finished</b></font>' +
-                         '</center></html>';
+echo "</form>\n";
+echo "<div id=output></div>\n";
+echo "</center>\n";
 
-	      parent.stopbutton.document.close();
-	      parent.stopbutton.document.open();
-	      parent.stopbutton.document.write(html);
-          }
-          //-->
-      </script>\n";
-
-echo " <frameset cols=\"10%,*\" border=5 onLoad=\"LinktestDone()\"> 
-        <frame src=\"linktest.php3?pid=$pid&eid=$eid&frame=stopbutton\"
-               name=stopbutton> 
-        <frame src=\"linktest.php3?".
-                   "pid=$pid&eid=$eid&level=$level&frame=output\"
-               name=output> 
-        <noframes>You must use a browser that can display frames 
-                  to see this page.
-        </noframes>
-      </frameset>\n";
+#
+# Standard Testbed Footer
+# 
+PAGEFOOTER();
 ?>
