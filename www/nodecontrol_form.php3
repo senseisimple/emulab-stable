@@ -59,6 +59,9 @@ $temp_boot_osid     = $row[temp_boot_osid];
 $rpms               = $row[rpms];
 $tarballs           = $row[tarballs];
 $startupcmd         = $row[startupcmd];
+$bios_version       = $row[bios_version];
+$serial             = $row[serial];
+$service_tag        = $row[service_tag];
 
 #
 # Get the OSID list. These are either OSIDs that are currently loaded on
@@ -231,6 +234,27 @@ if ($isadmin) {
     echo "       </select>";
     echo "    </td>
            </tr>\n";
+
+    echo "<tr>
+              <td>BIOS Version:</td>
+              <td class=\"left\">
+                  <input type=\"text\" name=\"bios_version\" size=\"64\"
+                         value=\"$bios_version\"></td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Serial Number:</td>
+              <td class=\"left\">
+                  <input type=\"text\" name=\"serial\" size=\"32\"
+                         value=\"$serial\"></td>
+          </tr>\n";
+
+    echo "<tr>
+              <td>Service Tag:</td>
+              <td class=\"left\">
+                  <input type=\"text\" name=\"service_tag\" size=\"32\"
+                         value=\"$service_tag\"></td>
+          </tr>\n";
 }
 
 echo "<tr>

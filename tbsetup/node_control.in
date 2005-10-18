@@ -58,6 +58,10 @@ my %controlset =
      [1, 0, "temp_boot_osid",     undef,       1, "-t", "os_info:osid"],
  bios_version		=>
      [1, 0, "bios_version",	  undef,       0, "",   "nodes:bios_version"],
+ serial		        =>
+     [1, 0, "serial",	          undef,       0, "",   "nodes:serial"],
+ service_tag            =>
+     [1, 0, "service_tag",	  undef,       0, "",   "nodes:service_tag"],
 );
   
 #

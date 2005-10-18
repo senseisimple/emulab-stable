@@ -1978,6 +1978,8 @@ function SHOWNODE($node_id, $flags = 0) {
     $battery_percentage = $row[battery_percentage];
     $battery_timestamp  = $row[battery_timestamp];
     $boot_errno         = $row[boot_errno];
+    $serial             = $row[serial];
+    $service_tag        = $row[service_tag];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -2303,6 +2305,20 @@ function SHOWNODE($node_id, $flags = 0) {
 	    echo "<tr>
                       <td>Bios Version:</td>
                       <td class=left>$bios</td>
+                  </tr>\n";
+	}
+
+        if ($serial) {
+          echo "<tr>
+                      <td>Serial Number:</td>
+                      <td class=left>$serial</td>
+                  </tr>\n";
+	}
+
+        if ($service_tag) {
+          echo "<tr>
+                      <td>Service Tag:</td>
+                      <td class=left>$service_tag</td>
                   </tr>\n";
 	}
 	

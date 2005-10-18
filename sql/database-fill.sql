@@ -740,6 +740,8 @@ REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|
 REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('mailman_listnames','listname','text','regex','^[-\\w\\.\\+]+$',3,64,NULL);
 REPLACE INTO table_regex VALUES ('default','fulltext','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,20000,NULL);
+REPLACE INTO table_regex VALUES ('nodes','serial','text','regex','^[-\\w\\.+]+$',0,32,NULL);
+REPLACE INTO table_regex VALUES ('nodes','service_tag','text','regex','^[-\\w\\.+]+$',0,32,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
