@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2004 University of Utah and the Flux Group.
+   Copyright (c) 2000-2005 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -20,8 +20,8 @@
     </ul>
 <li> <a href="#Advanced">Advanced Topics</a>
     <ul>
+    <li> <a href="#Web">Running Linktest from the Web Interface</a>
     <li> <a href="#Ops">Running Linktest on Ops</a>
-    <li> <a href="#Tevc">Running Linktest with Tevc</a>
     <li> <a href="#Log">Linktest Log Directory</a>
     </ul>
 </ul>
@@ -42,8 +42,13 @@ will check that all nodes respond to ping and that latency is correct.
 href="#Level3">Level 3 - Loss</a>. Test levels are cumulative, so this option includes
 Connectivity, Latency, Static Routing (if applicable) and Loss.
 <li>If bandwidth is important in your experiment, select <a
-href="#Level4">Level 4 - Bandwidth</a>. Be warned that the bandwidth test takes up to 40 seconds per
-link.
+href="#Level4">Level 4 - Bandwidth</a>. Be warned that the bandwidth
+test takes up to 40 seconds per link. <b>Also note that not all
+bandwidths can be accurately measured</b>. If this happens, a warning will
+be placed in the log file for each link that is out of range for
+bandwidth testing. It is up to you to ensure that links are behaving
+as you expect them too!
+
 </ul>
 <p>If you select a test lest level other than 0, Linktest
 will run after the experiment completes its swapin. If a problem is
@@ -175,19 +180,31 @@ time.
 </center>
 
 <p>
-To run Linktest after experiment swapin, manually
-invoke the script run_linktest.pl on ops or use tevc to send a custom
-Linktest event. You may also examine Linktest output in its log
-directory. Read about these options in the following sections:
+To run Linktest after experiment swapin, you may use Emulab's Web
+Interface, or you may manually invoke the script <tt>run_linktest.pl</tt> on
+ops. You may also examine Linktest output in its log directory. Read
+about these options in the following sections:
 </p>
 <p>
     <ul>
+    <li> <a href="#Web">Running Linktest from the Web Interface</a>
     <li> <a href="#Ops">Running Linktest on Ops</a>
-    <li> <a href="#Tevc">Running Linktest with Tevc</a>
     <li> <a href="#Log">Linktest Log Directory</a>
     </ul>
 </p>
 <ul>
+<a NAME="Web"></a>
+<li> <h3>Running Linktest from the Web Interface</h3>
+<p>
+If you go to the "Show Experiment" page for your experiment, you will
+see an option called "Run Linktest" in the auxiliary menu for the
+experiment. Clicking on that link will take you to the run linktest
+page, where you can select a level, and then start linktest running by
+clicking on the Start button. Once linktest starts running, you can
+stop it by clicking on the Stop button. Please be patient; linktest
+can take a long time to run. Eventually, you will be notified of its
+results in the window below the Start/Stop button. 
+</p>
 <a NAME="Ops"></a>
 <li> <h3>Running Linktest on Ops</h3>
 <p>
@@ -212,27 +229,6 @@ Example:
 After Linktest completes, run_linktest.pl prints out errors found
 during the run, if any. For scripting, run_linktest.pl returns 0 if no
 errors were found, or !0 if at least one error was found.
-</p>
-
-
-<a NAME="Tevc"></a>
-<li> <h3>Running Linktest with Tevc</h3>
-<p>
-
-For the most fine-grained control of Linktest, use tevc to send
-Linktest events. Use STARTAT and STOPAT optional arguments to specify
-start and stop levels, or tevc to specify one test only. For example,
-to run only the bandwidth test:
-</p>
-<p>
-<code><pre>
-tevc -e pid/eid now linktest start STARTAT=4 STOPAT=4
-</code></pre>
-</p>
-<p>
-When running Linktest manually using tevc events, no messages appear
-indicating whether the tests passed. Instead, watch the contents of
-the tbdata/linktest directory for error reports.
 </p>
 
 
