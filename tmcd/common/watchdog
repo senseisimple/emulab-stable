@@ -436,12 +436,9 @@ sub setintervals($)
 	    if ($retry{check});
 
 	my %oiv;
-	$oiv{check} = $iv{check};
-	$oiv{isalive} = $iv{isalive};
-	$oiv{drift} = $iv{drift};
-	$oiv{cvsup} = $iv{cvsup};
-	$oiv{rusage} = $iv{rusage};
-	$oiv{hkeys} = $iv{hkeys};
+	foreach my $key (keys %iv) {
+	    $oiv{$key} = $iv{$key};
+	}
 
 	if ($tmccresults[0] =~
 	    /INTERVAL=(-?\d+) ISALIVE=(-?\d+) NTPDRIFT=(-?\d+) CVSUP=(-?\d+) RUSAGE=(-?\d+) HOSTKEYS=(-?\d+)/) {
