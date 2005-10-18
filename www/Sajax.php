@@ -24,6 +24,16 @@ if (!isset($SAJAX_INCLUDED)) {
 	}
 	
 	$sajax_remote_uri = sajax_get_my_uri();
+	
+	function sajax_client_request() {
+	    $sajax_request = false;
+		
+	    if (! empty($_GET["rs"]) ||
+		! empty($_POST["rs"])) {
+		$sajax_request = true;
+	    }
+	    return $sajax_request;
+	}
 
 	function sajax_handle_client_request() {
 		global $sajax_export_list;
@@ -156,7 +166,33 @@ if (!isset($SAJAX_INCLUDED)) {
 			sajax_debug(func_name + " waiting..");
 			delete x;
 		}
-		
+
+		function getObjbyName(name) {
+		  if (document.getElementById) {
+		    return document.getElementById(name);
+		  }
+		  else if (document.all) {
+		    return document.all[name];
+		  }
+		  else if (document.layers) {
+		    return getObjNN4(document,name);
+		  }
+		  return null;
+		}
+		function getObjNN4(obj,name) {
+		  var x = document.layers;
+		  var foundLayer;
+		    
+		  for (var i=0; i < x.length; i++) {
+		    if (x[i].id == name)
+		      foundLayer = x[i];
+		    else if (x[i].layers.length)
+		      var tmp = getObjNN4(x[i],name);
+		      
+		    if (tmp) foundLayer = tmp;
+		  }
+		  return foundLayer;
+		}
 		<?php
 		$html = ob_get_contents();
 		ob_end_clean();
