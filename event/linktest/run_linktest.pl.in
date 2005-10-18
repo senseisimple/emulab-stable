@@ -299,7 +299,7 @@ else {
 	    my $eventargs = $2;
 	    if (($eventtype eq $STOPEVENT) ||
 		($eventtype eq $COMPLETEEVENT)) {
-		print "Linktest completed normally.\n"
+		print "Linktest completed.\n"
 		    if($verbose);
 		last;
 	    }
@@ -342,6 +342,12 @@ sub analyze {
     unlink($logfile)
 	if (defined($logfile));
 
+    return 0
+	if (! @dir_contents);
+
+    print "***************************************************************\n";
+    print "***************** Linktest Error Reports **********************\n";
+
     foreach my $file (@dir_contents) {
 	# Hmm, need to taint check the filenames. Ick.
 	if ($file =~ /^([-\w\.\/]+)$/) {
@@ -366,6 +372,7 @@ sub analyze {
 	    system("/bin/cat $linktest_path/$file");
 	}
     }
+    print "***************************************************************\n";
     return scalar(@dir_contents);
 }
 
