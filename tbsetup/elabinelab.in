@@ -980,7 +980,8 @@ sub TearDownEmulab()
 		 "  def_boot_osid='',next_boot_osid='',temp_boot_osid='' ".
 		 "where " .
 		    join(" or ", map("node_id='$_'",
-				     ($bossnode, $opsnode, $fsnode,
+				     ($bossnode, $opsnode,
+				      defined($fsnode) ? $fsnode : (),
 				      @expnodes))));
     
     #
