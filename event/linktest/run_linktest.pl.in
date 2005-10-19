@@ -224,6 +224,7 @@ sub handler($)
 
     $SIG{INT}  = 'IGNORE';
     $SIG{TERM} = 'IGNORE';
+    $SIG{HUP}  = 'IGNORE';
 
     sleep(2);
     &kill_linktest_run;
@@ -260,6 +261,7 @@ if (($child_pid = fork())) {
     #
     $SIG{INT}  = \&handler;
     $SIG{TERM} = \&handler;
+    $SIG{HUP}  = \&handler;
     
     #
     # Set timeout behavior if requested.
