@@ -140,7 +140,9 @@ external use, a small
 grow into a large mobile robotic wireless testbed. The small version
 (5 Motes and 5 Stargates on 5 robots, all remotely controllable, plus
 25 static Motes, many with attached sensor boards) is in an open area
-within our offices.  
+within our offices.  An overview of this new mobile testbed is presented in 
+<a href="http://www.cs.utah.edu/flux/testbed-docs/teapot05-emulab-only.pdf">
+this article</a>.
 <br><br>
 <li> <b>Fixed 802.11 Wireless</b>: Netbed's
 <a href="tutorial/docwrapper.php3?docname=wireless.html">Fixed Wireless</a>
