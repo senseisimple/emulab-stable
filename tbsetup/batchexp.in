@@ -618,45 +618,6 @@ TBSaveExpLogFiles($pid, $eid);
 system("cp -Rfp $workdir/ $userdir/tbdata");
 
 #
-# Deal with linktest. If requested, swapping in or modifying, and experiment
-# is indeed active, then run it!
-#
-# XXX - linktest uses files from $userdir/tbdata/, so the above cp must
-#       happen first!
-#
-if ($linktest && ExpState($pid, $eid) eq EXPTSTATE_ACTIVE) {
-    #
-    # Run it. No worries about failures.
-    #
-    my $output = "$userdir/logs/linktest.log";
-    my $optarg = "-o $output";
-
-    if ($linktest =~ /^(\d)$/) {
-	$optarg .= " -l $1";
-    }
-    else {
-	$optarg .= " -l 1";
-    }
-    
-    print "Running 'linktest_control $optarg $pid $eid'\n";
-    if (system("$TB/sbin/linktest_control $optarg $pid $eid") != 0) {
-	system("cat $output")
-	    if (-r $output);
-	
-	print STDERR "*** WARNING: ".
-	             "Linktest run returned non-zero status!\n";
-	
-	SENDMAIL("$user_name <$user_email>",
-		 "Linktest Failure: $pid/$eid",
-		 "Failure in linktest (level $linktest); ".
-		 "returned non-zero status",
-		 "$user_name <$user_email>",
-		 "Cc: $TBOPS",
-		 ($output));
-    }
-}
-
-#
 # Gather statistics.
 #
 if ($frontend || $batchmode) {

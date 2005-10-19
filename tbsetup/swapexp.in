@@ -342,7 +342,6 @@ my $expt_path       = $hashrow{'path'};
 my $expt_locked     = $hashrow{'expt_locked'};
 my $isbatchexpt     = $hashrow{'batchmode'};
 my $canceled        = $hashrow{'canceled'};
-my $linktest_level  = $hashrow{'linktest_level'};
 my $swappablebit= $hashrow{'swappable'};
 my $idleswapbit = $hashrow{'idleswap'};
 my $autoswapbit = $hashrow{'autoswap'};
@@ -1006,39 +1005,6 @@ TBSaveExpLogFiles($pid, $eid);
 # but thats okay.
 #
 system("cp -Rfp $workdir/ $userdir/tbdata/");
-
-#
-# Deal with linktest. If requested, swapping in or modifying, and experiment
-# is indeed active, then run it!
-#
-# XXX - linktest uses files from $userdir/tbdata/, so the above cp must
-#       happen first!
-#
-if ($linktest_level && ExpState($pid, $eid) eq EXPTSTATE_ACTIVE) {
-    #
-    # Run it. No worries about failures.
-    #
-    my $output = "$userdir/logs/linktest.log";
-    my $optarg = "-l $linktest_level -o $output";
-    
-    print STDOUT "Running 'linktest_control $optarg $pid $eid'\n";
-    if (system("$TB/sbin/linktest_control $optarg $pid $eid") != 0) {
-	system("cat $output")
-	    if (-r $output);
-	
-	print STDERR "*** WARNING: ".
-	             "Linktest run returned non-zero status!\n";
-	
-	SENDMAIL("$user_name <$user_email>",
-		 "Linktest Failure: $pid/$eid",
-		 "Failure in linktest (level $linktest_level); ".
-		 "returned non-zero status",
-		 "$user_name <$user_email>",
-		 "Cc: $expt_head_name <$expt_head_email>\n".
-		 "Cc: $TBOPS",
-		 ($output));
-    }
-}
 
 #
 # Gather stats. 
