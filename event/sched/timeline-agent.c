@@ -332,6 +332,7 @@ static int timeline_agent_immediate(local_agent_t la, sched_event_t *se)
 					     "TOKEN",
 					     (int32_t *)&token);
 		gettimeofday(&now, NULL);
+		then = now;
 		for (lpc = 0; lpc < ta->ta_count; lpc++) {
 			timeradd(&now,
 				 &ta->ta_events[lpc].time,
@@ -340,17 +341,16 @@ static int timeline_agent_immediate(local_agent_t la, sched_event_t *se)
 						 &ta->ta_events[lpc],
 						 &then);
 		}
-		if (ta->ta_count > 0) {
-			event_do(la->la_handle,
-				 EA_Experiment, pideid,
-				 EA_When, &then,
-				 EA_Type, TBDB_OBJECTTYPE_TIMELINE,
-				 EA_Name, la->la_link.ln_Name,
-				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
-				 EA_ArgInteger, "ERROR", 0,
-				 EA_ArgInteger, "CTOKEN", token,
-				 EA_TAG_DONE);
-		}
+		
+		event_do(la->la_handle,
+			 EA_Experiment, pideid,
+			 EA_When, &then,
+			 EA_Type, TBDB_OBJECTTYPE_TIMELINE,
+			 EA_Name, la->la_link.ln_Name,
+			 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+			 EA_ArgInteger, "ERROR", 0,
+			 EA_ArgInteger, "CTOKEN", token,
+			 EA_TAG_DONE);
 		
 		retval = 0;
 	}

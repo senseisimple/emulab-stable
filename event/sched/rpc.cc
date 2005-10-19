@@ -308,9 +308,10 @@ RPC_metadata(char *pid, char *eid)
 	return retval;
 }
 
-int
-RPC_waitforactive(char *pid, char *eid)
+expt_state_t
+RPC_expt_state(char *pid, char *eid)
 {
+	expt_state_t retval = ES_UNKNOWN;
 	emulab::EmulabResponse er;
 
 	assert(pid != NULL);
@@ -318,7 +319,19 @@ RPC_waitforactive(char *pid, char *eid)
 	assert(eid != NULL);
 	assert(strlen(eid) > 0);
 
-	return RPC_invoke(pid, eid, "experiment.waitforactive", &er);
+	if (RPC_invoke(pid, eid, "experiment.state", &er) == 0) {
+		ulxr::RpcString tmp;
+		const char *state;
+
+		tmp = er.getValue();
+		state = tmp.getString().c_str();
+		if (strcmp(state, "activating") == 0)
+			retval = ES_ACTIVATING;
+		else if (strcmp(state, "active") == 0)
+			retval = ES_ACTIVE;
+	}
+
+	return retval;
 }
 
 int RPC_notifystart(char *pid, char *eid, char *timeline, int set_or_clear)
@@ -429,6 +442,19 @@ RPC_obstaclelist(FILE *emcd_config, char *area)
 	}
 	
 	return 0;
+}
+
+int
+RPC_waitforactive(char *pid, char *eid)
+{
+	emulab::EmulabResponse er;
+
+	assert(pid != NULL);
+	assert(strlen(pid) > 0);
+	assert(eid != NULL);
+	assert(strlen(eid) > 0);
+
+	return RPC_invoke(pid, eid, "experiment.waitforactive", &er);
 }
 
 int

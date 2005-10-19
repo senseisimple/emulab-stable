@@ -63,6 +63,8 @@ static int	get_static_events(event_handle_t handle);
 int	debug;
 const char *XMLRPC_ROOT = TBROOT;
 
+expt_state_t expt_state;
+
 struct lnList agents;
 
 static struct lnList timelines;
@@ -383,9 +385,11 @@ main(int argc, char *argv[])
 		fatal("could not subscribe to EVENT_SCHEDULE event");
 	}
 
-	if (RPC_waitforactive(pid, eid))
-		fatal("waitforactive: RPC failed!");
+	expt_state = RPC_expt_state(pid, eid);
 
+	if (expt_state == ES_UNKNOWN)
+		fatal("Experiment is not activating or active\n");
+	
 	if (RPC_agentlist(handle, pid, eid))
 		fatal("Could not get agentlist from RPC server\n");
 
@@ -795,6 +799,8 @@ handle_event(event_handle_t handle, sched_event_t *se)
 			primary_simulator_agent->sa_flags |= SAF_TIME_STARTED;
 			RPC_notifystart(pid, eid, "", 1);
 			RPC_drop();
+
+			did_start = 1;
 		}
 	}
 }
@@ -1240,6 +1246,11 @@ get_static_events(event_handle_t handle)
 		event.time.tv_usec = 1;
 		event.length = 1;
 		event.flags = SEF_SINGLE_HANDLER;
+		event_notification_put_int32(handle,
+					     event.notification,
+					     "TOKEN",
+					     next_token);
+		next_token += 1;
 	
 		sched_event_prepare(handle, &event);
 		timeline_agent_append(ns_sequence, &event);
@@ -1265,6 +1276,11 @@ get_static_events(event_handle_t handle)
 	event.agent.s = NULL;
 	event.length = 1;
 	event.flags = SEF_TIME_START;
+	event_notification_put_int32(handle,
+				     event.notification,
+				     "TOKEN",
+				     next_token);
+	next_token += 1;
 	timeline_agent_append(ns_sequence, &event);
 
 	
@@ -1280,6 +1296,11 @@ get_static_events(event_handle_t handle)
 	event.time.tv_usec = 3;
 	event.length = 1;
 	event.flags = SEF_SENDS_COMPLETE | SEF_SINGLE_HANDLER;
+	event_notification_put_int32(handle,
+				     event.notification,
+				     "TOKEN",
+				     next_token);
+	next_token += 1;
 	
 	sched_event_prepare(handle, &event);
 	timeline_agent_append(ns_sequence, &event);
@@ -1311,12 +1332,14 @@ get_static_events(event_handle_t handle)
 		return -1;
 	}
 
-	event_do(handle,
-		 EA_Experiment, pideid,
-		 EA_Type, TBDB_OBJECTTYPE_SEQUENCE,
-		 EA_Event, TBDB_EVENTTYPE_START,
-		 EA_Name, ns_sequence_agent.name,
-		 EA_TAG_DONE);
+	if (expt_state == ES_ACTIVE) {
+		event_do(handle,
+			 EA_Experiment, pideid,
+			 EA_Type, TBDB_OBJECTTYPE_SEQUENCE,
+			 EA_Event, TBDB_EVENTTYPE_START,
+			 EA_Name, ns_sequence_agent.name,
+			 EA_TAG_DONE);
+	}
 	
 	return 0;
 }
@@ -1365,6 +1388,9 @@ handle_completeevent(event_handle_t handle, sched_event_t *eventp)
 	char objname[TBDB_FLEN_EVOBJNAME];
 	char objtype[TBDB_FLEN_EVOBJTYPE];
 	int rc, ctoken = ~0, agerror = 0, handled = 0;
+
+	event_notification_insert_hmac(handle, eventp->notification);
+	event_notify(handle, eventp->notification);
 
 	event_notification_get_objname(handle, eventp->notification,
 				       objname, sizeof(objname));

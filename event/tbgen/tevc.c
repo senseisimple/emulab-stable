@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -33,14 +33,22 @@
 
 static int debug;
 
+static int exit_value = 0;
+
+static void     comp_callback(event_handle_t handle,
+			      event_notification_t notification,
+			      void *data);
+
 void
 usage(char *progname)
 {
     fprintf(stderr,
-	"Usage: %s [-s server] [-c] event\n"
-	"       %s [-s server] [-k keyfile] -e pid/eid time objname "
+	"Usage: %s [-w] [-s server] [-c] event\n"
+	"       %s [-w] [-s server] [-k keyfile] -e pid/eid time objname "
 	"event [args ...]\n"
 	"       time: 'now' or '+seconds' or [[[[yy]mm]dd]HH]MMss\n"
+	"Options:\n"
+	"       -w    Wait for the event to complete.\n"
 	"Examples:\n"
 	"       %s -e pid/eid now cbr0 set interval_=0.2\n"
 	"       %s -e pid/eid +10 cbr0 start\n"
@@ -59,6 +67,7 @@ main(int argc, char **argv)
 	char *server = NULL;
 	char *port = NULL;
 	int control = 0;
+	int wait_for_complete = 0;
 	char *myeid = NULL;
 	char *keyfile = NULL;
 	char keyfilebuf[BUFSIZ];
@@ -68,10 +77,13 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "ds:p:ce:k:")) != -1) {
+	while ((c = getopt(argc, argv, "dws:p:ce:k:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
+			break;
+		case 'w':
+			wait_for_complete = 1;
 			break;
 		case 's':
 			server = optarg;
@@ -200,6 +212,16 @@ main(int argc, char **argv)
 		handle = event_register_withkeyfile(server, 0, keyfile);
 	if (handle == NULL) {
 		fatal("could not register with event system");
+	}
+
+	if (wait_for_complete) {
+		tuple->expt      = myeid;
+		tuple->eventtype = TBDB_EVENTTYPE_COMPLETE;
+		tuple->objname   = objname;
+		
+		if (! event_subscribe(handle, comp_callback, tuple, NULL)) {
+			fatal("could not subscribe to event");
+		}
 	}
 
 	if (control) {
@@ -343,10 +365,35 @@ main(int argc, char **argv)
 
 	event_notification_free(handle, notification);
 
+	if (wait_for_complete) {
+		event_main(handle);
+	}
+
 	/* Unregister with the event system: */
 	if (event_unregister(handle) == 0) {
 		fatal("could not unregister with event system");
 	}
 	
-	return 0;
+	return exit_value;
+}
+
+void comp_callback(event_handle_t handle,
+		   event_notification_t notification,
+		   void *data)
+{
+	char *value, argsbuf[BUFSIZ] = "";
+
+	event_notification_get_arguments(handle, notification,
+					 argsbuf, sizeof(argsbuf));
+	
+	if (event_arg_get(argsbuf, "ERROR", &value) > 0) {
+		if (sscanf(value, "%d", &exit_value) != 1) {
+			error("bad error value for complete: %s\n", argsbuf);
+		}
+	}
+	else {
+		warning("completion event is missing ERROR argument\n");
+	}
+
+	event_stop_main(handle);
 }

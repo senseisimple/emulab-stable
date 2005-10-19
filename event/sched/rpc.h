@@ -54,12 +54,19 @@ extern "C" {
 
 extern const char *topography_name; // XXX temporary
 
+typedef enum {
+	ES_UNKNOWN,
+	ES_ACTIVATING,
+	ES_ACTIVE,
+} expt_state_t;
+	
 int RPC_init(const char *certpath, const char *host, unsigned short port);
 int RPC_grab(void);
 void RPC_drop(void);
 
 int RPC_metadata(char *pid, char *eid);
 int RPC_waitforrobots(event_handle_t handle, char *pid, char *eid);
+expt_state_t RPC_expt_state(char *pid, char *eid);
 int RPC_waitforactive(char *pid, char *eid);
 int RPC_notifystart(char *pid, char *eid, char *timeline, int set_or_clear);
 int RPC_agentlist(event_handle_t handle, char *pid, char *eid);

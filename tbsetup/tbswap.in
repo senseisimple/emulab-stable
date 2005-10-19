@@ -1164,6 +1164,17 @@ sub doSwapin($) {
 	TBDebugTimeStamp("ElabInElab setup finished");
     }
 
+    if (! ($DISABLE_EVENTS || $elabinelab)) {
+	if ( $update_Eventsys_restart || 
+	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
+	    TBDebugTimeStamp("Starting event time");
+	    if (system("tevc -e $pid/$eid now __ns_sequence start")) {
+		print STDERR "*** Failed to start event time.\n";
+		return 1;
+	    }
+	}
+    }
+
     return 0;
 }
 
