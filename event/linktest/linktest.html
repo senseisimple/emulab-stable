@@ -10,6 +10,7 @@
 <h2>Contents</h2>
 <ul>
 <li> <a href="#QuickStart">Quick Start</a>
+<li> <a href="#Limits">Limitations</a>
 <li> <a href="#Understand">Understanding Linktest</a>
     <ul>
     <li> <a href="#Level0">Level 0 - Do not run Linktest</a>
@@ -55,6 +56,33 @@ will run after the experiment completes its swapin. If a problem is
 found, testbed-ops is automatically notified and a message will appear
 in the activation log. Otherwise, no notification will appear.
 </p>
+
+<hr>
+<a name="Limits"></a>
+<center>
+<h2>Limitations (Important, Please Read)</h2>
+</center>
+
+<ul>
+<li> Not all bandwidths can be accurately measured, and linktest will
+     skip links that it knows will give false results. Please check
+     the output, and be sure to test those links yourself if your
+     results depend on total accuracy.
+
+<li> As with any automated testing procedure, we have to balance the desire
+     for accuracy with the possibility of false positives. To reduce
+     the number of false positives, we allow for a small amount of
+     fudge of any link. <b>If your results are dependent on total
+     accuracy, then you should test your links yourself!</b>
+
+<li> When using linkdelays (endnodeshaping) latency is less accurate
+     because of the 1ms clock resolution that the kernel runs at. At
+     worst, latency can be off by up to 2ms, say for a roundtrip ping
+     packet.
+ 
+</ul>
+</center>
+
 
 <hr>
 <a name="Understand"></a>
