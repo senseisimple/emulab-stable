@@ -14,7 +14,7 @@ use Exporter;
     qw ( SENDMAIL OPENMAIL TBTimeStamp TBBackGround TBDateTimeFSSafe
 	 TBMakeLogname TB_BOSSNODE TB_OPSEMAIL TBGenSecretKey TBDebugTimeStamp
 	 TBDebugTimeStampsOn TBForkCmd TB_BOSSEVENTPORT TB_EVENTSERVER
-	 TBScriptLock TBScriptUnlock
+	 TBScriptLock TBScriptUnlock TBTimeStampWithDate
 	 TBSCRIPTLOCK_OKAY TBSCRIPTLOCK_TIMEDOUT
 	 TBSCRIPTLOCK_IGNORE TBSCRIPTLOCK_FAILED);
 
@@ -159,6 +159,11 @@ sub TBTimeStamp()
     my ($seconds, $microseconds) = gettimeofday();
     
     return POSIX::strftime("%H:%M:%S", localtime($seconds)) . ":$microseconds";
+}
+
+sub TBTimeStampWithDate()
+{
+    return POSIX::strftime("%m/%d/20%y %H:%M:%S", localtime());
 }
 
 #

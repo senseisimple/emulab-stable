@@ -160,8 +160,11 @@ TBDebugTimeStampsOn();
 #
 # Print starting message.
 #
+my $exptidx;
+TBExptIDX($pid, $eid, \$exptidx);
 
-print "Beginning swap-$swapop for $pid/$eid. " . TBTimeStamp() . "\n";
+print "Beginning swap-$swapop for $pid/$eid ($exptidx). " .
+    TBTimeStampWithDate() . "\n";
 TBDebugTimeStamp("tbswap $swapop started");
 
 #
