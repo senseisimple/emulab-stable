@@ -100,23 +100,117 @@ function NLCEMPTY()
 #
 ?>
 <center>
+
     <h2>Emulab Tutorial - Mobile Wireless Networking</h2>
 
-    <i><font size="-1">
-
-    Note: This part of the testbed is in the prototype stage, so the hardware
-    and software may behave in unexpected ways.  
-   
-
-    </font></i>
 </center>
 
-<br>
+<script type="text/javascript">
+default_text = "Click on an image to enlarge.";
+
+if (document.all || document.getElementById || document.layers) {
+  has_scripting = true;
+  default_text = "(Move mouse over an image to see a caption here; click to enlarge.)";
+}
+
+captions = new Array();
+//captions[0] = 'Three of our Acroname Garcia robots.  Each robot has a ' + 
+//	      'blue and orange marker from which the localization system ' +
+//	      'extracts position and orientation.  All robots have a one ' +
+//	      'antenna riser, beneath which is an Intel Stargate and ' +
+//	      'Crossbow Mica2 mote.';
+captions[0] = 'Three of our modified Acroname Garcia robots.  Fiducials for ' +
+	      'vision system atop antenna riser mount; Intel ' +
+	      'Stargate and Crossbow Mica2 beneath riser.';
+captions[1] = 'A wall-mounted mote.  Mote is behind the serial programming ' +
+	      'board; a sensor board is visible in front.';
+captions[2] = 'A screenshot of our Java applet motion control interface, ' +
+	      'enlarged webcam showing robot motion and position.';
+captions[3] = 'Robots prior to antenna riser modifications.  Crosshatch ' +
+	      'pattern used for localization system calibration.';
+captions[4] = 'A ceiling-mounted mote.';
+
+function imageinfo(msg) {
+  mmsg = '<div style="text-align: center; font-size: 10px; font-style: italic;">' + msg +'</div>';
+  //mmsg = msg;
+  elm = (document.getElementById)?document.getElementById('captionLayer'):(document.all)?document.all['captionLayer']:null;
+
+  if (elm && typeof elm.innerHTML != "undefined") {
+    elm.innerHTML = mmsg;
+  }
+  else if (document.layers) {
+    document.layers['captionLayer'].document.write(mmsg);
+  }
+
+//  if (document.all) {
+//    elm.innerHTML = mmsg;
+//  }
+//  else if (document.getElementById) {
+//    range = document.createRange();
+//    range.setStartBefore(elm);
+//    html = range.createContextualFragment(mmsg);
+//    while (elm.hasChildNodes()) {
+//      elm.removeChild(elm.lastChild);
+//    }
+//    elm.appendChild(html);
+//  }
+//  else {
+//    elm.document.write(mmsg);
+//  }
+}
+
+</script>
+  
 
 <table cellspacing=5 cellpadding=5 border=0 class="stealth" bgcolor="#ffffff">
 
 <tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
+<tr>
+<td colspan="3" class="stealth" align=center>
+<table cellspacing=5 cellpadding=5 class="stealth" width="100%">
+<tr>
+<td class="stealth" align=center>
+  <a href="3bots.jpg" onmouseover="imageinfo(captions[0])" onmouseout="imageinfo(default_text)">
+  <img src="3bots_thumb.jpg" border=1 alt="Our Robots.">
+  </a>
+</td>
+<td class="stealth" align=center>
+  <a href="wall_mote.jpg" onmouseover="imageinfo(captions[1])" onmouseout="imageinfo(default_text)">
+  <img src="wall_mote_thumb.jpg" border=1 alt="Our Robots.">
+  </a>
+</td>
+<td class="stealth" align=center>
+  <a href="interface1.jpg" onmouseover="imageinfo(captions[2])" onmouseout="imageinfo(default_text)">
+  <img src="interface1_thumb.jpg" border=1 alt="User Interface.">
+  </a>
+</td>
+<td class="stealth" align=center>
+  <a href="5bots.jpg" onmouseover="imageinfo(captions[3])" onmouseout="imageinfo(default_text)">
+  <img src="5bots_thumb.jpg" border=1 alt="Our Robots.">
+  </a>
+</td>
+<td class="stealth" align=center>
+  <a href="ceiling_mote.jpg" onmouseover="imageinfo(captions[4])" onmouseout="imageinfo(default_text)">
+  <img src="ceiling_mote_thumb.jpg" border=1 alt="Our Robots.">
+  </a>
+</td>
+</tr>
+<tr>
+<td colspan=5 class=stealth align=center>
+  <div id="captionLayer" name="captionLayer" style="text-align: center;">
+    <script type="text/javascript">
+      imageinfo(default_text);
+    </script>
+  </div>
+</td>
+</tr>
+</table>
+</center>
+</td>
+</tr>
+
+<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
 
 <tr>
 
@@ -147,6 +241,14 @@ following tech report:
 <blockquote>
 <a href="http://www.cs.utah.edu/flux/papers/truemobile-ftn2005-02.pdf">A Mobile
 Robotic Wireless and Sensor Network Testbed</a>
+</blockquote>
+
+<p>
+You can read a shorter overview of the mobile testbed in this article:
+
+<blockquote>
+<a href="http://www.cs.utah.edu/flux/testbed-docs/teapot05-emulab-only.pdf">
+Real Mobility, Real Wireless: A New Kind of Testbed</a>
 </blockquote>
 
 <?php NLCBODYEND() ?>
@@ -669,10 +771,23 @@ descriptor can then be used in <code>tb-set-node-os</code> lines in your
 NS files, and your app will be automatically loaded on the appropriate mote(s).
 
 <p>
+Alternatively, if you don't have a local TinyOS build environment, just load
+ours onto an Emulab PC in your experiment.  You can do this by setting the node
+operating system to <b>RHL90-TINYOS</b> using the <code>tb-set-node-os</code>
+command (as shown in the Emulab <a
+href="http://www.emulab.net/tutorial/docwrapper.php3?docname=tutorial.html">tutorial</a>).  This image is based off Emulab's
+default RedHat 9.0 image and has an installation of a TinyOS 1.1.13 CVS
+snapshot.  When you log in to the node, the $TOSROOT and $TOSDIR environment
+variables will be set to /opt/tinyos-1.x and /opt/tinyos-1.x/tos,
+respectively.  Your $CLASSPATH variable will also include the TinyOS Java paths
+necessary to run many common Java applications supplied with TinyOS.
+<!--
 At this time, we don't have a TinyOS installation on the Emulab servers, so
 you'll need to have a TinyOS installation to build from on your desktop
 machine, or some other machine you control.  We hope to provide a way for you
-build TinyOS apps on Emulab in the near future.  Also, at the current time, all
+build TinyOS apps on Emulab in the near future.  
+-->
+Also, at the current time, all
 of our motes have radios in the 900MHz band, so see the TinyOS
 <a href="http://www.tinyos.net/tinyos-1.x/doc/mica2radio/CC1000.html">CC1000
 radio document</a> to make sure you're tuning the radios to the right band.
