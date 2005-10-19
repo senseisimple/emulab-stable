@@ -232,7 +232,7 @@ sub handler($)
     $SIG{INT}  = 'IGNORE';
 
     if (defined($child_pid)) {
-	kill('TERM', $child_pid);
+	kill('HUP', $child_pid);
 	waitpid($child_pid, 0);
 	undef($child_pid);
     }
@@ -245,9 +245,15 @@ sub handler($)
 # Fork a child to run the actual linktest script. The parent just waits
 # for child to exit, or to be signaled to terminate the child.
 #
-if (($child_pid = fork()) < 0) {
+if (defined($output)) {
+    $child_pid = TBBackGround($output);
+}
+else {
+    $child_pid = fork();
+}
+if ($child_pid < 0) {
     die("*** $0:\n".
-	"    Linktest could not fork a new process for $pid/$eid!\n")
+	"    Linktest could not fork a new process for $pid/$eid!\n");
 }
 
 if ($child_pid) {
@@ -271,14 +277,14 @@ if ($child_pid) {
 # We tell ssh to allocate a tty so that we can kill it with TERM and have
 # everything die off properly.
 #
-my @cmdargs = ("$SSH", "-1", "-F", "/dev/null",
-	       "-host", $CONTROL, "$TB/sbin/linktest.proxy");
+# XXX: "-t -t" to ssh is so that kill -TERM carries across to ops. 
+#
+my @cmdargs = ("$SSH", "-t", "-t", "-1", "-F", "/dev/null",
+	       "-host", $CONTROL, "exec", "$TB/sbin/linktest.proxy");
 push(@cmdargs, ("-d", "$debug"))
     if ($debug);
 push(@cmdargs, ("-t", "$timeout"))
     if (defined($timeout));
-push(@cmdargs, ("-o", "$output"))
-    if (defined($output));
 push(@cmdargs, "-l");
 push(@cmdargs, (defined($level) ? $level : $linktest_level));
 push(@cmdargs, ("-g", $unix_gidname));
