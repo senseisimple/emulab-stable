@@ -169,6 +169,10 @@ dolinux() {
 		return 1
 	}
 
+	# grab the default linux kernel to boot while we are in the area
+	linux=`grep -E 'default=[a-zA-Z][-_\.a-zA-Z0-9]*' /mnt/etc/lilo.conf | sed -e 's/default=\([a-zA-Z][-_\.a-zA-Z0-9]*\).*/\1/'`
+	linux=${linux:-'linux'}
+
 	# XXX note the hardwired path, cannot use BOOTDIR as it is different
         # in frisbee MFS.  This also assumes Linux partition is one big
 	# filesystem.
@@ -177,7 +181,7 @@ dolinux() {
 	umount $rootdev
 
 	# setup one time lilo command line, must be done after unmount
-	$BINDIR/groklilo -c "linux root=$lrootdev" $part /dev/$disk || {
+	$BINDIR/groklilo -c "$linux root=$lrootdev" $part /dev/$disk || {
 		echo "Failed to set LILO command line"
 		return 1
 	}
