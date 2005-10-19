@@ -138,7 +138,7 @@ use vars qw(@ISA @EXPORT);
 	 TBNodeEventStateUpdated
 	 TBSetNodeAllocState TBGetNodeAllocState
 	 TBSetNodeOpMode TBGetNodeOpMode TBSetNodeNextOpMode
-	 TB_OSID_MBKERNEL TB_OSID_PXEBOOT TB_OSID_FRISBEE
+	 TB_OSID_MBKERNEL 
 	 TB_OSID_FREEBSD_MFS TB_OSID_FRISBEE_MFS
 	 TBBootWhat TBNodeStateTimeout
 	 TBDB_TBCONTROL_RESET TBDB_TBCONTROL_RELOADDONE
@@ -176,6 +176,7 @@ use vars qw(@ISA @EXPORT);
 	 TBClearExptFirewallVlan
 
 	 TBNodeSubNodes
+	 TBNodeAdminOSID TBNodeDiskloadOSID
 	 TBNodeType TBNodeTypeProcInfo TBNodeTypeBiosWaittime
 
 	 TBExptRemoveVirtualState TBExptBackupVirtualState
@@ -453,8 +454,6 @@ sub TB_OSID_MAX()		{ TB_OSID_DESTROY; }
 
 # Magic OSID constants
 sub TB_OSID_MBKERNEL()          { "_KERNEL_"; } # multiboot kernel OSID
-sub TB_OSID_PXEBOOT()           { "PXEBOOT"; } # osid for def pxe_boot_path
-sub TB_OSID_FRISBEE()           { "PXEFRISBEE"; }
 
 # Magic MFS constants
 sub TB_OSID_FREEBSD_MFS()	{ "FREEBSD-MFS" };
@@ -3335,6 +3334,42 @@ sub TBNodeType($)
     } else {
 	return $type;
     }
+}
+
+sub TBNodeAdminOSID($)
+{
+    my ($node) = @_;
+
+    my $result = DBQueryFatal("SELECT nt.adminmfs_osid FROM node_types AS nt ".
+			      "LEFT JOIN nodes as n on nt.type = n.type ".
+			      "WHERE n.node_id='$node'");
+    if ($result->num_rows() != 1) {
+	return undef;
+    }
+    
+    my ($mfs) = $result->fetchrow();
+    if (!$mfs) {
+	$mfs = TB_OSID_FREEBSD_MFS();
+    }
+    return $mfs;
+}
+
+sub TBNodeDiskloadOSID($)
+{
+    my ($node) = @_;
+
+    my $result = DBQueryFatal("SELECT nt.diskloadmfs_osid FROM node_types AS nt ".
+			      "LEFT JOIN nodes as n on nt.type = n.type ".
+			      "WHERE n.node_id='$node'");
+    if ($result->num_rows() != 1) {
+	return undef;
+    }
+    
+    my ($mfs) = $result->fetchrow();
+    if (!$mfs) {
+	$mfs = TB_OSID_FRISBEE_MFS();
+    }
+    return $mfs;
 }
 
 #

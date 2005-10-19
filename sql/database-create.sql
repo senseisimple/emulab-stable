@@ -1142,6 +1142,8 @@ CREATE TABLE node_types (
   trivlink_maxspeed int(11) unsigned NOT NULL default '0',
   isrebootable tinyint(1) default '1',
   bios_waittime int(10) unsigned default NULL,
+  adminmfs_osid varchar(35) default 'FREEBSD-MFS',
+  diskloadmfs_osid varchar(35) default 'FRISBEE-MFS',
   PRIMARY KEY  (type)
 ) TYPE=MyISAM;
 

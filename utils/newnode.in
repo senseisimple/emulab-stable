@@ -176,15 +176,18 @@ NODE: foreach my $node_id (@node_ids) {
     # Make sure that the new node is of a valid type, and grab a few other
     # things to fill in as initial values
     #
-    $query_result = DBQueryFatal("SELECT control_iface,virtnode_capacity ".
+    $query_result = DBQueryFatal("SELECT control_iface,virtnode_capacity,adminmfs_osid ".
 				 "FROM node_types WHERE type='$type'");
     if (!$query_result->num_rows()) {
 	warn "Node $node_id failed: Type $type does not exist!\n";
 	next NODE;
     }
-    my ($control_iface,$virtnode_capacity) = $query_result->fetchrow();
+    my ($control_iface,$virtnode_capacity,$admin_mfs) =
+	$query_result->fetchrow();
     $virtnode_capacity = 0
 	if (!defined($virtnode_capacity));
+    $admin_mfs = $MFS_INITIAL
+	if (!defined($admin_mfs));
 
     #
     # Grab the node's MACs from the new_interfaces table
@@ -266,7 +269,7 @@ NODE: foreach my $node_id (@node_ids) {
     if ($role eq "ctrlnode") {
 	$osid = $OS_OPSNODE;
     } else {
-	$osid = $MFS_INITIAL;
+	$osid = $admin_mfs;
     }
 
     #

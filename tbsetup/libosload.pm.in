@@ -37,7 +37,6 @@ my $MAXRETRIES  = 1;
 my $FRISBEELAUNCHER = "$TB/sbin/frisbeelauncher";
 my $osselect	    = "$TB/bin/os_select";
 my $TBUISP	    = "$TB/bin/tbuisp";
-my $FRISBEEOSID     = TB_OSID_FRISBEE_MFS();
 
 # Locals
 my %imageinfo       = ();	# Per imageid DB info.
@@ -431,7 +430,7 @@ sub osload ($$) {
 	    = GetNodesRequiringReboot(\%reload_info, @nodes);
 	if (@$reboot_nodes) {
 	    # Reboot them all.
-	    print "osload: Issuing reboot for @nodes and then waiting ...\n";
+	    print "osload: Issuing reboot for @$reboot_nodes and then waiting ...\n";
 	    
 	    my %reboot_args     = ();
 	    my %reboot_failures = ();
@@ -649,7 +648,7 @@ sub WaitTillReloadDone($$$@)
 sub SetupReloadFrisbee($$$$)
 {
     my ($node, $imageid, $osid_notused, $zerofree) = @_;
-    my $osid = $FRISBEEOSID;
+    my $osid = TBNodeDiskloadOSID($node);
 
     #
     # Put it in the current_reloads table so that nodes can find out which

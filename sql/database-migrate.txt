@@ -2836,3 +2836,10 @@ last_net_act,last_cpu_act,last_ext_act);
                 default NULL after destination_orientation;
       alter table nodes add service_tag varchar(32) \
                 default NULL after serial;
+
+4.14: Add disk loader and admin MFS fields to node_types.
+
+      alter table node_types add adminmfs_osid varchar(35) \
+	        default 'FREEBSD-MFS' after bios_waittime;
+      alter table node_types add diskloadmfs_osid varchar(35) \
+	        default 'FRISBEE-MFS' after adminmfs_osid;

@@ -53,7 +53,6 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 #
 my $nodereboot	= "$TB/bin/node_reboot";
 my $osselect    = "$TB/bin/os_select";
-my $ADMINOSID   = TB_OSID_FREEBSD_MFS;
 my @nodes       = ();
 
 #
@@ -163,9 +162,17 @@ else {
 
 # Switcheroo the osids on the nodes.
 if ($onoff eq "on") {
-    system("$osselect -t $ADMINOSID @nodes") and
+    my %adminosid = ();
+    for my $node (@nodes) {
+	my $osid = TBNodeAdminOSID($node);
+	push @{$adminosid{$osid}}, $node;
+    }
+    for my $osid (keys %adminosid) {
+	my @n = @{$adminosid{$osid}};
+	system("$osselect -t $osid @n") and
 	die("*** $0:\n".
-	    "    Failed to set temp boot to $ADMINOSID for some nodes!\n");
+	    "    Failed to set temp boot to $osid for some of: @n\n");
+    }
 }
 else {
     system("$osselect -c -t @nodes") and
