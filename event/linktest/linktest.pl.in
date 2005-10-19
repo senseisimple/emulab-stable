@@ -65,8 +65,9 @@ use constant LIMIT_BW_LOSS => 0;
 
 # Make sure that we dont get bogged down in being too accurate! 
 # Make sure the error is a certain significance before we start reporting it.
-use constant INSIGNIFICANT_LAT_ERROR => 0.50;  # ms
-use constant INSIGNIFICANT_BW_ERROR  => 1.00;  # mb
+use constant INSIGNIFICANT_LAT_ERROR_LO => 0.50;  # ms
+use constant INSIGNIFICANT_LAT_ERROR_HI => 3.00;  # ms
+use constant INSIGNIFICANT_BW_ERROR     => 1.00;  # mb
 
 # latency must be corrected for xmit delay under this speed.
 use constant LAT_LOW_BW => 10000000;
@@ -692,23 +693,24 @@ sub latency_test {
 				exit(EXIT_NOT_OK);
 			    } else {
 				my $z = $numerator / $denominator;
-
-
-
 				my $t_reject = 3.250; # alpha = 0.01, df=9
 
-				if(abs($z) > $t_reject
-				   && (abs($x_bar - $u) > INSIGNIFICANT_LAT_ERROR)
-				   ) {
-				    my $errmsg = "Probable latency misconfiguration (expected=$u, measured mean=$x_bar).";
-				    &error(NAME_LATENCY, $edge, $errmsg);
+				if ((abs($z) > $t_reject) &&
+				    (($x_bar < $u &&
+				      (($u - $x_bar) >=
+				       INSIGNIFICANT_LAT_ERROR_LO)) ||
+				     ($x_bar > $u &&
+				      (($x_bar - $u) >=
+				       INSIGNIFICANT_LAT_ERROR_HI)))) {
+				    &error(NAME_LATENCY, $edge,
+					   "Probable latency ".
+					   "misconfiguration (expected=$u, ".
+					   "measured mean=$x_bar).");
 				    exit(EXIT_NOT_OK);
 				}
 			    }
-
 			}
 			exit(EXIT_OK);
-
 		    } else {
 			$waitlist{$pid} = 1;
 		    }
@@ -761,6 +763,9 @@ sub bw_test {
 	    if($hostname eq $edge->dst) {
 		if (&valid_bw($edge)) {
 		    push @analyze_list, $edge;
+		    
+		    &info("    Starting bandwidth test for " .
+			  &print_link($edge) . "\n");
 		    
 		    &my_system(PATH_PATHRATE_RCV, "-Q","-s",$edge->src,"-q","-N", PATHRATE_DAT);
 		} else {
