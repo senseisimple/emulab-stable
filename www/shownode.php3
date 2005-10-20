@@ -172,7 +172,7 @@ if ($isadmin || STUDLY() || OPSGUY()) {
 }
 
 if ($isadmin || STUDLY() || OPSGUY()) {
-    WRITESUBMENUBUTTON("Modify node attributes",
+    WRITESUBMENUBUTTON("Modify Node Attributes",
                        "modnodeattributes_form.php3?node_id=$node_id");
 }
 
