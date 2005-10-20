@@ -170,6 +170,12 @@ if ($isadmin || STUDLY() || OPSGUY()) {
     WRITESUBMENUBUTTON("Update Power State",
 		       "powertime.php3?node_id=$node_id");
 }
+
+if ($isadmin || STUDLY() || OPSGUY()) {
+    WRITESUBMENUBUTTON("Modify node attributes",
+                       "modnodeattributes_form.php3?node_id=$node_id");
+}
+
 SUBMENUEND();
 
 #
