@@ -816,7 +816,8 @@ sub bw_test {
 	    }
 	}
     }
-    
+    # wait for completion before termination so that all errors reported in.
+    &barrier();
 }
 
 
