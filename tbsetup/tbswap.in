@@ -1165,7 +1165,7 @@ sub doSwapin($) {
 	    #
 	    # Run it. No worries about failures.
 	    #
-	    my $optarg = "-l $linktest_level -t 120 -m";
+	    my $optarg = "-l $linktest_level -t 600 -m";
     
 	    print "Starting linktest ... this could take a while!'\n";
 	    if (system("linktest_control $optarg $pid $eid") != 0) {
