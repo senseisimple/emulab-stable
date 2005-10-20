@@ -23,17 +23,21 @@ sub usage()
 	  "-k   - Kill a currently running linktest.\n".
 	  "-t   - Specify timeout in seconds.\n".
 	  "-o   - Specify output file for linktest results.\n".
+	  "-m   - Send email to swapper if linktest fails.\n".
 	  "-d   - Turn on debugging output.\n");
     exit(-1);
 }
-my $optlist  = "dkl:o:t:";
+my $optlist  = "dkl:o:t:m";
 my $debug    = 0;
 my $cancel   = 0;
+my $sendmail = 0;
 my $timeout;
 my $level;
 my $output;
 my $expstate;
 my $dbuid;
+my $user_name;
+my $user_email;
 my $child_pid;			# Child run_linktest process.
 
 #
@@ -42,6 +46,7 @@ my $child_pid;			# Child run_linktest process.
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CONTROL	= "@USERNODE@";
+my $TBBASE	= "@TBBASE@";
 my $SSH		= "$TB/bin/sshtb";
 
 #
@@ -75,6 +80,9 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"d"})) {
     $debug = 1;
+}
+if (defined($options{"m"})) {
+    $sendmail = 1;
 }
 if (defined($options{"k"})) {
     $cancel = 1;
@@ -148,6 +156,14 @@ if ($expstate ne EXPTSTATE_ACTIVE && $expstate ne EXPTSTATE_ACTIVATING) {
 if (! UNIX2DBUID($UID, \$dbuid)) {
     die("*** $0:\n".
 	"    You do not exist in the Emulab Database!\n");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    die("*** $0:\n".
+	"    Cannot determine your name and email address.\n");
 }
 
 #
@@ -241,6 +257,20 @@ sub handler($)
 	"    Linktest has been canceled on experiment $pid/$eid!\n")
 }
 
+sub notify()
+{
+    my $lev = (defined($level) ? $level : $linktest_level);
+    
+    SENDMAIL("$user_name <$user_email>",
+	     "Linktest Failure: $pid/$eid",
+	     "Failure in linktest (level $lev); ".
+	     "returned non-zero status.\n".
+	     "Activity log file at:\n\n".
+	     "    $TBBASE/spewlogfile.php3?pid=${pid}&eid=${eid}\n",
+	     "$user_name <$user_email>",
+	     "Cc: $TBOPS");
+}
+
 #
 # Fork a child to run the actual linktest script. The parent just waits
 # for child to exit, or to be signaled to terminate the child.
@@ -269,6 +299,8 @@ if ($child_pid) {
     waitpid($child_pid, 0);
     my $exitval = $? >> 8;
     cleanup();
+    notify()
+	if ($exitval && $sendmail);
     exit($exitval);
 }
 
