@@ -113,6 +113,28 @@ dofreebsd() {
 	return 0
 }
 
+#
+# echo the name of the kernel that lilo will boot by default
+#
+lilogetkernel() {
+    _lconf=$1
+    _re='[a-zA-Z][-_\.a-zA-Z0-9]*'
+
+    # see if there is a default= line and prefer that
+    linux=`grep -E "default=$_re" $_lconf | sed -e "s/default=\($_re\).*/\1/"`
+
+    # no explicit default, use first kernel listed
+    if [ "x${linux}" = x ]; then
+	linux=`grep -E "label=$_re" $_lconf | head -1 | \
+		sed -e "s/label=\($_re\).*/\1/"`
+    fi
+
+    # still no hit, just use 'linux'
+    linux=${linux:-'linux'}
+
+    echo $linux
+}
+
 dolinux() {
 	# figure out the linux device name
 	dunit=`echo $disk | sed -e 's/..\([0-7]\)/\1/'`
@@ -162,29 +184,37 @@ dolinux() {
 		return 1
 	}
 
-	# update lilo.conf and set indicator to tell Emulab to rerun lilo
-	sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" /mnt/etc/lilo.conf || {
-		echo "Failed to update /etc/lilo.conf"
-		umount $rootdev
-		return 1
-	}
+	#
+	# If using lilo, update lilo.conf and set indicator to tell Emulab
+	# to rerun lilo.
+	#
+	linux=
+	lconf=/mnt/etc/lilo.conf
+	if [ -r $lconf ]; then
+	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $lconf || {
+		    echo "Failed to update /etc/lilo.conf"
+		    umount $rootdev
+		    return 1
+	    }
 
-	# grab the default linux kernel to boot while we are in the area
-	linux=`grep -E 'default=[a-zA-Z][-_\.a-zA-Z0-9]*' /mnt/etc/lilo.conf | sed -e 's/default=\([a-zA-Z][-_\.a-zA-Z0-9]*\).*/\1/'`
-	linux=${linux:-'linux'}
+	    # XXX note the hardwired path, cannot use BOOTDIR as it is
+	    # different in frisbee MFS.  This also assumes Linux partition
+	    # is one big filesystem.
+	    cp /dev/null /mnt/var/emulab/boot/runlilo
 
-	# XXX note the hardwired path, cannot use BOOTDIR as it is different
-        # in frisbee MFS.  This also assumes Linux partition is one big
-	# filesystem.
-	cp /dev/null /mnt/var/emulab/boot/runlilo
+	    # grab the default linux kernel to boot
+	    linux=`lilogetkernel $lconf`
+	fi
 
 	umount $rootdev
 
-	# setup one time lilo command line, must be done after unmount
-	$BINDIR/groklilo -c "$linux root=$lrootdev" $part /dev/$disk || {
+	if [ "x${linux}" != x ]; then
+	    # setup one time lilo command line, must be done after unmount
+	    $BINDIR/groklilo -c "$linux root=$lrootdev" $part /dev/$disk || {
 		echo "Failed to set LILO command line"
 		return 1
-	}
+	    }
+	fi
 
 	return 0
 }
