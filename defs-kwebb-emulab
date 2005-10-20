@@ -10,4 +10,6 @@ TBAUDITEMAIL=kwebb@flux.utah.edu
 TBSTATEDEMAIL=kwebb@flux.utah.edu
 TBTESTSUITEEMAIL=kwebb@flux.utah.edu
 WWW=www.emulab.net/dev/kwebb
+FS_WITH_QUOTAS="/q /groups /users"
+PLABSUPPORT=1
 PLAB_ROOTBALL="plabroot-kwebb.tar.bz2"

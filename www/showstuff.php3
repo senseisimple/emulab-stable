@@ -1942,7 +1942,6 @@ function SHOWNODE($node_id, $flags = 0) {
     $vname		= $row[vname];
     $pid 		= $row[pid];
     $eid		= $row[eid];
-    $bios               = $row[bios_version];
     $def_boot_osid      = $row[def_boot_osid];
     $def_boot_cmd_line  = $row[def_boot_cmd_line];
     $next_boot_osid     = $row[next_boot_osid];
@@ -1978,8 +1977,6 @@ function SHOWNODE($node_id, $flags = 0) {
     $battery_percentage = $row[battery_percentage];
     $battery_timestamp  = $row[battery_timestamp];
     $boot_errno         = $row[boot_errno];
-    $serial             = $row[serial];
-    $service_tag        = $row[service_tag];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -2300,27 +2297,6 @@ function SHOWNODE($node_id, $flags = 0) {
                       <td class=left>$rsrvrole</td>
                   </tr>\n";
 	}
-
-	if ($bios) {
-	    echo "<tr>
-                      <td>Bios Version:</td>
-                      <td class=left>$bios</td>
-                  </tr>\n";
-	}
-
-        if ($serial) {
-          echo "<tr>
-                      <td>Serial Number:</td>
-                      <td class=left>$serial</td>
-                  </tr>\n";
-	}
-
-        if ($service_tag) {
-          echo "<tr>
-                      <td>Service Tag:</td>
-                      <td class=left>$service_tag</td>
-                  </tr>\n";
-	}
 	
 	#
 	# Show battery stuff
@@ -2434,6 +2410,31 @@ function SHOWNODE($node_id, $flags = 0) {
                   </tr>\n";
 	}
     }
+
+    if (!$short) {
+      #
+      # Spit out node attributes
+      #
+      echo "<tr>
+                <td align=center colspan=2>Node Attributes</td>
+            </tr>\n";
+      echo "<tr><th>Attribute</th><th>Value</th>\n";
+
+      $query_result =
+        DBQueryFatal("select attrkey,attrvalue from node_attributes where ".
+                     "node_id='$node_id'");
+
+      while($row = mysql_fetch_array($query_result)) {
+        $attrkey   = $row["attrkey"];
+        $attrvalue = $row["attrvalue"];
+
+        echo "<tr>
+                  <td>$attrkey</td>
+                  <td>$attrvalue</td>
+              </td>\n";
+      }
+    }
+
     echo "</table>\n";
 }
 

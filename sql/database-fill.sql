@@ -654,7 +654,6 @@ REPLACE INTO table_regex VALUES ('experiments','jail_osname','text','redirect','
 REPLACE INTO table_regex VALUES ('experiments','delay_osname','text','redirect','os_info:osname',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','use_ipassign','int','redirect','default:boolean',0,0,NULL);
 REPLACE INTO table_regex VALUES ('experiments','ipassign_args','text','regex','^[\\w\\s-]*$',0,255,NULL);
-REPLACE INTO table_regex VALUES ('nodes','bios_version','text','regex','^[-\\w\\.+]+$',0,64,NULL);
 REPLACE INTO table_regex VALUES ('os_info','osid','text','regex','^[-\\w\\.+]+$',2,35,NULL);
 REPLACE INTO table_regex VALUES ('experiments','expt_name','text','redirect','default:tinytext',1,255,NULL);
 REPLACE INTO table_regex VALUES ('experiments','noswap_reason','text','redirect','default:tinytext',1,255,NULL);
@@ -740,8 +739,8 @@ REPLACE INTO table_regex VALUES ('virt_firewalls','type','text','regex','^(ipfw|
 REPLACE INTO table_regex VALUES ('virt_firewalls','style','text','regex','^(open|closed|basic|emulab)$',0,0,NULL);
 REPLACE INTO table_regex VALUES ('mailman_listnames','listname','text','regex','^[-\\w\\.\\+]+$',3,64,NULL);
 REPLACE INTO table_regex VALUES ('default','fulltext','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,20000,NULL);
-REPLACE INTO table_regex VALUES ('nodes','serial','text','regex','^[-\\w\\.+]+$',0,32,NULL);
-REPLACE INTO table_regex VALUES ('nodes','service_tag','text','regex','^[-\\w\\.+]+$',0,32,NULL);
+REPLACE INTO table_regex VALUES ('node_attributes','attrkey','text','regex','^[-\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('node_attributes','attrvalue','text','regex','^[-\\w\\.+,\\s]+$',0,255,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`

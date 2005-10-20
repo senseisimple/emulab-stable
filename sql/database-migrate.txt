@@ -2830,12 +2830,7 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table global_policies change auxdata \
                 auxdata varchar(128) NOT NULL default '';
 
-4.13: Add serial and service_tag columns to nodes table.
-
-      alter table nodes add serial varchar(32) \
-                default NULL after destination_orientation;
-      alter table nodes add service_tag varchar(32) \
-                default NULL after serial;
+4.13: Skip to 4.14
 
 4.14: Add disk loader and admin MFS fields to node_types.
 
@@ -2843,3 +2838,23 @@ last_net_act,last_cpu_act,last_ext_act);
 	        default 'FREEBSD-MFS' after bios_waittime;
       alter table node_types add diskloadmfs_osid varchar(35) \
 	        default 'FRISBEE-MFS' after adminmfs_osid;
+
+4.15 Create node_attributes table; migrate a column from the nodes table.
+
+     CREATE TABLE node_attributes (
+       node_id varchar(32) NOT NULL default '',
+       attrkey varchar(32) NOT NULL default '',
+       attrvalue tinytext NOT NULL,
+       PRIMARY KEY  (node_id,attrkey),
+       KEY node_id (node_id)
+     ) TYPE=MyISAM;
+
+     Migrate bios_version info:
+
+     Run:
+                ./bios_move.pl | mysql tbdb
+
+     Check the node_attributes table to be sure it contains your bios
+     version entries.  Then remove the column from the nodes table:
+
+     alter table nodes drop column bios_version;

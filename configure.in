@@ -701,7 +701,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/savelogs tbsetup/setgroups tbsetup/websetgroups \
 	tbsetup/savelogs.proxy \
 	tbsetup/rmgroup tbsetup/webrmuser tbsetup/webrmgroup tbsetup/mkexpdir \
-	tbsetup/webnodecontrol tbsetup/node_control \
+	tbsetup/webnodecontrol tbsetup/node_control tbsetup/node_attributes \
         tbsetup/webmkgroup tbsetup/mkgroup tbsetup/eventsys_start \
 	tbsetup/eventsys_control tbsetup/webeventsys_control \
 	tbsetup/webmkproj tbsetup/mkproj tbsetup/libtestbed.pm \
@@ -711,7 +711,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/libreboot.pm tbsetup/libosload.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
-	tbsetup/newnode_reboot \
+	tbsetup/newnode_reboot tbsetup/webnodeattributes \
         tbsetup/libtestbed.py \
 	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \

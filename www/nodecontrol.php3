@@ -71,15 +71,6 @@ if ($isadmin) {
     if ($temp_boot_osid != $row[temp_boot_osid]) {
 	$command_string .= "temp_boot_osid='$temp_boot_osid' ";
     }
-    if ($bios_version != $row[bios_version]) {
-	$command_string .= "bios_version='$bios_version' ";
-    }
-    if ($serial != $row[serial]) {
-	$command_string .= "serial='$serial' ";
-    }
-    if ($service_tag != $row[service_tag]) {
-	$command_string .= "service_tag='$service_tag' ";
-    }
 }
 
 #

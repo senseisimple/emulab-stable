@@ -978,6 +978,18 @@ CREATE TABLE node_activity (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `node_attributes`
+--
+
+CREATE TABLE node_attributes (
+  node_id varchar(32) NOT NULL default '',
+  attrkey varchar(32) NOT NULL default '',
+  attrvalue tinytext NOT NULL,
+  PRIMARY KEY  (node_id,attrkey),
+  KEY node_id (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `node_auxtypes`
 --
 
@@ -1211,7 +1223,6 @@ CREATE TABLE nodes (
   failureaction enum('fatal','nonfatal','ignore') NOT NULL default 'fatal',
   routertype enum('none','ospf','static','manual','static-ddijk','static-old') NOT NULL default 'none',
   next_pxe_boot_path text,
-  bios_version varchar(64) default NULL,
   eventstate varchar(20) default NULL,
   state_timestamp int(10) unsigned default NULL,
   op_mode varchar(20) default NULL,
@@ -1240,8 +1251,6 @@ CREATE TABLE nodes (
   destination_x float default NULL,
   destination_y float default NULL,
   destination_orientation float default NULL,
-  serial varchar(32) default NULL,
-  service_tag varchar(32) default NULL,
   PRIMARY KEY  (node_id),
   KEY phys_nodeid (phys_nodeid),
   KEY node_id (node_id,phys_nodeid),
