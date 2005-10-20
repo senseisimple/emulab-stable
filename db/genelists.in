@@ -431,7 +431,7 @@ sub ProjectLists($$)
 		     " from group_membership as p ".
 		     "left join users as u on u.uid=p.uid ".
 		     "where p.pid='$pid' and p.gid='$gid' and ".
-		     " p.trust!='none' ".
+		     " p.trust!='none' and u.status='active' ".
 		     "order by u.usr_email");
 
     if ($query_result->numrows) {
