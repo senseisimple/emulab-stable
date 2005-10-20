@@ -58,6 +58,7 @@ typedef enum {
 	ES_UNKNOWN,
 	ES_ACTIVATING,
 	ES_ACTIVE,
+	ES_MODIFY_RESWAP,
 } expt_state_t;
 	
 int RPC_init(const char *certpath, const char *host, unsigned short port);

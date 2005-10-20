@@ -329,6 +329,8 @@ RPC_expt_state(char *pid, char *eid)
 			retval = ES_ACTIVATING;
 		else if (strcmp(state, "active") == 0)
 			retval = ES_ACTIVE;
+		else if (strcmp(state, "modify_reswap") == 0)
+			retval = ES_MODIFY_RESWAP;
 	}
 
 	return retval;
