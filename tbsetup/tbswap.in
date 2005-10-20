@@ -1150,6 +1150,31 @@ sub doSwapin($) {
     }
 
     #
+    # Do linktest if user requested it at swapin.
+    #
+    my $query_result =
+	DBQueryFatal("select linktest_level,linktest_pid from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    my ($linktest_level,$linktest_pid) = $query_result->fetchrow_array();
+ 
+    if ($linktest_level && ($type == REAL || $type == UPDATE)) {
+	if ($linktest_pid) {
+	    print STDERR "*** Linktest is already running! $linktest_pid\n";
+	}
+	else {
+	    #
+	    # Run it. No worries about failures.
+	    #
+	    my $optarg = "-l $linktest_level -t 120 -m";
+    
+	    print "Starting linktest ... this could take a while!'\n";
+	    if (system("linktest_control $optarg $pid $eid") != 0) {
+		print STDERR "*** Linktest run returned non-zero status!\n";
+	    }
+	}
+    }
+
+    #
     # ElabinElab setup. This might not be the right place for this!
     #
     if ($elabinelab && !$TESTMODE && ($type == REAL || $type == UPDATE)) {
@@ -1164,6 +1189,9 @@ sub doSwapin($) {
 	TBDebugTimeStamp("ElabInElab setup finished");
     }
 
+    #
+    # Tell the event scheduler to START.
+    # 
     if (! ($DISABLE_EVENTS || $elabinelab)) {
 	if ( $update_Eventsys_restart || 
 	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
