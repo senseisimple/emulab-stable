@@ -37,24 +37,31 @@
 To run linktest, select a Linktest test level from the dropdown on the
 <a href="beginexp_html.php3">Begin an Experiment</a> page.
 <ul>
-<li>For fastest response, select <a href="#Level1">Level 1 - Connectivity and Latency</a>. This
-will check that all nodes respond to ping and that latency is correct.
-<li>For a more thorough but relatively fast test, select <a
-href="#Level3">Level 3 - Loss</a>. Test levels are cumulative, so this option includes
-Connectivity, Latency, Static Routing (if applicable) and Loss.
-<li>If bandwidth is important in your experiment, select <a
-href="#Level4">Level 4 - Bandwidth</a>. Be warned that the bandwidth
-test takes up to 40 seconds per link. <b>Also note that not all
-bandwidths can be accurately measured</b>. If this happens, a warning will
-be placed in the log file for each link that is out of range for
-bandwidth testing. It is up to you to ensure that links are behaving
-as you expect them too!
-
+<li> <a href="#Level1"><b>Level 1</b> - Connectivity and Latency</a>:
+     For fastest response, level 1. This will check that all nodes respond
+     to ping and that latency is correct.
+<br>
+<li> <a href="#Level3"><b>Level 3</b> - Link Loss</a>: Check link loss
+     characteristics. Test levels are cumulative, so this option also
+     includes connectivity, latency, and static routing (if
+     applicable).
+<br>
+<li> <a href="#Level4"><b>Level 4</b> - Bandwidth</a>: If bandwidth is
+     important in your experiment, select level 4. Be warned that the
+     bandwidth test takes up to 40 seconds per link. <b>Also note that
+     not all bandwidths can be accurately measured</b>. If this
+     happens, a warning will be placed in the log file for each link
+     that is out of range for bandwidth testing. 
 </ul>
-<p>If you select a test lest level other than 0, Linktest
-will run after the experiment completes its swapin. If a problem is
-found, testbed-ops is automatically notified and a message will appear
-in the activation log. Otherwise, no notification will appear.
+<p>
+If you select a test lest level other than zero, Linktest will run after
+the experiment completes its swapin. If a problem is found,
+testbed-ops is automatically notified and a message will appear in the
+activation log. Otherwise, no notification will appear. A failure in
+linktest will <em><b>not</b> cause the swapin to fail!</em> If traffic
+shaping parameters are of critical importance to your experiments,
+make sure you take a closer look if linktest reports failures!
+
 </p>
 
 <hr>
@@ -72,13 +79,19 @@ in the activation log. Otherwise, no notification will appear.
 <li> As with any automated testing procedure, we have to balance the desire
      for accuracy with the possibility of false positives. To reduce
      the number of false positives, we allow for a small amount of
-     fudge of any link. <b>If your results are dependent on total
+     fudge on any link. <b>If your results are dependent on total
      accuracy, then you should test your links yourself!</b>
 
 <li> When using linkdelays (endnodeshaping) latency is less accurate
      because of the 1ms clock resolution that the kernel runs at. At
      worst, latency can be off by up to 2ms, say for a roundtrip ping
      packet.
+
+<li> Linktest can take a <b>long time</b> on large experiments. Even
+     on very small experiments (5-10 nodes), doing the full bandwidth test
+     can 3-4 minutes. You should probably <em>not<em> do bandwidth
+     tests at swapin on any experiment over 20 nodes unless you are
+     prepared to wait a <em>long</em> time for the experiment to swap in.
  
 </ul>
 </center>
