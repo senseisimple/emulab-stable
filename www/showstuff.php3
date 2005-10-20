@@ -2411,18 +2411,17 @@ function SHOWNODE($node_id, $flags = 0) {
 	}
     }
 
-    if (!$short) {
-      #
-      # Spit out node attributes
-      #
+    #
+    # Spit out node attributes
+    #
+    $query_result =
+      DBQueryFatal("select attrkey,attrvalue from node_attributes where ".
+                   "node_id='$node_id'");
+    if (!$short && mysql_num_rows($query_result)) {
       echo "<tr>
                 <td align=center colspan=2>Node Attributes</td>
             </tr>\n";
       echo "<tr><th>Attribute</th><th>Value</th>\n";
-
-      $query_result =
-        DBQueryFatal("select attrkey,attrvalue from node_attributes where ".
-                     "node_id='$node_id'");
 
       while($row = mysql_fetch_array($query_result)) {
         $attrkey   = $row["attrkey"];
