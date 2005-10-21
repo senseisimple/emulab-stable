@@ -40,7 +40,6 @@ my $TBUISP	    = "$TB/bin/tbuisp";
 
 # Locals
 my %imageinfo       = ();	# Per imageid DB info.
-my %maxwaits        = ();	# Per imageid max wait time.
 my $debug           = 0;
 my %children        = ();	# Child pids in when asyncmode=1
 
@@ -115,6 +114,21 @@ sub osload ($$) {
     }
 
     #
+    # If there's a maxiumum number of concurrent loads listed for the image,
+    # check to see if we'll go over the limit, by checking to see how many
+    # other nodes are currently booting thie image's default_osid. This is
+    # NOT intended to be strong enforcement of license restrictions, just a
+    # way to catch mistakes.
+    #
+    if (defined($imageid) &&
+	!TBImageLoadMaxOkay($imageid, scalar(@nodes), @nodes)) {
+	print STDERR
+	    "*** osload: Would exceed maxiumum concurrent instances ".
+		"limitation for $imageid\n";
+	return -1;
+    }
+
+    #
     # This is somewhat hackish. To promote parallelism during os_setup, we
     # want to fork off the osload from the parent so it can do other things.
     # The problem is how to return status via the results vector. Well,
@@ -172,99 +186,20 @@ sub osload ($$) {
 	    if $debug;
 
 	#
-	# Try to avoid repeated queries to DB for info that does not change!
+	# We try to avoid repeated queries to DB for info that does not change
+	# by caching the image info on the first use.  GetImageInfo() will
+	# perform various one-time checks as well.
 	# 
-	if (exists($imageinfo{$imageid})) {
-	    $rowref = $imageinfo{$imageid};
+	if (!exists($imageinfo{$imageid}) && !GetImageInfo($imageid, $node)) {
+	    goto failednode;
 	}
-	else {
-	    my $query_result =
-		DBQueryWarn("select * from images where imageid='$imageid'");
+	$rowref = $imageinfo{$imageid};
 
-	    if (! $query_result || $query_result->numrows < 1) {
-		print STDERR
-		    "*** osload ($node): Imageid $imageid is not defined!\n";
-		goto failednode;
-	    }
-	    $rowref = $query_result->fetchrow_hashref();
-	}
-	
 	my $loadpart       = $rowref->{'loadpart'};
 	my $loadlen        = $rowref->{'loadlength'};
 	my $imagepath      = $rowref->{'path'};
 	my $defosid        = $rowref->{'default_osid'};
-
-	# Check for a few errors early!
-	if (!defined($imagepath)) {
-	    print STDERR 
-		"*** osload ($node): No filename associated with $imageid!\n";
-	    goto failednode;
-	}
-
-	if (! -R $imagepath) {
-	    if ($ELABINELAB) {
-		#
-		# Yuck. See if we can get it via frisbeelauncher before
-		# giving up. 
-		#
-		system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
-		if ($?) {
-		    print STDERR
-			"*** osload ($node): ".
-			    "Frisbee Launcher ($imageid) failed!\n";
-		    goto failednode;
-		}
-		if (! -R $imagepath) {
-		    print STDERR
-			"*** osload ($node): ".
-			    "Frisbee Launcher did not fetch $imagepath ($imageid)!\n";
-		    goto failednode;
-		}
-	    }
-	    else {
-		print STDERR 
-		    "*** osload ($node): ".
-			"$imagepath does not exists or cannot be read!\n";
-		goto failednode;
-	    }
-	}
-
-	#
-	# If there's a maxiumum number of concurrent loads listed, check to
-	# see if we'll go over the limit, by checking to see how many other
-	# nodes are currently booting thie image's default_osid. This is NOT
-	# intended to be strong enforcement of license restrictions, just a way
-	# to catch mistakes.
-	# XXX This could go outside the @nodes loop, but so could most of this
-	# stuff
-	#
-	if (!TBImageLoadMaxOkay($imageid, scalar(@nodes), @nodes)) {
-	    print STDERR
-		"*** osload ($node): Exceeded maxiumum concurrent instances\n";
-	    goto failednode;
-	}
-
-	#
-	# Compute a maxwait time based on the image size plus a constant
-	# factor for the reboot cycle. We store this globally for later in
-	# WaitTillReloadDone(), and so we do not recompute each time
-	# through the loop!
-	#
-	if (!exists($maxwaits{$imageid})) {
-	    my $sb      = stat($imagepath);
-	    my $chunks  = $sb->size >> 20; # Size may be > 2^31.  Shift is unsigned.
-
-	    $maxwaits{$imageid} = int((($chunks / 100.0) * 30) + (5 * 60));
-	}
-
-	# 0 means load the entire disk.
-	my $diskpart = "";
-	if ($loadpart) {
-	    $diskpart = "wd0:s${loadpart}";
-	}
-	else {
-	    $diskpart = "wd0";
-	}
+	my $maxwait	   = $rowref->{'maxloadwait'};
 
 	print "osload ($node): Changing default OS to $defosid\n";
 	if (!$TESTMODE) {
@@ -351,7 +286,8 @@ sub osload ($$) {
 	    'imageid' => $imageid,
 	    'osid'    => $defosid,
 	    'reboot'  => $reboot_required,
-	    'zerofree'=> $zerofree
+	    'zerofree'=> $zerofree,
+	    'maxwait' => $maxwait
 	};
 
 	print "Setting up reload for $node (mode: $reload_mode)\n";
@@ -394,7 +330,7 @@ sub osload ($$) {
     # Fire off a mass reboot and quit if not in waitmode.
     if (! $waitmode) {
 	my ($reboot_nodes, $noreboot_nodes)
-	    = GetNodesRequiringReboot(\%reload_info);
+	    = GetNodesRequiringReboot(\%reload_info, keys(%reload_info));
 	if (@$reboot_nodes) {
 	    print "osload: Rebooting nodes.\n";
 
@@ -518,6 +454,87 @@ sub osload ($$) {
     return $failures;
 }
 
+#
+# Fetch information for a specified image the first time it is used
+# (for the indicated node).  This info is cached for use by all other
+# nodes that require the image.  Returns 1 on success, 0 on failure.
+#
+sub GetImageInfo($$)
+{
+    my ($imageid, $node) = @_;
+
+    my $query_result =
+	DBQueryWarn("select * from images where imageid='$imageid'");
+    if (! $query_result || $query_result->numrows < 1) {
+	print STDERR
+	    "*** osload ($node): Imageid $imageid is not defined!\n";
+	return 0;
+    }
+    $imageinfo{$imageid} = $query_result->fetchrow_hashref();
+
+    my $rowref = $imageinfo{$imageid};
+    my $imagepath = $rowref->{'path'};
+
+    #
+    # Perform a few validity checks: imageid should have a file name
+    # and that file should exist.
+    #
+    if (!defined($imagepath)) {
+	print STDERR 
+	    "*** osload ($node): No filename associated with $imageid!\n";
+	return 0;
+    }
+
+    if (! -R $imagepath) {
+	if ($ELABINELAB) {
+	    #
+	    # Yuck. See if we can get it via frisbeelauncher before giving up.
+	    #
+	    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
+	    if ($?) {
+		print STDERR
+		    "*** osload ($node): Frisbeelauncher ($imageid) failed!\n";
+		return 0;
+	    }
+	    if (! -R $imagepath) {
+		print STDERR
+		    "*** osload ($node): ".
+			"Frisbeelauncher could not fetch $imagepath ($imageid)!\n";
+		return 0;
+	    }
+	}
+	else {
+	    print STDERR 
+		"*** osload ($node): ".
+		    "$imagepath does not exist or cannot be read!\n";
+	    return 0;
+	}
+    }
+
+    #
+    # Compute a maxwait time based on the image size plus a constant
+    # factor for the reboot cycle.  This is used later in
+    # WaitTillReloadDone().  Arguably, this should be part of the
+    # image DB state, so we store it in the imageinfo array too.
+    #
+    if (!defined($rowref->{'maxloadwait'})) {
+	my $sb = stat($imagepath);
+	my $chunks = $sb->size >> 20; # size may be > 2^31, shift is unsigned
+
+	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 30) + (5 * 60));
+    }
+
+    print STDERR
+	"$imageid: loadpart=", $rowref->{'loadpart'},
+	", loadlen=", $rowref->{'loadlength'},
+	", imagepath=", $rowref->{'path'},
+	", defosid=", $rowref->{'default_osid'},
+	", maxloadwait=", $rowref->{'maxloadwait'}, "\n"
+	    if ($debug);
+
+    return 1;
+}
+
 # Wait for a reload to finish by watching its state
 sub WaitTillReloadDone($$$@)
 {
@@ -565,7 +582,7 @@ sub WaitTillReloadDone($$$@)
 			if (!$disksize);
 		    $maxwait = ($disksize * 60);
 		} else {
-		    $maxwait = $maxwaits{$reload_info->{$node}{'imageid'}};
+		    $maxwait = $reload_info->{$node}{'maxwait'};
 		}
 		
 		my $query_result =
@@ -738,10 +755,10 @@ sub SetupReloadUISP($$$$)
 # Return two array references (possbily empty) of:
 # [all nodes requiring reboot, all nodes not requiring reboot]
 #
-sub GetNodesRequiringReboot($) {
-    my ($reload_info) = @_;
+sub GetNodesRequiringReboot($@) {
+    my ($reload_info, @nodes) = @_;
     my (@reboot, @noreboot);
-    foreach my $node (%$reload_info) {
+    foreach my $node (@nodes) {
 	if ($reload_info->{$node}{'reboot'}) {
 	    push @reboot, $node;
 	} else {
