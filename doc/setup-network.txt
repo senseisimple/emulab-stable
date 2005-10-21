@@ -28,11 +28,11 @@ these switches if they are Ciscos.)
 ##### Splitting up the control net
 
 We basically have 5 VLANs on the control network:
-'external' contains our connection to the outside world
-'private' contains the boss node, and our tape backup server
-'public' contains our ops node
-'control' contains the control net interfaces of all experimental nodes
-'control-hardware' contains all IP-controllable devices (namely, power
+'External' contains our connection to the outside world
+'Private' contains the boss node, and our tape backup server
+'Public' contains our ops node
+'Control' contains the control net interfaces of all experimental nodes
+'Control-hardware' contains all IP-controllable devices (namely, power
 	controllers and switch IP interfaces, as well as a second
 	interface on the boss node. This VLAN uses private IP addresses,
 	and does NOT contain a router interface.
@@ -74,6 +74,10 @@ aspects of security, ask Utah, and we can probably help you.
 
 Since our firewall rules change frequently as we add new services, it's best to
 contact Utah and ask us for the current set.
+
+Note: If you plan to use our control-network firewalling code, you should make
+sure to name the control network 'Control' (case sensitive) so that our code
+can find it.
 
 ##### Connecting the contol net to the experimental net
 
