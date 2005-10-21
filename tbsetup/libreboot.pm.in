@@ -371,10 +371,10 @@ sub nodereboot($$)
 		# Child signaled to us that this node needs a power cycle
 		push(@needPowercycle, $node);
 	    }
-	    elsif ($?) {
+	    elsif ($mypid != 0 && $?) {
 		$failed++;
 		$result->{$node} = -1;
-		print STDERR "*** reboot ($node): Failed!\n";
+		print STDERR "*** reboot ($node): Failed ($?)!\n";
 	    }
 	    else {
 		print STDOUT "reboot ($node): Successful!\n";
