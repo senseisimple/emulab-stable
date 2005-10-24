@@ -126,8 +126,10 @@ control-net interface, and replace the IP address with that of your boss node.
 In order for multicast to work correctly, you need to make sure that IGMP
 snooping is enabled on the control switch. This is needed for frisbee, our
 disk-loading system. It's up to you whether you want to enable this on the
-experimental switches.  [We should make a recommendation or at least mention
-criteria/issues.]  On CatOS, the command is:
+experimental switches.  In general, we recommend it so that your experimenters
+can use multicast, but it does seem that unexpected or malformed multicast
+packets have an easier time DOSing the switch control processor than unicast
+traffic.  On CatOS, the command is:
   set igmp enable
 
 #### VTP domains
