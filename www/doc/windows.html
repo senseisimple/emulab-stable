@@ -345,13 +345,35 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
 </ul>
 
 <div style="margin-left: 40px;"> <b>NOTE:</b> If your dot-files replace the
-execution search path entirely, you will not be able to execute Windows commands in
-shells.  In that case, you should add
+execution search path entirely, you will not be able to execute Windows system
+commands in shells.  (It's come to our attention that when new Emulab user
+accounts are created, the default tcsh and Bash dotfiles are copied from a
+FreeBSD /usr/share/skel.  They do just what is warned against here: replace
+the whole $PATH rather than add to it, and of course they don't include the
+Windows directories.)  <p>
+
+In that case, you should add
 <b><code>/cygdrive/c/WINDOWS/system32</code></b> and 
 <b><code>/cygdrive/c/WINDOWS</code></b>
-to your <code>$PATH</code>.  Don't worry about your home directory dot-files
+to your <code>$PATH</code> in your dotfiles: <code>~/.cshrc</code> and <code>~/.profile</code> .  Don't worry about your home directory dot-files
 being shared among Windows, FreeBSD, and Linux nodes.  Non-existent
-directories are ignored. </div>
+directories are ignored by shells. </div>
+
+<div style="margin-left: 40px;"> <b>NOTE:</b> The Windows
+<b><code>ping</code></b> program has <emph>completely</emph> different option
+args from the Linux and FreeBSD ones, and they differ widely from each other.
+There is a ping package in Cygwin that is a port of the 4.3bsd ping.  Its
+options are close to a common subset of the Linux and FreeBSD options, so it
+will be included in future WINXP images:
+<pre> ping [ -dfqrv ] host [ packetsize [count [ preload]]] </pre> <p>
+
+You can load it yourself now using <a href="#Cygwin_packages"> Cygwin Setup </a>.
+</div>
+
+<div style="margin-left: 40px;"> <b>NOTE:</b> There are no Cygwin ports of
+some other useful networking commands, such as <b><code>traceroute</code></b>
+and <b><code>ifconfig -a</code></b>.  The Windows equivalents are
+<code>tracert</code> and <code>ipconfig /all</code>. </div>
 
 <h4><a name="RDP_details"> </a> RDP details </h4>
 
