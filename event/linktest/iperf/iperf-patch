@@ -1,0 +1,254 @@
+Index: include/headers.h
+===================================================================
+RCS file: /usr/flux/CVS/emulab-iperf/include/headers.h,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 headers.h
+*** include/headers.h	24 Oct 2005 15:18:33 -0000	1.1.1.1
+--- include/headers.h	24 Oct 2005 16:06:09 -0000
+***************
+*** 180,186 ****
+--- 180,190 ----
+  // from the gnu archive
+  
+  #include <iperf-int.h>
++ #ifdef __FreeBSD__
++ typedef uint64_t max_size_t;
++ #else
+  typedef uintmax_t max_size_t;
++ #endif
+  
+  /* in case the OS doesn't have these, we provide our own implementations */
+  #include "gettimeofday.h"
+Index: src/Client.cpp
+===================================================================
+RCS file: /usr/flux/CVS/emulab-iperf/src/Client.cpp,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Client.cpp
+*** src/Client.cpp	24 Oct 2005 15:18:33 -0000	1.1.1.1
+--- src/Client.cpp	24 Oct 2005 16:06:10 -0000
+***************
+*** 61,66 ****
+--- 61,102 ----
+  #include "util.h"
+  #include "Locale.h"
+  
++ static int	flood_wait;
++ static int	flood_delta;
++ static int	flood_hysteresis;
++ static int	flood_good;
++ 
++ void
++ pkt_wait_init(void)
++ {
++     flood_wait       = 1;
++     flood_delta      = 1;
++     flood_hysteresis = 1;
++     flood_good       = 0;
++ }
++ 
++ void
++ pkt_wait(int err)
++ {
++     volatile int	i;
++ 
++     if (err) {
++         flood_wait += flood_delta;
++ 	flood_good = 0;
++ 
++ 	//fprintf(stderr, "%d\n", flood_wait);
++     }
++     else {
++         if (++flood_good >= flood_hysteresis) {
++ 	    flood_wait -= flood_delta;
++ 	    flood_good = 0;
++ 	    if (flood_wait = 0)
++ 	        flood_wait = 1;
++ 	}
++     }
++     delay_loop( flood_wait );     
++ }
++ 
+  /* -------------------------------------------------------------------
+   * Store server hostname, optionally local hostname, and socket info.
+   * ------------------------------------------------------------------- */
+***************
+*** 69,74 ****
+--- 105,112 ----
+      mSettings = inSettings;
+      mBuf = NULL;
+  
++     pkt_wait_init();
++ 
+      // initialize buffer
+      mBuf = new char[ mSettings->mBufLen ];
+      pattern( mBuf, mSettings->mBufLen );
+***************
+*** 213,236 ****
+          } else
+              canRead = true; 
+  
+!         // perform write 
+          currLen = write( mSettings->mSock, mBuf, mSettings->mBufLen ); 
+          if ( currLen < 0 ) {
+!             WARN_errno( currLen < 0, "write2" ); 
+!             break; 
+!         }
+  
+!         // report packets 
+!         reportstruct->packetLen = currLen;
+!         ReportPacket( mSettings->reporthdr, reportstruct );
+!         
+          if ( delay > 0 ) {
+              delay_loop( delay ); 
+          }
+!         if ( !mMode_Time ) {
+              mSettings->mAmount -= currLen;
+          }
+! 
+      } while ( ! (sInterupted  || 
+                   (mMode_Time   &&  mEndTime.before( reportstruct->packetTime ))  || 
+                   (!mMode_Time  &&  0 >= mSettings->mAmount)) && canRead ); 
+--- 251,283 ----
+          } else
+              canRead = true; 
+  
+!         // perform write
+!     again:
+          currLen = write( mSettings->mSock, mBuf, mSettings->mBufLen ); 
+          if ( currLen < 0 ) {
+! 	    if (errno != ENOBUFS) {
+!                 WARN_errno( currLen < 0, "write2" ); 
+! 		break;
+! 	    }
+!         }
+! 	if (currLen > 0) {
+! 	    // report packets 
+! 	    reportstruct->packetLen = currLen;
+! 	    ReportPacket( mSettings->reporthdr, reportstruct );
+! 	}
+! 	pkt_wait((currLen < 0));
+! 	if (currLen < 0)
+! 	    goto again;
+  
+! #if 0
+          if ( delay > 0 ) {
+              delay_loop( delay ); 
+          }
+! #endif
+!         if ( !mMode_Time && currLen > 0 ) {
+              mSettings->mAmount -= currLen;
+          }
+! 	
+      } while ( ! (sInterupted  || 
+                   (mMode_Time   &&  mEndTime.before( reportstruct->packetTime ))  || 
+                   (!mMode_Time  &&  0 >= mSettings->mAmount)) && canRead ); 
+Index: src/Makefile.in
+===================================================================
+RCS file: /usr/flux/CVS/emulab-iperf/src/Makefile.in,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 Makefile.in
+*** src/Makefile.in	24 Oct 2005 15:18:33 -0000	1.1.1.1
+--- src/Makefile.in	24 Oct 2005 16:06:10 -0000
+***************
+*** 38,44 ****
+  POST_UNINSTALL = :
+  build_triplet = @build@
+  host_triplet = @host@
+! bin_PROGRAMS = iperf$(EXEEXT)
+  subdir = src
+  DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+  ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+--- 38,44 ----
+  POST_UNINSTALL = :
+  build_triplet = @build@
+  host_triplet = @host@
+! bin_PROGRAMS = emulab-iperf$(EXEEXT)
+  subdir = src
+  DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
+  ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
+***************
+*** 266,273 ****
+  
+  clean-binPROGRAMS:
+  	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+! iperf$(EXEEXT): $(iperf_OBJECTS) $(iperf_DEPENDENCIES) 
+! 	@rm -f iperf$(EXEEXT)
+  	$(CXXLINK) $(iperf_LDFLAGS) $(iperf_OBJECTS) $(iperf_LDADD) $(LIBS)
+  
+  mostlyclean-compile:
+--- 266,273 ----
+  
+  clean-binPROGRAMS:
+  	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
+! emulab-iperf$(EXEEXT): $(iperf_OBJECTS) $(iperf_DEPENDENCIES) 
+! 	@rm -f emulab-iperf$(EXEEXT)
+  	$(CXXLINK) $(iperf_LDFLAGS) $(iperf_OBJECTS) $(iperf_LDADD) $(LIBS)
+  
+  mostlyclean-compile:
+Index: src/main.cpp
+===================================================================
+RCS file: /usr/flux/CVS/emulab-iperf/src/main.cpp,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 main.cpp
+*** src/main.cpp	24 Oct 2005 15:18:34 -0000	1.1.1.1
+--- src/main.cpp	24 Oct 2005 16:06:10 -0000
+***************
+*** 163,168 ****
+--- 163,173 ----
+      // read settings from command-line parameters
+      Settings_ParseCommandLine( argc, argv, ext_gSettings );
+  
++     // if needed, redirect the output into a specified file
++     if ( !isSTDOUT( ext_gSettings ) ) {
++         redirect( ext_gSettings->mOutputFileName );
++     }
++ 
+      // Check for either having specified client or server
+      if ( ext_gSettings->mThreadMode == kMode_Client 
+           || ext_gSettings->mThreadMode == kMode_Listener ) {
+Index: src/stdio.c
+===================================================================
+RCS file: /usr/flux/CVS/emulab-iperf/src/stdio.c,v
+retrieving revision 1.1.1.1
+diff -c -r1.1.1.1 stdio.c
+*** src/stdio.c	24 Oct 2005 15:18:34 -0000	1.1.1.1
+--- src/stdio.c	24 Oct 2005 16:06:10 -0000
+***************
+*** 255,262 ****
+   * ------------------------------------------------------------------- */
+  
+  void redirect(const char *inOutputFileName) {
+- #ifdef WIN32
+- 
+      FILE *fp;
+  
+      if ( inOutputFileName == NULL ) {
+--- 255,260 ----
+***************
+*** 264,277 ****
+          return;
+      }
+  
+!     fp = freopen(inOutputFileName, "a+", stdout);
+      if ( fp == NULL ) {
+          fprintf(stderr, "redirect stdout failed!\n");
+          return;
+      }
+- 
+- #endif
+- 
+      return;
+  }
+  
+--- 262,272 ----
+          return;
+      }
+  
+!     fp = freopen(inOutputFileName, "a", stdout);
+      if ( fp == NULL ) {
+          fprintf(stderr, "redirect stdout failed!\n");
+          return;
+      }
+      return;
+  }
+  
