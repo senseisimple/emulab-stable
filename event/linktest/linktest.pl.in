@@ -10,16 +10,17 @@ use Class::Struct;
 use POSIX qw(uname);
 use IO::Handle;
 use English;
+use Socket;
 
 #
 # Linktest test script. This script is set up to run as root on
 # experiment nodes. It is invoked by the Linktest daemon after the
-# daemon receives a Linktest "START" event. The script runs tests using
-# ping, rude/crude (a real-time packet emitter/collector) and pathrate
-# to test all links in the experiment. If the results show a 99% chance
-# that the experiment is configured incorrectly, an error is logged to
-# the experiment directory in tbdata/linktest.  Valid ranges have been
-# calibrated ahead of time.
+# daemon receives a Linktest "START" event. The script runs tests
+# using ping, rude/crude (a real-time packet emitter/collector) and a
+# locally hacked iperf to test all links in the experiment. If the
+# results show a 99% chance that the experiment is configured
+# incorrectly, an error is logged to the experiment directory in
+# tbdata/linktest.  Valid ranges have been calibrated ahead of time.
 #
 sub usage() 
 {
@@ -29,10 +30,6 @@ sub usage()
 	  " [DEBUG=<debugging level. 1=on, 0=off>]\n");
     exit(0);
 }
-
-
-
-
 
 
 ##############################################################################
@@ -45,8 +42,7 @@ use constant PATH_NICKNAME => "@CLIENT_VARDIR@/boot/nickname";
 use constant PATH_KEYFILE => "@CLIENT_VARDIR@/boot/eventkey";
 use constant PATH_RUDE => "/usr/local/bin/rude";
 use constant PATH_CRUDE => "/usr/local/bin/crude";
-use constant PATH_PATHRATE_SND => "/usr/local/bin/pathrate_snd";
-use constant PATH_PATHRATE_RCV => "/usr/local/bin/pathrate_rcv";
+use constant PATH_IPERF => "/usr/local/bin/emulab-iperf";
 use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
 use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
 use constant PATH_TEVC => "@CLIENT_BINDIR@/tevc";
@@ -56,10 +52,10 @@ use constant EVENTSERVER => "@EVENTSERVER@";
 # log files used by tests.
 use constant CRUDE_DAT => "/tmp/crude.dat"; # binary data
 use constant RUDE_CFG  => "/tmp/rude.cfg";
-use constant PATHRATE_DAT => "/tmp/pathrate.dat";
+use constant IPERF_DAT => "/tmp/iperf.dat";
 
-# pathrate test limits.
-use constant LIMIT_BW_HI => 45000000;
+# iperf test limits.
+use constant LIMIT_BW_HI => 100000000;
 use constant LIMIT_BW_LO =>  1000000;
 use constant LIMIT_BW_LOSS => 0;
 
@@ -67,7 +63,8 @@ use constant LIMIT_BW_LOSS => 0;
 # Make sure the error is a certain significance before we start reporting it.
 use constant INSIGNIFICANT_LAT_ERROR_LO => 0.50;  # ms
 use constant INSIGNIFICANT_LAT_ERROR_HI => 3.00;  # ms
-use constant INSIGNIFICANT_BW_ERROR     => 1.00;  # mb
+use constant INSIGNIFICANT_BW_ERROR_HI  => 0.01;  # percent.
+use constant INSIGNIFICANT_BW_ERROR_LO  => 0.05;  # percent.
 
 # latency must be corrected for xmit delay under this speed.
 use constant LAT_LOW_BW => 10000000;
@@ -112,7 +109,9 @@ use constant EXIT_OK => 0;
 # struct for representing a link.
 struct ( edge => {
     src => '$',
+    srcip => '$',
     dst => '$',
+    dstip => '$',
     bw  => '$',
     delay => '$',
     loss => '$'});
@@ -300,17 +299,17 @@ if(&is_special_node()) {
 # run, if any.
 # 
 &do_unlink(CRUDE_DAT);
-&do_unlink(PATHRATE_DAT);
+&do_unlink(IPERF_DAT);
 &do_unlink(RUDE_CFG);
 
 #
-# Start up child processes for receiving RUDE and Pathrate streams.
+# Start up child processes for receiving RUDE and iperf streams.
 # These run over the lifetime of Linktest to reduce the number of
 # barrier synchronizations and startup delays. Always give the 
 # collectors a moment to start up.
 #
 if(&dotest(TEST_BW)){
-    &my_system_initonly(PATH_PATHRATE_SND,"-i","-q");
+    &my_system_initonly(PATH_IPERF,"-s","-f","b","-u","-w","200000");
     sleep(1);
 }
 if(&dotest(TEST_LOSS)){
@@ -748,71 +747,124 @@ sub valid_bw {
 
 # Checks bandwidth for directly connected links.
 sub bw_test {
-    my @analyze_list;
-    my @edge_copy;
-    @edge_copy = @links;
+    my @analyze_list	= ();
+    my @edge_copy	= @links;
 
-
-
+    #
     # all nodes will execute the same reductions on the edge list
     # on their own so that the number of barriers is the same.
-    while(&has_elems(\@edge_copy)) {
-	my $edge = &get_assign(\@edge_copy);
+    #
+    while (&has_elems(\@edge_copy)) {
+	my ($edge,$redge) = &get_twoway_assign(\@edge_copy);
 
-	if(defined($edge) ) {
+	if (defined($edge)) {
 	    if($hostname eq $edge->dst) {
+		#
+		# iperf does a twoway test.
+		#
 		if (&valid_bw($edge)) {
-		    push @analyze_list, $edge;
+		    push(@analyze_list, $edge);
 		    
 		    &info("    Starting bandwidth test for " .
 			  &print_link($edge) . "\n");
+		}
+		else {
+		    &debug("Skipping bandwidth test for " .
+			   &print_link($edge) . "\n");
 		    
-		    &my_system(PATH_PATHRATE_RCV, "-Q","-s",$edge->src,"-q","-N", PATHRATE_DAT);
-		} else {
-		    &debug("Skipping bandwidth test for " . &print_link($edge) . "\n");
 		    &info("*** Skipping bandwidth test for " .
 			  &print_link($edge) . "\n");
 		    &info("*** Bandwidth is out of range ".
 			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
 			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
 		}
+		if (&valid_bw($redge)) {
+		    push(@analyze_list, $redge);
+		    
+		    &info("    Starting bandwidth test for " .
+			  &print_link($redge) . "\n");
+		}
+		else {
+		    &debug("Skipping bandwidth test for " .
+			   &print_link($redge) . "\n");
+		    
+		    &info("*** Skipping bandwidth test for " .
+			  &print_link($redge) . "\n");
+		    &info("*** Bandwidth is out of range ".
+			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
+			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
+		}
+		# Okay, start the test.
+		if (&valid_bw($edge) || &valid_bw($redge)) {
+		    &my_system(PATH_IPERF,
+			       "-c", $edge->src, "-t", "10", "-f", "b",
+			       "-r", "-u", "-w", "200000", "-b", "100Mb",
+			       "-x", "s", "-y", "c",
+			       "-L", "4444", "-o", IPERF_DAT);
+		}
 	    } 
 	}
 	&barrier();
     }
 
-
     # read the log file.
-    if(@analyze_list) {
-	my @results = &read_file(PATHRATE_DAT);
-	foreach (@results) {
-	    my $edge = shift(@analyze_list);
-	    my $sender = $edge->src;
-	    if(/SNDR=$sender.*CAPL=(\d+\.\d+)Mbps.*CAPH=(\d+\.\d+)Mbps/) {
-		my $expected = $edge->bw / 1000000;
-		my $low = $1;
-		my $hi = $2;
-
-
-		my $diff;
-		if($expected > $2) {
-		    $diff = $expected - $2;
-		} elsif ($expected < $1) {
-		    $diff = $1 - $expected;
-		} else {
-		    $diff = 0;
+    if (@analyze_list) {
+	my @results = &read_file(IPERF_DAT);
+	foreach my $edge (@analyze_list) {
+	    my $found_results = 0;
+	    
+	    foreach my $result (@results) {
+		my @stuff = split(",", $result);
+		if (scalar(@stuff) < 9) {
+		    die("Error parsing " . IPERF_DAT . "\n");
 		}
+		my $myip  = $stuff[1];
+		my $port  = $stuff[2];
+		my $hisip = $stuff[3];
+		my $bw    = $stuff[8];
+		
+		#
+		# iperf is a twoway test. Both edges represented in the file.
+		#
+		if (($hostname eq $edge->dst &&
+		     $edge->dstip eq $myip && "$port" eq "4444" &&
+		     $edge->srcip eq $hisip) ||
+		    ($hostname eq $edge->src &&
+		     $edge->dstip eq $myip && "$port" eq "5001" &&
+		     $edge->srcip eq $hisip)) {
+		    my $expected = $edge->bw;
+		    my $diff     = abs($bw - $expected);
+		    my $error    = undef;
 
-		my $output = sprintf "Receive from " . $edge->src
-		    . ": $1/$2/%.1f/%.1f\n", $expected, $diff;
-		&debug($output);
+		    &debug("BW results for " . $edge->src . ": ".
+			   "$bw/$expected/$diff\n");
 
-		if($diff > INSIGNIFICANT_BW_ERROR) {
-		    &error (NAME_BW, $edge, "Bandwidth estimate $low to $hi Mbps does not include expected bandwidth $expected Mbps");
+		    #
+		    # The measurement tool does not give perfect results.
+		    # However, it reports low all the time, so if it reports
+		    # high, then the link is almost certainly bad.
+                    #
+		    if ($bw > $edge->bw) {
+			if ($diff > ($expected * INSIGNIFICANT_BW_ERROR_HI)) {
+			    $error = "higher";
+			}
+		    }
+		    elsif ($bw < $edge->bw) {
+			if ($diff > ($expected * INSIGNIFICANT_BW_ERROR_LO)) {
+			    $error = "lower";
+			}
+		    }
+		    if (defined($error)) {
+			&error(NAME_BW, $edge,
+			       "Bandwidth estimate ($bw bps) is $error ".
+			       "expected ($expected)");
+		    }
+		    $found_results = 1;
+		    last;
 		}
-
-	    } else {
-		 die ("Error while parsing " . PATHRATE_DAT . "\n");
+	    }
+	    if (!$found_results) {
+		&error(NAME_BW, $edge, "Could not find results!");
 	    }
 	}
     }
@@ -922,7 +974,9 @@ sub get_topo {
 	} elsif ( /^l (\S+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)/) {
 	    my $newEdge = new edge;
 	    $newEdge->src($1);
+	    $newEdge->srcip(hostip($1));
 	    $newEdge->dst($2);
+	    $newEdge->dstip(hostip($2));
 	    $newEdge->bw($3);
 	    $newEdge->delay($4 * 1000); # units of ms
 	    $newEdge->loss($5);
@@ -1357,4 +1411,11 @@ sub linux_version {
 	}
     }
     return $vers;
+}
+
+sub hostip {
+    my $host = shift(@_);
+    
+    my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($host);
+    return inet_ntoa($ipaddrs[0]);
 }
