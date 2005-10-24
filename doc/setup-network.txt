@@ -11,7 +11,7 @@
 The purpose of this document is to aid in designing and setting up the control
 and experimental networks on other emulabs.
 
-First a bit of background: On the the control network will be your control
+First a bit of background: On the control network will be your control
 nodes (boss, ops, any tipservers, etc.), control hardware (SNMP-controllable
 devices such as power controllers and switch IP interfaces), your connection to
 the outside world, and the control interfaces of your nodes. So far, we haven't
@@ -46,7 +46,7 @@ goals are:
 2) Protect the control nodes from the experimental nodes
 3) Protect the control hardware (power controllers, etc.) from nodes
    and the outside world
-4) Protect the boss node (which is _not_ publically accessible) from the ops
+4) Protect the boss node (which is _not_ publicly accessible) from the ops
    node (which all experimenters have shells on.)
 
 Now, it's entirely possible to combine these VLANs into one big one - this is
@@ -59,7 +59,7 @@ outside world, to satisfy #1.
 
 It is also a good idea to separate the nodes' control net into a separate VLAN,
 which satisfies #2 and #3. After all, you are giving people root access to the
-experimental nodes. In situations where you are only giving acess to a small
+experimental nodes. In situations where you are only giving access to a small
 number of trusted people, this is probably not too big a deal, but once access
 gets outside the small circle of your friends, or if you are allowing students
 access, then taking these precautions are a very good idea.
@@ -78,6 +78,13 @@ contact Utah and ask us for the current set.
 Note: If you plan to use our control-network firewalling code, you should make
 sure to name the control network 'Control' (case sensitive) so that our code
 can find it.
+
+Note: For compatibility with Emulab's current control-network firewalling
+code, and possible future improvements such as inter-experiment control
+network isolation, you should make sure to name the control network 
+'Control' (case sensitive).  In fact, we recommend keeping all 5 VLANs
+named as we do, for ease of communication among testbed admins,
+if nothing else.
 
 ##### Connecting the contol net to the experimental net
 
@@ -101,24 +108,26 @@ CatOS, you do it like this:
 
 ##### DHCP through the router
 
-If your boss node is on a seperate VLAN from the node control net, you'll need
+If your boss node is on a separate VLAN from the node control net, you'll need
 to make sure that DHCP traffic can get from the control net to your boss node,
 since normally, DHCP is not forwarded through routers. On Cisco routers, this
 is done with the 'ip helper-address'. For example, here, the name of the
-router's interface in the node control net is 'Vlan3'.  So, I'd log  into the
+router's interface in the node control net is 'Vlan3'.  So, I'd log into the
 router, and run the following:                                 
   configure terminal                                                      
   interface Vlan3                                                         
   ip helper-address 155.101.128.70                                   
 
 Of course, replace 'Vlan3' with the name of your router's node
-control-net interface, and replace the IP address with that of your boss node.                                                          
+control-net interface, and replace the IP address with that of your boss node.
+
 ##### IGMP snooping on the control net
 
 In order for multicast to work correctly, you need to make sure that IGMP
 snooping is enabled on the control switch. This is needed for frisbee, our
-disk-loading system. It's up to you wheter you want to enable this on the
-experimental switches. On CatOS, the command is:
+disk-loading system. It's up to you whether you want to enable this on the
+experimental switches.  [We should make a recommendation or at least mention
+criteria/issues.]  On CatOS, the command is:
   set igmp enable
 
 #### VTP domains
@@ -129,12 +138,12 @@ switches. You do this (in CatOS) with:
   set vtp mode transparent
 
 If you have multiple experimental switches connected by trunk lines, you should
-use FTP. Pick a domain name (we call ours simply 'Testbed',) and run the
+use VTP. Pick a domain name (we call ours simply 'Testbed',) and run the
 following on all of your switches:
   set vtp domain <domainname>
 
 Pick one switch to be the master - it doesn't really matter which one. (See the
-switch setup insturctions in setup-db.txt, and make sure you name the stack
+switch setup instructions in setup-db.txt, and make sure you name the stack
 after the master switch.) On this one, run
   set vtp mode server
 On all the others, run
