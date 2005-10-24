@@ -15,10 +15,17 @@ all:	src/emulab-iperf
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+# Next two rules for linux, where make=gmake.
+%-am:		force
+	make $(MAKEFLAGS) -f Makefile $@
+
+%-recursive:	force
+	make $(MAKEFLAGS) -f Makefile $@
+
 src/emulab-iperf:	iperf-2.0.2 config.status build-iperf
 
 build-iperf:
-	make $(MAKEFLAGS) -f Makefile
+	make $(MAKEFLAGS) -f Makefile all
 
 client-install:
 	make $(MAKEFLAGS) -f Makefile install
@@ -31,3 +38,5 @@ iperf-2.0.2:
 
 clean:
 	make $(MAKEFLAGS) -f Makefile clean
+
+force: ;
