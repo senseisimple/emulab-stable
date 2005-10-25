@@ -7,7 +7,6 @@
 #
 
 use English;
-use Fcntl ':flock';
 
 #
 # Create an /etc/exports.tail file based on current reserved table and project
@@ -44,7 +43,6 @@ my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
 my $PROG	= "$TB/sbin/exports_setup.proxy";
 my $exportstail = "/var/tmp/exports.tail";
 my $smbconftail = "/var/tmp/smbconf.tail";
-my $lockfile    = "/var/tmp/testbed_exports_lockfile";
 my $dbg		= 1;
 my @row; 
 
@@ -97,66 +95,15 @@ my $GROUPROOT = GROUPROOT();
 my $USERROOT  = USERROOT();
 
 #
-# We need to serialize this script to avoid a trashed map file. Use
-# a dummy file in /var/tmp, opened for writing and flock'ed. 
+# We need to serialize this script to avoid a trashed map file.
 #
 if (!$TESTMODE) {
-    open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-    $count = 0;
-    if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-	#
-	# If we don't get it the first time, we wait for:
-	# 1) The lock to become free, in which case we do our thing
-	# 2) The time on the lock to change, in which case we wait for that process
-	#    to finish
-	#
-	my $oldlocktime = (stat(LOCK))[9];
-	my $gotlock = 0;
-	while (1) {
-	    print "Another exports update in progress, waiting for it to finish\n";
-	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		# OK, got the lock, we can do what we're supposed to
-		$gotlock = 1;
-		last;
-	    }
-	    $locktime = (stat(LOCK))[9];
-	    if ($locktime != $oldlocktime) {
-		$oldlocktime = $locktime;
-		last;
-	    }
-	    if ($count++ > 20)  {
-		fatal("Could not get the lock after a long time!\n");
-	    }
-	    sleep(1);
-	}
-
-	$count = 0;
-	#
-	# If we didn't get the lock, wait for the processes that did to finish
-	#
-	if (!$gotlock) {
-	    while (1) {
-		if ((stat(LOCK))[9] != $oldlocktime) {
-		    exit(0);
-		}
-		if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		    close(LOCK);
-		    exit(0);
-		}
-		if ($count++ > 20)  {
-		    fatal("Process with the lock didn't finish after a long time!\n");
-		}
-		sleep(1); 
-	    }
-	}
+    if ((my $locked = TBScriptLock("exports", 1)) != TBSCRIPTLOCK_OKAY()) {
+	exit(0)
+	    if ($locked == TBSCRIPTLOCK_IGNORE);
+	fatal("Could not get the lock after a long time!\n");
     }
 }
-
-#
-# Perl-style touch(1)
-#
-my $now = time;
-utime $now, $now, $lockfile;
 
 #
 # We stick the new map entries into the tail file. First zero it out.
@@ -415,9 +362,9 @@ if (!$TESTMODE) {
   }
 
   #
-  # Close the lock file. Exiting releases it, but might as well.
+  # Release the lock!
   #
-  close(LOCK);
+  TBScriptUnlock();
 }
 
 exit(0);
@@ -425,6 +372,9 @@ exit(0);
 sub fatal {
     local($msg) = $_[0];
 
+    TBScriptUnlock()
+	if (!$TESTMODE);
+    
     SENDMAIL($TBOPS, "Exports Setup Failed", $msg);
     die($msg);
 }

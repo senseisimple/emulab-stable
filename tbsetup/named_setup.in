@@ -1,13 +1,10 @@
 #!/usr/bin/perl -wT
-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
-
 use English;
-use Fcntl ':flock';
 use Socket;
 use strict;
 
@@ -45,19 +42,18 @@ my $mapfile_internal_tail	= "$mapfile_internal.tail";
 my $vnodesfile			= "$mapdir/vnodes.${OURDOMAIN}.db";
 my $vnodesback 			= "$mapdir/vnodes.${OURDOMAIN}.db.backup";
 my $reversedir			= "$mapdir/reverse";
-my $lockfile			= "/var/tmp/testbed_named_lockfile";
 my $restart_named		= 1;
 my $dbg	= 0;
 my @row;
 
 use strict;
 
-# If we're disabled, just quietly exit
+# If we are disabled, just quietly exit
 if ($DISABLED) {
     exit 0;
 }
 
-# We don't want to run this script unless its the real version.
+# We do not want to run this script unless its the real version.
 if ($EUID != 0) {
     die("*** $0:\n".
 	"    Must be root! Maybe its a development version?\n");
@@ -88,66 +84,13 @@ if (@ARGV && $ARGV[0] eq "-norestart") {
 }
 
 #
-# We need to serialize this script to avoid a trashed map file. Use
-# a dummy file in /var/tmp, opened for writing and flock'ed. 
+# We need to serialize this script to avoid a trashed map file.
 #
-open(LOCK, ">>$lockfile") || fatal("Couldn't open $lockfile\n");
-my $count = 0;
-if (flock(LOCK, LOCK_EX|LOCK_NB) == 0) {
-    #
-    # If we don't get it the first time, we wait for:
-    # 1) The lock to become free, in which case we do our thing
-    # 2) The time on the lock to change, in which case we wait for that process
-    #    to finish
-    #
-    my $oldlocktime = (stat(LOCK))[9];
-    my $gotlock = 0;
-    while (1) {
-	print "Another named map update in progress, waiting for it to finish\n";
-	if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-	    # OK, got the lock, we can do what we're supposed to
-	    $gotlock = 1;
-	    last;
-	}
-	my $locktime = (stat(LOCK))[9];
-	if ($locktime != $oldlocktime) {
-	    $oldlocktime = $locktime;
-	    last;
-	}
-	if ($count++ > 20)  {
-	    fatal("Could not get the lock after a long time!\n");
-	}
-	sleep(1);
-    }
-
-    $count = 0;
-    #
-    # If we didn't get the lock, wait for the processes that did to finish
-    #
-    if (!$gotlock) {
-	while (1) {
-	    if ((stat(LOCK))[9] != $oldlocktime) {
-		exit(0);
-	    }
-	    if (flock(LOCK, LOCK_EX|LOCK_NB) != 0) {
-		close(LOCK);
-		exit(0);
-	    }
-	    if ($count++ > 20)  {
-		fatal("Process with the lock didn't finish after a long time!\n");
-	    }
-	    sleep(1); 
-	}
-
-    }
+if ((my $locked = TBScriptLock("named", 1)) != TBSCRIPTLOCK_OKAY()) {
+    exit(0)
+        if ($locked == TBSCRIPTLOCK_IGNORE);
+    fatal("Could not get the lock after a long time!\n");
 }
-
-
-#
-# Perl-style touch(1)
-#
-my $now = time;
-utime $now, $now, $lockfile;
 
 #
 # Grab the list of all nodes, including virtual and widearea nodes
@@ -306,6 +249,8 @@ if ($restart_named) {
 	    fatal("named.reload failed!\n");
     }
 }
+TBScriptUnlock();
+exit(0);
 
 #
 # Die and tell someone about it
@@ -313,6 +258,7 @@ if ($restart_named) {
 sub fatal {
     my $msg = $_[0];
 
+    TBScriptUnlock();
     SENDMAIL($TBOPS, "Named Setup Failed", $msg);
     die($msg);
 }
