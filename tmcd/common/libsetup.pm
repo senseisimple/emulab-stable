@@ -405,7 +405,6 @@ sub initsfs()
     
     # Do I have a host key?
     if (! -e "/etc/sfs/sfs_host_key") {
-	warn "*** This node does not have a host key, skipping SFS stuff\n";
 	return;
     }
 
