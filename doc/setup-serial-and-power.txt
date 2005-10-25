@@ -15,6 +15,12 @@ Details:
 Steps two and three can be easily scripted (automated) if you have an
 online mapping of node to outlet and node to serial line.
 
+Note that your boss node should *NOT* also be a tipserver node! You can
+host tiplines on your users node if you like, or on other dedicated
+tipserver nodes. Hosting tiplines on boss (and thus exporting them via
+capture) is generally a bad idea because of security issues, not to mention
+that it just will plain not work.
+
 0) Setup capture logging
 
 Before you can start capture for any power controllers or nodes, you should
