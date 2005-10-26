@@ -43,6 +43,7 @@ FILES  += $(wildcard $(SRCDIR)/*.php)
 FILES  += $(wildcard $(SRCDIR)/*.ico)
 FILES  += $(wildcard $(SRCDIR)/*.class)
 FILES  += $(wildcard $(SRCDIR)/*.jar)
+FILES  += $(wildcard $(SRCDIR)/*.js)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml \
 	  $(SRCDIR)/ssh-mime.pl $(SRCDIR)/rdp-mime.pl \
 	  $(SRCDIR)/ssh-mime-winxp.pl $(SRCDIR)/rdp-mime-winxp.pl \

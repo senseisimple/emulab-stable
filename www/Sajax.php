@@ -1,6 +1,10 @@
 <?php	
 if (!isset($SAJAX_INCLUDED)) {
 
+	require_once('JSON.php');
+
+	$json = new Services_JSON();
+    
 	/*  
 	 * GLOBALS AND DEFAULTS
 	 *
@@ -36,7 +40,7 @@ if (!isset($SAJAX_INCLUDED)) {
 	}
 
 	function sajax_handle_client_request() {
-		global $sajax_export_list;
+		global $sajax_export_list, $json;
 		
 		$mode = "";
 		
@@ -73,9 +77,15 @@ if (!isset($SAJAX_INCLUDED)) {
 		if (! in_array($func_name, $sajax_export_list))
 			echo "-:$func_name not callable";
 		else {
-			echo "+:";
 			$result = call_user_func_array($func_name, $args);
-			echo $result;
+			if (is_string($result)) {
+			    echo "+:";
+			    echo $result;
+			}
+			else {
+			    echo "$:";
+			    echo $json->encode($result);
+			}
 		}
 		exit;
 	}
@@ -97,6 +107,19 @@ if (!isset($SAJAX_INCLUDED)) {
 		var sajax_debug_mode = <?php echo $sajax_debug_mode ? "true" : "false"; ?>;
 		var sajax_request_type = "<?php echo $t; ?>";
 		
+		// http://www.phpied.com/javascript-include/
+		function include_dom(script_filename) {
+		    var html_doc = document.getElementsByTagName('head').item(0);
+		    var js = document.createElement('script');
+		    js.setAttribute('language', 'javascript');
+		    js.setAttribute('type', 'text/javascript');
+		    js.setAttribute('src', script_filename);
+		    html_doc.appendChild(js);
+		    return false;
+		}
+
+		include_dom("json.js");
+
 		function sajax_debug(text) {
 			if (sajax_debug_mode)
 				alert("RSD: " + text)
@@ -158,8 +181,10 @@ if (!isset($SAJAX_INCLUDED)) {
 				data = x.responseText.substring(2);
 				if (status == "-") 
 					alert("Error: " + data);
-				else  
+				else if (status == "+")
 					args[args.length-1](data);
+				else if (status == "$")
+					args[args.length-1](JSON.parse(data));
 			}
 			x.send(post_data);
 			sajax_debug(func_name + " uri = " + uri + "/post = " + post_data);
