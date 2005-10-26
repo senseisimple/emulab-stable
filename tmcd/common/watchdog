@@ -283,10 +283,14 @@ qinsert($curtime + $speakupiv, \&saysomething)
 #
 # Loop, sleeping and then processing events
 # 
+my $lasttime = 0;
 while (1) {
     my ($nexttime, $event);
 
     $curtime = time();
+    if ($curtime < $lasttime) {
+	qfix($lasttime - $curtime);
+    }
 
     qhead($nexttime, $event) == 0 or
 	die("All timeouts disabled at $date!");
@@ -298,6 +302,7 @@ while (1) {
 	    die("All timeouts disabled at $date!");
 	$curtime = time();
     }
+    $lasttime = $curtime;
 
     sleep($nexttime - $curtime);
 }
@@ -978,5 +983,22 @@ sub qbinsearch {
     } else {
 	if ($val > $timeout) { return qbinsearch($timeout,$min,$mid,$first); }
 	else { return qbinsearch($timeout,$mid+1,$max,$first); }
+    }
+}
+
+#
+# qfix($delta)
+#   The clock was set back on us, most likely on Windows as NTP changed the
+#   clock from UTC time to local time.  Set all of the queue item and index
+#   timestamps back by the same amount to compensate.
+#
+sub qfix {
+    my ($delta) = @_;
+    logmsg("qfix: The clock was set back by $delta seconds.\n");
+    foreach my $ikey (keys %i) {
+	$i{$ikey} -= $delta;
+    }
+    for (my $qitem = 0; $qitem <= $#q; $qitem++) {
+	${$q[$qitem]}[0] -= $delta;
     }
 }
