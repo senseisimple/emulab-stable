@@ -109,6 +109,7 @@ use constant EXIT_OK => 0;
 
 # struct for representing a link.
 struct ( edge => {
+    name => '$',
     src => '$',
     srcip => '$',
     dst => '$',
@@ -408,7 +409,7 @@ sub write_rude_cfg {
     my @contents;
     push @contents, "START NOW\n";
     push @contents, "0000 $stream_id ON 3001 " 
-	. $edge->dst 
+	. $edge->dst . "-" . $edge->name
 	    . ":10001 CONSTANT " 
 		. &get_loss_sample_size($edge) 
 		    . " 20\n";
@@ -629,7 +630,7 @@ sub latency_test {
 
 			# call ping_node with ttl=1
 			my ($result_cnt, $sample_avg, $sample_dev) =
-			    &ping_node($edge->dst,1);
+			    &ping_node($edge->dst . "-" . $edge->name,1);
 
 			my $n = PING_SEND_COUNT;
 
@@ -763,7 +764,7 @@ sub bw_test {
     while (&has_elems(\@edge_copy)) {
 	my ($edge,$redge) = &get_twoway_assign(\@edge_copy);
 
-	if (defined($edge)) {
+	if (defined($edge) && defined($redge)) {
 	    if($hostname eq $edge->dst) {
 		#
 		# iperf does a twoway test.
@@ -803,7 +804,8 @@ sub bw_test {
 		# Okay, start the test.
 		if (&valid_bw($edge) || &valid_bw($redge)) {
 		    &my_system(PATH_IPERF,
-			       "-c", $edge->src, "-t", "10", "-f", "b",
+			       "-c", $edge->src . "-" . $edge->name,
+			       "-t", "10", "-f", "b",
 			       "-r", "-u", "-w", "200000", "-b", "100Mb",
 			       "-x", "s", "-y", "c",
 			       "-L", "4444", "-o", IPERF_DAT);
@@ -977,12 +979,13 @@ sub get_topo {
 	    $newHost->name($1);
 	    $newHost->visited(0);
 	    $hostmap{$1} = $newHost;
-	} elsif ( /^l (\S+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)/) {
+	} elsif ( /^l (\S+)\s+(\S+)\s+(\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(\S+)/) {
 	    my $newEdge = new edge;
+	    $newEdge->name($6);
 	    $newEdge->src($1);
-	    $newEdge->srcip(hostip($1));
+	    $newEdge->srcip(hostip("$1-$6"));
 	    $newEdge->dst($2);
-	    $newEdge->dstip(hostip($2));
+	    $newEdge->dstip(hostip("$2-$6"));
 	    $newEdge->bw($3);
 	    $newEdge->delay($4 * 1000); # units of ms
 	    $newEdge->loss($5);
@@ -1010,8 +1013,8 @@ sub get_topo {
 sub info {
     my($msg) = @_;
     
-    &post_event(EVENT_REPORT, "    " . $msg);
-    &sim_event(EVENT_LOG, "    " . $msg);
+    &post_event2(EVENT_REPORT, "    " . $msg);
+    &sim_event2(EVENT_LOG, "    " . $msg);
 }
 
 # prints out the topology read in from the NS file
@@ -1226,6 +1229,20 @@ sub post_event {
     }
 }
 
+sub post_event2 {
+    my ($event,$args) = map { $1 if (/(.*)/) } @_;
+    system(PATH_LTEVENT,
+	   "-s",
+	   EVENTSERVER,
+	   "-e",
+	   "$proj_id/$exp_id",
+	   "-k", 
+	   PATH_KEYFILE,
+	   "-x",
+	   "$event",
+	   "$args");
+}
+
 #
 # The special node sends a signal to run_linktest, in case it is listening.
 # Mainly informational, but the COMPLETE message informs run_linktest.pl
@@ -1241,6 +1258,16 @@ sub sim_event {
 	       "$event",
 	       "$args");
     }
+}
+
+sub sim_event2 {
+    my ($event,$args) = map { $1 if (/(.*)/) } @_;
+    system(PATH_TEVC,
+	   "-e", "$proj_id/$exp_id",
+	   "now",
+	   $simname,
+	   "$event",
+	   "$args");
 }
 
 # cleanup any child procs.

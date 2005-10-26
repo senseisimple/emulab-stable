@@ -135,7 +135,7 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 #   l node0 node1 100000 0.0 0.0
 #
 $query_result =
-    DBQueryFatal("select l1.vnode,l2.vnode,l1.bandwidth*1000,".
+    DBQueryFatal("select l1.vname,l1.vnode,l2.vnode,l1.bandwidth*1000,".
 		 "  l1.delay/1000+l2.delay/1000,l1.lossrate ".
 		 "from virt_lans as l1 ".
 		 "left join virt_lans as l2 ".
@@ -143,8 +143,8 @@ $query_result =
 		 "     l2.eid=l1.eid and l2.vnode!=l1.vnode ".
 		 "where l1.pid='$pid' and l1.eid='$eid'");
 
-while (my ($vn1,$vn2,$bw,$delay,$lr) = $query_result->fetchrow_array) {
-    print $LTOUT "l $vn1 $vn2 $bw $delay $lr\n";
+while (my ($name,$vn1,$vn2,$bw,$delay,$lr) = $query_result->fetchrow_array) {
+    print $LTOUT "l $vn1 $vn2 $bw $delay $lr $name\n";
 }
 
 #
