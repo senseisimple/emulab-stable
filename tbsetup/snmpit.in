@@ -47,6 +47,7 @@ Usage: $0 [-h] [-v] [-q] [-n] [-i device] [-S stack]
 	  [-T port name]
 	  [-U port]
 	  [-o name]
+          [ -N name]
           [-r pid eid]
 	  [-t pid eid]
 	  [-d ports] [-e ports] [-a ports]
@@ -78,6 +79,7 @@ VLAN Control:
   -z <port>         Used with -y and -x, to specify which port is to be used
                         with the private VLAN
   -o <name>         Delete the VLAN with name <name>
+  -N <name>         Print out the VLAN number for the named VLAN
   -c                Delete ALL VLANs, and recreate from the database. ** USE
                         WITH EXTREME CAUTION **
 
@@ -106,8 +108,9 @@ END
 
 my %opt = ();
 Getopt::Long::Configure("no_ignore_case");
-GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n','o=s@',
-    'p=s','q','r','s', 'S=s@', 't','T=s','u=s','U','v=s','w','y=s','x=s','z=s');
+GetOptions(\%opt, 'a','c','d','e','b','B=s@','g','h','i=s@','l','m=s@','M','n',
+    'N=s@','o=s@','p=s','q','r','s', 'S=s@', 't','T=s','u=s','U','v=s','w',
+    'y=s','x=s','z=s');
 # Unused: f,j
 
 if ($opt{h}) {
@@ -218,6 +221,12 @@ if ($opt{m}) {
 if ($opt{o}) {
     foreach my $name (@{$opt{o}}) {
 	push @commands, ["remove",$name];
+    }
+}
+
+if ($opt{N}) {
+    foreach my $name (@{$opt{N}}) {
+	push @commands, ["vlannumber",$name];
     }
 }
 
@@ -429,7 +438,7 @@ foreach my $command (@commands) {
     my @devicenames;
     my @vlans;
     SWITCH: for ($operation) {
-	(/listvlans/ || /getstats/ || /make/ || /remove/) && do {
+	(/listvlans/ || /getstats/ || /make/ || /remove/ || /vlannumber/) && do {
 	    @devicenames = $supplied_switches?
 			   @supplied_switches : getTestSwitches();
 	    last;
@@ -666,6 +675,11 @@ foreach my $command (@commands) {
 	}; # /trunkdisable/ && do
 	/portstatus/ && do {
 	    $exitval += doPortStatus(\@stacks,@ports);
+	    last;
+	}; # /portstatus/ && do
+	/vlannumber/ && do {
+	    my ($vlan_name) = @args;
+	    $exitval += doVlanNumber(\@stacks,$vlan_name);
 	    last;
 	}; # /portstatus/ && do
 	/restorestatus/ && do {
@@ -1261,6 +1275,44 @@ sub doDeleteVlan($@) {
     }
 
     return $errors;
+}
+
+#
+# Print the device-dependant VLAN number for a given named VLAN
+#
+sub doVlanNumber ($$) {
+
+    my $stacks = shift;
+    my $name = shift;
+
+    my $found = 0;
+
+    #
+    # Allow the user to give us multiple stacks
+    #
+    foreach my $stack (@$stacks) {
+        #
+        # TODO: This is horrendously inefficient! But, it allows me to write
+        # this function without requiring more from the switch/stack modules.
+        # Once a specialized function has been added to the switch/stack API,
+        # we should use it here.
+        #
+	my @vlanList = $stack->listVlans();
+	foreach my $vlan (@vlanList) {
+	    my ($id,$ddep,$memberref) = @$vlan;
+            if ($id eq $name) {
+                $found = 1;
+                print "$name $stack->{STACKID} $ddep\n";
+            }
+	}
+    }
+
+    if ($found) {
+        return 0; 
+    } else {
+        return 1;
+    }
+
 }
 
 #
