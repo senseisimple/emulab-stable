@@ -156,7 +156,7 @@ else {
 
     echo "<br><br>
           If you are the morbid type, you can watch the experiment die in
-          <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
+          <a href=showlogfile.php3?pid=$exp_pid&eid=$exp_eid>
           realtime</a>.\n";
     
 }

@@ -170,7 +170,7 @@ else {
 	"<br><br>".
 	"While you are waiting, you can watch the log of experiment ".
 	"modification in ".
-	"<a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid> ".
+	"<a href=showlogfile.php3?pid=$pid&eid=$eid> ".
 	"realtime</a>.\n";
 }
 

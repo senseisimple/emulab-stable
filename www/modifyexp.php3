@@ -29,7 +29,7 @@ if ($justsuccess) {
           whether nodes were added to the experiments, and whether
           disk images had to be loaded.</p>
           <p>While you are waiting, you can watch the log 
-          in <a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid>
+          in <a href=showlogfile.php3?pid=$pid&eid=$eid>
           realtime</a>.</p></font>\n";
     PAGEFOOTER();
     return;
@@ -277,7 +277,7 @@ else {
 	"<br><br>".
 	"While you are waiting, you can watch the log of experiment ".
 	"modification in ".
-	"<a target=_blank href=spewlogfile.php3?pid=$pid&eid=$eid> ".
+	"<a href=showlogfile.php3?pid=$pid&eid=$eid> ".
 	"realtime</a>.\n";
 	    
     # the following line is required for Netbuild.

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -190,7 +190,7 @@ echo "<br>\n";
 echo $results[message];
 echo "<br><br>\n";
 echo "While you are waiting, you can watch the log
-      in <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_id>
+      in <a href=showlogfile.php3?pid=$exp_pid&eid=$exp_id>
       realtime</a>.\n";
 echo "<br>
       </font>\n";

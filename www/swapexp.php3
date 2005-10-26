@@ -307,7 +307,7 @@ else {
 
 	echo "<br><br>
               While you are waiting, you can watch the log in
-              <a target=_blank href=spewlogfile.php3?pid=$exp_pid&eid=$exp_eid>
+              <a href=showlogfile.php3?pid=$exp_pid&eid=$exp_eid>
               realtime</a>.\n";
     }
 }
