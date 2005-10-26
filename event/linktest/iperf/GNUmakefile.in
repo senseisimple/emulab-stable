@@ -16,27 +16,33 @@ all:	src/emulab-iperf
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 # Next two rules for linux, where make=gmake.
-%-am:		force
-	make $(MAKEFLAGS) -f Makefile $@
+%-am:		Makefile force
+	$(MAKE) -f Makefile $@
 
-%-recursive:	force
-	make $(MAKEFLAGS) -f Makefile $@
+%-recursive:	Makefile force
+	$(MAKE) -f Makefile $@
 
 src/emulab-iperf:	iperf-2.0.2 config.status build-iperf
 
-build-iperf:
-	make $(MAKEFLAGS) -f Makefile all
+build-iperf: Makefile
+	$(MAKE) -f Makefile all
 
-client-install:
-	make $(MAKEFLAGS) -f Makefile install
+client: all
 
+client-install: Makefile
+	$(MAKE) -f Makefile install
+
+# Note: GNU make wants to pass options in MAKEFLAGS (w) that are compatible
+# with BSD make.  So we just force configure to assume/use gmake for BSD.
 config.status:
-	$(SRCDIR)/iperf-2.0.2/configure
+	MAKE=$(MAKE) $(SRCDIR)/iperf-2.0.2/configure
 
 iperf-2.0.2:
 	$(SRCDIR)/iperf-fetch.sh $(SRCDIR)
 
-clean:
-	make $(MAKEFLAGS) -f Makefile clean
+clean: Makefile
+	$(MAKE) -f Makefile clean
+
+Makefile: config.status
 
 force: ;

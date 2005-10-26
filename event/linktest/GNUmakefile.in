@@ -107,7 +107,7 @@ control-install:	binaries
 	$(INSTALL_PROGRAM) $(SCRIPT_PROXY) $(INSTALL_BINDIR)
 
 client: all
-	$(MAKE) --no-print-directory -C iperf
+	$(MAKE) -C iperf client
 
 client-install: client
 	@if test ! -x '/usr/local/bin/rude' -o \
@@ -129,8 +129,8 @@ client-install: client
 	$(INSTALL_PROGRAM) $(LTEVENT) $(DESTDIR)$(CLIENT_BINDIR)/$(LTEVENT)
 	$(INSTALL_PROGRAM) $(SCRIPT) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT)
 	$(INSTALL_PROGRAM) $(SCRIPT_RUN) $(DESTDIR)$(CLIENT_BINDIR)/$(SCRIPT_RUN)
-	$(MAKE) --no-print-directory -C iperf client-install
+	$(MAKE) -C iperf client-install
 
 clean:
 	rm -f *.o $(TESTS) $(SCRIPT) $(SCRIPT_RUN) weblinktest linktest_control
-	$(MAKE) --no-print-directory -C iperf clean
+	$(MAKE) -C iperf clean
