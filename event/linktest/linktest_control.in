@@ -79,7 +79,7 @@ if (! getopts($optlist, \%options)) {
     usage();
 }
 if (defined($options{"d"})) {
-    $debug = 1;
+    $debug = 2;
 }
 if (defined($options{"m"})) {
     $sendmail = 1;
