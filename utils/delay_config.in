@@ -48,6 +48,7 @@ my  $optlist = "dms:";
 my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TEVC        = "$TB/bin/tevc";
+my $GENTOPO     = "$TB/libexec/gentopofile";
 my $debug	= 0;
 
 #
@@ -605,5 +606,13 @@ sub ChangeVirtLans() {
 	    }
 	    DBQueryFatal($query_string);
 	}
+    }
+    #
+    # Now we need to regen the linktest map file ...
+    #
+    system("$GENTOPO $pid $eid");
+    if ($?) {
+	die("*** $0:\n".
+	    "    $GENTOPO failed!\n");
     }
 }
