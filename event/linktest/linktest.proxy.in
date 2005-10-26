@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -84,10 +84,6 @@ if (! defined($options{"u"}) ||
     usage();
 }    
 	    
-if (defined($options{"d"})) {
-    $debug = 1;
-}
-
 $user   = $options{"u"};
 $gid    = $options{"g"};
 $level  = $options{"l"};
