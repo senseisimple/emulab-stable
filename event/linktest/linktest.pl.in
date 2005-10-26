@@ -43,6 +43,7 @@ use constant PATH_KEYFILE => "@CLIENT_VARDIR@/boot/eventkey";
 use constant PATH_RUDE => "/usr/local/bin/rude";
 use constant PATH_CRUDE => "/usr/local/bin/crude";
 use constant PATH_IPERF => "/usr/local/bin/emulab-iperf";
+use constant PATH_RCTOPO => "@CLIENT_BINDIR@/rc/rc.topomap";
 use constant PATH_EMULAB_SYNC => "@CLIENT_BINDIR@/emulab-sync";
 use constant PATH_LTEVENT => "@CLIENT_BINDIR@/ltevent";
 use constant PATH_TEVC => "@CLIENT_BINDIR@/tevc";
@@ -278,6 +279,9 @@ if(&is_special_node()) {
 	chown($swapperid, $swappergid, $linktest_path);
     }
 
+    # Update our ltmap file so that linktest runs off current data.
+    &my_system(PATH_RCTOPO);
+
     #
     # Call get_topo before the other nodes because
     # get_topo is used to initialize @hosts.
@@ -331,6 +335,8 @@ if(&dotest(TEST_LOSS)){
 # have a short randomized delay to avoid hitting NFS too hard.
 #
 sleep(int(rand(5)));
+# Update our ltmap file so that linktest runs off current data.
+&my_system(PATH_RCTOPO);
 &get_topo($topology_file) unless &is_special_node();
 &debug_top();
 
