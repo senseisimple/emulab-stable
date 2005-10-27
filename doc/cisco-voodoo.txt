@@ -233,6 +233,10 @@ ID  Name                            Members of VLAN
 
     http://www.netplusinc.com/misc/CiscoSPAN.pdf
 
+    How to setup span for IOS on the 6500 series:
+
+    http://www.cisco.com/univercd/cc/td/doc/product/lan/cat6000/12_1e/swconfig/span.htm
+
 13. Good reference for making nodes boot quickly (ensuring that port spanning,
    trunking, etc. are off on the switch port):
 
