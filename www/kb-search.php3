@@ -98,8 +98,8 @@ function SPITFORM($query, $query_type, $query_which, $error)
           </table><br>\n";
 
     echo "<center>".
-	"Enter a space or comma separated list of keywords<br>".
-	"Use <font size=+2><b>*</b></font> to get all entries".
+	 "You may also <a href=kb-browse.php3>
+	     browse the entire Knowledge Base</a>.".
          "</center>\n";
 }
 
