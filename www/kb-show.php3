@@ -6,18 +6,42 @@
 #
 include("defs.php3");
 
+# Page arguments.
+$printable = $_GET['printable'];
+if (!isset($printable))
+    $printable = 0;
+
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Knowledge Base Entry");
+if (!$printable) {
+    PAGEHEADER("Knowledge Base Entry");
+}
+
+if ($printable) {
+    #
+    # Need to spit out some header stuff.
+    #
+    echo "<html>
+          <head>
+  	  <link rel='stylesheet' href='tbstyle-plain.css' type='text/css'>
+          </head>
+          <body>\n";
+}
+else {
+    echo "<b><a href=$REQUEST_URI&printable=1>
+                Printable version of this document</a></b><br>\n";
+}
 
 #
 # Admin users get a menu.
 #
-$uid     = GETLOGIN();
-$isadmin = 0;
-if (CHECKLOGIN($uid) & CHECKLOGIN_LOGGEDIN) {
-    $isadmin = ISADMIN();
+if (!$printable) {
+    $uid     = GETLOGIN();
+    $isadmin = 0;
+    if (CHECKLOGIN($uid) & CHECKLOGIN_LOGGEDIN) {
+	$isadmin = ISADMIN();
+    }
 }
 
 #
@@ -57,7 +81,7 @@ echo "<center><b>Knowledge Base Entry: $idx</b><br>".
      "(<a href=kb-search.php3>Search Again</a>)</center>\n";
 echo "<br><br>\n";
 
-if ($isadmin) {
+if (!$printable && $isadmin) {
     SUBPAGESTART();
     SUBMENUSTART("Options");
     
@@ -81,31 +105,39 @@ echo "<font size=-2>Posted by " . $row['creator_uid'] . " on " .
 #
 # Get other similar topics and list the titles.
 #
-$query_result =
-    DBQueryFatal("select * from knowledge_base_entries ".
-		 "where section='". $row['section'] . "'");
+if (!$printable) {
+    $query_result =
+	DBQueryFatal("select * from knowledge_base_entries ".
+		     "where section='". $row['section'] . "'");
 
-if (mysql_num_rows($query_result)) {
-    echo "<hr>";
-    echo "<b>Other similar topics</b>:<br>\n";
-    echo "<blockquote>\n";
-    echo "<ul>\n";
+    if (mysql_num_rows($query_result)) {
+	echo "<hr>";
+	echo "<b>Other similar topics</b>:<br>\n";
+	echo "<blockquote>\n";
+	echo "<ul>\n";
 
-    while ($row = mysql_fetch_array($query_result)) {
-	$title    = $row['title'];
-	$idx      = $row['idx'];
+	while ($row = mysql_fetch_array($query_result)) {
+	    $title    = $row['title'];
+	    $idx      = $row['idx'];
     
-	echo "<li>";
-	echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+	    echo "<li>";
+	    echo "<a href=kb-show.php3?idx=$idx>$title</a>\n";
+	}
+	echo "</ul>\n";
+	echo "</blockquote>\n";
     }
-    echo "</ul>\n";
-    echo "</blockquote>\n";
 }
 
-if ($isadmin) {
+if (!$printable && $isadmin) {
     echo "</blockquote>\n";
     SUBPAGEEND();
 }
 
-PAGEFOOTER();
+if ($printable) {
+    echo "</body>
+          </html>\n";
+}
+else {
+    PAGEFOOTER();
+}
 ?>

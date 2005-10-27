@@ -6,10 +6,32 @@
 #
 require("defs.php3");
 
+# Page arguments.
+$printable = $_GET['printable'];
+if (!isset($printable))
+    $printable = 0;
+
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Emulab Knowledge Base");
+if (!$printable) {
+    PAGEHEADER("Emulab Knowledge Base");
+}
+
+if ($printable) {
+    #
+    # Need to spit out some header stuff.
+    #
+    echo "<html>
+          <head>
+  	  <link rel='stylesheet' href='tbstyle-plain.css' type='text/css'>
+          </head>
+          <body>\n";
+}
+else {
+    echo "<b><a href=$REQUEST_URI?printable=1>
+                Printable version of this document</a></b><br>\n";
+}
 
 #
 # Get all entries.
@@ -89,7 +111,13 @@ echo "</ul></ul>\n";
 
 #
 # Standard Testbed Footer
-# 
-PAGEFOOTER();
+#
+if ($printable) {
+    echo "</body>
+          </html>\n";
+}
+else {
+    PAGEFOOTER();
+}
 ?>
 
