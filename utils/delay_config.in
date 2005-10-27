@@ -175,7 +175,7 @@ while (@ARGV) {
     #
     SWITCH: for ($opt) {
 	/^BANDWIDTH=([0-9]*)$/i && do {
-	    if ($1 && ($1 > 100000 || $1 < 10)) {
+	    if ($1 > 100000 || $1 < 10) {
 		usage();
 	    }
 	    $config{"bandwidth"} = $1;
