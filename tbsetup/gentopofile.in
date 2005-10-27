@@ -80,6 +80,13 @@ else {
     die("Bad data in eid: $eid.");
 }
 
+# Do this in case we are not called from tbprerun.
+my $workdir = TBExptWorkDir($pid, $eid);
+
+chdir("$workdir") or
+    die("*** $0:\n".
+	"    Could not chdir to $workdir: $!");
+
 # The output stream.
 my $OUT;
 
