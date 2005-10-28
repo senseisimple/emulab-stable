@@ -37,6 +37,12 @@ my @DEADFILES	= ("rc.agents", "rc.delayagent", "rc.delta", "rc.healthd",
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
 #
 # Turn off line buffering on output
 #
@@ -153,8 +159,8 @@ print "Clearing out $RUNDIR ...\n";
 system("rm -rf $RUNDIR/*.pid");
 
 print "Clearing out /tmp ...\n";
-system("chmod -R 777 /tmp/* /tmp/.??*");
-system("chown -R root /tmp");
+system("chmod -Rf 777 /tmp/* /tmp/.??* > /dev/null");
+system("chown -Rf root /tmp > /dev/null");
 system("rm -rf /tmp/* /tmp/.??*");
 
 print "Cleaning out /local/logs ...\n";

@@ -130,12 +130,12 @@ sub os_account_cleanup()
 	    mysystem("$NET user $name /delete > /dev/null");
 
 	    # There will only be an NT homedir if the user has logged in sometime.
-	    system("$CHMOD -R 777 C:/'Documents and Settings'/$name");
-	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name");
-	    system("$RM -rf C:/'Documents and Settings'/$name");
+	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name > /dev/null");
+	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name > /dev/null");
+	    system("$RM -rf C:/'Documents and Settings'/$name ");
 	    # It sometimes also makes user.PCnnn, user.PCnnn.000, etc.
-	    system("$CHMOD -R 777 C:/'Documents and Settings'/$name.*");
-	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name.*");
+	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name.* > /dev/null");
+	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name.* > /dev/null");
 	    system("$RM -rf C:/'Documents and Settings'/$name.*");
 
 	    # Unmount the homedir so we can get to the mount point.
