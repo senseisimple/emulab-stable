@@ -92,7 +92,7 @@ use constant TEST_LOSS => 3;   # prior plus loss
 use constant TEST_BW => 4; # prior plus bandwidth
 
 # test names
-use constant NAME_RT_STATIC => "Static Routing";
+use constant NAME_RT_STATIC => "Routing";
 use constant NAME_LATENCY => "Latency (Round Trip)";
 use constant NAME_LOSS => "Loss";
 use constant NAME_BW => "Bandwidth";
@@ -357,7 +357,7 @@ if(&dotest(TEST_LATENCY)) {
 if(&dotest(TEST_RT_STATIC)
     && defined($rtproto)
     && $rtproto eq RTPROTO_STATIC) {
-    my $msg = "Testing Static Routing...";
+    my $msg = "Testing Routing...";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
     &debug("\n$msg\n\n");
@@ -772,14 +772,16 @@ sub bw_test {
 		if (&valid_bw($edge)) {
 		    push(@analyze_list, $edge);
 		    
-		    &info("    Starting bandwidth test for " .
+		    &debug("    Starting bandwidth test on $hostname for " .
+			  &print_link($edge) . "\n");
+		    &info("    Starting bandwidth test on $hostname for " .
 			  &print_link($edge) . "\n");
 		}
 		else {
-		    &debug("Skipping bandwidth test for " .
+		    &debug("Skipping bandwidth test on $hostname for " .
 			   &print_link($edge) . "\n");
 		    
-		    &info("*** Skipping bandwidth test for " .
+		    &info("*** Skipping bandwidth test on $hostname for " .
 			  &print_link($edge) . "\n");
 		    &info("*** Bandwidth is out of range ".
 			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
@@ -788,14 +790,16 @@ sub bw_test {
 		if (&valid_bw($redge)) {
 		    push(@analyze_list, $redge);
 		    
-		    &info("    Starting bandwidth test for " .
+		    &debug("    Starting bandwidth test on $hostname for " .
+			  &print_link($redge) . "\n");
+		    &info("    Starting bandwidth test on $hostname for " .
 			  &print_link($redge) . "\n");
 		}
 		else {
-		    &debug("Skipping bandwidth test for " .
+		    &debug("Skipping bandwidth test on $hostname for " .
 			   &print_link($redge) . "\n");
 		    
-		    &info("*** Skipping bandwidth test for " .
+		    &info("*** Skipping bandwidth test on $hostname for " .
 			  &print_link($redge) . "\n");
 		    &info("*** Bandwidth is out of range ".
 			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
@@ -844,7 +848,8 @@ sub bw_test {
 		    my $diff     = abs($bw - $expected);
 		    my $error    = undef;
 
-		    &debug("BW results for " . $edge->src . ": ".
+		    &debug("BW results on $hostname for " .
+			   $edge->src . "-" . $edge->name . ": ".
 			   "$bw/$expected/$diff\n");
 
 		    #
@@ -918,7 +923,7 @@ sub static_rt_test {
     my @nodes = ();
 
     &reachable_nodes(\@nodes, $hostname);
-    &debug("Static route test nodes: @nodes\n");
+    &debug("Route test nodes: @nodes\n");
 
     my %waitlist;
     # fork processes to run the pings in parallel.
@@ -954,7 +959,9 @@ sub static_rt_test {
 # Convenience to print information about a link.
 sub print_link {
     my $edge = shift @_;
-    my $str = $edge->src . " to " . $edge->dst;
+    my $str = $edge->src . "-" . $edge->name . " to " .
+	$edge->dst . "-" . $edge->name;
+
     if ($edge->bw && $edge->delay && $edge->loss) {
 	$str .= " (" . ($edge->bw / 1000000)  . " Mbps, " .
 	    $edge->delay . "ms, " . (100 * $edge->loss) . "% loss)";
@@ -993,8 +1000,9 @@ sub get_topo {
 	    push @{ $hostmap{$newEdge->src}->links }, $newEdge;
 	    push @{ $hostmap{$newEdge->dst}->links }, $newEdge;
 
-	# currently recognize only Static routing
 	} elsif (/^r [Ss]tatic/i) {
+	    $rtproto = RTPROTO_STATIC;
+	} elsif (/^r ospf/i) {
 	    $rtproto = RTPROTO_STATIC;
 	} elsif (/^s ([-\w\(\)]+)/i) {
 	    $simname = $1;
@@ -1005,7 +1013,8 @@ sub get_topo {
 
     # sorted order.
     @hosts = sort { $a cmp $b } @hosts;
-    @links = sort { $a->src . $a->dst cmp $b->src . $b->dst } @links;
+    @links = sort { $a->src . $a->dst . $a->name 
+			cmp $b->src . $b->dst . $a->name } @links;
 
 }
 
@@ -1153,7 +1162,8 @@ sub get_twoway_assign {
 		my $otheredge = @{$todo_ref}[$j];
 		if(defined($otheredge)
 		   && $edge->src eq  $otheredge->dst
-		   && $edge->dst eq $otheredge->src) {
+		   && $edge->dst eq $otheredge->src
+		   && $edge->name eq $otheredge->name) {
 		    push @thisrun,$otheredge;
 		    @{$todo_ref}[$j] = undef;
 		}
