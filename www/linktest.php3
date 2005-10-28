@@ -12,7 +12,7 @@ include("showstuff.php3");
 #
 require("Sajax.php");
 sajax_init();
-sajax_export("start_linktest", "stop_linktest");
+sajax_export("stop_linktest");
 
 #
 # We need all errors to come back to us so that we can report the error
@@ -21,6 +21,7 @@ sajax_export("start_linktest", "stop_linktest");
 function handle_error($message, $death)
 {
     echo "failed:$message";
+    TBERROR("failed:$message", 0);
     # Always exit; ignore $death.
     exit(1);
 }
@@ -121,19 +122,17 @@ function stop_linktest() {
 #
 # If user hits stop button in the output side, stop linktest.
 #
-$process = 0;
+$linktest_running = 0;
 
 function SPEWCLEANUP()
 {
-    global $pid, $gid;
-    $process = $GLOBALS["process"];
+    global $pid, $gid, $linktest_running;
 
     TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
-    if (connection_aborted() && $process) {
+    if (connection_aborted() && $linktest_running) {
 	SUEXEC($uid, "$pid,$unix_gid", "weblinktest -k $pid $eid",
 	       SUEXEC_ACTION_IGNORE);
-	proc_close($process);
     }
 }
 
@@ -141,8 +140,8 @@ function SPEWCLEANUP()
 # Start linktest running.
 # 
 function start_linktest($level) {
-    global $linktest_pid;
-    global $uid, $pid, $gid, $eid, $suexec_output, $TBSUEXEC_PATH;
+    global $linktest_pid, $linktest_running, $TBSUEXEC_PATH;
+    global $uid, $pid, $gid, $eid, $suexec_output;
 
     # Must do this!
     CHECKPAGEARGS();
@@ -162,49 +161,52 @@ function start_linktest($level) {
 
     # Make sure we shutdown if client goes away.
     register_shutdown_function("SPEWCLEANUP");
-    ignore_user_abort(1);
     set_time_limit(0);
 
-    #
-    # Having problems with popen reporting the proper exit status,
-    # so switched to proc_open instead. Obtuse, I know.
-    #
-    $descriptorspec = array(0 => array("pipe", "r"),
-			    1 => array("pipe", "w"));
-
-    $process = proc_open("$TBSUEXEC_PATH ".
-		 "$uid $pid,$unix_gid weblinktest -l $level $pid $eid",
-			 $descriptorspec, $pipes);
-
-    if (! is_resource($process)) {
-	return "failed:Linktest failed!";
+    # XXX Hackish!
+    $linktest_running = 1;
+    $fp = popen("$TBSUEXEC_PATH $uid $pid,$unix_gid ".
+		"weblinktest -l $level $pid $eid", "r");
+    if (! $fp) {
+	USERERROR("Could not start linktest!", 1);
     }
-    $GLOBALS["process"] = $process;
-    fclose($pipes[0]);
 
-    # Build up an output string to return to caller.
-    $output = "Starting linktest run at level $level on " .
-	date("D M d G:i:s T") . "\n";
+    header("Content-Type: text/plain");
+    header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+    header("Cache-Control: no-cache, must-revalidate");
+    header("Pragma: no-cache");
 
-    while (!feof($pipes[1])) {
-	$string  = fgets($pipes[1], 1024);
-	$output .= $string;
+    echo "Starting linktest run at level $level on " .
+	date("D M d G:i:s T");
+    # Oh, this is soooooo bogus!
+    for ($i = 0; $i < 1024; $i++) {
+	echo " ";
     }
-    fclose($pipes[1]);
-    $retval = proc_close($process);
-    $fp = 0;
+    echo "\n";
+    
+    flush();
+    
+    while (!feof($fp)) {
+	$string = fgets($fp, 1024);
+	echo "$string";
+	flush();
+    }
+    $retval = pclose($fp);
+    $linktest_running = 0;
+
     if ($retval > 0) {
-	$output .= "Linktest reported errors! Stopped at " .
+	echo "Linktest reported errors! Stopped at " .
 	    date("D M d G:i:s T") . "\n";
-	return "error:$output";
     }
     elseif ($retval < 0) {
-	return "failed:$output";
+	echo $suexec_output;
     }
-    # Success.
-    $output .= "Linktest run was successful! Stopped at " .
-	date("D M d G:i:s T") . "\n";
-    return "stopped:$output";
+    else {
+        # Success.
+	echo "Linktest run was successful! Stopped at " .
+	    date("D M d G:i:s T") . "\n";
+    }
+    exit(0);
 }
 
 # See if this request is to one of the above functions. Does not return
@@ -221,6 +223,10 @@ if (isset($kill) && $kill == 1) {
     header("Location: showexp.php3?pid=$pid&eid=$eid");
     return;
 }
+if (isset($start) && isset($level)) {
+    start_linktest($level);
+    return;
+}
 
 #
 # Okay, this is the initial page.
@@ -234,54 +240,15 @@ GRABDBDATA();
 echo "<script>\n";
 sajax_show_javascript();
 if ($linktest_pid) {
-    echo "var curstate    = 'running';";
+    echo "var curstate    = 'running';\n";
 }
 else {
-    echo "var curstate    = 'stopped';";
+    echo "var curstate    = 'stopped';\n";
 }
 ?>
-function do_start_cb(msg) {
-    if (msg == '') {
-	return;
-    }
-
-    //
-    // The first part of the message is an indicator whether linktest
-    // really started. The rest of it (after the ":" is the text itself).
-    //
-    var offset = msg.indexOf(":");
-    if (offset == -1) {
-	return;
-    }
-    var status = msg.substring(0, offset);
-    var output = msg.substring(offset + 1);
-
-    curstate = 'stopped';
-    getObjbyName('action').value = 'Start';
-
-    // Display the data, even if error.
-    var stuff = "";
-
-    if (status == 'error') {
-	stuff = "<font size=+1 color=red><blink>" +
-	    "Linktest has reported errors! Please examine log below." +
-	    "</blink></font>";
-    }
-
-    stuff = stuff + 
-	'<textarea id=outputarea rows=15 cols=90 readonly>' +
-	output + '</textarea>';
-
-    getObjbyName('output').innerHTML = stuff;
-
-    // If we got an error; disable the button. 
-    if (status == 'failed') {
-	getObjbyName('action').disabled = true;    
-    }
-}
 
 // Linktest stopped. No need to do anything since if a request was running,
-// it will have returned to do_start_cb() above, prematurely. 
+// it will have returned prematurely.
 function do_stop_cb(msg) {
     if (msg == '') {
 	return;
@@ -300,26 +267,30 @@ function do_stop_cb(msg) {
 
     // If we got an error; throw up something useful.
     if (status != 'stopped') {
-	alert("Linktest Stop: " + output);
+	alert("Linktest could not be stopped: " + output);
     }
 }
 
-function heartbeat() {
-    var today=new Date();
-    var h=today.getHours();
-    var m=today.getMinutes();
-    var s=today.getSeconds();
+// onLoad callback for when linktest stops in the iframe.
+function linktest_stopped() {
+    // Avoid initial outer page load event.
+    if (curstate != 'running')
+	return;
     
-    // add a zero in front of numbers<10
-    if (m < 10)
-	m = "0" + 1;
-    if (s < 10)
-	s = "0" + 1;
+    curstate = 'stopped';	
+    getObjbyName('action').value = 'Start';
 
-    if (curstate == 'running') {
-	getObjbyName('outputarea').value =
-	    "Linktest starting up ... please be patient: " + h+":"+m+":"+s;
-	setTimeout('heartbeat()', 500);
+    var Iframe = document.getElementById('outputarea');
+    var html   = Iframe.contentWindow.document.documentElement.innerHTML;
+
+    re = /reported errors/gi
+    re.multiline = true;
+
+    if (html.search(re) != -1) {
+	getObjbyName('message').innerHTML =
+	    '<font size=+1 color=red><blink>' +
+	    'Linktest has reported errors! Please examine log below.' +
+	    '</blink></font>';
     }
 }
 
@@ -332,17 +303,23 @@ function doaction(theform) {
 	if (level == '0')
 	    return;
 
-	// Display something so that users activity.
-	getObjbyName('output').innerHTML =
-	    '<textarea id=outputarea rows=15 cols=90 readonly>' +
-	    "Linktest starting up ... please be patient. " + '</textarea>';
-	
+	// This clears the message area.
+	getObjbyName('message').innerHTML = "";
+
+	Iframe = document.getElementById('outputarea');
+	// This stuff clears the current contents of the iframe.
+	Iframe.contentWindow.document.open();
+	Iframe.contentWindow.document.write(" ");
+	Iframe.contentWindow.document.close();
+	// And this fires it up.
+	Iframe.contentWindow.document.location =
+	    '<?php echo $REQUEST_URI; ?>&start=1&level=' + level;
+
 	curstate = "running";
 	theform['action'].value = "Stop Linktest";
-	heartbeat();
-	x_start_linktest(level, do_start_cb);
     }
-    else {
+    else if (curstate == 'running') {
+	curstate = 'stopping';	
 	x_stop_linktest(do_stop_cb);
     }
 }
@@ -360,8 +337,7 @@ echo "<center><font size=+2><br>
 SHOWEXP($pid, $eid, 1);
 
 echo "<br>\n";
-echo "<form action=linktest.php3 method=post name=myform
-                target=Linktest_${pid}_${eid}>";
+echo "<form action=linktest.php3 method=post name=myform id=myform>";
 echo "<input type=hidden name=pid value=$pid>\n";
 echo "<input type=hidden name=eid value=$eid>\n";
 
@@ -396,7 +372,12 @@ else {
 }
 
 echo "</form>\n";
-echo "<div id=output></div>\n";
+echo "<div id=message></div>\n";
+echo "<div id=output style='overflow:auto'>
+      <iframe onload=\"linktest_stopped();\"
+      width=80% height=400 scrolling=auto id=outputarea frameborder=1>
+      </iframe></center>
+     </div>\n";
 echo "</center>\n";
 
 #
