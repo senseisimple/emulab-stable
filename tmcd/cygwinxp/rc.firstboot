@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# rc.firstboot - CygWin-specific startup.  
+
+# Run by EmulabStartup before rc.bootsetup on CygWin.  Since Windows needs a
+# reboot to change some network settings (including the host name), do this
+# first and force the reboot.  It was separated out from rc.cygwinxp, which is
+# run by rc.bootsetup, because of a race condition on the required reboot: if
+# the rc.cygwin child process is killed before rc.bootsetup, rc.bootsetup may
+# get a chance to report TBFAILED to Emulab, killing off the whole swap-in.
+
+PATH=/usr/local/etc/emulab:/bin:$SYSTEMROOT/system32:$PATH
+export PATH
+
+# Enable logging.
+logfile=/var/log/EmulabStartup.log
+chmod -f g+w $logfile
+function logit () {
+    msg="`date`: $1"
+    echo "$msg" >> $logfile
+    echo "$msg"
+}
+
+# Enable WINDOWS() in libsetup.pm .
+iscygwin=/etc/emulab/iscygwin
+chmod -f g+w /etc/emulab
+chmod -f g+w $iscygwin
+uname -r > $iscygwin
+chmod g+w $iscygwin
+chmod -f g-w /etc/emulab
+
+# Get the desired node name from tmcc, and make sure we have a connection.
+# There is a swap-in race condition where tmcc nodeid at first returns nothing.
+nodeid=
+while [ -z $nodeid ]; do
+    nodeid=`tmcc nodeid`
+    if [ -z $nodeid ]; then
+        logit "Null nodeid returned from tmcc.  Trying again."
+        sleep 5
+    elif [ "$nodeid" == UNKNOWN ]; then
+        logit "UNKNOWN nodeid returned from tmcc.  Trying again."
+        nodeid=
+        sleep 5
+    fi
+done
+logit "nodeid = $nodeid"
+
+# NetBT (Netbios over TCP) chatters, messes up slothd, and is not needed for
+# SMB, so disable it.  This doesn't take effect until TCP/IP is restarted, so
+# do it before the computer name change below, which reboots the first time.
+ccs=/HKLM/SYSTEM/CurrentControlSet svcs=$ccs/Services cntl=$ccs/Control
+pi=Parameters/Interfaces nbtif=$svcs/NetBT/$pi
+for ifc in `regtool list $nbtif`; do
+     # Set the NetBT interface NetbiosOptions to Disable (2.)
+     regtool set -i $nbtif/$ifc/NetbiosOptions 2
+     # Also turn off outgoing DNS registration traffic.
+     regtool set -i $nbtif/$ifc/DisableDynamicUpdate 1
+done
+
+# Turn on IP forwarding if there is more than one experimental net interface.
+# Also requires a reboot to take effect.
+tp=$svcs/Tcpip/Parameters
+if [ `tmcc ifconfig | wc -l` \> 1 ]; then
+    regtool set -i $tp/IPEnableRouter 1
+else
+    regtool set -i $tp/IPEnableRouter 0
+fi
+logit "IPEnableRouter set to `regtool get $tp/IPEnableRouter`."
+
+hostname=`/bin/hostname`
+host="Host name '$hostname'"
+if [ $nodeid = $hostname ]; then
+    logit "$host matches nodeid '$nodeid'."
+else
+    logit "$host differs from nodeid '$nodeid'."
+
+    logit "Remove a redirect switch to make sure we come back with a serial console."
+    bootcfg /ems OFF /id 1
+
+    # Mash the hostname in all the places it shows up in the registry.
+    regtool set -s $tp/Hostname $nodeid
+    regtool set -s $tp/"NV Hostname" $nodeid
+    cn=ComputerName NODEID=`echo $nodeid | tr 'a-z' 'A-Z'`
+    regtool set -s $cntl/$cn/Active$cn/$cn $NODEID
+    regtool set -s $cntl/$cn/$cn/$cn $NODEID
+    regtool set -s $svcs/Eventlog/$cn $NODEID
+
+    logit "Rebooting as '$nodeid'/'$NODEID'."
+    /sbin/reboot
+    # Reboot shouldn't return to the shell.  Give it a few seconds to take effect.
+    sleep 10
+
+    # Should never get here.  Try /bin/shutdown.
+    logit "$host - Didn't /sbin/reboot changing to '$nodeid'!  Trying shutdown."
+    /bin/shutdown -r -f now
+    # Shutdown returns to the shell.  Give it a few seconds to take effect.
+    sleep 10
+
+    # Last resort!!!  tsshutdn
+    logit "$host - Didn't /bin/shutdown changing to '$nodeid'!  Trying tsshutdn."
+    tsshutdn 1 /REBOOT /DELAY:1
+    sleep 10
+
+    # Give up, log it, and go on.
+    logit "$host - Failed to reboot changing to '$nodeid'."
+fi
+

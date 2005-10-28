@@ -1,3 +1,5 @@
+# -*- mode: text; indent-tabs-mode: nil -*-
+#
 # Directions for setting up an XP image from scratch.
 # These are raw notes and commands to paste into a shell.
 # Mostly Bash shell commands for Windows, some tcsh commands for Boss or Ops.
@@ -145,9 +147,9 @@ alias v='ls -lsF'
         . Download site mirror is http://mirrors.xmission.com .
         . Click [View] to "Not Installed" (alphabetical.)  
           Click on the Skip in the "New" column to add a binary version of:
-            agetty, bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
+            agetty (with src), bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
             make, minires-devel, more, nano, openssh (with src), openssl-devel, 
-            patch, perl, perl-libwin32, psmisc, python, rpm, rsync, 
+            patch, perl, perl-libwin32, ping, psmisc, python, rpm, rsync, 
             shutdown, sysvinit, tcsh, vim, wget, zip .
           Click in the "src" column for openssh and agetty, so patches can be applied.
         . At the end, don't "Create an icon on the Desktop", do "Add icon to Start Menu".
@@ -595,9 +597,11 @@ q
               # Set up to run the program-agent service.  Notice the -i (interactive) argument.
                 cygrunsrv -R ProgAgent
               progagent=/usr/local/etc/emulab/rc/rc.progagent
-              cygrunsrv -I ProgAgent -d "Emulab Program Agent" -i -p /cygdrive/c/cygwin/bin/bash \
+              proglog=/var/log/program-agent.log
+              cygrunsrv -I ProgAgent -d "Emulab Program Agent" -i \
                   --type manual \
-                  -a "--norc --noprofile -c '$progagent >& /var/log/program-agent.log'"
+                  -p /cygdrive/c/cygwin/bin/bash \
+                  -a "--norc --noprofile -c '$progagent >& $proglog &'"
                 regtool -v list /HKLM/SYSTEM/CurrentControlSet/Services/ProgAgent/Parameters
                 cygrunsrv -VQ ProgAgent
                   ## This won't work until you build the Emulab programs, including program-agent, below.
@@ -828,15 +832,17 @@ if [ ]; then
 
       . Set up the boot script to run as a service.
 
-          # Start up after DHCP and Elvin, run ProgAgent and SlothD afterwards.
+          # Start up after DHCP, Elvin, and W32Time (for watchdog), run ProgAgent afterwards.
               cygrunsrv -R EmulabStartup 
           rootpwd='daFluxGroup'
+          firstboot=/usr/local/etc/emulab/rc/rc.firstboot
           bootsetup=/usr/local/etc/emulab/rc/rc.bootsetup
           progrun="cygrunsrv -S ProgAgent"
           bootlog=/var/log/bootsetup.log
-          cygrunsrv -I EmulabStartup -u root -w $rootpwd --dep DHCP --dep elvinsvc.exe \
+          cygrunsrv -I EmulabStartup -u root -w $rootpwd \
+            --dep DHCP --dep elvinsvc.exe --dep W32Time \
             -p /cygdrive/c/cygwin/bin/bash \
-            -a "--norc --noprofile -c '( $bootsetup; $progrun ) >& $bootlog'"
+            -a "--norc --noprofile -c '( $firstboot; $bootsetup; $progrun ) >& $bootlog'"
           cygrunsrv -VQ EmulabStartup 
 
             ## If you run this, and the node name hasn't been changed yet, it will reboot.
@@ -1239,11 +1245,14 @@ Updating a set of existing images.
         set date=2005-09-29
         set updates=/proj/testbed/fish/winxp
         set nodes="SP0 SP1 SP2 UPDATE"
+
         # Choose ONE of the following hardware types:
           # pc850, IDE disk (pc1 - pc178)
           set hw=pc850 disk=/dev/ad0
+
           # pc3000, SCSI disk. (pc201 - pc360)
           set hw=pc3000 disk=/dev/da0
+
         set pid=testbed eid=new-windows-$hw
           ## set pid=testbed eid=test-windows-$hw
         set exp=$eid.$pid.emulab.net
@@ -1459,8 +1468,8 @@ Updating a set of existing images.
          # First, -new symlinks for testing.
          cd /usr/testbed/images
          set pctype; if ( "$hw" != pc850 ) set pctype="-$hw"
-         v WINXP-{SP[012],UPDATE}$pctype-new.ndz
-         v WINXP-{SP[012],UPDATE}-$hw"_"$date.ndz
+         ls -lt WINXP-{SP[012],UPDATE}$pctype-new.ndz
+         ls -lt WINXP-{SP[012],UPDATE}-$hw"_"$date.ndz
          foreach node ( $nodes )
            set link=WINXP-$node$pctype-new.ndz file=WINXP-$node-$hw"_"$date.ndz
            echo "$link -> $file"
@@ -1475,12 +1484,16 @@ Updating a set of existing images.
                 # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
                 "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
                 image = gensub("\.ndz", "", 1, $NF); \
+                image = gensub("UPDATE-pc3000-new", "UPD-pc3000-new", 1, image); # Special case.\
                 print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
 
          echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb
          mysql tbdb < ~/imgdates.sql
          echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb
+
+         # Check before installing the non -new versions.  (WINXP will always be in partition 1.)
+         echo "select part1_osid from images where imageid like 'emulab-ops-WINXP%';" | mysql tbdb
 
          # Then the regular symlinks.
          cd /usr/testbed/images
@@ -1504,7 +1517,7 @@ Updating a set of existing images.
                 print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
 
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort +1
          mysql tbdb < ~/imgdates.sql
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb| sort +1
 
