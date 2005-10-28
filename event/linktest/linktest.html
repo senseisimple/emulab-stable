@@ -54,14 +54,15 @@ To run linktest, select a Linktest test level from the dropdown on the
      that is out of range for bandwidth testing. 
 </ul>
 <p>
-If you select a test lest level other than zero, Linktest will run after
-the experiment completes its swapin. If a problem is found,
+If you select a test lest level other than zero, Linktest will run
+after the experiment completes its swapin. If a problem is found,
 testbed-ops is automatically notified and a message will appear in the
-activation log. Otherwise, no notification will appear. A failure in
-linktest will <em><b>not</b> cause the swapin to fail!</em> If traffic
-shaping parameters are of critical importance to your experiments,
-make sure you take a closer look if linktest reports failures!
-
+activation log. You will also receive an email message to ensure that
+you are aware of the problem. Otherwise, no notification will
+appear. A failure in linktest will <em><b>not</b></em> cause the
+swapin to fail!</em> If traffic shaping parameters are of critical
+importance to your experiments, make sure you take a closer look if
+linktest reports failures! 
 </p>
 
 <hr>
@@ -84,14 +85,17 @@ make sure you take a closer look if linktest reports failures!
 
 <li> When using linkdelays (endnodeshaping) latency is less accurate
      because of the 1ms clock resolution that the kernel runs at. At
-     worst, latency can be off by up to 2ms, say for a roundtrip ping
+     worst, latency can be off by up to 3ms, say for a roundtrip ping
      packet.
 
 <li> Linktest can take a <b>long time</b> on large experiments. Even
      on very small experiments (5-10 nodes), doing the full bandwidth test
-     can add 2-3 minutes. You should probably <em>not<em> do bandwidth
+     can add 2-3 minutes. You should probably <em>not</em> do bandwidth
      tests at swapin on any experiment over 20 nodes unless you are
-     prepared to wait a <em>long</em> time for the experiment to swap in.
+     prepared to wait a <em>long</em> time for the experiment to swap
+     in. If you decide you have waited long enough, you can use the
+     <b>Stop Linktest</b> menu option on the Show Experiment page. This
+     will cancel linktest and allow the swapin to complete normally.
  
 </ul>
 </center>
@@ -109,47 +113,37 @@ verifies that experiment nodes are up, that they are reachable by
 static routes (when applicable), and that traffic shaping on delay
 nodes matches the experiment NS script.
 </p>
+
 <p>
-Linktest works by parsing the experiment NS script, then invoking
-external measurement tools -- namely
+Linktest works by reading a data file of all of the links and their
+attributes, and then invoking external measurement tools -- namely
 ping, <a href="http://rude.sourceforge.net">Rude and Crude</a> and <a
-href="http://www.cc.gatech.edu/fac/Constantinos.Dovrolis/pathrate.html">Pathrate</a>.
-Linktest compares the results against margins of error calculated in
-advance to identify major errors in configuration.
+href=http://dast.nlanr.net/Projects/Iperf/>iperf</a>.  Linktest
+compares the results against margins of error calculated in advance to
+identify major errors in configuration.
 </p>
+
 <p>
 Linktest runs on each experiment node. The Linktest daemon waits for a
 custom event instructing it to begin testing. When it receives the
 event, it invokes the Linktest script to conduct the actual tests. The
-script invokes external processes to parse the NS script, validate
-links and log any errors found.
-</p>
-<p>
-If a node detects an error, it writes
-an explanatory message to the experiment tbdata/linktest
-directory. Otherwise, no messages appear in the directory after
-Linktest completes its run.
+script invokes external processes to validate links and log any errors
+found.  If a node detects an error, it writes an explanatory message
+to the experiment tbdata/linktest directory. Otherwise, no messages
+appear in the directory after Linktest completes its run.
+
 </p>
 <p>
 Linktest uses test levels to select which tests to perform. Test
 levels are cumulative, so that selecting a higher test level ensures
 lower-level tests are also run. Test levels are ordered in length of
-time to complete, so that <a href="#Level4">Level 4 - Bandwidth</a> takes the most time and
+time to complete, so that <a href="#Level4">Level 4 - Bandwidth</a>
+takes the most time and
 <a href="#Level1">Level 1 - Connectivity and Latency</a> takes the least.
 </p>
 <p>
 Read more about each test level in the following sections:
 </p>
-<p>
-    <ul>
-    <li> <a href="#Level0">Level 0 - Do not run Linktest</a>
-    <li> <a href="#Level1">Level 1 - Connectivity and Latency</a>
-    <li> <a href="#Level2">Level 2 - Static Routing</a>
-    <li> <a href="#Level3">Level 3 - Loss</a>
-    <li> <a href="#Level4">Level 4 - Bandwidth</a>
-    </ul>
-</p>
-
 <ul>
 <a NAME="Level0"></a>
 <li> <h3>Level 0 - Do not run Linktest</h3>
@@ -169,7 +163,16 @@ side of the link. From the responses, the node detects whether the
 link is up and the latency of the link. Linktest compares the measured
 latency with the expected latency of the link, adjusting for known
 delay crossing the testbed backplane. If the measured latency
-is outside the 99% confidence interval for latencies at that setting, Linktest reports an error.
+is outside the 99% confidence interval for latencies at that setting,
+Linktest reports an error.
+</p>
+
+<p>
+<b>Note:</b> In an effort not to get bogged down by reporting too many
+false positive errors, Linktest will look at the actual delta and
+report an error only if the measured latency is more then 0.5
+millseconds <em>below</em> the desired value, or more than 3.5
+millseconds <em>above</em> the desired value.
 </p>
 
 <a NAME="Level2"></a>
@@ -199,18 +202,24 @@ error.
 <li> <h3>Level 4 - Bandwidth</h3>
 
 <p>
-Each Linktest node on a lan or direct link uses Pathrate to measure
-the bandwidth of the link, provided that the link is >= 1 Mbps and <=
-45 Mbps. If the measured bandwidth is outside the margin of error
-of 1Mb, Linktest reports an error.
+Each Linktest node on a lan or direct link uses iperf to measure the
+bandwidth of the link, provided that the link is >= 1 Mbps and does
+not have a link loss value. If the measured bandwidth is outside the
+margin of error, Linktest reports an error.
+The Bandwidth test adds up to 20 seconds per distinct link in the
+experiment; 10 seconds in each direction. Linktest attempts to run
+tests in parallel whenever 
+possible, but topologies such as a star will lead to longer runtimes
+since Linktest allows only one sender or receiver to run on a node at a
+time.
 </p>
 
 <p>
-The Bandwidth test adds up to 40 seconds per distinct link in the
-experiment, or 15-20 seconds in each direction. Linktest attempts to run tests in parallel whenever
-possible, but topologies such as a star will lead to longer runtimes
-because Linktest allows only one sender or receiver to run on a node at a
-time.
+<b>Note:</b> In an effort not to get bogged down by reporting too many
+false positive errors, Linktest will look at the actual delta and
+report an error only if the measured bandwidth is more then 5%
+<em>below</em> the desired value, or more than 1% <em>above</em> the
+desired value.
 </p>
 
 </ul>
@@ -277,8 +286,8 @@ errors were found, or !0 if at least one error was found.
 <li> <h3>Linktest Log Directory</h3>
 <p>
 
-Linktest logs the results of parsing the NS script and any error reports
-in the tbdata/linktest directory for each experiment. By default this
-is in ops:/proj/$pid/exp/$eid.
+Linktest logs the results and any error reports in the tbdata/linktest
+directory for each experiment. By default this is in
+<tt>/proj/$pid/exp/$eid</tt>.
 </p>
 </ul>
