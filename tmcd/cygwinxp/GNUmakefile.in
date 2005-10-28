@@ -96,6 +96,7 @@ script-install:	dir-install $(SCRIPTS)
 	# Put the tcsh desktop startup script in the CygWin root directory.
 	$(INSTALL) -m 755 $(SRCDIR)/cygwin-tcsh.bat /
 	ln -f -s /bin/shutdown /sbin/shutdown
+	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.firstboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwin
 	# The following will fail if the user login script is still busy in a shell.
 	-$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp-user $(BINDIR)/rc/rc.cygwinxp-user

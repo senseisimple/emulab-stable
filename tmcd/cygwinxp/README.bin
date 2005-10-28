@@ -137,10 +137,14 @@ Intel PRO NIC drivers
 Installed on the pc600 and pc850.
 
 Installer: pro2kxp.exe
+Intel9.1/PRO100/WS03XP2K -> xpsp2_support_tools_deploy/pro100
 
 --------------------------------
 Intel PRO/1000 gigabit ether drivers, installed on the pc3000's.
+Intel9.1/PRO1000/WS03XP2K -> xpsp2_support_tools_deploy/pro1000
 
 LSI Logic Ultra320 SCSI 2000 drivers, installed on the pc3000's.
+symmpi_xp_1.20.18.zip
+symmpi_xp_1.20.18 -> xpsp2_support_tools_deploy/symmpi_xp_1.20.18
 
 ================================================================

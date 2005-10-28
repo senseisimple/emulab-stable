@@ -90,7 +90,7 @@ unlink($pidfile) or
     warn("Could not unlink $pidfile");
 
 print "Stopping evproxy ...\n";
-system("killall evproxy")
+system("killall evproxy");
 $pidfile = "/var/run/evproxy.pid";
 unlink($pidfile) or
     warn("Could not unlink $pidfile");
