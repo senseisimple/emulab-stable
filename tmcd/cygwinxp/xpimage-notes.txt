@@ -843,7 +843,7 @@ if [ ]; then
             --dep DHCP --dep elvinsvc.exe --dep W32Time \
             -p /cygdrive/c/cygwin/bin/bash \
             -a "--norc --noprofile -c '( $firstboot; $bootsetup; $progrun ) >& $bootlog'"
-          cygrunsrv -VQ EmulabStartup 
+          cygrunsrv -VQ EmulabStartup
 
             ## If you run this, and the node name hasn't been changed yet, it will reboot.
             cygrunsrv -S EmulabStartup 
@@ -1042,7 +1042,8 @@ Making images
 
     . Windows Update
       - This might be needed after each Microsoft "Patch Tuesday" (second tues of the month.)
-      - Start up Internet Explorer and go to:
+      - After it's installed, just click Start/All Programs/Windows Update, Express, Install.
+        For initial installation, start up Internet Explorer and go to:
         . http://update.microsoft.com
            - The first time, just installs/updates the updater and asks to reboot.
            - I just choose the EXPRESS update, installing all high-priority updates.
@@ -1219,35 +1220,37 @@ Updating a set of existing images.
 
     . Build changes one place, make tarballs to update the others.
         #[On the build node, as me.]
-        date=2005-09-29
+        date=2005-10-28
         updates=/proj/testbed/fish/winxp
           v $updates/*$date*
 
         cd /
-        # Work around a running sshd.
+        # Work around a running sshd (on the destination machines.)
         cp -p /usr/sbin/sshd.exe{,.new}
         sysfiles="usr/sbin/sshd.exe.new bin/ssh-host-config etc/sshd_config \
                   etc/profile sbin/agetty.exe etc/inittab"
         v $sysfiles
-        rm /usr/local/etc/emulab/{*.exe.prev,*~}
+        # Does inittab really need to have mode 600?  Owned by SYSTEM.SYSTEM, can't read here.
+        chmod 644 /etc/inittab
         tar cvfz $updates/sys_$date.tgz $sysfiles
 
         cd /usr/local
         elabpat="etc/emulab man/man{1/{install,emulab}-*,8/program-*}"
         elabfiles=`eval "echo $elabpat"`
         v -d $elabfiles
-          v -t $elabfiles | grep '~'
+          v -Rt $elabfiles | grep '~'
           v -t $elabfiles | head -20
           v /etc/emulab/paths.*
+        rm /usr/local/etc/emulab/{*.exe.prev,*~}
         tar cvfz $updates/elab_$date.tgz $elabfiles
 
         #[On Boss.]
-        set date=2005-09-29
+        set date=2005-10-28
         set updates=/proj/testbed/fish/winxp
         set nodes="SP0 SP1 SP2 UPDATE"
 
         # Choose ONE of the following hardware types:
-          # pc850, IDE disk (pc1 - pc178)
+          # pc850, IDE disk (pc41 - pc178)
           set hw=pc850 disk=/dev/ad0
 
           # pc3000, SCSI disk. (pc201 - pc360)
@@ -1325,9 +1328,11 @@ Updating a set of existing images.
             /sbin/reboot
 
             # Unpack the patched and edited system files.
-            set date=2005-09-29
+            set date=2005-10-28
             net stop init
+            chmod 777 /etc/inittab
             tar xvfz /tmp/sys_$date.tgz -C /
+            chmod 600 /etc/inittab
             net start init
             # sshd.exe may be busy, move the busy executable aside.
               ls -l /usr/sbin/sshd*
@@ -1345,11 +1350,11 @@ Updating a set of existing images.
                     /usr/local/etc/emulab/rc/rc.progagent shutdown; \
                     /usr/local/etc/emulab/rc/rc.slothd stop; \
                     ps -Welf | grep emulab"
-          # Just in case...
-          su_nodes "killall emulab-sync program-agent slothd"
+          # Just in case... (Try it again if something is still running afterward.)
+          su_nodes "killall emulab-sync program-agent slothd idlemon; ps -Welf | grep emulab"
 
           # Unpack the Emulab files.
-          su_nodes "tar xfz /tmp/elab_2005-09-29.tgz -C /usr/local"
+          su_nodes "tar xfz /tmp/elab_2005-10-28.tgz -C /usr/local"
 
      . Do one-time updates
          #[On Boss.]
@@ -1367,9 +1372,14 @@ Updating a set of existing images.
          end
          su_nodes "regtool get /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle"
 
-       - Some things still have to be done through the GUI under RDP.
+       - Some things still have to be done through the GUI under RDP on each node.
+         . Run Windows Update after each Patch Tuesday on the UPDATE nodes.
+
          . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
            Also set Power Options / Power Schemes to "Always On".
+
+         . 10/28/05 Install the Cygwin ping package, keep everything else the same.
+           /cygdrive/c/software/cygwin/setup.exe &
 
      . Prepare, reboot and test.
          #[On Boss.]
@@ -1380,7 +1390,8 @@ Updating a set of existing images.
 
          # Network configs.
          su_nodes "ipconfig /all"
-         su_nodes "grep IPEnableRouter /var/log/bootsetup.log"
+         # Should be set to 1 on the SP2 node in the topology, 0 elsewhere.
+         su_nodes "grep IPEnableRouter /var/log/EmulabStartup.log"
 
          # Connectivity test.
          foreach node1 ( $nodes )
@@ -1388,7 +1399,7 @@ Updating a set of existing images.
              if ( "$node1" != "$node2" ) then
                echo ================================================================
                echo $node1 pings $node2
-               sudo ssh $node1.$exp "ping -n 1 $node2"
+               sudo ssh $node1.$exp "ping -n 1 $node2" | grep loss
              endif
            end
          end
@@ -1397,19 +1408,20 @@ Updating a set of existing images.
          su_nodes "prepare"
          ##node_admin -e $pid,$eid on
 
-           ## node_admin -e might be broken.  (Or maybe the problem is that we don't want the firewall down...)
+           ## node_admin -e might be broken.  (Or maybe the firewall can't be down...)
            ## Do it by hand on just the Windows nodes in the experiment for now.
+           ## Translate $node.$exp to pcXXX to avoid "*** Tainted node name: ".
            foreach node ( $nodes )
              echo ================================ $node.$exp
              set pc=`nslookup $node.$exp | sed -n '/^Name:/s/.*\(pc[0-9]*\).*/\1/p'`
              node_admin on $pc
            end
 
-           # Check that they're in the MFS (FreeBSD 4.7-RELEASE (TESTBED) #1: Tue Nov  5 16:03:29 MST 2002)
+           # Check that they're booted into the FreeBSD MFS.
+           # (FreeBSD 5.3-STABLE (TESTBED) #1: Thu Oct 21 15:06:28 MDT 2004)
            foreach node ( $nodes )
              echo ================================ $node.$exp
-             set pc=`nslookup $node.$exp | sed -n '/^Name:/s/.*\(pc[0-9]*\).*/\1/p'`
-             sudo ssh $pc cat /etc/motd | head -1
+             sudo ssh $node.$exp cat /etc/motd | head -1
            end
 
          nping
@@ -1516,8 +1528,8 @@ Updating a set of existing images.
                 image = gensub("\.ndz", "", 1, $NF); \
                 print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
-
          echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort +1
+
          mysql tbdb < ~/imgdates.sql
          echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb| sort +1
 

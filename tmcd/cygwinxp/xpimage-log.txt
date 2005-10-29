@@ -1,6 +1,54 @@
 Log of XP images produced (most recent first.)
 
-    . WINXP-*-pc*_2005-9-29 - Serial console, network settings, slothd RDP idlemon.
+    . WINXP-*-pc*_2005-10-28, minor update.
+      - Race condition tweaks to rc.cygwin, add rc.firstboot to EmulabStartup service.
+      - Cleanup tweaks to prepare and liblocsetup.pm .
+      - Add Cygwin ping package.
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-SP0-pc850_2005-10-28.ndz
+	    4293596160 input (1990345728 compressed) bytes in 600.930 seconds
+	    Image size: 970981376 bytes
+	    3.159MB/second compressed
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-SP1-pc850_2005-10-28.ndz
+	    4293596160 input (2187777024 compressed) bytes in 706.318 seconds
+	    Image size: 1162870784 bytes
+	    2.954MB/second compressed
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-SP2-pc850_2005-10-28.ndz
+	    4293596160 input (1825031168 compressed) bytes in 545.718 seconds
+	    Image size: 860880896 bytes
+	    3.189MB/second compressed
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-UPDATE-pc850_2005-10-28.ndz
+	    4293596160 input (2045842432 compressed) bytes in 635.409 seconds
+	    Image size: 1040187392 bytes
+	    3.071MB/second compressed
+
+
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-SP0-pc3000_2005-10-28.ndz
+	     8587192320 input (2062292992 compressed) bytes in 316.225 seconds
+	     Image size: 978321408 bytes
+	     6.219MB/second compressed
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-SP1-pc3000_2005-10-28.ndz
+	     8587192320 input (1801369600 compressed) bytes in 310.454 seconds
+	     Image size: 918552576 bytes
+	     5.534MB/second compressed
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-SP2-pc3000_2005-10-28.ndz
+	     8587192320 input (1857005568 compressed) bytes in 312.829 seconds
+	     Image size: 931135488 bytes
+	     5.661MB/second compressed
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-UPDATE-pc3000_2005-10-28.ndz
+	     8587192320 input (2215192576 compressed) bytes in 375.866 seconds
+	     Image size: 1168113664 bytes
+	     5.621MB/second compressed
+
+
+    . WINXP-*-pc*_2005-9-29
+      - Cygwin updated, including OpenSSH 4.2p1-1 .
+      - Serial console now works, with agetty and sysvinit providing a login shell.
+      - network settings: DNS interface registration and TCP/IP autoconfiguration disabled,
+			  disabled unused experimental net interfaces, 
+			  IPEnableRouter enabled on multihomed experimental nodes.
+      - slothd: RDP idlemon for RDP keyboard and mouse events, load-avg correction on pc3000's.
+      - program-agent: commands forked on experiment nodes now see Samba directories.
+
       pc850 /dev/ad0 /proj/testbed/images/WINXP-SP0-pc850_2005-09-29.ndz
             4293596160 input (1958704128 compressed) bytes in 622.637 seconds
             Image size: 960495616 bytes
