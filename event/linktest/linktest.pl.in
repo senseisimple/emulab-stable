@@ -378,6 +378,9 @@ if(&dotest(TEST_BW)){
     my $msg = "Testing Bandwidth...";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike.
+    &barrier();
     &debug("\n$msg\n\n");
     &bw_test;
     &report_status;
