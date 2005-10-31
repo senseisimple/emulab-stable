@@ -22,7 +22,7 @@ if [ ! -d iperf-2.0.2/src ]; then
         echo "ERROR: iperf-fetch.sh: tar failed"
 	exit 1
     }
-    cd iperf-2.0.2 && patch < ../iperf-patch || {
+    cd iperf-2.0.2 && patch -p0 < ../iperf-patch || {
         echo "ERROR: iperf-fetch.sh: patch failed"
 	exit 1
     }
