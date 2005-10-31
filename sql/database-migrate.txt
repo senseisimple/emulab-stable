@@ -2186,6 +2186,12 @@ last_net_act,last_cpu_act,last_ext_act);
 
        mysql tbdb < fwrules-create.sql
 
+       If fwrules-create.sql does not exist (it disappeared circa 1.300),
+       then instead do:
+
+	cd <your_build_tree>/firewall
+	gmake insertrules
+
 1.290: Add conversion factor floorimages that converts from pixels to
       meters.
 
