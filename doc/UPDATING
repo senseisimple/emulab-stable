@@ -42,6 +42,11 @@ earliest time one of the steps needs to occur.
         which creates the initial CVS trees in all of the existing project
         trees.
 
+20050205: Before build/config
+
+	* Install the rsync port from /usr/ports/net/rsync
+
+
 20041108: Anytime
 
 	* Update sql/database-fill-suplement.sql stuff.
