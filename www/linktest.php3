@@ -274,7 +274,7 @@ function do_stop_cb(msg) {
 // onLoad callback for when linktest stops in the iframe.
 function linktest_stopped() {
     // Avoid initial outer page load event.
-    if (curstate != 'running')
+    if (curstate != 'running' && curstate != 'stopping')
 	return;
     
     curstate = 'stopped';	
