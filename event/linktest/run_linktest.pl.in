@@ -236,14 +236,12 @@ sub handler($)
     }
 
     if ($signame eq 'ALRM') {
-	print "Linktest timer has expired, aborting the run.\n"
-	    if ($verbose);
+	print "*** Linktest timer has expired, aborting the run.\n";
     }
     else {
-	print "Linktest KILL event has been sent, aborting the run.\n"
-	    if ($verbose);
+	print "*** Linktest has been aborted\n";
     }
-    exit(&analyze);
+    exit(1);
 }
 
 #
@@ -254,6 +252,7 @@ sub handler($)
 $args = starter();
 $args .= " -w";
 if (($child_pid = fork())) {
+    my $exitval;
 
     #
     # Install signal handlers to wait for a kill or a timeout.
@@ -271,11 +270,16 @@ if (($child_pid = fork())) {
 	alarm($timeout);
     }
     waitpid($child_pid, 0);
+    $exitval = $?;
     alarm 0;
+    if ($exitval) {
+	exit($exitval >> 8);
+    }
     exit(&analyze());
 }
 else {
     my $ltpid;
+    my $exitval = 0;
 
     #
     # Open child process to read in the output from ltevent,
@@ -307,8 +311,8 @@ else {
 	    }
 	    elsif ($eventtype eq $KILLEVENT) {
 		print("Linktest has been cancelled due to a timeout ".
-		      "or unrecoverable error.\n")
-		    if ($verbose);
+		      "or unrecoverable error.\n");
+		$exitval = 1;
 		last;
 	    } else {
 		#
@@ -320,12 +324,13 @@ else {
 	} else {
 	    # parse error, exit.
 	    print "error parsing: " . $_ . "\n";
+	    $exitval = -1;
 	    last;
 	}
     }
     kill('TERM', $ltpid);
     close(LTC);
-    exit;
+    exit($exitval);
 }
 
 #
