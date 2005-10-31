@@ -62,16 +62,37 @@ if (isset($pid) && $pid != "") {
     $cookietype = "user";
     $listiface  = "private";
     $optargs    = "?username=${user_email}";
-    
+
     if (isset($wantadmin) && $isadmin) {
 	$cookietype = "admin";
 	$listiface  = "admin";
 	$optargs    = "";
     }
 
-    SUEXEC($uid, "nobody", "mmxlogin $uid $listname $cookietype",
-	   SUEXEC_ACTION_DIE);
+    $retval = SUEXEC($uid, "nobody", "mmxlogin $uid $listname $cookietype",
+		     SUEXEC_ACTION_IGNORE);
 
+    #
+    # If this was an admin trying to get to a list, then retry as admin.
+    #
+    if ($retval) {
+	if ($isadmin && !isset($wantadmin)) {
+	    $cookietype = "admin";
+	    $listiface  = "admin";
+	    $optargs    = "";
+
+	    $retval = SUEXEC($uid, "nobody",
+			     "mmxlogin $uid $listname $cookietype",
+			     SUEXEC_ACTION_IGNORE);
+	}
+	if ($retval == 1) {
+	    USERERROR("You are not a member of $pid/$gid.", 1);
+	}
+	elseif ($retval) {
+	    SUEXECERROR(SUEXEC_ACTION_DIE);
+	}
+    }
+    
     #
     # Parse the silly thing
     #
