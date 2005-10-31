@@ -79,6 +79,7 @@ sub SetAdminPassword(@);
 sub DeleteList(@);
 sub ListMembership(@);
 sub xLogin(@);
+sub mmfix(@);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -159,6 +160,9 @@ elsif ($action eq "deluser") {
 elsif ($action eq "reconfig") {
     exit(AddList(1, @ARGV));
 }
+elsif ($action eq "mmfix") {
+    exit(mmfix(@ARGV));
+}
 else {
     fatal("Do not know what to do with '$action'!\n");
 }
@@ -192,6 +196,9 @@ sub Email2EmulabID($$)
 {
     my ($email, $puid) = @_;
 
+    # Always lowercase before storing it.
+    $email = lc($email);
+
     return -1
 	if (!defined($EMAILhash{$email}));
 
@@ -215,6 +222,10 @@ sub Email2EmulabID($$)
 sub StoreMapping($$)
 {
     my ($ID, $email) = @_;
+
+    # Always lowercase before storing it.
+    $email = lc($email);
+    
     $IDhash{$ID} = $email;
     $EMAILhash{$email} = $ID;
     return 0;
@@ -224,6 +235,10 @@ sub StoreMapping($$)
 sub DeleteMapping($$)
 {
     my ($ID, $email) = @_;
+
+    # Always lowercase before using it.
+    $email = lc($email);
+    
     delete($IDhash{$ID});
     delete($EMAILhash{$email});
     return 0;
@@ -870,6 +885,18 @@ sub xLogin(@)
 	       or fatal("xlogin: ".
 			"Could not get xlogin cookie for $email/$listname!");
     return 0;
+}
+
+sub mmfix(@)
+{
+    foreach my $uid (keys(%IDhash)) {
+	my $email    = $IDhash{$uid};
+	my $lc_email = lc($email);
+
+	$IDhash{$uid} = $lc_email;
+	delete($EMAILhash{$email});
+	$EMAILhash{$lc_email} = $uid;
+    }
 }
      
 sub fatal($)
