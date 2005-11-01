@@ -307,7 +307,7 @@ sub cleanup_node ($) {
     my ($scrub) = @_;
     
     print STDOUT "Cleaning node; removing configuration files\n";
-    unlink TMUSESFS, TMROLE, ISSIMTRAFGENPATH;
+    unlink TMUSESFS, TMROLE, ISSIMTRAFGENPATH, ISDELAYNODEPATH;
 
     #
     # If scrubbing, also remove the password/group files and DBs so
