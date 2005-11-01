@@ -26,6 +26,7 @@
     <li> <a href="#Boots_twice"> Windows nodes boot twice </a></li>
     <li> <a href="#Login_connections"> Login connections to Windows </a></li>
     <li> <a href="#RDP_details"> RDP details </a></li>
+    <li> <a href="#Custom_images"> Making custom Windows OS images </a></li>
   </ul>
   <li> <a href="#Cygwin"> Cygwin </a> </li>
   <ul>
@@ -293,7 +294,27 @@ to remotely reboot the node:<pre>    node_reboot pcxxx</pre>
 
 If you are able to log in but your remote home directory isn't mounted, you
 have the additional option of executing this command on
-the node itself: <pre>    /sbin/reboot</pre> </div>
+the node itself: <pre>    /sbin/reboot</pre>
+
+The EmulabStartup service runs <code>/usr/local/etc/emulab/rc/rc.bootsetup</code>,
+logging output to <code>/var/log/bootsetup.log</code>.  If you're having swap-in
+problems and rc.bootsetup doesn't finish sending <code>ISUP</code> to Emulab within
+10 minutes, the node will be rebooted.  After a couple of reboot cycles without a
+<code>ISUP</code>, Emulab gives up on the node.  <p>
+
+If you want to prevent swap-in failure, whether to diagnose the problem or to continue
+manually, you may add this line to your
+<a href="../tutorial/docwrapper.php3?docname=nscommands.html"> ns file </a>
+for each Windows node: <br>
+&nbsp; &nbsp; &nbsp; &nbsp; <code>
+    <a href="../tutorial/docwrapper.php3?docname=nscommands.html#tb-set-node-failure-action"> 
+    tb-set-node-failure-action</a> <i>$node</i> "nonfatal"
+</code>  <br>
+(where <code><i>$node</i></code> is replaced with the node variable, of course.)
+<p>
+
+It will still complain if it doesn't get the ISUP signal at the end of rc.bootsetup,
+but the swap-in will proceed and allow you to figure out what's happening.  </div>
 
 <h4><a name="Login_connections"> </a> Login connections to Windows </h4>
 
@@ -475,6 +496,43 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
 </ul>
 
+<h4><a name="Custom_images"> </a> Making custom Windows OS images </h4>
+
+Making custom Windows images is similar to <a
+href="../tutorial/docwrapper.php3?docname=tutorial.html#CustomOS"> doing it on the
+other Emulab operating systems</a>, except that you must do a little more work to run
+the <code>prepare</code> script as user <code>root</code> since there are no
+<code>su</code> or <code>sudo</code> commands on Windows.  This is optional on the
+other OS types, but on Windows, proper TCP/IP network setup depends on
+<code>prepare</code> being run.
+
+<ul>
+  <li>
+    Log in to the node where you want to save a custom image.  Give
+    the shell command to change the root password.  Pick a password
+    string you can remember, typing it twice as prompted:
+    <pre>
+       % passwd root
+       Enter the new password (minimum of 5, maximum of 8 characters).
+       Please use a combination of upper and lower case letters and numbers.
+       New password:
+       Re-enter new password:
+    </pre>
+
+    This works becuase you are part of the Windows <code>Administrators</code> group.
+    Otherwise you would have to already know the root password to change it. </li>
+  <li>
+     Log in to the node as user <code>root</code> through the Console or SSH,
+     using the password you set above, then run the <code>prepare</code> command.
+     (It will print "Must be root to run this script!" and do nothing
+     if not run as root.)
+     <pre>
+       /usr/local/etc/emulab/prepare
+     </pre> </li>       
+  <li>
+     Then log out and create your custom image. </li>
+</ul>
+
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Cygwin"> </a> Cygwin </h3>
 
@@ -623,8 +681,8 @@ good across SMB.
   <li> Windows drive letter mounts <p>
 
        Cygwin knows about drive letter prefixes like
-       <b><code>C:</code></b><nbsp>, which are equivalent to
-       <code>/cygdrive/&lt;drive-letter&gt;</code><nbsp>.  However,
+       <b><code>C:</code></b>&nbsp;, which are equivalent to
+       <code>/cygdrive/&lt;drive-letter&gt;</code>&nbsp;.  However,
        <code>/cygdrive</code>, like <code>/dev</code>, isn't a real directory,
        so you can't <code>ls</code> it.  <p>
 
