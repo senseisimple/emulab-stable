@@ -16,6 +16,9 @@ OURDOMAIN       = @OURDOMAIN@
 CVSSUPPORT      = @CVSSUPPORT@
 CHATSUPPORT     = @CHATSUPPORT@
 
+# Filter program
+HTMLINSTALL     = $(INSTALL_SBINDIR)/htmlinstall  
+
 include $(OBJDIR)/Makeconf
 
 SUBDIRS = garcia-telemetry
@@ -24,7 +27,8 @@ SUBDIRS = garcia-telemetry
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
 # 
-all: defs.php3 dbdefs.php3 swish.conf websearch xmlrpc.php3 all-subdirs
+all: defs.php3 dbdefs.php3 swish.conf websearch htmlinstall xmlrpc.php3 \
+	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -160,7 +164,8 @@ ALLHY     = $(notdir $(HYFILES))
 ALLSDR   = $(notdir $(SDRFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 
-install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
+install: $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
+	$(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/floormap/, $(ALLFLOORMAPS)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
 	$(addprefix $(INSTALL_WWWDIR)/tutorial/, $(ALLTUTS)) \
@@ -174,6 +179,7 @@ install: $(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
+	$(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/cvsweb/, $(ALLCVSWEB)) \
 	$(addprefix $(INSTALL_DIR)/opsdir/www/cvsweb/, $(ALLOPSCVSWEB)) \
 	$(INSTALL_WWWDIR)/doc/LICENSE.txt \
@@ -199,12 +205,22 @@ boss-install:	install
 $(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/LICENSE
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
-	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@)
+
+$(INSTALL_WWWDIR)/%.html: %.html htmlinstall
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(HTMLINSTALL) $(subst $$,\$$,$<) $(subst $$,\$$,$@)
 
 $(INSTALL_WWWDIR)/%: %
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+
+$(INSTALL_DIR)/opsdir/www/%.html: %.html htmlinstall
+	@echo "Installing $<"
+	-mkdir -p $(patsubst %/,%,$(dir $@))
+	$(HTMLINSTALL) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
 
 $(INSTALL_DIR)/opsdir/www/%: %
 	@echo "Installing $<"

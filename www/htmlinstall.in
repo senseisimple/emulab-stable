@@ -1,0 +1,88 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use File::Basename;
+
+#
+# Install html files, filtering local goo (emulab.net to OURDOMAIN).
+# 
+sub usage {
+    print STDERR "Usage: htmlinstall <src> <target>\n";
+    exit(-1);
+}
+my $optlist  = "";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $WWWHOST	= "@WWWHOST@";
+my $INSTALL     = "@INSTALL@ -m 444";
+my $tempfile	= "/tmp/html.$$";
+my $TBMAINSITE  = 1;
+
+#
+# Hardcoded check against $WWWHOST, to prevent anyone from
+# accidentally setting $TBMAINSITE when it should not be
+#
+if ($WWWHOST ne "www.emulab.net") {
+    $TBMAINSITE = 0;
+}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Turn off line buffering on output
+$| = 1;
+
+usage()
+    if (@ARGV != 2);
+
+my $source = $ARGV[0];
+my $target = $ARGV[1];
+
+#
+# Open source file and filter to temporary file, then install.
+#
+open(IN, $source) or
+    die("$0: Could not open $source: $!\n");
+open(OUT, "> $tempfile") or
+    die("$0: Could not open $tempfile: $!\n");
+
+while (<IN>) {
+    s/www\.emulab\.net/www.@OURDOMAIN@/g;
+    s/users\.emulab\.net/@USERNODE@/g;
+    s/ops\.emulab\.net/@USERNODE@/g;
+    s/boss\.emulab\.net/@BOSSNODE@/g;
+    s/fs\.emulab\.net/@FSNODE@/g;
+    s/(\s+[-\w]+)\.emulab\.net/$1.@OURDOMAIN@/g;
+    s/testbed-ops\@emulab\.net/@TBOPSEMAIL@/g;
+    if (! $TBMAINSITE) {
+	s/testbed-ops\@flux\.utah\.edu/@TBOPSEMAIL@/g;
+	s/\@flux\.utah\.edu/\@@OURDOMAIN@/g;
+    }
+    print OUT $_;
+}
+close(IN);
+close(OUT);
+
+system("$INSTALL $tempfile $target") == 0
+    or exit($? >> 8);
+exit(0);
+
+#
+# Make sure tempfile deleted.
+#
+END {
+    my $saved_exitcode = $?;
+    unlink($tempfile)
+	if (-e $tempfile);
+    $? = $saved_exitcode;
+}
+
