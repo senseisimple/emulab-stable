@@ -57,7 +57,7 @@ function SPITFORM($formfields, $returning, $errors)
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDOCBASE, $WWWHOST;
     global $usr_keyfile, $FirstInitState;
     global $ACCOUNTWARNING, $EMAILWARNING;
-    global $WIKISUPPORT, $WIKIURL;
+    global $WIKISUPPORT, $WIKIHOME;
     
     PAGEHEADER("Start a New Testbed Project");
 
@@ -198,7 +198,7 @@ function SPITFORM($formfields, $returning, $errors)
 	if ($WIKISUPPORT) {
 	    echo "<tr>
                       <td colspan=2>*
-                          <a href=${WIKIURL}/TWiki/WikiName
+                          <a href=${WIKIHOME}/bin/view/TWiki/WikiName
                             target=_blank>WikiName</a>:<td class=left>
                           <input type=text
                                  name=\"formfields[wikiname]\"

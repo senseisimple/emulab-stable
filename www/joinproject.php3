@@ -55,7 +55,7 @@ function SPITFORM($formfields, $returning, $errors)
 {
     global $TBDB_UIDLEN, $TBDB_PIDLEN, $TBDB_GIDLEN;
     global $ACCOUNTWARNING, $EMAILWARNING;
-    global $WIKISUPPORT, $forwikionly, $WIKIURL;
+    global $WIKISUPPORT, $forwikionly, $WIKIHOME;
 
     if ($forwikionly)
 	PAGEHEADER("Wiki Registration");
@@ -181,7 +181,7 @@ function SPITFORM($formfields, $returning, $errors)
 	if ($WIKISUPPORT) {
 	    echo "<tr>
                       <td colspan=2>*
-                          <a href=${WIKIURL}/TWiki/WikiName
+                          <a href=${WIKIHOME}/bin/view/TWiki/WikiName
                             target=_blank>WikiName</a>:<td class=left>
                           <input type=text
                                  name=\"formfields[wikiname]\"
