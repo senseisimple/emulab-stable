@@ -137,6 +137,9 @@ if ($CONTROL ne $BOSSNODE) {
     close(COOKIE) or
 	fatal("$MMPROXY failed on $CONTROL!");
 
+    exit(1)
+	if (!defined($cookie));
+
     # Send back to PHP.
     print $cookie;
 }
