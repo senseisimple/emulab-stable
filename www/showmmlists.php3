@@ -18,6 +18,7 @@ PAGEHEADER("Mailman Lists");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
+TBUserInfo($uid, $user_name, $user_email);
 
 if (! isset($sortby)) {
     $sortby = "listname";
@@ -68,7 +69,8 @@ SUEXEC($uid, "nobody", "webmmlistmembership $uid", SUEXEC_ACTION_DIE);
 if (count($suexec_output_array)) {
     echo "<br>
            <center><font size=+1>
-          You are a member of the following Mailman lists
+          You are a member of the following Mailman
+            lists<sup><font size=+1><b>1</b></font></sup>
           </font></center><br>\n";
     
     echo "<table border=2 cellpadding=0 cellspacing=2
@@ -180,6 +182,13 @@ echo "<br><br>
       List Managers</a> on the Mailman
       <a href=http://www.gnu.org/software/mailman/docs.html>
       documentation</a> page.
+      </blockquote></blockquote>\n";
+
+echo "<blockquote><blockquote>
+      <b>1</b>: Your subscription list includes only lists where your
+         subscription email address is the same as your Emulab registered
+         email address ($user_email). Please use this email address when 
+         subscribing to Emulab lists. 
       </blockquote></blockquote>\n";
 
 #
