@@ -111,7 +111,7 @@ SUBMENUSTART("Experiment Options");
 if ($expstate) {
     if (TBExptLogFile($exp_pid, $exp_eid)) {
 	WRITESUBMENUBUTTON("View Activity Logfile",
-			   "spewlogfile.php3?pid=$exp_pid&eid=$exp_eid");
+			   "showlogfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
       
     if ($state == $TB_EXPTSTATE_ACTIVE) {
