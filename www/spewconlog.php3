@@ -8,9 +8,8 @@ include("defs.php3");
 include("showstuff.php3");
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Console Log for $node_id");
+# No PAGEHEADER since we spit out a Location header later. See below.
+# 
 
 #
 # Only known and logged in users can do this.
@@ -48,27 +47,45 @@ if (isset($linecount) && $linecount != "") {
     if (! TBvalid_integer($linecount)) {
 	PAGEARGERROR("Illegal characters in linecount!");
     }
-    $optarg = "&linecount=$linecount";
+    $optarg = "-l $linecount";
 }
 else {
     $optarg = "";
 }
 
-echo "<font size=+2>".
-     "Node <a href=shownode.php3?node_id=$node_id><b>$node_id</b></font></a>";
-echo "<br /><br />\n";
-
-echo "<center>
-      <iframe src=spewconlog.php3?node_id=${node_id}${optarg}
-              width=90% height=500 scrolling=auto frameborder=1>
-      Your user agent does not support frames or is currently configured
-      not to display frames. However, you may visit
-      <A href=spewconlog.php3?node_id=${node_id}${optarg}>the
-      log file directly.</A>
-      </iframe></center>\n";
-
 #
-# Standard Testbed Footer
-# 
-PAGEFOOTER();
+# A cleanup function to keep the child from becoming a zombie.
+#
+$fp = 0;
+
+function SPEWCLEANUP()
+{
+    global $fp;
+
+    if (connection_aborted() && $fp) {
+	pclose($fp);
+    }
+    exit();
+}
+register_shutdown_function("SPEWCLEANUP");
+
+$fp = popen("$TBSUEXEC_PATH $uid nobody webspewconlog $optarg $node_id", "r");
+if (! $fp) {
+    USERERROR("Spew console log failed!", 1);
+}
+
+header("Content-Type: text/plain; charset=us-ascii");
+header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
+header("Cache-Control: no-cache, must-revalidate");
+header("Pragma: no-cache");
+flush();
+
+while (!feof($fp)) {
+    $string = fgets($fp, 1024);
+    echo "$string";
+    flush();
+}
+pclose($fp);
+$fp = 0;
+
 ?>
