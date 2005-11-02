@@ -114,6 +114,11 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
           If the email address and phone number you give us matches
           our user records, we will email a URL that will allow you to change
           your password.
+
+          <br><br>
+          <b>Please read this <a href='kb-show.php3?idx=69'>Knowledge Base
+          Entry</a> if you get an error
+          when trying to use the link we email to you!</b>
           </blockquote>\n";
 }
 
