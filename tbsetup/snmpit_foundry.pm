@@ -308,9 +308,9 @@ sub findVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
     my %mapping = ();
-    my ($name, $id, $vlan_number, $vlan_name);
+    my ($count, $name, $id, $vlan_number, $vlan_name) = ( scalar (@vlan_ids));
 
-    if ($#vlan_ids == -1) {
+    if ($count == 0) {
 	while ( ($id, $name) = each %{$self->{NEW_NAMES}} ) {
 		$mapping{$id} = $name;
 	}
@@ -319,10 +319,10 @@ sub findVlans($@) {
 	foreach $id (@vlan_ids) {
 	    if (defined($self->{NEW_NAMES}->{$id})) {
 		$mapping{$id} = $self->{NEW_NAMES}->{$id};
+		if (--$count == 0) { return %mapping };
 	    }
 	}
     }
-
     #
     # Find all VLAN names. Do one to get the first field...
     #
@@ -336,10 +336,13 @@ sub findVlans($@) {
 	# We only want the names - we ignore everything else
 	#
 	if ($name =~ /snVLanByPortCfgVLanName/) {
-	    if (!@vlan_ids || exists $mapping{$vlan_name}) {
+	    if (($count <= 0) || exists $mapping{$vlan_name}) {
 		$self->debug("Putting in mapping from $vlan_name to " .
-		    "$vlan_number\n");
+		    "$vlan_number\n",2);
+		$id = $mapping{$vlan_name};
 		$mapping{$vlan_name} = $vlan_number;
+		if (!defined($id) && (--$count == 0))
+			{ return %mapping };
 	    }
 	}
 
@@ -468,10 +471,23 @@ sub setPortVlan($$@) {
 	my $obj = "snVLanByPortMemberRowStatus.$vlan_number.$port";
 	my $RetVal = $self->{SESS}->set( $obj, 4);
 
-	if (!$RetVal) {
-	    print STDERR "$port VLAN change failed with $RetVal.\n";
+	if (!defined($RetVal) || !$RetVal) {
+	    # might fail if the port is untagged and a member of another
+	    # VLAN (e.g. Control, when setting up a firewalled experiment)
+	    # so try to clear it out, and then try again.
+	    my $portIndex = $self->{PORTINDEX}->{$port};
+	    $RetVal = $self->{SESS}->get(["snSwPortInfoTagMode",$portIndex]);
+	    $self->debug("TagMode for portIndex $portIndex is $RetVal\n");
+	    if (defined($RetVal) && ($RetVal eq "untagged")) {
+		$self->debug("2nd chance at $port return $RetVal\n");
+		$self->clearAllVlansOnTrunk($port);
+		$RetVal = $self->{SESS}->set( $obj, 4);
+		if (defined ($RetVal) && $RetVal ) {
+			next;
+		}
+	    }
+	    print STDERR "VLAN change for index $port failed\n";
 	    $errors++;
-	    next;
 	}
     }
 
@@ -490,8 +506,8 @@ sub setPortVlan($$@) {
     #
 
     if (defined($vlan_id)) {
-	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
-		"$self->{NAME} ... ";
+#	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
+#		"$self->{NAME} ... ";
 	my $obj = "snVLanByPortCfgStpMode";
 	my $RetVal = $self->{SESS}->set( [$obj, $vlan_number,0,"INTEGER"]);
 	if (!$RetVal) {
@@ -500,7 +516,7 @@ sub setPortVlan($$@) {
 	}
 	$obj = "snVLanByPortCfgVLanName";
 	$RetVal = $self->{SESS}->set( [$obj, $vlan_number,"$vlan_id","OCTETSTR"]);
-	if (!$RetVal) {
+	if (!defined($RetVal) || !$RetVal) {
 	    print STDERR "can't set name for vlan $vlan_number\n";
 	    $errors++;
 	}
@@ -950,20 +966,20 @@ sub setVlansOnTrunk($$$$) {
     if (grep(/^1$/,@vlan_numbers)) {
 	die "VLAN 1 passed to setVlansOnTrunk\n";
     }
-    $self->debug("setVlansOnTrunk m $modport v $value nums @vlan_numbers");
-    $portindex = $self->{PORTINDEX}{$modport};
-    $ifIndex = $self->{IFINDEX}{$modport};
-    foreach my $vlan_number (@vlan_numbers) {
-	$RetVal = undef;
-	#make sure they are tagged;
-	if ($value == 1) {
-	    $RetVal = $self->{SESS}->set(
-		    [["snSwPortInfoTagMode",$portindex,"tagged","INTEGER"]]);
-	    if (!$RetVal) {
-		print STDERR "couldn't tag port $modport\n";
-		$errors++;
-	    }
+    $self->debug("foundry::setVlansOnTrunk" .
+		"m $modport v $value nums @vlan_numbers\n");
+    ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
+    $portindex = $self->{PORTINDEX}{$ifIndex};
+    # Make sure port is tagged
+    if ($value == 1) { 
+	$RetVal = $self->{SESS}->set(
+		[["snSwPortInfoTagMode",$portindex,"tagged","INTEGER"]]);
+	if (!defined($RetVal) || !$RetVal) {
+	    print STDERR "couldn't tag port $modport\n";
+	    $errors++;
 	}
+    }
+    foreach my $vlan_number (@vlan_numbers) {
 	my $action = ($value == 1) ? "create" : "delete" ;
 	$RetVal = $self->{SESS}->set(
 		"snVLanByPortMemberRowStatus.$vlan_number.$ifIndex",$action);
@@ -989,23 +1005,36 @@ sub clearAllVlansOnTrunk($$) {
     my $portIndex = $self->{PORTINDEX}{$ifIndex};
 
     my $tag_obj = ["snSwPortInfoTagMode",$portIndex];
-    my $tag_state  = snmpGet($self->{SESS}, $tag_obj);
-    if ($tag_state == 1 ) {
-	snmpSet(["snSwPortVlanId",$portIndex,0,"INTEGER"]);
+    my ($RetVal, $errors, $member_obj, @vlanlist);
+    $errors = 0;
+    $self->debug("foundry::clearAllVlansOnTurn modport $modport "
+		    . " ifIndex $ifIndex portIndex $portIndex\n");
+    my $tag_state  = $self->{SESS}->get( $tag_obj);
+    $self->debug("tag state is $tag_state ");
+    if (defined($tag_state) && ($tag_state eq "tagged") ) {
+	$self->{SESS}->set(["snSwPortVlanId",$portIndex,0,"INTEGER"]);
+	my %vlaninfo = $self->findVlans();
+	@vlanlist = values %vlaninfo;
+    } else {
+	@vlanlist = ( $self->{SESS}->get([["snSwPortVlanId",$portIndex]]) );
     }
-    my @vlaninfo = $self->listVlans();
-    while ((scalar @vlaninfo)) {
-	my ($name, $number, @members) = pop @vlaninfo;
-	if (grep {$_ eq $modport} @members) {
-	    $self->debug("removing port $portIndex from VLAN $number\n",1);
-	    my $obj = "snVLanByPortMemberRowStatus.$number.$portIndex";
-	    my $RetVal = $self->{SESS}->set( $obj, 3);
+    foreach my $number (@vlanlist) {
+	if ($number == 1) { next ; }
+	$member_obj = "snVLanByPortMemberRowStatus.$number.$ifIndex";
+	$RetVal = $self->{SESS}->get($member_obj);
+	if (!defined($RetVal)) { next;}
+	$self->debug("got $RetVal for $member_obj\n",1);
+	if ($RetVal eq "valid") {
+	    $self->debug("removing port $ifIndex from VLAN $number\n",1);
+	    my $RetVal = $self->{SESS}->set( $member_obj, 3);
 
 	    if (!defined($RetVal) || ! $RetVal ) {
+		$errors++;
 		print STDERR "Couldn't remove $modport from VLAN $number\n";
 	    }
 	}
     }
+    return ($errors == 0) ;
 }
 #
 # Enable trunking on a port
@@ -1035,7 +1064,7 @@ sub enablePortTrunking($$$) {
     #
     # Add this port to the VLAN as a tagged port
     #
-    $rv = $self->setVlansOnTrunk($port, 1, [ $native_vlan] );
+    $rv = $self->setVlansOnTrunk($port, 1, ( $native_vlan) );
     if (!$rv) {
 	warn "ERROR: Unable to add port $port to VLAN $native_vlan\n";
 	return 0;
@@ -1066,9 +1095,6 @@ sub disablePortTrunking($$) {
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
     my $portIndex = $self->{PORTINDEX}{$ifIndex};
     my $vlan_obj = ["snSwPortVlanId",$portIndex];
-    my $tag_obj = ["snSwPortInfoTagMode",$portIndex];
-
-    my $tag_state = snmpitGet($self->{SESS},$tag_obj);
     my $native_vlan = snmpitGet($self->{SESS},$vlan_obj);
 
     #
@@ -1079,12 +1105,15 @@ sub disablePortTrunking($$) {
 	warn "ERROR: Unable to clear VLANs on trunk\n";
 	return 0;
     } 
-
-    if ($native_vlan != 0) {
-	$self->setPortVlan($native_vlan, [$port]);
+    $rv = $self->{SESS}->set(
+	[["snSwPortInfoTagMode",$portIndex,"untagged","INTEGER"]]);
+    if (defined($rv)) {
+	$self->debug("foundry::disablePortTrunking TagMode set to $rv\n");
+    }
+    if ($native_vlan > 1) {
+	$self->setPortVlan($native_vlan, $port);
     }
     return 1;
-    
 }
 
 #

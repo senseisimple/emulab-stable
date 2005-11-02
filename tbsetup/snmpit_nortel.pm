@@ -112,8 +112,6 @@ sub new($$$;$) {
     #
     # set up hashes for pending vlans
     #
-    $self->{NEW_NAMES} = {};
-    $self->{NEW_NUMBERS} = {};
     $self->{IFINDEX} = {};
     $self->{PORTINDEX} = {};
 
@@ -368,45 +366,34 @@ sub findVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
     my %mapping = ();
-    my ($name, $id, $vlan_number, $vlan_name);
+    my ($count, $name, $id, $vlan_number, $vlan_name) = (scalar(@vlan_ids));
 
-    if ($#vlan_ids == -1) {
-	while ( ($id, $name) = each %{$self->{NEW_NAMES}} ) {
-		$mapping{$id} = $name;
-	}
-    } else  {
-	@mapping{@vlan_ids} = undef;
-	foreach $id (@vlan_ids) {
-	    if (defined($self->{NEW_NAMES}->{$id})) {
-		$mapping{$id} = $self->{NEW_NAMES}->{$id};
-	    }
+    if ($count > 0) { @mapping{@vlan_ids} = undef; }
+
+#
+# Find all VLAN names. Do one to get the first field...
+#
+my $field = ["rcVlanName",0];
+$self->{SESS}->getnext($field);
+do {
+    ($name,$vlan_number,$vlan_name) = @{$field};
+    $self->debug("findVlan: Got $name $vlan_number $vlan_name\n",2);
+
+    #
+    # We only want the names - we ignore everything else
+    #
+    if ($name =~ /rcVlanName/) {
+	if (!@vlan_ids || exists $mapping{$vlan_name}) {
+	    $self->debug("Putting in mapping from $vlan_name to " .
+		"$vlan_number\n", 2);
+	    $mapping{$vlan_name} = $vlan_number;
 	}
     }
 
-    #
-    # Find all VLAN names. Do one to get the first field...
-    #
-    my $field = ["rcVlanName",0];
     $self->{SESS}->getnext($field);
-    do {
-	($name,$vlan_number,$vlan_name) = @{$field};
-	$self->debug("findVlan: Got $name $vlan_number $vlan_name\n",2);
+} while ( $name =~ /^rcVlanName/) ;
 
-	#
-	# We only want the names - we ignore everything else
-	#
-	if ($name =~ /rcVlanName/) {
-	    if (!@vlan_ids || exists $mapping{$vlan_name}) {
-		$self->debug("Putting in mapping from $vlan_name to " .
-		    "$vlan_number\n");
-		$mapping{$vlan_name} = $vlan_number;
-	    }
-	}
-
-	$self->{SESS}->getnext($field);
-    } while ( $name =~ /^rcVlanName/) ;
-
-    return %mapping;
+return %mapping;
 }
 
 #
@@ -419,39 +406,37 @@ sub findVlans($@) {
 #        returns undef if the VLAN id is not found
 #
 sub findVlan($$;$) { 
-    my $self = shift;
-    my $vlan_id = shift;
-    my $no_retry = shift;
+my $self = shift;
+my $vlan_id = shift;
+my $no_retry = shift;
 
-    $self->debug("Entering device findVlan of $vlan_id\n",2);
-    my $max_tries = $no_retry ? 1 : 5;
-    my $vlan_number = undef;
+$self->debug("Entering device findVlan of $vlan_id\n",2);
+my $max_tries = $no_retry ? 1 : 5;
+my $vlan_number = undef;
 
- BLOCK: {
-    $vlan_number = $self->{NEW_NAMES}->{$vlan_id};
+BLOCK: {
+
+#
+# We try this a few time, with 1 second sleeps, since it can take
+# a while for VLAN information to propagate
+#
+foreach my $try (1 .. $max_tries) {
+
+    my %mapping = $self->findVlans($vlan_id);
+    $vlan_number = $mapping{$vlan_id};
     if (defined($vlan_number)) { last BLOCK; }
 
     #
-    # We try this a few time, with 1 second sleeps, since it can take
-    # a while for VLAN information to propagate
+    # Wait before we try again
     #
-    foreach my $try (1 .. $max_tries) {
-
-	my %mapping = $self->findVlans($vlan_id);
-	$vlan_number = $mapping{$vlan_id};
-	if (defined($vlan_number)) { last BLOCK; }
-
-	#
-	# Wait before we try again
-	#
-	if ($try != $max_tries) {
-	    $self->debug("VLAN find failed, trying again\n",2);
-	    sleep 1;
-	}
+    if ($try != $max_tries) {
+	$self->debug("VLAN find failed, trying again\n",2);
+	sleep 1;
     }
- }
-    $self->debug("Leaving device findVlan of $vlan_id \n");
-    return $vlan_number;
+}
+}
+$self->debug("Leaving device findVlan of $vlan_id \n");
+return $vlan_number;
 }
 
 #   
@@ -469,41 +454,48 @@ sub findVlan($$;$) {
 # we have to supply all parameters in the same SNMP packet, however.
 #
 sub createVlan($$$) {
-    my $self = shift;
-    my $vlan_id = shift;
-    my $vlan_number = shift;
+my $self = shift;
+my $vlan_id = shift;
+my $vlan_number = shift;
 
-    if (!defined($vlan_number)) {
-	warn "nortel::createVlan called without supplying vlan_number";
-	return 0;
+if (!defined($vlan_number)) {
+    warn "nortel::createVlan called without supplying vlan_number";
+    return 0;
+}
+my $check_number = $self->findVlan($vlan_id,1);
+if (defined($check_number)) {
+    if ($check_number != $vlan_number) {
+	    warn "attempingting to recreate vlan id $vlan_id which has ".
+		 "existing vlan number $check_number with the new number ".
+		 "$vlan_number\n";
+		 return 0;
     }
-    my $check_number = $self->findVlan($vlan_id,1);
-    if (defined($check_number)) {
-	if ($check_number != $vlan_number) {
-		warn "attempingting to recreate vlan id $vlan_id which has ".
-		     "existing vlan number $check_number with the new number ".
-		     "$vlan_number\n";
-		     return 0;
-	}
-     }
-    my $VlanRowStatus = 'rcVlanRowStatus'; # vlan # is index
-    my $VlanName = 'rcVlanName'; # vlan # is index
-    my $VlanType = 'rcVlanType'; # vlan # is index
-    my $VlanStg = 'rcVlanStgId'; # vlan # is index
-    $self->debug("createVlan: name $vlan_id number $vlan_number \n");
-    #
-    # Perform the actual creation. Yes, this next line MUST happen all in
-    # one set command....
-    #
-    my $RetVal = $self->{SESS}->set([[$VlanRowStatus,"$vlan_number",
-		    "createAndGo","INTEGER"],
-	    [$VlanType,"$vlan_number","byPort","INTEGER"],
-	    [$VlanStg,"$vlan_number",1,"INTEGER"],
-	    [$VlanName,"$vlan_number",$vlan_id,"OCTETSTR"]
-	    ]);
-    print "",($RetVal? "Succeeded":"Failed"), ".\n";
+ }
+my $VlanRowStatus = 'rcVlanRowStatus'; # vlan # is index
+my $VlanName = 'rcVlanName'; # vlan # is index
+my $VlanType = 'rcVlanType'; # vlan # is index
+my $VlanStg = 'rcVlanStgId'; # vlan # is index
+$self->debug("createVlan: name $vlan_id number $vlan_number \n");
+#
+# Perform the actual creation. Yes, this next line MUST happen all in
+# one set command....
+#
+my $RetVal = $self->{SESS}->set([[$VlanRowStatus,"$vlan_number",
+		"createAndGo","INTEGER"],
+	[$VlanType,"$vlan_number","byPort","INTEGER"],
+	[$VlanStg,"$vlan_number",1,"INTEGER"],
+	[$VlanName,"$vlan_number",$vlan_id,"OCTETSTR"]
+	]);
+print "",($RetVal? "Succeeded":"Failed"), ".\n";
 
-     return $vlan_number;
+# You'ld think you'ld be able to add the next one to the list above as one
+# more item, but that caused it to fail, even though it wins as a separate
+# packet.
+
+$RetVal = $self->{SESS}->set(
+	[["rcVlanIgmpSnoopEnable","$vlan_number","true","INTEGER"]]);
+
+ return $vlan_number;
 }
 
 #
@@ -517,65 +509,164 @@ sub createVlan($$$) {
 # nortel specific: if the vlan_number < 0 *remove* the ports from the vlan
 #
 sub setPortVlan($$@) {
-    my $self = shift;
-    my $vlan_number = shift;
-    my @ports = @_;
+my $self = shift;
+my $vlan_number = shift;
+my @ports = @_;
 
-    my $errors = 0;
-    my $obj = "rcVlanPortMembers";
-    my $action = $vlan_number;
-    if ($vlan_number < 0) {
-	$vlan_number = 0 - $vlan_number;
+my $errors = 0;
+my $obj = "rcVlanPortMembers"; my $igmp = "rcVlanIgmpVer1SnoopMRouterPorts";
+$self->debug("nortel::setPortVlan $vlan_number ");
+       
+#
+# Run the port list through portmap to find the ports on the switch that
+# we are concerned with
+#
+
+my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
+$self->debug("ports: " . join(",",@ports) . "\n");
+$self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
+
+#
+# We need to remove any normal ports from other vlans to which
+# they may belong; the nortels don't automatically do this, unlike
+# foundry's and cisco's.
+#
+my (%vlansToPorts, $porttype, $vlans, $portIndex);
+my (@vlanList, $vlan, @memberlist);
+%vlansToPorts = ();
+foreach $portIndex (@portlist) {
+    $porttype = $self->{SESS}->get("rcVlanPortType.$portIndex");
+    if (defined($porttype)) {
+	$self->debug("ifIndex $portIndex has type $porttype");
+	if ($porttype eq "access") {
+	    $vlans = $self->{SESS}->get("rcVlanPortVlanIds.$portIndex");
+	    if (defined($vlans)) {
+		@vlanList = unpack "n*", $vlans;
+		$self->debug(" and is in vlans @vlanList");
+		foreach $vlan (@vlanList) {
+		    if ($vlan != $vlan_number) {
+			if (!defined($vlansToPorts{$vlan})) {
+			    $vlansToPorts{$vlan} = [];
+			}
+			push @{$vlansToPorts{$vlan}}, $portIndex;
+		    }
+		}
+	    }
+	}
     }
-           
-    #
-    # Run the port list through portmap to find the ports on the switch that
-    # we are concerned with
-    #
+    $self->debug("\n");
+}
+foreach $vlan (keys %vlansToPorts) {
+    $self->delPortVlan($vlan, @{$vlansToPorts{$vlan}});
+}
 
-    my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
-    $self->debug("nortel::setPortVLan ports: " . join(",",@ports) . "\n");
-    $self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
+my $portSet = $self->{SESS}->get("$obj.$vlan_number");
+if (!$portSet) {
+    printf STDERR "Could not get current list for VLAN $vlan_number\n";
+    return 1;
+}
+my @oldlist = $self->portSetToList($portSet);
+push @oldlist, @portlist;
+my $SetVal = $self->listToPortSet(@oldlist);
+$self->debug("members of VLAN $vlan_number [ @oldlist ]\n");
 
-    my $portSet = $self->{SESS}->get("$obj.$vlan_number");
-    if (!$portSet) {
-	printf STDERR "Could not get current list for VLAN $vlan_number\n";
-	return 1;
-    }
-    my @oldlist = $self->portSetToList($portSet);
-    if ($action > 0) {
-	push @oldlist, @portlist;
-    } else {
-	@oldlist = grep {(0 == (grep ($_, @portlist)))} @oldlist;
-    }
-    my $SetVal = $self->listToPortSet(@oldlist);
-    $self->debug("members of VLAN $vlan_number [ @oldlist ]\n");
+my $RetVal = $self->{SESS}->set( [[$obj, $vlan_number, $SetVal, "OCTETSTR"]] );
 
+if (!$RetVal) {
+    print STDERR "setting ports on VLAN $vlan_number failed.\n";
+    print STDERR "used obj $obj , SetVal $SetVal \n";
+    $errors++;
+    return 1;
+}
 
-    my $RetVal = $self->{SESS}->set([[$obj, $vlan_number, $SetVal, "OCTETSTR"]]);
+# ibid, desire to do two steps at once above... 
 
-    if (!$RetVal) {
-	print STDERR "setting ports on VLAN $vlan_number failed.\n";
-	print STDERR "used obj $obj , SetVal $SetVal \n";
-	$errors++;
-	return 1;
-    }
+$RetVal = $self->{SESS}->set( [[$igmp, $vlan_number, $SetVal, "OCTETSTR"]] );
+if (!$RetVal) {
+    print STDERR "setting igmp ports on VLAN $vlan_number failed.\n";
+    $errors++;
+    return 1;
+}
 
-    if ($action < 0) {
-	return $errors;
-    }
+#
+# We need to make sure the ports get enabled.
+#
 
-    #
-    # We need to make sure the ports get enabled.
-    #
+$self->debug("Enabling "  . join(',',@ports) . "...\n");
+if ( my $rv = $self->portControl("enable",@ports) ) {
+    print STDERR "Port enable had $rv failures.\n";
+    $errors += $rv;
+}
 
-    $self->debug("Enabling "  . join(',',@ports) . "...\n");
-    if ( my $rv = $self->portControl("enable",@ports) ) {
-	print STDERR "Port enable had $rv failures.\n";
-	$errors += $rv;
-    }
+return $errors;
+}
 
-    return $errors;
+sub not_in($$@) {
+my $self = shift;
+my $value = shift;
+my @list = @_;
+
+return 0 == scalar(grep {$_ == $value;} @list);
+}
+
+#
+# Remove the given ports from the given VLAN. The VLAN is given as an 802.1Q 
+# tag number.
+#
+# usage: delPortVlan($self, $vlan_number, @ports)
+#	 returns 0 on sucess.
+#	 returns the number of failed ports on failure.
+#
+sub delPortVlan($$@) {
+my $self = shift;
+my $vlan_number = shift;
+my @ports = @_;
+
+my $errors = 0;
+my $obj = "rcVlanPortMembers"; my $igmp = "rcVlanIgmpVer1SnoopMRouterPorts";
+$self->debug("nortel::delPortVlan $vlan_number ");
+       
+#
+# Run the port list through portmap to find the ports on the switch that
+# we are concerned with
+#
+
+my @portlist = $self->convertPortFormat($PORT_FORMAT_IFINDEX, @ports);
+$self->debug("ports: " . join(",",@ports) . "\n");
+$self->debug("as ifIndexes: " . join(",",@portlist) . "\n");
+
+my $portSet = $self->{SESS}->get("$obj.$vlan_number");
+
+if (!$portSet) {
+    printf STDERR "Could not get current list for VLAN $vlan_number\n";
+    return 1;
+}
+my @oldlist = $self->portSetToList($portSet);
+
+$self->debug("oldlist of VLAN $vlan_number [ @oldlist ]\n");
+$self->debug("portlist to drop is [ @portlist ]\n");
+@oldlist =  grep {$self->not_in($_, @portlist);} @oldlist;
+$self->debug("after set diff oldlist is [ @oldlist ]\n");
+
+my $SetVal = $self->listToPortSet(@oldlist);
+
+my $RetVal = $self->{SESS}->set([[$obj, $vlan_number, $SetVal, "OCTETSTR"]]);
+
+if (!$RetVal) {
+    print STDERR "setting ports on VLAN $vlan_number failed.\n";
+    print STDERR "used obj $obj , SetVal $SetVal \n";
+    $errors++;
+    return 1;
+}
+
+$RetVal = $self->{SESS}->set( [[$igmp, $vlan_number, $SetVal, "OCTETSTR"]] );
+if (!$RetVal) {
+    print STDERR "setting igmp ports on VLAN $vlan_number failed.\n";
+    $errors++;
+    return 1;
+}
+
+return $errors;
 }
 
 
@@ -588,38 +679,38 @@ sub setPortVlan($$@) {
 #	 returns the number of failed ports on failure.
 #
 sub removePortsFromVlan($@) {
-    my $self = shift;
-    my @vlan_numbers = @_;
-    my $errors = 0;
+my $self = shift;
+my @vlan_numbers = @_;
+my $errors = 0;
 
-    my ($name,$index,$value,$modport,$portIndex,$portString);
-    foreach my $vlan_number (@vlan_numbers) {
+my ($name,$index,$value,$modport,$portIndex,$portString);
+foreach my $vlan_number (@vlan_numbers) {
+    #
+    # Do one to get the first field...
+    #
+    $self->debug("nortel::removePortsFromVlan number $vlan_number\n");
+    my $field = ["rcVlanPortMembers",$vlan_number,"OCTETSTRING"];
+    $value = $self->{SESS}->get($field);
+    if (!$value) {
+	    print STDERR "No port member list for VLAN $vlan_number\n";
+	    return 1;
+    }
+    my @portlist = $self->portSetToList($value);
+    $self->debug("removePortsFromVlan $vlan_number: @portlist\n");
+    foreach $portIndex (@portlist) {
 	#
-	# Do one to get the first field...
+	# disable this port, unless it is tagged.
 	#
-	$self->debug("nortel::removePortsFromVlan number $vlan_number\n");
-	my $field = ["rcVlanPortMembers",$vlan_number,"OCTETSTRING"];
-	$value = $self->{SESS}->get($field);
-	if (!$value) {
-		print STDERR "No port member list for VLAN $vlan_number\n";
-		return 1;
-	}
-	my @portlist = $self->portSetToList($value);
-	$self->debug("removePortsFromVlan $vlan_number: @portlist\n");
-	foreach $portIndex (@portlist) {
-	    #
-	    # disable this port, unless it is tagged.
-	    #
-	    $value= $self->{SESS}->get(["rcVlanPortType",$portIndex]);
-	    if (defined($value) && ($value eq "access")) {
-		$self->debug("disabling port $portIndex  "
-				. "from vlan $vlan_number ( $value )\n" );
-		$value = $self->{SESS}->set
-		(["ifAdminStatus",$portIndex,"down","INTEGER"]);
-	    }
+	$value= $self->{SESS}->get(["rcVlanPortType",$portIndex]);
+	if (defined($value) && ($value eq "access")) {
+	    $self->debug("disabling port $portIndex  "
+			    . "from vlan $vlan_number ( $value )\n" );
+	    $value = $self->{SESS}->set
+	    (["ifAdminStatus",$portIndex,"down","INTEGER"]);
 	}
     }
-    return $errors;
+}
+return $errors;
 }
 
 #
@@ -633,88 +724,88 @@ sub removePortsFromVlan($@) {
 #
 #
 sub removeVlan($@) {
-    my $self = shift;
-    my @vlan_numbers = @_;
-    my $errors = 0;
-    my $DeleteOID = "rcVlanRowStatus";
-    my $name = $self->{NAME};
+my $self = shift;
+my @vlan_numbers = @_;
+my $errors = 0;
+my $DeleteOID = "rcVlanRowStatus";
+my $name = $self->{NAME};
 
 
 
-    foreach my $vlan_number (@vlan_numbers) {
-	#
-	# Perform the actual removal
-	#
-	my $RetVal = undef;
-	print "  Removing VLAN # $vlan_number ... ";
-	$RetVal = $self->{SESS}->set([[$DeleteOID,$vlan_number,"destroy","INTEGER"]]);
-	if ($RetVal) {
-	    print "Removed VLAN $vlan_number on switch $name.\n";
-	} else {
-	    print STDERR "Removing VLAN $vlan_number failed on switch $name.\n";
-	}
+foreach my $vlan_number (@vlan_numbers) {
+    #
+    # Perform the actual removal
+    #
+    my $RetVal = undef;
+    print "  Removing VLAN # $vlan_number ... ";
+    $RetVal = $self->{SESS}->set([[$DeleteOID,$vlan_number,"destroy","INTEGER"]]);
+    if ($RetVal) {
+	print "Removed VLAN $vlan_number on switch $name.\n";
+    } else {
+	print STDERR "Removing VLAN $vlan_number failed on switch $name.\n";
     }
-    return ($errors == 0) ? 1 : 0;
+}
+return ($errors == 0) ? 1 : 0;
 }
 
 #
 # XXX: Major cleanup
 #
 sub UpdateField($$$@) {
-    my $self = shift;
-    my ($OID,$val,@ports)= @_;
+my $self = shift;
+my ($OID,$val,@ports)= @_;
 
-    $self->debug("nortel::UpdateField: OID $OID value $val ports @ports\n");
+$self->debug("nortel::UpdateField: OID $OID value $val ports @ports\n");
 
-    my $Status = 0;
-    my $result = 0;
-    my ($portname, $module, $port, $row, $modport);
+my $Status = 0;
+my $result = 0;
+my ($portname, $module, $port, $row, $modport);
 
 
-    foreach my $portname (@ports) {
-	#
-	# Check the input format - the ports might already be in
-	# switch:module.port form, or we may have to convert them to it with
-	# portnum
-	#
-	if ($portname =~ /:(\d+)\.(\d+)/) {
-	    $module = $1; $port = $2;
-	} else {
-	    $portname = portnum($portname);
-	    if (!$portname) { next; }
-	    $portname =~ /:(\d+)\.(\d+)/;
-	    $module = $1; $port = $2;
-	}
-	$modport = "$module.$port";
-	$self->debug("port $portname ( $modport ), " );
-	if ($OID =~ /^ifAdmin/) {
-		$row = $self->{IFINDEX}{$modport};
-	} else {
-		$row = $self->{PORTINDEX}{$modport};
-	}
-	$self->debug("checking row $row for $val ...\n");
-	$Status = $self->{SESS}->get([$OID,$row]);
-	if (!defined $Status) {
-	    print STDERR "Port $portname, change to $val: No answer from device\n";
-	    $result = -1;
-	} else {
-	    $self->debug("Port $portname, row $row was $Status\n");
-	    if ($Status ne $val) {
-		$self->debug("Setting $portname (r $row) to $val...");
-		$self->{SESS}->set([[$OID,$row,$val,"INTEGER"]]);
-		my $count = 6;
-		while (($Status ne $val) && (--$count > 0)) { 
-		    sleep 1;
-		    $Status = $self->{SESS}->get([$OID,$row]);
-		    $self->debug("Value for $portname is currently $Status\n");
-		}
-		$result =  ($count > 0) ? 0 : -1;
-		$self->debug($result ? "failed.\n" : "succeeded.\n");
-	    }
-	}
-
+foreach my $portname (@ports) {
+    #
+    # Check the input format - the ports might already be in
+    # switch:module.port form, or we may have to convert them to it with
+    # portnum
+    #
+    if ($portname =~ /:(\d+)\.(\d+)/) {
+	$module = $1; $port = $2;
+    } else {
+	$portname = portnum($portname);
+	if (!$portname) { next; }
+	$portname =~ /:(\d+)\.(\d+)/;
+	$module = $1; $port = $2;
     }
-    return $result;
+    $modport = "$module.$port";
+    $self->debug("port $portname ( $modport ), " );
+    if ($OID =~ /^ifAdmin/) {
+	    $row = $self->{IFINDEX}{$modport};
+    } else {
+	    $row = $self->{PORTINDEX}{$modport};
+    }
+    $self->debug("checking row $row for $val ...\n");
+    $Status = $self->{SESS}->get([$OID,$row]);
+    if (!defined $Status) {
+	print STDERR "Port $portname, change to $val: No answer from device\n";
+	$result = -1;
+    } else {
+	$self->debug("Port $portname, row $row was $Status\n");
+	if ($Status ne $val) {
+	    $self->debug("Setting $portname (r $row) to $val...");
+	    $self->{SESS}->set([[$OID,$row,$val,"INTEGER"]]);
+	    my $count = 6;
+	    while (($Status ne $val) && (--$count > 0)) { 
+		sleep 1;
+		$Status = $self->{SESS}->get([$OID,$row]);
+		$self->debug("Value for $portname is currently $Status\n");
+	    }
+	    $result =  ($count > 0) ? 0 : -1;
+	    $self->debug($result ? "failed.\n" : "succeeded.\n");
+	}
+    }
+
+}
+return $result;
 }
 
 #
@@ -724,112 +815,112 @@ sub UpdateField($$$@) {
 # see snmpit_cisco_stack.pm for a description of return value format
 #
 sub listVlans($) {
-    my $self = shift;
+my $self = shift;
 
-    my %Names = ();
-    my %Numbers = ();
-    my %Members = ();
-    my $vlan_name;
+my %Names = ();
+my %Numbers = ();
+my %Members = ();
+my $vlan_name;
 
-    #
-    # First, we grab the numbers of all the VLANs
-    #
-    my ($varname,$index,$value);
-    my $field = ["rcVlanId",0];
-    $self->{SESS}->getnext($field);
-    do {
-	($varname,$index,$value) = @{$field};
-	$self->debug("listVlans(numbers): Got $varname $index $value\n");
-	if ($varname =~ /rcVlanId/) {
-	    $Numbers{$index} = $value;
-	}
-	$self->{SESS}->getnext($field);
-    } while ( $varname eq "rcVlanId");
-    #
-    # Then, we grab the names of all the VLANs
-    #
-    $field = ["rcVlanName",0];
-    $self->{SESS}->getnext($field);
-    do {
-	($varname,$index,$value) = @{$field};
-	$self->debug("listVlans(names): Got $varname $index $value\n");
-	if ($varname =~ /rcVlanName/) {
-	    $Names{$index} = $value;
-	}
-	$self->{SESS}->getnext($field);
-	$vlan_name = $Names{$index};
-    } while ( $varname eq "rcVlanName");
-
-    #
-    # Next, we find membership, by port
-    #
-    my $prefix = ($self->{NAME} || "port" );
-    my ($portstring, $numports, $port);
-    my (@portlist, @memberlist);
-    $field = ["rcVlanPortMembers",0];
-    $self->{SESS}->getnext($field);
-    do {
-	($varname,$index,$value) = @{$field};
-	if ($varname =~ /rcVlanPortMembers/) {
-	    $portstring = unpack "B*", $value ;
-	    @portlist = unpack "C*", $portstring ;
-
-	    @memberlist = ();
-	    $vlan_name = $Names{$index};
-	    if (!defined($vlan_name)) { $vlan_name = "random" }
-	    $self->debug("Vlan $vlan_name has portlist $portstring\n",2);
-
-	    $numports = scalar @portlist;
-	    $port = 0;
-	    while ($port < $numports) {
-
-	    # Find out the real node name. We just call it portX if
-	    # it doesn't seem to have one.
-	      if ($portlist[$port] == 49) {
-	
-		my $portname = $self->{NAME} . ":" . $self->{IFINDEX}{$port};
-		my $node = portnum($portname);
-		if (defined($node)) {
-		    $self->debug("portnum returns $node for  $portname\n",2);
-		    push @{$Members{$index}}, $node;
-		    push @memberlist, $node;
-		} else {
-		    $self->debug("no portnum for $portname in $vlan_name\n",2);
-		}
-	      }
-	      $port++;
-            }
-	   $self->debug("constructed list @memberlist\n");
-	}
-	$self->{SESS}->getnext($field);
-    } while ( $varname eq "rcVlanPortMembers" );
-
-    #
-    # Build a list from the name and membership lists
-    #
-    my @list = ();
-    my $vlan_id;
-
-    foreach $vlan_id ( sort keys %Numbers ) {
-	my $number = $Numbers{$vlan_id};
-
-
-	if (defined($number) && !($number ==  1)) {
-		# Check for members to avoid pushing an undefined value into
-		# the array (which causes warnings elsewhere)
-
-		$self->debug("number $number for index $vlan_id \n",2);
-	
-		if ($Members{$vlan_id}) {
-		    push @list, [$Names{$vlan_id},$number,$Members{$vlan_id}];
-		} else {
-		    push @list, [$Names{$vlan_id},$number,[]];
-		}
-	} else  { $self->debug("skipping index $vlan_id\n",2); }
+#
+# First, we grab the numbers of all the VLANs
+#
+my ($varname,$index,$value);
+my $field = ["rcVlanId",0];
+$self->{SESS}->getnext($field);
+do {
+    ($varname,$index,$value) = @{$field};
+    $self->debug("listVlans(numbers): Got $varname $index $value\n");
+    if ($varname =~ /rcVlanId/) {
+	$Numbers{$index} = $value;
     }
+    $self->{SESS}->getnext($field);
+} while ( $varname eq "rcVlanId");
+#
+# Then, we grab the names of all the VLANs
+#
+$field = ["rcVlanName",0];
+$self->{SESS}->getnext($field);
+do {
+    ($varname,$index,$value) = @{$field};
+    $self->debug("listVlans(names): Got $varname $index $value\n");
+    if ($varname =~ /rcVlanName/) {
+	$Names{$index} = $value;
+    }
+    $self->{SESS}->getnext($field);
+    $vlan_name = $Names{$index};
+} while ( $varname eq "rcVlanName");
 
-    #$self->debug("devListVlans:".join("\n",(map {join ",", @$_} @list))."\n");
-    return @list;
+#
+# Next, we find membership, by port
+#
+my $prefix = ($self->{NAME} || "port" );
+my ($portstring, $numports, $port);
+my (@portlist, @memberlist);
+$field = ["rcVlanPortMembers",0];
+$self->{SESS}->getnext($field);
+do {
+    ($varname,$index,$value) = @{$field};
+    if ($varname =~ /rcVlanPortMembers/) {
+	$portstring = unpack "B*", $value ;
+	@portlist = unpack "C*", $portstring ;
+
+	@memberlist = ();
+	$vlan_name = $Names{$index};
+	if (!defined($vlan_name)) { $vlan_name = "random" }
+	$self->debug("Vlan $vlan_name has portlist $portstring\n",2);
+
+	$numports = scalar @portlist;
+	$port = 0;
+	while ($port < $numports) {
+
+	# Find out the real node name. We just call it portX if
+	# it doesn't seem to have one.
+	  if ($portlist[$port] == 49) {
+    
+	    my $portname = $self->{NAME} . ":" . $self->{IFINDEX}{$port};
+	    my $node = portnum($portname);
+	    if (defined($node)) {
+		$self->debug("portnum returns $node for  $portname\n",2);
+		push @{$Members{$index}}, $node;
+		push @memberlist, $node;
+	    } else {
+		$self->debug("no portnum for $portname in $vlan_name\n",2);
+	    }
+	  }
+	  $port++;
+	}
+       $self->debug("constructed list @memberlist\n");
+    }
+    $self->{SESS}->getnext($field);
+} while ( $varname eq "rcVlanPortMembers" );
+
+#
+# Build a list from the name and membership lists
+#
+my @list = ();
+my $vlan_id;
+
+foreach $vlan_id ( sort keys %Numbers ) {
+    my $number = $Numbers{$vlan_id};
+
+
+    if (defined($number) && !($number ==  1)) {
+	    # Check for members to avoid pushing an undefined value into
+	    # the array (which causes warnings elsewhere)
+
+	    $self->debug("number $number for index $vlan_id \n",2);
+    
+	    if ($Members{$vlan_id}) {
+		push @list, [$Names{$vlan_id},$number,$Members{$vlan_id}];
+	    } else {
+		push @list, [$Names{$vlan_id},$number,[]];
+	    }
+    } else  { $self->debug("skipping index $vlan_id\n",2); }
+}
+
+#$self->debug("devListVlans:".join("\n",(map {join ",", @$_} @list))."\n");
+return @list;
 }
 
 #
@@ -839,74 +930,74 @@ sub listVlans($) {
 # see snmpit_cisco_stack.pm for a description of return value format
 #
 sub listPorts($) {
-    my $self = shift;
+my $self = shift;
 
-    my %Able = ();
-    my %Link = ();
-    my %auto = ();
-    my %speed = ();
-    my %duplex = ();
+my %Able = ();
+my %Link = ();
+my %auto = ();
+my %speed = ();
+my %duplex = ();
 
-    my $ifTable = ["ifAdminStatus",0];
+my $ifTable = ["ifAdminStatus",0];
 
-    #
-    # Get the ifAdminStatus (enabled/disabled) and ifOperStatus
-    # (up/down)
-    #
-    my ($varname, $modport, $ifIndex, $portIndex, $status, $portname);
-    $self->{SESS}->getnext($ifTable);
-    do {
-	($varname,$ifIndex,$status) = @{$ifTable};
-	$self->debug("$varname $ifIndex $status\n");
-	if ($varname =~ /AdminStatus/) { 
-	    $Able{$ifIndex} = ($status =~/up/ ? "yes" : "no");
-	}
-	$self->{SESS}->getnext($ifTable);
-    } while ( $varname =~ /^ifAdminStatus$/) ;
-
-    #
-    # Get the port configuration, including speed, duplex, and whether or not
-    # it is autoconfiguring
-    #
-    foreach $ifIndex (keys %Able) {
-	$portIndex = $self->{PORTINDEX}{$ifIndex};
-	if ($status = $self->{SESS}->get(["ifOperStatus",$ifIndex])) {
-	    $Link{$ifIndex} = $status;
-	}
-	if ($status = $self->{SESS}->get(["rcPortOperDuplex",$ifIndex])) {
-	    $duplex{$ifIndex} = $status;
-	}
-	if ($status = $self->{SESS}->get(["rcPortOperSpeed",$ifIndex])) {
-	    $speed{$ifIndex} = $status;
-	}
-    };
-
-    #
-    # Put all of the data gathered in the loop into a list suitable for
-    # returning
-    #
-    my @rv = ();
-    foreach my $id ( keys %Able ) {
-	$modport = $self->{IFINDEX}{$id};
-	$portname = $self->{NAME} . ":$modport";
-	my $port = portnum($portname);
-
-	#
-	# Skip ports that don't seem to have anything interesting attached
-	#
-	if (!$port && $self->{DOALLPORTS}) {
-#		$port = $portname;
-		$port = "n:$modport";
-	}
-	if (!$port) {
-	    $self->debug("$id ($modport) not connected, skipping\n");
-	    next;
-	}
-	if (! defined ($speed{$id}) ) { $speed{$id} = " "; }
-	if (! defined ($duplex{$id}) ) { $duplex{$id} = " "; }
-	push @rv, [$port,$Able{$id},$Link{$id},$speed{$id},$duplex{$id}];
+#
+# Get the ifAdminStatus (enabled/disabled) and ifOperStatus
+# (up/down)
+#
+my ($varname, $modport, $ifIndex, $portIndex, $status, $portname);
+$self->{SESS}->getnext($ifTable);
+do {
+    ($varname,$ifIndex,$status) = @{$ifTable};
+    $self->debug("$varname $ifIndex $status\n");
+    if ($varname =~ /AdminStatus/) { 
+	$Able{$ifIndex} = ($status =~/up/ ? "yes" : "no");
     }
-    return @rv;
+    $self->{SESS}->getnext($ifTable);
+} while ( $varname =~ /^ifAdminStatus$/) ;
+
+#
+# Get the port configuration, including speed, duplex, and whether or not
+# it is autoconfiguring
+#
+foreach $ifIndex (keys %Able) {
+    $portIndex = $self->{PORTINDEX}{$ifIndex};
+    if ($status = $self->{SESS}->get(["ifOperStatus",$ifIndex])) {
+	$Link{$ifIndex} = $status;
+    }
+    if ($status = $self->{SESS}->get(["rcPortOperDuplex",$ifIndex])) {
+	$duplex{$ifIndex} = $status;
+    }
+    if ($status = $self->{SESS}->get(["rcPortOperSpeed",$ifIndex])) {
+	$speed{$ifIndex} = $status;
+    }
+};
+
+#
+# Put all of the data gathered in the loop into a list suitable for
+# returning
+#
+my @rv = ();
+foreach my $id ( keys %Able ) {
+    $modport = $self->{IFINDEX}{$id};
+    $portname = $self->{NAME} . ":$modport";
+    my $port = portnum($portname);
+
+    #
+    # Skip ports that don't seem to have anything interesting attached
+    #
+    if (!$port && $self->{DOALLPORTS}) {
+#		$port = $portname;
+	    $port = "n:$modport";
+    }
+    if (!$port) {
+	$self->debug("$id ($modport) not connected, skipping\n");
+	next;
+    }
+    if (! defined ($speed{$id}) ) { $speed{$id} = " "; }
+    if (! defined ($duplex{$id}) ) { $duplex{$id} = " "; }
+    push @rv, [$port,$Able{$id},$Link{$id},$speed{$id},$duplex{$id}];
+}
+return @rv;
 }
 
 # 
@@ -917,80 +1008,80 @@ sub listPorts($) {
 #
 #
 sub getStats ($) {
-    my $self = shift;
+my $self = shift;
 
-    my $ifTable = ["ifInOctets",0];
-    my %inOctets=();
-    my %inUcast=();
-    my %inNUcast=();
-    my %inDiscard=();
-    my %inErr=();
-    my %inUnkProt=();
-    my %outOctets=();
-    my %outUcast=();
-    my %outNUcast=();
-    my %outDiscard=();
-    my %outErr=();
-    my %outQLen=();
-    my ($varname, $port, $value);
+my $ifTable = ["ifInOctets",0];
+my %inOctets=();
+my %inUcast=();
+my %inNUcast=();
+my %inDiscard=();
+my %inErr=();
+my %inUnkProt=();
+my %outOctets=();
+my %outUcast=();
+my %outNUcast=();
+my %outDiscard=();
+my %outErr=();
+my %outQLen=();
+my ($varname, $port, $value);
 
-    #
-    # Walk the whole stats tree, and fill these ha
-    #
-    $self->{SESS}->getnext($ifTable);
-    do {
-	($varname,$port,$value) = @{$ifTable};
-	$self->debug("getStats: Got $varname, $port, $value\n");
-	    if ($varname =~ /InOctets/) {
-		$inOctets{$port} = $value;
-	    } elsif ($varname =~ /InUcast/) {
-		$inUcast{$port} = $value;
-	    } elsif ($varname =~ /InNUcast/) {
-		$inNUcast{$port} = $value;
-	    } elsif ($varname =~ /InDiscard/) {
-		$inDiscard{$port} = $value;
-	    } elsif ($varname =~ /InErrors/) {
-		$inErr{$port} = $value;
-	    } elsif ($varname =~ /InUnknownP/) {
-		$inUnkProt{$port} = $value;
-	    } elsif ($varname =~ /OutOctets/) {
-		$outOctets{$port} = $value;
-	    } elsif ($varname =~ /OutUcast/) {
-		$outUcast{$port} = $value;
-	    } elsif ($varname =~ /OutNUcast/) {
-		$outNUcast{$port} = $value;
-	    } elsif ($varname =~ /OutDiscard/) {
-		$outDiscard{$port} = $value;
-	    } elsif ($varname =~ /OutErrors/) {
-		$outErr{$port} = $value;
-	    } elsif ($varname =~ /OutQLen/) {
-		$outQLen{$port} = $value;
-	    }
-	$self->{SESS}->getnext($ifTable);
-    } while ( $varname =~ /^i[f](In|Out)/) ;
-
-    #
-    # Put all of the data gathered in the loop into a list suitable for
-    # returning
-    #
-    my @rv = ();
-    foreach my $id ( keys %inOctets ) {
-	$port = portnum($self->{NAME} . ":" . $self->{IFINDEX}{$id});
-
-	#
-	# Skip ports that don't seem to have anything interesting attached
-	#
-	if (!$port) {
-	    $self->debug("$id does not seem to be connected, skipping\n");
-	    next;
+#
+# Walk the whole stats tree, and fill these ha
+#
+$self->{SESS}->getnext($ifTable);
+do {
+    ($varname,$port,$value) = @{$ifTable};
+    $self->debug("getStats: Got $varname, $port, $value\n");
+	if ($varname =~ /InOctets/) {
+	    $inOctets{$port} = $value;
+	} elsif ($varname =~ /InUcast/) {
+	    $inUcast{$port} = $value;
+	} elsif ($varname =~ /InNUcast/) {
+	    $inNUcast{$port} = $value;
+	} elsif ($varname =~ /InDiscard/) {
+	    $inDiscard{$port} = $value;
+	} elsif ($varname =~ /InErrors/) {
+	    $inErr{$port} = $value;
+	} elsif ($varname =~ /InUnknownP/) {
+	    $inUnkProt{$port} = $value;
+	} elsif ($varname =~ /OutOctets/) {
+	    $outOctets{$port} = $value;
+	} elsif ($varname =~ /OutUcast/) {
+	    $outUcast{$port} = $value;
+	} elsif ($varname =~ /OutNUcast/) {
+	    $outNUcast{$port} = $value;
+	} elsif ($varname =~ /OutDiscard/) {
+	    $outDiscard{$port} = $value;
+	} elsif ($varname =~ /OutErrors/) {
+	    $outErr{$port} = $value;
+	} elsif ($varname =~ /OutQLen/) {
+	    $outQLen{$port} = $value;
 	}
-	push @rv, [$port,$inOctets{$id},$inUcast{$id},$inNUcast{$id},
-		$inDiscard{$id},$inErr{$id},$inUnkProt{$id},$outOctets{$id},
-		$outUcast{$id},$outNUcast{$id},$outDiscard{$id},$outErr{$id},
-		$outQLen{$id}];
+    $self->{SESS}->getnext($ifTable);
+} while ( $varname =~ /^i[f](In|Out)/) ;
 
+#
+# Put all of the data gathered in the loop into a list suitable for
+# returning
+#
+my @rv = ();
+foreach my $id ( keys %inOctets ) {
+    $port = portnum($self->{NAME} . ":" . $self->{IFINDEX}{$id});
+
+    #
+    # Skip ports that don't seem to have anything interesting attached
+    #
+    if (!$port) {
+	$self->debug("$id does not seem to be connected, skipping\n");
+	next;
     }
-    return @rv;
+    push @rv, [$port,$inOctets{$id},$inUcast{$id},$inNUcast{$id},
+	    $inDiscard{$id},$inErr{$id},$inUnkProt{$id},$outOctets{$id},
+	    $outUcast{$id},$outNUcast{$id},$outDiscard{$id},$outErr{$id},
+	    $outQLen{$id}];
+
+}
+return @rv;
 
 }
 
@@ -1004,47 +1095,44 @@ sub getStats ($) {
 #        Returns 1 on success, 0 otherwise
 #
 sub setVlansOnTrunk($$$$) {
-    my $self = shift;
-    my ($modport, $value, @vlan_numbers) = @_;
-    my ($portindex,$ifIndex,$RetVal);
-    my $errors = 0;
+my $self = shift;
+my ($modport, $value, @vlan_numbers) = @_;
+my ($portindex,$ifIndex,$RetVal);
+my $errors = 0;
 
-    #
-    # Some error checking
-    #
-    if (($value != 1) && ($value != 0)) {
-	die "Invalid value $value passed to setVlansOnTrunk\n";
+#
+# Some error checking
+#
+if (($value != 1) && ($value != 0)) {
+    die "Invalid value $value passed to setVlansOnTrunk\n";
+}
+if (grep(/^1$/,@vlan_numbers)) {
+    die "VLAN 1 passed to setVlansOnTrunk\n";
+}
+$self->debug("setVlansOnTrunk m $modport v $value nums @vlan_numbers\n");
+$portindex = $self->{PORTINDEX}{$modport};
+$ifIndex = $self->{IFINDEX}{$modport};
+
+#
+# Make sure ostensible trunk is either trunk or dual mode
+#
+$RetVal = $self->{SESS}->get(["rcVlanPortType",$portindex]);
+if (defined($RetVal) && ($RetVal eq "access")) {
+    warn "nortel::setVlansOnTrunk: port $modport is normal port, " .
+	    "refusing to add vlan(s) @vlan_numbers\n";
+    return 0;
+}
+
+foreach my $vlan_number (@vlan_numbers) {
+    $RetVal = ($value == 1) ? $self->setPortVlan($vlan_number,$modport) :
+				$self->delPortVlan($vlan_number,$modport);
+    if ($RetVal) {
+	$errors++;
+	warn "nortel::setVlansOnTrunk:" . 
+	    "couldn't add/remove port $modport on vlan $vlan_number\n";
     }
-    if (grep(/^1$/,@vlan_numbers)) {
-	die "VLAN 1 passed to setVlansOnTrunk\n";
-    }
-    $self->debug("setVlansOnTrunk m $modport v $value nums @vlan_numbers\n");
-    $portindex = $self->{PORTINDEX}{$modport};
-    $ifIndex = $self->{IFINDEX}{$modport};
-    foreach my $vlan_number (@vlan_numbers) {
-	$RetVal = undef;
-	if ($value == 1) {
-	    #make sure they are tagged;
-	    $RetVal = $self->{SESS}->get(
-		    [["rcVlanPortPerformTagging",$portindex]]);
-	    if ((!$RetVal) || $RetVal eq "false") {
-		$RetVal = $self->{SESS}->set(
-		    [["rcVlanPortPerformTagging",$portindex,"true","INTEGER"]]);
-		if (!$RetVal) {
-		    print STDERR "couldn't tag port $modport\n";
-		    $errors++;
-		}
-	    }
-	}
-	my $action = ($value == 1) ? $vlan_number : (0 - $vlan_number);
-	$RetVal = $self->setPortVlan($action,$modport);
-	if ($RetVal) {
-		$errors++;
-		print STDERR "couldn't add/remove port $modport" .
-				"on vlan $vlan_number\n";
-	}
-    }
-    return !$errors;
+}
+return !$errors;
 }
 #
 # Clear the list of allowed VLANs from a trunk
@@ -1054,23 +1142,26 @@ sub setVlansOnTrunk($$$$) {
 #        Returns 1 on success, 0 otherwise
 #
 sub clearAllVlansOnTrunk($$) {
-    my $self = shift;
-    my ($modport) = @_;
-    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
-    my $portIndex = $self->{PORTINDEX}{$ifIndex};
+my $self = shift;
+my ($modport) = @_;
+my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
+my $portIndex = $self->{PORTINDEX}{$ifIndex};
+my $errors = 0;
 
-    my @vlaninfo = $self->listVlans();
-    while ((scalar @vlaninfo)) {
-	my ($name, $number, @members) = pop @vlaninfo;
-	if (grep {$_ eq $modport} @members) {
-	    $self->debug("removing port $portIndex from VLAN $number\n",1);
-	    my $RetVal = $self->setPortVlan( - $number , [ $modport ] );
+my @vlaninfo = $self->listVlans();
+while ((scalar @vlaninfo)) {
+    my ($name, $number, @members) = pop @vlaninfo;
+    if (grep {$_ eq $modport} @members) {
+	$self->debug("removing port $portIndex from VLAN $number\n",1);
+	my $RetVal = $self->delPortVlan( $number , [ $modport ] );
 
-	    if (!defined($RetVal) || ! $RetVal ) {
-		print STDERR "Couldn't remove $modport from VLAN $number\n";
-	    }
+	if (!defined($RetVal) || ! $RetVal ) {
+	    print STDERR "Couldn't remove $modport from VLAN $number\n";
+	    $errors++;
 	}
     }
+}
+return !$errors;
 }
 #
 # Enable trunking on a port
@@ -1081,49 +1172,40 @@ sub clearAllVlansOnTrunk($$) {
 #        Returns 1 on success, 0 otherwise
 #
 sub enablePortTrunking($$$) {
-    my $self = shift;
-    my ($port,$native_vlan) = @_;
+my $self = shift;
+my ($port,$native_vlan) = @_;
 
-    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
-    my $portIndex = $self->{PORTINDEX}{$ifIndex};
-    #
-    # Set port type to "untagPvidOnly"
-    #
-    my $portType = ["rcVlanPortType",$portIndex,5,"INTEGER"];
-    my $rv = snmpitSet($self->{SESS},$portType);
-    if (!$rv) {
-	warn "ERROR: Unable to set port type on trunk\n";
-	return 0;
-    }
-
-    #
-    # Clear out the list of allowed VLANs for this trunk port, so that when it
-    # comes up, there is not some race condition
-    #
-    $rv = $self->clearAllVlansOnTrunk($port);
-    if (!$rv) {
-	warn "ERROR: Unable to clear VLANs on trunk\n";
-	return 0;
-    } 
-
-    #
-    # Add this port to the VLAN as a tagged port
-    #
-    $rv = $self->setVlansOnTrunk($port, 1, [ $native_vlan] );
-    if (!$rv) {
-	warn "ERROR: Unable to add port $port to VLAN $native_vlan\n";
-	return 0;
-    } 
-
-    #
-    # Set the native VLAN for this trunk
-    #
-    my $nativeVlan = ["rcVlanPortDefaultVlanId",$portIndex,$native_vlan,"INTEGER"];
-    $rv = snmpitSet($self->{SESS},$nativeVlan);
-    if (!$rv) {
-	warn "ERROR: Unable to set native VLAN on trunk\n";
-	return 0;
-    }
+if (!defined($native_vlan) || ($native_vlan <= 1)) {
+    warn "Error: innappropriate or missing PVID for trunk\n";
+    return 0;
+}
+my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
+my $portIndex = $self->{PORTINDEX}{$ifIndex};
+#
+# temporarily set port type to "access" and add to native_vlan
+# portSetVlan will clear out all other vlans and set the PVID
+#
+my $portType = ["rcVlanPortType",$portIndex,1,"INTEGER"];
+my $rv = snmpitSet($self->{SESS},$portType);
+if (!defined($rv)) {
+    warn "enablePortTrunking: Unable to set trunk port type to access\n";
+    return 0;
+}
+$rv = $self->setPortVlan($native_vlan, $port);
+if ($rv) {
+    warn "ERROR: Unable to add Trunk $port to PVID $native_vlan\n";
+    return 0;
+} 
+#
+# Set port type to "untagPvidOnly"
+#
+$portType = ["rcVlanPortType",$portIndex,5,"INTEGER"];
+$rv = snmpitSet($self->{SESS},$portType);
+if (!defined($rv)) {
+    warn "enablePortTrunking: Unable to set port type to untagPvidOnly\n";
+    return 0;
+}
+return 1;
 }
 
 #
@@ -1134,40 +1216,29 @@ sub enablePortTrunking($$$) {
 #        Returns 1 on success, 0 otherwise
 #
 sub disablePortTrunking($$) {
-    my $self = shift;
-    my ($port) = @_;
+my $self = shift;
+my ($port) = @_;
 
-    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
-    my $portIndex = $self->{PORTINDEX}{$ifIndex};
-    my $native_vlan = $self->{SESS}->get("rcVlanPortDefaultVlanId.$portIndex");
+my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
+my $portIndex = $self->{PORTINDEX}{$ifIndex};
+my $native_vlan = $self->{SESS}->get("rcVlanPortDefaultVlanId.$portIndex");
 
-    #
-    # Clear out the list of allowed VLANs for this trunk port
-    #
-    my $rv = $self->clearAllVlansOnTrunk($port);
-    if (!$rv) {
-	warn "ERROR: Unable to clear VLANs on trunk\n";
-	return 0;
-    } 
-    #
-    # Set port type back to "access"
-    #
-    my $portType = ["rcVlanPortType",$portIndex,1,"INTEGER"];
-    $rv = snmpitSet($self->{SESS},$portType);
-    if (!$rv) {
-	warn "ERROR: Unable to set port type to access\n";
-	return 0;
-    }
-    if (defined($native_vlan) && ($native_vlan > 1)) {
-	$rv = snmpitSet($self->{SESS},
-	   ["rcVlanPortDefaultVlanId", $portIndex, $native_vlan, "INTEGER"]);
-	if (!$rv) {
-	    warn "ERROR: Unable to reset default Vlan\n";
-	    return 0;
-	}
-    }
-    return 1;
+#
+# Set port type back to "access", and adding it to its native Vlan
+# will remove it from any other vlans to which it may belong
+#
+my $portType = ["rcVlanPortType",$portIndex,1,"INTEGER"];
+my $rv = snmpitSet($self->{SESS},$portType);
+if (!defined($rv)) {
+    warn "ERROR: Unable to set port type to access\n";
+    return 0;
+}
+if (!defined($native_vlan) || ($native_vlan == 0)) {
+    $native_vlan = 1;
+}
+$rv = $self->setPortVlan($native_vlan, $port);
     
+return ($rv == 0);
 }
 
 # for accellar's this function is not necessary, the port index is the ifIndex
@@ -1181,33 +1252,33 @@ sub disablePortTrunking($$) {
 #        returns nothing but sets instance variables IFINDEX and PORTINDEX
 #
 sub readifIndex($) {
-    my $self = shift;
-    my ($name,$ifindex,$iidoid);
-    my ($oidbits, $oidshift) = (15, 4);
-    $self->debug("readifIndex:\n",2);
+my $self = shift;
+my ($name,$ifindex,$iidoid);
+my ($oidbits, $oidshift) = (15, 4);
+$self->debug("readifIndex:\n",3);
 
-    if (getDeviceType($self->{NAME}) =~ /^nortel5/) {
-	($oidbits, $oidshift) = (63, 6);
+if (getDeviceType($self->{NAME}) =~ /^nortel5/) {
+    ($oidbits, $oidshift) = (63, 6);
+}
+my $field = ["rcPortIndex",0];
+$self->{SESS}->getnext($field);
+do {
+    ($name,$ifindex,$iidoid) = @{$field};
+    $self->debug("got $name, $ifindex, iidoid $iidoid ",3);
+    if ($name =~ /rcPortIndex/) {
+	my $port = $iidoid & $oidbits;
+	my $mod = 1 + ($iidoid >> $oidshift);
+	my $modport = "$mod.$port";
+	my $portindex = $iidoid ;
+	$self->{IFINDEX}{$modport} = $ifindex;
+	$self->{IFINDEX}{$ifindex} = $modport;
+	$self->{PORTINDEX}{$modport} = $portindex;
+	$self->{PORTINDEX}{$ifindex} = $portindex;
+	$self->debug("mod $mod, port $port, ",3);
+	$self->debug("modport $modport, portindex $portindex\n",3);
     }
-    my $field = ["rcPortIndex",0];
     $self->{SESS}->getnext($field);
-    do {
-	($name,$ifindex,$iidoid) = @{$field};
-	$self->debug("got $name, $ifindex, iidoid $iidoid ",2);
-	if ($name =~ /rcPortIndex/) {
-	    my $port = $iidoid & $oidbits;
-	    my $mod = 1 + ($iidoid >> $oidshift);
-	    my $modport = "$mod.$port";
-	    my $portindex = $iidoid ;
-	    $self->{IFINDEX}{$modport} = $ifindex;
-	    $self->{IFINDEX}{$ifindex} = $modport;
-	    $self->{PORTINDEX}{$modport} = $portindex;
-	    $self->{PORTINDEX}{$ifindex} = $portindex;
-	    $self->debug("mod $mod, port $port, ");
-	    $self->debug("modport $modport, portindex $portindex\n");
-	}
-	$self->{SESS}->getnext($field);
-    } while ($name =~ /rcPortIndex/);
+} while ($name =~ /rcPortIndex/);
 }
 
 
@@ -1221,48 +1292,48 @@ sub readifIndex($) {
 # On sucess, returns a two-dimensional list indexed by port,oid
 #
 sub getFields($$$) {
-    my $self = shift;
-    my ($ports,$oids) = @_;
+my $self = shift;
+my ($ports,$oids) = @_;
 
-    my @ifindicies = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@$ports);
-    my @oids = @$oids;
+my @ifindicies = $self->convertPortFormat($PORT_FORMAT_IFINDEX,@$ports);
+my @oids = @$oids;
 
-    
-    #
-    # Put together an SNMP::VarList for all the values we want to get
-    #
-    my @vars = ();
-    foreach my $ifindex (@ifindicies) {
-	foreach my $oid (@oids) {
-	    push @vars, ["$oid","$ifindex"];
-	}
+
+#
+# Put together an SNMP::VarList for all the values we want to get
+#
+my @vars = ();
+foreach my $ifindex (@ifindicies) {
+    foreach my $oid (@oids) {
+	push @vars, ["$oid","$ifindex"];
     }
+}
 
-    #
-    # If we try to ask for too many things at once, we get back really bogus
-    # errors. So, we limit ourselves to an arbitrary number that, by
-    # experimentation, works.
-    #
-    my $maxvars = 16;
-    my @results = ();
-    while (@vars) {
-	my $varList = new SNMP::VarList(splice(@vars,0,$maxvars));
-	my $rv = $self->{SESS}->get($varList);
-	push @results, @$varList;
+#
+# If we try to ask for too many things at once, we get back really bogus
+# errors. So, we limit ourselves to an arbitrary number that, by
+# experimentation, works.
+#
+my $maxvars = 16;
+my @results = ();
+while (@vars) {
+    my $varList = new SNMP::VarList(splice(@vars,0,$maxvars));
+    my $rv = $self->{SESS}->get($varList);
+    push @results, @$varList;
+}
+	
+#
+# Build up the two-dimensional list for returning
+#
+my @return = ();
+foreach my $i (0 .. $#ifindicies) {
+    foreach my $j (0 .. $#oids) {
+	my $val = shift @results;
+	$return[$i][$j] = $$val[2];
     }
-	    
-    #
-    # Build up the two-dimensional list for returning
-    #
-    my @return = ();
-    foreach my $i (0 .. $#ifindicies) {
-	foreach my $j (0 .. $#oids) {
-	    my $val = shift @results;
-	    $return[$i][$j] = $$val[2];
-	}
-    }
+}
 
-    return @return;
+return @return;
 }
 
 #
@@ -1273,15 +1344,15 @@ sub getFields($$$) {
 # Usage: debug($self, $message, $level)
 #
 sub debug($$;$) {
-    my $self = shift;
-    my $string = shift;
-    my $debuglevel = shift;
-   if (!(defined $debuglevel)) {
-	$debuglevel = 1;
-    }
-    if ($self->{DEBUG} >= $debuglevel) {
-	print STDERR $string;
-    }
+my $self = shift;
+my $string = shift;
+my $debuglevel = shift;
+if (!(defined $debuglevel)) {
+    $debuglevel = 1;
+}
+if ($self->{DEBUG} >= $debuglevel) {
+    print STDERR $string;
+}
 }
 
 # End with true

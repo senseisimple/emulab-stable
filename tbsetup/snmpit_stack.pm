@@ -17,6 +17,7 @@ use SNMP;
 use snmpit_lib;
 
 use libdb;
+use libtestbed;
 
 #
 # Creates a new object. A list of devices that will be operated on is given
@@ -136,21 +137,14 @@ sub new($$$@) {
 sub lock($) {
     my $self = shift;
     my $stackid = $self->{STACKID};
-    foreach my $i (1 .. 20) {
-	if (symlink("./$$", "/tmp/$stackid")) {
-		return 1;
-	} else {
-		$self->debug("sleeping on lock (/tmp/$stackid)\n");
-		sleep(3);
-	}
-    }
-    die "Can't lock /tmp/$stackid\n" ;
+    my $token = "snmpit_$stackid";
+    my $old_umask = umask(0);
+    die if (TBScriptLock($token) != TBSCRIPTLOCK_OKAY());
+    umask($old_umask);
 }
 
 sub unlock($) {
-    my $self = shift;
-    my $stackid = $self->{STACKID};
-    return unlink("/tmp/$stackid");
+	TBScriptUnlock();
 }
 
 
@@ -293,19 +287,15 @@ sub setPortVlan($$@) {
 sub newVlanNumber($$) {
     my $self = shift;
     my $vlan_id = shift;
-    my @vlans = $self->listVlans();
-    my @numbers = ();
-    $self->debug("newVlanNumber: vlans @vlans\n");
-    if ((grep {@$_[0] eq $vlan_id} @vlans) > 0) {
-	return 0;
-    }
-#    foreach my $ref (@vlans) {
-#	my ($name , $number , $c) = @$ref;
-#	push @numbers, $number;
-#    }
-    @numbers = map { @$_[1] } @vlans ;
+
+    $self->debug("stack::newVlanNumber $vlan_id\n");
+    my %vlans = $self->findVlans();
+    my $number = $vlans{$vlan_id};
+
+    if (defined($number)) { return 0; }
+    my @numbers = values %vlans;
     $self->debug("newVlanNumbers: numbers ". "@numbers" . " \n");
-    my $number = $self->{MIN_VLAN}-1;
+    $number = $self->{MIN_VLAN}-1;
     my $lim = $self->{MAX_VLAN};
     do { ++$number }
 	until (!(grep {$_ == $number} @numbers) || ($number > $lim));
@@ -342,10 +332,10 @@ sub createVlan($$$;$$$) {
 	my ($vlan_number, $res, $devicename, $device);
 	$vlan_number = $self->newVlanNumber($vlan_id);
 	if ($vlan_number == 0) { last LOCKBLOCK;}
+	print "  Creating VLAN $vlan_id as VLAN #$vlan_number on " .
+                 "$self->{STACKID} ... ";
 	%map = mapPortsToDevices(@ports);
 	foreach $devicename (sort {tbsort($a,$b)} keys %map) {
-	    $self->debug( "Creating VLAN $vlan_id , number $vlan_number " .
-	     "on member switch $devicename\n") ;
 	    $device = $self->{DEVICES}{$devicename};
 	    $res = $device->createVlan($vlan_id, $vlan_number);
 	    if (!$res) {
@@ -353,6 +343,7 @@ sub createVlan($$$;$$$) {
 		# Ooops, failed. Don't try any more
 		#
 		$okay = 0;
+		print " Failed\n";
 		last;
 	    }
 	}
@@ -366,16 +357,25 @@ sub createVlan($$$;$$$) {
 		$okay = 0;
 	    }
 	}
+	print " Succeeded\n";
 
     }
     $self->unlock();
     return $okay;
 }
 
+#
+# Given VLAN indentifiers from the database, finds the 802.1Q VLAN
+# number for them. If no VLAN id is given, returns mappings for the entire
+# switch.
+# 
+# usage: findVlans($self, @vlan_ids)
+#        returns a hash mapping VLAN ids to 802.1Q VLAN numbers
+#
 sub findVlans($@) {
     my $self = shift;
     my @vlan_ids = @_;
-    my ($device, $devicename);
+    my ($count, $device, $devicename) = (scalar(@vlan_ids));
     my %mapping = ();
 
     $self->debug("snmpit_stack::findVlans( @vlan_ids )\n",2);
@@ -391,6 +391,8 @@ sub findVlans($@) {
 		} else
 		    { $mapping{$id} = $num; }
 	}
+	if (($count > 0) && ($count = scalar (keys %mapping)))
+		{ return %mapping ;}
     }
     return %mapping;
 }
