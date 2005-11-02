@@ -501,6 +501,26 @@ sub existantVlans($@) {
 }
 
 #
+# Given VLAN indentifiers from the database, finds the 802.1Q VLAN
+# number for them. If no VLAN id is given, returns mappings for the entire
+# stack.
+#
+# usage: findVlans($self, @vlan_ids)
+#        returns a hash mapping VLAN ids to 802.1Q VLAN numbers
+#
+#
+sub findVlans($@) {
+    my $self = shift;
+    my @vlan_ids = @_;
+    my %mapping = ();
+
+    #
+    # For now, on Cisco, we only need to do this on the leader
+    #
+    return $self->{LEADER}->findVlans(@vlan_ids);
+}
+
+#
 # Removes a VLAN from the stack. This implicitly removes all ports from the
 # VLAN. It is an error to remove a VLAN that does not exist.
 #
