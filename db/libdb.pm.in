@@ -173,7 +173,7 @@ use vars qw(@ISA @EXPORT);
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
 	 TBExptFirewall TBNodeFirewall TBSetExptFirewallVlan
-	 TBClearExptFirewallVlan
+	 TBClearExptFirewallVlan TBNodeConsoleTail
 
 	 TBNodeSubNodes
 	 TBNodeAdminOSID TBNodeDiskloadOSID
@@ -3852,6 +3852,29 @@ sub TBNodeBootReset($)
     return 0;
 }
 
+sub TBNodeConsoleTail ($$) {
+    my ($pc, $fh) = @_;
+
+    my $query_result =
+	DBQueryFatal("select server from tiplines where node_id='$pc'");
+    
+    if (!$query_result->numrows) {
+	return;
+    }
+    my ($tipserver) = $query_result->fetchrow_array();
+
+    print $fh "Tail of $pc console:\n";
+    my $oldeuid = $EUID;
+    $EUID = $UID;
+    open(CONTAIL, "$TB/sbin/spewconlog -l 10 $pc |");
+    while (<CONTAIL>) {
+	print $fh "$pc: $_";
+    }
+    close(CONTAIL);
+    print $fh "\n";
+    $EUID = $oldeuid;
+}
+
 #
 # Wait for a node to hit a certain state. Provide a start time and a max
 # wait time.
@@ -3891,6 +3914,7 @@ sub TBNodeStateWait ($$$$@) {
 	if ($waittime > $maxwait) {
 	    $minutes = int($waittime / 60);
 	    print "*** Giving up on $pc - it's been $minutes minute(s).\n";
+	    TBNodeConsoleTail($pc, *STDOUT);
 	    return 1;
 	}
 	if (int($waittime / 60) > $minutes) {

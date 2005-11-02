@@ -619,6 +619,7 @@ sub WaitTillReloadDone($$$@)
 		    my $t = (int ($waittime / 60));
 		    print STDERR "*** osload ($node): appears wedged; ".
 			"it has been $t minutes since it was rebooted.\n";
+		    TBNodeConsoleTail($node, *STDERR);
 
 		    $count--;
 		    $done{$node} = $waitmode;
