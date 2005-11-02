@@ -2,7 +2,7 @@
  * EMULAB-COPYRIGHT
  * Copyright (c) 2005 University of Utah and the Flux Group.
  *
- * whol.c - Send a 'whack on LAN' packet to node
+ * whol.c - Send a 'Whack-on-LAN' packet to node
  */
 
 #include <stdio.h>
@@ -153,7 +153,7 @@ whackanode(char *iface, char *victim)
     ip->ip_sum = in_cksum((u_short *)ip,sizeof(*ip));
 
     /*
-     * Make a UDP header
+     * Make a UDP header; plain IP will work too
      */
     udp->uh_sport = 0;
     udp->uh_dport = 0;
@@ -161,8 +161,10 @@ whackanode(char *iface, char *victim)
     udp->uh_sum = 0;
 
     /*
-     * Put in the magic juice that maekes the victim reboot - 6 bytes of 1s,
+     * Put in the magic juice that makes the victim reboot - 6 bytes of 1s,
      * then 16 repititions of the victim's MAC address
+	 * 
+	 * 11/05 NOTE: Our Intel cards ignore the 6 * 0xFF synchronization.
      */
     length = 0;
     for (i = 0; i < 6; i++) {
