@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -116,8 +116,8 @@ function SPITFORM($email, $phone, $failed, $simple, $view)
           your password.
 
           <br><br>
-          <b>Please read this <a href='kb-show.php3?idx=69'>Knowledge Base
-          Entry</a> if you get an error
+          <b>Please read this <a href='kb-show.php3?xref_tag=forgotpassword'>
+          Knowledge Base Entry</a> if you get an error
           when trying to use the link we email to you!</b>
           </blockquote>\n";
 }
