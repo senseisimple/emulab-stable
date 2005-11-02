@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,7 +25,8 @@ sub usage()
 	"Spew the logfile for an experiment.\n";
     exit(-1);
 }
-my  $optlist = "";
+my $optlist = "w";
+my $fromweb = 0;
   
 #
 # Configure variables
@@ -58,6 +59,9 @@ $| = 1;
 %options = ();
 if (! getopts($optlist, \%options)) {
     usage();
+}
+if (defined($options{"w"})) {
+    $fromweb = 1;
 }
 if (@ARGV != 2) {
     usage();
@@ -127,6 +131,21 @@ sysopen(LOG, $logname, O_RDONLY | O_NONBLOCK) or
 #
 if (TBAdmin($UID)) {
     $EUID = $UID;
+}
+
+my ($dev,$ino,$mode,$nlink,$uid,$gid,$rdev,$size,
+    $atime,$mtime,$ctime,$blksize,$blocks) = stat(LOG);
+
+#
+# Icky. If the file is open and less then 1024 bytes, send out some
+# stuff at the beginning to make the browser do something. This terrible,
+# but not sure what else to do.
+#
+if ($fromweb && $isopen && $size < 1024) {
+    for ($i = $size; $i < 1024; $i++) {
+	print " ";
+    }
+    print "\n";
 }
 
 #

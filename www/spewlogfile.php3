@@ -73,7 +73,7 @@ function SPEWCLEANUP()
 ignore_user_abort(1);
 register_shutdown_function("SPEWCLEANUP");
 
-if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile $pid $eid", "r")) {
+if ($fp = popen("$TBSUEXEC_PATH $uid $pid spewlogfile -w $pid $eid", "r")) {
     header("Content-Type: text/plain");
     header("Expires: Mon, 26 Jul 1997 05:00:00 GMT");
     header("Cache-Control: no-cache, must-revalidate");
