@@ -213,16 +213,16 @@ tar ball:
 <a href="/downloads/netlab-client.jar">netlab-client.jar</a>
 </td>
 <td align="center">(370K)</td>
-<td align="center">v0.1.0b</td>
-<td align="right">May 12, 2004</td>
+<td align="center">v0.1.1</td>
+<td align="right">Nov 2, 2005</td>
 </tr>
 <tr>
 <td>
-<a href="/downloads/netlab-client-0.1.0b.tar.gz">netlab-client-0.1.0b.tar.gz</a>
+<a href="/downloads/netlab-client-0.1.1.tar.gz">netlab-client-0.1.1.tar.gz</a>
 </td>
 <td align="center">(787K)</td>
-<td align="center">v0.1.0b</td>
-<td align="right">May 12, 2004</td>
+<td align="center">v0.1.1</td>
+<td align="right">Nov 2, 2005</td>
 </tr>
 </table>
 </blockquote>
@@ -698,6 +698,7 @@ on its own.
 The release history:
 
 <ul>
+<li>v0.1.1 - Add support for nodes with non-routable control networks.
 <li>v0.1.0b - Add ability to customize the SSH config template.
 Ask the user before swapping/terminating an experiment.
 Fix some other minor bugs.

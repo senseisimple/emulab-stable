@@ -17,7 +17,7 @@ PAGEHEADER("Emulab Software Distributions");
 
 <ul>
 <li> 
-     Emulab GUI Client v0.1.0b
+     Emulab GUI Client v0.1.1
      <a href="/downloads/netlab-client.jar">(JAR</a>,
      <a href="/downloads/netlab-client-0.1.0b.tar.gz">source tarball</a>
      <img src="/new.gif" alt="&lt;NEW&gt;">).
