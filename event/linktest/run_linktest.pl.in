@@ -24,7 +24,7 @@ sub usage()
 	     
     exit(1);
 }
-my $optlist = "vqd:s:p:k:e:l:o:t:";
+my $optlist = "vqd:s:p:k:e:L:l:o:t:";
 my $debug   = 0;
 my $verbose = 0;
 my $timeout = 0;
@@ -96,6 +96,16 @@ if (defined($options{"t"})) {
     else {
 	die("*** $0:\n".
 	    "    Bad data in timeout: $timeout\n");
+    }
+}
+if (defined($options{"L"})) {
+    $startAt = $options{"L"};
+    if ($startAt =~ /^(\d)$/) {
+	$startAt = $1;
+    }
+    else {
+	die("*** $0:\n".
+	    "    Bad data in start level: $startAt\n");
     }
 }
 if (defined($options{"l"})) {
