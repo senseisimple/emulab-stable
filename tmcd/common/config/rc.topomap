@@ -175,6 +175,19 @@ sub dotopomap()
 	}
     }
 
+    if (! -e $templt) {
+	#
+	# Try using tmcc. It returns compressed data so do it directly.
+	#
+	system(TMCC() . " ltmap > $templt");
+	#
+	# tmcc does not really return useful error codes.
+	#
+	if ($?) {
+	    fatal("Could not get ltmap from tmcd or from NFS");
+	}
+    }
+
     if (-s $tempmap) {
 	system("cat ${tempmap} | gunzip > " . TMTOPOMAP());
 	if ($?) {

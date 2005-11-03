@@ -239,6 +239,7 @@ COMMAND_PROTOTYPE(douserenv);
 COMMAND_PROTOTYPE(dotiptunnels);
 COMMAND_PROTOTYPE(dorelayconfig);
 COMMAND_PROTOTYPE(dotraceconfig);
+COMMAND_PROTOTYPE(doltmap);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -323,7 +324,7 @@ struct command {
 	{ "userenv",      FULLCONFIG_ALL,  F_ALLOCATED, douserenv},
 	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
 	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
-	
+	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},	
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -5881,6 +5882,43 @@ COMMAND_PROTOTYPE(dotopomap)
 
 	if ((fp = fopen(buf, "r")) == NULL) {
 		errorc("DOTOPOMAP: Could not open topomap for %s:",
+		       reqp->nodeid);
+		return 1;
+	}
+
+	while (1) {
+		cc = fread(buf, sizeof(char), sizeof(buf), fp);
+		if (cc == 0) {
+			if (ferror(fp)) {
+				fclose(fp);
+				return 1;
+			}
+			break;
+		}
+		client_writeback(sock, buf, cc, tcp);
+	}
+	fclose(fp);
+	return 0;
+}
+
+/*
+ * Spit back the ltmap. This is a backup for when NFS fails.
+ * We send back the gzipped version.
+ */
+COMMAND_PROTOTYPE(doltmap)
+{
+	FILE		*fp;
+	char		buf[MYBUFSIZE];
+	int		cc;
+
+	/*
+	 * Open up the file on boss and spit it back.
+	 */
+	sprintf(buf, "%s/expwork/%s/%s/ltmap.gz", TBROOT,
+		reqp->pid, reqp->eid);
+
+	if ((fp = fopen(buf, "r")) == NULL) {
+		errorc("DOLTMAP: Could not open ltmap for %s:",
 		       reqp->nodeid);
 		return 1;
 	}
