@@ -1,0 +1,3 @@
+#! /bin/sh
+# Dumb dummy sudo.  Everybody is in the Administrators group already!
+csh -c "$*"
