@@ -1497,12 +1497,16 @@ Updating a set of existing images.
                 "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
                 image = gensub("\.ndz", "", 1, $NF); \
                 image = gensub("UPDATE-pc3000-new", "UPD-pc3000-new", 1, image); # Special case.\
-                print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
+                print "update images set created=" sq date sq " where imagename=" sq image sq ";"\
+                print "update os_info set created=" sq date sq " where osname=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
 
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
+         echo "select osname, created from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
+
          mysql tbdb < ~/imgdates.sql
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
+         echo "select osname, created from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
 
          # Check before installing the non -new versions.  (WINXP will always be in partition 1.)
          echo "select part1_osid from images where imageid like 'emulab-ops-WINXP%';" | mysql tbdb
@@ -1526,10 +1530,12 @@ Updating a set of existing images.
                 # Convert from "Oct 1 18:24:27 2005" to "2005-10-01 18:24:27" date format. \
                 "date -j -f \"%b %d %T %Y\" \""$6" "$7" "$8" "$9"\" +\"%F %T\"" | getline date; \
                 image = gensub("\.ndz", "", 1, $NF); \
-                print "update images set created=" sq date sq " where imagename=" sq image sq ";" }' \
+                print "update images set created=" sq date sq " where imagename=" sq image sq ";"\
+                print "update os_info set created=" sq date sq " where osname=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
          echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort +1
+         echo "select osname, created from os_info where osname like 'WINXP-%$pctype';" | mysql tbdb | sort +1
 
          mysql tbdb < ~/imgdates.sql
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb| sort +1
-
+         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort +1
+         echo "select osname, created from os_info where osname like 'WINXP-%$pctype';" | mysql tbdb | sort +1
