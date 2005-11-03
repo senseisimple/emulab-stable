@@ -266,6 +266,23 @@ href="../tutorial/docwrapper.php3?docname=firewall.html#Use"> style keyword
     $fw set-style basic
 </pre>
 
+<div style="margin-left: 40px;"> <b>NOTE:</b> There is currently a problem
+which makes swapping-in Windows nodes behind a control-net firewall take
+longer or fail, especially on the pc850's.  <p>
+
+Details: DHCP packets aren't passed until the firewall node is loaded with
+FreeBSD and started up.  That takes 3-4 minutes on a pc850 and leaves the
+Windows nodes in the FreeBSD PXE-loader image waiting for DHCP.  Periodically,
+they time-out and reload the PXE-loader, which adds up to another minute after
+the firewall node is up, if you're unlucky.  <p>
+
+After 10 minutes in the reloading state, Emulab gives up and reboots the node
+to try again, even if Frisbee is working hard and nearly done.  5-6 minutes is
+hardly enough time to Frisbee a WINXP image into a pc850.  Either the image
+load time-out needs to be extended in experiments that have a firewall
+configured, or the load timer shouldn't start ticking until the firewall is
+up. </div>
+
 The <i>Windows Firewall</i> software is installed in WINXP-SP2 and
 WINXP-UPDATE images, but disabled to allow RDP and SSH access to Windows
 nodes.  <p>
