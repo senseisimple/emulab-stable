@@ -10,13 +10,331 @@
 The <b>loghole</b> utility downloads log files from certain directories on the
 experimental nodes (e.g. "/local/logs") to the Emulab users machine.  After
 downloading, it can also be used to produce and manage archives of the log
-files.  Using this utility to manage an experiment's log files is encouraged
+files.  <p>
+
+Using this utility to manage an experiment's log files is encouraged
 because it will transfer the logs in a network-friendly manner and is already
 integrated with the rest of Emulab.  For example, any programs executed using
 the Emulab event-system will have their standard output/error automatically
 placed in the "/local/logs" directory.  The tool can also be used to preserve
 multiple trials of an experiment by producing and managing zip archives of the
-logs.
+logs.  <p>
 
 You can learn more about the <b>loghole</b> utility by reading its man page on
-<i>users.emulab.net</i>.
+<i>users.emulab.net</i>, included below.
+
+<!-- Manpage converted by man2html 3.0.1
+     ops% man loghole  > loghole-man.txt
+     bsd% man2html -bare < loghole-man.txt > loghole-man.html
+  -->
+
+<H2>SYNOPSIS</H2><PRE>
+       <B>loghole</B> [<B>-hVdqva</B>] [<B>-e</B> <I>pid</I>/<I>eid</I>] [<B>-s</B> <I>server</I>] [<B>-P</B> <I>port</I>] <I>action</I> [<I>...</I>]
+
+       <B>loghole</B> <B>sync</B> [<I>node1</I> <I>node2</I> <I>...</I>]
+
+       <B>loghole</B> <B>validate</B>
+
+       <B>loghole</B>	<B>archive</B> [<B>-k</B> (<B>i-delete</B>|<B>space-is-needed</B>)] [<B>-a</B> <I>days</I>] [<B>-c</B> <I>comment</I>]
+       [<B>-d</B>] [<I>archive-name</I>]
+
+       <B>loghole</B> <B>change</B> [<B>-k</B> (<B>i-delete</B>|<B>space-is-needed</B>)] [<B>-a</B> <I>days</I>]  [<B>-c</B>  <I>comment</I>]
+       <I>archive-name1</I> [<I>archive-name2</I> <I>...</I>]
+
+       <B>loghole</B> <B>list</B> [<B>-O1!Xo</B>] [<B>-m</B> <I>atmost</I>] [<B>-s</B> <I>megabytes</I>]
+
+       <B>loghole</B> <B>show</B> [<I>archive-name</I>]
+
+       <B>loghole</B> <B>clean</B> [<B>-fne</B>] [<I>node1</I> <I>node2</I> <I>...</I>]
+
+       <B>loghole</B> <B>gc</B> [<B>-n</B>] [<B>-m</B> <I>atmost</I>] [<B>-s</B> <I>megabytes</I>]
+
+
+</PRE>
+<H2>DESCRIPTION</H2><PRE>
+       The <B>loghole</B> utility downloads log files from certain directories on the
+       experimental nodes (e.g. "/local/logs") to the  Emulab  users  machine.
+       After  downloading,  it can also be used to produce and manage archives
+       of the log files.  Using this utility to  manage  an  experiment's  log
+       files  is  encouraged  because  it will transfer the logs in a network-
+       friendly manner and is already integrated with the rest of Emulab.  For
+       example,  any programs executed using the Emulab event-system will have
+       their standard output/error automatically placed in  the  "/local/logs"
+       directory.  The tool can also be used to preserve multiple trials of an
+       experiment by producing and managing zip archives of the logs.
+
+       The set of logs that are actually downloaded  by  the  tool  are  those
+       located	in  <I>logholes</I>  on  the nodes, where a loghole is simply a well-
+       known directory that acts like a blackhole for log  files.   Any  files
+       found  in  these  directories  are  downloaded  to the experiment's log
+       directory (i.e. "/proj/&lt;pid&gt;/exp/&lt;eid&gt;/logs") and placed under separate
+       directories  for each node and loghole.	The referent of symbolic links
+       are also downloaded, so if you do not want an  entire  directory  down-
+       loaded, you can create links in a loghole to those files of interest.
+
+       To  perform  its  various  tasks, the <B>loghole</B> utility is broken up into
+       several sub-actions that you can apply to an experiment's log holes  or
+       log  archives.  As a quick example, to synchronize the logholes for the
+       experiment "neptune/myexp" and create an  archive  of  these  logs  you
+       would run:
+
+	      [vmars@users ~] loghole -e neptune/myexp sync
+	      [vmars@users ~] loghole -e neptune/myexp archive
+
+       The  following  listing	gives  a  brief overview of the current set of
+
+       <B>list</B>   Print  a	brief  listing of the archives in the experiment's log
+	      directory.
+
+       <B>show</B>   Print a detailed listing of the archives in the experiment's log
+	      directory.
+
+       <B>clean</B>  Clean out the experiment log directory by removing any subdirec-
+	      tories and/or clean the log directories on the nodes.
+
+       <B>gc</B>     Garbage collect old archives to free up disk space.
+
+       Options passed to the utility are  split  between  globally  applicable
+       ones that are placed before the action and action-specific options that
+       are placed after.  For example, the <B>-a</B>  global  option  will  apply  an
+       action to all of your experiments and the <B>-X</B> option for the <B>list</B> action
+       will list only those files that will be deleted	at  the  next  garbage
+       collection.  To combine these options you would enter:
+
+	      [vmars@users ~] loghole -a list -X
+
+       The set of global options is as follows:
+
+       <B>-h</B>, <B>--help</B>
+	      Print  the  usage message for the <B>loghole</B> utility as a whole or,
+	      if an action is given, the usage message for that action.
+
+       <B>-V</B>, <B>--version</B>
+	      Print out version information and exit.
+
+       <B>-d</B>, <B>--debug</B>
+	      Output debugging messages.
+
+       <B>-q</B>, <B>--quiet</B>
+	      Decrease the level of verbosity, this is subtractive, so	multi-
+	      ple  uses  of this option will make the utility quieter and qui-
+	      eter.  The default level of verbosity is	human-readable,  below
+	      that  is	machine-readable, and below that is silent.  For exam-
+	      ple, the default output from the "list" action looks like:
+
+		     [ ] foobar.1.zip	10/15
+		     [!] foobar.0.zip	10/13
+
+	      Using a single "-q" option changes the output to look like:
+
+		     foobar.1.zip
+		     foobar.0.zip
+
+       <B>-e</B>, <B>--experiment</B>=<I>PID</I>/<I>EID</I>
+	      Specify the experiment(s) to operate on.	If multiple <B>-e</B> options
+	      are  given,  the	action will apply to all of them.  This option
+	      overrides the default behavior of inferring the experiment  from
+
+
+
+</PRE>
+<H2>SYNC</H2><PRE>
+       The  <B>sync</B>  action is used to synchronize the logholes on the nodes with
+       the experiment's log directory on the Emulab users machine.  The action
+       will  iterate  through  each  node  in  the  experiment	and perform an
+       <B>rsync(1)</B> on the loghole directories for that node.  Currently, the only
+       directories  synced are "/var/emulab/logs" and "/local/logs".  In addi-
+       tion, if any of the network links in the experiment are	being  traced,
+       the  utility  will  create a directory for each link and setup symbolic
+       links to the <B>pcap(3)</B> files retrieved from the delay nodes.
+
+       Optional arguments:
+
+       <I>node1</I> <I>...</I>
+	      Specify a subset of virtual or physical  nodes  that  should  be
+	      synchronized, otherwise all of the nodes will be synchronized.
+
+
+</PRE>
+<H2>VALIDATE</H2><PRE>
+       The  <B>validate</B>  action  is  used to check that the logs were sync'd cor-
+       rectly.	Currently, the following checks are performed:
+
+       program-agent logs
+	      The stdout and stderr logs from program agents  are  checked  by
+	      comparing  their metadata against that saved in the accompanying
+	      ".status" files.
+
+       valid soft links
+	      All soft links are checked to ensure the referent exists.
+
+
+</PRE>
+<H2>ARCHIVE</H2><PRE>
+       The <B>archive</B> action is used to archive the logs in an  experiment's  log
+       directory for future reference.	The action will produce a standard zip
+       archive with the logs and some metadata about the experiment  and  when
+       it can be garbage collected.
+
+       Available options:
+
+       <B>-k</B>, <B>--keep-until</B>=(<I>i-delete</I>|<I>space-is-needed</I>)
+	      Keep the archive until you decide to delete it manually or space
+	      is needed.  See the GC section later in the manual to learn  how
+	      this  option  and  others  affect garbage collection.  (Default:
+	      space-is-needed)
+
+       <B>-a</B>, <B>--keep-atleast</B>=<I>N</I>
+	      Keep the archive atleast <I>N</I>  days	after  creation.   This  value
+	      keeps  the  archive from being garbage collected when more space
+	      is needed for atleast the given number  of  days.   (Default:  3
+	      days)
+
+       <B>-c</B>, <B>--comment</B>=<I>COMMENT</I>
+	      Add  a comment to the archive.  This option can be used multiple
+       chive.  For example, if after analyzing the log files, you decide  that
+       they represent "good" data, you can add a comment stating that fact and
+       mark the archive as not garbage collectable.  The action takes the same
+       set of options as the <B>archive</B> action.
+
+
+</PRE>
+<H2>LIST</H2><PRE>
+       The  <B>list</B>  action  is used to get a brief summary of all of the log ar-
+       chives found in an experiment's log directory.	The  listing  displays
+       the archive name, when it was created, and its GC status so you can get
+       an idea of when the experiment runs were performed  and	what  will  be
+       garbage collected.
+
+       <B>-O</B>     Only list archives that are marked as 'keep until "i-delete"'.
+
+       <B>-1</B>     Only  list archives that are a day from their keep-atleast date.
+
+       <B>-!</B>     Only list archives that are past their keep-atleast date.
+
+       <B>-X</B>     Only list archives that are ready to be garbage collected.
+
+       <B>-o</B>     List archives that do not  match	the  above  flags.   In  other
+	      words,  archives	that  will  not be deleted at the next garbage
+	      collection and are more than a day away from their  keep-atleast
+	      dates.
+
+       <B>-m</B>, <B>--keep-atmost</B>=<I>N</I>
+	      Specify  how  many  archives  should  be kept in the experiment.
+	      This setting effects what files will be  garbage	collected,  so
+	      you  should pass this same option to the <B>gc</B> if you use a differ-
+	      ent value from the default of 100 archives.
+
+       <B>-s</B>, <B>--keep-size</B>=<I>megabytes</I>
+	      Specify the maximum total size, in megabytes, for all of the ar-
+	      chives  in the experiment.  This setting effects what files will
+	      be garbage collected, so you pass this same option to the <B>gc</B>  if
+	      you use a different value from the default of 3MB.
+
+
+</PRE>
+<H2>SHOW</H2><PRE>
+       The  <B>show</B>  action  provides a more detailed listing of the log archives
+       for an experiment.  The listing contains information about when and who
+       created	the  archive, any attributes used when computing the GC status
+       of the archive, comments attached to the archive, and a listing of  the
+       files in the archive.
+
+       Optional arguments:
+
+       <I>archive-name</I>
+	      The  full  or partial name of the archive to display.  If a par-
+	      tial name is given, any archive names that start with the  argu-
+	      ment  are  displayed.  The default behavior is to display all of
+	      the archives in an experiment.
+
+	      Only remove log directories in the experiment's log directory.
+
+
+</PRE>
+<H2>GC</H2><PRE>
+       The <B>gc</B> action is used to garbage collect any archives in order to  free
+       up  space or reduce the total number of archives in an experiment.  The
+       process for selecting files to be garbage collected is as follows:
+
+       1.     If the total number of archives and their total size  are  below
+	      the  values  specified  by  the  <B>--keep-atmost</B>  and  <B>--keep-size</B>
+	      options then no archives will be deleted, otherwise...
+
+       2.     Any files that are marked as 'keep until "space-is-needed"'  and
+	      past their "keep-atleast" dates, will be deleted until the keep-
+	      atmost and keep-size conditions  are  met.   If  deleting  these
+	      files does not meet these conditions then...
+
+       3.     The  oldest files that are marked 'keep until "space-is-needed"'
+	      will be deleted until the keep-atmost and  keep-size  conditions
+	      are  met	or there are no more files that can be deleted without
+	      user intervention.
+
+       Available <B>gc</B> options:
+
+       <B>-m</B>, <B>--keep-atmost</B>=<I>N</I>
+	      Specify how many archives should	be  kept  in  the  experiment.
+	      (Default: 100 archives)
+
+       <B>-s</B>, <B>--keep-size</B>=<I>megabytes</I>
+	      Specify the maximum total size, in megabytes, for all of the ar-
+	      chives in the experiment.  (Default: 3.0 MB)
+
+
+</PRE>
+<H2>ENVIRONMENT</H2><PRE>
+       By default, the project and experiment ID will  be  inferred  from  the
+       current	working  directory, if it is inside the experiment's directory
+       (i.e. /proj/<I>pid</I>/exp/<I>eid</I>).  This behavior can be overridden using the <B>-e</B>
+       option.
+
+
+</PRE>
+<H2>RETURN VALUES</H2><PRE>
+       3      If rsync reports an error.
+
+       2      If there was an error processing the command line arguments.
+
+       0      If the action was completed successfully.
+
+
+</PRE>
+<H2>EXAMPLES</H2><PRE>
+       To  synchronize	the  log directory for experiment "neptune/myexp" with
+       the log holes on the experimental nodes.
+
+	      [vmars@users ~] loghole -e neptune/myexp sync
+
+       To archive the newly recovered logs and print out just the name of  the
+       new log file:
+
+       /local/logs
+	      One  of  the log directories on experimental nodes that is auto-
+	      matically sync'd.  Users should place any  logs/data  they  want
+	      transferred back in this directory.
+
+       /var/emulab/logs
+	      Another  log  directory  on experimental nodes that is automati-
+	      cally sync'd.  This directory usually holds  logs  generated  by
+	      the Emulab software running on the node.
+
+
+</PRE>
+<H2>SEE ALSO</H2><PRE>
+       <B>event-sched(8)</B>, <B>tevc(1)</B>, <B>zip(1)</B>, <B>rsync(1)</B>, <B>pcap(3)</B>
+
+
+</PRE>
+<H2>AUTHOR</H2><PRE>
+       The Emulab project at the University of Utah.
+
+
+</PRE>
+<H2>NOTES</H2><PRE>
+       The Emulab project can be found on the web at <I>http://www.emulab.net</I>
+
+
+
+Emulab				 June 16, 2005			    <B>LOGHOLE(1)</B>
+</PRE>
