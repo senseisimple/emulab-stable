@@ -33,6 +33,10 @@ uname -r > $iscygwin
 chmod g+w $iscygwin
 chmod -f g-w /etc/emulab
 
+# If 'prepare' wasn't executed before pulling an image, tmcc will be confused
+# by the cached info from tmcd.  Clean up like bootsetup()/tmccclrconfig().
+rm -rf /var/emulab/boot/tmcc
+
 # Get the desired node name from tmcc, and make sure we have a connection.
 # There is a swap-in race condition where tmcc nodeid at first returns nothing.
 nodeid=
