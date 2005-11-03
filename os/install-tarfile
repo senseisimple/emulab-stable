@@ -344,7 +344,7 @@ push(@identlines, "$tarfile $filestamp $filemd5 $installdir");
 # Figure what decompression flag is required, based on file extension.
 #
 SWITCH: for ($tarfile) {
-    /^.*\.tar\.Z$/   && do {$decompressflag = "-Z"; last SWITCH; } ;
+    /^.*\.tar\.Z$/   && do {$decompressflag = "-z"; last SWITCH; } ;
     /^.*\.tar\.gz$/  && do {$decompressflag = "-z"; last SWITCH; } ;
     /^.*\.tgz$/      && do {$decompressflag = "-z"; last SWITCH; } ;
     /^.*\.tar\.bz2$/ && do {$decompressflag = "-j"; last SWITCH; } ;
