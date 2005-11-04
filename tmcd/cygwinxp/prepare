@@ -159,8 +159,8 @@ print "Clearing out $RUNDIR ...\n";
 system("rm -rf $RUNDIR/*.pid");
 
 print "Clearing out /tmp ...\n";
-system("chmod -Rf 777 /tmp/* /tmp/.??* > /dev/null");
-system("chown -Rf root /tmp > /dev/null");
+system("chmod -Rf 777 /tmp/* /tmp/.??* >& /dev/null");
+system("chown -Rf root /tmp >& /dev/null");
 system("rm -rf /tmp/* /tmp/.??*");
 
 print "Cleaning out /local/logs ...\n";

@@ -127,15 +127,15 @@ sub os_account_cleanup()
 	    print "Removing user: $name\n";
 
 	    # There is always an NT account.
-	    mysystem("$NET user $name /delete > /dev/null");
+	    mysystem("$NET user $name /delete >& /dev/null");
 
 	    # There will only be an NT homedir if the user has logged in sometime.
-	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name > /dev/null");
-	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name > /dev/null");
+	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name >& /dev/null");
+	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name >& /dev/null");
 	    system("$RM -rf C:/'Documents and Settings'/$name ");
 	    # It sometimes also makes user.PCnnn, user.PCnnn.000, etc.
-	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name.* > /dev/null");
-	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name.* > /dev/null");
+	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name.* >& /dev/null");
+	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name.* >& /dev/null");
 	    system("$RM -rf C:/'Documents and Settings'/$name.*");
 
 	    # Unmount the homedir so we can get to the mount point.
@@ -418,7 +418,7 @@ sub os_usermod($$$$$$)
 	}
     }
 
-    $cmd = "echo -e '$pswd\\n$pswd' | passwd $login > /dev/null 2>&1";
+    $cmd = "echo -e '$pswd\\n$pswd' | passwd $login >& /dev/null";
     ##print "    $cmd\n";
     if (system($cmd) != 0) {
 	warning("os_usermod error ($cmd)\n");
