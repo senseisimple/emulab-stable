@@ -47,6 +47,8 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libadminctrl;
+use libtblog;
+
 #require exitonwarn; # exitonwarn isn't really a module, so just require it
 
 #
@@ -155,6 +157,16 @@ else {
     die("Tainted argument $eid!\n");
 }
 
+#
+# Set Error reporting info
+# 
+
+tblog_set_info($pid,$eid,$UID);
+
+#
+#
+#
+
 TBDebugTimeStampsOn();
 
 #
@@ -171,31 +183,26 @@ TBDebugTimeStamp("tbswap $swapop started");
 # Get experiment state; verify that experiment exists.
 #
 if (! ($state = ExpState($pid, $eid))) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid\n");
+    tbdie "No such experiment $pid/$eid";
 }
 # Sanity check the current state. 
 if (!$force) {
     if ($swapop eq "in") {
-	die("*** $0:\n".
-	    "    Experiment should be ACTIVATING. Currently $state.\n")
+	tbdie("Experiment should be ACTIVATING. Currently $state.")
 	    if ($state ne EXPTSTATE_ACTIVATING);
     }
     elsif ($swapop eq "out") {
-	die("*** $0:\n".
-	    "    Experiment should be SWAPPING. Currently $state.\n")
+	tbdie("Experiment should be SWAPPING. Currently $state.")
 	    if ($state ne EXPTSTATE_SWAPPING);
     }
     elsif ($swapop eq "update") {
-	die("*** $0:\n".
-	    "    Experiment should be MODIFY_RESWAP. Currently $state.\n")
+	tbdie("Experiment should be MODIFY_RESWAP. Currently $state.")
 	    if ($state ne EXPTSTATE_MODIFY_RESWAP);
     }
 }
 # Get elabinelab status. See below.
 if (! TBExptIsElabInElab($pid, $eid, \$elabinelab)) {
-    die("*** $0:\n".
-	"    Could not get elabinelab status for experiment $pid/$eid\n");
+    tbdie("Could not get elabinelab status for experiment $pid/$eid");
 }
 
 #
@@ -393,7 +400,7 @@ sub doSwapout($) {
 		($update_Eventsys_restart && $type == UPDATE) ) {
 		print "Stopping the event system\n";
 		if (system("eventsys_control stop $pid $eid")) {
-		    print STDERR "*** Failed to stop the event system.\n";
+		    tberror "Failed to stop the event system.";
 		    $swapout_errors = 1;
 		}
 
@@ -403,7 +410,7 @@ sub doSwapout($) {
 		if (-x $piper) {
 		    print "Stopping the location piper\n";
 		    if (system("$piper -k $pid $eid")) {
-			print STDERR "*** Failed to stop location piper.\n";
+			tberror "Failed to stop location piper.";
 			$swapout_errors = 1;
 		    }
 		}
@@ -418,7 +425,7 @@ sub doSwapout($) {
 	if ($elabinelab && $type >= CLEANUP) {
 	    print "Tearing down elabinelab. This could take a while.\n";
 	    if (system("elabinelab -k $pid $eid")) {
-		print STDERR "*** Failed to teardown elabinelab!\n";
+		tberror "Failed to teardown elabinelab!";
 		$swapout_errors = 1;
 	    }
 	}
@@ -433,7 +440,7 @@ sub doSwapout($) {
 	    TBDebugTimeStamp("snmpit started");
 	    print STDERR "Removing VLANs.\n";
 	    if (system("snmpit -r $pid $eid")) {
-		print STDERR "*** Failed to reset VLANs\n";
+		tberror "Failed to reset VLANs";
 		$swapout_errors = 1;
 	    } else {
 		$cleanvlans = 0;
@@ -452,7 +459,7 @@ sub doSwapout($) {
 	    print "Tearing down virtual nodes.\n";
 	    TBDebugTimeStamp("vnode_setup -k started");
 	    if (system("vnode_setup -d -k $pid $eid")) {
-		print STDERR "*** Failed to tear down vnodes.\n";
+		tberror "Failed to tear down vnodes.";
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("vnode_setup finished");
@@ -480,7 +487,7 @@ sub doSwapout($) {
 		    # If an error, cannot continue. Must leave firewall in
 		    # place. 
 		    #
-		    print STDERR "*** Failed to power nodes off! Stopping.\n";
+		    tberror "Failed to power nodes off! Stopping.";
 		    return 1;
 		}
 
@@ -502,7 +509,7 @@ sub doSwapout($) {
 		    # If an error, cannot continue. Must leave firewall in
 		    # place. 
 		    #
-		    print STDERR "*** Failed to reset OSIDs! Stopping.\n";
+		    tberror "Failed to reset OSIDs! Stopping.";
 		    return 1;
 		}
 
@@ -520,7 +527,7 @@ sub doSwapout($) {
 		    # know what nodes failed. But for now we have to do the
 		    # ISUP test to make sure nodes really got into the MFS.
 		    #
-		    print STDERR "*** Failed to power on nodes! Stopping.\n";
+		    tberror "Failed to power on nodes! Stopping.";
 		    return 1;
 		}
 	    }
@@ -548,7 +555,7 @@ sub doSwapout($) {
 		    # Okay to continue; reload daemon will probably send
 		    # email later when the reload fails.
 		    #
-		    print STDERR "*** Some nodes failed to reboot. Continuing\n";
+		    tberror "Some nodes failed to reboot. Continuing";
 		}
 	    }	    
 	}
@@ -560,7 +567,7 @@ sub doSwapout($) {
 	print STDERR "Freeing nodes.\n";
 	TBDebugTimeStamp("nfree started");
 	if (system("nfree $pid $eid")) {
-	    print STDERR "*** Could not free nodes.\n";
+	    tberror "Could not free nodes.";
 	    $swapout_errors = 1;
 	}
 	TBDebugTimeStamp("nfree finished");
@@ -606,7 +613,7 @@ sub doSwapout($) {
 	    print "Tearing down failed virtual nodes.\n";
 	    TBDebugTimeStamp("vnode_setup -k started");
 	    if (system("vnode_setup -d -k $pid $eid @failedvnodes")) {
-		print STDERR "*** Failed to tear down vnodes.\n";
+		tberror "Failed to tear down vnodes.";
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("vnode_setup -k finished");
@@ -626,7 +633,7 @@ sub doSwapout($) {
 	    #
 	    if (system("nfree -x $pid $eid " .
 		       join(" ", (@failedpnodes, @failedvnodes)))) {
-		print STDERR "*** Could not free nodes.\n";
+		tberror "Could not free nodes.";
 		$swapout_errors = 1;
 	    }
 	    TBDebugTimeStamp("nfree finished");
@@ -658,7 +665,7 @@ sub doSwapout($) {
 		print "Destroying Planetlab slice.\n";
 		TBDebugTimeStamp("plabslice destroy started");
 		if (system("plabslice destroy $pid $eid")) {
-		    print STDERR "*** Failed to destroy Plab dslice\n";
+		    tberror "Failed to destroy Plab dslice.";
 		    $swapout_errors = 1;
 		}
 		TBDebugTimeStamp("plabslice destroy finished");
@@ -680,7 +687,7 @@ sub doSwapout($) {
 	    print "Resetting mountpoints.\n";
 	    TBDebugTimeStamp("exports started");
 	    if (system("exports_setup")) {
-		print STDERR "*** Failed to reset mountpoints.\n";
+		tberror "Failed to reset mountpoints.";
 	    }
 	    TBDebugTimeStamp("exports finished");
 	}
@@ -692,14 +699,14 @@ sub doSwapout($) {
 	print "Resetting named maps.\n";
 	TBDebugTimeStamp("named started");
 	if (system("named_setup")) {
-	    print "*** WARNING: Failed to reset named map.\n";
+	    tbwarn "Failed to reset named map.";
 	}
 	TBDebugTimeStamp("named finished");
 
 	print "Resetting email lists.\n";
 	TBDebugTimeStamp("genelists started");
 	if (system("genelists -t")) {
-	    print "*** WARNING: Failed to reset email lists.\n";
+	    tbwarn "Failed to reset email lists.";
 	}
 	TBDebugTimeStamp("genelists finished");
     }
@@ -782,7 +789,7 @@ sub doSwapin($) {
 	if (system("$wrapper $pid $eid")) {
 	    $exitcode = $? >> 8;
 
-	    print STDERR "*** Failed ($exitcode) to map to reality.\n";
+	    tberror "Failed ($exitcode) to map to reality.";
 
 	    # Wrapper sets this bit when recovery is possible.
 	    if ($exitcode & 64) {
@@ -860,7 +867,7 @@ sub doSwapin($) {
 		if ($elabinelab) {
 		    print "Removing nodes from inner elab.\n";
 		    if (system("elabinelab -r $pid $eid @physnodes")) {
-			print STDERR "*** Failed to remove inner nodes!\n";
+			tberror "Failed to remove inner nodes!";
 			return 1;
 		    }
 		}
@@ -901,7 +908,7 @@ sub doSwapin($) {
 	#
 	# No recovery for now - what would we do?
 	#
-	print STDERR "*** Failed to set up tarballs.\n";
+	tberror "Failed to set up tarballs.";
 	return 1;
     }
     TBDebugTimeStamp("tarfiles_setup finished");
@@ -935,7 +942,7 @@ sub doSwapin($) {
 		print "Creating Planetlab slice.\n";
 		TBDebugTimeStamp("plabslice create started");
 		if (system("plabslice create $pid $eid")) {
-		    print STDERR "*** Failed to create Plab dslice\n";
+		    tberror "Failed to create Plab dslice";
 		    return 3;
 		}
 		TBDebugTimeStamp("plabslice alloc finished");
@@ -957,7 +964,7 @@ sub doSwapin($) {
     print "Setting up mountpoints.\n";
     TBDebugTimeStamp("mountpoints started");
     if (system("exports_setup")) {
-	print STDERR "*** Failed to setup mountpoints.\n";
+	tberror "Failed to setup mountpoints.";
 	return 1;
     }
     TBDebugTimeStamp("mountpoints finished");
@@ -965,7 +972,7 @@ sub doSwapin($) {
     TBDebugTimeStamp("named started");
     print "Setting up named maps.\n";
     if (system("named_setup")) {
-	print STDERR "*** WARNING: Failed to add node names to named map.\n";
+	tbwarn "Failed to add node names to named map.";
 	#
 	# This is a non-fatal error.
 	#
@@ -1024,7 +1031,7 @@ sub doSwapin($) {
     if (!($os_setup_pid = fork())) { 
 	exec("os_setup $pid $eid") or return 1;
     } elsif ($os_setup_pid == -1) {
-	print STDERR "*** Fork failed.\n";
+	tberror "Fork failed.";
 	return 1;
     }
 
@@ -1039,7 +1046,7 @@ sub doSwapin($) {
     print "Setting up VLANs.\n";
     TBDebugTimeStamp("snmpit started");
     if (system("snmpit -t $pid $eid")) {
-	print STDERR "*** Failed to set up VLANs.\n";
+	tberror "Failed to set up VLANs.";
 	return 1;
     }
     TBDebugTimeStamp("snmpit finished");
@@ -1052,7 +1059,7 @@ sub doSwapin($) {
     print "Setting up email lists.\n";
     TBDebugTimeStamp("genelists started");
     if (system("genelists -t")) {
-	print STDERR "*** WARNING: Failed to update email lists.\n";
+	tbwarn "Failed to update email lists.";
 	#
 	# This is a non-fatal error.
 	# 
@@ -1067,7 +1074,7 @@ sub doSwapin($) {
 	print "Clearing port counters.\n";
 	TBDebugTimeStamp("portstats started");
 	if (system("portstats -z -a -q $pid $eid")) {
-	    print STDERR "*** WARNING: Failed to clear port counters.\n";
+	    tbwarn "Failed to clear port counters.";
 	    #
 	    # This is a non-fatal error.
 	    # 
@@ -1082,7 +1089,7 @@ sub doSwapin($) {
     if ($kid == $os_setup_pid) {
 	undef $os_setup_pid; # Make sure doswapout() doesn't wait for it.
 	if ($CHILD_ERROR) {
-	    print STDERR "*** Failed to reset OS and reboot nodes.\n";
+	    tberror "Failed to reset OS and reboot nodes.";
 	    #
 	    # If there is a firewall involved, it could be that the
 	    # firewall rules are preventing essential communication,
@@ -1112,7 +1119,7 @@ sub doSwapin($) {
 	}
     } else {
 	undef $os_setup_pid;
-	print STDERR "*** Error waiting for os_setup to finish.\n";
+	tberror "Error waiting for os_setup to finish.";
 	return 1;
     }
     TBDebugTimeStamp("os_setup finished");
@@ -1132,7 +1139,7 @@ sub doSwapin($) {
 	if (-x $piper && ($type != UPDATE && $type != UPDATE_RECOVER)) {
 	    print "Starting the location piper.\n";
 	    if (system("$piper $pid $eid")) {
-		print STDERR "*** Failed to start the location piper.\n";
+		tberror "Failed to start the location piper.";
 		return 1;
 	    }
 	}
@@ -1142,7 +1149,7 @@ sub doSwapin($) {
 	    print "Starting the event system.\n";
 	    TBDebugTimeStamp("eventsys_control started");
 	    if (system("eventsys_control start $pid $eid")) {
-		print STDERR "*** Failed to start the event system.\n";
+		tberror "Failed to start the event system.";
 		return 1;
 	    }
 	    TBDebugTimeStamp("eventsys_control finished");
@@ -1183,7 +1190,7 @@ sub doSwapin($) {
 	print "Setting up elabinelab. This could take a while!\n";
 	TBDebugTimeStamp("elabinelab setup started");
 	if (system("elabinelab $optarg $pid $eid")) {
-	    print STDERR "*** Failed to setup elabinelab!\n";
+	    tberror "Failed to setup elabinelab!";
 	    return 1;
 	}
 	TBDebugTimeStamp("ElabInElab setup finished");
@@ -1294,7 +1301,7 @@ sub doFW($$$$) {
 	}
     }
     if (!defined($fwport)) {
-	print STDERR "*** Firewall node '$fwnode' not found in $pid/${eid}!\n";
+	tberror "Firewall node '$fwnode' not found in $pid/${eid}!";
 	return 0;
     }
     if ($portlist eq "") {
@@ -1303,7 +1310,7 @@ sub doFW($$$$) {
 	# but mere users must have at least one firewalled node. Just print
 	# the warning though. 
 	# 
-	print STDERR "*** WARNING: No firewalled nodes in $pid/${eid}!\n";
+	tberror "No firewalled nodes in $pid/${eid}!";
     }
 
     #
@@ -1343,7 +1350,7 @@ sub doFW($$$$) {
 	print "doFW: '$fwsetupstr1'\n";
 	my $snmpit_out = `$fwsetupstr1`;
 	if ($? != 0 || $snmpit_out !~ /VLAN #(\d+) on /) {
-	    print STDERR "*** Failed to setup Firewall control net VLAN.\n";
+	    tberror "Failed to setup Firewall control net VLAN.";
 	    return 1;
 	}
 	my $fwvlan = $1;
@@ -1351,14 +1358,12 @@ sub doFW($$$$) {
 	TBDebugTimeStamp("snmpit firewall setup: trunk");
 	print "doFW: '$fwsetupstr2'\n";
 	if (system($fwsetupstr2)) {
-	    print STDERR "*** Failed to setup Firewall trunk on port $fwport.\n";
+	    tberror "Failed to setup Firewall trunk on port $fwport.";
 	    if (system($fwtakedownstr1)) {
-		print STDERR
-		    "*** Could not return $portlist to Control VLAN!\n";
+		tberror "Could not return $portlist to Control VLAN!";
 	    }
 	    if (system($fwtakedownstr2)) {
-		print STDERR
-		    "*** Could not destroy VLAN $fwvlanname ($fwvlan)!\n";
+		tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
 	    }
 	    return 1;
 	}
@@ -1372,8 +1377,7 @@ sub doFW($$$$) {
 	print "doFW: '$fwsetupstr1'\n";
 	my $snmpit_out = `$fwsetupstr1`;
 	if ($?) {
-	    print STDERR
-	        "*** Failed to add nodes to Firewall control net VLAN.\n";
+	    tberror "Failed to add nodes to Firewall control net VLAN.";
 	    return 1;
 	}
 	TBDebugTimeStamp("snmpit firewall setup done");
@@ -1382,8 +1386,7 @@ sub doFW($$$$) {
 	TBDebugTimeStamp("snmpit firewall port deletion");
 	print "doFW: '$fwtakedownstr1'\n";
 	if (system($fwtakedownstr1)) {
-	    print STDERR
-		"*** Failed to remove nodes from Firewall control net VLAN.\n";
+	    tberror "Failed to remove nodes from Firewall control net VLAN.\n";
 	    return 1;
 	}
 	TBDebugTimeStamp("snmpit firewall setup done");
@@ -1393,34 +1396,29 @@ sub doFW($$$$) {
 	print "doFW: '$fwtakedownstr0'\n";
 	my $failed = 0;
 	if (system($fwtakedownstr0)) {
-	    print STDERR
-		"*** Could not re-enable firewall control port $fwport!\n";
+	    tberror "Could not re-enable firewall control port $fwport!";
 	    $failed = 1;
 	}
 	TBDebugTimeStamp("snmpit firewall teardown: VLAN");
 	print "doFW: '$fwtakedownstr1'\n";
 	if (system($fwtakedownstr1)) {
-	    print STDERR
-		"*** Could not return $portlist to Control VLAN!\n";
+	    tberror "Could not return $portlist to Control VLAN!";
 	    $failed = 1;
 	}
 	print "doFW: '$fwtakedownstr2'\n";
 	if (system($fwtakedownstr2)) {
-	    print STDERR
-		"*** Could not destroy VLAN $fwvlanname ($fwvlan)!\n";
+	    tberror "Could not destroy VLAN $fwvlanname ($fwvlan)!";
 	    $failed = 1;
 	}
 	TBDebugTimeStamp("snmpit firewall teardown: trunk");
 	print "doFW: '$fwtakedownstr3'\n";
 	if (system($fwtakedownstr3)) {
-	    print STDERR
-		"*** Could not tear down trunk on $fwport!\n";
+	    tberror "Could not tear down trunk on $fwport!";
 	    $failed = 1;
 	}
 	print "doFW: '$fwtakedownstr4'\n";
 	if (system($fwtakedownstr4)) {
-	    print STDERR
-		"*** Could not return $fwport to Control VLAN!\n";
+	    tberror "Could not return $fwport to Control VLAN!";
 	    $failed = 1;
 	}
 	if ($failed) {

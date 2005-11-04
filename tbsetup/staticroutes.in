@@ -52,6 +52,7 @@ my $format      = "";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';

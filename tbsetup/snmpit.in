@@ -21,6 +21,7 @@ my $TB = '@prefix@';
 use libdb;
 use snmpit_lib;
 use snmpit_remote;
+use libtblog;
 
 use English;
 use Getopt::Long;
@@ -323,7 +324,7 @@ if ($opt{y}) {
     @pvlanArgs = $opt{y};
     if ($opt{y} ne "primary") {
 	if (!$opt{x} || !$opt{z}) {
-	    warn "**** -x and -z must be given when -y is $opt{y}!\n";
+	    warn "****-x and -z must be given when -y is $opt{y}!\n";
 	    exit &usage;
 	}
 	#
