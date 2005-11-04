@@ -688,9 +688,9 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0 ) {
     	    <style type='text/css' media='all'>
             <!-- @import '$BASEPATH/style.css'; -->";
 
-#    if (!$MAINPAGE) {
-#	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
-#    } 
+    if (!$MAINPAGE) {
+	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
+    } 
 
     echo "</style>\n";
 
