@@ -478,12 +478,7 @@ function WRITESIDEBAR() {
 
 		WRITESIDEBARDIVIDER();
 
-                # Free PCs. Silly.
-		$freepcs = TBFreePCs();
-
-		WRITESIDEBARBUTTON("Node Status ".
-				   "<b><font color=black>($freepcs free PCs)".
-				   "</font></b>",
+		WRITESIDEBARBUTTON("Node Status",
 				   $TBBASE, "nodecontrol_list.php3");
 
 		SIDEBARCELL("List <a " .
@@ -670,7 +665,7 @@ function WRITESIMPLESIDEBAR($menudefs) {
 #
 # spits out beginning part of page
 #
-function PAGEBEGINNING( $title, $nobanner = 0 ) {
+function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0 ) {
     global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB;
     global $TBDIR, $WWW;
     global $MAINPAGE;
@@ -693,9 +688,9 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
     	    <style type='text/css' media='all'>
             <!-- @import '$BASEPATH/style.css'; -->";
 
-    if (!$MAINPAGE) {
-	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
-    } 
+#    if (!$MAINPAGE) {
+#	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
+#    } 
 
     echo "</style>\n";
 
@@ -739,13 +734,21 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
         if (!$MAINPAGE) {
 	     echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
 	}
-	echo "</td></tr></table>\n";
+	echo "</td>\n";
+	echo "<td valign=top align=right width=175
+                 class=banneriframe>
+             <iframe src=currentusage.php3
+                 width=100% height=100 marginheight=0 marginwidth=0
+                 scrolling=no frameborder=0></iframe></td>\n";
+        echo "</tr></table>\n";
     }
-
-    echo "<table cellpadding='8' cellspacing='0' height='100%' width='100%'>
-            <tr height='100%'>
-              <td valign='top' class='leftcell' bgcolor='#ccddee'>
-              <!-- sidebar begins -->";
+    if (! $nocontent ) {
+	echo "<table cellpadding='8' cellspacing='0' height='100%'
+                width='100%'>
+                <tr height='100%'>
+                  <td valign='top' class='leftcell' bgcolor='#ccddee'>
+                  <!-- sidebar begins -->";
+    }
 }
 
 #
@@ -838,7 +841,7 @@ function PAGEHEADER($title, $view = NULL) {
     } else {
 	$nobanner = 0;
     }
-    PAGEBEGINNING( $title, $nobanner );
+    PAGEBEGINNING( $title, $nobanner, 0 );
     if (!isset($view['hide_sidebar'])) {
 	WRITESIDEBAR();
     }

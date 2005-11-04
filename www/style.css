@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -49,6 +49,11 @@ td.paddedcell2 { padding: 0.5em; }
 	padding: 8px;
 	padding-left: 3px;
 	background-image: url(wallpaper1.png); }
+.banneriframe {
+	background-color: #000; 
+        border: solid 2px black;
+	padding: 0px;
+        spacing: 0px; }
 .menu {
 	border: solid 2px black; 
 	margin: 0px; 
@@ -69,7 +74,6 @@ td.paddedcell2 { padding: 0.5em; }
 	padding-bottom: 0px; 
 	margin: 0px;
 	border: 0px; }
-
 .menuopt,.menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb {
 	background-color: #cde; 
 	padding-left: 6px;
@@ -78,6 +82,15 @@ td.paddedcell2 { padding: 0.5em; }
 	margin: 0px; 
 	border: 0px;
 	font-size: 10pt; }
+
+td.menuoptusage {
+	background-color: #cde; 
+	padding-left: 6px;
+	padding-top: 1px; 
+	padding-bottom: 0px;
+	margin: 0px; 
+	border: 0px;
+	font-size: 10pt }
 
 .topbaropt {
     	background-color: #fff;

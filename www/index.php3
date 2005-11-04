@@ -45,42 +45,6 @@ if ($uid = GETUID()) {
 #
 PAGEHEADER("Emulab - Network Emulation Testbed Home");
 
-# Get some stats about current experiments
-
-$query_result =
-    DBQueryFatal("select count(*) from experiments as e " .
-	"left join experiment_stats as s on s.exptidx=e.idx " .
-	"left join experiment_resources as rs on rs.idx=s.rsrcidx ".
-	"where state='active' and rs.pnodes>0 and " .
-        "      e.pid!='emulab-ops' and ".
-	"      not (e.pid='ron' and e.eid='all')");
-
-if (mysql_num_rows($query_result) != 1) {
-    $active_expts = "ERR";
-} else {
-    $row = mysql_fetch_array($query_result);
-    $active_expts = $row[0];
-}
-
-$query_result = DBQueryFatal("select count(*) from experiments where ".
-	"state='swapped' and pid!='emulab-ops' and pid!='testbed'");
-if (mysql_num_rows($query_result) != 1) {
-    $swapped_expts = "ERR";
-} else {
-    $row = mysql_fetch_array($query_result);
-    $swapped_expts = $row[0];
-}
-
-$query_result = DBQueryFatal("select count(*) from experiments where ".
-			     "swap_requests > 0 and idle_ignore=0 ".
-			     "and pid!='emulab-ops' and pid!='testbed'");
-if (mysql_num_rows($query_result) != 1) {
-    $idle_expts = "ERR";
-} else {
-    $row = mysql_fetch_array($query_result);
-    $idle_expts = $row[0];
-}
-
 #
 # Special banner message.
 #
@@ -92,23 +56,6 @@ if ($message != "") {
 }
 
 ?>
-
-<center>
-<table align="right">
-<tr><th nowrap colspan=2 class="contentheader" align="center">
-	Current Experiments</th></tr>
-<tr><td align="right" class="menuopt"><?php echo $active_expts ?></td> 
-    <td align="left" class="menuopt">
-        <a href=explist.php3#active>Active</a>
-    </td></tr>
-<tr><td align="right" class="menuopt"><?php echo $idle_expts ?></td>
-    <td align="left" class="menuopt">Idle</td></tr>
-<tr><td align="right" class="menuopt"><?php echo $swapped_expts ?></td>
-    <td align="left" class="menuopt">
-        <a href=explist.php3#swapped>Swapped</a>
-    </td></tr>
-</table>
-</center>
 
 <p><em>Netbed</em>, an outgrowth of <em>Emulab</em>, provides
 integrated access to three disparate experimental environments:
