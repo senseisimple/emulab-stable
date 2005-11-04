@@ -405,12 +405,6 @@ function WRITESIDEBAR() {
 	    "</td></tr>\n";
     }
 
-    # Free PCs. Silly.
-    if ($login_status & CHECKLOGIN_LOGGEDIN) {
-         $freepcs = TBFreePCs();
-	 WRITESIDEBARNOTICE( "($freepcs free PCs)" );
-    }
-
     #
     # Basically, we want to let admin people continue to use
     # the web interface even when nologins set. But, we want to make
@@ -484,7 +478,12 @@ function WRITESIDEBAR() {
 
 		WRITESIDEBARDIVIDER();
 
-		WRITESIDEBARBUTTON("Node Status",
+                # Free PCs. Silly.
+		$freepcs = TBFreePCs();
+
+		WRITESIDEBARBUTTON("Node Status ".
+				   "<b><font color=black>($freepcs free PCs)".
+				   "</font></b>",
 				   $TBBASE, "nodecontrol_list.php3");
 
 		SIDEBARCELL("List <a " .
@@ -551,7 +550,9 @@ function WRITESIDEBAR() {
     }
 
     # And now the Collaboration menu.
-    if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID))) {
+    if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
+	($WIKISUPPORT || $MAILMANSUPPORT || $BUGDBSUPPORT ||
+	 $CVSSUPPORT  || $CHATSUPPORT)) {
 	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
 	    "<tr><td class=menuheader>".
 	    "<b>Collaboration</b>".
@@ -725,7 +726,7 @@ function PAGEBEGINNING( $title, $nobanner = 0 ) {
             <tr valign='top'>
               <td valign='top' class='bannercell'
                   background='$BASEPATH/headerbgbb.jpg'
-                  bgcolor=#3D627F
+                  bgcolor=#3D627F>
               <img width=369 height=100 border=0 usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
