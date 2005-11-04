@@ -62,6 +62,7 @@ if ($EUID != 0) {
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 
 #
 # Turn off line buffering on output

@@ -66,6 +66,9 @@ my $TBROOT = "@prefix@";
 use lib '@prefix@/lib';
 require exitonwarn;
 use libdb;
+use libtblog;
+
+tblog_stop_capture('stdout');
 
 my $TRACK_INTERSWITCH_BANDWIDTH = "@TRACK_INTERSWITCH_BANDWIDTH@";
 

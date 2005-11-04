@@ -1,0 +1,601 @@
+#!/usr/bin/perl -w
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# libtblog: Logging library for testbed
+#
+# The very act of including libtblog in a perl script will activate
+# the logging subsystem.  Also, all output to STDOUT and STDERR will,
+# by default, be captured and turned into log messages, in addition to
+# being printed.  Handlers are also installed for die/warn.
+# To turn this feature off use tblog_stop_capture(..).
+#
+# Although the logging subsystem is activated automatically, the pid,
+# eid, and uid can not be determined automatically.  Thus the function
+# tblog_set_info(...) needs to be called to set this info.
+#
+# To create a log entry use tblog(...) or one of the shortcut function:
+# tberror, tberr, tbwarn, tbwarning, tbnotice, tbinfo, and tbdebug.
+#
+# To attempt and figure out what went wrong during a session use
+# tblog_find_error(..).
+# 
+# To turn off the database logging set the environmental variable
+# TBLOG_OFF to a true value.
+#
+
+package libtblog;
+use Exporter;
+
+@ISA = "Exporter";
+@EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
+	      tbdie tblog_set_info tblog_find_error
+	      tblog_capture tblog_stop_capture
+	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
+	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
+@EXPORT_OK = qw (*SOUT *SERR);
+
+# After package decl.
+use English;
+use POSIX qw(isatty setsid);
+use File::Basename;
+use IO::Handle;
+
+use strict;
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libtestbed;
+use libdb;
+
+my $SCRIPTNAME = basename($PROGRAM_NAME);
+my $SCRIPTNUM = 0;
+my $PARENT_INVOCATION = 0;
+
+my %PRIORITY_MAP_TO_NUM;
+my %PRIORITY_MAP_TO_STR;
+
+#
+# Duplicate STDOUT and STDERR to SOUT and SERR respectfully, since
+# tblog_capture() will redirect the real STDOUT and STDERR
+#
+
+open SOUT ,">&=STDOUT"; # Must be "&=" not "&" to avoid creating a
+                        # new low level file descriper as the
+                        # interacts strangly with the fork in swapexp.
+autoflush SOUT 1;
+open SERR ,">&=STDERR"; # Ditto
+autoflush SERR 1;
+
+#
+# Make constants for the error level, the sub, prefixed with TBLOG_,
+# are exported, the non-prefixed variables are used internally
+#
+
+sub TBLOG_EMERG   {000} my $EMERG   = 000;
+sub TBLOG_ALERT   {100} my $ALRET   = 100;
+sub TBLOG_CRIT    {200} my $CRIT    = 200;
+sub TBLOG_ERR     {300} my $ERR     = 300;
+sub TBLOG_WARNING {400} my $WARNING = 400;
+sub TBLOG_NOTICE  {500} my $NOTICE  = 500;
+sub TBLOG_INFO    {600} my $INFO    = 600;
+sub TBLOG_DEBUG   {700} my $DEBUG   = 700;
+
+#
+# Internal Utility Functions
+#
+
+sub check_env_def ( $ )
+{
+  die "Environment variable \"$_[0]\" not defined." unless defined $_[0];
+}
+
+sub check_env_num ( $ )
+{
+    check_env_def $_[0];
+    die "Environment variable \"$_[0]\" not a positive integer." 
+	unless $ENV{$_[0]} =~ /^[0-9]+$/;
+}
+
+sub check_env ()
+{
+    check_env_num 'TBLOG_LEVEL';
+    check_env_num 'TBLOG_SESSION';
+    check_env_num 'TBLOG_PIDX';
+    check_env_num 'TBLOG_INVOCATION';
+    check_env_num 'TBLOG_UID';
+}
+
+sub if_defined ($$) {
+    return $_[0] if defined $_[0];
+    return $_[1] if defined $_[1];
+    return '';
+}
+
+sub oneof ($@) {
+    my ($to_find) = shift;
+    my @res = grep {$to_find eq $_} @_;
+    return @res > 0;
+}
+
+#
+# Like DBQueryFatal but also fail if the query didn't return any results
+#
+sub DBQuerySingleFatal ( $ )
+{
+    my ($query) = @_;
+    my $query_result = DBQueryFatal $query;
+    DBFatal("DB Query \"$query\" didn't return any results") 
+	unless $query_result->numrows > 0;
+    my @row = $query_result->fetchrow_array();
+    return $row[0];
+}
+
+#
+# Forward Decals
+#
+
+sub dblog ( $@ );
+sub tblog ( $@ );
+
+#
+# tblog_init(): Called automatically when a script starts.  
+#
+# Will: (1) Get the unique ID for the script name, (2) get the
+# priority mapping (string -> int) from the database, (3) Creating an
+# "entring" log message in the database, (4) get the session id and
+# set up the environmental variables if they are not already set, 
+# 5) Get the invocation id, and 6) increment the level
+#
+sub tblog_init() {
+    # Get script number
+
+    my $query_result = DBQueryFatal
+	sprintf("select script from scripts where name=%s",
+		DBQuoteSpecial $SCRIPTNAME);
+    if ($query_result->num_rows > 0) {
+	$SCRIPTNUM = ($query_result->fetchrow_array())[0];
+    } else {
+	DBQueryFatal 
+	    sprintf("insert into scripts (name) values (%s)",
+		    DBQuoteSpecial $SCRIPTNAME);
+	$SCRIPTNUM = DBQuerySingleFatal 'select LAST_INSERT_ID()';
+    }
+
+    # Get priority mapping
+
+    $query_result = DBQueryFatal "SELECT * FROM priorities";
+    for (my $i = 0; $i < $query_result->num_rows; $i++) {
+        my ($n,$v) = $query_result->fetchrow_array();
+	$PRIORITY_MAP_TO_STR{$n} = $v;
+	$PRIORITY_MAP_TO_NUM{uc $v} = $n;
+	$PRIORITY_MAP_TO_NUM{lc $v} = $n;
+    }
+
+    # ...
+
+    if (defined $ENV{'TBLOG_SESSION'}) {
+	check_env();
+	$ENV{'TBLOG_LEVEL'}++;
+	$PARENT_INVOCATION = $ENV{'TBLOG_INVOCATION'};
+	dblog($NOTICE, {type => 'entering'},
+	      'Entering "', join(' ', $SCRIPTNAME, @ARGV), '"') or die;
+	my $id = DBQuerySingleFatal 'select LAST_INSERT_ID()';
+	$ENV{'TBLOG_INVOCATION'} = $id;
+	DBQueryFatal("update log set invocation=$id where seq=$id");
+    } else {
+	$ENV{TBLOG_SESSION} = 0;
+	$ENV{TBLOG_INVOCATION} = 0;
+	$ENV{TBLOG_LEVEL} = 0;
+	$ENV{TBLOG_PIDX} = 0;
+	$ENV{TBLOG_UID} = 0;
+	dblog($NOTICE, {type => 'entering'},
+	      'Entering "', join(' ', $SCRIPTNAME, @ARGV), '"') or die;
+	my $id = DBQuerySingleFatal 'select LAST_INSERT_ID()';
+	# set SESSION in database
+	$ENV{TBLOG_SESSION} = $id;
+	$ENV{TBLOG_INVOCATION} = $id;
+	DBQueryFatal("update log set session=$id,invocation=$id where seq=$id");
+    }
+}
+
+#
+# tblog_set_info(pid, eid, uid): Sets info in the database which can't
+#   be derived automatically with init.  Needs to be called at least
+#   once during a session
+#
+sub tblog_set_info ( $$$ ) 
+{
+    check_env();
+    my ($pid, $eid, $uid) = @_;
+    $ENV{'TBLOG_PIDX'} = 
+	DBQuerySingleFatal("select idx from experiments where pid='$pid' and eid='$eid'");
+    $ENV{'TBLOG_UID'} = $uid;
+    DBQueryFatal
+	sprintf('update log set pidx=%d,uid=%s where session=%s',
+		$ENV{TBLOG_PIDX}, $ENV{TBLOG_UID}, $ENV{TBLOG_SESSION});
+    print SERR "Session ID = $ENV{TBLOG_SESSION}\n";
+}
+
+#
+# tblog_exit(): Called automatically when a script exits
+#
+sub tblog_exit() {
+    return unless defined $ENV{'TBLOG_SESSION'};
+    check_env();
+    dblog($INFO, {type=>'exiting'}, "Leaving \"$SCRIPTNAME ...\"");
+}
+
+#
+# dblog(priority, [{parm=>value,...},] mesg, ...)
+#   Internal function.  Logs a message to the database.  Doesn't print
+#   anything. Will not die, instead return 0 on error, with the error
+#   message in $@.
+#   Valid parms: cause, type, fatal
+#
+my $in_dblog = 0; # Used to avoid an infinite recursion when
+                  # DBQueryFatal fails as a log entry is made to
+                  # record the failure, which will than likely cause
+                  # another failure and so on
+sub dblog( $@ ) {
+    my ($priority, @mesg) = @_;
+    my $parms = {};
+    $parms = shift @mesg if ref $mesg[0];
+    my $mesg = join('',@mesg);
+    return if $ENV{TBLOG_OFF} || $in_dblog;
+    $in_dblog = 1;
+    eval {
+	check_env();
+	my $query = 
+	  sprintf('insert into log (stamp,pidx,uid,session,parent,invocation,script,level,priority,inferred,cause,type,mesg) '. 
+		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
+		  $ENV{TBLOG_PIDX}, 
+		  $ENV{TBLOG_UID},
+		  $ENV{TBLOG_SESSION}, 
+		  $PARENT_INVOCATION, 
+		  $ENV{TBLOG_INVOCATION},
+		  $SCRIPTNUM, 
+		  $ENV{TBLOG_LEVEL},
+		  $priority,
+		  if_defined($parms->{inferred}, 0),
+		  DBQuoteSpecial if_defined($parms->{cause}, ''),
+		  DBQuoteSpecial if_defined($parms->{type}, 'normal'),
+		  DBQuoteSpecial $mesg);
+	my $result = DBQuery($query);
+	if (!$result && DBErr() == 1100) {
+	    DBQueryFatal("LOCK TABLE log WRITE");
+	    $result = DBQuery($query)
+	}
+	DBFatal("DB Query failed") unless $result;
+    };
+    $in_dblog = 0;
+    return 0 if $@;
+    return 1;
+}
+
+#
+# tblog(priority, mesg, ...)
+# tblog(priority, {parm=>value,...}, mesg, ...)
+
+#   The main log function.  Logs a message to the database and print
+#   the message to STDERR with an approate prefix depending on the
+#   severity of the error.  If more than one string is given for the
+#   message than they will concatenated.  If the env. var. TBLOG_OFF
+#   is set to a true value than nothing will be written to the
+#   database, but the message will still be written to STDOUT.  
+#   Useful parms: cause
+#
+sub tblog( $@ ) {
+    my ($priority, @rest) = @_;
+
+    if (exists $PRIORITY_MAP_TO_STR{$priority}) {
+      # $priority already a valid priority number
+    } elsif (exists $PRIORITY_MAP_TO_NUM{$priority}) {
+      # $priority a priority string, convert to num
+      $priority = $PRIORITY_MAP_TO_NUM{$priority}
+    } else {
+      die "Unknown Priority \"$priority\"" unless defined $priority;
+    }
+
+    my $mesg = join('', @rest);
+    my $res = dblog($priority, @rest) unless $mesg =~ /^\s+$/;
+
+    if ($priority <= $ERR ) {
+	print SERR "*** $SCRIPTNAME:\n"."    $mesg\n";
+    } elsif ($priority == $WARNING) {
+	print SERR "*** WARNING: $mesg\n";
+    } else {
+	print SERR "$mesg\n";
+    }
+
+    return $res;
+}
+
+# Useful alias functions
+
+sub tberror( @ ) {&tblog($ERR, @_)}
+sub tberr( @ ) {&tblog($ERR, @_)}
+sub tbwarn( @ ) {&tblog($WARNING, @_)}
+sub tbwarning( @ ) {&tblog($WARNING, @_)}
+sub tbnotice( @ ) {&tblog($NOTICE, @_)}
+sub tbinfo( @ ) {&tblog($INFO, @_)}
+sub tbdebug( @ ) {&tblog($DEBUG, @_)}
+
+#
+
+sub tbdie( @ ) {
+    dblog($ERR, @_);
+    tblog_stop_capture();
+    die ("*** $SCRIPTNAME:\n".
+	 "    $_[0]\n");
+}
+
+#
+# tblog_find_error([session],[store]): attempts to find the relevant error.  
+# 
+# Parameters:
+#   session: Session id to use. Defaults to the current as given by 
+#       $ENV{TVLOG_SESSION}.
+#   store: If set store the results into the database and act in
+#       a way that is safe to use in an END block, that is 
+#       (1) never die, (2) don't modify the exit code,  Will also
+#       print the results to and some additional info to STDERR
+#       for diagnosis purposed.  If not set simply print the results to
+#       STDERR.  Defaults to true unless the "session" parameter is also
+#       given, in which case default to false.
+#
+# Format of the result:
+#   <seq>: <script name>: <error msg>
+# for each relevent error
+#
+# To retrieve the results from the database:
+#   select ... where session = <Session ID> AND type = 'thecause' form log
+# The relevant errors are also flagged using "relevant" flag:
+#   select ... where session = <Session ID> AND relevant != 0 form log
+#
+sub tblog_find_error ( ;$$ ) {
+
+    my ($session,$store) = @_;
+    my $saved_exitcode = $?;
+
+    if (not defined $session) {
+        check_env();
+	$store = 1;
+	$session = $ENV{TBLOG_SESSION};
+    }
+
+    $store = 0 unless defined $store;
+
+    eval {
+
+	#
+	# Build the Tree
+	#
+	# Tree data structure:
+	# invocation = {invocation => INT, parent => INT, [{seq => int ...} || {seq => int, child => invox}]
+	
+	my $root = {invocation => 0, log => []};
+	my %lookup = (0 => $root);
+	my @log;
+	
+	my $query_result = DBQueryFatal "select seq,parent,invocation,priority,mesg,scripts.name from log natural join scripts where session = $session and priority <= $NOTICE order by seq";
+	
+	for (my $i = 0; $i < $query_result->num_rows; $i++) {
+	    
+	    my ($seq, $parent, $invocation, $priority, $mesg, $script) = $query_result->fetchrow;
+	    
+	    if (not exists $lookup{$invocation}) {
+		
+		my $p = $lookup{$parent};
+		die "Parent Doesn't Exists!" unless defined $p;
+		$lookup{$invocation} = {invocation => $invocation, parent => $parent, script=>$script, log => []};
+		push @{$p->{log}}, {seq => $invocation, child => $lookup{$invocation}};
+		
+	    }
+	    
+	    push @{$lookup{$invocation}{log}}, {seq => $seq, invocation=>$invocation, priority => $priority, mesg => $mesg};
+	    
+	}
+	
+	#
+	# Walk the Tree to find relevant errors
+	#
+	
+	my $prev_err_level = 0;
+	my @relevant;
+	
+	my $walk_tree;
+	$walk_tree = sub {
+	    
+	    my ($tree, $level) = @_;
+	    
+	    foreach (@{$tree->{log}}) {
+		
+		if (exists $_->{child}) {
+		    
+		    $walk_tree->($_->{child}, $level + 1);
+		    
+		} elsif ($_->{priority} <= $ERR) {
+		    
+		    push @relevant, $_ unless $prev_err_level > $level;
+		    
+		    $prev_err_level = $level;
+		    
+		}
+		
+	    }
+	    
+	};
+	
+	$walk_tree->($root, 0);
+	
+	# 
+	# Finally print/store the relevant errors
+	#
+	
+	my $error = '';
+	
+	foreach (@relevant) {
+	    $error .= "$_->{seq}: $lookup{$_->{invocation}}->{script}: $_->{mesg}\n";
+	}
+	$error = "No clue as to what went wrong!\n" unless length $error > 0;
+	
+	if ($store) {
+	    print SERR "**** Experimental information, please ignore ****\n";
+	    print SERR "Session ID = $ENV{TBLOG_SESSION}\n";
+	    print SERR "Likely Cause of the Problem:\n";
+	    print SERR $error;
+	    print SERR "**** End experimental information ****\n";
+	    chop $error;
+	    dblog $NOTICE, {type=>'thecause'}, $error;
+	    DBQueryFatal(sprintf("update log set relevant=1 where seq in (%s)",
+				 join(',', map {$_->{seq}} @relevant))) if @relevant;
+	} else {
+	    print SERR $error;
+	}
+    };
+
+    if ($@) {
+	my $err = $@;
+	eval {SENDMAIL(TB_OPSEMAIL, "tblog_find_error failed",
+		       "Experiment: $ENV{TBLOG_PIDX}\n".
+		       "User: $ENV{TBLOG_UID}\n".
+		       "Session: $ENV{TBLOG_SESSION}\n".
+		       "Script: $SCRIPTNAME\n".
+		       "\n".
+		       "$err\n")};
+	if ($store) {
+	    eval {dblog $WARNING, {type=>'thecause'}, 
+		    "tblog_find_error failed: $err" };
+	} else {
+	    $? = $saved_exitcode;
+	    die;
+	}
+    }
+    $? = $saved_exitcode;
+}
+
+#
+# Perl Tie Methods, see perltie(1)
+#
+
+sub TIEHANDLE {
+    my ($classname, $glob) = @_;
+    bless \$glob, $classname;
+}
+
+sub PRINT {
+    my $this = shift;
+    print {$$this} @_;
+    local $_ = join '', @_; # NOTE: This doesn't take into account "$,"
+                            # or output_field_separator
+    s/\n$//;
+    if (/warning:/i) {
+      dblog $WARNING, {inferred=>2}, $_;
+    } elsif (/\*\*\*/) {
+      dblog $ERR, {inferred=>2}, $_;
+    } else {
+      dblog $INFO, {inferred=>3}, $_;
+    }
+}
+
+sub PRINTF {
+    my ($this,$format) = (shift, shift);
+    &PRINT($this, sprintf($format, @_));
+}
+
+#
+# tblog_start_capture(): Capture all output to STDOUT and STDERR and turn
+#   them into log messages.  Use SOUT and SERR to print to the real
+#   STDOUT and STDERR respectfully.  Does NOT capture output of
+#   subprocesses.  Will also install handlers for "die" and "warn";
+#
+# Implementation node: tie is used to catch prints to STDOUT and
+#  STDERR as that seams to be the only sane way to do it.  "print" is
+#  a special function in perl and can not be overridden normally.
+#  Using "*print = &myprint" or even "*IO::Handle::print = &myprint"
+#  will only catch the calls to print without a file handle.  Although
+#  it may be possible to catch the other type of call to print I don't
+#  know how.
+#
+sub tblog_start_capture( ;@ ) {
+    my (@what) = @_;
+    @what = qw(stdout stderr die warn) unless @what;
+    foreach (@what) {
+	if ($_ eq 'stdout') {
+	    tie *STDOUT, 'libtblog', \*SOUT;
+	} elsif ($_ eq 'stderr') {
+	    tie *STDERR, 'libtblog', \*SERR;
+	} elsif ($_ eq 'die') {
+	    # Should not need to worry about parser errors since the
+	    # handlers will be set only after parsing is done
+	    $SIG{__DIE__} = sub {
+		return if $^S; # In Eval Block
+		local $_ = $_[0];
+		s/\n$//;
+		dblog($ERR, {inferred=>1}, $_);
+		$_ = "*** $_" unless /\*\*\*/;
+		die "$_\n";
+	    };
+	} elsif ($_ eq 'warn') {
+	    # Should not need to worry about parser errors since the
+	    # handlers will be set only after parsing is done
+	    $SIG{__WARN__} = sub {
+		local $_ = $_[0];
+		s/\n$//;
+		dblog($WARNING, {inferred=>1}, $_);
+		print SERR "$_\n";
+	    };
+	} else {
+	    warn "Unknown flag in tblog_start_capture: $_";
+	}
+    }
+}
+
+#
+# tblog_stop_capture(): stop capture of STDOUT and STDERR
+#
+sub tblog_stop_capture( ;@ ) {
+    my (@what) = @_;
+    @what = qw(stdout stderr die warn) unless @what;
+    foreach (@what) {
+	if    ($_ eq 'stdout') {untie *STDOUT}
+	elsif ($_ eq 'stderr') {untie *STDERR}
+	elsif ($_ eq 'die')    {delete $SIG{__DIE__}}  
+	elsif ($_ eq 'warn')   {delete $SIG{__WARN__}}
+	else 
+	  {warn "Unknown flag in tblog_stop_capture: $_"}
+    }
+}
+
+#
+# BEGIN
+#
+
+tblog_init();
+tblog_start_capture();
+
+#
+# END
+#
+
+END {
+    # Save, since shell commands will alter it.
+    my $exitstatus = $?;
+
+    tblog_exit();
+
+    $? = $exitstatus;
+}
+
+1;
+
+
+

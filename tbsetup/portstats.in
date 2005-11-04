@@ -24,6 +24,7 @@ use lib '@prefix@/lib';
 
 use libdb;
 use snmpit_lib;
+use libtblog;
 
 use English;
 use Getopt::Long;

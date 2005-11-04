@@ -59,6 +59,7 @@ use libdb;
 use libreboot;
 use libosload;
 use libtestbed;
+use libtblog;
 
 TBDebugTimeStampsOn();
 

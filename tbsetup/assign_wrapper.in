@@ -112,6 +112,7 @@ use libdb;
 use libtestbed;
 use Node;
 use libadminctrl;
+use libtblog;
 
 #
 # assign_wrapper Settings
@@ -189,8 +190,7 @@ sub fatal ($)
 {
     my($message) = @_;
 
-    print STDERR "*** $0:\n".
-	         "    $message\n";
+    tberror $message;
 
     # We next go to the END block below.
     exit($WRAPPER_FAILED);
@@ -211,8 +211,7 @@ END {
     }
     
     if ($warnings > 0) {
-	print STDERR "*** $0:\n".
-	             "    $warnings warnings.\n";
+	tbwarn "$warnings.\n";
 
 	$exitcode |= $WRAPPER_FAILED;
     }
@@ -889,8 +888,7 @@ sub RunAssign ()
 	#
         POSIX::setsid();
 	exec("nice $cmd $cmdargs > assign.log");
-	die("*** $0:\n".
-	    "    Could not start assign!\n");
+	die "Could not start assign!\n";
     }
 
     # Check cancel flag before continuing. 
@@ -4260,18 +4258,16 @@ sub CreateTopFile()
 		# If the user had explicitly asked for these, we
 		# print a warning
 		if (virtlanemulated($lan)) {
-		    print STDERR "*** WARNING: $0: ".
-	         		 "tb-set-multiplexed not supported on ".
-	         		 "$lan since one of the nodes in $lan is ".
-	         		 "not running the standard FreeBSD image ".
-				 "(FBSD-STD)\n";
+		    tbwarn "tb-set-multiplexed not supported on ".
+			   "$lan since one of the nodes in $lan is ".
+			   "not running the standard FreeBSD image ".
+			   "(FBSD-STD)";
 		}
 		if (virtlanuseveth($lan)) {
-		    print STDERR "*** WARNING: $0: ".
-	         		 "tb-set-useveth not supported on ".
-	         		 "$lan since one of the nodes in $lan is ".
-	         		 "not running the standard FreeBSD image ".
-				 "(FBSD-STD)\n";
+		    tbwarn "tb-set-useveth not supported on ".
+	         	   "$lan since one of the nodes in $lan is ".
+	         	   "not running the standard FreeBSD image ".
+			   "(FBSD-STD)";
 		}
 		$emulated = 0;
 		$virt_lans{$lan}->{"EMULATED"} = 0;

@@ -82,6 +82,7 @@ my $CONTROL  = "@USERNODE@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 
 my $parser   = "$TB/libexec/parse-ns";
 my $mkexpdir = "$TB/libexec/mkexpdir";
@@ -366,6 +367,11 @@ if (! DBQueryWarn("unlock tables")) {
 # See the END block below.
 #
 $justexit = 0;
+
+#
+# Set error reporting info
+# 
+tblog_set_info($pid,$eid,$UID);
 
 #
 # Create a directory structure for the experiment.
@@ -1017,6 +1023,8 @@ END {
     }
     my $saved_exitcode = $?;
     
+    tblog_find_error() if $?;
+
     if ($cleaning) {
 	#
 	# We are screwed; a recursive error. Someone will have to clean
