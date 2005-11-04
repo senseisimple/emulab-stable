@@ -2864,3 +2864,9 @@ last_net_act,last_cpu_act,last_ext_act);
      version entries.  Then remove the column from the nodes table:
 
      alter table nodes drop column bios_version;
+
+4.16: Add new tables for the logging subsystem (libdblog)
+
+	mysql tbdb < tbsetup/libtblog.sql
+
+

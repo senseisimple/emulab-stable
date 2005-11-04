@@ -817,6 +817,30 @@ CREATE TABLE location_info (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `log`
+--
+
+CREATE TABLE log (
+  seq int(10) unsigned NOT NULL auto_increment,
+  stamp int(10) unsigned NOT NULL default '0',
+  pidx int(11) NOT NULL default '0',
+  uid int(11) default NULL,
+  session int(10) unsigned NOT NULL default '0',
+  invocation int(10) unsigned NOT NULL default '0',
+  parent int(10) unsigned NOT NULL default '0',
+  script smallint(3) NOT NULL default '0',
+  level smallint(2) NOT NULL default '0',
+  priority smallint(3) NOT NULL default '0',
+  inferred tinyint(1) NOT NULL default '0',
+  cause varchar(32) NOT NULL default '',
+  type enum('normal','entering','exiting','thecause') NOT NULL default 'normal',
+  relevant tinyint(1) NOT NULL default '0',
+  mesg text NOT NULL,
+  PRIMARY KEY  (seq),
+  KEY session (session)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `login`
 --
 
@@ -1486,6 +1510,17 @@ CREATE TABLE portmap (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `priorities`
+--
+
+CREATE TABLE priorities (
+  priority smallint(3) NOT NULL default '0',
+  name varchar(8) NOT NULL default '',
+  PRIMARY KEY  (priority),
+  UNIQUE KEY name (name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `proj_memb`
 --
 
@@ -1603,6 +1638,17 @@ CREATE TABLE scheduled_reloads (
   image_id varchar(45) NOT NULL default '',
   reload_type enum('netdisk','frisbee') default NULL,
   PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `scripts`
+--
+
+CREATE TABLE scripts (
+  script smallint(3) NOT NULL auto_increment,
+  name varchar(24) NOT NULL default '',
+  PRIMARY KEY  (script),
+  UNIQUE KEY id (name)
 ) TYPE=MyISAM;
 
 --

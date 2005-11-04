@@ -121,6 +121,7 @@ REPLACE INTO exported_tables VALUES ('event_objecttypes');
 REPLACE INTO exported_tables VALUES ('exported_tables');
 REPLACE INTO exported_tables VALUES ('foreign_keys');
 REPLACE INTO exported_tables VALUES ('mode_transitions');
+REPLACE INTO exported_tables VALUES ('priorities');
 REPLACE INTO exported_tables VALUES ('state_timeouts');
 REPLACE INTO exported_tables VALUES ('state_transitions');
 REPLACE INTO exported_tables VALUES ('state_triggers');
@@ -254,6 +255,20 @@ REPLACE INTO mode_transitions VALUES ('ALWAYSUP','SHUTDOWN','RELOAD-MOTE','SHUTD
 REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','SHUTDOWN','ReloadStart');
 REPLACE INTO mode_transitions VALUES ('ALWAYSUP','ISUP','RELOAD-MOTE','ISUP','ReloadStart');
 REPLACE INTO mode_transitions VALUES ('RELOAD-MOTE','SHUTDOWN','ALWAYSUP','ISUP','ReloadDone');
+
+--
+-- Dumping data for table `priorities`
+--
+
+
+REPLACE INTO priorities VALUES (0,'EMERG');
+REPLACE INTO priorities VALUES (100,'ALERT');
+REPLACE INTO priorities VALUES (200,'CRIT');
+REPLACE INTO priorities VALUES (300,'ERR');
+REPLACE INTO priorities VALUES (400,'WARNING');
+REPLACE INTO priorities VALUES (500,'NOTICE');
+REPLACE INTO priorities VALUES (600,'INFO');
+REPLACE INTO priorities VALUES (700,'DEBUG');
 
 --
 -- Dumping data for table `state_timeouts`

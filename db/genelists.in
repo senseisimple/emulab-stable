@@ -71,6 +71,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 
 #
 # We don't want to run this script unless its the real version.

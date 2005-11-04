@@ -154,7 +154,7 @@ use vars qw(@ISA @EXPORT);
 	 TBAdmin TBOpsGuy TBProjAccessCheck TBNodeAccessCheck TBOSIDAccessCheck
 	 TBImageIDAccessCheck TBExptAccessCheck ExpLeader MarkNodeDown
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
-	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal
+	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
 	 ExpNodes ExpNodesOldReserved DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
@@ -4296,6 +4296,14 @@ sub DBQuoteSpecial($)
     $string = $DB->quote($string);
 
     return $string;
+}
+
+#
+# Get the Error From the Last Database query
+#
+sub DBErr()
+{
+    return $DB->err;
 }
 
 #
