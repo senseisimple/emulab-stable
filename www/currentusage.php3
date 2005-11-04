@@ -54,13 +54,13 @@ PAGEBEGINNING("Current Usage", 1, 1);
 <tr><td class="menuoptusage" align=right>
        <?php echo $active_expts ?></td> 
     <td align="left" class="menuoptusage">
-        <a href=explist.php3#active>Active</a>
+        <a target=_parent href=explist.php3#active>Active</a>
     </td></tr>
 <tr><td align="right" class="menuoptusage"><?php echo $idle_expts ?></td>
     <td align="left" class="menuoptusage">Idle</td></tr>
 <tr><td align="right" class="menuoptusage"><?php echo $swapped_expts ?></td>
     <td align="left" class="menuoptusage">
-        <a href=explist.php3#swapped>Swapped</a>
+        <a target=_parent href=explist.php3#swapped>Swapped</a>
     </td></tr>
 <tr><td align="right" class="menuoptusage"><b><?php echo $freepcs ?></b></td>
     <td align="left" class="menuoptusage"><b>Free PCs</b></td>
