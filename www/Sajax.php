@@ -107,22 +107,15 @@ if (!isset($SAJAX_INCLUDED)) {
 		var sajax_debug_mode = <?php echo $sajax_debug_mode ? "true" : "false"; ?>;
 		var sajax_request_type = "<?php echo $t; ?>";
 		
-		// http://www.phpied.com/javascript-include/
-		function include_dom(script_filename) {
-		    var html_doc = document.getElementsByTagName('head').item(0);
-		    var js = document.createElement('script');
-		    js.setAttribute('language', 'javascript');
-		    js.setAttribute('type', 'text/javascript');
-		    js.setAttribute('src', script_filename);
-		    html_doc.appendChild(js);
-		    return false;
-		}
-
-		include_dom("json.js");
-
 		function sajax_debug(text) {
-			if (sajax_debug_mode)
-				alert("RSD: " + text)
+			if (sajax_debug_mode) {
+				if (debug) {
+					debug("RSD: " + text);
+				}
+				else {
+					alert("RSD: " + text);
+				}
+			}
 		}
  		function sajax_init_object() {
  			sajax_debug("sajax_init_object() called..")
@@ -183,8 +176,14 @@ if (!isset($SAJAX_INCLUDED)) {
 					alert("Error: " + data);
 				else if (status == "+")
 					args[args.length-1](data);
-				else if (status == "$")
-					args[args.length-1](JSON.parse(data));
+				else if (status == "$") {
+					try {
+						args[args.length-1](JSON.parse(data));
+					}
+					catch(error) {
+						sajax_debug("callback error " + error);
+}
+					}
 			}
 			x.send(post_data);
 			sajax_debug(func_name + " uri = " + uri + "/post = " + post_data);
