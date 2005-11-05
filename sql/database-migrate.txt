@@ -2867,6 +2867,6 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.16: Add new tables for the logging subsystem (libdblog)
 
-	mysql tbdb < tbsetup/libtblog.sql
+	mysql tbdb < libtblog.sql
 
 
