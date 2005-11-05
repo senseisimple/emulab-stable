@@ -735,7 +735,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0 ) {
 	     echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
 	}
 	echo "</td>\n";
-	echo "<td valign=top align=right width=175
+	echo "<td valign=top align=right width=200
                  class=banneriframe>
              <iframe src=currentusage.php3
                  width=100% height=100 marginheight=0 marginwidth=0
