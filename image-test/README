@@ -1,0 +1,139 @@
+
+SETUP
+
+Copy the entire directory tree into a /proj/PID/ directory.  You
+might want to also change the variable $eid_prefix at the start of
+"image-test" to something different, your username might be a good 
+choice.
+
+BASIC USAGE
+
+From the base directory run:
+
+  ./image-test OS
+
+where <OS> is an exiting image name such as RHL90-STD.
+
+This will run each of the experiments in series.  The project to run
+them in will automatically be determined based on the current working
+directory.
+
+The results will be in results-DATE.  It will print the directory
+where the results will can be found to stdout.  The results of each
+experiment can than be found in RESULTSDIR/EXP
+
+Some of the files in this directory include:
+
+  log: all output to stdout and stderr is redirected here
+  nsfile.ns: the nsfile used
+  parms: the value of the different parmaters used in the experment.
+    This is diffrent from the one found in the test directory described 
+    latter.
+  failed-tests: a list of tests that failed
+  exp-data/: a copy of the experiment data as found in /proj/PID/exp/EID
+  tiplog-NODE: a copy of tiplog for NODE
+
+
+Running each of the experiments in series can take a long time.  For this
+reason it is possible to run more than one tests at once.  To do this use
+
+  ./image-test -p NUM OS
+
+where NUM is the maxim number of nodes to use at once.  If a
+particular experiment uses more than NUM nodes it will be run in series
+after all the experiments that can be run in parallel have finished.
+Thus setting NUM to 0 will force all the experiments to run in series.
+
+
+To only run particular experiment use:
+
+  ./image-test OS EXPS
+
+which will only run the experiments listed in EXPS.  For example:
+
+  ./image-test RHL90-STD single-pc850 single-pc3000
+
+will only run the experiments single-pc850 and single-pc3000.
+
+
+Certain experiments can be run with different parameters.  These
+parameters will be appended to the base experiment name.  For example
+the experiment "single-pc850" is really the experiment "single" with
+the first parameter being "pc850".  To run a particular experiment in
+all the possible combinations just specify the base name, for example:
+
+  ./image-test RHL90-STD single
+
+
+Each experiment consists of 5 stages:
+
+  (c) Create the experiment
+  (s) Swap it in
+  (t) Perform a series of tests of the experiment
+  (o) Swap it out
+  (e) End the experiment
+
+To only run particular stages of an experiment use:
+
+  ./image-test -s STAGES ...
+
+where STAGES consists of the letters above.  Note that 'e' implies 'o'.
+For example to avoid swapping an experiment out use:
+
+  ./image-test -s cst ...
+
+Or to just run the tests on a already swapped in experiment use:
+
+  ./image-test -s t ...
+
+TESTING FRAMEWORK
+
+Each individual experiment is expected to be the directory "tests/EXP".
+This directory must contain the following files
+
+  num-nodes
+  nsfile.ns
+  
+and may also contain:
+
+  parms
+  tests.pl
+
+and any other experiment specific files.
+
+The file "num-nodes" consists of a single line which is the number of
+nodes the experiment will use.
+
+The file "nsfile.ns" in the template ns file for the experiment. Any
+strings of the form "@PARM@" will be substituted for the value of the
+parameter.  The following parameters are available to all experiments:
+
+  OS: OS to use as given in the command line
+  DATADIR: BASE/tests/EXP
+
+The file "parms" can be used to specify additional parameters for the
+experiment.  all possible combinations of the parameters specified will
+be tried with each combination being run with the experiment name
+"EXP-PARM1-PARM2-...".
+
+The file "tests.pl" can be used to specify additional experiment
+specific tests.  This code will be run inside the "ImageTest"
+package.  See the file "ImageTest.pm" and existing tests for more
+info.
+
+For every experiment a number of standard tests will be run.
+
+For each node in the experiment the following tests will be run:
+
+  ssh-NODE: try to ssh into the node
+  sudo-NODE: make sure sudo is working correctly
+  hostname-NODE: make sure host name is what it is expected to be
+  login_prompt-NODE: make sure that the login prompt appears
+    in the console
+
+For experiments with more than one node:
+
+  linktest: run linktest
+
+Additional standard tests will be added over time.
+

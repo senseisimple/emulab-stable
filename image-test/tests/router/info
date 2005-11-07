@@ -1,0 +1,17 @@
+5 node experient in the following configuration:
+
+  N 
+    \
+     N - N - N
+    /
+  N
+
+(See info.png)
+
+Uses traceroute to make sure all nodes can find each other via the
+correct path.
+
+Expands to two test
+  router-static
+  router-session
+

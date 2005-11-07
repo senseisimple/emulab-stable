@@ -1,0 +1,339 @@
+#!/usr/bin/perl -w
+
+########################################################################
+#
+# This value is prefixed to all experiments to avoid conflicts with 
+# existing experient names
+#
+
+my $eid_prefix = 'it-';
+
+########################################################################
+#
+#
+#
+
+autoflush STDOUT, 1;
+autoflush STDERR, 1;
+
+use ImageTest;
+use Cwd;
+use Getopt::Long;
+
+use Data::Dumper;
+
+use strict;
+
+sub true() {1}
+sub false() {0}
+
+sub usage() {
+  die "usage: $0 -h | [-l] [-s CSTOE] [-p NUM] IMAGE [TESTS ...]\n";
+}
+
+sub help() {
+  print
+    ("usage: $0 -h | [<OPTIONS>] <OS> [TESTS ...]\n".
+     "  IMAGE      image to use\n".
+     "  TESTS      if present only run these particular tests\n".
+     "OPTIONS:\n".
+     "  -s STAGES  only execute particular stages of the test where\n".
+     "             STAGES is any one of:\n".
+     "               c: create, s: swapin, t: test o: swapout, e: end experment\n".
+     "             (note 'e' implies 'o')\n".
+     "  -p NUM     max number of nodes to alloacate when running experiments\n".
+     "             in parallel.  Experments larger than NUM will be run in series\n".
+     "             after all the parallel experiments have run.\n".
+     "             Default: 0, which means all experiments will run in series\n".
+     "  -l         Just list the available experements.\n");
+}
+
+die usage unless @ARGV > 0;
+
+my $cwd = cwd();
+$cwd =~ s~^/q/~/~;
+die "Working Directory needs to be in /proj\n" unless $cwd =~ m~^/proj~;
+
+my $basedir = $cwd;
+
+my $srcdir = $cwd;
+my $destdir = $cwd;
+
+my $date=`date +%Y%m%d%H%M`;
+chop $date;
+$destdir="$destdir/results-$date";
+
+my $testsdir = "$srcdir/tests";
+
+my ($pid) = $cwd =~ m~^/proj/(.+?)/~;
+
+my @argv;
+my %exp_opts;
+
+my $stages = 'cstoe';
+my $max_parallel = 0;
+my $just_list;
+
+GetOptions
+    "h|help" => sub {help(); exit 0;},
+    "s|stages=s" => \$stages,
+    "p=i" => \$max_parallel,
+    "l|list" => \$just_list
+  or usage();
+
+my $os = shift @ARGV;
+my @exps_torun = map {lc} @ARGV;
+
+if ($stages =~ /([^cstoe])/) {
+  print STDERR "Unknown stage, \"$1\", in stage string.\n" if $stages =~ /([^cstoe])/;
+  usage();
+}
+
+my @exps;
+my %exps;
+my @exps_inseries;
+my $num_exps_inparallel = 0;
+my @exps_inparallel_bysize;
+
+########################################################################
+#
+#
+#
+
+sub get_parms ($);
+sub get_numnodes ($);
+sub mktests ($$$@);
+
+my @p;
+
+opendir D, "$testsdir";
+while (my $test = readdir D) {
+  next if $test =~ /^\./;
+  @p = get_parms $test;
+  mktests $test, get_numnodes $test, [], @p;
+}
+
+sub get_parms ($) {
+  my ($test) = @_;
+  my @p;
+  open F, "$testsdir/$test/parms" or return;
+  while (<F>) {
+    chop;
+    next if /^\s*$/;
+    my ($key, $value) = /^\s*(.+?)\s*:\s*(.+?)\s*$/ or die "?$_?";
+    my @values = split /\s+/, $value;
+    push @p, [$key, [@values]];
+  }
+  return @p;
+}
+
+sub get_numnodes ($) {
+  # FIXME: needs better error detection
+  my ($test) = @_;
+  open F, "$testsdir/$test/num-nodes";
+  local $_ = <F>;
+  chop;
+  return $_;
+}
+
+sub use_exp ($);
+
+sub mktests ($$$@) {
+  my ($test, $numnodes, $what, @parms) = @_;
+  if (@parms == 0) {
+    my $t = $test;
+    for (my $i = 1; $i < @$what; $i += 2) {$t .= "-".lc($what->[$i])}
+    return unless use_exp $t;
+    $exps{$t} = {pid => $pid,
+		 eid => "$eid_prefix$t",
+		 numnodes => $numnodes,
+		 os => $os,
+		 datadir => "$testsdir/$test",
+		 resultsdir => "$destdir/$t",
+		 @$what,
+		 stages => $stages,
+		 %exp_opts};
+    push @exps, $t;
+  } else {
+    my $p = shift @parms;
+    foreach (@{$p->[1]}) {
+      mktests $test, $numnodes, [@$what, $p->[0], $_], @parms;
+    }
+  }
+}
+
+sub use_exp ($) {
+  my ($exp) = @_;
+  return true if (@exps_torun == 0);
+  foreach my $e (@exps_torun) {
+    return true if ($e eq $exp);
+    return true if $exp =~ /^$e-/;
+  }
+  return false;
+}
+
+########################################################################
+#
+#
+#
+
+if ($just_list) {
+  foreach (@exps) {
+    print "$_\n";
+  }
+  exit 0;
+}
+
+########################################################################
+#
+#
+#
+
+sub get_exps ($@);    # parms: available nodes, size list
+                      # returns list of experments, see below
+sub get_sizelist ($); # parms: maxim size
+                      # returns list of sizes less than max
+sub extract_exps (@); # parms: size list
+                      # extracts nodes from %explist_bysize and returns them
+
+my @results;
+my %pids;
+
+my $avail_nodes = $max_parallel;
+
+mkdir $destdir, 0777;
+unlink "$basedir/results";
+symlink "results-$date", "results";
+
+print "EXPECT RESULTS IN \"$destdir\".\n";
+
+foreach (@exps) {
+  my $s = $exps{$_}{numnodes};
+  if ($s <= $avail_nodes) {
+    push @{$exps_inparallel_bysize[$s]}, $_;
+    $num_exps_inparallel++;
+  } else {
+    push @exps_inseries, $_;
+  }
+}
+for (my $i = 0; $i <= $avail_nodes; $i++) {
+  $exps_inparallel_bysize[$i] = [] unless defined $exps_inparallel_bysize[$i];
+}
+
+while ($num_exps_inparallel > 0 || %pids) {
+  if ($avail_nodes > 0) {
+    my ($size, @set) = get_exps($avail_nodes, get_sizelist($avail_nodes));
+    foreach (extract_exps(@set)) {
+      print "STARTING TEST EXP $_\n";
+      my $pid = test_experiment %{$exps{$_}};
+      $pids{$pid} = $_;
+    }
+    $avail_nodes -= $size;
+  }
+  my $pid = wait();
+  if ($pid >= 0) {
+    my $exp = $pids{$pid};
+    delete $pids{$pid};
+    my $exit = $? >> 8;
+    &get_results_summary($exp, $exit);
+    print "FINISHED TEST EXP $exp\n";
+    push @results, [$exp, $exit];
+    $avail_nodes += $exps{$exp}{numnodes};
+  }
+}
+
+foreach my $exp (@exps_inseries) {
+  print "STARTING TEST EXP $exp\n";
+  my $pid = test_experiment %{$exps{$exp}};
+  my $pid_ = wait();
+  die unless $pid == $pid_;
+  my $exit = $? >> 8;
+  &get_results_summary($exp, $exit);
+  print "FINISHED TEST EXP $exp\n";
+  push @results, [$exp, $exit];
+}
+
+#
+# get_exps: get a list of experiments (actually sizes) to run
+# such that the total number of nodes used is less than $avail.
+# the second paramater is a sorted list of experment sizes with
+# the smallest size first
+#
+sub get_exps($@) {
+  my ($avail,@exps_s) = @_;
+  return (0) unless @exps_s;
+  if ($exps_s[-1] == $avail) {
+    return ($avail, $exps_s[-1]);
+  } else {
+    # every element of @exps_s < $avail
+    my $best_size = 0;
+    my @best_set  = ();
+    while (@exps_s) {
+      my $s = pop @exps_s;
+      my ($size, @set) = get_exps($avail - $s, @exps_s);
+      $size += $s;
+      push @set, $s;
+      return ($size, @set) if $size == $avail;
+      ($best_size = $size, @best_set = @set) if $size > $best_size;
+    }
+    return ($best_size, @best_set);
+  }
+}
+
+sub get_sizelist ($) {
+  my ($max) = @_;
+  my @sizes;
+  for (my $i = 1; $i <= $max; $i++) {
+    for (my $j = 0; $j < @{$exps_inparallel_bysize[$i]}; $j++) {
+      push @sizes, $i;
+    }
+  }
+  return @sizes;
+}
+
+sub extract_exps (@) {
+  my @e;
+  foreach (@_) {
+    push @e, (shift @{$exps_inparallel_bysize[$_]});
+    $num_exps_inparallel--;
+  }
+  return @e;
+}
+
+########################################################################
+#
+#
+#
+
+print "SUMMARY: \n";
+
+sub get_results_summary($$) {
+  my ($exp, $res) = @_;
+  if    ($res == ERR_NONE)    {print "  $exp passed\n"}
+  elsif ($res == ERR_FAILED)  {print "  $exp had failed tests: ",
+				 failed_tests($exp), "\n"}
+  elsif ($res == ERR_SWAPIN)  {print "  $exp failed to swap in\n"}
+  elsif ($res == ERR_FATAL)   {print "  $exp had one of more fatal errors\n"}
+  elsif ($res == ERR_CLEANUP) {print "  $exp requires cleanup\n"}
+  else                        {print "  $exp exited with unknown code: $res\n"}
+}
+
+sub failed_tests($);
+
+foreach (@results) {
+  &get_results_summary(@$_);
+}
+
+sub failed_tests($) {
+  my ($exp) = @_;
+  open FAILED, "$exps{$exp}{resultsdir}/failed-tests";
+  my $res;
+  while (<FAILED>) {
+    chop;
+    $res .= "$_ ";
+  }
+  chop $res;
+  return $res;
+}
+
+print "RESULTS IN \"$destdir\".\n";

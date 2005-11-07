@@ -1,0 +1,18 @@
+set ns [new Simulator] 
+source tb_compat.tcl 
+
+set tb [list]
+lappend tb /usr @DATADIR@/tartree.tar
+lappend tb /usr/tar.Z @DATADIR@/mytar.tar.Z
+lappend tb /usr/tgz @DATADIR@/mytar.tgz
+lappend tb /usr/tar.gz @DATADIR@/mytar.tar.gz
+lappend tb /usr/tar.bz2 @DATADIR@/mytar.tar.bz2
+
+set node [$ns node] 
+tb-set-node-os $node @OS@
+tb-set-hardware $node @HARDWARE@
+eval tb-set-node-tarfiles $node $tb
+
+tb-set-node-startcmd $node @DATADIR@/startcmd.sh
+
+$ns run
