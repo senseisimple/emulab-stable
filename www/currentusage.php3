@@ -118,11 +118,12 @@ function SHOWFREENODES()
 	          bgcolor='#E1EAEA' align=center>
  	       <font size=-1>Free PCs</font></td></tr>\n";
 
-    $newrow = 1;
+    $pccount = count($freecounts);
+    $newrow  = 1;
     foreach($freecounts as $key => $value) {
 	$freecount = $freecounts[$key];
 
-	if ($newrow) 
+	if ($newrow || $pccount <= 3) 
 	    echo "<tr>\n";
 	$newrow = ($newrow ? 0 : 1);
 	
@@ -131,12 +132,19 @@ function SHOWFREENODES()
                       $key</a></td>
               <td class=menuoptusage align=left>${freecount}</td>\n";
 
-	if ($newrow) {
+	if ($newrow || $pccount <= 3) {
 	    echo "</tr>\n";
 	}
     }
-    if (! $newrow) {
+    if (! $newrow && $pccount > 3) {
 	echo "<td></td><td></td></tr>\n";
+    }
+    # Fill in up to 3 rows.
+    if ($pccount < 3) {
+	for ($i = $pccount + 1; $i <= 3; $i++) {
+	    echo "<tr><td class=menuoptusage>&nbsp</td>
+                      <td class=menuoptusage>&nbsp</td></tr>\n";
+	}
     }
     $freepcs = TBFreePCs();
     echo "<tr>
