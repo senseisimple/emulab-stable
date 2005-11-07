@@ -108,7 +108,7 @@ my @p;
 
 opendir D, "$testsdir";
 while (my $test = readdir D) {
-  next if $test =~ /^\./;
+  next if $test =~ /^(\.|CVS)/;
   @p = get_parms $test;
   mktests $test, get_numnodes $test, [], @p;
 }

@@ -1,9 +1,17 @@
-
 SETUP
 
-Copy the entire directory tree into a /proj/PID/ directory.  You
-might want to also change the variable $eid_prefix at the start of
-"image-test" to something different, your username might be a good 
+Checkout a copy of the image-test directory into the /proj/PID/ directory,
+for example:
+
+  cd /proj/PID/
+  cvs -d bas.flux.utah.edu:/usr/flux/CVS co -d image-test testbed/image-test
+
+The directory tree can be located anywhere as long as it is under
+/proj/PID.  Also the directory doesn't necessary need to be named
+"image-test".
+
+You might want to also change the variable $eid_prefix at the start of
+"image-test" to something different, your username might be a good
 choice.
 
 BASIC USAGE
