@@ -737,7 +737,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0 ) {
 	echo "</td>\n";
 	echo "<td valign=top align=right width=200
                  class=banneriframe>
-             <iframe src=currentusage.php3
+             <iframe src=$BASEPATH/currentusage.php3
                  width=100% height=100 marginheight=0 marginwidth=0
                  scrolling=no frameborder=0></iframe></td>\n";
         echo "</tr></table>\n";
