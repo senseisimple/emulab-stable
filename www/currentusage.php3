@@ -91,6 +91,16 @@ function SHOWSTATS()
 #
 function SHOWFREENODES()
 {
+    # Get typelist and set freecounts to zero.
+    $query_result =
+	DBQueryFatal("select n.type from nodes as n ".
+		     "left join node_types as nt on n.type=nt.type ".
+		     "where (role='testnode') and class='pc' ");
+    while ($row = mysql_fetch_array($query_result)) {
+	$type              = $row[0];
+	$freecounts[$type] = 0;
+    }
+    
     # Get free totals by type.
     $query_result =
 	DBQueryFatal("select n.eventstate,n.type,count(*) from nodes as n ".
