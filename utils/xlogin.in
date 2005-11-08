@@ -1,0 +1,127 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Cross domain login.
+#
+sub usage()
+{
+    print STDOUT "Usage: xlogin <host> <uid> <key>\n";
+    exit(-1);
+}
+my $optlist = "d";
+my $debug   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $SSH         = "/usr/bin/ssh";
+my $XLOGINUSER  = "authelab";
+my $XLOGINCMD   = "/usr/local/datapository/bin/xdomain_auth";
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/usr/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Load the Testbed support stuff. 
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+#
+# We do not want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be setuid! Maybe its a development version?\n");
+}
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+# 
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (@ARGV != 3) {
+    usage();
+}
+my $host = $ARGV[0];
+my $user = $ARGV[1];
+my $key  = $ARGV[2];
+
+#
+# Untaint args.
+#
+if ($host =~ /^([-\w\.]+)$/) {
+    $host = $1;
+}
+else {
+    die("Bad data in host: $host");
+}
+if ($user =~ /^([-\w]+)$/) {
+    $user = $1;
+}
+else {
+    die("Bad data in user: $user.");
+}
+if ($key =~ /^([\w]+)$/) {
+    $key = $1;
+}
+else {
+    fatal("Bad data in secretkey!");
+}
+
+# Just nfs.emulab.net or www.datapository.net for now ...
+if ($host ne "nfs.emulab.net" &&
+    $host ne "www.datapository.net") {
+    fatal("Bad host; must be one of nfs.emulab.net or www.datapository.net!");
+}
+
+#
+# For ssh.
+#
+$UID = $EUID;
+
+if (system("$SSH -l $XLOGINUSER $host $XLOGINCMD $user '$key'")) {
+    fatal("$XLOGINCMD failed on $host!");
+}
+exit(0);
+
+sub fatal($)
+{
+    my($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
