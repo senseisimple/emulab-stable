@@ -58,6 +58,7 @@ if (isset($idx) && $idx != "") {
 	USERERROR("No such knowledge_base entry: $idx", 1);
     }
     $row = mysql_fetch_array($query_result);
+    $xref_tag = $row['xref_tag'];
 }
 elseif (isset($xref_tag) && $xref_tag != "") {
     if (! preg_match("/^[-\w]+$/", $xref_tag)) {
@@ -77,7 +78,8 @@ else {
     PAGEARGERROR("Must supply a knowledge_base index or xref tag");
 }
 
-echo "<center><b>Knowledge Base Entry: $idx</b><br>".
+
+echo "<center><b>Knowledge Base Entry: $idx $xref_tag</b><br>".
      "(<a href=kb-search.php3>Search Again</a>)</center>\n";
 echo "<br><br>\n";
 
