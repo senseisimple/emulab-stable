@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -205,11 +205,14 @@ set_lilo_cmdline(int partition, char *cmdline)
 
 static int devfd;
 static int nogo;
+static int comport = 0;
+int set_lilo_comport(int, int);
 
 static char *usagestr = 
  "usage: %s <options> partition devicefile\n"
  " -d              Turn on debugging.\n"
  " -c 'str'        Set the LILO command line\n"
+ " -p {1 or 2}     Switch to com1 or com2 if already set up\n"
  " -n              Do not actually perform the operation\n"
  " partition       The DOS partition number where LILO resides (1-4)\n"
  " device          The *whole* disk device special file (ie: /dev/ad0)\n";
@@ -236,6 +239,9 @@ main(int argc, char **argv)
 		case 'c':
 			cmdline = optarg;
 			break;
+		case 'p':
+			comport = atoi(optarg);
+			break;
 		case 'n':
 			nogo++;
 			break;
@@ -260,6 +266,15 @@ main(int argc, char **argv)
 
 	if (cmdline != 0) {
 		rv = set_lilo_cmdline(part, cmdline);
+		if (rv) {
+			fprintf(stderr, "%s: command failed on part %d, "
+				"no change made\n",
+				argv[1], part);
+		}
+	}
+
+	if (comport != 0) {
+		rv = set_lilo_comport(part, comport);
 		if (rv) {
 			fprintf(stderr, "%s: command failed on part %d, "
 				"no change made\n",
@@ -294,6 +309,7 @@ struct bios_partition_info {
 
 static struct bios_mbr diskmbr;
 static char partbr[512];
+static int partbr_secno;
 
 static int
 check_mbr(void)
@@ -358,7 +374,7 @@ load_partition_bblock(int pnum)
 
 	pnum--;
 	entry = ((struct bios_partition_info *)diskmbr.partinfo) + pnum;
-	if (load_sector((int)entry->offset, partbr) != 0 ||
+	if (load_sector((partbr_secno = (int)entry->offset), partbr) != 0 ||
 	    ((struct bios_mbr *)partbr)->magic != BIOS_MAGIC) {
 		printf("Could not load/verify partition %d boot record\n",
 		       pnum);
@@ -368,4 +384,60 @@ load_partition_bblock(int pnum)
 	return partbr;
 }
 
+
+int
+set_lilo_comport(int partition, int comport)
+{
+	struct bb1 *bb;
+
+	printf("Asked to set LILO comport in partition %d to %d\n",
+	       partition, comport);
+
+	if (comport < 1 || comport > 2) {
+		if (debug)
+			printf("%d: invalid comport number\n", comport);
+		return 1;
+	}
+
+	bb = load_partition_bblock(partition);
+	if (bb == NULL)
+		return 1;
+
+	if (strncmp(bb->sig, "LILO", 4) != 0) {
+		if (debug)
+			printf("%d: no LILO bootblock in partition\n",
+			       partition);
+		return 1;
+	}
+
+	if (bb->stage != 1) {
+		if (debug)
+			printf("%d: can only handle LILO stage1 bootblock\n",
+			       partition);
+		return 1;
+	}
+
+	if (bb->port == 0) {
+		if (debug)
+			printf("%d: can only switch between COM1 and COM2\n",
+			       partition);
+		return 1;
+	}
+
+	if (debug) {
+		printf("%d: old comport was: %d (%s)\n",
+		       partition, bb->port, bb->port == 1 ?  "COM1" : "COM2");
+	}
+
+	bb->port = comport;
+
+	if (save_sector(partbr_secno, partbr)) {
+		if (debug)
+			printf("%d: could not write LILO boot sector %d\n",
+			       partition, partbr_secno);
+		return 1;
+	}
+
+	return 0;
+}
 #endif
