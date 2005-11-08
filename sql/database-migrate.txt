@@ -2869,4 +2869,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	mysql tbdb < libtblog.sql
 
+4.17: Add linktest feature.
+
+       alter table os_info change osfeatures osfeatures \
+	set('ping','ssh','ipod','isup','veths','mlinks','linktest') default NULL;
 
