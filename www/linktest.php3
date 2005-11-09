@@ -292,6 +292,11 @@ function linktest_stopped() {
 	    'Linktest has reported errors! Please examine log below.' +
 	    '</blink></font>';
     }
+    else {
+	getObjbyName('message').innerHTML =
+	    '<font size=+1 color=black>' +
+	    'Linktest has completed, no reported errors' + '</font>';
+    }
 }
 
 function doaction(theform) {
