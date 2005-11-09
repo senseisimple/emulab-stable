@@ -636,6 +636,9 @@ function SPITFORM($formfields, $errors)
 		      <li> If it is based on one of our standard Linux,
 			   FreeBSD, or Windows XP images (or otherwise
 			   sends its own ISUP notification), mark isup.
+                      </li>
+		      <li> If it is based on one of our standard Linux,
+			   FreeBSD, or Windows XP images, mark linktest.
 		      </li>
 		    </ul>
 		 </li>
@@ -710,6 +713,7 @@ if (! $submit) {
 	$defaults[os_feature_ssh]  = "checked";
 	$defaults[os_feature_ipod] = "checked";
 	$defaults[os_feature_isup] = "checked";
+	$defaults[os_feature_linktest] = "checked";
 
 	# mtype_all is a "fake" variable which makes all
 	# mtypes checked in the virgin form.

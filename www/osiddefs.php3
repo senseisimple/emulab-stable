@@ -25,6 +25,7 @@ $osid_featurelist["ipod"]	= 1;
 $osid_featurelist["isup"]	= 1;
 $osid_featurelist["veths"]	= 0;
 $osid_featurelist["mlinks"]	= 0;
+$osid_featurelist["linktest"]	= 1;
 
 # Default op modes. The value is a user-okay flag.
 $osid_opmodes			= array();
