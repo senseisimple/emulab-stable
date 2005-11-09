@@ -27,10 +27,12 @@ sub usage()
 	  "-d   - Turn on debugging output.\n");
     exit(-1);
 }
-my $optlist  = "dkl:o:t:m";
-my $debug    = 0;
+my $optlist  = "dkl:o:t:mf";
+my $debug    = 2;
 my $cancel   = 0;
 my $sendmail = 0;
+my $hosed    = 0;
+my $forcerun = 0;
 my $timeout;
 my $level;
 my $output;
@@ -83,6 +85,9 @@ if (defined($options{"d"})) {
 }
 if (defined($options{"m"})) {
     $sendmail = 1;
+}
+if (defined($options{"f"})) {
+    $forcerun = 1;
 }
 if (defined($options{"k"})) {
     $cancel = 1;
@@ -230,6 +235,34 @@ if (defined($linktest_pid) && $linktest_pid) {
 elsif ($cancel) {
     die("*** $0:\n".
 	"    Linktest is not running on experiment $pid/$eid!\n")
+}
+
+#
+# Okay, this is hacky. Before trying, lets make sure that all the nodes
+# in the experiment are able to run linktest. This is defined by the
+# "linktest" feature in the osfeatures list of the OSID, for each node.
+#
+$query_result =
+    DBQueryFatal("select v.vname,o.osname,FIND_IN_SET('linktest',osfeatures) ".
+		 "  from virt_nodes as v ".
+		 "left join reserved as r on r.pid=v.pid and ".
+		 "     r.eid=v.eid and r.vname=v.vname ".
+		 "left join nodes as n on n.phys_nodeid=r.node_id ".
+		 "left join os_info as o on o.osid=n.def_boot_osid ".
+		 "where v.pid='$pid' and v.eid='$eid'");
+
+
+while (my ($vname,$osname,$gotlinktest) = $query_result->fetchrow_array()) {
+    if (! $gotlinktest) {
+	print STDERR
+	    "*** Node $vname is running an OSID ($osname) that does not ".
+		"support linktest!\n";
+	$hosed++;
+    }
+}
+if ($hosed && !$forcerun) {
+    die("*** $0:\n".
+	"    Aborting linktest since not all nodes support it!\n");
 }
 
 #
