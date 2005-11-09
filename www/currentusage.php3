@@ -128,7 +128,7 @@ function SHOWFREENODES()
 
     echo "<table valign=top align=center width=100% height=100% border=1>
           <tr><td nowrap colspan=4 class=menuoptusage align=center>
- 	       <b>$freepcs Free PCs</b></td></tr>\n";
+ 	       <font size=+1>$freepcs Free PCs</font></td></tr>\n";
 
     $pccount = count($freecounts);
     $newrow  = 1;
