@@ -16,6 +16,10 @@ require("defs.php3");
 # WARNING: See the LOGGEDINORDIE() calls below.
 #
 $uid = GETLOGIN();
+unset($repodir);
+
+# Tell system we do not want any headers drawn on errors.
+$noheaders = 1;
 
 #
 # Verify form arguments.
@@ -40,19 +44,97 @@ if (isset($pid) && $pid != "") {
     if (! TBValidProject($pid)) {
 	USERERROR("The project '$pid' is not a valid project.", 1);
     }
-    if (! ISADMIN($uid) &&
-	! TBProjAccessCheck($uid, $pid, $pid, $TB_PROJECT_READINFO)) {
-	# Then check to see if the project cvs repo is public.
+    if (isset($eid) && $eid != "") {
+	#
+	# Wants access to the experiment archive, which is really a repo.
+	#
+	if (!TBvalid_eid($eid)) {
+	    PAGEARGERROR("Invalid experiment ID.");
+	}
+	if (! TBValidExperiment($pid, $eid)) {
+	    USERERROR("Experiment '$pid/$eid' is not a valid experiment", 1);
+	}
+	if (! ISADMIN($uid) &&
+	    ! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	    USERERROR("Not enough permission to view '$pid/$eid'", 1);
+	}
+	# Get the repo index for the experiment.
 	$query_result =
-	    DBQueryFatal("select cvsrepo_public from projects ".
-			 "where pid='$pid'");
+	    DBQueryFatal("select s.archive_idx from experiments as e ".
+			 "left join experiment_stats as s on s.exptidx=e.idx ".
+			 "where e.pid='$pid' and e.eid='$eid'");
+	
 	if (!mysql_num_rows($query_result)) {
-	    TBERROR("Error getting cvsrepo_public bit", 1);
+	    TBERROR("Error getting repo index for '$pid/$eid'", 1);
 	}
- 	$row = mysql_fetch_array($query_result);
-	if ($row[0] == 0) {
-	    USERERROR("You are not a member of Project $pid.", 1);
+	$row = mysql_fetch_array($query_result);
+	if (!isset($row[0])) {
+	    TBERROR("Error getting repo index for '$pid/$eid'", 1);
 	}
+	$repoidx = $row[0];
+	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";
+    }
+    else {
+	#
+	# Wants access to the project repo.
+	#
+	if (! ISADMIN($uid) &&
+	    ! TBProjAccessCheck($uid, $pid, $gid, $TB_PROJECT_READINFO)) {
+            # Then check to see if the project cvs repo is public.
+	    $query_result =
+		DBQueryFatal("select cvsrepo_public from projects ".
+			     "where pid='$pid'");
+	    if (!mysql_num_rows($query_result)) {
+		TBERROR("Error getting cvsrepo_public bit", 1);
+	    }
+	    $row = mysql_fetch_array($query_result);
+	    if ($row[0] == 0) {
+		USERERROR("You are not a member of Project $pid.", 1);
+	    }
+	}
+	$repodir = "$TBCVSREPO_DIR/$pid";
+    }
+}
+elseif (isset($exptidx) && $exptidx != "") {
+    if (!$CVSSUPPORT) {
+	USERERROR("Project CVS support is not enabled!", 1);
+    }
+    if (!TBvalid_integer($exptidx)) {
+	PAGEARGERROR("Invalid experiment index.");
+    }
+
+    # Must be logged in for this!
+    if ($uid) {
+	LOGGEDINORDIE($uid);
+    }
+    
+    # Need the pid/eid/gid. Access the stats table since we want to provide
+    # cvs access to terminated experiments via the archive.
+    $query_result =
+	DBQueryFatal("select pid,eid,gid,archive_idx from experiment_stats ".
+		     "where exptidx='$exptidx'");
+    if (!mysql_num_rows($query_result)) {
+	USERERROR("Experiment '$exptidx' is not a valid experiment", 1);
+    }
+    $row = mysql_fetch_array($query_result);
+    $pid = $row[0];
+    $eid = $row[1];
+    $gid = $row[2];
+    $repoidx = $row[3];
+
+    # If a current experiment, check usual permissions.
+    if (TBValidExperiment($pid, $eid)) {
+	if (! ISADMIN($uid) &&
+	    ! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
+	    USERERROR("Not enough permission to view '$pid/$eid'", 1);
+	}
+	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";
+    }
+    else {
+	if (! ISADMIN($uid)) {
+	    USERERROR("Must be administrator to view historical archives!", 1);
+	}
+	$repodir = "$TBDIR/expinfo/${pid}-${eid}.${exptidx}/Archive";
     }
 }
 else {
@@ -111,13 +193,13 @@ $shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
             "SCRIPT_NAME=$name HTTP_USER_AGENT=$agent " .
             "HTTP_ACCEPT_ENCODING=$encoding ";
 
-if (isset($pid)) {
-  # I know, I added an argument to a script that is not supposed to
-  # take any. So be it; it was easy.
-  $shellcmd .= "$TBSUEXEC_PATH $uid $pid webcvsweb -repo $TBCVSREPO_DIR/$pid";
+if (isset($repodir)) {
+    # I know, I added an argument to a script that is not supposed to
+    # take any. So be it; it was easy.
+    $shellcmd .= "$TBSUEXEC_PATH $uid $pid webcvsweb -repo $repodir";
 }
 else {
-  $shellcmd .= "$script";
+    $shellcmd .= "$script";
 }
 
 $fp = popen($shellcmd, 'r');

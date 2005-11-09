@@ -89,7 +89,7 @@ echo "<tr>
 
 while (list($pid) = each($projlist)) {
     $cvsdir = "$TBCVSREPO_DIR/$pid";
-    $cvsurl = "cvsweb/cvsweb.php3?pid=$pid";
+    $cvsurl = "cvsweb/cvswebwrap.php3?pid=$pid";
 	
     echo "<tr>
               <td><A href='showproject.php3?pid=$pid'>$pid</A></td>
@@ -104,7 +104,7 @@ echo "</table>\n";
 if (TBCvswebAllowed($uid)) {
     echo "<br><center>
           You also have CVSweb access to the
-          <a href=cvsweb/cvsweb.php3>Emulab Source Repository</a>.
+          <a href=cvsweb/cvswebwrap.php3>Emulab Source Repository</a>.
           </center><br>\n";
           
 }

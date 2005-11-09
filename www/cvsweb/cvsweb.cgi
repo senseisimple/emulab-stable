@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.5 2005-09-02 22:07:23 stoller Exp $
+# $Id: cvsweb.cgi,v 1.6 2005-11-09 17:28:12 stoller Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
@@ -311,7 +311,8 @@ $maycompress =
 # to hold our state - they will be added (with
 # their current value) to any link/query string
 # you construct
-@stickyvars = qw(cvsroot hideattic sortby logsort f only_with_tag pid);
+@stickyvars = qw(cvsroot hideattic sortby logsort f only_with_tag
+		 pid eid exptidx);
 @unsafevars = qw(logsort only_with_tag r1 r2 rev sortby tr1 tr2);
 
 if (-f $config) {
