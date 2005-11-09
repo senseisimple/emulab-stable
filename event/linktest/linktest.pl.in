@@ -79,6 +79,7 @@ use constant FAST_SEND => 1002;
 use constant BSD => "FreeBSD";
 use constant LINUX => "Linux";
 use constant RTPROTO_STATIC => "Static";
+use constant RTPROTO_SESSION => "Session";
 use constant EVENT_COMPLETE => "COMPLETE";
 use constant EVENT_REPORT => "REPORT";
 use constant EVENT_LOG => "LOG";
@@ -345,6 +346,13 @@ my $msg = "Linktest Starting";
 &sim_event(EVENT_LOG,$msg);
 &debug("\n$msg\n\n");
 
+if (defined($rtproto) && $rtproto eq RTPROTO_SESSION) {
+    my $msg = "Session routing active; waiting a bit to let routes stabilize";
+    &sim_event(EVENT_LOG,$msg);
+    &debug("\n$msg\n\n");
+    sleep(30);
+}
+
 if(&dotest(TEST_LATENCY)) {
     my $msg = "Testing Single Hop Connectivity and Latency...";
     &post_event(EVENT_REPORT,$msg);
@@ -359,10 +367,13 @@ if(&dotest(TEST_LATENCY)) {
 
 if(&dotest(TEST_RT_STATIC)
     && defined($rtproto)
-    && $rtproto eq RTPROTO_STATIC) {
+    && ($rtproto eq RTPROTO_STATIC || $rtproto eq RTPROTO_SESSION)) {
     my $msg = "Testing Routing...";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike
+    &barrier();
     &debug("\n$msg\n\n");
     &static_rt_test; # nodes not covered by 1hop test
     &report_status;
@@ -372,6 +383,9 @@ if(&dotest(TEST_LOSS)) {
     my $msg = "Testing Loss...";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike
+    &barrier();
     &debug("\n$msg\n\n");
     &loss_test; 
     &report_status;
@@ -1038,7 +1052,7 @@ sub get_topo {
 	} elsif (/^r [Ss]tatic/i) {
 	    $rtproto = RTPROTO_STATIC;
 	} elsif (/^r ospf/i) {
-	    $rtproto = RTPROTO_STATIC;
+	    $rtproto = RTPROTO_SESSION;
 	} elsif (/^s ([-\w\(\)]+)/i) {
 	    $simname = $1;
 	} else {
