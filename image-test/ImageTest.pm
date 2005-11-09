@@ -3,7 +3,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT = qw (test test_cmd test_ssh test_rcmd test_experiment
-	      ERR_NONE ERR_FAILED ERR_SWAPIN ERR_FATAL ERR_CLEANUP);
+	      ERR_NONE ERR_FAILED ERR_SWAPIN ERR_FATAL ERR_CLEANUP ERR_INT);
 use IO::File;
 use strict;
 
@@ -18,6 +18,7 @@ sub ERR_FAILED  {1}; # tests failed
 sub ERR_SWAPIN  {2}; # swapin failed
 sub ERR_FATAL   {3}; # fatal error
 sub ERR_CLEANUP {4}; # fatal error - cleanup needed
+sub ERR_INT     {5}; # interrupted
 
 #
 # Performs a test on a swapped in experient.  Returns true if the test
@@ -240,12 +241,19 @@ sub test_experiment (%) {
 
   $SIG{__DIE__} = sub {
     return unless defined $^S && !$^S;
-    $! = ERR_FATAL;
+    $! = ERR_CLEANUP;
     die $_[0];
+  };
+
+  $SIG{INT} = 'IGNORE';
+
+  $SIG{TERM} = sub {
+    exit ERR_INT;
   };
 
   mkdir $resultsdir, 0777;
 
+  open STDIN,  "/dev/null"        or die;
   open STDOUT, ">$resultsdir/log" or die;
   open STDERR, ">&STDOUT"         or die;
 

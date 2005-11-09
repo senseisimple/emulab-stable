@@ -13,9 +13,6 @@ my $eid_prefix = 'it-';
 #
 #
 
-autoflush STDOUT, 1;
-autoflush STDERR, 1;
-
 use ImageTest;
 use Cwd;
 use Getopt::Long;
@@ -49,6 +46,7 @@ sub help() {
 }
 
 die usage unless @ARGV > 0;
+my $ARGV = join ' ', @ARGV;
 
 my $cwd = cwd();
 $cwd =~ s~^/q/~/~;
@@ -201,11 +199,44 @@ my %pids;
 
 my $avail_nodes = $max_parallel;
 
+autoflush STDOUT, 1;
+autoflush STDERR, 1;
+
+open STDIN, "/dev/null" or die;
+
 mkdir $destdir, 0777;
 unlink "$basedir/results";
 symlink "results-$date", "results";
 
-print "EXPECT RESULTS IN \"$destdir\".\n";
+open F, ">$destdir/argv" or die;
+print F "$ARGV\n";
+close F;
+
+open LOG, ">$destdir/log" or die;
+autoflush LOG, 1;
+
+use subs 'log';
+sub log {
+  print @_;
+  print LOG @_;
+}
+
+my $quit = 0;
+
+sub TERM {
+  my ($sig) = @_;
+  log "TERMINATING\n";
+  $quit = 1;
+  $SIG{TERM} = sub {
+    $SIG{$sig} = \&TERM;
+  };
+  kill TERM => -$$;
+}
+
+$SIG{TERM} = \&TERM;
+$SIG{INT} = \&TERM;
+
+log "EXPECT RESULTS IN \"$destdir\".\n";
 
 foreach (@exps) {
   my $s = $exps{$_}{numnodes};
@@ -220,11 +251,11 @@ for (my $i = 0; $i <= $avail_nodes; $i++) {
   $exps_inparallel_bysize[$i] = [] unless defined $exps_inparallel_bysize[$i];
 }
 
-while ($num_exps_inparallel > 0 || %pids) {
-  if ($avail_nodes > 0) {
+while (%pids || (!$quit && $num_exps_inparallel > 0)) {
+  if ($avail_nodes > 0 && !$quit) {
     my ($size, @set) = get_exps($avail_nodes, get_sizelist($avail_nodes));
     foreach (extract_exps(@set)) {
-      print "STARTING TEST EXP $_\n";
+      log "STARTING TEST EXP $_\n";
       my $pid = test_experiment %{$exps{$_}};
       $pids{$pid} = $_;
     }
@@ -236,20 +267,21 @@ while ($num_exps_inparallel > 0 || %pids) {
     delete $pids{$pid};
     my $exit = $? >> 8;
     &get_results_summary($exp, $exit);
-    print "FINISHED TEST EXP $exp\n";
+    log "FINISHED TEST EXP $exp\n";
     push @results, [$exp, $exit];
     $avail_nodes += $exps{$exp}{numnodes};
   }
 }
 
 foreach my $exp (@exps_inseries) {
-  print "STARTING TEST EXP $exp\n";
+  last if $quit;
+  log "STARTING TEST EXP $exp\n";
   my $pid = test_experiment %{$exps{$exp}};
   my $pid_ = wait();
   die unless $pid == $pid_;
   my $exit = $? >> 8;
   &get_results_summary($exp, $exit);
-  print "FINISHED TEST EXP $exp\n";
+  log "FINISHED TEST EXP $exp\n";
   push @results, [$exp, $exit];
 }
 
@@ -305,17 +337,18 @@ sub extract_exps (@) {
 #
 #
 
-print "SUMMARY: \n";
+log "SUMMARY: \n";
 
 sub get_results_summary($$) {
   my ($exp, $res) = @_;
-  if    ($res == ERR_NONE)    {print "  $exp passed\n"}
-  elsif ($res == ERR_FAILED)  {print "  $exp had failed tests: ",
+  if    ($res == ERR_NONE)    {log "  $exp passed\n"}
+  elsif ($res == ERR_FAILED)  {log "  $exp had failed tests: ",
 				 failed_tests($exp), "\n"}
-  elsif ($res == ERR_SWAPIN)  {print "  $exp failed to swap in\n"}
-  elsif ($res == ERR_FATAL)   {print "  $exp had one of more fatal errors\n"}
-  elsif ($res == ERR_CLEANUP) {print "  $exp requires cleanup\n"}
-  else                        {print "  $exp exited with unknown code: $res\n"}
+  elsif ($res == ERR_SWAPIN)  {log "  $exp failed to swap in\n"}
+  elsif ($res == ERR_FATAL)   {log "  $exp had one of more fatal errors\n"}
+  elsif ($res == ERR_CLEANUP) {log "  $exp requires cleanup\n"}
+  elsif ($res == ERR_INT)     {log "  $exp was interrupted\n"}
+  else                        {log "  $exp exited with unknown code: $res\n"}
 }
 
 sub failed_tests($);
@@ -336,4 +369,5 @@ sub failed_tests($) {
   return $res;
 }
 
-print "RESULTS IN \"$destdir\".\n";
+log "RESULTS IN \"$destdir\".\n";
+
