@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -17,6 +17,16 @@ $reset_uid = $_REQUEST['reset_uid'];
 $keyB      = $_REQUEST['key'];
 # We also need the other half of the key from the browser.
 $keyA      = $HTTP_COOKIE_VARS[$TBAUTHCOOKIE];
+
+# If the browser part is missing, direct user to answer
+if ((isset($keyB) && $keyB != "") && (!isset($keyA) || $keyA == "")) {
+    PAGEHEADER("Reset Your Password", $view);
+
+    USERERROR("Oops, not able to proceed!<br>".
+	      "Please read this ".
+	      "<a href='kb-show.php3?xref_tag=forgotpassword'>".
+	      "Knowledge Base Entry</a> to see what the likely cause is.", 1);
+}
 
 if (!isset($reset_uid) || $reset_uid == "" || !TBvalid_uid($reset_uid) ||
     !isset($keyA) || $keyA == "" || !preg_match("/^[\w]+$/", $keyA) ||
