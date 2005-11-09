@@ -30,6 +30,7 @@ $BUGDBCOOKIENAME= "FlysprayCookie";
 $MAILMANURL     = "http://${USERNODE}/mailman";
 $OPSCVSURL      = "http://${USERNODE}/cvsweb/cvsweb.cgi";
 $OPSJETIURL     = "http://${USERNODE}/jabber/jeti.php";
+$EXPOSELINKTEST = 0;
 
 $TBMAILADDR_OPS		= "@TBOPSEMAIL_NOSLASH@";
 $TBMAILADDR_WWW		= "@TBWWWEMAIL_NOSLASH@";

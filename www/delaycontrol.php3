@@ -479,10 +479,19 @@ for ($i = 0; $i < $num; $i++) {
 
 print "</table>\n" .
       "<input type=checkbox value=\"1\" name=modbase>
-              &nbsp Save? (Check this box if you want to modify the base
-	            experiment configuration)<br><br>\n".
+              &nbsp <b>Save?</b> (Check this box if you want these settings to
+                           be used next time the experiment is swapped in)".
+      "<br><br>\n".
       "<input type=submit value='Execute'>\n" .
       "</form>\n";
+
+if (STUDLY() || $EXPOSELINKTEST) {
+echo "<br>
+      After you change the settings, you can run
+      <a href=linktest.php3?pid=$pid&eid=$eid>Linktest</a> to make sure the
+      links are configured properly,<br>
+      but <b><em>only</em></b> if you clicked the 'Save' box above!\n";
+} 
 
 PAGEFOOTER();
 ?>

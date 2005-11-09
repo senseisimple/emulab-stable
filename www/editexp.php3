@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -50,7 +50,7 @@ if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
 #
 function SPITFORM($formfields, $errors)
 {
-    global $eid, $pid, $TBDOCBASE, $linktest_levels;
+    global $eid, $pid, $TBDOCBASE, $linktest_levels, $EXPOSELINKTEST;
 
     #
     # Standard Testbed Header
@@ -264,7 +264,7 @@ function SPITFORM($formfields, $errors)
     #
     # Run linktest, and level. 
     # 
-   if (STUDLY()) {
+    if (STUDLY() || $EXPOSELINKTEST) {
     echo "<tr>
               <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
 	                  "docname=linktest.html'>Linktest</a> Option:</td>
@@ -281,10 +281,11 @@ function SPITFORM($formfields, $errors)
 	    $linktest_levels[$i] . "</option>\n";
     }
     echo "       </select>";
-    echo "    (Experimental; will not affect swapin)";
+    echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
+	"docname=linktest.html'><b>Whats this?</b></a>)";
     echo "    </td>
           </tr>\n";
-   }
+    }
 
     echo "<tr>
               <td colspan=2 align=center>

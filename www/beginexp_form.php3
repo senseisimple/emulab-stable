@@ -142,6 +142,7 @@ function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $view, $view_style, $projlist, $linktest_levels;
+    global $EXPOSELINKTEST;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -475,7 +476,7 @@ function SPITFORM($formfields, $errors)
     #
     # Run linktest, and level. 
     #
-   if (STUDLY()) {
+    if (STUDLY() || $EXPOSELINKTEST) {
     echo "<tr>
               <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
 	                  "docname=linktest.html'>Linktest</a> Option:</td>
@@ -492,10 +493,11 @@ function SPITFORM($formfields, $errors)
 	    $linktest_levels[$i] . "</option>\n";
     }
     echo "       </select>";
-    echo "    (Experimental; will not affect swapin)";
+    echo "    (<a href='$TBDOCBASE/doc/docwrapper.php3?".
+	"docname=linktest.html'><b>Whats this?</b></a>)";
     echo "    </td>
           </tr>\n";
-   }
+    }
 
     #
     # Batch Experiment?

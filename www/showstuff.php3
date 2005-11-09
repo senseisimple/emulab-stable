@@ -310,7 +310,7 @@ function SHOWGROUP($pid, $gid, $thisuid) {
 
 	if (ISADMIN()) {
 	    $mmurl .= "&wantadmin=1";
-	    echo "<A href='$mmurl'>(admin)</A>";
+	    echo "<A href='$mmurl'>(admin page)</A>";
 	}
 	echo "    </td>
               </tr>\n";
@@ -742,7 +742,8 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $mem_usage   = $exprow["mem_usage"];
     $cpu_usage   = $exprow["cpu_usage"];
     $exp_slice   = $exprow[slicename];
-    $linktest    = $exprow["linktest_level"];
+    $linktest_level = $exprow["linktest_level"];
+    $linktest_pid   = $exprow["linktest_pid"];
     $usemodelnet = $exprow["usemodelnet"];
     $mnet_cores  = $exprow["modelnet_cores"];
     $mnet_edges  = $exprow["modelnet_edges"];
@@ -872,6 +873,19 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                 <td>Status: </td>
                 <td class=\"left\">$exp_state $expt_locked</td>
               </tr>\n";
+
+	if ($linktest_pid) {
+	    $linktest_running = "<b>(Linktest Running)</b>";
+	}
+	else {
+	    $linktest_running = "";
+	}
+
+	echo "<tr>
+                <td><a href='doc/docwrapper.php3?docname=linktest.html'>".
+	            "Linktest Level</a>: </td>
+                <td class=\"left\">$linktest_level $linktest_running</td>
+              </tr>\n";
     }
 
     if (count($nodecounts)) {
@@ -991,12 +1005,6 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 	    echo "<tr>
                       <td>Sync Server: </td>
                       <td class=\"left\">$syncserver</td>
-                  </tr>\n";
-	}
-	if ($linktest) {
-	    echo "<tr>
-                      <td>Linktest Level: </td>
-                      <td class=\"left\">$linktest</td>
                   </tr>\n";
 	}
     }

@@ -198,16 +198,22 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Reboot All Nodes",
 			   "boot.php3?pid=$exp_pid&eid=$exp_eid");
     }
+}
 
-    if (STUDLY()) {
-	WRITESUBMENUBUTTON(($linktest_running ?
-			    "Stop LinkTest" : "Run LinkTest"), 
-			   "linktest.php3?pid=$exp_pid&eid=$exp_eid");
-    }
+if (($expstate == $TB_EXPTSTATE_ACTIVE ||
+     $expstate == $TB_EXPTSTATE_ACTIVATING) &&
+    (STUDLY() || $EXPOSELINKTEST)) {
+    WRITESUBMENUBUTTON(($linktest_running ?
+			"Stop LinkTest" : "Run LinkTest"), 
+		       "linktest.php3?pid=$exp_pid&eid=$exp_eid".
+		       ($linktest_running ? "&kill=1" : ""));
+}
 
+if ($expstate == $TB_EXPTSTATE_ACTIVE) {
     if (STUDLY() && $classes['pcvm']) {
 	WRITESUBMENUBUTTON("Record Feedback Data",
-			   "feedback.php3?pid=$exp_pid&eid=$exp_eid&mode=record");
+			   "feedback.php3?pid=$exp_pid&".
+			   "eid=$exp_eid&mode=record");
     }
 }
 
