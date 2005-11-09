@@ -20,9 +20,9 @@ diff -c -r1.1.1.1 headers.h
   /* in case the OS doesn't have these, we provide our own implementations */
   #include "gettimeofday.h"
 Index: src/Client.cpp
-diff -c emulab-iperf/src/Client.cpp:1.1 emulab-iperf/src/Client.cpp:1.3
-*** emulab-iperf/src/Client.cpp:1.1	Mon Oct 24 09:18:33 2005
---- emulab-iperf/src/Client.cpp	Tue Nov  8 17:10:42 2005
+diff -c src/Client.cpp:1.1 src/Client.cpp:1.3
+*** src/Client.cpp:1.1	Mon Oct 24 09:18:33 2005
+--- src/Client.cpp	Tue Nov  8 17:10:42 2005
 ***************
 *** 216,228 ****
           // perform write 
