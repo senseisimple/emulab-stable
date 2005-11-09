@@ -2874,3 +2874,9 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table os_info change osfeatures osfeatures \
 	set('ping','ssh','ipod','isup','veths','mlinks','linktest') default NULL;
 
+      Also add some experimental fields to project table.
+
+       alter table projects add inactive tinyint(4) default '0' \
+             after approved;
+       alter table projects add date_inactive datetime default NULL \
+             after inactive;
