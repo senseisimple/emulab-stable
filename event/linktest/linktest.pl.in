@@ -63,9 +63,9 @@ use constant LIMIT_BW_LOSS => 0;
 # Make sure that we dont get bogged down in being too accurate! 
 # Make sure the error is a certain significance before we start reporting it.
 use constant INSIGNIFICANT_LAT_ERROR_LO => 0.50;  # ms
-use constant INSIGNIFICANT_LAT_ERROR_HI => 3.00;  # ms
+use constant INSIGNIFICANT_LAT_ERROR_HI => 3.50;  # ms
 use constant INSIGNIFICANT_BW_ERROR_HI  => 0.01;  # percent.
-use constant INSIGNIFICANT_BW_ERROR_LO  => 0.05;  # percent.
+use constant INSIGNIFICANT_BW_ERROR_LO  => 0.06;  # percent.
 
 # latency must be corrected for xmit delay under this speed.
 use constant LAT_LOW_BW => 10000000;
@@ -349,6 +349,9 @@ if(&dotest(TEST_LATENCY)) {
     my $msg = "Testing Single Hop Connectivity and Latency...";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
+    # Ick, this barrier makes sure the above message gets into the log
+    # first, so as not to confuse Mike
+    &barrier();
     &debug("\n$msg\n\n");
     &latency_test;
     &report_status;
@@ -379,7 +382,7 @@ if(&dotest(TEST_BW)){
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
     # Ick, this barrier makes sure the above message gets into the log
-    # first, so as not to confuse Mike.
+    # first, so as not to confuse Mike
     &barrier();
     &debug("\n$msg\n\n");
     &bw_test;
@@ -634,6 +637,11 @@ sub latency_test {
 			# call ping_node with ttl=1
 			my ($result_cnt, $sample_avg, $sample_dev) =
 			    &ping_node($edge->dst . "-" . $edge->name,1);
+			
+			&info("    Latency result on $hostname for " .
+			      &print_edge($edge) . 
+			      ": count/avg/stddev = ".
+			      "$result_cnt/$sample_avg/$sample_dev\n");
 
 			my $n = PING_SEND_COUNT;
 
@@ -767,6 +775,11 @@ sub bw_test {
     while (&has_elems(\@edge_copy)) {
 	my ($edge,$redge) = &get_twoway_assign(\@edge_copy);
 
+	# Figure out what bw to use so as not to overflow the
+	# system too badly. Take the max of the two edges and
+	# add 10 percent.
+	my $bw = 0;
+
 	if (defined($edge) && defined($redge)) {
 	    if($hostname eq $edge->dst) {
 		#
@@ -774,6 +787,9 @@ sub bw_test {
 		#
 		if (&valid_bw($edge)) {
 		    push(@analyze_list, $edge);
+
+		    $bw = $edge->bw
+			if ($edge->bw > $bw);
 		    
 		    &debug("    Starting bandwidth test on $hostname for " .
 			  &print_link($edge) . "\n");
@@ -793,6 +809,9 @@ sub bw_test {
 		if (&valid_bw($redge)) {
 		    push(@analyze_list, $redge);
 		    
+		    $bw = $redge->bw
+			if ($redge->bw > $bw);
+		    
 		    &debug("    Starting bandwidth test on $hostname for " .
 			  &print_link($redge) . "\n");
 		    &info("    Starting bandwidth test on $hostname for " .
@@ -808,12 +827,14 @@ sub bw_test {
 			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
 			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
 		}
+		my $bw = $bw + int($bw * 0.10);
+		
 		# Okay, start the test.
 		if (&valid_bw($edge) || &valid_bw($redge)) {
 		    &my_system(PATH_IPERF,
 			       "-c", $edge->src . "-" . $edge->name,
 			       "-t", "10", "-f", "b",
-			       "-r", "-u", "-w", "200000", "-b", "100Mb",
+			       "-r", "-u", "-w", "200000", "-b", "$bw",
 			       "-x", "s", "-y", "c",
 			       "-L", "4444", "-o", IPERF_DAT);
 		}
@@ -854,6 +875,10 @@ sub bw_test {
 		    &debug("BW results on $hostname for " .
 			   $edge->src . "-" . $edge->name . ": ".
 			   "$bw/$expected/$diff\n");
+
+		    &info("    Bandwidth result on $hostname for " .
+			  &print_edge($edge) . 
+			  ": expected/actual = $expected/$bw\n");
 
 		    #
 		    # The measurement tool does not give perfect results.
@@ -965,10 +990,17 @@ sub print_link {
     my $str = $edge->src . "-" . $edge->name . " to " .
 	$edge->dst . "-" . $edge->name;
 
-    if ($edge->bw && $edge->delay && $edge->loss) {
-	$str .= " (" . ($edge->bw / 1000000)  . " Mbps, " .
-	    $edge->delay . "ms, " . (100 * $edge->loss) . "% loss)";
-    }
+    $str .= " (" . ($edge->bw / 1000000)  . " Mbps, " .
+	$edge->delay . "ms, " . (100 * $edge->loss) . "% loss)";
+
+    return $str;
+}
+
+sub print_edge {
+    my $edge = shift @_;
+    my $str = $edge->src . "-" . $edge->name . " to " .
+	$edge->dst . "-" . $edge->name;
+
     return $str;
 }
 
