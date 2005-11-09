@@ -123,10 +123,12 @@ function SHOWFREENODES()
     }
     PAGEBEGINNING("Free Node Summary", 1, 1);
 
+    $freepcs   = TBFreePCs();
+    $reloading = TBReloadingPCs();
+
     echo "<table valign=top align=center width=100% height=100% border=1>
-          <tr><td nowrap colspan=4 class=contentheader
-	          bgcolor='#E1EAEA' align=center>
- 	       <font size=-1>Free PCs</font></td></tr>\n";
+          <tr><td nowrap colspan=4 class=menuoptusage align=center>
+ 	       <b>$freepcs Free PCs</b></td></tr>\n";
 
     $pccount = count($freecounts);
     $newrow  = 1;
@@ -156,10 +158,10 @@ function SHOWFREENODES()
                       <td class=menuoptusage>&nbsp</td></tr>\n";
 	}
     }
-    $freepcs = TBFreePCs();
+
     echo "<tr>
           <td class=menuoptusage colspan=4 align=center>
-               <b>$freepcs Free PCs</b></td>
+               <b>$reloading PCs reloading</b></td>
           </tr>\n";
     echo "</table>";
 }

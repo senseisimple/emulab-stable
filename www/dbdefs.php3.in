@@ -9,6 +9,9 @@ $TBOPSPID	= "emulab-ops";
 $NODEDEAD_PID   = $TBOPSPID;
 $NODEDEAD_EID   = "hwdown";
 $FIRSTUSER      = "elabman";
+$NODERELOADING_PID	= $TBOPSPID;
+$NODERELOADING_EID	= "reloading";
+$NODERELOADPENDING_EID	= "reloadpending";
 
 # All these constants need to go at some point, replaced by data from
 # the regex table. 
@@ -1499,6 +1502,26 @@ function TBUserPCs($uid)
 		     "  and a.role='testnode' and nt.class = 'pc'");
 
     return mysql_num_rows($query_result);
+}
+
+#
+# Number of PCs reloading.
+#
+function TBReloadingPCs()
+{
+    global $NODERELOADING_PID, $NODERELOADING_EID, $NODERELOADPENDING_EID;
+
+    $query_result =
+	DBQueryFatal("select count(*) from reserved ".
+		     "where pid='$NODERELOADING_PID' and ".
+		     "      (eid='$NODERELOADING_EID' or ".
+		     "       eid='$NODERELOADPENDING_EID')");
+    
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_row($query_result);
+    return $row[0];
 }
 
 function TBExptLogFile($pid, $eid)
