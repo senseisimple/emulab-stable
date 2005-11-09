@@ -8,6 +8,7 @@
 $login_status     = CHECKLOGIN_NOTLOGGEDIN;
 $login_uid        = 0;
 $drewheader       = 0;
+$noheaders	  = 0;
 $autorefresh      = 0;
 
 #
@@ -968,14 +969,15 @@ function PAGEFOOTER($view = NULL) {
 }
 
 function PAGEERROR($msg) {
-    global $drewheader;
+    global $drewheader, $noheaders;
 
-    if (! $drewheader)
+    if (! $drewheader && ! $noheaders)
 	PAGEHEADER("Page Error");
 
     echo "$msg\n";
 
-    PAGEFOOTER();
+    if (! $noheaders) 
+	PAGEFOOTER();
     die("");
 }
 
