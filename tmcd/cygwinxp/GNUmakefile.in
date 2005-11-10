@@ -98,7 +98,7 @@ script-install:	dir-install $(SCRIPTS)
 	ln -f -s /bin/shutdown /sbin/shutdown
 	# Everybody is in the Administrators group already, so sudo is irrelevant.
 	$(INSTALL) -m 755 $(SRCDIR)/sudo.dummy /bin/sudo
-	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.firstboot
+	$(INSTALL) -m 755 $(SRCDIR)/rc.firstboot $(BINDIR)/rc/rc.firstboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwin
 	# The following will fail if the user login script is still busy in a shell.
 	-$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp-user $(BINDIR)/rc/rc.cygwinxp-user

@@ -113,3 +113,4 @@ else
     logit "$host - Failed to reboot changing to '$nodeid'."
 fi
 
+logit "rc.firstboot finished."
