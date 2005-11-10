@@ -110,18 +110,18 @@ client: all
 	$(MAKE) -C iperf client
 
 client-install: client
-	@if test ! -x '/usr/local/bin/rude' -o \
-	    	 ! -x '/usr/local/bin/crude' -o \
-		 ! -x '/usr/local/bin/emulab-iperf'; then \
+	@if test ! -x '/usr/local/bin/rude$(EXE)' -o \
+	    	 ! -x '/usr/local/bin/crude$(EXE)' -o \
+		 ! -x '/usr/local/bin/emulab-iperf$(EXE)'; then \
 	  echo "**********************************************************"; \
 	  echo "*                                                        *"; \
 	  echo "* WARNING: Some tools needed by linktest were not found. *"; \
 	  echo "*                                                        *"; \
 	  echo "* Make sure the following executables are installed:     *"; \
 	  echo "*                                                        *"; \
-	  echo "*   /usr/local/bin/rude                                  *"; \
-	  echo "*   /usr/local/bin/crude                                 *"; \
-	  echo "*   /usr/local/bin/emulab-iperf                          *"; \
+	  echo "*   /usr/local/bin/rude$(EXE)                            *"; \
+	  echo "*   /usr/local/bin/crude$(EXE)                           *"; \
+	  echo "*   /usr/local/bin/emulab-iperf$(EXE)                    *"; \
 	  echo "*                                                        *"; \
 	  echo "**********************************************************"; \
 	fi

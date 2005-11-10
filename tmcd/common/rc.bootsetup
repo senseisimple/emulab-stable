@@ -296,7 +296,7 @@ sub doboot()
     # Start the linktest daemon. This script will exit without running
     # linktest is the node is hosting SIM or JAILS.
     #
-    if (-x "$RCDIR/rc.linktest" && ! WINDOWS()) {
+    if (-x "$RCDIR/rc.linktest") {
 	system("$RCDIR/rc.linktest start");
 	if ($?) {
 	    fatal("Error running $RCDIR/rc.linktest");

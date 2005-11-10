@@ -129,6 +129,26 @@ MSDN documentation:
   Device Installation: Windows DDK: Device Identification Strings
   http://msdn.microsoft.com/library/default.asp?url=/library/en-us/install/hh/install/idstrings_a974863f-a410-4259-8474-b57a3e20d326.xml.asp
 
+--------------------------------
+Rude and Crude: Real-time UDP Data Emitter and Collector for Rude
+  Used by linktest level 3 to verify link delays
+  The -P argument for setting real-time priority is not supported on Windows.
+
+  Web home page: http://rude.sourceforge.net/
+  Sources: rude-0.70.tar.gz - http://prdownloads.sourceforge.net/rude/rude-0.70.tar.gz
+           c_rude.patch - Ifdef out the Linux mmap and sched calls.
+  Executables and man pages: /usr/{local/{bin/{,c}rude.exe,man/man8/{,c}rude.8},share/doc/rude}
+	   Tar file: rude_cygwin_0.70.tgz
+  	   Install with: tar xvfz rude_cygwin_0.70.tgz -C /usr
+
+--------------------------------
+iperf: TCP/UDP Bandwidth Measurement Tool
+  Used by linktest level 4 to verify link bandwidth.
+  Patched by Emulab, installed as emulab-iperf.
+
+  Web home page and sources: http://dast.nlanr.net/Projects/Iperf
+
+
 ================================================================
 Windows drivers for the Emulab machines:
 
