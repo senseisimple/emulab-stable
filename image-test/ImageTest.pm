@@ -2,8 +2,10 @@ package ImageTest;
 use Exporter;
 
 @ISA = "Exporter";
-@EXPORT = qw (test test_cmd test_ssh test_rcmd test_experiment
-	      ERR_NONE ERR_FAILED ERR_SWAPIN ERR_FATAL ERR_CLEANUP ERR_INT);
+@EXPORT = qw (test test_cmd test_ssh test_rcmd test_experiment exit_str
+	      ERR_MASK ERR_NONE ERR_FAILED ERR_FATAL ERR_INT
+	      STATUS_MASK STATUS_NONE STATUS_SWAPPEDIN STATUS_EXISTS STATUS_CLEANUP);
+
 use IO::File;
 use strict;
 
@@ -11,14 +13,39 @@ use vars qw(%parms %dependencies %tally);
 use vars qw($eid $pid $datadir $resultsdir);
 use vars qw(@mapping @nodes @pnodes %to_physical %from_physical);
 use vars qw($FAILED);
+use vars qw(%ERR %STATUS);
 
-# exit values
+sub true() {1}
+sub false() {0}
+
+#
+# exit values, or two parts together
+#
+
+sub ERR_MASK    {3};
 sub ERR_NONE    {0};
 sub ERR_FAILED  {1}; # tests failed
-sub ERR_SWAPIN  {2}; # swapin failed
-sub ERR_FATAL   {3}; # fatal error
-sub ERR_CLEANUP {4}; # fatal error - cleanup needed
-sub ERR_INT     {5}; # interrupted
+sub ERR_FATAL   {2}; # fatal error
+sub ERR_INT     {3}; # interrupted
+%ERR = (ERR_NONE, 'ERR_NONE',
+	ERR_FAILED, 'ERR_FAILED',
+	ERR_FATAL, 'ERR_FATAL',
+	ERR_INT, 'ERR_INT');
+
+sub STATUS_MASK      {3 << 2};
+sub STATUS_NONE      {0 << 2};
+sub STATUS_SWAPPEDIN {1 << 2}; # experment still swapped in
+sub STATUS_EXISTS    {2 << 2}; # experment still exists
+sub STATUS_CLEANUP   {3 << 2}; # requires cleanup
+%STATUS = (STATUS_NONE, 'STATUS_NONE',
+	   STATUS_SWAPPEDIN, 'STATUS_SWAPPEDIN',
+	   STATUS_EXISTS, 'STATUS_EXISTS',
+	   STATUS_CLEANUP, 'STATUS_CLEANUP');
+
+sub exit_str($) {
+  my ($exit) = @_;
+  return join(' ', $ERR{$exit &  ERR_MASK}, $STATUS{$exit & STATUS_MASK});
+}
 
 #
 # Performs a test on a swapped in experient.  Returns true if the test
@@ -47,25 +74,37 @@ sub test ($$&) {
     return 0;
   }
 
+  print "<--- starting test: $name\n";
+
   my $res;
   eval {$res = &$test(%parms)};
 
   if ($res) {
     $tally{passed}++;
     $dependencies{$name} = 1;
-    print "\"$name\" succeeded\n";
-    return 1;
+    print ">--- \"$name\" succeeded\n";
+    return true;
   } elsif ($@) {
     $tally{failed}++;
     print $FAILED "$name\n";
-    print "*** \"$name\" died: $@";
-    return 0;
+    print ">*** \"$name\" died: $@";
+    return false;
   } else {
     $tally{failed}++;
     print $FAILED "$name\n";
-    print "*** \"$name\" failed\n";
-    return 0;
+    print ">*** \"$name\" failed\n";
+    return false;
   }
+}
+
+#
+#
+#
+sub sys (@) {
+  print "<-- executing: ", join(' ', @_), "\n";
+  system @_;
+  print ">-- done\n";
+  return $? >> 8 == 0;
 }
 
 #
@@ -77,16 +116,16 @@ sub test ($$&) {
 sub test_cmd ($$$;&) {
   my ($name,$requires,$cmd,$output_test) = @_;
   test $name, $requires, sub {
-    print "Executing: $cmd\n";
     if (not defined $output_test) {
-      system $cmd;
-      return ($? >> 8 == 0);
+      return sys($cmd);
     } else {
       local $/ = undef;
       my $F = new IO::File;
-      open $F, "$cmd |" or return 0;
+      print "<-- executing: $cmd\n";
+      open $F, "$cmd |" or return false;
       local $_ = <$F>;
       close $F;
+      print ">-- done\n";
       return 0 unless ($? >> 8 == 0);
       open $F, ">$resultsdir/$name.out";
       print $F $_;
@@ -106,7 +145,7 @@ sub test_cmd ($$$;&) {
 #
 sub test_ssh ($) {
   my ($node) = @_;
-  test_cmd "ssh-$node", [], "ssh  -o BatchMode=yes -o StrictHostKeyChecking=no $node.$parms{eid}.$parms{pid} true";
+  test_cmd "ssh-$node", [], "ssh-node $node true";
 }
 
 #
@@ -121,7 +160,7 @@ sub test_ssh ($) {
 sub test_rcmd ($$$$;&) {
   my ($name,$requires,$node,$cmd,$output_test) = @_;
   &test_cmd($name, ["ssh-$node", @$requires],
-	    "ssh -o BatchMode=yes $node.$parms{eid}.$parms{pid} $cmd", $output_test);
+	    "ssh-node $node $cmd", $output_test);
 }
 
 #
@@ -178,6 +217,12 @@ sub single_node_tests ($) {
     local $_ = cat "/var/log/tiplogs/$pnode.run";
     /login\: /;
   };
+
+  test "proj_mount-$node", ["ssh-$node"], sub {
+    sys "ssh-node $node touch $resultsdir/working/$node"
+      or return false;
+    return -e "$resultsdir/working/$node";
+  }
 
 }
 
@@ -237,39 +282,68 @@ sub test_experiment (%) {
   $pid = $parms{pid};
   $datadir = $parms{datadir};
   $resultsdir = $parms{resultsdir};
-  my $exit = 0;
+
+  my $err = ERR_NONE;
+  my $status = STATUS_NONE;
 
   $SIG{__DIE__} = sub {
     return unless defined $^S && !$^S;
-    $! = ERR_CLEANUP;
+    $! = (ERR_FATAL | $status);
     die $_[0];
   };
 
   $SIG{INT} = 'IGNORE';
 
   $SIG{TERM} = sub {
-    exit ERR_INT;
+    print "TERMINATING\n";
+    exit (ERR_INT | $status);
   };
 
+  #sleep 30;
+  #exit 0;
+
   mkdir $resultsdir, 0777;
+  chdir $resultsdir;
 
-  open STDIN,  "/dev/null"        or die;
-  open STDOUT, ">$resultsdir/log" or die;
-  open STDERR, ">&STDOUT"         or die;
+  mkdir "working", 0777;
+  mkdir "bin",     0777;
 
-  $FAILED = new IO::File ">$resultsdir/failed-tests" or die;
+  $ENV{PATH} = "$resultsdir/bin:$ENV{PATH}";
+
+  open STDOUT, ">log"      or die;
+  open STDERR, ">&STDOUT"  or die;
 
   my ($F,$O);
 
-  $F = new IO::File ">$resultsdir/parms" or die;
+  $F = new IO::File ">pid" or die;
+  print $F "$$\n";
+  close $F;
+
+  $FAILED = new IO::File ">failed-tests" or die;
+
+  $F = new IO::File ">parms" or die;
   foreach (sort keys %parms) {
     print $F "$_: $parms{$_}\n";
   }
+  close $F;
+
+  $F = new IO::File ">bin/ssh-node" or die;
+  print $F "#!/bin/sh\n";
+  print $F "\n";
+  print $F 'cmd=$1',"\n";
+  print $F 'shift', "\n";
+  print $F join(' ',
+		'ssh', "-x",
+		"-o BatchMode=yes", "-o StrictHostKeyChecking=no",
+		"-o UserKnownHostsFile=$resultsdir/working/known_hosts",
+		"\$cmd.$parms{eid}.$parms{pid}", '"$@"', "\n");
+  close $F;
+  chmod 0755, "bin/ssh-node";
 
   if ($parms{stages} =~ /c/) {
 
     $F = new IO::File "$datadir/nsfile.ns" or die;
-    $O = new IO::File ">$resultsdir/nsfile.ns" or die;
+    $O = new IO::File ">nsfile.ns" or die;
     while (<$F>) {
       s/\@([^@]+)\@/$parms{lc $1}/g;
       print $O $_;
@@ -277,19 +351,22 @@ sub test_experiment (%) {
     close $O;
     close $F;
 
-    system("/usr/testbed/bin/startexp -w -i -f".
-	   " -E \"Experiment For Testing Images\"".
-	   " -p $pid -e $eid $resultsdir/nsfile.ns");
+    $status = STATUS_EXISTS;
+    sys("/usr/testbed/bin/startexp -w -i -f".
+	" -E \"Experiment For Testing Images\"".
+	" -p $pid -e $eid nsfile.ns");
     if ($? >> 8 != 0) {
       print "*** Could not create experment\n";
-      exit ERR_FATAL;
+      exit (ERR_FATAL | STATUS_NONE);
     }
   }
 
   my $swapin_success = 1;
   if ($parms{stages} =~ /s/) {
+    $status = STATUS_SWAPPEDIN;
     $swapin_success = test_cmd 'swapin', [],
       "/usr/testbed/bin/swapexp -w -e $pid,$eid in";
+    $status = STATUS_EXISTS unless $swapin_success;
   }
 
   if ($swapin_success) {
@@ -336,7 +413,7 @@ sub test_experiment (%) {
 	if ($@) {
 	  print "*** Unable to complete tests: $@";
 	  print "*** Results may not be accurate.\n";
-	  $exit = ERR_FATAL
+	  $err = ERR_FATAL
 	}
       }
     }
@@ -347,54 +424,56 @@ sub test_experiment (%) {
 	
       foreach my $node (@nodes) {
 	my $pnode = $to_physical{$node};
-	system "cp -pr /var/log/tiplogs/$pnode.run $resultsdir/tiplog-$node";
-	if ($? >> 8 != 0) {
-	  print "*** WARNING: Unable to copy tiplog for node $node.\n";
-	}
+	sys "cp -pr /var/log/tiplogs/$pnode.run tiplog-$node"
+	  or print "*** WARNING: Unable to copy tiplog for node $node.\n";
       }
 
       test_cmd 'swapout', [],
-	"/usr/testbed/bin/swapexp -w -e $pid,$eid out";
+	"/usr/testbed/bin/swapexp -w -e $pid,$eid out"
+	  and $status = STATUS_EXISTS;
 
       # FIXME: need proper way to get the log file
       test_scanlog 'error_free_swapout', ['swapout'],
 	`ls -t /proj/$pid/exp/$eid/tbdata/swapexp.* | head -1`;
     }
 
-    if ($parms{stages} =~ /t/) {
-
-      print "\n";
-      print "Num Tests:         $tally{total}\n";
-      print "Passed:            $tally{passed}\n";
-      print "Failed:            $tally{failed}\n";
-      my $unex = $tally{total} - $tally{passed} - $tally{failed};
-      print "Unable to Execute: $unex\n";
-
-    }
-
   } else {
 
-    $exit = ERR_SWAPIN;
+    $err = ERR_FATAL;
 
   }
+
+  $err = ERR_FAILED if $err == ERR_NONE && $tally{failed} > 0;
 
   if ($parms{stages} =~ /e/) {
 
-    system("cp -pr /proj/$pid/exp/$eid $resultsdir/exp-data");
+    sys("cp -pr /proj/$pid/exp/$eid exp-data");
     if ($? >> 8 != 0) {
       print "*** Unable to copy exp data.  Not terminating exp\n";
-      exit ERR_CLEANUP;
+      exit ($err | STATUS_CLEANUP);
     }
 
-    system("/usr/testbed/bin/endexp -w -e $pid,$eid");
+    sys("/usr/testbed/bin/endexp -w -e $pid,$eid");
     if ($? >> 8 != 0) {
       print "*** Could not terminate experiment.  Must do manually\n";
-      exit ERR_CLEANUP;
+      exit ($err | STATUS_CLEANUP);
     }
+
+    $status = STATUS_NONE;
   }
 
-  $exit = ERR_FAILED if $exit == 0 && $tally{failed} > 0;
-  exit $exit;
+  if ($parms{stages} =~ /t/) {
+
+    print "\n";
+    print "Num Tests:         $tally{total}\n";
+    print "Passed:            $tally{passed}\n";
+    print "Failed:            $tally{failed}\n";
+    my $unex = $tally{total} - $tally{passed} - $tally{failed};
+    print "Unable to Execute: $unex\n";
+
+  }
+
+  exit ($err | $status);
 }
 
 

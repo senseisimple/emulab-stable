@@ -10,39 +10,47 @@ my $eid_prefix = 'it-';
 
 ########################################################################
 #
+# Prelude
 #
-#
+
+use strict;
 
 use ImageTest;
 use Cwd;
 use Getopt::Long;
-
-use Data::Dumper;
-
-use strict;
+use POSIX 'setsid';
+use POSIX ':sys_wait_h';
+use Errno 'EINTR';
 
 sub true() {1}
 sub false() {0}
 
+sub LARGE_NUM {100000}
+
+########################################################################
+#
+# Process command-line arguments
+#
+
 sub usage() {
-  die "usage: $0 -h | [-l] [-s CSTOE] [-p NUM] IMAGE [TESTS ...]\n";
+  die "usage: $0 -h | -l | [OPTIONS] IMAGE [TESTS ...]\n";
 }
 
 sub help() {
   print
-    ("usage: $0 -h | [<OPTIONS>] <OS> [TESTS ...]\n".
+    ("usage: $0 -h | -l | [OPTIONS] IMAGE [TESTS ...]\n".
      "  IMAGE      image to use\n".
      "  TESTS      if present only run these particular tests\n".
+     "  -h --help  print this help message\n".
+     "  -l --list  just list the available experements\n".
      "OPTIONS:\n".
      "  -s STAGES  only execute particular stages of the test where\n".
      "             STAGES is any one of:\n".
      "               c: create, s: swapin, t: test o: swapout, e: end experment\n".
      "             (note 'e' implies 'o')\n".
-     "  -p NUM     max number of nodes to alloacate when running experiments\n".
-     "             in parallel.  Experments larger than NUM will be run in series\n".
-     "             after all the parallel experiments have run.\n".
-     "             Default: 0, which means all experiments will run in series\n".
-     "  -l         Just list the available experements.\n");
+     "  -p         run experments in parallel\n".
+     "  -m NUM     soft limit on the maximum number of nodes to use at once\n".
+     "  -M NUM     hard limit on the maximum number of nodes to use at once\n");
 }
 
 die usage unless @ARGV > 0;
@@ -69,15 +77,25 @@ my @argv;
 my %exp_opts;
 
 my $stages = 'cstoe';
-my $max_parallel = 0;
+my $in_parallel;
+my $soft_limit = 5;
+my $hard_limit = 0;
 my $just_list;
+
+Getopt::Long::Configure 'no_ignore_case';
 
 GetOptions
     "h|help" => sub {help(); exit 0;},
-    "s|stages=s" => \$stages,
-    "p=i" => \$max_parallel,
+    "s=s" => \$stages,
+    "p" => \$in_parallel,
+    "m=i" => \$soft_limit,
+    "M=i" => \$hard_limit,
     "l|list" => \$just_list
   or usage();
+
+$soft_limit = LARGE_NUM   if $soft_limit == 0;
+$hard_limit = LARGE_NUM   if $hard_limit == 0;
+$soft_limit = $hard_limit if $soft_limit > $hard_limit;
 
 my $os = shift @ARGV;
 my @exps_torun = map {lc} @ARGV;
@@ -87,20 +105,20 @@ if ($stages =~ /([^cstoe])/) {
   usage();
 }
 
-my @exps;
-my %exps;
-my @exps_inseries;
-my $num_exps_inparallel = 0;
-my @exps_inparallel_bysize;
-
 ########################################################################
 #
-#
+# Get the list of experments to run
 #
 
 sub get_parms ($);
 sub get_numnodes ($);
 sub mktests ($$$@);
+
+my @exps;
+my %exps;
+my @exps_inseries;
+my $num_exps_inparallel = 0;
+my @exps_inparallel_bysize;
 
 my @p;
 
@@ -172,7 +190,7 @@ sub use_exp ($) {
 
 ########################################################################
 #
-#
+# Handle the just list case
 #
 
 if ($just_list) {
@@ -182,27 +200,15 @@ if ($just_list) {
   exit 0;
 }
 
+
 ########################################################################
 #
+# Set everything up
 #
+
 #
-
-sub get_exps ($@);    # parms: available nodes, size list
-                      # returns list of experments, see below
-sub get_sizelist ($); # parms: maxim size
-                      # returns list of sizes less than max
-sub extract_exps (@); # parms: size list
-                      # extracts nodes from %explist_bysize and returns them
-
-my @results;
-my %pids;
-
-my $avail_nodes = $max_parallel;
-
-autoflush STDOUT, 1;
-autoflush STDERR, 1;
-
-open STDIN, "/dev/null" or die;
+# setup results directory
+#
 
 mkdir $destdir, 0777;
 unlink "$basedir/results";
@@ -215,74 +221,219 @@ close F;
 open LOG, ">$destdir/log" or die;
 autoflush LOG, 1;
 
-use subs 'log';
-sub log {
-  print @_;
-  print LOG @_;
+print LOG "EXPECT RESULTS IN \"$destdir\"\n";
+
+#
+# Fork a child to do the real work.
+# The parent will monitor the log file and echo the results to stdout.
+# And pass the TERM and INT signals to the child.
+#
+
+if ((my $pid = fork()) != 0) {
+
+  my $TERM;
+  $TERM = sub {
+    my ($sig) = @_;
+    $SIG{$sig} = $TERM;
+    kill $sig, $pid;
+  };
+  $SIG{TERM} = $TERM;
+  $SIG{INT} = $TERM;
+
+  open LOG2, "$destdir/log";
+
+  my $res = 0;
+  for (;;) {
+    my $data;
+    $res = sysread LOG2, $data, 1024;
+    last if (!defined $res && $! != EINTR); # Error
+    print $data;
+    if ($res == 0) {
+      my $p = waitpid $pid, WNOHANG;
+      last if $p > 0;
+      sleep 1;
+    }
+  }
+
+  unless (defined $res) {
+    my $str = "read: $!\n";
+    print $str;
+    print LOG $str;
+    exit 1;
+  }
+
+  exit 0;
+
+} elsif (not defined $pid) {
+  die "couldn't fork child\n";
 }
+
+#
+# disassociate stufff
+#
+
+open STDIN, "/dev/null";
+setsid();
+delete $ENV{DISPLAY};
+
+#
+# setup standard output streams
+#
+
+open STDOUT, ">&LOG";
+open STDERR, ">&LOG";
+
+autoflush STDOUT, 1;
+autoflush STDERR, 1;
+
+#
+# setup signal handlers
+#
 
 my $quit = 0;
 
 sub TERM {
   my ($sig) = @_;
-  log "TERMINATING\n";
+  print "TERMINATING\n";
   $quit = 1;
   $SIG{TERM} = sub {
     $SIG{$sig} = \&TERM;
   };
   kill TERM => -$$;
 }
-
 $SIG{TERM} = \&TERM;
 $SIG{INT} = \&TERM;
 
-log "EXPECT RESULTS IN \"$destdir\".\n";
+########################################################################
+#
+# Begin
+#
+
+sub start_exp ($);    # parms: experiment name
+                      # starts an experent, returns nothing
+sub wait_exp ();      # parms: none
+                      # waits for an expernet to end, returns nothing
+sub get_exps ($@);    # parms: available nodes, size list
+                      # returns list of experments, see below
+sub get_sizelist ($); # parms: maxim size
+                      # returns list of sizes less than max
+sub extract_exps (@); # parms: size list
+                      # extracts nodes from %explist_bysize and returns them
+
+my @results;
+my %pids;
+
+my $avail_in_parallel = $in_parallel ? $soft_limit : 0;
+
+#
+# fill the initial list of experments to run in parallel and in series
+#
 
 foreach (@exps) {
   my $s = $exps{$_}{numnodes};
-  if ($s <= $avail_nodes) {
+  if ($s <= $avail_in_parallel) {
     push @{$exps_inparallel_bysize[$s]}, $_;
     $num_exps_inparallel++;
   } else {
     push @exps_inseries, $_;
   }
 }
-for (my $i = 0; $i <= $avail_nodes; $i++) {
+for (my $i = 0; $i <= $avail_in_parallel; $i++) {
   $exps_inparallel_bysize[$i] = [] unless defined $exps_inparallel_bysize[$i];
 }
 
-while (%pids || (!$quit && $num_exps_inparallel > 0)) {
-  if ($avail_nodes > 0 && !$quit) {
-    my ($size, @set) = get_exps($avail_nodes, get_sizelist($avail_nodes));
-    foreach (extract_exps(@set)) {
-      log "STARTING TEST EXP $_\n";
-      my $pid = test_experiment %{$exps{$_}};
-      $pids{$pid} = $_;
-    }
-    $avail_nodes -= $size;
+#
+# run as many experiments in parallel as possible
+#
+
+while (%pids || $num_exps_inparallel > 0) {
+  last if $quit;
+  my ($size, @set) = get_exps($avail_in_parallel, 
+			      get_sizelist($avail_in_parallel));
+  last if (!%pids && $size == 0); # unable to run any more experments
+                                  # in parallel so give up
+  foreach (extract_exps(@set)) {
+    start_exp($_);
   }
+  wait_exp();
+}
+
+#
+# remove any experiments that were unable to be run in parallel
+#
+
+foreach (@exps_inparallel_bysize) {
+  foreach my $exp (@$_) {
+    push @exps_inseries, $exp;
+  }
+}
+
+#
+# run the rest in series, unless over the hard limit
+#
+
+foreach my $exp (@exps_inseries) {
+  last if $quit;
+  if ($exps{$exp}{numnodes} > $hard_limit) {
+    print "SKIPPING $exp since it uses more nodes than are available\n";
+    next;
+  }
+  next if $exps{$exp}{numnodes} > $hard_limit;
+  start_exp($exp);
+  wait_exp();
+}
+
+
+#
+# Wait for any remaing experments to end, which may happen if $quit.
+#
+
+while (%pids) {
+  wait_exp();
+}
+
+#
+# Start an experment, keeping $avail_in_parallel in sync
+#
+
+sub start_exp ($) {
+  my ($exp) = @_;
+  print "STARTING TEST EXP $exp\n";
+  my $pid = test_experiment %{$exps{$exp}};
+  $pids{$pid} = $exp;
+  $avail_in_parallel -= $exps{$exp}{numnodes};
+}
+
+#
+# Wait for an experient to end, keeping $avail_in_parallel in sync. If
+# for some reason an experient couldn't be swapped out than adjust the soft and
+# hard limits accordingly.
+#
+sub wait_exp () {
   my $pid = wait();
   if ($pid >= 0) {
     my $exp = $pids{$pid};
     delete $pids{$pid};
     my $exit = $? >> 8;
-    &get_results_summary($exp, $exit);
-    log "FINISHED TEST EXP $exp\n";
+    &print_results_summary($exp, $exit);
     push @results, [$exp, $exit];
-    $avail_nodes += $exps{$exp}{numnodes};
+    my $F = new IO::File ">$exps{$exp}{resultsdir}/exit";
+    print $F "$exit\n";
+    print $F exit_str($exit), "\n";
+    print $F &results_summary($exp, $exit), "\n";
+    close $F;
+    unless (($exit & STATUS_MASK) == STATUS_SWAPPEDIN) {
+      $avail_in_parallel += $exps{$exp}{numnodes};
+    } else {
+      # the experient failed to swap out, since the nodes are still in
+      # use substract that number from the soft and hard limits
+      $soft_limit -= $exps{$exp}{numnodes}   unless $soft_limit == LARGE_NUM;
+      $hard_limit -= $exps{$exp}{numnodes}   unless $hard_limit == LARGE_NUM;
+      print "  only $hard_limit nodes now available for use\n"
+	unless $hard_limit == LARGE_NUM;
+    }
+    print "FINISHED TEST EXP $exp\n";
   }
-}
-
-foreach my $exp (@exps_inseries) {
-  last if $quit;
-  log "STARTING TEST EXP $exp\n";
-  my $pid = test_experiment %{$exps{$exp}};
-  my $pid_ = wait();
-  die unless $pid == $pid_;
-  my $exit = $? >> 8;
-  &get_results_summary($exp, $exit);
-  log "FINISHED TEST EXP $exp\n";
-  push @results, [$exp, $exit];
 }
 
 #
@@ -334,27 +485,18 @@ sub extract_exps (@) {
 
 ########################################################################
 #
-#
+# Finish
 #
 
-log "SUMMARY: \n";
+print "SUMMARY: \n";
 
-sub get_results_summary($$) {
+sub print_results_summary($$) {
   my ($exp, $res) = @_;
-  if    ($res == ERR_NONE)    {log "  $exp passed\n"}
-  elsif ($res == ERR_FAILED)  {log "  $exp had failed tests: ",
-				 failed_tests($exp), "\n"}
-  elsif ($res == ERR_SWAPIN)  {log "  $exp failed to swap in\n"}
-  elsif ($res == ERR_FATAL)   {log "  $exp had one of more fatal errors\n"}
-  elsif ($res == ERR_CLEANUP) {log "  $exp requires cleanup\n"}
-  elsif ($res == ERR_INT)     {log "  $exp was interrupted\n"}
-  else                        {log "  $exp exited with unknown code: $res\n"}
+  print "  $exp ", results_summary($exp, $res), "\n";
 }
 
-sub failed_tests($);
-
 foreach (@results) {
-  &get_results_summary(@$_);
+  &print_results_summary(@$_);
 }
 
 sub failed_tests($) {
@@ -369,5 +511,45 @@ sub failed_tests($) {
   return $res;
 }
 
-log "RESULTS IN \"$destdir\".\n";
+sub results_summary($$) {
+  my ($exp, $res) = @_;
+
+  return "passed"
+    if $res == (ERR_NONE   | STATUS_NONE);
+  return "passed but is still swapped in"
+    if $res == (ERR_NONE   | STATUS_SWAPPEDIN);
+  return "passed but still exists" 
+    if $res == (ERR_NONE   | STATUS_EXISTS);
+  return "passed but requires cleanup"
+    if $res == (ERR_NONE   | STATUS_CLEANUP);
+  return "had failed tests: ".failed_tests($exp)
+    if $res == (ERR_FAILED | STATUS_NONE);
+  return "is still swapped in and had failed tests: ".failed_tests($exp)
+    if $res == (ERR_FAILED | STATUS_SWAPPEDIN);
+  return "still exists had failed tests: ".failed_tests($exp)
+    if $res == (ERR_FAILED | STATUS_EXISTS);
+  return "requires cleanup and had failed tests: ".failed_tests($exp)
+    if $res == (ERR_FAILED | STATUS_CLEANUP);
+  return "had one of more fatal errors"
+    if $res == (ERR_FATAL  | STATUS_NONE);
+  return "had one of more fatal errors and is still swapped in"
+    if $res == (ERR_FATAL  | STATUS_SWAPPEDIN);
+  return "had one of more fatal errors and still exists"
+    if $res == (ERR_FATAL  | STATUS_EXISTS);
+  return "had one of more fatal errors and requires cleanup"
+    if $res == (ERR_FATAL  | STATUS_CLEANUP);
+  return "was interrupted"
+    if $res == (ERR_INT    | STATUS_NONE);
+  return "was interrupted and is still swapped in"
+    if $res == (ERR_INT    | STATUS_SWAPPEDIN);
+  return "was interrupted and still exists"
+    if $res == (ERR_INT    | STATUS_EXISTS);
+  return "was interrupted and requires cleanup"
+    if $res == (ERR_INT    | STATUS_CLEANUP);
+
+  return "exited with unknown code: $res";
+}
+
+print "RESULTS IN \"$destdir\".\n";
+
 

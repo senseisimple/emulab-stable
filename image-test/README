@@ -45,12 +45,22 @@ Some of the files in this directory include:
 Running each of the experiments in series can take a long time.  For this
 reason it is possible to run more than one tests at once.  To do this use
 
-  ./image-test -p NUM OS
+  ./image-test -p [-m NUM] OS
 
-where NUM is the maxim number of nodes to use at once.  If a
-particular experiment uses more than NUM nodes it will be run in series
-after all the experiments that can be run in parallel have finished.
-Thus setting NUM to 0 will force all the experiments to run in series.
+where NUM is the maxim number of nodes to use at once.  If the "-m"
+flag is not given NUM defaults to 5.  If a particular experiment uses
+more than NUM nodes it will be run in series after all the experiments
+that can be run in parallel have finished.  Thus setting NUM to 0 will
+force all the experiments to run in series.
+
+
+Setting -m sets a soft limit to the number of nodes to use.  To set a
+hard limit use "-M NUM".  If an experemnt will use more nodes than NUM
+it will simply not be run.
+
+
+Experiments that fail to swap out decrees both the soft and hard
+limits.
 
 
 To only run particular experiment use:
@@ -144,4 +154,24 @@ For experiments with more than one node:
   linktest: run linktest
 
 Additional standard tests will be added over time.
+
+
+NOTE ON SIGNAL HANDLING
+
+image-test works by forking and having the child do the real work.
+All the parent does is monitor the log file and pass the signals
+SIGINT and SIGTERM to the parent.  The calls setsid() so that it does
+not have a controlling terminal.  This unfortunately also means that it
+is in a separate process group.
+
+In addition each experiment runs in a separate process.  The PID of
+this process is in the file "pid" in the experiment results directory.
+
+Sending a SIGINT or a SIGTERM to the parent (or child) will terminate
+all experiments ASAP.  Sending the SIGINT or a SIGTERM to an experiment
+process will terminate only that experiment.
+
+Sending a SIGHUP to the the parent will only terminate the parents.
+The test will proceed normally in the background.  Similarly, sending a
+SIGTSTP will only suspend the parent.
 
