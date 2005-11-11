@@ -710,13 +710,20 @@ sub CheckDotFiles()
 
     #
     # Add testbed path to .cshrc and .profile.
+    # Plus a conditional Cygwin section for the Windows system path.
     #
-    my $cpathstr = "set path = ($USERPATH \$path)";
+    my $cpathstr = "set path = ($USERPATH \$path)\n" .
+    'if ( `uname -s` =~ CYGWIN* ) then' . "\n" .
+    '    setenv PATH "${PATH}:/cygdrive/c/WINDOWS/system32:/cygdrive/c/WINDOWS"' . "\n" .
+    'endif';
     if (-e $cshrc && system("egrep -q -s '$USERPATH' $cshrc")) {
 	system("echo '$cpathstr' >> $cshrc");
     }
 
-    my $spathstr = "PATH=$USERPATH:\$PATH";
+    my $spathstr = "PATH=$USERPATH:\$PATH\n" .
+    'if [[ `uname -s` == CYGWIN* ]]; then' . "\n" .
+    '    PATH="$PATH":/cygdrive/c/WINDOWS/system32:/cygdrive/c/WINDOWS' . "\n" .
+    'fi';
     if (-e $profile && system("egrep -q -s '$USERPATH' $profile")) {
 	system("echo '$spathstr' >> $profile");
     }
