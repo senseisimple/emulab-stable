@@ -69,3 +69,5 @@ insert into priorities values (400, 'WARNING');
 insert into priorities values (500, 'NOTICE');
 insert into priorities values (600, 'INFO');
 insert into priorities values (700, 'DEBUG');
+
+insert into exported_tables values ('state_timeouts');
