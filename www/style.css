@@ -164,3 +164,10 @@ a2  { padding: 4px; }
 a2:hover   { background-color: #E7E7F0; border: solid 1px #007; text-decoration: none; padding: 3px;}
 
 span.topbaroption { background-color:#E1E1EA; }
+
+.textInput {
+	color: #000000
+}
+.textInputEmpty {
+	color: #888888
+}

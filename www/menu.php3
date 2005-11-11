@@ -268,6 +268,7 @@ function WRITESIDEBAR() {
 
     echo "<FORM method=get ACTION=$TBDOCBASE/search.php3>\n";
 ?>
+  <script type='text/javascript' language='javascript' src='textbox.js'></script>
   <table class="menu" width=210 cellpadding="0" cellspacing="0">
     <tr><td class="menuheader"><b>Information</b></td></tr>
 <?php
@@ -321,7 +322,10 @@ function WRITESIDEBAR() {
 
     # The actual search box. Form starts above ...
     echo "<tr><td class=menuoptst>
-                 <input name=query value='Search String' size=16/>".
+                 <input class='textInputEmpty' name=query
+                        value='Search String'
+                        size=16 onfocus='focus_text(this, \"Search String\")'
+                        onblur='blur_text(this, \"Search String\")' />".
 	"<input type=submit style='font-size:10px;' value=Search /><br>".
 	"</td></tr>\n";
     WRITESIDEBARDIVIDER();
