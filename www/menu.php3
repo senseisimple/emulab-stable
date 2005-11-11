@@ -40,7 +40,7 @@ function SIDEBARCELL($contents, $last = 0) {
     } else {
 	echo "<td class=\"menuopt\">";
     }
-    echo "$contents";
+    echo "<font size=tiny>&#8226; </font> $contents";
     echo "</td>";
     echo "</tr>";
     echo "\n";
@@ -320,11 +320,11 @@ function WRITESIDEBAR() {
     }
 
     # The actual search box. Form starts above ...
-    echo "<tr><td class=menuoptst><b>".
-	"Search Documentation:</b></td></tr>".
-	"<tr><td class=menuoptsb><input name=query size = 15/>".
-	"<input type=submit style='font-size:10px;' value=Go /><br>".
+    echo "<tr><td class=menuoptst>
+                 <input name=query value='Search String' size=16/>".
+	"<input type=submit style='font-size:10px;' value=Search /><br>".
 	"</td></tr>\n";
+    WRITESIDEBARDIVIDER();
 
     #
     # Cons up a nice message.
@@ -354,21 +354,14 @@ function WRITESIDEBAR() {
     }
 
     #
-    # Now the login/logout box. Remember, already inside a table.
-    # We want the links to the login/logout pages to always be https,
+    # Now the login box. Remember, already inside a table.
+    # We want the links to the login pages to always be https,
     # but the images path depends on whether the page was loaded as
     # http or https, since we do not want to mix them, since they
     # cause warnings.
-    # 
-    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-      echo "<tr>";
-      echo "<td class=\"menuoptst\" align=center valign=center>";
-      echo "<a href=\"$TBBASE/logout.php3?target_uid=$login_uid\">";
-      echo "<img alt=\"logoff\" border=0 ";
-      echo "src=\"$BASEPATH/logoff.gif\"></a>\n";
-      echo "</td></tr>\n";
-    }
-    elseif (!NOLOGINS()) {
+    #
+    if (! ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
+	!NOLOGINS()) {
 	echo "<tr>";
 	echo "<td class=\"menuoptst\" align=center valign=center>";
 
@@ -396,7 +389,6 @@ function WRITESIDEBAR() {
     }
 
     echo "</table>\n";
-    echo "</form>\n";
 
     # Start Interaction section if going to spit out interaction options.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
@@ -533,15 +525,18 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARDIVIDER();
 	    SIDEBARCELL("<a href=\"$TBBASE/newproject.php3\">Start</a> or " .
 	             "<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project",
-			1);
+			0);
 	}
     }
-
     #WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
     #    $TBDOCBASE, "survey.php3");
 
     # Terminate Interaction menu.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+        # Logout option. No longer take up space with an image.
+	WRITESIDEBARLASTBUTTON("<b>Logout</b>",
+			       $TBBASE, "logout.php3?target_uid=$login_uid");
+	
 	echo "</table>\n";
     }
 
@@ -641,6 +636,7 @@ function WRITESIDEBAR() {
 			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
 	echo "</table>\n";
     }
+    echo "</form>\n";
 }
 
 #

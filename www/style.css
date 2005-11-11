@@ -77,7 +77,7 @@ td.paddedcell2 { padding: 0.5em; }
 .menuopt,.menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb {
 	background-color: #cde; 
 	padding-left: 6px;
-	padding-top: 4px; 
+	padding-top: 2px; 
 	padding-bottom: 0px;
 	margin: 0px; 
 	border: 0px;
@@ -110,7 +110,7 @@ td.menuoptusage {
 }
 
 .menuoptdiv {
-	height: 8px;
+	height: 6px;
 }
 
 .menuoptst {
