@@ -14,6 +14,7 @@ You might want to also change the variable $eid_prefix at the start of
 "image-test" to something different, your username might be a good
 choice.
 
+
 BASIC USAGE
 
 From the base directory run:
@@ -104,6 +105,7 @@ Or to just run the tests on a already swapped in experiment use:
 
   ./image-test -s t ...
 
+
 TESTING FRAMEWORK
 
 Each individual experiment is expected to be the directory "tests/EXP".
@@ -143,15 +145,19 @@ For every experiment a number of standard tests will be run.
 
 For each node in the experiment the following tests will be run:
 
-  ssh-NODE: try to ssh into the node
+  ssh-NODE: try to ssh into the node, this also makes sure that the 
+    users home directory is mounted, otherwise public-key authorization
+    will fail
   sudo-NODE: make sure sudo is working correctly
   hostname-NODE: make sure host name is what it is expected to be
   login_prompt-NODE: make sure that the login prompt appears
     in the console
+  proj_mount-NODE: make sure that the approicate/proj directory is mounted
+    and readable
 
 For experiments with more than one node:
 
-  linktest: run linktest
+  linktest?: run linktest levels 1 - 4
 
 Additional standard tests will be added over time.
 
@@ -160,9 +166,9 @@ NOTE ON SIGNAL HANDLING
 
 image-test works by forking and having the child do the real work.
 All the parent does is monitor the log file and pass the signals
-SIGINT and SIGTERM to the parent.  The calls setsid() so that it does
-not have a controlling terminal.  This unfortunately also means that it
-is in a separate process group.
+SIGINT and SIGTERM to the parent.  The child calls setsid() so that it
+does not have a controlling terminal.  This unfortunately also means
+that it is in a separate process group.
 
 In addition each experiment runs in a separate process.  The PID of
 this process is in the file "pid" in the experiment results directory.
@@ -171,7 +177,7 @@ Sending a SIGINT or a SIGTERM to the parent (or child) will terminate
 all experiments ASAP.  Sending the SIGINT or a SIGTERM to an experiment
 process will terminate only that experiment.
 
-Sending a SIGHUP to the the parent will only terminate the parents.
-The test will proceed normally in the background.  Similarly, sending a
-SIGTSTP will only suspend the parent.
+Sending a SIGHUP to the the parent will only terminate the parent.
+The test will proceed normally in the background.  Similarly, sending
+a SIGTSTP will only suspend the parent.
 

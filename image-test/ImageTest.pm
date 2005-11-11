@@ -74,7 +74,7 @@ sub test ($$&) {
     return 0;
   }
 
-  print "<--- starting test: $name\n";
+  print "<=== Starting Test: $name\n";
 
   my $res;
   eval {$res = &$test(%parms)};
@@ -82,7 +82,7 @@ sub test ($$&) {
   if ($res) {
     $tally{passed}++;
     $dependencies{$name} = 1;
-    print ">--- \"$name\" succeeded\n";
+    print ">=== \"$name\" succeeded\n";
     return true;
   } elsif ($@) {
     $tally{failed}++;
@@ -101,9 +101,9 @@ sub test ($$&) {
 #
 #
 sub sys (@) {
-  print "<-- executing: ", join(' ', @_), "\n";
+  print "<- Executing: ", join(' ', @_), "\n";
   system @_;
-  print ">-- done\n";
+  print ">- Done\n";
   return $? >> 8 == 0;
 }
 
@@ -121,17 +121,17 @@ sub test_cmd ($$$;&) {
     } else {
       local $/ = undef;
       my $F = new IO::File;
-      print "<-- executing: $cmd\n";
+      print "<- Executing: $cmd\n";
       open $F, "$cmd |" or return false;
       local $_ = <$F>;
       close $F;
-      print ">-- done\n";
+      print ">- Done\n";
       return 0 unless ($? >> 8 == 0);
       open $F, ">$resultsdir/$name.out";
       print $F $_;
       close $F;
       my $res = &$output_test;
-      print "*** output of \"$cmd\" did not match expected output\n" unless $res;
+      print "*** Output of \"$cmd\" did not match expected output\n" unless $res;
       return $res;
     }
   };
