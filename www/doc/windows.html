@@ -382,20 +382,20 @@ buttons work, from FreeBSD, Linux, and Windows workstations:
        </ul>
 </ul>
 
-<div style="margin-left: 40px;"> <b>NOTE:</b> If your dot-files replace the
-execution search path entirely, you will not be able to execute Windows system
-commands in shells.  (It's come to our attention that when new Emulab user
-accounts are created, the default tcsh and Bash dotfiles are copied from a
-FreeBSD /usr/share/skel.  They do just what is warned against here: replace
-the whole $PATH rather than add to it, and of course they don't include the
-Windows directories.)  <p>
+<div style="margin-left: 40px;"> <b>NOTE:</b> If you import dot-files into
+Emulab that replace the system execution search path rather than add to it,
+you will have a problem running Windows system commands in shells.  Fix this
+by adding <b><code>/cygdrive/c/WINDOWS/system32</code></b> and
+<b><code>/cygdrive/c/WINDOWS</code></b> to your <code>$PATH</code> in
+<code>~/.cshrc</code> and either <code>~/.bash_profile</code> or
+<code>~/.profile</code>.  Don't worry about your home directory dot-files
+being shared among Windows, FreeBSD, and Linux nodes; non-existent directories
+in the <code>$PATH</code> are ignored by shells.  <p>
 
-In that case, you should add
-<b><code>/cygdrive/c/WINDOWS/system32</code></b> and 
-<b><code>/cygdrive/c/WINDOWS</code></b>
-to your <code>$PATH</code> in your dotfiles: <code>~/.cshrc</code> and <code>~/.profile</code> .  Don't worry about your home directory dot-files
-being shared among Windows, FreeBSD, and Linux nodes.  Non-existent
-directories are ignored by shells. </div>
+When new Emulab user accounts are created, the default CSH and Bash dotfiles
+are copied from the FreeBSD /usr/share/skel.  They replace the whole $PATH
+rather than add to it.  Then we append an Emulab-specific part that takes care
+of the path, conditionally adding the Windows directories on Cygwin.  </div>
 
 <div style="margin-left: 40px;"> <b>NOTE:</b> The Windows
 <b><code>ping</code></b> program has <emph>completely</emph> different option
@@ -410,7 +410,7 @@ You can load it yourself now using <a href="#Cygwin_packages"> Cygwin Setup </a>
 
 <div style="margin-left: 40px;"> <b>NOTE:</b> There are no Cygwin ports of
 some other useful networking commands, such as <b><code>traceroute</code></b>
-and <b><code>ifconfig -a</code></b>.  The Windows equivalents are
+and <b><code>ifconfig -a</code></b>.  The Windows system equivalents are
 <code>tracert</code> and <code>ipconfig /all</code>. </div>
 
 <h4><a name="RDP_details"> </a> RDP details </h4>
