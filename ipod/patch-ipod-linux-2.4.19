@@ -1,0 +1,138 @@
+diff -urN linux-2.4.19/include/linux/sysctl.h linux-2.4.19a/include/linux/sysctl.h
+--- linux-2.4.19/include/linux/sysctl.h	2002-08-02 18:39:46.000000000 -0600
++++ linux-2.4.19/include/linux/sysctl.h	2005-11-11 14:39:41.000000000 -0700
+@@ -291,7 +291,14 @@
+ 	NET_IPV4_NONLOCAL_BIND=88,
+ 	NET_IPV4_ICMP_RATELIMIT=89,
+ 	NET_IPV4_ICMP_RATEMASK=90,
+-	NET_TCP_TW_REUSE=91
++	NET_TCP_TW_REUSE=91,
++
++	/* CONFIG_ICMP_PINGOFDEATH */
++	NET_IPV4_ICMP_IPOD_ENABLED=92,
++	NET_IPV4_ICMP_IPOD_HOST=93,
++	NET_IPV4_ICMP_IPOD_MASK=94,
++	NET_IPV4_ICMP_IPOD_KEY=95,
++	NET_IPV4_ICMP_IPOD_VERSION=96
+ };
+ 
+ enum {
+diff -urN linux-2.4.19/net/ipv4/Config.in linux-2.4.19a/net/ipv4/Config.in
+--- linux-2.4.19/net/ipv4/Config.in	2001-12-21 10:42:05.000000000 -0700
++++ linux-2.4.19/net/ipv4/Config.in	2005-11-11 14:41:45.000000000 -0700
+@@ -15,6 +15,8 @@
+    bool '    IP: use TOS value as routing key' CONFIG_IP_ROUTE_TOS
+    bool '    IP: verbose route monitoring' CONFIG_IP_ROUTE_VERBOSE
+    bool '    IP: large routing tables' CONFIG_IP_ROUTE_LARGE_TABLES
++   # Emulab Special
++   bool '    ICMP: ICMP Ping-of-Death (Emulab)' CONFIG_ICMP_PINGOFDEATH
+ fi
+ bool '  IP: kernel level autoconfiguration' CONFIG_IP_PNP
+ if [ "$CONFIG_IP_PNP" = "y" ]; then
+diff -urN linux-2.4.19/net/ipv4/icmp.c linux-2.4.19a/net/ipv4/icmp.c
+--- linux-2.4.19/net/ipv4/icmp.c	2002-08-02 18:39:46.000000000 -0600
++++ linux-2.4.19/net/ipv4/icmp.c	2005-11-11 16:24:24.000000000 -0700
+@@ -870,6 +870,67 @@
+ 	in_dev_put(in_dev);
+ }
+ 
++#ifdef CONFIG_ICMP_PINGOFDEATH
++#include <linux/reboot.h>
++
++int sysctl_ipod_version = 2;
++int sysctl_ipod_enabled = 0;
++u32 sysctl_ipod_host = 0xffffffff;
++u32 sysctl_ipod_mask = 0xffffffff;
++char sysctl_ipod_key[32+1] = { "SETMETOSOMETHINGTHIRTYTWOBYTES!!" };
++#define IPOD_CHECK_KEY \
++   (sysctl_ipod_key[0] != 0)
++#define IPOD_VALID_KEY(d) \
++   (strncmp(sysctl_ipod_key, (char *)(d), strlen(sysctl_ipod_key)) == 0)
++
++static void icmp_ping_of_death(struct sk_buff *skb)
++{
++   struct icmphdr *icmph = skb->h.icmph;
++   struct iphdr *iph = skb->nh.iph;
++   int doit = 0;
++
++#if 0
++   printk(KERN_INFO "IPOD: got type=6, code=%d, host=%u.%u.%u.%u\n", icmph->code, ntohs(iph->tot_len), NIPQUAD(iph->saddr));
++#endif
++
++   /*
++    * If IPOD not enabled or wrong ICMP code, ignore.
++    */
++   if (!sysctl_ipod_enabled || icmph->code != 6)
++       return;
++
++   /*
++    * First check the source address info.
++    * If host not set, ignore.
++    */
++   if (sysctl_ipod_host != 0xffffffff &&
++       (ntohl(iph->saddr) & sysctl_ipod_mask) == sysctl_ipod_host) {
++       /*
++        * Now check the key if enabled.
++        * If packet doesn't contain enough data or key
++        * is otherwise invalid, ignore.
++        */
++       if (IPOD_CHECK_KEY) {
++           if (pskb_may_pull(skb, sizeof(sysctl_ipod_key)-1) &&
++               IPOD_VALID_KEY(skb->data))
++               doit = 1;
++       } else {
++           doit = 1;
++       }
++   }
++
++   if (doit) {
++       sysctl_ipod_enabled = 0;
++       printk(KERN_CRIT "IPOD: reboot forced by %u.%u.%u.%u...\n",
++              NIPQUAD(iph->saddr));
++       machine_restart(NULL);
++   } else {
++       printk(KERN_WARNING "IPOD: from %u.%u.%u.%u rejected\n",
++              NIPQUAD(iph->saddr));
++   }
++}
++#endif
++
+ static void icmp_discard(struct sk_buff *skb)
+ {
+ }
+diff -urN linux-2.4.19/net/ipv4/sysctl_net_ipv4.c linux-2.4.19a/net/ipv4/sysctl_net_ipv4.c
+--- linux-2.4.19/net/ipv4/sysctl_net_ipv4.c	2002-08-02 18:39:46.000000000 -0600
++++ linux-2.4.19/net/ipv4/sysctl_net_ipv4.c	2005-11-11 16:34:25.000000000 -0700
+@@ -22,6 +22,13 @@
+ extern int sysctl_icmp_echo_ignore_all;
+ extern int sysctl_icmp_echo_ignore_broadcasts;
+ extern int sysctl_icmp_ignore_bogus_error_responses;
++#ifdef CONFIG_ICMP_PINGOFDEATH
++extern int sysctl_ipod_version;
++extern int sysctl_ipod_enabled;
++extern u32 sysctl_ipod_host;
++extern u32 sysctl_ipod_mask;
++extern char sysctl_ipod_key[32+1];
++#endif
+ 
+ /* From ip_fragment.c */
+ extern int sysctl_ipfrag_low_thresh;
+@@ -176,6 +183,18 @@
+ 	{NET_IPV4_ICMP_IGNORE_BOGUS_ERROR_RESPONSES, "icmp_ignore_bogus_error_responses",
+ 	 &sysctl_icmp_ignore_bogus_error_responses, sizeof(int), 0644, NULL,
+ 	 &proc_dointvec},
++#ifdef CONFIG_ICMP_PINGOFDEATH
++	{NET_IPV4_ICMP_POD_ENABLED, "icmp_ipod_version",
++	 &sysctl_ipod_version, sizeof(int), 0444, NULL, &proc_dointvec},
++	{NET_IPV4_ICMP_POD_ENABLED, "icmp_ipod_enabled",
++	 &sysctl_ipod_enabled, sizeof(int), 0644, NULL, &proc_dointvec},
++	{NET_IPV4_ICMP_POD_HOST, "icmp_ipod_host",
++	 &sysctl_ipod_host, sizeof(int), 0644, NULL, &proc_dointvec},
++	{NET_IPV4_ICMP_POD_MASK, "icmp_ipod_mask",
++	 &sysctl_ipod_mask, sizeof(int), 0644, NULL, &proc_dointvec},
++	{NET_IPV4_ICMP_POD_KEY, "icmp_ipod_key",
++	 sysctl_ipod_key, sizeof(sysctl_ipod_key), 0600, NULL, &proc_dostring, &sysctl_string},
++#endif	
+ 	{NET_IPV4_ROUTE, "route", NULL, 0, 0555, ipv4_route_table},
+ #ifdef CONFIG_IP_MULTICAST
+ 	{NET_IPV4_IGMP_MAX_MEMBERSHIPS, "igmp_max_memberships",
