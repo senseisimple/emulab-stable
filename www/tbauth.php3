@@ -14,6 +14,7 @@ $CHECKLOGIN_STATUS		= -1;
 $CHECKLOGIN_UID			= 0;
 $CHECKLOGIN_NOLOGINS		= -1;
 $CHECKLOGIN_WIKINAME            = "";
+$CHECKLOGIN_IDLETIME            = 0;
 
 #
 # New Mapping. 
@@ -229,6 +230,7 @@ function CHECKLOGIN($uid) {
 	$CHECKLOGIN_STATUS = CHECKLOGIN_TIMEDOUT;
 	return $CHECKLOGIN_STATUS;
     }
+    $CHECKLOGIN_IDLETIME = time() - ($timeout - $TBAUTHTIMEOUT);
 
     #
     # We know the login has not expired. The problem is that we might not
@@ -256,16 +258,8 @@ function CHECKLOGIN($uid) {
 	}
 	else {
             #
-	    # User is logged in. Update the time in the database.
-	    # Basically, each time the user does something, we bump the
-	    # logout further into the future. This avoids timing them
-	    # out just when they are doing useful work.
-            #
-	    $timeout = time() + $TBAUTHTIMEOUT;
-
-	    DBQueryFatal("UPDATE login set timeout='$timeout' ".
-			 "WHERE uid='$uid'");
-
+	    # User is logged in.
+	    #
 	    $CHECKLOGIN_STATUS = CHECKLOGIN_LOGGEDIN;
 	}
     }
@@ -348,6 +342,7 @@ function CHECKLOGIN($uid) {
 #
 function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
     global $TBBASE, $BASEPATH, $HTTP_COOKIE_VARS, $TBNAMECOOKIE;
+    global $TBAUTHTIMEOUT;
 
     # If our login is not valid, then the uid is already set to "",
     # so refresh it to the cookie value. Then we can pass the right
@@ -383,6 +378,15 @@ function LOGGEDINORDIE($uid, $modifier = 0, $login_url = NULL) {
 		  "browser or another machine? $link", 1);
         break;
     case CHECKLOGIN_LOGGEDIN:
+        #
+	# Update the time in the database.
+        # Basically, each time the user does something, we bump the
+	# logout further into the future. This avoids timing them
+	# out just when they are doing useful work.
+        #
+	$timeout = time() + $TBAUTHTIMEOUT;
+
+	DBQueryFatal("UPDATE login set timeout='$timeout' where uid='$uid'");
 	break;
     default:
 	TBERROR("LOGGEDINORDIE failed mysteriously", 1);

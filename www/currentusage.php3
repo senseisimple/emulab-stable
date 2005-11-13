@@ -11,9 +11,6 @@ require("defs.php3");
 # 
 $uid = GETLOGIN();
 
-# Force the page to reload periodically.
-$autorefresh = 90;
-
 #
 # For anonymous users, show experiment stats.
 #
@@ -167,9 +164,15 @@ function SHOWFREENODES()
 }
      
 #
-# If user is anonymous, show experiment stats.
+# If user is anonymous, show experiment stats, otherwise useful info.
 # 
-if (CHECKLOGIN($uid) & CHECKLOGIN_LOGGEDIN) {
+if ($uid) {
+    #
+    # Auto refresh, but only for an hour of idle time.
+    #
+    if ($CHECKLOGIN_IDLETIME < (60 * 60)) {
+	$autorefresh = 90;
+    }
     SHOWFREENODES();
 }
 else {
