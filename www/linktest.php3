@@ -62,9 +62,6 @@ function CHECKPAGEARGS() {
 	if (! TBValidExperiment($pid, $eid)) {
 	    USERERROR("$pid/$eid is not a valid experiment!", 1);
 	}
-	if (TBExptState($pid, $eid) != $TB_EXPTSTATE_ACTIVE) {
-	    USERERROR("$pid/$eid is not currently swapped in!", 1);
-	}
 	if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
 	    USERERROR("You do not have permission to run linktest on ".
 		      "$pid/$eid!", 1);
@@ -98,13 +95,16 @@ function GRABDBDATA() {
 # 
 function stop_linktest() {
     global $linktest_pid;
-    global $uid, $pid, $gid, $eid, $suexec_output;
+    global $uid, $pid, $gid, $eid, $suexec_output, $session_interactive;
 
     # Must do this!
     CHECKPAGEARGS();
     GRABDBDATA();
 
     if (! $linktest_pid) {
+	if ($session_interactive) {
+	    USERERROR("$pid/$eid is not running linktest!", 1);
+	}
 	return "stopped:Linktest is not running on experiment $pid/$eid!";
     }
     # For backend script call.
