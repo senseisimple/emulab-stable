@@ -61,8 +61,12 @@ if (background()) {
     #
     exit 0;
 }
+
+#
 # Delay to allow the boot to complete. 
-sleep(30);
+# We are fired off last thing, so the boot should be pretty much done.
+#
+sleep(5);
 
 #
 # Open up the command file, which tells us what to do.
