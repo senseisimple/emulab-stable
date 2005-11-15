@@ -34,6 +34,7 @@ if ($EUID != 0) {
 
 # Script specific goo.
 my $PCAPPER    = "/usr/local/etc/emulab/pcapper";
+my $GKRELLMD   = "/usr/local/etc/emulab/gkrellmd";
 my @childpids  = ();
 
 #
@@ -77,6 +78,7 @@ if (@ARGV) {
 # After libsetup include; tcpdumps run outside vnodes.
 my $PIDFILE  = (defined($vnodeid) ? CONFDIR() : "/var/run") . "/trace.pid";
 my $LOGFILE  = (defined($vnodeid) ? CONFDIR() : $LOGDIR)    . "/trace.debug";
+my $GKPIDFILE = "/var/run/gkrellmd.pid";
 
 # Execute the action.
 SWITCH: for ($action) {
@@ -176,7 +178,13 @@ sub doboot()
     # 
     system("echo '$PID' > $PIDFILE") == 0
 	or fatal("Could not create $PIDFILE!");
-    
+
+    open(GK, "> /etc/gkrellmd.conf");
+    print GK "detach\n";
+    print GK "pidfile $GKPIDFILE\n";
+    print GK "user daemon\n";
+    print GK "group daemon\n";
+
     $SIG{TERM} = \&Pcleanup;
     $SIG{INT}  = \&Pcleanup;
     $SIG{HUP}  = \&Pcleanup;
@@ -295,6 +303,10 @@ sub doboot()
 	    push(@cmd, $file);
 	    push(@args, $iface);
 	    push(@args, "$expr");
+
+	    if ($dir eq "recv") {
+		print GK "mapif ${iface}=${vnode}-${linkname}\n";
+	    }
 	}
 	my @cmdargs = (@cmd, @args);
 	print "Starting tcpdump: '@cmdargs'\n";
@@ -334,6 +346,12 @@ sub doboot()
 	}
     }
 
+    close(GK);
+
+    if (-x $GKRELLMD) {
+	system($GKRELLMD);
+    }
+
     #
     # Just wait. We will die via the signal handler above.
     #
@@ -356,6 +374,9 @@ sub doshutdown()
 	    print "Waiting for $PIDFILE to die ...\n";
 	    sleep(10);
 	}
+    }
+    if (-e $GKPIDFILE) {
+	system("kill `cat $GKPIDFILE`");
     }
 }
 
