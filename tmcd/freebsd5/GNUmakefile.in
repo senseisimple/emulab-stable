@@ -50,7 +50,7 @@ destdircheck:
 install client-install:	basefbsd-install etc-install \
 			sup-install script-install bin-install # jail-install
 
-mfs-install:	destdircheck basefbsd-install etc-install \
+mfs-install:	destdircheck basefbsdmfs-install etc-install \
 			script-install bin-install
 	cp $(SRCDIR)/mfs-rc.conf $(SYSETCDIR)/rc.conf
 	$(INSTALL) -m 444 $(SRCDIR)/rc.dhclient $(SYSETCDIR)/rc.conf.d/dhclient
@@ -99,7 +99,11 @@ dir-install:
 
 basefbsd-install: dir-install
 	(cd ../freebsd; $(MAKE) all install)
-	rm -f $(SYSETCDIR)/start_if.*
+	rm -f $(SYSETCDIR)/start_if.* $(BINDIR)/dhclient
+
+basefbsdmfs-install: dir-install
+	(cd ../freebsd; $(MAKE) mfs-install)
+	rm -f $(SYSETCDIR)/start_if.* $(BINDIR)/dhclient
 
 basefbsdcdboot-install: dir-install
 	(cd ../freebsd; $(MAKE) DESTDIR=$(DESTDIR) all cdboot-install)

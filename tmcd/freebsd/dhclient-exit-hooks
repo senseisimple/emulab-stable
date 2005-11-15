@@ -6,7 +6,7 @@
 #
 . /etc/emulab/paths.sh
 
-echo "${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
+echo "`date`: ${interface}: ${reason}" >>$LOGDIR/dhclient-exit.log 2>&1
 
 if [ x$reason != xREBOOT -a x$reason != xBOUND -a x$reason != xRENEW -a x$reason != xREBIND ]
 then
@@ -107,6 +107,6 @@ do
     fi >>$LOGDIR/dhclient.log 2>&1
 done
 
-echo "${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
+echo "`date`: ${interface}: ${reason}: done" >>$LOGDIR/dhclient-exit.log 2>&1
 
 exit 0
