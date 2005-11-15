@@ -63,3 +63,5 @@ INSERT INTO sitevariables VALUES ('general/version/major','1','','Source code ma
 INSERT INTO sitevariables VALUES ('general/mailman/password','','','Admin password for Emulab generated lists');
 INSERT INTO sitevariables VALUES ('general/linux_endnodeshaping','1','1','Use this sitevar to disable endnodeshaping on linux globally on your testbed');
 INSERT INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this experiment to view all running experiments on the experiment list page');
+INSERT INTO sitevariables VALUES ('swap/swapout_command',NULL,'','Command to run in admin MFS on each node of an experiment at swapout time. Runs as swapout user.');
+INSERT INTO sitevariables VALUES ('swap/swapout_command_failaction',NULL,'warn','What to do if swapout command fails (warn == continue, fail == fail swapout).');
