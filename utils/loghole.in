@@ -16,6 +16,7 @@ import time
 import getopt
 import socket
 import zipfile
+import tempfile
 import cStringIO
 import threading
 import xmlrpclib
@@ -56,15 +57,9 @@ LINK_DUMP_FMT = [ "trace_%s-%s.xmit", "trace_%s-%s.recv" ]
 
 CLEANFILE = ".cleanonsync"
 
-DOT_LOGHOLES = """+ /var/
-+ /var/emulab/
-+ /var/emulab/logs/
-+ /var/emulab/logs/**
-+ /local/
-+ /local/logs/
-+ /local/logs/**
-- *
-"""
+DOT_LOGHOLES = ""
+
+DEFAULT_LOGHOLES = ["/var/emulab/logs", "/local/logs"]
 
 PID = None
 EID = None
@@ -103,6 +98,25 @@ if len(XMLRPC_SERVER) == 0:
 if len(RSYNC) == 0:
     sys.stderr.write("internal error: RSYNC is empty\n")
     sys.exit(2)
+    pass
+
+def loghole_include(path):
+    retval = ""
+
+    prefix = "/"
+    for comp in path.split("/"):
+        if comp != "":
+            prefix = prefix + comp + "/"
+            retval = retval + "+ " + prefix + "\n"
+            pass
+        pass
+
+    retval = retval + "+ " + prefix + "**\n"
+    
+    return retval
+
+for path in DEFAULT_LOGHOLES:
+    DOT_LOGHOLES += loghole_include(path)
     pass
 
 ##
@@ -217,12 +231,22 @@ def usage():
 # Print the usage statement for the "sync" action.
 #
 def sync_usage():
-    print "Usage: loghole sync [node1 ...]"
+    print "Usage: loghole sync [-n] [-r remotedir] [-l localdir] [node1 ...]"
     print
-    print "Synchronize the experiment's log holes with the experiment's log"
-    print "directory."
+    print "Synchronize the experiment's log holes with a local directory."
     print
     print "Optional arguments:"
+    print "  -r, --remote=REMOTEDIR"
+    print "               An additional remote directory to sync.  This option"
+    print "               is additive, so you can download several additional"
+    print "               directories."
+    print "  -l, --local=LOCALDIR"
+    print "               The local directory to store the downloaded files."
+    print "               This defaults to the experiment's log directory."
+    print "  -n, --no-standard"
+    print "               Flag that indicates that the standard logholes"
+    print "               (i.e. '/var/emulab/logs', '/local/logs') should not"
+    print "               be downloaded."
     print "  node1 ...    The names of the virtual or physical nodes that "
     print "               should be synced.  The default behavior is to sync "
     print "               all of the nodes in an experiment."
@@ -839,7 +863,7 @@ def do_show(args):
 # @param *args The list of directories to sync.
 # @retval The exit status of the rsync command-line.
 #
-def rsync(host, base, *args):
+def rsync(host, base, dlpath, *args):
     global RSYNC, HOME, DEBUG
     
     retval = 0
@@ -853,7 +877,7 @@ def rsync(host, base, *args):
         cmd = [RSYNC,
                "-rptgoDlz",
                "--copy-unsafe-links",
-               "--include-from=" + os.path.join(base, os.pardir, ".logholes")]
+               "--include-from=" + dlpath]
         if VERBOSITY > VERBOSITY_HUMAN:
             cmd.append("-v")
             pass
@@ -920,26 +944,64 @@ def rmstar(host, *args):
 #
 def do_sync(args, mode="sync", must_be_active=1):
     from emulabclient import RESPONSE_SUCCESS
-    global OSIDS, SERVER
+    global OSIDS, SERVER, DOT_LOGHOLES
     
     retval = 0
 
+    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
+
+    standard_logholes = True
+    extra_logholes = []
+
+    try:
+        opts, node_list = getopt.getopt(args, "nl:r:", [
+            "no-standard", "local=", "remote=",
+            ])
+        for opt, val in opts:
+            if opt in ("-n", "--no-standard"):
+                standard_logholes = False
+                pass
+            elif opt in ("-l", "--local"):
+                logdir = os.path.abspath(val)
+                if not os.path.isdir(logdir):
+                    raise getopt.error(
+                        'error: local directory does not exist - '
+                        + logdir)
+                pass
+            elif opt in ("-r", "--remote"):
+                extra_logholes.append(val)
+                pass
+            pass
+        pass
+    except getopt.error, e:
+        print e.args[0]
+        sync_usage()
+        return 2
+
+    if not standard_logholes:
+        DOT_LOGHOLES = ""
+        pass
+    
+    for path in extra_logholes:
+        DOT_LOGHOLES += loghole_include(path)
+        pass
+
+    DOT_LOGHOLES += "- *\n"
+    
     init_server()
     
     state_method = getattr(SERVER, "experiment.state")
     
-    logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
     os.chdir(logdir)
-
-    if os.path.exists(CLEANFILE):
+    
+    if standard_logholes and os.path.exists(CLEANFILE):
         do_clean(["-f", "-e"])
         os.unlink(CLEANFILE)
         pass
 
-    fp = open(os.path.join(logdir, ".logholes"), "w")
-    os.chmod(fp.name, 0664)
-    fp.write(DOT_LOGHOLES)
-    fp.close()
+    dlhandle = tempfile.NamedTemporaryFile(prefix=".logholes")
+    dlhandle.write(DOT_LOGHOLES)
+    dlhandle.flush()
 
     state = state_method(PACKAGE_VERSION, { "proj" : PID, "exp" : EID })
     if state["code"] != RESPONSE_SUCCESS:
@@ -990,17 +1052,17 @@ def do_sync(args, mode="sync", must_be_active=1):
 
             phosts = sets.Set([x[0] for x in hosts])
             vhosts = sets.Set([x[1] for x in hosts])
-            if len(args) == 0:
-                args = vhosts
+            if len(node_list) == 0:
+                node_list = vhosts
                 pass
 
-            known_nodes = sets.Set(args) & (phosts | vhosts)
-            unknown_nodes = known_nodes ^ sets.Set(args)
+            known_nodes = sets.Set(node_list) & (phosts | vhosts)
+            unknown_nodes = known_nodes ^ sets.Set(node_list)
 
             jobs = {}
             hoststatus = {}
             for phost, vhost in hosts:
-                if (vhost in args) or (phost in args):
+                if (vhost in node_list) or (phost in node_list):
                     osid = physical[vhost]["osid"]
                     if osid not in OSIDS:
                         oi = osinfo_method(PACKAGE_VERSION, {
@@ -1029,7 +1091,9 @@ def do_sync(args, mode="sync", must_be_active=1):
                         pass
 
                     if mode == "sync":
-                        pid = rsync(phost, os.path.join(logdir, vhost), "/")
+                        pid = rsync(phost, os.path.join(logdir, vhost),
+                                    dlhandle.name,
+                                    "/")
                         pass
                     elif mode == "clean":
                         pid = rmstar(phost, "/local/logs/*")
@@ -1110,7 +1174,7 @@ def do_sync(args, mode="sync", must_be_active=1):
             
             pass
         pass
-
+    
     return retval
 
 ##

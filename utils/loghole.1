@@ -18,6 +18,9 @@ loghole \- Log management tool for experiments.
 .P
 .BI loghole
 .BI sync
+[\fB-n\fR]
+[\fB-r \fIremotedir\fR]
+[\fB-l \fIlocaldir\fR]
 [\fInode1 node2 ...\fR]
 .P
 .BI loghole
@@ -204,12 +207,24 @@ The
 action is used to synchronize the logholes on the nodes with the experiment's
 log directory on the Emulab users machine.  The action will iterate through
 each node in the experiment and perform an rsync(1) on the loghole directories
-for that node.  Currently, the only directories synced are "/var/emulab/logs"
+for that node.  Currently, the default set of directories that will be synced are "/var/emulab/logs"
 and "/local/logs".  In addition, if any of the network links in the experiment
 are being traced, the utility will create a directory for each link and setup
 symbolic links to the pcap(3) files retrieved from the delay nodes.
 .P
 Optional arguments:
+.TP
+\fB-r\fR, \fB--remote\fR=\fIremotedir
+An additional remote directory to sync.  This option is additive, so you can
+download several additional directories.
+.TP
+\fB-l\fR, \fB--local\fR=\fIlocaldir
+The local directory to store the downloaded files.  This defaults to the
+experiment's log directory.
+.TP
+\fB-n\fR, \fB--no-standard
+Flag that indicates that the standard logholes (i.e. "/var/emulab/logs",
+"/local/logs") should not be downloaded.
 .TP
 .I node1 ...
 Specify a subset of virtual or physical nodes that should be synchronized,
