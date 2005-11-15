@@ -1,12 +1,13 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 #
-# This file goes in /usr/site/sbin on the CDROM.
+# This file goes in /usr/local/etc/emulab on a Frisbee demo CD
+# This is the FreeBSD 5 version.
 #
 use English;
 use Getopt::Std;
@@ -14,22 +15,18 @@ use Fcntl;
 use IO::Handle;
 
 #
-# Disk related parameters
+# Set this to 1 if you don't want the warning, and just want to default
+# all the values (will use DHCP).
 #
+my $justdoit = 0;
 
-# where to find kernel config output
-my $dmesgcmd = "/sbin/dmesg";
-my $dmesgfile = "/var/run/dmesg.boot";
+#
+# Default network option to using DHCP.
+# This is most useful with justdoit above.
+#
+my $dodhcp   = 1;
 
-# preferred ordering of disks to use
-my @preferred = ("ar", "aacd", "amrd", "mlxd", "twed", "ad", "da");
-
-# ordered list of disks found and hash of sizes
-my @disklist;
-my %disksize;
-
-# min disk size we can use (in MB)
-my $MINDISKSIZE = 8000;
+sub BootFromCD();
 
 #
 # Boot configuration for the CDROM. Determine the IP configuration, either
@@ -61,10 +58,8 @@ $ENV{'PATH'} = "/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:".
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 my $etcdir	= "/etc";
-my $rcconflocal	= "$etcdir/rc.conf.local";
 my $resolveconf = "$etcdir/resolv.conf";
 my $rootuser	= "root";
-my $dodhcp	= 1;
     
 #
 # This is our configuration.
@@ -107,8 +102,6 @@ sub handler () {
 $SIG{INT}  = \&handler;
 
 # Do it.
-sub BootFromCD();
-
 BootFromCD();
 exit(0);
 
@@ -177,7 +170,7 @@ sub GetNewConfig()
     print "\n";
     print "****************************************************************\n";
     print "*                                                              *\n";
-    print "* Frisbee Demonstration CD (version 0.1).                      *\n";
+    print "* Frisbee Demonstration CD (version 0.2).                      *\n";
     print "*                                                              *\n";
     print "* This CD will boot up the machine in a RAM/CD-based FreeBSD   *\n";
     print "* system that allows remote ssh access as root to save/restore *\n";
@@ -196,7 +189,7 @@ sub GetNewConfig()
     print "****************************************************************\n";
     print "\n";
 
-    if (Prompt("Continue with Frisbee Demonstration?", "No") =~ /no/i) {
+    if (Prompt("Continue with Frisbee Demonstration?", "Yes") =~ /no/i) {
 	exit(13);
     }
 
@@ -208,6 +201,10 @@ sub GetNewConfig()
 	system("stty -echo");
 	$rootpswd = Prompt("Root Password");
 	system("stty echo");
+	print "\n";
+
+	last
+	    if ($justdoit);
 
 	if (!defined($rootpswd)) {
 	    print "Entering a null root password is VERY dangerous.\n";
@@ -244,6 +241,12 @@ sub GetUserConfig()
     print "Please enter the system configuration by hand\n";
     
     $config{'interface'} = Prompt("Network Interface", WhichInterface());
+    while ($justdoit && !defined($config{'interface'})) {
+	print "Must have a network interface, talk to me!\n";
+	$justdoit = 0;
+	$config{'interface'} = Prompt("Network Interface", WhichInterface());
+	$justdoit = 1;
+    }
 
     #
     # Ask if they want to use DHCP. If so, we skip all the other stuff.
@@ -283,7 +286,8 @@ sub WhichInterface()
     #
     foreach my $iface (@allifaces) {
 	if ($iface =~ /([a-zA-z]+)(\d+)/) {
-	    if ($1 eq "lo" || $1 eq "faith" || $1 eq "gif" || $1 eq "tun") {
+	    if ($1 eq "lo" || $1 eq "faith" || $1 eq "gif" ||
+		$1 eq "tun" || $1 eq "plip") {
 		next;
 	    }
 
@@ -297,6 +301,22 @@ sub WhichInterface()
     }
 
     return undef;
+}
+
+#
+# If user specified interface is not in ifconfig list, try loading a module
+# for it.
+#
+sub LoadInterface()
+{
+    my @allifaces = split(" ", `ifconfig -l`);
+    my $iface = $config{'interface'};
+
+    if (scalar(grep { $_ eq $iface } @allifaces) == 0) {
+	my $kmod = "/boot/kernel/if_$iface.ko";
+	system("kldload $kmod")
+	    if (-e "$kmod");
+    }
 }
 
 #
@@ -375,50 +395,67 @@ sub PrintConfig()
 
 #
 # Write an rc.conf style file which can be included by sh. This is based
-# on the info we get. We also write a resolve.conf
+# on the info we get. We also write a resolv.conf
+#
+# XXX gak!  It appears that setting the variables in rc.conf or rc.conf.local
+# is either too late or does not get propogated back to other scripts or gets
+# overwritten, so setting network_interfaces, etc. here has no effect.
+# So we do a couple of (gross) things:
+#	ifconfig_*	set in rc.conf.d/dhclient (if DHCP)
+#	ifconfig_*	set in rc.conf.d/network (if not DHCP)
+#	hostname	set in rc.conf.d/hostname (if not DHCP)
+#	defaultroute	set in rc.conf.d/routing (if not DHCP)
+# These files get sourced at the appropriate place and seem to work.
 #
 sub WriteRCFiles()
 {
-    my $path = "$rcconflocal";
+    my $iface = $config{'interface'};
 
-    if (! open(CONFIG, "> $path")) {
+    my $path = "/etc/rc.conf.d/" . ($dodhcp ? "dhclient" : "network");
+    print "Fixing $path\n";
+    if (!open(CONFIG, "> $path")) {
 	print("$path could not be opened for writing: $!\n");
 	return -1;
     }
-    print "Writing $path\n";
-    print CONFIG "#\n";
-    print CONFIG "# DO NOT EDIT! This file is autogenerated at reboot.\n";
-    print CONFIG "#\n";
 
-    print CONFIG "network_interfaces=\"".
-	         "\$network_interfaces $config{'interface'}\"\n";
-
-    #
-    # Its very simple if using DHCP!
-    #
     if ($dodhcp) {
-	print CONFIG "ifconfig_$config{interface}=\"DHCP\"\n";
+	print CONFIG "ifconfig_$iface=\"DHCP\"\n";
+    } else {
+	print CONFIG "ifconfig_$iface=\"".
+	    "inet $config{IP} netmask $config{netmask}\"\n";
 	close(CONFIG);
-	return 0;
+
+	# Write hostname
+	$path = "/etc/rc.conf.d/hostname";
+	print "Fixing $path\n";
+	if (!open(CONFIG, "> $path")) {
+	    print("$path could not be opened for writing: $!\n");
+	    return -1;
+	}
+	print CONFIG "hostname=\"$config{hostname}.$config{domain}\"\n";
+	close(CONFIG);
+
+	# and default route
+	$path = "/etc/rc.conf.d/routing";
+	print "Fixing $path\n";
+	if (!open(CONFIG, "> $path")) {
+	    print("$path could not be opened for writing: $!\n");
+	    return -1;
+	}
+	print CONFIG "defaultrouter=\"$config{gateway}\"\n";
+	close(CONFIG);
+
+	# and resolv.conf
+	$path = $resolveconf;
+	print "Fixing $path\n";
+	if (! open(CONFIG, "> $path")) {
+	    print("$path could not be opened for writing: $!\n");
+	    return -1;
+	}
+	print CONFIG "search $config{domain}\n";
+	print CONFIG "nameserver $config{nameserver}\n";
     }
-
-    print CONFIG "hostname=\"$config{hostname}.$config{domain}\"\n";
-    print CONFIG "ifconfig_$config{interface}=\"".
-	         "inet $config{IP} netmask $config{netmask}\"\n";
-    print CONFIG "defaultrouter=\"$config{gateway}\"\n";
-    print CONFIG "# EOF\n";
     close(CONFIG);
-
-    $path = $resolveconf;
-    print "Writing $path\n";
-    if (! open(CONFIG, "> $path")) {
-	print("$path could not be opened for writing: $!\n");
-	return -1;
-    }
-    print CONFIG "search $config{domain}\n";
-    print CONFIG "nameserver $config{nameserver}\n";
-    close(CONFIG);
-
     return 0;
 }
 
@@ -433,6 +470,9 @@ sub Prompt($$;$)
     if (!defined($timeout)) {
 	$timeout = 10000000;
     }
+
+    return $default
+	if ($justdoit);
 
     print "$prompt";
     if (defined($default)) {

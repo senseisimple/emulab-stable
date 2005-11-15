@@ -1,0 +1,65 @@
+# PROVIDE: cdroot
+# BEFORE: disks
+# KEYWORD: FreeBSD
+
+#
+# rc.cdroot
+# Inspired by FreeBSD 4.x rc.cdroot and FreesBIE cdboot for 5.x
+#
+
+hier=/usr/local/bin/hier
+if [ ! -x $hier ]; then
+	hier=/usr/site/bin/hier
+	if [ ! -x $hier ]; then
+		echo "no hier: dropping into /bin/sh"
+		/bin/sh
+	fi
+fi
+
+# chkerr:
+#
+# Routine to check for error
+#
+#	checks error code and drops into shell on failure.
+#	if shell exits, terminates script as well as /etc/rc.
+#
+chkerr() {
+	case $1 in
+	0)
+		;;
+	*)
+		echo "$2 failed: dropping into /bin/sh"
+		/bin/sh
+		# RESUME
+		;;
+	esac
+}
+
+mkmfs() {
+	FS=$1
+	FSSIZE=$2
+	DOFSCOPY=$3
+
+	echo "Generating ${FS} via md"
+	MDDEVICE=`/sbin/mdconfig -a -t malloc -s ${FSSIZE}m`
+	/sbin/newfs -i 1024 /dev/${MDDEVICE} > /dev/null
+	chkerr $? "${FS}: newfs"
+	if [ $DOFSCOPY -eq 1 ]; then
+		TMP=/tmp/mount_mfs_tmp
+		mkdir ${TMP}
+		/sbin/mount /dev/${MDDEVICE} ${TMP}
+		chkerr $? "${FS}: mount"
+		$hier cp $FS ${TMP}
+		chkerr $? "${FS}: hier save"
+		umount ${TMP}
+		rmdir ${TMP}
+	fi
+	/sbin/mount /dev/${MDDEVICE} ${FS}
+	chkerr $? "${FS}: mount"
+}
+
+mkmfs /tmp 4 0
+mkmfs /etc 4 1
+mkmfs /var 4 1
+
+exit 0

@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+# PROVIDE: frisbee
+# REQUIRE: mountcritlocal
+# BEFORE: netif hostname
+# KEYWORD: FreeBSD
+
+. /etc/rc.subr
+. /etc/network.subr
+
+name="emulab"
+start_cmd="emulab_start"
+stop_cmd=":"
+
+#
+# The script goes in /etc/rc.d on the CDROM.
+# 
+
+CONFSCRIPT=/usr/local/etc/emulab/waipconfig.pl
+
+#
+# This script runs the testbed IP configuration stuff. It will generate the
+# above named file, which we then suck in to define the IP config so that
+# network configuration will proceed properly. 
+#
+# We also define a routine to call at the end of /etc/rc to change the
+# boot header.
+#
+EmulabCheckIPConfig()
+{
+	if [ -x $CONFSCRIPT ]; then
+		$CONFSCRIPT
+
+		case $? in
+	        0)
+		        ;;
+		13)
+			echo 'Installation aborted'
+			echo 'Remove the CD and reboot'
+			halt
+			;;
+		12)
+			# Useful for debugging, and basically harmless.
+			# since a root password is required.
+			echo 'Installation aborted'
+			echo 'Continuing to boot from CD'
+			echo 'This will NOT harm your hard disk'
+			return 0
+			;;
+		*)
+			echo 'Error in testbed configuration program'
+			echo 'Reboot failed. HELP!'
+			exit 1
+			;;
+		esac
+	fi
+}
+
+emulab_start()
+{
+	echo "Doing Frisbee configuration"
+	#
+	# Woeful hack to deal with USB keyboard.  We cannot just
+	# REQUIRE devd as that introduces a circular dependency.
+	#
+	test -c /dev/kbd1 && kbdcontrol -k /dev/kbd1 < /dev/console
+	EmulabCheckIPConfig
+}
+
+load_rc_config $name
+run_rc_command "$1"
