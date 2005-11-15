@@ -159,7 +159,7 @@ sub ArchiveCreate(;$$)
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
     # Now enter an initial tag for the tree. Nothing actually gets tagged.
-    DBQueryWarn("insert into archive_tags set ".
+    DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$tag', archive_idx='$idx', revision='1.1', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
@@ -364,8 +364,8 @@ sub ArchiveSavePoint($;$$)
     # Ack! We need to set the default branch to match the head revision.
     # I think CVS is totally screwed up on this! 
     #
-    mysystem("rcs -b${rev} ".
-	     "`$CVSBIN $cvsopt -d $cvsdir -q log -R`");
+    #mysystem("rcs -b${rev} ".
+    #	     "`$CVSBIN $cvsopt -d $cvsdir -q log -R`");
 
     # Now do the import.
     if (! chdir("$checkin")) {
@@ -382,7 +382,7 @@ sub ArchiveSavePoint($;$$)
     #
     # And record the new tag. 
     # 
-    DBQueryWarn("insert into archive_tags set ".
+    DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$savetag', revision='${archive_revision}', ".
 		"  archive_idx='$archive_idx', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
@@ -476,7 +476,7 @@ sub ArchiveCommit($;$$$)
     my $query_result =
 	DBQueryWarn("select tag from archive_tags ".
 		    "where archive_idx='$archive_idx' ".
-		    "order by date_created desc limit 1");
+		    "order by idx desc limit 1");
     goto bad
 	if (!$query_result || !$query_result->numrows);
     
@@ -485,13 +485,12 @@ sub ArchiveCommit($;$$$)
 	print "ArchiveCommit: Archive is clean; no need to commit.\n";
 	goto okay;
     }
+    my ($seconds, $microseconds) = gettimeofday();
+    my $import_tag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
+    $import_tag    .= $microseconds;
 
     if (!defined($newtag)) {
-	my ($seconds, $microseconds) = gettimeofday();
-	
-	$newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-	$newtag .= $microseconds;
-	$newtag .= "_commit";
+	$newtag = $import_tag . "_commit";
     }
 
     # CVS tags cannot must start with a letter.
@@ -582,14 +581,20 @@ sub ArchiveCommit($;$$$)
     mysystem("rcs -b${next_revision}.1 ".
 	     "`$CVSBIN $cvsopt -d $cvsdir -q log -R`");
 
-    DBQueryWarn("insert into archive_tags set ".
+    DBQueryWarn("insert into archive_tags set idx=NULL, ".
+		"  tag='$import_tag', revision='${next_revision}', ".
+		"  archive_idx='$archive_idx', ".
+		"  date_created=UNIX_TIMESTAMP(now())")
+	or goto bad;
+
+    DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$newtag', revision='${next_revision}', ".
 		"  archive_idx='$archive_idx', ".
 		"  date_created=UNIX_TIMESTAMP(now())")
 	or goto bad;
 
     DBQueryWarn("update archive_views set ".
-		"  current_tag='$newtag', ".
+		"  current_tag='$import_tag', ".
 		"  previous_tag='$archive_tag' ".
 		"where archive_idx='$archive_idx' and view='$view'")
 	or goto bad;
