@@ -348,6 +348,7 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
 		      qq|sendmail_enable="YES"|,
 		      qq|nfs_server_enable="YES"|,
 		      qq|nfs_server_flags="-u -t -n 16"|,
+		      qq|mountd_flags="-r -p 900"|,
 		      (($ISFS && $WINSUPPORT) ? qq|smbd_enable="YES"| : ()),
 		      qq|syslogd_flags=""|);
 };
