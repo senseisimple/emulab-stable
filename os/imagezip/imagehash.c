@@ -1,13 +1,14 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 /*
- * Usage: imagedump <input file>
+ * Usage: imagehash
  *
- * Prints out information about an image.
+ * Compute the hash signature of an imagezip image or compare a signature
+ * to disk contents.
  */
 
 #include <stdio.h>
@@ -73,10 +74,15 @@ static int dovis = 0;
 static int doall = 1;
 static int detail = 0;
 static int create = 0;
+static int report = 0;
+static int regfile = 0;
 static int nothreads = 0;
 static int hashtype = HASH_TYPE_MD5;
+static int hashlen = 16;
+static long hashblksize = HASHBLK_SIZE;
 static unsigned long long ndatabytes;
 static unsigned long nchunks, nregions, nhregions;
+static char *fileid = NULL;
 
 static char chunkbuf[SUBBLOCKSIZE];
 
@@ -88,7 +94,10 @@ static void dumphash(char *name, struct hashinfo *hinfo);
 static int createhash(char *name, struct hashinfo **hinfop);
 static int hashimage(char *name, struct hashinfo **hinfop);
 static int hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop);
-static char *spewhash(unsigned char *h);
+static int hashfile(char *name, struct hashinfo **hinfop);
+static int hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
+			 struct hashinfo **hinfop);
+static char *spewhash(unsigned char *h, int hlen);
 
 static int imagecmp(char *ifile, char *dev);
 static int datacmp(uint32_t off, uint32_t size, unsigned char *idata);
@@ -112,8 +121,20 @@ main(int argc, char **argv)
 	extern char build_info[];
 	struct hashinfo *hashinfo = 0;
 
-	while ((ch = getopt(argc, argv, "cdvhnD:NV")) != -1)
+	while ((ch = getopt(argc, argv, "cb:dvhnrD:NVRF:")) != -1)
 		switch(ch) {
+		case 'b':
+			hashblksize = atol(optarg);
+			if (hashblksize < 512 || hashblksize > (32*1024*1024)) {
+				fprintf(stderr, "Invalid hash block size\n");
+				usage();
+			}
+			break;
+		case 'F':
+			fileid = strdup(optarg);
+			break;
+		case 'R':
+			report++;
 		case 'c':
 			create++;
 			break;
@@ -144,6 +165,9 @@ main(int argc, char **argv)
 			break;
 		case 'V':
 			dovis = 1;
+			break;
+		case 'r':
+			regfile = 1;
 			break;
 		case 'h':
 		case '?':
@@ -184,9 +208,15 @@ main(int argc, char **argv)
 	 * Create a hash file
 	 */
 	if (create) {
-		if (createhash(argv[0], &hashinfo))
-			exit(2);
-		dumphash(argv[0], hashinfo);
+		if (report) {
+			if (fileid == NULL)
+				fileid = argv[0];
+			hashimage(argv[0], &hashinfo);
+		} else {
+			if (createhash(argv[0], &hashinfo))
+				exit(2);
+			dumphash(argv[0], hashinfo);
+		}
 		exit(0);
 	}
 
@@ -208,10 +238,16 @@ usage(void)
 		"imagehash [-d] <image-filename> <device>\n"
 		"    check the signature file for the specified image\n"
 		"    against the specified disk device\n"
-		"imagehash -c [-d] <image-filename>\n"
+		"imagehash -c [-dr] [-b blksize] <image-filename>\n"
 		"    create a signature file for the specified image\n"
+		"imagehash -R [-dr] [-b blksize] <image-filename>\n"
+		"    output an ASCII report to stdout rather than creating a signature file\n"
 		"imagehash -v\n"
-		"    print version info and exit\n");
+		"    print version info and exit\n"
+		"\n"
+		"-b blksize    size of hash blocks (512 <= size <= 32M)\n"
+		"-d            print additional detail to STDOUT\n"
+		"-r            input file is a regular file, not an image\n");
 	exit(1);
 }	
 
@@ -299,6 +335,15 @@ readhashinfo(char *name, struct hashinfo **hinfop)
 	close(fd);
 	free(hname);
 	*hinfop = hinfo;
+	switch (hinfo->hashtype) {
+	case HASH_TYPE_MD5:
+	default:
+		hashlen = 16;
+		break;
+	case HASH_TYPE_SHA1:
+		hashlen = 20;
+		break;
+	}
 	return 0;
 }
 
@@ -308,6 +353,15 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 {
 	struct hashinfo *hinfo = *hinfop;
 	int nreg;
+
+	if (report) {
+		static int first = 1;
+		printf("%s\t%u\t%u\t%u\tU\t%s\n",
+		       spewhash(hash, hashlen), start, size, chunkno,
+		       first ? fileid : "-");
+		first = 0;
+		return;
+	}
 
 	if (hinfo == 0) {
 		nreg = 0;
@@ -341,20 +395,24 @@ dumphash(char *name, struct hashinfo *hinfo)
 			reg = &hinfo->regions[i];
 			printf("[%u-%u]: chunk %d, hash %s\n",
 			       reg->region.start,
-			       reg->region.start + reg->region.size - 1,
-			       reg->chunkno, spewhash(reg->hash));
+			       reg->region.start + reg->region.size-1,
+			       reg->chunkno, spewhash(reg->hash, hashlen));
 		}
 	}
 }
 
 static char *
-spewhash(unsigned char *h)
+spewhash(unsigned char *h, int hlen)
 {
-	static char hbuf[33];
-	uint32_t *foo = (uint32_t *)h;
+	static char hbuf[HASH_MAXSIZE*2+1];
+	static const char hex[] = "0123456789abcdef";
+	int i;
 
-	snprintf(hbuf, sizeof hbuf, "%08x%08x%08x%08x",
-		 foo[0], foo[1], foo[2], foo[3]);
+	for (i = 0; i < hlen; i++) {
+		hbuf[i*2] = hex[h[i] >> 4];
+		hbuf[i*2+1] = hex[h[i] & 0xf];
+	}
+	hbuf[i*2] = '\0';
 	return hbuf;
 }
 
@@ -424,7 +482,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 	uint32_t badhashes, badchunks, lastbadchunk;
 	uint64_t badhashdata;
 	struct hashregion *reg;
-	int hashlen, chunkno;
+	int chunkno;
 	unsigned char hash[HASH_MAXSIZE];
 	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
 				   unsigned char *);
@@ -478,8 +536,8 @@ checkhash(char *name, struct hashinfo *hinfo)
 		if (detail > 2) {
 			printf("[%u-%u]:\n", reg->region.start,
 			       reg->region.start + reg->region.size - 1);
-			printf("  sig  %s\n", spewhash(reg->hash));
-			printf("  disk %s\n", spewhash(hash));
+			printf("  sig  %s\n", spewhash(reg->hash, hashlen));
+			printf("  disk %s\n", spewhash(hash, hashlen));
 		}
 
 		if (memcmp(reg->hash, hash, hashlen) == 0) {
@@ -711,6 +769,10 @@ hashimage(char *name, struct hashinfo **hinfop)
 	int isstdin = !strcmp(name, "-");
 	int errors = 0;
 
+	/* XXX */
+	if (regfile)
+		return hashfile(name, hinfop);
+
 	if (isstdin)
 		ifd = fileno(stdin);
 	else {
@@ -819,20 +881,23 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	case HASH_TYPE_MD5:
 	default:
 		hashfunc = MD5;
+		hashlen = 16;
 		break;
 	case HASH_TYPE_SHA1:
 		hashfunc = SHA1;
+		hashlen = 20;
 		break;
 	case HASH_TYPE_RAW:
 		hashfunc = 0;
+		hashlen = 0;
 		break;
 	}
 
 	/*
 	 * Loop through all regions, decompressing and hashing data
-	 * in HASHBLK_SIZE or smaller blocks.
+	 * in hashblksize or smaller blocks.
 	 */
-	rbuf = alloc_readbuf(0, bytestosec(HASHBLK_SIZE), 0);
+	rbuf = alloc_readbuf(0, bytestosec(hashblksize), 0);
 	if (rbuf == NULL) {
 		fprintf(stderr, "no memory\n");
 		exit(1);
@@ -844,8 +909,8 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 		rsize = regp->size;
 		ndatabytes += sectobytes(rsize);
 		while (rsize > 0) {
-			if (rsize > bytestosec(HASHBLK_SIZE))
-				hsize = bytestosec(HASHBLK_SIZE);
+			if (rsize > bytestosec(hashblksize))
+				hsize = bytestosec(hashblksize);
 			else
 				hsize = rsize;
 
@@ -915,6 +980,149 @@ hashchunk(int chunkno, char *chunkbufp, struct hashinfo **hinfop)
 	return errors;
 }
 
+/*
+ * Hash a regular file.
+ * Here we have a problem that a random file won't necessarily be a multiple
+ * of the disk sector size, and the current hashinfo layout is oriented around
+ * sectors.  So the hack is this for regular files:
+ *
+ *  * chunkno is always 0 except for an optional partial sector at the end
+ *
+ *  * for a final partial sector, the size field will be 0 and chunkno will
+ *    contain the number of bytes covered by the hash.
+ */
+static int
+hashfile(char *name, struct hashinfo **hinfop)
+{
+	char *bp;
+	int ifd, cc, chunkno, count, chunksize;
+	int isstdin = !strcmp(name, "-");
+	int errors = 0;
+
+	if (isstdin)
+		ifd = fileno(stdin);
+	else {
+		ifd = open(name, O_RDONLY, 0666);
+		if (ifd < 0) {
+			perror(name);
+			return -1;
+		}
+	}
+
+	/*
+	 * For a regular file, there is nothing special about a
+	 * "chunk", it is just some multiple of the hash unit size
+	 * (and smaller than our chunk buffer) that we use to keep
+	 * reads large.
+	 */
+	chunksize = (sizeof(chunkbuf) / hashblksize) * hashblksize;
+	chunkno = 0;
+	while (1) {
+		bp = chunkbuf;
+
+		/*
+		 * Parse the file one chunk at a time.  We read the entire
+		 * chunk and hand it off.  Since we might be reading from
+		 * stdin, we have to make sure we get the entire amount.
+		 *
+		 */
+		count = chunksize;
+		while (count) {
+			if ((cc = read(ifd, bp, count)) <= 0) {
+				if (cc == 0) {
+					if (count != chunksize)
+						break;
+					goto done;
+				}
+				perror(name);
+				if (!isstdin)
+					close(ifd);
+				return -1;
+			}
+			count -= cc;
+			bp += cc;
+		}
+		errors += hashfilechunk(chunkno, chunkbuf, chunksize-count,
+					hinfop);
+	}
+ done:
+	if (!isstdin)
+		close(ifd);
+	nchunks = chunkno + 1;
+	return errors;
+}
+
+/*
+ * Calculate hashs for a file chunk.
+ */
+static int
+hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
+	      struct hashinfo **hinfop)
+{
+	int resid;
+	uint32_t cursect = 0, nbytes;
+	unsigned char hash[HASH_MAXSIZE];
+	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
+				   unsigned char *);
+	unsigned char *bufp = chunkbufp;
+	int errors = 0;
+
+	memset(hash, 0, sizeof hash);
+
+	/*
+	 * Deterimine the hash function
+	 */
+	switch (hashtype) {
+	case HASH_TYPE_MD5:
+	default:
+		hashfunc = MD5;
+		break;
+	case HASH_TYPE_SHA1:
+		hashfunc = SHA1;
+		break;
+	case HASH_TYPE_RAW:
+		hashfunc = 0;
+		break;
+	}
+
+	/*
+	 * Loop through the file chunk, hashing data
+	 * in hashblksize or smaller blocks.
+	 */
+	resid = chunksize - sectobytes(bytestosec(chunksize));
+	while (chunksize > 0) {
+		uint32_t rstart, rsize;
+
+		if (chunksize > hashblksize)
+			nbytes = hashblksize;
+		else if (chunksize >= sectobytes(1))
+			nbytes = sectobytes(bytestosec(chunksize));
+		else {
+			assert(resid > 0);
+			nbytes = chunksize;
+		}
+
+		rstart = cursect;
+		rsize = bytestosec(nbytes);
+
+		/*
+		 * NULL hashfunc indicates we are doing raw
+		 * comparison.  Otherwise, we compute the hash.
+		 */
+		if (hashfunc == 0) {
+			errors += datacmp(rstart, rsize, bufp);
+		} else {
+			(void)(*hashfunc)(bufp, nbytes, hash);
+			addhash(hinfop, nbytes >= sectobytes(1) ? 0 : resid,
+				rstart, rsize, hash);
+		}
+		bufp += nbytes;
+		cursect += bytestosec(nbytes);
+		chunksize -= nbytes;
+	}
+	return errors;
+}
+
 static int devfd = -1;
 static char *devfile;
 static volatile unsigned long curreadbufmem, curreadbufs;
@@ -962,7 +1170,7 @@ alloc_readbuf(uint32_t start, uint32_t size, int dowait)
 
 	pthread_mutex_lock(&readbuf_mutex);
 	bufsize = sectobytes(size);
-	if (size > HASHBLK_SIZE) {
+	if (size > hashblksize) {
 		fprintf(stderr, "%s: hash region too big (%d bytes)\n",
 			devfile, size);
 		exit(1);
