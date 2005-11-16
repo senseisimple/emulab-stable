@@ -478,7 +478,7 @@ proc new {class args} {
 # <unit> is any of b, bps, kb, kbps, Mb, Mbps, Gb, or Gbps.  If no
 # unit is given then bytes (b) is assumed.  It returns the bandwidth
 # in Kbps.
-proc parse_bw {bspec} {
+proc parse_bw {bspec {islink 1}} {
     # Default to bytes
     if {[scan $bspec "%f%s" bw unit] == 1} {
 	set unit b
@@ -506,7 +506,7 @@ proc parse_bw {bspec} {
 	}
     }
 
-    if {$val < 10} {
+    if {$val < 10 && $islink} {
 	perror "Bandwidth of $val Kbs is too low."
 	return 0
     }

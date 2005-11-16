@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -410,7 +410,7 @@ Application/Traffic/CBR instproc get_params {} {
     $self instvar iptos_
 
     if {$rate_ != {} && $rate_ != 0} {
-	set rate [parse_bw $rate_]
+	set rate [parse_bw $rate_ 0]
     } else {
 	set rate -1
     }

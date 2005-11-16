@@ -646,6 +646,17 @@ Simulator instproc attach-agent {node agent} {
     $node attach-agent $agent
 }
 
+Simulator instproc agentinit {agent} {
+    $self instvar event_list
+    $self instvar event_count
+
+    if {[$agent info class Application/Traffic/CBR]} {
+	set event_count [expr $event_count + 1]
+	lappend event_list [list \
+	    "0" [$agent get_node] $agent TRAFGEN MODIFY [$agent get_params] ""]
+    }
+}
+
 # connect <src> <dst>
 # Connects two agents together.
 Simulator instproc connect {src dst} {
@@ -680,16 +691,6 @@ Simulator instproc connect {src dst} {
     if {$error} {return}
     $src connect $dst
     $dst connect $src
-    if {[$src info class Application/Traffic/CBR]} {
-	set event_count [expr $event_count + 1]
-	lappend event_list [list \
-		"0" [$src get_node] $src TRAFGEN MODIFY [$src get_params] ""]
-    }
-    if {[$dst info class Application/Traffic/CBR]} {
-	set event_count [expr $event_count + 1]
-	lappend event_list [list \
-		"0" [$dst get_node] $dst TRAFGEN MODIFY [$dst get_params] ""]
-    }
 }
 
 # at <time> <event>
