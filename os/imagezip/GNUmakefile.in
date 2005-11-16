@@ -16,23 +16,45 @@ DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
 SYSTEM	:= $(shell uname -s)
+
+# FreeBSD specific goop
 ifeq ($(SYSTEM),FreeBSD)
 FBSDREL	:= $(shell uname -r | sed -e 's/\([^-][^-]*\)-.*/\1/')
+FBSDMAJ := $(basename $(FBSDREL))
+
+# FreeBSD 5 has GCC3 and LOCALE
+# XXX this should be done with configure
+ifeq ($(FBSDMAJ),5)
+export HAVE_GCC3 = 1
+export HAVE_LOCALE = 1
+endif
+
 # XXX 5.3 and linuxthreads don't see to get along
 ifeq ($(FBSDREL),5.3)
 WITH_LTHREADS	= 0
 else
 WITH_LTHREADS	= 1
 endif
+
+# XXX special checkpoint/shadow device support
+WITH_SHD	= 0
+
+endif
+
+# Linux specific goop
+ifeq ($(SYSTEM),Linux)
+
+# XXX this should be done with configure
+export LINUX = 1
+export HAVE_GCC3 = 1
+export HAVE_LOCALE = 1
+
 endif
 
 WITH_FFS	= 1
 WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
-
-# XXX special checkpoint/shadow device support
-WITH_SHD	= 0
 
 include $(OBJDIR)/Makeconf
 
@@ -104,6 +126,13 @@ FSLIBS		+= shd/libshd.a
 endif
 
 all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
+
+whoami:
+	@echo "SYSTEM is $(SYSTEM)"
+ifeq ($(SYSTEM),FreeBSD)
+	@echo "FBSDREL is $(FBSDREL)"
+	@echo "FBSDMAJ is $(FBSDMAJ)"
+endif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
