@@ -166,7 +166,7 @@ sub doboot()
     #
     # This is temporary until images are up to date.
     #
-    if (! $skipit) {
+    if (0 && ! $skipit) {
 	print "*** Installing current software first ... \n";
 	
 	mysystem("cd /users/stoller/testbed/obj-real/tmcd/common; ".
