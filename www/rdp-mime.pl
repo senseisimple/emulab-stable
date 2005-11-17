@@ -97,10 +97,21 @@ if (!defined($hostname)) {
 # But once an rdesktop is started up, its display resolution is fixed.  If you make it
 # smaller than the previous one, it will push your windows around to fit.
 #
-my $rd = 'cd ~fish/misc/rdesktop/rdesktop-1.3.1; ./rdesktop -K -g 1280x1024';
+my $rdir = "/usr/local/share/rdesktop";
+my $rdcmd = "rdesktop";
+if (! -d $rdir) {
+    $rdir = "~fish/misc/rdesktop/rdesktop-1.3.1";
+    my $rdcmd = "cd $rdir; ./rdesktop";
+}
+die("rdp-mime.pl: No rdesktop directory found.\n")
+    if (! -d $rdir);
+
+# Customize -g resolution and -a colordepth to taste.
+my $rdargs = "-K -g 1280x1024 -a 16";
+
 if (!defined($gateway)) {
-    exec "$rd $login $pswd $hostname &";
+    exec "$rdcmd $rdargs $login $pswd $hostname &";
 }
 else {
-    die("No proxying yet.\n");
+    die("rdp-mime.pl: No proxying yet.\n");
 }
