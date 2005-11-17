@@ -40,6 +40,7 @@
 #include "log.h"
 #include "popenf.h"
 #include "systemf.h"
+#include "be_user.h"
 #include "event.h"
 #include <elvin/elvin.h>
 #ifdef __CYGWIN__
@@ -556,48 +557,7 @@ main(int argc, char **argv)
 	/*
 	 * Flip to the user, but only if we are currently root.
 	 */
-	if (getuid() == 0) {
-
-#ifdef __CYGWIN__
-	/* 
-	 * Present the plain-text password from the tmcc accounts file
-	 * so remote Samba directory mounts like /proj can be accessed.
-	 */
-	FILE *pwd_file = fopen("/var/emulab/boot/tmcc/accounts", "r");
-	static char line[255], name[30], password[30];
-	int matched = 0;
-	while (pwd_file && fgets(line, 255, pwd_file)) {
-		if (sscanf(line, "ADDUSER LOGIN=%30s PSWD=%30s ",
-			   name, password) == 2 &&
-		   (matched = (strncmp(user, name, 30) == 0)))
-			break; /* Found it. */
-	}
-	fclose(pwd_file);
-	if (matched) {
-		info("cygwin_logon_user: name %s, password '%s'...",
-		     pw->pw_name, password);
-		HANDLE hToken = cygwin_logon_user(pw, password);
-		if (hToken != INVALID_HANDLE_VALUE) {
-			info(" suceeded\n");
-			/* This sets context for setuid() below. */
-			cygwin_set_impersonation_token(hToken);
-		}
-		else
-			info(" failed\n");
-	}
-	else
-		info("AGENT: user %s, %s", pw->pw_name, "password not found\n");
-#endif /* __CYGWIN__ */
-
-		/*
-		 * Initialize the group list, and then flip to uid.
-		 */
-		if (setgid(pw->pw_gid) ||
-		    initgroups(user, pw->pw_gid) ||
-		    setuid(pw->pw_uid)) {
-			fatal("Could not become user: %s", user);
-		}
-	}
+	be_user(user);
 
 	if (access(LOGDIR, W_OK) < 0) {
 		fatal("Cannot write to log directory: %s", LOGDIR);

@@ -54,7 +54,7 @@ ifeq ($(SYSTEM),Linux)
 LIBS     	+= -ldl
 endif
 
-LIBTB_OBJS	= $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o
+LIBTB_OBJS	= $(LIBTBDIR)/log.o $(LIBTBDIR)/tbdefs.o $(LIBTBDIR)/be_user.o
 DAEMON_OBJS	= linktest.o version.o
 LTEVENT_OBJS	= ltevent.o
 

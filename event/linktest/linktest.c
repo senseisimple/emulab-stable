@@ -18,6 +18,7 @@
 #include <time.h>
 #include "tbdefs.h"
 #include "log.h"
+#include "be_user.h"
 #include "event.h"
 
 #define TRUE    1
@@ -361,6 +362,13 @@ exec_linktest(char *args, int buflen) {
 		 && (i<MAX_ARGS));
 	argv[i] = NULL;
 	argv[0] = LINKTEST_SCRIPT;
+
+#ifdef __CYGWIN__
+	/*
+	 * Run as the swapper on Cygwin for access to the shared /proj dir.
+	 */
+	be_user(swapper);
+#endif /* __CYGWIN__ */
 
 	/*
 	 * Execute the script with the arguments from the event
