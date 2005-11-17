@@ -25,21 +25,29 @@
 #define BLOCKSIZE	1024
 
 /*
- * Make sure we can represent a bitmap of blocks in a single packet.
  * Make sure we can fit a block in a single ethernet MTU.
+ * This limits the maximum block size to 1448 with the current protocol
+ * headers on Ethernet.
  */
-#if (CHUNKSIZE%CHAR_BIT) != 0 || (CHUNKSIZE/CHAR_BIT) > MAXBLOCKSIZE
-#error "Invalid chunk size"
-#endif
 #if BLOCKSIZE > MAXBLOCKSIZE
 #error "Invalid block size"
 #endif
 
 /*
+ * Make sure we can represent a bitmap of blocks in a single packet.
+ * This limits the maximum number of blocks in a chunk to 1448*8 == 11584.
+ * With the maximum block size of 1448, this limits a chunk to no more
+ * than 16,773,632 bytes (just under 16MB).
+ */
+#if (CHUNKSIZE%CHAR_BIT) != 0 || (CHUNKSIZE/CHAR_BIT) > MAXBLOCKSIZE
+#error "Invalid chunk size"
+#endif
+
+/*
  * Chunk buffers and output write buffers constitute most of the memory
  * used in the system.  These should be sized to fit in the physical memory
- * of the client, forcing pieces of frisbee to be paged out to disk (even
- * if there is a swap disk to use) is not a very efficient way to load disks.
+ * of the client (forcing pieces of frisbee to be paged out to disk, even
+ * if there is a swap disk to use, is not a very efficient way to load disks!)
  *
  * MAXCHUNKBUFS is the number of BLOCKSIZE*CHUNKSIZE chunk buffers used to
  * receive data from the network.  With the default values, these are 1MB
@@ -52,8 +60,8 @@
  * The ratio of the number of these two buffer types depends on the ratio
  * of network to disk speed and the degree of compression in the image.
  */
-#define MAXCHUNKBUFS	64	/* 64MB */
-#define MAXWRITEBUFMEM	64	/* 64MB */
+#define MAXCHUNKBUFS	64	/* 64MB with default chunk size */
+#define MAXWRITEBUFMEM	64	/* in MB */
 
 /*
  * Socket buffer size, used for both send and receive in client and
@@ -65,7 +73,7 @@
  * The number of read-ahead chunks that the client will request
  * at a time. No point in requesting too far ahead either, since they
  * are uncompressed/written at a fraction of the network transfer speed.
- * Also, with multiple clients at different stages, each requesting blocks
+ * Also, with multiple clients at different stages, each requesting blocks,
  * it is likely that there will be plenty more chunks ready or in progress.
  */
 #define MAXREADAHEAD	2
@@ -90,7 +98,7 @@
 
 /*
  * The number of disk read blocks in a single read on the server.
- * Must be an even divisor of CHUNKSIZE.
+ * Must be an integer divisor of CHUNKSIZE.
  */
 #define SERVER_READ_SIZE	32
 
