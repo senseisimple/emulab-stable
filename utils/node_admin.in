@@ -14,15 +14,18 @@ sub usage()
 {
     print STDOUT "Usage: node_admin [-h] [-n | -w] <on | off> [node ....]\n";
     print STDOUT "       node_admin [-h] [-n | -w] -e pid,eid <on | off>\n";
-    print STDOUT "-h   This message\n";
-    print STDOUT "-n   Do not reboot node\n";
-    print STDOUT "-w   Wait for node to come back up if rebooted\n";
-    print STDOUT "-e   Operate on all nodes in an experiment\n";
+    print STDOUT "-h     This message\n";
+    print STDOUT "-n     Do not reboot node\n";
+    print STDOUT "-w     Wait for node to come back up if rebooted\n";
+    print STDOUT "-e     Operate on all nodes in an experiment\n";
+    print STDOUT "-c cmd Run command in MFS and wait for completion\n".
+		 "       (-n and -w apply after the command is run).\n";
     exit(-1);
 }
-my $optlist  = "hnwe:";
+my $optlist  = "hnwe:c:";
 my $waitmode = 0;
 my $reboot   = 1;
+my $runcmd   = "";
 
 #
 # Configure variables
@@ -35,7 +38,7 @@ my $TB		= "@prefix@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
-use StateWait;
+use libadminmfs;
 
 #
 # Turn off line buffering on output
@@ -73,11 +76,17 @@ if (defined($options{"w"})) {
     $waitmode = 1;
 }
 
-if (!@ARGV) {
-    usage();
-}
+my $onoff;
 
-my $onoff  = shift(@ARGV);
+if (defined($options{"c"})) {
+    $runcmd = $options{"c"};
+    $onoff = "on";
+} else {
+    if (!@ARGV) {
+	usage();
+    }
+    $onoff  = shift(@ARGV);
+}
 
 if ($onoff ne "on" && $onoff ne "off") {
     usage();
@@ -160,87 +169,63 @@ else {
     }
 }
 
-# Switcheroo the osids on the nodes.
-if ($onoff eq "on") {
-    my %adminosid = ();
-    for my $node (@nodes) {
-	my $osid = TBNodeAdminOSID($node);
-	push @{$adminosid{$osid}}, $node;
-    }
-    for my $osid (keys %adminosid) {
-	my @n = @{$adminosid{$osid}};
-	system("$osselect -t $osid @n") and
+my @bad;
+my %args;
+
+if ($runcmd ne "") {
+    #
+    # Reboot into admin more and run the command
+    #
+    %args = ();
+    $args{'name'} = $0;
+    $args{'command'} = $runcmd;
+    if (TBAdminMfsRunCmd(\%args, undef, @nodes)) {
 	die("*** $0:\n".
-	    "    Failed to set temp boot to $osid for some of: @n\n");
+	    "    Failed to run '$runcmd' on some of @nodes!\n");
     }
-}
-else {
-    system("$osselect -c -t @nodes") and
+
+    #
+    # Turn admin mode back off and optionally reboot back to the old OS
+    #
+    %args = ();
+    $args{'name'} = $0;
+    $args{'on'} = 0;
+    $args{'clearall'} = 0;
+    if (TBAdminMfsSelect(\%args, \@bad, @nodes)) {
 	die("*** $0:\n".
-	    "    Failed to clear temp boot for some nodes!\n");
+	    "    Could not turn admin mode off for @bad!\n");
+    }
+
+    if ($reboot) {
+	%args = ();
+	$args{'name'} = $0;
+	$args{'on'} = 0;
+	$args{'reboot'} = $reboot;
+	$args{'wait'} = $waitmode;
+	if (TBAdminMfsBoot(\%args, \@bad, @nodes)) {
+	    die("*** $0:\n".
+		"    Did not properly reboot @bad after command!\n");
+	}
+    }
+    exit(0);
 }
 
-# Is this needed anymore? 
-DBQueryFatal("update nodes set startupcmd='', startstatus='none' ".
-	     "where " . join(" or ", map("node_id='$_'", @nodes)));
-
-#
-# Reboot nodes
-#
+$args{'name'} = $0;
+$args{'on'} = ($onoff eq "on");
+$args{'clearall'} = 0;
+if (TBAdminMfsSelect(\%args, \@bad, @nodes)) {
+    die("*** $0:\n".
+	"    Could not turn admin mode $onoff for @bad!\n");
+}
 if ($reboot) {
-    if ($waitmode) {
-	$StateWait::debug = 0;
-	
-	#
-	# Initialize the statewait library.
-	#
-	my @states   = ();
-	my @finished = ();
-	my @failed   = ();
-
-	#
-	# Only wait for MFSSETUP when going into the MFS. When coming out
-	# of MFS, just wait for generic ISUP.
-	# 
-	push(@states, TBDB_NODESTATE_MFSSETUP())
-	    if ($onoff eq "on");
-	push(@states, TBDB_NODESTATE_ISUP());
-    
-	if (initStateWait(\@states, @nodes)) {
-	    die("*** $0:\n".
-		"    Failed to initialize the statewait library!\n");
-	}
-    }
-
-    # Reboot nodes *after* setting up statewait above.
-    if (system("$nodereboot @nodes")) {
+    %args = ();
+    $args{'name'} = $0;
+    $args{'on'} = ($onoff eq "on");
+    $args{'reboot'} = $reboot;
+    $args{'wait'} = $waitmode;
+    if (TBAdminMfsBoot(\%args, \@bad, @nodes)) {
 	die("*** $0:\n".
-	    "    WARNING: Could not reboot some nodes!\n");
-    }
-
-    if ($waitmode) {
-	#
-	# Initialize the statewait library.
-	#
-	my @finished = ();
-	my @failed   = ();
-	my $timeout  = 6 * 60;
-
-	print STDOUT "node_admin: Waiting for nodes to come up.\n";
-	
-	# Now we can statewait.
-	if (waitForState(\@finished, \@failed, $timeout)) {
-	    die("*** $0:\n".
-		"    Failed in waitForState!\n");
-	}
-	endStateWait();
-	
-	if (@failed) {
-	    die("*** $0:\n".
-		"    Failed to boot MFS: @failed\n");
-	}
-	
+	    "    Did not properly reboot @bad!\n");
     }
 }
 exit(0);
-

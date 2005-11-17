@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -120,9 +120,7 @@ else {
 #
 # See if the experiment is firewalled. Error if not.
 #
-my $firewall;
-my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
-
+my $firewalled = TBExptFirewall($pid, $eid);
 if (!$firewalled) {
     die("*** $0:\n".
 	"    Experiment $pid/$eid is not firewalled!\n");
@@ -217,14 +215,13 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
     $expt_head_email = $TBOPS;
 }
 
-$query_result = 
-    DBQueryFatal("select card1 from wires ".
-		 "where node_id1='$firewall' AND type='Control'");
-
-if (!$query_result->numrows) {
+#
+# Get firewall node and port info
+#
+my ($firewall, $port);
+if (!TBExptFirewallAndPort($pid, $eid, \$firewall, \$port)) {
     fatal("Could not determine firewall port for $pid/$eid!");
 }
-my ($port) = $query_result->fetchrow_array();
 
 #
 # Call snmpit.

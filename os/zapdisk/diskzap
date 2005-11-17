@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Front-end script to run the bootblock zapper.
+#
+# This is run on nodes that were behind a firewall and presumed tainted.
+# It prevents them from ever booting from the disk by zeroing the MBR and
+# partition boot blocks.
+#
+
+args="-BvZ"	# the real deal
+#args="-Bv"	# fakin it
+
+if [ -r /etc/emulab/paths.sh ]; then
+    . /etc/emulab/paths.sh
+else
+    BINDIR=/etc/testbed
+fi
+
+if [ ! -x "$BINDIR/zapdisk" ]; then
+    echo "$BINDIR/zapdisk not found!"
+    exit -1
+fi
+
+#
+# XXX We really should not be using a heuristic to figure this out.
+#     We should get the info from Emulab central.
+#
+if [ $# -eq 0 ]; then
+    set -- `dmesg | egrep '(ad|da|ar|amrd)[0-9]: [0-9]+MB' | \
+		    sed -e 's/^\([a-z][^:]*\):.*/\1/'`
+fi
+status=0
+for disk in $*; do
+    echo -n "Zapping bootblocks for $disk..."
+    if [ -r "/dev/$disk" ]; then
+        $BINDIR/zapdisk $args /dev/$disk
+	if [ $? -ne 0 ]; then
+	    echo "FAILED!"
+	    status=`expr $status + 1`
+        else
+	    echo "OK"
+        fi
+    else
+	echo "SKIPPED!"
+    fi
+done
+exit $status

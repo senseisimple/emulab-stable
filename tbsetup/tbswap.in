@@ -32,6 +32,7 @@ sub usage()
 # Configure variables
 #
 my $TBROOT         = "@prefix@";
+my $TBOPS          = "@TBOPSEMAIL@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
@@ -47,6 +48,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libadminctrl;
+use libadminmfs;
 use libtblog;
 
 #require exitonwarn; # exitonwarn isn't really a module, so just require it
@@ -160,13 +162,11 @@ else {
 #
 # Set Error reporting info
 # 
-
 tblog_set_info($pid,$eid,$UID);
 
 #
+# Turn on timestamps
 #
-#
-
 TBDebugTimeStampsOn();
 
 #
@@ -465,99 +465,54 @@ sub doSwapout($) {
 	    TBDebugTimeStamp("vnode_setup finished");
 	}
 
-	if ($firewalled) {
-	    #
-	    # If the panic button was pressed, put all nodes into admin
-	    # mode and power them off. After the firewall is torn down,
-	    # we can power them back up.
-	    #
-	    my @nodes     = ExpNodes($pid, $eid, 1);
-	    my $ADMINOSID = TB_OSID_FREEBSD_MFS;
-	    my $paniced;
+	#
+	# Nodes behind a firewall are treated special.
+	# See undoFWNodes for details.
+	#
+	if ($firewalled && undoFWNodes($pid, $eid)) {
+	    return 1;
+	}
 
-	    TBExptGetPanicBit($pid, $eid, \$paniced);
+	#
+	# Perform swapout time admin actions.  Right now there is at most
+	# one of these.  It isn't really a general mechanism, just a hook
+	# for state saving or data collection during swapout.
+	# A couple of important "fer now" notes:
+	#
+	#	We don't do this for firewalled experiments.  We need a way
+	#	to "tag" the saved disk state to ensure it doesn't get
+	#	instantiated outside of a firewall.
+	#
+	#	We only do this on REAL swapouts, and not on CLEANUPs.
+	#	There are some types of CLEANUPs where we may want to
+	#	do this, in particular an invocation caused by a failed
+	#	modify operation, where the admin action is to save the
+	#	experiment state.  So we will need to revisit this.
+	#
+	my %soaction = ();
+	if ($type == REAL && !$firewalled) {
+	    TBExptGetSwapoutAction($pid, $eid, \%soaction);
+	}
+	if ($soaction{'command'}) {
+	    my @nodes = ExpNodes($pid, $eid, 1);
 
-	    if ($paniced) {
-		print STDERR "Powering down nodes.\n";
-		TBDebugTimeStamp("Powering down nodes");
-
-		system("power off @nodes");
-		if ($?) {
-		    #
-		    # If an error, cannot continue. Must leave firewall in
-		    # place. 
-		    #
-		    tberror "Failed to power nodes off! Stopping.";
+	    print STDERR "Performing swapout admin MFS actions.\n";
+	    TBDebugTimeStamp("Performing swapout actions");
+	    my @failed = ();
+	    my %myargs = ();
+	    $myargs{'name'} = "tbswap";
+	    $myargs{'command'} = $soaction{'command'};
+	    if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
+		if ($soaction{'isfatal'}) {
+		    tberror
+			"Failed to run '" . $soaction{'command'} .
+			    "' on @failed!";
 		    return 1;
 		}
-
-		#
-		# XXX: node_admin should take a list of nodes, or pid,eid.
-		#      Instead, call os_select directly for now. 
-		#
-		# Clear any one-shot boots and partition boots.
-		#
-		print STDERR "Changing OSID to admin MFS.\n";
-		TBDebugTimeStamp("Changing OSID to admin MFS");
-
-		# Order matters cause os_select sillyness.
-		if (system("os_select -c -1 @nodes") ||
-		    system("os_select -t $ADMINOSID @nodes") ||
-		    system("os_select -c @nodes")) {
-
-		    #
-		    # If an error, cannot continue. Must leave firewall in
-		    # place. 
-		    #
-		    tberror "Failed to reset OSIDs! Stopping.";
-		    return 1;
-		}
-
-		#
-		# Now we can power up the nodes again.
-		#
-		print STDERR "Powering up nodes.\n";
-		TBDebugTimeStamp("Powering up nodes");
-
-		system("power on @nodes");
-		if ($?) {
-		    #
-		    # If an error, cannot continue. Must leave firewall in
-		    # place. Eventually, we can continue past this, if we
-		    # know what nodes failed. But for now we have to do the
-		    # ISUP test to make sure nodes really got into the MFS.
-		    #
-		    tberror "Failed to power on nodes! Stopping.";
-		    return 1;
-		}
+		tbwarn
+		    "Failed to run '" . $soaction{'command'} .
+			"' on @failed!";
 	    }
-
-	    #
-	    # Once all nodes are safely in the admin MFS, we can take
-	    # down the firewall
-	    #
-	    doFW($pid, $eid, FWTEARDOWN, undef);
-
-	    if ($paniced) {
-		#
-		# Now wait for ISUP. I do this here cause the reload daemon
-		# will power cycle the nodes again if its reboot fails, and
-		# that will happen if the nodes are not back into the MFS in
-		# time. THe right thing to do is to store the power state in
-		# the DB, and have the reload daemon turn the nodes back on.
-		#
-		print STDERR "Waiting for nodes to boot the MFS.\n";
-		TBDebugTimeStamp("Waiting for nodes to boot the MFS");
-		
-		system("node_statewait -s " . TBDB_NODESTATE_ISUP . " @nodes");
-		if ($?) {
-		    #
-		    # Okay to continue; reload daemon will probably send
-		    # email later when the reload fails.
-		    #
-		    tberror "Some nodes failed to reboot. Continuing";
-		}
-	    }	    
 	}
 
 	#
@@ -873,13 +828,10 @@ sub doSwapin($) {
 		}
 
 		#
-		# XXX Nodes should actually be cleaned up, but we are not
-		# doing that in the swapout case either, unless the panic
-		# button was pressed, and in that case swapmod is not
-		# allowed anyway (just swapout).
+		# If the experiment is firewalled, cleanup the nodes
+		# we are releasing.
 		# 
-		if ($firewalled && doFW($pid, $eid,
-					FWDELNODES, \@deleted_pnodes)) {
+		if ($firewalled && undoFWNodes($pid, $eid, @deleted_pnodes)) {
 		    return 1;
 		}
 		
@@ -1317,7 +1269,8 @@ sub doFW($$$$) {
     # XXX hack commands til we nail down the API
     #
     my $fwsetupstr1 = "snmpit $cnetstack -m $fwvlanname $portlist";
-    my $fwsetupstr2 = "snmpit $cnetstack -T $fwport $cnetvlanname $fwvlanname";
+    my $fwsetupstr2 = "snmpit $cnetstack -N $fwvlanname";
+    my $fwsetupstr3 = "snmpit $cnetstack -T $fwport $cnetvlanname $fwvlanname";
     my $fwtakedownstr0 = "snmpit $cnetstack -e $fwport";
     my $fwtakedownstr1 = ($portlist eq "" ? "true" :
 			  "snmpit $cnetstack -m $cnetvlanname $portlist");
@@ -1325,39 +1278,28 @@ sub doFW($$$$) {
     my $fwtakedownstr3 = "snmpit $cnetstack -U $fwport";
     my $fwtakedownstr4 = "snmpit $cnetstack -m $cnetvlanname $fwport";
 
-    if (0) {
-    # XXX debug fer now
-    TBDebugTimeStamp("    setup1: $fwsetupstr1");
-    TBDebugTimeStamp("    setup2: $fwsetupstr2");
-    TBDebugTimeStamp(" teardown1: $fwtakedownstr1");
-    TBDebugTimeStamp(" teardown2: $fwtakedownstr2");
-    TBDebugTimeStamp(" teardown3: $fwtakedownstr3");
-    TBDebugTimeStamp(" teardown4: $fwtakedownstr4");
-    if ($action == FWSETUP) {
-	my $lan = 100 + $fwvid;
-	$fwsetupstr1    = "/bin/echo VLAN \#$lan on cisco2";
-	$fwsetupstr2    = "true";
-    } else {
-	$fwtakedownstr1 = "true";
-	$fwtakedownstr2 = "true";
-	$fwtakedownstr3 = "true";
-	$fwtakedownstr4 = "true";
-    }
-    }
-
     if ($action == FWSETUP) {
 	TBDebugTimeStamp("snmpit firewall setup: VLAN");
 	print "doFW: '$fwsetupstr1'\n";
-	my $snmpit_out = `$fwsetupstr1`;
-	if ($? != 0 || $snmpit_out !~ /VLAN #(\d+) on /) {
+	if (system($fwsetupstr1)) {
 	    tberror "Failed to setup Firewall control net VLAN.";
 	    return 1;
 	}
-	my $fwvlan = $1;
+	#
+	# XXX we don't need to rely on the format of the output of
+	# the snmpit 
+	#
+	my @snmpit_out = split(' ', `$fwsetupstr2`);
+	if ($? || @snmpit_out != 3 || $snmpit_out[2] !~ /^\d+$/) {
+	    tberror "Could not get VLAN number for firewall VLAN, ".
+		    "is your snmpit out of date?\n";
+	    return 1;
+	}
+	my $fwvlan = $snmpit_out[2];
 
 	TBDebugTimeStamp("snmpit firewall setup: trunk");
-	print "doFW: '$fwsetupstr2'\n";
-	if (system($fwsetupstr2)) {
+	print "doFW: '$fwsetupstr3'\n";
+	if (system($fwsetupstr3)) {
 	    tberror "Failed to setup Firewall trunk on port $fwport.";
 	    if (system($fwtakedownstr1)) {
 		tberror "Could not return $portlist to Control VLAN!";
@@ -1375,8 +1317,7 @@ sub doFW($$$$) {
     elsif ($action == FWADDNODES) {
 	TBDebugTimeStamp("snmpit firewall port addition");
 	print "doFW: '$fwsetupstr1'\n";
-	my $snmpit_out = `$fwsetupstr1`;
-	if ($?) {
+	if (system($fwsetupstr1)) {
 	    tberror "Failed to add nodes to Firewall control net VLAN.";
 	    return 1;
 	}
@@ -1429,5 +1370,197 @@ sub doFW($$$$) {
 	# Clean VLAN info from DB
 	TBClearExptFirewallVlan($pid, $eid);
     }
+    return 0;
+}
+
+#
+# Undo the firewall state for a set of nodes in the indicated experiment.
+# If no nodes are specified, we remove all nodes and tear down the firewall.
+#
+# This function takes care of ensuring that all such nodes have been
+# neutered prior to being released:
+#
+# Change the OSID of all nodes (firewall included) to reboot into
+# the admin MFS and then power cycle them.  We must power cycle to
+# ensure nodes don't spoof a simple reboot request and pretend to
+# come up in the MFS.  The power "cycle" is actually an "off"
+# followed by an "on", since true power cycling of large numbers
+# of nodes may be done in batches to avoid network (or power)
+# overload on restart.  Skewed reboots like this open a window of
+# vulnerability where nodes rebooted later might be able, before
+# they are rebooted, to spoof the reload server for nodes that have
+# just rebooted.  So we first turn everyone off, then batched power
+# ons are safe.
+#
+# Note that we take down the firewall while the nodes are turned
+# off.  This is a convenient time while we know no nodes are in
+# transition.  Plus, since we take down the firewall too, other
+# nodes would not be able to reboot if we left the firewall up.
+#
+# BIG SECURITY ASSUMPTION: we are assuming that upon power on,
+# no node can somehow reboot from the hard disk instead of
+# from the network.  If it does, it is out from behind the
+# firewall and can wreak havoc.
+#
+sub undoFWNodes($$;@) {
+    my ($pid, $eid, @nodes) = @_;
+    my $doall = 0;
+    my $fwerr     = 0;
+    my @fwstate   = ();
+
+    if (!defined(@nodes) || @nodes == 0) {
+	@nodes = ExpNodes($pid, $eid, 1);
+	$doall = 1;
+    }
+
+    if ($doall) {
+	print "Taking down experiment firewall.\n";
+    } else {
+	my $fwnode;
+	TBExptFirewall($pid, $eid, \$fwnode);
+	if (grep {$_ eq $fwnode} @nodes) {
+	    tberror "Cannot remove firewall node from an experiment!";
+	    return 1;
+	}
+	print "Removing firewalled nodes from experiment.\n";
+    }
+
+    #
+    # First turn off all the machines.
+    # If we fail, the firewall in left in place, and some nodes may
+    # be powered off.
+    #
+    print STDERR "Powering down firewalled nodes.\n";
+    TBDebugTimeStamp("Powering down nodes");
+    system("power off @nodes");
+    if ($?) {
+	$fwerr = "Failed to power off all nodes!";
+	@fwstate = ("Firewall is still in place",
+		    "Some nodes may NOT be powered off",
+		    "Nodes NOT switched to admin MFS");
+	goto done;
+    }
+
+    #
+    # Force all nodes into admin mode.
+    # If we fail, the firewall is left in place.
+    #
+    my %myargs;
+    $myargs{'name'} = "tbswap";
+    $myargs{'on'} = 1;
+    $myargs{'clearall'} = 1;
+    if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
+	$fwerr = "Failed to force all nodes into admin mode!";
+	@fwstate = ("Firewall is still in place",
+		    "All nodes are powered off",
+		    "Not all nodes have been switched to admin MFS");
+	goto done;
+    }
+
+    #
+    # Once all nodes have been turned off and their DB state changed
+    # to force MFS booting, we can take modify the switch firewall state,
+    # either tearing down the firewall ($doall) entirely or just moving
+    # the indicated nodes out from behind it (!$doall).
+    #
+    # If this fails, we warn and punt.  The switch or DB state could
+    # be screwed up at this point.
+    #
+    if ($doall) {
+	if (doFW($pid, $eid, FWTEARDOWN, undef)) {
+	    $fwerr = "Failed to tear down firewall!";
+	    @fwstate = ("Firewall may NOT be in place",
+			"All nodes are powered off",
+			"All nodes set to admin mode",
+			"Switch/DB firewall state could be inconsistent!");
+	    goto done;
+	}
+    } else {
+	my @deleted = @nodes;
+	if (doFW($pid, $eid, FWDELNODES, \@deleted)) {
+	    $fwerr = "Failed to remove nodes from firewall VLAN!";
+	    @fwstate = ("Nodes may still be in firewall VLAN",
+			"All nodes are powered off",
+			"All nodes set to admin mode");
+	    goto done;
+	}
+    }
+
+    #
+    # Now we power on the nodes and let them boot into the MFS,
+    # where they will run the disk bootblock zapper.
+    #
+    # If this fails, we power off all the nodes again and get a
+    # little edgy in our error messages to emphasize the gravity
+    # of the situation.  Someday we could just move the failed
+    # nodes into a special firewalled holding experiment, and
+    # let the experiment swapout finish, freeing up the nodes that
+    # did succeed.
+    #
+    print STDERR "Booting nodes into admin MFS and zapping bootblocks.\n";
+    TBDebugTimeStamp("Booting admin MFS/zapping bootblocks");
+    my @failed = ();
+    %myargs = ();
+    $myargs{'name'} = "tbswap";
+    $myargs{'command'} = "sudo /usr/local/bin/diskzap";
+    $myargs{'poweron'} = 1;
+    if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
+	$fwerr = "Failed to invalidate bootblocks on @failed!";
+	@fwstate = ("Firewall is NOT in place",
+		    "All nodes set to admin mode");
+	system("power off @nodes");
+	if ($?) {
+	    push(@fwstate, "Some nodes may NOT be powered off");
+	} else {
+	    push(@fwstate, "All nodes are powered off");
+	}
+	push(@fwstate, "MAKE SURE THESE NODES DO NOT BOOT FROM DISK!");
+    }
+done:
+    #
+    # If we had a failure when tearing down the firewall completely,
+    # we act as though the panic button had been pressed (set panic
+    # bit in DB, disable cnet port, and inform tbops).  This hopefully
+    # ensures that everything will get cleaned up correctly.  This may
+    # eventually prove to be overkill.
+    #
+    # If we failed while removing some nodes from behind the firewall
+    # we don't get quite so cranky.
+    #
+    if ($fwerr) {
+	my $op;
+
+	if ($doall) {
+	    my ($fwnode, $fwport);
+	    if (!TBExptFirewallAndPort($pid, $eid, \$fwnode, \$fwport) ||
+		system("snmpit -d ${fwnode}:${fwport}") != 0) {
+		push(@fwstate, "Firewall cnet interface NOT disabled");
+	    } else {
+		push(@fwstate, "Firewall cnet interface disabled");
+	    }
+	    TBExptSetPanicBit($pid, $eid);
+	    $op = "Swapout";
+	} else {
+	    $op = "Modify";
+	}
+
+	tberror "$fwerr" . "\nINFORMING $TBOPS!";
+	my ($dbuid, $uname, $umail);
+	if (UNIX2DBUID($UID, \$dbuid) &&
+	    UserDBInfo($dbuid, \$uname, \$umail)) {
+	    SENDMAIL("$uname <$umail>",
+		     "Firewalled experiment $op failed".
+		     " for $pid/$eid",
+		     "$op of firewalled experiment $pid/$eid".
+		     " by $dbuid failed!\n".
+		     "Admin intervention required:\n\n$fwerr\n\n".
+		     "Current state of @nodes:\n\n".
+		     join("\n", @fwstate) . "\n",
+		     "$uname <$umail>",
+		     "Cc: $TBOPS");
+	}
+	return 1;
+    }
+
     return 0;
 }

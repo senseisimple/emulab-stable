@@ -2224,7 +2224,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	os/imagezip/shd/GNUmakefile \
 	os/frisbee.redux/GNUmakefile os/growdisk/GNUmakefile \
         os/syncd/GNUmakefile os/dijkstra/GNUmakefile \
-	os/genhostsfile/GNUmakefile \
+	os/genhostsfile/GNUmakefile os/zapdisk/GNUmakefile \
 	pxe/GNUmakefile pxe/bootinfo.restart \
 	security/GNUmakefile security/lastlog_daemon \
         sensors/GNUmakefile sensors/slothd/GNUmakefile \
@@ -2271,7 +2271,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/portstats tbsetup/vnode_setup tbsetup/staticroutes \
 	tbsetup/console_setup.proxy tbsetup/exports_setup.proxy \
 	tbsetup/checkports tbsetup/webnodereboot tbsetup/libaudit.pm \
-	tbsetup/libreboot.pm tbsetup/libosload.pm \
+	tbsetup/libreboot.pm tbsetup/libosload.pm tbsetup/libadminmfs.pm \
 	tbsetup/sfskey_update tbsetup/sfskey_update.proxy \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tbsetup/newnode_reboot tbsetup/webnodeattributes \

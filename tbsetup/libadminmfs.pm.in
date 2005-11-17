@@ -1,0 +1,440 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# Admin MFS library.  Routines related to getting into and out of the
+# admin MFS and executing programs within it.
+#
+# Note that none of these routines are graceful about errors.  If some/all
+# nodes fail, their bootinfo states may be modified and not all the same;
+# i.e., some nodes may be set to boot into the MFS (or may even have booted
+# into the MFS) and others not.  These routines are used primarily at swap
+# out time where all inconsistent state will get fixed up anyway, or by
+# node_admin where the caller is assumed to be saavy.
+#
+package libadminmfs;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( TBAdminMfsBoot TBAdminMfsSelect TBAdminMfsRunCmd );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use StateWait;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $TESTMODE    = @TESTMODE@;
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ELABINELAB  = @ELABINELAB@;
+
+my $nodereboot	= "$TB/bin/node_reboot";
+my $power	= "$TB/bin/power";
+my $osselect    = "$TB/bin/os_select";
+
+#
+# Timeout for a node to reboot into (or out of) the admin MFS
+# XXX we could calculate this from node_type and os_info reboot times
+#
+my $reboottimo  = (5 * 60);
+my $commandtimo = (2 * 60);
+my $sleepwait   = 10;
+
+#
+# TBAdminMfsBoot(\%args, \@failed, @nodes)
+#
+# Boot up (reboot or power on) a set of nodes (@nodes) and optionally wait
+# for them to enter or exit the admin MFS.  It is assumed that the node
+# has been setup to boot into or out of the admin MFS as appropriate
+# (TBAdminMfsSelect). If not, you could be waiting a long time!
+# Arguments passed in the $args hash:
+#
+#	'name'	 string identifying the caller for error messages
+#	'on'	 1 to enter MFS, 0 to exit
+#	'reboot' 1 to reboot into MFS, -1 to "power on", 0 to do nothing
+#	'wait'	 1 to wait for all nodes to reach MFS before returning,
+#		 0 to return after reboot/power-on
+#
+# Returns zero if all nodes successfully complete the reboot (wait==0)
+# or reach the MFS (wait==1), and non-zero otherwise.  If the $failed ref
+# is defined, it is an arrayref in which we return the list of nodes that
+# failed.
+#
+# Note: NO PERMISSION CHECKING IS DONE.  It is assumed that the caller
+# has performed all the necessary checks.
+#
+sub TBAdminMfsBoot($$@)
+{
+    my ($args, $failedref, @nodes) = @_;
+
+    my $me = $args->{'name'};
+    my $on = $args->{'on'};
+    my $reboot = $args->{'reboot'};
+    my $wait = $args->{'wait'};
+
+    #
+    # Reboot or power on nodes...
+    #
+   if ($wait) {
+	$StateWait::debug = 0;
+	
+	#
+	# Initialize the statewait library.
+	#
+	my @states   = ();
+
+	#
+	# Only wait for MFSSETUP when going into the MFS. When coming out
+	# of MFS, just wait for generic ISUP.
+	# 
+	push(@states, TBDB_NODESTATE_MFSSETUP())
+	    if ($on);
+	push(@states, TBDB_NODESTATE_ISUP());
+    
+	if (initStateWait(\@states, @nodes)) {
+	    print STDERR "*** $me:\n".
+		"    Failed to initialize the statewait library!\n";
+	    @$failedref = @nodes
+		if (defined($failedref));
+	    return 1;
+	}
+    }
+
+    if ($reboot > 0) {
+	if (system("$nodereboot @nodes")) {
+	    print STDERR "*** $me:\n".
+		"    WARNING: Could not reboot some of: @nodes!\n";
+	}
+    } elsif ($reboot < 0) {
+	print STDOUT "Powering on nodes.\n";
+	if (system("$power on @nodes")) {
+	    print STDERR "*** $me:\n".
+		"    WARNING: Could not power on some of: @nodes!\n";
+	}
+    }
+
+    #
+    # ...and wait for them to come back up.
+    #
+    if ($wait) {
+	#
+	# Initialize the statewait library.
+	#
+	my @finished = ();
+	my @failed   = ();
+	my $endtime = time() + $reboottimo;
+
+	print STDOUT "Waiting for nodes to come up.\n";
+	
+	# Now we can statewait.
+	if (waitForState(\@finished, \@failed, $reboottimo)) {
+	    print STDERR "*** $me:\n".
+		"    Failed in waitForState!\n";
+	    @$failedref = @nodes
+		if (defined($failedref));
+	    return 1;
+	}
+	endStateWait();
+	
+	#
+	# XXX gak! Our whole state wait system (actually event system)
+	# doesn't distinguish timeouts.  A timeout is a failure in this
+	# context since it means that some node did not get where it was
+	# supposed to go, and that could be dangerous.  Fortunately, nodes
+	# that do timeout, while not added to failed, are not added to
+	# finished either (ditto for nodes that go through an improper
+	# state transition sequence).  So if the sum of @finished + @failed
+	# is not @nodes, then we know some nodes timed out.  So we can go
+	# back and tease those out.
+	#
+	if (scalar(@nodes) > scalar(@finished) + scalar(@failed)) {
+	    # there is probably a better way to do a set diff...
+	    my %seen;
+	    for my $n (@finished, @failed) {
+		$seen{$n} = 1;
+	    }
+	    for my $n (@nodes) {
+		push(@failed, $n)
+		    if (!defined($seen{$n}));
+	    }
+	}
+
+	if (@failed) {
+	    print STDERR "*** $me:\n".
+		"    Failed to boot " . ($on ? "MFS" : "regular OS") .
+		    " on: @failed\n";
+	    @$failedref = @failed
+		if (defined($failedref));
+	    return 1;
+	}
+
+	print STDOUT "All nodes are up.\n";
+    }
+
+    return 0;
+}
+
+#
+# TBAdminMfsSelect(\%args, \@failed, @nodes)
+#
+# For the given list of nodes, set or clear the temp OSID field so that
+# they will or will not boot into the admin MFS.
+#
+# Arguments passed via the $args hashref:
+#
+#	'name'	   string identifying the caller for error messages
+#	'on'	   1 to set temp OSID to MFS, 0 to clear
+#	'clearall' 1 to clear one-shot and partition boot OSIDs
+#		   (if 'on' is set), 0 leaves them alone
+#
+# Returns zero if we successfully set the state for all nodes,
+# and non-zero otherwise.  If the $failed ref is defined, it is an
+# arrayref in which we return the list of nodes that failed.
+#
+# Note: NO PERMISSION CHECKING IS DONE.  It is assumed that the caller
+# has performed all the necessary checks.
+#
+# Note: this call will clear any user-set startupcmd and status.  The
+# caller is responsible for saving it if they care.
+#
+sub TBAdminMfsSelect($$@)
+{
+    my ($args, $failedref, @nodes) = @_;
+
+    return 0
+	if (@nodes == 0);
+
+    my $me = $args->{'name'};
+    my $on = $args->{'on'};
+    my $only = $args->{'clearall'};
+    my @good = ();
+    my @bad = ();
+
+    #
+    # Set/clear the temp OSID for all nodes.
+    #
+    if ($on) {
+	# clear one-shot boots
+	if ($only && system("os_select -c -1 @nodes")) {
+	    print STDERR "*** $me:\n".
+		"    Failed to clear one-shot boot for @nodes!\n";
+	    @{$failedref} = @nodes
+		if (defined($failedref));
+	    return 1;
+	}
+
+	# determine the correct admin OSID for all nodes
+	my %adminosid = ();
+	for my $node (@nodes) {
+	    my $osid = TBNodeAdminOSID($node);
+	    push @{$adminosid{$osid}}, $node;
+	}
+
+	# and set it
+	for my $osid (keys %adminosid) {
+	    my @n = @{$adminosid{$osid}};
+	    if (system("$osselect -t $osid @n")) {
+		print STDERR "*** $me:\n".
+		    "    Failed to set temp boot to $osid for @n!\n";
+		push(@bad, @n);
+	    } else {
+		push(@good, @n);
+	    }
+	}
+
+	# clear partition boots for successful nodes
+	if ($only && system("os_select -c @good")) {
+	    print STDERR "*** $me:\n".
+		"    Failed to clear partition boot for @good!\n";
+	    @{$failedref} = @nodes
+		if (defined($failedref));
+	    return 1;
+	}
+    } else {
+	if (system("$osselect -c -t @nodes")) {
+	    print STDERR "*** $me:\n".
+		"    Failed to clear temp boot for @nodes!\n";
+	    @{$failedref} = @nodes
+		if (defined($failedref));
+	    return 1;
+	}
+	@good = @nodes;
+    }
+
+    #
+    # Make sure we don't execute any unintended command, either those
+    # set by the user when we enter admin mode, or those set by us when
+    # we leave admin mode.
+    #
+    my $cond = "node_id in (" . join(",", map("'$_'", @good)) . ")";
+    if (!DBQueryWarn("update nodes set startupcmd='', startstatus='none' ".
+		     "where $cond")) {
+	    print STDERR "*** $me:\n".
+		"    Failed to clear startup state for @good!\n";
+	    push(@bad, @good);
+    }
+
+    @{$failedref} = @bad
+	if (defined($failedref));
+
+    return (@bad != 0);
+}
+
+#
+# TBAdminMfsRunCmd(\%args, \@failed, @nodes)
+#
+# For the given list of nodes, boot each one into the admin MFS and run the
+# indicated command.  Upon successful completion, all nodes are left in the
+# MFS with admin mode enabled.  Arguments passed in the $args hash:
+#
+#	'name'	  string identifying the caller for error messages
+#	'command' command+args to run on the nodes
+#	'timeout' time in seconds to wait for command completion
+#		  (starts when node has booted into MFS)
+#	'poweron' 1 if nodes need to be powered on initially
+#		  rather than rebooted
+#
+# Returns zero if all nodes successfully run the command.
+# If the $failed ref is defined, it is an arrayref in which we return the
+# list of nodes that failed.
+#
+# Note: NO PERMISSION CHECKING IS DONE.  It is assumed that the caller
+# has performed all the necessary checks.
+#
+# Note: this call will clear any user-set startupcmd and status.  The
+# caller is responsible for saving it if they care.
+#
+sub TBAdminMfsRunCmd($$@)
+{
+    my ($args, $failedref, @nodes) = @_;
+
+    my $me = $args->{'name'};
+    my $cmd = $args->{'command'};
+    my $timeout = $args->{'timeout'};
+    my $poweron = $args->{'poweron'};
+
+    # we always need a value
+    $timeout = $commandtimo
+	if (!defined($timeout));
+    $poweron = 0
+	if (!defined($poweron));
+
+    #
+    # Arrange for the node to boot into the MFS, but don't boot it yet.
+    #
+    my %myargs;
+    $myargs{'name'} = $me;
+    $myargs{'on'} = 1;
+    $myargs{'clearall'} = 0;
+    if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
+	@{$failedref} = @nodes
+	    if (defined($failedref));
+	return 1;
+    }
+
+    #
+    # Record the startup command.  The status has already been set to
+    # 'none' by Select above.
+    #
+    my $allcond = "node_id in (" . join(",", map("'$_'", @nodes)) . ")";
+    if (!DBQueryWarn("update nodes set startupcmd='$cmd' where $allcond")) {
+	print STDERR "*** $me:\n".
+	    "    DB error updating node startupcmd info for @nodes!\n";
+	@{$failedref} = @nodes
+	    if (defined($failedref));
+	return 1;
+    }
+
+    #
+    # Now reboot into the admin MFS.  TBAdminMfsBoot will return when
+    # the nodes report ISUP, which they will do before firing off the
+    # startup command.
+    #
+    %myargs = ();
+    $myargs{'name'} = $me;
+    $myargs{'on'} = 1;
+    $myargs{'reboot'} = $poweron ? -1 : 1;
+    $myargs{'wait'} = 1;
+    my @failed = ();
+    if (TBAdminMfsBoot(\%myargs, \@failed, @nodes)) {
+	print STDERR "*** $me:\n".
+	    "    Some nodes failed to boot into MFS: @failed!\n";
+	@{$failedref} = @nodes
+	    if (defined($failedref));
+	return 1;
+    }
+
+    #
+    # Wait for the command completion status or til we time out
+    #
+    my @running = @nodes;
+    my %status = ();
+    my $endtime = time() + $timeout;
+    while (@running > 0 && time() < $endtime) {
+
+	my $cond = "node_id in (" . join(",", map("'$_'", @running)) . ")";
+	my $query_result =
+	    DBQueryWarn("select node_id,startstatus from nodes where $cond");
+
+	if (!$query_result || $query_result->numrows < 1) {
+	    print STDERR "*** $me:\n".
+		"    DB error getting startstatus for @running!\n";
+	    @running = ();
+	    last;
+	}
+ 
+	@running = ();
+	while (my ($node, $result) = $query_result->fetchrow_array()) {
+	    if ("$result" eq "none") {
+		push(@running, $node);
+	    } else {
+		$status{$node} = $result;
+	    }
+	}
+
+	sleep($sleepwait)
+	    if (@running > 0);
+    }
+
+    #
+    # Everyone has reported or we timed out.
+    # Find out who succeeded, who failed, and who timed out.
+    #
+    my @succeeded = ();
+    my @timedout = ();
+    for my $node (@nodes) {
+	if (!defined($status{$node})) {
+	    $status{$node} = "";
+	    push(@timedout, $node);
+	} elsif ($status{$node}) {
+	    push(@failed, $node);
+	} else {
+	    push(@succeeded, $node);
+	}
+    }
+
+    if (scalar(@nodes) != scalar(@succeeded)) {
+	if (scalar(@failed) > 0) {
+	    print STDERR "*** $me:\n".
+		"    Nodes failed running command: @failed\n";
+	    push(@{$failedref}, @failed)
+		if (defined($failedref));
+	}
+	if (scalar(@timedout) > 0) {
+	    print STDERR "*** $me:\n".
+		"    Nodes timed out running command: @timedout\n";
+	    push(@{$failedref}, @timedout)
+		if (defined($failedref));
+	}
+	return 1;
+    }
+
+    print STDOUT "All nodes have completed their command.\n";
+    return 0;
+}

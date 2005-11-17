@@ -172,8 +172,9 @@ use vars qw(@ISA @EXPORT);
 	 TBExptDestroy TBIPtoNodeID TBNodeBootReset TBNodeStateWait
 	 TBLeaderMailList ExpGroup TBExptSetSwapUID TBExptSetThumbNail
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
-	 TBExptFirewall TBNodeFirewall TBSetExptFirewallVlan
-	 TBClearExptFirewallVlan TBNodeConsoleTail
+	 TBExptFirewall TBNodeFirewall TBExptFirewallAndPort
+	 TBSetExptFirewallVlan TBClearExptFirewallVlan
+	 TBNodeConsoleTail TBExptGetSwapoutAction
 
 	 TBNodeSubNodes
 	 TBNodeAdminOSID TBNodeDiskloadOSID
@@ -4005,6 +4006,32 @@ sub TBExptFirewall ($$;$$$) {
 }
 
 #
+# Get the firewall node name and port number for an experiment;
+# e.g., for use in an snmpit call.
+# Return 1 if successful, 0 on error.
+#
+sub TBExptFirewallAndPort($$$$) {
+    my ($pid, $eid, $fwnodep, $fwportp) = @_;
+    my $fwnode;
+
+    if (!TBExptFirewall($pid, $eid, \$fwnode)) {
+	return 0;
+    }
+
+    my $query_result = 
+	DBQueryWarn("select card1 from wires ".
+		    "where node_id1='$fwnode' AND type='Control'");
+    if (!$query_result || !$query_result->numrows) {
+	return 0;
+    }
+
+    $$fwnodep = $fwnode;
+    ($$fwportp) = $query_result->fetchrow_array();
+
+    return 1;
+}
+
+#
 # Set the firewall VLAN number for an experiment.
 #
 # XXX this will need to change if we support multiple firewalls per experiment.
@@ -4153,6 +4180,33 @@ sub TBExptGetPanicBit($$$) {
     $$panicp = $row[0];
 
     return 1;
+}
+
+#
+# See if there is an admin MFS swapout action associated with the experiment.
+# For now we just look at a globally defined action via sitevar.
+#
+# Returns 1 if there is a swapout action (with $ref hash filled in),
+# 0 otherwise.
+#
+sub TBExptGetSwapoutAction($$$) {
+    my ($pid, $eid, $ref) = @_;
+    my ($action, $faction);
+
+    if (TBGetSiteVar("swap/swapout_command", \$action)) {
+	my $failisfatal = 1;
+
+	if (TBGetSiteVar("swap/swapout_command_failaction", \$faction)) {
+	    $failisfatal = ($faction eq "fail");
+	}
+
+	%$ref = ('command' => $action, 'isfatal' => $failisfatal);
+	return 1;
+    }
+
+    # Someday maybe check for per-experiment setting
+    %$ref = ();
+    return 0;
 }
 
 #

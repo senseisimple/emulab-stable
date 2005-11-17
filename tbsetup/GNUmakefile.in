@@ -54,8 +54,8 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  snmpit_foundry.pm snmpit_stack.pm snmpit_remote.pm \
 		  snmpit_nortel.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
-		  power_mail.pm power_whol.pm \
-		  libtblog.pm
+		  libadminmfs.pm libtblog.pm \
+		  power_mail.pm power_whol.pm
 
 #
 # Force dependencies on the scripts so that they will be rerun through
