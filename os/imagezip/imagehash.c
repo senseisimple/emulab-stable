@@ -83,6 +83,7 @@ static long hashblksize = HASHBLK_SIZE;
 static unsigned long long ndatabytes;
 static unsigned long nchunks, nregions, nhregions;
 static char *fileid = NULL;
+static char *sigfile = NULL;
 
 static char chunkbuf[SUBBLOCKSIZE];
 
@@ -121,7 +122,7 @@ main(int argc, char **argv)
 	extern char build_info[];
 	struct hashinfo *hashinfo = 0;
 
-	while ((ch = getopt(argc, argv, "cb:dvhnrD:NVRF:")) != -1)
+	while ((ch = getopt(argc, argv, "cb:dvhno:rD:NVRF:")) != -1)
 		switch(ch) {
 		case 'b':
 			hashblksize = atol(optarg);
@@ -137,6 +138,9 @@ main(int argc, char **argv)
 			report++;
 		case 'c':
 			create++;
+			break;
+		case 'o':
+			sigfile = strdup(optarg);
 			break;
 		case 'D':
 			if (strcmp(optarg, "md5") == 0)
@@ -238,7 +242,7 @@ usage(void)
 		"imagehash [-d] <image-filename> <device>\n"
 		"    check the signature file for the specified image\n"
 		"    against the specified disk device\n"
-		"imagehash -c [-dr] [-b blksize] <image-filename>\n"
+		"imagehash -c [-dr] [-b blksize] [-o sigfile] <image-filename>\n"
 		"    create a signature file for the specified image\n"
 		"imagehash -R [-dr] [-b blksize] <image-filename>\n"
 		"    output an ASCII report to stdout rather than creating a signature file\n"
@@ -247,6 +251,7 @@ usage(void)
 		"\n"
 		"-b blksize    size of hash blocks (512 <= size <= 32M)\n"
 		"-d            print additional detail to STDOUT\n"
+		"-o sigfile    name to use for sig file, else <image>.sig\n"
 		"-r            input file is a regular file, not an image\n");
 	exit(1);
 }	
@@ -258,6 +263,9 @@ static char *
 signame(char *name)
 {
 	char *hfile;
+
+	if (sigfile != NULL)
+		return sigfile;
 
 	hfile = malloc(strlen(name) + 5);
 	if (hfile == NULL) {
