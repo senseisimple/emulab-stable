@@ -731,26 +731,50 @@ good across SMB.
        <code>chown/chgrp</code>, use the numeric suffix as the uid,
        e.g. <code>1334</code>.  This is different from your normal Emulab Unix
        user ID number, and the Samba server takes care of the
-       difference. </li>
+       difference. <p>
+
+       The <b><code>id</code></b> command reports your user id and group
+       memberships.  <p>
+
+       Note that all users are in group <b><code>None</code></b> on XP.
+       Contrary to the name, this is a group that contains <b>all users</b>.
+       It was named <code>Everybody</code> on Windows 2000, which was a better
+       name.  </li>
 
   <li> There is no direct equivalent of the Unix <b>setuid</b> programs under
        Windows, and hence no <code>su</code> or <code>sudo</code> commands. <p>
 
-       Everybody is in group <b><code>wheel</code></b>, an alias for the
-       Windows <code>Administrators</code> group.  The Emulab notion of
-       non-local-root members of a project is not implemented. </li>
+       The Windows equivalent to running a Unix command as <code>root</code>
+       is membership in the Windows <b><code>Administrators</code></b> group.
+       Emulab project members who have either <code>local_root</code> or
+       <code>group_root</code> privileges are put in group
+       <b><code>wheel</code></b>, another alias for
+       <code>Administrators</code>.  Project members with <code>user</code>
+       privileges are not members of the wheel group. <p>
+
+       You can <code>ssh</code> a command to the node as the target user, as
+       long as you arrange for the proper authentication.  <p>
+
+       There is not usually a Windows account named <b><code>root</code></b>.
+       We create one as part of the Emulab setup to own installed software,
+       and to run services and Unix scripts that check that they're running
+       with root privileges.  The <code>root</code> user does not have Samba
+       privileges to access Samba shared mounts, including <code>/proj</code>,
+       <code>/groups</code>, and <code>/users</code>.  <p>
+
+       For C/C++ code, there is a <code>setuid()</code> function in the Cygwin
+       library, which "impersonates" the user if proper setup is done first.
+       </li>
 
   <li> Cygwin does a pretty good job of mapping Unix user-group-other file
        permissions to Windows NT security ACLs.  <p>
 
-       One difference is that on windows, file protections can lock out root,
+       On Windows, unlike Unix, file permissions can lock out root,
        Administrator, or SYSTEM user access.  Many Unix scripts don't bother
-       with permissions if they're running as root. <p>
+       with permissions if they're running as root, and hence need
+       modification to run on Cygwin. </li>
 
-       There is not usually a Windows account named <b><code>root</code></b>,
-       but we create one as part of the Emulab setup. </li>
-
-       Cygwin tries to treat <code>.exe</code> files the same as executable
+  <li> Cygwin tries to treat <code>.exe</code> files the same as executable
        files without the <code>.exe</code> suffix, but with execute
        permissions turned on.  This breaks down in Makefile actions and
        scripts, where <code>rm</code>, <code>ls -l</code>, and
