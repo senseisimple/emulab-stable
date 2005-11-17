@@ -1111,7 +1111,7 @@ sub SetupBossNode()
     #
     print "Copying over tftpboot tar file from web server and unpacking\n";
     mysystem("wget -q -O ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
-	     "http://www.emulab.net/downloads/".
+	     "http://${bossname}/downloads/".
 	     $emulabconfig{"MFSTARBALL"});
 
     mysystem("tar xzf ${TBDIR}/testbed/stuff/tftpboot.tar.gz ".
