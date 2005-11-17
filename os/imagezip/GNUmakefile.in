@@ -164,7 +164,7 @@ imagehash.o: imagehdr.h
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"
 
-install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip $(INSTALL_BINDIR)/imagedump
+install: $(INSTALL_BINDIR)/imagezip $(INSTALL_BINDIR)/imageunzip $(INSTALL_BINDIR)/imagedump $(INSTALL_BINDIR)/imagehash
 
 client: all
 client-install: client

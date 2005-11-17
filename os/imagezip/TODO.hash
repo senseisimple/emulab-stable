@@ -208,8 +208,8 @@ or Linux zero blocks that get freed nor do they chain free blocks together
 using part of the block as a link field.  So I think still hashing the
 blocks might pay off, but we'll have to do some tests.
 
-Another issue is how does imagezip know how much of the file it should look
-at when creating a delta.  If a users only loads FreeBSD in partition 1,
+Another issue is how does imagezip know how much of the disk it should look
+at when creating a delta.  If a user only loads FreeBSD in partition 1,
 but then puts data in the other partitions, how do we know that we should
 save that in the delta?  In a sense, the mechanism will just work.  If the
 signature used for comparison only covers partition 1, and imagezip is

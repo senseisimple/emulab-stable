@@ -428,6 +428,8 @@ createhash(char *name, struct hashinfo **hinfop)
 	int ofd, cc;
 	int count;
 	struct hashinfo *hinfo;
+	struct stat sb;
+	struct timeval tm[2];
 
 	hfile = signame(name);
 	ofd = open(hfile, O_RDWR|O_CREAT, 0666);
@@ -466,6 +468,21 @@ createhash(char *name, struct hashinfo **hinfop)
 	}
 
 	free(hfile);
+
+	/*
+	 * Set the modtime of the hash file to match that of the image.
+	 * This is a crude (but fast!) method for matching images with
+	 * signatures.
+	 */
+	cc = stat(name, &sb);
+	if (cc >= 0) {
+		TIMESPEC_TO_TIMEVAL(&tm[0], &sb.st_atimespec);
+		TIMESPEC_TO_TIMEVAL(&tm[1], &sb.st_mtimespec);
+		cc = utimes(hfile, tm);
+	}
+	if (cc < 0)
+		fprintf(stderr, "%s: WARNING: could not set mtime\n", hfile);
+
 	nhregions = hinfo->nregions;
 	printf("%s: %lu chunks, %lu regions, %lu hashregions, %llu data bytes\n",
 	       name, nchunks, nregions, nhregions, ndatabytes);
