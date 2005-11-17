@@ -647,14 +647,11 @@ Simulator instproc attach-agent {node agent} {
 }
 
 Simulator instproc agentinit {agent} {
-    $self instvar event_list
-    $self instvar event_count
+    var_import ::TBCOMPAT::objtypes
+    var_import ::TBCOMPAT::eventtypes
 
     if {[$agent info class Application/Traffic/CBR]} {
-	set event_count [expr $event_count + 1]
-	set mod_event [list \
-	    "0" [$agent get_node] $agent TRAFGEN MODIFY [$agent get_params] ""]
-	$self set event_list [linsert $event_list 0 $mod_event]
+	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" "parent" ] [list "0" [$agent get_node] $agent $objtypes(TRAFGEN) $eventtypes(MODIFY) [$agent get_params] "" "__ns_sequence"]
     }
 }
 

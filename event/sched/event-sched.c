@@ -1231,9 +1231,38 @@ get_static_events(event_handle_t handle)
 	}
 	tuple->expt = pideid;
 
+	if (RPC_grouplist(handle, pid, eid)) {
+		error("Could not get grouplist from RPC server\n");
+		return -1;
+	}
+	
+	if (debug) {
+		struct agent *agentp = (struct agent *)agents.lh_Head;
+
+		while (agentp->link.ln_Succ) {
+			info("Agent: %15s  %10s %10s %8s %16s\n",
+			     agentp->name, agentp->objtype,
+			     agentp->vnode, agentp->nodeid,
+			     agentp->ipaddr);
+
+			agentp = (struct agent *)agentp->link.ln_Succ;
+		}
+	}
+
+	sprintf(pideid, "%s/%s", pid, eid);
+	gettimeofday(&now, NULL);
+	info(" Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
+	
+	if (RPC_eventlist(pid, eid, handle, tuple)) {
+		error("Could not get eventlist from RPC server\n");
+		return -1;
+	}
+
 	event.agent.s = primary_simulator_agent->sa_local_agent.la_agent;
 	if (event.agent.s != NULL) {
-		// XXX emulab-ops experiments
+		// XXX emulab-ops experiments might not have a simulator agent
+
+		/* Log when time has officially started. */
 		event.notification = event_notification_create(
 			handle,
 			EA_Experiment, pideid,
@@ -1242,7 +1271,7 @@ get_static_events(event_handle_t handle)
 			EA_Name, event.agent.s->name,
 			EA_Arguments, "Time started",
 			EA_TAG_DONE);
-		event.time.tv_sec = 0;
+		event.time.tv_sec = 1;
 		event.time.tv_usec = 1;
 		event.length = 1;
 		event.flags = SEF_SINGLE_HANDLER;
@@ -1272,7 +1301,7 @@ get_static_events(event_handle_t handle)
 	event_notification_insert_hmac(handle, notification);
 	event.notification = notification;
 	event.time.tv_sec  = 0;
-	event.time.tv_usec = 2;
+	event.time.tv_usec = 1;
 	event.agent.s = NULL;
 	event.length = 1;
 	event.flags = SEF_TIME_START;
@@ -1283,7 +1312,7 @@ get_static_events(event_handle_t handle)
 	next_token += 1;
 	timeline_agent_append(ns_sequence, &event);
 
-	
+	/* Start the main timeline */
 	event.agent.s = &ns_timeline_agent;
 	event.notification = event_notification_create(
 		handle,
@@ -1293,7 +1322,7 @@ get_static_events(event_handle_t handle)
 		EA_Name, ns_timeline_agent.name,
 		EA_TAG_DONE);
 	event.time.tv_sec = 0;
-	event.time.tv_usec = 3;
+	event.time.tv_usec = 1;
 	event.length = 1;
 	event.flags = SEF_SENDS_COMPLETE | SEF_SINGLE_HANDLER;
 	event_notification_put_int32(handle,
@@ -1304,33 +1333,6 @@ get_static_events(event_handle_t handle)
 	
 	sched_event_prepare(handle, &event);
 	timeline_agent_append(ns_sequence, &event);
-
-	if (RPC_grouplist(handle, pid, eid)) {
-		error("Could not get grouplist from RPC server\n");
-		return -1;
-	}
-	
-	if (debug) {
-		struct agent *agentp = (struct agent *)agents.lh_Head;
-
-		while (agentp->link.ln_Succ) {
-			info("Agent: %15s  %10s %10s %8s %16s\n",
-			     agentp->name, agentp->objtype,
-			     agentp->vnode, agentp->nodeid,
-			     agentp->ipaddr);
-
-			agentp = (struct agent *)agentp->link.ln_Succ;
-		}
-	}
-
-	sprintf(pideid, "%s/%s", pid, eid);
-	gettimeofday(&now, NULL);
-	info(" Getting event stream at: %lu:%d\n",  now.tv_sec, now.tv_usec);
-	
-	if (RPC_eventlist(pid, eid, handle, tuple)) {
-		error("Could not get eventlist from RPC server\n");
-		return -1;
-	}
 
 	if (expt_state == ES_ACTIVE) {
 		event_do(handle,
