@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
   int ch;
   int debug = 0;
   int input_occurred_fd;
-  time_t last_time = 0;
+  DWORD last_tick = 0;
   
   while ((ch = getopt(argc, argv, "d")) != -1) {
     switch (ch) {
@@ -55,13 +55,19 @@ int main(int argc, char **argv) {
     else {
 
       /* Windows keeps time in millisecond ticks since boot time. */
-      DWORD windows_ticks = GetTickCount() - windows_input.dwTime;
-      time_t windows_time = time(0) - windows_ticks/1000;
-      if (debug)
-	printf("Windows input event time: %s", ctime(&windows_time));
+      DWORD windows_tick = windows_input.dwTime;
+      if (debug) {
+	time_t windows_time = time(0) - (GetTickCount() - windows_tick)/1000;
+	printf("Windows input event tick %d, time: %s", 
+	       windows_tick, ctime(&windows_time));
+      }
       
-      if (windows_time > last_time) {
-	last_time = windows_time;
+      /* Check time in ticks, because they're monotonic.  The clock jumps back
+       * many hours (in the western hemisphere) as NTP changes from UTC time
+       * to local time.
+       */
+      if (windows_tick > last_tick) {
+	last_tick = windows_tick;
 
 	/* It would be nice to use futimes(), but there's not one
 	 * on Cygwin.  Instead, use ftruncate() to set the modtime.

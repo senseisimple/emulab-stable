@@ -12,9 +12,9 @@ SLOTHD_DIR	= unknownclient
 TBLIB		= $(OBJDIR)/lib/libtb/libtb.a
 
 SBIN_SCRIPTS    = sdisrunning sddeploy
-SDPROGS		= sdcollectd slothd
+SDPROGS		= sdcollectd$(EXE) slothd$(EXE)
 
-SYSTEM               := $(shell uname -s)
+SYSTEM          := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
@@ -34,6 +34,7 @@ ifeq ($(SYSTEM),CYGWIN_NT-5.1)
 MLIBS += -liphlpapi
 
 WINCLIENT = idlemon
+WINPROGS = idlemon$(EXE)
 WINCLIENTSRC = idlemon.c
 CVR = /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run
 IDLEKEY = $(CVR)/EmulabIdle
@@ -86,4 +87,4 @@ endif
 control-install:
 
 clean:
-	rm -f *.o $(SDPROGS) *~ core *.core version.c
+	rm -f *.o $(SDPROGS) $(WINPROGS) *~ core *.core version.c

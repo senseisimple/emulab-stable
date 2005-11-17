@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
 
   int exitcode = -1;
   u_int myabits, span;
-  time_t curtime;
+  time_t curtime, lasttime = 0;
   static SLOTHD_OPTS mopts;
   static SLOTHD_PARAMS mparms;
   static SLOTHD_PACKET mpkt;
@@ -105,6 +105,28 @@ int main(int argc, char **argv) {
       lnotice(build_info);
       for (;;) {
         
+	time(&curtime);
+	if (opts->debug) {
+	  printf("The time is now %s", ctime(&curtime));
+	  fflush(stdout);
+	}
+
+	if (curtime < lasttime) {
+	  /*
+	   * The clock was set back on us, most likely on Windows as NTP
+	   * changed the clock from UTC time to local time.  Set the
+	   * timestamps back by the same amount to compensate.
+	   */
+	  int delta = lasttime - curtime;
+	  parms->startup -= delta;
+	  mparms.lastrpt -= delta;
+	  if (opts->debug) {
+	    printf("The clock was set back by %d seconds.\n\n", delta);
+	    fflush(stdout);
+	  }
+	}
+	lasttime = curtime;
+
         /* Collect current machine stats */
         mparms.cnt++;
         get_load(pkt);
@@ -119,7 +141,7 @@ int main(int argc, char **argv) {
          * 2) Its been over <reg_interval> seconds since the last report
          */
         if ((!opkt->actbits && pkt->actbits) ||
-            (time(&curtime) >=  mparms.lastrpt + mopts.reg_interval) ||
+            (curtime >=  mparms.lastrpt + mopts.reg_interval) ||
             parms->dolast) {
           if (send_pkt(pkt)) {
             mparms.lastrpt = curtime;
@@ -496,14 +518,24 @@ void get_min_tty_idle(SLOTHD_PACKET *pkt) {
 #ifndef __CYGWIN__
       /* The time of last reading keyboard input. */
       time_t tty_time = sb.st_atime;
+      if (opts->debug)
+	printf("Input on %s: %s", parms->ttys[i], ctime(&tty_time));
 #else
-      /* We're modding time tag files Cygwin, not reading them. */
+      /* We're modding time tag files on Cygwin, not reading them. */
       time_t tty_time = sb.st_mtime;
+
+      /* Ignore a time tag from the future when the clock gets set back. */
+      if ( tty_time > time(NULL) ) {
+	if (opts->debug)
+	  printf("Ignored future time on %s: %s", 
+		 parms->ttys[i], ctime(&tty_time));
+	tty_time = mintime;
+      }
 #endif
+      if (opts->debug)
+	printf("Input on %s: %s", parms->ttys[i], ctime(&tty_time));
       if (tty_time > mintime) {
 	mintime = tty_time;
-	if (opts->debug)
-	  printf("Input on %s: %s", parms->ttys[i], ctime(&mintime));
       }
     }
   }
