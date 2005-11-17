@@ -652,8 +652,9 @@ Simulator instproc agentinit {agent} {
 
     if {[$agent info class Application/Traffic/CBR]} {
 	set event_count [expr $event_count + 1]
-	lappend event_list [list \
+	set mod_event [list \
 	    "0" [$agent get_node] $agent TRAFGEN MODIFY [$agent get_params] ""]
+	$self set event_list [linsert $event_list 0 $mod_event]
     }
 }
 
