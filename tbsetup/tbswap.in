@@ -1538,7 +1538,7 @@ done:
 	    } else {
 		push(@fwstate, "Firewall cnet interface disabled");
 	    }
-	    TBExptSetPanicBit($pid, $eid);
+	    TBExptSetPanicBit($pid, $eid, 2);
 	    $op = "Swapout";
 	} else {
 	    $op = "Modify";

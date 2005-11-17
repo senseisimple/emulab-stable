@@ -312,7 +312,22 @@ if (TBExptFirewall($exp_pid, $exp_eid) &&
      $expstate == $TB_EXPTSTATE_ACTIVATING ||
      $expstate == $TB_EXPTSTATE_SWAPPING)) {
     echo "<center>\n";
-    if ($paniced) {
+    if ($paniced == 2) {
+	#
+	# Paniced due to failed swapout.
+	# Only be semi-obnoxious (no blinking) since it wasn't their fault.
+	#
+	echo "<br><font size=+1 color=red>".
+	     "Your experiment was cut off due to a failed swapout on $panic_date!".
+	     "<br>".
+	     "You will need to contact testbed operations to make further ".
+  	     "changes (swap, terminate) to your experiment.</font>";
+    }
+    elseif ($paniced) {
+	#
+	# Paniced due to panic button.
+  	# Full-on obnoxious is called for here!
+	#
 	echo "<br><font size=+1 color=red><blink>".
 	     "Your experiment was cut off via the Panic Button on $panic_date!".
 	     "<br>".

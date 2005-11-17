@@ -4145,11 +4145,14 @@ sub TBNodeFirewall ($$$) {
 #
 # Set the paniced bit for an experiment.
 #
-sub TBExptSetPanicBit($$) {
-    my ($pid, $eid) = @_;
+sub TBExptSetPanicBit($$;$) {
+    my ($pid, $eid, $value) = @_;
+
+    $value = 1
+	if (!defined($value));
 
     return DBQueryWarn("update experiments set ".
-		       "    paniced=1,panic_date=now() ".
+		       "    paniced=$value,panic_date=now() ".
 		       "where pid='$pid' and eid='$eid'");
 }
 

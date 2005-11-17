@@ -907,16 +907,7 @@ sub TearDownEmulab()
     my $tbdir      = "/usr/testbed";
     my $wap        = "$tbdir/sbin/withadminprivs";
     my $nodereboot = "$tbdir/bin/node_reboot";
-    my $paniced;
 
-    #
-    # If firewalled, check to see if paniced. Right now that means the nodes
-    # are going to be powered off, so need to do the clean shutdown dance.
-    # 
-    if ($firewalled) {
-	TBExptGetPanicBit($pid, $eid, \$paniced);
-    }
-        
     #
     # We want to rebuild the DHCPD file so that when we reboot the inner nodes
     # they come back to the outer emulab. We cannot just free the nodes, cause
@@ -959,10 +950,11 @@ sub TearDownEmulab()
 		 "where pid='$pid' and eid='$eid'");
 
     #
-    # If panic set, just return; nodes are going to be powered down.
+    # If firewalled, just return now since all nodes will be powered
+    # off anyway.
     #
-    if ($firewalled and $paniced) {
-	print "Skipping clean shutdown cause panic button pressed.\n";
+    if ($firewalled) {
+	print "Skipping clean shutdown since experiment is firewalled.\n";
 	return 0;
     }
 
@@ -1054,7 +1046,7 @@ sub RemoveNodes()
     my $nodereboot = "$tbdir/bin/node_reboot";
     my $deletenode = "$tbdir/sbin/deletenode";
     my @nodes	   = ();
-    my $paniced;
+    my $paniced    = 0;
 
     #
     # If firewalled, check to see if paniced. Right now that means the nodes
@@ -1068,8 +1060,8 @@ sub RemoveNodes()
     # Actually, this should not even happen; a paniced experiment cannot be
     # modified at all.
     #
-    if ($firewalled and $paniced) {
-	print "An paniced experiment cannot be modified! What happened?\n";
+    if ($paniced) {
+	print "A paniced experiment cannot be modified! What happened?\n";
 	return -1;
     }
 
@@ -1260,7 +1252,7 @@ sub UpdateEmulab()
     my $nodereboot = "$tbdir/bin/node_reboot";
     my $nodewait   = "$tbdir/sbin/node_statewait";
     my @nodes      = ();
-    my $paniced;
+    my $paniced    = 0;
 
     #
     # If firewalled, check to see if paniced. Right now that means the nodes
@@ -1274,8 +1266,8 @@ sub UpdateEmulab()
     # Actually, this should not even happen; a paniced experiment cannot be
     # modified at all.
     #
-    if ($firewalled and $paniced) {
-	print "An paniced experiment cannot be modified! What happened?\n";
+    if ($paniced) {
+	print "A paniced experiment cannot be modified! What happened?\n";
 	return -1;
     }
 
