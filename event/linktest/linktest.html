@@ -7,6 +7,13 @@
 <h1>Linktest Tutorial</h1>
 </center>
 
+<em>Linktest is an online validation test of the network characteristics
+in an Emulab experiment.  It's a check that Emulab set up the network
+as you requested.  If you care about the fidelity of your network, you
+should set linktest to run on all or some swapins, and you should read
+this entire tutorial.</em>
+
+
 <h2>Contents</h2>
 <ul>
 <li> <a href="#QuickStart">Quick Start</a>
@@ -38,23 +45,25 @@ To run linktest, select a Linktest test level from the dropdown on the
 <a href="beginexp_html.php3">Begin an Experiment</a> page.
 <ul>
 <li> <a href="#Level1"><b>Level 1</b> - Connectivity and Latency</a>:
-     For fastest response, level 1. This will check that all nodes respond
-     to ping and that latency is correct.
+     For fastest response, select level 1.  Through ping, this will check
+     link-level connectivity and link latencies.
 <br>
-<li> <a href="#Level3"><b>Level 3</b> - Link Loss</a>: Check link loss
-     characteristics. Test levels are cumulative, so this option also
-     includes connectivity, latency, and static routing (if
-     applicable).
+<li> <a href="#Level2"><b>Level 2</b> - Plus Static Routing</a>:
+     In addition to the above, tests static routing (if applicable).
 <br>
-<li> <a href="#Level4"><b>Level 4</b> - Bandwidth</a>: If bandwidth is
-     important in your experiment, select level 4. Be warned that the
-     bandwidth test takes up to 20 seconds per link. <b>Also note that
-     not all bandwidths can be accurately measured</b>. If this
+<li> <a href="#Level3"><b>Level 3</b> - Plus Link Loss</a>: Check link loss
+     characteristics.  Test levels are cumulative, so this option also
+     includes connectivity, latency, and static routing (if applicable).
+<br>
+<li> <a href="#Level4"><b>Level 4</b> - Plus Bandwidth</a>: If bandwidth is
+     important in your experiment, select level 4.  Be warned that the
+     bandwidth test takes up to 20 seconds per link.  <b>Also note that
+     not all bandwidths can be accurately measured</b>. If that
      happens, a warning will be placed in the log file for each link
      that is out of range for bandwidth testing. 
 </ul>
 <p>
-If you select a test lest level other than zero, Linktest will run
+If you select a test level other than zero, Linktest will run
 after the experiment completes its swapin. If a problem is found,
 testbed-ops is automatically notified and a message will appear in the
 activation log. You will also receive an email message to ensure that
@@ -72,9 +81,9 @@ linktest reports failures!
 </center>
 
 <ul>
-<li> Not all bandwidths can be accurately measured, and linktest will
-     skip links that it knows will give false results. Please check
-     the output, and be sure to test those links yourself if your
+<li> Not all bandwidths can be accurately measured, and linktest <a href="#Level4">will
+     skip links</a> that it knows will give false results (e.g., slow or lossy links).
+     Please check the output, and be sure to test those links yourself if your
      results depend on total accuracy.
 
 <li> As with any automated testing procedure, we have to balance the desire
@@ -83,8 +92,8 @@ linktest reports failures!
      fudge on any link. <b>If your results are dependent on total
      accuracy, then you should test your links yourself!</b>
 
-<li> When using linkdelays (endnodeshaping) latency is less accurate
-     because of the 1ms clock resolution that the kernel runs at. At
+<li> When using "endnodeshaping" (so-called linkdelays), latency is less accurate
+     because of the 1ms clock resolution at which the kernel runs. At
      worst, latency can be off by up to 3ms, say for a roundtrip ping
      packet.
 
