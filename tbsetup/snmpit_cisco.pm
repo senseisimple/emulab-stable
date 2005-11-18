@@ -1035,16 +1035,16 @@ sub removeVlan($@) {
     my $self = shift;
     my @vlan_numbers = @_;
 
-    #
-    # Need to lock the VLAN edit buffer
-    #
-    if (!$self->vlanLock()) {
-    	return 0;
-    }
-
     my $errors = 0;
 
     foreach my $vlan_number (@vlan_numbers) {
+        #
+        # Need to lock the VLAN edit buffer
+        #
+        if (!$self->vlanLock()) {
+            return 0;
+        }
+
 	#
 	# Make sure the VLAN actually exists
 	#
@@ -1067,12 +1067,13 @@ sub removeVlan($@) {
 	    print "Failed.\n";
 	    $errors++;
 	}
-    }
 
-    #
-    # Unlock whether successful or not
-    #
-    $self->vlanUnlock();
+        #
+        # Unlock whether successful or not
+        #
+        $self->vlanUnlock();
+
+    }
 
     if ($errors) {
 	return 0;
