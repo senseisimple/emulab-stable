@@ -597,18 +597,25 @@ sub ping_node {
 
     # set deadline to prevent long waits
     my $cmd;
+    my $ttlarg = "";
     if($ttl) {
 	if($platform eq BSD) {
-	    $cmd = "/sbin/ping -c $send_count -q -i $send_rate -t $timeout -m $ttl $host";
+	    $ttlarg = "-m $ttl";
 	} elsif($platform eq LINUX) {
-	    $cmd = "/bin/ping -c $send_count -q -i $send_rate -w $timeout -t $ttl $host";
+	    $ttlarg = "-t $ttl";
+	} elsif($platform =~ /CYGWIN/) {
+	    # The Windows system ping has a TTL arg; Cygwin ping doesn't. 
+	    $ttlarg = "-i $ttl";
 	}
-    } else {
-	if($platform eq BSD) {
-	    $cmd = "/sbin/ping -c $send_count -q -i $send_rate -t $timeout $host";
-	} elsif($platform eq LINUX) {
-	    $cmd = "/bin/ping -c $send_count -q -i $send_rate -w $timeout $host";
-	}
+    }
+    if($platform eq BSD) {
+	$cmd = "/sbin/ping -c $send_count -q -i $send_rate -t $timeout $ttlarg $host";
+    } elsif($platform eq LINUX) {
+	$cmd = "/bin/ping -c $send_count -q -i $send_rate -w $timeout $ttlarg $host";
+    } elsif($platform =~ /CYGWIN/) {
+	# Neither Windows nor Cygwin ping has either send rate or timeout.
+	# Windows ping doesn't have -q, but it does have TTL, so use it.
+	$cmd = "/cygdrive/c/WINDOWS/system32/ping.exe -n $send_count $ttlarg $host";
     }
 
     # note backticks passes SIGINT to child procs
@@ -621,6 +628,9 @@ sub ping_node {
 	$count = $1;
     } elsif($platform eq LINUX && $result =~ /(\d+) received/) {
 	$count = $1;
+    } elsif($platform =~ /CYGWIN/ && 
+	    $results[$reslt_cnt-3] =~ /Received = (\d+)/) {
+	$count = $1;
     }
 
     if($count) {
@@ -628,6 +638,9 @@ sub ping_node {
 	if($result=~ /\d+\.\d+\/(\d+\.\d+)\/\d+\.\d+\/(\d+\.\d+)/) {
 	    $avg_latency = $1;
 	    $stddev = $2;
+	} elsif($result=~ /Average = (\d+)ms/) {
+	    $avg_latency = $1;
+	    $stddev = 0.03;	# Stddev is not reported on Windows.
 	}
     }
     return ($count, $avg_latency, $stddev);
