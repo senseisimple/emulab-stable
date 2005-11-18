@@ -76,7 +76,7 @@ function SPITFORM($formfields, $returning, $errors)
                  If you are a <font color=red>student
                  (undergrad or graduate)</font>, please
                  do not try to start a project! <br>Your advisor must do it.
-                 <a href=docwrapper.php3?docname=auth.html>
+                 <a href=docwrapper.php3?docname=auth.html target='_blank'>
                  Read this for more info.</a>
               </font></center><br>\n";
 
@@ -158,7 +158,7 @@ function SPITFORM($formfields, $returning, $errors)
                       Project Head Information:&nbsp&nbsp&nbsp&nbsp&nbsp&nbsp
                       <font size=-2>
                        (Prospective project leaders please read our
-                       <a href='docwrapper.php3?docname=policies.html'>
+                       <a href='docwrapper.php3?docname=policies.html' target='_blank'>
                        Administrative Policies</a>)</font>
                   </th>
               </tr>\n";
@@ -436,7 +436,7 @@ function SPITFORM($formfields, $returning, $errors)
     #
     echo "<tr>
               <td colspan=2>*Will you add a link on your project page
-                             to <a href=\"$TBDOCBASE\">$WWWHOST</a>?
+                             to <a href=\"$TBDOCBASE\" target='_blank'>$WWWHOST</a>?
               </td>
               <td><input type=checkbox value=checked
                          name=\"formfields[proj_linked]\"
@@ -474,7 +474,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>*Estimated #of
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbpcs\">
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=hardware.html#tbpcs\" target='_blank'>
                              PCs</a>:</td>
               <td class=left>
                   <input type=text
@@ -486,7 +486,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>*Estimated #of
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\" target='_blank'>
                              Planetlab PCs</a>:</td>
               <td class=left>
                   <input type=text
@@ -498,7 +498,7 @@ function SPITFORM($formfields, $returning, $errors)
 
     echo "<tr>
               <td colspan=2>*Estimated #of
-        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\">
+        <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\" target='_blank'>
                              wide-area PCs</a>:</td>
               <td class=left>
                   <input type=text
@@ -537,23 +537,23 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html'>
+                 <a href = 'docwrapper.php3?docname=security.html' target='_blank'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (! $returning) {
 	echo "<li> If you want us to use your existing ssh public key,
                    then either paste it in or specify the path to your
                    your identity.pub file. <font color=red>NOTE:</font>
-                   We use the <a href=http://www.openssh.org>OpenSSH</a>
+                   We use the <a href=http://www.openssh.org target='_blank'>OpenSSH</a>
                    key format,
                    which has a slightly different protocol 2 public key format
                    than some of the commercial vendors such as
-                   <a href=http://www.ssh.com>SSH Communications</a>. If you
+                   <a href=http://www.ssh.com target='_blank'>SSH Communications</a>. If you
                    use one of these commercial vendors, then please
                    upload the public  key file and we will convert it
                    for you. <i>Please do not paste it in.</i>\n
 
-              <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a>
+              <li> Note to <a href=http://www.opera.com target='_blank'><b>Opera 5</b></a>
                    users: The file upload mechanism is broken in Opera, so
                    you cannot specify a local file for upload. Instead,
                    please paste your public key in.\n";

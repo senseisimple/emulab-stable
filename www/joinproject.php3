@@ -391,23 +391,23 @@ function SPITFORM($formfields, $returning, $errors)
     echo "<h4><blockquote><blockquote>
           <ol>
             <li> Please consult our
-                 <a href = 'docwrapper.php3?docname=security.html'>
+                 <a href = 'docwrapper.php3?docname=security.html' target='_blank'>
                  security policies</a> for information
                  regarding passwords and email addresses.\n";
     if (!$returning && !$forwikionly) {
 	echo "<li> If you want us to use your existing ssh public key,
                    then either paste it in or specify the path to your
                    your identity.pub file.  <font color=red>NOTE:</font>
-                   We use the <a href=http://www.openssh.org>OpenSSH</a>
+                   We use the <a href=http://www.openssh.org target='_blank'>OpenSSH</a>
                    key format,
                    which has a slightly different protocol 2 public key format
                    than some of the commercial vendors such as
-                   <a href=http://www.ssh.com>SSH Communications</a>. If you
+                   <a href=http://www.ssh.com target='_blank'>SSH Communications</a>. If you
                    use one of these commercial vendors, then please
                    upload the public  key file and we will convert it
                    for you. <i>Please do not paste it in.</i>\n
 
-              <li> Note to <a href=http://www.opera.com><b>Opera 5</b></a>
+              <li> Note to <a href=http://www.opera.com target='_blank'><b>Opera 5</b></a>
                    users: The file upload mechanism is broken in Opera, so
                    you cannot specify a local file for upload. Instead,
                    please paste your public key in.\n";
