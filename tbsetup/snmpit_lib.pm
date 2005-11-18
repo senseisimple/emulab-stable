@@ -24,6 +24,7 @@ use Exporter;
                 getTrunkHash
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
 		snmpitSet snmpitSetWarn snmpitSetFatal snmpitWarn snmpitFatal
+                snmpitBulkwalk snmpitBulkwalkWarn snmpitBulkwalkFatal
 		printVars tbsort );
 
 use English;
@@ -40,6 +41,7 @@ my $DEFAULT_RETRIES = 10;
 
 my $SNMPIT_GET = 0;
 my $SNMPIT_SET = 1;
+my $SNMPIT_BULKWALK = 2;
 
 my %Devices=();
 # Devices maps device names to device IPs
@@ -738,6 +740,8 @@ sub snmpitDoIt($$$;$) {
     my $array_size;
     if ($getOrSet == $SNMPIT_GET) {
 	$array_size = 2;
+    } elsif ($getOrSet == $SNMPIT_BULKWALK) {
+	$array_size = 1;
     } else {
 	$array_size = 4;
     }
@@ -753,8 +757,11 @@ sub snmpitDoIt($$$;$) {
     #
     foreach my $retry ( 1 .. $retries) {
 	my $status;
+        my @return;
 	if ($getOrSet == $SNMPIT_GET) {
 	    $status = $sess->get($var);
+	} elsif ($getOrSet == $SNMPIT_BULKWALK) {
+	    @return = $sess->bulkwalk(0,32,$var);
 	} else {
 	    $status = $sess->set($var);
 	}
@@ -774,6 +781,8 @@ sub snmpitDoIt($$$;$) {
 	    my $type;
 	    if ($getOrSet == $SNMPIT_GET) {
 		$type = "get";
+	    } elsif ($getOrSet == $SNMPIT_BULKWALK) {
+		$type = "bulkwalk";
 	    } else {
 		$type = "set";
 	    }
@@ -788,6 +797,8 @@ sub snmpitDoIt($$$;$) {
 	} else {
 	    if ($getOrSet == $SNMPIT_GET) {
 		return $var->[2];
+	    } elsif ($getOrSet == $SNMPIT_BULKWALK) {
+                return @return;
 	    } else {
 	        return 1;
 	    }
@@ -797,8 +808,8 @@ sub snmpitDoIt($$$;$) {
 	# Don't flood requests too fast. Randomize the sleep a little so that
 	# we don't end up with all our retries coming in at the same time.
 	#
-	sleep(2);
-	select(undef, undef, undef, rand(2));
+        sleep(1);
+	select(undef, undef, undef, rand(1));
     }
 
     #
@@ -903,6 +914,54 @@ sub snmpitSetFatal($$;$) {
 	snmpitFatal("SNMP SET failed");
     }
     return $result;
+}
+
+#
+# usage: snmpitBulkwalk(session, var, [retries])
+# args:  session - SNMP::Session object, already connected to the SNMP
+#                  device
+#        var     - An SNMP::Varbind or a reference to a single-element array
+#        retries - Number of times to retry in case of failure
+# returns: an array of values on success, undef on failure
+#
+sub snmpitBulkwalk($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my @result;
+
+    @result = snmpitDoIt($SNMPIT_BULKWALK,$sess,$var,$retries);
+
+    return @result;
+}
+
+#
+# Same as snmpitBulkwalk, but send mail if any errors occur
+#
+sub snmpitBulkwalkWarn($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my @result;
+
+    @result = snmpitDoIt($SNMPIT_BULKWALK,$sess,$var,$retries);
+
+    if (! defined @result) {
+	snmpitWarn("SNMP Bulkwalk failed");
+    }
+    return @result;
+}
+
+#
+# Same as snmpitBulkwalkWarn, but also exits from the program if there is a 
+# failure.
+#
+sub snmpitBulkwalkFatal($$;$) {
+    my ($sess,$var,$retries) = @_;
+    my @result;
+
+    @result = snmpitDoIt($SNMPIT_BULKWALK,$sess,$var,$retries);
+
+    if (! defined @result) {
+	snmpitFatal("SNMP Bulkwalk failed");
+    }
+    return @result;
 }
 
 #

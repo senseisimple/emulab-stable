@@ -190,6 +190,15 @@ sub new($$$;$) {
     }
 
     #
+    # Connecting an SNMP session doesn't necessarily mean you can actually get
+    # packets to and from the switch. Test that by grabbing an OID that should
+    # be on every switch. Let it retry a bunch, to hide transient failures
+    #
+
+    my $OS_details = snmpitGetFatal($self->{SESS},["sysDescr",0],30);
+    print "Switch $self->{NAME} is running $OS_details\n" if $self->{DEBUG};
+
+    #
     # The bless needs to occur before readifIndex(), since it's a class 
     # method
     #
@@ -386,7 +395,8 @@ sub vlanLock($) {
 	#
 	# Attempt to grab the edit buffer
 	#
-	my $grabBuffer = $self->{SESS}->set([$EditOp,1,"copy","INTEGER"]);
+	my $grabBuffer = snmpitSetWarn($self->{SESS},
+            [$EditOp,1,"copy","INTEGER"]);
 
 	#
 	# Check to see if we were sucessful
@@ -421,7 +431,7 @@ sub vlanLock($) {
 	#
 	my $me = `/usr/bin/uname -n`;
 	chomp $me;
-	$self->{SESS}->set([$BufferOwner,1,$me,"OCTETSTR"]);
+	snmpitSetWarn($self->{SESS},[$BufferOwner,1,$me,"OCTETSTR"]);
 
 	return 1;
     }
@@ -434,46 +444,59 @@ sub vlanLock($) {
 #
 # usage: vlanUnlock($self)
 #
-# TODO: Finish commenting, major cleanup, removal of obsolete features
-#        
-sub vlanUnlock($;$) {
+sub vlanUnlock($) {
     my $self = shift;
-    my $force = shift;
 
+    #
+    # OIDs of the operations we'll be using in this function
+    #
     my $EditOp = 'vtpVlanEditOperation'; # use index 1
     my $ApplyStatus = 'vtpVlanApplyStatus'; # use index 1
-    my $ApplyRetVal = $self->{SESS}->set([[$EditOp,1,"apply","INTEGER"]]);
+
+    print "    Applying VLAN changes on $self->{NAME} ...";
+
+    #
+    # Send the command to apply what's in the edit buffer
+    #
+    my $ApplyRetVal = snmpitSetWarn($self->{SESS},[$EditOp,1,"apply","INTEGER"]);
     $self->debug("Apply set: '$ApplyRetVal'\n");
 
+    #
+    # Loop waiting for the switch to tell us that it's finished applying the
+    # edits
+    #
     $ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
     $self->debug("Apply gave $ApplyRetVal\n");
     while ($ApplyRetVal eq "inProgress") { 
+        # Rate-limit our polling
+        select(undef,undef,undef,.1);
 	$ApplyRetVal = snmpitGetWarn($self->{SESS},[$ApplyStatus,1]);
 	$self->debug("Apply gave $ApplyRetVal\n");
+        print ".";
     }
 
+    #
+    # Tell the caller what happened
+    #
     if ($ApplyRetVal ne "succeeded") {
-	$self->debug("Apply failed: Gave $ApplyRetVal\n");
-	warn("ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
-	# Only release the buffer if they've asked to force it.
-	if (!$force) {
-	    my $RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
-	    $self->debug("Release: '$RetVal'\n");
-	    if (! $RetVal ) {
-		warn("VLAN Reconfiguration Failed. No changes saved.\n");
-		return 0;
-	    }
-	}
+        print " FAILED\n";
+	warn("**** ERROR: Failure applying VLAN changes: $ApplyRetVal\n");
     } else { 
+        print " Succeeded\n";
 	$self->debug("Apply Succeeded.\n");
-	# If I succeed, release buffer
-	my $RetVal = $self->{SESS}->set([[$EditOp,1,"release","INTEGER"]]);
-	if (! $RetVal ) {
-	    warn("VLAN Reconfiguration Failed. No changes saved.\n");
-	    return 0;
-	}
-	$self->debug("Release: '$RetVal'\n");
     }
+
+    #
+    # Try to release the lock, even if the previous part failed - we don't
+    # want to keep holding it
+    #
+    my $snmpvar = [$EditOp,1,"release",'INTEGER'];
+    my $RetVal = snmpitSetWarn($self->{SESS},$snmpvar);
+    if (! $RetVal ) {
+        warn("*** ERROR: Failed to unlock VLAN edit buffer\n");
+        return 0;
+    }
+    $self->debug("Release: '$RetVal'\n");
     
     return $ApplyRetVal;
 }
@@ -494,7 +517,7 @@ sub vlanNumberExists($$) {
     # Just look up the name for this VLAN, and see if we get an answer back
     # or not
     #
-    my $rv = $self->{SESS}->get([$VlanName,"1.$vlan_number"]);
+    my $rv = snmpitGetWarn($self->{SESS},[$VlanName,"1.$vlan_number"]);
     if (!$rv or $rv eq "NOSUCHINSTANCE") {
 	return 0;
     } else {
@@ -525,7 +548,7 @@ sub findVlans($@) {
     #
     my %mapping = ();
     @mapping{@vlan_ids} = undef;
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,[$VlanName]);
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS},[$VlanName]);
     foreach my $rowref (@$rows) {
 	my ($name,$vlan_number,$vlan_name) = @$rowref;
 	#
@@ -662,35 +685,27 @@ sub createVlan($$;$$$) {
 
 	if (!$vlan_number) {
 	    #
-	    # Find a free VLAN number to use.
+	    # Find a free VLAN number to use. Get a list of all VLANs on the
+            # switch, then look through for a free one
 	    #
+            my %vlan_mappings = $self->findVlans();
+
+            #
+            # Convert the mapping to a form we can use
+            #
+            my @vlan_numbers = values(%vlan_mappings);
+            my @taken_vlans;
+            foreach my $num (@vlan_numbers) {
+                $taken_vlans[$num] = 1;
+            }
+
+            #
+            # Pick a VLAN number
+            #
 	    $vlan_number = $self->{MIN_VLAN};
-	    my $RetVal = snmpitGetWarn($self->{SESS},
-		[$VlanRowStatus,"1.$vlan_number"]);
-	    if (!defined($RetVal)) {
-		#
-		# If we can't get the first one, we might as well bail
-		#
-		warn "WARNING: Failed to VLAN name for VLAN $vlan_number\n";
-		next;
-	    }
-	    $self->debug("Row $vlan_number got '$RetVal'\n",2);
-	    while (($RetVal ne 'NOSUCHINSTANCE') &&
-		    ($vlan_number <= $self->{MAX_VLAN})) {
-		$vlan_number += 1;
-		$RetVal = snmpitGetWarn($self->{SESS},
-		    [$VlanRowStatus,"1.$vlan_number"]);
-		if (!defined($RetVal)) {
-		    #
-		    # We probably could unlock the edit buffer and die, but
-		    # the script using this library could have other unfinished
-		    # business
-		    #
-		    warn "WARNING: Failed to VLAN name for VLAN $vlan_number\n";
-		} else {
-		    $self->debug("Row $vlan_number got '$RetVal'\n",2);
-		}
-	    }
+            while ($taken_vlans[$vlan_number]) {
+                $vlan_number++;
+            }
 	    if ($vlan_number > $self->{MAX_VLAN}) {
 		#
 		# We must have failed to find one
@@ -715,8 +730,8 @@ sub createVlan($$;$$$) {
 	# Perform the actual creation. Yes, this next line MUST happen all in
 	# one set command....
 	#
-	my $RetVal = $self->{SESS}->set([[$VlanRowStatus,"1.$vlan_number",
-			"createAndGo","INTEGER"],
+	my $RetVal = snmpitSetWarn($self->{SESS},
+               [[$VlanRowStatus,"1.$vlan_number", "createAndGo","INTEGER"],
 		[$VlanType,"1.$vlan_number","ethernet","INTEGER"],
 		[$VlanName,"1.$vlan_number",$vlan_id,"OCTETSTR"],
 		[$VlanSAID,"1.$vlan_number",$SAID,"OCTETSTR"]]);
@@ -741,8 +756,8 @@ sub createVlan($$;$$$) {
 		#
 		my $PVlanType = "cpvlanVlanEditPrivateVlanType";
 		print "    Setting private VLAN type to $private_type ... ";
-		$RetVal = $self->{SESS}->set([$PVlanType,"1.$vlan_number",$private_type,
-		    'INTEGER']);
+		$RetVal = snmpitSetWarn($self->{SESS},
+                    [$PVlanType,"1.$vlan_number",$private_type, 'INTEGER']);
 		print "",($RetVal? "Succeeded":"Failed"), ".\n";
 		if (!$RetVal) {
 		    $okay = 0;
@@ -761,8 +776,9 @@ sub createVlan($$;$$$) {
 			    $okay = 0;
 			} else {
 			    print "    Associating with $private_primary (#$primary_number) ... ";
-			    $RetVal = $self->{SESS}->set([[$PVlanAssoc,"1.$vlan_number",
-				$primary_number,"INTEGER"]]);
+			    $RetVal = snmpitSetWarn($self->{SESS},
+                                [$PVlanAssoc,"1.$vlan_number",
+                                 $primary_number,"INTEGER"]);
 			    print "", ($RetVal? "Succeeded":"Failed"), ".\n";
 			    if (!$RetVal) {
 				$okay = 0;
@@ -811,7 +827,8 @@ sub createVlan($$;$$$) {
 		    # Get the existing bitfield used to maintain the mapping
 		    # for the port
 		    #
-		    my $bitfield = $self->{SESS}->get([$SecondaryPort,$ifIndex]);
+		    my $bitfield = snmpitGetFatal($self->{SESS},
+                        [$SecondaryPort,$ifIndex]);
 		    my $unpacked = unpack("B*",$bitfield);
 
 		    #
@@ -834,8 +851,8 @@ sub createVlan($$;$$$) {
 		    $bitfield = pack("B*",$unpacked);
 
 		    # And save it back...
-		    $RetVal = $self->{SESS}->set([$SecondaryPort,$ifIndex,$bitfield,
-			"OCTETSTR"]);
+		    $RetVal = snmpitSetFatal($self->{SESS},
+                        [$SecondaryPort,$ifIndex,$bitfield, "OCTETSTR"]);
 		    print "", ($RetVal? "Succeeded":"Failed"), ".\n";
 
 		}
@@ -1004,7 +1021,7 @@ sub removePortsFromVlan($@) {
     #
     # Walk the tree to find VLAN membership
     #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan);
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS},$VlanPortVlan);
     foreach my $rowref (@$rows) {
 	my ($name,$modport,$port_vlan_number) = @$rowref;
 	$self->debug("Got $name $modport $port_vlan_number\n");
@@ -1059,8 +1076,8 @@ sub removeVlan($@) {
 	my $VlanRowStatus = 'vtpVlanEditRowStatus'; # vlan is index
 
 	print "  Removing VLAN #$vlan_number on $self->{NAME} ... ";
-	my $RetVal = $self->{SESS}->set([$VlanRowStatus,"1.$vlan_number",
-					 "destroy","INTEGER"]);
+	my $RetVal = snmpitSetWarn($self->{SESS},
+            [$VlanRowStatus,"1.$vlan_number","destroy","INTEGER"]);
 	if ($RetVal) {
 	    print "Succeeded.\n";
 	} else {
@@ -1109,7 +1126,8 @@ sub UpdateField($$$@) {
 	    if ($Status ne $val) {
 		$self->debug("Setting $port to $val...");
 		# Don't use async
-		my $result = $self->{SESS}->set([$OID,$port,$val,"INTEGER"]);
+		my $result = snmpitSetWarn($self->{SESS},
+                    [$OID,$port,$val,"INTEGER"]);
 		$self->debug("Set returned '$result'\n") if (defined $result);
 		if ($self->{BLOCK}) {
 		    my $n = 0;
@@ -1150,15 +1168,15 @@ sub listVlans($) {
 
     my $VlanPortVlan;
     if ($self->{OSTYPE} eq "CatOS") {
-	$VlanPortVlan = "vlanPortVlan"; #index is ifIndex
+	$VlanPortVlan = ["vlanPortVlan"]; #index is ifIndex
     } elsif ($self->{OSTYPE} eq "IOS") {
-	$VlanPortVlan = "vmVlan"; #index is ifIndex
+	$VlanPortVlan = ["vmVlan"]; #index is ifIndex
     }
 
     #
     # Walk the tree to find the VLAN names
     #
-    my ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanName);
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS},$VlanName);
     my %Names = ();
     my %Members = ();
     foreach my $rowref (@$rows) {
@@ -1179,7 +1197,8 @@ sub listVlans($) {
     #
     # Walk the tree for the VLAN members
     #
-    ($rows) = $self->{SESS}->bulkwalk(0,32,$VlanPortVlan);
+    ($rows) = snmpitBulkwalkFatal($self->{SESS},$VlanPortVlan);
+    $self->debug("Vlan members walk returned " . scalar(@$rows) . " rows\n");
     foreach my $rowref (@$rows) {
 	my ($name,$modport,$vlan_number) = @$rowref;
 	$self->debug("Got $name $modport $vlan_number\n",3);
@@ -1234,7 +1253,7 @@ sub walkTableIfIndex($$$;$) {
     #
     # Grab the whole table in one fell swoop
     #
-    my @table = $self->{SESS}->bulkwalk(0,32,$table);
+    my @table = snmpitBulkwalkFatal($self->{SESS},[$table]);
 
     foreach my $table (@table) {
         foreach my $row (@$table) {
@@ -1457,8 +1476,8 @@ sub setVlansOnTrunk($$$$) {
     $bitfield = pack("B*",$unpacked);
 
     # And save it back...
-    my $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
-    	    "OCTETSTR"]);
+    my $rv = snmpitSetFatal($self->{SESS},
+        ["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,"OCTETSTR"]);
     if ($rv) {
 	return 1;
     } else {
@@ -1513,8 +1532,8 @@ sub clearAllVlansOnTrunk($$) {
     $bitfield = pack("B*",$unpacked);
 
     # And save it back...
-    my $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
-    	    "OCTETSTR"]);
+    my $rv = snmpitSetFatal($self->{SESS},
+        ["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield, "OCTETSTR"]);
     if ($rv) {
 	return 1;
     } else {
@@ -1646,7 +1665,7 @@ sub readifIndex($) {
     #
 
     if ($self->{OSTYPE} eq "CatOS") {
-	my ($rows) = $self->{SESS}->bulkwalk(0,32,["portIfIndex"]);
+	my ($rows) = snmpitBulkwalkFatal($self->{SESS},["portIfIndex"]);
 
 	foreach my $rowref (@$rows) {
 	    my ($name,$modport,$ifindex) = @$rowref;
@@ -1655,7 +1674,7 @@ sub readifIndex($) {
 	    $self->{IFINDEX}{$ifindex} = $modport;
 	}
     } elsif ($self->{OSTYPE} eq "IOS") {
-	my ($rows) = $self->{SESS}->bulkwalk(0,32,["ifDescr"]);
+	my ($rows) = snmpitBulkwalkFatal($self->{SESS},["ifDescr"]);
    
 	foreach my $rowref (@$rows) {
 	    my ($name,$iid,$descr) = @$rowref;
@@ -1725,6 +1744,8 @@ sub getFields($$$) {
     my @results = ();
     while (@vars) {
 	my $varList = new SNMP::VarList(splice(@vars,0,$maxvars));
+        # TODO: Convert this to snmpitGet*(), but can't yet because it doesn't
+        # support VarLists
 	my $rv = $self->{SESS}->get($varList);
 	push @results, @$varList;
     }
