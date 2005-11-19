@@ -1021,7 +1021,7 @@ sub removePortsFromVlan($@) {
     #
     # Walk the tree to find VLAN membership
     #
-    my ($rows) = snmpitBulkwalkFatal($self->{SESS},$VlanPortVlan);
+    my ($rows) = snmpitBulkwalkFatal($self->{SESS},[$VlanPortVlan]);
     foreach my $rowref (@$rows) {
 	my ($name,$modport,$port_vlan_number) = @$rowref;
 	$self->debug("Got $name $modport $port_vlan_number\n");
