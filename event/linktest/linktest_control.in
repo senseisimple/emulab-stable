@@ -152,7 +152,8 @@ if (! ($expstate = ExpState($pid, $eid))) {
     die("*** $0:\n".
 	"    No such experiment $pid/$eid!\n");
 }
-if ($expstate ne EXPTSTATE_ACTIVE && $expstate ne EXPTSTATE_ACTIVATING) {
+if ($expstate ne EXPTSTATE_ACTIVE && $expstate ne EXPTSTATE_ACTIVATING &&
+    $expstate ne EXPTSTATE_MODIFY_RESWAP) {
     die("*** $0:\n".
 	"    Experiment $pid/$eid must be active!\n");
 }
