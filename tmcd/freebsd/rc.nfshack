@@ -1,0 +1,34 @@
+#/bin/sh -
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Enable our gross hack to avoid transient NFS "permission denied" errors
+# due to a BSD NFS server changing its exports list.
+#
+
+if [ -r /etc/emulab/paths.sh ]; then
+    . /etc/emulab/paths.sh
+else
+    BINDIR=/etc/testbed
+fi
+
+enabled=`sysctl -n vfs.nfs.eacces_retry_enable 2>/dev/null`
+if [ "$enabled"x = x ]; then
+    echo "WARNING: NFS client-side hack not supported, beware of \"permission denied\" failures"
+    exit 1
+fi
+if [ $enabled -eq 0 ]; then
+    sysctl vfs.nfs.eacces_retry_enable=1 >/dev/null 2>&1
+    # sysctl always returns 0 status?
+    enabled=`sysctl -n vfs.nfs.eacces_retry_enable 2>/dev/null`
+    if [ "$enabled"x = x -o $enabled -eq 0 ]; then
+	echo "WARNING: NFS client-side hack not enabled, beware of \"permission denied\" failures"
+	exit 1
+    fi
+fi
+echo "NFS client-side hack enabled"
+exit 0

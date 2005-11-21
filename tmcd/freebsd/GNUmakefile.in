@@ -191,6 +191,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc/rc.kname
 	$(INSTALL) -m 755 $(SRCDIR)/rc.mfs $(BINDIR)/rc/rc.mfs
+	$(INSTALL) -m 755 $(SRCDIR)/rc.nfshack $(BINDIR)/rc/rc.nfshack
 	$(INSTALL) -m 755 ./sethostname $(BINDIR)/sethostname
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient $(BINDIR)/dhclient
 	$(INSTALL) -m 755 $(SRCDIR)/nodetype $(BINDIR)/nodetype

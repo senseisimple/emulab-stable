@@ -97,6 +97,13 @@ sub doboot()
 	# This is allowed to fail; ipod might not be supported.
     }
 
+    # XXX enable the NFS client-side EACCES hack
+    if (-x "$RCDIR/rc.nfshack") {
+	print("Enabling client-side NFS EACCES hack\n");
+	system("$RCDIR/rc.nfshack");
+	# This is allowed to fail; the hack might not be supported.
+    }
+
     # Now we get into the real work.
     print("Checking Testbed reservation status\n");
     my ($pid, $eid, $vname) = bootsetup();
