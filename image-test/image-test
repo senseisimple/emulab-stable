@@ -50,7 +50,8 @@ sub help() {
      "             (note 'e' implies 'o')\n".
      "  -p         run experments in parallel\n".
      "  -m NUM     soft limit on the maximum number of nodes to use at once\n".
-     "  -M NUM     hard limit on the maximum number of nodes to use at once\n");
+     "  -M NUM     hard limit on the maximum number of nodes to use at once\n".
+     "  --skip-std-tests  skip standard tests expect for ssh-*\n");
 }
 
 die usage unless @ARGV > 0;
@@ -74,13 +75,13 @@ my $testsdir = "$srcdir/tests";
 my ($pid) = $cwd =~ m~^/proj/(.+?)/~;
 
 my @argv;
-my %exp_opts;
 
 my $stages = 'cstoe';
 my $in_parallel;
 my $soft_limit = 5;
 my $hard_limit = 0;
 my $just_list;
+my $skip_std_tests;
 
 Getopt::Long::Configure 'no_ignore_case';
 
@@ -90,7 +91,8 @@ GetOptions
     "p" => \$in_parallel,
     "m=i" => \$soft_limit,
     "M=i" => \$hard_limit,
-    "l|list" => \$just_list
+    "l|list" => \$just_list,
+    "skip-std-tests" => \$skip_std_tests
   or usage();
 
 $soft_limit = LARGE_NUM   if $soft_limit == 0;
@@ -168,7 +170,7 @@ sub mktests ($$$@) {
 		 resultsdir => "$destdir/$t",
 		 @$what,
 		 stages => $stages,
-		 %exp_opts};
+		 skip_std_tests => $skip_std_tests};
     push @exps, $t;
   } else {
     my $p = shift @parms;
@@ -445,6 +447,9 @@ sub wait_exp () {
 sub get_exps($@) {
   my ($avail,@exps_s) = @_;
   return (0) unless @exps_s;
+  while ($exps_s[-1] > $avail) {
+    pop @exps_s;
+  }
   if ($exps_s[-1] == $avail) {
     return ($avail, $exps_s[-1]);
   } else {

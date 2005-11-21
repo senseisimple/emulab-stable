@@ -207,6 +207,8 @@ sub single_node_tests ($) {
 
   test_ssh $node;
 
+  return if $parms{skip_std_tests};
+
   test_rcmd "sudo-$node", [], $node, 'sudo touch /afile.txt';
 
   test_rcmd "hostname-$node" , [], $node, 'hostname', sub {
@@ -232,6 +234,8 @@ sub single_node_tests ($) {
 sub multi_node_tests () {
 
   #test_cmd 'linktest', [], "run_linktest.pl -v -e $pid/$eid";
+
+  return if $parms{skip_std_tests};
 
   sleep 10;
   test_cmd 'linktest1', [], "run_linktest.pl -v -L 1 -l 1 -e $pid/$eid";
@@ -299,14 +303,14 @@ sub test_experiment (%) {
     exit (ERR_INT | $status);
   };
 
-  #sleep 30;
-  #exit 0;
-
   mkdir $resultsdir, 0777;
   chdir $resultsdir;
 
   mkdir "working", 0777;
   mkdir "bin",     0777;
+
+  #sleep 5;
+  #exit 0;
 
   $ENV{PATH} = "$resultsdir/bin:$ENV{PATH}";
 

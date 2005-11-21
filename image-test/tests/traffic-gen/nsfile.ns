@@ -1,0 +1,53 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set node0 [$ns node]
+set node1 [$ns node]
+
+set link1 [$ns duplex-link $node0 $node1 100Mb 0ms DropTail]
+
+set udp0 [new Agent/UDP]
+$ns attach-agent $node0 $udp0
+
+set cbr_udp [new Application/Traffic/CBR]
+$cbr_udp set packetSize_ 500
+$cbr_udp set interval_ 0.05
+$cbr_udp attach-agent $udp0
+
+set null0 [new Agent/Null]
+$ns attach-agent $node1 $null0
+
+$ns connect $udp0 $null0
+
+set tcp0 [new Agent/TCP]
+$ns attach-agent $node1 $tcp0
+
+set cbr_tcp [new Application/Traffic/CBR]
+$cbr_tcp set packetSize_ 500
+$cbr_tcp set interval_ 0.01
+$cbr_tcp attach-agent $tcp0
+
+set null1 [new Agent/Null]
+$ns attach-agent $node0 $null1
+
+$ns connect $tcp0 $null1
+
+set tl [$ns event-timeline]
+
+$tl at 10.0 "$cbr_udp start"
+$tl at 12.0 "$cbr_udp stop"
+$tl at 15.0 "$cbr_tcp start"
+$tl at 17.0 "$cbr_tcp stop"
+
+$tl at 20.0 "$cbr_udp start"
+$tl at 20.0 "$cbr_tcp start"
+$tl at 22.0 "$cbr_udp stop"
+$tl at 22.0 "$cbr_tcp stop"
+
+$link1 trace
+$link1 trace_endnode 1
+
+$ns rtproto Static
+$ns run
+
+
