@@ -496,22 +496,28 @@ sub doSwapout($) {
 	if ($soaction{'command'}) {
 	    my @nodes = ExpNodes($pid, $eid, 1);
 
-	    print STDERR "Performing swapout admin MFS actions.\n";
-	    TBDebugTimeStamp("Performing swapout actions");
-	    my @failed = ();
-	    my %myargs = ();
-	    $myargs{'name'} = "tbswap";
-	    $myargs{'command'} = $soaction{'command'};
-	    if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
-		if ($soaction{'isfatal'}) {
-		    tberror
+	    if (@nodes > 0) {
+		print STDERR "Performing swapout admin MFS actions.\n";
+		TBDebugTimeStamp("Performing swapout actions");
+		my @failed = ();
+		my %myargs = ();
+		$myargs{'name'} = "tbswap";
+		$myargs{'command'} = $soaction{'command'};
+		if (defined($soaction{'timeout'})) {
+		    $myargs{'timeout'} = $soaction{'timeout'};
+		}
+		$myargs{'timestamp'} = 1;
+		if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
+		    if ($soaction{'isfatal'}) {
+			tberror
+			    "Failed to run '" . $soaction{'command'} .
+				"' on @failed!";
+			return 1;
+		    }
+		    tbwarn
 			"Failed to run '" . $soaction{'command'} .
 			    "' on @failed!";
-		    return 1;
 		}
-		tbwarn
-		    "Failed to run '" . $soaction{'command'} .
-			"' on @failed!";
 	    }
 	}
 
@@ -1411,6 +1417,13 @@ sub undoFWNodes($$;@) {
     if (!defined(@nodes) || @nodes == 0) {
 	@nodes = ExpNodes($pid, $eid, 1);
 	$doall = 1;
+    }
+
+    #
+    # There has to at least be a firewall node to be interesting
+    #
+    if (@nodes == 0) {
+	return 0;
     }
 
     if ($doall) {
