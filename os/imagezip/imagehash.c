@@ -19,6 +19,7 @@
 #include <string.h>
 #include <zlib.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <openssl/sha.h>
 #include <openssl/md5.h>
@@ -77,7 +78,7 @@ static int create = 0;
 static int report = 0;
 static int regfile = 0;
 static int nothreads = 0;
-static int hashtype = HASH_TYPE_MD5;
+static int hashtype = HASH_TYPE_SHA1;
 static int hashlen = 16;
 static long hashblksize = HASHBLK_SIZE;
 static unsigned long long ndatabytes;
@@ -475,8 +476,6 @@ createhash(char *name, struct hashinfo **hinfop)
 		return -1;
 	}
 
-	free(hfile);
-
 	/*
 	 * Set the modtime of the hash file to match that of the image.
 	 * This is a crude (but fast!) method for matching images with
@@ -484,12 +483,20 @@ createhash(char *name, struct hashinfo **hinfop)
 	 */
 	cc = stat(name, &sb);
 	if (cc >= 0) {
+#ifdef linux
+		tm[0].tv_sec = sb.st_atime;
+		tm[0].tv_usec = 0;
+		tm[1].tv_sec = sb.st_mtime;
+		tm[1].tv_usec = 0;
+#else
 		TIMESPEC_TO_TIMEVAL(&tm[0], &sb.st_atimespec);
 		TIMESPEC_TO_TIMEVAL(&tm[1], &sb.st_mtimespec);
+#endif
 		cc = utimes(hfile, tm);
 	}
 	if (cc < 0)
-		fprintf(stderr, "%s: WARNING: could not set mtime\n", hfile);
+		fprintf(stderr, "%s: WARNING: could not set mtime (%s)\n",
+			hfile, strerror(errno));
 
 	nhregions = hinfo->nregions;
 	printf("%s: %lu chunks, %lu regions, %lu hashregions, %llu data bytes\n",
@@ -497,6 +504,7 @@ createhash(char *name, struct hashinfo **hinfop)
 #ifdef TIMEIT
 	printf("%qu bytes: inflate cycles: %llu\n", ndatabytes, dcycles);
 #endif
+	free(hfile);
 	return 0;
 }
 
@@ -1089,7 +1097,7 @@ hashfilechunk(int chunkno, char *chunkbufp, int chunksize,
 	unsigned char hash[HASH_MAXSIZE];
 	unsigned char *(*hashfunc)(const unsigned char *, unsigned long,
 				   unsigned char *);
-	unsigned char *bufp = chunkbufp;
+	unsigned char *bufp = (unsigned char *)chunkbufp;
 	int errors = 0;
 
 	memset(hash, 0, sizeof hash);
