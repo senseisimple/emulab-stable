@@ -318,7 +318,6 @@ sub AddUser(@)
 		     "    user_name='$user' ,".
 		     "    user_pass='$passhash' ,".
 		     "    real_name=$gcos ,".
-		     "    group_in=0 ,".
 		     "    jabber_id='' ,".
 		     "    email_address='$email' ,".
 		     "    notify_type=1 ,".
