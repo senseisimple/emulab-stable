@@ -453,38 +453,53 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
   <li> There are several <b>Desktop icons</b> (i.e. "shortcuts") installed by
        default in the XP images: Computer Management, Bash and TCSH shells,
-       and <i>NtEmacs</i>.  </li>
+       and <i>NtEmacs</i>.  You will notice two flavors of Bash and TCSH icons
+       on the desktop, labeled <code>rxvt</code> and <code>Cygwin</code>.
        
-  <li> The Bash and TCSH icons run their respective shells in a </b>Windows
-       Terminal</b>, just as the Windows cmd.exe does.  <p>
-
-       <b>Quick-edit mode</b> is on by default, so you can cut-and-paste
-       freely between your local workstation desktop and your remote RDP
-       desktops. <p>
-
-       Remember that the cut-and-paste mouse clicks are different from in
-       <b>X</b>, where left-click starts a selection, right-click extends it,
-       and middle-click pastes.  (These are the clicks to use when you are
-       SSH'ed in to a Windows node from an xterm window.)  Yes, it can be
-       confusing. <p>
-
-       In a Windows Terminal window on your RDP remote desktop, the
-       quick-edit cut-and-paste mouse clicks are:
-
        <ul>
 
-         <li> <b>Left-drag</b> the mouse to <i>mark</i> a rectangle 
-	      of text, highlighting it.  </li>
-       
-         <li> <b>Type <i>Enter</i> or <i>right-click</i> the mouse when text
-	      is highlighted</b>, to <i>copy</i> the selected text to the
-	      clipboard. (<b><i>Escape</i></b> <i>cancels</i> the selection
-	      without copying it.)  </li>
-       
-	 <li> <b>Right-click the mouse with nothing selected</b> to 
-	      <i>paste</i> the contents of the clipboard.  </li>
+       <li> The <b><code>rxvt</code> shells</b> run in windows with
+	    <b>X</b>-like cut-and-paste mouse clicks:
 
-       </ul> <br>
+	    <ul>
+
+	      <li> <b>Left-click</b> starts a selection,  </li>
+
+	      <li> <b>Right-click</b> extends it, and  </li>
+
+	      <li> <b>middle-click</b> pastes. </li>
+
+	    </ul>
+
+	    These are the ones to use if you're connecting from an X
+	    workstation.  </li> <br>
+
+       <li> The <b><code>Cygwin</code> shells</b> run in a </b>Windows Terminal</b>
+	    window, just as the Windows cmd.exe does.  These are the ones to use
+	    if you're connecting from a Windows workstation.  <p>
+
+	    <b>Quick-edit mode</b> is on by default, so you can cut-and-paste
+	    freely between your local workstation desktop and your remote RDP
+	    desktops. <p>
+
+	    In a Windows Terminal window on your RDP remote desktop, the
+	    quick-edit cut-and-paste mouse clicks are:
+
+	    <ul>
+
+	      <li> <b>Left-drag</b> the mouse to <i>mark</i> a rectangle 
+		   of text, highlighting it.  </li>
+
+	      <li> <b>Type <i>Enter</i> or <i>right-click</i> the mouse when text
+		   is highlighted</b>, to <i>copy</i> the selected text to the
+		   clipboard. (<b><i>Escape</i></b> <i>cancels</i> the selection
+		   without copying it.)  </li>
+
+	      <li> <b>Right-click the mouse with nothing selected</b> to 
+		   <i>paste</i> the contents of the clipboard.  </li>
+
+	    </ul>
+       </ul> </li> <br>
 
   <li> On the <b>first login by a user</b>, Windows creates the user's <i>Windows
        profile directory</i> under <code>C:\Documents and Settings</code>, and creates
