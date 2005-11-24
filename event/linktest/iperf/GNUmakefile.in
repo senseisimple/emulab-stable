@@ -11,6 +11,14 @@ SUBDIR		= event/linktest/iperf
 
 include $(OBJDIR)/Makeconf
 
+SYSTEM         := $(patsubst CYGWIN%,CYGWIN,$(shell uname -s))
+
+ifeq ($(SYSTEM),CYGWIN)
+# Compile single-threaded on Windows.  Otherwise, the client iperf often hangs
+# after the first phase of a two-way bandwidth test.
+CONFIG_ARGS     = --disable-threads
+endif
+
 all:	src/emulab-iperf
 
 include $(TESTBED_SRCDIR)/GNUmakerules
@@ -35,7 +43,7 @@ client-install: Makefile
 # Note: GNU make wants to pass options in MAKEFLAGS (w) that are compatible
 # with BSD make.  So we just force configure to assume/use gmake for BSD.
 config.status:
-	MAKE=$(MAKE) $(SRCDIR)/iperf-2.0.2/configure
+	MAKE=$(MAKE) $(SRCDIR)/iperf-2.0.2/configure $(CONFIG_ARGS)
 
 iperf-2.0.2:
 	$(SRCDIR)/iperf-fetch.sh $(SRCDIR)

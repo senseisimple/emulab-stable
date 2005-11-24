@@ -66,6 +66,7 @@ use constant INSIGNIFICANT_LAT_ERROR_LO => 0.50;  # ms
 use constant INSIGNIFICANT_LAT_ERROR_HI => 3.50;  # ms
 use constant INSIGNIFICANT_BW_ERROR_HI  => 0.01;  # percent.
 use constant INSIGNIFICANT_BW_ERROR_LO  => 0.06;  # percent.
+use constant INSIGNIFICANT_BW_ERROR_LO_Windows  => 0.10;  # Lower expectations.
 
 # latency must be corrected for xmit delay under this speed.
 use constant LAT_LOW_BW => 10000000;
@@ -918,7 +919,10 @@ sub bw_test {
 			}
 		    }
 		    elsif ($bw < $edge->bw) {
-			if ($diff > ($expected * INSIGNIFICANT_BW_ERROR_LO)) {
+			if ($diff > ($expected * 
+				     (($platform =~ /CYGWIN/) ? 
+				      INSIGNIFICANT_BW_ERROR_LO_Windows : 
+				      INSIGNIFICANT_BW_ERROR_LO))) {
 			    $error = "lower";
 			}
 		    }
