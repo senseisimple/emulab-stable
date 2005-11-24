@@ -18,7 +18,7 @@
 alias v 'ls -lsF'               # "Verbose" listing
 setenv en emulab.net
 alias rootpc 'sudo ssh pc\!^.$en \!:2*'
-alias rootrd 'rd  -K -g 1280x1024 -u root pc\!^.$en &'
+alias rootrd 'rdesktop -K -g 1280x1024 -a 16 -u root pc\!^.$en &'
 
 # In Bash,
 alias v='ls -lsF'
@@ -149,7 +149,7 @@ alias v='ls -lsF'
           Click on the Skip in the "New" column to add a binary version of:
             agetty (with src), bison, cvs, cygrunsrv, ed, file, flex, gcc, gdb, inetutils, 
             make, minires-devel, more, nano, openssh (with src), openssl-devel, 
-            patch, perl, perl-libwin32, ping, psmisc, python, rpm, rsync, 
+            patch, perl, perl-libwin32, ping, psmisc, python, rpm, rsync, rxvt, 
             shutdown, sysvinit, tcsh, vim, wget, zip .
           Click in the "src" column for openssh and agetty, so patches can be applied.
         . At the end, don't "Create an icon on the Desktop", do "Add icon to Start Menu".
@@ -173,6 +173,18 @@ alias v='ls -lsF'
           - Copy the tcsh icon into All Users/Start Menu/Programs/Cygwin.
                cd C:/Documents\ and\ Settings/All\ Users
                cp -p Desktop/Cygwin\ TCSH\ Shell.lnk Start\ Menu/Programs/Cygwin
+
+        . Make rxvt All Users desktop icons for both Bash and TCSH.  
+          It doesn't need an X server running, but uses the X mouse cut-and-paste keys.
+          Windows shortcut options such as layout are ignored.  Use dash args or ~/.Xdefaults.
+              Name: rxvt Bash  Shell
+              Target: C:\cygwin\bin\rxvt.exe -g 80x55 -sl 3000 -e /bin/bash -l
+              Start in: C:\cygwin\bin
+
+              Name: rxvt TCSH Shell
+              Target: C:\cygwin\bin\rxvt.exe -g 80x55 -sl 3000 -e /bin/tcsh -l
+              Start in: C:\cygwin\bin
+
 
         . Set up local homedirs under /home as a symlink.  ~root is already there.
             cd /tmp
@@ -717,26 +729,67 @@ q
             # If this is an update, evproxy is run by rc.bootsetup and nothing stops it.
             # The install of evproxy in the make will fail unless we stop it first.
             ps -Welf | grep evproxy
+            killall evproxy
               kill `ps -Welf | grep evproxy | awk '{print $2}'`
             # Ditto emulab-syncd, program-agent, and slothd.
               ps -Welf | grep emulab
             $rc/rc.syncserver shutdown
             $rc/rc.progagent shutdown
             $rc/rc.slothd stop
+            $rc/rc.linktest stop
+            killall idlemon
+              ps -Welf | grep emulab
+              kill `ps -Welf | grep idlemon | awk '{print $2}'`
 
+            # The second make fails with tar "Cannot change ownership" errors unpacking iperf,
+            # ERROR: iperf-fetch.sh: tar failed
             make client-install >& make.log2
-            tail make.log2
+            tail -15 make.log2
               tail -f make.log2
+            # The iperf patch is skipped, so do it manually.
+            (cd ~/flux/testbed/event/linktest/iperf/iperf-2.0.2 && patch -p0 < ../iperf-patch)
+            # Also comment out linktest/iperf/iperf-2.0.2/compat/Thread.c:205, pthread_cancel( oldTID );
+            ed ~/flux/testbed/event/linktest/iperf/iperf-2.0.2/compat/Thread.c
+            /pthread_cancel( oldTID )/s|^|//|p
+            w
+            q
+
+            # Install the iperf HTML doc, since the makefiles don't do it.
+            idoc=/usr/share/doc/iperf
+            mkdir $idoc; chmod 755 $idoc
+            (cd ~root/flux/testbed/event/linktest/iperf/iperf-2.0.2/doc; \
+             for f in [a-z]*; do /usr/bin/install -c -o root -m 0644 $f $idoc ; done)
+            v $idoc
+
+            # Continue making.
+            make client-install >& make.log3
+            tail make.log3
+              tail -f make.log3
 
                 # Only needed if there are problems...
                   v -t make.log*
-                make client-install >& make.log3
                 make client-install >& make.log4
                 make client-install >& make.log5
                 make client-install >& make.log6
                 make client-install >& make.log7
                 make client-install >& make.log8
                 make client-install >& make.log9
+
+              # Optional: save the Emulab client-side make tree.  'prepare' wipes it out.
+              #[On the node as me.]
+              cd ~root
+                v $ptf/xpimage*.tgz
+              tar cfz $ptf/xpimage-elab.tgz flux
+              #[Later, on the node as me.]
+              cd ~root
+                v $ptf/xpimage*.tgz
+              cp $ptf/xpimage-elab.tgz /tmp
+              #[On the node as root.]
+              cd ~root
+                v flux
+                tar tvfz /tmp/xpimage-elab.tgz | head
+              tar xfz /tmp/xpimage-elab.tgz flux
+              
 
       . Patch the /etc/profile file to use /home dirs if the /users mounts are down.
         ## Note their comment:
@@ -872,8 +925,10 @@ if [ ]; then
 
         - RDP into a node as root and shut down all ssh processes before update.
           (Otherwise, installation of an openssh update can hang mysteriously.)
+          Use Task Manager if killall and kill don't work.
             net stop sshd
             ps -Welf | grep ssh
+            killall ssh-agent
 
         - Go through Cygwin setup and make sure everything is updated.  
               cygcheck -c openssh
@@ -886,8 +941,8 @@ if [ ]; then
         - Install the source patches.  (Go get CVSROOT and agent keys set above first.)
             (cd ~/flux; cvs update testbed/tmcd/cygwinxp)
               (cd ~/flux; cvs co testbed/tmcd/cygwinxp)
-          ##cd /usr/src/openssh-4.1p1-2
-          cd /usr/src/openssh-4.2p1-1
+          cd /usr/src/openssh-4.1p1-2
+          ###cd /usr/src/openssh-4.2p1-1
             v -t *.[ch] | head -30
 
           # Enable no-password ssh logins which can access shared homedirs.
@@ -1036,9 +1091,42 @@ if [ ]; then
           prepare
           /sbin/reboot
 
+      . Install Rude and Crude from a tarball.
+        #[On Boss]
+        sudo scp -p /share/windows/rude_cygwin_0.70.tgz root@pc$pc":"/tmp
+        rootpc $pc tar xvfz /tmp/rude-0.70.tar.gz -C /usr
+
+# [ SKIP building Rude and Crude for linktest, if we have a tarball.
+      # See http://rude.sourceforge.net/
+      #[On the node, as root.]
+      cd /tmp
+      wget http://prdownloads.sourceforge.net/rude/rude-0.62.tar.gz
+      cp ~root/flux/testbed/tmcd/cygwinxp/c_rude.patch /tmp
+      tar xvfz rude-0.70.tar.gz
+      cd rude
+
+      # Patch for Cygwin: ifdef out the Linux mmap and sched calls.
+        patch --dry-run -p0 </tmp/c_rude.patch
+      patch -p0 < /tmp/c_rude.patch
+
+      ./configure --enable-wall --with-debug-lvl=3 >& config.trace
+      make >& make.log1
+          # no root group.  make install >& install.log1
+      /usr/bin/install -c -o root -m 0755 rude/rude.exe /usr/local/bin
+      /usr/bin/install -c -o root -m 0755 crude/crude.exe /usr/local/bin
+      /usr/bin/install -c -o root -m 0644 rude/rude.8 /usr/local/man/man8
+      /usr/bin/install -c -o root -m 0644 crude/crude.8 /usr/local/man/man8
+      rdoc=/usr/share/doc/rude; mkdir $rdoc; chmod 755 $rdoc
+      (cd DOC; for f in *; do /usr/bin/install -c -o root -m 0644 $f $rdoc ; done)
+      v $rdoc
+
+      # Make a tarball so we don't have to rebuild from sources all the time.
+      tar cvfz /tmp/rude_cygwin_0.70.tgz -C /usr \
+          local/bin/{,c}rude.exe local/man/man8/{,c}rude.8 share/doc/rude
+# SKIP ]
 
 ================================================================
-Making images
+Making single images
 
     . Windows Update
       - This might be needed after each Microsoft "Patch Tuesday" (second tues of the month.)
@@ -1065,6 +1153,7 @@ Making images
 
      . Run prepare to clear out experiment-specific state.
         rootpc $pc
+          # Log off any RDP sessions as you to unlock your C:/Documents and Settings files.
           # Ignore complaints about all of the C:/Documents and Settings directories
           # that were never created because the users didn't log in...
           prepare
@@ -1105,13 +1194,14 @@ Making images
             rootpc $pc 'tsshutdn 1 /REBOOT /DELAY:1'
           ## Or you can shutdown/restart it from the task manager under RDP,
           ## or just wait a while and Emulab will cycle power to force a reboot.
-        # Wait until the node is in the MFS, based on the serial console.
 
-        # Make WINXP-TMP on /proj, then move it to /usr/testbed/images with the right name.
+        # Wait until the node is in the MFS, based on the serial console.
+        # Then make WINXP-TMP on /proj, and move it to /usr/testbed/images with the right name.
         rootpc $pc
             cd /proj/testbed/images
             df -m /proj/testbed/images
-            ls -lt /proj/testbed/images/WINXP*
+              ls -lt /proj/testbed/images/WINXP*
+            ls -l /proj/testbed/images/WINXP-TMP.ndz
           # IDE disk (pc1 - pc178)
           imagezip -o -I 2 -I 3 -I 4 /dev/ad0 /proj/testbed/images/WINXP-TMP.ndz
           # SCSI disk. (pc201 - pc360)
@@ -1215,24 +1305,28 @@ Making images
         df -m /usr/testbed/images
 
 ================================================================
-
 Updating a set of existing images.
 
     . Build changes one place, make tarballs to update the others.
-        #[On the build node, as me.]
-        date=2005-10-28
+        #[On the build node, as me, in a Bash shell.]
+        date=2005-11-22
         updates=/proj/testbed/fish/winxp
           v $updates/*$date*
 
-        cd /
         # Work around a running sshd (on the destination machines.)
+        #[As root.]
         cp -p /usr/sbin/sshd.exe{,.new}
+        #[Back to me.]
+        cd /
         sysfiles="usr/sbin/sshd.exe.new bin/ssh-host-config etc/sshd_config \
-                  etc/profile sbin/agetty.exe etc/inittab"
+                  etc/profile sbin/agetty.exe etc/inittab sbin/reboot \
+                  usr/local/bin/install-tarfile usr/local/bin/install-rpm \
+                  usr/local/bin/emulab-iperf.exe usr/share/doc/iperf"
         v $sysfiles
         # Does inittab really need to have mode 600?  Owned by SYSTEM.SYSTEM, can't read here.
         chmod 644 /etc/inittab
         tar cvfz $updates/sys_$date.tgz $sysfiles
+        chmod 600 /etc/inittab
 
         cd /usr/local
         elabpat="etc/emulab man/man{1/{install,emulab}-*,8/program-*}"
@@ -1245,7 +1339,7 @@ Updating a set of existing images.
         tar cvfz $updates/elab_$date.tgz $elabfiles
 
         #[On Boss.]
-        set date=2005-10-28
+        set date=2005-11-22
         set updates=/proj/testbed/fish/winxp
         set nodes="SP0 SP1 SP2 UPDATE"
 
@@ -1258,6 +1352,7 @@ Updating a set of existing images.
 
         set pid=testbed eid=new-windows-$hw
           ## set pid=testbed eid=test-windows-$hw
+          ## set pid=testbed eid=test-win-$hw-nofw
         set exp=$eid.$pid.emulab.net
 
         alias nping 'foreach node ( $nodes )\
@@ -1296,7 +1391,7 @@ Updating a set of existing images.
           # Log in a bunch of RDP windows, *as root*.
           set rootpwd='daFluxGroup'
           set rd=/proj/testbed/fish/rdesktop/rdesktop-1.3.1
-          set rdarg="-K -g 1280x1024"
+          set rdarg="-K -g 1280x1024 -a 16"
           foreach node ( $nodes )
             echo $node.$exp
             (cd $rd; ./rdesktop $rdarg -u root -p "$rootpwd" $node.$exp &)
@@ -1328,7 +1423,7 @@ Updating a set of existing images.
             /sbin/reboot
 
             # Unpack the patched and edited system files.
-            set date=2005-10-28
+            date=2005-11-22
             net stop init
             chmod 777 /etc/inittab
             tar xvfz /tmp/sys_$date.tgz -C /
@@ -1352,9 +1447,11 @@ Updating a set of existing images.
                     ps -Welf | grep emulab"
           # Just in case... (Try it again if something is still running afterward.)
           su_nodes "killall emulab-sync program-agent slothd idlemon; ps -Welf | grep emulab"
+          # Go into Task Manager and kill processes if nothing else has worked.
+          nodes "ps -Welf | grep emulab"
 
-          # Unpack the Emulab files.
-          su_nodes "tar xfz /tmp/elab_2005-10-28.tgz -C /usr/local"
+          # Unpack the Emulab files.  (Why doesn't $date work in this command?)
+          su_nodes "tar xfz /tmp/elab_2005-11-22.tgz -C /usr/local"
 
      . Do one-time updates
          #[On Boss.]
@@ -1363,6 +1460,7 @@ Updating a set of existing images.
                   cygrunsrv -I init -d 'Cygwin SysV init' -p /sbin/init -a -i -s INT; \
                   net start init"
 
+         # Install idlemon user-login wrapper.
          ##su_nodes "regtool -s set /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle 'C:\cygwin\usr\local\etc\emulab\idlemon.vbs'"
          ## The su_nodes alias just isn't up to handling complicated quoting...
          foreach node ( $nodes )
@@ -1372,6 +1470,26 @@ Updating a set of existing images.
          end
          su_nodes "regtool get /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle"
 
+         # 11/22/05 Install Rude and Crude for linktest.
+         foreach node ( $nodes )
+           echo ================  $node.$exp
+           sudo scp /share/windows/rude_cygwin_0.70.tgz $node.$exp":"/tmp
+           sudo ssh -n $node.$exp "tar xvfz /tmp/rude_cygwin_0.70.tgz -C /usr"
+           echo ""
+         end
+
+         # 11/22/05 Update rxvt and Cygwin shell links.
+         set audtop=/cygdrive/c/Documents\ and\ Settings/All\ Users/Desktop
+         foreach node ( $nodes )
+           echo ================  $node.$exp
+           sudo scp -rp /share/windows/Desktop $node.$exp":"/tmp
+           sudo ssh -n $node.$exp "chown root '$audtop'"
+           sudo ssh -n $node.$exp "cp /tmp/Desktop/*Shell.lnk '$audtop'"
+           sudo ssh -n $node.$exp "chown SYSTEM '$audtop'"
+           sudo ssh -n $node.$exp "ls -l '$audtop'"
+           echo ""
+         end
+
        - Some things still have to be done through the GUI under RDP on each node.
          . Run Windows Update after each Patch Tuesday on the UPDATE nodes.
 
@@ -1379,6 +1497,9 @@ Updating a set of existing images.
            Also set Power Options / Power Schemes to "Always On".
 
          . 10/28/05 Install the Cygwin ping package, keep everything else the same.
+           /cygdrive/c/software/cygwin/setup.exe &
+
+         . 11/22/05 Install the Cygwin rxvt package and back-rev OpenSSH from 4.2 to 4.1 .
            /cygdrive/c/software/cygwin/setup.exe &
 
      . Prepare, reboot and test.
@@ -1393,6 +1514,9 @@ Updating a set of existing images.
          # Should be set to 1 on the SP2 node in the topology, 0 elsewhere.
          su_nodes "grep IPEnableRouter /var/log/EmulabStartup.log"
 
+         # Test network setup.
+         ssh ops run_linktest.pl -v -e $pid/$eid
+
          # Connectivity test.
          foreach node1 ( $nodes )
            foreach node2 ( $nodes )
@@ -1406,6 +1530,7 @@ Updating a set of existing images.
                  
      . Prepare again, go into admin mode, and pull the images.
          su_nodes "prepare"
+         su_nodes "cat /etc/motd"
          ##node_admin -e $pid,$eid on
 
            ## node_admin -e might be broken.  (Or maybe the firewall can't be down...)
@@ -1427,7 +1552,7 @@ Updating a set of existing images.
          nping
          echo $date
          v -t /{usr,proj}/testbed/images/WINXP-*$date*.ndz
-           v -t /{usr,proj}/testbed/images/WINXP*.ndz
+           v -t /{usr,proj}/testbed/images/WINXP*.ndz | head
          df -m /{usr,proj}/testbed/images
            echo $hw $disk
          foreach node ( $nodes )
@@ -1448,14 +1573,15 @@ Updating a set of existing images.
 
      . Move the images to /usr/testbed/images to avoid NFS reads, for faster swap-in.
         df -m /{proj,usr}/testbed/images
-        v /{proj,usr}/testbed/images/WINXP-*-pc*_$date.ndz
-        set projimages=/proj/testbed/images/WINXP-*-pc*_$date.ndz
+          v /{proj,usr}/testbed/images/WINXP-*-pc*_$date.ndz
+        set projimages=/proj/testbed/images/WINXP-*-$hw"_"$date.ndz
           v $projimages
             ##cp -p $projimages /usr/testbed/images
         # NFS gets swamped on Ops, use scp instead.
         foreach prjimg ( $projimages )
           v $prjimg
           set usrimg=/usr/testbed/images/$prjimg:t
+          echo $prjimg $usrimg
           scp -p ops:$prjimg $usrimg.new
           # Install with mv.  Frisbee might have the old inode still open.
           if ( -f $usrimg.prev ) rm -f $usrimg.prev
@@ -1467,12 +1593,14 @@ Updating a set of existing images.
 
         # Check that everything arrived correctly.
         ssh -n ops cksum $projimages > ~/projimages.cksums &
-        set usrimages=/usr/testbed/images/WINXP-*-pc*_$date.ndz
+        set usrimages=/usr/testbed/images/WINXP-*-$hw"_"$date.ndz
         cksum $usrimages > ~/usrimages.cksums &
+          jobs
           diff ~/projimages.cksums ~/usrimages.cksums
         sed 's/proj/usr/' ~/projimages.cksums | diff - ~/usrimages.cksums
 
         # The ones on Ops:/proj are not needed anymore.
+        v $usrimages
         v $projimages
         rm -f $projimages
 

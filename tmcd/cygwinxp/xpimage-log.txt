@@ -1,5 +1,45 @@
 Log of XP images produced (most recent first.)
 
+    . WINXP-*-pc*_2005-11-22, minor update.
+      - Enable linktest, including ltmap fetching, misc fixes, (c)rude and iperf.
+      - Add hacks in watchdog, slothd, and idlemon for clock setback.
+      - Back-rev OpenSSH to 4.1 in an attempt to cure sshd boot-time busy-looping.
+      - Add rxvt shell windows for X-like mousing.
+      
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-SP0-pc850_2005-11-22.ndz
+	    4293596160 input (1961526272 compressed) bytes in 618.941 seconds
+	    Image size: 960495616 bytes
+	    3.022MB/second compressed
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-SP1-pc850_2005-11-22.ndz
+	    4293596160 input (2136777728 compressed) bytes in 685.615 seconds
+	    Image size: 1123024896 bytes
+	    2.972MB/second compressed
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-SP2-pc850_2005-11-22.ndz
+	    4293596160 input (2133701632 compressed) bytes in 678.703 seconds
+	    Image size: 1119879168 bytes
+	    2.998MB/second compressed
+      pc850 /dev/ad0 /proj/testbed/images/WINXP-UPDATE-pc850_2005-11-22.ndz
+	    4293596160 input (2072335360 compressed) bytes in 670.742 seconds
+	    Image size: 1103101952 bytes
+	    2.946MB/second compressed
+
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-SP0-pc3000_2005-11-22.ndz
+	    8587192320 input (2095056896 compressed) bytes in 362.556 seconds
+	    Image size: 988807168 bytes
+	    5.511MB/second compressed
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-SP1-pc3000_2005-11-22.ndz
+	    8587192320 input (1825642496 compressed) bytes in 341.516 seconds
+	    Image size: 934281216 bytes
+	    5.098MB/second compressed
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-SP2-pc3000_2005-11-22.ndz
+	    8587192320 input (1876342784 compressed) bytes in 327.933 seconds
+	    Image size: 951058432 bytes
+	    5.457MB/second compressed
+      pc3000 /dev/da0 /proj/testbed/images/WINXP-UPDATE-pc3000_2005-11-22.ndz
+	    8587192320 input (2241202176 compressed) bytes in 401.167 seconds
+	    Image size: 1229979648 bytes
+	    5.328MB/second compressed
+
     . WINXP-*-pc*_2005-10-28, minor update.
       - Race condition tweaks to rc.cygwin, add rc.firstboot to EmulabStartup service.
       - Cleanup tweaks to prepare and liblocsetup.pm .
@@ -20,7 +60,6 @@ Log of XP images produced (most recent first.)
 	    4293596160 input (2045842432 compressed) bytes in 635.409 seconds
 	    Image size: 1040187392 bytes
 	    3.071MB/second compressed
-
 
       pc3000 /dev/da0 /proj/testbed/images/WINXP-SP0-pc3000_2005-10-28.ndz
 	     8587192320 input (2062292992 compressed) bytes in 316.225 seconds

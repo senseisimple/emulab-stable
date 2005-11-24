@@ -131,13 +131,14 @@ MSDN documentation:
 
 --------------------------------
 Rude and Crude: Real-time UDP Data Emitter and Collector for Rude
-  Used by linktest level 3 to verify link delays
+  Used by linktest level 3 to verify link packet loss.
   The -P argument for setting real-time priority is not supported on Windows.
 
   Web home page: http://rude.sourceforge.net/
   Sources: rude-0.70.tar.gz - http://prdownloads.sourceforge.net/rude/rude-0.70.tar.gz
            c_rude.patch - Ifdef out the Linux mmap and sched calls.
-  Executables and man pages: /usr/{local/{bin/{,c}rude.exe,man/man8/{,c}rude.8},share/doc/rude}
+  Executables: /usr/local/bin/{,c}rude.exe
+  Documentation: /usr/share/doc/rude/*, /usr/local/man/man8/{,c}rude.8
 	   Tar file: rude_cygwin_0.70.tgz
   	   Install with: tar xvfz rude_cygwin_0.70.tgz -C /usr
 
@@ -147,7 +148,9 @@ iperf: TCP/UDP Bandwidth Measurement Tool
   Patched by Emulab, installed as emulab-iperf.
 
   Web home page and sources: http://dast.nlanr.net/Projects/Iperf
-
+  Documentation: http://dast.nlanr.net/Projects/Iperf/iperfdocs_1.7.0.html
+	Newest doc page is in iperf-2.0.2/index.html here.
+	Installed as /usr/share/doc/iperf/index.html on the node.
 
 ================================================================
 Windows drivers for the Emulab machines:

@@ -567,6 +567,17 @@ sub os_routing_add_manual($$$$$;$)
 	$cmd = "";
     }
 
+    # There appears to be a race with interfaces coming on-line.
+    #     The route addition failed: Either the interface index is wrong or
+    #     the gateway does not lie on the same network as the interface. Check
+    #     the IP Address Table for the machine.
+    # Re-doing the command later succeeds.
+    # Wrap the route command in a loop to make sure it gets done.
+    $cmd = "while ! ( route print | grep -Fq $destip ); do \n
+                echo $cmd;\n
+                $cmd\n
+            done";
+
     return $cmd;
 }
 
