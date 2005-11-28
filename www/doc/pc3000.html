@@ -67,6 +67,13 @@ For Linux, add the following to your .config:
   CONFIG_FUSION_MAX_SGE=40
   CONFIG_FUSION_ISENSE=m
 </code></pre>
+<b>NOTE:</b> The default Pro/1000 ethernet driver (e1000) included in
+the RedHat 9.0 kernel sources does not work on the pc3000s.  We
+recommend that you start with the sources in
+/share/redhat/9.0/linux-2.4.20-31.9emulab since this tree includes a
+working e1000 driver.  If you need to use your own RHL9-era kernel
+source tree, be sure to use an updated e1000 driver.  You can get it
+here: /share/linux/e1000-5.5.4.tar.gz
 </p><p>
 For Windows you will need to re-customize based on our current -pc3000
 images.
