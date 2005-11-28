@@ -369,15 +369,27 @@ if(&dotest(TEST_LATENCY)) {
 if(&dotest(TEST_RT_STATIC)
     && defined($rtproto)
     && ($rtproto eq RTPROTO_STATIC || $rtproto eq RTPROTO_SESSION)) {
-    my $msg = "Testing Routing...";
+    my $msg;
+
+    if ($total_error_count) {
+	$msg = "Skipping Routing tests because of previous errors!";
+    }
+    else {
+	$msg = "Testing Routing...";
+    }
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
     # Ick, this barrier makes sure the above message gets into the log
     # first, so as not to confuse Mike
     &barrier();
     &debug("\n$msg\n\n");
-    &static_rt_test; # nodes not covered by 1hop test
-    &report_status;
+    if (! $total_error_count) {
+	&static_rt_test; # nodes not covered by 1hop test
+	&report_status;
+    }
+    else {
+	&barrier();
+    }
 }
 
 if(&dotest(TEST_LOSS)) {
@@ -1143,18 +1155,23 @@ sub report_status {
 }
 
 sub barrier {
-    if($hostname eq $synserv) {
-	if($barr_count) {
-	    my $rc = &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,
-				"-n",SYNC_NAMESPACE,
-				"-e",$error_count);
-	    
-	    if ($rc) {
-		$stage_error_count += 1;
-	    }
-	}
-    } else {
-	&my_system(PATH_EMULAB_SYNC,"-n",SYNC_NAMESPACE,"-e",$error_count);
+    my $rc;
+    
+    if ($hostname eq $synserv) {
+	return
+	    if (! $barr_count);
+
+	$rc = &my_system(PATH_EMULAB_SYNC,"-i",$barr_count,
+			 "-n",SYNC_NAMESPACE,
+			 "-e",$error_count);
+    }
+    else {
+	$rc = &my_system(PATH_EMULAB_SYNC,"-n",
+			 SYNC_NAMESPACE,"-e",$error_count);
+    }
+    # All peers get error notification.
+    if ($rc) {
+	$stage_error_count += 1;
     }
 }
 
