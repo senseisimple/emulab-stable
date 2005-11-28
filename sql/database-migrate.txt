@@ -2880,3 +2880,15 @@ last_net_act,last_cpu_act,last_ext_act);
              after approved;
        alter table projects add date_inactive datetime default NULL \
              after inactive;
+
+4.18: Add PlanetLab node mapping table
+
+     CREATE TABLE plab_mapping (
+       node_id varchar(32) NOT NULL default '',
+       plab_id varchar(32) NOT NULL default '',
+       hostname varchar(255) NOT NULL default '',
+       IP varchar(15) NOT NULL default  '',
+       mac varchar(17) NOT NULL default '',
+       create_time datetime default NULL,
+       PRIMARY KEY  (node_id)
+     ) TYPE=MyISAM;

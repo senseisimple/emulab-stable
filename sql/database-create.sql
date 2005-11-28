@@ -1447,6 +1447,20 @@ CREATE TABLE partitions (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `plab_mapping`
+--
+
+CREATE TABLE plab_mapping (
+  node_id varchar(32) NOT NULL default '',
+  plab_id varchar(32) NOT NULL default '',
+  hostname varchar(255) NOT NULL default '',
+  IP varchar(15) NOT NULL default '',
+  mac varchar(17) NOT NULL default '',
+  create_time datetime default NULL,
+  PRIMARY KEY  (node_id)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `plab_slice_nodes`
 --
 
