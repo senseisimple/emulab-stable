@@ -167,7 +167,10 @@ function SPITFORM($formfields, $returning, $errors)
         # UserName:
         #
         echo "<tr>
-                  <td colspan=2>*Username (alphanumeric, lowercase):</td>
+                  <td colspan=2>*<a
+                         href='docwrapper.php3?docname=security.html'
+                         target=_blank>Username</a>
+                            (alphanumeric, lowercase):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[proj_head_uid]\"

@@ -150,7 +150,10 @@ function SPITFORM($formfields, $returning, $errors)
         # UserName:
         #
         echo "<tr>
-                  <td colspan=2>*Username (alphanumeric, lowercase):</td>
+                  <td colspan=2>*<a
+                         href='docwrapper.php3?docname=security.html'
+                         target=_blank>Username</a>
+                            (alphanumeric, lowercase):</td>
                   <td class=left>
                       <input type=text
                              name=\"formfields[joining_uid]\"
@@ -180,8 +183,8 @@ function SPITFORM($formfields, $returning, $errors)
 	#
 	if ($WIKISUPPORT) {
 	    echo "<tr>
-                      <td colspan=2>*
-                          <a href=${WIKIHOME}/bin/view/TWiki/WikiName
+                      <td colspan=2>*<a
+                            href=${WIKIHOME}/bin/view/TWiki/WikiName
                             target=_blank>WikiName</a>:<td class=left>
                           <input type=text
                                  name=\"formfields[wikiname]\"
