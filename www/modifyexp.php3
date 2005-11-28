@@ -117,6 +117,13 @@ if (! isset($go)) {
 	echo "<br>";
     }
 
+    if (STUDLY()) {
+	echo "<font size='+1'>".
+	    "<a href='clientui.php3?pid=$pid&eid=$eid'>GUI Editor</a>".
+	    " - Edit the topology using a Java applet.</font>";
+	echo "<br>";
+    }
+
     echo "<form action='modifyexp.php3' method='post'>";
     echo "<textarea cols='100' rows='40' name='nsdata'>";
 

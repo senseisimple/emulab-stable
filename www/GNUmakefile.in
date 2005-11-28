@@ -28,7 +28,7 @@ SUBDIRS = garcia-telemetry
 # is changed.
 # 
 all: defs.php3 dbdefs.php3 swish.conf websearch htmlinstall xmlrpc.php3 \
-	all-subdirs
+	xmlrpcpipe.php3 all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 

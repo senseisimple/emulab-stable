@@ -109,6 +109,15 @@ virtual_tables = {
     "eventlist"                 : { "rows"  : None, 
                                     "tag"   : "events",
                                     "attrs" : [ "vname" ]},
+    "event_groups"              : { "rows"  : None,
+                                    "tag"   : "event_groups",
+                                    "attrs" : [ "group_name", "agent-name" ]},
+    "virt_firewalls"            : { "rows"  : None,
+                                    "tag"   : "virt_firewalls",
+                                    "attrs" : [ "fwname", "type", "style" ]},
+    "firewall_rules"            : { "rows"  : None,
+                                    "tag"   : "firewall_rules",
+                                    "attrs" : [ "fwname", "ruleno", "rule" ]},
     "virt_tiptunnels"           : { "rows"  : None,
                                     "tag"   : "tiptunnels",
                                     "attrs" : [ "host", "vnode" ]},
@@ -180,6 +189,14 @@ def CheckProjPermission(uid, pid):
                                       "access project: " + pid))
     
     return None
+
+def GetProjects(uid):
+    res = DBQueryFatal("SELECT distinct pid FROM group_membership "
+                       "WHERE uid=%s",
+                       (uid,))
+
+    return [x[0] for x in res]
+
 
 #
 # Check user permission to access an experiment.
@@ -365,6 +382,29 @@ class emulab:
             tmp["msgid"] = res[3]
             
             result.append(tmp)
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    def getareas(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        # Get the listing that is accessible to this user and
+        res = DBQueryFatal("SELECT distinct building FROM obstacles")
+
+        if len(res) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No areas?")
+
+        result = {}
+        for area in res:
+            result[area[0]] = {
+                "name" : area[0]
+                }
             pass
 
         return EmulabResponse(RESPONSE_SUCCESS,
@@ -827,7 +867,7 @@ class osid:
         
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
-                              output=str(result))
+                              output="")
     
     def info(self, version, argdict):
         # Check for valid arguments.
@@ -951,9 +991,13 @@ class experiment:
 
         # XXX Let the user specify the pid/gid
         dbres = DBQueryFatal("SELECT e.pid,e.gid,e.eid,e.expt_name,e.state,"
-                             "e.expt_head_uid "
+                             "e.expt_head_uid,e.minimum_nodes,e.maximum_nodes,"
+                             "count(r.node_id) as actual_nodes "
                              "  FROM experiments AS e "
-                             "WHERE e.expt_head_uid=%s",
+                             "left join reserved as r on e.pid=r.pid and "
+                             "  e.eid=r.eid "
+                             "WHERE e.expt_head_uid=%s "
+                             "GROUP BY e.pid,e.eid",
                              (self.uid,))
 
         # Build a dictionary of projects that refer to a dictionary of groups
@@ -967,6 +1011,9 @@ class experiment:
             desc = res[3]
             state = res[4]
             expt_head = res[5]
+            minimum_nodes = res[6]
+            maximum_nodes = res[7]
+            actual_nodes = res[8]
             # ... make sure 'result' has the proper slots,
             if not result.has_key(pid):
                 result[pid] = {
@@ -990,11 +1037,14 @@ class experiment:
                     "description" : desc,
                     "state" : state,
                     "expt_head" : expt_head,
+                    "minimum_nodes" : minimum_nodes,
+                    "maximum_nodes" : maximum_nodes,
+                    "actual_nodes" : actual_nodes,
                     }
                 pass
 
             # ... append it to the group list.
-            result[pid][gid].append(expdata)
+            result[pid][gid].append(scrubdict(expdata))
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
@@ -2155,6 +2205,9 @@ class experiment:
             if argdict.has_key("tables") and (tag not in argdict["tables"]):
                 continue
             
+            if argdict.has_key("exclude") and (tag in argdict["exclude"]):
+                continue
+            
             res = DBQuery("SELECT * FROM " + key + " " +
                           "WHERE pid=%s and eid=%s",
                           (argdict["proj"], argdict["exp"]), asDict=True);
@@ -2165,7 +2218,10 @@ class experiment:
                     # Convert NULL to ""
                     #
                     for key2, val2 in row.items():
-                        if val2 == None:
+                        if key2 in ("pid", "eid"):
+                            del row[key2]
+                            pass
+                        elif val2 == None:
                             row[key2] = ""
                             pass
                         elif isinstance(val2, datetime.datetime):
@@ -2917,17 +2973,33 @@ class node:
 
             pid_clause = " or p.pid='%s'" % (str(argdict["proj"]),)
             pass
+
+        intf_join = ""
+        intf_clause = ""
+        if argdict.has_key("nic"):
+            nic = argdict["nic"]
+            if "wireless" in nic:
+                intf_join = (
+                    "left join interfaces as i on a.node_id=i.node_id "
+                    "left join interface_types as it on "
+                    "  i.interface_type=it.type ")
+                intf_clause = " and i.role='expt' and it.connector='Wireless'"
+                pass
+            pass
         
-        res = DBQueryFatal("SELECT count(a.node_id) FROM nodes AS a "
+        res = DBQueryFatal("SELECT distinct count(a.node_id) FROM nodes AS a "
                            "left join reserved as b on a.node_id=b.node_id "
                            "left join node_types as nt on a.type=nt.type "
                            "left join nodetypeXpid_permissions as p "
                            "  on a.type=p.type "
+                           + intf_join +
                            "WHERE b.node_id is null and a.role='testnode' "
                            "  and nt.class=%s and "
                            "      (p.pid is null" + pid_clause + ") and "
                            "      (a.eventstate='ISUP' or "
-                           "       a.eventstate='PXEWAIT')" + type_test,
+                           "       a.eventstate='PXEWAIT')"
+                           + type_test
+                           + intf_clause,
                            (argdict["class"],))
 
         if len(res) == 0:
@@ -2937,6 +3009,119 @@ class node:
             result = int(res[0][0])
             pass
 
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    def getlist(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+ 
+        if argdict.has_key("class"):
+            if not re.match("^[-\w]*$", str(argdict["class"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed node class")
+            
+            class_test = " and nt.class='"+str(argdict["class"])+"'"
+            pass
+        else:
+            class_test = " and nt.class!='pcplabphys'"
+            pass
+
+        type_test = ""
+        if argdict.has_key("type"):
+            if not re.match("^[-\w]*$", str(argdict["type"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed node type")
+            
+            type_test = " and nt.type='%s'" % (str(argdict["type"]),)
+            pass
+
+        pid_clause = ""
+        if argdict.has_key("proj"):
+            permerror = CheckProjPermission(self.uid, argdict["proj"])
+            if permerror:
+                return permerror
+
+            pid_clause = " or p.pid='%s'" % (str(argdict["proj"]),)
+            pass
+        else:
+            pid_clause = (" or p.pid in ("
+                          + ",".join([("'" + x + "'")
+                                      for x in GetProjects(self.uid)])
+                          + ")")
+            pass
+
+        res = DBQueryFatal(
+            "SELECT a.node_id,a.type,b.node_id is null,"
+            "  (a.eventstate='ISUP' or "
+            "   a.eventstate='PXEWAIT' or "
+            "   a.eventstate='POWEROFF') "
+            "FROM nodes AS a "
+            "left join reserved as b on a.node_id=b.node_id "
+            "left join node_types as nt on a.type=nt.type "
+            "left join nodetypeXpid_permissions as p on a.type=p.type "
+            "WHERE a.role='testnode' "
+            "  "+ class_test +" and "
+            "      (p.pid is null" + pid_clause + ") " + type_test)
+        
+        if len(res) == 0:
+            result = {}
+            pass
+        else:
+            result = {}
+            # gotta enumerate the list of nodes of this type that are avail
+            for row in res:
+                result[row[0]] = {
+                    "node_id" : row[0],
+                    "type" : row[1],
+                    "free" : (row[2] == 1 and row[3] == 1),
+                    }
+                pass
+            pass
+
+        return EmulabResponse(RESPONSE_SUCCESS,
+                              value=result,
+                              output=str(result))
+
+    def typeinfo(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+
+        if argdict.has_key("type"):
+            if not re.match("^[-\w]*$", str(argdict["type"])):
+                return EmulabResponse(RESPONSE_BADARGS,
+                                      output="Improperly formed node type")
+            
+            type_test = " and type='%s'" % (str(argdict["type"]),)
+            pass
+        else:
+            type_test = ""
+            pass
+
+        res = DBQuery("SELECT distinct nt.* FROM node_types as nt "
+                      "left join nodetypeXpid_permissions as p "
+                      "  on nt.type=p.type "
+                      "left join group_membership as m on m.uid=%s "
+                      "WHERE (p.pid is null or p.pid=m.pid) and "
+                      " nt.isdynamic=0 and nt.class not in ("
+                      " 'pcplabphys','switch','shark','power','misc')"
+                      + type_test,
+                      (self.uid),
+                      asDict=True)
+
+        if len(res) == 0:
+            result = {}
+            pass
+        else:
+            result = {}
+            for re in res:
+                result[re["type"]] = scrubdict(re, prunelist=["ismodelnet"])
+                pass
+            pass
+        
         return EmulabResponse(RESPONSE_SUCCESS,
                               value=result,
                               output=str(result))
