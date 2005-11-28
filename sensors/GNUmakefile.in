@@ -9,7 +9,7 @@ EVENTSYS	= @EVENTSYS@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS	= slothd and powermon
+SUBDIRS	= slothd and powermon nfstrace
 
 SYSTEM            := $(shell uname -s)
 

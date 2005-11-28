@@ -1,0 +1,26 @@
+
+Mon Jul  9 14:30:36 EDT 2001
+
+	Several fixes:
+
+	1.  The format for read responses (v3) was missing the "count"
+		before the actual number.
+
+	2.  The info printed for write requests (v3) was truncated, so
+		the count (and following info) was lost.
+
+	3.  Fixed numerous problems in the v2 protocol, where field
+		names were missing.  This will require massive changes
+		in the parsing of v2 requests/responses.
+
+Sun Jul 15 10:21:21 EDT 2001
+
+	Changed "FROM" and "TO" in the v3 rename to the usual syntax.
+	Removed extra keywords (redundancies).
+
+Tue Jul 17 15:14:22 EDT 2001
+
+	Many small changes (see fixer2.pl) and fixed the fn in rename
+	(which was being given as a fh-- oops!).  This might cause
+	problems:  it will need to be checked carefully everywhere the
+	conversion is done.

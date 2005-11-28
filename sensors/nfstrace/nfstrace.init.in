@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# chkconfig: 2345 90 10
+# description: trace NFS on the experimental network.
+#
+# processname: nfstrace
+#
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+INSTALL_SBIN=@sbindir@
+
+AS_NT="sudo -u nfstrace"
+ND_DIR="/var/nfstrace"
+ND_TEMPNAME="${ND_DIR}/temp"
+ND_BASENAME="${ND_DIR}/trace"
+ND_COUNT="10"
+ND_FLAGS="-s400 -I 1 -N $ND_COUNT -T $ND_TEMPNAME -B $ND_BASENAME"
+ND_FILTER="(port 2049 or port 900) and host fs and not host boss"
+
+ND_TRACES=""
+
+lpc=0
+while test $lpc -lt $ND_COUNT; do
+    ND_TRACES="$ND_TRACES $ND_BASENAME.txt.0$lpc"
+    lpc=`expr $lpc + 1`
+done
+
+PYTHONUNBUFFERED=1
+export PYTHONUNBUFFERED
+
+case "$1" in
+    start)
+	echo -n "Starting nfstrace daemons:"
+	${AS_NT} \
+	    ${INSTALL_SBIN}/nfsdump $ND_FLAGS $ND_FILTER \
+	    > /var/nfstrace/nfsdump.log 2>&1 &
+	echo $! > /var/nfstrace/nfsdump.pid
+	ps axuw | grep -v grep | grep ${INSTALL_SBIN}/nfsdump > /dev/null
+	if test $? -eq 0; then
+	    ${AS_NT} \
+		${INSTALL_SBIN}/nfsdump2db $ND_TRACES \
+		> /var/nfstrace/nfsdump2db.log 2>&1 &
+	    echo $! > /var/nfstrace/nfsdump2db.pid
+	    ps axuw | grep -v grep | grep ${INSTALL_SBIN}/nfsdump2db \
+		> /dev/null
+	    if test $? -eq 0; then
+		echo " done"
+		exit 0
+	    else
+		${AS_NT} kill `cat /var/nfstrace/nfsdump.pid`
+		echo " failed"
+		exit 1
+	    fi
+	else
+	    echo " failed"
+	    exit 1
+	fi
+	;;
+    stop)
+	echo -n "Shutting down nfstrace daemons:"
+	ps axuw | grep -v grep | grep ${INSTALL_SBIN}/nfsdump > /dev/null
+	if test $? -eq 0; then
+	    ${AS_NT} kill `cat /var/nfstrace/nfsdump.pid`
+	    ${AS_NT} kill `cat /var/nfstrace/nfsdump2db.pid`
+	    echo " done"
+	else
+	    echo " already stopped"
+	fi
+	exit 0
+	;;
+    restart)
+	$0 stop  &&  $0 start
+	exit 0
+	;;
+    *)
+	echo "Usage: $0 {start|stop|restart}"
+	exit 1
+esac

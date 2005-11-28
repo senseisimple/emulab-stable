@@ -1,0 +1,574 @@
+#! /usr/bin/env python
+
+import os
+import re
+import sys
+import stat
+import time
+import signal
+import socket
+import getopt
+
+import MySQLdb
+
+BASEDIR = "/var/nfstrace"
+DBDIR = "/var/db/nfstrace"
+
+DBNAME = "nfsdb"
+DBUSER = "nfstrace"
+DBPASS = open(os.path.join(BASEDIR, "dbpass")).read().strip()
+
+INTERVAL = 5
+VERBOSITY = 1
+
+count = 0
+update_only = False
+
+def usage():
+    return
+
+try:
+    opts, req_args = getopt.getopt(sys.argv[1:],
+                                   "hvc:t:u",
+                                   [ "help", "verbose", "count=", ])
+    
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            sys.exit()
+            pass
+        elif opt in ("-v", "--verbose"):
+            VERBOSITY = VERBOSITY + 1
+            pass
+        elif opt in ("-c", "--count"):
+            count = int(val)
+            pass
+        elif opt in ("-u"):
+            update_only = True
+            pass
+        pass
+    
+    if len(req_args) < 1:
+        raise getopt.error('error: too few arguments')
+
+    pass
+except getopt.error, e:
+    print e.args[0]
+    usage()
+    sys.exit(2)
+    pass
+
+IDX_TIMESTAMP = 0
+IDX_SRC_IP = 1
+IDX_DST_IP = 2
+IDX_PKT_TYPE = 3
+IDX_REQ_REPLY = 4
+IDX_ID = 5
+IDX_COMMAND = 7
+IDX_BODY_START = 8
+
+TABLES = [
+    "mounts",
+    "mount_replies",
+    "reads",
+    "writes",
+    "creates",
+    "create_replies",
+    "removes",
+    "lookups",
+    "lookup_replies",
+    ]
+
+con = MySQLdb.connect(db = DBNAME, user = DBUSER, passwd = DBPASS)
+
+cur = con.cursor()
+
+def convert_ip(hexip):
+    hexip = hexip.split(".")[0]
+    comp = []
+    for lpc in range(0, 8, 2):
+        comp.append(str(int(hexip[lpc:lpc + 2], 16)))
+        pass
+    retval = ".".join(comp)
+    
+    return retval
+
+def body_to_dict(line):
+    retval = { "fn" : None, "tcount" : None }
+    for lpc in range(0, len(line), 2):
+        retval[line[lpc]] = line[lpc + 1]
+        pass
+    
+    return retval
+
+class Parser:
+
+    def __init__(self):
+        self.first_timestamp = 0
+
+        self.data_files = {}
+        for tab in TABLES:
+            self.data_files[tab] = open(os.path.join(DBDIR, tab), 'w')
+            self.data_files[tab].truncate(0)
+            pass
+        return
+
+    def load_files(self):
+        for tab in TABLES:
+            self.data_files[tab].flush()
+
+            cur.execute("LOAD DATA INFILE %s REPLACE INTO TABLE " + tab +
+                        " FIELDS TERMINATED BY ','",
+                        (self.data_files[tab].name,))
+
+            self.data_files[tab].truncate(0)
+            pass
+
+        return
+
+    def clear_timestamp(self):
+        self.first_timestamp = 0
+        return
+
+    def nextline(self, line):
+        sl = line.split()
+        cmd = sl[IDX_COMMAND]
+        try:
+            if not self.first_timestamp:
+                self.first_timestamp = int(sl[IDX_TIMESTAMP].split(".")[0])
+                pass
+            if sl[IDX_REQ_REPLY] in ("C1", "C2", "C3") :
+                body = body_to_dict(sl[IDX_BODY_START:-6])
+                self.dispatch("handle_" + cmd, sl, body)
+                pass
+            elif sl[IDX_REQ_REPLY] in ("R1", "R2", "R3"):
+                body = body_to_dict(sl[IDX_BODY_START + 1:-10])
+                self.dispatch("handle_" + cmd + "_reply", sl, body)
+                if sl[IDX_BODY_START] == "OK" and cmd != "mnt":
+                    self.update_file_checkpoint(sl, body)
+                    pass
+                pass
+            pass
+        except:
+            print "line " + line
+            raise
+        
+        return
+
+    def write_row(self, tab, data):
+        data = map(lambda x: re.sub(r',', '\\,', str(x)), data)
+        self.data_files[tab].write(",".join(data))
+        self.data_files[tab].write("\n")
+        return
+
+    def dispatch(self, method_name, sl, body):
+        retval = None
+        if hasattr(self, method_name):
+            method = getattr(self, method_name)
+            retval = method(sl, body)
+            pass
+        else:
+            # print "unhandled " + method_name
+            pass
+        
+        return retval
+
+    def update_file_checkpoint(self, sl, body):
+        if False and body.has_key("fh"):
+            data = (
+                int(sl[IDX_TIMESTAMP].split(".")[0]),
+                body["fh"],
+                int(body["ftype"], 16),
+                int(body["mode"], 16),
+                int(body["nlink"], 16),
+                int(body["uid"], 16),
+                int(body["gid"], 16),
+                int(body["size"], 16),
+                int(body["rdev"], 16),
+                int(body["fsid"], 16),
+                int(body["fileid"], 16),
+                int(body["atime"].split(".")[0]),
+                int(body["mtime"].split(".")[0]),
+                int(body["ctime"].split(".")[0]),
+                )
+            cur.execute("REPLACE INTO file_checkpoint (timestamp, fh, ftype, mode, nlink, uid, gid, size, rdev, fsid, fileid, atime, mtime, ctime) VALUES (" + ",".join(("%s",) * len(data)) + ")", data)
+            pass
+        
+        return
+    
+    def handle_mnt(self, sl, body):
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_SRC_IP]),
+            body["fn"][1:-1],
+            int(body["euid"], 16),
+            int(body["egid"], 16))
+        self.write_row("mounts", data)
+        
+        return
+
+    def handle_mnt_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = 0
+            pass
+        else:
+            status = int(status, 16)
+            pass
+        
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_DST_IP]),
+            status,
+            body.get("fh", ''))
+        self.write_row("mount_replies", data)
+        
+        return
+    
+    def handle_read(self, sl, body):
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_SRC_IP]),
+            body["fh"],
+            int(body["count"], 16),
+            int(body["euid"], 16),
+            int(body["egid"], 16))
+        self.write_row("reads", data)
+        
+        return
+
+    def handle_write(self, sl, body):
+        data = (
+            str(int(sl[IDX_TIMESTAMP].split(".")[0])),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_SRC_IP]),
+            body["fh"],
+            int((body["tcount"] or body["count"]), 16),
+            int(body["euid"], 16),
+            int(body["egid"], 16))
+        self.write_row("writes", data)
+        
+        return
+
+    def handle_create(self, sl, body):
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_SRC_IP]),
+            body["fh"],
+            (body["fn"] or body["name"])[1:-1],
+            int(body.get("mode", "0"), 16), # XXX
+            int(body["euid"], 16),
+            int(body["egid"], 16))
+        self.write_row("creates", data)
+        
+        return
+
+    def handle_create_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = 0
+            pass
+        else:
+            status = int(status, 16)
+            pass
+        
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_DST_IP]),
+            status,
+            body.get("fh", ''))
+        self.write_row("create_replies", data)
+        
+        return
+    
+    def handle_remove(self, sl, body):
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_SRC_IP]),
+            body["fh"],
+            (body["fn"] or body["name"])[1:-1],
+            int(body["euid"], 16),
+            int(body["egid"], 16))
+        self.write_row("removes", data)
+        
+        return
+
+    def handle_lookup(self, sl, body):
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_SRC_IP]),
+            body["fh"],
+            (body["fn"] or body["name"])[1:-1],
+            int(body["euid"], 16),
+            int(body["egid"], 16))
+        self.write_row("lookups", data)
+        
+        return
+
+    def handle_lookup_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = 0
+            pass
+        else:
+            status = int(status, 16)
+            pass
+        
+        data = (
+            int(sl[IDX_TIMESTAMP].split(".")[0]),
+            str(int(sl[IDX_ID], 16)),
+            convert_ip(sl[IDX_DST_IP]),
+            status,
+            body.get("fh", ''))
+        self.write_row("lookup_replies", data)
+        
+        return
+    
+    pass
+
+class LRU:
+    """
+    Implementation of a length-limited O(1) LRU queue.
+    Built for and used by PyPE:
+    http://pype.sourceforge.net
+    Copyright 2003 Josiah Carlson.
+    """
+    class Node:
+        def __init__(self, prev, me):
+            self.prev = prev
+            self.me = me
+            self.next = None
+    def __init__(self, count, pairs=[]):
+        self.count = max(count, 1)
+        self.d = {}
+        self.first = None
+        self.last = None
+        for key, value in pairs:
+            self[key] = value
+    def __contains__(self, obj):
+        return obj in self.d
+    def __getitem__(self, obj):
+        a = self.d[obj].me
+        self[a[0]] = a[1]
+        return a[1]
+    def __setitem__(self, obj, val):
+        if obj in self.d:
+            del self[obj]
+        nobj = self.Node(self.last, (obj, val))
+        if self.first is None:
+            self.first = nobj
+        if self.last:
+            self.last.next = nobj
+        self.last = nobj
+        self.d[obj] = nobj
+        if len(self.d) > self.count:
+            if self.first == self.last:
+                self.first = None
+                self.last = None
+                return
+            a = self.first
+            a.next.prev = None
+            self.first = a.next
+            a.next = None
+            del self.d[a.me[0]]
+            del a
+    def __delitem__(self, obj):
+        nobj = self.d[obj]
+        if nobj.prev:
+            nobj.prev.next = nobj.next
+        else:
+            self.first = nobj.next
+        if nobj.next:
+            nobj.next.prev = nobj.prev
+        else:
+            self.last = nobj.prev
+        del self.d[obj]
+    def __iter__(self):
+        cur = self.first
+        while cur != None:
+            cur2 = cur.next
+            yield cur.me[1]
+            cur = cur2
+    def iteritems(self):
+        cur = self.first
+        while cur != None:
+            cur2 = cur.next
+            yield cur.me
+            cur = cur2
+    def iterkeys(self):
+        return iter(self.d)
+    def itervalues(self):
+        for i,j in self.iteritems():
+            yield j
+    def keys(self):
+        return self.d.keys()
+
+fh_cache = LRU(1024)
+
+def resolve_fh(fh, depth=0):
+    retval = None
+
+    if depth > 50:
+        print "exceeded depth on " + fh
+        return (0, "<unknown>")
+
+    prefix = " " * depth
+    if fh not in fh_cache:
+        cur.execute("SELECT complete,fn FROM handle_map WHERE fh=%s", (fh,))
+        fh_cache[fh] = cur.fetchone()
+        pass
+    fn = fh_cache[fh]
+    
+    print prefix + "   cache " + `fn` + " " + fh
+    if fn:
+        retval = (fn[0], fn[1])
+        pass
+    else:
+        cur.execute("SELECT l.fh,l.fn FROM lookup_replies as lr "
+                    "left join lookups as l on (l.node_ip=lr.node_ip and "
+                    "  l.id=lr.id and l.fh!=%s) "
+                    "where lr.fh=%s and lr.status=0 limit 1", (fh, fh,))
+        res = cur.fetchone()
+        print prefix + "   lookup " + `res` + " " + fh
+        if res and res[0]:
+            comp = resolve_fh(res[0], depth + 1)
+            retval = (comp[0], comp[1] + "/" + res[1])
+            pass
+        else:
+            cur.execute("SELECT m.fn FROM mount_replies as mr "
+                        "left join mounts as m on (m.node_ip=mr.node_ip and "
+                        "  m.id=mr.id) "
+                        "where mr.fh=%s and mr.status=0 limit 1", (fh,))
+            res = cur.fetchone()
+            print prefix + "   mount " + `res` + " " + fh
+            if res and res[0]:
+                retval = (1, res[0])
+                pass
+            pass
+
+        if retval:
+            cur.execute("REPLACE INTO handle_map (fh, complete, fn) "
+                        "VALUES (%s, %s, %s)", (fh, retval[0], retval[1]))
+        else:
+            retval = (0, "<unknown>")
+            pass
+
+        fh_cache[fh] = retval
+        pass
+
+    return retval
+
+def update_handle_map(ts):
+    cur.execute("SELECT distinct lr.fh FROM lookup_replies as lr "
+                "left join handle_map as hm on hm.fh=lr.fh "
+                "where lr.status=0 and lr.timestamp>=%s and hm.fh is NULL",
+                (ts,))
+    for (fh,) in cur:
+        print "  lookup " + fh
+        resolve_fh(fh)
+        pass
+    
+    cur.execute("SELECT distinct cr.fh FROM create_replies as cr "
+                "left join handle_map as hm on hm.fh=cr.fh "
+                "where cr.status=0 and cr.timestamp>=%s and hm.fh is NULL",
+                (ts,))
+    for (fh,) in cur:
+        print "  create " + fh
+        resolve_fh(fh)
+        pass
+    
+    return
+
+if update_only:
+    update_handle_map(0)
+    sys.exit()
+    pass
+
+parser = Parser()
+name2stamp = {}
+
+def update_files(files):
+    for fn in files:
+        try:
+            st = os.stat(fn)
+            mtime = st[stat.ST_MTIME]
+            if mtime > name2stamp.get(fn, 0):
+                print "Reading " + fn
+                name2stamp[fn] = st[stat.ST_MTIME]
+                fh = open(fn)
+                for line in fh.readlines():
+                    parser.nextline(line)
+                    pass
+                fh.close()
+
+                print "  Loading into DB..."
+                parser.load_files()
+
+                print "  Update handle map..."
+                update_handle_map(parser.first_timestamp)
+
+                print "  Update dropped files..."
+                cur.execute("REPLACE INTO file_dropped "
+                            "(fh, node_ip, last_remove) "
+                            "SELECT hm2.fh,r.node_ip,MAX(r.timestamp) "
+                            "  FROM removes as r "
+                            "LEFT JOIN handle_map as hm1 on hm1.fh=r.fh "
+                            "LEFT JOIN handle_map as hm2 on "
+                            "  hm2.fn=CONCAT(hm1.fn, '/', r.fn) "
+                            "WHERE timestamp >= %s "
+                            "GROUP BY r.node_ip,hm2.fh",
+                            (parser.first_timestamp,))
+
+                print "  Update accessed files..."
+                cur.execute("REPLACE INTO file_access "
+                            "(fh, node_ip, last_access) "
+                            "SELECT fh,node_ip,MAX(timestamp) FROM reads "
+                            "WHERE timestamp >= %s "
+                            "GROUP BY fh,node_ip",
+                            (parser.first_timestamp,))
+                cur.execute("REPLACE INTO file_access "
+                            "(fh, node_ip, last_access) "
+                            "SELECT fh,node_ip,MAX(timestamp) FROM writes "
+                            "WHERE timestamp >= %s "
+                            "GROUP BY fh,node_ip",
+                            (parser.first_timestamp,))
+
+                print "  Delete old data..."
+                for tab in TABLES:
+                    cur.execute("DELETE FROM " + tab + " WHERE timestamp<%s",
+                                (parser.first_timestamp - (5 * 60),))
+                    pass
+
+                print "  Done."
+                parser.clear_timestamp()
+                pass
+            pass
+        except OSError, e:
+            pass
+        except IOError, e:
+            pass
+        pass
+
+    return
+
+try:
+    lpc = 0
+
+    while (count == 0) or (lpc < count):
+        update_files(req_args)
+        con.commit()
+        
+        time.sleep(INTERVAL)
+        lpc = lpc + 1
+        pass
+    pass
+finally:
+    con.commit()
+    pass

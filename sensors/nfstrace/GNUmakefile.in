@@ -1,0 +1,69 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# This is the Emulab specific makefile.
+#
+
+SRCDIR          = @srcdir@
+TESTBED_SRCDIR  = @top_srcdir@
+OBJDIR          = ../..
+SUBDIR          = sensors/nfstrace
+
+include $(OBJDIR)/Makeconf
+
+all: nfstrace.proxy nfsdump2db nfsdump nfstrace.init
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+#
+# Install to the ops directory.
+#
+PREFIX=$(INSTALL_DIR)/opsdir
+INSTALL_ETC=$(PREFIX)/etc
+INSTALL_INITD=$(PREFIX)/etc/rc.d
+INSTALL_SBIN=$(PREFIX)/sbin
+INSTALL_MAN=$(PREFIX)/man
+
+PW=/usr/sbin/pw
+
+$(SRCDIR)/nfsdump2/config.status:
+	cd $(SRCDIR)/nfsdump2 && ./configure
+
+make.nfsdump: 
+	cd $(SRCDIR)/nfsdump2 && $(MAKE)
+
+$(SRCDIR)/nfsdump2/nfsdump: $(SRCDIR)/nfsdump2/config.status make.nfsdump
+
+nfsdump: $(SRCDIR)/nfsdump2/nfsdump
+	cp $(SRCDIR)/nfsdump2/nfsdump .
+
+client client-install:
+
+control-install: all
+	-mkdir -p $(INSTALL_DIR)/sbin
+	-mkdir -p $(INSTALL_DIR)/etc
+	-mkdir -p $(INSTALL_DIR)/etc/rc.d
+	@if ! id nfstrace > /dev/null 2>&1; then \
+		sudo $(PW) useradd nfstrace -d /nonexistent \
+			-s /sbin/nologin -u 50,200 \
+			-c "NFS Tracing Daemon"; \
+	fi
+	@if ! $(PW) groupshow bpf; then \
+		sudo $(PW) groupadd bpf; \
+	fi
+	@if test ! -d /var/nfstrace; then \
+		sudo mkdir -m 0750 /var/nfstrace; \
+	fi
+	sudo chown nfstrace /var/nfstrace
+	$(INSTALL) -m 0755 nfsdump $(DESTDIR)$(INSTALL_SBINDIR)
+	$(INSTALL) -m 0755 $(SRCDIR)/nfsdump2db $(DESTDIR)$(INSTALL_SBINDIR)
+	$(INSTALL) -m 0755 $(SRCDIR)/nfstrace.proxy $(DESTDIR)$(INSTALL_SBINDIR)
+	$(INSTALL) -m 0755 nfstrace.init $(INSTALL_DIR)/etc/rc.d/nfstrace
+
+install: all
+	$(INSTALL) -m 0755 nfsdump $(DESTDIR)$(INSTALL_SBIN)
+	$(INSTALL) -m 0755 $(SRCDIR)/nfsdump2db $(DESTDIR)$(INSTALL_SBIN)
+	$(INSTALL) -m 0755 $(SRCDIR)/nfstrace.proxy $(DESTDIR)$(INSTALL_SBIN)
+	$(INSTALL) -m 0755 nfstrace.init $(DESTDIR)$(INSTALL_ETC)/rc.d/nfstrace

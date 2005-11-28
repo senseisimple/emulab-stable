@@ -670,6 +670,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         sensors/canaryd/GNUmakefile sensors/canaryd/feedbacklogs \
 	sensors/and/GNUmakefile sensors/and/and-emulab.conf \
 	sensors/powermon/GNUmakefile sensors/powermon/powermon \
+	sensors/nfstrace/GNUmakefile sensors/nfstrace/nfstrace.init \
 	account/GNUmakefile account/tbacct account/webtbacct \
 	account/addpubkey account/webaddpubkey \
 	account/addsfskey account/webaddsfskey \
@@ -727,7 +728,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ipassign/GNUmakefile tbsetup/ipassign/src/GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
 	tbsetup/panic tbsetup/webpanic \
-        tbsetup/tbrsync \
+        tbsetup/tbrsync tbsetup/nfstrace \
 	tip/GNUmakefile tip/console \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
 	tmcd/common/GNUmakefile tmcd/common/config/GNUmakefile \
