@@ -23,6 +23,10 @@ if (isset($project_title) && $project_title == "") {
     unset($project_title);
 }
 
+if (isset($do) && $do == "") {
+    unset($do);
+}
+
 #
 # Look for our cookie. If the browser has it, then there is nothing
 # more to do; just redirect the user over to the bugdb.
@@ -31,6 +35,7 @@ if (isset($_COOKIE[$BUGDBCOOKIENAME])) {
     $myhash = $_COOKIE[$BUGDBCOOKIENAME];
     
     header("Location: ${BUGDBURL}?username=${uid}&bosscred=${myhash}" .
+	   (isset($do) ? "&do=${do}" : "") .
 	   (isset($project_title) ? "&project_title=${project_title}" : ""));
     return;
 }
@@ -43,7 +48,12 @@ $myhash = GENHASH();
 
 SUEXEC("nobody", "nobody", "bugdbxlogin $uid $myhash", SUEXEC_ACTION_DIE);
 
+$pp_args = "${BUGDBURL}?";
+$pp_args .= (isset($do) ? "&do=${do}" : "");
+$pp_args .= (isset($project_title) ? "&project_title=${project_title}" : "");
+
+$pp_args = rawurlencode($pp_args);
+
 setcookie($BUGDBCOOKIENAME, $myhash, 0, "/", $TBAUTHDOMAIN, $TBSECURECOOKIES);
-header("Location: ${BUGDBURL}?do=authenticate&username=${uid}&bosscred=${myhash}&prev_page=${BUGDBURL}" .
-       (isset($project_title) ? "&project_title=${project_title}" : ""));
+header("Location: ${BUGDBURL}?do=authenticate&username=${uid}&bosscred=${myhash}&prev_page=" . $pp_args);
 ?>
