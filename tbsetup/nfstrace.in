@@ -1,0 +1,141 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use IPC::Open2;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TESTMODE    = @TESTMODE@;
+my $FSNODE      = "@FSNODE@";
+
+# Note no -n option. We redirect stdin from the new exports file below.
+my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
+my $DBPROG	= "$TB/sbin/nfsdump2db";
+my $PROG	= "$TB/sbin/nfstrace.proxy";
+my $TMPFILE     = "/var/nfstrace/temp";
+my $dbg		= 1;
+my @row;
+
+#
+# Handle command-line arguments
+#
+sub usage() {
+    warn "Usage: $0 <gc|get|stats> pid eid\n";
+    return 1;
+}
+
+my $cmd = shift @ARGV;
+if (!$cmd) {
+    exit usage();
+}
+
+# Check the operation type
+if ($cmd !~ /^(gc|get|stats)$/) {
+    exit usage();
+} else {
+    # Untaint operation
+    $cmd = $1;
+}
+
+my $pid;
+my $eid;
+
+if (@ARGV == 2) {
+    $pid = $ARGV[0];
+    $eid = $ARGV[1];
+
+    #
+    # Untaint args.
+    #
+    if ($pid =~ /^([-\@\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	die_noretry("Bad data in pid: $pid.");
+    }
+    if ($eid =~ /^([-\@\w]+)$/) {
+	$eid = $1;
+    }
+    else {
+	die_noretry("Bad data in eid: $eid.");
+    }
+}
+elsif ($cmd ne "stats") {
+    print "Project ID and Experiment ID missing.";
+    exit usage();
+}
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root! Maybe its a development version?\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Testbed Support libraries
+# 
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+$UID = 0;
+
+if ($cmd ne "gc") {
+    # system("$SSH sudo -u nfstrace $DBPROG -c 1 $TMPFILE");
+}
+
+local (*NT_READER, *NT_WRITER);
+$ntpid = open2(\*NT_READER, \*NT_WRITER, "$SSH xargs -n 50 $PROG $cmd");
+
+if (defined($pid)) {
+    #
+    # First gather up all the nodes that are reserved and the required info.
+    # Order by pid,gid first so that they're all grouped together and we avoid
+    # extra db queries.
+    #
+    # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
+    #
+    $nodes_result =
+	DBQueryFatal("select r.vname,r.pid,r.eid from reserved as r ".
+		     "left join nodes on r.node_id=nodes.node_id ".
+		     "left join node_types on node_types.type=nodes.type ".
+		     " where nodes.role='testnode' ".
+		     "       and node_types.isvirtnode=0 ".
+		     "       and node_types.isremotenode=0 ".
+		     "       and pid='$pid' and eid='$eid'");
+    
+    while (my ($vname,$pid,$eid) = $nodes_result->fetchrow_array) {
+	print NT_WRITER "$vname.$eid.$pid\n";
+    }
+}
+
+close(NT_WRITER);
+
+while (<NT_READER>) {
+    print "$_";
+}
+
+close(NT_READER);
+waitpid($ntpid, 0);
+
+exit(0);

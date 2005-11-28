@@ -33,6 +33,7 @@ sub usage()
 #
 my $TBROOT         = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
+my $TBAUDIT        = "@TBAUDITEMAIL@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
@@ -393,6 +394,18 @@ sub doSwapout($) {
 	waitpid($os_setup_pid, 0);
 	undef $os_setup_pid;
     }
+
+    print "Getting files accessed via NFS.\n";
+    TBDebugTimeStamp("nfstrace started");
+    my ($dbuid, $uname, $umail);
+    if (UNIX2DBUID($UID, \$dbuid) &&
+	UserDBInfo($dbuid, \$uname, \$umail)) {
+	SENDMAIL("$TBAUDIT",
+		 "Files accessed by $pid/$eid via NFS",
+		 `nfstrace get $pid $eid`,
+		 "$uname <$umail>");
+    }
+    TBDebugTimeStamp("nfstrace finished");
 
     if (! $TESTMODE) { 
 	if (! ($DISABLE_EVENTS || $elabinelab)) {
@@ -936,6 +949,14 @@ sub doSwapin($) {
 	#
     }
     TBDebugTimeStamp("named finished");
+
+    print "Cleaning NFS traces.\n";
+    TBDebugTimeStamp("nfstrace gc started");
+    if (system("nfstrace gc $pid $eid")) {
+	tberror "Failed to setup nfstrace.";
+	return 1;
+    }
+    TBDebugTimeStamp("nfstrace gc finished");
 
     # Check cancel flag before continuing. No retry, 
     TBGetCancelFlag($pid, $eid, \$canceled);
