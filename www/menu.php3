@@ -40,7 +40,7 @@ function SIDEBARCELL($contents, $last = 0) {
     } else {
 	echo "<td class=\"menuopt\">";
     }
-    echo "<font size=tiny>&#8226; </font> $contents";
+    echo "$contents";
     echo "</td>";
     echo "</tr>";
     echo "\n";
