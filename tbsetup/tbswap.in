@@ -33,7 +33,7 @@ sub usage()
 #
 my $TBROOT         = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
-my $TBAUDIT        = "@TBAUDITEMAIL@";
+my $TBLOGS         = "@TBLOGSEMAIL@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
@@ -400,7 +400,7 @@ sub doSwapout($) {
     my ($dbuid, $uname, $umail);
     if (UNIX2DBUID($UID, \$dbuid) &&
 	UserDBInfo($dbuid, \$uname, \$umail)) {
-	SENDMAIL("$TBAUDIT",
+	SENDMAIL("$TBLOGS",
 		 "Files accessed by $pid/$eid via NFS",
 		 `nfstrace get $pid $eid`,
 		 "$uname <$umail>");
