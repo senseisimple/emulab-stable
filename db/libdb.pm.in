@@ -3869,6 +3869,7 @@ sub TBNodeConsoleTail ($$) {
     $EUID = $UID;
     open(CONTAIL, "$TB/sbin/spewconlog -l 10 $pc |");
     while (<CONTAIL>) {
+	s/[^ -~\t\n]/./g;
 	print $fh "$pc: $_";
     }
     close(CONTAIL);
