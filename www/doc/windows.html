@@ -472,7 +472,14 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 	    </ul>
 
 	    These are the ones to use if you're connecting from an X
-	    workstation.  </li> <br>
+	    workstation.  <p>
+
+	    <b>NOTE:</b> The default colors used in Bash and rxvt don't work
+	    well in 4-bit color mode under RDP.  Make sure you update your
+	    rdp-mime.pl to get the rdesktop <b><code>-a 16</code></b> argument
+	    for 16-bit color.  Or, you can over-ride the rxvt defaults by
+	    putting lines in your <code>~/.Xdefaults</code> file like this:
+	    <br> <code>rxvt*background: steelblue</code> </li> <br>
 
        <li> The <b><code>Cygwin</code> shells</b> run in a </b>Windows Terminal</b>
 	    window, just as the Windows cmd.exe does.  These are the ones to use
