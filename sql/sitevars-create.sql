@@ -50,10 +50,10 @@ INSERT INTO sitevariables VALUES ('robotlab/opentime','08:00','07:00','Time the 
 INSERT INTO sitevariables VALUES ('robotlab/closetime',NULL,'18:00','Time the Robot lab closes down for the night.');
 INSERT INTO sitevariables VALUES ('robotlab/open','1','0','Turn the Robot Lab on/off for weekends and holidays. Overrides the open/close times.');
 INSERT INTO sitevariables VALUES ('swap/admission_control_debug',NULL,'0','Turn on/off admission control debugging (lots of output!)');
-INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg','emulab-boss-1.8','','Name of boss node install package');
-INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir','/share/freebsd/packages/FreeBSD-4.10-20041102','','Path from which to fetch boss packages');
-INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg','emulab-ops-1.4','','Name of ops node install package');
-INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir','/share/freebsd/packages/FreeBSD-4.10-20041102','','Path from which to fetch ops packages');
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg','emulab-boss-1.8','emulab-boss-1.8','Name of boss node install package');
+INSERT INTO sitevariables VALUES ('elabinelab/boss_pkg_dir','/share/freebsd/packages/FreeBSD-4.10-20041102','/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch boss packages');
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg','emulab-ops-1.4','emulab-ops-1.4','Name of ops node install package');
+INSERT INTO sitevariables VALUES ('elabinelab/ops_pkg_dir','/share/freebsd/packages/FreeBSD-4.10-20041102','/share/freebsd/packages/FreeBSD-4.10-20041102','Path from which to fetch ops packages');
 INSERT INTO sitevariables VALUES ('elabinelab/windows','1','0','Turn on Windows support in inner Emulab');
 INSERT INTO sitevariables VALUES ('general/firstinit/state',NULL,'Ready','Indicates that a new emulab is not setup yet. Moves through several states.');
 INSERT INTO sitevariables VALUES ('general/firstinit/pid',NULL,'testbed','The Project Name of the first project.');
