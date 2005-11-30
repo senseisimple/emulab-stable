@@ -11,6 +11,7 @@ SUBDIR		= os/imagezip/ntfs/libntfs
 NTFSVER		= ntfsprogs-1.7.1
 NTFSDIR		= ntfsprogs
 LIBSRCDIR	= $(NTFSDIR)/libntfs
+LOCALPKGHOST	= @OUTERBOSS_NODENAME@
 PKGHOST		= www.emulab.net
 
 include $(OBJDIR)/Makeconf
@@ -69,7 +70,13 @@ libntfs.a: $(LIBSRCDIR)/patched $(OBJS)
 $(SRCS): $(LIBSRCDIR)/patched
 
 $(LIBSRCDIR)/patched:
-	$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz
+	@if [ -n "$(LOCALPKGHOST)" ]; then \
+	    if [ ! `$(FETCH) http://$(LOCALPKGHOST)/$(NTFSVER).tar.gz` ]; then \
+		$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz; \
+	    fi \
+	else \
+		$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz; \
+	fi
 	$(UNPACK) $(NTFSVER).tar.gz
 ifdef LINUX
 	$(PATCH) < $(SRCDIR)/ntfs.linuxpatch
