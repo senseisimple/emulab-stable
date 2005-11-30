@@ -5,6 +5,7 @@ import sys
 import time
 import socket
 import getopt
+import os, os.path
 
 import MySQLdb
 
@@ -17,6 +18,11 @@ try:
 except IOError:
     sys.stderr.write("error: permission denied\n")
     sys.exit(1)
+    pass
+
+if os.path.exists("/var/nfstrace/maint"):
+    # sys.stderr.write("not available\n")
+    sys.exit(0)
     pass
 
 VERBOSITY = 1
