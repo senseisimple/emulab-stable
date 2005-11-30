@@ -240,7 +240,7 @@ if ($wireless) {
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
-if ($types['garcia'] || $types['static-mica2']) {
+if ($types['garcia'] || $types['static-mica2'] || $types['robot']) {
     SUBMENUSECTION("Robot/Mote Options");
     WRITESUBMENUBUTTON("Robot/Mote Map",
 		       "robotmap.php3".
