@@ -22,6 +22,7 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/param.h>
 #include <time.h>
@@ -865,8 +866,16 @@ dequeue(event_handle_t handle)
 int
 SetExpPath(const char *path)
 {
+	struct stat st;
+	int retval;
+	
 	setenv("EXPDIR", path, 1);
-	return chdir(path);
+	retval = chdir(path);
+
+	if (stat("logs", &st) == -1)
+		mkdir("logs", 0770);
+
+	return retval;
 }
 
 int

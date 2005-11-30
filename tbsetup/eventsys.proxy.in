@@ -162,6 +162,14 @@ my (undef,undef,$unix_pgid) = getgrnam($pid) or
     die("*** $0:\n".
 	"    No such group $pid\n");
 
+my $LOGDIR = `dirname $logfile`;
+if (! -d $LOGDIR) {
+    if (system("mkdir -p -m 775 $LOGDIR")) {
+	die("*** $0:\n".
+	    "    Could not mkdir $LOGDIR\n");
+    }
+}
+
 #
 # Create a chile whose output is directed into the logfile. Parents waits
 # a moment and then exits.
