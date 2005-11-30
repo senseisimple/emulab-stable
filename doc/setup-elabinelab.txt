@@ -37,8 +37,18 @@ a missing file, is frustrating.
 
 3. Install tarballs for the standard FreeBSD packages.  These are the
    packages that contain third-party apps that Emulab uses (e.g., apache).
-   Again, use the tarballs you downloaded from Emulab:
+   Again, use the tarball you downloaded from Emulab:
 
 	http://www.emulab.net/downloads/FreeBSD-4.10-20041102.tar.gz
 
-   and put them in your downloads directory.
+   and put it in your downloads directory.
+
+4. Install the libntfs tarball.  If you are enabling windows support, the
+   imagezip makefile will want to download the NTFS library.  It first tries
+   fetching this from the outer boss node and failing that, from the
+   mothership (www.emulab.net).  If your inner boss cannot talk to the outside
+   world, then you will need to make sure the file is on your boss node.  Grab:
+
+	http://www.emulab.net/downloads/ntfsprogs-1.7.1.tar.gz
+
+   and put it in your downloads directory.
