@@ -37,14 +37,12 @@ my $MKDIR       = "/bin/mkdir";
 my $CHMOD       = "/bin/chmod";
 my $TAR		= "/usr/bin/tar";
 my $RM		= "/bin/rm";
-my $CVSBIN      = "/usr/bin/cvs";
 my $SVN         = "/usr/local/bin/svn";
 my $SVNADMIN    = "/usr/local/bin/svnadmin";
 my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
 my $inittag     = 'root';
 my $defaultview = 'head';
 my $debug       = 1;
-my $cvsopt      = ($debug ? "" : "-q");
 my $svnopt      = ($debug ? "" : "-q");
 
 # Little helper and debug function.
@@ -73,7 +71,7 @@ sub ArchiveCreate(;$$)
     $view = $defaultview
 	if (!defined($view));
 
-    # CVS tags cannot must start with a letter.
+    # Tags cannot must start with a letter.
     if ($tag =~ /^\d+/) {
 	$tag = "T" . $tag;
     }
@@ -103,7 +101,7 @@ sub ArchiveCreate(;$$)
 	or goto bad;
 
     #
-    # Make subdirs. One to hold the CVS control tree, and the other
+    # Make subdirs. One to hold the control tree, and the other
     # to hold currently checked out versions of the tree. Lastly, we
     # need a place to copyin files before they are added to the repo.
     #
@@ -348,7 +346,7 @@ sub ArchiveSavePoint($;$$)
 	$savetag .= "_savepoint";
     }
 
-    # CVS tags must start with a letter.
+    # Tags must start with a letter.
     if ($savetag =~ /^\d+/) {
 	$savetag = "T" . $savetag;
     }
@@ -466,7 +464,7 @@ sub ArchiveCommit($;$$$)
 	$newtag = $import_tag . "_commit";
     }
 
-    # CVS tags cannot must start with a letter.
+    # Tags cannot must start with a letter.
     if ($newtag =~ /^\d+/) {
 	$newtag = "T" . $newtag;
     }
@@ -585,9 +583,10 @@ sub ArchiveCommit($;$$$)
 # once forked, there is no join, as that would be impossibly hard to deal
 # with cause of conflicts.
 #
-sub ArchiveFork($$;$)
+sub ArchiveFork($$;$$$)
 {
-    my ($archive_idx, $newview, $view) = @_;
+    my ($archive_idx, $newview, $branchtag, $newtag, $view) = @_;
+    my $sourcepoint;
     my $cwd;
 
     $view = $defaultview
@@ -610,7 +609,7 @@ sub ArchiveFork($$;$)
 	print STDERR "ArchiveCommit: $directory cannot be written!\n";
 	goto bad;
     }
-    my $cvsdir      = "$directory/repo";
+    my $repodir     = "$directory/repo";
     my $checkouts   = "$directory/checkouts";
     my $checkout    = "$directory/checkouts/$view";
     my $checkin     = "$directory/checkins/$view";
@@ -637,6 +636,22 @@ sub ArchiveFork($$;$)
 	goto bad;
     }
 
+    #
+    # Form new tag.
+    # 
+    my ($seconds, $microseconds) = gettimeofday();
+    my $import_tag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
+    $import_tag    .= $microseconds;
+
+    if (!defined($newtag)) {
+	$newtag = $import_tag . "_fork";
+    }
+
+    # Tags cannot must start with a letter.
+    if ($newtag =~ /^\d+/) {
+	$newtag = "T" . $newtag;
+    }
+
     # Create new view directories and checkout.
     if (! mkdir("$newcheckin", 0777)) {
 	print STDERR "ArchiveCreate: Could not mkdir $newcheckin: $!\n";
@@ -646,13 +661,47 @@ sub ArchiveFork($$;$)
 	print STDERR "ArchiveCreate: Could not chmod $newcheckin: $!\n";
 	goto bad;
     }
-    # Now checkout new view; this creates the $checkouts/$newview directory.
-    mysystem("cd $checkouts; ".
-	     "$CVSBIN $cvsopt -d $cvsdir checkout root; ".
-	     "/bin/mv root ${newview}")
+
+    # Create newview directory in the repo.
+    mysystem("$SVN mkdir -m 'ArchiveFork' ".
+	     "          file://$repodir/$newview")
 	== 0 or goto bad;
 
+    # Split at the trunk if no branchpoint provided.
+    if (defined($branchtag)) {
+	$sourcepoint = "tags/$branchtag";
+    }
+    else {
+	$sourcepoint = "trunk"
+    }
+
+    # Copy the trunk of the old view.
+    mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
+	     "          file://$repodir/$view/$sourcepoint ".
+	     "          file://$repodir/$newview/trunk")
+	== 0 or goto bad;
+
+    # Do not want to copy the tags/savepoints directories. Add new ones.
+    mysystem("$SVN mkdir -m 'ArchiveFork' ".
+	     "          file://$repodir/$newview/savepoint ".
+	     "          file://$repodir/$newview/tags")
+	== 0 or goto bad;
+
+    # Now check it out. This creates the checkouts/$newview directory.
+    mysystem("cd $checkouts; ".
+	     "$SVN checkout $svnopt file://$repodir/$newview")
+	== 0 or goto bad;
+
+    # Now enter the newview (okay, branch) of this archive.
+    DBQueryWarn("insert into archive_views set ".
+		"  current_tag='$newtag', archive_idx='$archive_idx', ".
+		"  view='$newview', ".
+		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
+    # Now enter an initial tag for the new view. Nothing actually gets tagged.
+    DBQueryWarn("insert into archive_tags set idx=NULL, ".
+		"  tag='$newtag', archive_idx='$archive_idx', ".
+		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
 
   okay:
     TBScriptUnlock();
@@ -690,7 +739,7 @@ sub ArchiveArchive($$)
 	print STDERR "ArchiveFile: $directory cannot be written!\n";
 	return -1;
     }
-    my $cvsdir  = "$directory/repo";
+    my $repodir  = "$directory/repo";
 
     if (! -e $target) {
 	if (! mkdir("$target", 0777)) {
@@ -707,7 +756,7 @@ sub ArchiveArchive($$)
     #
     # Tar up the whole thing and move it across.
     #
-    mysystem("$TAR cf - -C $cvsdir . | tar xf - -C $target");
+    mysystem("$TAR cf - -C $repodir . | tar xf - -C $target");
     if ($?) {
 	print STDERR "ArchiveArchive: Could not copy in $directory\n";
 	return -1;
