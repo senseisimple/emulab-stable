@@ -24,6 +24,7 @@ my $action = "boot";
 my $debug = 0;
 my $fwinfo;
 my @fwrules;
+my @fwhosts;
 
 sub usage()
 {
@@ -84,7 +85,7 @@ if (@ARGV) {
     $action = $ARGV[0];
 }
 
-my $TMFWC = CONFDIR() . "/rc.fw";
+my $TMFWC = TMFWCONFIG;
 
 # Execute the action.
 SWITCH: for ($action) {
@@ -113,7 +114,7 @@ sub doboot()
     #
     # Get our firewall info
     #
-    if (getfwconfig(\$fwinfo, \@fwrules) != 0) {
+    if (getfwconfig(\$fwinfo, \@fwrules, \@fwhosts) != 0) {
 	exit(0);
     }
 
@@ -167,6 +168,15 @@ sub doboot()
     if ($rc) {
 	unlink($TMFWC);
 	exit($rc);
+    }
+
+    #
+    # Update the hosts file with unqualified names for firewalled hosts
+    #
+    if (@fwhosts > 0) {
+	if (genhostsfile($HOSTSFILE, @fwhosts) != 0) {
+	    fatal("Could not update $HOSTSFILE!");
+	}
     }
 
     #

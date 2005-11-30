@@ -5445,6 +5445,38 @@ COMMAND_PROTOTYPE(dofwinfo)
 	if (verbose)
 	    info("FWINFO: %d default rules\n", nrows);
 
+	/*
+	 * Ohhh...I gotta bad case of the butt-uglies!
+	 *
+	 * Return the list of the unqualified names of the firewalled hosts
+	 * along with their IP addresses.  The client code uses this to
+	 * construct a local hosts file so that symbolic host names can
+	 * be used in firewall rules.
+	 */
+	if (vers > 24) {
+		res = mydb_query("select r.vname,i.IP from reserved as r "
+			"left join interfaces as i on r.node_id=i.node_id "
+			"where r.pid='%s' and r.eid='%s' and i.role='ctrl'",
+			 2, reqp->pid, reqp->eid);
+		if (!res) {
+			error("FWINFO: %s: DB Error getting host info!\n",
+			      reqp->nodeid);
+			return 1;
+		}
+		nrows = (int)mysql_num_rows(res);
+
+		for (n = nrows; n > 0; n--) {
+			row = mysql_fetch_row(res);
+			OUTPUT(buf, sizeof(buf), "HOST=%s CNETIP=%s\n",
+			       row[0], row[1]);
+			client_writeback(sock, buf, strlen(buf), tcp);
+		}
+
+		mysql_free_result(res);
+		if (verbose)
+			info("FWINFO: %d firewalled hosts\n", nrows);
+	}
+
 	return 0;
 }
 

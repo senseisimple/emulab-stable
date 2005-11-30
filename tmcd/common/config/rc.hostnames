@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -104,10 +104,15 @@ sub fromtopo($);
 #
 sub doboot()
 {
-    my $HTEMP = "${pathname}.new";
     my @tmccresults;
 
     print STDOUT "Checking Testbed hostnames configuration ... \n";
+
+    #
+    # Firewall hostname setup is done much earlier (rc.firewall)
+    #
+    return 0
+	if (ISFW());
 
     #
     # First see if we have a topo file; we can generate our own hosts
@@ -122,57 +127,10 @@ sub doboot()
     return 0
 	if (! @tmccresults);
 
-    #
-    # Note, we no longer start with the 'prototype' file here because we have
-    # to make up a localhost line that's properly qualified.
-    #
-    if (!open(HOSTS, ">$HTEMP")) {
-	fatal("Could not open $HTEMP: $!");
+    if (genhostsfile($pathname, @tmccresults) != 0) {
+	fatal("Could not update $pathname!");
     }
 
-    my $localaliases = "loghost";
-
-    #
-    # Find out our domain name, so that we can qualify the localhost entry
-    #
-    my $hostname = `hostname`;
-    if ($hostname =~ /[^.]+\.(.+)/) {
-	$localaliases .= " localhost.$1";
-    }
-    
-    #
-    # First, write a localhost line into the hosts file - we have to know the
-    # domain to use here
-    #
-    print HOSTS os_etchosts_line("localhost", "127.0.0.1",
-				 $localaliases), "\n";
-
-    #
-    # Now convert each hostname into hosts file representation and write
-    # it to the hosts file. Note that ALIASES is for backwards compat.
-    # Should go away at some point.
-    #
-    my $pat  = q(NAME=([-\w\.]+) IP=([0-9\.]*) ALIASES=\'([-\w\. ]*)\');
-
-    foreach my $str (@tmccresults) {
-	if ($str =~ /$pat/) {
-	    my $name    = $1;
-	    my $ip      = $2;
-	    my $aliases = $3;
-	    
-	    my $hostline = os_etchosts_line($name, $ip, $aliases);
-	    
-	    print HOSTS "$hostline\n";
-	}
-	else {
-	    warning("Bad hosts line: $str");
-	}
-    }
-    close(HOSTS);
-    system("mv -f $HTEMP $pathname");
-    if ($?) {
-	fatal("Could not move $HTEMP to $pathname!");
-    }
     return 0;
 }
 

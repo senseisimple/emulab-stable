@@ -20,18 +20,19 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
-	 gettraceconfig
+	 gettraceconfig genhostsfile
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
 	 MFS REMOTE CONTROL WINDOWS JAILED PLAB LOCALROOTFS IXP USESFS 
 	 SIMTRAFGEN SIMHOST ISDELAYNODEPATH JAILHOST DELAYHOST STARGATE
+	 ISFW
 
 	 CONFDIR TMDELAY TMJAILNAME TMSIMRC TMCC
 	 TMNICKNAME TMSTARTUPCMD FINDIF
 	 TMROUTECONFIG TMLINKDELAY TMDELMAP TMTOPOMAP TMLTMAP
 	 TMGATEDCONFIG TMSYNCSERVER TMKEYHASH TMNODEID TMEVENTKEY 
-	 TMCREATOR TMSWAPPER 
+	 TMCREATOR TMSWAPPER TMFWCONFIG
        );
 
 # Must come after package declaration!
@@ -46,7 +47,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 24; };
+sub TMCD_VERSION()	{ 25; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -217,6 +218,7 @@ sub TMROLE()		{ CONFDIR() . "/role";}
 sub TMSIMRC()		{ CONFDIR() . "/rc.simulator";}
 sub TMCREATOR()		{ CONFDIR() . "/creator";}
 sub TMSWAPPER()		{ CONFDIR() . "/swapper";}
+sub TMFWCONFIG()	{ CONFDIR() . "/rc.fw";}
 
 #
 # This is a debugging thing for my home network.
@@ -282,6 +284,11 @@ sub PLAB()	{ if ($inplab) { return $vnodeid; } else { return 0; } }
 # Are we on an IXP
 #
 sub IXP()	{ if ($inixp) { return $vnodeid; } else { return 0; } }
+
+#
+# Are we a firewall node
+#
+sub ISFW()	{ if (-e TMFWCONFIG()) { return 1; } else { return 0; } }
 
 #
 # Are we hosting a simulator or maybe just a NSE based trafgen.
@@ -661,6 +668,73 @@ sub gettopomap($)
 }
 
 #
+# Generate a hosts file given hostname info in tmcc hostinfo format
+# Returns 0 on success, non-zero otherwise.
+#
+sub genhostsfile($@)
+{
+    my ($pathname, @hostlist) = @_;
+
+    my $HTEMP = "$pathname.new";
+
+    #
+    # Note, we no longer start with the 'prototype' file here because we have
+    # to make up a localhost line that's properly qualified.
+    #
+    if (!open(HOSTS, ">$HTEMP")) {
+	warn("Could not create temporary hosts file $HTEMP\n");
+	return 1;
+    }
+
+    my $localaliases = "loghost";
+
+    #
+    # Find out our domain name, so that we can qualify the localhost entry
+    #
+    my $hostname = `hostname`;
+    if ($hostname =~ /[^.]+\.(.+)/) {
+	$localaliases .= " localhost.$1";
+    }
+    
+    #
+    # First, write a localhost line into the hosts file - we have to know the
+    # domain to use here
+    #
+    print HOSTS os_etchosts_line("localhost", "127.0.0.1",
+				 $localaliases), "\n";
+
+    #
+    # Now convert each hostname into hosts file representation and write
+    # it to the hosts file. Note that ALIASES is for backwards compat.
+    # Should go away at some point.
+    #
+    my $pat  = q(NAME=([-\w\.]+) IP=([0-9\.]*) ALIASES=\'([-\w\. ]*)\');
+
+    foreach my $str (@hostlist) {
+	if ($str =~ /$pat/) {
+	    my $name    = $1;
+	    my $ip      = $2;
+	    my $aliases = $3;
+	    
+	    my $hostline = os_etchosts_line($name, $ip, $aliases);
+	    
+	    print HOSTS "$hostline\n";
+	}
+	else {
+	    warn("Ignoring bad hosts line: $str");
+	}
+    }
+    close(HOSTS);
+    system("mv -f $HTEMP $pathname");
+    if ($?) {
+	warn("Could not move $HTEMP to $pathname\n");
+	return 1;
+    }
+
+    return 0;
+}
+
+#
 # Convert from MAC to iface name (eth0/fxp0/etc) using little helper program.
 # 
 sub findiface($)
@@ -963,12 +1037,13 @@ sub expandfwvars($)
 # Return the firewall configuration. We parse tmcd output here and return
 # a list of hash entries to the caller.
 #
-sub getfwconfig($$)
+sub getfwconfig($$;$)
 {
-    my ($infoptr, $rptr) = @_;		# Return info and rule list to caller.
+    my ($infoptr, $rptr, $hptr) = @_;
     my @tmccresults = ();
     my $fwinfo      = {};
     my @fwrules     = ();
+    my @fwhosts	    = ();
 
     $$infoptr = undef;
     @$rptr = ();
@@ -978,9 +1053,10 @@ sub getfwconfig($$)
     }
 
     my $rempat = q(TYPE=remote FWIP=([0-9\.]*));
-    my $fwpat  = q(TYPE=([\w-]+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*) IN_VLAN=(\d+) OUT_VLAN=(\d+));
+    my $fwpat  = q(TYPE=([-\w]+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*) IN_VLAN=(\d+) OUT_VLAN=(\d+));
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
     my $vpat   = q(VAR=(EMULAB_\w+) VALUE="(.*)");
+    my $hpat   = q(HOST=([-\w]+) CNETIP=([0-9\.]*));
 
     $fwinfo->{"TYPE"} = "none";
     foreach my $line (@tmccresults) {
@@ -1026,6 +1102,10 @@ sub getfwconfig($$)
 	    push(@fwrules, $fw);
 	} elsif ($line =~ /$vpat/) {
 	    $fwvars{$1} = $2;
+	} elsif ($line =~ /$hpat/) {
+	    # create a tmcc hostlist format string
+	    push(@fwhosts,
+		 "NAME=$1 IP=$2 ALIASES=''");
 	} else {
 	    warn("*** WARNING: Bad firewall info line: $line\n");
 	    return 1;
@@ -1040,6 +1120,7 @@ sub getfwconfig($$)
 
     $$infoptr = $fwinfo;
     @$rptr = @fwrules;
+    @$hptr = @fwhosts;
     return $bad;
 }
 
