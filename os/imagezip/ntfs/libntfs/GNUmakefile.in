@@ -71,11 +71,11 @@ $(SRCS): $(LIBSRCDIR)/patched
 
 $(LIBSRCDIR)/patched:
 	@if [ -n "$(LOCALPKGHOST)" ]; then \
-	    if [ ! `$(FETCH) http://$(LOCALPKGHOST)/$(NTFSVER).tar.gz` ]; then \
-		$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz; \
+	    if [ ! `$(FETCH) http://$(LOCALPKGHOST)/downloads/$(NTFSVER).tar.gz` ]; then \
+		$(FETCH) http://$(PKGHOST)/downloads/$(NTFSVER).tar.gz; \
 	    fi \
 	else \
-		$(FETCH) http://$(PKGHOST)/$(NTFSVER).tar.gz; \
+		$(FETCH) http://$(PKGHOST)/downloads/$(NTFSVER).tar.gz; \
 	fi
 	$(UNPACK) $(NTFSVER).tar.gz
 ifdef LINUX
