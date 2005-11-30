@@ -164,7 +164,7 @@ ALLHY     = $(notdir $(HYFILES))
 ALLSDR   = $(notdir $(SDRFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 
-install: $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
+INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
 	$(addprefix $(INSTALL_WWWDIR)/floormap/, $(ALLFLOORMAPS)) \
 	$(addprefix $(INSTALL_WWWDIR)/pix/, $(ALLPIXES)) \
@@ -184,6 +184,8 @@ install: $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_DIR)/opsdir/www/cvsweb/, $(ALLOPSCVSWEB)) \
 	$(INSTALL_WWWDIR)/doc/LICENSE.txt \
 	$(addprefix $(INSTALL_ETCDIR)/, swish.conf)
+
+install: $(INSTALLFILES)
 	(swish-e -c ./swish.conf)
 	cd $(INSTALL_WWWDIR) && \
 		rm -f tbdb.html; \
@@ -201,6 +203,11 @@ endif
 post-install:
 
 boss-install:	install
+
+uninstall:
+	rm -f $(INSTALLFILES)
+
+force-install:	uninstall install
 
 $(INSTALL_WWWDIR)/doc/LICENSE.txt: $(TESTBED_SRCDIR)/LICENSE
 	@echo "Installing $<"
