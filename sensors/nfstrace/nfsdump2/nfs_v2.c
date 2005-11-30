@@ -1,5 +1,5 @@
 /*
- * $Id: nfs_v2.c,v 1.1 2005-11-28 15:44:00 stack Exp $
+ * $Id: nfs_v2.c,v 1.2 2005-11-30 17:30:57 stack Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -32,7 +32,7 @@ static int compute_pct (int n, int d);
 
 #define	PRINT_STATUS(s, p)	\
 	if (p) { if ((s) == NFS_OK) { fprintf (OutFile, "OK "); } \
-		else { fprintf (OutFile, "%x ", (s)); } \
+		else { fprintf (OutFile, "%d ", (s)); } \
 	}
 
 /*
@@ -445,13 +445,13 @@ u_int32_t *print_sattr2 (u_int32_t *p, u_int32_t *e, int print)
 			fprintf (OutFile, "mode %x ", ntohl (p [0]));
 		}
 		if (ntohl (p [1]) != -1) {
-			fprintf (OutFile, "uid %x ", ntohl (p [1]));
+			fprintf (OutFile, "uid %d ", ntohl (p [1]));
 		}
 		if (ntohl (p [2]) != -1) {
-			fprintf (OutFile, "gid %x ", ntohl (p [2]));
+			fprintf (OutFile, "gid %d ", ntohl (p [2]));
 		}
 		if (ntohl (p [3]) != -1) {
-			fprintf (OutFile, "size %x ", ntohl (p [3]));
+			fprintf (OutFile, "size %d ", ntohl (p [3]));
 		}
 
 		/*
@@ -570,8 +570,8 @@ u_int32_t *print_fattr2 (u_int32_t *p, u_int32_t *e, int print)
 		fprintf (OutFile, "ftype %x ", ntohl (p [0]));	/* ftype */
 		fprintf (OutFile, "mode %x ", ntohl (p [1]));	/* mode */
 		fprintf (OutFile, "nlink %x ", ntohl (p [2]));	/* nlink */
-		fprintf (OutFile, "uid %x ", ntohl (p [3]));	/* uid */
-		fprintf (OutFile, "gid %x ", ntohl (p [4]));	/* gid */
+		fprintf (OutFile, "uid %d ", ntohl (p [3]));	/* uid */
+		fprintf (OutFile, "gid %d ", ntohl (p [4]));	/* gid */
 		fprintf (OutFile, "size %x ", ntohl (p [5]));	/* size */
 		fprintf (OutFile, "blksize %x ", ntohl (p [6]));	/* blksize */
 		fprintf (OutFile, "rdev %x ", ntohl (p [7]));	/* rdev */

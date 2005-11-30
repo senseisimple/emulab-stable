@@ -1,5 +1,5 @@
 /*
- * $Id: nfs_v3.c,v 1.1 2005-11-28 15:44:00 stack Exp $
+ * $Id: nfs_v3.c,v 1.2 2005-11-30 17:30:57 stack Exp $
  *
  */
 
@@ -959,10 +959,10 @@ int print_sattr3_x (sattr3 *s)
 		fprintf (OutFile, "mode %x ", s->mode.set_mode3_u.mode);
 	}
 	if (s->uid.set_it) {
-		fprintf (OutFile, "uid %x ", s->uid.set_uid3_u.uid);
+		fprintf (OutFile, "uid %d ", s->uid.set_uid3_u.uid);
 	}
 	if (s->gid.set_it) {
-		fprintf (OutFile, "gid %x ", s->gid.set_gid3_u.gid);
+		fprintf (OutFile, "gid %d ", s->gid.set_gid3_u.gid);
 	}
 	if (s->size.set_it) {
 		print_uint64_x ((u_int32_t *) &(s->size.set_size3_u.size),

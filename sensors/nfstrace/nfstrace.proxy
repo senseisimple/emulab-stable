@@ -10,7 +10,14 @@ import MySQLdb
 
 DBNAME = "nfsdb"
 DBUSER = "nfstrace"
-DBPASS = open("/var/nfstrace/dbpass").read().strip()
+
+try:
+    DBPASS = open("/var/nfstrace/dbpass").read().strip()
+    pass
+except IOError:
+    sys.stderr.write("error: permission denied\n")
+    sys.exit(1)
+    pass
 
 VERBOSITY = 1
 
@@ -113,8 +120,6 @@ def do_gc(args):
                     "(" + ",".join(("%s",) * len(ips)) + ")", ips)
         pass
 
-    cur.execute("DELETE FROM handle_map where complete=0")
-
     for lpc in range(0, len(ips)):
         if args[lpc] != ips[lpc]:
             cur.execute("REPLACE INTO node_ids (node_id, node_ip) VALUES "
@@ -123,7 +128,7 @@ def do_gc(args):
             pass
         pass
 
-    # con.commit();
+    con.commit();
     
     return retval
 
@@ -153,17 +158,26 @@ def do_get(args):
         get_usage()
         return 2
 
-    cur.execute("select distinct hm.fn,fa.fh,"
+    missing = 0
+    
+    cur.execute("select hm.fn,"
                 "  IFNULL(MAX(fa.last_access)>MAX(fd.last_remove),1) "
                 "  from file_access as fa "
                 "left join file_dropped as fd on fa.fh=fd.fh "
                 "left join handle_map as hm on hm.fh=fa.fh "
                 "where fa.node_ip in (" + ",".join(("%s",) * len(args))
-                + ") group by fa.fh", args)
-    for (fn, fh, alive) in cur:
+                + ") group by hm.fn", args)
+    for (fn, alive) in cur:
         if alive and fn:
             print fn
             pass
+        elif not fn:
+            missing += 1
+            pass
+        pass
+
+    if missing > 0:
+        print `missing` + " unknown file(s) accessed."
         pass
 
     return retval
@@ -193,17 +207,33 @@ def do_stats(args):
         return 2
 
     print "Top readers:"
-    cur.execute("select r.node_ip,ni.node_id,count(1) as wc from reads as r "
-                "left join node_ids as ni on ni.node_ip=r.node_ip "
+    cur.execute("select r.node_ip,count(1) as wc from reads as r "
                 "where timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
                 "group by r.node_ip order by wc desc limit %s",
                 (over_last, row_count))
-    for (node_ip,node_id,count) in cur:
-        if not node_id:
+    readers = cur.fetchall()
+    for (node_ip,count) in readers:
+        cur.execute("select node_id from node_ids where node_ip=%s",
+                    (node_ip,))
+        node_id = cur.fetchone()
+        if node_id:
+            node_id = node_id[0];
+            pass
+        else:
             he = socket.gethostbyaddr(node_ip)
             node_id = he[0].split('.')[0]
             pass
         print "  %8d\t%s" % (count, node_id)
+        pass
+
+    print "Top read files:"
+    cur.execute("select hm.fn,count(1) as rc from reads as r "
+                "left join handle_map as hm on hm.fh=r.fh "
+                "where timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
+                "group by r.fh order by rc desc limit %s",
+                (over_last, row_count))
+    for (fn,count) in cur:
+        print "  %8d\t%s" % (count, fn or "<unknown>")
         pass
     
     print "Top writers:"
@@ -219,6 +249,16 @@ def do_stats(args):
             node_id = he[0].split('.')[0]
             pass
         print "  %8d\t%16d\t%s" % (count, amount, node_id)
+        pass
+    
+    print "Top written files:"
+    cur.execute("select hm.fn,count(1) as wc from writes as w "
+                "left join handle_map as hm on hm.fh=w.fh "
+                "where timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
+                "group by w.fh order by wc desc limit %s",
+                (over_last, row_count))
+    for (fn,count) in cur:
+        print "  %8d\t%s" % (count, fn or "<unknown>")
         pass
     
     return retval

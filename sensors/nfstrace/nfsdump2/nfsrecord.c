@@ -1,5 +1,5 @@
 /*
- * $Id: nfsrecord.c,v 1.1 2005-11-28 15:44:00 stack Exp $
+ * $Id: nfsrecord.c,v 1.2 2005-11-30 17:30:57 stack Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -471,9 +471,9 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 				fprintf (OutFile, ".%.4x ", 0xffff & record->dstPort);
 				
 				fprintf (OutFile, "%c ", proto == IPPROTO_TCP ? 'T' : 'U');
-				fprintf (OutFile, "C%d %x 1 mnt fn \"%s\" ", record->nfsVersion, ntohl (rpc_b->rm_xid), payload_data);
+				fprintf (OutFile, "C%d %d 1 mnt fn \"%s\" ", record->nfsVersion, ntohl (rpc_b->rm_xid), payload_data);
 				if (euid != -1 && egid != -1) {
-					fprintf (OutFile, "euid %x egid %x ",
+					fprintf (OutFile, "euid %d egid %d ",
 						 euid, egid);
 				}
 				fprintf (OutFile, "con = %d len = %d",
@@ -490,7 +490,7 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 				fprintf (OutFile, ".%.4x ", 0xffff & record->dstPort);
 				
 				fprintf (OutFile, "%c ", proto == IPPROTO_TCP ? 'T' : 'U');
-				fprintf (OutFile, "R%d %x ", record->nfsVersion, ntohl (rpc_b->rm_xid));
+				fprintf (OutFile, "R%d %d ", record->nfsVersion, ntohl (rpc_b->rm_xid));
 				if (record->rpcStatus == 0) {
 					fprintf(OutFile, "1 mnt OK ");
 					if (record->nfsVersion == 1 || record->nfsVersion == 2) {
@@ -502,9 +502,9 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 					}
 				}
 				else {
-					fprintf(OutFile, "1 mnt %x ", record->rpcStatus);
+					fprintf(OutFile, "1 mnt %d ", record->rpcStatus);
 				}
-				fprintf (OutFile, "status=%x ", record->rpcStatus);
+				fprintf (OutFile, "status=%d ", record->rpcStatus);
 				
 				fprintf (OutFile, "pl = %d ", payload_len);
 				fprintf (OutFile, "con = %d len = %d",
@@ -520,7 +520,7 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 					tot_len - consumed);
 
 			if (euid != -1 && egid != -1) {
-				fprintf (OutFile, "euid %x egid %x ",
+				fprintf (OutFile, "euid %d egid %d ",
 						euid, egid);
 			}
 
@@ -623,7 +623,7 @@ void printRecord (nfs_pkt_t *record, void *xdr, u_int32_t payload_len,
 			fprintf (OutFile, "RU%d\n", record->nfsVersion);
 		}
 
-		fprintf (OutFile, "status=%x ", record->rpcStatus);
+		fprintf (OutFile, "status=%d ", record->rpcStatus);
 
 		fprintf (OutFile, "pl = %d ", payload_len);
 	}
