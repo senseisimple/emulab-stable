@@ -381,7 +381,7 @@ sub SetupFsNode()
 
     # Make sure /usr/ports is not a symlink to RO shared space
     if (-l "/usr/ports") {
-	if (!unlink("/usr/ports") {
+	if (!unlink("/usr/ports")) {
 	    print "WARNING: /usr/ports is a symlink, port install may fail\n";
 	} else {
 	    mysystem("mkdir /usr/ports");
@@ -682,7 +682,7 @@ sub SetupOpsNode($)
 
     # Make sure /usr/ports is not a symlink to RO shared space
     if (-l "/usr/ports") {
-	if (!unlink("/usr/ports") {
+	if (!unlink("/usr/ports")) {
 	    print "WARNING: /usr/ports is a symlink, port install may fail\n";
 	} else {
 	    mysystem("mkdir /usr/ports");
@@ -1014,7 +1014,7 @@ sub SetupBossNode()
 
     # Make sure /usr/ports is not a symlink to RO shared space
     if (-l "/usr/ports") {
-	if (!unlink("/usr/ports") {
+	if (!unlink("/usr/ports")) {
 	    print "WARNING: /usr/ports is a symlink, port install may fail\n";
 	} else {
 	    mysystem("mkdir /usr/ports");
