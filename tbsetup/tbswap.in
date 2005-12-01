@@ -718,7 +718,7 @@ sub doSwapin($) {
     # assign_wrapper does all the virtual to physical mapping 
     # and updating the DB state.
     #
-
+    
     if ($type > UPDATE_RECOVER) {
         #
         # Hacky test to allow disabling of linkdelays if the node is going
@@ -1000,6 +1000,19 @@ sub doSwapin($) {
 	    }
 	}
     }
+
+    #
+    # Lets run gentopofile again, so we get ltmap right. This will come out
+    # later, most likely.
+    #
+    TBDebugTimeStamp("gentopofile started");
+    print "Generating ltmap (again) ...\n";
+
+    if (system("gentopofile $pid $eid")) {
+        tberror("gentopofile failed!");
+	return 1;
+    }
+    TBDebugTimeStamp("gentopofile finished");
 
     #
     # Since it'll take a while for the nodes to reboot, we'll start now, and
