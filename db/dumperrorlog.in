@@ -1,0 +1,222 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Check DB consistency.
+#
+sub usage() {
+    print STDOUT "Usage: dumperrorlog [-d]\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 1;
+my $tempfile = "/var/tmp/testbed_dumperrorlog_tempfile";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ISMAINSITE  = @TBMAINSITE@;
+my $USERNODE	= "@USERNODE@";
+my $PROXY       = "$TB/sbin/dumperrorlog.proxy";
+my $SCP         = "/usr/bin/scp";
+my $SSHTB	= "$TB/bin/sshtb";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Protos
+sub fatal($);
+
+#
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+#
+# Form a temp name.
+#
+my $logname = TBMakeLogname("dumperrorlog");
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+#
+if (! $debug) {
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+}
+
+#
+# Get the last index we archived out.
+#
+my $query_result =
+    DBQueryFatal("select idx from emulab_indicies ".
+		 "where name='lastlog_seqnum'");
+my ($lastseq) = $query_result->fetchrow_array();
+if (!defined($lastseq)) {
+    DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		 "values ('lastlog_seqnum', 0)");
+    $lastseq = 0;
+}
+
+#
+# Grab the index number for the NOTICE priority.
+#
+$query_result =
+    DBQueryFatal("select priority from priorities where name='NOTICE'");
+my ($NOTICE) = $query_result->fetchrow_array();
+if (!defined($NOTICE)) {
+    fatal("No priority named 'NOTICE' in the priorities table!");
+}
+
+#
+# Only the main site does this archiving stuff.
+#
+if ($ISMAINSITE) {
+    #
+    # Must lock the table of course
+    #
+    DBQueryFatal("lock tables log write");
+
+    my $maxseq = $lastseq + 10;
+
+    #
+    # Grab all of the new entries and store to the file
+    #
+    DBQueryFatal("select * from log ".
+		 "where seq > $lastseq " .
+		 "into outfile '${tempfile}.log' ");
+
+    #
+    # Now we need to find out what the last index really was. 
+    # 
+    $query_result =
+	DBQueryFatal("select seq from log ".
+		     "where seq > $lastseq " .
+		     "order by seq desc limit 1");
+    # Save for later.
+    $lastseq = $query_result->fetchrow_array();
+
+    DBQueryFatal("unlock tables");
+
+    #
+    # Might not be any new entries ...
+    # 
+    if (defined($lastseq)) {
+	system("echo \"load data infile '${tempfile}.log' into table log\" ".
+	       "     | mysql errorlog");
+	fatal("Could not load into archive DB!")
+	    if ($?);
+
+	# Okay, now that we have really archived them away, update the
+	# seq number.
+	DBQueryFatal("update emulab_indicies set idx='$lastseq' ".
+		     "where name='lastlog_seqnum'");
+
+	#
+	# XXX This awful hack will go away when Kevin is happy with
+	# the error logging code.
+	#
+
+	#
+	# Copy the file over to ops and load it into the DB over there.
+	#
+	system("$SCP -p ${tempfile}.log ".
+	       "     ${USERNODE}:/var/db/mysql/errorlog") == 0
+	    or fatal("Could not copy $tempfile to $USERNODE!");
+
+	system("$SSHTB -host $USERNODE $PROXY log") == 0
+	    or fatal("Could not load log entries into ops DB!");
+    }
+    unlink("${tempfile}.log");
+
+    #
+    # Now the other tables Kevin needs
+    #
+    foreach my $tablename ("scripts", "priorities") {
+	DBQueryFatal("select * from $tablename ".
+		     "into outfile '${tempfile}.${tablename}' ");
+
+	system("echo \"load data infile '${tempfile}.${tablename}' ".
+	       "     into table $tablename\" | mysql errorlog");
+	fatal("Could not load $tablename into archive DB!")
+	    if ($?);
+
+	#
+	# Copy the file over to ops and load it into the DB over there.
+	#
+	system("$SCP -p ${tempfile}.${tablename} ".
+	       "     ${USERNODE}:/var/db/mysql/errorlog") == 0
+	    or fatal("Could not copy ${tempfile}.${tablename} to $USERNODE!");
+
+	system("$SSHTB -host $USERNODE $PROXY $tablename") == 0
+	    or fatal("Could not load $tablename entries into ops DB!");
+	
+	unlink("${tempfile}.${tablename}");
+    }
+}
+
+#
+# And then age out entries older then 14 days.
+#
+DBQueryFatal("delete from log ".
+	     "where stamp < (UNIX_TIMESTAMP(now()) - (14 * 24 * 60 * 60))");
+
+#
+# And age out non critical data older then 7 days.
+#
+DBQueryFatal("delete from log ".
+	     "where priority > $NOTICE and ".
+	     "      stamp < (UNIX_TIMESTAMP(now()) - (7 * 24 * 60 * 60))");
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "DumpErrorLog Failed", $msg, undef, undef, ($logname));
+   
+    unlink("$logname")
+	if (-e $logname);
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
