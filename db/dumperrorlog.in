@@ -172,7 +172,7 @@ if ($ISMAINSITE) {
     #
     foreach my $tablename ("scripts", "priorities") {
 	DBQueryFatal("select * from $tablename ".
-		     "into outfile '${tempfile}.${tablename}' ");
+		     "replace into outfile '${tempfile}.${tablename}' ");
 
 	system("echo \"load data infile '${tempfile}.${tablename}' ".
 	       "     into table $tablename\" | mysql errorlog");
