@@ -458,6 +458,7 @@ REPLACE INTO state_transitions VALUES ('NODEALLOC','RELOAD_PENDING','RELOAD_TO_F
 REPLACE INTO state_transitions VALUES ('PXEKERNEL','PXEWAKEUP','PXEWAKEUP','Retry');
 REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','SHUTDOWN','Reboot');
 REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','SHUTDOWN','Error');
+REPLACE INTO state_transitions VALUES ('NORMALv2','SHUTDOWN','WEDGED','Error');
 REPLACE INTO state_transitions VALUES ('NORMALv2','BOOTING','TBSETUP','BootOK');
 REPLACE INTO state_transitions VALUES ('NORMALv2','PXEBOOTING','BOOTING','BootInfo');
 REPLACE INTO state_transitions VALUES ('NORMALv2','ISUP','PXEBOOTING','KernelChange');
@@ -517,6 +518,7 @@ REPLACE INTO state_triggers VALUES ('*','*','BOOTING','BOOTING, CHECKGENISUP');
 REPLACE INTO state_triggers VALUES ('*','MINIMAL','ISUP','RESET');
 REPLACE INTO state_triggers VALUES ('*','RELOAD-MOTE','RELOADDONE','RELOADDONE');
 REPLACE INTO state_triggers VALUES ('*','OPSNODEBSD','ISUP','SCRIPT:opsreboot');
+REPLACE INTO state_triggers VALUES ('*','NORMALv2','WEDGED','POWERCYCLE');
 
 --
 -- Dumping data for table `table_regex`

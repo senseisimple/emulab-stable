@@ -65,6 +65,12 @@ for ifc in `regtool list $nbtif`; do
      regtool set -i $nbtif/$ifc/DisableDynamicUpdate 1
 done
 
+# Turn off LMHOSTS lookup to make sure NetBT is not active.
+# Sometimes we get errors like this trying to reboot below:
+#      Error 53 The network path was not found.
+nbtp=$svcs/NetBT/Parameters
+regtool set -i $nbtp/EnableLMHOSTS 0
+
 # Turn on IP forwarding if there is more than one experimental net interface.
 # Also requires a reboot to take effect.
 tp=$svcs/Tcpip/Parameters
@@ -81,6 +87,8 @@ if [ $nodeid = $hostname ]; then
     logit "$host matches nodeid '$nodeid'."
 else
     logit "$host differs from nodeid '$nodeid'."
+    # A reboot will be required.
+    tmcd state SHUTDOWN
 
     logit "Remove a redirect switch to make sure we come back with a serial console."
     bootcfg /ems OFF /id 1
@@ -109,8 +117,12 @@ else
     tsshutdn 1 /REBOOT /DELAY:1
     sleep 10
 
-    # Give up, log it, and go on.
-    logit "$host - Failed to reboot changing to '$nodeid'."
+    # Give up, log it, ask for power cycle, and wait until timeout if that fails.
+    logit "$host - Failed to reboot changing to '$nodeid'  Asking for power cycle."
+    tmcc state WEDGED
+    sleep 1200
+    # Should never get here!
+    logit "$host - Failed power cycle too.  Network stack is not reset."
 fi
 
 logit "rc.firstboot finished."

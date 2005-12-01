@@ -820,6 +820,10 @@ sub stateTransition($$) {
 			      objname   => $node);
 		next;
 	    };
+	    (/^$TBPOWERCYCLE$/) && do {
+		handleCommand($node,$TBPOWERCYCLE);
+		next;
+	    };
 	    notify("Unknown trigger '$trig' for $node in $mode/$newstate!\n");
 	}
 	# Clear any of the node triggers that we ran.
