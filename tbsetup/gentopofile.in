@@ -95,11 +95,17 @@ if ($impotent) {
     $LTOUT = *STDERR;
 }
 else {
+    unlink("${toponame}.new")
+	if (-e "${toponame}.new");
+    
     open(MAP, "> ${toponame}.new") or
 	die("Could not create ${toponame}.new: $!\n");
 
     $OUT = *MAP;
 
+    unlink("${ltname}.new")
+	if (-e "${ltname}.new");
+    
     open(LTMAP, "> ${ltname}.new") or
 	die("Could not create ${ltname}.new: $!\n");
 
@@ -141,17 +147,93 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 #
 #   l node0 node1 100000 0.0 0.0
 #
-$query_result =
-    DBQueryFatal("select l1.vname,l1.vnode,l2.vnode,l1.bandwidth*1000,".
-		 "  l1.delay/1000+l2.delay/1000,l1.lossrate ".
-		 "from virt_lans as l1 ".
-		 "left join virt_lans as l2 ".
-		 "  on l2.vname=l1.vname and l2.pid=l1.pid and ".
-		 "     l2.eid=l1.eid and l2.vnode!=l1.vnode ".
-		 "where l1.pid='$pid' and l1.eid='$eid'");
+my %virt_lans = ();
 
-while (my ($name,$vn1,$vn2,$bw,$delay,$lr) = $query_result->fetchrow_array) {
-    print $LTOUT "l $vn1 $vn2 $bw $delay $lr $name\n";
+$query_result =
+    DBQueryFatal("select * from virt_lans ".
+		 "where pid='$pid' and eid='$eid' ".
+		 "order by vname,member");
+
+while (my $rowref = $query_result->fetchrow_hashref()) {
+    my $vname  = $rowref->{"vname"};
+    my $member = $rowref->{"member"};
+
+    #
+    # Create a row for this lan, if we have not seen it already.
+    #
+    if (!exists($virt_lans{$vname})) {
+	my $rec = {};
+	$rec->{"MEMBERLIST"} = [];
+	$rec->{"MEMBERS"}    = {};
+	$virt_lans{$vname}   = $rec;
+    }
+    $virt_lans{$vname}->{"MEMBERS"}->{$member} = $rowref;
+    push(@{$virt_lans{$vname}->{"MEMBERLIST"}}, $member);
+}
+
+foreach my $lan (keys(%virt_lans)) {
+    my @members = @{$virt_lans{$lan}->{"MEMBERLIST"}};
+
+    if (@members == 2) {
+	my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$members[0]};
+	my $member1 = $virt_lans{$lan}->{"MEMBERS"}->{$members[1]};
+
+	my $node0   = $member0->{"vnode"};
+	my $delay0  = $member0->{"delay"};
+	my $loss0   = $member0->{"lossrate"};
+	my $bw0     = $member0->{"bandwidth"};
+	my $rdelay0 = $member0->{"rdelay"};
+	my $rloss0  = $member0->{"rlossrate"};
+	my $rbw0    = $member0->{"rbandwidth"};
+
+	my $node1   = $member1->{"vnode"};
+	my $delay1  = $member1->{"delay"};
+	my $loss1   = $member1->{"lossrate"};
+	my $bw1     = $member1->{"bandwidth"};
+	my $rdelay1 = $member1->{"rdelay"};
+	my $rloss1  = $member1->{"rlossrate"};
+	my $rbw1    = $member1->{"rbandwidth"};
+	
+	my $delay = ($delay0+$rdelay1) / 1000.0 ;
+	my $loss = 1-(1-$loss0)*(1-$rloss1);
+	my $bw = &min($bw0,$rbw1) * 1000;
+	my $rdelay = ($rdelay0+$delay1) / 1000.0;
+	my $rloss = 1-(1-$rloss0)*(1-$loss1);
+	my $rbw = &min($rbw0,$bw1) * 1000;
+
+	printf $LTOUT
+	    "l $node0 $node1 $bw %.4f %.6f $lan\n", $delay, $loss;
+	printf $LTOUT
+	    "l $node1 $node0 $rbw %.4f %.6f $lan\n", $rdelay, $rloss;
+    }
+    else {
+	foreach my $memb0 (@members) {
+	    my $member0 = $virt_lans{$lan}->{"MEMBERS"}->{$memb0};
+	    
+	    my $node0   = $member0->{"vnode"};
+	    my $delay0  = $member0->{"delay"};
+	    my $loss0   = $member0->{"lossrate"};
+	    my $bw0     = $member0->{"bandwidth"};
+	    
+	    foreach my $memb1 (@members) {
+		next
+		    if ($memb0 eq $memb1);
+
+		my $member1 = $virt_lans{$lan}->{"MEMBERS"}->{$memb1};
+		my $node1   = $member1->{"vnode"};
+		my $rdelay1 = $member1->{"rdelay"};
+		my $rloss1  = $member1->{"rlossrate"};
+		my $rbw1    = $member1->{"rbandwidth"};
+
+		my $delay = ($delay0+$rdelay1) / 1000.0;
+		my $loss = 1-(1-$loss0)*(1-$rloss1);
+		my $bw = &min($bw0,$rbw1) * 1000;
+
+		printf $LTOUT
+		    "l $node0 $node1 $bw %.4f %.6f $lan\n", $delay, $loss;
+	    }
+	}
+    }
 }
 
 #
