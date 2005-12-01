@@ -163,6 +163,7 @@ my (undef,undef,$unix_pgid) = getgrnam($pid) or
 	"    No such group $pid\n");
 
 my $LOGDIR = `dirname $logfile`;
+$LOGDIR =~ s/\s+$//;
 if (! -d $LOGDIR) {
     if (system("mkdir -p -m 775 $LOGDIR")) {
 	die("*** $0:\n".
