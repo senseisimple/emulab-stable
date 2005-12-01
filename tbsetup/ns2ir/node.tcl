@@ -227,7 +227,9 @@ Node instproc updatedb {DB} {
     foreach agent $agentlist {
 	$agent updatedb $DB
 
-	$sim agentinit [$agent set application]
+	if {[$agent set application] != {}} {
+	    $sim agentinit [$agent set application]
+	}
 
 	# The following is for NSE traffic generation
 	# Simulated nodes in make-simulated should not be doing this
