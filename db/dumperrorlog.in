@@ -172,10 +172,10 @@ if ($ISMAINSITE) {
     #
     foreach my $tablename ("scripts", "priorities") {
 	DBQueryFatal("select * from $tablename ".
-		     "replace into outfile '${tempfile}.${tablename}' ");
+		     "into outfile '${tempfile}.${tablename}' ");
 
 	system("echo \"load data infile '${tempfile}.${tablename}' ".
-	       "     into table $tablename\" | mysql errorlog");
+	       "     replace into table $tablename\" | mysql errorlog");
 	fatal("Could not load $tablename into archive DB!")
 	    if ($?);
 
