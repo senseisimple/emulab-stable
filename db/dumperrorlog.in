@@ -15,7 +15,7 @@ sub usage() {
     exit(-1);
 }
 my $optlist  = "d";
-my $debug    = 1;
+my $debug    = 0;
 my $tempfile = "/var/tmp/testbed_dumperrorlog_tempfile";
 
 #
@@ -205,6 +205,9 @@ DBQueryFatal("delete from log ".
 DBQueryFatal("delete from log ".
 	     "where priority > $NOTICE and ".
 	     "      stamp < (UNIX_TIMESTAMP(now()) - (7 * 24 * 60 * 60))");
+
+unlink("$logname")
+    if (-e $logname);
 
 exit(0);
 
