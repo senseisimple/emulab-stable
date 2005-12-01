@@ -87,8 +87,6 @@ sysetc-remove:
 
 script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/liblocsetup.pm $(BINDIR)/liblocsetup.pm
-	$(INSTALL) -m 755 $(SRCDIR)/startsshd $(BINDIR)/startsshd
-	$(INSTALL) -m 755 $(SRCDIR)/stopsshd $(BINDIR)/stopsshd
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
 	$(INSTALL) -m 755 $(SRCDIR)/tbshutdown $(BINDIR)/tbshutdown
 	$(INSTALL) -c -m 755 -o root -g wheel -d /sbin
@@ -100,8 +98,6 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/sudo.dummy /bin/sudo
 	$(INSTALL) -m 755 $(SRCDIR)/rc.firstboot $(BINDIR)/rc/rc.firstboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwin
-	# The following will fail if the user login script is still busy in a shell.
-	-$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp-user $(BINDIR)/rc/rc.cygwinxp-user
 
 sfs-install:
 
