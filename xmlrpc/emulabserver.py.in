@@ -3266,7 +3266,7 @@ class node:
 
         if isvirt:
             if isremote:
-                if jailflag and isplab:
+                if jailflag or isplab:
                     result["port"] = sshdport
                     pass
                 pass

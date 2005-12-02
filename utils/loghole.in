@@ -863,11 +863,11 @@ def do_show(args):
 # @param *args The list of directories to sync.
 # @retval The exit status of the rsync command-line.
 #
-def rsync(host, base, dlpath, *args):
+def rsync(host, base, dlpath, paths = ["/"], port = None):
     global RSYNC, HOME, DEBUG
     
     retval = 0
-    for path in args:
+    for path in paths:
         fullpath = os.path.join("", base, path[1:], "")
         try:
             os.makedirs(fullpath)
@@ -881,9 +881,13 @@ def rsync(host, base, dlpath, *args):
         if VERBOSITY > VERBOSITY_HUMAN:
             cmd.append("-v")
             pass
-        cmd.extend([("--rsh=ssh -o StrictHostKeyChecking=no "
-                     + "-o UserKnownHostsFile="
-                     + os.path.join(HOME, ".ssh", "emulab_known_hosts")),
+        ssh_args = ("ssh -o StrictHostKeyChecking=no "
+                    + "-o UserKnownHostsFile="
+                    + os.path.join(HOME, ".ssh", "emulab_known_hosts"))
+        if port:
+            ssh_args += " -p " + str(port)
+            pass
+        cmd.extend([("--rsh=" + ssh_args),
                     host + ":" + path,
                     fullpath])
         if DEBUG:
@@ -1021,6 +1025,7 @@ def do_sync(args, mode="sync", must_be_active=1):
     else:
         info_method = getattr(SERVER, "experiment.info")
         osinfo_method = getattr(SERVER, "osid.info")
+        ssh_method = getattr(SERVER, "node.sshdescription")
 
         physical = info_method(PACKAGE_VERSION, {
             "proj" : PID,
@@ -1090,10 +1095,17 @@ def do_sync(args, mode="sync", must_be_active=1):
                             continue
                         pass
 
+                    sd = ssh_method(PACKAGE_VERSION, { "node" : phost })
+                    if sd["code"] != RESPONSE_SUCCESS:
+                        sys.stderr.write("error: xmlrpc failed - %s\n" %
+                                         (sd["output"],))
+                        retval = 1
+                        return retval
+                    sd = sd["value"]
                     if mode == "sync":
                         pid = rsync(phost, os.path.join(logdir, vhost),
                                     dlhandle.name,
-                                    "/")
+                                    port = sd.get("port", None))
                         pass
                     elif mode == "clean":
                         pid = rmstar(phost, "/local/logs/*")
