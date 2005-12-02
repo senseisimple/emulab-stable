@@ -205,6 +205,9 @@ foreach my $dir (@SYSVARDIRS) {
     }
 }
 
+# take these out since they are large and RHL regens them anyway
+system("rm -f /var/lib/rpm/__db*");
+
 print "Clearing out directories in $VARDIR ...\n";
 foreach my $dir (@VARDIRS) {
     if (-d "$VARDIR/$dir") {
