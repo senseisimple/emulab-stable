@@ -1371,6 +1371,7 @@ done
 
 
 
+
 #
 # Offer both versions of the email addresses that have the @ escaped
 # for perl (the default), and that don't
@@ -1932,17 +1933,17 @@ for ac_hdr in ulxmlrpcpp/ulxr_config.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1936: checking for $ac_hdr" >&5
+echo "configure:1937: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1941 "configure"
+#line 1942 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1946: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1947: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -1981,17 +1982,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1985: checking for $ac_hdr" >&5
+echo "configure:1986: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1990 "configure"
+#line 1991 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1995: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1996: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2024,7 +2025,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2028: checking for $ac_word" >&5
+echo "configure:2029: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2103,7 +2104,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2107: checking for a BSD compatible install" >&5
+echo "configure:2108: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2164,7 +2165,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2168: checking for $ac_word" >&5
+echo "configure:2169: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2549,6 +2550,7 @@ s%@OURDOMAIN@%$OURDOMAIN%g
 s%@FSDIR_PROJ@%$FSDIR_PROJ%g
 s%@FSDIR_GROUPS@%$FSDIR_GROUPS%g
 s%@FSDIR_USERS@%$FSDIR_USERS%g
+s%@FSDIR_SHARE@%$FSDIR_SHARE%g
 s%@FS_WITH_QUOTAS@%$FS_WITH_QUOTAS%g
 s%@TRACK_INTERSWITCH_BANDWIDTH@%$TRACK_INTERSWITCH_BANDWIDTH%g
 s%@TIMESTAMPS@%$TIMESTAMPS%g
