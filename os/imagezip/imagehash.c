@@ -79,7 +79,7 @@ static int report = 0;
 static int regfile = 0;
 static int nothreads = 0;
 static int hashtype = HASH_TYPE_SHA1;
-static int hashlen = 16;
+static int hashlen = 20;
 static long hashblksize = HASHBLK_SIZE;
 static unsigned long long ndatabytes;
 static unsigned long nchunks, nregions, nhregions;
@@ -243,13 +243,14 @@ usage(void)
 		"imagehash [-d] <image-filename> <device>\n"
 		"    check the signature file for the specified image\n"
 		"    against the specified disk device\n"
-		"imagehash -c [-dr] [-b blksize] [-o sigfile] <image-filename>\n"
+		"imagehash -c [-dr] [-D hfunc] [-b blksize] [-o sigfile] <image-filename>\n"
 		"    create a signature file for the specified image\n"
 		"imagehash -R [-dr] [-b blksize] <image-filename>\n"
 		"    output an ASCII report to stdout rather than creating a signature file\n"
 		"imagehash -v\n"
 		"    print version info and exit\n"
 		"\n"
+		"-D hfunc      hash function to use (md5 or sha1)\n"
 		"-b blksize    size of hash blocks (512 <= size <= 32M)\n"
 		"-d            print additional detail to STDOUT\n"
 		"-o sigfile    name to use for sig file, else <image>.sig\n"
@@ -441,7 +442,7 @@ createhash(char *name, struct hashinfo **hinfop)
 	struct timeval tm[2];
 
 	hfile = signame(name);
-	ofd = open(hfile, O_RDWR|O_CREAT, 0666);
+	ofd = open(hfile, O_RDWR|O_CREAT|O_TRUNC, 0666);
 	if (ofd < 0) {
 		perror(hfile);
 		free(hfile);
