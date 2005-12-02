@@ -5,10 +5,12 @@
 # All rights reserved.
 #
 use Getopt::Std;
-use POSIX 'setsid'; # For &daemonize
+use POSIX 'setsid';	 # For &daemonize
+use POSIX ":sys_wait_h"; # For &WNOHANG
 use Sys::Syslog;
 use English;
 use Socket;
+use Errno qw(EADDRINUSE);
 
 #
 # This also kills a running frisbee.
@@ -232,7 +234,20 @@ if ($ELABINELAB && ! -e $filename) {
 }
 
 # Run in the background
-if (TBBackGround($LOGFILE)) {
+if (my $childpid = TBBackGround($LOGFILE)) {
+    #
+    # Delay a moment, and they look for an exit status.
+    # This is intended to catch startup problems.
+    #
+    # XXX TBBackGround should do this!
+    #
+    sleep(1);
+    my $foo = waitpid($childpid, &WNOHANG);
+    if ($foo) {
+	&clear_address;
+	die("*** $0:\n".
+	    "    Error $? backgrounding frisbeelauncher\n!");
+    }
     exit(0);
 }
 
@@ -268,6 +283,8 @@ if ($ELABINELAB) {
     $args .= " -K 15";
 }
 
+my $firsttry = 1;
+
 # Now, we actually launch Frisbee
 while (1) {
         #
@@ -286,19 +303,43 @@ while (1) {
 		waitpid($child_pid, 0);
 
 		if ($?) {
-			SENDMAIL($TBOPS, "Frisbeed Failed!",
-				 "Imageid: $imageid\n".
-				 "Address: $address\n\n".
-				 "Process $child_pid exited with value $?.\n".
-				 "Please look at the syslog for frisbeed!\n\n".
-				 "NOTE: Another frisbeed will not start!\n");
-			#
-			# Dump early. This will leave the address in
-			# in the DB, so that another one will not start
-			# until the matter is resolved by someone. 
-			#
-			set_pid($imageid, 0);
-			exit(1);
+		    #
+		    # If this is the first time we are firing up this server
+		    # and the port is already in use, try another port.
+		    #
+		    # If a server was running, died, and now we can no longer 
+		    # get the port, something else might be wrong so just die
+		    # in the usual way.
+		    #
+		    my $err = $?;
+		    if ($firsttry && ($err >> 8) == EADDRINUSE()) {
+			warn "Frisbeed bind failed for address $address, ".
+			     "picking another address\n";
+			&lock_tables();
+			$address = &pick_address;
+			if ($address) {
+			    &set_address($imageid, $address);
+			    &unlock_tables;
+			    next;
+			}
+			&unlock_tables;
+			warn "Unable to find a free address to send on\n";
+		    }
+		    SENDMAIL($TBOPS, "Frisbeed Failed!",
+			     "Imageid: $imageid\n".
+			     "Address: $address\n\n".
+			     "Process $child_pid exited with value $err.\n".
+			     "Please look at the syslog for frisbeed!\n\n".
+			     "NOTE: Another frisbeed will not start!\n");
+		    #
+		    # Dump early. This will leave the address in
+		    # in the DB, so that another one will not start
+		    # until the matter is resolved by someone. 
+		    #
+		    set_pid($imageid, 0);
+		    exit(1);
+		} else {
+		    $firsttry = 0;
 		}
 	}
 	else {
