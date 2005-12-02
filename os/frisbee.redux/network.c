@@ -30,7 +30,7 @@ unsigned long nonetbufs;
 #endif
 
 /* Max number of times to attempt bind to port before failing. */
-#define MAXBINDATTEMPTS		10
+#define MAXBINDATTEMPTS		2
 
 /* Max number of hops multicast hops. */
 #define MCAST_TTL		5
@@ -71,8 +71,15 @@ CommonInit(void)
 		if (bind(sock, (struct sockaddr *)&name, sizeof(name)) == 0)
 			break;
 
-		if (--i == 0)
-			pfatal("Could not bind to port %d!", portnum);
+		/*
+		 * Note that we exit with a magic value. 
+		 * This is for server wrapper-scripts so that they can
+		 * differentiate this case and try again with a different port.
+		 */
+		if (--i == 0) {
+			error("Could not bind to port %d!\n", portnum);
+			exit(EADDRINUSE);
+		}
 
 		pwarning("Bind to port %d failed. Will try %d more times!",
 			 portnum, i);

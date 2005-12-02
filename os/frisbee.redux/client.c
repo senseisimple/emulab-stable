@@ -1182,7 +1182,7 @@ PlayFrisbee(void)
 		delay = 0;
 	if (delay) {
 		if (debug)
-			log("Starup delay: %d.%03d seconds",
+			log("Startup delay: %d.%03d seconds",
 			    delay/1000, delay%1000);
 		DOSTAT(delayms = delay);
 		fsleep(delay * 1000);
