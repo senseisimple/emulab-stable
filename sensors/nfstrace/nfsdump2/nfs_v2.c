@@ -1,5 +1,5 @@
 /*
- * $Id: nfs_v2.c,v 1.2 2005-11-30 17:30:57 stack Exp $
+ * $Id: nfs_v2.c,v 1.3 2005-12-02 00:43:29 stack Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -208,7 +208,7 @@ int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
 	}
 
 	if (new_p == NULL) {
-		fprintf (OutFile, "+|+");
+		fprintf (OutFile, " error 1 ");
 	}
 
 	return (0);

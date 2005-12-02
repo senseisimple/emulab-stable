@@ -1,5 +1,5 @@
 /*
- * $Id: nfs_v3.c,v 1.2 2005-11-30 17:30:57 stack Exp $
+ * $Id: nfs_v3.c,v 1.3 2005-12-02 00:43:29 stack Exp $
  *
  */
 
@@ -505,7 +505,7 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
 	xdr_destroy (&xdr);
 
 	if (! got_all) {
-		fprintf (OutFile, "SHORT PACKET");
+		fprintf (OutFile, " error 1 ");
 	}
 
 	return (rc);
@@ -1069,7 +1069,7 @@ u_int32_t *print_fn3 (u_int32_t *p, u_int32_t *e, int print)
 	}
 
 	if (e < (u_int32_t *) (str + tot_len)) {
-		fprintf (OutFile, " ... ");
+		fprintf (OutFile, " \"...\" ");
 		return (NULL);
 	}
 

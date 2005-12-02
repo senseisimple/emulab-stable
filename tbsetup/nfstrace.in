@@ -17,6 +17,11 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TESTMODE    = @TESTMODE@;
 my $FSNODE      = "@FSNODE@";
 
+my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
+my $FSDIR_PROJ = "@FSDIR_PROJ@";
+my $FSDIR_USERS = "@FSDIR_USERS@";
+my $FSDIR_SHARE = "@FSDIR_SHARE@";
+
 # Note no -n option. We redirect stdin from the new exports file below.
 my $SSH		= "$TB/bin/sshtb -l root -host $FSNODE";
 my $DBPROG	= "$TB/sbin/nfsdump2db";
@@ -100,14 +105,23 @@ use libtestbed;
 
 $UID = 0;
 
-if ($cmd ne "gc") {
-    # system("$SSH sudo -u nfstrace $DBPROG -c 1 $TMPFILE");
+my $cmdline = "$SSH $PROG $cmd";
+
+if ($cmd eq "get") {
+    $cmdline .= " -m $FSDIR_GROUPS:/groups";
+    $cmdline .= " -m $FSDIR_PROJ:/proj";
+    $cmdline .= " -m $FSDIR_USERS:/users";
+    $cmdline .= " -m $FSDIR_SHARE:/share";
+    $cmdline .= " $pid $eid";
+}
+elsif ($cmd eq "gc") {
+    $cmdline = "$SSH xargs -n 100 $PROG $cmd -e $pid/$eid";
 }
 
 local (*NT_READER, *NT_WRITER);
-$ntpid = open2(\*NT_READER, \*NT_WRITER, "$SSH xargs -n 50 $PROG $cmd");
+$ntpid = open2(\*NT_READER, \*NT_WRITER, $cmdline);
 
-if (defined($pid)) {
+if ($cmd eq "gc" && defined($pid)) {
     #
     # First gather up all the nodes that are reserved and the required info.
     # Order by pid,gid first so that they're all grouped together and we avoid
@@ -116,7 +130,7 @@ if (defined($pid)) {
     # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
     #
     $nodes_result =
-	DBQueryFatal("select r.vname,r.pid,r.eid from reserved as r ".
+	DBQueryFatal("select r.vname from reserved as r ".
 		     "left join nodes on r.node_id=nodes.node_id ".
 		     "left join node_types on node_types.type=nodes.type ".
 		     " where nodes.role='testnode' ".
@@ -124,8 +138,8 @@ if (defined($pid)) {
 		     "       and node_types.isremotenode=0 ".
 		     "       and pid='$pid' and eid='$eid'");
     
-    while (my ($vname,$pid,$eid) = $nodes_result->fetchrow_array) {
-	print NT_WRITER "$vname.$eid.$pid\n";
+    while (my ($vname) = $nodes_result->fetchrow_array) {
+	print NT_WRITER "$vname\n";
     }
 }
 

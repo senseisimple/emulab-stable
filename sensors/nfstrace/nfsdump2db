@@ -29,14 +29,13 @@ INTERVAL = 5
 VERBOSITY = 1
 
 count = 0
-update_only = False
 
 def usage():
     return
 
 try:
     opts, req_args = getopt.getopt(sys.argv[1:],
-                                   "hvc:t:u",
+                                   "hvc:t:",
                                    [ "help", "verbose", "count=", ])
     
     for opt, val in opts:
@@ -49,9 +48,6 @@ try:
             pass
         elif opt in ("-c", "--count"):
             count = int(val)
-            pass
-        elif opt in ("-u"):
-            update_only = True
             pass
         pass
     
@@ -74,8 +70,6 @@ IDX_ID = 5
 IDX_COMMAND = 7
 IDX_BODY_START = 8
 
-fh_cache = None
-
 TABLES = [
     "mounts",
     "mount_replies",
@@ -83,7 +77,14 @@ TABLES = [
     "writes",
     "creates",
     "create_replies",
+    "mkdirs",
+    "mkdir_replies",
+    "readlinks",
+    "readlink_replies",
     "removes",
+    "remove_replies",
+    "rmdirs",
+    "rmdir_replies",
     "renames",
     "rename_replies",
     "lookups",
@@ -122,6 +123,9 @@ def padfh(fh):
         pass
     
     return retval
+
+def getfn(fn):
+    return (fn[1:-1]).replace(",","\\,")
 
 class Parser:
 
@@ -197,7 +201,10 @@ class Parser:
 
     def dispatch(self, method_name, sl, body):
         retval = None
-        if hasattr(self, method_name):
+        if "error" in body:
+            print "Bad line " + sl.join(" ")
+            pass
+        elif hasattr(self, method_name):
             method = getattr(self, method_name)
             retval = method(sl, body)
             pass
@@ -235,7 +242,7 @@ class Parser:
             sl[IDX_TIMESTAMP],
             sl[IDX_ID],
             convert_ip(sl[IDX_SRC_IP]),
-            body["fn"][1:-1],
+            getfn(body["fn"]),
             body["euid"],
             body["egid"])
         self.write_row("mounts", data)
@@ -284,13 +291,45 @@ class Parser:
         
         return
 
+    def handle_readlink(self, sl, body):
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_SRC_IP]),
+            padfh(body["fh"]),
+            body["euid"],
+            body["egid"])
+        self.write_row("readlinks", data)
+        
+        return
+
+    def handle_readlink_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = "0"
+            fn = getfn(body["fn"] or body["name"])
+            pass
+        else:
+            fn = ""
+            pass
+
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_DST_IP]),
+            status,
+            fn)
+        self.write_row("readlink_replies", data)
+        
+        return
+    
     def handle_create(self, sl, body):
         data = (
             sl[IDX_TIMESTAMP],
             sl[IDX_ID],
             convert_ip(sl[IDX_SRC_IP]),
             padfh(body["fh"]),
-            (body["fn"] or body["name"])[1:-1],
+            getfn(body["fn"] or body["name"]),
             str(int(body.get("mode", "0"), 16)), # XXX
             body["euid"],
             body["egid"])
@@ -314,16 +353,89 @@ class Parser:
         
         return
     
+    def handle_mkdir(self, sl, body):
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_SRC_IP]),
+            padfh(body["fh"]),
+            getfn(body["fn"] or body["name"]),
+            str(int(body.get("mode", "0"), 16)), # XXX
+            body["euid"],
+            body["egid"])
+        self.write_row("mkdirs", data)
+        
+        return
+
+    def handle_mkdir_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = "0"
+            pass
+        
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_DST_IP]),
+            status,
+            padfh(body.get("fh", '')))
+        self.write_row("mkdir_replies", data)
+        
+        return
+    
     def handle_remove(self, sl, body):
         data = (
             sl[IDX_TIMESTAMP],
             sl[IDX_ID],
             convert_ip(sl[IDX_SRC_IP]),
             padfh(body["fh"]),
-            (body["fn"] or body["name"])[1:-1],
+            getfn(body["fn"] or body["name"]),
             body["euid"],
             body["egid"])
         self.write_row("removes", data)
+        
+        return
+
+    def handle_remove_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = "0"
+            pass
+        
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_DST_IP]),
+            status)
+        self.write_row("remove_replies", data)
+        
+        return
+
+    def handle_rmdir(self, sl, body):
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_SRC_IP]),
+            padfh(body["fh"]),
+            getfn(body["fn"] or body["name"]),
+            body["euid"],
+            body["egid"])
+        self.write_row("rmdirs", data)
+        
+        return
+
+    def handle_rmdir_reply(self, sl, body):
+        status = sl[IDX_BODY_START]
+        if status == "OK":
+            status = "0"
+            pass
+        
+        data = (
+            sl[IDX_TIMESTAMP],
+            sl[IDX_ID],
+            convert_ip(sl[IDX_DST_IP]),
+            status)
+        self.write_row("rmdir_replies", data)
         
         return
 
@@ -333,9 +445,9 @@ class Parser:
             sl[IDX_ID],
             convert_ip(sl[IDX_SRC_IP]),
             padfh(body["fh"]),
-            (body["fn"] or body["name"])[1:-1],
+            getfn(body.get("fn", None) or body["name"]),
             padfh(body["fh2"]),
-            (body["fn2"] or body["name2"])[1:-1],
+            getfn(body.get("fn2", None) or body["name2"]),
             body["euid"],
             body["egid"])
         self.write_row("renames", data)
@@ -351,7 +463,7 @@ class Parser:
         data = (
             sl[IDX_TIMESTAMP],
             sl[IDX_ID],
-            convert_ip(sl[IDX_SRC_IP]),
+            convert_ip(sl[IDX_DST_IP]),
             status)
         self.write_row("rename_replies", data)
         
@@ -363,7 +475,7 @@ class Parser:
             sl[IDX_ID],
             convert_ip(sl[IDX_SRC_IP]),
             padfh(body["fh"]),
-            (body["fn"] or body["name"])[1:-1],
+            getfn(body["fn"] or body["name"]),
             body["euid"],
             body["egid"])
         self.lookups[(data[1], data[2])] = data
@@ -400,189 +512,113 @@ class Parser:
     
     pass
 
-class LRU:
-    """
-    Implementation of a length-limited O(1) LRU queue.
-    Built for and used by PyPE:
-    http://pype.sourceforge.net
-    Copyright 2003 Josiah Carlson.
-    """
-    class Node:
-        def __init__(self, prev, me):
-            self.prev = prev
-            self.me = me
-            self.next = None
-    def __init__(self, count, pairs=[]):
-        self.count = max(count, 1)
-        self.d = {}
-        self.first = None
-        self.last = None
-        for key, value in pairs:
-            self[key] = value
-    def __contains__(self, obj):
-        return obj in self.d
-    def __getitem__(self, obj):
-        a = self.d[obj].me
-        self[a[0]] = a[1]
-        return a[1]
-    def __setitem__(self, obj, val):
-        if obj in self.d:
-            del self[obj]
-        nobj = self.Node(self.last, (obj, val))
-        if self.first is None:
-            self.first = nobj
-        if self.last:
-            self.last.next = nobj
-        self.last = nobj
-        self.d[obj] = nobj
-        if len(self.d) > self.count:
-            if self.first == self.last:
-                self.first = None
-                self.last = None
-                return
-            a = self.first
-            a.next.prev = None
-            self.first = a.next
-            a.next = None
-            del self.d[a.me[0]]
-            del a
-    def __delitem__(self, obj):
-        nobj = self.d[obj]
-        if nobj.prev:
-            nobj.prev.next = nobj.next
-        else:
-            self.first = nobj.next
-        if nobj.next:
-            nobj.next.prev = nobj.prev
-        else:
-            self.last = nobj.prev
-        del self.d[obj]
-    def __iter__(self):
-        cur = self.first
-        while cur != None:
-            cur2 = cur.next
-            yield cur.me[1]
-            cur = cur2
-    def iteritems(self):
-        cur = self.first
-        while cur != None:
-            cur2 = cur.next
-            yield cur.me
-            cur = cur2
-    def iterkeys(self):
-        return iter(self.d)
-    def itervalues(self):
-        for i,j in self.iteritems():
-            yield j
-    def keys(self):
-        return self.d.keys()
-
-def resolve_fh(fh, depth=0):
-    global fh_cache
-    
-    retval = None
-
-    if depth > 50:
-        print "exceeded depth on " + fh
-        return (0, "<unknown>")
-
-    # prefix = " " * depth
-    if fh not in fh_cache:
-        cur.execute("SELECT complete,fn FROM handle_map WHERE fh=%s", (fh,))
-        fh_cache[fh] = cur.fetchone()
-        pass
-    fn = fh_cache[fh]
-    
-    # print prefix + "   cache " + `fn` + " " + fh
-    if fn:
-        retval = (fn[0], fn[1])
-        pass
-    else:
-        cur.execute("SELECT l.fh,l.fn FROM lookup_replies as lr "
-                    "left join lookups as l on (l.node_ip=lr.node_ip and "
-                    "  l.id=lr.id and l.fh!=%s) "
-                    "where lr.fh=%s and lr.status=0 limit 1", (fh, fh,))
-        res = cur.fetchone()
-        # print prefix + "   lookup " + `res` + " " + fh
-        if res and res[0]:
-            comp = resolve_fh(res[0], depth + 1)
-            retval = (comp[0], comp[1] + "/" + res[1])
-            pass
-
-        if retval:
-            cur.execute("REPLACE INTO handle_map (fh, complete, fn) "
-                        "VALUES (%s, %s, %s)", (fh, retval[0], retval[1]))
-            pass
-        else:
-            retval = (0, "<unknown>")
-            pass
-
-        fh_cache[fh] = retval
-        pass
-
-    return retval
-
 def update_handle_map(ts):
-    global fh_cache
-
-    cur.execute("SELECT distinct m.fn,mr.fh FROM mount_replies as mr "
-                "left join mounts as m on (m.node_ip=mr.node_ip and "
+    print "    mounts"
+    cur.execute("REPLACE INTO handle_map (fh, fn, timestamp, valid) "
+                "SELECT mr.fh,m.fn,m.timestamp,1 "
+                "FROM mount_replies as mr "
+                "INNER JOIN mounts as m on (m.node_ip=mr.node_ip and "
                 "  m.id=mr.id) "
-                "left join handle_map as hm on hm.fh=mr.fh "
-                "where mr.status=0 and mr.timestamp>=%s and hm.fh is NULL",
+                "WHERE mr.status=0 and mr.timestamp>=%s",
                 (ts,))
-    count = 0
-    for (fn, fh) in cur:
-        count += 1
-        fh_cache[fh] = (1, fn)
-        cur.execute("REPLACE INTO handle_map (fh, complete, fn) "
-                    "VALUES (%s, %s, %s)", (fh, 1, fn))
-        pass
-
-    print "    " + `count` + " mount(s)"
     
-    cur.execute("SELECT distinct lr.fh FROM lookup_replies as lr "
-                "left join handle_map as hm on hm.fh=lr.fh "
-                "where lr.status=0 and lr.timestamp>=%s and "
-                "  (hm.fh is NULL or hm.complete=0)",
+    print "    lookups"
+    cur.execute("REPLACE INTO temp_handle_map "
+                "  (fh, parent, fn, timestamp, valid) "
+                "SELECT lr.fh,l.fh,l.fn,MAX(l.timestamp),1 "
+                "FROM lookup_replies as lr "
+                "INNER JOIN lookups as l on (l.node_ip=lr.node_ip and "
+                "  l.id=lr.id) "
+                "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
+                "WHERE lr.status=0 and lr.timestamp>=%s and "
+                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
+                "GROUP BY lr.fh,l.fh,l.fn",
                 (ts,))
-    count = 0
-    for (fh,) in cur:
-        count += 1
-        resolve_fh(fh)
-        pass
+    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+                "SELECT * from temp_handle_map")
+    cur.execute("DELETE FROM temp_handle_map")
     
-    print "    " + `count` + " lookup(s)"
-    
-    cur.execute("SELECT distinct cr.fh FROM create_replies as cr "
-                "left join handle_map as hm on hm.fh=cr.fh "
-                "where cr.status=0 and cr.timestamp>=%s",
+    print "    creates"
+    cur.execute("REPLACE INTO temp_handle_map "
+                "  (fh, parent, fn, timestamp, valid) "
+                "SELECT lr.fh,l.fh,l.fn,MAX(l.timestamp),1 "
+                "FROM create_replies as lr "
+                "INNER JOIN creates as l on (l.node_ip=lr.node_ip and "
+                "  l.id=lr.id) "
+                "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
+                "WHERE lr.status=0 and lr.timestamp>=%s and "
+                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
+                "GROUP BY lr.fh,l.fh,l.fn",
                 (ts,))
-    count = 0
-    for (fh,) in cur:
-        count += 1
-        resolve_fh(fh)
-        pass
+    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+                "SELECT * from temp_handle_map")
+    cur.execute("DELETE FROM temp_handle_map")
     
-    print "    " + `count` + " create(s)"
-
+    print "    mkdirs"
+    cur.execute("REPLACE INTO temp_handle_map "
+                "  (fh, parent, fn, timestamp, valid) "
+                "SELECT lr.fh,l.fh,l.fn,MAX(l.timestamp),1 "
+                "FROM mkdir_replies as lr "
+                "INNER JOIN mkdirs as l on (l.node_ip=lr.node_ip and "
+                "  l.id=lr.id) "
+                "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
+                "WHERE lr.status=0 and lr.timestamp>=%s and "
+                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
+                "GROUP BY lr.fh,l.fh,l.fn",
+                (ts,))
+    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+                "SELECT * from temp_handle_map")
+    cur.execute("DELETE FROM temp_handle_map")
+    
+    print "    renames"
+    cur.execute("REPLACE INTO temp_handle_map "
+                "  (fh, parent, fn, timestamp, valid) "
+                "SELECT hm.fh,l.from_fh,l.from_fn,MAX(l.timestamp),0 "
+                "FROM rename_replies as lr "
+                "INNER JOIN renames as l on (l.node_ip=lr.node_ip and "
+                "  l.id=lr.id) "
+                "INNER JOIN handle_map as hm on (hm.parent=l.from_fh and "
+                "  hm.fn=l.from_fn) "
+                "WHERE lr.status=0 and lr.timestamp>=%s and "
+                "  lr.timestamp > hm.timestamp "
+                "GROUP BY hm.fh,l.from_fh,l.from_fn",
+                (ts,))
+    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+                "SELECT * from temp_handle_map")
+    cur.execute("DELETE FROM temp_handle_map")
+    
+    cur.execute("REPLACE INTO temp_handle_map "
+                "  (fh, parent, fn, timestamp, valid) "
+                "SELECT hm.fh,l.to_fh,l.to_fn,MAX(l.timestamp),1 "
+                "FROM rename_replies as lr "
+                "INNER JOIN renames as l on (l.node_ip=lr.node_ip and "
+                "  l.id=lr.id) "
+                "LEFT JOIN handle_map as hm on (hm.parent=l.from_fh and "
+                "  hm.fn=l.from_fn) "
+                "WHERE lr.status=0 and lr.timestamp>=%s and "
+                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
+                "GROUP BY hm.fh,l.to_fh,l.to_fn",
+                (ts,))
+    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+                "SELECT * from temp_handle_map")
+    cur.execute("DELETE FROM temp_handle_map")
+    
     return
-
-if update_only:
-    update_handle_map(0)
-    sys.exit()
-    pass
 
 parser = Parser()
 name2stamp = {}
+updates = 0
 
 def update_files(files):
+    global updates
+    
     for fn in files:
         try:
             st = os.stat(fn)
             mtime = st[stat.ST_MTIME]
             if mtime > name2stamp.get(fn, 0):
                 print "Reading " + fn
+                updates += 1
                 name2stamp[fn] = st[stat.ST_MTIME]
                 fh = open(fn)
                 for line in fh:
@@ -599,15 +635,39 @@ def update_files(files):
                 print "  Update dropped files..."
                 cur.execute("REPLACE INTO file_dropped "
                             "(fh, node_ip, last_remove) "
-                            "SELECT hm2.fh,r.node_ip,MAX(r.timestamp) "
+                            "SELECT hm.fh,r.node_ip,MAX(r.timestamp) "
                             "  FROM removes as r "
-                            "LEFT JOIN handle_map as hm1 on hm1.fh=r.fh "
-                            "LEFT JOIN handle_map as hm2 on "
-                            "  hm2.fn=CONCAT(hm1.fn, '/', r.fn) "
-                            "WHERE timestamp >= %s "
-                            "GROUP BY r.node_ip,hm2.fh",
+                            "INNER JOIN handle_map as hm on "
+                            "  (hm.parent=r.fh and hm.fn=r.fn) "
+                            "INNER JOIN remove_replies as rr on "
+                            "  (rr.node_ip=r.node_ip and rr.id=r.id) "
+                            "WHERE rr.timestamp >= %s and rr.status=0 "
+                            "GROUP BY r.node_ip,hm.fh",
+                            (parser.first_timestamp,))
+                
+                cur.execute("REPLACE INTO file_dropped "
+                            "(fh, node_ip, last_remove) "
+                            "SELECT hm.fh,r.node_ip,MAX(r.timestamp) "
+                            "  FROM rmdirs as r "
+                            "INNER JOIN handle_map as hm on "
+                            "  (hm.parent=r.fh and hm.fn=r.fn) "
+                            "INNER JOIN rmdir_replies as rr on "
+                            "  (rr.node_ip=r.node_ip and rr.id=r.id) "
+                            "WHERE rr.timestamp >= %s and rr.status=0 "
+                            "GROUP BY r.node_ip,hm.fh",
                             (parser.first_timestamp,))
 
+                print "  Update accessed links..."
+                cur.execute("REPLACE INTO link_access "
+                            "(fh, fn, node_ip, last_access) "
+                            "SELECT r.fh,rr.fn,r.node_ip,MAX(rr.timestamp) "
+                            "FROM readlink_replies as rr "
+                            "INNER JOIN readlinks as r on "
+                            "  (r.node_ip=rr.node_ip and r.id=rr.id) "
+                            "WHERE rr.timestamp >= %s "
+                            "GROUP BY r.fh,r.node_ip",
+                            (parser.first_timestamp,))
+                
                 print "  Update accessed files..."
                 cur.execute("REPLACE INTO file_access "
                             "(fh, node_ip, last_access) "
@@ -628,6 +688,22 @@ def update_files(files):
                                 (float(parser.first_timestamp) - (5 * 60),))
                     pass
 
+                if updates % 10 == 0:
+                    print "  Garbage collecting handle map"
+                    cur.execute(
+                        "SELECT hm1.fh FROM handle_map as hm1 "
+                        "LEFT JOIN file_access as fa on fa.fh=hm1.fh "
+                        "LEFT JOIN link_access as la on la.fh=hm1.fh "
+                        "LEFT JOIN handle_map as hm2 on hm2.parent=hm1.fh "
+                        "WHERE hm1.timestamp < "
+                        "  (UNIX_TIMESTAMP() - (2 * 24 * 60 * 60)) and "
+                        "  fa.fh is null and la.fh is null and hm2.fh is null "
+                        "GROUP BY hm1.fh")
+                    for res in cur:
+                        cur.execute("DELETE FROM handle_map WHERE fh=%s", res)
+                        pass
+                    pass
+
                 print "  Done."
                 
                 parser.clear_timestamp()
@@ -641,21 +717,12 @@ def update_files(files):
 
     return
 
-fh_cache = LRU(1024)
-
 try:
     lpc = 0
 
     while (count == 0) or (lpc < count):
         update_files(req_args)
         con.commit()
-
-        for key in fh_cache.keys():
-            complete, fh = fh_cache[key]
-            if not complete:
-                del fh_cache[key]
-                pass
-            pass
         
         time.sleep(INTERVAL)
         lpc = lpc + 1
