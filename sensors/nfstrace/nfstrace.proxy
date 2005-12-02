@@ -28,7 +28,7 @@ except IOError:
 MAINT_PATH = "/var/nfstrace/maint"
 if os.path.exists(MAINT_PATH):
     # sys.stderr.write("not available\n")
-    # sys.exit(0)
+    sys.exit(0)
     pass
 
 VERBOSITY = 1
