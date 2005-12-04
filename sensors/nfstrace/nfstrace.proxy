@@ -289,6 +289,9 @@ def resolve_fh(fh, depth=0):
     
     retval = None
 
+    if not fh:
+        return (0, "<u:none>")
+
     if depth > 50:
         print "exceeded depth on " + fh
         return (0, "<u:" + fh + ">")
