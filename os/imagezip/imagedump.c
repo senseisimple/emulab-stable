@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -24,6 +24,7 @@ static int detail = 0;
 static int dumpmap = 0;
 static int ignorev1 = 0;
 static int infd = -1;
+static char *chkpointdev;
 
 static unsigned long long wasted;
 static uint32_t sectinuse;
@@ -35,6 +36,12 @@ static void usage(void);
 static void dumpfile(char *name, int fd);
 static int dumpchunk(char *name, char *buf, int chunkno, int checkindex);
 
+#ifdef WITH_SHD
+void add_shdrange(u_int32_t start, u_int32_t size);
+int write_shd(char *shddev);
+int debug = 0;
+#endif
+
 #define SECTOBYTES(s)	((unsigned long long)(s) * SECSIZE)
 
 int
@@ -43,7 +50,7 @@ main(int argc, char **argv)
 	int ch, version = 0;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "dimv")) != -1)
+	while ((ch = getopt(argc, argv, "C:dimv")) != -1)
 		switch(ch) {
 		case 'd':
 			detail++;
@@ -54,6 +61,9 @@ main(int argc, char **argv)
 		case 'm':
 			dumpmap++;
 			detail = 0;
+			break;
+		case 'C':
+			chkpointdev = optarg;
 			break;
 		case 'v':
 			version++;
@@ -235,6 +245,14 @@ dumpfile(char *name, int fd)
 			break;
 	}
  done:
+
+#ifdef WITH_SHD
+	if (chkpointdev && write_shd(chkpointdev)) {
+		fprintf(stderr, "Could not record SHD alloc block info\n");
+		exit(1);
+	}
+#endif
+
 	if (filesize == 0)
 		filesize = (off_t)(chunkno + 1) * SUBBLOCKSIZE;
 
@@ -393,6 +411,14 @@ dumpchunk(char *name, char *buf, int chunkno, int checkindex)
 				fmax = count;
 			franges++;
 		}
+
+#ifdef WITH_SHD
+		/*
+		 * Accumulate SHD allocated list info
+		 */
+		if (chkpointdev)
+			add_shdrange(reg->start, reg->size);
+#endif
 
 		count = reg->size;
 		sectinuse += count;

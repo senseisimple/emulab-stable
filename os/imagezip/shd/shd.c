@@ -34,7 +34,8 @@ int fake_ioctl(int, int, void *);
 #endif
 
 int
-read_shd(char *shddev, char *infile, int infd, u_int32_t ssect)
+read_shd(char *shddev, char *infile, int infd, u_int32_t ssect,
+	 void (*addvalid)(u_int32_t, u_int32_t))
 {
 	int shdfd;
 	struct shd_modinfo sm;
@@ -79,7 +80,7 @@ read_shd(char *shddev, char *infile, int infd, u_int32_t ssect)
 			if (debug > 2)
 				fprintf(stderr, "  %12d    %9d\n",
 					sr->start, (sr->end-sr->start));
-			addvalid(sr->start + ssect, (sr->end-sr->start));
+			(*addvalid)(sr->start + ssect, (sr->end-sr->start));
 		}
 
 		sm.command = 2;
@@ -97,6 +98,55 @@ read_shd(char *shddev, char *infile, int infd, u_int32_t ssect)
 
 	close(shdfd);
 	return 0;
+}
+
+static struct shd_allocinfo alloclist;
+
+int
+write_shd(char *shddev)
+{
+	int shdfd;
+
+	if (alloclist.buf == 0 || alloclist.bufsiz == 0)
+		return 0;
+
+	/*
+	 * Open the shd device so we can ioctl
+	 */
+	shdfd = open(shddev, O_RDWR);
+	if (shdfd < 0) {
+		perror(shddev);
+		return 1;
+	}
+
+	if (SHDIOCTL(shdfd, SHDSETALLOCATEDRANGES, &alloclist) < 0) {
+		perror(shddev);
+		close(shdfd);
+		return 1;
+	}
+
+	close(shdfd);
+
+	free(alloclist.buf);
+	alloclist.buf = 0;
+	alloclist.bufsiz = 0;
+
+	return 0;
+}
+
+void
+add_shdrange(u_int32_t start, u_int32_t size)
+{
+	size_t nsize = (alloclist.bufsiz + 1) * sizeof(struct shd_range);
+
+	alloclist.buf = realloc(alloclist.buf, nsize);
+	if (alloclist.buf == 0) {
+		fprintf(stderr, "No memory for SHD alloc ranges\n");
+		exit(1);
+	}
+	alloclist.buf[alloclist.bufsiz].start = start;
+	alloclist.buf[alloclist.bufsiz].end = start + size;
+	alloclist.bufsiz++;
 }
 
 #ifdef FAKEIT
@@ -135,26 +185,47 @@ struct shd_range foo[] = {
 int
 fake_ioctl(int fd, int cmd, void *data)
 {
-	struct shd_modinfo *sm = data;
 	static struct shd_range *fooptr, *out;
 	int i;
 
-	switch (sm->command) {
-	case 1:
-		fooptr = foo;
-	case 2:
-		out = sm->buf;
-		for (i = 0; i < sm->bufsiz; i++) {
-			if (fooptr->start == 0 && fooptr->size == 0)
-				break;
-			*out++ = *fooptr++;
-		}
-		sm->retsiz = i;
-		break;
-	case 3:
-		break;
-	}
+	switch (cmd) {
+	case SHDGETMODIFIEDRANGES:
+	{
+		struct shd_modinfo *sm = data;
 
-	return 0;
+		switch (sm->command) {
+		case 1:
+			fooptr = foo;
+		case 2:
+			out = sm->buf;
+			for (i = 0; i < sm->bufsiz; i++) {
+				if (fooptr->start == 0 && fooptr->end == 0)
+					break;
+				out->start = fooptr->start;
+				out->end = fooptr->start + fooptr->end;
+				fooptr++, out++;
+			}
+			sm->retsiz = i;
+			break;
+		case 3:
+			break;
+		}
+		return 0;
+	}
+	case SHDSETALLOCATEDRANGES:
+	{
+		struct shd_allocinfo *sa = data;
+		int i;
+
+		printf("SETALLOCATEDRANGES: %ld entries:\n", sa->bufsiz);
+		out = sa->buf;
+		for (i = 0; i < sa->bufsiz; i++) {
+			printf(" [%u-%u]\n", out->start, out->end);
+			out++;
+		}
+		return 0;
+	}
+	}
+	return -1;
 }
 #endif

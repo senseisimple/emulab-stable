@@ -123,6 +123,7 @@ ifeq ($(WITH_SHD),1)
 CFLAGS		+= -DWITH_SHD
 SUBDIRS		+= shd
 FSLIBS		+= shd/libshd.a
+SHDLIBS		+= shd/libshd.a
 endif
 
 all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
@@ -145,8 +146,8 @@ imageunzip: imageunzip.o crc.o version.o
 imageunzip.o:	imageunzip.c
 	$(CC) -c $(UNZIPCFLAGS) -o imageunzip.o $<
 
-imagedump: imagedump.o version.o
-	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) -o imagedump
+imagedump: imagedump.o version.o $(SHDLIBS)
+	$(CC) $(CFLAGS) imagedump.o version.o $(LIBS) $(SHDLIBS) -o imagedump
 
 imagehash: imagehash.o version.o
 	$(CC) $(CFLAGS) imagehash.o version.o $(HASHLIBS) -o imagehash

@@ -17,4 +17,10 @@ struct shd_modinfo {
 	long retsiz;		/* size of returned data (in entries) */
 };
 
-#define SHDGETMODIFIEDRANGES _IOWR('S', 29, struct shd_modinfo)
+struct shd_allocinfo {
+	struct shd_range *buf;	/* range buffer */
+	long bufsiz;		/* buffer size (in entries) */
+};
+
+#define SHDGETMODIFIEDRANGES  _IOWR('S', 29, struct shd_modinfo)
+#define SHDSETALLOCATEDRANGES _IOWR('S', 30, struct shd_allocinfo)

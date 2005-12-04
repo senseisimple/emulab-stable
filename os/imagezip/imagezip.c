@@ -88,6 +88,7 @@ void	sortrange(struct range *head, int domerge,
 		  int (*rangecmp)(struct range *, struct range *));
 void    makeranges(void);
 void	dumpranges(int verbose);
+void	addvalid(uint32_t start, uint32_t size);
 void	addreloc(off_t offset, off_t size, int reloctype);
 static int cmpfixups(struct range *r1, struct range *r2);
 static int read_doslabel(int infd, int lsect, int pstart,
@@ -100,7 +101,8 @@ int	compress_image(void);
 void	usage(void);
 
 #ifdef WITH_SHD
-int	read_shd(char *shddev, char *infile, int infd, u_int32_t ssect);
+int	read_shd(char *shddev, char *infile, int infd, u_int32_t ssect,
+		 void (*add)(uint32_t, uint32_t));
 #endif
 
 static SLICEMAP_PROCESS_PROTO(read_slice);
@@ -503,7 +505,7 @@ main(int argc, char *argv[])
 
 		if (rval == 0) {
 			rval = read_shd(chkpointdev, infilename, infd,
-					inputminsec);
+					inputminsec, addvalid);
 			if (rval == 0)
 				sortrange(ranges, 1, 0);
 		}
