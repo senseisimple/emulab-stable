@@ -136,6 +136,7 @@ if ($cmd eq "gc" && defined($pid)) {
 		     " where nodes.role='testnode' ".
 		     "       and node_types.isvirtnode=0 ".
 		     "       and node_types.isremotenode=0 ".
+		     "       and node_types.control_net is not null ".
 		     "       and pid='$pid' and eid='$eid'");
     
     while (my ($vname) = $nodes_result->fetchrow_array) {
