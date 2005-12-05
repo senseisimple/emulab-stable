@@ -34,6 +34,7 @@ sub usage()
 my $TBROOT         = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 my $TBLOGS         = "@TBLOGSEMAIL@";
+my $THISHOMEBASE   = "@THISHOMEBASE@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
@@ -397,13 +398,18 @@ sub doSwapout($) {
 
     print "Getting files accessed via NFS.\n";
     TBDebugTimeStamp("nfstrace started");
-    my ($dbuid, $uname, $umail);
-    if (UNIX2DBUID($UID, \$dbuid) &&
-	UserDBInfo($dbuid, \$uname, \$umail)) {
-	SENDMAIL("$TBLOGS",
-		 "Files accessed by $pid/$eid via NFS",
-		 `nfstrace get $pid $eid`,
-		 "$uname <$umail>");
+    if (lc $THISHOMEBASE eq "emulab.net") {
+	my ($dbuid, $uname, $umail);
+	if (UNIX2DBUID($UID, \$dbuid) &&
+	    UserDBInfo($dbuid, \$uname, \$umail)) {
+	    SENDMAIL("$TBLOGS",
+		     "Files accessed by $pid/$eid via NFS",
+		     `nfstrace get $pid $eid`,
+		     "$uname <$umail>");
+	}
+    }
+    else {
+	system("nfstrace get $pid $eid");
     }
     TBDebugTimeStamp("nfstrace finished");
 
