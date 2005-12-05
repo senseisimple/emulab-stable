@@ -366,7 +366,7 @@ if(&dotest(TEST_LATENCY)) {
     &report_status;
 }
 
-if(&dotest(TEST_RT_STATIC)
+if(0 && &dotest(TEST_RT_STATIC)
     && defined($rtproto)
     && ($rtproto eq RTPROTO_STATIC || $rtproto eq RTPROTO_SESSION)) {
     my $msg;
@@ -605,8 +605,8 @@ sub ping_node {
     my $stddev = 0;
 
     my $send_count = PING_SEND_COUNT;
-    my $timeout = 1; # 1 second
-    my $send_rate = $timeout / $send_count;
+    my $timeout = 3; # 3 seconds max
+    my $send_rate = ($timeout - 1) / $send_count;
 
     # set deadline to prevent long waits
     my $cmd;
