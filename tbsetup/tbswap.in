@@ -171,6 +171,12 @@ tblog_set_info($pid,$eid,$UID);
 #
 TBDebugTimeStampsOn();
 
+# Need this below.
+my ($dbuid, $uname, $umail);
+if (UNIX2DBUID($UID, \$dbuid)) {
+    UserDBInfo($dbuid, \$uname, \$umail);
+}
+
 #
 # Print starting message.
 #
@@ -399,9 +405,7 @@ sub doSwapout($) {
     print "Getting files accessed via NFS.\n";
     TBDebugTimeStamp("nfstrace started");
     if (lc $THISHOMEBASE eq "emulab.net") {
-	my ($dbuid, $uname, $umail);
-	if (UNIX2DBUID($UID, \$dbuid) &&
-	    UserDBInfo($dbuid, \$uname, \$umail)) {
+	if (defined($umail)) {
 	    SENDMAIL("$TBLOGS",
 		     "Files accessed by $pid/$eid via NFS",
 		     `nfstrace get $pid $eid`,
@@ -1161,6 +1165,16 @@ sub doSwapin($) {
 	DBQueryFatal("select linktest_level,linktest_pid from experiments ".
 		     "where pid='$pid' and eid='$eid'");
     my ($linktest_level,$linktest_pid) = $query_result->fetchrow_array();
+
+    # Temporary. Only studly users get to control linktest level.
+    # Mere users always get at least level three.
+    $query_result =
+	DBQueryFatal("select stud from users where uid='$dbuid'");
+    my ($studly) = $query_result->fetchrow_array();
+
+    if (! $studly) {
+	$linktest_level = ($linktest_level <= 3 ? 3 : $linktest_level);
+    }
  
     if ($linktest_level && ($type == REAL || $type == UPDATE)) {
 	if ($linktest_pid) {
@@ -1598,9 +1612,7 @@ done:
 	}
 
 	tberror "$fwerr" . "\nINFORMING $TBOPS!";
-	my ($dbuid, $uname, $umail);
-	if (UNIX2DBUID($UID, \$dbuid) &&
-	    UserDBInfo($dbuid, \$uname, \$umail)) {
+	if (defined($umail)) {
 	    SENDMAIL("$uname <$umail>",
 		     "Firewalled experiment $op failed".
 		     " for $pid/$eid",
