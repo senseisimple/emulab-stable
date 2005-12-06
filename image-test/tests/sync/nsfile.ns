@@ -1,0 +1,20 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set node0 [$ns node]
+set node1 [$ns node]
+set node2 [$ns node]
+set node3 [$ns node]
+set node4 [$ns node]
+
+tb-set-sync-server $node0
+
+tb-set-node-startcmd $node0 "@DATADIR@/startcmd0.sh /proj/@PID@/exp/@EID@/tmp/"
+tb-set-node-startcmd $node1 "@DATADIR@/startcmd1.sh /proj/@PID@/exp/@EID@/tmp/"
+tb-set-node-startcmd $node2 "@DATADIR@/startcmd2.sh /proj/@PID@/exp/@EID@/tmp/"
+
+tb-set-node-startcmd $node3 "@DATADIR@/startcmd3.sh /proj/@PID@/exp/@EID@/tmp/"
+tb-set-node-startcmd $node4 "@DATADIR@/startcmd4.sh /proj/@PID@/exp/@EID@/tmp/"
+
+$ns run
+

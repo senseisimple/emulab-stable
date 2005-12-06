@@ -148,7 +148,7 @@ sub get_parms ($) {
 sub get_numnodes ($) {
   # FIXME: needs better error detection
   my ($test) = @_;
-  open F, "$testsdir/$test/num-nodes";
+  open F, "$testsdir/$test/num-nodes" or die "Unable to open $test/num-nodes\n";
   local $_ = <F>;
   chop;
   return $_;
