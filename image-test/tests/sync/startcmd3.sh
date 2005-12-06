@@ -2,7 +2,10 @@
 
 cd $1
 
-sleep 55
+# This wil deadlock unless the asynchronous (-a) option is working
+/usr/testbed/bin/emulab-sync
+
+sleep 22
 echo 3 > node3up
 
 /usr/testbed/bin/emulab-sync -n barrier2

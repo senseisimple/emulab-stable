@@ -2,6 +2,7 @@
 
 cd $1;
 
+# This wil deadlock unless the asynchronous (-a) option is working
 /usr/testbed/bin/emulab-sync -a -i 2 -n barrier2
 
 perl -e 'sleep(rand()*30)'
