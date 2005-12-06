@@ -62,7 +62,7 @@ function INITFORM($formfields, $projlist)
     $defaults[exp_nsfile]            = ""; # Multipart data.
     $defaults[exp_preload]           = "no";
     $defaults[exp_batched]           = "no";
-    $defaults[exp_linktest]          = 1;
+    $defaults[exp_linktest]          = 3;
 
     #
     # Allow formfields that are already set to override defaults

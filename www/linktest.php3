@@ -240,7 +240,7 @@ GRABDBDATA();
 echo "<script>\n";
 sajax_show_javascript();
 if ($linktest_pid) {
-    echo "var curstate    = 'running';\n";
+    echo "var curstate    = 'busy';\n";
 }
 else {
     echo "var curstate    = 'stopped';\n";
@@ -268,6 +268,17 @@ function do_stop_cb(msg) {
     // If we got an error; throw up something useful.
     if (status != 'stopped') {
 	alert("Linktest could not be stopped: " + output);
+	return;
+    }
+
+    // Strictly for the benefit of stopping a linktest started from
+    // another window.
+    if (curstate == 'busy') {
+	curstate = 'stopped';	
+	getObjbyName('action').value = 'Start';
+
+	// This clears the message area.
+	getObjbyName('message').innerHTML = "";
     }
 }
 
@@ -327,6 +338,9 @@ function doaction(theform) {
 	curstate = 'stopping';	
 	x_stop_linktest(do_stop_cb);
     }
+    else if (curstate == 'busy') {
+	x_stop_linktest(do_stop_cb);
+    }
 }
 <?php
 echo "</script>\n";
@@ -377,7 +391,11 @@ else {
 }
 
 echo "</form>\n";
-echo "<div id=message></div>\n";
+echo "<div id=message>\n";
+if ($linktest_pid) {
+    echo "<font size=+1 color=red>Linktest is already running</font>\n";
+}
+echo "</div>\n";
 echo "<div id=output style='overflow:auto'>
       <iframe onload=\"linktest_stopped();\"
       width=80% height=400 scrolling=auto id=outputarea frameborder=1>
