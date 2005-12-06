@@ -290,7 +290,7 @@ int main(int argc, char **argv) {
 
 	if ((old_status != current_status) || 
 	    newclient || 
-	    (since_last_update > (naptime * 150))) {
+	    (since_last_update > (naptime * 50))) {
 	    // If we have a socket, print on that
 	    if ((mode & MODE_SOCKET) && (current_clients > 0)) {
 		char outbuf[1024];
