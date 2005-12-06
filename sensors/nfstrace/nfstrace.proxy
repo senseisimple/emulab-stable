@@ -135,6 +135,7 @@ def stats_usage():
     return
 
 def resolve_hosts(pid, eid, hosts):
+    failures = []
     retval = []
     for lpc in range(0, len(hosts)):
         try:
@@ -147,7 +148,28 @@ def resolve_hosts(pid, eid, hosts):
             retval.append(socket.gethostbyname(name))
             pass
         except socket.gaierror, e:
-            raise getopt.error(hosts[lpc] + ":" + e.args[1])
+            failures.append(lpc)
+            retval.append(None)
+            pass
+        pass
+
+    if len(failures) > 0:
+        time.sleep(2)
+        for lpc in failures:
+            try:
+                if pid and eid:
+                    name = hosts[lpc] + "." + eid + "." + pid
+                    pass
+                else:
+                    name = hosts[lpc]
+                    pass
+                retval[lpc] = socket.gethostbyname(name)
+                pass
+            except socket.gaierror, e:
+                sys.stderr.write("warning: Unable to resolve '" + name
+                                 + "':" + e.args[1] + "\n")
+                pass
+            pass
         pass
 
     return retval
@@ -192,7 +214,7 @@ def do_gc(args):
         pass
 
     for lpc in range(0, len(ips)):
-        if args[lpc] != ips[lpc]:
+        if ips[lpc] and args[lpc] != ips[lpc]:
             cur.execute("REPLACE INTO node_ids (pid, eid, node_id, node_ip) "
                         "VALUES (%s,%s,%s,%s)",
                         (pid, eid, args[lpc], ips[lpc]))
@@ -505,16 +527,20 @@ def do_stats(args):
         pass
     
     print "Top writers:"
-    cur.execute("select w.node_ip,ni.node_id,count(1) as wc,sum(amount) "
+    cur.execute("select w.node_ip,ni.node_id,ni.eid,ni.pid,count(1) as wc, "
+                "sum(amount) "
                 "from writes as w "
                 "left join node_ids as ni on ni.node_ip=w.node_ip "
                 "where w.timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
                 "group by w.node_ip order by wc desc limit %s",
                 (over_last, row_count))
-    for (node_ip,node_id,count,amount) in cur:
+    for (node_ip,node_id,eid,pid,count,amount) in cur:
         if not node_id:
             he = socket.gethostbyaddr(node_ip)
             node_id = he[0].split('.')[0]
+            pass
+        else:
+            node_id = node_id + "." + eid + "." + pid
             pass
         print "  %8d pkts\t %8s\t%s" % (count, human_readable(amount), node_id)
         pass
