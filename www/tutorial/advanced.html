@@ -670,9 +670,9 @@ events. For example, to tell the packet capture processes monitoring
 And of course, you may use the NS "at" syntax to schedule static
 events from your NS file:
 	<code><pre>
-	$ns at 10 "$link0 stop"
-	$ns at 20 "$link0 start"
-	$ns at 30 "$link0 snapshot"</pre></code>
+	$ns at 10 "$link0 trace stop"
+	$ns at 20 "$link0 trace start"
+	$ns at 30 "$link0 trace snapshot"</pre></code>
 
 <br>
 The output files that the capture process create, are stored in
