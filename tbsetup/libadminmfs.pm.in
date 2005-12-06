@@ -26,6 +26,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use libdb;
+use libtestbed;
 use StateWait;
 
 # Configure variables
@@ -293,12 +294,20 @@ sub TBAdminMfsSelect($$@)
 # indicated command.  Upon successful completion, all nodes are left in the
 # MFS with admin mode enabled.  Arguments passed in the $args hash:
 #
-#	'name'	  string identifying the caller for error messages
-#	'command' command+args to run on the nodes
-#	'timeout' time in seconds to wait for command completion
-#		  (starts when node has booted into MFS)
-#	'poweron' 1 if nodes need to be powered on initially
-#		  rather than rebooted
+#	'name'	    string identifying the caller for error messages
+#	'command'   command+args to run on the nodes
+#	'timeout'   time in seconds to wait for command completion
+#		    (starts when node has booted into MFS)
+#	'poweron'   1 if nodes need to be powered on initially
+#		    rather than rebooted
+#	'pfunc'
+#	'pinterval'
+#	'pcookie'   Progress tracking.  'pfunc' will be called every
+#		    'pinterval' seconds with argument 'pcookie' and a
+#		    node-indexed status hash for all nodes.  If
+#		    the function returns 0, we abort as we would with
+#		    a timeout.
+#	'timestamp' if timestamps after significant events are desired
 #
 # Returns zero if all nodes successfully run the command.
 # If the $failed ref is defined, it is an arrayref in which we return the
@@ -318,12 +327,20 @@ sub TBAdminMfsRunCmd($$@)
     my $cmd = $args->{'command'};
     my $timeout = $args->{'timeout'};
     my $poweron = $args->{'poweron'};
+    my $timestamp = $args->{'timestamp'};
+    my $pfunc = $args->{'pfunc'};
+    my $pinterval = $args->{'pinterval'};
+    my $pcookie = $args->{'pcookie'};
 
     # we always need a value
     $timeout = $commandtimo
 	if (!defined($timeout));
     $poweron = 0
 	if (!defined($poweron));
+    if ($pfunc) {
+	$pinterval = 10
+	    if (!defined($pinterval));
+    }
 
     #
     # Arrange for the node to boot into the MFS, but don't boot it yet.
@@ -356,6 +373,8 @@ sub TBAdminMfsRunCmd($$@)
     # the nodes report ISUP, which they will do before firing off the
     # startup command.
     #
+    TBDebugTimeStamp("Booting nodes into admin MFS")
+	if ($timestamp);
     %myargs = ();
     $myargs{'name'} = $me;
     $myargs{'on'} = 1;
@@ -364,7 +383,7 @@ sub TBAdminMfsRunCmd($$@)
     my @failed = ();
     if (TBAdminMfsBoot(\%myargs, \@failed, @nodes)) {
 	print STDERR "*** $me:\n".
-	    "    Some nodes failed to boot into MFS: @failed!\n";
+	    "    failed admin MFS boot for @failed!\n";
 	@{$failedref} = @nodes
 	    if (defined($failedref));
 	return 1;
@@ -373,10 +392,17 @@ sub TBAdminMfsRunCmd($$@)
     #
     # Wait for the command completion status or til we time out
     #
+    TBDebugTimeStamp("Nodes in admin MFS, running command")
+	if ($timestamp);
     my @running = @nodes;
     my %status = ();
+    foreach my $node (@nodes) {
+	$status{$node} = "none";
+    }
     my $endtime = time() + $timeout;
+    my $interval = $pfunc ? $pinterval : $sleepwait;
     while (@running > 0 && time() < $endtime) {
+	sleep($interval);
 
 	my $cond = "node_id in (" . join(",", map("'$_'", @running)) . ")";
 	my $query_result =
@@ -389,30 +415,38 @@ sub TBAdminMfsRunCmd($$@)
 	    last;
 	}
  
-	@running = ();
 	while (my ($node, $result) = $query_result->fetchrow_array()) {
-	    if ("$result" eq "none") {
-		push(@running, $node);
-	    } else {
-		$status{$node} = $result;
-	    }
+	    $status{$node} = $result;
 	}
 
-	sleep($sleepwait)
-	    if (@running > 0);
+	#
+	# Run the progress function with the updated status of all nodes.
+	#
+	if ($pfunc && &$pfunc($pcookie, \%status) == 0) {
+	    last;
+	}
+
+	#
+	# Recompute the set of running nodes after any progress function
+	# has been called in case that function has updated a node's status.
+	# We trust that the function will be well behaved and not add nodes
+	# that don't belong!
+	#
+	@running = grep { $status{$_} eq "none" } keys(%status);
     }
 
     #
     # Everyone has reported or we timed out.
     # Find out who succeeded, who failed, and who timed out.
     #
+    TBDebugTimeStamp("Node admin MFS commands completed/timedout")
+	if ($timestamp);
     my @succeeded = ();
     my @timedout = ();
     for my $node (@nodes) {
-	if (!defined($status{$node})) {
-	    $status{$node} = "";
+	if ($status{$node} eq "none" || $status{$node} eq "timeout") {
 	    push(@timedout, $node);
-	} elsif ($status{$node}) {
+	} elsif (int($status{$node}) != 0) {
 	    push(@failed, $node);
 	} else {
 	    push(@succeeded, $node);
@@ -422,13 +456,13 @@ sub TBAdminMfsRunCmd($$@)
     if (scalar(@nodes) != scalar(@succeeded)) {
 	if (scalar(@failed) > 0) {
 	    print STDERR "*** $me:\n".
-		"    Nodes failed running command: @failed\n";
+		"    Failed to run command on @failed\n";
 	    push(@{$failedref}, @failed)
 		if (defined($failedref));
 	}
 	if (scalar(@timedout) > 0) {
 	    print STDERR "*** $me:\n".
-		"    Nodes timed out running command: @timedout\n";
+		"    Timed-out while running command on @timedout\n";
 	    push(@{$failedref}, @timedout)
 		if (defined($failedref));
 	}
