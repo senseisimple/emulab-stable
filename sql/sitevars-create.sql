@@ -65,3 +65,4 @@ INSERT INTO sitevariables VALUES ('general/linux_endnodeshaping','1','1','Use th
 INSERT INTO sitevariables VALUES ('general/open_showexplist',NULL,'','Allow members of this experiment to view all running experiments on the experiment list page');
 INSERT INTO sitevariables VALUES ('swap/swapout_command',NULL,'','Command to run in admin MFS on each node of an experiment at swapout time. Runs as swapout user.');
 INSERT INTO sitevariables VALUES ('swap/swapout_command_failaction',NULL,'warn','What to do if swapout command fails (warn == continue, fail == fail swapout).');
+INSERT INTO sitevariables VALUES ('swap/swapout_command_timeout',NULL,'120','Time (in seconds) to allow for command completion');
