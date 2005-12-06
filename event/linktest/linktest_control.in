@@ -294,15 +294,23 @@ sub handler($)
 sub notify()
 {
     my $lev = (defined($level) ? $level : $linktest_level);
+    my $logname = undef;
+    my $isopen;
+    my $filespec = "";
+
+    TBExptGetLogFile($pid, $eid, \$logname, \$isopen);
+    if (defined($logname)) {
+	$filespec = "\n\nfile://$logname\n";
+    }
     
-    SENDMAIL("$user_name <$user_email>",
+    SENDMAIL($TBOPS,
 	     "Linktest Failure: $pid/$eid",
 	     "Failure in linktest (level $lev); ".
 	     "returned non-zero status.\n".
 	     "Activity log file at:\n\n".
-	     "    $TBBASE/spewlogfile.php3?pid=${pid}&eid=${eid}\n",
-	     "$user_name <$user_email>",
-	     "Cc: $TBOPS");
+	     "    $TBBASE/spewlogfile.php3?pid=${pid}&eid=${eid}\n".
+	     "$filespec",
+	     "$user_name <$user_email>");
 }
 
 #
