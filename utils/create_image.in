@@ -12,6 +12,22 @@ use POSIX qw(setsid);
 use File::Basename;
 
 #
+# Tuneables:
+#
+# $maxwait	max wall clock time to allow, progress or not
+# $idlewait	max time to wait between periods of progress
+# $checkwait	time between progress checks (must be int div of $idlewait)
+# $reportwait	time between progress reports (must be multiple of $checkwait)
+#
+# $maximagesize	max size in bytes of an image
+#
+my $maxwait      = (20 * 60);
+my $idlewait     = ( 8 * 60);
+my $reportwait   = ( 2 * 60);
+my $checkwait    = 15;
+my $maximagesize = (4 * 1024**3); # 4GB
+
+#
 # Create a disk image.
 #
 # XXX: Device file should come from DB.
@@ -20,12 +36,12 @@ use File::Basename;
 sub usage()
 {
     print(STDERR
-	  "Usage: create_image [-w] [-p <pid>] <imageid> <node>\n" .
+	  "Usage: create_image [-w] [-p <pid>] <imagename> <node>\n" .
 	  "switches and arguments:\n".
-	  "-w        - wait for image to be fully created\n".
-	  "-p <pid>  - project ID of the imageid; defaults to system project\n".
-	  "<imageid> - imageid to use\n".
-	  "<node>    - nodeid to create the image from\n");
+	  "-w          - wait for image to be fully created\n".
+	  "-p <pid>    - project ID of the image; defaults to system project\n".
+	  "<imagename> - imagename to use\n".
+	  "<node>      - nodeid to create the image from\n");
     exit(-1);
 }
 my $optlist  = "p:w";
@@ -47,6 +63,7 @@ my $TFTPDIR     = "/tftpboot";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libadminmfs;
 
 #
 # Turn off line buffering on output
@@ -365,136 +382,39 @@ if ($waitmode) {
 }
 
 #
-# We want to save off the old startupcmd and replace with the command
-# we created above. Then we reboot the node, and wait for it to come
-# back alive. We also clear the startcommand status, and and use that
-# to wait for the zipper to finish.  I think we need a better
-# mechanism for determining when a node is booted since we are
-# basically stuck waiting for this, without knowing if the node even
-# came up okay.
-#
-$query_result =
-    DBQueryWarn("select startupcmd from nodes ".
-                "where node_id='$node'");
-
-if (!$query_result ||
-    $query_result->numrows < 1) {
-    fatal("DB error getting node info for $node");
-}
-@row = $query_result->fetchrow_array();
-my $saved_startupcmd  = $row[0];
-
-my $result   = 0;
-my $maxwait  = (60 * 5); # 5 minutes - in seconds.
-my $sleepwait= 10;	  # seconds (must be a multiple of the above)
-my $maxloops = ($maxwait / $sleepwait);
-my $tries    = 2;
-my $maximagesize = (4 * 1024**3); # 4 GB maximum
-my $cursize  = 0;
-my $repfreq  = 2; # wait report frequency.
-my $maxslack = (3 * 60) / $sleepwait; # NFS cache slop factor
-
-#
 # From here on out, we should take care to clean up the DB, and
 # reboot the source node.
 #
 $needcleanup = 1;
 
-my $adminmfs = TBNodeAdminOSID($node);
-while ($tries) {
-    system("$osselect -t $adminmfs $node") and
-	fatal("*** Failed to set temp boot to $adminmfs for $node!");
+#
+# Reboot into admin more and run the command.
+#
+my $me           = $0;
+my %args         = ();
+$args{'name'}    = $me;
+$args{'command'} = $command;
+$args{'timeout'} = $maxwait + $checkwait;
 
-    print "Setting startupcmd to '${command}'\n";
+$args{'pfunc'}     = \&check_progress;
+$args{'pinterval'} = $checkwait;
 
-    if (! DBQueryWarn("update nodes set ".
-		      "startupcmd='$command', startstatus='none' ".
-		      "where node_id='$node'")) {
-	fatal("DB error updating node info for $node");
+# check_progress state
+my $runticks	 = 0;
+my $maxticks	 = int($maxwait / $checkwait);
+my $reportticks  = int($reportwait / $checkwait);
+my $idleticks    = 0;
+my $maxidleticks = int($idlewait / $checkwait);
+my $lastsize     = 0;
+my $result;
+
+my $retry = 1;
+while ($retry) {
+    $retry = 0;
+    if (TBAdminMfsRunCmd(\%args, undef, $node)) {
+	$result = "setupfailed"
+	    if (!defined($result));
     }
-
-    #
-    # Reboot node. If this fails must reset. Note race with update above.
-    # I think this is harmless; node will either be rebooted for no reason
-    # (load finished between these two ops) or the load will be redone a
-    # second time.
-    #
-    if (system("$nodereboot", "$node")) {
-	fatal("Failed to reboot $node!");
-    }
-
-    #
-    # Now we wait for the status to flip. We don't want to wait too long of
-    # course. 
-    #
-    my $count = $maxloops;
-    my $prevsize = 0;
-    my $starttime = time();
-    my $curtdiff = 0;
-    my $prevtdiff = 0;
-    my $slack = $maxslack-1;
- 
-    while ($count) {
-
-	sleep($sleepwait);
-
-	$query_result =
-	    DBQueryWarn("select startstatus from nodes where node_id='$node'");
-
-	if (!$query_result ||
-	    $query_result->numrows < 1) {
-	    fatal("DB error getting startstatus for $node");
-	}
- 
-	@row = $query_result->fetchrow_array();
-	$result = $row[0];
-
-	if ("$result" ne "none") {
-	    last;
-	}
-
-        #
-        # See if imagezip on the node is making progress.  If not, we need to
-        # decrement our timeout counter.  If so, be sure to reset the counter.
-        #
-        # Also, check to see if the (somewhat arbitrary) maximum filesize has 
-        # been exceeded.
-        #
-        $cursize = (stat($filename))[7];
-        if ($cursize > $maximagesize) {
-            last;
-        }
-        if ($cursize == $prevsize) {
-            if ($slack) {$slack--;}  # NFS cache slop timer
-            else {
-                if ($count*$sleepwait % 60 == 0) {
-                    print "Timeout in ". 
-                          int($count*$sleepwait/60) .
-                          " minutes.\n";
-                }
-                $count--;
-            }
-        }
-        else {
-            $slack = $maxslack-1;
-            if ($count != $maxloops) {
-                print "Timeout aborted - image size increased.\n";
-                $count = $maxloops;
-            }
-        }
-        $prevsize = $cursize;
-
-        $curtdiff = int((time() - $starttime)/60);
-        if ( ($curtdiff != $prevtdiff) && ($curtdiff % $repfreq == 0) ) {
-            print "Still waiting ... its been ". $curtdiff ." minutes.".
-                " Current image size: $cursize bytes.\n";
-        }
-        $prevtdiff = $curtdiff;
-    }
-    if ("$result" ne "none") {
-	last;
-    }
-    $tries--;
 }
 
 if (! cleanup()) {
@@ -505,14 +425,17 @@ if (! cleanup()) {
 # If we timed out, if the result code was bad, or if the image size
 # grew too large.
 #
-if (! $tries) {
+if ($result eq "setupfailed") {
+    fatal("FAILED: Node setup failed ... \n");
+}
+if ($result eq "timeout") {
     fatal("FAILED: Timed out generating image ... \n");
 }
-if ($result) {
-    fatal("FAILED: Returned error code $result generating image ... \n");
-}
-if ($cursize > $maximagesize) {
+if ($result eq "toobig") {
     fatal("FAILED: Maximum image size ($maximagesize bytes) exceeded ... \n");
+}
+if ($result != 0) {
+    fatal("FAILED: Returned error code $result generating image ... \n");
 }
 
 print "Image creation succeeded.\n";
@@ -522,10 +445,11 @@ SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
 	 "Image creation on $node has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
-	 "You may now os_load this image on other nodes in your experiment.\n",
+	 "You may now os_load this image on other nodes in your experiment.\n".
+	 "$swmsg",
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
-	 ($logname));
+	 defined($logname) ? ($logname) : ());
 
 if (defined($logname)) {
     unlink("$logname");
@@ -534,33 +458,33 @@ exit 0;
 
 sub cleanup ()
 {
-    my $retval = 1;
-
     $needcleanup = 0;
 
     #
-    # Reset node (DB) state
+    # Turn admin mode back off and reboot back to the old OS
     #
-
-    if (system("$osselect -c -t $node")) {
-	print("*** Failed to clear temp boot for $node!\n");
-        $retval = 0;
+    my %args          = ();
+    $args{'name'}     = $me;
+    $args{'on'}       = 0;
+    $args{'clearall'} = 0;
+    if (TBAdminMfsSelect(\%args, undef, $node)) {
+	print("*** $me:\n".
+	      "    Could not turn admin mode off for $node!\n");
+	return 0;
     }
 
-    if (!DBQueryWarn("update nodes set startupcmd='$saved_startupcmd' ".
-                      "where node_id='$node'")) {
-        print("*** Failed to reset node statup command!\n");
-        $retval = 0;
+    %args           = ();
+    $args{'name'}   = $me;
+    $args{'on'}     = 0;
+    $args{'reboot'} = 1;
+    $args{'wait'}   = 0;
+    if (TBAdminMfsBoot(\%args, undef, $node)) {
+	print("*** $me:\n".
+	      "    Failed to reboot $node on cleanup!\n");
+	return 0;
     }
 
-    #
-    # Leave the node alone if we couldn't reset its DB state.
-    #
-    if ($retval && system("$nodereboot", "$node")) {
-        print("*** Failed to reboot node on cleanup!\n");
-    }
-
-    return $retval;
+    return 1;
 }
 
 sub fatal($)
@@ -581,8 +505,7 @@ sub fatal($)
 	     $mesg,
 	     "$user_name <$user_email>",
 	     "Cc: $TBOPS",
-	     ($logname));
-    
+	     defined($logname) ? ($logname) : ());
     
     if (defined($logname)) {
 	unlink("$logname");
@@ -590,3 +513,62 @@ sub fatal($)
     exit(-1);
 }
 
+#
+# Check progress of image creation by periodically checking the image size.
+#
+# Called every $checkwait seconds.
+# Reports progress every $reportwait seconds.
+# Gives up after $idlewait seconds without a size change.
+#
+sub check_progress($$)
+{
+    my (undef, $statusp) = @_;
+
+    #
+    # Command has finished for better or worse, record status and finish.
+    #
+    if ($statusp->{$node} ne "none") {
+	$result = $statusp->{$node};
+	return 0;
+    }
+
+    #
+    # Has run too long
+    #
+    $runticks++;
+    if ($runticks >= $maxticks) {
+	$result = "timeout";
+	return 0;
+    }
+
+    #
+    # See if imagezip on the node is making progress.  If not, we need to
+    # check the idle timer and timeout if we have taken too long.
+    #
+    # Also, check to see if the (somewhat arbitrary) maximum filesize has 
+    # been exceeded.
+    #
+    my $cursize = (stat($filename))[7];
+    if ($cursize > $maximagesize) {
+	$result = "toobig";
+	return 0;
+    }
+    if ($cursize == $lastsize) {
+	$idleticks++;
+	if ($idleticks >= $maxidleticks) {
+	    $result = "timeout";
+	    return 0;
+	}
+    } else {
+	$idleticks = 0;
+    }
+    $lastsize = $cursize;
+    
+    if (($runticks % $reportticks) == 0) {
+	my $curtdiff = int($runticks * $checkwait / 60);
+	print "Still waiting ... its been ". $curtdiff ." minutes.".
+	    " Current image size: $cursize bytes.\n";
+    }
+
+    return 1;
+}
