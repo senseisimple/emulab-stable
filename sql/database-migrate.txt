@@ -2892,3 +2892,14 @@ last_net_act,last_cpu_act,last_ext_act);
        create_time datetime default NULL,
        PRIMARY KEY  (node_id)
      ) TYPE=MyISAM;
+
+4.19: Infrastructure for disk state saving.  Add imageid and imagepid
+      fields to partitions table to track what image is loaded on the disk
+      and savedisk field in experiments table.
+
+      alter table partitions add imageid varchar(45) default NULL \
+             after osid; 
+      alter table partitions add imagepid varchar(12) NOT NULL default '' \
+             after imageid; 
+      alter table experiments add savedisk tinyint(1) NOT NULL default 0 \
+             after delay_capacity;	

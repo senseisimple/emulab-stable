@@ -407,6 +407,7 @@ CREATE TABLE experiments (
   paniced tinyint(1) NOT NULL default '0',
   panic_date datetime default NULL,
   delay_capacity tinyint(3) unsigned default NULL,
+  savedisk tinyint(1) NOT NULL default '0',
   locpiper_pid int(11) default '0',
   locpiper_port int(11) default '0',
   PRIMARY KEY  (eid,pid),
@@ -1443,6 +1444,8 @@ CREATE TABLE partitions (
   node_id varchar(32) NOT NULL default '',
   partition tinyint(4) NOT NULL default '0',
   osid varchar(35) default NULL,
+  imageid varchar(45) default NULL,
+  imagepid varchar(12) NOT NULL default '',
   PRIMARY KEY  (node_id,partition)
 ) TYPE=MyISAM;
 
