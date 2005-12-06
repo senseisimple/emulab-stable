@@ -86,6 +86,8 @@ int			numregions, numrelocs;
 void	dumpskips(int verbose);
 void	sortrange(struct range *head, int domerge,
 		  int (*rangecmp)(struct range *, struct range *));
+int	mergeskips(int verbose);
+int	mergeranges(struct range *head);
 void    makeranges(void);
 void	dumpranges(int verbose);
 void	addvalid(uint32_t start, uint32_t size);
@@ -539,7 +541,7 @@ main(int argc, char *argv[])
 		/*
 		 * Create a valid range list from the skip list
 		 */
-		sortrange(skips, 1, 0);
+		(void) mergeskips(info || debug > 2);
 		if (debug)
 			dumpskips(info || debug > 2);
 		makeranges();
@@ -820,9 +822,6 @@ addskip(uint32_t start, uint32_t size)
 {
 	struct range	   *skip;
 
-	if (size == 0 || size < (uint32_t)frangesize)
-		return;
-
 	if ((skip = (struct range *) malloc(sizeof(*skip))) == NULL) {
 		fprintf(stderr, "No memory for skip range, "
 			"try again with '-F <numsect>'\n"
@@ -867,6 +866,7 @@ dumpskips(int verbose)
 {
 	struct range	*pskip;
 	uint32_t	offset = 0, total = 0;
+	int		nranges = 0;
 
 	if (!skips)
 		return;
@@ -885,11 +885,88 @@ dumpskips(int verbose)
 		assert(pskip->start >= offset);
 		offset = pskip->start + pskip->size;
 		total += pskip->size;
+		nranges++;
 		pskip  = pskip->next;
 	}
 	
-	fprintf(stderr, "Total Number of Free Sectors: %d (bytes %lld)\n",
-		total, sectobytes(total));
+	fprintf(stderr,
+		"Total Number of Free Sectors: %d (bytes %lld) in %d ranges\n",
+		total, sectobytes(total), nranges);
+}
+
+#undef DOHISTO
+
+/*
+ * Sort and merge the list of skip blocks.
+ * This code also winnows out the free ranges smaller than frangesize.
+ * Returns the number of entries freed, useful so that it can be called
+ * on-the-fly if we run out of memory to see if we managed to free anything.
+ */
+int
+mergeskips(int verbose)
+{
+	struct range *prange, **prevp;
+	int freed = 0, culled = 0;
+	uint32_t total = 0;
+#ifdef DOHISTO
+	uint32_t histo[64];
+	memset(histo, 0, sizeof(histo));
+#endif
+
+	sortrange(skips, 0, 0);
+	freed += mergeranges(skips);
+
+	/*
+	 * After merging, make another pass to cull out the too-small ranges.
+	 */
+	if (frangesize) {
+		prevp = &skips;
+		while (*prevp) {
+			prange = *prevp;
+			if (prange->size < (uint32_t)frangesize) {
+				if (debug > 1)
+					fprintf(stderr,
+						"dropping range [%u-%u]\n",
+						prange->start,
+						prange->start+prange->size-1);
+				total += prange->size;
+#ifdef DOHISTO
+				if (prange->size < 64)
+					histo[prange->size]++;
+#endif
+				*prevp = prange->next;
+				free(prange);
+				culled++;
+			} else
+				prevp = &prange->next;
+		}
+		if (verbose && culled) {
+			fprintf(stderr,
+				"\nFree Sectors Ignored: %d (%lld bytes) in %d ranges\n",
+				total, sectobytes(total), culled);
+#ifdef DOHISTO
+			{
+				int i;
+				double r, s;
+				double cumr = 0.0, cums = 0.0;
+				for (i = 0; i < 64; i++) {
+					if (histo[i] == 0)
+						continue;
+					r = (double)histo[i]/culled*100.0;
+					cumr += r;
+					s = (double)(histo[i]*i)/total*100.0;
+					cums += s;
+					fprintf(stderr,
+						"%d: %u, %4.1f%% (%4.1f%%) of ranges "
+						"%4.1f%% (%4.1f%%) of sectors)\n",
+						i, histo[i], r, cumr, s, cums);
+				}
+			}
+#endif
+		}
+	}
+
+	return (freed + culled);
 }
 
 /*
@@ -899,7 +976,7 @@ void
 sortrange(struct range *head, int domerge,
 	  int (*rangecmp)(struct range *, struct range *))
 {
-	struct range	*prange, tmp, *ptmp;
+	struct range	*prange, tmp;
 	int		changed = 1;
 
 	if (head == NULL)
@@ -930,26 +1007,46 @@ sortrange(struct range *head, int domerge,
 		}
 	}
 
-	if (!domerge)
-		return;
+	if (domerge)
+		(void)mergeranges(head);
 
-	/*
-	 * Now look for contiguous free regions and combine them.
-	 */
+	return;
+}
+
+/*
+ * Look for contiguous free regions and combine them.
+ * Returns the number of entries freed up as a result of merging.
+ */
+int
+mergeranges(struct range *head)
+{
+	struct range *prange, *ptmp;
+	int freed = 0;
+
 	prange = head;
 	while (prange) {
-	again:
-		if (prange->next &&
-		    prange->start + prange->size == prange->next->start) {
+		if (prange->next == 0)
+			break;
+
+		if (prange->start + prange->size == prange->next->start) {
+			if (debug > 1)
+				fprintf(stderr,
+					"merging ranges [%u-%u] and [%u-%u]\n",
+					prange->start,
+					prange->start+prange->size-1,
+					prange->next->start,
+					prange->next->start+prange->next->size-1);
 			prange->size += prange->next->size;
 			
-			ptmp        = prange->next;
-			prange->next = prange->next->next;
+			ptmp = prange->next;
+			prange->next = ptmp->next;
 			free(ptmp);
-			goto again;
-		}
-		prange  = prange->next;
+			freed++;
+		} else
+			prange = prange->next;
 	}
+
+	return (freed);
 }
 
 /*
@@ -999,6 +1096,7 @@ dumpranges(int verbose)
 {
 	struct range *range;
 	uint32_t total = 0;
+	int nranges = 0;
 
 	if (verbose)
 		fprintf(stderr, "\nAllocated ranges (start/size) in sectors:\n");
@@ -1008,11 +1106,12 @@ dumpranges(int verbose)
 			fprintf(stderr, "  %12d    %9d\n",
 				range->start, range->size);
 		total += range->size;
+		nranges++;
 		range = range->next;
 	}
 	fprintf(stderr,
-		"Total Number of Valid Sectors: %d (bytes %lld)\n",
-		total, sectobytes(total));
+		"Total Number of Valid Sectors: %d (bytes %lld) in %d ranges\n",
+		total, sectobytes(total), nranges);
 }
 
 /*
