@@ -445,8 +445,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
 	 "Image creation on $node has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
-	 "You may now os_load this image on other nodes in your experiment.\n".
-	 "$swmsg",
+	 "You may now os_load this image on other nodes in your experiment.\n",
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 defined($logname) ? ($logname) : ());
