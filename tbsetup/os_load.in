@@ -206,13 +206,27 @@ if (defined($options{"m"})) {
 #
 # Weed out non-imageable nodes (e.g., virtnodes, emotes, etc.)
 #
+my $first = 1;
 my @temp = ();
 foreach my $node ( @nodes ) {
     if (!TBIsNodeImageable($node)) {
+	#
+	# Common mistake: forget the -i before the imagename, e.g.,
+	# "os_load FBSD54-STD pcNN", which results in pcNN getting loaded
+	# with the default image.  So if the first arg fails as a node, but
+	# is an image ID, assume they have made this mistake and stop.
+	#
+	my $_pid = defined($imagepid) ? $imagepid : TB_OPSPID();
+	if ($first && !defined($imagename) && TBImageID($_pid, $node)) {
+	    print "*** reload: forgot the -i before image name $node?\n";
+	    exit(1);
+	}
 	print "*** reload ($node): cannot image node, skipped.\n";
+	$first = 0;
 	next;
     }
     push(@temp, $node);
+    $first = 0;
 }
 @nodes = @temp;
 if (! @nodes) {
