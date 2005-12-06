@@ -139,13 +139,21 @@ def resolve_hosts(pid, eid, hosts):
     retval = []
     for lpc in range(0, len(hosts)):
         try:
-            if pid and eid:
-                name = hosts[lpc] + "." + eid + "." + pid
+            if hosts[lpc].find(":") == -1:
+                if pid and eid:
+                    name = hosts[lpc] + "." + eid + "." + pid
+                    pass
+                else:
+                    name = hosts[lpc]
+                    pass
+                ip = socket.gethostbyname(name)
                 pass
             else:
-                name = hosts[lpc]
+                pair = hosts[lpc].split(":")
+                hosts[lpc] = pair[0]
+                ip = pair[1]
                 pass
-            retval.append(socket.gethostbyname(name))
+            retval.append(ip)
             pass
         except socket.gaierror, e:
             failures.append(lpc)
@@ -312,11 +320,11 @@ def resolve_fh(fh, depth=0):
     retval = None
 
     if not fh:
-        return (0, "<u:none>")
+        return (0, "<u:none>", 0)
 
     if depth > 50:
         print "exceeded depth on " + fh
-        return (0, "<u:" + fh + ">")
+        return (0, "<u:" + fh + ">", 0)
 
     # prefix = " " * depth
     if fh in fh_cache:
@@ -332,7 +340,7 @@ def resolve_fh(fh, depth=0):
         pass
     else:
         cur.execute("SELECT parent,fn,valid from handle_map "
-                    "WHERE fh=%s and fn!='.' "
+                    "WHERE fh=%s and fn!='.' and fn!='..' "
                     "ORDER BY valid DESC",
                     (fh,))
         res = cur.fetchone()
@@ -497,6 +505,35 @@ def do_stats(args):
         get_usage()
         return 2
 
+    print "Top lookers:"
+    cur.execute("select l.node_ip,count(1) as lc from lookups as l "
+                "where timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
+                "group by l.node_ip order by lc desc limit %s",
+                (over_last, row_count))
+    readers = cur.fetchall()
+    for (node_ip,count) in readers:
+        cur.execute("select node_id,eid,pid from node_ids where node_ip=%s",
+                    (node_ip,))
+        node_id = cur.fetchone()
+        if node_id:
+            node_id = node_id[0] + "." + node_id[1] + "." + node_id[2];
+            pass
+        else:
+            he = socket.gethostbyaddr(node_ip)
+            node_id = he[0].split('.')[0]
+            pass
+        print "  %8d pkts\t  %s" % (count, node_id)
+        pass
+
+    print "Top lookup'd files:"
+    cur.execute("select l.fh,l.fn,count(1) as lc from lookups as l "
+                "where l.timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
+                "group by l.fh,l.fn order by lc desc limit %s",
+                (over_last, row_count))
+    for (fh,fn,count) in cur:
+        print "  %8d pkts\t  %s" % (count, os.path.join(resolve_fh(fh)[1], fn))
+        pass
+    
     print "Top readers:"
     cur.execute("select r.node_ip,count(1) as wc from reads as r "
                 "where timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "

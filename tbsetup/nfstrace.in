@@ -130,17 +130,19 @@ if ($cmd eq "gc" && defined($pid)) {
     # VIRTNODE HACK: Virtual nodes are special, so do not export. (isvirtnode).
     #
     $nodes_result =
-	DBQueryFatal("select r.vname from reserved as r ".
+	DBQueryFatal("select r.vname,i.IP from reserved as r ".
 		     "left join nodes on r.node_id=nodes.node_id ".
 		     "left join node_types on node_types.type=nodes.type ".
+		     "left join interfaces as i on i.node_id=r.node_id and ".
+		     "  i.card=node_types.control_net ".
 		     " where nodes.role='testnode' ".
 		     "       and node_types.isvirtnode=0 ".
 		     "       and node_types.isremotenode=0 ".
 		     "       and node_types.control_net is not null ".
 		     "       and pid='$pid' and eid='$eid'");
     
-    while (my ($vname) = $nodes_result->fetchrow_array) {
-	print NT_WRITER "$vname\n";
+    while (my ($vname,$ip) = $nodes_result->fetchrow_array) {
+	print NT_WRITER "$vname:$ip\n";
     }
 }
 
