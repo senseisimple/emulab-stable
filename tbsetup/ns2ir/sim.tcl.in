@@ -368,7 +368,6 @@ Simulator instproc run {} {
     var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::elabinelab_cvstag
     var_import ::GLOBALS::security_level
-    var_import ::GLOBALS::sourcefile_list
     
     if {$ran == 1} {
 	perror "The Simulator 'run' statement can only be run once."
@@ -616,10 +615,6 @@ Simulator instproc run {} {
 
     foreach event $event_list {
 	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] ]
-    }
-
-    foreach sourcefile $sourcefile_list {
-	$self spitxml_data "external_sourcefiles" [list "pathname"] [list $sourcefile]
     }
 
     $self spitxml_finish
