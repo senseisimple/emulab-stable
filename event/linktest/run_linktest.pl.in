@@ -42,6 +42,7 @@ my $stopAt = 4 ; # default stop level
 my $TB          = "@prefix@";
 my $TMCC	= "@CLIENT_BINDIR@/tmcc";
 my $LTEVENT     = "@CLIENT_BINDIR@/ltevent";
+my $LOGHOLE     = "$TB/bin/loghole";
 my $LTEVENTOPS  = "$TB/libexec/ltevent";
 my $STOPEVENT   = "STOP"; # XXX Left in here for backwards compat.
 my $COMPLETEEVENT = "COMPLETE";
@@ -361,6 +362,15 @@ sub analyze {
 
     return 0
 	if (! @dir_contents);
+
+    my $ltlogs = "/proj/$pid/exp/$eid/tbdata/ltlogs";
+
+    print "Downloading logs...\n";
+
+    system("rm -rf $ltlogs");
+    system("mkdir -p $ltlogs");
+    system("$LOGHOLE -e $pid/$eid sync -n -l $ltlogs -r /var/emulab/logs ".
+	   "> /dev/null 2>&1");
 
     print "***************************************************************\n";
     print "***************** Linktest Error Reports **********************\n";
