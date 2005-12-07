@@ -97,7 +97,7 @@ use constant TEST_BW => 4; # prior plus bandwidth
 
 # test names
 use constant NAME_RT_STATIC => "Routing";
-use constant NAME_LATENCY => "Latency (Round Trip)";
+use constant NAME_LATENCY => "Latency";
 use constant NAME_LOSS => "Loss";
 use constant NAME_BW => "Bandwidth";
 
@@ -365,10 +365,10 @@ if(&dotest(TEST_LATENCY)) {
     &barrier();
     &debug("\n$msg\n\n");
     &latency_test;
-    &report_status;
+    &report_status(NAME_LATENCY);
 }
 
-if(0 && &dotest(TEST_RT_STATIC)
+if(&dotest(TEST_RT_STATIC)
     && defined($rtproto)
     && ($rtproto eq RTPROTO_STATIC || $rtproto eq RTPROTO_SESSION)) {
     my $msg;
@@ -387,7 +387,7 @@ if(0 && &dotest(TEST_RT_STATIC)
     &debug("\n$msg\n\n");
     if (! $total_error_count) {
 	&static_rt_test; # nodes not covered by 1hop test
-	&report_status;
+	&report_status(NAME_RT_STATIC);
     }
     else {
 	&barrier();
@@ -403,7 +403,7 @@ if(&dotest(TEST_LOSS)) {
     &barrier();
     &debug("\n$msg\n\n");
     &loss_test; 
-    &report_status;
+    &report_status(NAME_LOSS);
 }
 
 if(&dotest(TEST_BW)){
@@ -415,7 +415,7 @@ if(&dotest(TEST_BW)){
     &barrier();
     &debug("\n$msg\n\n");
     &bw_test;
-    &report_status;
+    &report_status(NAME_BW);
 }
 
 &cleanup;
@@ -564,11 +564,11 @@ sub loss_test {
 		    ## TODO:
 
 		    
-		    my $errmsg = "Unexpected loss occurred (n=$n, received=$received)\n";
+		    my $errmsg = "Unexpected loss (sent $n, received=$received)";
 		    &error(NAME_LOSS, $edge, $errmsg);
 		} # note, no logging of succesful 0-loss. (too common).
 	    } elsif($denominator == 0) {
-		my $errmsg = "No packets were lost (n=$n, plr=" . $edge->loss .")";
+		my $errmsg = "No packets lost (sent $n, plr " . $edge->loss .")";
 		&error(NAME_LOSS, $edge, $errmsg);
 	    } else {
 
@@ -576,7 +576,7 @@ sub loss_test {
 		my $z = $numerator / $denominator;
 		my $reject_region = 2.58; # alpha = 0.1, normal distro by CLT
 		if(abs($z) > $reject_region) {
-		    my $errmsg = "Probable loss misconfiguration (n:$n, received: $received; expected proportion: $p, measured proportion=$p_hat)";
+		    my $errmsg = "sent $n, received $received; expected proportion $p, measured proportion $p_hat";
 		    &error(NAME_LOSS, $edge, $errmsg);
 		}
 	    }
@@ -691,7 +691,7 @@ sub latency_test {
 			my $n = PING_SEND_COUNT;
 
 			if($result_cnt == 0) {
-			    my $errmsg = "No packets were received (n=$n)\n";
+			    my $errmsg = "No packets received (n=$n)\n";
 			    &error(NAME_LATENCY, $edge, $errmsg);
 			    exit(EXIT_NOT_OK);
 			} else {
@@ -765,9 +765,8 @@ sub latency_test {
 				      (($x_bar - $u) >=
 				       INSIGNIFICANT_LAT_ERROR_HI)))) {
 				    &error(NAME_LATENCY, $edge,
-					   "Probable latency ".
-					   "misconfiguration (expected=$u, ".
-					   "measured mean=$x_bar).");
+					   "expected=$u, ".
+					   "measured mean=$x_bar");
 				    exit(EXIT_NOT_OK);
 				}
 			    }
@@ -945,8 +944,7 @@ sub bw_test {
 		    }
 		    if (defined($error)) {
 			&error(NAME_BW, $edge,
-			       "Bandwidth estimate ($bw bps) is $error ".
-			       "expected ($expected)");
+			       "Measured $bw, Expected $expected bps");
 		    }
 		    $found_results = 1;
 		    last;
@@ -976,6 +974,7 @@ sub reachable_nodes {
     $hostmap{$currnode}->visited(1);
     foreach my $edge (@{ $hostmap{$currnode}->links }) {
 	my $nextnode;
+	my $lan = $edge->name;
 
 	if ($edge->src eq $currnode) {
 	    $nextnode = $edge->dst;
@@ -985,7 +984,7 @@ sub reachable_nodes {
 	}
 	if ($hostmap{$nextnode}->visited == 0) {
 	    if (!($currnode eq $hostname)) { # Don't add 1st hop nodes.
-		push @{$nodes_ref}, $nextnode;
+		push(@{$nodes_ref}, "$nextnode:$lan");
 	    }
 	    &reachable_nodes($nodes_ref, $nextnode);
 	}
@@ -1004,17 +1003,19 @@ sub static_rt_test {
     my %waitlist;
     # fork processes to run the pings in parallel.
     foreach my $dst (@nodes) {
+	my ($host,$lan) = split(":", $dst);
+	my $dstname     = "${host}-${lan}";
+	
 	my $pid = fork();
 	if(!$pid) {
-	    my ($recv_cnt,$ignored1, $ignored2) = &ping_node($dst,0);
+	    my ($recv_cnt) = &ping_node($dstname, 0);
+	    
 	    if(!$recv_cnt) {
-		my $newEdge = new edge;
-		$newEdge->src($hostname);
-		$newEdge->dst($dst);
-		&error(NAME_RT_STATIC,$newEdge , "$hostname could not ping $dst");
+		&error(NAME_RT_STATIC, undef,
+		       "$hostname could not ping $dstname");
 		exit(EXIT_NOT_OK);
 	    } else {
-		&debug("Attempting to reach $dst... OK\n");
+		&debug("Attempting to reach $dstname ... OK\n");
 	    }
 	    exit(EXIT_OK);
 	} else {
@@ -1130,9 +1131,11 @@ sub error {
 
     $error_count += 1;
 
-    my $output = "$test\n";
-    $output .= "  Link:  " . &print_link($edge) . "\n";
-    $output .=     "  Error: $msg\n\n";
+    my $output = "$test error: ";
+    if (defined($edge)) {
+	$output .= &print_link($edge) . " ";
+    }
+    $output .= ": $msg\n\n";
 
     &debug($output);    
     &append_file($linktest_path . "/" . $hostname . SUFFIX_ERROR,
@@ -1140,15 +1143,18 @@ sub error {
 }
 
 sub report_status {
+    my ($test) = @_;
+    $test = lc($test);
+
     if ($hostname eq $synserv) {
 	if ($stage_error_count) {
-	    my $msg = "  Some tests had errors!";
+	    my $msg = "  Some $test tests had errors!";
 	    &post_event(EVENT_REPORT,$msg);
 	    &sim_event(EVENT_LOG,$msg);
 	    &debug("\n$msg\n");
 	}
 	else {
-	    my $msg = "  All tests were successful!";
+	    my $msg = "  All $test tests were successful!";
 	    &post_event(EVENT_REPORT,$msg);
 	    &sim_event(EVENT_LOG,$msg);
 	    &debug("\n$msg\n");
