@@ -1713,14 +1713,34 @@ sub doSwapoutAction($$%)
 	    $state{'_interval'} = $stateinterval;
 	    $state{'_timeout'} = $statetimeout;
 	    $state{'_iterations'} = 0;
+	    my $swapdir = "/proj/$pid/exp/$eid/swapinfo";
+	    my @enodes = ();
 	    foreach my $node (@pnodes) {
 		my $vname = $nodes{$node};
+
+		#
+		# XXX time saving hack.
+		#
+		# If the swap state files don't exist, don't bother to boot
+		# the node into the MFS.  Complain about unsaved nodes unless
+		# they are delay nodes.
+		#
+		if (! -r "$swapdir/$vname.part" || ! -r "$swapdir/$vname.sig") {
+		    # XXX do this based on role
+		    if ($vname !~ /^tbsdelay/) {
+			tbwarn "no swap info for $node ($vname), ".
+			    "not saving disk state!";
+		    }
+		    next;
+		}
+		push(@enodes, $node);
 		$state{$node} = {
 		    'name' => "/proj/$pid/exp/$eid/swapinfo/$vname-swap.ndz",
 		    'time' => 0,
 		    'size' => 0
 		};
 	    }
+	    @pnodes = @enodes;
 	}
 
 	if (TBAdminMfsRunCmd(\%myargs, \@failed, @pnodes)) {

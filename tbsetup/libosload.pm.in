@@ -838,9 +838,6 @@ sub osload_setupswapinfo($$;@)
     my $allnodes;
     my $clause = "";
 
-    # XXX comment this out to force save of all disks
-    $clause = "e.savedisk!=0 and ";
-
     if (!defined(@nodelist)) {
 	@nodelist = ExpNodes($pid, $eid, 1);
 	$clause .= "r.pid='$pid' and r.eid='$eid'";
@@ -861,7 +858,7 @@ sub osload_setupswapinfo($$;@)
     # set to an MFS at other times.
     #
     my $query_result = DBQueryWarn(
-	"select r.node_id,r.vname,r.pid,r.eid,n.osid,nt.disktype,nt.bootdisk_unit,p.partition,p.imageid,p.imagepid,i.loadpart ".
+	"select r.node_id,r.vname,r.pid,r.eid,r.erole,n.osid,nt.disktype,nt.bootdisk_unit,p.partition,p.imageid,p.imagepid,i.loadpart,e.savedisk ".
 	"from reserved as r ".
 	"left join nodes as n on n.node_id=r.node_id ".
 	"left join node_types as nt on nt.type=n.type ".
@@ -873,7 +870,7 @@ sub osload_setupswapinfo($$;@)
 	return 1;
     }
 
-    while (my ($node, $vname, $rpid, $reid, $osid, $dtype, $dunit, $part, $imageid, $imagepid, $lpart) =
+    while (my ($node, $vname, $rpid, $reid, $erole, $osid, $dtype, $dunit, $part, $imageid, $imagepid, $lpart, $savedisk) =
 	   $query_result->fetchrow_array()) {
 
 	#
@@ -884,6 +881,19 @@ sub osload_setupswapinfo($$;@)
 	    next
 		if (!$allnodes);
 	    return 1;
+	}
+
+	#
+	# Weed out otherwise ineligible nodes:
+	#	- from experiments that are not saving disk state
+	#	- non-'node' role machines
+	# They are removed from nodeinfo entirely so we do not complain about
+	# them below.  This is the only reason we are doing this here rather
+	# than as part of the above query.
+	#
+	if ($savedisk == 0 || $erole ne "node") {
+	    delete $nodeinfo{$node};
+	    next;
 	}
 
 	# Sanity checks
@@ -897,6 +907,7 @@ sub osload_setupswapinfo($$;@)
 	    print "*** swapinfo: Got redundant partition info for $node!?\n";
 	    return 1;
 	}
+
 	my $disk = "$dtype$dunit";
 	$nodeinfo{$node} =
 	    [$vname, $rpid, $reid, $osid, $disk, $part, $imageid, $imagepid, $lpart];
