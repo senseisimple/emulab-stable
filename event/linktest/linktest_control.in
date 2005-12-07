@@ -191,6 +191,8 @@ if (! TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_gidname)) {
 	"    Could not get unix group info for $pid/$gid!\n");
 }
 
+my $errlog = TBExptUserDir($pid, $eid) . "/logs/linktest.log";
+
 #
 # Lets see if there is a linktest running already.
 #
@@ -309,7 +311,9 @@ sub notify()
 	     "returned non-zero status.\n".
 	     "Activity log file at:\n\n".
 	     "    $TBBASE/spewlogfile.php3?pid=${pid}&eid=${eid}\n".
-	     "$filespec",
+	     "$filespec\n".
+	     "\n".
+	     `/bin/cat $errlog`,
 	     "$user_name <$user_email>");
 }
 
@@ -340,6 +344,9 @@ if ($child_pid) {
     
     waitpid($child_pid, 0);
     my $exitval = $? >> 8;
+    if (-e $errlog) {
+	system("/bin/cat $errlog");
+    }
     cleanup();
     notify()
 	if ($exitval && $sendmail);
@@ -364,6 +371,7 @@ push(@cmdargs, (defined($level) ? $level : $linktest_level));
 push(@cmdargs, ("-g", $unix_gidname));
 push(@cmdargs, ("-u", $dbuid));
 push(@cmdargs, ("-e", "$pid/$eid"));
+push(@cmdargs, ("-o", $errlog));
 
 print "Running '@cmdargs'\n"
     if ($debug);
