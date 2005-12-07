@@ -734,6 +734,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $autoswap    = $exprow[autoswap];
     $autoswap_timeout  = $exprow[autoswap_timeout];
     $idle_ignore = $exprow[idle_ignore];
+    $savedisk    = $exprow[savedisk];
     $swapreqs    = $exprow[swap_requests];
     $lastswapreq = $exprow[last_swap_req];
     $minnodes    = $exprow["min_nodes"];
@@ -775,6 +776,11 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 	$idle_ignore = "<b>Yes</b>";
     else
 	$idle_ignore = "No";
+
+    if ($savedisk)
+	$savedisk = "<b>Yes</b>";
+    else
+	$savedisk = "No";
 
     if ($expt_locked)
 	$expt_locked = "($expt_locked)";
@@ -855,6 +861,12 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                 <td><a href='$TBDOCBASE/docwrapper.php3?".
 	               "docname=swapping.html#autoswap'>Max. Duration:</a></td>
                 <td class=\"left\">$autoswap</td>
+              </tr>\n";
+
+	echo "<tr>
+                <td><a href='$TBDOCBASE/docwrapper.php3?".
+	               "docname=swapping.html#swapstatesave'>Save State:</a></td>
+                <td class=\"left\">$savedisk</td>
               </tr>\n";
 
 	if (ISADMIN()) {

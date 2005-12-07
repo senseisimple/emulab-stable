@@ -43,7 +43,7 @@ my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
 my $CVSREPOS = "$PROJROOT/cvsrepos";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
-		"groups", "tiplogs");
+		"groups", "tiplogs", "images/sigs");
 my $projhead;
 
 #

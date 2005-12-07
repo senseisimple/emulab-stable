@@ -1,0 +1,169 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+
+#
+# Create a swapout-time disk image.  By default, we save an incremental
+# image based on the image signature.  Use -f to create a full image.
+# Caller must have sudo permission!
+#
+# XXX for now, all the arguments are intuited (instead of using tmcc).
+# XXX we should probably save the old swap image in case of failure.
+#
+sub usage()
+{
+    print STDOUT "Usage: create-swapimage [-f]\n";
+    exit(-1);
+}
+my  $optlist = "f";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+
+my $debug = 1;
+my $me = "create-swapimage";
+
+#
+# No configure vars.
+#
+my $sudo   = "/usr/local/bin/sudo";
+my $zipperdir = "/usr/local/bin";
+my $zipperbin = "imagezip";
+my $zipper = "$zipperdir/$zipperbin";
+my $device;
+my $filename;
+my $fullimage = 0;
+my $args = "";
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV > 0) {
+    usage();
+}
+if ($options{"f"}) {
+    $fullimage = 1;
+}
+
+my ($pid, $eid, $vname) = check_nickname();
+if (!defined($eid)) {
+    die("Node is not allocated!?");
+}
+if (!chdir("/proj/$pid/exp/$eid/swapinfo")) {
+    die("Swapinfo directory for $pid/$eid does not exist!");
+}
+if (! -r "$vname.part" || (! $fullimage && ! -r "$vname.sig")) {
+    die("Swapinfo signature/partition info for $pid/$eid does not exist!");
+}
+
+$args = "-H $vname.sig"
+    if (!$fullimage);
+
+my $info = `cat $vname.part`;
+if ($info !~ /DISK=(\w+) LOADPART=([0-4]) BOOTPART=([1-4])/) {
+    die("Swapinfo partition info for $pid/$eid is malformed!");
+}
+$device = "/dev/$1";
+$lpart = $2;
+$bpart = $3;
+$filename = "$vname-swap.ndz";
+
+print STDERR "$me: device=$device, loadpart=$lpart, bootpart=$bpart\n"
+    if ($debug);
+
+#
+# XXX For now we just use the load partition to dictate what we save.
+#
+# In the case where LOADPART=0, meaning a whole-disk image, we are almost
+# certainly saving more than we care about.  Chances are that when swapping
+# in, the user specified one of the standard OSes which is part of the whole
+# disk image that is loaded on the disk by default.  In this case we will be
+# saving the entire disk, even though they probably only care about the
+# partition they are running from.  Technically, this is the correct thing
+# to do, since they could have (re)used the other partitions and we will
+# want to pick up those changes.  However, most of the time they probably
+# haven't done anything to the rest of the disk and we are just waiting time
+# scanning the entire disk (though the resulting image will not be any larger).
+#
+# So, the boot partition is passed in just in case we someday want to
+# distinguish this case.  What we could (should?) do, is add an OTHERPARTS=
+# field to the file to give us a list of partitions that are active.  Then
+# we would always do a full-disk image but construct a list of -I options to
+# ignore the inactive partitions.
+#
+if ($lpart != 0) {
+    $args .= " -s $lpart";
+}
+
+#
+# Save the old swap image if it exists, both as a backup and so that the
+# imagefile size starts at zero for the benefit of monitoring processes.
+#
+my $ofilename = "$filename.OLD";
+if (-e $filename) {
+    unlink($ofilename);
+    if (!rename($filename, $ofilename)) {
+	warn("$me: could not back up old image, clobbering it!");
+	unlink($filename);
+	$ofilename = "";
+    }
+}
+
+#
+# XXX tmp hack: see if there is a newer version of the image zipper.
+# This way we do not have to update the admin MFS everytime we want to
+# try a new debugger, making it easier in the debugging phase.
+#
+if (-x "/proj/$pid/bin/$zipperbin") {
+    $zipper = "/proj/$pid/bin/$zipperbin";
+    warn("$me: using alternate zipper $zipper\n");
+}
+
+#
+# Run the command using sudo, since by definition only testbed users
+# with proper trust should be able to zip up a disk. sudo will fail
+# if the user is not in the proper group.
+#
+print STDERR "$me: doing '$sudo $zipper $args $device $filename'\n"
+    if ($debug);
+if (system("$sudo $zipper $args $device $filename")) {
+    print STDERR "*** Failed to create image!\n";
+    if ($ofilename ne "") {
+	print STDERR "    Restoring old image\n";
+	rename($ofilename, $filename) or
+	    warn("    Could not restore old image file!\n");
+    }
+    exit 1;
+}
+
+#
+# Get rid of the backup image
+#
+if ($ofilename ne "") {
+    unlink($ofilename);
+}
+
+exit 0;

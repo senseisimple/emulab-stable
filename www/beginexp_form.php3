@@ -63,6 +63,7 @@ function INITFORM($formfields, $projlist)
     $defaults[exp_preload]           = "no";
     $defaults[exp_batched]           = "no";
     $defaults[exp_linktest]          = 3;
+    $defaults[exp_savedisk]          = "no";
 
     #
     # Allow formfields that are already set to override defaults
@@ -143,6 +144,7 @@ function SPITFORM($formfields, $errors)
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $view, $view_style, $projlist, $linktest_levels;
     global $EXPOSELINKTEST;
+    global $EXPOSESTATESAVE;
 
     PAGEHEADER("Begin a Testbed Experiment");
 
@@ -481,9 +483,25 @@ function SPITFORM($formfields, $errors)
 			 value='";
 	echo htmlspecialchars($formfields[exp_autoswap_timeout], ENT_QUOTES);
 	echo "' size='3'> hours, even if not idle.</td>
-		  </tr></table>
-		  </td>
-	       </tr>";
+		  </tr>";
+
+	if (STUDLY() || $EXPOSESTATESAVE) {
+	    echo "<tr><td>
+	         <input type=checkbox name='formfields[exp_savedisk]'
+	         value='Yep'";
+
+	    if (isset($formfields[exp_savedisk]) &&
+		strcmp($formfields[exp_savedisk], "Yep") == 0) {
+		    echo " checked='1'";
+	    }
+
+	    echo "></td>\n";
+	    echo "<td><a href='$TBDOCBASE/docwrapper.php3?".
+		              "docname=swapping.html#swapstatesave'>
+		  <b>State Saving:</b></a> Save disk state on swapout</td>
+		  </tr>";
+	}
+	echo "</table></td></tr>";
     }
 
     #

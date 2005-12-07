@@ -211,10 +211,33 @@ function SPITFORM($formfields, $errors)
                                size='3'>
                       hours, even if not idle.
                   </td>
-               </tr>
-             </table>
-            </td>
-         </tr>";
+                  </tr>";
+
+    #
+    # Swapout disk state saving
+    # XXX requires more work, need to create/remove sigs as appropriate
+    #
+    if (0) {
+    echo "<tr>
+		  <td>
+	              <input type='checkbox'
+		             name='formfields[savedisk]'
+	                     value='1' ";
+
+    if ($formfields[savedisk] == "1") {
+	echo " checked='1'";
+    }
+    echo ">
+                  </td>
+                  <td>
+                      <a href='${swaplink}#swapstatesave'>
+		         <b>State Saving:</b></a>
+                      Save disk state on swapout
+		  </td>
+	       </tr>";
+    }
+
+    echo "</table></td></tr>";
 
     #
     # Resource usage.
@@ -329,6 +352,7 @@ $defaults[noidleswap_reason] = $row[noidleswap_reason];
 $defaults[autoswap]          = $row[autoswap];
 $defaults[autoswap_timeout]  = $row[autoswap_timeout] / 60.0;
 $defaults[idle_ignore]       = $row[idle_ignore];
+$defaults[savedisk]          = $row[savedisk];
 $defaults[mem_usage]         = $row["mem_usage"];
 $defaults[cpu_usage]         = $row["cpu_usage"];
 $defaults[linktest_level]    = $row["linktest_level"];
@@ -468,6 +492,19 @@ elseif (!isset($formfields[autoswap_timeout]) ||
 else {
     $inserts[] = "autoswap=1";
     $inserts[] = "autoswap_timeout=" . 60 * $formfields[autoswap_timeout];
+}
+
+#
+# Swapout disk state saving
+#
+if (!isset($formfields[savedisk]) ||
+    strcmp($formfields[savedisk], "1")) {
+    $formfields[savedisk] = 0;
+    $inserts[] = "savedisk=0";
+}
+else {
+    $formfields[savedisk] = 1;
+    $inserts[] = "savedisk=1";
 }
 
 #

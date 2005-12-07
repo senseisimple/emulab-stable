@@ -40,7 +40,7 @@ my $projroot = PROJROOT();
 my $grouproot= GROUPROOT();
 
 my $tbdata   = "tbdata";
-my @dirlist  = ($tbdata, "bin", "tmp", "logs", "tftpboot");
+my @dirlist  = ($tbdata, "bin", "tmp", "logs", "tftpboot", "swapinfo");
 my $exitval;
 
 #

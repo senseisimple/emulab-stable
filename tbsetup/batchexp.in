@@ -44,6 +44,7 @@ sub usage()
 	  "-n       - Do not send idle email (internal option only)\n".
 	  "-a <nnn> - Auto swapout nnn minutes after experiment is swapped in\n".
 	  "-l <nnn> - Auto swapout nnn minutes after experiment goes idle\n".
+	  "-s       - Save disk state on swapout\n".
 	  "-E <str> - A pithy sentence describing your experiment\n".
 	  "-p <pid> - The project in which to create the experiment\n".
 	  "-g <gid> - The group in which to create the experiment\n".
@@ -55,7 +56,7 @@ sub usage()
 sub ParseArgs();
 sub fatal($);
 
-my $optlist = "iE:g:e:p:S:L:a:l:fwqt:nz";
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nz";
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -63,6 +64,7 @@ my $quiet    = 0;
 my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
+my $savestate= 0;
 
 #
 # Configure variables
@@ -312,14 +314,14 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  " idleswap, idleswap_timeout, autoswap, autoswap_timeout,".
 		  " idle_ignore, keyhash, expt_locked, eventkey,".
 		  " noswap_reason, noidleswap_reason, batchmode, ".
-		  " batchstate, linktest_level) ".
+		  " batchstate, linktest_level, savedisk) ".
 		  "VALUES ($exptidx, '$eid', '$pid', '$gid', now(), ".
 		  "$description,'$dbuid', '$dbuid', '$exptstate', $priority, ".
 		  "$swappable, $idleswap, '$swaptime', $autoswap, ".
 		  "'$autoswaptime', $idleignore, '$webkey', ".
 		  "now(), '$eventkey', $noswap_reason, ".
 		  "$noidleswap_reason, $batchmode, '$batchstate', ".
-		  "$linktest)")) {
+		  "$linktest, $savestate)")) {
     DBQueryWarn("unlock tables");
     die("*** $0:\n".
 	"    DB error inserting experiment record for $pid/$eid!\n");
@@ -907,6 +909,10 @@ sub ParseArgs()
     # This option should not be exported via the XMLRPC server. 
     if (defined($options{"n"})) {
 	$idleignore = 1;
+    }
+
+    if (defined($options{"s"})) {
+	$savestate = 1;
     }
 
     #

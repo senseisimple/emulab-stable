@@ -84,6 +84,7 @@ my $createimage = "/usr/local/bin/create-image";
 my $friskiller  = "$TB/sbin/frisbeelauncher";
 my $osselect    = "$TB/bin/os_select";
 my $checkquota  = "$TB/sbin/checkquota";
+my $imagehash	= "$TB/bin/imagehash";
 my $devtype	= "ad";
 my $devnum	= 0;
 my $mereuser    = 0;
@@ -438,6 +439,25 @@ if ($result != 0) {
     fatal("FAILED: Returned error code $result generating image ... \n");
 }
 
+#
+# Everything worked, create the hash signature file.
+#
+my $sigdir;
+($sigdir = $filename) =~ s/^(.*)\/[^\/]+$/$1\/sigs/;
+system("mkdir $sigdir")
+    if (! -d "$sigdir");
+
+my $sigfilename;
+($sigfilename = $filename) =~ s/^(.*)(\/[^\/]+$)/$1\/sigs$2.sig/;
+my $swmsg = "";
+if (! -x $imagehash || system("$imagehash -c -o $sigfilename $filename") != 0) {
+    warn("Could not create swapout signature file\n");
+    $swmsg = "WARNING: could not create swapout signature file $sigfilename\n".
+	     "       You will not be able to save disk state for this image\n";
+} else {
+    print("Swapout signature file created\n");
+}
+
 print "Image creation succeeded.\n";
 #      "Final size: " . (stat($filename))[7] . " bytes.\n";
 
@@ -445,7 +465,8 @@ SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
 	 "Image creation on $node has completed. As you requested, the\n".
 	 "image has been written to $filename.\n".
-	 "You may now os_load this image on other nodes in your experiment.\n",
+	 "You may now os_load this image on other nodes in your experiment.\n".
+	 "$swmsg",
 	 "$user_name <$user_email>",
 	 "Bcc: $TBLOGS",
 	 defined($logname) ? ($logname) : ());

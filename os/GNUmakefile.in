@@ -59,7 +59,8 @@ mfs:
 	$(MAKE) -C zapdisk mfs
 
 mfs-install: mfs
-	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-swapimage $(LBINDIR)/
 	$(MAKE) -C imagezip client-install
 	$(MAKE) -C zapdisk mfs-install
 

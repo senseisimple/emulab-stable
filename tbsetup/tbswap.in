@@ -516,32 +516,8 @@ sub doSwapout($) {
 	if ($type == REAL && !$firewalled) {
 	    TBExptGetSwapoutAction($pid, $eid, \%soaction);
 	}
-	if ($soaction{'command'}) {
-	    my @nodes = ExpNodes($pid, $eid, 1);
-
-	    if (@nodes > 0) {
-		print STDERR "Performing swapout admin MFS actions.\n";
-		TBDebugTimeStamp("Performing swapout actions");
-		my @failed = ();
-		my %myargs = ();
-		$myargs{'name'} = "tbswap";
-		$myargs{'command'} = $soaction{'command'};
-		if (defined($soaction{'timeout'})) {
-		    $myargs{'timeout'} = $soaction{'timeout'};
-		}
-		$myargs{'timestamp'} = 1;
-		if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
-		    if ($soaction{'isfatal'}) {
-			tberror
-			    "Failed to run '" . $soaction{'command'} .
-				"' on @failed!";
-			return 1;
-		    }
-		    tbwarn
-			"Failed to run '" . $soaction{'command'} .
-			    "' on @failed!";
-		}
-	    }
+	if ($soaction{'command'} && doSwapoutAction($pid, $eid, %soaction)) {
+	    return 1;
 	}
 
 	#
@@ -1124,7 +1100,6 @@ sub doSwapin($) {
 	tberror "Error waiting for os_setup to finish.";
 	return 1;
     }
-    TBDebugTimeStamp("os_setup finished");
 
     #
     # Okay, start the event system now that we know all the nodes have
@@ -1625,6 +1600,138 @@ done:
 		     "Cc: $TBOPS");
 	}
 	return 1;
+    }
+
+    return 0;
+}
+
+#
+# Monitor the progress of swapout image creation.
+# This is a lot like regular image creation: we make sure that progress
+# is being made (the image is growing) and abort if not.
+#
+sub doSwapoutProgress($%)
+{
+    my ($mystate, $status) = @_;
+    my $perminute = int(60 / $mystate->{'_interval'});
+    my $iterations = $mystate->{'_iterations'};
+
+    my @running = grep { $status->{$_} eq "none" } keys(%$status);
+    if (@running == 0) {
+	return 0;
+    }
+
+    #
+    # Make a generic progress report
+    #
+    if ((++$iterations % $perminute) == 0) {
+	print "swapimage: still running after ",
+	$iterations / $perminute,
+	" minutes: @running\n";
+    }
+
+    #
+    # Of the nodes still running, determine which are not making progress
+    # and fail them.
+    # 
+    my $curtime = time();
+    foreach my $node (@running) {
+	my $nstate = $mystate->{$node};
+	my $fname = $nstate->{'name'};
+	my $fsize = $nstate->{'size'};
+	my $ftime = $nstate->{'time'};
+
+	# XXX
+	$ftime = ($curtime - $mystate->{'_interval'})
+	    if ($ftime == 0);
+
+	#
+	# If no progress, see if we should timeout
+	#
+	my $cursize = (stat($fname))[7];
+	if (!defined($cursize) || $cursize == $fsize) {
+	    if ($curtime - $ftime > $mystate->{'_timeout'}) {
+		tbwarn("$node: no progress saving state after " .
+		       int(($curtime - $ftime) / 60) .
+		       " minutes, terminating state save for this node\n");
+		$status->{$node} = "timeout";
+	    }
+	    if (defined($cursize)) {
+		print "$node: imagefile has not grown (still at $cursize bytes) in the last";
+	    } else {
+		print "$node: imagefile does not exist after";
+	    }
+	} else {
+	    $nstate->{'size'} = $cursize;
+	    $nstate->{'time'} = $curtime;
+	    print "$node: imagefile grew from $fsize to $cursize in";
+	}
+	print " ", int($curtime - $ftime), " seconds\n";
+    }
+
+    $mystate->{'_iterations'} = $iterations;
+
+    return 1;
+}
+
+#
+# Handle swapout time actions.
+# Returns zero if successful, non-zero otherwise.
+#
+sub doSwapoutAction($$%)
+{
+    my ($pid, $eid, %soaction) = @_;
+
+    # swapout disk image related state
+    my $statesavecmd = "/usr/local/bin/create-swapimage";
+    my $stateinterval = 60;
+    my $statetimeout = (5 * 60);
+    my %state = ();
+
+    my %nodes = ExpNodeVnames($pid, $eid, 1);
+    my @pnodes = keys(%nodes);
+    if (@pnodes > 0) {
+	print STDERR "Performing swapout admin MFS actions.\n";
+	TBDebugTimeStamp("Performing swapout actions");
+	my @failed = ();
+	my %myargs = ();
+	$myargs{'name'} = "tbswap";
+	$myargs{'command'} = $soaction{'command'};
+	if (defined($soaction{'timeout'})) {
+	    $myargs{'timeout'} = $soaction{'timeout'};
+	}
+	$myargs{'timestamp'} = 1;
+
+	#
+	# If this is swapout disk state saving, setup a progress function
+	#
+	if ($soaction{'command'} =~ /^$statesavecmd/) {
+	    $myargs{'pfunc'} = \&doSwapoutProgress;
+	    $myargs{'pinterval'} = $stateinterval;
+	    $myargs{'pcookie'} = \%state;
+
+	    $state{'_interval'} = $stateinterval;
+	    $state{'_timeout'} = $statetimeout;
+	    $state{'_iterations'} = 0;
+	    foreach my $node (@pnodes) {
+		my $vname = $nodes{$node};
+		$state{$node} = {
+		    'name' => "/proj/$pid/exp/$eid/swapinfo/$vname-swap.ndz",
+		    'time' => 0,
+		    'size' => 0
+		};
+	    }
+	}
+
+	if (TBAdminMfsRunCmd(\%myargs, \@failed, @pnodes)) {
+	    if ($soaction{'isfatal'}) {
+		tberror
+		    "Failed to run '" . $soaction{'command'} . "' on @failed!";
+		return 1;
+	    }
+	    tbwarn
+		"Failed to run '" . $soaction{'command'} . "' on @failed!";
+	}
     }
 
     return 0;

@@ -386,6 +386,10 @@ if (isset($formfields[exp_preload]) &&
     $exp_preload   = 1;
     $batcharg     .= " -f";
 }
+if (isset($formfields[exp_savedisk]) &&
+    strcmp($formfields[exp_savedisk], "Yep") == 0) {
+    $batcharg     .= " -s";
+}
 if (isset($formfields[exp_linktest]) && $formfields[exp_linktest] != "") {
     $linktestarg   = "-t " . $formfields[exp_linktest];
 }

@@ -26,7 +26,7 @@ require 'ctime.pl';
 
 sub usage()
 {
-    print STDERR "Usage: os_setup <pid> <eid>\n";
+    print STDERR "Usage: os_setup [-d] <pid> <eid>\n";
     exit(-1);
 }
 my  $optlist = "d";
@@ -358,7 +358,8 @@ while (my %row = $db_result->fetchhash()) {
 	    #
 	    my $p_result =
 		DBQueryFatal("select * from partitions ".
-			     "where node_id='$node' and osid='$osid'");
+			     "where node_id='$node' and osid='$osid'".
+			     "order by partition");
 
 	    #
 	    # If not loaded, then see if the user was looking for the generic
@@ -1056,6 +1057,20 @@ print "*** There were $failedvnodes failed virtual nodes\n"
 print "*** There were $failedplab failed plab nodes\n"
     if ($failedplab);
 
+#
+# If not failing for any reason, save off swap state.
+#
+# For all nodes in the experiment that are booting from the disk,
+# figure out the image from which they are booting and stash away the
+# appropriate info to enable disk state saving at swapout.
+#
+my $swapstate;
+if (!($failedvnodes || $canceled || $noretry || $failed || $failedplab) &&
+    TBExptGetSwapState($pid, $eid, \$swapstate) && $swapstate) {
+    TBDebugTimeStamp("Stashing image signatures");
+    osload_setupswapinfo($pid, $eid);
+    TBDebugTimeStamp("Finished stashing image signatures");
+}
 TBDebugTimeStamp("os_setup finished");
 
 # No retry if vnodes failed. Indicates a fatal problem.

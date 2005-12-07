@@ -14,7 +14,7 @@ use Exporter;
 use vars qw(@ISA @EXPORT);
 
 @ISA    = "Exporter";
-@EXPORT = qw ( osload osload_wait );
+@EXPORT = qw ( osload osload_wait osload_setupswapinfo );
 
 # Must come after package declaration!
 use lib '@prefix@/lib';
@@ -53,6 +53,7 @@ sub osload ($$) {
     my $noreboot    = 0;
     my $asyncmode   = 0;
     my $zerofree    = 0;
+    my $swapinfo    = 0;
 
     # Locals
     my %retries	    = ();
@@ -85,6 +86,9 @@ sub osload ($$) {
     }
     if (defined($args->{'zerofree'})) {
 	$zerofree = $args->{'zerofree'};
+    }
+    if (defined($args->{'swapinfo'})) {
+	$swapinfo = $args->{'swapinfo'};
     }
     
     #
@@ -200,6 +204,7 @@ sub osload ($$) {
 	my $imagepath      = $rowref->{'path'};
 	my $defosid        = $rowref->{'default_osid'};
 	my $maxwait	   = $rowref->{'maxloadwait'};
+	my $imagepid	   = $rowref->{'pid'};
 
 	print "osload ($node): Changing default OS to $defosid\n";
 	if (!$TESTMODE) {
@@ -241,8 +246,9 @@ sub osload ($$) {
 		
 		$dbresult =
 		    DBQueryWarn("replace into partitions ".
-				"(partition, osid, node_id) ".
-				"values('$i', '$osid', '$node')");
+				"(node_id,partition,osid,imageid,imagepid) ".
+				"values ".
+				"('$node','$i','$osid','$imageid','$imagepid')");
 	    }
 	    else {
 		$dbresult =
@@ -254,6 +260,15 @@ sub osload ($$) {
 		    "*** osload ($node): Could not update partition table\n";
 		goto failednode;
 	    }
+	}
+
+	#
+	# Setup swapinfo now after partitions have initialized but before
+	# we setup the one-shot frisbee load.
+	#
+	if ($swapinfo) {
+	    print "osload: Updating image signature.\n";
+	    osload_setupswapinfo(undef, undef, $node);
 	}
 
 	#
@@ -805,6 +820,170 @@ sub osload_wait($)
     # 
     waitpid($childpid, 0);
     return $? >> 8;
+}
+
+#
+# Save signature files and boot partition info for all nodes in an experiment
+# (or just the listed nodes).  We call this when swapping in an experiment or
+# when reloading nodes in an experiment.
+#
+# Note that this is not strictly an os loading function, we do it on swapins
+# of nodes which already have the correct OS as well.  But we stick it here
+# because it is about os loading in principle.
+#
+sub osload_setupswapinfo($$;@)
+{
+    my ($pid, $eid, @nodelist) = @_;
+    my %nodeinfo = ();
+    my $allnodes;
+    my $clause = "";
+
+    # XXX comment this out to force save of all disks
+    $clause = "e.savedisk!=0 and ";
+
+    if (!defined(@nodelist)) {
+	@nodelist = ExpNodes($pid, $eid, 1);
+	$clause .= "r.pid='$pid' and r.eid='$eid'";
+	$allnodes = 1;
+    } else {
+	$clause .= "r.node_id in (" . join(",", map("'$_'", @nodelist)) . ")";
+	$allnodes = 0;
+    }
+    map { $nodeinfo{$_} = 0 } @nodelist;
+
+    # XXX only know how to do this for local PCs right now
+    $clause .= " and nt.imageable!=0 and nt.class='pc' and nt.isremotenode=0";
+
+    #
+    # Note that we are using the def_boot_osid from the nodes table to identify
+    # the image of interest.  This is because the osid field is set by stated
+    # after a node has reached the BOOTING state the first time, and may be
+    # set to an MFS at other times.
+    #
+    my $query_result = DBQueryWarn(
+	"select r.node_id,r.vname,r.pid,r.eid,n.osid,nt.disktype,nt.bootdisk_unit,p.partition,p.imageid,p.imagepid,i.loadpart ".
+	"from reserved as r ".
+	"left join nodes as n on n.node_id=r.node_id ".
+	"left join node_types as nt on nt.type=n.type ".
+	"left join partitions as p on p.node_id=n.node_id and p.osid=n.def_boot_osid ".
+        "left join images as i on i.imageid=p.imageid ".
+        "left join experiments as e on e.pid=r.pid and e.eid=r.eid ".
+	"where $clause");
+    if (!$query_result) {
+	return 1;
+    }
+
+    while (my ($node, $vname, $rpid, $reid, $osid, $dtype, $dunit, $part, $imageid, $imagepid, $lpart) =
+	   $query_result->fetchrow_array()) {
+
+	#
+	# XXX not a disk-based OSID.  This can happen during frisbee loads
+	#
+	if (!defined($imageid)) {
+	    print "*** swapinfo: $osid is not disk-based!?\n";
+	    next
+		if (!$allnodes);
+	    return 1;
+	}
+
+	# Sanity checks
+	if (!defined($nodeinfo{$node})) {
+	    next
+		if (!$allnodes);
+	    print "*** swapinfo: Got partition info for invalid node $node!?\n";
+	    return 1;
+	}
+	if ($nodeinfo{$node} != 0) {
+	    print "*** swapinfo: Got redundant partition info for $node!?\n";
+	    return 1;
+	}
+	my $disk = "$dtype$dunit";
+	$nodeinfo{$node} =
+	    [$vname, $rpid, $reid, $osid, $disk, $part, $imageid, $imagepid, $lpart];
+    }
+
+    #
+    # Copy over the signature file for the image used on every node under
+    # the name <vname>.sig.  Likewise, we record the partition that the
+    # image resides in under <vname>.part.
+    #
+    # Note that we actually copy the signature over as <imageid>.sig and
+    # then symlink the <vname>.sig's to it.  This not only saves space,
+    # but makes it easier to determine what is loaded on each node.
+    #
+    for my $node (keys(%nodeinfo)) {
+	my $infop = $nodeinfo{$node};
+	if ($infop == 0) {
+	    print "*** swapinfo: WARNING: got no partition info for $node!\n";
+	    next;
+	}
+	my ($vname, $rpid, $reid, $osid, $disk, $part, $imageid, $imagepid, $lpart) = @{$infop};
+
+	#
+	# If imageid is not "fully qualified" with the project name,
+	# generate a name that is.
+	#
+	my $rimageid = $imageid;
+	if ($rimageid !~ /^$imagepid-/) {
+	    $rimageid = "$imagepid-$imageid";
+	}
+
+	# XXX backward compat
+	my $infodir = "/proj/$rpid/exp/$reid/swapinfo";
+	if (! -d "$infodir" && !mkdir($infodir, 0770)) {
+	    print "*** swapinfo: no swap info directory $infodir!\n";
+	    next
+		if (!$allnodes);
+	    return 1;
+	}
+
+	#
+	# First make sure we get rid of any old signature for the node
+	# in case any of the following steps fail.
+	#
+	unlink("$infodir/$vname.sig", "$infodir/$vname.part");
+
+	my ($sigdir, $signame);
+	if ($imagepid eq TBOPSPID()) {
+	    $sigdir = "$TB/images/sigs";
+	} else {
+	    $sigdir = "/proj/$imagepid/images/sigs";
+	}
+	$signame = "$imageid.ndz.sig";
+	$signame =~ s/^$imagepid-//;
+	if (! -d $sigdir || ! -f "$sigdir/$signame") {
+	    print "*** swapinfo: WARNING: no image signature for $rimageid, ".
+		"cannot save swapout state!\n";
+	    next;
+	}
+	my $basesig = "$infodir/$rimageid";
+	if (! -r $basesig) {
+	    if (system("/bin/cp -p $sigdir/$signame $basesig")) {
+		print "*** swapinfo: WARNING: ".
+		      "could not create signature $basesig, ".
+		      "cannot save swapout state!\n";
+		next;
+	    }
+	}
+	if (system("/bin/ln -s $rimageid $infodir/$vname.sig")) {
+	    print "*** swapinfo: WARNING: ".
+		"could not create signature $infodir/$vname.sig, ".
+		    "cannot save swapout state!\n";
+	    next;
+	}
+
+	if (!open(FD, "> $infodir/$vname.part")) {
+		print "*** swapinfo: WARNING: ".
+		      "could not create partition file $infodir/$vname.part, ".
+		      "cannot save swapout state!\n";
+		unlink("$infodir/$vname.sig");
+		next;
+	}
+	print FD "DISK=$disk ";
+	print FD "LOADPART=$lpart ";
+	print FD "BOOTPART=$part\n";
+	close(FD);
+    }
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

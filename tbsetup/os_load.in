@@ -251,6 +251,7 @@ $osloadargs{'nodelist'} = [ @nodes ];
 # No imageid means to load the default image.
 $osloadargs{'imageid'}  = $imageid
     if (defined($imageid));
+$osloadargs{'swapinfo'} = 1;
 
 exit(osload(\%osloadargs, \%failednodes));
 

@@ -156,7 +156,8 @@ use vars qw(@ISA @EXPORT);
 	 SetNodeBootStatus OSFeatureSupported IsShelved NodeidToExp NodeidToExpOldReserved
 	 UserDBInfo DBQuery DBQueryFatal DBQueryWarn DBWarn DBFatal DBErr
 	 DBQuoteSpecial UNIX2DBUID ExpState SetExpState ProjLeader
-	 ExpNodes ExpNodesOldReserved DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
+	 ExpNodes ExpNodeVnames ExpNodesOldReserved
+	 DBDateTime DefaultImageID GroupLeader TBGroupUnixInfo
 	 TBValidNodeLogType TBValidNodeName TBSetNodeLogEntry
 	 TBSetSchedReload MapNodeOSID TBLockExp TBUnLockExp TBSetExpSwapTime
 	 TBUnixGroupList TBOSID TBOSMaxConcurrent TBOSCountInstances
@@ -174,7 +175,7 @@ use vars qw(@ISA @EXPORT);
 	 TBNodeAllocCheck TBPlabNodeUsername MarkPhysNodeDown TBExptIsElabInElab
 	 TBExptFirewall TBNodeFirewall TBExptFirewallAndPort
 	 TBSetExptFirewallVlan TBClearExptFirewallVlan
-	 TBNodeConsoleTail TBExptGetSwapoutAction
+	 TBNodeConsoleTail TBExptGetSwapoutAction TBExptGetSwapState
 
 	 TBNodeSubNodes
 	 TBNodeAdminOSID TBNodeDiskloadOSID
@@ -1665,9 +1666,10 @@ sub ExpNodesOldReserved($$)
 #
 # Return a list of all the nodes in an experiment.
 #
-# usage: ExpNodes(char *pid, char *eid)
+# usage: ExpNodes(char *pid, char *eid, [bool islocal])
 #        returns the list if a valid pid/eid.
-#        returns 0 if an invalid pid/eid or if an error.
+#	 If the optional flag is set, returns only local nodes.
+#        Returns 0 if an invalid pid/eid or if an error.
 #
 sub ExpNodes($$;$)
 {
@@ -1706,6 +1708,57 @@ sub ExpNodes($$;$)
 	}
     }
     return @nodes;
+}
+
+#
+# Return a hash of all the nodes in an experiment.  The hash maps pnames
+# to vnames.
+#
+# usage: ExpNodeVnames(char *pid, char *eid, [bool islocal])
+#        returns the hash if a valid pid/eid.
+#	 If the optional flag is set, returns only local nodes.
+#        Returns 0 if an invalid pid/eid or if an error.
+#
+sub ExpNodeVnames($$;$)
+{
+    my($pid, $eid, $flag) = @_;
+    my(@row);
+    my(%nodes);
+    my $clause = "";
+
+    if (defined($flag)) {
+	$clause = "and nt.isremotenode=0";
+    }
+    my $query_result =
+	DBQueryWarn("select r.node_id,r.vname from reserved as r ".
+		    "left join nodes as n on n.node_id=r.node_id ".
+		    "left join node_types as nt on nt.type=n.type ".
+		    "where r.pid='$pid' and r.eid='$eid' $clause");
+
+    if (!$query_result || $query_result->numrows == 0) {
+	return ();
+    }
+    while (@row = $query_result->fetchrow_array()) {
+	my $node = $row[0];
+	my $vname = $row[1];
+
+	#
+	# Taint check. I do not understand this sillyness, but if I
+	# taint check these node names, I avoid warnings throughout.
+	#
+	if ($node =~ /^([-\w]+)$/) {
+	    $node = $1;
+	    if ($vname =~ /^([-\w]+)$/) {
+		$vname = $1;
+	    } else {
+		$vname = $node;
+	    }
+	    $nodes{$node} = $vname;
+	} else {
+	    print "*** $0: WARNING: Bad node name: $node.\n";
+	}
+    }
+    return %nodes;
 }
 
 #
@@ -4187,6 +4240,26 @@ sub TBExptGetPanicBit($$$) {
 }
 
 #
+# Get the value of the swapout state.
+# Right now this is just the savedisk field.
+# Returns 1 if there is swap state, 0 otherwise.
+# 
+sub TBExptGetSwapState($$$) {
+    my ($pid, $eid, $statep) = @_;
+
+    my $query_result =
+	DBQueryWarn("select savedisk from experiments ".
+		    "where pid='$pid' and eid='$eid'");
+    if (!$query_result || $query_result->num_rows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    $$statep = $row[0];
+
+    return 1;
+}
+
+#
 # See if there is an admin MFS swapout action associated with the experiment.
 # For now we just look at a globally defined action via sitevar.
 #
@@ -4195,16 +4268,35 @@ sub TBExptGetPanicBit($$$) {
 #
 sub TBExptGetSwapoutAction($$$) {
     my ($pid, $eid, $ref) = @_;
-    my ($action, $faction);
+    my ($action, $faction, $timeout);
 
     if (TBGetSiteVar("swap/swapout_command", \$action)) {
 	my $failisfatal = 1;
 
+	#
+	# Swapout-time state saving.
+	# Only perform if the experiment has desired state saving.
+	#
+	if ($action =~ /create-swapimage/) {
+	    my $doit;
+	    my $query_result =
+		DBQueryWarn("select savedisk from experiments ".
+			    "where pid='$pid' and eid='$eid'");
+	    if (!$query_result || $query_result->num_rows == 0 ||
+		(($doit) = $query_result->fetchrow_array()) == 0) {
+		%$ref = ();
+		return 0;
+	    }
+	}
+
 	if (TBGetSiteVar("swap/swapout_command_failaction", \$faction)) {
 	    $failisfatal = ($faction eq "fail");
 	}
+	TBGetSiteVar("swap/swapout_command_timeout", \$timeout);
 
-	%$ref = ('command' => $action, 'isfatal' => $failisfatal);
+	%$ref = ('command' => $action,
+		 'isfatal' => $failisfatal,
+		 'timeout' => $timeout);
 	return 1;
     }
 
@@ -4414,7 +4506,7 @@ sub MapNodeOSID($$)
     my ($node, $osid) = @_;
 
     #
-    # See id this this OSID is actually loaded on the machine.
+    # See if this OSID is actually loaded on the machine.
     #
     my $p_result =
 	DBQueryWarn("select * from partitions ".
