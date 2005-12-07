@@ -73,8 +73,9 @@ use constant LAT_LOW_BW => 10000000;
 
 # slow send rate (for bw 256kbps to 1Mbps)
 use constant SLOW_BW => 256000;
-use constant SLOW_SEND => 400;
-use constant FAST_SEND => 1002;
+use constant SLOW_SEND => 100;
+use constant FAST_SEND => 250;
+use constant LOSS_TEST_DURATION => 4;	# In seconds.
 
 # misc contstants
 use constant BSD => "FreeBSD";
@@ -437,17 +438,19 @@ exit(EXIT_OK);
 # Loss Test Functions
 ##############################################################################
 
+
 # Writes the configuration file used by RUDE.
 sub write_rude_cfg {
     my ($stream_id, $edge) = @_;
+    my $sample_size = &get_loss_sample_size($edge);
+    my $millis      = LOSS_TEST_DURATION * 1000;
     my @contents;
+    
     push @contents, "START NOW\n";
     push @contents, "0000 $stream_id ON 3001 " 
 	. $edge->dst . "-" . $edge->name
-	    . ":10001 CONSTANT " 
-		. &get_loss_sample_size($edge) 
-		    . " 20\n";
-    push @contents, "1000 $stream_id OFF\n";
+	    . ":10001 CONSTANT $sample_size 20\n";
+    push @contents, "$millis $stream_id OFF\n";
 
     &write_file(RUDE_CFG, @contents);
 
@@ -458,9 +461,10 @@ sub write_rude_cfg {
 sub get_loss_sample_size {
     my $edge = shift @_;
     if($edge->loss > 0) {
-	return &round( 10 / $edge->loss);
+	return &round( 2.5 / $edge->loss);
     } else {
-	return SLOW_SEND; # just in case a slow link with no loss.
+	# just in case a slow link with no loss.
+	return SLOW_SEND; 
     }
 }
 
@@ -546,7 +550,7 @@ sub loss_test {
 	    # this is a large sample test about proportion p.
 	    # this is considered a valid statistical estimate for np >= 10.
 	    my $p = 1 - $edge->loss;
-	    my $n = &get_loss_sample_size($edge) + 1 ;
+	    my $n = (&get_loss_sample_size($edge) * LOSS_TEST_DURATION) + 1 ;
 
 
 	    my $p_hat = $received / $n;
