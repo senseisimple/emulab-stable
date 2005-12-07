@@ -4278,12 +4278,14 @@ sub TBExptGetSwapoutAction($$$) {
 	# Only perform if the experiment has desired state saving.
 	#
 	if ($action =~ /create-swapimage/) {
-	    my $doit;
+	    my $doit = 0;
 	    my $query_result =
 		DBQueryWarn("select savedisk from experiments ".
 			    "where pid='$pid' and eid='$eid'");
-	    if (!$query_result || $query_result->num_rows == 0 ||
-		(($doit) = $query_result->fetchrow_array()) == 0) {
+	    if ($query_result && $query_result->num_rows != 0) {
+		($doit) = $query_result->fetchrow_array();
+	    }
+	    if (!$doit) {
 		%$ref = ();
 		return 0;
 	    }
