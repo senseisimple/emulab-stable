@@ -1703,9 +1703,12 @@ sub doSwapoutAction($$%)
 	$myargs{'timestamp'} = 1;
 
 	#
-	# If this is swapout disk state saving, setup a progress function
+	# If this is swapout disk state saving, we do lots o stuff.
 	#
 	if ($soaction{'command'} =~ /^$statesavecmd/) {
+	    #
+	    # Setup a progress function
+	    #
 	    $myargs{'pfunc'} = \&doSwapoutProgress;
 	    $myargs{'pinterval'} = $stateinterval;
 	    $myargs{'pcookie'} = \%state;
@@ -1726,8 +1729,8 @@ sub doSwapoutAction($$%)
 		# they are delay nodes.
 		#
 		if (! -r "$swapdir/$vname.part" || ! -r "$swapdir/$vname.sig") {
-		    # XXX do this based on role
-		    if ($vname !~ /^tbsdelay/) {
+		    # XXX should do this based on role, not name
+		    if ($vname !~ /^tbs?delay\d+$/) {
 			tbwarn "no swap info for $node ($vname), ".
 			    "not saving disk state!";
 		    }
@@ -1735,7 +1738,7 @@ sub doSwapoutAction($$%)
 		}
 		push(@enodes, $node);
 		$state{$node} = {
-		    'name' => "/proj/$pid/exp/$eid/swapinfo/$vname-swap.ndz",
+		    'name' => "$swapdir/$vname-swap.ndz",
 		    'time' => 0,
 		    'size' => 0
 		};

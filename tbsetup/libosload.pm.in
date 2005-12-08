@@ -963,7 +963,8 @@ sub osload_setupswapinfo($$;@)
 	$signame = "$imageid.ndz.sig";
 	$signame =~ s/^$imagepid-//;
 	if (! -d $sigdir || ! -f "$sigdir/$signame") {
-	    print "*** swapinfo: WARNING: no image signature for $rimageid, ".
+	    print "*** swapinfo: WARNING: ".
+		"no image signature for $rimageid, ".
 		"cannot save swapout state!\n";
 	    next;
 	}
