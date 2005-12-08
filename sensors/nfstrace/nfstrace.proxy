@@ -436,21 +436,32 @@ def do_get(args):
     # Find all the accessed files and print them out.
     seen = {}
     dirs = {}
-    cur.execute("SELECT fa.fh,"
+    cur.execute("SELECT fa.fh,fc.size,"
                 "  IFNULL(MAX(fa.last_access)>MAX(fd.last_remove),1) "
                 "FROM file_access as fa "
                 "INNER JOIN node_ids as ni on (ni.node_ip=fa.node_ip and "
                 "  ni.pid=%s and ni.eid=%s) "
                 "LEFT JOIN file_dropped as fd on (fa.fh=fd.fh and "
                 "  ni.node_ip=fd.node_ip) "
+                "LEFT JOIN file_checkpoint as fc on (fa.fh=fc.fh) "
                 "GROUP BY fa.fh", (pid, eid))
-    for (fh,alive) in cur:
+
+    total_size = 0
+    
+    for (fh,size,alive) in cur:
         if not alive:
             continue
 
         complete, fn, valid = resolve_fh(fh)
         if valid and fn not in seen:
-            print fn
+            if size == None:
+                size = "U"
+                pass
+            else:
+                total_size += size
+                size = human_readable(size)
+                pass
+            print "%10s %s" % (size, fn)
             if fn in links:
                 used_links[links[fn]] = 1
                 pass
@@ -469,11 +480,14 @@ def do_get(args):
 
     # Finally, print out the used links.
     for (complete, fn) in used_links.keys():
-        print fn
+        print "%10s %s" % ("link", fn)
         if not complete:
             missing += 1
             pass
         pass
+
+    print ("-" * 79)
+    print "%10s Total" % (human_readable(total_size),)
 
     if missing > 0:
         sys.stderr.write(`missing` + " unknown file(s) accessed.\n")
