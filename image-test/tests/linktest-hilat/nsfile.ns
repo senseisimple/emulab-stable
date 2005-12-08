@@ -1,0 +1,40 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set node0 [$ns node]
+tb-set-node-os $node0 @OS@
+set node00 [$ns node]
+tb-set-node-os $node00 @OS@
+set node000 [$ns node]
+tb-set-node-os $node000 @OS@
+set node001 [$ns node]
+tb-set-node-os $node001 @OS@
+set node0010 [$ns node]
+tb-set-node-os $node0010 @OS@
+set node00100 [$ns node]
+tb-set-node-os $node00100 @OS@
+set node0000 [$ns node]
+tb-set-node-os $node0000 @OS@
+set node00000 [$ns node]
+tb-set-node-os $node00000 @OS@
+
+
+
+set lan0 [$ns make-lan "$node0 $node00 $node000 $node0000 " 1Mb 0ms]
+set lan1 [$ns make-lan "$node0000 $node00000 " 100Mb 0ms]
+set lan00 [$ns make-lan "$node001 $node0010 $node00100 $node00000 " 1Mb 0ms]
+
+tb-set-node-lan-params $node0 $lan0 100ms 1Mb 0.0
+tb-set-node-lan-params $node00 $lan0 100ms 1Mb 0.0
+tb-set-node-lan-params $node000 $lan0 100ms 1Mb 0.0
+tb-set-node-lan-params $node0000 $lan0 100ms 1Mb 0.0
+tb-set-node-lan-params $node0000 $lan1 50ms 100Mb 0.0
+tb-set-node-lan-params $node00000 $lan1 50ms 100Mb 0.0
+tb-set-node-lan-params $node001 $lan00 100ms 1Mb 0.0
+tb-set-node-lan-params $node0010 $lan00 100ms 1Mb 0.0
+tb-set-node-lan-params $node00100 $lan00 100ms 1Mb 0.0
+tb-set-node-lan-params $node00000 $lan00 100ms 1Mb 0.0
+
+
+$ns rtproto Static
+$ns run
