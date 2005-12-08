@@ -21,6 +21,8 @@ var getPNodeProgress = 0;
 var nextState = LOG_STATE_LOADING; // The state of the log download.
 var docTriesLeft = 2; // Tries before giving up on getting the document.
 
+var lastError = -2;
+
 /*
  * True for the first line of the log.  Used to counteract the hack that sends
  * 1024 spaces to flush the log.
@@ -53,6 +55,27 @@ function ml_loadFinished() {
     nextState = LOG_STATE_LOADED;
 }
 
+function ml_getInnerText(el) {
+	if (typeof el == "string") return el;
+	if (typeof el == "undefined") { return ""; };
+	if (el.innerText) return el.innerText;	//Not needed but it is faster
+	var str = "";
+	
+	var cs = el.childNodes;
+	var l = cs.length;
+	for (var i = 0; i < l; i++) {
+		switch (cs[i].nodeType) {
+			case 1: //ELEMENT_NODE
+				str += ml_getInnerText(cs[i]);
+				break;
+			case 3:	//TEXT_NODE
+				str += cs[i].nodeValue;
+				break;
+		}
+	}
+	return str;
+}
+
 /*
  * @param ifr The iframe to retrieve the text from.
  * @return The text in the given iframe.  If the text is surrounded by '<pre>'
@@ -66,7 +89,14 @@ function ml_getBodyText(ifr) {
 	if (oDoc.document) {
 	    oDoc = oDoc.document;
 	}
-	retval = oDoc.body.innerHTML;
+	for (lpc = 0; lpc < oDoc.childNodes.length; lpc++) {
+	    text = ml_getInnerText(oDoc.childNodes[lpc]);
+	    if (text != "") {
+		if (retval == null)
+		  retval = "";
+		retval += text;
+	    }
+	}
 	if (retval.indexOf("<pre>") != -1 || retval.indexOf("<PRE>") != -1) {
 	    retval = retval.substring(5, retval.length - 6);
 	}
@@ -204,13 +234,18 @@ function ml_handleReadyState(state) {
 	    var hasError = 0;
 	    
 	    /* Check for errors. */
-	    if (line.indexOf('***') != -1) {
+	    if (line.indexOf('***') != -1 ||
+		(lastError == i - 1) && line.indexOf('   ') == 0) {
 		if (plain != "") {
 		    tn = document.createTextNode(plain);
 		    oa.appendChild(tn);
 		}
 		plain = "";
 		hasError = 1;
+		lastError = i;
+	    }
+	    else {
+		lastError = -2;
 	    }
 	    
 	    /*
@@ -270,9 +305,9 @@ function ml_handleReadyState(state) {
 		    lastIndex = index + pnode.length;
 		}
 	    }
-	    else if (hasError) {
+	    if (hasError) {
 		/* It is an error line, turn it red. */
-		tn = document.createTextNode(line);
+		tn = document.createTextNode(line.substring(lastIndex));
 		fn = document.createElement("font");
 		fn.setAttribute("color", "red");
 		fn.appendChild(tn);
@@ -286,6 +321,10 @@ function ml_handleReadyState(state) {
 	    firstLine = false;
 	}
 	lastLine = lines[lines.length - 1];
+
+	if (lastError != -2) {
+	    lastError = -1;
+	}
 	
 	if (state == LOG_STATE_LOADED)
 	  plain += lastLine;
