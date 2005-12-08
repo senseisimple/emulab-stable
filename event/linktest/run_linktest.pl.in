@@ -370,7 +370,7 @@ sub analyze {
     system("rm -rf $ltlogs");
     system("mkdir -p $ltlogs");
     system("$LOGHOLE -e $pid/$eid sync -n -l $ltlogs -r /var/emulab/logs ".
-	   "> /dev/null 2>&1");
+	   "> $ltlogs/loghole.out 2>&1");
 
     print "***************************************************************\n";
     print "***************** Linktest Error Reports **********************\n";
