@@ -444,7 +444,7 @@ if ($result != 0) {
 #
 my $sigdir;
 ($sigdir = $filename) =~ s/^(.*)\/[^\/]+$/$1\/sigs/;
-system("mkdir $sigdir")
+mkdir($sigdir, 0770)
     if (! -d "$sigdir");
 
 my $sigfilename;
