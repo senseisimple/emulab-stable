@@ -559,7 +559,7 @@ other OS types, but on Windows, proper TCP/IP network setup depends on
     </pre>
 
     This works becuase you are part of the Windows <code>Administrators</code> group.
-    Otherwise you would have to already know the root password to change it. </li>
+    Otherwise you would have to already know the root password to change it. </li> <br>
   <li>
      Log in to the node as user <code>root</code> through the Console or SSH,
      using the password you set above, then run the <code>prepare</code> command.
@@ -569,7 +569,14 @@ other OS types, but on Windows, proper TCP/IP network setup depends on
        /usr/local/etc/emulab/prepare
      </pre> </li>       
   <li>
-     Then log out and create your custom image. </li>
+     Then log out and create your custom image. <br> <br>
+
+       <div style="margin-left: 40px;"> <b>NOTE:</b> Windows XP is too big to
+       fit in the partitioning scheme used by FreeBSD and Linux, so it's
+       necessary when making a Windows custom image to specify <b>Partition
+       1</b>, and click <b>Whole Disk Image.</b> </div>
+     </li>
+
 </ul>
 
 <hr style="width: 100%; height: 2px;">
