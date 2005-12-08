@@ -1,0 +1,34 @@
+
+set ns [new Simulator]
+source tb_compat.tcl
+
+set client1 [$ns node]
+tb-set-node-os $client1 @OS@
+
+set router1 [$ns node]
+tb-set-node-os $router1 @OS@
+
+set server1 [$ns node]
+tb-set-node-os $server1 @OS@
+
+set link0 [$ns duplex-link $client1 $router1 1Mbps 25ms DropTail]
+set queue0 [[$ns link $client1 $router1] queue]
+$queue0 set limit_ 20
+
+set link1 [$ns duplex-link $router1 $server1 1Mbps 25ms DropTail]
+set queue1 [[$ns link $router1 $server1] queue]
+$queue1 set limit_ 20
+
+set tcp_src [new Agent/TCP/FullTcp]
+$ns attach-agent $client1 $tcp_src
+
+set tcp_sink [new Agent/TCP/FullTcp]
+$tcp_sink listen
+$ns attach-agent $server1 $tcp_sink
+
+$ns connect $tcp_src $tcp_sink
+
+set ftp [new Application/FTP]
+$ftp attach-agent $tcp_src
+
+$ns run
