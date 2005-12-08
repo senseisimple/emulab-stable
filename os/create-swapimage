@@ -133,6 +133,13 @@ if (-e $filename) {
 }
 
 #
+# Create the new file now so it is owned by the user and not root
+#
+if (!open(FILE, "> $filename") || !close(FILE)) {
+    goto failed;
+}
+
+#
 # XXX tmp hack: see if there is a newer version of the image zipper.
 # This way we do not have to update the admin MFS everytime we want to
 # try a new debugger, making it easier in the debugging phase.
@@ -149,21 +156,21 @@ if (-x "/proj/$pid/bin/$zipperbin") {
 #
 print STDERR "$me: doing '$sudo $zipper $args $device $filename'\n"
     if ($debug);
-if (system("$sudo $zipper $args $device $filename")) {
-    print STDERR "*** Failed to create image!\n";
+if (system("$sudo $zipper $args $device $filename") == 0) {
+    #
+    # Get rid of the backup image
+    #
     if ($ofilename ne "") {
-	print STDERR "    Restoring old image\n";
-	rename($ofilename, $filename) or
-	    warn("    Could not restore old image file!\n");
+	unlink($ofilename);
     }
-    exit 1;
+    exit 0;
 }
 
-#
-# Get rid of the backup image
-#
+failed:
+print STDERR "*** Failed to create image $filename!\n";
 if ($ofilename ne "") {
-    unlink($ofilename);
+    print STDERR "    Restoring old image\n";
+    rename($ofilename, $filename) or
+	warn("    Could not restore old image file!\n");
 }
-
-exit 0;
+exit 1;
