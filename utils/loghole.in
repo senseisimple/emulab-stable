@@ -1012,7 +1012,9 @@ def do_sync(args, mode="sync", must_be_active=1):
         sys.stderr.write("error: " + state["output"] + "\n")
         retval = 1
         pass
-    elif state["value"] != "active":
+    elif (state["value"] != "active" and
+          state["value"] != "activating" and
+          state["value"] != "modify_reswap"):
         if must_be_active:
             sys.stderr.write("error: %s/%s is not an active experiment!\n" %
                              (PID, EID))
