@@ -332,10 +332,6 @@ sub convertPortFormat($$@) {
 	return @ports;
     }
 
-    # Shark hack
-    @ports = map {if (/(sh\d+)-\d(:\d)/) { "$1$2" } else { $_ }} @ports;
-    # End shark hack
-
     if ($input == $PORT_FORMAT_IFINDEX) {
 	if ($output == $PORT_FORMAT_MODPORT) {
 	    $self->debug("Converting ifindex to modport\n",2);
@@ -1456,7 +1452,7 @@ sub setVlansOnTrunk($$$$) {
     my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$port);
 
     #
-    # Get the exisisting bitfield for allowed VLANs on the trunk
+    # Get the existing bitfield for allowed VLANs on the trunk
     #
     my $bitfield = snmpitGetFatal($self->{SESS},
 	    ["vlanTrunkPortVlansEnabled",$ifIndex]);

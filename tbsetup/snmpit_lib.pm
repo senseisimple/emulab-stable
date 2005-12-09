@@ -108,7 +108,6 @@ sub ReadTranslationTable {
 	$name = "$_[0]:$_[1]";
 	if ($_[2] != 1) {$name .=$_[2]; }
 	$mac = "$_[3]";
-	if ($name =~ /(sh\d+)(-\d)(:\d)?/ ) { $name = "$1$3"; }
 	$Interfaces{$name} = $mac;
 	$Interfaces{$mac} = $name;
 	print "Interfaces: $mac <==> $name\n" if $debug > 1;
