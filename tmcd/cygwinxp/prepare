@@ -31,7 +31,8 @@ my @DEADFILES	= ("rc.agents", "rc.delayagent", "rc.delta", "rc.healthd",
 		   "rc.setup", "rc.slothd", "rc.testbed",
 		   "batchcmddone", "bootsetup", "install-tarfile",
 		   "jailsetup", "update_delays", "rc/rc.linux",
-		   "sethostname" # replaced by sethostname.dhclient on linux
+		   "sethostname", # replaced by sethostname.dhclient on linux
+		   "startssh", "stopssh", "rc/rc.cygwinxp-user"
 		   );
 
 # Drag in path stuff so we can find emulab stuff.
@@ -42,6 +43,57 @@ if ($EUID != 0) {
     die("*** $0:\n".
 	"    Must be root to run this script!\n");
 }
+
+#
+# Need the current root password to re-define the Emulab services to match.
+#
+use Term::ReadKey;
+my $rootpwd = "";
+while ($rootpwd eq "") {
+    print "Enter the root password: ";
+    ReadMode 'noecho';
+    $rootpwd = ReadLine 0;
+    chomp $rootpwd;
+    ReadMode 'normal';
+    print "\n";
+}
+my $rootpwd2 = "";
+while ($rootpwd2 eq "" || $rootpwd ne $rootpwd2) {
+    print "Didn't match, try again.\n"
+	if $rootpwd2 ne "" && $rootpwd ne $rootpwd2;
+    print "Re-enter the root password: ";
+    ReadMode 'noecho';
+    $rootpwd2 = ReadLine 0;
+    chomp $rootpwd2;
+    ReadMode 'normal';
+    print "\n";
+}
+
+#
+# Windows stores the password as part of the definition of services that run
+# as a real user, such as root, rather than as SYSTEM.  Redefine them with the
+# current password.  Otherwise, Windows will refuse to start them up at reboot.
+#
+print "\nRedefining EmulabShutdown.\n";
+# Have to remove a service before you can redefine it.
+system("cygrunsrv -R EmulabShutdown");
+system("cygrunsrv -I EmulabShutdown -u root -w \"$rootpwd\"" .
+       " -p /cygdrive/c/cygwin/bin/bash" .
+       " --shutdown --type manual" .
+       " -a \"--norc --noprofile -c '/usr/local/etc/emulab/tbshutdown'\"");
+system("cygrunsrv -VQ EmulabShutdown");
+print "\nRedefining EmulabStartup.\n";
+my $firstboot = "/usr/local/etc/emulab/rc/rc.firstboot";
+my $bootsetup = "/usr/local/etc/emulab/rc/rc.bootsetup";
+my $progrun = "cygrunsrv -S ProgAgent";
+my $bootlog = "/var/log/bootsetup.log";
+system("cygrunsrv -R EmulabStartup");
+system("cygrunsrv -I EmulabStartup -u root -w \"$rootpwd\"" .
+       " --dep DHCP --dep elvinsvc.exe --dep W32Time" .
+       " -p /cygdrive/c/cygwin/bin/bash" .
+       " -a \"--norc --noprofile -c " .
+       "      '( $firstboot; $bootsetup; $progrun ) >& $bootlog'\"");
+system("cygrunsrv -VQ EmulabStartup");
 
 #
 # Turn off line buffering on output
@@ -137,9 +189,8 @@ if (-f $MAILFILE) {
 }
 
 #
-# Just removing the drift file results in no drift being tracked,
-# so set it to zero instead.  Not ideal, but at least the clock will
-# stabilize eventually this way.
+# Just removing the drift file gives an error, so set it to zero instead.
+# Watchdog never sends zero drift files to the DB so we lose nothing.
 #
 print "Resetting drift in $NTPDRIFT ...\n";
 if (-f $NTPDRIFT) {
@@ -166,6 +217,10 @@ system("rm -rf /tmp/* /tmp/.??*");
 print "Cleaning out /local/logs ...\n";
 system("chown -R root /local/logs");
 system("rm -rf /local/logs/* /local/logs/.??*");
+
+print "Cleaning out Windows logs ...\n";
+system("chown root C:/windows/{iis6,setupapi}.log");
+system("rm -f C:/windows/{iis6,setupapi}.log");
 
 print "Clearing out C:/TEMP ...\n";
 system("chown -R root C:/TEMP");
@@ -224,5 +279,5 @@ system("rm -rf C:/WINDOWS/ServicePackFiles/i386");
 system("du -sm C:/WINDOWS/SoftwareDistribution/Download");
 system("rm -rf C:/WINDOWS/SoftwareDistribution/Download/*");
 
-print "Re-enable all network interfaces.";
+print "Re-enable all network interfaces.\n";
 system("devcon enable =net 'PCI*'");
