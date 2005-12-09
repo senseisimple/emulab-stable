@@ -479,7 +479,7 @@ sub removeVlan($@) {
 	# Prevent the VLAN from being sent across trunks.
 	#
 	if (!$self->setVlanOnTrunks($vlan_number,0)) {
-	    warn "ERROR: Unable to set up VLANs on trunks!\n";
+	    warn "ERROR: Unable to remove VLAN $vlan_number from trunks!\n";
 	    #
 	    # We can keep going, 'cause we can still remove the VLAN
 	    #
