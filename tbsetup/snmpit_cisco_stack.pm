@@ -556,7 +556,7 @@ sub removeVlan($@) {
 	# Prevent the VLAN from being sent across trunks.
 	#
 	if (!$self->setVlanOnTrunks($vlan_number,0)) {
-	    warn "ERROR: Unable to set up VLANs on trunks!\n";
+	    warn "ERROR: Unable to remove VLAN $vlan_number from trunks!\n";
 	    #
 	    # We can keep going, 'cause we can still remove the VLAN
 	    #
@@ -861,12 +861,13 @@ sub setVlanOnTrunks($$$;@) {
             my $trunkIndex = $self->{DEVICES}{$src}->
                              getChannelIfIndex(@{ $trunks{$src}{$dst} });
             if (!defined($trunkIndex)) {
-                warn "ERROR - unable to find channel information for $src\n";
+                warn "ERROR - unable to find channel information on $src ".
+		     "for $src-$dst EtherChannel\n";
                 $errors += 1;
             } else {
 		if (!$self->{DEVICES}{$src}->
                         setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
-                    warn "ERROR - unable to set trunk on swich $src\n";
+                    warn "ERROR - unable to set trunk on switch $src\n";
                     $errors += 1;
                 }
 	    }
@@ -881,12 +882,13 @@ sub setVlanOnTrunks($$$;@) {
             my $trunkIndex = $self->{DEVICES}{$dst}->
                              getChannelIfIndex(@{ $trunks{$dst}{$src} });
             if (!defined($trunkIndex)) {
-                warn "ERROR - unable to find channel information for $dst\n";
+                warn "ERROR - unable to find channel information on $dst ".
+		     "for $src-$dst EtherChannel\n";
                 $errors += 1;
             } else {
 		if (!$self->{DEVICES}{$dst}->
                         setVlansOnTrunk($trunkIndex,$value,$vlan_number)) {
-                    warn "ERROR - unable to set trunk on swich $dst\n";
+                    warn "ERROR - unable to set trunk on switch $dst\n";
                     $errors += 1;
                 }
 	    }
