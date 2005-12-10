@@ -135,6 +135,8 @@ dumpfile(char *name, int fd)
 	isstdin = (fd == fileno(stdin));
 	wasted = sectinuse = sectfree = 0;
 	nextsector = 0;
+	relocs = 0;
+	relocbytes = 0;
 
 	fmax = amax = 0;
 	fmin = amin = ~0;
