@@ -615,8 +615,9 @@ sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
 sub TBDB_STATS_FLAGS_PREMODIFY(){ 0x02; }
 sub TBDB_STATS_FLAGS_START()    { 0x04; }
 sub TBDB_STATS_FLAGS_PRESWAPIN(){ 0x08; }
-# Do not export this variable!
+# Do not export these variables!
 my $TBDB_STATS_STARTCLOCK;
+my $TBDB_STATS_SAVEDSWAPUID;
 
 # Jail.
 sub TBDB_JAILIPBASE()		{ "@JAILIPBASE@"; }
@@ -3134,6 +3135,7 @@ sub TBExptDestroy($$)
 	unlink($eidlink)
 	    if (-l $eidlink);
     }
+    #libArchive::TBDeleteExperimentArchive($pid, $eid);
 
     #
     # Remove all trace from the DB.
@@ -4679,6 +4681,10 @@ sub GatherSwapStats($$$$$;$)
     }
     my ($curstate, $gid, $exptidx, $rsrcidx, $lastrsrc, $lastswapuid) =
 	$query_result->fetchrow_array;
+    # This overrides when doing a swapmod.
+    $lastswapuid = $TBDB_STATS_SAVEDSWAPUID
+	if (defined($TBDB_STATS_SAVEDSWAPUID));
+    # This happens at first swapin.
     $lastswapuid = $uid
 	if (!defined($lastswapuid) || $lastswapuid eq "");
 
@@ -4741,37 +4747,50 @@ sub GatherSwapStats($$$$$;$)
     if (($mode eq TBDB_STATS_SWAPMODIFY &&
 	 $flags & TBDB_STATS_FLAGS_PREMODIFY) ||
 	($mode eq TBDB_STATS_SWAPIN &&
-	 $flags & TBDB_STATS_FLAGS_PRESWAPIN && defined($lastrsrc))) {
-	$query_result =
-	    DBQueryWarn("insert into experiment_resources ".
-			" (idx, tstamp, exptidx, lastidx) ".
-			"values (0, now(), $exptidx, $rsrcidx)");
-	if (! $query_result ||
-	    ! $query_result->insertid) {
-	    print STDERR
-		"*** WARNING $0:\n".
-		"    Failed to insert a new resource record for $pid/$eid\n";
-	}
-	$lastrsrc = $rsrcidx;
-	$rsrcidx  = $query_result->insertid;
-	DBQueryWarn("update experiment_stats set ".
-		    "  rsrcidx=$rsrcidx,lastrsrc=$lastrsrc ".
-		    "where pid='$pid' and eid='$eid' and ".
-		    "      exptidx=$exptidx");
-
-	#
-	# In SWAPIN, copy over the thumbnail. This is temporary; I think
-	# the thumbnail is going to end up going someplace else. 
-	#
-	if ($mode eq TBDB_STATS_SWAPIN) {
+	 $flags & TBDB_STATS_FLAGS_PRESWAPIN)) {
+	# This check to catch preloaded experiments, which have an
+	# unused resources record.
+	if (defined($lastrsrc)) {
 	    $query_result =
-		DBQueryWarn("select thumbnail from experiment_resources ".
-			    "where idx=$lastrsrc");
-	    if ($query_result &&
-		$query_result->numrows) {
-		my ($thumbdata) = $query_result->fetchrow_array();
-		TBExptSetThumbNail($pid, $eid, $thumbdata);
+		DBQueryWarn("insert into experiment_resources ".
+			    " (idx, tstamp, exptidx, lastidx) ".
+			    "values (0, now(), $exptidx, $rsrcidx)");
+	    if (! $query_result ||
+		! $query_result->insertid) {
+		print STDERR
+		    "*** WARNING $0:\n".
+		    "    Failed to insert a new resource record for ".
+			"$pid/$eid\n";
 	    }
+	    $lastrsrc = $rsrcidx;
+	    $rsrcidx  = $query_result->insertid;
+	    DBQueryWarn("update experiment_stats set ".
+			"  rsrcidx=$rsrcidx,lastrsrc=$lastrsrc ".
+			"where pid='$pid' and eid='$eid' and ".
+			"      exptidx=$exptidx");
+
+	    #
+	    # In SWAPIN, copy over the thumbnail. This is temporary; I think
+	    # the thumbnail is going to end up going someplace else. 
+	    #
+	    if ($mode eq TBDB_STATS_SWAPIN) {
+		$query_result =
+		    DBQueryWarn("select thumbnail from experiment_resources ".
+				"where idx=$lastrsrc");
+		if ($query_result &&
+		    $query_result->numrows) {
+		    my ($thumbdata) = $query_result->fetchrow_array();
+		    TBExptSetThumbNail($pid, $eid, $thumbdata);
+		}
+	    }
+	}
+	#
+	# When doing a (pre)swapmod, save off the previous swap uid
+	# so we can do accounting later. Might be the same as the current
+	# uid of course.
+	#
+	if ($mode eq TBDB_STATS_SWAPMODIFY) {
+	    $TBDB_STATS_SAVEDSWAPUID = $lastswapuid;
 	}
 	return;
     }
