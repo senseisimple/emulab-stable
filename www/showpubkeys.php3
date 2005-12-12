@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -126,8 +126,11 @@ function SPITFORM($formfields, $errors)
 
     echo "<br><hr size=4>\n";
     echo "<center>
-          Enter ssh (protocol 1 or 2) public keys for user
-                    ${target_uid}[<b>1,2</b>].
+          Enter ssh public keys for user
+                    ${target_uid} [<b>1,2</b>]
+          <br>
+          (<em>We <b>strongly</b>
+             encourage the use of Protocol 2 keys only!</em> [<b>6</b>])
           </center><br>\n";
 
     if ($errors) {
@@ -222,6 +225,8 @@ function SPITFORM($formfields, $errors)
                  identity.pub, contained in your .ssh directory.
             <li> As a security precaution, you must supply your password
                  when adding new ssh public keys. 
+            <li> Protocol 2 keys are more secure then Protocol 1 keys, and
+                 Emulab will soon <b>require</b> Protocol 2 keys.
           </ol>
           </blockquote></blockquote></blockquote>\n";
 
