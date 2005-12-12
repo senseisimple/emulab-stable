@@ -152,6 +152,7 @@ AC_SUBST(CVSSUPPORT)
 AC_SUBST(CHATSUPPORT)
 AC_SUBST(MIN_UNIX_UID)
 AC_SUBST(MIN_UNIX_GID)
+AC_SUBST(DELAYTHRESH)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -213,6 +214,7 @@ FRISEBEEMCASTADDR="234.5.6"
 FRISEBEEMCASTPORT=3564
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
+DELAYTHRESH=2
 
 #
 # Okay, I know this is improper usage of --with. Too bad.

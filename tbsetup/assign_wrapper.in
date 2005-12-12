@@ -119,7 +119,7 @@ use libtblog;
 #
 # Maximum delay in ms above which a delay node is needed.
 # (Note that the DB represents delays as floating point numbers)
-my $delaythresh = 2;
+my $delaythresh = @DELAYTHRESH@;
 
 # Maximum number of times we run assign.
 my $maxrun = 3;

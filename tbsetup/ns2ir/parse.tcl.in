@@ -523,14 +523,19 @@ proc parse_delay {dspec} {
 	set unit s
     }
     switch $unit {
-	s {return [expr int($delay*1000)]}
-	ms {return [expr int($delay)]}
-	ns {return [expr int($delay/1000)]}
+	s {set val [expr $delay*1000]}
+	ms {set val $delay}
+	ns {set val [expr $delay/1000]}
 	default {
 	    perror "Unknown delay unit $unit."
 	    return 0
 	}
     }
+    if {$val != 0 && $val < @DELAYTHRESH@} {
+	perror "The delay of ${val}ms is invalid, it must be either 0 or at least @DELAYTHRESH@ms."
+	return 0
+    }
+    return [expr int($val)]
 }
 
 # We now have all our infrastructure in place.  We are ready to load
