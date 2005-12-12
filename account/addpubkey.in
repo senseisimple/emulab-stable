@@ -68,8 +68,7 @@ use libtestbed;
 #
 sub ParseKey($);
 sub InitUser();
-sub GenerateKeyFiles();
-sub GenerateKeyFile($@);
+sub GenerateKeyFile();
 sub fatal($);
 
 #
@@ -172,7 +171,7 @@ if ($initmode) {
 if ($genmode) {
     # Drop root privs, switch to target user.
     $EUID = $USERUID;
-    exit GenerateKeyFiles();
+    exit GenerateKeyFile();
 }
 
 # Else, key parse mode ...
@@ -332,7 +331,7 @@ sub ParseKey($) {
     
     # Generate new auth keys file. 
     if ($genmode) {
-	GenerateKeyFiles();
+	GenerateKeyFile();
     }
 
     if (! $noemail) {
@@ -362,11 +361,21 @@ sub InitUser()
 	mkdir("$sshdir", 0700) or
 	    fatal("Could not mkdir $sshdir: $!");
     }
-    if (! -f "$sshdir/identity" || $force) {
-	print "Setting up ssh configuration for $user.\n";
+    if (! -e "$sshdir/identity" || $force) {
+	print "Creating ssh protocol 1 key for $user.\n";
 
-	unlink("$sshdir/identity")
-	    if (-f "$sshdir/identity");
+	#
+	# Want to delete existing key from DB.
+	#
+	if (-e "$sshdir/identity") {
+	    my $ident = `cat $sshdir/identity.pub`;
+
+	    if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([-\w\@\.]*)/) {
+		DBQueryFatal("delete from user_pubkeys ".
+			     "where uid='$user' and pubkey='$1 $2'");
+	    }
+	    unlink("$sshdir/identity");
+	}
 
 	# Hmm, need to use -C option so comment field makes sense.
     
@@ -381,7 +390,49 @@ sub InitUser()
 	# 
 	my $ident = `cat $sshdir/identity.pub`;
 
-	if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([\w\@\.]*)/) {
+	if ($ident =~ /(\d*\s\d*\s[0-9a-zA-Z]*)\s([-\w\@\.]*)/) {
+	    DBQueryFatal("replace into user_pubkeys ".
+			 "values ('$user', 0, '$1 $2', now(), '$2')");
+	}
+	else {
+	    fatal("Bad protocol 1 public key: $ident\n");
+	}
+    }
+    #
+    # Moving to V2 keys ...
+    #
+    if (! -e "$sshdir/id_rsa" || $force) {
+	print "Creating ssh protocol 2 key for $user.\n";
+
+	#
+	# Want to delete existing key from DB.
+	#
+	if (-e "$sshdir/id_rsa") {
+	    my $ident = `cat $sshdir/id_rsa.pub`;
+
+	    if ($ident =~
+		/^(ssh-rsa [-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
+		DBQueryFatal("delete from user_pubkeys ".
+			     "where uid='$user' and pubkey='$1 $2'");
+	    }
+	    unlink("$sshdir/id_rsa");
+	}
+
+	# Hmm, need to use -C option so comment field makes sense.
+    
+	if (system("$KEYGEN -t rsa -P '' ".
+		   "-C '${user}" . "\@" . ${OURDOMAIN} . "' ".
+		   "-f $sshdir/id_rsa")) {
+	    fatal("Failure in ssh-keygen!");
+	}
+
+	#
+	# Grab a copy for the DB.
+	# 
+	my $ident = `cat $sshdir/id_rsa.pub`;
+
+	if ($ident =~
+	    /^(ssh-rsa [-\w\.\@\+\/\=]*) ([-\w\@\.\ ]*)$/) {
 	    DBQueryFatal("replace into user_pubkeys ".
 			 "values ('$user', 0, '$1 $2', now(), '$2')");
 
@@ -392,49 +443,19 @@ sub InitUser()
 			 "where uid='$user'");
 	}
 	else {
-	    fatal("Bad emulab public key: $ident\n");
+	    fatal("Bad protocol 2 public key: $ident\n");
 	}
     }
-    return GenerateKeyFiles();
-}
-
-#
-# Generate the ssh key files for the user. The keys come from the DB, and
-# are split into protocol 1 and protocol 2 keys. Then use the aux function
-# to generate each file. 
-#
-sub GenerateKeyFiles()
-{
-    my @p1keys = ();
-    my @p2keys = ();
-    
-    my $query_result =
-	DBQueryFatal("select * from user_pubkeys where uid='$user'");
-
-
-    while (my %row = $query_result->fetchhash()) {
-	my $key = $row{'pubkey'};
-
-	if ($key =~ /^\d+\s+.*$/) {
-	    push(@p1keys, $key);
-	}
-	else {
-	    push(@p2keys, $key);
-	}
-    }
-    GenerateKeyFile(1, @p1keys);
-    GenerateKeyFile(2, @p2keys);
-    return 0;
+    return GenerateKeyFile();
 }
 
 #
 # Generate ssh authorized_keys files. Either protocol 1 or 2.
 # Returns 0 on success, -1 on failure.
 #
-#
-sub GenerateKeyFile($@)
+sub GenerateKeyFile()
 {
-    my ($protocol, @pkeys) = @_;
+    my @pkeys   = ();
     my $sshdir  = "$HOMEDIR/$user/.ssh";
     my $keyfile = "$sshdir/authorized_keys";
 	
@@ -444,9 +465,13 @@ sub GenerateKeyFile($@)
 	    return -1;
 	}
     }
-    if ($protocol == 2) {
-	$keyfile .= "2";
+    my $query_result =
+	DBQueryFatal("select pubkey from user_pubkeys where uid='$user'");
+
+    while (my ($key) = $query_result->fetchrow_array()) {
+	push(@pkeys, $key);
     }
+    
     print "Generating $keyfile ...\n";
 
     if (!open(AUTHKEYS, "> ${keyfile}.new")) {
@@ -481,6 +506,12 @@ sub GenerateKeyFile($@)
     }
     if (system("mv -f ${keyfile}.new ${keyfile}")) {
 	warn("*** Could not mv ${keyfile} to ${keyfile}.new: $!\n");
+    }
+    elsif (-e "$sshdir/authorized_keys2") {
+	#
+	# Save to remove deprecated authorized_keys2 file at this point.
+	#
+	unlink("$sshdir/authorized_keys2");
     }
     return 0;
 }
