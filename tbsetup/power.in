@@ -381,40 +381,60 @@ sub dostatus(@) {
 	if ($doall);
 
     #
+    # For anything that was specified that is not a power controller,
+    # look it up as a node and discover its controller.
+    # XXX this is not very efficient.
+    #
+    my @nwanted = ();
+    for my $node (@wanted) {    
+	my $ctrl;
+
+	if (!defined($ctrls{$node})) {
+	    $result = DBQueryFatal("select power_id,outlet from outlets ". 
+				   "where node_id='$node'");
+	    if (!$result || $result->numrows == 0) {
+		warn "No such power controller '$node', ignored\n";
+		$errors++;
+		next;
+	    } else {
+		($ctrl, $outlet) = $result->fetchrow();
+		print "$node is $ctrl outlet $outlet...\n";
+	    }
+	} else {
+	    $ctrl = $node;
+	}
+	push(@nwanted, $ctrl);
+    }
+
+    #
     # Loop through desired controllers getting status
     #
-    for my $ctrl (@wanted) {
+    for my $ctrl (@nwanted) {
 	my %status;
 
-	if (!defined($ctrls{$ctrl})) {
-	    warn "No such power controller '$ctrl', ignored\n";
-	    $errors++;
-	    next;
-	}
 	if ($ctrls{$ctrl} =~ /^RPC/) {
 	    if (rpc27status($ctrl,\%status)) {
 		print "Could not get status for $ctrl.\n";
 		$errors++;
 		next;
 	    }
-	    print "$ctrl: ";
-	    print $status{current}, " Amps, "
+	    print "$ctrl Current: ", $status{current}, " Amps\n"
 		if defined($status{current});
-	    print $status{power}, " Watts, "
+	    print "$ctrl Power: ", $status{power}, " Watts\n"
 		if defined($status{power});
 	    if (defined($status{tempF}) || defined($status{tempC})) {
 		my $temp = $status{tempF};
 		if (!defined($temp)) {
 		    $temp = $status{tempC} * 9 / 5 + 32;
 		}
-		printf "%.1f F", $temp;
+		printf "$ctrl Temperature: %.1f F\n", $temp;
 	    }
-	    print "\n";
 	    for my $outlet (1..20) {
 		my $ostr = "outlet$outlet";
-		print "  Outlet $outlet: ", $status{$ostr}, "\n"
+		print "$ctrl Outlet $outlet: ", $status{$ostr}, "\n"
 		    if (defined($status{$ostr}));
 	    }
+	    print "\n";
 	} elsif (!$doall) {
 	    warn "Cannot get status for $ctrl (type " .
 		$ctrls{$ctrl} . ") yet\n";
