@@ -38,6 +38,7 @@ my $THISHOMEBASE   = "@THISHOMEBASE@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
 my $piper          = "$TBROOT/sbin/locpiper";
+my $NFSTRACESUPPORT= @NFSTRACESUPPORT@;
 
 # Untaint the path
 $ENV{'PATH'} = "/usr/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" . 
@@ -402,20 +403,22 @@ sub doSwapout($) {
 	undef $os_setup_pid;
     }
 
-    print "Getting files accessed via NFS.\n";
-    TBDebugTimeStamp("nfstrace started");
-    if (lc $THISHOMEBASE eq "emulab.net") {
-	if (defined($umail)) {
-	    SENDMAIL("$TBLOGS",
-		     "Files accessed by $pid/$eid via NFS",
-		     `nfstrace get $pid $eid`,
-		     "$uname <$umail>");
+    if ($NFSTRACESUPPORT) {
+	print "Getting files accessed via NFS.\n";
+	TBDebugTimeStamp("nfstrace started");
+	if (lc $THISHOMEBASE eq "emulab.net") {
+	    if (defined($umail)) {
+		SENDMAIL("$TBLOGS",
+			 "Files accessed by $pid/$eid via NFS",
+			 `nfstrace get $pid $eid`,
+			 "$uname <$umail>");
+	    }
 	}
+	else {
+	    system("nfstrace get $pid $eid");
+	}
+	TBDebugTimeStamp("nfstrace finished");
     }
-    else {
-	system("nfstrace get $pid $eid");
-    }
-    TBDebugTimeStamp("nfstrace finished");
 
     if (! $TESTMODE) { 
 	if (! ($DISABLE_EVENTS || $elabinelab)) {
@@ -936,13 +939,15 @@ sub doSwapin($) {
     }
     TBDebugTimeStamp("named finished");
 
-    print "Cleaning NFS traces.\n";
-    TBDebugTimeStamp("nfstrace gc started");
-    if (system("nfstrace gc $pid $eid")) {
-	tberror "Failed to setup nfstrace.";
-	return 1;
+    if ($NFSTRACESUPPORT) {
+	print "Cleaning NFS traces.\n";
+	TBDebugTimeStamp("nfstrace gc started");
+	if (system("nfstrace gc $pid $eid")) {
+	    tberror "Failed to setup nfstrace.";
+	    return 1;
+	}
+	TBDebugTimeStamp("nfstrace gc finished");
     }
-    TBDebugTimeStamp("nfstrace gc finished");
 
     # Check cancel flag before continuing. No retry, 
     TBGetCancelFlag($pid, $eid, \$canceled);

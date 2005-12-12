@@ -16,6 +16,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $TESTMODE    = @TESTMODE@;
 my $FSNODE      = "@FSNODE@";
+my $NFSTRACESUPPORT= @NFSTRACESUPPORT@;
 
 my $FSDIR_GROUPS = "@FSDIR_GROUPS@";
 my $FSDIR_PROJ = "@FSDIR_PROJ@";
@@ -85,6 +86,14 @@ elsif ($cmd ne "stats") {
 if ($EUID != 0) {
     die("*** $0:\n".
 	"    Must be root! Maybe its a development version?\n");
+}
+
+#
+# If no bugdb support, just exit. 
+#
+if (! $NFSTRACESUPPORT) {
+    print "NFS trace support is not enabled. Exit ...\n";
+    exit(0);
 }
 
 # un-taint path
