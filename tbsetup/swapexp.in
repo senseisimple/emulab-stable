@@ -213,6 +213,7 @@ my $workdir = TBExptWorkDir($pid, $eid);
 my $userdir = TBExptUserDir($pid, $eid);
 my $tempnsfile;
 my $modnsfile;
+my $nsfile;
 
 if ($inout eq "modify" && @ARGV > 2) {
     $tempnsfile = $ARGV[2];
@@ -259,7 +260,8 @@ if ($inout eq "modify" && @ARGV > 2) {
 	die("*** $0:\n".
 	    "    $tempnsfile does not look like an NS file!\n");
     }
-    $modnsfile = "$eid-modify.ns";
+    $nsfile    = "$eid.ns";
+    $modnsfile = "${eid}-modify.ns";
 }
 
 #
@@ -342,6 +344,7 @@ if (! $query_result->numrows) {
 }
 my %hashrow = $query_result->fetchhash();
 my $expt_head_login = $hashrow{'expt_head_uid'};
+my $last_swap_uid   = $hashrow{'expt_swap_uid'};
 my $estate          = $hashrow{'state'};
 my $batchstate      = $hashrow{'batchstate'};
 my $expt_path       = $hashrow{'path'};
@@ -846,6 +849,10 @@ if ($inout eq "out") {
 elsif ($inout eq "in") {
     GatherSwapStats($pid, $eid, $dbuid,
 		    TBDB_STATS_SWAPIN, 0, TBDB_STATS_FLAGS_PRESWAPIN);
+
+    # Set the swapper now so that nodes use the proper uid. If the swapin
+    # fails, we leave the swapper as is, since its harmless and informative.
+    TBExptSetSwapUID($pid, $eid, $dbuid);
     
     print STDOUT "Running 'tbswap in $pid $eid'\n";
     if (system("$tbdir/tbswap in $pid $eid") != 0) {
@@ -922,6 +929,11 @@ elsif ($inout eq "modify") {
     else {
 	SetExpState($pid, $eid, EXPTSTATE_MODIFY_RESWAP);
 
+	# Set the swapper now so that nodes use the proper uid. If the
+	# swapin fails, we need to reset the swapper back so that he
+	# is charged appropriately.
+	TBExptSetSwapUID($pid, $eid, $dbuid);
+
 	my $optarg = "";
 	#
 	# For elabinelab experiments; ignore reboot/eventsys_restart,
@@ -938,7 +950,8 @@ elsif ($inout eq "modify") {
 	print STDOUT "Running 'tbswap update $optarg $pid $eid'\n";
 	if (system("$tbdir/tbswap update $optarg $pid $eid") == 0) {
 	    #
-	    # Success. Set the state back to active cause thats where it started.
+	    # Success. Set the state back to active cause thats where it
+	    # started.
 	    # 
 	    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 	    $estate = EXPTSTATE_ACTIVE;
@@ -968,6 +981,9 @@ elsif ($inout eq "modify") {
 	    }
 	    else {
 		$modifyError = "Update aborted; old state restored.";
+
+		# Reset the swapper since the experiment is still running.
+		TBExptSetSwapUID($pid, $eid, $last_swap_uid);
 	    }
 	}
     }
@@ -980,7 +996,7 @@ elsif ($inout eq "modify") {
     #
     if (defined($modnsfile)) {
 	system("prerender -t $pid $eid")	
-	    if (!defined($modifyError) || $rendering)
+	    if (!defined($modifyError) || $rendering);
     }
 
     #
@@ -988,6 +1004,16 @@ elsif ($inout eq "modify") {
     #
     fatal($modifyError)
 	if (defined($modifyError));
+
+    #
+    # Move the temporary ns file to its real name.
+    #
+    if (defined($modnsfile)) {
+	unlink($nsfile);
+	if (system("/bin/mv", "$modnsfile", "$nsfile")) {
+	    fatal("Could not mv $modnsfile to $nsfile");
+	}
+    }
 
     TBExptClearBackupState($pid, $eid);
     system("$tbdir/tbreport -b $pid $eid 2>&1 > $repfile");
@@ -1029,9 +1055,13 @@ elsif ($inout eq "modify") {
 TBSetExpSwapTime($pid, $eid);
 
 #
-# Set the swapper uid on success only, and *after* gathering swap stats!
+# Set the swapper on swapout, only after stats have been gathered, and
+# *only* on success (since on failure nodes might still be held).
+# See above for swapin/swapmod.
 #
-TBExptSetSwapUID($pid, $eid, $dbuid);
+if ($inout eq "out") {
+    TBExptSetSwapUID($pid, $eid, $dbuid);
+}
 
 #
 # In batch mode, just exit without sending email or unlocking. The
@@ -1103,7 +1133,7 @@ SENDMAIL("$user_name <$user_email>",
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
 	 "Bcc: $TBLOGS",
 	 (($inout eq "restart") ? ($logname) :
-	  (($repfile, $logname), (defined($modnsfile) ? ($modnsfile) : ()))));
+	  (($repfile, $logname), (defined($nsfile) ? ($nsfile) : ()))));
 
 exit(0);
 
@@ -1132,10 +1162,10 @@ sub cleanup()
 	}
     }
 
-    #
-    # Clear backup state since not needed anymore; experiment is toast. 
-    # 
     if ($inout eq "modify") {
+	#
+	# Clear backup state since not needed anymore; experiment is toast.
+	#
 	TBExptClearBackupState($pid, $eid);
     }
 
