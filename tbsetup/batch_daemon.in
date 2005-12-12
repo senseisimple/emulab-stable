@@ -182,6 +182,7 @@ while (1) {
 		    "WHERE e2.eid is null and ".
 		    " e1.batchmode=1 and e1.canceled=0 and ".
 		    " e1.expt_locked is null and ".
+		    " e1.batchstate!='$BSTATE_LOCKED' and ".
 		    " e1.state='$BSTATE_POSTED' and ".
 		    "  (e1.attempts=0 or ".
 		    "    ((UNIX_TIMESTAMP() - ".
@@ -190,7 +191,8 @@ while (1) {
 
     $running_result =
 	DBQuery("select * from experiments ".
-		"where batchmode=1 and state='$BSTATE_RUNNING' ".
+		"where batchmode=1 and state='$BSTATE_RUNNING' and ".
+		"      batchstate!='$BSTATE_LOCKED' ".
 		"ORDER BY expt_start");
 
     if (!$pending_result || !$running_result) {
