@@ -299,12 +299,17 @@ sub notify()
     my $logname = undef;
     my $isopen;
     my $filespec = "";
+    my $errbody = "";
 
     TBExptGetLogFile($pid, $eid, \$logname, \$isopen);
     if (defined($logname)) {
 	$filespec = "\n\nfile://$logname\n";
     }
     
+    if (-e $errlog) {
+	$errbody = `/bin/cat $errlog`;
+    }
+
     SENDMAIL($TBOPS,
 	     "Linktest Failure: $pid/$eid",
 	     "Failure in linktest (level $lev); ".
@@ -313,7 +318,7 @@ sub notify()
 	     "    $TBBASE/spewlogfile.php3?pid=${pid}&eid=${eid}\n".
 	     "$filespec\n".
 	     "\n".
-	     `/bin/cat $errlog`,
+	     $errbody,
 	     "$user_name <$user_email>");
 }
 

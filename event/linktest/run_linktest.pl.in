@@ -252,6 +252,8 @@ sub handler($)
     else {
 	print "*** Linktest has been aborted\n";
     }
+    &run_loghole;
+
     exit(1);
 }
 
@@ -284,6 +286,8 @@ if (($child_pid = fork())) {
     $exitval = $?;
     alarm 0;
     if ($exitval) {
+	&run_loghole;
+	
 	exit($exitval >> 8);
     }
     exit(&analyze());
@@ -363,14 +367,7 @@ sub analyze {
     return 0
 	if (! @dir_contents);
 
-    my $ltlogs = "/proj/$pid/exp/$eid/tbdata/ltlogs";
-
-    print "Downloading logs...\n";
-
-    system("rm -rf $ltlogs");
-    system("mkdir -p $ltlogs");
-    system("$LOGHOLE -e $pid/$eid sync -n -l $ltlogs -r /var/emulab/logs ".
-	   "> $ltlogs/loghole.out 2>&1");
+    &run_loghole;
 
     print "***************************************************************\n";
     print "***************** Linktest Error Reports **********************\n";
@@ -431,6 +428,17 @@ sub kill_linktest_run {
 	die("*** $0:\n".
 	    "    Error running '$args'\n");
     }
+}
+
+sub run_loghole {
+    my $ltlogs = "/proj/$pid/exp/$eid/tbdata/ltlogs";
+
+    print "Downloading logs...\n";
+
+    system("rm -rf $ltlogs");
+    system("mkdir -p $ltlogs");
+    system("$LOGHOLE -e $pid/$eid sync -n -l $ltlogs -r /var/emulab/logs ".
+	   "> $ltlogs/loghole.out 2>&1");
 }
 
 sub TBTimeStamp {
