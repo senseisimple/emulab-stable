@@ -1,0 +1,59 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $TBAUDIT     = "@TBAUDITEMAIL@";
+my $OURDOMAIN   = "@OURDOMAIN@";
+my $ADDPUBKEY	= "$TB/sbin/addpubkey";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Grab all active/frozen users.
+#
+my $query_result =
+    DBQueryFatal("select uid from users ".
+		 "where webonly=0 and wikionly=0 and ".
+		 "      (status='active' or status='frozen')");
+
+while (my ($uid) = $query_result->fetchrow_array()) {
+    my $sshdir = USERROOT() . "/$uid";
+
+    if (! -e $sshdir) {
+	print "No home directory ($sshdir) for $uid!\n";
+	next;
+    }
+
+    system("$ADDPUBKEY -i $uid");
+    if ($?) {
+	die("*** $0:\n".
+	    "    Failed to initialize keys for $uid!\n");
+    }
+}
