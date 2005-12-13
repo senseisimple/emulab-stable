@@ -239,7 +239,7 @@ if [ x"$ADDRESS" != x ]; then
 		if [ $reboot -eq 1 ]; then
 		    $BINDIR/tmcc state RELOADDONEV2
 		    echo "Waiting for server to reboot us ..."
-		    sleep 120
+		    sleep 240
 		    echo "No response from server, rebooting myself ..."
 		    /sbin/reboot
 		    sleep 100
