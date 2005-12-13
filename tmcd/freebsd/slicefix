@@ -81,8 +81,28 @@ dofreebsd() {
 		return 1
 	}
 
-	# If our disk appears anywhere in fstab, assume we are good to go
-	if `grep "^/dev/${disk}s" /mnt/etc/fstab >/dev/null 2>&1`; then
+	#
+	# See if we need to modify anything in the image
+	#
+	changedisk=0
+	changeentropy=0
+
+	# If our disk does not appear anywhere in fstab, we need to fix it
+	grep "^/dev/${disk}s" /mnt/etc/fstab >/dev/null 2>&1
+	case $? in
+	0)
+	    ;;
+	*)
+	    changedisk=1
+	    ;;
+	esac
+
+	# If there is a /entropy file, we need to update it
+	if [ -f /mnt/entropy -a -c /dev/random ]; then
+		changeentropy=1
+	fi
+
+	if [ $changedisk -eq 0 -a $changeentropy -eq 0 ]; then
 		umount $rootdev
 		return 0
 	fi
@@ -93,16 +113,27 @@ dofreebsd() {
 		echo "Mount of $rootdev failed"
 		return 1
 	}
-	sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
+
+	if [ $changedisk -eq 1 ]; then
+	    echo "  updating /etc/dumpdates"
+	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/fstab || {
 		echo "Failed to update /etc/fstab"
 		umount $rootdev
 		return 1
-	}
-	sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
+	    }
+	    echo "  updated /etc/fstab"
+	    sed -E -i .orig -e "s;^/dev/[a-zA-Z]+[0-9]+s[0-9]+;/dev/${disk}s${part};" /mnt/etc/dumpdates || {
 		echo "Failed to update /etc/dumpdates"
 		umount $rootdev
 		return 1
-	}
+	    }
+	fi
+
+	if [ $changeentropy -eq 1 ]; then
+	    echo "  updating /entropy"
+	    dd if=/dev/random of=/mnt/entropy bs=4096 count=1 >/dev/null 2>&1
+	fi
+
 	umount $rootdev
 
 	# XXX need to fixup FS, see big comment above
@@ -172,6 +203,7 @@ dolinux() {
 
 	# attempt to mount filesystem   
 	rootdev=/dev/${disk}s${part}
+	echo "fixing Linux root partition ${disk}s${part}"
 	mount -t ext2fs $rootdev /mnt || {
 		echo "EXT2FS mount of $rootdev failed"
 		return 1
@@ -191,6 +223,7 @@ dolinux() {
 	linux=
 	lconf=/mnt/etc/lilo.conf
 	if [ -r $lconf ]; then
+	    echo "  updating /etc/lilo.conf"
 	    sed -i .orig -e "s;\([br]oot=/dev\)/[hs]d.\([0-7]\);\1/${ldisk}\2;" $lconf || {
 		    echo "Failed to update /etc/lilo.conf"
 		    umount $rootdev
@@ -209,6 +242,7 @@ dolinux() {
 	umount $rootdev
 
 	if [ "x${linux}" != x ]; then
+	    echo -n "  "
 	    # setup one time lilo command line, must be done after unmount
 	    $BINDIR/groklilo -c "$linux root=$lrootdev" $part /dev/$disk || {
 		echo "Failed to set LILO command line"
@@ -233,8 +267,14 @@ fixone() {
 	dolinux
 	return $?
 	;;
+    130)
+	echo "ignoring Linux swap partition"
+	;;
+    7)
+	echo "ignoring NTFS partition"
+	;;
     0)
-	echo "unused"
+	echo "ignoring unused partition"
 	;;
     *)
 	echo "ignoring partition type $ptype"

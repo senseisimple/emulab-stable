@@ -28,6 +28,7 @@ my $NTPDRIFT    = "/etc/ntp.drift";
 my $SFSUSERS    = "/etc/sfs/sfs_users";
 my $SFSHOSTKEY  = "/etc/sfs/sfs_host_key";
 my $MOUNTINFO	= "/var/db/mounttab";
+my $ENTROPY	= "/var/db/entropy/*";
 
 #
 # Dead wood in $BINDIR
@@ -66,14 +67,6 @@ foreach my $dbfile (@DBFILES) {
 	unlink($dbfile) or
 	    die("Could not unlink $dbfile");
     }
-}
-
-#
-# Build the locate database. I hate that its never there!
-#
-if (-x "/usr/libexec/locate.updatedb") {
-    print "Building the locate database ... Be patient, will ya!\n";
-    system("/usr/libexec/locate.updatedb");
 }
 
 #
@@ -138,6 +131,12 @@ if (-f $MOUNTINFO) {
     unlink($MOUNTINFO) or
         die("Could not unlink $MOUNTINFO: $!");
 }    
+
+#
+# Remove accumulated entropy
+#
+print "Removing entropy DB ...\n";
+system("rm -rf $ENTROPY");
 
 print "Removing root's history and .saves files...\n";
 if (-f $HISTORY) {
@@ -218,6 +217,14 @@ foreach my $file (@DEADFILES) {
     }
 }
 system("rm -f /etc/start_if*");
+
+#
+# Finally, build the locate database. I hate that its never there!
+#
+if (-x "/usr/libexec/locate.updatedb") {
+    print "Building the locate database ... Be patient, will ya!\n";
+    system("/usr/libexec/locate.updatedb");
+}
 
 exit 0;
 
