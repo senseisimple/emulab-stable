@@ -888,7 +888,7 @@ sub DumpDBGoo()
     #
     $UID = 0;
     system("tar cf - -C $statedir . | ".
-	   "   gzip | $SSH -1 -F /dev/null -host $CONTROL ".
+	   "   gzip | $SSH -F /dev/null -host $CONTROL ".
 	   "   '(cat > /$PROJROOT/$pid/exp/$eid/dbstate.tar.gz)'");
     if ($?) {
 	die("*** $0:\n".
