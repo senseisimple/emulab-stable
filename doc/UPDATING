@@ -47,7 +47,9 @@ earliest time one of the steps needs to occur.
          directory on boss and ops.  Next, change the
          /etc/ssh/sshd_config (sshd config) file on both boss and ops
          to try ssh protocol 2 first: Edit the line that reads
-         "Protocol 1,2" to be "Procotol 2,1".
+         "Protocol 1,2" to be "Procotol 2,1".  Finally, be sure to
+         remove any "Protocol" directives from /root/.ssh/config on
+         boss and ops.
 
          For your default disk images:
 
