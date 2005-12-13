@@ -70,6 +70,16 @@ earliest time one of the steps needs to occur.
          has been modified to try authenticating with both ssh protocols
          to preserve backward compatibility with existing user images.
 
+
+20051212: After DB schema is updated, and updated software installed.
+
+          Fix an error in the statistics gathering code, that was
+          causing duplicate swapin records in some case. From the source
+          directory:
+
+		perl perl/fixstats-swapin.pl | mysql tbdb
+
+
 20050818: Anytime after the DB schema is updated
 
 	Load the initial contents of the new knowledge_base_entries table
