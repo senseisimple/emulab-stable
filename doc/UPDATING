@@ -32,6 +32,42 @@ earliest time one of the steps needs to occur.
          will need to retain protocol 1 keys for users because of old
          images.
 
+         For boss and ops:
+
+         You must setup a new passphraseless keypair for root on boss.
+         To do this, simply run the following command on boss:
+
+                sudo /usr/bin/ssh-keygen -t rsa -N ""
+
+         Next, append the contents of /root/.ssh/id_rsa.pub on boss to
+         the /root/.ssh/authorized_keys file on both your ops and boss
+         nodes.  Remove any ssh version 1 keys that appear in either
+         of these authorized_keys files.  Also, remove the
+         authorized_keys2 file (if it exists) from the /root/.ssh
+         directory on boss and ops.  Next, change the
+         /etc/ssh/sshd_config (sshd config) file on both boss and ops
+         to try ssh protocol 2 first: Edit the line that reads
+         "Protocol 1,2" to be "Procotol 2,1".
+
+         For your default disk images:
+
+         Add the contents of /root/.ssh/id_rsa.pub on your boss node
+         to the /root/.ssh/authorized_keys file in each of your
+         default disk images.  Remove any version 1 ssh keys that
+         remain in authorized_keys.  Also, remove any authorized_keys2
+         file that might exist in the /root/.ssh directory.  Next,
+         edit the /etc/ssh/sshd_config file, changing the "Procotol
+         1,2" line to "Protocol 2,1".  Re-create the modified images
+         (of course).
+
+         Note on user disk images:
+
+         User images may still require access via ssh version 1, so
+         don't delete the ssh version 1 key on your boss node
+         (/root/.ssh/identity[.pub]).  The ssh wrapper command (sshtb)
+         has been modified to try authenticating with both ssh protocols
+         to preserve backward compatibility with existing user images.
+
 20050818: Anytime after the DB schema is updated
 
 	Load the initial contents of the new knowledge_base_entries table
