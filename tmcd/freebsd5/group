@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/group,v 1.28 2003/04/27 05:49:53 imp Exp $
+# $FreeBSD: src/etc/group,v 1.31 2004/06/23 01:32:28 mlaier Exp $
 #
 wheel:*:0:root,toor
 daemon:*:1:
