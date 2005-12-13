@@ -56,6 +56,7 @@ GC_TABLES = [
     "renames",
     "rename_replies",
     "file_access",
+    "file_writes",
     "link_access",
     "file_dropped", ]
 
@@ -365,6 +366,52 @@ def resolve_fh(fh, depth=0):
 
     return retval
 
+def print_files(type, seen, links, used_links):
+    global cur
+    
+    retval = 0
+    
+    for (fh,size,alive) in cur:
+        if not alive:
+            continue
+
+        complete, fn, valid = resolve_fh(fh)
+        if valid and fn not in seen:
+            if size == None:
+                size = "U"
+                pass
+            else:
+                retval += size
+                size = human_readable(size)
+                pass
+            if fn in links:
+                used_links[links[fn]] = 1
+                pass
+            seen[fn] = [type, size, fn]
+            if not complete:
+                missing += 1
+                pass
+
+            # Check if the directory was accessed through a link.
+            dir = fn
+            while True:
+                if dir == "/":
+                    break
+                dir, file = os.path.split(dir)
+                if dir in links:
+                    used_links[links[dir]] = 1
+                    pass
+                pass
+            pass
+        elif valid and fn in seen:
+            if type not in seen[fn][0]:
+                seen[fn][0] += type
+                pass
+            pass
+        pass
+
+    return retval
+
 ##
 # Performs the "get" action, which prints out the files accessed by a set of
 # nodes.
@@ -435,7 +482,8 @@ def do_get(args):
 
     # Find all the accessed files and print them out.
     seen = {}
-    dirs = {}
+    total_size = 0
+    
     cur.execute("SELECT fa.fh,fc.size,"
                 "  IFNULL(MAX(fa.last_access)>MAX(fd.last_remove),1) "
                 "FROM file_access as fa "
@@ -446,38 +494,27 @@ def do_get(args):
                 "LEFT JOIN file_checkpoint as fc on (fa.fh=fc.fh) "
                 "GROUP BY fa.fh", (pid, eid))
 
-    total_size = 0
-    
-    for (fh,size,alive) in cur:
-        if not alive:
-            continue
+    total_size += print_files("r", seen, links, used_links)
 
-        complete, fn, valid = resolve_fh(fh)
-        if valid and fn not in seen:
-            if size == None:
-                size = "U"
-                pass
-            else:
-                total_size += size
-                size = human_readable(size)
-                pass
-            print "%10s %s" % (size, fn)
-            if fn in links:
-                used_links[links[fn]] = 1
-                pass
-            seen[fn] = 1
-            if not complete:
-                missing += 1
-                pass
+    cur.execute("SELECT fw.fh,fc.size,"
+                "  IFNULL(MAX(fw.last_access)>MAX(fd.last_remove),1) "
+                "FROM file_writes as fw "
+                "INNER JOIN node_ids as ni on (ni.node_ip=fw.node_ip and "
+                "  ni.pid=%s and ni.eid=%s) "
+                "LEFT JOIN file_dropped as fd on (fw.fh=fd.fh and "
+                "  ni.node_ip=fd.node_ip) "
+                "LEFT JOIN file_checkpoint as fc on (fw.fh=fc.fh) "
+                "GROUP BY fw.fh", (pid, eid))
 
-            # Check if the directory was accessed through a link.
-            dir, file = os.path.split(fn)
-            if dir in links:
-                used_links[links[dir]] = 1
-                pass
-            pass
+    total_size += print_files("w", seen, links, used_links)
+
+    keys = seen.keys()
+    keys.sort()
+    for key in keys:
+        value = seen[key]
+        print "%2s %10s %s" % (value[0], value[1], value[2])
         pass
-
+    
     # Finally, print out the used links.
     for (complete, fn) in used_links.keys():
         print "%10s %s" % ("link", fn)
@@ -549,7 +586,7 @@ def do_stats(args):
         pass
     
     print "Top readers:"
-    cur.execute("select r.node_ip,count(1) as wc from reads as r "
+    cur.execute("select r.node_ip,sum(r.total) as wc from reads as r "
                 "where timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
                 "group by r.node_ip order by wc desc limit %s",
                 (over_last, row_count))
@@ -569,7 +606,7 @@ def do_stats(args):
         pass
 
     print "Top read files:"
-    cur.execute("select r.fh,count(1) as rc from reads as r "
+    cur.execute("select r.fh,sum(r.total) as rc from reads as r "
                 "where r.timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
                 "group by r.fh order by rc desc limit %s",
                 (over_last, row_count))
