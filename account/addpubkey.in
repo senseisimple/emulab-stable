@@ -266,7 +266,7 @@ sub ParseKey($) {
 	return 0;
     }
     
-    if ($keyline =~ /^(\d*\s\d*\s[0-9a-zA-Z]*) ([-\w\@\.\ ]*)$/) {
+    if ($keyline =~ /^(\d*\s\d*\s[0-9a-zA-Z]*) ([-\w\@\.\ ]*)\s*$/) {
         # Protocol 1
 	$type    = "ssh-rsa1";
 	$key     = $1;
