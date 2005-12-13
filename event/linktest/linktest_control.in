@@ -365,7 +365,7 @@ if ($child_pid) {
 #
 # XXX: "-t -t" to ssh is so that kill -TERM carries across to ops. 
 #
-my @cmdargs = ("$SSH", "-t", "-t", "-1", "-F", "/dev/null",
+my @cmdargs = ("$SSH", "-t", "-t", "-F", "/dev/null",
 	       "-host", $CONTROL, "exec", "$TB/sbin/linktest.proxy");
 push(@cmdargs, ("-d", "$debug"))
     if ($debug);
