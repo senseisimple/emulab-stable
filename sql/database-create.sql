@@ -5,6 +5,43 @@
 -- Server version	3.23.58-log
 
 --
+-- Table structure for table `archive_tags`
+--
+
+CREATE TABLE archive_tags (
+  idx int(10) unsigned NOT NULL auto_increment,
+  tag varchar(64) NOT NULL default '',
+  archive_idx int(10) unsigned NOT NULL default '0',
+  date_created int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (idx),
+  UNIQUE KEY tag (tag,archive_idx)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `archive_views`
+--
+
+CREATE TABLE archive_views (
+  view varchar(64) NOT NULL default '',
+  archive_idx int(10) unsigned NOT NULL default '0',
+  current_tag varchar(64) NOT NULL default '',
+  previous_tag varchar(64) default NULL,
+  date_created int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (view,archive_idx)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `archives`
+--
+
+CREATE TABLE archives (
+  idx int(10) unsigned NOT NULL auto_increment,
+  directory tinytext,
+  date_created int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (idx)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `buildings`
 --
 
@@ -287,6 +324,7 @@ CREATE TABLE experiment_resources (
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
   delay_capacity tinyint(3) unsigned default NULL,
+  archive_tag varchar(32) NOT NULL default '',
   thumbnail mediumblob,
   PRIMARY KEY  (idx),
   KEY exptidx (exptidx),
@@ -321,6 +359,7 @@ CREATE TABLE experiment_stats (
   elabinelab tinyint(1) NOT NULL default '0',
   elabinelab_exptidx int(10) unsigned default NULL,
   security_level tinyint(1) NOT NULL default '0',
+  archive_idx int(10) unsigned default NULL,
   PRIMARY KEY  (eid,pid,exptidx),
   KEY exptidx (exptidx),
   KEY rsrcidx (rsrcidx)

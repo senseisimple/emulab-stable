@@ -2919,3 +2919,38 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table nodes add reserved_pid varchar(12) default NULL \
                   after destination_orientation;
+
+4.22: Experimental archiving code. Sure to change!
+
+        CREATE TABLE archive_tags (
+          idx int(10) unsigned NOT NULL auto_increment,
+          tag varchar(64) NOT NULL default '',
+          archive_idx int(10) unsigned NOT NULL default '0',
+          date_created int(10) unsigned NOT NULL default '0',
+          PRIMARY KEY (idx),
+          UNIQUE KEY (tag,archive_idx)
+        ) TYPE=MyISAM;
+        
+        CREATE TABLE archive_views (
+          view varchar(64) NOT NULL default '',
+          archive_idx int(10) unsigned NOT NULL default '0',
+          current_tag varchar(64) NOT NULL default '',
+          previous_tag varchar(64) default NULL,
+          date_created int(10) unsigned NOT NULL default '0',
+          PRIMARY KEY  (view,archive_idx)
+        ) TYPE=MyISAM;
+        
+        CREATE TABLE archives (
+          idx int(10) unsigned NOT NULL auto_increment,
+          directory tinytext,
+          date_created int(10) unsigned NOT NULL default '0',
+          PRIMARY KEY  (idx)
+        ) TYPE=MyISAM;
+        
+        alter table experiment_stats add
+             archive_idx int(10) unsigned default NULL
+             after security_level;
+        
+        alter table experiment_resources add
+             archive_tag varchar(32) NOT NULL default ''
+             after delay_capacity;
