@@ -80,6 +80,7 @@ if (! getopts($optlist, \%options)) {
 }
 if (defined($options{"w"})) {
     if (open(WHINE, ">$whinefile")) {
+	autoflush WHINE 1;
 	$whiner = 1;
     } else {
 	print "*** Could not open $whinefile, $TBOPS whining disabled\n";
