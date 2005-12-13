@@ -2910,3 +2910,12 @@ last_net_act,last_cpu_act,last_ext_act);
      alter table virt_lans change lossrate lossrate float(10,5) default NULL;
      alter table virt_lans change rlossrate rlossrate float(10,5) default NULL;
 
+4.21: Add a slot to nodes table to be used for reserving a node for
+      use in the emulab-ops project only, so that we can more easily take
+      nodes out of the general pool, but still be able to use them.
+      This slot actually takes a pid, so we could potentially use it more
+      generally for reserving nodes to particular projects, but I am
+      not sure that is the best approach yet.
+
+      alter table nodes add reserved_pid varchar(12) default NULL \
+                  after destination_orientation;
