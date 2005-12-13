@@ -37,6 +37,7 @@ my $FSNODE      = "@FSNODE@";
 my $debug	= 0;
 my @args;
 my $hostname;
+my $chpid       = 0;
 
 #
 # Testbed Support libraries
@@ -128,7 +129,7 @@ else {
 	push(@sshargs, $f);
     }
 
-    @cmdargs = ($SSH, @sshargs, @args,
+    @cmdargs = (@sshargs, @args,
 		(defined($user) ? ("-l", "$user") : ()),
 		$hostname, @ARGV);
 }
@@ -139,4 +140,52 @@ if ($debug) {
 # Close our connection the DB to avoid holding open connections.
 TBDBDisconnect();
 
-exec(@cmdargs);
+#
+# Signal Helper - help reap child process
+#
+sub sighandler {
+    kill("TERM", $chpid);
+    my $kpid;
+    do {
+        $kpid = wait();
+    } until $kpid == -1;
+    exit $?;
+}
+
+#
+# Check for existing protocol specification args.
+# If they exist, don't set the protocol.
+#
+if (grep {/Protocol/ || /-[12]/} @args) {
+    print "Protocol spec present on command line - not forcing it.\n" 
+        if $debug;
+    exec($SSH, @cmdargs);
+} else {
+    #
+    # Try both ssh protocol 2 and 1 for backward compatibility with
+    # old images utilizing only v1 keys.
+    #
+    print "Trying ssh protocol 2...\n" if $debug;
+    if ($chpid = fork()) {
+        # Yuck.  Must deal with termination signals (kill child proc)
+        local $SIG{TERM} = \&sighandler;
+        local $SIG{HUP}  = \&sighandler;
+        local $SIG{INT}  = \&sighandler;
+        my $kidpid = waitpid($chpid, 0);
+        # Sanity check.
+        if ($kidpid < 1) { 
+            warn "*** $0: waitpid() returned $kidpid.  Exiting.";
+            sighandler();
+        }
+        my $kidstatus = $?;
+        if ($kidstatus >> 8 == 255) {
+            # XXX: May not be due to v2 vs. v1, but there is no
+            #      way to differentiate from the exit value.
+            print "Protocol 2 failed:  Trying ssh protocol 1\n" if $debug;
+            exec($SSH, "-o Protocol=1", @cmdargs);
+        }
+    } else {
+        exec($SSH, "-o Protocol=2", @cmdargs);
+    }
+}
+
