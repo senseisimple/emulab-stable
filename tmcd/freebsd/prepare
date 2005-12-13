@@ -163,10 +163,15 @@ if (-f $NTPDRIFT) {
 }
 
 print "Cleaning .pid files ...\n";
-system("rm -rf $RUNDIR/*.pid");
+system("rm -rf $RUNDIR/*.pid /var/spool/*/*.pid");
 
 print "Clearing utmp file ...\n";
 system("rm -rf $RUNDIR/utmp");
+
+print "Clearing other $RUNDIR stuff ...\n";
+system("rm -f $RUNDIR/*.db $RUNDIR/*.boot $RUNDIR/*.hints $RUNDIR/*.lock");
+system("rm -f $RUNDIR/*.sock $RUNDIR/*.sockets");
+system("rm -rf $RUNDIR/sudo/*");
 
 print "Cleaning out /tmp ...\n";
 system("rm -rf /tmp/* /tmp/.??*");
@@ -195,6 +200,7 @@ if (-f $SFSUSERS) {
 if (-f $SFSHOSTKEY) {
     system("rm -f $SFSHOSTKEY");
 }
+system("rm -f /var/sfs/sockets/*.sock");
 
 
 print "Clearing out directories in $VARDIR ...\n";
@@ -212,3 +218,6 @@ foreach my $file (@DEADFILES) {
     }
 }
 system("rm -f /etc/start_if*");
+
+exit 0;
+
