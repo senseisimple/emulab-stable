@@ -8,6 +8,11 @@ use English;
 use Getopt::Std;
 
 #
+# This script will generate new Emulab keys for all users who do not
+# already have them.
+#
+
+#
 # Configure variables
 #
 my $TB		= "@prefix@";
@@ -43,6 +48,10 @@ my $query_result =
 		 "where webonly=0 and wikionly=0 and ".
 		 "      (status='active' or status='frozen')");
 
+#
+# Note that errors are usually the result of over-quota or improper
+# permissions on the .ssh directory.
+# 
 while (my ($uid) = $query_result->fetchrow_array()) {
     my $sshdir = USERROOT() . "/$uid";
 
