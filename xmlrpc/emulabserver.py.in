@@ -1692,7 +1692,9 @@ class experiment:
         result  = {}
         mapping = None
 
-        if state == "active":
+        if (state == "active" or
+            state == "activating" or
+            state == "modify_reparse"):
             dbres = DBQuery(
                 "select r.vname,r.node_id,n.type,n.def_boot_osid,ns.status,"
                 "n.eventstate,"
@@ -1745,11 +1747,13 @@ class experiment:
             pass
 
         if argdict["aspect"] == "mapping":
-            if state != "active":
+            if (state != "active" and
+                state != "activating" and
+                state != "modify_reparse"):
                 return EmulabResponse(RESPONSE_ERROR,
                                       output="Experiment is not active!")
             # Just return the mapping above
-            result = mapping
+            result = scrubdict(mapping)
             pass
         elif argdict["aspect"] == "links":
             dbres = DBQueryFatal("SELECT vname,ips from virt_nodes "
