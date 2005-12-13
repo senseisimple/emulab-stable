@@ -881,7 +881,7 @@ def rsync(host, base, dlpath, paths = ["/"], port = None):
         if VERBOSITY > VERBOSITY_HUMAN:
             cmd.append("-v")
             pass
-        ssh_args = ("ssh -o StrictHostKeyChecking=no "
+        ssh_args = ("ssh -o BatchMode=yes -o StrictHostKeyChecking=no "
                     + "-o UserKnownHostsFile="
                     + os.path.join(HOME, ".ssh", "emulab_known_hosts"))
         if port:
@@ -900,6 +900,8 @@ def rsync(host, base, dlpath, paths = ["/"], port = None):
                 # Parent
                 pass
             else:
+                os.close(0)
+                fd = os.open("/dev/null", os.O_RDONLY)
                 os.execve(RSYNC, cmd, os.environ)
                 os._exit(127)
                 pass
@@ -908,19 +910,20 @@ def rsync(host, base, dlpath, paths = ["/"], port = None):
     
     return retval
 
-def rmstar(host, *args):
+def rmstar(host, port, *args):
     global HOME, DEBUG
 
     retval = 0
     for path in args:
         cmd = ["/usr/bin/ssh",
+               "-o", "BatchMode=yes",
                "-o", "StrictHostKeyChecking=no",
                "-o", ("UserKnownHostsFile=" +
-                      os.path.join(HOME, ".ssh", "emulab_known_hosts")),
-               host,
-               "rm",
-               "-rf",
-               path]
+                      os.path.join(HOME, ".ssh", "emulab_known_hosts"))]
+        if port:
+            cmd.extend([ "-p", str(port) ])
+            pass
+        cmd.extend([ host, "rm", "-rf", path ])
         if DEBUG:
             print `cmd`
             retval = -1
@@ -1110,7 +1113,8 @@ def do_sync(args, mode="sync", must_be_active=1):
                                     port = sd.get("port", None))
                         pass
                     elif mode == "clean":
-                        pid = rmstar(phost, "/local/logs/*")
+                        pid = rmstar(phost, sd.get("port", None),
+                                     "/local/logs/*")
                         pass
                     else:
                         assert 0
