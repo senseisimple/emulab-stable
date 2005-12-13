@@ -448,13 +448,12 @@ AC_SUBST(ASSIGN)
 #
 # Arguments to ssh to disable strict host key checking, etc
 #
-AC_ARG_WITH(SSH_ARGS,
+AC_ARG_WITH(ssh-args,
 [  --with-ssh-args	Specify ssh arguments when running from testbed scripts ],
 [
     SSH_ARGS="$withval"
 ],[
-    SSH_ARGS="-q -o \"BatchMode yes\" -o \"StrictHostKeyChecking no\""
-    SSH_ARGS="$SSH_ARGS -o \"Protocol 1\""
+    SSH_ARGS="-q -o BatchMode=yes -o StrictHostKeyChecking=no"
 ])
 AC_SUBST(SSH_ARGS)
 
