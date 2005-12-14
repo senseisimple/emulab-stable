@@ -27,6 +27,8 @@ use Time::HiRes qw(gettimeofday);
 
 # Configure variables
 my $TB		= "@prefix@";
+my $MAINSITE    = @TBMAINSITE@;
+my $ALLOWEDPID  = "testbed";
 # XXX
 my $ARCHIVEDIR  = "/usr/testbed/exparchive";
 my $TESTMODE    = @TESTMODE@;
@@ -80,7 +82,7 @@ sub ArchiveCreate(;$$)
     # Need to create the directory for it, once we have the index.
     # 
     my $query_result =
-	DBQueryWarn("insert into file_archives set ".
+	DBQueryWarn("insert into archives set ".
 		    "  idx=NULL, ".
 		    "  date_created=UNIX_TIMESTAMP(now())");
 
@@ -97,7 +99,7 @@ sub ArchiveCreate(;$$)
     mysystem("$MKDIR $dir") == 0 or goto bad;
     mysystem("$CHMOD 775 $dir") == 0 or goto bad;
 
-    DBQueryWarn("update file_archives set directory='$dir' where idx='$idx'")
+    DBQueryWarn("update archives set directory='$dir' where idx='$idx'")
 	or goto bad;
 
     #
@@ -148,6 +150,7 @@ sub ArchiveCreate(;$$)
     # Create an stub directory tree and import it as "root"
     mysystem("cd $dir; mkdir ignore; cd ignore; mkdir $view; ".
              "         mkdir $view/trunk $view/savepoint $view/tags; ".
+	     "         mkdir $view/history; ".
 	     "$SVN import -m 'ArchiveCreate' $view file://$repodir/$view")
 	== 0 or goto bad;
 
@@ -180,7 +183,7 @@ sub ArchiveCreate(;$$)
     DBQueryFatal("delete from archive_views ".
 		 "where view='$view' and archive_idx='$idx'")
 	if (defined($idx));
-    DBQueryFatal("delete from file_archives where idx='$idx'")
+    DBQueryFatal("delete from archives where idx='$idx'")
 	if (defined($idx));
     return -1;
 }
@@ -361,7 +364,7 @@ sub ArchiveSavePoint($;$$)
 	goto bad;
     }
     mysystem("$IMPORTER -no_user_input file://$repodir ".
-	     "          $view/savepoint . > /dev/null")
+	     "          $view/savepoint . ")
 	== 0 or goto bad;
 
     #
@@ -528,6 +531,14 @@ sub ArchiveCommit($;$$$)
     mysystem("$SVN copy -m 'ArchiveCommit' ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${newtag}")
+	== 0 or goto bad;
+    
+    # Create a tag in the history directory for the commit. The
+    # history directory has just the commit tags, so its easy to go
+    # back in time.
+    mysystem("$SVN copy -m 'ArchiveCommit' ".
+	     "          file://$repodir/$view/trunk ".
+	     "          file://$repodir/$view/history/${newtag}")
 	== 0 or goto bad;
     
     # Create a branch tag in the tags directory to base differences against.
@@ -797,7 +808,7 @@ sub ArchiveDestroy($;$)
 		     "where archive_idx='$archive_idx'") &&
 	 DBQueryWarn("delete from archive_views ".
 		     "where archive_idx='$archive_idx'") &&
-	 DBQueryWarn("delete from file_archives ".
+	 DBQueryWarn("delete from archives ".
 		     "where idx='$archive_idx'")) || return -1;
     }
     return 0;
@@ -812,7 +823,7 @@ sub GetArchiveDirectory($$)
     my ($idx, $rvalp) = @_;
     
     my $query_result =
-	DBQueryWarn("select directory from file_archives where idx='$idx'");
+	DBQueryWarn("select directory from archives where idx='$idx'");
 
     return -1
 	if (!$query_result || !$query_result->numrows);
@@ -892,6 +903,9 @@ sub TBCreateExperimentArchive($$)
 {
     my ($pid, $eid) = @_;
 
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
     # Grab experiment indicies we need,
     my $query_result =
 	DBQueryWarn("select e.idx,s.rsrcidx from experiments as e ".
@@ -932,6 +946,9 @@ sub TBExperimentArchiveAddFile($$$)
     my ($pid, $eid, $pathname) = @_;
     my ($archive_idx, $view);
 
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
 
@@ -945,6 +962,9 @@ sub TBExperimentArchiveSavePoint($$$)
 {
     my ($pid, $eid, $tagext) = @_;
     my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
@@ -967,6 +987,9 @@ sub TBExperimentArchivePreSwapMod($$)
 {
     my ($pid, $eid) = @_;
     my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
@@ -1047,6 +1070,9 @@ sub TBExperimentArchiveRollBack($$)
     my ($pid, $eid) = @_;
     my ($archive_idx, $view);
 
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
 
@@ -1096,17 +1122,20 @@ sub TBExperimentArchiveSwapModCommit($$)
     my ($pid, $eid) = @_;
     my ($archive_idx, $view);
 
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
 
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchivePreSwapMod: ".
+	print STDERR "ArchiveSwapModCommit: ".
 	    "Archive '$archive_idx' does not exist in the DB!\n";
 	return -1;
     }
     if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchivePreSwapMod: $directory cannot be written!\n";
+	print STDERR "ArchiveSwapModCommit: $directory cannot be written!\n";
 	return -1;
     }
     my $checkin    = "$directory/checkins/$view";
@@ -1130,7 +1159,7 @@ sub TBExperimentArchiveSwapModCommit($$)
     my ($seconds, $microseconds) = gettimeofday();
     my $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
     $newtag .= int($microseconds / 1000);
-    $newtag .= "_swapmod";
+    $newtag .= "_postswapmod";
 
     return -1
 	if (ArchiveCommit($archive_idx, $newtag, $view, $preswapdir) != 0);
@@ -1147,19 +1176,8 @@ sub TBExperimentArchiveSwapModCommit($$)
     # 
     system("/bin/rm -rf $preswapdir");
     if ($?) {
-	print STDERR "*** ArchiveRollBack: Could not rm $preswapdir\n";
+	print STDERR "*** ArchiveSwapModCommit: Could not rm $preswapdir\n";
     }
-
-    ($seconds, $microseconds) = gettimeofday();
-    $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-    $newtag .= int($microseconds / 1000);
-    $newtag .= "_postswapmod";
-
-    #
-    # Do a savepoint on the new tree.
-    #
-    return -1
-	if (ArchiveSavePoint($archive_idx, $newtag, $view) != 0);
 
     return 0;
 }
@@ -1171,6 +1189,9 @@ sub TBCommitExperimentArchive($$$)
 {
     my ($pid, $eid, $tagext) = @_;
     my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
@@ -1214,6 +1235,9 @@ sub TBArchiveExperimentArchive($$)
     my ($pid, $eid) = @_;
     my ($archive_idx, $view);
 
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
 
@@ -1229,6 +1253,9 @@ sub TBDeleteExperimentArchive($$)
     my ($pid, $eid) = @_;
     my ($archive_idx, $view);
 
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
 
@@ -1242,6 +1269,9 @@ sub TBDestroyExperimentArchive($$)
 {
     my ($pid, $eid) = @_;
     my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
     return -1
 	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
