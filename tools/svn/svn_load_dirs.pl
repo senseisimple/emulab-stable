@@ -11,13 +11,13 @@ use strict;
 use Carp;
 use Cwd;
 use Digest::MD5  2.20;
-use File::Copy   2.03;
+use File::Copy;
 use File::Find;
-use File::Path   1.0404;
-use File::Temp   0.12   qw(tempdir tempfile);
-use Getopt::Long 2.25;
+use File::Path;
+use File::Temp   qw(tempdir tempfile);
+use Getopt::Long;
 use Text::Wrap;
-use URI          1.17;
+use URI;
 use English;
 
 $Text::Wrap::columns = 72;
@@ -557,13 +557,14 @@ while (defined (my $load_dir = &get_next_load_dir))
             # %del_files.
             my $wanted = sub
               {
-                s#^\./##;
                 return if $_ eq '.';
 
-                my $source_path = $_;
-                my $dest_path   = "$wc_import_dir_cwd/$_";
+		my $source_file = $_;
+                my $source_path = $File::Find::name;
+		$source_path    =~ s#^\./##;
+                my $dest_path   = "$wc_import_dir_cwd/$source_path";
 
-                my ($source_type) = &file_info($source_path);
+                my ($source_type) = &file_info($source_file);
                 my ($dest_type)   = &file_info($dest_path);
 
                 # Fail if the destination type exists but is of a
@@ -889,13 +890,14 @@ while (defined (my $load_dir = &get_next_load_dir))
     # to the working copy directory.
     my $wanted = sub
       {
-        s#^\./##;
         return if $_ eq '.';
 
-        my $source_path = $_;
-        my $dest_path   = "$wc_import_dir_cwd/$_";
+	my $source_file = $_;
+	my $source_path = $File::Find::name;
+        $source_path =~ s#^\./##;
+	my $dest_path   = "$wc_import_dir_cwd/$source_path";
 
-        my ($source_type, $source_is_exe) = &file_info($source_path);
+        my ($source_type, $source_is_exe) = &file_info($source_file);
         my ($dest_type)                   = &file_info($dest_path);
 
         return if ($source_type ne 'd' and $source_type ne 'f');
@@ -915,7 +917,7 @@ while (defined (my $load_dir = &get_next_load_dir))
           {
             if (defined (my $del_digest = $del_info->{digest}))
               {
-                my $new_digest = &digest_hash_file($source_path);
+                my $new_digest = &digest_hash_file($source_file);
                 if ($new_digest ne $del_digest)
                   {
                     print "U   $source_path\n";
@@ -1005,7 +1007,7 @@ while (defined (my $load_dir = &get_next_load_dir))
           {
             if ($dest_type eq '0')
               {
-                mkdir($dest_path)
+                mkdir($dest_path, 0777)
                   or die "$0: cannot mkdir '$dest_path': $!\n";
               }
           }
@@ -1014,7 +1016,7 @@ while (defined (my $load_dir = &get_next_load_dir))
             # Only copy the file if the digests do not match.
             if ($add_files{$source_path} or $upd_files{$source_path})
               {
-                copy($source_path, $dest_path)
+                copy($source_file, $dest_path)
                   or die "$0: copy '$source_path' to '$dest_path': $!\n";
               }
           }
@@ -1545,6 +1547,8 @@ sub recursive_ls_and_hash
   # This is the directory to change into.
   my $dir = shift;
 
+  print "REC $dir\n";
+
   # Get the current directory so that the script can change into the
   # current working directory after changing into the specified
   # directory.
@@ -1557,16 +1561,25 @@ sub recursive_ls_and_hash
 
   my $wanted = sub
     {
-      s#^\./##;
       return if $_ eq '.';
+
+      my $source_path = $File::Find::name;
+      $source_path =~ s#^\./##;
+
+      # prune out the .svn stuff, as would happen in the current find().
+      if ($source_path =~ /\.svn$/) {
+	  $File::Find::prune = 1;
+	  return;
+      }
+
       my ($file_type) = &file_info($_);
       my $file_digest;
       if ($file_type eq 'f' or ($file_type eq 'l' and stat($_) and -f _))
         {
           $file_digest = &digest_hash_file($_);
         }
-      $files{$_} = {type   => $file_type,
-                    digest => $file_digest};
+      $files{$source_path} = {type   => $file_type,
+			      digest => $file_digest};
     };
   find({no_chdir   => 1,
         preprocess => sub { grep { $_ !~ /\.svn$/ } @_ },
