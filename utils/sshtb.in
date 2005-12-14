@@ -177,12 +177,14 @@ if (grep {/Protocol/ || /-[12]/} @args) {
             warn "*** $0: waitpid() returned $kidpid.  Exiting.";
             sighandler();
         }
-        my $kidstatus = $?;
-        if ($kidstatus >> 8 == 255) {
+        my $kidstatus = $? >> 8;
+        if ($kidstatus == 255) {
             # XXX: May not be due to v2 vs. v1, but there is no
             #      way to differentiate from the exit value.
             print "Protocol 2 failed:  Trying ssh protocol 1\n" if $debug;
             exec($SSH, "-o Protocol=1", @cmdargs);
+        } else {
+            exit $kidstatus;
         }
     } else {
         exec($SSH, "-o Protocol=2", @cmdargs);
