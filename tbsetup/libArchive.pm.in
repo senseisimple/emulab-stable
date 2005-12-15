@@ -881,8 +881,9 @@ sub TBExperimentArchiveInfo($$$$)
 
     my ($archive_idx,$exptidx) = $query_result->fetchrow_array();
 
-    return -1
-	if (!defined($archive_idx));
+    # Need to deal with no archive yet!
+    return 1
+	if (!defined($archive_idx) || $archive_idx == 0);
 
     $$idxp = $archive_idx
 	if (defined($idxp));
@@ -949,8 +950,11 @@ sub TBExperimentArchiveAddFile($$$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     return ArchiveAdd($archive_idx, $pathname, $view);
 }
@@ -966,8 +970,11 @@ sub TBExperimentArchiveSavePoint($$$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     #
     # Derive a tag that contains some useful info?
@@ -991,8 +998,11 @@ sub TBExperimentArchivePreSwapMod($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
@@ -1073,8 +1083,11 @@ sub TBExperimentArchiveRollBack($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
@@ -1125,8 +1138,11 @@ sub TBExperimentArchiveSwapModCommit($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
@@ -1193,8 +1209,11 @@ sub TBCommitExperimentArchive($$$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     #
     # Need this below.
@@ -1238,8 +1257,11 @@ sub TBArchiveExperimentArchive($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     return ArchiveArchive($archive_idx, TBExptLogDir($pid, $eid));
 }
@@ -1256,8 +1278,11 @@ sub TBDeleteExperimentArchive($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     return ArchiveDestroy($archive_idx, 0);
 }
@@ -1273,8 +1298,11 @@ sub TBDestroyExperimentArchive($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
     return -1
-	if (TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view) < 0);
+	if ($rval < 0);
 
     return ArchiveDestroy($archive_idx, 1);
 }
