@@ -35,7 +35,7 @@ my @row;
 # Handle command-line arguments
 #
 sub usage() {
-    warn "Usage: $0 <gc|get|transfer|stats> pid eid\n";
+    warn "Usage: $0 <gc|get|transfer|stats|add> pid eid\n";
     return 1;
 }
 
@@ -45,7 +45,7 @@ if (!$cmd) {
 }
 
 # Check the operation type
-if ($cmd !~ /^(gc|get|transfer|stats)$/) {
+if ($cmd !~ /^(gc|get|transfer|stats|add)$/) {
     exit usage();
 } else {
     # Untaint operation
@@ -111,8 +111,13 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libArchive;
 
 $UID = 0;
+
+if ($cmd eq "add") {
+    exit libArchive::TBExperimentArchiveAddTracedFiles($pid, $eid);
+}
 
 if ($cmd ne "stats") {
     my $expstate;
@@ -195,6 +200,11 @@ sub InsertFile($)
 {
     my ($fn) = @_;
     my $retval = -1;
+    
+    $fn =~ s|^$FSDIR_GROUPS|/groups|;
+    $fn =~ s|^$FSDIR_PROJ|/proj|;
+    $fn =~ s|^$FSDIR_USERS|/users|;
+    $fn =~ s|^$FSDIR_SHARE|/share|;
     
     $fn = DBQuoteSpecial($fn);
 

@@ -847,6 +847,14 @@ if ($inout eq "out") {
 	$errorstat = $? >> 8;
 	fatal("tbswap out failed!");
     }
+
+    #
+    # Add the files that have been detected by tracing to the archive.
+    #
+    if (libArchive::TBExperimentArchiveAddTracedFiles($pid, $eid) < 0) {
+	fatal("Failed to add traced files to the experiment archive!");
+    }
+
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
 	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
     TBExptClearPanicBit($pid, $eid);
@@ -967,6 +975,14 @@ elsif ($inout eq "modify") {
 	    # 
 	    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 	    $estate = EXPTSTATE_ACTIVE;
+
+	    #
+	    # Add the files that have been detected by tracing to the archive.
+	    #
+	    if (libArchive::TBExperimentArchiveAddTracedFiles($pid, 
+							      $eid) < 0) {
+		fatal("Failed to add traced files to the experiment archive!");
+	    }
 	}
 	else {
 	    $modifyError = $errorstat = $? >> 8;

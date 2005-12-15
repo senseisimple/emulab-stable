@@ -960,6 +960,48 @@ sub TBExperimentArchiveAddFile($$$)
 }
 
 #
+# Add files picked up by NFS tracing to an experiment archive.
+#
+sub TBExperimentArchiveAddTracedFiles($$)
+{
+    my ($pid, $eid) = @_;
+    my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    my $query_result =
+	DBQueryFatal("SELECT e.idx,s.rsrcidx FROM experiments as e ".
+		     "left join experiment_stats as s on e.idx=s.exptidx ".
+		     "where e.pid='$pid' and e.eid='$eid'");
+    
+    if ($query_result->num_rows() != 1) {
+	die("*** $0:\n".
+	    "    Experiment $pid/$eid has no stats!\n");
+    }
+    my ($exptidx, $rsrcidx) = $query_result->fetchrow_array();
+
+    $query_result = 
+	DBQueryFatal("SELECT af.fn FROM fs_resources as fr ".
+		     "LEFT JOIN accessed_files as af on af.idx=fr.fileidx ".
+		     "WHERE fr.rsrcidx=$rsrcidx and fr.type!='l'");
+    while (my ($fn) = $query_result->fetchrow_array()) {
+	$rval = ArchiveAdd($archive_idx, $fn, $view);
+
+	return $rval
+	    if ($rval != 0);
+    }
+
+    return 0;
+}
+
+#
 # SavePoint an experiment archive. 
 #
 sub TBExperimentArchiveSavePoint($$$)
