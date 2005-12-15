@@ -25,8 +25,24 @@ from libtestbed import *
 #
 # Debug vars.
 #
-verbose = 0;
-debug = 0;
+verbose = 0
+debug = 0
+
+# Constants
+TBOPSPID               = "emulab-ops"
+NODEDEAD_PID           = TBOPSPID
+NODEDEAD_EID           = "hwdown"
+TB_NODEHISTORY_OP_MOVE = "move"
+
+# Node Log Types
+TB_NODELOGTYPE_MISC    = "misc"
+TB_NODELOGTYPES        = (TB_NODELOGTYPE_MISC, )
+TB_DEFAULT_NODELOGTYPE = TB_NODELOGTYPE_MISC
+
+# Node History Stuff.
+TB_NODEHISTORY_OP_FREE  = "free"
+TB_NODEHISTORY_OP_ALLOC	= "alloc"
+TB_NODEHISTORY_OP_MOVE  = "move"
 
 #
 # DB variables.
@@ -90,7 +106,7 @@ def DBQuery(queryPat, querySub = (), asDict = False):
             if ret == None:
                 return ()
             return ret
-        except MySQLdb.MySQLError:
+        except MySQLdb.MySQLError, e:
             tries -= 1
             if tries == 0:
                 break
@@ -100,6 +116,7 @@ def DBQuery(queryPat, querySub = (), asDict = False):
                     __dbConnection.ping()
                 except MySQLdb.MySQLError:
                     pass
+                
     tbmsg  = queryPat % cursor.connection.literal(querySub)
     tbmsg += "\n\n"
     tbmsg += "".join(traceback.format_exception(*sys.exc_info()))
@@ -111,6 +128,157 @@ def DBQueryFatal(*args):
     if ret == None:
         raise RuntimeError, "DBQueryFatal failed"
     return ret
+
+def DBQueryWarn(*args):
+    return DBQuery(*args)
+
+def DBQuoteSpecial(str):
+    TBDBConnect()
+    return __dbConnection.escape_string(str)
+
+
+#
+# Map UID to DB UID (login). Does a DB check to make sure user is known to
+# the DB (user obviously has a regular account), and that account will
+# always match what the DB says. Redundant, I know. But consider it a
+# sanity (or consistency) check.
+#
+# usage: UNIX2DBUID(int uid)
+#        returns username if the UID is okay.
+#        raises a UserError exception if the UID is bogus.
+#
+class UserError(StandardError): pass # XXX: need better suite of exceptions
+def UNIX2DBUID (unix_uid):
+    qres = \
+         DBQueryFatal("select uid from users where unix_uid=%s",
+                      (unix_uid))
+    if not len(qres):
+	raise UserError, "*** %s not a valid Emulab user!" % uid
+    pwname = pwd.getpwuid(unix_uid)[0]
+    dbuser = qres[0][0]
+    if dbuser != pwname:
+	raise UserError, "*** %s (passwd file) does not match %s (db)" % \
+              (pwname, dbuser)
+    return dbuser
+
+#
+# Helper. Test if numeric. Convert to dbuid if numeric.
+#
+def MapNumericUID(uid):
+    name = ""
+    try:
+        uid = int(uid)
+	name = UNIX2DBUID(uid)
+    except ValueError:
+	name = uid
+        pass
+    return name
+
+
+#
+# Return the IDX for a current experiment. 
+#
+# usage: TBExptIDX(char $pid, char *gid, int \$idx)
+#        returns 1 if okay.
+#	 returns 0 if error.
+#
+class UnknownExptID(StandardError): pass # XXX: need better suite of exceptions
+def TBExptIDX(pid,eid):
+    qres = \
+         DBQueryWarn("select idx from experiments "
+                     "where pid=%s and eid=%s",
+                     (pid, eid))
+
+    if not len(qres):
+	raise UnknownExptID, "Experiment %s/%s unknown!" % (pid,eid)
+    
+    idx = qres[0][0]
+    return int(idx)
+
+#
+# Insert a Log entry for a node.
+#
+# usage: TBSetNodeLogEntry(char *node, char *uid, char *type, char *message)
+#        Returns 1 if okay.
+#        Returns 0 if failed.
+#
+def TBSetNodeLogEntry(node, dbuid, type, message):
+    if not TBValidNodeName(node) or not TBValidNodeLogType(type):
+	return 0
+    return DBQueryWarn("insert into nodelog "
+		       "values "
+                       "(%s, NULL, %s, %s, %s, now())",
+                       (node, type, dbuid, message))
+
+#
+# Validate a node name.
+#
+# usage: TBValidNodeName(char *name)
+#        Returns 1 if the node is valid.
+#        Returns 0 if not.
+#
+def TBValidNodeName(node):
+    qres = \
+         DBQueryWarn("select node_id from nodes where node_id=%s",
+                     (node))
+    if len(qres) == 0:
+	return 0
+    return 1
+
+#
+# Validate a node log type.
+#
+# usage: TBValidNodeLogType(char *type)
+#        Returns 1 if the type string is valid.
+#        Returns 0 if not.
+#
+def TBValidNodeLogType(type):
+    if type in TB_NODELOGTYPES:
+        return 1
+    return 0
+
+#
+# Mark a Phys node as down. Cannot use next reserve since the pnode is not
+# going to go through the free path.
+#
+# usage: MarkPhysNodeDown(char *nodeid)
+#
+def MarkPhysNodeDown(pnode):
+    pid = NODEDEAD_PID;
+    eid = NODEDEAD_EID;
+    
+    DBQueryFatal("lock tables reserved write")
+    DBQueryFatal("update reserved set "
+		 "  pid=%s,eid=%s,rsrv_time=now() "
+		 "where node_id=%s",
+                 (pid, eid, pnode))
+    DBQueryFatal("unlock tables")
+    TBSetNodeHistory(pnode, TB_NODEHISTORY_OP_MOVE, os.getuid(), pid, eid)
+    return
+
+
+def TBSetNodeHistory(nodeid, op, uid, pid, eid):
+    exptidx = 0
+
+    try:
+        exptidx = TBExptIDX(pid, eid)
+    except:
+        print "*** WARNING: No such experiment %s/%s!" % (pid,eid)
+	return 0
+
+    try:
+        uid = int(uid)
+        # val = <expr> ? TrueRet : FalseRet
+        uid = uid == 0 and "root" or UNIX2DBUID(uid)
+        pass
+    except ValueError:
+        pass
+    
+    return DBQueryWarn("insert into node_history set "
+		       "  history_id=0, node_id=%s, op=%s, "
+		       "  uid=%s, stamp=UNIX_TIMESTAMP(now()), "
+		       "  exptidx=%s",
+                       (nodeid,op,uid,exptidx))
 
 
 def TBSiteVarExists(name):
@@ -142,9 +310,3 @@ def TBGetSiteVar(name):
     
     raise RuntimeException, \
           "*** attempted to fetch unknown site variable name!"
-
-
-def DBQuoteSpecial(str):
-    TBDBConnect()
-    return __dbConnection.escape_string(str)
-

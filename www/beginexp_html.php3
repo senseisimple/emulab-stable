@@ -34,8 +34,8 @@ LOGGEDINORDIE($uid);
 unset($view);
 if (isset($view_style) && $view_style == "plab") {
     $view['hide_proj'] = $view['hide_group'] = $view['hide_swap'] =
-	$view['hide_preload'] = $view['hide_batch'] = $view['quiet'] =
-	$view['plab_ns_message'] = 1;
+	$view['hide_preload'] = $view['hide_batch'] = $view['hide_linktest'] =
+        $view['quiet'] = $view['plab_ns_message'] = 1;
 }
 include("beginexp_form.php3");
 

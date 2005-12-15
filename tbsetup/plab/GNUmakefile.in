@@ -17,7 +17,7 @@ SUBDIRS		= libdslice etc
 SBIN_STUFF	= plabslice plabnode plabrenewd plabmetrics plabstats \
 		  plabmonitord plablinkdata plabdist plabhttpd plabdiscover
 
-LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py
+LIB_STUFF       = libplab.py mod_dslice.py mod_PLC.py mod_PLCNM.py
 
 LIBEXEC_STUFF	= webplabstats
 

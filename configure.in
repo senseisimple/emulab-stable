@@ -723,6 +723,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \
         tbsetup/plab/mod_dslice.py tbsetup/plab/mod_PLC.py \
+        tbsetup/plab/mod_PLCNM.py \
 	tbsetup/plab/plabslice tbsetup/plab/plabnode tbsetup/plab/plabrenewd \
 	tbsetup/plab/plabmetrics tbsetup/plab/plabstats \
 	tbsetup/plab/plabmonitord tbsetup/plab/plablinkdata \

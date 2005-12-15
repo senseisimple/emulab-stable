@@ -6,7 +6,7 @@
 # All rights reserved.
 #
 
-import sys
+import sys, os
 sys.path.append("@prefix@/lib")
 import getopt
 from libtestbed import *

@@ -43,9 +43,11 @@ from libdb import *
 #
 from mod_PLC import mod_PLC
 from mod_dslice import mod_dslice
+from mod_PLCNM import mod_PLCNM
 
 agents = {'PLC'    : mod_PLC,
-          'dslice' : mod_dslice}
+          'dslice' : mod_dslice,
+          'PLCNM'  : mod_PLCNM}
 
 #
 # output control vars
@@ -56,7 +58,7 @@ debug = 0
 #
 # Constants
 #
-DEF_AGENT = "PLC";
+DEF_AGENT = "PLCNM";
 
 RENEW_TIME = 2*24*60*60  # Renew two days before lease expires
 
@@ -72,18 +74,19 @@ RESERVED_EID = "hwdown"       # start life in hwdown
 MONITOR_PID  = "emulab-ops"
 MONITOR_EID  = "plab-monitor"
 
-MAGIC_INET2_GATEWAYS = ("205.124.237.10", )
-MAGIC_INET_GATEWAYS = ("205.124.249.123", "205.124.249.113",
-                       "205.124.249.121", "205.124.249.115")
+MAGIC_INET2_GATEWAYS = ("205.124.237.10",  "205.124.244.18", )
+MAGIC_INET_GATEWAYS =  ("205.124.244.150", "205.124.239.185",
+                        "205.124.244.154", "205.124.244.138",
+                        "205.124.244.130", )
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
 LOCAL_PLAB_LINKTYPE = "pcplabinet2"
-# right now these are the only 2.0 machines running the new slice interface:
-#ALLOWED_NODES = ('198.78.49.59', '18.31.0.213', '169.229.50.85',
-#                 '169.229.50.89', '128.112.152.124', '12.46.129.23',
-#                 '64.41.221.196', '132.239.17.226', '128.223.6.113',
-#                 '128.208.4.199', '128.2.198.199', '155.98.35.2',
-#                 '155.98.35.3')
+
 ALLOWED_NODES = ()
+#ALLOWED_NODES = ("128.112.139.80", "128.112.139.72", "169.229.50.4")
+IGNORED_NODES = ("10283",)
+
+# allowed nil/unknown values (sentinels).
+ATTR_NIL_VALUES = ('None',)
 
 PLABNODE = "@prefix@/sbin/plabnode"
 SSH = "@prefix@/bin/sshtb"
@@ -167,9 +170,13 @@ class siteParser:
             pass
         
         elif name == "HOST":
+            if not attrs.has_key('MAC'):
+                attrs['MAC'] = "None"
+                pass
             self.__hosts.append({'HNAME' : attrs['NAME'],
                                  'IP'    : attrs['IP'],
-                                 'NODEID': attrs['NODE_ID'],
+                                 'PLABID': attrs['NODE_ID'],
+                                 'MAC'   : attrs['MAC'],
                                  'SITE'  : self.__sitename})
             pass
         
@@ -227,11 +234,6 @@ class Plab:
         magic.  This is the main/only way that Plab nodes get into the
         nodes DB, and this list is updated dynamically.  It also gathers
         static data about new nodes.
-
-        Deleting nodes that are no longer available may not be the
-        best approach due to the overhead of adding new nodes (ie, if
-        the node disappears for a while, then comes back). Therefore,
-        this is not currently done.
         """
         
         print "Getting available Plab nodes ..."
@@ -255,17 +257,42 @@ class Plab:
             print avail
             pass
 
-        # Enforce allowed nodes limitation, if any.
-        if len(ALLOWED_NODES):
-            ravail = []
+        # Enforce node limitations, if any.
+        # XXX: This is ugly - maybe move to a separate function
+        #      that takes a list of filter functions.  I know!!
+        #      Create a generator out of a set of filter functions
+        #      and the initial node list! :-)  Python geek points to me if
+        #      I ever get around to it...  KRW
+        if len(ALLOWED_NODES) or len(IGNORED_NODES):
+            allowed = []
             for nodeent in avail:
-                if nodeent['IP'] in ALLOWED_NODES:
-                    ravail.append(nodeent)
+                if nodeent['PLABID'] in IGNORED_NODES:
+                    continue
+                elif len(ALLOWED_NODES):
+                    if nodeent['IP'] in ALLOWED_NODES:
+                        allowed.append(nodeent)
+                        pass
+                    pass
+                else:
+                    allowed.append(nodeent)
                     pass
                 pass
-            print "Advertisements in allowed nodes list:\n%s" % ravail
-            avail = ravail
+            if verbose:
+                print "Advertisements in allowed nodes list:\n%s" % allowed
+                pass
+            avail = allowed
             pass
+
+        # Check for duplicate node attributes (sanity check)
+        availdups = self.__findDuplicateAttrs(avail)
+        if len(availdups):
+            SENDMAIL(TBOPS, "Duplicates in plab advertised node list",
+                     "Duplicate attributes:\n"
+                     "%s\n\n"
+                     "Let plab support know!" % availdups,
+                     TBOPS)
+            raise RuntimeError, \
+                  "Duplicate attributes in plab node listing:\n%s" % availdups
 
         # Get node info we already have.
         known = self.__getKnownPnodes()
@@ -275,31 +302,22 @@ class Plab:
             pass
 
         # Create list of nodes to add or update
-        toadd = []  # List of node entries to add to DB
+        toadd    = []  # List of node entries to add to DB
+        toupdate = []  # List of node entries to update in the DB
         for nodeent in avail:
             # Replace sequences of bad chars in the site entity with
             # a single "-".
             nodeent['SITE'] = BADSITECHARS.sub("-", nodeent['SITE'])
-            nid = nodeent['NODEID']
-            # If we don't know about this node, then add it and mark
-            # that we are _not_ doing an update.
-            if not known.has_key(nid):
-                toadd.append((nodeent, False))
+            res = self.__matchPlabNode(nodeent, known)
+            if not res:
+                toadd.append(nodeent)
                 pass
-            # If we do know abou this node, check to see if any of its
-            # attributes have changed, and if so, add it to the list and
-            # mark if for update.
-            else:
-                kent = known[nid]
-                if kent['HNAME'] != nodeent['HNAME'] or \
-                   kent['IP']    != nodeent['IP'] or \
-                   kent['SITE']  != nodeent['SITE']:
-                    toadd.append((nodeent, True))
-                    pass
+            elif len(res[1]):
+                toupdate.append(res)
                 pass
-            pass
 
-        # Process the add/update list - add to, or update in the DB.
+        # Process the list of nodes to add
+        addstr = ""
         if len(toadd):
             # Are we ignoring new entries?
             if ignorenew:
@@ -309,72 +327,142 @@ class Plab:
                 pass
             # If not ignoring, do the addition/update.
             else:
-                addstr = ""
-                updstr = ""
-                print "There are %d new/changed Plab nodes." % len(toadd)
-                for nodeent, update in toadd:
+                print "There are %d new Plab nodes." % len(toadd)
+                for nodeent in toadd:
                     # Get the linktype here so we can report it in email.
                     self.__findLinkType(nodeent)
                     if debug:
                         print "Found linktype %s for node %s" % \
                               (nodeent['LINKTYPE'], nodeent['IP'])
                         pass
-                    # Add/update the node in the DB.
-                    self.__addNode(nodeent, update)
-                    # Rest of block adds a line for the add/update messages.
+                    # Add the node.
+                    self.__addNode(nodeent)
+                    # Add a line for the add/update message.
                     nodestr = "%s\t\t%s\t\t%s\t\t%s\t\t%s\n" % \
-                              (nodeent['NODEID'],
+                              (nodeent['PLABID'],
                                nodeent['IP'],
                                nodeent['HNAME'],
                                nodeent['SITE'],
                                nodeent['LINKTYPE'])
-                    if update:
-                        updstr += nodestr
-                        pass
-                    else:
-                        addstr += nodestr
-                        pass
+                    addstr += nodestr
                     pass
-
-                # We need to update DNS since we've added hosts..
-                print "Forcing a named map update ..."
-                os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
-                # Now announce that we've added/updated nodes.
-                SENDMAIL(TBOPS,
-                         "Plab nodes have been added/updated in the DB.",
-                         "The following plab nodes have been added to the DB:\n"
-                         "NodeID\t\tIP\t\tHostname\t\tSite\t\tLinktype\n\n"
-                         "%s\n\n"
-                         "The following plab nodes have been updated in the DB:\n"
-                         "NodeID\t\tIP\t\tHostname\t\tSite\n\n"
-                         "%s\n\n" % \
-                         (addstr, updstr),
-                         TBOPS)
-                print "Done adding new Plab nodes."
                 pass
             pass
+
+        # Process node attribute updates.
+        updstr = ""
+        if len(toupdate):
+            print "There are %d plab node updates." % len(toupdate)
+            for updent in toupdate:
+                self.__updateNode(updent)
+                # Add a line for the add/update message.
+                nodestr = updent[0] + "\n"
+                for attr,val in updent[1].items():
+                    nodestr += "\t%s:\t%s => %s\n" % (attr,val[0],val[1])
+                    pass
+                updstr += nodestr + "\n"
+                pass
+            pass
+
+        if len(toadd) or len(toupdate):
+            # We need to update DNS since we've added hosts..
+            print "Forcing a named map update ..."
+            os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
+            # Now announce that we've added/updated nodes.
+            SENDMAIL(TBOPS,
+                     "Plab nodes have been added/updated in the DB.",
+                     "The following plab nodes have been added to the DB:\n"
+                     "PlabID\t\tIP\t\tHostname\t\tSite\t\tLinktype\n\n"
+                     "%s\n\n"
+                     "The following plab nodes have been updated in the DB:\n"
+                     "\n%s\n\n" % \
+                     (addstr, updstr),
+                     TBOPS)
+            print "Done adding new Plab nodes."
+            pass
         return
+
+    def __matchPlabNode(self, plabent, knownents):
+        """
+        Helper function.  Returns a two-element tuple or null.
+        Null is returned when the node does not match any in the
+        knownents list (none of it's attributes match those of any
+        in the list).  If a match (or partial match) is found, a two
+        element tuple is returned.  The first element is the emulab
+        node id that matched, and the second is a dictionary containing
+        thos elements that differed between the two (in the case of a
+        partial match).
+        """
+        for nid in knownents:
+            ent = knownents[nid]
+            same = {}
+            diff = {}
+            for attr in ent:
+                if ent[attr] in ATTR_NIL_VALUES:
+                    continue
+                elif ent[attr] == plabent[attr]:
+                    same[attr] = ent[attr]
+                    pass
+                else:
+                    diff[attr] = (ent[attr], plabent[attr])
+                    pass
+                pass
+            if len(same):
+                return (nid, diff)
+            pass
+        return ()
 
     def __getKnownPnodes(self):
         """
         getFree helper function.  Returns a dict of IP:node_id pairs
         for the Plab nodes that currently exist in the DB.
         """
-        res = DBQueryFatal("select i.node_id, i.IP, w.hostname, w.site"
-                           " from interfaces as i"
-                           " left join nodes as np on"
-                           "  np.node_id = i.node_id"
-                           " left join widearea_nodeinfo as w on"
-                           "  i.node_id = w.node_id"
-                           " where np.type = 'pcplabphys'")
+        res = DBQueryFatal("select node_id,plab_id,hostname,IP,mac"
+                           " from plab_mapping")
+        
         ret = {}
-        for nodeid, ip, hname, site in res:
-            nid = nodeid.replace(NODEPREFIX, "")
-            ret[nid] = {'HNAME' : hname,
-                        'IP'    : ip,
-                        'SITE'  : site}
+        for nodeid, plabid, hostname, ip, mac in res:
+            ret[nodeid] = {'PLABID'  : plabid,
+                           'HNAME'   : hostname,
+                           'IP'      : ip,
+                           'MAC'     : mac}
             pass
+        # Check for duplicate node attributes: report any that are found.
+        dups = self.__findDuplicateAttrs(ret.values())
+        if len(dups):
+            SENDMAIL(TBOPS, "Duplicate plab node attributes in the DB!",
+                     "Duplicate node attrs:\n"
+                     "%s\n\n"
+                     "Fix up please!" % dups,
+                     TBOPS)
+            raise RuntimeError, \
+                  "Duplicate node attributes in DB:\n%s" % dups            
         return ret
+
+    def __findDuplicateAttrs(self, nodelist):
+        """
+        Find duplicate node attributes in the node list passed in.
+        """
+        uniqattrs = ['PLABID', 'HNAME', 'IP', 'MAC']
+        attrs = {}
+        dups = {}
+        
+        for ent in nodelist:
+            for attr in uniqattrs:
+                entry = "%s:%s" % (attr, ent[attr])
+                if attrs.has_key(entry) and \
+                   ent[attr] not in ATTR_NIL_VALUES:
+                    print "Duplicate node attribute: %s" % entry
+                    if not dups.has_key(entry):
+                        dups[entry] = [attrs[entry],]
+                        pass
+                    dups[entry].append(ent['PLABID'])
+                else:
+                    attrs[entry] = ent['PLABID']
+                    pass
+                pass
+            pass
+        return dups
         
     def __findLinkType(self, nodeent):
         """
@@ -445,8 +533,9 @@ class Plab:
         # block out common termination signals while adding a node
         osigs = disable_sigs(TERMSIGS)
         defosid, controliface = self.__getNodetypeInfo()
-        nodeid = NODEPREFIX + nodeent['NODEID']
-        priority = PLABBASEPRIO + int(nodeent['NODEID'])
+        nidnum, priority = self.__nextFreeNodeid()
+        nodeid = "%s%d" % (NODEPREFIX, nidnum)
+        vnodeprefix = "%svm%d" % (NODEPREFIX, nidnum)
         hostonly = nodeent['HNAME'].replace(".", "-")
         
         print "Creating pnode %s as %s, priority %d." % \
@@ -503,20 +592,21 @@ class Plab:
                          " values (%s, %s, now())",
                          (nodeid, 'down'))
 
-            # Don't do any vnode additions if we are just updating.
-            if update:
-                enable_sigs(osigs)
-                return
-
-            vnodetype = "pcplab"
-            vnodeid = ""
+            DBQueryFatal("insert into plab_mapping"
+                         " (node_id, plab_id, hostname, IP, mac, create_time)"
+                         " values (%s, %s, %s, %s, %s, now())",
+                         (nodeid, nodeent['PLABID'], nodeent['HNAME'],
+                          nodeent['IP'], nodeent['MAC']))
 
             # Create a single reserved plab vnode for the managment sliver.
-            # XXX I left it as "20" cause of all the existing ones. 
-            n = 20
-            vprio = (priority * 100) + (n+1)
-            sshdport = 38000+(n+1)
-            vnodeid = "%s-%d" % (nodeid, n+1)
+            # XXX I left it as "20" cause of all the existing ones.
+            # XXXX I set it to 1 due to the above comment (correct?)
+            #      since we are re-creating anyway.            
+            n = 1
+            vprio = (priority * 100) + n
+            sshdport = 38000 + n
+            vnodeid = "%s-%d" % (vnodeprefix, n)
+            vnodetype = "pcplab"
             if verbose:
                 print "Creating vnode %s, priority %d" % (vnodeid, vprio)
                 pass
@@ -564,6 +654,40 @@ class Plab:
         enable_sigs(osigs)
         return
 
+    def __updateNode(self, updent):
+        """
+        Updates changed node attributes in the mapping table.
+        """
+        uid = os.getuid()
+        dbuid = uid == 0 and "root" or UNIX2DBUID(uid)
+        attrmap = {'PLABID' : 'plab_id',
+                   'HNAME'  : 'hostname',
+                   'IP'     : 'IP',
+                   'MAC'    : 'mac'}
+        nodeid, chattrs = updent
+        
+        if len(chattrs) > 2:
+            errmsg = "More than 2 plab node attrs have changed!\n\n%s\n\n" \
+                     "%s has been moved to hwdown." % (chattrs, nodeid)
+            MarkPhysNodeDown(nodeid)
+            TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, errmsg)
+            SENDMAIL(TBOPS,
+                     "More than 2 plab node attrs have changed on %s" % nodeid,
+                     errmsg,
+                     TBOPS)
+            raise RuntimeError, errmsg # XXX: maybe don't raise an exception.
+        
+        updstr = ",".join(map(lambda x: "%s='%s'" % (attrmap[x[0]],x[1][1]),
+                              chattrs.items()))
+        DBQueryFatal("update plab_mapping set " + updstr + " where node_id=%s",
+                     (nodeid))
+        updmsg = "Plab node %s attributes updated:\n\n%s" % (nodeid, chattrs)
+        TBSetNodeLogEntry(nodeid, dbuid, TB_NODELOGTYPE_MISC, updmsg)
+        # updateNodeEtries() already sends mail.
+        #SENDMAIL(TBOPS,
+        #         "Plab node %s attributes updated." % nodeid, updmsg, TBOPS)
+        return
+
     def __getNodetypeInfo(self):
         """
         addNode helper function.  Returns a (defosid, controliface) 
@@ -583,7 +707,6 @@ class Plab:
         
         return self.__getNodetypeInfoCache
 
-    # XXX: deprecated - should probably just be removed
     def __nextFreeNodeid(self):
         """
         addNode helper function.  Returns a (nodeid, priority) tuple of
@@ -854,6 +977,43 @@ class Slice:
         node._load()
         return node
 
+    def updateSliceMeta(self):
+        """
+        Grab current slice metadata from Planetlab and store in db
+        """
+        try:
+            self.slicemeta = self.plab.agent.getSliceMeta(self)
+            DBQueryFatal("update plab_slices set "
+                         "slicemeta=%s where slicename=%s",
+                         (self.slicemeta, self.slicename))
+            pass
+        except:
+            print "Error updating slice metadata!"
+            tbstr = "".join(traceback.format_exception(*sys.exc_info()))
+            SENDMAIL(TBOPS, "Error updating slice metadata",
+                     "Slice metadata update error:\n\n%s" % tbstr, TBOPS)
+            raise
+
+    def getSliceNodes(self):
+        """
+        Return a tuple containing the nodes that belong to this slice
+        """
+        # Grab set of plab nodes belonging to expt and their IPs:
+        return DBQueryFatal("select r.node_id, i.IP, w.hostname "
+                            " from reserved as r "
+                            " left join nodes as n1 "
+                            "  on r.node_id = n1.node_id "
+                            " left join nodes as n2 "
+                            "  on n1.phys_nodeid = n2.node_id "
+                            " left join widearea_nodeinfo as w "
+                            "  on n2.node_id = w.node_id "
+                            " left join interfaces as i "
+                            "  on w.node_id = i.node_id "
+                            " where r.pid=%s and r.eid=%s "
+                            " and n1.type=%s and i.role=%s",
+                            (self.pid, self.eid, "pcplab", "ctrl"))
+
+
 #
 # Node abstraction
 #
@@ -1102,9 +1262,14 @@ class Node:
                            " where nv.node_id=%s"
                            " limit 1",
                            (self.nodeid))
-        assert (res and len(res) > 0), \
-               "No IP found for nodeid %s" % self.nodeid
-        ((IP, ), ) = res
+        if (not res or len(res) == 0):
+            # XXX: send email
+            print "Warning: no IP found for nodeid %s" % self.nodeid
+            IP = "0.0.0.0"
+            pass
+        else:
+            ((IP, ), ) = res
+            pass
         if debug:
-            print "Found IP %s for node %s" % (IP, self.nodeid)
+            print "IP is %s for node %s" % (IP, self.nodeid)
         return IP

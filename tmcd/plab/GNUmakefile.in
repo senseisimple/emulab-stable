@@ -23,11 +23,10 @@ ALLSCRIPTS	= $(ULEESCRIPTS) $(OSSCRIPTS) $(EESCRIPTS)
 THISDIR         = $(PWD)
 
 #
-# Linux binaries the tarball needs
+# Root of tree containing stock package stuff that is needed
+# in the plab vserver environment to support Emulab (e.g. sshd)
 #
-BINARIES	= $(SRCDIR)/tmcc $(SRCDIR)/suidperl $(SRCDIR)/tcsh \
-		  $(SRCDIR)/gzip
-ALLBINARIES	= $(BINARIES)
+PKGSRCTREE	= /share/plab/pkgroot
 
 #
 # Configuration, or other files necessary for tarball
@@ -58,7 +57,7 @@ $(ROOTBALLNAME): copyfiles
 	chown -R 0:0 plabroot
 	tar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
 
-copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
+copyfiles: $(ALLSCRIPTS) $(ALLCONFS) $(ALLCERTS) $(PKGSRCTREE) mkdirtree
 	(cd ../common/config; $(MAKE) script-install DESTDIR=$(THISDIR)/plabroot)
 	$(INSTALL_PROGRAM) $(ULEESCRIPTS) plabroot/usr/local/etc/emulab
 	chmod u+s plabroot/usr/local/etc/emulab/vnodesetup
@@ -69,17 +68,11 @@ copyfiles: $(ALLSCRIPTS) $(ALLBINARIES) $(ALLCONFS) $(ALLCERTS) mkdirtree
 	$(INSTALL_PROGRAM) $(EESCRIPTS)   plabroot/etc
 	$(INSTALL) -m 440  $(TESTBED_SRCDIR)/tmcd/plab/sudoers \
 					  plabroot/etc/sudoers
-	ln -fs suidperl  plabroot/usr/bin/sperl5.8.0
-	$(INSTALL_PROGRAM) -s $(SRCDIR)/tmcc \
-			plabroot/usr/local/etc/emulab/tmcc.bin
-	$(INSTALL_PROGRAM) -s -m 4511 $(SRCDIR)/suidperl plabroot/usr/bin
-	$(INSTALL_PROGRAM) -s $(SRCDIR)/tcsh plabroot/bin
-	$(INSTALL_PROGRAM) -s $(SRCDIR)/gzip plabroot/bin
-	ln -fs gzip plabroot/bin/gunzip
 	$(INSTALL_DATA) /usr/testbed/etc/pcplab.pem \
 	                plabroot/usr/local/etc/emulab/client.pem
 	$(INSTALL_DATA) /usr/testbed/etc/emulab.pem \
 			plabroot/usr/local/etc/emulab
+	cp -pR $(PKGSRCTREE)/ plabroot
 	echo "@BOSSNODE@" > plabroot/usr/local/etc/emulab/bossnode
 	cp /dev/null plabroot/usr/local/etc/emulab/isrem
 

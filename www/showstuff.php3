@@ -1221,6 +1221,21 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	}
     }
 
+    #
+    # Discover whether to show or hide certain columns
+    #
+    $colcheck_query_result = 
+      DBQueryFatal("SELECT sum(oi.OS = 'Windows') as winoscount, ".
+                   "       sum(nt.isplabdslice) as plabcount ".
+                   "from reserved as r ".
+                   "left join nodes as n on n.node_id=r.node_id ".
+                   "left join os_info as oi on n.def_boot_osid=oi.osid ".
+                   "left join node_types as nt on n.type = nt.type ".
+                   "WHERE r.eid='$eid' and r.pid='$pid'");
+    $colcheckrow = mysql_fetch_array($colcheck_query_result);
+    $anywindows = $colcheckrow[winoscount];
+    $anyplab    = $colcheckrow[plabcount];
+
     if ($showlastlog) {
 	#
 	# We need to extract, for each node, just the latest nodelog message.
@@ -1242,12 +1257,14 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	# every reserved node.
 	#
 	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS,tip.tipname, ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,nt.isplabdslice, ".
+                         " oi.OS,tip.tipname,wa.site,wa.hostname, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime, ".
 		         "nl.reported,nl.entry ".
 		         "from reserved as r ".
 		         "left join nodes as n on n.node_id=r.node_id ".
+                         "left join widearea_nodeinfo as wa on wa.node_id=n.phys_nodeid ".
 		         "left join node_types as nt on nt.type=n.type ".
 		         "left join node_status as ns on ns.node_id=r.node_id ".
 		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
@@ -1262,11 +1279,13 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
     }
     else {
 	$query_result =
-	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,oi.OS,tip.tipname, ".
+	    DBQueryFatal("SELECT r.*,n.*,nt.isvirtnode,nt.isplabdslice, ".
+                         " oi.OS,tip.tipname,wa.site,wa.hostname, ".
 		         " ns.status as nodestatus, ".
 		         " date_format(rsrv_time,\"%Y-%m-%d&nbsp;%T\") as rsrvtime ".
 		         "from reserved as r ".
 		         "left join nodes as n on n.node_id=r.node_id ".
+                         "left join widearea_nodeinfo as wa on wa.node_id=n.phys_nodeid ".
 		         "left join node_types as nt on nt.type=n.type ".
 		         "left join node_status as ns on ns.node_id=r.node_id ".
 		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
@@ -1288,6 +1307,13 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
                 <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
 	                 "&sortby=vname&showclass=$showclass\">
 				Name</a></th>\n";
+
+        # Only show 'Site' column if there are plab nodes.
+        if ($anyplab) {
+            echo "  <th>Site</th>
+                    <th>Widearea<br>Hostname</th>\n";
+        }
+
 	if ($pid == $TBOPSPID) {
 	    echo "<th>Reserved<br>
                       <a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
@@ -1305,17 +1331,12 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    echo "  <th>Last Log<br>Time</th>
 		    <th>Last Log Message</th>\n";
 	}
+
         echo "  <th><a href=\"docwrapper.php3?docname=ssh-mime.html\">SSH</a></th>
                 <th><a href=\"faq.php3#tiptunnel\">Console</a></th> .
                 <th>Log</th>";
 
 	# Only put out a RDP column header if there are any Windows nodes.
-	$windows_query_result = DBQueryFatal("SELECT r.pid,r.eid,n.node_id,oi.OS ".
-		         "from reserved as r ".
-		         "left join nodes as n on n.node_id=r.node_id ".
-		         "left join os_info as oi on n.def_boot_osid=oi.osid ".
-		         "WHERE r.eid='$eid' and r.pid='$pid' and oi.OS='Windows'");
-	$anywindows = mysql_num_rows($windows_query_result);
 	if ($anywindows) {
             echo "  <th>
                         <a href=\"docwrapper.php3?docname=rdp-mime.html\">RDP</a>
@@ -1331,11 +1352,14 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    $vname   = $row[vname];
 	    $rsrvtime= $row[rsrvtime];
 	    $type    = $row[type];
+            $wasite  = $row[site];
+            $wahost  = $row[hostname];
 	    $def_boot_osid = $row[def_boot_osid];
 	    $startstatus   = $row[startstatus];
 	    $status        = $row[nodestatus];
 	    $bootstate     = $row[eventstate];
 	    $isvirtnode    = $row[isvirtnode];
+            $isplabdslice  = $row[isplabdslice];
 	    $tipname       = $row[tipname];
 	    $iswindowsnode = $row[OS]=='Windows';
 	    $idlehours = TBGetNodeIdleTime($node_id);
@@ -1358,6 +1382,16 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
 	    echo "<tr>
                     <td><A href='shownode.php3?node_id=$node_id'>$node_id</a></td>
                     <td>$vname</td>\n";
+
+            if ($isplabdslice) {
+              echo "  <td>$wasite</td>
+                      <td>$wahost</td>\n";
+            }
+            elseif ($anyplab) {
+              echo "  <td>&nbsp</td>
+                      <td>&nbsp</td>\n";
+            }
+
 	    if ($pid == $TBOPSPID)
 		echo "<td>$rsrvtime</td>\n";
             echo "  <td>$type</td>\n";

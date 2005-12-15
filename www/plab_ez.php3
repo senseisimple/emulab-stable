@@ -47,6 +47,12 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
     global $plab_types, $plab_type_descr;
 
     #
+    # Default autoswap time - very long...
+    #
+    $aswapunits = 168; # 1 week (in hours)
+    $aswaptime  = 52;  # 52 weeks == 1 year
+
+    #
     # Header/footer view options
     #
     if ($advanced) {
@@ -183,6 +189,8 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	 echo "<input type='hidden' name='formfields[canfail]' value='Yep'>\n";
 	 echo "<input type='hidden' name='formfields[type]' value='pcplab'>\n";
 	 echo "<input type='hidden' name='formfields[resusage]' value='3'>\n";
+         echo "<input type='hidden' name='formfields[units]' value='$aswapunits'>\n";         
+         echo "<input type='hidden' name='formfields[when]' value='$aswaptime'>\n";
      }
 
     #
@@ -286,11 +294,11 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
         #
 	# Auto-swap
 	#
-	if (!$formfields['when']) {
-	    $when = "never";
-	} else {
-	    $when = $formfields['when'];
-	}
+        if (!$formfields['when']) {
+          $when = "never";
+        } else {
+          $when = $formfields['when'];
+        }
 	echo "<tr>
 	         <td><a href='plab_ez_footnote7.html'
 		     target='emulabfootnote'>Auto-terminate</a> slice after:
@@ -477,6 +485,9 @@ function MAKENS($formfields) {
 	   "&formfields[exp_noidleswap_reason]=" .
 	   urlencode("PlanetLab experiment");
 
+    # XXX: until we want to use linktest on plab
+    $url .= "&formfields[exp_linktest]=0";
+
     #
     # Batched?
     #
@@ -487,10 +498,14 @@ function MAKENS($formfields) {
     #
     # Determine the auto-swap time
     #
-    if ($formfields['when'] && ($formfields['when'] != 'never')) {
-	$swaptime = $formfields['when'] * $formfields['units'];
-	$url .= "&formfields[exp_autoswap]=1";
-	$url .= "&formfields[exp_autoswap_timeout]=$swaptime";
+    if ($formfields['when']) {
+        if (strcmp($formfields['when'], 'never') == 0) {
+            $url .= "&formfields[exp_autoswap]=0";
+        } else {
+            $swaptime = $formfields['when'] * $formfields['units'];
+            $url .= "&formfields[exp_autoswap]=1";
+            $url .= "&formfields[exp_autoswap_timeout]=$swaptime";
+        }
     }
 
     #
@@ -524,7 +539,7 @@ function MAKENS($formfields) {
     }
     if ($formfields['startupcmd']) {
 	$nsgen_args .= "-v Startup='$formfields[startupcmd]' ";
-    }
+    }    
     
     #
     # Note: We run this as nobody on purpose - this is really dumb, but later
@@ -545,7 +560,7 @@ function CHECKFORM($formfields) {
     if (!preg_match("/^\d+$/",$formfields['count'],$matches)) {
 	$errors['count'] = "Number of nodes must be a positive integer";
     }
-    if ($formfields['when'] && ($formfields['when'] != "never") &&
+    if ($formfields['when'] && (strcmp($formfields['when'],"never") != 0) &&
         (!preg_match("/^\d*(\.\d+)?$/",$formfields['when'],$matches))) {
 	$errors['when'] = "Auto-terminate time must be a positive decimal " .
 	    "or 'never'";

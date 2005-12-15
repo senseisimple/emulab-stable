@@ -508,6 +508,12 @@ function SPITFORM($formfields, $errors)
     # Run linktest, and level. 
     #
     if (STUDLY() || $EXPOSELINKTEST) {
+      if (isset($view['hide_linktest'])) {
+        if ($formfields[exp_linktest]) {
+          echo "<input type='hidden' name='formfields[exp_linktest]'
+                       value='$formfields[exp_linktest]'\n";
+        }
+      } else {
     echo "<tr>
               <td><a href='$TBDOCBASE/doc/docwrapper.php3?".
 	                  "docname=linktest.html'>Linktest</a> Option:</td>
@@ -528,6 +534,7 @@ function SPITFORM($formfields, $errors)
 	"docname=linktest.html'><b>Whats this?</b></a>)";
     echo "    </td>
           </tr>\n";
+      }
     }
 
     #

@@ -929,9 +929,17 @@ elsif (@vnodelist) {
 	my $pnode  = $vnode2pnode{$node};
 	my $islocal= exists($nodes{$pnode});
 	my $wstart = $waitstart{$node};
-	my $maxwait = 90 + (40 * $pnodevcount{$pnode});
 	my $curallocstate;
 	my $actual_state;
+
+        #
+        # Base the maxwait for vnodes on the reboot_waittime field for
+        # their respective OSIDs, with some slop time that scales up
+        # as a function of the number of vnodes on the parent pnode.
+        #
+        my $osid        = $osids{$node};
+        my $reboot_time = $reboot_waittime{$osid};
+	my $maxwait     = $reboot_time + (40 * $pnodevcount{$pnode});
 
 	TBGetNodeAllocState($node, \$curallocstate);
 
