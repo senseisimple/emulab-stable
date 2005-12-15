@@ -240,6 +240,11 @@ if ($wireless) {
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
+if ($EXPOSEARCHIVE) {
+    WRITESUBMENUBUTTON("Experiment File Archive",
+		       "cvsweb/cvswebwrap.php3?exptidx=$expindex");
+}
+
 if ($types['garcia'] || $types['static-mica2'] || $types['robot']) {
     SUBMENUSECTION("Robot/Mote Options");
     WRITESUBMENUBUTTON("Robot/Mote Map",

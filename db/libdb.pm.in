@@ -3135,7 +3135,7 @@ sub TBExptDestroy($$)
 	unlink($eidlink)
 	    if (-l $eidlink);
     }
-    #libArchive::TBDeleteExperimentArchive($pid, $eid);
+    libArchive::TBDeleteExperimentArchive($pid, $eid);
 
     #
     # Remove all trace from the DB.

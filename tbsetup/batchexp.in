@@ -85,6 +85,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use libArchive;
 
 my $parser   = "$TB/libexec/parse-ns";
 my $mkexpdir = "$TB/libexec/mkexpdir";
@@ -386,6 +387,10 @@ if (system("$mkexpdir $pid $gid $eid") != 0) {
     fatal("$mkexpdir failed");
 }
 
+if (libArchive::TBCreateExperimentArchive($pid, $eid) < 0) {
+    fatal("Could not create experiment archive!");
+}
+
 #
 # Grab the working directory path, and thats where we work.
 # The user's experiment directory is off in /proj space.
@@ -572,6 +577,19 @@ SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
     or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
 
 #
+# Lets get the NS file into the archive now, since we want to quit before
+# going further if it fails. Note that any NS files the experiment sourced
+# were added by the parse wrapper.
+#
+system("cp -p $workdir/$nsfile $userdir/$nsfile");
+
+if ($? != 0 ||
+    (libArchive::TBExperimentArchiveAddFile($pid, $eid,
+					    "$userdir/$nsfile") < 0)) {
+    fatal("Failed to add $userdir/$nsfile to the archive!");
+}
+
+#
 # If not in frontend mode (preload only) continue to swapping exp in.
 # 
 if (! ($frontend || $batchmode)) {
@@ -624,6 +642,13 @@ TBSaveExpLogFiles($pid, $eid);
 # can see the log files.
 #
 system("cp -Rfp $workdir/ $userdir/tbdata");
+
+#
+# Do a SavePoint on the experiment files.
+#
+if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
+    fatal("Failed to do a savepoint on the experiment archive!");
+}
 
 #
 # Gather statistics.
@@ -741,6 +766,9 @@ sub cleanup()
 	# Clear the experiment record and cleanup directories
 	#
 	TBExptDestroy($pid, $eid);
+
+	# Completely remove all trace of the archive.
+        libArchive::TBDestroyExperimentArchive($pid, $eid);
 
 	#
 	# Now we can clean up the stats records. 

@@ -78,6 +78,7 @@ my $TBLOGS = "@TBLOGSEMAIL@";
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libArchive;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -447,12 +448,23 @@ if ($estate eq EXPTSTATE_ACTIVE) {
     }
     SetExpState($pid, $eid, EXPTSTATE_TERMINATING);
     $estate = EXPTSTATE_SWAPPED;
-    
+
     #
     # Gather statistics for the swapout.
     #
     GatherSwapStats($pid, $eid, $dbuid, TBDB_STATS_SWAPOUT, 0);
+
+    # Do a SavePoint on the experiment files.
+    print "Doing a savepoint to the experiment archive ...\n";
+    if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "swapout") < 0) {
+	fatal("Failed to do a savepoint on the experiment archive!");
+    }
 }
+
+# Commit the archive after swapout.
+print "Doing a final commit on the experiment archive ...\n";
+libArchive::TBCommitExperimentArchive($pid, $eid, "endexp") == 0 or
+    fatal("Could not commit experiment archive!");
 
 if ($estate eq EXPTSTATE_SWAPPED ||
     $estate eq EXPTSTATE_QUEUED) {
@@ -482,6 +494,14 @@ if ($estate ne EXPTSTATE_TERMINATED) {
 # Try to copy off the files for testbed information gathering.
 #
 TBSaveExpLogFiles($pid, $eid);
+
+# Copy out the archive and then delete it.
+print "Archiving and clearing the experiment archive ...\n";
+libArchive::TBArchiveExperimentArchive($pid, $eid) == 0 or
+    fatal("Could not archive experiment archive!");
+    
+libArchive::TBDeleteExperimentArchive($pid, $eid) == 0 or
+    fatal("Could not delete experiment archive!");
 
 # Terminate the log so the web page stops spewing.
 TBExptClearLogFile($pid, $eid);

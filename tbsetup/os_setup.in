@@ -60,6 +60,7 @@ use libreboot;
 use libosload;
 use libtestbed;
 use libtblog;
+use libArchive;
 
 TBDebugTimeStampsOn();
 
@@ -307,6 +308,8 @@ while (my %row = $db_result->fetchhash()) {
 	if (! -f $rpm) {
 	    die_noretry("*** RPM $rpm for node $node does not exist!");
 	}
+        libArchive::TBExperimentArchiveAddFile($pid, $eid, $rpm) == 0 or
+	    die_noretry("*** Failed to add RPM $rpm to the archive!");
     }
 
     #
@@ -318,6 +321,8 @@ while (my %row = $db_result->fetchhash()) {
 	if (! -f $tar) {
 	    die_noretry("*** Tarfile $tar for node $node does not exist!");
 	}
+        libArchive::TBExperimentArchiveAddFile($pid, $eid, $tar) == 0 or
+	    die_noretry("*** Failed to add Tarfile $tar to the archive!");
     }
 
     #

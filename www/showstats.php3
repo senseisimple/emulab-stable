@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -164,7 +164,8 @@ else {
 
 $query_result =
     DBQueryFatal("select t.exptidx,s.pid,s.eid,t.action,t.exitcode,t.uid, ".
-                 "       r.pnodes,t.idx as statno,t.start_time,t.end_time ".
+                 "       r.pnodes,t.idx as statno,t.start_time,t.end_time, ".
+		 "       s.archive_idx,r.archive_tag ".
 		 "  from testbed_stats as t ".
 		 "left join experiment_stats as s on s.exptidx=t.exptidx ".
 		 "left join experiment_resources as r on r.idx=t.rsrcidx ".
@@ -174,7 +175,6 @@ $query_result =
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No testbed stats records in the system!", 1);
 }
-
 echo "<table align=center border=1>
       <tr>
         <th>#</th>
@@ -185,8 +185,11 @@ echo "<table align=center border=1>
         <th>Start</th>
         <th>End</th>
         <th>Action (Nodes)</th>
-        <th>ECode</th>
-      </tr>\n";
+        <th>ECode</th>";
+if ($EXPOSEARCHIVE) {
+        echo "<th>Archive</th>";
+}
+echo " </tr>\n";
 
 while ($row = mysql_fetch_assoc($query_result)) {
     $idx     = $row[statno];
@@ -199,6 +202,8 @@ while ($row = mysql_fetch_assoc($query_result)) {
     $action  = $row[action];
     $ecode   = $row[exitcode];
     $pnodes  = $row[pnodes];
+    $archive_idx = $row[archive_idx];
+    $archive_tag = $row[archive_tag];
 
     if (!isset($end))
 	$end = "&nbsp";
@@ -218,8 +223,21 @@ while ($row = mysql_fetch_assoc($query_result)) {
     else {
 	echo "<td>$action</td>\n";
     }
-    echo " <td>$ecode</td>
-          </tr>\n";
+    echo " <td>$ecode</td>\n";
+    if ($EXPOSEARCHIVE) {
+	if ($archive_idx && $archive_tag &&
+	    (strcmp($action, "swapout") == 0 ||
+	     strcmp($action, "swapmod") == 0)) {
+	    echo "<td>".
+		 "<a href='cvsweb/cvswebwrap.php3/$exptidx/history/".
+		          "$archive_tag/?exptidx=$exptidx'>$archive_tag</a>".
+		 "</td>\n";
+	}
+	else {
+	    echo "<td>&nbsp</td>\n";
+	}
+    }
+    echo "</tr>\n";
 }
 echo "</table>\n";
 

@@ -119,7 +119,7 @@ DOWNLOADFILES += $(wildcard $(SRCDIR)/downloads/*.exe)
 #
 # This stuff only gets installed on the main site
 #
-ifeq ($(OURDOMAIN),$(MAINSITE)) 
+ifeq ($(CVSSUPPORT),1)
 	CVSWEBFILES  = $(wildcard $(SRCDIR)/cvsweb/*.php3)
 	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.php)
 	CVSWEBFILES += $(wildcard $(SRCDIR)/cvsweb/*.conf)

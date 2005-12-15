@@ -21,6 +21,9 @@ unset($repodir);
 # Tell system we do not want any headers drawn on errors.
 $noheaders = 1;
 
+# Use cvsweb or viewvc.
+$use_viewvc = 0;
+
 #
 # Verify form arguments.
 #
@@ -73,6 +76,7 @@ if (isset($pid) && $pid != "") {
 	}
 	$repoidx = $row[0];
 	$repodir = "/usr/testbed/exparchive/$repoidx/repo/";
+	$use_viewvc = 1;
     }
     else {
 	#
@@ -136,6 +140,7 @@ elseif (isset($exptidx) && $exptidx != "") {
 	}
 	$repodir = "$TBDIR/expinfo/${pid}-${eid}.${exptidx}/Archive";
     }
+    $use_viewvc = 1;
 }
 else {
     LOGGEDINORDIE($uid);
@@ -194,9 +199,11 @@ $shellcmd = "env PATH=./cvsweb/ QUERY_STRING=$query PATH_INFO=$path " .
             "HTTP_ACCEPT_ENCODING=$encoding ";
 
 if (isset($repodir)) {
+    $prog = ($use_viewvc ? webviewvc : webcvsweb);
+    
     # I know, I added an argument to a script that is not supposed to
     # take any. So be it; it was easy.
-    $shellcmd .= "$TBSUEXEC_PATH $uid $pid webcvsweb -repo $repodir";
+    $shellcmd .= "$TBSUEXEC_PATH $uid $pid $prog -repo $repodir";
 }
 else {
     $shellcmd .= "$script";

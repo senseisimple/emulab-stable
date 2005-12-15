@@ -79,6 +79,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use libArchive;
 
 # Be careful not to exit on transient error; 0 means infinite retry.
 $libdb::DBQUERY_MAXTRIES = 0;
@@ -111,6 +112,7 @@ my $user_email;
 my @allnodes;
 my @row;
 my $action;
+my $tag;
 my $nextswapstate;
 my $termswapstate;
 my $isadmin  = 0;
@@ -690,15 +692,18 @@ DBQueryFatal("unlock tables");
 
 if ($inout eq "in") {
     $action = "swapped in";
+    $tag    = "swapin";
 }
 if ($inout eq "out") {
     $action = "swapped out";
+    $tag    = "swapout";
 }
 if ($inout eq "restart") {
     $action = "restarted";
 }
 if ($inout eq "modify") {
     $action = "modified";
+    $tag    = "swapmod";
 }
 
 #
@@ -866,6 +871,13 @@ elsif ($inout eq "in") {
 }
 elsif ($inout eq "modify") {
     my $modifyError;
+
+    #
+    # Prepare the Archive for the swapmod, in case we have to "roll back".
+    #
+    if (libArchive::TBExperimentArchivePreSwapMod($pid, $eid) < 0) {
+	fatal("Failed to do a preswapmod on the experiment archive!");
+    }
 
     GatherSwapStats($pid, $eid, $dbuid,
 		    TBDB_STATS_SWAPMODIFY, 0, TBDB_STATS_FLAGS_PREMODIFY);
@@ -1039,6 +1051,39 @@ TBSaveExpLogFiles($pid, $eid);
 system("cp -Rfp $workdir/ $userdir/tbdata/");
 
 #
+# The archive gets different treatment when doing a swapmod.
+#
+if ($inout eq "modify") {
+    # Get the new NS file into the new swapdir.
+    if (defined($nsfile)) {
+	system("cp -p $workdir/$nsfile $userdir/$nsfile");
+    
+	if (libArchive::TBExperimentArchiveAddFile($pid, $eid,
+						   "$userdir/$nsfile") < 0) {
+	    fatal("Failed to add $userdir/$nsfile to the archive!");
+	}
+    }
+
+    print "Doing a commit on the previous experiment archive ...\n";
+    libArchive::TBExperimentArchiveSwapModCommit($pid, $eid) == 0 or
+	fatal("Failed to commit experiment archive!");
+}
+
+#
+# Do a SavePoint on the experiment files.
+#
+if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, $tag) < 0) {
+    fatal("Failed to do a savepoint on the experiment archive!");
+}
+
+# Commit the archive after swapout
+if ($inout eq "out") {
+    print "Doing a commit on the experiment archive ...\n";
+    libArchive::TBCommitExperimentArchive($pid, $eid, $tag) == 0 or
+	fatal("Failed to commit experiment archive!");
+}
+
+#
 # Gather stats. 
 #
 if ($inout eq "in") {
@@ -1167,6 +1212,11 @@ sub cleanup()
 	# Clear backup state since not needed anymore; experiment is toast.
 	#
 	TBExptClearBackupState($pid, $eid);
+
+	#
+	# Rollback the archive.
+	#
+        libArchive::TBExperimentArchiveRollBack($pid, $eid);
     }
 
     #
