@@ -33,6 +33,10 @@ if os.path.exists(MAINT_PATH):
 
 VERBOSITY = 1
 
+STYLE_MACHINE = 0
+STYLE_HUMAN = 1
+OUTPUT_STYLE = STYLE_HUMAN
+
 # Tables that should be cleaned when a node transitions from one experiment
 # to another.
 GC_TABLES = [
@@ -62,17 +66,22 @@ GC_TABLES = [
 
 def human_readable(n, suffix='B', places=2):
     '''Return a human friendly approximation of n, using SI prefixes'''
-    prefixes = [' ','K','M','G','T']
-    base, step, limit = 10, 3, 100
-
-    if n == 0:
-        magnitude = 0 #cannot take log(0)
+    if OUTPUT_STYLE == STYLE_HUMAN:
+        prefixes = [' ','K','M','G','T']
+        base, step, limit = 10, 3, 100
+        
+        if n == 0:
+            magnitude = 0 #cannot take log(0)
+            pass
+        else:
+            magnitude = math.log(n, base)
+            
+            order = int(round(magnitude)) // step
+            return '%.1f %s%s' % (float(n)/base**(order*step), \
+                                  prefixes[order], suffix)
+        pass
     else:
-        magnitude = math.log(n, base)
-
-    order = int(round(magnitude)) // step
-    return '%.1f %s%s' % (float(n)/base**(order*step), \
-                          prefixes[order], suffix)
+        return str(n)
 
 def usage():
     print "Usage: nfstrace.proxy [-h] <action> [...]"
@@ -366,7 +375,7 @@ def resolve_fh(fh, depth=0):
 
     return retval
 
-def print_files(type, seen, links, used_links):
+def process_files(type, seen, links, used_links):
     global cur
     
     retval = 0
@@ -424,7 +433,7 @@ def do_get(args):
     mount_map = []
     
     try:
-        opts, args = getopt.getopt(args, "m:", [ "map=" ])
+        opts, args = getopt.getopt(args, "m:", [ "map=", ])
         for opt, val in opts:
             if opt in ("-m", "--map="):
                 l = val.split(':')
@@ -494,7 +503,7 @@ def do_get(args):
                 "LEFT JOIN file_checkpoint as fc on (fa.fh=fc.fh) "
                 "GROUP BY fa.fh", (pid, eid))
 
-    total_size += print_files("r", seen, links, used_links)
+    total_size += process_files("r", seen, links, used_links)
 
     cur.execute("SELECT fw.fh,fc.size,"
                 "  IFNULL(MAX(fw.last_access)>MAX(fd.last_remove),1) "
@@ -506,12 +515,15 @@ def do_get(args):
                 "LEFT JOIN file_checkpoint as fc on (fw.fh=fc.fh) "
                 "GROUP BY fw.fh", (pid, eid))
 
-    total_size += print_files("w", seen, links, used_links)
+    total_size += process_files("w", seen, links, used_links)
 
     keys = seen.keys()
     keys.sort()
     for key in keys:
         value = seen[key]
+        if value[0] == "r":
+            value[0] = "r "
+            pass
         print "%2s %10s %s" % (value[0], value[1], value[2])
         pass
     
@@ -523,8 +535,10 @@ def do_get(args):
             pass
         pass
 
-    print ("-" * 79)
-    print "%10s Total" % (human_readable(total_size),)
+    if OUTPUT_STYLE == STYLE_HUMAN:
+        print ("-" * 79)
+        print "%10s Total" % (human_readable(total_size),)
+        pass
 
     if missing > 0:
         sys.stderr.write(`missing` + " unknown file(s) accessed.\n")
@@ -653,8 +667,8 @@ ACTIONS = {
 
 try:
     opts, req_args = getopt.getopt(sys.argv[1:],
-                                   "h",
-                                   [ "help", ])
+                                   "hm",
+                                   [ "help", "machine" ])
     
     if len(req_args) > 0:
         action = req_args[0].lower()
@@ -669,6 +683,9 @@ try:
                 usage()
                 pass
             sys.exit()
+            pass
+        elif opt in ("-m", "--machine"):
+            OUTPUT_STYLE = STYLE_MACHINE
             pass
         pass
     

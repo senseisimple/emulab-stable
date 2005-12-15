@@ -406,17 +406,7 @@ sub doSwapout($) {
     if ($NFSTRACESUPPORT) {
 	print "Getting files accessed via NFS.\n";
 	TBDebugTimeStamp("nfstrace started");
-	if (lc $THISHOMEBASE eq "emulab.net") {
-	    if (defined($umail)) {
-		SENDMAIL("$TBLOGS",
-			 "Files accessed by $pid/$eid via NFS",
-			 `nfstrace get $pid $eid`,
-			 "$uname <$umail>");
-	    }
-	}
-	else {
-	    system("nfstrace get $pid $eid");
-	}
+	system("nfstrace transfer $pid $eid");
 	TBDebugTimeStamp("nfstrace finished");
     }
 

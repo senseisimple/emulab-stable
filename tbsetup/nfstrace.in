@@ -35,7 +35,7 @@ my @row;
 # Handle command-line arguments
 #
 sub usage() {
-    warn "Usage: $0 <gc|get|stats> pid eid\n";
+    warn "Usage: $0 <gc|get|transfer|stats> pid eid\n";
     return 1;
 }
 
@@ -45,7 +45,7 @@ if (!$cmd) {
 }
 
 # Check the operation type
-if ($cmd !~ /^(gc|get|stats)$/) {
+if ($cmd !~ /^(gc|get|transfer|stats)$/) {
     exit usage();
 } else {
     # Untaint operation
@@ -114,9 +114,43 @@ use libtestbed;
 
 $UID = 0;
 
+if ($cmd ne "stats") {
+    my $expstate;
+    
+    if (! ($expstate = ExpState($pid, $eid))) {
+	die("*** $0:\n".
+	    "    No such experiment $pid/$eid!\n");
+    }
+
+    if ($expstate ne EXPTSTATE_ACTIVE &&
+	$expstate ne EXPTSTATE_ACTIVATING &&
+	$expstate ne EXPTSTATE_MODIFY_RESWAP &&
+	$expstate ne EXPTSTATE_SWAPPING) {
+	die("*** $0:\n".
+	    "    Experiment $pid/$eid must be active (or swapping)! $expstate\n");
+    }
+}
+
+my $exptidx;
+my $rsrcidx;
+my $query_result;
 my $cmdline = "$SSH $PROG $cmd";
 
-if ($cmd eq "get") {
+if ($cmd eq "get" || $cmd eq "transfer") {
+    if ($cmd eq "transfer") {
+	$cmdline = "$SSH $PROG -m get";
+	
+	$query_result =
+	    DBQueryFatal("SELECT e.idx,s.rsrcidx FROM experiments as e ".
+			 "left join experiment_stats as s on e.idx=s.exptidx ".
+			 "where e.pid='$pid' and e.eid='$eid'");
+	
+	if ($query_result->num_rows() != 1) {
+	    die("*** $0:\n".
+		"    Experiment $pid/$eid has no stats!\n");
+	}
+	($exptidx, $rsrcidx) = $query_result->fetchrow_array();
+    }
     $cmdline .= " -m $FSDIR_GROUPS:/groups";
     $cmdline .= " -m $FSDIR_PROJ:/proj";
     $cmdline .= " -m $FSDIR_USERS:/users";
@@ -157,8 +191,59 @@ if ($cmd eq "gc" && defined($pid)) {
 
 close(NT_WRITER);
 
+sub InsertFile($)
+{
+    my ($fn) = @_;
+    my $retval = -1;
+    
+    $fn = DBQuoteSpecial($fn);
+
+    $query = "INSERT IGNORE INTO accessed_files (fn) VALUES ($fn)";
+    $query_result = DBQueryWarn($query);
+    if (!$query_result) {
+	print STDERR
+	    "*** WARNING $0:\n".
+	    "    Failed to insert a new file access record for ".
+		"$pid/$eid\n";
+    }
+
+    $query_result =
+	DBQueryFatal("SELECT idx FROM accessed_files WHERE fn=$fn");
+    
+    if ($query_result->num_rows() != 1) {
+	die("*** $0:\n".
+	    "    Missing file $fn!\n");
+    }
+    ($retval) = $query_result->fetchrow_array();
+
+    return $retval;
+}
+
 while (<NT_READER>) {
-    print "$_";
+    if ($cmd eq "transfer") {
+	if ($_ =~ /^\s?(r|w|rw)\s+(\d+)\s+(.+)$/) {
+	    my $fileidx = InsertFile($3);
+
+	    $query = "REPLACE INTO fs_resources ".
+		"(rsrcidx, fileidx, exptidx, type, size) VALUES (".
+		"$rsrcidx, $fileidx, $exptidx, '$1', $2)";
+	    DBQueryFatal($query);
+	}
+	elsif ($_ =~ /^\s+link\s+(.+)$/) {
+	    my $fileidx = InsertFile($1);
+
+	    $query = "REPLACE INTO fs_resources ".
+		"(rsrcidx, fileidx, exptidx, type, size) VALUES (".
+		"$rsrcidx, $fileidx, $exptidx, 'l', 0)";
+	    DBQueryFatal($query);
+	}
+	else {
+	    print "No match: $_";
+	}
+    }
+    else {
+	print "$_";
+    }
 }
 
 close(NT_READER);
