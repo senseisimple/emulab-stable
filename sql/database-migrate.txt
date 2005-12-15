@@ -2954,3 +2954,24 @@ last_net_act,last_cpu_act,last_ext_act);
         alter table experiment_resources add
              archive_tag varchar(32) NOT NULL default ''
              after delay_capacity;
+
+4.23: [TENTATIVE]
+      Add tables to store the set of files accessed by an experiment.
+
+	CREATE TABLE fs_resources (
+	  rsrcidx int(10) unsigned NOT NULL default '0',
+	  fileidx int(11) unsigned NOT NULL default '0',
+	  exptidx int(10) unsigned NOT NULL default '0',
+	  type enum('r','w','rw','l') default 'r',
+	  size int(11) unsigned default '0',
+	  PRIMARY KEY  (rsrcidx,fileidx),
+	  KEY rsrcidx (rsrcidx),
+	  KEY fileidx (fileidx)
+	) TYPE=MyISAM;
+
+	CREATE TABLE accessed_files (
+	  fn text NOT NULL,
+	  idx int(11) unsigned NOT NULL auto_increment,
+	  PRIMARY KEY  (fn(255)),
+	  KEY idx (idx)
+	) TYPE=MyISAM;

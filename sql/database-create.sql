@@ -5,6 +5,17 @@
 -- Server version	3.23.58-log
 
 --
+-- Table structure for table `accessed_files`
+--
+
+CREATE TABLE accessed_files (
+  fn text NOT NULL,
+  idx int(11) unsigned NOT NULL auto_increment,
+  PRIMARY KEY  (fn(255)),
+  KEY idx (idx)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `archive_tags`
 --
 
@@ -530,6 +541,21 @@ CREATE TABLE foreign_keys (
   table2 varchar(30) NOT NULL default '',
   column2 varchar(30) NOT NULL default '',
   PRIMARY KEY  (table1,column1)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `fs_resources`
+--
+
+CREATE TABLE fs_resources (
+  rsrcidx int(10) unsigned NOT NULL default '0',
+  fileidx int(11) unsigned NOT NULL default '0',
+  exptidx int(10) unsigned NOT NULL default '0',
+  type enum('r','w','rw','l') default 'r',
+  size int(11) unsigned default '0',
+  PRIMARY KEY  (rsrcidx,fileidx),
+  KEY rsrcidx (rsrcidx),
+  KEY fileidx (fileidx)
 ) TYPE=MyISAM;
 
 --
