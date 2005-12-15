@@ -266,6 +266,9 @@ namespace eval GLOBALS {
     # Security level. Defaults to green
     variable security_level 0
 
+    # List of source files.
+    variable sourcefile_list {}
+
     #
     # Named argument helper function.
     #
@@ -430,6 +433,32 @@ proc set {args} {
     return [uplevel real_set \{$var\} \{$val\}]
 }
 
+##################################################
+# Redifing source
+#
+# Trap the "source" command so that we can tell the boss-side caller about
+# any ns files it has to capture and archive.
+#
+##################################################
+rename source real_source
+proc source {args} {
+    var_import GLOBALS::sourcefile_list
+
+    #
+    # Record the name for later.
+    #
+    # XXX Do not record the tb_compat file ...
+    #
+    if {[lindex $args 0] != "tb_compat.tcl"} {
+	lappend sourcefile_list [lindex $args 0]
+    }
+
+    #
+    # The run real command returning value.
+    #
+    return [uplevel real_source \{[lindex $args 0]\}]
+}
+
 ###
 # new <class> ...
 # NS defines the new command to create class instances.  If the call is
@@ -543,7 +572,7 @@ proc parse_delay {dspec} {
 
 if { ${GLOBALS::errors} != 1 } {
     file copy -force ${GLOBALS::tbcompat} .
-    source ${GLOBALS::nsfile}
+    real_source ${GLOBALS::nsfile}
 
     if {${GLOBALS::ran} == 0} {
 	perror "No 'Simulator run' statement found."
