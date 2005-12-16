@@ -295,9 +295,11 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	# Auto-swap
 	#
         if (!$formfields['when']) {
-          $when = "never";
+          $when  = $aswaptime;
+          $units = $aswapunits;
         } else {
-          $when = $formfields['when'];
+          $when  = $formfields['when'];
+          $units = $formfields['units'];
         }
 	echo "<tr>
 	         <td><a href='plab_ez_footnote7.html'
@@ -305,12 +307,18 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	         <td>
 		    <input type='text' size=6 name='formfields[when]'
 		           value='$when'>
-		    <select name='formfields[units]'>
-		    <option value='1' selected>Hours</option>
-		    <option value='24'>Days</option>
-		    <option value='168'>Weeks</option>
-		    </select>
-		 </td>
+		    <select name='formfields[units]'>";
+        foreach (array(1 => 'Hours', 24 => 'Days', 168 => 'Weeks') 
+                 as $mult => $label) {
+            if (strcmp($mult,$units) == 0) {
+                echo "<option value='$mult' selected>$label</option>";
+            } else {
+                echo "<option value='$mult'>$label</option>";
+            }
+        }
+        echo "
+		  </select>
+	        </td>
 	      </tr>\n";
 
 	#
