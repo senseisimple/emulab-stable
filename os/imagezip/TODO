@@ -24,13 +24,15 @@ Things to do for image*:
    file reading and decompression that are currently one in imageunzip.
 
 6. Create a "signature" file for an image using a collision-resistant hash
-   like MD5 or SHA-1.  See TODO.hash for more.
+   like MD5 or SHA-1.  See TODO.hash for more. [DONE -- as a separate
+   program, imagehash.  It would be more efficient to have imagezip create
+   the signature as it does. ]
 
 7. Add an option to exclude (skip) disk blocks outside of any DOS partition.
    By default, we want to include these blocks in the image since some
    systems stash magic info this way (IBM laptops for instance).  But in
    some cases we want to ignore it.  Since the MBR often falls in the
-   outside-of-any-partition catagory (e.g., DOS partition 1 starting at
+   outside-of-any-partition category (e.g., DOS partition 1 starting at
    sector 63, aka cylinder 1), we may need to further break this down into
    "before first part", "between parts", "after last part".  Also need an
    option to exclude space outside a filesystem but inside a DOS partition
@@ -72,3 +74,38 @@ Things to do for image*:
    approach (#6 above), or we could include a single, coarser-grained
    hash/checksum for each chunk.
 
+9. Recognize unused filesystem metadata blocks.
+   Right now we pretty much leave FS metadata structures alone and thus
+   consider them allocated, we might be able to improve on that.  In
+   particular, free UNIX-like inode data structures consume a lot of space.
+   However, free inodes still need to have some initialized fields, at
+   the very least, the mode field needs to be zero.  But we could create
+   a relocation-type for inode blocks, telling imageunzip that a particular
+   block range consists of unused inodes and that it should zero those
+   blocks rather than just skip them.  The downside is that there are a lot
+   of different inode layouts, and that is a lot of specific knowledge for
+   imageunzip.  We could get away with a generic relocation that just says
+   zero this block range.  Some BSDs like to randomize the initial generation
+   number on an inode though, so this would not work for that.  But I could
+   imagine a relocation type that says "place X-bytes of random data every
+   Y bytes starting at offset Z in this range".  I can imagine it, but I
+   just cannot bring myself to do it!  At any rate, I'm not sure the saving
+   vs. complexity trade-off is in our favor here.
+
+   A quick check: out FreeBSD image consists of 3 filesystems.  Lets just
+   consider /usr (a 2GB filesystem) which has 23552 inodes per cylinder group
+   with 12 cylinder groups.  Each inode is 128 bytes so that is 36 (decimal)
+   megabytes of which about 80% are free.  Allowing for scattering of the
+   allocated inodes, we could still have upwards of 20MB of free blocks of
+   inodes.
+
+10. Treat zero blocks special.
+   This is prompted by the zero-this-range relocation postulated in #9.
+   There might be value is distinguishing block ranges that must be zero
+   (e.g., allocated data blocks that contain all zeros, or free inode blocks
+   that require certain fields to be zero) and just note them in the image
+   header range data.  Maybe save as a relocation type as above or just as
+   a distinguished allocated range type.  The question is whether we can
+   efficiently recognize such blocks and whether we ultimately save space
+   over just allowing zlib to compress the data (presumably blocks of zeros
+   compress really well!)
