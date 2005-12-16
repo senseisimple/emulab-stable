@@ -5,7 +5,7 @@
     begin                : Wed Jun 23 2004
     author               : Ioan S. Popescu
 
-Copyright (C) 2004 DATAQ Instruments, Inc. <develop@dataq.com>
+Copyright (C) 2004, 2005 DATAQ Instruments, Inc. <develop@dataq.com>
 
 This program is free software; you can redistribute it and/or 
 modify it under the terms of the GNU General Public License 
@@ -29,6 +29,7 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 #include "di_serial_io.h"
 
+#include <string.h>
 #include <unistd.h>   // UNIX standard function definitions
 #include <sys/ioctl.h>// IO port control function definitions
 #include <time.h>     // Time function definitions
@@ -90,6 +91,11 @@ const u_int16_t di_serial_io::connect(const char *const dev_file, const u_int8_t
     my_errno = errno;
     return my_errno; // same error codes as tcgetattr()
   }
+
+  if (!strncmp(dev_file, "/dev/tip", 8)) {
+      return 0;
+  }
+  
   // get copy of other current serial port settings to restore later
   if(ioctl(m_comm_fd, TIOCMGET, &m_old_tiocm) == -1)
   {

@@ -9,13 +9,15 @@ using namespace std;
 #include "powerMeasure.h"
 #include "exceptions.h"
 
-int main(void)
+int main(int argc, char *argv[])
 {
     vector<double> calPoints;
 
     PowerMeasure::readVtoItable("cal.txt",&calPoints);
     string sampleFile = "/tmp/dataq.dat";
     string serialPath = "/dev/ttyS0";
+    if (argc == 2)
+	serialPath = argv[1];
     PowerMeasure pwrMeasure( &serialPath, 2, 240.0, &calPoints );
     pwrMeasure.setFile( &sampleFile, 240*75 );
 //    pwrMeasure.enableVoltageLogging();
