@@ -53,7 +53,7 @@ include $(TESTBED_SRCDIR)/GNUmakerules
 
 rootball:	$(ROOTBALLNAME)
 
-$(ROOTBALLNAME): copyfiles
+$(ROOTBALLNAME): copyfiles mkhosts
 	chown -R 0:0 plabroot
 	tar cf - --numeric-owner -C plabroot . | bzip2 -c -9 > $(ROOTBALLNAME)
 
@@ -83,6 +83,11 @@ mkdirtree:
 	mkdir -p plabroot/etc
 	mkdir -p plabroot/bin
 	ln -fs ../usr/local/etc/emulab plabroot/etc/emulab
+
+mkhosts:
+	echo "127.0.0.1 localhost"               >  plabroot/etc/hosts
+	echo "@EXTERNAL_BOSSNODE_IP@ @BOSSNODE@" >> plabroot/etc/hosts
+	echo "@EXTERNAL_USERNODE_IP@ @USERNODE@" >> plabroot/etc/hosts
 
 tmcc:
 	@echo "*** Error:"
