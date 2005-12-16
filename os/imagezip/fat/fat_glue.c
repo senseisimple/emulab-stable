@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003, 2004 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -17,13 +17,6 @@
 #include "sliceinfo.h"
 #include "global.h"
 #include "fat_glue.h"
-
-/* XXX */
-extern int debug;
-extern void addskip(uint32_t start, uint32_t size);
-extern int secsize;
-#define sectobytes(s)	((off_t)(s) * secsize)
-#define bytestosec(b)	(uint32_t)((b) / secsize)
 
 static u_int32_t fat_offset, fat_limit;
 static int fatsecpersec;
