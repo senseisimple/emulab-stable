@@ -51,6 +51,14 @@ earliest time one of the steps needs to occur.
          remove any "Protocol" directives from /root/.ssh/config on
          boss and ops.
 
+         In your database:
+
+         You'll need to update the key stored in the node/ssh_pubkey
+         variable to contain the public half of the new v2 rsa key you
+         created for root on boss.  This key will be automatically
+         distributed to the nodes as they boot up when using images
+         dating from late 2004 onward.
+
          For your default disk images:
 
          Add the contents of /root/.ssh/id_rsa.pub on your boss node
