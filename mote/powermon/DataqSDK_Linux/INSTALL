@@ -1,0 +1,57 @@
+DataqSDK 1.0 (beta) for Linux
+
+Refer to the README first.
+
+BUILDING THE LIBRARY:
+
+[DataqSDK]$ make
+
+-for static binary:
+  [DataqSDK]$ make static
+
+-for shared binary:
+  [DataqSDK]$ make shared
+
+  *you may need to install the shared library, unless you plan on linking
+   it yourself
+  *ROOT OPERATION (use "su" to become root)
+
+  [DataqSDK]# make install
+
+  *to go back to normal user, use "exit"
+
+*Note: to install the precompiled shared library, first move it to the
+"DataqSDK" directory and then perform the "make install"
+
+*Note: to uninstall the library, do the following as root:
+  [DataqSDK]# make uninstall
+
+-------------------------------------------------------------------------------
+
+BUILDING EXAMPLE PROGRAM:
+
+-Static library:
+  1) Copy the precompiled static library (*.a) to the example directory:
+      [dataqsdk_example]$ cp ../DataqSDK/precompiled/libdataqsdk.a .
+  2) Build the example:
+      [dataqsdk_example]$ make static-example
+    *Note: The shared library must not be installed for the static library to
+           work properly.
+  3) Example program usage: ./static-example [sample rate] [scans] [channels]
+      [dataqsdk_example]$ ./static-example 240.00 100 5
+
+-Shared library:
+  1) Copy the precompiled shared library (*.so.*) to the "DataqSDK" directory:
+      [DataqSDK]$ cp precompiled/libdataqsdk.so.0.0 .
+  2) Install the library:
+      [DataqSDK]$ make install
+      *Note: This must be done as root.
+  3) Build the example:
+      [dataqsdk_example]$ make shared-example
+  4) Example program usage: ./shared-example [sample rate] [scans] [channels]
+      [dataqsdk_example]$ ./shared-example 240.00 100 5
+
+
+*You may also use the precompiled example binaries in the "precompiled"
+directory. Note, however, that the shared library must still be installed
+before it can be used by the shared-example program.
