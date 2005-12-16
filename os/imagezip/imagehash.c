@@ -31,36 +31,12 @@
 #endif
 
 #include "imagehdr.h"
+#include "imagehash.h"
 #include "queue.h"
 
 #ifndef linux
 #define TIMEIT
 #endif
-
-#define HASH_MAGIC	".ndzsig"
-#define HASH_VERSION	0x20031107
-#define HASHBLK_SIZE	(64*1024)
-#define HASH_MAXSIZE	20
-
-struct hashregion {
-	struct region region;
-	uint32_t chunkno;
-	unsigned char hash[HASH_MAXSIZE];
-};
-
-struct hashinfo {
-	uint8_t	 magic[8];
-	uint32_t version;
-	uint32_t hashtype;
-	uint32_t nregions;
-	uint8_t	 pad[12];
-	struct hashregion regions[0];
-};
-
-#define HASH_TYPE_MD5	1
-#define HASH_TYPE_SHA1	2
-#define HASH_TYPE_RAW	3
-
 
 #define MAXREADBUFMEM	(8*HASHBLK_SIZE)	/* 0 == unlimited */
 
@@ -728,8 +704,8 @@ fullcmp(void *p1, void *p2, off_t sz, uint32_t soff)
 		if (ip[off] == dp[off]) {
 			if (boff != -1 &&
 			    off+1 < sz && ip[off+1] == dp[off+1]) {
-				fprintf(stderr, " [%llu-%llu]: bad",
-					byoff+boff, byoff+off-1);
+				fprintf(stderr, " [%llu-%llu] (sect %u): bad",
+					byoff+boff, byoff+off-1, soff);
 				reloc = hasrelocs(byoff+boff, off-boff);
 				if (reloc)
 					fprintf(stderr, " (overlaps reloc [%llu-%llu])",
