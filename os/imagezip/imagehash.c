@@ -333,6 +333,12 @@ readhashinfo(char *name, struct hashinfo **hinfop)
 	return 0;
 }
 
+/*
+ * We realloc the region array in big chunks so we don't thrash so much.
+ * This is the number of ~32 byte regions per memory chunk
+ */
+#define REGPERBLK	8192	/* ~256KB -- must be power of 2 */
+
 static void
 addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	unsigned char hash[HASH_MAXSIZE])
@@ -351,17 +357,19 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 
 	if (hinfo == 0) {
 		nreg = 0;
-		hinfo = calloc(1, sizeof(*hinfo) + sizeof(struct hashregion));
+		hinfo = calloc(1, sizeof(*hinfo));
 	} else {
 		nreg = hinfo->nregions;
+	}
+	if ((nreg % REGPERBLK) == 0) {
 		hinfo = realloc(hinfo, sizeof(*hinfo) +
-				(nreg+1) * sizeof(struct hashregion));
+				(nreg+REGPERBLK) * sizeof(struct hashregion));
+		if (hinfo == 0) {
+			fprintf(stderr, "out of memory for hash map\n");
+			exit(1);
+		}
+		*hinfop = hinfo;
 	}
-	if (hinfo == 0) {
-		fprintf(stderr, "out of memory for hash map\n");
-		exit(1);
-	}
-	*hinfop = hinfo;
 
 	hinfo->regions[nreg].chunkno = chunkno;
 	hinfo->regions[nreg].region.start = start;
