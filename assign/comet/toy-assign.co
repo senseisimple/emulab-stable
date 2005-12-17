@@ -1,0 +1,149 @@
+/*
+ * Toy version of assign, written in Comet
+ * Robert Ricci <ricci@cs.utah.edu>
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2005 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+string rcsid = "$Id: toy-assign.co,v 1.1 2005-12-17 00:46:45 ricci Exp $";
+
+/*
+ * Include some routines for a local solver
+ */
+include "LocalSolver";
+
+/*
+ * Declare the local solver
+ */
+LocalSolver m();
+
+/*
+ * Virtual nodes
+ */
+int n_vnodes = 100;
+range VSize = 1..n_vnodes;
+UniformDistribution vdistr(VSize);
+
+/*
+ * Physical nodes
+ */
+int n_pnodes = 100;
+range PSize = 1..n_pnodes;
+UniformDistribution pdistr(PSize);
+range MaxSlots = 1..100;
+
+/*
+ * Mapping of virtual to physical
+ */
+var{int}[] mapping = new var{int}[VSize];
+forall (i in VSize) {
+    mapping[i] = new var{int}(m,PSize);
+    // Start them on random pnodes
+    mapping[i] := pdistr.get();
+}
+
+/*
+ * Constraints
+ */
+ConstraintSystem S(m);
+
+/*
+ * All virtual nodes must be mapped to different physical nodes
+ * Now done with slot counts - see below
+ */
+//S.post(alldifferent(mapping));
+
+/*
+ * Put a constraint on how many vnodes can be on each pnode
+ */
+int slots[PSize];
+forall (k in PSize) {
+    // For now, every pnode gets one slot
+    slots[k] = 1;
+}
+/*
+ * This line says:
+ *   for every index i in the slots array:
+ *     i must appear as a value in mapping no more than slots[i] timex
+ *
+ */
+S.post(atmost(slots,mapping));
+
+/*
+ * Maintain a list of how many slots are used in each pnode. This will get
+ * automatically updated for us by Comet
+ */
+var{int} pnodeSlotsUsed[node in PSize](m)
+    <- sum(k in VSize) (mapping[k] == node);
+
+/*
+ * Maintain a set of empty pnodes.
+ * Again, maintained incrementally by Comet
+ */
+var{set{int}} emptyPnodes(m) <- setof(k in PSize) (pnodeSlotsUsed[k] == 0);
+
+/*
+ * Let's get a set of nodes with remaining capacity too
+ */
+var{set{int}} pnodesWithSpace(m)
+    <- setof(k in PSize) (pnodeSlotsUsed[k] < slots[k]);
+
+/*
+ * A simple objective function - minimize the number of pnodes used
+ */
+/*
+Objective O = new MaxNbDistinct(slots, mapping);
+*/
+
+/*
+ * This says we're done adding constraints to the solver
+ */
+m.close();
+
+cout << "Starting" << endl;
+int it = 0;
+int max_it = 50 * n_vnodes;
+/*
+ * Termination condidtions
+ */
+while (S.violations() > 0
+        &&
+        it < max_it ) {
+    /*
+     * The actual search
+     */
+    /*
+     * queens-style search
+    selectMax(q in VSize)(S.getViolations(mapping[q])) 
+        selectMin(v in VSize)(S.getAssignDelta(mapping[q],v)) 
+        mapping[q] := v;      
+        */
+    /*
+     * Purely random search
+    select(vnode in VSize)
+        select(pnode in mapping[vnode].getDomain())
+            mapping[vnode] := pnode;
+     */
+
+    /*
+     * Slightly smarter search
+     */
+    // Pick the most violated virtual node
+    selectMax(vnode in VSize)(S.violations(mapping[vnode])) {
+        // Put it on the first pnode with remaining capacity we find
+        selectFirst(pnode in pnodesWithSpace) {
+            mapping[vnode] := pnode;
+        }
+    }
+    //cout << "On iteration " << it << endl;
+    it++;
+}
+
+forall(i in VSize) {
+    cout << "mapping[" << i << "] = " << mapping[i] << endl;
+}
+
+cout << "Done after " << it << " iterations" << endl;
+cout << "Number of violations is " << S.violations() << endl;
+// cout << "Objective functions returns " << O.evaluation() << endl;
