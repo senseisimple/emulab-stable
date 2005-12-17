@@ -19,10 +19,10 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT "Usage: create-swapimage [-f]\n";
+    print STDOUT "Usage: create-swapimage [-fs]\n";
     exit(-1);
 }
-my  $optlist = "f";
+my  $optlist = "fs";
 
 #
 # Turn off line buffering on output
@@ -51,6 +51,7 @@ my $zipper = "$zipperdir/$zipperbin";
 my $device;
 my $filename;
 my $fullimage = 0;
+my $statsonly = 0;
 my $args = "";
 
 #
@@ -67,6 +68,9 @@ if (@ARGV > 0) {
 if ($options{"f"}) {
     $fullimage = 1;
 }
+if ($options{"s"}) {
+    $statsonly = 1;
+}
 
 my ($pid, $eid, $vname) = check_nickname();
 if (!defined($eid)) {
@@ -81,6 +85,9 @@ if (! -r "$vname.part" || (! $fullimage && ! -r "$vname.sig")) {
 
 $args = "-H $vname.sig"
     if (!$fullimage);
+
+$args .= " -i"
+    if ($statsonly);
 
 my $info = `cat $vname.part`;
 if ($info !~ /DISK=(\w+) LOADPART=([0-4]) BOOTPART=([1-4])/) {
@@ -118,25 +125,28 @@ if ($lpart != 0) {
     $args .= " -s $lpart";
 }
 
-#
-# Save the old swap image if it exists, both as a backup and so that the
-# imagefile size starts at zero for the benefit of monitoring processes.
-#
-my $ofilename = "$filename.OLD";
-if (-e $filename) {
-    unlink($ofilename);
-    if (!rename($filename, $ofilename)) {
-	warn("$me: could not back up old image, clobbering it!");
-	unlink($filename);
-	$ofilename = "";
+my $ofilename = "";
+if (!$statsonly) {
+    #
+    # Save the old swap image if it exists, both as a backup and so that the
+    # imagefile size starts at zero for the benefit of monitoring processes.
+    #
+    my $ofilename = "$filename.OLD";
+    if (-e $filename) {
+	unlink($ofilename);
+	if (!rename($filename, $ofilename)) {
+	    warn("$me: could not back up old image, clobbering it!");
+	    unlink($filename);
+	    $ofilename = "";
+	}
     }
-}
 
-#
-# Create the new file now so it is owned by the user and not root
-#
-if (!open(FILE, "> $filename") || !close(FILE)) {
-    goto failed;
+    #
+    # Create the new file now so it is owned by the user and not root
+    #
+    if (!open(FILE, "> $filename") || !close(FILE)) {
+	goto failed;
+    }
 }
 
 #
@@ -149,14 +159,18 @@ if (-x "/proj/$pid/bin/$zipperbin") {
     warn("$me: using alternate zipper $zipper\n");
 }
 
+mkdir("logs")
+    if (! -d "logs");
+my $logfile = "logs/imagezip.$vname." . time();
+
 #
 # Run the command using sudo, since by definition only testbed users
 # with proper trust should be able to zip up a disk. sudo will fail
 # if the user is not in the proper group.
 #
-print STDERR "$me: doing '$sudo $zipper $args $device $filename'\n"
+print STDERR "$me: doing '$sudo $zipper $args $device $filename >$logfile'\n"
     if ($debug);
-if (system("$sudo $zipper $args $device $filename") == 0) {
+if (system("$sudo $zipper $args $device $filename >$logfile 2>&1") == 0) {
     #
     # Get rid of the backup image
     #
