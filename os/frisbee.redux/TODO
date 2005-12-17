@@ -139,6 +139,14 @@ ENHANCEMENTS:
    reasonable loss metric now, just need a smooth weighted decay formula
    we can use.  Look at the proposed standard TCP-friendly rate equation.
 
+7. Partial last chunks.
+
+   This is way-nit-like comparted to the others.  The "must be a multiple
+   of 1MB (chunksize)" requirement for images can be onerous for the
+   so-called delta images which can be only a couple hundred KB.  By allowing
+   the last chunk in the image file to be partial, and having imageunzip
+   and frisbeed pad it out, we can save a lot of disk space for these
+   small images.
 
 PROBLEMS:
 
