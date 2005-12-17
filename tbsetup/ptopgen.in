@@ -326,6 +326,10 @@ if (defined($exempt_eid)) {
     $free_condition = "($free_condition or ".
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
 }
+elsif (defined($pid)) {
+    $free_condition = "($free_condition and ".
+	"(np.reserved_pid is null or np.reserved_pid='$pid'))";
+}
 
 # If the user wants all nodes, we consider everything to be free (this
 # overrides the other possible free conditions

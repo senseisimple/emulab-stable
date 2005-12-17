@@ -104,7 +104,7 @@ function SHOWFREENODES()
 		     "left join node_types as nt on n.type=nt.type ".
 		     "left join reserved as r on r.node_id=n.node_id ".
 		     "where (role='testnode') and class='pc' ".
-		     "      and r.pid is null ".
+		     "      and r.pid is null and n.reserved_pid is null ".
 		     "group BY n.eventstate,n.type");
 
     while ($row = mysql_fetch_array($query_result)) {

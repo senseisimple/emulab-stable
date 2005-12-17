@@ -215,7 +215,7 @@ if (! strcmp($showtype, "summary")) {
 		     "where (role='testnode') and ".
 		     "      (nt.class!='shark' and nt.class!='pcRemote' ".
 		     "      and nt.class!='pcplabphys') ".
-		     "      and r.pid is null ".
+		     "      and r.pid is null and n.reserved_pid is null ".
 		     "group BY n.eventstate,n.type");
 
     while ($row = mysql_fetch_array($query_result)) {

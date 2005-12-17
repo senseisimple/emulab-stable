@@ -2031,6 +2031,7 @@ function SHOWNODE($node_id, $flags = 0) {
     $battery_percentage = $row[battery_percentage];
     $battery_timestamp  = $row[battery_timestamp];
     $boot_errno         = $row[boot_errno];
+    $reserved_pid       = $row[reserved_pid];
 
     if (!$def_boot_cmd_line)
 	$def_boot_cmd_line = "&nbsp";
@@ -2349,6 +2350,15 @@ function SHOWNODE($node_id, $flags = 0) {
 	    echo "<tr>
                       <td>Role:</td>
                       <td class=left>$rsrvrole</td>
+                  </tr>\n";
+	}
+	
+	if ($reserved_pid) {
+	    echo "<tr>
+                      <td>Reserved Pid:</td>
+                      <td class=left>
+                          <a href='showproject.php3?pid=$reserved_pid'>
+                               $reserved_pid</a></td>
                   </tr>\n";
 	}
 	

@@ -74,7 +74,7 @@ if (! $isadmin &&
 }
 
 $query_result =
-    DBQueryFatal("select r.vname,r.pid,r.eid from nodes as n ".
+    DBQueryFatal("select r.vname,r.pid,r.eid,n.reserved_pid from nodes as n ".
 		 "left join reserved as r on n.node_id=r.node_id ".
 		 "where n.node_id='$node_id'");
 
@@ -86,6 +86,7 @@ $row = mysql_fetch_array($query_result);
 $vname		= $row[vname];
 $pid 		= $row[pid];
 $eid		= $row[eid];
+$reserved_pid   = $row[reserved_pid];
 
 if (isset($pid) && $vname != "") {
     echo " (<b>".
@@ -174,6 +175,17 @@ if ($isadmin || STUDLY() || OPSGUY()) {
 if ($isadmin || STUDLY() || OPSGUY()) {
     WRITESUBMENUBUTTON("Modify Node Attributes",
                        "modnodeattributes_form.php3?node_id=$node_id");
+}
+
+if ($isadmin) {
+    if (!isset($reserved_pid)) {
+	WRITESUBMENUBUTTON("Pre-Reserve Node",
+			   "prereserve_node?node_id=$node_id");
+    }
+    else {
+	WRITESUBMENUBUTTON("Clear Pre-Reserve",
+			   "prereserve_node?node_id=$node_id&clear=1");
+    }
 }
 
 SUBMENUEND();

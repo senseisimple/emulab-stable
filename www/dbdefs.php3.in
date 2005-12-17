@@ -1475,6 +1475,7 @@ function TBFreePCs()
 		     "left join nodetypeXpid_permissions as p ".
 		     "  on a.type=p.type ".
 		     "where b.node_id is null and a.role='testnode' ".
+                     "  and a.reserved_pid is null ".
 		     "  and nt.class = 'pc' and p.pid is null and ".
                      "      (a.eventstate='" . TBDB_NODESTATE_ISUP . "' or ".
                      "       a.eventstate='" . TBDB_NODESTATE_PXEWAIT . "') and".
