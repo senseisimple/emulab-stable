@@ -10,8 +10,9 @@ OBJDIR		= ../..
 SUBDIR		= os/imagezip
 DISTFILES	= global.h imagehdr.h queue.h sliceinfo.h \
 		  imagedump.c imagedump.8 imagezip.c imagezip.8 \
-		  imageunzip.c crc.c imageunzip.8 \
-		  extfs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc] shd/*.[hc]
+		  imageunzip.c crc.c disksize.c imageunzip.8 \
+		  extfs/*.[hc] fat/*.[hc] ffs/*.[hc] ntfs/*.[hc] shd/*.[hc] \
+		  hashmap/*.[hc]
 
 EXPANDCOPYRIGHT	= /usr/site/lib/copyright/expand-copyr
 
@@ -55,6 +56,7 @@ WITH_FFS	= 1
 WITH_EXTFS	= 1
 WITH_NTFS	= @WINSUPPORT@
 WITH_FAT	= @WINSUPPORT@
+WITH_HASH	= 1
 
 include $(OBJDIR)/Makeconf
 
@@ -79,6 +81,8 @@ endif
 
 CFLAGS		= $(SUBDIRCFLAGS) -I$(SRCDIR) -static
 LIBS 		= -lz
+ZIPCFLAGS	= $(CFLAGS) -Wall
+ZIPLIBS		= 
 UNZIPCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
 UNZIPLIBS	= $(LIBS) $(PTHREADLIBS)
 HASHCFLAGS	= $(CFLAGS) $(PTHREADCFLAGS) -Wall
@@ -88,14 +92,14 @@ HASHLIBS	= $(LIBS) -lcrypto $(PTHREADLIBS)
 ifeq ($(WITH_FFS),1)
 CFLAGS		+= -DWITH_FFS
 SUBDIRS		+= ffs
-FSLIBS		+= ffs/libffs.a
+ZIPLIBS		+= ffs/libffs.a
 endif
 
 # EXT2/EXT3
 ifeq ($(WITH_EXTFS),1)
 CFLAGS		+= -DWITH_EXTFS
 SUBDIRS		+= extfs
-FSLIBS		+= extfs/libextfs.a
+ZIPLIBS		+= extfs/libextfs.a
 endif
 
 # with NTFS
@@ -105,9 +109,9 @@ CC		= gcc30
 endif
 CFLAGS		+= -DWITH_NTFS
 SUBDIRS		+= ntfs
-FSLIBS		+= ntfs/libntfs.a
+ZIPLIBS		+= ntfs/libntfs.a
 ifndef HAVE_LOCALE
-FSLIBS		+= ntfs/liblocale.a
+ZIPLIBS		+= ntfs/liblocale.a
 endif
 endif
 
@@ -115,15 +119,24 @@ endif
 ifeq ($(WITH_FAT),1)
 CFLAGS		+= -DWITH_FAT
 SUBDIRS		+= fat
-FSLIBS		+= fat/libfat.a
+ZIPLIBS		+= fat/libfat.a
 endif
 
 # with SHD
 ifeq ($(WITH_SHD),1)
 CFLAGS		+= -DWITH_SHD
 SUBDIRS		+= shd
-FSLIBS		+= shd/libshd.a
+ZIPLIBS		+= shd/libshd.a
 SHDLIBS		+= shd/libshd.a
+endif
+
+# with HASH
+ifeq ($(WITH_HASH),1)
+CFLAGS		+= -DWITH_HASH -DHASHSTATS
+SUBDIRCFLAGS	+= -DHASHSTATS
+SUBDIRS		+= hashmap
+ZIPLIBS		+= hashmap/libhashmap.a
+LIBS		+= -lcrypto $(PTHREADLIBS)
 endif
 
 all:	$(SUBDIRS) imagezip imageunzip imagedump imagehash
@@ -137,8 +150,11 @@ endif
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-imagezip: imagezip.o version.o $(FSLIBS)
-	$(CC) $(CFLAGS) imagezip.o version.o $(LIBS) $(FSLIBS) -o imagezip
+imagezip: imagezip.o disksize.o version.o $(ZIPLIBS)
+	$(CC) $(CFLAGS) imagezip.o disksize.o version.o $(ZIPLIBS) $(LIBS) -o imagezip
+
+imagezip.o:	imagezip.c
+	$(CC) -c $(ZIPCFLAGS) -o imagezip.o $<
 
 imageunzip: imageunzip.o crc.o version.o 
 	$(CC) $(CFLAGS) imageunzip.o crc.o version.o $(UNZIPLIBS) -o imageunzip
@@ -155,12 +171,12 @@ imagehash: imagehash.o version.o
 imagehash.o:	imagehash.c
 	$(CC) -c $(HASHCFLAGS) -o imagehash.o $<
 
-ffs extfs ntfs fat shd:
+ffs extfs ntfs fat shd hashmap:
 	@$(MAKE) SUBDIRCFLAGS="$(SUBDIRCFLAGS)" -C $@ all
 
 imagezip.o: sliceinfo.h imagehdr.h global.h
 imageunzip.o: imagehdr.h
-imagehash.o: imagehdr.h
+imagehash.o: imagehdr.h imagehash.h
 
 version.c: imagezip.c imageunzip.c imagedump.c
 	echo >$@ "char build_info[] = \"Built `date +%d-%b-%Y` by `id -nu`@`hostname | sed 's/\..*//'`:`pwd`\";"

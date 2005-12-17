@@ -53,7 +53,14 @@ int	retrywrites= 1;
 int	dorelocs  = 1;
 off_t	datawritten;
 partmap_t ignore, forceraw;
+
+#ifdef WITH_SHD
 char	*chkpointdev;
+#endif
+
+#ifdef WITH_HASH
+char	*hashfile;
+#endif
 
 #define HDRUSED(reg, rel) \
     (sizeof(blockhdr_t) + \
@@ -66,6 +73,7 @@ char	*chkpointdev;
  *
  * These numbers are in sectors.
  */
+extern unsigned long getdisksize(int fd);
 unsigned long inputminsec	= 0;
 unsigned long inputmaxsec	= 0;	/* 0 means the entire input image */
 
@@ -89,6 +97,7 @@ void	sortrange(struct range *head, int domerge,
 int	mergeskips(int verbose);
 int	mergeranges(struct range *head);
 void    makeranges(void);
+void	freeranges(struct range *);
 void	dumpranges(int verbose);
 void	addvalid(uint32_t start, uint32_t size);
 void	addreloc(off_t offset, off_t size, int reloctype);
@@ -105,6 +114,11 @@ void	usage(void);
 #ifdef WITH_SHD
 int	read_shd(char *shddev, char *infile, int infd, u_int32_t ssect,
 		 void (*add)(uint32_t, uint32_t));
+#endif
+
+#ifdef WITH_HASH
+struct range *hashmap_compute_delta(struct range *, char *, int, u_int32_t);
+void	report_hash_stats(void);
 #endif
 
 static SLICEMAP_PROCESS_PROTO(read_slice);
@@ -351,15 +365,18 @@ main(int argc, char *argv[])
 	char	*outfilename = 0;
 	int	rawmode	  = 0;
 	int	slicetype = 0;
+	struct timeval sstamp;
 	extern char build_info[];
 
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:")) != -1)
+	gettimeofday(&sstamp, 0);
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:H:")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
 			break;
 		case 'i':
 			info++;
+			debug++;
 			break;
 		case 'D':
 			retrywrites = 0;
@@ -421,7 +438,20 @@ main(int argc, char *argv[])
 			forcereads++;
 			break;
 		case 'C':
+#ifdef WITH_SHD
 			chkpointdev = optarg;
+#else
+			fprintf(stderr, "'C' option not supported\n");
+			usage();
+#endif
+			break;
+		case 'H':
+#ifdef WITH_HASH
+			hashfile = optarg;
+#else
+			fprintf(stderr, "'H' option not supported\n");
+			usage();
+#endif
 			break;
 		case 'h':
 		case '?':
@@ -431,7 +461,7 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (version || info || debug) {
+	if (version || debug) {
 		fprintf(stderr, "%s\n", build_info);
 		if (version) {
 			fprintf(stderr, "Supports");
@@ -442,6 +472,9 @@ main(int argc, char *argv[])
 						fsmap[ch].desc);
 #ifdef WITH_SHD
 			fprintf(stderr, ", SHD device");
+#endif
+#ifdef WITH_HASH
+			fprintf(stderr, ", hash-signature comparison");
 #endif
 			fprintf(stderr, "\n");
 			exit(0);
@@ -468,9 +501,6 @@ main(int argc, char *argv[])
 	else
 		outfilename = argv[1];
 
-	if (info && !debug)
-		debug++;
-
 	if (!slicemode && dorelocs)
 		dorelocs = 0;
 
@@ -480,8 +510,19 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (chkpointdev) {
+#if 0
+	/*
+	 * Use OS-specific techniques to discover the size of the disk.
+	 * Note that this could produce an image that will not fit on a
+	 * smaller disk, as imagezip will consider any space beyond the
+	 * final partition as allocated and will record the ranges.
+	 */
+	if (!slicemode && !maxmode)
+		inputmaxsec = getdisksize(infd);
+#endif
+
 #ifdef WITH_SHD
+	if (chkpointdev) {
 		rval = 0;
 		if (dorelocs) {
 			fprintf(stderr, "WARNING: no relocation info "
@@ -515,11 +556,9 @@ main(int argc, char *argv[])
 			fprintf(stderr, "* * * Aborting * * *\n");
 			exit(1);
 		}
-#else
-		fprintf(stderr, "Checkpoint device not supported\n\n");
-		usage();
+	} else
 #endif
-	} else {
+	{
 		/*
 		 * Create the skip list by scanning the filesystems on
 		 * the disk or indicated partition.
@@ -541,40 +580,95 @@ main(int argc, char *argv[])
 		/*
 		 * Create a valid range list from the skip list
 		 */
-		(void) mergeskips(info || debug > 2);
+		(void) mergeskips(debug > 1);
 		if (debug)
-			dumpskips(info || debug > 2);
+			dumpskips(debug > 1);
 		makeranges();
 	}
 	if (debug)
-		dumpranges(info || debug > 2);
+		dumpranges(debug > 1);
+
 	sortrange(fixups, 0, cmpfixups);
 	fflush(stderr);
 
-	if (info) {
-		close(infd);
-		exit(0);
-	}
+#ifdef WITH_HASH
+	/*
+	 * If we are creating a "delta" image from a hash signature,
+	 * we read in the signature info and reconcile that with the
+	 * known allocated range that we have just computed.  The result
+	 * is a new list of ranges that are currently allocated and that
+	 * have changed from the signature version.
+	 *
+	 * XXX we need to consider relocations here.  If an existing
+	 * range has an associated fixup, we should always include it in
+	 * the image.
+	 */
+	if (hashfile != NULL) {
+		struct range *nranges;
 
-	if (strcmp(outfilename, "-")) {
-		if ((outfd = open(outfilename, O_RDWR|O_CREAT|O_TRUNC, 0666))
-		    < 0) {
-			perror("opening output file");
-			exit(1);
+		/*
+		 * next compare allocated 'ranges' and 'hinfo' to find out the
+		 * changed blocks -- computing the hashes for some 'ranges'
+		 * in the process
+		 */
+		nranges = hashmap_compute_delta(ranges, hashfile, infd,
+						inputminsec);
+		if (nranges == NULL)
+			fprintf(stderr, "NO differences !!!!\n");
+
+		freeranges(ranges);
+		ranges = nranges;
+
+		if (debug) {
+			fprintf(stderr, "\nAfter delta computation: ");
+			dumpranges(debug > 1);
 		}
-		outcanseek = 1;
+		report_hash_stats();
 	}
-	else {
-		outfd = fileno(stdout);
-		outcanseek = 0;
-		retrywrites = 0;
-	}
-	compress_image();
+#endif
+
+	/*
+	 * Now we have all the allocated information, create the image
+	 * (unless we just want an info report).
+	 */
+	if (!info) {
+		if (strcmp(outfilename, "-")) {
+			if ((outfd = open(outfilename, O_RDWR|O_CREAT|O_TRUNC,
+					  0666)) < 0) {
+				perror("opening output file");
+				exit(1);
+			}
+			outcanseek = 1;
+		}
+		else {
+			outfd = fileno(stdout);
+			outcanseek = 0;
+			retrywrites = 0;
+		}
+		compress_image();
 	
-	fflush(stderr);
+		if (outcanseek)
+			close(outfd);
+	}
 	close(infd);
-	if (outcanseek)
-		close(outfd);
+
+	{
+		struct timeval stamp;
+		unsigned int ms;
+
+		gettimeofday(&stamp, 0);
+		if (stamp.tv_usec < sstamp.tv_usec) {
+			stamp.tv_usec += 1000000;
+			stamp.tv_sec--;
+		}
+		ms = (stamp.tv_sec - sstamp.tv_sec) * 1000 +
+			(stamp.tv_usec - sstamp.tv_usec) / 1000;
+		fprintf(stderr,
+			"\nFinished in %u.%03u seconds\n",
+			ms / 1000, ms % 1000);
+	}
+	fflush(stderr);
+
 	exit(0);
 }
 
@@ -799,6 +893,7 @@ char *usagestr =
  " -c count       Compress <count> number of sectors (not with slice mode)\n"
  " -D             Do `dangerous' writes (don't check for async errors)\n"
  " -1             Output a version one image file\n"
+ " -H hashfile    Use the specified imagehash-generated signature to produce a delta image\n"
  "\n"
  " Debugging options (not to be used by mere mortals!)\n"
  " -d             Turn on debugging.  Multiple -d options increase output\n"
@@ -924,7 +1019,7 @@ mergeskips(int verbose)
 		while (*prevp) {
 			prange = *prevp;
 			if (prange->size < (uint32_t)frangesize) {
-				if (debug > 1)
+				if (debug > 2)
 					fprintf(stderr,
 						"dropping range [%u-%u]\n",
 						prange->start,
@@ -1029,7 +1124,7 @@ mergeranges(struct range *head)
 			break;
 
 		if (prange->start + prange->size == prange->next->start) {
-			if (debug > 1)
+			if (debug > 2)
 				fprintf(stderr,
 					"merging ranges [%u-%u] and [%u-%u]\n",
 					prange->start,
@@ -1088,6 +1183,18 @@ makeranges(void)
 		 * if we don't know where it is.
 		 */
 		addvalid(offset, inputmaxsec ? (inputmaxsec - offset) : 0);
+	}
+}
+
+void
+freeranges(struct range *head)
+{
+	struct range *next;
+
+	while (head != NULL) {
+		next = head->next;
+		free(head);
+		head = next;
 	}
 }
 
@@ -1196,7 +1303,7 @@ applyfixups(off_t offset, off_t size, void *data)
 
 			coff = (u_int32_t)(fp->offset - offset);
 			clen = (u_int32_t)fp->size;
-			if (debug > 1)
+			if (debug > 2)
 				fprintf(stderr,
 					"Applying fixup [%llu-%llu] "
 					"to [%llu-%llu]\n",
@@ -1325,7 +1432,7 @@ compress_image(void)
 		/*
 		 * Compress the chunk.
 		 */
-		if (debug > 0 && debug < 3) {
+		if (debug > 1 && debug < 3) {
 			fprintf(stderr,
 				"Compressing range: %14lld --> ", inputoffset);
 			fflush(stderr);
@@ -1334,7 +1441,7 @@ compress_image(void)
 		size = compress_chunk(inputoffset, rangesize,
 				      &full, &blkhdr->size);
 	
-		if (debug >= 3) {
+		if (debug > 2) {
 			fprintf(stderr, "%14lld -> %12lld %10ld %10u %10d %d\n",
 				inputoffset, inputoffset + size,
 				prange->start - inputminsec,
@@ -1576,7 +1683,7 @@ compress_image(void)
 	}
 
 	inputoffset += size;
-	if (debug || dots)
+	if (debug > 1 || dots)
 		fprintf(stderr, "\n");
 	compress_status(0);
 	fflush(stderr);
