@@ -258,15 +258,7 @@ value for that range.  dranges consist of a start block and end block
     drange = first element of dranges;
     for (all hranges) {
 	/*
-	 * Any allocated range in the original file that is below our
-	 * first allocated range on the current disk can be ignored.
-	 * (The blocks must have been deallocated.)
-	 */
-	if (hrange.end <= drange.start)
-	    continue;
-
-	/*
-	 * Any allocated ranges on disk that are before the first
+	 * Any allocated ranges on disk that are before the current
 	 * hash range are newly allocated, and must be put in the image.
 	 */
 	while (drange && drange.end <= hrange.start) {
@@ -277,19 +269,23 @@ value for that range.  dranges consist of a start block and end block
 	    break;
 
 	/*
+	 * Any allocated range in the original disk that is below our
+	 * current allocated range on the current disk can be ignored.
+	 * (The blocks must have been deallocated.)
+	 */
+	if (hrange.end <= drange.start)
+	    continue;
+
+	/*
 	 * Otherwise there is some overlap between the current drange
 	 * and hrange.  To simplfy things, we split dranges so they
 	 * align with hrange boundaries, and then treat the portion
-	 * outside the hrange accordingly.
+	 * outside the hrange accordingly.  First we split off the head.
 	 */
 	if (drange.start < hrange.start) {
 	    split drange at hrange.start value;
 	    add leading drange to merged list;
 	    trailing drange becomes current drange;
-	}
-	if (drange.end > hrange.end) {
-	    split drange at hrange.end value;
-	    leading drange becomes current drange;
 	}
 
 	/*
@@ -324,6 +320,14 @@ value for that range.  dranges consist of a start block and end block
 	    keepit = 1;
 
 	while (drange && drange.start < hrange.end) {
+	    /*
+	     * Split off the tail if necessary, it will be processed
+	     * in the next iteration of the outer loop.
+	     */
+	    if (drange.end > hrange.end) {
+		split drange at hrange.end value;
+		leading drange becomes current drange;
+	    }
 	    if (keepit)
 		add drange to merged list;
 	}
