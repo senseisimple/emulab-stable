@@ -10,38 +10,19 @@ include("showstuff.php3");
 $parser   = "$TB/libexec/ns2ir/parse-ns";
 
 #
-# Standard Testbed Header
-#
-PAGEHEADER("Modify Experiment");
-
-# the following hack is a page for Netbuild to
-# point the users browser at after a successful modify.
-# this does no error checking.
-if ($justsuccess) {
-    echo "<br /><br />";
-    echo "<font size=+1>
-	  <p>Experiment
-          <a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a>
-          in project <A href='showproject.php3?pid=$pid'>$pid</A>
-          is being modified!</p><br />
-	  <p>You will be notified via email when the operation is complete.
-          This could take one to ten minutes, depending on
-          whether nodes were added to the experiments, and whether
-          disk images had to be loaded.</p>
-          <p>While you are waiting, you can watch the log 
-          in <a href=showlogfile.php3?pid=$pid&eid=$eid>
-          realtime</a>.</p></font>\n";
-    PAGEFOOTER();
-    return;
-}
-
-#
 # Only known and logged in users can modify experiments.
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
-
 $isadmin = ISADMIN($uid);
+
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
+#
+# Standard Testbed Header
+#
+PAGEHEADER("Modify Experiment");
 
 #
 # Verify page arguments.
@@ -65,21 +46,15 @@ $eid = addslashes($eid);
 # Check to make sure this is a valid experiment.
 #
 if (! TBValidExperiment($pid, $eid)) {
-    # Netbuild requires the following line.
-    echo "\n\n<!-- NetBuild! Experiment does not exist -->\n\n";	
     USERERROR("The experiment $eid is not a valid experiment ".
 	      "in project $pid.", 1);
 }
 
 if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_MODIFY)) {
-    # Netbuild requires the following line.
-    echo "\n\n<!-- NetBuild! No permission to modify -->\n\n";	
     USERERROR("You do not have permission to modify this experiment.", 1);
 }
 
 if (TBExptLockedDown($pid, $eid)) {
-    # Netbuild requires the following line.
-    echo "\n\n<!-- NetBuild! No permission to modify -->\n\n";	
     USERERROR("Cannot proceed; experiment is locked down!", 1);
 }
 
@@ -87,8 +62,6 @@ $expstate = TBExptState($pid, $eid);
 
 if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
     strcmp($expstate, $TB_EXPTSTATE_SWAPPED)) {
-    # Netbuild requires the following line.
-    echo "\n\n<!-- NetBuild! Experiment is in transition. -->\n\n";	
     USERERROR("You cannot modify an experiment in transition.", 1);
 }
 
@@ -96,7 +69,8 @@ if (strcmp($expstate, $TB_EXPTSTATE_ACTIVE) &&
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
-echo "<br><br>\n";
+echo "<br>\n";
+flush();
 
 #
 # Put up the modify form on first load.
@@ -106,17 +80,6 @@ if (! isset($go)) {
 	 "Modify Experiment Documentation (FAQ)</a></h3>";
     echo "<br>";
 
-    #
-    # Unreleased option?
-    # 
-    if ($isadmin) {
-	echo "<font size='+1'>You can ".
-	    "<a href='buildui/bui.php3?action=modify&pid=$pid&eid=$eid'>".
-	    "modify this experiment with NetBuild</a>, ".
-	    "or edit the NS directly:</font>";
-	echo "<br>";
-    }
-
     if (STUDLY()) {
 	echo "<font size='+1'>".
 	    "<a href='clientui.php3?pid=$pid&eid=$eid'>GUI Editor</a>".
@@ -124,7 +87,7 @@ if (! isset($go)) {
 	echo "<br>";
     }
 
-    echo "<form action='modifyexp.php3' method='post'>";
+    echo "<form action='modifyexp.php3?pid=$pid&eid=$eid' method='post'>";
     echo "<textarea cols='100' rows='40' name='nsdata'>";
 
     $query_result =
@@ -159,8 +122,6 @@ if (! isset($go)) {
 	      Restart Event System in experiment (Highly Recommended)</input>";
     }
     echo "<br>";
-    echo "<input type='hidden' name='pid' value='$pid'>";
-    echo "<input type='hidden' name='eid' value='$eid'>";
     echo "<input type='submit' name='go' value='Modify'>";
     echo "</form>\n";
     PAGEFOOTER();
@@ -211,9 +172,6 @@ if ($retval != 0) {
     if ($retval < 0) {
 	SUEXECERROR(SUEXEC_ACTION_CONTINUE);
     }
-    # Netbuild requires the following line.
-    echo "\n\n<!-- NetBuild! Modifed NS file contains syntax errors -->\n\n";
-
     echo "<br>";
     echo "<h3>Modified NS file contains syntax errors</h3>";
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
@@ -221,12 +179,6 @@ if ($retval != 0) {
     PAGEFOOTER();
     exit();
 }
-
-echo "<center>";
-echo "<h2>Starting experiment modify. Please wait a moment ...
-      </h2></center>";
-
-flush();
 
 #	
 # Avoid SIGPROF in child.
@@ -248,9 +200,6 @@ unlink($nsfile);
 # do with the error. Also reports to tbops.
 # 
 if ($retval < 0) {
-    # the following line is required for Netbuild interaction.
-    echo "\n\n<!-- Netbuild! Modify failed -->\n\n";
-
     SUEXECERROR(SUEXEC_ACTION_DIE);
     #
     # Never returns ...
@@ -265,16 +214,12 @@ echo "<br>\n";
 if ($retval) {
     echo "<h3>Experiment modify could not proceed</h3>";
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
-    # the following line is required for Netbuild interaction.
-    echo "\n\n<!-- Netbuild! Modify failed -->\n\n";
 }
 else {
     #
     # Exit status 0 means the experiment is modifying.
     #
-    echo "<br>";
-    echo "Your experiment is being modified!<br><br>";
-
+    echo "<b>Your experiment is being modified!</b> ";
     echo "You will be notified via email when the experiment has ".
 	"finished modifying and you are able to proceed. This ".
 	"typically takes less than 10 minutes, depending on the ".
@@ -283,12 +228,8 @@ else {
 	"reasonable amount time, please contact $TBMAILADDR. ".
 	"<br><br>".
 	"While you are waiting, you can watch the log of experiment ".
-	"modification in ".
-	"<a href=showlogfile.php3?pid=$pid&eid=$eid> ".
-	"realtime</a>.\n";
-	    
-    # the following line is required for Netbuild.
-    echo "\n\n<!-- Netbuild! success -->\n\n";
+	"modification in realtime:<br>\n";
+    STARTLOG($pid, $eid);    
 }
 
 #

@@ -13,6 +13,9 @@ include("showstuff.php3");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
 #
 # Must provide the EID!
 # 
@@ -125,6 +128,8 @@ elseif (!strcmp($inout, "restart")) {
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
+echo "<br>\n";
+flush();
 
 # A locked down experiment means just that!
 if ($lockdown) {
@@ -203,18 +208,6 @@ if (!$confirmed) {
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 #
-# We run a wrapper script that does all the work of terminating the
-# experiment. 
-#
-#   tbstopit <pid> <eid>
-#
-echo "<center>";
-echo "<h2>Starting experiment state change. Please wait a moment ...
-      </h2></center>";
-
-flush();
-
-#
 # Run the scripts. We use a script wrapper to deal with changing
 # to the proper directory and to keep some of these details out
 # of this. 
@@ -280,6 +273,7 @@ else {
 	}
     }
     else {
+	echo "<div>";
 	if (strcmp($inout, "out") == 0 &&
 	    strcmp($state, $TB_EXPTSTATE_ACTIVATING) == 0) {
 
@@ -287,7 +281,7 @@ else {
                   It typically takes a few minutes for this to be recognized,
                   assuming you made your request early enough. You will
                   be notified via email when the original swapin request has
-                  either aborted or finished.\n";
+                  either aborted or finished. ";
 	}
 	else {
 	    if (strcmp($inout, "in") == 0)
@@ -295,20 +289,19 @@ else {
 	    else
 		$howlong = "less than two";
     
-	    echo "Your experiment has started its $action.
+	    echo "<b>Your experiment has started its $action.</b> 
                  You will be notified via email when the operation is complete.
                  This typically takes $howlong minutes, depending on the
-                 number of nodes in the experiment.\n";
+                 number of nodes in the experiment. ";
 	}
-	echo "<br><br>
-              If you do not receive
+	echo "If you do not receive
               email notification within a reasonable amount of time,
               please contact $TBMAILADDR.\n";
 
 	echo "<br><br>
-              While you are waiting, you can watch the log in
-              <a href=showlogfile.php3?pid=$exp_pid&eid=$exp_eid>
-              realtime</a>.\n";
+              While you are waiting, you can watch the log in realtime:<br>\n";
+	echo "</div>";
+	STARTLOG($pid, $eid);
     }
 }
 

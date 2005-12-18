@@ -28,6 +28,9 @@ function EXPERROR()
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
 #
 # Handle pre-defined view styles
 #
@@ -182,18 +185,12 @@ echo "<font size=+2>Experiment <b>".
      "</font>\n";
 echo "<br><br>\n";
 
-echo "<center><br>";
-echo "<font size=+1>Starting experiment configuration.</font>
-      </center>";
-
-echo "<br>\n";
-echo $results[message];
+echo "<b>Starting experiment configuration!</b> " . $results[message];
 echo "<br><br>\n";
 echo "While you are waiting, you can watch the log
-      in <a href=showlogfile.php3?pid=$exp_pid&eid=$exp_id>
-      realtime</a>.\n";
-echo "<br>
-      </font>\n";
+      in realtime:<br>\n";
+echo "</font>\n";
+STARTLOG($exp_pid, $exp_id);
 
 #
 # Standard Testbed Footer

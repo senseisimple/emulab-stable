@@ -110,14 +110,16 @@ function ml_getBodyText(ifr) {
 /* @return The innerHeight of the window. */
 function ml_getInnerHeight() {
     var retval;
+    var win = document.getElementById('outputframe').contentWindow;
+    var doc = document.getElementById('outputframe').contentWindow.document;
 
-    if (self.innerHeight) // all except Explorer
-      retval = self.innerHeight;
-    else if (document.documentElement && document.documentElement.clientHeight)
+    if (win.innerHeight) // all except Explorer
+      retval = win.innerHeight;
+    else if (doc.documentElement && doc.documentElement.clientHeight)
       // Explorer 6 Strict Mode
-	retval = document.documentElement.clientHeight;
-    else if (document.body) // other Explorers
-      retval = document.body.clientHeight;
+	retval = doc.documentElement.clientHeight;
+    else if (doc.body) // other Explorers
+      retval = doc.body.clientHeight;
 
     return retval;
 }
@@ -125,9 +127,11 @@ function ml_getInnerHeight() {
 /* @return The scrollTop of the window. */
 function ml_getScrollTop() {
     var retval;
+    var win = document.getElementById('outputframe').contentWindow;
+    var doc = document.getElementById('outputframe').contentWindow.document;
 
-    if (self.pageYOffset) // all except Explorer
-      retval = self.pageYOffset;
+    if (win.pageYOffset) // all except Explorer
+      retval = win.pageYOffset;
     else if (document.documentElement && document.documentElement.scrollTop) // Explorer 6 Strict
       retval = document.documentElement.scrollTop;
     else if (document.body) // all other Explorers
@@ -139,14 +143,16 @@ function ml_getScrollTop() {
 /* @return The height of the document. */
 function ml_getScrollHeight() {
     var retval;
-    var test1 = document.body.scrollHeight;
-    var test2 = document.body.offsetHeight;
+    var win = document.getElementById('outputframe').contentWindow;
+    var doc = document.getElementById('outputframe').contentWindow.document;
+    var test1 = doc.body.scrollHeight;
+    var test2 = doc.body.offsetHeight;
 
     if (test1 > test2) // all but Explorer Mac
-      retval = document.body.scrollHeight;
+      retval = doc.body.scrollHeight;
     else // Explorer Mac;
     //would also work in Explorer 6 Strict, Mozilla and Safari
-      retval = document.body.offsetHeight;
+      retval = doc.body.offsetHeight;
 
     return retval;
 }
@@ -158,7 +164,9 @@ function ml_getScrollHeight() {
  * @param state The state of the download.
  */
 function ml_handleReadyState(state) {
-    var oa = document.getElementById('outputarea');
+    var Iframe = document.getElementById('outputframe');
+    var idoc   = Iframe.contentWindow.document;
+    var oa = Iframe.contentWindow.document.getElementById('outputarea');
     var dl = document.getElementById('downloader');
 
     if ((rt = ml_getBodyText(dl)) == null) {
@@ -237,7 +245,7 @@ function ml_handleReadyState(state) {
 	    if (line.indexOf('***') != -1 ||
 		(lastError == i - 1) && line.indexOf('   ') == 0) {
 		if (plain != "") {
-		    tn = document.createTextNode(plain);
+		    tn = idoc.createTextNode(plain);
 		    oa.appendChild(tn);
 		}
 		plain = "";
@@ -281,9 +289,9 @@ function ml_handleReadyState(state) {
 		    pnode = lengths[index];
 		    
 		    plain += line.substring(lastIndex, index);
-		    tn = document.createTextNode(plain);
+		    tn = idoc.createTextNode(plain);
 		    if (hasError) {
-			fn = document.createElement("font");
+			fn = idoc.createElement("font");
 			fn.setAttribute("color", "red");
 			fn.appendChild(tn);
 			oa.appendChild(fn);
@@ -295,10 +303,11 @@ function ml_handleReadyState(state) {
 		    
 		    /* Create the link. */
 		    var linktext = line.substring(index, index + pnode.length);
-		    var nlink = document.createElement("A");
+		    var nlink = idoc.createElement("A");
 		    nlink.setAttribute('href',
 				       'shownode.php3?node_id=' + pnode);
-		    tn = document.createTextNode(linktext);
+		    nlink.setAttribute('target', '_parent');
+		    tn = idoc.createTextNode(linktext);
 		    nlink.appendChild(tn);
 		    oa.appendChild(nlink);
 		    
@@ -307,8 +316,8 @@ function ml_handleReadyState(state) {
 	    }
 	    if (hasError) {
 		/* It is an error line, turn it red. */
-		tn = document.createTextNode(line.substring(lastIndex));
-		fn = document.createElement("font");
+		tn = idoc.createTextNode(line.substring(lastIndex));
+		fn = idoc.createElement("font");
 		fn.setAttribute("color", "red");
 		fn.appendChild(tn);
 		oa.appendChild(fn);
@@ -329,15 +338,15 @@ function ml_handleReadyState(state) {
 	if (state == LOG_STATE_LOADED)
 	  plain += lastLine;
 
-	tn = document.createTextNode(plain);
+	tn = idoc.createTextNode(plain);
 	oa.appendChild(tn);
 
 	var nh = ml_getScrollHeight();
-	
+
 	/* See if we should scroll the window down. */
 	if ((h - (y + ih)) < (y == 0 ? 200 : 10)) {
-	    document.documentElement.scrollTop = nh;
-	    document.body.scrollTop = nh;
+	    Iframe.contentWindow.document.documentElement.scrollTop = nh;
+	    Iframe.contentWindow.document.body.scrollTop = nh;
 	}
     }
 }

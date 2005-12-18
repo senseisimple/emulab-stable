@@ -13,6 +13,9 @@ include("showstuff.php3");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
 #
 # Must provide the EID!
 # 
@@ -38,7 +41,7 @@ if ($canceled) {
 #
 # Standard Testbed Header, after checking for cancel above.
 #
-PAGEHEADER("Terminate a Testbed Experiment");
+PAGEHEADER("Terminate Experiment");
 
 #
 # Check to make sure thats this is a valid PID/EID, while getting the
@@ -65,7 +68,7 @@ if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_DESTROY)) {
 echo "<font size=+2>Experiment <b>".
      "<a href='showproject.php3?pid=$exp_pid'>$exp_pid</a>/".
      "<a href='showexp.php3?pid=$exp_pid&eid=$exp_eid'>$exp_eid</a>".
-     "</b></font>\n";
+     "</b></font><br>\n";
 
 # A locked down experiment means just that!
 if ($lockdown) {
@@ -106,16 +109,6 @@ if (!$confirmed) {
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
-#
-# We run a wrapper script that does all the work of terminating the
-# experiment. 
-#
-#   tbstopit <pid> <eid>
-#
-echo "<center><br>";
-echo "<h2>Starting experiment termination. Please wait a moment ...
-      </h2></center>";
-
 flush();
 
 #
@@ -146,7 +139,7 @@ if ($retval) {
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    echo "<h3>Your experiment is terminating!</h3><br>
+    echo "<b>Your experiment is terminating!</b> 
           You will be notified via email when the experiment has been torn
 	  down, and you can reuse the experiment name.
           This typically takes less than two minutes, depending on the
@@ -155,10 +148,8 @@ else {
           of time, please contact $TBMAILADDR.\n";
 
     echo "<br><br>
-          If you are the morbid type, you can watch the experiment die in
-          <a href=showlogfile.php3?pid=$exp_pid&eid=$exp_eid>
-          realtime</a>.\n";
-    
+          Watch the experiment die in realtime:<br>\n";
+    STARTLOG($exp_pid, $exp_eid);
 }
 
 #
