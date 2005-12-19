@@ -38,7 +38,7 @@ my  $optlist = "d";
 sub die_noretry($)
 {
     my ($mesg) = shift;
-    print STDERR "$mesg\n";
+    tberror $mesg;
     exit(-1);
 }
 
@@ -144,8 +144,7 @@ else {
 #
 if ($UID && !TBAdmin($UID) &&
     !TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_MODIFY)) {
-    die_noretry("*** $0:\n".
-		"    You do not have permission to swap this experiment!");
+    die_noretry("You do not have permission to swap this experiment!");
 }
 
 #
@@ -154,8 +153,7 @@ if ($UID && !TBAdmin($UID) &&
 #
 my $dbuid;
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
+    tbdie("You do not exist in the Emulab Database.");
 }
 
 #
@@ -163,8 +161,7 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 #
 my ($user_name,$user_email);
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
+    tbdie("Cannot determine your name and email address.");
 }
 my $user_email_to = "$user_name <$user_email>";
 
@@ -267,12 +264,11 @@ while (my %row = $db_result->fetchhash()) {
 
 	    # Path must begin with $TFTP
 	    if (! ($path =~ /^\/$TFTP\//)) {
-		die_noretry(
-		    "*** File $path for node $node must reside in $TFTP");
+		die_noretry("File $path for node $node must reside in $TFTP");
 	    }
 
 	    if (! -f $path) {
-		die_noretry("*** File $path for node $node does not exist!");
+		die_noretry("File $path for node $node does not exist!");
 	    }
 	    $bootpath = 1;
 	}
@@ -291,12 +287,11 @@ while (my %row = $db_result->fetchhash()) {
 
 	    # Path must begin with $TFTP
 	    if (! ($path =~ /^\/$TFTP\//)) {
-		die_noretry(
-		    "*** File $path for node $node must reside in $TFTP");
+		die_noretry("File $path for node $node must reside in $TFTP");
 	    }
 
 	    if (! -f $path) {
-		die_noretry("*** File $path for node $node does not exist!");
+		die_noretry("File $path for node $node does not exist!");
 	    }
 	}
     }
@@ -306,7 +301,7 @@ while (my %row = $db_result->fetchhash()) {
     #
     foreach my $rpm (split(":", $row{'rpms'})) {
 	if (! -f $rpm) {
-	    die_noretry("*** RPM $rpm for node $node does not exist!");
+	    die_noretry("RPM $rpm for node $node does not exist!");
 	}
         libArchive::TBExperimentArchiveAddFile($pid, $eid, $rpm) == 0 or
 	    die_noretry("*** Failed to add RPM $rpm to the archive!");
@@ -319,7 +314,7 @@ while (my %row = $db_result->fetchhash()) {
 	my ($dir, $tar) = split(" ", $tarspec);
 
 	if (! -f $tar) {
-	    die_noretry("*** Tarfile $tar for node $node does not exist!");
+	    die_noretry("Tarfile $tar for node $node does not exist!");
 	}
         libArchive::TBExperimentArchiveAddFile($pid, $eid, $tar) == 0 or
 	    die_noretry("*** Failed to add Tarfile $tar to the archive!");
@@ -337,8 +332,7 @@ while (my %row = $db_result->fetchhash()) {
 	# are doing the right thing, but lets be careful anyway.
 	#
 	if (! $osid) {
-	    die_noretry(
-	        "*** $node has no bootpath and no def_boot_osid set!");
+	    die_noretry("$node has no bootpath and no def_boot_osid set!");
 	}
 
 	#
@@ -348,7 +342,7 @@ while (my %row = $db_result->fetchhash()) {
 	    DBQueryFatal("select * from os_info where osid='$osid'");
 
 	if ($osid_result->numrows == 0) {
-	    die_noretry("*** No such OSID $osid is defined!");
+	    die_noretry("No such OSID $osid is defined!");
 	}
 
 	my %osid_row   = $osid_result->fetchhash();
@@ -382,16 +376,12 @@ while (my %row = $db_result->fetchhash()) {
 		    # map it to another osid.
 		    #
 		    if (!defined($osid_row{'nextosid'})) {
-			die_noretry(
-			    "*** $0:\n".
-			    "    No mapping can be made for $osid ($node)!");
+			die_noretry("No mapping can be made for $osid ($node)!");
 		    }
 
 		    my $nextosid = TBResolveNextOSID($osid, $pid, $eid);
 		    if (!defined($nextosid)) {
-			die_noretry(
-			    "*** $0:\n".
-			    "    No mapping can be made for $osid ($node)!");
+			die_noretry("No mapping can be made for $osid ($node)!");
 		    }
 		
 		    #
@@ -426,8 +416,8 @@ while (my %row = $db_result->fetchhash()) {
 			}
 			else {
 			    system("$osselect $nextosid $node") and
-				die_noretry("*** Could not set boot OS to ".
-				    "$nextosid for $node");
+				die_noretry("Could not set boot OS to ".
+					    "$nextosid for $node");
 			}
 			$osids{$node} = $nextosid;
 		    }
@@ -482,8 +472,7 @@ foreach my $vnode (keys(%vnodes)) {
     }
 
     if (! TBPhysNodeID($vnode, \$pnode)) {
-	die_noretry("*** $0:\n".
-	    "    Cannot determine phys_nodeid for $vnode!");
+	die_noretry("Cannot determine phys_nodeid for $vnode!");
     }
 
     #
@@ -633,7 +622,7 @@ if (!$TESTMODE) {
 	$noretry = 1;
 
 	foreach my $node (@nodelist) {
-	    print "*** Not waiting for $node since its reload/reboot failed!\n";
+	    tbnotice "Not waiting for $node since its reload/reboot failed!";
 	    $failed++;
 	    delete($nodes{$node});
 
@@ -709,8 +698,7 @@ while ( @nodelist ) {
     if (!TBNodeStateWait($node, $wstart, $waittime, \$actual_state,
 			 (TBDB_NODESTATE_TBFAILED, TBDB_NODESTATE_ISUP))) {
 	if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
-	    print "*** WARNING: $node reported a TBFAILED event; ".
-		"not retrying\n";
+	    tbwarn "$node reported a TBFAILED event; not retrying";
 	    $retries{$node} = 0;
 	    goto tbfailed;
 	}
@@ -724,7 +712,7 @@ while ( @nodelist ) {
 	# 
 	if ($firewalled && $node eq $firewall) {
 	    if (!FirewallBoot()) {
-		print "*** WARNING: Firewall Boot Setup failed!\n";
+		tbwarn "Firewall Boot Setup failed!";
 		$failed++;
 		$noretry = 1;
 	    }
@@ -740,14 +728,14 @@ while ( @nodelist ) {
 	TBGetCancelFlag($pid, $eid, \$canceled);
 
 	if ($canceled) {
-	    print "*** Swap canceled; will terminate os_setup early!\n";
+	    tbnotice "Swap canceled; will terminate os_setup early!";
 	}
     }
 
     if ($retries{$node} && !($canceled || $noretry)) {
 	$retries{$node} -= 1;
 
-	print "*** Rebooting $node and waiting again ...\n";
+	tbnotice "Rebooting $node and waiting again ...";
 
 	if (system("$nodereboot $node") == 0) {
 	    push(@nodelist, $node);
@@ -757,15 +745,14 @@ while ( @nodelist ) {
 	# Fall through on failure.
     }
 
-    print "*** WARNING: $node may be down.\n".
-	  "    This has been reported to testbed-ops.\n";
+    tbwarn "$node may be down. This has been reported to testbed-ops.";
 
   tbfailed:
     SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 
     if ($canfail{$node} && !($canceled || $noretry)) {
 	push(@informuser, $node);
-	print "*** Continuing with experiment setup anyway ...\n";
+	tbnotice "Continuing with experiment setup anyway ...";
 	next;
     }
 
@@ -888,11 +875,11 @@ foreach my $vnode (@vnodelist) {
 # usually leads to cascading errors.
 #
 if ($canceled && @vnodelist) {
-    print "*** Skipping virtual node setup since swapin was canceled!\n";
+    tbnotice "Skipping virtual node setup since swapin was canceled!";
 }
 elsif ($failed && @vnodelist) {
-    print "*** Skipping virtual node setup since there were previous ".
-	"failures!\n";
+    tbnotice "Skipping virtual node setup since there were previous ".
+	"failures!";
 }
 elsif (@vnodelist) {
     my $vnode_setup_args = ""; # add any generic args here.
@@ -913,8 +900,7 @@ elsif (@vnodelist) {
     TBDebugTimeStamp("Setting up virtual nodes");
     system("$vnode_setup $vnode_setup_args $pid $eid");
     if ($?) {
-	die_noretry("*** $0:\n".
-	    "    Vnode setup failed!");
+	die_noretry("Vnode setup failed!");
     }
     print "Waiting for virtual testbed nodes to finish setting up ...\n";
     TBDebugTimeStamp("Virtual node waiting started");
@@ -954,7 +940,7 @@ elsif (@vnodelist) {
 				  TBDB_NODESTATE_ISUP))) {
 
 		if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
-		    print "*** WARNING: $node reported a TBFAILED event.\n";
+		    tbwarn "$node reported a TBFAILED event.";
 		    goto vtbfailed;
 		}
 		print "$node is alive and well\n";
@@ -978,7 +964,7 @@ elsif (@vnodelist) {
 	    if ($islocal && $retries{$node}) {
 		$retries{$node} -= 1;
 
-		print "*** WARNING: $node did not boot; will retry setup ...\n";
+		tbwarn "$node did not boot; will retry setup ...";
 		push(@retry_list, $node);
 		next;
 	    }
@@ -986,7 +972,7 @@ elsif (@vnodelist) {
 	    # Otherwise, fall through ...
 	}
 
-	print "*** WARNING: $node did not boot!\n";
+	tbwarn "$node did not boot!";
 
 	if ($plabvnodes{$node}) {
 	    #
@@ -1005,7 +991,7 @@ elsif (@vnodelist) {
 	if ($canfail{$node}) {
 	    # Send mail to testbed-ops and to the user about it.
 	    push(@informuser, $node);
-	    print "*** Continuing with experiment setup anyway ...\n";
+	    tbnotice "Continuing with experiment setup anyway ...";
 	    next;
 	}
 	if ($plabvnodes{$node}) {
@@ -1026,7 +1012,7 @@ elsif (@vnodelist) {
 	    TBGetCancelFlag($pid, $eid, \$canceled);
 	
 	    if ($canceled) {
-		print "*** Swap canceled; not retrying failed virtual nodes!\n";
+		tbnotice "Swap canceled; not retrying failed virtual nodes!";
 	    }
 	    else {
 		# Mark each node so that vnode_setup will retry.
@@ -1062,12 +1048,12 @@ if ($count > 0) {
 	     "Cc: $TBOPS");
 }
 
-print "OS Setup Done.\n";
-print "*** There were $failed failed nodes\n"
+tbinfo "OS Setup Done.";
+tberror "There were $failed failed nodes"
     if ($failed);
-print "*** There were $failedvnodes failed virtual nodes\n"
+tberror "There were $failedvnodes failed virtual nodes"
     if ($failedvnodes);
-print "*** There were $failedplab failed plab nodes\n"
+tberror "There were $failedplab failed plab nodes"
     if ($failedplab);
 
 #
@@ -1129,8 +1115,7 @@ sub SetupReload($$$)
 	}
     }
     else {
-	die_noretry("*** $0:\n".
-	    "    No image can be found for $osid on $node!");
+	die_noretry("No image can be found for $osid on $node!");
     }
 }
 

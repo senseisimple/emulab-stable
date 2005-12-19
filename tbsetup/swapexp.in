@@ -52,11 +52,10 @@ sub ExitWithStatus($$)
     my ($status, $message) = @_;
     
     if ($status < 0) {
-	die("*** $0:\n".
-	    "    $message\n");
+	tbdie($message);
     }
     else {
-	print STDERR "$message\n";
+	tbnotice($message);
     }
     exit($status);
 }
@@ -202,13 +201,13 @@ if ($pid =~ /^([-\w\.]+)$/) {
     $pid = $1;
 }
 else {
-    die("Tainted argument $pid!\n");
+    tbdie("Tainted argument $pid!");
 }
 if ($eid =~ /^([-\w\.]+)$/) {
     $eid = $1;
 }
 else {
-    die("Tainted argument $eid!\n");
+    tbdie("Tainted argument $eid!");
 }
 my $repfile = "$eid.report";
 my $workdir = TBExptWorkDir($pid, $eid);
@@ -227,7 +226,7 @@ if ($inout eq "modify" && @ARGV > 2) {
 	$tempnsfile = $1;
     }
     else {
-	die("Tainted nsfile name: $tempnsfile\n");
+	tbdie("Tainted nsfile name: $tempnsfile");
     }
     #
     # Called from ops interactively. Make sure NS file in /proj or /users.
@@ -239,7 +238,7 @@ if ($inout eq "modify" && @ARGV > 2) {
 	$tempnsfile = $1;
     }
     else {
-	die("Tainted nsfile returned by realpath: $translated\n");
+	tbdie("Tainted nsfile returned by realpath: $translated");
     }
 
     #
@@ -255,12 +254,11 @@ if ($inout eq "modify" && @ARGV > 2) {
 	! ($tempnsfile =~ /^\/proj/) &&
 	! ($tempnsfile =~ /^\/groups/) &&
 	! ($tempnsfile =~ /^\/users/)) {
-	die("$tempnsfile does not resolve to an appropriate directory!\n");
+	tbdie("$tempnsfile does not resolve to an appropriate directory!");
     }
 
     if (! -f $tempnsfile || -z $tempnsfile || ! -r $tempnsfile) {
-	die("*** $0:\n".
-	    "    $tempnsfile does not look like an NS file!\n");
+	tbdie("$tempnsfile does not look like an NS file!");
     }
     $nsfile    = "$eid.ns";
     $modnsfile = "${eid}-modify.ns";
@@ -270,16 +268,14 @@ if ($inout eq "modify" && @ARGV > 2) {
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-	"    You do not exist in the Emulab Database.\n");
+    tbdie("You do not exist in the Emulab Database.");
 }
 
 #
 # Get email info for user.
 #
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-	"    Cannot determine your name and email address.\n");
+    tbdie("Cannot determine your name and email address.");
 }
 $isadmin = TBAdmin($UID);
 
@@ -294,8 +290,7 @@ tblog_set_info($pid,$eid,$UID);
 #
 if ($UID && !$isadmin &&
     !TBExptAccessCheck($dbuid, $pid, $eid, TB_EXPT_DESTROY)) {
-    die("*** $0:\n".
-	"    You do not have permission to swap or modify this experiment!\n");
+    tbdie("You do not have permission to swap or modify this experiment!");
 }
 
 # Must do this before lock tables!
@@ -317,9 +312,7 @@ if ($waitmode) {
 my $overquota = system("$checkquota $dbuid");
 
 if ($overquota) {
-    print STDERR
-	"*** $0:\n".
-	"    You are over your disk quota on $CONTROL; please cleanup!\n";
+    tberror("You are over your disk quota on $CONTROL; please cleanup!");
 }
 
 #
@@ -341,8 +334,7 @@ $query_result =
     DBQueryFatal("SELECT * FROM experiments WHERE eid='$eid' and pid='$pid'");
 
 if (! $query_result->numrows) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid exists!\n");
+    tbdie("No such experiment $pid/$eid exists!");
 }
 my %hashrow = $query_result->fetchhash();
 my $expt_head_login = $hashrow{'expt_head_uid'};
@@ -380,8 +372,7 @@ my $swapsettings =
   ($autoswapbit ? ", at $autoswaptime hours\n" : "\n");
 
 if (! chdir($workdir)) {
-    die("*** $0:\n".
-	"    Could not chdir to $workdir: $!\n");
+    tbdie("Could not chdir to $workdir: $!");
 }
 
 #
@@ -393,43 +384,35 @@ if ($batch) {
     # must be a batch experiment, and must be in proper state for the
     # operation requested. 
     #
-    die("*** $0:\n".
-	"    Experiment $pid/$eid is supposed to be a batch experiment!\n")
+    tbdie("Experiment $pid/$eid is supposed to be a batch experiment!")
 	if (!$isbatchexpt);
     
-    die("*** $0:\n".
-	"    Batch experiment $pid/$eid should be locked!\n")
+    tbdie("Batch experiment $pid/$eid should be locked!")
 	if (!defined($expt_locked) ||
 	    $batchstate ne BATCHSTATE_LOCKED());
-
-    die("*** $0:\n".
-	"    Batch experiment $pid/$eid is locked down; cannot be swapped!\n")
+    
+    tbdie("Batch experiment $pid/$eid is locked down; cannot be swapped!")
 	if ($lockdown);
 
     if ($inout eq "in") {
-	die("*** $0:\n".
-	    "    Batch experiment $pid/$eid is not in the proper state!\n".
-	    "    Currently $estate, but should be QUEUED.\n")
+	tbdie("Batch experiment $pid/$eid is not in the proper state!\n".
+	      "Currently $estate, but should be QUEUED.")
 	    if ($estate ne EXPTSTATE_QUEUED);
 	
-	die("*** $0:\n".
-	    "    Batch experiment $pid/$eid has been canceled! Aborting.\n")
+	tbdie("Batch experiment $pid/$eid has been canceled! Aborting.")
 	    if ($canceled);
 
 	# Do not allow it to swap in. What about swapout? 
-	die("*** $0:\n".
-	    "    Batch experiment cannot swap in when over quota! Aborting.\n")
+	tbdie("Batch experiment cannot swap in when over quota! Aborting.")
 	    if ($overquota);
     }
     elsif ($inout eq "out") {
-	die("*** $0:\n".
-	    "    Batch experiment $pid/$eid is not in the proper state!\n".
-	    "    Currently $estate, but should be ACTIVE.\n")
+	tbdie("Batch experiment $pid/$eid is not in the proper state!\n".
+	      "Currently $estate, but should be ACTIVE.")
 	    if ($estate ne EXPTSTATE_ACTIVE);
     }
     else {
-	die("*** $0:\n".
-	    "    Improper request from batch daemon for $pid/$eid!\n");
+	tbdie("Improper request from batch daemon for $pid/$eid!\n");
     }
 }
 else {
@@ -518,8 +501,7 @@ else {
 	    goto doit;
 	}
 	else {
-	    die("*** $0:\n",
-		"    Operation $inout not allowed on a batch experiment!\n");
+	    tbdie("Operation $inout not allowed on a batch experiment!");
 	}
 	ExitWithStatus(0, 
 		       "Batch experiment $pid/$eid state has been changed.\n");
@@ -624,8 +606,7 @@ else {
 		  
 		  last SWITCH;
 	      };
-	      die("*** $0:\n".
-		  "    Missing state check for action: $action\n");
+	      tbdie("Missing state check for action: $action");
 	  }
 	}
     }
@@ -654,8 +635,7 @@ SWITCH: for ($inout) {
 			  EXPTSTATE_MODIFY_PARSE() : EXPTSTATE_MODIFY_REPARSE());
 	last SWITCH;
     };
-    die("*** $0:\n".
-	"    Missing state check for action: $action\n");
+    tbdie("Missing state check for action: $action");
 }
  
 # Update idleswap_timeout to whatever the current value is.
@@ -671,8 +651,7 @@ $termswapstate = $estate;
 
 # Lock the record, set the nextstate, and unlock the table.
 TBLockExp($pid, $eid, $nextswapstate)
-    or die("*** $0:\n".
-	   "Failed to set experiment state to $nextswapstate\n");
+    or tbdie("Failed to set experiment state to $nextswapstate");
 
 #
 # At this point, we need to force a cleanup no matter how we exit.
@@ -715,8 +694,7 @@ my $expt_head_name;
 my $expt_head_email;
 
 if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
-    print STDERR "*** WARNING: ".
-	         "Could not determine name/email for $expt_head_login.\n";
+    tbwarn("Could not determine name/email for $expt_head_login.");
     $expt_head_name  = "TBOPS";
     $expt_head_email = $TBOPS;
 }
@@ -1472,7 +1450,7 @@ sub CheckFWinfo($)
     return 0;
 
   noway:
-    print STDOUT "*** $msg\n";
+    tberror($msg);
     return 1;
 }
 
@@ -1485,9 +1463,8 @@ sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print "*** $0:\n";
-    print "    $mesg\n";
-    print "Cleaning up and exiting with status $errorstat ...\n";
+    tberror($mesg);
+    tbinfo("Cleaning up and exiting with status $errorstat ...");
 
     #
     # This exit will drop into the END block below.

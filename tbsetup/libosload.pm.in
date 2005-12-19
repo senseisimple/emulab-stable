@@ -20,6 +20,7 @@ use vars qw(@ISA @EXPORT);
 use lib '@prefix@/lib';
 use libdb;
 use libreboot;
+use libtblog;
 use English;
 use File::stat;
 use IO::Handle;
@@ -63,7 +64,7 @@ sub osload ($$) {
     my $rowref;
 
     if (!defined($args->{'nodelist'})) {
-	print STDERR "*** osload: Must supply a node list!\n";
+	tberror "Must supply a node list!"; # INTERNAL
 	return -1;
     }
     @nodes = sort(@{ $args->{'nodelist'} });
@@ -87,10 +88,19 @@ sub osload ($$) {
     if (defined($args->{'zerofree'})) {
 	$zerofree = $args->{'zerofree'};
     }
+
     if (defined($args->{'swapinfo'})) {
 	$swapinfo = $args->{'swapinfo'};
     }
-    
+
+    #
+    # Start a new logging sub-process
+    #
+    my $old_env = \%ENV;
+    local %ENV;
+    copy_hash %ENV, $old_env;
+    tblog_sub_process("osload", @nodes);
+
     #
     # Figure out who called us. Root and admin types can do whatever they
     # want. Normal users can only change nodes in experiments in their
@@ -100,9 +110,9 @@ sub osload ($$) {
 	$mereuser = 1;
 
 	if (! TBNodeAccessCheck($UID, TB_NODEACCESS_LOADIMAGE, @nodes)) {
-	    print STDERR
-		"*** osload: Not enough permission to load images on one or ".
-		    "more nodes!\n";
+	    tberror
+		"Not enough permission to load images on one or ".
+		    "more nodes!";
 	    return -1;
 	}
     }
@@ -112,8 +122,7 @@ sub osload ($$) {
     # 
     if (defined($imageid) && $mereuser &&
 	! TBImageIDAccessCheck($UID, $imageid, TB_IMAGEID_READINFO)) {
-	print STDERR
-	    "*** osload: You do not have permission to load '$imageid'!\n";
+	tberror "You do not have permission to load '$imageid'!";
 	return -1;
     }
 
@@ -126,9 +135,9 @@ sub osload ($$) {
     #
     if (defined($imageid) &&
 	!TBImageLoadMaxOkay($imageid, scalar(@nodes), @nodes)) {
-	print STDERR
-	    "*** osload: Would exceed maxiumum concurrent instances ".
-		"limitation for $imageid\n";
+	tberror 
+	    "Would exceed maxiumum concurrent instances ".
+		"limitation for $imageid";
 	return -1;
     }
 
@@ -148,7 +157,7 @@ sub osload ($$) {
 	# Create a pipe to read back results from the child we will create.
 	#
 	if (! pipe(PARENT_READER, CHILD_WRITER)) {
-	    print STDERR "*** osload: creating pipe: $!\n";
+	    tberror "creating pipe: $!";
 	    return -1;
 	}
 	CHILD_WRITER->autoflush(1);
@@ -178,7 +187,7 @@ sub osload ($$) {
 	my $default_imageid;
 	if (! DefaultImageID($node, \$default_imageid) ||
 	    ! defined($default_imageid)) {
-	    print STDERR "*** osload ($node): No default imageid defined!\n";
+	    tberror "$node: No default imageid defined!";
 	    goto failednode;
 	}
 
@@ -210,7 +219,7 @@ sub osload ($$) {
 	if (!$TESTMODE) {
 	    system("$osselect $defosid $node");
 	    if ($?) {
-		print STDERR "*** osload ($node): os_select $defosid failed!\n";
+		tberror "$node: os_select $defosid failed!";
 		goto failednode;
 	    }
 	}
@@ -223,8 +232,8 @@ sub osload ($$) {
 	#
 	if ($imageid ne $default_imageid &&
 	    !TBSetSchedReload($node, $default_imageid)) {
-	    print STDERR
-		"*** osload ($node): Could not schedule default reload\n";
+	    tberror
+		"$node: Could not schedule default reload";
 	    goto failednode;
 	}
 
@@ -256,8 +265,7 @@ sub osload ($$) {
 				"where node_id='$node' and partition='$i'");
 	    }
 	    if (!$dbresult) {
-		print STDERR
-		    "*** osload ($node): Could not update partition table\n";
+		tberror "$node: Could not update partition table";
 		goto failednode;
 	    }
 	}
@@ -309,8 +317,7 @@ sub osload ($$) {
 
 	if (!$TESTMODE) {
 	    if (&$reload_func($node, $imageid, $defosid, $zerofree) < 0) {
-		print STDERR
-		"*** osload ($node): Could not set up reload. Skipping.\n";
+		tberror("$node: Could not set up reload. Skipping.");
 		goto failednode;
 	    }
 	}
@@ -338,7 +345,7 @@ sub osload ($$) {
     }
 
     if (! @nodes) {
-	print STDERR "*** osload: Stopping because of previous failures!\n";
+	tbnotice "Stopping because of previous failures!";
 	goto done;
     }
 
@@ -422,17 +429,14 @@ sub osload ($$) {
 	    my $node = shift(@failednodes);
 
 	    if ($retries{$node}) {
-		print "*** osload ($node): Trying again ...\n";
+		tbnotice "$node: Trying again ...";
 
 		my $reload_info = $reload_info{$node};
 
 		# Possible race with reboot?
 		if (&{$reload_info->{'func'}}($node, $reload_info->{'imageid'},
 		    $reload_info->{'osid'}, $reload_info->{'zerofree'}) < 0) {
-		    print(STDERR
-			  "*** osload ($node): ".
-			  "Could not set up reload. Skipping.\n");
-		    
+		    tberror("$node: Could not set up reload. Skipping.");
 		    $result->{$node} = -1;
 		    $failures++;
 		    next;
@@ -443,7 +447,8 @@ sub osload ($$) {
 		$retries{$node} -= 1;
 	    }
 	    else {
-		print "*** osload ($node): failed too many times. Skipping!\n";
+		tberror ({sublevel => -1}, 
+			 "$node failed to boot too many times. Skipping!");
 		$result->{$node} = -1;
 		$failures++;
 	    }
@@ -481,8 +486,7 @@ sub GetImageInfo($$)
     my $query_result =
 	DBQueryWarn("select * from images where imageid='$imageid'");
     if (! $query_result || $query_result->numrows < 1) {
-	print STDERR
-	    "*** osload ($node): Imageid $imageid is not defined!\n";
+	tberror "Imageid $imageid is not defined!";
 	return 0;
     }
     $imageinfo{$imageid} = $query_result->fetchrow_hashref();
@@ -495,8 +499,7 @@ sub GetImageInfo($$)
     # and that file should exist.
     #
     if (!defined($imagepath)) {
-	print STDERR 
-	    "*** osload ($node): No filename associated with $imageid!\n";
+	tberror "No filename associated with $imageid!";
 	return 0;
     }
 
@@ -507,21 +510,16 @@ sub GetImageInfo($$)
 	    #
 	    system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
 	    if ($?) {
-		print STDERR
-		    "*** osload ($node): Frisbeelauncher ($imageid) failed!\n";
+		tberror "Frisbeelauncher ($imageid) failed!";
 		return 0;
 	    }
 	    if (! -R $imagepath) {
-		print STDERR
-		    "*** osload ($node): ".
-			"Frisbeelauncher could not fetch $imagepath ($imageid)!\n";
+		tberror	"Frisbeelauncher could not fetch $imagepath ($imageid)!";
 		return 0;
 	    }
 	}
 	else {
-	    print STDERR 
-		"*** osload ($node): ".
-		    "$imagepath does not exist or cannot be read!\n";
+	    tberror "$imagepath does not exist or cannot be read!";
 	    return 0;
 	}
     }
@@ -609,8 +607,7 @@ sub WaitTillReloadDone($$$@)
 		# try again in a little bit.
 		# 
 		if (!$query_result) {
-		    print STDERR
-			"*** osload ($node): Query failed; waiting a bit.\n";
+		    tbwarn "$node: Query failed; waiting a bit.";
 		    next;
 		}
 
@@ -632,8 +629,8 @@ sub WaitTillReloadDone($$$@)
 		$waittime = time - $startwait;
 		if ($waittime > $maxwait) {
 		    my $t = (int ($waittime / 60));
-		    print STDERR "*** osload ($node): appears wedged; ".
-			"it has been $t minutes since it was rebooted.\n";
+		    tbnotice "$node appears wedged; ".
+			"it has been $t minutes since it was rebooted.";
 		    TBNodeConsoleTail($node, *STDERR);
 
 		    $count--;
@@ -696,12 +693,12 @@ sub SetupReloadFrisbee($$$$)
 
     system("$osselect -1 $osid $node");
     if ($?) {
-	print STDERR "*** osload ($node): os_select $osid failed!\n";
+	tberror "os_select $osid failed!";
 	return -1;
     }
     system("$FRISBEELAUNCHER " . ($debug ? "-d ": "") . "$imageid");
     if ($?) {
-	print STDERR "*** osload ($node): Frisbee Launcher ($imageid) failed!\n";
+	tberror "Frisbee Launcher ($imageid) failed!";
 	return -1;
     }
     return 0;
@@ -722,7 +719,7 @@ sub SetupReloadUISP($$$$)
     my $query_result = DBQueryFatal("select path from images " .
 	"where imageid='$imageid'");
     if ($query_result->num_rows() != 1) {
-	print STDERR "*** osload ($node): Failed to get path for $imageid!\n";
+	tberror "Failed to get path for $imageid!";
 	return -1;
     }
     my ($path) = $query_result->fetchrow();
@@ -743,7 +740,7 @@ sub SetupReloadUISP($$$$)
     #
     my $rv = system("$TBUISP upload $path $node");
     if ($rv) {
-	print STDERR "*** osload ($node): tbuisp failed\n";
+	tberror "$node: tbuisp failed";
 	return -1;
     }
 
@@ -754,7 +751,7 @@ sub SetupReloadUISP($$$$)
 
     system("$osselect $osid $node");
     if ($?) {
-	print STDERR "*** osload ($node): os_select $osid failed!\n";
+	tberror "os_select $osid failed!";
 	goto failednode;
     }
 
@@ -795,7 +792,7 @@ sub osload_wait($)
     my ($childpid) = @_;
 
     if (!exists($children{$childpid})) {
-	print STDERR "*** osload: No such child pid $childpid!\n";
+	tberror "No such child pid $childpid!"; # INTERNAL
 	return -1;
     }
     my ($PARENT_READER, $result) = @{ $children{$childpid}};
@@ -811,7 +808,7 @@ sub osload_wait($)
 	    print STDERR "reload ($1): child returned $2 status.\n";
 	}
 	else {
-	    print STDERR "*** osload: Improper response from child: $_\n";
+	    tberror "Improper response from child: $_"; # INTERNAL
 	}
     }
     

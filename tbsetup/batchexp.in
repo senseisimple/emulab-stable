@@ -146,16 +146,14 @@ my $committed    = 0;
 # Verify user and get his DB uid.
 #
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** $0:\n".
-        "    You do not exist in the Emulab Database!\n");
+    tbdie("You do not exist in the Emulab Database!");
 }
 
 #
 # Get email info for user.
 #
 if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
-    die("*** $0:\n".
-        "    Cannot determine your name and email address.\n");
+    tbdie("Cannot determine your name and email address.");
 }
 
 #
@@ -163,9 +161,7 @@ if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
 # our time. Make sure user sees the error by exiting with 1.
 #
 if (system("$checkquota $dbuid") != 0) {
-    print STDERR
-	"*** $0:\n".
-	"    You are over your disk quota on $CONTROL; please cleanup!\n";
+    tberror("You are over your disk quota on $CONTROL; please cleanup!");
     exit(1);
 }
 
@@ -187,14 +183,13 @@ if (!defined($description)) {
     $description = "'Created by $dbuid'";
 }
 if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
-    die("Must provide a reason with -S option (not swappable reason)!\n");
+    tbdie("Must provide a reason with -S option (not swappable reason)!");
 }
 if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")) {
-    die("Must provide a reason with -L option (no idleswap reason)!\n");
+    tbdie("Must provide a reason with -L option (no idleswap reason)!");
 }
 if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
-    die("*** $0:\n".
-	"    Only admins can create experiments with no NS file\n");
+    tbdie("Only admins can create experiments with no NS file");
 }
 my $nsfile  = "$eid.ns";
 my $repfile = "$eid.report";
@@ -209,8 +204,7 @@ $noidleswap_reason = "'None Given'"
 # Make sure UID is allowed to create experiments in this project.
 #
 if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
-    die("*** $0:\n".
-	"    You do not have permission to create experiments in $pid/$gid\n");
+    die("You do not have permission to create experiments in $pid/$gid");
 }
 
 #
@@ -223,8 +217,7 @@ if (!defined($tempnsfile)) {
 }
 elsif (! -f $tempnsfile || ! -r $tempnsfile || -z $tempnsfile) {
     # Exit so that user sees the error, not us.
-    print STDERR "*** $0:\n".
-	         "    $tempnsfile does not exist or is not a readable file!\n";
+    tberror("$tempnsfile does not exist or is not a readable file!");
     exit(1);
 }
 
@@ -270,8 +263,7 @@ $query_result =
 
 if ($query_result->numrows) {
     DBQueryWarn("unlock tables");
-    die("*** $0:\n".
-        "    Experiment $eid in project $pid already exists!\n");
+    tbdie("Experiment $eid in project $pid already exists!");
 }
 
 #
@@ -298,8 +290,7 @@ foreach my $table ("experiments", "experiment_stats", "experiment_resources",
     
     if ($query_result->numrows) {
 	DBQueryWarn("unlock tables");
-	die("*** $0:\n".
-	    "    Experiment index $exptidx exists in $table; this is bad!\n");
+	tbdie("Experiment index $exptidx exists in $table; this is bad!");
     }
 }
 
@@ -324,8 +315,7 @@ if (! DBQueryWarn("INSERT INTO experiments ".
 		  "$noidleswap_reason, $batchmode, '$batchstate', ".
 		  "$linktest, $savestate)")) {
     DBQueryWarn("unlock tables");
-    die("*** $0:\n".
-	"    DB error inserting experiment record for $pid/$eid!\n");
+    tbdie("DB error inserting experiment record for $pid/$eid!");
 }
 
 #
@@ -338,8 +328,7 @@ $query_result =
 if (!$query_result) {
     DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
     DBQueryWarn("unlock tables");
-    die("*** $0:\n".
-	"    DB error inserting experiment resources record for $pid/$eid!");
+    tbdie("DB error inserting experiment resources record for $pid/$eid!");
 }
 my $rsrcidx = $query_result->insertid;
 
@@ -353,16 +342,14 @@ if (! DBQueryWarn("insert into experiment_stats ".
     DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
     DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
     DBQueryWarn("unlock tables");
-    die("*** $0:\n".
-	"    DB error inserting experiment stats record for $pid/$eid!");
+    tbdie("DB error inserting experiment stats record for $pid/$eid!");
 }
 
 if (! DBQueryWarn("unlock tables")) {
     DBQueryWarn("delete from experiments where pid='$pid' and eid='$eid'");
     DBQueryWarn("delete from experiment_resources where idx=$rsrcidx");
     DBQueryWarn("delete from experiment_stats where exptidx=$exptidx");
-    die("*** $0:\n".
-	"    DB error unlocking tables!");
+    tbdie("DB error unlocking tables!");
 }
 
 #
@@ -883,8 +870,7 @@ sub ParseArgs()
 	    $tempnsfile = $1;
 	}
 	else {
-	    die("*** $0:\n".
-		"    Bad data in nsfile: $tempnsfile\n");
+	    tbdie("Bad data in nsfile: $tempnsfile");
 	}
 
 	#
@@ -897,8 +883,7 @@ sub ParseArgs()
 	    $tempnsfile = $1;
 	}
 	else {
-	    die("*** $0:\n".
-		"    Bad data returned by realpath: $translated\n");
+	    tbdie("Bad data returned by realpath: $translated");
 	}
 
 	#
@@ -913,9 +898,7 @@ sub ParseArgs()
 	    ! ($tempnsfile =~ /^\/proj/) &&
 	    ! ($tempnsfile =~ /^\/groups/) &&
 	    ! ($tempnsfile =~ /^\/users/)) {
-	    print STDERR
-		"*** $0:\n".
-		"    $tempnsfile does not resolve to an allowed directory!\n";
+	    tberror("$tempnsfile does not resolve to an allowed directory!");
 	    # Note positive status; so error goes to user not tbops.
 	    exit(1);
 	}
@@ -953,7 +936,7 @@ sub ParseArgs()
 	    $pid = $1;
 	}
 	else {
-	    die("Bad data in argument: $pid.");
+	    tbdie("Bad data in argument: $pid.");
 	}
     }
     if (defined($options{"e"})) {
@@ -963,11 +946,11 @@ sub ParseArgs()
 	    $eid = $1;
 	}
 	else {
-	    die("Bad data in argument: $eid.");
+	    tbdie("Bad data in argument: $eid.");
 	}
 	if (! TBcheck_dbslot($eid, "experiments", "eid",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper experiment name (id)!\n");
+	    tbdie("Improper experiment name (id)!");
 	}
     }
     if (defined($options{"g"})) {
@@ -977,20 +960,20 @@ sub ParseArgs()
 	    $gid = $1;
 	}
 	else {
-	    die("Bad data in argument: $gid.");
+	    tbdie("Bad data in argument: $gid.");
 	}
     }
     if (defined($options{"E"})) {
 	if (! TBcheck_dbslot($options{"E"}, "experiments", "expt_name",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper experiment description!\n");
+	    tbdie("Improper experiment description!");
 	}
 	$description = DBQuoteSpecial($options{"E"});
     }
     if (defined($options{"S"})) {
 	if (! TBcheck_dbslot($options{"S"}, "experiments", "noswap_reason",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper noswap reason!\n");
+	    tbdie("Improper noswap reason!");
 	}
 	$swappable     = 0;
 	$noswap_reason = DBQuoteSpecial($options{"S"});
@@ -998,7 +981,7 @@ sub ParseArgs()
     if (defined($options{"L"})) {
 	if (! TBcheck_dbslot($options{"L"}, "experiments", "noidleswap_reason",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper noidleswap reason!\n");
+	    tbdie("Improper noidleswap reason!");
 	}
 	$idleswap          = 0;
 	$noidleswap_reason = DBQuoteSpecial($options{"L"});
@@ -1006,7 +989,7 @@ sub ParseArgs()
     if (defined($options{"l"})) {
 	if (! TBcheck_dbslot($options{"l"}, "experiments", "idleswap_timeout",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper idleswap timeout!\n");
+	    tbdie("Improper idleswap timeout!");
 	}
         $idleswap     = 1;
 	$idleswaptime = $options{"l"};
@@ -1014,7 +997,7 @@ sub ParseArgs()
     if (defined($options{"a"})) {
 	if (! TBcheck_dbslot($options{"a"}, "experiments", "autoswap_timeout",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper autoswap timeout!\n");
+	    tbdie("Improper autoswap timeout!");
 	}
         $autoswap     = 1;
 	$autoswaptime = $options{"a"};
@@ -1022,7 +1005,7 @@ sub ParseArgs()
     if (defined($options{"t"})) {
 	if (! TBcheck_dbslot($options{"t"}, "experiments", "linktest_level",
 			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
-	    die("Improper linktest level!\n");
+	    tbdie("Improper linktest level!");
 	}
 	$linktest = $options{"t"};
     }
@@ -1040,9 +1023,8 @@ sub fatal($)
 {
     my($mesg) = $_[0];
 
-    print "*** $0:\n";
-    print "    $mesg\n";
-    print "Cleaning up and exiting with status $errorstat ...\n";
+    tberror $mesg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
 
     #
     # This exit will drop into the END block below.

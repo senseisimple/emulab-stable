@@ -42,12 +42,10 @@ $| = 1;
 # We don't want to run this script unless its the real version.
 #
 if ($EUID != 0) {
-    die("*** $0:\n".
-	"    Must be root! Maybe its a development version?\n");
+    tbdie("Must be root! Maybe its a development version?");
 }
 if (!$ELABINELAB) {
-    die("*** $0:\n".
-	"    This script is for elabinelab systems only!\n");
+    tbdie("This script is for elabinelab systems only!");
 }
 
 # Load the Testbed support stuff.
@@ -55,6 +53,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libxmlrpc;
+use libtblog;
 
 # Locals
 my $FRISBEE     = "$TB/sbin/frisbee";
@@ -93,8 +92,7 @@ else {
 # Grab mcastif. This is has been set up for us, and its a serious kludge.
 #
 if (! -e "/etc/emulab/outer_ipaddr") {
-    die("*** $0:\n".
-	"    /etc/emulab/outer_ipaddr does not exist!\n");
+    tbdie("/etc/emulab/outer_ipaddr does not exist!");
 }
 $mcastif = `cat /etc/emulab/outer_ipaddr`;
 chomp($mcastif);
@@ -102,8 +100,7 @@ if ($mcastif =~ /^([\d\.]+)$/) {
     $mcastif = $1;
 }
 else {
-    die("*** $0:\n".
-	"    Could not parse outer IP: $mcastif\n!");
+    tbdie("Could not parse outer IP: $mcastif!");
 }
 
 #
@@ -125,8 +122,7 @@ my ($filename,$creator,$gid) = $query_result->fetchrow();
 my $rval = libxmlrpc::CallMethod("elabinelab", "frisbeelauncher",
 				 {"imageid" => "$imageid"});
 if (!defined($rval)) {
-    die("*** $0:\n".
-	"    Could not fire up frisbee on outer Emulab!\n");
+    die("Could not fire up frisbee on outer Emulab!");
 }
 
 #
@@ -138,8 +134,7 @@ if ($rval =~ /^(.*):(\d*)$/) {
     $loadport = $2;
 }
 else {
-    die("*** $0:\n".
-	"    Could not parse loadinfo from server: $rval\n!");
+    tbdie("Could not parse loadinfo from server: $rval!");
 }
 
 if ($debug) {
@@ -148,7 +143,6 @@ if ($debug) {
 
 system("$FRISBEE -N -i $mcastif -m $loadaddr -p $loadport $filename");
 if ($?) {
-    die("*** $0:\n".
-	"    Error downloading image data from outer Emulab!\n");
+    tbdie("Error downloading image data from outer Emulab!");
 }
 exit(0);

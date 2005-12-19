@@ -1,0 +1,100 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Hack to get assign error messages into the database correctly.  Will
+# be removed once the API is ported to other languages besides perl
+#
+
+BEGIN {$FAKE_SCRIPTNAME = $ARGV[0];}
+
+use lib "@prefix@/lib";
+use libtblog;
+use libtblog qw(dblog *SOUT *SERR);
+
+use strict;
+
+open P, join(' ', @ARGV, ' |');
+
+my @out;
+my @err;
+my $obvious_error = 0;
+
+while (<P>) {
+    print SOUT $_;
+    push @out, $_;
+}
+close P;
+
+my $exitcode = $? >> 8;
+
+#
+# Now parse out relevent info and echo it to stderr.  Also, pull out
+# any obvious errors (prefixed with ***) and log them sepertly.  The
+# rest will go in te database as one big error.
+#
+if ($exitcode) {
+    my $violations = 0;
+    
+    # Pull out relevent info
+    print SERR "ASSIGN FAILED:\n";
+    while ((shift @out) !~ /^[\w\s]*precheck:$/) {}
+    while (($_ = shift @out)) {
+	/^[\w\s]*precheck:$/ && do {
+	    next;
+	};
+	/^With ([0-9]+) violations$/ && do {
+	    $violations = $1;
+	    last;
+	};
+	print SERR  $_;
+	push @err, $_;
+    }
+    if ($violations) {
+	while ((shift @out) !~ /^Violations:/) {}
+	while (($_ = shift @out)) {
+	    if (/^Nodes:/) {
+		last;
+	    }
+	    print SERR $_;
+	    push @err, $_;
+	}
+    }
+
+    # See if there are any obvious errors
+    my $err = '';
+    while (($_ = shift @err)) {
+	$err .= $_;
+	if (/^(\s*)\*\*\*+\s*(.+)/) {
+	    $obvious_error = 1;
+	    my $space = $1;
+	    my $mesg = $2;
+	    while (@err && $err[0] =~ /^$space    \s*(.+)/) {
+		$mesg .= "\n$1";
+		shift @err;
+	    }
+	    my $sublevel = length($space) > 0 ? 1 : 0;
+	    if ($mesg =~ s/^warning:\s+//i) {
+		dblog(TBLOG_WARNING, {sublevel=>$sublevel}, $mesg);
+	    } else {
+		dblog(TBLOG_ERR, {sublevel=>$sublevel}, $mesg);
+	    }
+	}
+    }
+
+    # log all relevent output as one entry unless an obvious_error was
+    # already found
+    dblog(TBLOG_ERR, {}, $err) unless ($obvious_error);
+
+    # create a log entry that assign failed
+    my %parms;
+    $parms{sublevel} = -1;
+    $parms{type} = 'extra' unless $obvious_error;
+    dblog(TBLOG_ERR, \%parms, "Assign Failed.");
+}
+
+exit $exitcode;

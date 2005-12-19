@@ -48,6 +48,7 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 
 # Defines
 my $FRISBEED	= "$TB/sbin/frisbeed";
@@ -94,12 +95,11 @@ my $filename = &get_filename($imageid);
 if (!TBImageIDAccessCheck($UID, $imageid,
 			  ($killmode ? TB_IMAGEID_DESTROY :
 			   TB_IMAGEID_READINFO))) {
-    die("*** $0:\n".
-	"    Not enough permission!\n");
+    tbdie("Not enough permission!");
 }
 
 if (!$killmode && !$ELABINELAB && ! -R $filename) {
-    die("*** You do not have permission to read the image file for\n".
+    tbdie("You do not have permission to read the image file for".
 	"imageid $imageid: $filename\n");
 }
 
@@ -136,8 +136,7 @@ if ($killmode) {
 		 "Imageid: $imageid\n".
 		 $mesg);
 	
-	die("*** $0:\n".
-	    "    $mesg\n");
+	tbdie($mesg);
     }
     if ($address && !$pid) {
 	#
@@ -163,8 +162,7 @@ if ($killmode) {
 		     "Imageid: $imageid\n".
 		     $mesg);
 	
-	    die("*** $0:\n".
-		"    $mesg\n");
+	    tbdie($mesg);
 	}
     }
 
@@ -181,8 +179,7 @@ if ($killmode) {
 		 "Failed to stop frisbee daemon for $imageid\n".
 		 "Could not kill(TERM) process $pid: $? $!");
 
-	die("*** $0:\n".
-	    "    Failed to stop frisbee daemon for $imageid!\n");
+	tbdie("Failed to stop frisbee daemon for $imageid!");
     }
     exit(0);
 }
@@ -202,8 +199,7 @@ if ($pid) {
 	     "Imageid: $imageid\n".
 	     $mesg);
 	
-    die("*** $0:\n".
-	"    $mesg\n");
+    tbdie($mesg);
 }
 
 # Pick an address: Die if unsucessful, set address and unlock if sucessful
@@ -227,8 +223,7 @@ if ($ELABINELAB && ! -e $filename) {
     $EUID = $UID;
     system("$FRISBEEIMAGE $imageid");
     if ($?) {
-	die("*** $0:\n".
-	    "    No such image file: $filename\n!");
+	tbdie("No such image file: $filename!");
     }
     $EUID = 0;
 }
@@ -245,8 +240,7 @@ if (my $childpid = TBBackGround($LOGFILE)) {
     my $foo = waitpid($childpid, &WNOHANG);
     if ($foo) {
 	&clear_address;
-	die("*** $0:\n".
-	    "    Error $? backgrounding frisbeelauncher\n!");
+	tbdie("Error $? backgrounding frisbeelauncher!");
     }
     exit(0);
 }
@@ -456,8 +450,7 @@ sub pick_address {
 			 "Imageid: $imageid\n".
 			 $mesg);
 	
-		die("*** $0:\n".
-		    "    $mesg\n");
+		tbdie($mesg);
 	    }
 	}
     }

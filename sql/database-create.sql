@@ -922,11 +922,12 @@ CREATE TABLE log (
   invocation int(10) unsigned NOT NULL default '0',
   parent int(10) unsigned NOT NULL default '0',
   script smallint(3) NOT NULL default '0',
-  level smallint(2) NOT NULL default '0',
+  level tinyint(2) NOT NULL default '0',
+  sublevel tinyint(2) NOT NULL default '0',
   priority smallint(3) NOT NULL default '0',
   inferred tinyint(1) NOT NULL default '0',
   cause varchar(32) NOT NULL default '',
-  type enum('normal','entering','exiting','thecause') NOT NULL default 'normal',
+  type enum('normal','entering','exiting','thecause','extra','summary') NOT NULL default 'normal',
   relevant tinyint(1) NOT NULL default '0',
   mesg text NOT NULL,
   PRIMARY KEY  (seq),
@@ -1625,9 +1626,9 @@ CREATE TABLE portmap (
 
 CREATE TABLE priorities (
   priority smallint(3) NOT NULL default '0',
-  name varchar(8) NOT NULL default '',
+  priority_name varchar(8) NOT NULL default '',
   PRIMARY KEY  (priority),
-  UNIQUE KEY name (name)
+  UNIQUE KEY name (priority_name)
 ) TYPE=MyISAM;
 
 --
@@ -1758,9 +1759,9 @@ CREATE TABLE scheduled_reloads (
 
 CREATE TABLE scripts (
   script smallint(3) NOT NULL auto_increment,
-  name varchar(24) NOT NULL default '',
+  script_name varchar(24) NOT NULL default '',
   PRIMARY KEY  (script),
-  UNIQUE KEY id (name)
+  UNIQUE KEY id (script_name)
 ) TYPE=MyISAM;
 
 --

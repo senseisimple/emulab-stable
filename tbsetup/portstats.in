@@ -94,13 +94,13 @@ if (!$opt{p}) {
         $pid = $1;
     }
     else {
-        die("*** Bad data in pid: $pid.\n");
+        tbdie("Bad data in pid: $pid.");
     }
     if ($eid =~ /^([-\w]+)$/) {
         $eid = $1;
     }
     else {
-        die("*** Bad data in eid: $eid.\n");
+        tbdie("Bad data in eid: $eid.");
     }
 }
 
@@ -114,7 +114,7 @@ foreach my $arg (@ARGV) {
         $arg = $1;
     }
     else {
-        die("*** Bad data in arg: $arg.\n");
+        tbdie("Bad data in arg: $arg.");
     }
     push(@passedPorts, $arg);
 }

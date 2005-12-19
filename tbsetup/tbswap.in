@@ -236,7 +236,7 @@ elsif ($swapop eq "update") {
     #
     print STDERR "Checking with Admission Control ...\n";
     if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
-	print STDERR "Admission control failure!\n";
+	tberror "Admission control failure!\n";
 	print "Failingly finished swap-$swapop for $pid/$eid. " .
 	    TBTimeStamp() . "\n";
 	TBDebugTimeStamp("tbswap $swapop finished (failed)");
@@ -325,7 +325,7 @@ elsif ($swapop eq "in") {
     #
     print STDERR "Checking with Admission Control ...\n";
     if (! TBAdmissionControlCheck($UID, $pid, $eid, undef)) {
-	print STDERR "Admission control failure!\n";
+	tberror "Admission control failure!\n";
 	print "Failingly finished swap-$swapop for $pid/$eid. " .
 	    TBTimeStamp() . "\n";
 	TBDebugTimeStamp("tbswap $swapop finished (failed)");
@@ -719,8 +719,8 @@ sub doSwapin($) {
 			 "     e.pid='$pid' and e.eid='$eid'");
 
 	    if ($db_result->numrows) {
-		print "*** Endnodeshaping is disabled on Linux Images!\n";
-		print "*** You must modify your experiment to swap it in.\n";
+		tberror "Endnodeshaping is disabled on Linux Images!";
+		tberror "You must modify your experiment to swap it in.";
 		return 1;
 	    }
 	}
@@ -806,13 +806,13 @@ sub doSwapin($) {
 		TBDebugTimeStamp("vnode_setup started");
 		
 		if (system("vnode_setup -k $pid $eid @virtnodes")) {
-		    print "Failed to tear down unused virtnodes!\n";
+		    tberror "Failed to tear down unused virtnodes!\n";
 		    return 1;
 		}
 		TBDebugTimeStamp("vnode_setup finished");
 		
 		if (system("nfree $pid $eid @virtnodes")) {
-		    print "Failed to nfree unused virtnodes!\n";
+		    tberror "Failed to nfree unused virtnodes!\n";
 		    return 1;
 		}
 	    }
@@ -834,7 +834,7 @@ sub doSwapin($) {
 		}
 		
 		if (system("nfree $pid $eid @physnodes")) {
-		    print "Failed to nfree unused physnodes!\n";
+		    tberror "Failed to nfree unused physnodes!\n";
 		    return 1;
 		}
 	    }
@@ -1026,7 +1026,7 @@ sub doSwapin($) {
     print "Setting up VLANs.\n";
     TBDebugTimeStamp("snmpit started");
     if (system("snmpit -t $pid $eid")) {
-	tberror "Failed to set up VLANs.";
+	tberror {type=>'summary'}, "Failed to set up VLANs.";
 	return 1;
     }
     TBDebugTimeStamp("snmpit finished");
@@ -1079,8 +1079,8 @@ sub doSwapin($) {
 	    # rules.  But right now, I may screw up too!
 	    #
 	    if ($firewalled) {
-		print STDERR "Not retrying, ".
-		    "firewall may be preventing setup.\n";
+		tberror "Not retrying, ".
+		    "firewall may be preventing setup.";
 		return 1;
 	    }
 
@@ -1155,7 +1155,7 @@ sub doSwapin($) {
  
     if ($linktest_level && ($type == REAL || $type == UPDATE)) {
 	if ($linktest_pid) {
-	    print STDERR "*** Linktest is already running! $linktest_pid\n";
+	    tbwarn "Linktest is already running! $linktest_pid";
 	}
 	else {
 	    #
@@ -1165,7 +1165,7 @@ sub doSwapin($) {
     
 	    print "Starting linktest ... this could take a while!'\n";
 	    if (system("linktest_control $optarg $pid $eid") != 0) {
-		print STDERR "*** Linktest run returned non-zero status!\n";
+		tbwarn "Linktest run returned non-zero status!";
 	    }
 	}
     }
@@ -1193,7 +1193,7 @@ sub doSwapin($) {
 	    ($type != UPDATE && $type != UPDATE_RECOVER) ) {
 	    TBDebugTimeStamp("Starting event time");
 	    if (system("tevc -e $pid/$eid now __ns_sequence start")) {
-		print STDERR "*** Failed to start event time.\n";
+		tberror "Failed to start event time.";
 		return 1;
 	    }
 	}
@@ -1761,3 +1761,4 @@ sub doSwapoutAction($$%)
 
     return 0;
 }
+

@@ -23,6 +23,7 @@ use vars qw(@ISA @EXPORT);
 # Must come after package declaration!
 use lib '@prefix@/lib';
 use libdb;
+use libtblog;
 use English;
 
 #
@@ -68,6 +69,16 @@ my %children    = ();
 sub nodereboot($$)
 {
     my ($args, $result) = @_;
+    my @nodes       = @{ $args->{'nodelist'}};
+
+    #
+    # Start a new logging sub-process
+    #
+    my $old_env = \%ENV;
+    local %ENV;
+    copy_hash %ENV, $old_env;
+    tblog_sub_process("reboot", @nodes);
+
 
     $debug = $args->{'debug'}
         if (exists($args->{'debug'}));
@@ -79,7 +90,7 @@ sub nodereboot($$)
 	# caused by installing improperly.
 	#
 	if (exists($ENV{'REBOOTPIPENO'})) {
-	    print STDERR "*** reboot: Must be root when using library!\n";
+	    tberror "Must be root when using library!";
 	    return -1;
 	}
 	print STDERR "reboot: no privs; invoking real nodereboot script!\n"
@@ -88,10 +99,9 @@ sub nodereboot($$)
     }
 
     if (!defined($args->{'nodelist'})) {
-	print STDERR "*** reboot: Must supply a node list!\n";
+	tberror "Must supply a node list!";
 	return -1;
     }
-    my @nodes       = @{ $args->{'nodelist'}};
     my $powercycle  = 0;
     my $rebootmode  = 0;
     my $waitmode    = 0;
@@ -122,7 +132,7 @@ sub nodereboot($$)
 	    $pipemode = $1;
 	}
 	else {
-	    print STDERR "*** reboot: Bad pipeno in environment: $pipemode!\n";
+	    tberror "Bad pipeno in environment: $pipemode!";
 	    return -1;
 	}
     }
@@ -132,8 +142,7 @@ sub nodereboot($$)
     #
     if ($UID && !TBAdmin($UID) &&
 	! TBNodeAccessCheck($UID, TB_NODEACCESS_REBOOT, @nodes)) {
-	print STDERR "*** reboot: ".
-	    "You do not have permission to reboot some of the nodes!\n";
+	tberror "You do not have permission to reboot some of the nodes!";
 	return -1;
     }
 
@@ -178,7 +187,7 @@ sub nodereboot($$)
 	    my $pnode;
 
 	    if (! TBPhysNodeID($node, \$pnode)) {
-		print STDERR "*** reboot ($node): No physical node!\n";
+	        tberror "$node: No physical node!";
 		return -1;
 	    }
 	    $virtnodes{$node} = $pnode;
@@ -235,7 +244,7 @@ sub nodereboot($$)
 	# Create a pipe to read back results from the child we will create.
 	#
 	if (! pipe(PARENT_READER, CHILD_WRITER)) {
-	    print STDERR "*** reboot: creating pipe: $!\n";
+	    tberror "creating pipe: $!";
 	    return -1;
 	}
 	CHILD_WRITER->autoflush(1);
@@ -262,7 +271,7 @@ sub nodereboot($$)
 	# but rather just write the results to the pipe we got. 
 	#
 	if (! open(CHILD_WRITER, ">>&=${pipemode}")) {
-	    print STDERR "*** reboot: reopening pipe: $!\n";
+	    tberror "reopening pipe: $!";
 	    return -1;
 	}
 	CHILD_WRITER->autoflush(1);
@@ -309,8 +318,7 @@ sub nodereboot($$)
 	    #
 	    info("*** reboot: Powercyle mode: power cycle ".join(" ",@batch));
 	    if (PowerCycle(@batch)) {
-		print STDERR
-		    "*** reboot: Powercyle failed for " . join(" ",@batch) ."\n";
+		tberror "Powercyle failed for " . join(" ",@batch);
 		foreach my $node (@batch) {
 		    $result->{$node} = -1;
 		    $failed++;
@@ -374,7 +382,7 @@ sub nodereboot($$)
 	    elsif ($mypid != 0 && $?) {
 		$failed++;
 		$result->{$node} = -1;
-		print STDERR "*** reboot ($node): Failed ($?)!\n";
+		tberror "Failed ($?)!";
 	    }
 	    else {
 		print STDOUT "reboot ($node): Successful!\n";
@@ -387,9 +395,7 @@ sub nodereboot($$)
     #
     if (@needPowercycle) {
 	if (PowerCycle(@needPowercycle)) {
-	    print STDERR
-		"*** reboot: Powercyle failed for " .
-		    join(" ",@needPowercycle) ."\n";
+	    tberror "Powercyle failed for " . join(" ",@needPowercycle);
 	    foreach my $node (@needPowercycle) {
 		$result->{$node} = -1;
 		$failed++;
@@ -406,7 +412,7 @@ sub nodereboot($$)
 	if (RebootVNode($node, $pnode)) {
 	    $failed++;
 	    $result->{$node} = -1;
-	    print STDERR "*** reboot ($node): failed (on $pnode).\n";
+	    tberror "$node: Reboot failed (on $pnode)";
 	}
 	else {
 	    print STDOUT "reboot ($node): rebooting (on $pnode).\n";
@@ -442,7 +448,7 @@ sub nodereboot($$)
 		    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 		    next;
 		}
-		print STDOUT "*** reboot ($node): reported a TBFAILED event.\n";
+		tberror "$node reported a TBFAILED event.";
 	    }
 	    SetNodeBootStatus($node, NODEBOOTSTATUS_FAILED);
 	    $result->{$node} = -1;
@@ -475,6 +481,14 @@ sub nodereboot($$)
 sub RebootNode {
     my ($pc, $reconfig, $killmode, $rebootmode) = @_;
     my ($status, $syspid, $mypid, $didipod, $nodestate);
+
+    #
+    # Start a new logging sub-process
+    #
+    my $old_env = \%ENV;
+    local %ENV;
+    copy_hash %ENV, $old_env;
+    tblog_sub_process("reboot_node", $pc);
 
     if ($reconfig) {
 	print "reboot ($pc): Attempting to reconfigure ...\n";
@@ -530,8 +544,7 @@ sub RebootNode {
 	system("$bisend $optarg $reqarg $pc");
 	if ($?) {
 	    info("$pc: PXEWAKEUP failed ... power cycle");
-	    print STDERR
-		"*** reboot ($pc): PXEWAKEUP failed; will power cycle.\n";
+	    tbnotice "$pc: PXEWAKEUP failed; will power cycle.\n";
 	    
 	    # Signal to the caller that the node needs to be power cycled
 	    return -2;
@@ -555,7 +568,7 @@ sub RebootNode {
     #
     if (! DoesPing($pc)) {
 	info("$pc appears dead: power cycle");
-	print STDERR "*** reboot ($pc): appears dead; will power cycle.\n";
+	tbnotice "$pc appears dead; will power cycle.";
 	
 	# Signal to the parent that the node needs to be power cycled
 	exit(2);
@@ -863,7 +876,7 @@ sub nodereboot_wait($)
     my ($childpid) = @_;
 
     if (!exists($children{$childpid})) {
-	print STDERR "*** reboot: No such child pid $childpid!\n";
+	tberror "No such child pid $childpid!";
 	return -1;
     }
     my ($PARENT_READER, $result) = @{ $children{$childpid}};
@@ -879,7 +892,7 @@ sub nodereboot_wait($)
 	    print STDERR "reboot ($1): child returned $2 status.\n";
 	}
 	else {
-	    print STDERR "*** reboot: Improper response from child: $_\n";
+	    tberror "Improper response from child: $_";
 	}
     }
     
@@ -930,7 +943,7 @@ sub nodereboot_exec($$)
     # Create a pipe to read back results from the child we will create.
     #
     if (! pipe(PARENT_READER, CHILD_WRITER)) {
-	print STDERR "*** reboot: creating pipe: $!\n";
+	tberror "creating pipe: $!";
 	return -1;
     }
     CHILD_WRITER->autoflush(1);

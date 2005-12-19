@@ -47,6 +47,7 @@ $ENV{'PATH'} = "/usr/bin:/bin:$TBROOT/libexec:$TBROOT/libexec/ns2ir" .
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
 
 #
 # Turn off line buffering on output
@@ -74,21 +75,18 @@ if (@ARGV != 3) {
 my ($pid,$eid,$nsfile) = @ARGV;
 
 if (! -r $nsfile) {
-    die("*** $0:\n".
-	"    NS File '$nsfile' does not exist!\n");
+    tbdie("NS File '$nsfile' does not exist!");
 }
 
 print "Beginning pre run for $pid/$eid. " . TBTimeStamp() . "\n";
 TBDebugTimeStamp("tbprerun started");
 
 if (! ($state = ExpState($pid, $eid))) {
-    die("*** $0:\n".
-	"    No such experiment $pid/$eid\n");
+    tbdie("No such experiment $pid/$eid");
 }
 
 if (! ($gid = ExpGroup($pid,$eid))) {
-    die("*** $0:\n".
-	"    Unable to get group for $pid/$eid\n");
+    tbdie("Unable to get group for $pid/$eid");
 }
 
 #
@@ -97,8 +95,7 @@ if (! ($gid = ExpGroup($pid,$eid))) {
 if (!$force &&
     !($state eq EXPTSTATE_PRERUN || $state eq EXPTSTATE_MODIFY_PARSE ||
       $state eq EXPTSTATE_MODIFY_REPARSE)) {
-    die("*** $0:\n".
-	"    Experiment is not in the proper state: $state\n");
+    tbdie("Experiment is not in the proper state: $state");
 }
 
 #
@@ -123,8 +120,7 @@ sub fatal($)
     my ($mesg) = @_;
     
     cleanup();
-    die("*** $0:\n".
-	"    $mesg\n");
+    tbdie($mesg);
 }
 
 # Need this below.

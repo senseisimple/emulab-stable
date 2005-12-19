@@ -40,7 +40,8 @@ FSBIN_STUFF	= exports_setup.proxy
 LIBEXEC_STUFF	= rmproj wanlinksolve wanlinkinfo \
 		  os_setup mkexpdir console_setup webnscheck webreport \
 		  webendexp webbatchexp webpanic \
-		  assign_wrapper assign_prepass ptopgen webnodeupdate \
+		  assign_wrapper assign_wrapper2 \
+		  assign_prepass ptopgen webnodeupdate \
 		  webdelay_config webnodehistory \
 		  webrmgroup webswapexp webnodecontrol webeventsys_control \
 		  webmkgroup websetgroups webmkproj webmodgroups \

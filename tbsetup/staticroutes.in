@@ -129,8 +129,7 @@ my $query_result =
 		 "where pid='$pid' and eid='$eid'");
 
 if (!$query_result->numrows) {
-    warn("*** $0:\n".
-	 "    No nodes in experiment $pid/$eid!\n");
+    tbwarn("No nodes in experiment $pid/$eid!");
     exit(0);
 }
 
@@ -232,8 +231,7 @@ $query_result =
     DBQueryFatal("select vname,member,cost,mask " .
 		 "from virt_lans where pid='$pid' and eid='$eid'");
 if (!$query_result->numrows) {
-    warn("*** $0:\n".
-	 "    No links or lans in experiment $pid/$eid!\n");
+    tbwarn("No links or lans in experiment $pid/$eid!");
     exit(0);
 }
 
@@ -252,8 +250,7 @@ while (my ($vname,$member,$cost,$mask) = $query_result->fetchrow_array) {
 # (normal perl I/O provides just unidirectional I/O to a process).
 # 
 if (! socketpair(CHILD, PARENT, AF_UNIX, SOCK_STREAM, PF_UNSPEC)) {
-    die("*** $0:\n".
-	"    socketpair failed: $!\n");
+    tbdie("socketpair failed: $!");
 }
 
 CHILD->autoflush(1);

@@ -63,13 +63,13 @@ if ($TESTMODE) {
 }
 elsif ($EUID != 0) {
     # We don't want to run this script unless its the real version.
-    die("*** $0: Must be root! Maybe its a development version?\n");
+    tbdie("Must be root! Maybe its a development version?");
 }
 
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
 if ($UID == 0) {
-    die("*** $0: Please do not run this as root! Its already setuid!\n");
+    tbdie("Please do not run this as root! Its already setuid!");
 }
 
 #
@@ -91,20 +91,20 @@ my $dbuid;
 # Verify user and get his DB uid.
 #   
 if (! UNIX2DBUID($UID, \$dbuid)) {
-    die("*** Go Away! You do not exist in the Emulab Database.\n");
+    tbdie("Go Away! You do not exist in the Emulab Database.");
 }
 #
 # First, make sure the experiment exists
 #
 if (!ExpState($pid,$eid)) {
-    die("*** There is no experiment $eid in project $pid\n");
+    tbdie("There is no experiment $eid in project $pid");
 }
 
 #
 # User must have at least MODIFY permissions to use this script
 #
 if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
-    die("*** You are not allowed to modify experiment $eid in project $pid\n");
+    tbdie("You are not allowed to modify experiment $eid in project $pid");
 }
 
 #
@@ -113,7 +113,7 @@ if (!TBExptAccessCheck($dbuid,$pid,$eid,TB_EXPT_MODIFY())) {
 #
 my $expdir = TBExptUserDir($pid,$eid);
 if (!$expdir) {
-    die("*** Unable to get experiment directory\n");
+    tbdie("Unable to get experiment directory");
 }
 
 #
@@ -151,7 +151,7 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	    #
 	    my $URL = verifyURL($rpm);
 	    if (!$URL) {
-		die("*** Invalid RPM URL given: $rpm\n");
+		tbdie("Invalid RPM URL given: $rpm");
 	    }
 
 	    #
@@ -183,7 +183,7 @@ while (my ($vname, $rpms, $tarfiles) = $result->fetchrow()) {
 	if ($tarfile =~ /^(http|https|ftp)/) {
 	    my $URL = verifyURL($tarfile);
 	    if (!$URL) {
-		die("*** Invalid tarball URL given: $tarfile\n");
+		tbdie("Invalid tarball URL given: $tarfile");
 	    }
 	    my $md5 = `md5 -q -s '$URL'`;
 	    chomp $md5;
@@ -243,7 +243,7 @@ while (my ($URL, $localfile) = each %tofetch) {
     $EUID = $UID = $SAVEUID;
 
     if ($?) {
-	die("*** Fetch of Tarball/RPM failed!\n");
+	tbdie("Fetch of Tarball/RPM failed!");
     }
 }
 

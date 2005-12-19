@@ -113,6 +113,7 @@ use libtestbed;
 use Node;
 use libadminctrl;
 use libtblog;
+use libtblog qw(*SOUT *SERR);
 
 #
 # assign_wrapper Settings
@@ -186,11 +187,9 @@ TBDebugTimeStampsOn();
 #
 # All exits happen via this function!
 #
-sub fatal ($)
+sub fatal (@)
 {
-    my($message) = @_;
-
-    tberror $message;
+    &tberror(@_);
 
     # We next go to the END block below.
     exit($WRAPPER_FAILED);
@@ -200,7 +199,7 @@ sub fatal ($)
 # We want warnings to cause assign_wrapper to exit abnormally.
 # We will come through here no matter how we exit though.
 # 
-$SIG{__WARN__} = sub { print STDERR $_[0];$warnings++; };
+$SIG{__WARN__} = sub { tbwarn $_[0];$warnings++; };
 
 END {
     # Watch for getting here cause of a die()/exit() statement someplace.
@@ -211,7 +210,7 @@ END {
     }
     
     if ($warnings > 0) {
-	tbwarn "$warnings.\n";
+	tberror "$warnings warnings.\n";
 
 	$exitcode |= $WRAPPER_FAILED;
     }
@@ -750,7 +749,7 @@ while (1) {
 	$precheck = 1;
 	my $retval = RunAssign();
 	if ($retval != 0) {
-	    fatal("Experiment can not be run on an empty testbed.  Please fix the experiment.");
+	    fatal({type=>'extra'}, "Experiment can not be run on an empty testbed.  Please fix the experiment.");
 	}
 	print("Assign succeeded on an empty testbed.\n");
 	$precheck = 0;
@@ -887,20 +886,20 @@ sub RunAssign ()
 	# the parent. 
 	#
         POSIX::setsid();
-	exec("nice $cmd $cmdargs > assign.log");
+	exec("nice assign_wrapper2 $cmd $cmdargs > assign.log");
 	die "Could not start assign!\n";
     }
 
     # Check cancel flag before continuing. 
     TBGetCancelFlag($pid, $eid, \$canceled);
     if ($canceled) {
-	print("Cancel flag set; aborting assign run!\n");
+	tbnotice("Cancel flag set; aborting assign run!\n");
 	return -1;
     }
 
     # Check for possible full filesystem ...
     if (-z "assign.log") {
-	print("assign.log is zero length! Stopping ...\n");
+	tbnotice("assign.log is zero length! Stopping ...\n");
 	return -1;
     }
 
@@ -916,37 +915,12 @@ sub RunAssign ()
     printdb "Reading assign results.\n";
 
     #
-    # We no longer care what assign has to say when it fails! Just
-    # tell the caller whether we want to keep trying or not. We still
-    # send some of the goo to the output stream so that Rob can quickly
-    # deduce what what wrong.
+    # We no longer care what assign has to say when it fails!
+    # Any relevent info was already sent to stderr so just 
+    # tell the caller whether we want to keep trying or not.
     #
     if ($assignexitcode) {
-	my $violations = 0;
-
-	print "ASSIGN FAILED:\n";
-	while (<ASSIGNFP> !~ /^[\w\s]*precheck:$/) {}
-	while (<ASSIGNFP>) {
-	    chop;
-	    /^\w*\s*precheck:$/ && do {
-		next;
-	    };
-	    /^With ([0-9]+) violations$/ && do {
-		$violations = $1;
-		last;
-	    };
-	    print $_ . "\n";
-	}
-	if ($violations) {
-	    while (<ASSIGNFP> !~ /^Violations:/) {}
-	    while (<ASSIGNFP>) {
-		if (/^Nodes:/) {
-		    last;
-		}
-		print "$_";
-	    }
-	}
-	close(ASSIGNFP);
+	close ASSIGNFP;
 	return (($assignexitcode == 1) ? 1 : -1);
     }
     

@@ -2867,7 +2867,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.16: Add new tables for the logging subsystem (libdblog)
 
-	mysql tbdb < libtblog.sql
+	mysql tbdb < libtblog-orig.sql
 
 4.17: Add linktest feature.
 
@@ -3021,3 +3021,16 @@ last_net_act,last_cpu_act,last_ext_act);
 	  notes text,
 	  PRIMARY KEY  (uid_idx)
         ) TYPE=MyISAM;
+
+4.25: Modify tables for the logging subsystem
+
+  alter table log
+    modify level tinyint(2) not null,
+    add sublevel tinyint(2) NOT NULL default 0 after level,
+    modify type 
+      enum('normal','entering','exiting','thecause','extra','summary')
+      NOT NULL default 'normal';
+
+  alter table scripts change name script_name varchar(24) NOT NULL default '';
+
+  alter table priorities change name priority_name varchar(8) NOT NULL;

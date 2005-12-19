@@ -144,7 +144,7 @@ if ($opt{t} || $opt{r}) {
     # Options that take 'pid eid'
     #
     if (@ARGV < 2) {
-	warn "ERROR: pid/eid reqired!\n";
+	tberror "pid/eid reqired!";
 	exit &usage;
     } else {
 	($pid, $eid) = (shift @ARGV, shift @ARGV);
@@ -164,7 +164,7 @@ if ($opt{t} || $opt{r}) {
     # one VLAN to be given
     #
     if (!@ARGV) {
-	warn "ERROR: At least one VLAN required";
+	tberror "At least one VLAN required";
 	exit &usage;
     }
     @optvlanids = @ARGV;
@@ -178,7 +178,7 @@ if ($opt{t} || $opt{r}) {
     # Everything else
     #
     if (@ARGV) {
-	warn "ERROR: Too many arguments!\n";
+	tberror "Too many arguments!";
 	exit &usage;
     }
 }
@@ -239,7 +239,7 @@ if ($opt{B}) {
         # permissions
         my %args = parseStatusString($statstring);
         if (!$args{port}) {
-            die "ERROR: No port given in status string\n";
+            tbdie "No port given in status string";
         }
         if ($args{port}) {
             push @ports, convertPortsFromIfaces($args{port});
@@ -302,7 +302,7 @@ if ($opt{S}) {
 	if (@switches) {
 	    push @supplied_stacks, $stack;
 	} else {
-	    die "ERROR: No such switch stack: $stack\n";
+	    tbdie "No such switch stack: $stack";
 	}
     }
 }
@@ -324,7 +324,7 @@ if ($opt{y}) {
     @pvlanArgs = $opt{y};
     if ($opt{y} ne "primary") {
 	if (!$opt{x} || !$opt{z}) {
-	    warn "****-x and -z must be given when -y is $opt{y}!\n";
+	    tberror "-x and -z must be given when -y is $opt{y}!";
 	    exit &usage;
 	}
 	#
@@ -335,8 +335,8 @@ if ($opt{y}) {
 	    if ($opt{i} && @{$opt{i}} == 1) {
 		$opt{z} = $opt{i}->[0] . "." . $opt{z};
 	    } else {
-		die "The module/port format is only legal if exactly one -i " .
-		    "argument has been given\n";
+		tbdie "The module/port format is only legal if exactly one -i " .
+		    "argument has been given";
 	    }
 	}
 	push @pvlanArgs,$opt{x},$opt{z};
@@ -493,7 +493,7 @@ foreach my $command (@commands) {
             my ($statusarg) = @args;
             my %args = parseStatusString($statusarg);
             if (!$args{port}) {
-                die "ERROR: No port given in status string\n";
+                tbdie "No port given in status string";
             }
             @ports = convertPortsFromIfaces($args{port});
             if ($args{vlan}) {
@@ -608,8 +608,8 @@ foreach my $command (@commands) {
 		}
 	    }
 	    if (!$matched) {
-		die "*** ERROR: One or more ports are on $device, but no " .
-		    "stack containing it was specified!\n";
+		tbdie "One or more ports are on $device, but no " .
+		    "stack containing it was specified!";
 	    }
 	}
     }
@@ -716,7 +716,7 @@ sub parseStatusString($) {
     foreach my $pair (split /;/, $string) {
         my ($key, $value) = split /=/,$pair,2;
         if (!$key || !$value) {
-            die "ERROR: Bad port status string: $string\n";
+            tbdie "Bad port status string: $string";
         } else {
             $pairs{$key} = $value;
         }
@@ -953,7 +953,7 @@ sub doPortStatus($@) {
     #
     foreach my $port (keys %ports) {
         if (!$ports{$port}) {
-            warn "ERROR: Unable to get status information for $port!\n";
+            tberror "Unable to get status information for $port!";
             $errors++;
         } else {
             print "port=$port;$ports{$port}\n";
@@ -977,7 +977,7 @@ sub doRestorePortStatus($@) {
 
     my $port = $params{port};
     if (!$port) {
-        die "ERROR: No port passed to -B option\n";
+        tbdie "No port passed to -B option";
     }
 
     if (@$stacks > 1) {
@@ -1022,7 +1022,7 @@ sub doRestorePortStatus($@) {
             if ($speed =~ /(\d+)(Mbps|mbit)/) {
                 $errors = $stack->portControl("${1}mbit",$port);
             } else {
-                warn "*** WARNING: Bad speed given for $port: $speed\n";
+                tbwarn "Bad speed given for $port: $speed";
                 $errors++;
             }
         }
@@ -1034,7 +1034,7 @@ sub doRestorePortStatus($@) {
         } elsif ($duplex eq "full") {
             $errors = $stack->portControl("full",$port);
         } else {
-            warn "*** WARNING: Bad duplex given for $port: $duplex\n";
+            tbwarn "Bad duplex given for $port: $duplex";
             $errors++;
         }
     }
@@ -1113,7 +1113,7 @@ sub doVlansFromTables($@) {
 	    $errors += $stack->setPortVlan($vlan,@ports);
 	} else {
 	    if (!$stack->createVlan($vlan,\@ports)) {
-		warn "ERROR: Failed to create VLAN with id $vlan\n";
+		tberror "Failed to create VLAN with id $vlan";
 		#
 		# Don't try to put ports in a VLAN if it couldn't be created
 		#

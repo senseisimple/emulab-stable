@@ -9,6 +9,7 @@
 use English;
 use Getopt::Std;
 use Socket;
+use File::Basename;
     
 #
 # Parse an ns file. Since the parser runs arbitrary NS file for the user,
@@ -67,15 +68,13 @@ if ($TESTMODE) {
 }
 elsif ($EUID != 0) {
     # We don't want to run this script unless its the real version.
-    die("*** $0:\n".
-	"    Must be root! Maybe its a development version?\n");
+    tbdie("Must be root! Maybe its a development version?");
 }
 
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
 if ($UID == 0) {
-    die("*** $0:\n".
-	"    Please do not run this as root! Its already setuid!\n");
+    tbdie("Please do not run this as root! Its already setuid!");
 }
 
 #
@@ -84,6 +83,8 @@ if ($UID == 0) {
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libtblog;
+use libtblog qw(dblog *SERR);
 
 #
 # Parse command arguments. Once we return from getopts, all that should
@@ -157,8 +158,7 @@ if (!$TESTMODE) {
     # as the user running the testsuite, obviously.
     #
     if (! UNIX2DBUID($UID, \$dbuid)) {
-	die("*** $0:\n".
-	    "    You do not exist in the Emulab Database!\n");
+	tbdie("You do not exist in the Emulab Database!");
     }
 
     # Run as the user for most of this script.
@@ -178,12 +178,10 @@ system("cat $nsfile >> $infile") == 0
 #
 if (-e $outfile) {
     unlink($outfile) or
-	die("*** $0:\n".
-	    "    Could not unlink $outfile\n");
+	tbdie("Could not unlink $outfile");
 }
 system("touch $outfile") == 0 or
-    die("*** $0:\n".
-	"    Could not create $outfile\n");
+    tbdie("Could not create $outfile");
 
 #
 # Build up a new command line to run the parser on ops, writing the
@@ -206,13 +204,14 @@ $cmdargs .= " $pid $gid $eid"
 
 #
 # Run parser, redirecting stdout to a file to capture the parser results.
+# Stderr is redirected to the ERR filehandle
 # Must flip to real root to run ssh.
 #
 if ($TESTMODE) {
     #
     # In testmode, no ssh. Just run locally.
     #
-    system("$cmdargs < $infile >> $outfile");
+    open ERR, "$cmdargs < $infile 2>&1 >> $outfile |";
 }
 else {
     #
@@ -220,17 +219,57 @@ else {
     # back afterwards.
     # 
     $EUID = $UID = 0;
-    system("sshtb -host $CONTROL $cmdargs < $infile >> $outfile");
+    open ERR, "sshtb -host $CONTROL $cmdargs < $infile 2>&1 >> $outfile |";
     $EUID = $UID = $SAVEUID;
 }
 
-# 
-# Error output went to stderr, so the caller captures that. 
-# 
+#
+# Now read in the results from stderr and correctly insert the errors
+# into the database under the process name of the script called above.
+# Also echo the results to the non-captured stderr (SERR).  This is
+# needed because parse.proxy may be run on ops, not boss.
+#
+{
+    my $old_env = \%ENV;
+    local %ENV;
+    copy_hash %ENV, $old_env;
+
+    my @argv = split /\s+/, $cmdargs;
+    my $cmd = basename(shift @argv);
+    
+    tblog_new_process($cmd, @argv);
+
+    my $err = '';
+    
+    # assume any output indicates an error
+    while (<ERR>) {
+	print SERR $_;
+	if (/^\s*\*\*\*\s*(.+)/) {
+	    dblog(TBLOG_ERR, {}, $err) if $err; # flush any previous errors
+	    $_ = $1;
+	    if (/^\S+:\s*$/) { # error on next line
+		$_ = <ERR>;
+		print SERR $_;
+		s/^\s+//;
+	    } 
+	    s/\s+$//;
+	    dblog(TBLOG_ERR, {}, $_) if $_;
+	    $err = '';
+	} else {
+	    $err .= $_;
+	}
+    }
+    dblog(TBLOG_ERR, {}, $err) if $err;
+
+    tblog_exit();
+}
+close ERR;
+
+
 if ($?) {
     my $exit_status = $? >> 8;
     
-    die("Parser exited with error code $exit_status!\n");
+    tbdie({type=>'extra'}, "Parsing failed (error code $exit_status)!");
 }
 exit(0)
     if ($impotent);
@@ -243,7 +282,7 @@ system("$TB/libexec/xmlconvert -p -x $outfile $pid $eid");
 if ($?) {
     my $exit_status = $? >> 8;
     
-    die("XML converter exited with error code $exit_status!\n");
+    tbdie("XML converter exited with error code $exit_status!\n");
 }
 
 #
@@ -539,13 +578,11 @@ sub GenDefsFile($)
 	my $elabinelab_eid;
 
 	TBExptIsElabInElab($pid, $eid, \$elabinelab, \$elabinelab_eid)
-	    or die("*** $0:\n".
-		   "    Failed to get ElabInElab attributes!");
+	    or tbdie("Failed to get ElabInElab attributes!");
 
 	if ($elabinelab && defined($elabinelab_eid)) {
 	    if (! TBExptMinMaxNodes($pid, $elabinelab_eid, undef, \$maxnodes)) {
-		die("*** $0:\n".
-		    "    Could not get max nodes from DB!");
+		tbdie("Could not get max nodes from DB!");
 	    }
 	}
     }
