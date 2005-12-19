@@ -22,6 +22,7 @@ var nextState = LOG_STATE_LOADING; // The state of the log download.
 var docTriesLeft = 2; // Tries before giving up on getting the document.
 
 var lastError = -2;
+var maxLineLength = 110;
 
 /*
  * True for the first line of the log.  Used to counteract the hack that sends
@@ -207,7 +208,8 @@ function ml_handleReadyState(state) {
 	var newData = lastLine + rt.substring(lastLength);
 
 	/* Look for assigns "signal" that the pnode list is available. */
-	if (newData.indexOf('Mapped to physical reality!') != -1) {
+	/* XXX Turned off since it is slow. */
+	if (0 && newData.indexOf('Mapped to physical reality!') != -1) {
 	    if (getPNodeProgress == 1) {
 		/* Still waiting for the reply. */
 		return;
@@ -240,6 +242,16 @@ function ml_handleReadyState(state) {
 	    var matches = new Array();
 	    var lengths = new Array();
 	    var hasError = 0;
+
+	    if (!firstLine && line.length > maxLineLength) {
+		var lastwhite = line.lastIndexOf(" ", maxLineLength);
+
+		if (lastwhite == 0)
+		  lastwhite = maxLineLength;
+		nextLine = line.substring(lastwhite);
+		line = line.substring(0, lastwhite) + " \\";
+		lines.splice(i + 1, 0, nextLine)
+	    }
 	    
 	    /* Check for errors. */
 	    if (line.indexOf('***') != -1 ||
@@ -255,7 +267,7 @@ function ml_handleReadyState(state) {
 	    else {
 		lastError = -2;
 	    }
-	    
+
 	    /*
 	     * Look for pnodes to turn into links.  The list is sorted by the
 	     * length of the name so longer names will match before shorter
