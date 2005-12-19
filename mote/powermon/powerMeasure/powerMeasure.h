@@ -39,7 +39,7 @@ public:
                                vector<double>* f_OUT_vTomAPoints );
     void enableVoltageLogging(); /* write voltage as well as current to file*/
     void disableVoltageLogging();
-
+    void dumpStats();
 
   private:
     int channel;
@@ -57,6 +57,8 @@ public:
     vector<float> cal_highV;	//pair of voltages: <dataq measured high, DMM measured high>
     short int lastSampleRaw;
     double averageRaw;
+    short int minRaw;
+    short int maxRaw;
     string* devicePath;
     int fLogVoltage;
     void checkError();	//throws a DataqException if error flag on device is set

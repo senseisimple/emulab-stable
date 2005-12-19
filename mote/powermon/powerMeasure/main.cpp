@@ -3,26 +3,46 @@
 #include <iomanip>
 #include <vector>
 #include <string>
+#include <signal.h>
 
 using namespace std;
 
 #include "powerMeasure.h"
 #include "exceptions.h"
 
+
+PowerMeasure* g_powmeas = 0; // pointer to obj to be used by sig handlers
+
+
+void SIG_dump_handler(int signum)
+{
+//    cout<<"dump..."<<endl;
+    g_powmeas->dumpStats();
+}
+
 int main(int argc, char *argv[])
 {
+
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sa.sa_handler = SIG_dump_handler;
+    sigaction( SIGUSR1, &sa, 0 );
+    
+
     vector<double> calPoints;
 
     PowerMeasure::readVtoItable("cal.txt",&calPoints);
     string sampleFile = "/tmp/dataq.dat";
     string serialPath = "/dev/ttyS0";
     if (argc == 2)
-	serialPath = argv[1];
+        serialPath = argv[1];
     PowerMeasure pwrMeasure( &serialPath, 2, 240.0, &calPoints );
+    g_powmeas = &pwrMeasure;
     pwrMeasure.setFile( &sampleFile, 240*75 );
 //    pwrMeasure.enableVoltageLogging();
-    char c;
 /*
+    char c;
     cout<<"DO YOU WISH TO CALIBRATE? (y/n)"<<endl;
     cin>>c;
     if( c == 'y' )
@@ -42,17 +62,21 @@ int main(int argc, char *argv[])
         pwrMeasure.cal_SetHighV(cal_highV);
     }
 */    
+
+
     try{
         pwrMeasure.startRecording( );
     }catch( DataqException& datEx ){
         cout<< datEx.what() <<endl;
     }
-    
     while( pwrMeasure.isCapturing() )
+//    while(1)
     {
+//        pause();
+        
         system("sleep 0.5s");
         cout<<"average: "<<pwrMeasure.getAveI() <<endl;
-//        cout<<"lastsample:"<<pwrMeasure.getLastSampleI()<<endl;
+        cout<<"lastsample:"<<pwrMeasure.getLastSampleI()<<endl;
 //        cout<<"lastsample->V "<<
 //            pwrMeasure.rawToV((short int) pwrMeasure.getLastSampleRaw())<<endl;
     }

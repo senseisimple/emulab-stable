@@ -1,5 +1,6 @@
 /**
 * TODO:
+- "dumpStats()": min, max, average, integral, last sample
 - miscellaneous TODO's listed in code.
 - refactor for niceness.
 */
@@ -459,4 +460,10 @@ void PowerMeasure::enableVoltageLogging()
 void PowerMeasure::disableVoltageLogging()
 {
     fLogVoltage = 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void PowerMeasure::dumpStats()
+{
+    //TODO
 }
