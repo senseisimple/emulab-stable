@@ -134,7 +134,12 @@ my %virtual_tables =
      "virt_tiptunnels"		=> { rows  => undef, 
 				     tag   => "tiptunnels",
 				     row   => "tiptunnel",
-				     attrs => [ "host", "vnode" ]}
+				     attrs => [ "host", "vnode" ]},
+     # This is a fake table. See below. If we add more, lets generalize.
+     "external_sourcefiles"	=> { rows  => undef, 
+				     tag   => "nsfiles",
+				     row   => "nsfiles",
+				     attrs => [ "pathname" ]}
      );
 
 # XXX
@@ -193,6 +198,7 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+use libArchive;
 
 sub fatal($);
 
@@ -427,6 +433,34 @@ sub readXML($$$$) {
 	# Don't want to muck with this table! Done above. 
 	next
 	    if ($table eq "experiments");
+
+	#
+	# The external_sourcefiles table is treated special. Might
+	# become a real table later, once we decide if its useful.
+	# 
+	if ($table eq "external_sourcefiles") {
+	    foreach my $rowref (@{$virtual_tables{$table}->{"rows"}}) {
+		my %rowhash = %{ $rowref };
+
+		# If no actual rows, then skip. Might happen.
+		last
+		    if (! scalar(keys(%rowhash)));
+
+		if (exists($rowhash{'pathname'}) &&
+		    defined($rowhash{'pathname'})) {
+		    my $pathname = $rowhash{'pathname'};
+
+		    # libArchive checks the paths to make sure they are
+		    # from the allowed places.
+		    if (libArchive::TBExperimentArchiveAddFile($pid, $eid,
+							       $pathname)
+			< 0) {
+			fatal("Failed to add $pathname to the archive!");
+		    }
+		}
+	    }
+	    next;
+	}
 
 	# Delete only during the initial parsing and not
 	# during parsing of nse specifications
