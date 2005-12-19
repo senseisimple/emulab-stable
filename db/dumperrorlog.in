@@ -100,7 +100,8 @@ if (!defined($lastseq)) {
 # Grab the index number for the NOTICE priority.
 #
 $query_result =
-    DBQueryFatal("select priority from priorities where name='NOTICE'");
+    DBQueryFatal("select priority from priorities ".
+		 "where priority_name='NOTICE'");
 my ($NOTICE) = $query_result->fetchrow_array();
 if (!defined($NOTICE)) {
     fatal("No priority named 'NOTICE' in the priorities table!");
