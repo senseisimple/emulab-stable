@@ -172,16 +172,17 @@ else {
     }
 }
 
+# Get current status.
+$query_result =
+    DBQueryFatal("select status from users where uid='$user'");
+my ($status) = $query_result->fetchrow_array();
+
 #
 # If nuke mode is also specified, then the account is being nuked from
 # web page because of a project join denial. Check to make sure user
 # is not an active user (must be newuser or unapproved).
 #
 if ($nuke) {
-    $query_result =
-	DBQueryFatal("select status from users where uid='$user'");
-    my ($status) = $query_result->fetchrow_array();
-
     if ($status ne USERSTATUS_NEWUSER &&
 	$status ne USERSTATUS_UNAPPROVED) {
 	die("*** $0:\n".
@@ -265,7 +266,6 @@ DBQueryFatal("delete from nodeuidlastlogin where uid='$user'");
 DBQueryFatal("delete from uidnodelastlogin where uid='$user'");
 DBQueryFatal("delete from unixgroup_membership where uid='$user'");
 DBQueryFatal("delete from userslastlogin where uid='$user'");
-DBQueryFatal("delete from user_stats where uid='$user'");
 
 #
 # Remove user from both local and control node. No need to do this in
@@ -304,6 +304,20 @@ if (-d "$HOMEDIR/$user") {
 	fatal("Could not rename user directory to $newname: $!");
     }
 }
+
+# Note that we no longer delete from the user_stats table. We maintain
+# deleted user records.
+DBQueryFatal("replace into deleted_users ".
+	     " (uid, usr_deleted, uid_idx, usr_created, usr_name, ".
+	     "  usr_title, usr_affil, usr_email, usr_URL, ".
+	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
+	     "  usr_country, usr_phone, webonly, wikionly, notes) ".
+	     " select '$user', now(), unix_uid, usr_created, usr_name, ".
+	     "  usr_title, usr_affil, usr_email, usr_URL, ".
+	     "  usr_addr, usr_addr2, usr_city, usr_state, usr_zip, ".
+	     "  usr_country, usr_phone, webonly, wikionly, notes ".
+	     " from users where uid='$user'")
+    if ($status eq USERSTATUS_ACTIVE || $status eq USERSTATUS_FROZEN);
 
 #
 # Then the users table. This is the very last step, since if there were

@@ -2062,6 +2062,37 @@ function TBUniqueEmail($uid, $email)
 }
 
 #
+# Return a unique index from emulab_indicies for the indicated name.
+# Updates the index to be, well, unique.
+# Eats flaming death on error.
+#
+function TBGetUniqueIndex($name)
+{
+    #
+    # Lock the table to avoid conflicts
+    #
+    DBQueryFatal("lock tables emulab_indicies write");
+
+    $query_result =
+	DBQueryFatal("select idx from emulab_indicies ".
+		     "where name='$name'");
+
+    $row = mysql_fetch_array($query_result);
+    $curidx = $row["idx"];
+    if (!isset($curidx)) {
+	$curidx = 1;
+    }
+
+    $nextidx = $curidx + 1;
+
+    DBQueryFatal("replace into emulab_indicies (name, idx) ".
+		 "values ('$name', $nextidx)");
+    DBQueryFatal("unlock tables");
+
+    return $curidx;
+}
+
+#
 # DB Interface.
 #
 $maxtries = 3;

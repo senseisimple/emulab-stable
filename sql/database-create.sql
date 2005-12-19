@@ -202,6 +202,33 @@ CREATE TABLE delays (
 -- Table structure for table `delta_inst`
 --
 
+CREATE TABLE deleted_users (
+  uid varchar(8) NOT NULL default '',
+  uid_idx smallint(5) unsigned NOT NULL default '0',
+  usr_created datetime default NULL,
+  usr_deleted datetime default NULL,
+  usr_name tinytext,
+  usr_title tinytext,
+  usr_affil tinytext,
+  usr_email tinytext,
+  usr_URL tinytext,
+  usr_addr tinytext,
+  usr_addr2 tinytext,
+  usr_city tinytext,
+  usr_state tinytext,
+  usr_zip tinytext,
+  usr_country tinytext,
+  usr_phone tinytext,
+  webonly tinyint(1) default '0',
+  wikionly tinyint(1) default '0',
+  notes text,
+  PRIMARY KEY  (uid_idx)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `delta_inst`
+--
+
 CREATE TABLE delta_inst (
   node_id varchar(32) NOT NULL default '',
   partition tinyint(4) NOT NULL default '0',
@@ -2022,6 +2049,7 @@ CREATE TABLE user_sslcerts (
 
 CREATE TABLE user_stats (
   uid varchar(8) NOT NULL default '',
+  uid_idx smallint(5) unsigned NOT NULL default '0',
   weblogin_count int(11) unsigned default '0',
   weblogin_last datetime default NULL,
   exptstart_count int(11) unsigned default '0',
@@ -2040,7 +2068,7 @@ CREATE TABLE user_stats (
   allexpt_vnode_duration int(11) unsigned default '0',
   allexpt_pnodes int(11) unsigned default '0',
   allexpt_pnode_duration int(11) unsigned default '0',
-  PRIMARY KEY  (uid)
+  PRIMARY KEY  (uid_idx)
 ) TYPE=MyISAM;
 
 --
@@ -2067,7 +2095,7 @@ CREATE TABLE users (
   usr_shell tinytext,
   usr_pswd tinytext NOT NULL,
   usr_w_pswd tinytext,
-  unix_uid smallint(5) unsigned NOT NULL auto_increment,
+  unix_uid smallint(5) unsigned NOT NULL default '0',
   status enum('newuser','unapproved','unverified','active','frozen','other') NOT NULL default 'newuser',
   admin tinyint(4) default '0',
   dbedit tinyint(4) default '0',

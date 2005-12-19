@@ -126,7 +126,7 @@ function showsummary ($showby, $sortby) {
 	    $which = "uid";
 	    $table = "user_stats";
 	    $title = "User Summary Stats (Epoch)";
-	    $link  = "showuser.php3?target_uid=";
+	    $link  = "showuser.php3?target_idx=";
 	    break;
         default:
 	    USERERROR("Invalid showby argument: $showby!", 1);
@@ -159,15 +159,30 @@ function showsummary ($showby, $sortby) {
 	    USERERROR("Invalid sortby argument: $sortby!", 1);
     }
 
-    $query_result =
-	DBQueryFatal("select $which, allexpt_pnodes, ".
-		     "allexpt_pnode_duration / (24 * 3600) as pnode_days, ".
-		     "allexpt_duration / (24 * 3600) as expt_days, ".
-		     "exptswapin_count+exptstart_count as expt_swapins, ".
-		     "exptpreload_count+exptstart_count as expt_new ".
-		     "from $table  ".
-		     "$wclause ".
-		     "order by $order");
+    if ($showby == "users") {
+	$query_result =
+	    DBQueryFatal("select s.uid, allexpt_pnodes, ".
+			 "allexpt_pnode_duration / (24 * 3600) as pnode_days,".
+			 "allexpt_duration / (24 * 3600) as expt_days, ".
+			 "exptswapin_count+exptstart_count as expt_swapins, ".
+			 "exptpreload_count+exptstart_count as expt_new, ".
+			 "u.usr_name ".
+			 "from user_stats as s ".
+			 "left join users as u on u.unix_uid=s.uid_idx ".
+			 "$wclause ".
+			 "order by $order");
+    }
+    else {
+	$query_result =
+	    DBQueryFatal("select $which, allexpt_pnodes, ".
+			 "allexpt_pnode_duration / (24 * 3600) as pnode_days,".
+			 "allexpt_duration / (24 * 3600) as expt_days, ".
+			 "exptswapin_count+exptstart_count as expt_swapins, ".
+			 "exptpreload_count+exptstart_count as expt_new ".
+			 "from $table  ".
+			 "$wclause ".
+			 "order by $order");
+    }
 
     if (mysql_num_rows($query_result) == 0) {
 	USERERROR("No summary stats of interest!", 1);
@@ -251,9 +266,22 @@ function showsummary ($showby, $sortby) {
 	$swapins = $row["expt_swapins"];
 	$new     = $row["expt_new"];
 
-	echo "<tr>
-                <td><A href='$link${heading}'>$heading</A></td>
-                <td>$pnodes</td>
+	echo "<tr>";
+	if ($showby == "users") {
+	    # A current or a deleted user?
+	    $usr_name = $row["usr_name"];
+	    
+	    if (isset($usr_name)) {
+		echo "<td><A href='$link${heading}'>$heading</A></td>";
+	    }
+	    else {
+		echo "<td>$heading</td>";
+	    }
+	}
+	else {
+	    echo "<td><A href='$link${heading}'>$heading</A></td>";
+	}
+	echo "  <td>$pnodes</td>
                 <td>$phours</td>
                 <td>$ehours</td>
                 <td>$swapins</td>

@@ -121,6 +121,9 @@ if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G $Ggid -h - " .
        die "Unable to add user to the password file!\n";
 }
 
+# Initialize the index value;
+DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid");
+
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
 	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".

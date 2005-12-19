@@ -1041,6 +1041,9 @@ if (! $returning) {
     # Initial mailman_password.
     $mailman_password = substr(GENHASH(), 0, 10);
 
+    # Unique Unix UID.
+    $unix_uid = TBGetUniqueIndex('next_uid');
+
     DBQueryFatal("INSERT INTO users ".
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
@@ -1051,11 +1054,12 @@ if (! $returning) {
 	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
 	 "'$usr_country', ".
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', 'tcsh', '$encoding', NULL, 'newuser', ".
+	 "'$usr_phone', 'tcsh', '$encoding', $unix_uid, 'newuser', ".
 	 "date_add(now(), interval 1 year), now(), '$wikiname', ".
 	 "'$mailman_password')");
 
-    DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$proj_head_uid')");
+    DBQueryFatal("INSERT INTO user_stats (uid, uid_idx) ".
+		 "VALUES ('$proj_head_uid', $unix_uid)");
 
     if (! $FirstInitState) {
 	$key = TBGenVerificationKey($proj_head_uid);

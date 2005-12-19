@@ -2889,7 +2889,9 @@ function SHOWWIDEAREANODE($node_id, $embedded = 0) {
 function SHOWUSERSTATS($uid) {
 
     $query_result =
-	DBQueryFatal("SELECT * from user_stats where uid='$uid'");
+	DBQueryFatal("select s.* from users as u ".
+		     "left join user_stats as s on s.uid_idx=u.unix_uid ".
+		     "where u.uid='$uid'");
 
     if (! mysql_num_rows($query_result)) {
 	return;

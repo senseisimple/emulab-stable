@@ -28,7 +28,7 @@ use vars qw(@ISA @EXPORT);
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
 	 PROJMEMBERTRUST_PROJROOT
 
-	 PROJROOT GROUPROOT USERROOT TBOPSPID 
+	 PROJROOT GROUPROOT USERROOT TBOPSPID EXPTLOGNAME
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
 
 	 TBTrustConvert TBMinTrust TBGrpTrust TBProjTrust MapNumericUID
@@ -243,6 +243,7 @@ my $SCRIPTNAME  = "Unknown";
 my $PROJROOT    = "/proj";
 my $GROUPROOT   = "/groups";
 my $USERROOT    = "/users";
+my $EXPTLOGNAME = "activity.log";
 
 if ($EVENTSYS) {
     require event;
@@ -350,6 +351,7 @@ sub PROJROOT()			{ $PROJROOT; }
 sub GROUPROOT()			{ $GROUPROOT; }
 sub USERROOT()			{ $USERROOT; }
 sub TBOPSPID()			{ $TBOPSPID; }
+sub EXPTLOGNAME()		{ $EXPTLOGNAME; }
 
 sub NODEBOOTSTATUS_OKAY()	{ "okay" ; }
 sub NODEBOOTSTATUS_FAILED()	{ "failed"; }
@@ -5249,9 +5251,9 @@ sub TBcheck_dbslot($$$;$)
 #
 # WARNING: this will unlock all locked tables, be careful where you call it!
 #
-sub TBGetUniqueIndex($)
+sub TBGetUniqueIndex($;$)
 {
-    my ($name) = @_;
+    my ($name, $initval) = @_;
 
     #
     # Lock the table to avoid conflicts
@@ -5262,8 +5264,9 @@ sub TBGetUniqueIndex($)
 	DBQueryFatal("select idx from emulab_indicies ".
 		     "where name='$name'");
     my ($curidx) = $query_result->fetchrow_array();
-    $curidx = 1
-	if (!defined($curidx));
+    if (!defined($curidx)) {
+	$curidx = (defined($initval) ? $initval : 1);
+    }
     my $nextidx = $curidx + 1;
 
     DBQueryFatal("replace into emulab_indicies (name, idx) ".

@@ -598,7 +598,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
     $user_result =
 	DBQueryFatal("select uid,usr_pswd,admin,weblogin_frozen,".
 		     "       weblogin_failcount,weblogin_failstamp, ".
-		     "       usr_email,usr_name ".
+		     "       usr_email,usr_name,unix_uid ".
 		     "from users where ".
 		     (TBvalid_email($token) ?
 		      "usr_email='$token'" :
@@ -617,6 +617,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	$failstamp   = $row['weblogin_failstamp'];
 	$usr_email   = $row['usr_email'];
 	$usr_name    = $row['usr_name'];
+	$uid_idx     = $row['unix_uid'];
 
 	# Check for frozen accounts. We do not update the IP record when
 	# an account is frozen.
@@ -680,7 +681,7 @@ function DOLOGIN($token, $password, $adminmode = 0) {
 	DBQueryFatal("update user_stats set ".
 		     " weblogin_count=weblogin_count+1, ".
 		     " weblogin_last=now() ".
-		     "where uid='$uid'");
+		     "where uid_idx='$uid_idx'");
 
 	#
 	# Issue the cookie requests so that subsequent pages come back
@@ -893,7 +894,9 @@ function LASTWEBLOGIN($uid) {
     global $TBDBNAME;
 
     $query_result =
-        DBQueryFatal("SELECT weblogin_last from user_stats where uid='$uid'");
+        DBQueryFatal("select weblogin_last from users as u ".
+		     "left join user_stats as s on s.uid_idx=u.unix_uid ".
+		     "where u.uid='$uid'");
     
     if (mysql_num_rows($query_result)) {
 	$lastrow      = mysql_fetch_array($query_result);

@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -859,6 +859,9 @@ if (! $returning) {
 	ADDPUBKEY($usr_uid, "webaddpubkey $addpubkeyargs");
     }
 
+    # Unique Unix UID.
+    $unix_uid = TBGetUniqueIndex('next_uid');
+
     DBQueryFatal("INSERT INTO users ".
 	 "(uid,usr_created,usr_expires,usr_name,usr_email,usr_addr,".
 	 " usr_addr2,usr_city,usr_state,usr_zip,usr_country, ".
@@ -869,10 +872,11 @@ if (! $returning) {
 	 "'$usr_addr', '$usr_addr2', '$usr_city', '$usr_state', '$usr_zip', ".
 	 "'$usr_country', ".
 	 "'$usr_URL', '$usr_title', '$usr_affil', ".
-	 "'$usr_phone', '$encoding', NULL, 'newuser', ".
+	 "'$usr_phone', '$encoding', $unix_uid, 'newuser', ".
 	 "date_add(now(), interval 1 year), now(), 1)");
     
-    DBQueryFatal("INSERT INTO user_stats (uid) VALUES ('$usr_uid')");
+    DBQueryFatal("INSERT INTO user_stats (uid, uid_idx) ".
+		 "VALUES ('$usr_uid', $unix_uid)");
 
     $key = TBGenVerificationKey($usr_uid);
 

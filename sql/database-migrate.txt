@@ -2975,3 +2975,49 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (fn(255)),
 	  KEY idx (idx)
 	) TYPE=MyISAM;
+
+4.24: Add support for maintaining records of deleted users.
+
+      Change unix_uid in the users table to use an index from
+      emulab_indicies table (instead of an auto increment).
+
+      replace into emulab_indicies (name, idx) \
+             select 'next_uid',max(unix_uid)+1 from users;
+
+      alter table users change unix_uid unix_uid smallint(5) \
+                unsigned NOT NULL default '0';
+
+      alter table user_stats add uid_idx smallint(5) unsigned NOT NULL \
+                default '0' after uid;
+
+      Run this script:
+
+	    sql/mod-userstats.pl
+
+      alter table user_stats add unique uid_idx (uid_idx); 
+      alter table user_stats drop primary key;
+      alter table user_stats add primary key (uid_idx);
+      alter table user_stats drop index uid_idx;
+
+	CREATE TABLE deleted_users (
+	  uid varchar(8) NOT NULL default '',
+	  uid_idx smallint(5) unsigned NOT NULL default '0',
+	  usr_created datetime default NULL,
+	  usr_deleted datetime default NULL,
+	  usr_name tinytext,
+	  usr_title tinytext,
+	  usr_affil tinytext,
+	  usr_email tinytext,
+	  usr_URL tinytext,
+	  usr_addr tinytext,
+	  usr_addr2 tinytext,
+	  usr_city tinytext,
+	  usr_state tinytext,
+	  usr_zip tinytext,
+	  usr_country tinytext,
+	  usr_phone tinytext,
+	  webonly tinyint(1) default '0',
+	  wikionly tinyint(1) default '0',
+	  notes text,
+	  PRIMARY KEY  (uid_idx)
+        ) TYPE=MyISAM;

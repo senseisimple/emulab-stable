@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -131,7 +131,7 @@ $query_result =
 		 "FROM users as u ".
 		 "$clause ".
 		 "left join userslastlogin as ull on u.uid=ull.uid ".
-		 "left join user_stats as ll on u.uid=ll.uid ".
+		 "left join user_stats as ll on u.unix_uid=ll.uid_idx ".
 		 "$where ".
 		 "order by $order");
 
