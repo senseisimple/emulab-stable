@@ -995,6 +995,13 @@ sub doSwapin($) {
     }
     TBDebugTimeStamp("gentopofile finished");
 
+    # XXX fer now hack
+    if (!$firewalled && !$elabinelab && ($pid eq "testbed")) {
+	DBQueryWarn("update experiments set ".
+		    "    savedisk=1 where pid='$pid' and eid='$eid'");
+    }
+
+
     #
     # Since it'll take a while for the nodes to reboot, we'll start now, and
     # wait for the os_setup to finish, down below
