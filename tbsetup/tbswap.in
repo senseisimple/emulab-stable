@@ -1644,8 +1644,10 @@ sub doSwapoutProgress($%)
 	my $ftime = $nstate->{'time'};
 
 	# XXX
-	$ftime = ($curtime - $mystate->{'_interval'})
-	    if ($ftime == 0);
+	if ($ftime == 0) {
+	    $ftime = ($curtime - $mystate->{'_interval'});
+	    $nstate->{'time'} = $ftime;
+	}
 
 	#
 	# If no progress, see if we should timeout
