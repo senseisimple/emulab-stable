@@ -239,6 +239,11 @@ dolinux() {
 	    linux=`lilogetkernel $lconf`
 	fi
 
+	if [ -f /mnt/var/lib/random-seed -a -c /dev/urandom ]; then
+	    echo "  updating /var/lib/random-seed"
+	    dd if=/dev/urandom of=/mnt/var/lib/random-seed bs=512 count=1 >/dev/null 2>&1
+	fi
+
 	umount $rootdev
 
 	if [ "x${linux}" != x ]; then
