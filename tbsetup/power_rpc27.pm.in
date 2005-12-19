@@ -261,6 +261,7 @@ sub syncandsend($$$) {
     #
     my %status = ();
     my $gotcmd = 0;
+    my $gotstatus = 0;
     print "Reading output following command\n"
 	if ($debug);
     while (my $line = rpc_readline($TIP)) {
@@ -275,17 +276,25 @@ sub syncandsend($$$) {
 	if ($line =~ /Input error/) {
 	    return -1;
 	}
-	# got the following prompt, all done
-	if ($gotcmd && $line =~ $RPC27_PROMPT) {
+	#
+	# Got the following prompt, all done.
+	# XXX the prompt+command does not always get echoed correctly
+	# (e.g. "atatus" or "ststus" instead of "status") so we also
+	# exit if we parsed any status data.
+	#
+	if (($gotcmd || $gotstatus) && $line =~ $RPC27_PROMPT) {
 	    last;
 	}
 	if ($statusp) {
 	    if ($line =~ /Temperature:\s+(\d+\.\d+) C/) {
 		$status{tempC} = $1;
+		$gotstatus = 1;
 	    } elsif ($line =~ /Average Power:\s+(\d+) Watts/) {
 		$status{power} = $1;
+		$gotstatus = 1;
 	    } elsif ($line =~ /True RMS Current:\s+(\d+\.\d+) Amps/) {
 		$status{current} = $1;
+		$gotstatus = 1;
 	    }
 	    # note the /g, controllers with 20 ports put two outlets per line
 	    elsif (my %ohash = $line =~ /Outlet\s+(\d+)\s+:\s+(On|Off)/g) {
@@ -293,6 +302,7 @@ sub syncandsend($$$) {
 		    my $outlet = "outlet$o";
 		    $status{$outlet} = $ohash{$o};
 		}
+		$gotstatus = 1;
 	    }
 	}
     }
