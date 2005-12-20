@@ -33,24 +33,27 @@ sub LARGE_NUM {100000}
 #
 
 sub usage() {
-  die "usage: $0 -h | -l | [OPTIONS] IMAGE [TESTS ...]\n";
+  die "usage: $0 -h | -l | [OPTIONS] IMAGE [EXPS ...]\n";
 }
 
 sub help() {
   print
-    ("usage: $0 -h | -l | [OPTIONS] IMAGE [TESTS ...]\n".
+    ("usage: $0 -h | -l | [OPTIONS] IMAGE [EXPS ...]\n".
      "  IMAGE      image to use\n".
-     "  TESTS      if present only run these particular tests\n".
-     "  -h --help  print this help message\n".
+     "  EXPS       if present only run these particular experiments\n".
+     "  -? --help  print this help message\n".
      "  -l --list  just list the available experements\n".
      "OPTIONS:\n".
-     "  -s STAGES  only execute particular stages of the test where\n".
+     "  -s STAGES  only execute particular stages of the experiment where\n".
      "             STAGES is any one of:\n".
      "               c: create, s: swapin, t: test o: swapout, e: end experment\n".
      "             (note 'e' implies 'o')\n".
      "  -p         run experments in parallel\n".
      "  -m NUM     soft limit on the maximum number of nodes to use at once\n".
      "  -M NUM     hard limit on the maximum number of nodes to use at once\n".
+     "  -e FILE    exceptions file to use\n".
+     "  -u         don't swap an experment out with unexpected failed tests\n".
+     "  -h         halt on failed swapouts\n".
      "  --skip-std-tests  skip standard tests expect for ssh-*\n");
 }
 
@@ -80,17 +83,23 @@ my $stages = 'cstoe';
 my $in_parallel;
 my $soft_limit = 5;
 my $hard_limit = 0;
+my $exceptions_file;
+my $dont_swapout_unexpected = false;
+my $halt_failed_swapouts = false;
 my $just_list;
-my $skip_std_tests;
+my $skip_std_tests = false;
 
 Getopt::Long::Configure 'no_ignore_case';
 
 GetOptions
-    "h|help" => sub {help(); exit 0;},
+    "help|?" => sub {help(); exit 0;},
     "s=s" => \$stages,
     "p" => \$in_parallel,
     "m=i" => \$soft_limit,
     "M=i" => \$hard_limit,
+    "e=s" => \$exceptions_file,
+    "u" => \$dont_swapout_unexpected,
+    "h" => \$halt_failed_swapouts,
     "l|list" => \$just_list,
     "skip-std-tests" => \$skip_std_tests
   or usage();
@@ -99,6 +108,11 @@ $soft_limit = LARGE_NUM   if $soft_limit == 0;
 $hard_limit = LARGE_NUM   if $hard_limit == 0;
 $soft_limit = $hard_limit if $soft_limit > $hard_limit;
 
+if (@ARGV == 0) {
+  print STDERR "Must specify an image.\n";
+  usage();
+}
+
 my $os = shift @ARGV;
 my @exps_torun = map {lc} @ARGV;
 
@@ -106,6 +120,48 @@ if ($stages =~ /([^cstoe])/) {
   print STDERR "Unknown stage, \"$1\", in stage string.\n" if $stages =~ /([^cstoe])/;
   usage();
 }
+
+########################################################################
+#
+# Get the list of exceptions
+#
+
+my @exps_toskip;
+my %tests_toskip;
+my %tests_toignore;
+
+if (defined $exceptions_file) {
+
+  open F, $exceptions_file;
+
+  my $lineno = 1;
+  while (<F>) {
+    chop;
+    s/\#.*//;
+    s/^\s+//;
+    next unless /\S/;
+    if (s/^in\s+(\S+)\s+//) {
+      my $exp = $1;
+      if (s/^skip\s+//) {
+	my @tests = split /\s+/;
+	push @{$tests_toskip{$exp}}, @tests; 
+      } elsif (s/^ignore\s+//) {
+	my @tests = split /\s+/;
+	push @{$tests_toignore{$exp}}, @tests;
+      } else {
+	die "Syntax error in line $lineno of \"$exceptions_file\"\n";
+      }
+    } elsif (s/^skip\s+//) {
+      my @exps = split /\s+/;
+      push @exps_toskip, @exps;
+    } else {
+      die "Syntax error in line $lineno of \"$exceptions_file\"\n";
+    }
+    $lineno++;
+  }
+
+}
+
 
 ########################################################################
 #
@@ -154,7 +210,8 @@ sub get_numnodes ($) {
   return $_;
 }
 
-sub use_exp ($);
+sub use_exp ( $ );
+sub get_exceptions ( $$ );
 
 sub mktests ($$$@) {
   my ($test, $numnodes, $what, @parms) = @_;
@@ -170,6 +227,9 @@ sub mktests ($$$@) {
 		 resultsdir => "$destdir/$t",
 		 @$what,
 		 stages => $stages,
+		 dont_swapout_unexpected => $dont_swapout_unexpected,
+		 skip => get_exceptions($t, \%tests_toskip),
+		 ignore =>  get_exceptions($t, \%tests_toignore),
 		 skip_std_tests => $skip_std_tests};
     push @exps, $t;
   } else {
@@ -182,12 +242,26 @@ sub mktests ($$$@) {
 
 sub use_exp ($) {
   my ($exp) = @_;
+  foreach my $e (@exps_toskip) {
+    return false if ($e eq $exp);
+    return false if $exp =~ /^$e-/;
+  }
   return true if (@exps_torun == 0);
   foreach my $e (@exps_torun) {
     return true if ($e eq $exp);
     return true if $exp =~ /^$e-/;
   }
   return false;
+}
+
+sub get_exceptions ($$) {
+  my ($exp, $exceptions) = @_;
+  my @res;
+  foreach my $e (keys %$exceptions) {
+    push(@res, @{$exceptions->{$e}})
+	if $e eq '*' || $e eq $exp || $exp =~ /^$e-/;
+  }
+  return \@res;
 }
 
 ########################################################################
@@ -427,12 +501,18 @@ sub wait_exp () {
     unless (($exit & STATUS_MASK) == STATUS_SWAPPEDIN) {
       $avail_in_parallel += $exps{$exp}{numnodes};
     } else {
-      # the experient failed to swap out, since the nodes are still in
-      # use substract that number from the soft and hard limits
-      $soft_limit -= $exps{$exp}{numnodes}   unless $soft_limit == LARGE_NUM;
-      $hard_limit -= $exps{$exp}{numnodes}   unless $hard_limit == LARGE_NUM;
-      print "  only $hard_limit nodes now available for use\n"
-	unless $hard_limit == LARGE_NUM;
+      # the experient failed to swap out
+      if ($halt_failed_swapouts) {
+	print "  will not start any new experiments\n";
+	$quit = 1;
+      } else {
+	# since the nodes are still in use substract that number from
+	# the soft and hard limits
+	$soft_limit -= $exps{$exp}{numnodes}   unless $soft_limit == LARGE_NUM;
+	$hard_limit -= $exps{$exp}{numnodes}   unless $hard_limit == LARGE_NUM;
+	print "  only $hard_limit nodes now available for use\n"
+	    unless $hard_limit == LARGE_NUM;
+      }
     }
     print "FINISHED TEST EXP $exp\n";
   }
@@ -504,6 +584,18 @@ foreach (@results) {
   &print_results_summary(@$_);
 }
 
+sub failed_but_ignored($) {
+  my ($exp) = @_;
+  open FAILED, "$exps{$exp}{resultsdir}/failed-but-ignored";
+  my $res;
+  while (<FAILED>) {
+    chop;
+    $res .= "$_ ";
+  }
+  chop $res;
+  return $res;
+}
+
 sub failed_tests($) {
   my ($exp) = @_;
   open FAILED, "$exps{$exp}{resultsdir}/failed-tests";
@@ -520,13 +612,23 @@ sub results_summary($$) {
   my ($exp, $res) = @_;
 
   return "passed"
-    if $res == (ERR_NONE   | STATUS_NONE);
+    if $res == (ERR_NONE | STATUS_NONE);
   return "passed but is still swapped in"
-    if $res == (ERR_NONE   | STATUS_SWAPPEDIN);
+    if $res == (ERR_NONE | STATUS_SWAPPEDIN);
   return "passed but still exists" 
-    if $res == (ERR_NONE   | STATUS_EXISTS);
+    if $res == (ERR_NONE | STATUS_EXISTS);
   return "passed but requires cleanup"
-    if $res == (ERR_NONE   | STATUS_CLEANUP);
+    if $res == (ERR_NONE | STATUS_CLEANUP);
+
+  return "passed with expected failures: ".failed_but_ignored($exp)
+    if $res == (ERR_EXPECTED | STATUS_NONE);
+  return "passed with expected failures but is still swapped in: ".failed_but_ignored($exp)
+    if $res == (ERR_EXPECTED | STATUS_SWAPPEDIN);
+  return "passed with expected failures but still exists: ".failed_but_ignored($exp)
+    if $res == (ERR_EXPECTED | STATUS_EXISTS);
+  return "passed with expected failures but requires cleanup: ".failed_but_ignored($exp)
+    if $res == (ERR_EXPECTED | STATUS_CLEANUP);
+
   return "had failed tests: ".failed_tests($exp)
     if $res == (ERR_FAILED | STATUS_NONE);
   return "is still swapped in and had failed tests: ".failed_tests($exp)
@@ -535,22 +637,24 @@ sub results_summary($$) {
     if $res == (ERR_FAILED | STATUS_EXISTS);
   return "requires cleanup and had failed tests: ".failed_tests($exp)
     if $res == (ERR_FAILED | STATUS_CLEANUP);
+
   return "had one of more fatal errors"
-    if $res == (ERR_FATAL  | STATUS_NONE);
+    if $res == (ERR_FATAL | STATUS_NONE);
   return "had one of more fatal errors and is still swapped in"
-    if $res == (ERR_FATAL  | STATUS_SWAPPEDIN);
+    if $res == (ERR_FATAL | STATUS_SWAPPEDIN);
   return "had one of more fatal errors and still exists"
-    if $res == (ERR_FATAL  | STATUS_EXISTS);
+    if $res == (ERR_FATAL | STATUS_EXISTS);
   return "had one of more fatal errors and requires cleanup"
-    if $res == (ERR_FATAL  | STATUS_CLEANUP);
+    if $res == (ERR_FATAL | STATUS_CLEANUP);
+
   return "was interrupted"
-    if $res == (ERR_INT    | STATUS_NONE);
+    if $res == (ERR_INT | STATUS_NONE);
   return "was interrupted and is still swapped in"
-    if $res == (ERR_INT    | STATUS_SWAPPEDIN);
+    if $res == (ERR_INT | STATUS_SWAPPEDIN);
   return "was interrupted and still exists"
-    if $res == (ERR_INT    | STATUS_EXISTS);
+    if $res == (ERR_INT | STATUS_EXISTS);
   return "was interrupted and requires cleanup"
-    if $res == (ERR_INT    | STATUS_CLEANUP);
+    if $res == (ERR_INT | STATUS_CLEANUP);
 
   return "exited with unknown code: $res";
 }

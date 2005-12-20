@@ -35,8 +35,8 @@ Some of the files in this directory include:
 
   log: all output to stdout and stderr is redirected here
   nsfile.ns: the nsfile used
-  parms: the value of the different parmaters used in the experment.
-    This is diffrent from the one found in the test directory described 
+  parms: the value of the different parmaters used in the experiment.
+    This is different from the one found in the test directory described 
     latter.
   failed-tests: a list of tests that failed
   exp-data/: a copy of the experiment data as found in /proj/PID/exp/EID
@@ -54,14 +54,25 @@ more than NUM nodes it will be run in series after all the experiments
 that can be run in parallel have finished.  Thus setting NUM to 0 will
 force all the experiments to run in series.
 
-
 Setting -m sets a soft limit to the number of nodes to use.  To set a
-hard limit use "-M NUM".  If an experemnt will use more nodes than NUM
+hard limit use "-M NUM".  If an experiment will use more nodes than NUM
 it will simply not be run.
 
+If an experiment fails to swap out, the number of available nodes will
+decrees, but other experiments will continue to run as long as there
+are enough nodes left.  If there is only a soft limit all the
+experiments will still run, but some of them may not be in parallel.
+If a hard limit is specified than some experiments may be skipped if
+there are no longer enough nodes available.  
 
-Experiments that fail to swap out decrees both the soft and hard
-limits.
+To prevent new experiments from starting on a failed swap out by use the
+"-h" option.  Any existing experiments already running will be allowed
+to continue, however.
+
+To prevent an experiment from being swapped out when a tests fails use
+the "-u" option.  Since there are some test which are expected to fail
+occasionally, this option is most useful when an exceptions file is
+given via the "-e" option.  See "EXCEPTIONS FILE" for more info.
 
 
 To only run particular experiment use:
@@ -104,6 +115,7 @@ For example to avoid swapping an experiment out use:
 Or to just run the tests on a already swapped in experiment use:
 
   ./image-test -s t ...
+
 
 
 TESTING FRAMEWORK
@@ -152,8 +164,8 @@ For each node in the experiment the following tests will be run:
   hostname-NODE: make sure host name is what it is expected to be
   login_prompt-NODE: make sure that the login prompt appears
     in the console
-  proj_mount-NODE: make sure that the approicate/proj directory is mounted
-    and readable
+  proj_mount-NODE: make sure that the appropriate "/proj" directory is 
+    mounted and readable
 
 For experiments with more than one node:
 
@@ -181,3 +193,31 @@ Sending a SIGHUP to the the parent will only terminate the parent.
 The test will proceed normally in the background.  Similarly, sending
 a SIGTSTP will only suspend the parent.
 
+
+EXCEPTIONS FILE
+
+An exceptions file may be specified with the "-e <FILE>" option.  For
+example:
+  ./image-test -e FILE IMAGE
+
+The exceptions provides allows you to specify 1) experiments to skip 2)
+individual tests within an experiment to skip, and 3) tests to ignore
+failures for.
+
+(1) and (2) are useful if there are experiments or individual tests
+which are not relevant for the image being tested.  (3) is primary
+useful with the "-u" option.
+
+Each line of the exceptions file has is one of the following.  Blank lines
+and extra whitespace are ignored, as well as anything after the "#"
+
+  skip <exps>
+  in <exp> skip <tests>
+  in <exp> ignore <tests>
+
+<exps> is a list of one or more experiments separated by spaces.
+<exp> is a single experiment name.  A "*" may be used as a wildcard.
+<tests> is a list of one or more tests.
+
+Like with the experiments specified on the command line a base name of
+an experiment may also be specified.

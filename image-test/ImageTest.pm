@@ -3,7 +3,7 @@ use Exporter;
 
 @ISA = "Exporter";
 @EXPORT = qw (test test_cmd test_ssh test_rcmd test_experiment exit_str
-	      ERR_MASK ERR_NONE ERR_FAILED ERR_FATAL ERR_INT
+	      ERR_MASK ERR_NONE ERR_EXPECTED ERR_FAILED ERR_FATAL ERR_INT
 	      STATUS_MASK STATUS_NONE STATUS_SWAPPEDIN STATUS_EXISTS STATUS_CLEANUP);
 
 use IO::File;
@@ -12,7 +12,7 @@ use strict;
 use vars qw(%parms %dependencies %tally);
 use vars qw($eid $pid $datadir $resultsdir);
 use vars qw(@mapping @nodes @pnodes %to_physical %from_physical);
-use vars qw($FAILED);
+use vars qw($EXPECTED $FAILED);
 use vars qw(%ERR %STATUS);
 
 sub true() {1}
@@ -22,21 +22,23 @@ sub false() {0}
 # exit values, or two parts together
 #
 
-sub ERR_MASK    {3};
-sub ERR_NONE    {0};
-sub ERR_FAILED  {1}; # tests failed
-sub ERR_FATAL   {2}; # fatal error
-sub ERR_INT     {3}; # interrupted
+sub ERR_MASK     {7};
+sub ERR_NONE     {0};
+sub ERR_EXPECTED {1}; # expected failures
+sub ERR_FAILED   {2}; # tests failed
+sub ERR_FATAL    {3}; # fatal error
+sub ERR_INT      {4}; # interrupted
 %ERR = (ERR_NONE, 'ERR_NONE',
+	ERR_EXPECTED, 'ERR_EXPECTED',
 	ERR_FAILED, 'ERR_FAILED',
 	ERR_FATAL, 'ERR_FATAL',
 	ERR_INT, 'ERR_INT');
 
-sub STATUS_MASK      {3 << 2};
-sub STATUS_NONE      {0 << 2};
-sub STATUS_SWAPPEDIN {1 << 2}; # experment still swapped in
-sub STATUS_EXISTS    {2 << 2}; # experment still exists
-sub STATUS_CLEANUP   {3 << 2}; # requires cleanup
+sub STATUS_MASK      {3 << 3};
+sub STATUS_NONE      {0 << 3};
+sub STATUS_SWAPPEDIN {1 << 3}; # experment still swapped in
+sub STATUS_EXISTS    {2 << 3}; # experment still exists
+sub STATUS_CLEANUP   {3 << 3}; # requires cleanup
 %STATUS = (STATUS_NONE, 'STATUS_NONE',
 	   STATUS_SWAPPEDIN, 'STATUS_SWAPPEDIN',
 	   STATUS_EXISTS, 'STATUS_EXISTS',
@@ -45,6 +47,18 @@ sub STATUS_CLEANUP   {3 << 2}; # requires cleanup
 sub exit_str($) {
   my ($exit) = @_;
   return join(' ', $ERR{$exit &  ERR_MASK}, $STATUS{$exit & STATUS_MASK});
+}
+
+#
+#
+#
+
+sub oneof ($$) {
+  my ($what, $which) = @_;
+  foreach (@{$parms{$which}}) {
+    return true if ($_ eq $what);
+  }
+  return false;
 }
 
 #
@@ -64,6 +78,11 @@ sub exit_str($) {
 #
 sub test ($$&) {
   my ($name,$requires,$test) = @_;
+
+  if (oneof($name, 'skip')) {
+    return 0;
+  }
+
   $tally{total}++;
 
   my $deps_sat = 1;
@@ -85,14 +104,26 @@ sub test ($$&) {
     print ">=== \"$name\" succeeded\n";
     return true;
   } elsif ($@) {
-    $tally{failed}++;
-    print $FAILED "$name\n";
-    print ">*** \"$name\" died: $@";
+    if (oneof($name, 'ignore')) {
+      $tally{expected}++;
+      print $EXPECTED "$name\n";
+      print ">=== \"$name\" died: $@ -- ignored";
+    } else {
+      $tally{failed}++;
+      print $FAILED "$name\n";
+      print ">*** \"$name\" died: $@";
+    }
     return false;
   } else {
-    $tally{failed}++;
-    print $FAILED "$name\n";
-    print ">*** \"$name\" failed\n";
+    if (oneof($name, 'ignore')) {
+      $tally{expected}++;
+      print $EXPECTED "$name\n";
+      print ">=== \"$name\" failed -- ignored\n";
+    } else {
+      $tally{failed}++;
+      print $FAILED "$name\n";
+      print ">*** \"$name\" failed\n";
+    }
     return false;
   }
 }
@@ -280,7 +311,7 @@ sub test_experiment (%) {
 
   %parms = @_;
   %dependencies = ();
-  %tally = (total => 0, passed => 0, failed => 0);
+  %tally = (total => 0, passed => 0, expected => 0, failed => 0);
 
   $eid = $parms{eid};
   $pid = $parms{pid};
@@ -324,10 +355,15 @@ sub test_experiment (%) {
   close $F;
 
   $FAILED = new IO::File ">failed-tests" or die;
+  $EXPECTED = new IO::File ">failed-but-ignored" or die;
 
   $F = new IO::File ">parms" or die;
   foreach (sort keys %parms) {
-    print $F "$_: $parms{$_}\n";
+    unless (ref $parms{$_}) {
+      print $F "$_: $parms{$_}\n";
+    } else {
+      print $F "$_: @{$parms{$_}}\n";
+    }
   }
   close $F;
 
@@ -422,8 +458,9 @@ sub test_experiment (%) {
       }
     }
 
-    if ($parms{stages} =~ /[oe]/) {
-
+    if ($parms{stages} =~ /[oe]/ && 
+	(!$parms{dont_swapout_unexpected} || $tally{failed} == 0)) {
+      
       test_cmd 'loghole', [], "loghole -e $pid/$eid sync";
 	
       foreach my $node (@nodes) {
@@ -447,9 +484,11 @@ sub test_experiment (%) {
 
   }
 
-  $err = ERR_FAILED if $err == ERR_NONE && $tally{failed} > 0;
+  $err = ERR_FAILED   if $err == ERR_NONE && $tally{failed} > 0;
+  $err = ERR_EXPECTED if $err == ERR_NONE && $tally{expected} > 0;
 
-  if ($parms{stages} =~ /e/) {
+  if ($parms{stages} =~ /e/ &&
+      (!$parms{dont_swapout_unexpected} || $tally{failed} == 0)) {
 
     sys("cp -pr /proj/$pid/exp/$eid exp-data");
     if ($? >> 8 != 0) {
@@ -469,11 +508,12 @@ sub test_experiment (%) {
   if ($parms{stages} =~ /t/) {
 
     print "\n";
-    print "Num Tests:         $tally{total}\n";
-    print "Passed:            $tally{passed}\n";
-    print "Failed:            $tally{failed}\n";
-    my $unex = $tally{total} - $tally{passed} - $tally{failed};
-    print "Unable to Execute: $unex\n";
+    print "Num Tests:           $tally{total}\n";
+    print "Passed:              $tally{passed}\n";
+    print "Expected Failures:   $tally{expected}\n";
+    print "Unexpected Failures: $tally{failed}\n";
+    my $unex = $tally{total} - $tally{passed} - $tally{expected} - $tally{failed};
+    print "Unable to Execute:   $unex\n";
 
   }
 
