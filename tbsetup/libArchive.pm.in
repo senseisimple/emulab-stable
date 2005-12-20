@@ -226,6 +226,7 @@ sub ArchiveAdd($$;$)
     # The file must reside in /proj, /groups, or /users. 
     #
     if (! ($realpath =~ /^\/proj/) &&
+	! ($realpath =~ /^\/share/) &&
 	! ($realpath =~ /^\/groups/) &&
 	! ($realpath =~ /^\/users/)) {
 	print STDERR "ArchiveFile: ".
@@ -728,6 +729,88 @@ sub ArchiveFork($$;$$$)
 }
 
 #
+# Checkout a copy of the archive, optionally at a particular view/branch.
+#
+sub ArchiveCheckout($$;$$)
+{
+    my ($archive_idx, $target, $view, $tag) = @_;
+    my $sourcepoint;
+    my $cwd;
+
+    $view = $defaultview
+	if (!defined($view));
+
+    return -1
+	if (TBScriptLock("archive_${archive_idx}", 0, 120) !=
+	    TBSCRIPTLOCK_OKAY());
+
+    #
+    # See if the archive exists and if it does, get the pathname to it.
+    #
+    my $directory;
+    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
+	print STDERR "ArchiveCheckout: ".
+	    "Archive '$archive_idx' does not exist in the DB!\n";
+	goto bad;
+    }
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ArchiveCheckout: $directory cannot be written!\n";
+	goto bad;
+    }
+    my $repodir     = "$directory/repo";
+
+    #
+    # We allow target to exist or not exist.
+    #
+    if (! -e $target) {
+	if (! mkdir("$target", 0777)) {
+	    print STDERR "ArchiveCheckout: Could not mkdir $target: $!\n";
+	    return -1;
+	}
+	if (! chmod(0777, "$target")) {
+	    print STDERR "ArchiveCheckout: ".
+		"Could not chmod directory $target: $!\n";
+	    return -1;
+	}
+    }
+
+    # Need to remember where we came from!
+    chomp($cwd = `pwd`);
+    # Must do the taint check too.
+    if ($cwd =~ /^([-\w\.\/]+)$/) {
+	$cwd = $1;
+    }
+    else {
+	print STDERR "ArchiveCheckout: Bad data in $cwd!\n";
+	goto bad;
+    }
+
+    # Where to find what we want.
+    if (defined($tag)) {
+	$sourcepoint = "tags/$tag";
+    }
+    else {
+	$sourcepoint = "trunk"
+    }
+
+    # Now check it out. This creates the $checkouts/$view directory.
+    mysystem("cd $target; ".
+	     "$SVN checkout $svnopt file://$repodir/$view/$sourcepoint .")
+	== 0 or goto bad;
+  okay:
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return 0;
+
+  bad:
+    TBScriptUnlock();
+    chdir($cwd)
+	if (defined($cwd));
+    return -1;
+}
+
+#
 # Archive the Archive, moving it into the expinfo directory.
 # I intend this to be run only when an experiment is terminated.
 # No need to have two copies.
@@ -750,7 +833,6 @@ sub ArchiveArchive($$)
 	print STDERR "ArchiveFile: $directory cannot be written!\n";
 	return -1;
     }
-    my $repodir  = "$directory/repo";
 
     if (! -e $target) {
 	if (! mkdir("$target", 0777)) {
@@ -767,9 +849,23 @@ sub ArchiveArchive($$)
     #
     # Tar up the whole thing and move it across.
     #
-    mysystem("$TAR cf - -C $repodir . | tar xf - -C $target");
+    mysystem("$TAR cf - -C $directory repo | tar xf - -C $target");
     if ($?) {
 	print STDERR "ArchiveArchive: Could not copy in $directory\n";
+	return -1;
+    }
+
+    #
+    # Update its location in the DB, and remove the old directory.
+    # 
+    DBQueryWarn("update archives set directory='$target' ".
+		"where idx='$archive_idx'")
+	or return -1;
+    
+    mysystem("/bin/rm -rf $directory");
+    if ($?) {
+	print STDERR "ArchiveArchive: ".
+	    "Could not remove contents of $directory!\n";
 	return -1;
     }
     return 0;
@@ -793,7 +889,6 @@ sub ArchiveDestroy($;$)
 	return -1;
     }
     if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveDestroy: $directory does not exist!\n";
 	return 0;
     }
 
@@ -1286,6 +1381,26 @@ sub TBCommitExperimentArchive($$$)
 	return -1;
     }
     return 0;
+}
+
+#
+# Checkout a copy of an experiment archive, optionally at a branch.
+# 
+sub TBCheckoutExperimentArchive($$$;$)
+{
+    my ($pid, $eid, $path, $tag) = @_;
+    my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    return ArchiveCheckout($archive_idx, $path, $view, $tag);
 }
 
 #
