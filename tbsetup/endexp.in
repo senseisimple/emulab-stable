@@ -500,9 +500,6 @@ print "Archiving and clearing the experiment archive ...\n";
 libArchive::TBArchiveExperimentArchive($pid, $eid) == 0 or
     fatal("Could not archive experiment archive!");
     
-libArchive::TBDeleteExperimentArchive($pid, $eid) == 0 or
-    fatal("Could not delete experiment archive!");
-
 # Terminate the log so the web page stops spewing.
 TBExptClearLogFile($pid, $eid);
 
