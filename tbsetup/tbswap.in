@@ -996,7 +996,7 @@ sub doSwapin($) {
     TBDebugTimeStamp("gentopofile finished");
 
     # XXX fer now hack
-    if (!$firewalled && !$elabinelab && ($pid eq "testbed")) {
+    if (0 && !$firewalled && !$elabinelab && ($pid eq "testbed")) {
 	DBQueryWarn("update experiments set ".
 		    "    savedisk=1 where pid='$pid' and eid='$eid'");
     }
