@@ -83,7 +83,7 @@ LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 
 ALLOWED_NODES = ()
 #ALLOWED_NODES = ("128.112.139.80", "128.112.139.72", "169.229.50.4")
-IGNORED_NODES = ("10283",)
+IGNORED_NODES = ("10283","24","25")
 
 # allowed nil/unknown values (sentinels).
 ATTR_NIL_VALUES = ('None',)
