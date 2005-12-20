@@ -722,7 +722,7 @@ Simulator instproc at {time eventstring} {
     $self instvar event_list
     $self instvar event_count
 
-    if {$event_count > 4000} {
+    if {$event_count > 14000} {
 	perror "Too many events in your NS file!"
 	exit 1
     }
