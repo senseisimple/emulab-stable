@@ -563,7 +563,7 @@ class Plab:
             DBQueryFatal("replace into widearea_nodeinfo"
                          " (node_id, contact_uid, hostname, site)"
                          " values (%s, %s, %s, %s)",
-                         (nodeid, 'bnc', nodeent['HNAME'], nodeent['SITE']))
+                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE']))
 
             DBQueryFatal("replace into interfaces"
                          " (node_id, card, port, IP, interface_type,"

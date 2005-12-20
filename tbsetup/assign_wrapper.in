@@ -2280,7 +2280,7 @@ foreach my $vnode (keys(%v2pmap)) {
     my $pnode  = $v2pmap{$vnode};
     my $vvnode = $v2vmap{$vnode};
 
-    if (virtnodeisjailed($vnode)) {
+    if (virtnodeisjailed($vnode) or virtnodeisplabnode($vnode)) {
 	my $sshdport = nextipportnum($pnode);
 
 	printdb("sshdport: $vnode $pnode $vvnode $sshdport\n");

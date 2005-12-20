@@ -16,6 +16,8 @@ sub usage()
     print "Usage: " . scriptname() . " boot|shutdown|reconfig|reset\n";
     exit(1);
 }
+
+my %options = ();
 my $optlist = "";
 my $action  = "boot";
 
@@ -128,9 +130,27 @@ sub doboot()
 	fatal("Error running $RCDIR/rc.config");
     }
 
+    #
+    # Create the /local/logs directory if necessary
+    #
+    if (! -e "/local") {
+        my @tmccresults = ();
+        if (tmcc(TMCCCMD_CREATOR, undef, \@tmccresults) < 0) {
+            fatal("Unable to lookup experiment creator!\n");
+        }
+        my ($creator) = $tmccresults[0] =~ /CREATOR=([-\w]+)/
+            or fatal("Can't parse out creator!");
+        my @pwent = getpwnam($creator)
+            or fatal("No password entry for experiment creator: $creator!");
+        mkdir("/local", 0775);
+        chown($pwent[2],$pwent[3],"/local");
+        mkdir("/local/logs", 0775);
+        chown($pwent[2],$pwent[3],"/local/logs");
+    }
+
     print("Informing Emulab Control that we are up and running\n");
     if (tmcc(TMCCCMD_STATE, "ISUP") < 0) {
-	fatal("Error sneding ISUP to Emulab Control!");
+	fatal("Error sending ISUP to Emulab Control!");
     }
 
     #
