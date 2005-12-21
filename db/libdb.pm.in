@@ -1717,20 +1717,24 @@ sub ExpNodes($$;$)
 # Return a hash of all the nodes in an experiment.  The hash maps pnames
 # to vnames.
 #
-# usage: ExpNodeVnames(char *pid, char *eid, [bool islocal])
+# usage: ExpNodeVnames(char *pid, char *eid, [bool islocal], [bool isphys])
 #        returns the hash if a valid pid/eid.
-#	 If the optional flag is set, returns only local nodes.
+#	 If the optional islocal is set, returns only local nodes.
+#	 If the optional isphys is set, returns only physical nodes.
 #        Returns 0 if an invalid pid/eid or if an error.
 #
-sub ExpNodeVnames($$;$)
+sub ExpNodeVnames($$;$$)
 {
-    my($pid, $eid, $flag) = @_;
+    my($pid, $eid, $localonly, $physonly) = @_;
     my(@row);
     my(%nodes);
     my $clause = "";
 
-    if (defined($flag)) {
+    if (defined($localonly)) {
 	$clause = "and nt.isremotenode=0";
+    }
+    if (defined($physonly)) {
+	$clause = "and nt.isvirtnode=0";
     }
     my $query_result =
 	DBQueryWarn("select r.node_id,r.vname from reserved as r ".

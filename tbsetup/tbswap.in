@@ -1692,7 +1692,7 @@ sub doSwapoutAction($$%)
     my $statetimeout = (5 * 60);
     my %state = ();
 
-    my %nodes = ExpNodeVnames($pid, $eid, 1);
+    my %nodes = ExpNodeVnames($pid, $eid, 1, 1);
     my @pnodes = keys(%nodes);
     if (@pnodes > 0) {
 	print STDERR "Performing swapout admin MFS actions.\n";
@@ -1750,7 +1750,13 @@ sub doSwapoutAction($$%)
 	    @pnodes = @enodes;
 	}
 
-	if (TBAdminMfsRunCmd(\%myargs, \@failed, @pnodes)) {
+	#
+	# We may have disqualified all the nodes above, so see if there
+	# is still anything to do.
+	#
+	if (@pnodes == 0) {
+	    print STDERR "No nodes require state saving.\n";
+	} elsif (TBAdminMfsRunCmd(\%myargs, \@failed, @pnodes)) {
 	    if ($soaction{'isfatal'}) {
 		tberror
 		    "Failed to run '" . $soaction{'command'} . "' on @failed!";

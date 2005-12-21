@@ -883,7 +883,7 @@ sub osload_setupswapinfo($$;@)
 	#
 	# Weed out otherwise ineligible nodes:
 	#	- from experiments that are not saving disk state
-	#	- non-'node' role machines
+	#	- non-'node' role machines (i.e., delaynodes, virthosts)
 	# They are removed from nodeinfo entirely so we do not complain about
 	# them below.  This is the only reason we are doing this here rather
 	# than as part of the above query.
