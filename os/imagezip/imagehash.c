@@ -59,6 +59,7 @@ static int hashlen = 20;
 static long hashblksize = HASHBLK_SIZE;
 static unsigned long long ndatabytes;
 static unsigned long nchunks, nregions, nhregions;
+static char *imagename;
 static char *fileid = NULL;
 static char *sigfile = NULL;
 
@@ -88,6 +89,7 @@ static void readblock(readbuf_t *rbuf);
 static readbuf_t *alloc_readbuf(uint32_t start, uint32_t size, int dowait);
 static void free_readbuf(readbuf_t *rbuf);
 static void dump_readbufs(void);
+static void dump_stats(int sig);
 
 #define sectobytes(s)	((off_t)(s) * SECSIZE)
 #define bytestosec(b)	(uint32_t)((b) / SECSIZE)
@@ -166,6 +168,7 @@ main(int argc, char **argv)
 
 	if ((create && argc < 1) || (!create && argc < 2))
 		usage();
+	imagename = argv[0];
 
 	/*
 	 * Ensure we can open both files before we do the expensive stuff.
@@ -178,6 +181,10 @@ main(int argc, char **argv)
 		perror("device file");
 		exit(1);
 	}
+
+#ifdef SIGINFO
+	signal(SIGINFO, dump_stats);
+#endif
 
 	/*
 	 * Raw image comparison
@@ -330,6 +337,7 @@ readhashinfo(char *name, struct hashinfo **hinfop)
 		hashlen = 20;
 		break;
 	}
+	nhregions = hinfo->nregions;
 	return 0;
 }
 
@@ -376,6 +384,7 @@ addhash(struct hashinfo **hinfop, int chunkno, uint32_t start, uint32_t size,
 	hinfo->regions[nreg].region.size = size;
 	memcpy(hinfo->regions[nreg].hash, hash, HASH_MAXSIZE);
 	hinfo->nregions++;
+	nhregions = hinfo->nregions;
 }
 
 static void
@@ -483,9 +492,7 @@ createhash(char *name, struct hashinfo **hinfop)
 		fprintf(stderr, "%s: WARNING: could not set mtime (%s)\n",
 			hfile, strerror(errno));
 
-	nhregions = hinfo->nregions;
-	printf("%s: %lu chunks, %lu regions, %lu hashregions, %llu data bytes\n",
-	       name, nchunks, nregions, nhregions, ndatabytes);
+	dump_stats(0);
 #ifdef TIMEIT
 	printf("%qu bytes: inflate cycles: %llu\n", ndatabytes, dcycles);
 #endif
@@ -612,9 +619,7 @@ checkhash(char *name, struct hashinfo *hinfo)
 
 	stopreader();
 
-	nhregions = hinfo->nregions;
-	printf("%s: %lu chunks, %lu hashregions, %llu data bytes\n",
-	       name, nchunks, nhregions, ndatabytes);
+	dump_stats(0);
 	if (badhashes)
 		printf("%s: %u regions (%d chunks) had bad hashes, "
 		       "%llu bytes affected\n",
@@ -823,11 +828,12 @@ hashimage(char *name, struct hashinfo **hinfop)
 			bp += cc;
 		}
 		errors += hashchunk(chunkno, chunkbuf, hinfop);
+		nchunks++;
 	}
  done:
 	if (!isstdin)
 		close(ifd);
-	nchunks = chunkno + 1;
+	nchunks++;
 	return errors;
 }
 
@@ -1436,3 +1442,10 @@ fsleep(unsigned int usecs)
 }
 #endif
 #endif
+
+static void
+dump_stats(int sig)
+{
+	printf("%s: %lu chunks, %lu regions, %lu hashregions, %llu data bytes\n",
+	       imagename, nchunks, nregions, nhregions, ndatabytes);
+}
