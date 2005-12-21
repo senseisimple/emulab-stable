@@ -730,18 +730,19 @@ class Plab:
         
         return nodeid, priority
 
-    def renew(self):
+    def renew(self, force = False):
         """
         Renews all of the Plab leases regardless of when they expire.  Note
         that all times are handled in the UTC time zone.  We don't trust
         MySQL to do the right thing with times (yet).
         """
 
+        global failedrenew # XXX
+        
         now = int(time.mktime(time.gmtime()))
         res = DBQueryFatal("select pid, eid from plab_slices");
         
         loadedSlices = {}
-        global failedrenew # XXX
         newfail = []
         failsoon = []
         ret = 0
@@ -758,7 +759,7 @@ class Plab:
                 loadedSlices[(pid, eid)] = slice
                 pass
             
-            res = slice.renew()
+            res = slice.renew(force)
             entry = (pid, eid, slice.leaseend)
             
             if not res:
@@ -887,15 +888,15 @@ class Slice:
                                                       "%Y-%m-%d %H:%M:%S"))
         return
 
-    def renew(self):
+    def renew(self, force = False):
         """
-        Renews slice lease.  We want this to be the maximum allowed by law..
+        Renews slice lease.  We want this to be the maximum allowed by law...
         Store the expiration time in UTC.
         """
         print "Renewing lease for slice %s" % self.slicename
 
         try:
-            ret = self.plab.agent.renewSlice(self)
+            ret = self.plab.agent.renewSlice(self, force)
             DBQueryFatal("update plab_slices "
                          " set slicemeta=%s, leaseend=%s "
                          " where slicename=%s",

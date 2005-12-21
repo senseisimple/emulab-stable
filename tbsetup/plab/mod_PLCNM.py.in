@@ -32,11 +32,17 @@ DEF_PLC_PASS = "phurds"            # XXX: hardcoded, cleartext passwds bad.
 
 DEF_NM_PORT = "814"
 
-MAX_PLC_LEASELEN = 2*30*24*60*60   # defined by PLC as two months
-MIN_LEASE_ADDTIME = 23*60*60       # less than a day used? leave it be then..
+#
+# A bunch of time constants / intervals (in seconds)
+#
+HOUR  = 60*60
+DAY   = 24*HOUR
+WEEK  = 7*DAY
+MONTH = 30*DAY
+MAX_PLC_LEASELEN = 2*MONTH-4*DAY   # defined by PLC as ~two months (56 days)
+MIN_LEASE_WINDOW = MONTH           # minimum time until expiration (1 month)
 MAX_LEASE_SLOP = 600 # (ten minutes)
-MAX_CACHE_TIME = 3600 # (one hour)
-DEF_PLC_SHARES = 30 # XXX: totally arbitrary
+MAX_CACHE_TIME = HOUR # (one hour)
 
 EMULABMAN_EMAIL = "emulabman@emulab.net"
 
@@ -213,8 +219,9 @@ class PLCagent:
                                                          self.__slicename,
                                                          self.__insmeth)
 
-    def SliceInfo(self):
-        return self.__server.SliceInfo(self.__auth, [self.__slicename,])
+    def SliceInfo(self, slicelist=[]):
+        return self.__server.SliceInfo(self.__auth, slicelist,
+                                       False, False)
 
     pass # end of PLCagent class
 
@@ -315,7 +322,7 @@ class mod_PLCNM:
         pass
 
     # XXX: copied code - not correct for PLC/NM hybrid
-    def renewSlice(self, slice):
+    def renewSlice(self, slice, force = False):
         agent = self.__getAgent(slice.slicename)
         ret = 0
         now = calendar.timegm(time.gmtime()) # make explicit that we want UTC
@@ -341,39 +348,37 @@ class mod_PLCNM:
             pass
 
         # Expired!  Just bitch about it; try renewal anyway.  The renewal
-        # code in liabplab will send email.
+        # code in libplab will send email.
         if leaseend < now:
             print "Slice %s (%s/%s) has expired!" % \
                   (slice.slicename, slice.pid, slice.eid)
             pass
 
-        # Max out leaseend as far as (politically) possible
-        addtime = now + MAX_PLC_LEASELEN - leaseend
-
-        # If the lease is within delta of the max, don't bother.
-        if addtime < MIN_LEASE_ADDTIME:
+        # If the lease is at least as large as the minimum window,
+        # don't bother renewing it.
+        if leaseend - now > MIN_LEASE_WINDOW and not force:
             print "Slice %s (%s/%s) doesn't need to be renewed" % \
                   (slice.slicename, slice.pid, slice.eid)
             return 1
+
+        # Max out leaseend as far as (politically) possible
+        newleaseend = now + MAX_PLC_LEASELEN
         
         try:
-            res = tryXmlrpcCmd(agent.AssignShares,
-                               (addtime,
-                                DEF_PLC_SHARES),
-                               NOKstrs = ["does not Exist",
-                                          "unknown within Planetlab"])
+            res = tryXmlrpcCmd(agent.SliceRenew,
+                               newleaseend,
+                               NOKstrs = ["does not exist"])
             ret = 1
             if debug:
-                print "AssignShares returns: %s" % res
+                print "SliceRenew returns: %s" % res
                 pass
             pass
         except:
-            print "Failed to extend lease for slice %s" % slice.slicename
+            print "Failed to renew lease for slice %s" % slice.slicename
             ret = 0
             pass
         else:
-            # XXX: This may not be accurate - PLC _accumulates_ renewal time.
-            slice.leaseend = now + addtime
+            slice.leaseend = newleaseend
             pass
         
         return ret
@@ -481,9 +486,9 @@ class mod_PLCNM:
         if not self.__sliceexpdict or \
            self.__sliceexptime < time.time() - MAX_CACHE_TIME or \
            not self.__sliceexpdict.has_key(slicename):
-            sdict = tryXmlrpcCmd(agent.listSlice)
+            sdict = tryXmlrpcCmd(agent.SliceInfo)
             for entry in sdict:
-                self.__sliceexpdict[entry['slicename']] = entry
+                self.__sliceexpdict[entry['name']] = entry
                 pass
             self.__sliceexptime = time.time()
             pass
@@ -492,8 +497,7 @@ class mod_PLCNM:
             print "Slice %s unknown to PLC" % slicename
             return None
 
-        exptime = self.__sliceexpdict[slicename]['expires']
-        leaseend = calendar.timegm(time.strptime(exptime, "%Y-%m-%d %H:%M:%S"))
+        leaseend = self.__sliceexpdict[slicename]['expires']
 
         return leaseend
 
