@@ -1571,6 +1571,10 @@ Simulator instproc make_event {outer event} {
 	}
     }
 
+    if { $otype == "" } {
+	perror "\[make_event] otype was empty; event was $event"
+    }
+
     return [list $vnode $vname $otype $etype $args $atstring]
 }
 
