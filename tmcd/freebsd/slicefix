@@ -149,7 +149,7 @@ dofreebsd() {
 #
 lilogetkernel() {
     _lconf=$1
-    _re='[a-zA-Z][-_\.a-zA-Z0-9]*'
+    _re='[a-zA-Z0-9][-_\.a-zA-Z0-9]*'
 
     # see if there is a default= line and prefer that
     linux=`grep -E "default=$_re" $_lconf | sed -e "s/default=\($_re\).*/\1/"`
