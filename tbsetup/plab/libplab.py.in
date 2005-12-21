@@ -308,13 +308,15 @@ class Plab:
             # Replace sequences of bad chars in the site entity with
             # a single "-".
             nodeent['SITE'] = BADSITECHARS.sub("-", nodeent['SITE'])
-            res = self.__matchPlabNode(nodeent, known)
-            if not res:
+            # Determine if we already know about this node.
+            matchres = self.__matchPlabNode(nodeent, known)
+            if not matchres:
                 toadd.append(nodeent)
                 pass
-            elif len(res[1]):
-                toupdate.append(res)
+            elif len(matchres[1]):
+                toupdate.append((nodeent,matchres))
                 pass
+            pass
 
         # Process the list of nodes to add
         addstr = ""
@@ -349,15 +351,16 @@ class Plab:
                 pass
             pass
 
-        # Process node attribute updates.
+        # Process node updates.
         updstr = ""
         if len(toupdate):
             print "There are %d plab node updates." % len(toupdate)
-            for updent in toupdate:
-                self.__updateNode(updent)
+            for updent,updmapent in toupdate:
+                self.__updateNodeMapping(updmapent)
+                self.__addNode(updent, updmapent)
                 # Add a line for the add/update message.
-                nodestr = updent[0] + "\n"
-                for attr,val in updent[1].items():
+                nodestr = updmapent[0] + "\n"
+                for attr,val in updmapent[1].items():
                     nodestr += "\t%s:\t%s => %s\n" % (attr,val[0],val[1])
                     pass
                 updstr += nodestr + "\n"
@@ -518,30 +521,54 @@ class Plab:
         nodeent['LINKTYPE'] = "pcplabinet"
         return
 
-    def __addNode(self, nodeent, update = False):
+    def __addNode(self, nodeent, updent = ()):
         """
         getFree helper function.  Adds a new Plab pnode and associated
         vnodes to the DB.  linktype should be one of (inet2, inet, intl,
         dsl).
-
-        XXX This duplicates a lot of the functionality of newwanode.
-        Note that, very unlike newwanode, the node is initially up,
-        since it had to be up to be added in the first place.  This also
-        adds some additional fields that newwanode doesn't, and takes
-        advantage of the fact that the Plab nodes may be added in bulk.
         """
         # block out common termination signals while adding a node
         osigs = disable_sigs(TERMSIGS)
         defosid, controliface = self.__getNodetypeInfo()
-        nidnum, priority = self.__nextFreeNodeid()
-        nodeid = "%s%d" % (NODEPREFIX, nidnum)
-        vnodeprefix = "%svm%d" % (NODEPREFIX, nidnum)
         hostonly = nodeent['HNAME'].replace(".", "-")
-        
-        print "Creating pnode %s as %s, priority %d." % \
-              (nodeent['IP'], nodeid, priority)
+        # These will be setup properly below.
+        priority = 0;
+        nodeid = ""
+        vnodeprefix = ""
+
+        # Setup nodeid according to whether or not we were passed in an
+        # update entry.
+        if updent:
+            nodeid = updent[0]
+            print "Updating node %s" % nodeid
+            pass
+        else:
+            nidnum, priority = self.__nextFreeNodeid()
+            nodeid = "%s%d" % (NODEPREFIX, nidnum)
+            vnodeprefix = "%svm%d" % (NODEPREFIX, nidnum)
+            print "Creating pnode %s as %s, priority %d." % \
+                  (nodeent['IP'], nodeid, priority)
+            pass
 
         try:
+            # XXX: Site is not checked for updates.
+            DBQueryFatal("replace into widearea_nodeinfo"
+                         " (node_id, contact_uid, hostname, site)"
+                         " values (%s, %s, %s, %s)",
+                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE']))
+
+            DBQueryFatal("replace into interfaces"
+                         " (node_id, card, port, IP, interface_type,"
+                         " iface, role)"
+                         " values (%s, %s, %s, %s, %s, %s, %s)",
+                         (nodeid, 0, 1, nodeent['IP'], 'fxp',
+                          controliface, 'ctrl'))
+
+            # Don't do anything else if we are only updating the node
+            if updent:
+                enable_sigs(osigs)
+                return
+
             DBQueryFatal("replace into nodes"
                          " (node_id, type, phys_nodeid, role, priority,"
                          "  op_mode, def_boot_osid,"
@@ -560,23 +587,13 @@ class Plab:
                          " values (%s)",
                          (nodeid))
 
-            DBQueryFatal("replace into widearea_nodeinfo"
-                         " (node_id, contact_uid, hostname, site)"
-                         " values (%s, %s, %s, %s)",
-                         (nodeid, 'nobody', nodeent['HNAME'], nodeent['SITE']))
-
-            DBQueryFatal("replace into interfaces"
-                         " (node_id, card, port, IP, interface_type,"
-                         " iface, role)"
-                         " values (%s, %s, %s, %s, %s, %s, %s)",
-                         (nodeid, 0, 1, nodeent['IP'], 'fxp',
-                          controliface, 'ctrl'))
-
             DBQueryFatal("replace into reserved"
                          " (node_id, pid, eid, rsrv_time, vname)"
                          " values (%s, %s, %s, now(), %s)",
                          (nodeid, RESERVED_PID, RESERVED_EID, hostonly))
 
+            # XXX: This should probably be checked and updated if necessary
+            #      when updating.
             DBQueryFatal("replace into node_auxtypes"
                          " (node_id, type, count)"
                          " values (%s, %s, %s)",
@@ -654,7 +671,7 @@ class Plab:
         enable_sigs(osigs)
         return
 
-    def __updateNode(self, updent):
+    def __updateNodeMapping(self, updent):
         """
         Updates changed node attributes in the mapping table.
         """
