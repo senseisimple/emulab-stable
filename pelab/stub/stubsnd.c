@@ -109,6 +109,31 @@ void print_header(char *buf){
   }
 }
 
+int get_socket(unsigned long destaddr){
+  int sockfd_traffic;
+  struct sockaddr_in their_addr;  // connector's address information 
+
+  if ((sockfd_traffic=search_db(destaddr)) == -1) {
+    if ((sockfd_traffic = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+      perror("socket");
+      clean_exit(1);
+    }
+
+    their_addr.sin_family = AF_INET;    // host byte order 
+    their_addr.sin_port = htons(TRAFFIC_PORT);  // short, network byte order 
+    their_addr.sin_addr.s_addr = destaddr;
+    memset(&(their_addr.sin_zero), '\0', 8);  // zero the rest of the struct 
+    if (getenv("Debug")!=NULL) printf("Try to connect to %s \n", inet_ntoa(their_addr.sin_addr));
+
+    if (connect(sockfd_traffic, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
+      perror("connect");
+      clean_exit(1);
+    }
+    insert_db(destaddr, sockfd_traffic);
+  }
+  return sockfd_traffic;
+}
+
 int receive_message(int sockfd_monitor, char *buf) {
   int numbytes;
   struct timeval tv;
@@ -140,10 +165,11 @@ int receive_message(int sockfd_monitor, char *buf) {
 }
 
 void send_message(int sockfd_monitor, char *buf) {
-  char feedback[] = "test";
+  char inbuf[3*SIZEOF_LONG], outbuf[SIZEOF_LONG];
   struct timeval tv;
   fd_set writeset;
-  unsigned long timeout;
+  unsigned long timeout, tmpulong;
+  int i;
 
   timeout = QUANTA/2;  //QUANTA should be even   
   tv.tv_sec = timeout/1000000;
@@ -152,50 +178,47 @@ void send_message(int sockfd_monitor, char *buf) {
   FD_SET(sockfd_monitor, &writeset);
 
   //poll for feed-back
-  if (select(sockfd_monitor+1, NULL, &writeset, NULL, &tv) >0) {
-    printf("poll receivers. \n"); //poll func
-    memcpy(buf, feedback, sizeof(feedback));  
-    if (send(sockfd_monitor, buf, MAX_PKTSIZE, 0) == -1){
-      perror("ERROR: send_messages() - send()");
-      clean_exit(1);
-    }    
-  } //if
+  tmpulong = CODE_INQUIRY;
+  memcpy(outbuf, &tmpulong, SIZEOF_LONG);
+  for (i=0; i<CONCURRENT_RECEIVERS; i++){
+    if (db[i].valid==1) {
+      if (send(db[i].sockfd, outbuf, SIZEOF_LONG, 0) == -1){
+	perror("ERROR: send_messages() - send() traffic");
+	clean_exit(1);
+      }    
+      //no incomplete receive check here
+      if ((recv(db[i].sockfd, inbuf, 3*SIZEOF_LONG, 0)) == -1) {
+	perror("ERROR: send_messages() - recv()");
+	clean_exit(1);	
+      }
+      if (select(sockfd_monitor+1, NULL, &writeset, NULL, &tv) >0) {  
+	if (send(sockfd_monitor, inbuf, 3*SIZEOF_LONG, 0) == -1){
+	  perror("ERROR: send_messages() - send() monitor");
+	  clean_exit(1);
+	}    
+      } //if
+    } //if
+  } //for
+
 }
 
-void send_packets(unsigned long destaddr, char *packet_buffer){
-  int sockfd_traffic, i;
-  struct sockaddr_in their_addr;  // connector's address information 
+void send_packets(int sockfd_traffic, char *packet_buffer){
+  int i;
   struct timeval application_sendtime;
   unsigned long tmpulong;
 
-  if ((sockfd_traffic=search_db(destaddr)) == -1) {
-    if ((sockfd_traffic = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-      perror("socket");
-      clean_exit(1);
-    }
-
-    their_addr.sin_family = AF_INET;    // host byte order 
-    their_addr.sin_port = htons(TRAFFIC_PORT);  // short, network byte order 
-    their_addr.sin_addr.s_addr = destaddr;
-    memset(&(their_addr.sin_zero), '\0', 8);  // zero the rest of the struct 
-    if (getenv("Debug")!=NULL) printf("Try to connect to %s \n", inet_ntoa(their_addr.sin_addr));
-
-    if (connect(sockfd_traffic, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
-      perror("connect");
-      clean_exit(1);
-    }
-    insert_db(destaddr, sockfd_traffic);
-  }
-
   srandom(getpid());
   for (i=0; i<MAX_PKTSIZE; i++) packet_buffer[i]=(char)(random()&0x000000ff);
-  //put the application send time at the first eight bytes
+  //put the packet type, application send time at the first eight bytes
+  tmpulong = htonl(CODE_TRAFFIC);
+  memcpy(packet_buffer, &tmpulong, SIZEOF_LONG);
   gettimeofday(&application_sendtime, NULL);
   tmpulong = htonl(application_sendtime.tv_sec);
-  memcpy(packet_buffer, &tmpulong, sizeof(long));
+  memcpy(packet_buffer+ SIZEOF_LONG, &tmpulong,  SIZEOF_LONG);
   tmpulong = htonl(application_sendtime.tv_usec);
-  memcpy(packet_buffer+sizeof(long), &tmpulong, sizeof(long));
+  memcpy(packet_buffer+SIZEOF_LONG+SIZEOF_LONG, &tmpulong,  SIZEOF_LONG);
 
+  //add send loop here!
   if (send(sockfd_traffic, packet_buffer, MAX_PKTSIZE, 0) == -1){
     perror("ERROR: send_packets() - send()");
     clean_exit(1);
@@ -208,7 +231,7 @@ void sigchld_handler(int s)
 }
 
 int main(int argc, char *argv[]) {
-  int sockfd_control, sockfd_monitor;  
+  int sockfd_control, sockfd_monitor, sockfd_traffic;  
   struct sigaction sa;
   char buf[MAX_PKTSIZE];
   struct sockaddr_in their_addr;  // connector's address information 
@@ -278,11 +301,12 @@ int main(int argc, char *argv[]) {
 	  memcpy(&tmpulong, nextptr, longsz);
 	  destaddr = tmpulong; //address should stay in Network Order!
 	  nextptr += longsz;
+	  sockfd_traffic = get_socket(destaddr);
 	  if (!fork()) { // this is the child process
 	    close(sockfd_control); // child doesn't need the listener					 
-	    close(sockfd_monitor);
-	    send_packets(destaddr, buf);
-	    clean_exit(0);
+	    close(sockfd_monitor);	    
+	    send_packets(sockfd_traffic, buf);
+	    exit(0); //child doesn't close traffic connections
 	  } 	    
 	} //for
       } //if
