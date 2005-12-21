@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -180,6 +180,7 @@ $query_result =
     DBQueryFatal("select num_pcplab,num_ron from projects where pid='$pid'");
 
 $row = mysql_fetch_array($query_result);
+# These are now booleans, not actual counts.
 $num_pcplab = $row[num_pcplab];
 $num_ron    = $row[num_ron];
 

@@ -39,6 +39,7 @@ function SHOWPROJECT($pid, $thisuid) {
     $proj_head_uid	= $row[head_uid];
     $proj_members       = $row[num_members];
     $proj_pcs           = $row[num_pcs];
+    # These are now booleans, not actual counts.
     $proj_ronpcs        = $row[num_ron];
     $proj_plabpcs       = $row[num_pcplab];
     $proj_linked        = $row[linked_to_us];
@@ -62,6 +63,20 @@ function SHOWPROJECT($pid, $thisuid) {
     }
     else {
 	$proj_linked = "No";
+    }
+
+    if ($proj_ronpcs) {
+	$proj_ronpcs = "Yes";
+    }
+    else {
+	$proj_ronpcs = "No";
+    }
+    
+    if ($proj_plabpcs) {
+	$proj_plabpcs = "Yes";
+    }
+    else {
+	$proj_plabpcs = "No";
     }
 
     if (!$expt_last) {
@@ -180,12 +195,12 @@ function SHOWPROJECT($pid, $thisuid) {
           </tr>\n";
     
     echo "<tr>
-              <td>#Planetlab PCs: </td>
+              <td>Planetlab Access: </td>
               <td class=\"left\">$proj_plabpcs</td>
           </tr>\n";
     
     echo "<tr>
-              <td>#RON PCs: </td>
+              <td>RON Access: </td>
               <td class=\"left\">$proj_ronpcs</td>
           </tr>\n";
     
@@ -749,6 +764,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $mnet_cores  = $exprow["modelnet_cores"];
     $mnet_edges  = $exprow["modelnet_edges"];
     $lockdown    = $exprow["lockdown"];
+    $exptidx     = $exprow["idx"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -1019,6 +1035,10 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                       <td class=\"left\">$syncserver</td>
                   </tr>\n";
 	}
+        echo "<tr>
+                  <td>Index: </td>
+                  <td class=\"left\">$exptidx</td>
+              </tr>\n";
     }
 
     echo "</table>\n";

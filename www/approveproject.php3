@@ -223,6 +223,19 @@ elseif (strcmp($approval, "approve") == 0) {
 			 "WHERE pid='$pid'");
     }
 
+    #
+    # Invoke the script. This does it all. If it fails, we will find out
+    # about it.
+    #
+    echo "<br>
+          Project '$pid' is being created!<br><br>
+          This will take a minute or two. <b>Please</b> do not click the Stop
+          button during this time. If you do not receive notification within
+          a reasonable amount of time, please contact $TBMAILADDR.\n";
+    flush();
+
+    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", SUEXEC_ACTION_DIE);
+
     TBMAIL("$headname '$headuid' <$headuid_email>",
          "Project '$pid' Approval",
          "\n".
@@ -240,19 +253,6 @@ elseif (strcmp($approval, "approve") == 0) {
          "From: $TBMAIL_APPROVAL\n".
          "Bcc: $TBMAIL_APPROVAL\n".
          "Errors-To: $TBMAIL_WWW");
-
-    #
-    # Invoke the script. This does it all. If it fails, we will find out
-    # about it.
-    #
-    echo "<br>
-          Project '$pid' is being created!<br><br>
-          This will take a minute or two. <b>Please</b> do not click the Stop
-          button during this time. If you do not receive notification within
-          a reasonable amount of time, please contact $TBMAILADDR.\n";
-    flush();
-
-    SUEXEC($uid, $TBADMINGROUP, "webmkproj $pid", SUEXEC_ACTION_DIE); 
 
     if (!$FirstInitState) {
 	echo "<p><b>

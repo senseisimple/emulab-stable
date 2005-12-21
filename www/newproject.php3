@@ -488,26 +488,26 @@ function SPITFORM($formfields, $returning, $errors)
           </tr>\n";
 
     echo "<tr>
-              <td colspan=2>*Estimated #of
+              <td colspan=2>Request Access to 
         <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\" target='_blank'>
                              Planetlab PCs</a>:</td>
               <td class=left>
-                  <input type=text
+                  <input type=checkbox value=checked
                          name=\"formfields[proj_plabpcs]\"
-                         value=\"" . $formfields[proj_plabpcs] . "\"
-                         size=4>
+                         " . $formfields[proj_plabpcs] . ">
+                         Yes &nbsp
               </td>
           </tr>\n";
 
     echo "<tr>
-              <td colspan=2>*Estimated #of
+              <td colspan=2>Request Access to 
         <a href=\"$TBDOCBASE/docwrapper.php3?docname=widearea.html\" target='_blank'>
                              wide-area PCs</a>:</td>
               <td class=left>
-                  <input type=text
+                  <input type=checkbox value=checked
                          name=\"formfields[proj_ronpcs]\"
-                         value=\"" . $formfields[proj_ronpcs] . "\"
-                         size=4>
+                         " . $formfields[proj_ronpcs] . ">
+                         Yes &nbsp
               </td>
           </tr>\n";
 
@@ -600,8 +600,8 @@ if (! isset($_POST['submit'])) {
     $defaults[proj_URL] = "$HTTPTAG";
     $defaults[usr_URL] = "$HTTPTAG";
     $defaults[usr_country] = "USA";
-    $defaults[proj_ronpcs]  = "0";
-    $defaults[proj_plabpcs] = "0";
+    $defaults[proj_ronpcs]  = "";
+    $defaults[proj_plabpcs] = "";
     $defaults[proj_public] = "checked";
     $defaults[proj_linked] = "checked";
 
@@ -826,19 +826,16 @@ if (!isset($formfields[proj_pcs]) ||
 elseif (! TBvalid_num_pcs($formfields[proj_pcs])) {
     $errors["#of PCs"] = TBFieldErrorString();
 }
-if (!isset($formfields[proj_plabpcs]) ||
-    strcmp($formfields[proj_plabpcs], "") == 0) {
-    $errors["#of Planetlab PCs"] = "Missing Field";
+
+if (isset($formfields[proj_plabpcs]) &&
+    strcmp($formfields[proj_plabpcs], "") &&
+    strcmp($formfields[proj_plabpcs], "checked")) {
+    $errors["Planetlab Access"] = "Bad Value";
 }
-elseif (! TBvalid_num_pcplab($formfields[proj_plabpcs])) {
-    $errors["#of Planetlab PCs"] = TBFieldErrorString();
-}
-if (!isset($formfields[proj_ronpcs]) ||
-    strcmp($formfields[proj_ronpcs], "") == 0) {
-    $errors["#of RON PCs"] = "Missing Field";
-}
-elseif (! TBvalid_num_ron($formfields[proj_ronpcs])) {
-    $errors["#of RON PCs"] = TBFieldErrorString();
+if (isset($formfields[proj_ronpcs]) &&
+    strcmp($formfields[proj_ronpcs], "") &&
+    strcmp($formfields[proj_ronpcs], "checked")) {
+    $errors["Ron Access"] = "Bad Value";
 }
 if (!isset($formfields[proj_why]) ||
     strcmp($formfields[proj_why], "") == 0) {
@@ -989,8 +986,6 @@ $proj_funders      = addslashes($formfields[proj_funders]);
 $proj_whynotpublic = addslashes($formfields[proj_whynotpublic]);
 $proj_members      = $formfields[proj_members];
 $proj_pcs          = $formfields[proj_pcs];
-$proj_plabpcs      = $formfields[proj_plabpcs];
-$proj_ronpcs       = $formfields[proj_ronpcs];
 $proj_why	   = addslashes($formfields[proj_why]);
 $proj_expires      = date("Y:m:d", time() + (86400 * 120));
 
@@ -1011,6 +1006,24 @@ if (!isset($formfields[proj_linked]) ||
 else {
     $proj_linked = "Yes";
     $linked = 1;
+}
+if (isset($formfields[proj_plabpcs]) &&
+    $formfields[proj_plabpcs] == "checked") {
+    $proj_plabpcs = "Yes";
+    $plabpcs = 1;
+}
+else {
+    $proj_plabpcs = "No";
+    $plabpcs = 0;
+}
+if (isset($formfields[proj_ronpcs]) &&
+    $formfields[proj_ronpcs] == "checked") {
+    $proj_ronpcs = "Yes";
+    $ronpcs = 1;
+}
+else {
+    $proj_ronpcs = "No";
+    $ronpcs = 0;
 }
 
 #
@@ -1099,7 +1112,7 @@ DBQueryFatal("INSERT INTO projects ".
 	     "VALUES ('$pid', now(), '$proj_expires','$proj_name', ".
 	     "        '$proj_URL', '$proj_head_uid', '$proj_members', ".
 	     "        '$proj_pcs', '$proj_why', ".
-	     "        '$proj_funders', NULL, $proj_plabpcs, $proj_ronpcs, ".
+	     "        '$proj_funders', NULL, $plabpcs, $ronpcs, ".
 	     "         $public, '$proj_whynotpublic', $linked)");
 
 DBQueryFatal("INSERT INTO project_stats (pid) VALUES ('$pid')");
