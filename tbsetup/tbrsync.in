@@ -187,6 +187,8 @@ NODE: foreach my $node (@nodes) {
     #
     my @rsync_args = "-ar";
 
+    push @rsync_args, "--rsh=\"$TB/bin/sshtb -host \"";
+
     # Are we deleting files that only exist at the destination?
     if ($delete) {
         push @rsync_args, "--delete";
