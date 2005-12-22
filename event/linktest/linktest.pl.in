@@ -533,6 +533,7 @@ sub loss_test {
     my $result_count = @results;
     &debug("result_count from crude: $result_count\n");
     foreach (@results) {
+	&debug("result from crude: $_");
 	if(/ID=(\d+) /) {
 	    $recv_cnt{$1}++;
 	}
@@ -730,15 +731,15 @@ sub latency_test {
 			    $u += 0.333 - 0.005 * $u / 2;
 
 
-# factor in transport delay at slow network speeds.
-
-			    # transport delay: 64 bytes + 18 bytes eth/crc
+			    # factor in transport delay at slow network speeds.
+			    # transport delay:
+			    #     64B (icmp) + 20B (ip) + 14B (ethernet)
 			    # to units of ms.
 			    if($edge->bw < LAT_LOW_BW) {
-				$u += 1000 * (82 * 8) / $edge->bw;
+				$u += 1000 * (98 * 8) / $edge->bw;
 			    }
 			    if($other_edge->bw < LAT_LOW_BW) {
-				$u += 1000 * (82 * 8) / $other_edge->bw;
+				$u += 1000 * (98 * 8) / $other_edge->bw;
 			    }
 			    
 			    my $x_bar = $sample_avg;
@@ -996,33 +997,97 @@ sub reachable_nodes {
 # with this host. IE, use TTL > 1. Pings are in parallel.
 sub static_rt_test {
     my @nodes = ();
+    my %okay  = ();
+    my $maxtrials = ($rtproto eq RTPROTO_SESSION ? 2 : 1);
 
     &reachable_nodes(\@nodes, $hostname);
     &debug("Route test nodes: @nodes\n");
-
-    my %waitlist;
-    # fork processes to run the pings in parallel.
-    foreach my $dst (@nodes) {
-	my ($host,$lan) = split(":", $dst);
-	my $dstname     = "${host}-${lan}";
+    
+    #
+    # Because of session routing, we run failed nodes twice, in the
+    # hopes that the routes stabilize between the first and second runs.
+    #
+    for (my $trial = 0; $trial < $maxtrials; $trial++) {
+	my %waitlist  = ();
+	my $waitcount = 0;
 	
-	my $pid = fork();
-	if(!$pid) {
-	    my ($recv_cnt) = &ping_node($dstname, 0);
+	# fork processes to run the pings in parallel.
+	foreach my $dst (@nodes) {
+	    my ($host,$lan) = split(":", $dst);
+	    my $dstname     = "${host}-${lan}";
+	
+	    my $pid = fork();
+	    if (!$pid) {
+		my ($recv_cnt) = &ping_node($dstname, 0);
 	    
-	    if(!$recv_cnt) {
-		&error(NAME_RT_STATIC, undef,
-		       "$hostname could not ping $dstname");
-		exit(EXIT_NOT_OK);
-	    } else {
+		if (!$recv_cnt) {
+		    &debug("Attempting to reach $dstname ... Failed!\n");
+		    exit(EXIT_NOT_OK);
+		}
 		&debug("Attempting to reach $dstname ... OK\n");
+		exit(EXIT_OK);
 	    }
-	    exit(EXIT_OK);
-	} else {
-	    $waitlist{$pid} = 1;
+	    else {
+		$waitlist{$dst} = $pid;
+		$waitcount++;
+	    }
+
+	    #
+	    # If the count gets too high, lets stop and wait.
+	    #
+	    if ($waitcount > 1) {
+		&debug("Pausing to wait for outstanding pings to clear ...\n");
+
+		foreach my $name (keys(%waitlist)) {
+		    my $wpid = $waitlist{$name};
+
+		    waitpid($wpid, 0);
+		    if ($? == 0) {
+			$okay{$name} = 1;
+		    }
+		}
+		$waitcount = 0;
+		%waitlist  = ();
+	    }
+	}
+	# Wait for stragglers.
+	&debug("Waiting for outstanding pings to clear ...\n");
+	foreach my $name (keys(%waitlist)) {
+	    my $wpid = $waitlist{$name};
+
+	    waitpid($wpid, 0);
+	    if ($? == 0) {
+		$okay{$name} = 1;
+	    }
+	}
+
+	#
+	# See if any failed, and if so lets delay a bit more.
+	#
+	if ($trial < ($maxtrials - 1)) {
+	    last 
+		if (scalar(@nodes) == scalar(keys(%okay)));
+
+	    my $seconds = 60 + int(scalar(@nodes) * 0.25);
+		
+	    &debug("Some nodes failed to respond during trial $trial!\n");
+	    &debug("Waiting for $seconds seconds, and then trying again.\n");
+
+	    sleep($seconds);
 	}
     }
-    &wait_all(%waitlist);
+    #
+    # No look at the final results.
+    #
+    foreach my $dst (@nodes) {
+	if (! exists($okay{$dst})) {
+	    my ($host,$lan) = split(":", $dst);
+	    my $dstname     = "${host}-${lan}";
+	    
+	    &error(NAME_RT_STATIC, undef,
+		   "$hostname could not ping $dstname");
+	}
+    }
     # wait for completion before next test.
     &barrier();
 }
