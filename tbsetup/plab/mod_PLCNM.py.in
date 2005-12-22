@@ -321,7 +321,6 @@ class mod_PLCNM:
         tryXmlrpcCmd(agent.SliceDelete, OKstrs = ["does not exist"])
         pass
 
-    # XXX: copied code - not correct for PLC/NM hybrid
     def renewSlice(self, slice, force = False):
         agent = self.__getAgent(slice.slicename)
         ret = 0
@@ -421,8 +420,8 @@ class mod_PLCNM:
         if vers[0] != MAJOR_VERS or vers[1] != MINOR_VERS \
                or vers[2] < MIN_REV:
             raise RuntimeError, \
-                  "Remote node manager version incompatible: " + \
-                  ".".join(map(lambda x: str(x), vers))
+                  "Remote node manager version incompatible on %s: %s" % \
+                  (node.nodeid, ".".join(map(lambda x: str(x), vers)))
         pass
 
         try:

@@ -133,7 +133,7 @@ sub doboot()
     #
     # Create the /local/logs directory if necessary
     #
-    if (! -e "/local") {
+    if (! -e "/local/logs") {
         my @tmccresults = ();
         if (tmcc(TMCCCMD_CREATOR, undef, \@tmccresults) < 0) {
             fatal("Unable to lookup experiment creator!\n");
