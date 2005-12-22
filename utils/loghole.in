@@ -77,7 +77,7 @@ HOME = pw.pw_dir
 
 CERTIFICATE = os.path.join(HOME, ".ssl", "emulab.pem")
 
-PARALLELIZATION = 10
+PARALLELIZATION = 25
 
 DEBUG = 0
 
@@ -99,6 +99,30 @@ if len(RSYNC) == 0:
     sys.stderr.write("internal error: RSYNC is empty\n")
     sys.exit(2)
     pass
+
+IDENTITY = None
+
+try:
+    auth = open(os.path.join(HOME, ".ssh", "authorized_keys"), "r").read()
+
+    for (pub, full) in ((os.path.join(HOME, ".ssh", "identity.pub"),
+                         (1, os.path.join(HOME, ".ssh", "identity"))),
+                        (os.path.join(HOME, ".ssh", "id_rsa.pub"),
+                         (2, os.path.join(HOME, ".ssh", "id_rsa")))):
+        try:
+            idpub = open(pub, "r").read()
+            
+            if auth.find(idpub) != -1:
+                IDENTITY = full
+                break
+            pass
+        except IOError:
+            pass
+        pass
+    pass
+except IOError:
+    pass
+
 
 def loghole_include(path):
     retval = ""
@@ -863,7 +887,7 @@ def do_show(args):
 # @param *args The list of directories to sync.
 # @retval The exit status of the rsync command-line.
 #
-def rsync(host, base, dlpath, paths = ["/"], port = None):
+def rsync(host, base, dlpath, paths = ["/"], port = None, output = False):
     global RSYNC, HOME, DEBUG
     
     retval = 0
@@ -876,6 +900,7 @@ def rsync(host, base, dlpath, paths = ["/"], port = None):
             pass
         cmd = [RSYNC,
                "-rptgoDlz",
+               "-v", # XXX
                "--copy-unsafe-links",
                "--include-from=" + dlpath]
         if VERBOSITY > VERBOSITY_HUMAN:
@@ -884,6 +909,9 @@ def rsync(host, base, dlpath, paths = ["/"], port = None):
         ssh_args = ("ssh -o BatchMode=yes -o StrictHostKeyChecking=no "
                     + "-o UserKnownHostsFile="
                     + os.path.join(HOME, ".ssh", "emulab_known_hosts"))
+        if IDENTITY:
+            ssh_args += " -o Protocol=%d -i %s" % IDENTITY
+            pass
         if port:
             ssh_args += " -p " + str(port)
             pass
@@ -900,10 +928,22 @@ def rsync(host, base, dlpath, paths = ["/"], port = None):
                 # Parent
                 pass
             else:
-                os.close(0)
-                fd = os.open("/dev/null", os.O_RDONLY)
-                os.execve(RSYNC, cmd, os.environ)
-                os._exit(127)
+                try:
+                    os.close(0)
+                    os.open("/dev/null", os.O_RDONLY)
+                    if output:
+                        os.close(1)
+                        fd = os.open(os.path.join(base, ".rsync.out"),
+                                     os.O_CREAT|os.O_TRUNC|os.O_WRONLY,
+                                     0664)
+                        os.dup2(fd, 2)
+                        pass
+                    os.execve(RSYNC, cmd, os.environ)
+                    os._exit(127)
+                    pass
+                except:
+                    sys.exit(1)
+                    pass
                 pass
             pass
         pass
@@ -941,7 +981,41 @@ def rmstar(host, port, *args):
         pass
     
     return retval
+
+def print_status(hosts, jobs, hoststatus, hoststart):
+    if not sys.stdout.isatty() or VERBOSITY < VERBOSITY_HUMAN:
+        return
     
+    lmsg = "nodes todo/doing/done %d/%d/%d "
+    rmsg = "sync time min/avg/max: %.2f/%.2f/%.2f secs"
+
+    hosttimes = map(lambda x:
+                    hoststatus.get(x, (time.time(),))[0] - hoststart[x],
+                    hoststart.keys())
+    
+    if len(hosttimes) == 0:
+        hosttimes = [0]
+        avg = 0.0
+        pass
+    else:
+        avg = sum(hosttimes) / len(hosttimes)
+        pass
+    lmsg = lmsg % (
+        len(hosts) - len(hoststatus) - len(jobs),
+        len(jobs),
+        len(hoststatus))
+    rmsg = rmsg % (
+        min(hosttimes),
+        avg,
+        max(hosttimes))
+    line_len = len(lmsg) + len(rmsg)
+    if line_len < 79:
+        lmsg += " " * (79 - line_len)
+        pass
+    sys.stdout.write(lmsg + rmsg + "\r")
+    sys.stdout.flush()
+
+    return
 
 ##
 # Performs the "sync" action, which synchronizes the logholes for a group of
@@ -1043,9 +1117,15 @@ def do_sync(args, mode="sync", must_be_active=1):
             "exp" : EID,
             "aspect" : "traces",
             })
+
+        ssh_data = ssh_method(PACKAGE_VERSION, {
+            "proj" : PID,
+            "exp" : EID
+            })
         
         if ((physical["code"] != RESPONSE_SUCCESS) or
-            (traces["code"] != RESPONSE_SUCCESS)):
+            (traces["code"] != RESPONSE_SUCCESS) or
+            (ssh_data["code"] != RESPONSE_SUCCESS)):
             sys.stderr.write("error: xmlrpc failed - %s\n" %
                              (physical["output"],))
             retval = 1
@@ -1053,6 +1133,7 @@ def do_sync(args, mode="sync", must_be_active=1):
         else:
             physical = physical["value"]
             traces = traces["value"]
+            ssh_data = ssh_data["value"]
             
             hosts = [(x["node"], x["name"]) for x in physical.values()
                      if ((x["erole"] == "virthost" or
@@ -1060,10 +1141,23 @@ def do_sync(args, mode="sync", must_be_active=1):
                           x["erole"] == "delaynode") and
                          (x["status"] == "up" and x["eventstatus"] == "ISUP"))]
 
+            downhosts = [(x["node"], x["name"]) for x in physical.values()
+                     if ((x["erole"] == "virthost" or
+                          x["erole"] == "node" or
+                          x["erole"] == "delaynode") and
+                         (x["status"] != "up" or x["eventstatus"] != "ISUP"))]
+
             phosts = sets.Set([x[0] for x in hosts])
             vhosts = sets.Set([x[1] for x in hosts])
+            dphosts = sets.Set([x[0] for x in downhosts])
+            dvhosts = sets.Set([x[1] for x in downhosts])
             if len(node_list) == 0:
                 node_list = vhosts
+                
+                for host in downhosts:
+                    sys.stderr.write("warning: '%s' is down, its logs will "
+                                     "not be retrieved\n" % (host[1],))
+                    pass
                 pass
 
             known_nodes = sets.Set(node_list) & (phosts | vhosts)
@@ -1071,8 +1165,11 @@ def do_sync(args, mode="sync", must_be_active=1):
 
             jobs = {}
             hoststatus = {}
+            hoststart = {}
             for phost, vhost in hosts:
                 if (vhost in node_list) or (phost in node_list):
+                    print_status(node_list, jobs, hoststatus, hoststart)
+                    
                     osid = physical[vhost]["osid"]
                     if osid not in OSIDS:
                         oi = osinfo_method(PACKAGE_VERSION, {
@@ -1100,32 +1197,27 @@ def do_sync(args, mode="sync", must_be_active=1):
                             continue
                         pass
 
-                    sd = ssh_method(PACKAGE_VERSION, { "node" : phost })
-                    if sd["code"] != RESPONSE_SUCCESS:
-                        sys.stderr.write("error: xmlrpc failed - %s\n" %
-                                         (sd["output"],))
-                        retval = 1
-                        return retval
-                    sd = sd["value"]
                     if mode == "sync":
                         pid = rsync(phost, os.path.join(logdir, vhost),
                                     dlhandle.name,
-                                    port = sd.get("port", None))
+                                    port = ssh_data[phost].get("port", None),
+                                    output = True)
                         pass
                     elif mode == "clean":
-                        pid = rmstar(phost, sd.get("port", None),
+                        pid = rmstar(phost, ssh_data[phost].get("port", None),
                                      "/local/logs/*")
                         pass
                     else:
                         assert 0
                     
                     jobs[pid] = vhost
+                    hoststart[vhost] = time.time()
 
                     try:
                         while len(jobs) == PARALLELIZATION:
                             pid, sts = os.waitpid(0, 0)
                             if pid in jobs:
-                                hoststatus[jobs[pid]] = sts
+                                hoststatus[jobs[pid]] = (time.time(), sts)
                                 del jobs[pid]
                                 pass
                             pass
@@ -1136,25 +1228,48 @@ def do_sync(args, mode="sync", must_be_active=1):
                 pass
 
             try:
-                for job in jobs:
-                    pid, sts = os.waitpid(job, 0)
-                    hoststatus[jobs[pid]] = sts
+                while len(jobs) > 0:
+                    pid, sts = os.waitpid(0, 0)
+                    if pid in jobs:
+                        hoststatus[jobs[pid]] = (time.time(), sts)
+                        del jobs[pid]
+                        
+                        print_status(node_list, jobs, hoststatus, hoststart)
+                        pass
                     pass
                 pass
             except OSError:
                 pass
 
+            sys.stdout.write("\n")
+
             if len(unknown_nodes) > 0:
                 for vhost in unknown_nodes:
-                    sys.stderr.write("error: unknown node - %s\n" % vhost)
+                    if vhost in dvhosts or vhost in dphosts:
+                        sys.stderr.write("error: node '%s' is down\n" %
+                                         (vhost,))
+                        pass
+                    else:
+                        sys.stderr.write("error: unknown node - %s\n" %
+                                         (vhost,))
+                        pass
                     pass
                 retval = 2
                 pass
 
-            for vhost, sts in hoststatus.items():
+            for vhost, (etime, sts) in hoststatus.items():
+                if VERBOSITY > VERBOSITY_HUMAN:
+                    print "info: %s - %.2f" % (vhost, etime - hoststart[vhost])
+                    pass
                 if sts not in ACCEPTABLE_RSYNC_STATUS:
                     sys.stderr.write("error: failed to %s node '%s'\n" %
                                      (mode, vhost))
+                    eout = open(os.path.join(logdir, vhost, ".rsync.out"),
+                                "r").read()
+                    sys.stderr.write(
+                        vhost + ": " + re.sub(r'\n',
+                                              "\n" + vhost + ": ",
+                                              eout[:-1]))
                     retval = 3
                     pass
                 pass
@@ -1806,13 +1921,18 @@ except getopt.error, e:
     sys.exit(2)
     pass
 
-for PID, EID in exp_list:
-    if DEBUG:
-        sys.stderr.write("loghole: pid/eid - " + PID + "/" + EID + "\n")
+try:
+    for PID, EID in exp_list:
+        if DEBUG:
+            sys.stderr.write("loghole: pid/eid - " + PID + "/" + EID + "\n")
+            pass
+        
+        rc = ACTIONS[action][0](req_args[1:])
+        if rc != 0:
+            sys.exit(rc)
+            pass
         pass
-    
-    rc = ACTIONS[action][0](req_args[1:])
-    if rc != 0:
-        sys.exit(rc)
-        pass
+    pass
+except KeyboardInterrupt:
+    sys.exit(1)
     pass

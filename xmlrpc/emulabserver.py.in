@@ -1030,7 +1030,7 @@ class experiment:
                 expdata = eid;
                 pass
             elif format == "full":
-                expdata = {
+                expdata = scrubdict({
                     "pid" : pid,
                     "gid" : gid,
                     "name" : eid,
@@ -1040,11 +1040,11 @@ class experiment:
                     "minimum_nodes" : minimum_nodes,
                     "maximum_nodes" : maximum_nodes,
                     "actual_nodes" : actual_nodes,
-                    }
+                    })
                 pass
 
             # ... append it to the group list.
-            result[pid][gid].append(scrubdict(expdata))
+            result[pid][gid].append(expdata)
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
@@ -1357,6 +1357,63 @@ class experiment:
         
         return EmulabResponse(RESPONSE_SUCCESS, output=output)
 
+    #
+    # Get textual info from tbreport and send back as string
+    #
+    def history(self, version, argdict):
+        if version != self.VERSION:
+            return EmulabResponse(RESPONSE_BADVERSION,
+                                  output="Client version mismatch!")
+        
+        if self.readonly:
+            return EmulabResponse(RESPONSE_FORBIDDEN,
+                              output="Insufficient privledge to invoke method")
+        
+        try:
+            checknologins()
+            pass
+        except NoLoginsError, e:
+            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
+
+        argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror):
+            return argerror
+
+        #
+        # Check permission. This will check proj/exp for illegal chars.
+        #
+        permerror = CheckExptPermission(self.uid,
+                                        argdict["proj"], argdict["exp"])
+        if (permerror):
+            return permerror
+
+        res = {}
+        dbres = DBQuery(
+            "SELECT * FROM experiment_stats "
+            "WHERE pid=%s and eid=%s ORDER by exptidx desc",
+            (argdict["proj"], argdict["exp"]),
+            asDict=True)
+
+        if len(dbres) == 0:
+            return EmulabResponse(RESPONSE_ERROR,
+                                  output="No such experiment!")
+        
+        res["stats"] = scrubdict(dbres[0])
+        dbres = DBQuery(
+            "SELECT er.*,ts.start_time,ts.end_time,ts.action,ts.idx as tidx "
+            "FROM experiments as e "
+            "LEFT JOIN experiment_resources as er on e.idx=er.exptidx "
+            "LEFT JOIN testbed_stats as ts on ts.rsrcidx=er.idx "
+            "WHERE e.pid=%s and e.eid=%s",
+            (argdict["proj"], argdict["exp"]),
+            asDict=True)
+        for er in dbres:
+            er["thumbnail"] = xmlrpclib.Binary(er["thumbnail"])
+            pass
+        res["resources"] = [scrubdict(x) for x in dbres]
+
+        return EmulabResponse(RESPONSE_SUCCESS, value=res)
+        
     #
     # Get textual info from tbreport and send back as string
     #
@@ -3207,9 +3264,10 @@ class node:
             return EmulabResponse(RESPONSE_BADVERSION,
                                   output="Client version mismatch!")
 
-        argerror = CheckRequiredArgs(argdict, ("node",))
-        if (argerror):
-            return argerror
+        argerror1 = CheckRequiredArgs(argdict, ("node",))
+        argerror2 = CheckRequiredArgs(argdict, ("proj", "exp"))
+        if (argerror1 and argerror2):
+            return argerror1
 
         try:
             checknologins()
@@ -3217,24 +3275,55 @@ class node:
         except NoLoginsError, e:
             return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
-        if not re.match("^[-\w]*$", str(argdict["node"])):
+        if (argdict.has_key("node") and
+            not re.match("^[-\w]*$", str(argdict["node"]))):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed node value!")
+        elif argdict.has_key("node"):
+            # XXX Refactor the trust stuff
+            res = DBQueryFatal("SELECT e.pid,e.gid,e.eid FROM reserved AS r "
+                               "left join experiments as e on "
+                               "     e.pid=r.pid and e.eid=r.eid "
+                               "WHERE r.node_id=%s",
+                               (argdict["node"],))
+            
+            if len(res) == 0:
+                return EmulabResponse(RESPONSE_ERROR,
+                                      output="No such node: " +
+                                      argdict["node"])
+            pid = res[0][0]
+            gid = res[0][1]
+            eid = res[0][2]
+            clause = "n.node_id=%s"
+            clause_args = (argdict["node"],)
+            pass
         
-        # XXX Refactor the trust stuff
-        res = DBQueryFatal("SELECT e.pid,e.gid FROM reserved AS r "
-                           "left join experiments as e on "
-                           "     e.pid=r.pid and e.eid=r.eid "
-                           "WHERE r.node_id=%s",
-                           (argdict["node"],))
-
-        if len(res) == 0:
-            return EmulabResponse(RESPONSE_ERROR,
-                                  output="No such node: " + argdict["node"])
+        if (argdict.has_key("proj") and
+            not (re.match("^[-\w]*$", argdict["proj"]) and
+                 re.match("^[-\w]*$", argdict["exp"]))):
+            return EmulabResponse(RESPONSE_BADARGS,
+                                  output="Improperly formed proj/exp!")
+        elif argdict.has_key("proj"):
+            pid = argdict["proj"]
+            eid = argdict["exp"]
+            res = DBQueryFatal("SELECT gid,state FROM experiments "
+                               "WHERE pid=%s and eid=%s",
+                               (pid, eid))
+            if len(res) == 0:
+                return EmulabResponse(RESPONSE_ERROR,
+                                      output="No such experiment: %s/%s" %
+                                      (pid, eid))
+            if res[0][1] not in ("activating", "active", "modify_reparse"):
+                return EmulabResponse(RESPONSE_ERROR,
+                                      output="Experiment is not active")
+            gid = res[0][0]
+            clause = "r.pid=%s and r.eid=%s"
+            clause_args = (pid, eid)
+            pass
 
         trust = DBQueryFatal("SELECT trust FROM group_membership "
                              "WHERE uid=%s and pid=%s and gid=%s",
-                             (self.uid, res[0][0], res[0][1]))
+                             (self.uid, pid, gid))
 
         if len(trust) == 0:
             return EmulabResponse(
@@ -3242,41 +3331,50 @@ class node:
                 output=("You do not have permission to access: "
                         + argdict["node"]))
 
-        res = DBQueryFatal("select n.jailflag,n.sshdport, "
+        res = DBQueryFatal("select n.node_id,n.jailflag,n.sshdport, "
                            "       r.vname,r.pid,r.eid, "
                            "       t.isvirtnode,t.isremotenode,t.isplabdslice "
                            " from nodes as n "
                            "left join reserved as r on n.node_id=r.node_id "
                            "left join node_types as t on t.type=n.type "
-                           "where n.node_id=%s",
-                           (argdict["node"],))
+                           "where " + clause,
+                           clause_args)
 
         if len(res) == 0:
             return EmulabResponse(RESPONSE_ERROR,
                                   output="No such node: " + argdict["node"])
 
-        jailflag = res[0][0]
-        sshdport = res[0][1]
-        vname = res[0][2]
-        pid = res[0][3]
-        eid = res[0][4]
-        isvirt = res[0][5]
-        isremote = res[0][6]
-        isplab = res[0][7]
-        
-        result = {
-            "hostname" : vname + "." + eid + "." + pid + "." + OURDOMAIN,
-            }
-
-        if isvirt:
-            if isremote:
-                if jailflag or isplab:
-                    result["port"] = sshdport
+        result = {}
+        for node in res:
+            node_id = node[0]
+            jailflag = node[1]
+            sshdport = node[2]
+            vname = node[3]
+            pid = node[4]
+            eid = node[5]
+            isvirt = node[6]
+            isremote = node[7]
+            isplab = node[8]
+            
+            node_data = {
+                "hostname" : vname + "." + eid + "." + pid + "." + OURDOMAIN,
+                }
+            
+            if isvirt:
+                if isremote:
+                    if jailflag or isplab:
+                        node_data["port"] = sshdport
+                        pass
+                    pass
+                else:
+                    node_data["gateway"] = USERNODE
                     pass
                 pass
-            else:
-                result["gateway"] = USERNODE
-                pass
+            result[node_id] = node_data
+            pass
+
+        if argdict.has_key("node"):
+            result = result[argdict["node"]]
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS,
