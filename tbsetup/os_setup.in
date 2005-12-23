@@ -172,6 +172,7 @@ TBDebugTimeStamp("os_setup started");
 #
 my $firewall;
 my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
+my $firewallimageid;
 
 #
 # Ditto ElabinElab.
@@ -497,9 +498,73 @@ foreach my $vnode (keys(%vnodes)) {
 }
 
 #
+# Setup the firewall first.  Once it is up we can continue with the
+# remaining nodes.
+#
+# There is very little point in setting up the other nodes at the same time
+# as they will not be able to PXE boot until the firewall is up.  We could
+# fire them off a little early in hopes of overlapping any BIOS boot time
+# with the last stages of the firewall setup, but it probably isn't worth
+# the complexity (and would not work with nodes for which "reboot" means
+# "fall out of PXEWAIT and boot".
+#
+# Note that we formerly did just do them all at once and let the nodes
+# continually PXE-timeout and reboot until the firewall came up.  But that
+# can actually take longer than what we do now, if a node happened to
+# timeout and reboot just as the firewall came up (i.e., we would have to
+# wait an extra BIOS-reboot cycle, which can be 90 seconds or more.
+#
+if ($firewalled) {
+    my $node = $firewall;
+
+    TBDebugTimeStamp("rebooting/reloading firewall");
+    if (!FirewallSetup($node)) {
+	tbwarn "Firewall node $node failed to boot.".
+	    "This has been reported to testbed-ops.";
+
+	# XXX do we need to set NODEBOOTSTATUS_FAILED here?
+
+	#
+	# We assume that firewall node images are "standard" here,
+	# and whine to tbops.
+	#
+	MarkNodeDown($node);
+	TBSetNodeLogEntry($node, $dbuid, TB_DEFAULT_NODELOGTYPE(),
+			  "'Moved to hwdown by os_setup; ".
+			  "failed to boot image for osid " . $osids{$node} .
+			  " in $pid/$eid'");
+	SENDMAIL($TBOPS, "1 node is down",
+		 "Node:\n".
+		 "  $node\n".
+		 "in pid/eid $pid/$eid appears to be dead.\n\n".
+		 "The node has been taken out of the pool until this matter ".
+		 "is resolved.\n");
+
+	$failed++;
+	goto tballdone;
+    }
+
+    #
+    # Check for cancelation.  Firewall setup may have taken awhile.
+    #
+    if (!$canceled) {
+	TBGetCancelFlag($pid, $eid, \$canceled);
+	if ($canceled) {
+	    tbnotice "Swap canceled; will terminate os_setup early!";
+	    goto tballdone;
+	}
+    }
+
+    #
+    # remove it from the nodelist
+    #
+    delete $nodes{$node};
+}
+
+#
 # We need to issue the reboots and the reloads in parallel.
 #
-TBDebugTimeStamp("rebooting/reloading started");
+TBDebugTimeStamp("rebooting/reloading nodes started");
 if (!$TESTMODE) {
     my @children = ();
 
@@ -643,21 +708,6 @@ TBDebugTimeStamp("rebooting/reloading finished");
 my @nodelist = keys(%nodes);
 
 #
-# Firewall stuff. If there is a firewall, we want to wait for that node
-# first, so reorder the list. 
-#
-if ($firewalled) {
-    my @tmp = ();
-
-    foreach my $node (@nodelist) {
-	push(@tmp, $node)
-	    if ($node ne $firewall);
-    }
-    unshift(@tmp, $firewall);
-    @nodelist = @tmp;
-}
-
-#
 # Now lets wait for them to come back alive. Set up a retry list though
 # so that we can give each node at least 1 second chance. Avoids pointless
 # experiment failures.
@@ -706,17 +756,6 @@ while ( @nodelist ) {
 	SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
 	TBSetNodeAllocState( $node, TBDB_ALLOCSTATE_RES_READY() );
 	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
-
-	#
-	# Firewall has booted. 
-	# 
-	if ($firewalled && $node eq $firewall) {
-	    if (!FirewallBoot()) {
-		tbwarn "Firewall Boot Setup failed!";
-		$failed++;
-		$noretry = 1;
-	    }
-	}
 	next;
     }
 
@@ -1048,6 +1087,8 @@ if ($count > 0) {
 	     "Cc: $TBOPS");
 }
 
+tballdone:
+
 tbinfo "OS Setup Done.";
 tberror "There were $failed failed nodes"
     if ($failed);
@@ -1107,10 +1148,12 @@ sub SetupReload($$$)
     my ($node, $osid, $type) = @_;
 
     if ((my $imageid = TBMapOSIDtoImageID($osid, $type))) {
-	if (! defined($reloads{$imageid})) {
+	# XXX firewall is treated special
+	if ($firewalled && ($node eq $firewall)) {
+	    $firewallimageid = $imageid;
+	} elsif (!defined($reloads{$imageid})) {
 	    $reloads{$imageid} = [ $node ];
-	}
-	else {
+	} else {
 	    push(@{ $reloads{$imageid} }, $node);
 	}
     }
@@ -1161,5 +1204,130 @@ sub FirewallBoot()
     return 0
 	if ($?);
     
+    return 1;
+}
+
+#
+# This is a scaled-down version of what the rest of os_setup does.
+# We don't have to do all the asychronous hoohaw here.
+#
+sub FirewallSetup($)
+{
+    my ($node) = @_;
+
+    #
+    # XXX this is probably not entirely right.
+    #
+    if ($TESTMODE) {
+	return 1;
+    }
+
+    #
+    # Reload the node if necessary
+    #
+    if (defined($firewallimageid)) {
+	delete $reboots{$node};
+	delete $reconfigs{$node};
+
+	TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_RELOAD());
+	$nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_RELOAD();
+
+	my @nodelist        = ($node);
+	my %reload_args     = ();
+	my $reload_failures = {};
+
+	$reload_args{'debug'}    = $dbg;
+	$reload_args{'waitmode'} = 1;
+	$reload_args{'imageid'}  = $firewallimageid;
+	$reload_args{'nodelist'} = [ @nodelist ];
+
+	if (osload(\%reload_args, $reload_failures) != 0) {
+	    return 0;
+	}
+
+	#
+	# Gak!  waitmode in osload only waits for the reload to complete
+	# in the frisbee MFS, the node still has to reboot after that.
+	#
+	TBDebugTimeStamp("firewall reload done, waiting for reboot");
+	my $wstart = time;
+	my $actual_state;
+	my $waittime = (60 * 7);
+	if (defined($bios_waittime{$node_types{$node}}) &&
+	    defined($reboot_waittime{$osids{$node}})) {
+	    $waittime = ($bios_waittime{$node_types{$node}} +
+			 $reboot_waittime{$osids{$node}}) * 2;
+	}
+	if (!TBNodeStateWait($node, $wstart, $waittime, \$actual_state,
+			     (TBDB_NODESTATE_TBFAILED, TBDB_NODESTATE_ISUP))) {
+	    if ($actual_state eq TBDB_NODESTATE_TBFAILED) {
+		tbwarn "Firewall $node reported a TBFAILED event";
+		return 0;
+	    }
+	    print "$node is alive and well\n";
+	    SetNodeBootStatus($node, NODEBOOTSTATUS_OKAY);
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_READY());
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_READY();
+	} else {
+	    tbwarn "Firewall $node reload timed-out";
+	    return 0;
+	}
+    }
+
+    #
+    # Reboot if necessary
+    #
+    elsif (defined($reboots{$node})) {
+	delete $reboots{$node};
+
+	if ($nodeAllocStates{$node} eq TBDB_ALLOCSTATE_RES_INIT_CLEAN()) {
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_CLEAN());
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_CLEAN();
+	} else {
+	    TBSetNodeAllocState($node, TBDB_ALLOCSTATE_RES_REBOOT_DIRTY());
+	    $nodeAllocStates{$node} = TBDB_ALLOCSTATE_RES_REBOOT_DIRTY();
+	}
+
+	my @nodelist        = ($node);
+	my %reboot_args     = ();
+	my $reboot_failures = {};
+
+	$reboot_args{'debug'}     = $dbg;
+	$reboot_args{'waitmode'}  = 1;
+	$reboot_args{'nodelist'}  = [ @nodelist ];
+
+	if (nodereboot(\%reboot_args, $reboot_failures) != 0) {
+	    return 0;
+	}
+    }
+
+    #
+    # Reconfigure if necessary
+    #
+    elsif (defined($reconfigs{$node})) {
+	delete $reconfigs{$node};
+
+	my @nodelist        = ($node);
+	my %reboot_args     = ();
+	my $reboot_failures = {};
+
+	$reboot_args{'debug'}     = $dbg;
+	$reboot_args{'waitmode'}  = 1;
+	$reboot_args{'reconfig'}  = 1;
+	$reboot_args{'nodelist'}  = [ @nodelist ];
+
+	if (nodereboot(\%reboot_args, $reboot_failures) != 0) {
+	    return 0;
+	}
+    }
+
+    #
+    # Firewall has booted, perform any final actions.
+    # 
+    if (!FirewallBoot()) {
+	tbwarn "Firewall Boot Setup failed!";
+	return 0;
+    }
+
     return 1;
 }
