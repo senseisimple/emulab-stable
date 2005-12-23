@@ -34,9 +34,19 @@ my $CLIENT_BIN  = "@CLIENT_BINDIR@";
 my $BOSSNODE    = "@BOSSNODE@";
 
 #
-# The number of nodes we reboot at a time. Degree of parallelism ...
+# The number of nodes we reboot at a time and the time to wait between batches. 
+# The batch size determines the degree of parallelism.
 #
 my $BATCHCOUNT  = 12;
+my $BATCHSLEEP	= 5;
+
+#
+# Default reboot waittime.
+# If the user doesn't specify, we use this historic value.
+#
+# XXX should come from DB.
+#
+my $MAXWAITTIME	= (6 * 60);
 
 #
 # Testbed Support libraries
@@ -105,6 +115,7 @@ sub nodereboot($$)
     my $powercycle  = 0;
     my $rebootmode  = 0;
     my $waitmode    = 0;
+    my $waittime    = $MAXWAITTIME;
     my $realmode    = 1;
     my $killmode    = 0;
     my $freemode    = 0;
@@ -115,6 +126,7 @@ sub nodereboot($$)
     $powercycle  = $args->{'powercycle'} if (exists($args->{'powercycle'}));
     $rebootmode  = $args->{'rebootmode'} if (exists($args->{'rebootmode'}));
     $waitmode    = $args->{'waitmode'}   if (exists($args->{'waitmode'}));
+    $waittime    = $args->{'waittime'}   if (exists($args->{'waittime'}));
     $realmode    = $args->{'realmode'}   if (exists($args->{'realmode'}));
     $killmode    = $args->{'killmode'}   if (exists($args->{'killmode'}));
     $freemode    = $args->{'freemode'}   if (exists($args->{'freemode'}));
@@ -281,31 +293,22 @@ sub nodereboot($$)
     }
 
     #
-    # We do not want 50 nodes all rebooting at the same time.  Lets order
-    # them so that the shelves are grouped together at least, and issue the
-    # reboots in batches.
+    # We do not want lots of nodes all rebooting at the same time, it puts
+    # a strain on UDP-based PXE/DHCP/TFTP protocols.  So we group them in
+    # batches and wait a short time between batches.
+    #
+    # Currently batches are organized by increasing node order.  In the
+    # future we may want to batch based on power controllers; e.g. either
+    # reboot all nodes on a power controller at once or AVOID rebooting
+    # all nodes on a power controller at once (if controller cannot handle
+    # max surge of all attached nodes).
     #
     while (@sortednodes) {
 	my @batch     = ();
 	my $i         = 0;
-	my $lastshelf = 0;
 
 	while ($i < $BATCHCOUNT && @sortednodes > 0) {
 	    my $node = shift(@sortednodes);
-	    my $shelf;
-	    my $unit;
-
-	    #
-	    # The point of this sillyness is stop at each shark shelf transition.
-	    # Whats a shark you ask?
-	    #
-	    if (IsShelved($node, \$shelf, \$unit)) {
-		if ($lastshelf && $lastshelf ne $shelf) {
-		    unshift(@sortednodes, $node);
-		    last;
-		}
-		$lastshelf = $shelf;
-	    }
 	    push(@batch, $node);
 	    $i++;
 	}
@@ -344,13 +347,7 @@ sub nodereboot($$)
 	if (@sortednodes) {
 	    print "reboot: Pausing to give some nodes time to reboot\n"
 		if ($debug);
-	    
-	    if ($lastshelf) {
-		sleep(10);
-	    }
-	    else {
-		sleep(5);
-	    }
+	    sleep($BATCHSLEEP);
 	}
     }
 
@@ -440,7 +437,7 @@ sub nodereboot($$)
 	    next
 		if ($result->{node});
 	    
-	    if (!TBNodeStateWait($node, $waitstart, (60*6), \$actual_state,
+	    if (!TBNodeStateWait($node, $waitstart, $waittime, \$actual_state,
 				 (TBDB_NODESTATE_TBFAILED,
 				  TBDB_NODESTATE_ISUP))) {
 		if ($actual_state eq TBDB_NODESTATE_ISUP) {
