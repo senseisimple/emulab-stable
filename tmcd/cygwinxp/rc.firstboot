@@ -37,6 +37,15 @@ chmod -f g-w /etc/emulab
 # by the cached info from tmcd.  Clean up like bootsetup()/tmccclrconfig().
 rm -rf /var/emulab/boot/tmcc
 
+# Make sure all NIC's are up at the start, so they show up on ipconfig.
+devcon enable =net 'PCI*'
+
+# Make sure DHCP is enabled on all connected interfaces.  Otherwise tmcc will fail.
+ipconfig /all | tr -d '\r' | awk \
+    '/^Ethernet adapter/{ ifc = gensub("Ethernet adapter (.*):", "\\1", 1); next }\
+     /Dhcp Enabled.*No/{ stat = system("netsh interface ip set address \"$ifc\" dhcp");\
+         printf("Enabled DHCP on %s, status %d.\n", ifc, stat) }'
+
 # Get the desired node name from tmcc, and make sure we have a connection.
 # There is a swap-in race condition where tmcc nodeid at first returns nothing.
 nodeid=
@@ -81,6 +90,14 @@ else
 fi
 logit "IPEnableRouter set to `regtool get $tp/IPEnableRouter`."
 
+# I'd rather not have it put MSN and Windows Media Player icons on my desktop...
+logit "Clearing the MSN and WMP Desktop shortcuts."
+rm -f /cygdrive/c/"Documents and Settings/All Users/Desktop/MSN Explorer.lnk"
+rm -f /cygdrive/c/"Documents and Settings/Default User/Desktop"/*.lnk
+regtool -s set /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/CleanWMP \
+  'DEL "%USERPROFILE%\Desktop\Windows Media Player.lnk"'
+
+# Reset the host name if it hasn't been done yet.  Requires a reboot.
 hostname=`/bin/hostname`
 host="Host name '$hostname'"
 if [ $nodeid = $hostname ]; then
@@ -88,7 +105,7 @@ if [ $nodeid = $hostname ]; then
 else
     logit "$host differs from nodeid '$nodeid'."
     # A reboot will be required.
-    tmcd state SHUTDOWN
+    tmcc state SHUTDOWN
 
     logit "Remove a redirect switch to make sure we come back with a serial console."
     bootcfg /ems OFF /id 1

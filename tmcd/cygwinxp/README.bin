@@ -167,7 +167,11 @@ Intel PRO/1000 gigabit ether drivers, installed on the pc3000's.
 Intel9.1/PRO1000/WS03XP2K -> xpsp2_support_tools_deploy/pro1000
 
 LSI Logic Ultra320 SCSI 2000 drivers, installed on the pc3000's.
-symmpi_xp_1.20.18.zip
-symmpi_xp_1.20.18 -> xpsp2_support_tools_deploy/symmpi_xp_1.20.18
+symmpi_xp_1.20.18.zip - Unsigned, but newer driver.
+LSI21320_50700IO_01016100IO_1090200_676995.zip and
+	 symmpi_xp_10902.zip - Older, but signed, driver.
+Need to use the unsigned driver with Sysprep/Mini-Setup for 
+	hardware-independent images.
+symmpi_xp_10902 -> xpsp2_support_tools_deploy/symmpi
 
 ================================================================

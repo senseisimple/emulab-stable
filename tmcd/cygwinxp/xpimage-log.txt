@@ -265,6 +265,6 @@ Log of XP images produced (most recent first.)
       - Need to install pro2kxp.exe drivers.
       - Install Cygwin rpm package.
 
-    . WINXP-10-24 - Windows XP SP1, host rename at boot, user dir mounts.
+    . WINXP-10-24 - Windows XP SP1, host rename at boot, /users NFS mounts.
       prtn 1, whole disk, OS other, 5.1.2, node pc174, ping/ssh, MINIMAL, pc2000.
       Leave shared and global bits off until production images are being done.

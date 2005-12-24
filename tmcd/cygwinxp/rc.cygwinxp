@@ -49,7 +49,7 @@ logit "nodeid = $nodeid"
 # status on the interfaces than 'netsh interface show interface'.  This might help.
 netsh interface reset all
 
-# Windows DHCP doesn't make a /etc/resolv.h, which tmcc needs for bossinfo.
+# Windows DHCP doesn't make an /etc/resolv.conf, which tmcc needs for bossinfo.
 # Make one from ipconfig output.
 ipconfig /all | tr -d '\r' | awk \
     '/^ *Connection-specific DNS Suffix.*: ./{print "search", $NF} \
@@ -63,8 +63,6 @@ tp=$svcs/Tcpip/Parameters
 regtool set -s $tp/Domain $domain
 logit "domain = $domain"
 
-# Make sure all NIC's are up at the start, so they show up on ifconfig.
-devcon enable =net 'PCI*'
 # Cache getmac output while all interfaces are still enabled.  Used by rc.ifconfig .
 bootdir=/var/emulab/boot
 getmac /nh /v /fo csv > $bootdir/getmac-cache
