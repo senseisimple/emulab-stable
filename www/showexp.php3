@@ -240,6 +240,11 @@ if ($wireless) {
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
+if (STUDLY()) {
+    WRITESUBMENUBUTTON("Duplicate Experiment",
+		       "beginexp_html.php3?copyid=${exp_pid},${exp_eid}");
+}
+
 if ($EXPOSEARCHIVE) {
     WRITESUBMENUBUTTON("Experiment File Archive",
 		       "cvsweb/cvswebwrap.php3?exptidx=$expindex");

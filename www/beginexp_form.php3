@@ -10,29 +10,94 @@
 # 
 function INITFORM($formfields, $projlist)
 {
-    global $nsref, $guid;
+    global $nsref, $guid, $copyid;
     
     $defaults = array();
 
     #
-    # This stuff is here for netbuild. The initial post from netbuild will
-    # include these; they point to the nsfile. The right approach for doing
-    # this is to have another page for netbuild that does some magic and
-    # redirects the browser to this page. 
+    # This is for experiment copying ...
     #
-    if (isset($nsref)) {
-	if (strcmp($nsref, "") == 0 || !ereg("^[0-9]+$", $nsref))
-	    unset($nsref);
-	else
-	    $defaults[nsref] = $nsref;
-    }
-    if (isset($guid)) {
-	if (strcmp($guid, "") == 0 || !ereg("^[0-9]+$", $guid))
-	    unset($guid);
-	else
-	    $defaults[guid] = $guid;
-    }
+    if (isset($copyid) && $copyid != "") {
+	unset($copypid);
+	unset($copyeid);
+	
+	#
+	# See what kind of copy.
+	#
+	if (preg_match("/^(\d+)((?::[-\w]*)?)$/", $copyid, $matches)) {
+	    $exptidx = $matches[1];
+	    
+	    if (TBvalid_integer($exptidx)) {
+		#
+		# See if its a current experiment.
+		#
+		$query_result =
+		    DBQueryFatal("select pid,eid from experiments ".
+				 "where idx='$exptidx'");
+		
+		if (mysql_num_rows($query_result)) {
+		    $row = mysql_fetch_row($query_result);
 
+		    $copypid = $row[0];
+		    $copyeid = $row[1];
+		}
+	    }
+	}
+	elseif (preg_match("/^([-\w]+),([-\w]+)((?::[-\w]*)?)$/",
+		       $copyid, $matches)) {
+	    $copypid = $matches[1];
+	    $copyeid = $matches[2];
+	}
+
+	#
+	# Current experiment; we can get some additional stuff.
+	#
+	if (isset($copypid) && isset($copyeid)) {
+	    if (TBvalid_pid($copypid) && TBvalid_eid($copyeid)) {
+		$query_result =
+		    DBQueryFatal("select expt_name from experiments ".
+				 "where eid='$copyeid' and pid='$copypid'");
+
+		if (mysql_num_rows($query_result)) {
+		    $row = mysql_fetch_row($query_result);
+		    
+		    $defaults["exp_description"] = $row[0];
+		}
+	    }
+	    
+	    # See if already a copy.
+	    if (preg_match("/^([-\w]*)-Copy(\d*)$/", $copyeid, $matches2)) {
+		$copyeid   = $matches2[1];
+		$copycount = "Copy" . (((int) $matches2[2]) + 1);
+	    }
+	    else
+		$copycount = "Copy0";
+
+	    $defaults["exp_pid"] = $copypid;
+	    $defaults["exp_id"]  = "${copyeid}-${copycount}";
+	}
+	$defaults["copyid"] = $copyid;
+    }
+    else {
+	unset($copyid);
+
+        #
+        # This stuff is here for netbuild. The initial post from netbuild will
+        # include these; they point to the nsfile. The right approach for doing
+        # this is to have another page for netbuild that does some magic and
+        # redirects the browser to this page. 
+        #
+	if (isset($nsref) && $nsref != "" && ereg("^[0-9]+$", $nsref))
+	    $defaults[nsref] = $nsref;
+	else
+	    unset($nsref);
+	
+	if (isset($guid) && $guid != "" &&  ereg("^[0-9]+$", $guid))
+	    $defaults[guid] = $guid;
+	else
+	    unset($guid);
+    }
+    
     #
     # For users that are in one project and one subgroup, it is usually
     # the case that they should use the subgroup, and since they also tend
@@ -193,6 +258,7 @@ function SPITFORM($formfields, $errors)
 	echo "</table><br>\n";
     }
     else {
+       if (! isset($formfields['copyid'])) {
 	if (!isset($formfields[nsref]) && !isset($view['quiet'])) {
 	  if (STUDLY()) {
             echo "<p><ul>
@@ -229,6 +295,7 @@ function SPITFORM($formfields, $errors)
 		     "please fill out the following information:</p>";
 	    }
         }
+       }
     }
 
     echo "<form name=form1 enctype=multipart/form-data
@@ -355,7 +422,16 @@ function SPITFORM($formfields, $errors)
     #
     # NS file
     #
-    if (isset($formfields[nsref])) {
+    if (isset($formfields['copyid'])) {
+	$copyid = $formfields['copyid'];
+
+	echo "<tr>
+               <td class='pad4'>Copy of experiment: &nbsp</td>
+               <td class='pad4'>$copyid</td>
+                <input type=hidden name=\"formfields[copyid]\" value='$copyid'>
+              </tr>\n";
+    }
+    elseif (isset($formfields[nsref])) {
 	$nsref = $formfields[nsref];
 	
 	if (isset($formfields[guid])) {

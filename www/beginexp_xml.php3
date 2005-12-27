@@ -152,7 +152,14 @@ if (isset($formfields[guid])) {
 	$errors["NS File GUID"] = "Invalid characters";
     }
 }
-if (isset($formfields[nsref])) {
+if (isset($formfields['copyid'])) {
+    if ($formfields[copyid] == "" ||
+	!preg_match("/^[-\w,:]*$/", $formfields['copyid'])) {
+	$errors["Copy ID"] = "Invalid characters";
+    }
+    $nsfilelocale = "copyid";
+}
+elseif (isset($formfields[nsref])) {
     if ($formfields[nsref] == "" ||
 	!preg_match("/^\d+$/", $formfields[nsref])) {
 	$errors["NS File Reference"] = "Invalid characters";
@@ -297,8 +304,11 @@ if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
 #
 # Figure out the NS file to give to the script. Eventually we will allow
 # it to come inline as an XML argument.
-# 
-if ($nsfilelocale == "local") {
+#
+if ($nsfilelocale == "copyid") {
+    $thensfile = "-c " . $formfields['copyid'];
+}
+elseif ($nsfilelocale == "local") {
     #
     # No way to tell from here if this file actually exists, since
     # the web server runs as user nobody. The startexp script checks
