@@ -49,32 +49,40 @@ without sacrificing the features that make Emulab so easy to use.
 </p>
 <a NAME="Use"></a><h2>Use</h2>
 <p>
-In your ns file you can specify a <emph>security level</emph> at which an
+In your NS file you can specify a <emph>security level</emph> at which an
 experiment should be run.  Security levels are specified as colors
 (oh, now that is real original!)
-with the <code>tb-set-security-level</code> command.  Eventually, the
-colors will provide different styles of firewalls, potentially in combination
-with a per-experiment Emulab environment, to provide increasing levels of
-security.
-However, currently the colors are only an implicit way of allocating a
-firewall of a particular type.  Since the firewall is implicitly specified,
-there is no way to add additional rules.  The current color mappings are:
+with the <code>tb-set-security-level</code> command.  Colors are a way to
+conveniently configure a firewall with a known, fixed ruleset.  If you use
+<code>tb-set-security-level</code> then you cannot modify the implied
+firewall (e.g., by using "add-rule"), nor can you allocate your own firewall.
+The exact configuration of the firewalls implied by the security level, is
+still a work-in-progress, but the current meanings are:
 <ul>
 <li>Green.
 The default for all experiments.  No firewall is allocated.
 Hence all nodes are still on the shared control network.
 <li>Blue.
-An <a href="docwrapper.php3?docname=firewall.html#Styles">open style</a>
-firewall is allocated.  This is largely worthless since you cannot add
-any rules to the firewall.  However, you can use it to gauge the performance
-impact of placing a firewall node between your experiment and the outside
-world.
-<li>Yellow.
 A <a href="docwrapper.php3?docname=firewall.html#Styles">basic style</a>
-firewall is allocated.  
+firewall is allocated.  This configuration is intended for preventing
+bad stuff from getting in, not to prevent it from getting out.  The only
+practical implication right now is that, at swapout time, nodes in a Blue
+experiment do not undergo
+<a href="docwrapper.php3?docname=firewall.html#Swapout">
+the rigorous decontamination process</a>
+that all higher security levels (and explicit firewalls) require.
+This security
+level is appropriate for running a Windows node in while you customize it,
+without needing to worry about it becoming infected.
+<li>Yellow.
+Currently allocates a
+<a href="docwrapper.php3?docname=firewall.html#Styles">basic style</a>
+firewall.
+All nodes going through the swapout decontamination process.
 <li>Orange.
 A <a href="docwrapper.php3?docname=firewall.html#Styles">closed style</a>
-firewall is allocated.  
+firewall is allocated.
+All nodes going through the swapout decontamination process.
 <li>Red.
 Not currently implemented.  This will eventually be an experiment for which
 the control network has been completely disabled.  The only outside access

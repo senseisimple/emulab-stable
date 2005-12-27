@@ -26,7 +26,7 @@ This is <b>not</b> a firewall
 between nodes within an experiment, that is, the firewall is not part of
 your NS-specified network topology.
 The purpose of an Emulab firewall is to prevent experimental traffic from
-escaping, via the control network, to the internet due to a mis-configured
+escaping, via the control network, to the Internet due to a mis-configured
 application or router within an experiment.  Control net firewalls are also
 a key component of Emulab ``high-security'' experiment environments.
 </p><p>
@@ -38,12 +38,38 @@ infrastructure or Internet hosts in general) must pass through the firewall
 node.  The firewall is setup as a filtering layer2 bridge using IPFW2
 on FreeBSD and can be configured in a number
 of ways to block or allow certain types of traffic.
-</p><p>
+</p>
+<p>
+<a NAME="Swapin"></a><h3>Swapin actions</h3>
 When a firewalled experiment is swapped in, the firewall is setup and
-activated before any experiment nodes are allowed to setup.
+activated before any experiment nodes are allowed to setup.  Currently
+this adds approximately five more minutes to swapin time, as the firewall
+node must first be loaded with the FBSD-IPFW2 image.
+</p>
+<a NAME="Swapout"></a><h3>Swapout actions</h3>
+<p>
 When a firewalled experiment is swapped out, extra precautions are taken
 to ensure that the nodes are decontaminated before the firewall is taken
-down.
+down.  The nodes, including the firewall itself, are scheduled to boot into
+a network-loaded, memory-based version of FreeBSD (the "MFS") which will run
+a script to zero all the known bootblocks on the disk.  This prevents a node
+from accidentally booting from its disk prior to being reloaded.
+</p><p>
+The "boot to MFS" process is done not by issuing a reboot command or even by
+doing a power cycle, but rather by simultaneously powering off all nodes
+and then later powering them back on.  Reboot is not used since the reboot
+command could be spoofed on a contaminated node.  Power cycling is not used
+since cycling is normally performed in batches to avoid network (or power)
+overload on restart.  Skewed reboots like this open a window of vulnerability
+where nodes rebooted later might be able, before they are rebooted, to spoof
+the reload server for nodes that have just rebooted.
+So we first turn everyone off so that later batched power-ons are safe.
+</p><p>
+Only when all nodes are known to be running in the MFS and their disks
+neutered, will the nodes be released to the reloading experiment.
+Any failure in the above process results in all nodes for the experiment
+being left powered off, with the control net disabled, and marked as "paniced"
+so that only a testbed admin can swap it out.
 </p>
 <a NAME="Use"></a><h2>Use</h2>
 <p>
