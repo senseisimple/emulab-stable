@@ -163,7 +163,7 @@ if ($cmd eq "get" || $cmd eq "transfer") {
     $cmdline .= " $pid $eid";
 }
 elsif ($cmd eq "gc") {
-    $cmdline = "$SSH xargs -n 100 $PROG $cmd -e $pid/$eid";
+    $cmdline .= " $pid $eid";
 }
 
 local (*NT_READER, *NT_WRITER);
