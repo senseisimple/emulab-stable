@@ -25,6 +25,7 @@
 #include "imagehash.h"
 
 //#define FOLLOW
+#define HASH_FREE
 
 /*
  * globals for fetching the HASHSTATS related information
@@ -52,8 +53,6 @@ struct timeval time_orig_read, time_curr_read, time_hash,
 	time_hash_and_cmp;
 #endif
 extern void	freeranges(struct range *);
-
-#define HASH_FREE
 
 /*
  * hash_free determines what we do when we have overlapping free blocks

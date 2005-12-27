@@ -99,6 +99,7 @@ int	mergeranges(struct range *head);
 void    makeranges(void);
 void	freeranges(struct range *);
 void	dumpranges(int verbose);
+void	dumpfixups(int verbose);
 void	addvalid(uint32_t start, uint32_t size);
 void	addreloc(off_t offset, off_t size, int reloctype);
 static int cmpfixups(struct range *r1, struct range *r2);
@@ -250,7 +251,6 @@ devread(int fd, void *buf, size_t nbytes)
 		else
 			count = nbytes;
 		cc = slowread(fd, buf, count, startoffset);
-fprintf(stderr, "slowread(fd, buf, %d, %llu) -> %d\n", count, startoffset, cc);
 		if (cc != count) {
 			fprintf(stderr, "devread: read failed on sector %u, "
 				"returning zeros\n",
@@ -589,6 +589,8 @@ main(int argc, char *argv[])
 		dumpranges(debug > 1);
 
 	sortrange(fixups, 0, cmpfixups);
+	if (debug > 1)
+		dumpfixups(debug > 2);
 	fflush(stderr);
 
 #ifdef WITH_HASH
@@ -664,7 +666,7 @@ main(int argc, char *argv[])
 		ms = (stamp.tv_sec - sstamp.tv_sec) * 1000 +
 			(stamp.tv_usec - sstamp.tv_usec) / 1000;
 		fprintf(stderr,
-			"\nFinished in %u.%03u seconds\n",
+			"Finished in %u.%03u seconds\n",
 			ms / 1000, ms % 1000);
 	}
 	fflush(stderr);
@@ -1232,14 +1234,22 @@ struct fixup {
 	off_t poffset;	/* partition offset */
 	off_t size;
 	int reloctype;
-	char data[0];
+	void *data;	/* current value of data ptr */
+	void (*func)(void *, off_t, void *);
 };
+static int nfixups;
 
-void
-addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
+static void
+addfixupentry(off_t offset, off_t poffset, off_t size, void *data, off_t dsize,
+	      int reloctype, void (*func)(void *, off_t, void *))
 {
+	struct mydata {
+		struct fixup _fixup;
+		char _fdata[0];
+	} *buf;
 	struct range *entry;
 	struct fixup *fixup;
+	void *fdata;
 
 	if (oldstyle) {
 		static int warned;
@@ -1251,11 +1261,19 @@ addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
 		return;
 	}
 
+	/*
+	 * Malloc the range separate from the fixup data since
+	 * sortranges will swap contents of the former.
+	 */
 	if ((entry = malloc(sizeof(*entry))) == NULL ||
-	    (fixup = malloc(sizeof(*fixup) + (int)size)) == NULL) {
+	    (buf = malloc(sizeof(*buf) + (size_t)dsize)) == NULL) {
 		fprintf(stderr, "Out of memory!\n");
 		exit(1);
 	}
+	assert((void *)buf == (void *)&buf->_fixup);
+
+	fixup = &buf->_fixup;
+	fdata = dsize ? buf->_fdata : NULL;
 	
 	entry->start = bytestosec(offset);
 	entry->size  = bytestosec(size + secsize - 1);
@@ -1265,10 +1283,42 @@ addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
 	fixup->poffset   = poffset;
 	fixup->size      = size;
 	fixup->reloctype = reloctype;
-	memcpy(fixup->data, data, size);
+	fixup->data	 = fdata;
+	if (fdata)
+		memcpy(fixup->data, data, (size_t)dsize);
+	fixup->func	 = func;
 
 	entry->next  = fixups;
 	fixups       = entry;
+	nfixups++;
+}
+
+/*
+ * Create a fixup to apply to the disk data prior to compressing.
+ * The given fixup will be applied to the appropriate data and a relocation
+ * genearated if desired.  The region over which the fixup should be
+ * applied is given by 'offset' and 'size'.  That range is replaced by
+ * the data in 'data'.  If 'reloctype' is not 0, a relocation entry of
+ * the appropraite type is generated.  'poffset' is the partition
+ * offset which is used when generating relocations to ensure that
+ * they are partition-relative.
+ */
+void
+addfixup(off_t offset, off_t poffset, off_t size, void *data, int reloctype)
+{
+	addfixupentry(offset, poffset, size, data, size, reloctype, NULL);
+}
+
+/*
+ * Similar to the above but calls a function with the fixup entry and the
+ * range of data to apply the fixup to.  The data arg is passed to the
+ * function along with the data range.
+ */
+void
+addfixupfunc(void (*func)(void *, off_t, void *), off_t offset,
+	     off_t poffset, off_t size, void *data, int dsize, int reloctype)
+{
+	addfixupentry(offset, poffset, size, data, dsize, reloctype, func);
 }
 
 /*
@@ -1285,6 +1335,11 @@ cmpfixups(struct range *r1, struct range *r2)
 	return 0;
 }
 
+/*
+ * Look for fixups which overlap the range [offset - offset+size-1].
+ * If an overlap is found, we overwrite the data for that range with
+ * that given in the fixup or call the associated function.
+ */
 void
 applyfixups(off_t offset, off_t size, void *data)
 {
@@ -1292,36 +1347,134 @@ applyfixups(off_t offset, off_t size, void *data)
 	struct fixup *fp;
 	uint32_t coff, clen;
 
+#ifdef FOLLOW
+	fprintf(stderr, "D: [%u-%u], %d fixups\n",
+		bytestosec(offset), bytestosec(offset+size)-1, nfixups);
+#endif
 	prev = &fixups;
 	while ((entry = *prev) != NULL) {
+		assert(entry->data != NULL);
 		fp = entry->data;
+#ifdef FOLLOW
+		fprintf(stderr, "  F%p: [%u/%u-%u/%u]: ",
+			fp,
+			bytestosec(fp->offset),
+			(uint32_t)fp->offset % SECSIZE,
+			bytestosec(fp->offset+fp->size),
+			(uint32_t)(fp->offset+fp->size) % SECSIZE);
+#endif
 
-		if (offset < fp->offset+fp->size && offset+size > fp->offset) {
-			/* XXX lazy: fixup must be totally contained */
-			assert(offset <= fp->offset);
-			assert(fp->offset+fp->size <= offset+size);
+		/*
+		 * Since we sort both the ranges we are processing and
+		 * the fixup ranges, and we remove fixups as we apply them,
+		 * we should never encounter any fixups that fall even
+		 * partially before the data range we are operating on.
+		 */
+		assert(fp->offset >= offset);
 
+		/*
+		 * Again, since the lists are sorted, if the current fixup
+		 * starts beyond the end of the data we are processing,
+		 * we are done.
+		 */
+		if (offset+size <= fp->offset) {
+#ifdef FOLLOW
+			fprintf(stderr, "after, done\n");
+#endif
+			break;
+		}
+
+		/*
+		 * If the frange extends beyond the current data buffer,
+		 * apply as much as we can and save the rest.  We only do
+		 * this for RELOC_NONE for the moment.
+		 */
+		if (fp->offset+fp->size > offset+size) {
+			assert(fp->reloctype == RELOC_NONE);
+			coff = (u_int32_t)(fp->offset - offset);
+			clen = (offset + size) - fp->offset;
+		} else {
 			coff = (u_int32_t)(fp->offset - offset);
 			clen = (u_int32_t)fp->size;
-			if (debug > 2)
-				fprintf(stderr,
-					"Applying fixup [%llu-%llu] "
-					"to [%llu-%llu]\n",
-					fp->offset, fp->offset+fp->size,
-					offset, offset+size);
-			memcpy((char *)data+coff, fp->data, clen);
+		}
+		assert(offset+coff == fp->offset);
+		assert(offset+coff+clen <= fp->offset+fp->size);
 
-			/* create a reloc if necessary */
-			if (fp->reloctype != RELOC_NONE)
-				addreloc(fp->offset - fp->poffset,
-					 fp->size, fp->reloctype);
+		if (debug > 2)
+			fprintf(stderr,
+				"Applying %sfixup [%llu-%llu] to [%llu-%llu]\n",
+				(clen == (u_int32_t)fp->size) ?
+				"full " : "partial ",
+				fp->offset, fp->offset+fp->size,
+				offset, offset+size);
 
-			*prev = entry->next;
-			free(fp);
-			free(entry);
-		} else
+		/* don't mess with data arg for functions */
+		if (fp->func != NULL)
+			(*fp->func)(data+coff, (off_t)clen, fp->data);
+		else {
+			memcpy(data+coff, fp->data, clen);
+			fp->data += clen;
+		}
+
+		/* create a reloc if necessary */
+		if (fp->reloctype != RELOC_NONE)
+			addreloc(fp->offset - fp->poffset,
+				 fp->size, fp->reloctype);
+
+		/*
+		 * See if there is anything left over in the fixup.
+		 * If so, adjust it and move to the next entry.
+		 * If not, free the entry.
+		 */
+		fp->size -= clen;
+		if (fp->size > 0) {
+			fp->offset += clen;
+#ifdef FOLLOW
+			fprintf(stderr, "used, reduced to [%u/%u-%u/%u]\n",
+				bytestosec(fp->offset),
+				(uint32_t)fp->offset % SECSIZE,
+				bytestosec(fp->offset+fp->size),
+				(uint32_t)(fp->offset+fp->size) % SECSIZE);
+#endif
 			prev = &entry->next;
+		} else {
+#ifdef FOLLOW
+			fprintf(stderr, "used, freed E%p\n", entry);
+#endif
+			*prev = entry->next;
+			free(entry->data);
+			free(entry);
+			nfixups--;
+			if (debug > 2)
+				fprintf(stderr, " %d fixups left\n",
+					nfixups);
+		}
 	}
+}
+
+void
+dumpfixups(int verbose)
+{
+	struct range *range;
+	struct fixup *fp;
+	int nfixups = 0;
+
+	if (verbose)
+		fprintf(stderr, "\nFixups (start/size) in sectors and bytes:\n");
+	range = fixups;
+	while (range) {
+		assert(range->data != NULL);
+		fp = range->data;
+
+		if (verbose) {
+			fprintf(stderr, "  %12d    %9d (%12lld/%9lld)\n",
+				range->start, range->size,
+				fp->offset, fp->size);
+		}
+		nfixups++;
+		range = range->next;
+	}
+	fprintf(stderr, "Total Number of Fixups: %d\n", nfixups);
 }
 
 void
@@ -1448,7 +1601,7 @@ compress_image(void)
 				bytestosec(size),
 				blkhdr->size, full);
 		}
-		else if (debug) {
+		else if (debug > 1) {
 			gettimeofday(&estamp, 0);
 			estamp.tv_sec -= cstamp.tv_sec;
 			fprintf(stderr, "%12lld in %ld seconds.\n",

@@ -18,6 +18,9 @@ extern void addskip(uint32_t start, uint32_t size);
 extern void addvalid(uint32_t start, uint32_t size);
 extern void addfixup(off_t offset, off_t poffset, off_t size, void *data,
 		     int reloctype);
+extern void addfixupfunc(void (*func)(void *, off_t, void *), off_t offset,
+			 off_t poffset, off_t size, void *data, int dsize,
+			 int reloctype);
 
 extern SLICEMAP_PROCESS_PROTO(read_bsdslice);
 extern SLICEMAP_PROCESS_PROTO(read_linuxslice);

@@ -1,10 +1,12 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2005 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <err.h>
 #include <assert.h>
 #include <sys/param.h>
@@ -14,9 +16,29 @@
 #include "global.h"
 #include "imagehdr.h"
 
+/*
+ * If DO_INODES is defined, we look at the inode list in each cylinder group
+ * and try to make further space reducing optimizations.  If there are
+ * uninitialized inodes (UFS2 only) we add those blocks to the skip list.
+ *
+ * If CLEAR_FREE_INODES is also defined, we make a more dubious optimization.
+ * Initialized but free inodes will go into the image data, but we first zero
+ * everything except the (usually randomized) generation number in an attempt
+ * to reduce the compressed size of the data.
+ */
+#define DO_INODES
+#undef CLEAR_FREE_INODES
+
+#ifndef DO_INODES
+#undef CLEAR_FREE_INODES
+#endif
+
 static int read_bsdpartition(int infd, struct disklabel *dlabel, int part);
 static int read_bsdsblock(int infd, u_int32_t off, int part, struct fs *fsp);
-static int read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart);
+static int read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t off);
+#ifdef CLEAR_FREE_INODES
+static void inodefixup(void *buf, off_t buflen, void *fdata);
+#endif
 
 /* Map partition number to letter */
 #define BSDPARTNAME(i)       ("abcdefghijklmnop"[(i)])
@@ -222,10 +244,9 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 
 	freecount = 0;
 	for (i = 0; i < fs.fs_ncg; i++) {
-		unsigned long	cgoff, dboff;
+		unsigned long	cgoff;
 
 		cgoff = fsbtodb(&fs, cgtod(&fs, i)) + offset;
-		dboff = fsbtodb(&fs, cgbase(&fs, i)) + offset;
 
 		if (devlseek(infd, sectobytes(cgoff), SEEK_SET) < 0) {
 			warn("BSD Partition '%c': "
@@ -249,7 +270,7 @@ read_bsdpartition(int infd, struct disklabel *dlabel, int part)
 				i, cgoff, cg.cg.cg_cs.cs_nbfree);
 		}
 		
-		rval = read_bsdcg(&fs, &cg.cg, dboff);
+		rval = read_bsdcg(&fs, &cg.cg, i, offset);
 		if (rval)
 			return rval;
 	}
@@ -369,11 +390,12 @@ read_bsdsblock(int infd, u_int32_t offset, int part, struct fs *fsp)
 }
 
 static int
-read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
+read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t offset)
 {
 	int  i, max;
 	u_int8_t *p;
 	int count, j;
+	unsigned long dboff, dbcount, dbstart;
 
 	max = fsp->fs_fpg;
 	p   = cg_blksfree(cgp);
@@ -394,13 +416,13 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 	 * we add the bitmap offset. All blocks before cgdmin() will always
 	 * be allocated, but we scan them anyway. 
 	 */
+	assert(cgbase(fsp, cg) == cgstart(fsp, cg));
+	dbstart = fsbtodb(fsp, cgbase(fsp, cg)) + offset;
 
 	if (debug > 2)
-		fprintf(stderr, "                 ");
+		fprintf(stderr, "                   ");
 	for (count = i = 0; i < max; i++)
 		if (isset(p, i)) {
-			unsigned long dboff, dbcount;
-
 			j = i;
 			while ((i+1)<max && isset(p, i+1))
 				i++;
@@ -413,7 +435,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 				if (count)
 					fprintf(stderr, ",%s",
 						count % 4 ?
-						" " : "\n                 ");
+						" " : "\n                   ");
 				fprintf(stderr, "%lu:%ld", dboff, dbcount);
 			}
 			addskip(dboff, dbcount);
@@ -421,6 +443,225 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, unsigned int dbstart)
 		}
 	if (debug > 2)
 		fprintf(stderr, "\n");
+
+#ifdef DO_INODES
+	/*
+	 * Look for free inodes
+	 */
+	if (cgp->cg_cs.cs_nifree != 0) {
+#ifdef CLEAR_FREE_INODES
+		static uint32_t ufs1_magic = FS_UFS1_MAGIC;
+		static uint32_t ufs2_magic = FS_UFS2_MAGIC;
+		uint32_t *magic;
+#endif
+		int tifree = 0;
+		unsigned long edboff;
+		int ino;
+
+		p = cg_inosused(cgp);
+		max = fsp->fs_ipg;
+		assert(&p[max/NBBY] <= (u_int8_t *)cgp + fsp->fs_cgsize);
+
+		/*
+		 * For UFS2, (cylinder-group relative) inode numbers beyond
+		 * initediblk are uninitialized.  We do not process those
+		 * now.  They are treated as regular free blocks below.
+		 */
+		if (fsp->fs_magic == FS_UFS2_MAGIC) {
+			assert(cgp->cg_initediblk > 0);
+			assert(cgp->cg_initediblk <= fsp->fs_ipg);
+			assert((cgp->cg_initediblk % INOPB(fsp)) == 0);
+			max = cgp->cg_initediblk;
+		}
+		ino = cg * fsp->fs_ipg;
+
+#ifdef CLEAR_FREE_INODES
+		if (debug > 1)
+			fprintf(stderr,
+				"        \t ifree  %9d\n",
+				cgp->cg_cs.cs_nifree);
+		if (debug > 2)
+			fprintf(stderr, "                   ");
+
+		magic = (fsp->fs_magic == FS_UFS2_MAGIC) ?
+			&ufs2_magic : &ufs1_magic;
+		for (count = i = 0; i < max; i++) {
+			if (isset(p, i)) {
+				continue;
+			}
+			if (ino_to_fsbo(fsp, ino+i) == 0) {
+				j = i;
+				while ((i+1) < max && !isset(p, i+1))
+					i++;
+
+				dboff = fsbtodb(fsp, ino_to_fsba(fsp, ino+j));
+				edboff = fsbtodb(fsp, ino_to_fsba(fsp, ino+i));
+#if 0
+				fprintf(stderr, "      found free inodes %d-%d"
+					" db %lu.%u to %lu.%u\n",
+					ino+j, ino+i,
+					dboff+offset, ino_to_fsbo(fsp, ino+j),
+					edboff+offset, ino_to_fsbo(fsp, ino+i));
+#endif
+				tifree += (i+1 - j);
+				dbcount = edboff - dboff;
+				if ((i+1) == max)
+					dbcount++;
+				if (dbcount == 0)
+					continue;
+
+				addfixupfunc(inodefixup,
+					     sectobytes(dboff+offset),
+					     sectobytes(offset),
+					     sectobytes(dbcount),
+					     magic, sizeof(magic),
+					     RELOC_NONE);
+				if (debug > 2) {
+					if (count)
+						fprintf(stderr, ",%s",
+							count % 4 ?
+							" " :
+							"\n                   ");
+					fprintf(stderr, "%lu:%ld",
+						dboff+offset, dbcount);
+				}
+				count++;
+			} else
+				tifree++;
+		}
+		assert(i == max);
+
+		if (debug > 2)
+			fprintf(stderr, "\n");
+#endif
+
+		/*
+		 * For UFS2, deal with uninitialized inodes.
+		 * These are sweet, we just add them to the skip list.
+		 */
+		if (fsp->fs_magic == FS_UFS2_MAGIC && max < fsp->fs_ipg) {
+			i = max;
+			if (debug > 1)
+				fprintf(stderr,
+					"        \t uninit %9d\n",
+					fsp->fs_ipg - i);
+			if (debug > 2)
+				fprintf(stderr, "                   ");
+
+			max = fsp->fs_ipg;
+#if 1
+			/*
+			 * Paranoia!
+			 */
+			j = i;
+			while ((j+1) < max) {
+				assert(!isset(p, j+1));
+				j++;
+			}
+#endif
+			tifree += (max - i);
+			dboff = fsbtodb(fsp, ino_to_fsba(fsp, ino+i));
+			edboff = fsbtodb(fsp, ino_to_fsba(fsp, ino+max-1));
+			dbcount = edboff - dboff + 1;
+
+			if (debug > 2)
+				fprintf(stderr, "%lu:%ld",
+					dboff+offset, dbcount);
+
+			addskip(dboff+offset, dbcount);
+			if (debug > 2)
+				fprintf(stderr, "\n");
+		}
+
+#ifdef CLEAR_FREE_INODES
+		if (tifree != cgp->cg_cs.cs_nifree)
+			fprintf(stderr, "Uh-oh! found %d free inodes, "
+				"shoulda found %d\n",
+				tifree, cgp->cg_cs.cs_nifree);
+#endif
+	}
+#endif
+
 	return 0;
 }
 
+#ifdef CLEAR_FREE_INODES
+/*
+ * Simplified from fsck/pass1.c checkinode
+ */
+static int
+inodeisfree(int32_t magic, union dinode *dp)
+{
+	static union dinode zino;
+
+	switch (magic) {
+	case FS_UFS1_MAGIC:
+		if (dp->dp1.di_mode != 0 || dp->dp1.di_size != 0 ||
+		    memcmp(dp->dp1.di_db, zino.dp1.di_db,
+			   NDADDR * sizeof(ufs1_daddr_t)) ||
+		    memcmp(dp->dp1.di_ib, zino.dp1.di_ib,
+			   NIADDR * sizeof(ufs1_daddr_t)))
+			return 0;
+		break;
+	case FS_UFS2_MAGIC:
+		if (dp->dp2.di_mode != 0 || dp->dp2.di_size != 0 ||
+		    memcmp(dp->dp2.di_db, zino.dp2.di_db,
+			   NDADDR * sizeof(ufs2_daddr_t)) ||
+		    memcmp(dp->dp2.di_ib, zino.dp2.di_ib,
+			   NIADDR * sizeof(ufs2_daddr_t))) {
+			fprintf(stderr, "mode=%x, size=%x\n", 
+				dp->dp2.di_mode, (unsigned)dp->dp2.di_size);
+			return 0;
+		}
+		break;
+	}
+
+	return 1;
+}
+
+static void
+inodefixup(void *bstart, off_t bsize, void *fdata)
+{
+	uint32_t magic = *(uint32_t *)fdata;
+	void *ptr, *eptr;
+	int inodesize;
+
+	if (debug > 1)
+		fprintf(stderr, "inodefixup: data [%p-%p], fs=UFS%d\n",
+			bstart, bstart+bsize-1,
+			magic == FS_UFS2_MAGIC ? 2 : 1);
+
+	switch (magic) {
+	case FS_UFS1_MAGIC:
+		inodesize = sizeof(struct ufs1_dinode);
+		break;
+	case FS_UFS2_MAGIC:
+		inodesize = sizeof(struct ufs2_dinode);
+		break;
+	default:
+		fprintf(stderr, "Unknown UFS version: %x\n", magic);
+		exit(1);
+	}
+	assert((bsize % inodesize) == 0);
+
+	for (ptr = bstart, eptr = ptr+bsize; ptr < eptr; ptr += inodesize) {
+		uint32_t gen;
+
+		if (!inodeisfree(magic, (union dinode *)ptr)) {
+			fprintf(stderr, "UFS%d inode is not free!\n",
+				magic == FS_UFS1_MAGIC ? 1 : 2);
+			exit(1);
+		}
+		/*
+		 * Save off the randomized generation number
+		 * and zap the rest.
+		 */
+		gen = DIP(magic, (union dinode *)ptr, di_gen);
+		memset(ptr, 0, inodesize);
+		if (magic == FS_UFS1_MAGIC)
+			((union dinode *)ptr)->dp1.di_gen = gen;
+		else
+			((union dinode *)ptr)->dp2.di_gen = gen;
+	}
+}
+#endif
