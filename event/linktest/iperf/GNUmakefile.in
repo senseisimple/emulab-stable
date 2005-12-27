@@ -19,7 +19,13 @@ ifeq ($(SYSTEM),CYGWIN)
 CONFIG_ARGS     = --disable-threads
 endif
 
-all:	src/emulab-iperf
+ifeq ($(host_cpu),arm)
+TARGETS =
+else
+TARGETS = src/emulab-iperf
+endif
+
+all: $(TARGETS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
@@ -37,8 +43,12 @@ build-iperf: Makefile
 
 client: all
 
+ifeq ($(host_cpu),arm)
+client-install:
+else
 client-install: Makefile
 	$(MAKE) -f Makefile install
+endif
 
 # Note: GNU make wants to pass options in MAKEFLAGS (w) that are compatible
 # with BSD make.  So we just force configure to assume/use gmake for BSD.

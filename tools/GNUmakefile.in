@@ -11,17 +11,26 @@ SUBDIR		= tools
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = pcapper teachswitch webcamapplet whol
+SUBDIRS = teachswitch webcamapplet whol
+
+ifneq ($(host_cpu),arm)
+SUBDIRS += pcapper
+endif
 
 all:	all-subdirs
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+ifeq ($(host_cpu),arm)
+client:
+client-install:
+else
 client:
 	$(MAKE) -C pcapper client
 
 client-install: client
 	$(MAKE) -C pcapper client-install
+endif
 
 post-install:
 	@$(MAKE) -C whol post-install
