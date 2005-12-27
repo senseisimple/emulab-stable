@@ -1081,7 +1081,7 @@ sub doSwapin($) {
 	    #
 	    if ($firewalled) {
 		tberror "Not retrying, ".
-		    "firewall may be preventing setup.";
+		    "possibly an error in firewall setup or configuration.";
 		return 1;
 	    }
 
@@ -1442,9 +1442,10 @@ sub doFW($$$$) {
 #
 sub undoFWNodes($$;@) {
     my ($pid, $eid, @nodes) = @_;
-    my $doall = 0;
-    my $fwerr     = 0;
-    my @fwstate   = ();
+    my $doall   = 0;
+    my $fwerr   = 0;
+    my @fwstate = ();
+    my $zap = 1;
 
     if (!defined(@nodes) || @nodes == 0) {
 	@nodes = ExpNodes($pid, $eid, 1);
@@ -1471,35 +1472,53 @@ sub undoFWNodes($$;@) {
     }
 
     #
+    # At the lowest level of security, we don't do the diskzap dance
+    # unless we have paniced.
+    #
+    # This level ("blue") is used for experiments where we are trying to
+    # protect the inside from outside; i.e., there is no bad stuff inside
+    # to clean up.
+    #
+    my $paniced;
+    my $security_level;
+    if (TBExptGetPanicBit($pid, $eid, \$paniced) && $paniced == 0 &&
+	TBExptSecurityLevel($pid, $eid, \$security_level) &&
+	$security_level < TBDB_SECLEVEL_ZAPDISK()) {
+	$zap = 0;
+    }
+
+    #
     # First turn off all the machines.
     # If we fail, the firewall in left in place, and some nodes may
     # be powered off.
     #
-    print STDERR "Powering down firewalled nodes.\n";
-    TBDebugTimeStamp("Powering down nodes");
-    system("power off @nodes");
-    if ($?) {
-	$fwerr = "Failed to power off all nodes!";
-	@fwstate = ("Firewall is still in place",
-		    "Some nodes may NOT be powered off",
-		    "Nodes NOT switched to admin MFS");
-	goto done;
-    }
+    if ($zap) {
+	print STDERR "Powering down firewalled nodes.\n";
+	TBDebugTimeStamp("Powering down nodes");
+	system("power off @nodes");
+	if ($?) {
+	    $fwerr = "Failed to power off all nodes!";
+	    @fwstate = ("Firewall is still in place",
+			"Some nodes may NOT be powered off",
+			"Nodes NOT switched to admin MFS");
+	    goto done;
+	}
 
-    #
-    # Force all nodes into admin mode.
-    # If we fail, the firewall is left in place.
-    #
-    my %myargs;
-    $myargs{'name'} = "tbswap";
-    $myargs{'on'} = 1;
-    $myargs{'clearall'} = 1;
-    if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
-	$fwerr = "Failed to force all nodes into admin mode!";
-	@fwstate = ("Firewall is still in place",
-		    "All nodes are powered off",
-		    "Not all nodes have been switched to admin MFS");
-	goto done;
+	#
+	# Force all nodes into admin mode.
+	# If we fail, the firewall is left in place.
+	#
+	my %myargs;
+	$myargs{'name'} = "tbswap";
+	$myargs{'on'} = 1;
+	$myargs{'clearall'} = 1;
+	if (TBAdminMfsSelect(\%myargs, undef, @nodes)) {
+	    $fwerr = "Failed to force all nodes into admin mode!";
+	    @fwstate = ("Firewall is still in place",
+			"All nodes are powered off",
+			"Not all nodes have been switched to admin MFS");
+	    goto done;
+	}
     }
 
     #
@@ -1515,8 +1534,8 @@ sub undoFWNodes($$;@) {
 	if (doFW($pid, $eid, FWTEARDOWN, undef)) {
 	    $fwerr = "Failed to tear down firewall!";
 	    @fwstate = ("Firewall may NOT be in place",
-			"All nodes are powered off",
-			"All nodes set to admin mode",
+			$zap ? ("All nodes are powered off",
+				"All nodes set to admin mode") : (),
 			"Switch/DB firewall state could be inconsistent!");
 	    goto done;
 	}
@@ -1525,8 +1544,8 @@ sub undoFWNodes($$;@) {
 	if (doFW($pid, $eid, FWDELNODES, \@deleted)) {
 	    $fwerr = "Failed to remove nodes from firewall VLAN!";
 	    @fwstate = ("Nodes may still be in firewall VLAN",
-			"All nodes are powered off",
-			"All nodes set to admin mode");
+			$zap ? ("All nodes are powered off",
+				"All nodes set to admin mode") : ());
 	    goto done;
 	}
     }
@@ -1542,25 +1561,28 @@ sub undoFWNodes($$;@) {
     # let the experiment swapout finish, freeing up the nodes that
     # did succeed.
     #
-    print STDERR "Booting nodes into admin MFS and zapping bootblocks.\n";
-    TBDebugTimeStamp("Booting admin MFS/zapping bootblocks");
-    my @failed = ();
-    %myargs = ();
-    $myargs{'name'} = "tbswap";
-    $myargs{'command'} = "sudo /usr/local/bin/diskzap";
-    $myargs{'poweron'} = 1;
-    if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
-	$fwerr = "Failed to invalidate bootblocks on @failed!";
-	@fwstate = ("Firewall is NOT in place",
-		    "All nodes set to admin mode");
-	system("power off @nodes");
-	if ($?) {
-	    push(@fwstate, "Some nodes may NOT be powered off");
-	} else {
-	    push(@fwstate, "All nodes are powered off");
+    if ($zap) {
+	print STDERR "Booting nodes into admin MFS and zapping bootblocks.\n";
+	TBDebugTimeStamp("Booting admin MFS/zapping bootblocks");
+	my @failed = ();
+	%myargs = ();
+	$myargs{'name'} = "tbswap";
+	$myargs{'command'} = "sudo /usr/local/bin/diskzap";
+	$myargs{'poweron'} = 1;
+	if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
+	    $fwerr = "Failed to invalidate bootblocks on @failed!";
+	    @fwstate = ("Firewall is NOT in place",
+			"All nodes set to admin mode");
+	    system("power off @nodes");
+	    if ($?) {
+		push(@fwstate, "Some nodes may NOT be powered off");
+	    } else {
+		push(@fwstate, "All nodes are powered off");
+	    }
+	    push(@fwstate, "MAKE SURE THESE NODES DO NOT BOOT FROM DISK!");
 	}
-	push(@fwstate, "MAKE SURE THESE NODES DO NOT BOOT FROM DISK!");
     }
+
 done:
     #
     # If we had a failure when tearing down the firewall completely,

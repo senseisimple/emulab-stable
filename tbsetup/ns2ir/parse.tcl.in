@@ -263,8 +263,13 @@ namespace eval GLOBALS {
     variable elabinelab_eid {}
     variable elabinelab_cvstag {}
 
-    # Security level. Defaults to green
+    # Security level. Defaults to 0 ("green")
+    # If explicit_firewall is set, then you cannot also give a security level.
+    # security_level_diskzap is the level at which we need to zap the disk
+    #  at swapout time.  This value (2) is encoded in libdb.pm also.
     variable security_level 0
+    variable explicit_firewall 0
+    variable security_level_diskzap 2
 
     # List of source files.
     variable sourcefile_list {}

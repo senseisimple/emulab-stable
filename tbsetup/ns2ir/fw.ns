@@ -2,9 +2,17 @@
 # This file is intended to be included into another NS file. It is not
 # a stand alone file.
 # 
-if {${::GLOBALS::security_level} >= 1} {
+if {${::GLOBALS::explicit_firewall}} {
+    # explicit firewalls require disk zappage
+    set ::GLOBALS::security_level ${::GLOBALS::security_level_diskzap}
+} elseif {${::GLOBALS::security_level} >= 1} {
     # Set up a firewall
+    # XXX hack: have to clear the security level temporarily
+    set sl ${::GLOBALS::security_level}
+    set ::GLOBALS::security_level 0
     set fw [new Firewall $ns]
+    set ::GLOBALS::security_level $sl
+
     $fw set-type ipfw2-vlan
         
     if {${::GLOBALS::security_level} == 1} {

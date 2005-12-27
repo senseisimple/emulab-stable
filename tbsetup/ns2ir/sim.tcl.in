@@ -368,6 +368,7 @@ Simulator instproc run {} {
     var_import ::GLOBALS::elabinelab_eid
     var_import ::GLOBALS::elabinelab_cvstag
     var_import ::GLOBALS::security_level
+    var_import ::GLOBALS::explicit_firewall
     var_import ::GLOBALS::sourcefile_list
     
     if {$ran == 1} {
@@ -383,7 +384,7 @@ Simulator instproc run {} {
 	}
 	uplevel 1 real_source "@prefix@/lib/ns2ir/${nsfilename}"
     }
-    if {$security_level} {
+    if {$security_level || $explicit_firewall} {
 	uplevel 1 real_source "@prefix@/lib/ns2ir/fw.ns"
     }
 

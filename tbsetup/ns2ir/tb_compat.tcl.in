@@ -1492,6 +1492,11 @@ proc tb-set-node-inner-elab-role {node role} {
 #
 proc tb-set-security-level {level} {
     var_import ::GLOBALS::security_level
+    var_import ::GLOBALS::explicit_firewall
+
+    if {$explicit_firewall} {
+	perror "\[tb-set-security-level] cannot combine with explicit firewall"
+    }
 
     switch -- $level {
 	"Green" {

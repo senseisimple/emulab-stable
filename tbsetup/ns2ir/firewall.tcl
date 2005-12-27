@@ -19,6 +19,8 @@ namespace eval GLOBALS {
 
 Firewall instproc init {s} {
     global ::GLOBALS::last_class
+    var_import ::GLOBALS::explicit_firewall
+    var_import ::GLOBALS::security_level
 
     $self set sim $s
 
@@ -36,6 +38,13 @@ Firewall instproc init {s} {
     if {[$s add_firewall $self] == 0} {
 	set ::GLOBALS::last_class $self
     }
+
+    if {$security_level} {
+	perror "\[add_firewall] cannot combine firewall with security-level"
+    }
+
+    # avoid conflicts with security_level
+    set explicit_firewall 1
 }
 
 Firewall instproc rename {old new} {

@@ -210,8 +210,8 @@ use vars qw(@ISA @EXPORT);
 	 TBGetUniqueIndex
 
 	 TBExptMinMaxNodes TBExptSecurityLevel TBExptIDX
-	 TBDB_SECLEVEL_GREEN  TBDB_SECLEVEL_YELLOW
-	 TBDB_SECLEVEL_ORANGE TBDB_SECLEVEL_RED
+	 TBDB_SECLEVEL_GREEN TBDB_SECLEVEL_BLUE TBDB_SECLEVEL_YELLOW
+	 TBDB_SECLEVEL_ORANGE TBDB_SECLEVEL_RED TBDB_SECLEVEL_ZAPDISK
 
 	 TBExptSetPanicBit TBExptGetPanicBit TBExptClearPanicBit
 
@@ -657,9 +657,13 @@ sub TBDB_CHECKDBSLOT_ERROR()	{ 0x2; }
 
 # Security Levels.
 sub TBDB_SECLEVEL_GREEN()	{ 0; }
-sub TBDB_SECLEVEL_YELLOW()	{ 1; }
-sub TBDB_SECLEVEL_ORANGE()	{ 2; }
-sub TBDB_SECLEVEL_RED()		{ 3; }
+sub TBDB_SECLEVEL_BLUE()	{ 1; }
+sub TBDB_SECLEVEL_YELLOW()	{ 2; }
+sub TBDB_SECLEVEL_ORANGE()	{ 3; }
+sub TBDB_SECLEVEL_RED()		{ 4; }
+
+# This is the level at which we get extremely cautious when swapping out
+sub TBDB_SECLEVEL_ZAPDISK()	{ TBDB_SECLEVEL_YELLOW; }
 
 #
 # A hash of all tables that contain information about physical nodes - the
