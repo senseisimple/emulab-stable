@@ -409,6 +409,10 @@ function WRITESIDEBAR() {
     # it clear its disabled.
     # 
     if (NOLOGINS()) {
+	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
+	    "<tr><td class=menuheader> &nbsp".
+	    "</td></tr>\n";
+	
         WRITESIDEBARBUTTON("<font color=red> ".
 			   "Web Interface Temporarily Unavailable</font>",
 			   $TBDOCBASE, "nologins.php3");
@@ -416,6 +420,7 @@ function WRITESIDEBAR() {
         if (!$login_uid || !ISADMIN($login_uid)) {	
 	    WRITESIDEBARNOTICE("Please Try Again Later");
         }
+	echo "</table>\n";
     }
 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
