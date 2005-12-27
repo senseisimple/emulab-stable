@@ -1,0 +1,14 @@
+set ns [new Simulator]                  
+source tb_compat.tcl
+
+set nodeA [$ns node]
+set nodeB [$ns node]
+
+tb-set-node-os $nodeA @OS@
+tb-set-node-os $nodeB @OS@
+
+set linkAB [$ns duplex-link $nodeA $nodeB 64kb 50ms DropTail]
+tb-set-link-loss $linkAB 0.0
+
+$ns rtproto Static
+$ns run
