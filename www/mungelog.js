@@ -246,7 +246,7 @@ function ml_handleReadyState(state) {
 	    if (!firstLine && line.length > maxLineLength) {
 		var lastwhite = line.lastIndexOf(" ", maxLineLength);
 
-		if (lastwhite == 0)
+		if (lastwhite <= 0)
 		  lastwhite = maxLineLength;
 		nextLine = line.substring(lastwhite);
 		line = line.substring(0, lastwhite) + " \\";
