@@ -1,6 +1,6 @@
 /**
 * TODO:
-- "dumpStats()": min, max, average, integral, last sample
+- save "dump" to file - append existing, label with "timestamp"
 - miscellaneous TODO's listed in code.
 - refactor for niceness.
 */
@@ -50,7 +50,10 @@ PowerMeasure::PowerMeasure( string* f_devicePath,
     errorCode=0;
     fStopLogger = 0;
     lastSampleRaw = 0;
-    averageRaw = 0;
+    averageRaw = 0.0;
+    minRaw = 0x7fff;
+    maxRaw = 0;
+    total_mAH = 0.0;
     fLogVoltage = 0;
     
     //read in the calibration data for the channel, if it exists
@@ -108,6 +111,13 @@ void PowerMeasure::startRecording()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+void PowerMeasure::stopRecording()
+{
+    fStopLogger = 1;
+    pthread_join( loggerThread, NULL );    
+}
+
+///////////////////////////////////////////////////////////////////////////////
 void* PowerMeasure::logData( void* ptr )
 {
     PowerMeasure* pwrMeasure = (PowerMeasure*)ptr;
@@ -124,12 +134,17 @@ void* PowerMeasure::logData( void* ptr )
     pwrMeasure->averageRaw = 0;
 
     //save data to disk until limit reached
-    while( sampleCnt <= pwrMeasure->sampleLimit )
+    //when sampleLimit == 0, record indefinitely
+    while( sampleCnt <= pwrMeasure->sampleLimit 
+           || pwrMeasure->sampleLimit == 0 )
     {
         //check request for thread destruction
         if( pwrMeasure->fStopLogger == 1 )
+        {
+            pwrMeasure->loggerThreadBusy = 0;            
             pthread_exit(NULL);
-
+        }
+        
         //check if new data is available
 //        cout<<"checking for new data"<<endl;
         if( pwrMeasure->dataq.NewData(newDataCnt) )
@@ -148,7 +163,6 @@ void* PowerMeasure::logData( void* ptr )
 
                 newCurSamples[0] = pwrMeasure->rawToMa(newDataPoints[0]);
                 //write to disk
-//cout<<newCurSamples[0]<<endl;
                 if( pwrMeasure->fLogVoltage == 1 )
                 {
                     fout<<pwrMeasure->rawToV(newDataPoints[0])<<",";
@@ -159,11 +173,40 @@ void* PowerMeasure::logData( void* ptr )
                 //set last sample
                 pwrMeasure->setLastSampleRaw(newDataPoints[0]);
 
+                //set min
+                if( newDataPoints[0] < pwrMeasure->getMinRaw() )
+                    pwrMeasure->setMinRaw( newDataPoints[0] );
+                //set max
+                if( newDataPoints[0] >  pwrMeasure->getMaxRaw() )
+                    pwrMeasure->setMaxRaw( newDataPoints[0] );
+
                 //average samples
                 double ave = (pwrMeasure->getAveRaw()*(sampleCnt+r-1)
-                       + newDataPoints[0])
+                              + newDataPoints[0])
                     / (sampleCnt+r);
                 pwrMeasure->setAveRaw(ave);
+
+                //set total mA-h
+                double hrs = (sampleCnt+r+1)
+                    / (double)pwrMeasure->getSampleRate()
+                    / 60 / 60;
+
+//                cout<<"ave "<<pwrMeasure->rawToMa((short int)ave);
+//                cout<<"   hrs "<<hrs;
+//                cout<<"  ave*hrs "<<
+//                    pwrMeasure->rawToMa((short int)ave)
+//                    * hrs<<endl;
+                
+                pwrMeasure->setTotal_mAH( 
+                    (double)(
+                    pwrMeasure->rawToMa((short int)ave)
+                    * hrs) );
+//                    ave*(sampleCnt+r+1));
+//                    / 
+//                    (double)pwrMeasure->getSampleRate() /
+//                60);
+                
+                
             }
             fout.close();
         }
@@ -337,6 +380,48 @@ float PowerMeasure::getAveI( )
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+short int PowerMeasure::getMinRaw( )
+{
+    return minRaw;    
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void PowerMeasure::setMinRaw(short int f_raw )
+{
+    minRaw = f_raw;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+short int PowerMeasure::getMaxRaw( )
+{
+    return maxRaw;    
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void PowerMeasure::setMaxRaw(short int f_raw )
+{
+    maxRaw = f_raw;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+double PowerMeasure::getTotal_mAH( )
+{
+    return total_mAH;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+void PowerMeasure::setTotal_mAH( double f_mAH )
+{
+    total_mAH = f_mAH;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+double PowerMeasure::getSampleRate( )
+{
+    return sampleRate;    
+}
+
+///////////////////////////////////////////////////////////////////////////////
 void PowerMeasure::cal_SetZeroV()
 {
     cal_zeroV.clear();
@@ -465,5 +550,10 @@ void PowerMeasure::disableVoltageLogging()
 ///////////////////////////////////////////////////////////////////////////////
 void PowerMeasure::dumpStats()
 {
-    //TODO
+    cout<<"last "<< rawToMa(lastSampleRaw)<<endl;
+    cout<<"average "<< rawToMa((short int)averageRaw)<<endl;
+    cout<<"min "<<rawToMa(minRaw)<<endl;
+    cout<<"max "<<rawToMa(maxRaw)<<endl;
+    cout<<"accum_mA-H "<<total_mAH<<endl;
+    
 }

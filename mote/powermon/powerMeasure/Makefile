@@ -22,3 +22,4 @@ $(EXECUTABLE): $(OBJS)
 	
 clean:
 	rm -f *.o $(EXECUTABLE) *stackdump
+	(cd ../DataqSDK_Linux/DataqSDK/ && $(MAKE) clean)

@@ -20,15 +20,21 @@ void SIG_dump_handler(int signum)
     g_powmeas->dumpStats();
 }
 
+void SIG_exit_handler(int signum)
+{
+    cout<<"received term signal: stopping recording..."<<endl;
+    g_powmeas->stopRecording();
+}
+
 int main(int argc, char *argv[])
 {
-
     struct sigaction sa;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sa.sa_handler = SIG_dump_handler;
     sigaction( SIGUSR1, &sa, 0 );
-    
+    sa.sa_handler = SIG_exit_handler;
+    sigaction( SIGTERM, &sa, 0 );
 
     vector<double> calPoints;
 
@@ -39,7 +45,7 @@ int main(int argc, char *argv[])
         serialPath = argv[1];
     PowerMeasure pwrMeasure( &serialPath, 2, 240.0, &calPoints );
     g_powmeas = &pwrMeasure;
-    pwrMeasure.setFile( &sampleFile, 240*75 );
+    pwrMeasure.setFile( &sampleFile, 240*0 );
 //    pwrMeasure.enableVoltageLogging();
 /*
     char c;
@@ -69,18 +75,21 @@ int main(int argc, char *argv[])
     }catch( DataqException& datEx ){
         cout<< datEx.what() <<endl;
     }
+
+
     while( pwrMeasure.isCapturing() )
 //    while(1)
     {
+//        sleep(1);
+        
 //        pause();
         
-        system("sleep 0.5s");
-        cout<<"average: "<<pwrMeasure.getAveI() <<endl;
-        cout<<"lastsample:"<<pwrMeasure.getLastSampleI()<<endl;
+        system("sleep 1s");
+//        cout<<"average: "<<pwrMeasure.getAveI() <<endl;
+//        cout<<"lastsample:"<<pwrMeasure.getLastSampleI()<<endl;
 //        cout<<"lastsample->V "<<
 //            pwrMeasure.rawToV((short int) pwrMeasure.getLastSampleRaw())<<endl;
     }
-
-
+    
     return(0);
 }

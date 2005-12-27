@@ -45,6 +45,7 @@ public:
     int channel;
     int CHANNELLIST[2];	
     double sampleRate;
+    double getSampleRate();
     unsigned long long sampleLimit;
     vector<double>* vTomAPoints;
     string* filePath;
@@ -59,6 +60,15 @@ public:
     double averageRaw;
     short int minRaw;
     short int maxRaw;
+    double total_mAH;
+
+    short int getMinRaw();
+    void setMinRaw(short int f_raw);
+    short int getMaxRaw();
+    void setMaxRaw(short int f_raw);
+    double getTotal_mAH( );
+    void setTotal_mAH(double f_mAH );
+
     string* devicePath;
     int fLogVoltage;
     void checkError();	//throws a DataqException if error flag on device is set
