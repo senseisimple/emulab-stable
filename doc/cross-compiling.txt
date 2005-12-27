@@ -66,12 +66,14 @@ Cross-compiling openssl for arm:
   env PATH=/usr/local/arm/3.4.1/bin:${PATH} gmake install_sw \
       INSTALL_PREFIX=/tmp/stargate-install
 
+      gmake install_sw INSTALL_PREFIX=/tmp/stargate-install \
+	    SHARED_ILBS="libssl.so.0.9.7 libcrypto.so.0.9.7"
 
 Finally, build the testbed tree:
 
   env ELVIN_CONFIG=/tmp/elvin-install/bin/elvin-config \
-      LDFLAGS=-L/tmp/stargate-install/usr/local/ssl/lib \
-      CFLAGS=-I/tmp/stargate-install/usr/local/ssl/include \
+      LDFLAGS=-L/tmp/stargate-install/usr/lib \
+      CFLAGS=-I/tmp/stargate-install/usr/include \
       ../testbed/configure --host=arm-linux --build=i686-linux \
       --with-brainstem=/proj/testbed/src/brainstem
 
@@ -81,6 +83,8 @@ Finally, build the testbed tree:
 
   gmake client-install DESTDIR=/tmp/stargate-install
 
+  env CC=arm-linux-gcc LDSHARED="arm-linux-gcc -shared -Wl,-soname,libz.so.1" \
+      ./configure --prefix=/usr --shared
 
 Random notes:
 
@@ -95,6 +99,20 @@ made a fake /sbin/consoletype
 copied /etc/sysconfig/network from a pc
 
 added /var/tmp, /var/db to /etc/rcS.d/S05mountall.sh for install-tarfile
+
+openssh:
+
+  ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-libs="-lresolv" --disable-strip
+
+  gmake CC=arm-linux-gcc \
+	LDFLAGS="-L/tmp/stargate-install/usr/lib -L. -Lopenbsd-compat" \
+	CFLAGS="-I/tmp/stargate-install/usr/include -g -O2 -Wall -Wpointer-arith -Wuninitialized -Wsign-compare -std=gnu99" RANLIB=arm-linux-ranlib \
+	AR=arm-linux-ar LD=arm-linux-gcc
+
+  gmake install CC=arm-linux-gcc \
+	LDFLAGS="-L/tmp/stargate-install/usr/lib -L. -Lopenbsd-compat" \
+	CFLAGS=-I/tmp/stargate-install/usr/include RANLIB=arm-linux-ranlib \
+	AR=arm-linux-ar LD=arm-linux-gcc DESTDIR=/tmp/stargate-install/
 
 rsync flags: -avzpog --exclude-from=garcia.exclude
 
