@@ -1,6 +1,12 @@
 #! /usr/bin/env python
 
 #
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
 # nfstrace.proxy - Tool used to query the nfstrace infrastructure.
 #
 
@@ -8,6 +14,7 @@ import re
 import sys
 import time
 import math
+import stat
 import socket
 import getopt
 import os, os.path
@@ -17,14 +24,31 @@ import MySQLdb
 DBNAME = "nfsdb"
 DBUSER = "nfstrace"
 
+BASEDIR = "/var/nfstrace"
+PASSFILE = os.path.join(BASEDIR, "dbpass")
+
+# Try to get the DB password.
 try:
-    DBPASS = open("/var/nfstrace/dbpass").read().strip()
+    st = os.stat(BASEDIR)
+    if st[stat.ST_MODE] & 0x007:
+        sys.stderr.write("error: %s should not be world readable.\n" %
+                         (BASEDIR,))
+        sys.exit(1)
+        pass
+    DBPASS = open(PASSFILE).read().strip()
     pass
 except IOError:
+    # Regular users won't have access to the raw DB data.
     sys.stderr.write("error: permission denied\n")
     sys.exit(1)
     pass
+except OSError, e:
+    sys.stderr.write("error: cannot read pass from - %s [%s]\n" %
+                     (PASSFILE, e[1]))
+    sys.exit(1)
+    pass
 
+# If tracing is undergoing some sort of maintenance, just return immediately.
 MAINT_PATH = "/var/nfstrace/maint"
 if os.path.exists(MAINT_PATH):
     # sys.stderr.write("not available\n")
@@ -64,6 +88,15 @@ GC_TABLES = [
     "link_access",
     "file_dropped", ]
 
+##
+# Convert a number into a human or machine readable value, depending on the
+# OUTPUT_STYLE.
+#
+# @param n The number to convert.
+# @param suffix The units for the number.  (Default: B)
+# @param places The number of decimal places.
+# @return The converted string.
+#
 def human_readable(n, suffix='B', places=2):
     '''Return a human friendly approximation of n, using SI prefixes'''
     if OUTPUT_STYLE == STYLE_HUMAN:
@@ -83,6 +116,9 @@ def human_readable(n, suffix='B', places=2):
     else:
         return str(n)
 
+##
+# Print the main usage text.
+#
 def usage():
     print "Usage: nfstrace.proxy [-h] <action> [...]"
     print
@@ -102,17 +138,20 @@ def usage():
 # Print the usage statement for the "gc" action.
 #
 def gc_usage():
-    print "Usage: nfstrace gc [-e pid/eid] <host0> [<host1> ...]"
+    print "Usage: nfstrace gc <pid> <eid>"
     print
     print "Garbage collect old NFS trace data for the given hosts and update"
-    print "the node_ids table."
+    print "the node_ids table.  The host names should be listed on standard"
+    print "input with the form 'vnode' or 'vnode:IP'."
     print
-    print "Optional arguments:"
-    print "  -e, --experiment=PID/EID"
-    print "        Specify a project ID and experiment ID for the nodes."
+    print "Required arguments:"
+    print "  PID"
+    print "        The project ID for the nodes."
+    print "  EID"
+    print "        The experiment ID for the nodes."
     print
     print "Examples:"
-    print "  $ nfstrace gc -e foo/bar node0 node1"
+    print "  $ echo node1 node2 | nfstrace gc bsg pegasus"
     return
 
 ##
@@ -133,7 +172,7 @@ def get_usage():
     return
 
 ##
-# Print the usage statement for the "get" action.
+# Print the usage statement for the "stats" action.
 #
 def stats_usage():
     print "Usage: nfstrace stats"
@@ -144,7 +183,17 @@ def stats_usage():
     print "  $ nfstrace stats"
     return
 
+##
+# Get the IP addresses for a list of host names.
+#
+# @param pid Project ID.
+# @param eid Experiment ID.
+# @param hosts The host names to resolve.
+# @return The IP addresses for the given host names in the same order.
+#
 def resolve_hosts(pid, eid, hosts):
+    assert isinstance(hosts, list)
+    
     failures = []
     retval = []
     for lpc in range(0, len(hosts)):
@@ -204,20 +253,15 @@ def do_gc(args):
     eid = None
     
     try:
-        opts, args = getopt.getopt(args, "e:", [ "experiment=" ])
-        for opt, val in opts:
-            if opt in ("-e", "--experiment"):
-                l = val.split('/')
-                if len(l) != 2:
-                    raise getopt.error("Invalid experiment name: " + val)
-                pid, eid = l
-                pass
-            pass
-
-        if len(args) == 0:
+        if len(args) < 2:
             raise getopt.error("Not enough arguments")
-        
-        ips = resolve_hosts(pid, eid, args)
+        if len(args) > 2:
+            raise getopt.error("Too many arguments")
+
+        pid, eid = args
+
+        hosts = re.split(r'[ \n\t]+', sys.stdin.read().strip())
+        ips = resolve_hosts(pid, eid, hosts)
         pass
     except getopt.error, e:
         print e.args[0]
@@ -232,10 +276,10 @@ def do_gc(args):
         pass
 
     for lpc in range(0, len(ips)):
-        if ips[lpc] and args[lpc] != ips[lpc]:
+        if ips[lpc] and hosts[lpc] != ips[lpc]:
             cur.execute("REPLACE INTO node_ids (pid, eid, node_id, node_ip) "
                         "VALUES (%s,%s,%s,%s)",
-                        (pid, eid, args[lpc], ips[lpc]))
+                        (pid, eid, hosts[lpc], ips[lpc]))
             pass
         pass
 
@@ -243,6 +287,9 @@ def do_gc(args):
     
     return retval
 
+##
+# LRU Cache for file handles that are pulled from the DB.
+#
 class LRU:
     """
     Implementation of a length-limited O(1) LRU queue.
@@ -326,6 +373,9 @@ fh_cache = LRU(1024)
 
 def resolve_fh(fh, depth=0):
     global fh_cache
+
+    assert isinstance(fh, str)
+    assert depth >= 0
     
     retval = None
 
@@ -375,8 +425,26 @@ def resolve_fh(fh, depth=0):
 
     return retval
 
+missing = 0
+
+##
+# Process the results of a query for file handles.
+#
+# @param type The type of access (i.e. "r" or "w")
+# @param seen A dictionary of files that have already been seen.
+# @param links The set of links read by this experiment.
+# @param used_links A dictionary to update when a file referred to by a link
+# has been accessed.
+# @return The total size of new files that have been accessed.
+#
 def process_files(type, seen, links, used_links):
     global cur
+    global missing
+
+    assert type in ("r", "w")
+    assert isinstance(seen, dict)
+    assert isinstance(links, dict)
+    assert isinstance(used_links, dict)
     
     retval = 0
     
@@ -404,7 +472,7 @@ def process_files(type, seen, links, used_links):
             # Check if the directory was accessed through a link.
             dir = fn
             while True:
-                if dir == "/":
+                if dir == "/" or not dir:
                     break
                 dir, file = os.path.split(dir)
                 if dir in links:
@@ -428,6 +496,8 @@ def process_files(type, seen, links, used_links):
 # @param args Action-specific command line arguments.
 #
 def do_get(args):
+    global missing
+    
     retval = 0
 
     mount_map = []
@@ -456,8 +526,6 @@ def do_get(args):
         get_usage()
         return 2
 
-    missing = 0
-
     # Get the accessed links first.  We don't print them out yet, instead we
     # wait to see if the file they reference was accessed.
     links = {}
@@ -480,6 +548,7 @@ def do_get(args):
         if valid and lvalid:
             full_fn = os.path.join(fn, link_fn)
             full_fn = os.path.normpath(full_fn)
+            # Convert references based on the mount map.
             for sdir, cdir in mount_map:
                 if full_fn.startswith(cdir):
                     full_fn = full_fn.replace(cdir, sdir, 1)
@@ -553,15 +622,12 @@ def do_stats(args):
     over_last = 5
     
     try:
-        opts, args = getopt.getopt(args, "c:l:", [
-            "count=", "last="
+        opts, args = getopt.getopt(args, "c:", [
+            "count=",
             ])
         for opt, val in opts:
             if opt in ("-c", "--count"):
                 row_count = int(val)
-                pass
-            elif opt in ("-l", "--last"):
-                over_last = int(val)
                 pass
             pass
         pass
@@ -616,7 +682,9 @@ def do_stats(args):
             he = socket.gethostbyaddr(node_ip)
             node_id = he[0].split('.')[0]
             pass
-        print "  %8d pkts\t  %s" % (count, node_id)
+        byte_count = count * 4096
+        print "  %8d pkts\t %8s\t %s" % (
+            count, human_readable(byte_count), node_id)
         pass
 
     print "Top read files:"
@@ -629,8 +697,8 @@ def do_stats(args):
         pass
     
     print "Top writers:"
-    cur.execute("select w.node_ip,ni.node_id,ni.eid,ni.pid,count(1) as wc, "
-                "sum(amount) "
+    cur.execute("select w.node_ip,ni.node_id,ni.eid,ni.pid, "
+                "  sum(w.total) as wc,sum(amount) "
                 "from writes as w "
                 "left join node_ids as ni on ni.node_ip=w.node_ip "
                 "where w.timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
