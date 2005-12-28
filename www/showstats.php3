@@ -19,6 +19,10 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
+if (!isset($verbose)) {
+     $verbose = 0;
+}
+
 # Page args,
 if (! isset($showby)) {
     if ($isadmin) 
@@ -111,6 +115,9 @@ elseif ($showby == "expt") {
     if (!$which) {
 	USERERROR("Must supply an experiment to view!", 1);
     }
+    if (!TBvalid_integer($which)) {
+	USERERROR("Invalid characters in $which!", 1);
+    }
 
     #
     # We get an index. Must map that to a pid/eid to do the permission
@@ -118,22 +125,35 @@ elseif ($showby == "expt") {
     # sure I like this so I am not going to permit it for mere users
     # just yet.
     #
+    $query_result =
+	DBQueryFatal("select pid,eid from experiments where idx='$which'");
+    if (mysql_num_rows($query_result) == 0) {
+	USERERROR("No such experiment index $which!", 1);
+    }
+    $row   = mysql_fetch_array($query_result);
+    $pid   = $row[pid];
+    $eid   = $row[eid];
+
     if (!$isadmin) {
-	$query_result =
-	    DBQueryFatal("select pid,eid from experiments where idx='$which'");
-	if (mysql_num_rows($query_result) == 0) {
-	    USERERROR("No such experiment index $which!", 1);
-	}
-	$row   = mysql_fetch_array($query_result);
-	$pid   = $row[pid];
-	$eid   = $row[eid];
-	
 	if (! TBExptAccessCheck($uid, $pid, $eid, $TB_EXPT_READINFO)) {
 	    USERERROR("You do not have permission to view stats for ".
 		      "experiment $which!", 1);
 	}
     }
     $wclause = "where t.exptidx='$which'";
+
+    #
+    # When showing a single experiment, put uid,pid,eid,idx in a header.
+    # Less crap to look at.
+    #
+    echo "<center><font size=+1>".
+	 "Experiment <b>".
+         "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+	 "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a> ".
+	 "(<a href='showexpstats.php3?record=$which'>$which</a>) ".
+	 "</b></font>\n";
+         "</center><br>";
+    echo "<br>\n";
 }
 elseif ($showby == "all") {
     if ($which) {
@@ -175,14 +195,22 @@ $query_result =
 if (mysql_num_rows($query_result) == 0) {
     USERERROR("No testbed stats records in the system!", 1);
 }
+
 echo "<table align=center border=1>
-      <tr>
-        <th>#</th>
-        <th>Uid</th>
-        <th>Pid</th>
-        <th>Eid</th>
-        <th>ExptIdx</th>
-        <th>Start</th>
+      <tr>";
+if ($verbose) {
+    echo "<th>#</th>";
+}
+if ($EXPOSEARCHIVE) {
+    echo "  <th>Run</th>";
+}
+if ($verbose || $showby != "expt") {
+    echo "  <th>Uid</th>
+            <th>Pid</th>
+            <th>Eid</th>
+            <th>ExptIdx</th>";
+}
+echo "  <th>Start</th>
         <th>End</th>
         <th>Action (Nodes)</th>
         <th>ECode</th>";
@@ -208,13 +236,28 @@ while ($row = mysql_fetch_assoc($query_result)) {
     if (!isset($end))
 	$end = "&nbsp";
 	
-    echo "<tr>
-            <td>$idx</td>
-            <td>$uid</td>
-            <td>$pid</td>
-            <td>$eid</td>
-            <td><a href=showexpstats.php3?record=$exptidx>$exptidx</a></td>
-            <td>$start</td>
+    echo "<tr>";
+    if ($verbose)
+	echo "<td>$idx</td>";
+    if ($EXPOSEARCHIVE) {
+	if ($archive_idx && $archive_tag &&
+	    (strcmp($action, "swapout") == 0 ||
+	     strcmp($action, "swapmod") == 0)) {
+	    echo "  <td align=center>
+                       <a href=beginexp_html.php3?copyid=$exptidx:$archive_tag>
+                       <img border=0 alt=Run src=greenball.gif></a></td>";
+	}
+	else {
+	    echo "<td>&nbsp</td>\n";
+	}
+    }
+    if ($verbose || $showby != "expt") {
+	echo "<td>$uid</td>
+              <td>$pid</td>
+              <td>$eid</td>
+              <td><a href=showexpstats.php3?record=$exptidx>$exptidx</a></td>";
+    }
+    echo "  <td>$start</td>
             <td>$end</td>\n";
     if (!$ecode && (strcmp($action, "preload") &&
 		    strcmp($action, "destroy"))) {
