@@ -38,7 +38,9 @@ my $MD5		= "/sbin/md5";
 my $MKDIR       = "/bin/mkdir";
 my $CHMOD       = "/bin/chmod";
 my $TAR		= "/usr/bin/tar";
+my $RSYNC	= "/usr/local/bin/rsync";
 my $RM		= "/bin/rm";
+my $REALPATH	= "/bin/realpath";
 my $SVN         = "/usr/local/bin/svn";
 my $SVNADMIN    = "/usr/local/bin/svnadmin";
 my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
@@ -194,27 +196,26 @@ sub ArchiveCreate(;$$)
 # temporary store. Later, after all the files are in the tree, must
 # commit it to the repo. 
 #
-sub ArchiveAdd($$;$)
+sub ArchiveAdd($$;$$)
 {
-    my ($archive_idx, $pathname, $view) = @_;
+    my ($archive_idx, $pathname, $view, $exact) = @_;
 
     $view = $defaultview
 	if (!defined($view));
+
+    $exact = 0
+	if (!defined($exact));
 
     if (! -e $pathname || ! -r $pathname) {
 	print STDERR "ArchiveFile: $pathname cannot be read!\n";
 	return -1;
     }
 
-    if (! -f $pathname) {
-	print STDERR "ArchiveFile: $pathname must be a plain file!\n";
-	return -1;
-    }
     #
     # Check that the path does not contain an links to files outside
     # the directory space the user is allowed to access.
     #
-    my $realpath = `realpath $pathname`;
+    my $realpath = `$REALPATH $pathname`;
     if ($realpath =~ /^([-\w\/\.\+\@,]+)$/) {
 	$realpath = $1;
     }
@@ -261,24 +262,17 @@ sub ArchiveAdd($$;$)
     my $checkin   = "$directory/checkins/$view";
     
     #
-    # See if the file is already in the archive. We currently deal with
-    # just files; directories are gonna be a pain in the butt.
+    # Copy the file in. We use tar on individual files (to retain the
+    # directory structure and mode bits, etc). On a directory, use either
+    # tar or rsync, depending on whether we want an exact copy (removing
+    # files in the target that are not present in the source). 
     #
-    my $target_path = "$checkin/$pathname";
-
-    #
-    # The file should not already exist in the temporary store. 
-    #
-    if (-e $target_path) {
-	print STDERR "ArchiveFile: ".
-	    "WARNING: $pathname already exists in archive '$archive_idx'!\n";
+    if (-f "/${pathname}" || !$exact) {
+	mysystem("$TAR cf - -C / $pathname | tar xf - -C $checkin");
     }
-
-    #
-    # Not in the archive. Copy the file in. We use tar cause we
-    # want to retain the directory structure and mode bits, etc.
-    #
-    mysystem("$TAR cf - -C / $pathname | tar xf - -C $checkin");
+    else {
+	mysystem("$RSYNC -R -avx --delete /${pathname} $checkin");
+    }
     if ($?) {
 	print STDERR "ArchiveFile: Could not copy in /$pathname\n";
 	return -1;
@@ -293,9 +287,9 @@ sub ArchiveAdd($$;$)
 # head revision until the entire branch (all the savepoints) is committed
 # later, say when the experiment is swapped out.
 #
-sub ArchiveSavePoint($;$$)
+sub ArchiveSavePoint($;$$$)
 {
-    my ($archive_idx, $savetag, $view) = @_;
+    my ($archive_idx, $savetag, $view, $altdir) = @_;
     my $cwd;
 
     $view = $defaultview
@@ -319,8 +313,7 @@ sub ArchiveSavePoint($;$$)
 	goto bad;
     }
     my $repodir   = "$directory/repo";
-    my $checkout  = "$directory/checkouts/$view";
-    my $checkin   = "$directory/checkins/$view";
+    my $checkin   = (defined($altdir) ? $altdir : "$directory/checkins/$view");
 
     # Need to remember where we came from!
     chomp($cwd = `pwd`);
@@ -439,12 +432,12 @@ sub ArchiveCommit($;$$$)
 	$cwd = $1;
     }
     else {
-	print STDERR "ArchiveSavePoint: Bad data in $cwd!\n";
+	print STDERR "ArchiveCommit: Bad data in $cwd!\n";
 	goto bad;
     }
 
-    if (! chdir("$checkin")) {
-	print STDERR "ArchiveCommit: Cannot chdir to $checkin!\n";
+    if (! chdir("$directory")) {
+	print STDERR "ArchiveCommit: Cannot chdir to $directory!\n";
 	goto bad;
     }
 
@@ -491,17 +484,19 @@ sub ArchiveCommit($;$$$)
 	$noactivity = 1;
     }
     
-    # Clean the temp dir for next phase.
-    mysystem("/bin/rm -rf $checkin/*");
-    if ($?) {
-	print STDERR "ArchiveCommit: Could not clean $checkin!\n";
-	goto bad;
-    }
-
     #
     # Okay, do the commit to the trunk for this view.
     # 
     if (! $noactivity) {
+	#
+	# Create a temporary spot to work in.
+	# 
+	if (! mkdir("merge.$$", 0777)) {
+	    print STDERR "ArchiveCommit: Could not mkdir merge.$$: $!\n";
+	    goto bad;
+	}
+	chdir("merge.$$");
+	
 	#
 	# Check out the current trunk.
 	#
@@ -526,6 +521,13 @@ sub ArchiveCommit($;$$$)
 	mysystem("$SVN commit $svnopt ".
 		 "     -m 'Commit merge of ${archive_tag} to trunk' trunk")
 	    == 0 or goto bad;
+
+	# Clean the temp dir,
+	chdir("$directory");
+	mysystem("/bin/rm -rf merge.$$");
+	if ($?) {
+	    print STDERR "ArchiveCommit: Could not remove merge.$$\n";
+	}
     }
 
     # Create a tag in the tags directory for the commit.
@@ -561,11 +563,23 @@ sub ArchiveCommit($;$$$)
 	or goto bad;
 
     # Clean the temp dir for later.
-    mysystem("/bin/rm -rf $checkin/*");
-    if ($?) {
-	print STDERR "ArchiveCommit: Could not clean $checkin!\n";
-	goto bad;
+   if (0) {
+    if (!defined($altdir)) {
+	mysystem("/bin/rm -rf $checkin");
+	if ($?) {
+	    print STDERR "ArchiveCommit: Could not remove $checkin!\n";
+	    goto bad;
+	}
+	if (! mkdir("$checkin", 0777)) {
+	    print STDERR "ArchiveCommit: Could not mkdir $checkin: $!\n";
+	    goto bad;
+	}
+	if (! chmod(0777, "$checkin")) {
+	    print STDERR "ArchiveCommit: Could not chmod $checkin: $!\n";
+	    goto bad;
+	}
     }
+   }
 
     # And now into the checkout dir to checkout a current copy.
     if (! chdir("$checkout")) {
@@ -635,7 +649,7 @@ sub ArchiveFork($$;$$$)
 	$cwd = $1;
     }
     else {
-	print STDERR "ArchiveSavePoint: Bad data in $cwd!\n";
+	print STDERR "ArchiveFork: Bad data in $cwd!\n";
 	goto bad;
     }
 
@@ -1097,6 +1111,35 @@ sub TBExperimentArchiveAddTracedFiles($$)
 }
 
 #
+# Add files the user explicitly wants archived
+#
+sub TBExperimentArchiveAddUserFiles($$)
+{
+    my ($pid, $eid) = @_;
+    my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    my $userdir  = TBExptUserDir($pid, $eid);
+    my $userarch = "$userdir/archive";
+
+    if (-e $userarch) {
+	$rval = ArchiveAdd($archive_idx, $userarch, $view, 1);
+
+	return $rval
+	    if ($rval != 0);
+    }
+    return 0;
+}
+
+#
 # SavePoint an experiment archive. 
 #
 sub TBExperimentArchiveSavePoint($$$)
@@ -1152,21 +1195,7 @@ sub TBExperimentArchivePreSwapMod($$)
 	return -1;
     }
     my $checkin    = "$directory/checkins/$view";
-    my $preswapdir = "${checkin}.preswap";
-
-    #
-    # Derive a tag that says something useful?
-    #
-    my ($seconds, $microseconds) = gettimeofday();
-    my $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-    $newtag .= int($microseconds / 1000);
-    $newtag .= "_preswapmod";
-
-    #
-    # Do a savepoint just for grins,
-    #
-    return -1
-	if (ArchiveSavePoint($archive_idx, $newtag, $view) != 0);
+    my $preswapdir = "${checkin}.preswapmod";
 
     #
     # Make a copy of the current tree, since its easier to rollback
@@ -1210,6 +1239,96 @@ sub TBExperimentArchivePreSwapMod($$)
 }
 
 #
+# Next phase of a swapmod; do another snapshot after the swapout completes.
+#
+sub TBExperimentArchiveSwapModSwapOut($$)
+{
+    my ($pid, $eid) = @_;
+    my ($archive_idx, $view);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    my $directory;
+    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
+	print STDERR "ArchiveSwapmodswapout: ".
+	    "Archive '$archive_idx' does not exist in the DB!\n";
+	return -1;
+    }
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ArchiveSwapmodswapout: $directory cannot be written!\n";
+	return -1;
+    }
+    my $checkin    = "$directory/checkins/$view";
+    my $preswapdir = "${checkin}.swapmodswapout";
+
+    #
+    # Grab the user specified files. 
+    #
+    if (TBExperimentArchiveAddUserFiles($pid, $eid) < 0) {
+	print STDERR "ArchiveSwapmodswapout: ".
+	    "Failed to add user specified files to the experiment archive!\n";
+	return -1;
+    }
+    
+    #
+    # Add the files that have been detected by tracing to the archive.
+    #
+    if (TBExperimentArchiveAddTracedFiles($pid, $eid) < 0) {
+	print STDERR "ArchiveSwapmodswapout: ".
+	    "Failed to add traced files to the experiment archive!\n";
+	return -1;
+    }
+
+    #
+    # Make a copy of the current tree; This is the tree that will be
+    # committed as the swapout if the swapmod completes okay.
+    #
+    if (-e $preswapdir) {
+	system("/bin/rm -rf $preswapdir");
+	if (-e $preswapdir) {
+	    print STDERR
+		"ArchiveSwapmodswapout: Could not delete old preswap dir!\n";
+	    return -1;
+	}
+    }
+    if (! mkdir("$preswapdir", 0777)) {
+	print STDERR
+	    "ArchiveSwapmodswapout: Could not mkdir $preswapdir: $!\n";
+	return -1;
+    }
+    if (! chmod(0777, "$preswapdir")) {
+	print STDERR "ArchiveSwapmodswapout: ".
+	    "Could not chmod directory $preswapdir: $!\n";
+	goto bad;
+    }
+    
+    mysystem("$TAR cf - -C $checkin . | tar xf - -C $preswapdir");
+    if ($?) {
+	print STDERR "ArchiveSwapmodswapout: Could not copy to $preswapdir\n";
+	goto bad;
+    }
+    return 0;
+
+  bad:
+    # Be sure to remove the new directory!
+    if (-e $preswapdir) {
+	system("/bin/rm -rf $preswapdir");
+	if (-e $preswapdir) {
+	    print STDERR
+		"ArchiveSwapmodswapout: Could not delete new preswap dir!\n";
+	}
+    }
+    return -1;
+}
+
+#
 # Rollback from a failed swapmod.
 #
 sub TBExperimentArchiveRollBack($$)
@@ -1236,8 +1355,9 @@ sub TBExperimentArchiveRollBack($$)
 	print STDERR "ArchiveRollBack: $directory cannot be written!\n";
 	return -1;
     }
-    my $checkin    = "$directory/checkins/$view";
-    my $preswapdir = "${checkin}.preswap";
+    my $checkin        = "$directory/checkins/$view";
+    my $preswapdir     = "${checkin}.preswapmod";
+    my $swapmodswapout = "${checkin}.swapmodswapout";
 
     # In case we bailed out really early in the swapmod path.
     return 0
@@ -1250,7 +1370,15 @@ sub TBExperimentArchiveRollBack($$)
 	system("/bin/rm -rf $checkin");
 	if (-e $checkin) {
 	    print STDERR
-		"ArchiveRollBack: Could not delete old preswap dir!\n";
+		"ArchiveRollBack: Could not delete $checkin!\n";
+	    return -1;
+	}
+    }
+    if (-e $swapmodswapout) {
+	system("/bin/rm -rf $swapmodswapout");
+	if (-e $swapmodswapout) {
+	    print STDERR
+		"ArchiveRollBack: Could not delete $swapmodswapout!\n";
 	    return -1;
 	}
     }
@@ -1267,9 +1395,9 @@ sub TBExperimentArchiveRollBack($$)
 # Swapmod completed okay. Need to commit the old preswap directory and
 # move forward. 
 #
-sub TBExperimentArchiveSwapModCommit($$)
+sub TBExperimentArchiveSwapModCommit($$$)
 {
-    my ($pid, $eid) = @_;
+    my ($pid, $eid, $swapped) = @_;
     my ($archive_idx, $view);
 
     return 0
@@ -1291,8 +1419,15 @@ sub TBExperimentArchiveSwapModCommit($$)
 	print STDERR "ArchiveSwapModCommit: $directory cannot be written!\n";
 	return -1;
     }
-    my $checkin    = "$directory/checkins/$view";
-    my $preswapdir = "${checkin}.preswap";
+    my $checkin        = "$directory/checkins/$view";
+    my $preswapdir     = "${checkin}.preswapmod";
+    my $swapmodswapout = "${checkin}.swapmodswapout";
+
+    #
+    # Where we get the previous stuff depends on whether the modify is
+    # of a swapped in or swapped out experiment.
+    #
+    my $location = ($swapped ? $preswapdir : $swapmodswapout);
 
     #
     # We need this below.
@@ -1312,10 +1447,15 @@ sub TBExperimentArchiveSwapModCommit($$)
     my ($seconds, $microseconds) = gettimeofday();
     my $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
     $newtag .= int($microseconds / 1000);
-    $newtag .= "_postswapmod";
+    $newtag .= "_preswapmod";
 
+    print "Doing a savepoint on the experiment archive ...\n";
+    return -1 
+	if (ArchiveSavePoint($archive_idx, undef, $view, $location) != 0);
+
+    print "Doing a commit on the experiment archive ...\n";
     return -1
-	if (ArchiveCommit($archive_idx, $newtag, $view, $preswapdir) != 0);
+	if (ArchiveCommit($archive_idx, $newtag, $view, $location) != 0);
 
     if (!DBQueryWarn("update experiment_resources set ".
 		     "      archive_tag='$newtag' ".
@@ -1330,6 +1470,14 @@ sub TBExperimentArchiveSwapModCommit($$)
     system("/bin/rm -rf $preswapdir");
     if ($?) {
 	print STDERR "*** ArchiveSwapModCommit: Could not rm $preswapdir\n";
+    }
+    #
+    # Ditto.
+    # 
+    system("/bin/rm -rf $swapmodswapout");
+    if ($?) {
+	print STDERR
+	    "*** ArchiveSwapModCommit: Could not rm $swapmodswapout\n";
     }
 
     return 0;
@@ -1401,6 +1549,35 @@ sub TBCheckoutExperimentArchive($$$;$)
 	if ($rval < 0);
 
     return ArchiveCheckout($archive_idx, $path, $view, $tag);
+}
+
+#
+# Checkout a copy of an experiment archive, optionally at a branch.
+# 
+sub TBCheckoutExperimentArchivebyExptIDX($$;$)
+{
+    my ($exptidx, $path, $tag) = @_;
+
+    return 0
+	if (!$MAINSITE);
+
+    my $query_result =
+	DBQueryWarn("select s.archive_idx,s.pid from experiment_stats as s ".
+		    "where s.exptidx='$exptidx'");
+
+    return -1
+	if (!$query_result || $query_result->numrows == 0);
+
+    my ($archive_idx,$pid) = $query_result->fetchrow_array();
+
+    return 0
+	if ($pid ne $ALLOWEDPID);
+
+    # Need to deal with no archive yet!
+    return 1
+	if (!defined($archive_idx) || $archive_idx == 0);
+
+    return ArchiveCheckout($archive_idx, $path, $exptidx, $tag);
 }
 
 #

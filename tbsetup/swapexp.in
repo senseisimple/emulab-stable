@@ -833,6 +833,13 @@ if ($inout eq "out") {
 	fatal("Failed to add traced files to the experiment archive!");
     }
 
+    #
+    # Add the special per-experiment archive directory.
+    #
+    if (libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) < 0) {
+	fatal("Failed to add user specified files to the experiment archive!");
+    }
+
     SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
 	or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
     TBExptClearPanicBit($pid, $eid);
@@ -861,6 +868,7 @@ elsif ($inout eq "modify") {
     #
     # Prepare the Archive for the swapmod, in case we have to "roll back".
     #
+    print "Doing a preswapmod on the experiment archive ...\n";
     if (libArchive::TBExperimentArchivePreSwapMod($pid, $eid) < 0) {
 	fatal("Failed to do a preswapmod on the experiment archive!");
     }
@@ -953,14 +961,6 @@ elsif ($inout eq "modify") {
 	    # 
 	    SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 	    $estate = EXPTSTATE_ACTIVE;
-
-	    #
-	    # Add the files that have been detected by tracing to the archive.
-	    #
-	    if (libArchive::TBExperimentArchiveAddTracedFiles($pid, 
-							      $eid) < 0) {
-		fatal("Failed to add traced files to the experiment archive!");
-	    }
 	}
 	else {
 	    $modifyError = $errorstat = $? >> 8;
@@ -1032,6 +1032,11 @@ else { # $inout eq "restart" assumed.
     SetExpState($pid, $eid, EXPTSTATE_ACTIVE);
 }
 
+# Latest log is always called the same thing.
+if (defined($logname)) {
+    system("cp -fp $logname $workdir/" . EXPTLOGNAME());
+}
+
 #
 # Try to copy off the files for testbed information gathering.
 #
@@ -1044,28 +1049,31 @@ TBSaveExpLogFiles($pid, $eid);
 #
 system("cp -Rfp $workdir/ $userdir/tbdata/");
 
+# Now add that copy to the archive. 
+if (defined($logname)) {
+    libArchive::TBExperimentArchiveAddFile($pid, $eid,
+					   "$userdir/tbdata/" . EXPTLOGNAME());
+}
+
+# Always copy the NS file into the archive.
+system("cp -p $workdir/$eid.ns $userdir/$eid.ns");
+libArchive::TBExperimentArchiveAddFile($pid, $eid, "$userdir/$eid.ns") == 0 or
+    fatal("Failed to add $userdir/$eid.ns to the archive!");
+
 #
 # The archive gets different treatment when doing a swapmod.
 #
 if ($inout eq "modify") {
-    # Get the new NS file into the new swapdir.
-    if (defined($nsfile)) {
-	system("cp -p $workdir/$nsfile $userdir/$nsfile");
-    
-	if (libArchive::TBExperimentArchiveAddFile($pid, $eid,
-						   "$userdir/$nsfile") < 0) {
-	    fatal("Failed to add $userdir/$nsfile to the archive!");
-	}
-    }
-
     print "Doing a commit on the previous experiment archive ...\n";
-    libArchive::TBExperimentArchiveSwapModCommit($pid, $eid) == 0 or
-	fatal("Failed to commit experiment archive!");
+    libArchive::TBExperimentArchiveSwapModCommit($pid, $eid,
+						 $estate eq EXPTSTATE_SWAPPED)
+	== 0 or	fatal("Failed to commit experiment archive!");
 }
 
 #
 # Do a SavePoint on the experiment files.
 #
+print "Doing a savepoint on the experiment archive ...\n";
 if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, $tag) < 0) {
     fatal("Failed to do a savepoint on the experiment archive!");
 }

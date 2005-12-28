@@ -53,6 +53,7 @@ use libtestbed;
 use libadminctrl;
 use libadminmfs;
 use libtblog;
+use libArchive;
 
 #require exitonwarn; # exitonwarn isn't really a module, so just require it
 
@@ -252,6 +253,12 @@ elsif ($swapop eq "update") {
     TBExptBackupPhysicalState($pid,$eid);
 
     $errors = doSwapout(UPDATE);
+
+    print STDERR "Doing a swapmodswapout on the experiment archive ...\n";    
+    if (libArchive::TBExperimentArchiveSwapModSwapOut($pid, $eid) < 0) {
+	tberror("Failed to do a swapmodswapout on the experiment archive!");
+	$errors = 1;
+    }
 
     if ($errors) {
 	#

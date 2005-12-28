@@ -54,9 +54,10 @@ sub usage()
 }
 
 sub ParseArgs();
+sub GetNSFile();
 sub fatal($);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nz";
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:";
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -65,6 +66,7 @@ my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
 my $savestate= 0;
+my $copyexp;
 
 #
 # Configure variables
@@ -173,9 +175,11 @@ ParseArgs();
 #
 # Sanity check them.
 #
-if (!defined($pid) || !defined($eid)) {
-    usage();
-}
+usage()
+    if (!defined($pid) || !defined($eid));
+usage()
+    if (defined($tempnsfile) && defined($copyexp));
+
 if (!defined($gid)) {
     $gid = $pid;
 }
@@ -185,10 +189,10 @@ if (!defined($description)) {
 if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
     tbdie("Must provide a reason with -S option (not swappable reason)!");
 }
-if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")) {
+if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")){
     tbdie("Must provide a reason with -L option (no idleswap reason)!");
 }
-if (!defined($tempnsfile) && !TBAdmin($dbuid)) {
+if (!defined($tempnsfile) && !defined($copyexp) && !TBAdmin($dbuid)) {
     tbdie("Only admins can create experiments with no NS file");
 }
 my $nsfile  = "$eid.ns";
@@ -207,11 +211,12 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
     die("You do not have permission to create experiments in $pid/$gid");
 }
 
-#
-# If no NS file, then override swap/idle stuff. Again, might change
-# when new forms installed
-#
-if (!defined($tempnsfile)) {
+if (defined($copyexp)) {
+    # See if we can get the NS file from an existing (or past) experiment.
+    GetNSFile();
+}
+elsif (!defined($tempnsfile)) {
+    # If no NS file, then override swap/idle stuff. 
     $swappable     = 0;
     $idleswap      = 0;
 }
@@ -619,6 +624,11 @@ if (system("$tbbindir/tbreport -b $pid $eid 2>&1 > $repfile") != 0) {
     fatal("tbreport failed!");
 }
 
+# Latest log is always called the same thing.
+if (defined($logname)) {
+    system("cp -fp $logname $workdir/" . EXPTLOGNAME());
+}
+
 #
 # Try to copy off the files for testbed information gathering.
 #
@@ -629,6 +639,12 @@ TBSaveExpLogFiles($pid, $eid);
 # can see the log files.
 #
 system("cp -Rfp $workdir/ $userdir/tbdata");
+
+# Now add that copy to the archive. 
+if (defined($logname)) {
+    libArchive::TBExperimentArchiveAddFile($pid, $eid,
+					   "$userdir/tbdata/" . EXPTLOGNAME());
+}
 
 #
 # Do a SavePoint on the experiment files.
@@ -927,6 +943,19 @@ sub ParseArgs()
     }
 
     #
+    # Clone an experiment, either an existing experiment or an old one
+    # (using the archive). 
+    #
+    if (defined($options{"c"})) {
+	$copyexp = $options{"c"};
+
+	if (! (($copyexp =~ /^([-\w]+),([-\w]+)(?::[-\w]*)?$/) ||
+	       ($copyexp =~ /^(\d+)(?::[-\w]*)?$/))) {
+	    tbdie("Bad data in argument: $copyexp");
+	}
+    }
+
+    #
     # pid,eid,gid get passed along as shell commands args; must taint check.
     # 
     if (defined($options{"p"})) {
@@ -1011,6 +1040,130 @@ sub ParseArgs()
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
+    }
+}
+
+#
+# Try to get an NS file when copying an experiment.
+#
+sub GetNSFileFromExperiment($$);
+sub GetNSFileFromArchive($$$$);
+
+sub GetNSFile()
+{
+    if ($copyexp =~ /^([-\w]+),([-\w]+)((?::[-\w]*)?)$/) {
+	#
+	# pid,eid of an existing experiment.
+	#
+	my $copypid = $1;
+	my $copyeid = $2;
+	my $copytag = $3;
+
+	if ($copytag == "") {
+	    GetNSFileFromExperiment($copypid, $copyeid);
+	}
+	else {
+	    my $exptidx;
+	    
+	    if (!TBExptIDX($copypid, $copyeid, \$exptidx)) {
+		tbdie("Could not get experiment index for $copypid/$copyeid");
+	    }
+	    
+	    GetNSFileFromArchive($exptidx, $copypid, $copyeid, $copytag);
+	}
+    }
+    elsif ($copyexp =~ /^(\d+)((?::[-\w]*)?)$/) {
+	#
+	# By convention, using an idx means we want to go to the experiment
+	# archive instead of what is currently in the filesystem. 
+	#
+	my $exptidx = $1;
+	my $copytag = ($2 == "" ? undef : $2);
+
+	my $query_result =
+	    DBQueryFatal("select pid,eid from experiment_stats ".
+			 "where exptidx='$exptidx'");
+
+	if (! $query_result->numrows) {
+	    tbdie("No such experiment index: $exptidx");
+	}
+	my ($copypid, $copyeid) = $query_result->fetchrow_array();
+	
+	if (!TBProjAccessCheck($UID, $copypid, $copypid, TB_PROJECT_READINFO)){
+	    tberror("You do not have permission to copy experiment: ".
+		    "$copypid/$copyeid");
+	    exit(1);
+	}
+	GetNSFileFromArchive($exptidx, $copypid, $copyeid, $copytag);
+    }
+    else {
+	tbdie("Bad data in -c option: $copyexp");
+    }
+}
+
+#
+# Look at an existing experiment and grab its NS file. User must have
+# permission of course.
+#
+sub GetNSFileFromExperiment($$)
+{
+    my ($copypid, $copyeid) = @_;
+
+    print "Extracting NS file from current experiment $copypid/$copyeid\n";
+    
+    if (!ExpState($copypid, $copyeid)) {
+	tberror("No such experiment to copy: $copypid/$copyeid");
+	exit(1);
+    }
+    if (!TBExptAccessCheck($UID, $copypid, $copyeid, TB_EXPT_READINFO)) {
+	tberror("You do not have permission to copy experiment: ".
+		"$copypid/$copyeid");
+	exit(1);
+    }
+    my $copyworkdir = TBExptWorkDir($copypid, $copyeid);
+    my $copynsfile  = "$copyworkdir/$copyeid.ns";
+
+    if (! -e $copynsfile) {
+	tberror("Cannot find the NS file from $copypid/$copyeid");
+	exit(1);
+    }
+    $tempnsfile = $copynsfile;
+}
+
+#
+# Here we get the NS file from an experiment archive.
+#
+sub GetNSFileFromArchive($$$$)
+{
+    my ($exptidx, $copypid, $copyeid, $tag) = @_;
+
+    print "Extracting NS file from experiment archive for ".
+	"$copypid/$copyeid ($exptidx)\n";
+
+    my $copydir    = "/var/tmp/checkout.$$";
+    my $copynsfile = "$copydir/proj/$copypid/exp/$copyeid/$copyeid.ns";
+
+    #
+    # Ask for a checkout of the archive. 
+    #
+    if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
+							 $copydir, $tag) < 0) {
+	tbdie("Could not check out a copy from the archive!");
+    }
+    
+    if (! -e $copynsfile) {
+	system("/bin/rm -rf $copydir");
+	tbdie("Cannot find the NS file in the archive for expt $exptidx");
+    }
+    # global variable
+    $tempnsfile = "/tmp/nsfile.$$";
+
+    system("/bin/cp $copynsfile $tempnsfile");
+    my $rval = $?;
+
+    system("/bin/rm -rf $copydir");
+    if ($rval) {
+	tbdie("Cannot copy NS file from $copydir");
     }
 }
 
