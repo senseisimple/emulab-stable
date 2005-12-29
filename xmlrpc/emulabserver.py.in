@@ -1538,12 +1538,6 @@ class experiment:
             return EmulabResponse(RESPONSE_FORBIDDEN,
                               output="Insufficient privledge to invoke method")
         
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
         argerror = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror):
             return argerror
