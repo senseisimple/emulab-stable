@@ -658,7 +658,8 @@ sub RebootNode {
     $syspid = fork();
 
     if ($syspid) {
-	local $SIG{ALRM} = sub { kill("TERM", $syspid); };
+	my $timedout = 0;
+	local $SIG{ALRM} = sub { kill("TERM", $syspid); $timedout = 1; };
 	alarm 20;
 	waitpid($syspid, 0);
 	alarm 0;
@@ -670,16 +671,17 @@ sub RebootNode {
 	print STDERR "reboot ($pc): reboot returned $?.\n" if $debug;
 
 	#
-	# If either ssh is not running or it timed out,
-	# send it a ping of death.
+	# We used to special case $?==256 here as meaning "ssh is not running"
+	# but relying on any return code here is dubious.  Too much depends on
+	# the timing of the reboot operation on the client.  So we just check
+	# for a self-induced timeout here and immediately send a PoD in that
+	# case.  Otherwise, we assume the reboot happened and we will catch
+	# our error below if the node does not stop pinging within a couple
+	# of seconds.
 	#
-	if ($? == 256 || $? == 15) {
-	    if ($? == 256) {
-		print STDERR "*** reboot ($pc): not running sshd.\n" if $debug;
-	    } else {
-		print STDERR "*** reboot ($pc): wedged.\n" if $debug;
-	    }
-	    info("$pc: ssh reboot failed ... sending ipod");
+	if ($timedout) {
+	    print STDERR "*** reboot ($pc): wedged.\n" if $debug;
+	    info("$pc: ssh reboot failed (hung) ... sending ipod");
 	    print STDERR "*** reboot ($pc): Trying Ping-of-Death.\n" if $debug;
 
 	    system("$ipod $pc");
@@ -702,9 +704,9 @@ sub RebootNode {
     $UID = $oldUID;
 
     #
-    # Okay, before we power cycle lets really make sure. We wait a while
-    # for it to stop responding to pings, and if it never goes silent,
-    # punch the power button.
+    # Okay, before we try IPoD or power cycle lets really make sure we need to.
+    # We wait a while for the node to stop responding to pings, and if it never
+    # goes silent, whack it with a bigger stick.
     #
     if (WaitTillDead($pc) == 0) {
 	my $state = TBDB_NODESTATE_SHUTDOWN;
