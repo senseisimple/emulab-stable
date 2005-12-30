@@ -678,7 +678,8 @@ function WRITESIMPLESIDEBAR($menudefs) {
 #
 # spits out beginning part of page
 #
-function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0 ) {
+function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
+        $extra_headers = NULL ) {
     global $BASEPATH, $TBMAINSITE, $THISHOMEBASE, $ELABINELAB;
     global $TBDIR, $WWW;
     global $MAINPAGE;
@@ -715,6 +716,9 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0 ) {
 	           "CONTENT=\"NOARCHIVE\">\n";
 	echo "<meta NAME=\"description\" ".
                    "CONTENT=\"emulab - network emulation testbed home\">\n";
+    }
+    if ($extra_headers) {
+        echo $extra_headers;
     }
     echo "</head>
             <body bgcolor='#FFFFFF' 
@@ -781,7 +785,7 @@ function FINISHSIDEBAR()
 #
 # Spit out a vanilla page header.
 #
-function PAGEHEADER($title, $view = NULL) {
+function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     global $login_status, $login_uid, $TBBASE, $TBDOCBASE, $THISHOMEBASE;
     global $BASEPATH, $SSL_PROTOCOL, $drewheader, $autorefresh;
     global $TBMAINSITE;
@@ -854,7 +858,7 @@ function PAGEHEADER($title, $view = NULL) {
     } else {
 	$nobanner = 0;
     }
-    PAGEBEGINNING( $title, $nobanner, 0 );
+    PAGEBEGINNING( $title, $nobanner, 0, $extra_headers );
     if (!isset($view['hide_sidebar'])) {
 	WRITESIDEBAR();
     }

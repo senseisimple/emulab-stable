@@ -205,31 +205,49 @@ if ($isadmin) {
     }
 }
 else {
-    PAGEHEADER("News");
+    # This is so that smart browsers like Firefox can detect the presence
+    # of an RSS feed.
+    $rssAuto = "<link rel=\"alternate\" type=\"application/rss+xml\" " .
+               "title=\"Emulab News\" href=\"$TBDOCBASE/news-rss.php3\" />";
+    PAGEHEADER("News",NULL,$rssAuto);
 }
 
 ?>
 <table align=center class=stealth border=0>
 <tr><td class=stealth align=center><h1>News</h1></td></tr>
 <?php
-if ($TBMAINSITE) {
+if ($TBMAINSITE && !$single) {
     echo "<tr><td class=stealth align=center>
                   <a href = 'doc/changelog.php3'>
                      (Changelog/Technical Details)</a></td></tr>\n";
+}
+if (!$single) {
+    echo "<tr><td class=stealth align=center>
+                  <a href = '$TBDOCBASE/news-rss.php3'>
+                  <img src='rss.png' width=27 height=14 border=0>
+                  RSS Feed
+                  </a></td></tr>";
 }
 echo "</table>
       <br />\n";
 
 # Allow admin caller to flip the archive bit. 
-$show_archive_clause = "where archived=0";
+$show_archive_clause = "archived=0";
 if ($isadmin) {
     if ($show_archived) {
-	$show_archive_clause = "";
+	$show_archive_clause = "1";
 	echo "<a href='news.php3?show_archived=0'>Hide Archived Messages</a>\n";
     }
     else {
 	echo "<a href='news.php3?show_archived=1'>Show Archived Messages</a>\n";
     }
+}
+
+# Allow users to view a single message
+$which_msgid_clause = "1"; # MySQL will optimize this out
+if (isset($single)) {
+    $which_msgid_clause = "msgid='$single'";
+    $show_archive_clause = 1;
 }
 
 $query_result=
@@ -240,7 +258,10 @@ $query_result=
 		 "DATE_FORMAT(archived_date,'%W, %M %e, %Y, %l:%i%p') as ".
 		 "  archived_date ".
 		 "FROM webnews ".
-		 "$show_archive_clause ".
+                 "WHERE " .
+                 "$show_archive_clause " .
+                 "AND " .
+		 "$which_msgid_clause ".
 		 "ORDER BY date DESC" );
 
 if (!mysql_num_rows($query_result)) {
