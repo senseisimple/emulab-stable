@@ -110,6 +110,7 @@ int	hwflow = 0, speed = B9600, debug = 0, runfile = 0, standalone = 0;
 int	stampinterval = -1;
 sigset_t actionsigmask;
 sigset_t allsigmask;
+int	 powermon = 0;
 #ifndef  USESOCKETS
 #define relay_snd 0
 #define relay_rcv 0
@@ -303,7 +304,7 @@ main(int argc, char **argv)
 
 	Progname = (Progname = rindex(argv[0], '/')) ? ++Progname : *argv;
 
-	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:")) != EOF)
+	while ((op = getopt(argc, argv, "rds:Hb:ip:c:T:aou:v:P")) != EOF)
 		switch (op) {
 #ifdef	USESOCKETS
 #ifdef  WITHSSL
@@ -344,6 +345,9 @@ main(int argc, char **argv)
 			stampinterval = atoi(optarg);
 			if (stampinterval < 0)
 				usage();
+			break;
+		case 'P':
+			powermon = 1;
 			break;
 #ifdef  WITHSSL
 		case 'a':
@@ -1123,7 +1127,7 @@ char *optstr =
 #endif
 "[-b bossnode] [-p bossport] [-i] "
 #endif
-"-Hdrao [-s speed] [-T stampinterval]";
+"-HdraoP [-s speed] [-T stampinterval]";
 void
 usage(void)
 {
@@ -1226,6 +1230,101 @@ writepid(void)
 	(void) close(fd);
 }
 
+int
+powermonmode(void)
+{
+	struct termios serial_opts;
+	int old_tiocm, status;
+	
+	// get copy of other current serial port settings to restore later
+	if(ioctl(devfd, TIOCMGET, &old_tiocm) == -1)
+		return -1;
+
+	// get current serial port settings (must modify existing settings)
+	if(tcgetattr(devfd, &serial_opts) == -1)
+		return -1;
+	
+	// clear out settings
+	serial_opts.c_cflag = 0;
+	serial_opts.c_iflag = 0;
+	serial_opts.c_lflag = 0;
+	serial_opts.c_oflag = 0;
+	
+	// set baud rate
+	if(cfsetispeed(&serial_opts, speed) == -1)
+		return -1;
+	if(cfsetospeed(&serial_opts, speed) == -1)
+		return -1;
+	
+	// no parity
+	serial_opts.c_cflag &= ~PARENB;
+	serial_opts.c_iflag &= ~INPCK;
+	
+	// apply settings and check for error
+	// this is done because tcsetattr() would return success if *any*
+	// settings were set correctly; this way, more error checking is done
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+
+	serial_opts.c_cflag &= ~CSTOPB; // 1 stop bit
+	serial_opts.c_cflag &= ~CSIZE;  // reset byte size
+	serial_opts.c_cflag |= CS8;     // 8 bits
+	
+	// apply settings and check for error
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+	
+	// disable hardware flow control
+	serial_opts.c_cflag &= ~CRTSCTS;
+	
+	// apply settings and check for error
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+	
+	// disable software flow control
+	serial_opts.c_iflag &= ~(IXON | IXOFF | IXANY);
+	
+	// apply settings and check for error
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+	
+	// raw I/O
+	serial_opts.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+	serial_opts.c_oflag &= ~OPOST;
+	
+	// apply settings and check for error
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+	
+	// timeouts
+	serial_opts.c_cc[VMIN] = 0;
+	serial_opts.c_cc[VTIME] = 10;
+	
+	// apply settings and check for error
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+	
+	// misc. settings
+	serial_opts.c_cflag |= HUPCL;
+	serial_opts.c_cflag |= (CLOCAL | CREAD);
+
+	// apply settings and check for error
+	if(tcsetattr(devfd, TCSANOW, &serial_opts) == -1)
+		return -1;
+	
+	status = old_tiocm; // get settings
+	status |= TIOCM_DTR;  // turn on DTR and...
+	status |= TIOCM_RTS;  // ...RTS lines to power up device
+	// apply settings
+	if(ioctl(devfd, TIOCMSET, &status) == -1)
+		return -1;
+	
+	// wait for device to power up
+	usleep(100000);
+	
+	tcflush(devfd, TCOFLUSH);
+}
+
 /*
  * Put the console line into raw mode.
  */
@@ -1253,6 +1352,10 @@ rawmode(char *devname, int speed)
 	t.c_cc[VSTART] = t.c_cc[VSTOP] = _POSIX_VDISABLE;
 	if (tcsetattr(devfd, TCSAFLUSH, &t) < 0)
 		die("%s: tcsetattr: %s", Devname, geterr(errno));
+
+	if (powermon && powermonmode() < 0)
+		die("%s: powermonmode: %s", Devname, geterr(errno));
+	
 }
 
 /*
