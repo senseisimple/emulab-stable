@@ -16,18 +16,21 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <math.h>
 
-#define QUANTA 5000000    // feed-loop interval in usec
-#define CONTROL_PORT 3490 // the port users will be connecting to
-#define TRAFFIC_PORT 3491 // the port client will be connecting to 
-#define CONCURRENT_SENDERS   50	 // how many pending connections queue will hold
-#define CONCURRENT_RECEIVERS 50	 // how many pending connections queue will hold
-#define MAX_PKTSIZE         100  // conservative for now 
-#define SIZEOF_LONG    sizeof(long) //message bulding block
+#define STDIN 0 // file descriptor for standard input
+#define QUANTA 5000000    //feed-loop interval in usec
+#define MONITOR_PORT 3490 //the port the monitor connects to
+#define SENDER_PORT  3491 //the port the stub senders connect to 
+#define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold
+#define CONCURRENT_SENDERS   50	 //concurrent senders the stub maintains
+#define CONCURRENT_RECEIVERS 50	 //concurrent receivers the stub maintains
+#define MAX_PAYLOAD_SIZE     100 //size of the traffic payload 
+#define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
+#define SIZEOF_LONG sizeof(long) //message bulding block
+#define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
 
 //magic numbers
-#define CODE_TRAFFIC   0x01000000 
-#define CODE_INQUIRY   0x02000000
 #define CODE_BANDWIDTH 0x00000001 
 #define CODE_DELAY     0x00000002 
 #define CODE_LOSS      0x00000003 
@@ -37,7 +40,7 @@ struct connection {
   short  valid;
   int    sockfd;
   unsigned long ip;
-  time_t last_usetime;
+  time_t last_usetime; //last monitor access time
 };
 typedef struct connection connection;
 
