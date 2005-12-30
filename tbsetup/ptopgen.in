@@ -320,15 +320,16 @@ my $free_condition = "(b.node_id is null and ".
                      "  np.eventstate='" . TBDB_NODESTATE_POWEROFF . "' or ".
                      "  np.eventstate='" . TBDB_NODESTATE_ALWAYSUP . "')) ";
 
+if (defined($pid)) {
+    $free_condition = "($free_condition and ".
+	"(np.reserved_pid is null or np.reserved_pid='$pid'))";
+}
+
 # if the user has specified an exempt pid/eid, 
 # then view any node which is reserved to that experiment as available.
 if (defined($exempt_eid)) {
     $free_condition = "($free_condition or ".
 	"(b.pid='$pid' and b.eid='$exempt_eid'))"; 
-}
-elsif (defined($pid)) {
-    $free_condition = "($free_condition and ".
-	"(np.reserved_pid is null or np.reserved_pid='$pid'))";
 }
 
 # If the user wants all nodes, we consider everything to be free (this
