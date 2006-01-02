@@ -284,7 +284,7 @@ if (!mysql_num_rows($query_result)) {
 	$archived = $row[archived];
 	$archived_date = $row[archived_date];
 
-	echo "<a name=\"$msgid\" />\n";
+	echo "<a name=\"$msgid\"></a>\n";
 	echo "<table class='nogrid' 
                      cellpadding=0 
                      cellspacing=0 
