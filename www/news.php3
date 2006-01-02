@@ -247,6 +247,7 @@ if ($isadmin) {
 # Allow users to view a single message
 $which_msgid_clause = "1"; # MySQL will optimize this out
 if (isset($single)) {
+    $single = addslashes($single);    
     $which_msgid_clause = "msgid='$single'";
     $show_archive_clause = 1;
 }
