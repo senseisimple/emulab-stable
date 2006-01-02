@@ -1,0 +1,177 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2006 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH CHECKUP_DAEMON 8 "Jan 2, 2006" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+checkup_daemon \- Daemon that periodically performs checkups on the testbed
+hardware and software.
+.SH SYNOPSIS
+.BI checkup_daemon
+[\fB-hd\fR]
+.SH DESCRIPTION
+The
+.B checkup_daemon
+executes regular checkups on the testbed so as to proactively uncover any
+hardware or software problems.  The daemon itself acts primarily as a manager
+and relies on NS files or scripts to perform the necessary testing of objects
+in the testbed.  For example, to perform a checkup on the experimental
+interfaces of a node, the daemon creates an experiment that runs linktest and
+terminates itself if there were no problems.  If there was a problem, an email
+is sent to testbed-ops and the checkup stays in a locked state until a human
+can have a look at the problem.  Once the checkup finishes, either because
+there was no problem or it was resolved, the next checkup is scheduled.
+.SH CONFIGURATION
+The configuration for the
+.B checkup_daemon
+is derived from the testbed database.  The schedule for the objects to be
+checked and the type of checks is stored in the
+.I checkups
+table and has the following fields:
+.TP
+.I object
+The "object" identifier.  The objects under test are pretty loosely defined at
+the moment, so it is possible to schedule checkups for things that have no real
+representation in the rest of the testbed.
+.TP
+.I type
+The type of checkup to perform on this object.
+.TP
+.I next
+The next time this checkup should be run on this object.
+.P
+The
+.I checkup_types
+table provides additional information for each type of check to be applied to
+an object and has the following fields:
+.TP
+.I checkup_type
+The checkup type identifier and the name of the script or NS file to execute.
+Scripts must be stored in "/usr/testbed/libexec/checkup" and NS files must
+be stored in "/usr/testbed/lib/checkup" with a ".ns" extension.
+.TP
+.I object_type
+The type of object this checkup can be applied to.  This field is usually
+used in conjunction with the major_type field, for example, to automatically
+schedule checkups for nodes of a given type.
+.TP
+.I major_type
+The "major" type of an object.  This field is used by the daemon to perform
+some additional actions, for example, doing some setup before executing the
+checkup on an object.  Currently, the actions are hardcoded into the daemon
+itself.
+.TP
+.I expiration
+The number of seconds after a checkup that the next checkup should be run.
+.SH MAJOR TYPES
+The currently recognized major types are as follows:
+.TP
+node
+The
+.I node
+major type indicates that the object identifier is a physical node name and
+should be prereserved so the checkup can be run in a timely fashion.
+.SH NS\-BASED CHECKUPS
+The first method of performing a checkup is to use an NS file that can be run
+as a batch experiment.  The daemon will create an experiment with the NS file
+and wait for it to terminate itself or for an error to be reported through the
+event system.  If an error is reported, the experiment will stay swapped in
+until a testbed operator can diagnose the problem and swap out the experiment.
+.P
+Arguments are passed to the NS file through the following TCL variables:
+.TP
+opt(CHECKUP_OBJECT)
+The identifier of the object to be tested.
+.TP
+opt(OBJECT_TYPE)
+The object type as listed in the checkup_types table.
+.TP
+opt(MAJOR_TYPE)
+The major type as listed in the checkup_types table.
+.SH SCRIPT\-BASED CHECKUPS
+Checkups that don't make sense as NS file can be implemented using a script.
+The daemon executes the script in a polling fashion, therefore, scripts that
+take longer than a few seconds to execute should daemonize and report when the
+daemon finishes the next time the script is executed.  The script is started in
+its own working directory and passed the following arguments:
+.TP
+.I object
+The object to operate on.
+.TP
+.I state
+The current state of the checkup.  See
+.B ACTIVE CHECKUP STATES
+below for an explanation of the states.
+.P
+The script is then expected to return one of the following error codes:
+.TP
+0
+The checkup has finished successfully.
+.TP
+10
+The checkup is still running.
+.TP
+.I other
+The checkup failed.  An email containing the output of the script will be sent
+to testbed-ops and the checkup will be placed in the "locked" state.
+.SH ACTIVE CHECKUP STATES
+.TP
+.B new
+The checkup was just made active.  For NS based checkups, the experiment is
+created here and added to the batch queue.  For script based checkups, the
+script should report success immediately or daemonize and exit with status 10.
+.TP
+.B running
+The checkup is still running.  Script based checkups should poll the status of
+the daemon here.
+.TP
+.B locked
+The checkup is locked and waiting for human intervention.  Unlocking an NS
+based checkup is done by swapping out the experiment, the daemon will then take
+care of terminating the experiment.  Script based checkups should provide their
+own method of unlocking the checkup.
+.SH EXAMPLES
+.PP
+To add a new checkup type that is rerun every seconds on an object:
+.PP
+.RS
+mysql> insert into checkup_types set checkup_type='mytest', expiration=60;
+.RE
+.PP
+To schedule a "mytest" checkup for the "foo" object:
+.PP
+.RS
+mysql> insert into checkups set object='foo', type='mytest', next=NOW();
+.RE
+.PP
+To add a new checkup for all pc600's that is rerun every day:
+.PP
+.RS
+mysql> insert into checkup_types set object_type='pc600', major_type='node',
+checkup_type='hwtest.ns';
+.RE
+.SH FILES
+.TP
+/usr/testbed/lib/checkup/
+Directory that holds NS files that can perform a checkup.
+.TP
+/usr/testbed/lib/checkup/linktest.ns
+NS file used to check the experimental interfaces on a node.  XXX It is
+currently hardwired to test for four interfaces.
+.TP
+/usr/testbed/libexec/checkup/
+Directory that holds scripts that can perform a checkup.
+.TP
+/usr/testbed/libexec/checkup/example_checkup
+Example checkup script that demonstrates the "protocol" between the
+checkup_daemon and a checkup script.
+.TP
+/users/elabckup/ckup-*
+The working directories for any active script based checkups.
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

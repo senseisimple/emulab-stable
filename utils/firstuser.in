@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -32,18 +32,23 @@ my $HOMEDIR         = "/users";
 my $protoproj       = 'emulab-ops';
 my $protoproj_desc  = 'Operations Meta-Project';
 my $batchmode       = 0;
+my $webonly         = 1;
+my $trust           = "project_root";
 my $password;
 my $encpass;
 my %opts;
+
+my $CONTROL	= "@USERNODE@";
+my $BOSSNODE	= "@BOSSNODE@";
 
 #
 # Handle command-line options
 #
 sub usage {
-    print "Usage: firstuser [-b] [-p password]\n";
+    print "Usage: firstuser [-b] [-p password] [-u user] [-n name] [-e email]\n";
     exit(1);
 }
-if (! getopts("bp:", \%opts)) {
+if (! getopts("bp:u:n:e:", \%opts)) {
     usage();
 }
 if (defined($opts{b})) {
@@ -51,6 +56,17 @@ if (defined($opts{b})) {
 }
 if (defined($opts{p})) {
     $password = $opts{p};
+}
+if (defined($opts{u})) {
+    $protouser = $opts{u};
+    $webonly = 0;
+    $trust = "local_root";
+}
+if (defined($opts{n})) {
+    $protouser_name = $opts{n};
+}
+if (defined($opts{e})) {
+    $protouser_email = $opts{e};
 }
 
 my $result = DBQueryFatal("select * from users where uid='$protouser'");
@@ -62,9 +78,11 @@ if ($UID != 0) {
     die "Sorry, this must be run as root\n";
 }
 
-print "This script will create the 'proto-user' $protouser, which you will\n";
-print "use to bootstrap other users. It also creates the emulab-ops\n";
-print "meta-project.\n\n";
+if (!defined($opts{u})) {
+    print "This script will create the 'proto-user' $protouser, which you will\n";
+    print "use to bootstrap other users. It also creates the emulab-ops\n";
+    print "meta-project.\n\n";
+}
 
 # Get a password for the user
 if (!defined($password)) {
@@ -107,6 +125,10 @@ if (!defined $agid) {
 }
 # And in the wheel group so elabman can sudo to root.
 my $Ggid = "wheel";
+
+if (defined($opts{u})) {
+    $Ggid .= " $protoproj";
+}
     
 if (!$batchmode) {
     print "Creating user/project: Are you sure? (Y/N) ";
@@ -116,9 +138,20 @@ if (!$batchmode) {
 }
 
 print "Creating user on boss...\n";
-if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G $Ggid -h - " .
+if (system "/usr/sbin/pw useradd $protouser -u $uid -g $agid -G \"$Ggid\" -h - " .
     "-m -d $HOMEDIR/$protouser -s /bin/nologin -c \"$protouser_name\"\n") {
        die "Unable to add user to the password file!\n";
+}
+
+if ($CONTROL ne $BOSSNODE) {
+    print "Creating user on ops...\n";
+    
+    if (system("ssh $CONTROL ".
+	       "'/usr/sbin/pw useradd $protouser -u $uid -g $agid ".
+	       "-G \"$Ggid\" -h - -d $HOMEDIR/$protouser -s /bin/nologin ".
+	       "-c \"$protouser_name\"'")) {
+	die "Unable to add user to the ops password file!\n";
+    }
 }
 
 # Initialize the index value;
@@ -127,22 +160,26 @@ DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid");
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
 	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
-	"usr_modified=now(), admin=1, webonly=1, status='active', ".
+	"usr_modified=now(), admin=1, webonly=$webonly, status='active', ".
 	"usr_shell='$protouser_shell', usr_email='$protouser_email'");
 
-print "Creating project in database...\n";
-DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
-	"name='$protoproj_desc', head_uid='$protouser', unix_gid=$gid, " .
-	"approved=1");
+if (!defined($opts{u})) {
+    
+    print "Creating project in database...\n";
+    DBQueryFatal("insert into projects set pid='$protoproj', created=now(), " .
+		 "name='$protoproj_desc', head_uid='$protouser', ".
+		 "unix_gid=$gid,approved=1");
 
-print "Creating group in database...\n";
-DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', " .
-	"leader='$protouser', created=now(), description='Default Group', " .
-	"unix_gid=$ggid, unix_name='$protoproj'");
+    print "Creating group in database...\n";
+    DBQueryFatal("insert into groups set pid='$protoproj', gid='$protoproj', ".
+		 "leader='$protouser', created=now(), ".
+		 "description='Default Group', " .
+		 "unix_gid=$ggid, unix_name='$protoproj'");
+}
 
 print "Putting user in group...\n";
 DBQueryFatal("insert into group_membership set uid='$protouser', " .
-	"pid='$protoproj', gid='$protoproj',  trust='project_root'," .
+	"pid='$protoproj', gid='$protoproj',  trust='$trust'," .
 	"date_applied=now(), date_approved=now()");
 
 # Flip UID to the new user so that the mk* scripts are happy - they can't
@@ -150,19 +187,25 @@ DBQueryFatal("insert into group_membership set uid='$protouser', " .
 $EUID = $UID = $uid;
 $EGID = $GID = $gid;
 
-print "Running mkproj...\n";
-if (system "$wap $mkproj $protoproj") {
-    die "Unable to create initial project $protoproj\n";
-}
+if (!defined($opts{u})) {
+    print "Running mkproj...\n";
+    if (system "$wap $mkproj $protoproj") {
+	die "Unable to create initial project $protoproj\n";
+    }
 
-print "Running mkgrp...\n";
-if (system "$wap $mkgroup $protoproj $protoproj") {
-    die "Unable to create group for initial project $protoproj\n";
+    print "Running mkgrp...\n";
+    if (system "$wap $mkgroup $protoproj $protoproj") {
+	die "Unable to create group for initial project $protoproj\n";
+    }
 }
 
 print "Running mkacct...\n";
 if (system "$wap $mkacct $protouser") {
     die "Unable to create account for initial user $protouser\n";
+}
+
+if (defined($opts{u})) {
+    exit(0);
 }
 
 #

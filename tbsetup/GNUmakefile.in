@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -13,7 +13,7 @@ PLABSUPPORT     = @PLABSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir ipassign nseparse
+SUBDIRS		= checkpass ns2ir ipassign nseparse checkup
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
@@ -75,7 +75,7 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir plab ipassign
+.PHONY:	checkpass ns2ir plab ipassign checkup
 checkpass:
 	@$(MAKE) -C checkpass all
 
@@ -90,6 +90,9 @@ plab:
 
 ipassign:
 	@$(MAKE) -C ipassign all
+
+checkup:
+	@$(MAKE) -C checkup all
 
 install: all script-install subdir-install
 	@echo "Don't forget to do a post-install as root"
@@ -116,6 +119,7 @@ subdir-install:
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)
 	@$(MAKE) -C ipassign install
+	@$(MAKE) -C checkup install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 	 $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
@@ -210,6 +214,7 @@ subdir-clean:
 	@$(MAKE) -C nseparse clean
 	@$(MAKE) -C plab clean
 	@$(MAKE) -C ipassign clean
+	@$(MAKE) -C checkup clean
 
 distclean:	subdir-distclean
 
@@ -219,6 +224,7 @@ subdir-distclean:
 	@$(MAKE) -C nseparse distclean
 	@$(MAKE) -C plab distclean
 	@$(MAKE) -C ipassign distclean
+	@$(MAKE) -C checkup distclean
 #
 # XXX Create non .tcl files.
 #

@@ -1,0 +1,50 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/checkup
+
+include $(OBJDIR)/Makeconf
+
+LIB_STUFF     = linktest.ns
+LIBEXEC_STUFF = example_checkup
+SBIN_STUFF    = checkup_daemon
+MAN_STUFF     = checkup_daemon.8
+
+#
+# Force dependencies on the scripts so that they will be rerun through
+# configure if the .in file is changed.
+# 
+all: $(LIB_STUFF) $(SBIN_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_SBINDIR)/, $(SBIN_STUFF)) \
+	$(addprefix $(INSTALL_LIBDIR)/checkup/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/checkup/, $(LIBEXEC_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/man/man8/, $(MAN_STUFF))
+
+$(INSTALL_DIR)/man/man8/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/man/man8
+	$(INSTALL_DATA) $< $@
+
+$(INSTALL_LIBDIR)/checkup/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/checkup
+	$(INSTALL) $< $@
+
+$(INSTALL_LIBEXECDIR)/checkup/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)/checkup
+	$(INSTALL) $< $@
+
+clean:

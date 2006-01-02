@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -243,6 +243,31 @@ if ($query_result->numrows) {
     
     while (my ($node_id) = $query_result->fetchrow()) {
 	print "$node_id ";
+    }
+    print "\n";
+}
+
+#
+# Look for stuck checkups.
+#
+
+if (! ($query_result = 
+       DBQueryWarn("select object,type,state,start from active_checkups ".
+		   "where start < DATE_SUB(NOW(), INTERVAL 1 DAY)"))) {
+    fatal("Error accessing the database.");
+}
+
+if ($query_result->numrows) {
+    print "\n";
+    print "----------------------------------------------------------------\n";
+    print "\n";
+    print "Checkups running for more than a day:\n";
+    
+    printf("%-16s %-16s %-16s %-22s\n", "Object", "Type", "State", "Start");
+    print "---------------- ---------------- ---------------- ".
+	"--------------------\n";
+    while (my ($object,$type,$state,$start) = $query_result->fetchrow()) {
+	printf("%-16s %-16s %-16s %-20s\n", $object, $type, $state, $start);
     }
     print "\n";
 }

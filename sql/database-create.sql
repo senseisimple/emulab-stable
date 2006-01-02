@@ -16,6 +16,18 @@ CREATE TABLE accessed_files (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `active_checkups`
+--
+
+CREATE TABLE active_checkups (
+  object varchar(128) NOT NULL default '',
+  type varchar(64) NOT NULL default '',
+  state varchar(16) NOT NULL default 'new',
+  start datetime default NULL,
+  PRIMARY KEY  (object)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `archive_tags`
 --
 
@@ -97,6 +109,40 @@ CREATE TABLE cdroms (
   created datetime NOT NULL default '0000-00-00 00:00:00',
   version int(10) unsigned NOT NULL default '1',
   PRIMARY KEY  (cdkey)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `checkup_types`
+--
+
+CREATE TABLE checkup_types (
+  object_type varchar(64) NOT NULL default '',
+  checkup_type varchar(64) NOT NULL default '',
+  major_type varchar(64) NOT NULL default '',
+  expiration int(10) NOT NULL default '86400',
+  PRIMARY KEY  (object_type,checkup_type)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `checkups`
+--
+
+CREATE TABLE checkups (
+  object varchar(128) NOT NULL default '',
+  type varchar(64) NOT NULL default '',
+  next datetime default NULL,
+  PRIMARY KEY  (object,type)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `checkups_temp`
+--
+
+CREATE TABLE checkups_temp (
+  object varchar(128) NOT NULL default '',
+  type varchar(64) NOT NULL default '',
+  next datetime default NULL,
+  PRIMARY KEY  (object,type)
 ) TYPE=MyISAM;
 
 --
@@ -199,7 +245,7 @@ CREATE TABLE delays (
 ) TYPE=MyISAM;
 
 --
--- Table structure for table `delta_inst`
+-- Table structure for table `deleted_users`
 --
 
 CREATE TABLE deleted_users (

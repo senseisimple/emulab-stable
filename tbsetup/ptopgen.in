@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -340,7 +340,8 @@ if ($allnodes) {
 
 $result =
     DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
-		 "a.def_boot_osid, (b.pid is not null and b.eid is not null) " .
+		 "a.def_boot_osid, (b.pid is not null and b.eid is not null), " .
+		 "  np.reserved_pid is not null ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
@@ -355,8 +356,8 @@ $result =
 # to use all nodes), or if there is no entry in the perms table for
 # the type/class of node.
 #
-while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved) 
-       = $result->fetchrow_array) {
+while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
+	$prereserved) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -370,6 +371,8 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved)
     } else {
 	$is_reserved{$node} = 0;
     }
+
+    $is_prereserved{$node} = $prereserved;
 }
 
 #
@@ -553,6 +556,10 @@ foreach $node (keys(%nodes)) {
     # assign to prefer nodes the user has already allocated
     if ($exempt_eid && !$allnodes && $is_reserved{$node}) {
 	push(@features,"already_reserved:0");
+    }
+
+    if ($is_prereserved{$node}) {
+	push(@features,"prereserved:0.9");
     }
 
     # Add in modelnet stuff.

@@ -3034,3 +3034,35 @@ last_net_act,last_cpu_act,last_ext_act);
   alter table scripts change name script_name varchar(24) NOT NULL default '';
 
   alter table priorities change name priority_name varchar(8) NOT NULL;
+
+4.26: Add tables for the checkup_daemon.
+
+	CREATE TABLE active_checkups (
+	  object varchar(128) NOT NULL default '',
+	  type varchar(64) NOT NULL default '',
+	  state varchar(16) NOT NULL default 'new',
+	  start datetime default NULL,
+	  PRIMARY KEY  (object)
+	) TYPE=MyISAM;
+
+	CREATE TABLE checkup_types (
+	  object_type varchar(64) NOT NULL default '',
+	  checkup_type varchar(64) NOT NULL default '',
+	  major_type varchar(64) NOT NULL default '',
+	  expiration int(10) NOT NULL default '86400',
+	  PRIMARY KEY  (object_type,checkup_type)
+	) TYPE=MyISAM;
+
+	CREATE TABLE checkups (
+	  object varchar(128) NOT NULL default '',
+	  type varchar(64) NOT NULL default '',
+	  next datetime default NULL,
+	  PRIMARY KEY  (object,type)
+	) TYPE=MyISAM;
+
+	CREATE TABLE checkups_temp (
+	  object varchar(128) NOT NULL default '',
+	  type varchar(64) NOT NULL default '',
+	  next datetime default NULL,
+	  PRIMARY KEY  (object,type)
+	) TYPE=MyISAM;
