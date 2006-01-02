@@ -256,7 +256,7 @@ $query_result =
 
 
 while (my ($vname,$osname,$gotlinktest) = $query_result->fetchrow_array()) {
-    if (! $gotlinktest) {
+    if (! defined($gotlinktest) || !$gotlinktest) {
 	print STDERR
 	    "*** Node $vname is running an OSID ($osname) that does not ".
 		"support linktest!\n";
