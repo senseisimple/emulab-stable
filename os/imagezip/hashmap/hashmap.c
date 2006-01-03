@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -85,6 +85,7 @@ static unsigned int hashdatasize;
 #define TIMEOP(op, global_v)	(op);
 #endif
 
+#ifdef DEBUG
 static char *
 spewhash(unsigned char *h)
 {
@@ -111,6 +112,7 @@ dumphash(struct hashinfo *hinfo)
 	}
 	printf("TOTAL = %u\n", total);
 }
+#endif
 
 //#define READ_CACHE
 
@@ -385,7 +387,9 @@ readhashinfo(char *hfile, struct hashinfo **hinfop, uint32_t ssect)
 		return -1;
 	}
 
+#ifdef DEBUG
 	//dumphash(hinfo);
+#endif
 
 	*hinfop = hinfo;
 	return 0;
@@ -669,6 +673,11 @@ hashmap_compute_delta(struct range *curranges, char *hfile, int infd,
 			 * Keep track of the gaps
 			 */
 			if (gapstart < curstart) {
+#ifdef FOLLOW
+				fprintf(stderr,
+					"    G: [%u-%u]\n",
+					gapstart, curstart - 1);
+#endif
 				gapsize += curstart - gapstart;
 				gapcount++;
 			}
@@ -697,6 +706,26 @@ hashmap_compute_delta(struct range *curranges, char *hfile, int infd,
 		}
 
 #ifdef HASHSTATS
+		/*
+		 * Check for an end gap
+		 */
+		if (gapstart < hreg->region.start + hreg->region.size) {
+			uint32_t hregend =
+				hreg->region.start + hreg->region.size;
+#ifdef FOLLOW
+			fprintf(stderr, "    G: [%u-%u]\n",
+				gapstart, hregend - 1);
+#endif
+			gapsize += hregend - gapstart;
+			gapcount++;
+		}
+
+		/*
+		 * Properly account for gaps.
+		 * Earlier we counted the gap as part of the shared
+		 * space and as either unchanged or uncompared--adjust
+		 * those counts now.
+		 */
 		if (gapcount) {
 			hashstats.gaps++;
 
@@ -793,7 +822,7 @@ error:
 #include <sys/stat.h>
 
 void
-report_hash_stats(void)
+report_hash_stats(int pnum)
 {
 #ifdef HASHSTATS
 	uint32_t b1, b2;
@@ -816,6 +845,7 @@ report_hash_stats(void)
 		stat(hashfile, &sb);
 	}
 	fprintf(stderr, "(%u)\n", (unsigned)sb.st_mtime);
+	fprintf(stderr, "Partition:              %d\n", pnum);
 
 	fprintf(stderr, "Max hash block size:    %u sectors\n\n",
 		bytestosec(hashdatasize));
@@ -863,8 +893,7 @@ report_hash_stats(void)
 	fprintf(stderr, "Added to original:      %10u (%.1f%%)\n",
 		b2, ((double)b2 / b1) * 100.0);
 
-	b2 = (hashstats.shared - hashstats.unchanged) +
-		(hashstats.gapsects - hashstats.gapunchanged);
+	b2 = (hashstats.shared - hashstats.unchanged);
 	fprintf(stderr, "Modified from original: %10u (%.1f%%)\n\n",
 		b2, ((double)b2 / b1) * 100.0);
 
