@@ -185,6 +185,10 @@ foreach my $lan (keys(%virt_lans)) {
 	my $rdelay0 = $member0->{"rdelay"};
 	my $rloss0  = $member0->{"rlossrate"};
 	my $rbw0    = $member0->{"rbandwidth"};
+	my $qtype0  = "droptail";
+	if ($member0->{"q_red"}) {
+	    $qtype0 = ($member0->{"q_gentle"} ? "gred" : "red");
+	}
 
 	my $node1   = $member1->{"vnode"};
 	my $delay1  = $member1->{"delay"};
@@ -193,6 +197,10 @@ foreach my $lan (keys(%virt_lans)) {
 	my $rdelay1 = $member1->{"rdelay"};
 	my $rloss1  = $member1->{"rlossrate"};
 	my $rbw1    = $member1->{"rbandwidth"};
+	my $qtype1  = "droptail";
+	if ($member1->{"q_red"}) {
+	    $qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
+	}
 	
 	my $delay = ($delay0+$rdelay1) / 1000.0 ;
 	my $loss = 1-(1-$loss0)*(1-$rloss1);
@@ -202,9 +210,9 @@ foreach my $lan (keys(%virt_lans)) {
 	my $rbw = &min($rbw0,$bw1) * 1000;
 
 	printf $LTOUT
-	    "l $node0 $node1 $bw %.4f %.6f $lan\n", $delay, $loss;
+	    "l $node0 $node1 $bw %.4f %.6f $lan $qtype0\n", $delay, $loss;
 	printf $LTOUT
-	    "l $node1 $node0 $rbw %.4f %.6f $lan\n", $rdelay, $rloss;
+	    "l $node1 $node0 $rbw %.4f %.6f $lan $qtype1\n", $rdelay, $rloss;
     }
     else {
 	foreach my $memb0 (@members) {
@@ -224,13 +232,18 @@ foreach my $lan (keys(%virt_lans)) {
 		my $rdelay1 = $member1->{"rdelay"};
 		my $rloss1  = $member1->{"rlossrate"};
 		my $rbw1    = $member1->{"rbandwidth"};
+		my $qtype1  = "droptail";
+		if ($member1->{"q_red"}) {
+		    $qtype1 = ($member1->{"q_gentle"} ? "gred" : "red");
+		}
 
 		my $delay = ($delay0+$rdelay1) / 1000.0;
 		my $loss = 1-(1-$loss0)*(1-$rloss1);
 		my $bw = &min($bw0,$rbw1) * 1000;
 
 		printf $LTOUT
-		    "l $node0 $node1 $bw %.4f %.6f $lan\n", $delay, $loss;
+		    "l $node0 $node1 $bw %.4f %.6f $lan $qtype1\n",
+		    $delay, $loss;
 	    }
 	}
     }
