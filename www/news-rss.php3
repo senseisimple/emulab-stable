@@ -23,9 +23,12 @@ $query_result=
     <link><? echo $TBBASE?>/news.php3</link>
     <description>News items for <? echo $THISHOMEBASE ?></description>
     <docs>http://blogs.law.harvard.edu/tech/rss</docs>
-    <managingEditor><? echo $TBOPSEMAIL ?></managingEditor>
-    <webMaster><? echo $TBOPSEMAIL ?></webMaster>
+    <managingEditor><? echo $TBMAILADDR_OPS ?></managingEditor>
+    <webMaster><? echo $TBMAILADDR_OPS ?></webMaster>
+    <pubDate><? echo date("r"); ?></pubDate>
 <?
+
+$first = 1;
 while ($row = mysql_fetch_array($query_result)) {
     $subject     = $row[subject];
     $timestamp   = $row['date'];
@@ -53,6 +56,13 @@ while ($row = mysql_fetch_array($query_result)) {
     list($year,$month,$day) = split('-',$date);
     list($hour,$min,$sec) = split(':',$hours);
     $rfc822date = date(r,mktime($hour, $min, $sec, $month, $day, $year));
+
+    if ($first) {
+        # If this is the 'first' article (the most recent), include it as
+        # the date the channel was last updated
+        echo "    <lastBuildDate>" . $rfc822date . "</lastBuildDate>\n";
+        $first = 0;
+    }
 
     echo "    <item>\n";
     echo "        <title>$subject</title>\n";
