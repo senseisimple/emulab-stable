@@ -2493,6 +2493,41 @@ function SHOWNODE($node_id, $flags = 0) {
                       <td class=left>$type ($man $model; $protocols)</td>
                   </tr>\n";
 	}
+
+	#
+	# Switch info. Very useful for debugging.
+	#
+	if (!$noperm) {
+	    $query_result =
+		DBQueryFatal("select i.*,w.* from interfaces as i ".
+			     "left join wires as w on i.node_id=w.node_id1 ".
+			     "   and i.card=w.card1 and i.port=w.port1 ".
+			     "where i.node_id='$node_id' and ".
+			     "      w.node_id1 is not null ".
+			     "order by iface");
+
+	    echo "<tr></tr><tr>
+                    <td align=center colspan=2>Switch Info</td>
+                  </tr>\n";
+	    echo "<tr><th>Iface:role &nbsp card,port</th>
+                      <th>Switch &nbsp card,port</th>\n";
+		
+	    while ($row = mysql_fetch_array($query_result)) {
+		$iface       = $row["iface"];
+		$role        = $row["role"];
+		$card        = $row["card1"];
+		$port        = $row["port1"];
+		$switch      = $row["node_id2"];
+		$switch_card = $row["card2"];
+		$switch_port = $row["port2"];
+
+		echo "<tr>
+                      <td>$iface:$role &nbsp $card,$port</td>
+                      <td class=left>".
+		          "$switch: &nbsp $switch_card,$switch_port</td>
+                  </tr>\n";
+	    }
+	}
     }
 
     #
