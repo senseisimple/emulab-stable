@@ -205,7 +205,7 @@ if ($isadmin) {
     }
 }
 else {
-    PAGEHEADER("News",NULL,$RSSAUTO);
+    PAGEHEADER("News",NULL,$RSS_HEADER_NEWS);
 }
 
 ?>
