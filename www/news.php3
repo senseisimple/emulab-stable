@@ -25,11 +25,6 @@ if ($uid) {
     $isadmin = 0;
 }
 
-# This is so that smart browsers like Firefox can detect the presence
-# of an RSS feed.
-$RSSAUTO = "<link rel=\"alternate\" type=\"application/rss+xml\" " .
-           "title=\"Emulab News\" href=\"$TBDOCBASE/news-rss.php3\" />";
-
 if ($isadmin) {
     if (isset($deletec)) {
 	$safeid = addslashes($deletec);
@@ -58,7 +53,7 @@ if ($isadmin) {
 	return;
     }
 
-    PAGEHEADER("News",NULL,$RSSAUTO);
+    PAGEHEADER("News",NULL,$RSS_HEADER_NEWS);
     
     if (isset($delete)) {
 	$delete = addslashes($delete);

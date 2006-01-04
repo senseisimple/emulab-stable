@@ -43,7 +43,7 @@ if ($uid = GETUID()) {
 #
 # Standard Testbed Header
 #
-PAGEHEADER("Emulab - Network Emulation Testbed Home");
+PAGEHEADER("Emulab - Network Emulation Testbed Home",NULL,$RSS_HEADER_NEWS);
 
 #
 # Special banner message.
