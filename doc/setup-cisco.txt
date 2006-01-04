@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2002-2005 University of Utah and the Flux Group.
+# Copyright (c) 2002-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -109,6 +109,37 @@ What I finally did to resolve this was to tear down the trunk link and
 EtherChannel that port was a part of, run the command on it (which succeeded
 this time), and then build the EtherChannel and trunk back up.
 
+##### Setting the clock
+
+Since bos is an NTP server, you should set your switches to sync time with it.
+On CatOS, this is accomplised with:
+set ntp server 10.11.12.1
+set ntp timezone MST -7
+set ntp summertime MDT
+set ntp summertime enable
+set ntp summertime recurring
+set ntp client enable
+show time
+
+Of course, you'll need to replace 10.11.12.1 with the IP address your boss node
+uses to talk to the switches (usually its control-hardware interface), and
+'MST', -7, and 'MDT' with the names of your timezone and its offset from GMT.
+If you don't use daylight-savings time, leave out the 'summertime' steps, and
+instead do:
+set ntp summertime enable
+
+Watch the output of 'show time' for a while to make sure the clock syncs up.
+It may take a few minutes.
+
+On IOS, these commands are:
+configure terminal
+ntp server 10.11.12.1
+clock timezone MST -7
+clock summer-time MDT recurring
+exit
+
+...  and to see the current time, run 'show clock'
+
 ##### IOS commands
 
 The above commands are given under the assummption that your switches are
@@ -156,7 +187,8 @@ no vlan 1000
 
 To put an interface into a VLAN:
 interface gi0/1
-access 10
+switchport access vlan 10
+exit
 
 In order to turn on trunking for an interface:
 interface gi0/1
