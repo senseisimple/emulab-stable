@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Osload library. Basically the backend to the osload script, but also used
@@ -919,6 +919,7 @@ sub osload_setupswapinfo($$;@)
     # then symlink the <vname>.sig's to it.  This not only saves space,
     # but makes it easier to determine what is loaded on each node.
     #
+    my %gotsig = ();
     for my $node (keys(%nodeinfo)) {
 	my $infop = $nodeinfo{$node};
 	if ($infop == 0) {
@@ -951,6 +952,11 @@ sub osload_setupswapinfo($$;@)
 	#
 	unlink("$infodir/$vname.sig", "$infodir/$vname.part");
 
+	#
+	# Now copy over the base signature if needed, either because
+	# it doesn't exist in the swapinfo directory or is out of date.
+	#
+	my $mustcopy = 0;
 	my ($sigdir, $signame);
 	if ($imagepid eq TBOPSPID()) {
 	    $sigdir = "$TB/images/sigs";
@@ -965,8 +971,23 @@ sub osload_setupswapinfo($$;@)
 		"cannot save swapout state!\n";
 	    next;
 	}
-	my $basesig = "$infodir/$rimageid";
+	my $basesig = "$infodir/$rimageid.sig";
 	if (! -r $basesig) {
+	    $mustcopy = 1;
+	} elsif (!defined($gotsig{$basesig})) {
+	    my $fromtime = stat("$sigdir/$signame")->mtime;
+	    my $totime = stat($basesig)->mtime;
+	    if ($fromtime > $totime) {
+		print "*** swapinfo: WARNING: ".
+		    "$rimageid.sig out of date, updating...\n";
+		$mustcopy = 1;
+	    } elsif ($fromtime < $totime) {
+		print "*** swapinfo: WARNING: ".
+		    "$rimageid.sig newer than source $sigdir/$signame!\n";
+	    }
+	}
+	if ($mustcopy) {
+	    unlink($basesig);
 	    if (system("/bin/cp -p $sigdir/$signame $basesig")) {
 		print "*** swapinfo: WARNING: ".
 		      "could not create signature $basesig, ".
@@ -974,7 +995,9 @@ sub osload_setupswapinfo($$;@)
 		next;
 	    }
 	}
-	if (system("/bin/ln -s $rimageid $infodir/$vname.sig")) {
+	$gotsig{$basesig} = 1;
+
+	if (system("/bin/ln -s $rimageid.sig $infodir/$vname.sig")) {
 	    print "*** swapinfo: WARNING: ".
 		"could not create signature $infodir/$vname.sig, ".
 		    "cannot save swapout state!\n";
@@ -992,6 +1015,27 @@ sub osload_setupswapinfo($$;@)
 	print FD "LOADPART=$lpart ";
 	print FD "BOOTPART=$part\n";
 	close(FD);
+    }
+
+    #
+    # Now get rid of usused signature files
+    # Note that we can only use the gotsig hash if we are loading all nodes
+    # in an experiment (else we don't know whether a sig is used or not).
+    #
+    if ($allnodes) {
+	my $infodir = "/proj/$pid/exp/$eid/swapinfo";
+	my @allsigs = `ls $infodir/*.sig`;
+	chomp(@allsigs);
+	for my $sig (@allsigs) {
+	    if (! -l $sig && !defined($gotsig{$sig})) {
+		# untaint the file name
+		if ($sig =~ /^($infodir\/[-\w\.\+]+\.sig)$/) {
+		    $sig = $1;
+		    print "removing unused signature file $sig ...\n";
+		    unlink($sig);
+		}
+	    }
+	}
     }
 }
 
