@@ -3066,3 +3066,11 @@ last_net_act,last_cpu_act,last_ext_act);
 	  next datetime default NULL,
 	  PRIMARY KEY  (object,type)
 	) TYPE=MyISAM;
+
+4.27: Some changes to the archive table:
+
+      alter table archives add archived tinyint(1) default '0';
+      alter table archives add date_archived int(10) unsigned \
+		NOT NULL default '0';
+
+		

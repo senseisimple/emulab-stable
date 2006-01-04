@@ -61,6 +61,8 @@ CREATE TABLE archives (
   idx int(10) unsigned NOT NULL auto_increment,
   directory tinytext,
   date_created int(10) unsigned NOT NULL default '0',
+  archived tinyint(1) default '0',
+  date_archived int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (idx)
 ) TYPE=MyISAM;
 
