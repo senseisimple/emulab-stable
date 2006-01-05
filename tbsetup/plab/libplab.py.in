@@ -28,6 +28,7 @@ import httplib
 import xml.parsers.expat
 import re
 import calendar
+import shlex
 
 from popen2 import Popen4
 from warnings import warn
@@ -1259,7 +1260,10 @@ class Node:
         """
         Executes the given command, optionally squelching the output.
         """
-        cmdobj = Popen4(command)
+        # Split up the command into a list to exec (avoid
+        # intermediate shell invocation).
+        cmdlist = shlex.split(command)
+        cmdobj = Popen4(cmdlist)
         cmdout = cmdobj.fromchild.read()
         cmdstatus = cmdobj.wait()
         if (not quiet) and cmdout:
