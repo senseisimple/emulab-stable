@@ -53,6 +53,10 @@ cfg = viewcvs.load_config(CONF_PATHNAME, server)
 
 cfg.general.default_root = 'svn'
 cfg.general.svn_roots    = {'svn' : repodir}
+cfg.general.cvs_roots    = {}
 cfg.options.docroot      = "/cvsweb/viewvc"
+cfg.options.http_expiration_time = 10
+cfg.options.generate_etags = 1
+cfg.general.address      = "<a href='mailto:@TBOPSEMAIL_NOSLASH@'>@TBOPSEMAIL_NOSLASH@</a>"
 
 viewcvs.main(server, cfg)
