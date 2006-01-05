@@ -180,7 +180,7 @@ if ($expstate) {
     }
 }
 
-WRITESUBMENUBUTTON("Modify Experiment Metadata",
+WRITESUBMENUBUTTON("Modify Metadata",
 		   "editexp.php3?pid=$exp_pid&eid=$exp_eid");
 
 WRITESUBMENUDIVIDER();
@@ -253,7 +253,7 @@ if (STUDLY()) {
 
 if ($EXPOSEARCHIVE) {
     WRITESUBMENUBUTTON("Experiment File Archive",
-		       "cvsweb/cvswebwrap.php3?exptidx=$expindex");
+		       "archive_view.php3?pid=$exp_pid&eid=$exp_eid");
 }
 
 if ($types['garcia'] || $types['static-mica2'] || $types['robot']) {

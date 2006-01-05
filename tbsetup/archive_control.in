@@ -1,0 +1,188 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Command line interface to experiment archive module.
+#
+sub usage()
+{
+    print STDOUT
+	"Usage: archive_control [-f] <commit> <pid> <eid>\n";
+    exit(-1);
+}
+my $optlist = "df";
+my $debug   = 0;
+my $force   = 0;
+my $dbuid;
+
+#
+# Configure variables
+#
+my $TB		    = "@prefix@";
+my $TBOPS           = "@TBOPSEMAIL@";
+my $NFSTRACESUPPORT = @NFSTRACESUPPORT@;
+my $NFSTRACE	    = "$TB/sbin/nfstrace";
+
+# Protos
+sub fatal($);
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# un-taint path
+$ENV{'PATH'} = "/bin:/usr/bin:/usr/local/bin:$TB/bin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libaudit;
+use libArchive;
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    die("*** $0:\n".
+	"    You do not exist in the Emulab Database!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV != 3) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+my $action = $ARGV[0];
+my $pid    = $ARGV[1];
+my $eid    = $ARGV[2];
+
+#
+# Untaint args.
+#
+if ($action =~ /^(commit)$/) {
+    $action = $1;
+}
+else {
+    usage();
+}
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in pid: $pid.");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in eid: $eid.");
+}
+
+if (! ($expstate = ExpState($pid, $eid))) {
+    fatal("No such experiment $pid/$eid!");
+}
+
+#
+# Check permission. Only people with permission to destroy the experiment
+# can do this.
+#
+if (! TBExptAccessCheck($UID, $pid, $eid, TB_EXPT_UPDATE)) {
+    fatal("You do not have permission to control the archive for $pid/$eid!");
+}
+
+#
+# Do not allow an archive system to be controlled if the experiment is not
+# active or swapped. Will probably be changed later.
+#
+if ($expstate ne EXPTSTATE_ACTIVE && 
+    $expstate ne EXPTSTATE_SWAPPED) {
+    fatal("Experiment $pid/$eid must be active or swapped!");
+}
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+# Temporary
+libArchive::setdebug(1);
+
+#
+# Allow the user to force a commit of the archive.
+#
+if ($action eq "commit") {
+    if ($NFSTRACESUPPORT) {
+	#
+	# This program asks the nodes for the trace results.
+	#
+	print "Getting files accessed via NFS.\n";
+	system("$NFSTRACE transfer $pid $eid");
+ 
+	#
+	# Add the files that have been detected by tracing to the archive.
+	#
+	if (libArchive::TBExperimentArchiveAddTracedFiles($pid, $eid) < 0) {
+	    fatal("Failed to add traced files to the experiment archive!");
+	}
+    }
+
+    #
+    # Add the special per-experiment archive directory.
+    #
+    print "Getting user added files.\n";
+    if (libArchive::TBExperimentArchiveAddUserFiles($pid, $eid) < 0) {
+	fatal("Failed to add user specified files to the experiment archive!");
+    }
+
+    #
+    # Do a SavePoint on the experiment files.
+    #
+    print "Doing a savepoint on the experiment archive ...\n";
+    if (libArchive::TBExperimentArchiveSavePoint($pid, $eid) < 0) {
+	fatal("Failed to do a savepoint on the experiment archive!");
+    }
+
+    # Commit the archive after swapout
+    print "Doing a commit on the experiment archive ...\n";
+    if (libArchive::TBCommitExperimentArchive($pid, $eid, "user_commit") < 0) {
+	  fatal("Failed to commit experiment archive!");
+    }
+}
+exit(0);
+
+sub fatal($)
+{
+    my ($mesg) = $_[0];
+
+    die("*** $0:\n".
+	"    $mesg\n");
+}
+

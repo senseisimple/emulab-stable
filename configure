@@ -2,7 +2,7 @@
 
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 2.13 
-# Copyright (C) 1992, 93, 94, 95, 96 Free Software Foundation, Inc.
+# Copyright (C) 1992, 93, 94, 95, 96, 05 Free Software Foundation, Inc.
 #
 # This configure script is free software; the Free Software Foundation
 # gives unlimited permission to copy, distribute and modify it.
@@ -2282,6 +2282,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/idleswap tbsetup/webidleswap tbsetup/switchmac \
 	tbsetup/newnode_reboot tbsetup/webnodeattributes \
         tbsetup/libtestbed.py \
+	tbsetup/libArchive.pm tbsetup/archive_control \
+	tbsetup/webarchive_control \
 	tbsetup/tarfiles_setup tbsetup/webtarfiles_setup \
 	tbsetup/fetchtar.proxy tbsetup/webfrisbeekiller \
 	tbsetup/plab/GNUmakefile tbsetup/plab/libplab.py \

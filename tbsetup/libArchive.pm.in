@@ -46,7 +46,7 @@ my $SVNADMIN    = "/usr/local/bin/svnadmin";
 my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
 my $inittag     = 'root';
 my $defaultview = 'head';
-my $debug       = 1;
+my $debug       = 0;
 my $svnopt      = ($debug ? "" : "-q");
 
 # Little helper and debug function.
@@ -57,6 +57,21 @@ sub mysystem($)
     print STDERR "Running '$command'\n"
 	if ($debug);
     system($command);
+}
+
+# Another little helper for scripts that include this library.
+sub setdebug($)
+{
+    my ($toggle) = @_;
+
+    if ($toggle) {
+	$debug  = 1;
+	$svnopt = "";
+    }
+    else {
+	$debug  = 0;
+	$svnopt = "-q";
+    }
 }
 
 #
@@ -153,11 +168,12 @@ sub ArchiveCreate(;$$)
     mysystem("cd $dir; mkdir ignore; cd ignore; mkdir $view; ".
              "         mkdir $view/trunk $view/savepoint $view/tags; ".
 	     "         mkdir $view/history; ".
-	     "$SVN import -m 'ArchiveCreate' $view file://$repodir/$view")
+	     "$SVN import $svnopt -m 'ArchiveCreate' "/
+	     "     $view file://$repodir/$view")
 	== 0 or goto bad;
 
     # Create a branch tag in the tags directory to base differences against.
-    mysystem("$SVN copy -m 'ArchiveCreate Branch' ".
+    mysystem("$SVN copy $svnopt -m 'ArchiveCreate Branch' ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${tag}-branch")
 	== 0 or goto bad;
@@ -271,7 +287,7 @@ sub ArchiveAdd($$;$$)
 	mysystem("$TAR cf - -C / $pathname | tar xf - -C $checkin");
     }
     else {
-	mysystem("$RSYNC -R -avx --delete /${pathname} $checkin");
+	mysystem("$RSYNC -R -ax --delete /${pathname} $checkin");
     }
     if ($?) {
 	print STDERR "ArchiveFile: Could not copy in /$pathname\n";
@@ -358,13 +374,13 @@ sub ArchiveSavePoint($;$$$)
 	goto bad;
     }
     mysystem("$IMPORTER -no_user_input file://$repodir ".
-	     "          $view/savepoint . ")
+	     "          $view/savepoint . > /dev/null")
 	== 0 or goto bad;
 
     #
     # Create the tag for this savepoint. 
     # 
-    mysystem("$SVN copy -m 'ArchiveCreate Branch' ".
+    mysystem("$SVN copy $svnopt -m 'ArchiveCreate Branch' ".
 	     "          file://$repodir/$view/savepoint ".
 	     "          file://$repodir/$view/tags/${savetag}")
 	== 0 or goto bad;
@@ -531,7 +547,7 @@ sub ArchiveCommit($;$$$)
     }
 
     # Create a tag in the tags directory for the commit.
-    mysystem("$SVN copy -m 'ArchiveCommit' ".
+    mysystem("$SVN copy $svnopt -m 'ArchiveCommit' ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${newtag}")
 	== 0 or goto bad;
@@ -539,13 +555,13 @@ sub ArchiveCommit($;$$$)
     # Create a tag in the history directory for the commit. The
     # history directory has just the commit tags, so its easy to go
     # back in time.
-    mysystem("$SVN copy -m 'ArchiveCommit' ".
+    mysystem("$SVN copy $svnopt -m 'ArchiveCommit' ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/history/${newtag}")
 	== 0 or goto bad;
     
     # Create a branch tag in the tags directory to base differences against.
-    mysystem("$SVN copy -m 'ArchiveCommit Branch' ".
+    mysystem("$SVN copy $svnopt -m 'ArchiveCommit Branch' ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${newtag}-branch")
 	== 0 or goto bad;
@@ -689,7 +705,7 @@ sub ArchiveFork($$;$$$)
     }
 
     # Create newview directory in the repo.
-    mysystem("$SVN mkdir -m 'ArchiveFork' ".
+    mysystem("$SVN mkdir $svnopt -m 'ArchiveFork' ".
 	     "          file://$repodir/$newview")
 	== 0 or goto bad;
 
@@ -708,7 +724,7 @@ sub ArchiveFork($$;$$$)
 	== 0 or goto bad;
 
     # Do not want to copy the tags/savepoints directories. Add new ones.
-    mysystem("$SVN mkdir -m 'ArchiveFork' ".
+    mysystem("$SVN mkdir $svnopt -m 'ArchiveFork' ".
 	     "          file://$repodir/$newview/savepoint ".
 	     "          file://$repodir/$newview/tags")
 	== 0 or goto bad;
@@ -839,12 +855,28 @@ sub ArchiveArchive($$)
     #
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveCommit: ".
+	print STDERR "ArchiveArchive: ".
 	    "Archive '$archive_idx' does not exist in the DB!\n";
 	return -1;
     }
+
+    #
+    # Need additional check to make sure that it has not already been
+    # archived.
+    #
+    my ($archived, $date_archived);
+    
+    if (IsArchiveArchived($archive_idx, \$archived, \$date_archived) < 0) {
+	return -1;
+    }
+    if ($archived) {
+	print STDERR "ArchiveArchive: ".
+	    "Archive '$archive_idx' already archived on $date_archived!\n";
+	return 0;
+    }
+    
     if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveFile: $directory cannot be written!\n";
+	print STDERR "ArchiveArchive: $directory cannot be written!\n";
 	return -1;
     }
 
@@ -872,7 +904,10 @@ sub ArchiveArchive($$)
     #
     # Update its location in the DB, and remove the old directory.
     # 
-    DBQueryWarn("update archives set directory='$target' ".
+    DBQueryWarn("update archives set ".
+		"   directory='$target', ".
+		"   archived=1, ".
+		"   date_archived=UNIX_TIMESTAMP(now()) ".
 		"where idx='$archive_idx'")
 	or return -1;
     
@@ -889,7 +924,7 @@ sub ArchiveArchive($$)
 # Destroy an archive. The DB state is retained unless optional flag says
 # to clean it.
 #
-sub ArchiveDestroy($;$)
+sub ArchiveDestroy($$)
 {
     my ($archive_idx, $clean) = @_;
 
@@ -902,6 +937,22 @@ sub ArchiveDestroy($;$)
 	    "Archive '$archive_idx' does not exist in the DB!\n";
 	return -1;
     }
+
+    #
+    # Need additional check to make sure that it has not already been
+    # archived. Do not want to do anything, unless clean is specified.
+    #
+    my ($archived, $date_archived);
+    
+    if (IsArchiveArchived($archive_idx, \$archived, \$date_archived) < 0) {
+	return -1;
+    }
+    if ($archived && !$clean) {
+	print STDERR "ArchiveDestroy: ".
+	    "Archive '$archive_idx' archived on $date_archived!\n";
+	return 0;
+    }
+    
     if (! -d $directory || ! -w $directory) {
 	return 0;
     }
@@ -912,7 +963,7 @@ sub ArchiveDestroy($;$)
 	    "Could not remove contents of $directory!\n";
 	return -1;
     }
-    if (defined($clean) && $clean) {
+    if ($clean) {
 	(DBQueryWarn("delete from archive_tags ".
 		     "where archive_idx='$archive_idx'") &&
 	 DBQueryWarn("delete from archive_views ".
@@ -940,6 +991,30 @@ sub GetArchiveDirectory($$)
 
     $$rvalp = $dir
 	if (defined($rvalp));
+    return 0;
+}
+
+#
+# See if the archive has already been archived away, and when.
+#
+sub IsArchiveArchived($$$)
+{
+    my ($idx, $parch, $pdate) = @_;
+    
+    my $query_result =
+	DBQueryWarn("select archived,FROM_UNIXTIME(date_archived) ".
+		    "  from archives where idx='$idx'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    
+    my ($archived,$date_archived) = $query_result->fetchrow_array();
+
+    $$parch = $archived
+	if (defined($parch));
+    $$pdate = $date_archived
+	if (defined($pdate));
+    
     return 0;
 }
 
@@ -1142,10 +1217,13 @@ sub TBExperimentArchiveAddUserFiles($$)
 #
 # SavePoint an experiment archive. 
 #
-sub TBExperimentArchiveSavePoint($$$)
+sub TBExperimentArchiveSavePoint($$;$)
 {
     my ($pid, $eid, $tagext) = @_;
     my ($archive_idx, $view);
+
+    $tagext = "savepoint"
+	if (!defined($tagext));
 
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
