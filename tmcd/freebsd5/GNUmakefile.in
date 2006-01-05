@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,7 @@ SUBDIR		= tmcd/freebsd5
 
 include $(OBJDIR)/Makeconf
 
-SCRIPTS		= sethostname
+SCRIPTS		= 
 
 #
 # Force dependencies on the scripts so that they will be rerun through
