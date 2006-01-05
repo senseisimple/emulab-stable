@@ -1,20 +1,27 @@
 # -*- mode: text; indent-tabs-mode: nil -*-
 #
-# Directions for setting up an XP image from scratch.
+# Blow-by-blow directions for setting up an XP image from scratch.
+# 
 # These are raw notes and commands to paste into a shell.
 # Mostly Bash shell commands for Windows, some tcsh commands for Boss or Ops.
 # Some (most?) of it could be scriptified with some work. 
+# 
+# A major prerequisite is a Windows XP image that doesn't require activation on each
+# installation.  We use the MSDN August, 2001 image, updated by Service Packs and
+# Windows Update.  "Bulk license" versions should work as well.
 
-# Notice that this file has spaces instead of tabs at the beginning of lines.
-# A tab in either Bash or tcsh causes it to display all of the possible command completions!
+# Notice that this file has spaces instead of tabs at the beginning of lines.  A tab
+# in either Bash or tcsh causes it to display all of the possible command completions!
+
 # Here's a little Emacs keyboard macro to ease the copy-and-paste business:
     ; Copy a command line, leaving off the whitespace on the beginning of the line.
     (fset 'copy-command-line [?\M-m ?\C-  ?\C-e ?\C-f C-insert])
     (global-set-key "\^C\^E" 'copy-command-line)
 
-# By convention, optional "informational" commands are indented a couple of spaces more.
-## Debugging and problem-solving stuff is double-# commented.
+  # By convention, optional "informational" commands are indented a couple of spaces more.
+  ## Debugging and problem-solving stuff is double-# commented.
 
+# TCSH aliases used below:
 alias v 'ls -lsF'               # "Verbose" listing
 setenv en emulab.net
 alias rootpc 'sudo ssh pc\!^.$en \!:2*'
@@ -331,8 +338,8 @@ q
               chown root.wheel /home/root
               chmod 755 /home/root
               passwd root
-daFluxGroup
-daFluxGroup
+myRootPwd
+myRootPwd
               mkdir ~root/.ssh
               chown root.wheel ~root/.ssh
               # [On boss.]
@@ -341,11 +348,11 @@ daFluxGroup
               # This password isn't used for anything else, and doesn't need to be
               # very secure because all users are in the Administrators group on the node.
               eval sudo ssh "$ssh_args" root@pc$pc id
-daFluxGroup
+myRootPwd
               eval sudo scp "$ssh_args" ~root/.ssh/{id_dsa,identity}.pub root@pc$pc":".ssh
-daFluxGroup
+myRootPwd
               eval sudo ssh "$ssh_args" root@pc$pc
-daFluxGroup
+myRootPwd
                 # [On the target.]
                 id
                 cd ~root/.ssh
@@ -366,6 +373,7 @@ daFluxGroup
               rootpc $pc id
 
           - Install the standard host keys, dated Jun 21  2001.
+            ## XXX Need to update for the SSH Version 2 keys! ##
             ls -l /etc/ssh*
             # [On boss.]
               set pc=201
@@ -480,7 +488,7 @@ q
             tail install.log1
               make clean
 
-# [ SKIP
+# [ SKIP once you have an Elvin tarball in /share/windows.
             # Build Elvin for Windows on Coke, and tar it up for later installation.
             scp -p bos:"/usr/testbed/www/distributions/*elvin*-4.0.3.tar.gz" /tmp
             mkdir C:/elvin
@@ -558,7 +566,7 @@ q
               # (4 is Disabled, 3 is Manual, 2 is Automatic, 1 is only used for System services.)
               regtool -v set /HKLM/SYSTEM/CurrentControlSet/Services/elvinsvc.exe/Start 2
 
-# [ SKIP
+# [ SKIP testing
               ## Use any Windows experiment with a Program object in it for testing.
               pid=testbed eid=Windows-1
                 pid=testbed eid=Windows-1b
@@ -627,7 +635,7 @@ q
                 # Messages go to syslog.
                 tail /var/log/messages
 
-# [ SKIP
+# [ SKIP testing
                 # Little problem: "Must be root to run this script!"
                 # Add this: 
                   # This runs as a separate Local System service on XP.  Change to root.
@@ -829,7 +837,7 @@ if [ ]; then
             editrights -u root -l
           editrights -u root -a SeServiceLogonRight -l
           # Don't forget to set the root password to the following, if you haven't done it yet.
-          rootpwd='daFluxGroup'
+          rootpwd='myRootPwd'
           # EmulabShutdown is started manually later on from rc.cygwinxp .
           echo "$rootpwd"
             cygrunsrv -R EmulabShutdown
@@ -887,7 +895,7 @@ if [ ]; then
 
           # Start up after DHCP, Elvin, and W32Time (for watchdog), run ProgAgent afterwards.
               cygrunsrv -R EmulabStartup 
-          rootpwd='daFluxGroup'
+          rootpwd='myRootPwd'
           firstboot=/usr/local/etc/emulab/rc/rc.firstboot
           bootsetup=/usr/local/etc/emulab/rc/rc.bootsetup
           progrun="cygrunsrv -S ProgAgent"
@@ -1389,7 +1397,7 @@ Updating a set of existing images.
         su_nodes "(cd C:/Software/Cygwin; cp /tmp/setup.exe .; rm -f cygwin-setup.exe; ls -l)"
 
           # Log in a bunch of RDP windows, *as root*.
-          set rootpwd='daFluxGroup'
+          set rootpwd='myRootPwd'
           set rd=/proj/testbed/fish/rdesktop/rdesktop-1.3.1
           set rdarg="-K -g 1280x1024 -a 16"
           foreach node ( $nodes )
