@@ -429,6 +429,7 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        Login session rather than killing it. You can reconnect later on
        without losing anything. <p>
 
+       <a name="QWINSTA"></a>
        SSH doesn't count as a desktop, so you can ssh in and use this command:
        <b><code>qwinsta</code></b> (Query WINdows STAtion) to show existing
        winstation sessions and their session ID's, and this one to reset
@@ -506,7 +507,8 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 		   <i>paste</i> the contents of the clipboard.  </li>
 
 	    </ul>
-       </ul> </li> <br>
+       </ul>
+  </li> <br>
 
   <li> On the <b>first login by a user</b>, Windows creates the user's <i>Windows
        profile directory</i> under <code>C:\Documents and Settings</code>, and creates
@@ -519,7 +521,8 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
 
        User "root" is special, and has a local home directory under
        <code>/home</code>.  <code>/home</code> is a Cygwin symbolic link to
-       <code>C:\Documents and Settings</code>.  </li>
+       <code>C:\Documents and Settings</code>.
+  </li>
 
   <li> The <i>Windows XP</i> Start menu has no <b>Shutdown</b> button under
        RDP.  Instead, it is labeled <b>Disconnect</b> and only closes the RDP
@@ -531,19 +534,19 @@ Here are some fine points and hints for RDP logins to remote Windows desktops:
        To restart the computer, run <b>/sbin/reboot</b>, or use the "Shut
        Down" menu of <b>Task Manager</b>.  One way to start Task Manager is to
        right-click on the background of the Taskbar at the bottom of the
-       screen and select "Task Manager". </li>
-
+       screen and select "Task Manager".
+  </li>
 </ul>
 
 <h4><a name="Custom_images"> </a> Making custom Windows OS images </h4>
 
 Making custom Windows images is similar to <a
-href="../tutorial/docwrapper.php3?docname=tutorial.html#CustomOS"> doing it on the
-other Emulab operating systems</a>, except that you must do a little more work to run
-the <code>prepare</code> script as user <code>root</code> since there are no
-<code>su</code> or <code>sudo</code> commands on Windows.  This is optional on the
-other OS types, but on Windows, proper TCP/IP network setup depends on
-<code>prepare</code> being run.
+href="../tutorial/docwrapper.php3?docname=tutorial.html#CustomOS"> doing it on
+the other Emulab operating systems</a>, except that you must do a little more
+work to run the <code>prepare</code> script as user <code>root</code> since
+there are no <code>su</code> or <code>sudo</code> commands on Windows.  This
+is optional on the other OS types, but on Windows, proper TCP/IP network setup
+depends on <code>prepare</code> being run.
 
 <ul>
   <li>
@@ -558,8 +561,22 @@ other OS types, but on Windows, proper TCP/IP network setup depends on
        Re-enter new password:
     </pre>
 
-    This works becuase you are part of the Windows <code>Administrators</code> group.
-    Otherwise you would have to already know the root password to change it. </li> <br>
+    This works becuase you are part of the Windows <code>Administrators</code>
+    group.  Otherwise you would have to already know the root password to
+    change it.  <p>
+
+       <div style="margin-left: 40px;"> <b>NOTE:</b> If you change the root
+       password and reboot Windows before running <code>prepare</code> below,
+       the root password will not match the definitions of the Emulab Windows
+       services (daemons) that run as root, so they will not start up. </div>
+  </li> <br>
+
+  <li>
+     Log out all sessions by users other than <code>root</code>, because
+     <code>prepare</code> will be unable to remove their login profile
+     directories if they are logged in.  (See <a href="#QWINSTA">QWINSTA</a>.)
+  </li> <br>
+
   <li>
      Log in to the node as user <code>root</code> through the Console or SSH,
      using the password you set above, then run the <code>prepare</code> command.
@@ -567,16 +584,89 @@ other OS types, but on Windows, proper TCP/IP network setup depends on
      if not run as root.)
      <pre>
        /usr/local/etc/emulab/prepare
-     </pre> </li>       
+     </pre>
+     
+     If run without option arguments, <code>prepare</code> will ask for the
+     root password you want to use in your new image, prompting twice as the
+     passwd command did above.  It needs this to redefine the Emulab Windows
+     services (daemons) that run as root.  It doesn't need to be the same as
+     the root password you logged in with, since it sets the root password to
+     be sure.  The Administrator password is changed as well, since the
+     Sysprep option needs that (below.)  <p>
+
+     <ul>
+       <li>
+         You can give the <b><code>-p</code></b> option to specify the root
+	 password on the command line:
+	 <pre>
+	   /usr/local/etc/emulab/prepare -p myRootPwd
+	 </pre>
+       </li>
+       <li>
+	 The <b><code>-n</code></b> option says not to change the passwords at
+	 all, and the Emulab Windows services are not redefined.
+	 <pre>
+	   /usr/local/etc/emulab/prepare -n
+	 </pre>
+       </li>
+       <li>
+	 The <b><code>-s</code></b> option is used to make
+	 hardware-independent images using the Windows
+	 <b><code>Sysprep</code></b> deploy tool.  If you use it with the
+	 <code>-n</code> option instead of giving a password, it assumes that
+	 you separately blank the Administrator password, or edit your
+	 Administrator password into the
+	 <code>[GuiUnattended]AdminPassword</code> entry of the sysprep.inf
+	 file.
+	 <pre>
+	   /usr/local/etc/emulab/prepare -s -p myRootPwd
+	 </pre>
+
+	   <div style="margin-left: 40px;"> <b>NOTE:</b> This must be done
+	   from a login on the <b>serial console</b>, because Sysprep shuts
+	   down the network.  <code>prepare -s</code> refuses to run from an
+	   SSH or RDP login. </div> <br>
+
+	 Windows normally casts some aspects of the NT image into concrete at
+	 the first boot after installation, including the specific boot disk
+	 driver to be used by the NT loader (IDE vs. SCSI.)
+	 <code>Sysprep</code> is used by PC hardware manufacturers as they
+	 make XP installation disks with their own drivers installed.  The
+	 Sysprep option to run an unattended <code>Mini-Setup</code> at first
+	 boot instead of the normal "Out Of the Box Experience" is used in
+	 some large corporate roll-outs.  We do both. <p>
+
+	 The Emulab <code> /share/windows/sysprep </code> directory contains
+	 various service pack versions of the XP deploy tools, appropriate
+	 device driver directories, and a draft sysprep.inf file to direct the
+	 automated install process. <p>
+
+	 Unfortunately, the cost of having just one WINXP image for all PC
+	 types is that Mini-setup is slow, being a stripped-down NT kernel.
+	 It also forces an additional reboot when it's finished installing
+	 drivers.  Together, this adds between 4 and 5 minutes to the total
+	 Windows swap-in time, increasing it from about 10 minutes to around
+	 15.
+
+	   <div style="margin-left: 40px;"> <b>NOTE:</b> If you do this, set
+	   the <b>reboot wait-time</b> as you create your Image Descriptor to
+	   <b>360</b> rather than 240 so that swap-ins don't time out. </div>
+	   <br>
+       </li>
+
+     </ul>
+  </li>       
+
   <li>
-     Then log out and create your custom image. <br> <br>
+     Then log out and <a
+     href="../tutorial/docwrapper.php3?docname=tutorial.html#CustomOS">
+     create your custom image.</a> <br>
 
        <div style="margin-left: 40px;"> <b>NOTE:</b> Windows XP is too big to
        fit in the partitioning scheme used by FreeBSD and Linux, so it's
        necessary when making a Windows custom image to specify <b>Partition
        1</b>, and click <b>Whole Disk Image.</b> </div>
-     </li>
-
+  </li>
 </ul>
 
 <hr style="width: 100%; height: 2px;">
@@ -591,15 +681,15 @@ installation levels. <p>
 Cygwin is well documented.  Here are some links to get you started:
 <ul>
   <li> <a href="http://cygwin.com/cygwin-ug-net/cygwin-ug-net.html"> 
-    Users guide </a>
+    Users guide </a> </li>
   <li> <a href="http://cygwin.com/cygwin-ug-net/highlights.html"> 
-    Cygwin highlights </a>
+    Cygwin highlights </a> </li>
   <li> <a href="http://cygwin.com/cygwin-ug-net/using-utils.html"> 
-    Cygwin-added utilities </a>
+    Cygwin-added utilities </a> </li>
   <li> <a href="http://cygwin.com/faq.html"> 
-    FAQ </a>
+    FAQ </a> </li>
   <li> <a href="http://cygwin.com/cygwin-api/cygwin-api.html"> 
-    API compatibility and Cygwin functions </a>
+    API compatibility and Cygwin functions </a> </li>
 </ul>
 
 <h4><a name="Cygwin_packages"> </a> Cygwin packages </h4>
