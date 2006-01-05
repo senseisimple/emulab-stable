@@ -1011,13 +1011,22 @@ function WRITESUBMENUBUTTON($text, $link, $target = "") {
 
     echo "<!-- Table row for button $text -->
           <tr>
-            <td valign=center align=left nowrap>
-                <b>
-         	 <a class=sidebarbutton href='$link' $targettext>$text</a>\n";
-
-    echo "      </b>
+            <td class=submenuopt nowrap>
+         	 <a href='$link' $targettext>$text</a>
             </td>
           </tr>\n";
+}
+
+function WRITESUBMENUDIVIDER() {
+    global $BASEPATH;
+    echo "<tr>";
+    echo "<td class=\"submenuoptdiv\">";
+    # We have to put something in this cell, or IE ignores it. But, we do not
+    # want to make the table row full line-height, so a space will not do.
+    echo "<img src=\"$BASEPATH/1px.gif\" border=0 height=1 width=1 />";
+    echo "</td>";
+    echo "</tr>";
+    echo "\n";
 }
 
 #
@@ -1045,8 +1054,7 @@ function SUBPAGEEND() {
 function SUBMENUSTART($title) {
 ?>
     <!-- begin submenu -->
-    <table class='menu' cellpadding="0" cellspacing="0"
-	style="margin-right: 6px;" >
+    <table class="submenu" cellpadding="0" cellspacing="0">
       <tr>
         <td class="menuheader"><b><?php echo "$title";?></b></td>
       </tr>

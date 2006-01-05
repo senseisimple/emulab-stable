@@ -58,6 +58,11 @@ td.paddedcell2 { padding: 0.5em; }
 	border: solid 2px black; 
 	margin: 0px; 
 	padding: 0px;  }
+.submenu {
+	border: solid 2px black;
+	margin: 0px; 
+	margin-right: 6px; 
+	padding: 0px;  }
 .menuheader {
 	background-color: #000; 
 	color: #FFF;
@@ -74,7 +79,7 @@ td.paddedcell2 { padding: 0.5em; }
 	padding-bottom: 0px; 
 	margin: 0px;
 	border: 0px; }
-.menuopt,.menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb {
+.menuopt, .menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb, .submenuopt, .submenuoptdiv {
 	background-color: #cde; 
 	padding-left: 6px;
 	padding-top: 2px; 
@@ -82,6 +87,10 @@ td.paddedcell2 { padding: 0.5em; }
 	margin: 0px; 
 	border: 0px;
 	font-size: 10pt; }
+
+.submenuopt, .submenuoptdiv {
+	background-color: #F1FAFA; 
+}
 
 td.menuoptusage {
 	background-color: #cde; 
@@ -100,7 +109,7 @@ td.menuoptusage {
 	text-align: center;
 }
 
-.menuopt, .menuoptb {
+.menuopt, .menuoptb, .submenuopt {
 	padding-left: 14px;
 	text-indent: -8px;
 }

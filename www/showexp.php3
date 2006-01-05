@@ -125,6 +125,8 @@ if ($expstate) {
     WRITESUBMENUBUTTON("Download NS File",
 		       "spitnsdata.php3?pid=$exp_pid&eid=$exp_eid");
 
+    WRITESUBMENUDIVIDER();
+
     if (!$lockdown) {
         # Swap option.
 	if ($isbatch) {
@@ -175,19 +177,21 @@ if ($expstate) {
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Modify Traffic Shaping",
 			   "delaycontrol.php3?pid=$exp_pid&eid=$exp_eid");
-
-	WRITESUBMENUBUTTON("Link Tracing/Monitoring",
-			   "linkmon_list.php3?pid=$exp_pid&eid=$exp_eid");
     }
 }
 
-WRITESUBMENUBUTTON("Edit Experiment Metadata",
+WRITESUBMENUBUTTON("Modify Experiment Metadata",
 		   "editexp.php3?pid=$exp_pid&eid=$exp_eid");
 
-#
-# Admin and project/experiment leader get this option.
-#
+WRITESUBMENUDIVIDER();
+
 if ($expstate == $TB_EXPTSTATE_ACTIVE) {
+    WRITESUBMENUBUTTON("Link Tracing/Monitoring",
+		       "linkmon_list.php3?pid=$exp_pid&eid=$exp_eid");
+    
+    #
+    # Admin and project/experiment leaders get this option.
+    #
     if (TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_UPDATE)) {
 	WRITESUBMENUBUTTON("Update All Nodes",
 			   "updateaccounts.php3?pid=$exp_pid&eid=$exp_eid");
@@ -235,6 +239,8 @@ if ($wireless) {
 		       ($expstate == $TB_EXPTSTATE_ACTIVE ?
 			"?pid=$exp_pid&eid=$exp_eid" : ""));
 }
+
+WRITESUBMENUDIVIDER();
 
 # History
 WRITESUBMENUBUTTON("Show History",
