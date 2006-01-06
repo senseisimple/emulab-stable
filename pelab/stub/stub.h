@@ -29,6 +29,7 @@
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
+#define SNIFFWIN_SIZE 131071 //from min(net.core.rmem_max, max(net.ipv4.tcp_rmem)) on Plab linux
 
 //magic numbers
 #define CODE_BANDWIDTH 0x00000001 
@@ -44,12 +45,13 @@ struct connection {
 };
 typedef struct connection connection;
 
+extern short  flag_debug;
+extern connection rcvdb[CONCURRENT_RECEIVERS];
+extern unsigned long delays[CONCURRENT_SENDERS];
+extern int search_rcvdb(unsigned long indexip);
+extern void sniff(int to_ms);
+
 #endif
-
-
-
-
-
 
 
 

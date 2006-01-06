@@ -10,9 +10,11 @@
 #include "stub.h"
 
 //Global  
-connection snddb[CONCURRENT_SENDERS];
+short  flag_debug;
 connection rcvdb[CONCURRENT_RECEIVERS];
-unsigned long delays[CONCURRENT_SENDERS],last_delays[CONCURRENT_SENDERS];
+unsigned long delays[CONCURRENT_SENDERS];
+connection snddb[CONCURRENT_SENDERS];
+unsigned long last_delays[CONCURRENT_SENDERS];
 unsigned long throughputs[CONCURRENT_SENDERS], last_throughputs[CONCURRENT_SENDERS];
 fd_set read_fds,write_fds;
 
@@ -105,7 +107,7 @@ int get_rcvdb_index(unsigned long destaddr){
     their_addr.sin_port = htons(SENDER_PORT);  // short, network byte order 
     their_addr.sin_addr.s_addr = destaddr;
     memset(&(their_addr.sin_zero), '\0', 8);  // zero the rest of the struct 
-    if (getenv("Debug")!=NULL) printf("Try to connect to %s \n", inet_ntoa(their_addr.sin_addr));
+    if (flag_debug) printf("Try to connect to %s \n", inet_ntoa(their_addr.sin_addr));
 
     if (connect(sockfd, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
       perror("connect");
@@ -141,7 +143,7 @@ int recv_all(int sockfd, char *buf, int size){
     nleft -= numbytes;
     next  += numbytes;
   }
-  if (getenv("Debug")!=NULL) printf("recv_all(): from sockfd %d \n", sockfd);
+  if (flag_debug) printf("recv_all(): from sockfd %d \n", sockfd);
   return size;
 }
 
@@ -161,7 +163,7 @@ int send_all(int sockfd, char *buf, int size) {
     total += n; 
     bytesleft -= n; 
   } 
-  if (getenv("Debug")!=NULL) printf("send_all(): to sockfd %d \n", sockfd);
+  if (flag_debug) printf("send_all(): to sockfd %d \n", sockfd);
   return size; 
 }
 
@@ -179,8 +181,8 @@ void receive_sender(int i) {
     sndsec = ntohl(tmpulong);
     memcpy(&tmpulong, inbuf+SIZEOF_LONG, SIZEOF_LONG);
     sndusec = ntohl(tmpulong);
-    delays[i] = (rcvtime.tv_sec-sndsec)*1000000+(rcvtime.tv_usec-sndusec);
-    if (getenv("Debug")!=NULL) printf("One Way Delay (usec): %ld \n",delays[i]);
+    delays[i] = (rcvtime.tv_sec-sndsec)*1000+floor((rcvtime.tv_usec-sndusec)/1000+0.5);
+    if (flag_debug) printf("One Way Delay (msec): %ld \n",delays[i]);
   }
 }
 
@@ -252,8 +254,7 @@ int send_monitor(int sockfd) {
     if (snddb[i].valid == 1) {
       if (delays[i] != last_delays[i]) {
 	memcpy(outbuf_delay, &(snddb[i].ip), SIZEOF_LONG); //the sender or src ip
-	tmpf = delays[i]/1000.0f+0.5f;
-	tmpulong = htonl(floor(tmpf));
+	tmpulong = htonl(delays[i]);
 	memcpy(outbuf_delay+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
 	if (send_all(sockfd, outbuf_delay, 3*SIZEOF_LONG) == 0){
 	  return 0;
@@ -344,7 +345,13 @@ int main(void) {
   fd_set read_fds_copy, write_fds_copy;
   socklen_t sin_size;
   struct timeval start_tv, left_tv;
-  int yes=1, maxfd, i, flag_send_monitor=0;
+  int yes=1, maxfd, i, to_ms, flag_send_monitor=0;
+
+  //set up debug flag
+  if (getenv("Debug")!=NULL) 
+    flag_debug=1;
+  else 
+    flag_debug=0;
 
   //set up the sender connection listener
   if ((sockfd_rcv_sender = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -359,7 +366,7 @@ int main(void) {
   my_addr.sin_port = htons(SENDER_PORT);  // short, network byte order
   my_addr.sin_addr.s_addr = INADDR_ANY;   // automatically fill with my IP
   memset(&(my_addr.sin_zero), '\0', 8);   // zero the rest of the struct
-  if (getenv("Debug")!=NULL) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));  
+  if (flag_debug) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));  
   if (bind(sockfd_rcv_sender, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
@@ -382,7 +389,7 @@ int main(void) {
   my_addr.sin_port = htons(MONITOR_PORT); // short, network byte order
   my_addr.sin_addr.s_addr = INADDR_ANY;   // automatically fill with my IP
   memset(&(my_addr.sin_zero), '\0', 8);   // zero the rest of the struct
-  if (getenv("Debug")!=NULL) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));  
+  if (flag_debug) printf("Listen on %s\n",inet_ntoa(my_addr.sin_addr));  
   if (bind(sockfd_rcv_monitor, (struct sockaddr *)&my_addr, sizeof(struct sockaddr)) == -1) {
     perror("bind");
     exit(1);
@@ -437,7 +444,7 @@ int main(void) {
 	  if (sockfd_snd > maxfd) { // keep track of the maximum 
 	    maxfd = sockfd_snd; 
 	  } 
-	  if (getenv("Debug")!=NULL) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
+	  if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
 	} 
       }
       
@@ -453,7 +460,7 @@ int main(void) {
 	  if (sockfd_monitor > maxfd) { //keep track of the maximum 
 	    maxfd = sockfd_monitor; 
 	  } 
-	  if (getenv("Debug")!=NULL) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
+	  if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
 	} 
       }
 
@@ -485,11 +492,12 @@ int main(void) {
 	}
       }
          
-      //handle the tcpdump input
-      if (FD_ISSET(STDIN, &read_fds_copy)) { 
-	readline();
+      //sniff packets
+      if (have_time(&start_tv, &left_tv)) { 
+	to_ms = left_tv.tv_sec*1000+floor(left_tv.tv_usec/1000+0.5);
+	sniff(to_ms);
       }
-      	     
+
     } //while in quanta
   } //while forever
  
