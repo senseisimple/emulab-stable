@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX Need to deal with locking at some point ...
@@ -168,7 +168,7 @@ sub ArchiveCreate(;$$)
     mysystem("cd $dir; mkdir ignore; cd ignore; mkdir $view; ".
              "         mkdir $view/trunk $view/savepoint $view/tags; ".
 	     "         mkdir $view/history; ".
-	     "$SVN import $svnopt -m 'ArchiveCreate' "/
+	     "$SVN import $svnopt -m 'ArchiveCreate' ".
 	     "     $view file://$repodir/$view")
 	== 0 or goto bad;
 
