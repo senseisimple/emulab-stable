@@ -1,0 +1,367 @@
+#! /usr/bin/env python
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+# 
+# Permission to use, copy, modify and distribute this software is hereby
+# granted provided that (1) source code retains these copyright, permission,
+# and disclaimer notices, and (2) redistributions including binaries
+# reproduce the notices in supporting documentation.
+#
+# THE UNIVERSITY OF UTAH ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+# CONDITION.  THE UNIVERSITY OF UTAH DISCLAIMS ANY LIABILITY OF ANY KIND
+# FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
+#
+import sys
+import getopt
+import os, os.path
+
+TBROOT = "@prefix@"
+DOMAIN = "@OURDOMAIN@"
+TBPATH = os.path.join(TBROOT, "lib")
+
+if TBPATH not in sys.path:
+    sys.path.append(TBPATH)
+    pass
+
+# We get this from the testbed library directory.
+import xmpp
+
+# Debugging output.
+debug           = 0
+
+# Error condition.
+server_error    = 0
+exitval         = 0
+
+# The default admin user to connect as is tbops.
+admin_user      = "testbed-ops"
+admin_password  = "WeLovChat"
+
+# Default server to jabber server
+jabber_server   = "jabber." + DOMAIN
+muc_server      = "conference." + DOMAIN
+
+# The room we are operating on.
+chatroom        = False
+
+# State variable.
+statevar        = 0
+STATE_PRESENCE  = 1
+
+# Current ID we are looking for, and the one we have.
+current_id      = False;
+desired_id      = False;
+
+# Stuff to hand to the muc server.
+chatroom_fields = {
+    "muc#owner_roomname"                : "",
+    "muc#owner_roomdesc"                : "",
+    "muc#owner_publicroom"              : "0",
+    "muc#owner_persistentroom"          : "1",
+    "privacy"                           : "1",
+    "muc#owner_maxusers"                : "50",
+    "muc#owner_moderatedroom"           : "0",
+    "defaulttype"                       : "0",
+    "privmsg"                           : "0",
+    "muc#owner_inviteonly"              : "1",
+    "muc#owner_allowinvites"            : "1",
+    "legacy"                            : "0",
+    "muc#owner_passwordprotectedroom"   : "1",
+    "muc#owner_roomsecret"              : "foobar",
+    "muc#owner_enablelogging"           : "0",
+    "muc#owner_whois"                   : "anyone"
+    }
+
+##
+# Print the usage statement to stdout.
+#
+def usage():
+    print ("Usage: " + sys.argv[0] 
+           + " [-d] [-s server] <room> <op> [params]")
+    sys.exit(-1)
+
+#
+# Process program arguments.
+# 
+try:
+    # Parse the options,
+    opts, req_args =  getopt.getopt(sys.argv[1:],
+                      "dhs:",
+                      [ "help", "server="])
+    # ... act on them appropriately, and
+    for opt, val in opts:
+        if opt in ("-h", "--help"):
+            usage()
+            pass
+        elif opt in ("-s", "--server"):
+	    jabber_server = val
+            pass
+        elif opt in ("-d", "--debug"):
+	    debug = 1
+            pass
+        pass
+    pass
+except getopt.error, e:
+    print e.args[0]
+    usage()
+    sys.exit(2)
+    pass
+
+if len(req_args) < 2:
+    usage()
+    sys.exit(2)
+    pass
+
+# First argument is the room jid.
+chatroom = req_args[0]
+req_args = req_args[1:];
+
+#
+# These handlers are required by the xmpp library.
+#
+def HandlePresence(session, presence):
+    global current_id
+    current_id = presence.getID()
+    if presence.getType() == 'error':
+        errmsg       = presence.getError()
+        server_error = 1
+        print "HandlePresence Error: " + errmsg
+        raise xmpp.protocol.NodeProcessed
+    print "HandlePresence: " + presence.getJid()
+    pass
+
+def HandleMessage(session, message):
+    print "HandleMessage: " + message.getBody()
+    current_id = message.getID()
+    pass
+
+def HandleIQ(conn, iq_node):
+    global current_id
+    print "HandleIQ: "
+    current_id = iq_node.getID()
+    raise xmpp.protocol.NodeProcessed
+    pass
+
+def HandleIQ_Error(conn, iq_node):
+    global current_id, server_error
+    errmsg       = iq_node.getError()
+    current_id   = iq_node.getID()
+    server_error = 1
+    print "HandleIQ Error: " + errmsg
+    raise xmpp.protocol.NodeProcessed
+    pass
+
+#
+# Try and connect.
+#
+def Connect():
+    jid = xmpp.protocol.JID(admin_user + "@" + jabber_server + "/Test")
+    cl  = xmpp.Client(jid.getDomain(), debug=['always',])
+    cl.connect()
+    cl.auth(jid.getNode(), admin_password)
+    cl.sendInitPresence(requestRoster=0)
+    cl.Process(timeout=2)
+
+    cl.RegisterHandler('presence', HandlePresence)
+    cl.RegisterHandler('message', HandleMessage)
+    cl.RegisterHandler('iq', HandleIQ, 'result', xmpp.protocol.NS_MUC_OWNER)
+    cl.RegisterHandler('iq', HandleIQ_Error, 'error')
+
+    return cl
+
+#
+# Wait for response. Generic 10 second timeout, or if error. 
+#
+def SendAndWait(client, x):
+    global current_id, desired_id, server_error
+
+    server_error = 0
+    current_id   = False
+    desired_id   = x.getID()
+    
+    # Send it and wait.
+    client.send(x)
+    waitcount = 10
+    while (waitcount >= 0):
+        client.Process(timeout=1)
+        if current_id == desired_id:
+            if server_error != 0:
+                return -1
+            return 0
+        waitcount = waitcount - 1
+        pass
+    
+    if waitcount == 0:
+        print "Timed out talking to server";
+        sys.exit(1);
+        pass
+
+    pass
+
+#
+# See if a room already exists.
+# 
+def RoomExists(client):
+    p = xmpp.Presence(to = chatroom + "@" + muc_server, typ='unavailable')
+    p.setID("exists");
+
+    exists = SendAndWait(client, p);
+    if exists < 0:
+        return False
+    return True
+
+#
+# Create/Delete a romm
+#
+def DoChatRoom(client, args):
+    global statevar
+    global current_id, desired_id, server_error
+    
+    op = args[0]
+    exists = RoomExists(client);
+    
+    #
+    # Destroy the room.
+    #
+    if (op == "destroy"):
+        if exists == False:
+            print "Chatroom " + chatroom + " does not exist."
+            return 0
+        
+        iq = xmpp.Iq(typ = 'set', queryNS = xmpp.protocol.NS_MUC_OWNER,
+                     frm = admin_user + "@" + jabber_server + "/Test",
+                     to = chatroom + "@" + muc_server)
+
+        # Add a destroy element to the query element. It is empty.
+        item = iq.getTag('query').setTag('destroy')
+
+        # Add an id, to look for.
+        iq.setID("begone")
+
+        # Send it and wait. Server either did it or failed.
+        return SendAndWait(client, iq)
+    
+    #
+    # Otherwise creating a room. Must have a password.
+    #
+    if len(args) != 2:
+        usage()
+        sys.exit(2)
+        pass
+    
+    password = args[1]
+    
+    # Already exists is a non-fatal error.
+    if exists == True:
+        print "Chatroom " + chatroom + " already exists."
+        return 0
+    
+    # Set up the rest of the room parameters from arguments.
+    chatroom_fields["muc#owner_roomname"]   = chatroom
+    chatroom_fields["muc#owner_roomdesc"]   = "This is an Emulab Chat Room"
+    chatroom_fields["muc#owner_roomsecret"] = password
+    
+    # Announce presence, which creates room.
+    p = xmpp.Presence(to = chatroom + "@" + muc_server + "/" + admin_user);
+    p.setTag(xmpp.NS_MUC + ' x')
+    p.setID("create");
+    
+    if SendAndWait(client, p) < 0:
+        print "Presence: Chatroom " + chatroom + " could not be created."
+        return -1
+    
+    #
+    # This unlocks the room.
+    #
+    iq = xmpp.Iq(typ = 'set', queryNS = xmpp.protocol.NS_MUC_OWNER,
+                 to = chatroom + "@" + muc_server)
+    iq.setID("unlock")
+    query = iq.getTag('query')
+    query.setTag(xmpp.protocol.NS_DATA + ' x', attrs = {'type': 'submit'})
+    
+    if SendAndWait(client, iq) < 0:
+        print "Chatroom " + chatroom + " could not be unlocked."
+        return -1
+    
+    #
+    # Now request a configuration form. We are going to ignore it, but we
+    # need to request it in order to send one in.
+    #
+    iq = xmpp.Iq(typ = 'get', queryNS = xmpp.protocol.NS_MUC_OWNER,
+                 to = chatroom + "@" + muc_server)
+    iq.setID("getform")
+    
+    if SendAndWait(client, iq) < 0:
+        print "Chatroom " + chatroom + " did not send a form back."
+        return -1
+    
+    #
+    # Now build up a form to send in.
+    #
+    iq = xmpp.Iq(typ = 'set', queryNS = xmpp.protocol.NS_MUC_OWNER,
+                 to = chatroom + "@" + muc_server)
+    iq.setID("config")
+    query = iq.getTag('query')
+    x = query.setTag(xmpp.protocol.NS_DATA + ' x', attrs = {'type': 'submit'})
+    
+    for key, val in chatroom_fields.items():
+        tag = x.addChild('field')
+        tag.setAttr('var', key)
+        tag.setTagData('value', val)
+        pass
+    
+    if SendAndWait(client, iq) < 0:
+        print "Chatroom " + chatroom + " did not not properly configure."
+        return -1
+    
+    return 0
+
+#
+# Add/Remove members from a room
+#
+def DoMemberShip(client, args):
+    iq = xmpp.Iq(typ = 'set', queryNS = xmpp.NS_MUC_ADMIN,
+                 to  = chatroom + "@" + DOMAIN)
+
+    op = args[0]
+    jid_str = args[1] + "@" + jabber_server + "/Test"
+
+    jid  = xmpp.protocol.JID(jid_str)
+    item = iq.getTag('query').setTag('item')
+    
+    item.setAttr('jid', jid)
+
+    if op == "add":
+        item.setAttr('affiliation', 'member')
+        pass
+    elif op == "owner":
+        item.setAttr('affiliation', 'owner')
+        pass
+    else:
+        item.setAttr('affiliation', 'none')
+        pass
+
+    client.send(iq)
+    pass
+
+#
+# We can create/delete rooms and add/remove members of rooms.
+#
+if (req_args[0] == "create" or req_args[0] == "destroy"):
+    client = Connect();
+    exitval = DoChatRoom(client, req_args)
+    pass
+elif (req_args[0] == "add" or req_args[0] == "remove"):
+    client = Connect();
+    exitval = DoMemberShip(client, req_args)
+    pass
+else:
+    usage()
+    sys.exit(2)
+    pass
+
+client.Process(timeout=1)
+client.disconnect();
+sys.exit(exitval)
