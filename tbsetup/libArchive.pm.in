@@ -1154,6 +1154,8 @@ sub TBExperimentArchiveAddTracedFiles($$)
     return 0
 	if (!$MAINSITE || $pid ne $ALLOWEDPID);
 
+    return 0;
+
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
