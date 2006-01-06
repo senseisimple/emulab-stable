@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -51,6 +51,7 @@ int	forcereads= 0;
 int	badsectors= 0;
 int	retrywrites= 1;
 int	dorelocs  = 1;
+int	metaoptimize = 0;
 off_t	datawritten;
 partmap_t ignore, forceraw;
 
@@ -119,7 +120,7 @@ int	read_shd(char *shddev, char *infile, int infd, u_int32_t ssect,
 
 #ifdef WITH_HASH
 struct range *hashmap_compute_delta(struct range *, char *, int, u_int32_t);
-void	report_hash_stats(void);
+void	report_hash_stats(int pnum);
 #endif
 
 static SLICEMAP_PROCESS_PROTO(read_slice);
@@ -369,7 +370,7 @@ main(int argc, char *argv[])
 	extern char build_info[];
 
 	gettimeofday(&sstamp, 0);
-	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:H:")) != -1)
+	while ((ch = getopt(argc, argv, "vlbnNdihrs:c:z:oI:1F:DR:S:XC:H:M")) != -1)
 		switch(ch) {
 		case 'v':
 			version++;
@@ -452,6 +453,9 @@ main(int argc, char *argv[])
 			fprintf(stderr, "'H' option not supported\n");
 			usage();
 #endif
+			break;
+		case 'M':
+			metaoptimize++;
 			break;
 		case 'h':
 		case '?':
@@ -600,10 +604,6 @@ main(int argc, char *argv[])
 	 * known allocated range that we have just computed.  The result
 	 * is a new list of ranges that are currently allocated and that
 	 * have changed from the signature version.
-	 *
-	 * XXX we need to consider relocations here.  If an existing
-	 * range has an associated fixup, we should always include it in
-	 * the image.
 	 */
 	if (hashfile != NULL) {
 		struct range *nranges;
@@ -625,7 +625,7 @@ main(int argc, char *argv[])
 			fprintf(stderr, "\nAfter delta computation: ");
 			dumpranges(debug > 1);
 		}
-		report_hash_stats();
+		report_hash_stats(slice);
 	}
 #endif
 
@@ -648,6 +648,7 @@ main(int argc, char *argv[])
 			retrywrites = 0;
 		}
 		compress_image();
+		assert(fixups == NULL);
 	
 		if (outcanseek)
 			close(outfd);
@@ -1336,6 +1337,45 @@ cmpfixups(struct range *r1, struct range *r2)
 }
 
 /*
+ * See if there is a fixup associated with any part of the given addr range.
+ * Returns 1 if so, 0 otherwise.
+ */
+int
+hasfixup(uint32_t soffset, uint32_t ssize)
+{
+	struct range *rp;
+	struct fixup *fp;
+	off_t offset, eoffset;
+
+	offset = sectobytes(soffset);
+	eoffset = offset + sectobytes(ssize);
+	for (rp = fixups; rp != NULL; rp = rp->next) {
+		fp = rp->data;
+
+		/* range completely before fixup, all done */
+		if (eoffset <= fp->offset)
+			break;
+
+		/* range completely after fixup, keep looking */
+		if (offset >= fp->offset + fp->size)
+			continue;
+
+		/* otherwise, there is overlap */
+#ifdef FOLLOW
+		fprintf(stderr, "R: [%u-%u] overlaps with F: [%u/%u-%u/%u]\n",
+			soffset, soffset+ssize-1,
+			bytestosec(fp->offset),
+			(uint32_t)fp->offset % SECSIZE,
+			bytestosec(fp->offset+fp->size-1),
+			(uint32_t)(fp->offset+fp->size-1) % SECSIZE);
+#endif
+		return 1;
+	}
+
+	return 0;
+}
+
+/*
  * Look for fixups which overlap the range [offset - offset+size-1].
  * If an overlap is found, we overwrite the data for that range with
  * that given in the fixup or call the associated function.
@@ -1360,8 +1400,8 @@ applyfixups(off_t offset, off_t size, void *data)
 			fp,
 			bytestosec(fp->offset),
 			(uint32_t)fp->offset % SECSIZE,
-			bytestosec(fp->offset+fp->size),
-			(uint32_t)(fp->offset+fp->size) % SECSIZE);
+			bytestosec(fp->offset+fp->size-1),
+			(uint32_t)(fp->offset+fp->size-1) % SECSIZE);
 #endif
 
 		/*
@@ -1379,7 +1419,7 @@ applyfixups(off_t offset, off_t size, void *data)
 		 */
 		if (offset+size <= fp->offset) {
 #ifdef FOLLOW
-			fprintf(stderr, "after, done\n");
+			fprintf(stderr, "falls after, done\n");
 #endif
 			break;
 		}
@@ -1433,8 +1473,8 @@ applyfixups(off_t offset, off_t size, void *data)
 			fprintf(stderr, "used, reduced to [%u/%u-%u/%u]\n",
 				bytestosec(fp->offset),
 				(uint32_t)fp->offset % SECSIZE,
-				bytestosec(fp->offset+fp->size),
-				(uint32_t)(fp->offset+fp->size) % SECSIZE);
+				bytestosec(fp->offset+fp->size-1),
+				(uint32_t)(fp->offset+fp->size-1) % SECSIZE);
 #endif
 			prev = &entry->next;
 		} else {

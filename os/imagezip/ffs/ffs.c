@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -27,7 +27,7 @@
  * to reduce the compressed size of the data.
  */
 #define DO_INODES
-#undef CLEAR_FREE_INODES
+#define CLEAR_FREE_INODES
 
 #ifndef DO_INODES
 #undef CLEAR_FREE_INODES
@@ -449,11 +449,6 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t offset)
 	 * Look for free inodes
 	 */
 	if (cgp->cg_cs.cs_nifree != 0) {
-#ifdef CLEAR_FREE_INODES
-		static uint32_t ufs1_magic = FS_UFS1_MAGIC;
-		static uint32_t ufs2_magic = FS_UFS2_MAGIC;
-		uint32_t *magic;
-#endif
 		int tifree = 0;
 		unsigned long edboff;
 		int ino;
@@ -476,63 +471,71 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t offset)
 		ino = cg * fsp->fs_ipg;
 
 #ifdef CLEAR_FREE_INODES
-		if (debug > 1)
-			fprintf(stderr,
-				"        \t ifree  %9d\n",
-				cgp->cg_cs.cs_nifree);
-		if (debug > 2)
-			fprintf(stderr, "                   ");
+		if (metaoptimize) {
+			static uint32_t ufs1_magic = FS_UFS1_MAGIC;
+			static uint32_t ufs2_magic = FS_UFS2_MAGIC;
+			uint32_t *magic;
 
-		magic = (fsp->fs_magic == FS_UFS2_MAGIC) ?
-			&ufs2_magic : &ufs1_magic;
-		for (count = i = 0; i < max; i++) {
-			if (isset(p, i)) {
-				continue;
-			}
-			if (ino_to_fsbo(fsp, ino+i) == 0) {
-				j = i;
-				while ((i+1) < max && !isset(p, i+1))
-					i++;
+			if (debug > 1)
+				fprintf(stderr,
+					"        \t ifree  %9d\n",
+					cgp->cg_cs.cs_nifree);
+			if (debug > 2)
+				fprintf(stderr, "                   ");
 
-				dboff = fsbtodb(fsp, ino_to_fsba(fsp, ino+j));
-				edboff = fsbtodb(fsp, ino_to_fsba(fsp, ino+i));
-#if 0
-				fprintf(stderr, "      found free inodes %d-%d"
-					" db %lu.%u to %lu.%u\n",
-					ino+j, ino+i,
-					dboff+offset, ino_to_fsbo(fsp, ino+j),
-					edboff+offset, ino_to_fsbo(fsp, ino+i));
-#endif
-				tifree += (i+1 - j);
-				dbcount = edboff - dboff;
-				if ((i+1) == max)
-					dbcount++;
-				if (dbcount == 0)
+			magic = (fsp->fs_magic == FS_UFS2_MAGIC) ?
+				&ufs2_magic : &ufs1_magic;
+			for (count = i = 0; i < max; i++) {
+				if (isset(p, i)) {
 					continue;
-
-				addfixupfunc(inodefixup,
-					     sectobytes(dboff+offset),
-					     sectobytes(offset),
-					     sectobytes(dbcount),
-					     magic, sizeof(magic),
-					     RELOC_NONE);
-				if (debug > 2) {
-					if (count)
-						fprintf(stderr, ",%s",
-							count % 4 ?
-							" " :
-							"\n                   ");
-					fprintf(stderr, "%lu:%ld",
-						dboff+offset, dbcount);
 				}
-				count++;
-			} else
-				tifree++;
-		}
-		assert(i == max);
+				if (ino_to_fsbo(fsp, ino+i) == 0) {
+					j = i;
+					while ((i+1) < max && !isset(p, i+1))
+						i++;
 
-		if (debug > 2)
-			fprintf(stderr, "\n");
+					dboff = fsbtodb(fsp,
+							ino_to_fsba(fsp, ino+j));
+					edboff = fsbtodb(fsp,
+							 ino_to_fsba(fsp, ino+i));
+#if 0
+					fprintf(stderr, "      found free inodes %d-%d"
+						" db %lu.%u to %lu.%u\n",
+						ino+j, ino+i,
+						dboff+offset, ino_to_fsbo(fsp, ino+j),
+						edboff+offset, ino_to_fsbo(fsp, ino+i));
+#endif
+					tifree += (i+1 - j);
+					dbcount = edboff - dboff;
+					if ((i+1) == max)
+						dbcount++;
+					if (dbcount == 0)
+						continue;
+
+					addfixupfunc(inodefixup,
+						     sectobytes(dboff+offset),
+						     sectobytes(offset),
+						     sectobytes(dbcount),
+						     magic, sizeof(magic),
+						     RELOC_NONE);
+					if (debug > 2) {
+						if (count)
+							fprintf(stderr, ",%s",
+								count % 4 ?
+								" " :
+								"\n                   ");
+						fprintf(stderr, "%lu:%ld",
+							dboff+offset, dbcount);
+					}
+					count++;
+				} else
+					tifree++;
+			}
+			assert(i == max);
+
+			if (debug > 2)
+				fprintf(stderr, "\n");
+		}
 #endif
 
 		/*
@@ -574,7 +577,7 @@ read_bsdcg(struct fs *fsp, struct cg *cgp, int cg, u_int32_t offset)
 		}
 
 #ifdef CLEAR_FREE_INODES
-		if (tifree != cgp->cg_cs.cs_nifree)
+		if (metaoptimize && tifree != cgp->cg_cs.cs_nifree)
 			fprintf(stderr, "Uh-oh! found %d free inodes, "
 				"shoulda found %d\n",
 				tifree, cgp->cg_cs.cs_nifree);

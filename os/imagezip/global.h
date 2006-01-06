@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -11,6 +11,7 @@ extern int debug;
 extern int secsize;
 extern int slicemode;
 extern int dorelocs;
+extern int metaoptimize;
 
 extern off_t devlseek(int fd, off_t off, int whence);
 extern ssize_t devread(int fd, void *buf, size_t nbytes);
@@ -21,6 +22,7 @@ extern void addfixup(off_t offset, off_t poffset, off_t size, void *data,
 extern void addfixupfunc(void (*func)(void *, off_t, void *), off_t offset,
 			 off_t poffset, off_t size, void *data, int dsize,
 			 int reloctype);
+extern int hasfixup(uint32_t soffset, uint32_t ssize);
 
 extern SLICEMAP_PROCESS_PROTO(read_bsdslice);
 extern SLICEMAP_PROCESS_PROTO(read_linuxslice);

@@ -20,6 +20,8 @@
 #include <sys/time.h>
 #endif
 
+#include "sliceinfo.h"
+#include "global.h"
 #include "imagehdr.h"
 #include "hashmap.h"
 #include "imagehash.h"
@@ -43,10 +45,12 @@ struct hashstats {
 	uint32_t hash_scompares; /* sectors compared */
 	uint32_t hash_identical; /* hash blocks identical */
 	uint32_t hash_sidentical;/* sectors identical */
-	uint32_t gaps;		 /* free gaps in hash ranges */
+	uint32_t gaps;		 /* hash ranges with free gaps */
 	uint32_t gapsects;	 /* free sectors in gaps */
+	uint32_t unchangedgaps;	 /* hash ranges with gaps that hash ok */
 	uint32_t gapunchanged;	 /* unchanged free sectors in gaps */
 	uint32_t gapnocompare;	 /* uncompared sectors in gaps */
+	uint32_t fixup;		 /* uncompared due to fixup overlap */
 } hashstats;
 
 struct timeval time_orig_read, time_curr_read, time_hash,
@@ -588,20 +592,40 @@ hashmap_compute_delta(struct range *curranges, char *hfile, int infd,
 		    (drange->start == hreg->region.start &&
 		     drange->size >= hreg->region.size)) {
 
-			TIMEOP(
-			    changed = hash_and_cmp(infd, hashfunc, hashlen,
-						   hreg, ereg - hreg),
-			time_hash_and_cmp);
-
-			if (changed < 0)
-				goto error;
+			/*
+			 * XXX if there is a fixup, all bets are off
+			 * (e.g., they might compare equal now, but not
+			 * after the fixup).  Just force inclusion of all
+			 * data.
+			 *
+			 * XXX we could do this on a drange by drange basis
+			 * below, but I deem it not worth the trouble since
+			 * all this code will be changing anyway.
+			 */
+			if (hasfixup(hreg->region.start, hreg->region.size)) {
+				changed = 3;
+#ifdef FOLLOW
+				fprintf(stderr, "  H: [%u-%u] fixup overlap\n",
+					hreg->region.start,
+					hreg->region.start + hreg->region.size-1);
+#endif
+			} else {
+				
+				TIMEOP(
+				       changed = hash_and_cmp(infd, hashfunc,
+							      hashlen, hreg,
+							      ereg - hreg),
+				       time_hash_and_cmp);
+				if (changed < 0)
+					goto error;
 
 #ifdef FOLLOW
-			fprintf(stderr, "  H: [%u-%u] hash compare: %s\n",
-				hreg->region.start,
-				hreg->region.start + hreg->region.size - 1,
-				changed ? "differ" : "match");
+				fprintf(stderr, "  H: [%u-%u] hash %s\n",
+					hreg->region.start,
+					hreg->region.start + hreg->region.size-1,
+					changed ? "differs" : "matches");
 #endif
+			}
 		} else {
 			/*
 			 * There is a gap in the dranges covered by the hreg.
@@ -619,8 +643,11 @@ hashmap_compute_delta(struct range *curranges, char *hfile, int infd,
 		hashstats.shared += hreg->region.size;
 		if (!changed)
 			hashstats.unchanged += hreg->region.size;
-		else if (changed == 2)
+		else if (changed > 1) {
 			hashstats.nocompare += hreg->region.size;
+			if (changed == 3)
+				hashstats.fixup += hreg->region.size;
+		}
 		gapstart = hreg->region.start;
 		gapsize = gapcount = 0;
 #endif
@@ -734,9 +761,12 @@ hashmap_compute_delta(struct range *curranges, char *hfile, int infd,
 			hashstats.gapsects += gapsize;
 			if (!changed) {
 				hashstats.unchanged -= gapsize;
+				hashstats.unchangedgaps++;
 				hashstats.gapunchanged += gapsize;
-			} else if (changed == 2) {
+			} else if (changed > 1) {
 				hashstats.nocompare -= gapsize;
+				if (changed == 3)
+					hashstats.fixup -= gapsize;
 				hashstats.gapnocompare += gapsize;
 			}
 #ifdef FOLLOW
@@ -901,10 +931,14 @@ report_hash_stats(int pnum)
 		hashstats.gaps);
 	fprintf(stderr, "  Total free sectors covered:        %u\n",
 		hashstats.gapsects);
+	fprintf(stderr, "  Hash blocks compared identical:    %u\n",
+		hashstats.unchangedgaps);
 	fprintf(stderr, "  Free sectors compared identical:   %u\n",
 		hashstats.gapunchanged);
 	fprintf(stderr, "  Allocated sectors assumed changed: %u\n",
 		hashstats.nocompare);
+	fprintf(stderr, "    Assumed changed due to fixups:   %u\n",
+		hashstats.fixup);
 
 	fprintf(stderr,"\nEND HASH STATS\n");
 #endif
