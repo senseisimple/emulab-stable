@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 #
@@ -163,7 +163,7 @@ function SHOWPROJECT($pid, $thisuid) {
                       <A href='$mmurl'>${pid}-users</A> ";
 	if (ISADMIN()) {
 	    $mmurl .= "&wantadmin=1";
-	    echo "<A href='$mmurl'>(admin)</A>";
+	    echo "<A href='$mmurl'>(admin access)</A>";
 	}
 	echo "    </td>
               </tr>\n";
