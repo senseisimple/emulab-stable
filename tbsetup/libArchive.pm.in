@@ -1176,6 +1176,11 @@ sub TBExperimentArchiveAddTracedFiles($$)
 		     "LEFT JOIN accessed_files as af on af.idx=fr.fileidx ".
 		     "WHERE fr.rsrcidx=$rsrcidx and fr.type!='l'");
     while (my ($fn) = $query_result->fetchrow_array()) {
+	if ($fn =~ /^\/share/ ||
+	    $fn =~ /^<u:/) {
+	    next;
+	}
+
 	$rval = ArchiveAdd($archive_idx, $fn, $view);
 
 	return $rval
