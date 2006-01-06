@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -61,7 +61,6 @@ my %vv2pmap;
 my $hasremote  = 0;
 my $hasplab    = 0;
 my %ipmap;
-my %macmap;
 my %membermap;
 
 getopts('hnmdlevbrf',\%opt);
@@ -319,72 +318,127 @@ if ($showmap && $state eq EXPTSTATE_ACTIVE) {
 # Links and Lans
 #
 if ($showlinks) {
-    $result =
-	DBQueryFatal("select vname,vnode,vport,ip,member,mask,delay, ".
-		     "       bandwidth,lossrate, ".
-		     "       rdelay,rbandwidth,rlossrate,protocol ".
-		     "  from virt_lans as v ".
-		     "where pid='$pid' and eid='$eid' ".
-		     "order by vname,member");
+    my %portmap = ();
+    my %macmap  = ();
 
-    while (my ($vname,$vnode,$vport,$ip) = $result->fetchrow_array()) {
-	$ipmap{"$vnode:$vport"} = $ip;
-	$macmap{$ip}->{"MEMBER"} = "$vnode:$vport";
+    my $vlan_result =
+	DBQueryFatal("select v.* from virt_lans as v ".
+		     "where v.pid='$pid' and v.eid='$eid' ".
+		     "order by v.vname,v.member");
+
+    while (my %row = $vlan_result->fetchhash()) {
+	my $ip          = $row{"ip"};
+	my $vnode       = $row{"vnode"};
+	my $vport       = $row{"vport"};
+	my $member      = "$vnode:$vport";
+
+	$ipmap{$member} = $ip;
     }
-    $result->dataseek(0);
+    $vlan_result->dataseek(0);
 
-    my $iface_result =
-	DBQueryFatal("select i.ip,i.mac,i.iface from reserved as r ".
-		     "left join interfaces as i on r.node_id=i.node_id ".
-		     "where r.pid='$pid' and r.eid='$eid' and ".
-		     "      i.ip is not NULL and i.ip!=''");
+    #
+    # If swapped in, get a bunch of physical link info.
+    #
+    if ($state eq EXPTSTATE_ACTIVE && $vlan_result->numrows) {
+	$link_result =
+	    DBQueryFatal("select v.vname,v.vnode,v.vport, ".
+			 "       i.ip,i.mac,i.iface,w.* from virt_lans as v ".
+			 "left join reserved as r on r.vname=v.vnode and ".
+			 "     r.pid=v.pid and r.eid=v.eid ".
+			 "left join interfaces as i on r.node_id=i.node_id ".
+			 "left join wires as w on i.node_id=w.node_id1 ".
+			 "     and i.card=w.card1 and i.port=w.port1 ".
+			 "where v.pid='$pid' and v.eid='$eid' and ".
+			 "      i.ip is not NULL and i.ip!='' ".
+			 "order by v.vname,v.member");
 
-    while (($ip,$mac,$iface) = $iface_result->fetchrow_array()) {
-	if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
-	    $mac = "$1:$2:$3:$4:$5:$6";
+	while (my %row = $link_result->fetchhash()) {
+	    my $ip          = $row{"ip"};
+	    my $mac         = $row{"mac"};
+	    my $lan         = $row{"vname"};
+	    my $vnode       = $row{"vnode"};
+	    my $vport       = $row{"vport"};
+	    my $iface       = $row{"iface"};
+	    my $member      = "$vnode:$vport";
+
+	    if ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+		$mac = "$1:$2:$3:$4:$5:$6";
+	    }
+	    $portmap{$member}->{"NODEMAC"}     = $mac;
+	    $portmap{$member}->{"IFACE"}      = $iface;
+	    $portmap{$member}->{"NODECARD"}   = $row{"card1"};
+	    $portmap{$member}->{"NODEPORT"}   = $row{"port1"};
+	    $portmap{$member}->{"SWITCH"}     = $row{"node_id2"};
+	    $portmap{$member}->{"SWITCHCARD"} = $row{"card2"};
+	    $portmap{$member}->{"SWITCHPORT"} = $row{"port2"};
 	}
-	$macmap{$ip}->{"MAC"}   = $mac;
-	$macmap{$ip}->{"IFACE"} = $iface;
     }
 
-    if ($result->numrows) {
+    if ($vlan_result->numrows) {
 	print  "Virtual Lan/Link Info:\n";
 	printf "%-15s %-15s %-15s %-9s %-9s %-9s\n",
-	       "ID", "Member/Proto", "IP/Mask", "Delay", "BW (Kbs)", "Loss Rate";
+	       "ID", "Member/Proto", "IP/Mask", "Delay","BW (Kbs)","Loss Rate";
 	print  "--------------- --------------- --------------- --------- ".
 	       "--------- ---------\n";
 
-	while (($vname,$vnode,$vport,$ip,$member,$mask,$delay,$bandwidth,
-		$lossrate,$rdelay,$rbandwidth,$rlossrate,$protocol)
-	       = $result->fetchrow_array()) {
+	while (my %row = $vlan_result->fetchhash()) {
+	    my $vname       = $row{"vname"};
+	    my $vnode       = $row{"vnode"};
+	    my $vport       = $row{"vport"};
+	    my $ip          = $row{"ip"};
+	    my $member      = "$vnode:$vport";
+	    my $mask        = $row{"mask"};
+	    my $delay       = $row{"delay"};
+	    my $bandwidth   = $row{"bandwidth"};
+	    my $lossrate    = $row{"lossrate"};
+	    my $rdelay      = $row{"rdelay"};
+	    my $rbandwidth  = $row{"rbandwidth"};
+	    my $rlossrate   = $row{"rlossrate"};
+	    my $protocol    = $row{"protocol"};
+	    
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", $vname,
 	           $member, $ipmap{$member}, $delay, $bandwidth, $lossrate;
 	    printf "%-15s %-15s %-15s %-9s %-9s %-9s\n", "",
 	           $protocol, $mask, $rdelay, $rbandwidth, $rlossrate;
 	}
 	print "\n";
+	$vlan_result->dataseek(0);
     }
 
-    if ($state eq EXPTSTATE_ACTIVE && $result->numrows) {
-	$result->dataseek(0);
-
+    if ($state eq EXPTSTATE_ACTIVE && $vlan_result->numrows) {
 	print  "Physical Lan/Link Mapping:\n";
 	printf "%-15s %-15s %-15s %-20s %-9s\n",
 	       "ID", "Member", "IP", "MAC", "NodeID";
 	print  "--------------- --------------- --------------- ".
 	       "-------------------- ---------\n";
 
-	while (($vname,$vnode,$vport,$ip,$member) =
-	       $result->fetchrow_array()) {
-	    my ($vname,$port) = split(":", $member);
-	    
+	while (my %row = $vlan_result->fetchhash()) {
+	    my $vname       = $row{"vname"};
+	    my $vnode       = $row{"vnode"};
+	    my $vport       = $row{"vport"};
+	    my $ip          = $row{"ip"};
+	    my $member      = "$vnode:$vport";
+	    my $mac         = (exists($portmap{$member}) ?
+			       $portmap{$member}->{"NODEMAC"} : "");
+	    my $pnode       = $v2pmap{$vnode}->{PNODE};
+
 	    printf "%-15s %-15s %-15s %-20s %-9s\n", $vname,
-	            $member, $ipmap{$member},
-	            (defined($macmap{$ipmap{$member}}->{"MAC"}) ?
-		     $macmap{$ipmap{$member}}->{"MAC"} : ""),
-		    $v2pmap{$vname}->{PNODE};
+		   $member, $ipmap{$member}, $mac, $pnode;
+
+	    if (exists($portmap{$member})) {
+		my $node_card   = $portmap{$member}->{"NODECARD"};
+		my $node_port   = $portmap{$member}->{"NODEPORT"};
+		my $switch      = $portmap{$member}->{"SWITCH"};
+		my $switch_card = $portmap{$member}->{"SWITCHCARD"};
+		my $switch_port = $portmap{$member}->{"SWITCHPORT"};
+		
+		printf "%-15s %-15s %-15s %-20s %-9s\n", "", "", "",
+		    "$node_card/$node_port <-> $switch_card/$switch_port",
+		    $switch;
+	    }
 	}
 	print "\n";
+	$vlan_result->dataseek(0);
     }
 
     # Queue info.
@@ -395,7 +449,7 @@ if ($showlinks) {
 		     "where pid='$pid' and eid='$eid' ".
 		     "order by vname,member");
 
-    if ($result->numrows) {
+    if ($vlan_result->numrows) {
 	print  "Virtual Queue Info:\n";
 	printf "%-15s %-15s %-10s %-7s %s\n",
 	       "ID", "Member", "Q Limit", "Type",
@@ -403,10 +457,20 @@ if ($showlinks) {
 	print  "--------------- --------------- ---------- ".
 	       "------- ----------------------------\n";
 
-	while (($vname,$member,$q_limit,$q_maxthresh,$q_minthresh,
-		$q_weight,$q_linterm,$q_qinbytes,$q_red,$q_gentle)
-	       = $result->fetchrow_array()) {
-
+	while (my %row = $vlan_result->fetchhash()) {
+	    my $vname       = $row{"vname"};
+	    my $vnode       = $row{"vnode"};
+	    my $vport       = $row{"vport"};
+	    my $member      = "$vnode:$vport";
+	    my $q_limit     = $row{"q_limit"};
+	    my $q_maxthresh = $row{"q_maxthresh"};
+	    my $q_minthresh = $row{"q_minthresh"};
+	    my $q_weight    = $row{"q_weight"};
+	    my $q_linterm   = $row{"q_linterm"};
+	    my $q_qinbytes  = $row{"q_qinbytes"};
+	    my $q_red       = $row{"q_red"};
+	    my $q_gentle    = $row{"q_gentle"};
+	    
 	    printf("%-15s %-15s %-10s %-7s %s\n", $vname, $member,
 		   $q_limit . ($q_qinbytes ? " bytes" : " slots"),
 		   ($q_red ? ($q_gentle ? "GRED" : "RED") : "Tail"),
@@ -414,31 +478,41 @@ if ($showlinks) {
 		    "0/0/0/0"));
 	}
 	print "\n";
+	$vlan_result->dataseek(0);
     }
 
-    # Trace info.
-    $result =
-	DBQueryFatal("select vname,member,trace_type,trace_expr, ".
-		     "  trace_snaplen ".
-		     "  from virt_lans ".
-		     "where pid='$pid' and eid='$eid' and traced!=0 ".
-		     "order by vname,member");
-
-    if ($result->numrows) {
+    # Trace info. See if any traced links
+    my $got_traced = 0;
+    while (my %row = $vlan_result->fetchhash()) {
+	if ($row{'traced'}) {
+	    $got_traced++;
+	    last;
+	}
+    }
+    $vlan_result->dataseek(0);
+    
+    if ($got_traced) {
 	print  "Trace/Monitoring Info:\n";
 	printf "%-15s %-15s %-10s %-7s %s\n",
 	       "ID", "Member", "Type", "Snap", "Expression";
 	print  "--------------- --------------- ---------- ".
 	       "------- ----------------------------\n";
 
-	while (($vname,$member,$trace_type,$trace_expr,
-		$trace_snaplen) = $result->fetchrow_array()) {
+	while (my %row = $vlan_result->fetchhash()) {
+	    my $vname       = $row{"vname"};
+	    my $vnode       = $row{"vnode"};
+	    my $vport       = $row{"vport"};
+	    my $member      = "$vnode:$vport";
+	    my $trace_type  = $row{"trace_type"};
+	    my $trace_snap  = $row{"trace_snaplen"};
+	    my $trace_expr  = $row{"trace_expr"};
 
 	    printf("%-15s %-15s %-10s %-7s %s\n", $vname, $member,
-		   $trace_type, $trace_snaplen,
+		   $trace_type, $trace_snap,
 		   (defined($trace_expr) ? $trace_expr : ""));
 	}
 	print "\n";
+	$vlan_result->dataseek(0);
     }
 
     #
@@ -506,12 +580,11 @@ if ($showlinks) {
 	#
 	my %links = ();
 	$result =
-	    DBQueryFatal("select vname,member,delay,bandwidth,lossrate ".
+	    DBQueryFatal("select vname,member ".
 			 "from virt_lans where pid='$pid' and eid='$eid' and ".
 			 "widearea!=0 order by vname,member");
 	if ($result->numrows) {
-	    while (($vname,$member,$delay,$bandwidth,$lossrate)
-		       = $result->fetchrow_array()) {
+	    while (($vname,$member) = $result->fetchrow_array()) {
 		$member =~ /(.+):(\d+)/;
 		my ($pname,$card) = ($v2pmap{$1}->{PNODE}, $2);
 
@@ -605,10 +678,15 @@ if ($showlinks) {
 #
 if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
     $result_delays =
-	DBQueryFatal("select d.*,r.vname as delayvname from delays as d ".
+	DBQueryFatal("select d.*,w.*,i.iface,r.vname as delayvname ".
+		     "   from delays as d ".
 		     "left join reserved as r on d.node_id=r.node_id ".
+		     "left join interfaces as i on i.node_id=d.node_id and ".
+		     "     (i.iface=d.iface0 or i.iface=d.iface1) ".
+ 		     "left join wires as w on w.node_id1=i.node_id ".
+		     "     and i.card=w.card1 and i.port=w.port1 ".
 		     "where d.pid='$pid' and d.eid='$eid' ".
-		     "order by vname,vnode0");
+		     "order by d.vname,d.vnode0");
 
     $result_linkdelays =
 	DBQueryFatal("select * from linkdelays ".
@@ -616,7 +694,7 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 		     "order by vlan,vnode,node_id");
 
     if ($result_delays->numrows || $result_linkdelays->numrows) {
-	print  "Physical Lan/Link Info:\n";
+	print  "Physical Delay Info:\n";
 	printf "%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
 	       "ID", "Member", "Delay Node", "Delay", "BW (Kbs)", "PLR",
 	       "Pipe";
@@ -626,6 +704,10 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 
     if ($result_delays->numrows) {
 	while (my %row = $result_delays->fetchhash()) {
+	    # Skip dups.
+	    next
+		if ($row{'iface'} eq $row{'iface1'});
+	    
 	    printf("%-15s %-15s %-12s %-8s %-8s %-6s %-9s\n",
 		   $row{vname}, $row{vnode0}, $row{delayvname},
 		   $row{delay0}, $row{bandwidth0}, $row{lossrate0},
@@ -711,6 +793,39 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 		    "$row{q_weight}/$row{q_minthresh}/".
 		    "$row{q_maxthresh}/$row{q_linterm}" :
 		    "0/0/0/0"));
+	}
+	print "\n";
+    }
+
+    $result_delays->dataseek(0);
+
+    if ($result_delays->numrows) {
+	print  "Delay Node Switch Info:\n";
+	printf "%-15s %-15s %-12s %-9s %-9s %-9s\n",
+	       "ID", "Member", "Delay Node", "Card/Port", "Switch",
+	       "Card/Port";
+	print  "--------------- --------------- ------------ --------- ".
+	       "--------- --------\n";
+
+	while (my %row = $result_delays->fetchhash()) {
+	    my $vname       = $row{"vname"};
+	    my $dname       = $row{"delayvname"};
+	    my $iface       = $row{"iface"};
+	    my $iface0      = $row{"iface0"};
+	    my $iface1      = $row{"iface1"};
+	    my $vnode0      = $row{"vnode0"};
+	    my $vnode1      = $row{"vnode1"};
+	    my $vnode       = ($iface eq $iface0 ? $vnode0 : $vnode1);
+	    my $node_card   = $row{"card1"};
+	    my $node_port   = $row{"port1"};
+	    my $switch      = $row{"node_id2"};
+	    my $switch_card = $row{"card2"};
+	    my $switch_port = $row{"port2"};
+
+	    printf("%-15s %-15s %-12s %-9s %-9s %-9s\n", $vname, $vnode,
+		   $dname,
+		   "$node_card/$node_port", $switch,
+		   "$switch_card/$switch_port");
 	}
 	print "\n";
     }
