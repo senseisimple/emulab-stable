@@ -223,8 +223,8 @@ sub ArchiveAdd($$;$$)
 	if (!defined($exact));
 
     if (! -e $pathname || ! -r $pathname) {
-	print STDERR "ArchiveFile: $pathname cannot be read!\n";
-	return -1;
+	print STDERR "*** ArchiveFile: $pathname cannot be read!\n";
+	return 0;
     }
 
     #
@@ -232,7 +232,7 @@ sub ArchiveAdd($$;$$)
     # the directory space the user is allowed to access.
     #
     my $realpath = `$REALPATH $pathname`;
-    if ($realpath =~ /^([-\w\/\.\+\@,]+)$/) {
+    if ($realpath =~ /^([-\w\/\.\+\@,~]+)$/) {
 	$realpath = $1;
     }
     else {
@@ -252,7 +252,7 @@ sub ArchiveAdd($$;$$)
     }
     
     # Strip leading / from the pathname, and taint check it. 
-    if ($pathname =~ /^[\/]+([-\w\/\.\+\@,]+)$/) {
+    if ($pathname =~ /^[\/]+([-\w\/\.\+\@,~]+)$/) {
 	$pathname = $1;
     }
     else {
