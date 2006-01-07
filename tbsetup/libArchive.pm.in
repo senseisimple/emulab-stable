@@ -37,6 +37,7 @@ my $ELABINELAB  = @ELABINELAB@;
 my $MD5		= "/sbin/md5";
 my $MKDIR       = "/bin/mkdir";
 my $CHMOD       = "/bin/chmod";
+my $CHGRP       = "/usr/bin/chgrp";
 my $TAR		= "/usr/bin/tar";
 my $RSYNC	= "/usr/local/bin/rsync";
 my $RM		= "/bin/rm";
@@ -78,9 +79,9 @@ sub setdebug($)
 # Create a new archive. Returns -1 if any error. Otherwise return
 # the new record index.
 # 
-sub ArchiveCreate(;$$)
+sub ArchiveCreate(;$$$)
 {
-    my ($tag, $view) = @_;
+    my ($tag, $view, $unix_gid) = @_;
     
     my $idx;
     my $dir;
@@ -115,6 +116,9 @@ sub ArchiveCreate(;$$)
     # 
     mysystem("$MKDIR $dir") == 0 or goto bad;
     mysystem("$CHMOD 775 $dir") == 0 or goto bad;
+    if (defined($unix_gid)) {
+	mysystem("$CHGRP $unix_gid $dir") == 0 or goto bad;
+    }
 
     DBQueryWarn("update archives set directory='$dir' where idx='$idx'")
 	or goto bad;
@@ -1104,9 +1108,21 @@ sub TBCreateExperimentArchive($$)
     my $archive_tag = "T${rsrcidx}";
 
     #
+    # The point of this is to set the group of the new directory.
+    #
+    my $gid = ExpGroup($pid, $eid);
+    if (! $gid) {
+	return -1;
+    }
+    my ($unix_gid, $unix_name);
+    if (!TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
+	return -1;
+    }
+
+    #
     # Create the new archive and get back the new index. 
     #
-    my $archive_idx = ArchiveCreate($archive_tag, "$exptidx");
+    my $archive_idx = ArchiveCreate($archive_tag, "$exptidx", $unix_name);
     return -1
 	if ($archive_idx < 0);
 
@@ -1121,6 +1137,10 @@ sub TBCreateExperimentArchive($$)
 	return -1;
     }
     return 0;
+
+  bad:
+    ArchiveDestroy($archive_idx, 1);
+    return -1;
 }
 
 #
