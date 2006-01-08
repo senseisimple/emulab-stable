@@ -986,7 +986,7 @@ Phase "chkupuser", "Setting up checkup user (elabckup)", sub {
 	if (-d "/users/elabckup");
     ExecQuietFatal("perl $TOP_OBJDIR/utils/firstuser -b ".
 		   (defined($password) ? " -p $password" : "").
-		   "-u elabckup -n 'Emulab Checkup User' ".
+		   " -u elabckup -n 'Emulab Checkup User' ".
 		   "-e '@TBTESTSUITEEMAIL@'");
 };
 
