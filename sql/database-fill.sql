@@ -87,6 +87,8 @@ REPLACE INTO event_eventtypes VALUES (19,'LOG');
 REPLACE INTO event_eventtypes VALUES (20,'RUN');
 REPLACE INTO event_eventtypes VALUES (21,'SNAPSHOT');
 REPLACE INTO event_eventtypes VALUES (22,'RELOAD');
+REPLACE INTO event_eventtypes VALUES (23,'CLEAR');
+REPLACE INTO event_eventtypes VALUES (24,'CREATE');
 
 --
 -- Dumping data for table `event_objecttypes`
