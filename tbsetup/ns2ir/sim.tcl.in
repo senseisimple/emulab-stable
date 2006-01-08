@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -259,6 +259,18 @@ Simulator instproc make-lan {nodelist bw delay args} {
     return $curlan
 }
 
+Simulator instproc make-cloud {nodelist args} {
+    $self instvar event_list
+    $self instvar event_count
+
+    set retval [$self make-lan $nodelist 100Mbps 0ms]
+
+    $retval set iscloud 1
+    $retval mustdelay
+
+    return $retval
+}
+
 Simulator instproc event-timeline {args} {
     $self instvar id_counter
     $self instvar timeline_list
@@ -504,6 +516,10 @@ Simulator instproc run {} {
     
     foreach lan [concat [array names lanlink_list]] {
 	$lan updatedb "sql"
+	if {[$lan set iscloud] != 0} {
+	    lappend event_list [list "0" "*" $lan LINK CLEAR "" "" "__ns_sequence"]
+	    lappend event_list [list "1" "*" $lan LINK CREATE "" "" "__ns_sequence"]
+	}
     }
     foreach vtype [array names vtypes] {
 	$vtype updatedb "sql"
@@ -616,7 +632,13 @@ Simulator instproc run {} {
     }
 
     foreach event $event_list {
-	$self spitxml_data "eventlist" [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ] [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6] ]
+	set fields [list "time" "vnode" "vname" "objecttype" "eventtype" "arguments" "atstring" ]
+	set values [list [lindex $event 0] [lindex $event 1] [lindex $event 2] $objtypes([lindex $event 3]) $eventtypes([lindex $event 4]) [lindex $event 5] [lindex $event 6]]
+	if {[llength $event] > 7} {
+	    lappend fields "parent"
+	    lappend values [lindex $event 7]
+	}
+	$self spitxml_data "eventlist" $fields $values
     }
 
     foreach sourcefile $sourcefile_list {
