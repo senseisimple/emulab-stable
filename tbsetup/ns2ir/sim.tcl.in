@@ -1572,15 +1572,15 @@ Simulator instproc make_event {outer event} {
 		"linktest" {
 		    set otype LINKTEST
 		    set etype START
-		    set stopat 3
 		    set vname "linktest"
 		    ::GLOBALS::named-args $evargs {
 			-bw 0
+			-stopat 3
 		    }
 		    if {$(-bw) != 0} {
 			set stopat 4
 		    }
-		    set args "STARTAT=1 STOPAT=$stopat"
+		    set args "STARTAT=1 STOPAT=$(-stopat)"
 		}
 		unknown {
 		    punsup "$obj $cmd $evargs"

@@ -26,7 +26,7 @@ set link2 [$ns duplex-link $node0 $node3 100000.0kb 0.0ms DropTail]
 set link3 [$ns duplex-link $node0 $node4 100000.0kb 0.0ms DropTail]
 
 set doit [$ns event-sequence {
-  $ns linktest
+  $ns linktest -stopat 2
   $ns terminate
 }]
 
