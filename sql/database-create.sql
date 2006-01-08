@@ -21,6 +21,7 @@ CREATE TABLE accessed_files (
 
 CREATE TABLE active_checkups (
   object varchar(128) NOT NULL default '',
+  object_type varchar(64) NOT NULL default '',
   type varchar(64) NOT NULL default '',
   state varchar(16) NOT NULL default 'new',
   start datetime default NULL,
@@ -131,6 +132,7 @@ CREATE TABLE checkup_types (
 
 CREATE TABLE checkups (
   object varchar(128) NOT NULL default '',
+  object_type varchar(64) NOT NULL default '',
   type varchar(64) NOT NULL default '',
   next datetime default NULL,
   PRIMARY KEY  (object,type)
@@ -142,6 +144,7 @@ CREATE TABLE checkups (
 
 CREATE TABLE checkups_temp (
   object varchar(128) NOT NULL default '',
+  object_type varchar(64) NOT NULL default '',
   type varchar(64) NOT NULL default '',
   next datetime default NULL,
   PRIMARY KEY  (object,type)

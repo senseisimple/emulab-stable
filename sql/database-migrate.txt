@@ -3039,6 +3039,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	CREATE TABLE active_checkups (
 	  object varchar(128) NOT NULL default '',
+	  object_type varchar(64) NOT NULL default '',
 	  type varchar(64) NOT NULL default '',
 	  state varchar(16) NOT NULL default 'new',
 	  start datetime default NULL,
@@ -3055,6 +3056,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	CREATE TABLE checkups (
 	  object varchar(128) NOT NULL default '',
+	  object_type varchar(64) NOT NULL default '',
 	  type varchar(64) NOT NULL default '',
 	  next datetime default NULL,
 	  PRIMARY KEY  (object,type)
@@ -3062,6 +3064,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	CREATE TABLE checkups_temp (
 	  object varchar(128) NOT NULL default '',
+	  object_type varchar(64) NOT NULL default '',
 	  type varchar(64) NOT NULL default '',
 	  next datetime default NULL,
 	  PRIMARY KEY  (object,type)
