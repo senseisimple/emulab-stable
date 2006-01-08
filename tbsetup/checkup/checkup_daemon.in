@@ -62,7 +62,7 @@ sub ExptExists($$);
 
 my $logfile	= "$TB/log/checkuplog";
 my $debug	= 0;
-my $parallelization = 10;
+my $parallelization = 5;
 my $retry_interval = 10 * 60; # seconds
 
 #
@@ -143,7 +143,8 @@ MAINLOOP: while(1) {
 		    "  ct.checkup_type,ct.major_type,ct.expiration ".
 		    "from active_checkups as ac ".
 		    "left join checkup_types as ct on ".
-		    "  ac.type=ct.checkup_type");
+		    "  ac.type=ct.checkup_type and ".
+		    "  ac.object_type=ct.object_type");
     
     my $count = 0;
     while (my ($object, $state, $otype, $ctype, $mtype, $exp) =
@@ -209,7 +210,7 @@ MAINLOOP: while(1) {
 		    # Failed...
 		    SENDMAIL($TBOPS,
 			     "Checkup failure - $object/$ctype",
-			     "[Failed experiment is $eid]\n\n".
+			     "[Swapout $TBOPSPID/$eid when you're finished]\n\n".
 			     `cat $report`,
 			     $TBOPS);
 		    UpdateCheckupState($object, $ctype, $mtype,
@@ -302,12 +303,12 @@ MAINLOOP: while(1) {
     if ($iter % 5 == 0) {
 	# Automatically fill the checkups table.
 	# XXX Just do nodes for now.
-	DBQueryWarn("INSERT INTO checkups_temp (object, type, next) ".
-		    "SELECT n.node_id,ct.checkup_type,NOW() FROM nodes as n ".
+	DBQueryWarn("INSERT INTO checkups_temp (object, object_type, type, next) ".
+		    "SELECT n.node_id,n.type,ct.checkup_type,NOW() FROM nodes as n ".
 		    "INNER JOIN checkup_types as ct on n.type=ct.object_type ".
 		    "LEFT JOIN checkups as c on c.object=n.node_id ".
-		    "WHERE c.object is null");
-	DBQueryWarn("INSERT INTO checkups (object, type, next) ".
+		    "WHERE c.object is null and n.role='testnode'");
+	DBQueryWarn("INSERT INTO checkups (object, object_type, type, next) ".
 		    "SELECT * FROM checkups_temp");
 	DBQueryWarn("DELETE FROM checkups_temp");
     }
@@ -319,7 +320,8 @@ MAINLOOP: while(1) {
 			"  ct.major_type,ct.expiration ".
 			"FROM checkups as c ".
 			"INNER JOIN checkup_types as ct on ".
-			"  c.type=ct.checkup_type ".
+			"  c.type=ct.checkup_type and ".
+			"  c.object_type=ct.object_type ".
 			"LEFT JOIN active_checkups as ac on ".
 			"  ac.object=c.object ".
 			"WHERE NOW() >= c.next and ac.object is null ".
@@ -345,7 +347,8 @@ MAINLOOP: while(1) {
 
 	    # Make the checkups active.
 	    DBQueryWarn("INSERT INTO active_checkups SET ".
-			"object='$object',type='$ctype',start=NOW()");
+			"object='$object',object_type='$otype',".
+			"type='$ctype',start=NOW()");
 
 	    if ($exp == 0) {
 		$exp = 10;

@@ -40,7 +40,7 @@ $(INSTALL_DIR)/man/man8/%: %
 $(INSTALL_LIBDIR)/checkup/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_LIBDIR)/checkup
-	$(INSTALL) $< $@
+	$(INSTALL_DATA) $< $@
 
 $(INSTALL_LIBEXECDIR)/checkup/%: %
 	@echo "Installing $<"
