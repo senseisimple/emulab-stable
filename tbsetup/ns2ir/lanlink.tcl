@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -261,6 +261,9 @@ LanLink instproc init {s nodes bw d type} {
     $self instvar rloss
     $self instvar cost
     $self instvar linkq
+
+    $self instvar iscloud
+    $self set iscloud 0
 
     foreach node $nodes {
 	set nodepair [list $node [$node add_lanlink $self]]
