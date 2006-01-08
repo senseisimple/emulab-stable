@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -73,6 +73,7 @@ my $BSTATE_TERMINATING	= EXPTSTATE_TERMINATING;
 my $BSTATE_PAUSED	= EXPTSTATE_SWAPPED;
 my $BSTATE_LOCKED       = BATCHSTATE_LOCKED;
 my $BSTATE_UNLOCKED     = BATCHSTATE_UNLOCKED;
+my $TBOPSPID            = TBOPSPID;
 
 #
 # These are valid in the children, not the parent. I suppose I could use
@@ -178,7 +179,8 @@ while (1) {
 		    "left join experiments as e2 on ".
 		    " e2.expt_head_uid=e1.expt_head_uid and ".
 		    " e2.batchmode=1 and e2.state='$BSTATE_RUNNING' and ".
-		    " e1.pid=e2.pid and e1.eid!=e2.eid ".
+		    " e1.pid=e2.pid and e1.eid!=e2.eid and ".
+		    " e2.pid!='$TBOPSPID' ".
 		    "WHERE e2.eid is null and ".
 		    " e1.batchmode=1 and e1.canceled=0 and ".
 		    " e1.expt_locked is null and ".
