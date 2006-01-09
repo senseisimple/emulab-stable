@@ -49,6 +49,10 @@ my $inittag     = 'root';
 my $defaultview = 'head';
 my $debug       = 0;
 my $svnopt      = ($debug ? "" : "-q");
+my %ROOTS       = ("proj"   => "proj",
+		   "users"  => "users",
+		   "share"  => "share",
+		   "groups" => "groups");
 
 # Little helper and debug function.
 sub mysystem($)
@@ -219,6 +223,7 @@ sub ArchiveCreate(;$$$)
 sub ArchiveAdd($$;$$)
 {
     my ($archive_idx, $pathname, $view, $exact) = @_;
+    my $rootdir;
 
     $view = $defaultview
 	if (!defined($view));
@@ -226,41 +231,52 @@ sub ArchiveAdd($$;$$)
     $exact = 0
 	if (!defined($exact));
 
+    # Taint check path before handing off to shell below.
+    if ($pathname =~ /^([-\w\/\.\+\@,~]+)$/) {
+	$pathname = $1;
+    }
+    else {
+	print STDERR "ArchiveAdd: ".
+	    "Illegal characters in: $pathname\n";
+    }
+
     if (! -e $pathname || ! -r $pathname) {
-	print STDERR "*** ArchiveFile: $pathname cannot be read!\n";
+	print STDERR "*** ArchiveAdd: $pathname cannot be read!\n";
 	return 0;
     }
 
     #
-    # Check that the path does not contain an links to files outside
-    # the directory space the user is allowed to access.
+    # Use realpath to check that the path does not contain links to
+    # files outside the directory space the user is allowed to access.
     #
     my $realpath = `$REALPATH $pathname`;
     if ($realpath =~ /^([-\w\/\.\+\@,~]+)$/) {
 	$realpath = $1;
     }
     else {
-	print STDERR "ArchiveFile: ".
+	print STDERR "ArchiveAdd: ".
 	    "Bad data returned by realpath: $realpath\n";
     }
+
     #
-    # The file must reside in /proj, /groups, or /users. 
+    # Strip leading /dir from the pathname, and taint check it. We want
+    # a relative path to the rootdiir so we can copy it in. 
     #
-    if (! ($realpath =~ /^\/proj/) &&
-	! ($realpath =~ /^\/share/) &&
-	! ($realpath =~ /^\/groups/) &&
-	! ($realpath =~ /^\/users/)) {
-	print STDERR "ArchiveFile: ".
-	    "$realpath does not resolve to an allowed directory!\n";
-	return -1;
-    }
-    
-    # Strip leading / from the pathname, and taint check it. 
-    if ($pathname =~ /^[\/]+([-\w\/\.\+\@,~]+)$/) {
-	$pathname = $1;
+    if ($realpath =~ /^[\/]+(\w+)\/([-\w\/\.\+\@,~]+)$/) {
+	$rootdir  = $1;
+	$pathname = $2;
     }
     else {
-	print STDERR "ArchiveFile: Illegal characters in pathname $pathname\n";
+	print STDERR "ArchiveAdd: Illegal characters in pathname $pathname\n";
+	return -1;
+    }
+
+    #
+    # The file must reside in one of the Emulab "root" filesystems.
+    #
+    if (! exists($ROOTS{$rootdir})) {
+	print STDERR "ArchiveAdd: ".
+	    "$realpath does not resolve to an allowed directory!\n";
 	return -1;
     }
 
@@ -269,12 +285,12 @@ sub ArchiveAdd($$;$$)
     #
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveFile: ".
+	print STDERR "ArchiveAdd: ".
 	    "Archive '$archive_idx' does not exist in the DB!\n";
 	return -1;
     }
     if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveFile: $directory cannot be written!\n";
+	print STDERR "ArchiveAdd: $directory cannot be written!\n";
 	return -1;
     }
     my $repodir   = "$directory/repo";
@@ -287,14 +303,20 @@ sub ArchiveAdd($$;$$)
     # tar or rsync, depending on whether we want an exact copy (removing
     # files in the target that are not present in the source). 
     #
-    if (-f "/${pathname}" || !$exact) {
-	mysystem("$TAR cf - -C / $pathname | tar xf - -C $checkin");
+    if (! -e "$checkin/$rootdir") {
+	mysystem("$MKDIR $checkin/$rootdir") == 0 or return -1;
+    }
+    
+    if (-f "/${rootdir}/${pathname}" || !$exact) {
+	mysystem("$TAR cf - -C /$rootdir $pathname | ".
+		 "$TAR xf - -C $checkin/$rootdir");
     }
     else {
-	mysystem("$RSYNC -R -ax --delete /${pathname} $checkin");
+	mysystem("cd /$rootdir; ".
+		 "$RSYNC -R -ax --delete ${pathname} $checkin/$rootdir");
     }
     if ($?) {
-	print STDERR "ArchiveFile: Could not copy in /$pathname\n";
+	print STDERR "ArchiveAdd: Could not copy in $realpath\n";
 	return -1;
     }
     return 0;
@@ -1146,9 +1168,9 @@ sub TBCreateExperimentArchive($$)
 #
 # Add a file to an experiment archive.
 #
-sub TBExperimentArchiveAddFile($$$)
+sub TBExperimentArchiveAddFile($$$;$)
 {
-    my ($pid, $eid, $pathname) = @_;
+    my ($pid, $eid, $pathname, $exact) = @_;
     my ($archive_idx, $view);
 
     return 0
@@ -1160,7 +1182,7 @@ sub TBExperimentArchiveAddFile($$$)
     return -1
 	if ($rval < 0);
 
-    return ArchiveAdd($archive_idx, $pathname, $view);
+    return ArchiveAdd($archive_idx, $pathname, $view, $exact);
 }
 
 #
