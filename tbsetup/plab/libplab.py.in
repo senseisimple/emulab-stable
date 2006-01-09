@@ -84,7 +84,7 @@ LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 
 ALLOWED_NODES = ()
 #ALLOWED_NODES = ("128.112.139.80", "128.112.139.72", "169.229.50.4")
-IGNORED_NODES = ("10283","24","25")
+IGNORED_NODES = ("10283","25","155")
 
 # allowed nil/unknown values (sentinels).
 ATTR_NIL_VALUES = ('None',)
@@ -1263,15 +1263,49 @@ class Node:
         # Split up the command into a list to exec (avoid
         # intermediate shell invocation).
         cmdlist = shlex.split(command)
+
+        # Catch termination signals and kill child if we get one.
+        def catchkill(signum, frame):
+            if verbose:
+                print "Received signal", signum, "while running command."
+                pass
+            e = OSError("Received signal %s" % signum)
+            e.killed = 1
+            raise e
+        
+        sig = {}
+        sig["INT"]  = signal.signal(signal.SIGINT, catchkill)
+        sig["TERM"] = signal.signal(signal.SIGTERM, catchkill)
+        sig["HUP"]  = signal.signal(signal.SIGHUP, catchkill)
+
+        # Now run the command, catching it's output and handling signals.
         cmdobj = Popen4(cmdlist)
-        cmdout = cmdobj.fromchild.read()
-        cmdstatus = cmdobj.wait()
-        if (not quiet) and cmdout:
-            print cmdout
+        try:
+            cmdout = cmdobj.fromchild.read()
+            cmdstatus = cmdobj.wait()
+            signal.signal(signal.SIGINT, sig["INT"])
+            signal.signal(signal.SIGTERM, sig["TERM"])
+            signal.signal(signal.SIGHUP, sig["HUP"])
+            if (not quiet) and cmdout:
+                print cmdout
+                pass
+            if cmdstatus:
+                raise RuntimeError, "'%s' failed (excode: %s). output:\n%s" % \
+                      (command, cmdstatus, cmdout)
             pass
-        if cmdstatus:
-            raise RuntimeError, "'%s' failed (excode: %s). output:\n%s" % \
-                  (command, cmdstatus, cmdout)
+        except OSError, e:
+            if hasattr(e,"killed") and e.killed:
+                os.kill(cmdobj.pid, signal.SIGTERM)
+                cmdobj.wait()
+                sys.exit(1)
+                pass
+            else:
+                signal.signal(signal.SIGINT, sig["INT"])
+                signal.signal(signal.SIGTERM, sig["TERM"])
+                signal.signal(signal.SIGHUP, sig["HUP"])
+                raise e
+            pass
+        
         return
 
     def __findIP(self):
