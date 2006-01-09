@@ -12,13 +12,15 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print STDOUT
-	"Usage: archive_control [-f] <commit> <pid> <eid>\n";
+    print STDERR
+	"Usage: archive_control [-f] commit <pid> <eid>\n".
+	"       archive_control [-f] [-a] addfile <pid> <eid> [files ...]\n";
     exit(-1);
 }
-my $optlist = "df";
+my $optlist = "dfa";
 my $debug   = 0;
 my $force   = 0;
+my $exact   = 0;
 my $dbuid;
 
 #
@@ -66,23 +68,26 @@ if (! UNIX2DBUID($UID, \$dbuid)) {
 if (! getopts($optlist, \%options)) {
     usage();
 }
-if (@ARGV != 3) {
+if (@ARGV < 3) {
     usage();
 }
 if (defined($options{"d"})) {
     $debug = 1;
 }
+if (defined($options{"a"})) {
+    $exact = 1;
+}
 if (defined($options{"f"})) {
     $force = 1;
 }
-my $action = $ARGV[0];
-my $pid    = $ARGV[1];
-my $eid    = $ARGV[2];
+my $action = shift(@ARGV);
+my $pid    = shift(@ARGV);
+my $eid    = shift(@ARGV);
 
 #
 # Untaint args.
 #
-if ($action =~ /^(commit)$/) {
+if ($action =~ /^(commit|addfile)$/) {
     $action = $1;
 }
 else {
@@ -174,6 +179,20 @@ if ($action eq "commit") {
     print "Doing a commit on the experiment archive ...\n";
     if (libArchive::TBCommitExperimentArchive($pid, $eid, "user_commit") < 0) {
 	  fatal("Failed to commit experiment archive!");
+    }
+}
+elsif ($action eq "addfile") {
+    usage()
+	if (! @ARGV);
+
+    # The Archive library does a taint check on the pathnames.
+    while (@ARGV) {
+	my $pathname = shift(@ARGV);
+
+	if (libArchive::TBExperimentArchiveAddFile($pid, $eid,
+						   $pathname, $exact) < 0) {
+	    fatal("Failed to add '$pathname' to experiment archive!");
+	}
     }
 }
 exit(0);
