@@ -748,6 +748,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tmcd/linux9/GNUmakefile tmcd/linux9/supfile \
         tmcd/linux-sg/GNUmakefile \
 	tmcd/freebsd5/GNUmakefile tmcd/freebsd5/supfile \
+	tmcd/freebsd6/GNUmakefile tmcd/freebsd6/supfile \
+	tmcd/freebsd6/netif-emulab \
 	tmcd/cygwinxp/GNUmakefile \
 	tmcd/openbsd/GNUmakefile tmcd/ron/GNUmakefile tmcd/plab/GNUmakefile \
 	utils/GNUmakefile utils/vlandiff utils/vlansync utils/delay_config \
