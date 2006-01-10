@@ -12,7 +12,7 @@ use IO::Handle;
 use English;
 use Socket;
 
-my $LINKTEST_VERSION = "1.0";
+my $LINKTEST_VERSION = "1.1";
 
 #
 # Linktest test script. This script is set up to run as root on
@@ -150,11 +150,10 @@ my $gid;        # group id
 my $platform;   # name of platform
 my $startat=1;  # which test to start at
 my $stopat=99;  # which test to stop at
-my @kill_list;  # PIDs maintained through the life of linktest
-                    # which get killed as part of cleanup.
+my %kill_list;  # PIDS that are running as background procs, needing cleanup.
 my $debug_level = 0; # enable debug statements
-                    # 1 = print debug statements.
-                    # 2 = show STDOUT and STDERR
+                     # 1 = print debug statements.
+                     # 2 = show STDOUT and STDERR
 my $barr_count;   # used by synserv host, nubmer of hosts -1
 my $log_file;    # common logfile for information saved over time.
 
@@ -315,17 +314,12 @@ if(&is_special_node()) {
 &do_unlink(RUDE_CFG);
 
 #
-# Start up child processes for receiving RUDE and iperf streams.
-# These run over the lifetime of Linktest to reduce the number of
-# barrier synchronizations and startup delays. Always give the 
-# collectors a moment to start up.
+# Start up iperf listener; this run over the lifetime of Linktest to
+# reduce the number of barrier synchronizations and startup
+# delays. Always give the collectors a moment to start up.
 #
 if(&dotest(TEST_BW)){
-    &my_system_initonly(PATH_IPERF,"-s","-f","b","-u","-w","200000");
-    sleep(1);
-}
-if(&dotest(TEST_LOSS)){
-    &my_system_initonly(PATH_CRUDE,"-l",CRUDE_DAT,"-P",RUDE_PRI);
+    &start_listener(PATH_IPERF,"-s","-f","b","-u","-w","200000");
     sleep(1);
 }
 
@@ -503,6 +497,11 @@ sub loss_test {
     my %recv_cnt;
     my $stream_id = 1;
     my @edge_copy = @links;
+
+    my $listener = &start_listener(PATH_CRUDE,"-l",CRUDE_DAT,"-P",RUDE_PRI);
+    sleep(1);
+    &barrier();
+    
     while(&has_elems(\@edge_copy)) {
 	my ($edge,$other_edge) = &get_twoway_assign(\@edge_copy);
 	if(defined($edge) && defined($other_edge)) {
@@ -516,6 +515,11 @@ sub loss_test {
 		}
 	    } elsif ($hostname eq $other_edge->src) {
 		if(valid_loss($other_edge)) {
+		    # Hmm, lets wait for the other one to finish. Using
+		    # Real Time Scheduling, with both links spitting at
+		    # each other, appears to cause grief on at least the
+		    # RHL kernel. Packets get lost someplace. 
+		    sleep(LOSS_TEST_DURATION + 1);
 		    &write_rude_cfg($stream_id,$other_edge);
 		    &my_system(PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI);
 		    $analyze{$stream_id} = $edge;
@@ -588,7 +592,7 @@ sub loss_test {
 	}
 
     }
-
+    kill_listener($listener);
 
     # wait for completion before next test.
     &barrier();
@@ -750,7 +754,10 @@ sub latency_test {
 			    my $numerator = $x_bar - $u;
 
 			    my $S = $sample_dev;
-			    
+
+			    # Very rarely, ping reports a 0.0 stddev.
+			    $S = 0.03
+				if ($S == 0.0);
 
 			    my $denominator = $S / sqrt( abs( $n ) );
 
@@ -1451,8 +1458,10 @@ sub sim_event2 {
 
 # cleanup any child procs.
 sub cleanup {
-    &debug("Cleaning up @kill_list\n");
-    kill 9, @kill_list;
+    my @pidlist = keys(%kill_list);
+    
+    &debug("Cleaning up @pidlist\n");
+    kill 9, @pidlist;
 }
 
 sub dotest {
@@ -1519,10 +1528,10 @@ sub my_system {
     }
     &debug("\n");
     if(my $pid =fork) {
-	push @kill_list, $pid;
+	$kill_list{$pid} = $pid;
 	waitpid($pid,0);
 	$retval = $? >> 8;
-	pop(@kill_list);
+	delete($kill_list{$pid});
     } else {
 	if($debug_level < DEBUG_ALL) {
 	    open(STDOUT, "/dev/null") ;
@@ -1533,19 +1542,33 @@ sub my_system {
     }
     return $retval;
 }
+
 # permutation of my_system to start but not wait for child procs.
-sub my_system_initonly {
+sub start_listener {
     &check_filename($_[0]);
 
-    if(my $pid =fork) {
-	push @kill_list, $pid;
-    } else {
+    if (my $pid = fork()) {
+	$kill_list{$pid} = $pid;
+	return $pid;
+    }
+    else {
 	if($debug_level < DEBUG_ALL) {
 	    open(STDOUT, "/dev/null") ;
 	    open(STDERR, $linktest_path . "/" . $hostname . SUFFIX_ERROR) ;
 	}
 	exec(@_);
     }
+}
+
+sub kill_listener {
+    my $pid = $_[0];
+
+    return
+	if (! exists($kill_list{$pid}));
+
+    kill 9, $pid;
+    waitpid($pid, 0);
+    delete($kill_list{$pid});
 }
 
 sub check_filename {
