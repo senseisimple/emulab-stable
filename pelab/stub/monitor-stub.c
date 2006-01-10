@@ -4,8 +4,13 @@
 
 #include "stub.h"
 
-char addr1[]  = "155.98.70.168";  //labnix18
-char addr2[] = "155.98.70.161";   //labnix11
+char public_hostname0[] = "planet0.measure.tbres.emulab.net";
+char public_hostname1[] = "planet1.measure.tbres.emulab.net";
+char public_addr0[16];
+char public_addr1[16];
+char private_addr0[]="10.1.0.1";
+char private_addr1[]="10.1.0.2";
+
 fd_set read_fds,write_fds;
 
 void print_header(char *buf){
@@ -62,7 +67,7 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   gettimeofday(&current_tv, NULL);
   past_usec = (current_tv.tv_sec-start_tvp->tv_sec)*1000000+ 
     (current_tv.tv_usec-start_tvp->tv_usec);
-  left_usec = QUANTA-past_usec;
+  left_usec = QUANTA*1000-past_usec; //QUANTA is in msec
   if (left_usec > 0) {
     left_tvp->tv_sec = left_usec/1000000;
     left_tvp->tv_usec= left_usec%1000000;
@@ -73,60 +78,72 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
 
 int main(int argc, char *argv[])
 {
-  int sockfd1, sockfd2;  
+  int sockfd0, sockfd1;  
   fd_set read_fds_copy, write_fds_copy;
   struct timeval start_tv, left_tv;
   char buf[MAX_PAYLOAD_SIZE];
   struct sockaddr_in their_addr; // connector's address information 
-  int maxfd, yes=1, flag_send_stub1=0,flag_send_stub2=0 ;
-  
-  if ((sockfd1 = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+  int maxfd, yes=1, flag_send_stub0=0,flag_send_stub1=0 ;
+  struct hostent *hp;
+  struct in_addr addr;
+  char *ip;
+
+  hp = gethostbyname(public_hostname0);
+  bcopy(hp->h_addr, &addr, hp->h_length);
+  ip = inet_ntoa(addr);
+  strcpy(public_addr0, ip);
+  hp = gethostbyname(public_hostname1);
+  bcopy(hp->h_addr, &addr, hp->h_length);
+  ip = inet_ntoa(addr);
+  strcpy(public_addr1, ip);
+
+  if ((sockfd0 = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
     exit(1);
   }
-  if (setsockopt(sockfd1, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+  if (setsockopt(sockfd0, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
     perror("setsockopt");
     exit(1);
   }
   their_addr.sin_family = AF_INET;    // host byte order 
   their_addr.sin_port = htons(MONITOR_PORT);  // short, network byte order 
-  inet_aton(addr1, &(their_addr.sin_addr));
+  inet_aton(public_addr0, &(their_addr.sin_addr)); //contact the stub through the control network!
   memset(&(their_addr.sin_zero), '\0', 8);  // zero the rest of the struct 
-  if (connect(sockfd1, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
+  if (connect(sockfd0, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
     perror("connect1");
     exit(1);
   }
   
-  if ((sockfd2 = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+  if ((sockfd1 = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
 	    exit(1);
   }
-  if (setsockopt(sockfd2, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+  if (setsockopt(sockfd1, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
     perror("setsockopt");
     exit(1);
   }
-  inet_aton(addr2, &(their_addr.sin_addr));
-  if (connect(sockfd2, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
+  inet_aton(public_addr1, &(their_addr.sin_addr));
+  if (connect(sockfd1, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
     perror("connect2");
     exit(1);
-  }
-	
+  } 
+
   //initialization
   FD_ZERO(&read_fds);
   FD_ZERO(&read_fds_copy);
   FD_ZERO(&write_fds);
   FD_ZERO(&write_fds_copy);
+  FD_SET(sockfd0, &read_fds);
   FD_SET(sockfd1, &read_fds);
-  FD_SET(sockfd2, &read_fds);
+  FD_SET(sockfd0, &write_fds);
   FD_SET(sockfd1, &write_fds);
-  FD_SET(sockfd2, &write_fds);
-  maxfd = sockfd2; //socket order
+  maxfd = sockfd1; //socket order
 
   //main loop - the monitor runs forever
   while (1) {
     gettimeofday(&start_tv, NULL); //reset start time for each quanta
+    flag_send_stub0=0;
     flag_send_stub1=0;
-    flag_send_stub2=0;
 
     //while in a quanta
     while(have_time(&start_tv, &left_tv)) {  
@@ -138,29 +155,29 @@ int main(int argc, char *argv[])
 	exit(1); 
       }
       //check write
+      if (flag_send_stub0==0 && FD_ISSET(sockfd0, &write_fds_copy)) {
+	send_stub(sockfd0, private_addr1, buf); //feed the stub with the private address
+	flag_send_stub0=1;
+      } 
+
       if (flag_send_stub1==0 && FD_ISSET(sockfd1, &write_fds_copy)) {
-	send_stub(sockfd1, addr2,buf);
+	send_stub(sockfd1, private_addr0, buf); //feed the stub with the private address
 	flag_send_stub1=1;
       } 
 
-      if (flag_send_stub2==0 && FD_ISSET(sockfd2, &write_fds_copy)) {
-	send_stub(sockfd2, addr1,buf);
-	flag_send_stub2=1;
+      //check read
+      if (FD_ISSET(sockfd0, &read_fds_copy)) {
+	receive_stub(sockfd0,buf);
       } 
 
-      //check read
       if (FD_ISSET(sockfd1, &read_fds_copy)) {
 	receive_stub(sockfd1,buf);
-      } 
-
-      if (FD_ISSET(sockfd2, &read_fds_copy)) {
-	receive_stub(sockfd2,buf);
       } 
 
     } //while in a quanta
   } //while forever
 
+  close(sockfd0);
   close(sockfd1);
-  close(sockfd2);
   return 0;
 }
