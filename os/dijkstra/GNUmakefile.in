@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -11,7 +11,7 @@ SUBDIR		= os/dijkstra
 
 include $(OBJDIR)/Makeconf
 
-CXXFLAGS	= -Wall -O2 -I/usr/local/include -ftemplate-depth-30 -g
+CXXFLAGS	= -Wall -O2 -I/usr/local/include -ftemplate-depth-40 -g
 
 all:	dijkstra
 
