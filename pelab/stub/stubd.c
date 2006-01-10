@@ -169,13 +169,14 @@ int send_all(int sockfd, char *buf, int size) {
 
 void receive_sender(int i) {
   char inbuf[MAX_PAYLOAD_SIZE];
-  unsigned long tmpulong, sndsec, sndusec;
-  struct timeval rcvtime; 
+  //unsigned long tmpulong, sndsec, sndusec;
+  //struct timeval rcvtime; 
 
   if (recv_all(snddb[i].sockfd, inbuf, MAX_PAYLOAD_SIZE)== 0) { //connection closed
     snddb[i].valid = 0;
     FD_CLR(snddb[i].sockfd, &read_fds);
   } else {
+    /* outdated since we use sniff for delay measurement now
     gettimeofday(&rcvtime, NULL);
     memcpy(&tmpulong, inbuf, SIZEOF_LONG);
     sndsec = ntohl(tmpulong);
@@ -183,25 +184,30 @@ void receive_sender(int i) {
     sndusec = ntohl(tmpulong);
     delays[i] = (rcvtime.tv_sec-sndsec)*1000+floor((rcvtime.tv_usec-sndusec)/1000+0.5);
     if (flag_debug) printf("One Way Delay (msec): %ld \n",delays[i]);
+    */
   }
 }
 
 void send_receiver(unsigned long destaddr, char *buf){
   int i, index;
-  struct timeval sendtime;
-  unsigned long tmpulong;
   int sockfd;
+  //struct timeval sendtime;
+  //unsigned long tmpulong;
+
 
   index = get_rcvdb_index(destaddr);
   sockfd= rcvdb[index].sockfd;
   srandom(getpid());
   for (i=0; i<MAX_PAYLOAD_SIZE; i++) buf[i]=(char)(random()&0x000000ff);
-  //put the send time at the first eight bytes
+
+  /* outdated since we use sniff for delay measurement now
+   * put the send time at the first eight bytes
   gettimeofday(&sendtime, NULL);
   tmpulong = htonl(sendtime.tv_sec);
   memcpy(buf, &tmpulong,  SIZEOF_LONG);
   tmpulong = htonl(sendtime.tv_usec);
   memcpy(buf+SIZEOF_LONG, &tmpulong,  SIZEOF_LONG);
+  */
 
   //send packets
   while (send_all(sockfd, buf, MAX_PAYLOAD_SIZE) == 0){ //rcv conn closed
@@ -244,7 +250,7 @@ int send_monitor(int sockfd) {
   char outbuf_delay[3*SIZEOF_LONG], outbuf_bandwidth[3*SIZEOF_LONG];
   unsigned long tmpulong;
   int i;
-  float tmpf;
+  //float tmpf;
 
   tmpulong = htonl(CODE_DELAY);
   memcpy(outbuf_delay+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
@@ -260,10 +266,12 @@ int send_monitor(int sockfd) {
 	  return 0;
 	}
 	last_delays[i] = delays[i];
-      } //if
+      } //if measurement changed since last send
+
+      /* Throughput is not measured at the moment
       if (throughputs[i] != last_throughputs[i]) {
 	memcpy(outbuf_bandwidth, &(snddb[i].ip), SIZEOF_LONG); //the sender or src ip
-	tmpf=throughputs[i]*1000.0f/QUANTA+0.5f;
+	tmpf=throughputs[i]/QUANTA+0.5f;
 	tmpulong = htonl(floor(tmpf)+BANDWIDTH_OVER_THROUGHPUT);
 	memcpy(outbuf_bandwidth+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
 	if (send_all(sockfd, outbuf_bandwidth, 3*SIZEOF_LONG) == 0){
@@ -271,6 +279,8 @@ int send_monitor(int sockfd) {
 	}
 	last_throughputs[i] = throughputs[i];
       } //if measurement changed since last send
+      */
+
     } //if connection is valid
   } //for 
   return 1;
@@ -283,59 +293,13 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   gettimeofday(&current_tv, NULL);
   past_usec = (current_tv.tv_sec-start_tvp->tv_sec)*1000000+ 
     (current_tv.tv_usec-start_tvp->tv_usec);
-  left_usec = QUANTA-past_usec;
+  left_usec = QUANTA*1000-past_usec; //QUANTA is in msec
   if (left_usec > 0) {
     left_tvp->tv_sec = left_usec/1000000;
     left_tvp->tv_usec= left_usec%1000000;
     return 1;
   }
   return 0;
-}
-
-void readline(void) {
-  struct in_addr address;
-  char line[MAX_TCPDUMP_LINE];
-  char *trash, *src, *size, *id;
-  char ip[16], size_string[5];
-  int i=0, j=0, numbytes=0, index;
-
-  if(fgets(line, MAX_TCPDUMP_LINE, STDIN) != NULL) {
-    strtok(line, " ");
-    while ( (trash=strtok(NULL, " ")) != NULL){
-      if (i == 2 ) {
-	src = trash;
-      }	else if  (i == 6){
-	id  = trash;
-      } else if (i == 7){
-	size = trash;
-	break;
-      }
-    } //while
-    if (src != NULL){
-      i = 0;
-      j = 0;
-      while (j < 4 ) {
-	ip[i] = src[i];
-	if (src[i] == '.'){ j++; }
-	i++;
-      }
-      if (j==4){
-	ip[15]='\0';
-	inet_aton(ip, &address);
-	if ((index=search_rcvdb(address.s_addr)) != -1) {
-	  if (id != NULL) {  
-	    if (strcmp(id,"length")!=0) {
-	      numbytes = atoi(size); //error on size==null?
-	    } else {
-	      sscanf(id, "%*s(%s)",size_string);
-	      numbytes = atoi(size_string);
-	    } //if id=="length"
-	    throughputs[index] += numbytes;
-	  } //if id exists	  
-	} //if ip in rcvdb
-      } //if 4 dots
-    } //if src exists          
-  } //if fgets 
 }
 
 int main(void) {
@@ -345,7 +309,7 @@ int main(void) {
   fd_set read_fds_copy, write_fds_copy;
   socklen_t sin_size;
   struct timeval start_tv, left_tv;
-  int yes=1, maxfd, i, to_ms, flag_send_monitor=0;
+  int yes=1, maxfd, i, flag_send_monitor=0;
 
   //set up debug flag
   if (getenv("Debug")!=NULL) 
@@ -400,16 +364,17 @@ int main(void) {
   }
 
   //initialization
+  init_db();
+  init_pcap(SNIFF_TIMEOUT);
   FD_ZERO(&read_fds);
   FD_ZERO(&read_fds_copy);
   FD_ZERO(&write_fds);
   FD_ZERO(&write_fds_copy);
+  FD_SET(pcapfd,  &read_fds);
   FD_SET(sockfd_rcv_sender,  &read_fds);
   FD_SET(sockfd_rcv_monitor, &read_fds);
-  FD_SET(STDIN, &read_fds);
-  maxfd = sockfd_rcv_monitor; //socket order
+  maxfd = pcapfd; //socket order
   sin_size = sizeof(struct sockaddr_in);
-  init_db();
 
   //main loop - the stubd runs forever
   while (1) {
@@ -493,9 +458,8 @@ int main(void) {
       }
          
       //sniff packets
-      if (have_time(&start_tv, &left_tv)) { 
-	to_ms = left_tv.tv_sec*1000+floor(left_tv.tv_usec/1000+0.5);
-	sniff(to_ms);
+      if (FD_ISSET(pcapfd, &read_fds_copy)) { 
+	sniff();     
       }
 
     } //while in quanta

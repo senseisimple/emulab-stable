@@ -17,9 +17,16 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <math.h>
+#include <pcap.h>
+#include <netinet/if_ether.h> 
+#include <net/ethernet.h>
+#include <netinet/ether.h> 
+#include <netinet/ip.h> 
+#include <netinet/udp.h>
+#include <netinet/tcp.h>
 
 #define STDIN 0 // file descriptor for standard input
-#define QUANTA 5000000    //feed-loop interval in usec
+#define QUANTA 5000    //feed-loop interval in msec
 #define MONITOR_PORT 3490 //the port the monitor connects to
 #define SENDER_PORT  3491 //the port the stub senders connect to 
 #define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold
@@ -29,7 +36,8 @@
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
-#define SNIFFWIN_SIZE 131071 //from min(net.core.rmem_max, max(net.ipv4.tcp_rmem)) on Plab linux
+#define SNIFF_WINSIZE 131071 //from min(net.core.rmem_max, max(net.ipv4.tcp_rmem)) on Plab linux
+#define SNIFF_TIMEOUT QUANTA/10 //in msec 
 
 //magic numbers
 #define CODE_BANDWIDTH 0x00000001 
@@ -46,10 +54,12 @@ struct connection {
 typedef struct connection connection;
 
 extern short  flag_debug;
+extern int pcapfd;
 extern connection rcvdb[CONCURRENT_RECEIVERS];
 extern unsigned long delays[CONCURRENT_SENDERS];
 extern int search_rcvdb(unsigned long indexip);
-extern void sniff(int to_ms);
+extern void sniff(void);
+extern void init_pcap(int to_ms);
 
 #endif
 

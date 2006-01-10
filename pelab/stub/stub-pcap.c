@@ -1,16 +1,3 @@
-#include <pcap.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netinet/if_ether.h> 
-#include <net/ethernet.h>
-#include <netinet/ether.h> 
-#include <netinet/ip.h> 
-#include <netinet/udp.h>
-#include <netinet/tcp.h>
 #include "stub.h"
 
 /* tcpdump header (ether.h) defines ETHER_HDRLEN) */
@@ -56,12 +43,14 @@ struct sniff_record {
 };
 typedef struct sniff_record sniff_record;
 struct sniff_path {
-  sniff_record records[SNIFFWIN_SIZE];
+  sniff_record records[SNIFF_WINSIZE];
   short start; //circular buffer pointers
   short end;
 };
 typedef struct sniff_path sniff_path;
 sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
+pcap_t* descr;
+int pcapfd;
 
 void init_sniff_rcvdb(void) {
   int i;
@@ -78,8 +67,9 @@ int push_sniff_rcvdb(int path_id, u_long start_seq, u_long end_seq, const struct
   int next;
 
   path = &(sniff_rcvdb[path_id]);
-  next = (((path->end)+1)%SNIFFWIN_SIZE);
-  if ((next-(path->start))%SNIFFWIN_SIZE == 0){
+  next = path->end;
+  //The circular buffer is full when the start and end pointers are back to back
+  if ((path->start-next)%SNIFF_WINSIZE == (SNIFF_WINSIZE-1)){
     addr.s_addr =rcvdb[path_id].ip;
     printf("Error: circular buffer is full for the path to %s", inet_ntoa(addr));
     return -1;
@@ -88,19 +78,24 @@ int push_sniff_rcvdb(int path_id, u_long start_seq, u_long end_seq, const struct
   path->records[next].seq_end   = end_seq;
   path->records[next].captime.tv_sec  = ts->tv_sec;
   path->records[next].captime.tv_usec = ts->tv_usec;
-  path->end=next;
+  path->end=(next+1)%SNIFF_WINSIZE;
   return 0;
 }
+
 
 int search_sniff_rcvdb(int path_id, u_long seqnum) {
   sniff_path *path = &(sniff_rcvdb[path_id]);
   int next = path->start;
 
   while (next != (path->end)){
-    if ((path->records[next].seq_start)<=seqnum && (path->records[next].seq_end)>=seqnum) {
+    if ((path->records[next].seq_start)==(path->records[next].seq_end)){//no payload
+      if ((path->records[next].seq_end)==seqnum){
+	return next;
+      }
+    } else if ((path->records[next].seq_start)<=seqnum && (path->records[next].seq_end)>seqnum) {
       return next;
     }
-    next = ((next+1) % SNIFFWIN_SIZE);
+    next = (next+1) % SNIFF_WINSIZE;
   }
   return -1;
 }
@@ -108,8 +103,9 @@ int search_sniff_rcvdb(int path_id, u_long seqnum) {
 void pop_sniff_rcvdb(int path_id, u_long to_seqnum){
   int to_index = search_sniff_rcvdb(path_id, to_seqnum);
   if (to_index != -1) {
-    if (sniff_rcvdb[path_id].records[to_index].seq_end == to_seqnum) {
-      sniff_rcvdb[path_id].start = to_index+1; //complete pop-up 
+    if ((sniff_rcvdb[path_id].records[to_index].seq_end==sniff_rcvdb[path_id].records[to_index].seq_start) 
+      || (sniff_rcvdb[path_id].records[to_index].seq_end-1 == to_seqnum)) {
+      sniff_rcvdb[path_id].start = (to_index+1)%SNIFF_WINSIZE; //complete pop-up 
     } else {
       sniff_rcvdb[path_id].start = to_index; //partial pop-up
       sniff_rcvdb[path_id].records[to_index].seq_start = to_seqnum+1;
@@ -137,7 +133,6 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
   const struct my_ip* ip;
   const struct tcphdr *tp;
   const struct udphdr *up;
-  struct in_addr addr_src, addr_dst;
   u_char *cp;
   u_int length = pkthdr->len;
   u_int caplen = pkthdr->caplen;
@@ -185,11 +180,10 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
     ip_src = ip->ip_src.s_addr;
     ip_dst = ip->ip_dst.s_addr;
 
-    if (flag_debug){
-      addr_src.s_addr = ip_src;
-      addr_dst.s_addr = ip_dst;
-      fprintf(stdout,"src:%s dst:%s hlen:%d version:%d len:%d\n",
-	      inet_ntoa(addr_src),inet_ntoa(addr_dst),hlen,version,len);
+    if (flag_debug){    
+      //For an unknown reason, inet_ntoa returns the same string if called twice in one fprintf
+      fprintf(stdout,"IP src:%s ", inet_ntoa(ip->ip_src));
+      fprintf(stdout,"dst:%s hlen:%d version:%d len:%d\n",inet_ntoa(ip->ip_dst),hlen,version,len);
     }
     /*jump pass the ip header */
     cp = (u_char *)ip + (hlen * 4);
@@ -207,36 +201,55 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       tcp_hlen  = ((tp)->doff & 0x000f);
       length   -= (tcp_hlen * 4); //jump pass the tcp header
       seq_start = ntohl(tp->seq);      
-      seq_end   = seq_start+length-1;
+      seq_end   = seq_start+length;
+      ack_bit= ((tp)->ack  & 0x0001);
 
       path_id = search_rcvdb(ip_dst);
       if (path_id != -1) { //a monitored outgoing packet  
 	path = &(sniff_rcvdb[path_id]);
-	end  = path->end;
 
-	if (seq_start > path->records[end].seq_end) { //new packet
-	  return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts));
+	//ignore the pure outgoing ack
+	if ((ack_bit==1) && (seq_end==seq_start)) {
+	  return 0;
+	}
+
+	//find the real received end index
+	if (path->end == path->start){ //no previous packet
+	  return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet	
 	} else {
+	  end  = (path->end-1)%SNIFF_WINSIZE;
 	  /* Note: we discard resent-packet records for the delay estimation because 
-           * TCP don't use them to calculate the sample RTT in the RTT estimation */
-	  if (seq_end > path->records[end].seq_end){ //partial resend
-	    pop_sniff_rcvdb(path_id, path->records[end].seq_end);
-	    return push_sniff_rcvdb(path_id, path->records[end].seq_end+1, seq_end, &(pkthdr->ts));
-	  } else { //pure resend
-	    pop_sniff_rcvdb(path_id, seq_end);
-	  }	  
-	}       
+	   * TCP don't use them to calculate the sample RTT in the RTT estimation */
+	  //if the packet has no payload
+	  if (seq_end == seq_start) {
+	    if ((path->records[end].seq_end==path->records[end].seq_start) &&  (path->records[end].seq_end==seq_end)) {
+	      //the last packet also has no payload and has the same seqnum
+	      pop_sniff_rcvdb(path_id, seq_end); //pure resent
+	    } else { 
+	      return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet
+	    }	  
+	  } else if (seq_start >= path->records[end].seq_end) { //new packet
+	    return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts));
+	  } else {
+	    if (seq_end > path->records[end].seq_end){ //partial resend
+	      pop_sniff_rcvdb(path_id, path->records[end].seq_end-1);
+	      return push_sniff_rcvdb(path_id, path->records[end].seq_end+1, seq_end, &(pkthdr->ts));
+	    } else { //pure resend
+	      pop_sniff_rcvdb(path_id, seq_end-1);
+	    }	  
+	  } // if has payload and resent   
+	}
+   
       } else {
 	path_id = search_rcvdb(ip_src);
 	if (path_id != -1) { //a monitored incoming packet
-	  ack_bit= ((tp)->ack  & 0x0001);
 	  if (ack_bit == 1) { //has an acknowledgement
 	    ack_seq  = ntohl(tp->ack_seq);
-	    record_id = search_sniff_rcvdb(path_id, ack_seq);
+	    record_id = search_sniff_rcvdb(path_id, ack_seq-1);
 	    if (record_id != -1) {
-	      msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000+0.5);
+	      msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
 	      delays[path_id] = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
-	      pop_sniff_rcvdb(path_id, ack_seq);
+	      pop_sniff_rcvdb(path_id, ack_seq-1);
 	    } //ack in rcvdb
 	  } //has ack
 	} //if incoming
@@ -305,23 +318,22 @@ u_int16_t handle_ethernet (u_char *args,const struct pcap_pkthdr* pkthdr,const u
     return ether_type;
 }
 
-
-void sniff(int to_ms) { 
+void init_pcap(int to_ms) {
     char *dev; 
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t* descr;
     struct bpf_program fp;      /* hold compiled program     */
     bpf_u_int32 maskp;          /* subnet mask               */
     bpf_u_int32 netp;           /* ip                        */
-    u_char* args = NULL;
-    char string_filter[25];
-    struct in_addr addr;
+    char string_filter[128];
+    //struct in_addr addr;
 
-    dev = "vnet";
+    dev = "eth0"; //"vnet";
+
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(dev,&netp,&maskp,errbuf);
-    addr.s_addr = netp;
-    sprintf(string_filter, "host %s", inet_ntoa(addr));
+    //For an unknown reason, netp has the wrong 4th number
+    //addr.s_addr = netp;
+    sprintf(string_filter, "port %d and tcp", SENDER_PORT);
 
     /* open device for reading. 
      * NOTE: We use non-promiscuous */
@@ -331,16 +343,31 @@ void sniff(int to_ms) {
       exit(1); 
     }
 
-    /* Lets try and compile the program.. non-optimized */
-    if(pcap_compile(descr, &fp, string_filter, 0, netp) == -1) {
+ 
+    // Lets try and compile the program, optimized 
+    if(pcap_compile(descr, &fp, string_filter, 1, maskp) == -1) {
       fprintf(stderr,"Error: calling pcap_compile\n"); 
       exit(1); 
     }
-    /* set the compiled program as the filter */
+    // set the compiled program as the filter 
     if(pcap_setfilter(descr,&fp) == -1) {
       fprintf(stderr,"Error: setting filter\n"); 
       exit(1); 
     }
+
+    /*
+    if (pcap_setnonblock(descr, 1, errbuf) == -1){
+      printf("Error: pcap_setnonblock(): %s\n",errbuf); 
+      exit(1); 
+    }
+    */
+
+    pcapfd = pcap_fileno(descr);
+    init_sniff_rcvdb();
+}
+
+void sniff(void) { 
+    u_char* args = NULL;
 
     /* use dispatch here instead of loop 
      * Note: no max pkt num is specified */ 
