@@ -47,7 +47,11 @@ endif
 
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION    := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/freebsd\1/')
+ifeq ($(FBSDVERSION),freebsd4)
+MDSUBDIR  = freebsd
+else
 MDSUBDIR  = $(FBSDVERSION)
+endif
 endif
 
 ifeq ($(SYSTEM),CYGWIN_NT-5.1)
