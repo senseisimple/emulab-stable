@@ -2,7 +2,7 @@ all: stubd stub-monitor
 
 stubd: stubd.o stub-pcap.o stub.h
 	gcc -g -Wall -lm -lpcap stubd.o stub-pcap.o -o stubd
-monitor-stub: monitor-stub.c stub.h
+stub-monitor: stub-monitor.c stub.h
 	gcc -g -Wall stub-monitor.c -o stub-monitor
 stubd.o: stubd.c stub.h
 	gcc -g -Wall -c stubd.c 

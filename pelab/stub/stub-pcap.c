@@ -103,6 +103,7 @@ int search_sniff_rcvdb(int path_id, u_long seqnum) {
 void pop_sniff_rcvdb(int path_id, u_long to_seqnum){
   int to_index = search_sniff_rcvdb(path_id, to_seqnum);
   if (to_index != -1) {
+    //if the packet has no payload or the last sent seqnum equals the pop number
     if ((sniff_rcvdb[path_id].records[to_index].seq_end==sniff_rcvdb[path_id].records[to_index].seq_start) 
       || (sniff_rcvdb[path_id].records[to_index].seq_end-1 == to_seqnum)) {
       sniff_rcvdb[path_id].start = (to_index+1)%SNIFF_WINSIZE; //complete pop-up 
@@ -181,7 +182,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
     ip_dst = ip->ip_dst.s_addr;
 
     if (flag_debug){    
-      //For an unknown reason, inet_ntoa returns the same string if called twice in one fprintf
+      //Note:inet_ntoa returns the same string if called twice in one line due to static string buffer
       fprintf(stdout,"IP src:%s ", inet_ntoa(ip->ip_src));
       fprintf(stdout,"dst:%s hlen:%d version:%d len:%d\n",inet_ntoa(ip->ip_dst),hlen,version,len);
     }
@@ -327,7 +328,7 @@ void init_pcap(int to_ms) {
     char string_filter[128];
     //struct in_addr addr;
 
-    dev = "eth0"; //"vnet";
+    dev = "vnet"; //"eth0";
 
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(dev,&netp,&maskp,errbuf);

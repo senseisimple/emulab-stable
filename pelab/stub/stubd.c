@@ -232,7 +232,11 @@ int receive_monitor(int sockfd) {
   memcpy(&tmpulong, nextptr, SIZEOF_LONG);
   destnum = ntohl(tmpulong);
 
-  //receive dest addrs
+  //return success if no dest addr is given
+  if (destnum == 0){
+    return 1;
+  }
+  //otherwise, receive dest addrs
   if (recv_all(sockfd, buf, destnum*SIZEOF_LONG)==0) {
     return 0;
   }
