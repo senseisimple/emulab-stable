@@ -3076,4 +3076,24 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table archives add date_archived int(10) unsigned \
 		NOT NULL default '0';
 
-		
+4.28: Some changes to the archive_tags table, for support of forking
+      an archive.
+
+	CREATE TABLE archive_tags_new (
+	  idx int(10) unsigned NOT NULL auto_increment,
+	  tag varchar(64) NOT NULL default '',
+	  archive_idx int(10) unsigned NOT NULL default '0',
+	  view varchar(64) NOT NULL default '',
+	  date_created int(10) unsigned NOT NULL default '0',
+	  PRIMARY KEY  (idx),
+	  UNIQUE KEY tag (tag,archive_idx,view)
+	) TYPE=MyISAM;
+      
+	insert into archive_tags_new (idx,tag,archive_idx,view,date_created) \
+           select distinct NULL,t.tag,t.archive_idx,v.view,t.date_created \
+	   from archive_tags as t left join archive_views as v on \
+	   v.archive_idx=t.archive_idx;
+
+        rename table archive_tags TO archive_tags_old, \
+                  archive_tags_new TO archive_tags;
+

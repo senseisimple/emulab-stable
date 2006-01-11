@@ -197,7 +197,7 @@ sub ArchiveCreate(;$$$)
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
     # Now enter an initial tag for the tree. Nothing actually gets tagged.
-    DBQueryWarn("insert into archive_tags set idx=NULL, ".
+    DBQueryWarn("insert into archive_tags set idx=NULL, view='$view', ".
 		"  tag='$tag', archive_idx='$idx', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
@@ -416,7 +416,7 @@ sub ArchiveSavePoint($;$$$)
     # And record the new tag. 
     # 
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
-		"  tag='$savetag', ".
+		"  tag='$savetag', view='$view', ".
 		"  archive_idx='$archive_idx', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
 
@@ -515,7 +515,7 @@ sub ArchiveCommit($;$$$)
     #
     my $query_result =
 	DBQueryWarn("select tag from archive_tags ".
-		    "where archive_idx='$archive_idx' ".
+		    "where archive_idx='$archive_idx' and view='$view' ".
 		    "order by idx desc limit 1");
     goto bad
 	if (!$query_result || !$query_result->numrows);
@@ -593,7 +593,7 @@ sub ArchiveCommit($;$$$)
 	== 0 or goto bad;
     
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
-		"  tag='$newtag', ".
+		"  tag='$newtag', view='$view', ".
 		"  archive_idx='$archive_idx', ".
 		"  date_created=UNIX_TIMESTAMP(now())")
 	or goto bad;
@@ -769,6 +769,7 @@ sub ArchiveFork($$;$$$)
     # Now enter an initial tag for the new view. Nothing actually gets tagged.
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$newtag', archive_idx='$archive_idx', ".
+		"  view='$newview', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
 
   okay:
@@ -1057,7 +1058,7 @@ sub GetArchiveCurrentTags($$$;$)
 		    "    from archive_views as v ".
 		    "left join archive_tags as t on ".
 		    "     t.archive_idx=v.archive_idx and ".
-		    "     t.tag=v.current_tag ".
+		    "     t.tag=v.current_tag and t.view=v.view ".
 		    "where v.archive_idx='$archive_idx' and ".
 		    "      v.view='$view'");
 

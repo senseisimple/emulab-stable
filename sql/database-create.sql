@@ -36,9 +36,10 @@ CREATE TABLE archive_tags (
   idx int(10) unsigned NOT NULL auto_increment,
   tag varchar(64) NOT NULL default '',
   archive_idx int(10) unsigned NOT NULL default '0',
+  view varchar(64) NOT NULL default '',
   date_created int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (idx),
-  UNIQUE KEY tag (tag,archive_idx)
+  UNIQUE KEY tag (tag,archive_idx,view)
 ) TYPE=MyISAM;
 
 --
