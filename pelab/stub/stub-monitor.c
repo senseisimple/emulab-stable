@@ -4,13 +4,13 @@
 
 #include "stub.h"
 
-char public_hostname0[] = "planet0.measure.tbres.emulab.net";
-char public_hostname1[] = "planet1.measure.tbres.emulab.net";
+char public_hostname0[] = "planetlab1.cs.dartmouth.edu"; //"planet0.measure.tbres.emulab.net";
+char public_hostname1[] = "pl1.cs.utk.edu"; //"planet1.measure.tbres.emulab.net";
 char public_addr0[16];
 char public_addr1[16];
 char private_addr0[]="10.1.0.1";
 char private_addr1[]="10.1.0.2";
-
+short  flag_debug;
 fd_set read_fds,write_fds;
 
 void print_header(char *buf){
@@ -33,7 +33,7 @@ void send_stub(int sockfd, char *addr, char *buf) {
   memcpy(buf+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
   inet_aton(addr, &address);
   tmpulong = address.s_addr;
-  if (getenv("Debug")!=NULL) {
+  if (flag_debug) {
     printf("tmpulong: %lu \n", tmpulong);
     printf("store address: %s \n", inet_ntoa(address));
   }
@@ -53,7 +53,7 @@ void receive_stub(int sockfd, char *buf) {
     exit(1);
   }
     
-  if (getenv("Debug")!=NULL) {
+  if (flag_debug) {
     print_header(buf);
     printf("numbytes: %d \n", numbytes);
   }    
@@ -88,14 +88,27 @@ int main(int argc, char *argv[])
   struct in_addr addr;
   char *ip;
 
+  //set up debug flag
+  if (getenv("Debug")!=NULL) 
+    flag_debug=1;
+  else 
+    flag_debug=0;
+
   hp = gethostbyname(public_hostname0);
   bcopy(hp->h_addr, &addr, hp->h_length);
   ip = inet_ntoa(addr);
   strcpy(public_addr0, ip);
+  if (flag_debug) {
+    printf("public_addr0: %s", inet_ntoa(addr));
+  }
   hp = gethostbyname(public_hostname1);
   bcopy(hp->h_addr, &addr, hp->h_length);
   ip = inet_ntoa(addr);
   strcpy(public_addr1, ip);
+  if (flag_debug) {
+    printf("public_addr1: %s", inet_ntoa(addr));
+  }
+
 
   if ((sockfd0 = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
     perror("socket");
@@ -156,21 +169,27 @@ int main(int argc, char *argv[])
       }
       //check write
       if (flag_send_stub0==0 && FD_ISSET(sockfd0, &write_fds_copy)) {
-	send_stub(sockfd0, private_addr1, buf); //feed the stub with the private address
+	send_stub(sockfd0, public_addr1, buf); //feed the stub with the private or public  address
 	flag_send_stub0=1;
       } 
 
       if (flag_send_stub1==0 && FD_ISSET(sockfd1, &write_fds_copy)) {
-	send_stub(sockfd1, private_addr0, buf); //feed the stub with the private address
+	send_stub(sockfd1, public_addr0, buf); //feed the stub with the private or public address
 	flag_send_stub1=1;
       } 
 
       //check read
       if (FD_ISSET(sockfd0, &read_fds_copy)) {
+	if (flag_debug) {
+	  printf("received from %s \n", public_addr0);
+	}
 	receive_stub(sockfd0,buf);
       } 
 
       if (FD_ISSET(sockfd1, &read_fds_copy)) {
+	if (flag_debug) {
+	  printf("received from %s \n", public_addr1);
+	}
 	receive_stub(sockfd1,buf);
       } 
 
