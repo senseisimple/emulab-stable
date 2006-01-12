@@ -1085,6 +1085,11 @@ Simulator instproc make_event {outer event} {
 	return {}
     }
 
+    if {$cmd == {}} {
+	perror "Missing event type for $obj"
+	return
+    }
+
     if {[$obj info class] == "EventGroup"} {
 	set cl [$obj set mytype]
     } else {
