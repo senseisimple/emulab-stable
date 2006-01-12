@@ -917,6 +917,17 @@ sub ArchiveArchive($$)
 	    "Archive '$archive_idx' already archived on $date_archived!\n";
 	return 0;
     }
+
+    # Is it shared? If so, certainly do not archive it!
+    my $shared;
+    if (IsArchiveShared($archive_idx, \$shared) < 0) {
+	return -1;
+    }
+    if ($shared) {
+	print STDERR "ArchiveArchive: ".
+	    "Archive '$archive_idx' is shared; not archiving!\n";
+	return 0;
+    }
     
     if (! -d $directory || ! -w $directory) {
 	print STDERR "ArchiveArchive: $directory cannot be written!\n";
