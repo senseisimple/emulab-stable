@@ -3102,3 +3102,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table archive_tags add tagtype enum('user','commit',\
             'savepoint','internal') NOT NULL default 'internal';
         alter table archive_tags add description text;
+
+4.30: Add a contact email to the location_info table.
+
+      alter table location_info add email tinytext after contact;

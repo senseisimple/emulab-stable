@@ -957,6 +957,7 @@ CREATE TABLE location_info (
   loc_z float default NULL,
   orientation float default NULL,
   contact tinytext,
+  email tinytext,
   phone tinytext,
   room varchar(32) default NULL,
   stamp int(10) unsigned default NULL,
