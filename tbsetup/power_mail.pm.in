@@ -39,6 +39,8 @@ sub mailctrl($@) {
     my %actual = ();
     my $open = 1;
 
+    my ($pid,$eid,$swapper_uid);
+
     # XXX Hack so that we only send mail if the robotlab is open, which ought
     # to be the only time this script gets run.  Otherwise, noone is around to
     # do anything about it.
@@ -61,8 +63,10 @@ sub mailctrl($@) {
 	    print "Unknown node $node";
 	    next;
 	}
+
+	my $ok;
 	
-	my ($ok, $pid, $eid) = $dbres->fetchrow();
+	($ok, $pid, $eid) = $dbres->fetchrow();
 
 	if (defined($pid) && defined($eid) &&
 	    $pid eq NODEDEAD_PID() && $eid eq NODEDEAD_EID()) {
@@ -75,17 +79,60 @@ sub mailctrl($@) {
 	}
     }
 
+    my $dbres = DBQueryFatal("select expt_swap_uid from experiments" .
+			     " where pid='$pid' and eid='$eid'");
+    if ($dbres->num_rows() != 0) {
+	($swapper_uid) = $dbres->fetchrow();
+    }
+
     if (scalar(keys %actual)) {
 	print "Sending mail to the operators\n";
 	
-	SENDMAIL($TBOPS,
+	## grab the email addrs for any of these bots.
+	## if we add lots of bots, this will be inefficient,
+	## cause each bot's pname is added to the conditional in the query.
+	my $cond_str = "where (";
+	my $lpc = 0;
+	my @emails;
+
+	foreach my $node (@nodes) {
+	    if ($lpc) {
+		$cond_str .= " OR";
+	    }
+	    else {
+		$lpc++;
+	    }
+	    $cond_str .= " node_id='$node'";
+	}
+	$cond_str .= ") group by email";
+	
+	my $dbres = DBQueryFatal("select email from location_info ".$cond_str);
+	if ($dbres->num_rows() != 0) {
+	    my $row;
+	    while (($row = $dbres->fetchrow_hashref())) {
+		my $email = $row->{'email'};
+
+		push @emails, $email;
+	    }
+	}
+
+	if (scalar(@emails) == 0) {
+	    push @emails, $TBOPS;
+	}
+
+	foreach $email (@emails) {
+	    if ($email ne "") {	
+		SENDMAIL($email,
 		 "Power $cmd nodes: " . join(" ",@nodes),
 		 "Someone needs to power $cmd the following nodes:\n" .
-		 "\t" . join(" ",@nodes) . "\n" .
+		 "\t" . join(" ",@nodes) . " for $pid/$eid, " .
+		 "swapped in by $swapper_uid.\n" . 
 		 "\nAnd update power time through this web page:\n" .
 		 "\n  https://$WWW/powertime.php3?node_id=" . join(",",@nodes),
 		 $TBOPS);
-	
+	    }
+	}
+
 	foreach my $node (keys %actual) {
 	    my $tries = $default_tries;
 	    my $ok = 0;
