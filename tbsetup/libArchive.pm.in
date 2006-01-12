@@ -47,7 +47,7 @@ my $SVNADMIN    = "/usr/local/bin/svnadmin";
 my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
 my $inittag     = 'root';
 my $defaultview = 'head';
-my $debug       = 0;
+my $debug       = 2;
 my $svnopt      = ($debug ? "" : "-q");
 my %ROOTS       = ("proj"   => "proj",
 		   "users"  => "users",
@@ -197,8 +197,8 @@ sub ArchiveCreate(;$$$)
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
     # Now enter an initial tag for the tree. Nothing actually gets tagged.
-    DBQueryWarn("insert into archive_tags set idx=NULL, view='$view', ".
-		"  tag='$tag', archive_idx='$idx', ".
+    DBQueryWarn("insert into archive_tags set idx=NULL, ".
+		"  tag='$tag', archive_idx='$idx', view='$view', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
     return $idx;
@@ -400,7 +400,8 @@ sub ArchiveSavePoint($;$$$)
 	goto bad;
     }
     mysystem("$IMPORTER -no_user_input file://$repodir ".
-	     "          $view/savepoint . > /dev/null")
+	     "          $view/savepoint . " .
+	     ($debug < 2 ? "> /dev/null" : ""))
 	== 0 or goto bad;
 
     #
@@ -749,12 +750,24 @@ sub ArchiveFork($$;$$$)
 	     "          file://$repodir/$newview/trunk")
 	== 0 or goto bad;
 
-    # Do not want to copy the tags/savepoints directories. Add new ones.
+    # Ditto for the savepoints directory. 
+    mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
+	     "          file://$repodir/$view/savepoint ".
+	     "          file://$repodir/$newview/savepoint")
+	== 0 or goto bad;
+
+    # Do not want to copy the tags/history directories. Add new ones.
     mysystem("$SVN mkdir $svnopt -m 'ArchiveFork' ".
-	     "          file://$repodir/$newview/savepoint ".
+	     "          file://$repodir/$newview/history ".
 	     "          file://$repodir/$newview/tags")
 	== 0 or goto bad;
 
+    # Create a branch tag in the tags directory to base differences against.
+    mysystem("$SVN copy $svnopt -m 'ArchiveFork Branch' ".
+	     "          file://$repodir/$newview/trunk ".
+	     "          file://$repodir/$newview/tags/${newtag}-branch")
+	== 0 or goto bad;
+    
     # Now check it out. This creates the checkouts/$newview directory.
     mysystem("cd $checkouts; ".
 	     "$SVN checkout $svnopt file://$repodir/$newview")
@@ -788,9 +801,9 @@ sub ArchiveFork($$;$$$)
 #
 # Checkout a copy of the archive, optionally at a particular view/branch.
 #
-sub ArchiveCheckout($$;$$)
+sub ArchiveCheckout($$;$$$)
 {
-    my ($archive_idx, $target, $view, $tag) = @_;
+    my ($archive_idx, $target, $view, $tag, $subdir) = @_;
     my $sourcepoint;
     my $cwd;
 
@@ -849,6 +862,9 @@ sub ArchiveCheckout($$;$$)
     else {
 	$sourcepoint = "trunk"
     }
+    # Allowed to check out a particular subdir (but not a file).
+    $sourcepoint = $sourcepoint . "/$subdir"
+	if (defined($subdir));
 
     # Now check it out. This creates the $checkouts/$view directory.
     mysystem("cd $target; ".
@@ -951,9 +967,12 @@ sub ArchiveArchive($$)
 # Destroy an archive. The DB state is retained unless optional flag says
 # to clean it.
 #
-sub ArchiveDestroy($$)
+sub ArchiveDestroy($$;$)
 {
-    my ($archive_idx, $clean) = @_;
+    my ($archive_idx, $clean, $view) = @_;
+
+    $view = $defaultview
+	if (!defined($view));
 
     #
     # See if the archive exists and if it does, get the pathname to it.
@@ -984,19 +1003,31 @@ sub ArchiveDestroy($$)
 	return 0;
     }
 
-    mysystem("/bin/rm -rf $directory");
-    if ($?) {
-	print STDERR "ArchiveDestroy: ".
-	    "Could not remove contents of $directory!\n";
+    # Is it shared? If so, certainly do not delete it!
+    my $shared;
+    if (IsArchiveShared($archive_idx, \$shared) < 0) {
 	return -1;
     }
+    if (! $shared) {
+	mysystem("/bin/rm -rf $directory");
+	if ($?) {
+	    print STDERR "ArchiveDestroy: ".
+		"Could not remove contents of $directory!\n";
+	    return -1;
+	}
+    }
+    
     if ($clean) {
 	(DBQueryWarn("delete from archive_tags ".
-		     "where archive_idx='$archive_idx'") &&
+		     "where archive_idx='$archive_idx' and view='$view'") &&
 	 DBQueryWarn("delete from archive_views ".
-		     "where archive_idx='$archive_idx'") &&
-	 DBQueryWarn("delete from archives ".
-		     "where idx='$archive_idx'")) || return -1;
+		     "where archive_idx='$archive_idx' and view='$view'"))
+	    || return -1;
+	
+	if (! $shared) {
+	    DBQueryWarn("delete from archives ".
+			"where idx='$archive_idx'") || return -1;
+	}
     }
     return 0;
 }
@@ -1041,6 +1072,29 @@ sub IsArchiveArchived($$$)
 	if (defined($parch));
     $$pdate = $date_archived
 	if (defined($pdate));
+    
+    return 0;
+}
+
+#
+# See if the archive is shared amongst more then one experiment. This
+# only looks at current experiments. Once an archive is archived, not
+# sure what we will do if the user want to branch from it. 
+#
+sub IsArchiveShared($$)
+{
+    my ($idx, $prval) = @_;
+    
+    my $query_result =
+	DBQueryWarn("select e.pid,e.eid,s.archive_idx from experiments as e ".
+		    "left join experiment_stats as s on s.exptidx=e.idx ".
+		    "where s.archive_idx='$idx'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+    
+    $$prval = ($query_result->numrows > 1)
+	if (defined($prval));
     
     return 0;
 }
@@ -1141,11 +1195,12 @@ sub TBCreateExperimentArchive($$)
     if (!TBGroupUnixInfo($pid, $gid, \$unix_gid, \$unix_name)) {
 	return -1;
     }
+    my $view = "$exptidx";
 
     #
     # Create the new archive and get back the new index. 
     #
-    my $archive_idx = ArchiveCreate($archive_tag, "$exptidx", $unix_name);
+    my $archive_idx = ArchiveCreate($archive_tag, $view, $unix_name);
     return -1
 	if ($archive_idx < 0);
 
@@ -1156,13 +1211,13 @@ sub TBCreateExperimentArchive($$)
 	   DBQueryWarn("update experiment_resources set ".
 		       "      archive_tag='$archive_tag' ".
 		       "where idx='$rsrcidx'"))) {
-	ArchiveDestroy($archive_idx, 1);
+	ArchiveDestroy($archive_idx, 1, $view);
 	return -1;
     }
     return 0;
 
   bad:
-    ArchiveDestroy($archive_idx, 1);
+    ArchiveDestroy($archive_idx, 1, $view);
     return -1;
 }
 
@@ -1662,9 +1717,9 @@ sub TBCommitExperimentArchive($$$)
 #
 # Checkout a copy of an experiment archive, optionally at a branch.
 # 
-sub TBCheckoutExperimentArchive($$$;$)
+sub TBCheckoutExperimentArchive($$$;$$)
 {
-    my ($pid, $eid, $path, $tag) = @_;
+    my ($pid, $eid, $path, $tag, $subdir) = @_;
     my ($archive_idx, $view);
 
     return 0
@@ -1676,15 +1731,15 @@ sub TBCheckoutExperimentArchive($$$;$)
     return -1
 	if ($rval < 0);
 
-    return ArchiveCheckout($archive_idx, $path, $view, $tag);
+    return ArchiveCheckout($archive_idx, $path, $view, $tag, $subdir);
 }
 
 #
 # Checkout a copy of an experiment archive, optionally at a branch.
 # 
-sub TBCheckoutExperimentArchivebyExptIDX($$;$)
+sub TBCheckoutExperimentArchivebyExptIDX($$;$$)
 {
-    my ($exptidx, $path, $tag) = @_;
+    my ($exptidx, $path, $tag, $subdir) = @_;
 
     return 0
 	if (!$MAINSITE);
@@ -1705,7 +1760,7 @@ sub TBCheckoutExperimentArchivebyExptIDX($$;$)
     return 1
 	if (!defined($archive_idx) || $archive_idx == 0);
 
-    return ArchiveCheckout($archive_idx, $path, $exptidx, $tag);
+    return ArchiveCheckout($archive_idx, $path, $exptidx, $tag, $subdir);
 }
 
 #
@@ -1746,7 +1801,7 @@ sub TBDeleteExperimentArchive($$)
     return -1
 	if ($rval < 0);
 
-    return ArchiveDestroy($archive_idx, 0);
+    return ArchiveDestroy($archive_idx, 0, $view);
 }
 
 #
@@ -1766,7 +1821,56 @@ sub TBDestroyExperimentArchive($$)
     return -1
 	if ($rval < 0);
 
-    return ArchiveDestroy($archive_idx, 1);
+    return ArchiveDestroy($archive_idx, 1, $view);
+}
+
+#
+# Branch an experiment archive. Only an existing experiment can be
+# branched, but that will probably change later. 
+#
+sub TBForkExperimentArchive($$$$$)
+{
+    my ($pid, $eid, $copypid, $copyeid, $copytag) = @_;
+    my ($archive_idx, $copyview);
+
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($copypid, $copyeid,
+				       \$archive_idx, \$copyview);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    # Grab experiment indicies we need,
+    my $query_result =
+	DBQueryWarn("select e.idx,s.rsrcidx from experiments as e ".
+		    "left join experiment_stats as s on e.idx=s.exptidx ".
+		    "where e.pid='$pid' and e.eid='$eid'");
+    if (!$query_result || !$query_result->numrows) {
+	return -1;
+    }
+    my ($exptidx,$rsrcidx) = $query_result->fetchrow_array();
+    my $archive_tag = "T${rsrcidx}";
+    my $newview     = "$exptidx";
+
+    return -1
+	if (ArchiveFork($archive_idx, $newview,
+			$copytag, $archive_tag, $copyview) < 0);
+
+    if (! (DBQueryWarn("update experiment_stats set ".
+		       "      archive_idx='$archive_idx' ".
+		       "where pid='$pid' and eid='$eid' and ".
+		       "      exptidx='$exptidx'") &&
+	   DBQueryWarn("update experiment_resources set ".
+		       "      archive_tag='$archive_tag' ".
+		       "where idx='$rsrcidx'"))) {
+	# Its a shared resource, but ArchiveDestroy() checks.
+	ArchiveDestroy($archive_idx, 1, $newview);
+	return -1;
+    }
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

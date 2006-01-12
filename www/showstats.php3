@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -241,8 +241,7 @@ while ($row = mysql_fetch_assoc($query_result)) {
 	echo "<td>$idx</td>";
     if ($EXPOSEARCHIVE) {
 	if ($archive_idx && $archive_tag &&
-	    (strcmp($action, "swapout") == 0 ||
-	     strcmp($action, "swapmod") == 0)) {
+	    ($action == "swapout" || $action == "swapmod")) {
 	    echo "  <td align=center>
                        <a href=beginexp_html.php3?copyid=$exptidx:$archive_tag>
                        <img border=0 alt=Run src=greenball.gif></a></td>";

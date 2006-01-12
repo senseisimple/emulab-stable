@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -24,7 +24,7 @@ function INITFORM($formfields, $projlist)
 	#
 	# See what kind of copy.
 	#
-	if (preg_match("/^(\d+)((?::[-\w]*)?)$/", $copyid, $matches)) {
+	if (preg_match("/^(\d+)(?::([-\w]*))?$/", $copyid, $matches)) {
 	    $exptidx = $matches[1];
 	    
 	    if (TBvalid_integer($exptidx)) {
@@ -43,7 +43,7 @@ function INITFORM($formfields, $projlist)
 		}
 	    }
 	}
-	elseif (preg_match("/^([-\w]+),([-\w]+)((?::[-\w]*)?)$/",
+	elseif (preg_match("/^([-\w]+),([-\w]+)(?::([-\w]*))?$/",
 		       $copyid, $matches)) {
 	    $copypid = $matches[1];
 	    $copyeid = $matches[2];
@@ -208,7 +208,7 @@ function SPITFORM($formfields, $errors)
 {
     global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
     global $view, $view_style, $projlist, $linktest_levels;
-    global $EXPOSELINKTEST;
+    global $EXPOSELINKTEST, $EXPOSEARCHIVE;
     global $EXPOSESTATESAVE;
 
     PAGEHEADER("Begin a Testbed Experiment");
@@ -427,7 +427,21 @@ function SPITFORM($formfields, $errors)
 
 	echo "<tr>
                <td class='pad4'>Copy of experiment: &nbsp</td>
-               <td class='pad4'>$copyid</td>
+               <td class='pad4'>
+                   <a target=nsfile href=spitnsdata.php3?copyid=$copyid>
+                      $copyid</a>\n";
+
+	if ($EXPOSEARCHIVE) {
+	    $checked = "";
+
+	    if ($formfields[exp_branch] == "1") {
+		$checked = "checked=1";
+	    }
+	    echo "&nbsp <input type='checkbox' $checked
+			 name='formfields[exp_branch]' value='1'> ";
+	    echo "&nbsp Branch?";
+	}
+        echo "  </td>
                 <input type=hidden name=\"formfields[copyid]\" value='$copyid'>
               </tr>\n";
     }

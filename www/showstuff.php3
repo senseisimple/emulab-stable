@@ -715,10 +715,12 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     }
 		
     $query_result =
-	DBQueryFatal("select e.*, pl.slicename, ". 
+	DBQueryFatal("select e.*, s.archive_idx, pl.slicename, ". 
                      "round(e.minimum_nodes+.1,0) as min_nodes, ".
 		     "round(e.maximum_nodes+.1,0) as max_nodes ".
-		     " from experiments as e left join plab_slices as pl".
+		     " from experiments as e ".
+		     "left join experiment_stats as s on s.exptidx=e.idx ".
+		     "left join plab_slices as pl".
                      " on e.pid = pl.pid and e.eid = pl.eid ".
 		     "where e.pid='$pid' and e.eid='$eid'");
     
@@ -765,6 +767,7 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     $mnet_edges  = $exprow["modelnet_edges"];
     $lockdown    = $exprow["lockdown"];
     $exptidx     = $exprow["idx"];
+    $archive_idx = $exprow["archive_idx"];
 
     $autoswap_hrs= ($autoswap_timeout/60.0);
     $idleswap_hrs= ($idleswap_timeout/60.0);
@@ -1037,7 +1040,10 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
 	}
         echo "<tr>
                   <td>Index: </td>
-                  <td class=\"left\">$exptidx</td>
+                  <td class=\"left\">$exptidx";
+	if ($archive_idx)
+	    echo " ($archive_idx) ";
+	echo " </td>
               </tr>\n";
     }
 

@@ -56,7 +56,7 @@ $exptidx = TBExptIndex($pid, $eid);
 if ($exptidx < 0) {
     TBERROR("Could not get experiment index for $pid/$eid!", 1);
 }
-$url = "cvsweb/cvsweb.php3?exptidx=$exptidx";
+$url = "cvsweb/cvsweb.php3/${exptidx}?exptidx=$exptidx";
 
 echo "<center>\n";
 echo "This is the Subversion archive for your experiment.<br>";

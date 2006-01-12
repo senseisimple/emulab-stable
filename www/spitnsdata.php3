@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2005-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -11,6 +11,88 @@ include("defs.php3");
 #
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
+
+#
+# This comes from the begin_experiment page, when cloning an experiment
+# from another experiment.
+#
+if (isset($copyid) && $copyid != "") {
+    unset($exptidx);
+    unset($copypid);
+    unset($copyeid);
+    unset($copytag);
+    
+    #
+    # See what kind of copyid.
+    #
+    if (preg_match("/^(\d+)(?::([-\w]*))?$/", $copyid, $matches)) {
+	$exptidx = $matches[1];
+	$copytag = $matches[2];
+	    
+	if (TBvalid_integer($exptidx)) {
+            #
+	    # See if its a current experiment.
+	    #
+	    $query_result =
+		DBQueryFatal("select pid,eid from experiments ".
+			     "where idx='$exptidx'");
+		
+	    if (mysql_num_rows($query_result)) {
+		$row = mysql_fetch_row($query_result);
+
+		$copypid = $row[0];
+		$copyeid = $row[1];
+	    }
+	}
+    }
+    elseif (preg_match("/^([-\w]+),([-\w]+)(?::([-\w]*))?$/",
+		       $copyid, $matches)) {
+	$copypid = $matches[1];
+	$copyeid = $matches[2];
+	$copytag = $matches[3];
+    }
+    else {
+	PAGEARGERROR("Invalid ID");
+    }
+
+    if (isset($copypid) && isset($copyeid) &&
+	(!isset($copytag) || $copytag == "")) {
+	$pid = $copypid;
+	$eid = $copyeid;
+	# Fall through to below.
+    }
+    elseif (isset($exptidx)) {
+	#
+	# By convention, this means to always go to the archive. There
+	# must be a tag.
+	#
+	if (! isset($copytag) || $copytag == "") {
+	    PAGEARGERROR("Must supply a tag");
+	}
+	if (! isset($copypid)) {
+	    #
+	    # Ick, map to pid,eid so we can generate a proper path into
+	    # the archive. This is bad. 
+	    #
+	    $query_result =
+		DBQueryFatal("select pid,eid from experiments_stats ".
+			     "where exptidx='$exptidx'");
+		
+	    if (!mysql_num_rows($query_result)) {
+		PAGEARGERROR("Invalid experiment index!", 1);
+	    }
+	    $row = mysql_fetch_row($query_result);
+	    $copypid = $row[0];
+	    $copyeid = $row[1];
+	}
+	header("Location: cvsweb/cvsweb.php3/$exptidx/tags/$copytag/".
+	       "proj/$copypid/exp/$copyeid/${copyeid}.ns?".
+	       "exptidx=$exptidx&view=markup");
+    }
+    else {
+	PAGEARGERROR("");
+    }
+}
 
 #
 # Spit back an NS file to the user. 

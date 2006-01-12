@@ -54,10 +54,11 @@ sub usage()
 }
 
 sub ParseArgs();
-sub GetNSFile();
+sub CheckCopyArgs();
+sub CopyInArchive();
 sub fatal($);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:";
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:b";
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -66,7 +67,16 @@ my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
 my $savestate= 0;
-my $copyexp;
+# All of these are for experiment dup and branch. Really mucks things up.
+# These globals are set when we parse the -c argument, but used later
+my $copybranch = 0;	# A branch instead of a duplicate
+my $copyfrom;		# Copy from where, archive or current experiment.
+my $copyarg;            # The -c argument.
+my $copyidx;            # The index of the experiment copied.
+my $copypid;		# The pid of the experiment copied.
+my $copyeid;		# The eid of the experiment copied.
+my $copytag;		# The archive tag to us.
+my $copydir;		# Directory extracted from archive, to delete.
 
 #
 # Configure variables
@@ -89,10 +99,11 @@ use libtestbed;
 use libtblog;
 use libArchive;
 
-my $parser   = "$TB/libexec/parse-ns";
-my $mkexpdir = "$TB/libexec/mkexpdir";
-my $checkquota = "$TB/sbin/checkquota";
-my $tbbindir = "$TB/bin/";
+my $parser      = "$TB/libexec/parse-ns";
+my $mkexpdir    = "$TB/libexec/mkexpdir";
+my $checkquota  = "$TB/sbin/checkquota";
+my $tbbindir    = "$TB/bin/";
+my $RSYNC	= "/usr/local/bin/rsync";
 my $errorstat=-1;
 my $user_name;
 my $user_email;
@@ -171,6 +182,7 @@ if (system("$checkquota $dbuid") != 0) {
 # Parse command arguments.
 #
 ParseArgs();
+CheckCopyArgs();
 
 #
 # Sanity check them.
@@ -178,7 +190,7 @@ ParseArgs();
 usage()
     if (!defined($pid) || !defined($eid));
 usage()
-    if (defined($tempnsfile) && defined($copyexp));
+    if (defined($tempnsfile) && defined($copyarg));
 
 if (!defined($gid)) {
     $gid = $pid;
@@ -192,7 +204,7 @@ if (! $swappable && (!defined($noswap_reason) || $noswap_reason eq "")) {
 if (! $idleswap && (!defined($noidleswap_reason) || $noidleswap_reason eq "")){
     tbdie("Must provide a reason with -L option (no idleswap reason)!");
 }
-if (!defined($tempnsfile) && !defined($copyexp) && !TBAdmin($dbuid)) {
+if (!defined($tempnsfile) && !defined($copyarg) && !TBAdmin($dbuid)) {
     tbdie("Only admins can create experiments with no NS file");
 }
 my $nsfile  = "$eid.ns";
@@ -211,9 +223,9 @@ if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
     die("You do not have permission to create experiments in $pid/$gid");
 }
 
-if (defined($copyexp)) {
-    # See if we can get the NS file from an existing (or past) experiment.
-    GetNSFile();
+if (defined($copyarg)) {
+    # This will be handled below.
+    ;
 }
 elsif (!defined($tempnsfile)) {
     # If no NS file, then override swap/idle stuff. 
@@ -379,10 +391,6 @@ if (system("$mkexpdir $pid $gid $eid") != 0) {
     fatal("$mkexpdir failed");
 }
 
-if (libArchive::TBCreateExperimentArchive($pid, $eid) < 0) {
-    fatal("Could not create experiment archive!");
-}
-
 #
 # Grab the working directory path, and thats where we work.
 # The user's experiment directory is off in /proj space.
@@ -392,6 +400,31 @@ my $userdir = TBExptUserDir($pid, $eid);
 
 chdir("$workdir") or
     fatal("Could not chdir to $workdir: $!");
+
+#
+# Create a new archive, which might actually be a branch of an existing one
+# when doing an experiment branch (fork).
+#
+if ($copybranch) {
+    # Currently, support branching from existing experiment only.
+    fatal("Could not create experiment archive!")
+	if (libArchive::TBForkExperimentArchive($pid, $eid,
+						$copypid,
+						$copyeid, $copytag) < 0);
+}
+elsif (libArchive::TBCreateExperimentArchive($pid, $eid) < 0) {
+    fatal("Could not create experiment archive!");
+}
+
+#
+# Okay, if copying/branching an experiment, we have to go find the
+# NS file, extracting the special (currently by convention) archive
+# directory into the new experiment. This will set the tempnsfile
+# variable needed below.
+#
+if ($copyarg) {
+    CopyInArchive();
+}
 
 #
 # It would be nice to check for overquota during the rest of this
@@ -569,19 +602,6 @@ SetExpState($pid, $eid, EXPTSTATE_SWAPPED)
     or fatal("Failed to set experiment state to " . EXPTSTATE_SWAPPED());
 
 #
-# Lets get the NS file into the archive now, since we want to quit before
-# going further if it fails. Note that any NS files the experiment sourced
-# were added by the parse wrapper.
-#
-system("cp -p $workdir/$nsfile $userdir/$nsfile");
-
-if ($? != 0 ||
-    (libArchive::TBExperimentArchiveAddFile($pid, $eid,
-					    "$userdir/$nsfile") < 0)) {
-    fatal("Failed to add $userdir/$nsfile to the archive!");
-}
-
-#
 # If not in frontend mode (preload only) continue to swapping exp in.
 # 
 if (! ($frontend || $batchmode)) {
@@ -645,12 +665,32 @@ if (defined($logname)) {
     libArchive::TBExperimentArchiveAddFile($pid, $eid,
 					   "$userdir/tbdata/" . EXPTLOGNAME());
 }
+libArchive::TBExperimentArchiveAddFile($pid, $eid, "$userdir/tbdata/$repfile");
+
+#
+# Make a copy of the NS file where we can get at it easily. Then add it.
+#
+system("cp -p $workdir/$nsfile $userdir/archive/$nsfile");
+libArchive::TBExperimentArchiveAddFile($pid, $eid,
+				       "$userdir/archive/$nsfile") == 0 or
+    fatal("Failed to add $userdir/archive/$nsfile to the archive!");
 
 #
 # Do a SavePoint on the experiment files.
 #
+print "Doing a savepoint on the experiment archive ...\n";
 if (libArchive::TBExperimentArchiveSavePoint($pid, $eid, "startexp") < 0) {
     fatal("Failed to do a savepoint on the experiment archive!");
+}
+
+#
+# If this is a branch, then do a commit. Otherwise, the archive looks
+# wrong cause its a branch from the original and shows all those files.
+#
+if ($copybranch) {
+    print "Doing a commit on the experiment archive ...\n";
+    libArchive::TBCommitExperimentArchive($pid, $eid, "branch_merge") == 0 or
+	fatal("Failed to commit experiment archive!");
 }
 
 #
@@ -947,11 +987,15 @@ sub ParseArgs()
     # (using the archive). 
     #
     if (defined($options{"c"})) {
-	$copyexp = $options{"c"};
+	$copyarg = $options{"c"};
 
-	if (! (($copyexp =~ /^([-\w]+),([-\w]+)(?::[-\w]*)?$/) ||
-	       ($copyexp =~ /^(\d+)(?::[-\w]*)?$/))) {
-	    tbdie("Bad data in argument: $copyexp");
+	if (! (($copyarg =~ /^([-\w]+),([-\w]+)(?::[-\w]*)?$/) ||
+	       ($copyarg =~ /^(\d+)(?::[-\w]*)?$/))) {
+	    tbdie("Bad data in argument: $copyarg");
+	}
+	# This option only makes sense with -c option.
+	if (defined($options{"b"})) {
+	    $copybranch = 1;
 	}
     }
 
@@ -1044,127 +1088,105 @@ sub ParseArgs()
 }
 
 #
-# Try to get an NS file when copying an experiment.
+# Check the -c argument, and set some global variables at the same time.
 #
-sub GetNSFileFromExperiment($$);
-sub GetNSFileFromArchive($$$$);
-
-sub GetNSFile()
+sub CheckCopyArgs()
 {
-    if ($copyexp =~ /^([-\w]+),([-\w]+)((?::[-\w]*)?)$/) {
+    return 0
+	if (!defined($copyarg));
+    
+    if ($copyarg =~ /^([-\w]+),([-\w]+)(?::([-\w]*))?$/) {
 	#
 	# pid,eid of an existing experiment.
 	#
-	my $copypid = $1;
-	my $copyeid = $2;
-	my $copytag = $3;
+	$copypid  = $1;
+	$copyeid  = $2;
+	$copytag  = (defined($3) ? (($3 eq "") ? undef : $3) : undef);
+	$copyfrom = "exp";
 
-	if ($copytag eq "") {
-	    GetNSFileFromExperiment($copypid, $copyeid);
-	}
-	else {
-	    my $exptidx;
-	    
-	    if (!TBExptIDX($copypid, $copyeid, \$exptidx)) {
+	#
+	# If given a tag, must use the archive. To do that, we need the
+	# experiment index of the experiment we are copying from.
+	#
+	if (defined($copytag)) {
+	    if (!TBExptIDX($copypid, $copyeid, \$copyidx)) {
 		tbdie("Could not get experiment index for $copypid/$copyeid");
 	    }
-	    
-	    GetNSFileFromArchive($exptidx, $copypid, $copyeid, $copytag);
+	    $copyfrom = "archive";
 	}
     }
-    elsif ($copyexp =~ /^(\d+)((?::[-\w]*)?)$/) {
+    elsif ($copyarg =~ /^(\d+)(?::([-\w]*))?$/) {
 	#
 	# By convention, using an idx means we want to go to the experiment
 	# archive instead of what is currently in the filesystem. 
 	#
-	my $exptidx = $1;
-	my $copytag = ($2 eq "" ? undef : $2);
+	$copyidx  = $1;
+	$copytag  = (defined($2) ? (($2 eq "") ? undef : $2) : undef);
+	$copyfrom = "arch";
 
 	my $query_result =
 	    DBQueryFatal("select pid,eid from experiment_stats ".
-			 "where exptidx='$exptidx'");
+			 "where exptidx='$copyidx'");
 
 	if (! $query_result->numrows) {
-	    tbdie("No such experiment index: $exptidx");
+	    tbdie("No such experiment index: $copyidx");
 	}
 	my ($copypid, $copyeid) = $query_result->fetchrow_array();
 	
 	if (!TBProjAccessCheck($UID, $copypid, $copypid, TB_PROJECT_READINFO)){
-	    tberror("You do not have permission to copy experiment: ".
-		    "$copypid/$copyeid");
+	    tberror("You do not have permission to copy experiment  ".
+		    "$copypid/$copyeid ($copyidx)");
 	    exit(1);
 	}
-	GetNSFileFromArchive($exptidx, $copypid, $copyeid, $copytag);
     }
     else {
-	tbdie("Bad data in -c option: $copyexp");
+	tbdie("Bad data in -c option: $copyarg");
     }
 }
 
 #
-# Look at an existing experiment and grab its NS file. User must have
-# permission of course.
+# Copy in what we need from another experiment (or archive).
 #
-sub GetNSFileFromExperiment($$)
+sub CopyInArchive()
 {
-    my ($copypid, $copyeid) = @_;
+    return 0
+	if (!defined($copyarg));
 
-    print "Extracting NS file from current experiment $copypid/$copyeid\n";
+    my $dstdir = "$userdir/archive";
+
+    if ($copyfrom eq "exp") {
+	#
+	# Copy in from a current experiment. This is probably a bad thing
+	# to do, but hey. 
+	#
+	my $srcdir = TBExptUserDir($copypid, $copyeid) . "/archive";
+
+	print "Copying experiment archive from ${srcdir}\n";
+	system("$RSYNC -ax --delete ${srcdir}/ $dstdir");
+	if ($?) {
+	    fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
+	}
+    }
+    else {
+	#
+	# Ask for a checkout of the archive. 
+	#
+	my $subdir = "/proj/$copypid/exp/$copyeid/archive";
+
+	print "Checking out experiment archive to $dstdir\n";
+        libArchive::TBCheckoutExperimentArchivebyExptIDX($copyidx,
+							 $dstdir,
+ 							 $copytag,
+							 $subdir)
+	    == 0 or fatal("CopyInArchive: Checking out archive");
+    }
+    # The directory contains the old NS file. Move that out of the way
+    # and set the tempnsfile.
+    system("/bin/mv -f $dstdir/$copyeid.ns $dstdir/nsfile.ns") == 0
+	or fatal("CopyInArchive: ".
+		 "Could not mv $dstdir/$copyeid.ns $dstdir/nsfile.ns");
     
-    if (!ExpState($copypid, $copyeid)) {
-	tberror("No such experiment to copy: $copypid/$copyeid");
-	exit(1);
-    }
-    if (!TBExptAccessCheck($UID, $copypid, $copyeid, TB_EXPT_READINFO)) {
-	tberror("You do not have permission to copy experiment: ".
-		"$copypid/$copyeid");
-	exit(1);
-    }
-    my $copyworkdir = TBExptWorkDir($copypid, $copyeid);
-    my $copynsfile  = "$copyworkdir/$copyeid.ns";
-
-    if (! -e $copynsfile) {
-	tberror("Cannot find the NS file from $copypid/$copyeid");
-	exit(1);
-    }
-    $tempnsfile = $copynsfile;
-}
-
-#
-# Here we get the NS file from an experiment archive.
-#
-sub GetNSFileFromArchive($$$$)
-{
-    my ($exptidx, $copypid, $copyeid, $tag) = @_;
-
-    print "Extracting NS file from experiment archive for ".
-	"$copypid/$copyeid ($exptidx)\n";
-
-    my $copydir    = "/var/tmp/checkout.$$";
-    my $copynsfile = "$copydir/proj/$copypid/exp/$copyeid/$copyeid.ns";
-
-    #
-    # Ask for a checkout of the archive. 
-    #
-    if (libArchive::TBCheckoutExperimentArchivebyExptIDX($exptidx,
-							 $copydir, $tag) < 0) {
-	tbdie("Could not check out a copy from the archive!");
-    }
-    
-    if (! -e $copynsfile) {
-	system("/bin/rm -rf $copydir");
-	tbdie("Cannot find the NS file in the archive for expt $exptidx");
-    }
-    # global variable
-    $tempnsfile = "/tmp/nsfile.$$";
-
-    system("/bin/cp $copynsfile $tempnsfile");
-    my $rval = $?;
-
-    system("/bin/rm -rf $copydir");
-    if ($rval) {
-	tbdie("Cannot copy NS file from $copydir");
-    }
+    $tempnsfile = "$dstdir/nsfile.ns";
 }
 
 #
