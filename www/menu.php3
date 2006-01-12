@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -300,7 +300,7 @@ function WRITESIDEBAR() {
 
     if ($rootEmulab) {
 	# Leave _NEW here about 2 weeks
-	WRITESIDEBARBUTTON_NEW("Papers (Dec 24)", $TBDOCBASE, "pubs.php3");
+	WRITESIDEBARBUTTON("Papers (Dec 24)", $TBDOCBASE, "pubs.php3");
 	WRITESIDEBARBUTTON("Software (Jul 18)",
 			       $TBDOCBASE, "software.php3");
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
