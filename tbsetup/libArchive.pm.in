@@ -1093,7 +1093,7 @@ sub IsArchiveShared($$)
     return -1
 	if (!$query_result || !$query_result->numrows);
     
-    $$prval = ($query_result->numrows > 1)
+    $$prval = (($query_result->numrows > 1) ? 1 : 0)
 	if (defined($prval));
     
     return 0;
