@@ -82,7 +82,11 @@ sub mailctrl($@) {
     my $dbres = DBQueryFatal("select expt_swap_uid from experiments" .
 			     " where pid='$pid' and eid='$eid'");
     if ($dbres->num_rows() != 0) {
-	($swapper_uid) = $dbres->fetchrow();
+	my $row = $dbres->fetchrow_hashref();
+	$swapper_uid = $row->{'expt_swap_uid'};
+    }
+    else {
+	$swapper_uid = "unknown";
     }
 
     if (scalar(keys %actual)) {
@@ -123,9 +127,9 @@ sub mailctrl($@) {
 	foreach $email (@emails) {
 	    if ($email ne "") {	
 		SENDMAIL($email,
-		 "Power $cmd nodes: " . join(" ",@nodes),
+		 "Power $cmd nodes for $pid/$eid\n" .
 		 "Someone needs to power $cmd the following nodes:\n" .
-		 "\t" . join(" ",@nodes) . " for $pid/$eid, " .
+		 "\t\n" . join(" ",@nodes) . "\n\nfor $pid/$eid, " .
 		 "swapped in by $swapper_uid.\n" . 
 		 "\nAnd update power time through this web page:\n" .
 		 "\n  https://$WWW/powertime.php3?node_id=" . join(",",@nodes),
