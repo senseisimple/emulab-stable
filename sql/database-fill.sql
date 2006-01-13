@@ -760,8 +760,8 @@ REPLACE INTO table_regex VALUES ('mailman_listnames','listname','text','regex','
 REPLACE INTO table_regex VALUES ('default','fulltext','text','regex','^[\\040-\\176\\012\\015\\011]*$',0,20000,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrkey','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrvalue','text','regex','^[-\\w\\.+,\\s]+$',0,255,NULL);
-REPLACE INTO table_regex VALUES ('archive_tags','description','text','redirect','default:text',1,512,NULL);
-REPLACE INTO table_regex VALUES ('archive_tags','tagtype','text','regex','^(user|commit|savepoint|internal)$',0,0,NULL);
+REPLACE INTO table_regex VALUES ('archive_tags','description','text','redirect','default:text',1,2048,NULL);
+REPLACE INTO table_regex VALUES ('archive_tags','tag','text','regex','^[a-zA-Z][-\\w\\.\\+]+$',3,64,NULL);
 
 --
 -- Dumping data for table `testsuite_preentables`
