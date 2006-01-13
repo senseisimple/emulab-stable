@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -3117,7 +3117,15 @@ sub NewVethIface($$$;$)
 	my $newid = $query_result->insertid;
 	$newveth = "veth" . $newid;
 
-	if (!defined($pport)) {
+	if (defined($pport)) {
+	    my $speed = interfacespeedmbps(physinterfacetype($pnode, $pport),
+					   "ethernet");
+
+	    DBQueryFatal("update interfaces set " .
+			 "   current_speed='$speed' " .
+			 "where node_id='$pnode' and iface='$pport'");
+	}
+	else {
 	    if (!defined($veth_interfaces{$lan})) {
 		$veth_interfaces{$lan} = {};
 	    }
