@@ -47,7 +47,7 @@ my $SVNADMIN    = "/usr/local/bin/svnadmin";
 my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
 my $inittag     = 'root';
 my $defaultview = 'head';
-my $debug       = 2;
+my $debug       = 0;
 my $svnopt      = ($debug ? "" : "-q");
 my %ROOTS       = ("proj"   => "proj",
 		   "users"  => "users",
