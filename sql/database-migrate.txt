@@ -3106,3 +3106,8 @@ last_net_act,last_cpu_act,last_ext_act);
 4.30: Add a contact email to the location_info table.
 
       alter table location_info add email tinytext after contact;
+
+4.31: Add slots to archive_views table to track branching.
+
+	alter table archive_views add branch_tag varchar(64) default NULL;
+	alter table archive_views add parent_view varchar(64) default NULL;

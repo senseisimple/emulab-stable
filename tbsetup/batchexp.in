@@ -805,13 +805,13 @@ sub cleanup()
     # via the exit code).
     # 
     if (!$committed) {
+	# Completely remove all trace of the archive.
+        libArchive::TBDestroyExperimentArchive($pid, $eid);
+
 	#
 	# Clear the experiment record and cleanup directories
 	#
 	TBExptDestroy($pid, $eid);
-
-	# Completely remove all trace of the archive.
-        libArchive::TBDestroyExperimentArchive($pid, $eid);
 
 	#
 	# Now we can clean up the stats records. 
@@ -1122,7 +1122,7 @@ sub CheckCopyArgs()
 	#
 	$copyidx  = $1;
 	$copytag  = (defined($2) ? (($2 eq "") ? undef : $2) : undef);
-	$copyfrom = "arch";
+	$copyfrom = "archive";
 
 	my $query_result =
 	    DBQueryFatal("select pid,eid from experiment_stats ".
@@ -1131,7 +1131,7 @@ sub CheckCopyArgs()
 	if (! $query_result->numrows) {
 	    tbdie("No such experiment index: $copyidx");
 	}
-	my ($copypid, $copyeid) = $query_result->fetchrow_array();
+	($copypid, $copyeid) = $query_result->fetchrow_array();
 	
 	if (!TBProjAccessCheck($UID, $copypid, $copypid, TB_PROJECT_READINFO)){
 	    tberror("You do not have permission to copy experiment  ".
@@ -1161,10 +1161,12 @@ sub CopyInArchive()
 	#
 	my $srcdir = TBExptUserDir($copypid, $copyeid) . "/archive";
 
-	print "Copying experiment archive from ${srcdir}\n";
-	system("$RSYNC -ax --delete ${srcdir}/ $dstdir");
-	if ($?) {
-	    fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
+	if (-e $srcdir) {
+	    print "Copying experiment archive from ${srcdir}\n";
+	    system("$RSYNC -ax --delete ${srcdir}/ $dstdir");
+	    if ($?) {
+		fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
+	    }
 	}
     }
     else {

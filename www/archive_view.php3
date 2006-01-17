@@ -61,10 +61,14 @@ $url = "cvsweb/cvsweb.php3/${exptidx}?exptidx=$exptidx";
 echo "<center>\n";
 echo "This is the Subversion archive for your experiment.<br>";
 echo "<form action='archive_tag.php3' method=get>\n";
-echo "<b><input type=submit name=tag value='Tag Archive'></b>\n";
+echo "<b><input type=submit name=tag value='Tag Archive'></b>";
 echo "<input type=hidden name=pid value='$pid'>";
 echo "<input type=hidden name=eid value='$eid'>";
-echo "</form>\n";
+echo "</form>";
+echo "<form action='archive_tags.php3' method=get>";
+echo "<b><input type=submit name=tag value='Show Tags'></b>";
+echo "<input type=hidden name=which value='$exptidx'>";
+echo "</form>";
 echo "</center>\n";
 
 echo "<iframe width=100% height=800 scrolling=yes src='$url' border=2>".

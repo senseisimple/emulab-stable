@@ -47,7 +47,7 @@ my $SVNADMIN    = "/usr/local/bin/svnadmin";
 my $IMPORTER    = "$TB/sbin/svn_load_dirs.pl";
 my $inittag     = 'root';
 my $defaultview = 'head';
-my $debug       = 0;
+my $debug       = 2;
 my $svnopt      = ($debug ? "" : "-q");
 my %ROOTS       = ("proj"   => "proj",
 		   "users"  => "users",
@@ -725,11 +725,11 @@ sub ArchiveFork($$;$$$)
 
     # Create new view directories and checkout.
     if (! mkdir("$newcheckin", 0777)) {
-	print STDERR "ArchiveCreate: Could not mkdir $newcheckin: $!\n";
+	print STDERR "ArchiveFork: Could not mkdir $newcheckin: $!\n";
 	goto bad;
     }
     if (! chmod(0777, "$newcheckin")) {
-	print STDERR "ArchiveCreate: Could not chmod $newcheckin: $!\n";
+	print STDERR "ArchiveFork: Could not chmod $newcheckin: $!\n";
 	goto bad;
     }
 
@@ -738,13 +738,20 @@ sub ArchiveFork($$;$$$)
 	     "          file://$repodir/$newview")
 	== 0 or goto bad;
 
-    # Split at the trunk if no branchpoint provided.
-    if (defined($branchtag)) {
-	$sourcepoint = "tags/$branchtag";
+    #
+    # If no branchtag supplied, we want to branch at the trunk. But we still
+    # need to mark it with a tag or else we have no idea later what actually
+    # happened.
+    #
+    if (!defined($branchtag)) {
+	$branchtag = $import_tag . "_fork";
+
+	mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
+		 "          file://$repodir/$view/trunk ".
+		 "          file://$repodir/$view/tags/$branchtag")
+	    == 0 or goto bad;
     }
-    else {
-	$sourcepoint = "trunk"
-    }
+    $sourcepoint = "tags/$branchtag";
 
     # Copy the trunk of the old view.
     mysystem("$SVN copy $svnopt -m 'ArchiveFork' ".
@@ -779,6 +786,7 @@ sub ArchiveFork($$;$$$)
     DBQueryWarn("insert into archive_views set ".
 		"  current_tag='$newtag', archive_idx='$archive_idx', ".
 		"  view='$newview', ".
+		"  parent_view='$view', branch_tag='$branchtag', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
     # Now enter an initial tag for the new view. Nothing actually gets tagged.
@@ -1022,8 +1030,20 @@ sub ArchiveDestroy($$;$)
     if (IsArchiveShared($archive_idx, \$shared) < 0) {
 	return -1;
     }
+
     if (! $shared) {
 	mysystem("/bin/rm -rf $directory");
+	if ($?) {
+	    print STDERR "ArchiveDestroy: ".
+		"Could not remove contents of $directory!\n";
+	    return -1;
+	}
+    }
+    elsif ($clean) {
+	my $checkout  = "$directory/checkouts/$view";
+	my $checkin   = "$directory/checkins/$view";
+
+	mysystem("/bin/rm -rf $checkout $checkin");
 	if ($?) {
 	    print STDERR "ArchiveDestroy: ".
 		"Could not remove contents of $directory!\n";

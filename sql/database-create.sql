@@ -54,7 +54,9 @@ CREATE TABLE archive_views (
   current_tag varchar(64) NOT NULL default '',
   previous_tag varchar(64) default NULL,
   date_created int(10) unsigned NOT NULL default '0',
-  PRIMARY KEY  (view,archive_idx)
+  branch_tag varchar(64) default NULL,
+  parent_view varchar(64) default NULL,
+  PRIMARY KEY (view,archive_idx)
 ) TYPE=MyISAM;
 
 --
