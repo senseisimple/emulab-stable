@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -154,8 +154,13 @@ foreach my $hit (@order) {
     print "<li> $rank - <b><a href=$url>$path</a></b>, $mod<br>\n";
     print "<ul>\n";
     foreach my $line (@{ $lines{$hit} }) {
-	$line =~ s/<li>//ig;
-	$line =~ s/<\/li>//ig;
+	$line =~ s/<([^>]*)>//ig;	
+	#$line =~ s/<.*>//ig; 	
+	#$line =~ s/<li>//ig;
+	#$line =~ s/<\/li>//ig;
+
+	next
+	    if ($line eq "");
 	
 	print "<li> $line\n";
     }
