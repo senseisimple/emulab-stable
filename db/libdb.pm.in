@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -3406,8 +3406,9 @@ sub TBNodeAdminOSID($)
 {
     my ($node) = @_;
 
-    my $result = DBQueryFatal("SELECT nt.adminmfs_osid FROM node_types AS nt ".
-			      "LEFT JOIN nodes as n on nt.type = n.type ".
+    my $result = DBQueryFatal("SELECT nt.adminmfs_osid FROM nodes AS n ".
+			      "LEFT JOIN node_types as nt ".
+			      "on nt.type = n.type ".
 			      "WHERE n.node_id='$node'");
     if ($result->num_rows() != 1) {
 	return undef;
@@ -3424,8 +3425,9 @@ sub TBNodeDiskloadOSID($)
 {
     my ($node) = @_;
 
-    my $result = DBQueryFatal("SELECT nt.diskloadmfs_osid FROM node_types AS nt ".
-			      "LEFT JOIN nodes as n on nt.type = n.type ".
+    my $result = DBQueryFatal("SELECT nt.diskloadmfs_osid FROM nodes AS n ".
+			      "LEFT JOIN node_types as nt ".
+			      "on nt.type = n.type ".
 			      "WHERE n.node_id='$node'");
     if ($result->num_rows() != 1) {
 	return undef;
