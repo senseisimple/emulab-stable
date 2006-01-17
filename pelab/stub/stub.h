@@ -52,11 +52,32 @@ struct connection {
   time_t last_usetime; //last monitor access time
 };
 typedef struct connection connection;
+struct sniff_record {
+  struct timeval captime;
+  unsigned long  seq_start;
+  unsigned long  seq_end;
+};
+typedef struct sniff_record sniff_record;
+struct sniff_path {
+  sniff_record records[SNIFF_WINSIZE];
+  short start; //circular buffer pointers
+  short end;
+};
+typedef struct sniff_path sniff_path;
+struct loss_record {
+  unsigned int loss_counter; //in terms of packet
+  unsigned int total_counter;
+};
+typedef struct loss_record loss_record;
+
 
 extern short  flag_debug;
 extern int pcapfd;
 extern connection rcvdb[CONCURRENT_RECEIVERS];
-extern unsigned long delays[CONCURRENT_SENDERS];
+extern sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
+extern unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
+extern loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
+
 extern int search_rcvdb(unsigned long indexip);
 extern void sniff(void);
 extern void init_pcap(int to_ms);

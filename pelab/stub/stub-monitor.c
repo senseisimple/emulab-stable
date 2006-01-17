@@ -4,11 +4,11 @@
 
 #include "stub.h"
 
-char public_hostname0[] = "planetlab1.cs.dartmouth.edu"; //"planet0.measure.tbres.emulab.net";
-char public_hostname1[] = "pl1.cs.utk.edu"; //"planet1.measure.tbres.emulab.net";
+char public_hostname0[128]; //= "planetlab1.cs.dartmouth.edu"; // "planet0.measure.tbres.emulab.net"; 
+char public_hostname1[128]; //= "pl1.cs.utk.edu"; // "planet1.measure.tbres.emulab.net";
 char public_addr0[16];
 char public_addr1[16];
-char private_addr0[]="10.1.0.1";
+char private_addr0[]="10.1.0.1"; //for testing on emulab only
 char private_addr1[]="10.1.0.2";
 short  flag_debug;
 fd_set read_fds,write_fds;
@@ -34,8 +34,8 @@ void send_stub(int sockfd, char *addr, char *buf) {
   inet_aton(addr, &address);
   tmpulong = address.s_addr;
   if (flag_debug) {
-    printf("tmpulong: %lu \n", tmpulong);
-    printf("store address: %s \n", inet_ntoa(address));
+    //printf("tmpulong: %lu \n", tmpulong);
+    printf("send the stub a probing address: %s \n", inet_ntoa(address));
   }
   memcpy(buf+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
   //should use send_all()!
@@ -93,6 +93,16 @@ int main(int argc, char *argv[])
     flag_debug=1;
   else 
     flag_debug=0;
+
+  if (argc != 3) {
+    fprintf(stderr,"Usage: stub-monitor <hostname1> <hostname2>\n");
+    exit(1);
+  }
+  strcpy(public_hostname0, argv[1]);
+  strcpy(public_hostname1, argv[2]);
+  if (flag_debug) {
+    printf("hostname1: %s, hostname2: %s\n", public_hostname0, public_hostname1);
+  }
 
   hp = gethostbyname(public_hostname0);
   bcopy(hp->h_addr, &addr, hp->h_length);
@@ -169,11 +179,17 @@ int main(int argc, char *argv[])
       }
       //check write
       if (flag_send_stub0==0 && FD_ISSET(sockfd0, &write_fds_copy)) {
-	send_stub(sockfd0, public_addr1, buf); //feed the stub with the private or public  address
+	if (flag_debug) {
+	  printf("send to: %s \n", public_addr0);
+	}
+	send_stub(sockfd0, public_addr1, buf); //feed the stub with the private or public address
 	flag_send_stub0=1;
       } 
 
       if (flag_send_stub1==0 && FD_ISSET(sockfd1, &write_fds_copy)) {
+	if (flag_debug) {
+	  printf("send to: %s \n", public_addr1);
+	}
 	send_stub(sockfd1, public_addr0, buf); //feed the stub with the private or public address
 	flag_send_stub1=1;
       } 

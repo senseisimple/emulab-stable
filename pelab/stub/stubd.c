@@ -12,17 +12,25 @@
 //Global  
 short  flag_debug;
 connection rcvdb[CONCURRENT_RECEIVERS];
-unsigned long delays[CONCURRENT_SENDERS];
+unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
+unsigned long last_delays[CONCURRENT_RECEIVERS];
+loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
+unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
+
 connection snddb[CONCURRENT_SENDERS];
-unsigned long last_delays[CONCURRENT_SENDERS];
 unsigned long throughputs[CONCURRENT_SENDERS], last_throughputs[CONCURRENT_SENDERS];
 fd_set read_fds,write_fds;
 
-void init_db(void) {
+void init(void) {
   int i;
   
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     rcvdb[i].valid = 0;
+    loss_records[i].loss_counter=0;
+    loss_records[i].total_counter=0;
+    last_loss_rates[i]=0;
+    delays[i]=0;
+    last_delays[i]=0;
   }
   for (i=0; i<CONCURRENT_SENDERS; i++){
     snddb[i].valid = 0;
@@ -30,19 +38,21 @@ void init_db(void) {
 }
 
 int insert_db(unsigned long ip, int sockfd, int dbtype) {
-  int i, next = -1;
+  int i, record_number, next = -1;
   time_t now  = time(NULL); 
   double thisdiff, maxdiff = 0;
   connection *db;
   
   if (dbtype == 0 ) {
     db = rcvdb;
+    record_number = CONCURRENT_RECEIVERS;
   } else {
     db = snddb;
+    record_number = CONCURRENT_SENDERS;
   }
 
   //find an unused entry or LRU entry
-  for (i=0; i<CONCURRENT_RECEIVERS; i++){
+  for (i=0; i<record_number; i++){
     if (db[i].valid == 0) {
       next = i;
       break;
@@ -55,6 +65,10 @@ int insert_db(unsigned long ip, int sockfd, int dbtype) {
     }
   }
   if (db[next].valid == 1) {
+    if (dbtype == 0 ) { 
+      //if it is a rcvdb record, reset the corresponding sniff_rcvdb record
+      sniff_rcvdb[next].start= sniff_rcvdb[next].end;
+    }
     FD_CLR(db[next].sockfd, &read_fds);
     close(db[next].sockfd);
   }
@@ -251,39 +265,47 @@ int receive_monitor(int sockfd) {
 }
 
 int send_monitor(int sockfd) {
-  char outbuf_delay[3*SIZEOF_LONG], outbuf_bandwidth[3*SIZEOF_LONG];
-  unsigned long tmpulong;
+  char outbuf_delay[3*SIZEOF_LONG], outbuf_loss[3*SIZEOF_LONG];
+  unsigned long tmpulong, loss_rate;
   int i;
-  //float tmpf;
 
   tmpulong = htonl(CODE_DELAY);
   memcpy(outbuf_delay+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
-  tmpulong = htonl(CODE_BANDWIDTH);
-  memcpy(outbuf_bandwidth+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+  tmpulong = htonl(CODE_LOSS);
+  memcpy(outbuf_loss+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
-    if (snddb[i].valid == 1) {
+    if (rcvdb[i].valid == 1) {
+      //send delay
       if (delays[i] != last_delays[i]) {
-	memcpy(outbuf_delay, &(snddb[i].ip), SIZEOF_LONG); //the sender or src ip
+	memcpy(outbuf_delay, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
 	tmpulong = htonl(delays[i]);
 	memcpy(outbuf_delay+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
 	if (send_all(sockfd, outbuf_delay, 3*SIZEOF_LONG) == 0){
 	  return 0;
 	}
-	last_delays[i] = delays[i];
+	last_delays[i] = delays[i];	
+	printf("Sent delay: %ld\n", delays[i]);	
       } //if measurement changed since last send
 
-      /* Throughput is not measured at the moment
-      if (throughputs[i] != last_throughputs[i]) {
-	memcpy(outbuf_bandwidth, &(snddb[i].ip), SIZEOF_LONG); //the sender or src ip
-	tmpf=throughputs[i]/QUANTA+0.5f;
-	tmpulong = htonl(floor(tmpf)+BANDWIDTH_OVER_THROUGHPUT);
-	memcpy(outbuf_bandwidth+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
-	if (send_all(sockfd, outbuf_bandwidth, 3*SIZEOF_LONG) == 0){
+      //send loss
+      if (loss_records[i].total_counter == 0){
+	loss_rate = 0;
+      } else {
+	loss_rate = floor(loss_records[i].loss_counter*1000000000.0f/loss_records[i].total_counter+0.5f); //loss per billion
+      }
+      if (loss_rate != last_loss_rates[i]) {
+	memcpy(outbuf_loss, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
+	tmpulong = htonl(loss_rate);
+	memcpy(outbuf_loss+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+	if (send_all(sockfd, outbuf_loss, 3*SIZEOF_LONG) == 0){
 	  return 0;
 	}
-	last_throughputs[i] = throughputs[i];
+	last_loss_rates[i] = loss_rate;	
+	printf("Sent loss: %d/%d=%ld \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
       } //if measurement changed since last send
-      */
+      loss_records[i].loss_counter=0;
+      loss_records[i].total_counter=0;
+      
 
     } //if connection is valid
   } //for 
@@ -368,7 +390,7 @@ int main(void) {
   }
 
   //initialization
-  init_db();
+  init();
   init_pcap(SNIFF_TIMEOUT);
   FD_ZERO(&read_fds);
   FD_ZERO(&read_fds_copy);
