@@ -54,6 +54,11 @@ my %ROOTS       = ("proj"   => "proj",
 		   "share"  => "share",
 		   "groups" => "groups");
 
+my $TAGTYPE_USER      = "user";
+my $TAGTYPE_COMMIT    = "commit";
+my $TAGTYPE_SAVEPOINT = "savepoint";
+my $TAGTYPE_INTERNAL  = "internal";
+
 # Little helper and debug function.
 sub mysystem($)
 {
@@ -199,6 +204,7 @@ sub ArchiveCreate(;$$$)
     # Now enter an initial tag for the tree. Nothing actually gets tagged.
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$tag', archive_idx='$idx', view='$view', ".
+		"  tagtype='$TAGTYPE_INTERNAL', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
     
     return $idx;
@@ -419,6 +425,7 @@ sub ArchiveSavePoint($;$$$)
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$savetag', view='$view', ".
 		"  archive_idx='$archive_idx', ".
+		"  tagtype='$TAGTYPE_SAVEPOINT', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
 
   okay:
@@ -438,9 +445,9 @@ sub ArchiveSavePoint($;$$$)
 # Commit the current contents of the temporary store to the archive.
 # Returns -1 if any error. Otherwise return 0.
 #
-sub ArchiveCommit($;$$$)
+sub ArchiveCommit($;$$$$)
 {
-    my ($archive_idx, $newtag, $view, $altdir) = @_;
+    my ($archive_idx, $newtag, $mfile, $view, $altdir) = @_;
     my $noactivity = 0;
     my $cwd;
 
@@ -526,6 +533,19 @@ sub ArchiveCommit($;$$$)
 	print "ArchiveCommit: Archive is clean; no need to commit.\n";
 	$noactivity = 1;
     }
+
+    #
+    # Message can come from a file. 
+    #
+    my $message_arg = "-m 'Commit merge of ${archive_tag} to trunk'";
+
+    if (defined($mfile)) {
+	if (! -r $mfile) {
+	    print STDERR "*** ArchiveCommit: $mfile cannot be read!\n";
+	    goto bad;
+	}
+	$message_arg = "-F $mfile";
+    }
     
     #
     # Okay, do the commit to the trunk for this view.
@@ -558,11 +578,7 @@ sub ArchiveCommit($;$$$)
 		 "     trunk")
 	    == 0 or goto bad;
 
-	#
-	# Now commit to the trunk!
-	#
-	mysystem("$SVN commit $svnopt ".
-		 "     -m 'Commit merge of ${archive_tag} to trunk' trunk")
+	mysystem("$SVN commit $svnopt $message_arg trunk")
 	    == 0 or goto bad;
 
 	# Clean the temp dir,
@@ -574,7 +590,7 @@ sub ArchiveCommit($;$$$)
     }
 
     # Create a tag in the tags directory for the commit.
-    mysystem("$SVN copy $svnopt -m 'ArchiveCommit' ".
+    mysystem("$SVN copy $svnopt $message_arg ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${newtag}")
 	== 0 or goto bad;
@@ -582,7 +598,7 @@ sub ArchiveCommit($;$$$)
     # Create a tag in the history directory for the commit. The
     # history directory has just the commit tags, so its easy to go
     # back in time.
-    mysystem("$SVN copy $svnopt -m 'ArchiveCommit' ".
+    mysystem("$SVN copy $svnopt $message_arg ".
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/history/${newtag}")
 	== 0 or goto bad;
@@ -592,11 +608,16 @@ sub ArchiveCommit($;$$$)
 	     "          file://$repodir/$view/trunk ".
 	     "          file://$repodir/$view/tags/${newtag}-branch")
 	== 0 or goto bad;
+
+    # For putting message into DB.
+    my $dclause = (defined($mfile) ? 
+		   ", description=" . DBQuoteSpecial(`cat $mfile`) : "");
     
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$newtag', view='$view', ".
 		"  archive_idx='$archive_idx', ".
-		"  date_created=UNIX_TIMESTAMP(now())")
+		"  tagtype='$TAGTYPE_COMMIT', ".
+		"  date_created=UNIX_TIMESTAMP(now()) $dclause")
 	or goto bad;
 
     DBQueryWarn("update archive_views set ".
@@ -604,25 +625,6 @@ sub ArchiveCommit($;$$$)
 		"  previous_tag='$archive_tag' ".
 		"where archive_idx='$archive_idx' and view='$view'")
 	or goto bad;
-
-    # Clean the temp dir for later.
-   if (0) {
-    if (!defined($altdir)) {
-	mysystem("/bin/rm -rf $checkin");
-	if ($?) {
-	    print STDERR "ArchiveCommit: Could not remove $checkin!\n";
-	    goto bad;
-	}
-	if (! mkdir("$checkin", 0777)) {
-	    print STDERR "ArchiveCommit: Could not mkdir $checkin: $!\n";
-	    goto bad;
-	}
-	if (! chmod(0777, "$checkin")) {
-	    print STDERR "ArchiveCommit: Could not chmod $checkin: $!\n";
-	    goto bad;
-	}
-    }
-   }
 
     # And now into the checkout dir to checkout a current copy.
     if (! chdir("$checkout")) {
@@ -670,12 +672,12 @@ sub ArchiveFork($$;$$$)
     #
     my $directory;
     if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
-	print STDERR "ArchiveCommit: ".
+	print STDERR "ArchiveFork: ".
 	    "Archive '$archive_idx' does not exist in the DB!\n";
 	goto bad;
     }
     if (! -d $directory || ! -w $directory) {
-	print STDERR "ArchiveCommit: $directory cannot be written!\n";
+	print STDERR "ArchiveFork: $directory cannot be written!\n";
 	goto bad;
     }
     my $repodir     = "$directory/repo";
@@ -700,7 +702,7 @@ sub ArchiveFork($$;$$$)
     my ($archive_tag, $previous_tag);
     if (GetArchiveCurrentTags($archive_idx, $view, \$archive_tag,
 			      \$previous_tag) < 0) {
-	print STDERR "ArchiveCommit: ".
+	print STDERR "ArchiveFork: ".
 	    "Archive '$archive_idx' does not have a current tag!\n";
 	goto bad;
     }
@@ -782,6 +784,7 @@ sub ArchiveFork($$;$$$)
     # Now enter an initial tag for the new view. Nothing actually gets tagged.
     DBQueryWarn("insert into archive_tags set idx=NULL, ".
 		"  tag='$newtag', archive_idx='$archive_idx', ".
+		"  tagtype='$TAGTYPE_INTERNAL', ".
 		"  view='$newview', ".
 		"  date_created=UNIX_TIMESTAMP(now())") or goto bad;
 
@@ -1105,6 +1108,29 @@ sub IsArchiveShared($$)
 	if (!$query_result || !$query_result->numrows);
     
     $$prval = (($query_result->numrows > 1) ? 1 : 0)
+	if (defined($prval));
+    
+    return 0;
+}
+
+#
+# See if a tag is unique to the archive.
+#
+sub IsArchiveTaqUnique($$$;$)
+{
+    my ($idx, $tag, $prval, $view) = @_;
+    
+    $view = $defaultview
+	if (!defined($view));
+
+    my $query_result =
+	DBQueryWarn("select * from archive_tags ".
+		    "where archive_idx='$idx' and ".
+		    "      view='$view' and tag='$tag'");
+    return -1
+	if (!$query_result);
+
+    $$prval = (($query_result->numrows > 0) ? 0 : 1)
 	if (defined($prval));
     
     return 0;
@@ -1649,7 +1675,8 @@ sub TBExperimentArchiveSwapModCommit($$$)
 
     print "Doing a commit on the experiment archive ...\n";
     return -1
-	if (ArchiveCommit($archive_idx, $newtag, $view, $location) != 0);
+	if (ArchiveCommit($archive_idx,
+			  $newtag, undef, $view, $location) != 0);
 
     if (!DBQueryWarn("update experiment_resources set ".
 		     "      archive_tag='$newtag' ".
@@ -1680,9 +1707,9 @@ sub TBExperimentArchiveSwapModCommit($$$)
 #
 # Commit an experiment archive. 
 #
-sub TBCommitExperimentArchive($$$)
+sub TBCommitExperimentArchive($$$;$$)
 {
-    my ($pid, $eid, $tagext) = @_;
+    my ($pid, $eid, $tagext, $usertagged, $mfile) = @_;
     my ($archive_idx, $view);
 
     return 0
@@ -1707,20 +1734,51 @@ sub TBCommitExperimentArchive($$$)
     my ($rsrcidx) = $query_result->fetchrow_array();
 
     #
-    # Derive a tag.
+    # Derive a tag, unless its a user specified tag. In that case it
+    # has to be unique cause we are going to use the whole thing as is.
     #
-    my ($seconds, $microseconds) = gettimeofday();
-    my $newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
-    $newtag .= int($microseconds / 1000);
-    $newtag .= "_${tagext}";
+    my $newtag;
+    if (! $usertagged) {
+	my ($seconds, $microseconds) = gettimeofday();
+	$newtag  = POSIX::strftime("T20%y%m%d-%H%M%S-", localtime());
+	$newtag .= int($microseconds / 1000);
+	$newtag .= "_${tagext}";
+    }
+    else {
+	$newtag = $tagext;
+
+	my $unique;
+	return -1
+	    if (IsArchiveTaqUnique($archive_idx,
+				   $newtag, \$unique, $view) < 0);
+
+	if (! $unique) {
+	    print STDERR "*** ArchiveCommit: Duplicate user tag: $newtag\n";
+	    return -1;
+	}
+    }
 
     return -1
-	if (ArchiveCommit($archive_idx, $newtag, $view) != 0);
+	if (ArchiveCommit($archive_idx, $newtag, $mfile, $view) != 0);
 
     if (!DBQueryWarn("update experiment_resources set ".
 		     "      archive_tag='$newtag' ".
 		     "where idx='$rsrcidx'")) {
 	return -1;
+    }
+    # A user specified tag is updated.
+    if ($usertagged) {
+	my $query_result =
+	    DBQueryWarn("update archive_tags set ".
+			"  tagtype='$TAGTYPE_USER' ".
+			"where archive_idx='$archive_idx' and ".
+			"      view='$view' and tag='$newtag'");
+	return -1
+	    if (!$query_result);
+	if (!$query_result->affectedrows) {
+	    print STDERR "*** ArchiveCommit: ".
+		"Could not update user tag: $newtag\n";
+	}
     }
     return 0;
 }
@@ -1882,6 +1940,26 @@ sub TBForkExperimentArchive($$$$$)
 	return -1;
     }
     return 0;
+}
+
+#
+# Check that a tag is unique.
+#
+sub TBIsTaqUnique($$$$)
+{
+    my ($pid, $eid, $tag, $prval) = @_;
+    my ($archive_idx, $view);
+    
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    return IsArchiveTaqUnique($archive_idx, $tag, $prval, $view);
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

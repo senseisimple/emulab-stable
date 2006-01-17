@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -13,14 +13,14 @@ use Getopt::Std;
 sub usage()
 {
     print STDERR
-	"Usage: archive_control [-f] commit <pid> <eid>\n".
-	"       archive_control [-f] [-a] addfile <pid> <eid> [files ...]\n";
+	"Usage: archive_control [-f] [-t tag] [-m file] commit <pid> <eid>\n".
+	"       archive_control [-f] [-a] addfile <pid> <eid> [files ...]\n".
+	"       archive_control checktag <pid> <eid> <tag>\n";
     exit(-1);
 }
-my $optlist = "dfa";
+my $optlist = "dfat:m:";
 my $debug   = 0;
 my $force   = 0;
-my $exact   = 0;
 my $dbuid;
 
 #
@@ -74,9 +74,6 @@ if (@ARGV < 3) {
 if (defined($options{"d"})) {
     $debug = 1;
 }
-if (defined($options{"a"})) {
-    $exact = 1;
-}
 if (defined($options{"f"})) {
     $force = 1;
 }
@@ -87,7 +84,7 @@ my $eid    = shift(@ARGV);
 #
 # Untaint args.
 #
-if ($action =~ /^(commit|addfile)$/) {
+if ($action =~ /^(commit|addfile|checktag)$/) {
     $action = $1;
 }
 else {
@@ -127,6 +124,28 @@ if ($expstate ne EXPTSTATE_ACTIVE &&
     fatal("Experiment $pid/$eid must be active or swapped!");
 }
 
+# Temporary
+libArchive::setdebug(2);
+
+# Do not audit this operation.
+if ($action eq "checktag") {
+    usage()
+	if (! @ARGV);
+
+    my $tag = $ARGV[0];
+
+    if (! TBcheck_dbslot($tag, "archive_tags", "tag",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	fatal("Illegal characters in tag");
+    }
+    my $unique;
+
+    fatal("Error checking tag for uniqueness!")
+	if (libArchive::TBIsTaqUnique($pid, $eid, $tag, \$unique) < 0);
+
+    exit(($unique ? 0 : 1));
+}
+
 #
 # This script is always audited. Mail is sent automatically upon exit.
 #
@@ -137,13 +156,38 @@ if (AuditStart(0)) {
     exit(0);
 }
 
-# Temporary
-libArchive::setdebug(1);
-
 #
 # Allow the user to force a commit of the archive.
 #
 if ($action eq "commit") {
+    my $tag     = "user_commit";
+    my $mfile   = undef;
+    
+    if (defined($options{"t"})) {
+	$tag = $options{"t"};
+
+	if (! TBcheck_dbslot($tag, "archive_tags", "tag",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    fatal("Illegal characters in tag");
+	}
+	# Force a taint check; the library will escape it for the shell.
+	$tag =~ /(.*)/;
+	$tag = $1;
+    }
+    if (defined($options{"m"})) {
+	#
+	# Argument is a pathname to a tempfile.
+	#
+	$mfile = $options{"m"};
+
+	if ($mfile =~ /^([-\w\/\.]+)$/) {
+	    $mfile = $1;
+	}
+	else {
+	    fatal("Illegal characters in $mfile");
+	}
+    }
+    
     if ($NFSTRACESUPPORT) {
 	#
 	# This program asks the nodes for the trace results.
@@ -175,15 +219,22 @@ if ($action eq "commit") {
 	fatal("Failed to do a savepoint on the experiment archive!");
     }
 
-    # Commit the archive after swapout
+    # And commit the archive.
     print "Doing a commit on the experiment archive ...\n";
-    if (libArchive::TBCommitExperimentArchive($pid, $eid, "user_commit") < 0) {
+    if (libArchive::TBCommitExperimentArchive($pid, $eid, $tag,
+					      1, $mfile) < 0) {
 	  fatal("Failed to commit experiment archive!");
     }
 }
 elsif ($action eq "addfile") {
+    my $exact   = 0;
+
     usage()
 	if (! @ARGV);
+
+    if (defined($options{"a"})) {
+	$exact = 1;
+    }
 
     # The Archive library does a taint check on the pathnames.
     while (@ARGV) {

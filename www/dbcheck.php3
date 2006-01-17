@@ -310,3 +310,11 @@ function TBvalid_fulltext($token) {
     return TBcheck_dbslot($token, "default", "fulltext",
 			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
 }
+function TBvalid_archive_tag($token) {
+    return TBcheck_dbslot($token, "archive_tags", "tag",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
+function TBvalid_archive_message($token) {
+    return TBcheck_dbslot($token, "archive_tags", "description",
+			  TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR);
+}
