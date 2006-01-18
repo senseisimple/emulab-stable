@@ -1,0 +1,12 @@
+libnetmon - monitor all data sent by an application to a socket.
+
+To build:
+make all (on BSD, use gmake)
+
+To use:
+setenv LD_LIBRARY_PATH /directory/your/.so/lives/in
+setenv LD_PRELOAD libnetmon.so
+run your application
+
+Current output: (to stdout)
+    seconds.millseconds [file descriptor #, number of bytes]
