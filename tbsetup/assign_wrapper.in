@@ -363,6 +363,15 @@ sub nodetypeisplab($)   { return $node_types{$_[0]}->{"isplabdslice"}; }
 sub nodetypeissim($)    { return $node_types{$_[0]}->{"issimnode"}; }
 sub nodetypesimcap($)   { return $node_types{$_[0]}->{"simnode_capacity"}; }
 
+#
+# osids: Information from the os_info table from the DB, indexed by osid
+#
+my %osids = ();
+
+sub osidpath($)         { return $osids{$_[0]}->{"path"}; }
+sub osidhaspath($)      { my $path = osidpath($_[0]);
+                          return (defined $path) && ($path ne "")};
+
 # 
 # interface_capabilities: We need this to find out the bandwidths of the devices
 # we actually have on the testbed. Index by interface type name.
@@ -3432,6 +3441,18 @@ sub LoadPhysInfo()
 	    }
 	}
     }
+
+    #
+    # Get paths from os_info, so that we can identify OSKit/MFS OSes, basically
+    # those which do not load a disk image
+    #
+    $query_result = DBQueryFatal("select osid, path from os_info");
+    while (my ($osid, $path) = $query_result->fetchrow()) {
+        $osids{$osid} = {};
+        if ($path) {
+            $osids{$osid}->{"path"} = $path;
+        }
+    }
 }
 sub interfacespeedmbps($$) {
     return $interface_capabilities{$_[0]}->{$_[1] . "_defspeed"} / 1000.0;
@@ -4108,10 +4129,12 @@ sub CreateTopFile()
 			       ":1");
 	    }
 
-	    # Require that this vnode be places onto a pnode that supports
-	    # the OS it is going to run
+	    # Require that this vnode be placed onto a pnode that supports
+	    # the OS it is going to run. However, if the OS is one with a
+            # 'path' (like an OSKit kernel), we don't have an entry in
+            # osidtoimageid for it, and thus we leave it off of the desire list
 	    my $os = virtnodeosid($vname);
-	    if ($os) {
+	    if ($os && !osidhaspath($os)) {
 		$desirestr .= " OS-${os}:1";
 	    }
 
