@@ -27,12 +27,12 @@
 
 #define STDIN 0 // file descriptor for standard input
 #define QUANTA 5000    //feed-loop interval in msec
-#define MONITOR_PORT 3490 //the port the monitor connects to
+#define MONITOR_PORT 4200 //the port the monitor connects to
 #define SENDER_PORT  3491 //the port the stub senders connect to 
 #define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold
 #define CONCURRENT_SENDERS   50	 //concurrent senders the stub maintains
 #define CONCURRENT_RECEIVERS 50	 //concurrent receivers the stub maintains
-#define MAX_PAYLOAD_SIZE     100 //size of the traffic payload 
+#define MAX_PAYLOAD_SIZE     2000 //size of the traffic payload 
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
@@ -81,6 +81,21 @@ extern loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at t
 extern int search_rcvdb(unsigned long indexip);
 extern void sniff(void);
 extern void init_pcap(int to_ms);
+
+typedef struct
+{
+  unsigned int firstUnknown;
+  unsigned int nextSequence;
+  unsigned int ackSize;
+  unsigned int repeatSize;
+} ThroughputAckState;
+
+extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
+
+// Returns the number of acknowledged bytes since the last
+// throughputTick() call.
+extern unsigned int throughputTick(ThroughputAckState * state);
+
 
 #endif
 

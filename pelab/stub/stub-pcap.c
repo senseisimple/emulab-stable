@@ -41,6 +41,71 @@ sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
 pcap_t* descr;
 int pcapfd;
 
+ThroughputAckState throughput[CONCURRENT_RECEIVERS];
+
+// Returns true if sequence is between the firstUnknown and the
+// nextSequence. Takes account of wraparound.
+int throughputInWindow(ThroughputAckState * state, unsigned int sequence)
+{
+  return sequence >= state->firstUnknown
+         || (state->nextSequence < state->firstUnknown
+             && sequence < state->nextSequence);
+}
+
+// Reset the state of a connection completely.
+void throughputInit(ThroughputAckState * state, unsigned int sequence)
+{
+  state->firstUnknown = sequence;
+  state->nextSequence = sequence;
+  state->ackSize = 0;
+  state->repeatSize = 0;
+}
+
+// Notify the throughput monitor that a new packet has been sent
+// out. This updates the expected nextSequence number.
+void throughputProcessSend(ThroughputAckState * state, unsigned int sequence,
+     unsigned int size)
+{
+  if (sequence == state->nextSequence)
+  {
+    state->nextSequence += size;
+  }
+  else if (throughputInWindow(state, sequence))
+  {
+    unsigned int maxRepeat = state->nextSequence - sequence;
+    if (size < maxRepeat)
+    {
+        state->repeatSize += size;
+    }
+    else
+    {
+        state->repeatSize += maxRepeat;
+        state->nextSequence += size - maxRepeat;
+    }
+  }
+}
+
+// Notify the throughput monitor that some bytes have been acknowledged.
+void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
+{
+  if (throughputInWindow(state, sequence))
+  {
+    state->ackSize += sequence - state->firstUnknown + 1;
+    state->firstUnknown = sequence + 1;
+  }
+}
+
+// How many bytes have been acknowledged since the last call to
+// throughputTick()?
+unsigned int throughputTick(ThroughputAckState * state)
+{
+  int result = state->ackSize;
+  state->ackSize = 0;
+  state->repeatSize = 0;
+  return result;
+}
+
+
 void init_sniff_rcvdb(void) {
   int i;
   
@@ -205,8 +270,11 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	}
 
 	if (path->end == path->start){ //no previous packet
+	  throughputInit(&throughput[path_id], seq_start);
+	  throughputProcessSend(&throughput[path_id], seq_start, length);
 	  return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet	
 	} else {
+	  throughputProcessSend(&throughput[path_id], seq_start, length);
 	  //find the real received end index
 	  end  = (path->end-1)%SNIFF_WINSIZE;
 
@@ -241,6 +309,9 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	if (path_id != -1) { //a monitored incoming packet
 	  if (ack_bit == 1) { //has an acknowledgement
 	    ack_seq  = ntohl(tp->ack_seq);
+
+	    throughputProcessAck(&throughput[path_id], ack_seq);
+
 	    record_id = search_sniff_rcvdb(path_id, ack_seq-1);
 	    if (record_id != -1) { //new ack received
 	      if (flag_resend) { //if the ack is triggered by a resend, skip the delay calculation.
@@ -327,8 +398,8 @@ void init_pcap(int to_ms) {
     char string_filter[128];
     //struct in_addr addr;
 
-    dev = "vnet"; //"eth0"; //
-
+//    dev = "vnet"; //"eth0"; //
+    dev = "eth1";
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(dev,&netp,&maskp,errbuf);
     //For an unknown reason, netp has the wrong 4th number

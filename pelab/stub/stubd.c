@@ -9,6 +9,8 @@
 
 #include "stub.h"
 
+void clean_exit(int);
+
 //Global  
 short  flag_debug;
 connection rcvdb[CONCURRENT_RECEIVERS];
@@ -20,6 +22,129 @@ unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 connection snddb[CONCURRENT_SENDERS];
 unsigned long throughputs[CONCURRENT_SENDERS], last_throughputs[CONCURRENT_SENDERS];
 fd_set read_fds,write_fds;
+
+int maxfd;
+
+char random_buffer[MAX_PAYLOAD_SIZE];
+
+typedef struct packet_buffer_node_tag
+{
+  struct packet_buffer_node_tag * next;
+  char * buffer;
+  int size;
+} packet_buffer_node;
+
+typedef struct
+{
+  unsigned long ip;
+  long delta;
+  long size;
+} packet_info;
+
+packet_buffer_node * packet_buffer_head;
+packet_buffer_node * packet_buffer_tail;
+int packet_buffer_index;
+
+void packet_buffer_init(void)
+{
+  packet_buffer_head = NULL;
+  packet_buffer_tail = NULL;
+  packet_buffer_index = 0;
+}
+
+void packet_buffer_cleanup(void)
+{
+  packet_buffer_node * old_head;
+  while (packet_buffer_head != NULL)
+  {
+    old_head = packet_buffer_head;
+    packet_buffer_head = old_head->next;
+    free(old_head->buffer);
+    free(old_head);
+  }
+  packet_buffer_tail = NULL;
+  packet_buffer_index = 0;
+}
+
+// Add a buffer with data about packets to send to the end of the list.
+void packet_buffer_add(char * buffer, int size)
+{
+  packet_buffer_node * newbuf = malloc(sizeof(packet_buffer_node));
+  if (newbuf == NULL)
+  {
+    perror("allocate");
+    clean_exit(1);
+  }
+  newbuf->next = NULL;
+  newbuf->buffer = buffer;
+  newbuf->size = size;
+  if (packet_buffer_tail == NULL)
+  {
+    packet_buffer_head = newbuf;
+    packet_buffer_tail = newbuf;
+    packet_buffer_index = 0;
+  }
+  else
+  {
+    packet_buffer_tail->next = newbuf;
+    packet_buffer_tail = newbuf;
+  }
+}
+
+// Get info about the next packet to send
+packet_info packet_buffer_front(void)
+{
+  packet_info result;
+  if (packet_buffer_head == NULL)
+  {
+    printf("packet_buffer_head == NULL in front\n");
+    clean_exit(1);
+  }
+  else
+  {
+    char * base = packet_buffer_head->buffer + packet_buffer_index;
+    memcpy(&result.ip, base, SIZEOF_LONG);
+    memcpy(&result.delta, base + SIZEOF_LONG, SIZEOF_LONG);
+    result.delta = ntohl(result.delta);
+    memcpy(&result.size, base + SIZEOF_LONG + SIZEOF_LONG, SIZEOF_LONG);
+    result.size = ntohl(result.size);
+  }
+  return result;
+}
+
+// Are there any packets to get info about?
+int packet_buffer_more(void)
+{
+  return packet_buffer_head != NULL;
+}
+
+// Move to the next packet, cleaning up as we go.
+void packet_buffer_advance(void)
+{
+  packet_buffer_index += 3*SIZEOF_LONG;
+  if (packet_buffer_index >= packet_buffer_head->size)
+  {
+    packet_buffer_node * old_head = packet_buffer_head;
+    packet_buffer_head = old_head->next;
+    packet_buffer_index = 0;
+    free(old_head->buffer);
+    free(old_head);
+    if (packet_buffer_head == NULL)
+    {
+      packet_buffer_tail = NULL;
+    }
+  }
+}
+
+void init_random_buffer(void)
+{
+  int i = 0;
+  srandom(getpid());
+  for (i=0; i<MAX_PAYLOAD_SIZE; i++)
+  {
+    random_buffer[i]=(char)(random()&0x000000ff);
+  }
+}
 
 void init(void) {
   int i;
@@ -104,6 +229,7 @@ void clean_exit(int code){
       close(snddb[i].sockfd); 
     } 
   }
+  packet_buffer_cleanup();
   exit(code);
 }
 
@@ -126,6 +252,11 @@ int get_rcvdb_index(unsigned long destaddr){
     if (connect(sockfd, (struct sockaddr *)&their_addr, sizeof(struct sockaddr)) == -1) {
       perror("connect");
       clean_exit(1);
+    }
+    // update maxfd
+    if (sockfd > maxfd)
+    {
+      maxfd = sockfd;
     }
     dbindex=insert_db(destaddr, sockfd, 0); //insert rcvdb
   }
@@ -202,41 +333,48 @@ void receive_sender(int i) {
   }
 }
 
-void send_receiver(unsigned long destaddr, char *buf){
-  int i, index;
+void send_receiver(unsigned long destaddr, long size, fd_set * write_fds_copy){
+  int index;
   int sockfd;
-  //struct timeval sendtime;
-  //unsigned long tmpulong;
+  int error = 1;
 
+  if (size > MAX_PAYLOAD_SIZE)
+  {
+    printf("size exceeded MAX_PAYLOAD_SIZE\n");
+    size = MAX_PAYLOAD_SIZE;
+  }
+  if (size <= 0)
+  {
+    size = 1;
+  }
 
   index = get_rcvdb_index(destaddr);
   sockfd= rcvdb[index].sockfd;
-  srandom(getpid());
-  for (i=0; i<MAX_PAYLOAD_SIZE; i++) buf[i]=(char)(random()&0x000000ff);
-
-  /* outdated since we use sniff for delay measurement now
-   * put the send time at the first eight bytes
-  gettimeofday(&sendtime, NULL);
-  tmpulong = htonl(sendtime.tv_sec);
-  memcpy(buf, &tmpulong,  SIZEOF_LONG);
-  tmpulong = htonl(sendtime.tv_usec);
-  memcpy(buf+SIZEOF_LONG, &tmpulong,  SIZEOF_LONG);
-  */
 
   //send packets
-  while (send_all(sockfd, buf, MAX_PAYLOAD_SIZE) == 0){ //rcv conn closed
+  // if (select says its ok to write) || (we just created this connection)
+  if (FD_ISSET(sockfd, write_fds_copy) || !FD_ISSET(sockfd, &write_fds))
+  {
+    FD_SET(sockfd, &write_fds);
+    error = send_all(sockfd, random_buffer, size);
+  }
+
+  while (error == 0){ //rcv conn closed
+    // TODO: What reset stuff needs to go here?
     rcvdb[index].valid = 0;
-    FD_CLR(rcvdb[index].sockfd, &read_fds);
+    FD_CLR(rcvdb[index].sockfd, &write_fds);
     index = get_rcvdb_index(destaddr);
     sockfd= rcvdb[index].sockfd;
+    FD_SET(sockfd, &write_fds);
+    error = send_all(sockfd, random_buffer, size);
   }
 }
 
-int receive_monitor(int sockfd) {
+int receive_monitor(int sockfd, struct timeval * deadline) {
   char buf[MAX_PAYLOAD_SIZE];
   char *nextptr;
-  unsigned long tmpulong, destnum, destaddr;
-  int i;
+  unsigned long tmpulong, destnum;
+  char * packet_buffer = NULL;
 
   //receive first two longs
   if (recv_all(sockfd, buf, 2*SIZEOF_LONG)==0) {
@@ -245,22 +383,31 @@ int receive_monitor(int sockfd) {
   nextptr = buf+SIZEOF_LONG;
   memcpy(&tmpulong, nextptr, SIZEOF_LONG);
   destnum = ntohl(tmpulong);
+  packet_buffer = malloc(destnum*3*SIZEOF_LONG);
 
   //return success if no dest addr is given
   if (destnum == 0){
     return 1;
   }
   //otherwise, receive dest addrs
-  if (recv_all(sockfd, buf, destnum*SIZEOF_LONG)==0) {
+  if (recv_all(sockfd, packet_buffer, destnum*3*SIZEOF_LONG)==0) {
+    free(packet_buffer);
     return 0;
   }
-  nextptr=buf;
-  for (i=0; i<destnum; i++){
-    memcpy(&tmpulong, nextptr, SIZEOF_LONG);
-    destaddr = tmpulong; //address should stay in Network Order!
-    nextptr += SIZEOF_LONG;   
-    send_receiver(destaddr, buf);
-  } //for
+  if (!packet_buffer_more())
+  {
+    gettimeofday(deadline, NULL);
+  }
+  packet_buffer_add(packet_buffer, destnum*3*SIZEOF_LONG);
+
+//  nextptr=buf;
+//  for (i=0; i<destnum; i++){
+//    memcpy(&tmpulong, nextptr, SIZEOF_LONG);
+//    destaddr = tmpulong; //address should stay in Network Order!
+//    nextptr += SIZEOF_LONG;
+//    send_receiver(destaddr, buf);
+//  } //for
+
   return 1;
 }
 
@@ -275,6 +422,10 @@ int send_monitor(int sockfd) {
   memcpy(outbuf_loss+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     if (rcvdb[i].valid == 1) {
+        printf("delays: %ld last: %ld\n", delays[i], last_delays[i]);     
+        unsigned int ackSize = throughputTick(&throughput[i]);
+        printf("ackSize = %u --- throughput(kbps) = %f\n", ackSize,       
+               ackSize / (5.0 * 1000));  
       //send delay
       if (delays[i] != last_delays[i]) {
 	memcpy(outbuf_delay, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
@@ -312,6 +463,41 @@ int send_monitor(int sockfd) {
   return 1;
 }
 
+void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
+{
+  struct timeval now;
+  packet_info packet;
+  gettimeofday(&now, NULL);
+
+  if (packet_buffer_more())
+  {
+    packet = packet_buffer_front();
+  }
+  while (packet_buffer_more() && (deadline->tv_sec < now.tv_sec ||
+        (deadline->tv_sec == now.tv_sec && deadline->tv_usec < now.tv_usec)))
+  {
+//    struct in_addr debug_temp;
+//    debug_temp.s_addr = packet.ip;
+//    printf("Sending packet to %s of size %ld\n", inet_ntoa(debug_temp),
+//           packet.size);
+
+    send_receiver(packet.ip, packet.size, write_fds_copy);
+
+    packet_buffer_advance();
+    if (packet_buffer_more())
+    {
+      packet = packet_buffer_front(); 
+      deadline->tv_usec += packet.delta * 1000;
+      if (deadline->tv_usec > 1000000)
+      { 
+        deadline->tv_sec += deadline->tv_usec / 1000000;
+        deadline->tv_usec = deadline->tv_usec % 1000000; 
+      } 
+    }
+  }
+}
+
+
 int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   struct timeval current_tv;
   long   left_usec, past_usec;
@@ -336,6 +522,9 @@ int main(void) {
   socklen_t sin_size;
   struct timeval start_tv, left_tv;
   int yes=1, maxfd, i, flag_send_monitor=0;
+  struct timeval packet_deadline;
+
+  gettimeofday(&packet_deadline, NULL);
 
   //set up debug flag
   if (getenv("Debug")!=NULL) 
@@ -390,6 +579,8 @@ int main(void) {
   }
 
   //initialization
+  packet_buffer_init();
+  init_random_buffer();
   init();
   init_pcap(SNIFF_TIMEOUT);
   FD_ZERO(&read_fds);
@@ -416,6 +607,9 @@ int main(void) {
 	perror("select"); 
 	clean_exit(1); 
       }
+
+      // Send out packets to our peers if the deadline has passed.
+      handle_packet_buffer(&packet_deadline, &write_fds_copy);
       
       //handle new sender packets
       for (i=0; i<CONCURRENT_SENDERS; i++){
@@ -457,7 +651,7 @@ int main(void) {
 
       //receive from the monitor
       if (sockfd_monitor!=-1 && FD_ISSET(sockfd_monitor, &read_fds_copy)) { 
-	if (receive_monitor(sockfd_monitor) == 0) { //socket_monitor closed by peer
+	if (receive_monitor(sockfd_monitor, &packet_deadline) == 0) { //socket_monitor closed by peer
 	  FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
 	  FD_CLR(sockfd_monitor, &write_fds);
 	  sockfd_monitor = -1;
@@ -490,7 +684,9 @@ int main(void) {
 
     } //while in quanta
   } //while forever
- 
+
+  packet_buffer_cleanup(); 
+
   return 0;
 }
 
