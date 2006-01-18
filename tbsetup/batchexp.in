@@ -1168,6 +1168,13 @@ sub CopyInArchive()
 		fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
 	    }
 	}
+	# This is for backwards compatability, and the mv below.
+	if (! -e "$dstdir/$copyeid.ns") {
+	    my $srcfile = TBExptUserDir($copypid, $copyeid) .
+		"/tbdata/$copyeid.ns";
+	    
+	    system("/bin/cp -p $srcfile $dstdir/$copyeid.ns");
+	}
     }
     else {
 	#
