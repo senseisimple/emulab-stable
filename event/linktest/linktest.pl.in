@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w -T
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -566,16 +566,14 @@ sub loss_test {
 	    my $numerator = $p_hat - $p;
 	    my $denominator = sqrt( abs( $p * (1 - $p_hat) / $n) );
 
-	    if( $edge->loss == 0) {
-		if($received < $n) {
-
-		    ####
-		    ## TODO:
-
-		    
+	    if ($edge->loss == 0) {
+		#
+		# Lets not worry about a single lost packet.
+		#
+		if ($received < ($n - 1)) {
 		    my $errmsg = "Unexpected loss (sent $n, received=$received)";
 		    &error(NAME_LOSS, $edge, $errmsg);
-		} # note, no logging of succesful 0-loss. (too common).
+		}
 	    } elsif($denominator == 0) {
 		my $errmsg = "No packets lost (sent $n, plr " . $edge->loss .")";
 		&error(NAME_LOSS, $edge, $errmsg);
