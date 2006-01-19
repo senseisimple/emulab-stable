@@ -110,14 +110,17 @@ def set_bandwidth(kbps, dest):
   sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
   return set_link(this_ip, dest, 'bandwidth=' + str(kbps))
 
+# Set delay on the link. We are given round trip time.
 def set_delay(milliseconds, dest):
+  # Set the delay from here to there to 1/2 rtt.
   error = set_link(this_ip, dest, 'delay=' + str(milliseconds/2))
   if error == 0:
+    # If that succeeded, set the delay from there to here.
     return set_link(dest, this_ip, 'delay=' + str(milliseconds/2))
   else:
     return error
 
-def set_loss(probability):
+def set_loss(probability, dest):
   return set_link(this_ip, dest, 'plr=' + str(probability))
 
 def set_link(source, dest, ending):
