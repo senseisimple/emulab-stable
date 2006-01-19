@@ -318,9 +318,10 @@ void receive_sender(int i) {
   //unsigned long tmpulong, sndsec, sndusec;
   //struct timeval rcvtime; 
 
-  if (recv_all(snddb[i].sockfd, inbuf, MAX_PAYLOAD_SIZE)== 0) { //connection closed
+  if (recv(snddb[i].sockfd, inbuf, MAX_PAYLOAD_SIZE, 0)== 0) { //connection closed
     snddb[i].valid = 0;
     FD_CLR(snddb[i].sockfd, &read_fds);
+    //additional clean-up !!
   } else {
     /* outdated since we use sniff for delay measurement now
     gettimeofday(&rcvtime, NULL);
@@ -333,6 +334,8 @@ void receive_sender(int i) {
     */
   }
 }
+
+int debug_fd = 0;
 
 void send_receiver(unsigned long destaddr, long size, fd_set * write_fds_copy){
   int index;
@@ -357,6 +360,7 @@ void send_receiver(unsigned long destaddr, long size, fd_set * write_fds_copy){
   if (FD_ISSET(sockfd, write_fds_copy) || !FD_ISSET(sockfd, &write_fds))
   {
     FD_SET(sockfd, &write_fds);
+    debug_fd = sockfd;
     error = send_all(sockfd, random_buffer, size);
   }
 
@@ -481,6 +485,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 //    debug_temp.s_addr = packet.ip;
 //    printf("Sending packet to %s of size %ld\n", inet_ntoa(debug_temp),
 //           packet.size);
+      printf(".");
 
     send_receiver(packet.ip, packet.size, write_fds_copy);
 
@@ -522,7 +527,7 @@ int main(int argc, char *argv[]) {
   fd_set read_fds_copy, write_fds_copy;
   socklen_t sin_size;
   struct timeval start_tv, left_tv;
-  int yes=1, maxfd, i, flag_send_monitor=0;
+  int yes=1, i, flag_send_monitor=0;
   struct timeval packet_deadline;
 
   gettimeofday(&packet_deadline, NULL);
@@ -610,6 +615,8 @@ int main(int argc, char *argv[]) {
   while (1) {
     flag_send_monitor=0; //reset flag for each quanta
     gettimeofday(&start_tv, NULL); //reset start time for each quanta
+
+    printf("quanta\n");
 
     //while in a quanta
     while(have_time(&start_tv, &left_tv)) {  
