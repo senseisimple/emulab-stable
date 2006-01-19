@@ -174,7 +174,7 @@ void log_packet(int fd, size_t len) {
     /*
     fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec, fd,len);
     */
-    fprintf(stderr,"%lu.%08lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
+    fprintf(stderr,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
             monitorFDs[fd].remote_hostname, monitorFDs[fd].remote_port, len);
 }
 
