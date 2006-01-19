@@ -3111,3 +3111,9 @@ last_net_act,last_cpu_act,last_ext_act);
 
 	alter table archive_views add branch_tag varchar(64) default NULL;
 	alter table archive_views add parent_view varchar(64) default NULL;
+
+4.32: Add Fedora as an OS to the os_info table.
+
+	alter table os_info change column OS OS \
+	    enum('Unknown','Linux','Fedora','FreeBSD','NetBSD',\
+	         'OSKit','Windows','TinyOS','Other') default 'Unknown';
