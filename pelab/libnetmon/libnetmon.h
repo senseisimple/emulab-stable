@@ -21,8 +21,11 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <strings.h>
+#include <string.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 /* #define DEBUGGING */
 
@@ -67,10 +70,26 @@ static void croak(char *, ...);
 static void log_packet(int, size_t);
 
 /*
+ * The information we keep about each FD we're monitoring
+ */
+typedef struct { 
+    bool monitoring;
+    char *remote_hostname; /* We keep the char* so that we don't have to
+                              convert every time we want to report */
+    int remote_port;
+} fdRecord;
+
+/*
  * List of which file descriptors we're monitoring
  */
-static bool *monitorFDs;
+static fdRecord* monitorFDs;
 static unsigned int fdSize;
+
+/*
+ * Manipulate the monitorFDs structure
+ */
+static void startFD(int, const struct sockaddr *);
+static void stopFD(int);
 
 /*
  * Prototypes for the real library functions - just makes it easier to declare

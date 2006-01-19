@@ -14,7 +14,7 @@
  */
 void croak(char *format, ...) {
     va_list ap;
-    fprintf(stderr,"*** ERROR\n    libnetmon:");
+    fprintf(stderr,"*** ERROR\n    libnetmon: ");
     vfprintf(stderr,format, ap);
     va_end(ap);
     exit(1);
@@ -34,7 +34,7 @@ void lnm_init() {
         /*
          * Set up the array we use to track which FDs we're tracking
          */
-        monitorFDs = (bool*)NULL;
+        monitorFDs = (fdRecord*)NULL;
         fdSize = 0;
         allocFDspace();
 
@@ -54,55 +54,81 @@ void lnm_init() {
         FIND_REAL_FUN(write);
         FIND_REAL_FUN(send);
 
-        /*
-        real_socket = (socket_proto_t*)dlsym(RTLD_NEXT,"socket");
-        if (!real_socket) {
-            croak("Unable to get the address of socket(): %s\n",
-                    dlerror());
-        }
-
-        real_close = (close_proto_t*)dlsym(RTLD_NEXT,"close");
-        if (!real_close) {
-            croak("Unable to get the address of close(): %s\n",
-                    dlerror());
-        }
-
-        real_connect = (connect_proto_t*)dlsym(RTLD_NEXT,"connect");
-        if (!real_connect) {
-            croak("Unable to get the address of connect(): %s\n",
-                    dlerror());
-        }
-
-        real_write = (write_proto_t*)dlsym(RTLD_NEXT,"write");
-        if (!real_write) {
-            croak("Unable to get the address of write(): %s\n",
-                    dlerror());
-        }
-
-        real_send = (send_proto_t*)dlsym(RTLD_NEXT,"send");
-        if (!real_send) {
-            croak("Unable to get the address of send(): %s\n",
-                    dlerror());
-        }
-        */
-
         intialized = true;
     } else {
         /* DEBUG(printf("Skipping intialization\n")); */
     }
 }
 
-void allocFDspace() {
-    bool *allocRV;
-    unsigned int newFDSize;
+void startFD(int fd, const struct sockaddr * addr) {
 
-    DEBUG(printf("Allocating space for %i FDs\n",newFDSize));
+    struct sockaddr_in *inaddr;
+    unsigned int socktype, typesize;
+
+    /*
+     * Make sure it's an IP connection
+     * XXX : Make sure the pointer is valid!
+     */
+    if (addr->sa_family != AF_INET) {
+        DEBUG(printf("Ignoring a non-INET socket\n"));
+        return;
+    }
+    /*
+     * Check to make sure it's a TCP socket
+     */
+    typesize = sizeof(unsigned int);
+    if (getsockopt(fd,SOL_SOCKET,SO_TYPE,&socktype,&typesize) != 0) {
+        croak("Unable to get socket type: %s\n",strerror(errno));
+    }
+    if (socktype != SOCK_STREAM) {
+        DEBUG(printf("Ignoring a non-TCP socket\n"));
+        return;
+    }
+
+    inaddr = (struct sockaddr_in*)addr;
+
+    /*
+     * Give oursleves enough space in the array to record information about
+     * this connection
+     */
+    while (fd >= fdSize) {
+        allocFDspace();
+    }
+
+    DEBUG(printf("Watching FD %i\n",fd));
+    monitorFDs[fd].monitoring = true;
+
+    /*
+     * Keep some information about the socket, so that we can print it out
+     * later
+     */
+    monitorFDs[fd].remote_port = ntohs(inaddr->sin_port);
+    /* XXX Error checking */
+    monitorFDs[fd].remote_hostname = inet_ntoa(inaddr->sin_addr);
+}
+
+void stopFD(int fd) {
+    if (!monitorFD_p(fd)) {
+        return;
+    }
+    DEBUG(printf("No longer watching FD %i\n",fd));
+    monitorFDs[fd].monitoring = false;
+    if (monitorFDs[fd].remote_hostname != NULL) {
+        monitorFDs[fd].remote_hostname = NULL;
+    }
+}
+
+void allocFDspace() {
+    fdRecord *allocRV;
+    unsigned int newFDSize;
 
     /*
      * Pick a new size, and use realloc() to grown our current allocation
      */
     newFDSize = fdSize + FD_ALLOC_SIZE;
-    allocRV = realloc(monitorFDs, newFDSize * sizeof(bool));
+    DEBUG(printf("Allocating space for %i FDs\n",newFDSize));
+
+    allocRV = realloc(monitorFDs, newFDSize * sizeof(fdRecord));
     if (!allocRV) {
         croak("Unable to malloc space for monitorFDs array\n");
     }
@@ -111,7 +137,7 @@ void allocFDspace() {
     /*
      * Set newly-allocated entries to 0
      */
-    bzero(monitorFDs + fdSize, (newFDSize - fdSize) * sizeof(bool));
+    bzero(monitorFDs + fdSize, (newFDSize - fdSize) * sizeof(fdRecord));
 
     fdSize = newFDSize;
 
@@ -126,7 +152,7 @@ bool monitorFD_p(int whichFD) {
     if (whichFD >= fdSize) {
         return false;
     } else {
-        return monitorFDs[whichFD];
+        return monitorFDs[whichFD].monitoring;
     }
 }
 
@@ -138,7 +164,6 @@ bool monitorFD_p(int whichFD) {
  */
 void log_packet(int fd, size_t len) {
     struct timeval time;
-    /* fprintf(stderr,"Sending packet on fd %i, length %i\n",fd,len); */
     /*
      * XXX - At some point, we may want to use something more precise than
      * gettimeofday()
@@ -146,7 +171,11 @@ void log_packet(int fd, size_t len) {
     if (gettimeofday(&time,NULL)) {
         croak("Error in gettimeofday()");
     }
+    /*
     fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec, fd,len);
+    */
+    fprintf(stderr,"%lu.%08lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
+            monitorFDs[fd].remote_hostname, monitorFDs[fd].remote_port, len);
 }
 
 /*
@@ -191,38 +220,35 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
 
     rv = real_connect(sockfd, serv_addr, addrlen);
 
-    while (sockfd >= fdSize) {
-        allocFDspace();
-    }
-    if (rv == 0) {
-        DEBUG(printf("Watching FD %i\n",sockfd));
-        monitorFDs[sockfd] = true;
-    } else {
-        /*
-         * There are actually some cases when connect() can 'fail', but we
-         * still want to watch the FD
-         */
-        if ((errno == EISCONN) ||     /* Socket is already connected */
+    /*
+     * There are actually some cases when connect() can 'fail', but we
+     * still want to watch the FD
+     */
+    if ((rv == 0) ||
+           ((errno == EISCONN) ||     /* Socket is already connected */
             (errno == EINPROGRESS) || /* Non blocking socket */
             (errno == EINTR) ||       /* Connect will happen in background */
-            (errno == EALREADY)) {    /* In progress in background */
-            /*
-             * TODO: In the case of the 'errors' that mean the socket is
-             * connecting in the background, we really should make sure that
-             * it actually connects - but this could be tricky. The caller is
-             * supposed to select() on the FD to find out when it's ready, but
-             * if they don't, and just write to it, we won't find out. So, for
-             * now, just assume that the connect() will succeed.
-             */
-            DEBUG(printf("Watching FD %i (error)\n",sockfd));
-            monitorFDs[sockfd] = true;
-        } else {
-            /*
-             * Do this in case they called connect() to reconnect a previously
-             * connected socket. If it fails, stop watching the FD
-             */
-            monitorFDs[sockfd] = false;
-        }
+            (errno == EALREADY))) {    /* In progress in background */
+        /*
+         * TODO: In the case of the 'errors' that mean the socket is
+         * connecting in the background, we really should make sure that
+         * it actually connects - but this could be tricky. The caller is
+         * supposed to select() on the FD to find out when it's ready, but
+         * if they don't, and just write to it, we won't find out. So, for
+         * now, just assume that the connect() will succeed.
+         */
+
+        /*
+         * Find out some things about the address we've connected to
+         * Note: The kernel already verified for us that the pointer is okay
+         */
+        startFD(sockfd,serv_addr);
+    } else {
+        /*
+         * Do this in case they called connect() to reconnect a previously
+         * connected socket. If it fails, stop watching the FD
+         */
+        stopFD(sockfd);
     }
 
     return rv;
@@ -238,9 +264,8 @@ int close(int d) {
 
     rv = real_close(d);
 
-    if ((!rv) && (d <= fdSize) && (monitorFDs[d])) {
-        DEBUG(printf("No longer watching FD %i\n",d));
-        monitorFDs[d] = false;
+    if (!rv && monitorFD_p(d)) {
+        stopFD(d);
     }
 
     return rv;
