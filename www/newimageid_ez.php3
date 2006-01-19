@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -606,10 +606,11 @@ function SPITFORM($formfields, $errors)
 		      here are some guidelines:
 		     <ul>
 			<li> if you customized one of our standard Linux
-			     images (RHL-*) then it is partition 2.
+                             (RHL*) or Fedora images (FC*) then it is
+                             partition 2.
 			</li>
 			<li> if you customized one of our standard BSD
-			     images (FBSD-*) then it is partition 1.
+			     images (FBSD*) then it is partition 1.
 			</li>
 			<li> if you customized one of our standard Windows XP
 			     images then it is partition 1, and make sure
@@ -629,15 +630,16 @@ function SPITFORM($formfields, $errors)
 		    <ul>
 		      <li> Mark ping and/or ssh if they are supported. 
 		      </li>
-		      <li> If you use one of our standard Linux or FreeBSD
-			   kernels, or started from our kernel configs, mark ipod.
+		      <li> If you use one of our standard Linux, Fedora or
+                           FreeBSD kernels, or started from our kernel
+                           configs, mark ipod.
 			   ipod is not supported on Windows XP.
 		      </li>
-		      <li> If it is based on one of our standard Linux,
+		      <li> If it is based on one of our standard Linux, Fedora,
 			   FreeBSD, or Windows XP images (or otherwise
 			   sends its own ISUP notification), mark isup.
                       </li>
-		      <li> If it is based on one of our standard Linux,
+		      <li> If it is based on one of our standard Linux, Fedora,
 			   FreeBSD, or Windows XP images, mark linktest.
 		      </li>
 		    </ul>
@@ -646,8 +648,9 @@ function SPITFORM($formfields, $errors)
 		      (Most images should use " . TBDB_DEFAULT_OSID_OPMODE . ")
 		    <ul>
 		      <li> If it is based on a testbed image (one of our
-			   RedHat Linux or FreeBSD images)  use the same
-			   op_mode as that image. Select it from the
+			   Linux, Fedora, FreeBSD, or Windows XP images)
+                           use the same op_mode as that image.
+                           Select it from the
 			   <a href=\"$TBBASE/showosid_list.php3\"
 			   >OS Descriptor List</a> to find out).
 		      </li>

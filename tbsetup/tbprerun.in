@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -162,7 +162,7 @@ my $events_result =
 		 "where ev.pid='$pid' and ev.eid='$eid' and ".
 		 "  (vl.uselinkdelay!=0 or e.uselinkdelays!=0 or ".
 		 "   e.forcelinkdelays!=0) and ev_ob.type='LINK' and ".
-		 "  (o.os is NULL or o.os='Linux')");
+		 "  (o.os is NULL or o.os='Linux' or o.os='Fedora')");
 if ($events_result->num_rows) {
     fatal("Oops, cannot send static events to linkdelay agents on Linux!");
 }

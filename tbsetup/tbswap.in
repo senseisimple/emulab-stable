@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -722,7 +722,8 @@ sub doSwapin($) {
 			 "  (o.pid=vl.pid or o.pid='" . TBOPSPID() . "') ".
 			 "where (vl.uselinkdelay!=0 or e.uselinkdelays!=0 or ".
 			 "       e.forcelinkdelays!=0) and ".
-			 "     (o.os is NULL or o.os='Linux') and ".
+			 "     (o.os is NULL or o.os='Linux' or ".
+			 "      o.os='Fedora') and ".
 			 "     e.pid='$pid' and e.eid='$eid'");
 
 	    if ($db_result->numrows) {
@@ -1003,7 +1004,7 @@ sub doSwapin($) {
     TBDebugTimeStamp("gentopofile finished");
 
     # XXX fer now hack
-    if (!$firewalled && !$elabinelab &&
+    if (0 && !$firewalled && !$elabinelab &&
 	($pid eq "testbed" || $pid eq "tbres")) {
 	DBQueryWarn("update experiments set ".
 		    "    savedisk=1 where pid='$pid' and eid='$eid'");

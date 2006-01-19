@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -178,7 +178,7 @@ echo "       </select>
               Guidelines for setting op_mode for your OS:
               <ol>
                 <li> If it is based on a testbed image (one of our
-                     RedHat Linux or FreeBSD images) use the same
+                     Linux, Fedora, FreeBSD or Windows images) use the same
                      op_mode as that image. Select it from the
                      <a href=\"$TBBASE/showosid_list.php3\"
                      >OS Descriptor List</a> to find out).

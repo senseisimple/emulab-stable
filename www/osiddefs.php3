@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Stuff for OSIDs. All this stuff should come from the DB instead!
@@ -10,6 +10,7 @@
 # List of allowed OS types for creating OSIDs. The value is a user-okay flag.
 $osid_oslist			= array();
 $osid_oslist["Linux"]		= 1;
+$osid_oslist["Fedora"]		= 1;
 $osid_oslist["FreeBSD"]		= 1;
 $osid_oslist["NetBSD"]		= 1;
 $osid_oslist["Windows"]		= 1;
@@ -42,6 +43,7 @@ define("TBDB_ALWAYSUP_OPMODE",		"ALWAYSUP");
 # Default OSID boot wait timeouts. User is not allowed to edit this.
 $osid_reboot_waitlist			= array();
 $osid_reboot_waitlist["Linux"]		= 120;
+$osid_reboot_waitlist["Fedora"]		= 120;
 $osid_reboot_waitlist["FreeBSD"]	= 120;
 $osid_reboot_waitlist["NetBSD"]		= 120;
 $osid_reboot_waitlist["Windows"]	= 240;
