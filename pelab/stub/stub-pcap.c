@@ -398,8 +398,11 @@ void init_pcap(int to_ms) {
     char string_filter[128];
     //struct in_addr addr;
 
-//    dev = "vnet"; //"eth0"; //
-    dev = "eth1";
+    dev = sniff_interface; //input parameter of stubd, should be "vnet" or "eth0"
+    if (flag_debug) {
+      printf("The sniff_interface: %s \n", sniff_interface);
+    }
+
     /* ask pcap for the network address and mask of the device */
     pcap_lookupnet(dev,&netp,&maskp,errbuf);
     //For an unknown reason, netp has the wrong 4th number

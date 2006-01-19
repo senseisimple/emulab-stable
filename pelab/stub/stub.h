@@ -73,6 +73,7 @@ typedef struct loss_record loss_record;
 
 extern short  flag_debug;
 extern int pcapfd;
+extern char sniff_interface[128];
 extern connection rcvdb[CONCURRENT_RECEIVERS];
 extern sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
 extern unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side

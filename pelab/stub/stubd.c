@@ -13,6 +13,7 @@ void clean_exit(int);
 
 //Global  
 short  flag_debug;
+char sniff_interface[128];
 connection rcvdb[CONCURRENT_RECEIVERS];
 unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 unsigned long last_delays[CONCURRENT_RECEIVERS];
@@ -514,7 +515,7 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   return 0;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
   int sockfd_snd, sockfd_rcv_sender, sockfd_rcv_monitor, sockfd_monitor=-1;  
   struct sockaddr_in my_addr;	// my address information
   struct sockaddr_in their_addr; // connector's address information
@@ -531,6 +532,18 @@ int main(void) {
     flag_debug=1;
   else 
     flag_debug=0;
+
+  if (argc != 2) {
+    fprintf(stderr,"Usage: stubd <sniff-interface>\n");
+    exit(1);
+  }
+  if (strlen(argv[1]) > 127) {
+    fprintf(stderr,"Error: the <sniff-interface> name must be less than 127 characters \n");
+    exit(1);
+  }
+
+  strcpy(sniff_interface, argv[1]);
+
 
   //set up the sender connection listener
   if ((sockfd_rcv_sender = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
