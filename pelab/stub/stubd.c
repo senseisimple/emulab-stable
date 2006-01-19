@@ -371,6 +371,7 @@ void send_receiver(unsigned long destaddr, long size, fd_set * write_fds_copy){
     index = get_rcvdb_index(destaddr);
     sockfd= rcvdb[index].sockfd;
     FD_SET(sockfd, &write_fds);
+    throughput[index].isValid = 0;
     error = send_all(sockfd, random_buffer, size);
   }
 }
@@ -428,9 +429,8 @@ int send_monitor(int sockfd) {
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     if (rcvdb[i].valid == 1) {
         printf("delays: %ld last: %ld\n", delays[i], last_delays[i]);     
-        unsigned int ackSize = throughputTick(&throughput[i]);
-        printf("ackSize = %u --- throughput(kbps) = %f\n", ackSize,       
-               ackSize / (5.0 * 1000));  
+        unsigned int through = throughputTick(&throughput[i]);
+        printf("throughput(kbps) = %u\n", through);
       //send delay
       if (delays[i] != last_delays[i]) {
 	memcpy(outbuf_delay, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
@@ -485,7 +485,6 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 //    debug_temp.s_addr = packet.ip;
 //    printf("Sending packet to %s of size %ld\n", inet_ntoa(debug_temp),
 //           packet.size);
-      printf(".");
 
     send_receiver(packet.ip, packet.size, write_fds_copy);
 

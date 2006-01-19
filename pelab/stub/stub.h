@@ -60,8 +60,8 @@ struct sniff_record {
 typedef struct sniff_record sniff_record;
 struct sniff_path {
   sniff_record records[SNIFF_WINSIZE];
-  short start; //circular buffer pointers
-  short end;
+  int start; //circular buffer pointers
+  int end;
 };
 typedef struct sniff_path sniff_path;
 struct loss_record {
@@ -89,6 +89,8 @@ typedef struct
   unsigned int nextSequence;
   unsigned int ackSize;
   unsigned int repeatSize;
+  struct timeval lastTime;
+  int isValid;
 } ThroughputAckState;
 
 extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
@@ -96,7 +98,7 @@ extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 // Returns the number of acknowledged bytes since the last
 // throughputTick() call.
 extern unsigned int throughputTick(ThroughputAckState * state);
-
+extern void throughputInit(ThroughputAckState * state, unsigned int sequence);
 
 #endif
 

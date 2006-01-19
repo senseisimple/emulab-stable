@@ -55,10 +55,15 @@ int throughputInWindow(ThroughputAckState * state, unsigned int sequence)
 // Reset the state of a connection completely.
 void throughputInit(ThroughputAckState * state, unsigned int sequence)
 {
-  state->firstUnknown = sequence;
-  state->nextSequence = sequence;
-  state->ackSize = 0;
-  state->repeatSize = 0;
+  if (state->isValid == 0)
+  {
+    state->firstUnknown = sequence;
+    state->nextSequence = sequence;
+    state->ackSize = 0;
+    state->repeatSize = 0;
+    gettimeofday(&state->lastTime, NULL);
+    state->isValid = 1;
+  }
 }
 
 // Notify the throughput monitor that a new packet has been sent
@@ -99,10 +104,18 @@ void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
 // throughputTick()?
 unsigned int throughputTick(ThroughputAckState * state)
 {
-  int result = state->ackSize;
+  double result = 0.0;
+  double divisor = 1.0;
+  struct timeval now;
+  gettimeofday(&now, NULL);
+  divisor = now.tv_sec - state->lastTime.tv_sec;
+  divisor += (now.tv_usec - state->lastTime.tv_usec)/1000000.0;
+  result = (state->ackSize * 8.0) / (divisor * 1000.0);
+  printf("ByteCount: %u\n", state->ackSize);
   state->ackSize = 0;
   state->repeatSize = 0;
-  return result;
+  state->lastTime = now;
+  return (unsigned int) result;
 }
 
 
@@ -112,6 +125,7 @@ void init_sniff_rcvdb(void) {
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     sniff_rcvdb[i].start = 0;
     sniff_rcvdb[i].end = 0;
+    throughput[i].isValid = 0;
   }
 }
 
