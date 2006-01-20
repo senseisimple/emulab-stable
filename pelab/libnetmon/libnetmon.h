@@ -26,8 +26,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/un.h>
 
-/* #define DEBUGGING  */
+#define DEBUGGING
 
 #ifdef DEBUGGING
 #define DEBUG(x) (x)
@@ -84,6 +85,11 @@ typedef struct {
  */
 static fdRecord* monitorFDs;
 static unsigned int fdSize;
+
+/*
+ * Stream on which to write reports
+ */
+FILE *outstream;
 
 /*
  * Manipulate the monitorFDs structure

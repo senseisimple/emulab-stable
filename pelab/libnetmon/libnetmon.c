@@ -27,6 +27,7 @@ void croak(char *format, ...) {
 void lnm_init() {
 
     static bool intialized = false;
+    char *sockpath;
 
     if (intialized == false) {
         DEBUG(printf("Initializing\n"));
@@ -53,6 +54,38 @@ void lnm_init() {
         FIND_REAL_FUN(connect);
         FIND_REAL_FUN(write);
         FIND_REAL_FUN(send);
+
+        sockpath = getenv("LIBNETMON_SOCKPATH");
+        if (sockpath) {
+            int sockfd;
+            struct sockaddr_un servaddr;
+
+            DEBUG(printf("Opening socket at path %s\n",sockpath));
+            
+            sockfd = real_socket(AF_LOCAL, SOCK_STREAM, 0);
+            if (!sockfd) {
+                croak("Unable to create socket\n");
+            }
+
+            servaddr.sun_family = AF_LOCAL;
+            strcpy(servaddr.sun_path,sockpath);
+
+            if (real_connect(sockfd,
+                             (struct sockaddr*) &servaddr,
+                             sizeof(servaddr))) {
+                croak("Unable to connect to netmond socket\n");
+            }
+
+            outstream = fdopen(sockfd,"w");
+            if (!outstream) {
+                croak("fdopen() failed on socket\n");
+            }
+
+            DEBUG(printf("Done opening socket\n"));
+
+        } else {
+            outstream = stdout;
+        }
 
         intialized = true;
     } else {
@@ -174,8 +207,9 @@ void log_packet(int fd, size_t len) {
     /*
     fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec, fd,len);
     */
-    fprintf(stdout,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
+    fprintf(outstream,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
             monitorFDs[fd].remote_hostname, monitorFDs[fd].remote_port, len);
+    fflush(outstream);
 }
 
 /*

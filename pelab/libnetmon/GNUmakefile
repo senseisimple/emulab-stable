@@ -9,7 +9,7 @@ else
     LD_FLAGS=
 endif
 
-all: libnetmon.so
+all: libnetmon.so netmond
 
 %.so: %.c %.h
 	$(CC) $(CFLAGS) $(LD_FLAGS) -shared -o $@ $<
