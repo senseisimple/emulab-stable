@@ -570,6 +570,9 @@ my $plabcount        = 0;
 my $needwanassign    = 0;
 my $simcount         = 0;
 
+# for checks made during topfile creation.
+my $toperrors        = 0;
+
 #
 # This is for stats gathering. It might duplicate other stuff, but
 # thats okay.
@@ -700,6 +703,10 @@ CheckMaxConcurrent();
 CreateTopFile();
 
 TBDebugTimeStamp("TOP finished");
+
+# Stop if creating the top file generated errors.
+exit($WRAPPER_FAILED)
+    if ($toperrors);
 
 # Stop here ...
 if ($toponly) {
@@ -4081,6 +4088,7 @@ sub CreateTopFile()
     my $simnode_count  = 0;
     my %osdoesveth     = ();
     my %osdoesmlink    = ();
+    my %osdoeslinkdelays = ();
     
     # Open the TOP file
     open(TOPFILE,"> $topfile") or
@@ -4218,6 +4226,9 @@ sub CreateTopFile()
 				OSFeatureSupported($osid, 'mlinks');
 			    $osdoesveth{$osid} =
 				OSFeatureSupported($osid, 'veths');
+			    # Need this for phys nodes requesting lindelays.
+			    $osdoeslinkdelays{$osid} =
+				OSFeatureSupported($osid, 'linkdelays');
 			}
 			# For simplicity, lets just say that a node needs
 			# both set.
@@ -4227,7 +4238,7 @@ sub CreateTopFile()
 		    } else {
 			# XXX If the user doesn't explicitly set an OS on a PC,
 			# currently it defaults to Redhat. At this point, it is
-			# not possible to know untill mapping if the default OS
+			# not possible to know until mapping if the default OS
 			# is indeed Redhat. Due to lack of information at this 
 			# point in the code, it would safe to assume non-BSD
 			# regardless of whether a future or different emulab is
@@ -4372,6 +4383,38 @@ sub CreateTopFile()
 		# Mark the links as shaped for later.
 		virtlansetshaped($lan, $nodeport0);
 		virtlansetshaped($lan, $nodeport1);
+	    }
+
+	    #
+	    # Check to make sure that both nodes support linkdelays.  This
+	    # check is only made for links comprised of physical nodes,
+	    # since if the OS supports virtual nodes, it supports linkdelays.
+	    #
+	    if ($shaped && $virtnodes == 0 &&
+		virtlan_use_linkdelay($lan, $shaped)) {
+		#
+		# The user had to specify the OS.
+		#
+		if (! (defined(virtnodeosid($node0)) &&
+		       defined(virtnodeosid($node1)))) {
+		    tbwarn("You must specify the OSID for all nodes in ".
+			   "lan $lan, when using linkdelays ".
+			   "(endnode traffic shaping)\n");
+		    $toperrors++;
+		}
+		#
+		# All the OS's have to support linkdelays.
+		#
+		foreach my $node ($node0, $node1) {
+		    my $osid = virtnodeosid($node);
+
+		    if (! $osdoeslinkdelays{$osid}) {
+			tbwarn("$node in link $lan is running an OSID ".
+			       "($osid) that does not support linkdelays ".
+			       "(endnode traffic shaping)\n");
+			$toperrors++;
+		    }
+		}
 	    }
 
 	    #
@@ -4521,6 +4564,36 @@ sub CreateTopFile()
 		    virtlansetshaped($lan, $member);
 		}
 
+		#
+		# Check to make sure that this node supports linkdelays.
+		# This check is only made for links comprised of physical
+		# nodes, since if the OS supports virtual nodes, it
+		# supports linkdelays.
+		#
+		if ($shaped && $virtnodes == 0 &&
+		    virtlan_use_linkdelay($lan, $shaped)) {
+		    #
+		    # The user had to specify the OS.
+		    #
+		    if (! defined(virtnodeosid($node))) {
+			tbwarn("You must specify the OSID for all nodes in ".
+			       "lan $lan, when using linkdelays ".
+			       "(endnode traffic shaping)\n");
+			$toperrors++;
+		    }
+		    #
+		    # All the OS's have to support linkdelays.
+		    #
+		    my $osid = virtnodeosid($node);
+
+		    if (! $osdoeslinkdelays{$osid}) {
+			tbwarn("$node in lan $lan is running an OSID ($osid) ".
+			       "that does not support linkdelays ".
+			       "(endnode traffic shaping)\n");
+			$toperrors++;
+		    }
+		}
+		
 		my ($top_bw, $top_rbw) = virtlantopbw($lan,$member);
 
 		$bandwidth = &getbandwidth($node,$lan,$bw);
