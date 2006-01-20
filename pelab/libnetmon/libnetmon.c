@@ -174,7 +174,7 @@ void log_packet(int fd, size_t len) {
     /*
     fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec, fd,len);
     */
-    fprintf(stderr,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
+    fprintf(stdout,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
             monitorFDs[fd].remote_hostname, monitorFDs[fd].remote_port, len);
 }
 
@@ -301,6 +301,26 @@ ssize_t send(int s, const void *msg, size_t len, int flags) {
 
     if ((rv > 0) && monitorFD_p(s)) {
         log_packet(s,rv);
+    }
+
+    return rv;
+
+}
+
+ssize_t write(int fd, const void *buf, size_t count) {
+    ssize_t rv;
+
+    lnm_init();
+
+    /*
+     * Wait until _after_ the packet is sent to log it, since the call might
+     * block, and we basically want to report when the kernel acked receipt of
+     * the packet
+     */
+    rv = real_write(fd,buf,count);
+
+    if ((rv > 0) && monitorFD_p(fd)) {
+        log_packet(fd,rv);
     }
 
     return rv;
