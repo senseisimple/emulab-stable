@@ -5,6 +5,7 @@ import os
 import time
 import socket
 import select
+import re
 
 #emulated_to_real = {'10.0.0.1' : '10.1.0.1',
 #                    '10.0.0.2' : '10.1.0.2'}
@@ -24,7 +25,8 @@ def main_loop():
   read_args()
   populate_ip_tables()
   quanta = 5 # in seconds
-  stub_address = 'planet0.pelab.tbres.emulab.net' # emulated_to_real[this_ip]
+  #stub_address = 'planet0.pelab.tbres.emulab.net' # emulated_to_real[this_ip]
+  stub_address = 'localhost'
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   conn.connect((stub_address, 4200))
   poll = select.poll()
@@ -43,8 +45,13 @@ def main_loop():
       for pos in fdlist:
         if pos[0] == sys.stdin.fileno() and not done:
           # A line of data from tcpdump is available.
-          packet = get_next_packet()
-          packet_list = packet_list + [packet]
+          try:
+            packet = get_next_packet()
+          except EOFError:
+            sys.stdout.write('Done: Got EOF on stdin\n')
+            done = 1
+          if (packet):
+            packet_list = packet_list + [packet]
         elif pos[0] == conn.fileno() and not done:
           # A record for change in link characteristics is available.
           done = not receive_characteristic(conn)
@@ -74,17 +81,27 @@ def populate_ip_tables():
 
 def get_next_packet():
   line = sys.stdin.readline()
-  ip_list = line.split('>', 1)[1].strip().split('.', 4)
-  ip = ip_list[0] + '.' + ip_list[1] + '.' + ip_list[2] + '.' + ip_list[3]
-#  sys.stdout.write('dest: ' + result + '\n')
-  time = float(line.split(' ', 1)[0])
-  size_list = line.split('(', 1)
-  if len(size_list) > 1:
-    size = int(size_list[1].split(')', 1)[0])
+  if line == "":
+      raise EOFError
+  # Could move this elsewhere to avoid re-compiling, but I'd like to keep it
+  # with this code for better readability
+  linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?$')
+  match = linexp.match(line)
+  if (match) :
+      time = float(match.group(1))
+      ipaddr = match.group(2)
+      port = int(match.group(3))
+      size_given = match.group(4) != ''
+      size = int(match.group(5))
+      sys.stdout.write('dest: ' + ipaddr + ' port: ' + str(port) + ' size: '
+              + str(size) + '\n')
+      if not size_given:
+          size = 0
+      return (ipaddr, time, size)
   else:
-    size = 0
-  return (ip, time, size)
-
+      sys.stdout.write('skipped line in the wrong format: ' + line + '\n')
+      return None
+    
 def receive_characteristic(conn):
   buffer = conn.recv(12)
   if len(buffer) == 12:
