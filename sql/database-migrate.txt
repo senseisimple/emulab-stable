@@ -3117,3 +3117,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table os_info change column OS OS \
 	    enum('Unknown','Linux','Fedora','FreeBSD','NetBSD',\
 	         'OSKit','Windows','TinyOS','Other') default 'Unknown';
+
+4.33: Add Fedora as an OS to the os_info table.
+
+       alter table os_info change osfeatures osfeatures \
+	    set('ping','ssh','ipod','isup','veths','mlinks', \
+	         'linktest','linkdelays') default NULL;
