@@ -33,6 +33,7 @@ if ($EUID != 0) {
 # Script specific goo.
 my $RCDIR	 = "$BINDIR/rc";
 my $PLABCONFIG   = "$BOOTDIR/rc.plab";
+my $TMPLPWDFILE  = "/etc/passwd.tmpl";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -197,6 +198,24 @@ sub doplabconfig()
 {
     my $plabconfig;
     my @tmccresults;
+
+    # get the slice user from the passwd file, fix it, and replace file
+    # XXX: need to actually use the slice name, but we don't really have
+    #      it stored anywhere yet.
+    print "Fixing up the passwd file.\n";
+    my $sliceuserent = `grep "^utah_" /etc/passwd`;
+    chomp $sliceuserent;
+    defined($sliceuserent) and $sliceuserent or 
+        die "Can't find slice user entry!";
+    my @pwdfields = split /:/, $sliceuserent;
+    $pwdfields[1] = "*";
+    $sliceuserent = join(":", @pwdfields);
+    open(TMPLPWD, ">>$TMPLPWDFILE") or die "Can't open passwd template file";
+    print TMPLPWD "$sliceuserent\n";
+    close(TMPLPWD);
+    !system("cp -f /etc/passwd /etc/passwd.orig") and
+        !system("cp -f $TMPLPWDFILE /etc/passwd") or
+            die "Couldn't fix up passwd file!";
 
     if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
 	fatal("Could not get plabconfig from server!");
