@@ -40,6 +40,17 @@ this entire tutorial.</em>
 <h2>Quick Start</h2>
 </center>
 
+<em>
+Temporarily, while we are validating and tuning linktest,
+on every swapin or modify:<br>
+(1) We ignore users' requests to set the linktest level below 3;
+i.e., we always run linktest, at level 3 or greater.<br>
+(2) Although the activity log still reports all linktest results, including
+failures, we email failures only to testbed-ops, not the user.<br>
+(If you <a href = "#Advanced">explictly invoke linktest</a>
+from the "Run Linktest" page or on ops, you get whatever level you request.)
+</em>
+
 <p>
 To run linktest, select a Linktest test level from the dropdown on the
 <a href="beginexp_html.php3">Begin an Experiment</a> page.
@@ -263,6 +274,7 @@ clicking on the Start button. Once linktest starts running, you can
 stop it by clicking on the Stop button. Please be patient; linktest
 can take a long time to run. Eventually, you will be notified of its
 results in the window below the Start/Stop button. 
+No email is sent.
 </p>
 <a NAME="Ops"></a>
 <li> <h3>Running Linktest on Ops</h3>
@@ -288,6 +300,7 @@ Example:
 After Linktest completes, run_linktest.pl prints out errors found
 during the run, if any. For scripting, run_linktest.pl returns 0 if no
 errors were found, or !0 if at least one error was found.
+No email is sent.
 </p>
 
 
