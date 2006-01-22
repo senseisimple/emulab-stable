@@ -27,6 +27,7 @@ $osid_featurelist["isup"]	= 1;
 $osid_featurelist["veths"]	= 0;
 $osid_featurelist["mlinks"]	= 0;
 $osid_featurelist["linktest"]	= 1;
+$osid_featurelist["linkdelays"]	= 0;
 
 # Default op modes. The value is a user-okay flag.
 $osid_opmodes			= array();
