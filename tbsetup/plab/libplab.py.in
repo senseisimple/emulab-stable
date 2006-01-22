@@ -23,6 +23,7 @@ sys.path.append("@prefix@/lib")
 import os, time
 import string
 import traceback
+import signal
 import socket
 import httplib
 import xml.parsers.expat
@@ -1295,9 +1296,16 @@ class Node:
             pass
         except OSError, e:
             if hasattr(e,"killed") and e.killed:
-                os.kill(cmdobj.pid, signal.SIGTERM)
-                cmdobj.wait()
-                sys._exit(256)
+                print "Received kill will running: %s" % command
+                try:
+                    os.kill(cmdobj.pid, signal.SIGTERM)
+                    cmdobj.wait()
+                    pass
+                except:
+                    print "Got exception while trying to kill off child proc"
+                    traceback.print_exc()
+                    pass
+                sys._exit(1)
                 pass
             else:
                 signal.signal(signal.SIGINT, sig["INT"])
