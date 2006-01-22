@@ -1296,7 +1296,7 @@ class Node:
             pass
         except OSError, e:
             if hasattr(e,"killed") and e.killed:
-                print "Received kill will running: %s" % command
+                print "Received kill while running: %s" % command
                 try:
                     os.kill(cmdobj.pid, signal.SIGTERM)
                     cmdobj.wait()
@@ -1305,9 +1305,11 @@ class Node:
                     print "Got exception while trying to kill off child proc"
                     traceback.print_exc()
                     pass
-                sys._exit(1)
+                os._exit(256)
                 pass
             else:
+                print "Received unhandled OSError while running command"
+                traceback.print_exc()
                 signal.signal(signal.SIGINT, sig["INT"])
                 signal.signal(signal.SIGTERM, sig["TERM"])
                 signal.signal(signal.SIGHUP, sig["HUP"])
