@@ -118,6 +118,50 @@ unsigned int throughputTick(ThroughputAckState * state)
   return (unsigned int) result;
 }
 
+//A modulus function that returns only a non-negative remainder
+//precondition: modulus > 0
+int nnmod(int num, int modulus){
+  int remainder, tmpint;
+
+  if (modulus <=0){
+    printf("Error: modulus is not a positive number - %d", modulus);
+    exit(1);
+  }
+  remainder = num % modulus;
+  if (remainder >= 0) {
+    return remainder;
+  }
+  tmpint = remainder+modulus;
+  if (tmpint < 0){
+    printf("Error: remainder+modulus<0 - %d+%d", remainder, modulus);
+    exit(1);
+  }
+  return tmpint;
+}
+
+//Check if the seq is in the sequence block [seq_start, seq_end)
+//Take account of the seq wrap-arround
+int in_seqence_block(unsigned long seq_start, unsigned long seq_end, unsigned long seq) {
+  if (seq_start < seq_end) {
+    if (seq_start<=seq && seq<seq_end) 
+      return 1; //in range
+    else 
+      return 0; //out of range
+  }
+
+  if (seq_start > seq_end) {
+    if (seq_start<=seq || seq<seq_end) 
+      return 1; //in range
+    else 
+      return 0; //out of range
+  }
+
+  //seq_start == seq_end
+  if (seq_start == seq) 
+    return 1; //in range
+  else
+    return 0; //out of range 
+}
 
 void init_sniff_rcvdb(void) {
   int i;
@@ -137,16 +181,16 @@ int push_sniff_rcvdb(int path_id, u_long start_seq, u_long end_seq, const struct
   path = &(sniff_rcvdb[path_id]);
   next = path->end;
   //The circular buffer is full when the start and end pointers are back to back
-  if ((path->start-next)%SNIFF_WINSIZE == (SNIFF_WINSIZE-1)){
+  if (nnmod(next-(path->start), SNIFF_WINSIZE) == (SNIFF_WINSIZE-1)){
     addr.s_addr =rcvdb[path_id].ip;
-    printf("Error: circular buffer is full for the path to %s", inet_ntoa(addr));
+    printf("Error: circular buffer is full for the path to %s \n", inet_ntoa(addr));
     return -1;
   }
   path->records[next].seq_start = start_seq;
   path->records[next].seq_end   = end_seq;
   path->records[next].captime.tv_sec  = ts->tv_sec;
   path->records[next].captime.tv_usec = ts->tv_usec;
-  path->end=(next+1)%SNIFF_WINSIZE;
+  path->end=nnmod(next+1, SNIFF_WINSIZE);
   return 0;
 }
 
@@ -156,14 +200,10 @@ int search_sniff_rcvdb(int path_id, u_long seqnum) {
   int next = path->start;
 
   while (next != (path->end)){
-    if ((path->records[next].seq_start)==(path->records[next].seq_end)){//no payload
-      if ((path->records[next].seq_end)==seqnum){
-	return next;
-      }
-    } else if ((path->records[next].seq_start)<=seqnum && (path->records[next].seq_end)>seqnum) {
+    if (in_seqence_block(path->records[next].seq_start, path->records[next].seq_end, seqnum)){
       return next;
     }
-    next = (next+1) % SNIFF_WINSIZE;
+    next = nnmod(next+1, SNIFF_WINSIZE);
   }
   return -1;
 }
@@ -173,11 +213,11 @@ void pop_sniff_rcvdb(int path_id, u_long to_seqnum){
   if (to_index != -1) {
     //if the packet has no payload or the last sent seqnum equals the pop number
     if ((sniff_rcvdb[path_id].records[to_index].seq_end==sniff_rcvdb[path_id].records[to_index].seq_start) 
-      || (sniff_rcvdb[path_id].records[to_index].seq_end-1 == to_seqnum)) {
-      sniff_rcvdb[path_id].start = (to_index+1)%SNIFF_WINSIZE; //complete pop-up 
+      || (((unsigned long)(sniff_rcvdb[path_id].records[to_index].seq_end-1)) == to_seqnum)) {
+      sniff_rcvdb[path_id].start = nnmod(to_index+1, SNIFF_WINSIZE); //complete pop-up 
     } else {
       sniff_rcvdb[path_id].start = to_index; //partial pop-up
-      sniff_rcvdb[path_id].records[to_index].seq_start = to_seqnum+1;
+      sniff_rcvdb[path_id].records[to_index].seq_start = ((unsigned long)(to_seqnum+1));
     }
   }
 }
@@ -270,18 +310,18 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       tcp_hlen  = ((tp)->doff & 0x000f);
       length   -= (tcp_hlen * 4); //jump pass the tcp header
       seq_start = ntohl(tp->seq);      
-      seq_end   = seq_start+length;
+      seq_end   = ((unsigned long)(seq_start+length));
       ack_bit= ((tp)->ack  & 0x0001);
 
       path_id = search_rcvdb(ip_dst);
-      if (path_id != -1) { //a monitored outgoing packet  
+      if (path_id != -1) { //a monitored outgoing packet
+        //ignore the pure outgoing ack
+        if ((ack_bit==1) && (seq_end==seq_start)) {
+          return 0;
+        }
+
 	path = &(sniff_rcvdb[path_id]);
 	loss_records[path_id].total_counter++;
-
-	//ignore the pure outgoing ack
-	if ((ack_bit==1) && (seq_end==seq_start)) {
-	  return 0;
-	}
 
 	if (path->end == path->start){ //no previous packet
 	  throughputInit(&throughput[path_id], seq_start);
@@ -290,7 +330,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	} else {
 	  throughputProcessSend(&throughput[path_id], seq_start, length);
 	  //find the real received end index
-	  end  = (path->end-1)%SNIFF_WINSIZE;
+	  end  = nnmod(path->end-1, SNIFF_WINSIZE);
 
 	  /* Note: we use flag_resend to igore resend-affected-packets in the delay estimation 
 	   * because TCP don't use them to calculate the sample RTT in the RTT estimation */
@@ -306,15 +346,12 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	    }	  
 	  } else if (seq_start >= path->records[end].seq_end) { //new packet
 	    return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts));
-	  } else {
+	  } else { //resend
+            flag_resend = 1;
+            loss_records[path_id].loss_counter++;
 	    if (seq_end > path->records[end].seq_end){ //partial resend
-	      flag_resend = 1;
-	      loss_records[path_id].loss_counter++;
 	      return push_sniff_rcvdb(path_id, path->records[end].seq_end+1, seq_end, &(pkthdr->ts));
-	    } else { //pure resend
-	      flag_resend = 1;
-	      loss_records[path_id].loss_counter++;
-	    }	  
+	    }
 	  } // if has payload and resent   
 	}
    
@@ -326,7 +363,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 
 	    throughputProcessAck(&throughput[path_id], ack_seq);
 
-	    record_id = search_sniff_rcvdb(path_id, ack_seq-1);
+	    record_id = search_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1));
 	    if (record_id != -1) { //new ack received
 	      if (flag_resend) { //if the ack is triggered by a resend, skip the delay calculation.
 		flag_resend = 0; 
@@ -334,7 +371,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
 		delays[path_id] = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
 	      }
-	      pop_sniff_rcvdb(path_id, ack_seq-1); //advance the sniff window base
+	      pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
 	    } //ack in rcvdb
 	  } //has ack
 	} //if incoming

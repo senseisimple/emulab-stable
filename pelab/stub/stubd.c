@@ -502,13 +502,12 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
   }
 }
 
-
 int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   struct timeval current_tv;
-  long   left_usec, past_usec;
+  long long   left_usec, past_usec; //64-bit integer
 
   gettimeofday(&current_tv, NULL);
-  past_usec = (current_tv.tv_sec-start_tvp->tv_sec)*1000000+ 
+  past_usec = ((long long)(current_tv.tv_sec-start_tvp->tv_sec))*1000000+
     (current_tv.tv_usec-start_tvp->tv_usec);
   left_usec = QUANTA*1000-past_usec; //QUANTA is in msec
   if (left_usec > 0) {
