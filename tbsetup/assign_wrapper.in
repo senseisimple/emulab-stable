@@ -4402,17 +4402,19 @@ sub CreateTopFile()
 			   "(endnode traffic shaping)\n");
 		    $toperrors++;
 		}
-		#
-		# All the OS's have to support linkdelays.
-		#
-		foreach my $node ($node0, $node1) {
-		    my $osid = virtnodeosid($node);
+		else {
+		    #
+		    # All the OS's have to support linkdelays.
+		    #
+		    foreach my $node ($node0, $node1) {
+			my $osid = virtnodeosid($node);
 
-		    if (! $osdoeslinkdelays{$osid}) {
-			tbwarn("$node in link $lan is running an OSID ".
-			       "($osid) that does not support linkdelays ".
-			       "(endnode traffic shaping)\n");
-			$toperrors++;
+			if (! $osdoeslinkdelays{$osid}) {
+			    tbwarn("$node in link $lan is running an OSID ".
+				   "($osid) that does not support linkdelays ".
+				   "(endnode traffic shaping)\n");
+			    $toperrors++;
+			}
 		    }
 		}
 	    }
@@ -4581,16 +4583,18 @@ sub CreateTopFile()
 			       "(endnode traffic shaping)\n");
 			$toperrors++;
 		    }
-		    #
-		    # All the OS's have to support linkdelays.
-		    #
-		    my $osid = virtnodeosid($node);
+		    else {
+			#
+			# All the OS's have to support linkdelays.
+			#
+			my $osid = virtnodeosid($node);
 
-		    if (! $osdoeslinkdelays{$osid}) {
-			tbwarn("$node in lan $lan is running an OSID ($osid) ".
-			       "that does not support linkdelays ".
-			       "(endnode traffic shaping)\n");
-			$toperrors++;
+			if (! $osdoeslinkdelays{$osid}) {
+			    tbwarn("$node in lan $lan is running an OSID ".
+				   "($osid) that does not support linkdelays ".
+				   "(endnode traffic shaping)\n");
+			    $toperrors++;
+			}
 		    }
 		}
 		
