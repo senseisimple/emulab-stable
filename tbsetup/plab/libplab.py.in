@@ -1297,7 +1297,7 @@ class Node:
             if hasattr(e,"killed") and e.killed:
                 os.kill(cmdobj.pid, signal.SIGTERM)
                 cmdobj.wait()
-                sys.exit(1)
+                sys._exit(256)
                 pass
             else:
                 signal.signal(signal.SIGINT, sig["INT"])

@@ -308,7 +308,7 @@ print "vnode_setup running at parallelization: $numbatch ".
 while (1) {
 
     # Space out the invocation of child processes a little.
-    sleep(3);
+    sleep(1);
 
     #
     # We're done when we've hit the last vnode, and we've outlived all of our
@@ -399,11 +399,13 @@ while (1) {
 	#
 	my $oldest;
 	my $oldestpid = 0;
+        my $oldestvnode = "";
 	while (my ($pid, $aref) = each %child_vnodes) {
 	    my ($vnode, $pnode, $mode, $jailed, $plab, $birthtime) = @$aref;
 	    if ((!$oldestpid) || ($birthtime < $oldest)) {
 		$oldest = $birthtime;
 		$oldestpid = $pid;
+                $oldestvnode = $vnode;
 	    }
 	}
 
@@ -416,19 +418,21 @@ while (1) {
 	}
 
 	#
-	# If the oldest has already expried, just kill it off right now, and go
+	# If the oldest has already expired, just kill it off right now, and go
 	# back around the loop
 	#
 	my $now = time();
 	my $waittime = ($oldest + $childwait) - time();
 
 	#
-	# Kill of the oldest if he gets too old while we're waiting
+	# Kill of the oldest if it gets too old while we're waiting.
 	#
-	local $SIG{ALRM} = sub { print "*** $0: timeout waiting for vnode:\n";
-                                 kill("TERM", $oldestpid); };
+	local $SIG{ALRM} = 
+            sub { print "*** $0: timeout (alarm clock) waiting for ".
+                        "vnode: $oldestvnode\n";
+                  kill("TERM", $oldestpid); };
 	if ($waittime <= 0) {
-            print "*** $0: timeout waiting for vnode:\n";
+            print "*** $0: timeout waiting for vnode: $oldestvnode\n";
 	    kill("TERM",$oldestpid);
 	} else {
 	    alarm($waittime);
