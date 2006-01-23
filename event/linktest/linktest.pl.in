@@ -8,6 +8,7 @@
 use strict;
 use Class::Struct;
 use POSIX qw(uname);
+use POSIX qw(strftime);
 use IO::Handle;
 use English;
 use Socket;
@@ -58,23 +59,24 @@ use constant RUDE_CFG  => "/tmp/rude.cfg";
 use constant IPERF_DAT => "/tmp/iperf.dat";
 
 # iperf test limits.
-use constant LIMIT_BW_HI => 100000000;
-use constant LIMIT_BW_LO =>  1000000;
-use constant LIMIT_BW_LOSS => 0;
+use constant LIMIT_BW_HI  => 100000000;
+use constant LIMIT_BW_MED =>  10000000;
+use constant LIMIT_BW_LO  =>   1000000;
+use constant LIMIT_BW_MIN =>     64000;
+use constant LIMIT_BW_LOSS => 0.20;
 
 # Make sure that we dont get bogged down in being too accurate! 
 # Make sure the error is a certain significance before we start reporting it.
 use constant INSIGNIFICANT_LAT_ERROR_LO => 0.50;  # ms
 use constant INSIGNIFICANT_LAT_ERROR_HI => 3.50;  # ms
-use constant INSIGNIFICANT_BW_ERROR_HI  => 0.01;  # percent.
-use constant INSIGNIFICANT_BW_ERROR_LO  => 0.06;  # percent.
+use constant INSIGNIFICANT_BW_ERROR_HI  => 0.015; # percent.
+use constant INSIGNIFICANT_BW_ERROR_LO  => 0.03;  # percent.
 use constant INSIGNIFICANT_BW_ERROR_LO_Windows  => 0.10;  # Lower expectations.
 
 # latency must be corrected for xmit delay under this speed.
 use constant LAT_LOW_BW => 10000000;
 
-# slow send rate (for bw 256kbps to 1Mbps)
-use constant SLOW_BW => 256000;
+# slow send rate (for bw from LIMIT_BW_MIN to LIMIT_BW_LO)
 use constant SLOW_SEND => 100;
 use constant FAST_SEND => 250;
 use constant LOSS_TEST_DURATION => 4;	# In seconds.
@@ -112,6 +114,9 @@ use constant EXIT_ABORTED => -1;
 use constant EXIT_NOT_OK => 1;
 use constant EXIT_OK => 0;
 
+# Protos
+sub TimeStamp();
+sub PATH_NICE();
 
 # struct for representing a link.
 struct ( edge => {
@@ -121,6 +126,8 @@ struct ( edge => {
     dst => '$',
     dstip => '$',
     bw  => '$',
+    testbw  => '$',
+    bwtime  => '$',
     delay => '$',
     loss => '$',
     queuetype => '$'});
@@ -319,7 +326,8 @@ if(&is_special_node()) {
 # delays. Always give the collectors a moment to start up.
 #
 if(&dotest(TEST_BW)){
-    &start_listener(PATH_IPERF,"-s","-f","b","-u","-w","200000");
+    &start_listener(PATH_NICE, "-n", "-10",
+		    PATH_IPERF,"-s","-f","b","-u","-w","200000");
     sleep(1);
 }
 
@@ -355,7 +363,8 @@ if (defined($rtproto) && $rtproto eq RTPROTO_SESSION) {
 }
 
 if(&dotest(TEST_LATENCY)) {
-    my $msg = "Testing Single Hop Connectivity and Latency...";
+    my $stamp = TimeStamp();
+    my $msg   = "Testing Single Hop Connectivity and Latency ... $stamp";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
     # Ick, this barrier makes sure the above message gets into the log
@@ -370,12 +379,13 @@ if(&dotest(TEST_RT_STATIC)
     && defined($rtproto)
     && ($rtproto eq RTPROTO_STATIC || $rtproto eq RTPROTO_SESSION)) {
     my $msg;
+    my $stamp = TimeStamp();
 
     if ($total_error_count) {
 	$msg = "Skipping Routing tests because of previous errors!";
     }
     else {
-	$msg = "Testing Routing...";
+	$msg = "Testing Routing ... $stamp";
     }
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
@@ -393,7 +403,8 @@ if(&dotest(TEST_RT_STATIC)
 }
 
 if(&dotest(TEST_LOSS)) {
-    my $msg = "Testing Loss...";
+    my $stamp = TimeStamp();
+    my $msg = "Testing Loss ... $stamp";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
     # Ick, this barrier makes sure the above message gets into the log
@@ -405,7 +416,8 @@ if(&dotest(TEST_LOSS)) {
 }
 
 if(&dotest(TEST_BW)){
-    my $msg = "Testing Bandwidth...";
+    my $stamp = TimeStamp();
+    my $msg = "Testing Bandwidth ... $stamp";
     &post_event(EVENT_REPORT,$msg);
     &sim_event(EVENT_LOG,$msg);
     # Ick, this barrier makes sure the above message gets into the log
@@ -471,7 +483,7 @@ sub get_loss_sample_size {
 # returns TRUE if the link loss is valid for the linktest loss test.
 sub valid_loss {
     my $edge = shift @_;
-    if($edge->bw >= SLOW_BW && $edge->bw < LIMIT_BW_LO) {
+    if($edge->bw >= LIMIT_BW_MIN && $edge->bw < LIMIT_BW_LO) {
 	if(&get_loss_sample_size($edge) > SLOW_SEND) {
 	    return FALSE;
 	} else {
@@ -511,20 +523,22 @@ sub loss_test {
 		    &my_system(PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI);
 		    $analyze{$stream_id} = $other_edge;
 		} else {
-		    &debug("Skipping loss test for " . &print_link($edge) . "\n");
+		    &debug("Skipping loss test for " .
+			   &print_link($edge) . "\n");
+		    &info("*** Skipping loss test on $hostname for " .
+			  &print_link($edge) . "\n");
 		}
 	    } elsif ($hostname eq $other_edge->src) {
 		if(valid_loss($other_edge)) {
-		    # Hmm, lets wait for the other one to finish. Using
-		    # Real Time Scheduling, with both links spitting at
-		    # each other, appears to cause grief on at least the
-		    # RHL kernel. Packets get lost someplace. 
-		    sleep(LOSS_TEST_DURATION + 1);
 		    &write_rude_cfg($stream_id,$other_edge);
 		    &my_system(PATH_RUDE,"-s", RUDE_CFG, "-P", RUDE_PRI);
 		    $analyze{$stream_id} = $edge;
 		} else {
-		    &debug("Skipping loss test for " . &print_link($other_edge) . "\n");
+		    &debug("Skipping loss test for " .
+			   &print_link($other_edge) . "\n");
+
+		    &info("*** Skipping loss test on $hostname for " .
+			  &print_link($other_edge) . "\n");
 		}
 	    }
 	}
@@ -541,7 +555,7 @@ sub loss_test {
     my $result_count = @results;
     &debug("result_count from crude: $result_count\n");
     foreach (@results) {
-	&debug("result from crude: $_");
+	#&debug("result from crude: $_");
 	if(/ID=(\d+) /) {
 	    $recv_cnt{$1}++;
 	}
@@ -806,7 +820,7 @@ sub latency_test {
 # Returns whether the link bandwidth is in a valid test range.
 sub valid_bw {
     my $edge = shift @_;
-    if($edge->bw >= LIMIT_BW_LO
+    if($edge->bw >= LIMIT_BW_MIN
        && $edge->bw <= LIMIT_BW_HI
        && $edge->loss <= LIMIT_BW_LOSS
        ) {
@@ -881,13 +895,37 @@ sub bw_test {
 			  "(" . LIMIT_BW_LO . " <= BW <= " . LIMIT_BW_HI .") ".
 			  "or loss is too high (> " . LIMIT_BW_LOSS . ").\n");
 		}
-		my $bw = $bw + int($bw * 0.10);
-		
+
 		# Okay, start the test.
 		if (&valid_bw($edge) || &valid_bw($redge)) {
-		    &my_system(PATH_IPERF,
+		    #
+		    # Depending on the bw we are going to test at, set
+		    # the duration
+		    #
+		    my $duration = 5;
+		    if ($bw >= LIMIT_BW_HI/3.0) {
+			$duration = 3;
+		    }
+		    elsif ($bw < LIMIT_BW_MED) {
+			$duration = 7;
+		    }
+		    if ($edge->loss > 0.10) {
+			$duration += 3;
+		    }
+			
+		    # Send a little faster to make sure its the delay
+		    # node doing the throttling. 
+		    my $bw = $bw + int($bw * 0.10);
+
+		    # So we know what was sent in the analysis below.
+		    $edge->testbw($bw);
+		    $redge->testbw($bw);
+		    $edge->bwtime($duration);
+		    $redge->bwtime($duration);
+
+		    &my_system(PATH_NICE, "-n", "-10", PATH_IPERF,
 			       "-c", $edge->src . "-" . $edge->name,
-			       "-t", "10", "-f", "b",
+			       "-t", "$duration", "-f", "b",
 			       "-r", "-u", "-w", "200000", "-b", "$bw",
 			       "-x", "s", "-y", "c",
 			       "-L", "4444", "-o", IPERF_DAT);
@@ -908,10 +946,31 @@ sub bw_test {
 		if (scalar(@stuff) < 9) {
 		    die("Error parsing " . IPERF_DAT . "\n");
 		}
-		my $myip  = $stuff[1];
-		my $port  = $stuff[2];
-		my $hisip = $stuff[3];
-		my $bw    = $stuff[8];
+		next
+		    if (scalar(@stuff) == 9);
+			
+		my $myip     = $stuff[1];
+		my $port     = $stuff[2];
+		my $hisip    = $stuff[3];
+		my $numsent  = $stuff[11];
+		my $numpkts  = $stuff[11] - $stuff[10];
+		my $duration = 0;
+
+		if ($stuff[6] =~ /^([\d.]+)-([\d.]+)$/) {
+		    $duration = abs($2 - $1);
+		    # Trim off excess; this is wrong.
+		    $duration = int($duration) * 1.0
+			if ($edge->loss > .10);
+		}
+
+		#
+		# XXX Iperf uses *only* UDP payload length when calculating
+		# the bandwidth. We want to add the rest of the overhead
+		# before making the comparison below.
+		#
+		# 1470B + 20B (ip) + 8B (udp) + 14B (ethernet) + 4B (CRC).
+		#
+		my $bw = (((1470+20+8+14+4) * 8.0) * $numpkts) / $duration;
 		
 		#
 		# iperf is a twoway test. Both edges represented in the file.
@@ -922,30 +981,62 @@ sub bw_test {
 		    ($hostname eq $edge->src &&
 		     $edge->dstip eq $myip && "$port" eq "5001" &&
 		     $edge->srcip eq $hisip)) {
-		    my $expected = $edge->bw;
-		    my $diff     = abs($bw - $expected);
+		    my $wanted   = $edge->bw;	# NS file amount
+		    my $expected = $wanted;     # After applying loss
+		    my $adjusted = $wanted;     # After applying extra 10%
+		    my $diff     = abs($bw - $adjusted);
 		    my $error    = undef;
 
-		    &debug("BW results on $hostname for " .
-			   $edge->src . "-" . $edge->name . ": ".
-			   "$bw/$expected/$diff\n");
+		    #
+		    # If there is loss on the channel, expected bandwidth
+		    # goes down, but must take into account the fact that
+		    # we added 10% above.
+		    #
+		    if ($edge->loss > 0) {
+			# Loss will reduce expected BW by this much.
+			$expected = $expected - ($expected * $edge->loss);
 
-		    &info("    Bandwidth result on $hostname for " .
-			  &print_edge($edge) . 
-			  ": expected/actual = $expected/$bw\n");
+			# But we sent in 10% more then the max of both sides.
+			$adjusted = (((1470+20+8+14+4) * 8.0) * $numsent)
+			    / $duration;
+			$adjusted -= ($edge->loss * $adjusted);
+
+			# If that adjusted bandwidth is still higher then
+			# the link BW setting, thats all we should get.
+			if ($adjusted > $edge->bw) {
+			    $adjusted = $edge->bw;
+			}
+
+			$diff = abs($bw - $adjusted);
+			
+			&info("    Bandwidth result on $hostname for " .
+			      $edge->src . "-" . $edge->name .
+			      ": wanted/expected/adjusted/actual = ".
+			      "$wanted/$expected/$adjusted/$bw\n");
+		    }
+		    else {
+			&info("    Bandwidth result on $hostname for " .
+			      $edge->src . "-" . $edge->name .
+			      ": wanted/actual = $wanted/$bw\n");
+		    }
+
+		    &debug("BW results on $hostname for " .
+			   &print_edge($edge) . ": ".
+			   "$bw/$wanted/$expected/$adjusted/$diff/".
+			   "$numsent/$numpkts/" . $edge->bwtime . "\n");
 
 		    #
 		    # The measurement tool does not give perfect results.
 		    # However, it reports low all the time, so if it reports
 		    # high, then the link is almost certainly bad.
                     #
-		    if ($bw > $edge->bw) {
-			if ($diff > ($expected * INSIGNIFICANT_BW_ERROR_HI)) {
+		    if ($bw > $adjusted) {
+			if ($diff > ($adjusted * INSIGNIFICANT_BW_ERROR_HI)) {
 			    $error = "higher";
 			}
 		    }
-		    elsif ($bw < $edge->bw) {
-			if ($diff > ($expected * 
+		    elsif ($bw < $adjusted) {
+			if ($diff > ($adjusted * 
 				     (($platform =~ /CYGWIN/) ? 
 				      INSIGNIFICANT_BW_ERROR_LO_Windows : 
 				      INSIGNIFICANT_BW_ERROR_LO))) {
@@ -954,7 +1045,7 @@ sub bw_test {
 		    }
 		    if (defined($error)) {
 			&error(NAME_BW, $edge,
-			       "Measured $bw, Expected $expected bps");
+			       "Measured $bw, Expected $adjusted bps");
 		    }
 		    $found_results = 1;
 		    last;
@@ -1652,3 +1743,18 @@ sub hostip {
     my (undef,undef,undef,undef,@ipaddrs) = gethostbyname($host);
     return inet_ntoa($ipaddrs[0]);
 }
+
+sub TimeStamp()
+{
+    return POSIX::strftime("%H:%M:%S", localtime());
+}
+
+sub PATH_NICE()
+{
+    if ($platform eq LINUX) {
+	return "/bin/nice";
+    }
+    return "/usr/bin/nice";
+}
+
+    
