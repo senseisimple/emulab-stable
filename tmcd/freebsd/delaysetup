@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -71,6 +71,16 @@ if (@ARGV) {
     usage();
 }
 sub checkkernel($);
+
+$FBSD_VERSION = `uname -v`;
+
+if ($FBSD_VERSION =~ /FreeBSD ([0-9]).*/) {
+    $FBSD_VERSION = int($1);
+}
+else {
+    die("*** $0:\n".
+	"    Cannot determine version\n");
+}
 
 #
 # Delay node configuration goop.
@@ -150,9 +160,16 @@ sub DelaySetup
 
 	print DEL "#!/bin/sh\n";
 	# Turn these off before setting bridge_cfg.
-	print DEL "sysctl -w net.link.ether.bridge=0\n";
-	print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
-	print DEL "sysctl -w net.link.ether.bridge_cfg=";
+	if ($FBSD_VERSION <= 4) {
+	    print DEL "sysctl -w net.link.ether.bridge=0\n";
+	    print DEL "sysctl -w net.link.ether.bridge_ipfw=0\n";
+	    print DEL "sysctl -w net.link.ether.bridge_cfg=";
+	}
+	else {
+	    print DEL "sysctl -w net.link.ether.bridge.enable=0\n";
+	    print DEL "sysctl -w net.link.ether.bridge.ipfw=0\n";
+	    print DEL "sysctl -w net.link.ether.bridge.cfg=";
+	}
 
 	foreach $delay (@delays) {
 	    $delay =~ /DELAY INT0=([\d\w]+) INT1=([\d\w]+) /;
@@ -164,8 +181,14 @@ sub DelaySetup
 	}
 	print DEL "\n";
 	# Now turn them back on.
-	print DEL "sysctl -w net.link.ether.bridge=1\n";
-	print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+	if ($FBSD_VERSION <= 4) {
+	    print DEL "sysctl -w net.link.ether.bridge=1\n";
+	    print DEL "sysctl -w net.link.ether.bridge_ipfw=1\n";
+	}
+	else {
+	    print DEL "sysctl -w net.link.ether.bridge.enable=1\n";
+	    print DEL "sysctl -w net.link.ether.bridge.ipfw=1\n";
+	}
 	print DEL "ipfw -f flush\n";
 
  	#
