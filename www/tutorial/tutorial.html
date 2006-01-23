@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2005 University of Utah and the Flux Group.
+   Copyright (c) 2000-2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -252,8 +252,7 @@ example of a simple loop:
 
 	for {set i 1} {$i <= $maxnodes} {incr i} {
 	    set node($i) [$ns node]
-	    set name node-${i}
-	    append lanstr "$name "
+	    append lanstr "$node($i) "
 	    tb-set-node-os $node($i) FBSD-STD
 	}
 
