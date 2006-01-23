@@ -1,0 +1,146 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Change the pid of an UNAPPROVED project.
+#
+sub usage()
+{
+    print(STDERR "Usage: changepid <oldpid> <newpid>\n");
+    exit(-1);
+}
+my $optlist = "df";
+my $debug   = 0;
+my $force   = 0;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libaudit;
+use libdb;
+use libtestbed;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 30;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "/bin:/sbin:/usr/bin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+#
+if ($UID == 0) {
+    die("*** $0:\n".
+	"    Please do not run this as root! Its already setuid!\n");
+}
+
+# Only admin types!
+if (!TBAdmin($UID)) {
+    die("*** $0:\n".
+	"    Only TB administrators can run this script!\n");
+}
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug = 1;
+}
+if (defined($options{"f"})) {
+    $force = 1;
+}
+if (@ARGV != 2) {
+    usage();
+}
+my $oldpid = shift(@ARGV);
+my $newpid = shift(@ARGV);
+
+#
+# This script is always audited. Mail is sent automatically upon exit.
+#
+if (AuditStart(0)) {
+    #
+    # Parent exits normally
+    #
+    exit(0);
+}
+
+#
+# Make sure new project is not already taken.
+# 
+$query_result =
+    DBQueryFatal("select approved from projects where pid='$newpid'");
+
+if ($query_result->numrows) {
+    die("*** $0:\n".
+	"    Project '$newpid' already exists in the DB!\n");
+}
+
+#
+# Get the project status. Only unapproved; too hard otherwise.
+#
+$query_result =
+    DBQueryFatal("select approved from projects where pid='$oldpid'");
+
+if ($query_result->numrows == 0) {
+    die("*** $0:\n".
+	"    No such project '$oldpid' in the DB!\n");
+}
+my ($approved) = $query_result->fetchrow_array();
+
+if ($approved) {
+    die("*** $0:\n".
+	"    User '$oldpid' must be an unapproved project!\n");
+}
+
+#
+# Change a bunch of tables!
+#
+print "Updating group_membership table ...\n";
+DBQueryFatal("update group_membership set pid='$newpid' ".
+	     "where pid='$oldpid'");
+
+print "Updating groups table ...\n";
+DBQueryFatal("update groups set pid='$newpid',unix_name='$newpid' ".
+	     "where pid='$oldpid'");
+
+print "Updating group_stats table ...\n";
+DBQueryFatal("update group_stats set pid='$newpid',gid='$newpid' ".
+	     "where pid='$oldpid'");
+
+print "Updating project_stats table ...\n";
+DBQueryFatal("update project_stats set pid='$newpid' ".
+	     "where pid='$oldpid'");
+
+#
+# Lastly change projects table; if anything breaks above we can still run
+# this script to finish the job.
+#
+print "Updating projects table ...\n";
+DBQueryFatal("update projects set pid='$newpid' where pid='$oldpid'");

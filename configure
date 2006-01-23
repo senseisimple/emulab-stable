@@ -2212,7 +2212,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	capture/GNUmakefile \
 	db/GNUmakefile db/nalloc db/nfree db/if2port db/backup \
 	db/webcontrol db/node_status db/genelists db/genelists.proxy \
-	db/setsitevar db/newwanode db/audit db/changeuid \
+	db/setsitevar db/newwanode db/audit db/changeuid db/changepid \
 	db/libdb.pm db/inuse db/avail db/nodeip db/showgraph \
 	db/dhcpd_makeconf db/nodelog db/webnodelog db/unixgroups \
 	db/dbcheck db/interswitch db/dbboot db/schemacheck \

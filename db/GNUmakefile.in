@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -15,7 +15,7 @@ BIN_SCRIPTS	= nalloc nfree nodeip readycount
 SBIN_SCRIPTS	= avail inuse showgraph if2port backup webcontrol node_status \
                   genelists genelists.proxy dhcpd_makeconf nodelog unixgroups \
 		  dbcheck interswitch dbboot grabron stategraph newwanode \
-		  idletimes idlemail setsitevar audit changeuid \
+		  idletimes idlemail setsitevar audit changeuid changepid \
 		  elabinelab_bossinit update_permissions mysqld_watchdog \
 		  dumperrorlog
 LIBEXEC_SCRIPTS = webnodelog webnfree webnewwanode webidlemail xmlconvert
