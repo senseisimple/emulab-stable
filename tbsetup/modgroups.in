@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -196,7 +196,7 @@ foreach my $token (@addlist) {
 
 	fatal("Group membership table problem; ".
 	      "$user,$pid,$gid,$trust,$curtrust\n")
-	    if ($curtrust ne "none" && !$ELABINELAB);
+	    if ($curtrust ne "none" && $curtrust ne $trust && !$ELABINELAB);
 
 	DBQueryFatal("update group_membership set ".
 		     "     trust='$trust', ".
