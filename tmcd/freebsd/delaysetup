@@ -168,7 +168,7 @@ sub DelaySetup
 	else {
 	    print DEL "sysctl -w net.link.ether.bridge.enable=0\n";
 	    print DEL "sysctl -w net.link.ether.bridge.ipfw=0\n";
-	    print DEL "sysctl -w net.link.ether.bridge.cfg=";
+	    print DEL "sysctl -w net.link.ether.bridge.config=";
 	}
 
 	foreach $delay (@delays) {
