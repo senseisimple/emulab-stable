@@ -116,14 +116,14 @@ my ($approved) = $query_result->fetchrow_array();
 
 if ($approved) {
     die("*** $0:\n".
-	"    User '$oldpid' must be an unapproved project!\n");
+	"    Project '$oldpid' must be an unapproved project!\n");
 }
 
 #
 # Change a bunch of tables!
 #
 print "Updating group_membership table ...\n";
-DBQueryFatal("update group_membership set pid='$newpid' ".
+DBQueryFatal("update group_membership set pid='$newpid',gid='$newpid' ".
 	     "where pid='$oldpid'");
 
 print "Updating groups table ...\n";
