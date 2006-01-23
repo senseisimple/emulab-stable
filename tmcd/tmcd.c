@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -5373,6 +5373,24 @@ COMMAND_PROTOTYPE(dofwinfo)
 	 * Return firewall variables
 	 */
 	if (vers > 21) {
+		/*
+		 * Grab the node gateway MAC which is not currently part
+		 * of the firewall variables table.
+		 */
+		res = mydb_query("select value from sitevariables "
+				 "where name='node/gw_mac'", 1);
+		if (res && mysql_num_rows(res) > 0) {
+			row = mysql_fetch_row(res);
+			if (row[0]) {
+				OUTPUT(buf, sizeof(buf),
+				       "VAR=EMULAB_GWMAC VALUE=\"%s\"\n",
+				       row[0]);
+				client_writeback(sock, buf, strlen(buf), tcp);
+			}
+		}
+		if (res)
+			mysql_free_result(res);
+
 		res = mydb_query("select name,value from default_firewall_vars",
 				 2);
 		if (!res) {
