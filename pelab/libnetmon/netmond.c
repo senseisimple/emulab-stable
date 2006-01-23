@@ -15,11 +15,16 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <string.h>
+#include <sys/select.h>
 
 int main() {
 
     int sockfd;
     struct sockaddr_un servaddr;
+    int max_clientfd;
+    fd_set real_fdset, returned_fdset;
+    int i;
 
     /*
      * Make ourselves a socket
@@ -43,33 +48,75 @@ int main() {
         return 1;
     }
 
+    FD_ZERO(&real_fdset);
+    FD_SET(sockfd,&real_fdset);
+    max_clientfd = sockfd;
+
     while (1) {
-        fprintf(stderr,"Waiting for clients\n");
+        /*
+         * Make a blocking call to select() to wait for a client to connect or 
+         * send us data
+         */
+        /* fprintf(stderr,"Waiting for clients\n"); */
+        bcopy(&real_fdset,&returned_fdset,sizeof(fd_set));
+
+        if (select(max_clientfd + 1,&returned_fdset,NULL,NULL,NULL) <= 0) {
+            /* 
+             * Just repeat in case of failure
+             */
+            continue;
+        }
 
         /*
-         * Do a blocking wait for a client to connect() to us
+         * Let's see if we got any new clients on our listen socket
          */
-        struct sockaddr_un clientaddr;
-        socklen_t clientlen;
-        int clientfd;
-        clientlen = sizeof(clientaddr);
-        clientfd = accept(sockfd, (struct sockaddr*)&clientaddr, &clientlen);
+        if (FD_ISSET(sockfd,&returned_fdset)) {
+            struct sockaddr_un clientaddr;
+            socklen_t clientlen;
+            int clientfd;
+            clientlen = sizeof(clientaddr);
+            clientfd = accept(sockfd, (struct sockaddr*)&clientaddr, &clientlen);
 
-        if (clientfd) {
-            char *buf[1024];
-            size_t bufsize = 1024;
-            size_t read_bytes;
-            fprintf(stderr,"Got a client\n");
+            if (clientfd) {
+                fprintf(stderr,"A new client connected\n");
 
-            /* 
-             * As long as the client is connected, just take whatever it
-             * tells us and spit it to stdout
-             */
-            while ((read_bytes = read(clientfd,buf,bufsize))) {
-                write(1,buf,read_bytes);
+                FD_SET(clientfd,&real_fdset);
+                if (clientfd > max_clientfd) {
+                    /* Note, max_clientfd never goes down, but that shouldn't
+                       be too much of a problem */
+                    max_clientfd = clientfd;
+                }
             }
 
-            close(clientfd);
+        }
+
+        /*
+         * Now, check to see if any clients have sent us any data
+         */
+        for (i = sockfd; i <= max_clientfd; i++) {
+            if (FD_ISSET(i,&returned_fdset)) {
+                char *buf[1024];
+                size_t bufsize = 1024;
+                size_t read_bytes;
+
+                read_bytes = read(i,buf,bufsize);
+
+                if (read_bytes >= 1) {
+                    /*
+                     * Okay, this client had data for us, let's copy that back out
+                     * to stdout
+                     */
+                    write(1,buf,read_bytes);
+                } else {
+                    /*
+                     * If we get back a 0 length read, or an error, boot the
+                     * client
+                     */
+                    printf("A client disconnected\n");
+                    close(i);
+                    FD_CLR(i,&real_fdset);
+                }
+            }
         }
     }
 
