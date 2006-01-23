@@ -2,7 +2,7 @@
 
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 2.13 
-# Copyright (C) 1992, 93, 94, 95, 96, 05 Free Software Foundation, Inc.
+# Copyright (C) 1992, 93, 94, 95, 96 Free Software Foundation, Inc.
 #
 # This configure script is free software; the Free Software Foundation
 # gives unlimited permission to copy, distribute and modify it.
@@ -2261,7 +2261,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
 	tbsetup/ns2ir/sim.tcl tbsetup/nseswap tbsetup/nseparse/GNUmakefile \
 	tbsetup/nseparse/nse.parse.proxy tbsetup/nseparse/parse-nse \
-	tbsetup/nseparse/nse.parse.tcl tbsetup/db2ns \
+	tbsetup/nseparse/nse.parse.tcl \
+	tbsetup/nsverify/GNUmakefile tbsetup/nsverify/nstbparse \
+	tbsetup/nsverify/verify-ns \
+	tbsetup/db2ns \
 	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend tbsetup/tbrestart \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \

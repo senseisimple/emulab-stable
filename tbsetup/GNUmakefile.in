@@ -13,7 +13,7 @@ PLABSUPPORT     = @PLABSUPPORT@
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir ipassign nseparse checkup
+SUBDIRS		= checkpass ns2ir nsverify ipassign nseparse checkup
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
@@ -75,12 +75,15 @@ wanlinksolve: wanlinksolve.cc
 routecalc: routecalc.cc
 	${CXX} $< ${CXXFLAGS} -o $@ ${LIBS} -lm -lstdc++ ${LDFLAGS}
 
-.PHONY:	checkpass ns2ir plab ipassign checkup
+.PHONY:	checkpass ns2ir nsverify plab ipassign checkup
 checkpass:
 	@$(MAKE) -C checkpass all
 
 ns2ir:
 	@$(MAKE) -C ns2ir all
+
+nsverify:
+	@$(MAKE) -C nsverify all
 
 nseparse:
 	@$(MAKE) -C nseparse all
@@ -116,6 +119,7 @@ endif
 subdir-install:
 	@$(MAKE) -C checkpass install	
 	@$(MAKE) -C ns2ir install
+	@$(MAKE) -C nsverify install
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)
 	@$(MAKE) -C ipassign install
@@ -130,6 +134,7 @@ script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
 
 post-install: 
 	@$(MAKE) -C ns2ir post-install
+	@$(MAKE) -C nsverify post-install
 	@$(MAKE) -C nseparse post-install
 	$(PLAB_POST_INSTALL)
 	@$(MAKE) -C ipassign post-install
@@ -191,6 +196,7 @@ control-install:	$(addprefix $(INSTALL_SBINDIR)/, $(CTRLBIN_STUFF)) \
 			$(addprefix $(INSTALL_BINDIR)/, fetchtar.proxy) \
 			$(addprefix $(INSTALL_LIBDIR)/, libtestbed.pm)
 	@$(MAKE) -C ns2ir control-install
+	@$(MAKE) -C nsverify control-install
 	@$(MAKE) -C nseparse control-install
 
 #
@@ -211,6 +217,7 @@ clean:	subdir-clean
 subdir-clean:
 	@$(MAKE) -C checkpass clean
 	@$(MAKE) -C ns2ir clean
+	@$(MAKE) -C nsverify clean
 	@$(MAKE) -C nseparse clean
 	@$(MAKE) -C plab clean
 	@$(MAKE) -C ipassign clean
@@ -221,6 +228,7 @@ distclean:	subdir-distclean
 subdir-distclean:
 	@$(MAKE) -C checkpass distclean
 	@$(MAKE) -C ns2ir distclean
+	@$(MAKE) -C nsverify distclean
 	@$(MAKE) -C nseparse distclean
 	@$(MAKE) -C plab distclean
 	@$(MAKE) -C ipassign distclean

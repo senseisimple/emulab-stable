@@ -191,6 +191,7 @@ system("touch $outfile") == 0 or
 my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
 $cmdargs .= " -u $dbuid"
     if (defined($dbuid));
+$cmdargs .= " -- ";
 $cmdargs .= " -a"
     if ($anonmode);
 $cmdargs .= " -n"

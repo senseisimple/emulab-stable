@@ -1,0 +1,177 @@
+#!/usr/bin/perl -wT
+
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+use English;
+use Getopt::Std;
+use Socket;
+use File::Basename;
+
+sub usage()
+{
+    print STDOUT "Usage: nsverify <pid> <gid> <eid> <nsfile>\n";
+ 
+    exit(-1);
+}
+
+#
+# Configure variables
+#
+my $TB       = "@prefix@";
+my $TBOPS    = "@TBOPSEMAIL@";
+my $CONTROL  = "@USERNODE@";
+
+# Locals
+my $SAVEUID  = $UID;
+my $dbuid;
+my $outfile = "nsltmap";
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Untaint the path
+# 
+$ENV{'PATH'} = "$TB/bin:$TB/sbin:/bin:/usr/bin:/sbin:/usr/sbin";
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+if ($EUID != 0) {
+    # We don't want to run this script unless its the real version.
+    tbdie("Must be root! Maybe its a development version?");
+}
+
+# This script is setuid, so please do not run it as root. Hard to track
+# what has happened.
+if ($UID == 0) {
+    tbdie("Please do not run this as root! Its already setuid!");
+}
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+
+if (@ARGV != 4) {
+    usage();
+}
+
+my $pid   = $ARGV[0];
+my $gid   = $ARGV[1];
+my $eid   = $ARGV[2];
+my $nsfile= $ARGV[3];
+
+#
+# Must taint check!
+#
+if ($pid =~ /^([-\w]+)$/) {
+    $pid = $1;
+}
+else {
+    die("Bad data in argument: $pid.");
+}
+if ($gid =~ /^([-\w]+)$/) {
+    $gid = $1;
+}
+else {
+    die("Bad data in argument: $gid.");
+}
+if ($eid =~ /^([-\w]+)$/) {
+    $eid = $1;
+}
+else {
+    die("Bad data in argument: $eid.");
+}
+if ($nsfile =~ /^([-\w\/\.]+)$/) {
+    $nsfile = $1;
+}
+else {
+    die("Bad data in argument: $nsfile.");
+}
+
+#
+# Get DB uid for sending over to ops. In testmode, it runs locally
+# as the user running the testsuite, obviously.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+# Run as the user for most of this script.
+$EUID = $UID;
+
+my $cmdargs = "$TB/libexec/ns2ir/parse.proxy ";
+$cmdargs .= " -u $dbuid -v -- $pid $gid $eid";
+
+$EUID = $UID = 0;
+system("sshtb -host $CONTROL $cmdargs < $nsfile > $outfile");
+$EUID = $UID = $SAVEUID;
+
+if ($?) {
+    my $exit_status = $? >> 8;
+    
+    tbdie({type=>'extra'}, "Verify parsing failed (error code $exit_status)!");
+}
+
+open(NSLTMAP, "sort $outfile |");
+open(DBLTMAP, "sort ltmap |");
+
+my $done = 0;
+
+sub fcmp($$$) {
+    my ($v1, $v2, $tol) = @_;
+
+    return (abs($v1 - $v2) < $tol);
+}
+
+while (!$done) {
+    my $nsline = <NSLTMAP>;
+    my $dbline = <DBLTMAP>;
+
+    if (!$nsline && !$dbline) {
+	$done = 1;
+    }
+    elsif (!$nsline || !$dbline) {
+	tbdie({type=>'extra'},
+	      "Topology verification failed (short file)!");
+    }
+    elsif ($nsline =~ /^l \S+ \S+ \d+ \d+\.\d+ \d+\.\d+ \S+ \S+$/ &&
+	   $dbline =~ /^l \S+ \S+ \d+ \d+\.\d+ \d+\.\d+ \S+ \S+$/) {
+	my @nsmatches;
+	my @dbmatches;
+
+	@nsmatches = ($nsline =~
+		/^l (\S+) (\S+) (\d+) (\d+\.\d+) (\d+\.\d+) (\S+) (\S+)$/);
+	@dbmatches = ($dbline =~
+		/^l (\S+) (\S+) (\d+) (\d+\.\d+) (\d+\.\d+) (\S+) (\S+)$/);
+	for (my $lpc = 0; $lpc < 7; $lpc++) {
+	    if ($lpc == 3 &&
+		fcmp($nsmatches[$lpc], $dbmatches[$lpc], 0.0003)) {
+	    }
+	    elsif ($lpc == 4 &&
+		   fcmp($nsmatches[$lpc], $dbmatches[$lpc], 0.000010)) {
+	    }
+	    elsif ($nsmatches[$lpc] ne $dbmatches[$lpc]) {
+		print "'$nsmatches[$lpc]' != '$dbmatches[$lpc]' in\n";
+		print "ns: $nsline";
+		print "db: $dbline";
+		tbdie({type=>'extra'},
+		      "Topology verification failed!");
+	    }
+	}
+    }
+    elsif ($nsline ne $dbline) {
+	tbdie({type=>'extra'},
+	      "Topology verification failed ('$nsline'!='$dbline')!");
+    }
+}
+
+exit(0);

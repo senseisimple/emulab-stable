@@ -699,7 +699,10 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ns2ir/parse-ns tbsetup/ns2ir/parse.proxy \
 	tbsetup/ns2ir/sim.tcl tbsetup/nseswap tbsetup/nseparse/GNUmakefile \
 	tbsetup/nseparse/nse.parse.proxy tbsetup/nseparse/parse-nse \
-	tbsetup/nseparse/nse.parse.tcl tbsetup/db2ns \
+	tbsetup/nseparse/nse.parse.tcl \
+	tbsetup/nsverify/GNUmakefile tbsetup/nsverify/nstbparse \
+	tbsetup/nsverify/verify-ns \
+	tbsetup/db2ns \
 	tbsetup/tbprerun tbsetup/tbswap tbsetup/tbend tbsetup/tbrestart \
 	tbsetup/tbreport tbsetup/named_setup tbsetup/exports_setup \
 	tbsetup/checkpass/GNUmakefile tbsetup/assign_wrapper tbsetup/ptopgen \

@@ -31,6 +31,7 @@ my $state;
 #
 my $TBROOT   = "@prefix@";
 my $TESTMODE = @TESTMODE@;
+my $TBOPS    = "@TBOPSEMAIL@";
 my $wrapper  = "$TBROOT/libexec/assign_wrapper";
 my $batchexp = "$TBROOT/bin/batchexp";
 my $template = "$TBROOT/lib/ns2ir/elabinelab.ns";
@@ -275,6 +276,24 @@ print "Generating topomap ...\n";
 
 if (system("gentopofile $pid $eid")) {
     fatal("gentopofile failed!");
+}
+
+if (!$elabinelab) {
+    TBDebugTimeStamp("verify-ns started");
+    print "Verifying parse ...\n";
+    
+    if (system("verify-ns $pid $gid $eid $nsfile")) {
+	if (1) {
+	    SENDMAIL($TBOPS,
+		     "NS Verify failure for $pid/$eid",
+		     "'verify-ns' failed for $pid/$eid\n".
+		     "\nIf it is not a user error nstb_compat.tcl is ".
+		     "probably out of date.\n");
+	}
+	else {
+	    fatal("verify-ns failed!");
+	}
+    }
 }
 
 #

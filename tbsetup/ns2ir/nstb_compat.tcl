@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -53,6 +53,7 @@ proc tb-set-lan-protocol {lanlink protocol} {}
 proc tb-set-lan-accesspoint {lanlink node} {}
 proc tb-set-lan-setting {lanlink capkey capval} {}
 proc tb-set-node-lan-setting {lanlink node capkey capval} {}
+proc tb-elab-in-elab {onoff} {}
 
 Class Program
 
@@ -60,6 +61,55 @@ Program instproc init {args} {
 }
 
 Program instproc unknown {m args} {
+}
+
+Class Firewall
+
+Firewall instproc init {args} {
+    global last_fw
+    set last_fw $self
+}
+
+Firewall instproc unknown {m args} {
+}
+
+Class EventSequence
+
+EventSequence instproc init {args} {
+}
+
+EventSequence instproc unknown {m args} {
+}
+
+Class EventTimeline
+
+EventTimeline instproc init {args} {
+}
+
+EventTimeline instproc unknown {m args} {
+}
+
+Class EventGroup
+
+EventGroup instproc init {args} {
+}
+
+EventGroup instproc unknown {m args} {
+}
+
+Class Console -superclass Agent
+
+Console instproc init {args} {
+}
+
+Console instproc unknown {m args} {
+}
+
+Topography instproc load_area {args} {
+}
+
+Topography instproc checkdest {args} {
+    return 1
 }
 
 Class NSENode -superclass Node
@@ -78,4 +128,45 @@ Simulator instproc nsenode {args} {
 
 Simulator instproc make-simulated {args} {
     uplevel 1 eval $args
+}
+
+Simulator instproc event-sequence {args} {
+    $self instvar id_counter
+
+    incr id_counter
+    return [new EventSequence]
+}
+
+Simulator instproc event-timeline {args} {
+    $self instvar id_counter
+
+    incr id_counter
+    return [new EventTimeline]
+}
+
+Simulator instproc event-group {args} {
+    return [new EventGroup]
+}
+
+Simulator instproc make-cloud {nodes args} {
+    return [$self make-lan $nodes 100Mbps 0ms]
+}
+
+Node instproc program-agent {args} {
+}
+
+Node instproc topography {args} {
+}
+
+Node instproc console {} {
+    return [new Console]
+}
+
+Simulator instproc connect {src dst} {
+}
+
+LanNode instproc trace {args} {
+}
+
+LanNode instproc trace_endnode {args} {
 }

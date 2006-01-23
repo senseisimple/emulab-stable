@@ -1,0 +1,89 @@
+diff -ur ./tcl/lan/vlan.tcl ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lan/vlan.tcl
+--- ./tcl/lan/vlan.tcl	Mon Jan 12 17:54:40 2004
++++ ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lan/vlan.tcl	Fri Jan 20 17:39:02 2006
+@@ -143,8 +143,12 @@
+ 		$src add-neighbor $self
+ 
+ 		set sid [$src id]
+-		set link_($sid:$id_) [new Vlink $ns_ $self $src  $self $bw 0]
+-		set link_($id_:$sid) [new Vlink $ns_ $self $self $src  $bw 0]
++		set link_($sid:$id_) [new Vlink $ns_ $self $src  $self $bw $delay]
++		set link_($id_:$sid) [new Vlink $ns_ $self $self $src  $bw $delay]
++
++		# linktest: add to the linktest set of links.
++		$ns_ addLTLink $sid:$id_
++		$ns_ addLTLink $id_:$sid
+ 
+ 		$src add-oif [$link_($sid:$id_) head]  $link_($sid:$id_)
+ 		$src add-iif [[$nif set iface_] label] $link_($id_:$sid)
+@@ -520,6 +524,12 @@
+ 	$lan addNode $nodelist $bw $delay $llType $ifqType $macType \
+ 			$phyType $mactrace $ifqLen
+ 	
++ 	# linktest renaming
++	$self instvar id_counter
++	$lan set tbaltname_ tblan-lan[incr id_counter]
++ 	global last_lan
++ 	set last_lan $lan
++
+ 	return $lan
+ }
+ 
+diff -ur ./tcl/lib/ns-lib.tcl ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lib/ns-lib.tcl
+--- ./tcl/lib/ns-lib.tcl	Mon Jan 12 17:54:42 2004
++++ ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lib/ns-lib.tcl	Fri Jan 20 17:38:51 2006
+@@ -258,6 +258,11 @@
+ 		$self multicast $args
+ 	}
+ 	eval $self next $args
++
++	# linktest renaming
++	$self set id_counter 0
++	global last_sim
++	set last_sim $self
+ }
+ 
+ Simulator instproc nullagent {} {
+@@ -561,6 +566,13 @@
+ 
+ 	$node set ns_ $self
+ 	$self check-node-num
++
++	# linktest renaming
++	$self instvar id_counter
++	$node set tbaltname_ tbnode-n[incr id_counter]
++	global last_host
++	set last_host $node
++
+ 	return $node
+ }
+ 
+@@ -1159,6 +1171,28 @@
+ 		$n1 set-neighbor [$n2 id]
+ 		$n2 set-neighbor [$n1 id]
+ 	}
++
++	### linktest -- set up DupLink class to return
++	set dup [new Duplink]
++	$dup set from $link_($i1:$i2)
++	$dup set to   $link_($i2:$i1)
++
++	# add the duplink ref to the simplex links.
++	$link_($i1:$i2) set linkRef_ $dup
++	$link_($i2:$i1) set linkRef_ $dup
++
++	# and add to the linktest list of links.
++	$self addLTLink $i1:$i2 $type
++	$self addLTLink $i2:$i1 $type
++
++	$self instvar id_counter
++	$dup set tbaltname_ tblink-l[incr id_counter]
++
++	# naming
++	global last_link
++	set last_link $dup
++	
++	return $dup
+ }
+ 
+ Simulator instproc duplex-intserv-link { n1 n2 bw pd sched signal adc args } {

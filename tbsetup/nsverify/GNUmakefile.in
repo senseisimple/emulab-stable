@@ -1,0 +1,92 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= tbsetup/nsverify
+
+NS_VERSION=2.27
+TCLCL_VERSION=1.15
+NS_SRC_TARBALL=ns-allinone-$(NS_VERSION).tar.gz
+
+include $(OBJDIR)/Makeconf
+
+LIB_STUFF = tb_compat.tcl nstb_compat.tcl
+LIBEXEC_STUFF = nstbparse
+BOSSLIBEXEC = verify-ns
+
+all: $(LIB_STUFF) $(LIBEXEC_STUFF)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: \
+	$(addprefix $(INSTALL_LIBEXECDIR)/, $(BOSSLIBEXEC)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/lib/nsverify/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/libexec/nsverify/, $(LIBEXEC_STUFF))
+
+post-install: 
+	chmod 775 $(INSTALL_LIBEXECDIR)
+	chown root $(INSTALL_LIBEXECDIR)/verify-ns
+	chmod u+s $(INSTALL_LIBEXECDIR)/verify-ns
+
+nstb_compat.tcl: $(SRCDIR)/../ns2ir/nstb_compat.tcl
+	cp $< $@
+
+ns-allinone-$(NS_VERSION):
+	@if test -f /share/tarballs/$(NS_SRC_TARBALL); then \
+		echo "Unpacking $(NS_SRC_TARBALL)"; \
+		tar xfz /share/tarballs/$(NS_SRC_TARBALL); \
+	else \
+		echo "Downloading $(NS_SRC_TARBALL)"; \
+		wget --quiet \
+		  http://www.emulab.net/downloads/ns-allinone-2.27.tar.gz; \
+		echo "Unpacking $(NS_SRC_TARBALL)"; \
+		tar xfz $(NS_SRC_TARBALL); \
+	fi
+
+patch-ns-$(NS_VERSION):
+	patch -d ns-allinone-$(NS_VERSION)/ns-$(NS_VERSION) \
+		< $(SRCDIR)/ns-$(NS_VERSION).patch
+	touch $@
+
+nstb: ns-allinone-$(NS_VERSION) patch-ns-$(NS_VERSION)
+	@cd $</tclcl-$(TCLCL_VERSION); \
+		./configure --with-tcl=/usr/local; \
+		$(MAKE)
+	@cd $</ns-$(NS_VERSION); \
+		./configure; \
+		$(MAKE)
+	cp $</ns-$(NS_VERSION)/ns $@
+
+control-install: nstb \
+	$(addprefix $(INSTALL_LIBDIR)/nsverify/, $(LIB_STUFF)) \
+	$(addprefix $(INSTALL_LIBEXECDIR)/nsverify/, $(LIBEXEC_STUFF) nstb)
+
+$(INSTALL_LIBDIR)/nsverify/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBDIR)/nsverify
+	$(INSTALL) $< $@
+
+$(INSTALL_LIBEXECDIR)/nsverify/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_LIBEXECDIR)/nsverify
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/lib/nsverify/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/lib/nsverify
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/nsverify/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec/nsverify
+	$(INSTALL) $< $@
+
+clean:

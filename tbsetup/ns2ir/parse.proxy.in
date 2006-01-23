@@ -2,12 +2,12 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 use English;
-use Getopt::Std;
+use Getopt::Long;
 use BSD::Resource;
 use POSIX qw(:signal_h);
     
@@ -41,10 +41,14 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $TESTMODE = @TESTMODE@;
 my $parser   = "$TB/lib/ns2ir/parse.tcl";
+my $vlib     = "$TB/lib/nsverify";
+my $vparser  = "$TB/libexec/nsverify/nstbparse";
 
 # Locals
 my $tempdir  = "/tmp/parse-$$";
 my $nsfile   = "$$.ns";
+
+my $optlist = "u:v";
 
 #
 # Turn off line buffering on output
@@ -63,6 +67,22 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 use lib "@prefix@/lib";
 use libtestbed;
 
+my $user;
+my $verifymode = 0;
+
+#
+# Parse command arguments. Once we return from getopts, all that should be
+# left are the required arguments.
+#
+if (! GetOptions("u:s" => \$user,
+		 "v" => \$verifymode)) {
+    usage();
+}
+
+if ($verifymode) {
+    $parser = $vparser;
+}
+
 #
 # First option has to be the -u option, the user to run this script as.
 # In testmode, we are not run as root, so run as the current user, and
@@ -73,14 +93,6 @@ if (! $TESTMODE) {
 	die("*** $0:\n".
 	    "    Must be root to run this script!");
     }
-    if ($ARGV[0] ne "-u") {
-	die("*** $0:\n".
-	    "    Improper first argument. Must be the user name!\n");
-    }
-
-    my $user = $ARGV[1];
-    shift(@ARGV);
-    shift(@ARGV);
 
     (undef,undef,$unix_uid) = getpwnam($user) or
 	die("*** $0:\n".
@@ -156,6 +168,11 @@ if (! $pid) {
     
     # Give parent a chance to react.
     sleep(1);
+
+    if ($verifymode) {
+	chdir($vlib);
+	$nsfile = $tempdir . "/" . $nsfile;
+    }
 
     exec("nice -15 $parser @ARGV $nsfile");
     die("Could not exec the parser!\n");

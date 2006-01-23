@@ -1,0 +1,68 @@
+#! @prefix@/libexec/nsverify/nstb
+
+# rename set in order to capture the variable names used in the ns file.
+variable last_host {}
+variable last_lan {}
+variable last_link {}
+variable last_sim {}
+variable last_fw {}
+#  arrays mapping tcl hostnames to variable names
+variable hosts
+variable lans
+variable links
+# optional items
+variable rtproto "none"
+variable simname
+
+rename puts real_puts
+proc puts {args} {
+}
+
+rename set real_set
+proc set {args} {
+    global last_host last_lan last_link last_sim last_fw
+    global hosts lans links simname
+
+    if {[llength $args] == 1} {
+	return [uplevel real_set \{[lindex $args 0]\}]
+    }
+
+    real_set var [lindex $args 0]
+    real_set rval [lindex $args 1]
+    
+    # Here we change ARRAY(INDEX) to ARRAY-INDEX
+    regsub -all {[\(]} $var {-} out
+    regsub -all {[\)]} $out {} val
+
+    if {$rval == {}} {
+    } elseif {$rval == $last_host} {
+	array set hosts [list $last_host $val]
+    } elseif {$rval == $last_lan} {
+	array set lans [list $last_lan $val]
+    } elseif {$rval == $last_link} {
+	array set links [list $last_link $val]
+    } elseif {$rval == $last_sim} {
+	real_set simname $last_sim
+    } elseif {$rval == $last_fw} {
+	array set hosts [list $last_fw $val]
+    }
+
+    real_set last_host {}
+    real_set last_lan {}
+    real_set last_link {}
+    real_set last_sim {}
+    real_set last_fw {}
+
+    # There are a bunch of cases where we just pass through to real set.
+    return [uplevel real_set \{[lindex $args 0]\} \{[lindex $args 1]\}]
+}
+
+variable pid [lindex $argv 0]
+variable gid [lindex $argv 1]
+variable eid [lindex $argv 2]
+variable nsfile [lindex $argv 3]
+
+variable tbroot @prefix@
+variable libdir @prefix@/lib/ns2ir
+
+source [lindex $argv 3]
