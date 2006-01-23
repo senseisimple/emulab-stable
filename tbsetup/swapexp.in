@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -1056,8 +1056,9 @@ if (defined($logname)) {
 }
 
 # Always copy the NS file into the archive.
-system("cp -p $workdir/$eid.ns $userdir/$eid.ns");
-libArchive::TBExperimentArchiveAddFile($pid, $eid, "$userdir/$eid.ns") == 0 or
+system("cp -p $workdir/$eid.ns $userdir/archive/$eid.ns");
+libArchive::TBExperimentArchiveAddFile($pid, $eid,
+				       "$userdir/archive/$eid.ns") == 0 or
     fatal("Failed to add $userdir/$eid.ns to the archive!");
 
 #
