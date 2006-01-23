@@ -12,6 +12,7 @@ proc tb-set-ip {node ip} {}
 proc tb-set-ip-interface {src dst ip} {}
 proc tb-set-ip-link {src link ip} {}
 proc tb-set-ip-lan {src lan ip} {}
+proc tb-set-netmask {lanlink netmask} {}
 proc tb-set-hardware {node type args} {}
 proc tb-set-node-os {node os} {}
 proc tb-set-link-loss {src args} {}
@@ -43,17 +44,36 @@ proc tb-set-noshaping {link onoff} {}
 proc tb-set-useveth {link onoff} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
+proc tb-set-sync-server {node} {}
 proc tb-set-node-startcmd {node cmd} {}
+proc tb-set-mem-usage {usage} {}
+proc tb-set-cpu-usage {usage} {}
+proc tb-bind-parent {sub phys} {}
+proc tb-fix-current-resources {onoff} {}
 proc tb-set-encapsulate {onoff} {}
 proc tb-set-jail-os {os} {}
 proc tb-set-delay-os {os} {}
+proc tb-set-delay-capacity {cap} {}
 proc tb-use-ipassign {onoff} {}
 proc tb-set-ipassign-args {args} {}
 proc tb-set-lan-protocol {lanlink protocol} {}
 proc tb-set-lan-accesspoint {lanlink node} {}
 proc tb-set-lan-setting {lanlink capkey capval} {}
 proc tb-set-node-lan-setting {lanlink node capkey capval} {}
+proc tb-use-physnaming {onoff} {}
+proc tb-feedback-vnode {vnode hardware args} {}
+proc tb-feedback-vlan {vnode lan args} {}
+proc tb-feedback-vlink {link args} {}
 proc tb-elab-in-elab {onoff} {}
+proc tb-elab-in-elab-topology {topo} {}
+proc tb-set-inner-elab-eid {eid} {}
+proc tb-set-elabinelab-cvstag {cvstag} {}
+proc tb-set-node-inner-elab-role {node role} {}
+proc tb-set-security-level {level} {}
+proc tb-set-node-id {vnode myid} {}
+proc tb-set-link-est-bandwidth {srclink args} {}
+proc tb-set-lan-est-bandwidth {lan bw} {}
+proc tb-set-node-lan-est-bandwidth {node lan bw} {}
 
 Class Program
 
