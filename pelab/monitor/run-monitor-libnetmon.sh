@@ -1,16 +1,22 @@
 #!/bin/sh
-LIB_LOCATION=../libnetmon/
-LIB_SO=libnetmon.so
-if ! [ -x $LIB_LOCATION/$LIB_SO ]; then
-    echo "$LIB_LOCATION/$LIB_SO missing - run 'gmake' in $LIB_LOCATION to build it"
+
+if [ $# != 2 ]; then
+    echo "Usage: $0 pid eid"
     exit 1;
 fi
 
-export LD_LIBRARY_PATH=$LIB_LOCATION
-export LD_PRELOAD=$LIB_SO
+PID=$1
+EID=$2
 
-PID=shift
-EID=shift
+SCRIPT=`which $0`
+SCRIPT_LOCATION=`dirname $SCRIPT`
+BIN_LOCATION=$SCRIPT_LOCATION/../libnetmon/
+BIN=netmond
 
-echo "$0 running $@";
-$@ | python monitor.py ip-mapping.txt $PID $EID
+if ! [ -x $BIN_LOCATION/$BIN ]; then
+    echo "$BIN_LOCATION/$BIN missing - run 'gmake' in $BIN_LOCATION to build it"
+    exit 1;
+fi
+
+echo "Starting up netmond for $PID $EID";
+$BIN_LOCATION/$BIN | python monitor.py ip-mapping.txt $PID $EID
