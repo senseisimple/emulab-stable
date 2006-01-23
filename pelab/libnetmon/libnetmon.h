@@ -28,7 +28,7 @@
 #include <arpa/inet.h>
 #include <sys/un.h>
 
-#define DEBUGGING
+/* #define DEBUGGING */
 
 #ifdef DEBUGGING
 #define DEBUG(x) (x)

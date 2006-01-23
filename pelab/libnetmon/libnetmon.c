@@ -313,7 +313,6 @@ int close(int d) {
  * data on a socket:
  * sendto
  * sendmsg
- * write
  * writev
  * others?
  */
