@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use strict;
@@ -62,6 +62,11 @@ $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 $| = 1; #Turn off line buffering on output
+
+#
+# Make sure log files get created so project members can delete them!
+#
+umask(0002);
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -437,6 +442,7 @@ sub run_loghole {
 
     system("rm -rf $ltlogs");
     system("mkdir -p $ltlogs");
+    system("chmod 775 $ltlogs");
     system("$LOGHOLE -e $pid/$eid sync -n -l $ltlogs -r /var/emulab/logs ".
 	   "> $ltlogs/loghole.out 2>&1");
 }
