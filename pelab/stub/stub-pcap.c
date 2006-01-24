@@ -141,7 +141,7 @@ int nnmod(int num, int modulus){
 
 //Check if the seq is in the sequence block [seq_start, seq_end)
 //Take account of the seq wrap-arround
-int in_seqence_block(unsigned long seq_start, unsigned long seq_end, unsigned long seq) {
+int in_sequence_block(unsigned long seq_start, unsigned long seq_end, unsigned long seq) {
   if (seq_start < seq_end) {
     if (seq_start<=seq && seq<seq_end) 
       return 1; //in range
@@ -200,7 +200,7 @@ int search_sniff_rcvdb(int path_id, u_long seqnum) {
   int next = path->start;
 
   while (next != (path->end)){
-    if (in_seqence_block(path->records[next].seq_start, path->records[next].seq_end, seqnum)){
+    if (in_sequence_block(path->records[next].seq_start, path->records[next].seq_end, seqnum)){
       return next;
     }
     next = nnmod(next+1, SNIFF_WINSIZE);

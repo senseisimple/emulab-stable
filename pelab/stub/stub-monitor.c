@@ -27,10 +27,11 @@ void send_stub(int sockfd, char *addr, char *buf) {
   struct in_addr address;
   unsigned long   tmpulong;
 
-  tmpulong = htonl(127L);
+  tmpulong = htonl(127L); //no use for now
   memcpy(buf, &tmpulong, SIZEOF_LONG);
-  tmpulong = htonl(1L);
+  tmpulong = htonl(1L); //1 destinate
   memcpy(buf+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+
   inet_aton(addr, &address);
   tmpulong = address.s_addr;
   if (flag_debug) {
@@ -38,8 +39,13 @@ void send_stub(int sockfd, char *addr, char *buf) {
     printf("send the stub a probing address: %s \n", inet_ntoa(address));
   }
   memcpy(buf+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+  tmpulong = htonl(5L); //interdeparture 5 ms
+  memcpy(buf+3*SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+  tmpulong = htonl(80L); //packet size 80
+  memcpy(buf+4*SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+
   //should use send_all()!
-  if (send(sockfd, buf, 3*SIZEOF_LONG, 0) == -1){
+  if (send(sockfd, buf, 5*SIZEOF_LONG, 0) == -1){
     perror("ERROR: send_stub() - send()");
     exit(1);
   }    
@@ -62,10 +68,10 @@ void receive_stub(int sockfd, char *buf) {
 
 int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   struct timeval current_tv;
-  long   left_usec, past_usec;
+  long long   left_usec, past_usec; //64-bit integer
 
   gettimeofday(&current_tv, NULL);
-  past_usec = (current_tv.tv_sec-start_tvp->tv_sec)*1000000+ 
+  past_usec = ((long long)(current_tv.tv_sec-start_tvp->tv_sec))*1000000+
     (current_tv.tv_usec-start_tvp->tv_usec);
   left_usec = QUANTA*1000-past_usec; //QUANTA is in msec
   if (left_usec > 0) {
@@ -109,14 +115,14 @@ int main(int argc, char *argv[])
   ip = inet_ntoa(addr);
   strcpy(public_addr0, ip);
   if (flag_debug) {
-    printf("public_addr0: %s", inet_ntoa(addr));
+    printf("public_addr0: %s \n", public_addr0);
   }
   hp = gethostbyname(public_hostname1);
   bcopy(hp->h_addr, &addr, hp->h_length);
   ip = inet_ntoa(addr);
   strcpy(public_addr1, ip);
   if (flag_debug) {
-    printf("public_addr1: %s", inet_ntoa(addr));
+    printf("public_addr1: %s \n", public_addr1);
   }
 
 
@@ -182,7 +188,7 @@ int main(int argc, char *argv[])
 	if (flag_debug) {
 	  printf("send to: %s \n", public_addr0);
 	}
-	send_stub(sockfd0, public_addr1, buf); //feed the stub with the private or public address
+	send_stub(sockfd0, private_addr1, buf); //feed the stub with the private or public address
 	flag_send_stub0=1;
       } 
 
@@ -190,7 +196,7 @@ int main(int argc, char *argv[])
 	if (flag_debug) {
 	  printf("send to: %s \n", public_addr1);
 	}
-	send_stub(sockfd1, public_addr0, buf); //feed the stub with the private or public address
+	send_stub(sockfd1, private_addr0, buf); //feed the stub with the private or public address
 	flag_send_stub1=1;
       } 
 

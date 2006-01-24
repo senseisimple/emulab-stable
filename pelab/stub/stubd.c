@@ -21,7 +21,6 @@ loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the send
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 
 connection snddb[CONCURRENT_SENDERS];
-unsigned long throughputs[CONCURRENT_SENDERS], last_throughputs[CONCURRENT_SENDERS];
 fd_set read_fds,write_fds;
 
 int maxfd;
@@ -147,16 +146,21 @@ void init_random_buffer(void)
   }
 }
 
+//Initialize or reset state varialbes related to a receiver connection
+void reset_rcv_entry(int i) {
+  rcvdb[i].valid = 0;
+  loss_records[i].loss_counter=0;
+  loss_records[i].total_counter=0;
+  last_loss_rates[i]=0;
+  delays[i]=0;
+  last_delays[i]=0;
+}
+
 void init(void) {
   int i;
   
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
-    rcvdb[i].valid = 0;
-    loss_records[i].loss_counter=0;
-    loss_records[i].total_counter=0;
-    last_loss_rates[i]=0;
-    delays[i]=0;
-    last_delays[i]=0;
+    reset_rcv_entry(i);
   }
   for (i=0; i<CONCURRENT_SENDERS; i++){
     snddb[i].valid = 0;
@@ -191,12 +195,18 @@ int insert_db(unsigned long ip, int sockfd, int dbtype) {
     }
   }
   if (db[next].valid == 1) {
-    if (dbtype == 0 ) { 
-      //if it is a rcvdb record, reset the corresponding sniff_rcvdb record
-      sniff_rcvdb[next].start= sniff_rcvdb[next].end;
-    }
-    FD_CLR(db[next].sockfd, &read_fds);
     close(db[next].sockfd);
+
+    if (dbtype == 0 ) { //if rcvdb
+      //reset related state variables
+      sniff_rcvdb[next].start = 0;
+      sniff_rcvdb[next].end   = 0;
+      throughput[next].isValid   = 0;
+      FD_CLR(db[next].sockfd, &write_fds);
+      reset_rcv_entry(next);
+    } else { //if snddb
+      FD_CLR(db[next].sockfd, &read_fds);
+    }
   }
   db[next].valid = 1;
   db[next].ip    = ip;
@@ -254,11 +264,7 @@ int get_rcvdb_index(unsigned long destaddr){
       perror("connect");
       clean_exit(1);
     }
-    // update maxfd
-    if (sockfd > maxfd)
-    {
-      maxfd = sockfd;
-    }
+
     dbindex=insert_db(destaddr, sockfd, 0); //insert rcvdb
   }
   return dbindex;
@@ -315,64 +321,68 @@ int send_all(int sockfd, char *buf, int size) {
 
 void receive_sender(int i) {
   char inbuf[MAX_PAYLOAD_SIZE];
-  //unsigned long tmpulong, sndsec, sndusec;
-  //struct timeval rcvtime; 
 
   if (recv(snddb[i].sockfd, inbuf, MAX_PAYLOAD_SIZE, 0)== 0) { //connection closed
-    snddb[i].valid = 0;
+    snddb[i].valid = 0; //no additional clean-up because no other state varialbe is related
     FD_CLR(snddb[i].sockfd, &read_fds);
-    //additional clean-up !!
-  } else {
-    /* outdated since we use sniff for delay measurement now
-    gettimeofday(&rcvtime, NULL);
-    memcpy(&tmpulong, inbuf, SIZEOF_LONG);
-    sndsec = ntohl(tmpulong);
-    memcpy(&tmpulong, inbuf+SIZEOF_LONG, SIZEOF_LONG);
-    sndusec = ntohl(tmpulong);
-    delays[i] = (rcvtime.tv_sec-sndsec)*1000+floor((rcvtime.tv_usec-sndusec)/1000+0.5);
-    if (flag_debug) printf("One Way Delay (msec): %ld \n",delays[i]);
-    */
   }
 }
 
-int debug_fd = 0;
 
 void send_receiver(unsigned long destaddr, long size, fd_set * write_fds_copy){
   int index;
   int sockfd;
-  int error = 1;
+  int error = 1, retry=0;
+  struct in_addr addr;
 
-  if (size > MAX_PAYLOAD_SIZE)
-  {
+  if (size > MAX_PAYLOAD_SIZE){
     printf("size exceeded MAX_PAYLOAD_SIZE\n");
     size = MAX_PAYLOAD_SIZE;
   }
-  if (size <= 0)
-  {
+  if (size <= 0){
     size = 1;
   }
 
   index = get_rcvdb_index(destaddr);
   sockfd= rcvdb[index].sockfd;
 
-  //send packets
-  // if (select says its ok to write) || (we just created this connection)
-  if (FD_ISSET(sockfd, write_fds_copy) || !FD_ISSET(sockfd, &write_fds))
-  {
-    FD_SET(sockfd, &write_fds);
-    debug_fd = sockfd;
+  //if (select says its ok to write) || (we just created this connection)
+  if (FD_ISSET(sockfd, write_fds_copy) || !FD_ISSET(sockfd, &write_fds)){
     error = send_all(sockfd, random_buffer, size);
   }
 
-  while (error == 0){ //rcv conn closed
-    // TODO: What reset stuff needs to go here?
-    rcvdb[index].valid = 0;
-    FD_CLR(rcvdb[index].sockfd, &write_fds);
+  while (error==0 && retry<3){ //rcv conn closed
+    //clear up the failed connection
+    if (!FD_ISSET(sockfd, &write_fds)) { //new connection
+      rcvdb[index].valid = 0;
+    } else { //existent connection
+      //reset the related state variables
+      sniff_rcvdb[index].start = 0;
+      sniff_rcvdb[index].end   = 0;
+      throughput[index].isValid   = 0;
+      FD_CLR(rcvdb[index].sockfd, &write_fds);
+      reset_rcv_entry(index);
+    }
+    //try again
     index = get_rcvdb_index(destaddr);
     sockfd= rcvdb[index].sockfd;
-    FD_SET(sockfd, &write_fds);
-    throughput[index].isValid = 0;
     error = send_all(sockfd, random_buffer, size);
+    retry++;
+  } //while
+
+  //if no success for 3 tries, clean up and report the error
+  if (error == 0) {
+    rcvdb[index].valid = 0;
+    addr.s_addr = destaddr;
+    printf("Error: send_receiver() - failed send to %s three times. \n", inet_ntoa(addr)); 
+  } else {
+    //if a new connection succeeds, set the fds    
+    if (error!=0 && !FD_ISSET(sockfd, &write_fds)){
+      FD_SET(sockfd, &write_fds);
+      if (sockfd > maxfd) {
+	maxfd = sockfd;
+      }
+    }
   }
 }
 
@@ -629,7 +639,7 @@ int main(int argc, char *argv[]) {
       // Send out packets to our peers if the deadline has passed.
       handle_packet_buffer(&packet_deadline, &write_fds_copy);
       
-      //handle new sender packets
+      //receive from existent senders
       for (i=0; i<CONCURRENT_SENDERS; i++){
 	if (snddb[i].valid==1 && FD_ISSET(snddb[i].sockfd, &read_fds_copy)) {	
 	  receive_sender(i);
