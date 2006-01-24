@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2000-2005 University of Utah and the Flux Group.
+   Copyright (c) 2000-2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -99,6 +99,10 @@ changed, and are defined in the NS manual (see Section 7.3).
 	$queue0 set thresh_ 5
 	$queue0 set linterm_ 10
 	$queue0 set q_weight_ 0.002</code></pre>
+
+<em>The maximum <tt>limit_</tt> for a queue is <b>1 megabyte</b> if it is
+specified in bytes, or <b>100 slots</b> if it is specified in slots (each
+slot is 1500 bytes).</em>
 </p>
 
 <p>
