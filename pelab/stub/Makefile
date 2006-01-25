@@ -14,4 +14,4 @@ stub-pcap.o: stub-pcap.c stub.h
 	gcc -g -Wall -c stub-pcap.c
 
 clean:
-	rm *.o stubd stub-monitor 
+	rm *.o stubd stubm stub-monitor 
