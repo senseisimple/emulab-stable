@@ -1264,8 +1264,17 @@ default images as a base, goes like this:
 
 <li> When we make global images for everybody (like WINXP-SP1,
      FBSD410-STD, RHL90-STD, and FC4-STD), the final thing we do before 
-     grabbing the image is log in as root and run the <code>prepare</code>
-     script.  It
+     grabbing the image is to login on the <a
+     href="../faq.php3?#node-consoles">console</a>, drop to single user mode,
+     and run the <code>prepare</code> script:
+
+<pre>
+     $ sudo shutdown now
+     ...
+     $ /usr/local/etc/emulab/prepare
+</pre>
+
+     It
      cleans out all of the other user accounts and per-experiment stuff
      so a clean image is saved.  Then at experiment swap-in time, the
      Emulab management scripts create all of the accounts with
