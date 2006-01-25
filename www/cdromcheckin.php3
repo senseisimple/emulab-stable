@@ -78,6 +78,10 @@ if (isset($needscript)) {
 	echo "URL=https://${WWWHOST}/images/netbed-setup-v69.pl\n";
 	echo "SIG=https://${WWWHOST}/images/netbed-setup-v69.pl.sig\n";
     }
+    elseif ($cdvers == 5) {
+	echo "URL=https://${WWWHOST}/images/netbed-setup-v5.pl\n";
+	echo "SIG=https://${WWWHOST}/images/netbed-setup-v5.pl.sig\n";
+    }
     else {
 	echo "URL=https://${WWWHOST}/images/netbed-setup-v4.pl\n";
 	echo "SIG=https://${WWWHOST}/images/netbed-setup-v4.pl.sig\n";
@@ -277,6 +281,16 @@ if (strcmp($privIP, "1.1.1.1")) {
 		    "slicex_slice=3\n" .
 		    "slicex_mount=/users";
 		break;
+
+
+            case "24a4f173a7716d47bbc047f8387c86af":
+		$upgrade_instructions =
+		    "slice1_image=slice1.ndz\n" .
+		    "slice1_alt_image=http://${WWWHOST}/images/slice1-v5.ndz\n" .
+		    "slice1_sig=https://${WWWHOST}/images/slice1-v5.ndz.sig\n".
+                    "slice1_md5=24a4f173a7716d47bbc047f8387c86af\n" .
+		    "slicex_slice=3\n" .
+		    "slicex_mount=/users";
 		
 	    default:
 		SPITSTATUS(CDROMSTATUS_UPGRADEERROR);
@@ -403,6 +417,20 @@ elseif ($cdvers == 69) {
 	# Still return this for the root tag. Might change later.
 	echo "slice1_md5=20d04a3ba96043788e2d31d52e7e7165\n";
     }
+}
+elseif ($cdvers == 5) {
+	# FreeBSD 5.3 CD-ROM, 2005-2006.
+	echo "fdisk=image.fdisk\n";
+	echo "fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig\n";
+	echo "slice1_image=slice1.ndz\n";
+	echo "slice1_alt_image=http://${WWWHOST}/images/slice1-v5.ndz\n";
+	echo "slice1_sig=https://${WWWHOST}/images/slice1-v5.ndz.sig\n";
+	# Still return this for the root tag. Might change later.
+        echo "slice1_md5=24a4f173a7716d47bbc047f8387c86af\n";
+	echo "slicex_slice=3\n";
+	echo "slicex_mount=/users\n";
+	echo "slicex_tarball=slicex.tar.gz\n";
+	echo "slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig\n";
 }
 else {
     # This is netbed-1.0.iso in the distributions directory!
