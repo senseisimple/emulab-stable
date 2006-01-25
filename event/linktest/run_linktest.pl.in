@@ -384,7 +384,7 @@ sub analyze($) {
 	print "****\n\n";
     }
 
-    if ($timedout) && defined($logfile)) {
+    if ($timedout && defined($logfile)) {
 	my $msg = "Linktest timer expired, run was aborted\n".
 	          "Gathering results generated before the timer expired\n".
 		  "\n";
