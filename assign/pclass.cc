@@ -52,7 +52,7 @@ extern pnode_pvertex_map pnode2vertex;
 // pclasses - A list of all pclasses.
 extern pclass_list pclasses;
 
-// type_table - Maps a type (crope) to a tt_entry.  A tt_entry
+// type_table - Maps a type (fstring) to a tt_entry.  A tt_entry
 // consists of an array of pclasses that satisfy that type, and the
 // length of the array.
 extern pclass_types type_table;
@@ -80,7 +80,7 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
   // check type information
   for (tb_pnode::types_map::iterator it=a->types.begin();
        it!=a->types.end();++it) {
-    const crope &a_type = (*it).first;
+    const fstring &a_type = (*it).first;
     tb_pnode::type_record *a_type_record = (*it).second;
     
     tb_pnode::types_map::iterator bit = b->types.find(a_type);
@@ -95,7 +95,7 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
   // not
   for (tb_pnode::types_map::iterator it=b->types.begin();
        it!=b->types.end();++it) {
-    const crope &b_type = (*it).first;
+    const fstring &b_type = (*it).first;
     tb_pnode::type_record *b_type_record = (*it).second;
     
     tb_pnode::types_map::iterator bit = a->types.find(b_type);
@@ -217,7 +217,7 @@ int pclass_equiv(tb_pgraph &PG, tb_pnode *a,tb_pnode *b)
 int generate_pclasses(tb_pgraph &PG, bool pclass_for_each_pnode,
     bool dynamic_pclasses) {
   typedef hash_map<tb_pclass*,tb_pnode*,hashptr<tb_pclass*> > pclass_pnode_map;
-  typedef hash_map<crope,pclass_list*> name_pclass_list_map;
+  typedef hash_map<fstring,pclass_list*> name_pclass_list_map;
 
   pvertex cur;
   pclass_pnode_map canonical_members;
@@ -326,7 +326,7 @@ int tb_pclass::add_member(tb_pnode *p, bool is_own_class)
 {
   tb_pnode::types_map::iterator it;
   for (it=p->types.begin();it!=p->types.end();++it) {
-    crope type = (*it).first;
+    fstring type = (*it).first;
     if (members.find(type) == members.end()) {
       members[type]=new tb_pnodelist;
     }

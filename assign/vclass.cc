@@ -24,21 +24,21 @@ using namespace boost;
 
 name_vclass_map vclass_map;
 
-void tb_vclass::add_type(crope type)
+void tb_vclass::add_type(fstring type)
 {
   members[type]=0;
-  if ((dominant.size() == 0) ||
+  if (dominant.empty() ||
       (members[dominant] == 0)) {
     dominant = type;
   }
 }
 
-bool tb_vclass::has_type(crope type) {
+bool tb_vclass::has_type(fstring type) {
     return (members.find(type) != members.end());
 }
 
 
-double tb_vclass::assign_node(crope type)
+double tb_vclass::assign_node(fstring type)
 {
   double new_score = score;
   members[type] += 1;
@@ -57,7 +57,7 @@ double tb_vclass::assign_node(crope type)
   return delta;
 }
 
-double tb_vclass::unassign_node(crope type)
+double tb_vclass::unassign_node(fstring type)
 {
   double new_score = 0;
   members[type] -= 1;
@@ -80,7 +80,7 @@ double tb_vclass::unassign_node(crope type)
   return delta;
 }
 
-crope tb_vclass::choose_type()
+fstring tb_vclass::choose_type()
 {
   // This may take some tweaking - i.e. might want to make more
   // efficient, although members is usually a very small hash.
@@ -97,11 +97,11 @@ crope tb_vclass::choose_type()
 }
 
 bool tb_vclass::empty() {
-  members_map::iterator dit;
-  for (dit=members.begin();dit != members.end();++dit) {
-      if ((*dit).second > 0) {
-          return false;
-      }
-  }
-  return true;
+    members_map::iterator dit;
+    for (dit=members.begin();dit != members.end();++dit) {
+        if ((*dit).second > 0) {
+            return false;
+        }
+    }
+    return true;
 }

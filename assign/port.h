@@ -6,23 +6,24 @@
 
 // This file may need to be changed depending on the architecture.
 #ifndef __PORT_H
-
+#define __PORT_H
 #include <limits.h>
 
+#ifndef WCHAR_MIN
 #define WCHAR_MIN INT_MIN
 #define WCHAR_MAX INT_MAX
+#endif
 
 /*
  * We have to do these includes differently depending on which version of gcc
  * we're compiling with
  */
 #if __GNUC__ == 3 && __GNUC_MINOR__ > 0
-#include <ext/rope>
+#include <ext/slist>
 using namespace __gnu_cxx;
 #else
-#include <rope>
+#include <slist>
 #endif
 
 #else
-#define PORT_H
 #endif

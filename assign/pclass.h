@@ -71,13 +71,13 @@ public:
   tb_pclass() : name(), size(0), used_members(0), refcount(0), disabled(false)
       {;}
 
-  typedef map<crope,tb_pnodelist*> pclass_members_map;
+  typedef map<fstring,tb_pnodelist*> pclass_members_map;
   typedef hash_set<tb_pnode*,hashptr<tb_pnode*> > tb_pnodeset;
-  typedef hash_map<crope,tb_pnodeset*> pclass_members_set;
+  typedef hash_map<fstring,tb_pnodeset*> pclass_members_set;
 
   int add_member(tb_pnode *p, bool is_own_class);
 
-  crope name;			// purely for debugging
+  fstring name;			// purely for debugging
   int size;
   int used_members;
   pclass_members_map members;
@@ -111,7 +111,7 @@ public:
 typedef list<tb_pclass*> pclass_list;
 typedef vector<tb_pclass*> pclass_vector;
 typedef pair<int,pclass_vector*> tt_entry;
-typedef hash_map<crope,tt_entry> pclass_types;
+typedef hash_map<fstring,tt_entry> pclass_types;
 
 /* Constants */
 #define PCLASS_BASE_WEIGHT 1

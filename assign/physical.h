@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -8,6 +8,7 @@
 #define __PHYSICAL_H
 
 #include "common.h"
+#include "delay.h"
 
 #include <set>
 #include <list>
@@ -19,6 +20,9 @@ using namespace std;
 #include <boost/graph/graph_traits.hpp>
 #include <boost/graph/adjacency_list.hpp>
 using namespace boost;
+
+#include <string>
+using namespace std;
 
 /*
  * We have to do these includes differently depending on which version of gcc
@@ -78,7 +82,7 @@ typedef graph_traits<tb_sgraph>::out_edge_iterator soedge_iterator;
 
 typedef set<pvertex> pvertex_set;
 typedef hash_map<tb_pnode*,pvertex,hashptr<tb_pnode*> > pnode_pvertex_map;
-typedef hash_map<crope,pvertex> name_pvertex_map;
+typedef hash_map<fstring,pvertex> name_pvertex_map;
 typedef vector<svertex> switch_pred_map;
 typedef hash_map<svertex,switch_pred_map*>switch_pred_map_map;
 typedef vector<svertex> switch_dist_map;
@@ -86,7 +90,7 @@ typedef hash_map<svertex,switch_dist_map*>switch_dist_map_map;
 typedef list<pedge> pedge_path;
 typedef list<pvertex> pvertex_list;
 
-typedef hash_map<crope,int> link_type_count_map;
+typedef hash_map<fstring,int> link_type_count_map;
 
 // Globals, declared in assign.cc
 
@@ -100,9 +104,9 @@ extern tb_sgraph_edge_pmap sedge_pmap;
  */
 class tb_ptype {
     public:
-	tb_ptype(crope _name) : users(0), max_users(0), my_name(_name), slots(0)
+	tb_ptype(fstring _name) : users(0), max_users(0), my_name(_name), slots(0)
 	    { ; }
-	inline crope name() const { return my_name; };
+	inline fstring name() const { return my_name; };
 	inline int pnode_slots() const { return slots; };
 	inline int maxusers() const { return max_users; };
 	inline int add_users(int count = 1) {
@@ -131,7 +135,7 @@ class tb_ptype {
 	    slots += additional_slots;
 	}
     private:
-	crope my_name;
+	fstring my_name;
 	/* How many users are using this type right now */
 	int users;
 	/* The maximum number of nodes of this type we're allowed to use */
@@ -144,7 +148,7 @@ class tb_ptype {
 class tb_pnode {
 public:
   tb_pnode() { tb_pnode("(unnamed)"); }
-  tb_pnode(crope _name) : types(), features(), name(_name), typed(false),
+  tb_pnode(fstring _name) : types(), features(), name(_name), typed(false),
   			  current_type_record(NULL), total_load(0),
 			  switches(), sgraph_switch(), switch_used_links(0),
 			  total_interfaces(0), used_interfaces(0),
@@ -180,7 +184,7 @@ public:
 
   // Contains max nodes for each type
   // NOTE: Parallel data strucure, see below!
-  typedef hash_map<crope,type_record*> types_map;
+  typedef hash_map<fstring,type_record*> types_map;
   types_map types;
   
   // Same as above, but a list for fast iteration
@@ -191,9 +195,9 @@ public:
   // contains cost of each feature
   node_feature_set features;
 
-  crope name;			// name of the node
+  fstring name;			// name of the node
   bool typed;			// has it been typed
-  crope current_type;		// type the node is currently being used as
+  fstring current_type;		// type the node is currently being used as
   type_record* current_type_record;
   int total_load;		// total load for all types
   //int max_load;			// maxmium load for current type
@@ -225,7 +229,7 @@ public:
 
   tb_pnode *subnode_of;		// the pnode, if any, that this node is a
   				// subnode of
-  crope subnode_of_name;        // name of the pnode this node is a subnode of -
+  fstring subnode_of_name;        // name of the pnode this node is a subnode of -
                                 // used to do late bindind
 
   bool has_subnode;		// whether or not this node has any subnodes
@@ -240,7 +244,7 @@ public:
   link_type_count_map link_counts; // Counts how many links of each type this
   				   // node has 
 	
-  bool set_current_type(crope type) {
+  bool set_current_type(fstring type) {
       if (types.find(type) == types.end()) {
 	  //cout << "Failed to find type " << type << endl;
 	  return false;
@@ -305,25 +309,27 @@ template <class T> struct pairhash {
     }
 };
 
-typedef pair<crope,crope> nodepair;
-typedef hash_map<nodepair,int,pairhash<crope> > nodepair_count_map;
+typedef pair<fstring,fstring> nodepair;
+typedef hash_map<nodepair,int,pairhash<fstring> > nodepair_count_map;
 
 class tb_plink {
 public:
   typedef enum {PLINK_NORMAL,PLINK_INTERSWITCH,PLINK_LAN} plinkType;
-  typedef hash_set<crope> type_set;
+  typedef hash_set<fstring> type_set;
 
-  tb_plink(crope _name, plinkType _is_type, crope _type, crope _srcmac, crope
-      _dstmac)
+  tb_plink(fstring _name, plinkType _is_type, fstring _type, fstring _srcmac, fstring
+      _dstmac, fstring _srciface, fstring _dstiface)
     : name(_name), srcmac(_srcmac), dstmac(_dstmac), is_type(_is_type),
+      srciface(_srciface), dstiface(_dstiface),
       delay_info(), bw_used(0), emulated(0), nonemulated(0),
       penalty(0.0), fixends(false), current_endpoints(), current_count(0),
       vedge_counts() {
 	  types.insert(_type);
       }
 
-  crope name;			// the name
-  crope srcmac,dstmac;		// source and destination MAC addresses.
+  fstring name;			// the name
+  fstring srcmac,dstmac;	// source and destination MAC addresses.
+  fstring srciface, dstiface;	// source and destination interface names
 
   plinkType is_type;		// inter-switch type of the link
   type_set types;		// type (ie. ethernet) of the link
@@ -417,7 +423,7 @@ int parse_ptop(tb_pgraph &PG, tb_sgraph &SG, istream& i);
 extern tb_pgraph PG;
 
 /* A map of all tb_ptypes currently in existance */
-typedef map<crope,tb_ptype*> tb_ptype_map;
+typedef map<fstring,tb_ptype*> tb_ptype_map;
 extern tb_ptype_map ptypes;
 
 #endif

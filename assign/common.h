@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -13,6 +13,7 @@
  */
 #if __GNUC__ == 3 && __GNUC_MINOR__ > 0
 #include <ext/hash_map>
+#include <ext/hash_fun.h>
 using namespace __gnu_cxx;
 #define RANDOM() random()
 #else
@@ -22,7 +23,8 @@ using namespace __gnu_cxx;
 
 #include "config.h"
 #include <utility>
-#include <rope>
+#include "port.h"
+#include "fstring.h"
 
 #include <boost/graph/adjacency_list.hpp>
 
@@ -132,8 +134,8 @@ static float SCORE_MAX_TYPES = 0.15; /* Cost of going over type limits - low
 				      * over leaving a node unassigned */
 
 // The following are used to weight possible link resolutions.  Higher
-// numbers mean a more likely resolution.  Trivial resolutions are always
-// used if possible.
+// numbers mean a more likely resolution.
+static float LINK_RESOLVE_TRIVIAL = 8.0;
 static float LINK_RESOLVE_DIRECT = 4.0;
 static float LINK_RESOLVE_INTRASWITCH = 2.0;
 static float LINK_RESOLVE_INTERSWITCH = 1.0;
@@ -182,6 +184,22 @@ struct eqstr
   }
 };
 
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+namespace __gnu_cxx
+{
+#endif
+    template<> struct hash< std::string >
+    {
+        size_t operator()( const std::string& x ) const
+        {
+            return hash< const char* >()( x.c_str() );
+        }
+    };
+#if __GNUC__ == 3 && __GNUC_MINOR__ > 0
+};
+#endif
+
+
 enum edge_data_t {edge_data};
 enum vertex_data_t {vertex_data};
 
@@ -193,8 +211,8 @@ namespace boost {
 /*
  * Used to count the number of nodes in each ptype and vtype
  */
-typedef hash_map<crope,int> name_count_map;
-typedef hash_map<crope,vector<crope> > name_list_map;
+typedef hash_map<fstring,int> name_count_map;
+typedef hash_map<fstring,vector<fstring> > name_list_map;
 
 /*
  * A hash function for pointers

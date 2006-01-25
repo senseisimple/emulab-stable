@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://emulab.net/resources/vtop/1.0" xmlns:vtop="http://emulab.net/resources/vtop/1.0">
+  <xs:element name="top">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:node"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:link"/>
+      </xs:sequence>
+      <xs:attribute name="pid" use="required">
+        <xs:annotation>
+          <xs:documentation>Project ID</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="eid" use="required">
+        <xs:annotation>
+          <xs:documentation>Experiment ID</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="gid">
+        <xs:annotation>
+          <xs:documentation>Group ID (optional)</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="uid">
+        <xs:annotation>
+          <xs:documentation>User ID owning the experiment (optional)</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="node">
+    <xs:annotation>
+      <xs:documentation>Nodes in the topology - zero or more</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="vtop:node_type"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:desire"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="vtop:node_option"/>
+      </xs:sequence>
+      <xs:attribute name="name" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="node_type">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="vtop:type_name"/>
+        <xs:element minOccurs="0" ref="vtop:type_slots"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="type_name" type="xs:string"/>
+  <xs:element name="type_slots" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>TODO - Change type</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+  <xs:element name="desire">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="vtop:desire_name"/>
+        <xs:element ref="vtop:desire_weight"/>
+        <xs:element minOccurs="0" ref="vtop:violatable"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="desire_name" type="xs:string"/>
+  <xs:element name="desire_weight" type="xs:string"/>
+  <xs:element name="violatable">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="node_option">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="vtop:option_name"/>
+        <xs:element ref="vtop:option_value"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="option_name" type="xs:string"/>
+  <xs:element name="option_value" type="xs:string"/>
+  <xs:element name="link" type="xs:string">
+    <xs:annotation>
+      <xs:documentation>Links in the topology - zero or more</xs:documentation>
+    </xs:annotation>
+  </xs:element>
+</xs:schema>

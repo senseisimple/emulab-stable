@@ -1,13 +1,13 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
 
 #include "port.h"
 
-#include <iostream.h>
+#include <iostream>
 #include <float.h>
 
 /*
@@ -149,6 +149,452 @@ void init_score()
   }
 
   SDEBUG(cerr << "  score=" << score << " violated=" << violated << endl);
+}
+
+/*
+ * Find all possbile resolutions for a link. The possible resolutions are placed
+ * into the resolutions parameter, and the total weight of all resolutions are
+ * returned.
+ */
+float find_link_resolutions(resolution_vector &resolutions, pvertex pv,
+    pvertex dest_pv, tb_vlink *vlink, tb_pnode *pnode, tb_pnode *dest_pnode,
+    bool flipped) {
+  SDEBUG(cerr << "   finding link resolutions" << endl);
+  /* We need to calculate all possible link resolutions, stick
+   * them in a nice datastructure along with their weights, and
+   * then select one randomly.
+   */
+  typedef vector<pvertex_list> switchlist_vector;
+
+  float total_weight = 0;
+
+  // Trivial link
+  if (dest_pv == pv) {
+    SDEBUG(cerr << "  trivial link" << endl);
+
+    /*
+     * Sometimes, we might not want to let a vlink be resolved as a
+     * trivial link
+     */
+    if (allow_trivial_links && vlink->allow_trivial) {
+      tb_link_info info(tb_link_info::LINK_TRIVIAL);
+      resolutions.push_back(info);
+      total_weight += LINK_RESOLVE_TRIVIAL;
+    }
+
+    /*
+     * This is to preserve some old behaviour - if we see a trivial link, that's
+     * the only one we consider using. Need to revisit this to see if it's always
+     * desirable.
+     */
+    return total_weight;
+  }
+
+  pedge pe;
+  // Direct link
+  if (find_best_link(dest_pv,pv,vlink,pe)) {
+    tb_link_info info(tb_link_info::LINK_DIRECT);
+    info.plinks.push_back(pe);
+    resolutions.push_back(info);
+    total_weight += LINK_RESOLVE_DIRECT;
+    SDEBUG(cerr << "    direct_link " << pe << endl);
+  }
+  // Intraswitch link
+  pedge first,second;
+  for (pvertex_set::iterator switch_it = pnode->switches.begin();
+      switch_it != pnode->switches.end();++switch_it) {
+    if (dest_pnode->switches.find(*switch_it) !=
+        dest_pnode->switches.end()) {
+      bool first_link, second_link;
+      /*
+       * Check to see if either, or both, pnodes are actually
+       * the switch we are looking for
+       */
+      if (pv == *switch_it) {
+        first_link = false;
+      } else {
+        first_link = true;
+      }
+      if (dest_pv == *switch_it) {
+        second_link = false;
+      } else {
+        second_link = true;
+      }
+
+      /*
+       * Intraswitch links to switches are not allowed - they
+       * will be caught as direct links above
+       */
+      if (pnode->is_switch || dest_pnode->is_switch) {
+        SDEBUG(cerr << "    intraswitch failed - switch" << endl;)
+          continue;
+      }
+
+      if (first_link) {
+        if (!find_best_link(pv,*switch_it,vlink,first)) {
+          SDEBUG(cerr << "    intraswitch failed - no link first" <<
+              endl;)
+            // No link to this switch
+            continue;
+        }
+      }
+
+      if (second_link) {
+        if (!find_best_link(dest_pv,*switch_it,vlink,second)) {
+          // No link to this switch
+          SDEBUG(cerr << "    intraswitch failed - no link second" <<
+              endl;)
+            continue;
+        }
+      }
+
+      tb_link_info info(tb_link_info::LINK_INTRASWITCH);
+      /*
+       * Order these need to go in depends on flipped bit
+       */
+      if (flipped) {
+        if (second_link) {
+          info.plinks.push_back(second);
+        }
+        if (first_link) {
+          info.plinks.push_back(first);
+        }
+      } else {
+        if (first_link) {
+          info.plinks.push_back(first);
+        }
+        if (second_link) {
+          info.plinks.push_back(second);
+        }
+      }
+      info.switches.push_front(*switch_it);
+      resolutions.push_back(info);
+      
+      total_weight += LINK_RESOLVE_INTRASWITCH;
+      SDEBUG(cerr << "    intraswitch " << first << " and " << second
+          <<                     endl);
+    }
+  }
+  for (pvertex_set::iterator source_switch_it = pnode->switches.begin();
+      source_switch_it != pnode->switches.end();
+      ++source_switch_it) {
+    int tmp = 0;
+    for (pvertex_set::iterator dest_switch_it =
+        dest_pnode->switches.begin();
+        dest_switch_it != dest_pnode->switches.end();
+        ++dest_switch_it) {
+      if (*source_switch_it == *dest_switch_it) continue;
+      tb_link_info info(tb_link_info::LINK_INTERSWITCH);
+      if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
+            info.plinks, info.switches) != 0) {
+        bool first_link, second_link;
+        /*
+         * Check to see if either, or both, pnodes are actually the
+         * switches we are looking for
+         */
+        if ((pv == *source_switch_it) || (pv ==
+              *dest_switch_it)) {
+          first_link = false;
+        } else {
+          first_link = true;
+        }
+        if ((dest_pv == *source_switch_it) ||
+            (dest_pv == *dest_switch_it)) {
+          second_link = false;
+        } else {
+          second_link = true;
+        }
+
+        if (first_link) {
+          if
+            (!find_best_link(pv,*source_switch_it,vlink,first)) {
+              // No link to this switch
+              SDEBUG(cerr << "    interswitch failed - no first link"
+                  << endl;)
+                continue;
+            }
+        }
+
+        if (second_link) {
+          if (!find_best_link(dest_pv,*dest_switch_it,vlink,second)) {
+            // No link to tshis switch
+            SDEBUG(cerr << "    interswitch failed - no second link" <<                                          endl;)
+              continue;
+          }
+        }
+
+        if (flipped) { // Order these need to go in depends on flipped bit
+          if (second_link) {
+            info.plinks.push_front(second);
+          }
+          if (first_link) {
+            info.plinks.push_back(first);
+          }
+        } else {
+          if (first_link) {
+           info.plinks.push_front(first);
+          }
+          if (second_link) {
+            info.plinks.push_back(second);
+          }
+        }
+        resolutions.push_back(info);
+        total_weight += LINK_RESOLVE_INTERSWITCH;
+        SDEBUG(cerr << "    interswitch " <<
+            get(pvertex_pmap,*source_switch_it)->name
+            << " and " <<
+            get(pvertex_pmap,*dest_switch_it)->name <<
+            endl);
+      } else {
+        SDEBUG(cerr << "    interswitch failed - no switch path";)
+      }
+    }
+  }
+      
+  return total_weight;
+
+}
+
+
+/*
+ * Return the cost of a resolution
+ */
+inline float resolution_cost(tb_link_info::linkType res_type) {
+    switch (res_type) {
+	case tb_link_info::LINK_DIRECT:
+	    return LINK_RESOLVE_DIRECT; break;
+	case tb_link_info::LINK_INTRASWITCH:
+	    return LINK_RESOLVE_INTRASWITCH; break;
+	case tb_link_info::LINK_INTERSWITCH:
+	    return LINK_RESOLVE_INTERSWITCH; break;
+	case tb_link_info::LINK_UNMAPPED:
+	case tb_link_info::LINK_TRIVIAL:
+	    cerr << "*** Internal error: Should not be here. (resolution_cost)" << endl;
+   	    exit(EXIT_FATAL);
+	break;
+    }
+}
+
+/*
+ * Mark a vlink as unassigned
+ */
+void mark_vlink_unassigned(tb_vlink *vlink) {
+    SADD(SCORE_NO_CONNECTION);
+    vlink->no_connection=true;
+    vinfo.no_connection++;
+    vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
+    violated++;
+}
+
+/*
+ * Resolve an individual vlink
+ */
+void resolve_link(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
+    bool deterministic, vedge edge) {
+  tb_vlink *vlink = get(vedge_pmap,edge);
+  vvertex dest_vv = target(edge,VG);
+
+  if (dest_vv == vv) {
+    dest_vv = source(edge,VG);
+  }
+
+  /*
+   * Indicates that we've assigned the nodes in reverse order compared to
+   * what's in the vlink, so we need to reverse the ordering in the
+   * pedge_path
+   */
+  bool flipped = false;
+  if (vlink->src != vv) {
+    flipped = true;
+  }
+
+  /*
+   * Find the link's destination
+   */
+  tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
+  SDEBUG(cerr << "  edge to " << dest_vnode->name << endl);
+
+  /*
+   * If the other end of the link is assigned, we can go ahead and try to
+   * find a mapping for the link
+   */
+  if (dest_vnode->assigned) {
+    pvertex dest_pv = dest_vnode->assignment;
+    tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
+
+    SDEBUG(cerr << "   goes to " << dest_pnode->name << endl);
+
+    if (dest_pv == pv) {
+      SDEBUG(cerr << "  trivial link" << endl);
+      
+      if (allow_trivial_links && vlink->allow_trivial) {
+        vlink->link_info.type_used = tb_link_info::LINK_TRIVIAL;
+        /*
+         * XXX - okay, this is really bad, but score_link_info
+         * doesn't usually get called for trivial links, and
+         * letting them fall through into the 'normal' link code
+         * below is disatrous!
+         */
+        score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
+      } else {
+	  mark_vlink_unassigned(vlink);
+      }
+    } else {
+      //assert(resolution_index <= 1)
+      resolution_vector resolutions;
+      float total_weight = find_link_resolutions(resolutions, pv, dest_pv,
+          vlink,pnode,dest_pnode,flipped);
+      
+      /*
+       * If they have asked for a specific interface, filter out any
+       * resolutions that don't have it
+       */
+      if (vlink->fix_src_iface) {
+	  resolution_vector::iterator rit;
+	  for (rit = resolutions.begin(); rit != resolutions.end();) {
+	      pedge link = (*rit).plinks.front();
+	      tb_plink *plink = get(pedge_pmap,link);
+	      if (plink->srciface != vlink->src_iface) {
+		  // Doesn't match, remove it!
+		   total_weight -= resolution_cost(rit->type_used);
+		   rit = resolutions.erase(rit);
+	       } else {
+		   rit++;
+	       }
+	  }
+      }
+      
+      if (vlink->fix_dst_iface) {
+	  resolution_vector::iterator rit;
+	  for (rit = resolutions.begin(); rit != resolutions.end();) {
+	      pedge link = (*rit).plinks.back();
+	      tb_plink *plink = get(pedge_pmap,link);
+	      // Yes, this really is srciface
+	      // XXX: This only works because we always have the node as the 'source'
+	      // of a plink! Shouldn't depend on this!
+	      if (plink->srciface != vlink->dst_iface) {
+		  // Doesn't match, remove it!
+		  total_weight -= resolution_cost(rit->type_used);
+		  rit = resolutions.erase(rit);
+	      } else {
+		  rit++;
+	      }
+	  }
+      }
+      
+      int n_resolutions = resolutions.size();
+      //int resolution_index = n_resolutions - 1;
+      int resolution_index = n_resolutions;
+      
+      /*
+       * check for no link
+       */
+      if (resolution_index == 0) {
+        SDEBUG(cerr << "  Could not find any resolutions" << endl;)
+        mark_vlink_unassigned(vlink);
+      } else {
+        /*
+         * Check to see if we are fixing a violation
+         */
+        if (vlink->no_connection) {
+          SDEBUG(cerr << "  Fixing previous violations." << endl);
+          SSUB(SCORE_NO_CONNECTION);
+          vlink->no_connection=false;
+          vinfo.no_connection--;
+          violated--;
+        }
+        /*
+         * Choose a link
+         */
+        int index;
+        if (!deterministic && !greedy_link_assignment) {
+          /*
+           * Not deterministic - randomly pick between the possibilities
+           * we've found.
+           */
+          float choice;
+          choice = RANDOM()%(int)total_weight;
+          for (index = 0;index < resolution_index;++index) {
+            switch (resolutions[index].type_used) {
+              case tb_link_info::LINK_DIRECT:
+                choice -= LINK_RESOLVE_DIRECT; break;
+              case tb_link_info::LINK_INTRASWITCH:
+                choice -= LINK_RESOLVE_INTRASWITCH; break;
+              case tb_link_info::LINK_INTERSWITCH:
+                choice -= LINK_RESOLVE_INTERSWITCH; break;
+              case tb_link_info::LINK_UNMAPPED:
+              case tb_link_info::LINK_TRIVIAL:
+                cerr << "*** Internal error: Should not be here." <<
+                  endl;
+                exit(EXIT_FATAL);
+                break;
+            }
+            if (choice < 0) break;
+          }
+        } else {
+          /*
+           * Deterministic - try all possibilities, and go with the best one
+           * (the one with the best score)
+           */
+          cerr << "Doing deterministic link resolution" << endl;
+          cerr << "total_weight: " << total_weight << ", resolution_index: "
+            << resolution_index << endl;
+          int bestindex;
+          int bestviolated = 10000;
+          double bestscore=10000.0;
+          int i;
+          for (i=0;i<resolution_index;++i) {
+            vlink->link_info = resolutions[i];
+            score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
+            if ((score <= bestscore) &&
+                (violated <= bestviolated)) {
+              bestscore = score;
+              bestviolated = violated;
+              bestindex = i;
+            }
+            unscore_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
+          }
+          index = bestindex;
+        }
+#ifdef PENALIZE_UNUSED_INTERFACES
+        pnode->used_interfaces++;
+#endif
+        vlink->link_info = resolutions[index];
+        SDEBUG(cerr << "  choice:" << vlink->link_info);
+        score_link_info(edge,pnode,dest_pnode,vnode,dest_vnode);
+      }
+    }
+  }
+}
+
+/*
+ * Assign any links on the vnode that can now be assigned (due to the other
+ * end of the link also being assigned)
+ */
+void resolve_links(vvertex vv, pvertex pv, tb_vnode *vnode, tb_pnode *pnode,
+    bool deterministic) {
+  /*
+   * Loop through all vlinks connected to this vnode
+   */
+  voedge_iterator vedge_it,end_vedge_it;
+  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);
+  hash_set<const tb_vlink*, hashptr<const tb_vlink*> > seen_links;
+  for (;vedge_it!=end_vedge_it;++vedge_it) {
+    /*
+     * We have to be careful, because we can see loopback links twice, since
+     * both endpoints are on the same vnode and the same pnode. If we've seen
+     * this link before, just go onto the next
+     */
+    // XXX: Seems silly to do this here, then again at the top of resolve_link
+    tb_vlink *vlink = get(vedge_pmap,*vedge_it);
+    if (seen_links.find(vlink) != seen_links.end()) {
+      SDEBUG(cerr << "    seen before - skipping" << endl);
+      continue;
+    } else {
+      seen_links.insert(vlink);      
+      resolve_link(vv,pv,vnode,pnode,deterministic,*vedge_it);
+    }
+  }
 }
 
 /* unscore_link_info(vedge ve)
@@ -697,7 +1143,7 @@ void score_link_info(vedge ve, tb_pnode *src_pnode, tb_pnode *dst_pnode, tb_vnod
  * is true then it deterministically solves the link problem for best
  * score.  Note: deterministic takes considerably longer.
  */
-int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
+int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed, bool skip_links)
 {
   // Get the vnode and pnode associated with the passed vertices
   tb_vnode *vnode = get(vvertex_pmap,vv);
@@ -814,314 +1260,10 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
    */
   vnode->assignment = pv;
   vnode->assigned = true;
- 
-  /*
-   * Assign any links on the vnode that can now be assigned (due to the other
-   * end of the link also being assigned)
-   */
-  voedge_iterator vedge_it,end_vedge_it;
-  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
-  hash_set<const tb_vlink*, hashptr<const tb_vlink*> > seen_loopback_links;
-  for (;vedge_it!=end_vedge_it;++vedge_it) {
-    tb_vlink *vlink = get(vedge_pmap,*vedge_it);
-    vvertex dest_vv = target(*vedge_it,VG);
 
-    if (dest_vv == vv) {
-      dest_vv = source(*vedge_it,VG);
-    }
-
-    bool flipped = false; // Indicates that we've assigned the nodes in reverse
-    			  // order compared to what's in the vlink, so we need
-			  // to reverse the ordering in the pedge_path
-    
-    if (vlink->src != vv) {
-	flipped = true;
-    }
-
-    // Find the link's destination
-    tb_vnode *dest_vnode = get(vvertex_pmap,dest_vv);
-    SDEBUG(cerr << "  edge to " << dest_vnode->name << endl);
-
-    // If the other end of the link is assigned, we can go ahead and try to
-    // find a home for the link itself
-    if (dest_vnode->assigned) {
-      pvertex dest_pv = dest_vnode->assignment;
-      tb_pnode *dest_pnode = get(pvertex_pmap,dest_pv);
-
-      SDEBUG(cerr << "   goes to " << dest_pnode->name << endl);
-
-      if (dest_pv == pv) {
-	SDEBUG(cerr << "  trivial link" << endl);
-	// We have to be careful with 'loopback' links, because we can see them
-	// twice - bail out if this is the second time
-	if (seen_loopback_links.find(vlink) != seen_loopback_links.end()) {
-	    SDEBUG(cerr << "    seen before - skipping" << endl);
-	    continue;
-	} else {
-	    seen_loopback_links.insert(vlink);
-	}
-	if (allow_trivial_links && vlink->allow_trivial) {
-	    vlink->link_info.type_used = tb_link_info::LINK_TRIVIAL;
-	    // XXX - okay, this is really bad, but score_link_info doesn't
-	    // usually get called for trivial links, and letting them fall
-	    // through into the 'normal' link code below is disatrous!
-	    score_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
-	} else {
-	    SADD(SCORE_NO_CONNECTION);
-	    vlink->no_connection=true;
-	    vinfo.no_connection++;
-	    violated++;
-	}
-      } else {
-	SDEBUG(cerr << "   finding link resolutions" << endl);
-	// We need to calculate all possible link resolutions, stick them
-	// in a nice datastructure along with their weights, and then
-	// select one randomly.
-	typedef vector<tb_link_info> resolution_vector;
-	typedef vector<pvertex_list> switchlist_vector;
-
-	resolution_vector resolutions(3);
-	int resolution_index = 0;
-	float total_weight = 0;
-
-	pedge pe;
-	// Direct link
-	if (find_best_link(dest_pv,pv,vlink,pe)) {
-	  resolutions[resolution_index].type_used = tb_link_info::LINK_DIRECT;
-	  resolutions[resolution_index].plinks.push_back(pe);
-	  resolution_index++;
-	  total_weight += LINK_RESOLVE_DIRECT;
-	  SDEBUG(cerr << "    direct_link " << pe << endl);
-	}
-	// Intraswitch link
-	pedge first,second;
-	for (pvertex_set::iterator switch_it = pnode->switches.begin();
-	     switch_it != pnode->switches.end();++switch_it) {
-	  if (dest_pnode->switches.find(*switch_it) != dest_pnode->switches.end()) {
-	      bool first_link, second_link;
-	      // Check to see if either, or both, pnodes are actually the
-	      // switch we are looking for
-	      if (pv == *switch_it) {
-		first_link = false;
-	      } else {
-		first_link = true;
-	      }
-	      if (dest_pv == *switch_it) {
-		second_link = false;
-	      } else {
-		second_link = true;
-	      }
-
-	      // Intraswitch links to switches are not allowed - they will be
-	      // caught as direct links above
-	      if (pnode->is_switch || dest_pnode->is_switch) {
-		SDEBUG(cerr << "    intraswitch failed - switch" << endl;)
-		continue;
-	      }
-
-	      if (first_link) {
-		if (!find_best_link(pv,*switch_it,vlink,first)) {
-		  SDEBUG(cerr << "    intraswitch failed - no link first" << endl;)
-		  // No link to this switch
-		  continue;
-		}
-	      }
-
-	      if (second_link) {
-		if (!find_best_link(dest_pv,*switch_it,vlink,second)) {
-		  // No link to this switch
-		  SDEBUG(cerr << "    intraswitch failed - no link second" << endl;)
-		  continue;
-		}
-	      }
-
-
-	    resolutions[resolution_index].type_used =
-		tb_link_info::LINK_INTRASWITCH;
-	    if (flipped) { // Order these need to go in depends on flipped bit
-	      if (second_link) {
-		resolutions[resolution_index].plinks.push_back(second);
-	      }
-	      if (first_link) {
-		resolutions[resolution_index].plinks.push_back(first);
-	      }
-	    } else { 
-	      if (first_link) {
-		resolutions[resolution_index].plinks.push_back(first);
-	      }
-	      if (second_link) {
-		resolutions[resolution_index].plinks.push_back(second);
-	      }
-	    }
-	    resolutions[resolution_index].switches.push_front(*switch_it);
-	    resolution_index++;
-            if (resolution_index <= resolutions.size()) {
-                if (resolutions.capacity() > resolutions.size()) {
-                    resolutions.resize(resolutions.capacity());
-                } else {
-                    resolutions.resize(resolutions.size() * 2);
-                }
-            }
-	    total_weight += LINK_RESOLVE_INTRASWITCH;
-	    SDEBUG(cerr << "    intraswitch " << first << " and " << second << endl);
-	  }
-	}
-	// Interswitch paths
-	//cout << "Source switches list has " << pnode->switches.size() <<
-	 //   " entries" << endl;
-	for (pvertex_set::iterator source_switch_it = pnode->switches.begin();
-	     source_switch_it != pnode->switches.end();
-	     ++source_switch_it) {
-	  //cout << "Source switch: " << get(pvertex_pmap,*source_switch_it)->name << endl;
-	  //cout << "Dest switches list has " << dest_pnode->switches.size() <<
-	   //   " entries" << endl;
-	  //cout << "Dest pnode is " << dest_pnode->name << endl;
-	  int tmp = 0;
-	  for (pvertex_set::iterator dest_switch_it = dest_pnode->switches.begin();
-	       dest_switch_it != dest_pnode->switches.end();
-	       ++dest_switch_it) {
-	    //cout << "Dest switch number " << ++tmp << endl;
-	    //cout << "Dest switch: " << get(pvertex_pmap,*dest_switch_it)->name << endl;
-	    if (*source_switch_it == *dest_switch_it) continue;
-	    if (find_interswitch_path(*source_switch_it,*dest_switch_it,vlink->delay_info.bandwidth,
-				      resolutions[resolution_index].plinks,
-				      resolutions[resolution_index].switches) != 0) {
-	      bool first_link, second_link;
-	      // Check to see if either, or both, pnodes are actually the
-	      // switches we are looking for
-	      if ((pv == *source_switch_it) || (pv == *dest_switch_it)) {
-		first_link = false;
-	      } else {
-		first_link = true;
-	      }
-	      if ((dest_pv == *source_switch_it) ||
-		  (dest_pv == *dest_switch_it)) {
-		second_link = false;
-	      } else {
-		second_link = true;
-	      }
-
-	      if (first_link) {
-		if (!find_best_link(pv,*source_switch_it,vlink,first)) {
-		  // No link to this switch
-		  SDEBUG(cerr << "    interswitch failed - no first link" << endl;)
-		  continue;
-		}
-	      }
-
-	      if (second_link) {
-		if (!find_best_link(dest_pv,*dest_switch_it,vlink,second)) {
-		  // No link to this switch
-		  SDEBUG(cerr << "    interswitch failed - no second link" << endl;)
-		  continue;
-		}
-	      }
-
-	      resolutions[resolution_index].type_used =
-		  tb_link_info::LINK_INTERSWITCH;
-	      if (flipped) { // Order these need to go in depends on flipped bit
-		if (second_link) {
-		  resolutions[resolution_index].plinks.push_front(second);
-		}
-		if (first_link) {
-		  resolutions[resolution_index].plinks.push_back(first);
-		}
-	      } else {
-		if (first_link) {
-		  resolutions[resolution_index].plinks.push_front(first);
-		}
-		if (second_link) {
-		  resolutions[resolution_index].plinks.push_back(second);
-		}
-	      }
-	      resolution_index++;
-              if (resolution_index <= resolutions.size()) {
-                  if (resolutions.capacity() > resolutions.size()) {
-                      resolutions.resize(resolutions.capacity());
-                  } else {
-                      resolutions.resize(resolutions.size() * 2);
-                  }
-              }
-	      total_weight += LINK_RESOLVE_INTERSWITCH;
-	      SDEBUG(cerr << "    interswitch " <<
-		     get(pvertex_pmap,*source_switch_it)->name << " and " <<
-		     get(pvertex_pmap,*dest_switch_it)->name << endl);
-	    } else {
-	      SDEBUG(cerr << "    interswitch failed - no switch path";)
-	    }
-	  }
-	}
-
-	//assert(resolution_index <= 1);
-
-	// check for no link
-	if (resolution_index == 0) {
-	  SDEBUG(cerr << "  Could not find any resolutions" << endl;)
-
-	  SADD(SCORE_NO_CONNECTION);
-	  vlink->no_connection=true;
-	  vinfo.no_connection++;
-	  vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
-	  violated++;
-	} else {
-	  // Check to see if we are fixing a violation
-	  if (vlink->no_connection) {
-	    SDEBUG(cerr << "  Fixing previous violations." << endl);
-	    SSUB(SCORE_NO_CONNECTION);
-	    vlink->no_connection=false;
-	    vinfo.no_connection--;
-	    violated--;
-	  }
-	  
-	  // Choose a link
-	  int index;
-	  if (!deterministic && !greedy_link_assignment) {
-	    float choice;
-	    choice = RANDOM()%(int)total_weight;
-	    for (index = 0;index < resolution_index;++index) {
-	      switch (resolutions[index].type_used) {
-	      case tb_link_info::LINK_DIRECT:
-		choice -= LINK_RESOLVE_DIRECT; break;
-	      case tb_link_info::LINK_INTRASWITCH:
-		choice -= LINK_RESOLVE_INTRASWITCH; break;
-	      case tb_link_info::LINK_INTERSWITCH:
-		choice -= LINK_RESOLVE_INTERSWITCH; break;
-	      case tb_link_info::LINK_UNMAPPED:
-	      case tb_link_info::LINK_TRIVIAL:
-		cerr << "*** Internal error: Should not be here." << endl;
-		exit(EXIT_FATAL);
-		break;
-	      }
-	      if (choice < 0) break;
-	    }
-	  } else {
-	    // Deterministic
-	    int bestindex;
-	    int bestviolated = 10000;
-	    double bestscore=10000.0;
-	    int i;
-	    for (i=0;i<resolution_index;++i) {
-	      vlink->link_info = resolutions[i];
-	      score_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
-	      if ((score <= bestscore) &&
-		  (violated <= bestviolated)) {
-		bestscore = score;
-		bestviolated = violated;
-		bestindex = i;
-	      }
-	      unscore_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
-	    }
-	    index = bestindex;
-	  }
-#ifdef PENALIZE_UNUSED_INTERFACES
-	  pnode->used_interfaces++;
-#endif
-	  vlink->link_info = resolutions[index];
-	  SDEBUG(cerr << "  choice:" << vlink->link_info);
-	  score_link_info(*vedge_it,pnode,dest_pnode,vnode,dest_vnode);
-	}
-      }
-    }
+  /* Links */
+  if (!skip_links) {
+      resolve_links(vv,pv,vnode,pnode,deterministic);
   }
   
   int old_load = tr->current_load;
@@ -1132,6 +1274,7 @@ int add_node(vvertex vv,pvertex pv, bool deterministic, bool is_fixed)
   pnode->total_load += vnode->typecount;
 
 #ifdef PENALIZE_UNUSED_INTERFACES
+  // XXX
   assert(pnode->used_interfaces <= pnode->total_interfaces);
   SADD((pnode->total_interfaces - pnode->used_interfaces) * SCORE_UNUSED_INTERFACE);
 #endif

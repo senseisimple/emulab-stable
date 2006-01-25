@@ -14,8 +14,6 @@
 
 #include <iostream>
 
-#include <stdio.h>
-
 using namespace boost;
 
 #include "common.h"
@@ -26,6 +24,8 @@ using namespace boost;
 #include "parser.h"
 #include "anneal.h"
 #include "string.h"
+#include "parse_top_xml.h"
+#include "xmlhelpers.h"
 
 extern name_vvertex_map vname2vertex;
 extern name_name_map fixed_nodes;
@@ -37,6 +37,7 @@ extern vvertex_vector virtual_nodes;
 #define top_error(s) errors++;cout << "TOP:" << line << ": " << s << endl
 #define top_error_noline(s) errors++;cout << "TOP: " << s << endl
 
+#if 0
 // Used to do late binding of subnode names to vnodes, so that we're no
 // dependant on their ordering in the top file, which can be annoying to get
 // right.
@@ -64,9 +65,91 @@ int bind_top_subnodes() {
 
     return errors;
 }
+#endif
 
 extern name_vclass_map vclass_map;
 
+void ParsePtopErrorHandler::error(const SAXParseException& toCatch) {    
+    cerr << "Error at file \"" << XStr(toCatch.getSystemId())
+		 << "\", line " << toCatch.getLineNumber()
+		 << ", column " << toCatch.getColumnNumber()
+         << "\n   Message: " << XStr(toCatch.getMessage()) << endl;
+    this->hadError = true;
+}
+void ParsePtopErrorHandler::fatalError(const SAXParseException& toCatch) {
+    XERCES_STD_QUALIFIER cerr << "Fatal Error at file \"" << XStr(toCatch.getSystemId())
+		 << "\", line " << toCatch.getLineNumber()
+		 << ", column " << toCatch.getColumnNumber()
+         << "\n   Message: " << XStr(toCatch.getMessage()) << XERCES_STD_QUALIFIER endl;
+    this->hadError = true;
+}
+
+int parse_top_xml(tb_vgraph &VG, char* filename) {
+    
+    /*
+     * Initialize the XML parser
+     */
+    XMLPlatformUtils::Initialize();
+    
+    //XMLReader xerces = XMLReaderFactory::createXMLReader("org.apache.xerces.parsers.SAXParser");
+    
+    XercesDOMParser *parser = new XercesDOMParser;
+    // XXX: Get validation working!
+    parser->setValidationScheme(XercesDOMParser::Val_Auto);
+    parser->setDoNamespaces(true);
+    parser->setDoSchema(true);
+    parser->setValidationSchemaFullChecking(true);
+    //parser->setCreateEntityReferenceNodes(gDoCreate);
+    
+    //parser->loadGrammar("top.xsd",1,true);
+    
+    ParsePtopErrorHandler *handler = new ParsePtopErrorHandler();
+    parser->setErrorHandler(handler);
+
+    /*
+     * Do the actual parsing
+     * TODO: Catch exceptions
+     */
+    parser->parse(filename);
+    
+    DOMDocument *doc = parser->getDocument();
+    DOMElement *root = doc->getDocumentElement();
+    cerr << XStr(root->getNodeName()) << endl;
+    
+    if (handler->sawError()) {
+	exit(EXIT_FATAL);
+    }
+    
+    /*
+     * Parse the nodes
+     */
+    DOMNodeList *nodes = root->getElementsByTagName(XStr("node").x());
+    cerr << "Found " << nodes->getLength() << " nodes" << endl;
+    
+    for (int i = 0; i < nodes->getLength(); i++) {
+	DOMNode *node = nodes->item(i);
+	DOMNamedNodeMap *atts = node->getAttributes();
+	char *name = XStr(atts->getNamedItem(XStr("name").x())->getNodeValue());
+	cerr << "Node name is: " << name << endl;
+    }
+ 
+    DOMNodeList *links = root->getElementsByTagName(XStr("links").x());
+    cerr << "Found " << links->getLength() << " links" << endl;
+	
+    for (int i = 0; i < links->getLength(); i++) {
+	DOMNode *link = links->item(i);
+	DOMNamedNodeMap *atts = link->getAttributes();
+	char *name = XStr(atts->getNamedItem(XStr("name").x())->getNodeValue());
+	cerr << "Link name is: " << name << endl;
+    }
+    
+    // Clean up parser memory
+    delete parser;
+    XMLPlatformUtils::Terminate();
+    return 0;
+}
+
+#if 0
 int parse_top(tb_vgraph &VG, istream& i)
 {
   string_vector parsed_line;
@@ -267,24 +350,14 @@ int parse_top(tb_vgraph &VG, istream& i)
 	l->allow_trivial = false;
 #endif
 	l->emulated = false;
-	l->fix_src_iface = false;
-	l->fix_dst_iface = false;
-		
+	
 	for (unsigned int i = 8;i < parsed_line.size();++i) {
-	  string stag, svalue;
-	  split_two(parsed_line[i],':',stag,svalue,"");
 	  if (parsed_line[i] == string("nodelay")) {
 	    l->allow_delayed = false;
 	  } else if (parsed_line[i] == string("emulated")) {
 	    l->emulated = true;
 	  } else if (parsed_line[i] == string("trivial_ok")) {
 	    l->allow_trivial = true;
-	  } else if (stag == string("fixsrciface")) {
-            l->fix_src_iface = true;
-	    l->src_iface = svalue;
-    	  } else if (stag == string("fixdstiface")) {
-            l->fix_dst_iface = true;
-	    l->dst_iface = svalue;
 	  } else {
 	    top_error("bad link line, unknown tag: " <<
 		      parsed_line[i] << ".");
@@ -353,3 +426,4 @@ int parse_top(tb_vgraph &VG, istream& i)
   
   return num_nodes;
 }
+#endif // 0

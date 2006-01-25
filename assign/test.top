@@ -3,4 +3,4 @@ node B pc
 node C pc
 link vl1 A B 100 0 0 ethernet
 link vl2 A C 100 0 0 ethernet
-link vl3 B C 100 0 0 ethernet
+link vl3 B C 1000000 0 0 ethernet

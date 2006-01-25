@@ -8,6 +8,7 @@
 #define __VCLASS_H
 
 #include "port.h"
+#include "fstring.h"
 
 /*
  * We have to do these includes differently depending on which version of gcc
@@ -35,34 +36,34 @@ using namespace std;
 
 class tb_vclass {
 public:
-  tb_vclass(crope n,double w) : name(n), weight(w), score(0) {;}
+  tb_vclass(fstring n,double w) : name(n), weight(w), score(0) {;}
 
-  crope name;			// Name of the vclass
+  fstring name;			// Name of the vclass
 
-  typedef hash_map<crope,int> members_map; 
+  typedef hash_map<fstring,int> members_map; 
   members_map members;		// Maps type to number of members of that
 				// type.
   
   double weight;		// Weight of class
   double score;			// the current score of the vclass
   
-  void add_type(crope type);	// Add a member of a certain type to the
+  void add_type(fstring type);	// Add a member of a certain type to the
 				// vclass
 
-  bool has_type(crope type);     // Does the vclass contain the given type?
+  bool has_type(fstring type);     // Does the vclass contain the given type?
 
-  crope dominant;		// Current dominant type
+  fstring dominant;		// Current dominant type
 
   bool empty();                 // True if no vnodes use this vlcass
 
   // The next two routines report the *change* in score.  The score
   // for the vclass as a whole is 0 if all nodes are of the dominant
   // type and the weight if they aren't.
-  double assign_node(crope type);
-  double unassign_node(crope type);
+  double assign_node(fstring type);
+  double unassign_node(fstring type);
 
   // Semi randomly choose a type from a vclass.
-  crope choose_type();
+  fstring choose_type();
 
   friend ostream &operator<<(ostream &o, const tb_vclass& c)
   {
@@ -78,7 +79,7 @@ public:
   }
 };
 
-typedef hash_map<crope,tb_vclass*> name_vclass_map;
+typedef hash_map<fstring,tb_vclass*> name_vclass_map;
 extern name_vclass_map vclass_map;
 
 #endif

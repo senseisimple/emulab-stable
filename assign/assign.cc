@@ -16,8 +16,8 @@
 #include <boost/graph/graphviz.hpp>
 #endif
 
-#include <fstream.h>
-#include <iostream.h>
+#include <fstream>
+#include <iostream>
 #include <time.h>
 #include <stdlib.h>
 #include <math.h>
@@ -31,6 +31,8 @@
 
 using namespace boost;
 
+#include <stdio.h>
+
 #include "common.h"
 #include "delay.h"
 #include "physical.h"
@@ -41,6 +43,10 @@ using namespace boost;
 #include "solution.h"
 #include "maps.h"
 #include "anneal.h"
+#ifdef WITH_XML
+#include "parse_ptop_xml.h"
+#include "parse_top_xml.h"
+#endif
 
 // Here we set up all our graphs.  Need to create the graphs
 // themselves and then setup the property maps.
@@ -119,6 +125,11 @@ bool print_summary = false;
 
 // Use the 'connected' find algorithm
 double use_connected_pnode_find = 0.0f;
+
+#ifdef WITH_XML
+// Use XML for file input
+bool xml_input = false;
+#endif
   
 // XXX - shouldn't be in this file
 double absbest;
@@ -132,8 +143,7 @@ tb_ptype_map ptypes;
  */
 
 // Return the CPU time (in seconds) used by this process
-float used_time()
-{
+float used_time() {
   struct rusage ru;
   getrusage(RUSAGE_SELF,&ru);
   return ru.ru_utime.tv_sec+ru.ru_utime.tv_usec/1000000.0+
@@ -141,15 +151,23 @@ float used_time()
 }
 
 // Read in the .ptop file
-void read_physical_topology(char *filename)
-{
+void read_physical_topology(char *filename) {
   ifstream ptopfile;
   ptopfile.open(filename);
   if (!ptopfile.is_open()) {
       cout << "*** Unable to open ptop file " << filename << endl;
       exit(EXIT_FATAL);
   }
-  cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
+  
+#ifdef WITH_XML
+  if (!xml_input) {
+      cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
+  } else {
+      cout << "Physical Graph: " << parse_ptop_xml(PG,SG,filename) << endl;
+  }
+#else
+cout << "Physical Graph: " << parse_ptop(PG,SG,ptopfile) << endl;
+#endif
 
 #ifdef DUMP_GRAPH
   {
@@ -210,8 +228,7 @@ void read_physical_topology(char *filename)
 
 // Calculate the minimum spanning tree for the switches - we only consider one
 // potential path between each pair of switches.
-void calculate_switch_MST()
-{
+void calculate_switch_MST() {
   cout << "Calculating shortest paths on switch fabric." << endl;
 
   // Set up the weight map for Dijkstra's
@@ -250,15 +267,23 @@ void calculate_switch_MST()
 }
 
 // Read in the .top file
-void read_virtual_topology(char *filename)
-{
+void read_virtual_topology(char *filename) {
   ifstream topfile;
   topfile.open(filename);
   if (!topfile.is_open()) {
       cout << "*** Unable to open top file " << filename << endl;
       exit(EXIT_FATAL);
   }
-  cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
+  
+#ifdef WITH_XML
+  if (!xml_input) {
+      cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
+  } else {
+      cout << "Virtual Graph: " << parse_top_xml(VG,filename) << endl;
+  }
+#else
+cout << "Virtual Graph: " << parse_top(VG,topfile) << endl;
+#endif
 
 #ifdef DUMP_GRAPH
   {
@@ -310,8 +335,7 @@ void prune_unusable_pclasses() {
 	pclasses.size() << " remain." << endl;
 }
 
-void print_help()
-{
+void print_help() {
   cout << "assign [options] ptopfile topfile [config params]" << endl;
   cout << "Options: " << endl;
 #ifdef TIME_TERMINATE
@@ -337,6 +361,9 @@ void print_help()
   cout << "  -c <float>  - Use the 'connected' pnode finding algorithm " <<
       "<float>*100% of the time." << endl;
   cout << "  -n          - Don't anneal - just do the prechecks." << endl;
+#ifdef WITH_XML
+  cout << "  -x          - Use XML top and ptop files (still incomplete)" << endl;
+#endif
   exit(EXIT_FATAL);
 }
  
@@ -351,7 +378,7 @@ int type_precheck() {
     // First, check the regular types
     for (name_count_map::iterator vtype_it=vtypes.begin();
 	    vtype_it != vtypes.end();++vtype_it) {
-    
+
 	// Check to see if there were any pnodes of the type at all
 	tb_ptype_map::iterator ptype_it = ptypes.find(vtype_it->first);
 	if (ptype_it == ptypes.end()) {
@@ -380,8 +407,9 @@ int type_precheck() {
     // Check the vclasses, too
     for (name_list_map::iterator vclass_it = vclasses.begin();
 	    vclass_it != vclasses.end(); ++vclass_it) {
+	bool found_match = false;
         // Make sure we actually use this vclass
-	name_vclass_map::iterator dit = vclass_map.find(vclass_it->first);
+        name_vclass_map::iterator dit = vclass_map.find(vclass_it->first);
         if (dit == vclass_map.end()) {
             cout << "***: Internal error - unable to find vtype " <<
                 vclass_it->first << endl;
@@ -393,8 +421,7 @@ int type_precheck() {
             }
         }
 
-	bool found_match = false;
-	for (vector<crope>::iterator vtype_it = vclass_it->second.begin();
+	for (vector<fstring>::iterator vtype_it = vclass_it->second.begin();
 		vtype_it != vclass_it->second.end(); vtype_it++) {
 	    tb_ptype_map::iterator mit = ptypes.find(*vtype_it);
 	    if ((mit != ptypes.end()) && (mit->second->pnode_slots() != 0)) {
@@ -452,12 +479,12 @@ int mapping_precheck() {
 	int matched_bw = 0;
 	// Keep track of desires had how many 'hits', so that we can tell
 	// if any simply were not matched
-	map<crope,int> matched_desires;
+	map<fstring,int> matched_desires;
 
 	// Keep track of which link types had how many 'hits', so that we can
 	// tell which type(s) caused this node to fail
 	tb_vnode::link_counts_map matched_link_counts;
-	map<crope,bool> matched_links;
+	map<fstring,bool> matched_links;
 
 	tb_vclass *vclass = v->vclass;
 	tb_vclass::members_map::iterator mit;
@@ -467,7 +494,7 @@ int mapping_precheck() {
 	for (;;) {
 	    // Loop over all types this node can take on, which might be only
 	    // one, if it's not part of a vclass
-	    crope this_type;
+	    fstring this_type;
 	    if (vclass) {
 		this_type = mit->first;
 	    } else {
@@ -553,7 +580,7 @@ int mapping_precheck() {
 		tb_vnode::link_counts_map::iterator vit;
 		for (vit = v->link_counts.begin(); vit != v->link_counts.end();
 		    vit++) {
-		  crope type = vit->first;
+		  fstring type = vit->first;
 		  int count = vit->second;
 		  if (pnode->link_counts.find(type) !=
 			pnode->link_counts.end()) {
@@ -600,7 +627,7 @@ nosuchtype:
 	    tb_vnode::link_counts_map::iterator lit;
 	    for (lit = v->link_counts.begin(); lit != v->link_counts.end();
 		lit++) {
-	      crope type = lit->first;
+	      fstring type = lit->first;
 	      if (!matched_links[type]) {
 		cout << "      No links of type " << type << " found!" << endl;
 	      } else {
@@ -615,7 +642,7 @@ nosuchtype:
 		cout << "      Too much bandwidth on emulated links!" << endl;
 	    }
 
-	    for (map<crope,int>::iterator dit = matched_desires.begin();
+	    for (map<fstring,int>::iterator dit = matched_desires.begin();
 		    dit != matched_desires.end();
 		    dit++) {
 		if (dit->second == 0) {
@@ -661,11 +688,13 @@ void status_report(int signal) {
     << endl;
 }
 
-int main(int argc,char **argv)
-{
+// From anneal.cc - the best solution found
+extern solution best_solution;
+
+int main(int argc,char **argv) {
   int seed = 0;
 #ifdef GRAPHVIZ_SUPPORT
-  crope viz_prefix;
+  fstring viz_prefix;
 #endif
   bool scoring_selftest = false;
   bool prechecks_only = false;
@@ -674,7 +703,7 @@ int main(int argc,char **argv)
   char ch;
   timelimit = 0.0;
   timetarget = 0.0;
-  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:n")) != -1) {
+  while ((ch = getopt(argc,argv,"s:v:l:t:rpPTdH:oguc:nx")) != -1) {
     switch (ch) {
     case 's':
       if (sscanf(optarg,"%d",&seed) != 1) {
@@ -737,6 +766,11 @@ int main(int argc,char **argv)
       prechecks_only = true;
       cout << "Doing only prechecks, exiting early" << endl;
       break;
+#ifdef WITH_XML
+    case 'x':
+      xml_input = true;
+      break;
+#endif
     default:
       print_help();
     }
@@ -778,8 +812,10 @@ int main(int argc,char **argv)
   action2.sa_handler = status_report;
   sigemptyset(&action2.sa_mask);
   action2.sa_flags = 0;
+#ifdef __FreeBSD__
   sigaction(SIGINFO,&action2,NULL);
-
+#endif 
+  
   // Convert options to the common.h parameters.
   parse_options(argv, options, noptions);
 #ifdef SCORE_DEBUG
@@ -835,9 +871,9 @@ int main(int argc,char **argv)
   // Output graphviz if necessary
 #ifdef GRAPHVIZ_SUPPORT
   if (viz_prefix.size() != 0) {
-    crope vviz = viz_prefix + "_virtual.viz";
-    crope pviz = viz_prefix + "_physical.viz";
-    crope sviz = viz_prefix + "_switch.viz";
+    fstring vviz = viz_prefix + "_virtual.viz";
+    fstring pviz = viz_prefix + "_physical.viz";
+    fstring sviz = viz_prefix + "_switch.viz";
     ofstream vfile,pfile,sfile;
     vfile.open(vviz.c_str());
     write_graphviz(vfile,VG,vvertex_writer(),vedge_writer(),graph_writer());
@@ -885,15 +921,15 @@ int main(int argc,char **argv)
   cout << "Violations: " << violated << endl;
   cout << vinfo;
 
-  print_solution();
+  print_solution(best_solution);
 
   if (print_summary) {
-    print_solution_summary();
+    print_solution_summary(best_solution);
   }
 
 #ifdef GRAPHVIZ_SUPPORT
   if (viz_prefix.size() != 0) {
-    crope aviz = viz_prefix + "_solution.viz";
+    fstring aviz = viz_prefix + "_solution.viz";
     ofstream afile;
     afile.open(aviz.c_str());
     write_graphviz(afile,VG,solution_vertex_writer(),

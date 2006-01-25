@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<element name="top" xmlns:a="http://relaxng.org/ns/compatibility/annotations/1.0" ns="http://emulab.net/resources/vtop/1.0" xmlns="http://relaxng.org/ns/structure/1.0">
+  <attribute name="pid">
+    <a:documentation>Project ID</a:documentation>
+  </attribute>
+  <attribute name="eid">
+    <a:documentation>Experiment ID</a:documentation>
+  </attribute>
+  <optional>
+    <attribute name="gid">
+      <a:documentation>Group ID (optional)</a:documentation>
+    </attribute>
+  </optional>
+  <optional>
+    <attribute name="uid">
+      <a:documentation>User ID owning the experiment (optional)</a:documentation>
+    </attribute>
+  </optional>
+  <zeroOrMore>
+    <element name="node">
+      <a:documentation>Nodes in the topology - zero or more</a:documentation>
+      <attribute name="name"/>
+      <element name="node_type">
+        <element name="type_name">
+          <text/>
+        </element>
+        <optional>
+          <element name="type_slots">
+            <a:documentation>TODO - Change type</a:documentation>
+            <text/>
+          </element>
+        </optional>
+      </element>
+      <zeroOrMore>
+        <element name="desire">
+          <element name="desire_name">
+            <text/>
+          </element>
+          <element name="desire_weight">
+            <text/>
+          </element>
+          <optional>
+            <element name="violatable">
+              <empty/>
+            </element>
+          </optional>
+        </element>
+      </zeroOrMore>
+      <zeroOrMore>
+        <element name="node_option">
+          <element name="option_name">
+            <text/>
+          </element>
+          <element name="option_value">
+            <text/>
+          </element>
+        </element>
+      </zeroOrMore>
+    </element>
+  </zeroOrMore>
+  <zeroOrMore>
+    <element name="link">
+      <a:documentation>Links in the topology - zero or more</a:documentation>
+      <text/>
+    </element>
+  </zeroOrMore>
+</element>

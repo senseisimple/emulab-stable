@@ -1,0 +1,34 @@
+default namespace = "http://emulab.net/resources/vtop/1.0"
+
+element top {
+    ## Project ID
+    attribute pid {text},
+    ## Experiment ID
+    attribute eid{text},
+    ## Group ID (optional)
+    attribute gid{text}?,
+    ## User ID owning the experiment (optional)
+    attribute uid{text}?,
+    ## Nodes in the topology - zero or more
+    element node {
+        attribute name {text},
+        element node_type {
+            element type_name { text },
+            ## TODO - Change type
+            element type_slots { text }?
+        },
+        element desire {
+            element desire_name { text },
+            element desire_weight { text },
+            element violatable { empty }?
+        }*,
+        element node_option{
+            element option_name { text },
+            element option_value { text }
+        }*
+    }*,
+    ## Links in the topology - zero or more
+    element link {
+        text
+    }*
+}

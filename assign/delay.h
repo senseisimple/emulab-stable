@@ -9,11 +9,13 @@
 
 // For DBL_MAX
 #include <float.h>
+// For fabs()
+#include <math.h>
 
 #include <iostream>
 using namespace std;
 
-template <class T> inline double basic_distance(T a,T b) {
+inline double double_distance(double a,double b) {
   if (b == 0) {
     if (a == 0)
       return 0;
@@ -23,13 +25,13 @@ template <class T> inline double basic_distance(T a,T b) {
   return fabs((double)a/(double)b - 1.0);
 }
 inline double delay_distance(int a, int b) {
-  return basic_distance(a,b);
+  return double_distance((double)a,(double)b);
 }
 inline double bandwidth_distance(int a,int b) {
-  return basic_distance(a,b);
+  return double_distance((double)a,(double)b);
 }
 inline double loss_distance(double a,double b) {
-  return basic_distance(a,b);
+  return double_distance(a,b);
 }
 
 class tb_delay_info {

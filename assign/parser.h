@@ -8,14 +8,16 @@
 #define __PARSER_H
 
 #include "port.h"
+#include <string>
+using namespace std;
 
 #include <vector>
 using namespace std;
 
-typedef vector<crope> string_vector;
+typedef vector<string> string_vector;
 
-int split_two(crope line,char split_char,crope &a,crope &b);
-int split_two(crope line,char split_char,crope &a,crope &b,crope default_b);
-string_vector split_line(crope line,char split_char);
+int split_two(string line,char split_char,string &a,string &b);
+int split_two(string line,char split_char,string &a,string &b,string default_b);
+string_vector split_line(string line,char split_char);
 
 #endif

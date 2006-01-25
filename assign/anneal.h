@@ -37,6 +37,7 @@ using namespace __gnu_cxx;
 #include "delay.h"
 #include "physical.h"
 #include "pclass.h"
+#include "fstring.h"
 
 // Some defaults for #defines
 #ifndef NO_REVERT
@@ -73,7 +74,7 @@ extern pclass_types vnode_type_table;
 #endif
 
 /* Decides based on the temperature if a new score should be accepted or not */
-inline int accept(double change, double temperature);
+inline bool accept(double change, double temperature);
 
 /* Find a pnode that can satisfy the give vnode */
 tb_pnode *find_pnode(tb_vnode *vn);
@@ -82,7 +83,7 @@ tb_pnode *find_pnode(tb_vnode *vn);
 void anneal(bool scoring_selftest, double scale_neighborhood,
     double *initial_temperature, double use_connected_pnode_find);
 
-typedef hash_map<crope,crope> name_name_map;
-typedef slist<crope> name_slist;
+typedef hash_map<fstring,fstring> name_name_map;
+typedef slist<fstring> name_slist;
 
 #endif

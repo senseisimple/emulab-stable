@@ -23,7 +23,7 @@ all: assign
 include $(TESTBED_SRCDIR)/GNUmakerules
 
 OBJS=parse_top.o parse_ptop.o assign.o pclass.o vclass.o config.o score.o \
-     parser.o solution.o anneal.o featuredesire.o
+     parser.o solution.o anneal.o featuredesire.o neighborhood.o fstring.o
 LIBS+= -lm
 LDFLAGS+= -pipe -O3
 CXXFLAGS = -pipe -I/usr/local/include -ftemplate-depth-40

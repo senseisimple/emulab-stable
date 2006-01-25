@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -12,7 +12,8 @@
  * we're compiling with
  */
 #if __GNUC__ == 3 && __GNUC_MINOR__ > 0
-#include <backward/queue.h>
+#include <queue>
+using namespace std;
 #else
 #include <queue>
 #endif
@@ -22,6 +23,14 @@
 using namespace std;
 
 #include "featuredesire.h"
+#include "fstring.h"
+
+#include <boost/config.hpp>
+#include <boost/utility.hpp>
+#include <boost/property_map.hpp>
+#include <boost/graph/graph_traits.hpp>
+#include <boost/graph/adjacency_list.hpp>
+using namespace boost;
 
 class tb_plink;
 class tb_vnode;
@@ -55,6 +64,11 @@ public:
   pedge_path plinks;		// the path of pedges
   pvertex_list switches;	// what switches were used
 
+  tb_link_info() { ; };
+  tb_link_info(linkType _type_used) : type_used(_type_used), plinks(), switches() { ; };
+  tb_link_info(linkType _type_used, pedge_path _plinks) : type_used(_type_used), plinks(_plinks), switches() { ; };
+  tb_link_info(linkType _type_used, pedge_path _plinks, pvertex_list _switches) : type_used(_type_used), plinks(_plinks), switches(_switches) { ; };
+  
   friend ostream &operator<<(ostream &o, const tb_link_info& link)
   {
     o << "  Type: ";
@@ -101,10 +115,10 @@ public:
   // contains weight of each desire
   node_desire_set desires;
 
-  crope type;			// the current type of the node
+  fstring type;			// the current type of the node
   int typecount;		// How many slots of the type this vnode takes up
   tb_vclass *vclass;		// the virtual class of the node, if any
-  crope name;			// string name of the node
+  fstring name;			// string name of the node
   bool fixed;			// is this node fixed
   bool assigned;		// is this node assigned?
   pvertex assignment;		// the physical vertex assigned to
@@ -126,10 +140,10 @@ public:
   tb_vnode *subnode_of;
   typedef list<tb_vnode*> subnode_list;
   subnode_list subnodes;
-  crope subnode_of_name;
+  fstring subnode_of_name;
 
   // Counts how many links of each type this virtual node has
-  typedef hash_map<crope,int> link_counts_map;
+  typedef hash_map<fstring,int> link_counts_map;
   link_counts_map link_counts;
 
 };
@@ -150,8 +164,13 @@ public:
 
   tb_delay_info delay_info;	// the delay characteristics of the link
   tb_link_info link_info;	// what it's mapped to
-  crope name;			// name
-  crope type;			// type of this link
+  fstring name;			// name
+  fstring type;			// type of this link
+  bool fix_src_iface;		// Did the user fix the name of the iface (src)?
+  fstring src_iface;		// If so, this is what it must be named
+  bool fix_dst_iface;		// Did the user fix the name of the iface (dst)?
+  fstring dst_iface;		// If so, this is what it must be named
+
   bool emulated;		// is this an emulated link, i.e. can it
 				// share a plink withouter emulated vlinks
   bool no_connection;		// true if this link should be satisfied
@@ -164,7 +183,7 @@ public:
 extern tb_vgraph_vertex_pmap vvertex_pmap;
 extern tb_vgraph_edge_pmap vedge_pmap;
 
-typedef hash_map<crope,vvertex> name_vvertex_map;
+typedef hash_map<fstring,vvertex> name_vvertex_map;
 typedef pair<vvertex,int> vvertex_int_pair;
 typedef vector<vvertex> vvertex_vector;
 

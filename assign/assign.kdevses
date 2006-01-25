@@ -1,0 +1,52 @@
+<?xml version = '1.0' encoding = 'UTF-8'?>
+<!DOCTYPE KDevPrjSession>
+<KDevPrjSession>
+ <DocsAndViews NumberOfDocuments="9" >
+  <Doc0 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/parse_ptop_xml.h" >
+   <View0 line="10" Type="Source" />
+  </Doc0>
+  <Doc1 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/parse_ptop_xml.cc" >
+   <View0 line="211" Type="Source" />
+  </Doc1>
+  <Doc2 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/xmlhelpers.h" >
+   <View0 line="62" Type="Source" />
+  </Doc2>
+  <Doc3 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/GNUmakefile" >
+   <View0 line="0" Type="Source" />
+  </Doc3>
+  <Doc4 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/test-ptop.xml" >
+   <View0 line="0" Type="Source" />
+  </Doc4>
+  <Doc5 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/ptop.dtd" >
+   <View0 line="0" Type="Source" />
+  </Doc5>
+  <Doc6 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/physical.h" >
+   <View0 line="0" Type="Source" />
+  </Doc6>
+  <Doc7 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/tags" >
+   <View0 line="0" Type="Source" />
+  </Doc7>
+  <Doc8 NumberOfViews="1" URL="file:///gemini/home/ricci/testbed/assign/assign.cc" >
+   <View0 line="157" Type="Source" />
+  </Doc8>
+ </DocsAndViews>
+ <pluginList>
+  <kdevdebugger>
+   <breakpointList/>
+  </kdevdebugger>
+  <kdevbookmarks>
+   <bookmarks>
+    <bookmark url="/gemini/home/ricci/testbed/assign/parse_ptop_xml.cc" >
+     <mark line="108" />
+     <mark line="233" />
+    </bookmark>
+   </bookmarks>
+  </kdevbookmarks>
+  <kdevvalgrind>
+   <executable path="" params="" />
+   <valgrind path="" params="" />
+   <calltree path="" params="" />
+   <kcachegrind path="" />
+  </kdevvalgrind>
+ </pluginList>
+</KDevPrjSession>

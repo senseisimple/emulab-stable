@@ -9,6 +9,8 @@
  */
 
 #include "featuredesire.h"
+#include <iostream>
+using namespace std;
 
 /*********************************************************************
  * tb_featuredesire
@@ -16,11 +18,10 @@
 tb_featuredesire::name_featuredesire_map
     tb_featuredesire::featuredesires_by_name;
 
-
 /*
  * Constructor
  */
-tb_featuredesire::tb_featuredesire(crope _my_name) : my_name(_my_name),
+tb_featuredesire::tb_featuredesire(fstring _my_name) : my_name(_my_name),
 				    global(false), local(false),
 				    l_additive(false), g_one_is_okay(false),
 				    g_more_than_one(false),
@@ -87,7 +88,7 @@ ostream &operator<<(ostream &o, const tb_featuredesire &fd) {
 /*
  * Static functions
  */
-tb_featuredesire *tb_featuredesire::get_featuredesire_obj(const crope name) {
+tb_featuredesire *tb_featuredesire::get_featuredesire_obj(const fstring name) {
     name_featuredesire_map::iterator it =
 	featuredesires_by_name.find(name);
     if (it == featuredesires_by_name.end()) {
@@ -118,7 +119,7 @@ void tb_featuredesire::remove_global_user(int howmany) {
 /*
  * Constructor
  */
-tb_node_featuredesire::tb_node_featuredesire(crope _name, double _weight) :
+tb_node_featuredesire::tb_node_featuredesire(fstring _name, double _weight) :
 	weight(_weight), violateable(false), used_local_capacity(0.0f) {
     // We'll want to change in the in the future to seperate out the notions of
     // score and violations

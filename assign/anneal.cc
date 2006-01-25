@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2003 University of Utah and the Flux Group.
+ * Copyright (c) 2003-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -12,14 +12,16 @@
 #include "score.h"
 #include "solution.h"
 #include "vclass.h"
+#include "neighborhood.h"
 
 /*
  * Internal variables
  */
 // These variables store the best solution.
-node_map absassignment;		// assignment field of vnode
-assigned_map absassigned;	// assigned field of vnode
-type_map abstypes;		// type field of vnode
+//node_map absassignment;		// assignment field of vnode
+//assigned_map absassigned;	// assigned field of vnode
+//type_map abstypes;		// type field of vnode
+solution best_solution;
 
 // Map of virtual node name to its vertex descriptor.
 name_vvertex_map vname2vertex;
@@ -48,8 +50,7 @@ extern FILE *scoresout, *tempout, *deltaout;
 
 // Determines whether to accept a change of score difference 'change' at
 // temperature 'temperature'.
-inline int accept(double change, double temperature)
-{
+inline bool accept(double change, double temperature) {
   double p;
   int r;
 
@@ -65,240 +66,106 @@ inline int accept(double change, double temperature)
   return 0;
 }
 
-/*
- * This overly-verbose function returns true if it's okay to map vn to pn,
- * false otherwise
- */
-inline bool pnode_is_match(tb_vnode *vn, tb_pnode *pn) {
-  // Find the type record for this type
-  tb_pnode::types_map::iterator mit = pn->types.find(vn->type);
-  if (mit == pn->types.end()) {
-    // The node doesn't even have this type, we can exit early
-    return false;
-  }
 
-  bool matched = false;
-  tb_pnode::type_record *tr = mit->second;
-  if (tr->is_static) {
-    if ((tr->current_load + vn->typecount) > tr->max_load) {
-      // This would put us over its max load
-      if (allow_overload && (tr->max_load > 1)) {
-	// That's okay, we're allowing overload
-	matched = true;
-      } else {
-	// Nope, it's full
-	matched = false;
-      }
-    } else {
-      // Plenty of room for us
-      matched = true;
-    }
-  } else { // the type is not static
-    if (pn->typed) {
-      if (pn->current_type.compare(vn->type)) {
-	// Failure - the pnode has a type, and it isn't ours
-	matched = false;
-      } else {
-	if ((pn->current_type_record->current_load + vn->typecount) >
-	    pn->current_type_record->max_load) {
-	  // This would put us over its max load
-	  //if (allow_overload && (tr->max_load > 1) &&
-	  //    ((pn->current_type_record->current_load + vn->typecount) <
-	  //    (pn->current_type_record->max_load + 2))) {
-	  if (allow_overload && (tr->max_load > 1)) {
-	    // That's okay, we're allowing overload
-	    matched = true;
-	  } else {
-	    // Failure - the type is right, but the pnode is full
-	    matched = false;
+#ifdef SMART_UNMAP
+/*
+ * XXX - I pulled this code out of the anneal loop, and it needs to be fixed
+ * up (and get some arguments and a return type) before it will compile
+ */
+void smart_unmap() {
+	// XXX: Should probably randomize this
+	// XXX: Add support for not using PER_VNODE_TT
+	// XXX: Not very robust
+
+	freednode = true;
+
+	tt_entry tt = vnode_type_table[vn->name];
+	int size = tt.first;
+	pclass_vector *acceptable_types = tt.second;
+	// Find a node to kick out
+	bool foundnode = false;
+	int offi = RANDOM();
+	int index;
+	for (int i = 0; i < size; i++) {
+	  index = (i + offi) % size;
+	  if ((*acceptable_types)[index]->used_members.find(vn->type) ==
+	      (*acceptable_types)[index]->used_members.end()) {
+	    continue;
 	  }
-	} else {
-	  // It's under its max load, we can fit in
-	  matched = true;
-	}
-      }
-    } else {
-      // pnode doesn't have a type
-      matched = true;
-    }
-  }
-
-  // Commented out for now because it's too slow!
-#if 0
-  // Check for 'local' desires - the reason we take the time to do this here is
-  // that they are actually, in many ways, like types with vn->typecount > 1.
-  if (matched && !vn->desires.empty()) {
-    tb_vnode::desires_map::iterator desire_it;
-    for (desire_it = vn->desires.begin();
-	desire_it != vn->desires.end();
-	desire_it++) {
-      if (desire_it->is_l_additive() {
-      tb_pnode::features_map::iterator feature_it =
-	pn->features.find(desire_it->first);
-      if (feature_it == pn->features.end()) {
-	matched = false;
-	break;
-      }
-      // If we are allowing overloading, do so only to a limited degree
-      if (allow_overload) {
-	if ((feature_it->second < desire_it->second)
-	    && (feature_it->second - desire_it->second)
-	        < (desire_it->second * 2)) {
-	  matched = false;
+	  if ((*acceptable_types)[index]->used_members[vn->type]->size() == 0) {
+	    continue;
+	  }
+	  foundnode = true;
 	  break;
 	}
-      } else {
-	// No overloading, and this would put us over the limit
-	if (feature_it->second < desire_it->second) {
-	  matched = false;
-	  break;
-	}
-      }
-    }
-  }
-#endif
 
-  return matched;
-}
-
-/*
- * Finds a pnode which:
- * 1) One of the vnode's neighbors is mapped to
- * 2) Satisifies the usual pnode mapping constraints
- * 3) The vnode is not already mapped to
- */
-tb_pnode *find_pnode_connected(vvertex vv, tb_vnode *vn) {
-
-  //cerr << "find_pnode_connected(" << vn->name << ") called" << endl;
-
-  // We make a list of all neighboring vnodes so that we can go through
-  // them in random order
-  vector<vedge> visit_order(out_degree(vv,VG));
-  voedge_iterator vedge_it,end_vedge_it;
-  tie(vedge_it,end_vedge_it) = out_edges(vv,VG);	    
-  for (int i = 0; vedge_it != end_vedge_it; vedge_it++, i++) {
-    visit_order[i] = *vedge_it;
-  }
-  for (int i = 0; i < visit_order.size(); i++) {
-	int i1 = RANDOM() % visit_order.size();
-	int i2 = RANDOM() % visit_order.size();
-	vedge tmp = visit_order[i1];
-	visit_order[i1] = visit_order[i2];
-	visit_order[i2] = tmp;
-  }
-  for (int i = 0; i < visit_order.size(); i++) {
-    vvertex neighbor_vv = target(visit_order[i],VG);
-    tb_vnode *neighbor_vn = get(vvertex_pmap,neighbor_vv);
-    //cerr << "    trying " << neighbor_vn->name << endl;
-    // Skip any that aren't assigned
-    if (!neighbor_vn->assigned) {
-      //cerr << "        not assigned" << endl;
-      continue;
-    }
-
-    // Skip any that are assigned to the same pnode we are
-    if (neighbor_vn->assignment == vn->assignment) {
-      //cerr << "        same assignment" << endl;
-      continue;
-    }
-
-    // Check to make sure that our vn can map to the neibor's assigment
-    tb_pnode *neighbor_pnode = get(pvertex_pmap,neighbor_vn->assignment);
-    //cerr << "        neighbor on " << neighbor_pnode->name << endl;
-    if (pnode_is_match(vn,neighbor_pnode)) {
-      //cerr << "        good" << endl;
-      //cerr << "    worked" << endl;
-      return neighbor_pnode;
-    }
-    //cerr << "        doesn't match" << endl;
-  }
-
-  //cerr << "    failed" << endl;
-  return NULL;
-}
-
-tb_pnode *find_pnode(tb_vnode *vn)
-{
-#ifdef PER_VNODE_TT
-  tt_entry tt = vnode_type_table[vn->name];
-#else
-  tt_entry tt = type_table[vn->type];
-#endif
-  int num_types = tt.first;
-  pclass_vector *acceptable_types = tt.second;
-  
-  tb_pnode *newpnode = NULL;
-  
-  //cerr << "Node is " << vn->name << " First = " << first << endl;
-
-  // Randomize the order in which we go through the list of acceptable pclasses
-  // We do this by making a randomly-ordered list of indicies into the
-  // acceptable_types vector
-  vector<int> traversal_order(num_types);
-  for (int i = 0; i < num_types; i++) {
-	traversal_order[i] = i;
-  }
-  for (int i = 0; i < num_types; i++) {
-	int i1 = RANDOM() % num_types;
-	int i2 = RANDOM() % num_types;
-	int tmp = traversal_order[i1];
-	traversal_order[i1] = traversal_order[i2];
-	traversal_order[i2] = tmp;
-  }
-
-  for (int i = 0; i < num_types; i++) {
-
-    int index = traversal_order[i];
-    tb_pclass *pclass = (*acceptable_types)[index];
-
-    // Skip pclasses that have been disabled
-    if (pclass->disabled) {
-	  continue;
-    }
-
-#ifndef FIND_PNODE_SEARCH
-    // If not searching for the pnode, just grab the front one
-    newpnode = pclass->members[vn->type]->front();
-#else
-#ifdef PER_VNODE_TT
-    // If using PER_VNODE_TT and vclasses, it's possible that there are
-    // some pclasses in this node's type table that can't be used right now,
-    // becuase they contain entires that don't contain the vnodes _current_
-    // type
-    if (pclass->members.find(vn->type) == pclass->members.end()) {
-	continue;
-    }
-#endif
-
-    list<tb_pnode*>::iterator it = pclass->members[vn->type]->L.begin();
-    while (it != pclass->members[vn->type]->L.end()) {
-	if (pnode_is_match(vn,*it)) {
-	    break; 
-	} else {
+	if (foundnode) {
+	  assert((*acceptable_types)[index]->used_members[vn->type]->size());
+	  tb_pclass::tb_pnodeset::iterator it =
+	    (*acceptable_types)[index]->used_members[vn->type]->begin();
+	  int j = RANDOM() %
+	    (*acceptable_types)[index]->used_members[vn->type]->size();
+	  while (j > 0) {
 	    it++;
+	    j--;
+	  }
+	  tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
+	  int k = RANDOM() % (*it)->assigned_nodes.size();
+	  while (k > 0) {
+	    it2++;
+	    k--;
+	  }
+	  tb_vnode *kickout = *it2;
+	  assert(kickout->assigned);
+	  vvertex toremove = vname2vertex[kickout->name];
+	  newpnode = *it;
+	  remove_node(toremove);
+	  unassigned_nodes.push(vvertex_int_pair(toremove,
+		RANDOM()));
+	} else {
+	  cerr << "Failed to find a replacement!" << endl;
 	}
-    }
-    if (it == pclass->members[vn->type]->L.end()) {
-	newpnode = NULL;
-    } else {
-	newpnode = *it;
-    }
-#endif // FIND_PNODE_SEARCH
-#ifdef PCLASS_DEBUG
-    cerr << "Found pclass: " <<
-      pclass->name << " and node " <<
-      (newpnode == NULL ? "NULL" : newpnode->name) << "\n";
+#endif /* SMART_UNMAP */
+
+#ifdef SMART_UNMAP
+/*
+ * Part II of the smart_unmap code - again, needs to be fixed before it
+ * will compile.
+ */
+void smart_unmap_part2() {
+#ifdef PER_VNODE_TT
+	  tt_entry tt = vnode_type_table[vn->name];
+#else
+	  tt_entry tt = type_table[vn->type];
 #endif
-    if (newpnode != NULL) {
-      RDEBUG(cout << " to " << newpnode->name << endl;)
-      return newpnode;
-    }
-  }
+	  pclass_vector *acceptable_types = tt.second;
 
-  // Nope, didn't find one
-  return NULL;
-}
+	  while (1) {
+	    bool keepgoing = false;
+	    if (get(vvertex_pmap,virtual_nodes[toremove])->fixed) {
+	      keepgoing = true;
+	    } else if (! get(vvertex_pmap,virtual_nodes[toremove])->assigned) {
+	      keepgoing = true;
+	    } else {
+	      pvertex pv = get(vvertex_pmap,virtual_nodes[toremove])->assignment;
+	      tb_pnode *pn = get(pvertex_pmap,pv);
+	      int j;
+	      for (j = 0; j < acceptable_types->size(); j++) {
+		if ((*acceptable_types)[j] == pn->my_class) {
+		  break;
+		}
+	      }
+	      if (j == acceptable_types->size()) {
+		keepgoing = true;
+	      }
+	    }
 
+	    if (!keepgoing) {
+	      break;
+	    }
+	}
+#endif	
+	
 // We put the temperature outside the function so that external stuff, like
 // status_report in assign.cc, can see it.
 double temp;
@@ -399,7 +266,7 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
           << vn->type << "\n";
       }
     }
-    if (add_node(vv,pv,false,true) == 1) {
+    if (add_node(vv,pv,false,true,false) == 1) {
       cout << "*** Fixed node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
       exit(EXIT_UNRETRYABLE);
@@ -452,13 +319,16 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	<< "fixed in place" << endl;
       continue;
     }
-    if (add_node(vv,pv,false,false) == 1) {
+    if (add_node(vv,pv,false,false,false) == 1) {
       cout << "Warning: Hinted node: Could not map " << vn->name <<
 	" to " << pn->name << endl;
       continue;
     }
   }
-
+       
+  /*
+   * Find out the starting temperature
+   */
   bestscore = get_score();
   bestviolated = violated;
 
@@ -470,19 +340,43 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   absbest = bestscore;
   absbestviolated = bestviolated;
 
+  /*
+   * Make a list of all nodes that are still unassigned
+   */
   vvertex_iterator vit,veit;
   tie(vit,veit) = vertices(VG);
   for (;vit!=veit;++vit) {
     tb_vnode *vn = get(vvertex_pmap,*vit);
-    absassigned[*vit] = vn->assigned;
     if (vn->assigned) {
-      absassignment[*vit] = vn->assignment;
-      abstypes[*vit] = vn->type;
+	// XXX
+//      absassignment[*vit] = vn->assignment;
+//      abstypes[*vit] = vn->type;
+	best_solution.set_assignment(*vit,vn->assignment);
+	best_solution.set_vtype_assignment(*vit,vn->type);
     } else {
-      unassigned_nodes.push(vvertex_int_pair(*vit,RANDOM()));
+	best_solution.clear_assignment(*vit);
+	unassigned_nodes.push(vvertex_int_pair(*vit,RANDOM()));
     }
   }
+  
+  /*
+   * Set any links that have been assigned
+   */
+  vedge_iterator eit, eeit;
+  tie(eit, eeit) = edges(VG);
+  for (;eit!=eeit;++eit) {
+      tb_vlink *vlink = get(vedge_pmap, *eit);
+      if (vlink->link_info.type_used != tb_link_info::LINK_UNMAPPED) {
+	  best_solution.set_link_assignment(*eit,vlink->link_info);
+      }
+  }
 
+  /*
+   * The neighborhood size is the number of solutions we can reach with one
+   * transition operation - it's roughly the number of virtual nodes times the
+   * number of pclasses. This is how long we usually stick with a given 
+   * temperature.
+   */
   int neighborsize;
   neighborsize = (nnodes - num_fixed) * npclasses;
   if (neighborsize < min_neighborhood_size) {
@@ -502,23 +396,27 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
     goto DONE;
   }
   
-  // Annealing loop!
   vvertex vv;
   tb_vnode *vn;
 
   // Crap added by ricci
+#ifdef MELT
   bool melting;
+  double meltstart;
+#endif
   int nincreases, ndecreases;
   double avgincrease;
   double avgscore;
   double initialavg;
   double stddev;
-  bool finished;
-  bool forcerevert;
+  bool finished; 
+  bool forcerevert; 
+  // Lame, we have to do this on a seperate line, or the compiler gets mad about
+  // the goto above crossing initialization. Well, okay, okay, I know the goto
+  // itself is lame....
   finished = forcerevert = false;
   int tsteps;
   int mintsteps;
-  double meltstart;
 
 #define MAX_AVG_HIST 16
   double avghist[MAX_AVG_HIST];
@@ -546,6 +444,9 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 
   stddev = 0;
 
+  /*
+   * Initial temperature calcuation/melting
+   */
 #ifdef MELT
   if (initial_temperature == NULL) {
       melting = true;
@@ -561,16 +462,32 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
   melting = false;
 #endif
 
+  /*
+   * Calculate the number of iterations to stay at this temperature step
+   */
   melt_trans = neighborsize;
+  
+  /*
+   * The main annealing loop!
+   * Each iteration is a temperature step - how we get out of the loop depends
+   * on what the termination condition is. Normally, we have a target temperature
+   * at which we stop, but with EPSILON_TERMINATE, we watch the derivative of the
+   * average temperature, and break out of the loop when it gets small enough.
+   */
 #ifdef EPSILON_TERMINATE
   while(1) {
 #else
   while (temp >= temp_stop) {
 #endif
+      
 #ifdef VERBOSE
     cout << "Temperature:  " << temp << " AbsBest: " << absbest <<
       " (" << absbestviolated << ")" << endl;
 #endif
+    
+    /*
+     * Initialize this temperature step
+     */
     trans = 0;
     accepts = 0;
     nincreases = ndecreases = 0;
@@ -590,6 +507,12 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       cout << "Doing melting run" << endl;
     }
 
+    /*
+     * The inner loop - 
+     * Each iteration of this inner loop corresponds to one attempt to try a new
+     * solution. When we're melting, we have a special number of transitions
+     * we're shooting for.
+     */
     while ((melting && (trans < melt_trans))
 #ifdef NEIGHBOR_LENGTH
 	    || (trans < transitions)) {
@@ -607,7 +530,12 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       trans++;
       iters++;
 
-      bool freednode = false;
+      /*
+       * Find a virtual node to map -
+       * If there are any virtual nodes that are not yet mapped, start with
+       *   those
+       * If not, find some other random vnode, which we'll unmap then remap
+       */
       if (! unassigned_nodes.empty()) {
 	vv = unassigned_nodes.top().first;
 	assert(!get(vvertex_pmap,vv)->assigned);
@@ -628,13 +556,21 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	    cout << "**** Error, unable to find any non-fixed nodes" << endl;
 	    goto DONE;
 	}
-      }
-      
+      }      
       vn = get(vvertex_pmap,vv);
       RDEBUG(cout << "Reassigning " << vn->name << endl;)
+	  
+      /*
+       * Keep track of the old assignment for this node
+       */
       oldassigned = vn->assigned;
       oldpos = vn->assignment;
       
+      /*
+       * Problem: If we free the chosen vnode now, we might just try remapping
+       * it to the same pnode. If FREE_IMMEDIATELY is not set, we do the 
+       * later, after we've chosen a pnode unmapping
+       */
 #ifdef FREE_IMMEDIATELY
       if (oldassigned) {
 	remove_node(vv);
@@ -642,6 +578,10 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       }
 #endif
       
+      /*
+       * We have to handle vnodes with vtypes (vclasses) specially - we have
+       * to make the vtype pick a type to masquerade as for now.
+       */
       if (vn->vclass != NULL) {
 	vn->type = vn->vclass->choose_type();
 #ifdef SCORE_DEBUG
@@ -650,185 +590,126 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	    vn->vclass->dominant << endl;
 #endif
       }
-
-      // Actually find a pnode
+      
+      // Did we free a node?
+      bool freednode = false;
+      
+      /* 
+       * Find a pnode to map this vnode to
+       */
       tb_pnode *newpnode = NULL;
       if ((use_connected_pnode_find != 0)
 	  && ((RANDOM() % 1000) < (use_connected_pnode_find * 1000))) {
 	newpnode = find_pnode_connected(vv,vn);
       }
+      
+      /* 
+       * If not using the connected find, or it failed to find a node, then
+       * fall back on the regular algorithm to find a pnode
+       */
       if (newpnode == NULL) {
 	newpnode = find_pnode(vn);
       }
+      
+      /*
+       * If we didn't free the vnode up above, do it now
+       */
 #ifndef FREE_IMMEDIATELY
       if (oldassigned) {
 	RDEBUG(cout << "removing: !lan, oldassigned" << endl;)
-	  remove_node(vv);
+	remove_node(vv);
       }
 #endif
+      
+      /*
+       * If we didn't find a node to map this vnode to, free up some other
+       * vnode so that we can make progress - otherwise, we could get stuck
+       */
       if (newpnode == NULL) {
-	// We're not going to be re-assigning this one
 #ifndef SMART_UNMAP
+	// Push this node back onto the unassigned map
 	unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
-#endif
-	// need to free up nodes
-#ifdef SMART_UNMAP
-	// XXX: Should probably randomize this
-	// XXX: Add support for not using PER_VNODE_TT
-	// XXX: Not very robust
-
-	freednode = true;
-
-	tt_entry tt = vnode_type_table[vn->name];
-	int size = tt.first;
-	pclass_vector *acceptable_types = tt.second;
-	// Find a node to kick out
-	bool foundnode = false;
-	int offi = RANDOM();
-	int index;
-	for (int i = 0; i < size; i++) {
-	  index = (i + offi) % size;
-	  if ((*acceptable_types)[index]->used_members.find(vn->type) ==
-	      (*acceptable_types)[index]->used_members.end()) {
-	    continue;
-	  }
-	  if ((*acceptable_types)[index]->used_members[vn->type]->size() == 0) {
-	    continue;
-	  }
-	  foundnode = true;
-	  break;
-	}
-
-	if (foundnode) {
-	  assert((*acceptable_types)[index]->used_members[vn->type]->size());
-	  tb_pclass::tb_pnodeset::iterator it =
-	    (*acceptable_types)[index]->used_members[vn->type]->begin();
-	  int j = RANDOM() %
-	    (*acceptable_types)[index]->used_members[vn->type]->size();
-	  while (j > 0) {
-	    it++;
-	    j--;
-	  }
-	  tb_vnode_set::iterator it2 = (*it)->assigned_nodes.begin();
-	  int k = RANDOM() % (*it)->assigned_nodes.size();
-	  while (k > 0) {
-	    it2++;
-	    k--;
-	  }
-	  tb_vnode *kickout = *it2;
-	  assert(kickout->assigned);
-	  vvertex toremove = vname2vertex[kickout->name];
-	  newpnode = *it;
-	  remove_node(toremove);
-	  unassigned_nodes.push(vvertex_int_pair(toremove,
-		RANDOM()));
-	} else {
-	  cerr << "Failed to find a replacement!" << endl;
-	}
-
-#else
 	int start = RANDOM()%nnodes;
 	int toremove = start;
+	while (get(vvertex_pmap,virtual_nodes[toremove])->fixed ||
+	       (! get(vvertex_pmap,virtual_nodes[toremove])->assigned)) {
+	    toremove = (toremove +1) % nnodes;
+	  if (toremove == start) {
+	    toremove = -1;
+	    break;
+	  }	
+      }	
+      if (toremove >= 0) {
+	RDEBUG(cout << "removing: freeing up nodes" << endl;)
+	remove_node(virtual_nodes[toremove]);
+	unassigned_nodes.push(vvertex_int_pair(virtual_nodes[toremove], RANDOM()));
+      }	
+      
+      /*
+       * Start again with another vnode - which will probably be the same one,
+       * since we just marked it as unmapped. But now, there will be at least one
+       * free pnode
+       */
+      continue;	
+#else /* SMART_UNMAP */
+      // XXX: This code is broken for now, which is okay, because we weren't
+      // using it
+      smart_unmap();
+      smart_unmap_part2();
+#endif
+      }
+    
+      /*
+       * Okay, we've got pnode to map this vnode to - let's do it
+       */
+      if (newpnode != NULL) {	
+        newpos = pnode2vertex[newpnode];
+        if (scoring_selftest) {
+	  // Run a little test here - see if the score we get by adding	
+	  // this node, then removing it, is the same one we had before
+	  double oldscore = get_score();
+	  int oldviolated = violated;
+	  double tempscore;
+	  int tempviolated;
+	  if (!add_node(vv,newpos,false,false,false)) {
+	    tempscore = get_score();
+	    tempviolated = violated;
+	    remove_node(vv);
+	  }	
+	  if ((oldscore != get_score()) || (oldviolated != violated)) {
+	    cerr << "Scoring problem adding a mapping - oldscore was " <<
+		oldscore <<  " newscore is " << newscore << " tempscore was "
+		<< tempscore << endl;
+	    cerr << "oldviolated was " << oldviolated << " newviolated is "
+		<< violated << " tempviolated was " << tempviolated << endl;
+	    cerr << "I was tring to map " << vn->name << " to " <<
+		newpnode->name << endl;
+	    print_solution(best_solution);
+	    cerr << vinfo;
+	    abort();
+          }
+        }
+      
+        /*
+         * Actually try the new mapping - if it fails, the node is still
+         * unassigned, and we go back and try with another
+         */
+        if (add_node(vv,newpos,false,false,false) != 0) {
+	  unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
+	  continue;
+        }
+      } else { // pnode != NULL
 #ifdef SMART_UNMAP
-
-#ifdef PER_VNODE_TT
-	  tt_entry tt = vnode_type_table[vn->name];
-#else
-	  tt_entry tt = type_table[vn->type];
+        unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
 #endif
-	  pclass_vector *acceptable_types = tt.second;
+        if (freednode) {
+	  continue;
+        }	
+      }
 
-	  while (1) {
-	    bool keepgoing = false;
-	    if (get(vvertex_pmap,virtual_nodes[toremove])->fixed) {
-	      keepgoing = true;
-	    } else if (! get(vvertex_pmap,virtual_nodes[toremove])->assigned) {
-	      keepgoing = true;
-	    } else {
-	      pvertex pv = get(vvertex_pmap,virtual_nodes[toremove])->assignment;
-	      tb_pnode *pn = get(pvertex_pmap,pv);
-	      int j;
-	      for (j = 0; j < acceptable_types->size(); j++) {
-		if ((*acceptable_types)[j] == pn->my_class) {
-		  break;
-		}
-	      }
-	      if (j == acceptable_types->size()) {
-		keepgoing = true;
-	      }
-	    }
-
-	    if (!keepgoing) {
-	      break;
-	    }
-
-#else
-	    while (get(vvertex_pmap,virtual_nodes[toremove])->fixed ||
-		(! get(vvertex_pmap,virtual_nodes[toremove])->assigned)) {
-#endif
-	      toremove = (toremove +1) % nnodes;
-	      if (toremove == start) {
-		toremove = -1;
-		break;
-	      }
-	    }
-	    if (toremove >= 0) {
-	      RDEBUG(cout << "removing: freeing up nodes" << endl;)
-		remove_node(virtual_nodes[toremove]);
-	      unassigned_nodes.push(vvertex_int_pair(virtual_nodes[toremove],
-		    RANDOM()));
-	    }
-	    continue;
-#endif /* SMART_UNMAP */
-#ifndef SMART_UNMAP
-	  } else {
-#else
-	  }
-#endif
-	  if (newpnode != NULL) {
-	    newpos = pnode2vertex[newpnode];
-	    if (scoring_selftest) {
-	      // Run a little test here - see if the score we get by adding
-	      // this node, then removing it, is the same one we would have
-	      // gotten otherwise
-	      double oldscore = get_score();
-	      int oldviolated = violated;
-	      double tempscore;
-	      int tempviolated;
-	      if (!add_node(vv,newpos,false,false)) {
-		tempscore = get_score();
-		tempviolated = violated;
-		remove_node(vv);
-	      }
-	      if ((oldscore != get_score()) || (oldviolated != violated)) {
-		cerr << "Scoring problem adding a mapping - oldscore was " <<
-		  oldscore <<  " newscore is " << newscore << " tempscore was "
-		  << tempscore << endl;
-		cerr << "oldviolated was " << oldviolated << " newviolated is "
-		  << violated << " tempviolated was " << tempviolated << endl;
-		cerr << "I was tring to map " << vn->name << " to " <<
-		  newpnode->name << endl;
-		print_solution();
-		cerr << vinfo;
-		abort();
-	      }
-	    }
-	    if (add_node(vv,newpos,false,false) != 0) {
-	      unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
-	      continue;
-	    }
-	  } else {
-#ifdef SMART_UNMAP
-	    unassigned_nodes.push(vvertex_int_pair(vv,RANDOM()));
-#endif
-	    if (freednode) {
-	      continue;
-	    }
-	  }
-#ifndef SMART_UNMAP
-	}
-#endif
-
+      /*
+       * Okay, now that we've mapped some new node, let's check the scoring
+       */
       newscore = get_score();
       assert(newscore >= 0);
 
@@ -837,95 +718,106 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       // This looks funny, because < 0 means worse, which means an increase in
       // score
       if (scorediff < 0) {
-	nincreases++;
-	avgincrease = avgincrease * (nincreases -1) / nincreases +
-	  (-scorediff)  / nincreases;
+        nincreases++;
+        avgincrease = avgincrease * (nincreases -1) / nincreases +
+  		    (-scorediff)  / nincreases;
       } else {
-	ndecreases++;
-      }
-      
+        ndecreases++;
+      }	
+   
+      /*
+       * Here are all the various conditions for deciding if we're going to accept
+       * this transition
+       */
       bool accepttrans = false;
       if (newscore < optimal) {
-	  accepttrans = true;
-	  RDEBUG(cout << "accept: optimal (" << newscore << "," << optimal
-		  << ")" << endl;)
+        // If this score is smaller than the one we think is optimal, of course we
+        // take it!
+        accepttrans = true;
+	RDEBUG(cout << "accept: optimal (" << newscore << "," << optimal
+	       << ")" << endl;)
       } else if (melting) {
-	  accepttrans = true;
-	  RDEBUG(cout << "accept: melting" << endl;)
+        // When melting, we take everything!
+	accepttrans = true;
+	RDEBUG(cout << "accept: melting" << endl;)
       } else {
 #ifdef NO_VIOLATIONS
-	  if (newscore < bestscore) {
-	      accepttrans = true;
-	      RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
-		      << ")" << endl;)
-	  } else if (accept(scorediff,temp)) {
-	      accepttrans = true;
-	      RDEBUG(cout << "accept: metropolis (" << newscore << ","
-		      << bestscore << "," << expf(scorediff/(temp*sensitivity))
-		      << ")" << endl;)
-	  }
+        // Here, we don't consider violations at all, just whether the regular
+        // simulated annealing accept conditions
+	if (newscore < bestscore) {
+	    accepttrans = true;
+	    RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
+		   << ")" << endl;)
+        } else if (accept(scorediff,temp)) {
+  	  accepttrans = true;
+	  RDEBUG(cout << "accept: metropolis (" << newscore << ","
+		 << bestscore << "," << expf(scorediff/(temp*sensitivity))
+		 << ")" << endl;)
+        }
 #else
 #ifdef SPECIAL_VIOLATION_TREATMENT
-	  /*
-	   * In this ifdef, we always accept new solutions that have fewer
-	   * violations than the old solution, and when we're trying to
-	   * determine whether or not to accept a new solution with a higher
-	   * score, we don't take violations into the account.
-	   *
-	   * The problem with this shows up at low temperatures. What can often
-	   * happen is that we accept a solution with worse violations but a
-	   * better (or similar) score. Then, if we were to try, say the first
-	   * solution (or a score-equivalent one) again, we'd accept it again.
-	   *
-	   * What this leads to is 'thrashing', where we have a whole lot of
-	   * variation of scores over time, but are not making any real
-	   * progress. This prevents the cooling schedule from converging for
-	   * much, much longer than it should really take.
-	   */
-          if ((violated == bestviolated) && (newscore < bestscore)) {
-	      accepttrans = true;
-	      RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
-		      << ")" << endl;)
-	  } else if (violated < bestviolated) {
-	      accepttrans = true;
-	      RDEBUG(cout << "accept: better (violations) (" << newscore << ","
-		      << bestscore << "," << violated << "," << bestviolated
-		      << ")" << endl;
-	          cout << "Violations: (new) " << violated << endl;
-		  cout << vinfo;)
-	  } else if (accept(scorediff,temp)) {
-	      accepttrans = true;
-	      RDEBUG(cout << "accept: metropolis (" << newscore << ","
-		      << bestscore << "," << expf(scorediff/(temp*sensitivity))
-		      << ")" << endl;)
-	  }
+        /*
+         * In this ifdef, we always accept new solutions that have fewer
+         * violations than the old solution, and when we're trying to
+         * determine whether or not to accept a new solution with a higher
+         * score, we don't take violations into the account.
+         *
+         * The problem with this shows up at low temperatures. What can often
+         * happen is that we accept a solution with worse violations but a
+         * better (or similar) score. Then, if we were to try, say the first
+         * solution (or a score-equivalent one) again, we'd accept it again.
+         *
+         * What this leads to is 'thrashing', where we have a whole lot of
+         * variation of scores over time, but are not making any real
+         * progress. This prevents the cooling schedule from converging for
+         * much, much longer than it should really take.
+         */
+        if ((violated == bestviolated) && (newscore < bestscore)) {
+	  accepttrans = true;
+	  RDEBUG(cout << "accept: better (" << newscore << "," << bestscore
+		 << ")" << endl;)
+	} else if (violated < bestviolated) {
+	  accepttrans = true;
+	  RDEBUG(cout << "accept: better (violations) (" << newscore << ","
+		 << bestscore << "," << violated << "," << bestviolated
+		 << ")" << endl;
+	    cout << "Violations: (new) " << violated << endl;
+	    cout << vinfo;)
+        } else if (accept(scorediff,temp)) {
+	  accepttrans = true;
+	  RDEBUG(cout << "accept: metropolis (" << newscore << ","
+		 << bestscore << "," << expf(scorediff/(temp*sensitivity))
+		 << ")" << endl;)
+        }
 #else // no SPECIAL_VIOLATION_TREATMENT
-	  /*
-	   * In this branch of the ifdef, we give violations no special
-	   * treatment when it comes to accepting new solution - we just add
-	   * them into the score. This makes assign behave in a more 'classic'
-	   * simulated annealing manner.
-	   *
-	   * One consequence, though, is that we have to be more careful with
-	   * scores. We do not want to be able to get into a situation where
-	   * adding a violation results in a _lower_ score than a solution with
-	   * fewer violations.
-	   */
-          double adjusted_new_score = newscore + violated * VIOLATION_SCORE;
-	  double adjusted_old_score = bestscore + bestviolated *
-	      VIOLATION_SCORE;
+        /*
+         * In this branch of the ifdef, we give violations no special
+         * treatment when it comes to accepting new solution - we just add
+         * them into the score. This makes assign behave in a more 'classic'
+         * simulated annealing manner.
+         *
+         * One consequence, though, is that we have to be more careful with
+         * scores. We do not want to be able to get into a situation where
+         * adding a violation results in a _lower_ score than a solution with
+         * fewer violations.
+         */
+        double adjusted_new_score = newscore + violated * VIOLATION_SCORE;
+        double adjusted_old_score = bestscore + bestviolated * VIOLATION_SCORE;
 
-	  if (adjusted_new_score < adjusted_old_score) {
-	    accepttrans = true;
-	  } else if (accept(adjusted_old_score - adjusted_new_score,temp)) {
-	    accepttrans = true;
-	  }
+        if (adjusted_new_score < adjusted_old_score) {
+          accepttrans = true;
+        } else if (accept(adjusted_old_score - adjusted_new_score,temp)) {
+	  accepttrans = true;
+        }
 
 #endif // SPECIAL_VIOLATION_TREATMENT
 
       }
-#endif
+#endif // NO_VIOLATIONS
 
+      /* 
+       * Okay, we've decided to accep this transition - do some bookkeeping
+       */
       if (accepttrans) {
 	bestscore = newscore;
 	bestviolated = violated;
@@ -934,34 +826,57 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	fprintf(tempout,"%f\n",temp);
 	fprintf(scoresout,"%f\n",newscore);
 	fprintf(deltaout,"%f\n",-scorediff);
-#endif
+#endif // GNUPLOT_OUTPUT
 
 	avgscore += newscore;
-
 	accepts++;
 
 #ifdef CHILL
 	 if (!melting) {
 	     scores[accepts] = newscore;
 	 }
-#endif
+#endif // CHILL
 
+        /*
+         * Okay, if this is the best score we've gotten so far, let's do some
+	 * further bookkeeping - copy it into the structures for our best solution
+	 */
 #ifdef NO_VIOLATIONS
 	if (newscore < absbest) {
-#else
+#else // NO_VIOLATIONS
 	if ((violated < absbestviolated) ||
 	    ((violated == absbestviolated) &&
 	     (newscore < absbest))) {
-#endif
+#endif // NO_VIOLATIONS
+	    
 #ifdef SCORE_DEBUG
 	  cerr << "New best solution." << endl;
-#endif
+#endif // SCORE_DEBUG
 	  tie(vit,veit) = vertices(VG);
 	  for (;vit!=veit;++vit) {
-	    absassignment[*vit] = get(vvertex_pmap,*vit)->assignment;
-	    absassigned[*vit] = get(vvertex_pmap,*vit)->assigned;
-	    abstypes[*vit] = get(vvertex_pmap,*vit)->type;
+	      tb_vnode *vn = get(vvertex_pmap,*vit);
+	      if (vn->assigned) {
+		  best_solution.set_assignment(*vit,vn->assignment);
+		  best_solution.set_vtype_assignment(*vit,vn->type);
+	      } else {
+		  best_solution.clear_assignment(*vit);
+	      }
+	    //absassignment[*vit] = get(vvertex_pmap,*vit)->assignment;
+	    //absassigned[*vit] = get(vvertex_pmap,*vit)->assigned;
+	    //abstypes[*vit] = get(vvertex_pmap,*vit)->type;
 	  }
+	  
+	  vedge_iterator eit, eeit;
+	  tie(eit, eeit) = edges(VG);
+	  for (;eit!=eeit;++eit) {
+	      tb_vlink *vlink = get(vedge_pmap, *eit);
+	      if (vlink->link_info.type_used != tb_link_info::LINK_UNMAPPED) {
+		  best_solution.set_link_assignment(*eit,vlink->link_info);
+	      } else {
+		  best_solution.clear_link_assignment(*eit);
+	      }
+	  }	
+	  
 	  absbest = newscore;
 	  absbestviolated = violated;
 	  iters_to_best = iters;
@@ -974,15 +889,20 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	  goto DONE;
 	}
 	// Accept change
-      } else {
-	// Reject change
+      } else { // !acceptrans
+	// Reject change, go back to the state we were in before
 	RDEBUG(cout << "removing: rejected change" << endl;)
 	remove_node(vv);
 	if (oldassigned) {
-	  add_node(vv,oldpos,false,false);
+	  add_node(vv,oldpos,false,false,false);
 	}
       }
 
+      /*
+       * If we're melting, we do a little extra bookkeeping to do, becuase the
+       * goal of melting is to come up with an initial temperature such that
+       * almost every transition will be accepted
+       */
       if (melting) {
 	temp = avgincrease /
 	  log(nincreases/ (nincreases * X0 - ndecreases * (1 - X0)));
@@ -990,6 +910,10 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
 	    temp = 0.0;
 	}
       }
+      
+      /*
+       * With TIME_TERMINATE, we just give up after our time limit
+       */
 #ifdef TIME_TERMINATE
       if (timelimit && ((used_time() - timestart) > timelimit)) {
 	printf("Reached end of run time, finishing\n");
@@ -999,24 +923,23 @@ void anneal(bool scoring_selftest, double scale_neighborhood,
       }
 #endif
 
-    }
-
-#ifdef RANDOM_ASSIGNMENT
-      if (violated == 0) {
-	  finished = true;
-      }
-#endif
-
-#ifdef REALLY_RANDOM_ASSIGNMENT
-      if (unassigned_nodes.size() == 0) {
-	  finished = true;
-      }
-#endif
+    } /* End of inner annealing loop */
+     
 
 NOTQUITEDONE:
-      RDEBUG(printf("avgscore: %f = %f / %i\n",avgscore / (accepts +1),avgscore,accepts+1);)
-      avgscore = avgscore / (accepts +1);
+    RDEBUG(printf("avgscore: %f = %f / %i\n",avgscore / (accepts +1),avgscore,accepts+1);)
+	
+    /*
+     * Most of the code past this point concerns itself with the cooling
+     * schedule (what the next temperature step should be
+     */
+	
+    // Keep an average of the score over this temperature step	
+    avgscore = avgscore / (accepts +1);
 
+    /*
+     * If we were melting, then we we need to pick an initial temperature
+     */
     if (melting) {
       melting = false;
       initialavg = avgscore;
@@ -1028,6 +951,11 @@ NOTQUITEDONE:
 	finished = true;
 	forcerevert = true;
       }
+      /*
+       * With TIME_TARGET, we look at how long melting took, then use that to
+       * estimate how many temperature steps it will take to hit our time
+       * target. We adjust our cooling schedule accordingly.
+       */
 #ifdef TIME_TARGET
       if (timetarget) {
 	double melttime = used_time() - meltstart;
@@ -1041,6 +969,11 @@ NOTQUITEDONE:
       }
 #endif
     } else {
+      /*
+       * The CHILL cooling schedule is the standard one from the Simulated
+       * Annealing literature - it lower the temperature based on the standard
+       * deviation of the scores of accepted configurations
+       */
 #ifdef CHILL
       if (!melting) {
 	  stddev = 0;
@@ -1052,11 +985,18 @@ NOTQUITEDONE:
 	  temp = temp / (1 + (temp * log(1 + delta))/(3  * stddev));
       }
 #else
+      /* 
+       * This is assign's original cooling schedule - more predictable, but not
+       * at all reactive to the problem at hand
+       */
       temp *= temp_rate;
 #endif
     }
 
 
+    /*
+     * Debugging
+     */
 #ifdef DEBUG_TSTEP
 #ifdef EPSILON_TERMINATE
 #ifdef CHILL
@@ -1083,7 +1023,17 @@ NOTQUITEDONE:
     printf("temp_end: temp: %f ratio: %f stddev: %f\n",temp,temp * avgscore / initialavg,stddev);
     );
 
-    // Add this to the history, and computed a smoothed average
+    /*
+     * The next section of code deals with termination conditions - how do we
+     * decide that we're done?
+     */
+    
+    /*
+     * Keep a history of the average scores over the last MAX_AVG_HIST
+     * temperature steps. We treat the avghist array like a ring buffer.
+     * Add this temperature step to the history, and computer a smoothed
+     * average.
+     */
     smoothedavg = avgscore / (nhist + 1);
     for (int j = 0; j < nhist; j++) {
       smoothedavg += avghist[(hstart + j) % MAX_AVG_HIST] / (nhist + 1);
@@ -1096,6 +1046,10 @@ NOTQUITEDONE:
       hstart = (hstart +1) % MAX_AVG_HIST;
     }
 
+    /*
+     * Are we computing the derivative of the average temperatures over the
+     * whole history, or just the most recent one?
+     */
 #ifdef LOCAL_DERIVATIVE
     deltaavg = lastsmoothed - smoothedavg;
     deltatemp = lasttemp - temp;
@@ -1107,6 +1061,11 @@ NOTQUITEDONE:
     lastsmoothed = smoothedavg;
     lasttemp = temp;
 
+    /*
+     * EPSILON_TERMINATE means that we define some small number, epsilon, and
+     * the derivative of the average change in temperature gets below that
+     * epsilon (ie. we have stopped getting improvements in score), we're done
+     */
 #ifdef EPSILON_TERMINATE
     RDEBUG(
        printf("avgs: real: %f, smoothed %f, initial: %f\n",avgscore,smoothedavg,initialavg);
@@ -1114,6 +1073,10 @@ NOTQUITEDONE:
 	   deltaavg, deltatemp, epsilon,(temp / initialavg) * (deltaavg/ deltatemp));
     );
     if ((tsteps >= mintsteps) &&
+    /*
+     * ALLOW_NEGATIVE_DELTA controls whether we're willing to stop if the
+     * derivative gets small and negative, not just small and positive.
+     */
 #ifdef ALLOW_NEGATIVE_DELTA
 	((temp < 0) || isnan(temp) ||
 //	 || (fabs((temp / initialavg) * (deltaavg/ deltatemp)) < epsilon))) {
@@ -1136,13 +1099,60 @@ NOTQUITEDONE:
 	forcerevert = true;
     }
 #endif
+    
+    /*
+     * RANDOM_ASSIGNMENT is not really very random, but we stop after the first
+     * valid solution we get
+     */
+#ifdef RANDOM_ASSIGNMENT
+    if (violated == 0) {
+       finished = true;
+    }
+#endif
 
+    /*
+     * REALLY_RANDOM_ASSIGNMENT stops after we've assigned all nodes, whether or
+     * not our solution is valid
+     */
+#ifdef REALLY_RANDOM_ASSIGNMENT
+    if (unassigned_nodes.size() == 0) {
+      finished = true;
+    }
+#endif
+
+    /*
+     * The following section deals with reverting. This is not standard
+     * Simulated Annealing at all. In assign, a revert means that we go back
+     * to some previous solution (usually a better one). There are lots of
+     * things that could trigger this, so we use a bool to check if any of
+     * them happened.
+     */
     bool revert = false;
+    
+    /*
+     * Some of the termination condidtions force a revert when they decide
+     * they're finished. This is fine - of course, we want to return the best
+     * solution we ever found, which might not be the one we're sitting at right
+     * now.
+     */
     if (forcerevert) {
-	cout << "Reverting: forced" << endl;
-	revert = true;
+      cout << "Reverting: forced" << endl;
+      revert = true;
+    }
+    if (REVERT_LAST && (temp < temp_stop)) {
+       cout << "Reverting: REVERT_LAST" << endl;
+       revert = true;
     }
 
+    
+    /*
+     * Okay, NO_REVERT is not the best possible name for this ifdef. 
+     * Historically, assign used to revert to the best solution at the end of
+     * every temperature step. This is definitely NOT kosher. In my mind, it
+     * assign too susceptible to falling into local minima. Anyhow, the idea is
+     * that we go back to the best soltion if the current solution is worse than
+     * it either in violations or in score.
+     */
 #ifndef NO_REVERT
     if (REVERT_VIOLATIONS && (absbestviolated < violated)) {
 	cout << "Reverting: REVERT_VIOLATIONS" << endl;
@@ -1154,17 +1164,22 @@ NOTQUITEDONE:
     }
 #endif
 
-    if (REVERT_LAST && (temp < temp_stop)) {
-	cout << "Reverting: REVERT_LAST" << endl;
-	revert = true;
-    }
-
-    // Only revert if the best configuration has better violations
-    vvertex_list lan_nodes;
+    /*
+     * This is the code to do the actual revert.
+     * IMPORTANT: At this time, a revert does not take you back to _exactly_ the
+     * same state as before, because there are some things, like link
+     * assignments, that we don't save. Since the way these get mapped is
+     * dependant on the order they happen in, and this order is almost certainly
+     * different than the order they got mapped during annealing, there can be
+     * discrepancies (ie. now we have violations, when before we had none.)
+     */
     vvertex_iterator vvertex_it,end_vvertex_it;
+    vedge_iterator vedge_it,end_vedge_it;
     if (revert) {
       cout << "Reverting to best solution\n";
-      // Do a full revert
+      /*
+       * We start out by unmapping every vnode that's currently allocated
+       */
       tie(vvertex_it,end_vvertex_it) = vertices(VG);
       for (;vvertex_it!=end_vvertex_it;++vvertex_it) {
 	tb_vnode *vnode = get(vvertex_pmap,*vvertex_it);
@@ -1194,25 +1209,68 @@ NOTQUITEDONE:
 	      }
 	  }
       }
+      
+      /* 
+       * Now, go through the previous best solution, and add all of the node
+       * mappings back in.
+       */
       tie(vvertex_it,end_vvertex_it) = vertices(VG);
       for (;vvertex_it!=end_vvertex_it;++vvertex_it) {
 	tb_vnode *vnode = get(vvertex_pmap,*vvertex_it);
 	if (vnode->fixed) continue;
-	if (absassigned[*vvertex_it]) {
+	if (best_solution.is_assigned(*vvertex_it)) {
 	  if (vnode->vclass != NULL) {
-	    vnode->type = abstypes[*vvertex_it];
+	    vnode->type = best_solution.get_vtype_assignment(*vvertex_it);
 	  }
-	  assert(!add_node(*vvertex_it,absassignment[*vvertex_it],true,false));
+	  assert(!add_node(*vvertex_it,best_solution.get_assignment(*vvertex_it),true,false,true));
 	}
       }
-    }
+      
+      /*
+       * Add back in the old link resolutions
+       */
+      tie(vedge_it,end_vedge_it) = edges(VG);
+      for (;vedge_it != end_vedge_it; ++vedge_it) {
+	  tb_vlink *vlink = get(vedge_pmap,*vedge_it);
+	  if (best_solution.link_is_assigned(*vedge_it)) {
+	      // XXX: It's crappy that I have to do all this work here - something
+	      // needs re-organzing
+	      /*
+	       * This line does the actual link mapping revert
+		*/
+	      vlink->link_info = best_solution.get_link_assignment(*vedge_it);
+	      
+	      tb_vnode *src_vnode = get(vvertex_pmap,vlink->src);
+	      tb_vnode *dst_vnode = get(vvertex_pmap,vlink->dst);
+	      if (!dst_vnode->assigned || !src_vnode->assigned) {
+		  // This shouldn't happen, but don't try to score links which
+		  // don't have both endpoints assigned.
+		  continue;
+	      }
+	      tb_pnode *src_pnode = get(pvertex_pmap,src_vnode->assignment);
+	      tb_pnode *dst_pnode = get(pvertex_pmap,dst_vnode->assignment);
+	      
+	      /*
+	       * Okay, now that we've jumped through enough hoops, we can actually
+	       * do the scoring
+	       */
+	      score_link_info(*vedge_it, src_pnode, dst_pnode, src_vnode, dst_vnode);
+	  } else {
+	      mark_vlink_unassigned(vlink);
+	  }
+      }
+    } // End of reverting code
 
+    /*
+     * Whew, that's it!
+     */
     tsteps++;
 
     if (finished) {
       goto DONE;
     }
-  }
- DONE:
+  } /* End of outer annealing loop */
+DONE:
   cout << "Done" << endl;
-}
+} // End of anneal()
+	    

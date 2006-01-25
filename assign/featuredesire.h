@@ -9,10 +9,11 @@
 
 #include "common.h"
 
-#include <rope>
-#include <map>
-#include <set>
-#include <slist>
+#include "port.h"
+#include "fstring.h"
+
+#include <iostream>
+using namespace std;
 
 /*
  * Base class for features and desires - not intended to be used directly, only
@@ -31,7 +32,7 @@ class tb_featuredesire {
 	 * Get the object for a particular feature/desire - if one does not
 	 * exist, creates a new one. Otherwise, returns the existing object
 	 */
-	static tb_featuredesire *get_featuredesire_obj(const crope name);
+	static tb_featuredesire *get_featuredesire_obj(const fstring name);
 
 	/*
 	 * Silly accessor functions
@@ -42,7 +43,7 @@ class tb_featuredesire {
 	inline bool  is_g_one()		const { return g_one_is_okay;	}
 	inline bool  is_g_more()	const { return g_more_than_one; }
 	inline int   global_use_count() const { return in_use_globally; }
-	inline crope name()             const { return my_name;         }
+	inline fstring name()             const { return my_name;         }
 
 	/*
 	 * Operators, primarily for use with the STL
@@ -69,13 +70,13 @@ class tb_featuredesire {
 	 * static get_featuredesire_obj function which uses the existing desire
 	 * if there is one
 	 */
-	explicit tb_featuredesire(crope _my_name);
+	explicit tb_featuredesire(fstring _my_name);
 
 	// Globally unique identifier
 	int id;
 
 	// String name of this FD, used for debugging purposes only
-	crope my_name;
+	fstring my_name;
 
 	// Flags
 	bool global;          // Whether this FD has global scope
@@ -89,7 +90,7 @@ class tb_featuredesire {
 	// nodes - for use with global nodes
 	int in_use_globally;
 
-	typedef map<crope,tb_featuredesire*> name_featuredesire_map;
+	typedef map<fstring,tb_featuredesire*> name_featuredesire_map;
 	static name_featuredesire_map featuredesires_by_name;
 };
 
@@ -99,7 +100,7 @@ class tb_featuredesire {
  */
 class tb_node_featuredesire {
     public:
-	tb_node_featuredesire(crope _name, double _weight);
+	tb_node_featuredesire(fstring _name, double _weight);
 
 	~tb_node_featuredesire() { ; }
 
@@ -134,7 +135,7 @@ class tb_node_featuredesire {
 	/*
 	 * Proxy functions for the stuff in tb_featuredesire
 	 */
-	const crope name()      const { return featuredesire_obj->name();      }
+	const fstring name()      const { return featuredesire_obj->name();      }
 	const bool  is_local()  const { return featuredesire_obj->is_local();  }
 	const bool  is_global() const { return featuredesire_obj->is_global(); }
 	const bool  is_l_additive() const {

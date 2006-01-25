@@ -11,6 +11,8 @@
 #ifndef __MAPS_H
 #define __MAPS_H
 
+#include "fstring.h"
+
 /*
  * A hash function for graph edges
  */
@@ -26,7 +28,7 @@ struct hashedge {
  */
 typedef hash_map<vvertex,pvertex,hashptr<void *> > node_map;
 typedef hash_map<vvertex,bool,hashptr<void *> > assigned_map;
-typedef hash_map<pvertex,crope,hashptr<void *> > type_map;
+typedef hash_map<pvertex,fstring,hashptr<void *> > type_map;
 typedef hash_map<vedge,tb_link_info,hashedge> link_map;
 
 
