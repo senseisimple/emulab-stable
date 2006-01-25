@@ -240,6 +240,7 @@ COMMAND_PROTOTYPE(dotiptunnels);
 COMMAND_PROTOTYPE(dorelayconfig);
 COMMAND_PROTOTYPE(dotraceconfig);
 COMMAND_PROTOTYPE(doltmap);
+COMMAND_PROTOTYPE(doelvindport);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -324,7 +325,9 @@ struct command {
 	{ "userenv",      FULLCONFIG_ALL,  F_ALLOCATED, douserenv},
 	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
 	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
-	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},	
+	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
+	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
+
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4536,9 +4539,10 @@ COMMAND_PROTOTYPE(dojailconfig)
  */
 COMMAND_PROTOTYPE(doplabconfig)
 {
-	MYSQL_RES	*res;	
+	MYSQL_RES	*res, *res2;	
 	MYSQL_ROW	row;
 	char		buf[MYBUFSIZE];
+        char            *bufp = buf, *ebufp = &buf[MYBUFSIZE];
 
 	if (!reqp->isvnode) {
 		/* Silent error is fine */
@@ -4552,22 +4556,47 @@ COMMAND_PROTOTYPE(doplabconfig)
 	res = mydb_query("select sshdport from nodes "
 			 "where node_id='%s'",
 			 1, reqp->nodeid);
+
+        /*
+         * .. And the elvind port.
+         */
+        res2 = mydb_query("select attrvalue from node_attributes "
+                          " where node_id='%s' and attrkey='elvind_port'",
+                          1, reqp->pnodeid);
 	
-	if (!res) {
+        if (res) {
+            if ((int)mysql_num_rows(res) > 0) {
+                row = mysql_fetch_row(res);
+                bufp += OUTPUT(bufp, ebufp-bufp, "SSHDPORT=%d ", 
+                               atoi(row[0]));
+            }
+            mysql_free_result(res);
+        }
+
+        if (res2) {
+            if ((int)mysql_num_rows(res2) > 0) {
+                row = mysql_fetch_row(res2);
+                bufp += OUTPUT(bufp, ebufp-bufp, "ELVIND_PORT=%d ", 
+                               atoi(row[0]));
+            }
+            else {
+                /*
+                 * XXX: should not hardwire port number here, but what should
+                 *      I reference for it?
+                 */
+                bufp += OUTPUT(bufp, ebufp-bufp, "ELVIND_PORT=%d ", 2917);
+            }
+            mysql_free_result(res2);
+        }
+        
+	if (!res || !res2) {
 		error("PLABCONFIG: %s: DB Error getting config!\n",
 		      reqp->nodeid);
 		return 1;
 	}
 
-	if ((int)mysql_num_rows(res) == 0) {
-		mysql_free_result(res);
-		return 0;
-	}
-	row   = mysql_fetch_row(res);
-
-	OUTPUT(buf, sizeof(buf), "SSHDPORT=%d\n", atoi(row[0]));
+        OUTPUT(bufp, ebufp-bufp, "\n");
 	client_writeback(sock, buf, strlen(buf), tcp);
-	mysql_free_result(res);
 
 	/* XXX Anything else? */
 	
@@ -6207,3 +6236,34 @@ COMMAND_PROTOTYPE(dotraceconfig)
 	return 0;
 }
 
+/*
+ * Acquire plab node elvind port update.
+ *
+ * Since there is (currently) no way to hard reserve a port on a plab node
+ * we might bind to a non-default port, and so must track this so that
+ * client vservers on the plab node know where to connect.
+ *
+ * XXX: should make sure it's the service slice reporting this.
+ */
+COMMAND_PROTOTYPE(doelvindport)
+{
+	char		buf[MYBUFSIZE];
+	unsigned int	elvport = 0;
+
+	if (sscanf(rdata, "%u",
+		   &elvport) != 1) {
+		strncpy(buf, rdata, 64);
+		error("ELVIND_PORT: %s: Bad arguments: %s...\n", reqp->nodeid,
+                      buf);
+		return 1;
+	}
+
+	/*
+         * Now shove the elvin port # we got into the db.
+	 */
+	mydb_update("replace into node_attributes "
+                    " values ('%s', '%s', %u)",
+		    reqp->pnodeid, "elvind_port", elvport);
+
+	return 0;
+}
