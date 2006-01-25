@@ -253,12 +253,12 @@ sub handler($)
 
     if ($signame eq 'ALRM') {
 	print "*** Linktest timer has expired, aborting the run.\n";
+	&analyze(1);
     }
     else {
 	print "*** Linktest has been aborted\n";
+	&run_loghole;
     }
-    &run_loghole;
-
     exit(1);
 }
 
@@ -295,7 +295,7 @@ if (($child_pid = fork())) {
 	
 	exit($exitval >> 8);
     }
-    exit(&analyze());
+    exit(&analyze(0));
 }
 else {
     my $ltpid;
@@ -358,7 +358,9 @@ else {
 # with a return code that indicates whether errors were found
 # by Linktest on the nodes.
 # 
-sub analyze {
+sub analyze($) {
+    my ($timedout) = @_;    
+    
     my @dir_contents;
     opendir(DIR, $linktest_path) ||
 	die("*** $0:\n".
@@ -370,12 +372,25 @@ sub analyze {
 	if (defined($logfile));
 
     return 0
-	if (! @dir_contents);
+	if (! (scalar(@dir_contents) || $timedout));
 
-    &run_loghole;
+    &run_loghole
+	if (! $timedout);
 
-    print "***************************************************************\n";
-    print "***************** Linktest Error Reports **********************\n";
+    if (!defined($logfile)) {
+	print "*************************************************************";
+	print "****\n";
+	print "***************** Linktest Error Reports ********************";
+	print "****\n\n";
+    }
+
+    if ($timedout) && defined($logfile)) {
+	my $msg = "Linktest timer expired, run was aborted\n".
+	          "Gathering results generated before the timer expired\n".
+		  "\n";
+
+	system("echo '$msg' > $logfile");
+    }
 
     foreach my $file (@dir_contents) {
 	# Hmm, need to taint check the filenames. Ick.
@@ -401,7 +416,10 @@ sub analyze {
 	    system("/bin/cat $linktest_path/$file");
 	}
     }
-    print "***************************************************************\n";
+    if (!defined($logfile)) {
+	print "*************************************************************";
+	print "****\n";
+    }
     return scalar(@dir_contents);
 }
 
