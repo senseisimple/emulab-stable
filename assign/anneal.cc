@@ -1232,6 +1232,8 @@ NOTQUITEDONE:
       tie(vedge_it,end_vedge_it) = edges(VG);
       for (;vedge_it != end_vedge_it; ++vedge_it) {
 	  tb_vlink *vlink = get(vedge_pmap,*vedge_it);
+          tb_vnode *src_vnode = get(vvertex_pmap,vlink->src);
+          tb_vnode *dst_vnode = get(vvertex_pmap,vlink->dst);
 	  if (best_solution.link_is_assigned(*vedge_it)) {
 	      // XXX: It's crappy that I have to do all this work here - something
 	      // needs re-organzing
@@ -1240,8 +1242,6 @@ NOTQUITEDONE:
 		*/
 	      vlink->link_info = best_solution.get_link_assignment(*vedge_it);
 	      
-	      tb_vnode *src_vnode = get(vvertex_pmap,vlink->src);
-	      tb_vnode *dst_vnode = get(vvertex_pmap,vlink->dst);
 	      if (!dst_vnode->assigned || !src_vnode->assigned) {
 		  // This shouldn't happen, but don't try to score links which
 		  // don't have both endpoints assigned.
@@ -1261,7 +1261,16 @@ NOTQUITEDONE:
 	       */
 	      score_link_info(*vedge_it, src_pnode, dst_pnode, src_vnode, dst_vnode);
 	  } else {
-	      mark_vlink_unassigned(vlink);
+              /*
+               * If one endpoint or the other was unmapped, we just note that
+               * the link wasn't mapped - however, if both endpoints were
+               * mapped, then we have to make sure the score reflects that.
+               */
+	      if (!dst_vnode->assigned || !src_vnode->assigned) {
+                  vlink->link_info.type_used = tb_link_info::LINK_UNMAPPED;
+              } else {
+                  mark_vlink_unassigned(vlink);
+              }
 	  }
       }
     } // End of reverting code
