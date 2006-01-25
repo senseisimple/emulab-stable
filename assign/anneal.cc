@@ -1247,6 +1247,11 @@ NOTQUITEDONE:
 		  // don't have both endpoints assigned.
 		  continue;
 	      }
+              if (dst_vnode->fixed && src_vnode->fixed) {
+                  // If both endpoints were fixed, this link never got
+                  // unmapped, so don't map it again
+                  continue;
+              }
 	      tb_pnode *src_pnode = get(pvertex_pmap,src_vnode->assignment);
 	      tb_pnode *dst_pnode = get(pvertex_pmap,dst_vnode->assignment);
 	      
