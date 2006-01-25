@@ -509,6 +509,7 @@ my $mem_usage;
 # Allow override of jail/delay osids.
 my $jail_osid;
 my $delay_osid;
+my $delay_osid_desire;
 
 # Flag that tells us whether to fix-node current
 # resources or not during a swap modify. This is
@@ -4051,6 +4052,13 @@ sub LoadExperiment()
 	    fatal("Invalid OS $delay_osname in project $pid!");
 	}
     }
+    # Keep a desire string we can use to make sure that the node type picked
+    # for the delay node can load the right OS
+    if ($delay_osid) {
+        $delay_osid_desire = "OS-$delay_osid:1";
+    } else {
+        $delay_osid_desire = "";
+    }
     if (defined($delay_capacity)) {
 	$DELAYCAPACITY     = $delay_capacity;
 	$delaycap_override = $delay_capacity;
@@ -4477,7 +4485,8 @@ sub CreateTopFile()
 					   $nodeport1,$rdelay,$rbw,$rloss,
 					   0];
 
-		    print TOPFILE "node $delayname delay\n";
+                    my $delayos = "";
+		    print TOPFILE "node $delayname delay $delay_osid_desire\n";
 		    print TOPFILE
 			"link linksdelaysrc/$lan/$nodeport0,$nodeport1 ".
 			"$node0 $delayname $top_bw 0 0 ethernet\n";
@@ -4649,7 +4658,8 @@ sub CreateTopFile()
 			    [$member,$delay,$bw,$loss,
 			     $member,$rdelay,$rbw,$rloss,0];
 			
-			print TOPFILE "node $delayname delay\n";
+			print TOPFILE "node $delayname delay " .
+                            "$delay_osid_desire\n";
 			print TOPFILE "link linkdelaysrc/$lan/$member" .
 			    " $node $delayname $top_bw 0 0 ethernet\n";
 			print TOPFILE "link linkdelaydst/$lan/$member" .
