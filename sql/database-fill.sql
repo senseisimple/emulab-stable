@@ -111,6 +111,7 @@ REPLACE INTO event_objecttypes VALUES (12,'TIMELINE');
 REPLACE INTO event_objecttypes VALUES (13,'CONSOLE');
 REPLACE INTO event_objecttypes VALUES (14,'TOPOGRAPHY');
 REPLACE INTO event_objecttypes VALUES (15,'LINKTRACE');
+REPLACE INTO event_objecttypes VALUES (16,'EVPROXY');
 
 --
 -- Dumping data for table `exported_tables`

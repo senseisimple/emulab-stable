@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -47,6 +47,7 @@
 #define TBDB_OBJECTTYPE_CONSOLE  "CONSOLE"
 #define TBDB_OBJECTTYPE_TOPOGRAPHY "TOPOGRAPHY"
 #define TBDB_OBJECTTYPE_LINKTRACE "LINKTRACE"
+#define TBDB_OBJECTTYPE_EVPROXY "EVPROXY"
 
 #define TBDB_EVENTTYPE_START	"START"
 #define TBDB_EVENTTYPE_STOP	"STOP"
