@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -215,6 +215,10 @@ int event_notification_remove(event_handle_t handle,
 event_subscription_t event_subscribe(event_handle_t handle,
                                      event_notify_callback_t callback,
                                      address_tuple_t tuple, void *data);
+event_subscription_t event_subscribe_auth(event_handle_t handle,
+					  event_notify_callback_t callback,
+					  address_tuple_t tuple, void *data,
+					  int do_auth);
 int event_notification_insert_hmac(event_handle_t handle,
 				   event_notification_t notification);
 int event_notification_pack(event_handle_t handle,

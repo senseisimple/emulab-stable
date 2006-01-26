@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -561,7 +561,7 @@ event_notification_alloc(event_handle_t handle, address_tuple_t tuple)
 	!EVPUT("OBJNAME", objname) ||
 	!EVPUT("EVENTTYPE", eventtype) ||
 	!EVPUT("TIMELINE", timeline) ||
-	! event_notification_put_int32(handle, notification, "SCHEDULER", 0)) {
+	! event_notification_put_int32(handle, notification, "SCHEDULER", tuple->scheduler)) {
 	ERROR("could not add attributes to notification %p\n", notification);
         return NULL;
     }
@@ -1028,6 +1028,7 @@ struct notify_callback_arg {
     event_notify_callback_t callback;
     void *data;
     event_handle_t handle;
+    int do_auth;
 };
 
 static void notify_callback(elvin_handle_t server,
@@ -1118,6 +1119,13 @@ event_subscription_t
 event_subscribe(event_handle_t handle, event_notify_callback_t callback,
 		address_tuple_t tuple, void *data)
 {
+	return event_subscribe_auth(handle, callback, tuple, data, 1);
+}
+
+event_subscription_t
+event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
+		     address_tuple_t tuple, void *data, int do_auth)
+{
     elvin_subscription_t subscription;
     struct notify_callback_arg *arg;
     char expression[EXPRESSION_LENGTH];
@@ -1184,6 +1192,7 @@ event_subscribe(event_handle_t handle, event_notify_callback_t callback,
     arg->callback = callback;
     arg->data = data;
     arg->handle = handle;
+    arg->do_auth = do_auth;
 
     subscription = handle->subscribe(handle->server, expression, NULL, 1,
                                      notify_callback, arg, handle->status);
@@ -1246,7 +1255,8 @@ notify_callback(elvin_handle_t server,
     handle = arg->handle;
 
     /* If MAC does not match, throw it away */
-    if (handle->keydata &&
+    if (arg->do_auth &&
+	handle->keydata &&
 	event_notification_check_hmac(handle, &notification)) {
 	    ERROR("bad hmac\n");
         return;
