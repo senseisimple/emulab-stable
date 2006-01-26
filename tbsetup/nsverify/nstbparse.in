@@ -35,16 +35,33 @@ proc set {args} {
     regsub -all {[\)]} $out {} val
 
     if {$rval == {}} {
-    } elseif {$rval == $last_host} {
-	array set hosts [list $last_host $val]
-    } elseif {$rval == $last_lan} {
-	array set lans [list $last_lan $val]
-    } elseif {$rval == $last_link} {
-	array set links [list $last_link $val]
-    } elseif {$rval == $last_sim} {
-	real_set simname $last_sim
-    } elseif {$rval == $last_fw} {
-	array set hosts [list $last_fw $val]
+    } else {
+	real_set do_rename 1
+
+	if {$rval == $last_host} {
+	    array set hosts [list $last_host $val]
+	} elseif {$rval == $last_lan} {
+	    array set lans [list $last_lan $val]
+	} elseif {$rval == $last_link} {
+	    array set links [list $last_link $val]
+	} elseif {$rval == $last_sim} {
+	    real_set simname $last_sim
+	} elseif {$rval == $last_fw} {
+	    array set hosts [list $last_fw $val]
+	} else {
+	    real_set do_rename 0
+	}
+
+	if {$do_rename != 0} {
+	    # Create a procedure with the variable name that forwards any calls
+	    # to the real object.  This is should emulate the behavior of the
+	    # testbed parser without requiring us to add "rename" methods to
+	    # the NS objects.
+	    real_set np "proc $val {args} {\n"
+	    append np "  eval return $rval \$args\n"
+	    append np "}\n"
+	    eval $np
+	}
     }
 
     real_set last_host {}
