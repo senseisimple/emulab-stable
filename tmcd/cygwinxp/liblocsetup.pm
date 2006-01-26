@@ -573,9 +573,10 @@ sub os_routing_add_manual($$$$$;$)
     #     the IP Address Table for the machine.
     # Re-doing the command later succeeds.
     # Wrap the route command in a loop to make sure it gets done.
-    $cmd = "while ! ( route print | grep -Fq $destip ); do \n
+    $cmd = "while ! ( $ROUTE print | grep -Fq $destip ); do \n
                 echo $cmd;\n
                 $cmd\n
+                sleep 5\n
             done";
 
     return $cmd;
