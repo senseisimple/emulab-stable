@@ -327,7 +327,6 @@ struct command {
 	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
 	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
-
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -4563,40 +4562,44 @@ COMMAND_PROTOTYPE(doplabconfig)
         res2 = mydb_query("select attrvalue from node_attributes "
                           " where node_id='%s' and attrkey='elvind_port'",
                           1, reqp->pnodeid);
-	
-        if (res) {
-            if ((int)mysql_num_rows(res) > 0) {
-                row = mysql_fetch_row(res);
-                bufp += OUTPUT(bufp, ebufp-bufp, "SSHDPORT=%d ", 
-                               atoi(row[0]));
-            }
-            mysql_free_result(res);
-        }
 
-        if (res2) {
-            if ((int)mysql_num_rows(res2) > 0) {
-                row = mysql_fetch_row(res2);
-                bufp += OUTPUT(bufp, ebufp-bufp, "ELVIND_PORT=%d ", 
-                               atoi(row[0]));
-            }
-            else {
-                /*
-                 * XXX: should not hardwire port number here, but what should
-                 *      I reference for it?
-                 */
-                bufp += OUTPUT(bufp, ebufp-bufp, "ELVIND_PORT=%d ", 2917);
-            }
-            mysql_free_result(res2);
-        }
-        
 	if (!res || !res2) {
 		error("PLABCONFIG: %s: DB Error getting config!\n",
 		      reqp->nodeid);
+                if (res) {
+                    mysql_free_result(res);
+                }
+                if (res2) {
+                    mysql_free_result(res2);
+                }
 		return 1;
 	}
+	
+        /* Add the sshd port (if any) to the output */
+        if ((int)mysql_num_rows(res) > 0) {
+            row = mysql_fetch_row(res);
+            bufp += OUTPUT(bufp, ebufp-bufp, "SSHDPORT=%d ", 
+                           atoi(row[0]));
+        }
+        mysql_free_result(res);
+
+        /* Add the elvind port to the output */
+        if ((int)mysql_num_rows(res2) > 0) {
+            row = mysql_fetch_row(res2);
+            bufp += OUTPUT(bufp, ebufp-bufp, "ELVIND_PORT=%d ", 
+                           atoi(row[0]));
+        }
+        else {
+            /*
+             * XXX: should not hardwire port number here, but what should
+             *      I reference for it?
+             */
+             bufp += OUTPUT(bufp, ebufp-bufp, "ELVIND_PORT=%d ", 2917);
+        }
+        mysql_free_result(res2);
 
         OUTPUT(bufp, ebufp-bufp, "\n");
-	client_writeback(sock, buf, strlen(buf), tcp);
+        client_writeback(sock, buf, strlen(buf), tcp);
 
 	/* XXX Anything else? */
 	
