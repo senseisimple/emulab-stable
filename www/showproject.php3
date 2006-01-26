@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -62,6 +62,12 @@ WRITESUBMENUBUTTON("Show Project History",
 		   "showstats.php3?showby=project&which=$pid");
 WRITESUBMENUBUTTON("Free Node Summary",
 		   "nodecontrol_list.php3?showtype=summary&bypid=$pid");
+if ($isadmin) {
+    WRITESUBMENUDIVIDER();
+    WRITESUBMENUBUTTON("Delete this project",
+		       "deleteproject.php3?pid=$pid");
+}
+
 SUBMENUEND();
 SHOWPROJECT($pid, $uid);
 SUBPAGEEND();
@@ -117,12 +123,6 @@ if ($isadmin) {
          </center>\n";
 
     SHOWPROJSTATS($pid);
-}
-
-if ($isadmin) {
-    echo "<p>
-          <A href='deleteproject.php3?pid=$pid'>
-             <font color=Red>Delete this project?</font></a>\n";
 }
 
 #
