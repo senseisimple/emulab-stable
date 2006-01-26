@@ -766,7 +766,8 @@ while (1) {
 	$precheck = 1;
 	my $retval = RunAssign();
 	if ($retval != 0) {
-	    fatal({type=>'extra'}, "Experiment can not be run on an empty testbed.  Please fix the experiment.");
+	    fatal({type=>'extra', cause=>'user'}, 
+		  "Experiment can not be run on an empty testbed.  Please fix the experiment.");
 	}
 	print("Assign succeeded on an empty testbed.\n");
 	$precheck = 0;

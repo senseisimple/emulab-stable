@@ -13,8 +13,9 @@
 BEGIN {$FAKE_SCRIPTNAME = $ARGV[0];}
 
 use lib "@prefix@/lib";
-use libtblog;
-use libtblog qw(dblog *SOUT *SERR);
+use libtblog qw(:DEFAULT dblog *SOUT *SERR);
+
+tblog_set_default_cause('temp');
 
 use strict;
 
@@ -98,3 +99,11 @@ if ($exitcode) {
 }
 
 exit $exitcode;
+
+
+
+
+
+
+
+

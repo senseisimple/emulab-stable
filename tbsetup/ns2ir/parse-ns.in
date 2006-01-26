@@ -239,6 +239,7 @@ else {
     my $cmd = basename(shift @argv);
     
     tblog_new_process($cmd, @argv);
+    tblog_set_default_cause('user');
 
     my $err = '';
     
@@ -270,7 +271,7 @@ close ERR;
 if ($?) {
     my $exit_status = $? >> 8;
     
-    tbdie({type=>'extra'}, "Parsing failed (error code $exit_status)!");
+    tbdie({type=>'extra', cause=>'user'}, "Parsing failed (error code $exit_status)!");
 }
 exit(0)
     if ($impotent);
