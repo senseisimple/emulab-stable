@@ -982,19 +982,25 @@ AddAgent(event_handle_t handle,
 		agentp->handler = &primary_simulator_agent->sa_local_agent;
 	}
 	else if (strcmp(type, TBDB_OBJECTTYPE_EVPROXY) == 0) {
-		address_tuple_t tuple = address_tuple_alloc();
-		
-		if (tuple == NULL) {
-			fatal("could not allocate an address tuple");
-		}
-		tuple->scheduler = 1;
-		tuple->objname = agentp->name;
-		tuple->objtype = TBDB_OBJECTTYPE_EVPROXY;
-		tuple->eventtype = TBDB_EVENTTYPE_UPDATE;
-		
-		if (event_subscribe_auth(handle, enqueue,
-					 tuple, NULL, 0) == NULL) {
-			fatal("could not subscribe to EVENT_SCHEDULE event");
+		static int evproxy_subscribed = 0;
+
+		if (!evproxy_subscribed) {
+			address_tuple_t tuple = address_tuple_alloc();
+			
+			if (tuple == NULL) {
+				fatal("could not allocate an address tuple");
+			}
+			tuple->scheduler = 1;
+			tuple->objtype = TBDB_OBJECTTYPE_EVPROXY;
+			tuple->eventtype = TBDB_EVENTTYPE_UPDATE;
+			
+			if (event_subscribe_auth(handle, enqueue,
+						 tuple, NULL, 0) == NULL) {
+				fatal("could not subscribe to EVENT_SCHEDULE "
+				      "event");
+			}
+			
+			evproxy_subscribed = 1;
 		}
 	}
 	else if ((strcmp(type, TBDB_OBJECTTYPE_TIMELINE) == 0) ||
