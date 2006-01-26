@@ -31,7 +31,7 @@ my $state;
 #
 my $TBROOT   = "@prefix@";
 my $TESTMODE = @TESTMODE@;
-my $TBOPS    = "@TBOPSEMAIL@";
+my $TBLOGS = "@TBLOGSEMAIL@";
 my $wrapper  = "$TBROOT/libexec/assign_wrapper";
 my $batchexp = "$TBROOT/bin/batchexp";
 my $template = "$TBROOT/lib/ns2ir/elabinelab.ns";
@@ -284,7 +284,7 @@ if (!$elabinelab) {
     
     if (system("verify-ns $pid $gid $eid $nsfile")) {
 	if (1) {
-	    SENDMAIL($TBOPS,
+	    SENDMAIL($TBLOGS,
 		     "NS Verify failure for $pid/$eid",
 		     "'verify-ns' failed for $pid/$eid\n".
 		     "\nIf it is not a user error nstb_compat.tcl is ".
