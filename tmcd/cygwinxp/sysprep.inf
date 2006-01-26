@@ -1,0 +1,97 @@
+;SetupMgrTag
+[Data]
+    AutoPartition=1
+    MsDosInitiated="0"
+    UnattendedInstall="Yes"
+
+[Unattended]
+    UnattendMode=FullUnattended
+    OemSkipEula=Yes
+    OemPreinstall=No
+    TargetPath=\WINDOWS
+    ; Specifies the location of files necessary for installation during Mini-Setup.
+    InstallFilesPath=c:\sysprep
+    ; LSI SCSI and Intel NIC drivers are in subdirs with .inf files.
+    ;;;OemPnPDriversPath=WINDOWS\inf;drivers\symmpi;drivers\pro1000;drivers\pro100
+    ;;UpdateInstalledDrivers=Yes
+
+; Enable RDP during mini-setup.
+[TerminalServices]
+    AllowConnections=1
+
+[GuiUnattended]
+    ; AdminPassword of * denotes blank or NULL password (no remote connections allowed.)
+    AdminPassword="*"
+    OEMSkipRegional=1
+    TimeZone=10
+    OemSkipWelcome=1
+
+[UserData]
+    ProductKey=DK6KR-YMFC4-PDC4Q-828TP-HW9BY
+    FullName="Netbed User"
+    OrgName="Netbed"
+    ComputerName=sysprep
+
+; This should be safe...
+[Display]
+    BitsPerPel=32
+    Xresolution=1024
+    YResolution=768
+    Vrefresh=60
+
+[Identification]
+    JoinWorkgroup=EMULAB
+
+[Networking]
+    InstallDefaultComponents=No
+
+[NetAdapters]
+    Adapter1=params.Adapter1
+
+[params.Adapter1]
+    INFID=*
+
+[NetClients]
+    MS_MSClient=params.MS_MSClient
+
+[NetServices]
+    MS_SERVER=params.MS_SERVER
+
+[NetProtocols]
+    MS_TCPIP=params.MS_TCPIP
+
+[params.MS_TCPIP]
+    DNS=Yes
+    UseDomainNameDevolution=No
+    EnableLMHosts=No
+    DisableDynamicUpdate=Yes
+    AdapterSections=params.MS_TCPIP.Adapter1
+
+[params.MS_TCPIP.Adapter1]
+    SpecificTo=Adapter1
+    DHCP=Yes
+    WINS=No
+    NetBIOSOptions=2
+
+[SysprepMassStorage]
+; pc3000:
+;    LSI Adapter, Ultra320 SCSI 2000 series, w/1020/1030 (LSI53C1020 chip)
+;    DevInstID: PCI\VEN_1000&DEV_0030&SUBSYS_016D1028&REV_08\5&39562480&0&280010
+;       C:\WINDOWS\system32\DRIVERS\symmpi.sys   LSI Logic 1.20.18.0 6/13/2005, unsigned.
+    pci\ven_1000&dev_0030="C:\drivers\symmpi\symmpi.inf"
+;
+; pc600 and pc850: 
+;    Intel(R) 82371/AP/EB PCI Bus Master IDE Controller
+;    DevInstID: PCI\VEN_8086&DEV_7111&SUBSYS_00000000&REV_01\3&61AAA01&0&21
+;     MS 5.1.2600.2180 (xpsp_sp2_rtm.040803-2158) 7/1/01
+;      C:\WINDOWS\system32\DRIVERS\atapi.sys
+;      C:\WINDOWS\system32\DRIVERS\intelide.sys
+;      C:\WINDOWS\system32\DRIVERS\pciindex.sys
+;    Primary / Secondary IDE Channel
+;    DevInstID: PCIIDE\IDECHANNEL\4&2503CF0&0&0
+;               PCIIDE\IDECHANNEL\4&2503CF0&0&1
+;      C:\WINDOWS\system32\DRIVERS\atapi.sys
+;      C:\WINDOWS\system32\storprop.dll
+;;;   pci\ven_8086&dev_7111="c:\windows\inf\mshdc.inf"
+    Primary_IDE_Channel="c:\windows\inf\mshdc.inf"
+    Secondary_IDE_Channel="c:\windows\inf\mshdc.inf"

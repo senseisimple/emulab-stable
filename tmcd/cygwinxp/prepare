@@ -5,32 +5,64 @@
 # All rights reserved.
 #
 use English;
-use Getopt::Std;
 require 'ctime.pl';
 
 #
 # Prepare the node for cutting a new image.  Should be run just prior.
 #
-sub usage()
-{
-    print("Usage: " . scriptname() . " [-p Rootpwd] [-n] [-s] \n" .
-	  "    -p Rootpwd : Root password, for Emulab services redef.\n" .
-	  "        If not present, and not -n, will be prompted-for.\n" .
-	  "    -s : Make a hardware-independent image using Sysprep.\n" .
-	  "    -n : Root password was not changed, don't redef services.\n");
-    exit(1);
-}
-my $optlist = "p:ns";
-my $rootpwd = "";
-my $rootpwd2 = "";
-my $noredef = 0;
-my $sysprep = 0;
 
 # Turn off line buffering on output
 $| = 1;
 
 # Drag in path stuff so we can find emulab stuff.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use librc;
+
+sub usage()
+{
+    print("Usage: " . scriptname() . " [-p Rootpwd] [-n] [-s] [-c] [-d]\n" .
+	  "    -p Rootpwd : Root password, for Emulab services redef.\n" .
+	  "        If not present, and not -n, will be prompted-for.\n" .
+	  "    -n : Root password was not changed, don't redef services.\n" .
+	  "    -s : Make a hardware-independent image using Sysprep.\n" .
+	  "    -c : Clear out the driver inf caches for a fresh start.\n" .
+	  "    -d : Bypass Sysprep and install drivers ourselves.\n");
+    exit(1);
+}
+my $optlist = "p:nscd";
+my $rootpwd = "";
+my $rootpwd2 = "";
+my $noredef = 0;
+my $sysprep = 0;
+my $drvinstall = 0;
+my $clearcaches = 0;
+
+# Parse command line.
+use Getopt::Std;
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (defined($options{'p'})) {
+    $rootpwd = $rootpwd2 = $options{'p'};
+}
+if (defined($options{'n'})) {
+    $noredef = 1;
+}
+if (defined($options{'s'})) {
+    $sysprep = 1;
+}
+if (defined($options{'d'})) {
+    $drvinstall = 1;
+}
+if (defined($options{'c'})) {
+    $clearcaches = 1;
+}
 
 # Only root.
 if ($EUID != 0) {
@@ -63,20 +95,6 @@ my @DEADFILES	= ("rc.agents", "rc.delayagent", "rc.delta", "rc.healthd",
 		   "startssh", "stopssh", "rc/rc.cygwinxp-user"
 		   );
 
-# Parse command line.
-if (! getopts($optlist, \%options)) {
-    usage();
-}
-if (defined($options{'p'})) {
-    $rootpwd = $rootpwd2 = $options{'p'};
-}
-if (defined($options{'n'})) {
-    $noredef = 1;
-}
-if (defined($options{'s'})) {
-    $sysprep = 1;
-}
-
 sub do_cmd ($)
 {
     my($cmd) = @_;
@@ -93,9 +111,12 @@ my $netcmd = "$sysdir/net.exe";
 # Could use /share/windows/sysprep, but prepare may have been run once
 # already, and unmounted /share.  We mount Z: to authenticate, so use that.
 my $sysprep_src = "/cygdrive/z/windows/sysprep";
+
 my $sysprep_dst = "/cygdrive/c/sysprep";
 my $sysprep_cmd = "$sysprep_dst/sysprep.exe";
 my $drivers_dst = "/cygdrive/c/drivers";
+my $drivers_win = '%SystemDrive%\drivers';
+my $device_path;
 
 #
 # Must be logged in on the serial console to run Sysprep.  Check for it.
@@ -133,55 +154,14 @@ if ($sysprep) {
     }
     close LAST;
 
+    #
+    # Make sure we can get the deploy tools, including sysprep itself.
+    #
     print "Authenticating for read-only access to /share/windows.\n";
     do_cmd "$netcmd use Z: /DELETE >& /dev/null";
     do_cmd "$netcmd use Z: '\\\\fs\\share' PublicOnly /persistent:no";
-    die "*** Cannot access sysprep tools from $sysprep_src."
+    die "*** Cannot access sysprep tools from $sysprep_src"
 	if (! -e $sysprep_src);
-
-    print "Setting up for Sysprep/Mini-Setup.\n";
-    #
-    # Get the right flavor of tools for the SP level.
-    #
-    my $cv = "/HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion";
-    my $sp = `regtool get "$cv/CSDVersion"`;
-    chomp $sp;
-    my $deploy_src;
-    if ($sp eq "Service Pack 2") {
-	$deploy_src = "$sysprep_src/xpsp2_support_tools_deploy";
-    }
-    elsif ($sp eq "Service Pack 1") {
-	$deploy_src = "$sysprep_src/xpsp1_support_tools_deploy";
-    }
-    else {
-	$deploy_src = "$sysprep_src/xp_support_tools_deploy";
-    }
-    print "$sp sysprep from $deploy_src\n";
-
-    print "Copying deploy tools to $sysprep_dst\n";
-    do_cmd "rm -rf $sysprep_dst";  # Removed by Mini-Setup, make sure.
-    do_cmd "cp -rp $deploy_src $sysprep_dst";
-    do_cmd "cp -p $sysprep_src/sysprep.inf $sysprep_dst";
-    die "*** Didn't get sysprep!\n"
-	if (! -x $sysprep_cmd);
-
-    print "Copying drivers directories to C:/drivers.\n";
-    do_cmd "rm -rf $drivers_dst";
-    do_cmd "cp -rp $sysprep_src/drivers $drivers_dst";
-
-    # Special case for non-Microsoft boot disk or SCSI controller drivers.
-    # OemPnpDriversPath in sysprep.inf evidently doesn't work for the boot
-    # disk driver when starting Mini-setup.  Pre-install it by hand.
-    my $driver = "symmpi";
-    my $drvdir = "$drivers_dst/$driver";
-    my $inf = "$driver.inf";
-    if (-e $drvdir) {
-	print "Pre-installing the $drvdir driver for Mini-Setup.\n";
-
-	# Must be a signed driver, with CatalogFile no-op'ed in the inf file.
-	do_cmd "sed 's/CatalogFile/;;;&/' $drvdir/$inf > $infdir/$inf";
-	do_cmd "cp -p $drvdir/* $sysdir";
-    }
 }
 
 if (! $noredef) {
@@ -208,6 +188,14 @@ if (! $noredef) {
 	ReadMode 'normal';
 	print "\n";
     }
+
+    #
+    # Set the root password to make sure it matches.  We also set this to be
+    # the Administrator password, to match the sysprep.inf file entry below.
+    print "\nSetting root password to $rootpwd.\n";
+    system("echo '$rootpwd\n$rootpwd\n' | passwd root");
+    print "\nSetting Administrator password to $rootpwd.\n";
+    system("echo '$rootpwd\n$rootpwd\n' | passwd Administrator");
 
     #
     # Windows stores the password as part of the definition of services that
@@ -237,11 +225,65 @@ if (! $noredef) {
     system("cygrunsrv -VQ EmulabStartup");
 }
 
-#
-# Load the OS independent support library. It will load the OS dependent
-# library and initialize itself. 
-# 
-use libsetup;
+if ($sysprep) {
+    print "\nSetting up for Sysprep/Mini-Setup.\n";
+    #
+    # Get the right flavor of tools for the SP level.
+    #
+    my $cv = "/HKLM/SOFTWARE/Microsoft/Windows NT/CurrentVersion";
+    my $sp = `regtool get "$cv/CSDVersion"`;
+    chomp $sp;
+    my $deploy_src;
+    if ($sp eq "Service Pack 2") {
+	$deploy_src = "$sysprep_src/xpsp2_support_tools_deploy";
+    }
+    elsif ($sp eq "Service Pack 1") {
+	$deploy_src = "$sysprep_src/xpsp1_support_tools_deploy";
+    }
+    else {
+	$deploy_src = "$sysprep_src/xp_support_tools_deploy";
+    }
+    print "$sp sysprep from $deploy_src\n";
+
+    print "Copying deploy tools to $sysprep_dst\n";
+    do_cmd "rm -rf $sysprep_dst";  # Removed by Mini-Setup, make sure.
+    do_cmd "cp -rp $deploy_src $sysprep_dst";
+    die "*** Didn't get sysprep!\n"
+	if (! -x $sysprep_cmd);
+
+    my $spi_src = "$sysprep_src/sysprep.inf";
+    my $spi_dst = "$sysprep_dst/sysprep.inf";
+    if ($noredef) {
+	# Assume the Administrator password is blank or NULL or set separately.
+	# (See deploy.chm for description of [GuiUnattended]AdminPassword.)
+	do_cmd "cp -p $spi_src $spi_dst";
+    }
+    else {
+	# Substitute the root password into [GuiUnattended]AdminPassword.
+	my $ap="AdminPassword";
+	my $admpwd = $rootpwd;
+	$admpwd =~ s/\|/\\|/g;	# Quote separator chars in the password.
+	do_cmd "sed '/$ap=.*/s||$ap=\"$admpwd\"|' $spi_src > $spi_dst";
+    }	
+
+    print "\nCopying drivers directories to C:/drivers.\n";
+    do_cmd "rm -rf $drivers_dst";
+    do_cmd "cp -rp $sysprep_src/drivers $drivers_dst";
+
+    #
+    # Build a DevicePath and check that it's not too long.
+    #
+    $device_path = '%SystemRoot%\inf';
+    foreach my $subdir (`ls $drivers_dst`) {
+	chomp $subdir;
+	$device_path .= ';' . $drivers_win . '\\' . $subdir;
+    }
+    die "DevicePath too long, limited to 4096 chars.\n$device_path\n"
+	if (length($device_path) > 4096);
+    die "Null DevicePath.\n$device_path\n"
+	if (length($device_path) == 0);
+    print "DevicePath $device_path\n";
+}
 
 # Capture the node name before cleaning out the config files.
 my $vname = "";
@@ -255,6 +297,7 @@ if (open(NICK, TMNICKNAME)) {
 #
 # First clean up the node as it would be if free.
 #
+print "\n";
 cleanup_node(1);
 
 print "Running $BINDIR/rc/rc.config to clean up ...\n";
@@ -416,7 +459,7 @@ system("rm -rf C:/WINDOWS/ServicePackFiles/i386");
 system("du -sm C:/WINDOWS/SoftwareDistribution/Download");
 system("rm -rf C:/WINDOWS/SoftwareDistribution/Download/*");
 
-print "Re-enable all network interfaces.\n";
+print "\nRe-enabling all network interfaces.\n";
 system("devcon enable =net 'PCI*'");
 
 #
@@ -426,8 +469,44 @@ system("devcon enable =net 'PCI*'");
 # file controlling an unattended Mini-Setup to install all drivers.
 #
 if ($sysprep) {
-    print "Executing sysprep.  Takes a couple of minutes.\n";
+    if ($clearcaches) {
+	print "\nClearing out the driver inf caches for a fresh start.\n";
+	do_cmd "rm -f $infdir/oem*.{inf,pnf}";
+###	do_cmd "rm -f $infdir/{oem*.inf,INFCACHE.1,*.pnf}";
+###	do_cmd "chown -R root $sysdir/CatRoot2";
+###	do_cmd "rm -rf $sysdir/CatRoot2";
+    }
+
+    if ($drvinstall) {
+	# Give up on OemPnPDriversPath, install the files ourselves.
+	print "\nInstalling driver files into $infdir and $sysdir.\n";
+
+	# Inf files complain about signing unless they're renamed oem*.inf .
+	# Comment-out the catalog file (signing) entries in the .inf files.
+	do_cmd("oem=0; for inf in $drivers_dst/*/*.inf; do " .
+	       "  inf_dst=$infdir/oem\$oem.inf; let oem++; " .
+	       "  echo \$inf \$inf_dst;" .
+	       "  sed 's/CatalogFile/;;;&/' \$inf > \$inf_dst;" .
+	       "done");
+	do_cmd "cp -p $drivers_dst/*/*.sys $sysdir/drivers";
+	do_cmd "cp -p $drivers_dst/*/*.{din,dll} $sysdir";
+    }
+    print "\n";
+
+    # The DevicePath registry key disables the OemPnPDriversPath entry in
+    # sysprep.inf .  It's set to %SystemRoot%\inf as a side-effect of sysprep!
+    print "\nExecuting sysprep.  Takes a couple of minutes.\n";
+    print "DevicePath $device_path\n";
+    my $drvkey = "/HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/DevicePath";
+    ##do_cmd "regtool get $drvkey";
+    do_cmd "regtool set -s $drvkey '$device_path'";
+    do_cmd "regtool get $drvkey";
+
     do_cmd "$sysprep_cmd -nosidgen -noreboot -reseal -mini -quiet";
+
+    do_cmd "regtool get $drvkey";
+    ##do_cmd "regtool set -s $drvkey '$device_path'";
+    ##do_cmd "regtool get $drvkey";
 }
 
 print "\nDone!\n";
