@@ -56,7 +56,7 @@ CREATE TABLE archive_views (
   date_created int(10) unsigned NOT NULL default '0',
   branch_tag varchar(64) default NULL,
   parent_view varchar(64) default NULL,
-  PRIMARY KEY (view,archive_idx)
+  PRIMARY KEY  (view,archive_idx)
 ) TYPE=MyISAM;
 
 --
@@ -1519,6 +1519,18 @@ CREATE TABLE obstacles (
   no_exclusion tinyint(1) NOT NULL default '0',
   no_tooltip tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (obstacle_id)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `os_boot_cmd`
+--
+
+CREATE TABLE os_boot_cmd (
+  OS enum('Unknown','Linux','Fedora','FreeBSD','NetBSD','OSKit','Windows','TinyOS','Other') NOT NULL default 'Unknown',
+  version varchar(12) NOT NULL default '',
+  role enum('default','delay','linkdelay','vnodehost') NOT NULL default 'default',
+  boot_cmd_line text,
+  PRIMARY KEY  (OS,version,role)
 ) TYPE=MyISAM;
 
 --

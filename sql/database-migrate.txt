@@ -3123,3 +3123,17 @@ last_net_act,last_cpu_act,last_ext_act);
        alter table os_info change osfeatures osfeatures \
 	    set('ping','ssh','ipod','isup','veths','mlinks', \
 	         'linktest','linkdelays') default NULL;
+
+4.34: Table that maps an OS, version, and role to a boot command line.
+      It is referred to when assign_wrapper needs to assign a command
+      line to a delay or jail node.
+
+	CREATE TABLE os_boot_cmd (
+	  OS enum('Unknown','Linux','Fedora','FreeBSD','NetBSD','OSKit',\
+		'Windows','TinyOS','Other') NOT NULL default 'Unknown',
+	  version varchar(12) NOT NULL default '',
+	  role enum('default','delay','linkdelay','vnodehost') \
+		NOT NULL default 'default',
+	  boot_cmd_line text,
+	  PRIMARY KEY  (OS,version,role)
+	) TYPE=MyISAM;

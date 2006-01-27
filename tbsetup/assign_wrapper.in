@@ -2688,7 +2688,8 @@ sub InitPnode($$)
 	# almost the same no matter what type.
 	#
 	my $routertype;
-	my $cmdline = "";	# XXX Gross hack. 
+	my $cmdline_role = "default";
+	my $cmdline = "";
 
 	if (exists($delaynodes{$vnode})) {
 	    #
@@ -2705,6 +2706,7 @@ sub InitPnode($$)
 	    $role  = TBDB_RSRVROLE_DELAYNODE;
 	    $routertype = TBDB_ROUTERTYPE_NONE;
 	    $cmdline = "/kernel.delay";
+	    $cmdline_role = "delay";
 	}
 	elsif (exists($virtnodes{$pnode})) {
 	    #
@@ -2725,10 +2727,21 @@ sub InitPnode($$)
 	    # XXX Must have routing on jail hosting nodes. Change me.
 	    $routertype = TBDB_ROUTERTYPE_MANUAL;
 	    $cmdline = "/kernel.jail";
+	    $cmdline_role = "vnodehost";
 	}
 	fatal("No OSID is defined for internal node $vname!")
 	    if (!defined($osid));
+
+	my $query_result =
+	    DBQueryFatal("SELECT ob.boot_cmd_line FROM os_info as oi ".
+			 "LEFT JOIN os_boot_cmd as ob on ob.OS=oi.OS and ".
+			 "  ob.version=oi.version ".
+			 "WHERE oi.osid='$osid' and ob.role='$cmdline_role'");
 	
+	if ($query_result->num_rows == 1) {
+	    ($cmdline) = $query_result->fetchrow_array();
+	}
+
 	DBQueryFatal("UPDATE nodes set ".
 		     " def_boot_cmd_line='$cmdline'," .
 		     " startstatus=0, ".
