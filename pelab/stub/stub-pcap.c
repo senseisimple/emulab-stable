@@ -73,6 +73,9 @@ void throughputProcessSend(ThroughputAckState * state, unsigned int sequence,
 {
   if (sequence == state->nextSequence)
   {
+    if (size == 0) {
+        size = 1;
+    }
     state->nextSequence += size;
   }
   else if (throughputInWindow(state, sequence))
@@ -93,6 +96,9 @@ void throughputProcessSend(ThroughputAckState * state, unsigned int sequence,
 // Notify the throughput monitor that some bytes have been acknowledged.
 void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
 {
+  if (! state->isValid) {
+      printf("throughputProcessAck() called with invalid state\n");
+  }
   if (throughputInWindow(state, sequence))
   {
     state->ackSize += sequence - state->firstUnknown + 1;
@@ -112,6 +118,9 @@ unsigned int throughputTick(ThroughputAckState * state)
   divisor += (now.tv_usec - state->lastTime.tv_usec)/1000000.0;
   result = (state->ackSize * 8.0) / (divisor * 1000.0);
   printf("ByteCount: %u\n", state->ackSize);
+  printf("UnAck ByteCount: %i (%i - %i)\n",
+          state->nextSequence - state->firstUnknown,
+          state->nextSequence, state->firstUnknown);
   state->ackSize = 0;
   state->repeatSize = 0;
   state->lastTime = now;
@@ -311,7 +320,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       length   -= (tcp_hlen * 4); //jump pass the tcp header
       seq_start = ntohl(tp->seq);      
       seq_end   = ((unsigned long)(seq_start+length));
-      ack_bit= ((tp)->ack  & 0x0001);
+      ack_bit= ((tp)->ack & 0x0001);
 
       path_id = search_rcvdb(ip_dst);
       if (path_id != -1) { //a monitored outgoing packet
@@ -396,7 +405,9 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       if (flag_debug) printf("An unknow packet captured: %d \n", ip->ip_p);
       break;
     } //switch
-  } //if unfragmented or last fragment
+  } else { //if unfragmented or last fragment
+      printf("Got an incomplete fragment\n");
+  }
 
   return 0;
 }
