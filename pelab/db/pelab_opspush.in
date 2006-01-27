@@ -85,6 +85,12 @@ if (! $debug) {
 }
 
 #
+# Only want to run this once!
+#
+TBScriptLock("pelab_opspush") == 0 or
+    fatal("Could not get the lock!");
+
+#
 # We periodically send a new table over, or on demand. At some point
 # might want to revisit this. Mabye just talk to the DB directly on ops.
 #
@@ -109,7 +115,7 @@ unlink("${tempfile}.site_mapping")
 
 unlink("$logname")
     if (-e $logname);
-
+TBScriptUnlock();
 exit(0);
 
 sub fatal($)
@@ -121,6 +127,8 @@ sub fatal($)
     unlink("$logname")
 	if (-e $logname);
 
+    TBScriptUnlock();
+    
     die("*** $0:\n".
 	"    $msg\n");
 }
