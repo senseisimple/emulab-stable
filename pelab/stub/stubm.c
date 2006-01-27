@@ -527,6 +527,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
   while (packet_buffer_more() && (deadline->tv_sec < now.tv_sec ||
         (deadline->tv_sec == now.tv_sec && deadline->tv_usec < now.tv_usec)))
   {
+      printf("In lame loop\n");
 //    struct in_addr debug_temp;
 //    debug_temp.s_addr = packet.ip;
 //    printf("Sending packet to %s of size %ld\n", inet_ntoa(debug_temp),
@@ -672,7 +673,7 @@ int main(int argc, char *argv[]) {
     gettimeofday(&start_tv, NULL); //reset start time for each quanta
     flag_print = 0;
 
-    printf("quanta\n");
+    printf("quanta: start=%i\n",start_tv.tv_sec);
 
     //while in a quanta
     while(have_time(&start_tv, &left_tv)) {  
@@ -754,10 +755,12 @@ int main(int argc, char *argv[]) {
       }
 
       //print measurements once in each quanta
+      /*
       if (flag_measure && flag_print==0) {
 	print_measurements();
 	flag_print = 1;
       }
+      */
 
       //sniff packets
       if (FD_ISSET(pcapfd, &read_fds_copy)) { 
@@ -765,6 +768,8 @@ int main(int argc, char *argv[]) {
       }
 
     } //while in quanta
+
+    print_measurements();
   } //while forever
 
   packet_buffer_cleanup(); 
