@@ -37,6 +37,8 @@ PLAB_ROOTBALL="plabroot-12.tar.bz2"
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 WINSUPPORT=1
+PELABSUPPORT=1
+
 #
 # These next six will not work outside of Utah (yet).
 #

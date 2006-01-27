@@ -154,6 +154,7 @@ AC_SUBST(CHATSUPPORT)
 AC_SUBST(MIN_UNIX_UID)
 AC_SUBST(MIN_UNIX_GID)
 AC_SUBST(DELAYTHRESH)
+AC_SUBST(PELABSUPPORT)
 
 #
 # Offer both versions of the email addresses that have the @ escaped
@@ -217,6 +218,7 @@ FRISEBEEMCASTPORT=3564
 MIN_UNIX_UID=10000
 MIN_UNIX_GID=6000
 DELAYTHRESH=2
+PELABSUPPORT=0
 
 #
 # Okay, I know this is improper usage of --with. Too bad.
@@ -559,6 +561,15 @@ fi
 AC_SUBST(EVENTSYS)
 
 #
+# Quickie pelab support.
+#
+if test $PELABSUPPORT -eq 0; then
+	pelabfiles="";
+else
+	pelabfiles="pelab/GNUmakefile pelab/db/GNUmakefile ";
+fi
+
+#
 # Enable Windows support.
 # Right now this means NTFS support in imagezip, maybe more things later.
 # Relies on Linux NTFS library.
@@ -780,6 +791,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
         tools/selectapplet/GNUmakefile \
 	$eventfiles \
 	$winfiles \
+	$pelabfiles \
 	apache/GNUmakefile apache/httpd.conf \
         xmlrpc/GNUmakefile xmlrpc/emulabclient.py xmlrpc/emulabserver.py \
 	xmlrpc/sshxmlrpc_client.py xmlrpc/sshxmlrpc_server.py \

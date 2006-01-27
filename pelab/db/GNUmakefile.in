@@ -1,0 +1,35 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= pelab/db
+
+include $(OBJDIR)/Makeconf
+
+SBIN_SCRIPTS = pelab_dbpush
+
+all:	$(SBIN_SCRIPTS)
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install: $(addprefix $(INSTALL_DIR)/opsdir/sbin, $(SBIN_SCRIPTS))
+
+boss-install: install
+
+clean:
+
+$(INSTALL_DIR)/opsdir/sbin/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
+	$(INSTALL) $< $@
+
+$(INSTALL_DIR)/opsdir/libexec/%: %
+	@echo "Installing $<"
+	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
+	$(INSTALL_DATA) $< $@
+
