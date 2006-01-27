@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -245,6 +245,7 @@ int capture_snaplen = 64;
 volatile int killme = 0;
 volatile int stop   = 0;
 volatile int reload = 0;
+char *reload_tag = NULL;
 
 #ifdef EVENTSYS
 /*
@@ -1420,7 +1421,14 @@ void *readpackets_capturemode(void *args)
 		 */
 		char buf[BUFSIZ];
 
-		sprintf(buf, "%s.0", filenames[sargs->index]);
+		if (reload_tag != NULL) {
+		  snprintf(buf, BUFSIZ,
+			   "%s.%s",
+			   filenames[sargs->index], reload_tag);
+		}
+		else {
+		  snprintf(buf, BUFSIZ, "%s.0", filenames[sargs->index]);
+		}
 		rename(filenames[sargs->index], buf);
 
 		fprintf(stderr, "reload=%d (%d)\n", reload, getpid());
@@ -1717,6 +1725,19 @@ callback(event_handle_t handle,
 		}
 		else if (!strcmp(eventtype,TBDB_EVENTTYPE_RELOAD) ||
 			 !strcmp(eventtype,TBDB_EVENTTYPE_SNAPSHOT)) {
+			char args[BUFSIZ];
+			int rc;
+			
+			free(reload_tag);
+			reload_tag = NULL;
+			event_notification_get_arguments(handle,
+							 notification,
+							 args, sizeof(args));
+			rc = event_arg_dup(args, "TAG", &reload_tag);
+			if ((rc == 0) || (rc > 256)) {
+				free(reload_tag);
+				reload_tag = NULL;
+			}
 			if (capture_mode) {
 				stop   = 1;
 				reload = interfaces;
