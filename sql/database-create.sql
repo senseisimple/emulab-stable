@@ -1627,6 +1627,18 @@ CREATE TABLE plab_mapping (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `plab_site_mapping`
+--
+
+CREATE TABLE plab_site_mapping (
+  site_name varchar(255) NOT NULL default '',
+  site_idx smallint(5) unsigned NOT NULL auto_increment,
+  node_id varchar(32) NOT NULL default '',
+  node_idx tinyint(3) unsigned NOT NULL default '0',
+  PRIMARY KEY  (site_name,site_idx,node_idx)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `plab_slice_nodes`
 --
 
