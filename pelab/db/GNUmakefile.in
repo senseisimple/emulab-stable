@@ -17,7 +17,7 @@ all:	$(SBIN_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_DIR)/opsdir/sbin, $(SBIN_SCRIPTS))
+install: $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(SBIN_SCRIPTS))
 
 boss-install: install
 
