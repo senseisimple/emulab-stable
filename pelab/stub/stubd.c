@@ -9,10 +9,20 @@
 
 #include "stub.h"
 
+/*
+ * For getopt()
+ */
+#include <unistd.h>
+extern char *optarg;
+extern int optind;
+extern int optopt;
+extern int opterr;
+extern int optreset;
+
 void clean_exit(int);
 
 //Global  
-short  flag_debug;
+short  flag_debug, flag_standalone;
 char sniff_interface[128];
 connection rcvdb[CONCURRENT_RECEIVERS];
 unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
@@ -478,6 +488,42 @@ int send_monitor(int sockfd) {
   return 1;
 }
 
+void print_measurements(void) {
+  float loss_rate;
+  int i;
+
+  for (i=0; i<CONCURRENT_RECEIVERS; i++){
+    if (rcvdb[i].valid == 1) {     
+      unsigned int through = throughputTick(&throughput[i]);
+      printf("Throughput(kbps) = %u\n", through);
+
+      //print delay
+      if (delays[i] != last_delays[i]) {
+	last_delays[i] = delays[i];	
+	printf("New delay: %ld\n", delays[i]);	
+      } else {
+	if (flag_debug) printf("Unchanged delay: %ld\n", delays[i]);	
+      }
+
+      //print loss
+      if (loss_records[i].total_counter == 0){
+	loss_rate = 0;
+      } else {
+	loss_rate = (float)loss_records[i].loss_counter/loss_records[i].total_counter; //float loss
+      }
+      if (loss_rate != last_loss_rates[i]) {
+	last_loss_rates[i] = loss_rate;	
+	printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
+      } else {
+	if (flag_debug) printf("Unchanged loss: %f \n", loss_rate);     
+      }
+      loss_records[i].loss_counter=0;
+      loss_records[i].total_counter=0;      
+
+    } //if connection is valid
+  } //for 
+}
+
 void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 {
   struct timeval now;
@@ -528,6 +574,13 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
   return 0;
 }
 
+void usage() {
+  fprintf(stderr,"Usage: stubd [-d] [-s] <sniff-interface> [remote_IPaddr]\n");
+  fprintf(stderr,"       -d:  Enable debugging mode\n");
+  fprintf(stderr,"       -s:  Enable standalone mode\n");
+  fprintf(stderr," remote_IPaddr is mandatory when using -s\n");
+}
+
 int main(int argc, char *argv[]) {
   int sockfd_snd, sockfd_rcv_sender, sockfd_rcv_monitor, sockfd_monitor=-1;  
   struct sockaddr_in my_addr;	// my address information
@@ -537,6 +590,9 @@ int main(int argc, char *argv[]) {
   struct timeval start_tv, left_tv;
   int yes=1, i, flag_send_monitor=0;
   struct timeval packet_deadline;
+  struct in_addr addr;
+  int flag_measure=0;
+  char ch;
 
   gettimeofday(&packet_deadline, NULL);
 
@@ -545,17 +601,51 @@ int main(int argc, char *argv[]) {
     flag_debug=1;
   else 
     flag_debug=0;
+  flag_standalone = 0;
 
-  if (argc != 2) {
-    fprintf(stderr,"Usage: stubd <sniff-interface>\n");
-    exit(1);
+  /*
+   * Process command-line arguments
+   */
+  while ((ch = getopt(argc,argv,"ds")) != -1) {
+    switch (ch) {
+      case 'd':
+        flag_debug = 1; break;
+      case 's':
+        flag_standalone = 1; break;
+      default:
+        fprintf(stderr,"Unknown option %c\n",ch);
+        usage(); exit(1);
+    }
   }
-  if (strlen(argv[1]) > 127) {
+  argc -= optind;
+  argv += optind;
+
+  if (flag_standalone) {
+    if (argc != 2) {
+      fprintf(stderr,"Wrong number of options for standalone: %i\n",argc);
+      usage();
+      exit(1);
+    } else {
+      flag_measure = 1;
+      rcvdb[0].valid = 1;
+      inet_aton(argv[1], &addr);
+      rcvdb[0].ip    =  addr.s_addr;
+      rcvdb[0].sockfd= -1; //show error if used
+      rcvdb[0].last_usetime = time(NULL);
+    }
+  } else {
+    if (argc != 1) {
+      fprintf(stderr,"Wrong number of options: %i\n",argc);
+      usage();
+      exit(1);
+    }
+  }
+  if (strlen(argv[0]) > 127) {
     fprintf(stderr,"Error: the <sniff-interface> name must be less than 127 characters \n");
     exit(1);
   }
 
-  strcpy(sniff_interface, argv[1]);
+  strcpy(sniff_interface, argv[0]);
 
 
   //set up the sender connection listener
@@ -711,6 +801,9 @@ int main(int argc, char *argv[]) {
       }
 
     } //while in quanta
+    if (flag_standalone) {
+      print_measurements();
+    }
   } //while forever
 
   packet_buffer_cleanup(); 
