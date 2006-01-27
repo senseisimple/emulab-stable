@@ -46,6 +46,9 @@ struct event_handle {
                                       elvin_keys_t keys, int accept_insecure,
                                       elvin_notify_cb_t callback, void *rock,
                                       elvin_error_t error);
+    int (*unsubscribe)(elvin_handle_t handle,
+		       elvin_subscription_t subscription,
+		       elvin_error_t error);
 };
 typedef struct event_handle * event_handle_t;
 
@@ -156,6 +159,11 @@ typedef void (*event_notify_callback_t)(event_handle_t handle,
                                         event_notification_t notification,
                                         void *data);
 
+typedef void (*event_subscription_callback_t)(event_handle_t handle,
+					      int result,
+					      event_subscription_t es,
+					      void *data);
+
 /*
  * Function prototypes:
  */
@@ -219,6 +227,14 @@ event_subscription_t event_subscribe_auth(event_handle_t handle,
 					  event_notify_callback_t callback,
 					  address_tuple_t tuple, void *data,
 					  int do_auth);
+int event_async_subscribe(event_handle_t handle,
+			  event_notify_callback_t callback,
+			  address_tuple_t tuple, void *data,
+			  event_subscription_callback_t scb,
+			  void *scb_data,
+			  int do_auth);
+int event_unsubscribe(event_handle_t handle, event_subscription_t es);
+int event_async_unsubscribe(event_handle_t handle, event_subscription_t es);
 int event_notification_insert_hmac(event_handle_t handle,
 				   event_notification_t notification);
 int event_notification_pack(event_handle_t handle,

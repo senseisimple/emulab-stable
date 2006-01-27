@@ -155,6 +155,7 @@ event_register_withkeydata(char *name, int threaded,
         handle->mainloop = NULL; /* no mainloop for mt programs */
         handle->notify = elvin_threaded_notify;
         handle->subscribe = elvin_threaded_add_subscription;
+        handle->unsubscribe = elvin_threaded_delete_subscription;
 #else
 	ERROR("Threaded API not linked in with the program!\n");
 	goto bad;
@@ -167,6 +168,7 @@ event_register_withkeydata(char *name, int threaded,
         handle->mainloop = elvin_sync_default_mainloop;
         handle->notify = elvin_sync_notify;
         handle->subscribe = elvin_sync_add_subscription;
+        handle->unsubscribe = elvin_sync_delete_subscription;
     }
 
     /* Initialize the elvin interface: */
@@ -1036,6 +1038,18 @@ static void notify_callback(elvin_handle_t server,
                             elvin_notification_t notification, int is_secure,
                             void *rock, elvin_error_t status);
 
+struct subscription_callback_arg {
+    event_subscription_callback_t callback;
+    void *data;
+    event_handle_t handle;
+};
+
+static void subscription_callback(elvin_handle_t server,
+				  int result,
+				  elvin_subscription_t subscription,
+				  void *rock,
+				  elvin_error_t status);
+
 #define EXPRESSION_LENGTH 1024
 
 /*
@@ -1115,6 +1129,60 @@ addclause(char *tag, char *clause, char *exp, int size, int *index)
 	return 0;	
 }
 
+static char *
+tuple_expression(address_tuple_t tuple, char *expression, int elen)
+{
+    char *retval = expression;
+    int index = 0;
+
+    if (tuple->site &&
+	! addclause("SITE", tuple->site,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+
+    if (tuple->expt &&
+	! addclause("EXPT", tuple->expt,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+
+    if (tuple->group &&
+	! addclause("GROUP", tuple->group,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+
+    if (tuple->host &&
+	! addclause("HOST", tuple->host,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+	
+    if (tuple->objtype &&
+	! addclause("OBJTYPE", tuple->objtype,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+
+    if (tuple->objname &&
+	! addclause("OBJNAME", tuple->objname,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+
+    if (tuple->eventtype &&
+	! addclause("EVENTTYPE", tuple->eventtype,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+    
+    if (tuple->timeline &&
+	! addclause("TIMELINE", tuple->timeline,
+		    &expression[index], elen - index, &index))
+	    return NULL;
+    
+    index += snprintf(&expression[index], elen - index,
+		     "%s SCHEDULER == %d ",
+		     (index ? "&&" : ""),
+		     tuple->scheduler);
+
+    return retval;
+}
+
 event_subscription_t
 event_subscribe(event_handle_t handle, event_notify_callback_t callback,
 		address_tuple_t tuple, void *data)
@@ -1129,7 +1197,6 @@ event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
     elvin_subscription_t subscription;
     struct notify_callback_arg *arg;
     char expression[EXPRESSION_LENGTH];
-    int index = 0;
 
     /* XXX: The declaration of expression has to go last, or the
        local variables on the stack after it get smashed.  Check
@@ -1140,51 +1207,9 @@ event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
         return NULL;
     }
 
-    if (tuple->site &&
-	! addclause("SITE", tuple->site,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-
-    if (tuple->expt &&
-	! addclause("EXPT", tuple->expt,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-
-    if (tuple->group &&
-	! addclause("GROUP", tuple->group,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-
-    if (tuple->host &&
-	! addclause("HOST", tuple->host,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-	
-    if (tuple->objtype &&
-	! addclause("OBJTYPE", tuple->objtype,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-
-    if (tuple->objname &&
-	! addclause("OBJNAME", tuple->objname,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-
-    if (tuple->eventtype &&
-	! addclause("EVENTTYPE", tuple->eventtype,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
+    if (tuple_expression(tuple, expression, sizeof(expression)) == NULL)
+	return NULL;
     
-    if (tuple->timeline &&
-	! addclause("TIMELINE", tuple->timeline,
-		    &expression[index], sizeof(expression) - index, &index))
-	    return NULL;
-    
-    index += snprintf(&expression[index], sizeof(expression) - index,
-		     "%s SCHEDULER == %d ",
-		     (index ? "&&" : ""),
-		     tuple->scheduler);
-
     TRACE("subscribing to event %s\n", expression);
 
     arg = xmalloc(sizeof(*arg));
@@ -1205,6 +1230,84 @@ event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
     return subscription;
 }
 
+int
+event_async_subscribe(event_handle_t handle, event_notify_callback_t callback,
+		      address_tuple_t tuple, void *data,
+		      event_subscription_callback_t scb, void *scb_data,
+		      int do_auth)
+{
+    struct notify_callback_arg *arg;
+    struct subscription_callback_arg *sarg;
+    char expression[EXPRESSION_LENGTH];
+    int retval;
+
+    /* XXX: The declaration of expression has to go last, or the
+       local variables on the stack after it get smashed.  Check
+       Elvin for buffer overruns. */
+
+    if (!handle || !callback || !tuple || !scb) {
+        ERROR("invalid parameter\n");
+        return NULL;
+    }
+
+    if (tuple_expression(tuple, expression, sizeof(expression)) == NULL)
+	return NULL;
+    
+    TRACE("subscribing to event %s\n", expression);
+
+    arg = xmalloc(sizeof(*arg));
+    /* XXX: Free this in an event_unsubscribe.. */
+    arg->callback = callback;
+    arg->data = data;
+    arg->handle = handle;
+    arg->do_auth = do_auth;
+
+    sarg = xmalloc(sizeof(*arg));
+    /* XXX: Free this in an event_unsubscribe.. */
+    sarg->callback = scb;
+    sarg->data = scb_data;
+    sarg->handle = handle;
+
+    retval = elvin_async_add_subscription(handle->server,
+					  expression,
+					  NULL,
+					  1,
+					  notify_callback,
+					  arg,
+					  subscription_callback,
+					  sarg,
+					  handle->status);
+    
+    return retval;
+}
+
+int
+event_async_unsubscribe(event_handle_t handle, event_subscription_t es)
+{
+    int retval;
+    
+    free(es->rock);
+    es->rock = NULL;
+    retval = elvin_async_delete_subscription(handle->server,
+					     es,
+					     NULL,
+					     NULL,
+					     handle->status);
+
+    return retval;
+}
+
+int
+event_unsubscribe(event_handle_t handle, event_subscription_t es)
+{
+    int retval;
+
+    free(es->rock);
+    es->rock = NULL;
+    retval = handle->unsubscribe(handle->server, es, handle->status);
+    
+    return retval;
+}
 
 /*
  * Callback passed to elvin_notification_traverse in
@@ -1274,6 +1377,33 @@ notify_callback(elvin_handle_t server,
     data = arg->data;
 
     callback(handle, &notification, data);
+}
+
+/*
+ * Callback passed to handle->subscribe in event_subscribe. Used to
+ * provide our own callback above Elvin's.
+ */
+static void
+subscription_callback(elvin_handle_t server,
+		      int result,
+		      elvin_subscription_t subscription,
+		      void *rock,
+		      elvin_error_t status)
+{
+    struct subscription_callback_arg *arg =
+	(struct subscription_callback_arg *) rock;
+    event_handle_t handle;
+    event_subscription_callback_t callback;
+    void *data;
+
+    TRACE("received subscription notification\n");
+    assert(arg);
+
+    handle = arg->handle;
+    callback = arg->callback;
+    data = arg->data;
+
+    callback(handle, result, subscription, data);
 }
 
 /*
