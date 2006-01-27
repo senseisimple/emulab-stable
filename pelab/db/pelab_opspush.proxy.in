@@ -1,0 +1,102 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Mysql;
+
+#
+# usage: pelab_opspush.proxy
+#
+sub usage() {
+    print STDOUT "Usage: pelab_opspush.proxy tablename\n";
+    exit(-1);
+}
+my $tablename;
+
+#
+# Configure variables
+#
+my $PWDFILE   = "/usr/testbed/etc/pelabdb.pwd";
+my $tempfile  = "testbed_pelab_opspush_tempfile";
+my $DBNAME    = "pelab";
+my $DBUSER    = "pelab";
+
+#
+# We don't want to run this script unless its the real version.
+#
+if ($UID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libtbdb;
+use libtestbed;
+
+sub fatal($) {
+    my ($msg) = @_;
+
+    die("*** $0:\n".
+	"    $msg\n");
+}
+
+if (@ARGV != 1) {
+    usage();
+}
+$tablename = $ARGV[0];
+
+#
+# Untaint the arguments.
+#
+if ($tablename =~ /^([-\w]+)$/) {
+    $tablename = $1;
+}
+else {
+    die("Tainted argument $tablename!\n");
+}
+
+#
+# Grab the passwords we need.
+#
+my $dbpwd;
+if (`cat $PWDFILE` =~ /^([\w]*)\s([\w]*)$/) {
+    $dbpwd = $1;
+}
+else {
+    fatal("Bad characters in password!");
+}
+
+if (TBDBConnect($DBNAME, $DBUSER, $dbpwd) < 0) {
+    fatal("Could not connect to DB!");
+}
+
+DBQueryFatal("create temporary table ${tablename}_tmp ".
+	     "select * from $tablename limit 0");
+
+DBQueryFatal("lock tables $tablename write");
+
+DBQueryFatal("load data infile '${tempfile}.${tablename}' ".
+	     "into table ${tablename}_tmp");
+
+DBQueryFatal("delete from $tablename");
+
+DBQueryFatal("insert into $tablename ".
+	     "select * from ${tablename}_tmp");
+
+DBQueryFatal("unlock tables");
+
+exit(0);
+

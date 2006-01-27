@@ -1,0 +1,126 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Push pelab tables to ops DB. This is run from /etc/crontab on as nodes
+# are added.
+#
+sub usage() {
+    print STDOUT "Usage: pelab_opspush [-d]\n";
+    exit(-1);
+}
+my $optlist  = "d";
+my $debug    = 0;
+my $tempfile = "/var/tmp/testbed_pelab_opspush_tempfile";
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $TBOPS       = "@TBOPSEMAIL@";
+my $ISMAINSITE  = @TBMAINSITE@;
+my $USERNODE	= "@USERNODE@";
+my $PROXY       = "$TB/sbin/pelab_opspush.proxy";
+my $SCP         = "/usr/bin/scp";
+my $SSHTB	= "$TB/bin/sshtb";
+
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin:/usr/site/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Turn off line buffering on output
+#
+$| = 1; 
+
+# Load the Testbed support stuff.
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+
+# Protos
+sub fatal($);
+
+#
+# Only real root can call this.
+# 
+if ($UID != 0) {
+    print STDERR "You must be root to run this script!\n";
+    exit(-1);
+}
+
+#
+# Form a temp name.
+#
+my $logname = TBMakeLogname("pelab_opspush");
+
+#
+# Parse command arguments. Once we return from getopts, all that should
+# left are the required arguments.
+#
+%options = ();
+if (! getopts($optlist, \%options)) {
+    usage();
+}
+if (@ARGV) {
+    usage();
+}
+if (defined($options{"d"})) {
+    $debug++;
+}
+
+#
+# Reopen both stdout and stderr so that we can record all the output for
+# later mailing.
+#
+if (! $debug) {
+    open(STDERR, ">> $logname") or die("opening $logname for STDERR: $!");
+    open(STDOUT, ">> $logname") or die("opening $logname for STDOUT: $!");
+}
+
+#
+# We periodically send a new table over, or on demand. At some point
+# might want to revisit this. Mabye just talk to the DB directly on ops.
+#
+unlink("${tempfile}.site_mapping")
+    if (-e "${tempfile}.site_mapping");
+
+DBQueryFatal("select * from plab_site_mapping ".
+	     "into outfile '${tempfile}.site_mapping' ");
+
+#
+# Copy the file over to ops and load it into the DB over there.
+#
+system("$SCP -p ${tempfile}.site_mapping ".
+       "     ${USERNODE}:/var/db/mysql/pelab") == 0
+    or fatal("Could not copy ${tempfile}.site_mapping to $USERNODE!");
+
+system("$SSHTB -host $USERNODE $PROXY site_mapping") == 0
+    or fatal("Could not load site_mapping entries into ops DB!");
+	
+unlink("${tempfile}.site_mapping")
+    if (! $debug);
+
+unlink("$logname")
+    if (-e $logname);
+
+exit(0);
+
+sub fatal($)
+{
+    my ($msg) = @_;
+
+    SENDMAIL($TBOPS, "Pelab OPS push Failed", $msg, undef, undef, ($logname));
+   
+    unlink("$logname")
+	if (-e $logname);
+
+    die("*** $0:\n".
+	"    $msg\n");
+}

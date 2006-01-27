@@ -11,13 +11,15 @@ SUBDIR		= pelab/db
 
 include $(OBJDIR)/Makeconf
 
-SBIN_SCRIPTS = pelab_dbpush
+USERSBIN_SCRIPTS = pelab_dbpush pelab_opspush.proxy
+BOSSSBIN_SCRIPTS = pelab_opspush 
 
-all:	$(SBIN_SCRIPTS)
+all:	$(BOSSSBIN_SCRIPTS) $(USERSBIN_SCRIPTS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
-install: $(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(SBIN_SCRIPTS))
+install:$(addprefix $(INSTALL_SBINDIR)/, $(BOSSSBIN_SCRIPTS)) \
+	$(addprefix $(INSTALL_DIR)/opsdir/sbin/, $(USERSBIN_SCRIPTS))
 
 boss-install: install
 
@@ -27,9 +29,3 @@ $(INSTALL_DIR)/opsdir/sbin/%: %
 	@echo "Installing $<"
 	-mkdir -p $(INSTALL_DIR)/opsdir/sbin
 	$(INSTALL) $< $@
-
-$(INSTALL_DIR)/opsdir/libexec/%: %
-	@echo "Installing $<"
-	-mkdir -p $(INSTALL_DIR)/opsdir/libexec
-	$(INSTALL_DATA) $< $@
-

@@ -57,6 +57,7 @@ use libtestbed;
 
 # Protos
 sub fatal($);
+sub SendToDatapository($);
 
 #
 # Only real root can call this.
@@ -108,8 +109,8 @@ else {
     fatal("Bad characters in password!");
 }
 
-print "$dbpwd\n";
-print "$dppwd\n";
+#print "$dbpwd\n";
+#print "$dppwd\n";
 
 if (TBDBConnect($DBNAME, $DBUSER, $dbpwd) < 0) {
     fatal("Could not connect to DB!");
@@ -160,6 +161,32 @@ DBQueryFatal("unlock tables");
 # Might not be any new entries ...
 # 
 if (defined($lastidx)) {
+    SendToDatapository("pair_data");
+    
+    #
+    # Okay, now that we have really archived them away, update the idx
+    # 
+    DBQueryFatal("update emulab_indicies set idx='$lastidx' ".
+		 "where name='pair_data_idx'");
+
+    #
+    # Delete those entries.
+    #
+    DBQueryFatal("delete from pair_data ".
+		 "where idx <= $lastidx ");
+}
+
+unlink("${tempfile}.pair_data")
+    if (-e "${tempfile}.pair_data" && !$debug);
+
+unlink("$logname")
+    if (-e $logname);
+exit(0);
+
+sub SendToDatapository($)
+{
+    my ($table) = @_;
+    
     #
     # Push the data over to the DP. Use IPC goo to create a child we
     # can both write to and read from, since we do not want to send the
@@ -193,8 +220,8 @@ if (defined($lastidx)) {
 	open(STDOUT, ">&PARENT_WRITER") || fatal("Cannot redirect stdout");
 	open(STDERR, ">&PARENT_WRITER") || fatal("Cannot redirect stderr");
 
-	my $cmd = "$CURL -v -F password=\@- -F table='pair_data' ".
-	    "-F infile=\@${tempfile}.pair_data $DATAPOSCGI";
+	my $cmd = "$CURL -v -F password=\@- -F table='$table' ".
+	    "-F infile=\@${tempfile}.${table} $DATAPOSCGI";
 
         exec("$cmd");
 	die("*** $0:\n".
@@ -220,6 +247,7 @@ if (defined($lastidx)) {
 	    $success  = 1;
 	}
     }
+    close(CHILD_READER);
     waitpid($childpid, 0);
 
     if ($?) {
@@ -229,29 +257,14 @@ if (defined($lastidx)) {
     if (!$success) {
 	fatal("Datapository replied with: $errormsg");
     }
-
-    #
-    # Okay, now that we have really archived them away, update the idx
-    # 
-    DBQueryFatal("update emulab_indicies set idx='$lastidx' ".
-		 "where name='pair_data_idx'");
-
-    #
-    # Delete those entries.
-    #
-    DBQueryFatal("delete from pair_data ".
-		 "where idx <= $lastidx ");
-}
-
-unlink("${tempfile}.pair_data")
-    if (-e "${tempfile}.pair_data" && !$debug);
-exit(0);
+    return 0;
+}    
 
 sub fatal($)
 {
     my ($msg) = @_;
 
-    SENDMAIL($TBOPS, "Pelab Push Failed", $msg, undef, undef, ($logname));
+    SENDMAIL($TBOPS, "Pelab DP Push Failed", $msg, undef, undef, ($logname));
    
     unlink("$logname")
 	if (-e $logname);
