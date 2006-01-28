@@ -93,6 +93,7 @@ ATTR_NIL_VALUES = ('None',)
 PLABNODE = "@prefix@/sbin/plabnode"
 SSH = "@prefix@/bin/sshtb"
 NAMED_SETUP = "@prefix@/sbin/named_setup"
+PELAB_PUSH  = "@prefix@/sbin/pelab_opspush"
 
 ROOTBALL_URL = "http://localhost:1492/" # ensure this ends in a slash
 
@@ -373,6 +374,8 @@ class Plab:
             # We need to update DNS since we've added hosts..
             print "Forcing a named map update ..."
             os.spawnl(os.P_WAIT, NAMED_SETUP, NAMED_SETUP)
+            print "Pushing out site_mapping ..."
+            os.spawnl(os.P_WAIT, PELAB_PUSH, PELAB_PUSH)
             # Now announce that we've added/updated nodes.
             SENDMAIL(TBOPS,
                      "Plab nodes have been added/updated in the DB.",
@@ -534,7 +537,8 @@ class Plab:
         defosid, controliface = self.__getNodetypeInfo()
         hostonly = nodeent['HNAME'].replace(".", "-")
         # These will be setup properly below.
-        priority = 0;
+        nidnum = 0
+        priority = 0
         nodeid = ""
         vnodeprefix = ""
 
@@ -617,6 +621,44 @@ class Plab:
                          (nodeid, nodeent['PLABID'], nodeent['HNAME'],
                           nodeent['IP'], nodeent['MAC']))
 
+            #
+            # NowAdd the site_mapping entry for this node.
+            #
+            
+            # See if we know about the associated site - grab idx if so
+            siteidx = 0
+            nodeidx = 1
+            siteres = DBQueryFatal("select site_idx, node_idx from "
+                                   " plab_site_mapping where site_name=%s",
+                                   nodeent['SITE']);
+            if len(siteres):
+                # There are already nodes listed for this site, so get
+                # the next node id.
+                siteidx = siteres[0][0]
+                for (foo, idx) in siteres:
+                    if idx > nodeidx: nodeidx = idx
+                    pass
+                nodeidx += 1
+                pass
+            else:
+                # No nodes listed for site, so get the largest site_idx
+                # in the DB so far, and increment cuz we're going to add
+                # a new one.
+                maxres = DBQueryFatal("select MAX(site_idx) from "
+                                      " plab_site_mapping")
+                try:
+                    siteidx = int(maxres[0][0]) + 1
+                    pass
+                except ValueError:
+                    siteidx = 1
+                    pass
+                pass
+            # Create site_mapping entry, optionally creating new site idx
+            # via not specifying the site_idx field (field is auto_increment)
+            DBQueryFatal("insert into plab_site_mapping "
+                         " values (%s, %s, %s, %s)",
+                         (nodeent['SITE'], siteidx, nodeid, nodeidx))
+
             # Create a single reserved plab vnode for the managment sliver.
             # XXX I left it as "20" cause of all the existing ones.
             # XXXX I set it to 1 due to the above comment (correct?)
@@ -672,6 +714,7 @@ class Plab:
         # last but not least, unblock signals
         enable_sigs(osigs)
         return
+
 
     def __updateNodeMapping(self, updent):
         """
