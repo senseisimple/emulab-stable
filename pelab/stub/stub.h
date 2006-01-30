@@ -99,6 +99,7 @@ extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 // throughputTick() call.
 extern unsigned int throughputTick(ThroughputAckState * state);
 extern void throughputInit(ThroughputAckState * state, unsigned int sequence);
+extern unsigned int bytesThisTick(ThroughputAckState * state);
 
 #endif
 

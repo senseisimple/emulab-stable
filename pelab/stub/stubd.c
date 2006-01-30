@@ -29,6 +29,9 @@ unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender 
 unsigned long last_delays[CONCURRENT_RECEIVERS];
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
+int flag_testmode=0;
+enum {TEST_NOTTESTING, TEST_NOTSTARTED, TEST_RUNNING, TEST_DONE } test_state;
+unsigned long long total_bytes = 0;
 
 connection snddb[CONCURRENT_SENDERS];
 fd_set read_fds,write_fds;
@@ -494,13 +497,35 @@ void print_measurements(void) {
 
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     if (rcvdb[i].valid == 1) {     
+      // Note, this has to be done before throughputTick, since that
+      // obliterates the byte count
+      unsigned int bytes = bytesThisTick(&throughput[i]);
       unsigned int through = throughputTick(&throughput[i]);
-      printf("Throughput(kbps) = %u\n", through);
+      if (flag_testmode) {
+          // We might need to do a state transition
+          if (test_state == TEST_NOTSTARTED && bytes > 0) {
+              test_state = TEST_RUNNING;
+          } else if (test_state == TEST_RUNNING && bytes == 0) {
+              test_state = TEST_DONE;
+          }
+      }
+
+      // Decide if we're going to print this quanta
+      short print;
+      if (flag_testmode && test_state != TEST_RUNNING) {
+          print = 0;
+      } else {
+          print = 1;
+      }
+
+      if (print) printf("Throughput(kbps) = %u\n", through);
+      if (print) printf("Bytecount = %u\n", bytes);
+      total_bytes += bytes;
 
       //print delay
       if (delays[i] != last_delays[i]) {
 	last_delays[i] = delays[i];	
-	printf("New delay: %ld\n", delays[i]);	
+	if (print) printf("New delay: %ld\n", delays[i]);	
       } else {
 	if (flag_debug) printf("Unchanged delay: %ld\n", delays[i]);	
       }
@@ -513,7 +538,7 @@ void print_measurements(void) {
       }
       if (loss_rate != last_loss_rates[i]) {
 	last_loss_rates[i] = loss_rate;	
-	printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
+	if (print) printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
       } else {
 	if (flag_debug) printf("Unchanged loss: %f \n", loss_rate);     
       }
@@ -575,9 +600,10 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
 }
 
 void usage() {
-  fprintf(stderr,"Usage: stubd [-d] [-s] <sniff-interface> [remote_IPaddr]\n");
+  fprintf(stderr,"Usage: stubd [-t] [-d] [-s] <sniff-interface> [remote_IPaddr]\n");
   fprintf(stderr,"       -d:  Enable debugging mode\n");
   fprintf(stderr,"       -s:  Enable standalone mode\n");
+  fprintf(stderr,"       -t:  Enable testing mode\n");
   fprintf(stderr," remote_IPaddr is mandatory when using -s\n");
 }
 
@@ -607,12 +633,14 @@ int main(int argc, char *argv[]) {
   /*
    * Process command-line arguments
    */
-  while ((ch = getopt(argc,argv,"ds")) != -1) {
+  while ((ch = getopt(argc,argv,"dst")) != -1) {
     switch (ch) {
       case 'd':
         flag_debug = 1; break;
       case 's':
         flag_standalone = 1; break;
+      case 't':
+        flag_testmode = 1; break;
       default:
         fprintf(stderr,"Unknown option %c\n",ch);
         usage(); exit(1);
@@ -642,6 +670,12 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
   }
+
+  if (flag_testmode) {
+      printf("Running in testmode\n");
+      test_state = TEST_NOTSTARTED;
+  }
+
   if (strlen(argv[0]) > 127) {
     fprintf(stderr,"Error: the <sniff-interface> name must be less than 127 characters \n");
     exit(1);
@@ -715,7 +749,7 @@ int main(int argc, char *argv[]) {
     flag_send_monitor=0; //reset flag for each quanta
     gettimeofday(&start_tv, NULL); //reset start time for each quanta
 
-    printf("quanta\n");
+    if (flag_debug) printf("quanta\n");
 
     //while in a quanta
     while(have_time(&start_tv, &left_tv)) {  
@@ -802,9 +836,18 @@ int main(int argc, char *argv[]) {
       }
 
     } //while in quanta
+
+    // In testmode, we only start printing in the quanta we first see a packet
     if (flag_standalone) {
       print_measurements();
     }
+    
+    // If running in testmode, and the test is over, exit!
+    if (flag_testmode && test_state == TEST_DONE) {
+      printf("Test done - total bytes transmitted: %llu\n",total_bytes);
+      break;
+    }
+     
   } //while forever
 
   packet_buffer_cleanup(); 

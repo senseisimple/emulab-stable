@@ -108,6 +108,12 @@ void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
 
 // How many bytes have been acknowledged since the last call to
 // throughputTick()?
+unsigned int bytesThisTick(ThroughputAckState * state) {
+    return state->ackSize;
+}
+
+// What is the bandwidth of the acknowledged bytes since the last call to
+// throughputTick()?
 unsigned int throughputTick(ThroughputAckState * state)
 {
   double result = 0.0;
@@ -117,10 +123,12 @@ unsigned int throughputTick(ThroughputAckState * state)
   divisor = now.tv_sec - state->lastTime.tv_sec;
   divisor += (now.tv_usec - state->lastTime.tv_usec)/1000000.0;
   result = (state->ackSize * 8.0) / (divisor * 1000.0);
+  /*
   printf("ByteCount: %u\n", state->ackSize);
   printf("UnAck ByteCount: %i (%i - %i)\n",
           state->nextSequence - state->firstUnknown,
           state->nextSequence, state->firstUnknown);
+          */
   state->ackSize = 0;
   state->repeatSize = 0;
   state->lastTime = now;
