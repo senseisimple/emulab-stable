@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -179,4 +179,16 @@ span.topbaroption { background-color:#E1E1EA; }
 }
 .textInputEmpty {
 	color: #888888
+}
+
+/* Sortable tables */
+table.sortable a.sortheader {
+    color:#666666;
+    font-weight: bold;
+    text-decoration: none;
+    display: block
+}
+table.sortable span.sortarrow {
+    color: black;
+    text-decoration: none
 }

@@ -1322,17 +1322,15 @@ function SHOWNODES($pid, $eid, $sortby, $showclass) {
     }
     
     if (mysql_num_rows($query_result)) {
-	echo "<center>
+	echo "
+              <script type='text/javascript' language='javascript' src='sorttable.js'></script>
+              <center>
               <h3>Reserved Nodes</h3>
               </center>
-              <table align=center border=1>
+              <table class='sortable' id='nodetable' align=center border=1>
               <tr>
-                <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
-	                        "&sortby=nodeid&showclass=$showclass\">
-				Node ID</a></th>
-                <th><a href=\"$SCRIPT_NAME?pid=$pid&eid=$eid".
-	                 "&sortby=vname&showclass=$showclass\">
-				Name</a></th>\n";
+                <th>Node ID</th>
+                <th>Name</th>\n";
 
         # Only show 'Site' column if there are plab nodes.
         if ($anyplab) {
