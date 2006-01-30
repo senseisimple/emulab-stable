@@ -78,7 +78,13 @@ event_register(char *name, int threaded)
 }
 
 event_handle_t
-event_register_withkeyfile(char *name, int threaded, char *keyfile)
+event_register_withkeyfile(char *name, int threaded, char *keyfile) {
+  return event_register_withkeyfile_withretry(name, threaded, keyfile, -1);
+}
+
+event_handle_t
+event_register_withkeyfile_withretry(char *name, int threaded, 
+				     char *keyfile, int retrycount)
 {
     /* Grab the key data and stick it into the handle. */
     if (keyfile) {
@@ -101,14 +107,25 @@ event_register_withkeyfile(char *name, int threaded, char *keyfile)
 		return 0;
 	}
 	fclose(fp);
-	return event_register_withkeydata(name, threaded, buf, cc);
+	return event_register_withkeydata_withretry(name, threaded, 
+					  buf, cc, retrycount);
     }
-    return event_register_withkeydata(name, threaded, NULL, 0);
+    return event_register_withkeydata_withretry(name, threaded, NULL, 
+						0, retrycount);
 }
 
 event_handle_t
 event_register_withkeydata(char *name, int threaded,
-			   unsigned char *keydata, int keylen)
+			   unsigned char *keydata, int keylen){
+    return event_register_withkeydata_withretry(name, threaded, keydata,
+						keylen, -1);
+
+}
+
+event_handle_t
+event_register_withkeydata_withretry(char *name, int threaded,
+			   unsigned char *keydata, int keylen,
+			   int retrycount)
 {
     event_handle_t	handle;
     elvin_handle_t	server;
@@ -200,6 +217,16 @@ event_register_withkeydata(char *name, int threaded,
             elvin_error_fprintf(stderr, status);
 	    goto bad;
         }
+    }
+
+    /* set connection retries */
+    if (retrycount >= 0) {
+      if (elvin_handle_set_connection_retries(server, retrycount, 
+					      status) == 0) {
+	ERROR("elvin_handle_set_connection_retries failed: ");
+	elvin_error_fprintf(stderr, status);
+	goto bad;
+      }
     }
 
     /* Connect to the elvin server: */
@@ -1224,6 +1251,7 @@ event_subscribe_auth(event_handle_t handle, event_notify_callback_t callback,
     if (subscription == NULL) {
         ERROR("could not subscribe to event %s: ", expression);
         elvin_error_fprintf(stderr, handle->status);
+	free(arg);
         return NULL;
     }
 
@@ -1247,11 +1275,11 @@ event_async_subscribe(event_handle_t handle, event_notify_callback_t callback,
 
     if (!handle || !callback || !tuple || !scb) {
         ERROR("invalid parameter\n");
-        return NULL;
+        return 0;
     }
 
     if (tuple_expression(tuple, expression, sizeof(expression)) == NULL)
-	return NULL;
+	return 0;
     
     TRACE("subscribing to event %s\n", expression);
 
@@ -1278,6 +1306,11 @@ event_async_subscribe(event_handle_t handle, event_notify_callback_t callback,
 					  sarg,
 					  handle->status);
     
+    if (retval == 0) {
+      free(arg);
+      free(sarg);
+    }
+
     return retval;
 }
 
@@ -1286,6 +1319,11 @@ event_async_unsubscribe(event_handle_t handle, event_subscription_t es)
 {
     int retval;
     
+    if (!es) {
+      ERROR("invalid parameter\n");
+      return 0;
+    }
+
     free(es->rock);
     es->rock = NULL;
     retval = elvin_async_delete_subscription(handle->server,
@@ -1404,6 +1442,9 @@ subscription_callback(elvin_handle_t server,
     data = arg->data;
 
     callback(handle, result, subscription, data);
+
+    /* free the sarg allocated in async_subscribe */
+    free(arg);
 }
 
 /*
@@ -2044,3 +2085,25 @@ int event_do(event_handle_t handle, ea_tag_t tag, ...)
 	
 	return retval;
 }
+
+
+int event_set_idle_period(event_handle_t handle, int seconds) {
+  int retval;
+
+  if (!handle) {
+    ERROR("invalid parameter\n");
+    return 0;
+  }
+
+  retval = elvin_handle_set_idle_period(handle->server, seconds,
+				     handle->status);
+  if (retval == 0) {
+    ERROR("could not set elvin idle period to %i", seconds);
+    elvin_error_fprintf(stderr, handle->status);
+  }
+
+  return retval;
+
+}
+
+		

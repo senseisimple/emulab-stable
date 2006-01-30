@@ -174,6 +174,11 @@ event_handle_t event_register_withkeyfile(char *name, int threaded,
 					  char *keyfile);
 event_handle_t event_register_withkeydata(char *name, int threaded,
 					  unsigned char *keydata, int len);
+event_handle_t event_register_withkeyfile_withretry(char *name, int threaded,
+					  char *keyfile, int retrycount);
+event_handle_t event_register_withkeydata_withretry(char *name, int threaded,
+					  unsigned char *keydata, int len,
+					  int retrycount);
 int event_unregister(event_handle_t handle);
 int event_poll(event_handle_t handle);
 int event_poll_blocking(event_handle_t handle, unsigned int timeout);
@@ -243,6 +248,7 @@ int event_notification_pack(event_handle_t handle,
 int event_notification_unpack(event_handle_t handle,
 			    event_notification_t *notification,
 			    unsigned char *data, int len);
+int event_set_idle_period(event_handle_t handle, int seconds) ;
 
 int event_arg_get(char *args, char *key, char **value);
 int event_arg_dup(char *args, char *key, char **value);
