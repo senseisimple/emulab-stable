@@ -89,6 +89,7 @@ function ts_resortTable(lnk) {
     if (itm.match(/^\d\d[\/-]\d\d[\/-]\d\d\d\d$/)) sortfn = ts_sort_date;
     if (itm.match(/^\d\d[\/-]\d\d[\/-]\d\d$/)) sortfn = ts_sort_date;
     if (itm.match(/^[£$]/)) sortfn = ts_sort_currency;
+    if (itm.match(/^[a-zA-Z]*[\d\.]+$/)) sortfn = ts_sort_prefixed_numeric;
     if (itm.match(/^[\d\.]+$/)) sortfn = ts_sort_numeric;
     SORT_COLUMN_INDEX = column;
     var firstRow = new Array();
@@ -171,8 +172,18 @@ function ts_sort_currency(a,b) {
 
 function ts_sort_numeric(a,b) { 
     aa = parseFloat(ts_getInnerText(a.cells[SORT_COLUMN_INDEX]));
-    if (isNaN(aa)) aa = 0;
+    if (isNaN(aa)) aa = Number.MIN_VALUE;
     bb = parseFloat(ts_getInnerText(b.cells[SORT_COLUMN_INDEX])); 
+    if (isNaN(bb)) bb = Number.MIN_VALUE;
+    return aa-bb;
+}
+
+function ts_sort_prefixed_numeric(a,b) { 
+    aa = parseFloat(ts_getInnerText(a.cells[SORT_COLUMN_INDEX]).
+		    replace(/^[a-zA-Z]*/, ""));
+    if (isNaN(aa)) aa = 0;
+    bb = parseFloat(ts_getInnerText(b.cells[SORT_COLUMN_INDEX]).
+		    replace(/^[a-zA-Z]*/, "")); 
     if (isNaN(bb)) bb = 0;
     return aa-bb;
 }
