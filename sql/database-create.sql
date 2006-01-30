@@ -418,6 +418,7 @@ CREATE TABLE experiment_resources (
   minlinks tinyint(3) unsigned default '0',
   maxlinks tinyint(3) unsigned default '0',
   delay_capacity tinyint(3) unsigned default NULL,
+  batchmode tinyint(1) unsigned default '0',
   archive_tag varchar(32) NOT NULL default '',
   thumbnail mediumblob,
   PRIMARY KEY  (idx),

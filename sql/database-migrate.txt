@@ -3149,3 +3149,9 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (site_name,site_idx,node_idx)
 	) TYPE=MyISAM;
 
+4.36: Add batchmode flag to experiment_resources table so we can track
+      the usage of the batch daemon on swapin.
+
+      alter table experiment_resources add batchmode tinyint(1) \
+               unsigned default '0' after delay_capacity;
+
