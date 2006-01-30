@@ -1,4 +1,11 @@
-#Usage: tcpdump | python monitor.py <mapping-file> <experiment-name> <ip-address>
+#Usage: tcpdump | python monitor.py <mapping-file> <experiment-name>
+#                                   <my-address> [stub-address]
+# mapping-file is a file which maps emulated addresses to real addresses.
+# experiment-name is the project/experiment name on emulab. For instance
+#   'tbres/pelab'.
+# my-address is the IP address of the current node.
+# stub-address is the IP address of the corresponding planet-lab node. If this
+#   is left out, then the mapping-file is used to determine it.
 
 import sys
 import os
@@ -7,28 +14,24 @@ import socket
 import select
 import re
 
-#emulated_to_real = {'10.0.0.1' : '10.1.0.1',
-#                    '10.0.0.2' : '10.1.0.2'}
-
-#real_to_emulated = {'10.1.0.1' : '10.0.0.1',
-#                    '10.1.0.2' : '10.0.0.2'}
-
 emulated_to_real = {}
 real_to_emulated = {}
 emulated_to_interface = {}
 ip_mapping_filename = ''
 this_experiment = ''
 this_ip = ''
+stub_ip = ''
+
+total_size = 0
+last_total = -1
 
 def main_loop():
+  global total_size, last_total
   # Initialize
   read_args()
-  populate_ip_tables()
-  quanta = 5 # in seconds
-  #stub_address = 'planet0.pelab.tbres.emulab.net' # emulated_to_real[this_ip]
-  stub_address = 'localhost'
+  quanta = 0.5# in seconds
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-  conn.connect((stub_address, 4200))
+  conn.connect((stub_ip, 4200))
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
   poll.register(conn, select.POLLIN)
@@ -59,14 +62,22 @@ def main_loop():
           sys.stdout.write('fd: ' + str(pos[0]) + ' conn-fd: ' + str(conn.fileno()) + '\n')
       # Update the stub
     send_destinations(conn, packet_list)
-    sys.stdout.write('Loop-end\n')
+    if total_size != last_total:
+      sys.stdout.write('Total Size: ' + str(total_size) + '\n')
+      last_total = total_size
+#    sys.stdout.write('Loop end\n')
 
 def read_args():
-  global ip_mapping_filename, this_experiment, this_ip
-  if len(sys.argv) == 4:
+  global ip_mapping_filename, this_experiment, this_ip, stub_ip
+  if len(sys.argv) >= 4:
     ip_mapping_filename = sys.argv[1]
     this_experiment = sys.argv[2]
     this_ip = sys.argv[3]
+    populate_ip_tables()
+    if len(sys.argv) == 5:
+      stub_ip = sys.argv[4]
+    else:
+      stub_ip = emulated_to_real[this_ip]
 
 def populate_ip_tables():
   input = open(ip_mapping_filename, 'r')
@@ -80,6 +91,7 @@ def populate_ip_tables():
     line = input.readline()
 
 def get_next_packet():
+  global total_size, last_total
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
@@ -93,10 +105,11 @@ def get_next_packet():
       port = int(match.group(3))
       size_given = match.group(4) != ''
       size = int(match.group(5))
-      sys.stdout.write('dest: ' + ipaddr + ' port: ' + str(port) + ' size: '
-              + str(size) + '\n')
+#      sys.stdout.write('dest: ' + ipaddr + ' port: ' + str(port) + ' size: '
+#              + str(size) + '\n')
       if not size_given:
           size = 0
+      total_size = total_size + size
       return (ipaddr, time, size)
   else:
       sys.stdout.write('skipped line in the wrong format: ' + line + '\n')
@@ -108,17 +121,17 @@ def receive_characteristic(conn):
     dest = real_to_emulated[int_to_ip(load_int(buffer[0:4]))]
     command = load_int(buffer[4:8])
     value = load_int(buffer[8:12])
-    sys.stdout.write('received: ' + str(dest) + ' '
-                     + str(command) + ' ' + str(value) + '\n')
+#    sys.stdout.write('received: ' + str(dest) + ' '
+#                     + str(command) + ' ' + str(value) + '\n')
     if command == 1:
       # value is bandwidth in kbps
       set_bandwidth(value, dest)
     elif command == 2:
       # value is delay in milliseconds
       set_delay(value, dest)
-    elif command == 3:
+#    elif command == 3:
       # value is packet loss in packets per billion
-      set_loss(value/1000000000.0, dest)
+#      set_loss(value/1000000000.0, dest)
     return True
   elif len(buffer) == 0:
     return False
@@ -144,11 +157,11 @@ def set_link(source, dest, ending):
   command = ('/usr/testbed/bin/tevc -e ' + this_experiment + ' now '
              + emulated_to_interface[source] + ' modify dest=' + dest + ' '
              + ending)
-  sys.stdout.write('event: ' + command + '\n')
+#  sys.stdout.write('event: ' + command + '\n')
   return os.system(command)
 
 def send_destinations(conn, packet_list):
-#  sys.stdout.write('<send> ' + str(0) + ' ' + str(len(packet_list)) + ' -- '
+#  sys.stdout.write('<send> total size:' + str(total_size) + ' packet count:' + str(len(packet_list)) + '\n')# + ' -- '
 #                   + str(packet_list) + '\n')
   output = save_int(0) + save_int(len(packet_list))
   prev_time = 0.0
