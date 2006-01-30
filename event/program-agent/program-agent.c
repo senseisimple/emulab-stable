@@ -370,11 +370,12 @@ main(int argc, char **argv)
 	struct stat st;
 	char *idx;
 	int c;
+	int remote = 0;
 
 	progname = argv[0];
 	bzero(agentlist, sizeof(agentlist));
 	
-	while ((c = getopt(argc, argv, "hVds:p:l:u:i:e:c:k:")) != -1) {
+	while ((c = getopt(argc, argv, "hVdrs:p:l:u:i:e:c:k:")) != -1) {
 		switch (c) {
 		case 'h':
 			usage(progname);
@@ -385,6 +386,9 @@ main(int argc, char **argv)
 			break;
 		case 'd':
 			debug++;
+			break;
+		case 'r':
+			remote++;
 			break;
 		case 's':
 			server = optarg;
@@ -487,7 +491,7 @@ main(int argc, char **argv)
 		loginit(0, logfile);
 	else {
 		/* Become a daemon */
-		daemon(0, 0);
+		if (!remote) daemon(0, 0);
 
 		if (logfile)
 			loginit(0, logfile);
@@ -637,11 +641,18 @@ main(int argc, char **argv)
 	/*
 	 * Register with the event system. 
 	 */
-	handle = event_register_withkeyfile(server, 0, keyfile);
+	if (remote){
+	        handle = event_register_withkeyfile_withretry(server, 0, 
+							      keyfile, 3);
+	} else {
+	        handle = event_register_withkeyfile(server, 0, keyfile);
+	}
 	if (handle == NULL) {
 		fatal("could not register with event system");
 	}
 	
+	if (remote) event_set_idle_period(handle, 60);
+
 	/*
 	 * XXX We need to send COMPLETE events when the children die, so we
 	 * have to either use a thread to wait(2) or catch SIGCHLD and hook
