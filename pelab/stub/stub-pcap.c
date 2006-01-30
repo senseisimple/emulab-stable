@@ -123,12 +123,10 @@ unsigned int throughputTick(ThroughputAckState * state)
   divisor = now.tv_sec - state->lastTime.tv_sec;
   divisor += (now.tv_usec - state->lastTime.tv_usec)/1000000.0;
   result = (state->ackSize * 8.0) / (divisor * 1000.0);
-  /*
-  printf("ByteCount: %u\n", state->ackSize);
-  printf("UnAck ByteCount: %i (%i - %i)\n",
-          state->nextSequence - state->firstUnknown,
-          state->nextSequence, state->firstUnknown);
-          */
+//  printf("ByteCount: %u\n", state->ackSize);
+//  printf("UnAck ByteCount: %i (%i - %i)\n",
+//          state->nextSequence - state->firstUnknown,
+//          state->nextSequence, state->firstUnknown);
   state->ackSize = 0;
   state->repeatSize = 0;
   state->lastTime = now;

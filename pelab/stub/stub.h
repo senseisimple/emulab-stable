@@ -32,7 +32,13 @@
 #define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold
 #define CONCURRENT_SENDERS   50	 //concurrent senders the stub maintains
 #define CONCURRENT_RECEIVERS 50	 //concurrent receivers the stub maintains
-#define MAX_PAYLOAD_SIZE     2000 //size of the traffic payload 
+#define MAX_PAYLOAD_SIZE     110000 //size of the traffic payload 
+
+// This is the low water mark of the send buffer. That is, if select
+// says that a write buffer is writable, this is the minimum amount of
+// buffer space available.
+#define LOW_WATER_MARK 110000
+
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
@@ -50,6 +56,7 @@ struct connection {
   int    sockfd;
   unsigned long ip;
   time_t last_usetime; //last monitor access time
+  int pending; // How many bytes are pending to this peer?
 };
 typedef struct connection connection;
 struct sniff_record {
