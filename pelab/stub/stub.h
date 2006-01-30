@@ -26,7 +26,7 @@
 #include <netinet/tcp.h>
 
 #define STDIN 0 // file descriptor for standard input
-#define QUANTA 5000    //feed-loop interval in msec
+#define QUANTA 500    //feed-loop interval in msec
 #define MONITOR_PORT 4200 //the port the monitor connects to
 #define SENDER_PORT  3491 //the port the stub senders connect to 
 #define PENDING_CONNECTIONS  10	 //the pending connections the queue will hold

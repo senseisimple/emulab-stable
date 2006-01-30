@@ -595,6 +595,7 @@ int main(int argc, char *argv[]) {
   char ch;
 
   gettimeofday(&packet_deadline, NULL);
+  init();
 
   //set up debug flag
   if (getenv("Debug")!=NULL) 
@@ -633,6 +634,7 @@ int main(int argc, char *argv[]) {
       rcvdb[0].sockfd= -1; //show error if used
       rcvdb[0].last_usetime = time(NULL);
     }
+    printf("Running in standalone mode\n");
   } else {
     if (argc != 1) {
       fprintf(stderr,"Wrong number of options: %i\n",argc);
@@ -697,7 +699,6 @@ int main(int argc, char *argv[]) {
   //initialization
   packet_buffer_init();
   init_random_buffer();
-  init();
   init_pcap(SNIFF_TIMEOUT);
   FD_ZERO(&read_fds);
   FD_ZERO(&read_fds_copy);
