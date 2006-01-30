@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -39,6 +39,11 @@
  */
 %echo "*** Warnings about function pointers can be ignored"
 %include "event.h"
+
+struct timeval {
+  long tv_sec;
+  long tv_usec;
+};
 
 /*
  * Glue needed to support callbacks under perl

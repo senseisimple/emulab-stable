@@ -74,6 +74,9 @@ class event_handle(_object):
     __swig_setmethods__["subscribe"] = _tbevent.event_handle_subscribe_set
     __swig_getmethods__["subscribe"] = _tbevent.event_handle_subscribe_get
     if _newclass:subscribe = property(_tbevent.event_handle_subscribe_get, _tbevent.event_handle_subscribe_set)
+    __swig_setmethods__["unsubscribe"] = _tbevent.event_handle_unsubscribe_set
+    __swig_getmethods__["unsubscribe"] = _tbevent.event_handle_unsubscribe_get
+    if _newclass:unsubscribe = property(_tbevent.event_handle_unsubscribe_get, _tbevent.event_handle_unsubscribe_set)
     def __init__(self, *args):
         _swig_setattr(self, event_handle, 'this', _tbevent.new_event_handle(*args))
         _swig_setattr(self, event_handle, 'thisown', 1)
@@ -186,6 +189,10 @@ event_register_withkeyfile = _tbevent.event_register_withkeyfile
 
 event_register_withkeydata = _tbevent.event_register_withkeydata
 
+event_register_withkeyfile_withretry = _tbevent.event_register_withkeyfile_withretry
+
+event_register_withkeydata_withretry = _tbevent.event_register_withkeydata_withretry
+
 event_unregister = _tbevent.event_unregister
 
 c_event_poll = _tbevent.c_event_poll
@@ -230,11 +237,21 @@ event_notification_remove = _tbevent.event_notification_remove
 
 c_event_subscribe = _tbevent.c_event_subscribe
 
+event_subscribe_auth = _tbevent.event_subscribe_auth
+
+event_async_subscribe = _tbevent.event_async_subscribe
+
+event_unsubscribe = _tbevent.event_unsubscribe
+
+event_async_unsubscribe = _tbevent.event_async_unsubscribe
+
 event_notification_insert_hmac = _tbevent.event_notification_insert_hmac
 
 event_notification_pack = _tbevent.event_notification_pack
 
 event_notification_unpack = _tbevent.event_notification_unpack
+
+event_set_idle_period = _tbevent.event_set_idle_period
 
 event_arg_get = _tbevent.event_arg_get
 
@@ -253,6 +270,10 @@ EA_ArgFloat = _tbevent.EA_ArgFloat
 EA_ArgString = _tbevent.EA_ArgString
 EA_When = _tbevent.EA_When
 
+event_notification_create_v = _tbevent.event_notification_create_v
+
+event_notification_create = _tbevent.event_notification_create
+
 event_do_v = _tbevent.event_do_v
 
 event_do = _tbevent.event_do
@@ -260,6 +281,34 @@ event_do = _tbevent.event_do
 xmalloc = _tbevent.xmalloc
 
 xrealloc = _tbevent.xrealloc
+class timeval(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, timeval, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, timeval, name)
+    def __repr__(self):
+        return "<C timeval instance at %s>" % (self.this,)
+    __swig_setmethods__["tv_sec"] = _tbevent.timeval_tv_sec_set
+    __swig_getmethods__["tv_sec"] = _tbevent.timeval_tv_sec_get
+    if _newclass:tv_sec = property(_tbevent.timeval_tv_sec_get, _tbevent.timeval_tv_sec_set)
+    __swig_setmethods__["tv_usec"] = _tbevent.timeval_tv_usec_set
+    __swig_getmethods__["tv_usec"] = _tbevent.timeval_tv_usec_get
+    if _newclass:tv_usec = property(_tbevent.timeval_tv_usec_get, _tbevent.timeval_tv_usec_set)
+    def __init__(self, *args):
+        _swig_setattr(self, timeval, 'this', _tbevent.new_timeval(*args))
+        _swig_setattr(self, timeval, 'thisown', 1)
+    def __del__(self, destroy=_tbevent.delete_timeval):
+        try:
+            if self.thisown: destroy(self)
+        except: pass
+
+class timevalPtr(timeval):
+    def __init__(self, this):
+        _swig_setattr(self, timeval, 'this', this)
+        if not hasattr(self,"thisown"): _swig_setattr(self, timeval, 'thisown', 0)
+        _swig_setattr(self, timeval,self.__class__,timeval)
+_tbevent.timeval_swigregister(timevalPtr)
+
 class callback_data(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, callback_data, name, value)
@@ -571,6 +620,12 @@ class EventClient:
         Send a notification.
         """
         return event_notify(self.handle, en.notification)
+
+    def schedule(self, en, tv):
+        """
+        Schedule a notification.
+        """
+        return event_schedule(self.handle, en.notification, tv)
 
     def set_timeout(self, timeout):
         """

@@ -687,8 +687,8 @@ SWIG_Python_InstallConstants(PyObject *d, swig_const_info constants[]) {
 #define  SWIGTYPE_p_unsigned_char swig_types[1] 
 #define  SWIGTYPE_p_event_notification swig_types[2] 
 #define  SWIGTYPE_p_double swig_types[3] 
-#define  SWIGTYPE_address_tuple_t swig_types[4] 
-#define  SWIGTYPE_p_event_handle swig_types[5] 
+#define  SWIGTYPE_p_event_handle swig_types[4] 
+#define  SWIGTYPE_address_tuple_t swig_types[5] 
 #define  SWIGTYPE_p_int32_t swig_types[6] 
 #define  SWIGTYPE_p_event_subscription_t swig_types[7] 
 #define  SWIGTYPE_p_int64_t swig_types[8] 
@@ -701,18 +701,21 @@ SWIG_Python_InstallConstants(PyObject *d, swig_const_info constants[]) {
 #define  SWIGTYPE_p_p_char swig_types[15] 
 #define  SWIGTYPE_p_va_list swig_types[16] 
 #define  SWIGTYPE_event_notify_callback_t swig_types[17] 
-#define  SWIGTYPE_p_callback_data swig_types[18] 
-#define  SWIGTYPE_p_address_tuple swig_types[19] 
-#define  SWIGTYPE_p_timeval swig_types[20] 
-#define  SWIGTYPE_p_f_void__elvin_error_t swig_types[21] 
-#define  SWIGTYPE_p_elvin_error_t swig_types[22] 
-#define  SWIGTYPE_p_f_p_int_elvin_error_t__int swig_types[23] 
-#define  SWIGTYPE_p_f_int_elvin_error_t__int swig_types[24] 
-#define  SWIGTYPE_p_f_elvin_handle_t_elvin_error_t__int swig_types[25] 
-#define  SWIGTYPE_callback_data_t swig_types[26] 
-#define  SWIGTYPE_p_f_elvin_handle_t_elvin_notification_t_int_elvin_keys_t_elvin_error_t__int swig_types[27] 
-#define  SWIGTYPE_p_int swig_types[28] 
-static swig_type_info *swig_types[30];
+#define  SWIGTYPE_event_subscription_callback_t swig_types[18] 
+#define  SWIGTYPE_p_callback_data swig_types[19] 
+#define  SWIGTYPE_p_address_tuple swig_types[20] 
+#define  SWIGTYPE_p_timeval swig_types[21] 
+#define  SWIGTYPE_p_p_timeval swig_types[22] 
+#define  SWIGTYPE_p_f_void__elvin_error_t swig_types[23] 
+#define  SWIGTYPE_p_elvin_error_t swig_types[24] 
+#define  SWIGTYPE_p_f_p_int_elvin_error_t__int swig_types[25] 
+#define  SWIGTYPE_p_f_int_elvin_error_t__int swig_types[26] 
+#define  SWIGTYPE_p_f_elvin_handle_t_elvin_error_t__int swig_types[27] 
+#define  SWIGTYPE_callback_data_t swig_types[28] 
+#define  SWIGTYPE_p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int swig_types[29] 
+#define  SWIGTYPE_p_f_elvin_handle_t_elvin_notification_t_int_elvin_keys_t_elvin_error_t__int swig_types[30] 
+#define  SWIGTYPE_p_int swig_types[31] 
+static swig_type_info *swig_types[33];
 
 /* -------- TYPES TABLE (END) -------- */
 
@@ -1319,6 +1322,42 @@ static PyObject *_wrap_event_handle_subscribe_get(PyObject *self, PyObject *args
     result = (elvin_subscription_t (*)(elvin_handle_t,char *,elvin_keys_t,int,elvin_notify_cb_t,void *,elvin_error_t)) ((arg1)->subscribe);
     
     resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_f_elvin_handle_t_p_char_elvin_keys_t_int_elvin_notify_cb_t_p_void_elvin_error_t__elvin_subscription_t, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_handle_unsubscribe_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct event_handle *arg1 = (struct event_handle *) 0 ;
+    int (*arg2)(elvin_handle_t,elvin_subscription_t,elvin_error_t) = (int (*)(elvin_handle_t,elvin_subscription_t,elvin_error_t)) 0 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:event_handle_unsubscribe_set",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_event_handle,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if (arg1) (arg1)->unsubscribe = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_handle_unsubscribe_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct event_handle *arg1 = (struct event_handle *) 0 ;
+    int (*result)(elvin_handle_t,elvin_subscription_t,elvin_error_t);
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:event_handle_unsubscribe_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_event_handle,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int (*)(elvin_handle_t,elvin_subscription_t,elvin_error_t)) ((arg1)->unsubscribe);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int, 0);
     return resultobj;
     fail:
     return NULL;
@@ -1959,6 +1998,45 @@ static PyObject *_wrap_event_register_withkeydata(PyObject *self, PyObject *args
 }
 
 
+static PyObject *_wrap_event_register_withkeyfile_withretry(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    char *arg1 ;
+    int arg2 ;
+    char *arg3 ;
+    int arg4 ;
+    event_handle_t result;
+    
+    if(!PyArg_ParseTuple(args,(char *)"sisi:event_register_withkeyfile_withretry",&arg1,&arg2,&arg3,&arg4)) goto fail;
+    result = (event_handle_t)event_register_withkeyfile_withretry(arg1,arg2,arg3,arg4);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_event_handle_t, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_register_withkeydata_withretry(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    char *arg1 ;
+    int arg2 ;
+    unsigned char *arg3 = (unsigned char *) 0 ;
+    int arg4 ;
+    int arg5 ;
+    event_handle_t result;
+    PyObject * obj2 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"siOii:event_register_withkeydata_withretry",&arg1,&arg2,&obj2,&arg4,&arg5)) goto fail;
+    if ((SWIG_ConvertPtr(obj2,(void **) &arg3, SWIGTYPE_p_unsigned_char,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (event_handle_t)event_register_withkeydata_withretry(arg1,arg2,arg3,arg4,arg5);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_event_handle_t, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_event_unregister(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     event_handle_t arg1 = (event_handle_t) 0 ;
@@ -2444,6 +2522,115 @@ static PyObject *_wrap_c_event_subscribe(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *_wrap_event_subscribe_auth(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    event_notify_callback_t arg2 = (event_notify_callback_t) 0 ;
+    address_tuple_t arg3 = (address_tuple_t) 0 ;
+    void *arg4 = (void *) 0 ;
+    int arg5 ;
+    event_subscription_t result;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    PyObject * obj2 = 0 ;
+    PyObject * obj3 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OOOOi:event_subscribe_auth",&obj0,&obj1,&obj2,&obj3,&arg5)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_event_notify_callback_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj2,(void **) &arg3, SWIGTYPE_address_tuple_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj3,(void **) &arg4, 0, SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = event_subscribe_auth(arg1,arg2,arg3,arg4,arg5);
+    
+    {
+        event_subscription_t * resultptr;
+        resultptr = (event_subscription_t *) malloc(sizeof(event_subscription_t));
+        memmove(resultptr, &result, sizeof(event_subscription_t));
+        resultobj = SWIG_NewPointerObj((void *) resultptr, SWIGTYPE_p_event_subscription_t, 1);
+    }
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_async_subscribe(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    event_notify_callback_t arg2 = (event_notify_callback_t) 0 ;
+    address_tuple_t arg3 = (address_tuple_t) 0 ;
+    void *arg4 = (void *) 0 ;
+    event_subscription_callback_t arg5 = (event_subscription_callback_t) 0 ;
+    void *arg6 = (void *) 0 ;
+    int arg7 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    PyObject * obj2 = 0 ;
+    PyObject * obj3 = 0 ;
+    PyObject * obj4 = 0 ;
+    PyObject * obj5 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OOOOOOi:event_async_subscribe",&obj0,&obj1,&obj2,&obj3,&obj4,&obj5,&arg7)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_event_notify_callback_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj2,(void **) &arg3, SWIGTYPE_address_tuple_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj3,(void **) &arg4, 0, SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj4,(void **) &arg5, SWIGTYPE_event_subscription_callback_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj5,(void **) &arg6, 0, SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)event_async_subscribe(arg1,arg2,arg3,arg4,arg5,arg6,arg7);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_unsubscribe(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    event_subscription_t arg2 ;
+    int result;
+    event_subscription_t *argp2 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:event_unsubscribe",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &argp2, SWIGTYPE_p_event_subscription_t,SWIG_POINTER_EXCEPTION) == -1)) SWIG_fail;
+    arg2 = *argp2; 
+    result = (int)event_unsubscribe(arg1,arg2);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_async_unsubscribe(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    event_subscription_t arg2 ;
+    int result;
+    event_subscription_t *argp2 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OO:event_async_unsubscribe",&obj0,&obj1)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &argp2, SWIGTYPE_p_event_subscription_t,SWIG_POINTER_EXCEPTION) == -1)) SWIG_fail;
+    arg2 = *argp2; 
+    result = (int)event_async_unsubscribe(arg1,arg2);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_event_notification_insert_hmac(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     event_handle_t arg1 = (event_handle_t) 0 ;
@@ -2514,6 +2701,24 @@ static PyObject *_wrap_event_notification_unpack(PyObject *self, PyObject *args)
 }
 
 
+static PyObject *_wrap_event_set_idle_period(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    int arg2 ;
+    int result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Oi:event_set_idle_period",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (int)event_set_idle_period(arg1,arg2);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
 static PyObject *_wrap_event_arg_get(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     char *arg1 ;
@@ -2549,6 +2754,65 @@ static PyObject *_wrap_event_arg_dup(PyObject *self, PyObject *args) {
     return resultobj;
     fail:
     return NULL;
+}
+
+
+static PyObject *_wrap_event_notification_create_v(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    struct timeval **arg2 = (struct timeval **) 0 ;
+    int arg3 ;
+    va_list arg4 ;
+    event_notification_t result;
+    va_list *argp4 ;
+    PyObject * obj0 = 0 ;
+    PyObject * obj1 = 0 ;
+    PyObject * obj3 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"OOiO:event_notification_create_v",&obj0,&obj1,&arg3,&obj3)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj1,(void **) &arg2, SWIGTYPE_p_p_timeval,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if ((SWIG_ConvertPtr(obj3,(void **) &argp4, SWIGTYPE_p_va_list,SWIG_POINTER_EXCEPTION) == -1)) SWIG_fail;
+    arg4 = *argp4; 
+    result = (event_notification_t)event_notification_create_v(arg1,arg2,(ea_tag_t )arg3,arg4);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_event_notification_t, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_notification_create__varargs__(PyObject *self, PyObject *args, PyObject *varargs) {
+    PyObject *resultobj;
+    event_handle_t arg1 = (event_handle_t) 0 ;
+    int arg2 ;
+    void *arg3 = 0 ;
+    event_notification_t result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Oi:event_notification_create",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_event_handle_t,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (event_notification_t)event_notification_create(arg1,(ea_tag_t )arg2,arg3);
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_event_notification_t, 0);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_event_notification_create(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    PyObject *varargs;
+    PyObject *newargs;
+    
+    newargs = PyTuple_GetSlice(args,0,2);
+    varargs = PyTuple_GetSlice(args,2,PyTuple_Size(args)+1);
+    resultobj = _wrap_event_notification_create__varargs__(self,newargs,varargs);
+    Py_XDECREF(newargs);
+    Py_XDECREF(varargs);
+    return resultobj;
 }
 
 
@@ -2641,6 +2905,111 @@ static PyObject *_wrap_xrealloc(PyObject *self, PyObject *args) {
 }
 
 
+static PyObject *_wrap_timeval_tv_sec_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct timeval *arg1 = (struct timeval *) 0 ;
+    long arg2 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Ol:timeval_tv_sec_set",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_timeval,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if (arg1) (arg1)->tv_sec = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_timeval_tv_sec_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct timeval *arg1 = (struct timeval *) 0 ;
+    long result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:timeval_tv_sec_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_timeval,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (long) ((arg1)->tv_sec);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_timeval_tv_usec_set(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct timeval *arg1 = (struct timeval *) 0 ;
+    long arg2 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"Ol:timeval_tv_usec_set",&obj0,&arg2)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_timeval,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    if (arg1) (arg1)->tv_usec = arg2;
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_timeval_tv_usec_get(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct timeval *arg1 = (struct timeval *) 0 ;
+    long result;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:timeval_tv_usec_get",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_timeval,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    result = (long) ((arg1)->tv_usec);
+    
+    resultobj = PyInt_FromLong((long)result);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_new_timeval(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct timeval *result;
+    
+    if(!PyArg_ParseTuple(args,(char *)":new_timeval")) goto fail;
+    result = (struct timeval *)(struct timeval *) calloc(1, sizeof(struct timeval));
+    
+    resultobj = SWIG_NewPointerObj((void *) result, SWIGTYPE_p_timeval, 1);
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject *_wrap_delete_timeval(PyObject *self, PyObject *args) {
+    PyObject *resultobj;
+    struct timeval *arg1 = (struct timeval *) 0 ;
+    PyObject * obj0 = 0 ;
+    
+    if(!PyArg_ParseTuple(args,(char *)"O:delete_timeval",&obj0)) goto fail;
+    if ((SWIG_ConvertPtr(obj0,(void **) &arg1, SWIGTYPE_p_timeval,SWIG_POINTER_EXCEPTION | 0 )) == -1) SWIG_fail;
+    free((char *) arg1);
+    
+    Py_INCREF(Py_None); resultobj = Py_None;
+    return resultobj;
+    fail:
+    return NULL;
+}
+
+
+static PyObject * timeval_swigregister(PyObject *self, PyObject *args) {
+    PyObject *obj;
+    if (!PyArg_ParseTuple(args,(char*)"O", &obj)) return NULL;
+    SWIG_TypeClientData(SWIGTYPE_p_timeval, obj);
+    Py_INCREF(obj);
+    return Py_BuildValue((char *)"");
+}
 static PyObject *_wrap_callback_data_callback_notification_set(PyObject *self, PyObject *args) {
     PyObject *resultobj;
     struct callback_data *arg1 = (struct callback_data *) 0 ;
@@ -3167,6 +3536,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"event_handle_notify_get", _wrap_event_handle_notify_get, METH_VARARGS },
 	 { (char *)"event_handle_subscribe_set", _wrap_event_handle_subscribe_set, METH_VARARGS },
 	 { (char *)"event_handle_subscribe_get", _wrap_event_handle_subscribe_get, METH_VARARGS },
+	 { (char *)"event_handle_unsubscribe_set", _wrap_event_handle_unsubscribe_set, METH_VARARGS },
+	 { (char *)"event_handle_unsubscribe_get", _wrap_event_handle_unsubscribe_get, METH_VARARGS },
 	 { (char *)"new_event_handle", _wrap_new_event_handle, METH_VARARGS },
 	 { (char *)"delete_event_handle", _wrap_delete_event_handle, METH_VARARGS },
 	 { (char *)"event_handle_swigregister", event_handle_swigregister, METH_VARARGS },
@@ -3203,6 +3574,8 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"event_register", _wrap_event_register, METH_VARARGS },
 	 { (char *)"event_register_withkeyfile", _wrap_event_register_withkeyfile, METH_VARARGS },
 	 { (char *)"event_register_withkeydata", _wrap_event_register_withkeydata, METH_VARARGS },
+	 { (char *)"event_register_withkeyfile_withretry", _wrap_event_register_withkeyfile_withretry, METH_VARARGS },
+	 { (char *)"event_register_withkeydata_withretry", _wrap_event_register_withkeydata_withretry, METH_VARARGS },
 	 { (char *)"event_unregister", _wrap_event_unregister, METH_VARARGS },
 	 { (char *)"c_event_poll", _wrap_c_event_poll, METH_VARARGS },
 	 { (char *)"c_event_poll_blocking", _wrap_c_event_poll_blocking, METH_VARARGS },
@@ -3225,15 +3598,29 @@ static PyMethodDef SwigMethods[] = {
 	 { (char *)"event_notification_put_string", _wrap_event_notification_put_string, METH_VARARGS },
 	 { (char *)"event_notification_remove", _wrap_event_notification_remove, METH_VARARGS },
 	 { (char *)"c_event_subscribe", _wrap_c_event_subscribe, METH_VARARGS },
+	 { (char *)"event_subscribe_auth", _wrap_event_subscribe_auth, METH_VARARGS },
+	 { (char *)"event_async_subscribe", _wrap_event_async_subscribe, METH_VARARGS },
+	 { (char *)"event_unsubscribe", _wrap_event_unsubscribe, METH_VARARGS },
+	 { (char *)"event_async_unsubscribe", _wrap_event_async_unsubscribe, METH_VARARGS },
 	 { (char *)"event_notification_insert_hmac", _wrap_event_notification_insert_hmac, METH_VARARGS },
 	 { (char *)"event_notification_pack", _wrap_event_notification_pack, METH_VARARGS },
 	 { (char *)"event_notification_unpack", _wrap_event_notification_unpack, METH_VARARGS },
+	 { (char *)"event_set_idle_period", _wrap_event_set_idle_period, METH_VARARGS },
 	 { (char *)"event_arg_get", _wrap_event_arg_get, METH_VARARGS },
 	 { (char *)"event_arg_dup", _wrap_event_arg_dup, METH_VARARGS },
+	 { (char *)"event_notification_create_v", _wrap_event_notification_create_v, METH_VARARGS },
+	 { (char *)"event_notification_create", _wrap_event_notification_create, METH_VARARGS },
 	 { (char *)"event_do_v", _wrap_event_do_v, METH_VARARGS },
 	 { (char *)"event_do", _wrap_event_do, METH_VARARGS },
 	 { (char *)"xmalloc", _wrap_xmalloc, METH_VARARGS },
 	 { (char *)"xrealloc", _wrap_xrealloc, METH_VARARGS },
+	 { (char *)"timeval_tv_sec_set", _wrap_timeval_tv_sec_set, METH_VARARGS },
+	 { (char *)"timeval_tv_sec_get", _wrap_timeval_tv_sec_get, METH_VARARGS },
+	 { (char *)"timeval_tv_usec_set", _wrap_timeval_tv_usec_set, METH_VARARGS },
+	 { (char *)"timeval_tv_usec_get", _wrap_timeval_tv_usec_get, METH_VARARGS },
+	 { (char *)"new_timeval", _wrap_new_timeval, METH_VARARGS },
+	 { (char *)"delete_timeval", _wrap_delete_timeval, METH_VARARGS },
+	 { (char *)"timeval_swigregister", timeval_swigregister, METH_VARARGS },
 	 { (char *)"callback_data_callback_notification_set", _wrap_callback_data_callback_notification_set, METH_VARARGS },
 	 { (char *)"callback_data_callback_notification_get", _wrap_callback_data_callback_notification_get, METH_VARARGS },
 	 { (char *)"callback_data_next_set", _wrap_callback_data_next_set, METH_VARARGS },
@@ -3269,8 +3656,8 @@ static swig_type_info _swigt__p_f_elvin_handle_t_p_char_elvin_keys_t_int_elvin_n
 static swig_type_info _swigt__p_unsigned_char[] = {{"_p_unsigned_char", 0, "unsigned char *", 0},{"_p_unsigned_char"},{0}};
 static swig_type_info _swigt__p_event_notification[] = {{"_p_event_notification", 0, "event_notification *", 0},{"_p_event_notification"},{"_event_notification_t"},{0}};
 static swig_type_info _swigt__p_double[] = {{"_p_double", 0, "double *", 0},{"_p_double"},{0}};
-static swig_type_info _swigt__address_tuple_t[] = {{"_address_tuple_t", 0, "address_tuple_t", 0},{"_address_tuple_t"},{"_p_address_tuple"},{0}};
 static swig_type_info _swigt__p_event_handle[] = {{"_p_event_handle", 0, "event_handle *", 0},{"_p_event_handle"},{"_event_handle_t"},{0}};
+static swig_type_info _swigt__address_tuple_t[] = {{"_address_tuple_t", 0, "address_tuple_t", 0},{"_address_tuple_t"},{"_p_address_tuple"},{0}};
 static swig_type_info _swigt__p_int32_t[] = {{"_p_int32_t", 0, "int32_t *", 0},{"_p_int32_t"},{0}};
 static swig_type_info _swigt__p_event_subscription_t[] = {{"_p_event_subscription_t", 0, "event_subscription_t *", 0},{"_p_event_subscription_t"},{0}};
 static swig_type_info _swigt__p_int64_t[] = {{"_p_int64_t", 0, "int64_t *", 0},{"_p_int64_t"},{0}};
@@ -3283,15 +3670,18 @@ static swig_type_info _swigt__p_event_notification_t[] = {{"_p_event_notificatio
 static swig_type_info _swigt__p_p_char[] = {{"_p_p_char", 0, "char **", 0},{"_p_p_char"},{0}};
 static swig_type_info _swigt__p_va_list[] = {{"_p_va_list", 0, "va_list *", 0},{"_p_va_list"},{0}};
 static swig_type_info _swigt__event_notify_callback_t[] = {{"_event_notify_callback_t", 0, "event_notify_callback_t", 0},{"_event_notify_callback_t"},{0}};
+static swig_type_info _swigt__event_subscription_callback_t[] = {{"_event_subscription_callback_t", 0, "event_subscription_callback_t", 0},{"_event_subscription_callback_t"},{0}};
 static swig_type_info _swigt__p_callback_data[] = {{"_p_callback_data", 0, "callback_data *", 0},{"_p_callback_data"},{"_callback_data_t"},{0}};
 static swig_type_info _swigt__p_address_tuple[] = {{"_p_address_tuple", 0, "address_tuple *", 0},{"_address_tuple_t"},{"_p_address_tuple"},{0}};
-static swig_type_info _swigt__p_timeval[] = {{"_p_timeval", 0, "struct timeval *", 0},{"_p_timeval"},{0}};
+static swig_type_info _swigt__p_timeval[] = {{"_p_timeval", 0, "timeval *", 0},{"_p_timeval"},{0}};
+static swig_type_info _swigt__p_p_timeval[] = {{"_p_p_timeval", 0, "struct timeval **", 0},{"_p_p_timeval"},{0}};
 static swig_type_info _swigt__p_f_void__elvin_error_t[] = {{"_p_f_void__elvin_error_t", 0, "elvin_error_t (*)(void)", 0},{"_p_f_void__elvin_error_t"},{0}};
 static swig_type_info _swigt__p_elvin_error_t[] = {{"_p_elvin_error_t", 0, "elvin_error_t *", 0},{"_p_elvin_error_t"},{0}};
 static swig_type_info _swigt__p_f_p_int_elvin_error_t__int[] = {{"_p_f_p_int_elvin_error_t__int", 0, "int (*)(int *,elvin_error_t)", 0},{"_p_f_p_int_elvin_error_t__int"},{0}};
 static swig_type_info _swigt__p_f_int_elvin_error_t__int[] = {{"_p_f_int_elvin_error_t__int", 0, "int (*)(int,elvin_error_t)", 0},{"_p_f_int_elvin_error_t__int"},{0}};
 static swig_type_info _swigt__p_f_elvin_handle_t_elvin_error_t__int[] = {{"_p_f_elvin_handle_t_elvin_error_t__int", 0, "int (*)(elvin_handle_t,elvin_error_t)", 0},{"_p_f_elvin_handle_t_elvin_error_t__int"},{0}};
 static swig_type_info _swigt__callback_data_t[] = {{"_callback_data_t", 0, "callback_data_t", 0},{"_p_callback_data"},{"_callback_data_t"},{0}};
+static swig_type_info _swigt__p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int[] = {{"_p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int", 0, "int (*)(elvin_handle_t,elvin_subscription_t,elvin_error_t)", 0},{"_p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int"},{0}};
 static swig_type_info _swigt__p_f_elvin_handle_t_elvin_notification_t_int_elvin_keys_t_elvin_error_t__int[] = {{"_p_f_elvin_handle_t_elvin_notification_t_int_elvin_keys_t_elvin_error_t__int", 0, "int (*)(elvin_handle_t,elvin_notification_t,int,elvin_keys_t,elvin_error_t)", 0},{"_p_f_elvin_handle_t_elvin_notification_t_int_elvin_keys_t_elvin_error_t__int"},{0}};
 static swig_type_info _swigt__p_int[] = {{"_p_int", 0, "int *", 0},{"_p_int"},{0}};
 
@@ -3300,8 +3690,8 @@ _swigt__p_f_elvin_handle_t_p_char_elvin_keys_t_int_elvin_notify_cb_t_p_void_elvi
 _swigt__p_unsigned_char, 
 _swigt__p_event_notification, 
 _swigt__p_double, 
-_swigt__address_tuple_t, 
 _swigt__p_event_handle, 
+_swigt__address_tuple_t, 
 _swigt__p_int32_t, 
 _swigt__p_event_subscription_t, 
 _swigt__p_int64_t, 
@@ -3314,15 +3704,18 @@ _swigt__p_event_notification_t,
 _swigt__p_p_char, 
 _swigt__p_va_list, 
 _swigt__event_notify_callback_t, 
+_swigt__event_subscription_callback_t, 
 _swigt__p_callback_data, 
 _swigt__p_address_tuple, 
 _swigt__p_timeval, 
+_swigt__p_p_timeval, 
 _swigt__p_f_void__elvin_error_t, 
 _swigt__p_elvin_error_t, 
 _swigt__p_f_p_int_elvin_error_t__int, 
 _swigt__p_f_int_elvin_error_t__int, 
 _swigt__p_f_elvin_handle_t_elvin_error_t__int, 
 _swigt__callback_data_t, 
+_swigt__p_f_elvin_handle_t_elvin_subscription_t_elvin_error_t__int, 
 _swigt__p_f_elvin_handle_t_elvin_notification_t_int_elvin_keys_t_elvin_error_t__int, 
 _swigt__p_int, 
 0

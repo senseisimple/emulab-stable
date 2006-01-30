@@ -244,6 +244,12 @@ class EventClient:
         """
         return event_notify(self.handle, en.notification)
 
+    def schedule(self, en, tv):
+        """
+        Schedule a notification.
+        """
+        return event_schedule(self.handle, en.notification, tv)
+
     def set_timeout(self, timeout):
         """
         @param timeout The timeout, in seconds, for the run() loop.
