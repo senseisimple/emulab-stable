@@ -10,7 +10,7 @@ OBJDIR		= ../..
 SUBDIR		= event/proxy
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= evproxy proxytest
+PROGRAMS	= evproxy proxytest evproxyplab elvindtest
 ifneq ($(SYSTEM),Linux)
 PROGRAMS       += evproxyclient evproxyserver
 endif
@@ -46,6 +46,7 @@ PFLAGS   += `$(ELVIN_CONFIG) --cflags vin4mt`
 LDFLAGS  += -L$(OBJDIR)/lib -L$(OBJDIR)/lib/libtb -L../lib
 LIBS     += -levent -ltb -lcrypto
 LIBS     += `$(ELVIN_CONFIG) --libs vin4c`
+CPPC     = g++
 
 ifeq ($(host_cpu),arm)
 else
@@ -80,6 +81,16 @@ proxyserver.o:  proxyserver.c
 
 proxytest-debug:	proxytest.o $(LIBTBDIR)/log.o
 	$(CC) $(LDFLAGS) -o $@ proxytest.o $(LIBS)
+
+evproxyplab.o: evproxyplab.cc
+	$(CPPC) $(CFLAGS)  -c $<
+
+evproxyplab:    evproxyplab.o ../lib/libevent.a ../lib/event.h
+	$(CPPC) $(LDFLAGS) -o $@ evproxyplab.o $(LIBS)
+
+elvindtest:     elvindtest.o
+	$(CC) $(LDFLAGS) -o $@ elvindtest.o $(LIBS)
+
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
