@@ -4714,15 +4714,15 @@ sub GatherSwapStats($$$$$;$)
 
     my $query_result =
 	DBQueryWarn("select e.state,e.gid,e.idx,s.rsrcidx,s.lastrsrc, ".
-		    "       e.expt_swap_uid,s.swapin_count ".
+		    "       e.expt_swap_uid,s.swapin_count,e.batchmode ".
 		    "  from experiments as e ".
 		    "left join experiment_stats as s on e.idx=s.exptidx ".
 		    "where e.pid='$pid' and e.eid='$eid'");
     if (!$query_result || !$query_result->numrows) {
 	return;
     }
-    my ($curstate, $gid, $exptidx, $rsrcidx, $lastrsrc,
-	$lastswapuid, $swapin_count) = $query_result->fetchrow_array;
+    my ($curstate, $gid, $exptidx, $rsrcidx, $lastrsrc,	$lastswapuid,
+	$swapin_count, $batchmode) = $query_result->fetchrow_array;
     # This overrides when doing a swapmod.
     $lastswapuid = $TBDB_STATS_SAVEDSWAPUID
 	if (defined($TBDB_STATS_SAVEDSWAPUID));
@@ -4964,6 +4964,14 @@ sub GatherSwapStats($$$$$;$)
 			"    swapin_duration=swapin_duration+${duration} ".
 			"where pid='$pid' and eid='$eid' and  ".
 			"      exptidx=$exptidx");
+	}
+
+	# Batch mode info.
+	if ($mode eq TBDB_STATS_SWAPIN ||
+	    $mode eq TBDB_STATS_START) {
+	    DBQueryWarn("update experiment_resources set ".
+			"    batchmode=$batchmode ".
+			"where idx=$rsrcidx");
 	}
     }
 
