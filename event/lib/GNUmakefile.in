@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -34,6 +34,8 @@ CFLAGS_NOWARN += -O2 -g -static -I.
 CFLAGS_NOWARN += `$(ELVIN_CONFIG) --cflags vin4c`
 ifeq ($(SYSTEM),Linux)
 PCORE  = -I/usr/lib/perl5/5.6.1/i386-linux/CORE
+PCORE  += -I/usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE
+PYCORE = -I@PYTHON_INCLUDE@
 else
 FBSDVERSION    := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 ifeq ($(FBSDVERSION),FreeBSD5)
@@ -119,6 +121,10 @@ control-install:	$(LIBS) $(addprefix $(INSTALL_LIBDIR)/, $(LIB_STUFF))
 #
 client: $(LIBS)
 client-install: client # client-libinstall
+
+client-pylibinstall: _tbevent.so
+	$(INSTALL_PROGRAM) $(SRCDIR)/tbevent.py $(DESTDIR)$(CLIENT_BINDIR)/tbevent.py
+	$(INSTALL_PROGRAM) _tbevent.so $(DESTDIR)$(CLIENT_BINDIR)/_tbevent.so
 
 #
 # XXX Fix the python install location.
