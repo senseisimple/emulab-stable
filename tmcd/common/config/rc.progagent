@@ -27,6 +27,7 @@ my $LOGFILE = "$LOGDIR/progagent.debug";
 my $PIDFILE = "/var/run/progagent.pid";
 my $CONFIG  = "$BOOTDIR/progagents";
 my $PAGENT  = "$BINDIR/program-agent";
+my $PAWRAPPER = "$BINDIR/pa-wrapper";
 
 #
 # Load the OS independent support library. It will load the OS dependent
@@ -49,7 +50,7 @@ if ($EUID != 0) {
 # Not all clients support this.
 #
 exit(0)
-    if (MFS() || REMOTE());
+    if (MFS() || REMOTE() && !PLAB());
 
 # Protos.
 sub doboot();
@@ -132,11 +133,17 @@ sub doboot()
     my ($pid, $eid, $vname) = check_nickname();
 
     print "Starting Program Agent ...\n";
-    
-    system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
-	   "-i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG &");
+
+    if (PLAB()) {
+        system("$PAWRAPPER $PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
+           "-i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG");
+    } else {
+        system("$PAGENT -e $pid/$eid -s localhost -l $LOGFILE ".
+               "-i $PIDFILE -k " . TMEVENTKEY() . " -c $CONFIG &");
+    }
+
     if ($?) {
-	fatal("Could not start program agent!");
+        fatal("Could not start program agent!");
     }
     return;
 }

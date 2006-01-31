@@ -1,0 +1,114 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+#
+# This script is a wrapper around the program-agent to handle
+# the runtime knowledge of elvind port on local node
+
+
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+
+# Script specific goo.
+$ELVIN_CONF = "/usr/local/etc/elvind.conf";
+$ELVIN_CONF_ORIG = "/usr/local/etc/elvind.conf.tmpl";
+$ELVIND_BIN = "/usr/local/sbin/elvind";
+$PORT_SUMMARY = "/proc/scout/ports/summary";
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself.
+#
+
+use libsetup;
+use libtmcc;
+
+# create a list of active ports: using associate arrays
+# for quick serarching.
+
+my %portmap;
+open(FP, "< $PORT_SUMMARY");
+
+while ($abc = <FP>) {
+    my ($prot, $port, $slice, $type) = split(" ", $abc);
+
+    if ($prot eq "tcp") {
+        $portmap["$port"]  = 1;
+    }
+}
+
+
+sub start_elvin {
+    my $port = shift;
+
+    # check in the portmap list if it's already active
+    if ($portmap[$port]) {
+	return 0;
+    }
+   
+    # update the port in the elvind.conf
+    `cp $ELVIN_CONF_ORIG $ELVIN_CONF`;
+    
+    open(FP, ">>$ELVIN_CONF");
+    print FP "\nprotocol elvin:/tcp,none,xdr/0.0.0.0:$port\n";
+    close FP;
+
+    system("$ELVIND_BIN");
+
+    # HACK: allow elvind to complete the bind/listen, as 
+    #       elvind daemonize before binding the port
+    sleep 1;    # HACK. arbitary 1 secs.
+
+    # check if elvind is successfully able to bind the port
+    system("$BINDIR/elvindtest -s localhost -p $port");
+    if ($?) {
+	return 0;
+    }
+    
+    return $port;
+}
+
+sub start_evproxy {
+    my $port = shift;
+
+    # start evproxy
+    $nodeid = "plab";
+    $content = `cat /var/emulab/boot/nodeid`;
+    if ($content =~ /plabvm(\d+)-*/) {
+	$nodeid .= $1;
+    } else {
+	fatal("not able to get physical node id");
+    }
+    
+    system("$BINDIR/evproxy -s event-server.emulab.net -n $nodeid -l $port");
+    if ($?) {
+	fatal("Not able to start evproxy");
+    }
+    
+    # make a tmcc call, and let emulab know of elvind-port
+    if (tmcc(TMCCCMD_ELVINDPORT, "$port") < 0) {
+	fatal("Error sending Elvind port to emulab central!");
+    }
+    
+}
+
+#
+# Start the elvind and evproxy
+#	
+if ((-x "$ELVIND_BIN") && (-x "$BINDIR/evproxy")) {
+    my $res = start_elvin(2917); # first try 2917
+    while ($res == 0) {
+	# select a random port between 10000 and 60000
+	$num = rand(50000);
+	$num = int($num) + 10000;
+	$res = start_elvin($num);
+    }
+
+    start_evproxy($res);
+}
+

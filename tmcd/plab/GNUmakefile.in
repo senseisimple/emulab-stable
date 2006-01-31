@@ -14,7 +14,7 @@ COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
                     libtmcc.pm libsetup.pm)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
-                    rc.inplab plabrusage)
+                    rc.inplab plabrusage pa-wrapper runelvin)
 OSSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/os/, \
 		    install-tarfile install-rpm)
 EESCRIPTS	= $(TESTBED_SRCDIR)/tmcd/plab/rc.vinit

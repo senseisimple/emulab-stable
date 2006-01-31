@@ -1,0 +1,77 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+#
+# This script is a wrapper around the program-agent to handle
+# the runtime knowledge of elvind port on local node
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself.
+#
+# Plab setup slightly different than Jail setup. libsetup already knows
+# our vnodeid, and has configured the tmcc library with that info as well.
+# 
+use libsetup;
+use libtmcc;
+
+sub daemonize;
+
+daemonize;
+
+# build Agent cmdline
+$AGENT = "";
+foreach $num (0 .. $#ARGV) {
+    $AGENT .= $ARGV[$num]." ";
+}
+
+
+for(;;) {
+    
+    # make a call to TMCC for elvind port
+    my @tmccresults;
+    
+    if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
+	#fatal("Could not get plabconfig from server!");
+	sleep 5;
+	next;
+    }
+    
+    $plabconfig = $tmccresults[0];
+    
+    if ($plabconfig =~ /ELVIND_PORT=(\d+)/) {
+	my $elvind_port = $1;
+	
+	# call the actual agent
+	system("$AGENT -p $elvind_port");
+    }
+    
+    sleep 5;
+} 
+
+
+sub daemonize {
+    chdir '/'                 or die "Can't chdir to /: $!";
+    open STDIN, '/dev/null'   or die "Can't read /dev/null: $!";
+    open STDOUT, '>>/dev/null' or die "Can't write to /dev/null: $!";
+    open STDERR, '>>/dev/null' or die "Can't write to /dev/null: $!";
+    defined(my $pid = fork)   or die "Can't fork: $!";
+    exit if $pid;
+    setsid                    or die "Can't start a new session: $!";
+    umask 0;
+}
+
+
+
+
