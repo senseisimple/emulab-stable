@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -271,6 +271,8 @@ def sync_usage():
     print "               Flag that indicates that the standard logholes"
     print "               (i.e. '/var/emulab/logs', '/local/logs') should not"
     print "               be downloaded."
+    print "  -P, --no-post"
+    print "               Do not do any additional post processing."
     print "  node1 ...    The names of the virtual or physical nodes that "
     print "               should be synced.  The default behavior is to sync "
     print "               all of the nodes in an experiment."
@@ -982,7 +984,16 @@ def rmstar(host, port, *args):
     
     return retval
 
-def print_status(hosts, jobs, hoststatus, hoststart):
+def print_status(msg):
+    if not sys.stdout.isatty() or VERBOSITY < VERBOSITY_HUMAN:
+        return
+    
+    sys.stdout.write(msg)
+    sys.stdout.flush()
+    
+    return
+
+def print_job_status(hosts, jobs, hoststatus, hoststart):
     if not sys.stdout.isatty() or VERBOSITY < VERBOSITY_HUMAN:
         return
     
@@ -1012,9 +1023,43 @@ def print_status(hosts, jobs, hoststatus, hoststart):
     if line_len < 79:
         lmsg += " " * (79 - line_len)
         pass
-    sys.stdout.write(lmsg + rmsg + "\r")
-    sys.stdout.flush()
+    print_status(lmsg + rmsg + "\r")
 
+    return
+
+def trace_post(link2trace):
+    lpc = 1
+    for linkvname in link2trace.keys():
+        print_status("linktrace post processing %d/%d  " %
+                     (lpc, len(link2trace)))
+        args = {}
+        os.chdir(linkvname)
+        for filename in glob.glob("*.recv*"):
+            base, ext = os.path.splitext(filename)
+            if base.startswith("__") or ext == ".recv":
+                continue
+            al = args.get(ext, [])
+            al.append(filename)
+            args[ext] = al
+            pass
+        for ext in args.keys():
+            if ext == ".recv":
+                continue
+            dst = "__all.recv%s" % (ext,)
+            print_status(".")
+            os.system("mergecap -w %s %s" % (dst, " ".join(args[ext])))
+            print_status(".")
+            os.system("tcptrace -G %s > .tcptrace.out" % (dst,))
+            print_status("\r")
+            pass
+        os.chdir(os.path.pardir)
+        lpc += 1
+        pass
+
+    if len(link2trace.keys()):
+        print_status("\n")
+        pass
+    
     return
 
 ##
@@ -1032,15 +1077,19 @@ def do_sync(args, mode="sync", must_be_active=1):
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
 
     standard_logholes = True
+    post_process = True
     extra_logholes = []
 
     try:
-        opts, node_list = getopt.getopt(args, "nl:r:", [
+        opts, node_list = getopt.getopt(args, "nl:r:P", [
             "no-standard", "local=", "remote=",
             ])
         for opt, val in opts:
             if opt in ("-n", "--no-standard"):
                 standard_logholes = False
+                pass
+            elif opt in ("-P", "--no-post"):
+                post_process = False
                 pass
             elif opt in ("-l", "--local"):
                 logdir = os.path.abspath(val)
@@ -1168,7 +1217,7 @@ def do_sync(args, mode="sync", must_be_active=1):
             hoststart = {}
             for phost, vhost in hosts:
                 if (vhost in node_list) or (phost in node_list):
-                    print_status(node_list, jobs, hoststatus, hoststart)
+                    print_job_status(node_list, jobs, hoststatus, hoststart)
                     
                     osid = physical[vhost]["osid"]
                     if osid not in OSIDS:
@@ -1234,7 +1283,10 @@ def do_sync(args, mode="sync", must_be_active=1):
                         hoststatus[jobs[pid]] = (time.time(), sts)
                         del jobs[pid]
                         
-                        print_status(node_list, jobs, hoststatus, hoststart)
+                        print_job_status(node_list,
+                                         jobs,
+                                         hoststatus,
+                                         hoststart)
                         pass
                     pass
                 pass
@@ -1275,8 +1327,15 @@ def do_sync(args, mode="sync", must_be_active=1):
                 pass
 
             # Add symbolic links to the trace files.
-            linkdirs = {}
+            link2trace = {}
             for trace in traces:
+                if trace["trace_type"] == "monitor":
+                    continue
+                
+                tl = link2trace.get(trace["linkvname"], [])
+                tl.append(trace)
+                link2trace[trace["linkvname"]] = tl
+                
                 fullpath = os.path.join(logdir, trace["linkvname"])
                 try:
                     os.makedirs(fullpath)
@@ -1285,7 +1344,8 @@ def do_sync(args, mode="sync", must_be_active=1):
                     pass
                 for fmt in LINK_DUMP_FMT:
                     src = os.path.join(trace["delayvname"],
-                                       "local/logs",
+                                       "local",
+                                       "logs",
                                        fmt % (trace["vnode"],
                                               trace["linkvname"]))
                     for filename in glob.glob(src + "*"):
@@ -1303,6 +1363,10 @@ def do_sync(args, mode="sync", must_be_active=1):
                         os.symlink(os.path.join(os.pardir, filename), dst)
                         pass
                     pass
+                pass
+
+            if post_process:
+                trace_post(link2trace)
                 pass
             
             pass
