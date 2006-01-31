@@ -330,6 +330,7 @@ if ($doplab) {
     # since it runs subcommands via system() that need to be
     # root.
     $UID = 0;
+    $GID = 0;
     ($pid, $eid, $vname) = vnodeplabsetup($vnodeid);
 }
 else {

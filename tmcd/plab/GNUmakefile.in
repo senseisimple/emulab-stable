@@ -11,7 +11,7 @@ SUBDIR		= tmcd/plab
 #
 COMSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/common/, \
 		    paths.sh paths.pm runstartup vnodesetup update watchdog \
-                    libtmcc.pm libsetup.pm)
+                    libtmcc.pm libsetup.pm startcmddone)
 LINSCRIPTS	= $(TESTBED_SRCDIR)/tmcd/linux/liblocsetup.pm
 PLABSCRIPTS	= $(addprefix $(TESTBED_SRCDIR)/tmcd/plab/, \
                     rc.inplab plabrusage pa-wrapper runelvin)

@@ -54,7 +54,7 @@ for(;;) {
 	my $elvind_port = $1;
 	
 	# call the actual agent
-	system("$AGENT -p $elvind_port");
+	system("$AGENT -r -p $elvind_port");
     }
     
     sleep 5;
