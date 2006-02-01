@@ -4,8 +4,6 @@
  *
  * netmond, a 'server' for libnetmon - simply repeat what a process being
  * monitored with libnetmon tell us on a unix-domian socket
- *
- * TODO: Handle more than one client at a time
  */
 
 #define SOCKPATH "/var/tmp/netmon.sock"
@@ -17,6 +15,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/select.h>
+#include <sys/stat.h>
 
 int main() {
 
@@ -47,6 +46,16 @@ int main() {
         perror("Failed to listen() on socket\n");
         return 1;
     }
+
+    if (chmod(SOCKPATH,0666)) {
+        perror("Failed to chmod() socket\n");
+        return 1;
+    }
+
+    /*
+     * We have to do this because netmod may be run as root, but we want to
+     * make sure any user can use it.
+     */
 
     FD_ZERO(&real_fdset);
     FD_SET(sockfd,&real_fdset);
