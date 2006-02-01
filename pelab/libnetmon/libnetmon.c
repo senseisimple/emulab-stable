@@ -17,6 +17,7 @@ void croak(char *format, ...) {
     fprintf(stderr,"*** ERROR\n    libnetmon: ");
     vfprintf(stderr,format, ap);
     va_end(ap);
+    fflush(stderr);
     exit(1);
 }
 
@@ -54,6 +55,7 @@ void lnm_init() {
         FIND_REAL_FUN(connect);
         FIND_REAL_FUN(write);
         FIND_REAL_FUN(send);
+        FIND_REAL_FUN(setsockopt);
 
         sockpath = getenv("LIBNETMON_SOCKPATH");
         if (sockpath) {
@@ -85,6 +87,18 @@ void lnm_init() {
 
         } else {
             outstream = stdout;
+        }
+
+        char *bufsize_s;
+        if ((bufsize_s = getenv("LIBNETMON_SOCKBUFSIZE"))) {
+            if (sscanf(bufsize_s,"%i",&forced_bufsize) == 1) {
+                printf("libnetmon: Forcing socket buffer size %i\n",
+                        forced_bufsize);
+            } else {
+                croak("Bad sockbufsize: %s\n",bufsize_s);
+            }
+        } else {
+            forced_bufsize = 0;
         }
 
         intialized = true;
@@ -202,7 +216,7 @@ void log_packet(int fd, size_t len) {
      * gettimeofday()
      */
     if (gettimeofday(&time,NULL)) {
-        croak("Error in gettimeofday()");
+        croak("Error in gettimeofday()\n");
     }
     /*
     fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec, fd,len);
@@ -277,6 +291,23 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          * Note: The kernel already verified for us that the pointer is okay
          */
         startFD(sockfd,serv_addr);
+
+        /*
+         * We may have been asked to force the socket buffer size
+         */
+        if (forced_bufsize) {
+            int sso_rv;
+            sso_rv = real_setsockopt(sockfd,SOL_SOCKET,SO_SNDBUF,
+                    &forced_bufsize, sizeof(forced_bufsize));
+            if (sso_rv == -1) {
+                croak("Unable to force out buffer size: %s\n",strerror(errno));
+            }
+            sso_rv = real_setsockopt(sockfd,SOL_SOCKET,SO_RCVBUF,
+                    &forced_bufsize, sizeof(forced_bufsize));
+            if (sso_rv == -1) {
+                croak("Unable to force in buffer size: %s\n",strerror(errno));
+            }
+        }
     } else {
         /*
          * Do this in case they called connect() to reconnect a previously
@@ -358,4 +389,29 @@ ssize_t write(int fd, const void *buf, size_t count) {
 
     return rv;
 
+}
+
+int setsockopt (int s, int level, int optname, const void *optval,
+                 socklen_t optlen) {
+    lnm_init();
+
+    DEBUG(printf("setsockopt called (%i,%i)\n",level,optname));
+
+    /*
+     * Note, we do this on all sockets, not just those we are currently
+     * monitoring, since it's likely they'll call setsockopt() before
+     * connect()
+     */
+    if (forced_bufsize && (level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
+                                  (optname == SO_RCVBUF))) {
+        /*
+         * I believe this is the right thing to do - return success but don't
+         * do anything - I think that this is what you normally get when you,
+         * say, pick a socket buffer size that is too big.
+         */
+        printf("Warning: Ignored attempt to change SO_SNDBUF or SO_RCVBUF\n");
+        return 0;
+    } else {
+        return real_setsockopt(s,level,optname,optval,optlen);
+    }
 }

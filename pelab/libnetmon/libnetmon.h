@@ -92,6 +92,11 @@ static unsigned int fdSize;
 FILE *outstream;
 
 /*
+ * Force the socket buffer size
+ */
+int forced_bufsize;
+
+/*
  * Manipulate the monitorFDs structure
  */
 static void startFD(int, const struct sockaddr *);
@@ -108,6 +113,7 @@ typedef int close_proto_t(int);
 typedef int connect_proto_t(int, const struct sockaddr*, socklen_t);
 typedef ssize_t write_proto_t(int, const void *, size_t);
 typedef ssize_t send_proto_t(int, const void *, ssize_t, int);
+typedef int setsockopt_proto_t(int, int, int, const void*, socklen_t);
 
 /*
  * Locations of the real library functions
@@ -117,6 +123,7 @@ static close_proto_t   *real_close;
 static connect_proto_t *real_connect;
 static write_proto_t   *real_write;
 static send_proto_t    *real_send;
+static setsockopt_proto_t *real_setsockopt;
 
 /*
  * Note: Functions that we're wrapping are in the .c file
