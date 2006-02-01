@@ -1,0 +1,281 @@
+I. Background:
+
+Packets flow through an IPFW2 firewall as follows (taken from IPFW man page):
+
+               ^     to upper layers   V
+               |                       |
+               +----------->-----------+
+               ^                       V
+          [ip_input]              [ip_output]   net.inet.ip.fw.enable=1
+               |                       |
+               ^                       V
+         [ether_demux]    [ether_output_frame]  net.link.ether.ipfw=1
+               |                       |
+               +-->--[bdg_forward]-->--+        net.link.ether.bridge_ipfw=1
+               ^                       V
+               |      to devices       |
+
+In our case, the devices involved are two VLANs coming via the same
+physical interface, which we will call "em0" from now on for simplicity,
+using 802.1q encapsulation.  However, on Ciscos, only one of the two
+VLANs is actually encapsulated, the other is the so-called "native" VLAN.
+Thus the devices involved under FreeBSD are vlan0, the encapsulated
+("tagged") VLAN that is the "inside" of the firewall, and em0, the
+unencapsulated VLAN that is the "outside".
+
+This creates some problems for the BSD bridge code.  Recall that both
+VLANs come over the same physical device so that there are tagged and
+untagged packets coming in to, and going out of, em0.  A naive bridging of
+all packets between em0 and vlan0 works correctly for untagged packets,
+which are from outside, that will get handed off to the vlan0 device,
+which is inside.  However, tagged packets coming into em0, which are from
+inside, will also get handed off to the vlan device since they too are
+technically coming in via em0.  So packets coming from the inside get
+tagged again and passed back out the inside.  So we added a bridge sysctl:
+
+	net.link.ether.bridge_vlan
+
+which, when set, tells the bridge code to pass 802.1q encapsulated packets
+through the bridge.  This is the default, and the traditional behavior.
+When cleared, encapsulated packets are not bridged and instead are considered
+"local" and passed on to ether_demux.  Ether_demux will pass the packet to
+the vlan driver which will strip the encapsulation and again hand the packet
+to the bridge code.  Now the packet will be properly bridged and sent out em0.
+
+This is actually only a problem when using interfaces that cannot handle
+VLAN tagging in hardware.  For these interfaces, the driver hands the
+encapsulated packet up to ether_input which then behaves as described above.
+However, with hardware support, the driver gets a packet that is
+unencapsulated along with a tag value for who it belongs to.  Here, the
+driver will hand the packet and tag directly to the vlan driver, skipping
+the first level of demux.  It also avoid a layer of dummynet filtering as
+we will see in the following diagrams.
+
+II. Packet Flow:
+
+A. Packets from the outside headed either inside or to the firewall itself
+   (including all mcast and bcast packets) follow the path:
+
+        em0
+         |
+         V
+    ether_input --<to-FW,mcast,bcast>--> ether_demux                       
+         |                          	      |                             
+ <ucast,mcast,bcast>	              [ IPFW2 layer2 rules ] -<deny>->X
+         |				      |                             
+         V				   <accept>                         
+   bridge_forward			      |                             
+         |				      V                             
+ [ IPFW2 layer2 rules ] -<deny>->X	   ip_input                         
+         |				      |                             
+      <accept>			      [ IPFW2 "not layer2" rules ] -<deny>->X
+         |			              |                             
+         V				      V                             
+     vlan_start				   <accept>                         
+         |				      |                             
+   <encapsulated>			      V                             
+         |			       [ higher levels ]                    
+         V
+        em0
+    
+   For bridged unicast packets, the firewall sees layer2 packets,
+   unencapsulated, originating from "em0".  For packets targeted to
+   the firewall itself, it sees the packets once or twice.  It always
+   sees them as layer2, and possibly as layer3 if it is an IP packet.
+   Multicast and broadcast packets are seen on BOTH paths, so up to
+   3 times.
+    
+B. Packets from the inside headed either outside or to the firewall itself
+   (including mcast and bcast) do:
+    
+	    (no HW VLAN support)
+        em0 -----------+
+         |             | 
+         |         ether_input
+  (HW    |             |
+  VLAN   |             V
+ support)|         ether_demux
+         |             |
+         |     [ IPFW2 layer2 rules ] -<deny>->X
+         |             |
+         |          <accept>
+         |             |
+         |             V
+  vlan_input_tag   vlan_input
+         |             |
+         |      <unencapsulated>
+         |             |
+         |<------------+
+         V
+    ether_input --<to-FW,mcast,bcast>--> ether_demux                       
+         |                          	      |                             
+ <ucast,mcast,bcast>	              [ IPFW2 layer2 rules ] -<deny>->X
+         |				      |                             
+         V				   <accept>                         
+   bridge_forward			      |                             
+         |				      V                             
+ [ IPFW2 layer2 rules ] -<deny>->X	   ip_input                         
+         |				      |                             
+      <accept>			      [ IPFW2 "not layer2" rules ] -<deny>->X
+         |			              |                             
+         V				      V                             
+        em0				   <accept>                         
+          				      |                             
+                 			      V                             
+          			       [ higher levels ]                    
+    
+   Are we getting scared yet?  With hardware VLAN support, we skip one layer
+   of firewalling with the encapsulated packet.  So bridged unicast traffic
+   is seen once or twice.  Traffic to the firewall is seen 1 to 3 times,
+   depending on whether there is HW VLAN support and whether it is an IP
+   packet.
+
+C. All packets from the firewall itself destined for anywhere
+   (including mcast and bcast):
+    
+  [ higher levels ]
+         |
+         V
+     ip_output
+         |
+ [ IPFW2 "not layer2" rules ] -<deny>->
+         |
+      <accept>
+         |
+         V
+  ether_output_frame
+         |
+         V
+    bridge_forward -<to-out,mcast,bcast>-+
+         |                               |
+ <to-in,mcast,bcast>                     |
+         |                               |
+	 V                               |
+     vlan_start                          |
+         |                               |
+   <encapsulated>                        |
+         |                               |
+         V                               |
+        em0 <----------------------------+
+    
+  Whoa!  Now that is a breath of fresh air, only one check!  Locally
+  generated, bridged packets do not go through the firewall.  I suspect
+  this is less of a "feature" and more of a side-effect of the need to
+  not filter packets more than once on the common bridge path.
+
+
+III. IPFW2 match pattern values:
+
+To summarize some of the ipfw match patterns:
+    
+Flow			layer2	in/out	recv	xmit	via	handled by
+
+A. outside->inside	true	in	em0	N/A	em0	bridge
+
+B. [ inside->outside 1	true	in	em0	N/A	em0	ether_in ]
+   inside->outside 2	true	in	vlan0	N/A	vlan0	bridge
+
+C. outside->FW 1	true	in	em0	N/A	em0	ether_in
+   outside->FW 2	false	in	em0	N/A	em0	IP_in
+
+D. FW->outside 1	false	out	N/A	em0	em0	IP_out
+   FW->outside 2	true	out	N/A	em0	em0	bridge
+
+E. [ inside->FW 1	true	in	em0	N/A	em0	ether_in ]
+   inside->FW 2		true	in	vlan0	N/A	vlan0	ether_in
+   inside->FW 3		false	in	vlan0	N/A	vlan0	IP_in
+
+F. FW->inside 1		false	out	N/A	vlan0	vlan0	IP_out
+   FW->inside 2		true	out	N/A	vlan0	vlan0	ether_out
+
+Note that the first checks in B and E are not done if there is HW VLAN
+support in effect.
+
+
+IV. The algorithm
+
+The first thing to do is to eliminate the difference between cases where
+there is HW VLAN support and where there isn't.  The only time the bridge
+or firewall sees encapsulated packets is the latter.  The bridge_vlan sysctl
+described above ensures that encapsulated packets are not seen by the bridge,
+and we introduce a simple firewall rule checking "mac-type vlan" and accepting
+immediately to get them past the firewall code.  That effectively eliminates
+the first checks of B and E above.
+
+Another way to do this would be to disable (rather, not enable)
+net.link.ether.ipfw, which would disable all "ether_in" and "ether_out"
+checks above.
+
+We can tell whether incoming packets are from the inside or outside with:
+
+"in via vlan0"
+	Means coming from the inside network.
+
+"in not via vlan0"
+	Means coming from the outside network.  Same as "in via em0" in
+	this case, but we don't always know the name of the physical
+	interface.
+
+We can differentiate unicast packets for the firewall from those that
+are to be bridged with:
+
+"from any to me in via vlan0"
+	To firewall from inside
+
+"from any to me in not via vlan0"
+	To firewall from outside.
+
+Unfortunately, we cannot differentiate broadcast, multicast or non-IP packets
+in this way as "me" means "one of my IP addresses".  There are three places
+where this matters: ARP (non-IP broadcast), DHCP (IP broadcast) and
+frisbee (IP multicast).  For the latter two, we know src IP addresses,
+or multicast IP ranges or port numbers that we can use to narrow things
+down.  Being a layer2 protocol, ARP is more difficult.  But for all, there
+are two classes of attacks to worry about: DoS attacks on shared servers
+and spoofing of servers.
+
+DoS attacks can happen with any protocol we allow through the firewall:
+ARP, DHCP, TFTP, DNS, HTTP, etc.  The solution to these involves non-shared
+infrastructure
+
+For non-IP packets, there is an issue with ARP discussed below.  For IP
+broadcast, we can safely just block it all, there is no need to allow it
+for either the firewall or the outside world.  For multicast, we need to
+allow frisbee (disk loader) traffic which requires broadcast requests from
+the nodes and broadcast responses from boss or whoever the image server is.
+The real problem is the outgoing
+traffic, both because the allowed address range is big and because it would
+allow the inside to DoS the image server.
+
+
+V. The problem with ARP
+
+We don't want to allow ARP packets from the inside to get out, since
+ARP spoofing is the enabler for lots of DoS or MitM attacks.  However,
+since we are a bridge, the nodes will need to locate the default router
+in order to talk to Emulab or the outside.  Likewise, the router may
+need to locate the nodes.  And the firewall itself needs to find the
+router and be found by it.
+
+The best solution is to allow ARP requests for the gateway from the inside
+(and from us) and ARP replies from the gateway to the inside (and to us).
+However, we cannot lock it down quite that tight as we cannot look inside
+ARP packets to extract protocol or hardware addresses.  So we would have to
+allow broadcast ARP packets (aka "requests for router") from the inside,
+unicast ARP packets from the router (aka "replies from router"), and
+broadcast ARP packets from the router (aka "requests from router").  But
+this would allow nodes on the inside to randomly broadcast "replies" for
+other machines it knows are on the outside control network.  While they
+would not be able to hijack the traffic for such nodes (we disallow IP
+traffic from outside control net to inside), they could DoS them.
+
+So, instead we will proxy for both both sides.  Nodes finding the router
+is handled by having the firewall publish an ARP entry for it (note that
+this is not "proxy ARP" in the traditional sense, we are publishing
+the router's real MAC, not our MAC).  This locked-down ARP entry takes
+care of the firewall finding the router as well.  Likewise we publish
+entries for all the nodes behind the firewall so that we can respond
+on their behalf to the router.
+
+VI. The problem with frisbee traffic
+
