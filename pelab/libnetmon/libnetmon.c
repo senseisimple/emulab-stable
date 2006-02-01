@@ -276,7 +276,7 @@ void log_packet(int fd, size_t len) {
     }
     switch (output_version) {
         case 0:
-            fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec,
+            fprintf(outstream,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec,
                     fd,len);
             break;
         case 1:
