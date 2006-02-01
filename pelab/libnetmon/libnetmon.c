@@ -40,6 +40,20 @@ void lnm_init() {
         fdSize = 0;
         allocFDspace();
 
+        /*
+         * Figure out which version of the output format we're supposed to use
+         */
+        char *outversion_s;
+        outversion_s = getenv("LIBNETMON_OUTPUTVERSION");
+        if (outversion_s) {
+            if (!sscanf(outversion_s,"%i",&output_version) == 1) {
+                croak("Bad output version: %s\n",outversion_s);
+            }
+        } else {
+            output_version = 1;
+        }
+        DEBUG(printf("Using output version %i\n",output_version));
+
 #define FIND_REAL_FUN(FUN) \
           real_##FUN = (FUN##_proto_t*)dlsym(RTLD_NEXT,#FUN); \
           if (!real_##FUN) { \
@@ -109,8 +123,13 @@ void lnm_init() {
 
 void startFD(int fd, const struct sockaddr * addr) {
 
-    struct sockaddr_in *inaddr;
+    struct sockaddr_in *remoteaddr, *localaddr;
     unsigned int socktype, typesize;
+    union {
+        struct sockaddr sa;
+        char data[128];
+    } sockname;
+    socklen_t namelen;
 
     /*
      * Make sure it's an IP connection
@@ -132,7 +151,7 @@ void startFD(int fd, const struct sockaddr * addr) {
         return;
     }
 
-    inaddr = (struct sockaddr_in*)addr;
+    remoteaddr = (struct sockaddr_in*)addr;
 
     /*
      * Give oursleves enough space in the array to record information about
@@ -149,9 +168,38 @@ void startFD(int fd, const struct sockaddr * addr) {
      * Keep some information about the socket, so that we can print it out
      * later
      */
-    monitorFDs[fd].remote_port = ntohs(inaddr->sin_port);
+    monitorFDs[fd].remote_port = ntohs(remoteaddr->sin_port);
     /* XXX Error checking */
-    monitorFDs[fd].remote_hostname = inet_ntoa(inaddr->sin_addr);
+    monitorFDs[fd].remote_hostname = inet_ntoa(remoteaddr->sin_addr);
+
+    /*
+     * Get the local port number
+     */
+    int gsn_rv;
+    gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
+    if (gsn_rv != 0) {
+        croak("Unable to get local socket name: %s\n", strerror(errno));
+    }
+    /* Assume it's the right address family, since we checked that above */
+    localaddr = (struct sockaddr_in *) &(sockname.sa);
+    monitorFDs[fd].local_port = localaddr->sin_port;
+
+    /*
+     * We may have been asked to force the socket buffer size
+     */
+    if (forced_bufsize) {
+        int sso_rv;
+        sso_rv = real_setsockopt(fd,SOL_SOCKET,SO_SNDBUF,
+                &forced_bufsize, sizeof(forced_bufsize));
+        if (sso_rv == -1) {
+            croak("Unable to force out buffer size: %s\n",strerror(errno));
+        }
+        sso_rv = real_setsockopt(fd,SOL_SOCKET,SO_RCVBUF,
+                &forced_bufsize, sizeof(forced_bufsize));
+        if (sso_rv == -1) {
+            croak("Unable to force in buffer size: %s\n",strerror(errno));
+        }
+    }
 }
 
 void stopFD(int fd) {
@@ -163,6 +211,14 @@ void stopFD(int fd) {
     if (monitorFDs[fd].remote_hostname != NULL) {
         monitorFDs[fd].remote_hostname = NULL;
     }
+}
+
+void fprintID(FILE *f, int fd) {
+
+    fprintf(f,"%i:%s:%i", monitorFDs[fd].local_port,
+            monitorFDs[fd].remote_hostname,
+            monitorFDs[fd].remote_port);
+
 }
 
 void allocFDspace() {
@@ -218,11 +274,24 @@ void log_packet(int fd, size_t len) {
     if (gettimeofday(&time,NULL)) {
         croak("Error in gettimeofday()\n");
     }
-    /*
-    fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec, fd,len);
-    */
-    fprintf(outstream,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec, time.tv_usec,
-            monitorFDs[fd].remote_hostname, monitorFDs[fd].remote_port, len);
+    switch (output_version) {
+        case 0:
+            fprintf(stderr,"%lu.%08lu [%i, %i]\n",time.tv_sec, time.tv_usec,
+                    fd,len);
+            break;
+        case 1:
+            fprintf(outstream,"%lu.%06lu > %s.%i (%i)\n",time.tv_sec,
+                    time.tv_usec, monitorFDs[fd].remote_hostname,
+                    monitorFDs[fd].remote_port, len);
+            break;
+        case 2:
+            fprintf(outstream,"%lu.%06lu > ", time.tv_sec, time.tv_usec);
+            fprintID(outstream,fd);
+            fprintf(outstream," (%i)\n", len);
+            break;
+        default:
+            croak("Bad output version: %i\n",output_version);
+    }
     fflush(outstream);
 }
 
@@ -292,22 +361,6 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          */
         startFD(sockfd,serv_addr);
 
-        /*
-         * We may have been asked to force the socket buffer size
-         */
-        if (forced_bufsize) {
-            int sso_rv;
-            sso_rv = real_setsockopt(sockfd,SOL_SOCKET,SO_SNDBUF,
-                    &forced_bufsize, sizeof(forced_bufsize));
-            if (sso_rv == -1) {
-                croak("Unable to force out buffer size: %s\n",strerror(errno));
-            }
-            sso_rv = real_setsockopt(sockfd,SOL_SOCKET,SO_RCVBUF,
-                    &forced_bufsize, sizeof(forced_bufsize));
-            if (sso_rv == -1) {
-                croak("Unable to force in buffer size: %s\n",strerror(errno));
-            }
-        }
     } else {
         /*
          * Do this in case they called connect() to reconnect a previously

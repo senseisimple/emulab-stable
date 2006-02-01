@@ -78,6 +78,7 @@ typedef struct {
     char *remote_hostname; /* We keep the char* so that we don't have to
                               convert every time we want to report */
     int remote_port;
+    int local_port;
 } fdRecord;
 
 /*
@@ -101,6 +102,16 @@ int forced_bufsize;
  */
 static void startFD(int, const struct sockaddr *);
 static void stopFD(int);
+
+/*
+ * Print unique identifier for an FD
+ */
+static void fprintID(FILE *, int);
+
+/*
+ * Which version of the output format are we using?
+ */
+static unsigned int output_version;
 
 /*
  * Prototypes for the real library functions - just makes it easier to declare
