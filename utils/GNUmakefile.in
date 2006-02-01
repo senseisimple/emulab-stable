@@ -15,7 +15,7 @@ include $(OBJDIR)/Makeconf
 SUBDIRS		= nsgen
 
 BIN_SCRIPTS	= delay_config sshtb create_image node_admin link_config \
-                  setdest loghole webcopy linkmon_ctl
+                  setdest loghole webcopy linkmon_ctl snmp-if-deref.sh
 SBIN_SCRIPTS	= vlandiff vlansync withadminprivs export_tables cvsupd.pl \
                   eventping grantnodetype import_commitlog dhcpd_wrapper \
 		  opsreboot deletenode node_statewait grabwebcams \
