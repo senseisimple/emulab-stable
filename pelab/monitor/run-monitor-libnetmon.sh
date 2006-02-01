@@ -1,15 +1,16 @@
 #!/bin/sh
 
-if [ $# != 2 ]; then
-    if [ $# != 3 ]; then
-      echo "Usage: $0 <project/experiment> <my-ip> [stub-ip]"
+if [ $# != 3 ]; then
+    if [ $# != 4 ]; then
+      echo "Usage: $0 <project> <experiment> <my-ip> [stub-ip]"
       exit 1;
     fi
+    SIP=$4
 fi
 
 PID=$1
 EID=$2
-SID=$3
+MIP=$3
 
 SCRIPT=`which $0`
 SCRIPT_LOCATION=`dirname $SCRIPT`
@@ -21,5 +22,5 @@ if ! [ -x $BIN_LOCATION/$BIN ]; then
     exit 1;
 fi
 
-echo "Starting up netmond for $PID $EID $SID";
-$BIN_LOCATION/$BIN | python monitor.py ip-mapping.txt $PID $EID $SID
+echo "Starting up netmond for $PID/$EID $MIP $SIP";
+$BIN_LOCATION/$BIN | python monitor.py ip-mapping.txt $PID/$EID $MIP $SIP
