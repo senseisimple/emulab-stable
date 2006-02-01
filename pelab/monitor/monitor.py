@@ -31,6 +31,7 @@ def main_loop():
   read_args()
   quanta = 0.5# in seconds
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  sys.stdout.write("stub_ip is %s\n" % stub_ip)
   conn.connect((stub_ip, 4200))
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
@@ -157,7 +158,7 @@ def set_link(source, dest, ending):
   command = ('/usr/testbed/bin/tevc -e ' + this_experiment + ' now '
              + emulated_to_interface[source] + ' modify dest=' + dest + ' '
              + ending)
-#  sys.stdout.write('event: ' + command + '\n')
+  sys.stdout.write('event: ' + command + '\n')
   return os.system(command)
 
 def send_destinations(conn, packet_list):
