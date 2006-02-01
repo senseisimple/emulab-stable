@@ -565,6 +565,7 @@ int sends_complete(struct agent *agent, const char *evtype)
 		{ TBDB_OBJECTTYPE_TOPOGRAPHY, NULL },
 		{ TBDB_OBJECTTYPE_LINKTRACE, NULL },
 		{ TBDB_OBJECTTYPE_EVPROXY, NULL },
+		{ TBDB_OBJECTTYPE_BGMON, NULL },
 		{ NULL, NULL }
 	};
 

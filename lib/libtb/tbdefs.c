@@ -31,6 +31,7 @@ char *tbdb_objecttypes[] = {
         TBDB_OBJECTTYPE_TOPOGRAPHY,
         TBDB_OBJECTTYPE_LINKTRACE,
         TBDB_OBJECTTYPE_EVPROXY,
+        TBDB_OBJECTTYPE_BGMON,
 	/*
 	 * NOTE: Add the object type and any events that send back COMPLETEs to
 	 * the objtype2complete array in event-sched.c:sends_complete().
