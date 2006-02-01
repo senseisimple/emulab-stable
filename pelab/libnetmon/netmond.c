@@ -102,18 +102,18 @@ int main() {
         /*
          * Now, check to see if any clients have sent us any data
          */
-        for (i = sockfd; i <= max_clientfd; i++) {
+        for (i = sockfd + 1; i <= max_clientfd; i++) {
             if (FD_ISSET(i,&returned_fdset)) {
                 char *buf[1024];
                 size_t bufsize = 1024;
-                size_t read_bytes;
+                int read_bytes;
 
                 read_bytes = read(i,buf,bufsize);
 
                 if (read_bytes >= 1) {
                     /*
-                     * Okay, this client had data for us, let's copy that back out
-                     * to stdout
+                     * Okay, this client had data for us, let's copy that back
+                     * out to stdout
                      */
                     write(1,buf,read_bytes);
                 } else {
