@@ -62,7 +62,7 @@ extern "C" {
 
 
 /*****************************************************************************
- * $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/event/lib/event_wrap.c,v 1.5 2003-11-10 17:20:04 ricci Exp $
+ * $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/event/lib/event_wrap.c,v 1.6 2006-02-01 01:08:49 stack Exp $
  *
  * perl5ptr.swg
  *
@@ -96,7 +96,10 @@ extern "C" {
  * SWIGSTATIC.
  *
  * $Log: event_wrap.c,v $
- * Revision 1.5  2003-11-10 17:20:04  ricci
+ * Revision 1.6  2006-02-01 01:08:49  stack
+ * Get the perl event library to compile on fedora core.
+ *
+ * Revision 1.5  2003/11/10 17:20:04  ricci
  * New versions of the perl even library, to bring it up to date with
  * Leigh's recent security enhancements.
  *
@@ -427,7 +430,11 @@ static void _swig_create_magic(CPerl *pPerl, SV *sv, char *name, int (CPerl::*se
 extern "C"
 #endif
 #ifndef PERL_OBJECT
+#  ifdef pTHX_
+SWIGEXPORT(void,boot_event)(pTHX_ CV* cv);
+#  else
 SWIGEXPORT(void,boot_event)(CV* cv);
+#  endif
 #else
 SWIGEXPORT(void,boot_event)(CPerl *, CV *cv);
 #endif
