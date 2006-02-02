@@ -219,6 +219,8 @@ use vars qw(@ISA @EXPORT);
 	 TB_NODEHISTORY_OP_FREE TB_NODEHISTORY_OP_ALLOC TB_NODEHISTORY_OP_MOVE
 	 TBSetNodeHistory
 
+	 TBGetOSBootCmd
+
 	 TBRobotLabExpt
 
 	 );
@@ -5341,6 +5343,24 @@ sub TBSetNodeHistory($$$$$)
 		       "  history_id=0, node_id='$nodeid', op='$op', ".
 		       "  uid='$uid', stamp=UNIX_TIMESTAMP(now()), ".
 		       "  exptidx=$exptidx");
+}
+
+sub TBGetOSBootCmd($$$)
+{
+    my ($osid, $role, $default_cmdline) = @_;
+    my $retval = $default_cmdline;
+    
+    my $query_result =
+	DBQueryFatal("SELECT ob.boot_cmd_line FROM os_info as oi ".
+		     "LEFT JOIN os_boot_cmd as ob on ob.OS=oi.OS and ".
+		     "  ob.version=oi.version ".
+		     "WHERE oi.osid='$osid' and ob.role='$role'");
+    
+    if ($query_result->num_rows == 1) {
+	($retval) = $query_result->fetchrow_array();
+    }
+    
+    return $retval;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...

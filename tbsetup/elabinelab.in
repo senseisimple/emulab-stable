@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004-2005 University of Utah and the Flux Group.
+# Copyright (c) 2004-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: ntpinfo table.
@@ -554,7 +554,8 @@ sub DumpDBGoo()
     my @FULLTABLES = ("node_types", "interface_types",
 		      "interface_capabilities",
 		      "switch_paths", "switch_stack_types", "switch_stacks",
-		      "node_type_features", "node_types_auxtypes", "osid_map");
+		      "node_type_features", "node_types_auxtypes", "osid_map",
+		      "os_boot_cmd");
 
     #
     # These tables are dumped by role (node/ops). For each one dump the table

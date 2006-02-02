@@ -116,7 +116,6 @@ if {[info exists ::TBCOMPAT::elabinelab_nodeos("boss")]} {
 } else {
     tb-set-node-os $myboss FBSD-STD
 }
-tb-set-node-cmdline $myboss /kernel.linkdelay
 
 if {[info exists ::TBCOMPAT::elabinelab_nodeos("ops")]} {
     namespace eval TBCOMPAT {
