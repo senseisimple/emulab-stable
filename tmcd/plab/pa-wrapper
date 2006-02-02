@@ -41,8 +41,9 @@ for(;;) {
     
     # make a call to TMCC for elvind port
     my @tmccresults;
+    my %tmccoptions = ("nocache" => 1);
     
-    if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults) < 0) {
+    if (tmcc(TMCCCMD_PLABCONFIG, undef, \@tmccresults, %tmccoptions) < 0) {
 	#fatal("Could not get plabconfig from server!");
 	sleep 5;
 	next;

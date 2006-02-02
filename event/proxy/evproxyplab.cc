@@ -55,7 +55,7 @@ sched_callback(event_handle_t handle,
 static void subscribe_callback(event_handle_t handle,  int result,
 			       event_subscription_t es, void *data);
 
-static void send_reloadevent();
+static void send_updateevent();
 
 
 int
@@ -110,13 +110,9 @@ main(int argc, char **argv)
 	   fatal("Must provide pnodeid and local elvin port"); 
 
 
-	if (debug)
+	if (debug) {
 	        loginit(0, 0);
-	else {
-		loginit(1, "evproxy");
-		/* See below for daemonization */
-	}
-
+        }
 
 	/*
 	 * Get our IP address. Thats how we name this host to the
@@ -165,7 +161,7 @@ main(int argc, char **argv)
 		fatal("could not register with remote event system");
 	}
 
-	sprintf(buf, "elvin://localhost:%s",lport);
+	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
 
 	/* Register with the event system on the local node */
 	localhandle = event_register(buf, 0);
@@ -179,9 +175,10 @@ main(int argc, char **argv)
 	 * if the node is unspecified (we want to avoid getting events
 	 * that are directed at specific nodes that are not us!). 
 	 */
-	sprintf(nodeidstr, "__%s_proxy", pnodeid);
-	sprintf(buf, "%s,%s,%s", TBDB_EVENTTYPE_UPDATE, TBDB_EVENTTYPE_CLEAR,
-		TBDB_EVENTTYPE_RELOAD);
+	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
+	snprintf(buf, sizeof(buf), "%s,%s,%s", 
+                 TBDB_EVENTTYPE_UPDATE, TBDB_EVENTTYPE_CLEAR,
+                 TBDB_EVENTTYPE_RELOAD);
 
 	tuple->eventtype = buf;
 	tuple->host = ipaddr;
@@ -192,7 +189,7 @@ main(int argc, char **argv)
 	if (! event_subscribe(bosshandle, callback, tuple, 
 			      (void *)"event received")) {
 		fatal("could not subscribe to events on remote server");
-	}
+        }
 
 	address_tuple_free(tuple);
 	tuple = address_tuple_alloc();
@@ -202,29 +199,34 @@ main(int argc, char **argv)
 	
 	if (! event_subscribe(localhandle, sched_callback, tuple,
 			      NULL)) {
-		fatal("could not subscribe to events on remote server");
+		fatal("could not subscribe to events on local server");
 	}
+
+        info("Successfully setup initial event subscriptions.\n");
 
 	/*
 	 * Stash the pid away.
 	 */
-	sprintf(buf, "%s/evproxy.pid", _PATH_VARRUN);
+	snprintf(buf, sizeof(buf), "%s/evproxy.pid", _PATH_VARRUN);
 	fp = fopen(buf, "w");
 	if (fp != NULL) {
 		fprintf(fp, "%d\n", getpid());
 		(void) fclose(fp);
 	}
 
-	send_reloadevent();
+	send_updateevent();
 
 	/*
 	 * Do this now, once we have had a chance to fail on the above
 	 * event system calls.
 	 */
-	if (!debug)
+	if (!debug) {
 		daemon(0, 0);
+		loginit(0, "/var/emulab/logs/evproxy.log");
+	}
 	
 	/* Begin the event loop, waiting to receive event notifications */
+        info("Entering main event loop.\n");
 	event_main(bosshandle);
 
 	/* Unregister with the remote event system: */
@@ -294,9 +296,11 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 					  subscribe_callback, 
 					  (void *) data, 1);
 	      if (! retval) {
-		error("could not subscribe to events on remote server");
-	      } 
-	      
+		error("could not subscribe to events on remote server.\n");
+	      }
+
+              info("Subscribing to experiment: %s\n", expt);
+
 	      address_tuple_free(tuple);
 	    }
 	  } 
@@ -317,16 +321,20 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      int success = event_async_unsubscribe(handle, tmp);
 	      
 	      if (!success) {
-		error("not able to delete the subscription");
+		error("not able to delete the subscription.\n");
 		elvin_error_fprintf(stderr, handle->status);
 	      } else {
 		exptmap.erase(key);
+                info("Unsubscribing from experiment: %s\n", expt);
 	      }
 	    }
 	  }
 	  
 	  /* reset all subscriptions if you get a RELOAD event */
 	  else if (strcmp(eventtype,TBDB_EVENTTYPE_RELOAD) == 0) {
+
+            info("RELOAD received.  Clearing experiment subscriptions "
+                 "and scheduling an UPDATE.\n");
 	   
 	    std::map<std::string, event_subscription_t>::iterator iter;
 	    
@@ -338,12 +346,13 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      int success = event_async_unsubscribe(handle, tmp);
 	      
 	      if (!success) {
-		error("not able to delete the subscription");
+		error("not able to delete the subscription.\n");
 		elvin_error_fprintf(stderr, handle->status);
 	      }
 	    }
 	      
 	    exptmap.clear();
+            send_updateevent();
 	    
 	  }
 	  
@@ -357,16 +366,25 @@ static void
 expt_callback(event_handle_t handle, event_notification_t notification, void *data)
 {
 	char		objecttype[TBDB_FLEN_EVOBJTYPE];
+        char		objectname[TBDB_FLEN_EVOBJNAME];
+	char            expt[TBDB_FLEN_PID + TBDB_FLEN_EID + 1];
 
 	event_notification_get_objtype(handle,
 				       notification, objecttype, sizeof(objecttype));
-	
+        event_notification_get_objname(handle,
+				       notification, objectname, sizeof(objectname));
+        event_notification_get_expt(handle, notification, expt, sizeof(expt));
+
+        if (debug) {
+          info("Received event for %s: %s %s\n", expt, objecttype, objectname);
+	}
+
 	if (strcmp(objecttype,TBDB_OBJECTTYPE_EVPROXY) != 0) {
 	  /*
            * Resend the notification to the local server.
            */
           if (! event_notify(localhandle, notification))
-            error("Failed to deliver notification!");
+            error("Failed to deliver notification!\n");
 	}
 
 }
@@ -379,7 +397,7 @@ sched_callback(event_handle_t handle,
 {
   
         if (! event_notify(bosshandle, notification))
-		error("Failed to deliver scheduled notification!");
+		error("Failed to deliver scheduled notification!\n");
   
 }
 
@@ -393,8 +411,9 @@ void subscribe_callback(event_handle_t handle,  int result,
   if (result) {
     std::string key((char *)data);
     exptmap[key] = es;
+    info("Subscription for %s added successfully.\n", (char *)data);
   } else {
-    error("not able to delete the subscription");
+    error("not able to delete the subscription.\n");
     elvin_error_fprintf(stderr, handle->status);
   }
   
@@ -403,16 +422,20 @@ void subscribe_callback(event_handle_t handle,  int result,
 }
 
 
-void send_reloadevent() {
+void send_updateevent() {
   /* send a message to elvind on ops */
   address_tuple_t tuple = address_tuple_alloc();
+
+  struct timeval now;
+  gettimeofday(&now, NULL);
+
   if (tuple == NULL) {
     fatal("could not allocate an address tuple");
   }
   
   tuple->objtype = TBDB_OBJECTTYPE_EVPROXY;
   tuple->objname = nodeidstr;
-  tuple->eventtype = TBDB_EVENTTYPE_RELOAD;
+  tuple->eventtype = TBDB_EVENTTYPE_UPDATE;
   tuple->host = ipaddr;
   
   event_notification_t notification = 
@@ -422,10 +445,12 @@ void send_reloadevent() {
     fatal("could not allocate notification\n");
   }
   
-  if (event_notify(bosshandle, notification) == 0) {
-    error("could not send reload event notification\n");
+  if (event_schedule(bosshandle, notification, &now) == 0) {
+    error("could not schedule update event.\n");
   }
-	    
+
+  info("Scheduled remote UPDATE event.\n");
+
   event_notification_free(bosshandle, notification);
   
   address_tuple_free(tuple);
