@@ -264,12 +264,43 @@ sub os_ifconfig_line($$$$$$$;$$)
     }
 
     if ($inet ne "") {
-	$uplines  .= sprintf($IFCONFIG, $iface, $inet, $mask);
-	$uplines  .= sprintf("\n    echo \"Enabling %s on %s\"", $iface, $inet);
-	$uplines  .= sprintf("\n    $DEVCON enable '%s'" , $dev_map{$iface});
+	# Startup.
+	$uplines   .= qq{\n    #================================\n    };
+	$uplines   .= qq{echo "Enabling $iface on $inet"\n    };
+	#
+	# Re-enable device if necessary (getmac Transport is "Disconnected".)
+	my $test   =  qq[getmac /v /fo csv | awk -F, '/^"$iface"/{print \$4}'];
+	$uplines   .= qq{if [ \`$test\` = '"Disconnected"' ]; then\n    };
+	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
+	$uplines   .= qq{  sleep 2\n    };
+	$uplines   .= qq{fi\n    };
+	#
+	# Configure.
+	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask) . qq{\n    };
+	#
+	# Check that the configuration took!
+	my $showip =  qq[$NETSH interface ip show address name="$iface"];
+	$test      =  qq[$showip | awk '/IP Address:/{print \$NF}'];
+	$uplines   .= qq{if [ \`$test\` != $inet ]; then\n    };
+	#
+	# Re-do it if not.
+	$uplines   .= qq{  echo "    Config failed on $iface, retrying."\n    };
+	$uplines   .=   "  $DEVCON disable '$dev_map{$iface}'\n    ";
+	$uplines   .= qq{  sleep 2\n    };
+	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
+	$uplines   .= qq{  sleep 2\n    };
+	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask) . qq{\n    };
+	#
+	# Re-check.
+	$uplines   .= qq{  if [ \`$test\` != $inet ]; then\n    };
+	$uplines   .= qq{    echo "    Reconfig still failed on $iface."\n    };
+	$uplines   .= qq{  else echo "    Reconfig succeeded on $iface."\n    };
+	$uplines   .= qq{  fi\n    };
+	$uplines   .= qq{fi};
 
-	$downlines  .= sprintf("echo \"Disabling %s from %s\"", $iface, $inet);
-	$downlines  .= sprintf("\n    $DEVCON disable '%s'" , $dev_map{$iface});
+	# Shutdown.
+	$downlines .= qq{echo "Disabling $iface from $inet"\n    };
+	$downlines .=   "$DEVCON disable '$dev_map{$iface}'\n";
     }
     
     return ($uplines, $downlines);
