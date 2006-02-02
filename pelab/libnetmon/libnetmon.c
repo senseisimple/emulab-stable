@@ -70,7 +70,14 @@ void lnm_init() {
         FIND_REAL_FUN(write);
         FIND_REAL_FUN(send);
         FIND_REAL_FUN(setsockopt);
+        FIND_REAL_FUN(read);
+        FIND_REAL_FUN(recv);
+        FIND_REAL_FUN(recvmsg);
+        FIND_REAL_FUN(accept);
 
+        /*
+         * Connect to netmod if we've been asked to
+         */
         sockpath = getenv("LIBNETMON_SOCKPATH");
         if (sockpath) {
             int sockfd;
@@ -86,8 +93,7 @@ void lnm_init() {
             servaddr.sun_family = AF_LOCAL;
             strcpy(servaddr.sun_path,sockpath);
 
-            if (real_connect(sockfd,
-                             (struct sockaddr*) &servaddr,
+            if (real_connect(sockfd, (struct sockaddr*) &servaddr,
                              sizeof(servaddr))) {
                 croak("Unable to connect to netmond socket\n");
             }
@@ -103,6 +109,10 @@ void lnm_init() {
             outstream = stdout;
         }
 
+        /*
+         * Check to see if we're supposed to force a specific socket buffer
+         * size
+         */
         char *bufsize_s;
         if ((bufsize_s = getenv("LIBNETMON_SOCKBUFSIZE"))) {
             if (sscanf(bufsize_s,"%i",&forced_bufsize) == 1) {
@@ -115,13 +125,24 @@ void lnm_init() {
             forced_bufsize = 0;
         }
 
+        /*
+         * Run a function to clean up state when the program exits
+         */
+        if (atexit(&stopWatchingAll) != 0) {
+            croak("Unable to register atexit() function\n");
+        }
+
         intialized = true;
     } else {
         /* DEBUG(printf("Skipping intialization\n")); */
     }
 }
 
-void startFD(int fd, const struct sockaddr * addr) {
+/*
+ * Start monitoring a new file descriptor
+ */
+void startFD(int fd, const struct sockaddr *localname,
+        const struct sockaddr *remotename) {
 
     struct sockaddr_in *remoteaddr, *localaddr;
     unsigned int socktype, typesize;
@@ -131,11 +152,29 @@ void startFD(int fd, const struct sockaddr * addr) {
     } sockname;
     socklen_t namelen;
 
+    if (monitorFD_p(fd)) {
+        printf("Warning: Tried to start monitoring an FD already in use!\n");
+        stopFD(fd);
+    }
+
+    if (remotename == NULL) {
+        int gpn_rv;
+        gpn_rv = getpeername(fd,(struct sockaddr *)sockname.data,&namelen);
+        if (gpn_rv != 0) {
+            croak("Unable to get remote socket name: %s\n", strerror(errno));
+        }
+        /* Assume it's the right address family, since we checked that above */
+        remotename = (struct sockaddr*)&(sockname.sa);
+        remoteaddr = (struct sockaddr_in *) &(sockname.sa);
+    } else {
+        remoteaddr = (struct sockaddr_in*)remotename;
+    }
+
     /*
      * Make sure it's an IP connection
      * XXX : Make sure the pointer is valid!
      */
-    if (addr->sa_family != AF_INET) {
+    if (remotename->sa_family != AF_INET) {
         DEBUG(printf("Ignoring a non-INET socket\n"));
         return;
     }
@@ -151,8 +190,6 @@ void startFD(int fd, const struct sockaddr * addr) {
         return;
     }
 
-    remoteaddr = (struct sockaddr_in*)addr;
-
     /*
      * Give oursleves enough space in the array to record information about
      * this connection
@@ -160,9 +197,6 @@ void startFD(int fd, const struct sockaddr * addr) {
     while (fd >= fdSize) {
         allocFDspace();
     }
-
-    DEBUG(printf("Watching FD %i\n",fd));
-    monitorFDs[fd].monitoring = true;
 
     /*
      * Keep some information about the socket, so that we can print it out
@@ -176,13 +210,17 @@ void startFD(int fd, const struct sockaddr * addr) {
      * Get the local port number
      */
     int gsn_rv;
-    gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
-    if (gsn_rv != 0) {
-        croak("Unable to get local socket name: %s\n", strerror(errno));
+    if (localname == NULL) {
+        gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
+        if (gsn_rv != 0) {
+            croak("Unable to get local socket name: %s\n", strerror(errno));
+        }
+        /* Assume it's the right address family, since we checked that above */
+        localaddr = (struct sockaddr_in *) &(sockname.sa);
+    } else {
+        localaddr = (struct sockaddr_in *) localname;
     }
-    /* Assume it's the right address family, since we checked that above */
-    localaddr = (struct sockaddr_in *) &(sockname.sa);
-    monitorFDs[fd].local_port = localaddr->sin_port;
+    monitorFDs[fd].local_port = ntohs(localaddr->sin_port);
 
     /*
      * We may have been asked to force the socket buffer size
@@ -200,19 +238,62 @@ void startFD(int fd, const struct sockaddr * addr) {
             croak("Unable to force in buffer size: %s\n",strerror(errno));
         }
     }
+
+    monitorFDs[fd].monitoring = true;
+
+    /*
+     * Let the monitor know about it
+     */
+    if (output_version == 2) {
+        fprintf(outstream,"New: ");
+        fprintID(outstream,fd);
+        printf("\n");
+    }
+
+    DEBUG(printf("Watching FD %i\n",fd));
+
 }
 
+/*
+ * Stop watching an FD
+ */
 void stopFD(int fd) {
     if (!monitorFD_p(fd)) {
         return;
     }
+
     DEBUG(printf("No longer watching FD %i\n",fd));
+
+    /*
+     * Let the monitor know we're done with it
+     */
+    if (output_version == 2) {
+        fprintf(outstream,"Closed: ");
+        fprintID(outstream,fd);
+        fprintf(outstream,"\n");
+    }
+
     monitorFDs[fd].monitoring = false;
     if (monitorFDs[fd].remote_hostname != NULL) {
         monitorFDs[fd].remote_hostname = NULL;
     }
 }
 
+/*
+ * Stop watching all FDs - for use when the program exits
+ */
+void stopWatchingAll() {
+    int i;
+    for (i = 0; i < fdSize; i++) {
+        if (monitorFD_p(i)) {
+            stopFD(i);
+        }
+    }
+}
+
+/*
+ * Print the unique identifier for a connection to the given filestream
+ */
 void fprintID(FILE *f, int fd) {
 
     fprintf(f,"%i:%s:%i", monitorFDs[fd].local_port,
@@ -359,7 +440,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          * Find out some things about the address we've connected to
          * Note: The kernel already verified for us that the pointer is okay
          */
-        startFD(sockfd,serv_addr);
+        startFD(sockfd,NULL,serv_addr);
 
     } else {
         /*
@@ -373,6 +454,29 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
 }
 
 /*
+ * We will also watch for accept()ed connections
+ */
+int accept(int s, struct sockaddr * addr,
+        socklen_t * addrlen) {
+
+    int rv;
+    lnm_init();
+    DEBUG(printf("accept() called on %i\n",s));
+
+    rv = real_accept(s, addr, addrlen);
+
+    if (rv > 0) {
+        /*
+         * Got a new client!
+         */
+        startFD(rv,addr,NULL);
+    }
+
+    return rv;
+
+}
+
+/*
  * When the user closes a socket, we can stop monitoring it
  */
 int close(int d) {
@@ -383,6 +487,7 @@ int close(int d) {
     rv = real_close(d);
 
     if (!rv && monitorFD_p(d)) {
+        DEBUG(printf("Detected a closed socket with close()\n"));
         stopFD(d);
     }
 
@@ -467,4 +572,60 @@ int setsockopt (int s, int level, int optname, const void *optval,
     } else {
         return real_setsockopt(s,level,optname,optval,optlen);
     }
+}
+
+/*
+ * The usual way to find 'eof' on a socket is to look for a zero-length
+ * read. Since some programs might not be well-behaved in the sense that they
+ * may not close() the socket, we wrap read() too
+ */
+ssize_t read(int d, void *buf, size_t nbytes) {
+    ssize_t rv;
+
+    lnm_init();
+
+    rv = real_read(d,buf,nbytes);
+    
+    if ((rv == 0) && monitorFD_p(d)) {
+        DEBUG(printf("Detected a closed socket with zero-length read()\n"));
+        stopFD(d);
+    }
+    
+    return rv;
+}
+
+/*
+ * See comment for read()
+ */
+ssize_t recv(int s, void *buf, size_t len, int flags) {
+    ssize_t rv;
+
+    lnm_init();
+
+    rv = real_recv(s,buf,len,flags);
+    
+    if ((rv == 0) && monitorFD_p(s)) {
+        DEBUG(printf("Detected a closed socket with zero-length recv()\n"));
+        stopFD(s);
+    }
+    
+    return rv;
+}
+
+/*
+ * See comment for recvmsg()
+ */
+ssize_t recvmsg(int s, struct msghdr *msg, int flags) {
+    ssize_t rv;
+
+    lnm_init();
+
+    rv = real_recvmsg(s,msg,flags);
+    
+    if ((rv == 0) && monitorFD_p(s)) {
+        DEBUG(printf("Detected a closed socket with zero-length recvmsg()\n"));
+        stopFD(s);
+    }
+    
+    return rv;
 }

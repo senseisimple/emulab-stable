@@ -100,8 +100,9 @@ int forced_bufsize;
 /*
  * Manipulate the monitorFDs structure
  */
-static void startFD(int, const struct sockaddr *);
+static void startFD(int, const struct sockaddr *, const struct sockaddr *);
 static void stopFD(int);
+static void stopWatchingAll();
 
 /*
  * Print unique identifier for an FD
@@ -125,16 +126,24 @@ typedef int connect_proto_t(int, const struct sockaddr*, socklen_t);
 typedef ssize_t write_proto_t(int, const void *, size_t);
 typedef ssize_t send_proto_t(int, const void *, ssize_t, int);
 typedef int setsockopt_proto_t(int, int, int, const void*, socklen_t);
+typedef ssize_t read_proto_t(int, void *, size_t);
+typedef ssize_t recv_proto_t(int, void *, size_t, int);
+typedef ssize_t recvmsg_proto_t(int,struct msghdr *, int);
+typedef ssize_t accept_proto_t(int,struct sockaddr *, socklen_t *);
 
 /*
  * Locations of the real library functions
  */
-static socket_proto_t  *real_socket;
-static close_proto_t   *real_close;
-static connect_proto_t *real_connect;
-static write_proto_t   *real_write;
-static send_proto_t    *real_send;
+static socket_proto_t     *real_socket;
+static close_proto_t      *real_close;
+static connect_proto_t    *real_connect;
+static write_proto_t      *real_write;
+static send_proto_t       *real_send;
 static setsockopt_proto_t *real_setsockopt;
+static read_proto_t       *real_read;
+static recv_proto_t       *real_recv;
+static recvmsg_proto_t    *real_recvmsg;
+static accept_proto_t     *real_accept;
 
 /*
  * Note: Functions that we're wrapping are in the .c file
