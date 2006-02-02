@@ -461,7 +461,7 @@ sub run_loghole {
     system("rm -rf $ltlogs");
     system("mkdir -p $ltlogs");
     system("chmod 775 $ltlogs");
-    system("$LOGHOLE -e $pid/$eid sync -n -l $ltlogs -r /var/emulab/logs ".
+    system("$LOGHOLE -e $pid/$eid sync -P -n -l $ltlogs -r /var/emulab/logs ".
 	   "> $ltlogs/loghole.out 2>&1");
 }
 
