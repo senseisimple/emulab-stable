@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -507,14 +507,19 @@ static void *simulator_agent_looper(void *arg)
 				error("cannot handle SIMULATOR event %s.",
 				      evtype);
 			}
-			event_do(handle,
-				 EA_Experiment, pideid,
-				 EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
-				 EA_Name, sa->sa_local_agent.la_link.ln_Name,
-				 EA_Event, TBDB_EVENTTYPE_COMPLETE,
-				 EA_ArgInteger, "ERROR", rc != 0,
-				 EA_ArgInteger, "CTOKEN", token,
-				 EA_TAG_DONE);
+			if (strcmp(evtype, TBDB_EVENTTYPE_RESET) == 0 ||
+			    strcmp(evtype, TBDB_EVENTTYPE_REPORT) == 0 ||
+			    strcmp(evtype, TBDB_EVENTTYPE_MODIFY) == 0) {
+				event_do(handle,
+					 EA_Experiment, pideid,
+					 EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
+					 EA_Name,
+					 sa->sa_local_agent.la_link.ln_Name,
+					 EA_Event, TBDB_EVENTTYPE_COMPLETE,
+					 EA_ArgInteger, "ERROR", rc != 0,
+					 EA_ArgInteger, "CTOKEN", token,
+					 EA_TAG_DONE);
+			}
 		}
 
 		sched_event_free(handle, &se);
