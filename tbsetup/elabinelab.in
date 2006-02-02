@@ -175,6 +175,14 @@ my $firewall;
 my $firewalled = TBExptFirewall($pid, $eid, \$firewall);
 
 #
+# XXX NOSETUP option needs more work ...
+#
+$query_result =
+    DBQueryFatal("select elabinelab_nosetup from experiments ".
+		 "where pid='$pid' and eid='$eid'");
+my ($nosetup) = $query_result->fetchrow_array();
+
+#
 # Presetup; turn off firewall.
 #
 if ($fwboot) {
@@ -259,7 +267,6 @@ elsif ($update) {
     exit(UpdateEmulab());
 }
 
-if (1) {
 #
 # Get elabinelab info. If this is a container for an actual experiment,
 # then need to fire off the experiment once the inner emulab is ready to
@@ -370,6 +377,9 @@ $UID  = $SAVEUID;
 # Run as real user for the next few scripts, which are setuid.
 $EUID = $UID;
 
+goto skipsetup
+    if ($nosetup);
+
 #
 # Restart DHCPD, but first mark the nodes as being ready to boot inside
 # the inner emulab, so that dhcpd_makeconf knows what nodes to change
@@ -453,7 +463,6 @@ if (@expnodes) {
 	TBSetNodeEventState($node, TBDB_NODESTATE_ISUP());
     }
 }
-}
 
 #
 # Fire off inner elab experiment.
@@ -499,6 +508,7 @@ if (defined($elabinelab_eid)) {
     $UID = $SAVEUID;
     unlink("/tmp/$$.ns");
 }
+skipsetup:
 
 #
 # Turn the firewall back on.

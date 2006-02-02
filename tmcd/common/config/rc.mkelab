@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # XXX I hardwire IPs into generated /etc/rc.conf and /etc/rc.resolv.
@@ -671,6 +671,9 @@ sub SetupOpsNode($)
     unlink("/etc/rc.conf.d/dhclient")
 	if (-e "/etc/rc.conf.d/dhclient");
 
+    goto skippkg
+	if ($NOSETUP);
+    
     #
     # Do this as a separate step because PKG_DIR might be an NFS path,
     # but we must do the NFS unmounts before running ops-install. 
@@ -704,6 +707,7 @@ sub SetupOpsNode($)
 	$ENV{"PKG_PATH"} = $emulabconfig{FS_PKG_DIR};
 	mysystem("pkg_add $emulabconfig{FS_PKG} >/tmp/fs-perrs 2>&1");
     }
+  skippkg:
 
     #
     # Clean up a few things on the image and create symlinks into ${TBDIR} for
@@ -873,10 +877,6 @@ sub SetupOpsNode($)
     mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
 	     "   >> /etc/rc.local");
 
-    # Ack, still waiting for new images.
-    mysystem("cp ${TBDIR}/testbed/src/testbed/tmcd/common/rc.inelab ".
-	     "   /usr/local/etc/emulab/rc/rc.inelab");
-
     return
 	if ($NOSETUP);
 
@@ -1003,6 +1003,9 @@ sub SetupBossNode()
 	if (! -d "/var/db/mysql");
     mysystem("$BINDIR/mkextrafs.pl -f -s 2 /var/db/mysql");
 
+    goto skippkg
+	if ($NOSETUP);
+
     #
     # Do this as a separate step cause we need the NFS mounts, but
     # must do the unmounts before running ops-install. 
@@ -1032,6 +1035,7 @@ sub SetupBossNode()
     #
 #    mysystem("tar xzf ${TBDIR}/testbed/stuff/extras.tar.gz -C /");
 
+  skippkg:
     #
     # We no longer need anything from NFS, and we need to unmount everything
     # so we can mount new NFS filesystems in their proper places. 
@@ -1238,10 +1242,6 @@ sub SetupBossNode()
     #
     mysystem("echo '/usr/local/etc/emulab/rc/rc.inelab' ".
 	     "   >> /etc/rc.local");
-
-    # Ack, still waiting for new images.
-    mysystem("cp ${TBDIR}/testbed/src/testbed/tmcd/common/rc.inelab ".
-	     "   /usr/local/etc/emulab/rc/rc.inelab");
 }
 
 #
