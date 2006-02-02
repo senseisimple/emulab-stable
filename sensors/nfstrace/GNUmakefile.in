@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # This is the Emulab specific makefile.
@@ -35,7 +35,8 @@ NFSTRACE_DBDIR=/var/db/nfstrace
 $(SRCDIR)/nfsdump2/config.status:
 	cd $(SRCDIR)/nfsdump2 && ./configure
 
-make.nfsdump: 
+make.nfsdump:
+	cd $(SRCDIR)/nfsdump2/ && ./config.status
 	cd $(SRCDIR)/nfsdump2 && $(MAKE)
 
 $(SRCDIR)/nfsdump2/nfsdump: $(SRCDIR)/nfsdump2/config.status make.nfsdump
