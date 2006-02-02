@@ -17,7 +17,7 @@
 #  WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 #  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 #
-# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/sensors/nfstrace/nfsdump2/Makefile.in,v 1.1 2005-11-28 15:44:00 stack Exp $ (LBL)
+# @(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/sensors/nfstrace/nfsdump2/Makefile.in,v 1.2 2006-02-02 16:16:17 stack Exp $ (LBL)
 
 #
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
@@ -38,10 +38,11 @@ INCLS = -I. @V_INCLS@
 DEFS = @DEFS@
 
 # Standard CFLAGS
-CFLAGS = $(CCOPT) $(DEFS) $(INCLS)
+CFLAGS = $(CCOPT) $(DEFS) $(INCLS) -g -I/usr/local/include/pthread -I/usr/local/include/pthread/linuxthreads
 
 # Standard LDFLAGS
-LDFLAGS = @LDFLAGS@
+#LDFLAGS = @LDFLAGS@ -pthread
+LDFLAGS = @LDFLAGS@ -L/usr/local/lib -llthread -llgcc_r
 
 # Standard LIBS
 LIBS = @LIBS@
@@ -59,7 +60,8 @@ INSTALL_DATA = @INSTALL_DATA@
 
 CSRC = nfsdump.c machdep.c \
 	util.c gmt2local.c setsignal.c \
-	nfsrecord.c nfs_v3.c nfs_v2.c nfs_prot_xdr.c
+	nfsrecord.c nfs_v3.c nfs_v2.c nfs_prot_xdr.c packetTable.c mypcap.c \
+	listNode.c
 
 LOCALSRC = @LOCALSRC@
 GENSRC = version.c

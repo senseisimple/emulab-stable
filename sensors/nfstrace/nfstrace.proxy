@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -260,8 +260,15 @@ def do_gc(args):
 
         pid, eid = args
 
-        hosts = re.split(r'[ \n\t]+', sys.stdin.read().strip())
-        ips = resolve_hosts(pid, eid, hosts)
+        host_lines = sys.stdin.read().strip()
+        if len(host_lines) > 0:
+            hosts = re.split(r'[ \n\t]+', host_lines)
+            ips = resolve_hosts(pid, eid, hosts)
+            pass
+        else:
+            hosts = []
+            ips = []
+            pass
         pass
     except getopt.error, e:
         print e.args[0]
@@ -270,9 +277,11 @@ def do_gc(args):
 
     cur.execute("DELETE FROM node_ids WHERE pid=%s and eid=%s", (pid, eid))
 
-    for tab in GC_TABLES:
-        cur.execute("DELETE FROM " + tab + " where node_ip in "
-                    "(" + ",".join(("%s",) * len(ips)) + ")", ips)
+    if len(ips) > 0:
+        for tab in GC_TABLES:
+            cur.execute("DELETE FROM " + tab + " where node_ip in "
+                        "(" + ",".join(("%s",) * len(ips)) + ")", ips)
+            pass
         pass
 
     for lpc in range(0, len(ips)):
@@ -369,12 +378,33 @@ class LRU:
     pass
 
 # Cache for file handles we pull from the DB when doing a resolve.
-fh_cache = LRU(1024)
+fh_cache = LRU(16 * 1024)
+chits = 0
+cmisses = 0
+
+def fill_cache(parent, depth):
+    cur_fh.execute("SELECT fh,parent,fn,valid from handle_map "
+                   "WHERE parent=%s and fn!='.' and fn!='..' and valid=1 "
+                   "LIMIT 128",
+                   (parent,))
+    for res in cur_fh:
+        if res[1] == '':
+            pass
+        else:
+            comp = resolve_fh(res[1], depth + 1)
+            fh_cache[res[0]] = (comp[0],
+                                os.path.join(comp[1], res[2]),
+                                res[3] and comp[2])
+            pass
+        pass
+    
+    return
+
+misstime = 0
 
 def resolve_fh(fh, depth=0):
-    global fh_cache
+    global fh_cache, chits, cmisses, misstime
 
-    assert isinstance(fh, str)
     assert depth >= 0
     
     retval = None
@@ -382,6 +412,8 @@ def resolve_fh(fh, depth=0):
     if not fh:
         return (0, "<u:none>", 0)
 
+    assert isinstance(fh, str)
+    
     if depth > 50:
         print "exceeded depth on " + fh
         return (0, "<u:" + fh + ">", 0)
@@ -389,27 +421,33 @@ def resolve_fh(fh, depth=0):
     # prefix = " " * depth
     if fh in fh_cache:
         fn = fh_cache[fh]
+        chits += 1
         pass
     else:
         fn = None
+        cmisses += 1
         pass
     
     # print prefix + "   cache " + `fn` + " " + fh
     if fn:
-        retval = (fn[0], fn[1], fn[2])
+        retval = fn
         pass
     else:
-        cur.execute("SELECT parent,fn,valid from handle_map "
-                    "WHERE fh=%s and fn!='.' and fn!='..' "
-                    "ORDER BY valid DESC",
-                    (fh,))
-        res = cur.fetchone()
+        cur_fh.execute("SELECT parent,fn,valid from handle_map "
+                       "WHERE fh=%s and fn!='.' and fn!='..' "
+                       "ORDER BY valid DESC",
+                       (fh,))
+        res = cur_fh.fetchone()
         # print prefix + "   lookup " + `res` + " " + fh
         if res:
             if res[0] == '':
+                # It was a mount
                 retval = (1, res[1], res[2])
                 pass
             else:
+                if res[0] not in fh_cache:
+                    fill_cache(res[0], depth)
+                    pass
                 comp = resolve_fh(res[0], depth + 1)
                 retval = (comp[0], os.path.join(comp[1], res[1]),
                           res[2] and comp[2])
@@ -420,12 +458,15 @@ def resolve_fh(fh, depth=0):
             retval = (0, "<u:" + fh + ">", 1)
             pass
 
+        # sys.stderr.write("miss: " + `retval` + "\n")
         fh_cache[fh] = retval
         pass
 
     return retval
 
 missing = 0
+
+pftime = 0
 
 ##
 # Process the results of a query for file handles.
@@ -439,7 +480,7 @@ missing = 0
 #
 def process_files(type, seen, links, used_links):
     global cur
-    global missing
+    global missing, pftime
 
     assert type in ("r", "w")
     assert isinstance(seen, dict)
@@ -447,12 +488,23 @@ def process_files(type, seen, links, used_links):
     assert isinstance(used_links, dict)
     
     retval = 0
-    
-    for (fh,size,alive) in cur:
-        if not alive:
+
+    ptimestart = time.time()
+    for (fh,size,alive, parent,fn,valid) in cur:
+        if not alive or not fn:
             continue
 
-        complete, fn, valid = resolve_fh(fh)
+        if parent == '':
+            # It was a mount
+            complete = 1
+            pass
+        else:
+            comp = resolve_fh(parent)
+            complete = comp[0]
+            fn = os.path.join(comp[1], fn)
+            valid = valid and comp[2]
+            pass
+
         if valid and fn not in seen:
             if size == None:
                 size = "U"
@@ -486,6 +538,7 @@ def process_files(type, seen, links, used_links):
                 pass
             pass
         pass
+    pftime += time.time() - ptimestart
 
     return retval
 
@@ -563,25 +616,31 @@ def do_get(args):
     total_size = 0
     
     cur.execute("SELECT fa.fh,fc.size,"
-                "  IFNULL(MAX(fa.last_access)>MAX(fd.last_remove),1) "
+                "  IFNULL(MAX(fa.last_access)>MAX(fd.last_remove),1), "
+                "  hm.parent,hm.fn,hm.valid "
                 "FROM file_access as fa "
                 "INNER JOIN node_ids as ni on (ni.node_ip=fa.node_ip and "
                 "  ni.pid=%s and ni.eid=%s) "
                 "LEFT JOIN file_dropped as fd on (fa.fh=fd.fh and "
                 "  ni.node_ip=fd.node_ip) "
                 "LEFT JOIN file_checkpoint as fc on (fa.fh=fc.fh) "
+                "LEFT JOIN handle_map as hm on (hm.fh=fa.fh and hm.fn!='.' "
+                "  and hm.fn!='..' and hm.valid=1) "
                 "GROUP BY fa.fh", (pid, eid))
 
     total_size += process_files("r", seen, links, used_links)
 
     cur.execute("SELECT fw.fh,fc.size,"
-                "  IFNULL(MAX(fw.last_access)>MAX(fd.last_remove),1) "
+                "  IFNULL(MAX(fw.last_access)>MAX(fd.last_remove),1), "
+                "  hm.parent,hm.fn,hm.valid "
                 "FROM file_writes as fw "
                 "INNER JOIN node_ids as ni on (ni.node_ip=fw.node_ip and "
                 "  ni.pid=%s and ni.eid=%s) "
                 "LEFT JOIN file_dropped as fd on (fw.fh=fd.fh and "
                 "  ni.node_ip=fd.node_ip) "
                 "LEFT JOIN file_checkpoint as fc on (fw.fh=fc.fh) "
+                "LEFT JOIN handle_map as hm on (hm.fh=fw.fh and hm.fn!='.' "
+                "  and hm.fn!='..' and hm.valid=1) "
                 "GROUP BY fw.fh", (pid, eid))
 
     total_size += process_files("w", seen, links, used_links)
@@ -609,6 +668,9 @@ def do_get(args):
         print "%10s Total" % (human_readable(total_size),)
         pass
 
+    # print "hits %d %d" % (chits, cmisses)
+    # print "tot %f %f" % (pftime, misstime)
+    
     if missing > 0:
         sys.stderr.write(`missing` + " unknown file(s) accessed.\n")
         pass
@@ -716,7 +778,7 @@ def do_stats(args):
         pass
     
     print "Top written files:"
-    cur.execute("select w.fh,count(1) as wc from writes as w "
+    cur.execute("select w.fh,sum(w.total) as wc from writes as w "
                 "where w.timestamp > (UNIX_TIMESTAMP() - (60 * %s)) "
                 "group by w.fh order by wc desc limit %s",
                 (over_last, row_count))
@@ -775,5 +837,6 @@ except getopt.error, e:
 con = MySQLdb.connect(db = DBNAME, user = DBUSER, passwd = DBPASS)
 
 cur = con.cursor()
+cur_fh = con.cursor()
 
 sys.exit(ACTIONS[action][0](req_args[1:]))

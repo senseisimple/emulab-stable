@@ -42,8 +42,10 @@
 #
 # daemon entry -- for the portmapper and such, also ignore jabber.
 #
-daemon	*	*	*	0	0	0
-jabber	*	*	*	0	0	0
+daemon		*	*	*	0	0	0
+jabber		*	*	*	0	0	0
+mysql		*	*	*	0	0	0
+nfstrace	*	*	*	0	0	0
 
 #
 # The main elvind server.

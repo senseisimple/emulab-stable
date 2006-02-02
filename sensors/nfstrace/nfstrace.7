@@ -1,0 +1,150 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2005 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH NFSTRACE 7 "Dec 20, 2005" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+nfstrace \- Framework for tracing NFS traffic on a per-experiment basis.
+.SH SYNOPSIS
+The NFS tracing framework examines NFS traffic in order to produce a listing of
+files accessed during the course of an experimental run.  This tracing data can
+then be used when encapsulating the parts of the filesystem needed by an
+experiment.  To start/stop NFS tracing, use the following init script:
+.RS
+.PP
+/usr/testbed/etc/rc.d/nfstrace
+.RE
+.SH OVERVIEW
+Tracing NFS traffic starts with the
+.B nfsdump
+daemon, which is a modified version of
+.B tcpdump\fR.
+As
+.B nfsdump
+runs it will capture NFS traffic and write any relevant packets to a series of
+output files.  The NFS packet output from
+.B nfsdump
+is then loaded into a MySQL database by the
+.B nfsdump2db
+daemon.  After loading the packets into the database,
+.B nfsdump2db
+processes them to produce a mapping of file handles to file names as well as
+determining which files were accessed by the experimental nodes.  The
+information built up in the database can then be accessed using the
+.B nfstrace.proxy
+tool.
+.SH NFSDB TABLES
+The
+.B nfsdb
+database on the Emulab filesystem node contains the NFS packets and any
+information derived from them.  The database consists of the following tables:
+.TP
+.I mounts\fR, \fImount_replies\fR, \fR<packet-type>, <packet-type replies>...
+The majority of the tables are those that store individual packets received
+over the network.  Later on these packets processed to produce more meaningful
+data in the other tables.  The common fields for these tables are:
+.RS
+.TP
+timestamp
+The unix time at which the packet was received by the bpf filter.
+.TP
+id
+Unique identifier for the RPC.  This value is used to match request packets
+with their replies.
+.TP
+node_ip
+The source address of the packet.
+.TP
+status (replies only)
+The return code for a request.  Zero means success.
+.TP
+fh
+An NFS file handle.  The
+.B nfsdump2db
+script ensures that all file handles placed into the database are the same
+length.
+.TP
+fn
+A file name.  Usually just the last component of the path, although mount
+packets contain a full path.
+.TP
+euid
+The effective uid of the user accessing the file.
+.TP
+egid
+The effective gid of the user accessing the file.
+.RE
+.TP
+.I reads\fR, \fIwrites
+These tables are similar to the above packet type tables, however, due to the
+large number of these types of packets, a single row can be used to encode runs
+of reads on the same file handle and from the same IP.  The
+.I total
+field is used to indicate how many packets a row represents.
+.TP
+.I handle_map
+Maps file handles to a parent/filename pair.  This table is filled out by
+.B nfsdump2db
+using information gathered from lookup's, create's, and other operations that
+produce file handles.  The mapping is then used by
+.B nfstrace.proxy
+to produce full path names for any file handles accessed by an experiment.  To
+keep this table from growing too large, it is regularly garbage collected by
+.B nfsdump2db\f.
+.RS
+.TP
+fh
+The handle for a particular file.
+.TP
+parent
+The parent directory's file handle.
+.TP
+fn
+The file name in the parent directory.
+.TP
+timestamp
+Indicates the last time this handle was updated by a lookup or other operation.
+.TP
+valid
+Indicates whether this mapping is still valid.  Mappings are invalidated when
+a remove or rename is performed on the handle.
+.RE
+.TP
+.I file_access
+Records the last time a file was read by a particular node.
+.TP
+.I file_writes
+Records the last time a file was written to by a particular node.
+.TP
+.I link_access
+Records the last time a softlink was read.
+.TP
+.I file_dropped
+Records the last time a file was removed by a node.
+.TP
+.I packet_stats
+Statistics table that tracks how many packets were received every minute for
+the past week.
+.SH FILES
+.TP
+/var/nfstrace
+The home directory for the
+.I nfstrace
+user.  It also contains most of the files used by the nfstrace tools.
+.TP
+/var/nfstrace/.my.cnf
+A MySQL option file that contains the nfstrace user's database password.  This
+file makes it trivial to connect to the database, for example:
+.RS
+.PP
+sudo -u nfstrace -H mysql nfsdb
+.RE
+.SH SEE ALSO
+nfsdump2db(8), nfstrace.proxy(8), bpf(4), mysql(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

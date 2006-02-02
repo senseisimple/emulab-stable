@@ -10,14 +10,26 @@ prefix=@prefix@
 exec_prefix=@exec_prefix@
 INSTALL_SBIN=@sbindir@
 
+# Execute as the nfstrace user.
 AS_NT="sudo -u nfstrace"
+# The nfstrace home directory.
 ND_DIR="/var/nfstrace"
+# Temporary file for nfsdump output.
 ND_TEMPNAME="${ND_DIR}/temp"
+# The base name for trace output.
 ND_BASENAME="${ND_DIR}/trace"
+# The number of trace files to use.
 ND_COUNT="10"
-ND_FLAGS="-s400 -I 1 -N $ND_COUNT -T $ND_TEMPNAME -B $ND_BASENAME"
-ND_FILTER="(port 2049 or port 900) and host fs and not host boss"
+# The interface to listen on for NFS traffic.  XXX Needs improvement.
+ND_IF=`/sbin/ifconfig -u -l | sed 's/lo0//' | cut -f 1 -d ' '`
+# Standard flags for nfsdump
+ND_FLAGS="-i $ND_IF -v -s400 -I 1 -N $ND_COUNT -T $ND_TEMPNAME -B $ND_BASENAME"
+ND_FLAGS="$ND_FLAGS -P"
+# BPF expression for nfsdump.  Captures NFS traffic between the FS node and the
+# experimental nodes.
+ND_FILTER="(port 2049 or port 900) and host @FSNODE@ and not @BOSSNODE@"
 
+# Build the list of trace file names.
 ND_TRACES=""
 
 lpc=0
@@ -33,6 +45,11 @@ case "$1" in
     start)
 	rm -f $ND_TRACES
 	echo -n "Starting nfstrace daemons:"
+	ps axuw | grep -v grep | grep ${INSTALL_SBIN}/nfsdump > /dev/null
+	if test $? -eq 0; then
+	    echo " already running"
+	    exit 0
+	fi
 	${AS_NT} \
 	    ${INSTALL_SBIN}/nfsdump $ND_FLAGS $ND_FILTER \
 	    > /var/nfstrace/nfsdump.log 2>&1 &
@@ -71,7 +88,32 @@ case "$1" in
 	exit 0
 	;;
     restart)
-	$0 stop  &&  $0 start
+	# Just restart the nfsdump2db daemon.  Need to do a full stop/start for
+	# nfsdump.
+	echo -n "Shutting down nfsdump2db daemon:"
+	ps axuw | grep -v grep | grep ${INSTALL_SBIN}/nfsdump2db > /dev/null
+	if test $? -eq 0; then
+	    ${AS_NT} kill `cat /var/nfstrace/nfsdump2db.pid`
+	    echo " done"
+	else
+	    echo " already stopped"
+	fi
+
+	rm -f $ND_TRACES
+	echo -n "Starting nfsdump2db daemon:"
+	${AS_NT} \
+	    ${INSTALL_SBIN}/nfsdump2db $ND_TRACES \
+	    > /var/nfstrace/nfsdump2db.log 2>&1 &
+	echo $! > /var/nfstrace/nfsdump2db.pid
+	ps axuw | grep -v grep | grep ${INSTALL_SBIN}/nfsdump2db \
+	    > /dev/null
+	if test $? -eq 0; then
+	    echo " done"
+	    exit 0
+	else
+	    echo " failed"
+	    exit 1
+	fi
 	exit 0
 	;;
     *)

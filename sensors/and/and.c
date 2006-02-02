@@ -1,7 +1,7 @@
 /*
 
     AND auto nice daemon - renice programs according to their CPU usage.
-    Copyright (C) 1999-2004 Patrick Schemitz <schemitz@users.sourceforge.net>
+    Copyright (C) 1999-2005 Patrick Schemitz <schemitz@users.sourceforge.net>
     http://and.sourceforge.net/
 
     This program is free software; you can redistribute it and/or modify
@@ -422,7 +422,7 @@ void read_priorities ()
     } else {
       and_printf(0,"Priority database line %i with invalid UID: %s\n",
 		 line_count, uid_s);
-      bad_count++;
+      // bad_count++;
       continue;
     }
     /* Identify GID */
@@ -435,7 +435,7 @@ void read_priorities ()
     } else {
       and_printf(0,"Priority database line %i with invalid GID: %s\n",
 		 line_count, gid_s);
-      bad_count++;
+      // bad_count++;
       continue;
     }
     /* figure parent mode */

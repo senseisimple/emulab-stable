@@ -1,6 +1,16 @@
 #! /usr/bin/env python
 
-import os
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+#
+# nfsdump2db - Daemon that digests nfsdump output and injects it into a DB.
+#
+
+import os, os.path
 import re
 import sys
 import stat
@@ -10,8 +20,12 @@ import socket
 import getopt
 
 import MySQLdb
+from MySQLdb.connections import OperationalError, InterfaceError, IntegrityError
 
+# Working directory.
 BASEDIR = "/var/nfstrace"
+
+# Directory for files that are to be loaded directly into the DB.
 DBDIR = "/var/db/nfstrace"
 
 DBNAME = "nfsdb"
@@ -25,17 +39,39 @@ except IOError:
     sys.exit(1)
     pass
 
-INTERVAL = 5
+if not os.path.isdir(DBDIR):
+    sys.stderr.write("error: '%s' does not exist\n" % DBDIR)
+    sys.exit(1)
+    pass
+
+INTERVAL = 5 # seconds to wait before checking for file updates.
 VERBOSITY = 1
 
 count = 0
 
+# MySQL error constants
+ER_NOT_KEYFILE = 1034
+ER_DUP_ENTRY = 1062
+CR_CONNECTION_ERROR = 2002
+CR_SERVER_GONE_ERROR = 2006
+CR_SERVER_LOST = 2013
+
 def usage():
+    print "Usage: nfsdump2db [-h] [-c count] <file1> [<file2>]"
+    print
+    print "Daemon that transfers the contents of nfsdump output files to a "
+    print "MySQL database."
+    print
+    print "Optional arguments:"
+    print "  -h, --help         Print this message, or the action's"
+    print "                     usage message."
+    print "  -c, --count=num    Specify the maximum number of times to loop"
+    print "                     over the listed files."
     return
 
 try:
     opts, req_args = getopt.getopt(sys.argv[1:],
-                                   "hvc:t:",
+                                   "hvc:",
                                    [ "help", "verbose", "count=", ])
     
     for opt, val in opts:
@@ -61,6 +97,7 @@ except getopt.error, e:
     sys.exit(2)
     pass
 
+# Offsets for the fields in the nfsdump output lines.
 IDX_TIMESTAMP = 0
 IDX_SRC_IP = 1
 IDX_DST_IP = 2
@@ -70,6 +107,7 @@ IDX_ID = 5
 IDX_COMMAND = 7
 IDX_BODY_START = 8
 
+# Tables that should be loaded into the DB from files.
 TABLES = [
     "mounts",
     "mount_replies",
@@ -89,32 +127,69 @@ TABLES = [
     "rename_replies",
     "lookups",
     "lookup_replies",
+    "file_checkpoint",
     ]
 
+# Tables that should not be cleaned 
+EXCLUDE_TABLES = [ "file_checkpoint" ]
+
+# Tables that should be automatically optimized every so often.
+OPTIMIZE_TABLES = [
+    "creates",
+    "create_replies",
+    "file_access",
+    "file_checkpoint",
+    "file_dropped",
+    "file_writes",
+    "handle_map",
+    "link_access",
+    "lookups",
+    "lookup_replies",
+    "mkdirs",
+    "mkdir_replies",
+    "mknods",
+    "mount_replies",
+    "mounts",
+    "packet_stats",
+    "readlink",
+    "readlink_replies",
+    "reads",
+    "removes",
+    "remove_replies",
+    "renames",
+    "rename_replies",
+    "rmdirs",
+    "rmdir_replies",
+    "temp_handle_map",
+    "writes",
+    ]
+
+# The maximum file handle length.  Shorter handles will be padded out with
+# zeroes.
 MAX_FH_LENGTH = 64
 
-con = MySQLdb.connect(db = DBNAME, user = DBUSER, passwd = DBPASS)
+# Database connection and cursor.
+con = None
+cur = None
 
-cur = con.cursor()
 
 def convert_ip(hexip):
-    hexip = hexip.split(".")[0]
-    comp = []
-    for lpc in range(0, 8, 2):
-        comp.append(str(int(hexip[lpc:lpc + 2], 16)))
-        pass
-    retval = ".".join(comp)
-    
-    return retval
+    return hexip[:hexip.rfind(".")]
 
 def body_to_dict(line):
     retval = { "fn" : None, "tcount" : None }
-    for lpc in range(0, len(line), 2):
+    for lpc in range(0, len(line) - (len(line) % 2), 2):
         retval[line[lpc]] = line[lpc + 1]
         pass
     
     return retval
 
+##
+# Pad out a filehandle to MAX_FH_LENGTH chars with zeroes.
+#
+# @param fh The file handle to pad.
+# @return A file handle that is the same length.
+#
 def padfh(fh):
     retval = fh
     
@@ -127,11 +202,53 @@ def padfh(fh):
 def getfn(fn):
     return (fn[1:-1]).replace(",","\\,")
 
+##
+# Wrapper function for queries that is resilient to broken tables.
+#
+# XXX Not sure why, but the mysql key indexes or something were getting
+# corrupted and requiring repairs to get them back into a working state.
+#
+# @param table The name of the table that should be repaired if something goes
+# wrong.
+# @param args The arguments to pass to 'cur.execute'.
+# @return The value returned by 'cur.execute'.
+#
+def requery(table, *args):
+    retval = None
+    tries = 3
+    while tries:
+        try:
+            retval = apply(cur.execute, args)
+            tries = 0
+            pass
+        except OperationalError, e:
+            tries -= 1
+            if e.args[0] == ER_NOT_KEYFILE:
+                print "  *** Issuing repair for " + table
+                cur.execute("REPAIR TABLES " + table)
+                pass
+            raise
+        except IntegrityError, e:
+            if e.args[0] == ER_DUP_ENTRY:
+                return
+            raise
+        pass
+
+    return retval
+
+##
+# Parser that converts the nfsdump output files to files that can be loaded
+# directly into the DB.
+#
+# XXX Eventually this class should be thrown out and nfsdump should be modified
+# to dump out the formatted files directly.
+#
 class Parser:
 
     def __init__(self):
         self.first_timestamp = 0
         self.lookups = {}
+        self.checkpoints = {}
 
         self.data_files = {}
         self.row_counts = {}
@@ -146,16 +263,42 @@ class Parser:
         for value in self.lookups.values():
             self.write_row("lookups", value)
             pass
+        for fc in self.checkpoints.values():
+            self.write_row("file_checkpoint", fc)
+            pass
         self.lookups.clear()
-        
+        self.checkpoints.clear()
+
+        # Load the data into the tables.
         for tab in TABLES:
             self.data_files[tab].flush()
 
             print ("    Table: " + tab.ljust(18) + " \t"
                    + `self.row_counts[tab]` + " record(s)")
-            cur.execute("LOAD DATA INFILE %s REPLACE INTO TABLE " + tab +
-                        " FIELDS TERMINATED BY ','",
-                        (self.data_files[tab].name,))
+            requery(tab,
+                    "LOAD DATA INFILE %s REPLACE INTO TABLE " + tab +
+                    " FIELDS TERMINATED BY ','",
+                    (self.data_files[tab].name,))
+
+
+            # Update packet statistics.
+            if tab in ("reads" or "writes"):
+                # Runs of reads and writes are coalesced to reduce table size,
+                # so we have to count them up when updating the stats.
+                requery("packet_stat",
+                        "REPLACE INTO packet_stats (table_name, stamp, "
+                        "  packet_count) "
+                        "SELECT %s,NOW(),sum(total) FROM reads "
+                        "WHERE timestamp >= %s",
+                        (tab, self.first_timestamp,))
+                pass
+            else:
+                requery("packet_stat",
+                        "INSERT INTO packet_stats (table_name, stamp, "
+                        "  packet_count) "
+                        "VALUES (%s, NOW(), %s)",
+                        (tab, self.row_counts[tab]))
+                pass
 
             self.data_files[tab].seek(0)
             self.data_files[tab].truncate(0)
@@ -170,10 +313,17 @@ class Parser:
 
     def nextline(self, line):
         sl = line.split()
+        if len(sl) < IDX_COMMAND:
+            return
+        
         cmd = sl[IDX_COMMAND]
         try:
+            ts = float(sl[IDX_TIMESTAMP])
             if not self.first_timestamp:
-                self.first_timestamp = sl[IDX_TIMESTAMP]
+                self.first_timestamp = ts
+                pass
+            elif ts < self.first_timestamp:
+                self.first_timestamp = ts
                 pass
             if sl[IDX_REQ_REPLY] in ("C1", "C2", "C3") :
                 body = body_to_dict(sl[IDX_BODY_START:-6])
@@ -189,7 +339,7 @@ class Parser:
             pass
         except:
             print "line " + line
-            raise
+            # raise
         
         return
 
@@ -202,7 +352,7 @@ class Parser:
     def dispatch(self, method_name, sl, body):
         retval = None
         if "error" in body:
-            print "Bad line " + sl.join(" ")
+            print "Bad line " + " ".join(sl)
             pass
         elif hasattr(self, method_name):
             method = getattr(self, method_name)
@@ -215,28 +365,28 @@ class Parser:
         return retval
 
     def update_file_checkpoint(self, sl, body):
-        if False and body.has_key("fh"):
+        if body.has_key("fh"):
             data = (
                 sl[IDX_TIMESTAMP],
-                body["fh"],
-                int(body["ftype"], 16),
-                int(body["mode"], 16),
-                int(body["nlink"], 16),
-                int(body["uid"], 16),
-                int(body["gid"], 16),
-                int(body["size"], 16),
-                int(body["rdev"], 16),
-                int(body["fsid"], 16),
-                int(body["fileid"], 16),
-                int(body["atime"].split(".")[0]),
-                int(body["mtime"].split(".")[0]),
-                int(body["ctime"].split(".")[0]),
+                padfh(body["fh"]),
+                str(int(body["ftype"], 16)),
+                str(int(body["mode"], 16)),
+                str(int(body["nlink"], 16)),
+                str(int(body["uid"], 16)),
+                str(int(body["gid"], 16)),
+                str(int(body["size"], 16)),
+                str(int(body["rdev"], 16)),
+                str(int(body["fsid"], 16)),
+                str(int(body["fileid"], 16)),
+                body["atime"],
+                body["mtime"],
+                body["ctime"],
                 )
-            cur.execute("REPLACE INTO file_checkpoint (timestamp, fh, ftype, mode, nlink, uid, gid, size, rdev, fsid, fileid, atime, mtime, ctime) VALUES (" + ",".join(("%s",) * len(data)) + ")", data)
+            self.checkpoints[data[1]] = data
             pass
         
         return
-    
+
     def handle_mnt(self, sl, body):
         data = (
             sl[IDX_TIMESTAMP],
@@ -272,8 +422,9 @@ class Parser:
             convert_ip(sl[IDX_SRC_IP]),
             padfh(body["fh"]),
             str(int(body["count"], 16)),
-            body["euid"],
-            body["egid"])
+            body.get("euid", "-1"),
+            body.get("egid", "-1"),
+            body["pcount"])
         self.write_row("reads", data)
         
         return
@@ -284,10 +435,12 @@ class Parser:
             sl[IDX_ID],
             convert_ip(sl[IDX_SRC_IP]),
             padfh(body["fh"]),
-            str(int((body["tcount"] or body["count"]), 16)),
-            body["euid"],
-            body["egid"])
+            str(int(body["count"], 16)),
+            body.get("euid", "-1"),
+            body.get("egid", "-1"),
+            body["pcount"])
         self.write_row("writes", data)
+        self.update_file_checkpoint(sl, body)
         
         return
 
@@ -512,96 +665,188 @@ class Parser:
     
     pass
 
+##
+# Update the 'handle_map' table with any newly discovered file handles present
+# in the packets captured over the previous time period.  Generally, the
+# processing is done by joining successful replies with requests and then
+# either adding the mapping to the table or updating the timestamp for an
+# existing mapping.
+#
+# @param ts The timestamp of the earliest packet that we should process.
+#
 def update_handle_map(ts):
+    # Mounts are pretty straightforward, just merge them.
     print "    mounts"
-    cur.execute("REPLACE INTO handle_map (fh, fn, timestamp, valid) "
-                "SELECT mr.fh,m.fn,m.timestamp,1 "
-                "FROM mount_replies as mr "
-                "INNER JOIN mounts as m on (m.node_ip=mr.node_ip and "
-                "  m.id=mr.id) "
-                "WHERE mr.status=0 and mr.timestamp>=%s",
-                (ts,))
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, fn, timestamp, valid) "
+            "SELECT mr.fh,m.fn,m.timestamp,1 "
+            "FROM mount_replies as mr "
+            "INNER JOIN mounts as m on (m.node_ip=mr.node_ip and "
+            "  m.id=mr.id) "
+            "WHERE mr.status=0 and mr.timestamp>=%s "
+            "GROUP BY mr.fh",
+            (ts,))
+
+    # The remaining merges are done into a temporary handle_map so we can do a
+    # join against the unmodified map.  We do the join to preserve the
+    # timestamp and valid fields in the map since we're merging packets of a
+    # particular type and not sequentially by time.  Otherwise, a lookup late
+    # in the timeline could be overwritten by an earlier remove if the lookups
+    # were merged before the removes.
+
+    requery("rename_handle_map", "DELETE FROM rename_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
     
+    # XXX Most of these queries can probably be merged into a couple of
+    # functions.
+
     print "    lookups"
-    cur.execute("REPLACE INTO temp_handle_map "
-                "  (fh, parent, fn, timestamp, valid) "
-                "SELECT lr.fh,l.fh,l.fn,MAX(l.timestamp),1 "
-                "FROM lookup_replies as lr "
-                "INNER JOIN lookups as l on (l.node_ip=lr.node_ip and "
-                "  l.id=lr.id) "
-                "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
-                "WHERE lr.status=0 and lr.timestamp>=%s and "
-                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
-                "GROUP BY lr.fh,l.fh,l.fn",
-                (ts,))
-    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
-                "SELECT * from temp_handle_map")
-    cur.execute("DELETE FROM temp_handle_map")
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map "
+            "  (fh, parent, fn, timestamp, valid) "
+            "SELECT lr.fh,l.fh,l.fn,MAX(lr.timestamp),1 "
+            "FROM lookup_replies as lr "
+            "INNER JOIN lookups as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
+            "WHERE lr.status=0 and lr.timestamp>=%s and "
+            "  (hm.fh is null or l.timestamp > hm.timestamp) "
+            "GROUP BY lr.fh,l.fh,l.fn",
+            (ts,))
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
     
     print "    creates"
-    cur.execute("REPLACE INTO temp_handle_map "
-                "  (fh, parent, fn, timestamp, valid) "
-                "SELECT lr.fh,l.fh,l.fn,MAX(l.timestamp),1 "
-                "FROM create_replies as lr "
-                "INNER JOIN creates as l on (l.node_ip=lr.node_ip and "
-                "  l.id=lr.id) "
-                "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
-                "WHERE lr.status=0 and lr.timestamp>=%s and "
-                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
-                "GROUP BY lr.fh,l.fh,l.fn",
-                (ts,))
-    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
-                "SELECT * from temp_handle_map")
-    cur.execute("DELETE FROM temp_handle_map")
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map "
+            "  (fh, parent, fn, timestamp, valid) "
+            "SELECT lr.fh,l.fh,l.fn,MAX(lr.timestamp),1 "
+            "FROM create_replies as lr "
+            "INNER JOIN creates as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
+            "WHERE lr.status=0 and lr.timestamp>=%s and "
+            "  (hm.fh is null or l.timestamp > hm.timestamp) "
+            "GROUP BY lr.fh,l.fh,l.fn",
+            (ts,))
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
     
     print "    mkdirs"
-    cur.execute("REPLACE INTO temp_handle_map "
-                "  (fh, parent, fn, timestamp, valid) "
-                "SELECT lr.fh,l.fh,l.fn,MAX(l.timestamp),1 "
-                "FROM mkdir_replies as lr "
-                "INNER JOIN mkdirs as l on (l.node_ip=lr.node_ip and "
-                "  l.id=lr.id) "
-                "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
-                "WHERE lr.status=0 and lr.timestamp>=%s and "
-                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
-                "GROUP BY lr.fh,l.fh,l.fn",
-                (ts,))
-    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
-                "SELECT * from temp_handle_map")
-    cur.execute("DELETE FROM temp_handle_map")
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map "
+            "  (fh, parent, fn, timestamp, valid) "
+            "SELECT lr.fh,l.fh,l.fn,MAX(lr.timestamp),1 "
+            "FROM mkdir_replies as lr "
+            "INNER JOIN mkdirs as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            "LEFT JOIN handle_map as hm on hm.fh=lr.fh "
+            "WHERE lr.status=0 and lr.timestamp>=%s and "
+            "  (hm.fh is null or l.timestamp > hm.timestamp) "
+            "GROUP BY lr.fh,l.fh,l.fn",
+            (ts,))
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
     
+    print "    removes"
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map "
+            "  (fh, parent, fn, timestamp, valid) "
+            "SELECT hm.fh,l.fh,l.fn,MAX(lr.timestamp),0 "
+            "FROM remove_replies as lr "
+            "INNER JOIN removes as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            # We use an inner join here since we don't care if the handle has
+            # already been removed.
+            "INNER JOIN handle_map as hm on (hm.parent=l.fh and "
+            "  hm.fn=l.fn) "
+            "WHERE lr.status=0 and lr.timestamp>=%s and "
+            "  l.timestamp > hm.timestamp and hm.valid=1 "
+            "GROUP BY hm.fh,l.fh,l.fn",
+            (ts,))
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
+    
+    print "    rmdirs"
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map "
+            "  (fh, parent, fn, timestamp, valid) "
+            "SELECT hm.fh,l.fh,l.fn,MAX(lr.timestamp),0 "
+            "FROM rmdir_replies as lr "
+            "INNER JOIN rmdirs as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            # We use an inner join here since we don't care if the handle has
+            # already been removed.
+            "INNER JOIN handle_map as hm on (hm.parent=l.fh and "
+            "  hm.fn=l.fn) "
+            "WHERE lr.status=0 and lr.timestamp>=%s and "
+            "  l.timestamp > hm.timestamp and hm.valid=1 "
+            "GROUP BY hm.fh,l.fh,l.fn",
+            (ts,))
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
+
     print "    renames"
-    cur.execute("REPLACE INTO temp_handle_map "
-                "  (fh, parent, fn, timestamp, valid) "
-                "SELECT hm.fh,l.from_fh,l.from_fn,MAX(l.timestamp),0 "
-                "FROM rename_replies as lr "
-                "INNER JOIN renames as l on (l.node_ip=lr.node_ip and "
-                "  l.id=lr.id) "
-                "INNER JOIN handle_map as hm on (hm.parent=l.from_fh and "
-                "  hm.fn=l.from_fn) "
-                "WHERE lr.status=0 and lr.timestamp>=%s and "
-                "  lr.timestamp > hm.timestamp "
-                "GROUP BY hm.fh,l.from_fh,l.from_fn",
-                (ts,))
-    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
-                "SELECT * from temp_handle_map")
-    cur.execute("DELETE FROM temp_handle_map")
+    # Renames are split into two actions, one to remove and one to add.  Note
+    # that we depend on the file handle staying the same after the rename.
+    requery("rename_handle_map",
+            "REPLACE INTO rename_handle_map "
+            "  (parent, fn, timestamp) "
+            "SELECT l.from_fh,l.from_fn,MAX(lr.timestamp) "
+            "FROM rename_replies as lr "
+            "INNER JOIN renames as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            "WHERE lr.status=0 and lr.timestamp>=%s "
+            "GROUP BY l.from_fh,l.from_fn",
+            (ts,))
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT hm.fh,rhm.parent,rhm.fn,rhm.timestamp,0 "
+            "  FROM rename_handle_map as rhm "
+            "LEFT JOIN handle_map as hm on (hm.parent=rhm.parent and "
+            "  hm.fn=rhm.fn) "
+            "WHERE hm.valid=1 and rhm.timestamp >= hm.timestamp "
+            "GROUP BY hm.fh,rhm.parent,rhm.fn")
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("rename_handle_map", "DELETE FROM rename_handle_map")
     
-    cur.execute("REPLACE INTO temp_handle_map "
-                "  (fh, parent, fn, timestamp, valid) "
-                "SELECT hm.fh,l.to_fh,l.to_fn,MAX(l.timestamp),1 "
-                "FROM rename_replies as lr "
-                "INNER JOIN renames as l on (l.node_ip=lr.node_ip and "
-                "  l.id=lr.id) "
-                "LEFT JOIN handle_map as hm on (hm.parent=l.from_fh and "
-                "  hm.fn=l.from_fn) "
-                "WHERE lr.status=0 and lr.timestamp>=%s and "
-                "  (hm.fh is null or lr.timestamp > hm.timestamp) "
-                "GROUP BY hm.fh,l.to_fh,l.to_fn",
-                (ts,))
-    cur.execute("REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
-                "SELECT * from temp_handle_map")
-    cur.execute("DELETE FROM temp_handle_map")
+    requery("rename_handle_map",
+            "REPLACE INTO rename_handle_map "
+            "  (fh, parent, fn, timestamp) "
+            "SELECT thm.fh,l.to_fh,l.to_fn,MAX(lr.timestamp) "
+            "FROM rename_replies as lr "
+            "INNER JOIN renames as l on (l.node_ip=lr.node_ip and "
+            "  l.id=lr.id) "
+            "INNER JOIN temp_handle_map as thm on (l.from_fh=thm.parent and "
+            "  l.from_fn=thm.fn) "
+            "WHERE lr.status=0 and lr.timestamp>=%s "
+            "GROUP BY l.to_fh,l.to_fn",
+            (ts,))
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
+    requery("temp_handle_map",
+            "REPLACE INTO temp_handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT rhm.fh,rhm.parent,rhm.fn,rhm.timestamp,1 "
+            "  FROM rename_handle_map as rhm ")
+    requery("handle_map",
+            "REPLACE INTO handle_map (fh, parent, fn, timestamp, valid) "
+            "SELECT * from temp_handle_map")
+    requery("rename_handle_map", "DELETE FROM rename_handle_map")
+    requery("temp_handle_map", "DELETE FROM temp_handle_map")
+    
+    # Clean out any handles that are for removed files.
+    requery("handle_map", "DELETE FROM handle_map where fn like '.nfs%%'")
     
     return
 
@@ -619,7 +864,6 @@ def update_files(files):
             if mtime > name2stamp.get(fn, 0):
                 print "Reading " + fn
                 updates += 1
-                name2stamp[fn] = st[stat.ST_MTIME]
                 fh = open(fn)
                 for line in fh:
                     parser.nextline(line)
@@ -630,83 +874,139 @@ def update_files(files):
                 parser.load_files()
 
                 print "  Update handle map..."
-                update_handle_map(parser.first_timestamp)
+                update_handle_map(float(parser.first_timestamp) - 5.0)
+
+                # With an updated handle_map it is time to figure out which
+                # files were accessed.
 
                 print "  Update dropped files..."
-                cur.execute("REPLACE INTO file_dropped "
-                            "(fh, node_ip, last_remove) "
-                            "SELECT hm.fh,r.node_ip,MAX(r.timestamp) "
-                            "  FROM removes as r "
-                            "INNER JOIN handle_map as hm on "
-                            "  (hm.parent=r.fh and hm.fn=r.fn) "
-                            "INNER JOIN remove_replies as rr on "
-                            "  (rr.node_ip=r.node_ip and rr.id=r.id) "
-                            "WHERE rr.timestamp >= %s and rr.status=0 "
-                            "GROUP BY r.node_ip,hm.fh",
-                            (parser.first_timestamp,))
+                # Record the files that were removed so they do not get
+                # reported.
+                requery("file_dropped",
+                        "REPLACE INTO file_dropped "
+                        "(fh, node_ip, last_remove) "
+                        "SELECT hm.fh,r.node_ip,MAX(r.timestamp) "
+                        "  FROM remove_replies as rr "
+                        "INNER JOIN removes as r on "
+                        "  (rr.node_ip=r.node_ip and rr.id=r.id) "
+                        "INNER JOIN handle_map as hm on "
+                        "  (hm.parent=r.fh and hm.fn=r.fn) "
+                        "WHERE rr.timestamp >= %s and rr.status=0 and "
+                        "  hm.valid=1 "
+                        "GROUP BY r.node_ip,hm.fh",
+                        (parser.first_timestamp,))
                 
-                cur.execute("REPLACE INTO file_dropped "
-                            "(fh, node_ip, last_remove) "
-                            "SELECT hm.fh,r.node_ip,MAX(r.timestamp) "
-                            "  FROM rmdirs as r "
-                            "INNER JOIN handle_map as hm on "
-                            "  (hm.parent=r.fh and hm.fn=r.fn) "
-                            "INNER JOIN rmdir_replies as rr on "
-                            "  (rr.node_ip=r.node_ip and rr.id=r.id) "
-                            "WHERE rr.timestamp >= %s and rr.status=0 "
-                            "GROUP BY r.node_ip,hm.fh",
-                            (parser.first_timestamp,))
+                requery("file_dropped",
+                        "REPLACE INTO file_dropped "
+                        "(fh, node_ip, last_remove) "
+                        "SELECT hm.fh,r.node_ip,MAX(r.timestamp) "
+                        "  FROM rmdir_replies as rr "
+                        "INNER JOIN rmdirs as r on "
+                        "  (rr.node_ip=r.node_ip and rr.id=r.id) "
+                        "INNER JOIN handle_map as hm on "
+                        "  (hm.parent=r.fh and hm.fn=r.fn) "
+                        "WHERE rr.timestamp >= %s and rr.status=0 "
+                        "GROUP BY r.node_ip,hm.fh",
+                        (parser.first_timestamp,))
 
                 print "  Update accessed links..."
-                cur.execute("REPLACE INTO link_access "
-                            "(fh, fn, node_ip, last_access) "
-                            "SELECT r.fh,rr.fn,r.node_ip,MAX(rr.timestamp) "
-                            "FROM readlink_replies as rr "
-                            "INNER JOIN readlinks as r on "
-                            "  (r.node_ip=rr.node_ip and r.id=rr.id) "
-                            "WHERE rr.timestamp >= %s "
-                            "GROUP BY r.fh,r.node_ip",
-                            (parser.first_timestamp,))
+                # Record all readlinks, the proxy will decide if they should be
+                # reported.
+                requery("link_access",
+                        "REPLACE INTO link_access "
+                        "(fh, fn, node_ip, last_access) "
+                        "SELECT r.fh,rr.fn,r.node_ip,MAX(rr.timestamp) "
+                        "FROM readlink_replies as rr "
+                        "INNER JOIN readlinks as r on "
+                        "  (r.node_ip=rr.node_ip and r.id=rr.id) "
+                        "WHERE rr.timestamp >= %s "
+                        "GROUP BY r.fh,r.node_ip",
+                        (parser.first_timestamp,))
                 
                 print "  Update accessed files..."
-                cur.execute("REPLACE INTO file_access "
-                            "(fh, node_ip, last_access) "
-                            "SELECT fh,node_ip,MAX(timestamp) FROM reads "
-                            "WHERE timestamp >= %s "
-                            "GROUP BY fh,node_ip",
-                            (parser.first_timestamp,))
-                cur.execute("REPLACE INTO file_access "
-                            "(fh, node_ip, last_access) "
-                            "SELECT fh,node_ip,MAX(timestamp) FROM writes "
-                            "WHERE timestamp >= %s "
-                            "GROUP BY fh,node_ip",
-                            (parser.first_timestamp,))
+                # Add any files that have been read or written.
+                requery("file_access",
+                        "REPLACE INTO file_access "
+                        "(fh, node_ip, last_access) "
+                        "SELECT fh,node_ip,MAX(timestamp) FROM reads "
+                        "WHERE timestamp >= %s "
+                        "GROUP BY fh,node_ip",
+                        (parser.first_timestamp,))
+                requery("file_writes",
+                        "REPLACE INTO file_writes "
+                        "(fh, node_ip, last_access) "
+                        "SELECT fh,node_ip,MAX(timestamp) FROM writes "
+                        "WHERE timestamp >= %s "
+                        "GROUP BY fh,node_ip",
+                        (parser.first_timestamp,))
 
                 print "  Delete old data..."
                 for tab in TABLES:
-                    cur.execute("DELETE FROM " + tab + " WHERE timestamp<%s",
+                    if tab not in EXCLUDE_TABLES:
+                        requery(tab,
+                                "DELETE FROM " + tab + " WHERE timestamp<%s",
                                 (float(parser.first_timestamp) - (5 * 60),))
+                        pass
                     pass
 
                 if updates % 10 == 0:
-                    print "  Garbage collecting handle map"
+                    print "  Garbage collecting handle map..."
+
+                    # Clean out recently invalidated handles.
+                    cur.execute(
+                        "DELETE FROM handle_map "
+                        "WHERE timestamp < (UNIX_TIMESTAMP() - (5 * 60)) "
+                        "  and valid=0")
+                    # Garbage collect file handles by checking if they were
+                    # referenced by any of the other tables.  Since handles
+                    # may still be "alive" even though they are not referenced
+                    # by anything else, we only GC them if they have not been
+                    # looked up for a couple days.
                     cur.execute(
                         "SELECT hm1.fh FROM handle_map as hm1 "
                         "LEFT JOIN file_access as fa on fa.fh=hm1.fh "
+                        "LEFT JOIN file_writes as fw on fw.fh=hm1.fh "
                         "LEFT JOIN link_access as la on la.fh=hm1.fh "
                         "LEFT JOIN handle_map as hm2 on hm2.parent=hm1.fh "
                         "WHERE hm1.timestamp < "
                         "  (UNIX_TIMESTAMP() - (2 * 24 * 60 * 60)) and "
                         "  fa.fh is null and la.fh is null and hm2.fh is null "
+                        "  and fw.fh is null "
                         "GROUP BY hm1.fh")
+                    # XXX Our version of mysql has a degenerate "DELETE"
+                    # statement so we have to do it this way...  We could still
+                    # do this better though.
                     for res in cur:
+                        cur.execute("DELETE FROM file_checkpoint WHERE fh=%s",
+                                    res)
                         cur.execute("DELETE FROM handle_map WHERE fh=%s", res)
                         pass
+                    pass
+
+                if updates % 25 == 0:
+                    print "  Optimizing tables..."
+                    # The files that back the tables do not seem to shrink on
+                    # their own so we have to run optimize on them.  This is
+                    # especially important for the lookups, reads, and writes
+                    # tables since so much data passes through them.
+                    for tab in OPTIMIZE_TABLES:
+                        requery(tab, "OPTIMIZE TABLE " + tab)
+                        pass
+                    pass
+
+                if updates % 1 == 0:
+                    print "  Delete old packet stats..."
+                    # Only keep the packet_stats data for a week.
+                    requery("packet_stats",
+                            "DELETE FROM packet_stats "
+                            "WHERE stamp < DATE_SUB(NOW(), INTERVAL 7 DAY)")
                     pass
 
                 print "  Done."
                 
                 parser.clear_timestamp()
+                # Update stamp here so we know the load was successful.
+                name2stamp[fn] = mtime
                 pass
             pass
         except OSError, e:
@@ -720,14 +1020,44 @@ def update_files(files):
 try:
     lpc = 0
 
+    # Main loop, just checks for updates every INTERVAL seconds.
     while (count == 0) or (lpc < count):
-        update_files(req_args)
-        con.commit()
+        try:
+            if not con:
+                con = MySQLdb.connect(db = DBNAME,
+                                      user = DBUSER,
+                                      passwd = DBPASS)
+                cur = con.cursor()
+                pass
+            
+            update_files(req_args)
+            pass
+        except InterfaceError:
+            # XXX Not sure why this is thrown sometimes instead of the one
+            # below.
+            print "*** Lost connection to server"
+            # Drop our connection so a reconnect is tried the next time
+            # around the loop.
+            con = None
+            cur = None
+            pass
+        except OperationalError, e:
+            if e.args[0] in (CR_CONNECTION_ERROR,
+                             CR_SERVER_GONE_ERROR,
+                             CR_SERVER_LOST):
+                print "*** Lost connection to server"
+                # Drop our connection so a reconnect is tried the next time
+                # around the loop.
+                con = None
+                cur = None
+                pass
+            else:
+                raise
+            pass
         
         time.sleep(INTERVAL)
         lpc = lpc + 1
         pass
     pass
 finally:
-    con.commit()
     pass

@@ -1,8 +1,12 @@
 /*
- * $Id: nfsrecord.h,v 1.1 2005-11-28 15:44:00 stack Exp $
+ * $Id: nfsrecord.h,v 1.2 2006-02-02 16:16:17 stack Exp $
  */
 
+#ifndef _nfsrecord_h
+#define _nfsrecord_h
+
 #include "nfs_prot.h"
+#include "packetTable.h"
 
 typedef	struct	nfs_v3_stat_t {
 	unsigned long	c3_total, r3_total;
@@ -54,6 +58,27 @@ typedef	struct	nfs_v2_stat_t {
 	unsigned long c2_unknown, r2_unknown;
 } nfs_v2_stat_t;
 
+typedef	struct	{
+
+	u_int32_t	secs, usecs;		/* timestamp */
+	u_int32_t	srcHost, dstHost;	/* IP of src and dst hosts */
+	u_int32_t	srcPort, dstPort;	/* ports... */
+	u_int32_t	rpcXID, pthash;
+
+						/* these can probably be squished a bunch. */
+	u_int32_t	rpcCall, nfsVersion, nfsProc, nfsProg;
+	u_int32_t	rpcStatus;
+
+    u_int32_t euid, egid;
+
+	/*
+	 * So far-- 11 uint32's replace 14 uint32's + verif + time
+	 */
+
+	/* some buffer for the payload. */
+
+} nfs_pkt_t;
+
 #define	print_uid3(p, e, l)		print_uint32(p, e, l, NULL)
 #define	print_gid3(p, e, l)		print_uint32(p, e, l, NULL)
 #define	print_size3(p, e, l)		print_uint64(p, e, l)
@@ -63,11 +88,11 @@ typedef	struct	nfs_v2_stat_t {
 #define	print_mode3(p, e, l)		print_uint32(p, e, l, NULL)
 #define	print_nfspath3(p, e, l)		print_fn3(p, e, l)
 
-int nfs_v3_print_call (u_int32_t op, u_int32_t xid, u_int32_t *p,
+int nfs_v3_print_call (nfs_pkt_t *record, u_int32_t op, u_int32_t xid, u_int32_t *p,
 		u_int32_t payload_len, u_int32_t actual_len,
 		nfs_v3_stat_t *stats);
 
-int nfs_v3_print_resp (u_int32_t op, u_int32_t xid, u_int32_t *p,
+int nfs_v3_print_resp (nfs_pkt_t *record, u_int32_t op, u_int32_t xid, u_int32_t *p,
 		u_int32_t payload_len, u_int32_t actual_len,
 		nfsstat3 status, nfs_v3_stat_t *stats);
 
@@ -102,11 +127,11 @@ u_int32_t *print_wcc_data3 (u_int32_t *p, u_int32_t *e, int print);
 #define	print_offset2(p, e, print)	print_uint32(p, e, print, NULL)
 #define	print_count2(p, e, print, c)	print_uint32(p, e, print, c)
 
-int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
+int nfs_v2_print_call (nfs_pkt_t *record, u_int32_t op, u_int32_t xid,
 		u_int32_t *p, u_int32_t payload_len, u_int32_t actual_len,
 		nfs_v2_stat_t *stats);
 
-int nfs_v2_print_resp (u_int32_t op, u_int32_t xid,
+int nfs_v2_print_resp (nfs_pkt_t *record, u_int32_t op, u_int32_t xid,
 		u_int32_t *p, u_int32_t len, u_int32_t actual_len,
 		nfsstat status, nfs_v2_stat_t *stats);
 
@@ -131,7 +156,11 @@ extern	FILE	*OutFile;
 extern	nfs_v3_stat_t	v3statsBlock;
 extern	nfs_v2_stat_t	v2statsBlock;
 
+extern  packetTable_t  *readTable;
+extern  packetTable_t  *writeTable;
+
 /*
  * end of nfsrecord.h
  */
 
+#endif

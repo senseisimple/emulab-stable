@@ -1,0 +1,165 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2005 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH NFSTRACE.PROXY 8 "Dec 16, 2005" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+nfstrace.proxy \- Control program for NFS tracing.
+.SH SYNOPSIS
+.BI nfstrace.proxy
+[\fB-hVm\fR]
+.I action
+[\fI...\fR]
+.P
+.BI nfstrace.proxy
+.BI get
+[\fB-m \fIsdir:cdir\fR]
+.I pid
+.I eid
+.P
+.BI nfstrace.proxy
+.BI gc
+.I pid
+.I eid
+.P
+.BI nfstrace.proxy
+.BI stats
+[\fB-c \fIcount\fR]
+.SH DESCRIPTION
+The
+.B nfstrace.proxy
+utility performs queries on the NFS tracing database.  The tool is broken up
+into three sub-actions described below: gc, get, and stats.  The first two
+actions setup tracing for a set of nodes and get the list of files and links
+they have accessed.  The last action provides a print out of overall
+statistics for NFS usage.
+.P
+The set of global options is as follows:
+.TP
+\fB-h\fR, \fB--help
+Print the usage message for the
+.B nfstrace.proxy
+utility as a whole or, if an action is given, the usage message for that
+action.
+.TP
+\fB-V\fR, \fB--version
+Print out version information and exit.
+.TP
+\fB-m\fR, \fB--machine
+Use an output style suitable for machine processing.  The default style is for
+humans.
+.SH ACTION: GC
+The
+.B gc
+action is used to remove old state for a set of nodes and record their new
+association.  The set of nodes is read from standard input with the format
+"\fIvname\fR:\fIIP\fR".
+.P
+Required arguments:
+.TP
+.I pid
+The project ID of the experiment the nodes are a member of.
+.TP
+.I eid
+The experiment ID of the experiment the nodes are a member of.
+.SH ACTION: GET
+The
+.B get
+action retrieves the set of files accessed by the nodes in an experiment.  The
+output is separated into two or three columns.  The first column specifies
+whether the file was read and/or written or if it is a link.  The second column
+is the size of the file at the last time it was accessed.  The last column is
+the file name.
+.P
+Accessed files are those that have been read or written by a node and have not
+been removed since the last access.  Accessed links are those that refer to a
+file that has been accessed.
+.P
+Optional Arguments:
+.TP
+\fB-m\fR, \fB--mount\fR=\fIsdir\fR:\fIcdir
+Add a mount mapping to use when translating links with absolute paths.  The
+.I sdir
+value represents the absolute path on the server and the
+.I cdir
+value represents the absolute path as mounted on the nodes.  Any links found to
+start with
+.I cdir
+will have
+.I sdir
+substituted in its place.  This option can be used multiple times.
+.\" XXX We should probably do the opposite thing here and translate all files
+.\" starting with the mount sdir to start with cdir.
+.SH ACTION: STATS
+The
+.B stats
+action prints out information about the most active hosts using NFS and the
+most actively accessed files.
+.P
+Optional Arguments:
+.TP
+\fB-c\fR, \fB--count\fR=\fInum
+The maximum number of hosts/files to print for each statistic.
+.SH DATABASE
+.TP
+nfsdb
+The
+.B mysql
+database where NFS tracing information is stored.
+.SH RETURN VALUES
+.TP
+0
+If the action was completed successfully.
+.SH EXAMPLES
+.PP
+To get the files accessed by experiment
+.B bsg\fR/\fBpegasus\fR.
+.PP
+.RS
+[adama@users ~] nfstrace.proxy gc bsg pegasus
+.PP
+To get the files accessed by experiment
+.B bsg\fR/\fBpegasus\fR.
+.PP
+.RS
+[adama@users ~] nfstrace.proxy get bsg pegasus
+.PD 0
+.P
+r    174.0  B /proj/bsg/exp/pegasus/overlay/tbdata/ltmap.gz
+.P
+r    191.0  B /proj/bsg/exp/pegasus/overlay/tbdata/topomap.gz
+.P
+r      1.0 MB /proj/bsg/exp/pegasus/tarfiles/cylon.tar.gz
+.P
+-------------------------------------------------------------
+.P
+       1.0 MB Total
+.PD
+.RE
+.PP
+To get the same data, except in a more machine friendly format.
+.PP
+.RS
+[adama@users ~] nfstrace.proxy -m get bsg pegasus
+.PD 0
+.P
+r        174 /proj/bsg/exp/pegasus/overlay/tbdata/ltmap.gz
+.P
+r        191 /proj/bsg/exp/pegasus/overlay/tbdata/topomap.gz
+.P
+r    1010340 /proj/bsg/exp/pegasus/tarfiles/cylon.tar.gz
+.PD
+.RE
+.SH FILES
+.TP
+/var/nfstrace/dbpass
+The database password.
+.SH SEE ALSO
+nfstrace(7), nfsdump2db(8), mysql(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

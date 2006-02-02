@@ -1,5 +1,5 @@
 /*
- * $Id: nfs_v2.c,v 1.3 2005-12-02 00:43:29 stack Exp $
+ * $Id: nfs_v2.c,v 1.4 2006-02-02 16:16:17 stack Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -44,11 +44,11 @@ static int compute_pct (int n, int d);
  * header).
  */
 
-int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
+int nfs_v2_print_call (nfs_pkt_t *record, u_int32_t op, u_int32_t xid,
 		u_int32_t *p, u_int32_t payload_len, u_int32_t actual_len,
 		nfs_v2_stat_t *stats)
 {
-	u_int32_t *e;
+	u_int32_t *e, *fh_start;
 	u_int32_t *new_p = p;
 	u_int32_t count;
 
@@ -61,7 +61,8 @@ int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
 
 	stats->c2_total++;
 
-	fprintf (OutFile, "C2 %-8x %2x ", xid, op);
+	if (op != NFSPROC_READ && op != NFSPROC_WRITE)
+	    fprintf (OutFile, "C2 %-8x %2x ", xid, op);
 
 	switch (op) {
 		case NFSPROC_NULL :
@@ -101,15 +102,25 @@ int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
 
 		case NFSPROC_READ :
 			stats->c2_read++;
-			fprintf (OutFile, "%-8s ", "read");
-			new_p = print_fh2 (p, e, 1, "fh");
-			fprintf (OutFile, "offset ");
-			new_p = print_offset2 (new_p, e, 1);
-			fprintf (OutFile, "count ");
-			new_p = print_count2 (new_p, e, 1, &count);
-			fprintf (OutFile, "tcount ");
-			new_p = print_count2 (new_p, e, 1, NULL);
+			// fprintf (OutFile, "%-8s ", "read");
+			fh_start = p;
+			new_p = print_fh2 (p, e, 0, "fh");
+			// fprintf (OutFile, "offset ");
+			new_p = print_offset2 (new_p, e, 0);
+			// fprintf (OutFile, "count ");
+			new_p = print_count2 (new_p, e, 0, &count);
+			// fprintf (OutFile, "tcount ");
+			new_p = print_count2 (new_p, e, 0, NULL);
 
+			if (new_p != NULL) {
+			    ptUpdateTrack(readTable,
+					  record->srcHost,
+					  (char *)fh_start, NFS_FHSIZE,
+					  record->secs, record->usecs,
+					  record->nfsVersion, record->rpcXID,
+					  count,
+					  &record->pthash);
+			}
 
 			break;
 
@@ -120,14 +131,25 @@ int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
 
 		case NFSPROC_WRITE :
 			stats->c2_write++;
-			fprintf (OutFile, "%-8s ", "write");
-			new_p = print_fh2 (p, e, 1, "fh");
-			fprintf (OutFile, "begoff ");
-			new_p = print_offset2 (new_p, e, 1);
-			fprintf (OutFile, "offset ");
-			new_p = print_offset2 (new_p, e, 1);
-			fprintf (OutFile, "tcount ");
-			new_p = print_count2 (new_p, e, 1, &count);
+			// fprintf (OutFile, "%-8s ", "write");
+			fh_start = p;
+			new_p = print_fh2 (p, e, 0, "fh");
+			// fprintf (OutFile, "begoff ");
+			new_p = print_offset2 (new_p, e, 0);
+			// fprintf (OutFile, "offset ");
+			new_p = print_offset2 (new_p, e, 0);
+			// fprintf (OutFile, "tcount ");
+			new_p = print_count2 (new_p, e, 0, &count);
+
+			if (new_p != NULL) {
+			    ptUpdateTrack(writeTable,
+					  record->srcHost,
+					  (char *)fh_start, NFS_FHSIZE,
+					  record->secs, record->usecs,
+					  record->nfsVersion, record->rpcXID,
+					  count,
+					  &record->pthash);
+			}
 
 			stats->c2_write_b += count;
 			if (stats->c2_write_b >= (1024 * 1024)) {
@@ -222,7 +244,7 @@ int nfs_v2_print_call (u_int32_t op, u_int32_t xid,
  * header).
  */
 
-int nfs_v2_print_resp (u_int32_t op, u_int32_t xid,
+int nfs_v2_print_resp (nfs_pkt_t *record, u_int32_t op, u_int32_t xid,
 		u_int32_t *p, u_int32_t payload_len, u_int32_t actual_len,
 		nfsstat status, nfs_v2_stat_t *stats)
 {
@@ -237,7 +259,8 @@ int nfs_v2_print_resp (u_int32_t op, u_int32_t xid,
 
 	e = p + (actual_len / 4);
 
-	fprintf (OutFile, "R2 %-8x %2x ", xid, op);
+	if (op != NFSPROC_READ && op != NFSPROC_WRITE)
+	    fprintf (OutFile, "R2 %-8x %2x ", xid, op);
 
 	stats->r2_total++;
 
@@ -312,10 +335,16 @@ int nfs_v2_print_resp (u_int32_t op, u_int32_t xid,
 
 		case NFSPROC_WRITE :
 			stats->r2_write++;
-			fprintf (OutFile, "%-8s ", "write");
-			PRINT_STATUS (status, 1);
+			// fprintf (OutFile, "%-8s ", "write");
+			// PRINT_STATUS (status, 1);
 			if (status == NFS_OK) {
-				new_p = print_fattr2 (p, e, 1);
+			    ptUpdateTrackAttr(writeTable,
+					      record->dstHost,
+					      record->pthash,
+					      record->rpcXID,
+					      p,
+					      e);
+				// new_p = print_fattr2 (p, e, 1);
 			}
 			break;
 
@@ -570,8 +599,8 @@ u_int32_t *print_fattr2 (u_int32_t *p, u_int32_t *e, int print)
 		fprintf (OutFile, "ftype %x ", ntohl (p [0]));	/* ftype */
 		fprintf (OutFile, "mode %x ", ntohl (p [1]));	/* mode */
 		fprintf (OutFile, "nlink %x ", ntohl (p [2]));	/* nlink */
-		fprintf (OutFile, "uid %d ", ntohl (p [3]));	/* uid */
-		fprintf (OutFile, "gid %d ", ntohl (p [4]));	/* gid */
+		fprintf (OutFile, "uid %x ", ntohl (p [3]));	/* uid */
+		fprintf (OutFile, "gid %x ", ntohl (p [4]));	/* gid */
 		fprintf (OutFile, "size %x ", ntohl (p [5]));	/* size */
 		fprintf (OutFile, "blksize %x ", ntohl (p [6]));	/* blksize */
 		fprintf (OutFile, "rdev %x ", ntohl (p [7]));	/* rdev */

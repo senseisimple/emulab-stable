@@ -1,5 +1,5 @@
 /*
- * $Id: nfs_v3.c,v 1.3 2005-12-02 00:43:29 stack Exp $
+ * $Id: nfs_v3.c,v 1.4 2006-02-02 16:16:17 stack Exp $
  *
  */
 
@@ -66,7 +66,7 @@ static int compute_pct (int n, int d);
  * header).
  */
 
-int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
+int nfs_v3_print_call (nfs_pkt_t *record, u_int32_t op, u_int32_t xid,
 		u_int32_t *p, u_int32_t payload_len, u_int32_t actual_len,
 		nfs_v3_stat_t *stats)
 {
@@ -86,7 +86,8 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
 
 	stats->c3_total++;
 
-	fprintf (OutFile, "C3 %-8x %2x ", xid, op);
+	if (op != NFSPROC3_READ && op != NFSPROC3_WRITE)
+	    fprintf (OutFile, "C3 %-8x %2x ", xid, op);
 
 	switch (op) {
 	case NFSPROC3_NULL :	/* OK */
@@ -184,13 +185,21 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
 		bzero ((void *) &args, sizeof (args));
 		args.file.data.data_val = BigBuf0;
 
-		fprintf (OutFile, "%-8s ", "read");
+		// fprintf (OutFile, "%-8s ", "read");
 
 		if (got_all = xdr_READ3args (&xdr, &args)) {
-			print_fh3_x (&(args.file), "fh");
+			// print_fh3_x (&(args.file), "fh");
+			ptUpdateTrack(readTable,
+				      record->srcHost,
+				      args.file.data.data_val,
+				      args.file.data.data_len,
+				      record->secs, record->usecs,
+				      record->nfsVersion, record->rpcXID,
+				      args.count,
+				      &record->pthash);
 
-			print_uint64_x ((u_int32_t *) &args.offset, "off");
-			fprintf (OutFile, "count %x ", args.count);
+			// print_uint64_x ((u_int32_t *) &args.offset, "off");
+			// fprintf (OutFile, "count %x ", args.count);
 		}
 
 		break;
@@ -203,7 +212,7 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
 		stable_how how;
 
 		stats->c3_write++;
-		fprintf (OutFile, "%-8s ", "write");
+		// fprintf (OutFile, "%-8s ", "write");
 
 		/*
 		 * We can't just gulp down the entire args to write,
@@ -216,13 +225,21 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
 		file.data.data_val = BigBuf0;
 
 		if (got_all = xdr_nfs_fh3 (&xdr, &file)) {
-			print_fh3_x (&file, "fh");
+			// print_fh3_x (&file, "fh");
 		}
 		if (got_all = xdr_offset3 (&xdr, &offset)) {
-			print_uint64_x ((u_int32_t *) &offset, "off");
+			// print_uint64_x ((u_int32_t *) &offset, "off");
 		}
 		if (got_all = xdr_count3 (&xdr, &count)) {
-			fprintf (OutFile, "count %x ", count);
+			// fprintf (OutFile, "count %x ", count);
+			ptUpdateTrack(writeTable,
+				      record->srcHost,
+				      file.data.data_val,
+				      file.data.data_len,
+				      record->secs, record->usecs,
+				      record->nfsVersion, record->rpcXID,
+				      count,
+				      &record->pthash);
 
 			stats->c3_write_b += count;
 			if (stats->c3_write_b >= (1024 * 1024)) {
@@ -231,7 +248,7 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
 			}
 		}
 		if (got_all = xdr_stable_how (&xdr, &how)) {
-			print_stable_how_x (how);
+			// print_stable_how_x (how);
 		}
 
 		break;
@@ -519,12 +536,12 @@ int nfs_v3_print_call (u_int32_t op, u_int32_t xid,
  * stuff after the call header).
  */
 
-int nfs_v3_print_resp (u_int32_t op, u_int32_t xid,
+int nfs_v3_print_resp (nfs_pkt_t *record, u_int32_t op, u_int32_t xid,
 		u_int32_t *p, u_int32_t payload_len, u_int32_t actual_len,
 		nfsstat3 status,
 		nfs_v3_stat_t *stats)
 {
-	u_int32_t *e;
+	u_int32_t *e, *fh_start;
 	u_int32_t *new_p = p;
 	u_int32_t count;
 
@@ -535,7 +552,8 @@ int nfs_v3_print_resp (u_int32_t op, u_int32_t xid,
 
 	e = p + (actual_len / 4);
 
-	fprintf (OutFile, "R3 %8x %2x ", xid, op);
+	if (op != NFSPROC3_READ && op != NFSPROC3_WRITE)
+		fprintf (OutFile, "R3 %8x %2x ", xid, op);
 
 	stats->r3_total++;
 
@@ -619,14 +637,25 @@ int nfs_v3_print_resp (u_int32_t op, u_int32_t xid,
 
 		case NFSPROC3_WRITE :
 			stats->r3_write++;
-			fprintf (OutFile, "%-8s ", "write");
-			PRINT_STATUS (status, 1);
-			new_p = print_wcc_data3 (p, e, 1);
+			// fprintf (OutFile, "%-8s ", "write");
+			// PRINT_STATUS (status, 1);
+			// new_p = print_wcc_data3 (p, e, 1);
+			p++;
+			if ((new_p = print_pre_op_attr3 (p, e, 0))
+			    != NULL) {
+			    new_p++;
+			    ptUpdateTrackAttr(writeTable,
+					      record->dstHost,
+					      record->pthash,
+					      record->rpcXID,
+					      new_p,
+					      e);
+			}
 			if (status == NFS3_OK) {
-				fprintf (OutFile, "count ");
-				new_p = print_uint32 (new_p, e, 1, NULL);
-				fprintf (OutFile, "stable ");
-				new_p = print_stable3 (new_p, e, 1);
+				// fprintf (OutFile, "count ");
+				// new_p = print_uint32 (new_p, e, 1, NULL);
+				// fprintf (OutFile, "stable ");
+				// new_p = print_stable3 (new_p, e, 1);
 				/* there's more, but we'll skip it */
 			}
 			break;
@@ -760,7 +789,7 @@ int nfs_v3_print_resp (u_int32_t op, u_int32_t xid,
 	}
 
 	if (new_p == NULL) {
-		fprintf (OutFile, "SHORT PACKET");
+	    // fprintf (OutFile, "SHORT PACKET");
 		return (-1);
 	}
 

@@ -1,5 +1,5 @@
 /*
- * $Id: nfsrecord.c,v 1.2 2005-11-30 17:30:57 stack Exp $
+ * $Id: nfsrecord.c,v 1.3 2006-02-02 16:16:17 stack Exp $
  */
 
 #ifdef HAVE_CONFIG_H
@@ -39,9 +39,12 @@
 
 nfs_v3_stat_t	v3statsBlock;
 nfs_v2_stat_t	v2statsBlock;
+packetTable_t  *readTable;
+packetTable_t  *writeTable;
 
 typedef	struct	_hash_t	{
 	u_int32_t	rpcXID;
+	u_int32_t	pthash;
 	u_int32_t	srcHost;		/* invoking host */
 	u_int32_t	srcPort;		/* port on invoking host */
 	u_int32_t	nfsVersion;
@@ -51,29 +54,10 @@ typedef	struct	_hash_t	{
 	struct _hash_t	*next;
 } hash_t;
 
-typedef	struct	{
-
-	u_int32_t	secs, usecs;		/* timestamp */
-	u_int32_t	srcHost, dstHost;	/* IP of src and dst hosts */
-	u_int32_t	srcPort, dstPort;	/* ports... */
-	u_int32_t	rpcXID;
-
-						/* these can probably be squished a bunch. */
-	u_int32_t	rpcCall, nfsVersion, nfsProc, nfsProg;
-	u_int32_t	rpcStatus;
-
-	/*
-	 * So far-- 11 uint32's replace 14 uint32's + verif + time
-	 */
-
-	/* some buffer for the payload. */
-
-} nfs_pkt_t;
-
 void packetPrinter (u_char *user, struct pcap_pkthdr *h, u_char *pp);
 int processPacket (struct pcap_pkthdr *h, u_char *pp, nfs_pkt_t *record);
 void printRecord (nfs_pkt_t *record, void *xdr, u_int32_t payload_len,
-		u_int32_t proto, u_int32_t actual_len);
+		u_int32_t proto, u_int32_t actual_len, int print);
 void printHostIp (u_int32_t ipa);
 int getEtherHeader (u_int32_t packet_len,
 		u_char *bp, unsigned int *proto, unsigned int *len);
@@ -85,7 +69,7 @@ int getRpcHeader (struct rpc_msg *rpc_b, u_int32_t *dir, u_int32_t maxlen,
 		u_int32_t *euid, u_int32_t *egid);
 int getData (u_char *bp, u_char *buf, unsigned int maxlen);
 
-int hashInsertXid (u_int32_t time, u_int32_t xid,
+hash_t *hashInsertXid (u_int32_t time, u_int32_t xid,
 		u_int32_t host, u_int32_t port,
 		u_int32_t version, u_int32_t proc, u_int32_t prog);
 
@@ -285,7 +269,8 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 	cnt = 0;
 	while (consumed < tot_len) {
 		u_int32_t euid, egid;
-		int print_it;
+		int print_it, print_all_of_it = 1;
+		hash_t *hp = NULL;
 
 		cnt++;
 		euid = egid = -1;
@@ -332,9 +317,8 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 
 		consumed += rh_len;
 
-		if (consumed == tot_len && dir == CALL && 
-				(ntohl (rpc_b->ru.RM_cmb.cb_proc) == NFSPROC_NULL ||
-				 ntohl (rpc_b->ru.RM_cmb.cb_proc) == MOUNTPROC_NULL)) {
+		if (consumed == tot_len && dir == CALL &&
+		    ntohl (rpc_b->ru.RM_cmb.cb_proc) == NFSPROC_NULL) {
 
 			/* It's a NULL RPC; do nothing */
 			continue;
@@ -347,6 +331,7 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 		}
 
 /* 		fprintf (OutFile, "XX good (cnt = %d)\n", cnt); */
+
 		print_it = 1;
 
 		if (dir == CALL) {
@@ -355,13 +340,12 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 			record->nfsVersion	= ntohl (rpc_b->ru.RM_cmb.cb_vers);
 			record->nfsProc		= ntohl (rpc_b->ru.RM_cmb.cb_proc);
 			record->nfsProg		= ntohl (rpc_b->ru.RM_cmb.cb_prog);
-			hashInsertXid (record->secs, record->rpcXID,
+			hp = hashInsertXid (record->secs, record->rpcXID,
 					record->srcHost, record->srcPort,
 					record->nfsVersion, record->nfsProc,
 				       record->nfsProg);
 		}
 		else {
-			hash_t *p;
 			u_int32_t accepted;
 			u_int32_t acceptStatus;
 
@@ -399,9 +383,9 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 			 * be dumped.
 			 */
 
-			p = hashLookupXid (record->secs, record->rpcXID,
+			hp = hashLookupXid (record->secs, record->rpcXID,
 					record->dstHost, record->dstPort);
-			if (p == NULL) {
+			if (hp == NULL) {
 /* 				fprintf (OutFile, "XX response without call\n"); */
 				print_it = 1;
 				record->nfsVersion	= 3;
@@ -412,13 +396,14 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 						sizeof (u_int32_t)));
 			}
 			else {
-				record->nfsVersion	= p->nfsVersion;
-				record->nfsProc		= p->nfsProc;
-				record->nfsProg		= p->nfsProg;
+				record->nfsVersion	= hp->nfsVersion;
+				record->nfsProc		= hp->nfsProc;
+				record->nfsProg		= hp->nfsProg;
+				record->pthash		= hp->pthash;
 				record->rpcStatus	= ntohl (*(u_int32_t *)
 					(pp + e_len + i_len + h_len + rh_len +
 						sizeof (u_int32_t)));
-				free (p);
+				free (hp);
 			}
 
 			/*
@@ -430,6 +415,65 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 			consumed += 2 * sizeof (u_int32_t);
 		}
 
+		if (record->nfsVersion == NFS_VERSION) {
+		    switch (record->nfsProc) {
+		    case NFSPROC_NULL:
+		    case NFSPROC_GETATTR:
+		    case NFSPROC_SETATTR:
+		    case NFSPROC_ROOT:
+		    case NFSPROC_WRITECACHE:
+		    case NFSPROC_READDIR:
+		    case NFSPROC_STATFS:
+			print_it = 0;
+			break;
+		    case NFSPROC_READ:
+			if (dir == REPLY) {
+			    print_it = 0;
+			}
+			else {
+			    print_all_of_it = 0;
+			}
+			break;
+		    case NFSPROC_WRITE:
+			print_all_of_it = 0;
+			break;
+		    default:
+			break;
+		    }
+		}
+		else if (record->nfsVersion == NFS_V3) {
+		    switch (record->nfsProc) {
+		    case NFSPROC3_NULL:
+		    case NFSPROC3_GETATTR:
+		    case NFSPROC3_SETATTR:
+		    case NFSPROC3_ACCESS:
+		    case NFSPROC3_READDIR:
+		    case NFSPROC3_READDIRPLUS:
+		    case NFSPROC3_FSSTAT:
+		    case NFSPROC3_FSINFO:
+		    case NFSPROC3_PATHCONF:
+		    case NFSPROC3_COMMIT:
+			print_it = 0;
+			break;
+		    case NFSPROC3_READ:
+			if (dir == REPLY) {
+			    print_it = 0;
+			}
+			else {
+			    print_all_of_it = 0;
+			}
+			break;
+		    case NFSPROC3_WRITE:
+			print_all_of_it = 0;
+			break;
+		    default:
+			break;
+		    }
+		}
+		else {
+		    // printf ("unknown version %d\n", record->nfsVersion);
+		}
+		
 		/*
 		 * The payload is everything left in the packet except
 		 * the rpc header.
@@ -517,8 +561,15 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 		else if (print_it) {
 			printRecord (record, (void *) (pp + consumed),
 					payload_len, proto,
-					tot_len - consumed);
+					tot_len - consumed,
+				     print_all_of_it);
 
+			if (dir == CALL && hp != NULL)
+			    hp->pthash = record->pthash;
+
+			if (!print_all_of_it)
+			    goto bail;
+			
 			if (euid != -1 && egid != -1) {
 				fprintf (OutFile, "euid %d egid %d ",
 						euid, egid);
@@ -542,24 +593,24 @@ int processPacket (struct pcap_pkthdr *h,	/* Captured stuff */
 			 * where the payload might be spread out over
 			 * several IP datagrams.
 			 */
-
+			
 #ifdef	COMMENT
 			if (payload_len + consumed > tot_len) {
-				fprintf (OutFile, " +++");
+			    fprintf (OutFile, " +++");
 			}
 #endif	/* COMMENT */
-
+			
 			fprintf (OutFile, "\n");
 		}
-
+		
 	bail:
 		consumed += payload_len;
 
-/* 		fprintf (OutFile, "XX consumed = %d, tot_len = %d\n", consumed, tot_len); */
+		/* 		fprintf (OutFile, "XX consumed = %d, tot_len = %d\n", consumed, tot_len); */
 
 	}
 
-	fflush(OutFile);
+	// fflush(OutFile);
 
 /* 	fprintf (OutFile, "XX end loop\n"); */
 end:
@@ -579,26 +630,28 @@ end:
  */
 
 void printRecord (nfs_pkt_t *record, void *xdr, u_int32_t payload_len,
-		u_int32_t proto, u_int32_t actual_len)
+		  u_int32_t proto, u_int32_t actual_len, int print)
 {
 	u_int32_t *dp = xdr;
 
-	fprintf (OutFile, "%u.%.6u ", record->secs, record->usecs);
-	printHostIp (record->srcHost);
-	fprintf (OutFile, ".%.4x ", 0xffff & record->srcPort);
-	printHostIp (record->dstHost);
-	fprintf (OutFile, ".%.4x ", 0xffff & record->dstPort);
+	if (print) {
+		fprintf (OutFile, "%u.%.6u ", record->secs, record->usecs);
+		printHostIp (record->srcHost);
+		fprintf (OutFile, ".%.4x ", 0xffff & record->srcPort);
+		printHostIp (record->dstHost);
+		fprintf (OutFile, ".%.4x ", 0xffff & record->dstPort);
 
-	fprintf (OutFile, "%c ", proto == IPPROTO_TCP ? 'T' : 'U');
+		fprintf (OutFile, "%c ", proto == IPPROTO_TCP ? 'T' : 'U');
+}
 
 	if (record->rpcCall == CALL) {
 		if (record->nfsVersion == 3) {
-			nfs_v3_print_call (record->nfsProc, record->rpcXID,
+			nfs_v3_print_call (record, record->nfsProc, record->rpcXID,
 					dp, payload_len, actual_len,
 					&v3statsBlock);
 		}
 		else if (record->nfsVersion == 2) {
-			nfs_v2_print_call (record->nfsProc, record->rpcXID,
+			nfs_v2_print_call (record, record->nfsProc, record->rpcXID,
 					dp, payload_len, actual_len,
 					&v2statsBlock);
 		}
@@ -608,13 +661,13 @@ void printRecord (nfs_pkt_t *record, void *xdr, u_int32_t payload_len,
 	}
 	else {
 		if (record->nfsVersion == 3) {
-			nfs_v3_print_resp (record->nfsProc, record->rpcXID,
+			nfs_v3_print_resp (record, record->nfsProc, record->rpcXID,
 					dp, payload_len, actual_len,
 					record->rpcStatus,
 					&v3statsBlock);
 		}
 		else if (record->nfsVersion == 2) {
-			nfs_v2_print_resp (record->nfsProc, record->rpcXID,
+			nfs_v2_print_resp (record, record->nfsProc, record->rpcXID,
 					dp, payload_len, actual_len,
 					record->rpcStatus,
 					&v2statsBlock);
@@ -623,9 +676,11 @@ void printRecord (nfs_pkt_t *record, void *xdr, u_int32_t payload_len,
 			fprintf (OutFile, "RU%d\n", record->nfsVersion);
 		}
 
+		if (print) {
 		fprintf (OutFile, "status=%d ", record->rpcStatus);
 
 		fprintf (OutFile, "pl = %d ", payload_len);
+		}
 	}
 
 	return ;
@@ -863,7 +918,7 @@ static int get_auth (u_int32_t *ui, u_int32_t *euid, u_int32_t *egid)
 	 */
 
 	if (ntohl (ui [0]) != AUTH_UNIX) {
-		printf ("XX Not Auth_Unix (%d)??\n", ntohl (ui [0]));
+	    // printf ("XX Not Auth_Unix (%d)??\n", ntohl (ui [0]));
 		return (-1);
 	}
 
@@ -960,7 +1015,7 @@ hash_t *hashLookupXid (u_int32_t now,
  * ignoring them.
  */
 
-int hashInsertXid (u_int32_t now, u_int32_t xid,
+hash_t *hashInsertXid (u_int32_t now, u_int32_t xid,
 		u_int32_t host, u_int32_t port,
 		u_int32_t version, u_int32_t proc, u_int32_t prog)
 {
@@ -1008,7 +1063,7 @@ int hashInsertXid (u_int32_t now, u_int32_t xid,
 	}
 	CullIndex = (CullIndex + 1) % HASHSIZE;
 
-	return (0);
+	return new;
 }
 
 /*

@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/sensors/nfstrace/nfsdump2/nfsdump.c,v 1.1 2005-11-28 15:44:00 stack Exp $ (LBL)";
+    "@(#) $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/sensors/nfstrace/nfsdump2/nfsdump.c,v 1.2 2006-02-02 16:16:17 stack Exp $ (LBL)";
 #endif
 
 /*
@@ -66,6 +66,7 @@ static const char rcsid[] =
 #include "setsignal.h"
 #include "gmt2local.h"
 
+#include "mypcap.h"
 #include "nfsrecord.h"
 
 int Oflag = 1;			/* run filter code optimizer */
@@ -118,6 +119,7 @@ static int printSummary (char *filename);
 
 /* Ignoring the default, we choose a ridiculously large snaplen */
 int snaplen = 1500;
+int parallel = 0;
 
 struct printer {
 	pcap_handler f;
@@ -183,7 +185,7 @@ main(int argc, char **argv)
 	
 	opterr = 0;
 	while (
-	    (op = getopt(argc, argv, "B:c:F:I:i:L:lm:nN:Opq:r:s:T:tuvw:")) != -1)
+	    (op = getopt(argc, argv, "B:c:F:I:i:L:lm:nN:Opq:r:s:T:tuvw:P")) != -1)
 		switch (op) {
 
 		case 'c':
@@ -319,6 +321,10 @@ main(int argc, char **argv)
 			quickSummaryFile = optarg;
 			break;
 
+		case 'P':
+			parallel = 1;
+			break;
+
 		default:
 			usage();
 			/* NOTREACHED */
@@ -329,6 +335,11 @@ main(int argc, char **argv)
 
 	nfs_v3_stat_init (&v3statsBlock);
 	nfs_v2_stat_init (&v2statsBlock);
+
+	if (((readTable = ptCreateTable()) == NULL) ||
+	    ((writeTable = ptCreateTable()) == NULL)) {
+	    error("cannot allocate packet tables");
+	}
 
 	if (RFileName != NULL) {
 		/*
@@ -411,6 +422,10 @@ main(int argc, char **argv)
 		int total_cnt = 0;
 		struct timeval now;
 
+		if (parallel) {
+			mypcap_init(pd, printer);
+		}
+		
 		/*
 		 * This definition assumes that packets are frequent,
 		 * so we won't have to wait very long at all to see
@@ -459,7 +474,10 @@ main(int argc, char **argv)
 				}
 			}
 
-			if (pcap_loop(pd, PACKET_POLL_CNT, printer, pcap_userdata) < 0) {
+			if (parallel) {
+				mypcap_read(pd, pcap_userdata);
+			}
+			else if (pcap_loop(pd, PACKET_POLL_CNT, printer, pcap_userdata) < 0) {
 				(void)fprintf(stderr, "%s: pcap_loop: %s\n",
 				    program_name, pcap_geterr(pd));
 				exit(1);
@@ -486,6 +504,8 @@ cleanup(int signo)
 
 	/* Can't print the summary if reading from a savefile */
 	if (pd != NULL && pcap_file(pd) == NULL) {
+		ptDumpTable(OutFile, readTable, "read");
+		ptDumpTable(OutFile, writeTable, "write");
 		(void)fflush(stdout);
 		putc('\n', stderr);
 		if (pcap_stats(pd, &stat) < 0)
@@ -528,6 +548,9 @@ static int updateOutFile (intervalDesc_t *i)
 	struct tm tm;
 	time_t clock;
 	int rc;
+
+	ptDumpTable(OutFile, readTable, "read");
+	ptDumpTable(OutFile, writeTable, "write");
 
 	if (OutFile != NULL && OutFile != stdout) {
 		fclose (OutFile);

@@ -1,0 +1,39 @@
+.\"
+.\" EMULAB-COPYRIGHT
+.\" Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+.\" All rights reserved.
+.\"
+.TH NFSDUMP2DB 8 "Dec 20, 2005" "Emulab" "Emulab Commands Manual"
+.OS
+.SH NAME
+nfsdump2db \- Daemon that transfers data from nfsdump to a database.
+.SH SYNOPSIS
+.BI nfsdump2db
+[\fB-h\fR]
+[\fB-c \fIcount\fR]
+.SH DESCRIPTION
+The
+.B nfsdump2db
+daemon processes the output from the nfsdump utility and injects it into a
+database for further processing.
+.SH DATABASE
+.TP
+nfsdb
+The
+.B mysql
+database where NFS tracing information is stored.
+.SH FILES
+.TP
+/var/nfstrace/dbpass
+The database password.
+.TP
+/var/db/nfstrace/*
+This directory contains the files that will be loaded directly into the
+corresponding database tables.
+.SH SEE ALSO
+nfstrace(7), nfstrace.proxy(8), mysql(1)
+.SH AUTHOR
+The Emulab project at the University of Utah.
+.SH NOTES
+The Emulab project can be found on the web at
+.IR http://www.emulab.net

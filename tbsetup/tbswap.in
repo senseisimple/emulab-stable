@@ -410,7 +410,7 @@ sub doSwapout($) {
 	undef $os_setup_pid;
     }
 
-    if ($NFSTRACESUPPORT) {
+    if (0 && $NFSTRACESUPPORT && $type == REAL) {
 	print "Getting files accessed via NFS.\n";
 	TBDebugTimeStamp("nfstrace started");
 	system("nfstrace transfer $pid $eid");
