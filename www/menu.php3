@@ -266,7 +266,7 @@ function WRITESIDEBAR() {
 	}
     }
 
-    echo "<FORM method=get ACTION=$TBDOCBASE/search.php3>\n";
+    echo "<FORM method=get ACTION=$newsBase/search.php3>\n";
 ?>
   <script type='text/javascript' language='javascript' src='textbox.js'></script>
   <table class="menu" width=210 cellpadding="0" cellspacing="0">
