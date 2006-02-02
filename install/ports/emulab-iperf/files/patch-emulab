@@ -1,10 +1,7 @@
-Index: include/headers.h
-===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/include/headers.h,v
-retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 headers.h
-*** include/headers.h	24 Oct 2005 15:18:33 -0000	1.1.1.1
---- include/headers.h	24 Oct 2005 16:06:09 -0000
+Index: emulab-iperf/include/headers.h
+diff -c emulab-iperf/include/headers.h:1.1 emulab-iperf/include/headers.h:1.2
+*** emulab-iperf/include/headers.h:1.1	Mon Oct 24 09:18:33 2005
+--- emulab-iperf/include/headers.h	Mon Oct 24 10:11:28 2005
 ***************
 *** 180,186 ****
 --- 180,190 ----
@@ -19,136 +16,46 @@ diff -c -r1.1.1.1 headers.h
   
   /* in case the OS doesn't have these, we provide our own implementations */
   #include "gettimeofday.h"
-Index: src/Client.cpp
-===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/Client.cpp,v
-retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 Client.cpp
-*** src/Client.cpp	24 Oct 2005 15:18:33 -0000	1.1.1.1
---- src/Client.cpp	24 Oct 2005 16:06:10 -0000
+Index: emulab-iperf/src/Client.cpp
+diff -c emulab-iperf/src/Client.cpp:1.1 emulab-iperf/src/Client.cpp:1.3
+*** emulab-iperf/src/Client.cpp:1.1	Mon Oct 24 09:18:33 2005
+--- emulab-iperf/src/Client.cpp	Tue Nov  8 17:10:42 2005
 ***************
-*** 61,66 ****
---- 61,102 ----
-  #include "util.h"
-  #include "Locale.h"
-  
-+ static int	flood_wait;
-+ static int	flood_delta;
-+ static int	flood_hysteresis;
-+ static int	flood_good;
-+ 
-+ void
-+ pkt_wait_init(void)
-+ {
-+     flood_wait       = 1;
-+     flood_delta      = 1;
-+     flood_hysteresis = 1;
-+     flood_good       = 0;
-+ }
-+ 
-+ void
-+ pkt_wait(int err)
-+ {
-+     volatile int	i;
-+ 
-+     if (err) {
-+         flood_wait += flood_delta;
-+ 	flood_good = 0;
-+ 
-+ 	//fprintf(stderr, "%d\n", flood_wait);
-+     }
-+     else {
-+         if (++flood_good >= flood_hysteresis) {
-+ 	    flood_wait -= flood_delta;
-+ 	    flood_good = 0;
-+ 	    if (flood_wait = 0)
-+ 	        flood_wait = 1;
-+ 	}
-+     }
-+     delay_loop( flood_wait );     
-+ }
-+ 
-  /* -------------------------------------------------------------------
-   * Store server hostname, optionally local hostname, and socket info.
-   * ------------------------------------------------------------------- */
-***************
-*** 69,74 ****
---- 105,112 ----
-      mSettings = inSettings;
-      mBuf = NULL;
-  
-+     pkt_wait_init();
-+ 
-      // initialize buffer
-      mBuf = new char[ mSettings->mBufLen ];
-      pattern( mBuf, mSettings->mBufLen );
-***************
-*** 213,236 ****
-          } else
-              canRead = true; 
-  
-!         // perform write 
+*** 216,228 ****
+          // perform write 
           currLen = write( mSettings->mSock, mBuf, mSettings->mBufLen ); 
           if ( currLen < 0 ) {
 !             WARN_errno( currLen < 0, "write2" ); 
 !             break; 
-!         }
+          }
   
 !         // report packets 
 !         reportstruct->packetLen = currLen;
 !         ReportPacket( mSettings->reporthdr, reportstruct );
-!         
+          
           if ( delay > 0 ) {
               delay_loop( delay ); 
-          }
-!         if ( !mMode_Time ) {
-              mSettings->mAmount -= currLen;
-          }
-! 
-      } while ( ! (sInterupted  || 
-                   (mMode_Time   &&  mEndTime.before( reportstruct->packetTime ))  || 
-                   (!mMode_Time  &&  0 >= mSettings->mAmount)) && canRead ); 
---- 251,283 ----
-          } else
-              canRead = true; 
-  
-!         // perform write
-!     again:
+--- 216,231 ----
+          // perform write 
           currLen = write( mSettings->mSock, mBuf, mSettings->mBufLen ); 
           if ( currLen < 0 ) {
 ! 	    if (errno != ENOBUFS) {
 !                 WARN_errno( currLen < 0, "write2" ); 
 ! 		break;
 ! 	    }
-!         }
-! 	if (currLen > 0) {
-! 	    // report packets 
-! 	    reportstruct->packetLen = currLen;
-! 	    ReportPacket( mSettings->reporthdr, reportstruct );
-! 	}
-! 	pkt_wait((currLen < 0));
-! 	if (currLen < 0)
-! 	    goto again;
+! 	    currLen = 0;
+          }
   
-! #if 0
+! 	// report packets 
+! 	reportstruct->packetLen = currLen;
+! 	ReportPacket( mSettings->reporthdr, reportstruct );
+          
           if ( delay > 0 ) {
               delay_loop( delay ); 
-          }
-! #endif
-!         if ( !mMode_Time && currLen > 0 ) {
-              mSettings->mAmount -= currLen;
-          }
-! 	
-      } while ( ! (sInterupted  || 
-                   (mMode_Time   &&  mEndTime.before( reportstruct->packetTime ))  || 
-                   (!mMode_Time  &&  0 >= mSettings->mAmount)) && canRead ); 
-Index: src/Makefile.in
-===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/Makefile.in,v
-retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 Makefile.in
-*** src/Makefile.in	24 Oct 2005 15:18:33 -0000	1.1.1.1
---- src/Makefile.in	24 Oct 2005 16:06:10 -0000
+Index: emulab-iperf/src/Makefile.in
+diff -c emulab-iperf/src/Makefile.in:1.1 emulab-iperf/src/Makefile.in:1.2
+*** emulab-iperf/src/Makefile.in:1.1	Mon Oct 24 09:18:33 2005
+--- emulab-iperf/src/Makefile.in	Mon Oct 24 10:11:28 2005
 ***************
 *** 38,44 ****
   POST_UNINSTALL = :
@@ -185,13 +92,10 @@ diff -c -r1.1.1.1 Makefile.in
   	$(CXXLINK) $(iperf_LDFLAGS) $(iperf_OBJECTS) $(iperf_LDADD) $(LIBS)
   
   mostlyclean-compile:
-Index: src/main.cpp
-===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/main.cpp,v
-retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 main.cpp
-*** src/main.cpp	24 Oct 2005 15:18:34 -0000	1.1.1.1
---- src/main.cpp	24 Oct 2005 16:06:10 -0000
+Index: emulab-iperf/src/main.cpp
+diff -c emulab-iperf/src/main.cpp:1.1 emulab-iperf/src/main.cpp:1.2
+*** emulab-iperf/src/main.cpp:1.1	Mon Oct 24 09:18:34 2005
+--- emulab-iperf/src/main.cpp	Mon Oct 24 10:11:28 2005
 ***************
 *** 163,168 ****
 --- 163,173 ----
@@ -206,13 +110,10 @@ diff -c -r1.1.1.1 main.cpp
       // Check for either having specified client or server
       if ( ext_gSettings->mThreadMode == kMode_Client 
            || ext_gSettings->mThreadMode == kMode_Listener ) {
-Index: src/stdio.c
-===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/stdio.c,v
-retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 stdio.c
-*** src/stdio.c	24 Oct 2005 15:18:34 -0000	1.1.1.1
---- src/stdio.c	24 Oct 2005 16:06:10 -0000
+Index: emulab-iperf/src/stdio.c
+diff -c emulab-iperf/src/stdio.c:1.1 emulab-iperf/src/stdio.c:1.2
+*** emulab-iperf/src/stdio.c:1.1	Mon Oct 24 09:18:34 2005
+--- emulab-iperf/src/stdio.c	Mon Oct 24 10:11:28 2005
 ***************
 *** 255,262 ****
    * ------------------------------------------------------------------- */
