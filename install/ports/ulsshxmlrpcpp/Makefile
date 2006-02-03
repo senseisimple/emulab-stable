@@ -3,7 +3,7 @@
 # Whom:                 ricci@cs.utah.edu
 
 PORTNAME=	ulsshxmlrpcpp
-PORTVERSION=	0.1.1
+PORTVERSION=	0.1.2
 CATEGORIES=	misc
 MASTER_SITES=	http://www.emulab.net/distributions/
 
