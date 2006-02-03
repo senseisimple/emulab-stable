@@ -5420,6 +5420,10 @@ COMMAND_PROTOTYPE(dofwinfo)
 			row = mysql_fetch_row(res);
 			if (row[0]) {
 				OUTPUT(buf, sizeof(buf),
+				       "VAR=EMULAB_GWIP VALUE=\"%s\"\n",
+				       CONTROL_ROUTER_IP);
+				client_writeback(sock, buf, strlen(buf), tcp);
+				OUTPUT(buf, sizeof(buf),
 				       "VAR=EMULAB_GWMAC VALUE=\"%s\"\n",
 				       row[0]);
 				client_writeback(sock, buf, strlen(buf), tcp);
@@ -5507,12 +5511,16 @@ COMMAND_PROTOTYPE(dofwinfo)
 	 * along with their IP addresses.  The client code uses this to
 	 * construct a local hosts file so that symbolic host names can
 	 * be used in firewall rules.
+	 *
+	 * We also return the control net MAC address for each node so
+	 * that we can provide proxy ARP.
 	 */
 	if (vers > 24) {
-		res = mydb_query("select r.vname,i.IP from reserved as r "
+		res = mydb_query("select r.vname,i.IP,i.mac "
+			"from reserved as r "
 			"left join interfaces as i on r.node_id=i.node_id "
 			"where r.pid='%s' and r.eid='%s' and i.role='ctrl'",
-			 2, reqp->pid, reqp->eid);
+			 3, reqp->pid, reqp->eid);
 		if (!res) {
 			error("FWINFO: %s: DB Error getting host info!\n",
 			      reqp->nodeid);
@@ -5522,8 +5530,15 @@ COMMAND_PROTOTYPE(dofwinfo)
 
 		for (n = nrows; n > 0; n--) {
 			row = mysql_fetch_row(res);
-			OUTPUT(buf, sizeof(buf), "HOST=%s CNETIP=%s\n",
-			       row[0], row[1]);
+			if (vers > 25) {
+				OUTPUT(buf, sizeof(buf),
+				       "HOST=%s CNETIP=%s CNETMAC=%s\n",
+				       row[0], row[1], row[2]);
+			} else {
+				OUTPUT(buf, sizeof(buf),
+				       "HOST=%s CNETIP=%s\n",
+				       row[0], row[1]);
+			}
 			client_writeback(sock, buf, strlen(buf), tcp);
 		}
 
