@@ -78,6 +78,11 @@
 #define TBDB_EVENTTYPE_RUN	"RUN"
 #define TBDB_EVENTTYPE_CREATE	"CREATE"
 
+/*
+ * Global event passthru sentinal - does _NOT_ go in either event array
+ */
+#define TBDB_EVENTEXPT_NONE     "__none"
+
 #define TBDB_NODESTATE_ISUP       "ISUP"
 #define TBDB_NODESTATE_REBOOTED   "REBOOTED"
 #define TBDB_NODESTATE_REBOOTING  "REBOOTING"

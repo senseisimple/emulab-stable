@@ -55,7 +55,7 @@ sched_callback(event_handle_t handle,
 static void subscribe_callback(event_handle_t handle,  int result,
 			       event_subscription_t es, void *data);
 
-static void send_updateevent();
+static void schedule_updateevent();
 
 
 int
@@ -191,11 +191,29 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on remote server");
         }
 
+        /* Setup the global event passthru */
 	address_tuple_free(tuple);
 	tuple = address_tuple_alloc();
-	
-	tuple->host = ADDRESSTUPLE_ALL;
-	tuple->scheduler = 1;
+
+	snprintf(buf, sizeof(buf), "%s,%s", 
+                 ipaddr, ADDRESSTUPLE_ALL);
+
+	tuple->host = buf;
+	tuple->expt = TBDB_EVENTEXPT_NONE;
+
+	if (! event_subscribe(bosshandle, expt_callback, tuple, 
+			      NULL)) {
+		fatal("could not subscribe to events on remote server");
+        }
+
+        /*
+         * Setup local elvind subscriptions:
+         */
+	address_tuple_free(tuple);
+	tuple = address_tuple_alloc();
+        
+        tuple->host = ADDRESSTUPLE_ALL;
+        tuple->scheduler = 1;
 	
 	if (! event_subscribe(localhandle, sched_callback, tuple,
 			      NULL)) {
@@ -214,7 +232,8 @@ main(int argc, char **argv)
 		(void) fclose(fp);
 	}
 
-	send_updateevent();
+        /* Tell the schedulers on ops that we want a subscription update. */
+	schedule_updateevent();
 
 	/*
 	 * Do this now, once we have had a chance to fail on the above
@@ -352,7 +371,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	    }
 	      
 	    exptmap.clear();
-            send_updateevent();
+            schedule_updateevent();
 	    
 	  }
 	  
@@ -395,7 +414,6 @@ sched_callback(event_handle_t handle,
 	       event_notification_t notification,
 	       void *data)
 {
-  
         if (! event_notify(bosshandle, notification))
 		error("Failed to deliver scheduled notification!\n");
   
@@ -422,7 +440,7 @@ void subscribe_callback(event_handle_t handle,  int result,
 }
 
 
-void send_updateevent() {
+void schedule_updateevent() {
   /* send a message to elvind on ops */
   address_tuple_t tuple = address_tuple_alloc();
 
