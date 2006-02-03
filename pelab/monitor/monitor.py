@@ -21,6 +21,7 @@ ip_mapping_filename = ''
 this_experiment = ''
 this_ip = ''
 stub_ip = ''
+netmon_output_version = 1
 
 total_size = 0
 last_total = -1
@@ -96,24 +97,51 @@ def get_next_packet():
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
+  #
+  # Check for a packet from netmond
+  #
   # Could move this elsewhere to avoid re-compiling, but I'd like to keep it
   # with this code for better readability
-  linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?$')
+  if netmon_output_version == 1:
+      linexp = re.compile('^(\d+\.\d+) > (\d+\.\d+\.\d+\.\d+)\.(\d+) (\((\d+)\))?')
+  elif netmon_output_version == 2:
+      linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
+
   match = linexp.match(line)
+  conexp = re.compile('^(New|Closed): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)')
+  cmatch = conexp.match(line)
   if (match) :
-      time = float(match.group(1))
-      ipaddr = match.group(2)
-      port = int(match.group(3))
-      size_given = match.group(4) != ''
-      size = int(match.group(5))
-#      sys.stdout.write('dest: ' + ipaddr + ' port: ' + str(port) + ' size: '
-#              + str(size) + '\n')
+      localport = 0 # We man not get this one
+      if (netmon_output_version == 1):
+          time = float(match.group(1))
+          ipaddr = match.group(2)
+          remoteport = int(match.group(3))
+          size_given = match.group(4) != ''
+          size = int(match.group(5))
+      elif (netmon_output_version == 2):
+          time = float(match.group(1))
+          localport = match.group(2)
+          ipaddr = match.group(3)
+          remoteport = int(match.group(4))
+          size_given = match.group(5) != ''
+          size = int(match.group(6))
+
+      #sys.stdout.write('dest: ' + ipaddr + ' destport: ' + str(remoteport) +
+      #        ' srcport: ' + str(localport) + ' size: ' + str(size) + '\n')
       if not size_given:
           size = 0
       total_size = total_size + size
       return (ipaddr, time, size)
+  elif ((netmon_output_version == 2) and cmatch):
+      #
+      # Watch for new or closed connections
+      #
+      event = cmatch.group(1)
+      localport = cmatch.group(2)
+      ipaddr = cmatch.group(3)
+      sys.stdout.write("Got a connection event: " + event + "\n")
   else:
-      sys.stdout.write('skipped line in the wrong format: ' + line + '\n')
+      sys.stdout.write('skipped line in the wrong format: ' + line)
       return None
     
 def receive_characteristic(conn):
