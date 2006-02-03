@@ -15,4 +15,4 @@ all: libnetmon.so netmond
 	$(CC) $(CFLAGS) $(LD_FLAGS) -shared -o $@ $<
 
 clean:
-	-rm *.so
+	-rm *.so netmond
