@@ -1,0 +1,36 @@
+
+ulsshxmlrpcpp
+-------------
+
+The ulsshxmlrpc library is a lightly customized version of the
+ulxmlrpcpp library, it's used in the testbed by the event scheduler.
+The following are some bits of information for maintaining the
+package:
+
+  * CVS Repository
+	cvs.flux.utah.edu:/flux/ANONCVS
+
+  * Original source
+	http://ulxmlrpcpp.sourceforge.net/
+
+	Importing a new version should be done in the ulxmlrpcpp
+	subdirectory.
+
+  * Regenerating Makefile.in's
+	Change to the source directory and run:
+
+	$ ./autogen.sh
+
+	The version of the autotools to run is hard coded in the
+	script, they will probably have to change over time.
+
+  * Build a distribution
+	$ cvs -d /flux/ANONCVS co ulsshxmlrpcpp
+	$ mkdir ulbuild
+	$ cd ulbuild
+	$ ../ulsshxmlrpcpp/configure
+	$ gmake dist
+
+  * Bump version number
+	Open configure.in and change the numbers passed to AC_INIT and
+	AM_INIT_AUTOMAKE.  Then rerun autogen.sh .
