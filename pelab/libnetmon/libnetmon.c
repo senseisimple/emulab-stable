@@ -247,7 +247,7 @@ void startFD(int fd, const struct sockaddr *localname,
     if (output_version == 2) {
         fprintf(outstream,"New: ");
         fprintID(outstream,fd);
-        printf("\n");
+        fprintf(outstream,"\n");
     }
 
     DEBUG(printf("Watching FD %i\n",fd));
