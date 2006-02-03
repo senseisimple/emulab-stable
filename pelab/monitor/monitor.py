@@ -51,13 +51,15 @@ def main_loop():
         if pos[0] == sys.stdin.fileno() and not done:
           # A line of data from tcpdump is available.
           try:
+#            sys.stdout.write('get_next_packet()\n')
             packet = get_next_packet()
           except EOFError:
-            sys.stdout.write('Done: Got EOF on stdin\n')
+#            sys.stdout.write('Done: Got EOF on stdin\n')
             done = 1
           if (packet):
             packet_list = packet_list + [packet]
         elif pos[0] == conn.fileno() and not done:
+          sys.stdout.write('receive_characteristic()\n')
           # A record for change in link characteristics is available.
           done = not receive_characteristic(conn)
         elif not done:
@@ -111,7 +113,7 @@ def get_next_packet():
   conexp = re.compile('^(New|Closed): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)')
   cmatch = conexp.match(line)
   if (match) :
-      localport = 0 # We man not get this one
+      localport = 0 # We may not get this one
       if (netmon_output_version == 1):
           time = float(match.group(1))
           ipaddr = match.group(2)
@@ -131,7 +133,7 @@ def get_next_packet():
       if not size_given:
           size = 0
       total_size = total_size + size
-      return (ipaddr, time, size)
+      return (ipaddr, localport, remoteport, time, size)
   elif ((netmon_output_version == 2) and cmatch):
       #
       # Watch for new or closed connections
@@ -140,27 +142,31 @@ def get_next_packet():
       localport = cmatch.group(2)
       ipaddr = cmatch.group(3)
       sys.stdout.write("Got a connection event: " + event + "\n")
+      return None
   else:
       sys.stdout.write('skipped line in the wrong format: ' + line)
       return None
     
 def receive_characteristic(conn):
-  buffer = conn.recv(12)
-  if len(buffer) == 12:
+  buffer = conn.recv(16)
+  if len(buffer) == 16:
     dest = real_to_emulated[int_to_ip(load_int(buffer[0:4]))]
-    command = load_int(buffer[4:8])
-    value = load_int(buffer[8:12])
-#    sys.stdout.write('received: ' + str(dest) + ' '
-#                     + str(command) + ' ' + str(value) + '\n')
+    source_port = load_short(buffer[4:6])
+    dest_port = load_short(buffer[6:8])
+    command = load_int(buffer[8:12])
+    value = load_int(buffer[12:16])
+#    sys.stdout.write('received: ' + str(dest) + ' ' + str(source_port) + ' '
+#                     + str(dest_port) + ' ' + str(command) + ' ' + str(value)
+#                     + '\n')
     if command == 1:
       # value is bandwidth in kbps
       set_bandwidth(value, dest)
     elif command == 2:
       # value is delay in milliseconds
       set_delay(value, dest)
-#    elif command == 3:
+    elif command == 3:
       # value is packet loss in packets per billion
-#      set_loss(value/1000000000.0, dest)
+      set_loss(value/1000000000.0, dest)
     return True
   elif len(buffer) == 0:
     return False
@@ -195,24 +201,38 @@ def send_destinations(conn, packet_list):
   output = save_int(0) + save_int(len(packet_list))
   prev_time = 0.0
   if len(packet_list) > 0:
-    prev_time = packet_list[0][1]
+    prev_time = packet_list[0][3]
   for packet in packet_list:
     ip = ip_to_int(emulated_to_real[packet[0]])
-    output = output + save_int(ip) + save_int(int((packet[1] - prev_time)
-                                                  * 1000)) + save_int(packet[2])
-    prev_time = packet[1]
+    output = (output + save_int(ip) + save_short(packet[1])
+              + save_short(packet[2])
+              + save_int(int((packet[3] - prev_time) * 1000))
+              + save_int(packet[4]))
+    prev_time = packet[3]
   conn.sendall(output)
 
 def load_int(str):
-  result = 0
-  for i in range(4):
-    result = result | ((ord(str[i]) & 0xff) << (8*(3-i)))
-  return result
+  return load_n(str, 4)
 
 def save_int(number):
+  return save_n(number, 4)
+
+def load_short(str):
+  return load_n(str, 2)
+
+def save_short(number):
+  return save_n(number, 2);
+
+def load_n(str, n):
+  result = 0
+  for i in range(n):
+    result = result | ((ord(str[i]) & 0xff) << (8*(n-1-i)))
+  return result
+
+def save_n(number, n):
   result = ''
-  for i in range(4):
-    result = result + chr((number >> ((3-i)*8)) & 0xff)
+  for i in range(n):
+    result = result + chr((number >> ((n-1-i)*8)) & 0xff)
   return result
 
 def ip_to_int(ip):

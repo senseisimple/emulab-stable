@@ -9,8 +9,9 @@
 #
 export NICKNAME=`cat /var/emulab/boot/nickname`;
 export HOSTNAME=`echo $NICKNAME | cut -d. -f1`;
-export PROJECT=`echo $NICKNAME | cut -d. -f2`;
-export EXPERIMENT=`echo $NICKNAME | cut -d. -f3`;
+export EXPERIMENT=`echo $NICKNAME | cut -d. -f2`;
+export PROJECT=`echo $NICKNAME | cut -d. -f3`;
+
 
 #
 # Important directories

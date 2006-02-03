@@ -108,12 +108,6 @@ void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
 
 // How many bytes have been acknowledged since the last call to
 // throughputTick()?
-unsigned int bytesThisTick(ThroughputAckState * state) {
-    return state->ackSize;
-}
-
-// What is the bandwidth of the acknowledged bytes since the last call to
-// throughputTick()?
 unsigned int throughputTick(ThroughputAckState * state)
 {
   double result = 0.0;
@@ -262,6 +256,8 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
   u_int caplen = pkthdr->caplen;
   u_short len, hlen, version, tcp_hlen, ack_bit;
   u_long  seq_start, seq_end, ack_seq, ip_src, ip_dst;
+  unsigned short source_port = 0;
+  unsigned short dest_port = 0;
   int path_id, record_id, msecs, end, flag_resend=0;
   sniff_path *path;
 
@@ -327,8 +323,14 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       seq_start = ntohl(tp->seq);      
       seq_end   = ((unsigned long)(seq_start+length));
       ack_bit= ((tp)->ack & 0x0001);
+      source_port = htons(tp->source);
+      dest_port = htons(tp->dest);
 
-      path_id = search_rcvdb(ip_dst);
+//      path_id = search_rcvdb(ip_dst);
+      // I contacted the receiver. Therefore, my port is unique and
+      // the receiver's port is fixed. The destination is the
+      // receiver, therefore my port is the one that is of interest.
+      path_id = find_by_stub_port(ip_dst, source_port);
       if (path_id != -1) { //a monitored outgoing packet
         //ignore the pure outgoing ack
         if ((ack_bit==1) && (seq_end==seq_start)) {
@@ -371,7 +373,12 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	}
    
       } else {
-	path_id = search_rcvdb(ip_src);
+//	path_id = search_rcvdb(ip_src);
+	// I contacted the receiver, so my port is unique and their
+	// port is the same every time. This means that if a packet is
+	// coming from them, the destination port is the one of
+	// interest.
+        path_id = find_by_stub_port(ip_src, dest_port);
 	if (path_id != -1) { //a monitored incoming packet
 	  if (ack_bit == 1) { //has an acknowledgement
 	    ack_seq  = ntohl(tp->ack_seq);

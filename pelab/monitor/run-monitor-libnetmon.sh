@@ -13,7 +13,7 @@ if [ $# != 1 ]; then
       echo "Usage: $0 <my-ip> [stub-ip]"
       exit 1;
     fi
-    SIP=$4
+    SIP=$2
 fi
 
 PID=$PROJECT
