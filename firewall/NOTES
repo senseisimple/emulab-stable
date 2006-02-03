@@ -164,49 +164,57 @@ C. All packets from the firewall itself destined for anywhere
   not filter packets more than once on the common bridge path.
 
 
-III. IPFW2 match pattern values:
+III. IPFW2 match pattern values and what they mean:
 
-To summarize some of the ipfw match patterns:
+To summarize some of the ipfw match patterns.  "From" is where the packet
+originates, either the "outside" network, "inside" network, or the
+"f(ire)wall" itself.  "To" is the destination, either unicast to the inside
+(Uin), outside (Uout), or either (Uany), or broadcast/multicast (BM) which
+both follow the same path.
     
-Flow			layer2	in/out	recv	xmit	via	handled by
+Check	From	To	layer2	in/out	recv	xmit	via	handled by
 
-A. outside->inside	true	in	em0	N/A	em0	bridge
+A1	outside	Uin,BM	true	in	em0	N/A	em0	bridge
+A2	outside	Ufw,BM	true	in	em0	N/A	em0	ether_in
+A3	outside	Ufw,BM	false	in	em0	N/A	em0	IP_in
 
-B. [ inside->outside 1	true	in	em0	N/A	em0	ether_in ]
-   inside->outside 2	true	in	vlan0	N/A	vlan0	bridge
+[ B1	inside	Uany,BM	true	in	em0	N/A	em0	ether_in ]
+B2	inside	Uout,BM	true	in	vlan0	N/A	vlan0	bridge
+B3	inside	Ufw,BM	true	in	vlan0	N/A	vlan0	ether_in
+B4	inside	Ufw,BM	false	in	vlan0	N/A	vlan0	IP_in
 
-C. outside->FW 1	true	in	em0	N/A	em0	ether_in
-   outside->FW 2	false	in	em0	N/A	em0	IP_in
+C1	fwall	Uin	false	out	N/A	em0	em0	IP_out
+C2	fwall	Uout	false	out	N/A	vlan0	vlan0	IP_out
 
-D. FW->outside 1	false	out	N/A	em0	em0	IP_out
-   FW->outside 2	true	out	N/A	em0	em0	bridge
-
-E. [ inside->FW 1	true	in	em0	N/A	em0	ether_in ]
-   inside->FW 2		true	in	vlan0	N/A	vlan0	ether_in
-   inside->FW 3		false	in	vlan0	N/A	vlan0	IP_in
-
-F. FW->inside 1		false	out	N/A	vlan0	vlan0	IP_out
-   FW->inside 2		true	out	N/A	vlan0	vlan0	ether_out
-
-Note that the first checks in B and E are not done if there is HW VLAN
-support in effect.
-
-
-IV. The algorithm
+Note that B1 is not done if there is hardware VLAN support.
 
 The first thing to do is to eliminate the difference between cases where
 there is HW VLAN support and where there isn't.  The only time the bridge
 or firewall sees encapsulated packets is the latter.  The bridge_vlan sysctl
 described above ensures that encapsulated packets are not seen by the bridge,
-and we introduce a simple firewall rule checking "mac-type vlan" and accepting
-immediately to get them past the firewall code.  That effectively eliminates
-the first checks of B and E above.
+and we can introduce a simple firewall rule checking "mac-type vlan" and
+accepting immediately to get them past the firewall code.  That would
+effectively eliminate B1 above, making inside/outside rules more symmetric.
 
-Another way to do this would be to disable (rather, not enable)
-net.link.ether.ipfw, which would disable all "ether_in" and "ether_out"
-checks above.
+Another way to do this, the one we currently use, is to disable (rather,
+not enable) net.link.ether.ipfw, which disables not only B1 but also A2
+and B3, the checks done in ether_demux.  The consequences of disabling
+the latter two is that we can no longer filter non-IP packets destined
+to the firewall.  IP packets for the firewall could still be filtered at
+A3 and B4.  This technique has the nice side-effect that true bridged
+packets will always be "bridged" (aka "layer2") while packets for the
+firewall will be "not bridged" in the firewall rules.  At least for
+unicast--broadcast and multicast might screw things up as they appear
+on both paths.  However, the local and bridged firewall rules will see
+different copies of these packets, so they can be treated separately.
+The fact that we lose the ability to filter out layer2-only broadcast
+and multicast, in particular ARP, may be bad.  In particular, it leaves
+firewall subject to ARP spoofing attacks from inside.  But more on that
+in a minute.
 
-We can tell whether incoming packets are from the inside or outside with:
+First lets look at the information available from the table above and
+what that means to firewall rules.  We can tell whether incoming packets
+are from the inside or outside with:
 
 "in via vlan0"
 	Means coming from the inside network.
@@ -214,38 +222,79 @@ We can tell whether incoming packets are from the inside or outside with:
 "in not via vlan0"
 	Means coming from the outside network.  Same as "in via em0" in
 	this case, but we don't always know the name of the physical
-	interface.
+	interface, so we stick with the contorted negation.
 
-We can differentiate unicast packets for the firewall from those that
-are to be bridged with:
+Because of non-setting of ether.ipfw to disable ether_demux checks for
+local packets we know that:
+
+"layer2 ... in via vlan0"
+	Means heading from inside to outside.
+
+"layer2 ... in not via vlan0"
+	Means heading from outside to inside.
+
+As the only packets matching "out" are locally generated, we know that
+IP packets from the firewall are:
+
+"from me to any out via vlan0"
+	Means to the inside network.
+
+"from me to any out not via vlan0"
+	Means to the outside network.  We don't really need the "from me"
+	in either, but it clarifies the rule.  But we may drop it for
+	performance reasons.
+
+and this is true for IP unicast, broadcast or multicast.  However, as
+mentioned, we cannot filter outgoing, non-IP packets (e.g., ARP).
+We can identify incoming IP packets for the firewall with:
 
 "from any to me in via vlan0"
-	To firewall from inside
+	Means to the firewall from inside.
 
 "from any to me in not via vlan0"
-	To firewall from outside.
+	Means to firewall from outside.  If we have already diverted off
+	the "layer2" packets with a "skipto" rule, then we don't need the
+	"to me" part.
 
-Unfortunately, we cannot differentiate broadcast, multicast or non-IP packets
-in this way as "me" means "one of my IP addresses".  There are three places
-where this matters: ARP (non-IP broadcast), DHCP (IP broadcast) and
-frisbee (IP multicast).  For the latter two, we know src IP addresses,
-or multicast IP ranges or port numbers that we can use to narrow things
-down.  Being a layer2 protocol, ARP is more difficult.  But for all, there
-are two classes of attacks to worry about: DoS attacks on shared servers
-and spoofing of servers.
+Again, recall that we will not see non-IP packets coming in or leaving
+the firewall.  If the ether_demux checks were enabled, we would be able
+to see incoming packets (A2,B3), but would not be able to distinguish
+bridged from local packets, and if we wanted to, say, disallow ethernet
+broadcast packets across the bridge, that would also disable IP broadcast
+traffic for the firewall (which appear as broadcast packets at layer2).
+
+
+IV. The problems of a bridging firewall.
+
+Note that the use of IPFW2 at layer2 doesn't present any problem for the
+bulk of IP traffic.  Any rules that can be applied at layer3, can also
+be done at layer2 (e.g., matching IP types, TCP flags, etc.)  But being
+a bridge implies other things, in particular forwarding non-IP traffic
+and layer2 broadcast.
+
+We really do want to be a routing firewall, in that we don't want to allow
+non-IP traffic through to the infrastructure where it has no business
+(at least currently, there has been talk of using a non-IP protocol on the
+control net to help reduce its accidental misuse).  And we would largely
+like to avoid letting IP broadcast and unrestrained IP multicast through
+as well, since that is traffic that could affect other experiments and the
+Emulab infrastructure.  So why don't we use a routing firewall
+implementation?  Largely this has to do with IP naming, and is the topic
+for another NOTES file, not this one.  But there is some exceptional
+traffic as well.
+
+So who are the non-unicast Bad Boys we care about?  ARP (non-IP broadcast),
+DHCP (IP broadcast), and frisbee (IP multicast).  For the latter two,
+we know src IP addresses, or multicast IP ranges or port numbers that we
+can use to narrow things down.  Being a layer2 protocol, ARP is more
+difficult.  But for all, there are two classes of attacks to worry about:
+DoS attacks on shared servers (and other experiments) and spoofing of servers.
 
 DoS attacks can happen with any protocol we allow through the firewall:
 ARP, DHCP, TFTP, DNS, HTTP, etc.  The solution to these involves non-shared
-infrastructure
-
-For non-IP packets, there is an issue with ARP discussed below.  For IP
-broadcast, we can safely just block it all, there is no need to allow it
-for either the firewall or the outside world.  For multicast, we need to
-allow frisbee (disk loader) traffic which requires broadcast requests from
-the nodes and broadcast responses from boss or whoever the image server is.
-The real problem is the outgoing
-traffic, both because the allowed address range is big and because it would
-allow the inside to DoS the image server.
+infrastructure (aka, Emulab in Emulab) to address completely, and I am
+willing to punt on those here.  But any of ARP, DHCP or frisbee have
+potential for spoofing problems.  We'll look at these in turn.
 
 
 V. The problem with ARP
@@ -257,25 +306,68 @@ in order to talk to Emulab or the outside.  Likewise, the router may
 need to locate the nodes.  And the firewall itself needs to find the
 router and be found by it.
 
-The best solution is to allow ARP requests for the gateway from the inside
+One solution is to allow through ARP requests for the gateway from the inside
 (and from us) and ARP replies from the gateway to the inside (and to us).
 However, we cannot lock it down quite that tight as we cannot look inside
-ARP packets to extract protocol or hardware addresses.  So we would have to
-allow broadcast ARP packets (aka "requests for router") from the inside,
-unicast ARP packets from the router (aka "replies from router"), and
-broadcast ARP packets from the router (aka "requests from router").  But
-this would allow nodes on the inside to randomly broadcast "replies" for
-other machines it knows are on the outside control network.  While they
-would not be able to hijack the traffic for such nodes (we disallow IP
-traffic from outside control net to inside), they could DoS them.
+ARP packets to extract protocol or hardware addresses.  So, with the current
+IPFW2, we would have to allow broadcast ARP packets (aka "requests for
+router") from the inside, unicast ARP packets from the router (aka "replies
+from router"), and broadcast ARP packets from the router (aka "requests
+from router").  But this would allow nodes on the inside to randomly
+broadcast "replies" for other machines it knows are on the outside control
+network.  While they would not be able to hijack the traffic for such nodes
+(we disallow IP traffic from outside control net to inside), they could DoS
+them.
 
-So, instead we will proxy for both both sides.  Nodes finding the router
-is handled by having the firewall publish an ARP entry for it (note that
-this is not "proxy ARP" in the traditional sense, we are publishing
-the router's real MAC, not our MAC).  This locked-down ARP entry takes
-care of the firewall finding the router as well.  Likewise we publish
-entries for all the nodes behind the firewall so that we can respond
-on their behalf to the router.
+Our solution is to block all ARP traffic through the bridge, and instead
+have the firewall act as a proxy for both both sides.  Nodes finding the
+router is handled by having the firewall publish an ARP entry for it (note
+that this is not "proxy ARP" in the traditional sense, we are publishing
+the router's real MAC, not our MAC).  This locked-down ARP entry takes care
+of the firewall finding the router as well.  Likewise we publish entries
+for all the nodes behind the firewall so that we can respond on their behalf
+to the router.
 
-VI. The problem with frisbee traffic
+But all is not well in the Land of Proxy ARP.  There is a minor problem,
+in that we would proxy for the router not only on the inside, but on the
+outside as well (this is a consequence of the way proxy arp is implemented
+and the particular way in which we setup the bridge).  So whenever anyone
+on the shared control net asked for the router, the router, us, and every
+other per-experiment firewall, would respond.  This is probably just
+annoying, and not fatal.  However, the same thing happens on the inside:
+any inside node ARPing for another inside node, would get a response from
+the firewall as well as from the real node.  At first glance this is harmless
+as well, but if the experiment inside is TRYING to do ARP spoofing, we would
+interfere with that.
+
+So, in the spirit of "anything can be fixed in the kernel", I have introduced
+an Egregious Kernel Hack to constrain ARPs in our situation.  The arp command
+has been modified to allow specifying an explicit interface with which the
+entry should be associated.  Then, if the net.link.ether.inet.proxyongwonly
+MIB is set and we are dealing with a proxy ARP entry, we will only reply
+if the request came in the interface associated with the ARP entry. 
+
+
+VI. The problem with DHCP traffic
+
+While we know the ports involved with DHCP, 67 and 68, requests and even
+replies can be broadcast.  The best we can do at the moment is to say that
+only requests can come from the inside, and only replies from the outside.
+So only someone outside of a firewall could spoof another experiment inside
+a firewall.  This is acceptible in our current threat model.
+
+VII. The problem with frisbee traffic
+
+There are two problems here.  One is that frisbee itself is vulnerable to
+snooping and spoofing, but that will be addressed with authentication and
+encryption in frisbee itself.  The other problem is that the range of MC
+address and ports used is quite wide, and leaves a pretty big hole in the
+firewall.  Once authentication and encryption are in place, we will be able
+to close this down.
+
+VIII. Other issues
+
+Note that there are issues with other services allowed through as well.
+In particular, NFS is the elephant in the middle of the room that we keep
+ignoring.
 
