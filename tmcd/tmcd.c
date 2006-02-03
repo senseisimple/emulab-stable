@@ -22,6 +22,7 @@
 #include <sys/fcntl.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
+#include <sys/param.h>
 #include <paths.h>
 #include <setjmp.h>
 #include <pwd.h>
@@ -51,6 +52,7 @@
 #define USERDIR		"/users"
 #define NETBEDDIR	"/netbed"
 #define SHAREDIR	"/share"
+#define PLISALIVELOGDIR "/usr/testbed/log/plabisalive"
 #define RELOADPID	"emulab-ops"
 #define RELOADEID	"reloading"
 #define FSHOSTID	"/usr/testbed/etc/fshostid"
@@ -5021,6 +5023,9 @@ COMMAND_PROTOTYPE(dorusage)
 {
 	char		buf[MYBUFSIZE];
 	float		la1, la5, la15, dused;
+        int             plfd;
+        struct timeval  now;
+        char            pllogfname[MAXPATHLEN];
 
 	if (sscanf(rdata, "LA1=%f LA5=%f LA15=%f DUSED=%f",
 		   &la1, &la5, &la15, &dused) != 4) {
@@ -5062,6 +5067,21 @@ COMMAND_PROTOTYPE(dorusage)
 	 */
 	OUTPUT(buf, sizeof(buf), "UPDATE=%d\n", reqp->update_accounts);
 	client_writeback(sock, buf, strlen(buf), tcp);
+
+        /* We're going to store plab up/down data in a file for a while. */
+        gettimeofday(&now, NULL);
+        snprintf(pllogfname, sizeof(pllogfname), 
+                 "%s/%s-isalive", PLISALIVELOGDIR, reqp->pnodeid);
+        snprintf(buf, sizeof(buf), "%ld %ld\n", 
+                 now.tv_sec, now.tv_usec);
+        plfd = open(pllogfname, O_WRONLY|O_APPEND|O_CREAT, 
+                  S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+        if (plfd < 0) {
+            errorc("Can't open log: %s", pllogfname);
+        } else {
+            write(plfd, buf, strlen(buf));
+            close(plfd);
+        }
 
 	return 0;
 }
