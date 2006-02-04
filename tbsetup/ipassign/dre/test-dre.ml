@@ -15,7 +15,7 @@ let argspec =
   ];;
 
 let rec compute_all_hops (g : ('a, 'b) Graph.t) =
-    let hops = Array.make_matrix (Graph.count_nodes g) (Graph.count_nodes g) Dijkstra.NoHop in
+    let hops = Array.make_matrix (Graph.count_nodes g) (Graph.count_nodes g) (-1) in
     let fill_array (base : unit) (node : (int, 'a) Graph.node) : unit =
         let node_id = node.Graph.node_contents in
         match (Dijkstra.run_dijkstra g node) with (_,pred) ->
@@ -31,7 +31,7 @@ Arg.parse argspec (fun x -> edgefile := Some x) "";;
 let edgestr = match !edgefile with
                 None -> raise (Failure "Need an arg")
               | Some(x) -> x in       
-let g = Graph.read_graph_file edgestr in 
+let g = Graph.read_subgraph_file edgestr in 
 let hops = compute_all_hops g in
 match !src with 
   Some(x) -> begin

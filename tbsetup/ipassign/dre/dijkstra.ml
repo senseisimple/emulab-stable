@@ -80,13 +80,16 @@ let run_dijkstra (graph : ('a, 'b) Graph.t) (node : ('a, 'b) Graph.node)
 ;;
 
 type ('a,'b) internal_first_hop = INoHop | INoHopYet | INodeHop of ('a,'b) Graph.node;;
-type ('a,'b) first_hop = NoHop | NodeHop of ('a,'b) Graph.node;;
-let string_of_fh (fh : (int, 'b) first_hop) : string =
+(* type ('a,'b) first_hop = NoHop | NodeHop of ('a,'b) Graph.node;; *)
+let string_of_fh (fh : int) : string =
+    (*
     match fh with
       NoHop -> "NoHop"
-    | NodeHop(n) -> string_of_int n.Graph.node_contents
+    | NodeHop(n) -> string_of_int n.Graph.node_contents*)
+    string_of_int fh
 ;;
 (* XXX - there has got to be a better way to do this, I'm sure *)
+(*
 let fh_equal (a : ('a, 'b) first_hop) (b : ('a, 'b) first_hop) : bool =
     match a with
       NoHop ->
@@ -96,13 +99,14 @@ let fh_equal (a : ('a, 'b) first_hop) (b : ('a, 'b) first_hop) : bool =
                NoHop -> false
              | NodeHop(y) -> x.Graph.node_contents == y.Graph.node_contents)
 ;;
+*)
 
 exception HopInternalError;;
 let get_first_hops (graph : ('a, 'b) Graph.t)
                    (pred : ('a, 'b) Graph.node array)
-                   (root : ('a, 'b) Graph.node) : ('a, 'b) first_hop array =
+                   (root : ('a, 'b) Graph.node) : 'a array =
     let hops = Array.make (Array.length pred) INoHopYet in
-    let out_hops = Array.make (Array.length pred) NoHop in
+    let out_hops = Array.make (Array.length pred) (-1) in
     hops.(root.Graph.node_contents) <- INoHop;
     let rec hop_helper (node : ('a, 'b) Graph.node) : ('a, 'b) internal_first_hop =
         match hops.(node.Graph.node_contents) with
@@ -124,8 +128,8 @@ let get_first_hops (graph : ('a, 'b) Graph.t)
         if i >= Array.length hops then () else
             begin
                 (match hops.(i) with
-                  INoHop -> out_hops.(i) <- NodeHop(Graph.find_node graph i) (* NoHop *)
-                | INodeHop(h) -> out_hops.(i) <- NodeHop(h)
+                  INoHop -> out_hops.(i) <- i
+                | INodeHop(h) -> out_hops.(i) <- h.Graph.node_contents
                 | INoHopYet -> raise HopInternalError);
                 copy_hops (i+1)
             end
@@ -136,8 +140,8 @@ let get_first_hops (graph : ('a, 'b) Graph.t)
     out_hops
 ;;
 
-let rec get_all_first_hops (g : ('a, 'b) Graph.t) =
-    let hops = Array.make_matrix (Graph.count_nodes g) (Graph.count_nodes g) NoHop in
+let rec get_all_first_hops (g : ('a, 'b) Graph.t) : 'a array array =
+    let hops = Array.make_matrix (Graph.count_nodes g) (Graph.count_nodes g) (-1) in
     let fill_array (base : unit) (node : (int, 'a) Graph.node) : unit =
         let node_id = node.Graph.node_contents in
         match (run_dijkstra g node) with (_,pred) ->
@@ -162,20 +166,43 @@ let get_all_first_hops (graph : ('a, 'b) Graph.t)
     all_hops
 ;;
 *)
-let score_ordering_transitions (hops : ('a,'b) first_hop array array)
+let score_ordering_transitions (hops : 'a array array)
         (ordering : int array) : float =
     let size = Array.length hops in
     let score = ref 0.0 in
     for i = 0 to (size - 1) do
-        let current_color = ref NoHop in
+        let current_color = ref (-1) in
         for j = 0 to (size - 1) do
             let a = ordering.(i) in
             let b = ordering.(j) in
-            if not (fh_equal !current_color hops.(a).(b)) then begin
+            if not (!current_color = hops.(a).(b)) then begin
                 score := !score +. 1.0;
                 current_color := hops.(a).(b)
             end
         done
     done; 
     !score
+;;
+
+(* Read in one of Jon's first hop files *)
+let read_fh_file (filename : string) (size : int) : int array array =
+    let hops = Array.make_matrix size size ~-1 in
+    let channel = open_in filename in
+    let rec get_hops (row : int) : unit =
+        try
+            let line = input_line channel in
+            let parts = Str.split (Str.regexp " +") line in
+            let rec fill_columns (col : int) (l : 'a list) =
+                match l with
+                  [] -> if col < size then raise (Failure "col not long enough")
+                | x :: xs -> (hops.(row).(col) <- (int_of_string x); fill_columns (col + 1) xs)
+            in
+            fill_columns 0 parts;
+            get_hops (row + 1)
+        with
+            End_of_file -> if row < size then raise (Failure "not enough rows")
+    in
+    get_hops 0;
+    (* Array.iter (fun x  -> Array.iter (fun y -> print_endline (string_of_int y)) x) hops; *)
+    hops
 ;;

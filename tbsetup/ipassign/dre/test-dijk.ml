@@ -19,12 +19,14 @@ let rec print_pred (channel : out_channel) (preds : (int, 'b) Graph.node array)
         print_pred channel preds (index + 1))
 ;;
 
-let rec print_fhop (channel : out_channel) (fhops : (int, 'a) Dijkstra.first_hop array)
+let rec print_fhop (channel : out_channel) (fhops : int array)
                    (index : int) : unit =
     if index >= Array.length fhops then ()
-    else (output_string channel (string_of_int index ^ ": " ^ (match fhops.(index) with
+    else (output_string channel (string_of_int index ^ ": " ^ (string_of_int fhops.(index)));
+    (* (match fhops.(index) with
       Dijkstra.NoHop -> "X"
     | Dijkstra.NodeHop(x) -> (string_of_int x.Graph.node_contents)) ^ "\n");
+    *)
     print_fhop channel fhops (index + 1))
 ;;
 

@@ -1,17 +1,11 @@
 (*
  * heap.ml - simple heap module
  *)
-
-(*
- * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
- * All rights reserved.
- *)
-
 (* Types used by this module *)
 type location = int;;
 type weight = int;;
 type weight_update_function = weight -> unit;;
+type 'a heap_remove_function = 'a -> unit;;
 let inf_weight = 32000;;
 
 type 'a heap_data = { mutable key : weight;
@@ -36,8 +30,11 @@ let left (i : int) : int =
 let right (i : int) : int =
     (i * 2) + 2;;
 
+exception EmptyHeap
+exception BadIndex
 let rec heapify_up (heap : 'a heap) (data : 'a heap_data) (i : location)
         : unit =
+    if i >= heap.len then raise BadIndex;
     if i <= 0 || heap.arr.(parent i).key <= data.key then
         (heap.arr.(i) <- data;
         heap.arr.(i).loc <- i)
@@ -67,6 +64,21 @@ let rec heapify (heap : 'a heap) (i : location) : unit =
     else
         ();;
 
+let extract (heap : 'a heap) (index : int) : unit =
+    if index < 0 then raise BadIndex else
+    if index >= heap.len then raise BadIndex else
+    if heap.len < 1 then raise EmptyHeap else
+        heap.len <- heap.len - 1;
+        if index != heap.len then begin
+        heap.arr.(index) <- heap.arr.(heap.len);
+        heap.arr.(index).loc <- index;
+        heapify heap index end;;
+
+let extract_element (heap : 'a heap) (data : 'a heap_data) (x : 'b) : unit =
+    (* print_endline ("Extracting element at " ^ (string_of_int data.loc)); *)
+    extract heap data.loc
+;;
+
 let update_weight (heap : 'a heap) (data : 'a heap_data) (weight : weight)
         : unit =
     data.key <- weight;
@@ -91,14 +103,35 @@ let insert (heap : 'a heap) (key : weight) (value : 'a)
     let newdata = insert_obj heap key value in
     fun w -> update_weight heap newdata w;;
 
-exception EmptyHeap
+let insert_remove (heap : 'a heap) (key : int) (value : 'a)
+        : ('b -> unit)  =
+    (* Copy array to grow it if necessary *)
+    let newdata = insert_obj heap key value in
+    fun x -> extract_element heap newdata x;;
+
 let extract_min (heap : 'a heap) : unit =
-    if heap.len < 1 then raise EmptyHeap else
-        heap.len <- heap.len - 1;
-        heap.arr.(0) <- heap.arr.(heap.len);
-        heapify heap 0;;
+    extract heap 0;;
 
 let min (heap : 'a heap) : (weight * 'a) =
     if heap.len = 0 then raise EmptyHeap else
         let record = Array.get heap.arr 0 in
         (record.key, record.value);;
+
+let iter (heap : ' heap) (visitor : ('a -> unit)) : unit =
+    let rec heap_iter (i : int) : unit =
+        if i >= heap.len then ()
+        else (visitor (Array.get heap.arr i).value; heap_iter (i + 1))
+    in
+    heap_iter 0
+;;
+
+let iterw (heap : ' heap) (visitor : (int -> 'a -> unit)) : unit =
+    let rec heap_iter (i : int) : unit =
+        if i >= heap.len then ()
+        else (visitor (Array.get heap.arr i).key (Array.get heap.arr i).value; heap_iter (i + 1))
+    in
+    heap_iter 0
+;;
+
+let size (heap : 'a heap) : int =
+    heap.len;;
