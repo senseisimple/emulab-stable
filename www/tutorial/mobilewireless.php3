@@ -236,11 +236,12 @@ This manual is broken up into the following sections:
 
 <p>
 If you are interested in how the mobile testbed works, you can read the
-following tech report:
+following paper (to appear at <a href="http://www.ieee-infocom.org/2006/">IEEE
+Infocom</a>, April 2006):
 
 <blockquote>
-<a href="http://www.cs.utah.edu/flux/papers/truemobile-ftn2005-02.pdf">A Mobile
-Robotic Wireless and Sensor Network Testbed</a>
+<a href="http://www.cs.utah.edu/flux/papers/robots-infocom06-base.html">
+Mobile Emulab: A Robotic Wireless and Sensor Network Testbed</a> 
 </blockquote>
 
 <p>
