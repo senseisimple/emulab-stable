@@ -272,7 +272,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 	my $test   =  qq[getmac /v /fo csv | awk -F, '/^"$iface"/{print \$4}'];
 	$uplines   .= qq{if [ \`$test\` = '"Disconnected"' ]; then\n    };
 	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
-	$uplines   .= qq{  sleep 2\n    };
+	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .= qq{fi\n    };
 	#
 	# Configure.
@@ -286,9 +286,9 @@ sub os_ifconfig_line($$$$$$$;$$)
 	# Re-do it if not.
 	$uplines   .= qq{  echo "    Config failed on $iface, retrying."\n    };
 	$uplines   .=   "  $DEVCON disable '$dev_map{$iface}'\n    ";
-	$uplines   .= qq{  sleep 2\n    };
+	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
-	$uplines   .= qq{  sleep 2\n    };
+	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask) . qq{\n    };
 	#
 	# Re-check.
@@ -604,9 +604,11 @@ sub os_routing_add_manual($$$$$;$)
     #     the IP Address Table for the machine.
     # Re-doing the command later succeeds.
     # Wrap the route command in a loop to make sure it gets done.
-    $cmd = "while ! ( $ROUTE print | grep -Fq $destip ); do \n
+    # Don't loop forever.
+    $cmd = "n=1; while ! ( $ROUTE print | grep -Fq $destip ); do \n
                 echo $cmd;\n
                 $cmd\n
+                let n++; if [[ \$n > 5 ]]; then break; fi
                 sleep 5\n
             done";
 
