@@ -1797,6 +1797,7 @@ COMMAND_PROTOTYPE(doaccounts)
 				}
 				auxgids[gcount++] = newgid;
 			skipit:
+				;
 			}
 			nrows--;
 
@@ -4105,12 +4106,12 @@ int myevent_send(address_tuple_t tuple) {
 	}
 
 	notification = event_notification_alloc(event_handle,tuple);
-	if (notification == NULL) {
+	if (notification == (event_notification_t) NULL) {
 		error("myevent_send: Unable to allocate notification!");
 		return 1;
 	}
 
-	if (event_notify(event_handle, notification) == NULL) {
+	if (! event_notify(event_handle, notification)) {
 		event_notification_free(event_handle, notification);
 
 		error("myevent_send: Unable to send notification!");
