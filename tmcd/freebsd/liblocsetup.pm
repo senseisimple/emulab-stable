@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -527,6 +527,21 @@ sub os_fwconfig_line($@)
     my $logreject = defined($fwinfo->{LOGREJECT}) ? $fwinfo->{LOGREJECT} : 0;
 
     #
+    # Convert MAC info to a useable form and filter out the firewall itself
+    #
+    my $href = $fwinfo->{MACS};
+    while (my ($node,$mac) = each(%$href)) {
+	if ($mac eq $fwinfo->{OUT_IF}) {
+	    delete($$href{$node});
+	} elsif ($mac =~ /^(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})(\w{2})$/) {
+	    $$href{$node} = "$1:$2:$3:$4:$5:$6";
+	} else {
+	    warn "*** WARNING: Bad MAC returned for $node in fwinfo: $mac\n";
+	    return ("false", "false");
+	}
+    }
+
+    #
     # VLAN enforced layer2 firewall with FreeBSD/IPFW2
     #
     if ($fwinfo->{TYPE} eq "ipfw2-vlan") {
@@ -546,11 +561,31 @@ sub os_fwconfig_line($@)
 	$upline .= "    fi\n";
 	$upline .= "    sysctl net.link.ether.bridge_vlan=0\n";
 	$upline .= "    sysctl net.link.ether.bridge_ipfw=1\n";
+	$upline .= "    sysctl net.link.ether.ipfw=0\n";
 	$upline .= "    sysctl net.link.ether.bridge_cfg=$vlandev,$pdev\n";
 	$upline .= "    if [ -z \"`sysctl net.inet.ip.fw.enable 2>/dev/null`\" ]; then\n";
 	$upline .= "        kldload ipfw.ko >/dev/null 2>&1\n";
 	$upline .= "    fi\n";
 
+	#
+	# Setup proxy ARP entries
+	#
+	if (defined($fwinfo->{MACS})) {
+	    $upline .= "    sysctl net.link.ether.inet.proxygwonly=1\n";
+
+	    # XXX must have an IP on the vlan dev for the arp to work
+	    $upline .= "    ifconfig $vlandev inet 10.0.0.1 netmask 255.255.255.255\n";
+
+	    # provide GW MAC to inside
+	    $upline .= "    arp -i $vlandev -s " .
+		$fwinfo->{GWIP} . " " . $fwinfo->{GWMAC} . " pub only\n";
+
+	    # provide node MACs to outside
+	    my $href = $fwinfo->{MACS};
+	    while (my ($node,$mac) = each %$href) {
+		$upline .= "    arp -i $pdev -s $node $mac pub only\n";
+	    }
+	}
 	foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
 	    my $rulestr = $rule->{RULE};
 	    if ($logaccept && $rulestr =~ /^(allow|accept|pass|permit)\s.*/) {
@@ -579,6 +614,15 @@ sub os_fwconfig_line($@)
 	$downline .= "    sysctl net.link.ether.bridge_cfg=\"\"\n";
 	$downline .= "    sysctl net.link.ether.bridge_ipfw=0\n";
 	$downline .= "    sysctl net.link.ether.bridge_vlan=1\n";
+	if (defined($fwinfo->{MACS})) {
+	    $downline .= "    arp -i $vlandev -d " . $fwinfo->{GWIP} . " pub\n";
+
+	    my $href = $fwinfo->{MACS};
+	    while (my ($node,$mac) = each %$href) {
+		$downline .= "    arp -i $pdev -d $node pub\n";
+	    }
+	    $downline .= "    sysctl net.link.ether.inet.proxygwonly=0\n";
+	}
 	$downline .= "    ifconfig $vlandev destroy";
 
 	return ($upline, $downline);

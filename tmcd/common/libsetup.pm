@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # TODO: Signal handlers for protecting db files.
@@ -47,7 +47,7 @@ use libtmcc;
 #
 # BE SURE TO BUMP THIS AS INCOMPATIBILE CHANGES TO TMCD ARE MADE!
 #
-sub TMCD_VERSION()	{ 25; };
+sub TMCD_VERSION()	{ 26; };
 libtmcc::configtmcc("version", TMCD_VERSION());
 
 # Control tmcc timeout.
@@ -1044,6 +1044,7 @@ sub getfwconfig($$;$)
     my $fwinfo      = {};
     my @fwrules     = ();
     my @fwhosts	    = ();
+    my %fwhostmacs  = ();
 
     $$infoptr = undef;
     @$rptr = ();
@@ -1052,11 +1053,11 @@ sub getfwconfig($$;$)
 	return -1;
     }
 
-    my $rempat = q(TYPE=remote FWIP=([0-9\.]*));
+    my $rempat = q(TYPE=remote FWIP=([\d\.]*));
     my $fwpat  = q(TYPE=([-\w]+) STYLE=(\w+) IN_IF=(\w*) OUT_IF=(\w*) IN_VLAN=(\d+) OUT_VLAN=(\d+));
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
     my $vpat   = q(VAR=(EMULAB_\w+) VALUE="(.*)");
-    my $hpat   = q(HOST=([-\w]+) CNETIP=([0-9\.]*));
+    my $hpat   = q(HOST=([-\w]+) CNETIP=([\d\.]*) CNETMAC=([\da-f]{12}));
 
     $fwinfo->{"TYPE"} = "none";
     foreach my $line (@tmccresults) {
@@ -1103,13 +1104,36 @@ sub getfwconfig($$;$)
 	} elsif ($line =~ /$vpat/) {
 	    $fwvars{$1} = $2;
 	} elsif ($line =~ /$hpat/) {
+	    my $host = $1;
+	    my $ip = $2;
+	    my $mac = $3;
+
 	    # create a tmcc hostlist format string
 	    push(@fwhosts,
-		 "NAME=$1 IP=$2 ALIASES=''");
+		 "NAME=$host IP=$ip ALIASES=''");
+
+	    # and save off the MACs
+	    $fwhostmacs{$host} = $mac;
 	} else {
 	    warn("*** WARNING: Bad firewall info line: $line\n");
 	    return 1;
 	}
+    }
+
+    # XXX inner elab: make sure we have a "myfs" entry
+    if (defined($fwhostmacs{"myboss"}) && !defined($fwhostmacs{"myfs"})) {
+	for my $host (@fwhosts) {
+	    if ($host =~ /NAME=myops/) {
+		$host =~ s/ALIASES=''/ALIASES='myfs'/;
+	    }
+	}
+    }
+
+    # info for proxy ARP
+    $fwinfo->{"GWIP"} = $fwvars{"EMULAB_GWIP"};
+    $fwinfo->{"GWMAC"} = $fwvars{"EMULAB_GWMAC"};
+    if (%fwhostmacs) {
+	$fwinfo->{"MACS"} = \%fwhostmacs;
     }
 
     # make a pass over the rules, expanding variables
