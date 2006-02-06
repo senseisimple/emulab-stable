@@ -426,7 +426,8 @@ if ($showlinks) {
 	    printf "%-15s %-15s %-15s %-20s %-9s\n", $vname,
 		   $member, $ipmap{$member}, $mac, $pnode;
 
-	    if (exists($portmap{$member})) {
+	    if (exists($portmap{$member}) &&
+		defined($portmap{$member}->{"SWITCH"})) {
 		my $node_card   = $portmap{$member}->{"NODECARD"};
 		my $node_port   = $portmap{$member}->{"NODEPORT"};
 		my $switch      = $portmap{$member}->{"SWITCH"};
@@ -825,7 +826,7 @@ if ($showdelays && $state eq EXPTSTATE_ACTIVE) {
 
 	    printf("%-15s %-15s %-12s %-9s %-9s %-9s\n", $vname, $vnode,
 		   $dname,
-		   "$node_card/$node_port", $switch,
+		   "$node_card/$node_port $iface", $switch,
 		   "$switch_card/$switch_port");
 	}
 	print "\n";
