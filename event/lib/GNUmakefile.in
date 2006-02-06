@@ -25,6 +25,9 @@ all:		$(PROGRAMS)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
+# We need to know what version of perl for headers below; use silly script.
+PERLVERS	:= $(shell $(SRCDIR)/perlvers.pl)
+
 #CFLAGS += -DDEBUG
 CFLAGS += -O2 -g -static -I. -Wall
 SCFLAGS = $(CFLAGS) `$(ELVIN_CONFIG) --cflags vin4c`
@@ -40,11 +43,11 @@ PYCORE = -I@PYTHON_INCLUDE@
 else
 FBSDVERSION    := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
 ifeq ($(FBSDVERSION),FreeBSD5)
-PCORE  = -I/usr/local/lib/perl5/5.6.1/mach/CORE
+PCORE  = -I/usr/local/lib/perl5/$(PERLVERS)/mach/CORE
 else
 PCORE  = -I/usr/libdata/perl/5.00503/mach/CORE
-PYCORE = -I@PYTHON_INCLUDE@
 endif
+PYCORE = -I@PYTHON_INCLUDE@
 endif
 
 # PERL_POLLUTE gets us sv_undef on newer versions of perl
