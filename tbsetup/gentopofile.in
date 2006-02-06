@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -252,9 +252,17 @@ foreach my $lan (keys(%virt_lans)) {
 #
 # Generate the linktest config for the routing type.
 #
+# XXX Linktest only supports one type of routing per-experiment at the moment,
+# not per-node.  We also have to prune out the firewall since it always has
+# routertype == "none".
+#
 $query_result =
-    DBQueryFatal("select distinct routertype from virt_nodes ".
-		 "where pid='$pid' and eid='$eid'");
+    DBQueryFatal("select vn.routertype from virt_nodes as vn ".
+		 "left join virt_firewalls as vf on (vf.pid=vn.pid and ".
+		 "  vf.eid=vn.eid and vf.fwname=vn.vname) ".
+		 "where vn.pid='$pid' and vn.eid='$eid' ".
+		 "  and vf.fwname is null ".
+		 "group by routertype");
 
 while (my ($rt) = $query_result->fetchrow_array) {
     print $LTOUT "r $rt\n";
