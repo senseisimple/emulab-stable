@@ -12,9 +12,10 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ../..
 SUBDIR		= tbsetup/nsverify
 
-NS_VERSION=2.27
-TCLCL_VERSION=1.15
-NS_SRC_TARBALL=ns-allinone-$(NS_VERSION).tar.gz
+NS_VERSION=2.29
+NS_TAR_VERSION=2.29.2
+TCLCL_VERSION=1.17
+NS_SRC_TARBALL=ns-allinone-$(NS_TAR_VERSION).tar.gz
 
 include $(OBJDIR)/Makeconf
 
@@ -46,7 +47,7 @@ ns-allinone-$(NS_VERSION):
 	else \
 		echo "Downloading $(NS_SRC_TARBALL)"; \
 		wget --quiet \
-		  http://www.emulab.net/downloads/ns-allinone-2.27.tar.gz; \
+		  http://www.emulab.net/downloads/ns-allinone-$(NS_TAR_VERSION).tar.gz; \
 		echo "Unpacking $(NS_SRC_TARBALL)"; \
 		tar xfz $(NS_SRC_TARBALL); \
 	fi
@@ -54,6 +55,10 @@ ns-allinone-$(NS_VERSION):
 patch-ns-$(NS_VERSION):
 	patch -d ns-allinone-$(NS_VERSION)/ns-$(NS_VERSION) \
 		< $(SRCDIR)/ns-$(NS_VERSION).patch
+	if test -e $(SRCDIR)/tclcl-$(TCLCL_VERSION).patch; then \
+		patch -d ns-allinone-$(NS_VERSION)/tclcl-$(TCLCL_VERSION) \
+			< $(SRCDIR)/tclcl-$(TCLCL_VERSION).patch; \
+	fi
 	touch $@
 
 nstb: ns-allinone-$(NS_VERSION) patch-ns-$(NS_VERSION)
