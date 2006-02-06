@@ -15,6 +15,8 @@ val make_heap : 'a -> 'a heap
  * the weight of the object, while keeping the heap property *)
 val insert : 'a heap -> int -> 'a -> (int -> unit)
 
+val insert_remove : 'a heap -> int -> 'a -> ('b -> unit)
+
 (* Remove the smallest-weighted object from the heap *)
 val extract_min : 'a heap -> unit
 
@@ -22,6 +24,11 @@ val extract_min : 'a heap -> unit
 val min : 'a heap -> (int * 'a)
 
 exception EmptyHeap
+
+val iter : 'a heap -> ('a -> unit) -> unit
+val iterw : 'a heap -> (int -> 'a -> unit) -> unit
+
+val size : 'a heap -> int
 
 (* Export a bit more stuff so that we can try a less functional approach
  * to this problem. *)
