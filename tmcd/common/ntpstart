@@ -68,18 +68,23 @@ sub ntpstart () {
 #
 sub ntpdate() {
     #
-    # We need to give -b to set time directly (instead of using adjtime()), and
-    # give the boss node's name
+    # We need to give -b to set time directly (instead of using adjtime()),
+    # and use "ntp1" in the boss node's domain as the server.
     #
     my $bossname = tmccbossname();
     if (!defined($bossname)) {
 	return (1);
     }
+    if ($bossname !~ /^[^\.]+(\..*)/) {
+	return (1);
+    }
+    my $ntpname = "ntp1$1";
+
     my $ntpcmd   = "$ntpdate -b -s ";
     if (REMOTE()) {
 	$ntpcmd .= "-t 5 ";
     }
-    $ntpcmd .= "$bossname";
+    $ntpcmd .= "$ntpname";
 
     if ($debug) {
 	print "$ntpcmd\n";
