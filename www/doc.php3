@@ -55,7 +55,7 @@ PAGEHEADER("Documentation");
 <li><b><a href="tutorial/docwrapper.php3?docname=advanced.html">
               Emulab Advanced Example</a></b>
 <li><b><a href="kb-search.php3">
-              Search Emulab Knowledge Base</a></b>
+              Search or Browse the Emulab Knowledge Base</a></b>
 <li><b><a href="tutorial/docwrapper.php3?docname=nscommands.html">
               Emulab-specific NS Extensions Reference Manual</a></b>
 <li><b><a href = "xmlrpcapi.php3">Emulab's XML-RPC interface reference</a></b>
