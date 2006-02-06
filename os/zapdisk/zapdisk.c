@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -134,8 +134,14 @@ main(int argc, char **argv)
 	fprintf(stderr, "Does't work under Windows yet\n");
 	exit(1);
 #else
-	if (readmbr(disk)) {
-		fprintf(stderr, "zapdisk only works on disks with DOS MBR\n");
+	if ((i = readmbr(disk)) != 0) {
+		/* lack of a valid MBR is ok */
+		if (i < 0) {
+			fprintf(stderr, "%s: no valid MBR, skipped\n", disk);
+			exit(0);
+		}
+
+		fprintf(stderr, "%s: error reading DOS MBR\n", disk);
 		exit(1);
 	}
 
@@ -185,10 +191,15 @@ readmbr(char *dev)
 		close(fd);
  		return 1;
 	}
+
+	/*
+	 * This is not an error for our purposes.
+	 * We assume that if the MBR is not valid, nothing would boot anyway.
+	 */
 	if (doslabel.magic != BOOT_MAGIC) {
 		fprintf(stderr, "Wrong magic number in DOS partition table\n");
 		close(fd);
- 		return 1;
+ 		return -1;
 	}
 
 	return 0;
