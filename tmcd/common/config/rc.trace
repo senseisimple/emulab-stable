@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -257,7 +257,11 @@ sub doboot()
 	# above expression. 
 	#
 	if (defined($trace_expr) and $trace_expr ne "") {
-	    if ($expr eq "") {
+	    # XXX Escape mechanism to avoid expr above.
+	    if ($trace_expr eq "all") {
+		$expr = "";
+	    }
+	    elsif ($expr eq "") {
 		$expr = $trace_expr;
 	    }
 	    else {
