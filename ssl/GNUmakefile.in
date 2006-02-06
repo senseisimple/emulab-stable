@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -18,7 +18,7 @@ all:	emulab.pem server.pem localnode.pem ronnode.pem pcwa.pem ctrlnode.pem \
 
 remote-site:	emulab.pem capture.pem capture.fingerprint server.pem \
 	localnode.pem capture.sha1fingerprint apache.pem apache-ops.pem \
-	ctrlnode.pem
+	ctrlnode.pem jabber.pem
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
