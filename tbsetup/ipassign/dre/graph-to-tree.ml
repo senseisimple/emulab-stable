@@ -60,7 +60,6 @@ let do_nothing () : unit =
 
 let (graph,_) = match !graphfile with
                     Some(x) -> Graph.read_subgraph_file x
-                  (* | None -> raise (Failure "No graph file given");; *)
                   | None -> Graph.read_subgraph_file "-"
 (*
 debug ("Graph size " ^ (string_of_int (List.length graph.Graph.nodes)));;
@@ -71,9 +70,7 @@ let hops = Dijkstra.get_all_first_hops graph;;
 let size = Array.length hops;;
 
 let estimated_routes = ref (size * (size - 1));;
-(* let heap = Heap.make_heap (-1,-1);; *)
-(* XXX - Cut down size *)
-(* let (matrix : matrix) = Array.make_matrix size size None;; *)
+
 let initial_node_set (i : int) (_ : 'b) : 'a node_sets_entry option =
     debug("Setting up node set " ^ (string_of_int i));
     let node_set = Dre.ISet.singleton i in
@@ -91,12 +88,7 @@ let consider_combining (node_sets : 'a node_sets) (matrix : matrix)
     let (s2,blob2,_) = match node_sets.(b) with
                       Some(x) -> x
                     | None -> raise (Failure "Bad b") in
-    (*
-    let (s1,res1,tree1) = a_entry in
-    let (s2,res2,tree2) = b_entry in
-    *)
     if a == b then raise (Failure "Tried to combine a node with itself");
-    (* let s3 = Dre.ISet.union s1 s2 in *)
     let blob3 = combine_blob hops s1 s2 blob1 blob2 in
     let score = (0 - score_blob blob3) in
     debug ("Adding " ^ (string_of_int score) ^ " (" ^ (string_of_int a) ^ "," ^
@@ -111,15 +103,6 @@ let initialize_heap (node_sets : 'a node_sets) (hops : int array array)
     let (matrix : matrix) = Array.make_matrix size size None in
     for i = 0 to size - 1 do
         for j = i + 1 to size - 1 do
-            (*
-            let i_entry = match node_sets.(i) with
-                            None -> raise (Failure "Bad node set entry")
-                          | Some(x) -> x in
-            let j_entry = match node_sets.(j) with
-                            None -> raise (Failure "Bad node set entry")
-                          | Some(x) -> x in
-            *)
-            (* consider_combining i j i_entry j_entry *)
             consider_combining node_sets matrix hops heap i j
         done
     done;
