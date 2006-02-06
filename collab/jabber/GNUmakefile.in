@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,7 +17,7 @@ SBIN_SCRIPTS		= jabbersetup addjabberuser deljabberuser \
 LIBEXEC_SCRIPTS		= 
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= 
-CTRL_SBIN_SCRIPTS	= jabberproxy mkchatroom.py
+CTRL_SBIN_SCRIPTS	= jabberproxy
 
 #
 # Force dependencies on the scripts so that they will be rerun through
