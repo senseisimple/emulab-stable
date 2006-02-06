@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2004 University of Utah and the Flux Group.
+   Copyright (c) 2004, 2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -80,7 +80,7 @@ following small example:
 	set node4  [$ns node]
 
 	# A wireless lan connecting the first three nodes.
-	set lan0 [$ns make-lan "nodew1 nodew2 nodew3" 54Mb 0ms]
+	set lan0 [$ns make-lan "$nodew1 $nodew2 $nodew3" 54Mb 0ms]
 
 	# A regular duplex link from a wireless-capable node to a plain node.
 	set link0 [$ns duplex-link $nodew1 $node4 100Mb 0ms DropTail]
