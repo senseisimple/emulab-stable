@@ -356,6 +356,11 @@ only requests can come from the inside, and only replies from the outside.
 So only someone outside of a firewall could spoof another experiment inside
 a firewall.  This is acceptible in our current threat model.
 
+Note that the fact that replies are broadcast means that nodes inside the
+firewall will see responses to all other Emulab nodes requests and learn
+all about them.  This is not great, but we cannot stop it without looking
+inside the DHCP reply and filtering based on that.
+
 VII. The problem with frisbee traffic
 
 There are two problems here.  One is that frisbee itself is vulnerable to
