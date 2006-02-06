@@ -431,6 +431,7 @@ int main(int argc, char *argv[])
 		actual_gname = strdup(rname);
 	    }
 	skip:
+	    ;
 	}
     }
 #else
