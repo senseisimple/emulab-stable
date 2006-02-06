@@ -78,6 +78,9 @@ $(SUBDIRS): %: %.all
 
 ###############################################################################
 
+fs-install:
+	@$(MAKE) -C nfstrace fs-install
+
 mfs: slothd.client
 
 mfs-install: mfs slothd.client-install
