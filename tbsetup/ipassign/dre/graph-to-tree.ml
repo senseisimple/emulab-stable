@@ -58,7 +58,7 @@ let do_nothing () : unit =
     raise (Failure "do_nothing called")
 ;;
 
-let graph = match !graphfile with
+let (graph,_) = match !graphfile with
                     Some(x) -> Graph.read_subgraph_file x
                   (* | None -> raise (Failure "No graph file given");; *)
                   | None -> Graph.read_subgraph_file "-"

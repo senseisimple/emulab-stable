@@ -5,7 +5,7 @@
 
 (* Read in the graph file *)
 exception NotATree;;
-let g = Graph.read_subgraph_file Sys.argv.(1);;
+let (g,_) = Graph.read_subgraph_file Sys.argv.(1);;
 let n_nodes = Graph.count_nodes g;;
 (*
 let heights = Array.make n_nodes ~-1;;

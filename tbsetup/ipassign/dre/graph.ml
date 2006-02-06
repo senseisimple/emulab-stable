@@ -153,16 +153,20 @@ let read_graph_file (filename : string) : ('a,'b) t =
     make_graph_from_edges edges
 ;;
 
-let rec eat_shit channel =
+let rec parse_header channel : (string * int) list =
     let line = input_line channel in
     let firsttwo = Str.first_chars line 2 in
-    if firsttwo = "%%" then () else eat_shit channel
+    if firsttwo = "%%" then [] else
+        let parts = Str.split (Str.regexp " +") line in
+        match parts with
+        key :: value :: [] -> (key,int_of_string value) :: parse_header channel
+        | _ -> raise (Failure "Bad header line")
 ;;
 
 (* Read in one of Jon's graph files *)
-let read_subgraph_file (filename : string) : ('a,'b) t =
+let read_subgraph_file (filename : string) : (('a,'b) t * (string * int) list) =
     let channel = if filename = "-" then stdin else open_in filename in
-    eat_shit channel;
+    let headers = parse_header channel in
     let rec get_nodes () : int list list =
         try
             let line = input_line channel in
@@ -253,7 +257,7 @@ let read_subgraph_file (filename : string) : ('a,'b) t =
                         in node.incident_edges <- node.incident_edges + 1) yss);
                 set_edge_count xs in
     set_edge_count edges;
-    g
+    (g, headers)
 ;;
 
 (* More operations will be added... *)

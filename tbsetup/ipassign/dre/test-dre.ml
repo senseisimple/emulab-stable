@@ -31,7 +31,7 @@ Arg.parse argspec (fun x -> edgefile := Some x) "";;
 let edgestr = match !edgefile with
                 None -> raise (Failure "Need an arg")
               | Some(x) -> x in       
-let g = Graph.read_subgraph_file edgestr in 
+let (g,_) = Graph.read_subgraph_file edgestr in 
 let hops = compute_all_hops g in
 match !src with 
   Some(x) -> begin

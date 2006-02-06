@@ -80,7 +80,7 @@ print_endline "Showing graph";
 if Array.length Sys.argv < 2 then raise NeedArg;;
 print_endline "Showing graph";
 (* let g = Graph.read_graph_file Sys.argv.(1) in *)
-let g = Graph.read_subgraph_file Sys.argv.(1) in
+let (g,_) = Graph.read_subgraph_file Sys.argv.(1) in
 print_endline "Showing graph";
 let mapfile = if Array.length Sys.argv > 2 then Some Sys.argv.(2) else None in
 print_endline "Showing graph";
