@@ -29,7 +29,8 @@ if TBPATH not in sys.path:
 import xmpp
 
 # Debugging output.
-debug           = 0
+debug           = False
+verbose         = False
 
 # Error condition.
 server_error    = 0
@@ -98,7 +99,7 @@ try:
 	    jabber_server = val
             pass
         elif opt in ("-d", "--debug"):
-	    debug = 1
+	    debug = True
             pass
         pass
     pass
@@ -126,8 +127,10 @@ admin_jid    = admin_user + "@" + jabber_server + "/" + admin_resource
 #
 def HandlePresence(session, presence):
     global current_id, server_error
-    
-    print str(presence)
+
+    if verbose:
+        print str(presence)
+        pass
     
     current_id = presence.getID()
     if presence.getType() == 'error':
@@ -140,7 +143,10 @@ def HandlePresence(session, presence):
 def HandleMessage(session, message):
     global current_id, server_error
 
-    print str(message)
+    if verbose:
+        print str(message)
+        pass
+    
     current_id = message.getID()
     if message.getType() == 'error':
         errmsg        = message.getError()
@@ -150,7 +156,11 @@ def HandleMessage(session, message):
 
 def HandleIQ(conn, iq_node):
     global current_id, desired_id
-    print str(iq_node)
+    
+    if verbose:
+        print str(iq_node)
+        pass
+    
     current_id = iq_node.getID()
     if current_id == desired_id:
         raise xmpp.protocol.NodeProcessed
@@ -158,10 +168,14 @@ def HandleIQ(conn, iq_node):
 
 def HandleIQ_Error(conn, iq_node):
     global current_id, server_error
+
+    if verbose:
+        print str(iq_node)
+        pass
+    
     errmsg       = iq_node.getError()
     current_id   = iq_node.getID()
     server_error = 1
-    print str(iq_node)
     raise xmpp.protocol.NodeProcessed
     pass
 
@@ -170,7 +184,12 @@ def HandleIQ_Error(conn, iq_node):
 #
 def Connect():
     jid = xmpp.protocol.JID(admin_jid)
-    cl  = xmpp.Client(jid.getDomain(), debug=['always',])
+    dbg = []
+    if debug:
+        dbg = ['always',]
+        pass
+    
+    cl  = xmpp.Client(jid.getDomain(), debug=dbg)
     cl.connect()
     cl.auth(jid.getNode(), admin_password, resource=admin_resource)
     cl.sendInitPresence(requestRoster=0)
@@ -296,12 +315,13 @@ def DoChatRoom(client, args):
     #
     # Otherwise creating a room. Must have a password.
     #
-    if len(args) != 2:
+    if len(args) != 3:
         usage()
         sys.exit(2)
         pass
     
     password = args[1]
+    leader   = args[2]
     
     # Announce presence, which creates room.
     p = xmpp.Presence(to = chatroom_jid)
@@ -361,9 +381,10 @@ def DoChatRoom(client, args):
         print "Chatroom " + chatroom + " did not not properly configure."
         return -1
     
-    client.Process(timeout=2)
+    client.Process(timeout=1)
 
-    return 0
+    # Now set the admin for the room.
+    return DoMemberShip(client, [leader, "admin"])
 
 #
 # Add/Remove members from a room
@@ -398,6 +419,9 @@ def DoMemberShip(client, args):
         pass
     elif op == "owner":
         item.setAttr('affiliation', 'owner')
+        pass
+    elif op == "admin":
+        item.setAttr('affiliation', 'admin')
         pass
     else:
         item.setAttr('affiliation', 'none')

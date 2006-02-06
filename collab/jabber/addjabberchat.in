@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -29,8 +29,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $CONTROL     = "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
 my $CHATSUPPORT = @CHATSUPPORT@;
-my $SSH         = "$TB/bin/sshtb";
-my $JABBERPROXY = "$TB/sbin/jabberproxy";
+my $JABBERCHAT  = "$TB/sbin/chatsup";
 
 #
 # Untaint the path
@@ -164,15 +163,14 @@ if ($CONTROL ne $BOSSNODE) {
     TBScriptLock("jabber_update") == 0 or
 	fatal("Could not get the lock!");
 
-    system("echo '$leader $password' | ".
-	   "$SSH -host $CONTROL $JABBERPROXY $optarg addchat $chatroom");
+    system("$JABBERCHAT $chatroom create $password $leader");
     
     my $status = $?;
     TBScriptUnlock();
     $? = $status;
 
     if ($?) {
-	fatal("$JABBERPROXY failed on $CONTROL!");
+	fatal("$JABBERCHAT failed!");
     }
 }
 exit(0);

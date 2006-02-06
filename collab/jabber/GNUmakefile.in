@@ -13,11 +13,11 @@ include $(OBJDIR)/Makeconf
 
 SBIN_SCRIPTS		= jabbersetup addjabberuser deljabberuser \
 			  modjabberbuddies addjabberchat deljabberchat \
-			  setchatmembers
+			  setchatmembers chatsup.py
 LIBEXEC_SCRIPTS		= 
 CTRL_LIBEXEC_SCRIPTS	= 
 CTRL_LIB_FILES		= 
-CTRL_SBIN_SCRIPTS	= jabberproxy
+CTRL_SBIN_SCRIPTS	= jabberproxy mkchatroom.py
 
 #
 # Force dependencies on the scripts so that they will be rerun through
