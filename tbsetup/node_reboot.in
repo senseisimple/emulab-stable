@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -178,8 +178,30 @@ elsif (defined($options{"e"})) {
             "    There are no nodes reserved in pid/eid $pid/$eid\n");
     }
     
+    #
+    # If this is a firewalled experiment, don't reboot the firewall.
+    # If you want to reboot the firewall, you have to do it individually.
+    #
+    # Two reasons.  One is that the firewall is not conceptually part of
+    # the experiment and the user should not "be aware" of it.  This
+    # is a pretty lame reason because pretty much everywhere else, the
+    # firewall IS part of the experiment.  That leads to reason number
+    # two: rebooting the firewall causes all other nodes in the experiment
+    # to become disconnected until the firewall reboots.  For some machines,
+    # that are also rebooting as you recall, not getting PXE info for a
+    # significant amount of time causes them to fail to the next boot.
+    # For some machines this might mean halting ("Strike any key to continue"),
+    # as there is no other boot possibility.  This means ya gotta come back
+    # later and reboot all those nodes again.
+    #
+    my $firewall = "";
+    if (TBExptFirewall($pid, $eid, \$firewall)) {
+	warn("WARNING: NOT rebooting firewall node $firewall\n");
+    }
+
     while (my ($nodeid) = $query_result->fetchrow_array()) {
-	push(@nodes, $nodeid);
+	push(@nodes, $nodeid)
+	    if ($nodeid ne $firewall);
     }
 }
 else {
