@@ -30,6 +30,8 @@ if TBPATH not in sys.path:
     sys.path.append(TBPATH)
     pass
 
+from tbevent import *
+
 PACKAGE_VERSION = 0.1
 
 # Default server
@@ -255,7 +257,7 @@ def usage():
 # Print the usage statement for the "sync" action.
 #
 def sync_usage():
-    print "Usage: loghole sync [-n] [-r remotedir] [-l localdir] [node1 ...]"
+    print "Usage: loghole sync [-nPs] [-r remotedir] [-l localdir] [node1 ...]"
     print
     print "Synchronize the experiment's log holes with a local directory."
     print
@@ -273,6 +275,8 @@ def sync_usage():
     print "               be downloaded."
     print "  -P, --no-post"
     print "               Do not do any additional post processing."
+    print "  -s, --snapshot"
+    print "               Send a SNAPSHOT event to any link trace agents."
     print "  node1 ...    The names of the virtual or physical nodes that "
     print "               should be synced.  The default behavior is to sync "
     print "               all of the nodes in an experiment."
@@ -1027,6 +1031,51 @@ def print_job_status(hosts, jobs, hoststatus, hoststart):
 
     return
 
+##
+# Trace preprocessing.
+#
+# @param traces Sequence of dictionaries describing the active link tracers.
+#
+def trace_pre(traces):
+    at = address_tuple()
+    at.eventtype = "SNAPSHOT"
+    at.expt = "%s/%s" % (PID, EID)
+    at.scheduler = 1
+
+    tv = timeval()
+    tv.tv_sec = int(time.time())
+    
+    notified = {}
+    ec = EventClient(server="event-server",
+                     keyfile=os.path.join("/proj", PID, "exp", EID,
+                                          "tbdata", "eventkey"))
+
+    for trace in traces:
+        if trace["trace_type"] == "monitor":
+            continue
+        
+        lvn = trace["linkvname"]
+        if lvn not in notified:
+            at.objname = "%s-tracemon" % (lvn,)
+            en = ec.create_notification(at)
+            ec.schedule(en, tv)
+            notified[lvn] = 1
+            pass
+        
+        pass
+
+    if len(notified) > 0:
+        time.sleep(1)
+        pass
+    
+    return
+
+##
+# Trace post processing
+#
+# @param link2trace Dictionary containing the link names that map to a sequence
+# of dictionaries containing individual trace information.
+#
 def trace_post(link2trace):
     lpc = 1
     for linkvname in link2trace.keys():
@@ -1049,9 +1098,19 @@ def trace_post(link2trace):
             print_status(".")
             os.system("mergecap -w %s %s" % (dst, " ".join(args[ext])))
             print_status(".")
+            if ext != ".0":
+                if not os.path.exists(ext[1:]):
+                    os.mkdir(ext[1:])
+                    pass
+                os.chdir(ext[1:])
+                dst = os.path.join(os.path.pardir, dst)
+                pass
             os.system("tcptrace -G %s > .tcptrace.out" % (dst,))
-            print_status("\r")
+            if ext != ".0":
+                os.chdir(os.path.pardir)
+                pass
             pass
+        print_status("\r")
         os.chdir(os.path.pardir)
         lpc += 1
         pass
@@ -1077,11 +1136,12 @@ def do_sync(args, mode="sync", must_be_active=1):
     logdir = os.path.join(EXPDIR_FMT % { "PID" : PID, "EID" : EID }, "logs")
 
     standard_logholes = True
+    snapshot_traces = False
     post_process = True
     extra_logholes = []
 
     try:
-        opts, node_list = getopt.getopt(args, "nl:r:P", [
+        opts, node_list = getopt.getopt(args, "nl:r:Ps", [
             "no-standard", "local=", "remote=",
             ])
         for opt, val in opts:
@@ -1100,6 +1160,9 @@ def do_sync(args, mode="sync", must_be_active=1):
                 pass
             elif opt in ("-r", "--remote"):
                 extra_logholes.append(val)
+                pass
+            elif opt in ("-s", "--snapshot"):
+                snapshot_traces = True
                 pass
             pass
         pass
@@ -1183,6 +1246,10 @@ def do_sync(args, mode="sync", must_be_active=1):
             physical = physical["value"]
             traces = traces["value"]
             ssh_data = ssh_data["value"]
+
+            if snapshot_traces:
+                trace_pre(traces)
+                pass
             
             hosts = [(x["node"], x["name"]) for x in physical.values()
                      if ((x["erole"] == "virthost" or
