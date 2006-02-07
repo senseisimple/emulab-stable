@@ -276,6 +276,24 @@ if ($just_list) {
   exit 0;
 }
 
+########################################################################
+#
+# Perform some basic pre-checks to catch common errors.
+#
+
+#
+# Check to make sure the image exists by creating a simple experment
+#
+
+
+#
+# Check to make sure that each experiment is a valid name and
+# it doesn't already exists.
+#
+
+sub experment_precheck() {
+}
+
 
 ########################################################################
 #
