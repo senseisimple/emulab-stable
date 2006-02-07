@@ -60,10 +60,12 @@ ordering-to-tree: heap.cmo graph.cmo dijkstra.cmo myset.cmo dre.cmo naming.cmo l
 ordering-to-tree.opt: heap.cmx graph.cmx dijkstra.cmx myset.cmx dre.cmx naming.cmx linklist.cmx ortc.cmx ordering-to-tree.ml
 	ocamlopt -o $@ /usr/local/lib/ocaml/str.cmxa $^
 
-graph-to-tree: heap.cmo graph.cmo dijkstra.cmo myset.cmo dre.cmo ortc.cmo graph-to-tree.ml
+graph-to-tree: heap.cmo graph.cmo dijkstra.cmo myset.cmo dre.cmo ortc.cmo \
+	mintree.cmo graph-to-tree.ml
 	ocamlc -g -o $@ /usr/local/lib/ocaml/str.cma $^
 
-graph-to-tree.opt: heap.cmx graph.cmx dijkstra.cmx myset.cmx dre.cmx ortc.cmx graph-to-tree.ml
+graph-to-tree.opt: heap.cmx graph.cmx dijkstra.cmx myset.cmx dre.cmx ortc.cmx \
+	mintree.cmx graph-to-tree.ml
 	ocamlopt -o $@ /usr/local/lib/ocaml/str.cmxa $^
 
 tree-assign: heap.cmo graph.cmo tree-assign.ml

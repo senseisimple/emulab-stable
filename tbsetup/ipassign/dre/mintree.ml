@@ -3,6 +3,13 @@
  * of trees.
  *)
 
+(* Tree we're constructing *)
+(* Depth, height, left, right *)
+type tree_node = NoNode | TreeNode of (int * int * tree_node * tree_node);;
+
+(* A collection of trees *)
+type forest_t = tree_node list;;
+
 (* Maximum depth of a tree *)
 let max_depth = 32;;
 
@@ -108,3 +115,38 @@ add_to_bin mybins 4;;
 add_to_bin mybins 4;;
 print_endline (string_of_int (height_of  mybins));
 *)
+
+(* Given a set of subtrees, find the minimum depth tree *)
+let min_depth_tree (forest : forest_t) : tree_node =
+    (* Fill up a heap with the heights of the trees as they keys - smallest
+     * first *)
+    let rec init_heap (forest : forest_t) (heap : tree_node Heap.heap) : unit =
+        match forest with
+          [] -> ()
+        | h :: tail -> match h with
+              TreeNode(depth,height,left,right) -> (
+                  let _ = Heap.insert heap height h in
+                init_heap tail heap
+               )
+             | NoNode -> raise (Failure "Empty node in forest")
+    in
+    let heap = Heap.make_heap NoNode in
+    init_heap forest heap;
+    while (Heap.size heap > 1) do
+        let (height1,tree1) = Heap.min heap in
+        Heap.extract_min heap;
+        let (height2,tree2) = Heap.min heap in
+        Heap.extract_min heap;
+        let newheight = (max height1 height2) + 1 in
+        (*
+        print_endline ("Combining h1 = " ^ (string_of_int height1) ^
+            " and h2 = " ^ (string_of_int height2) ^ " to get " ^ (string_of_int
+            newheight));*)
+        (* XXX Putting in a bogus ID, since it doesn't actually matter *)
+        let newroot = TreeNode(0,newheight,tree1,tree2) in
+        let _ = Heap.insert heap newheight newroot in
+        ()
+    done;
+    let (_,root) = Heap.min heap in
+    root
+;;

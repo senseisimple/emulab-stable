@@ -11,19 +11,16 @@ let argspec =
 
 Arg.parse argspec (fun x -> graphfile := Some(x)) "Usage";;
 
-(* Tree we're constructing *)
-type tree_node = NoNode | TreeNode of (int * int * tree_node * tree_node);;
-
-let rec tree_depth (tree : tree_node) : int =
+let rec tree_depth (tree : Mintree.tree_node) : int =
     match tree with
-      NoNode -> -1
-    | TreeNode(_,_,l,r) -> 1 + (max (tree_depth l) (tree_depth r))
+      Mintree.NoNode -> -1
+    | Mintree.TreeNode(_,_,l,r) -> 1 + (max (tree_depth l) (tree_depth r))
 ;;
 
-let rec tree_height (tree : tree_node) : int =
+let rec tree_height (tree : Mintree.tree_node) : int =
     match tree with
-      NoNode -> -1
-    | TreeNode(_,h,_,_) -> h;
+      Mintree.NoNode -> -1
+    | Mintree.TreeNode(_,h,_,_) -> h;
 ;;
 
 let debug (str : string) : unit =
@@ -52,7 +49,7 @@ let combine_blob hops s1 s2 blob1 blob2 =
                             | _ -> raise (Failure "Mismatched blobs"))
 
 
-type 'a node_sets_entry = (Dre.nodeset * 'a * tree_node);;
+type 'a node_sets_entry = (Dre.nodeset * 'a * Mintree.tree_node);;
 type matrix_entry = (unit -> unit);;
 
 type matrix = matrix_entry option array array;;
@@ -87,7 +84,8 @@ let bins = Mintree.make total_bits;;
 let initial_node_set (i : int) (_ : 'b) : 'a node_sets_entry option =
     debug("Setting up node set " ^ (string_of_int i));
     let node_set = Dre.ISet.singleton i in
-    Some(node_set,blob_from_set hops node_set,TreeNode(i,0,NoNode,NoNode));;
+    Some(node_set,blob_from_set hops node_set,
+        Mintree.TreeNode(i,0,Mintree.NoNode,Mintree.NoNode));;
 
 let node_sets = Array.mapi initial_node_set hops;;
 
@@ -191,7 +189,7 @@ let combine (node_sets : 'a node_sets) (matrix : matrix)
     let s3 = Dre.ISet.union s1 s2 in
     let blob3 = combine_blob hops s1 s2 blob1 blob2 in
     let d3 = (1 + max h1 h2) in
-    let tree3 = TreeNode(a, d3, tree1, tree2) in
+    let tree3 = Mintree.TreeNode(a, d3, tree1, tree2) in
     remove_from_matrix matrix a b;
     (*
             debug "Heap: ";
@@ -207,9 +205,9 @@ let combine (node_sets : 'a node_sets) (matrix : matrix)
 exception OutOfBits;;
 let rec greedy_combine (node_sets : 'a node_sets) (matrix : matrix)
         (hops : int array array) (heap : nodepair Heap.heap)
-        (remaining : int) (bins: Mintree.bins_t) : tree_node =
+        (remaining : int) (bins: Mintree.bins_t) : Mintree.tree_node =
     if remaining <= 0 then begin
-        let rec find_tree (i : int) : tree_node =
+        let rec find_tree (i : int) : Mintree.tree_node =
             match node_sets.(i) with
               None -> find_tree (i + 1)
             | Some(_,_,tree) -> tree in
@@ -224,7 +222,8 @@ let rec greedy_combine (node_sets : 'a node_sets) (matrix : matrix)
               None -> debug("X had no node_sets entry")
             | Some(_,_,tree) -> (
                 match tree with
-                TreeNode(_,h,_,_) -> (
+                  Mintree.NoNode -> raise (Failure "Null Node")
+                | Mintree.TreeNode(_,h,_,_) -> (
                     debug("X had height " ^ (string_of_int h));
                     Mintree.remove_from_bin bins h
                 )
@@ -234,7 +233,8 @@ let rec greedy_combine (node_sets : 'a node_sets) (matrix : matrix)
               None -> debug("Y had no node_sets entry")
             | Some(_,_,tree) -> (
                 match tree with
-                TreeNode(_,h,_,_) -> (
+                  Mintree.NoNode -> raise (Failure "Null Node")
+                | Mintree.TreeNode(_,h,_,_) -> (
                     debug("Y had height " ^ (string_of_int h));
                     Mintree.remove_from_bin bins h
                 )
@@ -245,7 +245,8 @@ let rec greedy_combine (node_sets : 'a node_sets) (matrix : matrix)
               None -> debug("X has no node_sets entry")
             | Some(_,_,tree) -> (
                 match tree with
-                TreeNode(_,h,_,_) -> (
+                  Mintree.NoNode -> raise (Failure "Null Node")
+                | Mintree.TreeNode(_,h,_,_) -> (
                     debug("New x has height " ^ (string_of_int h));
                     Mintree.add_to_bin bins h
                 )
@@ -254,7 +255,7 @@ let rec greedy_combine (node_sets : 'a node_sets) (matrix : matrix)
         let min_height = Mintree.height_of bins in
         debug ("Currently uses " ^ (string_of_int min_height) ^
                        " bits (" ^ (string_of_int total_bits) ^ ") bits max");
-        if min_height > total_bits then
+        if min_height >= total_bits then
             raise OutOfBits;
         greedy_combine node_sets matrix hops heap (remaining - 1) bins
     end
@@ -262,26 +263,42 @@ let rec greedy_combine (node_sets : 'a node_sets) (matrix : matrix)
 
 let (heap,matrix) = initialize_heap node_sets hops bins in
 debug "Heap initialized";
-let root = greedy_combine node_sets matrix hops heap (size - 1) bins in
-let rec print_tree (root : tree_node) =
+let root = try greedy_combine node_sets matrix hops heap (size - 1) bins
+    with OutOfBits -> (
+      debug "Ran out of bits";
+      let rec make_forest index =
+          if index >= Array.length node_sets then
+              []
+          else
+              match node_sets.(index) with
+                None -> make_forest (index + 1)
+              | Some (n) -> (match n with (_,_,tree) -> tree)
+                :: make_forest (index + 1)
+      in
+      let forest = make_forest 0 in
+      debug ("Forest has " ^ (string_of_int (List.length forest)) ^
+          " trees");
+      Mintree.min_depth_tree forest
+  ) in
+let rec print_tree (root : Mintree.tree_node) =
     match root with
-       NoNode -> ()
-    | TreeNode(id,heigt,left,right) -> begin
+       Mintree.NoNode -> ()
+    | Mintree.TreeNode(id,height,left,right) -> begin
             print_tree left;
             output_string stdout ((string_of_int id) ^ "\n");
             print_tree right
         end
 in
-let tree_placement (howmany : int) (tree : tree_node) : (int * int32 array) =
+let tree_placement (howmany : int) (tree : Mintree.tree_node) : (int * int32 array) =
     let locations = Array.make howmany Int32.minus_one in
-    let rec helper (tree : tree_node) (depth : int) (sofar : int32) : int =
+    let rec helper (tree : Mintree.tree_node) (depth : int) (sofar : int32) : int =
         (*
         if depth >= 32 then
             raise (Failure "Tree too deep"); *)
         match tree with
-          NoNode -> -1
-        | TreeNode(id,height,left,right) ->
-                if left == NoNode && right == NoNode then begin
+          Mintree.NoNode -> -1
+        | Mintree.TreeNode(id,height,left,right) ->
+                if left == Mintree.NoNode && right == Mintree.NoNode then begin
                     (* Leaf node *)
                     locations.(id) <- sofar;
                     depth
