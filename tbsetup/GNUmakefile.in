@@ -10,10 +10,11 @@ OBJDIR		= ..
 SUBDIR		= tbsetup
 UNIFIED         = @UNIFIED_BOSS_AND_OPS@
 PLABSUPPORT     = @PLABSUPPORT@
+SYSTEM         := $(shell uname -s)
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS		= checkpass ns2ir nsverify ipassign nseparse checkup
+SUBDIRS		= checkpass ns2ir nsverify nseparse checkup
 
 BIN_STUFF	= power snmpit tbend tbprerun tbreport \
 		  os_load endexp batchexp swapexp \
@@ -57,7 +58,15 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 		  snmpit_nortel.pm \
 		  libaudit.pm libreboot.pm libosload.pm libtestbed.py \
 		  libadminmfs.pm libtblog.pm libtblog_simple.pm libArchive.pm \
-		  power_mail.pm power_whol.pm 
+		  power_mail.pm power_whol.pm
+
+ifeq ($(SYSTEM),FreeBSD)
+FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
+ifneq ($(FBSDVERSION),FreeBSD5)
+SUBDIRS  += ipassign
+IPASSIGN  = Yes
+endif
+endif
 
 #
 # Force dependencies on the scripts so that they will be rerun through
@@ -122,7 +131,9 @@ subdir-install:
 	@$(MAKE) -C nsverify install
 	@$(MAKE) -C nseparse install
 	$(PLAB_INSTALL)
+ifeq ($(IPASSIGN),Yes)
 	@$(MAKE) -C ipassign install
+endif
 	@$(MAKE) -C checkup install
 
 script-install:	$(addprefix $(INSTALL_BINDIR)/, $(BIN_STUFF)) \
@@ -137,7 +148,9 @@ post-install:
 	@$(MAKE) -C nsverify post-install
 	@$(MAKE) -C nseparse post-install
 	$(PLAB_POST_INSTALL)
+ifeq ($(IPASSIGN),Yes)
 	@$(MAKE) -C ipassign post-install
+endif
 	chmod 775 $(INSTALL_BINDIR)
 	chmod 775 $(INSTALL_SBINDIR)
 	chmod 775 $(INSTALL_LIBDIR)
