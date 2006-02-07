@@ -34,7 +34,7 @@ sub internal_event_poll($$$) {
 	}
 
 	if ($rv) {
-		die "Trouble in event_poll - returned $rv\h";
+		die "Trouble in event_poll - returned $rv\n";
 	}
 
 	while (my $data = dequeue_callback_data() ) {
