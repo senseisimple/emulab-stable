@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -154,6 +154,19 @@ my $TB_OSID_MBKERNEL  = TB_OSID_MBKERNEL;
 # Special PXEBOOT state machine that all local nodes use.
 my $PXEKERNEL	 = "PXEKERNEL";
 
+# Protos.
+sub debug(@);
+sub fatal($);
+sub notify($;$);
+sub info($;$);
+sub getTimeouts();
+sub getValid();
+sub getModeTrans();
+sub getTriggers();
+sub readStates(;@);
+sub handleCtrlEvent($$);
+sub reload();
+    
 if (!$debug) {
     if ( $TB eq $REALTB ) {
 	$pidfile = "/var/run/stated.pid";
@@ -367,7 +380,7 @@ sub readStates(;@) {
     my %oldnodes = @_;
 
     # Guard against undefined variable warnings
-    if (! defined(%oldnodes)) {
+    if (! %oldnodes) {
 	%oldnodes = ();
     }
 
