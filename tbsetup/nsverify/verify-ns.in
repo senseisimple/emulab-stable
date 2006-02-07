@@ -118,7 +118,7 @@ $EUID = $UID = $SAVEUID;
 if ($?) {
     my $exit_status = $? >> 8;
     
-    tbdie({type=>'extra'}, "Verify parsing failed (error code $exit_status)!");
+    tbdie("Verify parsing failed (error code $exit_status)!");
 }
 
 open(NSLTMAP, "sort $outfile |");
