@@ -213,7 +213,7 @@ int event_notification_put_double(event_handle_t handle,
                                   char *name, double value);
 int event_notification_put_int32(event_handle_t handle,
                                  event_notification_t notification,
-                                 char *name, int32_t value);
+                                 char *name, int value);
 int event_notification_put_int64(event_handle_t handle,
                                  event_notification_t notification,
                                  char *name, int64_t value);

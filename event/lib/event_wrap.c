@@ -62,7 +62,7 @@ extern "C" {
 
 
 /*****************************************************************************
- * $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/event/lib/event_wrap.c,v 1.6 2006-02-01 01:08:49 stack Exp $
+ * $Header: /home/cvs_mirrors/cvs-public.flux.utah.edu/CVS/testbed/event/lib/event_wrap.c,v 1.7 2006-02-07 15:54:39 stack Exp $
  *
  * perl5ptr.swg
  *
@@ -96,7 +96,11 @@ extern "C" {
  * SWIGSTATIC.
  *
  * $Log: event_wrap.c,v $
- * Revision 1.6  2006-02-01 01:08:49  stack
+ * Revision 1.7  2006-02-07 15:54:39  stack
+ * Change the _put_int32 prototype to use an int instead of an int32_t,
+ * so swig generates proper code (i think).
+ *
+ * Revision 1.6  2006/02/01 01:08:49  stack
  * Get the perl event library to compile on fedora core.
  *
  * Revision 1.5  2003/11/10 17:20:04  ricci
@@ -1179,7 +1183,7 @@ XS(_wrap_event_notification_put_int32) {
     event_handle_t  _arg0;
     event_notification_t  _arg1;
     char * _arg2;
-    int32_t * _arg3;
+    int  _arg3;
     int argvi = 0;
     dXSARGS ;
 
@@ -1195,11 +1199,8 @@ XS(_wrap_event_notification_put_int32) {
         XSRETURN(1);
     }
     _arg2 = (char *) SvPV(ST(2),na);
-    if (SWIG_GetPtr(ST(3),(void **) &_arg3,"int32_tPtr")) {
-        croak("Type error in argument 4 of event_notification_put_int32. Expected int32_tPtr.");
-        XSRETURN(1);
-    }
-    _result = (int )event_notification_put_int32(_arg0,_arg1,_arg2,*_arg3);
+    _arg3 = (int )SvIV(ST(3));
+    _result = (int )event_notification_put_int32(_arg0,_arg1,_arg2,_arg3);
     ST(argvi) = sv_newmortal();
     sv_setiv(ST(argvi++),(IV) _result);
     XSRETURN(argvi);
