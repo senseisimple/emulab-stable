@@ -5190,7 +5190,7 @@ sub TBFieldData($$;$)
     my $toplevel;
     my $fielddata;
 
-    if (! defined(%DBFieldData)) {
+    if (! %DBFieldData) {
 	TBGrabFieldData();
     }
     my $key = $table . ":" . $column;
