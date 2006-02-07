@@ -15,25 +15,27 @@ exception EmptyBin;;
 (*
  * Add one to a given bin
  *)
-let add_to_bin (bins : bins_t) (which : int) : bins_t =
-    bins.(which) <- bins.(which) + 1;
-    bins
+let add_to_bin (bins : bins_t) (which : int) : unit =
+    (* print_endline ("Bin " ^ (string_of_int which) ^ " incremented to " ^
+        (string_of_int (bins.(which) + 1))); *)
+    bins.(which) <- bins.(which) + 1
 ;;
 
 (*
  * Remove one from a given bin
  *)
-let remove_from_bin (bins : bins_t) (which : int) : bins_t =
+let remove_from_bin (bins : bins_t) (which : int) : unit =
+    (* print_endline ("Bin " ^ (string_of_int which) ^ " decremented to " ^
+        (string_of_int (bins.(which) - 1))); *)
     if bins.(which) = 0 then raise EmptyBin;
-    bins.(which) <- bins.(which) - 1;
-    bins
+    bins.(which) <- bins.(which) - 1
 ;;
 
 (*
  * Make a new set of bins
  *)
 let make (size : int) : bins_t =
-    Array.make size 0
+    Array.make (size + 1) 0
 ;;
 
 exception TooManyBits;;
@@ -48,9 +50,9 @@ let height_of (bins : bins_t) : int =
     let bits_used = ref 0 in
     (* Loop for every bin *)
     for i = 0 to len - 1 do
-        if bins.(i) != 0 then (
-            let quotient = bins.(i) / 2 in
-            let remainder = bins.(i) mod 2 in
+        if newbins.(i) != 0 then (
+            let quotient = newbins.(i) / 2 in
+            let remainder = newbins.(i) mod 2 in
 
             (* If we are on a bin that only has one member, then it's
              * possible we're done with the algorithm *)
@@ -58,7 +60,7 @@ let height_of (bins : bins_t) : int =
             if (quotient = 0) && (remainder = 1) then (
                 (* Look for any later bins that have non-zero values *)
                 for j = i + 1 to len - 1 do (
-                    if bins.(j) != 0 then are_done := false;
+                    if newbins.(j) != 0 then are_done := false;
                 ) done;
             ) else (
                 (* We can't be done unless we find a one-member bin *)
@@ -75,14 +77,14 @@ let height_of (bins : bins_t) : int =
                 );
                 (* Two trees of this height can be replaced with one of the next
                  * height *)
-                bins.(i + 1) <- bins.(i + 1) + quotient;
+                newbins.(i + 1) <- newbins.(i + 1) + quotient;
                 (* If there's a leftover, we 'promote' it to the next height,
                  * where it'll get combined with some larger subtree *)
                 if (remainder != 0) then (
-                    bins.(i + 1) <- bins.(i + 1) + remainder
+                    newbins.(i + 1) <- newbins.(i + 1) + remainder
                 );
                 (* Okay, done with this bin *)
-                bins.(i) <- 0
+                newbins.(i) <- 0
             )
         ) else (
             (* We don't have to do anything to empty bins *)
