@@ -45,6 +45,10 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 
+# Protos
+sub TryQuery();
+sub RestartMysqld();
+
 # Daemonize;
 if (!$debug) {
     system("mv -f $LOGFILE ${LOGFILE}.old")

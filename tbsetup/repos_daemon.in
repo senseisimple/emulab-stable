@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -66,6 +66,9 @@ my $NODEDEAD_EID= NODEDEAD_EID;
 sub fatal($);
 sub notify($);
 sub daemonize();
+sub movetoreloading($);
+sub evsysctrl($);
+sub freefromrepositioning($);
 
 my $reboot	= "$TB/bin/node_reboot";
 my $evsys	= "$TB/bin/eventsys_control";
