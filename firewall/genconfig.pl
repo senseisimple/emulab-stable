@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Getopt::Std;
@@ -21,7 +21,9 @@ sub usage()
 	"  -e      expand EMULAB_ variables\n".
 	"  -f file specify the input rules file\n".
 	"  -M      generate mysql commands\n".
-	"  -I      generate IPFW commands\n";
+	"  -I      generate IPFW commands\n".
+	"\n".
+	" Valid configs are: open, closed, basic, elabinelab\n";
     exit(1);
 }
 
@@ -30,10 +32,12 @@ my %fwvars;
 sub getfwvars()
 {
     # XXX
-    $fwvars{EMULAB_BOSS} = "155.98.32.70";
-    $fwvars{EMULAB_OPS} = "155.98.33.74";
-    $fwvars{EMULAB_FS} = "155.98.33.74";
+    $fwvars{EMULAB_GWIP} = "155.98.36.1";
+    $fwvars{EMULAB_GWMAC} = "00:b0:8e:84:69:34";
+    $fwvars{EMULAB_NS} = "155.98.32.70";
     $fwvars{EMULAB_CNET} = "155.98.36.0/22";
+    $fwvars{EMULAB_MCADDR} = "234.5.0.0/16";
+    $fwvars{EMULAB_MCPORT} = "3564-65535";
 }
 
 sub expandfwvars($)
@@ -44,7 +48,7 @@ sub expandfwvars($)
 
     if ($rule =~ /EMULAB_\w+/) {
 	foreach my $key (keys %fwvars) {
-	    $rule =~ s/$key/$fwvars{$key}/
+	    $rule =~ s/$key/$fwvars{$key}/g
 		if (defined($fwvars{$key}));
 	}
 	if ($rule =~ /EMULAB_\w+/) {
@@ -77,7 +81,7 @@ sub doconfig($)
     }
 
     foreach my $line (@lines) {
-	next if ($line !~ /$config/);
+	next if ($line !~ /#.*$config/);
 	next if ($line =~ /^#/);
 	if ($line =~ /#\s*(\d+):.*/) {
 	    $ruleno = $1;
