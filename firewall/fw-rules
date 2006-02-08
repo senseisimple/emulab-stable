@@ -1,5 +1,6 @@
 #
 # Firewall rule template.
+#
 # The bulk of the line is the body of an IPFW rule, a '#' denoted "comment"
 # at the end of the line indicates a rule number to use, and a comma
 # separated list of styles to which the rule applies.
@@ -11,22 +12,59 @@
 #	BASIC		CLOSED + ssh from anywhere
 #	ELABINELAB	Elab-in-elab, eliminates many Emulab services
 #	WINDOWS		Rules specific to WinXP, not a real style right now
+#			these are usually incorporated into the BASIC rules.
 #
-# Variables expanded by rc.firewall script:
+# Variables expanded by rc.firewall script that can be used here:
 #
+#	EMULAB_GWIP	IP address of gateway
 #	EMULAB_NS	IP address of name server
 #	EMULAB_CNET	Node control network in CIDR notation
+#	EMULAB_MCADDR	Multicast address range used by frisbee
+#	EMULAB_MCPORT	Port range used by frisbee
 #
 # Currently these are sufficient for rules we use.  Note that you can
 # safely use symbolic hostnames "boss", "ops", "fs", "users", "ntp1"
-# and "ntp2" as they are all guaranteed to resolve (assuming an earlier
-# rule exists to allow DNS traffic to/from EMULAB_NS).
+# and "ntp2" as they are all guaranteed to resolve, either via the local
+# hosts file or via DNS (assuming the firewall is not yet up or allows
+# DNS traffic, which it should at that point in time).
 #
-# Questions, comments and warnings:
+# For an Emulab in Emulab setup, the names "myboss", "myops" and "myfs"
+# are also valid for naming the respective inner servers.
 #
-# 1. Anti-spoofing?  The real firewall will do spoofing checks, should
-#    we do them also?  It won't protect the rest of the control net from
-#    us unless we put in specific, per-firewalled-host rules.
+# There are a few idiom that can be used in rules.  These are dependent
+# on the exact configuration of the bridge and firewall, so be careful
+# (see NOTES for details on the implementation and implications):
+#
+# "layer2"
+#	A packet passing through the bridge.
+# "not layer2"
+#	A packet from or to the firewall itself.
+# "in via vlan0"
+#	Coming from the inside network.
+# "in not via vlan0"
+#	Coming from the outside network.
+# "out"
+#	Outbound from the firewall.
+# "layer2 ... in via vlan0"
+#	Traveling from inside to outside through the bridge.
+# "layer2 ... in not via vlan0"
+#	Traveling from outside to inside through the bridge.
+# "from me to any out via vlan0"
+#	IP traffic from firewall to the inside network.
+# "from me to any out not via vlan0"
+#	IP traffic from firewall to the outside network.
+# "from any to me in via vlan0"
+#	IP traffic to the firewall from inside.
+# "from any to me in not via vlan0"
+#	IP traffic to the firewall from outside.
+#
+# Questions, comments and warnings (refer to the NOTES file for more):
+#
+# 1. The rules use stateful checking via dynamic rules.  In addition to
+#    being subject to DoS attacks, they can wreak havoc if the firewall
+#    reboots.  In the case of the latter, all your TCP connections will
+#    be toast.  Despite this, dynamic rules allow us to be a little more
+#    constraining on what we allow through.
 #
 # 2. How much should we protect the firewall itself?  We disallow complete
 #    access from inside.  From outside, we treat the firewall pretty much
@@ -37,136 +75,280 @@
 #    when they come in off the phys interface, we want to process them
 #    when they have been untagged.
 #
-# 4. Currently we assume vlan0 is the inside interface on the firewall
-#    and "not vlan0" is the outside interface.
+
+##
+## COMMON RULES (2-9)
+## These rules apply to all packets
+##
+
 #
-# 5. For ELABINELAB, many of the rules should allow traffic with only
-#    the inner boss/ops nodes.  But we don't currently distinguish them
-#    from other nodes inside, so those rules are more permissive than
-#    desirable.
+# Match existing dynamic rules very early
 #
+check-state					# 4: BASIC,CLOSED,ELABINELAB
 
-# Let through anything
-allow all from any to any			# 65534: OPEN
+#
+# Anything that traverses the bridge will appear as layer2.
+# Skip the firewall-specific rules for this common case.
+#
+skipto 80 all from any to any layer2 in		# 9: BASIC,CLOSED,ELABINELAB
 
-# match existing dynamic rules first (rule 1 is used as a temp rule)
-check-state					# 2: BASIC,CLOSED,ELABINELAB
+##
+## FIREWALL SPECIFIC RULES (10-79)
+## These rules are for IP packets only.
+##
 
-# XXX we use ssh from boss to remove a tmp rule allowing all traffic.
-# These rules are necessary to allow the ssh to complete!
-allow tcp from me 22 to boss			# 3: ELABINELAB
-allow tcp from boss to me 22			# 4: ELABINELAB
+#
+# Nobody on the inside can talk to the firewall.
+# Prevents anyone spoofing "me", "boss", "ops", etc.
+#
+deny all from any to me in via vlan0		# 10: BASIC,CLOSED,ELABINELAB
 
-# Can talk to myself
-allow all from me to me				# 10: BASIC,CLOSED,ELABINELAB
+# Can talk to myself.  Does this do anything?
+# This appears to be used by elvind?
+allow all from me to me				# 11: BASIC,CLOSED,ELABINELAB
 
-# But no one on the inside can talk to me or other experiment nodes
-deny all from any to me via vlan0		# 11: BASIC,CLOSED,ELABINELAB
-deny all from any to EMULAB_CNET via vlan0	# 12: BASIC,CLOSED,ELABINELAB
+#
+# XXX early on in Emulab setup boss will ssh in and insert a rule at the
+# beginning to allow all traffic.  Later we ssh in again to remove that rule.
+# In order for the latter ssh command to complete, we have to make sure that
+# an established connection to boss continues to work.
+#
+allow tcp from me 22 to boss established	# 15: ELABINELAB
+allow tcp from boss to me 22 established	# 16: ELABINELAB
 
-# Let nodes find the gateway
-allow mac-type arp				# 13: BASIC,CLOSED,ELABINELAB
-
-# other boilerplate
-allow all from any to any frag			# 14: BASIC,CLOSED,ELABINELAB
-
-# Anti-spoofing?
+# Standard services
 
 # DNS to NS
-allow udp from any to EMULAB_NS 53 keep-state	# 50: BASIC,CLOSED,ELABINELAB
+allow udp from me to EMULAB_NS 53 keep-state	# 20: BASIC,CLOSED,ELABINELAB
+
+# ssh from boss (for reboot, etc.) and others if appropriate
+allow tcp from boss to me 22 setup keep-state	# 22: CLOSED,ELABINELAB
+allow tcp from any to me 22 setup keep-state	# 22: BASIC
+
+# NTP to ntp servers
+allow ip from me to ntp1,ntp2 123 keep-state	# 24: BASIC,CLOSED,ELABINELAB
+
+# syslog with ops
+allow udp from me 514 to ops 514		# 26: BASIC,CLOSED,ELABINELAB
+
+#
+# NFS
+# DANGER WILL ROBINSON!!!
+# Portmapper (tcp or udp), mountd and NFS with fs
+#
+# Note that we have to allow IP fragments through due to the default
+# 8k read/write size.  Perhaps we should dial down the read/write size for
+# firewalled experiments.
+#
+allow ip from me to fs 111 keep-state		# 30: BASIC,CLOSED,ELABINELAB
+allow udp from me not 0-700 to fs keep-state	# 31: BASIC,CLOSED,ELABINELAB
+allow udp from me to fs 900 keep-state		# 32: BASIC,CLOSED,ELABINELAB
+allow udp from me to fs 2049 keep-state		# 33: BASIC,CLOSED,ELABINELAB
+allow ip from me to fs frag			# 34: BASIC,CLOSED,ELABINELAB
+allow ip from fs to me frag			# 35: BASIC,CLOSED,ELABINELAB
+
+# Special services
+
+# cvsup to boss
+allow tcp from me to boss 5999 setup keep-state	# 36: BASIC,CLOSED,ELABINELAB
+
+# elvind to ops (unicast TCP and multicast UDP)
+allow ip from me to ops 2917 keep-state		# 38: BASIC,CLOSED,ELABINELAB
+
+# slothd to boss
+allow udp from me to boss 8509 			# 40: BASIC,CLOSED,ELABINELAB
+
+# we need to remain engaged in the multicast protocol
+# XXX maybe not needed after all
+#allow igmp from any to any			# 48: BASIC,CLOSED,ELABINELAB
+#allow pim from EMULAB_GWIP to any		# 49: BASIC,CLOSED,ELABINELAB
+
+# Ping, IPoD from boss
+allow icmp from boss to me icmptypes 6,8	# 50: BASIC,CLOSED,ELABINELAB
+allow icmp from me to boss icmptypes 0		# 51: BASIC,CLOSED,ELABINELAB
+
+#
+# Boot time only services (DHCP, TFTP, bootinfo, TMCC).
+#
+# Technically, we don't have to allow these since they will
+# happen before the firewall is up.  We allow TMCC for debugging.
+#
+allow ip from me to boss 7777 keep-state	# 70: BASIC,CLOSED,ELABINELAB
+
+# nuke everything else
+# this should be the default kernel setting, but just in case
+deny all from any to any			# 79: BASIC,CLOSED,ELABINELAB
+
+
+##
+## BRIDGE SPECIFIC RULES (80-99 cannot be changed by user, 100 and higher can).
+## These rules are for packets passing through the bridge.
+##
+
+#
+# Disallow non-IP traffic.
+#
+# In particular, this prevents ARP.
+#
+deny not mac-type ip				# 80: BASIC,CLOSED,ELABINELAB
+
+#
+# No one on the inside can talk to other experiments' nodes and visa-versa.
+#
+# XXX currently we only do this for the heavier weight firewalls because
+# the user cannot over ride this.
+#
+# Note that this does not apply to nodes within this experiment because
+# those packets never come to the firewall.
+#
+# Note also that EMULAB_CNET is only the "node control net" and does not
+# include the public/private nets for boss, ops, etc.
+#
+# XXX yuk!  The gateway *is* part of EMULAB_CNET, and assorted packets do
+# come from it:
+#  * IGMP and PIM traffic
+#  * DHCP replies from boss appear to have come from the gateway
+#    (due to the helper function).
+# so for now we allow any IP traffic from the gateway.
+#
+allow ip from EMULAB_GWIP to any in not via vlan0	# 83: CLOSED,ELABINELAB
+deny ip from any to EMULAB_CNET in via vlan0		# 84: CLOSED,ELABINELAB
+deny ip from EMULAB_CNET to any in not via vlan0	# 85: CLOSED,ELABINELAB
+
+#
+# Inside nodes cannot spoof other IP addresses.
+#
+# Beyond this rule we no longer have to check to make sure that source
+# hosts like "boss" and "ops" come in the correct interface.
+#
+deny ip from not 0.0.0.0,255.255.255.255,EMULAB_CNET to any in via vlan0 # 88: BASIC,CLOSED,ELABINELAB
 
 #
 # By convention, user supplied rules are in the 100-60000 range
 # This allows them to override the remaining infrastructure rules.
 #
 
-# Standard services for both us and firewalled nodes
+#
+# Standard services.
+#
+# Note that for many of these, the ELABINELAB configuration restricts
+# the operations to be with only the inner boss/ops/fs (as appropriate)
+# and NOT with the inner nodes.
+#
 
-# ssh from boss (for reboot, etc.)
-allow tcp from boss to any 22 setup keep-state	# 60000: CLOSED
-allow tcp from any to any 22 setup keep-state	# 60000: BASIC,ELABINELAB
+# DNS to NS
+allow udp from any to EMULAB_NS 53 keep-state			# 60020: BASIC,CLOSED
+allow udp from myboss,myops,myfs to EMULAB_NS 53 keep-state	# 60020: ELABINELAB
+
+# ssh from boss (for reboot, etc.) and others if appropriate
+allow tcp from boss to any 22 setup keep-state			# 60022: CLOSED
+allow tcp from boss to myboss,myops,myfs 22 setup keep-state	# 60022: ELABINELAB
+allow tcp from any to any 22 in not via vlan0 setup keep-state	# 60022: BASIC
 
 # NTP to ntp servers
-allow ip from any to ntp1,ntp2 123 keep-state	# 60010: BASIC,CLOSED,ELABINELAB
+allow ip from any to ntp1,ntp2 123 keep-state			# 60024: BASIC,CLOSED
+allow ip from myboss,myops,myfs to ntp1,ntp2 123 keep-state	# 60024: ELABINELAB
 
 # syslog with ops
-allow udp from any 514 to ops 514		# 60020: BASIC,CLOSED
+allow udp from any 514 to ops 514		# 60026: BASIC,CLOSED
 
+#
+# NFS
 # DANGER WILL ROBINSON!!!
-
-# portmapper (tcp or udp), mountd and NFS with fs
+# Portmapper (tcp or udp), mountd and NFS with fs
+#
+# Note that we have to allow IP fragments through due to the default
+# 8k read/write size.  Perhaps we should dial down the read/write size for
+# firewalled experiments.
+#
 allow ip from any to fs 111 keep-state		# 60030: BASIC,CLOSED
 allow udp from any not 0-700 to fs keep-state	# 60031: BASIC,CLOSED
 allow udp from any to fs 900 keep-state		# 60032: BASIC,CLOSED
 allow udp from any to fs 2049 keep-state	# 60033: BASIC,CLOSED
-allow ip from me to fs 111 keep-state		# 60030: ELABINELAB
-allow udp from me not 0-700 to fs keep-state	# 60031: ELABINELAB
-allow udp from me to fs 900 keep-state		# 60032: ELABINELAB
-allow udp from me to fs 2049 keep-state		# 60033: ELABINELAB
-
-# cvsup to boss
-allow tcp from any to boss 5999 setup keep-state	# 60040: BASIC,CLOSED
-
-# elvind to ops (unicast TCP and multicast UDP)
-allow ip from any to ops 2917 keep-state	# 60050: BASIC,CLOSED
-allow ip from me to ops 2917 keep-state		# 60050: ELABINELAB
-
-# slothd to boss
-allow udp from any to boss 8509 		# 60060: BASIC,CLOSED
-allow udp from me to boss 8509	 		# 60060: ELABINELAB
+allow ip from any to fs frag			# 60034: BASIC,CLOSED
+allow ip from fs to any frag			# 60035: BASIC,CLOSED
 
 # Special services
+
+# cvsup to boss
+allow tcp from any to boss 5999 setup keep-state # 60036: BASIC,CLOSED
+
+# elvind to ops (unicast TCP and multicast UDP)
+allow ip from any to ops 2917 keep-state	# 60038: BASIC,CLOSED
+
+# slothd to boss
+allow udp from any to boss 8509 		# 60040: BASIC,CLOSED
 
 # The inner boss also needs to SSLXMLRPC to real boss to start frisbeed
 # for image transfer.  Note that this rule must be before other XMLRPC rule
 # (blocking connections from inside).
-allow tcp from any to boss 3069 recv vlan0 setup keep-state	# 60069: ELABINELAB
+allow tcp from myboss to boss 3069 recv vlan0 setup keep-state	# 60042: ELABINELAB
 
 # HTTP/HTTPS/SSLXMLRPC into elabinelab boss from outside
-allow tcp from any to any 80,443 in not recv vlan0 setup keep-state # 60070: ELABINELAB
-allow tcp from any to any 3069 in not recv vlan0 setup keep-state   # 60071: ELABINELAB
+allow tcp from any to myboss 80,443 in not recv vlan0 setup keep-state # 60043: ELABINELAB
+allow tcp from any to myboss 3069 in not recv vlan0 setup keep-state   # 60044: ELABINELAB
 
-# frisbee multicast from boss
-allow udp from any to EMULAB_MCADDR			# 60080: BASIC,CLOSED,ELABINELAB
-allow udp from boss EMULAB_MCPORT to any EMULAB_MCPORT	# 60081: BASIC,CLOSED,ELABINELAB
-allow igmp from any to any				# 60082: BASIC,CLOSED,ELABINELAB
+#
+# Frisbee multicast from boss
+#  * nodes mcast everything (joins, leaves and requests)
+#  * boss mcasts blocks, unicasts join replies, both from/to same port
+#  * node and switch need to IGMP
+#
+# Elabinelab should only do this to download an image from real boss to
+# the inner boss.  Re-imaging anything else from outside would be a disaster.
+#
+allow udp from any to EMULAB_MCADDR EMULAB_MCPORT in via vlan0	# 60046: BASIC,CLOSED
+allow udp from boss EMULAB_MCPORT to any EMULAB_MCPORT		# 60047: BASIC,CLOSED
+allow udp from myboss to EMULAB_MCADDR EMULAB_MCPORT in via vlan0 # 60046: ELABINELAB
+allow udp from boss EMULAB_MCPORT to myboss EMULAB_MCPORT	  # 60047: ELABINELAB
+allow igmp from any to any					# 60048: BASIC,CLOSED,ELABINELAB
 
 # Ping, IPoD from boss
-# should we allow all ICMP?
-allow icmp from any to any			# 60090: BASIC,CLOSED,ELABINELAB
-allow icmp from boss to any icmptypes 6,8	# 60090: 
-allow icmp from any to boss icmptypes 0		# 60091: 
+# should we allow all ICMP in general?
+allow icmp from any to any			# 60050: BASIC
+allow icmp from boss to any icmptypes 6,8	# 60050: CLOSED,ELABINELAB
+allow icmp from any to boss icmptypes 0		# 60051: CLOSED,ELABINELAB
 
+#
 # Windows
 # allow http, https (80,443) outbound for windows/cygwin updates
 # SMB (445) with fs
-# SSH (2222) into nodes
 # rdesktop (3389) to nodes
-# no blaster (135,4444) or slammer (1434) please!
-allow tcp from any to any 80,443 in via vlan0 setup keep-state # 60103: WINDOWS,BASIC
-allow tcp from any to fs 445 in via vlan0 setup keep-state # 60100: WINDOWS,BASIC
-allow tcp from any to any 2222 in not recv vlan0 setup keep-state # 60101: WINDOWS
-allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60102: WINDOWS,BASIC
-deny tcp from any to any 135,4444				  # 60110: WINDOWS
-deny udp from any to any 1434					  # 60111: WINDOWS
+#
+allow tcp from any to any 80,443 in via vlan0 setup keep-state # 60056: WINDOWS,BASIC
+allow tcp from any to fs 445 in via vlan0 setup keep-state # 60057: WINDOWS,BASIC
+allow tcp from any not 0-1023 to any 3389 in not recv vlan0 setup keep-state # 60059: WINDOWS,BASIC
 
-# Boot time only services
+#
+# Windows
+# Explicitly stop blaster (135,4444) and slammer (1434)
+#
+deny tcp from any to any 135,4444			# 60060: WINDOWS
+deny udp from any to any 1434				# 60061: WINDOWS
 
-# DHCP requests from, and replies to, inside
-# requests are always broadcast, replies may be broadcast or unicast
-allow udp from any 68 to 255.255.255.255 67 recv vlan0	# 61000: BASIC,CLOSED,ELABINELAB
-allow udp from any 67 to any 68 in not recv vlan0	# 61001: BASIC,CLOSED,ELABINELAB
+# Boot time only services (DHCP, TFTP, bootinfo, TMCC).
+
+# DHCP requests from, and replies to, inside requests are always broadcast,
+# replies may be broadcast or unicast
+allow udp from any 68 to 255.255.255.255 67 recv vlan0	# 60064: BASIC,CLOSED,ELABINELAB
+allow udp from any 67 to any 68 in not recv vlan0	# 60065: BASIC,CLOSED,ELABINELAB
 
 # TFTP with boss or ops
 # XXX tftpd can pick any port it wants in response to a request from any port
 # so we have to open wide
-allow udp from any to boss,ops 69 keep-state # 61010: BASIC,CLOSED,ELABINELAB
-allow udp from boss,ops not 0-1023 to any not 0-1023 keep-state #61011:  BASIC,CLOSED,ELABINELAB
+allow udp from any to boss,ops 69 keep-state			# 60066: BASIC,CLOSED,ELABINELAB
+allow udp from boss,ops not 0-1023 to any not 0-1023 keep-state # 60067: BASIC,CLOSED,ELABINELAB
 
-# bootinfo and TMCC (udp or tcp) with boss
-allow udp from any to boss 6969 keep-state	# 61020: BASIC,CLOSED,ELABINELAB
-allow ip from any to boss 7777 keep-state	# 61021: BASIC,CLOSED,ELABINELAB
+# bootinfo with boss (nodes request/receive info or boss does PXEWAKEUP)
+allow udp from any 9696 to boss 6969 keep-state		# 60068: BASIC,CLOSED,ELABINELAB
+allow udp from boss 6970 to any 9696			# 60069: BASIC,CLOSED,ELABINELAB
+
+# TMCC (udp or tcp) with boss
+allow ip from any to boss 7777 keep-state		# 60070: BASIC,CLOSED
 
 # nuke everything else
 # this should be the default kernel setting, but just in case
 deny all from any to any			# 65534: BASIC,CLOSED,ELABINELAB
+
+# Let through anything
+allow all from any to any			# 65534: OPEN
