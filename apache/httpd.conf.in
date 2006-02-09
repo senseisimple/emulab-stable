@@ -354,7 +354,7 @@ Group nobody
 # e-mailed.  This address appears on some server-generated pages, such
 # as error documents.
 #
-ServerAdmin @TBOPSEMAIL@
+ServerAdmin @TBOPSEMAIL_NOSLASH@
 
 #
 # ServerName allows you to set a host name which is sent back to clients for
@@ -1153,7 +1153,7 @@ SSLLogLevel info
 #  General setup for the virtual host
 DocumentRoot "@prefix@/www"
 ServerName @WWWHOST@
-ServerAdmin @TBOPSEMAIL@
+ServerAdmin @TBOPSEMAIL_NOSLASH@
 ErrorLog @prefix@/log/apache_error_log
 TransferLog @prefix@/log/apache_access_log
 
