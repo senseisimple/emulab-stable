@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -55,7 +55,7 @@ my $USERMOD = "/usr/sbin/pw usermod";
 my $SAVEUID = $UID;
 
 my $dbuid;
-my @userlist;
+my @userlist = ();
 my $pid;
 my $user_name;
 my $user_email;
@@ -149,7 +149,7 @@ if (@ARGV) {
     }
 }
 
-if (!defined($pid) && !defined(@userlist)) {
+if (!defined($pid) && !scalar(@userlist)) {
     usage();
 }
 
@@ -191,7 +191,7 @@ $UID = $EUID;
 # If no user list provided, we have to do this for the entire project
 # member list since we have no idea who got changed.
 #
-if (! defined(@userlist)) {
+if (! scalar(@userlist)) {
     $query_result =
 	DBQueryFatal("select uid from group_membership ".
 		     "where pid='$pid' and pid=gid");
