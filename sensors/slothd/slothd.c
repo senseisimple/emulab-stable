@@ -277,12 +277,6 @@ int parse_args(int argc, char **argv) {
 
 int init_slothd(void) {
 
-#ifndef __CYGWIN__
-  DIR *devs;
-  char bufstr[MAXDEVLEN];
-  struct dirent *dptr;
-#endif /* __CYGWIN__ */
-
   int pfd;
   char pidbuf[10];
   struct hostent *hent;
@@ -327,53 +321,6 @@ int init_slothd(void) {
   /* Open socket for SIOCGHWADDR ioctl (to get mac addresses) */
   parms->ifd = socket(PF_INET, SOCK_DGRAM, 0);
 #endif
-
-#ifndef __CYGWIN__
-  /* enum tty special files */
-  if ((devs = opendir("/dev")) == 0) {
-    lerror("Can't open directory /dev for processing");
-    return -1;
-  }
-
-  parms->ttys[parms->numttys] = strdup("/dev/console");
-  parms->numttys++;
-
-#ifdef __linux__  
-  /* 
-     Include the pts mux device to check for activity on
-     dynamically allocated linux pts devices:
-     (/dev/pts/<num>)
-  */
-  parms->ttys[parms->numttys] = strdup("/dev/ptmx");
-  parms->numttys++;
-#endif
-
-  while (parms->numttys < MAXTTYS && (dptr = readdir(devs))) {
-    if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
-      snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
-      parms->ttys[parms->numttys] = strdup(bufstr);
-      parms->numttys++;
-      bzero(bufstr, sizeof(bufstr));
-    }
-  }
-  closedir(devs);
-
-#else /* __CYGWIN__ */
-
-  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
-   * However, stat on anything under /dev always returns the current time, so
-   * it's no help detecting user input.  Instead, we patch sshd to change the
-   * modtime on a file when input is received and stat that.
-   */
-  parms->ttys[0] = strdup("/var/run/ssh_input");
-
-  /* Likewise, idlemon is started up at user login on Windows to monitor
-   * desktop events for slothd under RDP logins and touches a time tag file.
-   */
-  parms->ttys[1] = strdup("/var/run/rdp_input");
-  parms->numttys = 2;
-
-#endif /* __CYGWIN__ */
 
   /* prepare UDP connection to server */
   if ((parms->sd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
@@ -459,6 +406,79 @@ int grab_cifname(char *buf, void *data) {
 }
 
 
+int add_tty(char *path) {
+
+  if (!path) {
+    return 0;
+  }
+
+  strncpy(parms->ttys[parms->numttys], path, MAXDEVLEN);
+  parms->numttys++;
+
+  return 1;
+}
+
+int clear_ttys() {
+
+  parms->numttys = 0;
+  return 1;
+}   
+
+int enum_ttys() {
+
+#ifndef __CYGWIN__
+  DIR *devs;
+  char bufstr[MAXDEVLEN];
+  struct dirent *dptr;
+#endif /* __CYGWIN__ */
+
+  clear_ttys();
+
+#ifndef __CYGWIN__
+  /* enum tty special files */
+  if ((devs = opendir("/dev")) == 0) {
+    lerror("Can't open directory /dev for processing");
+    return -1;
+  }
+
+  add_tty("/dev/console");
+
+#ifdef __linux__  
+  /* 
+     Include the pts mux device to check for activity on
+     dynamically allocated linux pts devices:
+     (/dev/pts/<num>)
+  */
+  add_tty("/dev/ptmx");
+#endif
+
+  while (parms->numttys < MAXTTYS && (dptr = readdir(devs))) {
+    if (strstr(dptr->d_name, "tty") || strstr(dptr->d_name, "pty")) {
+      snprintf(bufstr, MAXDEVLEN, "/dev/%s", dptr->d_name);
+      add_tty(bufstr);
+    }
+  }
+  closedir(devs);
+
+#else /* __CYGWIN__ */
+
+  /* On Cygwin, `tty` returns /dev/console under RDP, and /dev/tty$n under SSH.
+   * However, stat on anything under /dev always returns the current time, so
+   * it's no help detecting user input.  Instead, we patch sshd to change the
+   * modtime on a file when input is received and stat that.
+   */
+  add_tty("/var/run/ssh_input");
+
+  /* Likewise, idlemon is started up at user login on Windows to monitor
+   * desktop events for slothd under RDP logins and touches a time tag file.
+   */
+  add_tty("/var/run/rdp_input");
+
+#endif /* __CYGWIN__ */
+
+  return 1;
+}
+
 int send_pkt(SLOTHD_PACKET *pkt) {
 
   int i, numsent, retval = 1;
@@ -508,6 +528,8 @@ void get_min_tty_idle(SLOTHD_PACKET *pkt) {
   int i;
   time_t mintime = 0;
   struct stat sb;
+
+  enum_ttys();
 
   for (i = 0; i < parms->numttys; ++i) {
     if (stat(parms->ttys[i], &sb) < 0) {

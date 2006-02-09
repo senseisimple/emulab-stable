@@ -90,7 +90,7 @@ typedef struct {
   time_t startup;
   struct sockaddr_in servaddr;
   u_short numttys;
-  char *ttys[MAXTTYS];
+  char ttys[MAXTTYS][MAXDEVLEN];
 } SLOTHD_PARAMS;
 
 typedef struct {
@@ -131,5 +131,8 @@ int get_active_bits(SLOTHD_PACKET*, SLOTHD_PACKET*);
 
 int get_counters(char*,void*);
 int grab_cifname(char*,void*);
+int clear_ttys(void);
+int add_tty(char*);
+int enum_ttys(void);
 
 #endif /* #ifndef _SLOTHD_H */
