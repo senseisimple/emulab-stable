@@ -7,6 +7,8 @@
 
 source nstb_compat.tcl
 
+variable tbnsobj
+
 # Linktest-specific functions. Source these before running
 # linktest-ns.
 
@@ -97,7 +99,7 @@ LTLink instproc set_loss { loss } {
 # for final printing, always resolve lans to actual lists of hosts.
 LTLink instproc toString {} {
     $self instvar lanOrLink_ src_ dst_ bw_ delay_ loss_ qtype_
-    global hosts lans links
+    global hosts lans links tbnsobj
 
     if {[info exists links($lanOrLink_)]} {
 	set name $links($lanOrLink_)
@@ -115,6 +117,21 @@ LTLink instproc toString {} {
     } elseif {$qtype_ == "GRED"} {
 	set qt "gred"
     }
+    
+    if {[$tbnsobj link $src_ $dst_] != ""} {
+	set lq [[$tbnsobj link $src_ $dst_] queue]
+	if {[$lq info vars red_] != ""} {
+	    if {[$lq set red_] == 1} {
+		if {[$lq info vars gentle_] != "" && [$lq set gentle_] == 1} {
+		    set qt "gred"
+		} else {
+		    set qt "red"
+		}
+	    } else {
+		set qt "droptail"
+	    }
+	}
+    }
 
     return [format "l $hosts($src_) $hosts($dst_) %.0f %.4f %.6f $name $qt" $bw_ $delay_ $loss_ ]
 }
@@ -128,7 +145,9 @@ variable lt_links {}
 # the inst vars directly
 Simulator instproc addLTLink { linkref {qtype DropTail} } {
     $self instvar Node_ link_
-    global hosts lans links lt_links
+    global hosts lans links lt_links tbnsobj
+
+    set tbnsobj $self
 
     set newLink [new LTLink]
     $newLink set_src [$link_($linkref) src ]
@@ -163,9 +182,11 @@ Simulator instproc addLTLink { linkref {qtype DropTail} } {
 
 # just print the representation to stdout
 Simulator instproc run {args} {
+    global simname
+
     join_lans
     output
-    real_puts "s ns"
+    real_puts "s $simname"
 }
 
 # store the rtproto
@@ -233,10 +254,18 @@ proc join_lans {} {
 
 
 proc output {} {
-    global hosts lans links lt_links rtproto
+    global hosts lans links lt_links rtproto simname
+    global $simname
 
-    foreach name [array names hosts] {
-	real_puts "h $hosts($name)"
+    real_set ns [set $simname]
+    foreach name [$ns all-nodes-list] {
+	if {[$name info class] == "Node"} {
+	    if {[info exists hosts($name)]} {
+		real_puts "h $hosts($name)"
+	    } else {
+		real_puts "h [$name set tbaltname_]"
+	    }
+	}
     }
     foreach link $lt_links {
 	real_puts "[$link toString]"

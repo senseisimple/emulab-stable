@@ -30,6 +30,21 @@ proc set {args} {
     real_set var [lindex $args 0]
     real_set rval [lindex $args 1]
     
+    # Run the set to make sure variables declared as global get registered
+    # as global (does not happen until first set).
+    real_set ret [uplevel real_set \{$var\} \{$rval\}]
+
+    # Rename happens only when assigning to a global variable. Because of
+    # array syntax, must strip parens and indices to get the base variable
+    # name (has no effect if not an array access).
+    real_set l [split $var \(]
+    real_set base_var [lindex $l 0]
+
+    # Now check to see if its a global. No renaming if not a global.
+    if {[uplevel info globals $base_var] == {}} {
+        return $ret
+    }
+
     # Here we change ARRAY(INDEX) to ARRAY-INDEX
     regsub -all {[\(]} $var {-} out
     regsub -all {[\)]} $out {} val
@@ -45,7 +60,7 @@ proc set {args} {
 	} elseif {$rval == $last_link} {
 	    array set links [list $last_link $val]
 	} elseif {$rval == $last_sim} {
-	    real_set simname $last_sim
+	    real_set simname $var
 	} elseif {$rval == $last_fw} {
 	    array set hosts [list $last_fw $val]
 	} else {
@@ -71,7 +86,7 @@ proc set {args} {
     real_set last_fw {}
 
     # There are a bunch of cases where we just pass through to real set.
-    return [uplevel real_set \{[lindex $args 0]\} \{[lindex $args 1]\}]
+    return [uplevel real_set \{$var\} \{$rval\}]
 }
 
 variable pid [lindex $argv 0]

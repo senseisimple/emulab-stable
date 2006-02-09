@@ -45,7 +45,6 @@ proc tb-set-useveth {link onoff} {}
 proc tb-set-allowcolocate {lanlink onoff} {}
 proc tb-set-colocate-factor {factor} {}
 proc tb-set-sync-server {node} {}
-proc tb-set-node-startcmd {node cmd} {}
 proc tb-set-mem-usage {usage} {}
 proc tb-set-cpu-usage {usage} {}
 proc tb-bind-parent {sub phys} {}
@@ -74,6 +73,38 @@ proc tb-set-node-id {vnode myid} {}
 proc tb-set-link-est-bandwidth {srclink args} {}
 proc tb-set-lan-est-bandwidth {lan bw} {}
 proc tb-set-node-lan-est-bandwidth {node lan bw} {}
+
+#
+# Set the startup command for a node. Replaces the tb-set-node-startup
+# command above, but we have to keep that one around for a while. This
+# new version dispatched to the node object, which uses a program object.
+# 
+proc tb-set-node-startcmd {node command} {
+    if {[$node info class] != "Node"} {
+	perror "\[tb-set-node-startcmd] $node is not a node."
+	return
+    }
+    set command "($command ; /usr/local/etc/emulab/startcmddone \$?)"
+    set newprog [$node start-command $command]
+
+    return $newprog
+}
+
+#
+# Create a program object to run on the node when the experiment starts.
+#
+Node instproc start-command {command} {
+    global hosts
+
+    $self instvar sim
+    set newname "$hosts($self)_startcmd"
+
+    set newprog [uplevel 2 "set $newname [new Program]"]
+    $newprog set node $self
+    $newprog set command $command
+
+    return $newprog
+}
 
 Class Program
 
@@ -189,4 +220,7 @@ LanNode instproc trace {args} {
 }
 
 LanNode instproc trace_endnode {args} {
+}
+
+LanNode instproc unknown {m args} {
 }

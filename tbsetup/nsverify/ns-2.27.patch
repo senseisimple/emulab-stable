@@ -24,7 +24,7 @@ diff -ur ./tcl/lan/vlan.tcl ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lan/vlan.t
 +	$self instvar id_counter
 +	$lan set tbaltname_ tblan-lan[incr id_counter]
 + 	global last_lan
-+ 	set last_lan $lan
++ 	real_set last_lan $lan
 +
  	return $lan
  }
@@ -40,7 +40,7 @@ diff -ur ./tcl/lib/ns-lib.tcl ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lib/ns-l
 +	# linktest renaming
 +	$self set id_counter 0
 +	global last_sim
-+	set last_sim $self
++	real_set last_sim $self
  }
  
  Simulator instproc nullagent {} {
@@ -53,7 +53,7 @@ diff -ur ./tcl/lib/ns-lib.tcl ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lib/ns-l
 +	$self instvar id_counter
 +	$node set tbaltname_ tbnode-n[incr id_counter]
 +	global last_host
-+	set last_host $node
++	real_set last_host $node
 +
  	return $node
  }
@@ -81,7 +81,7 @@ diff -ur ./tcl/lib/ns-lib.tcl ../../ns-allinone-2.27-emulab/ns-2.27/tcl/lib/ns-l
 +
 +	# naming
 +	global last_link
-+	set last_link $dup
++	real_set last_link $dup
 +	
 +	return $dup
  }
