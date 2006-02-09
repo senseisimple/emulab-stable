@@ -8,13 +8,6 @@ use English;
 use Getopt::Std;
 
 #
-# For firewall rule logging: log accepted or rejected packets.
-# XXX debugging
-#
-my $logaccept = 0;
-my $logreject = 0;
-
-#
 # Hosts we need un-firewalled static routes for
 #
 my $elvinip = "224.4.0.1";
@@ -191,10 +184,6 @@ sub doboot()
 
 sub firewaller()
 {
-    # XXX debugging
-    $fwinfo->{LOGACCEPT} = $logaccept;
-    $fwinfo->{LOGREJECT} = $logreject;
-
     my ($upline, $downline) = os_fwconfig_line($fwinfo, @fwrules);
 
     print FWC "case \"\$action\" in\n";

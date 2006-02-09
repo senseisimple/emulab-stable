@@ -603,13 +603,31 @@ sub os_fwconfig_line($@)
 	    $upline .= "        exit 1\n";
 	    $upline .= "    }\n";
 	}
+	if ($logaccept || $logreject) {
+	    $upline .= "    sysctl net.inet.ip.fw.verbose=1\n";
+	}
 	$upline .= "    sysctl net.inet.ip.fw.enable=1 || {\n";
 	$upline .= "        echo 'WARNING: could not enable firewall'\n";
 	$upline .= "        exit 1\n";
 	$upline .= "    }\n";
 	$upline .= "    sysctl net.link.ether.bridge=1";
 
-	$downline  = "sysctl net.link.ether.bridge=0\n";
+	#
+	# XXX maybe we should be more careful to ensure that the bridge
+	# is really down before turning off the firewall.  OTOH, if
+	# someone has really hacked the firewall to the extent that they
+	# can prevent us from shutting down the bridge, then they should
+	# be quite capable of taking down the firewall on their own.
+	#
+	$downline  = "sysctl net.link.ether.bridge=0 || {\n";
+	$downline .= "        echo 'WARNING: could not disable bridge'\n";
+	$downline .= "        echo '         firewall left enabled'\n";
+	$downline .= "        exit 1\n";
+	$downline .= "    }\n";
+	$downline .= "    sysctl net.inet.ip.fw.enable=0\n";
+	if ($logaccept || $logreject) {
+	    $downline .= "    sysctl net.inet.ip.fw.verbose=0\n";
+	}
 	$downline .= "    ipfw -q flush\n";
 	$downline .= "    sysctl net.link.ether.bridge_cfg=\"\"\n";
 	$downline .= "    sysctl net.link.ether.bridge_ipfw=0\n";

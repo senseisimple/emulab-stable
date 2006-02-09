@@ -1058,6 +1058,7 @@ sub getfwconfig($$;$)
     my $rpat   = q(RULENO=(\d*) RULE="(.*)");
     my $vpat   = q(VAR=(EMULAB_\w+) VALUE="(.*)");
     my $hpat   = q(HOST=([-\w]+) CNETIP=([\d\.]*) CNETMAC=([\da-f]{12}));
+    my $lpat   = q(LOG=([\w,]+));
 
     $fwinfo->{"TYPE"} = "none";
     foreach my $line (@tmccresults) {
@@ -1114,6 +1115,14 @@ sub getfwconfig($$;$)
 
 	    # and save off the MACs
 	    $fwhostmacs{$host} = $mac;
+	} elsif ($line =~ /$lpat/) {
+	    for my $log (split(',', $1)) {
+		if ($log =~ /^allow|accept$/) {
+		    $fwinfo->{"LOGACCEPT"} = 1;
+		} elsif ($log =~ /^deny|reject$/) {
+		    $fwinfo->{"LOGREJECT"} = 1;
+		}
+	    }
 	} else {
 	    warn("*** WARNING: Bad firewall info line: $line\n");
 	    return 1;

@@ -5338,8 +5338,8 @@ COMMAND_PROTOTYPE(dofwinfo)
 	 *
 	 * XXX will only work if there is one firewall per experiment.
 	 */
-	res = mydb_query("select r.node_id,v.type,v.style,f.fwname,i.IP, "
-			 "  i.mac,f.vlan "
+	res = mydb_query("select r.node_id,v.type,v.style,v.log,f.fwname,"
+			 "  i.IP,i.mac,f.vlan "
 			 "from firewalls as f "
 			 "left join reserved as r on"
 			 "  f.pid=r.pid and f.eid=r.eid and f.fwname=r.vname "
@@ -5348,7 +5348,7 @@ COMMAND_PROTOTYPE(dofwinfo)
 			 "left join interfaces as i on r.node_id=i.node_id "
 			 "where f.pid='%s' and f.eid='%s' "
 			 "and i.role='ctrl'",	/* XXX */
-			 7, reqp->pid, reqp->eid);
+			 8, reqp->pid, reqp->eid);
 	
 	if (!res) {
 		error("FWINFO: %s: DB Error getting firewall info!\n",
@@ -5394,7 +5394,7 @@ COMMAND_PROTOTYPE(dofwinfo)
 		if (strcmp(row[1], "ipfw2-vlan") == 0)
 			fwip = "0.0.0.0";
 		else
-			fwip = row[4];
+			fwip = row[5];
 		OUTPUT(buf, sizeof(buf), "TYPE=remote FWIP=%s\n", fwip);
 		mysql_free_result(res);
 		client_writeback(sock, buf, strlen(buf), tcp);
@@ -5406,8 +5406,8 @@ COMMAND_PROTOTYPE(dofwinfo)
 	/*
 	 * Grab vlan info if available
 	 */
-	if (row[6] && row[6][0])
-		vlan = row[6];
+	if (row[7] && row[7][0])
+		vlan = row[7];
 	else
 		vlan = "0";
 
@@ -5419,14 +5419,24 @@ COMMAND_PROTOTYPE(dofwinfo)
 	 */
 	OUTPUT(buf, sizeof(buf),
 	       "TYPE=%s STYLE=%s IN_IF=%s OUT_IF=%s IN_VLAN=%s OUT_VLAN=%s\n",
-	       row[1], row[2], row[5], row[5], vlan, vlan);
+	       row[1], row[2], row[6], row[6], vlan, vlan);
 	client_writeback(sock, buf, strlen(buf), tcp);
 	if (verbose)
 		info("FWINFO: %s", buf);
 
+	/*
+	 * Put out info about firewall rule logging
+	 */
+	if (vers > 25 && row[3] && row[3][0]) {
+		OUTPUT(buf, sizeof(buf), "LOG=%s\n", row[3]);
+		client_writeback(sock, buf, strlen(buf), tcp);
+		if (verbose)
+			info("FWINFO: %s", buf);
+	}
+
 	strncpy(fwtype, row[1], sizeof(fwtype));
 	strncpy(fwstyle, row[2], sizeof(fwstyle));
-	strncpy(fwname, row[3], sizeof(fwname));
+	strncpy(fwname, row[4], sizeof(fwname));
 	mysql_free_result(res);
 
 	/*
