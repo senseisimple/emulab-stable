@@ -2290,6 +2290,7 @@ CREATE TABLE virt_firewalls (
   fwname varchar(32) NOT NULL default '',
   type enum('ipfw','ipfw2','ipchains','ipfw2-vlan') NOT NULL default 'ipfw',
   style enum('open','closed','basic','emulab') NOT NULL default 'basic',
+  log tinytext NOT NULL,
   PRIMARY KEY  (pid,eid,fwname)
 ) TYPE=MyISAM;
 

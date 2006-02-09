@@ -3155,3 +3155,6 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table experiment_resources add batchmode tinyint(1) \
                unsigned default '0' after delay_capacity;
 
+4.37: Add field to virt_firewalls to allow specification of rule logging.
+
+      alter table virt_firewalls add log tinytext NOT NULL default '' after style;
