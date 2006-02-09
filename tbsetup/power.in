@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -58,6 +58,9 @@ my $outlet = 0;			#stores number of an outlet
 my %IPList = ();		#holds machine/ip pairs
 my %OutletList = ();		#holds machine/outlet pairs
 my $exitval = 0;
+
+# Protos
+sub dostatus(@);
 
 #
 # Process command-line arguments
