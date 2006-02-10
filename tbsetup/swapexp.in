@@ -1459,7 +1459,7 @@ sub CheckFWinfo($)
     return 0;
 
   noway:
-    tberror($msg);
+    tberror({sublevel=>1}, $msg);
     return 1;
 }
 

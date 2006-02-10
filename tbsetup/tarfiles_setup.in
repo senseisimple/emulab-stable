@@ -63,13 +63,13 @@ if ($TESTMODE) {
 }
 elsif ($EUID != 0) {
     # We don't want to run this script unless its the real version.
-    tbdie("Must be root! Maybe its a development version?");
+    die("Must be root! Maybe its a development version?");
 }
 
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
 if ($UID == 0) {
-    tbdie("Please do not run this as root! Its already setuid!");
+    die("Please do not run this as root! Its already setuid!");
 }
 
 #

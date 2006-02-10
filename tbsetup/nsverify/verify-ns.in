@@ -43,13 +43,13 @@ delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
 
 if ($EUID != 0) {
     # We don't want to run this script unless its the real version.
-    tbdie("Must be root! Maybe its a development version?");
+    die("Must be root! Maybe its a development version?");
 }
 
 # This script is setuid, so please do not run it as root. Hard to track
 # what has happened.
 if ($UID == 0) {
-    tbdie("Please do not run this as root! Its already setuid!");
+    die("Please do not run this as root! Its already setuid!");
 }
 
 #
@@ -140,8 +140,7 @@ while (!$done) {
 	$done = 1;
     }
     elsif (!$nsline || !$dbline) {
-	tbdie({type=>'extra'},
-	      "Topology verification failed (short file)!");
+	tbdie("Topology verification failed (short file)!");
     }
     elsif ($nsline =~ /^l \S+ \S+ \d+ \d+\.\d+ \d+\.\d+ \S+ \S+$/ &&
 	   $dbline =~ /^l \S+ \S+ \d+ \d+\.\d+ \d+\.\d+ \S+ \S+$/) {
@@ -163,14 +162,12 @@ while (!$done) {
 		print "'$nsmatches[$lpc]' != '$dbmatches[$lpc]' in\n";
 		print "ns: $nsline";
 		print "db: $dbline";
-		tbdie({type=>'extra'},
-		      "Topology verification failed!");
+		tbdie("Topology verification failed!");
 	    }
 	}
     }
     elsif ($nsline ne $dbline) {
-	tbdie({type=>'extra'},
-	      "Topology verification failed ('$nsline'!='$dbline')!");
+	tbdie("Topology verification failed ('$nsline'!='$dbline')!");
     }
 }
 

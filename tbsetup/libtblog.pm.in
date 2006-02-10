@@ -617,12 +617,12 @@ sub tblog_find_error ( ;$$ ) {
 	$error = "No clue as to what went wrong!\n" unless length $error > 0;
 	
 	if ($store) {
+	    $error .= "Cause: $cause\n";
+	    $error .= "Confidence: $confidence\n";
 	    print SERR "**** Experimental information, please ignore ****\n";
 	    print SERR "Session ID = $ENV{TBLOG_SESSION}\n";
 	    print SERR "Likely Cause of the Problem:\n";
 	    print SERR $error;
-	    print SERR "Cause: $cause\n";
-	    print SERR "Confidence: $confidence\n";
 	    print SERR "**** End experimental information ****\n";
 	    chop $error;
 	    dblog $NOTICE, {type=>'thecause'}, $error;

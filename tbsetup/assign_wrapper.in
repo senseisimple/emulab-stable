@@ -199,6 +199,10 @@ sub fatal (@)
 # We want warnings to cause assign_wrapper to exit abnormally.
 # We will come through here no matter how we exit though.
 # 
+# FIXME: Is this still needed.  "warn" is only used once.  Also this
+#  will cause perl internal warnings (such as "Use of uninitialized
+#  value ..."  to cause assign_wrapper to fail. -- kevina
+#
 $SIG{__WARN__} = sub { tbwarn $_[0];$warnings++; };
 
 END {
@@ -4452,9 +4456,9 @@ sub CreateTopFile()
 		#
 		if (! (defined(virtnodeosid($node0)) &&
 		       defined(virtnodeosid($node1)))) {
-		    tbwarn("You must specify the OSID for all nodes in ".
-			   "lan $lan, when using linkdelays ".
-			   "(endnode traffic shaping)\n");
+		    tberror("You must specify the OSID for all nodes in ".
+			    "lan $lan, when using linkdelays ".
+			    "(endnode traffic shaping)\n");
 		    $toperrors++;
 		}
 		else {
@@ -4465,9 +4469,9 @@ sub CreateTopFile()
 			my $osid = virtnodeosid($node);
 
 			if (! $osdoeslinkdelays{$osid}) {
-			    tbwarn("$node in link $lan is running an OSID ".
-				   "($osid) that does not support linkdelays ".
-				   "(endnode traffic shaping)\n");
+			    tberror("$node in link $lan is running an OSID ".
+				    "($osid) that does not support linkdelays ".
+				    "(endnode traffic shaping)\n");
 			    $toperrors++;
 			}
 		    }
