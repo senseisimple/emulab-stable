@@ -67,7 +67,7 @@ let (graph,headers) = match !graphfile with
 let total_bits =
     match List.filter (fun e -> let (k,_) = e in k = "total-bits") headers with
       e :: [] -> let (k,v) = e in v
-   | _ -> 32;;
+   | _ -> 30;;
 
 debug ("Total Bits " ^ (string_of_int total_bits));;
 debug ("Graph size " ^ (string_of_int (List.length graph.Graph.nodes)));;

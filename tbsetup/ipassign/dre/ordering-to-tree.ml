@@ -33,6 +33,13 @@ debug ("Graph size " ^ (string_of_int (List.length graph.Graph.nodes)));;
 debug ("Edges " ^ (string_of_int (List.length graph.Graph.edges)));;
 let naming = Naming.read_naming_file Sys.argv.(2);;
 
+(* Grab the maxdepth header from the subgraph file *)
+let total_bits = match List.filter (fun e -> let (k,_) = e in k == "total-bits") headers with
+      e :: [] -> let (k,v) = e in v
+    | _ -> 30;;
+    
+debug ("Total Bits " ^ (string_of_int total_bits));;
+
 let ordering = Naming.ordering_of_naming naming;;
 (* let hops = Dijkstra.get_all_first_hops graph;; *)
 let hops = if Array.length Sys.argv > 3 then
