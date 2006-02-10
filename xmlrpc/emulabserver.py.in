@@ -3181,17 +3181,22 @@ class node:
             pass
 
         res = DBQueryFatal(
-            "SELECT a.node_id,a.type,b.node_id is null,"
+            "SELECT a.node_id,a.type,b.node_id is null or "
+            "  (b.pid=%s and b.eid=%s), "
             "  (a.eventstate='ISUP' or "
             "   a.eventstate='PXEWAIT' or "
-            "   a.eventstate='POWEROFF') "
+            "   a.eventstate='POWEROFF'),wn.site,nfcpu.weight "
             "FROM nodes AS a "
             "left join reserved as b on a.node_id=b.node_id "
             "left join node_types as nt on a.type=nt.type "
             "left join nodetypeXpid_permissions as p on a.type=p.type "
+            "left join widearea_nodeinfo as wn on wn.node_id=a.phys_nodeid "
+            "left join node_features as nfcpu on (nfcpu.node_id=a.phys_nodeid "
+            "  and nfcpu.feature='+load') "
             "WHERE a.role='testnode' "
             "  "+ class_test +" and "
-            "      (p.pid is null" + pid_clause + ") " + type_test)
+            "      (p.pid is null" + pid_clause + ") " + type_test,
+            (TBOPSPID, 'plabnodes'))
         
         if len(res) == 0:
             result = {}
@@ -3205,6 +3210,10 @@ class node:
                     "type" : row[1],
                     "free" : (row[2] == 1 and row[3] == 1),
                     }
+                if row[4]:
+                    result[row[0]]["site"] = row[4]
+                    result[row[0]]["cpu"] = row[5]
+                    pass
                 pass
             pass
 
