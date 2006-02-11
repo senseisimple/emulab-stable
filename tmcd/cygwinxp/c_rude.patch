@@ -1,5 +1,5 @@
-*** crude/main.c~	Thu Jun 13 06:15:21 2002
---- crude/main.c	Wed Nov  9 10:56:56 2005
+*** crude/main.c.orig	Thu Jun 13 06:15:21 2002
+--- crude_main.c	Thu Feb  2 17:18:17 2006
 ***************
 *** 35,42 ****
 --- 35,44 ----
@@ -26,8 +26,23 @@
     struct flow_stat *newflows;
   
 ***************
+*** 205,212 ****
+--- 209,220 ----
+        retval = -2;
+     }
+     if(user_id != 0){
++ #ifndef __CYGWIN__
+        fprintf(stderr,"crude: must be root to set the priority level\n");
+        retval = -2;
++ #else /* ifndef__CYGWIN__ */
++       fprintf(stderr,"crude: priority level is not supported on Cygwin\n");
++ #endif /* ifndef__CYGWIN__ */
+     }
+        } else {
+     RUDEBUG1("crude: invalid commandline arguments!\n");
+***************
 *** 288,293 ****
---- 292,298 ----
+--- 296,302 ----
     /* (if retval < 0 -> ERROR or/and EXIT IMMEDIATELY) */
     if(retval < 0){ goto crude_exit; }
    
@@ -44,7 +59,7 @@
    
     /* Activate the signal handler(s) */
     memset(&action, 0, sizeof(struct sigaction));
---- 311,318 ----
+--- 315,322 ----
         goto crude_exit;
       }
       RUDEBUG7("crude: program priority set to %d\n", p.sched_priority);
@@ -55,7 +70,7 @@
     memset(&action, 0, sizeof(struct sigaction));
 ***************
 *** 332,337 ****
---- 338,344 ----
+--- 342,348 ----
   
    crude_exit:
     if (retval >= 0 && nflows > 0) { ps_flag = 1; }
@@ -72,7 +87,7 @@
   
     if(ps_flag){ print_stats(); }
     if(main_file > 0){ close(main_file); }
---- 355,362 ----
+--- 359,366 ----
   
       /* Release the locked memory */
       munlockall();
@@ -83,7 +98,7 @@
     if(main_file > 0){ close(main_file); }
 ***************
 *** 384,392 ****
---- 392,403 ----
+--- 396,407 ----
    */
   void crude_handler(int value)
   {
@@ -105,7 +120,7 @@
   
     if(nflows > 0){ print_stats(); }
     if(main_file > 0){ close(main_file); }
---- 406,413 ----
+--- 410,417 ----
       } else {
         RUDEBUG7("crude_handler: crude priority restored\n");
       }
@@ -129,8 +144,8 @@
   #include <sys/time.h>
   #include <sys/types.h>
   #include <sys/socket.h>
-*** rude/main.c~	Thu Jun 13 06:15:21 2002
---- rude/main.c	Wed Nov  9 10:56:01 2005
+*** rude/main.c.orig	Thu Jun 13 06:15:21 2002
+--- rude_main.c	Thu Feb  2 17:18:19 2006
 ***************
 *** 31,42 ****
   #include <string.h>
@@ -173,8 +188,23 @@
     printf("rude version %s, Copyright (C) 1999 Juha Laine and Sampo Saaristo\n"
   	 "rude comes with ABSOLUTELY NO WARRANTY!\n"
 ***************
+*** 138,145 ****
+--- 142,153 ----
+  	  retval = -2;
+  	}
+  	if(user_id != 0){
++ #ifndef __CYGWIN__
+  	  fprintf(stderr,"rude: must be root to set the priority level\n");
+  	  retval = -2;
++ #else /* ifndef__CYGWIN__ */
++ 	  fprintf(stderr,"rude: priority level is not supported on Cygwin\n");
++ #endif /* ifndef__CYGWIN__ */
+  	}
+        } else {
+  	RUDEBUG1("rude: invalid commandline arguments!\n");
+***************
 *** 198,203 ****
---- 202,208 ----
+--- 206,212 ----
       goto rude_exit1;
     }
   
@@ -184,7 +214,7 @@
      * improve the performance... (the -P option)
 ***************
 *** 217,222 ****
---- 222,228 ----
+--- 226,232 ----
       }
       RUDEBUG7("rude: program priority set to %d\n", p.sched_priority);
     }
@@ -194,7 +224,7 @@
      * All is fine - start looping & transmitting
 ***************
 *** 229,234 ****
---- 235,241 ----
+--- 239,245 ----
   
    rude_exit:
   
@@ -204,7 +234,7 @@
      */
 ***************
 *** 245,250 ****
---- 252,258 ----
+--- 256,262 ----
       /* Release the locked memory */
       munlockall();
     }
@@ -214,7 +244,7 @@
   
 ***************
 *** 262,270 ****
---- 270,281 ----
+--- 274,285 ----
   void rude_handler(int value)
   {
     int ret_val = (value * (-1));
@@ -229,7 +259,7 @@
       pri.sched_priority = 0;
 ***************
 *** 276,281 ****
---- 287,293 ----
+--- 291,297 ----
     }
   
     munlockall();
