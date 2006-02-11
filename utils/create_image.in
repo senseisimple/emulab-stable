@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -301,11 +301,11 @@ close(FILE) or
 # Get the disktype for this node
 #
 $db_result =
-    DBQueryFatal("select disktype from nodes ".
+    DBQueryFatal("select disktype,bootdisk_unit from nodes ".
 		 "left join node_types on nodes.type=node_types.type ".
 		 "where node_id='$node'");
 if ($db_result->numrows == 1) {
-    ($devtype) = $db_result->fetchrow_array;
+    ($devtype,$devnum) = $db_result->fetchrow_array;
 }
 my $device = "/dev/${devtype}${devnum}";
 
