@@ -235,21 +235,13 @@ sub os_accounts_sync()
     return 0;
 }
 
-#
-# Generate and return an ifconfig line that is approriate for putting
-# into a shell script (invoked at bootup).
-#
+# Import the mapping from non-control interface names, e.g. "Local Area
+# Connection #4" to the Device Instance ID's used as devcon arguments, e.g.
+# "@PCI\VEN_8086&DEV_1010&SUBSYS_10128086&REV_01\5&2FA58B96&0&210030".
 my %dev_map = ();
-sub os_ifconfig_line($$$$$$$;$$)
+sub get_dev_map()
 {
-    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
-	$iface_type, $settings, $rtabid) = @_;
-    my ($uplines, $downlines);
-
     if (! $dev_map) {
-	# Map from non-control interface names, e.g. "Local Area Connection #4"
-	# to the Device Instance ID's used as devcon arguments, e.g.
-	# "@PCI\VEN_8086&DEV_1010&SUBSYS_10128086&REV_01\5&2FA58B96&0&210030".
 	if (! open(DEVMAP, $XIMAP)) {
 	    warning("Cannot open $XIMAP $!\n");
 	}
@@ -260,6 +252,35 @@ sub os_ifconfig_line($$$$$$$;$$)
 		$dev_map{$dev_name} = $dev_inst;
 	    }
 	    close(DEVMAP);
+	}
+    }
+}
+
+#
+# Generate and return an ifconfig line that is approriate for putting
+# into a shell script (invoked at bootup).
+#
+sub os_ifconfig_line($$$$$$$;$$)
+{
+    my ($iface, $inet, $mask, $speed, $duplex, $aliases,
+	$iface_type, $settings, $rtabid) = @_;
+    my ($uplines, $downlines);
+
+    # Handle interfaces missing from ipconfig.
+    get_dev_map();
+    if ( ! defined( $dev_map{$iface} ) ) {
+	# Try rc.cygwin again to disable/re-enable the interface object.
+	system("$BINDIR/rc.cygwin");
+
+	# Reboot if it still fails, in hope that the interface comes back.
+	# 
+	# We dare not proceed, because using netsh to try to set the IP
+	# address on one of the missing addresses will blow away the IP on
+	# *another* interface, sometimes the control net interface.  Then
+	# we would really be in the soup...
+	get_dev_map();
+	if ( ! defined( $dev_map{$iface} ) ) {
+	    system("$BINDIR/rc.reboot");
 	}
     }
 

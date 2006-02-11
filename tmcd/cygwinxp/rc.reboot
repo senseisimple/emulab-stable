@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# rc.reboot - CygWin-specific reboot script.
+# 
+# Run by rc.firstboot when it needs to change the hostname, and rc.ifconfig
+# when a needed experimental-net network interface can't be made to work.
+
+PATH=/usr/local/etc/emulab:/bin:$SYSTEMROOT/system32:$PATH
+export PATH
+
+# Enable logging.
+logfile=/var/log/EmulabStartup.log
+chmod -f g+w $logfile
+function logit () {
+    msg="`date`: $1"
+    echo "$msg" >> $logfile
+    echo "$msg"
+}
+
+logit "Entering rc.reboot"
+
+# Tell Emulab that a reboot is required.
+tmcc state SHUTDOWN
+
+logit "Remove a redirect switch to make sure we come back with a serial console."
+bootcfg /ems OFF /id 1
+
+# You wouldn't think that rebooting would be hard, but like everything else
+# on Windows, the obvious doesn't always work reliably.
+/sbin/reboot
+# Reboot shouldn't return to the shell.  Give it a few seconds to take effect.
+sleep 10
+
+# Should never get here.  Try /bin/shutdown.
+logit "*** /sbin/reboot didn't work.  Trying shutdown."
+/bin/shutdown -r -f now
+# Shutdown returns to the shell.  Give it a few seconds to take effect.
+sleep 10
+
+# Last resort!!!  tsshutdn
+logit "*** /bin/shutdown didn't work.  Trying tsshutdn."
+tsshutdn 1 /REBOOT /DELAY:1
+sleep 10
+
+# Give up, log it, ask for power cycle, and wait until timeout if that fails.
+logit "*** Failed to reboot.  Asking for power cycle."
+tmcc state 
+sleep 1200
+
+# Should never get here!
+logit "*** Failed power cycle too.  Network stack is not reset."
+sleep 9999

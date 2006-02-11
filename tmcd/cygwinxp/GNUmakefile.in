@@ -98,6 +98,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/sudo.dummy /bin/sudo
 	$(INSTALL) -m 755 $(SRCDIR)/rc.firstboot $(BINDIR)/rc/rc.firstboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.cygwinxp $(BINDIR)/rc/rc.cygwin
+	$(INSTALL) -m 755 $(SRCDIR)/rc.reboot $(BINDIR)/rc/rc.reboot
 
 sfs-install:
 

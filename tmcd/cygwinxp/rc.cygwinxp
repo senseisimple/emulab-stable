@@ -18,13 +18,11 @@ function logit () {
     echo "$msg"
 }
 
-# Enable WINDOWS() in libsetup.pm .
-iscygwin=/etc/emulab/iscygwin
-chmod -f g+w /etc/emulab
-chmod -f g+w $iscygwin
-uname -r > $iscygwin
-chmod g+w $iscygwin
-chmod -f g-w /etc/emulab
+logit "Entering rc.cygwin"
+
+# Stop the sshd service during setup, because it sometimes loops, eating 100% of the
+# CPU.  It will be restarted after rc.bootsetup by EmulabStartup.  Make sure below.
+cygrunsrv -E sshd
 
 # Make sure there isn't a dangling slothd lock file.
 rm -f /var/run/slothd.pid
@@ -169,8 +167,14 @@ else
     fi
 fi
 
+# Make double-sure that the sshd service is stopped during setup, because it
+# sometimes loops, eating 100% of the CPU.  It will be restarted after rc.bootsetup
+# by EmulabStartup.
+cygrunsrv -E sshd
+
 # Start up the service which will deliver a SHUTDOWN state event on reboot.
 cygrunsrv -S EmulabShutdown
 
-# The status 0 from this echo masks any failure of the above cygrunsrv.
-echo rc.cygwin finished.
+# Done.
+logit "rc.cygwin finished."
+exit 0
