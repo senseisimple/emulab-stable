@@ -70,6 +70,7 @@ cdboot-install:	destdircheck basefbsdcdboot-install etc-install \
 	rm -f $(SYSETCDIR)/rc.cdroot $(SYSETCDIR)/fstab.lbs
 	rm -f $(DESTDIR)/boot/loader.rc.lbs
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.dhclient $(SYSETCDIR)/rc.conf.d/dhclient
 #	$(INSTALL) -m 755 $(SRCDIR)/cdboot/rc.cdboot $(BINDIR)/rc/rc.cdboot
 	$(INSTALL) -m 755 $(SRCDIR)/cdboot/cdroot $(SYSETCDIR)/rc.d/cdroot
 	cp $(SRCDIR)/cdboot/fstab $(SYSETCDIR)/fstab

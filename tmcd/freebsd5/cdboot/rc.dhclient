@@ -1,0 +1,18 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2004, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# In rc.conf, we have told it to just to configure lo0.  Then when the
+# rc.d/dhclient script is executed, it sources this (/etc/rc.conf.d/dhclient)
+# file where we identify all the actual interfaces and mark them as
+# DHCPable.
+#
+# We do this work here rather than directly in rc.conf because rc.conf
+# is sourced by every startup rc file and even some periodic scripts.
+# No point in doing all this work a million times for no reason.
+#
+network_interfaces=`ifconfig -l | sed -E -e 's/(lo|ath|plip)[0-9]//g'`
+for _if in $network_interfaces; do
+	eval ifconfig_${_if}="DHCP"
+done
