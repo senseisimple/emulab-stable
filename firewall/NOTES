@@ -51,6 +51,7 @@ driver will hand the packet and tag directly to the vlan driver, skipping
 the first level of demux.  It also avoid a layer of dummynet filtering as
 we will see in the following diagrams.
 
+
 II. Packet Flow:
 
 A. Packets from the outside headed either inside or to the firewall itself
@@ -340,12 +341,42 @@ the firewall as well as from the real node.  At first glance this is harmless
 as well, but if the experiment inside is TRYING to do ARP spoofing, we would
 interfere with that.
 
-So, in the spirit of "anything can be fixed in the kernel", I have introduced
-an Egregious Kernel Hack to constrain ARPs in our situation.  The arp command
-has been modified to allow specifying an explicit interface with which the
-entry should be associated.  Then, if the net.link.ether.inet.proxyongwonly
-MIB is set and we are dealing with a proxy ARP entry, we will only reply
-if the request came in the interface associated with the ARP entry. 
+My initial fix, in the spirit of "anything can be fixed in the kernel",
+was to introduce an Egregious Kernel Hack to constrain ARPs in our
+situation.  The arp command was modified to allow specifying an explicit
+interface with which the entry should be associated.  Then, if the
+net.link.ether.inet.proxyongwonly MIB was set and we were dealing with
+a proxy ARP entry, we will only reply if the request came in the interface
+associated with the ARP entry.  Unfortunately, this was done by abusing
+the "gateway" field of the routing table entry for ARPs and resulting in
+it being set to the opposite interface than where the target host really
+resided.  If the firewall actually tried to send traffic to one of the
+proxy-arped hosts, it would wind up creating another routing table entry
+with the real gateway.  The result was two entries, one associated with
+each interface (inside and outside).  While things did seem to work, it
+was clear that I was header for a fall.
+
+So, try number two takes advantage of our support for multiple routing
+tables that we use for virtual nodes.  Now, the inner vlan0 interface is
+associated with a different routing table ID, allowing static, published
+ARP entries to be created in the normal way, but associated with different
+tables.  With this technique, the node MACs can be advertised via the
+regular routing table (used with the outer interface) and the gateway MAC
+can be advertised in the second routing table (used with the inner interface).
+So incoming requests will use info only in their associated routing tables.
+
+But, we are not out of the woods yet.  In order to associate an ARP entry
+with an interface, the interface has to be on the same subnet.  So to publish
+the gateway address on the inside interface, we have to assign an IP address
+to vlan0.  To maximize confusion (but simplifying my job :-) we give it
+the same IP address as the outer interface, which is possible because the
+two interfaces are now in different routing domains.  Does this confuse
+the firewall when it sends traffic?  No, because unless the sending socket
+is explicitly marked to use an alternate routing table, it will use the
+default, which is associated with the outer interface.  Thus, the firewall
+can only send to the outside, which is consistent with a world in which
+the inside interface had no address at all.  But, there is one problem with
+stateful firewall rules, covered later.
 
 
 VI. The problem with DHCP traffic
@@ -354,12 +385,13 @@ While we know the ports involved with DHCP, 67 and 68, requests and even
 replies can be broadcast.  The best we can do at the moment is to say that
 only requests can come from the inside, and only replies from the outside.
 So only someone outside of a firewall could spoof another experiment inside
-a firewall.  This is acceptible in our current threat model.
+a firewall.  This is acceptable in our current threat model.
 
 Note that the fact that replies are broadcast means that nodes inside the
 firewall will see responses to all other Emulab nodes requests and learn
 all about them.  This is not great, but we cannot stop it without looking
 inside the DHCP reply and filtering based on that.
+
 
 VII. The problem with frisbee traffic
 
@@ -370,9 +402,30 @@ address and ports used is quite wide, and leaves a pretty big hole in the
 firewall.  Once authentication and encryption are in place, we will be able
 to close this down.
 
-VIII. Other issues
+
+VIII. The problems with other traffic
 
 Note that there are issues with other services allowed through as well.
 In particular, NFS is the elephant in the middle of the room that we keep
 ignoring.
 
+
+IX. The problems with stateful firewall rules
+
+We currently use the dynamic firewall rules in IPFW2 to give us a so-called
+"stateful" firewall.  These allow us to reduce the number of rules by
+allowing a "connection" (either a real TCP connection or an RPC-type
+UDP exchange) to be initiated in one direction and have the firewall
+automatically introduce a limited lifetime rule to allow traffic in both
+directions between the source/destination addresses/ports.
+
+There are a couple of bad things about doing this however.  One is that
+it is another avenue for DoS attacks on the firewall.  See the ipfw man
+page for more.  Another is that active connections get cut off when the
+firewall reboots, we can live with this.  Related though, is that the
+firewall needs to send keep-alives for TCP connections for which it has
+dynamic rules so that the firewall rule will stay in place if the connection
+is still alive.  But, do to the way in which we configure the inside
+interface, we cannot send IP traffic, e.g., a keepalive, to the inside from
+the firewall.  Fortunately, sending to the outside is sufficient to keep the
+connection alive.
