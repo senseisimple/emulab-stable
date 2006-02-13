@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -48,7 +48,8 @@ client-install: client
 	$(INSTALL) -m 644 $(SRCDIR)/install-tarfile.1 $(DESTDIR)$(CLIENT_MANDIR)/man1/install-tarfile.1
 	$(INSTALL_PROGRAM) $(SRCDIR)/install-rpm $(LBINDIR)/install-rpm
 ifeq ($(SYSTEM),FreeBSD)
-	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/create-image
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-image $(LBINDIR)/
+	$(INSTALL_PROGRAM) $(SRCDIR)/create-swapimage $(LBINDIR)/
 	$(MAKE) -C growdisk client-install
 endif
 	$(MAKE) -C syncd client-install
