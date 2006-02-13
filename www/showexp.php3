@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -205,7 +205,8 @@ if ($expstate == $TB_EXPTSTATE_ACTIVE) {
 }
 
 if (($expstate == $TB_EXPTSTATE_ACTIVE ||
-     $expstate == $TB_EXPTSTATE_ACTIVATING) &&
+     $expstate == $TB_EXPTSTATE_ACTIVATING ||
+     $expstate == $TB_EXPTSTATE_MODIFY_RESWAP) &&
     (STUDLY() || $EXPOSELINKTEST)) {
     WRITESUBMENUBUTTON(($linktest_running ?
 			"Stop LinkTest" : "Run LinkTest"), 

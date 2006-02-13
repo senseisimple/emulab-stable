@@ -139,6 +139,7 @@ $TB_EXPTSTATE_ACTIVATING	= "activating";
 $TB_EXPTSTATE_ACTIVE		= "active";
 $TB_EXPTSTATE_PANICED		= "paniced";
 $TB_EXPTSTATE_QUEUED		= "queued";
+$TB_EXPTSTATE_MODIFY_RESWAP	= "modify_reswap";
 
 # Interfaces roles.
 define("TBDB_IFACEROLE_CONTROL",	"ctrl");
