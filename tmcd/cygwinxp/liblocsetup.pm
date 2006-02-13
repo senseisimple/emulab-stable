@@ -270,7 +270,7 @@ sub os_ifconfig_line($$$$$$$;$$)
     get_dev_map();
     if ( ! defined( $dev_map{$iface} ) ) {
 	# Try rc.cygwin again to disable/re-enable the interface object.
-	system("$BINDIR/rc.cygwin");
+	system("$BINDIR/rc/rc.cygwin");
 
 	# Reboot if it still fails, in hope that the interface comes back.
 	# 
@@ -280,7 +280,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 	# we would really be in the soup...
 	get_dev_map();
 	if ( ! defined( $dev_map{$iface} ) ) {
-	    system("$BINDIR/rc.reboot");
+	    system("$BINDIR/rc/rc.reboot");
 	}
     }
 
