@@ -568,22 +568,36 @@ sub os_fwconfig_line($@)
 	$upline .= "    fi\n";
 
 	#
-	# Setup proxy ARP entries
+	# Setup proxy ARP entries.
+	#
+	# Since we want to control which entries are proxied on inside/outside
+	# we use our multiple routing table support and put the inside IF
+	# into a different routing domain.  Then we can enter entries into
+	# one routing table or the other.
+	#
+	# XXX this blows: in order to enter an ARP entry on the vlan0
+	# interface, it has to be configured with an address in the same
+	# subnet.  So we give vlan0 our same address (the beauty of separate
+	# routing tables).  This *shouldn't* confuse anything on the firewall.
 	#
 	if (defined($fwinfo->{MACS})) {
-	    $upline .= "    sysctl net.link.ether.inet.proxygwonly=1\n";
+	    my $myip = `cat /var/emulab/boot/myip`;
+	    chomp($myip);
+	    my $mymask = `cat /var/emulab/boot/mynetmask`;
+	    chomp($mymask);
 
-	    # XXX must have an IP on the vlan dev for the arp to work
-	    $upline .= "    ifconfig $vlandev inet 10.0.0.1 netmask 255.255.255.255\n";
+	    $upline .=
+		"    ifconfig $vlandev inet $myip netmask $mymask rtabid 2\n";
 
 	    # provide GW MAC to inside
-	    $upline .= "    arp -i $vlandev -s " .
+	    $upline .= "    arp -r 2 -s " .
 		$fwinfo->{GWIP} . " " . $fwinfo->{GWMAC} . " pub only\n";
 
-	    # provide node MACs to outside
+	    # provide node MACs to outside, and unpublished on inside for us
 	    my $href = $fwinfo->{MACS};
 	    while (my ($node,$mac) = each %$href) {
-		$upline .= "    arp -i $pdev -s $node $mac pub only\n";
+		$upline .= "    arp -s $node $mac pub only\n";
+		$upline .= "    arp -r 2 -s $node $mac\n";
 	    }
 	}
 	foreach my $rule (sort { $a->{RULENO} <=> $b->{RULENO}} @fwrules) {
@@ -633,13 +647,11 @@ sub os_fwconfig_line($@)
 	$downline .= "    sysctl net.link.ether.bridge_ipfw=0\n";
 	$downline .= "    sysctl net.link.ether.bridge_vlan=1\n";
 	if (defined($fwinfo->{MACS})) {
-	    $downline .= "    arp -i $vlandev -d " . $fwinfo->{GWIP} . " pub\n";
-
 	    my $href = $fwinfo->{MACS};
 	    while (my ($node,$mac) = each %$href) {
-		$downline .= "    arp -i $pdev -d $node pub\n";
+		$downline .= "    arp -d $node pub\n";
+		$downline .= "    arp -r 2 -d $node\n";
 	    }
-	    $downline .= "    sysctl net.link.ether.inet.proxygwonly=0\n";
 	}
 	$downline .= "    ifconfig $vlandev destroy";
 
