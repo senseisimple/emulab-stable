@@ -1,6 +1,6 @@
 <!--
    EMULAB-COPYRIGHT
-   Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+   Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
    All rights reserved.
   -->
 <center>
@@ -44,7 +44,7 @@ of ways to block or allow certain types of traffic.
 When a firewalled experiment is swapped in, the firewall is setup and
 activated before any experiment nodes are allowed to setup.  Currently
 this adds approximately five more minutes to swapin time, as the firewall
-node must first be loaded with the FBSD-IPFW2 image.
+node must first be loaded with the FBSD-IPFW2 disk image.
 </p>
 <a NAME="Swapout"></a><h3>Swapout actions</h3>
 <p>
@@ -94,11 +94,12 @@ The "style" of the firewall is one of:
 <li><code>open</code>: A completely open firewall allowing all traffic.
 This gives you a hook for setting up custom firewall rules (below).
 <li><code>closed</code>: A closed firewall allowing no communication with
-the outside world.  Nodes can still communicate in a limited fashion with
+the outside world or other experiments within Emulab.
+Nodes can still communicate in a limited fashion with
 the Emulab infrastructure.
 <li><code>basic</code>: A mostly closed firewall allowing only <code>ssh</code>
-connections with the outside world, and <code>HTTP/HTTPS</code> connections
-from inside (for Windows Update).
+connections from the outside world, and <code>HTTP/HTTPS</code> connections
+from inside (primarily for Windows Update on Windows XP nodes).
 </ul>
 The firewall can be augmented with user-specified rules as well:
 	<code><pre>
@@ -116,6 +117,15 @@ There is also a method allowing explicit numbering of rules:
 	</code></pre>
 allowing more precise control over their interpretation and allowing for
 linked rules.  A <a href="#Example">complete example</a> is shown below.
+</p><p>
+It should be noted that user-specified rules will only apply to IP traffic
+passing through the firewall.  Non-IP traffic is not allowed through the
+firewall, and traffic to the firewall node itself is controlled by a different
+set of rules which cannot be overridden with this mechanism.
+For example, in a closed firewall that does not allow <code>ssh</code>,
+you can add a rule to allow <code>ssh</code> access from a particular machine
+to one of the firewalled nodes, but not to allow access to the firewall
+itself.
 </p>
 <a NAME="Limitations"></a><h2>Limitations</h2>
 <p>
@@ -124,10 +134,13 @@ One should note carefully the following issues.
 <li><b>The firewall is just another node in the topology</b>.
 It is setup just like all other nodes, this includes enabling accounts
 and NFS access.  Thus anyone who can login to a node, can login to the
-firewall.  This is not as bad as it may sound since, in all but the open
-firewall style, the firewall node rejects all packets sent to it from the
-inside.  However, the nodes and the firewall do share common filesystems
-in /users and /proj.
+firewall.  This is not as bad as it may sound since the firewall node is
+subject to its own rules.
+Thus, in all but the open firewall style, the firewall node rejects all
+packets sent to it from the inside, and in the closed firewall, it rejects
+all traffic from the outside as well.
+However, even with the firewall rules,
+the nodes and the firewall do share common filesystems in /users and /proj.
 In the future, firewalls will have much more constrained access.
 <li><b>The firewall must run FreeBSD with IPFW</b>.
 However, this is not fundamental to the design and we hope that the
@@ -139,7 +152,9 @@ or per-experiment variable substitution.
 There is a limited form of substitution used to plug in Emulab-wide
 parameters such as the Utah control network subnet.
 Since IPFW allows hostnames, you can at least
-use symbolic host names in place of IP addresses in your rules.
+use symbolic host names
+(i.e., the node names you use in your NS file)
+in place of IP addresses in your rules.
 <li><b>Firewall setup is static</b>.
 Rules are specified in the NS file at experiment creation time.
 Rules can be changed using experiment modify, or by logging into the firewall
@@ -188,11 +203,14 @@ Here is the NS code for a simple two node experiment with a firewall:
 	# create a firewall node
 	set fw [new Firewall $ns]
 	$fw set-type ipfw2-vlan
-	$fw set-style basic
+	$fw set-style closed
 
 	# allow traceroute through
 	$fw add-rule "allow udp from EMULAB_CNET to any 33434-33524"
 	$fw add-rule "allow udp from any 33434-33524 to EMULAB_CNET"
+
+	# and ssh sessions from "users" to one of the nodes
+	$fw add-rule "allow tcp from users.emulab.net to n1 setup keep-state"
 
 	$ns run
 	</code></pre>
@@ -200,7 +218,16 @@ Here is the NS code for a simple two node experiment with a firewall:
 capability.  In the Utah case, it expands to "155.98.36/22".  Note that
 even though this rule names the entire control net space of all experiments,
 it effects only those nodes within this experiment since the firewall is
-per-experiment.  This NS specification yields a topology that looks like:
+per-experiment.
+The last <code>add-rule</code> invocation demonstrates using a symbolic
+node name, "n1", to reference the node identified by the object "$n1"
+in the NS file.  This rule also takes advantage of the dynamic rule capability
+in IPFW2.  The rule itself only allows through TCP packets in the "setup"
+state (SYN but no ACK), but instructs IPFW to construct a limited lifetime
+dynamic rule allowing bidirectional traffic between the source and destination
+IP addresses and TCP ports from the packet.
+</p><p>
+This NS specification yields a topology that looks like:
 <br>
 <img src="firewall-experiment.png" alt="&lt;Three nodes, two connected&gt;">
 <br>
@@ -210,45 +237,74 @@ What isn't shown is that all three are connected via the control net.
 The firewall is accessible via a DNS name of
 <code>fw</code>.<i>experiment</i>.<i>project</i>.<code>emulab.net</code>
 similarly to
-other nodes.  You can login to the firewall, reboot it, etc. just as any
-other node.
+other nodes.
+You can login to the firewall (if allowed by the rules),
+reboot it, etc. just as any other node.
 The <code>Experiment Details</code> web page for the experiment lists
 all the rules for the firewall:
 <code><pre>
 Firewall information:
 ID              Type       Style    Rule# Rule
 --------------- ---------- -------- ----- -----------------------------------
-fw              ipfw2-vlan basic        2 check-state
-                                       10 allow all from me to me
-                                       11 deny all from any to me via vlan0
-                                       12 deny all from any to EMULAB_CNET via vlan0
-                                       13 allow mac-type arp
-                                       14 allow all from any to any frag
-                                       50 allow udp from any to EMULAB_NS 53 keep-state
+fw              ipfw2-vlan closed       4 check-state
+                                        9 skipto 80 all from any to any layer2 in
+                                       10 deny all from any to me via vlan0
+                                       11 allow all from me to me
+                                       20 allow udp from me to EMULAB_NS 53 keep-state
+                                       22 allow tcp from boss to me 22 setup keep-state
+                                       24 allow ip from me to ntp1,ntp2 123 keep-state
+                                       26 allow udp from me 514 to ops 514
+                                       30 allow ip from me to fs 111 keep-state
+                                       31 allow udp from me not 0-700 to fs keep-state
+                                       32 allow udp from me to fs 900 keep-state
+                                       33 allow udp from me to fs 2049 keep-state
+                                       34 allow ip from me to fs frag
+                                       35 allow ip from fs to me frag
+                                       36 allow tcp from me to boss 5999 setup keep-state
+                                       38 allow ip from me to ops 2917 keep-state
+                                       40 allow udp from me to boss 8509
+                                       50 allow icmp from boss to me icmptypes 6,8
+                                       51 allow icmp from me to boss icmptypes 0
+                                       70 allow ip from me to boss 7777 keep-state
+                                       79 deny all from any to any 
+                                       80 deny not mac-type ip
+                                       83 allow ip from EMULAB_GWIP to any in not via vlan0
+                                       84 deny ip from any to EMULAB_CNET in via vlan0
+                                       85 deny ip from EMULAB_CNET to any in not via vlan0
+                                       88 deny ip from not 0.0.0.0,255.255.255.255,EMULAB_CNET to any in via vlan0
                                       100 allow udp from EMULAB_CNET to any 33434-33524
                                       101 allow udp from any 33434-33524 to EMULAB_CNET
-                                    60000 allow tcp from any to any 22 setup keep-state
-                                    60010 allow ip from any to ntp1,ntp2 123 keep-state
-                                    60020 allow udp from any 514 to ops 514
+                                      102 allow tcp from users.emulab.net to n1 setup keep-state
+                                    60020 allow udp from any to EMULAB_NS 53 keep-state
+                                    60022 allow tcp from boss to any 22 setup keep-state
+                                    60024 allow ip from any to ntp1,ntp2 123 keep-state
+                                    60026 allow udp from any 514 to ops 514
                                     60030 allow ip from any to fs 111 keep-state
                                     60031 allow udp from any not 0-700 to fs keep-state
                                     60032 allow udp from any to fs 900 keep-state
                                     60033 allow udp from any to fs 2049 keep-state
-                                    60040 allow tcp from any to boss 5999 setup keep-state
-                                    60050 allow ip from any to ops 2917 keep-state
-                                    60060 allow udp from any to boss 8509
-                                    60080 allow udp from any to EMULAB_MCADDR
-                                    60081 allow udp from boss EMULAB_MCPORT to any EMULAB_MCPORT
-                                    60082 allow igmp from any to any
-                                    60090 allow icmp from any to any
-                                    61000 allow udp from any 68 to 255.255.255.255 67 recv vlan0
-                                    61001 allow udp from any 67 to any 68 in not recv vlan0
-                                    61010 allow udp from any to boss,ops 69 keep-state
-                                    61011 allow udp from boss,ops not 0-1023 to any not 0-1023 keep-state
-                                    61020 allow udp from any to boss 6969 keep-state
-                                    61021 allow ip from any to boss 7777 keep-state
-                                    65534 deny all from any to any
+                                    60034 allow ip from any to fs frag
+                                    60035 allow ip from fs to any frag
+                                    60036 allow tcp from any to boss 5999 setup keep-state
+                                    60038 allow ip from any to ops 2917 keep-state
+                                    60040 allow udp from any to boss 8509
+                                    60046 allow udp from any to EMULAB_MCADDR EMULAB_MCPORT in via vlan0
+                                    60047 allow udp from boss EMULAB_MCPORT to any EMULAB_MCPORT
+                                    60048 allow igmp from any to any
+                                    60050 allow icmp from boss to any icmptypes 6,8
+                                    60051 allow icmp from any to boss icmptypes 0
+                                    60064 allow udp from any 68 to 255.255.255.255 67 recv vlan0
+                                    60065 allow udp from any 67 to any 68 in not recv vlan0
+                                    60066 allow udp from any to boss,ops 69 keep-state
+                                    60067 allow udp from boss,ops not 0-1023 to any not 0-1023 keep-state
+                                    60068 allow udp from any 9696 to boss 6969 keep-state
+                                    60069 allow udp from boss 6970 to any 9696
+                                    60070 allow ip from any to boss 7777 keep-state
+                                    65534 deny all from any to any 
 </code></pre>
+The rules from 10 to 79 are for the firewall itself, from 80 to 65534 are
+for bridged ("layer2") packets, i.e., those that pass through the firewall.
+As user rules start at 100, 
 Again, notice the rules with <code>EMULAB_</code> variables.  <code>NS</code>
 is the Emulab name server IP address, <code>CNET</code> the control network
 subnet, <code>MCADDR</code> and <code>MCPORT</code>, the multicast addresses
