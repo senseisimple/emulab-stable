@@ -1,0 +1,60 @@
+How to get from FC2-* to PLAB-* (v3.2)
+
+1) Compiling the kernel
+
+  Either copy the PlanetLab kernel source in "/share/plab/v3.2/src" to
+  /usr/src or checkout a new copy via cvs, or get the source from the
+  PlanetLab site.
+
+  Find a matching config file for the kernel source in this directory
+  and copy it to ".config". and do a "make oldconfig".  If an exact
+  match is not found copy the PlanetLab config in the "configs/" and
+  adjust it so the following drivers are compiled in.
+
+    CONFIG_SCSI=y
+    CONFIG_BLK_DEV_SD=y
+    CONFIG_SCSI_SATA_PROMISE=y
+    CONFIG_SCSI_QLA2XXX=y
+    CONFIG_FUSION=y
+
+  Applying the most recent patch to config may do the trick.
+  
+  Edit the Makefile and change the minor version from "..-planetlab"
+  to something else to distinguish it from the official PlanetLab
+  kernel, I have been using "...-plab-NUM".
+
+  Now make as normal
+    make
+    make modules_install
+    make install
+  Than manually adjust /etc/lilo.conf if necessary and rerun lilo
+
+2) Add */sbin to the default path.  This step is not strictly needed
+   but it makes things slightly more convenient, especially since 
+   "/sbin:/usr/sbin" needs to be in the path for "vuseradd".
+
+   To do so apply the patches found in etc-patches for /etc/profile
+   and /etc/csh.login.
+
+3) Install DevBox.
+
+   Basically follow the instructions in:
+
+     https://wiki.planet-lab.org/twiki/bin/view/Planetlab/DevBox
+
+   However, note two things
+
+   1) You probably do not want to install the kernel.  Thus when prompted
+      to install the packages say no and manually install those that would
+      of been installed minus the kernel.
+
+   2) As of Feb 10, 2006, using the production DevBox installation,
+      you will also need to install the package:
+        util-vserver-legacy
+
+   Also note that parts of resman doesn't seam to function correctly
+   as it is looking for functionally of the kernel that no longer
+   exists: memlimit seams to work, cpulimit and bwlimit abort,
+   disklimit doesn't seam to have any effect.
+
+-- kevina / 2005-02-13

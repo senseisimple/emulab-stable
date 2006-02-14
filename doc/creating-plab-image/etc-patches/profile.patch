@@ -1,0 +1,18 @@
+--- /users/kevina/profile	2006-02-13 12:48:09.000000000 -0700
++++ /etc/profile	2006-02-10 16:48:50.000000000 -0700
+@@ -13,12 +13,9 @@
+ 	fi
+ }
+ 
+-# Path manipulation
+-if [ `id -u` = 0 ]; then
+-	pathmunge /sbin
+-	pathmunge /usr/sbin
+-	pathmunge /usr/local/sbin
+-fi
++pathmunge /sbin
++pathmunge /usr/sbin
++pathmunge /usr/local/sbin
+ 
+ pathmunge /usr/X11R6/bin after
+ 

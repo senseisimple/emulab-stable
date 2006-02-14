@@ -1,0 +1,321 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-us" lang="en-us"> 
+<head>
+ <title>  DevBox &lt; Planetlab &lt; TWiki</title>
+ <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1" />  
+ <base href="https://wiki.planet-lab.org/twiki/bin/view/Planetlab/DevBox" />
+ 
+</head>
+<body bgcolor="#ffffff">
+<a name="PageTop"></a>
+<form name="main" action="/twiki/bin/view/Planetlab/DevBox"> 
+<table width="100%" border="0" cellpadding="3" cellspacing="0">
+ <tr>
+  <td bgcolor="#80B048" rowspan="2" valign="top" width="1%">
+    <a href="http://www.planet-lab.org/"><img src="https://wiki.planet-lab.org/twiki/pub/Planetlab/deathstar-small.jpg" border="0" alt="PlanetLab homepage" /></a>
+   </td><td>
+   <a href="https://wiki.planet-lab.org/twiki/bin/view/Main/WebHome">TWiki</a>
+   &gt; <a href="https://wiki.planet-lab.org/twiki/bin/view/Planetlab/WebHome">Planetlab</a>
+   &gt; 
+   <font size="+1"><b>DevBox</b>   </font>
+  </td><td align="right">
+   <font size="-2">TWiki webs: <br />
+   <a class="twikiLink" href="/twiki/bin/view/Main/WebHome">Main</a>  |  <a class="twikiLink" href="/twiki/bin/view/TWiki/WebHome">TWiki</a>  |  <a class="twikiLink" href="/twiki/bin/view/Know/WebHome">Know</a>  |  <a class="twikiLink" href="/twiki/bin/view/Sandbox/WebHome">Sandbox</a>  |  <a class="twikiLink" href="/twiki/bin/view/Planetlab/WebHome">Planetlab</a> </font>
+  </td>
+ </tr>
+ <tr bgcolor="#80B048">
+  <td colspan="2">
+ Planetlab . {  <a class="twikiLink" href="/twiki/bin/view/Planetlab/WebChanges">Changes</a>  |  <a class="twikiLink" href="/twiki/bin/view/Planetlab/WebIndex">Index</a>  |  <a class="twikiLink" href="/twiki/bin/view/Planetlab/WebSearch">Search</a>  |  Go <input type="text" name="topic" size="16" />  }
+  </td>
+ </tr>
+</table>
+</form>
+This page describes the procedure to install the <a class="twikiLink" href="/twiki/bin/view/Planetlab/PlanetLab">PlanetLab</a> linux kernel and a set of RPMs on a conventional Fedora Core 2 systems.  Why would anyone want to do this? Maybe to:
+<p />
+<ul>
+<li> develop and test new PlanetLab related software that runs in a slice/vserver,
+</li>
+<li> look under the covers at the PlanetLab system software in action and enhance/modify it, or 
+</li>
+<li> play around with the PlanetLab linux kernel itself.
+</li>
+</ul>
+<p />
+There are three flavors of DevBox available: production, alpha, and beta.  These correspond to the latest software that is running on existing PlanetLab production, alpha, and beta nodes.  At the moment, the DevBox software is a proper subset of the software that one needs to run on a PlanetLab nodes.  In the  future, we hope to expand it to the point that a DevBox corresponds fully to the software needed to work with a <span class="twikiNewLink" style='background : #FFFFCE;'><font color="#0000FF">PlanetLabInABox</font><a href="/twiki/bin/edit/Planetlab/PlanetLabInABox?topicparent=Planetlab.DevBox"><sup>?</sup></a></span>.
+<p />
+The remainder of this document is organized as follows:
+<p />
+<div class="twikiToc">
+<ul>
+<li> <a href="#Adding_PlanetLab_software_to_a_F">Adding PlanetLab software to a Fedora Core 2 system</a>
+<ul>
+<li> <a href="#Getting_DevBox_with_yum">Getting DevBox with yum</a>
+</li>
+<li> <a href="#Post_Installation_Reboot_operati">Post Installation/Reboot operations</a>
+</li>
+<li> <a href="#Debugging_installation">Debugging installation</a>
+</li>
+</ul>
+</li>
+<li> <a href="#Changing_System_Resource_Allocat">Changing System Resource Allocations with RESMAN</a>
+</li>
+</ul>
+</div>
+<p />
+<h1><a name="Adding_PlanetLab_software_to_a_F"> </a> Adding <a class="twikiLink" href="/twiki/bin/view/Planetlab/PlanetLab">PlanetLab</a> software to a Fedora Core 2 system </h1>
+<p />
+<strong>NOTE:</strong> This is for Fedora Core 2. We have not tested it with FC3. There have been reports that it does not work without some additional work. Please try on a FC2 system first.
+<p />
+We have created DevBox yum repositories. Currently, the rpm set includes the kernel, vserver related utilities, and support to twiddle resource management knobs.
+<p />
+<h2><a name="Getting_DevBox_with_yum"> </a> Getting DevBox with yum </h2>
+<p />
+To get updates from the DevBox yum repositories, you will need to make a simple three line addtion to /etc/yum.conf.  I'll assume you have a x86 box that has Fedora Core 2  installed with recent rpm package updates and are using the grub bootloader.  
+<p />
+For the PRODUCTION DevBox installation, add the following lines to /etc/yum.conf:
+<p />
+<pre>
+[planetlab-devbox]
+name=PlanetLab DevBox RPMS -- PlanetLab Central
+baseurl=http://boot.planet-lab.org/install-rpms/planetlab-devbox/
+</pre> 
+<p />
+and then as root run
+<p />
+<pre>
+# yum groupupdate planetlab-devbox
+</pre>
+<p />
+This downloads the PlanetLab node software that corresponds to the production software currently deployed on PlanetLab nodes. 
+<p />
+After the yum groupupdate completes, reboot into the new planetlab kernel.  It should be listed as one of your grub choices with the name "planetlab" in it.  
+<p />
+For the ALPHA DevBox installation, please use the following yum.conf and yum commands:
+<p />
+<pre>
+[planetlab-alpha-devbox]
+name=PlanetLab Alpha DevBox RPMS -- PlanetLab Central
+baseurl=http://boot.planet-lab.org/install-rpms/planetlab-alpha-devbox/
+</pre> 
+<p />
+<pre>
+# yum groupupdate planetlab-alpha-devbox
+</pre>
+<p />
+For the BETA DevBox installation, please use the following yum.conf and yum commands:
+<p />
+<pre>
+[planetlab-beta-devbox]
+name=PlanetLab Beta DevBox RPMS -- PlanetLab Central
+baseurl=http://boot.planet-lab.org/install-rpms/planetlab-beta-devbox/
+</pre> 
+<p />
+<pre>
+# yum groupupdate planetlab-beta-devbox
+</pre>
+<p />
+<strong>NOTE</strong>: Once you install an alpha DevBox, you cannot easily downgrade to a beta or production DevBox.  Similarly, once you install a beta DevBox, you cannot easily downgrade to a production DevBox.  This is something we are still working on.  If you know how to solve this using yum, please send us email <a href="mailto:devel@planet-lab.org">devel@planet-lab.org</a>.
+<p />
+<h2><a name="Post_Installation_Reboot_operati"> </a> Post Installation/Reboot operations </h2>
+After the reboot, the vserver reference is automatically run.
+A displayed message: "Building vserver reference" should appear.
+This operation might take several minutes.
+<p />
+For adding slices (users) you can type:
+<p />
+<pre>
+# /usr/sbin/vuseradd v_test
+</pre>
+<p />
+which will create a vserver named v_test.
+<p />
+You can log into this vserver by typing:
+<p />
+<pre>
+#su v_test
+</pre>
+<p />
+Now you are operating inside a vserver in a similar manner as if you just logged into your slice account on a <a class="twikiLink" href="/twiki/bin/view/Planetlab/PlanetLab">PlanetLab</a> node. Go ahead and do whatever software development or testing you would like to do. 
+<p />
+<p />
+<p />
+<h2><a name="Debugging_installation"> </a> Debugging installation </h2>
+<p />
+In case everything went well, you should skip this section.<br>
+<p />
+<dl>
+<p />
+<dt><b>yum settings</b></dt>
+<dd>When editing /etc/yum.conf, you are advised to replace the [base] and [updates-relased]
+section to have mirrors which are geographically close to you. A list of FC2 mirrors is found on:
+<a href="http://fedora.redhat.com/download/mirrors.html">mirrors</a>. I have experianced stuck yum sessions where the
+mirror did not respond or was too busy. 
+You can check if the mirror is alive:
+<pre>
+#yum info gcc
+
+Unable to find pid
+Gathering header information file(s) from server(s)
+Server: Fedora Core 2 - i386 - Base
+Server: PlanetLab Desktop RPMS -- PlanetLab Central
+Server: Fedora Core 2 - i386 - Released Updates
+Finding updated packages
+Downloading needed headers
+Looking in Available Packages:
+
+Looking in Installed Packages:
+Name   : gcc
+Arch   : i386
+Version: 3.3.3
+Release: 7
+Size   : 11.07 MB
+Group  : Development/Languages
+Repo   : Locally Installed
+Summary: The GNU cc and gcc C compilers.
+Description:
+ The gcc package includes the cc and gcc GNU compilers for compiling C
+code.
+</pre>
+</dd>
+<br>
+<dt><b>Checking grub setup</b></dt>
+<dd>After doing <tt>yum groupupdate "planetlab-devbox"</tt> (or the equivalent for the alpha and beta versions of DevBox you can look at /boot/grub/grub.conf. A new entry similar to the following should appear:
+<tt>
+<pre>
+[root@planet8 daniel51]#  cat /boot/grub/grub.conf
+# grub.conf generated by anaconda
+#
+# Note that you do not have to rerun grub after making changes to this file
+# NOTICE:  You have a /boot partition.  This means that
+#          all kernel and initrd paths are relative to /boot/, eg.
+#          root (hd0,0)
+#          kernel /vmlinuz-version ro root=/dev/sda2
+#          initrd /initrd-version.img
+#boot=/dev/sda
+default=0
+timeout=10
+splashimage=(hd0,0)/grub/splash.xpm.gz
+<font color="red">title Fedora Core (2.6.8-1.521.2.4.planetlab)
+        root (hd0,0)
+        kernel /vmlinuz-2.6.8-1.521.2.4.planetlab ro root=LABEL=/ rhgb quiet
+        initrd /initrd-2.6.8-1.521.2.4.planetlab.img<br></font>
+title Fedora Core (2.6.9-1.6_FC2smp)
+        root (hd0,0)
+        kernel /vmlinuz-2.6.9-1.6_FC2smp ro root=LABEL=/ rhgb quiet
+        initrd /initrd-2.6.9-1.6_FC2smp.img
+title Fedora Core (2.6.9-1.6_FC2)
+        root (hd0,0)
+        kernel /vmlinuz-2.6.9-1.6_FC2 ro root=LABEL=/ rhgb quiet
+        initrd /initrd-2.6.9-1.6_FC2.img
+</tt>
+</pre>
+You can change the "default" parameter to point to the number of the planetlab version and thus avoid hitting enter when the node reboots.
+<dt><b>Verfying new kernel version</b></dt>
+<dd>After the reboot, you can do "uname -a" in order to check the new kernel version.
+<pre>
+[root@planet8 daniel51]# uname -a
+Linux planet8 2.6.8-1.521.2.4.planetlab #1 Tue Dec 14 15:20:58 EST 2004 i686 i686 i386 GNU/Linux
+</pre>
+The kernel is the third field (you do not have to be root to do this).
+</dd>
+<br>
+<dt><b>Removing a slice</b></dt><dd>In case you added a user with "vuseradd" and you like to remove it, use "vuserdel".
+</dd>
+<p />
+<dt><b>Errors when building the vservers:</b></dt>
+After the reboot it the vserver reference image is automatically built. 
+In case of error, you can build it using the following command:
+<p />
+<pre>
+# /sbin/service vserver-reference start
+</pre>
+<p />
+which will download a bunch of RPM packages to create /vservers/vserver-references. Depending on where you are located relative to the boot.planet-lab.org server located at Princeton University, this may take a while. This reference image is used to create a filesystem image for a vserver/slice.
+<p />
+After you have succeeded with creating the vserver-reference image (check in /vservers),
+<p />
+<dd><pre>
+[root@planet8 vservers]# /usr/sbin/vuseradd huji_daniel51
+/usr/sbin/vuseradd: line 30: useradd: command not found
+/usr/sbin/vuseradd: line 80: vserver: command not found
+/usr/sbin/vuseradd: line 81: vserver: command not found
+/usr/sbin/vuseradd: line 91: service: command not found
+</pre>
+Here the PATH environment variable was not set correctly. The fix was: (assuming root is working using bash)
+<pre>
+[root@planet8 vservers]# PATH=$PATH:/sbin:/usr/sbin ; export PATH
+</pre>
+</dd>
+<br>
+<dt><b>Manually installing new kernel (overriding yum)</b></dt>
+<dd>
+This is needed only if yum failed to download the right kernel. Find out which kernel version is current,
+and do the following (as the root user).
+<pre>
+[root@planet8 vservers]#wget http://boot.planet-lab.org/install-rpms/planetlab-desktop/kernel-2.6.8-1.521.2.4.planetlab.i686.rpm
+[root@planet8 vservers]#rpm -i ./kernel-2.6.8-1.521.2.4.planetlab.i686.rpm
+</pre>
+</dd>
+<p />
+<dt><b>Looking at the logs</b></dt>
+<dd>
+The service vservers-reference writes a log file into /var/logs/vserver-reference.log. You can try to examine this file in order find out where the script got stuck.
+</dd>
+<p />
+The last section  was written by <a href="http://www.cs.huji.ac.il/~daniel51/">Danny Bickson</a>
+<br>More tips can be found on the document <a href="http://www.cs.huji.ac.il/labs/danss/planetlab/PlanetlabProjectHowto.pdf">here</a>
+</dl>
+<p />
+<h1><a name="Changing_System_Resource_Allocat"> </a> Changing System Resource Allocations with RESMAN </h1>
+<p />
+A new package, called resman, is used to twiddle the knobs that the PlanetLab kernel exposes for disk space, network bandwidth, cpu, memory, tasks, and io.  The scripts provided by resman include: disklimit, bwlimit, cpulimit, memlimit, tasklimit, and iolimit.
+<p />
+Each script exports the following commands: init, setlimit, getlimit, on, off, and default.  The common case sequence of commands used to
+change a particular limit consists of a <strong>getlimit</strong>, <strong>setlimit</strong>, and <strong>on</strong> sequence.  The following example with cpulimit illustrates how to increase the cpu allocation by 4 shares for a slice called v_slice:
+<p />
+<pre>
+# /bin/bash # in case you are running a different shell
+# cur=$(cpulimit getlimit v_test)
+# let cur=$cur+4
+# cpulimit setlimit v_test $cur
+# cpulimit on v_test
+</pre>
+<p />
+A similar recipe can be used for all the other limit scripts.
+<p />
+<p />
+<br clear="all" />
+<table width="100%" border="0" cellpadding="3" cellspacing="0">
+ <tr bgcolor="#80B048">
+  <td valign="top">
+   Topic <b>DevBox</b> . {   <a href="/twiki/bin/edit/Planetlab/DevBox?t=1139854420"><b>Edit</b></a>
+   |  <a href="/twiki/bin/attach/Planetlab/DevBox">Attach</a>
+   |  <a href="/twiki/bin/search/Planetlab/SearchResult?scope=text&amp;regex=on&amp;excludetopic=DevBox&amp;search=Dev%20*Box%5B%5EA-Za-z0-9%5D">Ref-By</a>
+   |  <a href="/twiki/bin/view/Planetlab/DevBox?skin=print">Printable</a>
+   |  <a href="/twiki/bin/rdiff/Planetlab/DevBox">Diffs</a>  | r1.11 | <a href="/twiki/bin/rdiff/Planetlab/DevBox?rev1=1.11&amp;rev2=1.10">&gt;</a> | <a href="/twiki/bin/view/Planetlab/DevBox?rev=1.10">r1.10</a> | <a href="/twiki/bin/rdiff/Planetlab/DevBox?rev1=1.10&amp;rev2=1.9">&gt;</a> | <a href="/twiki/bin/view/Planetlab/DevBox?rev=1.9">r1.9</a>
+   |  <a href="/twiki/bin/oops/Planetlab/DevBox?template=oopsmore&amp;param1=1.11&amp;param2=1.11">More</a> 
+   }
+  </td>
+ </tr>
+</table>
+<table width="100%" border="0" cellpadding="3" cellspacing="0">
+ <tr>
+  <td>
+<div class="TWikiFooterNote">
+   Revision r1.11 - 09 Jan 2006 - 21:01 - <a class="twikiLink" href="/twiki/bin/view/Main/SteveMuir">SteveMuir</a> 
+<p />
+ </div>
+<p />
+  </td>
+  <td width="50%">
+    <div class="TWikiCopyright">
+<font size="-2"><font size="-2">Copyright &copy; 1999-2006 by the contributing authors. 
+All material on this collaboration platform is the property of the contributing authors. <br /> 
+Ideas, requests, problems regarding TWiki? <a href="mailto:twiki@planet-lab.org?subject=TWiki&#32;Feedback&#32;on&#32;Planetlab.DevBox">Send</a> feedback. </font></font>
+</div>
+  </td>
+ </tr>
+</table>
+<a name="PageBottom"></a>
+</body>
+</html>

@@ -1,0 +1,11 @@
+--- /users/kevina/csh.login	2006-02-13 12:48:19.000000000 -0700
++++ /etc/csh.login	2006-02-10 16:53:23.000000000 -0700
+@@ -5,7 +5,7 @@
+ if ($?PATH) then
+ 	setenv PATH "${PATH}:/usr/X11R6/bin"
+ else
+-	setenv PATH "/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
++	setenv PATH "/usr/local/sbin:/usr/sbin:/sbin:/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin"
+ endif
+ 
+ limit coredumpsize unlimited
