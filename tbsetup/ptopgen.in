@@ -341,7 +341,8 @@ if ($allnodes) {
 $result =
     DBQueryFatal("select a.node_id,a.type,a.phys_nodeid,t.class,t.issubnode," .
 		 "a.def_boot_osid, (b.pid is not null and b.eid is not null), " .
-		 "  np.reserved_pid is not null ".
+		 "  np.reserved_pid is not null,np.eventstate, ".
+		 "  np.battery_percentage ".
 		 "from nodes as a ".
 		 "left join reserved as b on a.node_id=b.node_id ".
 		 "left join reserved as m on a.phys_nodeid=m.node_id ".
@@ -357,7 +358,7 @@ $result =
 # the type/class of node.
 #
 while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
-	$prereserved) = $result->fetchrow_array) {
+	$prereserved,$eventstate,$battery_perc) = $result->fetchrow_array) {
     $nodes{$node} = $type
 	if (!defined($pid) ||
 	    ($permissions{$type} && $permissions{$class}));
@@ -373,6 +374,9 @@ while (($node,$type,$physnode,$class,$issubnode,$def_boot_osid,$reserved,
     }
 
     $is_prereserved{$node} = $prereserved;
+
+    $curr_state{$node} = $eventstate;
+    $curr_batt{$node} = $battery_perc;
 }
 
 #
@@ -560,6 +564,15 @@ foreach $node (keys(%nodes)) {
 
     if ($is_prereserved{$node}) {
 	push(@features,"prereserved:0.9");
+    }
+
+    # For robots, prefer ones that are already powered on and/or won't need to
+    # be recharged soon.
+    if (defined($curr_state{$node}) && ($curr_state{$node} eq TBDB_NODESTATE_POWEROFF)) {
+	push(@features,"poweroff:0.9");
+    }
+    if (defined($curr_batt{$node})) {
+	push(@features,"powerneeded:" . (1.0 - $curr_batt{$node} / 100.0));
     }
 
     # Add in modelnet stuff.
