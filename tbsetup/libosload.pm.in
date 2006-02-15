@@ -534,7 +534,7 @@ sub GetImageInfo($$)
 	my $sb = stat($imagepath);
 	my $chunks = $sb->size >> 20; # size may be > 2^31, shift is unsigned
 
-	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 30) + (5 * 60));
+	$rowref->{'maxloadwait'} = int((($chunks / 100.0) * 42) + (5 * 60));
     }
 
     print STDERR
