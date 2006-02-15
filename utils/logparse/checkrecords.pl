@@ -149,7 +149,9 @@ sub checkexpstate() {
 	    checkcreate($rec);
 	}
 	# Experiment swapout
-	elsif ($action == SWAPOUT || $action == BATCHSWAPOUT) {
+	elsif ($action == SWAPOUT || $action == BATCHSWAPOUT ||
+	       $action == AUTOSWAPOUT || $action == IDLESWAPOUT ||
+	       $action == FORCEDSWAPOUT) {
 	    checkswapout($rec);
 	}
 	# Experiment swapin

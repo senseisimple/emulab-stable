@@ -82,6 +82,10 @@ my @_swapout_pat = (
   "Experiment ($PID_RE)\/($EID_RE) $SWAPPED_RE out"
 );
 my @swapout_pat;
+my @_forcedswapout_pat = (
+  "idleswap (?:-r )?(-[ai] )?($PID_RE) ($EID_RE)"
+);
+my @forcedswapout_pat;
 my @_terminate_pat = (
   "Experiment ($PID_RE)\/($EID_RE) Terminated"
 );
@@ -109,12 +113,17 @@ my @modifyfail_pat;
 # Node related REs and patterns
 #
 my $PC_RE = '(?:tb)?pc\d+';
-my $SHARK_RE = 'sh\d+\-\d+';
+my $SHARK_RE = 'sh\d+\-\d+|tbsh\d+';
 my $RON_RE = 'vron\d+';
 my $NODE_RE = "(?:$PC_RE|$SHARK_RE|$RON_RE)";
 
+#
+# "alive and well" may not be at beginning of line due to parallel
+# operation of snmpit, it may be generating output at the same time.
+# It should always be the last thing on the line however.
+#
 my @_nodealloc_pat = (
-  "^($NODE_RE) is alive and well",
+  "($NODE_RE) is alive and well\$",
   "^Not waiting for ($NODE_RE) to come alive\. Foreign OS\."
 );
 my @nodealloc_pat;
@@ -158,6 +167,7 @@ sub compilepatterns()
     map { $_->{pat} = $_->{_pat} } @create_info;
     @swapin_pat = map { qr/$_/ } @_swapin_pat;
     @swapout_pat = map { qr/$_/ } @_swapout_pat;
+    @forcedswapout_pat = map { qr/$_/ } @_forcedswapout_pat;
     @terminate_pat = map { qr/$_/ } @_terminate_pat;
     @batch_pat = map { qr/$_/ } @_batch_pat;
     @preload_pat = map { qr/$_/ } @_preload_pat;
@@ -169,6 +179,10 @@ sub compilepatterns()
     @nodealloc_pat = map { qr/$_/ } @_nodealloc_pat;
     @nodefree_pat = map { qr/$_/ } @_nodefree_pat;
 }
+
+sub NODE_ALLOC()     { return 1 };
+sub NODE_DEALLOC()   { return 2 };
+sub NODE_UNKNOWN()   { return 3 };
 
 sub STATE_NORMAL()   { return 1 };
 sub STATE_OCREATE()  { return 2 };	# 2000-ish create message
@@ -337,6 +351,23 @@ sub processmsg(@) {
 		    $state = STATE_NLSEARCH;
 		    $msg{nodes} = {};
 		}
+		#
+		# For an idleswap message, we have everything we need by
+		# the time we parse the subject line.
+		#
+		elsif ($msg{action} == IDLESWAPOUT ||
+		       $msg{action} == AUTOSWAPOUT ||
+		       $msg{action} == FORCEDSWAPOUT) {
+		    if (!$msg{stamp} || !$msg{pid} || !$msg{eid} ||
+			!$msg{uid} || !$msg{id}) {
+			print STDERR
+			    "*** Bad idleswap message $msg{id} ignored\n"
+				if ($whine);
+			return;
+		    }
+		    $msg{subject} = $subject;
+		    last;
+		}
 		$msg{subject} = $subject;
 	    }
 	    next;
@@ -418,7 +449,11 @@ sub processmsg(@) {
 		if ($node =~ /tb(pc.*)/) {
 		    ($node = $1) =~ s/pc0/pc/;
 		}
-		$msg{nodes}{$node} = 1;
+		# and sharks
+		elsif ($node =~ /tb(sh\d+)/) {
+		    ($node = $1) =~ s/$/-1/;
+		}
+		$msg{nodes}{$node} = NODE_ALLOC;
 	    }
 	    next;
 	}
@@ -452,13 +487,17 @@ sub processmsg(@) {
 		    if ($node =~ /tb(pc.*)/) {
 			($node = $1) =~ s/pc0/pc/;
 		    }
-		    $msg{nodes}{$node} = 1;
+		    # and sharks
+		    elsif ($node =~ /tb(sh\d+)/) {
+			($node = $1) =~ s/$/-1/;
+		    }
+		    $msg{nodes}{$node} = NODE_UNKNOWN;
 		}
 		#
 		# Eeewww...ron nodes make our life miserable
 		#
 		elsif ($line =~ /\s+($RON_RE) \(ron\d+\)$/o) {
-		    $msg{nodes}{$1} = 1;
+		    $msg{nodes}{$1} = NODE_UNKNOWN;
 		}
 	    } else {
 		if ($line =~ /^Physical Node Mapping:$/) {
@@ -488,9 +527,21 @@ sub processmsg(@) {
 	# Recognize lines that represent a node being allocated or freed
 	#
 	if ($line =~ /$NODE_RE/o) {
-	    my $node = parsenode($line);
-	    $msg{nodes}{$node} = 1
-		if ($node);
+	    my ($node,$alloc) = parsenode($line);
+
+	    if ($node) {
+		#
+		# Check for nodes changing allocation status
+		#
+		if (exists($msg{nodes}{$node})) {
+		    # ALLOC -> ALLOC and ALLOC -> DEALLOC are ok
+		    if ($msg{nodes}{$node} != NODE_ALLOC) {
+			print STDERR "Found $node twice in ", $msg{id}, ": ",
+			             $msg{nodes}{$node}, "->$alloc\n";
+		    }
+		}
+		$msg{nodes}{$node} = $alloc;
+	    }
 	    next;
 	}
 
@@ -624,6 +675,22 @@ sub createrecord(%) {
 
     printmsg(%msg)
 	if ($debug > 1);
+
+    #
+    # Experiments may replace nodes that fail during a swapin,
+    # so be on the lookout for node deallocation messages in the
+    # middle of swapin/batchswapin.  We just remove such nodes
+    # entirely from this operation.
+    #
+    if ($msg{action} == SWAPIN || $msg{action} == BATCHSWAPIN) {
+	while (my ($node,$alloc) = each(%{$msg{nodes}})) {
+	    if ($alloc == NODE_DEALLOC) {
+		print STDERR "$node deallocated in ", ACTIONSTR($msg{action}),
+                             " msg ", $msg{id}, "\n";
+		delete($msg{nodes}{$node});
+	    }
+	}
+    }
 
     # save an experiment record
     if ($msg{pid}) {
@@ -832,6 +899,17 @@ sub parsesubject($)
 	    return (SWAPOUT, $1, $2);
 	}
     }
+    for $pat (@forcedswapout_pat) {
+	if ($str =~ /$pat/) {
+	    if (!defined($1)) {
+		return (FORCEDSWAPOUT, $2, $3);
+	    }
+	    if ($1 eq "-i ") {
+		return (IDLESWAPOUT, $2, $3);
+	    }
+	    return (AUTOSWAPOUT, $2, $3);
+	}
+    }
     for $pat (@terminate_pat) {
 	if ($str =~ /$pat/) {
 	    return (TERMINATE, $1, $2);
@@ -875,11 +953,13 @@ sub parsesubject($)
 sub parsenode($) {
     my ($str) = @_;
     my $pat;
+    my $alloc;
 
     my $node = "";
     for $pat (@nodealloc_pat) {
 	if ($str =~ /$pat/) {
 	    $node = $1;
+	    $alloc = NODE_ALLOC;
 	    last;
 	}
     }
@@ -887,6 +967,7 @@ sub parsenode($) {
 	for $pat (@nodefree_pat) {
 	    if ($str =~ /$pat/) {
 		$node = $1;
+		$alloc = NODE_DEALLOC;
 		last;
 	    }
 	}
@@ -894,9 +975,11 @@ sub parsenode($) {
     # compensate for old style name
     if ($node =~ /tb(pc.*)/) {
 	($node = $1) =~ s/pc0/pc/;
+    } elsif ($node =~ /tb(sh\d+)/) {
+	($node = $1) =~ s/$/-1/;
     }
 
-    return $node;
+    return ($node, $alloc);
 }
 
 sub parsebatch($$$) {

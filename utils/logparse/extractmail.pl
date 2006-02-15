@@ -4,7 +4,7 @@
 # and creates a new file with only the messages of interest.  Duplicates
 # are ignored.  Note that the resulting file is NOT necessarily in date order.
 #
-# Works for 2000 and 2001 mail.
+# Works for 2000-2005 mail.
 #
 # cat testbed*.mail | extracttbmail.pl > tb.mail
 #
@@ -40,6 +40,7 @@ my @ignore_pat = (
   '^Mysqld Watchdog',
   '^Named Setup',
   '^Reload Daemon',
+  '^Repositioning Daemon',
   '^Stated ',
   '^SFS ',
   '^SSH ',
@@ -48,7 +49,6 @@ my @ignore_pat = (
   '^Your CD ',
   '^changeuid ',
   '^genelists',
-  '^idleswap ',
   '^jabbersetup',
   '^mkproj ',
   '^mkgroup ',
@@ -87,9 +87,10 @@ my @ignore_pat = (
   '^Auto-Swap Warning',
   '^Max Duration Warning',
   '^Parser Exceeded CPU Limit',
+  '^Please tell us about your experiment',
   '^Login ID requested by ',
   '^No power outlet ',
-  '^Power cycle nodes:',
+  '^Power (?:cycle|on) nodes:',
   '^Robot Lab',
   '^Grab WebCam',
   '^OPS has rebooted',
@@ -100,7 +101,7 @@ my @ignore_pat = (
   '^Mailman list',
   '^WARNING: power controller',
   '^Duplicates in plab',
-  '^Plabdaemon',
+  '^Plab',
   '^WARNING: PLAB',
   'plab nodes revived\.',
   '[Nn]ew plab node',
