@@ -82,10 +82,6 @@ my @_swapout_pat = (
   "Experiment ($PID_RE)\/($EID_RE) $SWAPPED_RE out"
 );
 my @swapout_pat;
-my @_forcedswapout_pat = (
-  "idleswap (?:-r )?(-[ai] )?($PID_RE) ($EID_RE)"
-);
-my @forcedswapout_pat;
 my @_terminate_pat = (
   "Experiment ($PID_RE)\/($EID_RE) Terminated"
 );
@@ -167,7 +163,6 @@ sub compilepatterns()
     map { $_->{pat} = $_->{_pat} } @create_info;
     @swapin_pat = map { qr/$_/ } @_swapin_pat;
     @swapout_pat = map { qr/$_/ } @_swapout_pat;
-    @forcedswapout_pat = map { qr/$_/ } @_forcedswapout_pat;
     @terminate_pat = map { qr/$_/ } @_terminate_pat;
     @batch_pat = map { qr/$_/ } @_batch_pat;
     @preload_pat = map { qr/$_/ } @_preload_pat;
@@ -350,23 +345,6 @@ sub processmsg(@) {
 		elsif ($msg{action} == MODIFY) {
 		    $state = STATE_NLSEARCH;
 		    $msg{nodes} = {};
-		}
-		#
-		# For an idleswap message, we have everything we need by
-		# the time we parse the subject line.
-		#
-		elsif ($msg{action} == IDLESWAPOUT ||
-		       $msg{action} == AUTOSWAPOUT ||
-		       $msg{action} == FORCEDSWAPOUT) {
-		    if (!$msg{stamp} || !$msg{pid} || !$msg{eid} ||
-			!$msg{uid} || !$msg{id}) {
-			print STDERR
-			    "*** Bad idleswap message $msg{id} ignored\n"
-				if ($whine);
-			return;
-		    }
-		    $msg{subject} = $subject;
-		    last;
 		}
 		$msg{subject} = $subject;
 	    }
@@ -897,17 +875,6 @@ sub parsesubject($)
     for $pat (@swapout_pat) {
 	if ($str =~ /$pat/) {
 	    return (SWAPOUT, $1, $2);
-	}
-    }
-    for $pat (@forcedswapout_pat) {
-	if ($str =~ /$pat/) {
-	    if (!defined($1)) {
-		return (FORCEDSWAPOUT, $2, $3);
-	    }
-	    if ($1 eq "-i ") {
-		return (IDLESWAPOUT, $2, $3);
-	    }
-	    return (AUTOSWAPOUT, $2, $3);
 	}
     }
     for $pat (@terminate_pat) {

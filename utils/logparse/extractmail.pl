@@ -49,6 +49,7 @@ my @ignore_pat = (
   '^Your CD ',
   '^changeuid ',
   '^genelists',
+  '^idleswap ',
   '^jabbersetup',
   '^mkproj ',
   '^mkgroup ',

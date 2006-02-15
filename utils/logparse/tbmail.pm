@@ -14,7 +14,6 @@ use Exporter;
 	     ISCREATE SWAPIN SWAPOUT SWAPOUTMAYBE TERMINATE BATCH BATCHIGNORE
 	     BATCHCREATE BATCHCREATEMAYBE BATCHTERM BATCHTERMMAYBE BATCHSWAPIN
 	     BATCHSWAPOUT BATCHPRELOAD ACTIONSTR
-	     AUTOSWAPOUT IDLESWAPOUT FORCEDSWAPOUT
 );
 
 # Must come after package declaration!
@@ -57,9 +56,6 @@ sub ISCREATE($)
 sub SWAPIN()	    { return 21 };
 sub SWAPOUT()	    { return 31 };
 sub SWAPOUTMAYBE()  { return 32 };
-sub IDLESWAPOUT()   { return 33 };
-sub AUTOSWAPOUT()   { return 34 };
-sub FORCEDSWAPOUT() { return 35 };
 
 sub TERMINATE()	{ return 41 };
 
@@ -84,9 +80,6 @@ my %actiontostr = (
     CREATE2()      => 'CREATE',
     SWAPIN()       => 'SWAPIN',
     SWAPOUT()      => 'SWAPOUT',
-    AUTOSWAPOUT()  => 'AUTOSWAPOUT',
-    IDLESWAPOUT()  => 'IDLESWAPOUT',
-    FORCEDSWAPOUT() => 'FORCEDSWAPOUT',
     TERMINATE()    => 'TERMINATE',
     BATCH()        => 'BATCH',
     BATCHCREATE()  => 'BATCHCREATE',
@@ -106,9 +99,6 @@ my %strtoaction = (
     'CREATE'      => CREATE2(),
     'SWAPIN'      => SWAPIN(),
     'SWAPOUT'     => SWAPOUT(),
-    'AUTOSWAPOUT' => AUTOSWAPOUT(),
-    'IDLESWAPOUT' => IDLESWAPOUT(),
-    'FORCEDSWAPOUT' => FORCEDSWAPOUT(),
     'TERMINATE'   => TERMINATE(),
     'BATCH'       => BATCH(),
     'BATCHCREATE' => BATCHCREATE(),
