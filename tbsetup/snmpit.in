@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -26,6 +26,24 @@ use libtblog;
 use English;
 use Getopt::Long;
 use strict;
+
+# Protos
+sub parseStatusString($);
+sub debug($);
+sub doListVlans($);
+sub doListPorts($);
+sub doPortStatus($@);
+sub doGetStats($);
+sub doVlansFromTables($@);
+sub doReset($@);
+sub doMakeVlan($$@);
+sub doDeleteVlan($@);
+sub doVlanNumber($$);
+sub doPortControl($$@);
+sub doRecreateVlans($);
+sub doTrunkEnable($$@);
+sub doTrunkDisable($$);
+sub doRestorePortStatus($@);
 
 #
 # Defaults

@@ -1455,7 +1455,7 @@ sub undoFWNodes($$;@) {
     my @fwstate = ();
     my $zap = 1;
 
-    if (!defined(@nodes) || @nodes == 0) {
+    if (!@nodes || scalar(@nodes) == 0) {
 	@nodes = ExpNodes($pid, $eid, 1);
 	$doall = 1;
     }
