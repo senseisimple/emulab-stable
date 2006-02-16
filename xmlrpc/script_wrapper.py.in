@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 # 
 # Permission to use, copy, modify and distribute this software is hereby
@@ -183,7 +183,7 @@ def do_method(module, method, params):
     ctx.set_allow_unknown_ca(0)
     
     # Get a handle on the server,
-    server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx))
+    server = xmlrpclib.ServerProxy(URI, SSL_Transport(ctx), verbose=debug)
         
     # Get a pointer to the function we want to invoke.
     meth      = getattr(server, module + "." + method)
@@ -195,11 +195,6 @@ def do_method(module, method, params):
     try:
         response = apply(meth, meth_args)
         pass
-    except BadResponse, e:
-        print ("error: bad reponse from host, " + e.args[0]
-               + ", and handler: " + e.args[1])
-        print "error: " + e.args[2]
-        return (-1, None)
     except xmlrpclib.Fault, e:
         print e.faultString
         return (-1, None)
