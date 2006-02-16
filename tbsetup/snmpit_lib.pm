@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-LGPL
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -59,6 +59,9 @@ my %vlanids=();
 # vlanids maps pid:eid <==> id
 
 my $snmpitErrorString;
+
+# Protos
+sub getTrunkPath($$$$);
 
 #
 # Initialize the library
@@ -941,7 +944,7 @@ sub snmpitBulkwalkWarn($$;$) {
 
     @result = snmpitDoIt($SNMPIT_BULKWALK,$sess,$var,$retries);
 
-    if (! defined @result) {
+    if (! @result) {
 	snmpitWarn("SNMP Bulkwalk failed");
     }
     return @result;
@@ -957,7 +960,7 @@ sub snmpitBulkwalkFatal($$;$) {
 
     @result = snmpitDoIt($SNMPIT_BULKWALK,$sess,$var,$retries);
 
-    if (! defined @result) {
+    if (! @result) {
 	snmpitFatal("SNMP Bulkwalk failed");
     }
     return @result;

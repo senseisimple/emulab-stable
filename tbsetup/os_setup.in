@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -87,6 +87,10 @@ my %rebooted    = ();
 my $doautoload  = 1;
 my $dolastload  = 1;
 
+# Protos
+sub SetupReload($$$);
+sub FirewallSetup($);
+				  
 # un-taint path
 $ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
 delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
