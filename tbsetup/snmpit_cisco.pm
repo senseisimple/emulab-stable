@@ -1537,6 +1537,87 @@ sub clearAllVlansOnTrunk($$) {
     }
 
 }
+#
+# Easy flush of FDB for a (vlan, trunk port) if port is on vlan
+# by removing it and adding it back
+#
+# usage: resetVlanIfOnTrunk(self, modport, vlan_number)
+#        modport: module.port of the trunk to operate on
+#	 vlan_number: A cisco-native VLAN number to check
+#        return value currently ignored.
+
+sub resetVlanIfOnTrunk($$$) {
+    my $self = shift;
+    my ($modport, $value, $vlan_number) = @_;
+
+
+    my ($ifIndex) = $self->convertPortFormat($PORT_FORMAT_IFINDEX,$modport);
+
+    #
+    # If this is part of an EtherChannel, we have to find the ifIndex for the
+    # channel.
+    # TODO: Perhaps this should be general - ie. $self{IFINDEX} should have
+    # the channel ifIndex the the port is in a channel. Not sure that
+    # this is _always_ beneficial, though
+    #
+    my $channel = snmpitGetFatal($self->{SESS},["pagpGroupIfIndex",$ifIndex]);
+    if (!($channel =~ /^\d+$/) || ($channel == 0)) {
+	print "WARNING: setVlansOnTrunk got zero channel for $self->{NAME}.$modport\n";
+	return 0;
+    }
+    if (($channel =~ /^\d+$/) && ($channel != 0)) {
+	$ifIndex = $channel;
+    }
+
+    #
+    # Get the exisisting bitfield for allowed VLANs on the trunk
+    #
+    my $bitfield = snmpitGetFatal($self->{SESS},
+	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
+    my $unpacked = unpack("B*",$bitfield);
+    
+    # Put this into an array of 1s and 0s for easy manipulation
+    my @bits = split //,$unpacked;
+
+    # check to see if this vlan is already allowed on this trunk,
+    # if not, return.
+
+    if ($bits[$vlan_number] ne '1') {
+	return;
+    }
+
+    # Just set the bit of the vlan we want to remove...
+    $bits[$vlan_number] = 0;
+
+    # Pack it back up...
+    $unpacked = join('',@bits);
+
+    $bitfield = pack("B*",$unpacked);
+
+    # And save it back...
+    my $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
+    	    "OCTETSTR"]);
+
+    #
+    # ask for the bitfield over again to make sure that the cisco has time
+    # to deal with setting it, before we clobber it all over again.
+    #
+    $bitfield = snmpitGetFatal($self->{SESS},
+	    ["vlanTrunkPortVlansEnabled",$ifIndex]);
+
+    # Just set the bit of the vlan we want to add back...
+    $bits[$vlan_number] = '1';
+
+    # Pack it back up...
+    $unpacked = join('',@bits);
+
+    $bitfield = pack("B*",$unpacked);
+
+    # And save it back...
+    $rv = $self->{SESS}->set(["vlanTrunkPortVlansEnabled",$ifIndex,$bitfield,
+    	    "OCTETSTR"]);
+    return 0;
+}
 
 #
 # Enable trunking on a port
