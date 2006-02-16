@@ -835,7 +835,7 @@ sub osload_setupswapinfo($$;@)
     my $allnodes;
     my $clause = "";
 
-    if (!defined(@nodelist)) {
+    if (!@nodelist) {
 	@nodelist = ExpNodes($pid, $eid, 1);
 	$clause .= "r.pid='$pid' and r.eid='$eid'";
 	$allnodes = 1;
