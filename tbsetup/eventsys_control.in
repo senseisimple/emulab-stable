@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -52,7 +52,7 @@ if ($TESTMODE) {
 }
 
 if ($EUID != 0) {
-    tbdie("Must be root! Maybe its a development version?");
+    die("Must be root! Maybe its a development version?\n");
 }
 
 #

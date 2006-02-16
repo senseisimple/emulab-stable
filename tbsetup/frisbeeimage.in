@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -42,10 +42,10 @@ $| = 1;
 # We don't want to run this script unless its the real version.
 #
 if ($EUID != 0) {
-    tbdie("Must be root! Maybe its a development version?");
+    die("Must be root! Maybe its a development version?\n");
 }
 if (!$ELABINELAB) {
-    tbdie("This script is for elabinelab systems only!");
+    die("This script is for elabinelab systems only!\n");
 }
 
 # Load the Testbed support stuff.
