@@ -32,9 +32,6 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-
-sub fatal($);
-
 my  $optlist = "biafres:wq";
 
 #
@@ -118,6 +115,11 @@ my $nextswapstate;
 my $termswapstate;
 my $isadmin  = 0;
 
+# Protos
+sub fatal($);
+sub CheckFWinfo($);
+sub GatherFWinfo();
+		
 #
 # Untaint the path
 # 
