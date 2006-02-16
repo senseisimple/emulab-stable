@@ -223,6 +223,8 @@ use vars qw(@ISA @EXPORT);
 
 	 TBRobotLabExpt
 
+	 TBExptContainsNodeCT
+
 	 );
 
 # Must come after package declaration!
@@ -3298,6 +3300,33 @@ sub TBRobotLabExpt($$)
     my ($pid, $eid) = $query_result->fetchrow_array();
     $$ppid = $pid;
     $$peid = $eid;
+    return 1;
+}
+
+#
+# is a certain type/class node present?
+# args: pid, eid, valid type/class
+# 
+sub TBExptContainsNodeCT($$$) 
+{
+    my ($pid,$eid,$ntc) = @_;
+
+    # find out if this is a valid class or type...
+    my $dbq = DBQueryWarn("select v.pid,v.eid,v.type from virt_nodes as v " .
+			  "left join node_types as nt on v.type=nt.type " .
+			  "where v.pid='$pid' and v.eid='$eid' and " .
+			  "(nt.class='$ntc' or nt.type='$ntc')");
+
+
+#"select r.pid,r.eid,r.node_id from reserved as r " .
+#"left join nodes as n on n.node_id=r.node_id " . 
+#"left join node_types as nt on nt.type=n.type " . 
+#"where r.pid='$pid' and r.eid='$eid' and " . 
+#"(nt.class='$ntc' or nt.type='$ntc')");
+
+    return 0 
+	if (!$dbq || !$dbq->numrows());
+
     return 1;
 }
 

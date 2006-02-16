@@ -108,9 +108,11 @@ sub mailctrl($@) {
 	    }
 	    $cond_str .= " node_id='$node'";
 	}
-	$cond_str .= ") group by email";
+	$cond_str .= ")";
 	
-	my $dbres = DBQueryFatal("select email from location_info ".$cond_str);
+	my $dbres = DBQueryFatal("select email from location_info " . 
+				 $cond_str . " group by email");
+
 	if ($dbres->num_rows() != 0) {
 	    my $row;
 	    while (($row = $dbres->fetchrow_hashref())) {
@@ -124,19 +126,70 @@ sub mailctrl($@) {
 	    push @emails, $TBOPS;
 	}
 
+	my $email_body = 
+	    "Someone needs to power $cmd the following nodes:\n" .
+	    "\t\n" . join(" ",@nodes) . "\n\nfor $pid/$eid, " .
+	    "swapped in by $swapper_uid.\n" . 
+	    "\nAnd update power time through this web page:\n" .
+	    "\n  https://$WWW/powertime.php3?node_id=" . join(",",@nodes) .
+	    "\n";
+
+	$dbres = DBQueryFatal("select node_id,battery_voltage as v, " . 
+			      "battery_percentage as p, " . 
+			      "(UNIX_TIMESTAMP(NOW()) - battery_timestamp)".
+			      " as tdelta from nodes " . 
+			      "where battery_voltage is not NULL");
+	my $row;
+	my %powinfo = ();
+	while (($row = $dbres->fetchrow_hashref())) {
+	    $powinfo{$row->{'node_id'}} = { 'v' => $row->{'v'},
+					    'p' => $row->{'p'},
+					    'tdelta' => $row->{'tdelta'}
+				      };
+	}
+
+	$email_body .= 
+	    "\nHere's the last known battery info for these robots.  If \n" . 
+	    "it's been more than 3 days since last power update, or if \n" .
+	    "the remaining percent is below 50 or the voltage is below 7.5,\n".
+	    "you should probably replace the battery.\n\n";
+
+	foreach $bot (@nodes) {
+	    if (defined($powinfo{$bot})) {
+		my $ts = $powinfo{$bot}{'tdelta'};
+		my $time_str;
+		if ($ts > (3600*24)) {
+		    my $tts = sprintf("%.2f",($ts / (3600*24)));
+		    $time_str =  $tts . " days since last update.";
+		}
+		else {
+		    my $tts = sprintf("%.2f",($ts / 3600));
+		    $time_str = $tts . " hours since last update.";
+		}
+		
+		$email_body .= 
+		    $bot . ": " . sprintf("%.2f",$powinfo{$bot}{'p'}) . 
+		    "%, " . sprintf("%.2f",$powinfo{$bot}{'v'}) . 
+		    "V, " . $time_str . "\n";
+	    }
+	    else {
+		$email_body .= "$bot: no info!!!\n";
+	    }
+	}
+	
+        $email_body .= "\nThe Power Control Dude.\n";
+	
 	foreach $email (@emails) {
+	    #print "Sending to $email\n\n";
 	    if ($email ne "") {	
 		SENDMAIL($email,
-		 "Power $cmd nodes for $pid/$eid\n" .
-		 "Someone needs to power $cmd the following nodes:\n" .
-		 "\t\n" . join(" ",@nodes) . "\n\nfor $pid/$eid, " .
-		 "swapped in by $swapper_uid.\n" . 
-		 "\nAnd update power time through this web page:\n" .
-		 "\n  https://$WWW/powertime.php3?node_id=" . join(",",@nodes),
-		 $TBOPS);
+			 "Power $cmd nodes for $pid/$eid\n",
+			 $email_body);
 	    }
 	}
 
+	
+	
 	foreach my $node (keys %actual) {
 	    my $tries = $default_tries;
 	    my $ok = 0;

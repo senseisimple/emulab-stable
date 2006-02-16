@@ -65,6 +65,7 @@ sub ExitWithStatus($$)
 #
 my $TB     = "@prefix@";
 my $TBOPS  = "@TBOPSEMAIL@";
+my $TBROBOCOPS = "@TBROBOCOPSEMAIL@";
 my $TBLOGS = "@TBLOGSEMAIL@";
 my $TBINFO = "$TB/expinfo";
 my $TBDOCBASE = "@TBDOCBASE@";
@@ -102,6 +103,7 @@ my $eventsys_restart   = 0;
 my $errorstat= -1;
 my $modifyHosed   = 0;
 my $modifySwapped = 0;
+my $robotexp = 0;
 
 my $inout;
 my $logname;
@@ -320,6 +322,16 @@ if ($overquota) {
 # out later.
 #
 my $firewalled = TBExptFirewall($pid, $eid);
+
+#
+# see if we've got a robot exp (this isn't the only check; if this is a
+# swapmod, we've got to check tbprerun as well...
+#
+$robotexp = 
+    TBExptContainsNodeCT($pid,$eid,'robot') || 
+    TBExptContainsNodeCT($pid,$eid,'mote') || 
+    TBExptContainsNodeCT($pid,$eid,'motehost') || 
+    TBExptContainsNodeCT($pid,$eid,'powermon');
 
 #
 # We have to protect against trying to end an experiment that is currently
@@ -1291,6 +1303,15 @@ sub cleanup()
     #
     # Send a message to the testbed list. Append the logfile.
     #
+    
+    #
+    # also try to send mail to robocops if it was a robot/mote exp
+    #
+    my $rcops = '';
+    if ($robotexp) {
+	$rcops = "\nCc:  $TBROBOCOPS";
+    }
+
     SENDMAIL("$user_name <$user_email>",
 	 "Swap ${inout} Failure: $pid/$eid",
 	 "Please look at the log below to see what happened. If the error\n".
@@ -1305,7 +1326,7 @@ sub cleanup()
 	     "#BatchMode\n",
 	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
 	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Cc:  $TBOPS",
+	 "Cc:  $TBOPS $rcops",
 	 (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
 
     if ($modifyHosed) {

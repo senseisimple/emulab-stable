@@ -1400,6 +1400,8 @@ done
 
 
 
+
+
 #
 # Defaults for for above variables.
 # 
@@ -1610,6 +1612,8 @@ fi
 #
 TBOPSEMAIL_NOSLASH="$TBOPSEMAIL"
 TBOPSEMAIL="`echo $TBOPSEMAIL | sed -e 's/@/\\\@/'`"
+TBROBOCOPSEMAIL_NOSLASH="$TBROBOCOPSEMAIL"
+TBROBOCOPSEMAIL="`echo $TBROBOCOPSEMAIL | sed -e 's/@/\\\@/'`"
 TBLOGSEMAIL_NOSLASH="$TBLOGSEMAIL"
 TBLOGSEMAIL="`echo $TBLOGSEMAIL | sed -e 's/@/\\\@/'`"
 TBAUDITEMAIL_NOSLASH="$TBAUDITEMAIL"
@@ -1947,17 +1951,17 @@ for ac_hdr in ulxmlrpcpp/ulxr_config.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:1951: checking for $ac_hdr" >&5
+echo "configure:1955: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 1956 "configure"
+#line 1960 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:1961: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:1965: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -1996,17 +2000,17 @@ for ac_hdr in linux/videodev.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2000: checking for $ac_hdr" >&5
+echo "configure:2004: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2005 "configure"
+#line 2009 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2010: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2014: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2039,7 +2043,7 @@ done
 # Extract the first word of "gtk-config", so it can be a program name with args.
 set dummy gtk-config; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2043: checking for $ac_word" >&5
+echo "configure:2047: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_prog_GTK_CONFIG'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2118,7 +2122,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:2122: checking for a BSD compatible install" >&5
+echo "configure:2126: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
@@ -2179,7 +2183,7 @@ esac
 # Extract the first word of "rsync", so it can be a program name with args.
 set dummy rsync; ac_word=$2
 echo $ac_n "checking for $ac_word""... $ac_c" 1>&6
-echo "configure:2183: checking for $ac_word" >&5
+echo "configure:2187: checking for $ac_word" >&5
 if eval "test \"`echo '$''{'ac_cv_path_RSYNC'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
@@ -2651,6 +2655,8 @@ s%@DELAYTHRESH@%$DELAYTHRESH%g
 s%@PELABSUPPORT@%$PELABSUPPORT%g
 s%@TBOPSEMAIL@%$TBOPSEMAIL%g
 s%@TBOPSEMAIL_NOSLASH@%$TBOPSEMAIL_NOSLASH%g
+s%@TBROBOCOPSEMAIL@%$TBROBOCOPSEMAIL%g
+s%@TBROBOCOPSEMAIL_NOSLASH@%$TBROBOCOPSEMAIL_NOSLASH%g
 s%@TBLOGSEMAIL@%$TBLOGSEMAIL%g
 s%@TBLOGSEMAIL_NOSLASH@%$TBLOGSEMAIL_NOSLASH%g
 s%@TBWWWEMAIL@%$TBWWWEMAIL%g

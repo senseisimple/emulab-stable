@@ -9,6 +9,7 @@ TBDBNAME=tbdb
 TBADMINGROUP=flux
 TBOPSEMAIL=testbed-ops@flux.utah.edu
 TBLOGSEMAIL=testbed-logs@flux.utah.edu
+TBROBOCOPSEMAIL=testbed-robocops@flux.utah.edu
 TBWWWEMAIL=testbed-www@flux.utah.edu
 TBAPPROVALEMAIL=testbed-approval@flux.utah.edu
 TBAUDITEMAIL=testbed-audit@flux.utah.edu

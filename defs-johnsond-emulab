@@ -4,6 +4,7 @@
 . defs-default
 
 TBOPSEMAIL=johnsond@flux.utah.edu
+TBROBOCOPSEMAIL=johnsond@cs.utah.edu
 TBLOGSEMAIL=johnsond@flux.utah.edu
 TBWWWEMAIL=johnsond@flux.utah.edu
 TBAPPROVALEMAIL=johnsond@flux.utah.edu
