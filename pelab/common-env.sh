@@ -11,6 +11,23 @@ if [ "$COMMON_ENV_LOADED" != "yes" ]; then
 COMMON_ENV_LOADED="yes"
 
 #
+# Find out the OS we're running on
+#
+UNAME=`uname -s`
+
+#
+# Different binary directories for FreeBSD/Linux
+#
+if [ "$UNAME" == "Linux" ]; then
+    BIN_PATH="/usr/bin"
+elif [ "$UNAME" == "FreeBSD" ]; then
+    BIN_PATH="/usr/local/bin"
+else
+    echo "Unable to determine operating system"
+    exit -1
+fi
+
+#
 # Locations of some Emulab-specific files
 #
 EMUVAR="/var/emulab"
@@ -19,9 +36,9 @@ NICKFILE="$EMUBOOT/nickname"
 RCPLAB="$EMUBOOT/rc.plab"
 HOSTSFILE="/etc/hosts"
 IFCONFIG="/sbin/ifconfig"
-PERL="/usr/bin/perl"
-PYTHON="/usr/bin/python"
-SUDO="/usr/bin/sudo"
+PERL="${BIN_PATH}/perl"
+PYTHON="${BIN_PATH}/python"
+SUDO="${BIN_PATH}/sudo"
 
 #
 # Some 'constants' by convention. 
