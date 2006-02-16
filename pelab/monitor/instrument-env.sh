@@ -4,6 +4,7 @@
 
 LIB_SO="libnetmon.so"
 SOCK="${TMPDIR}/netmon.sock";
+CSOCK="${SOCK}.control";
 
 #
 # Try once to build the library
@@ -27,4 +28,4 @@ fi
 export LD_LIBRARY_PATH=$NETMON_DIR
 export LD_PRELOAD=$LIB_SO
 export LIBNETMON_SOCKPATH=$SOCK
-#export LIBNETMON_OUTPUTVERSION=2
+export LIBNETMON_CONTROL_SOCKPATH=$CSOCK

@@ -27,6 +27,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/un.h>
+#include <unistd.h>
+
+#include "netmon.h"
 
 /* #define DEBUGGING */
 
@@ -47,6 +50,16 @@ const unsigned int FD_ALLOC_SIZE = 8;
  * more than once, just skips intialization if it's already been done.
  */
 static void lnm_init();
+
+/*
+ * Handle packets on the control socket, if any
+ */
+static void lnm_control();
+
+/*
+ * Wait for a control message, then process it
+ */
+static void lnm_control_wait();
 
 /*
  * Allocate space for the monitorFDs - increases the allocation by
@@ -90,12 +103,22 @@ static unsigned int fdSize;
 /*
  * Stream on which to write reports
  */
-FILE *outstream;
+static FILE *outstream;
+
+/*
+ * File descriptor for the control socket - < 0 if we have none
+ */
+static int controlfd;
 
 /*
  * Force the socket buffer size
  */
-int forced_bufsize;
+static int forced_bufsize;
+
+/*
+ * Give a maximum socket buffer size
+ */
+static int max_bufsize;
 
 /*
  * Manipulate the monitorFDs structure
@@ -108,6 +131,16 @@ static void stopWatchingAll();
  * Print unique identifier for an FD
  */
 static void fprintID(FILE *, int);
+
+/*
+ * Process a packet from the control socket
+ */
+static void process_control_packet(generic_m *);
+
+/*
+ * Sed out a query on the control socket
+ */
+static void control_query();
 
 /*
  * Which version of the output format are we using?
