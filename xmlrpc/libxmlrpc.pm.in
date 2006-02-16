@@ -24,7 +24,7 @@ use vars qw(@ISA @EXPORT);
 	       RESPONSE_FORBIDDEN RESPONSE_BADVERSION RESPONSE_SERVERERROR
 	       RESPONSE_TOOBIG RESPONSE_REFUSED RESPONSE_TIMEDOUT
 
-	       ParseResponse CallMethod Config
+	       ParseResponse CallMethod0 CallMethod Config
 );
 
 # Must come after package declaration!
@@ -161,7 +161,7 @@ sub optionstring()
     return $options;
 }
 
-sub CallMethod($$$)
+sub CallMethod0($$$)
 {
     my ($module, $method, $arghash) = @_;
 
@@ -230,7 +230,12 @@ sub CallMethod($$$)
     #
     # Convert the xmlgoo to Perl and return it.
     #
-    my $response = ParseResponse($xmlgoo);
+    return ParseResponse($xmlgoo);
+}
+
+sub CallMethod($$$)
+{
+    my $response = CallMethod0($_[0], $_[1], $_[2]);
 
     if (($config{"verbose"} || $response->{"code"}) &&
 	defined($response->{"output"}) && $response->{"output"} ne "") {
