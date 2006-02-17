@@ -770,6 +770,37 @@ int setsockopt (int s, int level, int optname, const void *optval,
             printf("Warning: Capped attempt to change SO_SNDBUF or SO_RCVBUF\n");
             *((int *)optval) = max_bufsize;
         }
+
+        /*
+         * Let the monitor know that the app has changed it socket buffer size
+         */
+        if (output_version == 2) {
+            fprintf(outstream,"%s: ", (optname == SO_SNDBUF) ?
+                    "SO_SNDBUF" : "SO_RCVBUF");
+            fprintID(outstream,s);
+            fprintf(outstream," %i\n", *((int *)optval));
+        }
+    }
+
+    /*
+     * There are some TCP options we have to watch for
+     * TODO: Check for success before reporting
+     */
+    if (level == IPPROTO_TCP) {
+        if (optname == TCP_NODELAY) {
+            if (output_version == 2) {
+                fprintf(outstream,"TCP_NODELAY: ");
+                fprintID(outstream,s);
+                fprintf(outstream," %i\n",*((int *)optval));
+            }
+        }
+        if (optname == TCP_MAXSEG) {
+            if (output_version == 2) {
+                fprintf(outstream,"TCP_MAXSEG: ");
+                fprintID(outstream,s);
+                fprintf(outstream," %i\n",*((int *)optval));
+            }
+        }
     }
 
     /*
@@ -819,7 +850,7 @@ ssize_t recv(int s, void *buf, size_t len, int flags) {
 }
 
 /*
- * See comment for recvmsg()
+ * See comment for read()
  */
 ssize_t recvmsg(int s, struct msghdr *msg, int flags) {
     ssize_t rv;
