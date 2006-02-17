@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -403,7 +403,7 @@ sub AddList(@)
     print CONFIG "owner = ['$owneremail']\n";
     print CONFIG "description = 'Emulab Mailman List: $name'\n";
     print CONFIG "subject_prefix = '[$name] '\n";
-    print CONFIG "reply_goes_to_list = 1\n";
+    print CONFIG "reply_goes_to_list = 0\n";
     print CONFIG "send_reminders = False\n";
     print CONFIG "send_welcome_msg = False\n";
     print CONFIG "send_goodbye_msg = False\n";
