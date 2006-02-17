@@ -1,0 +1,32 @@
+set ns [new Simulator]
+source tb_compat.tcl
+
+set node1 [$ns node]
+set node2 [$ns node]
+set node3 [$ns node]
+set nodeA [$ns node]
+
+tb-set-node-os $node1 @OS@
+tb-set-node-os $node2 @OS@
+tb-set-node-os $node3 @OS@
+tb-set-node-os $nodeA @OS@
+
+set lan [$ns make-lan "$node1 $node2 $node3" 100Mb 0ms]
+set link [$ns duplex-link $node3 $nodeA 100Mb 0ms DropTail]
+
+tb-set-ip $node1 192.168.1.1 
+tb-set-ip $node2 192.168.1.2
+tb-set-ip-lan $node3 $lan 192.168.1.3
+tb-set-netmask $lan 255.255.255.248
+
+tb-set-ip-link $node3 $link 192.168.1.9
+tb-set-ip-link $nodeA $link 192.168.1.10
+tb-set-netmask $link 255.255.255.252
+
+$node1 add-route $nodeA $node3
+$node2 add-route $nodeA $node3
+
+$nodeA add-route $lan $node3
+
+$ns rtproto Manual
+$ns run

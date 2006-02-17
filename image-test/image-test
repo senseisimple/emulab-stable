@@ -1,12 +1,16 @@
 #!/usr/bin/perl -w
 
 ########################################################################
-#
-# This value is prefixed to all experiments to avoid conflicts with 
-# existing experient names
-#
 
+# This value is prefixed to all experiments to avoid conflicts with
+# existing experient names
 my $eid_prefix = 'it-';
+
+# Maxium length of experment name
+my $max_eid_length = 19;
+
+# Where libxmlrpc is
+use lib "/usr/testbed/lib";
 
 ########################################################################
 #
@@ -22,6 +26,8 @@ use POSIX 'setsid';
 use POSIX ':sys_wait_h';
 use Errno 'EINTR';
 
+use libxmlrpc;
+
 sub true() {1}
 sub false() {0}
 
@@ -33,7 +39,7 @@ sub LARGE_NUM {100000}
 #
 
 sub usage() {
-  die "usage: $0 -h | -l | [OPTIONS] IMAGE [EXPS ...]\n";
+  die "usage: $0 -? | -l | [OPTIONS] IMAGE [EXPS ...]\n";
 }
 
 sub help() {
@@ -108,7 +114,7 @@ $soft_limit = LARGE_NUM   if $soft_limit == 0;
 $hard_limit = LARGE_NUM   if $hard_limit == 0;
 $soft_limit = $hard_limit if $soft_limit > $hard_limit;
 
-if (@ARGV == 0) {
+if (@ARGV == 0 && !$just_list) {
   print STDERR "Must specify an image.\n";
   usage();
 }
@@ -282,17 +288,75 @@ if ($just_list) {
 #
 
 #
-# Check to make sure the image exists by creating a simple experment
+# Check to make sure the image exists
 #
 
+if ($stages =~ /c/ || $os ne '.') {
+  my $res = CallMethod0("osid", "getlist", {});
+  die $res->{output} unless $res->{code} == 0;
+  my $found_image = false;
+  while (my ($k,$v) = each %{$res->{value}}) {
+    next unless $v->{pid} eq 'emulab-ops' || $v->{pid} eq $pid;
+    $found_image = true if ($k eq $os);
+  }
+  if (!$found_image) {
+    print STDERR "The osid \"$os\" doesn't exists in the \"emulab-ops\" or \"$pid\" project.\n";
+    exit 2;
+  }
+}
 
 #
 # Check to make sure that each experiment is a valid name and
 # it doesn't already exists.
 #
 
-sub experment_precheck() {
+my $eid_to_long = '';
+foreach my $e (@exps) {
+  my $eid = "$eid_prefix$e";
+  if (length($eid) > $max_eid_length) {
+    $eid_to_long = $eid unless length($eid_to_long) > length($eid);
+  }
 }
+if (length($eid_to_long) > 0) {
+  print STDERR "The experiment name \"$eid_to_long\" is longer than $max_eid_length characters.\n";
+  exit 2;
+}
+
+if ($stages ne 'e') {
+  my $exp_errors = 0;
+
+  foreach my $e (@exps) {
+    my $eid = "$eid_prefix$e";
+    my $res = CallMethod0("experiment", "state", {proj=>$pid, exp=>$eid});
+    die $res->{output} unless $res->{code} == 0 || $res->{code} == 2;
+    if ($stages =~ /c/) {
+      # should't exist
+      if ($res->{code} != 2) {
+	print STDERR "Experiment \"$eid\" in \"$pid\" must not exist.\n";
+	$exp_errors++;
+      }
+    } elsif ($stages =~ /s/) {
+      # need to exist, but not be swapped in
+      if ($res->{code} != 0 || $res->{value} ne 'swapped') {
+	print STDERR "Experiment \"$eid\" in \"$pid\" must be in the \"swapped\" state.\n";
+	$exp_errors++;
+      }
+    } else {
+      # need to exist, and be swapped in
+      if ($res->{code} != 0 || $res->{value} ne 'active') {
+	print STDERR "Experiment \"$eid\" in \"$pid\" must be in the \"active\" state.\n";
+	$exp_errors++;
+      }
+    }
+  }
+  if ($exp_errors) {
+    exit 2;
+  }
+}
+
+#sub experment_precheck($) {
+#  if ($
+#}
 
 
 ########################################################################
