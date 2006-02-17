@@ -103,6 +103,18 @@ my $WINSUPPORT = 0;
 # This also gets turned on/off below
 my $NOSETUP    = 0;
 
+# This will not change ...
+my $PHP4_PKG = "php4-extensions-1.0";
+
+# Version of FreeBSD.
+my $FBSD_VERSION = 4;
+if (`uname -r` =~ /^(\d)/) {
+    $FBSD_VERSION = $1;
+}
+else {
+    die("Could not determine what version of FreeBSD you are running!\n");
+}
+
 #
 # Find out our domain name, so that we can qualify the localhost entry
 #
@@ -233,6 +245,16 @@ sub doboot()
 	$NOSETUP = 1;
     }
 
+    # XXX Temporary
+    if ($FBSD_VERSION == 5) {    
+	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/5.4/packages";
+	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/5.4/packages";
+	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/5.4/packages";
+	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
+    }
+
     if ($emulabconfig{"ROLE"} eq "fs") {
 	SetupFsNode();
     }
@@ -266,7 +288,7 @@ sub SetupFsNode()
 	SetupFatal("FS node must run FreeBSD\n");
     }
     # XXXX brutal!
-    if ($rel =~ /^5\.4/) {
+    if ($FBSD_VERSION == 5) {
 	$emulabconfig{FS_PKG_DIR} =
 	    "/share/freebsd/packages/FreeBSD-5.4-20050508";
 	($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
@@ -442,6 +464,8 @@ sub SetupFsNode()
     print RC "xntpd_enable=\"YES\"\n";
     print RC "linux_enable=\"YES\"\n";
 
+    print RC "rpcbind_enable=\"YES\"\n";
+    print RC "mountd_enable=\"YES\"\n";
     print RC "nfs_server_enable=\"YES\"\n";
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
@@ -694,8 +718,11 @@ sub SetupOpsNode($)
 
     $ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
     mysystem("pkg_add $emulabconfig{OPS_PKG} >/tmp/perrs 2>&1");
-    if ($WINSUPPORT) {
+    if ($WINSUPPORT && $FBSD_VERSION == 4) {
 	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
+    }
+    else {
+	mysystem("pkg_add $PHP4_PKG >>/tmp/perrs 2>&1");
     }
     if ($isfs) {
 	# XXX if not set, derive from the OPS info
@@ -767,6 +794,8 @@ sub SetupOpsNode($)
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 
+    print RC "rpcbind_enable=\"YES\"\n";
+    print RC "mountd_enable=\"YES\"\n";
     print RC "nfs_server_enable=\"YES\"\n";
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
@@ -822,7 +851,8 @@ sub SetupOpsNode($)
     #
     # Create the ops node.
     #
-    my $pkg = "-P $emulabconfig{OPS_PKG}";
+    my $pkg = "-P $emulabconfig{OPS_PKG} " .
+	($isfs ? "-F $emulabconfig{FS_PKG}" : "");
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
 	     "   perl ops-install $pkg -b");
 
@@ -854,6 +884,16 @@ sub SetupOpsNode($)
     # prepare, or scale it back for inner elab. Needs more thought.
     #
     mysystem("killall mountd");
+    #
+    # Its worse on FreeBSD5! We lost the rpcbind socket too. Killing
+    # that means we have to restart nfsd so it can register.
+    #
+    if ($FBSD_VERSION >= 5) {
+	mysystem("/etc/rc.d/nfsd stop");
+	mysystem("killall rpcbind");
+	mysystem("rpcbind");
+	mysystem("/etc/rc.d/nfsd start");
+    }
     mysystem("mountd -r");
 
     #
@@ -1025,9 +1065,12 @@ sub SetupBossNode()
     }
 
     $ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
-    mysystem("pkg_add -f -v $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
-    if ($WINSUPPORT) {
-	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
+    mysystem("pkg_add -f $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
+    if ($WINSUPPORT && $FBSD_VERSION == 4) {
+ 	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
+    }
+    else {
+	mysystem("pkg_add $PHP4_PKG >>/tmp/perrs 2>&1");
     }
 
     #
@@ -1061,6 +1104,8 @@ sub SetupBossNode()
     print RC "linux_enable=\"YES\"\n";
     print RC "accounting_enable=\"YES\"\n";
 
+    print RC "rpcbind_enable=\"YES\"\n";
+    print RC "mountd_enable=\"YES\"\n";
     print RC "nfs_server_enable=\"YES\"\n";
     print RC "nfs_server_flags=\"-u -t -n 8\"\n";
     print RC "nfs_client_enable=\"YES\"\n";
