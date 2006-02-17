@@ -8,7 +8,8 @@ SUBDIR		= apache
 
 include $(OBJDIR)/Makeconf
 
-CONFIG_FILES	= httpd.conf
+CONFIG_FILES	= httpd.conf httpd.conf-ops
+
 #
 # Force dependencies to make sure configure regenerates if the .in file
 # is changed.
@@ -25,5 +26,8 @@ $(INSTALL_APACHE_CONFIG)/%: %
 
 
 install: $(addprefix $(INSTALL_APACHE_CONFIG)/, $(CONFIG_FILES))
+
+control-install: httpd.conf-ops
+	$(INSTALL_DATA) httpd.conf-ops $(INSTALL_APACHE_CONFIG)/httpd.conf
 
 clean:
