@@ -854,7 +854,7 @@ sub SetupOpsNode($)
     my $pkg = "-P $emulabconfig{OPS_PKG} " .
 	($isfs ? "-F $emulabconfig{FS_PKG}" : "");
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
-	     "   perl ops-install $pkg -b");
+	     "   perl ops-install $pkg -b -w ElabInElab");
 
     #
     # And install the ops side.
