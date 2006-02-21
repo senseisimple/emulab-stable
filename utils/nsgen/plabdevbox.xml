@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!--
+    XML NS template for making a single-node PlanetLab DevBox experiment
+-->
+<nstemplate>
+    <variable name="HWType" default="pc" />
+    <variable name="NodeName" default="devbox" />
+    <!-- This hard-codes the image name, but it seems like we have to do
+         that somewhere... -->
+    <variable name="ImageName" default="PLAB-NONSTD" />
+    <nstext>
+        <section><![CDATA[
+# plabdevbox.ns - NS script to make a DevBox experiment on Emulab
+#
+# February 21, 2006
+#
+# Questions and comments to testbed-ops@emulab.net
+
+#
+# Boilerplate
+#
+source tb_compat.tcl
+set ns [new Simulator]
+
+set $<NodeName /> [$ns node]
+tb-set-hardware $<NodeName /> <HWType />
+tb-set-node-os $<NodeName /> "<ImageName />"
+
+#
+# Boilerplate
+#
+$ns run
+        ]]></section>
+    </nstext>
+</nstemplate>
+
