@@ -58,13 +58,14 @@ my $CP         = "/bin/cp";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
 my $SUDO       = "/usr/local/bin/sudo";
-
 my $SUIDPERL   = "/usr/bin/suidperl";
 
 my $MYSQL      = "/usr/local/bin/mysql";
 my $MYSQLADMIN = "/usr/local/bin/mysqladmin";
 my $MYSQLSHOW  = "/usr/local/bin/mysqlshow";
 my $MYSQLDUMP  = "/usr/local/bin/mysqldump";
+my $MYSQLINSTALL = "/usr/local/bin/mysql_install_db";
+my $MYSQLDBDIR = "/var/db/mysql";
 
 my $GMAKE      = "/usr/local/bin/gmake";
 my $RNDC_CONFGEN = "/usr/local/sbin/rndc-confgen";
@@ -84,15 +85,14 @@ my $ROOT_PRIVKEY    = "/root/.ssh/identity";
 my $ROOT_PUBKEY     = "$ROOT_PRIVKEY.pub";
 my $ROOT_AUTHKEY    = "/root/.ssh/authorized_keys";
 
+my $APACHE_ETCDIR   = "/usr/local/etc/apache";
 my $SUDOERS         = "/usr/local/etc/sudoers";
-my $HTTPD_CONF      = "/usr/local/etc/apache/httpd.conf";
+my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
 my $PHP_INI         = "/usr/local/etc/php.ini";
 my $DHCPD_CONF	    = "/usr/local/etc/dhcpd.conf";
 my $DHCPD_TEMPLATE  = "/usr/local/etc/dhcpd.conf.template";
 my $DHCPD_LEASES    = "/var/db/dhcpd.leases";
 my $DHCPD_MAKECONF  = "$PREFIX/sbin/dhcpd_makeconf";
-my $APACHE_CERTFILE = "/usr/local/etc/apache/ssl.crt/www.${OURDOMAIN}.crt";
-my $APACHE_KEYFILE  = "/usr/local/etc/apache/ssl.key/www.${OURDOMAIN}.key";
 my $BATCHEXP        = "$PREFIX/bin/batchexp";
 my $WAP             = "$PREFIX/sbin/withadminprivs";
 my $NAMED_SETUP     = "$PREFIX/sbin/named_setup";
@@ -116,8 +116,16 @@ my $EMULAB_PEM	    = "emulab.pem";
 my $CLIENT_PEM	    = "client.pem";
 my $CTRLNODE_PEM    = "ctrlnode.pem";
 my $ETC_EMULAB_DIR  = "/etc/emulab";
-my $APACHE_CERTPEM  = "apache_cert.pem";
-my $APACHE_KEYPEM   = "apache_key.pem";
+
+# Apache certs on both boss and ops
+my $APACHE_CERTPEM      = "apache_cert.pem";
+my $APACHE_KEYPEM       = "apache_key.pem";
+my $APACHE_CERTFILE     = "$APACHE_ETCDIR/ssl.crt/www.${OURDOMAIN}.crt";
+my $APACHE_KEYFILE      = "$APACHE_ETCDIR/ssl.key/www.${OURDOMAIN}.key";
+my $APACHE_CERTPEM_OPS  = "apache-ops_cert.pem";
+my $APACHE_KEYPEM_OPS   = "apache-ops_key.pem";
+my $APACHE_CERTFILE_OPS = "$APACHE_ETCDIR/ssl.crt/${USERNODE}.crt";
+my $APACHE_KEYFILE_OPS  = "$APACHE_ETCDIR/ssl.key/${USERNODE}.key";
 
 #
 # Some directories we care about
@@ -184,11 +192,21 @@ if ($USERNODE eq $FSNODE) {
     push(@OPS_NAMES, "fs");
 }
 
+# Version of FreeBSD.
+my $FBSD_VERSION = 4;
+if (`uname -r` =~ /^(\d)/) {
+    $FBSD_VERSION = $1;
+}
+else {
+    die("Could not determine what version of FreeBSD you are running!\n");
+}
+
 #
-# The meta-port (name and version) that drags in all the dependancies for
-# a boss node
+# The meta-ports (name and version) that drag in all the dependancies for
+# a boss node. These are OS dependent as we upgrade.
 #
-my $BOSS_PORT = "emulab-boss-1.8";
+my $BOSS_PORT = (($FBSD_VERSION == 4) ? "emulab-boss-1.8" : "emulab-boss-2.0");
+my $PHP4_PORT = "php4-extensions-1.0";
 
 #
 # Figure out which directory we live in, so that some stages can do thing
@@ -286,9 +304,10 @@ Phase "usersgroups", "Creating users and groups", sub {
 	    PhaseSkip("mysql user already exists");
 	}
 	ExecQuietFatal("$PW useradd mysql -g 88 -g 88 -h - ".
-		       "-d /var/db/mysql -s /sbin/nologin -c 'MySQL Daemon'");
-	ExecQuietFatal("$CHOWN mysql:mysql /var/db/mysql");	
+		       "-d $MYSQLDBDIR -s /sbin/nologin -c 'MySQL Daemon'");
     };
+    ExecQuietFatal("$CHOWN mysql:mysql $MYSQLDBDIR")
+	if (-e $MYSQLDBDIR);
 };
 
 Phase "dirs", "Setting directory permissions", sub {
@@ -335,14 +354,18 @@ Phase "tftp", "Setting up directories for tftp", sub {
 };
 
 Phase "ports", "Installing ports", sub {
-    if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT")) {
+    if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT") &&
+	(($FBSD_VERSION == 4) || !ExecQuiet("$PKG_INFO -e $PHP4_PORT"))) {
 	PhaseSkip("Ports already installed");
     }
     Phase "packages", "Installing packages", sub {
 	if (!$packagedir) {
 	    PhaseSkip("No package directory provided");
 	}
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $BOSS_PORT");
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $BOSS_PORT")
+	    if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT"));
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PHP4_PORT")
+	    if ($FBSD_VERSION > 4 && !ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
     };
     if ($packagedir) {
 	PhaseSkip("Packages installed okay");
@@ -351,21 +374,23 @@ Phase "ports", "Installing ports", sub {
 	DoneIfExists("$PORTSMISCDIR/emulab-boss");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
-    # Ick. The php4 port is broken with SSL, so we have to patch it - hopefully
-    # it'll get fixed someday, and we remove this
-    Phase "php4patch", "Patching php4 port", sub {
-	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $PHP4_PATCH")) {
-	    PhaseSkip("$PHP4_PATCH already applied");
-	}
-	ExecQuietFatal("$PATCH -f -l -p0 -i $PHP4_PATCH");
-    };
+    if ($FBSD_VERSION == 4) {
+	# Ick. The php4 port is broken with SSL, so we have to patch
+	# it - hopefully it'll get fixed someday, and we remove this
+	Phase "php4patch", "Patching php4 port", sub {
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $PHP4_PATCH")) {
+		PhaseSkip("$PHP4_PATCH already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $PHP4_PATCH");
+	};
+    }
     PhaseFail("Please install ports manually, since some\n of them are " .
 	      "interactive. Run: \n" .
-	      "cd $PORTSMISCDIR/emulab-boss && make install\n" .
+	      "    cd $PORTSMISCDIR/emulab-boss && make install\n" .
+	      "    cd $PORTSMISCDIR/emulab-php4 && make install\n" .
 	      "then re-run this script.");
 };
 
-# XXX Temporary.
 Phase "portfixup", "Fixing up packages", sub {
     Phase "rsync", "Looking for rsync", sub {
 	if (!ExecQuiet("$PKG_INFO -x rsync")) {
@@ -379,7 +404,8 @@ Phase "portfixup", "Fixing up packages", sub {
     };
     if ($WINSUPPORT) {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
-	    if (!ExecQuiet("$PKG_INFO -x gcc30")) {
+	    if ($FBSD_VERSION > 4 ||
+		!ExecQuiet("$PKG_INFO -x gcc30")) {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
 	    
@@ -392,17 +418,24 @@ Phase "portfixup", "Fixing up packages", sub {
 };
 
 Phase "patches", "Applying patches", sub {
-    Phase "g++patch", "Patching g++'s STL", sub {
-	if (!ExecQuiet("$PATCH -C -f -R -p0 -i $STL_PATCH")) {
-	    PhaseSkip("$STL_PATCH already applied");
-	}
-	ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
-    };
+    if ($FBSD_VERSION == 4) {
+	Phase "g++patch", "Patching g++'s STL", sub {
+	    if (!ExecQuiet("$PATCH -C -f -R -p0 -i $STL_PATCH")) {
+		PhaseSkip("$STL_PATCH already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -p0 -i $STL_PATCH");
+	};
+    }
     Phase "m2cryptopatch", "Patching m2crypto", sub {
-	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $M2CRYPTO_PATCH")) {
-	    PhaseSkip("$M2CRYPTO_PATCH already applied");
+	my $patchfile = $M2CRYPTO_PATCH;
+	
+	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+	    $patchfile = "${patchfile}-0.13";
 	}
-	ExecQuietFatal("$PATCH -f -l -p0 -i $M2CRYPTO_PATCH");
+	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+	    PhaseSkip("$patchfile already applied");
+	}
+	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
     };
 };
 
@@ -567,7 +600,14 @@ Phase "syslog", "Setting up syslog", sub {
 };
 
 Phase "database", "Setting up database", sub {
-    Phase "mysql", "Starting mysql", sub {
+    Phase "initialize", "Initializing mysql", sub {
+	PhaseSkip("mysqld already initialzed")
+	    if (-d "$MYSQLDBDIR/mysql");
+
+	ExecQuietFatal("$MYSQLINSTALL --ldata=${MYSQLDBDIR}");
+	ExecQuietFatal("$CHOWN -R mysql:mysql $MYSQLDBDIR");
+    };
+    Phase "mysql", "Starting mysqls", sub {
 	if (!ExecQuiet("$MYSQLADMIN ping")) {
 	    PhaseSkip("mysqld already running");
 	}
@@ -639,6 +679,8 @@ Phase "database", "Setting up database", sub {
 Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
     DoneIfEdited($RCCONF);
     AppendToFileFatal($RCCONF,
+        qq|rpcbind_enable="YES"|,
+        qq|mountd_enable="YES"|,
 	qq|nfs_server_enable="YES"|,
 	qq|nfs_server_flags="-u -t -n 16"|,
 	qq|nfs_client_enable="YES"|,
@@ -651,10 +693,15 @@ Phase "rc.conf", "Adding testbed content to $RCCONF", sub {
     	qq|apache_enable="YES"|);
 };
 
-Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
-    PhaseSkip("Already done") if (-u $SUIDPERL);
-    ExecQuietFatal("$CHMOD u+s $SUIDPERL");
-};
+#
+# New version perl does not appear to require this anymore.
+#
+if ($FBSD_VERSION == 4) {
+    Phase "suidperl", "Setting the suid bit on $SUIDPERL", sub {
+	PhaseSkip("Already done") if (-u $SUIDPERL);
+	ExecQuietFatal("$CHMOD u+s $SUIDPERL");
+    };
+}
 
 Phase "hosts", "Adding boss/ops/fs IP addresses to $HOSTS", sub {
     DoneIfEdited($HOSTS);
@@ -868,7 +915,7 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 		       "     'chmod 640 ${ETC_EMULAB_DIR}/${CLIENT_PEM}; ".
 		       "      chmod 640 ${ETC_EMULAB_DIR}/${EMULAB_PEM}'  ");
     };
-    Phase "apache", "Setting up Apache", sub {
+    Phase "apache", "Setting up Apache on boss", sub {
 	Phase "cert", "Installing Apache SSL certificate", sub {
 	    DoneIfExists("$APACHE_CERTFILE");
 	    ExecQuietFatal("$CP $TOP_OBJDIR/ssl/$APACHE_CERTPEM ".
@@ -888,6 +935,23 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	    ExecQuietFatal("$RCDIR/apache.sh start");
 	};
     };
+    if ($FBSD_VERSION > 4) {
+	Phase "apache", "Setting up Apache on ops", sub {
+	    Phase "cert", "Installing Apache SSL certificate", sub {
+		ExecQuietFatal("$SCP $TOP_OBJDIR/ssl/$APACHE_CERTPEM_OPS ".
+			       "     ${USERNODE}:$APACHE_CERTFILE_OPS");
+	    };
+	    Phase "key", "Installing Apache SSL key", sub {
+		ExecQuietFatal("$SCP $TOP_OBJDIR/ssl/$APACHE_KEYPEM_OPS ".
+			       "     ${USERNODE}:$APACHE_KEYFILE_OPS");
+	    };
+	    Phase "rc.d", "Installing Apache startup file", sub {
+		ExecQuietFatal("$SSH -o 'BatchMode=yes' root\@${USERNODE} ".
+			       "     cp -f $RCDIR/apache.sh.sample ".
+			       "           $RCDIR/apache.sh");
+	    };
+	};
+    }
 };
 
 Phase "event", "Setting up event system", sub {

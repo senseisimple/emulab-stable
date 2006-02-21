@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -56,11 +56,20 @@ sub usage {
     exit(1);
 }
 
+# Version of FreeBSD.
+my $FBSD_VERSION = 4;
+if (`uname -r` =~ /^(\d)/) {
+    $FBSD_VERSION = $1;
+}
+else {
+    die("Could not determine what version of FreeBSD you are running!\n");
+}
+
 #
-# The default meta-port (name and version) that drags in all the dependancies
-# for an fs node
+# The meta-ports (name and version) that drag in all the dependancies for
+# an fs node. These are OS dependent as we upgrade.
 #
-my $FS_PORT = "emulab-fs-1.4";
+my $FS_PORT   = (($FBSD_VERSION == 4) ? "emulab-fs-1.4" : "emulab-fs-2.0");
 
 my $packagedir = "";
 my $batchmode  = 0;
@@ -278,6 +287,7 @@ Phase "portfixup", "Fixing up packages", sub {
 Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     DoneIfEdited($RCCONF);
     AppendToFileFatal($RCCONF,
+		      qq|rpcbind_enable="YES"|,
 		      qq|nfs_server_enable="YES"|,
 		      qq|nfs_server_flags="-u -t -n 16"|,
 		      qq|mountd_flags="-r -p 900"|,

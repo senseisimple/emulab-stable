@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003, 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2003, 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -37,6 +37,9 @@ my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
+my $LOGDIR      = "$PREFIX/log";
+my $ETCDIR      = "$PREFIX/etc";
+
 
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
@@ -65,17 +68,28 @@ sub usage {
     exit(1);
 }
 
+# Version of FreeBSD.
+my $FBSD_VERSION = 4;
+if (`uname -r` =~ /^(\d)/) {
+    $FBSD_VERSION = $1;
+}
+else {
+    die("Could not determine what version of FreeBSD you are running!\n");
+}
+
 #
-# The default meta-port (name and version) that drags in all the dependancies
-# for an ops node
+# The meta-ports (name and version) that drag in all the dependancies for
+# an ops/fs node. These are OS dependent as we upgrade.
 #
-my $OPS_PORT = "emulab-ops-1.4";
-my $FS_PORT = "emulab-fs-1.4";
+my $OPS_PORT  = (($FBSD_VERSION == 4) ? "emulab-ops-1.4" : "emulab-ops-2.0");
+my $FS_PORT   = (($FBSD_VERSION == 4) ? "emulab-fs-1.4" : "emulab-fs-2.0");
+my $PHP4_PORT = "php4-extensions-1.0";
 
 my $packagedir = "";
 my $batchmode  = 0;
+my $password;
 my %opts;
-if (! getopts("P:p:b", \%opts)) {
+if (! getopts("P:p:bw:F:", \%opts)) {
     usage();
 }
 if (defined($opts{p})) {
@@ -87,7 +101,12 @@ if (defined($opts{b})) {
 if (defined($opts{P})) {
     $OPS_PORT = $opts{P};
 }
-
+if (defined($opts{F})) {
+    $FS_PORT = $opts{F};
+}
+if (defined($opts{w})) {
+    $password = $opts{w};
+}
 if (@ARGV) {
     usage();
 }
@@ -105,6 +124,7 @@ my $TOP_OBJDIR = "$OBJDIR/..";
 #
 my $CHGRP      = "/usr/bin/chgrp";
 my $CHMOD      = "/bin/chmod";
+my $CHOWN      = "/usr/sbin/chown";
 my $PW         = "/usr/sbin/pw";
 my $PATCH      = "/usr/bin/patch";
 my $NEWALIASES = "/usr/bin/newaliases";
@@ -138,6 +158,17 @@ my $CRONTAB         = "/etc/crontab";
 my $AUTHKEYS	    = "/root/.ssh/authorized_keys";
 my $SMBCONF_FILE    = "/usr/local/etc/smb.conf";
 my $SMBCONF_HEAD    = "$SMBCONF_FILE.head";
+my $APACHE_ETCDIR   = "/usr/local/etc/apache";
+my $HTTPD_CONF      = "$APACHE_ETCDIR/httpd.conf";
+
+# For installing mysqld
+my $MYSQL           = "/usr/local/bin/mysql";
+my $MYSQLADMIN      = "/usr/local/bin/mysqladmin";
+my $MYSQLSHOW       = "/usr/local/bin/mysqlshow";
+my $MYSQLDUMP       = "/usr/local/bin/mysqldump";
+my $MYSQLINSTALL    = "/usr/local/bin/mysql_install_db";
+my $MYSQLDBDIR      = "/var/db/mysql";
+my $MYSQL_LOGDIR    = "$LOGDIR/mysql";
 
 #
 # Some directories we care about
@@ -200,12 +231,29 @@ if ($UID != 0) {
 #
 # The phases are fairly self-explanatory
 #
-
-Phase "groups", "Creating admin group", sub {
-    if (getgrnam("tbadmin")) {
-	PhaseSkip("tbadmin group already exists");
-    }
-    ExecQuietFatal("$PW groupadd tbadmin -g $TBADMINGID");
+Phase "usersgroups", "Creating users and groups", sub {
+    Phase "tbadmin", "Creating tbadmin group", sub {
+	if (getgrnam("tbadmin")) {
+	    PhaseSkip("tbadmin group already exists");
+	}
+	ExecQuietFatal("$PW groupadd tbadmin -g $TBADMINGID");
+    };
+    # Added next two cause the mysql package does not do this (port does).
+    Phase "mysqlgroup", "Creating mysql group", sub {
+	if (getgrnam("mysql")) {
+	    PhaseSkip("mysql group already exists");
+	}
+	ExecQuietFatal("$PW groupadd mysql -g 88");
+    };
+    Phase "mysqluser", "Creating mysql user", sub {
+	if (getpwnam("mysql")) {
+	    PhaseSkip("mysql user already exists");
+	}
+	ExecQuietFatal("$PW useradd mysql -g 88 -g 88 -h - ".
+		       "-d $MYSQLDBDIR -s /sbin/nologin -c 'MySQL Daemon'");
+    };
+    ExecQuietFatal("$CHOWN mysql:mysql $MYSQLDBDIR")
+	if (-e $MYSQLDBDIR);
 };
 
 Phase "dirs", "Setting directory permissions", sub {
@@ -232,13 +280,17 @@ Phase "dirs", "Setting directory permissions", sub {
 
 Phase "ports", "Installing ports", sub {
     Phase "packages", "Installing packages", sub {
-	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT")) {
+	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT") &&
+	    (($FBSD_VERSION == 4) || !ExecQuiet("$PKG_INFO -e $PHP4_PORT"))) {
 	    PhaseSkip("Ports already installed");
 	}
 	if (!$packagedir) {
 	    PhaseSkip("No package directory provided");
 	}
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT")
+	    if (!ExecQuiet("$PKG_INFO -e $OPS_PORT"));
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PHP4_PORT")
+	    if ($FBSD_VERSION > 4 && !ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
     };
     Phase "fs-packages", "Installing FS packages", sub {
 	if (!$ISFS) {
@@ -321,7 +373,8 @@ Phase "portfixup", "Fixing up packages", sub {
 	    ExecQuietFatal("$PKG_ADD samba-3.0.7,1");
 	};
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
-	    if (!ExecQuiet("$PKG_INFO -x gcc30")) {
+	    if ($FBSD_VERSION > 4 ||
+		!ExecQuiet("$PKG_INFO -x gcc30")) {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
 	    
@@ -335,10 +388,15 @@ Phase "portfixup", "Fixing up packages", sub {
 
 Phase "patches", "Applying patches", sub {
     Phase "m2cryptopatch", "Patching m2crypto", sub {
-        if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $M2CRYPTO_PATCH")) {
-            PhaseSkip("$M2CRYPTO_PATCH already applied");
-        }
-        ExecQuietFatal("$PATCH -f -p0 -l -i $M2CRYPTO_PATCH");
+	my $patchfile = $M2CRYPTO_PATCH;
+	
+	if (ExecQuiet("$PKG_INFO -I -x m2crypto | fgrep -q -s '0.13'") == 0) {
+	    $patchfile = "${patchfile}-0.13";
+	}
+	if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+	    PhaseSkip("$patchfile already applied");
+	}
+	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
     };
 }; 
 
@@ -346,10 +404,13 @@ Phase "rc.conf", "Adding testbed content to rc.conf", sub {
     DoneIfEdited($RCCONF);
     AppendToFileFatal($RCCONF,
 		      qq|sendmail_enable="YES"|,
+		      qq|rpcbind_enable="YES"|,
+		      qq|mountd_enable="YES"|,
 		      qq|nfs_server_enable="YES"|,
 		      qq|nfs_server_flags="-u -t -n 16"|,
 		      qq|mountd_flags="-r -p 900"|,
 		      (($ISFS && $WINSUPPORT) ? qq|smbd_enable="YES"| : ()),
+		      qq|apache_enable="YES"|,
 		      qq|syslogd_flags=""|);
 };
 
@@ -584,6 +645,21 @@ Phase "syslog", "Setting up syslog", sub {
 	mkdir($TIPLOG_DIR,0755) or PhaseFail("Unable to make $TIPLOG_DIR : $!");
     };
     
+    Phase "logdir", "Creating log directory", sub {
+	DoneIfExists($LOGDIR);
+	mkdir $LOGDIR, 0775 or PhaseFail("Unable to create $LOGDIR : $!");
+	ExecQuietFatal("$CHGRP tbadmin $LOGDIR");
+	ExecQuietFatal("$CHMOD 775 $LOGDIR");
+    };
+
+    Phase "mysql-logdir", "Creating mysql log directory", sub {
+	DoneIfExists($MYSQL_LOGDIR);
+	mkdir $MYSQL_LOGDIR, 0775 or
+	    PhaseFail("Unable to create $MYSQL_LOGDIR : $!");
+	ExecQuietFatal("$CHOWN mysql:mysql $MYSQL_LOGDIR");
+	ExecQuietFatal("$CHMOD 775 $MYSQL_LOGDIR");
+    };
+
     Phase "logfiles", "Creating log files", sub {
 	foreach my $logfile (@LOGFILES) {
 	    Phase $logfile, $logfile, sub {
@@ -714,6 +790,12 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
 	    PhaseFail("Unable to remove $RCDIR/rsyncd.sh: $!");
 	}
     };
+    Phase "mysql-server", "Removing $RCDIR/mysql-server.sh", sub {
+	DoneIfDoesntExist("$RCDIR/mysql-server.sh");
+	if (!unlink "$RCDIR/mysql-server.sh") {
+	    PhaseFail("Unable to remove $RCDIR/mysql-server.sh: $!");
+	}
+    };
     Phase "rc.testbed", "Installing testbed RC scripts", sub {
         Phase "elvind.sh", "Removing port version of elvind.sh", sub {
 	    DoneIfDoesntExist("$RCDIR/elvind.sh");
@@ -721,6 +803,75 @@ Phase "rc.d", "Setting up rc.d scripts", sub {
         };
 	DoneIfExists("$RCDIR/2.elvind.sh");
 	ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/rc.d control-install");
+    };
+};
+
+Phase "apache", "Installing apache config file", sub {
+    PhaseSkip("apache not supported on ops")
+	if ($FBSD_VERSION == 4);
+
+    DoneIfEdited("$HTTPD_CONF");
+    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/apache control-install");
+};
+
+Phase "database", "Setting up database", sub {
+    PhaseSkip("mysqld not supported on ops")
+	if ($FBSD_VERSION == 4);
+    
+    # Get a password for the the DB.
+    Phase "password", "Asking for mysqld root password", sub {
+	DoneIfExists("$ETCDIR/mysqld.pwd");
+
+	if (!defined($password)) {
+	    print "\n\nPick a password for mysqld (warning, will be echoed): ";
+	    $password = <>;
+	    chomp($password)
+		if (defined($password));
+	}
+	PhaseFail("Invalid password supplied")
+	    if (!defined($password) || $password eq "");
+	
+	CreateFileFatal("$ETCDIR/mysqld.pwd", "$password");
+	ExecQuietFatal("$CHMOD 750 $ETCDIR/mysqld.pwd");
+	ExecQuietFatal("$CHGRP tbadmin $ETCDIR/mysqld.pwd");
+    };
+    $password = `cat $ETCDIR/mysqld.pwd`;
+    chomp($password);
+
+    Phase "initialize", "Initializing mysql", sub {
+	PhaseSkip("mysqld already initialzed")
+	    if (-d "$MYSQLDBDIR/mysql");
+
+	ExecQuietFatal("$MYSQLINSTALL --ldata=${MYSQLDBDIR}");
+	ExecQuietFatal("$CHOWN -R mysql:mysql $MYSQLDBDIR");
+    };
+    
+    Phase "start", "Starting mysqld", sub {
+	my ($exitval) = ExecQuiet("$MYSQLADMIN -u mysql ping");
+
+	PhaseSkip("mysqld already running")
+	    if ($exitval == 0);
+
+	ExecQuietFatal("$RCDIR/1.mysql-server.sh start");
+	# Give mysqld some time to start, then make sure it did
+	sleep 5;
+	ExecQuietFatal("$MYSQLADMIN -u mysql ping");
+    };
+
+    # Once the password is inserted and privs flushed, will need a password
+    # from this point forward!
+    Phase "privs", "Initializing mysqld priv system", sub {
+	my ($exitval, @rows) =
+	    ExecQuiet("echo 'select * from user limit 1' | ".
+		      "$MYSQL -s -u root mysql");
+	if ($exitval) {
+	    PhaseSkip("Privs already initialized");
+	}
+	($exitval, @rows) =
+	    ExecQuietFatal("echo 'update user set ".
+			   " Password=PASSWORD(\"$password\") ".
+			   "where user=\"root\"; flush privileges' | ".
+			   "$MYSQL -s -u root mysql");
     };
 };
 

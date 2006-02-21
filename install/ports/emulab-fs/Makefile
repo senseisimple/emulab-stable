@@ -1,9 +1,15 @@
-# New ports collection makefile for: emulab-ops
-# Date created:         28 January 2003
-# Whom:                 ricci@cs.utah.edu
+# New ports collection makefile for: emulab-fs
+#
+
+# Need the major version number to figure out to do.
+OSMAJOR!= /usr/bin/uname -r | /usr/bin/sed -e 's/\..*//'
 
 PORTNAME=	emulab-fs
+.if ${OSMAJOR} >= 5
+PORTVERSION=	2.0
+.else
 PORTVERSION=	1.4
+.endif
 CATEGORIES=	misc
 MASTER_SITES=	#none
 DISTFILES=	#none
@@ -15,7 +21,12 @@ MAINTAINER=	hibler@cs.utah.edu
 #
 # For samba, so that it doesn't suck in everything under the sun
 #
-.MAKEFLAGS+=	-DSAMBA_SUBPORT -DWITHOUT_WINBIND -DWITHOUT_LDAP -DWITHOUT_POPT
+.MAKEFLAGS+=	-DWITHOUT_WINBIND -DWITHOUT_LDAP -DWITHOUT_POPT -DWITHOUT_CUPS
+
+#
+# We must make sure PERL is built with this.
+#
+.MAKEFLAGS+=	ENABLE_SUIDPERL=yes
 
 #
 # This prevents any ports from trying to run interactively - some, ask silly
