@@ -152,7 +152,7 @@ sub substitute($$) {
 	#
 	# Replace all variables, which look like <Foo>
 	#
-        while ($lines =~ /<(\w+)>/) {
+        while ($lines =~ /<(\w+)\s*\/?>/) {
             if (!defined($variables->{$1})) {
                 fatal("Unknown variable: $1");
             }
@@ -166,7 +166,7 @@ sub substitute($$) {
 	    } else {
 		$value = $variables->{$1}{default};
 	    }
-            $lines =~ s/<(\w+)>/$value/;
+            $lines =~ s/<(\w+)\s*\/?>/$value/;
         }
         $nsfile .= $lines;
     }
