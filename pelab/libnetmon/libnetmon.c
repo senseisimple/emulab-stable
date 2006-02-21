@@ -258,23 +258,16 @@ void lnm_control_wait() {
 }
 
 /*
- * Start monitoring a new file descriptor
+ * Get the unique identifier for a connection
  */
-void startFD(int fd, const struct sockaddr *localname,
+void nameFD(int fd, const struct sockaddr *localname,
         const struct sockaddr *remotename) {
-
     struct sockaddr_in *remoteaddr, *localaddr;
-    unsigned int socktype, typesize;
     union {
         struct sockaddr sa;
         char data[128];
     } sockname;
     socklen_t namelen;
-
-    if (monitorFD_p(fd)) {
-        printf("Warning: Tried to start monitoring an FD already in use!\n");
-        stopFD(fd);
-    }
 
     if (remotename == NULL) {
         int gpn_rv;
@@ -287,34 +280,6 @@ void startFD(int fd, const struct sockaddr *localname,
         remoteaddr = (struct sockaddr_in *) &(sockname.sa);
     } else {
         remoteaddr = (struct sockaddr_in*)remotename;
-    }
-
-    /*
-     * Make sure it's an IP connection
-     * XXX : Make sure the pointer is valid!
-     */
-    if (remotename->sa_family != AF_INET) {
-        DEBUG(printf("Ignoring a non-INET socket\n"));
-        return;
-    }
-    /*
-     * Check to make sure it's a TCP socket
-     */
-    typesize = sizeof(unsigned int);
-    if (getsockopt(fd,SOL_SOCKET,SO_TYPE,&socktype,&typesize) != 0) {
-        croak("Unable to get socket type: %s\n",strerror(errno));
-    }
-    if (socktype != SOCK_STREAM) {
-        DEBUG(printf("Ignoring a non-TCP socket\n"));
-        return;
-    }
-
-    /*
-     * Give oursleves enough space in the array to record information about
-     * this connection
-     */
-    while (fd >= fdSize) {
-        allocFDspace();
     }
 
     /*
@@ -339,7 +304,50 @@ void startFD(int fd, const struct sockaddr *localname,
     } else {
         localaddr = (struct sockaddr_in *) localname;
     }
+
     monitorFDs[fd].local_port = ntohs(localaddr->sin_port);
+
+    monitorFDs[fd].connected = true;
+    informConnect(fd);
+
+}
+
+/*
+ * Start monitoring a new file descriptor
+ */
+void startFD(int fd) {
+    unsigned int socktype, typesize;
+    int sndsize, rcvsize;
+
+    if (monitorFD_p(fd)) {
+        printf("Warning: Tried to start monitoring an FD already in use!\n");
+        stopFD(fd);
+    }
+
+    /*
+     * Make sure it's an IP connection
+     * XXX : Make sure the pointer is valid!
+     */
+    /*
+     * XXX : Fix this!
+    if (remotename->sa_family != AF_INET) {
+        DEBUG(printf("Ignoring a non-INET socket\n"));
+        return;
+    }
+    */
+    /*
+     * Check to make sure it's a TCP socket
+     */
+    typesize = sizeof(unsigned int);
+    if (getsockopt(fd,SOL_SOCKET,SO_TYPE,&socktype,&typesize) != 0) {
+        croak("Unable to get socket type: %s\n",strerror(errno));
+    }
+    if (socktype != SOCK_STREAM) {
+        DEBUG(printf("Ignoring a non-TCP socket\n"));
+        return;
+    }
+
+    allocFDspaceFor(fd);
 
     /*
      * We may have been asked to force the socket buffer size
@@ -358,16 +366,24 @@ void startFD(int fd, const struct sockaddr *localname,
         }
     }
 
-    monitorFDs[fd].monitoring = true;
-
     /*
-     * Let the monitor know about it
+     * Find out the socket buffer sizes
      */
-    if (output_version == 2) {
-        fprintf(outstream,"New: ");
-        fprintID(outstream,fd);
-        fprintf(outstream,"\n");
+    sndsize = getNewSockbuf(fd,SO_SNDBUF);
+    rcvsize = getNewSockbuf(fd,SO_RCVBUF);
+
+    if (forced_bufsize && (sndsize > forced_bufsize)) {
+	printf("Warning: Tried to force SO_SNBUF to %i but got %i\n",
+		forced_bufsize, sndsize);
     }
+
+    if (forced_bufsize && (rcvsize > forced_bufsize)) {
+	printf("Warning: Tried to force SO_RCVBUF to %i but got %i\n",
+		forced_bufsize, rcvsize);
+    }
+
+    monitorFDs[fd].monitoring = true;
+    monitorFDs[fd].connected = false;
 
     DEBUG(printf("Watching FD %i\n",fd));
 
@@ -516,6 +532,12 @@ void allocFDspace() {
     return;
 }
 
+void allocFDspaceFor(int fd) {
+    while (fd > fdSize) {
+	allocFDspace();
+    }
+}
+
 bool monitorFD_p(int whichFD) {
     /*
      * If this FD is greater than the size of our fd array, then we're
@@ -525,6 +547,14 @@ bool monitorFD_p(int whichFD) {
         return false;
     } else {
         return monitorFDs[whichFD].monitoring;
+    }
+}
+
+bool connectedFD_p(int whichFD) {
+    if (whichFD >= fdSize) {
+        return false;
+    } else {
+        return monitorFDs[whichFD].connected;
     }
 }
 
@@ -565,30 +595,99 @@ void log_packet(int fd, size_t len) {
 }
 
 /*
+ * Inform the user that the nodelay flag has been changed
+ */
+void informNodelay(int fd) {
+    if (output_version == 2) {
+	fprintf(outstream,"TCP_NODELAY: ");
+	fprintID(outstream,fd);
+	fprintf(outstream," %i\n",monitorFDs[fd].tcp_nodelay);
+    }
+}
+
+void informMaxseg(int fd) {
+    if (output_version == 2) {
+	fprintf(outstream,"TCP_MAXSEG: ");
+	fprintID(outstream,fd);
+	fprintf(outstream," %i\n",monitorFDs[fd].tcp_maxseg);
+    }
+}
+
+void informBufsize(int fd, int which) {
+    int bufsize;
+    if (output_version == 2) {
+	/* TODO: Handle bad which parameter */
+	if (which == SO_SNDBUF) {
+	    bufsize = monitorFDs[fd].sndbuf;
+	} else {
+	    bufsize = monitorFDs[fd].rcvbuf;
+	}
+
+	fprintf(outstream,"%s: ", (which == SO_SNDBUF) ?
+		"SO_SNDBUF" : "SO_RCVBUF");
+	fprintID(outstream,fd);
+	fprintf(outstream," %i\n", bufsize);
+
+    }
+}
+
+void informConnect(int fd) {
+    if (output_version == 2) {
+	/*
+	 * Let the monitor know about it
+	 */
+	fprintf(outstream,"New: ");
+	fprintID(outstream,fd);
+	fprintf(outstream,"\n");
+
+	/*
+	 * Some things we report on for every connection
+	 */
+	informNodelay(fd);
+	informMaxseg(fd);
+	informBufsize(fd, SO_RCVBUF);
+	informBufsize(fd, SO_SNDBUF);
+
+	fprintf(outstream,"Connected: ");
+	fprintID(outstream,fd);
+	fprintf(outstream,"\n");
+    }
+}
+
+int getNewSockbuf(int fd, int which) {
+    int newsize;
+    int optsize;
+    optsize = sizeof(newsize);
+    if (getsockopt(fd,SOL_SOCKET,which,&newsize,&optsize)) {
+	croak("Unable to get socket buffer size");
+	/* Make GCC happy - won't get called */
+	return 0;
+    } else {
+	if (which == SO_SNDBUF) {
+	    monitorFDs[fd].sndbuf = newsize;
+	} else {
+	    monitorFDs[fd].rcvbuf = newsize;
+	}
+
+	return newsize;
+    }
+}
+
+/*
  * Library function wrappers
  */
 
-/*
- * Commented out, since we're actually deciding which FDs to monitor based on
- * success of the connect() function now.
- */
-/*
 int socket(int domain, int type, int protocol) {
     int returnedFD;
     lnm_init();
     DEBUG(printf("socket() called\n"));
     returnedFD = real_socket(domain, type, protocol);
     if (returnedFD > 0) {
-        while (returnedFD > fdSize) {
-            allocFDspace();
-        }
-        DEBUG(printf("Watching FD %i\n",returnedFD));
-        monitorFDs[returnedFD] = true;
+	startFD(returnedFD);
     }
 
     return returnedFD;
 }
-*/
 
 /*
  * We're only going to bother to monitor FDs after they have succeeded in
@@ -607,6 +706,10 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
     DEBUG(printf("connect() called on %i\n",sockfd));
 
     rv = real_connect(sockfd, serv_addr, addrlen);
+
+    if (!monitorFD_p(sockfd)) {
+	return rv;
+    }
 
     /*
      * There are actually some cases when connect() can 'fail', but we
@@ -630,7 +733,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          * Find out some things about the address we've connected to
          * Note: The kernel already verified for us that the pointer is okay
          */
-        startFD(sockfd,NULL,serv_addr);
+        nameFD(sockfd,NULL,serv_addr);
 
     } else {
         /*
@@ -657,11 +760,15 @@ int accept(int s, struct sockaddr * addr,
 
     rv = real_accept(s, addr, addrlen);
 
+    if (!monitorFD_p(s)) {
+	return rv;
+    }
+
     if (rv > 0) {
         /*
          * Got a new client!
          */
-        startFD(rv,addr,NULL);
+        nameFD(rv,addr,NULL);
     }
 
     return rv;
@@ -746,67 +853,91 @@ ssize_t write(int fd, const void *buf, size_t count) {
 
 int setsockopt (int s, int level, int optname, const void *optval,
                  socklen_t optlen) {
+    int rv;
+
     lnm_init();
     lnm_control();
 
     DEBUG(printf("setsockopt called (%i,%i)\n",level,optname));
 
     /*
-     * Note, we do this on all sockets, not just those we are currently
-     * monitoring, since it's likely they'll call setsockopt() before
-     * connect()
+     * If we're supposed to monitor this FD, there are some things that can
+     * make us ignore or cap this call.
      */
-    if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
-                                  (optname == SO_RCVBUF))) {
-        if (forced_bufsize) {
-            /*
-             * I believe this is the right thing to do - return success but don't
-             * do anything - I think that this is what you normally get when you,
-             * say, pick a socket buffer size that is too big.
-             */
-            printf("Warning: Ignored attempt to change SO_SNDBUF or SO_RCVBUF\n");
-            return 0;
-        } else if (max_bufsize && (*((int *)optval) > max_bufsize)) {
-            printf("Warning: Capped attempt to change SO_SNDBUF or SO_RCVBUF\n");
-            *((int *)optval) = max_bufsize;
-        }
+    if (monitorFD_p(s)) {
+	/*
+	 * Note, we do this on all sockets, not just those we are currently
+	 * monitoring, since it's likely they'll call setsockopt() before
+	 * connect()
+	 */
+	if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
+				      (optname == SO_RCVBUF))) {
+	    if (forced_bufsize) {
+		/*
+		 * I believe this is the right thing to do - return success but
+		 * don't do anything - I think that this is what you normally get
+		 * when you, say, pick a socket buffer size that is too big.
+		 */
+		printf("Warning: Ignored attempt to change SO_SNDBUF or "
+		       "SO_RCVBUF\n");
+		return 0;
+	    } else if (max_bufsize && (*((int *)optval) > max_bufsize)) {
+		printf("Warning: Capped attempt to change SO_SNDBUF or "
+		       "SO_RCVBUF\n");
+		*((int *)optval) = max_bufsize;
+	    }
 
-        /*
-         * Let the monitor know that the app has changed it socket buffer size
-         */
-        if (output_version == 2) {
-            fprintf(outstream,"%s: ", (optname == SO_SNDBUF) ?
-                    "SO_SNDBUF" : "SO_RCVBUF");
-            fprintID(outstream,s);
-            fprintf(outstream," %i\n", *((int *)optval));
-        }
-    }
-
-    /*
-     * There are some TCP options we have to watch for
-     * TODO: Check for success before reporting
-     */
-    if (level == IPPROTO_TCP) {
-        if (optname == TCP_NODELAY) {
-            if (output_version == 2) {
-                fprintf(outstream,"TCP_NODELAY: ");
-                fprintID(outstream,s);
-                fprintf(outstream," %i\n",*((int *)optval));
-            }
-        }
-        if (optname == TCP_MAXSEG) {
-            if (output_version == 2) {
-                fprintf(outstream,"TCP_MAXSEG: ");
-                fprintID(outstream,s);
-                fprintf(outstream," %i\n",*((int *)optval));
-            }
-        }
+	}
     }
 
     /*
      * Actually call the real thing
      */
-    return real_setsockopt(s,level,optname,optval,optlen);
+    rv = real_setsockopt(s,level,optname,optval,optlen);
+
+    /*
+     * If the call succeeded, we have to record some more information about it
+     */
+    if (rv == 0 && monitorFD_p(s)) {
+	if ((level == SOL_SOCKET) && ((optname == SO_SNDBUF) ||
+				      (optname == SO_RCVBUF))) {
+	    /*
+	     * We have to get the socket buffer size the kernel chose: it might
+	     * not be exactly what the user asked for
+	     */
+	    getNewSockbuf(s,optname);
+	    if (connectedFD_p(s)) {
+		informBufsize(s,optname);
+	    }
+	}
+
+	/*
+	 * There are some TCP options we have to watch for
+	 */
+	if (level == IPPROTO_TCP) {
+	    if (optname == TCP_NODELAY) {
+		monitorFDs[s].tcp_nodelay = *((int *)optval);
+
+		if (connectedFD_p(s)) {
+		     /* If connected, inform user of this call */
+		    informNodelay(s);
+		}
+	    }
+	    if (optname == TCP_MAXSEG) {
+		monitorFDs[s].tcp_maxseg = *((int *)optval);
+
+		if (connectedFD_p(s)) {
+		    /* If connected, inform user of this call */
+		    informMaxseg(s);
+		}
+	    }
+	}
+    }
+
+    /*
+     * Finally, give back the returned value
+     */
+    return rv;
 }
 
 /*

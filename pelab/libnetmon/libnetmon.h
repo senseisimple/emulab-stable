@@ -69,9 +69,20 @@ static void lnm_control_wait();
 static void allocFDspace();
 
 /*
+ * Make sure there's enough room for the given FD in the file descriptor
+ * table
+ */
+static void allocFDspaceFor(int);
+
+/*
  * Predicate function: Are we monitoring this file descriptor?
  */
 static bool monitorFD_p(int);
+
+/*
+ * Predicate funtion: Is this file descriptor connected?
+ */
+static bool connectedFD_p(int);
 
 /*
  * Die! Takes printf-style format and args
@@ -93,6 +104,18 @@ typedef struct {
                               convert every time we want to report */
     int remote_port;
     int local_port;
+
+    bool connected; /* Is this FD currently connected or not? */
+
+    /*
+     * Socket options we keep track of
+     */
+    int sndbuf;
+    int rcvbuf;
+    bool tcp_nodelay;
+    int tcp_maxseg;
+
+    
 } fdRecord;
 
 /*
@@ -100,6 +123,11 @@ typedef struct {
  */
 static fdRecord* monitorFDs;
 static unsigned int fdSize;
+
+/*
+ * Find out what size socket buffer the kernel just gave us
+ */
+static int getNewSockbuf(int,int);
 
 /*
  * Stream on which to write reports
@@ -124,7 +152,8 @@ static int max_bufsize;
 /*
  * Manipulate the monitorFDs structure
  */
-static void startFD(int, const struct sockaddr *, const struct sockaddr *);
+static void startFD(int);
+static void nameFD(int, const struct sockaddr *, const struct sockaddr *);
 static void stopFD(int);
 static void stopWatchingAll();
 
@@ -182,3 +211,11 @@ static accept_proto_t     *real_accept;
 /*
  * Note: Functions that we're wrapping are in the .c file
  */
+
+/*
+ * Functions we use to inform the user about various events
+ */
+static void informNodelay(int);
+static void informMaxseg(int);
+static void informBufsize(int, int);
+static void informConnect(int);
