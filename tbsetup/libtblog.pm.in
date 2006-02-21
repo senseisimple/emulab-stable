@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -701,9 +701,9 @@ sub tblog_start_capture( ;@ ) {
     @what = qw(stdout stderr die warn) unless @what;
     foreach (@what) {
 	if ($_ eq 'stdout') {
-	    tie *STDOUT, 'libtblog', \*SOUT;
+	    tie *STDOUT, 'libtblog', \*SOUT if ($] < 5.006);
 	} elsif ($_ eq 'stderr') {
-	    tie *STDERR, 'libtblog', \*SERR;
+	    tie *STDERR, 'libtblog', \*SERR if ($] < 5.006);
 	} elsif ($_ eq 'die') {
 	    # Should not need to worry about parser errors since the
 	    # handlers will be set only after parsing is done
