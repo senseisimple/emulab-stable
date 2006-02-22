@@ -254,6 +254,14 @@ sub doboot()
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
     }
+    elsif ($FBSD_VERSION == 6) {
+	$emulabconfig{FS_PKG_DIR}   = "/share/freebsd/6.0/packages";
+	$emulabconfig{OPS_PKG_DIR}  = "/share/freebsd/6.0/packages";
+	$emulabconfig{BOSS_PKG_DIR} = "/share/freebsd/6.0/packages";
+	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
+	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
+	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
+    }
 
     if ($emulabconfig{"ROLE"} eq "fs") {
 	SetupFsNode();
@@ -286,12 +294,6 @@ sub SetupFsNode()
     my ($os, $rel) = split " ", `uname -sr`;
     if ($os ne "FreeBSD") {
 	SetupFatal("FS node must run FreeBSD\n");
-    }
-    # XXXX brutal!
-    if ($FBSD_VERSION == 5) {
-	$emulabconfig{FS_PKG_DIR} =
-	    "/share/freebsd/packages/FreeBSD-5.4-20050508";
-	($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
     }
 
     #
