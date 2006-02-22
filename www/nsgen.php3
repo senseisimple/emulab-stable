@@ -192,9 +192,9 @@ function MAKENS($template,$templatefields,$templatevalues) {
         #
         # Make sure they don't try to break out of our quotes.
         #
-        $value = quotemeta($value);
+        $value = escapeshellarg($value);
 
-        $nsgen_args .= "-v $name='$value' ";
+        $nsgen_args .= "-v $name=$value ";
 
     }
 
