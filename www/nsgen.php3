@@ -7,6 +7,7 @@
 require("defs.php3");
 
 $NSGEN         = "webnsgen";
+$TMPDIR        = "/tmp/";
 
 # Page arguments.
 $template = $_GET['template'];
@@ -60,8 +61,17 @@ xml_parser_free($xml_parser);
 #
 # Body - Either make the NS file or ask the user for the form parameters 
 #
-if ($submit == "Submit") {
-    MAKENS($template,$templatefields,$templatevalues);
+if ($submit == "Begin Experiment" || $submit == "Show NS File") {
+    global $TMPDIR;
+    $nsref = MAKENS($template,$templatefields,$templatevalues);
+    if ($submit == "Begin Experiment") {
+        BEGINEXP($nsref);
+    } else {
+        $filename =  $TMPDIR . GETUID() . "-$nsref.nsfile";
+        header("Content-type: text/plain");
+        readfile($filename);
+        unlink($filename);
+    }
 } else {
     #
     # Just spit out the form!
@@ -99,7 +109,8 @@ function SPITFORM($advanced,$templatefields,$templateorder) {
     }
 
     echo "<tr><th colspan=2><center>";
-    echo "<input type=submit name=submit value='Submit'>&nbsp;";
+    echo "<input type=submit name=submit value='Begin Experiment'>&nbsp;";
+    echo "<input type=submit name=submit value='Show NS File'>&nbsp;";
     echo "<input type=reset name=reset value='Reset'>";
     echo "</center></th></tr>\n";
 
@@ -149,10 +160,11 @@ function startElement($parser,$name,$attrs)
 }
 
 #
-# Make an NS file with the supplied data
+# Make an NS file with the supplied data. Return the nsref for it
 #
 function MAKENS($template,$templatefields,$templatevalues) {
     global $NSGEN;
+    global $TMPDIR;
     global $templatefile;
     
     #
@@ -160,18 +172,12 @@ function MAKENS($template,$templatefields,$templatevalues) {
     #
 
     #
-    # Build up a URL to send the user to
-    #
-    $url = "beginexp_html.php3?";
-
-    #
     # Run nsgen - make up a random nsref for use with it
     #
     list($usec, $sec) = explode(' ', microtime());
     srand((float) $sec + ((float) $usec * 100000));
     $nsref = rand();
-    $url .= "&nsref=$nsref";
-    $outfile = "/tmp/" . GETUID() . "-$nsref.nsfile";
+    $outfile = $TMPDIR . GETUID() . "-$nsref.nsfile";
 
     #
     # Pick out the parameters for command-line arguments
@@ -206,6 +212,15 @@ function MAKENS($template,$templatefields,$templatevalues) {
     SUEXEC("nobody","nobody","$NSGEN -o $outfile $nsgen_args $templatefile",
 	SUEXEC_ACTION_DIE);
 
-    header("Location: $url");
+    return $nsref;
 }
 
+function BEGINEXP($nsref)
+{
+    #
+    # Build up a URL to send the user to
+    #
+    $url = "beginexp_html.php3?";
+    $url .= "&nsref=$nsref";
+    header("Location: $url");
+}
