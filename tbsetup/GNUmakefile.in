@@ -62,7 +62,7 @@ LIB_STUFF       = libtbsetup.pm exitonwarn.pm libtestbed.pm snmpit_intel.pm \
 
 ifeq ($(SYSTEM),FreeBSD)
 FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
-ifneq ($(FBSDVERSION),FreeBSD5)
+ifeq ($(FBSDVERSION),FreeBSD4)
 SUBDIRS  += ipassign
 IPASSIGN  = Yes
 endif
