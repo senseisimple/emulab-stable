@@ -18,3 +18,5 @@ INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','linkdelay','/kernel.lin
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','5.4','delay','/boot/kernel.delay/kernel');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','5.4','linkdelay','/boot/kernel.linkdelay/kernel');
 INSERT IGNORE INTO os_boot_cmd VALUES ('Linux','9.0','linkdelay','linkdelay');
+INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.0','delay','/boot/kernel.delay/kernel');
+INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','6.0','linkdelay','/boot/kernel.linkdelay/kernel');
