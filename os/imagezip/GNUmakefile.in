@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -25,7 +25,7 @@ FBSDMAJ := $(basename $(FBSDREL))
 
 # FreeBSD 5 has GCC3 and LOCALE
 # XXX this should be done with configure
-ifeq ($(FBSDMAJ),5)
+ifneq ($(FBSDMAJ),4)
 export HAVE_GCC3 = 1
 export HAVE_LOCALE = 1
 endif
