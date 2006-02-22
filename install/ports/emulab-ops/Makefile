@@ -31,8 +31,16 @@ MAINTAINER=	ricci@cs.utah.edu
 
 #
 # For SWIG, so that it doesn't feel the need to suck in php and apache
+# XXX Something is broken on FreeBSD 6.X and SWIG_LANGUAGES='x y z' breaks.
 #
-.MAKEFLAGS+=	SWIG_LANGUAGES="perl python tcl"
+.MAKEFLAGS+=	SWIG_LANGUAGES= 
+.MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
+
+#
+# Various ports need to agree on what version of apache. Make sure this
+# agrees with what is in the emulab-ops and emulab-php4 metaports.
+#
+.MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
 
 #
 # For samba, so that it doesn't suck in everything under the sun
@@ -65,7 +73,7 @@ RUN_DEPENDS= gmake:${PORTSDIR}/devel/gmake \
 	${PYTHON_SITELIBDIR}/M2Crypto/ASN1.py:${PORTSDIR}/security/py-m2crypto
 
 .if ${OSMAJOR} >= 5
-RUN_DEPENDS+= python:${PORTSDIR}/lang/python \
+RUN_DEPENDS+= \
 	${LOCALBASE}/etc/apache/ssl.crl:${PORTSDIR}/www/apache13-modssl \
 	${LOCALBASE}/libexec/apache/libauth_mysql.so:${PORTSDIR}/www/mod_auth_mysql \
 	${LOCALBASE}/libexec/mysqld:${PORTSDIR}/databases/mysql323-server \
@@ -80,6 +88,7 @@ RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 
 NO_BUILD=	yes
 USE_PYTHON=	yes
+USE_PERL5=	yes
 
 do-install:	# empty
 

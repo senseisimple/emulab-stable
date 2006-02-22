@@ -26,12 +26,12 @@ APACHE_PORT=www/apache13-modssl
 #
 BATCH=yes
 
+# Disgusting. When we build the php4 port, we have to tell it we're going
+# to be building an SSL extension later. The port appears to be fixed at
+# 4.4.2, so this can go when we upgrade our base to that (currently at
+# 4.4.1).
 #
-# Disgusting. When we build the php4 port, we have to tell it we're going to be
-# building an SSL extention later. The port appears to be fixed at 4.4.2, so
-# this can go when we upgrade our base to that (currently at 4.4.1).
-#
-.MAKEFLAGS+=    CFLAGS=-DHAVE_OPENSSL_EXT WITH_OPENSSL=yes
+.MAKEFLAGS+=    EXTRA_CFLAGS=-DHAVE_OPENSSL_EXT WITH_OPENSSL=yes
 
 #
 # But need this too!

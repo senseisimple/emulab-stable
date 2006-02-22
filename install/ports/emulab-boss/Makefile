@@ -31,12 +31,14 @@ MAINTAINER=	ricci@cs.utah.edu
 
 #
 # For SWIG, so that it doesn't feel the need to suck in php and apache
+# XXX Something is broken on FreeBSD 6.X and SWIG_LANGUAGES='x y z' breaks.
 #
-.MAKEFLAGS+=	SWIG_LANGUAGES="perl python tcl"
+.MAKEFLAGS+=	SWIG_LANGUAGES= 
+.MAKEFLAGS+=    WANT_SWIG_PERL=yes WANT_SWIG_PYTHON=yes WANT_SWIG_TCL=yes
 
 #
-# For the PHP ports, so they will depend on the actual version of apache we're
-# installing
+# Various ports need to agree on what version of apache. Make sure this
+# agrees with what is in the emulab-ops and emulab-php4 metaports.
 #
 .MAKEFLAGS+=	APACHE_PORT=www/apache13-modssl
 
@@ -90,7 +92,7 @@ RUN_DEPENDS=	\
 	${PYTHON_SITELIBDIR}/MySQLdb/times.py:${PORTSDIR}/databases/py-MySQLdb
 
 .if ${OSMAJOR} >= 5
-RUN_DEPENDS= ${RUN_DEPENDS} python:${PORTSDIR}/lang/python \
+RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
 	swig:${PORTSDIR}/devel/swig13
 .else
