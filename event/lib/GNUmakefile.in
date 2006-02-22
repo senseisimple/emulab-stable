@@ -42,10 +42,10 @@ PCORE  += -I/usr/lib/perl5/5.8.6/i386-linux-thread-multi/CORE
 PYCORE = -I@PYTHON_INCLUDE@
 else
 FBSDVERSION    := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
-ifeq ($(FBSDVERSION),FreeBSD5)
-PCORE  = -I/usr/local/lib/perl5/$(PERLVERS)/mach/CORE
-else
+ifeq ($(FBSDVERSION),FreeBSD4)
 PCORE  = -I/usr/libdata/perl/5.00503/mach/CORE
+else
+PCORE  = -I/usr/local/lib/perl5/$(PERLVERS)/mach/CORE
 endif
 PYCORE = -I@PYTHON_INCLUDE@
 endif
