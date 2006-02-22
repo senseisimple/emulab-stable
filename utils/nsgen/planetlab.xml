@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="ISO-8859-1"?>
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<!DOCTYPE nstemplate SYSTEM "nstemplate.dtd">
 <!--
     XML NS template based on planetlab.ns - For making PlanetLab experiments
 -->
@@ -6,7 +7,7 @@
     <variable name="Count" default="10" />
     <variable name="ResUsage" default="3" />
     <variable name="HWType" default="pcplab" />
-    <variable name="FailOK" />
+    <variable name="FailOK" default="" />
     <variable name="Tarballs" default="/somedir /proj/yourproj/tarfiles/yourtarball.tar.gz" />
     <variable name="RPMs" default="/proj/yourproj/rpms/yourrpm.rpm" />
     <variable name="Startup" default="/somepath/yourstartupcmd" />
