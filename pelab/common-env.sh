@@ -39,12 +39,18 @@ IFCONFIG="/sbin/ifconfig"
 PERL="${BIN_PATH}/perl"
 PYTHON="${BIN_PATH}/python"
 SUDO="${BIN_PATH}/sudo"
+SYNC="/usr/local/etc/emulab/emulab-sync"
 
 #
 # Some 'constants' by convention. 
 #
 export PELAB_LAN=elabc
 export EPLAB_LAN=planetc
+
+#
+# Name of the barrier for indicating all stubs are ready
+#
+export STUB_BARRIER=stubsready
 
 #
 # Node/experiment info
@@ -86,13 +92,11 @@ else
     export ON_ELAB="yes"
 fi
 
-
 #
 # IP addresses and interface names
 #
 ifacename() {
-    IPADDR=$1
-    LINKIP=`lookup_ip_host $1`
+    LINKIP=$1
     IFACENAME=`$IFCONFIG -a | $PERL -e "while(<>) { if (/^(eth\d+)/) { \\\$if = \\\$1; } if (/$LINKIP/) { print \"\\\$if\n\"; exit 0; }} exit 1;"`
 
     echo $IFACENAME
@@ -102,7 +106,7 @@ lookup_ip_host()
 {
     HOST=$1
     LINK=$2
-    IPADDR=`grep "$HOST-$LINK" $HOSTSFILE | cut -f1`
+    IPADDR=`grep "${HOST}-${LINK}[ ]" $HOSTSFILE | cut -f1`
     echo $IPADDR
 }
 
@@ -137,5 +141,27 @@ if [ "$EUID" != "0" ]; then
 else
     export AS_ROOT=""
 fi
+
+#
+# Function for waiting on a barrier sync
+# I'd rather automatically determine the number of peer pairs, but that
+# looks too hard for now.
+#
+barrier_wait()
+{
+    BARRIER=$1
+    #
+    # This needs to be set by the calling script
+    #
+    MASTER=$SYNC -m
+    if [ ! "$MASTER" ]; then
+        # I know, this looks backwards. But it's right
+        $SYNC -n $BARRIER 
+    else
+        echo "Waiting for $WAITERS clients"
+        WAITERS=`expr $PEER_PAIRS \* 2 - 1`
+        $SYNC -n $BARRIER -i $WAITERS
+    fi
+}
 
 fi # End of header guard
