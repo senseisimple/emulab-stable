@@ -929,6 +929,10 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
 	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
+	    if ($FBSD_VERSION == 4) {
+		ExecQuietFatal("sed -i .orig -e 's/^apache_/#apache_/' ".
+			       "$RCDIR/apache.sh");
+	    }
 	};
 	Phase "starting", "Starting Apache server", sub {
 	    DoneIfExists("$VARRUN/httpd.pid");
@@ -946,9 +950,8 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 			       "     ${USERNODE}:$APACHE_KEYFILE_OPS");
 	    };
 	    Phase "rc.d", "Installing Apache startup file", sub {
-		ExecQuietFatal("$SSH -o 'BatchMode=yes' root\@${USERNODE} ".
-			       "     cp -f $RCDIR/apache.sh.sample ".
-			       "           $RCDIR/apache.sh");
+		ExecQuietFatal("$SCP $RCDIR/apache.sh ".
+			       "     ${USERNODE}:$RCDIR/apache.sh");
 	    };
 	};
     }
