@@ -929,7 +929,7 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	Phase "rc.d", "Installing Apache startup file", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
 	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
-	    if ($FBSD_VERSION == 4) {
+	    if ($FBSD_VERSION == 6) {
 		ExecQuietFatal("sed -i .orig -e 's/^apache_/#apache_/' ".
 			       "$RCDIR/apache.sh");
 	    }
