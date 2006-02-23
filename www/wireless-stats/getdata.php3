@@ -12,7 +12,6 @@ LOGGEDINORDIE($uid);
 
 #$TARGET_FILE = "wireless-stats.data.zip";
 $TARGET_FILE = "wireless-stats.data";
-$DEV_PATH = "devel/johnsond/";
 
 function death($msg) {
     PAGEHEADER("Wireless Connectivity Data");
@@ -23,7 +22,7 @@ function death($msg) {
 }
 
 ## we need a type and a dataset.
-if (isset($type) && isset($dataset)) {
+if (isset($type) && isset($dataset) && !preg_match("/^[-\w]+$/", $dataset)) {
     $dbq = DBQueryFatal("select * from wireless_stats where name='$dataset'");
 
     if (mysql_num_rows($dbq)) {
@@ -38,11 +37,11 @@ if (isset($type) && isset($dataset)) {
 	if ($type == "data") {
             ## find the file...
             #$path = "/proj/$pid/exp/$eid/logs/$TARGET_FILE";
-            $path = "/usr/testbed/devel/johnsond/www/wireless-stats/$pid.$eid-$TARGET_FILE";
+            $path = "./wireless-stats/$pid.$eid-$TARGET_FILE";
             if (file_exists($path)) {
                 ## read and dump the file:
-                //header("Content-Type: application/zip");
-                //header("Content-Length: " . (filesize($path)));
+                #header("Content-Type: application/zip");
+                #header("Content-Length: " . (filesize($path)));
                 header("Content-Type: text/plain");
                 ## obviously, this duplication of headers might not
                 ## make all browsers very happy... if there's a 
@@ -65,6 +64,7 @@ if (isset($type) && isset($dataset)) {
             $gen_args = "-o $tmpfile -t -z -y -f $floor $building";
             $retval = SUEXEC($uid,"nobody","webfloormap $gen_args",
                              SUEXEC_ACTION_IGNORE);
+	    sleep(1);
             if ($retval) {
                 SUEXECERROR(SUEXEC_ACTION_USERERROR);
                 # Never returns.
@@ -77,8 +77,16 @@ if (isset($type) && isset($dataset)) {
                 header("Content-type: image/jpg");
                 fpassthru($fp);
             }
-            #readfile($tmpfile . ".jpg") or death("Error reading map image file!");
+	    else {
+	        death("Error while reading image file!");
+            }
+
+	    $gen_args = "-k -o $tmpfile";
+	    $retval = SUEXEC($uid,"nobody","webfloormap $gen_args",
+                             SUEXEC_ACTION_IGNORE);
+
             #unlink($tmpfile . ".jpg");
+	    #unlink($tmp
         }
         else if ($type == "posit") {
             $dbq = DBQueryFatal("select node_id,loc_x,loc_y,loc_z from " . 
@@ -107,7 +115,8 @@ if (isset($type) && isset($dataset)) {
 }
 else {
     ## error
-    death("You must supply a valid dataset name and type of data to generate!");
+    death("You must supply a valid dataset name and " . 
+          "type of data to generate!");
 }
 
 ## we're good, theoretically...
