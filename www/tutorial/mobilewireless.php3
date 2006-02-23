@@ -48,6 +48,11 @@ function NLCBODYBEGIN()
 	echo "<td align=\"left\" valign=\"top\" class=\"stealth\">";
 }
 
+function NLCBODYLONGBEGIN($cols)
+{
+	echo "<td align=\"left\" valign=\"top\" class=\"stealth\" colspan=\"$cols\" style=\"padding: 0px; \" >";
+}
+
 function NLCBODYEND()
 {
 	echo "</td>";
@@ -216,7 +221,10 @@ function imageinfo(msg) {
 
 <?php NLCH1("Preface") ?>
 
-<?php NLCBODYBEGIN() ?>
+<?php NLCBODYLONGBEGIN(2) ?>
+
+<table class="stealth" cellpadding=0 cellspacing=0 style="padding: 0px; margin: 0px">
+ <tr><td class="stealth">
 
 We have deployed and opened to public external use a small version of
 what will grow into a large mobile robotic wireless testbed.  The
@@ -252,9 +260,42 @@ You can read a shorter overview of the mobile testbed in this article:
 Real Mobility, Real Wireless: A New Kind of Testbed</a>
 </blockquote>
 
+  </td>
+
+  <td valign="top" class="stealth">
+
+  <table class="stealth">
+  <tr><td style="padding: 5px; border: solid 2px #669; background-color: #F1FAFA;">
+
+<b>Tools:</b>
+
+<p style="text-indent: 0em;">
+
+<a href="<?php echo $TBBASE?>/robotrack/robotrack.php3">Real-time Robot Tracking Applet</a>
+<br>
+<a href="<?php echo $TBBASE ?>/webcam.php3">Live Webcams</a>
+<br>
+<a href="<?php echo $TBBASE ?>/robotmap.php3">Static Robot Map</a>
+<br>
+<a href="<?php echo $TBBASE ?>/newimageid_ez.php3?nodetype=mote">Mote Image
+Creation Page</a>
+<br>
+<a href="<?php echo $TBBASE ?>/wireless-stats/statsapp.php3">WSN Connectivity
+Statistics Applet</a>
+
+</ul>
+
+  </td></tr></table>
+
+  </td>
+  </tr
+
+</table>
+
+
 <?php NLCBODYEND() ?>
 
-<?php NLCEMPTY() ?>
+<!-- ?php NLCEMPTY() ? -->
 
 </tr>
 
@@ -323,6 +364,10 @@ board computers for each robot. (<b><a href="<?php echo $TBBASE?>/doc/docwrapper
 the robots in their habitat.
 <li>An <a href="<?php echo $TBBASE ?>/robotmap.php3">abstract map</a> of the
 current locations of the robots.
+<li>A <a href="<?php echo $TBBASE ?>/robotrack/robotrack.php3">live robot
+motion control applet</a> for drag and drop control and monitoring of robots.
+<li>An <a href="<?php echo $TBBASE ?>/wireless-stats/statsapp.php3">applet for
+viewing wireless link connectivity</a> in our WSN testbed.
 <li>Open for public use weekdays 8am-6pm MST, with operations support.
 </ul>
 
@@ -813,6 +858,13 @@ tb-fix-node $fixed-receiver mote107
 This code allows you to explicitly choose mote107, rather than allowing Emulab
 to select a mote on your behalf.  Those who require very specific wireless network
 topologies may wish to use this command.
+
+<p>
+You can use the 
+<a href="<?php echo $TBBASE?>/wireless-stats/statsapp.php3">WSN Connectivity
+Applet</a> to choose specific motes with desired 
+link quality.  Then, using the mechanism above, you can bind the specific mote
+you want to a node name in your experiment.
 
 <?php NLCBODYEND() ?>
 
