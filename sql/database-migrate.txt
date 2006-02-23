@@ -3096,6 +3096,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
         rename table archive_tags TO archive_tags_old, \
                   archive_tags_new TO archive_tags;
+	drop table archive_tags_old;
 
 4.29: Add more fields to archive_tags table.
 
