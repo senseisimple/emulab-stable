@@ -6,11 +6,24 @@ TESTBED_SRCDIR	= @top_srcdir@
 OBJDIR		= ..
 SUBDIR		= rc.d
 
+WINSUPPORT      = @WINSUPPORT@
+SYSTEM         := $(shell uname -s)
+
 include $(OBJDIR)/Makeconf
 
 RC_SCRIPTS	= 2.mysql-server.sh 3.testbed.sh 2.elvind.sh 1.named.sh \
 		  2.dhcpd.sh 1.mysql-client.sh
 OPS_SCRIPTS     = 2.elvind.sh 3.and.sh 1.mysql-client.sh 1.mysql-server.sh
+
+ifeq ($(SYSTEM),FreeBSD)
+FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
+
+ifeq ($(FBSDVERSION),FreeBSD6)
+ifeq ($(WINSUPPORT),1)
+OPS_SCRIPTS += silly.sh
+endif
+endif
+endif
 
 #
 # Force dependencies to make sure configure regenerates if the .in file
