@@ -930,8 +930,10 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	    DoneIfExists("$RCDIR/apache.sh");
 	    ExecQuietFatal("mv $RCDIR/apache.sh.sample $RCDIR/apache.sh");
 	    if ($FBSD_VERSION == 6) {
-		ExecQuietFatal("sed -i .orig -e 's/^apache_/#apache_/' ".
+		ExecQuietFatal("sed -i .orig ".
+			       "-e 's/^apache_enable/#apache_enable/' ".
 			       "$RCDIR/apache.sh");
+		ExecQuietFatal("/bin/rm -f $RCDIR/apache.sh.orig");
 	    }
 	};
 	Phase "starting", "Starting Apache server", sub {
