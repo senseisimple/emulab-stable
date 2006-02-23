@@ -65,6 +65,9 @@ ROBOTRACKFILES  = $(wildcard $(SRCDIR)/robotrack/*.php3)
 ROBOTRACKFILES += $(wildcard $(SRCDIR)/robotrack/*.jpg)
 ROBOTRACKFILES += $(wildcard $(SRCDIR)/robotrack/*.jar)
 
+WIRELESSSTATSFILES = $(wildcard $(SRCDIR)/wireless-stats/*.php3)
+WIRELESSSTATSFILES += $(wildcard $(SRCDIR)/wireless-stats/*.jar)
+
 PIXFILES  = $(wildcard $(SRCDIR)/pix/*.jpg)
 PIXFILES += $(wildcard $(SRCDIR)/pix/*.gif)
 
@@ -163,6 +166,7 @@ ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
 ALLSDR   = $(notdir $(SDRFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
+ALLWISTATS = $(notdir $(WIRELESSSTATSFILES))
 
 INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/, $(ALLFILES)) \
@@ -177,6 +181,7 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
 	$(addprefix $(INSTALL_WWWDIR)/sdr/, $(ALLSDR)) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
+	$(addprefix $(INSTALL_WWWDIR)/wireless-stats/, $(ALLWISTATS)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
 	$(addprefix $(INSTALL_LIBEXECDIR)/, websearch) \
 	$(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
