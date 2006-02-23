@@ -8,7 +8,7 @@
     <variable name="NodeName" default="devbox" descr="Node Name" />
     <!-- This hard-codes the image name, but it seems like we have to do
          that somewhere... -->
-    <variable name="ImageName" default="PLAB-NONSTD" descr = "Disk Image" />
+    <variable name="ImageName" default="PLAB-DEVBOX" descr = "Disk Image" />
     <nstext>
         <section><![CDATA[
 # plabdevbox.ns - NS script to make a DevBox experiment on Emulab
