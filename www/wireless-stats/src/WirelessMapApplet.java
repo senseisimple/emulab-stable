@@ -80,7 +80,7 @@ public class WirelessMapApplet extends javax.swing.JApplet {
             InputStream data_is = null;
             try {
                 datafile = new URL(base,
-                                   "/dev/johnsond/wireless-stats/" + dataurl + 
+                                   dataurl + 
                                    "&dataset=" + URLEncoder.encode(fragDS[i]) + 
                                    "&nocookieuid=" + URLEncoder.encode(uid) + 
                                    "&nocookieauth=" + URLEncoder.encode(auth)
@@ -158,8 +158,9 @@ public class WirelessMapApplet extends javax.swing.JApplet {
             URL positfile = null;
             InputStream posit_is = null;
             try {
+                System.err.println("base = "+base.toString());
                 positfile = new URL(base,
-                                    "/dev/johnsond/wireless-stats/" + positurl +
+                                    positurl +
                                     "&dataset=" + URLEncoder.encode(fragDS[i]) + 
                                     "&nocookieuid=" + URLEncoder.encode(uid) +
                                     "&nocookieauth=" + URLEncoder.encode(auth)
@@ -216,12 +217,12 @@ public class WirelessMapApplet extends javax.swing.JApplet {
             Image img = null;
             try {
                 imgfile = new URL(base,
-                                  "/dev/johnsond/wireless-stats/" + mapurl +
+                                  mapurl +
                                   "&dataset=" + URLEncoder.encode(fragDS[i]) + 
                                   "&nocookieuid=" + URLEncoder.encode(uid) +
                                   "&nocookieauth=" + URLEncoder.encode(auth)
                                  );
-                img = getToolkit().getImage(imgfile);
+                img = this.getImage(imgfile);
                 MediaTracker tracker = new MediaTracker(this);
                 tracker.addImage(img,0);
                 tracker.waitForID(0);
