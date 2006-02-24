@@ -113,6 +113,14 @@ if (!defined($encpass)) {
 }
 
 # Get uid for the user and a gid for the project
+
+# For non-initial users, get the next available index.
+$result = DBQueryFatal("select idx from emulab_indicies ".
+		       "where name='next_uid'");
+if ($result->numrows() > 0) {
+    ($MINUID) = $result->fetchrow_array();
+}
+
 my $uid = $MINUID;
 while (getpwuid($uid)) { $uid++; }
 
@@ -160,7 +168,7 @@ if ($CONTROL ne $BOSSNODE) {
 }
 
 # Initialize the index value;
-DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid");
+DBQueryFatal("replace into emulab_indicies set name='next_uid',idx=$uid+1");
 
 print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
