@@ -26,7 +26,7 @@ my $TOP_SRCDIR = '@top_srcdir@';
 my $DBNAME     = "@TBDBNAME@";
 my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
-
+my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
 
 my $LOGFACIL   = '@TBLOGFACIL@';
@@ -354,22 +354,22 @@ Phase "tftp", "Setting up directories for tftp", sub {
 };
 
 Phase "ports", "Installing ports", sub {
-    if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT") &&
-	(($FBSD_VERSION == 4) || !ExecQuiet("$PKG_INFO -e $PHP4_PORT"))) {
-	PhaseSkip("Ports already installed");
-    }
     Phase "packages", "Installing packages", sub {
+	if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT") &&
+	    (($FBSD_VERSION == 4) || !ExecQuiet("$PKG_INFO -e $PHP4_PORT"))) {
+	    PhaseSkip("Ports already installed");
+	}
 	if (!$packagedir) {
 	    PhaseSkip("No package directory provided");
 	}
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $BOSS_PORT")
-	    if (!ExecQuiet("$PKG_INFO -e $BOSS_PORT"));
+	    if (ExecQuiet("$PKG_INFO -e $BOSS_PORT"));
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PHP4_PORT")
-	    if ($FBSD_VERSION > 4 && !ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
+	    if ($FBSD_VERSION > 4 && ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
     };
-    if ($packagedir) {
-	PhaseSkip("Packages installed okay");
-    }
+    PhaseSkip("Package directory provided; not installing from source")
+	if ($packagedir);
+
     Phase "pcopy", "Copying ports into place", sub {
 	DoneIfExists("$PORTSMISCDIR/emulab-boss");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
@@ -397,10 +397,10 @@ Phase "portfixup", "Fixing up packages", sub {
 	    PhaseSkip("rsync already installed");
 	}
 
-	PhaseFail("Must have a PKG_PATH variable set in your environment")
-	    if (!exists($ENV{"PKG_PATH"}));
-	
-	ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
+	PhaseFail("Must provide -p (packagedir) argument!")
+	    if (!$packagedir);
+
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD rsync-2.6.3_1");
     };
     if ($WINSUPPORT) {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
@@ -409,10 +409,10 @@ Phase "portfixup", "Fixing up packages", sub {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
 	    
-	    PhaseFail("Must have a PKG_PATH variable set in your environment")
-		if (!exists($ENV{"PKG_PATH"}));
-	
-	    ExecQuietFatal("$PKG_ADD gcc30-3.0.4_1");
+	    PhaseFail("Must provide -p (packagedir) argument!")
+		if (!$packagedir);
+
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD gcc30-3.0.4_1");
 	};
     }
 };
@@ -958,6 +958,16 @@ Phase "sslcerts", "Setting up SSL certificates", sub {
 	};
     }
 };
+
+if ($MAILMANSUPPORT) {
+    my $secret = substr(GenSecretKey(), 0, 10);
+    
+    Phase "Mailman", "Setting up Mailman admin Password", sub {
+	ExecQuietFatal("echo \"update sitevariables set value='$secret' ".
+		       "       where name='general/mailman/password'\" | ".
+		       "$MYSQL $DBNAME");
+    };
+}
 
 Phase "event", "Setting up event system", sub {
     Phase "elvinconf", "Installing elvind config file", sub {

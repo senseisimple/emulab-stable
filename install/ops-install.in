@@ -36,6 +36,7 @@ my $FSNODE_IP   = '@FSNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
+my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
@@ -148,6 +149,7 @@ my $RCLOCAL         = "/etc/rc.local";
 my $RCCAPTURE       = "$PREFIX/etc/rc.capture";
 my $LOCAL_HOSTNAMES = "/etc/mail/local-host-names";
 my $ALIASES_FILE    = "/etc/mail/aliases";
+my $SENDMAIL_CF     = "/etc/mail/sendmail.cf";
 my $EXPORTS_FILE    = "/etc/exports";
 my $EXPORTS_HEAD    = "$EXPORTS_FILE.head";
 my $SYSLOG_CONF     = "/etc/syslog.conf";
@@ -202,6 +204,7 @@ my @MOUNTPOINTS        = ("/users", "/proj", "/groups", "/share");
 my $ELVIND_CONF     = "/usr/local/etc/elvind.conf";
 my $OPS_ELVIND_CONF = "$TOP_OBJDIR/event/etc/elvind-ops.conf";
 my $M2CRYPTO_PATCH  = "$TOP_SRCDIR/patches/m2crypto.patch";
+my $MAILMAN_PATCH   = "$TOP_SRCDIR/patches/mailman.patch";
 my $IDENTPUB        = "$TOP_SRCDIR/install/identity.pub";
 
 #
@@ -288,9 +291,9 @@ Phase "ports", "Installing ports", sub {
 	    PhaseSkip("No package directory provided");
 	}
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT")
-	    if (!ExecQuiet("$PKG_INFO -e $OPS_PORT"));
+	    if (ExecQuiet("$PKG_INFO -e $OPS_PORT"));
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PHP4_PORT")
-	    if ($FBSD_VERSION > 4 && !ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
+	    if ($FBSD_VERSION > 4 && ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
     };
     Phase "fs-packages", "Installing FS packages", sub {
 	if (!$ISFS) {
@@ -304,10 +307,27 @@ Phase "ports", "Installing ports", sub {
 	}
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $FS_PORT");
     };
+    if ($MAILMANSUPPORT) {
+	Phase "mailman", "Installing Mailman package", sub {
+	    if (!ExecQuiet("$PKG_INFO -x -e mailman")) {
+		PhaseSkip("Mailman package already installed");
+	    }
+	    if (!$packagedir) {
+		PhaseSkip("No package directory provided");
+	    }
+	    # Lets not hardwire the package name; whatever it is will do.
+	    my $pname = `ls $packagedir/mailman-*.tbz`;
+	    PhaseFail("Cannot find mailman package in $packagedir!")
+		if ($?);
+	    chomp($pname);
+	    
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+    }
+    PhaseSkip("Package directory provided; not installing from source")
+	if ($packagedir);
+    
     Phase "pcopy", "Copying ports into place", sub {
-	if ($packagedir) {
-	    PhaseSkip("Package directory provided");
-	}
 	DoneIfExists("$PORTSMISCDIR/emulab-ops");
 	ExecQuietFatal("$SH $SRCDIR/ports/ports-install");
     };
@@ -316,9 +336,6 @@ Phase "ports", "Installing ports", sub {
     Phase "pinstall", "Installing ports (may take a while)", sub {
 	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT")) {
 	    PhaseSkip("Ports already installed");
-	}
-	if ($packagedir) {
-	    PhaseSkip("Package directory provided");
 	}
 
 	#
@@ -335,14 +352,29 @@ Phase "ports", "Installing ports", sub {
 	if (!ExecQuiet("$PKG_INFO -e $FS_PORT")) {
 	    PhaseSkip("Ports already installed");
 	}
-	if ($packagedir) {
-	    PhaseSkip("Package directory provided");
-	}
-	    
 	chdir "$PORTSMISCDIR/emulab-fs" or
 	    PhaseFail "Unable to change to $PORTSMISCDIR/emulab-fs: $!";
 	ExecQuietFatal("make -DBATCH install");
     };
+    Phase "php4-pinstall", "Installing PHP4 ports (may take a while)", sub {
+	if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
+	    PhaseSkip("Ports already installed");
+	}
+	chdir "$PORTSMISCDIR/emulab-php4" or
+	    PhaseFail "Unable to change to $PORTSMISCDIR/emulab-php4: $!";
+	ExecQuietFatal("make -DBATCH install");
+    };
+    if ($MAILMANSUPPORT) {
+	Phase "mailman-pinstall", "Installing mailman ports", sub {
+	    if (!ExecQuiet("$PKG_INFO -x -e mailman")) {
+		PhaseSkip("Ports already installed");
+	    }
+	    chdir "$PORTSMISCDIR/emulab-mailman" or
+		PhaseFail("Unable to change to ".
+			  "$PORTSMISCDIR/emulab-mailman: $!");
+	    ExecQuietFatal("make -DBATCH install");
+	};
+    }
     chdir $pwd;
 };
 
@@ -353,10 +385,10 @@ Phase "portfixup", "Fixing up packages", sub {
 	    PhaseSkip("rsync already installed");
 	}
 
-	PhaseFail("Must have PKG_PATH environment variable set")
-	    if (!exists($ENV{"PKG_PATH"}));
-	
-	ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
+	PhaseFail("Must provide -p (packagedir) argument!")
+	    if (!$packagedir);
+
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD rsync-2.6.3_1");
     };
     if ($WINSUPPORT) {
 	Phase "samba", "Looking for Samba and installing", sub {
@@ -367,10 +399,10 @@ Phase "portfixup", "Fixing up packages", sub {
 		PhaseSkip("samba already installed");
 	    }
 	    
-	    PhaseFail("Must have PKG_PATH environment variable set")
-		if (!exists($ENV{"PKG_PATH"}));
-		
-	    ExecQuietFatal("$PKG_ADD samba-3.0.7,1");
+	    PhaseFail("Must provide -p (packagedir) argument!")
+		if (!$packagedir);
+
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD samba-3.0.7,1");
 	};
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
 	    if ($FBSD_VERSION > 4 ||
@@ -378,10 +410,10 @@ Phase "portfixup", "Fixing up packages", sub {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
 	    
-	    PhaseFail("Must have PKG_PATH environment variable set")
-		if (!exists($ENV{"PKG_PATH"}));
-	
-	    ExecQuietFatal("$PKG_ADD gcc30-3.0.4_1");
+	    PhaseFail("Must provide -p (packagedir) argument!")
+		if (!$packagedir);
+
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD gcc30-3.0.4_1");
 	};
     }
 };
@@ -398,6 +430,16 @@ Phase "patches", "Applying patches", sub {
 	}
 	ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
     };
+    if ($MAILMANSUPPORT) {
+	Phase "mailmanpatch", "Patching mailman", sub {
+	    my $patchfile = $MAILMAN_PATCH;
+	
+	    if (!ExecQuiet("$PATCH -C -f -l -R -p0 -i $patchfile")) {
+		PhaseSkip("$patchfile already applied");
+	    }
+	    ExecQuietFatal("$PATCH -f -l -p0 -i $patchfile");
+	};
+    }
 }; 
 
 Phase "rc.conf", "Adding testbed content to rc.conf", sub {
@@ -874,6 +916,92 @@ Phase "database", "Setting up database", sub {
 			   "$MYSQL -s -u root mysql");
     };
 };
+
+if ($MAILMANSUPPORT) {
+    my $MAILMANDIR   = "/usr/local/mailman";
+    my $MAILMANCFG   = "$MAILMANDIR/Mailman/mm_cfg.py";
+    my $MAILMANLISTS = "$MAILMANDIR/lists";
+    my $MAILMANPWD   = "$ETCDIR/mailman.pwd";
+    my $MAILMANALIAS = "/etc/mail/aliases.mailman";
+    my $TBOPSEMAIL   = "@TBOPSEMAIL@";
+    
+    Phase "Mailman", "Setting up Mailman", sub {
+	PhaseSkip("mailman not supported on ops")
+	    if ($FBSD_VERSION == 4);
+
+	# Patch for broken install
+	ExecQuietFatal("$CHMOD 2770 $MAILMANDIR/archives/private");
+
+	# Get a password for the mailman installation.
+	Phase "password", "Generating mailman password", sub {
+	    DoneIfExists($MAILMANPWD);
+	    
+	    my $string = substr(GenSecretKey(), 0, 10);
+
+	    PhaseFail("Invalid password supplied")
+		if (!defined($string) || $string eq "");
+	
+	    CreateFileFatal("$MAILMANPWD", "$string");
+	    ExecQuietFatal("$CHMOD 750 $MAILMANPWD");
+	    ExecQuietFatal("$CHGRP tbadmin $MAILMANPWD");
+	};
+	my $secret = `cat $MAILMANPWD`;
+	chomp($secret);
+
+	Phase "config", "Editing local config file", sub {
+	    DoneIfEdited("$MAILMANCFG");
+
+	    AppendToFileFatal($MAILMANCFG,
+			      "DEFAULT_EMAIL_HOST = '${OURDOMAIN}'",
+			      "DEFAULT_URL_HOST = '${USERNODE}'",
+			      "add_virtualhost(DEFAULT_URL_HOST, ".
+			                       "DEFAULT_EMAIL_HOST)");
+	};
+	Phase "mailman", "Creating mailman list", sub {
+	    PhaseSkip("List already created")
+		if (-d "$MAILMANLISTS/mailman");
+
+	    ExecQuietFatal("cd $MAILMANDIR; ".
+			   "bin/newlist -q mailman $TBOPSEMAIL $secret");
+	};
+	Phase "subscribe", "Subscribing testbed-ops", sub {
+	    PhaseSkip("Already subscribed")
+		if (ExecQuiet("$MAILMANDIR/bin/list_members mailman | ".
+			      "fgrep -q -s $TBOPSEMAIL") == 0);
+
+	    ExecQuietFatal("cd $MAILMANDIR; ".
+			   "echo $TBOPSEMAIL | ".
+			   "   bin/add_members -r - -w n -a n mailman");
+	};
+	# Can do this as many times as we like. No way to know.
+	ExecQuietFatal("cd $MAILMANDIR; ".
+		       "bin/config_list -i data/sitelist.cfg mailman");
+	# Ditto
+	ExecQuietFatal("cd $MAILMANDIR; ".
+		       "bin/mmsitepass $secret; ".
+		       "bin/mmsitepass -c $secret");
+
+	Phase "config", "Editing $SENDMAIL_CF", sub {
+	    PhaseSkip("Already edited")
+		if (ExecQuiet("fgrep AliasFile $SENDMAIL_CF | ".
+			      "fgrep -q -s mailman") == 0);
+
+	    ExecQuietFatal("sed -i .orig -e ".
+			   "  's,\\(AliasFile.*\\),\\1\\,$MAILMANALIAS,' ".
+			   "$SENDMAIL_CF");
+	};
+	Phase "aliases", "Creating $MAILMANALIAS", sub {
+	    DoneIfExists($MAILMANALIAS);
+	    CreateFileFatal($MAILMANALIAS);
+	};
+	Phase "newaliases", "Running newaliases", sub {
+	    PhaseSkip("No new aliases") if PhaseWasSkipped("aliases");
+	    ExecQuietFatal($NEWALIASES);
+	};
+    };
+}
+exit(0)
+    if ($ELABINELAB);
 
 print "----------------------------------------------------------------------\n";
 print "Installation completed succesfully!\n";

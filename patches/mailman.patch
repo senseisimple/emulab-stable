@@ -1,0 +1,31 @@
+Index: /usr/local/mailman/Mailman/Cgi/options.py
+===================================================================
+--- options.py.save
++++ options.py
+@@ -320,6 +320,13 @@
+                              _('You are already using that email address'))
+                 print doc.Format()
+                 return
++            # Emulab hack.
++            listowner, domain_parts = Utils.ParseEmail(mlist.owner[0])
++            if listowner == "testbed-ops":
++                options_page(mlist, doc, user, cpuser, userlang,
++                             _('You are not allowed to change your address'))
++                print doc.Format()
++                return
+             # If they're requesting to subscribe an address which is already a
+             # member, and they're /not/ doing it globally, then refuse.
+             # Otherwise, we'll agree to do it globally (with a warning
+Index: /usr/local/mailman/Mailman/SecurityManager.py
+===================================================================
+--- SecurityManager.py.save
++++ SecurityManager.py
+@@ -295,7 +295,7 @@
+                 prefix = self.internal_name() + '+user+'
+                 for k in c.keys():
+                     if k.startswith(prefix):
+-                        usernames.append(k[len(prefix):])
++                        usernames.append(urllib.unquote(k[len(prefix):]))
+             # If any check out, we're golden.  Note: `@'s are no longer legal
+             # values in cookie keys.
+             for user in [Utils.UnobscureEmail(u) for u in usernames]:

@@ -483,4 +483,14 @@ sub PrintLastOutput() {
     print "--------------------------------------------------------------\n";
 }
 
+#
+# Get me a secret
+#
+sub GenSecretKey()
+{
+    my $key=`/bin/dd if=/dev/urandom count=128 bs=1 2> /dev/null | /sbin/md5`;
+    chomp($key);
+    return $key;
+}
+
 1;

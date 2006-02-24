@@ -7,7 +7,7 @@
 PORTSDIR=/usr/ports
 PORTSUBDIR=misc
 SRCDIR=`dirname $0`
-PORTS="elvind emulab-boss emulab-fs emulab-ops libelvin emulab-tftp-hpa p5-GD-old ulsshxmlrpcpp emulab-iperf emulab-php4"
+PORTS="elvind emulab-boss emulab-fs emulab-ops libelvin emulab-tftp-hpa p5-GD-old ulsshxmlrpcpp emulab-iperf emulab-php4 emulab-mailman"
 
 for PORT in $PORTS
 do

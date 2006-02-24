@@ -93,6 +93,9 @@ my $hostname = `hostname`;
 chomp($hostname);
 my ($bossname, $outer_bossip) = tmccbossinfo();
 
+# Outer FS node name. See below.
+my $fsname;
+
 # Cert stuff to give the inner emulab
 my $RPCCERT = "/usr/testbed/etc/outer_emulab.pem";
 #my $RPCPORT = 7778;
@@ -261,6 +264,19 @@ sub doboot()
 	$emulabconfig{FS_PKG}       = "emulab-fs-2.0";
 	$emulabconfig{OPS_PKG}      = "emulab-ops-2.0";
 	$emulabconfig{BOSS_PKG}     = "emulab-boss-2.0";
+    }
+
+    # Figure out where /share is coming from (outer fs node). We need
+    # that below.
+    $fsname = `mount | grep /users | head -1`;
+    if ($?) {
+	fatal("Could not get mount information!");
+    }
+    if ($fsname =~ /^([-\w\.]+):/) {
+	$fsname = $1;
+    }
+    else {
+	fatal("Could not determine the name of the outer FS node!");
     }
 
     if ($emulabconfig{"ROLE"} eq "fs") {
@@ -720,21 +736,13 @@ sub SetupOpsNode($)
 
     $ENV{"PKG_PATH"} = $emulabconfig{OPS_PKG_DIR};
     mysystem("pkg_add $emulabconfig{OPS_PKG} >/tmp/perrs 2>&1");
-    if ($WINSUPPORT && $FBSD_VERSION == 4) {
-	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
-    }
-    else {
-	mysystem("pkg_add $PHP4_PKG >>/tmp/perrs 2>&1");
-    }
+
     if ($isfs) {
 	# XXX if not set, derive from the OPS info
 	if (!$emulabconfig{FS_PKG_DIR} || !$emulabconfig{FS_PKG}) {
 	    $emulabconfig{FS_PKG_DIR} = $emulabconfig{OPS_PKG_DIR};
 	    ($emulabconfig{FS_PKG} = $emulabconfig{OPS_PKG}) =~ s/ops/fs/;
 	}
-	print "Installing the fs metaport.\n";
-	$ENV{"PKG_PATH"} = $emulabconfig{FS_PKG_DIR};
-	mysystem("pkg_add $emulabconfig{FS_PKG} >/tmp/fs-perrs 2>&1");
     }
   skippkg:
 
@@ -764,6 +772,15 @@ sub SetupOpsNode($)
     } else {
 	mysystem("mkdir /users /proj /groups /share");
     }
+
+    #
+    # Lets mount the package dir so that we can pass off some stuff to
+    # the install scripts;
+    #
+    if (! -d "/packages") {
+	mysystem("mkdir /packages");
+    }
+    mysystem("mount ${fsname}:" . $emulabconfig{OPS_PKG_DIR} . " /packages");
 
     #
     # Need these for rc.conf.
@@ -853,10 +870,11 @@ sub SetupOpsNode($)
     #
     # Create the ops node.
     #
-    my $pkg = "-P $emulabconfig{OPS_PKG} " .
+    $ENV{"PKG_PATH"} = "/packages";
+    my $pkg = "-P $emulabconfig{OPS_PKG} -p /packages " .
 	($isfs ? "-F $emulabconfig{FS_PKG}" : "");
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
-	     "   perl ops-install $pkg -b -w ElabInElab");
+	     "   perl ops-install $pkg -b -w ElabInElab ");
 
     #
     # And install the ops side.
@@ -1068,17 +1086,6 @@ sub SetupBossNode()
 
     $ENV{"PKG_PATH"} = $emulabconfig{BOSS_PKG_DIR};
     mysystem("pkg_add -f $emulabconfig{BOSS_PKG} >/tmp/perrs 2>&1");
-    if ($WINSUPPORT && $FBSD_VERSION == 4) {
- 	mysystem("pkg_add gcc30-3.0.4_1 >/tmp/perrs.gcc 2>&1");
-    }
-    else {
-	mysystem("pkg_add $PHP4_PKG >>/tmp/perrs 2>&1");
-    }
-
-    #
-    # Extra stuff to fix up php package stuff. Ask Rob!
-    #
-#    mysystem("tar xzf ${TBDIR}/testbed/stuff/extras.tar.gz -C /");
 
   skippkg:
     #
@@ -1086,7 +1093,16 @@ sub SetupBossNode()
     # so we can mount new NFS filesystems in their proper places. 
     # 
     mysystem("umount -A -t nfs");
-    
+
+    #
+    # Lets mount the package dir so that we can pass off some stuff to
+    # the install scripts.
+    #
+    if (! -d "/packages") {
+	mysystem("mkdir /packages");
+    }
+    mysystem("mount ${fsname}:" . $emulabconfig{BOSS_PKG_DIR} . " /packages");
+
     #
     # Need to create an /etc/rc.conf that is more suitable for boss.
     # I took most of this from our real ops node. It will be modified
@@ -1171,7 +1187,8 @@ sub SetupBossNode()
     #
     # Create the boss node. This will also install the software.
     #
-    my $pkg = "-P $emulabconfig{BOSS_PKG}";
+    $ENV{"PKG_PATH"} = "/packages";
+    my $pkg = "-P $emulabconfig{BOSS_PKG} -p /packages";
     mysystem("cd ${TBDIR}/testbed/obj/testbed/install; ".
 	     "   perl boss-install $pkg -b -w ElabInElab");
 
@@ -1455,6 +1472,15 @@ sub CreateDefsFile($)
 		/^FRISEBEEMCASTADDR$/ && do {
 		    print OUTDEFS "FRISEBEEMCASTADDR=\"$frismcastaddr\"\n";
 		    print OUTDEFS "FRISEBEEMCASTPORT=\"6000\"\n";
+		    last SWITCH;
+		};
+		/^MAILMANSUPPORT$/ && do {
+		    if ($FBSD_VERSION == 6) {
+			print OUTDEFS "MAILMANSUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "MAILMANSUPPORT=0\n";
+		    }
 		    last SWITCH;
 		};
 		
