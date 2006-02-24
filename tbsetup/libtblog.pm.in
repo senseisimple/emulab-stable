@@ -36,7 +36,7 @@ use Exporter;
 @EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
 	      tbdie tblog_set_info tblog_set_default_cause
 	      tblog_sub_process tblog_find_error
-	      tblog_capture tblog_stop_capture
+	      tblog_start_capture tblog_stop_capture
 	      tblog_new_process tblog_init_process tblog_exit
 	      copy_hash
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
@@ -682,6 +682,29 @@ sub PRINTF {
     &PRINT($this, sprintf($format, @_));
 }
 
+sub FILENO {
+    my $this = shift;
+    fileno($$this);
+}
+
+sub OPEN {
+    my $this = shift;
+    my ($caller_package) = caller;
+    # The open must be executed in the callers package becuase of
+    # things like "open FH, '>&LOG'" will fail if open is executed in
+    # the libtblog package since "LOG" is in the callers package.
+    # Since package is a compile time directive, the only way to do
+    # this is to do an eval on a string.
+    eval("package $caller_package;".
+	 '@_ == 1 ? open($$this, $_[0]) : open($$this, $_[0], $_[1])');
+}
+
+sub CLOSE {
+    # Don't do anything: If we really close $$this than we will lose
+    # the fact that SOUT and STDOUT have the same underlying fileno
+    # (ditto for SERR and STDERR)
+}
+
 #
 # tblog_start_capture(): Capture all output to STDOUT and STDERR and turn
 #   them into log messages.  Use SOUT and SERR to print to the real
@@ -701,9 +724,9 @@ sub tblog_start_capture( ;@ ) {
     @what = qw(stdout stderr die warn) unless @what;
     foreach (@what) {
 	if ($_ eq 'stdout') {
-	    tie *STDOUT, 'libtblog', \*SOUT if ($] < 5.006);
+	    tie *STDOUT, 'libtblog', \*SOUT;
 	} elsif ($_ eq 'stderr') {
-	    tie *STDERR, 'libtblog', \*SERR if ($] < 5.006);
+	    tie *STDERR, 'libtblog', \*SERR;
 	} elsif ($_ eq 'die') {
 	    # Should not need to worry about parser errors since the
 	    # handlers will be set only after parsing is done

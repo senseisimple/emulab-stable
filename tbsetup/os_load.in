@@ -75,6 +75,7 @@ $debug = 1
     if (defined($options{"d"}));
 
 # List only mode. No need to do anymore argument processing.
+sub dolisting();
 if (defined($options{"l"})) {
     dolisting();
     exit(0);
