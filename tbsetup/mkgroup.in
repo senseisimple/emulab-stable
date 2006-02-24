@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -34,6 +34,7 @@ my $TBOPS       = "@TBOPSEMAIL@";
 my $TBLOGS      = "@TBLOGSEMAIL@";
 my $CONTROL     = "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
+my $ELABINELAB  = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $PROJROOT    = "/proj";
 my $GRPROOT     = "/groups";
@@ -264,7 +265,7 @@ if ($pid ne $gid) {
 	}
     }
 
-    if ($MAILMANSUPPORT) {
+    if ($MAILMANSUPPORT && !$ELABINELAB) {
 	$UID  = $SAVEUID;
 	$EUID = $UID;
 	system("$ADDMMLIST -a ${pid}-${gid}-users") == 0 or

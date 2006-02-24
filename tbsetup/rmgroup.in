@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -47,6 +47,7 @@ my $TB       = "@prefix@";
 my $TBOPS    = "@TBOPSEMAIL@";
 my $CONTROL  = "@USERNODE@";
 my $BOSSNODE = "@BOSSNODE@";
+my $ELABINELAB    = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 
 my $PROJROOT = "/proj";
@@ -213,7 +214,7 @@ if (system("$GROUPDEL $unix_name")) {
     }
 }
 
-if ($MAILMANSUPPORT) {
+if ($MAILMANSUPPORT && !$ELABINELAB) {
     # For perl
     $EUID = $UID;
     system("$DELMMLIST -a ${pid}-${gid}-users") == 0 or
