@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use Fcntl ':flock';
@@ -33,12 +33,13 @@ sub ProjectLeaders();
 sub ProjectLists($$);
 sub genelist($$$$);
 
-my $optlist = "anu:p:tdm";
+my $optlist = "anu:p:tdmf";
 my $debug   = 0;
 my $all     = 0;
 my $update  = 0;
 my $activity= 0;
 my $impotent= 0;
+my $force   = 0;
 my $pid;
 my $user;
 
@@ -52,6 +53,7 @@ my $TBALL       = "@TBUSERSARCHIVE@";
 my $PROJROOT	= "/proj";
 my $GRPROOT	= "/groups";
 my $ELISTS      = "$TB/lists";
+my $ELABINELAB  = @ELABINELAB@;
 my $MAILMANSUPPORT= @MAILMANSUPPORT@;
 my $MMPROG	= "$TB/sbin/setmmlistmembers";
 
@@ -440,7 +442,8 @@ sub ProjectLists($$)
 	    genelist($query_result, undef, "$pid-users", 1);
 	}
 	else {
-	    genelist($query_result, undef, "$pid-$gid-users", 1);
+	    genelist($query_result, undef, "$pid-$gid-users",
+		     ($ELABINELAB ? 0 : 1));
 	}
     }
 }
@@ -497,8 +500,10 @@ sub genelist($$$$)
 	system("cmp -s $tempfile $ELISTS/$listname") == 0) {
 	print "$listname has not changed. Skipping.\n"
 	    if ($debug);
-	unlink("$tempfile");
-	return;
+	if (!$force) {
+	    unlink("$tempfile");
+	    return;
+	}
     }
 
     system("/bin/cp -pf $tempfile $ELISTS/$listname") == 0 ||
