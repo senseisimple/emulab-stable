@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -174,6 +174,7 @@ etc-install:	dir-install sysetc-install
 
 sysetc-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/rc.conf $(SYSETCDIR)/rc.conf
+	$(INSTALL) -m 755 $(SRCDIR)/sysctl.conf $(SYSETCDIR)/sysctl.conf
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-exit-hooks \
 			$(SYSETCDIR)/dhclient-exit-hooks
 	$(INSTALL) -m 755 $(SRCDIR)/dhclient-enter-hooks \
