@@ -398,6 +398,20 @@ function SPITFORM($advanced,$formfields, $errors = array()) {
 	     "</h4>\n";
     }
 
+    #
+    # Let them know about the devbox support
+    #
+    echo "<h4>Need a machine to build binaries for PlanetLab? " .
+         "<a href=nsgen.php3?template=plabdevbox>Make a DevBox</a> inside " .
+         " Emulab. (<a href=kb-show.php3?xref_tag=PLAB-DEVBOX>More information</a>)</h4>\n";
+
+    #
+    # Let them know about the devbox support
+    #
+    echo "<h4>Want to try your PlanetLab application on Emulab? " .
+         "<a href=kb-show.php3?xref_tag=plab-on-elab>This page</a> will " .
+         "show you how.</h4>\n";
+
     PAGEFOOTER();
 }
 
