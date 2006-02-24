@@ -13,6 +13,7 @@ use Getopt::Std;
 
 use lib '@prefix@/lib';
 use libdb;
+use libtestbed;
 
 my $tbadmin    = '@TBADMINGROUP@';
 my $ELABINELAB = @ELABINELAB@;
@@ -37,6 +38,7 @@ my $trust           = "project_root";
 my $password;
 my $encpass;
 my %opts;
+my $mailman_password;
 
 my $CONTROL	= "@USERNODE@";
 my $BOSSNODE	= "@BOSSNODE@";
@@ -83,6 +85,9 @@ if (!defined($opts{u})) {
     print "use to bootstrap other users. It also creates the emulab-ops\n";
     print "meta-project.\n\n";
 }
+
+# Need this for mailman support; harmless.
+$mailman_password = substr(TBGenSecretKey(), 0, 10);
 
 # Get a password for the user
 if (!defined($password)) {
@@ -161,7 +166,8 @@ print "Creating user in database...\n";
 DBQueryFatal("insert into users set uid='$protouser', usr_created=now(), " .
 	"usr_name='$protouser_name', usr_pswd='$encpass', unix_uid=$uid, ".
 	"usr_modified=now(), admin=1, webonly=$webonly, status='active', ".
-	"usr_shell='$protouser_shell', usr_email='$protouser_email'");
+	"usr_shell='$protouser_shell', usr_email='$protouser_email', ".
+	"mailman_password='$mailman_password'");
 
 if (!defined($opts{u})) {
     
