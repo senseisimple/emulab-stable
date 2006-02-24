@@ -72,6 +72,8 @@ use libtestbed;
 
 # Protos
 sub fatal($);
+sub AddUser(@);
+sub DelUser(@);
 sub AddList(@);
 sub SetListMembers(@);
 sub ModifyMember(@);
@@ -912,11 +914,11 @@ sub fatal($)
 #
 END {
     my $saved_exitcode = $?;
-    if (defined(%IDhash)) {
+    if (%IDhash) {
 	dbmclose(%IDhash);
 	undef(%IDhash);
     }
-    if (defined(%EMAILhash)) {
+    if (%EMAILhash) {
 	dbmclose(%EMAILhash);
 	undef(%EMAILhash);
     }
