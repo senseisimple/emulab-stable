@@ -7,8 +7,13 @@ All rights reserved.
 A DTD for Emulab NS template files
 -->
 
-<!ELEMENT nstemplate (variable*,nstext)>
-<!-- Attributes under conideration for nstemplate: name, author -->
+<!ELEMENT nstemplate (description?,variable*,nstext)>
+<!ATTLIST nstemplate name CDATA #IMPLIED
+                     author CDATA #IMPLIED
+                     authormail CDATA #IMPLIED
+                     authoruid CDATA #IMPLIED>
+
+<!ELEMENT description (#PCDATA)>
 
 <!ELEMENT variable EMPTY>
 <!ATTLIST variable name CDATA #REQUIRED

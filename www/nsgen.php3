@@ -36,6 +36,7 @@ if (!file_exists($templatefile)) {
 #
 $xml_parser = xml_parser_create();
 xml_set_element_handler($xml_parser, "startElement", "endElement");
+xml_set_character_data_handler($xml_parser,"cdata");
 
 #
 # Parse the XML template file. This is super-de-dooper lame, but it comes
@@ -87,6 +88,19 @@ if ($submit == "Begin Experiment" || $submit == "Show NS File") {
 
 function SPITFORM($advanced,$templatefields,$templateorder) {
     global $template;
+    global $templatename;
+    global $templateauthor;
+    global $templatedescr;
+
+    echo "<h3 align=center>$templatename";
+    if ($templateauthor != "") {
+        echo " - $templateauthor";
+    }
+    echo "</h3>\n";
+
+    if (isset($templatedescr)) {
+        echo "<p>$templatedescr</p>\n";
+    }
 
     echo "<form name='form1' action='nsgen.php3' method='get'>\n";
     echo "<input type='hidden' name='template' value='$template'>\n";
@@ -117,15 +131,37 @@ function SPITFORM($advanced,$templatefields,$templateorder) {
     echo "</form></table>\n";
 }
 
+function cdata($parser,$data)
+{
+    global $current_cdata;
+
+    #
+    # Just stash CDATA in a global so that we can pull it back out in the
+    # endElement handler. This gets cleaned in the startElement handler
+    #
+    $current_cdata .= $data;
+}
+
 function endElement($parser,$name)
 {
-    # Do nothing for now
+    global $current_cdata;
+    global $templatedescr;
+    if ($name == "DESCRIPTION") {
+        $templatedescr = $current_cdata;
+    }
+
 }
 
 function startElement($parser,$name,$attrs)
 {
     global $templatefields;
     global $templateorder;
+    global $templatename;
+    global $templateauthor;
+    global $template;
+    global $current_cdata;
+    $current_cdata = "";
+
     if ($name == "VARIABLE") {
 
         #
@@ -156,6 +192,33 @@ function startElement($parser,$name,$attrs)
         # Keep track of the order we saw them in
         #
         array_push($templateorder,$varname);
+    } elseif ($name == "NSTEMPLATE") {
+        #
+        # Look for the template name
+        #
+        if (isset($attrs['NAME'])) {
+            $templatename = $attrs['NAME'];
+        } else {
+            $templatename = $template;
+        }
+
+        #
+        # Figure out author information
+        #
+        $templateauthor = "";
+        if (isset($attrs['AUTHOR'])) {
+            if (isset($attrs['AUTHORUID'])) {
+                $templateauthor = "<a href='showuser.php3?target_uid=$attrs[AUTHORUID]'>";
+                $templateauthor .= $attrs['AUTHOR'] . "</a>";
+            } else {
+                $templateauthor = isset($attrs['AUTHOR']);
+            }
+        }
+
+        if (isset($attrs['AUTHORMAIL'])) {
+            $templateauthor .= " &lt;<a href='mailto:$attrs[AUTHORMAIL]'>";
+            $templateauthor .= $attrs['AUTHORMAIL'] . "</a>&gt;";
+        }
     }
 }
 
