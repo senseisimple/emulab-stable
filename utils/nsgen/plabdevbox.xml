@@ -3,7 +3,13 @@
 <!--
     XML NS template for making a single-node PlanetLab DevBox experiment
 -->
-<nstemplate>
+<nstemplate name="PlanetLab DevBox" author="Robert Ricci"
+            authormail="ricci@cs.utah.edu" authoruid="ricci">
+    <description>
+        This template is for creating a DevBox for building software
+        to run on PlanetLab. You shouldn't need to change any of
+        the defaults.
+    </description>
     <variable name="HWType" default="pc" descr="Hardware Type" />
     <variable name="NodeName" default="devbox" descr="Node Name" />
     <!-- This hard-codes the image name, but it seems like we have to do
