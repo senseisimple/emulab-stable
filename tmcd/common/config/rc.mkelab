@@ -1483,6 +1483,15 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
+		/^CVSSUPPORT$/ && do {
+		    if ($FBSD_VERSION == 6) {
+			print OUTDEFS "CVSSUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "CVSSUPPORT=0\n";
+		    }
+		    last SWITCH;
+		};
 		
 		print OUTDEFS $_;
 	    }

@@ -37,10 +37,11 @@ my $LOGFACIL    = '@TBLOGFACIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
+my $CVSSUPPORT  = @CVSSUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
-
+my $LIBDIR      = "$PREFIX/lib";
 
 # True if we are also the FS node
 my $ISFS	= ($USERNODE eq $FSNODE) ? 1 : 0;
@@ -318,6 +319,26 @@ Phase "ports", "Installing ports", sub {
 	    # Lets not hardwire the package name; whatever it is will do.
 	    my $pname = `ls $packagedir/mailman-*.tbz`;
 	    PhaseFail("Cannot find mailman package in $packagedir!")
+		if ($?);
+	    chomp($pname);
+	    
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+    }
+    if ($CVSSUPPORT) {
+	Phase "cvsd", "Installing cvsd package", sub {
+	    PhaseSkip("cvsd not supported on ops")
+		if ($FBSD_VERSION < 6);
+
+	    if (!ExecQuiet("$PKG_INFO -x -e cvsd")) {
+		PhaseSkip("cvsd package already installed");
+	    }
+	    if (!$packagedir) {
+		PhaseSkip("No package directory provided");
+	    }
+	    # Lets not hardwire the package name; whatever it is will do.
+	    my $pname = `ls $packagedir/cvsd-*.tbz`;
+	    PhaseFail("Cannot find cvsd package in $packagedir!")
 		if ($?);
 	    chomp($pname);
 	    
@@ -1000,6 +1021,59 @@ if ($MAILMANSUPPORT) {
 	};
     };
 }
+
+if ($CVSSUPPORT) {
+    my $CVSDDIR   = "/usr/local/etc/cvsd";
+    my $CVSDCONF  = "$CVSDDIR/cvsd.conf";
+    my $CVSDHEAD  = "$LIBDIR/cvsd.conf.head";
+    my $CVSDJAIL  = "/var/cvsjail";
+    my $BUILDROOT = "/usr/local/sbin/cvsd-buildroot";
+    my $REPOSDIR  = "/proj/cvsrepos";
+    
+    Phase "cvsd", "Installing cvsd", sub {
+	PhaseSkip("cvsd not supported on ops")
+	    if ($FBSD_VERSION < 6);
+
+	Phase "files", "Installing cvsd files", sub {
+	    DoneIfExists($CVSDHEAD);
+	    ExecQuietFatal("$GMAKE -C $TOP_OBJDIR/collab/cvs control-install");
+	};
+
+	Phase "cvsd.conf", "Installing cvsd.conf", sub {
+	    DoneIfExists($CVSDCONF);
+	    ExecQuietFatal("$CP -f $CVSDHEAD $CVSDCONF");
+	};
+
+	Phase "jail", "Creating cvsd jail hierarchy", sub {
+	    DoneIfExists($CVSDJAIL);
+	    ExecQuietFatal("$BUILDROOT $CVSDJAIL");
+	};
+	
+	Phase "dirs", "Creating extra directories", sub {
+	    if (! -e "$CVSDJAIL/dummy") {
+		mkdir("$CVSDJAIL/dummy", 0755) or
+		    PhaseFail("Unable to make $CVSDJAIL/dummy : $!");
+	    }
+	    if (! -e "$CVSDJAIL/cvsrepos") {
+		mkdir("$CVSDJAIL/cvsrepos", 0755) or
+		    PhaseFail("Unable to make $CVSDJAIL/cvsrepos : $!");
+	    }
+	    ExecQuietFatal("$CHGRP nobody $CVSDJAIL/dummy $CVSDJAIL/cvsrepos");
+	    
+	    if (! -e "$REPOSDIR") {
+		mkdir("$REPOSDIR", 0775) or
+		    PhaseFail("Unable to make $REPOSDIR : $!");
+	    }
+	};
+
+	Phase "cvsd.sh", "Installing cvsd.sh", sub {
+	    DoneIfExists("$RCDIR/cvsd.sh");
+	    ExecQuietFatal("mv $RCDIR/cvsd.sh.sample $RCDIR/cvsd.sh");
+	    ExecQuietFatal("$CHMOD a+x $RCDIR/cvsd.sh");
+	};
+    };
+}
+
 exit(0)
     if ($ELABINELAB);
 

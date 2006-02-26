@@ -86,6 +86,10 @@ RUN_DEPENDS+= \
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 
+.if ${OSMAJOR} >= 6
+RUN_DEPENDS+= ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd
+.endif
+
 NO_BUILD=	yes
 USE_PYTHON=	yes
 USE_PERL5=	yes
