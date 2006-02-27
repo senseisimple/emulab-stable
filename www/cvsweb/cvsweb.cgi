@@ -1,4 +1,4 @@
-#!/usr/bin/perl -wT
+#!/usr/bin/perl -w
 #
 # cvsweb - a CGI interface to CVS trees.
 #
@@ -46,7 +46,7 @@
 # SUCH DAMAGE.
 #
 # $FreeBSD: projects/cvsweb/cvsweb.cgi,v 1.119.2.6 2002/09/26 20:56:05 scop Exp $
-# $Id: cvsweb.cgi,v 1.6 2005-11-09 17:28:12 stoller Exp $
+# $Id: cvsweb.cgi,v 1.7 2006-02-27 15:58:14 stoller Exp $
 # $Idaemons: /home/cvs/cvsweb/cvsweb.cgi,v 1.84 2001/10/07 20:50:10 knu Exp $
 #
 ###
