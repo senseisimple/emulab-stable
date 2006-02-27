@@ -586,6 +586,24 @@ Phase "exports", "Setting up exports", sub {
 	}
 
 	#
+	# Add localhost mount to proj/cvsrepos.
+	#
+	if ($CVSSUPPORT) {
+	    my $pdir;
+	    my $dfout = `df /proj | fgrep '/dev'`;
+	    if ($?) {
+		PhaseFail("'df /proj' failed!");
+	    }
+	    if ($dfout =~ /\s+([\/\w]*)$/) {
+		$pdir = $1;
+	    }
+	    else {
+		PhaseFail("Could not determine where /proj is mounted!");
+	    }
+	    push(@exports_lines, "$pdir\tlocalhost -alldirs");
+	}
+
+	#
 	# Put them in exports.head, and copy that to /etc/exports
 	#
 	CreateFileFatal($EXPORTS_HEAD, @exports_lines);
