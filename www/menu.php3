@@ -967,14 +967,23 @@ function PAGEFOOTER($view = NULL) {
                 <br>
 		</center>\n";
     }
-    echo "
-                <p align=right>
-		  <font size=-2>
-                    Problems?
-	            Contact $TBMAILADDR.
-                  </font>
-                </p>
-                <!-- end copyright -->\n";
+    echo "      <table width='100%' cellpadding='0' cellspacing='0'
+                       class=stealth>
+                <tr>
+                 <td class=stealth align=left>\n";
+    if (! $TBMAINSITE) {
+	echo "       <a href='http://www.emulab.net'>
+                         <img src='$TBDOCBASE/builtwith.png'></a>";
+    }
+    else {
+	echo " &nbsp";
+    }
+    echo "       </td>
+                 <td class=stealth align=right>
+                    <font size=-2>Problems? Contact $TBMAILADDR
+                 </td>
+                </tr></table>\n";
+    echo " <!-- end copyright -->\n";
 
     ENDPAGE();
 
