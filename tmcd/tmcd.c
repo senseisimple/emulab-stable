@@ -243,6 +243,7 @@ COMMAND_PROTOTYPE(dorelayconfig);
 COMMAND_PROTOTYPE(dotraceconfig);
 COMMAND_PROTOTYPE(doltmap);
 COMMAND_PROTOTYPE(doelvindport);
+COMMAND_PROTOTYPE(doplabeventkeys);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -329,6 +330,7 @@ struct command {
 	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
 	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
+	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -6320,6 +6322,53 @@ COMMAND_PROTOTYPE(doelvindport)
 	mydb_update("replace into node_attributes "
                     " values ('%s', '%s', %u)",
 		    reqp->pnodeid, "elvind_port", elvport);
+
+	return 0;
+}
+
+/*
+ * Return all event keys on plab node to service slice.
+ */
+COMMAND_PROTOTYPE(doplabeventkeys)
+{
+	char		buf[MYBUFSIZE];
+        int             nrows = 0;
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+        char            *exppid, *expeid;
+        char            *addclause = "";
+
+        if (!reqp->isplabsvc) {
+                error("PLABEVENTKEYS: Unauthorized request from node: %s\n", 
+                      reqp->vnodeid);
+                return 1;
+        }
+
+        res = mydb_query("select e.pid, e.eid, e.eventkey from reserved as r "
+                         " left join nodes as n on r.node_id = n.node_id "
+                         " left join experiments as e on r.pid = e.pid "
+                         "  and r.eid = e.eid "
+                         " where n.phys_nodeid = '%s' ",
+                         3, reqp->pnodeid);
+
+	if ((nrows = (int)mysql_num_rows(res)) == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+
+		OUTPUT(buf, sizeof(buf),
+                       "PID=%s EID=%s KEY=%s\n",
+                       row[0], row[1], row[2]);
+
+		client_writeback(sock, buf, strlen(buf), tcp);
+		nrows--;
+		if (verbose)
+			info("PLABEVENTKEYS: %s\n", buf);
+	}
+	mysql_free_result(res);
 
 	return 0;
 }
