@@ -972,6 +972,10 @@ function PAGEFOOTER($view = NULL) {
                 <tr>
                  <td class=stealth align=left>\n";
     if (! $TBMAINSITE) {
+	#
+	# It is a violation of Emulab licensing restrictions to remove
+	# this logo!
+	#
 	echo "       <a href='http://www.emulab.net'>
                          <img src='$TBDOCBASE/builtwith.png'></a>";
     }
