@@ -90,6 +90,15 @@ my $olduid = shift(@ARGV);
 my $newuid = shift(@ARGV);
 
 #
+# Make sure that the new uid is valid!
+#
+if (! TBcheck_dbslot($newuid, "users", "uid",
+		     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+    die("*** $0:\n".
+	"    Invalid characters in new uid: $newuid!\n");
+}
+
+#
 # This script is always audited. Mail is sent automatically upon exit.
 #
 if (AuditStart(0)) {
