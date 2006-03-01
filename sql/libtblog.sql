@@ -66,13 +66,13 @@ CREATE TABLE priorities (
   unique key (name)
 );
 
-insert into priorities values (000, 'EMERG');
-insert into priorities values (100, 'ALERT');
-insert into priorities values (200, 'CRIT');
-insert into priorities values (300, 'ERR');
-insert into priorities values (400, 'WARNING');
-insert into priorities values (500, 'NOTICE');
-insert into priorities values (600, 'INFO');
-insert into priorities values (700, 'DEBUG');
+replace into priorities values (000, 'EMERG');
+replace into priorities values (100, 'ALERT');
+replace into priorities values (200, 'CRIT');
+replace into priorities values (300, 'ERR');
+replace into priorities values (400, 'WARNING');
+replace into priorities values (500, 'NOTICE');
+replace into priorities values (600, 'INFO');
+replace into priorities values (700, 'DEBUG');
 
-insert into exported_tables values ('state_timeouts');
+replace into exported_tables values ('state_timeouts');
