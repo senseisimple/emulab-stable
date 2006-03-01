@@ -48,7 +48,7 @@ sleep 10
 
 # Give up, log it, ask for power cycle, and wait until timeout if that fails.
 logit "*** Failed to reboot.  Asking for power cycle."
-tmcc state 
+tmcc state WEDGED
 sleep 1200
 
 # Should never get here!

@@ -164,9 +164,9 @@ alias v='ls -lsF'
         . Add ;C:\cygwin\bin to the end of the System PATH in 
           Control Panel/System/Advanced/Environment Variables.
 
-        . Start up a Cygwin shell and fix the shell properties:
+        . Start up a Cygwin shell and fix the shell properties (right-click title bar):
             Options QuickEdit Mode on, Layout/screen buffer height 3000, window height 55.
-            Check "Modify shortcut that started this window".
+            Check OK, "Modify shortcut that started this window", OK.
           - Might as well fix the Start/Programs/Accessories/Command Prompt properties, too.
           - Create c:\cygin\cygwin-tcsh.bat as a copy of c:\cygin\cygwin.bat with
             "bash --login -i" changed to "tcsh -l".
@@ -175,9 +175,11 @@ alias v='ls -lsF'
                cd C:/cygwin
                sed 's/bash --login -i/tcsh -l/' < cygwin.bat > cygwin-tcsh.bat
                chmod +x cygwin-tcsh.bat
-          - Copy the bash shortcut to the All Users/Desktop.  
-          - Copy it to a tcsh icon as well, changing the Target to c:\cygin\cygwin-tcsh.bat .
-          - Copy the tcsh icon into All Users/Start Menu/Programs/Cygwin.
+          - Copy the shortcuts in \\fs\share\windows\Desktop to the All Users/Desktop, or:
+            . Copy the bash shortcut in Programs to the All Users/Desktop.  
+            . Copy it to a tcsh icon as well, changing the Target to c:\cygin\cygwin-tcsh.bat .
+
+          - Copy the other shell icons into All Users/Start Menu/Programs/Cygwin.
                cd C:/Documents\ and\ Settings/All\ Users
                cp -p Desktop/Cygwin\ TCSH\ Shell.lnk Start\ Menu/Programs/Cygwin
 
@@ -197,6 +199,14 @@ alias v='ls -lsF'
             cd /tmp
             mv /home{,.orig}
             ln -s /cygdrive/c/Documents\ and\ Settings/ /home
+          Get the root dotfiles
+              ls -l //fs/share/windows/cygwin.root*
+              ls -l ~root/.??*
+            for f in //fs/share/windows/cygwin.root*; do
+              rf=`echo $f | sed s=.*cygwin.root=~root/=`
+              echo $f $rf; cp -p $f $rf; chown root $rf
+            done
+              ls -l ~root/.??*
 
         . The Windows hosts file should already be symlinked into the Cygwin /etc.
             ls -l /etc/hosts
@@ -280,6 +290,7 @@ alias v='ls -lsF'
                 # Make it writable to edit, then change it back.
                 chmod g+w /etc/sshd_config
                 ed /etc/sshd_config
+1
 /AuthorizedKeysFile
 a
 AuthorizedKeysFile /sshkeys/%u/authorized_keys
@@ -343,7 +354,7 @@ myRootPwd
               mkdir ~root/.ssh
               chown root.wheel ~root/.ssh
               # [On boss.]
-              set pc=201
+              set pc=161
               set ssh_args='-o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null"'
               # This password isn't used for anything else, and doesn't need to be
               # very secure because all users are in the Administrators group on the node.
@@ -401,6 +412,8 @@ myRootPwd
               mkdir /etc/emulab
               ls -l ~/elab-ssl-certs/* /etc/emulab/*.pem
               cp -p ~/elab-ssl-certs/* /etc/emulab
+
+            exit
 
             # The following should no longer complain due to nonstandard host keys.
             # [On Boss.] 
@@ -758,6 +771,7 @@ q
             (cd ~/flux/testbed/event/linktest/iperf/iperf-2.0.2 && patch -p0 < ../iperf-patch)
             # Also comment out linktest/iperf/iperf-2.0.2/compat/Thread.c:205, pthread_cancel( oldTID );
             ed ~/flux/testbed/event/linktest/iperf/iperf-2.0.2/compat/Thread.c
+            1
             /pthread_cancel( oldTID )/s|^|//|p
             w
             q
@@ -898,12 +912,13 @@ if [ ]; then
           rootpwd='myRootPwd'
           firstboot=/usr/local/etc/emulab/rc/rc.firstboot
           bootsetup=/usr/local/etc/emulab/rc/rc.bootsetup
+          sshrun="cygrunsrv -S sshd"
           progrun="cygrunsrv -S ProgAgent"
           bootlog=/var/log/bootsetup.log
           cygrunsrv -I EmulabStartup -u root -w $rootpwd \
             --dep DHCP --dep elvinsvc.exe --dep W32Time \
             -p /cygdrive/c/cygwin/bin/bash \
-            -a "--norc --noprofile -c '( $firstboot; $bootsetup; $progrun ) >& $bootlog'"
+            -a "--norc --noprofile -c '( $firstboot; $bootsetup; $sshrun; $progrun ) >& $bootlog'"
           cygrunsrv -VQ EmulabStartup
 
             ## If you run this, and the node name hasn't been changed yet, it will reboot.
@@ -1024,7 +1039,7 @@ if [ ]; then
 
         - Install the patched agetty, if not done above.
             #[As the user:]
-            cp /share/windows/agetty.exe /tmp
+            cp //fs/share/windows/agetty.exe /tmp
             #[As root:]
               mv /sbin/agetty.exe{,.orig}
             /usr/bin/install -s -m 755 -o administrator -g administrators /tmp/agetty.exe /sbin
@@ -1092,6 +1107,7 @@ if [ ]; then
       . Disable TCP/IP address autoconfiguration, so unswitched interfaces like the sixth NICs
         on the pc3000's don't get Microsoft class B network 169.254 addresses assigned.
           svcs=/HKLM/SYSTEM/CurrentControlSet/Services tcpp=$svcs/Tcpip/Parameters
+            regtool get $tcpp/IPAutoconfigurationEnabled
           regtool set -i $tcpp/IPAutoconfigurationEnabled 0
 
       . Reboot to make sure it all works right.  Note that prepare clears out the source
@@ -1106,9 +1122,9 @@ if [ ]; then
 
 # [ SKIP building Rude and Crude for linktest, if we have a tarball.
       # See http://rude.sourceforge.net/
+      # Download http://prdownloads.sourceforge.net/rude/rude-0.70.tar.gz
       #[On the node, as root.]
       cd /tmp
-      wget http://prdownloads.sourceforge.net/rude/rude-0.62.tar.gz
       cp ~root/flux/testbed/tmcd/cygwinxp/c_rude.patch /tmp
       tar xvfz rude-0.70.tar.gz
       cd rude
@@ -1118,7 +1134,9 @@ if [ ]; then
       patch -p0 < /tmp/c_rude.patch
 
       ./configure --enable-wall --with-debug-lvl=3 >& config.trace
+        tail config.trace
       make >& make.log1
+        tail make.log1
           # no root group.  make install >& install.log1
       /usr/bin/install -c -o root -m 0755 rude/rude.exe /usr/local/bin
       /usr/bin/install -c -o root -m 0755 crude/crude.exe /usr/local/bin
@@ -1139,8 +1157,9 @@ Making single images
     . Windows Update
       - This might be needed after each Microsoft "Patch Tuesday" (second tues of the month.)
       - After it's installed, just click Start/All Programs/Windows Update, Express, Install.
-        For initial installation, start up Internet Explorer and go to:
-        . http://update.microsoft.com
+        . For initial installation, start up Internet Explorer and go to:
+          http://update.microsoft.com
+        . After that, Windows Update is on your Start menu.
            - The first time, just installs/updates the updater and asks to reboot.
            - I just choose the EXPRESS update, installing all high-priority updates.
            - Don't turn on Automatic Updates.
@@ -1149,8 +1168,12 @@ Making single images
 
              To install SP2, you must have access to a console screen, because the
              Windows Firewall defaults to block both SSH and RDP.  Disable it.
+             . This can be done with serial console access after the reboot with:
+                   netsh firewall show config
+                 netsh firewall set opmode DISABLE
 
              . You may need to free disk space to install SP2, or allocate a partition.
+                 # The prepare script does this now.
                    du -sm C:/WINDOWS/ServicePackFiles/i386
                  rm -rf C:/WINDOWS/ServicePackFiles/i386
                    du -sm C:/WINDOWS/SoftwareDistribution/Download
@@ -1161,10 +1184,10 @@ Making single images
 
      . Run prepare to clear out experiment-specific state.
         rootpc $pc
-          # Log off any RDP sessions as you to unlock your C:/Documents and Settings files.
+          # Log off any non-root RDP sessions to unlock the C:/Documents and Settings files.
           # Ignore complaints about all of the C:/Documents and Settings directories
           # that were never created because the users didn't log in...
-          prepare
+          prepare -n
 
           exit
 
@@ -1179,13 +1202,13 @@ Making single images
         # [On boss.]
         set pc=98 img=SP1 image=SP1-pc850_2005-09-30
         set pc=72 img=SP0 image=SP0_2005-08-22
-        set pc=91 img=UPDATE image=UPDATE-pc850_2005-09-30
+        set pc=167 img=UPDATE image=UPDATE-pc850_2006-02-13
 
         set pc=210 img=BASE-pc3000 image=BASE-pc3000_2005-08-31
         set pc=201 img=SP0-pc3000 image=SP0-pc3000_2005-09-01
         set pc=201 img=SP1-pc3000 image=SP1-pc3000_2005-09-01
         set pc=242 img=SP2-pc3000 image=SP2-pc3000_2005-09-01
-        set pc=242 img=UPDATE-pc3000 image=UPDATE-pc3000_2005-09-01
+        set pc=246 img=UPDATE-pc3000 image=UPDATE-pc3000_2006-02-10
 
         df -m /proj/testbed/images /usr/testbed/images
           # Verify SSH working.
@@ -1194,6 +1217,8 @@ Making single images
         # Boot into the MFS.  The serial console will show you when it's open for business.
         echo $pc $image
         node_admin on pc$pc &
+          # Wait until it's in the NFS before returning.
+          node_admin -w on pc$pc &
               # Should not be necessary if ssh from root@boss to the node is working.
               rootpc $pc /sbin/reboot
           ## You may see:
@@ -1203,16 +1228,17 @@ Making single images
           ## Or you can shutdown/restart it from the task manager under RDP,
           ## or just wait a while and Emulab will cycle power to force a reboot.
 
-        # Wait until the node is in the MFS, based on the serial console.
+        # Wait until the node is in the MFS, based on watching the serial console.
+        # Or use the node_admin -w flag to wait.
         # Then make WINXP-TMP on /proj, and move it to /usr/testbed/images with the right name.
         rootpc $pc
             cd /proj/testbed/images
             df -m /proj/testbed/images
               ls -lt /proj/testbed/images/WINXP*
             ls -l /proj/testbed/images/WINXP-TMP.ndz
-          # IDE disk (pc1 - pc178)
+          # IDE disk (pc600 & pc850, pc1 - pc178)
           imagezip -o -I 2 -I 3 -I 4 /dev/ad0 /proj/testbed/images/WINXP-TMP.ndz
-          # SCSI disk. (pc201 - pc360)
+          # SCSI disk. (pc3000, pc201 - pc360)
           imagezip -o -I 2 -I 3 -I 4 /dev/da0 /proj/testbed/images/WINXP-TMP.ndz
             ls -lt /proj/testbed/images/WINXP*
           exit
@@ -1241,12 +1267,16 @@ Making single images
           ls -l /{proj,usr}/testbed/images/WIN*
         
         # Make symlinks without the date suffix, corresponding to the Image ID's.
-        ls -l /usr/testbed/images/WINXP-$img*
           ## -new images for testing, before we commit.
+          ls -l /usr/testbed/images/WINXP-$img-new*
           rm /usr/testbed/images/WINXP-$img-new.ndz
           ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img-new.ndz
+          ls -l /usr/testbed/images/WINXP-$img-new*
+        # Production images.
+        ls -l /usr/testbed/images/WINXP-$img*
         rm /usr/testbed/images/WINXP-$img.ndz
         ln -s WINXP-$image.ndz /usr/testbed/images/WINXP-$img.ndz
+        ls -l /usr/testbed/images/WINXP-$img*
 
 ================================================================
 
@@ -1317,7 +1347,7 @@ Updating a set of existing images.
 
     . Build changes one place, make tarballs to update the others.
         #[On the build node, as me, in a Bash shell.]
-        date=2005-11-22
+        date=2006-02-14
         updates=/proj/testbed/fish/winxp
           v $updates/*$date*
 
@@ -1342,12 +1372,18 @@ Updating a set of existing images.
         v -d $elabfiles
           v -Rt $elabfiles | grep '~'
           v -t $elabfiles | head -20
+          v -t $rc | head -20
           v /etc/emulab/paths.*
-        rm /usr/local/etc/emulab/{*.exe.prev,*~}
+          v /usr/local/etc/emulab/{*.exe.prev,*~}
+          v $rc/*~
+        rm /usr/local/etc/emulab/{*.exe.prev*,*~} $rc/*~
         tar cvfz $updates/elab_$date.tgz $elabfiles
 
         #[On Boss.]
-        set date=2005-11-22
+        set date=2006-02-14
+          script $rdf$date-pc850
+          script $rdf$date-pc3000
+          # Do the date again inside the script shell...
         set updates=/proj/testbed/fish/winxp
         set nodes="SP0 SP1 SP2 UPDATE"
 
@@ -1397,7 +1433,7 @@ Updating a set of existing images.
         su_nodes "(cd C:/Software/Cygwin; cp /tmp/setup.exe .; rm -f cygwin-setup.exe; ls -l)"
 
           # Log in a bunch of RDP windows, *as root*.
-          set rootpwd='myRootPwd'
+          set rootpwd='rootPwd'
           set rd=/proj/testbed/fish/rdesktop/rdesktop-1.3.1
           set rdarg="-K -g 1280x1024 -a 16"
           foreach node ( $nodes )
@@ -1452,14 +1488,15 @@ Updating a set of existing images.
           su_nodes "/usr/local/etc/emulab/rc/rc.syncserver shutdown; \
                     /usr/local/etc/emulab/rc/rc.progagent shutdown; \
                     /usr/local/etc/emulab/rc/rc.slothd stop; \
+                    /usr/local/etc/emulab/rc/rc.linktest stop; \
                     ps -Welf | grep emulab"
           # Just in case... (Try it again if something is still running afterward.)
-          su_nodes "killall emulab-sync program-agent slothd idlemon; ps -Welf | grep emulab"
-          # Go into Task Manager and kill processes if nothing else has worked.
+          su_nodes "killall emulab-sync program-agent slothd idlemon linktest; ps -Welf | grep emulab"
+          # Go into Task Manager and kill processes (probably idlemon) if nothing else has worked.
           nodes "ps -Welf | grep emulab"
 
           # Unpack the Emulab files.  (Why doesn't $date work in this command?)
-          su_nodes "tar xfz /tmp/elab_2005-11-22.tgz -C /usr/local"
+          su_nodes "tar xfz /tmp/elab_2006-02-14.tgz -C /usr/local"
 
      . Do one-time updates
          #[On Boss.]
@@ -1468,7 +1505,10 @@ Updating a set of existing images.
                   cygrunsrv -I init -d 'Cygwin SysV init' -p /sbin/init -a -i -s INT; \
                   net start init"
 
-         # Install idlemon user-login wrapper.
+         # Install idlemon user-login wrapper so that it starts up hidden.
+         # It touches /var/run/rdp_input for slothd to see.
+         # idlemon.vbs is in the registry on SP0 and SP1, but fails to start idlemon.
+         # idlemon.exe runs okay on all versions.
          ##su_nodes "regtool -s set /HKEY_LOCAL_MACHINE/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/EmulabIdle 'C:\cygwin\usr\local\etc\emulab\idlemon.vbs'"
          ## The su_nodes alias just isn't up to handling complicated quoting...
          foreach node ( $nodes )
@@ -1498,8 +1538,39 @@ Updating a set of existing images.
            echo ""
          end
 
+         # 2/3/06 Update rude/crude for linktest, do a little cleanup.
+         nodes "ls -lt /usr/local/bin | head"
+         v /share/windows/{c,}rude.exe
+         foreach node ( $nodes )
+           echo ================  $node.$exp
+           sudo scp -rp /share/windows/{c,}rude.exe $node.$exp":"/usr/local/bin
+         end
+         nodes "chmod 755 /usr/local/bin/{c,}rude.exe"
+         su_nodes "ls -l /usr/local/etc/emulab/{*.exe.prev*,*~}"
+         su_nodes "ls -l /usr/local/etc/emulab/rc/*~"
+         su_nodes "rm /usr/local/etc/emulab/rc/*~"
+         su_nodes "rm /usr/local/etc/emulab/rc/rc.cygwinxp-user"
+         # Clear Administrator desktop; shortcuts are copied to all Administrators group users.
+         su_nodes "ls /cygdrive/c/Documents\ and\ Settings"
+         # (There may be none if there has been no login as Administrator...)
+         su_nodes "ls /cygdrive/c/Documents\ and\ Settings/Administrator/Desktop"
+         su_nodes "rm /cygdrive/c/Documents\ and\ Settings/Administrator/Desktop/*.lnk"
+
+         # 2/10/06 Make sure autoconfiguration is turned off.
+         set svcs=/HKLM/SYSTEM/CurrentControlSet/Services; set tcpp=$svcs/Tcpip/Parameters
+         foreach node ( $nodes )
+           echo ================  $node.$exp
+           ssh -n $node.$exp "regtool get $tcpp/IPAutoconfigurationEnabled"
+         end
+         foreach node ( $nodes )
+           echo ================  $node.$exp
+           ssh -n $node.$exp "regtool set -i $tcpp/IPAutoconfigurationEnabled 0"
+         end
+
        - Some things still have to be done through the GUI under RDP on each node.
-         . Run Windows Update after each Patch Tuesday on the UPDATE nodes.
+
+         . **** Run Windows Update after each Patch Tuesday on the UPDATE nodes. ****
+           It will probably want to reboot at least once.
 
          . Go into Control Panel / Power Options / Hibernate, and make sure it's disabled.
            Also set Power Options / Power Schemes to "Always On".
@@ -1513,19 +1584,40 @@ Updating a set of existing images.
      . Prepare, reboot and test.
          #[On Boss.]
            su_nodes "ls -l /var/log"
-         su_nodes "prepare"
+         # (Insert root password for "rootPwd" below.)
+         su_nodes "prepare -p rootPwd"
          su_nodes "cat /etc/motd"
-         node_reboot -e $pid,$eid
+
+         ### Checking cycle before making images. ###
+         # It won't have to do the double-reboot dance, because the node names stay the same.
+         su_nodes "/sbin/reboot"
+         ##node_reboot -e $pid,$eid
+           ## node_reboot -e is broken.
+           ## It reboots the firewall too, then the nodes time out on DHCP in PXE boot.
+           ## Do it by hand on just the Windows nodes in the experiment for now.
+           ## Translate $node.$exp to pcXXX to avoid "*** Tainted node name: ".
+           foreach node ( $nodes )
+             echo ================================ $node.$exp
+             set bootpc=`nslookup $node.$exp | sed -n '/^Name:/s/.*\(pc[0-9]*\).*/\1/p'`
+             node_reboot -f $bootpc
+           end
 
          # Network configs.
          su_nodes "ipconfig /all"
+         su_nodes "grep number /var/log/bootsetup.log"
+         su_nodes "grep -A 4 Fixing /var/log/bootsetup.log"
          # Should be set to 1 on the SP2 node in the topology, 0 elsewhere.
          su_nodes "grep IPEnableRouter /var/log/EmulabStartup.log"
 
-         # Test network setup.
-         ssh ops run_linktest.pl -v -e $pid/$eid
+             # Test network setup.
+             ##Oops, firewall doesn't do linktest, so this fails.
+             ssh ops run_linktest.pl -v -e $pid/$eid
 
-         # Connectivity test.
+             ## set nodes="node1 node2 node3 node4 node5"
+             ## set exp=windows-5.testbed.emulab.net
+             ## set exp=windows-5a.testbed.emulab.net
+
+         # Simple connectivity test.
          foreach node1 ( $nodes )
            foreach node2 ( $nodes )
              if ( "$node1" != "$node2" ) then
@@ -1535,13 +1627,17 @@ Updating a set of existing images.
              endif
            end
          end
-                 
-     . Prepare again, go into admin mode, and pull the images.
-         su_nodes "prepare"
-         su_nodes "cat /etc/motd"
-         ##node_admin -e $pid,$eid on
+         # Linktest.
+         run_linktest.pl -v -l 4 -e $pid/$eid
 
-           ## node_admin -e might be broken.  (Or maybe the firewall can't be down...)
+     . Prepare again, go into admin mode, and pull the images.
+         # (Insert root password for "rootPwd" below.)
+         su_nodes "prepare -p rootPwd"
+         su_nodes "cat /etc/motd"
+
+         ##node_admin -e $pid,$eid on
+           ## node_admin -e is broken.
+           ## It reboots the firewall too, then the nodes time out on DHCP in PXE boot.
            ## Do it by hand on just the Windows nodes in the experiment for now.
            ## Translate $node.$exp to pcXXX to avoid "*** Tainted node name: ".
            foreach node ( $nodes )
@@ -1562,7 +1658,7 @@ Updating a set of existing images.
          v -t /{usr,proj}/testbed/images/WINXP-*$date*.ndz
            v -t /{usr,proj}/testbed/images/WINXP*.ndz | head
          df -m /{usr,proj}/testbed/images
-           echo $hw $disk
+           echo $hw $disk $date
          foreach node ( $nodes )
            echo ================================  $node.$exp
            set imagefile=/proj/testbed/images/WINXP-$node-$hw"_"$date.ndz
@@ -1604,6 +1700,7 @@ Updating a set of existing images.
         set usrimages=/usr/testbed/images/WINXP-*-$hw"_"$date.ndz
         cksum $usrimages > ~/usrimages.cksums &
           jobs
+          wait
           diff ~/projimages.cksums ~/usrimages.cksums
         sed 's/proj/usr/' ~/projimages.cksums | diff - ~/usrimages.cksums
 
@@ -1636,13 +1733,14 @@ Updating a set of existing images.
                 print "update images set created=" sq date sq " where imagename=" sq image sq ";"\
                 print "update os_info set created=" sq date sq " where osname=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
+           cat ~/imgdates.sql
 
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
-         echo "select osname, created from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
+         echo "select created, imagename, path, pid from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort
+         echo "select created, osname, pid from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort
 
          mysql tbdb < ~/imgdates.sql
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
-         echo "select osname, created from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort +1
+         echo "select created, imagename, path, pid from images where imagename like 'WINXP-%$pctype-new';" | mysql tbdb | sort
+         echo "select created, osname, pid from os_info where osname like 'WINXP-%$pctype-new';" | mysql tbdb | sort
 
          # Check before installing the non -new versions.  (WINXP will always be in partition 1.)
          echo "select part1_osid from images where imageid like 'emulab-ops-WINXP%';" | mysql tbdb
@@ -1669,9 +1767,9 @@ Updating a set of existing images.
                 print "update images set created=" sq date sq " where imagename=" sq image sq ";"\
                 print "update os_info set created=" sq date sq " where osname=" sq image sq ";" }' \
                 | tee ~/imgdates.sql
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort +1
-         echo "select osname, created from os_info where osname like 'WINXP-%$pctype';" | mysql tbdb | sort +1
+         echo "select created, imagename, path, pid from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort
+         echo "select created, osname, pid from os_info where osname like 'WINXP-%$pctype';" | mysql tbdb | sort
 
          mysql tbdb < ~/imgdates.sql
-         echo "select imagename, created, path from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort +1
-         echo "select osname, created from os_info where osname like 'WINXP-%$pctype';" | mysql tbdb | sort +1
+         echo "select created, imagename, path, pid from images where imagename like 'WINXP-%$pctype';" | mysql tbdb | sort
+         echo "select created, osname, pid from os_info where osname like 'WINXP-%$pctype';" | mysql tbdb | sort

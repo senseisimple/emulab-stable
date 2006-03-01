@@ -214,6 +214,7 @@ if (! $noredef) {
     print "\nRedefining EmulabStartup.\n";
     my $firstboot = "/usr/local/etc/emulab/rc/rc.firstboot";
     my $bootsetup = "/usr/local/etc/emulab/rc/rc.bootsetup";
+    my $sshrun = "cygrunsrv -S sshd";
     my $progrun = "cygrunsrv -S ProgAgent";
     my $bootlog = "/var/log/bootsetup.log";
     system("cygrunsrv -R EmulabStartup");
@@ -221,7 +222,7 @@ if (! $noredef) {
 	   " --dep DHCP --dep elvinsvc.exe --dep W32Time" .
 	   " -p /cygdrive/c/cygwin/bin/bash" .
 	   " -a \"--norc --noprofile -c " .
-	   "      '( $firstboot; $bootsetup; $progrun ) >& $bootlog'\"");
+	   "      '( $firstboot; $bootsetup; $sshrun; $progrun ) >& $bootlog'\"");
     system("cygrunsrv -VQ EmulabStartup");
 }
 
