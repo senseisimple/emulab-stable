@@ -5028,7 +5028,9 @@ COMMAND_PROTOTYPE(dorusage)
 	float		la1, la5, la15, dused;
         int             plfd;
         struct timeval  now;
+        struct tm       *tmnow;
         char            pllogfname[MAXPATHLEN];
+        char            timebuf[10];
 
 	if (sscanf(rdata, "LA1=%f LA5=%f LA15=%f DUSED=%f",
 		   &la1, &la5, &la15, &dused) != 4) {
@@ -5074,8 +5076,14 @@ COMMAND_PROTOTYPE(dorusage)
         /* We're going to store plab up/down data in a file for a while. */
         if (reqp->isplabsvc) {
             gettimeofday(&now, NULL);
+            tmnow = localtime(&now.tv_sec);
+            strftime(timebuf, sizeof(timebuf), "%Y%m%d", tmnow);
             snprintf(pllogfname, sizeof(pllogfname), 
-                     "%s/%s-isalive", PLISALIVELOGDIR, reqp->pnodeid);
+                     "%s/%s-isalive-%s", 
+                     PLISALIVELOGDIR, 
+                     reqp->pnodeid,
+                     timebuf);
+
             snprintf(buf, sizeof(buf), "%ld %ld\n", 
                      now.tv_sec, now.tv_usec);
             plfd = open(pllogfname, O_WRONLY|O_APPEND|O_CREAT, 
@@ -6335,8 +6343,6 @@ COMMAND_PROTOTYPE(doplabeventkeys)
         int             nrows = 0;
 	MYSQL_RES	*res;
 	MYSQL_ROW	row;
-        char            *exppid, *expeid;
-        char            *addclause = "";
 
         if (!reqp->isplabsvc) {
                 error("PLABEVENTKEYS: Unauthorized request from node: %s\n", 

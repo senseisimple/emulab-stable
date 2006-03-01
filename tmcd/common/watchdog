@@ -455,8 +455,9 @@ sub setintervals($)
 		if ($3 >= 0);
 	    $iv{cvsup} = $4
 		if ($4 >= 0);
-	    $iv{rusage} = $5
-		if ($5 >= 0);
+	    $iv{rusage} = int($5)/60
+		if ($5 >= 0); # XXX: hack - undo the conversion to minutes
+                              #      to enable finer granularity on plab.
 	    $iv{hkeys} = $6
 		if ($6 >= 0);
 	}
@@ -654,18 +655,14 @@ sub sendrusage($)
 	scalar(@tmccresults) == 0) {
 	#
 	# Failed, schedule a retry using a backoff.
-	#
-	if ($retry{rusage} < $maxretries) {
-	    my $nexttime = time() + (1 << $retry{rusage});
-	    qinsert($nexttime, \&sendrusage);
-	    $retry{rusage}++;
-	    logmsg("rusage: failed ($?), retry $retry{rusage}\n");
-	    return;
-	}
+	# XXX: removed so that we know when a plab node is back ASAP.
+        #      Just log the failure and reschedule at the normal time.
+        #
+
 	#
 	# Failed miserably, just whine and reschedule at the normal time.
 	#
-	logmsg("rusage: failed ($?) after $maxretries attempts\n");
+	logmsg("rusage: failed ($?)\n");
     } else {
 	#
 	# Success.  The format of the response is rather simple right now.
