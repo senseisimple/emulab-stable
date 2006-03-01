@@ -85,7 +85,7 @@ earliest time one of the steps needs to occur.
           causing duplicate swapin records in some case. From the source
           directory:
 
-		perl perl/fixstats-swapin.pl | mysql tbdb
+		perl sql/fixstats-swapin.pl | mysql tbdb
 
 
 20050818: Anytime after the DB schema is updated
