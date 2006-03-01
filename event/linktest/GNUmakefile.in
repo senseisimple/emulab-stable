@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -133,4 +133,4 @@ client-install: client
 
 clean:
 	rm -f *.o $(TESTS) $(SCRIPT) $(SCRIPT_RUN) weblinktest linktest_control
-	$(MAKE) -C iperf clean
+	-$(MAKE) -C iperf clean
