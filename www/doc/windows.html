@@ -39,7 +39,8 @@
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
   <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
-  <li> <a href="#Future"> Future work </a></li>
+  <li> <a href="#Changes"> Change Log </a></li>
+  <li> <a href="#Future"> Future Work </a></li>
 </ol>
 
 <hr style="width: 100%; height: 2px;">
@@ -931,8 +932,9 @@ crashed <i>Windows XP</i> when I tried it. <p>
   <li> Can drag-and-drop files from <i>Windows Explorer</i> to <i>NtEmacs</i>
        windows.  </li>
 
-  <li> <code>cygmount.el</code> makes Cygwin mounts visible within
-       <i>NtEmacs</i>.  </li>
+  <li> <code>cygwin-mount.el</code> in <code>c:/emacs-21.3/site-lisp/</code> 
+       makes Cygwin mounts visible within <i>NtEmacs</i>.  It doesn't do Cygwin
+       symlinks yet. </li>
 
   <li> Options - See <code>~root/.emacs</code>
 
@@ -942,9 +944,9 @@ crashed <i>Windows XP</i> when I tried it. <p>
 
 	 <li> <code>CUA-mode</code> option ( <code>^C</code> copy /
 	 <code>^X</code> cut on selection, <code>^V</code> paste,
-	 <code>^Z</code> undo). </li>
+	 <code>^Z</code> undo).&#14; </li>
 
-       </ul>
+       </ul> </li>
 </ul>
 
 <hr style="width: 100%; height: 2px;">
@@ -969,7 +971,135 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
 .NET Framework SDK Version 1.1 </a>.
 
 <hr style="width: 100%; height: 2px;">
-<h3><a name="Future"> </a> Future work </h3>
+<h3><a name="Changes"> </a> Change Log </h3>
+
+<b>2006-02-14</b>
+<ul>
+  <li>
+    The -UPDATE images include the most recent round of Microsoft patches,
+    plugging both known WMF holes and many others.  The -SP* images of course
+    DON'T have the holes plugged, but that is no different from before.
+  </li>
+
+  <li>
+    Within the Emulab code, these images restore linktest to working condition.
+  </li>
+
+  <li>
+    The other changes are intended to make Windows booting and setup more reliable.
+
+    One is that sshd is turned off during rc.bootsetup, since it would
+    sometimes go into a loop, eating the CPU and preventing setup from
+    finishing before timing out.  Unless you're logging in as root, it won't
+    do you much good to try to log in before accounts are set up anyway...  In
+    case of trouble, log in via RDP or the serial console, and say "net start
+    sshd" in a shell.
+  </li>
+
+  <li>
+    I've also been chasing a random problem where one of the network
+    interfaces disappears from ipconfig due to a race condition within Windows
+    startup.  rc.cygwin/rc.ifconfig now work harder at resetting the
+    interfaces, and reboot as a last resort if that fails.  It seems that
+    fixing one interface can make the problem move to another one though.
+    Unless you use all five available experimental network interfaces in an
+    experiment topology, this should fix the problem.
+  </li>
+</ul>
+
+<b>2005-11-22</b>
+<ul>
+  <li>
+    Enable linktest, including ltmap fetching, misc fixes, (c)rude and iperf.
+  </li>
+
+  <li>
+    Add hacks in watchdog, slothd, and idlemon for clock setback.
+  </li>
+
+  <li>
+    Back-rev OpenSSH to 4.1 in an attempt to cure sshd boot-time busy-looping.
+  </li>
+
+  <li>
+    Add rxvt shell windows for X-like mousing.
+  </li>
+</ul>
+
+<b>2005-10-28</b>
+<ul>
+  <li>
+    Race condition tweaks to rc.cygwin, add rc.firstboot to EmulabStartup service.
+  </li>
+
+  <li>
+    Cleanup tweaks to prepare and liblocsetup.pm .
+  </li>
+
+  <li>
+    Add Cygwin ping package.
+  </li>
+</ul>
+
+<b>2005-9-29</b>
+<ul>
+  <li>
+    Cygwin updated, including OpenSSH 4.2p1-1 .
+  </li>
+
+  <li>
+    Serial console now works, with agetty and sysvinit providing a login shell.
+  </li>
+
+  <li>
+    network settings: DNS interface registration and TCP/IP autoconfiguration disabled,
+    		  disabled unused experimental net interfaces, 
+    		  IPEnableRouter enabled on multihomed experimental nodes.
+  </li>
+
+  <li>
+    slothd: RDP idlemon for RDP keyboard and mouse events, load-avg correction on pc3000's.
+  </li>
+
+  <li>
+    program-agent: commands forked on experiment nodes now see Samba directories.
+  </li>
+</ul>
+
+<b>2005-8-22</b>
+<ul>
+  <li>
+    Everything created behind control-net firewalls to avoid contamination.
+  </li>
+
+  <li>
+    Patched sshd to support public-key login with Samba shares, and slothd.
+  </li>
+
+  <li>
+    Emulab program-agent, syncserver and slothd idle detection all work now.
+  </li>
+
+  <li>
+    NetBT (NetBios over TCP) is disabled to allow network idle detection by slothd.
+  </li>
+
+  <li>
+    Cygwin syslog now goes into /var/log/messages rather than Event Log.
+  </li>
+
+  <li>
+    Some Windows services are shut down: Messenger, SSDP Discovery Service,
+    Universal Plug and Play Device Host, and Remote Registry.
+  </li>
+
+  <li>
+    Image creation time now put in /etc/motd.
+  </li>
+</ul>
+
+<hr style="width: 100%; height: 2px;">
+<h3><a name="Future"> </a> Future Work </h3>
 
 There are still some things undone: <br>
 
