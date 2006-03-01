@@ -34,7 +34,7 @@ INSERT INTO sitevariables VALUES ('watchdog/isalive/wa',NULL,'1','Interval in mi
 INSERT INTO sitevariables VALUES ('watchdog/isalive/dead_time',NULL,'120','Time, in minutes, after which to consider a node dead if it has not checked in via tha watchdog');
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_batch_size',NULL,'40','Number of plab nodes to setup simultaneously');
 INSERT INTO sitevariables VALUES ('plab/setup/vnode_wait_time',NULL,'960','Number of seconds to wait for a plab node to setup');
-INSERT INTO sitevariables VALUES ('watchdog/rusage','5','1','Interval in minutes between node resource usage reports (0==never report)');
+INSERT INTO sitevariables VALUES ('watchdog/rusage','300','60','Interval in _seconds_ between node resource usage reports (0==never report)');
 INSERT INTO sitevariables VALUES ('watchdog/hostkeys',NULL,'999999','Interval in minutes between host key reports (0=never report, 999999=once only)');
 INSERT INTO sitevariables VALUES ('plab/message','Planetlab support is currently broken due to API incompatibilities introduced into PLC.','','Message to display at the top of the plab_ez page');
 INSERT INTO sitevariables VALUES ('node/ssh_pubkey','1024 37 168728947415883137658395816497236019932357443574364998989351516015013006429180411438552594116282442938932702706360430451154958992295988097967662214818020771421328881173382895214540694120581207714991274873698590147743427181599852480329442016838781882554809552882295931111276319070960396053057987057937216750401 root@paper.cs.utah.edu','','Boss SSH public key to install on nodes');
