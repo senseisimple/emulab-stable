@@ -25,6 +25,7 @@ TBBASE=http://golden-gw.ballmoss.com:9876/~stoller/testbed
 TBSECURECOOKIES=0
 TBAUTHTIMEOUT=216000
 THISHOMEBASE=Stoller.Emulab.Net
+FOO=BAR
 
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
