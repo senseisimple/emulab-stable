@@ -34,6 +34,7 @@ sub usage()
 my $TBROOT         = "@prefix@";
 my $TBOPS          = "@TBOPSEMAIL@";
 my $TBLOGS         = "@TBLOGSEMAIL@";
+my $MAINSITE	   = @TBMAINSITE@;
 my $THISHOMEBASE   = "@THISHOMEBASE@";
 my $TESTMODE       = @TESTMODE@;
 my $DISABLE_EVENTS = "@DISABLE_EVENT_SCHED@";
@@ -1158,7 +1159,7 @@ sub doSwapin($) {
 	DBQueryFatal("select stud from users where uid='$dbuid'");
     my ($studly) = $query_result->fetchrow_array();
 
-    if (! $studly) {
+    if (! $studly && $MAINSITE) {
 	$linktest_level = ($linktest_level <= 3 ? 3 : $linktest_level);
     }
  
