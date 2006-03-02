@@ -27,6 +27,7 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CURL	= "/usr/local/bin/curl";
 my $DATAPOSCGI  = "http://www.datapository.net/input/upload.cgi";
+my $MAXAGE	= (24 * 60 * 60);
 
 my $PWDFILE   = "/usr/testbed/etc/pelabdb.pwd";
 my $tempfile  = "/var/tmp/testbed_pelab_dbpush_tempfile";
@@ -115,6 +116,21 @@ else {
 if (TBDBConnect($DBNAME, $DBUSER, $dbpwd) < 0) {
     fatal("Could not connect to DB!");
 }
+
+unlink("${tempfile}.site_mapping")
+    if (-e "${tempfile}.site_mapping");
+
+#
+# Grab all entries and store to the file
+#
+DBQueryFatal("select * from site_mapping ".
+	     "into outfile '${tempfile}.site_mapping' ".
+	     "fields terminated by ' '");
+
+SendToDatapository("site_mapping");
+
+unlink("${tempfile}.site_mapping")
+    if (-e "${tempfile}.site_mapping" && !$debug);
 
 #
 # Get the last index we archived out.
@@ -246,6 +262,7 @@ sub SendToDatapository($)
 	elsif ($_ =~ /^SUCCESS/) {
 	    $success  = 1;
 	}
+	print $_;
     }
     close(CHILD_READER);
     waitpid($childpid, 0);
