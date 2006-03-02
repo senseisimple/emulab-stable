@@ -1492,6 +1492,15 @@ sub CreateDefsFile($)
 		    }
 		    last SWITCH;
 		};
+		/^BUGDBSUPPORT$/ && do {
+		    if ($FBSD_VERSION == 6) {
+			print OUTDEFS "BUGDBSUPPORT=1\n";
+		    }
+		    else {
+			print OUTDEFS "BUGDBSUPPORT=0\n";
+		    }
+		    last SWITCH;
+		};
 		
 		print OUTDEFS $_;
 	    }

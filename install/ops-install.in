@@ -34,10 +34,12 @@ my $BOSSNODE_IP = '@BOSSNODE_IP@';
 my $USERNODE_IP = '@USERNODE_IP@';
 my $FSNODE_IP   = '@FSNODE_IP@';
 my $LOGFACIL    = '@TBLOGFACIL@';
+my $TBOPSEMAIL  = '@TBOPSEMAIL@';
 my $ELABINELAB  = @ELABINELAB@;
 my $WINSUPPORT  = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $CVSSUPPORT  = @CVSSUPPORT@;
+my $BUGDBSUPPORT= @BUGDBSUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
@@ -139,6 +141,8 @@ my $MV         = "/bin/mv";
 my $GMAKE      = "/usr/local/bin/gmake";
 my $ENV        = "/usr/bin/env";
 my $MOUNT      = "/sbin/mount";
+my $TAR	       = "/usr/bin/tar";
+my $MD5	       = "/sbin/md5";
 
 #
 # Some files we edit/create
@@ -339,6 +343,26 @@ Phase "ports", "Installing ports", sub {
 	    # Lets not hardwire the package name; whatever it is will do.
 	    my $pname = `ls $packagedir/cvsd-*.tbz`;
 	    PhaseFail("Cannot find cvsd package in $packagedir!")
+		if ($?);
+	    chomp($pname);
+	    
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
+	};
+    }
+    if ($BUGDBSUPPORT) {
+	Phase "flyspray", "Installing flyspray package support", sub {
+	    PhaseSkip("flyspray not supported on ops")
+		if ($FBSD_VERSION < 6);
+
+	    if (!ExecQuiet("$PKG_INFO -x -e adodb")) {
+		PhaseSkip("adodb package already installed");
+	    }
+	    if (!$packagedir) {
+		PhaseSkip("No package directory provided");
+	    }
+	    # Lets not hardwire the package name; whatever it is will do.
+	    my $pname = `ls $packagedir/adodb-*.tbz`;
+	    PhaseFail("Cannot find adodb package in $packagedir!")
 		if ($?);
 	    chomp($pname);
 	    
@@ -962,7 +986,6 @@ if ($MAILMANSUPPORT) {
     my $MAILMANLISTS = "$MAILMANDIR/lists";
     my $MAILMANPWD   = "$ETCDIR/mailman.pwd";
     my $MAILMANALIAS = "/etc/mail/aliases.mailman";
-    my $TBOPSEMAIL   = "@TBOPSEMAIL@";
     
     Phase "Mailman", "Setting up Mailman", sub {
 	PhaseSkip("mailman not supported on ops")
@@ -1088,6 +1111,137 @@ if ($CVSSUPPORT) {
 	    DoneIfExists("$RCDIR/cvsd.sh");
 	    ExecQuietFatal("mv $RCDIR/cvsd.sh.sample $RCDIR/cvsd.sh");
 	    ExecQuietFatal("$CHMOD a+x $RCDIR/cvsd.sh");
+	};
+    };
+}
+
+if ($BUGDBSUPPORT) {
+    my $FLYSPRAYPWD   = "$ETCDIR/flyspray.pwd";
+    my $FLYSPRAYDIR   = "/usr/local/www/data/flyspray";
+    my $FLYSPRAYURL   = "http://www.emulab.net/downloads/flyspray-0.9.9.tgz";
+    my $FLYSPRAYCONF  = "$ETCDIR/flyspray.conf.php";
+    my $PHPCONFIG     = "/usr/local/etc/php.ini";
+    my $localtarfile  = "/tmp/flyspray.tgz";
+    my $ADODBPATH     = "/usr/local/share/adodb/adodb.inc.php";
+
+    Phase "flyspray", "Installing flyspray", sub {
+	PhaseSkip("flyspray not supported on ops")
+	    if ($FBSD_VERSION < 6);
+
+	# Get a password for the installation.
+	Phase "password", "Generating flyspray password", sub {
+	    DoneIfExists($FLYSPRAYPWD);
+	    
+	    my $string = substr(GenSecretKey(), 0, 10);
+
+	    PhaseFail("Invalid password supplied")
+		if (!defined($string) || $string eq "");
+	
+	    CreateFileFatal("$FLYSPRAYPWD", "$string");
+	    ExecQuietFatal("$CHMOD 750 $FLYSPRAYPWD");
+	    ExecQuietFatal("$CHGRP tbadmin $FLYSPRAYPWD");
+	};
+	my $secret = `cat $FLYSPRAYPWD`;
+	chomp($secret);
+
+	Phase "php", "Patching up PHP config file", sub {
+	    DoneIfExists($PHPCONFIG);
+	    CreateFileFatal($PHPCONFIG,
+			    "[PHP]",
+			    ";",
+			    "; For ADODB, which is needed by flyspray.",
+			    ";",
+			    "include_path=\"/usr/local/share/adodb\"");
+	};
+
+	Phase "dbcreate", "Creating flyspray DB", sub {
+	    if (! -d "$MYSQLDBDIR/flyspray") {
+		ExecQuietFatal("$MYSQLADMIN -u root -p${password} ".
+			       "            create flyspray");
+	    }
+	    ExecQuietFatal("echo 'grant all on flyspray.* to ".
+			   "      flyspray\@localhost ".
+			   "      identified by \"$secret\"' | ".
+			   "$MYSQL -s -u root -p${password} mysql");
+	};
+
+	Phase "fetching", "Fetching flyspray distribution", sub {
+	    DoneIfExists($localtarfile);
+	    FetchFileFatal($FLYSPRAYURL, $localtarfile);
+	};
+
+	Phase "unpacking", "Unpacking flyspray distribution", sub {
+	    if (! -e "$FLYSPRAYDIR") {
+		mkdir("$FLYSPRAYDIR", 0770) or
+		    PhaseFail("Unable to make $FLYSPRAYDIR : $!");
+	    }
+	    ExecQuietFatal("$CHOWN nobody $FLYSPRAYDIR");
+	    PhaseSkip("Flyspray already unpacked")
+		if (-e "$FLYSPRAYDIR/.htaccess");
+	    ExecQuietFatal("$TAR zxf $localtarfile -C $FLYSPRAYDIR"); 
+	};
+
+	Phase "dbinit", "Initializing flyspray DB", sub {
+	    if (!ExecQuiet("$MYSQLDUMP -d -u flyspray -p${secret} ".
+			   "flyspray flyspray_groups")) {
+		PhaseSkip("DB already initialized");
+	    }
+	    
+	    ExecQuietFatal("$MYSQL -u flyspray -p${secret} flyspray ".
+			   "  < $FLYSPRAYDIR/sql/flyspray-0.9.8.mysql");
+	    ExecQuietFatal("$MYSQL -u flyspray -p${secret} flyspray ".
+			   "  < $FLYSPRAYDIR/sql/flyspray-0.9.9-devel.mysql");
+	};
+
+	Phase "dbpatch", "Patching up flyspray DB", sub {
+	    if (!ExecQuiet("$MYSQLDUMP -d -u flyspray -p${secret} ".
+			   "flyspray emulab_project_mapping")) {
+		PhaseSkip("DB already patched");
+	    }
+
+	    ExecQuietFatal("$MYSQL -u flyspray -p${secret} flyspray ".
+			   "  < $TOP_SRCDIR/bugdb/sqlextras");
+	};
+	
+	#
+	# Fix up the password for the flyspray "superuser"
+	#
+	my $md5_secret = `$MD5 -q -s $secret`;
+	PhaseFail("Could not take MD5 of flyspray password!")
+	    if ($?);
+	chomp($md5_secret);
+
+	ExecQuietFatal("echo 'update flyspray_users set ".
+		       "        user_pass=\"${md5_secret}\", ".
+		       "        jabber_id=\"\", ".
+		       "        email_address=\"${TBOPSEMAIL}\"' | ".
+		       "$MYSQL -u flyspray -p${secret} flyspray");
+	
+	Phase "configfile", "Creating flyspray config file", sub {
+	    DoneIfExists($FLYSPRAYCONF);
+	    CreateFileFatal($FLYSPRAYCONF,
+			    ";",
+			    "; Flyspray configuration",
+			    ";",
+			    "[general]",
+			    "basedir   = \"${FLYSPRAYDIR}\"",
+			    "baseurl   = \"https://${USERNODE}/flyspray/\"",
+			    "adodbpath = \"$ADODBPATH\"",
+			    "cookiesalt= 130918332",
+			    "output_buffering = \"on\"",
+			    "passwdcrypt = \"md5\"",
+			    "address_rewriting = \"0\"",
+			    "reminder_daemon = \"0\"",
+			    "[database]",
+			    "dbtype    = \"mysql\"",
+			    "dbhost    = \"localhost\"",
+			    "dbname    = \"flyspray\"",
+			    "dbprefix  = \"flyspray_\"",
+			    "dbuser    = \"flyspray\"",
+			    "dbpass    = \"$secret\""
+			   );
+	    ExecQuietFatal("$CHOWN nobody:tbadmin $FLYSPRAYCONF");
+	    ExecQuietFatal("$CHMOD 750 $FLYSPRAYCONF");
 	};
     };
 }

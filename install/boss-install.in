@@ -27,6 +27,7 @@ my $DBNAME     = "@TBDBNAME@";
 my $ELABINELAB = @ELABINELAB@;
 my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
+my $BUGDBSUPPORT = @BUGDBSUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
 
 my $LOGFACIL   = '@TBLOGFACIL@';
@@ -1052,6 +1053,18 @@ Phase "named", "Setting up initial named configuration", sub {
 		       "     ${FSNODE}:/etc/resolv.conf");
     };
 };
+
+if ($BUGDBSUPPORT) {
+    my $BUGDBPROXY  = "$PREFIX/sbin/bugdbproxy";
+
+    Phase "flyspray", "Finalizing flyspray installation", sub {
+	PhaseSkip("flyspray not supported")
+	    if ($FBSD_VERSION < 6);
+
+ 	ExecQuietFatal("$SSH -o 'BatchMode=yes' root\@${USERNODE} ".
+		       "     '$BUGDBPROXY setup' ");
+    };
+}
 
 Phase "firstuser", "Setting up initial user (elabman)", sub {
     PhaseSkip("elabman already created")

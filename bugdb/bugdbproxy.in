@@ -68,6 +68,7 @@ sub FlysprayUserid($);
 sub FlysprayProjectid($);
 sub FlysprayGroupid($$);
 sub NewFlySprayGroup($$$$);
+sub FlySpraySetup();
 sub AddUser(@);
 sub DelUser(@);
 sub AddProject(@);
@@ -96,6 +97,9 @@ if (! @ARGV) {
 # hopefully not group readable. Open and parse that file, then open a
 # connection to the DB.
 #
+$FLYCONF = "$TB/etc/flyspray.conf.php"
+    if (! -e $FLYCONF);
+
 open(FLY, $FLYCONF) or
     die("*** $0:\n".
 	"    Could not open $FLYCONF for reading!\n");
@@ -144,6 +148,9 @@ elsif ($action eq "setgroups") {
 }
 elsif ($action eq "xlogin") {
     exit(xLogin(@ARGV));
+}
+elsif ($action eq "setup") {
+    exit(FlySpraySetup());
 }
 else {
     die("*** $0:\n".
@@ -405,18 +412,33 @@ sub DelUser(@)
 sub AddProject(@)
 {
     usage()
-	if (@_ != 1);
+	if (@_ < 1 || @_ > 2);
 
-    my ($pid) = @_;
+    my ($pid, $setup) = @_;
     my $project_id = FlysprayProjectid($pid);
 
     if ($project_id >= 0) {
 	print("*** $pid already exists in the flyspray DB! Skipping\n");
 	return 0;
     }
-    my $intro = "This is the Emulab Bug DB for the $pid project";
-    my $project_email = "${pid}-users\@${OURDOMAIN}";
+    my $intro;
+    my $project_email;
+    my $others_view;
 
+    if (defined($setup)) {
+	$intro = "This is the Bug DB for Emulab. This DB is intended ".
+	    "for bugs related to the Emulab software. If you want to manage ".
+	    "bugs for your own software/experiments, use the selector above ".
+	    "to change the view.";
+	$project_email = $TBOPS;
+	$others_view = 1;
+    }
+    else {
+	$intro = "This is the Emulab Bug DB for the $pid project";
+	$project_email = "${pid}-users\@${OURDOMAIN}";
+	$others_view = 0;
+    }
+    
     # Easy ...
     my $query_result =
 	DBQueryFatal("insert into flyspray_projects set ".
@@ -428,7 +450,7 @@ sub AddProject(@)
 		 "    project_is_active='1', ".
 		 "    visible_columns='".
 		 "id tasktype severity summary status dueversion progress', ".
-		 "    others_view='0', ".
+		 "    others_view='$others_view', ".
 		 "    anon_open='0', ".
 		 "    notify_email='$project_email', ".
 		 "    notify_email_when='0', ".
@@ -603,6 +625,18 @@ sub xLogin(@)
 		 "where user_id=$user_id");
     return 0;
 }
+
+#
+# Setup Flyspray at the beginning of time. This creates the Emulab project
+# and munges a couple of fields. 
+#
+sub FlySpraySetup()
+{
+    my @args = ("Emulab", 1);
+	
+    return AddProject(@args);
+}
+
      
 sub fatal($)
 {

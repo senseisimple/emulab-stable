@@ -87,7 +87,8 @@ RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 .endif
 
 .if ${OSMAJOR} >= 6
-RUN_DEPENDS+= ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd
+RUN_DEPENDS+= ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd \
+              ${LOCALBASE}/share/adodb/adodb.inc.php:${PORTSDIR}/databases/adodb
 .endif
 
 NO_BUILD=	yes
