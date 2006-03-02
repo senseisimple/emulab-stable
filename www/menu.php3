@@ -927,7 +927,7 @@ function ENDPAGE() {
 # Spit out a vanilla page footer.
 #
 function PAGEFOOTER($view = NULL) {
-    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE;
+    global $TBDOCBASE, $TBMAILADDR, $THISHOMEBASE, $BASEPATH;
     global $TBMAINSITE, $SSL_PROTOCOL;
 
     if (!$view) {
@@ -977,7 +977,7 @@ function PAGEFOOTER($view = NULL) {
 	# this logo!
 	#
 	echo "       <a href='http://www.emulab.net'>
-                         <img src='$TBDOCBASE/builtwith.png'></a>";
+                         <img src='$BASEPATH/builtwith.png'></a>";
     }
     else {
 	echo " &nbsp";
