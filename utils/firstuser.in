@@ -23,7 +23,7 @@ my $MINGID     = @MIN_UNIX_GID@;
 my $wap     = '@prefix@/sbin/withadminprivs';
 my $mkproj  = '@prefix@/sbin/mkproj';
 my $mkgroup = '@prefix@/sbin/mkgroup';
-my $mkacct  = '@prefix@/sbin/tbacct add';
+my $mkacct  = '@prefix@/sbin/tbacct';
 
 my $protouser       = 'elabman';
 my $protouser_name  = 'Emulab Manager';
@@ -214,7 +214,7 @@ if (!defined($opts{u})) {
 }
 
 print "Running mkacct...\n";
-if (system "$wap $mkacct $protouser") {
+if (system "$wap $mkacct -b add $protouser") {
     die "Unable to create account for initial user $protouser\n";
 }
 

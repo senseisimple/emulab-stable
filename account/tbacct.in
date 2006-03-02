@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -364,15 +364,15 @@ sub AddUser()
 
     # And to the wiki if enabled.
     system("$ADDWIKIUSER $user")
-	if ($WIKISUPPORT && !$batch && $user ne $PROTOUSER);
+	if ($WIKISUPPORT && $user ne $PROTOUSER);
 
     # And to the bugdb if enabled.
     system("$ADDBUGDBUSER $user")
-	if ($BUGDBSUPPORT && !$batch && $user ne $PROTOUSER);
+	if ($BUGDBSUPPORT && $user ne $PROTOUSER);
 
     # And to the chat server if enabled.
     system("$ADDCHATUSER $user")
-	if ($CHATSUPPORT && !$batch && $user ne $PROTOUSER);
+	if ($CHATSUPPORT && $user ne $PROTOUSER);
 
     # And the mailman lists if enabled.
     system("$ADDMMUSER $user")
