@@ -1,0 +1,38 @@
+#! /usr/bin/awk -f
+
+BEGIN {
+	printf("timeval unsigned\n");
+	printf("title\n");
+	printf("Event Timeline\n");
+	printf("xlabel\n");
+	printf("time\n");
+	printf("ylabel\n");
+	printf("agent\n");
+	printf("white\n");
+
+	firsttime = 0;
+	agents = 0;
+}
+
+/Agent: / {
+	agents += 1;
+	agent[$2] = agents;
+}
+
+/Fire: / {
+	split($3, tv, /:/);
+	split($5, aname, /:/);
+
+	if (firsttime == 0 || tv[2] < firsttime)
+		firsttime = tv[2];
+	if (aname[2] in agent) {
+		printf("x %s.%s %s\n", tv[2], tv[3], agent[aname[2]]);
+	}
+}
+
+END {
+	for (ag in agent) {
+		printf("rtext %s.0 %d\n%s\n", firsttime - 5, agent[ag], ag);
+	}
+	printf("go\n");
+}
