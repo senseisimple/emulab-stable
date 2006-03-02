@@ -496,7 +496,8 @@ private:
         size_t i = 0;
         for (i = 0; i < vertexCount; ++i)
         {
-            maxDegree = max(maxDegree, (*m_indexes)[i + 1] - (*m_indexes)[i]);
+            maxDegree = std::max(maxDegree,
+                                 (*m_indexes)[i + 1] - (*m_indexes)[i]);
         }
         anchorDeltaOrigin[SOURCE] = maxDegree;
         anchorDeltaOrigin[SINK] = maxDegree;
@@ -619,8 +620,9 @@ private:
                            + anchorDeltaOrigin[currentAnchor];
             anchorDelta[currentAnchor][index].push_front(vertex);
             info[vertex].pos = anchorDelta[currentAnchor][index].begin();
-            anchorMinIndex[currentAnchor] = min(anchorMinIndex[currentAnchor],
-                                                index);
+            anchorMinIndex[currentAnchor]
+                                      = std::min(anchorMinIndex[currentAnchor],
+                                                 index);
         }
     }
 
@@ -674,8 +676,9 @@ private:
 //        destList.splice(destList.begin(), originList, info[vertex].pos);
             info[vertex].pos = destList.begin();
             info[vertex].delta = newDelta;
-            anchorMinIndex[newPartition] = min(anchorMinIndex[newPartition],
-                                               newIndex);
+            anchorMinIndex[newPartition]
+                                     = std::min(anchorMinIndex[newPartition],
+                                                newIndex);
             normalizeDelta(oldPartition);
         }
     }

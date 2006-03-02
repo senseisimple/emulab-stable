@@ -32,7 +32,7 @@ public:
     FileWrapper & operator=(FileWrapper & right)
     {
         FileWrapper temp(right);
-        swap(data, temp.data);
+        std::swap(data, temp.data);
         return *this;
     }
 
@@ -65,7 +65,7 @@ private:
     FILE * data;
 };
 
-FileWrapper coprocess(string const & command);
+FileWrapper coprocess(std::string const & command);
 int read(FileWrapper & file, int & source, int & dest, int & firstHop,
           int & distance);
 void write(FileWrapper & file, char command);

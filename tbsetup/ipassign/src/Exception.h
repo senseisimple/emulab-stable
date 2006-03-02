@@ -20,6 +20,7 @@ public:
         : message(error)
     {
     }
+    virtual ~StringException() throw() {}
     virtual char const * what() const throw()
     {
         return message.c_str();
@@ -28,12 +29,12 @@ public:
     {
         message += addend;
     }
-    virtual void addToMessage(string const & addend)
+    virtual void addToMessage(std::string const & addend)
     {
         addToMessage(addend.c_str());
     }
 private:
-    string message;
+    std::string message;
 };
 
 // Can be thrown during IP assignment

@@ -60,8 +60,8 @@ Framework & Framework::operator=(Framework const & right)
     // This is a cool exception-safe way to do copy. See
     // Herb Sutter's 'Exceptional C++' book.
     Framework temp(right);
-    swap(m_assign, temp.m_assign);
-    swap(m_partition, temp.m_partition);
+    swap_auto_ptr(m_assign, temp.m_assign);
+    swap_auto_ptr(m_partition, temp.m_partition);
     return *this;
 }
 

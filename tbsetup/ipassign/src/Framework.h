@@ -33,7 +33,7 @@ public:
     void ipAssign(void);
 
     // Print IP addresses.
-    void printIP(ostream & output) const;
+    void printIP(std::ostream & output) const;
 private:
     // These constants are used to store the module options before the
     // modules themselves are created according to the specification.

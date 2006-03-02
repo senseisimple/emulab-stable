@@ -143,12 +143,12 @@ public:
                                       std::vector<int> & partitions)
     {
         // breadth first search.
-        queue<size_t> nextConnection;
+        std::queue<size_t> nextConnection;
         size_t first = 0;
         size_t numInPartition = 0;
         size_t i = 0;
         bool hasFirst = false;
-        vector<bool> connected;
+        std::vector<bool> connected;
         connected.resize(partitions.size());
 
         // Set all LANs in whichPartition to false. All others to true.

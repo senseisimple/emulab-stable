@@ -53,8 +53,8 @@ namespace ptree
         virtual Node * getChild(void)=0;
         virtual Node * getSibling(void)=0;
         virtual void setParent(Node * newParent)=0;
-        virtual void addChild(auto_ptr<Node> newChild)=0;
-        virtual void addSibling(auto_ptr<Node> newSibling)=0;
+        virtual void addChild(std::auto_ptr<Node> newChild)=0;
+        virtual void addSibling(std::auto_ptr<Node> newSibling)=0;
 
         IPAddress getPrefix(void) const
         {
@@ -114,7 +114,7 @@ namespace ptree
 
         virtual void accept(Visitor & target)=0;
 
-        void logStructure(ostream & output, vector<bool> & table)
+        void logStructure(std::ostream & output, std::vector<bool> & table)
         {
             // print out the current node
             output << "PARSE_TREE: ";
@@ -158,7 +158,7 @@ namespace ptree
             }
         }
 
-        virtual void printCustomDebug(ostream & output)=0;
+        virtual void printCustomDebug(std::ostream & output)=0;
     protected:
         void copyTo(Node & dest) const
         {
@@ -241,7 +241,7 @@ namespace ptree
             m_parent = newParent;
         }
 
-        virtual void addChild(auto_ptr<Node> newChild)
+        virtual void addChild(std::auto_ptr<Node> newChild)
         {
             if (newChild.get() != NULL)
             {
@@ -253,13 +253,13 @@ namespace ptree
                 else
                 {
                     // The new child goes at the front of the list.
-                    swap(m_child, newChild);
+                    swap_auto_ptr(m_child, newChild);
                     m_child->addSibling(newChild);
                 }
             }
         }
 
-        virtual void addSibling(auto_ptr<Node> newSibling)
+        virtual void addSibling(std::auto_ptr<Node> newSibling)
         {
             if (newSibling.get() != NULL)
             {
@@ -279,7 +279,7 @@ namespace ptree
         {
             target.visitBranch(*this);
         }
-        virtual void printCustomDebug(ostream & output)
+        virtual void printCustomDebug(std::ostream & output)
         {
             output << "Branch";
         }
@@ -343,12 +343,12 @@ namespace ptree
             m_parent = newParent;
         }
 
-        virtual void addChild(auto_ptr<Node> newChild)
+        virtual void addChild(std::auto_ptr<Node> newChild)
         {
             throw AddChildToLeafException();
         }
 
-        virtual void addSibling(auto_ptr<Node> newSibling)
+        virtual void addSibling(std::auto_ptr<Node> newSibling)
         {
             if (newSibling.get() != NULL)
             {
@@ -378,7 +378,7 @@ namespace ptree
         {
             target.visitLeaf(*this);
         }
-        virtual void printCustomDebug(ostream & output)
+        virtual void printCustomDebug(std::ostream & output)
         {
             output << "Leaf: " << m_lanIndex;
         }
@@ -436,7 +436,7 @@ namespace ptree
     class SiblingListVisitor : public Visitor
     {
     public:
-        SiblingListVisitor(list<Node *> & newSiblingList)
+        SiblingListVisitor(std::list<Node *> & newSiblingList)
             : siblingList(newSiblingList) {}
         virtual ~SiblingListVisitor() {}
         virtual void visitBranch(Branch & target)
@@ -459,7 +459,7 @@ namespace ptree
         }
 
     private:
-        list<Node *> & siblingList;
+        std::list<Node *> & siblingList;
     };
 
 /**************************************************/

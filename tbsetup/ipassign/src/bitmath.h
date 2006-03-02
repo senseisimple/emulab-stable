@@ -18,7 +18,7 @@ typedef unsigned int IPAddress;
 class BadStringToIPConversionException : public StringException
 {
 public:
-    explicit BadStringToIPConversionException(string const & error)
+    explicit BadStringToIPConversionException(std::string const & error)
         : StringException("Bad String to IP conversion: " + error)
     {
     }
@@ -37,8 +37,8 @@ public:
 
 // take an unsigned int and produce a dotted quadruplet based on it.
 // can throw bad_alloc
-string ipToString(IPAddress ip);
-IPAddress stringToIP(string const & source);
+std::string ipToString(IPAddress ip);
+IPAddress stringToIP(std::string const & source);
 
 // take a count and return the smallest block that is large enough
 // to contain count hosts.

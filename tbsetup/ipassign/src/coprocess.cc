@@ -11,6 +11,8 @@
 #include "lib.h"
 #include "coprocess.h"
 
+using namespace std;
+
 FileWrapper coprocess(string const & command)
 {
     FileWrapper temp(popen(command.c_str(), "r+"));

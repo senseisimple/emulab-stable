@@ -55,7 +55,8 @@ public:
                 bestCount = partitionCount;
                 bestScore = currentScore;
                 partitions = current;
-                cerr << "NewBest: " << i << ":" << partitionCount << endl;
+                std::cerr << "NewBest: " << i << ":" << partitionCount
+                          << std::endl;
             }
         }
         m_finalCount = bestCount;
