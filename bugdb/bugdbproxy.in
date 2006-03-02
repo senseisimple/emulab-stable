@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -423,8 +423,6 @@ sub AddProject(@)
 		 "    project_id=NULL, ".
 		 "    project_title='$pid' ,".
 		 "    theme_style='Bluey', ".
-		 "    show_logo='1', ".
-		 "    inline_images='0', ".
 		 "    default_cat_owner='0', ".
 		 "    intro_message='$intro', ".
 		 "    project_is_active='1', ".
