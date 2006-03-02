@@ -63,6 +63,8 @@ DOT_LOGHOLES = ""
 
 DEFAULT_LOGHOLES = ["/var/emulab/logs", "/local/logs"]
 
+DELAYLOG2XPLOT = os.path.join(prefix, "bin", "delaylog2xplot")
+
 PID = None
 EID = None
 
@@ -1118,7 +1120,7 @@ def trace_post(link2trace):
     if len(link2trace.keys()):
         print_status("\n")
         pass
-    
+
     return
 
 ##
@@ -1391,6 +1393,14 @@ def do_sync(args, mode="sync", must_be_active=1):
                                               eout[:-1]))
                     retval = 3
                     pass
+                else:
+                    os.chdir(os.path.join(vhost, "var", "emulab", "logs"))
+                    if os.path.exists("delayagent.debug"):
+                        os.system("%s %s" %
+                                  (DELAYLOG2XPLOT, "delayagent.debug"))
+                        pass
+                    os.chdir(logdir)
+                    pass
                 pass
 
             # Add symbolic links to the trace files.
@@ -1429,6 +1439,22 @@ def do_sync(args, mode="sync", must_be_active=1):
                             pass
                         os.symlink(os.path.join(os.pardir, filename), dst)
                         pass
+                    pass
+
+                src = os.path.join(trace["delayvname"],
+                                   "var", "emulab", "logs",
+                                   "%s-%s-*.xpl" % (trace["linkvname"],
+                                                    trace["vnode"]))
+                for filename in glob.glob(src):
+                    aspect = filename.split("-")[2].split(".")[0]
+                    dst = "%s-%s.xpl" % (trace["vnode"], aspect)
+                    dst = os.path.join(fullpath, dst)
+                    try:
+                        os.unlink(dst)
+                        pass
+                    except OSError:
+                        pass
+                    os.symlink(os.path.join(os.pardir, filename), dst)
                     pass
                 pass
 
