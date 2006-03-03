@@ -1,3 +1,7 @@
+configure
+autoconf/config.guess
+autoconf/config.sub
+autoconf/install.sh
 os/shd 
 www/cvsweb 
 robots/vmcd/camera_data/output_camera*
@@ -8,13 +12,17 @@ tmcd/plab
 tbsetup/checkpass/cracklib,2.7 
 mote/tools  
 mote/apps 
+mote/powermon/DataqSDK_Linux
 robots/mezzanine 
 daikon 
 uisp 
 sensors/healthd*
+sensors/and
+sensors/nfstrace/nfsdump2
 discvr 
 os/imagezip/fat 
 os/imagezip/ntfs/liblocale 
 tbsetup/plab/libdslice 
+tool/svn/svn_load_dirs.pl
 copyrights 
 hyperviewer/hypviewer 
