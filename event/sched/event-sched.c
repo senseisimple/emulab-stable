@@ -82,6 +82,8 @@ static pid_t rmcd_pid = -1;
 
 static struct agent ns_sequence_agent;
 static timeline_agent_t ns_sequence;
+static struct agent ns_teardown_agent;
+static timeline_agent_t ns_teardown;
 static struct agent ns_timeline_agent;
 static timeline_agent_t ns_timeline;
 
@@ -356,6 +358,20 @@ main(int argc, char *argv[])
 	ns_sequence_agent.handler = &ns_sequence->ta_local_agent;
 	lnAddTail(&sequences, &ns_sequence->ta_local_agent.la_link);
 	lnAddTail(&agents, &ns_sequence_agent.link);
+	
+	ns_teardown = create_timeline_agent(TA_SEQUENCE);
+	ns_teardown->ta_local_agent.la_link.ln_Name = ns_teardown_agent.name;
+	ns_teardown->ta_local_agent.la_handle = handle;
+	ns_teardown->ta_local_agent.la_agent = &ns_teardown_agent;
+	ns_teardown_agent.link.ln_Name = ns_teardown_agent.name;
+	strcpy(ns_teardown_agent.name, "__ns_teardown");
+	strcpy(ns_teardown_agent.nodeid, "*");
+	strcpy(ns_teardown_agent.vnode, "*");
+	strcpy(ns_teardown_agent.objtype, TBDB_OBJECTTYPE_SEQUENCE);
+	strcpy(ns_teardown_agent.ipaddr, "*");
+	ns_teardown_agent.handler = &ns_teardown->ta_local_agent;
+	lnAddTail(&sequences, &ns_teardown->ta_local_agent.la_link);
+	lnAddTail(&agents, &ns_teardown_agent.link);
 	
 	ns_timeline = create_timeline_agent(TA_TIMELINE);
 	ns_timeline->ta_local_agent.la_link.ln_Name = ns_timeline_agent.name;
@@ -1330,6 +1346,28 @@ get_static_events(event_handle_t handle)
 	
 		sched_event_prepare(handle, &event);
 		timeline_agent_append(ns_sequence, &event);
+		
+		/* Log when time has officially ended. */
+		event.notification = event_notification_create(
+			handle,
+			EA_Experiment, pideid,
+			EA_Type, TBDB_OBJECTTYPE_SIMULATOR,
+			EA_Event, TBDB_EVENTTYPE_LOG,
+			EA_Name, event.agent.s->name,
+			EA_Arguments, "Time ended",
+			EA_TAG_DONE);
+		event.time.tv_sec = 0;
+		event.time.tv_usec = 0;
+		event.length = 1;
+		event.flags = SEF_SINGLE_HANDLER;
+		event_notification_put_int32(handle,
+					     event.notification,
+					     "TOKEN",
+					     next_token);
+		next_token += 1;
+	
+		sched_event_prepare(handle, &event);
+		timeline_agent_append(ns_teardown, &event);
 	}
 	
 	/*

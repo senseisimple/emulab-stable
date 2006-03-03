@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -35,9 +35,18 @@ static int debug;
 
 static int exit_value = 0;
 
+static event_handle_t handle;
+
 static void     comp_callback(event_handle_t handle,
 			      event_notification_t notification,
 			      void *data);
+
+void
+sigalrm(int sig)
+{
+	event_stop_main(handle);
+	exit_value = -1;
+}
 
 void
 usage(char *progname)
@@ -49,6 +58,7 @@ usage(char *progname)
 	"       time: 'now' or '+seconds' or [[[[yy]mm]dd]HH]MMss\n"
 	"Options:\n"
 	"       -w    Wait for the event to complete.\n"
+	"       -t N  Timeout after waiting N seconds.\n"
 	"Examples:\n"
 	"       %s -e pid/eid now cbr0 set interval_=0.2\n"
 	"       %s -e pid/eid +10 cbr0 start\n"
@@ -60,7 +70,6 @@ usage(char *progname)
 int
 main(int argc, char **argv)
 {
-	event_handle_t handle;
 	event_notification_t notification;
 	address_tuple_t	tuple;
 	char *progname;
@@ -68,6 +77,7 @@ main(int argc, char **argv)
 	char *port = NULL;
 	int control = 0;
 	int wait_for_complete = 0;
+	int timeout = 0;
 	char *myeid = NULL;
 	char *keyfile = NULL;
 	char keyfilebuf[BUFSIZ];
@@ -77,7 +87,7 @@ main(int argc, char **argv)
 
 	progname = argv[0];
 	
-	while ((c = getopt(argc, argv, "dws:p:ce:k:")) != -1) {
+	while ((c = getopt(argc, argv, "dws:p:ce:k:t:")) != -1) {
 		switch (c) {
 		case 'd':
 			debug++;
@@ -99,6 +109,9 @@ main(int argc, char **argv)
 			break;
 		case 'k':
 			keyfile = optarg;
+			break;
+		case 't':
+			timeout = atoi(optarg);
 			break;
 		default:
 			usage(progname);
@@ -366,6 +379,10 @@ main(int argc, char **argv)
 	event_notification_free(handle, notification);
 
 	if (wait_for_complete) {
+		if (timeout) {
+			signal(SIGALRM, sigalrm);
+			alarm(timeout);
+		}
 		event_main(handle);
 	}
 

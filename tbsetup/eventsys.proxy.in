@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -111,7 +111,11 @@ $PIDFILE = "$PIDDIR/${pid}_${eid}.pid";
 # Deal with stop and replay.
 #
 if ($action eq "stop" || $action eq "replay") {
-    if (-e $PIDFILE) {    
+    if (-e $PIDFILE) {   
+	# Send any teardown events and wait, at most five seconds, for them to
+	# complete.
+	system("$TB/bin/tevc -w -t 5 -e ${pid}/${eid} now __ns_teardown run");
+
 	my $epid = `cat $PIDFILE`;
 	# untaint
 	if ($epid =~ /^(\d*)$/) {
