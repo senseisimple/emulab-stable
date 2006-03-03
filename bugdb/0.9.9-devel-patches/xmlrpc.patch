@@ -1,0 +1,180 @@
+
+Bring the XML-RPC interface back up to date.
+
+Index: remote.php
+===================================================================
+--- remote.php	(revision 502)
++++ remote.php	(working copy)
+@@ -41,6 +41,7 @@
+ // use xmlrpc library (library + server library)
+ require_once $conf['general']['baseurl'] . 'includes/xmlrpc.inc';
+ require_once $conf['general']['baseurl'] . 'includes/xmlrpcs.inc';
++require_once "$basedir/includes/class.tpl.php";
+ 
+ //////////////////////////////////////////////////
+ // Login/Authentication functions               //
+@@ -95,6 +96,7 @@
+ function getTask($args)
+ {
+    global $fs;
++   global $user;
+ 
+    $task_id    = php_xmlrpc_decode($args->getParam(2));
+ 
+@@ -108,13 +110,13 @@
+       return loginErrorResponse();
+    }
+ 
++   $user = new User($user_id);
+ 
+-
+    // Get the task details
+    $task_details = $fs->getTaskDetails($task_id);
+ 
+    // Get the user's permissions for the project this task belongs to
+-   $permissions = $fs->getPermissions($user_id, $task_details['attached_to_project']);
++   $permissions = $user->perms;
+ 
+    // If the task doesn't exist, stop.
+    if (!is_numeric($task_details['task_id']))
+@@ -236,16 +238,16 @@
+ **/
+ function taskTypeArray()
+ {
+-   return arrayForQuery("SELECT tasktype_id, tasktype_name FROM flyspray_list_tasktype ORDER BY list_position"
+-                        ,'tasktype_id','tasktype_name');
++   return arrayForQuery("SELECT tasktype_name, tasktype_id FROM flyspray_list_tasktype ORDER BY list_position"
++                        ,'tasktype_name','tasktype_id');
+ }
+ /**
+ ** returns an array of possible task category values
+ **/
+ function categoryArray()
+ {
+-   return arrayForQuery("SELECT category_id, category_name FROM flyspray_list_category ORDER BY list_position"
+-                        ,'category_id','category_name');
++   return arrayForQuery("SELECT category_name, category_id FROM flyspray_list_category ORDER BY list_position"
++                        ,'category_name','category_id');
+ }
+ /**
+ ** returns an array of possible task status values
+@@ -463,6 +465,7 @@
+    global $fs;
+    global $db;
+    global $be;
++   global $user;
+    include_once('includes/notify.inc.php');
+    $notify = new Notifications();
+ 
+@@ -479,15 +482,26 @@
+       return loginErrorResponse();
+    }
+ 
++   $user = new User($user_id);
++
+    // Get the task details
+    $task_details = @$fs->getTaskDetails($task_id);
+ 
+-   // Get the user's permissions for the project this task belongs to
+-   $permissions = $fs->getPermissions($user_id, $taskData['project_id']);
++   if (!empty($taskData['project_title'])) {
++	$get_pid = $db->Query("SELECT project_id
++			       FROM {projects}
++			       WHERE project_title = ?",
++			       $taskData['project_title']);
++	if ($db->CountRows($get_pid) != 1) {
++	    return new xmlrpcresp (0,PERMISSION_DENIED, 'No such project.');
++	}
++	else {
++	    $row = $db->FetchArray($get_pid);
++	    $taskData['project_id'] = $row['project_id'];
++	}
++   }
+ 
+ 
+-
+-
+    // compulsory args
+    $taskData[0] = $user_id;
+    $taskData[1] = $taskData['project_id'];
+@@ -495,6 +509,15 @@
+    $taskData[2] = $taskData['item_summary'];
+    $taskData[3] = $taskData['detailed_desc'];
+ 
++   if (empty($taskData['product_category']))
++	$taskData['product_category'] = 0;
++   if (empty($taskData['product_version']))
++	$taskData['product_version'] = 0;
++   if (empty($taskData['operating_system']))
++	$taskData['operating_system'] = 0;
++   if (empty($taskData['task_severity']))
++	$taskData['task_severity'] = 1;
++
+    $taskData[4] = $taskData['task_type'];
+    $taskData[5] = $taskData['product_category'];
+    $taskData[6] = $taskData['product_version'];
+@@ -515,13 +538,19 @@
+    // data should now be loaded
+ 
+ 
++   $proj = new Project($taskData['project_id']);
++   $proj->checkExists();
+ 
++   // Get the user's permissions for the project this task belongs to
++   $user->get_perms($proj);
++   $permissions = $user->perms;
++
+    // get permissions for the project
+-   $project_prefs = $fs->GetProjectPrefs($taskData['project_id']);
++   $project_prefs = $proj->prefs;
+ 
+    // check permissions here rather than waiting until we get to
+    // the backend module. Saves time and effort
+-   if ($permissions['open_new_tasks'] != '1' && $project_prefs['anon_open'] != '1') {
++   if (!$user->can_open_task($proj)) {
+       return new xmlrpcresp (0,PERMISSION_DENIED, 'You do not have permission to perform this function.');
+    }
+ 
+@@ -558,6 +587,7 @@
+ {
+    global $fs;
+    global $db;
++   global $user;
+    include_once('includes/notify.inc.php');
+    $notify = new Notifications;
+ 
+@@ -577,11 +607,13 @@
+       return loginErrorResponse();
+    }
+ 
++   $user = new User($user_id);
++
+    // Get the task details
+    $task_details = @$fs->getTaskDetails($task_id);
+ 
+    // Get the user's permissions for the project this task belongs to
+-   $permissions = $fs->getPermissions($user_id, $task_details['attached_to_project']);
++   $permissions = $user->perms;
+ 
+    // If the task doesn't exist, stop.
+    if (!is_numeric($task_details['task_id']))
+@@ -655,6 +687,7 @@
+ {
+    global $fs;
+    global $db;
++   global $user;
+ 
+    $req_user   = php_xmlrpc_decode($args->getParam(2));
+ 
+@@ -668,8 +701,10 @@
+       return loginErrorResponse();
+    }
+ 
++   $user = new User($user_id);
++
+    // Get the user's permissions
+-   $permissions = $fs->getPermissions($user_id, true);
++   $permissions = $user->perms;
+ 
+    if ($permissions['is_admin'] == '1' or $user_id == $req_user)
+    {

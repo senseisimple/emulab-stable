@@ -1,0 +1,281 @@
+
+Fixes for misc. scripts.
+
+  * Remove a bogus check.
+  * Add support for xlogin from boss.
+  * Fix SQL syntax errors.
+  * Move notification to the right place.
+  * Allow the current project to be specified with the project_title arg.
+
+
+Index: scripts/index.php
+===================================================================
+--- scripts/index.php	(revision 502)
++++ scripts/index.php	(working copy)
+@@ -10,10 +10,6 @@
+     $fs->Redirect( $fs->CreateURL('error', null) );
+ }
+ 
+-if (Get::val('project') === '0' && !$user->perms['global_view']) {
+-    $fs->Redirect( $fs->CreateURL('error', null) );
+-}
+-
+ // First, the obligatory language packs
+ $fs->get_language_pack('index');
+ $fs->get_language_pack('details');
+Index: scripts/authenticate.php
+===================================================================
+--- scripts/authenticate.php	(revision 502)
++++ scripts/authenticate.php	(working copy)
+@@ -58,6 +58,33 @@
+ 
+         $_SESSION['SUCCESS'] = $authenticate_text['loginsuccessful'];
+     }
++} elseif (Req::has('username') && Req::has('bosscred')) {
++    $username = Req::val('username');
++    $bosscred = Req::val('bosscred');
++
++    if (($user_id = $fs->checkXLogin($username, $bosscred))) {
++	$cookie_time = 0;
++	$user = new User($user_id);
++
++	// Set a couple of cookies
++	$fs->setcookie('flyspray_userid',
++		  $user->id, $cookie_time);
++	$fs->setcookie('flyspray_passhash',
++		  crypt($user->infos['user_pass'], $conf['general']['cookiesalt']), $cookie_time);
++	Cookie::clr('flyspray_project');
++	$fs->setcookie('flyspray_project',  '', time()-60);
++
++	$remove_magic = $db->Query("UPDATE {users} SET cred=NULL ".
++				   "WHERE user_id = ?",
++				   array($user->id)
++				   );
++
++	$_SESSION['SUCCESS'] = $authenticate_text['loginsuccessful'];
++    }
++    else {
++        $_SESSION['ERROR'] = $authenticate_text['loginfailed'];
++        $fs->redirect(Req::val('prev_page'));
++    }
+ }
+ else {
+     // If the user didn't provide both a username and a password, show this error:
+Index: scripts/depends.php
+===================================================================
+--- scripts/depends.php	(revision 502)
++++ scripts/depends.php	(working copy)
+@@ -71,11 +71,11 @@
+              t2.closure_comment AS com2, u2c.real_name AS clsdby2,
+              r2.resolution_name as res2
+        FROM  {dependencies} AS d
+-       JOIN  {tasks} AS t1 ON d.task_id=t1.task_id
++  INNER JOIN  {tasks} AS t1 ON d.task_id=t1.task_id
+   LEFT JOIN  {users} AS u1a ON t1.assigned_to=u1a.user_id
+   LEFT JOIN  {users} AS u1c ON t1.closed_by=u1c.user_id
+   LEFT JOIN  {list_resolution} AS r1 ON t1.resolution_reason=r1.resolution_id
+-       JOIN  {tasks} AS t2 ON d.dep_task_id=t2.task_id
++  INNER JOIN  {tasks} AS t2 ON d.dep_task_id=t2.task_id
+   LEFT JOIN  {users} AS u2a ON t2.assigned_to=u2a.user_id
+   LEFT JOIN  {users} AS u2c ON t2.closed_by=u2c.user_id
+   LEFT JOIN  {list_resolution} AS r2 ON t2.resolution_reason=r2.resolution_id
+Index: scripts/modify.php
+===================================================================
+--- scripts/modify.php	(revision 502)
++++ scripts/modify.php	(working copy)
+@@ -67,7 +67,7 @@
+                                attached_to_project, item_summary,
+                                detailed_desc, opened_by,
+                                percent_complete, $sql_params )
+-                     VALUES  ( ?, ?, $sql_placeholder)", $sql_values);
++                     VALUES  ($sql_placeholder)", $sql_values);
+ 
+     // Now, let's get the task_id back, so that we can send a direct link
+     // URL in the notification message
+@@ -114,11 +114,11 @@
+                          VALUES  (?, ?)", array($task_id, $owner));
+ 
+         $fs->logEvent($task_id, 9, $owner);
+-
+-        // Create the Notification
+-        $notify->Create('1', $task_id);
+     }
+ 
++    // Create the Notification
++    $notify->Create('1', $task_id);
++
+     // If the reporter wanted to be added to the notification list
+     if (Post::val('notifyme') == '1' && $user->id != $owner) {
+         $be->AddToNotifyList($user->id, $task_id);
+Index: includes/class.backend.php
+===================================================================
+--- includes/class.backend.php	(revision 502)
++++ includes/class.backend.php	(working copy)
+@@ -139,7 +139,7 @@
+                         $_FILES['userfile']['type'][$key],
+                         $_FILES['userfile']['size'][$key],
+                         $_FILES['userfile']['name'][$key],
+-                        $user->id), time());
++                        $user->id, time()));
+ 
+             // Fetch the attachment id for the history log
+             $result = $db->Query("SELECT  attachment_id
+@@ -326,6 +326,12 @@
+       // End of checking if there's a category owner set, and notifying them.
+       }
+ 
++      if ($user->id != $owner) {
++         $this->AddToNotifyList($user->id, $task_id);
++      }
++
++      $notify->Create('1', $taskid);
++
+       // give some information back
+       return $task_details;
+ 
+Index: includes/class.gpc.php
+===================================================================
+--- includes/class.gpc.php	(revision 502)
++++ includes/class.gpc.php	(working copy)
+@@ -54,6 +54,11 @@
+ 
+ class Cookie
+ {
++    function clr($key)
++    {
++	unset($_COOKIE[$key]);
++    }
++
+     function has($key)
+     {
+         return isset($_COOKIE[$key]) && $_COOKIE[$key] !== '';
+Index: includes/class.user.php
+===================================================================
+--- includes/class.user.php	(revision 502)
++++ includes/class.user.php	(working copy)
+@@ -13,7 +13,7 @@
+         $sql = $db->Query("SELECT  *, g.group_id AS global_group,
+                                    uig.record_id AS global_record_id
+                              FROM  {users}           u
+-                       INNER JOIN  {users_in_groups} uig
++                             JOIN  {users_in_groups} uig
+                        INNER JOIN  {groups}          g   ON uig.group_id = g.group_id
+                             WHERE  u.user_id = ? AND g.belongs_to_project = '0'",
+                     array($uid));
+@@ -68,7 +68,7 @@
+ 
+             // Get the global group permissions for the current user
+             $sql = $db->Query("SELECT  ".join(', ', $max).",
+-                                       MAX(IF(g.belongs_to_project, view_tasks, 0)) AS global_view
++                                       MAX(IF(g.belongs_to_project = 0, g.view_tasks, 0)) AS global_view
+                                  FROM  {groups} g
+                             LEFT JOIN  {users_in_groups} uig ON g.group_id = uig.group_id
+                                 WHERE  uig.user_id = ?  AND
+@@ -117,7 +117,7 @@
+     function can_create_group()
+     {
+         return $this->perms['is_admin']
+-            || ($this->perms['manage_project'] && !Get::val('project'));
++            || ($this->perms['manage_project'] && Get::val('project'));
+     }
+ 
+     function can_edit_comment($comment)
+Index: includes/functions.inc.php
+===================================================================
+--- includes/functions.inc.php	(revision 502)
++++ includes/functions.inc.php	(working copy)
+@@ -139,7 +139,8 @@
+                                           uo.real_name      AS opened_by_name,
+                                           ue.real_name      AS last_edited_by_name,
+                                           uc.real_name      AS closed_by_name,
+-                                          ua.real_name      AS assigned_to_name
++                                          ua.real_name      AS assigned_to_name,
++					  t.date_closed     AS date_closed
+                                     FROM  {tasks}              t
+                                LEFT JOIN  {projects}           p  ON t.attached_to_project = p.project_id
+                                LEFT JOIN  {list_category}      c  ON t.product_category = c.category_id
+@@ -475,12 +476,9 @@
+             case 32:
+                 $password = md5($password);
+                 break;
+-            case 13:
++            default:
+                 $password = crypt($password, $auth_details['user_pass']); //using the salt from db
+                 break;
+-            default:
+-                //unknown encryption!?
+-                return false;
+         }
+ 
+         // Compare the crypted password to the one in the database
+@@ -494,7 +492,38 @@
+         return false;
+     }
+ 
++   // This function checks if a user provided the right credentials
++   function checkXLogin($username, $cred)
++   {
++      global $db;
++      global $dbprefix;
+ 
++      $result = $db->Query("SELECT uig.*, g.group_open, u.account_enabled,
++			    u.cred FROM {users_in_groups} uig
++                            LEFT JOIN {groups} g ON uig.group_id = g.group_id
++                            LEFT JOIN {users} u ON uig.user_id = u.user_id
++                            WHERE u.user_name = ? AND g.belongs_to_project = ?
++                            ORDER BY g.group_id ASC",
++                            array($username, '0'));
++
++      $auth_details = $db->FetchArray($result);
++
++      // Compare the credential to the one in the database
++      if ($cred == $auth_details['cred']
++         && $auth_details['account_enabled'] == '1'
++         && $auth_details['group_open'] == '1')
++      {
++         return $auth_details['user_id'];
++
++      } else
++      {
++         return false;
++      }
++
++   // End of checkXLogin function
++   }
++
++
+     function setCookie($name, $val, $time)
+     {
+         global $baseurl;
+@@ -587,7 +616,7 @@
+             case 'newtask':   return $url . '&project=' . $arg1;
+ 
+             case 'editgroup':
+-            case 'projgroup': return $conf['general']['baseurl'] . '?do=admin&area=editgroup&id=' . $arg1;
++            case 'projgroup': return $conf['general']['baseurl'] . '?do=pm&area=editgroup&id=' . $arg1;
+ 
+             case 'error':
+             case 'lostpw':
+Index: header.php
+===================================================================
+--- header.php  (revision 502)
++++ header.php  (working copy)
+@@ -49,6 +49,18 @@
+     // Determine which project we want to see
+     if (Req::val('project')) {
+         $project_id = Req::val('project');
++    } elseif (Req::has('project_title')) {
++       $get_pid = $db->Query("SELECT project_id
++                              FROM {projects}
++                              WHERE project_title = ?",
++                              Req::val('project_title'));
++      if ($db->CountRows($get_pid) != 1)
++        $project_id = 0;
++      else
++      {
++        $row = $db->FetchArray($get_pid);
++        $project_id = $row['project_id'];
++      }
+     } else {
+         $project_id = Req::val('project_id', Cookie::val('flyspray_project',
+                     $fs->prefs['default_project']));

@@ -1,0 +1,24 @@
+
+Performance tweak for a slow SQL statement.
+
+Index: index.php
+===================================================================
+--- index.php	(revision 502)
++++ index.php	(working copy)
+@@ -130,10 +130,12 @@
+     // or, if the user is logged in
+     $sql = $db->Query(
+             "SELECT  p.project_id, p.project_title
+-               FROM  {projects} p
+-          LEFT JOIN  {groups} g ON p.project_id=g.belongs_to_project AND g.view_tasks=1
+-          LEFT JOIN  {users_in_groups} uig ON uig.group_id = g.group_id AND uig.user_id = ?
+-              WHERE  p.project_is_active='1' AND (p.others_view OR uig.user_id IS NOT NULL)
++               FROM  {users_in_groups} uig
++          LEFT JOIN  {groups} g ON uig.group_id = g.group_id
++          LEFT JOIN  {projects} p ON g.belongs_to_project = p.project_id
++              WHERE  uig.user_id = ? AND p.project_is_active='1' AND 
++		     g.view_tasks='1' AND
++		     (p.others_view OR uig.user_id IS NOT NULL)
+            ORDER BY  p.project_title", array($user->id));
+ }
+ else {

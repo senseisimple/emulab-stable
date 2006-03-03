@@ -1,0 +1,241 @@
+
+Adapt the default "Bluey" theme to make it Emulab friendly.
+
+  * Change out the flyspray header with the emulab one.
+  * Make disabled form fields look disabled.
+  * Hide the logout button.
+
+
+Index: themes/Bluey/theme.css
+===================================================================
+--- themes/Bluey/theme.css	(revision 502)
++++ themes/Bluey/theme.css	(working copy)
+@@ -49,11 +49,10 @@
+ 
+ /* the main title; h1 alone is also used in the popup windows. */
+ h1#title {
+-   background:#47617b url("title.png") no-repeat;
+-   height:45px;
++   background:#ffffff url("http://www.emulab.net/headerbgbb.jpg") repeat;
++   height:100px;
+    margin:0;
+-   padding:1ex 0;
+-   text-indent:-9000px;
++   padding:0 0;
+ }
+ 
+ h2 {
+@@ -86,6 +85,14 @@
+    margin:2px;
+ }
+ 
++input.disabled, textarea.disabled, select.disabled, button.disabled {
++   background-color     : #dde6ee;
++   color                : #02007e;
++   border               : 1px ridge #000000;
++   margin               : 2px;
++   font-size            : 100%;
++}
++
+ textarea {
+    width:95%;
+ }
+@@ -290,6 +297,13 @@
+    margin:3px 0 0;
+ }
+ 
++div#search select.disabled,div#search input.disabled {
++   background-color     : #dde6ee;
++   color                : #02007e;
++   border               : 1px ridge #000000;
++   margin               : 3px 0 0;
++}
++
+ div#search input.mainbutton {
+    color:#FFF;
+ }
+@@ -1030,4 +1044,8 @@
+ table.requests td {
+     border:solid 1px black;
+     padding:0.2em 0.5em;
+-}
+\ No newline at end of file
++}
++
++#logoutlink {
++    visibility: hidden;
++}
+Index: templates/common.profile.tpl
+===================================================================
+--- templates/common.profile.tpl	(revision 502)
++++ templates/common.profile.tpl	(working copy)
+@@ -4,15 +4,23 @@
+       <tr>
+         <td><label for="realname">{$admin_text['realname']}</label></td>
+         <td>
++	  <?php if (0): ?>
+           <input id="realname" type="text" name="real_name" size="50" maxlength="100"
+             value="{$theuser->infos['real_name']}" />
++	  <?php else: ?>
++	  {$theuser->infos['real_name']}
++	  <?php endif; ?>
+         </td>
+       </tr>
+       <tr>
+         <td><label for="emailaddress">{$admin_text['emailaddress']}</label></td>
+         <td>
++	  <?php if (0): ?>
+           <input id="emailaddress" type="text" name="email_address" size="50" maxlength="100"
+             value="{$theuser->infos['email_address']}" />
++	  <?php else: ?>
++	  {$theuser->infos['email_address']}
++	  <?php endif; ?>
+         </td>
+       </tr>
+       <tr>
+@@ -71,6 +79,7 @@
+         </td>
+       </tr>
+       <?php endif; ?>
++      <?php if (0): ?>
+       <tr>
+         <td colspan="2"><hr /></td>
+       </tr>
+@@ -82,6 +91,7 @@
+         <td><label for="confirmpass">{$admin_text['confirmpass']}</label></td>
+         <td><input id="confirmpass" type="password" name="confirmpass" size="40" maxlength="100" /></td>
+       </tr>
++      <?php endif; ?>
+       <tr>
+         <td colspan="2" class="buttons">
+           <input type="hidden" name="do" value="modify" />
+@@ -93,4 +103,4 @@
+       </tr>
+     </table>
+   </form>
+-</fieldset>
+\ No newline at end of file
++</fieldset>
+Index: templates/common.groups.tpl
+===================================================================
+--- templates/common.groups.tpl	(revision 502)
++++ templates/common.groups.tpl	(working copy)
+@@ -45,7 +45,7 @@
+ </form>
+ <?php endforeach; ?>
+ 
+-<?php if ($proj->id): ?>
++<?php if (0 && $proj->id): ?>
+ <form action="{$baseurl}" method="post">
+   <div>
+     <input type="hidden" name="do" value="modify" />
+Index: templates/links.tpl
+===================================================================
+--- templates/links.tpl	(revision 502)
++++ templates/links.tpl	(working copy)
+@@ -5,7 +5,7 @@
+ 	<a href="{$fs->CreateURL('myprofile', null)}" title="{$language['editmydetails']}">
+ 	  <em>{$user->infos['real_name']} ({$user->infos['user_name']})</em>
+ 	</a>
+-	<div id="permissions">
++	<div id="permissions" onmouseout='perms.do_later("hide")'>
+ 	  {!tpl_draw_perms($user->perms)}
+ 	</div>
+   </li>
+Index: templates/header.tpl
+===================================================================
+--- templates/header.tpl	(revision 502)
++++ templates/header.tpl	(working copy)
+@@ -1,7 +1,7 @@
+ <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+ <html xmlns="http://www.w3.org/1999/xhtml" lang="{$language['locale']}" xml:lang="{$language['locale']}">
+   <head>
+-    <title>Flyspray::&nbsp;&nbsp;{$proj->prefs['project_title']}:&nbsp;&nbsp;</title>
++    <title>Flyspray::{$proj->prefs['project_title']}:</title>
+ 
+     <meta name="description" content="Flyspray, a Bug Tracking System written in PHP." />
+     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+@@ -32,7 +32,7 @@
+   </head>
+   <body onload="perms = new Perms('permissions')">
+     <!-- Remove this to remove the logo -->
+-    <h1 id="title">{$proj->prefs['project_title']}</h1>
++    <h1 id="title"><a href="https://www.emulab.net"><img src="https://www.emulab.net/overlay.emulab.net.gif" border=0></a></h1>
+     <?php
+     if ($user->isAnon()):
+         $this->display('loginbox.tpl');
+@@ -83,4 +83,8 @@
+         </form>
+       </div>
+ 
++      <?php if (Get::val('project') == '0'): ?>
++      <div id="intromessage">This is the bug listing for all projects.<br></div>
++      <?php else: ?>
+       <div id="intromessage">{!@$intro_message}</div>
++      <?php endif; ?>
+Index: templates/newtask.tpl
+===================================================================
+--- templates/newtask.tpl	(revision 502)
++++ templates/newtask.tpl	(working copy)
+@@ -34,7 +34,7 @@
+         <tr>
+           <td><label for="status">{$newtask_text['status']}</label></td>
+           <td>
+-            <select id="status" name="item_status" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled"';?>>
++            <select id="status" name="item_status" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled" class="disabled"';?>>
+               {!tpl_options($status_list, 2)}
+             </select>
+           </td>
+@@ -49,7 +49,7 @@
+             <label for="assignedto">{$newtask_text['assignedto']}</label>
+           </td>
+           <td>
+-            <select id="assignedto" name="assigned_to" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled"';?>>
++            <select id="assignedto" name="assigned_to" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled" class="disabled"';?>>
+               <option value="0">{$newtask_text['noone']}</option>
+               <?php $fs->ListUsers($proj->id); ?>
+             </select>
+@@ -79,7 +79,7 @@
+         <tr>
+           <td><label for="priority">{$newtask_text['priority']}</label></td>
+           <td>
+-            <select id="priority" name="task_priority" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled"';?>>
++            <select id="priority" name="task_priority" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled" class="disabled"';?>>
+               {!tpl_options($priority_list, 2)}
+             </select>
+           </td>
+@@ -95,7 +95,7 @@
+         <tr>
+           <td><label for="dueversion">{$newtask_text['dueinversion']}</label></td>
+           <td>
+-            <select id="dueversion" name="closedby_version" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled"';?>>
++            <select id="dueversion" name="closedby_version" <?php if (!$user->perms['modify_all_tasks']) echo ' disabled="disabled" class="disabled"';?>>
+               <option value="">{$newtask_text['undecided']}</option>
+               {!tpl_options($proj->listVersions(false, 3))}
+             </select>
+Index: includes/class.tpl.php
+===================================================================
+--- includes/class.tpl.php	(revision 502)
++++ includes/class.tpl.php	(working copy)
+@@ -370,7 +370,7 @@
+ function tpl_disableif($if)
+ {
+     if ($if) {
+-        return 'disabled="disabled"';
++        return 'disabled="disabled" class="disabled"';
+     }
+ }
+ 
+Index: includes/perms.js
+===================================================================
+--- includes/perms.js	(revision 502)
++++ includes/perms.js	(working copy)
+@@ -19,7 +19,7 @@
+ Perms.prototype.do_later = function(action) {
+     this.clearTimeout();
+     closure = createClosure(this, action);
+-    this.timeout = setTimeout(closure, 1000);
++    this.timeout = setTimeout(closure, 250);
+ }
+ 
+ Perms.prototype.show = function() {

@@ -1,0 +1,164 @@
+
+Tweaks for notification stuff:
+
+  * Put mail addresses in the To: header so mailman doesn't get upset.
+  * Add meaningful subject lines, even though they aren't localized.
+  * Squelch notifications for some events.
+
+
+Index: includes/notify.inc.php
+===================================================================
+--- includes/notify.inc.php	(revision 502)
++++ includes/notify.inc.php	(working copy)
+@@ -27,9 +27,9 @@
+ 
+    // This function is the wrapper for the others in this class
+    // It addresses, creates and stores/sends the notifications
+-   function Create ( $type, $task_id, $info )
++   function Create ( $type, $task_id, $info = '')
+    {
+-      $to = $this->Address($task_id);
++      $to = $this->Address($type, $task_id);
+       $msg = $this->GenerateMsg($type, $task_id, $info);
+       $this->SendEmail($to[0], $msg[0], $msg[1]);
+       $this->StoreJabber($to[1], $msg[0], $msg[1]);
+@@ -271,11 +271,11 @@
+ 
+       if (is_array($to))
+       {
+-         $mail->AddAddress($fs->prefs['admin_email']);
++         // $mail->AddAddress($fs->prefs['admin_email']);
+          foreach ($to as $key => $val)
+          {
+             // Unlike the docs say, it *does (appear to)* work with mail()
+-            $mail->AddBcc($val);                        // Add each address
++            $mail->AddAddress($val);                        // Add each address
+          }
+ 
+       } else {
+@@ -361,6 +361,8 @@
+       ///////////////////////////////////////////////////////////////
+       if ($type == '1')
+       {
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " '" . $task_details['item_summary'] . "' opened";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .=  $notify_text['newtaskopened'] . "\n\n";
+          $body .= $notify_text['userwho'] . ' - ' . $user->infos['real_name'] . ' (' . $user->infos['user_name'] . ")\n\n";
+@@ -389,6 +391,9 @@
+       //////////////////////////
+       if ($type == '2')
+       {
++         // Generate the nofication message
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " changed";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .= $notify_text['taskchanged'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -420,6 +425,9 @@
+       /////////////////
+       if ($type == '3')
+       {
++         // Generate the nofication message
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " closed";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .=  $notify_text['taskclosed'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -444,6 +452,8 @@
+       ////////////////////
+       if ($type == '4')
+       {
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " re-opened";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .=  $notify_text['taskreopened'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -460,8 +470,11 @@
+       //////////////////////
+       if ($type == '5')
+       {
++         // Generate the nofication message
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " dependency added";
++
+          $depend_task = $fs->getTaskDetails($arg1);
+-        
++	 
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .=  $notify_text['depadded'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -481,6 +494,9 @@
+       ////////////////////////
+       if ($type == '6')
+       {
++         // Generate the nofication message
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " dependency removed";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .= $notify_text['depremoved'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -508,6 +524,9 @@
+                              );
+          $comment = $db->FetchArray($result);
+ 
++         // Generate the nofication message
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " comment added";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .= $notify_text['commentadded'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -532,6 +551,8 @@
+       //////////////////////
+       if ($type == '8')
+       {
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " attachment added";
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .= $notify_text['attachmentadded'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -548,6 +569,7 @@
+       ////////////////////////
+       if ($type == '9')
+       {
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " related task added";
+          $related_task = $fs->getTaskDetails($arg1);
+ 
+          $body = $notify_text['donotreply'] . "\n\n";
+@@ -569,6 +591,8 @@
+       /////////////////////
+       if ($type == '10')
+       {
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " assigned to " . $task_details['assigned_to_name'];
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .= $task_details['assigned_to_name'] . ' ' . $notify_text['takenownership'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n\n";
+@@ -635,6 +659,8 @@
+       //////////////////
+       if ($type == '14')
+       {
++         $subject = $proj->prefs['project_title'] . " FS#" . $task_id . " assigned to " . $current_user['user_name'];
++
+          $body = $notify_text['donotreply'] . "\n\n";
+          $body .= $notify_text['assignedtoyou'] . "\n\n";
+          $body .= 'FS#' . $task_id . ' - ' . $task_details['item_summary'] . "\n";
+@@ -706,7 +732,7 @@
+ 
+ 
+    // This sends a notification to multiple users, usually from the notifications tab on a task
+-   function Address($task_id)
++   function Address($type, $task_id)
+    {
+       global $db;
+       global $fs;
+@@ -772,7 +798,9 @@
+       // Now, we add the project contact addresses...
+       // ...but only if the task is public
+       $task_details = $fs->getTaskDetails($task_id);
+-      if ($task_details['mark_private'] != '1')
++      if (($task_details['mark_private'] != '1') &&
++	  (($type == 1) || ($type == 3) || ($type == 4) || ($type == 10) ||
++	   ($type == 14)))
+       {
+          $proj_emails = explode(",", $proj->prefs['notify_email']);
+          $proj_jids = explode(",", $proj->prefs['notify_jabber']);
