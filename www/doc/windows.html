@@ -39,7 +39,8 @@
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
   <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
-  <li> <a href="#Changes"> Change Log </a></li>
+  <li> <a href="#Changes"> Change Log </a>
+         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
   <li> <a href="#Future"> Future Work </a></li>
 </ol>
 
@@ -978,12 +979,18 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
   <li>
     The -UPDATE images include the most recent round of Microsoft patches,
     plugging both known WMF holes and many others.  The -SP* images of course
-    DON'T have the holes plugged, but that is no different from before.
-  </li>
+    <b>don't</b> have the WMF holes plugged, but that's no different from before.
+  </li><br>
+
+  <li>
+    When making <a href="#Custom_images">custom Windows images</a>, the
+    <code>prepare</code> script now requires you to set your own
+    <code>root</code> password.
+  </li><br>
 
   <li>
     Within the Emulab code, these images restore linktest to working condition.
-  </li>
+  </li><br>
 
   <li>
     The other changes are intended to make Windows booting and setup more reliable.
@@ -994,7 +1001,7 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
     do you much good to try to log in before accounts are set up anyway...  In
     case of trouble, log in via RDP or the serial console, and say "net start
     sshd" in a shell.
-  </li>
+  </li><br>
 
   <li>
     I've also been chasing a random problem where one of the network
@@ -1002,7 +1009,7 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
     startup.  rc.cygwin/rc.ifconfig now work harder at resetting the
     interfaces, and reboot as a last resort if that fails.  It seems that
     fixing one interface can make the problem move to another one though.
-    Unless you use all five available experimental network interfaces in an
+    Unless you use all four available experimental network interfaces in an
     experiment topology, this should fix the problem.
   </li>
 </ul>
