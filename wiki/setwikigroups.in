@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -47,6 +47,9 @@ $| = 1;
 use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
+
+# Protos
+sub fatal($);
 
 #
 # We don't want to run this script unless its the real version.
