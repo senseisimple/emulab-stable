@@ -1,0 +1,50 @@
+How we will generate sql
+------------------------
+To make viewing data easy, we will duplicate packet data amongst several
+subtables for each packet type.
+
+For packets that do not use arrays, there's really no problem.  Each field
+becomes a column.  Structures are flattened out (but column names reflect the
+struct -- just as mig does the transform).  Unions will act the same way here.
+
+However, when packets use arrays, we need to provide a good way to view the
+"list"-type data.  Motelab handles this by dumping the whole byte array into a
+blob column.  We can do better.  There are a variety of options.  First, we can
+smash the byte data into a string of basic types or tuples.  We can store this
+string either in a column next to the blob, and provide VIEWs to help the user
+see what they want.  Second, we can fragment the msg table: non-array fields
+become separate tables, with parent packet ids and index values.  This provides
+a clean sql way to extract data programmatically (via a join on the parent
+packet table), but is less nice visually.  Of course, for multiple arrays, the
+join will become uglier.  Third, we can smash out each item into a single
+column in the case of a basic type, or a set of columns for a struct.  However,
+this simply creates a MASSIVELY long table, which is not visually helpful
+either.  This, in fact, is a TERRIBLE option.
+
+So, what to do?  Well, we have to make the original data available to users.
+That (and motelab compat) require us to have BLOB types for array bytes.
+However, this may not be our default VIEW.  We will also smash the data into
+string tuples.  Should we put this in the same table with the blob(s)?  I tend
+to think no, since you will never want to view both at the same time.  Perhaps
+they should go in the same table anyway, and we should provide VIEWs
+corresponding to what they might want to see.  This is easier and reduces the
+number of tables per logging set.  Plus, we then only have to create a table
+for each array to join on the main type table.  We can provide VIEWs to do this
+which hide the join complexity.
+
+So, there will be a lot of tables (because VIEWs show up as tables) per
+discrete run of the logger.  Thus, we need a master table that helps the
+experimenter keep track of a binding between their description of what the
+logging run means, and the numeric id attached to each table.  This makes joins
+impossible as far as I know (can't somehow interpolate the id into a select as
+far as I know).  But that's ok; that info is just there for experimenter help.
+We will provide an outside command that lists which numeric IDs mean what
+descriptions/runs.  For each VIEW we provide, we'll also append a "_latest" tag
+on the back, which we will programmatically bind to the new table data every
+time a new run is started.
+
+For now, the "numeric" id will be a random number, OR an experimenter-assigned
+tag (may be alphanumeric).  Thus, the ID in the map table must be a varchar.
+If they don't make it unique, we'll reuse the old tables!
+
+
