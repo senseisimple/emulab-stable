@@ -1182,7 +1182,7 @@ COMMAND_PROTOTYPE(doifconfig)
 	/*
 	 * Find all the interfaces.
 	 */
-	res = mydb_query("select i.card,i.IP,i.IPalias,i.MAC,i.current_speed,"
+	res = mydb_query("select i.card,i.IP,i.MAC,i.current_speed,"
 			 "       i.duplex,i.IPaliases,i.iface,i.role,i.mask,"
 			 "       i.rtabid,i.interface_type,vl.vname "
 			 "  from interfaces as i "
@@ -1190,7 +1190,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			 "  vl.pid='%s' and vl.eid='%s' and "
 			 "  vl.vnode='%s' and vl.ip=i.IP "
 			 "where i.node_id='%s' and %s",
-			 13, reqp->pid, reqp->eid, reqp->nickname,
+			 12, reqp->pid, reqp->eid, reqp->nickname,
 			 reqp->issubnode ? reqp->nodeid : reqp->pnodeid,
 			 clause);
 
@@ -1210,10 +1210,10 @@ COMMAND_PROTOTYPE(doifconfig)
 		row = mysql_fetch_row(res);
 		if (row[1] && row[1][0]) {
 			int  card    = atoi(row[0]);
-			char *iface  = row[7];
-			char *role   = row[8];
-			char *type   = row[11];
-			char *lan    = row[12];
+			char *iface  = row[6];
+			char *role   = row[7];
+			char *type   = row[10];
+			char *lan    = row[11];
 			char *speed  = "100";
 			char *unit   = "Mbps";
 			char *duplex = "full";
@@ -1225,15 +1225,15 @@ COMMAND_PROTOTYPE(doifconfig)
 				goto skipit;
 
 			/* Do this after above test to avoid error in log */
-			mask = CHECKMASK(row[9]);
+			mask = CHECKMASK(row[8]);
 
 			/*
 			 * Speed and duplex if not the default.
 			 */
+			if (row[3] && row[3][0])
+				speed = row[3];
 			if (row[4] && row[4][0])
-				speed = row[4];
-			if (row[5] && row[5][0])
-				duplex = row[5];
+				duplex = row[4];
 
 			/*
 			 * We now use the MAC to determine the interface, but
@@ -1251,14 +1251,14 @@ COMMAND_PROTOTYPE(doifconfig)
 
 			bufp += OUTPUT(bufp, ebufp - bufp,
 				"INET=%s MASK=%s MAC=%s SPEED=%s%s DUPLEX=%s",
-				row[1], mask, row[3], speed, unit, duplex);
+				row[1], mask, row[2], speed, unit, duplex);
 
 			/* Tack on IPaliases */
 			if (vers >= 8) {
 				char *aliases = "";
 				
-				if (row[6] && row[6][0])
-					aliases = row[6];
+				if (row[5] && row[5][0])
+					aliases = row[5];
 
 				bufp += OUTPUT(bufp, ebufp - bufp,
 					       " IPALIASES=\"%s\"", aliases);
@@ -1276,7 +1276,7 @@ COMMAND_PROTOTYPE(doifconfig)
 			}
 			if (vers >= 14) {
 				bufp += OUTPUT(bufp, ebufp - bufp,
-					       " RTABID=%s", row[10]);
+					       " RTABID=%s", row[9]);
 			}
 			if (vers >= 17) {
 				bufp += OUTPUT(bufp, ebufp - bufp,
