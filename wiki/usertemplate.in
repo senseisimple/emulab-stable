@@ -17,12 +17,13 @@ __Permissions (leave these alone unless you know what you are doing, or ask us)_
 
 %INCLUDE{"Emulab.UserPermNotes"}%
 
-
+<!--
 __Personal Preferences (details in %TWIKIWEB%.TWikiVariables)__
 	* Horizontal size of text edit box:
 		* Set EDITBOXWIDTH = 70
 	* Vertical size of text edit box:
 		* Set EDITBOXHEIGHT = 17
 	* Default state of the __link__ check box in the attach file page:
-		* Set ATTACHLINKBOX = 
+		* Set ATTACHLINKBOX =
+ --!>
 </font>
