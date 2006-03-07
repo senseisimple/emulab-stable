@@ -6,6 +6,7 @@
  *
  ****************************************************************************/
 
+
 #include "stub.h"
 
 /*
@@ -18,17 +19,26 @@ extern int optopt;
 extern int opterr;
 extern int optreset;
 
+void clean_exit(int);
+void append_delay_sample(int path_id, long sample_value);
+
 //Global  
 short  flag_debug, flag_standalone;
 char sniff_interface[128];
 connection rcvdb[CONCURRENT_RECEIVERS];
 unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 unsigned long last_delays[CONCURRENT_RECEIVERS];
+delay_record delay_records[CONCURRENT_RECEIVERS]; //delay list is calculated at the sender side
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
+int last_through[CONCURRENT_RECEIVERS]; 
+int flag_testmode=0;
+enum {TEST_NOTTESTING, TEST_NOTSTARTED, TEST_RUNNING, TEST_DONE } test_state;
+unsigned long long total_bytes = 0;
 
 connection snddb[CONCURRENT_SENDERS];
 fd_set read_fds,write_fds;
+
 
 int maxfd;
 
@@ -48,8 +58,6 @@ typedef struct
   unsigned long ip;
   long delta;
   long size;
-  unsigned short source_port;
-  unsigned short dest_port;
 } packet_info;
 
 packet_buffer_node * packet_buffer_head;
@@ -114,30 +122,11 @@ packet_info packet_buffer_front(void)
   else
   {
     char * base = packet_buffer_head->buffer + packet_buffer_index;
-
-    // Get ip
     memcpy(&result.ip, base, SIZEOF_LONG);
-    base += SIZEOF_LONG;
-
-    // Get source port
-    memcpy(&result.source_port, base, sizeof(result.source_port));
-    result.source_port = ntohs(result.source_port);
-    base += sizeof(result.source_port);
-
-    // Get dest port
-    memcpy(&result.dest_port, base, sizeof(result.dest_port));
-    result.dest_port = ntohs(result.dest_port);
-    base += sizeof(result.dest_port);
-
-    // Get delta time
-    memcpy(&result.delta, base, SIZEOF_LONG);
+    memcpy(&result.delta, base + SIZEOF_LONG, SIZEOF_LONG);
     result.delta = ntohl(result.delta);
-    base += SIZEOF_LONG;
-
-    // Get size
-    memcpy(&result.size, base, SIZEOF_LONG);
+    memcpy(&result.size, base + SIZEOF_LONG + SIZEOF_LONG, SIZEOF_LONG);
     result.size = ntohl(result.size);
-    base += SIZEOF_LONG;
   }
   return result;
 }
@@ -151,7 +140,7 @@ int packet_buffer_more(void)
 // Move to the next packet, cleaning up as we go.
 void packet_buffer_advance(void)
 {
-  packet_buffer_index += 3*SIZEOF_LONG + 2*sizeof(unsigned short);
+  packet_buffer_index += 3*SIZEOF_LONG;
   if (packet_buffer_index >= packet_buffer_head->size)
   {
     packet_buffer_node * old_head = packet_buffer_head;
@@ -175,7 +164,95 @@ void init_random_buffer(void)
     random_buffer[i]=(char)(random()&0x000000ff);
   }
 }
-/*
+
+void copy_ulong(char **buf_ptr, ulong value, int flag_hton) {
+  ulong tmpulong;
+
+  if (flag_hton) {
+    tmpulong = htonl(value);
+  } else {
+    tmpulong = value;
+  }
+  memcpy(*buf_ptr, &tmpulong, SIZEOF_LONG);
+  (*buf_ptr) += SIZEOF_LONG;
+}  
+
+//Append a delay sample to the tail of the ith delay-record queue.
+void append_delay_sample(int path_id, long sample_value) {
+  delay_sample *sample = malloc(sizeof(delay_sample));
+  if (sample == NULL) {
+    perror("allocate");
+    clean_exit(1);
+  }
+  sample->next  = NULL;
+  sample->value = sample_value;
+  gettimeofday(&(sample->time), NULL);
+  if (delay_records[path_id].tail == NULL) {
+    delay_records[path_id].head = sample;
+    delay_records[path_id].tail = sample;
+  } else {
+    delay_records[path_id].tail->next = sample;
+    delay_records[path_id].tail = sample;
+  }
+  delay_records[path_id].sample_number++;
+}
+
+//Remove and return the delay samples.
+//Input: path_id.
+//Output: size.
+//Return: sample_buffer
+char *remove_delay_samples(int path_id, int *size) {
+  int i, number, msecs;
+  unsigned long interval;
+  char *sample_buffer, *buf_ptr;
+  struct timeval *last_tvp, *this_tvp;
+  delay_sample *samp_ptr;
+
+  number = delay_records[path_id].sample_number;
+  if (number == 0) return NULL;
+
+  *size = 3 * SIZEOF_LONG * (number+1);
+  sample_buffer = (char *) malloc(*size);
+  if (sample_buffer == NULL) {
+    perror("allocate");
+    clean_exit(1);
+  }
+  buf_ptr = sample_buffer;
+
+  //copy list size into the buffer
+  //format: ip, type, value
+  copy_ulong(&buf_ptr, rcvdb[path_id].ip, 0); //the receiver ip
+  copy_ulong(&buf_ptr, CODE_LIST_SIZE, 1);
+  copy_ulong(&buf_ptr, number, 1);
+
+  //copy the first delay into the buffer
+  //format: interval, type, value
+  samp_ptr = delay_records[path_id].head;
+  copy_ulong(&buf_ptr, 0L, 1); //zero interval
+  copy_ulong(&buf_ptr, CODE_LIST_DELAY, 1);
+  copy_ulong(&buf_ptr, samp_ptr->value, 1);
+  last_tvp = &(samp_ptr->time);
+
+  //copy the following delays
+  for (i=1; i<number; i++) {
+    samp_ptr = samp_ptr->next;
+    this_tvp = &(samp_ptr->time);
+    msecs = floor((this_tvp->tv_usec-last_tvp->tv_usec)/1000.0+0.5);
+    interval = (this_tvp->tv_sec-last_tvp->tv_sec)*1000 + msecs;
+    copy_ulong(&buf_ptr, interval, 1); //interval in msecs
+    copy_ulong(&buf_ptr, CODE_LIST_DELAY, 1);
+    copy_ulong(&buf_ptr, samp_ptr->value, 1);
+    last_tvp = &(samp_ptr->time);
+    free(delay_records[path_id].head); //release the i-1 delay_sample
+    delay_records[path_id].head = samp_ptr; //use head as the pre_ptr
+  }
+  free(delay_records[path_id].head); //release the last delay_sample
+  delay_records[path_id].head = NULL;
+  delay_records[path_id].tail = NULL;
+  delay_records[path_id].sample_number = 0;
+  return sample_buffer;
+}
+
 //Initialize or reset state varialbes related to a receiver connection
 void reset_rcv_entry(int i) {
   rcvdb[i].valid = 0;
@@ -185,31 +262,19 @@ void reset_rcv_entry(int i) {
   delays[i]=0;
   last_delays[i]=0;
 }
-*/
+
 void init(void) {
   int i;
   
-/*  for (i=0; i<CONCURRENT_RECEIVERS; i++){
+  for (i=0; i<CONCURRENT_RECEIVERS; i++){
     reset_rcv_entry(i);
   }
   for (i=0; i<CONCURRENT_SENDERS; i++){
     snddb[i].valid = 0;
-    }*/
-  for (i = 0; i < CONCURRENT_RECEIVERS; i++)
-  {
-      add_empty_receiver(i);
-      init_connection(& rcvdb[i]);
-  }
-  for (i = 0; i < CONCURRENT_SENDERS; i++)
-  {
-      add_empty_sender(i);
-      init_connection(& snddb[i]);
   }
 }
 
-/*
-int insert_db(unsigned long ip, unsigned short source_port,
-	      unsigned short dest_port, int sockfd, int dbtype) {
+int insert_db(unsigned long ip, int sockfd, int dbtype) {
   int i, record_number, next = -1;
   time_t now  = time(NULL); 
   double thisdiff, maxdiff = 0;
@@ -252,31 +317,23 @@ int insert_db(unsigned long ip, unsigned short source_port,
   }
   db[next].valid = 1;
   db[next].ip    = ip;
-  db[next].source_port = source_port;
-  db[next].dest_port = dest_port;
   db[next].sockfd= sockfd;
   db[next].last_usetime = now;
   db[next].pending = 0;
   return next;
 }
-*/
 
-/*
-int search_rcvdb(unsigned long indexip, unsigned short source_port,
-		 unsigned short dest_port){
+int search_rcvdb(unsigned long indexip){
   int i;
 
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
-    if (rcvdb[i].valid==1 && rcvdb[i].ip == indexip
-	&& rcvdb[i].source_port == source_port
-	&& rcvdb[i].dest_port == dest_port) {
+    if (rcvdb[i].valid==1 && rcvdb[i].ip == indexip) {
       rcvdb[i].last_usetime = time(NULL);
       return i;
     } 
   }
   return -1; //no sockfd is -1
 }
-*/
 
 void clean_exit(int code){
   int i;
@@ -295,13 +352,11 @@ void clean_exit(int code){
   exit(code);
 }
 
-/*
-int get_rcvdb_index(unsigned long destaddr, unsigned short source_port,
-		    unsigned short dest_port){
+int get_rcvdb_index(unsigned long destaddr){
   int dbindex, sockfd;
   struct sockaddr_in their_addr;  // connector's address information 
 
-  if ((dbindex=search_rcvdb(destaddr, source_port, dest_port)) == -1) {
+  if ((dbindex=search_rcvdb(destaddr)) == -1) {
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
       perror("socket");
       clean_exit(1);
@@ -321,18 +376,16 @@ int get_rcvdb_index(unsigned long destaddr, unsigned short source_port,
     if (sockfd > maxfd) {
       maxfd = sockfd;
     }
-    //insert rcvdb
-    dbindex=insert_db(destaddr, source_port, dest_port, sockfd, 0);
+    dbindex=insert_db(destaddr, sockfd, 0); //insert rcvdb
   }
   return dbindex;
 }
-*/
 
 void remove_pending(int index)
 {
     if (rcvdb[index].pending == 0)
     {
-	clear_pending(index, &write_fds);
+	FD_CLR(rcvdb[index].sockfd, &write_fds);
     }
 }
 
@@ -340,33 +393,37 @@ void add_pending(int index, int size)
 {
     if (rcvdb[index].pending == 0 && size > 0)
     {
-	set_pending(index, &write_fds);
+	FD_SET(rcvdb[index].sockfd, &write_fds);
     }
     rcvdb[index].pending += size;
 }
 
-void try_pending(int index)
+void try_pending(int index, fd_set * write_fds_copy)
 {
-    int size = 0;
-    int error = 0;
-    if (rcvdb[index].pending > LOW_WATER_MARK)
+    if (rcvdb[index].pending > 0 && FD_ISSET(rcvdb[index].sockfd,
+					     write_fds_copy))
     {
-	size = LOW_WATER_MARK;
+	int size = 0;
+	int error = 0;
+	if (rcvdb[index].pending > LOW_WATER_MARK)
+	{
+	    size = LOW_WATER_MARK;
+	}
+	else
+	{
+	    size = rcvdb[index].pending;
+	}
+	error = send(rcvdb[index].sockfd, random_buffer, size, 0);
+	if (error == -1)
+	{
+	    perror("try_pending");
+	    clean_exit(1);
+	}
+	rcvdb[index].pending -= error;
+	total_size += error;
+//	printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
+	remove_pending(index);
     }
-    else
-    {
-	size = rcvdb[index].pending;
-    }
-    error = send(rcvdb[index].sockfd, random_buffer, size, 0);
-    if (error == -1)
-    {
-	perror("try_pending");
-	clean_exit(1);
-    }
-    rcvdb[index].pending -= error;
-    total_size += error;
-    printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
-    remove_pending(index);
 }
 
 void print_header(char *buf){
@@ -421,69 +478,62 @@ int send_all(int sockfd, char *buf, int size) {
 void receive_sender(int i) {
   char inbuf[MAX_PAYLOAD_SIZE];
 
-  if (recv(snddb[i].sockfd, inbuf, MAX_PAYLOAD_SIZE, 0)== 0) {
-    //connection closed
-    remove_sender_index(i, &read_fds);
+  if (recv(snddb[i].sockfd, inbuf, MAX_PAYLOAD_SIZE, 0)== 0) { //connection closed
+    snddb[i].valid = 0; //no additional clean-up because no other state varialbe is related
+    FD_CLR(snddb[i].sockfd, &read_fds);
   }
 }
 
 
-void send_receiver(packet_info packet, fd_set * write_fds_copy){
+void send_receiver(unsigned long destaddr, long size, fd_set * write_fds_copy){
   int index;
   int sockfd;
   int error = 1, retry=0;
   struct in_addr addr;
 
-//  index = get_rcvdb_index(packet.ip, packet.source_port, packet.dest_port);
-  index = insert_by_address(packet.ip, packet.source_port, packet.dest_port);
-  if (index == -1)
-  {
-      printf("No more connections.\n");
-      clean_exit(1);
-  }
+  index = get_rcvdb_index(destaddr);
   sockfd= rcvdb[index].sockfd;
 
-  if (packet.size <= 0) {
-    packet.size = 1;
+  if (size <= 0) {
+    size = 1;
   }
   if (rcvdb[index].pending > 0) {
-    add_pending(index, packet.size);
+    add_pending(index, size);
     return;
   }
-  if (packet.size > MAX_PAYLOAD_SIZE){
-    add_pending(index, packet.size - MAX_PAYLOAD_SIZE);
-    packet.size = MAX_PAYLOAD_SIZE;
+  if (size > MAX_PAYLOAD_SIZE){
+    add_pending(index, size - MAX_PAYLOAD_SIZE);
+    size = MAX_PAYLOAD_SIZE;
   }
 
-  error = send(sockfd, random_buffer, packet.size, MSG_DONTWAIT);
+  error = send(sockfd, random_buffer, size, MSG_DONTWAIT);
   // Handle failed connection
   while (error == -1 && errno == ECONNRESET && retry < 3) {
-/*
+    // TODO: Think hard about what resetting a connection means for sniffing
+    // traffic.
+
     //reset the related state variables
     int pending = rcvdb[index].pending;
     sniff_rcvdb[index].start = 0;
     sniff_rcvdb[index].end   = 0;
     throughput[index].isValid   = 0;
     FD_CLR(rcvdb[index].sockfd, &write_fds);
-    // TODO: Fix redo
     reset_rcv_entry(index);
     //try again
-    index = get_rcvdb_index(packet.ip, packet.source_port, packet.dest_port);
+    index = get_rcvdb_index(destaddr);
     rcvdb[index].pending = pending;
-*/
-    reconnect_receiver(index);
     sockfd= rcvdb[index].sockfd;
-    error = send(sockfd, random_buffer, packet.size, MSG_DONTWAIT);
+    error = send(sockfd, random_buffer, size, MSG_DONTWAIT);
     retry++;
   }
   //if still disconnected, reset
   if (error == -1 && errno == ECONNRESET) {
-    remove_index(index, &write_fds);
-    addr.s_addr = packet.ip;
+    rcvdb[index].valid = 0;
+    addr.s_addr = destaddr;
     printf("Error: send_receiver() - failed send to %s three times. \n", inet_ntoa(addr)); 
   }
   else if (error == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-    add_pending(index, packet.size);
+    add_pending(index, size);
   }
   else if (error == -1) {
     perror("send_receiver: send");
@@ -491,34 +541,32 @@ void send_receiver(packet_info packet, fd_set * write_fds_copy){
   }
   else {
     total_size += error;
-    printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
-    add_pending(index, packet.size - error);
+//    printf("Total: %d, Pending: %d\n", total_size, rcvdb[index].pending);
+    add_pending(index, size - error);
   }
 }
 
 int receive_monitor(int sockfd, struct timeval * deadline) {
-  char buf[2*SIZEOF_LONG];
-  int buffer_size = 0;
-  unsigned long destnum = 0;
+  char buf[MAX_PAYLOAD_SIZE];
+  char *nextptr;
+  unsigned long tmpulong, destnum;
   char * packet_buffer = NULL;
 
   //receive first two longs
   if (recv_all(sockfd, buf, 2*SIZEOF_LONG)==0) {
     return 0;
   }
-  memcpy(&destnum, buf + SIZEOF_LONG, SIZEOF_LONG);
-  destnum = ntohl(destnum);
+  nextptr = buf+SIZEOF_LONG;
+  memcpy(&tmpulong, nextptr, SIZEOF_LONG);
+  destnum = ntohl(tmpulong);
+  packet_buffer = malloc(destnum*3*SIZEOF_LONG);
+
   //return success if no dest addr is given
   if (destnum == 0){
     return 1;
   }
-
-  buffer_size = (int)(destnum * (3 * SIZEOF_LONG
-				 + 2 * sizeof(unsigned short)));
-  packet_buffer = malloc(buffer_size);
-
   //otherwise, receive dest addrs
-  if (recv_all(sockfd, packet_buffer, buffer_size)==0) {
+  if (recv_all(sockfd, packet_buffer, destnum*3*SIZEOF_LONG)==0) {
     free(packet_buffer);
     return 0;
   }
@@ -526,120 +574,93 @@ int receive_monitor(int sockfd, struct timeval * deadline) {
   {
     gettimeofday(deadline, NULL);
   }
-  packet_buffer_add(packet_buffer, buffer_size);
+  packet_buffer_add(packet_buffer, destnum*3*SIZEOF_LONG);
 
-  return 1;
-}
+//  nextptr=buf;
+//  for (i=0; i<destnum; i++){
+//    memcpy(&tmpulong, nextptr, SIZEOF_LONG);
+//    destaddr = tmpulong; //address should stay in Network Order!
+//    nextptr += SIZEOF_LONG;
+//    send_receiver(destaddr, buf);
+//  } //for
 
-char * save_receiver_address(char * buf, int index)
-{
-  unsigned short port;
-  // Insert IP address
-  memcpy(buf, &(rcvdb[index].ip), SIZEOF_LONG); //the receiver ip
-  buf += SIZEOF_LONG;
-
-  // Insert source port
-  port = htons(rcvdb[index].source_port);
-  memcpy(buf, &port, sizeof(port));
-  buf += sizeof(port);
-
-  // Insert destination port
-  port = htons(rcvdb[index].dest_port);
-  memcpy(buf, &port, sizeof(port));
-  buf += sizeof(port);
-
-  return buf;
-}
-
-int send_delay_to_monitor(int monitor, int index)
-{
-  int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
-  char outbuf_delay[buffer_size];
-  unsigned long tmpulong;
-
-//  printf("delays: %ld last: %ld\n", delays[index], last_delays[index]);
-//  unsigned int through = throughputTick(&throughput[index]);
-//  printf("throughput(kbps) = %u\n", through);
-  // If measurement changed since last send
-  if (delays[index] != last_delays[index]) {
-    // Insert the address info
-    char * buf = save_receiver_address(outbuf_delay, index);
-
-    // Insert the code number for delay
-    tmpulong = htonl(CODE_DELAY);
-    memcpy(buf, &tmpulong, SIZEOF_LONG);
-    buf += SIZEOF_LONG;
-
-    // Insert the delay value
-    tmpulong = htonl(delays[index]);
-    memcpy(buf, &tmpulong, SIZEOF_LONG);
-    buf += SIZEOF_LONG;
-
-    if (send_all(monitor, outbuf_delay, buffer_size) == 0){
-      return 0;
-    }
-    last_delays[index] = delays[index];
-//  printf("Sent delay: %ld\n", delays[i]);
-  }
-  return 1;
-}
-
-int send_loss_to_monitor(int monitor, int index)
-{
-  int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
-  char outbuf_loss[buffer_size];
-  unsigned long tmpulong, loss_rate;
-
-  // Calculate loss
-  if (loss_records[index].total_counter == 0){
-    loss_rate = 0;
-  } else {
-    // Loss per billion
-    loss_rate = floor(loss_records[index].loss_counter*1000000000.0f
-		      /loss_records[index].total_counter+0.5f);
-  }
-
-  // If measurement changed since last send
-  if (loss_rate != last_loss_rates[index]) {
-    // Insert address info
-    char * buf = save_receiver_address(outbuf_loss, index);
-
-    // Insert the code number for loss
-    tmpulong = htonl(CODE_LOSS);
-    memcpy(buf, &tmpulong, SIZEOF_LONG);
-    buf += SIZEOF_LONG;
-
-    // Insert the loss rate
-    tmpulong = htonl(loss_rate);
-    memcpy(buf, &tmpulong, SIZEOF_LONG);
-    buf += SIZEOF_LONG;
-
-    if (send_all(monitor, outbuf_loss, buffer_size) == 0){
-      loss_records[index].loss_counter=0;
-      loss_records[index].total_counter=0;    
-      return 0;
-    }
-    last_loss_rates[index] = loss_rate;	
-//	printf("Sent loss: %d/%d=%ld \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
-  }
-  loss_records[index].loss_counter=0;
-  loss_records[index].total_counter=0;
   return 1;
 }
 
 int send_monitor(int sockfd) {
-  int result = 1;
+  char outbuf_delay[3*SIZEOF_LONG], outbuf_loss[3*SIZEOF_LONG], outbuf_bandwidth[3*SIZEOF_LONG];
+  char *outbuf_delaylist;
+  unsigned long tmpulong, loss_rate;
+  int i, delaylist_size;
+  unsigned int through;
 
-  if (result == 1) {
-    result = for_each_to_monitor(send_delay_to_monitor, sockfd);
-  }
-//  if (result == 1) {
-//    result = result && for_each_to_monitor(send_bandwidth_to_monitor, sockfd);
-//  }
-//  if (result == 1) {
-//    result = result && for_each_to_monitor(send_loss_to_monitor, sockfd);
-//  }
-  return result;
+  tmpulong = htonl(CODE_DELAY);
+  memcpy(outbuf_delay+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+  tmpulong = htonl(CODE_LOSS);
+  memcpy(outbuf_loss+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+  tmpulong = htonl(CODE_BANDWIDTH);
+  memcpy(outbuf_bandwidth+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+
+  for (i=0; i<CONCURRENT_RECEIVERS; i++){
+    if (rcvdb[i].valid == 1) {
+      //send available bandwidth
+      through = throughputTick(&throughput[i]);
+      if (through != last_through[i]) {
+	memcpy(outbuf_bandwidth, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
+	tmpulong = htonl(through); //convert through
+	memcpy(outbuf_bandwidth+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+	if (send_all(sockfd, outbuf_bandwidth, 3*SIZEOF_LONG) == 0){
+	  return 0;
+	}
+	last_through[i] = through;	
+	printf("Sent throughput(kbps): %u\n", through);
+      } //if measurement changed since last send
+
+      //send delay
+      //printf("delays: %ld last: %ld\n", delays[i], last_delays[i]);     
+      if (delays[i] != last_delays[i]) {
+	memcpy(outbuf_delay, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
+	tmpulong = htonl(delays[i]);
+	memcpy(outbuf_delay+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+	if (send_all(sockfd, outbuf_delay, 3*SIZEOF_LONG) == 0){
+	  return 0;
+	}
+	last_delays[i] = delays[i];	
+	printf("Sent delay(ms): %ld\n", delays[i]);	
+      } //if measurement changed since last send
+
+      //send delay list
+      outbuf_delaylist = remove_delay_samples(i, &delaylist_size);
+      if (outbuf_delaylist != NULL) {
+	if (send_all(sockfd, outbuf_delaylist, delaylist_size) == 0){
+	  return 0;
+	}
+	printf("Sent a delay list.\n");	
+      } //if there are new delay samples measured in this quantum
+
+      //send loss
+      if (loss_records[i].total_counter == 0){
+	loss_rate = 0;
+      } else {
+	loss_rate = floor(loss_records[i].loss_counter*1000000000.0f/loss_records[i].total_counter+0.5f); //loss per billion
+      }
+      if (loss_rate != last_loss_rates[i]) {
+	memcpy(outbuf_loss, &(rcvdb[i].ip), SIZEOF_LONG); //the receiver ip
+	tmpulong = htonl(loss_rate);
+	memcpy(outbuf_loss+SIZEOF_LONG+SIZEOF_LONG, &tmpulong, SIZEOF_LONG);
+	if (send_all(sockfd, outbuf_loss, 3*SIZEOF_LONG) == 0){
+	  return 0;
+	}
+	last_loss_rates[i] = loss_rate;	
+	printf("Sent loss: %d/%d=%ld \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
+      } //if measurement changed since last send
+      loss_records[i].loss_counter=0;
+      loss_records[i].total_counter=0;
+      
+
+    } //if connection is valid
+  } //for 
+  return 1;
 }
 
 void print_measurements(void) {
@@ -648,13 +669,35 @@ void print_measurements(void) {
 
   for (i=0; i<CONCURRENT_RECEIVERS; i++){
     if (rcvdb[i].valid == 1) {     
+      // Note, this has to be done before throughputTick, since that
+      // obliterates the byte count
+      unsigned int bytes = bytesThisTick(&throughput[i]);
       unsigned int through = throughputTick(&throughput[i]);
-      printf("Throughput(kbps) = %u\n", through);
+      if (flag_testmode) {
+          // We might need to do a state transition
+          if (test_state == TEST_NOTSTARTED && bytes > 0) {
+              test_state = TEST_RUNNING;
+          } else if (test_state == TEST_RUNNING && bytes == 0) {
+              test_state = TEST_DONE;
+          }
+      }
+
+      // Decide if we're going to print this quanta
+      short print;
+      if (flag_testmode && test_state != TEST_RUNNING) {
+          print = 0;
+      } else {
+          print = 1;
+      }
+
+      if (print) printf("Throughput(kbps) = %u\n", through);
+      if (print) printf("Bytecount = %u\n", bytes);
+      total_bytes += bytes;
 
       //print delay
       if (delays[i] != last_delays[i]) {
 	last_delays[i] = delays[i];	
-	printf("New delay: %ld\n", delays[i]);	
+	if (print) printf("New delay: %ld\n", delays[i]);	
       } else {
 	if (flag_debug) printf("Unchanged delay: %ld\n", delays[i]);	
       }
@@ -667,7 +710,7 @@ void print_measurements(void) {
       }
       if (loss_rate != last_loss_rates[i]) {
 	last_loss_rates[i] = loss_rate;	
-	printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
+	if (print) printf("New loss: %d/%d=%f \n", loss_records[i].loss_counter, loss_records[i].total_counter, loss_rate);	
       } else {
 	if (flag_debug) printf("Unchanged loss: %f \n", loss_rate);     
       }
@@ -696,7 +739,7 @@ void handle_packet_buffer(struct timeval * deadline, fd_set * write_fds_copy)
 //    printf("Sending packet to %s of size %ld\n", inet_ntoa(debug_temp),
 //           packet.size);
 
-    send_receiver(packet, write_fds_copy);
+    send_receiver(packet.ip, packet.size, write_fds_copy);
 
     packet_buffer_advance();
     if (packet_buffer_more())
@@ -729,9 +772,10 @@ int have_time(struct timeval *start_tvp, struct timeval *left_tvp){
 }
 
 void usage() {
-  fprintf(stderr,"Usage: stubd [-d] [-s] <sniff-interface> [remote_IPaddr]\n");
+  fprintf(stderr,"Usage: stubd [-t] [-d] [-s] <sniff-interface> [remote_IPaddr]\n");
   fprintf(stderr,"       -d:  Enable debugging mode\n");
   fprintf(stderr,"       -s:  Enable standalone mode\n");
+  fprintf(stderr,"       -t:  Enable testing mode\n");
   fprintf(stderr," remote_IPaddr is mandatory when using -s\n");
 }
 
@@ -742,13 +786,15 @@ int main(int argc, char *argv[]) {
   fd_set read_fds_copy, write_fds_copy;
   socklen_t sin_size;
   struct timeval start_tv, left_tv;
-  int yes=1, flag_send_monitor=0;
+  int yes=1, i, flag_send_monitor=0;
   struct timeval packet_deadline;
   struct in_addr addr;
   int flag_measure=0;
   char ch;
+  unsigned long quantum_no=0;
 
   gettimeofday(&packet_deadline, NULL);
+  init();
 
   //set up debug flag
   if (getenv("Debug")!=NULL) 
@@ -760,12 +806,14 @@ int main(int argc, char *argv[]) {
   /*
    * Process command-line arguments
    */
-  while ((ch = getopt(argc,argv,"ds")) != -1) {
+  while ((ch = getopt(argc,argv,"dst")) != -1) {
     switch (ch) {
       case 'd':
         flag_debug = 1; break;
       case 's':
         flag_standalone = 1; break;
+      case 't':
+        flag_testmode = 1; break;
       default:
         fprintf(stderr,"Unknown option %c\n",ch);
         usage(); exit(1);
@@ -780,7 +828,6 @@ int main(int argc, char *argv[]) {
       usage();
       exit(1);
     } else {
-	printf("TODO: Make this compliant with the lookup interface.\n");
       flag_measure = 1;
       rcvdb[0].valid = 1;
       inet_aton(argv[1], &addr);
@@ -788,6 +835,7 @@ int main(int argc, char *argv[]) {
       rcvdb[0].sockfd= -1; //show error if used
       rcvdb[0].last_usetime = time(NULL);
     }
+    printf("Running in standalone mode\n");
   } else {
     if (argc != 1) {
       fprintf(stderr,"Wrong number of options: %i\n",argc);
@@ -795,6 +843,12 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
   }
+
+  if (flag_testmode) {
+      printf("Running in testmode\n");
+      test_state = TEST_NOTSTARTED;
+  }
+
   if (strlen(argv[0]) > 127) {
     fprintf(stderr,"Error: the <sniff-interface> name must be less than 127 characters \n");
     exit(1);
@@ -852,7 +906,6 @@ int main(int argc, char *argv[]) {
   //initialization
   packet_buffer_init();
   init_random_buffer();
-  init();
   init_pcap(SNIFF_TIMEOUT);
   FD_ZERO(&read_fds);
   FD_ZERO(&read_fds_copy);
@@ -869,8 +922,10 @@ int main(int argc, char *argv[]) {
     flag_send_monitor=0; //reset flag for each quanta
     gettimeofday(&start_tv, NULL); //reset start time for each quanta
 
-//    printf("quanta\n");
-//    printf("Total: %d\n", total_size);
+    printf("Total: %d\n", total_size);
+    printf("========== Quantum %lu ==========\n", quantum_no);
+    quantum_no++;
+
     //while in a quanta
     while(have_time(&start_tv, &left_tv)) {  
       read_fds_copy  = read_fds;
@@ -883,41 +938,31 @@ int main(int argc, char *argv[]) {
 
       // Send out packets to our peers if the deadline has passed.
       handle_packet_buffer(&packet_deadline, &write_fds_copy);
-
-      // send to destinations which are writeable and are behind.
-      for_each_pending(try_pending, &write_fds_copy);
-
-      // receive from existing senders
-      for_each_readable_sender(receive_sender, &read_fds_copy);
-
-/*
+      
       //receive from existent senders
       for (i=0; i<CONCURRENT_SENDERS; i++){
 	// Send pending data if it exists.
+        try_pending(i, &write_fds_copy);
 	if (snddb[i].valid==1 && FD_ISSET(snddb[i].sockfd, &read_fds_copy)) {	
 	  receive_sender(i);
 	} 
       }
-*/    
+      
       //handle new senders 
       if (FD_ISSET(sockfd_rcv_sender, &read_fds_copy)) { 
 	if ((sockfd_snd = accept(sockfd_rcv_sender, (struct sockaddr *)&their_addr, &sin_size)) == -1) { 
 	  perror("accept"); 
 	  continue;
 	} else {
-	    replace_sender_by_stub_port(their_addr.sin_addr.s_addr,
-					ntohs(their_addr.sin_port), sockfd_snd,
-					&read_fds);
-//	  insert_db(their_addr.sin_addr.s_addr, their_addr.sin_port,
-//		    SENDER_PORT, sockfd_snd, 1); //insert snddb
-//	  FD_SET(sockfd_snd, &read_fds); // add to master set 
-//	  if (sockfd_snd > maxfd) { // keep track of the maximum 
-//	    maxfd = sockfd_snd; 
-//	  } 
+	  insert_db(their_addr.sin_addr.s_addr, sockfd_snd, 1); //insert snddb
+	  FD_SET(sockfd_snd, &read_fds); // add to master set 
+	  if (sockfd_snd > maxfd) { // keep track of the maximum 
+	    maxfd = sockfd_snd; 
+	  } 
 	  if (flag_debug) printf("server: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
 	} 
       }
-
+      
       //handle the new monitor
       if (FD_ISSET(sockfd_rcv_monitor, &read_fds_copy)) {  
 	if ((sockfd_monitor = accept(sockfd_rcv_monitor, (struct sockaddr *)&their_addr, &sin_size)) == -1) { 
@@ -961,16 +1006,25 @@ int main(int argc, char *argv[]) {
 	  flag_send_monitor=1;
 	}
       }
-
+         
       //sniff packets
       if (FD_ISSET(pcapfd, &read_fds_copy)) { 
 	sniff();     
       }
 
     } //while in quanta
+
+    // In testmode, we only start printing in the quanta we first see a packet
     if (flag_standalone) {
       print_measurements();
     }
+    
+    // If running in testmode, and the test is over, exit!
+    if (flag_testmode && test_state == TEST_DONE) {
+      printf("Test done - total bytes transmitted: %llu\n",total_bytes);
+      break;
+    }
+     
   } //while forever
 
   packet_buffer_cleanup(); 

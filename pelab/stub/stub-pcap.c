@@ -36,10 +36,10 @@ struct my_ip {
 	struct	in_addr ip_src,ip_dst;	/* source and dest address */
 };
 
-
 sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
 pcap_t* descr;
 int pcapfd;
+FILE  *loss_log;
 
 ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 
@@ -107,6 +107,12 @@ void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
 }
 
 // How many bytes have been acknowledged since the last call to
+// throughputTick()?
+unsigned int bytesThisTick(ThroughputAckState * state) {
+    return state->ackSize;
+}
+
+// What is the bandwidth of the acknowledged bytes since the last call to
 // throughputTick()?
 unsigned int throughputTick(ThroughputAckState * state)
 {
@@ -256,8 +262,6 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
   u_int caplen = pkthdr->caplen;
   u_short len, hlen, version, tcp_hlen, ack_bit;
   u_long  seq_start, seq_end, ack_seq, ip_src, ip_dst;
-  unsigned short source_port = 0;
-  unsigned short dest_port = 0;
   int path_id, record_id, msecs, end, flag_resend=0;
   sniff_path *path;
 
@@ -318,19 +322,14 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       }	    
 
       tp = (struct tcphdr *)cp;
-      tcp_hlen  = ((tp)->doff & 0x000f);
+      tcp_hlen  = ((tp)->doff & 0x000f);      
       length   -= (tcp_hlen * 4); //jump pass the tcp header
+      caplen   -= (tcp_hlen * 4); //jump pass the tcp header
       seq_start = ntohl(tp->seq);      
       seq_end   = ((unsigned long)(seq_start+length));
       ack_bit= ((tp)->ack & 0x0001);
-      source_port = htons(tp->source);
-      dest_port = htons(tp->dest);
 
-//      path_id = search_rcvdb(ip_dst);
-      // I contacted the receiver. Therefore, my port is unique and
-      // the receiver's port is fixed. The destination is the
-      // receiver, therefore my port is the one that is of interest.
-      path_id = find_by_stub_port(ip_dst, source_port);
+      path_id = search_rcvdb(ip_dst);
       if (path_id != -1) { //a monitored outgoing packet
         //ignore the pure outgoing ack
         if ((ack_bit==1) && (seq_end==seq_start)) {
@@ -358,6 +357,8 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	      //the last packet also has no payload and has the same seqnum
 	      flag_resend = 1; //pure resent
 	      loss_records[path_id].loss_counter++;
+	      fprintf(loss_log, "Resent: %lu\n",seq_end); //loss log
+	      fflush(loss_log); //loss log
 	    } else { 
 	      return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet
 	    }	  
@@ -367,21 +368,20 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
             flag_resend = 1;
             loss_records[path_id].loss_counter++;
 	    if (seq_end > path->records[end].seq_end){ //partial resend
+	      fprintf(loss_log, "Resent: %lu to %lu\n",seq_start, path->records[end].seq_end-1); //loss log
+	      fflush(loss_log); //loss log
 	      return push_sniff_rcvdb(path_id, path->records[end].seq_end+1, seq_end, &(pkthdr->ts));
 	    }
+	    fprintf(loss_log, "Resent: %lu to %lu\n",seq_start, seq_end-1); //loss log
+	    fflush(loss_log); //loss log
 	  } // if has payload and resent   
 	}
    
       } else {
-//	path_id = search_rcvdb(ip_src);
-	// I contacted the receiver, so my port is unique and their
-	// port is the same every time. This means that if a packet is
-	// coming from them, the destination port is the one of
-	// interest.
-        path_id = find_by_stub_port(ip_src, dest_port);
+	path_id = search_rcvdb(ip_src);
 	if (path_id != -1) { //a monitored incoming packet
 	  if (ack_bit == 1) { //has an acknowledgement
-	    ack_seq  = ntohl(tp->ack_seq);
+	    ack_seq  = ntohl(tp->ack_seq);	   
 
 	    throughputProcessAck(&throughput[path_id], ack_seq);
 
@@ -392,6 +392,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	      } else { //calculate the delay
 		msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
 		delays[path_id] = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
+		append_delay_sample(path_id, delays[path_id]);
 	      }
 	      pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
 	    } //ack in rcvdb
@@ -513,6 +514,9 @@ void init_pcap(int to_ms) {
 
     pcapfd = pcap_fileno(descr);
     init_sniff_rcvdb();
+
+    loss_log = fopen("loss.log", "w"); //loss log
+
 }
 
 void sniff(void) { 
