@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -499,8 +499,11 @@ TBSaveExpLogFiles($pid, $eid);
 print "Archiving and clearing the experiment archive ...\n";
 libArchive::TBArchiveExperimentArchive($pid, $eid) == 0 or
     fatal("Could not archive experiment archive!");
-    
+
+#
 # Terminate the log so the web page stops spewing.
+#
+print "Experiment $pid/$eid has been successfully terminated!\n";
 TBExptClearLogFile($pid, $eid);
 
 #
@@ -514,8 +517,6 @@ TBExptDestroy($pid, $eid);
 if ($batch) {
     exit(0);
 }
-
-print "Termination Success\n";
 
 #
 # Send email notification to user.
