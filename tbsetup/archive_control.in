@@ -84,7 +84,7 @@ my $eid    = shift(@ARGV);
 #
 # Untaint args.
 #
-if ($action =~ /^(commit|addfile|checktag)$/) {
+if ($action =~ /^(commit|addfile|checktag|list|missing|addtoarchive)$/) {
     $action = $1;
 }
 else {
@@ -147,22 +147,21 @@ if ($action eq "checktag") {
 }
 
 #
-# This script is always audited. Mail is sent automatically upon exit.
-#
-if (AuditStart(0)) {
-    #
-    # Parent exits normally
-    #
-    exit(0);
-}
-
-#
 # Allow the user to force a commit of the archive.
 #
 if ($action eq "commit") {
     my $tag     = "user_commit";
     my $mfile   = undef;
-    
+
+    #
+    # Audit this operation for now.
+    #
+    if (AuditStart(0)) {
+	#
+	# Parent exits normally
+	#
+	exit(0);
+    }
     if (defined($options{"t"})) {
 	$tag = $options{"t"};
 
@@ -244,6 +243,129 @@ elsif ($action eq "addfile") {
 						   $pathname, $exact) < 0) {
 	    fatal("Failed to add '$pathname' to experiment archive!");
 	}
+    }
+}
+elsif ($action eq "addtoarchive") {
+    my $exact   = 1;
+    my $userdir = TBExptUserDir($pid, $eid);
+    my $errors  = 0;
+	
+    # This is special by convention;
+    my $subdir = "$userdir/archive";
+
+    usage()
+	if (! @ARGV);
+
+    while (@ARGV) {
+	my $pathname = shift(@ARGV);
+
+	if (! -e $pathname) {
+	    print STDERR
+		"*** '$pathname' does not exist! Skipping ...\n";
+	    $errors++;
+	    next;
+	}
+	if (! -f $pathname) {
+	    print STDERR
+		"*** '$pathname' is not a plain file! Skipping ...\n";
+	    $errors++;
+	    next;
+	}
+
+	# This returns a taint checked value in $pathname.
+	if (libArchive::ValidatePath(\$pathname) != 0) {
+	    print STDERR "Could not validate pathname $pathname\n";
+	    $errors++;
+	    next;
+	}
+    }
+    exit($errors);
+}
+elsif ($action eq "list" ||
+       $action eq "missing") {
+    my @files    = ();
+    my $tag      = undef;
+    my $subdir   = undef;
+    
+    if (defined($options{"t"})) {
+	$tag = $options{"t"};
+
+	if (! TBcheck_dbslot($tag, "archive_tags", "tag",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    fatal("Illegal characters in tag");
+	}
+	# Force a taint check; the library will escape it for the shell.
+	$tag =~ /(.*)/;
+	$tag = $1;
+    }
+
+    if ($action eq "missing") {
+	#
+	# Figure out what files were accessed by NFS, but not from the
+	# archive directory. 
+	#
+	my $userdir  = TBExptUserDir($pid, $eid);
+	
+	# This is special by convention;
+	$subdir = "$userdir/archive";
+    }
+    elsif (@ARGV) {
+	$subdir = $ARGV[0];
+
+	# Taint check path before handing off.
+	if ($subdir =~ /^([-\w\/\.\+\@,~]+)$/) {
+	    $subdir = $1;
+	}
+	else {
+	    fatal("Illegal characters in subdir");
+	}
+    }
+
+    my $rval = 
+      libArchive::TBListExperimentArchive($pid, $eid, \@files, $tag, $subdir);
+    exit($rval)
+	if ($rval);
+
+    if ($action eq "list") {
+	foreach my $file (@files) {
+	    print "$file\n";
+	}
+	exit(0);
+    }
+    #
+    # Grab the NFS accessed files.
+    #
+    my %filehash = ();
+    
+    foreach my $file (@files) {
+	my $path = "$subdir/$file";
+
+	#print "Archived: $path\n";
+	$filehash{$path} = 1;
+    }
+    
+    my $query_result =
+	DBQueryFatal("SELECT s.rsrcidx FROM experiments as e ".
+		     "left join experiment_stats as s on e.idx=s.exptidx ".
+		     "where e.pid='$pid' and e.eid='$eid'");
+    
+    if ($query_result->num_rows() != 1) {
+	fatal("Experiment $pid/$eid has no stats record!");
+    }
+    my ($rsrcidx) = $query_result->fetchrow_array();
+
+    $query_result = 
+	DBQueryFatal("SELECT af.fn FROM fs_resources as fr ".
+		     "LEFT JOIN accessed_files as af on af.idx=fr.fileidx ".
+		     "WHERE fr.rsrcidx=$rsrcidx and fr.type!='l'");
+    while (my ($fn) = $query_result->fetchrow_array()) {
+	if ($fn =~ /^\/share/ ||
+	    $fn =~ /\/tbdata\// ||
+	    $fn =~ /^<u:/) {
+	    next;
+	}
+	print "$fn\n"
+	    if (! exists($filehash{$fn}));
     }
 }
 exit(0);
