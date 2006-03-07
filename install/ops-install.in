@@ -40,6 +40,7 @@ my $WINSUPPORT  = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $CVSSUPPORT  = @CVSSUPPORT@;
 my $BUGDBSUPPORT= @BUGDBSUPPORT@;
+my $WIKISUPPORT = @WIKISUPPORT@;
 my $QUOTA_FSLIST= '@FS_WITH_QUOTAS@';
 my $LOGDIR      = "$PREFIX/log";
 my $ETCDIR      = "$PREFIX/etc";
@@ -314,7 +315,7 @@ Phase "ports", "Installing ports", sub {
     };
     if ($MAILMANSUPPORT) {
 	Phase "mailman", "Installing Mailman package", sub {
-	    if (!ExecQuiet("$PKG_INFO -x -e mailman")) {
+	    if (!ExecQuiet("$PKG_INFO -x -E mailman")) {
 		PhaseSkip("Mailman package already installed");
 	    }
 	    if (!$packagedir) {
@@ -334,7 +335,7 @@ Phase "ports", "Installing ports", sub {
 	    PhaseSkip("cvsd not supported on ops")
 		if ($FBSD_VERSION < 6);
 
-	    if (!ExecQuiet("$PKG_INFO -x -e cvsd")) {
+	    if (!ExecQuiet("$PKG_INFO -x -E cvsd")) {
 		PhaseSkip("cvsd package already installed");
 	    }
 	    if (!$packagedir) {
@@ -354,7 +355,7 @@ Phase "ports", "Installing ports", sub {
 	    PhaseSkip("flyspray not supported on ops")
 		if ($FBSD_VERSION < 6);
 
-	    if (!ExecQuiet("$PKG_INFO -x -e adodb")) {
+	    if (!ExecQuiet("$PKG_INFO -x -E adodb")) {
 		PhaseSkip("adodb package already installed");
 	    }
 	    if (!$packagedir) {
@@ -791,8 +792,14 @@ Phase "cron", "Adding cron jobs", sub {
 	    PhaseSkip("No filesystem quotas");
 	}
 	DoneIfEdited($CRONTAB);
-	AppendToFileFatal($CRONTAB,
-	    "0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamail");
+
+	my @cronlist = ("0 \t6\t*\t*\t*\troot\t$PREFIX/sbin/quotamail");
+	if ($WIKISUPPORT) {
+	    push(@cronlist,
+		 "*/15 \t*\t*\t*\t*\troot\t(cd /usr/local/www/data/twiki/bin;".
+		 " ./mailnotify -q >> /var/tmp/mailnotify.log 2>&1)");
+	}
+	AppendToFileFatal($CRONTAB, @cronlist);
     };
     Phase "cronhup", "HUPing cron", sub {
 	if (PhaseWasSkipped("crontab")) { PhaseSkip("No new crontab"); }
@@ -1242,6 +1249,59 @@ if ($BUGDBSUPPORT) {
 			   );
 	    ExecQuietFatal("$CHOWN nobody:tbadmin $FLYSPRAYCONF");
 	    ExecQuietFatal("$CHMOD 750 $FLYSPRAYCONF");
+	};
+    };
+}
+
+if ($WIKISUPPORT) {
+    my $WIKIDIR       = "/usr/local/www/data/twiki";
+    my $WIKICONF      = "LocalSite.cfg";
+    my $WIKIURL       = "http://www.emulab.net/downloads/twiki-4.1.tgz";
+    my $localtarfile  = "/tmp/twiki.tgz";
+    my $CGISESSDIR    = "/var/db/cgisess";
+    my $WIKI_LOGDIR   = "$LOGDIR/twiki";
+    
+    Phase "TWiki", "Installing TWiki", sub {
+	PhaseSkip("TWiki not supported on ops")
+	    if ($FBSD_VERSION < 6);
+
+	Phase "fetching", "Fetching TWiki distribution", sub {
+	    DoneIfExists($localtarfile);
+	    FetchFileFatal($WIKIURL, $localtarfile);
+	};
+
+	if (! -e "$CGISESSDIR") {
+	    mkdir("$CGISESSDIR", 0770) or
+		PhaseFail("Unable to make $CGISESSDIR : $!");
+	}
+	ExecQuietFatal("$CHOWN nobody:wheel $CGISESSDIR");
+
+	Phase "unpacking", "Unpacking TWiki distribution", sub {
+	    if (! -e "$WIKIDIR") {
+		mkdir("$WIKIDIR", 0770) or
+		    PhaseFail("Unable to make $WIKIDIR : $!");
+	    }
+	    ExecQuietFatal("$CHMOD 770 $WIKIDIR");
+
+	    PhaseSkip("Flyspray already unpacked")
+		if (-e "$WIKIDIR/data");
+	    ExecQuietFatal("$TAR zxf $localtarfile -C $WIKIDIR"); 
+	};
+	ExecQuietFatal("$CHOWN -R nobody:tbadmin $WIKIDIR");
+
+	Phase "logdir", "Creating TWiki log directory", sub {
+	    DoneIfExists($WIKI_LOGDIR);
+	    mkdir $WIKI_LOGDIR, 0775 or
+		PhaseFail("Unable to create $WIKI_LOGDIR : $!");
+	    
+	    ExecQuietFatal("$CHOWN nobody:tbadmin $WIKI_LOGDIR");
+	    ExecQuietFatal("$CHMOD 770 $WIKI_LOGDIR");
+	};
+
+	Phase "config", "Configuring TWiki", sub {
+	    # Must overwrite the distribution version.
+	    ExecQuietFatal("$CP -f $TOP_OBJDIR/wiki/$WIKICONF ".
+			   "       $WIKIDIR/lib/$WIKICONF");
 	};
     };
 }

@@ -14,6 +14,11 @@ WITH_GD=yes
 WITH_MCRYPT=yes
 WITH_MYSQL=yes
 WITH_XML=yes
+# Additions for mediawiki
+#WITH_ICONV=yes
+#WITH_IMAGICK=yes
+#WITH_READLINE=yes
+#WITH_MBSTRING=yes
 
 #
 # For the PHP ports, so they will depend on the actual version of apache we're

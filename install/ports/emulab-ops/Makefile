@@ -81,6 +81,7 @@ RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/Mysql.pm:${PORTSDIR}/databases/p5-Mysql \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Parser:${PORTSDIR}/textproc/p5-XML-Parser \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/CGI/Session.pm:${PORTSDIR}/www/p5-CGI-Session \
         curl:${PORTSDIR}/ftp/curl
 .else
 RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
@@ -88,7 +89,8 @@ RUN_DEPENDS+= smbd:${PORTSDIR}/net/samba3
 
 .if ${OSMAJOR} >= 6
 RUN_DEPENDS+= ${LOCALBASE}/sbin/cvsd:${PORTSDIR}/devel/cvsd \
-              ${LOCALBASE}/share/adodb/adodb.inc.php:${PORTSDIR}/databases/adodb
+              ${LOCALBASE}/share/adodb/adodb.inc.php:${PORTSDIR}/databases/adodb \
+	      ${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/HTML/Parser.pm:${PORTSDIR}/www/p5-HTML-Parser
 .endif
 
 NO_BUILD=	yes

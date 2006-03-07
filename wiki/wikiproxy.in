@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -44,6 +44,7 @@ my $COOKIEDIR    = "/var/db/cgisess";
 my $WIKIUSER     = "nobody";
 my $WIKIGROUP    = "nobody";
 my $CI		 = "ci";
+my $TAR		 = "tar";
     
 #
 # Turn off line buffering on output
@@ -85,6 +86,15 @@ if ($UID != 0) {
 #
 use lib "@prefix@/lib";
 use libtestbed;
+
+# Version of FreeBSD.
+my $FBSD_VERSION = 4;
+if (`uname -r` =~ /^(\d)/) {
+    $FBSD_VERSION = $1;
+}
+else {
+    die("Could not determine what version of FreeBSD you are running!\n");
+}
 
 #
 # Parse command arguments. Once we return from getopts, all that should be
@@ -419,11 +429,17 @@ sub AddWikiProject(@)
     print "Creating ${WIKIDATADIR}/${wikiname}\n"
 	if ($debug);
 
+    mkdir("${WIKIDATADIR}/${wikiname}", 0775) or
+	fatal("Could not mkdir $WIKIDATADIR/$wikiname!");
+    
+    system("chown ${WIKIUSER}:${WIKIGROUP} $WIKIDATADIR/$wikiname") == 0
+	or fatal("Could not chown $WIKIDATADIR/$wikiname!");
+
     #
     # Copy the _default directory to the new WEB name. This "creates"
     # the new wiki web. 
     #
-    system("/usr/site/bin/hier cp _default $wikiname") == 0
+    system("$TAR cf - -C _default . | $TAR xf - -C $wikiname") == 0
 	or fatal("Could not copy _default to $wikiname");
 
     system("cp -p ${HOMETEMPLATE} ${wikiname}/WebHome.txt") == 0
@@ -863,7 +879,9 @@ sub CI($$) {
     system("chown ${WIKIUSER}:${WIKIGROUP} $file")
 	== 0 or fatal("Could not chown $file to ${WIKIUSER}:${WIKIGROUP}");
 
-    my $cmd = "sudo -u nobody ci -l '-mRevision by wikiproxy:\n$comment'".
+    my $locking = ($FBSD_VERSION == 4 ? "-l" : "-u");
+
+    my $cmd = "sudo -u nobody ci -u '-mRevision by wikiproxy:\n$comment'".
 	"      '-t-Revision by wikiproxy' $file 2>&1";
     my $output = `$cmd`;
     if ($? && $output =~ /no lock set by/ ) {

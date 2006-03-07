@@ -2385,7 +2385,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	robots/tracker/GNUmakefile \
 	robots/mezzanine/mezzcal/GNUmakefile robots/robomonitord \
         wiki/GNUmakefile wiki/addwikiuser wiki/wikiproxy \
-	wiki/usertemplate wiki/webhometemplate \
+	wiki/usertemplate wiki/webhometemplate wiki/LocalSite.cfg \
         wiki/delwikiuser wiki/setwikigroups wiki/addwikiproj \
         bugdb/GNUmakefile bugdb/bugdbproxy \
         collab/GNUmakefile \
