@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -17,13 +17,14 @@ LIBEXEC_SCRIPTS		= wikixlogin
 
 CTRL_SBIN_SCRIPTS	= wikiproxy
 CTRL_LIB_FILES		= usertemplate webhometemplate
+TWIKIFILES		= UserPermNotes.txt GroupPermNotes.txt LocalSite.cfg
 
 #
 # Force dependencies on the scripts so that they will be rerun through
 # configure if the .in file is changed.
 # 
 all:	$(SBIN_SCRIPTS) $(CTRL_SBIN_SCRIPTS) $(CTRL_LIB_FILES) \
-	$(LIBEXEC_SCRIPTS)
+	$(LIBEXEC_SCRIPTS) $(TWIKIFILES)
 
 include $(TESTBED_SRCDIR)/GNUmakerules
 
