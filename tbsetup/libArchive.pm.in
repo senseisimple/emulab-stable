@@ -59,6 +59,11 @@ my $TAGTYPE_COMMIT    = "commit";
 my $TAGTYPE_SAVEPOINT = "savepoint";
 my $TAGTYPE_INTERNAL  = "internal";
 
+#
+# Set umask so that other people in the project can mess with the archive.
+#
+umask(0002);
+
 # Little helper and debug function.
 sub mysystem($)
 {
@@ -221,6 +226,72 @@ sub ArchiveCreate(;$$$)
 }
 
 #
+# Helper function for below; Checks that a path is safe and legal.
+#
+sub ValidatePath($)
+{
+    my ($ppath)  = @_;
+    # We get a pointer so we can return the new path.
+    my $pathname = $$ppath;
+    my $rootdir;
+
+    # Taint check path before handing off to shell below.
+    if ($pathname =~ /^([-\w\/\.\+\@,~]+)$/) {
+	$pathname = $1;
+    }
+    else {
+	print STDERR "*** ValidatePath: illegal characters in '$pathname'\n";
+	return 1;
+    }
+
+    if (! -e $pathname || ! -r $pathname) {
+	print STDERR "*** ValidatePath: $pathname cannot be read!\n";
+	return 1;
+    }
+
+    #
+    # Use realpath to check that the path does not contain links to
+    # files outside the directory space the user is allowed to access.
+    # We must taint check the result to keep everyone happy.
+    #
+    my $realpath = `$REALPATH $pathname`;
+    if ($realpath =~ /^([-\w\/\.\+\@,~]+)$/) {
+	$realpath = $1;
+    }
+    else {
+	print STDERR "*** ValidatePath: ".
+	    "Bad data returned by realpath: $realpath\n";
+	return -1;
+    }
+
+    #
+    # Strip leading /dir from the pathname. We want a relative path to
+    # the rootdir so we can copy it in.
+    #
+    if ($realpath =~ /^[\/]+(\w+)\/(.+)$/) {
+	$rootdir  = $1;
+	$pathname = $2;
+    }
+    else {
+	print STDERR "*** ValidatePath: ".
+	    "Illegal characters in pathname: $realpath\n";
+	return -1;
+    }
+
+    #
+    # The file must reside in one of the Emulab "root" filesystems.
+    #
+    if (! exists($ROOTS{$rootdir})) {
+	print STDERR "*** ValidatePath: ".
+	    "$realpath does not resolve to an allowed directory!\n";
+	return -1;
+    }
+
+    $$ppath = $realpath;
+    return 0;
+}
+    
+#
 # Add a file to an archive. Returns -1 if any error. Otherwise return 0.
 # All this does is copy the file (and its directory structure) into the
 # temporary store. Later, after all the files are in the tree, must
@@ -237,52 +308,21 @@ sub ArchiveAdd($$;$$)
     $exact = 0
 	if (!defined($exact));
 
-    # Taint check path before handing off to shell below.
-    if ($pathname =~ /^([-\w\/\.\+\@,~]+)$/) {
-	$pathname = $1;
-    }
-    else {
-	print STDERR "ArchiveAdd: ".
-	    "Illegal characters in: $pathname\n";
-    }
-
-    if (! -e $pathname || ! -r $pathname) {
-	print STDERR "*** ArchiveAdd: $pathname cannot be read!\n";
-	return 0;
+    # This returns a taint checked value in $pathname.
+    if (ValidatePath(\$pathname) != 0) {
+	print STDERR "ArchiveAdd: Could not validate pathname $pathname\n";
+	return -1;
     }
 
     #
-    # Use realpath to check that the path does not contain links to
-    # files outside the directory space the user is allowed to access.
+    # Strip leading /dir from the pathname, we need it below.
     #
-    my $realpath = `$REALPATH $pathname`;
-    if ($realpath =~ /^([-\w\/\.\+\@,~]+)$/) {
-	$realpath = $1;
-    }
-    else {
-	print STDERR "ArchiveAdd: ".
-	    "Bad data returned by realpath: $realpath\n";
-    }
-
-    #
-    # Strip leading /dir from the pathname, and taint check it. We want
-    # a relative path to the rootdiir so we can copy it in. 
-    #
-    if ($realpath =~ /^[\/]+(\w+)\/([-\w\/\.\+\@,~]+)$/) {
+    if ($pathname =~ /^[\/]+(\w+)\/([-\w\/\.\+\@,~]+)$/) {
 	$rootdir  = $1;
 	$pathname = $2;
     }
     else {
 	print STDERR "ArchiveAdd: Illegal characters in pathname $pathname\n";
-	return -1;
-    }
-
-    #
-    # The file must reside in one of the Emulab "root" filesystems.
-    #
-    if (! exists($ROOTS{$rootdir})) {
-	print STDERR "ArchiveAdd: ".
-	    "$realpath does not resolve to an allowed directory!\n";
 	return -1;
     }
 
@@ -315,14 +355,15 @@ sub ArchiveAdd($$;$$)
     
     if (-f "/${rootdir}/${pathname}" || !$exact) {
 	mysystem("$TAR cf - -C /$rootdir $pathname | ".
-		 "$TAR xf - -C $checkin/$rootdir");
+		 "$TAR xf - -U -C $checkin/$rootdir");
+	mysystem("$CHMOD 775 $checkin/$rootdir/$pathname");
     }
     else {
 	mysystem("cd /$rootdir; ".
-		 "$RSYNC -R -ax --delete ${pathname} $checkin/$rootdir");
+		 "$RSYNC -R -rtgoDlz --delete ${pathname} $checkin/$rootdir");
     }
     if ($?) {
-	print STDERR "ArchiveAdd: Could not copy in $realpath\n";
+	print STDERR "ArchiveAdd: Could not copy in /$rootdir/$pathname\n";
 	return -1;
     }
     return 0;
@@ -1980,6 +2021,60 @@ sub TBIsTaqUnique($$$$)
 	if ($rval < 0);
 
     return IsArchiveTaqUnique($archive_idx, $tag, $prval, $view);
+}
+
+#
+# Return a list of files in a particular spot in the archive. This avoids
+# having to check it out.
+#
+sub TBListExperimentArchive($$$;$$)
+{
+    my ($pid, $eid, $prval, $tag, $subdir) = @_;
+    my ($archive_idx, $view);
+    my @filelist = ();
+
+    @$prval = @filelist;
+    return 0
+	if (!$MAINSITE || $pid ne $ALLOWEDPID);
+
+    my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
+    return 0
+	if ($rval > 0);
+    return -1
+	if ($rval < 0);
+
+    my $sourcepoint = (defined($tag) ? "tags/$tag" : "trunk");
+    $sourcepoint = "$sourcepoint/$subdir"
+	if (defined($subdir));
+
+    my $directory;
+    if (GetArchiveDirectory($archive_idx, \$directory) < 0) {
+	print STDERR "ListExperimentArchive: ".
+	    "Archive '$archive_idx' does not exist in the DB!\n";
+	return -1;
+    }
+    if (! -d $directory || ! -w $directory) {
+	print STDERR "ListExperimentArchive: $directory cannot be written!\n";
+	return -1;
+    }
+    my $repo = "$directory/repo/$view";
+	
+    #
+    # Start a subprocess that does the listing, and then read it back.
+    #
+    if (!open(LIST, "$SVN list -R file://$repo/$sourcepoint |")) {
+	print STDERR "ListExperimentArchive: Could not start svn!\n";
+	return -1;
+    }
+    while (<LIST>) {
+	chomp($_);
+	push(@filelist, $_);
+    }
+    return -1
+	if (! close(LIST));
+
+    @$prval = @filelist;
+    return 0;
 }
 
 # _Always_ make sure that this 1 is at the end of the file...
