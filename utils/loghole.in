@@ -907,7 +907,7 @@ def rsync(host, base, dlpath, paths = ["/"], port = None, output = False):
         except OSError:
             pass
         cmd = [RSYNC,
-               "-rptgoDlz",
+               "-rtgoDlz",
                "-v", # XXX
                "--copy-unsafe-links",
                "--include-from=" + dlpath]
