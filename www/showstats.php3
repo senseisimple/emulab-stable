@@ -36,10 +36,12 @@ if (! isset($which))
 if (!isset($records) || !strcmp($records, "")) {
     $records = 100;
 }
+elseif (! TBvalid_integer($records)) {
+    PAGEARGERROR("Invalid argument: $records!");
+}
 
 echo "<b>Show: <a class='static' href='showexpstats.php3'>
                   Experiment Stats</a>";
-
 if ($isadmin) {
     echo "<a class='static' href='showsumstats.php3'>, Summary Stats</a>\n";
 }
