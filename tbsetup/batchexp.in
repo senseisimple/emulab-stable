@@ -622,7 +622,7 @@ if (! ($frontend || $batchmode)) {
     #
     my @localnodes = ExpNodes($pid, $eid, 1);
     
-    if (defined(@localnodes) && scalar(@localnodes) > 2) {
+    if (@localnodes && scalar(@localnodes) > 2) {
 	my $vlans_result =
 	    DBQueryFatal("select pid from virt_lans ".
 			 "where pid='$pid' and eid='$eid'");
@@ -716,6 +716,7 @@ TBExptSetSwapUID($pid, $eid, $dbuid);
 #
 # Close up the log file so the webpage stops.
 #
+print "Experiment $pid/$eid has been successfully created!\n";
 TBExptCloseLogFile($pid, $eid);
 
 #
@@ -1163,7 +1164,7 @@ sub CopyInArchive()
 
 	if (-e $srcdir) {
 	    print "Copying experiment archive from ${srcdir}\n";
-	    system("$RSYNC -ax --delete ${srcdir}/ $dstdir");
+	    system("$RSYNC -rtgoDlz --delete ${srcdir}/ $dstdir");
 	    if ($?) {
 		fatal("CopyInArchive: Failed to copy ${srcdir} to $dstdir");
 	    }
