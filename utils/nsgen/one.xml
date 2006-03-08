@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="no"?>
+<!DOCTYPE nstemplate SYSTEM "nstemplate.dtd">
+<!--
+    XML NS template file for making a single-node experiment
+-->
+<nstemplate name="One Node" author="Robert Ricci"
+            authormail="ricci@cs.utah.edu" authoruid="ricci">
+    <description>
+        This template a quick way to get a single-node experiment.
+    </description>
+    <variable name="OS" default="RHL-STD" />
+    <variable name="HWType" default="pc" descr="Hardware Type" />
+    <variable name="NodeName" default="loneranger" descr="Node Name" />
+    <nstext>
+	<section><![CDATA[
+source tb_compat.tcl
+
+set ns [new Simulator]
+
+set <NodeName /> [$ns node]
+tb-set-node-os $<NodeName /> <OS>
+tb-set-hardware $<NodeName /> <HWType>
+
+$ns run
+	]]></section>
+    </nstext>
+</nstemplate>
