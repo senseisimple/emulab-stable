@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 SRCDIR		= @srcdir@
@@ -48,6 +48,7 @@ FILES  += $(wildcard $(SRCDIR)/*.ico)
 FILES  += $(wildcard $(SRCDIR)/*.class)
 FILES  += $(wildcard $(SRCDIR)/*.jar)
 FILES  += $(wildcard $(SRCDIR)/*.js)
+FILES  += $(wildcard $(SRCDIR)/*.htc)
 FILES  += $(SRCDIR)/.htaccess $(SRCDIR)/error.shtml \
 	  $(SRCDIR)/ssh-mime.pl $(SRCDIR)/rdp-mime.pl \
 	  $(SRCDIR)/ssh-mime-winxp.pl $(SRCDIR)/rdp-mime-winxp.pl \

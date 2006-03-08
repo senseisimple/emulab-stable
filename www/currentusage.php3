@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -60,9 +60,8 @@ function SHOWSTATS()
     PAGEBEGINNING("Current Usage", 1, 1);
     ?>
      <table valign=top align=center width=100% height=100% border=1>
-     <tr><td nowrap colspan=2 class="contentheader"
-	     bgcolor="#E1EAEA" align="center">
-	   <font size=-1>Current Experiments</font></td></tr>
+     <tr><th nowrap colspan=2 class='usagetitle'>
+	   Current Experiments</th></tr>
      <tr><td class="menuoptusage" align=right>
           <?php echo $active_expts ?></td> 
          <td align="left" class="menuoptusage">

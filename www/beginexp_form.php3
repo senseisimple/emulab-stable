@@ -220,7 +220,7 @@ function SPITFORM($formfields, $errors)
               document.form1.submit();
           }
           function SyntaxCheck() {
-              window.open('','nscheck','width=600,height=400,toolbar=no,".
+              window.open('','nscheck','width=650,height=400,toolbar=no,".
 	                      "resizeable=yes,scrollbars=yes,status=yes,".
 	                      "menubar=yes');
               var action = document.form1.action;

@@ -4,15 +4,27 @@
  * All rights reserved.
  */
 
-td, th { border: solid 0px #669;
-     background-color: #F1FAFA; 
-     ba2ckground-color: #FFF;  
-     margin: 0px;
-     padding: 2px; }
+body {
+  /* behavior:url("csshover.htc"); IE hack to make :hover work. */
+}
 
-th { background-color: #E1EAEA; text-align: left; vertical-align: bottom; }
+td, th {
+  border: solid 0px #669;
+  background-color: #F1FAFA;
+  margin: 0px;
+  padding: 2px;
+}
 
-table { border: 0px; background-color: #99A}
+th {
+  background-color: #E1EAEA;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+table {
+  border: 0px;
+  background-color: #99A
+}
 
 table.nogrid { border: solid 1px #669; background-color:#99A; }
 table.stealth { border: 0px; background-color:#FFF; }
@@ -26,135 +38,320 @@ td.pad4 { padding: 4px; }
 td.paddedcell { padding-left: 0.5em; padding-right: 0.5em; padding-top: 0.75em; }
 td.paddedcell2 { padding: 0.5em; }
 
-.bordercell {
-	background-color: #000; }
+/* BEGIN Banner - Draw and size the banner div across the top. */
 .bannercell {
-	ba2ckground-color: #3D627F; 
-	background-color: #000; 
-	background-image: url(headerbgbb.jpg);
-	background-repeat: repeat-x;
-	border: 0px;
-        border-bottom: solid 2px black;
-	padding: 0px;
-	spacing: 0px; }
-.leftcell {
-	bo2rder-right: solid thin black;
-	background-color: #9BACBB;
-	padding: 8px;
-	padding-right: 3px;
-	background-image: url(wallpaper1.png); }
-.rightcell {
-	bo2rder-left: solid thin black;
-	background-color: #9BACBB; 
-	padding: 8px;
-	padding-left: 3px;
-	background-image: url(wallpaper1.png); }
-.banneriframe {
-	background-color: #000; 
-        border: solid 2px black;
-	padding: 0px;
-        spacing: 0px; }
-.menu {
-	border: solid 2px black; 
-	margin: 0px; 
-	padding: 0px;  }
-.submenu {
-	border: solid 2px black;
-	margin: 0px; 
-	margin-right: 6px; 
-	padding: 0px;  }
-.menuheader {
-	background-color: #000; 
-	color: #FFF;
-	padding-left: 4px;
-	padding-top: 2px; 
-	padding-bottom: 1px; 
-	margin: 0px;
-	border: 0px; }
-.menufooter {
-	background-color: #abc; 
-	color: #000;
-	padding-left: 4px;
-	padding-top: 2px; 
-	padding-bottom: 0px; 
-	margin: 0px;
-	border: 0px; }
-.menuopt, .menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb, .submenuopt, .submenuoptdiv {
-	background-color: #cde; 
-	padding-left: 6px;
-	padding-top: 2px; 
-	padding-bottom: 0px;
-	margin: 0px; 
-	border: 0px;
-	font-size: 10pt; }
-
-.submenuopt, .submenuoptdiv {
-	background-color: #F1FAFA; 
+  background-color: #000;
+  background-image: url("headerbgbb.jpg");
+  background-repeat: repeat-x;
+  border-bottom: solid 2px black;
+  padding: 0px;
+  margin: 0px;
+  width: 100%;
+  height: 100px;
+}
+iframe.usageframe {
+  border-left: solid 2px black;
+  margin: 0px;
+  float: right;
+  width: 200px;
+  height: 100px;
 }
 
+/* Styling for the usage box title and cells. */
+.usagetitle {
+  background-color: #000;
+  color: #fff;
+  text-align: center;
+  font-size: 10pt;
+}
 td.menuoptusage {
-	background-color: #cde; 
-	padding-left: 6px;
-	padding-top: 1px; 
-	padding-bottom: 0px;
-	margin: 0px; 
-	border: 0px;
-	font-size: 10pt }
+  background-color: #cde; 
+  padding-left: 6px;
+  padding-top: 1px; 
+  padding-bottom: 0px;
+  margin: 0px; 
+  border: 0px;
+  font-size: 10pt;
+}
+/* END Banner */
+
+
+/* 
+ * The main body of page is split between the "leftcell", which contains the
+ * menus, and the "content" which is a container used to positon the
+ * "contentbody" to the right of the leftcell.
+ */
+
+
+/* BEGIN Left cell */
+.leftcell {
+  /* Border for the entire group of menus. */
+  border: solid 2px black;
+  border-top: 0px;
+
+  /* Style for text inlined between menus. */
+  background-color: #def;
+  text-align: center;
+  font-size: 10pt;
+
+  /* Position the menus on the left side of the page. */
+  position: absolute;
+  left: 8px;
+  margin-top: 8px;
+  width: 195px;
+}
+
+
+/*
+ * The menus are made up of a heading (e.g. h2) and an unordered list that
+ * contains the menu-items.  The .menuheader class makes the black bars with
+ * the menu title and the ul.* styles make plain rows of text/links.
+ */
+.menuheader {
+  background-color: #000;
+  color: #FFF;
+  padding: 3px 4px;
+  font-size: medium;
+  margin: 0px;
+  text-align: left;
+}
+ul.menu {
+  background-color: #cde;
+  text-align: left;
+  margin: 0px;
+  padding: 3px 6px 6px 6px; /* Padding for menu items and at the bottom. */
+}
+ul.menu li {
+  list-style: none; /* Get rid of the bullets. */
+  margin-bottom: 2px;
+}
+ul.menu li.newgroup {
+  /* Start of a new group of menu items, add some extra space to visually */
+  /* separate them. */
+  list-style: none;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+#searchrow {
+  padding: 3px;
+  /* Add some horizontal separators. */
+  border-top: solid 2px black;
+  border-bottom: solid 2px black;
+}
+#searchrow form, #searchrow table, #searchrow table td {
+  /* Make sure the background is the same for the table that makes up the
+   * search box. */
+  background-color: #def;
+  margin: 0px;
+}
+/* The text box. */
+#searchbox {
+  padding: 0px;
+  margin: 0px;
+  width: 100%; /* Force a width, the default value is actually too wide. */
+}
+.textInput {
+  color: #000000;
+  font-size: small;
+}
+.textInputEmpty {
+  color: #888888;
+  font-size: small;
+}
+/* The submit button. */
+#searchsub {
+  padding: 0px;
+  margin: 0px;
+  font-size: x-small;
+}
+
+/* The web/message text. */
+.notice {
+  display: block; /* Break the line. */
+  font-weight: bold;
+  padding-bottom: 2px;
+}
+
+#loginbox a {
+  display: block; /* Break the line for the login/request buttons. */
+}
+
+/* The login message. */
+#loginbox strong {
+  font-weight: bold;
+  display: block;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+/* Web temporarily disabled. */
+#webdisabled {
+  padding-top: 3px;
+  display: block;
+  color: red;
+  font-weight: normal;
+}
+/* END Left cell */
+
+
+/* Definition for regular pages that have a menu. */
+.content {
+  position: absolute;
+  left: 212px; /* Push it to the right of the menu. */
+  margin-top: 8px;
+  right: 8px;
+}
+/* Definition for pages with no menu, like nscheck. */
+.fullcontent {
+  margin: 8px;
+}
+
+
+/*   BEGIN Content */
+.contentbody {
+  background-color: #FFF;
+  border: solid 2px black;
+
+  /*
+   * XXX Very important.  We float the body so that any tables that are wider
+   * than the viewport will cause the div to expand.  This works so long as the
+   * wide table is the direct descendent of this div, otherwise, no joy.
+   */
+  float: left;
+  margin-left: 0px;
+  margin-right: 0px;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-bottom: 8px;
+  min-width: 95%; /* XXX Safari doesn't expand the div to fill the viewport. */
+}
+
+/* The black bar containing the page title. */
+.contenttitle {
+  background-color: #000;
+  color: #FFF;
+  margin: 0px;
+
+  /* Counteract the padding of the contentbody. */
+  margin-left: -16px;
+  margin-right: -16px;
+  margin-bottom: 16px; /* Simulate padding for the actual content. */
+  padding: 0px;
+  padding-left: 3px;
+  clear: none; /* Let the version/login floats share the line.  XXX IE6 */
+  line-height: 38px;
+}
+#versioninfo {
+  color: #FFF;
+  font-size: x-small;
+  /* Float the version info and add some space between #logintime. */
+  float: right;
+  display: inline;
+  margin-right: 10px;
+  line-height: 38px; /* Match the height of the header so the text is */
+		     /* vertically centered. */
+}
+#logintime {
+  color: #FFF;
+  /* Also float the login and timestamp to the right. */
+  float: right;
+  display: inline;
+  text-align: right;
+  font-size: 13px;
+  line-height: 16px; /* Smaller line-height to fit the login and timestamp. */
+  padding: 0px;
+  margin-top: 2px;
+  margin-right: -10px; /* The float obeys the contentbody padding so we need */
+		       /* to push it right a little. */
+}
+#logintime .uid {
+  font-weight: bold;
+}
+#logintime .uid:before, #logintime .uid:after {
+  font-weight: normal;
+  content: "'"; /* XXX Doesn't work in IE6. */
+}
+#loggedin {
+  color: #FFF;
+  display: block; /* Break the line between login and timestamp. */
+  margin: 0px;
+  padding: 0px;
+}
+
+
+/* The submenus are pretty much the same as the main ones. */
+.submenuheader {
+  background-color: #000;
+  color: #FFF;
+  border-top: solid 2px black;
+  border-right: solid 4px black;
+  border-left: solid 4px black;
+  font-size: medium;
+  margin: 0px;
+}
+ul.submenu {
+  background-color: #f1fafa;
+  margin: 0px;
+  padding: 3px 6px 6px 6px;
+  border: solid 2px black;
+}
+ul.submenu li {
+  font-size: 10pt;
+  list-style: none;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+ul.submenu li.newgroup {
+  list-style: none;
+  margin-top: 8px;
+  margin-bottom: 2px;
+}
+
+
+/* The footer with a list of links, contact, and copyright. */
+.contentfooter {
+  background-color: #FFF; 
+  padding: 16px;
+  margin: 0px;
+  text-align: center;
+  clear: both;
+}
+.contentfooter .navlist {
+  margin-bottom: 0px;
+}
+/* The navlist is the list of links at the bottom of the page. */
+.contentfooter .navlist li {
+  display: inline; /* Make the list horizontal. */
+  font-size: small;
+}
+.copyright {
+  font-size: x-small;
+}
+.builtwith {
+  float: left;
+}
+.contact {
+  font-size: x-small;
+  text-align: right;
+  margin-bottom: 0px;
+}
+/*   END Content */
+
 
 .topbaropt {
-    	background-color: #fff;
-	padding-bottom: 0px;
-	padding-left: 8px;
-	padding-right: 8px;
-	text-align: center;
+  background-color: #fff;
+  padding-bottom: 0px;
+  padding-left: 8px;
+  padding-right: 8px;
+  text-align: center;
 }
-
-.menuopt, .menuoptb, .submenuopt {
-	padding-left: 14px;
-	text-indent: -8px;
-}
-
-.menuoptb, .menuoptsb {
-   	padding-bottom: 8px;
-}
-
-.menuoptdiv {
-	height: 6px;
-}
-
-.menuoptst {
-        ba2ckground-color: #cccccc;
-	border-top: solid 2px black;
-}
-
-.menuopts, .menuoptst, .menuoptsb {
-	background-color: #def;
-}
-
-.content {
-	background-color: #FFF; 
-	border: solid 2px black;
-	margin: 0px; 
-	padding: 0px;
-}
-.contentheader {
-	background-color: #000; 
-	color: #FFF;
-	padding-left: 2px; 
-	margin: 0px;
-	border: 0px; 
-}
-.contentbody {
-	background-color: #FFF;  
-	padding: 16px;
-	padding-bottom: 2px;
-	border: 0px; }
 
 .picture { float: right; margin: 4px; }
 
-body  	{ background-image: url(wallpaper1.png); }
+body  	{ background-image: url("wallpaper1.png"); }
 
-a	    { color: #2222BB; text-decoration: underline; }
+a { color: #2222BB; text-decoration: underline; }
 
 a:plain   { color: #2222BB; text-decoration: none; }
 a:link    { color: #2222BB; text-decoration: none; }
@@ -174,9 +371,30 @@ a2:hover   { background-color: #E7E7F0; border: solid 1px #007; text-decoration:
 
 span.topbaroption { background-color:#E1E1EA; }
 
-.textInput {
-	color: #000000
+.walayer {
+  font-size: small;
+  width: 21ex;
+  height: 2.4em;
+  overflow: hidden;
+  position: relative;
 }
-.textInputEmpty {
-	color: #888888
+.walayer:hover {
+  overflow: visible;
+  position: static;
+}
+.wahover {
+  height: 2.4em;
+  min-width: 21ex;
+}
+.wahover:hover {
+  background-color: #def;
+  border: dotted 1px black;
+  margin-top: -2px;
+  margin-left: -2px;
+  padding: 1px;
+  position: absolute;
+}
+.wasite, .wahost {
+  display: block;
+  white-space: nowrap;
 }

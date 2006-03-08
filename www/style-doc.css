@@ -1,0 +1,117 @@
+/*
+ * EMULAB-COPYRIGHT
+ * Copyright (c) 2006 University of Utah and the Flux Group.
+ * All rights reserved.
+ */
+
+/*
+ * Some extra styling that puts documentation in a three column format with
+ * section headings in the left column, main text in the center, and figures
+ * in the right.
+ */
+
+#doctitle {
+  text-align: center;
+}
+
+.docsection {
+  border-top: solid 1px silver; /* Separate the sections. */
+  padding-top: 0px;
+  padding-left: 13ex; /* Make room for the left column. */
+  padding-right: 101px; /* Make room for the right column. */
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+.docsection h1, .docsection h2 {
+  float: left;
+  display: inline; /* XXX IE doubles the margins otherwise. */
+  margin: 0px;
+  margin-left: -13ex; /* Move it into the left column. */
+  width: 12ex;
+  text-align: right;
+}
+.docsection h1 {
+  padding-top: 1em;
+  font-size: medium;
+}
+.docsection h2 {
+  font-style: italic;
+  font-weight: normal;
+  font-size: small;
+  line-height: 1.5em;
+}
+.docsection p {
+  text-indent: 0px; /* Don't indent the first line. */
+}
+
+/* Place pictures that are 93px wide in the right column. */
+.docfig {
+  float: right;
+  display: inline; /* XXX IE doubles the margins otherwise. */
+  padding: 0px;
+  margin: 0px;
+  margin-top: 16px;
+  margin-right: -101px;
+  width: 98px;
+  text-align: center;
+  white-space: nowrap;
+  font-size: x-small;
+}
+.docfig a { display: block; }
+.docfig img { border: solid 1px; }
+
+/* Surround sample code with a light gray border. */
+.samplecode {
+  white-space: pre;
+  display: block;
+  border: solid 1px #bbb;
+  margin-top: 16px;
+  margin-right: 16px;
+  margin-left: 16px;
+  padding: 3px;
+}
+.caption {
+  display: block;
+  text-align: center;
+  font-size: x-small;
+}
+
+
+/* Stuff specific to the mobile wireless tutorial below. */
+
+/* Float the list of tools useful for robots to the right. */
+#toollist {
+  float: right;
+  display: inline; /* XXX IE doubles the margins otherwise. */
+  border: solid 1px silver;
+  background-color: #f1fafa;
+  margin-right: -95px;
+  margin-top: 1em;
+}
+#toollist h3 {
+  margin: 2px;
+  font-size: medium;
+}
+#toollist ul {
+  padding: 0px;
+  margin: 3px;
+  font-size: smaller;
+}
+#toollist li {
+  list-style: none;
+}
+
+#captionLayer {
+  height: 2em;
+}
+/* Make a horizontal list of robot thumbnail pictures. */
+#robothumbs {
+  margin-left: -15ex;
+  margin-right: -101px;
+  text-align: center;
+}
+#robothumbs li {
+  display: inline;
+  list-style: none;
+  padding-left: 16px;
+}

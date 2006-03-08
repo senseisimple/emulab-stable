@@ -1,15 +1,24 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 
 #
+# Define a stripped-down view of the web interface - less clutter
+#
+$view = array(
+    'hide_banner' => 1,
+    'hide_sidebar' => 1,
+    'hide_copyright' => 1
+);
+
+#
 # Standard Testbed Header
 #
-PAGEHEADER("Syntax Check an NS File");
+PAGEHEADER("Syntax Check an NS File", $view);
 
 #
 # Only known and logged in users can begin experiments.

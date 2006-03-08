@@ -18,6 +18,27 @@ $autorefresh      = 0;
 $BASEPATH	  = "";
 
 #
+# Determine the proper basepath, which depends on whether the page
+# was loaded as http or https. This lets us be consistent in the URLs
+# we spit back, so that users do not get those pesky warnings. These
+# warnings are generated when a page *loads* (say, images, style files),
+# a mix of http and https. Links can be mixed, and in fact when there
+# is no login active, we want to spit back http for the documentation,
+# but https for the start/join pages.
+#
+if (isset($SSL_PROTOCOL)) {
+    $BASEPATH = $TBBASE;
+}
+else {
+    $BASEPATH = $TBDOCBASE;
+}
+
+# Blank space dividers in the menus are handled by adding a class to the menu
+# item that starts a new group.
+$nextsidebarcl    = "";
+$nextsubmenucl    = "";
+
+#
 # TOPBARCELL - Make a cell for the topbar. Actually, the name lies, it can be
 # used for cells in a bottombar too.
 #
@@ -27,22 +48,6 @@ function TOPBARCELL($contents) {
     echo $contents;
     echo "&nbsp;</span>";
     echo "</td>";
-    echo "\n";
-}
-
-#
-# SIDEBARCELL - Make a cell for the sidebar
-#
-function SIDEBARCELL($contents, $last = 0) {
-    echo "<tr>";
-    if ($last) {
-	echo "<td class=\"menuoptb\">";
-    } else {
-	echo "<td class=\"menuopt\">";
-    }
-    echo "$contents";
-    echo "</td>";
-    echo "</tr>";
     echo "\n";
 }
 
@@ -63,15 +68,9 @@ function WRITETOPBARBUTTON_NEW($text, $base, $link ) {
 # WRITESIDEBARDIVIDER(): Put a bit of whitespace in the sidebar
 #
 function WRITESIDEBARDIVIDER() {
-    global $BASEPATH;
-    echo "<tr>";
-    echo "<td class=\"menuoptdiv\">";
-    # We have to put something in this cell, or IE ignores it. But, we do not
-    # want to make the table row full line-height, so a space will not do.
-    echo "<img src=\"$BASEPATH/1px.gif\" border=0 height=1 width=1 />";
-    echo "</td>";
-    echo "</tr>";
-    echo "\n";
+    global $nextsidebarcl;
+    
+    $nextsidebarcl = "newgroup";
 }
 
 #
@@ -79,50 +78,46 @@ function WRITESIDEBARDIVIDER() {
 # We do not currently try to match the current selection so that its
 # link looks different. Not sure its really necessary.
 #
-function WRITESIDEBARBUTTON($text, $base, $link ) {
+function WRITESIDEBARBUTTON($text, $base, $link, $extratext="") {
+    global $nextsidebarcl;
+    
     if ($base)
 	$link = "$base/$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>");
+    $cl = "";
+    if ($nextsidebarcl != "") {
+	$cl = "class='$nextsidebarcl'";
+	$nextsidebarcl = "";
+    }
+    echo "<li $cl><a href=\"$link\">$text</a>$extratext</li>\n";
 }
 
 # same as above with "new" gif next to it.
-function WRITESIDEBARBUTTON_NEW($text, $base, $link ) {
-    $link = "$base/$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/new.gif\" />");
+function WRITESIDEBARBUTTON_NEW($text, $base, $link) {
+    WRITESIDEBARBUTTON($text,
+		       $base,
+		       $link,
+		       "&nbsp;<img src=\"/new.gif\" />");
 }
 
 # same as above with "cool" gif next to it.
 function WRITESIDEBARBUTTON_COOL($text, $base, $link ) {
     $link = "$base/$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" />");
+    echo "<li><a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" /></li>\n";
 }
 
 function WRITESIDEBARBUTTON_ABS($text, $base, $link ) {
     $link = "$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>\n");
+    echo "<li><a href=\"$link\">$text</a></li>\n";
 }
 
 function WRITESIDEBARBUTTON_ABSCOOL($text, $base, $link ) {
     $link = "$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" />");
-}
-
-# same as above, but uses a slightly different style sheet so there
-# is more padding below the last button.
-# The devil is, indeed, in the details.
-function WRITESIDEBARLASTBUTTON($text, $base, $link) {
-    $link = "$base/$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>",1);
-}
-
-function WRITESIDEBARLASTBUTTON_COOL($text, $base, $link) {
-    $link = "$base/$link";
-    SIDEBARCELL("<a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" />",1);
+    echo "<li><a href=\"$link\">$text</a>&nbsp;<img src=\"/cool.gif\" /></li>\n";
 }
 
 # writes a message to the sidebar, without clickability.
 function WRITESIDEBARNOTICE($text) {
-    SIDEBARCELL("<b>$text</b>");
+    echo "<span class='notice'>$text</span>\n";
 }
 
 #
@@ -233,8 +228,7 @@ function WRITESIDEBAR() {
     # The document base cannot be a mix of secure and nonsecure.
     #
     
-    # create the main menu table, which also happens to reside in a form
-    # (for search.)
+    # create the main menu list
 
     #
     # get post time of most recent news;
@@ -266,11 +260,10 @@ function WRITESIDEBAR() {
 	}
     }
 
-    echo "<FORM method=get ACTION=$newsBase/search.php3>\n";
 ?>
   <script type='text/javascript' language='javascript' src='textbox.js'></script>
-  <table class="menu" width=210 cellpadding="0" cellspacing="0">
-    <tr><td class="menuheader"><b>Information</b></td></tr>
+    <h3 class="menuheader">Information</h3>
+  <ul class="menu">
 <?php
     if (0 == strcasecmp($THISHOMEBASE, "emulab.net")) {
 	$rootEmulab = 1;
@@ -306,42 +299,48 @@ function WRITESIDEBAR() {
 	#WRITESIDEBARBUTTON("Add Widearea Node (CD)",
 	#		    $TBDOCBASE, "cdrom.php");
 
-	SIDEBARCELL("<a href=\"$TBDOCBASE/people.php3\">People</a> and " .
-	            "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>");
+	echo "<li><a href=\"$TBDOCBASE/people.php3\">People</a> and " .
+	     "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a></li>";
 
-	SIDEBARCELL("Emulab <a href=\"$TBDOCBASE/doc/docwrapper.php3? " .
-		    "docname=users.html\">Users</a> and " .
-	            "<a href=\"$TBDOCBASE/docwrapper.php3? " .
-		    "docname=sponsors.html\">Sponsors</a>",1);
+	echo "<li>Emulab <a href=\"$TBDOCBASE/doc/docwrapper.php3? " .
+	     "docname=users.html\">Users</a> and " .
+	     "<a href=\"$TBDOCBASE/docwrapper.php3? " .
+	     "docname=sponsors.html\">Sponsors</a></li>";
     } else {
 	# Link ALWAYS TO UTAH
 	#WRITESIDEBARBUTTON_ABSCOOL("Add Widearea Node (CD)",
 	#		       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
-	WRITESIDEBARLASTBUTTON("Projects on Emulab", $TBDOCBASE,
-			       "projectlist.php3");
+	WRITESIDEBARBUTTON("Projects on Emulab", $TBDOCBASE,
+		"projectlist.php3");
     }
+    
+    echo "</ul>\n";
 
-    # The actual search box. Form starts above ...
-    echo "<tr><td class=menuoptst>
-                 <input class='textInputEmpty' name=query
-                        value='Search String'
-                        size=16 onfocus='focus_text(this, \"Search String\")'
-                        onblur='blur_text(this, \"Search String\")' />".
-	"<input type=submit style='font-size:10px;' value=Search /><br>".
-	"</td></tr>\n";
-    WRITESIDEBARDIVIDER();
+    # The search box.  Placed in a table so the text input fills available
+    # space.
+    echo "<div id='searchrow'>
+        <FORM method=get ACTION=$newsBase/search.php3>
+        <table border=0 cellspacing=0 cellpadding=0><tr>
+             <td width=100%><input class='textInputEmpty' name=query
+                        value='Search String' id='searchbox'
+                        onfocus='focus_text(this, \"Search String\")'
+                        onblur='blur_text(this, \"Search String\")' /></td>
+	     <td><input type=submit id='searchsub' value=Search /></td>
+        </table>
+        </form>
+	</div>\n";
 
     #
     # Cons up a nice message.
     # 
     switch ($login_status & CHECKLOGIN_STATUSMASK) {
     case CHECKLOGIN_LOGGEDIN:
-	$login_message = 0;
-	    
 	if ($login_status & CHECKLOGIN_PSWDEXPIRED)
-	    $login_message = "$login_message<br>(Password Expired!)";
+	    $login_message = "(Password Expired!)";
 	elseif ($login_status & CHECKLOGIN_UNAPPROVED)
-	    $login_message = "$login_message<br>(Unapproved!)";
+	    $login_message = "(Unapproved!)";
+	else
+	    $login_message = 0;
 	break;
     case CHECKLOGIN_TIMEDOUT:
 	$login_message = "Login Timed out.";
@@ -351,15 +350,8 @@ function WRITESIDEBAR() {
 	break;
     }
 
-    if ($login_message) {
-      echo "<tr>";
-      echo "<td class=menuoptst style='padding-top: 6px;' ><center><b>";
-      echo "$login_message</b></center></td>";
-      echo "</tr>";
-    }
-
     #
-    # Now the login box. Remember, already inside a table.
+    # Now the login box.
     # We want the links to the login pages to always be https,
     # but the images path depends on whether the page was loaded as
     # http or https, since we do not want to mix them, since they
@@ -367,22 +359,25 @@ function WRITESIDEBAR() {
     #
     if (! ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
 	!NOLOGINS()) {
-	echo "<tr>";
-	echo "<td class=\"menuoptst\" align=center valign=center>";
+	echo "<div id='loginbox'>";
+
+	if ($login_message) {
+	    echo "<strong>$login_message</strong>";
+	}
 
 	if (!$firstinitstate) {
 	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
 	    echo "<img alt=\"Request Account\" border=0 ";
 	    echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
 
-	    echo "<br /><b>or</b><br />";
+	    echo "<strong>or</strong>";
 	}
 
 	echo "<a href=\"$TBBASE/login.php3\">";
 	echo "<img alt=\"logon\" border=0 ";
 	echo "src=\"$BASEPATH/logon.gif\"></a>\n";
 
-	echo "</td></tr>\n";
+	echo "</div>";
     }
 
     #
@@ -390,17 +385,7 @@ function WRITESIDEBAR() {
     #
     $message = TBGetSiteVar("web/message");
     if (0 != strcmp($message,"")) {
-	WRITESIDEBARNOTICE($message);    	
-    }
-
-    echo "</table>\n";
-
-    # Start Interaction section if going to spit out interaction options.
-    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
-	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
-	    "<tr><td class=menuheader>".
-	    "<b>Experimentation</b>".
-	    "</td></tr>\n";
+	WRITESIDEBARNOTICE($message);
     }
 
     #
@@ -409,24 +394,18 @@ function WRITESIDEBAR() {
     # it clear its disabled.
     # 
     if (NOLOGINS()) {
-	if (! ($login_status &
-	       (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID))) {
-	    echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
-		"<tr><td class=menuheader> &nbsp".
-		"</td></tr>\n";
-	}
-	
-        WRITESIDEBARBUTTON("<font color=red> ".
-			   "Web Interface Temporarily Unavailable</font>",
-			   $TBDOCBASE, "nologins.php3");
+	echo "<a id='webdisabled' href='$TBDOCBASE/nologins.php3'>".
+	    "Web Interface Temporarily Unavailable</a>";
 
         if (!$login_uid || !ISADMIN($login_uid)) {	
 	    WRITESIDEBARNOTICE("Please Try Again Later");
         }
-	if (! ($login_status &
-	       (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID))) {
-	    echo "</table>\n";
-	}
+    }
+
+    # Start Interaction section if going to spit out interaction options.
+    if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
+	echo "<h3 class='menuheader'>Experimentation</h3>
+              <ul class=menu>\n";
     }
 
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
@@ -486,14 +465,14 @@ function WRITESIDEBAR() {
 				   $TBBASE, "showexp_list.php3");
 
 		WRITESIDEBARDIVIDER();
-
+		
 		WRITESIDEBARBUTTON("Node Status",
 				   $TBBASE, "nodecontrol_list.php3");
 
-		SIDEBARCELL("List <a " .
+		echo "<li>List <a " .
 			"href=\"$TBBASE/showimageid_list.php3\">" .
 	        	"ImageIDs</a> or <a " .
-	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a>");
+	                "href=\"$TBBASE/showosid_list.php3\">OSIDs</a></li>";
 
 		if ($login_status & CHECKLOGIN_TRUSTED) {
 		  WRITESIDEBARDIVIDER();
@@ -538,10 +517,8 @@ function WRITESIDEBAR() {
 	# Standard options for logged in users!
 	#
 	if (!$firstinitstate) {
-	    WRITESIDEBARDIVIDER();
-	    SIDEBARCELL("<a href=\"$TBBASE/newproject.php3\">Start</a> or " .
-	             "<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project",
-			0);
+	    echo "<li class='newgroup'><a href=\"$TBBASE/newproject.php3\">Start</a> or " .
+		"<a href=\"$TBBASE/joinproject.php3\">Join</a> a Project</li>";
 	}
     }
     #WRITESIDEBARLASTBUTTON_COOL("Take our Survey",
@@ -550,21 +527,19 @@ function WRITESIDEBAR() {
     # Terminate Interaction menu.
     if ($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) {
         # Logout option. No longer take up space with an image.
-	WRITESIDEBARLASTBUTTON("<b>Logout</b>",
-			       $TBBASE, "logout.php3?target_uid=$login_uid");
+	WRITESIDEBARBUTTON("<b>Logout</b>",
+			   $TBBASE, "logout.php3?target_uid=$login_uid");
 	
-	echo "</table>\n";
+	echo "</ul>\n";
     }
 
     # And now the Collaboration menu.
     if (($login_status & (CHECKLOGIN_LOGGEDIN|CHECKLOGIN_MAYBEVALID)) &&
 	($WIKISUPPORT || $MAILMANSUPPORT || $BUGDBSUPPORT ||
 	 $CVSSUPPORT  || $CHATSUPPORT)) {
-	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
-	    "<tr><td class=menuheader>".
-	    "<b>Collaboration</b>".
-	    "</td></tr>\n";
-     
+	echo "<h3 class='menuheader'>Collaboration</h3>
+              <ul class=menu>";
+
 	if ($WIKISUPPORT && $CHECKLOGIN_WIKINAME != "") {
 	    $wikiname = $CHECKLOGIN_WIKINAME;
 		
@@ -607,21 +582,18 @@ function WRITESIDEBAR() {
 	    WRITESIDEBARBUTTON("My Chat Buddies", $TBBASE,
 			       "mychat.php3?target_uid=$login_uid");
 	}
-	WRITESIDEBARDIVIDER();
-	echo "</table>\n";
+	echo "</ul>\n";
     }
 
     # Optional ADMIN menu.
     if ($login_status & CHECKLOGIN_LOGGEDIN && ISADMIN($login_uid)) {
-	echo "<table class=menu width=210 cellpadding=0 cellspacing=0>".
-	    "<tr><td class=menuheader>".
-	    "<b>Administration</b>".
-	    "</td></tr>\n";
+	echo "<h3 class='menuheader'>Administration</h3>
+              <ul class=menu>";
 	
-	SIDEBARCELL("List <a " .
-		    " href=\"$TBBASE/showproject_list.php3\">" .
-		    "Projects</a> or <a " .
-		    "href=\"$TBBASE/showuser_list.php3\">Users</a>");
+	echo "<li>List <a " .
+	    " href=\"$TBBASE/showproject_list.php3\">" .
+	    "Projects</a> or <a " .
+	    "href=\"$TBBASE/showuser_list.php3\">Users</a></li>";
 
 	WRITESIDEBARBUTTON("View Testbed Stats",
 			   $TBBASE, "showstats.php3");
@@ -648,11 +620,10 @@ function WRITESIDEBAR() {
 			   $TBBASE, "approvewauser_form.php3");
 
 	# Link ALWAYS TO UTAH
-	WRITESIDEBARLASTBUTTON("Add Widearea Node (CD)",
-			       $TBDOCBASE, "http://www.emulab.net/cdrom.php");
-	echo "</table>\n";
+	WRITESIDEBARBUTTON("Add Widearea Node (CD)",
+			   $TBDOCBASE, "http://www.emulab.net/cdrom.php");
+	echo "</ul>\n";
     }
-    echo "</form>\n";
 }
 
 #
@@ -661,18 +632,14 @@ function WRITESIDEBAR() {
 function WRITESIMPLESIDEBAR($menudefs) {
     $menutitle = $menudefs['title'];
     
-    echo "<table class=menu width=210 cellpadding=0 cellspacing=0>
-           <tr><td class=menuheader>\n";
-
-    echo "<b>$menutitle</b>";
-    echo " </td>";
-    echo "</tr>\n";
+    echo "<h3 class='menuheader'>$menutitle</h3>
+          <ul class=menu>";
 
     each($menudefs);    
     while (list($key, $val) = each($menudefs)) {
 	WRITESIDEBARBUTTON("$key", null, "$val");
     }
-    echo "</table>\n";
+    echo "</ul>\n";
 }
 
 #
@@ -700,10 +667,10 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     	    <!-- do not import full style sheet into NS47, since it does bad job
             of handling it. NS47 does not understand '@import'. -->
     	    <style type='text/css' media='all'>
-            <!-- @import '$BASEPATH/style.css'; -->";
+            <!-- @import url($BASEPATH/style.css); -->";
 
     if (!$MAINPAGE) {
-	echo "<!-- @import '$BASEPATH/style-nonmain.css'; -->";
+	echo "<!-- @import url($BASEPATH/style-nonmain.css); -->";
     } 
 
     echo "</style>\n";
@@ -734,11 +701,9 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
                  <area shape=rect coords=\"0,0,369,100\"
                        href='$TBDOCBASE/index.php3'>
               </map>
-            <table cellpadding='0' cellspacing='0' width='100%'>
-            <tr valign='top'>
-              <td valign='top' class='bannercell'
-                  background='$BASEPATH/headerbgbb.jpg'
-                  bgcolor=#3D627F>
+            <div class='bannercell'>
+	       <iframe src=$BASEPATH/currentusage.php3 class='usageframe'
+                 scrolling=no frameborder=0></iframe></td>
               <img width=369 height=100 border=0 usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
@@ -749,21 +714,12 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	}
 	echo "alt='$THISHOMEBASE - the network testbed'>\n";
         if (!$MAINPAGE) {
-	     echo "<font size='+1' color='#CCFFCC'>&nbsp;<b>$WWW</b></font>";
+	     echo "<span class='devpagename'>$WWW</span>";
 	}
-	echo "</td>\n";
-	echo "<td valign=top align=right width=200
-                 class=banneriframe>
-             <iframe src=$BASEPATH/currentusage.php3
-                 width=100% height=100 marginheight=0 marginwidth=0
-                 scrolling=no frameborder=0></iframe></td>\n";
-        echo "</tr></table>\n";
+        echo "</div>\n";
     }
     if (! $nocontent ) {
-	echo "<table cellpadding='8' cellspacing='0' height='100%'
-                width='100%'>
-                <tr height='100%'>
-                  <td valign='top' class='leftcell' bgcolor='#ccddee'>
+	echo "<div class='leftcell'>
                   <!-- sidebar begins -->";
     }
 }
@@ -771,15 +727,12 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 # finishes sidebar td
 #
-function FINISHSIDEBAR()
+function FINISHSIDEBAR($contentname = "content")
 {
     echo "<!-- sidebar ends -->
-        </td>
-        <td valign='top' width='100%' class='rightcell'>
-          <!-- content body table -->
-          <table class='content' width='100%' cellpadding='0' cellspacing='0'>
-            <tr>
-              <td class='contentheader'>";
+        </div>
+        <div class='$contentname'>
+          <!-- content body -->";
 }
 
 #
@@ -793,22 +746,6 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     $drewheader = 1;
     if (isset($_GET['refreshrate']) && is_numeric($_GET['refreshrate'])) {
 	$autorefresh = $_GET['refreshrate'];
-    }
-
-    #
-    # Determine the proper basepath, which depends on whether the page
-    # was loaded as http or https. This lets us be consistent in the URLs
-    # we spit back, so that users do not get those pesky warnings. These
-    # warnings are generated when a page *loads* (say, images, style files),
-    # a mix of http and https. Links can be mixed, and in fact when there
-    # is no login active, we want to spit back http for the documentation,
-    # but https for the start/join pages.
-    #
-    if (isset($SSL_PROTOCOL)) {
-	$BASEPATH = $TBBASE;
-    }
-    else {
-	$BASEPATH = $TBDOCBASE;
     }
 
     #
@@ -858,28 +795,32 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     } else {
 	$nobanner = 0;
     }
-    PAGEBEGINNING( $title, $nobanner, 0, $extra_headers );
+    $contentname = "content";
+    PAGEBEGINNING( $title, $nobanner,
+		   isset($view['hide_sidebar']) && !isset($view['menu']),
+		   $extra_headers );
     if (!isset($view['hide_sidebar'])) {
 	WRITESIDEBAR();
     }
     elseif (isset($view['menu'])) {
 	WRITESIMPLESIDEBAR($view['menu']);
     }
-    FINISHSIDEBAR();
-    echo "<h2 class=\"nomargin\">\n";
-
-    if ($login_uid && ISADMINISTRATOR()) {
-	if (ISADMIN($login_uid)) {
-	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=1>
-	             <img src='/redball.gif'
-                          border=0 alt='Admin On'></a>\n";
-	}
-	else {
-	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=0>
-	             <img src='/greenball.gif'
-                          border=0 alt='Admin Off'></a>\n";
-	}
+    else {
+	$contentname = "fullcontent";
     }
+    FINISHSIDEBAR($contentname);
+
+    echo "<div class='contentbody'>";
+    echo "<div id='logintime'>";
+    echo "<span id='loggedin'>";
+    $now = date("D M d g:ia T");
+    if ($login_uid) {
+	echo "<span class='uid'>$login_uid</span> Logged in.";
+    }
+    echo "</span>";
+    echo "<span class='timestamp'>$now</span>\n";
+    echo "</div>";
+    
     $major = "";
     $minor = "";
     $build = "";
@@ -888,27 +829,21 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 	$versioninfo = "";
     else
 	$versioninfo = "Vers: $major.$minor Build: $build";
-    
-    $now = date("D M d g:ia T");
-    echo "$title</h2></td>\n";
-    echo "<td class=contentheader align=right>\n";
-    echo "<table border='0' cellpadding='0' cellspacing='0'>";
-    echo "  <tr>";
-    echo "  <td class=contentheader><font size=-2>$versioninfo</font></td>";
-    echo "  <td class=contentheader>&nbsp&nbsp</td>";
-    echo "  <td class=contentheader align=right>";
-    if ($login_uid) {
-	echo "<font size=-1>'<b>$login_uid</b>' Logged in.<br>$now</font>\n";
+    echo "<div id='versioninfo'>$versioninfo</div>";
+
+    echo "<h2 class='contenttitle'>\n";
+    if ($login_uid && ISADMINISTRATOR()) {
+	if (ISADMIN($login_uid)) {
+	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=1><img src='/redball.gif'
+                          border=0 alt='Admin On'></a>\n";
+	}
+	else {
+	    echo "<a href=$TBBASE/toggle.php?target_uid=$login_uid&type=adminoff&value=0><img src='/greenball.gif'
+                          border=0 alt='Admin Off'></a>\n";
+	}
     }
-    else {
-	echo "$now";
-    }
-    echo "</td>";
-    echo "</tr>";
-    echo "</table>";
-    echo "</td>";
-    echo "</tr>\n";
-    echo "<tr><td colspan=3 class=\"contentbody\" width=*>";
+    echo "$title</h2>\n";
+
     echo "<!-- begin content -->\n";
     if ($view['show_topbar'] == "plab") {
 	WRITEPLABTOPBAR();
@@ -916,11 +851,10 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 }
 
 #
-# ENDPAGE(): This terminates the table started above.
+# ENDPAGE(): This terminates the div started above.
 # 
 function ENDPAGE() {
-  echo "</td></tr></table>";
-  echo "</td></tr></table>";
+  echo "</div>";
 }
 
 #
@@ -938,56 +872,45 @@ function PAGEFOOTER($view = NULL) {
     $year  = $today["year"];
 
     echo "<!-- end content -->\n";
+
     if ($view['show_bottombar'] == "plab") {
 	WRITEPLABBOTTOMBAR();
     }
 
     echo "
-              </td>
-            </tr>
-            <tr>
-              <td colspan=2 class=contentbody>\n";
+              <div class=contentfooter>\n";
     if (!$view['hide_copyright']) {
 	echo "
-	        <center>
-                <font size=-1>
-		[ <a href=http://www.cs.utah.edu/flux/>
-                    Flux&nbsp;Research&nbsp;Group</a> ]
-		[ <a href=http://www.cs.utah.edu/>
-                    School&nbsp;of&nbsp;Computing</a> ]
-		[ <a href=http://www.utah.edu/>
-                    University&nbsp;of&nbsp;Utah</a> ]
-		</font>
-		<br>
+                <ul class='navlist'>
+		<li>[ <a href=http://www.cs.utah.edu/flux/>
+                    Flux&nbsp;Research&nbsp;Group</a> ]</li>
+	        <li>[ <a href=http://www.cs.utah.edu/>
+                    School&nbsp;of&nbsp;Computing</a> ]</li>
+		<li>[ <a href=http://www.utah.edu/>
+                    University&nbsp;of&nbsp;Utah</a> ]</li>
+                </ul>
                 <!-- begin copyright -->
-                <font size=-2>
+                <span class='copyright'>
                 <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
                     Copyright &copy; 2000-$year The University of Utah</a>
-                </font>
-                <br>
-		</center>\n";
+                </span>\n";
     }
-    echo "      <table width='100%' cellpadding='0' cellspacing='0'
-                       class=stealth>
-                <tr>
-                 <td class=stealth align=left>\n";
-    if (! $TBMAINSITE) {
+    if (!$TBMAINSITE) {
 	#
 	# It is a violation of Emulab licensing restrictions to remove
 	# this logo!
 	#
-	echo "       <a href='http://www.emulab.net'>
+	echo "       <a class='builtwith' href='http://www.emulab.net'>
                          <img src='$BASEPATH/builtwith.png'></a>";
     }
-    else {
-	echo " &nbsp";
-    }
-    echo "       </td>
-                 <td class=stealth align=right>
-                    <font size=-2>Problems? Contact $TBMAILADDR
-                 </td>
-                </tr></table>\n";
-    echo " <!-- end copyright -->\n";
+    echo "
+                <p class='contact'>
+                    Problems?
+	            Contact $TBMAILADDR.
+                </p>
+                <!-- end copyright -->\n";
+    echo "</div>";
+    echo "</div>";
 
     ENDPAGE();
 
@@ -1014,6 +937,7 @@ function PAGEERROR($msg) {
 # Sub Page/Menu Stuff
 #
 function WRITESUBMENUBUTTON($text, $link, $target = "") {
+    global $nextsubmenucl;
 
     #
     # Optional 'target' agument, so that we can pop up new windows
@@ -1021,25 +945,19 @@ function WRITESUBMENUBUTTON($text, $link, $target = "") {
     if ($target) {
 	$targettext = "target='$target'";
     }
+    $cl = "";
+    if ($nextsubmenucl != "") {
+	$cl = "class='$nextsubmenucl'";
+	$nextsubmenucl = "";
+    }
 
-    echo "<!-- Table row for button $text -->
-          <tr>
-            <td class=submenuopt nowrap>
-         	 <a href='$link' $targettext>$text</a>
-            </td>
-          </tr>\n";
+    echo "<li $cl><a href='$link' $targettext>$text</a></li>\n";
 }
 
 function WRITESUBMENUDIVIDER() {
-    global $BASEPATH;
-    echo "<tr>";
-    echo "<td class=\"submenuoptdiv\">";
-    # We have to put something in this cell, or IE ignores it. But, we do not
-    # want to make the table row full line-height, so a space will not do.
-    echo "<img src=\"$BASEPATH/1px.gif\" border=0 height=1 width=1 />";
-    echo "</td>";
-    echo "</tr>";
-    echo "\n";
+    global $nextsubmenucl;
+    
+    $nextsubmenucl = "newgroup";
 }
 
 #
@@ -1067,16 +985,14 @@ function SUBPAGEEND() {
 function SUBMENUSTART($title) {
 ?>
     <!-- begin submenu -->
-    <table class="submenu" cellpadding="0" cellspacing="0">
-      <tr>
-        <td class="menuheader"><b><?php echo "$title";?></b></td>
-      </tr>
+    <h3 class="submenuheader"><?php echo "$title";?></h3>
+    <ul class="submenu">
 <?php
 }
 
 function SUBMENUEND() {
 ?>
-    </table>
+    </ul>
     <!-- end submenu -->
   </td>
   <td class="stealth" valign=top align=left width='100%'>
@@ -1089,16 +1005,16 @@ function SUBMENUSECTION($title) {
     SUBMENUSECTIONEND();
 ?>
       <!-- new submenu section -->
-      <tr>
-        <td class="menuheader"><b><?php echo "$title";?></b></td>
-      </tr>
+      </ul>
+      <h3 class="submenuheader"><?php echo "$title";?></h3>
+      <ul class="submenu">
 <?php
 }
 
-# End a submenu section - only need this on the last one of the table.
+# End a submenu section - only need this on the last one of the list.
 function SUBMENUSECTIONEND() {
 ?>
-      <tr height=5><td></td></tr>
+      </ul>
 <?php
 }
 
@@ -1106,7 +1022,7 @@ function SUBMENUSECTIONEND() {
 
 function SUBMENUEND_2A() {
 ?>
-    </table>
+    </ul>
     <!-- end submenu -->
 <?php
 }

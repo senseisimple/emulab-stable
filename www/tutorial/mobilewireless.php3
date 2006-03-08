@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 chdir("..");
@@ -24,65 +24,16 @@ if (!$printable) {
     PAGEHEADER("Emulab Tutorial - Mobile Wireless Networking");
 }
 
+echo "
+  <head>
+  <style text='text/css'>
+  @import url(\"$BASEPATH/style-doc.css\");
+  </style>
+  </head>";
+
 if (!$printable) {
     echo "<b><a href=$REQUEST_URI?printable=1>
              Printable version of this document</a></b><br>\n";
-}
-
-function NLCH1($value)
-{
-	echo "<td align=\"right\" valign=\"top\" class=\"stealth\">
-                <b>$value</b>
-              </td>";
-}
-
-function NLCH2($value)
-{
-	echo "<td align=\"right\" valign=\"top\" class=\"stealth\">
-                <font size=\"-1\"><i>$value</i></font>
-              </td>";
-}
-
-function NLCBODYBEGIN()
-{
-	echo "<td align=\"left\" valign=\"top\" class=\"stealth\">";
-}
-
-function NLCBODYLONGBEGIN($cols)
-{
-	echo "<td align=\"left\" valign=\"top\" class=\"stealth\" colspan=\"$cols\" style=\"padding: 0px; \" >";
-}
-
-function NLCBODYEND()
-{
-	echo "</td>";
-}
-
-function NLCFIGBEGIN()
-{
-	echo "<td align=\"center\" valign=\"top\" class=\"stealth\">";
-}
-
-function NLCFIGEND()
-{
-	echo "</td>";
-}
-
-function NLCFIG($value, $caption)
-{
-	echo "<td align=\"center\" valign=\"top\" class=\"stealth\">
-                $value
-                <font size=\"-2\">$caption</font>
-              </td>";
-}
-
-function NLCLINKFIG($link, $value, $caption)
-{
-	echo "<td align=\"center\" valign=\"top\" class=\"stealth\">
-                <a href=\"$link\" border=\"0\">
-                  $value<br>
-                  <font size=\"-2\">[$caption]</font></a>
-              </td>";
 }
 
 function NLCLINKFIG2($link, $value, $caption, $explanation)
@@ -95,20 +46,12 @@ function NLCLINKFIG2($link, $value, $caption, $explanation)
               </td>";
 }
 
-function NLCEMPTY()
-{
-	echo "<td class=\"stealth\"></td>";
-}
-
 #
 # Drop into html mode
 #
 ?>
-<center>
 
-    <h2>Emulab Tutorial - Mobile Wireless Networking</h2>
-
-</center>
+<h2 id="doctitle">Emulab Tutorial - Mobile Wireless Networking</h2>
 
 <script type="text/javascript">
 default_text = "Click on an image to enlarge.";
@@ -165,77 +108,67 @@ function imageinfo(msg) {
 }
 
 </script>
-  
 
-<table cellspacing=5 cellpadding=5 border=0 class="stealth" bgcolor="#ffffff">
+<div class="docsection">
+<ul id="robothumbs">
+<li><a href="3bots.jpg" onmouseover="imageinfo(captions[0])" onmouseout="imageinfo(default_text)">
+<img src="3bots_thumb.jpg" border=1 alt="Our Robots.">
+</a></li>
 
-<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
-
-<tr>
-<td colspan="3" class="stealth" align=center>
-<table cellspacing=5 cellpadding=5 class="stealth" width="100%">
-<tr>
-<td class="stealth" align=center>
-  <a href="3bots.jpg" onmouseover="imageinfo(captions[0])" onmouseout="imageinfo(default_text)">
-  <img src="3bots_thumb.jpg" border=1 alt="Our Robots.">
-  </a>
-</td>
-<td class="stealth" align=center>
-  <a href="wall_mote.jpg" onmouseover="imageinfo(captions[1])" onmouseout="imageinfo(default_text)">
+<li><a href="wall_mote.jpg" onmouseover="imageinfo(captions[1])" onmouseout="imageinfo(default_text)">
   <img src="wall_mote_thumb.jpg" border=1 alt="Our Robots.">
-  </a>
-</td>
-<td class="stealth" align=center>
-  <a href="interface1.jpg" onmouseover="imageinfo(captions[2])" onmouseout="imageinfo(default_text)">
+</a></li>
+
+<li><a href="interface1.jpg" onmouseover="imageinfo(captions[2])" onmouseout="imageinfo(default_text)">
   <img src="interface1_thumb.jpg" border=1 alt="User Interface.">
-  </a>
-</td>
-<td class="stealth" align=center>
-  <a href="5bots.jpg" onmouseover="imageinfo(captions[3])" onmouseout="imageinfo(default_text)">
+  </a></li>
+
+<li><a href="5bots.jpg" onmouseover="imageinfo(captions[3])" onmouseout="imageinfo(default_text)">
   <img src="5bots_thumb.jpg" border=1 alt="Our Robots.">
-  </a>
-</td>
-<td class="stealth" align=center>
-  <a href="ceiling_mote.jpg" onmouseover="imageinfo(captions[4])" onmouseout="imageinfo(default_text)">
+  </a></li>
+
+<li><a href="ceiling_mote.jpg" onmouseover="imageinfo(captions[4])" onmouseout="imageinfo(default_text)">
   <img src="ceiling_mote_thumb.jpg" border=1 alt="Our Robots.">
-  </a>
-</td>
-</tr>
-<tr>
-<td colspan=5 class=stealth align=center>
-  <div id="captionLayer" name="captionLayer" style="text-align: center;">
-    <script type="text/javascript">
-      imageinfo(default_text);
-    </script>
-  </div>
-</td>
-</tr>
-</table>
-</center>
-</td>
-</tr>
+  </a></li>
+</ul>
 
-<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
+<div id="captionLayer" name="captionLayer">
+  <script type="text/javascript">
+    imageinfo(default_text);
+  </script>
+</div>
+</div>
 
-<tr>
+<div class="docsection">
+<h1>Preface</h1>
 
-<?php NLCH1("Preface") ?>
+<div id="toollist">
+<h3>Tools:</h3>
 
-<?php NLCBODYLONGBEGIN(2) ?>
+<ul>
+<li><a href="<?php echo $TBBASE?>/robotrack/robotrack.php3">Real-time Robot Tracking Applet</a></li>
+<li><a href="<?php echo $TBBASE ?>/webcam.php3">Live Webcams</a></li>
+<li><a href="<?php echo $TBBASE ?>/robotmap.php3">Static Robot Map</a></li>
+<li><a href="<?php echo $TBBASE ?>/newimageid_ez.php3?nodetype=mote">Mote Image
+Creation Page</a></li>
+<li><a href="<?php echo $TBBASE ?>/wireless-stats/statsapp.php3">WSN Connectivity
+Statistics Applet</a></li>
+</ul>
+</div>
 
-<table class="stealth" cellpadding=0 cellspacing=0 style="padding: 0px; margin: 0px">
- <tr><td class="stealth">
-
+<p>
 We have deployed and opened to public external use a small version of
 what will grow into a large mobile robotic wireless testbed.  The
 small version (6 Motes and 6 Stargates on 6 robots, all remotely
 controllable, plus 25 static Motes) is in an open area within our offices;
 the big one will be elsewhere.
+</p>
 
 <p>
 This manual is broken up into the following sections:
+</p>
 
-<ol>
+<ol id="sectionlist">
 <li><a href="#INTRO">Introduction</a>
 <li><a href="#MOBILE">Mobile Experiments</a>
 <li><a href="#WIRELESS">Wireless Traffic (Mobile motes and fixed motes)</a>
@@ -246,6 +179,7 @@ This manual is broken up into the following sections:
 If you are interested in how the mobile testbed works, you can read the
 following paper (to appear at <a href="http://www.ieee-infocom.org/2006/">IEEE
 Infocom</a>, April 2006):
+</p>
 
 <blockquote>
 <a href="http://www.cs.utah.edu/flux/papers/robots-infocom06-base.html">
@@ -254,58 +188,18 @@ Mobile Emulab: A Robotic Wireless and Sensor Network Testbed</a>
 
 <p>
 You can read a shorter overview of the mobile testbed in this article:
+</p>
 
 <blockquote>
 <a href="http://www.cs.utah.edu/flux/testbed-docs/teapot05-emulab-only.pdf">
 Real Mobility, Real Wireless: A New Kind of Testbed</a>
 </blockquote>
 
-  </td>
+</div>
 
-  <td valign="top" class="stealth">
-
-  <table class="stealth">
-  <tr><td style="padding: 5px; border: solid 2px #669; background-color: #F1FAFA;">
-
-<b>Tools:</b>
-
-<p style="text-indent: 0em;">
-
-<a href="<?php echo $TBBASE?>/robotrack/robotrack.php3">Real-time Robot Tracking Applet</a>
-<br>
-<a href="<?php echo $TBBASE ?>/webcam.php3">Live Webcams</a>
-<br>
-<a href="<?php echo $TBBASE ?>/robotmap.php3">Static Robot Map</a>
-<br>
-<a href="<?php echo $TBBASE ?>/newimageid_ez.php3?nodetype=mote">Mote Image
-Creation Page</a>
-<br>
-<a href="<?php echo $TBBASE ?>/wireless-stats/statsapp.php3">WSN Connectivity
-Statistics Applet</a>
-
-</ul>
-
-  </td></tr></table>
-
-  </td>
-  </tr
-
-</table>
-
-
-<?php NLCBODYEND() ?>
-
-<!-- ?php NLCEMPTY() ? -->
-
-</tr>
-
-<tr>
-
-<?php NLCH1("Introduction") ?>
-
-<?php NLCBODYBEGIN() ?>
-<!-- Center -->
-
+<div class="docsection">
+<h1>Introduction</h1>
+<p>
 <a name="INTRO"></a>
 In addition to <a href="docwrapper.php3?docname=wireless.html">fixed wireless
 nodes</a> (currently predominantly 802.11), Emulab also features wireless nodes attached
@@ -323,25 +217,20 @@ intended as a tutorial for those interested in making use of this testbed;
 there is also a short <a href="<?php echo
 $TBBASE?>/doc/docwrapper.php3?docname=mobilewireless.html">reference manual</a>
 available that gives a few details about the workings of the system.
+</p>
 
-<br>
-<br>
-<?php NLCBODYEND() ?>
+<h2>Features</h2>
 
-<?php NLCLINKFIG("http://www.acroname.com/garcia/garcia.html",
-		 "<img src=\"garcia-thumb.jpg\" border=1
-                       alt=\"Acroname Garcia\">",
-		 "Acroname&nbsp;Garcia") ?>
+<div class="docfig">
+<a href="http://www.acroname.com/garcia/garcia.html">
+<img src="garcia-thumb.jpg" alt="Acroname Garcia">
+<span class="caption">[Acroname Garcia]</span>
+</a>
+</div>
 
-</tr>
-
-<tr>
-
-<?php NLCH2("Features") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 The current features of the mobile wireless testbed are:
+</p>
 
 <ul>
 <li>Four <a href="http://www.acroname.com">Acroname Garcia</a> robots
@@ -371,20 +260,12 @@ viewing wireless link connectivity</a> in our WSN testbed.
 <li>Open for public use weekdays 8am-6pm MST, with operations support.
 </ul>
 
-<?php NLCBODYEND() ?>
+<h2>Limitations</h2>
 
-<?php NLCEMPTY() ?>
-
-</tr>
-
-<tr>
-
-<?php NLCH2("Limitations") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 Due to the "brand-new" nature of this part of Emulab, there are some
 limitations you should be aware of:
+</p>
 
 <ul>
 <li>Before you can use the mobile testbed, your project must be granted the
@@ -401,20 +282,20 @@ We expect to overcome these limitations over time; however, we are also eager to
 introduce external users to the mobile testbed early on so we can integrate
 their feedback.
 
-<?php NLCBODYEND() ?>
+</div>
 
-<?php NLCEMPTY() ?>
+<div class="docsection">
+<h1>Mobile Experiments</h1>
 
-</tr>
+<div class="docfig">
+<span class="caption">Sample Movie</span>
+<img src="robot_anim.gif" alt="Robot Movie">
+<a href="robot_divx.avi">[DiVX (1.2M)]</a>
+<a href="robot.mpg">[MPG (5.3M)]</a>
+</a>
+</div>
 
-<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
-
-<tr>
-
-<?php NLCH1("Mobile Experiments") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 <a name="MOBILE"></a>
 Creating a mobile wireless experiment is very similar to creating a regular
 Emulab experiment: you construct an NS file, swap in the experiment, and then
@@ -424,31 +305,15 @@ robots.  This tutorial will take you through the process of: creating a mobile
 experiment, moving the robots to various destinations, creating random motion
 scenarios, and "attaching" transmitter and receiver motes to the robots in your
 experiment.
+</p>
 
-<?php NLCBODYEND() ?>
-
-<?php NLCFIGBEGIN() ?>
-
-<font size="-2">Sample Movie</font>
-<img src="robot_anim.gif" border="1" alt="Robot Movie">
-<a href="robot_divx.avi"><font size="-2">[DiVX (1.2M)]</font></a><br>
-<a href="robot.mpg"><font size="-2">[MPG (5.3M)]</font></a>
-
-<?php NLCFIGEND() ?>
-
-</tr>
-
-<tr>
-
-<?php NLCH2("A First Experiment") ?>
-
-<?php NLCBODYBEGIN() ?>
+<h2>A First Experiment</h2>
 
 Lets start with a simple NS script that will allocate a single robot located in
 our building:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>set ns [new Simulator]
+<code class="samplecode">
+set ns [new Simulator]
 source tb_compat.tcl
 
 set topo [new Topography]
@@ -461,13 +326,12 @@ set node(0) [$ns node]
 $node(0) set X_ 3.01
 $node(0) set Y_ 2.49
 
-$ns run</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 1: Example NS file with mobile nodes.</font>
-</center>
-<br>
+$ns run
 
+</code>
+<span class="caption">Figure 1: Example NS file with mobile nodes.</span>
+
+<p>
 Some parts of that example should be familiar to regular experimenters, so we
 will focus mainly on the new bits of code.  First, we specified the physical
 area where the robots will be roaming by creating a "topography" object and
@@ -511,18 +375,9 @@ check the "Do Not Swapin" checkbox so that the creation does not fail if
 someone else is using the mobile testbed at the time.  Once the area is free
 for use, you can swap-in your experiment and begin to work.
 
-<?php NLCBODYEND() ?>
+<h2>Adding Motion</h2>
 
-<?php NLCEMPTY() ?>
-
-</tr>
-
-<tr>
-
-<?php NLCH2("Adding Motion") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 Now that you have a node allocated, let's make it mobile.  During swap-in,
 Emulab will start moving the node to its initial position.  You can watch its
 progress by using the "Robot Map" menu item on the experiment page and checking
@@ -530,7 +385,6 @@ out the <a href="<?php echo $TBBASE ?>/webcam.php3">webcams</a> or
 the <a href="<?php echo $TBBASE ?>/robotrack/robotrack.php3">applet version of the map</a>
 that updates in real time.
 
-<p>
 <table width="100%" cellpadding=0 cellspacing=0 border=0 class="stealth">
 <tr>
 <?php NLCLINKFIG2("robotmap-ss.gif", 
@@ -571,55 +425,45 @@ objects</a>.
 Once the robot has reached its initial position, lets move it up a meter.  To
 do this, you will need to log in to ops.emulab.net and run:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>1 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> \
-             now node-0 SETDEST X=3.0 Y=1.5</pre>
-</blockquote>
-<blockquote>
-<center>
-<font size="-2">Figure 2: Command to send an event that will move the robot to
+<code class="samplecode">
+1 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> \
+         now node-0 SETDEST X=3.0 Y=1.5
+
+</code>
+<span class="caption">Figure 2: Command to send an event that will move the robot to
 the coordinates (3.0, 1.5).  Don't forget to change <b>proj</b>/<b>exp</b> to
-match your project and experiment IDs.</font>
-</center>
-</blockquote>
+match your project and experiment IDs.</span>
 
 <!-- mention that one setdest will override the previous. --> 
 
+<p>
 Then, check back with the map and webcams to see the results of your handiwork.
 Try moving it around a few more times to get a feel for how things work and
 where the robot can go.  Note that the robot should automatically navigate
 around obstacles in the area, like the pole in the middle, so you do not have
 to plot your own course around them.
+</p>
 
 <p>
 In addition to driving the robot with dynamic events, you can specify a static
 set of events in the NS file.  For example, you can issue the same move as
 above at T +5 seconds by adding:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>$ns at 5.0 "$node(0) setdest 3.01 1.5 0.1"</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 3: NS syntax that moves the robot to the same
-destination as in Figure 2.</font>
-</center>
-<br>
+<code class="samplecode">
+$ns at 5.0 "$node(0) setdest 3.01 1.5 0.1"
 
+</code>
+<span class="caption">Figure 3: NS syntax that moves the robot to the same
+destination as in Figure 2.</span>
+
+<p>
 Note that "setdest" takes a third argument, the speed, in addition to the X and
 Y coordinates.  The robot's speed is currently fixed at 0.1 meters per second.
+</p>
 
-<?php NLCBODYEND() ?>
+<h2>Random Motion</h2>
 
-<?php NLCEMPTY() ?>
-
-</tr>
-
-<tr>
-
-<?php NLCH2("Random Motion") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 Generating destination points for nodes can become quite a tedious task, so we
 provide a modified version of the NS-2 "setdest" tool that will produce a valid
 set of destination points for a given area.  The tool, called "tbsetdest", is
@@ -639,20 +483,18 @@ roaming around.  Currently, MEB-ROBOTS is the only area available.
 Now, taking your existing NS file, we'll add another node to make things more
 interesting:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre><i>...</i>
+<code class="samplecode">
+<i>...</i>
 $ns node-config -topography $topo
 
 set node(0) [$ns node]
-<b>set node(1) [$ns node]</b></pre>
-</blockquote>
-<center>
-<font size="-2">Figure 4: Excerpt of the original NS file with an additional
-node.
-</font>
-</center>
-<br>
+<b>set node(1) [$ns node]</b>
 
+</code>
+<span class="caption">Figure 4: Excerpt of the original NS file with an additional
+node.</span>
+
+<p>
 Then, use "tbsetdest" to produce some random motion for both robots:
 
 <blockquote>
@@ -661,8 +503,8 @@ Then, use "tbsetdest" to produce some random motion for both robots:
 
 Here is some sample output from the tool:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>$node(0) set X_ 3.01
+<code class="samplecode">
+$node(0) set X_ 3.01
 $node(0) set Y_ 2.49
 $node(1) set X_ 1.22
 $node(1) set Y_ 3.61
@@ -678,13 +520,12 @@ $rtl at 23.37 "$node(0) setdest 5.62 2.79 0.10"
 $rtl at 39.43 "$node(1) setdest 4.98 1.65 0.10"
 #
 # Destination Unreachables: 0
-#</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 5: Sample "tbsetdest" output.</font>
-</center>
-<br>
+#
 
+</code>
+<span class="caption">Figure 5: Sample "tbsetdest" output.</span>
+
+<p>
 You can then add the second node and motion events by clicking on the "Modify
 Experiment" menu item on the experiment web page and:
 
@@ -713,33 +554,27 @@ your experiment by just (re)queueing subsets of events.
 Once the modify completes, wait for the robots to reach their initial position
 and then start the robots on their way by running the following on ops:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>3 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> now rtl START</pre>
-</blockquote>
+<code class="samplecode">
+3 ops:~> /usr/testbed/bin/tevc -e <b>proj</b>/<b>exp</b> now rtl START
+
+</code>
 <blockquote>
-<center>
-<font size="-2">Figure 6: Command to start the "rtl" timeline.  Again, don't
+<span class="caption">Figure 6: Command to start the "rtl" timeline.  Again, don't
 forget to change <b>proj</b>/<b>exp</b> to match your project and experiment
-IDs.</font>
-</center>
-</blockquote>
+IDs.</span>
+</div>
 
-<?php NLCBODYEND() ?>
+<div class="docsection">
+<h1>Wireless Traffic</h1>
 
-<?php NLCEMPTY() ?>
+<div class="docfig">
+<a href="http://www.tinyos.net/scoop/special/hardware">
+<img src="mica2-thumb.jpg" alt="Mica2 Mote">
+<span class="caption">[Mica2 Mote]</span>
+</a>
+</div>
 
-</tr>
-
-
-<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
-
-
-<tr>
-
-<?php NLCH1("Wireless Traffic") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 <a name="WIRELESS"></a>
 Now that you are getting the hang of the mobility part of this testbed, we can
 move on to working with wireless network traffic.  As stated earlier, each of
@@ -748,27 +583,15 @@ device used in wireless sensor networks.  We'll be using the motes on the
 mobile nodes you already have allocated and loading them with <a
 href="http://www.tinyos.net">TinyOS</a> demo kernels, one that will be sending
 traffic and the other receiving.
+</p>
 
-<?php NLCBODYEND() ?>
-
-<?php NLCLINKFIG("http://www.tinyos.net/scoop/special/hardware",
-		 "<img src=\"mica2-thumb.jpg\" border=1
-                       alt=\"Mica2 Mote\">",
-		 "Mica2&nbsp;Mote") ?>
-
-</tr>
-
-<tr>
-
-<?php NLCH2("Adding Mobile Motes") ?>
-
-<?php NLCBODYBEGIN() ?>
+<h2>Adding Mobile Motes</h2>
 
 Adding a couple of motes to your existing experiment can be done by doing a
 modify and adding the following NS code:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>## BEGIN mote nodes
+<code class="samplecode">
+## BEGIN mote nodes
 $ns node-config -topography ""
 
 set receiver [$ns node]
@@ -780,13 +603,12 @@ set transmitter [$ns node]
 tb-set-hardware $transmitter mica2
 tb-set-node-os $transmitter TinyOS-CntRfm
 tb-fix-node $transmitter $node(1)
-## END mote nodes</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 7: NS syntax used to "attach" motes to a robot.</font>
-</center>
-<br>
+## END mote nodes
 
+</code>
+<span class="caption">Figure 7: NS syntax used to "attach" motes to a robot.</span>
+
+<p>
 This code creates two mote nodes and "attaches" each of them to one of the
 mobile nodes.  The OSs to be loaded on the mote nodes are the receiver,
 TinyOS-RfmLed, and the transmitter, TinyOS-CntRfm.  These are standard
@@ -807,35 +629,22 @@ away, to see the lights updating, or not.  You should also try running the
 nodes through the random motion created earlier and watching for the same
 effect on the lights.
 
-
-<?php NLCBODYEND() ?>
-
-<?php NLCEMPTY() ?>
-
-</tr>
-
-
-<tr>
-
-<?php NLCH2("Adding Fixed Motes") ?>
-
-<?php NLCBODYBEGIN() ?>
+<h2>Adding Fixed Motes</h2>
 
 Adding a fixed mote to your experiment is slightly simpler than adding mobile
 motes:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>## BEGIN fixed mote nodes
+<code class="samplecode">
+## BEGIN fixed mote nodes
 set fixed-receiver [$ns node]
 tb-set-hardware $fixed-receiver static-mica2
 tb-set-node-os $fixed-receiver TinyOS-RfmLed
-## END fixed mote nodes</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 8: NS syntax used to add a fixed mote.</font>
-</center>
-<br>
+## END fixed mote nodes
 
+</code>
+<span class="caption">Figure 8: NS syntax used to add a fixed mote.</span>
+
+<p>
 This code creates a single mote and loads the same TinyOS image as was
 previously loaded onto the mobile receiver mote.  Since the fixed
 motes are mounted on serial programming boards, you will not be able to access
@@ -845,19 +654,17 @@ If you want to choose a specific mote from the topology (view placement and
 positions by looking at the <a href="/robotmap.php3">robot map</a>), add the
 following NS code:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>
+<code class="samplecode">
 tb-fix-node $fixed-receiver mote107
-</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 9: NS syntax used to select a specific fixed mote.</font>
-</center>
-<br>
 
+</code>
+<span class="caption">Figure 9: NS syntax used to select a specific fixed mote.</span>
+
+<p>
 This code allows you to explicitly choose mote107, rather than allowing Emulab
 to select a mote on your behalf.  Those who require very specific wireless network
 topologies may wish to use this command.
+</p>
 
 <p>
 You can use the 
@@ -866,18 +673,7 @@ Applet</a> to choose specific motes with desired
 link quality.  Then, using the mechanism above, you can bind the specific mote
 you want to a node name in your experiment.
 
-<?php NLCBODYEND() ?>
-
-<?php NLCEMPTY() ?>
-
-</tr>
-
-
-<tr>
-
-<?php NLCH2("Custom Mote Applications") ?>
-
-<?php NLCBODYBEGIN() ?>
+<h2>Custom Mote Applications</h2>
 
 Uploading your own code to run on the motes is easy. Just build your TinyOS app
 normally (ie. '<code>make mica2</code>').  Then, upload the binary that gets
@@ -915,6 +711,7 @@ kernel in the path that was automatically constructed for you by the image
 creation page; the next time you use that OS in an NS file, the new version
 will be loaded. If you'd like to load your node code onto your motes without
 starting a new experiment, you have two options:
+</p>
 <ul>
   <li> <code>os_load</code> allows you to load an kernel that has already been
      defined as an image, as above. You give it the image descriptor with its
@@ -926,45 +723,38 @@ starting a new experiment, you have two options:
      development/debugging. Just pass it the operation <code>upload</code>, the
      path to the file you wish to load, and the physical names of your motes.
 </ul>
+<p>
 Both of these are commands in /usr/testbed/bin on ops.emulab.net.   They are
 also available through our
 <a href="<?php echo $TBBASE ?>/xmlrpcapi.php3">XML-RPC interface</a>, so you
 can run them from your desktop machine to save time - the file given as an
 argument to tbuisp is sent with the XML-RPC, so you don't need to copy it onto
 our servers.
+</p>
 
-<?php NLCBODYEND() ?>
+<h2>Mote Serial Interfaces</h2>
 
-<?php NLCEMPTY() ?>
-
-</tr>
-
-<tr>
-
-<?php NLCH2("Mote Serial Interfaces") ?>
-
-<?php NLCBODYBEGIN() ?>
-
+<p>
 To facilitate mote interaction, logging, and evaluation, we provide easy
 access to each mote's serial programming board's serial interface.  By simply
 adding a PC node to your experiment, and adding some NS code, you can
 access each mote's serial port directly on that PC.  To access
 <code>mote107</code>'s serial interface, add the following NS code to your
 experiment: 
+</p>
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>## BEGIN adding mote serial line access
+<code class="samplecode">
+## BEGIN adding mote serial line access
 set manager [$ns node]
 tb-set-node-os $manager RHL-TINYOS
 
 $ns connect [$fixed-receiver console] $manager
-##END adding mote serial line access</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 10: Accessing mote serial interface.</font>
-</center>
-<br>
+##END adding mote serial line access
 
+</code>
+<span class="caption">Figure 10: Accessing mote serial interface.</span>
+
+<p>
 This code allocates a single PC, <code>manager</code>, which runs our
 <emph>RHL-TINYOS</emph> image for convenience.  Emulab software exports the
 serial port from the physical machine to the <code>manager</code> PC, where it
@@ -979,34 +769,22 @@ the software you are using to access the mote's serial interface insists on
 using <b>/dev/ttyS1</b> or similar, you can simply run the following command on
 your <code>manager</code> PC:
 
-<blockquote style="border-style:solid; border-color:#bbbbbb; border-width: thin">
-<pre>sudo rm /dev/ttyS1 && sudo ln -s /dev/tip/fixed-receiver /dev/ttyS1</pre>
-</blockquote>
-<center>
-<font size="-2">Figure 11: Easing the pain for applications that use a specific
-serial device.</font>
-</center>
-<br>
+<code class="samplecode">
+sudo rm /dev/ttyS1 && sudo ln -s /dev/tip/fixed-receiver /dev/ttyS1
 
+</code>
+<span class="caption">Figure 11: Easing the pain for applications that use a specific
+serial device.</span>
+
+<p>
 If you need to use <b>/dev/ttyS0</b> on our RHL-TINYOS images, you may remove
 and relink the device as shown in Fig. 11, but background monitor scripts may
 decide to restart the serial port getty.  This will remove your link.  However,
 you should only need to relink /dev/ttyS0 when you restart your program.
+</div>
 
-<?php NLCBODYEND() ?>
-
-<?php NLCEMPTY() ?>
-
-</tr>
-
-
-<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
-
-<tr>
-
-<?php NLCH1("Frequently Asked Questions") ?>
-
-<?php NLCBODYBEGIN() ?>
+<div class="docsection">
+<h1>Frequently Asked Questions</h1>
 
 <table class="stealth">
 
@@ -1025,16 +803,7 @@ track the position of the robot.
 </td></tr>
 
 </table>
-
-<?php NLCBODYEND() ?>
-
-<?php NLCEMPTY() ?>
-
-</tr>
-
-<tr><td colspan="3" class="stealth"><hr size=1></td></tr>
-
-</table>
+</div>
 
 <?php
 #

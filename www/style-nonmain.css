@@ -1,37 +1,31 @@
 td, th { 
-     border: solid 0px #696;
-     background-color: #F1FAF1;
+  border: solid 0px #696;
+  background-color: #F1FAF1;
 }
 
+span.devpagename {
+  color: #CCFFCC;
+  font-weight: bold;
+  font-size: large;
+}
+.menuheader, .submenuheader, .contenttitle  {
+  background-color: #060; 
+}
 .leftcell {
- 	background-image: url(wallpaper0.jpg); 
-	background-color: #9BBBAC; 
+  border: solid 2px black;
 }
-.rightcell {
- 	background-image: url(wallpaper0.jpg); 
-	background-color: #9BBBAC; 
+.leftcell, #searchrow form, #searchrow table, #searchrow table td {
+  background-color: #dfe;
 }
-
-.menuheader {
-	background-color: #060; 
-}
-.menufooter {
-	background-color: #acb;
+ul.submenu, .submenuheader, #searchrow {
+  border-color: #060;
 }
 
-.menuopt, .menuoptb, .menuoptdiv, .menuopts, .menuoptst, .menuoptsb, .submenuopt, .submenuoptdiv {
-	background-color: #CED; 
-} 
-
-.menuopts, .menuoptst, .menuoptsb {
-	background-color: #dfe;
+ul.menu, ul.submenu {
+  background-color: #CED;
 }
 
-.contentheader {
-	background-color: #060; 
-}
-
-body  	{ background-image: url(wallpaper0.jpg); }
+body { background-image: url("wallpaper0.jpg"); }
 
 th { background-color: #E1EAE1; }
 

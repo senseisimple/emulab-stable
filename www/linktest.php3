@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -399,8 +399,7 @@ echo "</div>\n";
 echo "<div id=output style='overflow:auto'>
       <iframe onload=\"linktest_stopped();\"
       width=80% height=400 scrolling=auto id=outputarea frameborder=1>
-      </iframe></center>
-     </div>\n";
+      </iframe></center>\n";
 echo "</center>\n";
 
 #
