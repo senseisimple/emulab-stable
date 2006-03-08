@@ -877,7 +877,7 @@ handle_request(int sock, struct sockaddr_in *client, char *rdata, int istcp)
 		if (sscanf(bp, "VERSION=%d", &i) == 1) {
 			version = i;
 			if (version > CURRENT_VERSION) {
-				error("%s: version skew: server=%d, request=%d, "
+				error("version skew: server=%d, request=%d, "
 				      "old TMCD installed?\n",
 				      CURRENT_VERSION, version);
 			}
