@@ -292,20 +292,35 @@ $exp_pid     = $formfields[exp_pid];
 $exp_gid     = ((isset($formfields[exp_gid]) && $formfields[exp_gid] != "") ?
 		$formfields[exp_gid] : $exp_pid);
 $exp_id      = $formfields[exp_id];
+$extragroups = "";
 
 #
 # Verify permissions. We do this here since pid/eid/gid could be bogus above.
 #
 if (! TBProjAccessCheck($uid, $exp_pid, $exp_gid, $TB_PROJECT_CREATEEXPT)) {
-    $errors["Project/Group"] = "Not $exp_gid enough permission to create experiment";
+    $errors["Project/Group"] = "Not enough permission to create experiment";
     XMLERROR();
 }
+
 
 #
 # Figure out the NS file to give to the script. Eventually we will allow
 # it to come inline as an XML argument.
 #
 if ($nsfilelocale == "copyid") {
+    if (preg_match("/^([-\w]+),([-\w]+)$/", $formfields['copyid'], $matches)) {
+	$copypid = $matches[1];
+	$copyeid = $matches[2];
+
+	if (! TBExptAccessCheck($uid, $copypid, $copyeid, $TB_EXPT_READINFO)){
+	    $errors["Project/Group"] =
+		"Not enough permission to copy experiment $copypid/$copyeid";
+	    XMLERROR();
+	}
+	if ($copypid != $exp_pid)
+	    $extragroups = ",$copypid";
+    }
+    
     $thensfile = "-c " . $formfields['copyid'];
 
     # A branch needs the -b option.
@@ -426,7 +441,7 @@ TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 #
 set_time_limit(0);
 
-$retval = SUEXEC($uid, "$exp_pid,$unix_gid",
+$retval = SUEXEC($uid, "$exp_pid,$unix_gid" . $extragroups ,
 		 "webbatchexp $batcharg -E $exp_desc $exp_swappable ".
 		 "$linktestarg -p $exp_pid -g $exp_gid -e $exp_id ".
 		 ($nonsfile ? "" : "$thensfile"),
