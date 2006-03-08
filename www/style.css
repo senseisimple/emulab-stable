@@ -98,7 +98,7 @@ td.menuoptusage {
   position: absolute;
   left: 8px;
   margin-top: 8px;
-  width: 195px;
+  width: 198px;
 }
 
 
@@ -198,7 +198,7 @@ ul.menu li.newgroup {
 /* Definition for regular pages that have a menu. */
 .content {
   position: absolute;
-  left: 212px; /* Push it to the right of the menu. */
+  left: 214px; /* Push it to the right of the menu. */
   margin-top: 8px;
   right: 8px;
 }
