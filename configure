@@ -2351,7 +2351,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	vis/floormap vis/webfloormap \
 	rc.d/GNUmakefile rc.d/2.mysql-server.sh rc.d/3.testbed.sh \
 	rc.d/2.elvind.sh rc.d/3.plab.sh rc.d/2.dhcpd.sh rc.d/3.and.sh \
-	tools/GNUmakefile rc.d/1.mysql-server.sh \
+	tools/GNUmakefile rc.d/1.mysql-server.sh tools/svn/GNUmakefile \
 	tools/pcapper/GNUmakefile tools/teachswitch/GNUmakefile \
         tools/webcamapplet/GNUmakefile tools/whol/GNUmakefile \
         tools/selectapplet/GNUmakefile \
