@@ -40,12 +40,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #ifndef __CYGWIN__
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <net/ethernet.h>
 #include <net/if.h>
 #endif /* __CYGWIN__ */
@@ -56,33 +58,75 @@
 #include <net/route.h>
 #endif
 
+#define ADDR_MAC	0
+#define ADDR_IPV4	1
+static int	addrtype = ADDR_MAC;
+
 static int	find_iface(char *mac);
 
 void
 usage()
 {
-	fprintf(stderr, "usage: findif <macaddr>\n");
+	fprintf(stderr, "usage: findif [-mi] <addr>\n");
+	fprintf(stderr, "         -m   addr is a MAC addr (the default)\n");
+	fprintf(stderr, "         -i   addr is an IPv4 addr\n");
 	exit(1);
 }
 
 int
 main(int argc, char **argv)
 {
-	if (argc != 2)
+	int ch;
+
+	while ((ch = getopt(argc, argv, "im")) != -1) {
+		switch (ch) {
+		case 'i':
+			addrtype = ADDR_IPV4;
+			break;
+		case 'm':
+			addrtype = ADDR_MAC;
+			break;
+		default:
+			usage();
+		}
+	}
+	argv += optind;
+	argc -= optind;
+	if (argc != 1)
 		usage();
 
-	exit(find_iface(argv[1]));
+	exit(find_iface(argv[0]));
 }
 
 #ifdef __FreeBSD__
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
+void
+rt_xaddrs(char *cp, char *cplim, struct rt_addrinfo *rtinfo)
+{
+	struct sockaddr *sa;
+	int i;
+
+	memset(rtinfo->rti_info, 0, sizeof(rtinfo->rti_info));
+	for (i = 0; (i < RTAX_MAX) && (cp < cplim); i++) {
+		if ((rtinfo->rti_addrs & (1 << i)) == 0)
+			continue;
+		rtinfo->rti_info[i] = sa = (struct sockaddr *)cp;
+		ADVANCE(cp, sa);
+	}
+}
+
 static int
 find_iface(char *macaddr)
 {
 	struct	if_msghdr	*ifm;
+	struct	ifa_msghdr	*ifam;
 	struct	sockaddr_dl	*sdl;
-	char			*buf, *lim, *next, *cp;
+	char			*buf, *lim, *next, *cp, *name;
 	size_t			needed;
-	int			n, mib[6];
+	int			n, addrs, mib[6];
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -112,19 +156,26 @@ find_iface(char *macaddr)
 		}
 		next += ifm->ifm_msglen;
 
-		while (next < lim) {
-			struct	if_msghdr *nextifm = (struct if_msghdr *)next;
+		ifam = NULL;
+		for (addrs = 0; next < lim; addrs++) {
+			struct if_msghdr *nextifm = (struct if_msghdr *)next;
 
 			if (nextifm->ifm_type != RTM_NEWADDR)
 				break;
+
+			if (ifam == NULL)
+				ifam = (struct ifa_msghdr *)nextifm;
 
 			next += nextifm->ifm_msglen;
 		}
 		
 		cp = (char *)LLADDR(sdl);
-		if ((n = sdl->sdl_alen) > 0 &&
-		    sdl->sdl_type == IFT_ETHER) {
-			char	enet[BUFSIZ], *bp = enet;
+		if ((n = sdl->sdl_alen) <= 0 || sdl->sdl_type != IFT_ETHER)
+			continue;
+		name = sdl->sdl_data;
+
+		if (addrtype == ADDR_MAC) {
+			char enet[BUFSIZ], *bp = enet;
 
 			*bp = 0;
 			while (--n >= 0) {
@@ -134,8 +185,36 @@ find_iface(char *macaddr)
 			*bp = 0;
 
 			if (strcasecmp(enet, macaddr) == 0) {
-				printf("%s\n", sdl->sdl_data);
+				printf("%s\n", name);
 				return 0;
+			}
+		}
+		else if (addrtype == ADDR_IPV4) {
+			struct rt_addrinfo info;
+			struct sockaddr_in *sin;
+
+			while (addrs > 0) {
+				info.rti_addrs = ifam->ifam_addrs;
+
+				/* Expand the compacted addresses */
+				rt_xaddrs((char *)(ifam + 1),
+					  ifam->ifam_msglen + (char *)ifam,
+					  &info);
+
+				sin = (struct sockaddr_in *)
+					info.rti_info[RTAX_IFA];
+				if (sin && sin->sin_family == AF_INET) {
+					char *enet = inet_ntoa(sin->sin_addr);
+
+					if (!strcmp(enet, macaddr)) {
+						printf("%s\n", name);
+						return 0;
+					}
+				}
+
+				addrs--;
+				ifam = (struct ifa_msghdr *)
+					((char *)ifam + ifam->ifam_msglen);
 			}
 		}
 	}
@@ -160,9 +239,42 @@ find_iface(char *macaddr)
 	/*
 	 * Get a list of all the interfaces.
 	 *
-	 * SIOCGIFCONF appears to return a list of just the configured
-	 * interfaces, but we need all of them.
+	 * If we are looking for IP addresses, just use SIOCGIFCONF
+	 * which only returns configured interfaces but does return
+	 * alias devices.  Otherwise use /proc/net which returns all
+	 * interfaces but NOT alias devices.
 	 */
+	if (addrtype == ADDR_IPV4) {
+		struct ifconf ifc;
+		static struct ifreq reqbuf[128];
+		int n;
+
+		ifc.ifc_buf = (void *)reqbuf;
+		ifc.ifc_len = sizeof(reqbuf);
+
+		if (ioctl(sock, SIOCGIFCONF, &ifc) < 0) {
+			perror("SIOCGIFCONF");
+			return -1;
+		}
+
+		ifr = ifc.ifc_req;
+		for (n = 0; n < ifc.ifc_len; n += sizeof(struct ifreq)) {
+			sprintf(enet, "%u.%u.%u.%u",
+			       (unsigned char) ifr->ifr_addr.sa_data[2],
+			       (unsigned char) ifr->ifr_addr.sa_data[3],
+			       (unsigned char) ifr->ifr_addr.sa_data[4],
+			       (unsigned char) ifr->ifr_addr.sa_data[5]);
+			/* printf("%s %s\n", ifr->ifr_name, enet); */
+		
+			if (strcmp(enet, macaddr) == 0) {
+				printf("%s\n", ifr->ifr_name);
+				return 0;
+			}
+			ifr++;
+		}
+		return 1;
+	}
+
 	if ((fp = fopen("/proc/net/dev", "r")) == NULL) {
 		fprintf(stderr, "Could not open /proc/net/dev\n");
 		return -1;
