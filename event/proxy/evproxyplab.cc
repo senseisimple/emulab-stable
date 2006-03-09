@@ -55,6 +55,9 @@ sched_callback(event_handle_t handle,
 static void subscribe_callback(event_handle_t handle,  int result,
 			       event_subscription_t es, void *data);
 
+static void async_callback(event_handle_t handle,  int result,
+			   event_subscription_t es, void *data);
+
 static void schedule_updateevent();
 
 
@@ -305,6 +308,7 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      }
 	      
 	      tuple->expt = expt;
+	      tuple->scheduler = 2;
 		  
 	      /* malloc data -- to be freed in subscribe_callback */
 	      char *data = (char *) xmalloc(sizeof(expt));
@@ -317,6 +321,16 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	      if (! retval) {
 		error("could not subscribe to events on remote server.\n");
 	      }
+
+	      tuple->scheduler = 0;
+		  
+	      retval = event_async_subscribe(bosshandle, 
+					  expt_callback, tuple, NULL,
+					  async_callback, 
+					  NULL, 1);
+	      if (! retval) {
+		error("could not subscribe to events on remote server.\n");
+	      } 
 
               info("Subscribing to experiment: %s\n", expt);
 
@@ -375,6 +389,10 @@ callback(event_handle_t handle, event_notification_t notification, void *data)
 	    
 	  }
 	  
+	  /* pass thru EVPROXY events to plab-scheduler */
+	  if (! event_notify(localhandle, notification))
+            error("Failed to deliver notification!\n");
+	  
 	}
 }
 
@@ -387,6 +405,7 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 	char		objecttype[TBDB_FLEN_EVOBJTYPE];
         char		objectname[TBDB_FLEN_EVOBJNAME];
 	char            expt[TBDB_FLEN_PID + TBDB_FLEN_EID + 1];
+	int		plabsched = 0;
 
 	event_notification_get_objtype(handle,
 				       notification, objecttype, sizeof(objecttype));
@@ -400,12 +419,18 @@ expt_callback(event_handle_t handle, event_notification_t notification, void *da
 
 	if (strcmp(objecttype,TBDB_OBJECTTYPE_EVPROXY) != 0) {
 	  /*
-           * Resend the notification to the local server.
+           * Filter <plabsched,1> events, and for rest resend the notification 
+	   * to the local elvind server.
            */
-          if (! event_notify(localhandle, notification))
-            error("Failed to deliver notification!\n");
+	  int ret = event_notification_get_int32(handle, notification,
+						 TBDB_PLABSCHED, &plabsched);
+	  
+	  if ((!ret) || (plabsched != 1)) {
+	    
+	    if (! event_notify(localhandle, notification))
+	      error("Failed to deliver notification!\n");
+	  }
 	}
-
 }
 
 
@@ -422,7 +447,7 @@ sched_callback(event_handle_t handle,
 
 
 
-/* Callback functions for asysn event subscribe and ubnsubscribe */
+/* Callback functions for asysn event subscribe */
 
 void subscribe_callback(event_handle_t handle,  int result,
 			event_subscription_t es, void *data) {
@@ -431,11 +456,24 @@ void subscribe_callback(event_handle_t handle,  int result,
     exptmap[key] = es;
     info("Subscription for %s added successfully.\n", (char *)data);
   } else {
-    error("not able to delete the subscription.\n");
+    error("not able to add the subscription.\n");
     elvin_error_fprintf(stderr, handle->status);
   }
   
   free(data);
+
+}
+
+
+/* Callback functions for async event subscribe/unsubscribe */
+
+void async_callback(event_handle_t handle,  int result,
+			event_subscription_t es, void *data) {
+  if (!result) {
+    error("Error in async callback\n");
+    elvin_error_fprintf(stderr, handle->status);
+  }
+  
 
 }
 
