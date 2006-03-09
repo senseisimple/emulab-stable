@@ -372,10 +372,12 @@ function CHECKURL($url, &$error) {
 function CHECKPASSWORD($uid, $password, $name, $email, &$error)
 {
     global $TBCHKPASS_PATH;
+
+    $uid      = escapeshellarg($uid);
+    $password = escapeshellarg($password);
+    $stuff    = escapeshellarg("$name:$email");
     
-    $mypipe =
-	popen(escapeshellcmd("$TBCHKPASS_PATH $password $uid '$name:$email'"),
-	      "w+");
+    $mypipe = popen("$TBCHKPASS_PATH $password $uid $stuff", "w+");
     
     if ($mypipe) { 
         $retval=fgets($mypipe, 1024);

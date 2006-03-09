@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -196,6 +196,9 @@ $errors = array();
 # Need this for checkpass.
 #
 TBUserInfo($target_uid, $user_name, $user_email);
+
+#TBERROR("$target_uid, $user_name, $user_email, " .
+#	$formfields[passphrase1], 0); 
 
 #
 # Must supply a reasonable passphrase.
