@@ -70,7 +70,6 @@ class __PLCagent:
         def __init__(self, funcname, obj):
             self.__lockfile = open(PLC_LOCKFILE, "w")
             self.__meth = eval("obj.%s" % funcname)
-            self.__vers = [0,0,0]
             self.func_name = funcname
             return
         
@@ -103,7 +102,7 @@ class NMagent:
     def __init__(self, IP, nmport = DEF_NM_PORT):
         self.__server = xmlrpclib.ServerProxy("http://" + IP + ":" +
                                               nmport + "/")
-        self.__vers = []
+        self.__vers = [0,0,0]
         pass
 
     def create_sliver(self, ticket):
