@@ -70,6 +70,7 @@ class __PLCagent:
         def __init__(self, funcname, obj):
             self.__lockfile = open(PLC_LOCKFILE, "w")
             self.__meth = eval("obj.%s" % funcname)
+            self.__vers = [0,0,0]
             self.func_name = funcname
             return
         
@@ -112,22 +113,15 @@ class NMagent:
         return self.__server.delete_sliver(rcap)
 
     def version(self):
-        if not self.__vers:
-            try:
-                res = self.__server.version()
-                if type(res) == list and len(res) == 2 and res[0] == 0:
-                    verslist = res[1].split(".")
-                    major = verslist[0]
-                    minor, revision = verslist[1].split("-")
-                    self.__vers = [int(major), int(minor), int(revision)]
-                    pass
-                else:
-                    self.__vers = [0,0,0]
-                    pass
+        if self.__vers == [0,0,0]:
+            res = self.__server.version()
+            if type(res) == list and len(res) == 2 and res[0] == 0:
+                verslist = res[1].split(".")
+                major = verslist[0]
+                minor, revision = verslist[1].split("-")
+                self.__vers = [int(major), int(minor), int(revision)]
                 pass
-            except:
-                self.__vers = [0,0,0]
-                pass
+            pass
         return self.__vers
 
     pass
