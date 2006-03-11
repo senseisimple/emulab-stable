@@ -9,6 +9,7 @@ public class MoteLogger {
 
     private int debug;
     private File classDir;
+    private String[] classNames;
     private File aclDir;
     private String logTag;
     private String pid;
@@ -18,6 +19,7 @@ public class MoteLogger {
     private String dbURL = "jdbc.DriverMysql";
     private String dbUser = "root";
     private String dbPass = "";
+    private Hashtable classes;
 
     public static void main(String args[]) {
 	//
@@ -35,6 +37,7 @@ public class MoteLogger {
 
     public static void parseArgsAndRun(String args[]) {
 	File classDir = null;
+	String[] classNames = null;
 	String tag = null;
 	String pid = null;
 	String eid = null;
@@ -44,12 +47,21 @@ public class MoteLogger {
 
 	int i;
 	for (i = 0; i < args.length; ++i) {
-	    if (args[i].equals("-c")) {
+	    if (args[i].equals("-C")) {
 		if (++i < args.length && !args[i].startsWith("-")) {
 		    classDir = new File(args[i]);
 		}
 		else {
-		    System.err.println("option '-c' must have an argument!");
+		    System.err.println("option '-C' must have an argument!");
+		    usage();
+		}
+	    }
+	    else if (args[i].equals("-c")) {
+		if (++i < args.length && !args[i].startsWith("-")) {
+		    classNames = args[i].split(",");
+		}
+		else {
+		    System.err.println("option -c must have an argument!");
 		    usage();
 		}
 	    }
@@ -113,7 +125,7 @@ public class MoteLogger {
 	//this.motes = motes;
 
 	// startup
-	MoteLogger ml = new MoteLogger(classDir,aclDir,motes,
+	MoteLogger ml = new MoteLogger(classDir,classNames,aclDir,motes,
 				       pid,eid,tag,debug);
 	ml.run();
     }
@@ -122,8 +134,10 @@ public class MoteLogger {
 	String usage = "" + 
 	    "Usage: java MoteLogger -cipMd \n" +
 	    "Options:\n" +
-	    "\t-c <classdir>  Directory containing packet-matching " + 
+	    "\t-C <classdir>  Directory containing packet-matching " + 
 	    "classfiles \n" +
+	    "\t-c <classfile list>  Comma-separated list of fully-qualified " +
+	    "classnames. \n" + 
 	    "\t-i <idtag>  Alphanumeric tag for this logging set \n" +
 	    "\t-p pid,eid \n" + 
 	    //"\t-m <vname,vname,...>  (list of vnames present in acl dir) \n"+
@@ -135,15 +149,18 @@ public class MoteLogger {
 	System.exit(-1);
     }
 
-    public MoteLogger(File classDir,File aclDir,String[] motes,String pid,
+    public MoteLogger(File classDir,String[] classNames,
+		      File aclDir,String[] motes,String pid,
 		      String eid,String tag,int debug) {
 	this.classDir = classDir;
+	this.classNames = classNames;
 	this.aclDir = aclDir;
 	this.pid = pid;
 	this.eid = eid;
 	this.logTag = tag;
 	this.debug = debug;
 	this.motes = motes;
+	this.classes = new Hashtable();
     }
 
     // I know, not a thread, but who cares
@@ -177,6 +194,55 @@ public class MoteLogger {
 	    System.exit(0);
 	}
 
+	// load classfiles and create Class objs so we can do instance objs
+	// on incoming packet data
+	// first, have to discover the classfiles, if they weren't specified.
+	if (this.classNames == null || classNames.length == 0) {
+	    // try to read the classFile directory and use the XXX.class
+	    // names as the classes -- will fail if classes are in package.
+	    File[] classFiles = classDir.listFiles( new FilenameFilter() {
+		    public boolean accept(File dir, String name) {
+			if (name != null && name.endsWith(".class")) {
+			    return true;
+			}
+			else {
+			    return false;
+			}
+		    }
+		});
+
+	    if (classFiles != null) {
+		this.classNames = new String[classFiles.length];
+
+		for (int i = 0; i < classFiles.length; ++i) {
+		    String[] sa = classFiles[i].getName().split("\\.class");
+		    this.classNames[i] = sa[0];
+		}
+	    }
+	}
+
+	if (classFiles == null || classFiles.length == 0) {
+	    System.out.println("Could not find any classfiles; exiting.");
+	    System.exit(0);
+	}
+
+	// second, actually load them.
+	for (int i = 0; i < classNames.length; ++i) {
+	    try {
+		Class c = Class.forName(classNames[i]);
+
+		// this call does the class.forName, redundant i know.
+		classes.put(c,new SQLGenerator(classNames[i],
+					       null,
+					       this.logTag));
+	    }
+	    catch (Exception e) {
+		System.err.println("Problem loading class " + classNames[i] + 
+				   ":");
+		e.printStackTrace();
+	    }
+	}
+
 	// get capture keys
 	Hashtable acls = new Hashtable();
 	for (int i = 0; i < motes.length; ++i) {
@@ -194,22 +260,114 @@ public class MoteLogger {
 	packetQueue = new SynchQueue();
 	
 	// connect to the database
-	;
+	Connection conn = null;
+	try {
+	    Class.forName("com.mysql.jdbc.Driver");
+	    conn = DriverManager.getConnection("jdbc:mysql:" + 
+					       "//localhost/test?user=root");
+	}
+	catch (Exception e) {
+	    System.err.println("FATAL -- couldn't connect to the database: " +
+			       e.getMessage());
+	    e.printStackTrace();
+
+	    System.exit(-2);
+	}
 
 	// spawn connection threads
 	for (Enumeration e1 = acls.keys(); e1.hasMoreElements(); ) {
 	    String vNN = (String)e1.nextElement();
 	    ElabACL acl = (ElabACL)acls.get(vNN);
-	    (new MoteLogThread(acl,packetQueue)).start();
+	    (new MoteThread(acl,packetQueue)).start();
 	}
+
+	// now, process the packet queue forever.
+	while (true) {
+	    LogPacket lp = null;
+
+	    synchronized(packetQueue) {
+		while(packetQueue.peek() == null) {
+		    try {
+			packetQueue.wait();
+		    }
+		    catch (Exception e) {
+			e.printStackTrace();
+		    }
+		}
+
+		// once we get a packet...
+		lp = packetQueue.queueRemove();
+	    }
+
+	    // dump it out to database:
+	    // this is the real work:
+
+	    try {
+		// first match the packet:
+		SQLGenerator sq = null;
+		boolean foundMatch = false;
+
+		for (Enumeration e1 = classes.keys(); 
+		     !foundMatch && e1.hasMoreElements(); ) {
+
+		    Class cc = (Class)e1.nextElement();
+		    sq = (SQLGenerator)classes.get(cc);
+
+		    // Need to create a BaseTOSMsg
+		    // and extract the 'type' field... which is the am type
+		    // ... and then match this with the amType() method of the
+		    // invoked class.
+
+		    // XXX: note that this must be changed depending on the
+		    // architecture of the motes we're connecting to, in order
+		    // to decode using the correct host byte order assumption.
+		    // i.e., net.tinyos.message.telos.*
+		    // 
+		    if (true) {
+			net.tinyos.message.avrmote.BaseTOSMsg btm = 
+			    new net.tinyos.message.avrmote.BaseTOSMsg(lp.getData());
+			if (lp.amType() == sq.getAMType()) {
+			    // class match
+			    // invoke the byte[] data constructor on the data
+			    // from the basetosmsg:
+			    Constructor ccc = cc.getConstructor( new Class[] {
+				byte[].class } );
+			    Object msgObj = ccc.newInstance( new Object[] {
+				btm.get_data() } );
+
+			    lp.setMsgObject(msgObj);
+			    // ready to log!!!
+
+			    foundMatch = true;
+			}
+		    }
+
+		}
+	       
+		// do the db insert:
+		sq.storeMessage(msgObj,conn);
+
+		// that's all, folks!
+		
+	    }
+	    catch (Exception e) {
+		System.err.println("Error while logging packet: ");
+		e.printStackTrace();
+	    }
+	}
+
+	    
     }
 
-    class MoteLogThread extends Thread {
+    class MoteThread extends Thread {
+	private String vNodeName;
 	private ElabACL acl;
 	private SynchQueue q;
 	private Socket sock;
 
-	public MoteLogThread(ElabACL acl,SynchQueue packetQueue) {
+	public MoteLogThread(String vNodeName,ElabACL acl,
+			     SynchQueue packetQueue) {
+	    this.vNodeName = vNodeName;
 	    this.acl = acl;
 	    this.q = packetQueue;
 	}
@@ -313,7 +471,7 @@ public class MoteLogger {
 	    PacketReader pr = null;
 
 	    try {
-		pr = new PacketReader(sock.getInputStream());
+		pr = new PacketReader(vNodeName,sock.getInputStream());
 	    }
 	    catch (Exception e) {
 		e.printStackTrace();
@@ -324,6 +482,11 @@ public class MoteLogger {
 		lp = null;
 		try {
 		    lp = pr.readPacket();
+		    synchronized(packetQueue) {
+			packetQueue.queueAdd(lp);
+			packetQueue.notifyAll();
+		    }
+
 		}
 		catch (Exception e) {
 		    System.err.println("Problem while reading from " + 

@@ -64,8 +64,10 @@ public final class PacketReader {
     final static int P_UNKNOWN = 255;
 
     private InputStream in;
+    private String vNodeName;
 
-    public PacketReader(InputStream in) {
+    public PacketReader(String vNodeName,InputStream in) {
+	this.vNodeName = vNodeName;
 	this.in = in;
     }
 
@@ -148,13 +150,13 @@ public final class PacketReader {
 	    retval = new byte[buf.length-3];
 	    System.arraycopy(buf,1,retval,0,retval.length);
 	    
-	    return new LogPacket(t,retval,packetType,crc);
+	    return new LogPacket(vNodeName,t,retval,packetType,crc);
 	}
 	else if (buf[0] == P_PACKET_ACK) {
 	    retval = new byte[buf.length-4];
 	    System.arraycopy(buf,2,retval,0,retval.length);
 	    
-	    return new LogPacket(t,retval,packetType,crc);
+	    return new LogPacket(vNodeName,t,retval,packetType,crc);
 	}
 	else if (buf[0] == P_ACK || buf[0] == P_UNKNOWN) {
 	    // do nothing for now; this is only sent by receiver on
@@ -165,7 +167,7 @@ public final class PacketReader {
 	    // XXX: might want to log these in the future...
 	}
 
-	return lp;
+	return null;
     }
 
 }

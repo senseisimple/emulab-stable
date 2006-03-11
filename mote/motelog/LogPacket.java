@@ -1,6 +1,6 @@
 
 import java.util.*;
-//import net.tinyos.message.Message;
+import net.tinyos.message.Message;
 
 public class LogPacket {
 
@@ -8,9 +8,12 @@ public class LogPacket {
     private byte[] data;
     private int packetType;
     private int crc;
-    //private Message msg;
+    private Object msg;
+    private String srcVnodeName;
 
-    public LogPacket(Date time,byte[] data,int packetType,int crc) {
+    public LogPacket(String srcVnodeName,Date time,byte[] data,
+		     int packetType,int crc) {
+	this.srcVnodeName = srcVnodeName;
 	this.timeStamp = time;
 	this.data = data;
 	this.packetType = packetType;
@@ -32,6 +35,18 @@ public class LogPacket {
 
     public int getLowLevelCRC() {
 	return this.crc;
+    }
+
+    public String getSrcVnodeName() {
+	return this.srcVnodeName;
+    }
+
+    public void setMsgObject(Object obj) {
+	this.msg = obj;
+    }
+
+    public Object getMsgObject() {
+	return this.msg;
     }
 
 }
