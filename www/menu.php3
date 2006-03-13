@@ -300,7 +300,8 @@ function WRITESIDEBAR() {
 	#		    $TBDOCBASE, "cdrom.php");
 
 	echo "<li><a href=\"$TBDOCBASE/people.php3\">People</a> and " .
-	     "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a></li>";
+	     "<a href=\"$TBDOCBASE/gallery/gallery.php3\">Photos</a>" .
+	     "&nbsp;<img src=\"/new.gif\" /></li>";
 
 	echo "<li>Emulab <a href=\"$TBDOCBASE/doc/docwrapper.php3? " .
 	     "docname=users.html\">Users</a> and " .
