@@ -6,28 +6,201 @@
 # All rights reserved.
 #
 
-#
-# libtblog: Logging library for testbed
-#
-# The very act of including libtblog in a perl script will activate
-# the logging subsystem.  Also, all output to STDOUT and STDERR will,
-# by default, be captured and turned into log messages, in addition to
-# being printed.  Handlers are also installed for die/warn.
-# To turn this feature off use tblog_stop_capture(..).
-#
-# Although the logging subsystem is activated automatically, the pid,
-# eid, and uid can not be determined automatically.  Thus the function
-# tblog_set_info(...) needs to be called to set this info.
-#
-# To create a log entry use tblog(...) or one of the shortcut function:
-# tberror, tberr, tbwarn, tbwarning, tbnotice, tbinfo, and tbdebug.
-#
-# To attempt and figure out what went wrong during a session use
-# tblog_find_error(..).
-# 
-# To turn off the database logging set the environmental variable
-# TBLOG_OFF to a true value.
-#
+=head1 NAME
+
+libtblog - Logging library for testbed
+
+=head1 BASIC USAGE
+
+See the REFERENCE section for detailed descriptions of any of the
+functions mentioned here.
+
+=head2 Quick Start
+
+Every perl script that can possible report a testbed related error
+should use libtblog.  This should be done in the same place that
+the other testbed libraries are included:
+
+    use lib "@prefix@/lib";
+    ...
+    use libtblog;
+    ...
+
+This will activate the logging subsystem.  All output to STDOUT
+and STDERR will, by default, be captured and turned into log
+messages, in addition to being printed.  Handlers are also installed
+for die/warn.  To turn this feature off use tblog_stop_capture(...).
+
+If the script may be used at a top level than tblog_set_info(...)
+should be used.
+
+Than all output should use one of the tb* functions calls as follows:
+
+    tberror("message")   # to report an error
+    tbwarn("message")    # to report a warning
+    tbnotice("message")  # to report important information that not
+                         # really a warning.
+    tbinfo("message")    # for normal log messages
+
+    tbdie("message")     # to report an error than die using perl "die"
+
+The tb* log functions (except for tbinfo) will automatically prefix
+the message with "***" and other appropriate formatting so don't
+include any.  However, multiline messages are okay.
+
+Normal perl "die" can and should still be used when reporting an
+internal error such as calling a function incorrectly.  The message
+will still be logged but it will be flagged as an internal error.
+
+For basic usage that it.
+
+=head2 Associating a Cause With An Error
+
+One of the goals of this system is to be able to determine the cause
+of an error.  The current causes are:
+
+    temp - resources temp unavailable
+    user - user error
+    internal - software bug, should not happen
+    software - software problem, like a bad image
+    hardware - hardware problem
+    unknown - default
+
+(Note, that at the moment, internal is the same as software, but in
+the future that might change)
+
+The cause for an error can be set directly when calling tberror by passing
+in the "cause" parameter.  For example:
+
+    tberror({cause => 'temp'}, "message")
+
+Or, a default cause can be set for a script using
+"tblog_set_default_cause", for example:
+
+    tblog_set_default_cause ('temp')
+
+The cause is only relevant for errors.  For that reason
+tblog_set_default_cause will only set the default cause for errors.
+
+When using the normal perl C<die> or C<warn> the cause is always set
+to "internal", since they may come from perl itself.
+
+=head2 Finding the Cause of the Error
+
+Use tblog_find_error.
+
+=head1 ADVANCE USAGE
+
+=head2 Understanding How tblog_find_error Works
+
+When something goes wrong tblog_find_error will reconstruct a trace of
+what script called what.  Of all the scripts which reported errors, it
+will then use the last one at the deepest level.
+
+For example consider the following:
+
+    e (top)
+       * (a)
+       e (b)
+          e (1)
+       * (c)
+       e (d)
+          E (2)
+       * (e)
+
+In this example "top" called script "a", "b", "c", "d", "e".  When it
+called "b" something went wrong but it continued anyway, it than
+called "d" which failed.  However script "d" also called "2" which
+also failed.  Thus libtblog will report the errors coming from "2",
+the fact that "e" was called after "d" is irrelevant, since it didn't
+report any errors.
+
+However, this strategy doesn't always work.  The rest of this section
+will deal with the cases when it doesn't and how to help it.
+
+=head2 Extra, and Summary Log Messages
+
+In the case when an error message provides I<extra> information, that
+the user should know about, on what just happened with a script at a
+lower level, the "type" parameter should be used to set the message
+type to "extra":
+
+    tberror {type => 'extra'}, ...
+
+A good example of using the "extra" type to good effect is in
+assign_wrapper:
+
+    fatal({type=>'extra', cause=>'user'},
+          "Experiment can not be run on an empty testbed. ".
+          "Please fix the experiment.");
+
+Where C<fatal> here just calls tberror and then exists.
+
+In the case when the error message provides a useful I<summary> of the
+errors at the lower level, and should replace them, the message type
+should be set to "summary":
+
+    tberror {type => 'summary'}, ...
+
+=head2 Using Sublevels
+
+In some cases a script does more than one abstract thing such that
+when one thing fails it will report an error than latter on report
+that X failed.  Since both errors are coming from the same script
+both will be reported, but in reality only the error
+from the first thing should be reported.  To correct this situation
+the "sublevel" parameter should be used.  This parameter tweaks the
+call trace so that some errors are at a deeper level than others, even
+though they are coming form the same script.  The default sublevel is
+0.  Negative sublevels can be used.
+
+For example, consider the following code:
+
+    $res = do_something()
+
+    tbdie "do_something failed!" unless $res;
+
+    sub do_something() {
+        ...
+        tberror "foo not responding!";
+        return 0;
+       ...
+    }
+
+Without using sublevel the reported errors will be:
+
+    foo not responding!
+    do_something failed!
+
+However, the second error is not needed.  To fix this, the sublevel
+parameter should be added to one of the tb* calls.  This can either be
+accomplished by setting the sublevel to 1 on the "foo not
+responding!" error, or -1 on the "do_something failed!" error.  Since
+do_something may have many errors it is often easier to set the
+sublevel on the "do_something failed!" error:
+
+    ...
+    tbdie {sublevel => -1}, do_something failed!" unless $res;
+    ...
+
+=head2 Sub Processes
+
+In some cases, such as when forking children to run in parallel,
+simply using the sublevel parameter is not enough.  In this case
+a new sub-process should be started with tblog_sub_process.
+
+=head1 OTHER SCRIPTS
+
+Currently libtblog is only usable from perl scripts running on boss.
+To get errors coming form non-perl programs, or scripts running on ops,
+into the system the output should be parsed for errors.  For examples
+of this see F<assign_wrapper2> and F<parse-ns>.
+
+=head1 REFERENCE
+
+=over
+
+=cut
 
 package libtblog;
 use Exporter;
@@ -146,8 +319,11 @@ sub tblog_new_process(@);
 sub tblog_init_process(@);
 sub informative_scriptname();
 
+
 #
-# tblog_init(): Called automatically when a script starts.
+# tblog_init
+#
+# Called automatically when a script starts.
 #
 # Will: Get the priority mapping (string -> int) from the database and
 # than call tblog_new_process
@@ -168,10 +344,10 @@ sub tblog_init() {
 		      @ARGV);
 };
 
-
 #
-# tblog_new_process($cmd, @argv): enter a new (possible fake) process
-# calls tblog_init_process
+# tblog_new_process CMD, ARGV
+#
+# Enter a new (possible fake) process, calls tblog_init_process
 #
 # If used to start a new fake process it is advised to make a local
 # copy of %ENV using perl "local".  See tblog_sub_process for an
@@ -183,7 +359,9 @@ sub tblog_new_process(@) {
 }
 
 #
-# tblog_init_process($cmd, @argv): init a new process
+# tblog_init_process CMD, ARGV
+#
+# Init a new process
 #
 # Will: (1) Get the unique ID for the script name,  (2) Creating an
 # "entring" log message in the database, (3) get the session id and
@@ -246,26 +424,38 @@ sub tblog_init_process(@) {
 
 }
 
-#
-# Began a sub process.  It is advised to make a local copy of %ENV using
-# perl "local".  This can be done with:
-#   local %ENV = %ENV
-# however due to a bug in perl 5.005_03 if "-T" is used than the above will 
-# taint the path, instead use:
-#   my $old_env = \%ENV
-#   local %ENV;
-#   copy_hash %ENV, $old_env
-# See perlsub(1) 1 for more info on "local"
-#
+
+=item tblog_sub_process NAME, ARGV
+
+Began a sub process.  It is advised to make a local copy of %ENV using
+perl "local".  This can be done with:
+
+    local %ENV = %ENV
+
+however due to a bug in perl 5.005_03 if "-T" is used than the above will
+taint the path, instead use:
+
+    my $old_env = \%ENV
+    local %ENV;
+    copy_hash %ENV, $old_env
+
+See perlsub(1) for more info on "local"
+
+=cut
+
 sub tblog_sub_process($@) {
     my $name = shift;
     tblog_init_process("$ENV{TBLOG_BASE_SCRIPTNAME}-$name",
 		       @_);
 }
 
-#
-# copy_hash(%dest, \%src)
-#
+
+=item copy_hash %DEST, \%SRC
+
+Utility function, see tblog_sub_process
+
+=cut
+
 sub copy_hash(\%$) {
     my ($new, $old) = @_;
     foreach (keys %$old) {
@@ -273,11 +463,13 @@ sub copy_hash(\%$) {
     }
 }
 
-#
-# tblog_set_info(pid, eid, uid): Sets info in the database which can't
-#   be derived automatically with init.  Needs to be called at least
-#   once during a session.
-#
+=item tblog_set_info PID, EID, UID
+
+Sets info in the database which can't be derived automatically with
+init.  Needs to be called at least once during a session.
+
+=cut
+
 sub tblog_set_info ( $$$ )
 {
     check_env();
@@ -291,20 +483,25 @@ sub tblog_set_info ( $$$ )
 		$ENV{TBLOG_PIDX}, $ENV{TBLOG_UID}, $ENV{TBLOG_SESSION});
 }
 
-#
-# tblog_set_default_cause(cause)
-#
+=item tblog_set_default_cause CAUSE
+
+Set the default cause.
+
+=cut
+
 sub tblog_set_default_cause ( $ )
 {
     check_env();
     $ENV{TBLOG_CAUSE} = $_[0];
 }
 
+=item tblog_exit
 
-#
-# tblog_exit(): Called automatically when a script exits, or explistly
-# when a fake process exits.  
-#
+Exits a script or sub-process.  Generally called automatically when a
+script exists but may be called explistly when ending a sub-process.
+
+=cut
+
 sub tblog_exit() {
     return unless defined $ENV{'TBLOG_SESSION'};
     check_env();
@@ -324,12 +521,53 @@ sub informative_scriptname() {
 }
 
 
+=item tblog PRIORITY, MESG, ...
+
+=item tblog PRIORITY, {PARM=>VALUE,...}, MESG, ...
+
+The main log function.  Logs a message to the database and print
+the message to STDERR with an approate prefix depending on the
+severity of the error.  If more than one string is given for the
+message than they will concatenated.  If the env. var. TBLOG_OFF
+is set to a true value than nothing will be written to the
+database, but the message will still be written to STDERR.
+
+Useful parms: sublevel, cause, type
+
+=item tberror [{PARM=>VALUE,...},] MESG, ...
+
+=item tberr [{PARM=>VALUE,...},] MESG, ...
+
+=item tbwarn [{PARM=>VALUE,...},] MESG, ...
+
+=item tbwarning [{PARM=>VALUE,...},] MESG, ...
+
+=item tbnotice [{PARM=>VALUE,...},] MESG, ...
+
+=item tbinfo [{PARM=>VALUE,...},] MESG, ...
+
+=item tbdebug [{PARM=>VALUE,...},] MESG, ...
+
+Usefull alias functions.  Will call tblog with the appropriate priority.
+
+=item tbdie [{PARM=>VALUE,...},] MESG, ...
+
+Log the message to the database as an error and than die.  An
+optional set of paramaters may be specified as the first argument.
+not exactly like die as the message must be specified.
+
+=cut
+
+#
+# NOTE: tblog (and friends) defined in libtblog_simple
+#
+
 #
 # dblog(priority, {parm=>value,...}, mesg, ...)
 #   Internal function.  Logs a message to the database.  Doesn't print
 #   anything. Will not die, instead return 0 on error, with the error
 #   message in $@.
-#   Valid parms: sublevel, cause, type, fatal
+#   Valid parms: sublevel, cause, type
 #
 my $in_dblog = 0; # Used to avoid an infinite recursion when
                   # DBQueryFatal fails as a log entry is made to
@@ -388,25 +626,48 @@ sub dblog_real ( $$@ ) {
   *dblog = \&dblog_real;
 }
 
-#
-# tblog_find_error([session],[store]): attempts to find the relevant error.  
-# 
-# Parameters:
-#   session: Session id to use. Defaults to the current as given by 
-#       $ENV{TVLOG_SESSION}.
-#   store: If set store the results into the database and act in
-#       a way that is safe to use in an END block, that is 
-#       (1) never die, (2) don't modify the exit code,  Will also
-#       print the results to and some additional info to STDERR
-#       for diagnosis purposed.  If not set simply print the results to
-#       STDERR.  Defaults to true unless the "session" parameter is also
-#       given, in which case default to false.
-#
-# To retrieve the results from the database:
-#   select ... where session = <Session ID> AND type = 'thecause' form log
-# The relevant errors are also flagged using "relevant" flag:
-#   select ... where session = <Session ID> AND relevant != 0 form log
-#
+
+=item tblog_find_error [[SESSION], STORE]
+
+Attempts to find the relevant error.
+
+Parameters:
+
+=over
+
+=over
+
+=item session
+
+Session id to use. Defaults to the current as given by 
+$ENV{TVLOG_SESSION}.
+
+=item store
+
+If set store the results into the database and act in
+a way that is safe to use in an END block, that is 
+(1) never die, (2) don't modify the exit code,  Will also
+print the results to and some additional info to STDERR
+for diagnosis purposed.  If not set simply print the results to
+STDERR.  Defaults to true unless the "session" parameter is also
+given, in which case default to false.
+
+=back
+
+=back
+
+To retrieve the results from the database:
+
+    SELECT ... WHERE session = <Session ID>
+                 AND type = 'thecause' form log
+
+The relevant errors are also flagged using "relevant" flag:
+
+    SELECT ... WHERE session = <Session ID>
+                 AND relevant != 0 form log
+
+=cut
+
 sub tblog_find_error ( ;$$ ) {
 
     my ($session,$store) = @_;
@@ -705,11 +966,18 @@ sub CLOSE {
     # (ditto for SERR and STDERR)
 }
 
-#
-# tblog_start_capture(): Capture all output to STDOUT and STDERR and turn
-#   them into log messages.  Use SOUT and SERR to print to the real
-#   STDOUT and STDERR respectfully.  Does NOT capture output of
-#   subprocesses.  Will also install handlers for "die" and "warn";
+=item tblog_start_capture [LIST]
+
+Capture all output to STDOUT and STDERR and turn them into log
+messages.  Use SOUT and SERR to print to the real STDOUT and STDERR
+respectfully.  Does NOT capture output of subprocesses.  Will also
+install handlers for "die" and "warn".
+
+If LIST is present than only capture the parts present in list, can be
+any one of "stdout", "stderr", "die", or "warn".
+
+=cut
+
 #
 # Implementation node: tie is used to catch prints to STDOUT and
 #  STDERR as that seams to be the only sane way to do it.  "print" is
@@ -753,10 +1021,16 @@ sub tblog_start_capture( ;@ ) {
     }
 }
 
-#
-# tblog_stop_capture(): stop capture of STDOUT and STDERR, and remove 
-# handles for die and warn
-#
+=item tblog_stop_capture [LIST]
+
+Stop capture of STDOUT and STDERR, and remove handles for die and
+warn.
+
+If LIST is present than only stop capture of the parts present in
+list, can be any one of "stdout", "stderr", "die", or "warn".
+
+=cut
+
 sub tblog_stop_capture( ;@ ) {
     my (@what) = @_;
     @what = qw(stdout stderr die warn) unless @what;
@@ -791,3 +1065,24 @@ END {
 }
 
 1;
+
+=pod
+
+=back
+
+=head1 ENVIRONMENT
+
+To turn off the database logging set the environmental variable
+TBLOG_OFF to a true value.
+
+A number of environmental variables are used by libtblog, all of which
+start with "TBLOG_".  They should generally not be set directory.
+
+=head1 SEE ALSO
+
+The file F<libtblog.sql> in the F<sql/> directory in the source describes
+the tables used by libtblog.
+
+libtblog_simple, which is a special version of libtblog.
+
+=cut
