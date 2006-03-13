@@ -83,10 +83,6 @@ MAGIC_INET_GATEWAYS =  ("205.124.244.150", "205.124.239.185",
 LOCAL_PLAB_DOMAIN = ".flux.utah.edu"
 LOCAL_PLAB_LINKTYPE = "pcplabinet2"
 
-ALLOWED_NODES = ()
-#ALLOWED_NODES = ("128.112.139.80", "128.112.139.72", "169.229.50.4")
-IGNORED_NODES = ("10283","25","155")
-
 # allowed nil/unknown values (sentinels).
 ATTR_NIL_VALUES = ('None',)
 
@@ -99,6 +95,8 @@ ROOTBALL_URL = "http://localhost:1492/" # ensure this ends in a slash
 
 DEF_PLAB_URL = "www.planet-lab.org"
 DEF_SITE_XML = "/xml/sites.xml"
+IGNORED_NODES_FILE = "@prefix@/etc/plab/IGNOREDNODES"
+ALLOWED_NODES_FILE = "@prefix@/etc/plab/ALLOWEDNODES"
 
 DEF_ROOTBALL_NAME = "@PLAB_ROOTBALL@"
 SLICEPREFIX = "@PLAB_SLICEPREFIX@"
@@ -260,19 +258,22 @@ class Plab:
             print avail
             pass
 
+        ignored_nodes = self.__readNodeFile(IGNORED_NODES_FILE)
+        allowed_nodes = self.__readNodeFile(ALLOWED_NODES_FILE)
+
         # Enforce node limitations, if any.
         # XXX: This is ugly - maybe move to a separate function
         #      that takes a list of filter functions.  I know!!
         #      Create a generator out of a set of filter functions
         #      and the initial node list! :-)  Python geek points to me if
         #      I ever get around to it...  KRW
-        if len(ALLOWED_NODES) or len(IGNORED_NODES):
+        if len(allowed_nodes) or len(ignored_nodes):
             allowed = []
             for nodeent in avail:
-                if nodeent['PLABID'] in IGNORED_NODES:
+                if nodeent['PLABID'] in ignored_nodes:
                     continue
-                elif len(ALLOWED_NODES):
-                    if nodeent['IP'] in ALLOWED_NODES:
+                elif len(allowed_nodes):
+                    if nodeent['IP'] in allowed_nodes:
                         allowed.append(nodeent)
                         pass
                     pass
@@ -791,6 +792,19 @@ class Plab:
             pass
         
         return nodeid, priority
+
+    def __readNodeFile(self, filename):
+        """
+        Helper function - read in list of nodes from a file, seperated
+        by arbitrary amounts of whitespace.  No comments allowed.
+        """
+        nodelist = []
+        if os.access(filename, os.F_OK):
+            nodefile = open(filename, "r+")
+            nodelist = nodefile.read().split()
+            nodefile.close()
+            pass
+        return nodelist
 
     def renew(self, force = False):
         """
