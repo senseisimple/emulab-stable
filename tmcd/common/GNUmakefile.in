@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -70,6 +70,7 @@ common-script-install:	dir-install
 	$(INSTALL) -m 755 $(SRCDIR)/libtmcc.pm $(BINDIR)/libtmcc.pm
 	$(INSTALL) -m 755 $(SRCDIR)/libtestbed.pm $(BINDIR)/libtestbed.pm
 	$(INSTALL) -m 755 $(SRCDIR)/tmcc.pl $(BINDIR)/tmcc
+	$(INSTALL) -m 755 $(SRCDIR)/logboot $(BINDIR)/logboot
 	$(INSTALL) -m 755 $(SRCDIR)/watchdog $(BINDIR)/watchdog
 	$(INSTALL) -m 755 $(SRCDIR)/ntpstart $(BINDIR)/ntpstart
 	$(INSTALL) -m 755 $(SRCDIR)/runstartup $(BINDIR)/runstartup

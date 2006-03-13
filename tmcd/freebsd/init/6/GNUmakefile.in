@@ -1,0 +1,28 @@
+#
+# Insert Copyright Here.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+EVENTSYS	= @EVENTSYS@
+OBJDIR		= ../../../..
+SUBDIR		= tmcd/freebsd/init/6
+
+include $(OBJDIR)/Makeconf
+
+all:	
+client: init
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+CFLAGS	+= -DDEBUGSHELL -DSECURE -DLOGIN_CAP -DCOMPAT_SYSV_INIT -DTESTBED
+
+init: init.c pathnames.h
+	$(CC) $(CFLAGS) -static -o init $< -lutil -lcrypt
+
+install:
+
+client-install: client
+	install -s -o root -g wheel -m 500 -fschg -b -B.bak init /sbin/init
+
+clean:	
+	rm -f *.o core init

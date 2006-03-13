@@ -1,0 +1,62 @@
+#!/bin/bash
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+. /etc/emulab/paths.sh
+
+#
+# testbed       Run "prepare" on the way down.
+#
+# description:	Clean up node using Emulab's prepare script.
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Source networking configuration.
+if [ ! -f /etc/sysconfig/network ]; then
+    exit 0
+fi
+
+. /etc/sysconfig/network
+
+RETVAL=0
+
+# Oh, give me a break! Linux rc greps for keywords "daemon |action " to
+# determine if stdout/stderr should be redirected! So, put this stupid
+# line here so that output goes to the console!
+#
+# daemon action 
+
+# See how we were called.
+case "$1" in
+  start)
+	# We do not do anything; this is strictly for reboot time.
+	# Note: /var/lock/subsys/tbprepare will be created later, as needed.
+	;;
+  stop)
+  	rm /var/lock/subsys/tbprepare
+	echo "Running Testbed prepare script ..."
+	$BINDIR/prepare 2>&1 | tee /prepare.log
+	$BINDIR/logboot /prepare.log
+	rm -f /prepare.log
+	echo "Informing the testbed we're rebooting ..."
+	$BINDIR/tmcc state SHUTDOWN
+	RETVAL=$?
+	;;
+  status)
+	echo "Peachy"
+	;;
+  restart)
+	echo "Done"
+	;;
+  reload)
+	echo "Done"
+	;;
+  *)
+	echo "Usage: testbed {start|stop|restart|reload|status}"
+	exit 1
+esac
+
+exit $RETVAL

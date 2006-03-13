@@ -1,0 +1,45 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../../..
+SUBDIR		= tmcd/freebsd/init
+
+include $(OBJDIR)/Makeconf
+
+# To decide what directory
+FBSDVERSION   := $(shell uname -v | sed -e 's/FreeBSD \([0-9]\).*/FreeBSD\1/')
+
+ifeq ($(FBSDVERSION),FreeBSD4)
+SUBDIR	       = 4
+endif
+ifeq ($(FBSDVERSION),FreeBSD5)
+SUBDIR	       = 5
+endif
+ifeq ($(FBSDVERSION),FreeBSD6)
+SUBDIR	       = 6
+endif
+SUBDIRS	       = $(SUBDIR)
+
+all:
+
+include $(TESTBED_SRCDIR)/GNUmakerules
+
+install:
+
+client:		client-subdirs
+client-install: client client-install-subdirs
+
+clean:		clean-subdirs
+distclean:	distclean-subdirs
+
+# How to recursively descend into subdirectories to make general
+# targets such as `all'.
+%.MAKE:
+	@$(MAKE) -C $(dir $@) $(basename $(notdir $@))
+%-subdirs: $(addsuffix /%.MAKE,$(SUBDIRS)) ;
+
+.PHONY:	$(SUBDIRS)

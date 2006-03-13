@@ -588,7 +588,62 @@ single_user(void)
 		 * Start the single user session.
 		 */
 		setctty(_PATH_CONSOLE);
+#ifdef TESTBED
+#define TERMCMD "/bootcmd"
+		
+		if (access(TERMCMD, F_OK) == 0) {
+			FILE *fp;
+			char cmd[256], *bp;
+			char *myargv[3];
 
+			/*
+			 * Very simple; the file contains the path of a
+			 * command to run. No arguments supported, sorry.
+			 */
+			if ((fp = fopen(TERMCMD, "r")) == NULL) {
+				/* Lets avoid loops! */
+				unlink(TERMCMD);
+				goto skip;
+			}
+			
+			if (fgets(cmd, sizeof(cmd), fp) == NULL) {
+				fclose(fp);
+				/* Lets avoid loops! */
+				unlink(TERMCMD);
+				goto skip;
+			}
+			fclose(fp);
+
+			/* Lets avoid loops! */
+			unlink(TERMCMD);
+
+			if ((bp = rindex(cmd, '\n')))
+				*bp = '\0';
+			
+			if (access(cmd, X_OK) != 0) {
+				emergency("%s does not exist!", cmd);
+				goto skip;
+			}
+
+			/* See comment below */
+			sigemptyset(&mask);
+			sigprocmask(SIG_SETMASK, &mask, (sigset_t *) 0);
+
+			myargv[0] = "sh";
+			myargv[1] = cmd;
+			myargv[2] = 0;
+			
+			execv(_PATH_BSHELL, myargv);
+			stall("can't exec %s for %s: %m", _PATH_BSHELL, cmd);
+		}
+		/*
+		 * If something goes wrong, we want to sit in single user mode
+		 * so that we might catch the error. Not sure, might have to
+		 * do something fancier, like perhaps add a state transition
+		 * for this/
+		 */
+	skip:
+#endif
 #ifdef SECURE
 		/*
 		 * Check the root password.

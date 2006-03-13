@@ -67,6 +67,7 @@ my $sleepwait   = 10;
 #	'name'	 string identifying the caller for error messages
 #	'on'	 1 to enter MFS, 0 to exit
 #	'reboot' 1 to reboot into MFS, -1 to "power on", 0 to do nothing
+#	'prepare' 1 to run prepare on the way down
 #	'wait'	 1 to wait for all nodes to reach MFS before returning,
 #		 0 to return after reboot/power-on
 #
@@ -86,6 +87,7 @@ sub TBAdminMfsBoot($$@)
     my $on = $args->{'on'};
     my $reboot = $args->{'reboot'};
     my $wait = $args->{'wait'};
+    my $prepare = $args->{'prepare'};
 
     #
     # Reboot or power on nodes...
@@ -133,7 +135,9 @@ sub TBAdminMfsBoot($$@)
 		$i++;
 	    }
 	    if ($reboot > 0) {
-		if (system("$nodereboot $batch")) {
+		my $optarg = ($prepare ? "-p" : "");
+		
+		if (system("$nodereboot $optarg $batch")) {
 		    print STDERR "*** $me:\n".
 			"    WARNING: Could not reboot some of: $batch!\n";
 		}
@@ -339,6 +343,7 @@ sub TBAdminMfsSelect($$@)
 #		    the function returns 0, we abort as we would with
 #		    a timeout.
 #	'timestamp' if timestamps after significant events are desired
+#	'prepare'   1 if nodes should be rebooted with "prepare" flag
 #
 # Returns zero if all nodes successfully run the command.
 # If the $failed ref is defined, it is an arrayref in which we return the
@@ -362,6 +367,7 @@ sub TBAdminMfsRunCmd($$@)
     my $pfunc = $args->{'pfunc'};
     my $pinterval = $args->{'pinterval'};
     my $pcookie = $args->{'pcookie'};
+    my $prepare = $args->{'prepare'};
 
     # we always need a value
     $timeout = $commandtimo
@@ -410,6 +416,7 @@ sub TBAdminMfsRunCmd($$@)
     $myargs{'name'} = $me;
     $myargs{'on'} = 1;
     $myargs{'reboot'} = $poweron ? -1 : 1;
+    $myargs{'prepare'} = $prepare;
     $myargs{'wait'} = 1;
     my @failed = ();
     if (TBAdminMfsBoot(\%myargs, \@failed, @nodes)) {

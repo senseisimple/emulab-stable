@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 . /etc/emulab/paths.sh
@@ -46,9 +46,11 @@ case "$1" in
 	killproc linktest
 	killproc emulab-syncd
 	killproc tippty
-	echo "Informing the testbed we're rebooting ..."
-	$BINDIR/tmcc state SHUTDOWN
-	RETVAL=$?
+        if [ ! -f /var/lock/subsys/tbprepare ]; then
+	    echo "Informing the testbed we're rebooting ..."
+	    $BINDIR/tmcc state SHUTDOWN
+	    RETVAL=$?
+	fi
 	;;
   status)
 	echo "Peachy"

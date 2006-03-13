@@ -31,7 +31,7 @@ sub usage()
 }
 # The hidden -r option runs this in "realmode", ie don't send an event, but
 # really do the work instead.
-my $optlist     = "dfe:wrkacb";
+my $optlist     = "dfe:wrkacbp";
 my $debug       = 0;
 my $powercycle  = 0;
 my $waitmode    = 0;
@@ -39,6 +39,7 @@ my $realmode    = 1; # XXX Temporary, until we make event sending the default.
 my $killmode    = 0;
 my $reconfig    = 0;
 my $rebootmode  = 0;
+my $prepare     = 0;
 
 #
 # Configure variables
@@ -96,6 +97,9 @@ if (defined($options{"k"})) {
 }
 if (defined($options{"w"})) {
     $waitmode = 1;
+}
+if (defined($options{"p"})) {
+    $prepare = 1;
 }
 if (defined($options{"r"})) {
     $realmode = 1;
@@ -241,6 +245,7 @@ $args{'waitmode'}    = $waitmode;
 $args{'realmode'}    = $realmode;
 $args{'killmode'}    = $killmode;
 $args{'reconfig'}    = $reconfig;
+$args{'prepare'}     = $prepare;
 $args{'nodelist'}    = [ @nodes ];
 
 exit(nodereboot(\%args, \%status));

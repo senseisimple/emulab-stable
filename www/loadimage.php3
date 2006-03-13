@@ -1,11 +1,14 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2004 University of Utah and the Flux Group.
+# Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
 
 #
 # Standard Testbed Header
@@ -21,6 +24,10 @@ $isadmin = ISADMIN($uid);
 
 if (! isset($imageid)) {
     USERERROR("Must pass image name to page as 'imageid'.", 1 );
+}
+# Verify args.
+if (! TBvalid_imageid($imageid)) {
+    PAGEARGERROR("Invalid characters in $imageid!");
 }
 
 # get imageid group/project
@@ -74,10 +81,17 @@ if (! isset($node) || isset($cancelled)) {
     return;
 }
 
+# Verify args.
+if (! TBvalid_node_id($node)) {
+    PAGEARGERROR("Invalid characters in $node!");
+}
+
 if (! TBNodeAccessCheck($uid, $node, $TB_NODEACCESS_LOADIMAGE)) {
     USERERROR("You do not have permission to ".
 	      "snapshot an image from node '$node'.", 1);
 }
+
+TBNodeIDtoExpt($node, $node_pid, $node_eid, $node_gid);
 
 # Should check for file file_exists($image_path),
 # but too messy.
@@ -117,11 +131,12 @@ echo "This will take 10 minutes or more; you will receive email
       $node is in. In fact, it is best if you do not mess with 
       the node at all!<br>\n";
 
+flush();
+
+STARTLOG($node_pid, $node_eid);
+
 #
 # Standard Testbed Footer
 # 
 PAGEFOOTER();
 ?>
-
-
-

@@ -1,0 +1,10 @@
+#!/bin/sh
+
+#
+# Arrange for "prepare" to be run on the way down, and then shutdown.
+#
+. /etc/emulab/paths.sh
+
+echo "$ETCDIR/prepare.sh" > /bootcmd
+shutdown now "Rebooting with Prepare"
+exit 0

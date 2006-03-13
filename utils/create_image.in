@@ -341,6 +341,9 @@ else {
 if (!$debug) {
     $logname = TBMakeLogname("create-image-$pid-$eid");
 
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
+
     if (my $childpid = TBBackGround($logname)) {
 	#
 	# Parent exits normally, except if in waitmode. 
@@ -390,6 +393,9 @@ if ($waitmode) {
 #
 $needcleanup = 1;
 
+# Clear the bootlog; see below.
+DBQueryFatal("delete from node_bootlogs where node_id='$node'");
+
 #
 # Reboot into admin more and run the command.
 #
@@ -398,6 +404,7 @@ my %args         = ();
 $args{'name'}    = $me;
 $args{'command'} = $command;
 $args{'timeout'} = $maxwait + $checkwait;
+$args{'prepare'} = 1;
 
 $args{'pfunc'}     = \&check_progress;
 $args{'pinterval'} = $checkwait;
@@ -463,6 +470,18 @@ if (! -x $imagehash || system("$imagehash -c -o $sigfilename $filename") != 0) {
 print "Image creation succeeded.\n";
 #      "Final size: " . (stat($filename))[7] . " bytes.\n";
 
+# Append bootlog (which has prepare output)
+my $bootlog_result =
+    DBQueryFatal("select bootlog from node_bootlogs ".
+		 "where node_id='$node'");
+
+if ($bootlog_result->numrows) {
+    my ($stuff) = $bootlog_result->fetchrow_array();
+    print "\n\n";
+    print "------------------ Prepare Output ----------------\n";
+    print "$stuff\n";
+}
+
 SENDMAIL("$user_name <$user_email>",
 	 "Image Creation on $node Completed: $pid/$imagename",
 	 "Image creation on $node has completed. As you requested, the\n".
@@ -474,6 +493,8 @@ SENDMAIL("$user_name <$user_email>",
 	 defined($logname) ? ($logname) : ());
 
 if (defined($logname)) {
+    # Close up the log file so the webpage stops.
+    TBExptCloseLogFile($pid, $eid);
     unlink("$logname");
 }
 exit 0;
@@ -530,6 +551,8 @@ sub fatal($)
 	     defined($logname) ? ($logname) : ());
     
     if (defined($logname)) {
+        # Close up the log file so the webpage stops.
+	TBExptCloseLogFile($pid, $eid);
 	unlink("$logname");
     }
     exit(-1);

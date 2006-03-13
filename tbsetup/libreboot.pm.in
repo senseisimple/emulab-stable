@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # node reboot library. Basically the backend to the node_reboot script, but
@@ -119,6 +119,7 @@ sub nodereboot($$)
     my $realmode    = 1;
     my $killmode    = 0;
     my $freemode    = 0;
+    my $prepare     = 0;
     my $reconfig    = 0;
     my $asyncmode   = 0;
     my $pipemode    = 0;
@@ -130,6 +131,7 @@ sub nodereboot($$)
     $realmode    = $args->{'realmode'}   if (exists($args->{'realmode'}));
     $killmode    = $args->{'killmode'}   if (exists($args->{'killmode'}));
     $freemode    = $args->{'freemode'}   if (exists($args->{'freemode'}));
+    $prepare     = $args->{'prepare'}    if (exists($args->{'prepare'}));
     $reconfig    = $args->{'reconfig'}   if (exists($args->{'reconfig'}));
     $asyncmode   = $args->{'asyncmode'}  if (exists($args->{'asyncmode'}));
 
@@ -335,7 +337,7 @@ sub nodereboot($$)
 	    #
 	    foreach my $node ( @batch ) {
 		$pids{$node} = RebootNode($node, $reconfig,
-					  $killmode, $rebootmode);
+					  $killmode, $rebootmode, $prepare);
 	    }
 	}
 
@@ -476,7 +478,7 @@ sub nodereboot($$)
 # that it can wait on all the children later.
 #
 sub RebootNode {
-    my ($pc, $reconfig, $killmode, $rebootmode) = @_;
+    my ($pc, $reconfig, $killmode, $rebootmode, $prepare) = @_;
     my ($status, $syspid, $mypid, $didipod, $nodestate);
 
     #
@@ -563,7 +565,7 @@ sub RebootNode {
     # See if the machine is pingable. If its not pingable, then we just
     # power cycle the machine rather than wait for ssh to time out.
     #
-    if (! DoesPing($pc)) {
+    if (! DoesPing($pc, 0)) {
 	info("$pc appears dead: power cycle");
 	tbnotice "$pc appears dead; will power cycle.";
 	
@@ -660,7 +662,7 @@ sub RebootNode {
     if ($syspid) {
 	my $timedout = 0;
 	local $SIG{ALRM} = sub { kill("TERM", $syspid); $timedout = 1; };
-	alarm 20;
+	alarm 20;;
 	waitpid($syspid, 0);
 	alarm 0;
 
@@ -693,7 +695,11 @@ sub RebootNode {
 	}
     }
     else {
-	exec("$ssh -host $pc /sbin/reboot");
+	my $cmd = "/sbin/reboot";
+	$cmd = "'/usr/local/etc/emulab/reboot_prepare || $cmd'"
+	    if ($prepare);
+	
+	exec("$ssh -host $pc $cmd");
 	exit(0);
     }
 
@@ -708,7 +714,7 @@ sub RebootNode {
     # We wait a while for the node to stop responding to pings, and if it never
     # goes silent, whack it with a bigger stick.
     #
-    if (WaitTillDead($pc) == 0) {
+    if (WaitTillDead($pc, ($prepare ? 200 : 30)) == 0) {
 	my $state = TBDB_NODESTATE_SHUTDOWN;
 	TBSetNodeEventState($pc,$state);
 	exit(0);
@@ -726,7 +732,7 @@ sub RebootNode {
 	$UID = 0;
 	system("$ipod $pc");
 	$UID = $oldUID;
-	if (WaitTillDead($pc) == 0) {
+	if (WaitTillDead($pc, 20) == 0) {
 	    my $state = TBDB_NODESTATE_SHUTDOWN;
 	    TBSetNodeEventState($pc,$state);
 	    exit(0);
@@ -808,7 +814,7 @@ sub PowerCycle {
 # Wait until a machine stops returning ping packets.
 #
 sub WaitTillDead {
-    my ($pc) = @_;
+    my ($pc, $waittime) = @_;
 
     print STDERR "reboot ($pc): Waiting to die off.\n" if $debug;
 
@@ -817,8 +823,8 @@ sub WaitTillDead {
     # packets are sent from all the pings, before it will exit. So,
     # loop doing a bunch of shorter pings.
     #
-    for (my $i = 0; $i < 30; $i++) {
-	if (! DoesPing($pc)) {
+    for (my $i = 0; $i < $waittime; $i++) {
+	if (! DoesPing($pc, $i)) {
 	    print STDERR "reboot ($pc): Died off.\n" if $debug;
 	    return 0;
 	}
@@ -832,7 +838,7 @@ sub WaitTillDead {
 # This routine is NOT allowed to do any DB queries!
 #
 sub DoesPing {
-    my ($pc) = @_;
+    my ($pc, $index) = @_;
     my $status;
     my $saveuid;
 
@@ -847,7 +853,7 @@ sub DoesPing {
     # but no packets are returned. Other non-zero error codes indicate
     # other problems.  Any non-zero return indicates "not pingable" to us.
     #
-    print STDERR "reboot ($pc): $ping returned $status\n" if $debug;
+    print STDERR "reboot ($pc): $ping $index returned $status\n" if $debug;
     if ($status) {
 	return 0;
     }

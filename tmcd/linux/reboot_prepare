@@ -1,0 +1,8 @@
+#!/bin/sh
+
+#
+# Arrange for "prepare" to be run on the way down.
+#
+touch /var/lock/subsys/tbprepare
+/sbin/reboot
+exit 0

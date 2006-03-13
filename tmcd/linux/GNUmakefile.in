@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -100,6 +100,9 @@ sysetc-install:	dir-install ifcfgs
 	-ln -sf $(RRCDIR)/init.d/testbed $(DEFRUNLVLDIR)/S96testbed
 	-ln -sf $(RRCDIR)/init.d/testbed $(RCDIR)/rc1.d/K12testbed
 	-ln -sf $(RRCDIR)/init.d/testbed $(RCDIR)/rc6.d/K12testbed
+	$(INSTALL) -m 755 $(SRCDIR)/tbprepare $(RCDIR)/init.d/tbprepare
+	-ln -sf $(RRCDIR)/init.d/tbprepare $(RCDIR)/rc1.d/K89tbprepare
+	-ln -sf $(RRCDIR)/init.d/tbprepare $(RCDIR)/rc6.d/K89tbprepare
 	$(INSTALL) -m 755 -o root -g wheel -d $(SYSETCDIR)/cron.pend
 	if [ -e $(SYSETCDIR)/cron.daily/slocate.cron ]; then \
 		mv -f $(SYSETCDIR)/cron.daily/slocate.cron \
@@ -124,6 +127,7 @@ script-install:	dir-install $(SCRIPTS)
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ipod $(BINDIR)/rc/rc.ipod
 	$(INSTALL) -m 755 $(SRCDIR)/rc.kname $(BINDIR)/rc/rc.kname
 	$(INSTALL) -m 755 $(SRCDIR)/prepare $(BINDIR)/prepare
+	$(INSTALL) -m 755 $(SRCDIR)/reboot_prepare $(BINDIR)/reboot_prepare
 	$(INSTALL) -m 755 $(SRCDIR)/ixpboot $(BINDIR)/ixpboot
 	$(INSTALL) -m 755 $(SRCDIR)/rc.ixp $(BINDIR)/rc/rc.ixp
 	$(INSTALL) -m 755 ./sethostname.dhclient $(BINDIR)/sethostname.dhclient

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -226,5 +226,7 @@ if (-x "/usr/libexec/locate.updatedb") {
     system("/usr/libexec/locate.updatedb");
 }
 
+# Leave this print statement here; create_image depends on it.
+print "prepare ran successfully!\n";
 exit 0;
 
