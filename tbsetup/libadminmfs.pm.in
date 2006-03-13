@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Admin MFS library.  Routines related to getting into and out of the
@@ -40,10 +40,18 @@ my $power	= "$TB/bin/power";
 my $osselect    = "$TB/bin/os_select";
 
 #
+# The number of nodes we will power on at a time and the time to wait
+# between batches.  These values are NOT the same as in libreboot.pm.
+# I had to reduce the batch count to prevent problems.
+#
+my $BATCHCOUNT  = 8;
+my $BATCHSLEEP	= 5;
+
+#
 # Timeout for a node to reboot into (or out of) the admin MFS
 # XXX we could calculate this from node_type and os_info reboot times
 #
-my $reboottimo  = (5 * 60);
+my $reboottimo  = (6 * 60);
 my $commandtimo = (2 * 60);
 my $sleepwait   = 10;
 
@@ -107,16 +115,39 @@ sub TBAdminMfsBoot($$@)
 	}
     }
 
-    if ($reboot > 0) {
-	if (system("$nodereboot @nodes")) {
-	    print STDERR "*** $me:\n".
-		"    WARNING: Could not reboot some of: @nodes!\n";
-	}
-    } elsif ($reboot < 0) {
-	print STDOUT "Powering on nodes.\n";
-	if (system("$power on @nodes")) {
-	    print STDERR "*** $me:\n".
-		"    WARNING: Could not power on some of: @nodes!\n";
+    if ($reboot) {
+	#
+	# Since the admin MFS is large, we do are own limiting of the number
+	# of nodes rebooted in parallel.  This value is considerably lower than
+	# that enforced in libreboot.pm.  Also note that we would need to
+	# perform batching for the "power on" case anyway, as the power command
+	# does not do any batching.
+	#
+	my @nodelist = @nodes;
+	while (@nodelist) {
+	    my $batch = "";
+	    my $i = 0;
+	    while ($i < $BATCHCOUNT && @nodelist > 0) {
+		my $node = shift(@nodelist);
+		$batch .= " $node";
+		$i++;
+	    }
+	    if ($reboot > 0) {
+		if (system("$nodereboot $batch")) {
+		    print STDERR "*** $me:\n".
+			"    WARNING: Could not reboot some of: $batch!\n";
+		}
+	    } elsif ($reboot < 0) {
+		print STDOUT "Powering on nodes:\n";
+		if (system("$power on $batch")) {
+		    print STDERR "*** $me:\n".
+			"    WARNING: Could not power on some of: $batch!\n";
+		}
+	    }
+	    print STDOUT "  $batch ", @nodelist > 0 ? "...\n" : "\n";
+	    if (@nodelist) {
+		sleep($BATCHSLEEP);
+	    }
 	}
     }
 
