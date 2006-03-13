@@ -1786,6 +1786,7 @@ compress_image(void)
 		/*
 		 * Moving to the next block. Reserve the header area.
 		 */
+		memset(buf, 0, DEFAULTREGIONSIZE);
 		buffer_offset = DEFAULTREGIONSIZE;
 		curregion     = regions;
 		numregions    = 0;

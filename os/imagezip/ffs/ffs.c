@@ -629,11 +629,6 @@ inodefixup(void *bstart, off_t bsize, void *fdata)
 	void *ptr, *eptr;
 	int inodesize;
 
-	if (debug > 1)
-		fprintf(stderr, "inodefixup: data [%p-%p], fs=UFS%d\n",
-			bstart, bstart+bsize-1,
-			magic == FS_UFS2_MAGIC ? 2 : 1);
-
 	switch (magic) {
 	case FS_UFS1_MAGIC:
 		inodesize = sizeof(struct ufs1_dinode);
@@ -646,6 +641,11 @@ inodefixup(void *bstart, off_t bsize, void *fdata)
 		exit(1);
 	}
 	assert((bsize % inodesize) == 0);
+
+	if (debug > 1)
+		fprintf(stderr, "inodefixup: %d UFS%d inodes\n",
+			(int)(bsize / inodesize),
+			magic == FS_UFS2_MAGIC ? 2 : 1);
 
 	for (ptr = bstart, eptr = ptr+bsize; ptr < eptr; ptr += inodesize) {
 		uint32_t gen;
