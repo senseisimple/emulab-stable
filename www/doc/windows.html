@@ -62,15 +62,18 @@ Before booting the node at swap-in time, Emulab loads a
 onto the experiment nodes in parallel, using our <code>frisbee</code> service.
 Emulab software automatically configures each Windows XP node, providing the
 expected experiment user environment including: user accounts and Emulab SSH
-keys; remote home, project, and shared directories; and network connections.
-All of the Emulab experiment automation and monitoring services have been ported
-to run on Windows.
-<p>
+keys; remote home, project, and shared directories; and network connections. <p>
 
-The <a href="#Cygwin"> Cygwin GNU </a> environment is provided, 
-including Bash and TCSH shells, the
-C/C++, Perl and Python programming languages, and several editors including
-Emacs, vim, nano and ed.  <p>
+The <a href="#Cygwin"> Cygwin GNU </a> environment is provided, including Bash
+and TCSH shells, the C/C++, Perl and Python programming languages, and several
+editors including Emacs, vim, nano and ed.  <p>
+
+All of the Emulab experiment automation and monitoring services have been
+ported to run on Windows/Cygwin.  Sometimes the <a
+href="../tutorial/tutorial.php3#SyncServer"> Emulab documentation </a> shows
+explicit command paths, such as <code>/usr/testbed/bin/emulab-sync</code>.  <a
+href="#Cygwin"> Cygwin </a> handles both Unix and Windows-style command paths,
+as described <a href="#Cygwin_arcana"> below </a>. <p>
 
 The Emulab web interface manages a separate <a href="#Windows_Passwords"> 
 Windows password </a> in the user
@@ -897,10 +900,13 @@ good across SMB.
 
   <li> Cygwin tries to treat <code>.exe</code> files the same as executable
        files without the <code>.exe</code> suffix, but with execute
-       permissions turned on.  This breaks down in Makefile actions and
-       scripts, where <code>rm</code>, <code>ls -l</code>, and
-       <code>install</code> commands may need an explicit <code>.exe</code>
-       added. </li>
+       permissions turned on.  (See the <a
+       href="http://cygwin.com/cygwin-ug-net/using-specialnames.html#id4729857">
+       Cygwin Users Guide </a>.) <p>
+
+       This breaks down in Makefile actions and scripts, where
+       <code>rm</code>, <code>ls -l</code>, and <code>install</code> commands
+       may need an explicit <code>.exe</code> added. </li>
 
 </ul>
 
