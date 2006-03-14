@@ -473,6 +473,7 @@ if (! -x $imagehash || system("$imagehash -c -o $sigfilename $filename") != 0) {
 }
 
 print "Image creation succeeded.\n";
+print "Image written to $filename.\n";
 #      "Final size: " . (stat($filename))[7] . " bytes.\n";
 
 # Append bootlog (which has prepare output)
