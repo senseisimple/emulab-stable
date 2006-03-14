@@ -289,17 +289,27 @@ Phase "dirs", "Setting directory permissions", sub {
 
 Phase "ports", "Installing ports", sub {
     Phase "packages", "Installing packages", sub {
-	if (!ExecQuiet("$PKG_INFO -e $OPS_PORT") &&
-	    (($FBSD_VERSION == 4) || !ExecQuiet("$PKG_INFO -e $PHP4_PORT"))) {
-	    PhaseSkip("Ports already installed");
+	Phase "main", "Installing main package", sub {
+	    if (!ExecQuiet("$PKG_INFO -e $OPS_PORT")) {
+		PhaseSkip("Package already installed");
+	    }
+	    if (!$packagedir) {
+		PhaseSkip("No package directory provided");
+	    }
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT");
+	};
+	if ($FBSD_VERSION > 4) {
+	    Phase "php4", "Installing php4 package", sub {
+		if (!ExecQuiet("$PKG_INFO -e $PHP4_PORT")) {
+		    PhaseSkip("Package already installed");
+		}
+		if (!$packagedir) {
+		    PhaseSkip("No package directory provided");
+		}
+		ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
+			       "     $PKG_ADD $PHP4_PORT");
+	    };
 	}
-	if (!$packagedir) {
-	    PhaseSkip("No package directory provided");
-	}
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $OPS_PORT")
-	    if (ExecQuiet("$PKG_INFO -e $OPS_PORT"));
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $PHP4_PORT")
-	    if ($FBSD_VERSION > 4 && ExecQuiet("$PKG_INFO -e $PHP4_PORT"));
     };
     Phase "fs-packages", "Installing FS packages", sub {
 	if (!$ISFS) {
