@@ -1,0 +1,20 @@
+#!/usr/bin/perl
+
+#!/bin/bash
+
+#echo `pwd`
+#exec `perl -mevent -I. -I/usr/testbed/lib bgmon.pl`
+
+#use Cwd;
+#print "cwd = ".getcwd."\n";
+
+#print "Argc = $ARGC\n";
+if( @ARGV < 1 ){
+    die "usage: <path_to_bgmon.pl>";
+}
+
+
+#system "sudo perl -mevent -I. -I/usr/testbed/lib -d $ARGV[0]bgmon.pl &";
+system "perl $ARGV[0]bgmon.pl -d $ARGV[0] &";
+system "sudo $ARGV[0]iperf -s -p 5002 >& $ARGV[0]iperfout.err > $ARGV[0]iperfout.out &";
+

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+rm bgmon.tar.gz
+#tar -czf bgmon.tar.gz bgmon.pl runbgmon event.pm
+tar -czf bgmon.tar.gz bgmon.pl runbgmon
+cp bgmon.tar.gz /proj/tbres/gebhardt/
