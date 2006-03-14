@@ -79,7 +79,7 @@ C. Cutting the image:
 
 CVSUP:
 
-Each time we cut a new image, we need to bump the sup release since its
+Each time we cut a new image, we need to bump the sup release since it's
 entirely possible that different versions of the image will be running on
 different nodes. Older images will still need the sup release that they
 were built with so that they continue to get updates, while new images
