@@ -12,10 +12,10 @@ __These are your Projects:__
 __Permissions (leave these alone unless you know what you are doing, or ask us)__
 	* Set ALLOWTOPICVIEW = 
 	* Set ALLOWTOPICCHANGE = 
-	* Set ALLOWTOPICRENAME = 
+	* Set ALLOWTOPICRENAME =
 
-
-%INCLUDE{"Emulab.UserPermNotes"}%
+More infomation on user permissions can be found in the Emulab.UserPermNotes
+topic.
 
 <!--
 __Personal Preferences (details in %TWIKIWEB%.TWikiVariables)__

@@ -15,9 +15,8 @@ __TWiki groups that are relevant to your Project/Group__
 	* Other members of your project: [[%MAINWEB%.%WEB%Group][%WEB%Group]]
 	* Members with project root privs: [[%MAINWEB%.%WEB%RootGroup][%WEB%RootGroup]]
 
-
-%INCLUDE{"Emulab.GroupPermNotes"}%
-
+More information on controlling access to your pages can be found in
+the Emulab.GroupPermNotes topic.
 
 __Site Tools of the <nop>%WEB% Web__
 
