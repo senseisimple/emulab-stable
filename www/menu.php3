@@ -730,6 +730,8 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 function FINISHSIDEBAR($contentname = "content")
 {
+    global $TBMAINSITE;
+    
     if (!$TBMAINSITE) {
 	#
 	# It is a violation of Emulab licensing restrictions to remove
