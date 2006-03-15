@@ -730,6 +730,15 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 function FINISHSIDEBAR($contentname = "content")
 {
+    if (!$TBMAINSITE) {
+	#
+	# It is a violation of Emulab licensing restrictions to remove
+	# this logo!
+	#
+	echo "       <a class='builtwith' href='http://www.emulab.net'>
+                         <img src='$BASEPATH/builtwith.png'></a>";
+    }
+    
     echo "<!-- sidebar ends -->
         </div>
         <div class='$contentname'>
@@ -895,14 +904,6 @@ function PAGEFOOTER($view = NULL) {
                 <a href='$TBDOCBASE/docwrapper.php3?docname=copyright.html'>
                     Copyright &copy; 2000-$year The University of Utah</a>
                 </span>\n";
-    }
-    if (!$TBMAINSITE) {
-	#
-	# It is a violation of Emulab licensing restrictions to remove
-	# this logo!
-	#
-	echo "       <a class='builtwith' href='http://www.emulab.net'>
-                         <img src='$BASEPATH/builtwith.png'></a>";
     }
     echo "
                 <p class='contact'>

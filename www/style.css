@@ -329,7 +329,11 @@ ul.submenu li.newgroup {
   font-size: x-small;
 }
 .builtwith {
-  float: left;
+  position: absolute; /* Take it out of the normal flow. */
+  margin-top: 8px; /* Add some space between the leftcell and the link. */
+  left: 0px; /* XXX IE pushes it to the right without this. */
+  width: 100%; /* Same size as parent so it centers. */
+  display: block;
 }
 .contact {
   font-size: x-small;
