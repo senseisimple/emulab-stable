@@ -30,18 +30,14 @@ sub usage()
 	  "    -p Rootpwd : Root password, for Emulab services redef.\n" .
 	  "        If not present, and not -n, will be prompted-for.\n" .
 	  "    -n : Root password was not changed, don't redef services.\n" .
-	  "    -s : Make a hardware-independent image using Sysprep.\n" .
-	  "    -c : Clear out the driver inf caches for a fresh start.\n" .
-	  "    -d : Bypass Sysprep and install drivers ourselves.\n");
+	  "    -s : Make a hardware-independent image using Sysprep.\n");
     exit(1);
 }
-my $optlist = "p:nscd";
+my $optlist = "p:ns";
 my $rootpwd = "";
 my $rootpwd2 = "";
 my $noredef = 0;
 my $sysprep = 0;
-my $drvinstall = 0;
-my $clearcaches = 0;
 
 # Parse command line.
 use Getopt::Std;
@@ -56,12 +52,6 @@ if (defined($options{'n'})) {
 }
 if (defined($options{'s'})) {
     $sysprep = 1;
-}
-if (defined($options{'d'})) {
-    $drvinstall = 1;
-}
-if (defined($options{'c'})) {
-    $clearcaches = 1;
 }
 
 # Only root.
@@ -105,7 +95,6 @@ sub do_cmd ($)
 
 my $windir = "/cygdrive/c/WINDOWS";
 my $sysdir = "$windir/system32";
-my $infdir = "$windir/inf";
 my $netcmd = "$sysdir/net.exe";
 
 # Could use /share/windows/sysprep, but prepare may have been run once
@@ -114,9 +103,6 @@ my $sysprep_src = "/cygdrive/z/windows/sysprep";
 
 my $sysprep_dst = "/cygdrive/c/sysprep";
 my $sysprep_cmd = "$sysprep_dst/sysprep.exe";
-my $drivers_dst = "/cygdrive/c/drivers";
-my $drivers_win = '%SystemDrive%\drivers';
-my $device_path;
 
 #
 # Must be logged in on the serial console to run Sysprep.  Check for it.
@@ -252,8 +238,10 @@ if ($sysprep) {
     die "*** Didn't get sysprep!\n"
 	if (! -x $sysprep_cmd);
 
-    my $spi_src = "$sysprep_src/sysprep.inf";
-    my $spi_dst = "$sysprep_dst/sysprep.inf";
+    my $spi = "sysprep.inf";
+    my $spi_src = "$sysprep_src/$spi";
+    my $spi_dst = "$sysprep_dst/$spi";
+    print "Copying $spi to $spi_dst\n";
     if ($noredef) {
 	# Assume the Administrator password is blank or NULL or set separately.
 	# (See deploy.chm for description of [GuiUnattended]AdminPassword.)
@@ -267,23 +255,13 @@ if ($sysprep) {
 	do_cmd "sed '/$ap=.*/s||$ap=\"$admpwd\"|' $spi_src > $spi_dst";
     }	
 
-    print "\nCopying drivers directories to C:/drivers.\n";
-    do_cmd "rm -rf $drivers_dst";
-    do_cmd "cp -rp $sysprep_src/drivers $drivers_dst";
-
-    #
-    # Build a DevicePath and check that it's not too long.
-    #
-    $device_path = '%SystemRoot%\inf';
-    foreach my $subdir (`ls $drivers_dst`) {
-	chomp $subdir;
-	$device_path .= ';' . $drivers_win . '\\' . $subdir;
-    }
-    die "DevicePath too long, limited to 4096 chars.\n$device_path\n"
-	if (length($device_path) > 4096);
-    die "Null DevicePath.\n$device_path\n"
-	if (length($device_path) == 0);
-    print "DevicePath $device_path\n";
+    my $clt = "Cmdlines.txt";
+    my $clt_src = "$sysprep_src/$clt";
+    my $clt_dir = $sysprep_dst . '/$oem$';
+    my $clt_dst = "$clt_dir/$clt";
+    print "Copying $spi to $spi_dst\n";    
+    do_cmd "mkdir $clt_dir";
+    do_cmd "cp -p $clt_src $clt_dst";
 }
 
 # Capture the node name before cleaning out the config files.
@@ -453,6 +431,7 @@ else {
 }
 
 print "Cleaning out sp2 & Windows Update dirs.\n";
+system("rm -f /tmp/WindowsXP-KB835935-SP2-ENU.exe");
 system("du -sm C:/WINDOWS/\\\$*");
 system("rm -rf C:/WINDOWS/\\\$*");
 system("du -sm C:/WINDOWS/ServicePackFiles/i386");
@@ -464,51 +443,47 @@ print "\nRe-enabling all network interfaces.\n";
 system("devcon enable =net 'PCI*'");
 
 #
-# Windows wires the boot disk driver in to the NT loader, and wires
+# Windows wires the boot disk driver into the NT loader, and wires
 # the hardware network device instances into the network settings.
 # Run Sysprep to make hardware-independent images with a sysprep.inf
-# file controlling an unattended Mini-Setup to install all drivers.
+# file controlling an unattended Mini-Setup to install drivers.
+#
+# New drivers must be in subdirs of C:/drivers . Their .inf files must have
+# been introduced into the drivers database using the install-inf script.
 #
 if ($sysprep) {
-    if ($clearcaches) {
-	print "\nClearing out the driver inf caches for a fresh start.\n";
-	do_cmd "rm -f $infdir/oem*.{inf,pnf}";
-###	do_cmd "rm -f $infdir/{oem*.inf,INFCACHE.1,*.pnf}";
-###	do_cmd "chown -R root $sysdir/CatRoot2";
-###	do_cmd "rm -rf $sysdir/CatRoot2";
-    }
-
-    if ($drvinstall) {
-	# Give up on OemPnPDriversPath, install the files ourselves.
-	print "\nInstalling driver files into $infdir and $sysdir.\n";
-
-	# Inf files complain about signing unless they're renamed oem*.inf .
-	# Comment-out the catalog file (signing) entries in the .inf files.
-	do_cmd("oem=0; for inf in $drivers_dst/*/*.inf; do " .
-	       "  inf_dst=$infdir/oem\$oem.inf; let oem++; " .
-	       "  echo \$inf \$inf_dst;" .
-	       "  sed 's/CatalogFile/;;;&/' \$inf > \$inf_dst;" .
-	       "done");
-	do_cmd "cp -p $drivers_dst/*/*.sys $sysdir/drivers";
-	do_cmd "cp -p $drivers_dst/*/*.{din,dll} $sysdir";
-    }
-    print "\n";
-
-    # The DevicePath registry key disables the OemPnPDriversPath entry in
-    # sysprep.inf .  It's set to %SystemRoot%\inf as a side-effect of sysprep!
     print "\nExecuting sysprep.  Takes a couple of minutes.\n";
-    print "DevicePath $device_path\n";
+
+    #
+    # Cache a static mapping of node names and MAC addresses of their
+    # interfaces.  We will run "rc.firstboot -mini" from cmdlines.txt under
+    # Mini-Setup after Sysprep.  Since the network is set up then but not
+    # running yet, we won't be able to contact tmcc to find out the host name.
+    # But we can use the static mapping and save a reboot cycle.
+    #
+    do_cmd "tmcc intfcmap > /var/emulab/boot/intfcmap";
+
+    #
+    # It sucks to have state in three overlapping places.  Try to keep the
+    # OemPnPDriversPath entry in sysprep.inf in sync with the DevicePath
+    # registry key, as well as the value from the Drivers DB, which Mini-setup
+    # seems to over-ride it with.
+    #
+    # The Drivers DB DevicePath value was set from the DevicePath registry key when a
+    # driver .inf file was last introduced using right-click/Install from Windows
+    # Explorer.  You must do that on a graphics console, via RDP on a server with no
+    # hardware graphics console, hence MUST HAVE DONE IT BEFORE THIS because sysprep
+    # tears down the network!
+    #
     my $drvkey = "/HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/DevicePath";
-    ##do_cmd "regtool get $drvkey";
-    do_cmd "regtool set -s $drvkey '$device_path'";
-    do_cmd "regtool get $drvkey";
+    my $device_path = 'C:\WINDOWS\inf;C:\drivers\disk;C:\drivers\nic';
+    print "DevicePath was "; system("regtool get $drvkey");
+    system("regtool set -s $drvkey '$device_path'");
+    print "DevicePath now set to "; system("regtool get $drvkey");
 
     do_cmd "$sysprep_cmd -nosidgen -noreboot -reseal -mini -quiet";
 
-    do_cmd "regtool get $drvkey";
-    ##do_cmd "regtool set -s $drvkey '$device_path'";
-    ##do_cmd "regtool get $drvkey";
+    print "DevicePath = "; system("regtool get $drvkey");
 }
 
-print "\nDone!\n";
-
+print "\nDone!  Now capture the XP disk image.\n";
