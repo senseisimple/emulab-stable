@@ -2976,6 +2976,21 @@ class experiment:
                            "RUN",
                            "",
                            "__ns_sequence"))
+            
+            result.append((str(count),
+                           "2.0",
+                           "ns", # XXX
+                           "SIMULATOR",
+                           "LOG",
+                           "Plab teardown delay",
+                           "__plab_teardown"))
+            result.append((str(count),
+                           "0.0",
+                           "__plab_teardown",
+                           "TIMELINE",
+                           "RUN",
+                           "",
+                           "__ns_teardown"))
             pass
         
         return EmulabResponse(RESPONSE_SUCCESS, value=result)
