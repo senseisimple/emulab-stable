@@ -2717,6 +2717,21 @@ CREATE TABLE widearea_updates (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `wireless_stats`
+--
+
+CREATE TABLE wireless_stats (
+  name varchar(32) NOT NULL default '',
+  floor varchar(32) NOT NULL default '',
+  building varchar(32) NOT NULL default '',
+  data_eid varchar(32) default NULL,
+  data_pid varchar(32) default NULL,
+  type varchar(32) default NULL,
+  altsrc tinytext,
+  PRIMARY KEY  (name)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `wires`
 --
 
