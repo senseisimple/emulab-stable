@@ -244,11 +244,12 @@ COMMAND_PROTOTYPE(dotraceconfig);
 COMMAND_PROTOTYPE(doltmap);
 COMMAND_PROTOTYPE(doelvindport);
 COMMAND_PROTOTYPE(doplabeventkeys);
+COMMAND_PROTOTYPE(dointfcmap);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
  * out a full configuration. Physnodes get slightly different
- * then vnodes, and at some point we might want to distinguish different
+ * than vnodes, and at some point we might want to distinguish different
  * types of vnodes (jailed, plab).
  */
 #define FULLCONFIG_NONE		0x0
@@ -331,6 +332,7 @@ struct command {
 	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
 	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
+	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -6374,6 +6376,63 @@ COMMAND_PROTOTYPE(doplabeventkeys)
 		if (verbose)
 			info("PLABEVENTKEYS: %s\n", buf);
 	}
+	mysql_free_result(res);
+
+	return 0;
+}
+
+/*
+ * Return a map of pc node id's with their interface MAC addresses.
+ */
+COMMAND_PROTOTYPE(dointfcmap)
+{
+	char		buf[MYBUFSIZE] = {0}, pc[8] = {0};
+        int             nrows = 0, npcs = 0;
+	MYSQL_RES	*res;
+	MYSQL_ROW	row;
+
+        res = mydb_query("select node_id, mac from interfaces "
+			 "where node_id like 'pc%%' order by node_id",
+                         2);
+
+	nrows = (int)mysql_num_rows(res);
+	if (verbose)
+		info("intfcmap: nrows %d\n", nrows);
+	if (nrows == 0) {
+		mysql_free_result(res);
+		return 0;
+	}
+
+	while (nrows) {
+		row = mysql_fetch_row(res);
+		/* if (verbose) info("intfcmap: %s %s\n", row[0], row[1]); */
+
+		/* Consolidate interfaces on the same pc into a single line. */
+		if (pc[0] == '\0') {
+			/* First pc. */
+			strncpy(pc, row[0], 8);
+			snprintf(buf, MYBUFSIZE, "%s %s", row[0], row[1]);
+		} else if (strncmp(pc, row[0], 8) == 0 ) {
+			/* Same pc, append. */
+			strcat(buf, " ");
+			strcat(buf, row[1]);
+		} else {   
+			/* Different pc, dump this one and start the next. */
+			strcat(buf, "\n");
+			client_writeback(sock, buf, strlen(buf), tcp);
+			npcs++;
+
+			strncpy(pc, row[0], 8);
+			snprintf(buf, MYBUFSIZE, "%s %s", row[0], row[1]);
+		}
+		nrows--;
+	}
+	strcat(buf, "\n");
+	client_writeback(sock, buf, strlen(buf), tcp); /* Dump the last one. */
+	npcs++;
+	if (verbose)
+		info("intfcmap: npcs %d\n", npcs);
+
 	mysql_free_result(res);
 
 	return 0;
