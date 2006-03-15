@@ -1,0 +1,2 @@
+[Commands]
+"C:\cygwin\bin\bash.exe -c /usr/local/etc/emulab/rc/rc.firstboot"
