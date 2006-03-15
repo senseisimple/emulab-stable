@@ -105,8 +105,13 @@ NODEPREFIX  = "plab"
 BADSITECHARS = re.compile(r"\W+")
 PLABBASEPRIO = 20000
 PLAB_SVC_SLICENAME = "utah_svc_slice"
+PLAB_SVC_SLICEDESC = "Emulab management service slice. Performs periodic " \
+                     "checkins with Emulab central, and routes events for " \
+                     "other Emulab slices. Slivers in this slice should " \
+                     "only interact with other PlanetLab machines, and Emulab."
 PLABMON_PID = "emulab-ops"
 PLABMON_EID = "plab-monitor"
+DEF_SLICE_DESC = "Slice created by Emulab"
 
 PLABEXPIREWARN = 2*24*60*60   # two days advance warning.
 
@@ -893,6 +898,7 @@ class Slice:
         self.pid, self.eid = pid, eid
         self.slicemeta = None
         self.slicename = slicename
+        self.description = DEF_SLICE_DESC
         return
     
     def _create(self):
@@ -903,19 +909,23 @@ class Slice:
 
         adminbit = 0
         if self.pid == PLABMON_PID and self.eid == PLABMON_EID:
-            self.slicename = PLAB_SVC_SLICENAME
+            self.slicename   = PLAB_SVC_SLICENAME
+            self.description = PLAB_SVC_SLICEDESC
             adminbit = 1
             pass
         
         if not self.slicename:
-            res = DBQueryFatal("select idx from experiments "
+            res = DBQueryFatal("select idx, expt_name from experiments "
                                "where pid=%s "
                                "and eid=%s",
                                (self.pid, self.eid))
             if not len(res):
-                raise RuntimeError, "Didn't get any results while looking for idx"
-            eindex = res[0][0]
+                raise RuntimeError, \
+                      "Didn't get any results while looking up info on " \
+                      "experiment %s/%s" % (self.pid, self.eid)
+            (eindex, descr) = res[0]
             self.slicename = "%s_%s" % (SLICEPREFIX, eindex)
+            self.description = descr
             pass
 
         print "Creating Plab slice %s." % self.slicename

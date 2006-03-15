@@ -287,7 +287,7 @@ class mod_PLCNM:
         #    raise
 
         try:
-            res = tryXmlrpcCmd(agent.SliceUpdate)
+            res = tryXmlrpcCmd(agent.SliceUpdate, slice.description)
             if debug:
                 print "SliceUpdate result: %s" % res
                 pass

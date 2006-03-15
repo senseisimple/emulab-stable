@@ -287,8 +287,16 @@ function SPITFORM($formfields, $errors)
 	  }
 	} else {
 	    if (isset($view['plab_ns_message'])) {
-		echo "<p>To finish creating your slice, edit the following " .
-		     "information if you wish, and click Submit.</p>\n";
+		echo "<center>
+                        <p><b>To finish creating your slice, edit the 
+                              following information as needed, and click 
+                              Submit.  PlanetLab <font size=+1 color=red>  
+                              strongly advises </font>  users
+                              to provide detail on what their slice will
+                              be doing via it's description (i.e. what kind 
+                              of network traffic it will be producing).
+                       </b></p>
+                      </center>\n";
 	    } else {
 		echo "<p><b>Your automatically generated NS file has been " .
 		     "uploaded.</b> To finish creating your experiment, " .
@@ -408,16 +416,29 @@ function SPITFORM($formfields, $errors)
     #
     # Description
     #
-    echo "<tr>
-              <td class='pad4'>Description:<br>
-                  <font size='-1'>(A concise sentence)</font></td>
-              <td class='pad4' class=left>
-                  <input type=text
-                         name=\"formfields[exp_description]\"
-                         value=\"" . $formfields[exp_description] . "\"
-	                 size=60>
-              </td>
-          </tr>\n";
+    if (isset($view[plab_descr])) {
+          echo "<tr>
+                    <td class='pad4'>Slice Description:<br>
+                        <font size='-1'>(Please be detailed)</font></td>
+                    <td class='pad4' class=left>
+                        <textarea
+                               name=\"formfields[exp_description]\"
+                               value=\"" . $formfields[exp_description] . "\"
+	                       rows=5 cols=50></textarea>
+                    </td>
+                </tr>\n";
+    } else {
+          echo "<tr>
+                    <td class='pad4'>Description:<br>
+                        <font size='-1'>(A concise sentence)</font></td>
+                    <td class='pad4' class=left>
+                        <input type=text
+                               name=\"formfields[exp_description]\"
+                               value=\"" . $formfields[exp_description] . "\"
+	                       size=60>
+                    </td>
+                </tr>\n";
+    }
 
     #
     # NS file

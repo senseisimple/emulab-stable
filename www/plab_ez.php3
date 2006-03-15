@@ -495,15 +495,12 @@ function MAKENS($formfields) {
     #
 
     $expname = "planetlab" . $formfields['count'];
-    $descr   = "A planetlab experiment with " . $formfields['count'] .
-	" nodes started by " . GETUID();
 
     #
     # Build up a URL to send the user to
     #
     $url = "beginexp_html.php3?view_style=plab&formfields[exp_id]=" .
-           urlencode($expname) . "&formfields[exp_description]=" .
-	   urlencode($descr) . "&formfields[exp_idleswap]=0" .
+           urlencode($expname) . "&formfields[exp_idleswap]=0" .
 	   "&formfields[exp_noidleswap_reason]=" .
 	   urlencode("PlanetLab experiment");
 
