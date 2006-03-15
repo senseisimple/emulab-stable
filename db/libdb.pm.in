@@ -4992,7 +4992,8 @@ sub GatherSwapStats($$$$$;$)
 	    DBQueryWarn("update experiment_stats ".
 			"set ${tmp}_count=${tmp}_count+1, ".
 			"    ${tmp}_last=now(), ".
-			"    swapin_duration=swapin_duration+${duration} ".
+			"    swapin_duration=swapin_duration+${duration}, ".
+			"    swap_exitcode=0 ".
 			"where pid='$pid' and eid='$eid' and  ".
 			"      exptidx=$exptidx");
 	}
