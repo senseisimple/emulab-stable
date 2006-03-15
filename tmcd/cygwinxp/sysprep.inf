@@ -11,9 +11,11 @@
     TargetPath=\WINDOWS
     ; Specifies the location of files necessary for installation during Mini-Setup.
     InstallFilesPath=c:\sysprep
-    ; LSI SCSI and Intel NIC drivers are in subdirs with .inf files.
-    ;;;OemPnPDriversPath=WINDOWS\inf;drivers\symmpi;drivers\pro1000;drivers\pro100
-    ;;UpdateInstalledDrivers=Yes
+    ; Pre-install the NIC driver .inf files in C:/drivers subdirs with right-click/Install.
+    ; Disk drivers are referenced by the [SysprepMassStorage] section below.
+    ; See the notes in the 'prepare' script about the DevicePath regkey and OemPnPDriversPath.
+    OemPnPDriversPath=WINDOWS\inf;drivers\disk;drivers\nic
+    ;;;UpdateInstalledDrivers=Yes
 
 ; Enable RDP during mini-setup.
 [TerminalServices]
@@ -30,7 +32,7 @@
     ProductKey=DK6KR-YMFC4-PDC4Q-828TP-HW9BY
     FullName="Netbed User"
     OrgName="Netbed"
-    ComputerName=sysprep
+    ComputerName=*
 
 ; This should be safe...
 [Display]
@@ -74,13 +76,13 @@
     NetBIOSOptions=2
 
 [SysprepMassStorage]
-; pc3000:
+; pc3000: LSI Logic SCSI.
 ;    LSI Adapter, Ultra320 SCSI 2000 series, w/1020/1030 (LSI53C1020 chip)
 ;    DevInstID: PCI\VEN_1000&DEV_0030&SUBSYS_016D1028&REV_08\5&39562480&0&280010
 ;       C:\WINDOWS\system32\DRIVERS\symmpi.sys   LSI Logic 1.20.18.0 6/13/2005, unsigned.
-    pci\ven_1000&dev_0030="C:\drivers\symmpi\symmpi.inf"
+    pci\ven_1000&dev_0030="C:\drivers\disk\symmpi.inf"
 ;
-; pc600 and pc850: 
+; pc600 and pc850: Normal IDE.
 ;    Intel(R) 82371/AP/EB PCI Bus Master IDE Controller
 ;    DevInstID: PCI\VEN_8086&DEV_7111&SUBSYS_00000000&REV_01\3&61AAA01&0&21
 ;     MS 5.1.2600.2180 (xpsp_sp2_rtm.040803-2158) 7/1/01
@@ -95,3 +97,9 @@
 ;;;   pci\ven_8086&dev_7111="c:\windows\inf\mshdc.inf"
     Primary_IDE_Channel="c:\windows\inf\mshdc.inf"
     Secondary_IDE_Channel="c:\windows\inf\mshdc.inf"
+
+; pc3000w: Promise SATA150 TX2Plus disk.
+;    WinXP Promise SATA150 TX Series (tm) IDE Controller
+    pci\ven_105a&dev_3375="C:\drivers\disk\UlSata.inf"
+    pci\ven_105a&dev_3318="C:\drivers\disk\UlSata.inf"
+    pci\ven_105a&dev_6626="C:\drivers\disk\UlSata.inf"
