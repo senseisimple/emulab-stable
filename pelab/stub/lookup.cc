@@ -48,7 +48,7 @@ struct Address
 };
 
 
-void init_connection(struct connection * conn)
+void init_connection(connection * conn)
 {
   if (conn != NULL)
   {
@@ -191,8 +191,8 @@ int for_each_to_monitor(send_to_monitor function, int monitor)
   std::map<Stub, int>::iterator limit = stub_receivers.end();
   for (; pos != limit && result == 1; ++pos)
   {
-      int index = pos->second;
-      result = function(monitor, index);
+    int index = pos->second;
+    result = function(monitor, index);
   }
   return result;
 }
@@ -230,13 +230,48 @@ int insert_by_address(unsigned long ip, unsigned short source_port,
   return result;
 }
 
+int insert_fake(unsigned long ip, unsigned short port)
+{
+  int result = find_by_address(ip, 0, 0);
+  if (result == FAILED_LOOKUP && ! empty_receivers.empty())
+  {
+    // Update the lookup structures.
+    int index = * empty_receivers.begin();
+    empty_receivers.erase(index);
+
+    Address address_key = Address(ip, 0, 0);
+    address_receivers.insert(std::make_pair(address_key, index));
+
+    Stub stub_key = Stub(ip, port);
+    stub_receivers.insert(std::make_pair(stub_key, index));
+
+    // Connect to the index.
+    reset_receive_records(index, ip, 0, 0);
+    rcvdb[index].sockfd = -1;
+    // Set the new port and sockfd
+    rcvdb[index].stub_port = port;
+
+    // Reset sniffing records
+    sniff_rcvdb[index].start = 0;
+    sniff_rcvdb[index].end = 0;
+    throughput[index].isValid = 0;
+    loss_records[index].loss_counter=0;
+    loss_records[index].total_counter=0;
+    last_loss_rates[index]=0;
+    delays[index]=0;
+    last_delays[index]=0;
+    result = index;
+  }
+  return result;
+}
+
 void reconnect_receiver(int index)
 {
   struct sockaddr_in dest_addr;
   dest_addr.sin_family = AF_INET;
   dest_addr.sin_port = htons(SENDER_PORT);
   dest_addr.sin_addr.s_addr = rcvdb[index].ip;
-  memset(&(dest_addr.sin_zero), '\0', 8);
+//  memset(&(dest_addr.sin_zero), '\0', 8);
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd == -1)
   {
@@ -250,6 +285,12 @@ void reconnect_receiver(int index)
     perror("connect");
     clean_exit(1);
   }
+  int send_buf_size = 0;
+  int int_size = sizeof(send_buf_size);
+  getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &send_buf_size,
+	     (socklen_t*)&int_size);
+  fprintf(stderr, "Socket buffer size: %d\n", send_buf_size);
+
   struct sockaddr_in source_addr;
   socklen_t len = sizeof(source_addr);
   int sockname_error = getsockname(sockfd, (struct sockaddr *)&source_addr,
@@ -321,7 +362,6 @@ void set_pending(int index, fd_set * write_fds)
 {
   if (rcvdb[index].valid == 1)
   {
-      printf("Set sockfd: %d, maxfd: %d\n", rcvdb[index].sockfd, maxfd);
     pending_receivers.insert(index);
     FD_SET(rcvdb[index].sockfd, write_fds);
   }
@@ -331,7 +371,6 @@ void clear_pending(int index, fd_set * write_fds)
 {
   if (rcvdb[index].valid == 1)
   {
-      printf("Clear sockfd: %d\n", rcvdb[index].sockfd);
     pending_receivers.erase(index);
     FD_CLR(rcvdb[index].sockfd, write_fds);
     rcvdb[index].pending = 0;

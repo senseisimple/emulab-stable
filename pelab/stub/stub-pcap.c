@@ -1,4 +1,5 @@
 #include "stub.h"
+#include "log.h"
 
 /* tcpdump header (ether.h) defines ETHER_HDRLEN) */
 #ifndef ETHER_HDRLEN 
@@ -35,6 +36,7 @@ struct my_ip {
 	u_int16_t	ip_sum;		/* checksum */
 	struct	in_addr ip_src,ip_dst;	/* source and dest address */
 };
+
 
 sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
 pcap_t* descr;
@@ -262,8 +264,11 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
   u_int caplen = pkthdr->caplen;
   u_short len, hlen, version, tcp_hlen, ack_bit;
   u_long  seq_start, seq_end, ack_seq, ip_src, ip_dst;
+  unsigned short source_port = 0;
+  unsigned short dest_port = 0;
   int path_id, record_id, msecs, end, flag_resend=0;
   sniff_path *path;
+//  struct in_addr debug_addr;
 
   /* jump pass the ethernet header */
   ip = (struct my_ip*)(packet + sizeof(struct ether_header));
@@ -328,8 +333,29 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       seq_start = ntohl(tp->seq);      
       seq_end   = ((unsigned long)(seq_start+length));
       ack_bit= ((tp)->ack & 0x0001);
+      source_port = htons(tp->source);
+      dest_port = htons(tp->dest);
 
-      path_id = search_rcvdb(ip_dst);
+//      path_id = search_rcvdb(ip_dst);
+
+      // If there is a fake entry, the stub_port entry will be the
+      // destination port requested by the command line.
+//      debug_addr.s_addr = ip_src;
+//      printf("ip_src: %s ", inet_ntoa(debug_addr));
+//      debug_addr.s_addr = ip_dst;
+//      printf("ip_dst: %s, dest_port: %d, source_port: %d\n",
+//	     inet_ntoa(debug_addr), dest_port, source_port);
+      path_id = find_by_stub_port(ip_dst, dest_port);
+//      printf("outgoing path_id: %d\n", path_id);
+      if (path_id == -1 || rcvdb[path_id].source_port != 0
+	  || rcvdb[path_id].dest_port != 0)
+      {
+	// I contacted the receiver. Therefore, my port is unique and
+	// the receiver's port is fixed. The destination is the
+	// receiver, therefore my port is the one that is of interest.
+	path_id = find_by_stub_port(ip_dst, source_port);
+//	printf("stub path_id (outgoing): %d\n", path_id);
+      }
       if (path_id != -1) { //a monitored outgoing packet
         //ignore the pure outgoing ack
         if ((ack_bit==1) && (seq_end==seq_start)) {
@@ -378,7 +404,23 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	}
    
       } else {
-	path_id = search_rcvdb(ip_src);
+//	path_id = search_rcvdb(ip_src);
+	// If there is a fake entry, and the packet is incoming, then
+	// the source_port will be the remote port requested on the
+	// command line.
+	path_id = find_by_stub_port(ip_src, source_port);
+//	printf("incoming path_id: %d\n", path_id);
+
+	if (path_id == -1 || rcvdb[path_id].source_port != 0
+	    || rcvdb[path_id].dest_port != 0)
+	{
+	  // I contacted the receiver, so my port is unique and their
+	  // port is the same every time. This means that if a packet is
+	  // coming from them, the destination port is the one of
+	  // interest.
+	  path_id = find_by_stub_port(ip_src, dest_port);
+//	  printf("stub path_id (incoming): %d\n", path_id);
+	}
 	if (path_id != -1) { //a monitored incoming packet
 	  if (ack_bit == 1) { //has an acknowledgement
 	    ack_seq  = ntohl(tp->ack_seq);	   
@@ -393,6 +435,8 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
 		delays[path_id] = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
 		append_delay_sample(path_id, delays[path_id]);
+		logWrite(DELAY_DETAIL, &(pkthdr->ts),
+			 "Delay: %lu", delays[path_id]);
 	      }
 	      pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
 	    } //ack in rcvdb
@@ -465,54 +509,75 @@ u_int16_t handle_ethernet (u_char *args,const struct pcap_pkthdr* pkthdr,const u
     return ether_type;
 }
 
-void init_pcap(int to_ms) {
-    char *dev; 
+void init_pcap(int to_ms, unsigned short port, char * device, int is_live) {
     char errbuf[PCAP_ERRBUF_SIZE];
-    struct bpf_program fp;      /* hold compiled program     */
-    bpf_u_int32 maskp;          /* subnet mask               */
-    bpf_u_int32 netp;           /* ip                        */
-    char string_filter[128];
-    //struct in_addr addr;
 
-    dev = sniff_interface; //input parameter of stubd, should be "vnet" or "eth0"
     if (flag_debug) {
-      printf("The sniff_interface: %s \n", sniff_interface);
+      printf("The sniff_interface: %s \n", device);
     }
+    if (is_live)
+    {
+      logWrite(MAIN_LOOP, NULL,
+	       "Initializing pcap live interface with device %s, and port %d",
+	       device, port);
+      // We are running using live data. device refers to the network
+      // device.
+      struct bpf_program fp;      /* hold compiled program     */
+      bpf_u_int32 maskp;          /* subnet mask               */
+      bpf_u_int32 netp;           /* ip                        */
+      char string_filter[128];
 
-    /* ask pcap for the network address and mask of the device */
-    pcap_lookupnet(dev,&netp,&maskp,errbuf);
-    //For an unknown reason, netp has the wrong 4th number
-    //addr.s_addr = netp;
-    sprintf(string_filter, "port %d and tcp", SENDER_PORT);
+      /* ask pcap for the network address and mask of the device */
+      pcap_lookupnet(device, &netp, &maskp, errbuf);
+      //For an unknown reason, netp has the wrong 4th number
+      //addr.s_addr = netp;
+      sprintf(string_filter, "port %d and tcp", port);
 
-    /* open device for reading. 
-     * NOTE: We use non-promiscuous */
-    descr = pcap_open_live(dev, BUFSIZ, 0, to_ms, errbuf);
-    if(descr == NULL) { 
-      printf("Error: pcap_open_live(): %s\n",errbuf); 
-      exit(1); 
-    }
-
+      /* open device for reading. 
+       * NOTE: We use non-promiscuous */
+      descr = pcap_open_live(device, BUFSIZ, 0, to_ms, errbuf);
+      if(descr == NULL) { 
+	printf("Error: pcap_open_live(): %s\n",errbuf); 
+	exit(1); 
+      }
  
-    // Lets try and compile the program, optimized 
-    if(pcap_compile(descr, &fp, string_filter, 1, maskp) == -1) {
-      fprintf(stderr,"Error: calling pcap_compile\n"); 
-      exit(1); 
+      // Lets try and compile the program, optimized 
+      if(pcap_compile(descr, &fp, string_filter, 1, maskp) == -1) {
+	fprintf(stderr,"Error: calling pcap_compile\n"); 
+	exit(1); 
+      }
+      // set the compiled program as the filter 
+      if(pcap_setfilter(descr,&fp) == -1) {
+	fprintf(stderr,"Error: setting filter\n"); 
+	exit(1); 
+      }
+
+      /*
+	if (pcap_setnonblock(descr, 1, errbuf) == -1){
+	printf("Error: pcap_setnonblock(): %s\n",errbuf); 
+	exit(1); 
+	}
+      */
     }
-    // set the compiled program as the filter 
-    if(pcap_setfilter(descr,&fp) == -1) {
-      fprintf(stderr,"Error: setting filter\n"); 
-      exit(1); 
+    else
+    {
+      logWrite(MAIN_LOOP, NULL, "Initializing pcap replay interface");
+      // We are running offline using data recorded by tcpdump
+      // earlier. device is the filename. If device == '-', then we
+      // read from stdin.
+      descr = pcap_open_offline(device, errbuf);
+      if(descr == NULL) { 
+	printf("Error: pcap_open_offline(): %s\n", errbuf); 
+	exit(1); 
+      }
     }
 
-    /*
-    if (pcap_setnonblock(descr, 1, errbuf) == -1){
-      printf("Error: pcap_setnonblock(): %s\n",errbuf); 
-      exit(1); 
-    }
-    */
-
-    pcapfd = pcap_fileno(descr);
+    pcapfd = pcap_get_selectable_fd(descr);
+    if (pcapfd == -1)
+    {
+      fprintf(stderr, "Error: pcap file descriptor is not selectable\n");
+      exit(1);
+   }
     init_sniff_rcvdb();
 
     loss_log = fopen("loss.log", "w"); //loss log

@@ -14,6 +14,15 @@ import socket
 import select
 import re
 
+CODE_BANDWIDTH = 1
+CODE_DELAY = 2
+CODE_LOSS = 3
+CODE_LIST_DELAY = 4
+
+PACKET_WRITE = 1
+PACKET_SEND_BUFFER = 2
+PACKET_RECEIVE_BUFFER = 3
+
 emulated_to_real = {}
 real_to_emulated = {}
 emulated_to_interface = {}
@@ -21,7 +30,7 @@ ip_mapping_filename = ''
 this_experiment = ''
 this_ip = ''
 stub_ip = ''
-netmon_output_version = 1
+netmon_output_version = 2
 
 total_size = 0
 last_total = -1
@@ -96,6 +105,7 @@ def populate_ip_tables():
 
 def get_next_packet():
   global total_size, last_total
+  event_code = PACKET_WRITE
   line = sys.stdin.readline()
   if line == "":
       raise EOFError
@@ -110,11 +120,11 @@ def get_next_packet():
       linexp = re.compile('^(\d+\.\d+) > (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) (\((\d+)\))?')
 
   match = linexp.match(line)
-  conexp = re.compile('^(New|Closed): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+)')
+  conexp = re.compile('^(New|Closed|SO_RCVBUF|SO_SNDBUF): (\d+):(\d+\.\d+\.\d+\.\d+):(\d+) ((\d+))?')
   cmatch = conexp.match(line)
-  if (match) :
+  if match:
       localport = 0 # We may not get this one
-      if (netmon_output_version == 1):
+      if netmon_output_version == 1:
           time = float(match.group(1))
           ipaddr = match.group(2)
           remoteport = int(match.group(3))
@@ -122,7 +132,7 @@ def get_next_packet():
           size = int(match.group(5))
       elif (netmon_output_version == 2):
           time = float(match.group(1))
-          localport = match.group(2)
+          localport = int(match.group(2))
           ipaddr = match.group(3)
           remoteport = int(match.group(4))
           size_given = match.group(5) != ''
@@ -133,16 +143,29 @@ def get_next_packet():
       if not size_given:
           size = 0
       total_size = total_size + size
-      return (ipaddr, localport, remoteport, time, size)
+      return (ipaddr, localport, remoteport, time, size, event_code)
   elif ((netmon_output_version == 2) and cmatch):
       #
       # Watch for new or closed connections
       #
       event = cmatch.group(1)
-      localport = cmatch.group(2)
+      localport = int(cmatch.group(2))
       ipaddr = cmatch.group(3)
+      remoteport = int(cmatch.group(4))
+      value_given = cmatch.group(5) != ''
+      value = int(cmatch.group(6))
+      if not value_given:
+        value = 0
+
       sys.stdout.write("Got a connection event: " + event + "\n")
-      return None
+      if event == 'SO_RCVBUF':
+        event_code = PACKET_RECEIVE_BUFFER
+      elif event == 'SO_SNDBUF':
+        event_code = PACKET_SEND_BUFFER
+        sys.stdout.write('Packet send buffer was set to: ' + str(value) + '\n')
+      else:
+        return None
+      return (ipaddr, localport, remoteport, 0, value, event_code)
   else:
       sys.stdout.write('skipped line in the wrong format: ' + line)
       return None
@@ -158,25 +181,39 @@ def receive_characteristic(conn):
 #    sys.stdout.write('received: ' + str(dest) + ' ' + str(source_port) + ' '
 #                     + str(dest_port) + ' ' + str(command) + ' ' + str(value)
 #                     + '\n')
-    if command == 1:
+    if command == CODE_BANDWIDTH:
       # value is bandwidth in kbps
+      sys.stdout.write('Bandwidth: ' + str(value) + '\n');
       set_bandwidth(value, dest)
-    elif command == 2:
+    elif command == CODE_DELAY:
       # value is delay in milliseconds
+      sys.stdout.write('Delay: ' + str(value) + '\n');
       set_delay(value, dest)
-    elif command == 3:
+    elif command == CODE_LOSS:
       # value is packet loss in packets per billion
+      sys.stdout.write('Loss: ' + str(value) + '\n');
       set_loss(value/1000000000.0, dest)
+    elif command == CODE_LIST_DELAY:
+      # value is the number of samples
+      buffer = conn.recv(value*8)
+      # Dummynet isn't quite set up to deal with this yet, so ignore it.
+      sys.stdout.write('Ignoring delay list of size: ' + str(value) + '\n')
+    else:
+      sys.stdout.write('Other: ' + str(command) + ', ' + str(value) + '\n');
     return True
   elif len(buffer) == 0:
     return False
 
 def set_bandwidth(kbps, dest):
-  sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
+#  sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
   return set_link(this_ip, dest, 'bandwidth=' + str(kbps))
 
 # Set delay on the link. We are given round trip time.
 def set_delay(milliseconds, dest):
+  now = time.time()
+  sys.stderr.write('purple\n')
+  sys.stderr.write('line ' + ('%0.6f' % now) + ' 0 ' + ('%0.6f' % now)
+	+ ' ' + str(milliseconds) + '\n')
   # Set the delay from here to there to 1/2 rtt.
   error = set_link(this_ip, dest, 'delay=' + str(milliseconds/2))
   if error == 0:
@@ -204,11 +241,16 @@ def send_destinations(conn, packet_list):
     prev_time = packet_list[0][3]
   for packet in packet_list:
     ip = ip_to_int(emulated_to_real[packet[0]])
+    delta = int((packet[3] - prev_time) * 1000)
+    if packet[3] == 0:
+      delta = 0
     output = (output + save_int(ip) + save_short(packet[1])
               + save_short(packet[2])
-              + save_int(int((packet[3] - prev_time) * 1000))
-              + save_int(packet[4]))
-    prev_time = packet[3]
+              + save_int(delta)
+              + save_int(packet[4])
+              + save_short(packet[5]))
+    if packet[3] != 0:
+      prev_time = packet[3]
   conn.sendall(output)
 
 def load_int(str):
