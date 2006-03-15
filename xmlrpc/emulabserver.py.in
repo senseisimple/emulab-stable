@@ -3274,12 +3274,6 @@ class node:
         if (argerror):
             return argerror
 
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
-
         if not re.match("^[-\w]*$", str(argdict["node"])):
             return EmulabResponse(RESPONSE_BADARGS,
                                   output="Improperly formed node value!")
@@ -3343,12 +3337,6 @@ class node:
         argerror2 = CheckRequiredArgs(argdict, ("proj", "exp"))
         if (argerror1 and argerror2):
             return argerror1
-
-        try:
-            checknologins()
-            pass
-        except NoLoginsError, e:
-            return EmulabResponse(RESPONSE_REFUSED, output=str(e))
 
         if (argdict.has_key("node") and
             not re.match("^[-\w]*$", str(argdict["node"]))):
