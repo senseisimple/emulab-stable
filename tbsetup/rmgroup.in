@@ -215,10 +215,12 @@ if (system("$GROUPDEL $unix_name")) {
 }
 
 if ($MAILMANSUPPORT && !$ELABINELAB) {
+    my $listname = ($pid eq $gid ? "${pid}-users" : "${pid}-${gid}-users");
+    
     # For perl
     $EUID = $UID;
-    system("$DELMMLIST -a ${pid}-${gid}-users") == 0 or
-	fatal("$DELMMLIST -a ${pid}-${gid}-users failed!");
+    system("$DELMMLIST -a $listname") == 0 or
+	fatal("$DELMMLIST -a $listname failed!");
     $EUID = 0;
 }
 
