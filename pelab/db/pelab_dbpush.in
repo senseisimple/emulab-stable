@@ -149,6 +149,12 @@ unlink("${tempfile}.pair_data")
     if (-e "${tempfile}.pair_data");
 
 #
+# Compute the cutoff age; We leave MAXAGE old entries here, and ship
+# the rest over to the DP.
+#
+my $cutoffage = (time() - $MAXAGE) * 1.0;
+
+#
 # Must lock the table of course
 #
 DBQueryFatal("lock tables pair_data write");
@@ -157,7 +163,7 @@ DBQueryFatal("lock tables pair_data write");
 # Grab all of the new entries and store to the file
 #
 DBQueryFatal("select * from pair_data ".
-	     "where idx > $lastidx " .
+	     "where idx > $lastidx and unixstamp < $cutoffage ".
 	     "into outfile '${tempfile}.pair_data' ".
 	     "fields terminated by ' '");
 
@@ -166,7 +172,7 @@ DBQueryFatal("select * from pair_data ".
 # 
 $query_result =
     DBQueryFatal("select idx from pair_data ".
-		 "where idx > $lastidx " .
+		 "where idx > $lastidx and unixstamp < $cutoffage " .
 		 "order by idx desc limit 1");
 # Save for later.
 $lastidx = $query_result->fetchrow_array();
