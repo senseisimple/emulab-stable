@@ -1,0 +1,29 @@
+--
+-- SQL extra defs for setting Flyspray from ops-install
+--
+
+-- Okay, as I started to do the Emulab to Flyspray interface, I
+-- realized I need to add a new table to map between Emulab pid and
+-- Flyspray project. Not a problem for users or groups, but Flyspray
+-- allows people to edit the project names, which would make it
+-- impossible for Emulab to find the right records later.
+
+CREATE TABLE IF NOT EXISTS emulab_project_mapping (
+  pid varchar(32) NOT NULL default '',
+  flyspray_id mediumint(5) NOT NULL default '0',
+  PRIMARY KEY  (pid)
+) TYPE=MyISAM;
+
+
+-- Needed for cross-login (xlogin) support. 
+
+alter table flyspray_users add cred varchar(40) default NULL;
+
+
+-- In the default project, turn off the view bit for Basic users; That
+-- project is silly and no one should see it, since the only way to
+-- change permissions for it is to give users permission across all
+-- projects.
+
+update flyspray_projects set others_view='0' where project_id='1';
+
