@@ -1,0 +1,90 @@
+diff -ru iperf-2.0.2/compat/error.c iperf-2.0.2-patched-exitcode/compat/error.c
+--- iperf-2.0.2/compat/error.c	Wed Feb  1 14:02:12 2006
++++ iperf-2.0.2-patched-exitcode/compat/error.c	Wed Mar 15 15:54:39 2006
+@@ -162,6 +162,7 @@
+  * Prints message and return
+  * ------------------------------------------------------------------- */
+ 
++int had_warnings = 0;
+ void warn( const char *inMessage, const char *inFile, int inLine ) {
+     fflush( 0 );
+ 
+@@ -172,6 +173,7 @@
+     /* while debugging output file/line number also */
+     fprintf( stderr, "%s failed (%s:%d)\n", inMessage, inFile, inLine );
+ #endif
++    had_warnings = 1;
+ } /* end warn */
+ 
+ /* -------------------------------------------------------------------
+@@ -203,6 +205,7 @@
+     fprintf( stderr, "%s failed (%s:%d): %s (%d)\n",
+              inMessage, inFile, inLine, my_str, my_err );
+ #endif
++    had_warnings = 1;
+ } /* end warn_errno */
+ 
+ #ifdef __cplusplus
+diff -ru iperf-2.0.2/include/util.h iperf-2.0.2-patched-exitcode/include/util.h
+--- iperf-2.0.2/include/util.h	Wed Feb  1 14:02:15 2006
++++ iperf-2.0.2-patched-exitcode/include/util.h	Wed Mar 15 15:51:42 2006
+@@ -103,6 +103,8 @@
+ void warn      ( const char *inMessage, const char *inFile, int inLine );
+ void warn_errno( const char *inMessage, const char *inFile, int inLine );
+ 
++extern int had_warnings;
++
+ #if defined( HAVE_POSIX_THREAD ) || defined( HAVE_WIN32_THREAD)
+ #define FAIL( cond, msg, settings )             \
+   do {                                          \
+diff -ru iperf-2.0.2/src/main.cpp iperf-2.0.2-patched-exitcode/src/main.cpp
+--- iperf-2.0.2/src/main.cpp	Wed Feb  1 14:02:15 2006
++++ iperf-2.0.2-patched-exitcode/src/main.cpp	Wed Mar 15 15:53:48 2006
+@@ -133,7 +133,7 @@
+     int rc = WSAStartup( 0x202, &wsaData );
+     WARN_errno( rc == SOCKET_ERROR, "WSAStartup" );
+ 	if (rc == SOCKET_ERROR)
+-		return 0;
++		return 1;
+ 
+     // Tell windows we want to handle our own signals
+     SetConsoleCtrlHandler( sig_dispatcher, true );
+@@ -172,7 +172,7 @@
+         // in the listener_spawn function
+         if ( isDaemon( ext_gSettings ) ) {
+             CmdInstallService(argc, argv);
+-            return 0;
++            return 1;
+         }
+ 
+         // Remove the Windows service if requested
+@@ -181,7 +181,7 @@
+             if ( CmdRemoveService() ) {
+                 fprintf(stderr, "IPerf Service is removed.\n");
+ 
+-                return 0;
++                return 1;
+             }
+         }
+ #endif
+@@ -231,14 +231,18 @@
+ #endif
+         fprintf( stderr, usage_short, argv[0], argv[0] );
+ 
+-        return 0;
++        return 1;
+     }
+ 
+     // wait for other (client, server) threads to complete
+     thread_joinall();
+     
+     // all done!
+-    return 0;
++    if (had_warnings > 0) {
++        return 1;
++    } else {
++        return 0;
++    }
+ } // end main
+ 
+ /* -------------------------------------------------------------------
