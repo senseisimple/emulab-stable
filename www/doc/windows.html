@@ -744,9 +744,10 @@ another alias for Ops/Users, via the SMB protocol (Server Message Block, also
 known as Windows File Sharing) with the Windows Client connecting to the Samba
 server. <p>
 
-UNC paths with leading double-slashes <b><code>//fs</code></b> are used to
-access the SMB Shares under Cygwin.  They are then further mounted to the
-usual Unix paths for the shared directories:
+UNC paths with leading double-slashes and a server name,
+e.g. <b><code>//fs</code></b>, are used to access the SMB Shares under Cygwin.
+Emulab then uses the <a href="#Cygwin_mounts"> Cygwin mount command </a> to
+make them appear on the usual Unix paths for the Emulab shared directories:
 <code>/users/&lt;username&gt;</code>, <code>/proj/&lt;pid&gt;</code>,
 <code>/group/&lt;pid&gt;/&lt;gid&gt;</code>, and <code>/share</code>.
 <p>
@@ -765,16 +766,22 @@ or a file-open dialog with <b>backslashes</b>, e.g. <code>\\fs\share</code> or
 <code>\\fs\&lt;username&gt;</code>.  User and project shares are marked "not
 browsable", so just <code>\\fs</code> shows only <code>share</code>. <p>
 
-Windows limitation: There is only one protection mask for everything in a
-whole mount/share under SMB.  It's set in the "share properties" on the server
-(Samba config file in this case) so <b><code>chmod</code></b> will do you no
-good across SMB.
+<i>Windows limitation:</i> There is only <b>one protection mask</b> for
+everything in a whole mount/share under SMB.  It's set in the "share
+properties" on the server (Samba config file in this case) so
+<b><code>chmod</code></b> will do you no good across SMB. <p>
+
+<i>Cygwin limitation:</i> There is a hard-coded <b>limit of 30 mount
+points</b> in Cygwin.  Cygwin uses 4 of them, and Emulab uses another 3 or 4.
+So some of your <code>/users</code> mounts will fail on Windows startup if you
+have more than 23 or 24 members in your project, unless they are grouped into
+smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
 
 <h4><a name="Cygwin_arcana"> </a> Cygwin arcana </h4>
 
 <ul>
 
-  <li> Paths <p>
+  <li> <a name="Cygwin_paths"> </a> Paths <p>
 
        Cygwin accepts either flavor of slashes in paths, Unix/POSIX-style
        forward-slashes, or Windows-style back-slashes.  In Unix shell
@@ -788,14 +795,16 @@ good across SMB.
        are expanded in double-quotes.) <p>
 
        When you invoke Windows (as opposed to Cygwin) commands, for example
-       <b><code>net use</code></b>, they will know nothing about Unix-style paths in
-       their arguments. The <a
+       <b><code>net use</code></b>, they will know nothing about Unix-style
+       paths in their arguments. The <a
        href="http://cygwin.com/cygwin-ug-net/using-utils.html#cygpath">
        <b><code>cygpath</code></b> </a> utility is an aid to converting paths
        between the Unix and Windows conventions. <p>
 
-       <code>cygpath -w</code> converts its arguments to Windows format, where <code>cygpath
-       -u</code> converts its arguments to Unix format, e.g. <pre>
+       <code>cygpath -w</code> converts its arguments to Windows format, and
+       <code>cygpath -u</code> converts its arguments to Unix format,
+       e.g. <pre>
+
 	 $ cygpath -w /cygdrive/c/WINDOWS
 	 c:\WINDOWS
 
@@ -803,7 +812,7 @@ good across SMB.
 	 /cygdrive/c/WINDOWS
 	 </pre> <p>  </li>
 
-  <li> Cygwin mounts <p>
+  <li> <a name="Cygwin_mounts"> </a> Cygwin mounts <p>
 
        <a href="http://cygwin.com/cygwin-ug-net/using-utils.html#mount">
        Cygwin mount points </a> are shown by the <b><code>mount</code></b> and
@@ -813,13 +822,13 @@ good across SMB.
        Attempts to use the Cygwin <code>mount</code> command after that will
        fail. <p>
 
-       We discussed UNC <code>//machine</code> paths to SMB shares <a
-       href="#SMB_mounts"> above </a>. <p>
+       See the discussion of mount points and UNC <code>//machine</code>
+       paths to SMB shares <a href="#SMB_mounts"> above </a>. <p>
 
        Another special case is the <b>Unix root</b>, "<code>/</code>".  It's
        mounted to <code>C:\cygwin</code> in the Windows filesystem. </li>
 
-  <li> Windows drive letter mounts <p>
+  <li> <a name="Cygwin_drive_letters"> </a> Windows drive letter mounts <p>
 
        Cygwin knows about drive letter prefixes like
        <b><code>C:</code></b>&nbsp;, which are equivalent to
