@@ -21,15 +21,16 @@ use Exporter;
 		getSwitchStacks
 		getStackType getStackLeader
 		getDeviceOptions getTrunks getTrunksFromSwitches
-                getTrunkHash
+                getTrunkHash 
 		getExperimentPorts snmpitGet snmpitGetWarn snmpitGetFatal
-		snmpitSet snmpitSetWarn snmpitSetFatal snmpitWarn snmpitFatal
+		snmpitSet snmpitSetWarn snmpitSetFatal 
                 snmpitBulkwalk snmpitBulkwalkWarn snmpitBulkwalkFatal
 		printVars tbsort );
 
 use English;
 use libdb;
 use libtestbed;
+use libtblog ('tbdie', 'tbwarn');
 use strict;
 use SNMP;
 
@@ -989,11 +990,11 @@ sub printVars($) {
 # Both print out an error message and mail it to the testbed ops. Prints out
 # the snmpitErrorString set by snmpitGet.
 #
-# usage: snmpitWarn(message)
+# usage: snmpitWarn(message,fatal)
 #
-sub snmpitWarn($) {
+sub snmpitWarn($$) {
 
-    my ($message) = @_;
+    my ($message,$fatal) = @_;
 
     #
     # Untaint $PRORAM_NAME
@@ -1008,9 +1009,12 @@ sub snmpitWarn($) {
     my $text = "$message - In $progname\n" .
     	       "$snmpitErrorString\n";
 	
-    print STDERR "*** $text";
+    if ($fatal) {
+        tbdie({cause => 'hardware'}, $text);
+    } else {
+        tbwarn({cause => 'hardware'}, $text);
+    }
 
-    libtestbed::SENDMAIL($TBOPS, "snmpitError - $message", $text);
 }
 
 #
@@ -1018,8 +1022,7 @@ sub snmpitWarn($) {
 #
 sub snmpitFatal($) {
     my ($message) = @_;
-    snmpitWarn($message);
-    die("\n");
+    snmpitWarn($message,1);
 }
 
 #
