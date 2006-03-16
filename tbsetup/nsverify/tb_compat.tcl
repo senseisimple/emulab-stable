@@ -184,6 +184,12 @@ Simulator instproc addLTLink { linkref {qtype DropTail} } {
 Simulator instproc run {args} {
     global simname
 
+    if {${::GLOBALS::security_level} >= 1} {
+	global fw
+
+	set fw [new Firewall $self]
+    }
+    
     join_lans
     output
     real_puts "s $simname"

@@ -8,6 +8,10 @@
 # This is a nop tb_compact.tcl file that should be used when running scripts
 # under ns.
 
+namespace eval GLOBALS {
+    variable security_level 0
+}
+
 proc tb-set-ip {node ip} {}
 proc tb-set-ip-interface {src dst ip} {}
 proc tb-set-ip-link {src link ip} {}
@@ -68,11 +72,37 @@ proc tb-elab-in-elab-topology {topo} {}
 proc tb-set-inner-elab-eid {eid} {}
 proc tb-set-elabinelab-cvstag {cvstag} {}
 proc tb-set-node-inner-elab-role {node role} {}
-proc tb-set-security-level {level} {}
 proc tb-set-node-id {vnode myid} {}
 proc tb-set-link-est-bandwidth {srclink args} {}
 proc tb-set-lan-est-bandwidth {lan bw} {}
 proc tb-set-node-lan-est-bandwidth {node lan bw} {}
+
+proc tb-set-security-level {level} {
+
+    switch -- $level {
+	"Green" {
+	    set level 0
+	}
+	"Blue" {
+	    set level 1
+	}
+	"Yellow" {
+	    set level 2
+	}
+	"Orange" {
+	    set level 3
+	}
+	"Red" {
+	    perror "\[tb-set-security-level] Red security not implemented yet"
+	    return
+	}
+	unknown {
+	    perror "\[tb-set-security-level] $level is not a valid level"
+	    return
+	}
+    }
+    set ::GLOBALS::security_level $level
+}
 
 #
 # Set the startup command for a node. Replaces the tb-set-node-startup
@@ -116,9 +146,12 @@ Program instproc unknown {m args} {
 
 Class Firewall
 
-Firewall instproc init {args} {
+Firewall instproc init {sim args} {
     global last_fw
-    set last_fw $self
+    global last_fw_node
+    real_set tmp [$sim node]
+    real_set last_fw $self
+    real_set last_fw_node $tmp
 }
 
 Firewall instproc unknown {m args} {
@@ -211,6 +244,9 @@ Node instproc topography {args} {
 
 Node instproc console {} {
     return [new Console]
+}
+
+Node instproc unknown {m args} {
 }
 
 Simulator instproc connect {src dst} {

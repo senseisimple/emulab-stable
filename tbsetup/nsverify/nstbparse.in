@@ -6,6 +6,7 @@ variable last_lan {}
 variable last_link {}
 variable last_sim {}
 variable last_fw {}
+variable last_fw_node {}
 #  arrays mapping tcl hostnames to variable names
 variable hosts
 variable lans
@@ -20,7 +21,7 @@ proc puts {args} {
 
 rename set real_set
 proc set {args} {
-    global last_host last_lan last_link last_sim last_fw
+    global last_host last_lan last_link last_sim last_fw last_fw_node
     global hosts lans links simname
 
     if {[llength $args] == 1} {
@@ -62,7 +63,7 @@ proc set {args} {
 	} elseif {$rval == $last_sim} {
 	    real_set simname $var
 	} elseif {$rval == $last_fw} {
-	    array set hosts [list $last_fw $val]
+	    array set hosts [list $last_fw_node $val]
 	} else {
 	    real_set do_rename 0
 	}
