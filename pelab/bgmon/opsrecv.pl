@@ -23,10 +23,24 @@ use strict;
 my %nodeids;
 my %siteids;
 
+# Batch up insertions. Simple string.
+my $insertions = "";
+my $batchsize  = 0;
+my $maxbatch   = 30;
+my $maxidletime= 5;	# Seconds before forced insert.
+my $lastinsert = 0;	# Timestamp.
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
 sub usage {
 	warn "Usage: $0 ";
 	return 1;
 }
+my $debug    = 0;
+my $impotent = 0;
 
 my %opt = ();
 getopt(\%opt,"s:p:h");
@@ -92,12 +106,10 @@ if (!event_subscribe($handle,\&callbackFunc,$tuple)) {
 while (1) {
 
     #check for pending received events
-#    event_poll($handle);
-    event_poll_blocking($handle, 100);
+    event_poll_blocking($handle, 1000);
 
-
-    #sleep for a time
-#    select(undef, undef, undef, 0.05);
+    SendBatchedInserts()
+	if ($batchsize && (time() - $lastinsert) > $maxidletime);
 }
 
 #############################################################################
@@ -124,7 +136,8 @@ sub callbackFunc($$$) {
 #	print "Event: $time $site $expt $group $host $objtype $objname " .
 #		"$eventtype\n";
 
-	print "EVENT: $time $objtype $eventtype\n";
+	print "EVENT: $time $objtype $eventtype\n"
+	    if ($debug);
 
         my $linksrc = event_notification_get_string($handle,
 						    $notification,
@@ -146,20 +159,16 @@ sub callbackFunc($$$) {
 #						      "SCHEDULER");
 
 	#change values and/or initialize
-	if( $eventtype eq "RESULT" ){
+	if ( $debug && $eventtype eq "RESULT" ){
 	    print "***GOT RESULT***\n";
 	}
-
 				      
-	print(
-	      "linksrc=$linksrc\n".
+	print("linksrc=$linksrc\n".
 	      "linkdest=$linkdest\n".
 	      "testtype =$testtype\n".
 	      "result=$result\n".
-	      "tstamp=$tstamp\n"
-#	      ."SCHEDULER=$scheduler\n"
-	      );
-
+	      "tstamp=$tstamp\n")
+	    if ($debug);
 
 	saveTestToDB(linksrc   => $linksrc,
 		     linkdest  => $linkdest,
@@ -190,7 +199,6 @@ sub saveTestToDB()
 	$siteids{$results{linksrc}} = $srcsite;
     }else{
 	$srcsite = $siteids{$results{linksrc}};
-	print "++++++++++++++++++++++++++++hash hit: site=$srcsite\n";
     }
     if( !exists $nodeids{$results{linksrc}} ){       
 	@tmp = DBQuery("SELECT node_idx FROM site_mapping ".
@@ -224,19 +232,50 @@ sub saveTestToDB()
 	warn "srcnode=$srcnode\n";
 	warn "dstsite=$dstsite\n";
 	warn "dstnode=$dstnode\n";
-	#DBWarn("DBWARN:");
+	return;
+    }
+    my $testtype = $results{'testtype'};
+    my $result   = $results{'result'};
+    my $tstamp   = $results{'tstamp'};
+    my $latency  = ($testtype eq "latency" ? "$result" : "0");
+    my $loss     = ($testtype eq "loss"    ? "$result" : "0");
+    my $bw       = ($testtype eq "bw"      ? "$result" : "0");
+
+    if ($bw eq "") {
+	my $src = $results{'linksrc'};
+	my $dst = $results{'linkdest'};
+	
+	warn("BW came in as null string at $tstamp for $src,$dst\n");
+	return;
     }
 
-    my $query = 
-	"INSERT INTO pair_data (srcsite_idx, srcnode_idx, ".
-	"dstsite_idx, dstnode_idx, unixstamp, $results{testtype}) ".
-	"VALUES($srcsite, $srcnode, $dstsite, $dstnode, ".
-        "$results{tstamp}, $results{result})";
+    if ($batchsize == 0) {
+	$insertions =
+		"INSERT INTO pair_data (srcsite_idx, srcnode_idx, ".
+		"dstsite_idx, dstnode_idx, unixstamp, ".
+		"latency, loss, bw) values ";
+    }
+    $insertions .= ","
+	if ($batchsize);
 
-    my $query_res = DBQuery($query);
-#    my $query_res = DBQuery_data($query);
-    print "QUERY: $query\n";
-#    my $query_res = DBQueryFatal("describe pair_data");
-    
+    $insertions .=
+	"($srcsite, $srcnode, $dstsite, $dstnode, $tstamp, ".
+	" $latency, $loss, $bw)";
+
+    $batchsize++;
+    SendBatchedInserts()
+	if ($batchsize > $maxbatch);
 }
 
+sub SendBatchedInserts()
+{
+    if ($batchsize) {
+	DBQueryWarn($insertions)
+	    if (!$impotent);
+	print "$insertions\n"
+	    if ($debug);
+	$lastinsert = time();
+    }
+    $batchsize  = 0;
+    $insertions = "";
+}
