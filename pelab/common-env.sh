@@ -38,8 +38,19 @@ HOSTSFILE="/etc/hosts"
 IFCONFIG="/sbin/ifconfig"
 PERL="${BIN_PATH}/perl"
 PYTHON="${BIN_PATH}/python"
+SH=/bin/sh
 SUDO="${BIN_PATH}/sudo"
+MKDIR="/bin/mkdir"
+CHMOD="/bin/chmod"
 SYNC="/usr/local/etc/emulab/emulab-sync"
+if [ "$UNAME" == "Linux" ]; then
+    GREP="/bin/grep"
+elif [ "$UNAME" == "FreeBSD" ]; then
+    BIN_PATH="/usr/bin/grep"
+else
+    echo "Unable to determine operating system"
+    exit -1
+fi
 
 #
 # Some 'constants' by convention. 
@@ -70,6 +81,12 @@ export STUB_DIR="${BASE}/stub/";
 export NETMON_DIR="${BASE}/libnetmon/";
 export MONITOR_DIR="${BASE}/monitor/";
 export TMPDIR="/var/tmp/";
+export LOGDIR="/local/logs/"
+
+#
+# Temproary files we use
+#
+export IPMAP="/var/tmp/ip-mapping.txt"
 
 #
 # Important scrips/libraries
@@ -77,6 +94,7 @@ export TMPDIR="/var/tmp/";
 export NETMOND="netmond"
 export STUBD="stubd"
 export MONITOR="monitor.py"
+export GENIPMAP="gen-ip-mapping.pl"
 export NETMON_LIB="libnetmon.so"
 
 #
@@ -90,6 +108,29 @@ else
     export RUNNING_ON="elab"
     export ON_PLAB=""
     export ON_ELAB="yes"
+fi
+
+#
+# Make a handy variable for running as root (ie. invoke sudo if necessary)
+#
+if [ "$EUID" != "0" ]; then
+    export AS_ROOT="$SUDO"
+else
+    export AS_ROOT=""
+fi
+
+#
+# How big is this experiment? Counts the number of planetlab nodes
+#
+export PEER_PAIRS=`$GREP -E -c 'planet-.*-planetcontrol' /etc/hosts`
+export PEERS=`expr $PEER_PAIRS \* 2`
+
+#
+# Make the logdir if it doesn't exist
+#
+if [ ! -d $LOGDIR ]; then
+    $AS_ROOT $MKDIR -p $LOGDIR
+    $AS_ROOT $CHMOD 777 $LOGDIR
 fi
 
 #
@@ -134,15 +175,6 @@ elif [ "$HOST_ROLE" == "stub" ]; then
 fi
 
 #
-# Make a handy variable for running as root (ie. invoke sudo if necessary)
-#
-if [ "$EUID" != "0" ]; then
-    export AS_ROOT="$SUDO"
-else
-    export AS_ROOT=""
-fi
-
-#
 # Function for waiting on a barrier sync
 # I'd rather automatically determine the number of peer pairs, but that
 # looks too hard for now.
@@ -151,17 +183,30 @@ barrier_wait()
 {
     BARRIER=$1
     #
-    # This needs to be set by the calling script
+    # Are we the master?
     #
-    MASTER=$SYNC -m
-    if [ ! "$MASTER" ]; then
+    $SYNC -m
+    MASTER=$?
+    if [ "$MASTER" == "1" ]; then
         # I know, this looks backwards. But it's right
         $SYNC -n $BARRIER 
     else
+        WAITERS=`expr $PEERS - 1`
         echo "Waiting for $WAITERS clients"
-        WAITERS=`expr $PEER_PAIRS \* 2 - 1`
         $SYNC -n $BARRIER -i $WAITERS
     fi
+}
+
+#
+# Log the stdout and stderr of the given process to the logdir
+# Runs the program in the background and returns its pid
+#
+log_output_background()
+{
+    PROGNAME=$1
+    CMD=$2
+    $CMD 1> ${LOGDIR}/${PROGNAME}.stdout 2> ${LOGDIR}/${PROGNAME}.stderr &
+    echo $!
 }
 
 fi # End of header guard

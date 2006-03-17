@@ -30,5 +30,8 @@ if ! [ -x "$NETMON_DIR/$NETMOND" ]; then
     exit 1;
 fi
 
+echo "Generating IP mapping file into $IPMAP";
+$PERL ${MONITOR_DIR}/$GENIPMAP > $IPMAP
+
 echo "Starting up netmond for $PROJECT/$EXPERIMENT $PELAB_IP $SIP";
-exec $NETMON_DIR/$NETMOND -v 2 | $PYTHON $MONITOR_DIR/$MONITOR ip-mapping.txt $PROJECT/$EXPERIMENT $PELAB_IP $SIP
+exec $NETMON_DIR/$NETMOND -v 2 | $PYTHON $MONITOR_DIR/$MONITOR $IPMAP $PROJECT/$EXPERIMENT $PELAB_IP $SIP
