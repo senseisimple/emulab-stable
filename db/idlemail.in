@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -203,6 +203,9 @@ EOT
     # Next we need to check for stuff that needs to get swapped.
     # We need to find stuff to Idle-Swap, and stuff to Auto-Swap,
     # using two different queries.
+    #
+    # Note that 'paniced' experiments are ignored since there is no
+    # hope of auto swapping them.
     $sql  = <<EOT;
 select e.pid,e.eid, idleswap_timeout,
 (unix_timestamp(now()) - unix_timestamp(min(last_report))) as staleness,
@@ -211,6 +214,7 @@ last_tty_act,last_net_act,last_cpu_act,last_ext_act))))/60 as idlemin
 from reserved as r left join experiments as e on e.pid=r.pid and e.eid=r.eid
 left join node_activity as na on r.node_id=na.node_id
 where idleswap !=0 and swappable>0 and idle_ignore=0
+and paniced=0
 group by pid,eid having idlemin >= idleswap_timeout and staleness < 600
 order by pid,eid
 EOT
@@ -227,6 +231,7 @@ EOT
 select pid,eid,autoswap_timeout,
 (unix_timestamp(now()) - unix_timestamp(expt_swapped))/60 as activemin
 from experiments where swappable>0 and state="active" and autoswap>0
+and paniced=0
 having activemin>=autoswap_timeout order by pid,eid
 EOT
     $q = DBQueryFatal($sql);
