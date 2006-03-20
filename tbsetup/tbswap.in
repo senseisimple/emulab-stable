@@ -1610,9 +1610,11 @@ done:
 	    my ($fwnode, $fwport);
 	    if (!TBExptFirewallAndPort($pid, $eid, \$fwnode, \$fwport) ||
 		system("snmpit -d ${fwnode}:${fwport}") != 0) {
-		push(@fwstate, "Firewall cnet interface NOT disabled");
+		push(@fwstate,
+		     "Firewall cnet interface ${fwnode}:${fwport} NOT disabled");
 	    } else {
-		push(@fwstate, "Firewall cnet interface disabled");
+		push(@fwstate,
+		     "Firewall cnet interface ${fwnode}:${fwport} disabled");
 	    }
 	    TBExptSetPanicBit($pid, $eid, 2);
 	    $op = "Swapout";
