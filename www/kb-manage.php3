@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -250,6 +250,7 @@ if (isset($idx)) {
 	USERERROR("No such knowledge_base entry: $idx", 1);
     }
     $defaults = mysql_fetch_array($query_result);
+    $defaults[body] = htmlspecialchars($defaults[body], ENT_QUOTES);
 }
 
 #
