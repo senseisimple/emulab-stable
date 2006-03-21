@@ -50,7 +50,7 @@ extern "C"
 #define SIZEOF_LONG sizeof(long) //message bulding block
 #define BANDWIDTH_OVER_THROUGHPUT 0 //the safty margin for estimating the available bandwidth
 #define SNIFF_WINSIZE 131071 //from min(net.core.rmem_max, max(net.ipv4.tcp_rmem)) on Plab linux
-#define SNIFF_TIMEOUT QUANTA/10 //in msec 
+#define SNIFF_TIMEOUT 0 //in msec 
 
 //magic numbers
 #define CODE_BANDWIDTH  0x00000001 
@@ -115,6 +115,7 @@ extern connection rcvdb[CONCURRENT_RECEIVERS];
 extern sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
 extern unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 extern unsigned long last_delays[CONCURRENT_RECEIVERS];
+extern unsigned long delay_count[CONCURRENT_RECEIVERS];
 extern loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 extern unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 extern delay_record delay_records[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
@@ -122,8 +123,13 @@ extern delay_record delay_records[CONCURRENT_RECEIVERS]; //delay is calculated a
 extern void sniff(void);
 extern void init_pcap(int to_ms, unsigned short port, char * device,
 		      int is_live);
-extern void append_delay_sample(int path_id, long sample_value);
-void clean_exit(int);
+extern void append_delay_sample(int path_id, long sample_value,
+				struct timeval const * timestamp);
+extern void remove_delay_samples(int path_id);
+extern void clean_exit(int);
+extern void update_stats(void);
+extern unsigned int received_stat(void);
+extern unsigned int dropped_stat(void);
 
 typedef struct
 {
@@ -131,7 +137,8 @@ typedef struct
   unsigned int nextSequence;
   unsigned int ackSize;
   unsigned int repeatSize;
-  struct timeval lastTime;
+  struct timeval beginTime;
+  struct timeval endTime;
   int isValid;
 } ThroughputAckState;
 
@@ -140,7 +147,8 @@ extern ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 // Returns the number of acknowledged bytes since the last
 // throughputTick() call.
 extern unsigned int throughputTick(ThroughputAckState * state);
-extern void throughputInit(ThroughputAckState * state, unsigned int sequence);
+extern void throughputInit(ThroughputAckState * state, unsigned int sequence,
+			   struct timeval const * firstTime);
 extern unsigned int bytesThisTick(ThroughputAckState * state);
 
 // Add a potential sender to the pool.

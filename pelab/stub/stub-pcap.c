@@ -40,6 +40,7 @@ struct my_ip {
 
 sniff_path sniff_rcvdb[CONCURRENT_RECEIVERS];
 pcap_t* descr;
+struct pcap_stat stats;
 int pcapfd;
 FILE  *loss_log;
 
@@ -55,7 +56,8 @@ int throughputInWindow(ThroughputAckState * state, unsigned int sequence)
 }
 
 // Reset the state of a connection completely.
-void throughputInit(ThroughputAckState * state, unsigned int sequence)
+void throughputInit(ThroughputAckState * state, unsigned int sequence,
+		    struct timeval const * firstTime)
 {
   if (state->isValid == 0)
   {
@@ -63,7 +65,9 @@ void throughputInit(ThroughputAckState * state, unsigned int sequence)
     state->nextSequence = sequence;
     state->ackSize = 0;
     state->repeatSize = 0;
-    gettimeofday(&state->lastTime, NULL);
+//    gettimeofday(&state->lastTime, NULL);
+    state->beginTime = *firstTime;
+    state->endTime = *firstTime;
     state->isValid = 1;
   }
 }
@@ -96,11 +100,13 @@ void throughputProcessSend(ThroughputAckState * state, unsigned int sequence,
 }
 
 // Notify the throughput monitor that some bytes have been acknowledged.
-void throughputProcessAck(ThroughputAckState * state, unsigned int sequence)
+void throughputProcessAck(ThroughputAckState * state, unsigned int sequence,
+			  struct timeval const * timestamp)
 {
   if (! state->isValid) {
       printf("throughputProcessAck() called with invalid state\n");
   }
+  state->endTime = *timestamp;
   if (throughputInWindow(state, sequence))
   {
     state->ackSize += sequence - state->firstUnknown + 1;
@@ -120,18 +126,25 @@ unsigned int throughputTick(ThroughputAckState * state)
 {
   double result = 0.0;
   double divisor = 1.0;
-  struct timeval now;
-  gettimeofday(&now, NULL);
-  divisor = now.tv_sec - state->lastTime.tv_sec;
-  divisor += (now.tv_usec - state->lastTime.tv_usec)/1000000.0;
-  result = (state->ackSize * 8.0) / (divisor * 1000.0);
+//  struct timeval now;
+//  gettimeofday(&now, NULL);
+  divisor = state->endTime.tv_sec - state->beginTime.tv_sec;
+  divisor += (state->endTime.tv_usec - state->beginTime.tv_usec)/1000000.0;
+  if (fabs(divisor) < 0.0001)
+  {
+      result = 0.0;
+  }
+  else
+  {
+      result = (state->ackSize * 8.0) / (divisor * 1000.0);
+  }
 //  printf("ByteCount: %u\n", state->ackSize);
 //  printf("UnAck ByteCount: %i (%i - %i)\n",
 //          state->nextSequence - state->firstUnknown,
 //          state->nextSequence, state->firstUnknown);
   state->ackSize = 0;
   state->repeatSize = 0;
-  state->lastTime = now;
+  state->beginTime = state->endTime;
   return (unsigned int) result;
 }
 
@@ -366,7 +379,7 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	loss_records[path_id].total_counter++;
 
 	if (path->end == path->start){ //no previous packet
-	  throughputInit(&throughput[path_id], seq_start);
+	  throughputInit(&throughput[path_id], seq_start, &(pkthdr->ts));
 	  throughputProcessSend(&throughput[path_id], seq_start, length);
 	  return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet	
 	} else {
@@ -425,18 +438,22 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	  if (ack_bit == 1) { //has an acknowledgement
 	    ack_seq  = ntohl(tp->ack_seq);	   
 
-	    throughputProcessAck(&throughput[path_id], ack_seq);
+	    throughputProcessAck(&throughput[path_id], ack_seq, &(pkthdr->ts));
 
 	    record_id = search_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1));
 	    if (record_id != -1) { //new ack received
 	      if (flag_resend) { //if the ack is triggered by a resend, skip the delay calculation.
 		flag_resend = 0; 
 	      } else { //calculate the delay
+		  int delay = 0;
 		msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
-		delays[path_id] = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
-		append_delay_sample(path_id, delays[path_id]);
+		delay = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
+		delays[path_id] += delay;
+		(delay_count[path_id])++;
+		append_delay_sample(path_id, delay, &(pkthdr->ts));
 		logWrite(DELAY_DETAIL, &(pkthdr->ts),
-			 "Delay: %lu", delays[path_id]);
+			 "Delay: %lu, Sum: %lu, Count: %lu", delay,
+			 delays[path_id], delay_count[path_id]);
 	      }
 	      pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
 	    } //ack in rcvdb
@@ -571,13 +588,13 @@ void init_pcap(int to_ms, unsigned short port, char * device, int is_live) {
 	exit(1); 
       }
     }
-
+//    pcapfd = pcap_fileno(descr);
     pcapfd = pcap_get_selectable_fd(descr);
     if (pcapfd == -1)
     {
       fprintf(stderr, "Error: pcap file descriptor is not selectable\n");
       exit(1);
-   }
+    }
     init_sniff_rcvdb();
 
     loss_log = fopen("loss.log", "w"); //loss log
@@ -593,3 +610,22 @@ void sniff(void) {
  
 }
 
+void update_stats(void)
+{
+    int error = pcap_stats(descr, &stats);
+    if (error == -1)
+    {
+	pcap_perror(descr, "pcap_stats()");
+	clean_exit(1);
+    }
+}
+
+unsigned int received_stat(void)
+{
+    return stats.ps_recv;
+}
+
+unsigned int dropped_stat(void)
+{
+    return stats.ps_drop;
+}

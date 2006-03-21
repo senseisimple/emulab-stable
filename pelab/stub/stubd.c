@@ -19,13 +19,12 @@ extern int optopt;
 extern int opterr;
 extern int optreset;
 
-void append_delay_sample(int path_id, long sample_value);
-
 //Global  
 short  flag_debug, flag_standalone;
 connection rcvdb[CONCURRENT_RECEIVERS];
 unsigned long delays[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
 unsigned long last_delays[CONCURRENT_RECEIVERS];
+unsigned long delay_count[CONCURRENT_RECEIVERS];
 delay_record delay_records[CONCURRENT_RECEIVERS]; //delay list is calculated at the sender side
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
@@ -198,7 +197,8 @@ void init_random_buffer(void)
 }
 
 //Append a delay sample to the tail of the ith delay-record queue.
-void append_delay_sample(int path_id, long sample_value) {
+void append_delay_sample(int path_id, long sample_value,
+			 struct timeval const * timestamp) {
   delay_sample *sample = malloc(sizeof(delay_sample));
   if (sample == NULL) {
     perror("allocate");
@@ -206,7 +206,7 @@ void append_delay_sample(int path_id, long sample_value) {
   }
   sample->next  = NULL;
   sample->value = sample_value;
-  gettimeofday(&(sample->time), NULL);
+  sample->time = *timestamp;
   if (delay_records[path_id].tail == NULL) {
     delay_records[path_id].head = sample;
     delay_records[path_id].tail = sample;
@@ -688,14 +688,26 @@ int send_delay_to_monitor(int monitor, int index)
   char outbuf_delay[buffer_size];
   unsigned long tmpulong;
 
+  if (delay_count[index] > 0)
+  {
+      delays[index] /= delay_count[index];
+  }
+  else
+  {
+      delays[index] = last_delays[index];
+  }
+
   // If measurement changed since last send
-  if (abs((long)delays[index] - (long)last_delays[index])
-      > (long)(last_delays[index]/5)) {
+//  if (abs((long)delays[index] - (long)last_delays[index])
+//      > (long)(last_delays[index]/5)) {
+  if (delays[index] != last_delays[index])
+  {
     // Insert the address info
     char * buf = save_receiver_address(outbuf_delay, index);
 
     logWrite(CONTROL_SEND, NULL, "Sending delay(%d) about stream(%hu:%s:%hu)",
-	     delays[index], ipToString(rcvdb[index].ip));
+	     delays[index], rcvdb[index].source_port,
+	     ipToString(rcvdb[index].ip), rcvdb[index].dest_port);
 
     // Insert the code number for delay
     tmpulong = htonl(CODE_DELAY);
@@ -710,7 +722,7 @@ int send_delay_to_monitor(int monitor, int index)
     if (send_all(monitor, outbuf_delay, buffer_size) == 0){
       return 0;
     }
-    last_delays[index] = delays[index];
+
     logWrite(CONTROL_SEND, NULL, "Sending delay success");
 
     {
@@ -736,6 +748,10 @@ int send_delay_to_monitor(int monitor, int index)
     }
 //  printf("Sent delay: %ld\n", delays[i]);
   }
+  last_delays[index] = delays[index];
+  delays[index] = 0;
+  delay_count[index] = 0;
+
   return 1;
 }
 
@@ -749,6 +765,11 @@ int send_bandwidth_to_monitor(int monitor, int index)
   if (bandwidth != 0) {
     // Insert the address info
     char * buf = save_receiver_address(outbuf, index);
+
+    logWrite(CONTROL_SEND, NULL,
+	     "Sending bandwidth(%lukbps) about stream(%hu:%s:%hu)",
+	     bandwidth, rcvdb[index].source_port, ipToString(rcvdb[index].ip),
+	     rcvdb[index].dest_port);
 
     // Insert the code number for bandwidth
     memcpy(buf, &code, SIZEOF_LONG);
@@ -1014,7 +1035,7 @@ int main(int argc, char *argv[]) {
   fd_set read_fds_copy, write_fds_copy;
   socklen_t sin_size;
   struct timeval start_tv, left_tv;
-  int yes=1, flag_send_monitor=0;
+  int yes=1;//, flag_send_monitor=0;
   struct timeval packet_deadline;
   struct in_addr addr;
   int flag_measure=0;
@@ -1025,6 +1046,7 @@ int main(int argc, char *argv[]) {
   FILE * logfile = NULL;
   unsigned long quantum_no=0;
   int logflags = LOG_NOTHING;
+  int select_count = 0;
 
   gettimeofday(&packet_deadline, NULL);
 
@@ -1045,7 +1067,7 @@ int main(int argc, char *argv[]) {
       case 'd':
         flag_debug = 1; break;
       case 'f':
-	if (logfile != NULL)
+	if (logfile == NULL)
 	{
 	  logfile = fopen(optarg, "a");
 	  if (logfile == NULL)
@@ -1148,7 +1170,7 @@ int main(int argc, char *argv[]) {
 //      rcvdb[0].valid = 1;
       standalone_port = atoi(argv[2]);
       inet_aton(argv[1], &addr);
-      insert_fake(addr.s_addr, atoi(argv[2]));
+      insert_fake(addr.s_addr, standalone_port);
 //      rcvdb[0].ip    =  addr.s_addr;
 //      rcvdb[0].sockfd= -1; //show error if used
 //      rcvdb[0].last_usetime = time(NULL);
@@ -1237,12 +1259,15 @@ int main(int argc, char *argv[]) {
 
   //main loop - the stubd runs forever
   while (1) {
-    flag_send_monitor=0; //reset flag for each quanta
+//    flag_send_monitor=0; //reset flag for each quanta
     gettimeofday(&start_tv, NULL); //reset start time for each quanta
 
 //    printf("Total: %d\n", total_size);
 //    printf("========== Quantum %lu ==========\n", quantum_no);
     logWrite(MAIN_LOOP, NULL, "Quantum %lu", quantum_no);
+    update_stats();
+    logWrite(MAIN_LOOP, NULL, "PCAP Received: %u Dropped: %u",
+	     received_stat(), dropped_stat());
     quantum_no++;
 
     //while in a quanta
@@ -1250,11 +1275,14 @@ int main(int argc, char *argv[]) {
       read_fds_copy  = read_fds;
       write_fds_copy = write_fds;
 
-      if (select(maxfd+1, &read_fds_copy, &write_fds_copy, NULL, &left_tv) == -1) { 
+      select_count = select(maxfd+1, &read_fds_copy, &write_fds_copy, NULL,
+			    &left_tv);
+      if (select_count == -1)
+      {
 	perror("select"); 
 	clean_exit(1); 
       }
-
+//      fprintf(stderr, "Select count: %d\n", select_count);
       // Send out packets to our peers if the deadline has passed.
 //      logWrite(MAIN_LOOP, NULL, "Send normal packets to peers");
       handle_packet_buffer(&packet_deadline, &write_fds_copy);
@@ -1307,7 +1335,7 @@ int main(int argc, char *argv[]) {
 		   inet_ntoa(their_addr.sin_addr));
 	  FD_CLR(sockfd_rcv_monitor, &read_fds);  //allow only one monitor connection	  
 	  FD_SET(sockfd_monitor, &read_fds);  //check the monitor connection for read
-	  FD_SET(sockfd_monitor, &write_fds); //check the monitor connection for write
+//	  FD_SET(sockfd_monitor, &write_fds); //check the monitor connection for write
 	  if (sockfd_monitor > maxfd) { //keep track of the maximum 
 	    maxfd = sockfd_monitor; 
 	  } 
@@ -1320,7 +1348,7 @@ int main(int argc, char *argv[]) {
 	logWrite(MAIN_LOOP, NULL, "Receive control message from monitor");
 	if (receive_monitor(sockfd_monitor, &packet_deadline) == 0) { //socket_monitor closed by peer
 	  FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
-	  FD_CLR(sockfd_monitor, &write_fds);
+//	  FD_CLR(sockfd_monitor, &write_fds);
 	  sockfd_monitor = -1;
 	  FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
 	  if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum 
@@ -1329,32 +1357,34 @@ int main(int argc, char *argv[]) {
 	} 
       }
 
-      //send measurements to the monitor once in each quanta
-      if (sockfd_monitor!=-1 && flag_send_monitor==0 && FD_ISSET(sockfd_monitor, &write_fds_copy)) {  	
-	logWrite(MAIN_LOOP, NULL, "Send control message to monitor");
-	if (send_monitor(sockfd_monitor) == 0) { //socket_monitor closed by peer
-	  logWrite(MAIN_LOOP, NULL, "Message to monitor failed");
-	  FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
-	  FD_CLR(sockfd_monitor, &write_fds);
-	  sockfd_monitor = -1;
-	  FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
-	  if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum 
-	    maxfd = sockfd_rcv_monitor; 
-	  } 	 	  
-	} else {
-	  logWrite(MAIN_LOOP, NULL, "Message to monitor succeeded");
-	  flag_send_monitor=1;
-	}
-      }
-
       //sniff packets
       if (FD_ISSET(pcapfd, &read_fds_copy)) { 
-	logWrite(MAIN_LOOP, NULL, "Sniff packet stream");
+//	logWrite(MAIN_LOOP, NULL, "Sniff packet stream");
 	sniff();     
       }
 
     } //while in quanta
 
+    //send measurements to the monitor once in each quanta
+    if (sockfd_monitor!=-1)
+// && FD_ISSET(sockfd_monitor, &write_fds_copy)) {  	
+    {
+	logWrite(MAIN_LOOP, NULL, "Send control message to monitor");
+	if (send_monitor(sockfd_monitor) == 0) { //socket_monitor closed by peer
+	    logWrite(MAIN_LOOP, NULL, "Message to monitor failed");
+	    FD_CLR(sockfd_monitor, &read_fds); //stop checking the monitor socket
+//	  FD_CLR(sockfd_monitor, &write_fds);
+	    sockfd_monitor = -1;
+	    FD_SET(sockfd_rcv_monitor, &read_fds); //start checking the receiver control socket
+	    if (sockfd_rcv_monitor > maxfd) { // keep track of the maximum 
+		maxfd = sockfd_rcv_monitor; 
+	    } 	 	  
+	} else {
+	    logWrite(MAIN_LOOP, NULL, "Message to monitor succeeded");
+//	  flag_send_monitor=1;
+	}
+    }
+    
     // In testmode, we only start printing in the quanta we first see a packet
     if (flag_standalone) {
       print_measurements();
@@ -1365,7 +1395,6 @@ int main(int argc, char *argv[]) {
       printf("Test done - total bytes transmitted: %llu\n",total_bytes);
       break;
     }
-     
   } //while forever
 
   packet_buffer_cleanup(); 
