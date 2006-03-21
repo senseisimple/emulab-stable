@@ -525,6 +525,7 @@ sub os_fwconfig_line($@)
     # XXX debugging
     my $logaccept = defined($fwinfo->{LOGACCEPT}) ? $fwinfo->{LOGACCEPT} : 0;
     my $logreject = defined($fwinfo->{LOGREJECT}) ? $fwinfo->{LOGREJECT} : 0;
+    my $dotcpdump = defined($fwinfo->{LOGTCPDUMP}) ? $fwinfo->{LOGTCPDUMP} : 0;
 
     #
     # Convert MAC info to a useable form and filter out the firewall itself
@@ -581,9 +582,9 @@ sub os_fwconfig_line($@)
 	# routing tables).  This *shouldn't* confuse anything on the firewall.
 	#
 	if (defined($fwinfo->{MACS})) {
-	    my $myip = `cat /var/emulab/boot/myip`;
+	    my $myip = `cat $BOOTDIR/myip`;
 	    chomp($myip);
-	    my $mymask = `cat /var/emulab/boot/mynetmask`;
+	    my $mymask = `cat $BOOTDIR/mynetmask`;
 	    chomp($mymask);
 
 	    $upline .=
@@ -617,6 +618,14 @@ sub os_fwconfig_line($@)
 	    $upline .= "        exit 1\n";
 	    $upline .= "    }\n";
 	}
+
+	if ($dotcpdump) {
+	    $upline .= "    tcpdump -i $vlandev ".
+		"-w $LOGDIR/in.tcpdump >/dev/null 2>&1 &\n";
+	    $upline .= "    tcpdump -i $pdev ".
+		"-w $LOGDIR/out.tcpdump not vlan >/dev/null 2>&1 &\n";
+	}
+
 	if ($logaccept || $logreject) {
 	    $upline .= "    sysctl net.inet.ip.fw.verbose=1\n";
 	}
@@ -639,6 +648,9 @@ sub os_fwconfig_line($@)
 	$downline .= "        exit 1\n";
 	$downline .= "    }\n";
 	$downline .= "    sysctl net.inet.ip.fw.enable=0\n";
+	if ($dotcpdump) {
+	    $downline .= "    killall tcpdump >/dev/null 2>&1\n";
+	}
 	if ($logaccept || $logreject) {
 	    $downline .= "    sysctl net.inet.ip.fw.verbose=0\n";
 	}

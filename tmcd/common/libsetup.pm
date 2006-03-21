@@ -1121,6 +1121,8 @@ sub getfwconfig($$;$)
 		    $fwinfo->{"LOGACCEPT"} = 1;
 		} elsif ($log =~ /^deny|reject$/) {
 		    $fwinfo->{"LOGREJECT"} = 1;
+		} elsif ($log eq "tcpdump") {
+		    $fwinfo->{"LOGTCPDUMP"} = 1;
 		}
 	    }
 	} else {
