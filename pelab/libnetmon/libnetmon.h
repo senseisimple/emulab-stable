@@ -32,7 +32,7 @@
 
 #include "netmon.h"
 
-#define DEBUGGING
+/* #define DEBUGGING */
 
 #ifdef DEBUGGING
 #define DEBUG(x) (x)
