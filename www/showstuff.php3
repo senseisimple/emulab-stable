@@ -806,6 +806,19 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
     else
 	$expt_locked = "";
 
+    $query_result =
+	DBQueryFatal("select cause_desc ".
+		     "from experiment_stats as s,errors,causes ".
+                     "where s.exptidx = $exptidx ".
+		     "and errors.cause = causes.cause ".
+	             "and s.last_error = errors.session");
+
+    if ($row = mysql_fetch_array($query_result)) {
+      $err_cause = $row[0];
+    } else {
+      $err_cause = '';
+    }
+
     #
     # Generate the table.
     #
@@ -904,6 +917,13 @@ function SHOWEXP($pid, $eid, $short = 0, $sortby = "") {
                 <td>Status: </td>
                 <td class=\"left\">$exp_state $expt_locked</td>
               </tr>\n";
+
+	if ($err_cause) {
+ 	    echo "<tr>
+                    <td>Last Error: </td>
+                    <td class=\"left\"><a href=\"showlasterror.php3?pid=$pid&eid=$eid\">$err_cause</a></td>
+                  </tr>\n";
+        }
 
 	if ($linktest_pid) {
 	    $linktest_running = "<b>(Linktest Running)</b>";

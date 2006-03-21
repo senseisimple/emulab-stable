@@ -92,10 +92,16 @@ if ($exitcode) {
     dblog(TBLOG_ERR, {}, $err) unless ($obvious_error);
 
     # create a log entry that assign failed
-    my %parms;
-    $parms{sublevel} = -1;
-    $parms{type} = 'extra' unless $obvious_error;
-    dblog(TBLOG_ERR, \%parms, "Assign Failed.");
+
+    dblog(TBLOG_ERR, {sublevel => -1}, "Assign Failed.");
+    
+    dblog(TBLOG_ERR, {sublevel => -1, type=>'extra'}, 
+	  "Failed to find a set of physical testbed nodes to run your ".
+          "experiment on. This might mean that there are not enough ".
+          "nodes or switch resources free, or your experiment might ".
+          "require certain hardware which is not available.  If you ".
+          "believe this message is in error, contact @TBOPSEMAIL@.")
+	unless $obvious_error;
 }
 
 exit $exitcode;

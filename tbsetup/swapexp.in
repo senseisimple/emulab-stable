@@ -1303,6 +1303,11 @@ sub cleanup()
     TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR);
 
     #
+    # Figure out the error if possible
+    #
+    my $error_data = tblog_find_error();
+
+    #
     # Send a message to the testbed list. Append the logfile.
     #
     
@@ -1314,22 +1319,13 @@ sub cleanup()
 	$rcops = "\nCc:  $TBROBOCOPS";
     }
 
-    SENDMAIL("$user_name <$user_email>",
-	 "Swap ${inout} Failure: $pid/$eid",
-	 "Please look at the log below to see what happened. If the error\n".
-	 "resulted from a lack of free nodes, you can use this web page to\n".
-	 "get a summary of free nodes:\n\n".
-	 "  ${TBBASE}/nodecontrol_list.php3\n".
-	 "\n".
-	 "Please do not try again until you see enough nodes free. Or, you\n".
-	 "can use the batch system to swap your experiment in when enough\n".
-	 "nodes are free:\n\n".
-	 "  ${TBDOCBASE}/tutorial/docwrapper.php3?docname=tutorial.html".
-	     "#BatchMode\n",
-	 ($idleswap ? $TBOPS : "$user_name <$user_email>"),
-	 "Cc:  $expt_head_name <$expt_head_email>\n".
-	 "Cc:  $TBOPS $rcops",
-	 (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
+    tblog_email_error($error_data,
+		      "$user_name <$user_email>",
+		      "Swap ${inout} Failure", "$pid/$eid",
+		      ($idleswap ? $TBOPS : "$user_name <$user_email>"),
+		      "Cc:  $expt_head_name <$expt_head_email> $rcops",
+		      "Cc:  $TBOPS $rcops",
+		      (($logname), (defined($modnsfile) ? ($modnsfile) : ())));
 
     if ($modifyHosed) {
 	#
@@ -1510,8 +1506,6 @@ END {
 	return;
     }
     my $saved_exitcode = $?;
-
-    tblog_find_error() if $?;
 
     if ($cleaning) {
 	#

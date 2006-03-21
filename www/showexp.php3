@@ -113,7 +113,7 @@ if ($expstate) {
 	WRITESUBMENUBUTTON("View Activity Logfile",
 			   "showlogfile.php3?pid=$exp_pid&eid=$exp_eid");
     }
-      
+
     if ($state == $TB_EXPTSTATE_ACTIVE) {
 	WRITESUBMENUBUTTON("Visualization, NS File, Mapping",
 			   "shownsfile.php3?pid=$exp_pid&eid=$exp_eid");

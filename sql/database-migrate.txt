@@ -3173,3 +3173,55 @@ last_net_act,last_cpu_act,last_ext_act);
 	altsrc tinytext,
 	PRIMARY KEY  (name)
       ) TYPE=MyISAM;
+
+???: Add stuff to store the error, as determined by tblog, in a more
+     structured fashion:
+
+	CREATE TABLE errors (
+	  session int unsigned NOT NULL,
+	  stamp int unsigned NOT NULL,
+	  exptidx int NOT NULL,
+	  script smallint(3) NOT NULL,
+	  cause varchar(16) NOT NULL,
+	  confidence float NOT NULL,
+	  mesg text NOT NULL,
+	  primary key (session)
+	);
+
+        alter table experiment_stats
+	  add last_error int unsigned;
+
+        alter table testbed_stats
+	  add log_session int unsigned;
+
+	CREATE TABLE causes (
+	  cause varchar(16) NOT NULL,
+	  cause_desc varchar(32) NOT NULL,
+	  primary key (cause),
+	  unique key (cause_desc)
+	);
+
+        ALTER TABLE log 
+          change cause cause varchar(16) NOT NULL,
+          change pidx exptidx int NOT NULL default '0';
+
+	INSERT INTO exported_tables values ('causes');
+
+	INSERT INTO causes values ('temp', 'Temp Resource Shortage');
+	INSERT INTO causes values ('user', 'User Error');
+	INSERT INTO causes values ('internal', 'Internal Error');
+	INSERT INTO causes values ('software', 'Software Problem');
+	INSERT INTO causes values ('hardware', 'Hardware Problem');
+	INSERT INTO causes values ('unknown', 'Cause Unknown');
+
+     
+     The new code will than store all errors in the new table.  Before
+     they where stored as a special entry in the "log" table.  To copy
+     them over into the "errors" table you may also want to run:
+
+         perl errors-migrate.pl.
+
+     If the script completed with no errors you can than safely purge
+     those entries from the "log" table using:
+
+        delete from log where type = 'thecause';

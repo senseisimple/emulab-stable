@@ -105,6 +105,17 @@ CREATE TABLE cameras (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `causes`
+--
+
+CREATE TABLE causes (
+  cause varchar(16) NOT NULL default '',
+  cause_desc varchar(32) NOT NULL default '',
+  PRIMARY KEY  (cause),
+  UNIQUE KEY cause_desc (cause_desc)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `cdroms`
 --
 
@@ -337,6 +348,21 @@ CREATE TABLE emulab_indicies (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `errors`
+--
+
+CREATE TABLE errors (
+  session int(10) unsigned NOT NULL default '0',
+  stamp int(10) unsigned NOT NULL default '0',
+  exptidx int(11) NOT NULL default '0',
+  script smallint(3) NOT NULL default '0',
+  cause varchar(16) NOT NULL default '',
+  confidence float NOT NULL default '0',
+  mesg text NOT NULL,
+  PRIMARY KEY  (session)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `event_eventtypes`
 --
 
@@ -455,6 +481,7 @@ CREATE TABLE experiment_stats (
   elabinelab_exptidx int(10) unsigned default NULL,
   security_level tinyint(1) NOT NULL default '0',
   archive_idx int(10) unsigned default NULL,
+  last_error int(10) unsigned default NULL,
   PRIMARY KEY  (eid,pid,exptidx),
   KEY exptidx (exptidx),
   KEY rsrcidx (rsrcidx)
@@ -974,7 +1001,7 @@ CREATE TABLE location_info (
 CREATE TABLE log (
   seq int(10) unsigned NOT NULL auto_increment,
   stamp int(10) unsigned NOT NULL default '0',
-  pidx int(11) NOT NULL default '0',
+  exptidx int(11) NOT NULL default '0',
   uid int(11) default NULL,
   session int(10) unsigned NOT NULL default '0',
   invocation int(10) unsigned NOT NULL default '0',
@@ -984,7 +1011,7 @@ CREATE TABLE log (
   sublevel tinyint(2) NOT NULL default '0',
   priority smallint(3) NOT NULL default '0',
   inferred tinyint(1) NOT NULL default '0',
-  cause varchar(32) NOT NULL default '',
+  cause varchar(16) NOT NULL default '',
   type enum('normal','entering','exiting','thecause','extra','summary') NOT NULL default 'normal',
   relevant tinyint(1) NOT NULL default '0',
   mesg text NOT NULL,
@@ -1962,6 +1989,7 @@ CREATE TABLE testbed_stats (
   action varchar(16) NOT NULL default '',
   exitcode tinyint(3) default '0',
   uid varchar(8) NOT NULL default '',
+  log_session int(10) unsigned default NULL,
   PRIMARY KEY  (idx),
   KEY rsrcidx (rsrcidx),
   KEY exptidx (exptidx)

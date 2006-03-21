@@ -785,7 +785,13 @@ while (1) {
 	my $retval = RunAssign();
 	if ($retval != 0) {
 	    fatal({type=>'extra', cause=>'user'}, 
-		  "Experiment can not be run on an empty testbed.  Please fix the experiment.");
+		  "This experiment cannot be instantiated on this ".
+                  "testbed. You have most likely asked for hardware ".
+                  "this testbed does not have, such as nodes of a type ".
+                  "it does not contain, or nodes with too many network ".
+                  "interfaces.  You will need to modify this experiment ".
+                  "before it can be swapped in - re-submitting the ".
+                  "experiment as-is will always result in failure.");
 	}
 	print("Assign succeeded on an empty testbed.\n");
 	$precheck = 0;

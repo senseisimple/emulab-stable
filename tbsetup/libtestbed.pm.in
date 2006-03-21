@@ -85,7 +85,7 @@ sub SENDMAIL($$$;$$@)
     if (defined($From) && $From) {
 	print MAIL "From: $From\n";
     }
-    if (defined($Headers)) {
+    if (defined($Headers) && length($Headers) > 0) {
 	print MAIL "$Headers\n";
     }
     print MAIL "X-NetBed: $SCRIPTNAME\n";

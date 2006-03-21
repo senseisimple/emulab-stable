@@ -5,6 +5,18 @@
 -- Server version	3.23.58-log
 
 --
+-- Dumping data for table `causes`
+--
+
+
+REPLACE INTO causes VALUES ('temp','Temp Resource Shortage');
+REPLACE INTO causes VALUES ('user','User Error');
+REPLACE INTO causes VALUES ('internal','Internal Error');
+REPLACE INTO causes VALUES ('software','Software Problem');
+REPLACE INTO causes VALUES ('hardware','Hardware Problem');
+REPLACE INTO causes VALUES ('unknown','Cause Unknown');
+
+--
 -- Dumping data for table `comments`
 --
 
@@ -119,6 +131,7 @@ REPLACE INTO event_objecttypes VALUES (17,'BGMON');
 --
 
 
+REPLACE INTO exported_tables VALUES ('causes');
 REPLACE INTO exported_tables VALUES ('comments');
 REPLACE INTO exported_tables VALUES ('event_eventtypes');
 REPLACE INTO exported_tables VALUES ('event_objecttypes');

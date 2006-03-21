@@ -66,9 +66,6 @@ of an error.  The current causes are:
     hardware - hardware problem
     unknown - default
 
-(Note, that at the moment, internal is the same as software, but in
-the future that might change)
-
 The cause for an error can be set directly when calling tberror by passing
 in the "cause" parameter.  For example:
 
@@ -208,9 +205,10 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
 	      tbdie tblog_set_info tblog_set_default_cause
-	      tblog_sub_process tblog_find_error
+	      tblog_sub_process tblog_find_error tblog_email_error
 	      tblog_start_capture tblog_stop_capture
 	      tblog_new_process tblog_init_process tblog_exit
+	      tblog_session
 	      copy_hash
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
 	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
@@ -222,6 +220,7 @@ use POSIX qw(isatty setsid);
 use File::Basename;
 use IO::Handle;
 use Text::Wrap;
+use Text::Tabs;
 use Carp;
 
 use strict;
@@ -260,7 +259,7 @@ sub check_env ()
 {
     check_env_num 'TBLOG_LEVEL';
     check_env_num 'TBLOG_SESSION';
-    check_env_num 'TBLOG_PIDX';
+    check_env_num 'TBLOG_EXPTIDX';
     check_env_num 'TBLOG_INVOCATION';
     check_env_num 'TBLOG_PARENT_INVOCATION';
     check_env_num 'TBLOG_UID';
@@ -273,7 +272,7 @@ my %CAUSE_MAP = (# Don't notify testbed-ops
 		 temp => 'temp', # resources temp unavailable
 		 user => 'user', # user error
 		 # Notify testbed-ops
-		 internal => 'software', # software bug, should not happen
+		 internal => 'internal', # software bug, should not happen
 		 software => 'software', # software problem, like a bad image
 		 hardware => 'hardware', # hardware problem
 		 unknown => '');
@@ -282,6 +281,18 @@ sub normalize_cause ( $ ) {
     my $cause = $CAUSE_MAP{$_[0]};
     croak "Unknown cause \"$cause\"" unless defined $cause;
     return $cause;
+}
+
+sub indent ( $$ ) {
+    my ($text, $prefix) = @_;
+    $text =~ s/\n$//;
+    my $res = '';
+    foreach (split /\n/, $text) {
+	$res .= $prefix;
+	$res .= $_;
+	$res .= "\n";
+    }
+    return $res;
 }
 
 #
@@ -410,7 +421,7 @@ sub tblog_init_process(@) {
 	$ENV{TBLOG_INVOCATION} = 0;
 	$ENV{TBLOG_PARENT_INVOCATION} = 0;
 	$ENV{TBLOG_LEVEL} = 0;
-	$ENV{TBLOG_PIDX} = 0;
+	$ENV{TBLOG_EXPTIDX} = 0;
 	$ENV{TBLOG_UID} = 0;
 	dblog($NOTICE, {type => 'entering'},
 	      'Entering "', join(' ', informative_scriptname(), @ARGV), '"')
@@ -475,12 +486,12 @@ sub tblog_set_info ( $$$ )
     check_env();
     my ($pid, $eid, $uid) = @_;
     local $DBQUERY_MAXTRIES = 3;
-    $ENV{'TBLOG_PIDX'} = 
+    $ENV{'TBLOG_EXPTIDX'} = 
 	DBQuerySingleFatal("select idx from experiments where pid='$pid' and eid='$eid'");
     $ENV{'TBLOG_UID'} = $uid;
     DBQueryFatal
-	sprintf('update log set pidx=%d,uid=%s where session=%s',
-		$ENV{TBLOG_PIDX}, $ENV{TBLOG_UID}, $ENV{TBLOG_SESSION});
+	sprintf('update log set exptidx=%d,uid=%s where session=%s',
+		$ENV{TBLOG_EXPTIDX}, $ENV{TBLOG_UID}, $ENV{TBLOG_SESSION});
 }
 
 =item tblog_set_default_cause CAUSE
@@ -589,9 +600,9 @@ sub dblog_real ( $$@ ) {
 	  unless defined $cause;
 
 	my $query = 
-	  sprintf('insert into log (stamp,pidx,uid,session,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
+	  sprintf('insert into log (stamp,exptidx,uid,session,parent,invocation,script,level,sublevel,priority,inferred,cause,type,mesg) '. 
 		  'VALUES (UNIX_TIMESTAMP(now()),%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s)',
-		  $ENV{TBLOG_PIDX}, 
+		  $ENV{TBLOG_EXPTIDX}, 
 		  $ENV{TBLOG_UID},
 		  $ENV{TBLOG_SESSION}, 
 		  $ENV{TBLOG_PARENT_INVOCATION}, 
@@ -627,39 +638,31 @@ sub dblog_real ( $$@ ) {
 }
 
 
-=item tblog_find_error [[SESSION], STORE]
+=item tblog_find_error
 
 Attempts to find the relevant error.
 
-Parameters:
+Will act in a way that is safe to use in an END block, that is (1)
+never die, (2) don't modify the exit code. 
 
-=over
+Will, also, print the results to and some additional info to STDERR
+for diagnosis purposed.
 
-=over
+The results will be stored the "errors" table and also returned in a
+hash with the following..
 
-=item session
-
-Session id to use. Defaults to the current as given by 
-$ENV{TVLOG_SESSION}.
-
-=item store
-
-If set store the results into the database and act in
-a way that is safe to use in an END block, that is 
-(1) never die, (2) don't modify the exit code,  Will also
-print the results to and some additional info to STDERR
-for diagnosis purposed.  If not set simply print the results to
-STDERR.  Defaults to true unless the "session" parameter is also
-given, in which case default to false.
-
-=back
-
-=back
+    mesg: text of the error
+    cause: 
+    confidence:
+    script:
+    session: 
+    exptidx:
+    err: the text of any internal errors in tblog_find_error,
+      otherwise undefined
 
 To retrieve the results from the database:
 
-    SELECT ... WHERE session = <Session ID>
-                 AND type = 'thecause' form log
+    SELECT ... WHERE session = <Session ID> FROM errors
 
 The relevant errors are also flagged using "relevant" flag:
 
@@ -668,22 +671,22 @@ The relevant errors are also flagged using "relevant" flag:
 
 =cut
 
-sub tblog_find_error ( ;$$ ) {
+sub tblog_find_error () {
 
-    my ($session,$store) = @_;
     my $saved_exitcode = $?;
+
+    my $session = 0;
+    my $error = '';
+    my $script = '';
+    my $cause = '';
+    my $confidence = 0.0;
 
     local $DBQUERY_MAXTRIES = 3;
 
-    if (not defined $session) {
-        check_env();
-	$store = 1;
-	$session = $ENV{TBLOG_SESSION};
-    }
-
-    $store = 0 unless defined $store;
-
     eval {
+
+	check_env();
+	$session = $ENV{TBLOG_SESSION};
 
 	#
 	# Build the Tree
@@ -816,7 +819,7 @@ sub tblog_find_error ( ;$$ ) {
 	#
 	# Get the most relevent script
 	#
-	my $script = '';
+	$script = '';
 	if (@relevant) {
 	    $script = $lookup{$relevant[0]->{invocation}}->{script};
 	}
@@ -824,7 +827,7 @@ sub tblog_find_error ( ;$$ ) {
 	#
 	# From script determine confidence 
 	#
-	my $confidence = 0.5;
+	$confidence = 0.5;
 	if ($script =~ /^(assign|parse)/) {
 	    $confidence = 0.9;
 	} elsif ($script =~ /^(os_setup)/) {
@@ -834,7 +837,6 @@ sub tblog_find_error ( ;$$ ) {
 	#
 	# Figure out the cause;
 	#
-	my $cause = '';
 	my $type = '';
 
 	# Assumes that 'extra' info will come first
@@ -854,7 +856,7 @@ sub tblog_find_error ( ;$$ ) {
 	# Finally print/store the relevant errors
 	#
 	
-	my $error = '';
+	local $Text::Wrap::columns = 72;
 	
 	my $prev;
 	foreach (@relevant) {
@@ -864,54 +866,136 @@ sub tblog_find_error ( ;$$ ) {
 	    $error .= "\n" if defined $prev;
 
 	    if ($_->{mesg} !~ /\n/) {
-		$error .= wrap('  ','  ',
-			       "$_->{mesg} ($lookup{$_->{invocation}}->{script})\n");
+		$error .= expand(wrap('','', "$_->{mesg}\n"));
 	    } else {
 		# if multiline don't reformat
-		foreach (split /\s*\n/, $_->{mesg}) {
-		    $error .= "  $_\n";
-		}
-		$error .= "  ($lookup{$_->{invocation}}->{script})\n";
+		$error .= "$_->{mesg}\n";
 	    }
 	    $prev = $_;
 	}
 	$error = "No clue as to what went wrong!\n" unless length $error > 0;
+	chop $error;
 	
-	if ($store) {
-	    $error .= "Cause: $cause\n";
-	    $error .= "Confidence: $confidence\n";
-	    print SERR "**** Experimental information, please ignore ****\n";
-	    print SERR "Session ID = $ENV{TBLOG_SESSION}\n";
-	    print SERR "Likely Cause of the Problem:\n";
-	    print SERR $error;
-	    print SERR "**** End experimental information ****\n";
-	    chop $error;
-	    dblog $NOTICE, {type=>'thecause'}, $error;
-	    DBQueryFatal(sprintf("update log set relevant=1 where seq in (%s)",
-				 join(',', map {$_->{seq}} @relevant))) if @relevant;
-	} else {
-	    print SERR $error;
-	}
+	print SERR "**** Experimental information, please ignore ****\n";
+	print SERR "Session ID = $session\n";
+	print SERR "Likely Cause of the Problem:\n";
+	print SERR indent($error, '  ');
+	print SERR "Cause: $cause\n";
+	print SERR "Confidence: $confidence\n";
+	print SERR "Script: $script\n";
+	print SERR "**** End experimental information ****\n";
+	
+	my $script_num = DBQuerySingleFatal
+	  sprintf("select script from scripts where script_name=%s",
+		  DBQuoteSpecial $script);
+	
+	DBQueryFatal
+	  sprintf("insert into errors ".
+		  "(stamp, exptidx, session, cause, confidence, script, mesg) ".
+		  "values ".
+		  "(UNIX_TIMESTAMP(now()), %d, %d, %s, %f, %d, %s)",
+		  $ENV{TBLOG_EXPTIDX},
+		  $session, DBQuoteSpecial($cause), $confidence, $script_num,
+		  DBQuoteSpecial($error));
+
+	DBQueryFatal
+	  sprintf("update log set relevant=1 where seq in (%s)",
+		  join(',', map {$_->{seq}} @relevant))         if @relevant;
+	
     };
 
+    my $err;
+
     if ($@) {
-	my $err = $@;
+	$err = $@;
 	eval {SENDMAIL(TB_OPSEMAIL, "tblog_find_error failed",
-		       "Experiment: $ENV{TBLOG_PIDX}\n".
+		       "Experiment: $ENV{TBLOG_EXPTIDX}\n".
 		       "User: $ENV{TBLOG_UID}\n".
 		       "Session: $ENV{TBLOG_SESSION}\n".
 		       "Script: $ENV{TBLOG_SCRIPTNAME}\n".
 		       "\n".
 		       "$err\n")};
-	if ($store) {
-	    eval {tblog $WARNING, {type=>'thecause'}, 
-		    "tblog_find_error failed: $err" };
-	} else {
-	    $? = $saved_exitcode;
-	    die;
+
+	eval {tblog $WARNING, "tblog_find_error failed: $err" };
+    }
+    
+    $? = $saved_exitcode;
+    return {session=>$session, exptidx=>$ENV{TBLOG_EXPTIDX},
+	    mesg=>$error, cause=>$cause,
+	    confidence=>$confidence, script=>$script, err=>$err};
+}
+
+=item tblog_email_error DATA, TO, WHAT, EIDPID, FROM, HEADERS, TBOBS_HEADERS, @FILES
+
+Email the user and possible testbed-ops the error.
+
+DATA is the object returned form tblog_find_error.  It is OK if it is undefined.
+
+WHAT is something like "Swap In Failure", "Swap Out Failure", etc.
+
+=cut
+
+sub tblog_email_error ( $$$$$$$@ ) {
+    
+    my ($d, $to, $what, $pideid, $from, $headers, $testbed_ops, @files) = @_;
+
+    my $threshold = 0.65;
+
+    unless ($d->{confidence} > $threshold 
+	    && ($d->{cause} eq 'temp' || $d->{cause} eq 'user')) 
+    {
+	$headers .= "\n" if defined $headers && length($headers) > 0;
+	$headers .= "$testbed_ops";
+    } else {
+	$headers .= "\n" if defined $headers && length($headers) > 0;
+	$headers .= "Cc: @TBERRORSEMAIL@";
+    }
+
+    my $subject = "$what: $pideid";
+
+    if ($d->{confidence} > $threshold && $d->{cause} ne 'unknown') {
+
+	eval {
+	    my $cause_desc = DBQuerySingleFatal
+		"select cause_desc from causes where cause = '$d->{cause}'";
+	    
+	    $subject = "$what: $cause_desc: $pideid";
 	}
     }
-    $? = $saved_exitcode;
+    
+    my $body;
+
+    if ($d->{confidence} > $threshold) {
+
+	$body .= $d->{mesg};
+	$body .= "\n";
+
+	if ($d->{cause} eq 'temp') {
+	    $body .= "\n";
+	    $body .= "Please take a look at this Knowledge Base entry for hints on what to do:\n\n";
+	    $body .= "  @TBBASE@/kb-show.php3?xref_tag=no_resources\n";
+	}
+
+	$headers .= "\nX-NetBed-Cause: $d->{cause}";
+
+    } else {
+
+	$body = 
+	  ("Please look at the log below to see what happened. If the error\n".
+	   "resulted from a lack of free nodes, you can use this web page to\n".
+	   "get a summary of free nodes:\n\n".
+	   "  @TBBASE@/nodecontrol_list.php3\n".
+	   "\n".
+	   "Please do not try again until you see enough nodes free. Or, you\n".
+	   "can use the batch system to swap your experiment in when enough\n".
+	   "nodes are free:\n\n".
+	   "  @TBDOCBASE@/tutorial/docwrapper.php3?docname=tutorial.html".
+	   "#BatchMode\n");
+	
+    }
+
+
+    SENDMAIL($to, $subject, $body, $from, $headers, @files);
 }
 
 #
@@ -1043,6 +1127,12 @@ sub tblog_stop_capture( ;@ ) {
 	  {carp "Unknown flag in tblog_stop_capture: $_"}
     }
 }
+
+=item tblog_session
+
+Returns the current session or undefined if it hasn't been defined yet.
+
+=cut
 
 #
 # BEGIN

@@ -4740,6 +4740,9 @@ sub GatherSwapStats($$$$$;$)
 	$TBDB_STATS_STARTCLOCK = time();
 	return;
     }
+    
+    my $session = tblog_session();
+    $session = 'NULL' unless defined $session;
 
     local $DBQUERY_MAXTRIES = 0;
 
@@ -4770,7 +4773,8 @@ sub GatherSwapStats($$$$$;$)
     if ($ecode) {
 	DBQueryWarn("update experiment_stats set ".
 		    "  swap_errors=swap_errors+1, ".
-		    "  swap_exitcode=$ecode ".
+		    "  swap_exitcode=$ecode, ".
+		    "  last_error=$session ".
 		    "where pid='$pid' and eid='$eid' and exptidx=$exptidx");
 
 	#
@@ -4989,11 +4993,14 @@ sub GatherSwapStats($$$$$;$)
 		$tmp = TBDB_STATS_SWAPIN;
 	    }
 
+	    
+
 	    DBQueryWarn("update experiment_stats ".
 			"set ${tmp}_count=${tmp}_count+1, ".
 			"    ${tmp}_last=now(), ".
 			"    swapin_duration=swapin_duration+${duration}, ".
-			"    swap_exitcode=0 ".
+			"    swap_exitcode=0, ".
+			"    last_error=NULL ".
 			"where pid='$pid' and eid='$eid' and  ".
 			"      exptidx=$exptidx");
 	}
@@ -5047,9 +5054,9 @@ sub GatherSwapStats($$$$$;$)
 
     DBQueryWarn("insert into testbed_stats ".
 		"(idx, uid, start_time, end_time, exptidx, rsrcidx, ".
-		" action, exitcode) ".
+		" action, exitcode, log_session) ".
 		"values (0, '$uid', $starttime, now(), $exptidx, $rsrcidx, ".
-		"        '$mode', $ecode)");
+		"        '$mode', $ecode, $session)");
 
     # We do these here since even failed operations implies activity
     DBQueryWarn("update user_stats set last_activity=now() ".

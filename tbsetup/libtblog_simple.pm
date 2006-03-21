@@ -24,6 +24,7 @@ use Exporter;
 @ISA = "Exporter";
 @EXPORT = qw (tblog tberror tberr tbwarn tbwarning tbnotice tbinfo tbdebug 
 	      tbdie
+	      tblog_session
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
 	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
 
@@ -103,6 +104,14 @@ sub oneof ($@) {
 
 sub scriptname() {
   if_defined($SCRIPTNAME, $ENV{TBLOG_SCRIPTNAME});
+}
+
+#
+#
+#
+
+sub tblog_session() {
+    return $ENV{TBLOG_SESSION};
 }
 
 #
