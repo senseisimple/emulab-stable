@@ -248,6 +248,31 @@ if ($query_result->numrows) {
 }
 
 #
+# Look for pre-reserved nodes.
+#
+
+if (! ($query_result = 
+       DBQueryWarn("select reserved_pid,type,count(*) from nodes ".
+		   "where reserved_pid is not null ".
+		   "group by reserved_pid,type"))) {
+    fatal("Error accessing the database.");
+}
+
+if ($query_result->numrows) {
+    print "\n";
+    print "----------------------------------------------------------------\n";
+    print "\n";
+    print "Pre-reserved nodes:\n";
+    
+    printf("%-16s %-16s %-16s\n", "PID", "Type", "Count");
+    print "---------------- ---------------- ---------------- \n";
+    while (my ($pid,$type,$count) = $query_result->fetchrow()) {
+	printf("%-16s %-16s %-16s\n", $pid, $type, $count);
+    }
+    print "\n";
+}
+
+#
 # Look for stuck checkups.
 #
 
