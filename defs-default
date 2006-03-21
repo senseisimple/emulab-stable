@@ -18,6 +18,7 @@ TBTESTSUITEEMAIL=testbed-testsuite@flux.utah.edu
 TBAUTOMAILEMAIL=testbed-automail@flux.utah.edu
 TBACTIVEARCHIVE=testbed-active-users-archive@flux.utah.edu
 TBUSERSARCHIVE=testbed-users-archive@flux.utah.edu
+TBERRORSEMAIL=testbed-errors@flux.utah.edu
 JAILIPBASE=172.17.0.0
 JAILIPMASK=255.240.0.0
 DELAYCAPACITY=2
