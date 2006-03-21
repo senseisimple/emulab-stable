@@ -1080,10 +1080,9 @@ sub tblog_start_capture( ;@ ) {
 	} elsif ($_ eq 'stderr') {
 	    tie *STDERR, 'libtblog', \*SERR;
 	} elsif ($_ eq 'die') {
-	    # Should not need to worry about parser errors since the
-	    # handlers will be set only after parsing is done
 	    $SIG{__DIE__} = sub {
-		return if $^S; # In Eval Block
+		return unless defined $^S; # In Parser
+		return if $^S;             # In Eval Block
 		tblog_stop_capture();
 		local $_ = $_[0];
 		s/\n$//;
@@ -1091,9 +1090,8 @@ sub tblog_start_capture( ;@ ) {
 		die format_message(scriptname(), $ERR, $_);
 	    };
 	} elsif ($_ eq 'warn') {
-	    # Should not need to worry about parser errors since the
-	    # handlers will be set only after parsing is done
 	    $SIG{__WARN__} = sub {
+		warn $_[0] unless defined $^S; # In Parser
 		local $_ = $_[0];
 		s/\n$//;
 		dblog($WARNING, {inferred=>1, cause=>'internal'}, $_);
