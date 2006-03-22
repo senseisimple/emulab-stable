@@ -417,6 +417,14 @@ Simulator instproc run {} {
 	}
     }
 
+    # If the experiment is firewalled, make sure that all nodes in the
+    # experiment have the "firewallable" feature.
+    if {[array size firewall_list] > 0} {
+	foreach node [lsort [array names node_list]] {
+	    $node add-desire "firewallable" 1.0
+	}
+    }
+
     # Default sync server.
     set default_sync_server {}
 
