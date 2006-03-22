@@ -764,7 +764,7 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	tbsetup/ipassign/ipassign_wrapper tbsetup/assign_prepass \
 	tbsetup/panic tbsetup/webpanic \
         tbsetup/tbrsync tbsetup/nfstrace \
-	tbsetup/checkup/GNUmakefile tbsetup/checkup/checkup_daemon \	
+	tbsetup/checkup/GNUmakefile tbsetup/checkup/checkup_daemon \
 	tbsetup/libtblog.pm \
 	tip/GNUmakefile tip/console \
 	tmcd/GNUmakefile tmcd/tmcd.restart \
