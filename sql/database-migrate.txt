@@ -3076,7 +3076,7 @@ last_net_act,last_cpu_act,last_ext_act);
       alter table archives add date_archived int(10) unsigned \
 		NOT NULL default '0';
 
-4.28: Some changes to the archive_tags table, for support of forking
+4.29: Some changes to the archive_tags table, for support of forking
       an archive.
 
 	CREATE TABLE archive_tags_new (
@@ -3098,34 +3098,34 @@ last_net_act,last_cpu_act,last_ext_act);
                   archive_tags_new TO archive_tags;
 	drop table archive_tags_old;
 
-4.29: Add more fields to archive_tags table.
+4.30: Add more fields to archive_tags table.
 
 	alter table archive_tags add tagtype enum('user','commit',\
             'savepoint','internal') NOT NULL default 'internal';
         alter table archive_tags add description text;
 
-4.30: Add a contact email to the location_info table.
+4.31: Add a contact email to the location_info table.
 
       alter table location_info add email tinytext after contact;
 
-4.31: Add slots to archive_views table to track branching.
+4.32: Add slots to archive_views table to track branching.
 
 	alter table archive_views add branch_tag varchar(64) default NULL;
 	alter table archive_views add parent_view varchar(64) default NULL;
 
-4.32: Add Fedora as an OS to the os_info table.
+4.33: Add Fedora as an OS to the os_info table.
 
 	alter table os_info change column OS OS \
 	    enum('Unknown','Linux','Fedora','FreeBSD','NetBSD',\
 	         'OSKit','Windows','TinyOS','Other') default 'Unknown';
 
-4.33: Add Fedora as an OS to the os_info table.
+4.34: Add Fedora as an OS to the os_info table.
 
        alter table os_info change osfeatures osfeatures \
 	    set('ping','ssh','ipod','isup','veths','mlinks', \
 	         'linktest','linkdelays') default NULL;
 
-4.34: Table that maps an OS, version, and role to a boot command line.
+4.35: Table that maps an OS, version, and role to a boot command line.
       It is referred to when assign_wrapper needs to assign a command
       line to a delay or jail node.
 
@@ -3139,7 +3139,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (OS,version,role)
 	) TYPE=MyISAM;
 
-4.35: Add plab_site_mapping table for plab nodes, for use with the
+4.36: Add plab_site_mapping table for plab nodes, for use with the
       datapository.
 
 	CREATE TABLE plab_site_mapping (
@@ -3150,17 +3150,17 @@ last_net_act,last_cpu_act,last_ext_act);
 	  PRIMARY KEY  (site_name,site_idx,node_idx)
 	) TYPE=MyISAM;
 
-4.36: Add batchmode flag to experiment_resources table so we can track
+4.37: Add batchmode flag to experiment_resources table so we can track
       the usage of the batch daemon on swapin.
 
       alter table experiment_resources add batchmode tinyint(1) \
                unsigned default '0' after delay_capacity;
 
-4.37: Add field to virt_firewalls to allow specification of rule logging.
+4.38: Add field to virt_firewalls to allow specification of rule logging.
 
       alter table virt_firewalls add log tinytext NOT NULL default '' after style;
 
-4.38: Add new table, wireless_stats, to store some basic config info 
+4.39: Add new table, wireless_stats, to store some basic config info 
       for the new wireless stats applet.
 
       CREATE TABLE wireless_stats (
@@ -3174,7 +3174,7 @@ last_net_act,last_cpu_act,last_ext_act);
 	PRIMARY KEY  (name)
       ) TYPE=MyISAM;
 
-???: Add stuff to store the error, as determined by tblog, in a more
+4.40: Add stuff to store the error, as determined by tblog, in a more
      structured fashion:
 
 	CREATE TABLE errors (
