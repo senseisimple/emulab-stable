@@ -18,6 +18,23 @@ Note that some instructions may have steps that need to occur at a few
 different points in the install process - these are marked with the
 earliest time one of the steps needs to occur.
 
+20060322: Before installing tbsetup/ns2ir/sim.tcl.in rev 1.109 (3/22/06).
+
+	This revision introduces a new features/desire pair called
+	"firewallable".  All nodes in a firewalled experiment require
+	this feature from a node.  So you will need to do:
+
+        insert into node_type_features values ('TYPE','firewallable',0);
+
+	for every node type 'TYPE' which can participate in a firewalled
+	experiment.  The current requirement for a 'firewallable' node
+	is that it can be powered off (not just power cycled).  This is
+	required for proper post-swapout cleaning of nodes.  Another
+	attribute to consider is whether you can prevent a node from
+	booting anywhere other than the network.  If you have nodes that
+	can timeout from PXE boot and that will fall back to booting from
+	the hard drive, you may want to NOT make those nodes 'firewallable'.
+
 20051212: After DB schema is updated, and updated software installed.
 
          These changes are for shifting from SSH protocol 1 keys to
