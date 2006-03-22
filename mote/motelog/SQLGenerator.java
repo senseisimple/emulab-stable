@@ -32,7 +32,8 @@ public class SQLGenerator {
     private ArrayList[] insertInfo;
 
     private String className;
-    private String msgSpec;
+    private Class classInfo;
+    private String msgSpec[];
     private String tag;
     private int amType;
 
@@ -47,6 +48,9 @@ public class SQLGenerator {
 	this.tag = tag;
 
 	Class c = Class.forName(className);
+	this.classInfo = c;
+
+	//debug(3,"sqlgen constructor for '"+name+"'");
 
 	// grab the am type first!
 	Object msgObj = c.newInstance();
@@ -57,7 +61,7 @@ public class SQLGenerator {
 	// now figure out the methods.  Basically, we figure out which
 	// get_* methods correspond to which arrays by finding the longest
 	// common substring following the get_ part of the string.
-	Methods[] m = c.getMethods();
+	Method[] m = c.getMethods();
 	Vector flatFieldMethods = new Vector();
 	Vector arrayFieldMethods = new Vector();
 
@@ -111,9 +115,9 @@ public class SQLGenerator {
 	    ;
 	}
 	else {
-	    // simple, one-table layout with two views.
+	    // simple, n-table layout with two views; one master table.
 	    int numTables = 1 + arrayFields.length;
-	    int tableIndex = 1;
+	    int tableIdx = 1;
 
 	    tableCreates = new String[numTables];
 	    inserts = new String[numTables];
@@ -123,16 +127,18 @@ public class SQLGenerator {
 
 	    // main table
 	    String tableName = className + "__data_" + tag;
-	    parentTableName = tableName; 
+	    String parentTableName = tableName; 
 	    
 	    tableCreates[0] = "" + 
-		"CREATE TABLE " + tableName + " " +
+		"CREATE TABLE IF NOT EXISTS " + tableName + " " +
 		"(" + "id INT PRIMARY KEY AUTO_INCREMENT, " + 
 		"time DATETIME, " + 
 		"amType INT, " + 
 		"srcMote VARCHAR(32)";
 	    inserts[0] = "insert into " + tableName + 
 		" values (NULL,?," + this.amType + ",?";
+
+	    
 
 	    insertInfo[0] = new ArrayList();
 	    insertInfo[0].add( new String[] { "date",null,null } );
@@ -147,11 +153,11 @@ public class SQLGenerator {
 		String mn = ma[i].getName();
 		
 		if (mn.startsWith("get_")) {
-		    String mnSansGet = mn.subString(4,mnSansGet.length());
+		    String mnSansGet = mn.substring(4,mn.length());
 
 		    Method signMethod = null;
 		    try {
-			signMethod = c.getMethod("isSigned_" + mnSansGet);
+			signMethod = c.getMethod("isSigned_" + mnSansGet,null);
 		    }
 		    catch (Exception e) {
 			// no big deal
@@ -186,8 +192,8 @@ public class SQLGenerator {
 			// we add the table now:
 			String aTableName = mnSansGet + "__data_" + tag;
 			tableCreates[tableIdx] = "" +
-			    "CREATE TABLE " + aTableName + " (" + 
-			    "ppid INT PRIMARY KEY NOT NULL, " +
+			    "CREATE TABLE IF NOT EXISTS " + aTableName + 
+			    " (" + "ppid INT PRIMARY KEY NOT NULL, " +
 			    "idx INT NOT NULL, " +
 			    "" + mnSansGet + " " + internalArraySQLType + 
 			    ")";
@@ -225,8 +231,21 @@ public class SQLGenerator {
 	    inserts[0] += ")";
 	}
 
+	for (int k = 0; k < tableCreates.length; ++k) {
+	    debug(3,"tableCreates["+k+"] = '" + tableCreates[k] + "'.");
+	    debug(3,"inserts["+k+"] = '" + inserts[k] + "'.");
+	}
+
 	tablesCreated = false;
 
+    }
+
+    private void debug(int level,String msg) {
+	MoteLogger.globalDebug(level,"SQLGenerator (" + className + "): "+msg);
+    }
+
+    private void error(String msg) {
+	MoteLogger.globalError("SQLGenerator (" + className + "): " + msg);
     }
 
     public String[] getTableCreates() {
@@ -253,50 +272,84 @@ public class SQLGenerator {
 		tablesCreated = true;
 	    }
 	    catch (SQLException e) {
-		System.err.println("Problem while creating tables for " +
-				   this.className + "!");
+		error("problem while creating tables!");
 		e.printStackTrace();
 	    }
 	}
 
 	// run the inserts:
 	int errors = 0;
+	// the first table is always the master parent table...
+	int ppid = -1;
+
 	for (int i = 0; i < inserts.length; ++i) {
 	    ArrayList aInfo = insertInfo[i];
+
+
+	    // each element in the arrayList is a String[] with the 
+	    // following data:
+	    //   [ getMethodName, returnType, SQLType ]
+	    //private ArrayList[] insertInfo;
+
 
 	    // setup the prepared stmt:
 	    try {
 		PreparedStatement ps = conn.prepareStatement(inserts[i]);
-		int ppid = -1;
 
-		for (int j = 0; j < aInfo.length(); ++j) {
-		    String[] info = (String[])aInfo.get(j);
+		// if not an array insert (i.e., is main table insert):
+		if (true) {
+		    
+		    for (int j = 0; j < aInfo.size(); ++j) {
+			String[] info = (String[])aInfo.get(j);
+			
+			// now perform the ps.set op...
+			if (info[0].equals("date")) {
+			    // insert the date manually
+			    // note that we use j+1 since preparedStatement 
+			    // vars start at index 1
+			    ps.setTimestamp(j+1,(new java.sql.Timestamp(lp.getTimeStamp().getTime())));
+			}
+			else if (info[0].equals("srcMote")) {
+			    ps.setString(j+1,lp.getSrcVnodeName());
+			}
+			else if (info[0].equals("ppid")) {
+			    ps.setInt(j+1,ppid);
+			}
+			else if (info[0].equals("idx")) {
+			    //ps.setInt();
+			}
+			else {
+			    // "normal" field :-)
+			    
+			    if (info[1] != null && 
+				(info[1].equals("short") 
+				 || info[1].equals("S"))) {
 
-		    // now perform the ps.set op...
-		    if (info[0].equals("date")) {
-			// insert the date manually
-			// note that we use j+1 since preparedStatement vars
-			// start at index 1
-			ps.setDate(j+1,lp.getDate());
-		    }
-		    else if (info[0].equals("srcMote")) {
-			ps.setString(j+1,lp.getSrcMote());
-		    }
-		    else if (info[0].equals("ppid")) {
-			ps.setInt(j+1,ppid);
-		    }
-		    else if (info[0].equals("idx")) {
-			;
-		    }
-		    else {
-			// "normal" field :-)
+				int retval = 0;
+				Object msgObject = lp.getMsgObject();
+				Method m = this.classInfo.getMethod(info[0],
+								    null);
+				Short s = (Short)m.invoke(msgObject,null);
 
+				ps.setInt(j+1,(int)s.shortValue());
+
+			    }
+			    else if (info[1] != null && 
+				     (info[1].equals("I") 
+				      || info[1].equals("int"))) {
+				
+			    }
+
+			}
 		    }
+
+		    // dump the stmt...
+		    ps.executeUpdate();
 
 		    // now, if we were dumping into the main table (idx=0),
 		    // grab the id, because it's the global packet id for
 		    // this msg type.
-		    if (j == 0) {
+		    if (i == 0) {
 			// should be in the result set... ?
 			
 			// this only works with mysql 5.x and up, with
@@ -305,24 +358,31 @@ public class SQLGenerator {
 			// anytime soon, you'll need to try another technique
 			// -- there are a couple.
 			// i.e., select last_insert_id()
-			ResultSet rs = stmt.getGeneratedKeys();
+			ResultSet rs = ps.getGeneratedKeys();
 
 			if (rs.next()) {
 			    ppid = rs.getInt(1);
 			}
 			else {
-			    System.err.println("Could not get ppid from " +
-					       "main table insert -- cannot " +
-					       "add anything to array tables!");
+			    error("Could not get ppid from " +
+				  "main table insert -- cannot " +
+				  "add anything to array tables!");
 			}
 
 			rs.close();
 		    }
 		}
+		else {
+		    // XXXX we have an array insert... need to do 
+		    // multiple inserts on this prepared stmt, using ppid
+		    // as the backref:
+
+		    ;
+		}
 	    }
 	    catch (Exception e) {
-		System.err.println("Problem with insert for msg of type " + 
-				   this.amType + ":");
+		error("problem with insert for msg of type " + 
+		      this.amType + ":");
 		e.printStackTrace();
 
 		++errors;
@@ -350,12 +410,13 @@ public class SQLGenerator {
 				 boolean getArrayType) 
 	throws Exception {
 	
-	String rt = ma.getReturnType().getName();
+	String rt = m.getReturnType().getName();
 	boolean isSigned = false;
 	
 	if (signMethod != null) {
 	    try {
-		isSigned = ((Boolean)isSignedMethod.invoke()).getBoolValue();
+		Object msgObj = classInfo.newInstance();
+		isSigned = ((Boolean)signMethod.invoke(msgObj,null)).booleanValue();
 	    }
 	    catch (Exception e) {
 		// do nothing; there just wasn't sign info...
@@ -417,7 +478,7 @@ public class SQLGenerator {
 		retval += " UNSIGNED";
 	    }
 	}
-	else if (rt.equals("S")) {
+	else if (rt.equals("S") || rt.equals("short")) {
 	    // short
 	    retval = "SMALLINT";
 	    
@@ -430,6 +491,8 @@ public class SQLGenerator {
 	    // (or a multidim array, but we ruled this out earlier)
 	    
 	    // XXX: should throw exception or something
+
+	    error("unrecognized return type '" + rt +"'!");
 	}
 	
 	return retval;

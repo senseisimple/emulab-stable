@@ -52,7 +52,7 @@ public final class PacketReader {
 
     /* see http://www.tinyos.net/tinyos-1.x/doc/serialcomm/description.html */
 
-    final static int SYNC_BYTE = 0x7e;
+    final static int SYNC_BYTE = 0x7e; 
     final static int ESCAPE_BYTE = 0x7d;
     final static int MTU = 256;
     // don't need this cause we're not responding.
@@ -71,6 +71,14 @@ public final class PacketReader {
 	this.in = in;
     }
 
+    private void debug(int level,String msg) {
+	MoteLogger.globalDebug(level,"PacketReader: " + msg);
+    }
+
+    private void error(String msg) {
+	MoteLogger.globalError("PacketReader: " + msg);
+    }
+
     // this method is meant to be called repeatedly, at a high rate.
     // if "arrangements" in the caller (like synchronization with a queue)
     // make fast, repetitious calls impossible, the timestamps will get off.
@@ -84,6 +92,8 @@ public final class PacketReader {
 	// byte by byte for now -- ick!
 	// obviously, this method is NOT thread-safe.
 
+	debug(3,"trying to read a packet"); 
+
 	byte[] buf = new byte[MTU];
 	int currentOffset = 0;
 	boolean isEscaped = false;
@@ -96,10 +106,13 @@ public final class PacketReader {
 		    buf[i] = 0;
 		}
 		currentOffset = 0;
+		sync = false;
+		isEscaped = false;
 	    }
 	    
 	    // read byte -- let the exception fly through to the caller
-	    byte b = (byte)in.read();
+	    int b = (int)in.read();
+	    debug(4,"read byte: "+b);
 
 	    if (b == ESCAPE_BYTE) {
 		isEscaped = true;
@@ -108,7 +121,8 @@ public final class PacketReader {
 		if (isEscaped && sync) {
 		    // ex-xor it
 		    b ^= 0x20;
-		    buf[currentOffset++] = b;
+		    buf[currentOffset++] = (byte)b;
+		    isEscaped = false;
 		}
 		else if (isEscaped) {
 		    // we're trying to sync via an escaped data byte, bad us
@@ -116,9 +130,11 @@ public final class PacketReader {
 		}
 		else if (sync) {
 		    // end of packet
+		    debug(3,"saw end sync byte");
 		    break;
 		}
 		else {
+		    debug(3,"saw first sync byte");
 		    sync = true;
 		}
 	    }
@@ -126,9 +142,10 @@ public final class PacketReader {
 		// normal data byte:
 		if (isEscaped) {
 		    b ^= 0x20;
+		    isEscaped = false;
 		}
 
-		buf[currentOffset++] = b;
+		buf[currentOffset++] = (byte)b;
 	    }
 	}
 
@@ -147,14 +164,18 @@ public final class PacketReader {
 
 	if (buf[0] == P_PACKET_NO_ACK) {
 	    // no "prefix" byte
-	    retval = new byte[buf.length-3];
+	    retval = new byte[currentOffset-3];
 	    System.arraycopy(buf,1,retval,0,retval.length);
 	    
+	    debug(2,"recv no ack pkt; length="+retval.length);
+
 	    return new LogPacket(vNodeName,t,retval,packetType,crc);
 	}
 	else if (buf[0] == P_PACKET_ACK) {
 	    retval = new byte[buf.length-4];
 	    System.arraycopy(buf,2,retval,0,retval.length);
+
+	    debug(2,"recv ack pkt; length="+retval.length);
 	    
 	    return new LogPacket(vNodeName,t,retval,packetType,crc);
 	}
@@ -162,9 +183,13 @@ public final class PacketReader {
 	    // do nothing for now; this is only sent by receiver on
 	    // receipt of an unknown packet type anyway
 	    ;
+
+	    debug(2,"recv ack/unknown pkt!");
 	}
 	else {
 	    // XXX: might want to log these in the future...
+
+	    debug(2,"recv TOTALLY unknown pkt!");
 	}
 
 	return null;

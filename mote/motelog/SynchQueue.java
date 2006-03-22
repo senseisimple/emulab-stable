@@ -11,8 +11,12 @@ public class SynchQueue extends LinkedList {
 	this.addFirst(o);
     }
 
-    public synchronized Object queueRemove(Object o) {
+    public synchronized Object queueRemove() {
 	return this.removeLast();
+    }
+
+    public synchronized Object peek() {
+	return this.getLast();
     }
 
 }

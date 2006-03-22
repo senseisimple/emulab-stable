@@ -7,7 +7,8 @@ import java.io.*;
 
 public class MoteLogger {
 
-    private int debug;
+    public static int debug;
+
     private File classDir;
     private String[] classNames;
     private File aclDir;
@@ -15,7 +16,7 @@ public class MoteLogger {
     private String pid;
     private String eid;
     private String[] motes;
-    private SynchQueue packetQueue;
+    private LinkedList packetQueue;
     private String dbURL = "jdbc.DriverMysql";
     private String dbUser = "root";
     private String dbPass = "";
@@ -35,6 +36,16 @@ public class MoteLogger {
 	parseArgsAndRun(args);
     }
 
+    public static void globalDebug(int level,String msg) {
+	if (MoteLogger.debug >= level) {
+	    System.out.println("DEBUG: " + msg);
+	}
+    }
+
+    public static void globalError(String msg) {
+	System.err.println("ERROR: " + msg);
+    }
+
     public static void parseArgsAndRun(String args[]) {
 	File classDir = null;
 	String[] classNames = null;
@@ -42,7 +53,6 @@ public class MoteLogger {
 	String pid = null;
 	String eid = null;
 	File aclDir = new File("/var/log/tiplogs");
-	int debug = 0;
 	String[] motes = null;
 
 	int i;
@@ -102,7 +112,7 @@ public class MoteLogger {
 		}
 	    }
 	    else if (args[i].equals("-d")) {
-		++debug;
+		++MoteLogger.debug;
 	    }
 	    else if (args[i].startsWith("-")) {
 		System.err.println("Improper option '" + args[i] + "'!");
@@ -124,9 +134,14 @@ public class MoteLogger {
 
 	//this.motes = motes;
 
+	if (tag == null || tag.length() == 0) {
+	    // gen a random num
+	    tag = "" + (int)(Math.random()*9999);
+	}
+
 	// startup
 	MoteLogger ml = new MoteLogger(classDir,classNames,aclDir,motes,
-				       pid,eid,tag,debug);
+				       pid,eid,tag);
 	ml.run();
     }
 
@@ -151,18 +166,25 @@ public class MoteLogger {
 
     public MoteLogger(File classDir,String[] classNames,
 		      File aclDir,String[] motes,String pid,
-		      String eid,String tag,int debug) {
+		      String eid,String tag) {
 	this.classDir = classDir;
 	this.classNames = classNames;
 	this.aclDir = aclDir;
 	this.pid = pid;
 	this.eid = eid;
 	this.logTag = tag;
-	this.debug = debug;
 	this.motes = motes;
 	this.classes = new Hashtable();
     }
 
+    private void debug(int level,String msg) {
+	MoteLogger.globalDebug(level,"MoteLogger: " + msg);
+    }
+
+    private void error(String msg) {
+	MoteLogger.globalError("MoteLogger: " + msg);
+    }
+    
     // I know, not a thread, but who cares
     public void run() {
 	if (motes == null || motes.length == 0) {
@@ -190,17 +212,18 @@ public class MoteLogger {
 	}
 
 	if (motes == null || motes.length == 0) {
-	    System.out.println("Could not find any mote ACL files; exiting.");
+	    error("could not find any mote ACL files; exiting.");
 	    System.exit(0);
 	}
 
 	// load classfiles and create Class objs so we can do instance objs
 	// on incoming packet data
 	// first, have to discover the classfiles, if they weren't specified.
+	File[] classFiles = null;
 	if (this.classNames == null || classNames.length == 0) {
 	    // try to read the classFile directory and use the XXX.class
 	    // names as the classes -- will fail if classes are in package.
-	    File[] classFiles = classDir.listFiles( new FilenameFilter() {
+	    classFiles = classDir.listFiles( new FilenameFilter() {
 		    public boolean accept(File dir, String name) {
 			if (name != null && name.endsWith(".class")) {
 			    return true;
@@ -222,7 +245,7 @@ public class MoteLogger {
 	}
 
 	if (classFiles == null || classFiles.length == 0) {
-	    System.out.println("Could not find any classfiles; exiting.");
+	    error("could not find any classfiles; exiting.");
 	    System.exit(0);
 	}
 
@@ -237,7 +260,7 @@ public class MoteLogger {
 					       this.logTag));
 	    }
 	    catch (Exception e) {
-		System.err.println("Problem loading class " + classNames[i] + 
+		error("problem loading class " + classNames[i] + 
 				   ":");
 		e.printStackTrace();
 	    }
@@ -251,23 +274,23 @@ public class MoteLogger {
 		acls.put(motes[i],ma);
 	    }
 	    catch (Exception e) {
-		System.err.println("Problem reading ACL for " + motes[i]);
+		error("problem reading ACL for " + motes[i]);
 		e.printStackTrace();
 	    }
 	}
 
 	// setup queue
-	packetQueue = new SynchQueue();
+	packetQueue = new LinkedList();
 	
 	// connect to the database
-	Connection conn = null;
+	java.sql.Connection conn = null;
 	try {
 	    Class.forName("com.mysql.jdbc.Driver");
-	    conn = DriverManager.getConnection("jdbc:mysql:" + 
+	    conn = java.sql.DriverManager.getConnection("jdbc:mysql:" + 
 					       "//localhost/test?user=root");
 	}
 	catch (Exception e) {
-	    System.err.println("FATAL -- couldn't connect to the database: " +
+	    error("FATAL -- couldn't connect to the database: " +
 			       e.getMessage());
 	    e.printStackTrace();
 
@@ -278,7 +301,7 @@ public class MoteLogger {
 	for (Enumeration e1 = acls.keys(); e1.hasMoreElements(); ) {
 	    String vNN = (String)e1.nextElement();
 	    ElabACL acl = (ElabACL)acls.get(vNN);
-	    (new MoteThread(acl,packetQueue)).start();
+	    (new MoteThread(vNN,acl,packetQueue)).start();
 	}
 
 	// now, process the packet queue forever.
@@ -286,7 +309,9 @@ public class MoteLogger {
 	    LogPacket lp = null;
 
 	    synchronized(packetQueue) {
-		while(packetQueue.peek() == null) {
+		debug(1,"Waiting for packets...");
+		
+		while(packetQueue.size() == 0) {
 		    try {
 			packetQueue.wait();
 		    }
@@ -296,63 +321,99 @@ public class MoteLogger {
 		}
 
 		// once we get a packet...
-		lp = packetQueue.queueRemove();
+		lp = (LogPacket)packetQueue.removeLast();
 	    }
 
+	    debug(2,"Dumping packet to db:");
+	    
 	    // dump it out to database:
 	    // this is the real work:
 
-	    try {
-		// first match the packet:
-		SQLGenerator sq = null;
-		boolean foundMatch = false;
+	    if (lp != null) {
+		try {
+		    // first match the packet:
+		    SQLGenerator sq = null;
+		    boolean foundMatch = false;
+		    Object msgObj = null;
+		    
+		    for (Enumeration e1 = classes.keys(); 
+			 !foundMatch && e1.hasMoreElements(); ) {
+			
+			Class cc = (Class)e1.nextElement();
+			sq = (SQLGenerator)classes.get(cc);
+			
+			// Need to create a BaseTOSMsg
+			// and extract the 'type' field... which is the am type
+			// ... and then match this with the amType() method of
+			// the invoked class.
+			
+			// XXX: note that this must be changed depending on the
+			// architecture of the motes we're connecting to, in 
+			// order to decode using the correct host byte order 
+			// assumption.
+			// i.e., net.tinyos.message.telos.*
+			// 
+			if (true) {
+			    net.tinyos.message.avrmote.BaseTOSMsg btm = 
+				new net.tinyos.message.avrmote.BaseTOSMsg(lp.getData());
 
-		for (Enumeration e1 = classes.keys(); 
-		     !foundMatch && e1.hasMoreElements(); ) {
+			    debug(1,"lp data size = " + lp.getData().length);
 
-		    Class cc = (Class)e1.nextElement();
-		    sq = (SQLGenerator)classes.get(cc);
+			    // XXX: this is some nasty hack!!! the BaseTosMsg
+			    // doesn't seem to want to let me call get_data.
+			    // However, I want to remove the basic
+			    // AM fields at the front... which are 5 bytes
+			    // (at least for mica2!)
+			    int PREBYTE_REMOVE = 5;
+			    int realLen = lp.getData().length-PREBYTE_REMOVE;
+			    byte[] realdata = new byte[realLen];
+			    System.arraycopy(lp.getData(),PREBYTE_REMOVE,
+					     realdata,0,realLen);
 
-		    // Need to create a BaseTOSMsg
-		    // and extract the 'type' field... which is the am type
-		    // ... and then match this with the amType() method of the
-		    // invoked class.
-
-		    // XXX: note that this must be changed depending on the
-		    // architecture of the motes we're connecting to, in order
-		    // to decode using the correct host byte order assumption.
-		    // i.e., net.tinyos.message.telos.*
-		    // 
-		    if (true) {
-			net.tinyos.message.avrmote.BaseTOSMsg btm = 
-			    new net.tinyos.message.avrmote.BaseTOSMsg(lp.getData());
-			if (lp.amType() == sq.getAMType()) {
-			    // class match
-			    // invoke the byte[] data constructor on the data
-			    // from the basetosmsg:
-			    Constructor ccc = cc.getConstructor( new Class[] {
-				byte[].class } );
-			    Object msgObj = ccc.newInstance( new Object[] {
-				btm.get_data() } );
-
-			    lp.setMsgObject(msgObj);
-			    // ready to log!!!
-
-			    foundMatch = true;
+			    if (btm.get_type() == sq.getAMType()) {
+				// class match
+				// invoke the byte[] data constructor on the 
+				// data from the basetosmsg:
+				Constructor ccc = cc.getConstructor( new Class[] {
+					byte[].class } );
+				msgObj = ccc.newInstance( new Object[] {
+					//btm.get_data() } );
+				        //lp.getData() } );
+					realdata } );
+				
+				lp.setMsgObject(msgObj);
+				// ready to log!!!
+				
+				foundMatch = true;
+				debug(2,"found packet type match with type " +
+				      btm.get_type());
+			    }
+			    else {
+				debug(2,"btm.amType=" + btm.get_type() + 
+				      "; sq.getAMType=" + sq.getAMType());
+			    }
 			}
+			
 		    }
-
+		    
+		    // do the db insert:
+		    if (foundMatch) {
+			sq.storeMessage(lp,conn);
+		    }
+		    else {
+			error("NO match for packet!");
+		    }
+		    
+		    // that's all, folks!
+		    
 		}
-	       
-		// do the db insert:
-		sq.storeMessage(msgObj,conn);
-
-		// that's all, folks!
-		
+		catch (Exception e) {
+		    error("error while logging packet: ");
+		    e.printStackTrace();
+		}
 	    }
-	    catch (Exception e) {
-		System.err.println("Error while logging packet: ");
-		e.printStackTrace();
+	    else {
+		error("got a null packet from the PacketReader!");
 	    }
 	}
 
@@ -362,29 +423,37 @@ public class MoteLogger {
     class MoteThread extends Thread {
 	private String vNodeName;
 	private ElabACL acl;
-	private SynchQueue q;
+	private LinkedList q;
 	private Socket sock;
 
-	public MoteLogThread(String vNodeName,ElabACL acl,
-			     SynchQueue packetQueue) {
+	public MoteThread(String vNodeName,ElabACL acl,
+			     LinkedList packetQueue) {
 	    this.vNodeName = vNodeName;
 	    this.acl = acl;
 	    this.q = packetQueue;
 	}
-
+	
+	private void debug(int level,String msg) {
+	    MoteLogger.globalDebug(level,
+				   "MoteThread (" + vNodeName + "): " + msg);
+	}
+	
+	private void error(String msg) {
+	    MoteLogger.globalError("MoteThread (" + vNodeName + "): " + msg);
+	}
+	
 	public void run() {
 	    sock = null;
 
 	    try {
 		// isn't java just wonderful
 		sock = new Socket(acl.getHost(),acl.getPort());
-		System.out.println("Connected to " + sock.getInetAddress() + 
-				   ":" + sock.getPort() + " for " + 
-				   acl.getVnodeName());
+		debug(1,"connected to " + 
+		      sock.getInetAddress() + ":" + sock.getPort());
 	    }
 	    catch (Exception e) {
-		System.err.println("Couldn't connect to " + acl.getHost() +
-				   ":" + acl.getPort());
+		error("couldn't connect to " + acl.getHost() +
+		      ":" + acl.getPort());
 		e.printStackTrace();
 		return;
 	    }
@@ -418,9 +487,9 @@ public class MoteLogger {
 	    //bkey[0] = 0;
 	    //bkey[255] = 0;
 
-	    System.out.println("Sending keylen " + keylen + " and key " + 
-			       key + " bytearraylen = "+key.getBytes().length +
-			       " \n  realkey = '"+new String(authBytes)+"'");
+	    debug(4,"sending keylen " + keylen + " and key " + 
+		  key + " bytearraylen = "+key.getBytes().length +
+		  " \n  realkey = '"+new String(authBytes)+"'");
 
 	    try {
 		OutputStream out = sock.getOutputStream();
@@ -453,15 +522,15 @@ public class MoteLogger {
 		    msg = "failure (" + retval +").";
 		}
 
-		System.out.println("Result of authentication: " + msg);
+		debug(2,"result of authentication: " + msg);
 
 		if (retval != 0) {
 		    return;
 		}
 	    }
 	    catch (Exception e) {
-		System.err.println("Problem authenticating for " + 
-				   acl.getVnodeName());
+		error("problem authenticating for " + 
+		      acl.getVnodeName());
 		e.printStackTrace();
 		return;
 	    }
@@ -482,15 +551,15 @@ public class MoteLogger {
 		lp = null;
 		try {
 		    lp = pr.readPacket();
-		    synchronized(packetQueue) {
-			packetQueue.queueAdd(lp);
-			packetQueue.notifyAll();
+		    synchronized(q) {
+			q.addFirst(lp);
+			q.notifyAll();
 		    }
 
 		}
 		catch (Exception e) {
-		    System.err.println("Problem while reading from " + 
-				       acl.getVnodeName());
+		    error("problem while reading from " + 
+			  acl.getVnodeName());
 		    e.printStackTrace();
 		}
 	    }
