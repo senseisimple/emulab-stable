@@ -728,21 +728,24 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 #
 # finishes sidebar td
 #
-function FINISHSIDEBAR($contentname = "content")
+function FINISHSIDEBAR($contentname = "content", $nocontent = 0)
 {
     global $TBMAINSITE;
-    
-    if (!$TBMAINSITE) {
-	#
-	# It is a violation of Emulab licensing restrictions to remove
-	# this logo!
-	#
-	echo "       <a class='builtwith' href='http://www.emulab.net'>
+
+    if (!$nocontent) {
+	if (!$TBMAINSITE) {
+	    #
+	    # It is a violation of Emulab licensing restrictions to remove
+	    # this logo!
+	    #
+	    echo "       <a class='builtwith' href='http://www.emulab.net'>
                          <img src='$BASEPATH/builtwith.png'></a>";
+	}
+	echo "<!-- sidebar ends -->
+              </div>";
     }
-    
-    echo "<!-- sidebar ends -->
-        </div>
+
+    echo "
         <div class='$contentname'>
           <!-- content body -->";
 }
@@ -808,8 +811,9 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
 	$nobanner = 0;
     }
     $contentname = "content";
+    $nocontent = isset($view['hide_sidebar']) && !isset($view['menu']);
     PAGEBEGINNING( $title, $nobanner,
-		   isset($view['hide_sidebar']) && !isset($view['menu']),
+		   $nocontent,
 		   $extra_headers );
     if (!isset($view['hide_sidebar'])) {
 	WRITESIDEBAR();
@@ -820,7 +824,7 @@ function PAGEHEADER($title, $view = NULL, $extra_headers = NULL) {
     else {
 	$contentname = "fullcontent";
     }
-    FINISHSIDEBAR($contentname);
+    FINISHSIDEBAR($contentname, $nocontent);
 
     echo "<div class='contentbody'>";
     echo "<div id='logintime'>";
