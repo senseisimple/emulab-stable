@@ -31,6 +31,7 @@ use Exporter;
 	     TMCCCMD_CREATOR TMCCCMD_HOSTINFO TMCCCMD_LOCALIZATION
 	     TMCCCMD_BOOTERRNO TMCCCMD_BOOTLOG TMCCCMD_BATTERY TMCCCMD_USERENV
 	     TMCCCMD_TIPTUNNELS TMCCCMD_TRACEINFO TMCCCMD_ELVINDPORT
+             TMCCCMD_PLABEVENTKEYS
 	     );
 
 # Must come after package declaration!
@@ -171,6 +172,7 @@ my %commandset =
       "tiptunnels"      => {TAG => "tiptunnels"},
       "traceinfo"       => {TAG => "traceinfo"},
       "elvindport"      => {TAG => "elvindport"},
+      "plabeventkeys"   => {TAG => "plabeventkeys"},
     );
 
 #
@@ -226,6 +228,7 @@ sub TMCCCMD_USERENV     (){ $commandset{"userenv"}->{TAG}; }
 sub TMCCCMD_TIPTUNNELS  (){ $commandset{"tiptunnels"}->{TAG}; }
 sub TMCCCMD_TRACEINFO   (){ $commandset{"traceinfo"}->{TAG}; }
 sub TMCCCMD_ELVINDPORT  (){ $commandset{"elvindport"}->{TAG}; }
+sub TMCCCMD_PLABEVENTKEYS(){ $commandset{"plabeventkeys"}->{TAG}; }
 
 #
 # Caller uses this routine to set configuration of this library
