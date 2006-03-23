@@ -776,7 +776,7 @@ int send_bandwidth_to_monitor(int monitor, int index)
     buf += SIZEOF_LONG;
 
     // Insert the bandwidth
-    bandwidth = htonl(bandwidth + bandwidth/4);
+    bandwidth = htonl(bandwidth);
     memcpy(buf, &bandwidth, SIZEOF_LONG);
     buf += SIZEOF_LONG;
 
@@ -1265,9 +1265,12 @@ int main(int argc, char *argv[]) {
 //    printf("Total: %d\n", total_size);
 //    printf("========== Quantum %lu ==========\n", quantum_no);
     logWrite(MAIN_LOOP, NULL, "Quantum %lu", quantum_no);
-    update_stats();
-    logWrite(MAIN_LOOP, NULL, "PCAP Received: %u Dropped: %u",
-	     received_stat(), dropped_stat());
+    if (is_live)
+    {
+	update_stats();
+	logWrite(MAIN_LOOP, NULL, "PCAP Received: %u Dropped: %u",
+		 received_stat(), dropped_stat());
+    }
     quantum_no++;
 
     //while in a quanta
