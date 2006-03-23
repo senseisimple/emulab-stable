@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -116,8 +116,6 @@ if ($ISMAINSITE) {
     #
     DBQueryFatal("lock tables log write");
 
-    my $maxseq = $lastseq + 10;
-
     #
     # Grab all of the new entries and store to the file
     #
@@ -128,6 +126,8 @@ if ($ISMAINSITE) {
     #
     # Now we need to find out what the last index really was. 
     # 
+    my $firstseq = $lastseq;
+    
     $query_result =
 	DBQueryFatal("select seq from log ".
 		     "where seq > $lastseq " .
@@ -171,9 +171,15 @@ if ($ISMAINSITE) {
     #
     # Now the other tables Kevin needs
     #
-    foreach my $tablename ("scripts", "priorities") {
-	DBQueryFatal("select * from $tablename ".
-		     "into outfile '${tempfile}.${tablename}' ");
+    foreach my $tablename ("scripts", "priorities", "causes", "errors") {
+	if ($tablename eq "errors") {
+	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
+			 "into outfile '${tempfile}.${tablename}' ");
+	}
+	else {
+	    DBQueryFatal("select * from $tablename ".
+			 "into outfile '${tempfile}.${tablename}' ");
+	}
 
 	system("echo \"load data infile '${tempfile}.${tablename}' ".
 	       "     replace into table $tablename\" | mysql errorlog");
