@@ -291,10 +291,13 @@ function SPITFORM($formfields, $errors)
                         <p><b>To finish creating your slice, edit the 
                               following information as needed, and click 
                               Submit.  PlanetLab <font size=+1 color=red>  
-                              strongly advises </font>  users
+                              requires</font>  users
                               to provide detail on what their slice will
                               be doing via it's description (i.e. what kind 
                               of network traffic it will be producing).
+                              Be sure to read over the
+                              <a href='https://www.planet-lab.org/php/aup/'>
+                              PlanetLab AUP</a> if you haven't already.
                        </b></p>
                       </center>\n";
 	    } else {

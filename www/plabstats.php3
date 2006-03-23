@@ -32,12 +32,14 @@ else {
     if (!isset($SSL_PROTOCOL)) {
 	USERERROR("Must use https:// to access this page!", 1);
     }
-    $subnet = long2ip(ip2long($REMOTE_ADDR) & ip2long("255.255.255.0"));
+    $subnet_c = long2ip(ip2long($REMOTE_ADDR) & ip2long("255.255.255.0"));
+    $subnet_b = long2ip(ip2long($REMOTE_ADDR) & ip2long("255.255.0.0"));
     
-    if (strcmp($subnet, "155.98.60.0") &&
-	strcmp($subnet, "155.98.63.0") &&
-	strcmp($subnet, "134.134.248.0") &&
-	strcmp($subnet, "134.134.136.0")) {
+    if (strcmp($subnet_c, "155.98.60.0") &&
+	strcmp($subnet_c, "155.98.63.0") &&
+	strcmp($subnet_c, "134.134.248.0") &&
+	strcmp($subnet_c, "134.134.136.0") &&
+        strcmp($subnet_b, "128.112.0.0")) {
 	USERERROR("You do not have permission to view this page ($subnet)!",
 		  1);
     }
