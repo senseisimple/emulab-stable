@@ -973,7 +973,7 @@ sub tblog_email_error ( $$$$$$$@ ) {
 	if ($d->{cause} eq 'temp') {
 	    $body .= "\n";
 	    $body .= "Please take a look at this Knowledge Base entry for hints on what to do:\n\n";
-	    $body .= "  @TBBASE@/kb-show.php3?xref_tag=no_resources\n";
+	    $body .= "  @TBDOCBASE@/kb-show.php3?xref_tag=no_resources\n";
 	}
 
 	$headers .= "\nX-NetBed-Cause: $d->{cause}";
