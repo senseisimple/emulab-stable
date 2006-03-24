@@ -208,7 +208,7 @@ use Exporter;
 	      tblog_sub_process tblog_find_error tblog_email_error
 	      tblog_start_capture tblog_stop_capture
 	      tblog_new_process tblog_init_process tblog_exit
-	      tblog_session
+	      tblog_session tblog_lookup_error tblog_format_error
 	      copy_hash
 	      TBLOG_EMERG TBLOG_ALERT TBLOG_CRIT TBLOG_ERR 
 	      TBLOG_WARNING TBLOG_NOTICE TBLOG_INFO TBLOG_DEBUG);
@@ -679,6 +679,7 @@ sub tblog_find_error () {
     my $error = '';
     my $script = '';
     my $cause = '';
+    my $cause_desc;
     my $confidence = 0.0;
 
     local $DBQUERY_MAXTRIES = 3;
@@ -875,6 +876,9 @@ sub tblog_find_error () {
 	}
 	$error = "No clue as to what went wrong!\n" unless length $error > 0;
 	chop $error;
+
+	$cause_desc = DBQuerySingleFatal
+	    "select cause_desc from causes where cause = '$cause'";
 	
 	print SERR "**** Experimental information, please ignore ****\n";
 	print SERR "Session ID = $session\n";
@@ -921,9 +925,40 @@ sub tblog_find_error () {
     
     $? = $saved_exitcode;
     return {session=>$session, exptidx=>$ENV{TBLOG_EXPTIDX},
-	    mesg=>$error, cause=>$cause,
+	    mesg=>$error, cause=>$cause, cause_desc=>$cause_desc,
 	    confidence=>$confidence, script=>$script, err=>$err};
 }
+
+=item tblog_lookup_error [SESSION]
+
+Attempts to retrive the error for SESSION from the database.  Returns
+undef if it could't find anything.
+
+=cut
+
+sub tblog_lookup_error ( ;$ ) {
+
+    my ($session) = @_;
+    $session = $ENV{TBLOG_SESSION} unless defined $session;
+
+    local $DBQUERY_MAXTRIES = 3;
+
+    my $saved_exitcode = $?;
+
+    my $query_result = DBQueryFatal
+	("select session, exptidx, mesg, e.cause, cause_desc, confidence, script_name as script".
+	 "  from errors as e, scripts as s, causes as c".
+	 "  where e.script = s.script and e.cause = c.cause ".
+	 "    and session = $session");
+
+    $? = $saved_exitcode;
+
+    if ($query_result->numrows > 0) {
+	return $query_result->fetchrow_hashref;
+    } else {
+	return undef;
+    }
+}    
 
 =item tblog_email_error DATA, TO, WHAT, EIDPID, FROM, HEADERS, TBOBS_HEADERS, @FILES
 
@@ -954,13 +989,7 @@ sub tblog_email_error ( $$$$$$$@ ) {
     my $subject = "$what: $pideid";
 
     if ($d->{confidence} > $threshold && $d->{cause} ne 'unknown') {
-
-	eval {
-	    my $cause_desc = DBQuerySingleFatal
-		"select cause_desc from causes where cause = '$d->{cause}'";
-	    
-	    $subject = "$what: $cause_desc: $pideid";
-	}
+	$subject = "$what: $d->{cause_desc}: $pideid";
     }
     
     my $body;
@@ -996,6 +1025,36 @@ sub tblog_email_error ( $$$$$$$@ ) {
 
 
     SENDMAIL($to, $subject, $body, $from, $headers, @files);
+}
+
+=item tblog_format_error DATA
+
+Format the information in DATA in a format suitable for printing.
+
+DATA is the object returned form tblog_find_error.  It is OK if it is
+undefined.
+
+=cut
+
+sub tblog_format_error( $ ) 
+{
+    my ($d) = @_;
+    
+    unless (defined $d) {
+	$d = {mesg => "No clue as to what went wrong!",
+	      cause => 'unknown', cause_desc => 'Cause Unknown',
+	      confidence => 0}
+    }
+	
+    my $mesg = '';
+    $mesg .= "ERROR:: $d->{cause_desc}\n";
+    $mesg .= "\n";
+    $mesg .= "$d->{mesg}\n";
+    $mesg .= "\n";
+    $mesg .= "Cause: $d->{cause}\n";
+    $mesg .= "Confidence: $d->{confidence}\n";
+
+    return $mesg;
 }
 
 #

@@ -543,7 +543,15 @@ if (my $childpid = TBBackGround($logname)) {
 
     print("Done. Exited with status: $?\n")
 	if (! $quiet);
-    exit($? >> 8);
+
+    my $exit_code = $? >> 8;
+    
+    if ($exit_code != 0) {
+	my $d = tblog_lookup_error();
+	print tblog_format_error($d);
+    }
+    
+    exit $exit_code;
 }
 TBdbfork();
 
