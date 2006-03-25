@@ -35,12 +35,8 @@ DEF_NM_PORT = "814"
 #
 # A bunch of time constants / intervals (in seconds)
 #
-HOUR  = 60*60
-DAY   = 24*HOUR
-WEEK  = 7*DAY
-MONTH = 30*DAY
 MAX_PLC_LEASELEN = 2*MONTH-4*DAY   # defined by PLC as ~two months (56 days)
-MIN_LEASE_WINDOW = MONTH           # minimum time until expiration (1 month)
+MIN_LEASE_WINDOW = 2*MONTH-11*DAY  # minimum time until expiration
 MAX_LEASE_SLOP = 600 # (ten minutes)
 MAX_CACHE_TIME = HOUR # (one hour)
 
@@ -317,7 +313,7 @@ class mod_PLCNM:
     def renewSlice(self, slice, force = False):
         agent = self.__getAgent(slice.slicename)
         ret = 0
-        now = calendar.timegm(time.gmtime()) # make explicit that we want UTC
+        now = int(time.time()) # seconds since the epoch (UTC)
  
         # Get current PLC timeout for this slice
         leaseend = self.getSliceExpTime(slice.slicename)
@@ -360,6 +356,8 @@ class mod_PLCNM:
             res = tryXmlrpcCmd(agent.SliceRenew,
                                newleaseend,
                                NOKstrs = ["does not exist"])
+            # Get the updated ticket.
+            slice.slicemeta = self.getSliceMeta(slice)
             ret = 1
             if debug:
                 print "SliceRenew returns: %s" % res
@@ -367,6 +365,7 @@ class mod_PLCNM:
             pass
         except:
             print "Failed to renew lease for slice %s" % slice.slicename
+            traceback.print_exc()
             ret = 0
             pass
         else:
@@ -426,7 +425,8 @@ class mod_PLCNM:
                 pass
 
             if not res[0] == 0:
-                raise RuntimeError, "create_sliver failed: %d" % res[0]
+                raise RuntimeError, "create_sliver failed: %d, %s" % \
+                      (res[0], res[1])
             pass
         except:
             print "Failed to create sliver %s on slice %s" % \
@@ -462,7 +462,8 @@ class mod_PLCNM:
         return res
 
     def renewNode(self, node, length = 0):
-        return(0,None,None)
+        res =  self.createNode(node)
+        return (res[0], res[1], node.slice.leaseend)
 
     def getSliceExpTime(self, slicename):
         """

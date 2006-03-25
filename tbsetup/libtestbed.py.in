@@ -26,6 +26,14 @@ SCRIPTNAME        = sys.argv[0][sys.argv[0].rfind("/")+1:]
 DEFAULT_DATA_PATH = "@prefix@/etc/plab/" # ensure this ends in a slash
 
 #
+# Time constants (time lengths in seconds)
+#
+HOUR  = 60*60
+DAY   = 24*HOUR
+WEEK  = 7*DAY
+MONTH = 30*DAY
+
+#
 # How many seconds to sleep between failures and how many times to try
 # commands to both the dslice agent, and individual node managers.
 #

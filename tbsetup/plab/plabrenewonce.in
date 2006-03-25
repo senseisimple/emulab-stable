@@ -1,0 +1,35 @@
+#!/usr/local/bin/python
+# -*- python -*-
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# All rights reserved.
+#
+
+import sys
+sys.path.append("@prefix@/lib")
+import libplab
+from libtestbed import *
+
+def usage(me):
+    print "Usage: %s [ -vd ] [pid eid]" % me
+    sys.exit(1)
+
+
+def main(args):
+    me = args[0]
+    parser = TBParser()
+    opts, args = parser.parse_args()
+    pid = eid = None
+
+    plab = libplab.Plab()
+    if len(args) == 2:
+        pid, eid = args
+        pass
+
+    plab.renew(pid, eid, 1)
+    
+    return
+
+if __name__ == "__main__":
+    main(sys.argv)

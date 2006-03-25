@@ -113,7 +113,8 @@ PLABMON_PID = "emulab-ops"
 PLABMON_EID = "plab-monitor"
 DEF_SLICE_DESC = "Slice created by Emulab"
 
-PLABEXPIREWARN = 2*24*60*60   # two days advance warning.
+PLABEXPIREWARN = 1*WEEK        # one week advance warning for slice expiration.
+NODEEXPIREWARN = 2*WEEK+2*DAY  # about two weeks advance warning for slivers.
 
 #
 # var to track failed renewals
@@ -811,7 +812,7 @@ class Plab:
             pass
         return nodelist
 
-    def renew(self, force = False):
+    def renew(self, inpid = None, ineid = None, force = False):
         """
         Renews all of the Plab leases regardless of when they expire.  Note
         that all times are handled in the UTC time zone.  We don't trust
@@ -820,8 +821,16 @@ class Plab:
 
         global failedrenew # XXX
         
-        now = int(time.mktime(time.gmtime()))
-        res = DBQueryFatal("select pid, eid from plab_slices");
+        now = int(time.time())
+        
+        if not inpid:
+            res = DBQueryFatal("select pid, eid from plab_slices");
+            pass
+        else:
+            if not ineid:
+                raise RuntimeError, "renew: Must provide eid with pid."
+            res = ((inpid, ineid),)
+            pass
         
         loadedSlices = {}
         newfail = []
@@ -863,7 +872,7 @@ class Plab:
             failstr = ""
             for n in newfail:
                 failstr += "%s/%s (expires: %s UTC)\n" % \
-                           (n[:2] + (time.ctime(n[2]),))
+                           (n[:2] + (time.asctime(time.gmtime(n[2])),))
                 pass
             
             SENDMAIL(TBOPS, "Lease renewal(s) failed",
@@ -875,13 +884,13 @@ class Plab:
             failstr = ""
             for n in failsoon:
                 failstr += "%s/%s: (expires: %s UTC)\n" % \
-                           (n[:2] + (time.ctime(n[2]),))
+                           (n[:2] + (time.asctime(time.gmtime(n[2])),))
                 pass
             SENDMAIL(TBOPS, "WARNING: PLAB leases have expired, or will soon",
                      "The following plab leases have expired, or will soon:\n"
                      + failstr + "\n\nPlease look into it!", TBOPS)
             pass
-        
+
         return
     
     pass # end class Plab
@@ -969,8 +978,8 @@ class Slice:
                "No slice found for %s-%s" % (self.pid, self.eid)
         assert (len(res) == 1), \
                "Multiple slices found for %s-%s" % (self.pid, self.eid)
-        ((self.slicename, self.slicemeta, self.leaseend), ) = res
-        self.leaseend = calendar.timegm(time.strptime(str(self.leaseend),
+        ((self.slicename, self.slicemeta, leaseend), ) = res
+        self.leaseend = calendar.timegm(time.strptime(str(leaseend),
                                                       "%Y-%m-%d %H:%M:%S"))
         return
 
@@ -996,6 +1005,45 @@ class Slice:
             traceback.print_exc()
             ret = 0
             pass
+
+        # Renew individual slivers, if necessary.  Any that fail to renew
+        # and are close to expiration need to be noted.  They will be
+        # reported after renewal has been attempted on all nodes.
+        now = int(time.time())
+        nodes = map(lambda x: x[0], self.getSliceNodes())
+        reportfailed = []
+        for nodeid in nodes:
+            try:
+                node = self.loadNode(nodeid)
+                pass
+            except AssertionError:
+                print "Node %s doesn't really exist in %s" % \
+                      (nodeid, self.slicename)
+                continue
+            if node.renew():
+                print "Failed to renew node: %s (expires %s UTC)" % \
+                      (nodeid, time.asctime(time.gmtime(node.leaseend)))
+                print "Timediff: %s" % (node.leaseend - now)
+                if node.leaseend - now < NODEEXPIREWARN:
+                    reportfailed.append((nodeid, node.leaseend))
+                    pass
+                pass
+            del node
+            pass
+
+        # Report any nodes that are near to expiration
+        if len(reportfailed) > 0:
+            tbstr = ""
+            for nodeid, leaseend in reportfailed:
+                tbstr += "Node: %s, Leaseend: %s UTC\n" % \
+                         (nodeid, time.asctime(time.gmtime(leaseend)))
+                pass
+            SENDMAIL(TBOPS, "Plab nodes in danger of expiration: %s/%s" % \
+                     (self.pid, self.eid),
+                     "The following slivers in %s/%s will expire "
+                     "soon:\n\n%s" % \
+                     (self.pid, self.eid, tbstr),
+                     TBOPS)
         
         return ret
 
@@ -1106,10 +1154,11 @@ class Slice:
 #
 
 class Node:
-    def __init__(self, slice, nodeid, pollNode = True):
+    def __init__(self, slice, nodeid, pollNode = False):
         self.slice = slice
         self.nodeid = nodeid
         self.IP = self.__findIP()
+        self.leaseend = 0
         self.nodemeta = None
         self.pollNode = pollNode
         return
@@ -1137,7 +1186,7 @@ class Node:
             pass
 
         print "Creating Plab node %s on %s." % (self.nodeid, self.IP)
-        res, self.nodemeta, self.leaselen = \
+        res, self.nodemeta, self.leaseend = \
              self.slice.plab.agent.createNode(self)
         
         DBQueryFatal("replace into plab_slice_nodes"
@@ -1146,8 +1195,9 @@ class Node:
                      " values (%s, %s, %s, %s, %s, %s)",
                      (self.slice.pid, self.slice.eid,
                       self.slice.slicename, self.nodeid,
-                      self.nodemeta, self.leaselen))
-
+                      self.nodemeta,
+                      time.strftime("%Y-%m-%d %H:%M:%S",
+                                    time.gmtime(self.leaseend))))
         if self.pollNode:
             TIMESTAMP("Waiting for %s to respond" % self.nodeid)
             while True:
@@ -1172,7 +1222,7 @@ class Node:
         """
         if verbose:
             print "Loading node %s" % self.nodeid
-        res = DBQueryFatal("select slicename, nodemeta"
+        res = DBQueryFatal("select slicename, nodemeta, leaseend "
                            " from plab_slice_nodes where node_id = %s",
                            (self.nodeid))
         assert (len(res) > 0), \
@@ -1180,10 +1230,19 @@ class Node:
                (self.nodeid, self.slice.slicename)
         assert (len(res) == 1), \
                "Multiple nodes found for nodeid %s" % self.nodeid
-        ((slicename, self.nodemeta), ) = res
+        ((slicename, self.nodemeta, leaseend), ) = res
         assert (slicename == self.slice.slicename), \
                "Node %s loaded by slice %s, but claims to be in slice %s" % \
                (self.nodeid, self.slice.slicename, slicename)
+        if not leaseend:
+            self.leaseend = 0
+            pass
+        else:
+            self.leaseend = calendar.timegm(time.strptime(str(leaseend),
+                                                          "%Y-%m-%d %H:%M:%S"))
+            pass
+        
+        return
 
     def free(self):
         """
@@ -1223,7 +1282,6 @@ class Node:
         TIMESTAMP("freenode %s finished." % self.nodeid)
         return not deleted
 
-    # XXX: remove - backend module should take card of this internally now.
     def renew(self):
         """
         Renew the lease for this node.  Note that this method
@@ -1232,7 +1290,7 @@ class Node:
         """
         res = ForkCmd(self._renew, timeout = RENEW_TIMEOUT,
                       disable_sigs_parent = TERMSIGS)
-        return not (res[0] | res[1])
+        return res[0] | res[1]
 
     def _renew(self):
         res, self.nodemeta, self.leaseend = \
@@ -1240,7 +1298,10 @@ class Node:
         DBQueryFatal("update plab_slice_nodes"
                      " set nodemeta = %s, leaseend = %s"
                      " where node_id = %s",
-                     (self.nodemeta, self.leaseend, self.nodeid))
+                     (self.nodemeta,
+                      time.strftime("%Y-%m-%d %H:%M:%S",
+                                    time.gmtime(self.leaseend)),
+                      self.nodeid))
         TIMESTAMP("renewnode %s finished." % self.nodeid)
         return 0
 
