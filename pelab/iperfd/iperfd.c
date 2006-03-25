@@ -7,9 +7,7 @@
 /*
  * iperfd - tiny replacement for iperf server
  *
- * TODO: Accept the same command-line arguments as iperf (though only where
- *         relevant)
- *       Accept 'suffixes' like iperf (K,M)
+ * TODO:
  *       Use non-blocking accept() to prevent blocking in some (hopefully
  *         rare) cases.
  *       Use non-blocking IO for logging messages      
@@ -288,9 +286,9 @@ int main(int argc, char **argv) {
                                 &windowsize,sizeof(windowsize)) == -1) {
                         croak_perror("Unable to set send buffer size");
                     }
-                    if (setsockopt(newclient,SOL_SOCKET,SO_SNDBUF,
+                    if (setsockopt(newclient,SOL_SOCKET,SO_RCVBUF,
                                 &windowsize,sizeof(windowsize)) == -1) {
-                        croak_perror("Unable to set send buffer size");
+                        croak_perror("Unable to set recieve buffer size");
                     }
                 }
                 FD_SET(newclient,&master_fdset);
@@ -310,7 +308,6 @@ int main(int argc, char **argv) {
 	    if (FD_ISSET(i,&tmp_fdset)) {
 		/*
 		 * TODO: Do non-blocking I/O and more than one read?
-		 * TODO: Do more reads? (fewer select() calls)
 		 * TODO: Do we need to handle signals, like SIGPIPE?
 		 */
                 ssize_t readbytes = read(i,buffer,readsize);
