@@ -4,11 +4,6 @@
 #
 case "$1" in
 	start)
-		if [ -x @prefix@/sbin/plabrenewd  ]; then
-			echo -n " plabrenewd"
-			@prefix@/sbin/plabrenewd -v
-		fi
-
 		if [ -x @prefix@/sbin/plabmonitord  ]; then
 			echo -n " plabmonitord"
 			@prefix@/sbin/plabmonitord
