@@ -94,6 +94,7 @@ RUN_DEPENDS=	\
 .if ${OSMAJOR} >= 5
 RUN_DEPENDS+= \
 	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/DBI.pm:${PORTSDIR}/databases/p5-DBI \
+	${LOCALBASE}/lib/perl5/site_perl/${PERL_VER}/${PERL_ARCH}/XML/Simple.pm:${PORTSDIR}/textproc/p5-XML-Simple \
 	swig:${PORTSDIR}/devel/swig13
 .else
 RUN_DEPENDS+= cvsup:${PORTSDIR}/net/cvsup-without-gui \
