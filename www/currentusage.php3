@@ -5,6 +5,10 @@
 # All rights reserved.
 #
 require("defs.php3");
+#
+# This script uses Sajax ... BEWARE!
+#
+require("Sajax.php");
 
 #
 # Get current user.
@@ -57,29 +61,24 @@ function SHOWSTATS()
     }
     $freepcs = TBFreePCs();
 
-    PAGEBEGINNING("Current Usage", 1, 1);
-    ?>
-     <table valign=top align=center width=100% height=100% border=1>
-     <tr><th nowrap colspan=2 class='usagetitle'>
-	   Current Experiments</th></tr>
-     <tr><td class="menuoptusage" align=right>
-          <?php echo $active_expts ?></td> 
-         <td align="left" class="menuoptusage">
-             <a target=_parent href=explist.php3#active>Active</a>
-          </td></tr>
-     <tr><td align="right" class="menuoptusage"><?php echo $idle_expts ?></td>
-         <td align="left" class="menuoptusage">Idle</td></tr>
-     <tr><td align="right" class="menuoptusage">
-	     <?php echo $swapped_expts ?></td>
-         <td align="left" class="menuoptusage">
-            <a target=_parent href=explist.php3#swapped>Swapped</a>
-          </td></tr>
-     <tr><td align="right" class="menuoptusage">
-	     <b><?php echo $freepcs ?></b></td>
-         <td align="left" class="menuoptusage"><b>Free PCs</b></td>
-     </tr>
-     </table>
-   <?php
+    $output = "<table valign=top align=center width=100% height=100% border=1>
+                <tr><th nowrap colspan=2 class='usagetitle'>
+	            Current Experiments</th></tr>
+                <tr><td class=menuoptusage align=right>$active_expts</td>
+                    <td align=left class=menuoptusage>
+                        <a target=_parent href=explist.php3#active>Active</a>
+                    </td></tr>
+                <tr><td align=right class=menuoptusage>$idle_expts</td>
+                    <td align=left  class=menuoptusage>Idle</td></tr>
+                <tr><td align=right class=menuoptusage>$swapped_expts</td>
+                    <td align=left  class=menuoptusage>
+                        <a target=_parent href=explist.php3#swapped>Swapped</a>
+                    </td></tr>
+                <tr><td align=right class=menuoptusage><b>$freepcs</b></td>
+                    <td align=left  class=menuoptusage><b>Free PCs</b></td>
+                </tr>
+               </table>\n";
+    return $output;
 }
 
 #
@@ -117,14 +116,14 @@ function SHOWFREENODES()
 	    $freecounts[$type] = $count;
 	}
     }
-    PAGEBEGINNING("Free Node Summary", 1, 1);
-
+    $output = "";
+	
     $freepcs   = TBFreePCs();
     $reloading = TBReloadingPCs();
 
-    echo "<table valign=top align=center width=100% height=100% border=1>
-          <tr><td nowrap colspan=4 class=menuoptusage align=center>
- 	       <font size=+1>$freepcs Free PCs</font></td></tr>\n";
+    $output .= "<table valign=top align=center width=100% height=100% border=1>
+                 <tr><td nowrap colspan=4 class=menuoptusage align=center>
+ 	           <font size=+1>$freepcs Free PCs</font></td></tr>\n";
 
     $pccount = count($freecounts);
     $newrow  = 1;
@@ -132,51 +131,84 @@ function SHOWFREENODES()
 	$freecount = $freecounts[$key];
 
 	if ($newrow || $pccount <= 3) 
-	    echo "<tr>\n";
+	    $output .= "<tr>\n";
 	$newrow = ($newrow ? 0 : 1);
 	
-	echo "<td class=menuoptusage align=right>
-                  <a target=_parent href=shownodetype.php3?node_type=$key>
-                      $key</a></td>
-              <td class=menuoptusage align=left>${freecount}</td>\n";
+	$output .= "<td class=menuoptusage align=right>
+                     <a target=_parent href=shownodetype.php3?node_type=$key>
+                        $key</a></td>
+                    <td class=menuoptusage align=left>${freecount}</td>\n";
 
 	if ($newrow || $pccount <= 3) {
-	    echo "</tr>\n";
+	    $output .= "</tr>\n";
 	}
     }
     if (! $newrow && $pccount > 3) {
-	echo "<td></td><td></td></tr>\n";
+	$output .= "<td></td><td></td></tr>\n";
     }
     # Fill in up to 3 rows.
     if ($pccount < 3) {
 	for ($i = $pccount + 1; $i <= 3; $i++) {
-	    echo "<tr><td class=menuoptusage>&nbsp</td>
-                      <td class=menuoptusage>&nbsp</td></tr>\n";
+	    $output .= "<tr><td class=menuoptusage>&nbsp</td>
+                            <td class=menuoptusage>&nbsp</td></tr>\n";
 	}
     }
 
-    echo "<tr>
-          <td class=menuoptusage colspan=4 align=center>
-               <b>$reloading PCs reloading</b></td>
-          </tr>\n";
-    echo "</table>";
+    $output .= "<tr>
+                 <td class=menuoptusage colspan=4 align=center>
+                    <b>$reloading PCs reloading</b></td>
+               </tr>\n";
+    $output .= "</table>";
+    return $output;
+}
+
+#
+# This is for the Sajax request.
+#
+function FreeNodeHtml() {
+    global $uid;
+    
+    if ($uid) {
+	return SHOWFREENODES();
+    }
+    else {
+	return SHOWSTATS();
+    }
 }
      
 #
 # If user is anonymous, show experiment stats, otherwise useful info.
 # 
 if ($uid) {
-    #
-    # Auto refresh, but only for an hour of idle time.
-    #
-    if ($CHECKLOGIN_IDLETIME < (60 * 60)) {
-	$autorefresh = 90;
+    sajax_init();
+    sajax_export("FreeNodeHtml");
+    sajax_handle_client_request();
+
+    PAGEBEGINNING("Free Node Summary", 1, 1);
+    echo "<script>\n";
+    sajax_show_javascript();
+
+    ?>
+    function FreeNodeHtml_CB(stuff) {
+	getObjbyName('usage').innerHTML = stuff;
     }
-    SHOWFREENODES();
+    setInterval('GetFreeNodeHtml()', 10000);
+
+    function GetFreeNodeHtml() {
+	x_FreeNodeHtml(FreeNodeHtml_CB);
+    }
+    <?php
+    echo "</script>\n";
+	  
+    echo "<div id=usage>\n";
+    echo   SHOWFREENODES();
+    echo "</div>\n";
+    echo "</body></html>";
 }
 else {
-    SHOWSTATS();
+    PAGEBEGINNING("Current Usage", 1, 1);
+    echo "<div id=usage>\n";
+    echo   SHOWSTATS();
+    echo "</div>\n";
+    echo "</body></html>";
 }
-
-echo "</body></html>";
-
