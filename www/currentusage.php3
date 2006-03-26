@@ -192,7 +192,7 @@ if ($uid) {
     function FreeNodeHtml_CB(stuff) {
 	getObjbyName('usage').innerHTML = stuff;
     }
-    setInterval('GetFreeNodeHtml()', 10000);
+    setInterval('GetFreeNodeHtml()', 30000);
 
     function GetFreeNodeHtml() {
 	x_FreeNodeHtml(FreeNodeHtml_CB);
