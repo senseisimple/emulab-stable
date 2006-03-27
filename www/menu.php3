@@ -369,14 +369,14 @@ function WRITESIDEBAR() {
 	if (!$firstinitstate) {
 	    echo "<a href=\"$TBBASE/reqaccount.php3\">";
 	    echo "<img alt=\"Request Account\" border=0 ";
-	    echo "src=\"$BASEPATH/requestaccount.gif\"></a>";
+	    echo "src=\"$BASEPATH/requestaccount.gif\" width=144 height=32></a>";
 
 	    echo "<strong>or</strong>";
 	}
 
 	echo "<a href=\"$TBBASE/login.php3\">";
 	echo "<img alt=\"logon\" border=0 ";
-	echo "src=\"$BASEPATH/logon.gif\"></a>\n";
+	echo "src=\"$BASEPATH/logon.gif\" width=144 height=32></a>\n";
 
 	echo "</div>";
     }
