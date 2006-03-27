@@ -46,6 +46,9 @@ FILE  *loss_log;
 
 ThroughputAckState throughput[CONCURRENT_RECEIVERS];
 
+unsigned long max_throughput[CONCURRENT_RECEIVERS];
+unsigned long base_rtt[CONCURRENT_RECEIVERS];
+
 // Returns true if sequence is between the firstUnknown and the
 // nextSequence. Takes account of wraparound.
 int throughputInWindow(ThroughputAckState * state, unsigned int sequence)
@@ -349,25 +352,18 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
       source_port = htons(tp->source);
       dest_port = htons(tp->dest);
 
-//      path_id = search_rcvdb(ip_dst);
-
-      // If there is a fake entry, the stub_port entry will be the
-      // destination port requested by the command line.
-//      debug_addr.s_addr = ip_src;
-//      printf("ip_src: %s ", inet_ntoa(debug_addr));
-//      debug_addr.s_addr = ip_dst;
-//      printf("ip_dst: %s, dest_port: %d, source_port: %d\n",
-//	     inet_ntoa(debug_addr), dest_port, source_port);
-      path_id = find_by_stub_port(ip_dst, dest_port);
-//      printf("outgoing path_id: %d\n", path_id);
-      if (path_id == -1 || rcvdb[path_id].source_port != 0
-	  || rcvdb[path_id].dest_port != 0)
+      if (flag_standalone)
+      {
+	// If this is standalone mode, the stub_port entry will be the
+	// destination port requested by the command line.
+	path_id = find_by_stub_port(ip_dst, dest_port);
+      }
+      else
       {
 	// I contacted the receiver. Therefore, my port is unique and
 	// the receiver's port is fixed. The destination is the
 	// receiver, therefore my port is the one that is of interest.
 	path_id = find_by_stub_port(ip_dst, source_port);
-//	printf("stub path_id (outgoing): %d\n", path_id);
       }
       if (path_id != -1) { //a monitored outgoing packet
         //ignore the pure outgoing ack
@@ -417,22 +413,20 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	}
    
       } else {
-//	path_id = search_rcvdb(ip_src);
-	// If there is a fake entry, and the packet is incoming, then
-	// the source_port will be the remote port requested on the
-	// command line.
-	path_id = find_by_stub_port(ip_src, source_port);
-//	printf("incoming path_id: %d\n", path_id);
-
-	if (path_id == -1 || rcvdb[path_id].source_port != 0
-	    || rcvdb[path_id].dest_port != 0)
+	if (flag_standalone)
+	{
+	  // If this is standalone mode, and the packet is incoming,
+	  // then the source_port will be the remote port requested on
+	  // the command line.
+	  path_id = find_by_stub_port(ip_src, source_port);
+	}
+	else
 	{
 	  // I contacted the receiver, so my port is unique and their
 	  // port is the same every time. This means that if a packet is
 	  // coming from them, the destination port is the one of
 	  // interest.
 	  path_id = find_by_stub_port(ip_src, dest_port);
-//	  printf("stub path_id (incoming): %d\n", path_id);
 	}
 	if (path_id != -1) { //a monitored incoming packet
 	  if (ack_bit == 1) { //has an acknowledgement
@@ -445,15 +439,52 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	      if (flag_resend) { //if the ack is triggered by a resend, skip the delay calculation.
 		flag_resend = 0; 
 	      } else { //calculate the delay
-		  int delay = 0;
+		int delay = 0;
+	        int bandwidth = 0;
+		int goodput = 0;
+		struct tcp_info info;
 		msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
 		delay = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
+		if (delay != 0)
+		{
 		delays[path_id] += delay;
 		(delay_count[path_id])++;
-		append_delay_sample(path_id, delay, &(pkthdr->ts));
+		if (delay < base_rtt[path_id])
+		{
+		    base_rtt[path_id] = delay;
+		}
+		if (is_live && delay_count[path_id] > 0)
+		{
+		    int info_size = sizeof(info);
+		    int error = getsockopt(rcvdb[path_id].sockfd,
+					   SOL_TCP, TCP_INFO, &info,
+					   &info_size);
+		    if (error == -1)
+		    {
+			perror("getsockopt() TCP_INFO");
+			clean_exit(1);
+		    }
+		    bandwidth = (info.tcpi_snd_cwnd * info.tcpi_snd_mss)
+			/ base_rtt[path_id];
+		    if (bandwidth > max_throughput[path_id])
+		    {
+			max_throughput[path_id] = bandwidth;
+		    }
+		    goodput = throughputTick(&throughput[path_id]);
+		    logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
+		    logWrite(DELAY_DETAIL, NULL, "Throughput: %lu", bandwidth);
+		    logWrite(DELAY_DETAIL, NULL, "Congestion Window Size: %lu",
+			     info.tcpi_snd_cwnd);
+		    logWrite(DELAY_DETAIL, NULL, "Sending MSS: %lu",
+			     info.tcpi_snd_mss);
+		    logWrite(DELAY_DETAIL, NULL, "Base RTT: %lu",
+			     base_rtt[path_id]);
+		}
+//		append_delay_sample(path_id, delay, &(pkthdr->ts));
 		logWrite(DELAY_DETAIL, &(pkthdr->ts),
 			 "Delay: %lu, Sum: %lu, Count: %lu", delay,
 			 delays[path_id], delay_count[path_id]);
+	      }
 	      }
 	      pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
 	    } //ack in rcvdb
@@ -526,7 +557,7 @@ u_int16_t handle_ethernet (u_char *args,const struct pcap_pkthdr* pkthdr,const u
     return ether_type;
 }
 
-void init_pcap(int to_ms, unsigned short port, char * device, int is_live) {
+void init_pcap(int to_ms, unsigned short port, char * device) {
     char errbuf[PCAP_ERRBUF_SIZE];
 
     if (flag_debug) {

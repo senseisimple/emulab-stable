@@ -261,9 +261,11 @@ int insert_fake(unsigned long ip, unsigned short port)
     delays[index]=0;
     last_delays[index]=0;
     delay_count[index]=0;
-    delay_records[index].head = NULL;
-    delay_records[index].tail = NULL;
-    delay_records[index].sample_number = 0;
+    max_throughput[index] = 0;
+    base_rtt[index] = LONG_MAX;
+//    delay_records[index].head = NULL;
+//    delay_records[index].tail = NULL;
+//    delay_records[index].sample_number = 0;
     result = index;
   }
   return result;
@@ -336,7 +338,9 @@ void reconnect_receiver(int index)
   last_loss_rates[index]=0;
   delays[index]=0;
   last_delays[index]=0;
-  remove_delay_samples(index);
+  max_throughput[index] = 0;
+  base_rtt[index] = LONG_MAX;
+//  remove_delay_samples(index);
 }
 
 void reset_receive_records(int index, unsigned long ip,

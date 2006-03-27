@@ -108,6 +108,7 @@ typedef struct {
 } delay_record;
 
 extern short  flag_debug;
+    extern short flag_standalone;
 extern int pcapfd;
 extern int maxfd;
 extern connection snddb[CONCURRENT_SENDERS];
@@ -119,10 +120,13 @@ extern unsigned long delay_count[CONCURRENT_RECEIVERS];
 extern loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 extern unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 extern delay_record delay_records[CONCURRENT_RECEIVERS]; //delay is calculated at the sender side
+extern int is_live;
+
+extern unsigned long max_throughput[CONCURRENT_RECEIVERS];
+extern unsigned long base_rtt[CONCURRENT_RECEIVERS];
 
 extern void sniff(void);
-extern void init_pcap(int to_ms, unsigned short port, char * device,
-		      int is_live);
+extern void init_pcap(int to_ms, unsigned short port, char * device);
 extern void append_delay_sample(int path_id, long sample_value,
 				struct timeval const * timestamp);
 extern void remove_delay_samples(int path_id);

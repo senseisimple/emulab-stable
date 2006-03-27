@@ -241,6 +241,8 @@ def send_destinations(conn, packet_list):
     prev_time = packet_list[0][3]
   for packet in packet_list:
     ip = ip_to_int(emulated_to_real[packet[0]])
+    if prev_time == 0.0:
+      prev_time = packet[3]
     delta = int((packet[3] - prev_time) * 1000)
     if packet[3] == 0:
       delta = 0
