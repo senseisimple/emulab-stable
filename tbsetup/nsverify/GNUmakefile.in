@@ -19,7 +19,7 @@ NS_SRC_TARBALL=ns-allinone-$(NS_TAR_VERSION).tar.gz
 
 include $(OBJDIR)/Makeconf
 
-LIB_STUFF = tb_compat.tcl nstb_compat.tcl
+LIB_STUFF = tb_compat.tcl
 LIBEXEC_STUFF = nstbparse
 BOSSLIBEXEC = verify-ns
 
@@ -36,9 +36,6 @@ post-install:
 	chmod 775 $(INSTALL_LIBEXECDIR)
 	chown root $(INSTALL_LIBEXECDIR)/verify-ns
 	chmod u+s $(INSTALL_LIBEXECDIR)/verify-ns
-
-nstb_compat.tcl: $(SRCDIR)/../ns2ir/nstb_compat.tcl
-	cp $< $@
 
 ns-allinone-$(NS_VERSION):
 	@if test -f /share/tarballs/$(NS_SRC_TARBALL); then \

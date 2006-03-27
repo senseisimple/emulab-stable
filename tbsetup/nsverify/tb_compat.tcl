@@ -5,7 +5,7 @@
 # All rights reserved.
 #
 
-source nstb_compat.tcl
+source ../ns2ir/nstb_compat.tcl
 
 variable tbnsobj
 
