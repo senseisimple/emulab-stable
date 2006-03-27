@@ -981,9 +981,12 @@ sub tblog_email_error ( $$$$$$$@ ) {
     {
 	$headers .= "\n" if defined $headers && length($headers) > 0;
 	$headers .= "$testbed_ops";
+	$headers .= "\nX-NetBed-Cc: testbed-ops";
     } else {
+	$from = "Testbed Ops <@TBOPSEMAIL@>";
 	$headers .= "\n" if defined $headers && length($headers) > 0;
-	$headers .= "Cc: @TBERRORSEMAIL@";
+	$headers .= "Bcc: @TBERRORSEMAIL@";
+	$headers .= "\nX-NetBed-Cc: testbed-errors";
     }
 
     my $subject = "$what: $pideid";
