@@ -33,5 +33,5 @@ fi
 echo "Generating IP mapping file into $IPMAP";
 $PERL ${MONITOR_DIR}/$GENIPMAP > $IPMAP
 
-echo "Starting up netmond for $PROJECT/$EXPERIMENT $PELAB_IP $SIP";
+echo "Starting up monitor for $PROJECT/$EXPERIMENT $PELAB_IP $SIP";
 exec $NETMON_DIR/$NETMOND -v 2 | $PYTHON $MONITOR_DIR/$MONITOR $IPMAP $PROJECT/$EXPERIMENT $PELAB_IP $SIP

@@ -11,10 +11,10 @@ barrier_wait "stub";
 #
 # Start up our own monitor
 #
-MONPID=`log_output_background "monitor" \
-                              "$SH ${MONITOR_DIR}/run-monitor-libnetmon.sh"`
+$SH ${MONITOR_DIR}/run-monitor-libnetmon.sh &
+MONPID=$!
 # Kill the monitor if we get killed - TODO: harsher kill?
-trap "$AS_ROOT kill $MONPID" EXIT
+trap "$AS_ROOT kill $MONPID; $AS_ROOT killall netmond" EXIT
 
 #
 # Give it time to come up

@@ -16,5 +16,6 @@ export HOST_ROLE="stub"
 #
 # Just run the stub!
 #
+echo "Running PID $$"
 echo "Starting stubd on $PLAB_IFACE ($PLAB_IP) Extra arguments: $*"
 exec $AS_ROOT $STUB_DIR/$STUBD $PLAB_IFACE $*
