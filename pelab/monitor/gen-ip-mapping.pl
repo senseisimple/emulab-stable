@@ -19,12 +19,21 @@ while (<HOSTS>) {
     }
 }
 
+my $lines_output = 0;
 foreach my $elabnode (keys %elabips) {
     my $plabnode = $elabnode;
     $plabnode =~ s/elab/planet/i;
     if (exists $plabips{$plabnode}) {
         print "$elabips{$elabnode} $plabips{$plabnode} elabc-$elabnode\n";
+        $lines_output++;
     }
 }
 
 close HOSTS;
+
+if ($lines_output == 0) {
+    warn "Hosts file had no names I recognize\n";
+    exit 1;
+}
+
+exit 0;
