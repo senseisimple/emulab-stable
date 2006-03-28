@@ -2,14 +2,14 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003 University of Utah and the Flux Group.
+# Copyright (c) 2000-2003, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
 #
 # snmpit module for APC MasterSwitch power controllers
 #
-# supports new(ip), power(on|off|cyc[le],port)
+# supports new(ip), power(on|off|cyc[le],port), status
 #
 
 package snmpit_apc;
@@ -83,6 +83,34 @@ sub power {
     }
 
     return $errors;
+}
+
+sub status {
+    my $self = shift;
+    my $statusp = shift;
+    my %status;
+
+    my $StatOID = ".1.3.6.1.4.1.318.1.1.4.2.2";
+    my $Status = 0;
+
+    $Status = $self->{SESS}->get([[$StatOID,0]]);
+    if (!defined $Status) {
+	print STDERR $self->{DEVICENAME}, ": no answer from device\n";
+	return 1;
+    }
+    print("Status is '$Status'\n") if $self->{DEBUG};
+
+    if ($statusp) {
+	my @stats = split '\s+', $Status;
+	my $o = 1;
+	foreach my $ostat (@stats) {
+	    my $outlet = "outlet$o";
+	    $status{$outlet} = $ostat;
+	    $o++;
+	}
+	%$statusp = %status;
+    }
+    return 0;
 }
 
 sub UpdateField {
