@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -133,11 +133,13 @@ sub rpc27ctrl {
 	for my $try (1..$ntries) {
 	    $status = syncandsend($controller, $TIP, $command, undef);
 	    #
-	    # Double check that an off command really turned the outlet(s)
-	    # off.  We assume reliable power off in our security environment
-	    # and we have seen cases where powering off doesn't.
+	    # Double check that an off or on command really turned the
+	    # outlet(s) off or on.  We assume reliable power off in our
+	    # security environment and we have seen cases where powering
+	    # off doesn't.  Reliable power on also avoid many unnecessary
+	    # failures during firewalled experiment swapout.
 	    #
-	    if ($status == 0 && $cmd eq "off") {
+	    if ($status == 0 && ($cmd eq "off" || $cmd eq "on")) {
 		my %stathash;
 		for my $stry (1..$ntries) {
 		    $status = syncandsend($controller, $TIP, "status",
@@ -149,7 +151,7 @@ sub rpc27ctrl {
 		    my @noutlets = ();
 		    for my $o (split(",", $outlet)) {
 			if (!defined($stathash{"outlet$o"}) ||
-			    $stathash{"outlet$o"} !~ /^off$/i) {
+			    $stathash{"outlet$o"} !~ /^$cmd$/i) {
 			    push(@noutlets, $o);
 			}
 		    }
@@ -159,12 +161,12 @@ sub rpc27ctrl {
 			$status = -1;
 			if ($try == $ntries) {
 			    print STDERR
-				"*** Failed to turn off $controller $outlet\n";
+				"*** Failed to turn $cmd $controller $outlet\n";
 			}
 		    }
 		} elsif ($status > 0) {
 		    print STDERR
-			"*** Post-off status command failed on $controller\n";
+			"*** Post-$cmd status command failed on $controller\n";
 		}
 	    }
 	    last

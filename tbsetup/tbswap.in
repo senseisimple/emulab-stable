@@ -1578,6 +1578,7 @@ sub undoFWNodes($$;@) {
 	$myargs{'name'} = "tbswap";
 	$myargs{'command'} = "sudo /usr/local/bin/diskzap";
 	$myargs{'poweron'} = 1;
+	$myargs{'retry'} = 1;
 	if (TBAdminMfsRunCmd(\%myargs, \@failed, @nodes)) {
 	    $fwerr = "Failed to invalidate bootblocks on @failed!";
 	    @fwstate = ("Firewall is NOT in place",
