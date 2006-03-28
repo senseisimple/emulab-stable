@@ -49,31 +49,34 @@ void logWrite(int flags, struct timeval const * timestamp,
 enum LOG_TYPE
 {
   // Information about control messages being sent to the monitor
-  CONTROL_SEND     = 0x1,
+  CONTROL_SEND         = 0x1,
   // Information about control messages being received from the monitor
-  CONTROL_RECEIVE  = 0x2,
+  CONTROL_RECEIVE      = 0x2,
   // Information about sent control messages in a format used in
   // tcptrace graphs.
-  TCPTRACE_SEND    = 0x4,
+  TCPTRACE_SEND        = 0x4,
   // Information about received control messages in a format used in
   // tcptrace graphs.
-  TCPTRACE_RECEIVE = 0x8,
+  TCPTRACE_RECEIVE     = 0x8,
   // Information about sent packets which were sniffed by stub-pcap.
-  SNIFF_SEND       = 0x10,
+  SNIFF_SEND           = 0x10,
   // Information about received packets which were sniffed by stub-pcap.
-  SNIFF_RECEIVE    = 0x20,
+  SNIFF_RECEIVE        = 0x20,
   // Information about writing to peers.
-  PEER_WRITE       = 0x40,
+  PEER_WRITE           = 0x40,
   // Information about reading from peers.
-  PEER_READ        = 0x80,
+  PEER_READ            = 0x80,
   // Which stages are being run in the main loop.
-  MAIN_LOOP        = 0x100,
+  MAIN_LOOP            = 0x100,
   // Database storage and reterieval
-  LOOKUP_DB        = 0x200,
-  DELAY_DETAIL     = 0x400,
+  LOOKUP_DB            = 0x200,
+  // Print fine grained delay data in the log file.
+  DELAY_DETAIL         = 0x400,
+  // Print fine grained packet-buffer control data.
+  PACKET_BUFFER_DETAIL = 0x800,
   // Shortcuts for common cases.
   LOG_NOTHING      = 0x00,
-  LOG_EVERYTHING   = 0x7ff
+  LOG_EVERYTHING   = 0xfff
 };
 
 #ifdef __cplusplus

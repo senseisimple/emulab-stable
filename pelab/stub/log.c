@@ -74,6 +74,10 @@ static void logPrefix(int flags, struct timeval const * timestamp)
   {
       fprintf(logFile, "DELAY_DETAIL ");
   }
+  if (flags & PACKET_BUFFER_DETAIL)
+  {
+      fprintf(logFile, "PACKET_BUFFER_DETAIL ");
+  }
   if (logTimestamp)
   {
     struct timeval now;

@@ -45,6 +45,13 @@ char random_buffer[MAX_PAYLOAD_SIZE];
 
 int total_size = 0;
 
+char * ipToString(unsigned long ip)
+{
+  struct in_addr address;
+  address.s_addr = ip;
+  return inet_ntoa(address);
+}
+
 typedef struct packet_buffer_node_tag
 {
   struct packet_buffer_node_tag * next;
@@ -116,6 +123,8 @@ void packet_buffer_add(char * buffer, int size)
 packet_info packet_buffer_front(void)
 {
   packet_info result;
+  static char * lastAddress = NULL;
+  char * thisAddress = packet_buffer_head->buffer + packet_buffer_index;
   if (packet_buffer_head == NULL)
   {
     printf("packet_buffer_head == NULL in front\n");
@@ -154,6 +163,15 @@ packet_info packet_buffer_front(void)
     result.type = ntohs(result.type);
     base += sizeof(result.type);
   }
+  if (thisAddress != lastAddress)
+  {
+      logWrite(PACKET_BUFFER_DETAIL, NULL,
+	       "Looking at packet: type(%hu) value(%lu) delta(%lu) "
+	       "source_port(%hu) dest_port(%hu) ip(%s)",
+	       result.type, result.value, result.delta, result.source_port,
+	       result.dest_port, ipToString(result.ip));
+  }
+  lastAddress = thisAddress;
   return result;
 }
 
@@ -179,13 +197,6 @@ void packet_buffer_advance(void)
       packet_buffer_tail = NULL;
     }
   }
-}
-
-char * ipToString(unsigned long ip)
-{
-  struct in_addr address;
-  address.s_addr = ip;
-  return inet_ntoa(address);
 }
 
 void init_random_buffer(void)
@@ -1009,6 +1020,10 @@ int main(int argc, char *argv[]) {
 	else if (strcmp(optarg, "delay-detail") == 0)
 	{
 	    logflags = logflags | DELAY_DETAIL;
+	}
+	else if (strcmp(optarg, "packet-buffer-detail") == 0)
+	{
+	    logflags = logflags | PACKET_BUFFER_DETAIL;
 	}
 	else
 	{
