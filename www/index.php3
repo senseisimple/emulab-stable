@@ -57,31 +57,31 @@ if ($message != "") {
 
 ?>
 
-<p><em>Netbed</em>, an outgrowth of <em>Emulab</em>, provides
+<p><em>Emulab</em> provides
 integrated access to three disparate experimental environments:
 <a href="tutorial/docwrapper.php3?docname=nse.html">simulated</a>,
 emulated, and <a href=widearea.html>wide-area</a> network
-testbeds.  Netbed strives to preserve the control and ease of use of
+testbeds.  Emulab strives to preserve the control and ease of use of
 simulation, without sacrificing the realism of emulation and live
 network experimentation. 
 </p>
 
 <p>
-Netbed unifies all three environments under a common user interface,
+Emulab unifies all three environments under a common user interface,
 and integrates the three into a common framework.  This framework
 provides abstractions, services, and namespaces common to all, such as
 allocation and naming of nodes and links.  By mapping the abstractions
-into domain-specific mechanisms and internal names, Netbed masks much
+into domain-specific mechanisms and internal names, Emulab masks much
 of the heterogeneity of the three approaches.
 </p>
 
 <p>
-Netbed's emulation testbed consists of three sub-testbeds
+Emulab's emulation testbed consists of three sub-testbeds
 (nodes from each can be mixed and matched), each catering to a
 different research target:  
 
 <ul>
-<li> <b>Mobile Wireless</b>: Netbed has deployed and opened to public
+<li> <b>Mobile Wireless</b>: Emulab has deployed and opened to public
 external use, a small
 <a href="tutorial/mobilewireless.php3">robotic testbed</a> that will
 grow into a large mobile robotic wireless testbed. The small version
@@ -91,7 +91,7 @@ within our offices.  An overview of this new mobile testbed is presented in
 <a href="http://www.cs.utah.edu/flux/testbed-docs/teapot05-emulab-only.pdf">
 this article</a>.
 <br><br>
-<li> <b>Fixed 802.11 Wireless</b>: Netbed's
+<li> <b>Fixed 802.11 Wireless</b>: Emulab's
 <a href="tutorial/docwrapper.php3?docname=wireless.html">Fixed Wireless</a>
 testbed consists of PC nodes that contain 802.11 a/b/g wifi
 interfaces, and are scattered around our building at various
@@ -107,7 +107,7 @@ scripts or a Java GUI, allow you to remotely configure and control
 machines and links down to the hardware level.  Packet loss, latency,
 bandwidth, queue sizes--all can be user-defined.  Even the OS disk
 contents can be fully and securely replaced with custom images by any
-experimenter; Netbed can load ten or a hundred disks in less than two
+experimenter; Emulab can load ten or a hundred disks in less than two
 minutes. 
 
 <br><br>
@@ -132,7 +132,7 @@ characteristics, including its topology: configurable by users.
 
 <p>
 Numerous <a href=otheremulabs.html>other sites</a> have set
-up their own network emulators using Netlab's software, including the
+up their own network emulators using Emulab's software, including the
 <a href = "http://www.uky.emulab.net">University of Kentucky</a> testbed,
 and the <a href = "http://www.netlab.cc.gatech.edu">Georgia Tech</a>
 Testbed. 
