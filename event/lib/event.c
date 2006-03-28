@@ -1389,7 +1389,20 @@ notify_callback(elvin_handle_t server,
     void *data;
 
     TRACE("received event notification\n");
-    assert(arg);
+
+    /*
+     * If two subscriptions match an incoming event, and the first
+     * notified callback _asynchronously_ unsubscribes the second
+     * subscription, the second callback may still be called while the
+     * unsubscribe operation is underway.  In this case, the
+     * unsubscribe operation would have already cleared the second
+     * subscription's associated "rock."  So just return now if the
+     * rock has been cleared since this subscription is either on it's
+     * way out soon, or is otherwise bogus.
+     */
+    if (arg == NULL) {
+      return;
+    }
 
     notification.elvin_notification = elvin_notification;
     notification.has_hmac = 0;
@@ -2106,4 +2119,22 @@ int event_set_idle_period(event_handle_t handle, int seconds) {
 
 }
 
-		
+
+int event_set_failover(event_handle_t handle, int dofail) {
+  int retval;
+
+  if (!handle) {
+    ERROR("invalid parameter\n");
+    return 0;
+  }
+
+  retval = elvin_handle_set_failover(handle->server, dofail,
+				     handle->status);
+  if (retval == 0) {
+    ERROR("Could not set failover on event handle: ");
+    elvin_error_fprintf(stderr, handle->status);
+  }
+
+  return retval;
+
+}

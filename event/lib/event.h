@@ -249,6 +249,7 @@ int event_notification_unpack(event_handle_t handle,
 			    event_notification_t *notification,
 			    unsigned char *data, int len);
 int event_set_idle_period(event_handle_t handle, int seconds) ;
+int event_set_failover(event_handle_t handle, int dofail) ;
 
 int event_arg_get(char *args, char *key, char **value);
 int event_arg_dup(char *args, char *key, char **value);

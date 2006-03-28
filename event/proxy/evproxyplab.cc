@@ -163,6 +163,8 @@ main(int argc, char **argv)
 	if (bosshandle == NULL) {
 		fatal("could not register with remote event system");
 	}
+        /* Setup handle to periodically ping remote event server */
+        event_set_idle_period(bosshandle, 30);
 
 	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
 
