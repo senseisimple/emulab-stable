@@ -438,7 +438,7 @@ class mod_PLCNM:
             raise
 
         # send back the rcap
-        return (res, cPickle.dumps(res[1][0]), None)
+        return (res, cPickle.dumps(res[1][0]), node.slice.leaseend)
 
     def freeNode(self, node):
         rcap = cPickle.loads(node.nodemeta)
@@ -462,8 +462,7 @@ class mod_PLCNM:
         return res
 
     def renewNode(self, node, length = 0):
-        res =  self.createNode(node)
-        return (res[0], res[1], node.slice.leaseend)
+        return  self.createNode(node)
 
     def getSliceExpTime(self, slicename):
         """
