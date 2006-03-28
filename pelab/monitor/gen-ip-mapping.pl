@@ -26,6 +26,24 @@ foreach my $elabnode (keys %elabips) {
     if (exists $plabips{$plabnode}) {
         print "$elabips{$elabnode} $plabips{$plabnode} elabc-$elabnode\n";
         $lines_output++;
+    } else {
+        # Let's hope this is an experiment with a real (not emulated) planetlab
+        # half. Note - this should be run by something that has sourced
+        # common-env.sh so that these are set
+        my $plabhostname = "$elabnode.$ENV{EXPERIMENT}.$ENV{PROJECT}.emulab.net";
+        $plabhostname =~ s/^elab/planet/;
+        # Find out the IP address for $plabhostname
+        open(H,"host $plabhostname |") or die "Unable to run host\n";
+        # Yuck. Why can't 'host' have a flag to spit out just the IP?
+        <H>; # Throw away first line
+        # The next line is the one with interesting data
+        my $interesting_line = <H>;
+        close H;
+        if ($interesting_line =~ /has address (.*)$/) {
+            my $plabIP = $1;
+            print "$elabips{$elabnode} $plabIP elabc-$elabnode\n";
+            $lines_output++;
+        }
     }
 }
 
