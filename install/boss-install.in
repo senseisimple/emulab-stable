@@ -29,6 +29,7 @@ my $WINSUPPORT = @WINSUPPORT@;
 my $MAILMANSUPPORT = @MAILMANSUPPORT@;
 my $BUGDBSUPPORT = @BUGDBSUPPORT@;
 my $OURDOMAIN  = '@OURDOMAIN@';
+my $EXPOSETEMPLATES = $ELABINELAB;
 
 my $LOGFACIL   = '@TBLOGFACIL@';
 
@@ -412,6 +413,18 @@ Phase "portfixup", "Fixing up packages", sub {
 	    if (!$packagedir);
 
 	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD rsync-2.6.3_1");
+    };
+    # Temporary for template stuff
+    Phase "Simple", "Looking for Simple XML Parser", sub {
+	if (!ExecQuiet("$PKG_INFO -x p5-XML-Simple")) {
+	    PhaseSkip("p5-XML-Simple already installed");
+	}
+
+	PhaseFail("Must provide -p (packagedir) argument!")
+	    if (!$packagedir);
+
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
+		       "     $PKG_ADD p5-XML-Simple-2.14");
     };
     if ($WINSUPPORT) {
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
