@@ -8,6 +8,7 @@ include("defs.php3");
 include("showstuff.php3");
 
 $parser   = "$TB/libexec/ns2ir/parse-ns";
+$TMPDIR   = "/tmp/";
 
 #
 # Only known and logged in users can modify experiments.
@@ -15,6 +16,10 @@ $parser   = "$TB/libexec/ns2ir/parse-ns";
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
+
+if (isset($formfields['exp_localnsfile'])) {
+    $exp_localnsfile = $formfields['exp_localnsfile'];
+}
 
 # This will not return if its a sajax request.
 include("showlogfile_sup.php3");
@@ -76,19 +81,49 @@ flush();
 # Put up the modify form on first load.
 # 
 if (! isset($go)) {
-    echo "<a href='faq.php3#swapmod'>".
+    echo "G: $go <a href='faq.php3#swapmod'>".
 	 "Modify Experiment Documentation (FAQ)</a></h3>";
-    echo "<br>";
 
+    echo "<script language=JavaScript>
+          <!--
+          function NormalSubmit() {
+              document.form1.target='_self';
+              document.form1.submit();
+          }
+          function SyntaxCheck() {
+              window.open('','nscheck','width=650,height=400,toolbar=no,".
+                              "resizeable=yes,scrollbars=yes,status=yes,".
+                              "menubar=yes');
+              var action = document.form1.action;
+              var target = document.form1.target;
+
+              document.form1.action='nscheck.php3';
+              document.form1.target='nscheck';
+              document.form1.submit();
+
+              document.form1.action=action;
+              document.form1.target=target;
+          }
+          //-->
+          </script>\n";
+
+    echo "<table align=center border=1>\n";
     if (STUDLY()) {
-	echo "<font size='+1'>".
+	echo "<tr><th colspan=2><font size='+1'>".
 	    "<a href='clientui.php3?pid=$pid&eid=$eid'>GUI Editor</a>".
 	    " - Edit the topology using a Java applet.</font>";
-	echo "<br>";
+	echo "</th></tr>";
     }
 
-    echo "<form action='modifyexp.php3?pid=$pid&eid=$eid' method='post'>";
-    echo "<textarea cols='100' rows='40' name='nsdata'>";
+    echo "<form name='form1' action='modifyexp.php3?pid=$pid&eid=$eid&go=1' method='post' onsubmit=\"return false;\" enctype=multipart/form-data>";
+    echo "<tr><th>Upload new NS file: </th>";
+    echo "<td><input type=hidden name=MAX_FILE_SIZE value=512000>";
+    echo "<input type=file name=exp_nsfile size=30 onchange=\"this.form.syntax.disabled=(this.value=='')\" /></td></tr>\n";
+    echo "<tr><th><em>or</em> NS file on server: </th> ";
+    echo "<td><input type=text name=\"formfields[exp_localnsfile]\" size=40 onchange=\"this.form.syntax.disabled=(this.value=='')\" /> </td</tr>\n";
+    
+    echo "<tr><td colspan=2><b><em>or</em> Edit:</b><br>\n";
+    echo "<textarea cols='100' rows='40' name='nsdata' onchange=\"this.form.syntax.disabled=(this.value=='')\">";
 
     $query_result =
 	DBQueryFatal("SELECT nsfile from nsfiles ".
@@ -104,9 +139,9 @@ if (! isset($go)) {
     }
 	
     echo "</textarea>";
-    echo "<br>";
+    echo "</td></tr>\n";
     if (!strcmp($expstate, $TB_EXPTSTATE_ACTIVE)) {
-	echo "<p><b>Note!</b> It is recommended that you 
+	echo "<tr><td colspan=2><p><b>Note!</b> It is recommended that you 
 	      reboot all nodes in your experiment by checking the box below.
 	      This is especially important if changing your experiment
               topology (adding or removing nodes, links, and LANs).
@@ -120,9 +155,14 @@ if (! isset($go)) {
 	      Reboot nodes in experiment (Highly Recommended)</input>";
 	echo "<br><input type='checkbox' name='eventrestart' value='1' checked='1'>
 	      Restart Event System in experiment (Highly Recommended)</input>";
+      echo "</td></tr>";
     }
-    echo "<br>";
-    echo "<input type='submit' name='go' value='Modify'>";
+    echo "<tr><th colspan=2><center>";
+    echo "<input type=submit disabled id=syntax name=syntax value='Syntax Check' onclick=\"SyntaxCheck();\"> ";
+    echo "<input type=button name='go' value='Modify' onclick='NormalSubmit();'>\n";
+    echo "<input type='reset'>";
+    echo "</center></th></tr>\n";
+    echo "</table>\n";
     echo "</form>\n";
     PAGEFOOTER();
     exit();
@@ -131,27 +171,97 @@ if (! isset($go)) {
 #
 # Okay, form has been submitted.
 #
-if (! isset($nsdata)) {
-    USERERROR("NSdata CGI variable missing (How did that happen?)",1);
+$speclocal  = 0;
+$specupload = 0;
+$specform   = 0;
+$nsfile     = "";
+$tmpfile    = 0;
+
+if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
+    $speclocal = 1;
+}
+if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
+    strcmp($exp_nsfile, "none")) {
+    $specupload = 1;
+}
+if (!$speclocal && !$specupload && isset($nsdata))  {
+    $specform = 1;
+}
+
+if ($speclocal + $specupload + $specform > 1) {
+    USERERROR("You may not specify both an uploaded NS file and an ".
+	      "NS file that is located on the Emulab server", 1);
+}
+if (!$specupload && strcmp($exp_nsfile_name, "")) {
+    #
+    # Catch an invalid filename.
+    #
+    USERERROR("The NS file '$exp_nsfile_name' does not appear to be a ".
+	      "valid filename. Please go back and try again.", 1);
 }
 
 #
-# Generate a hopefully unique filename that is hard to guess.
-# See backend scripts.
-# 
-list($usec, $sec) = explode(' ', microtime());
-srand((float) $sec + ((float) $usec * 100000));
-$foo = rand();
-    
-$nsfile = "/tmp/$uid-$foo.nsfile";
-
-if (! ($fp = fopen($nsfile, "w"))) {
-    TBERROR("Could not create temporary file $nsfile", 1);
+# Gotta be one of them!
+#
+if (!$speclocal && !$specupload && !$specform) {
+    USERERROR("You must supply an NS file!", 1);
 }
-$nsdata_string = $nsdata;
-fwrite($fp, $nsdata_string);
-fclose($fp);
-chmod($nsfile, 0666);
+
+if ($speclocal) {
+    #
+    # No way to tell from here if this file actually exists, since
+    # the web server runs as user nobody. The startexp script checks
+    # for the file before going to ground, so the user will get immediate
+    # feedback if the filename is bogus.
+    #
+    # Do not allow anything outside of /users or /proj. I do not think there
+    # is a security worry, but good to enforce it anyway.
+    #
+    if (!preg_match("/^([-\@\w\.\/]+)$/", $exp_localnsfile)) {
+	USERERROR("NS File", "Pathname includes illegal characters", 1);
+    }
+    if (! ereg("^$TBPROJ_DIR/.*" ,$exp_localnsfile) &&
+        ! ereg("^$TBUSER_DIR/.*" ,$exp_localnsfile) &&
+        ! ereg("^$TBGROUP_DIR/.*" ,$exp_localnsfile)) {
+	USERERROR("NS File: You must specify a server resident file in either ".
+                  "$TBUSER_DIR/ or $TBPROJ_DIR/", 1);
+    }
+    
+    $nsfile = $exp_localnsfile;
+    $nonsfile = 0;
+}
+elseif ($specupload) {
+    #
+    # XXX
+    # Set the permissions on the NS file so that the scripts can get to it.
+    # It is owned by nobody, and most likely protected. This leaves the
+    # script open for a short time. A potential security hazard we should
+    # deal with at some point.
+    #
+    chmod($exp_nsfile, 0666);
+    $nsfile = $exp_nsfile;
+    $nonsfile = 0;
+} else # $specform
+if ($specform) {
+    #
+    # Take the NS file passed in from the form and write it out to a file
+    #
+    $tmpfile = 1;
+
+    #
+    # Generate a hopefully unique filename that is hard to guess.
+    # See backend scripts.
+    # 
+    list($usec, $sec) = explode(' ', microtime());
+    srand((float) $sec + ((float) $usec * 100000));
+    $foo = rand();
+
+    $nsfile = "/tmp/$uid-$foo.nsfile";
+    $handle = fopen($nsfile,"w");
+    fwrite($handle,$nsdata);
+    fclose($handle);
+    chmod($nsfile, 0666);
+}
 
 #
 # Get exp group so we can get the unix_gid.
@@ -166,7 +276,9 @@ $retval = SUEXEC($uid, "$pid,$unix_gid", "webnscheck $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($retval != 0) {
-    unlink($nsfile);
+    if ($tmpfile) {
+        unlink($nsfile);
+    }
     
     # Send error to tbops.
     if ($retval < 0) {
@@ -193,7 +305,9 @@ $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 SUEXEC_ACTION_IGNORE);
 		 
 # It has been copied out by the program!
-unlink($nsfile);
+if ($tmpfile) {
+    unlink($nsfile);
+}
 
 #
 # Fatal Error. Report to the user, even though there is not much he can

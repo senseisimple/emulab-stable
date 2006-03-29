@@ -31,7 +31,9 @@ LOGGEDINORDIE($uid);
 #
 $speclocal  = 0;
 $specupload = 0;
+$specform   = 0;
 $nsfile     = "";
+$tmpfile    = 0;
 $exp_localnsfile = $formfields['exp_localnsfile'];
 
 if (isset($exp_localnsfile) && strcmp($exp_localnsfile, "")) {
@@ -41,8 +43,11 @@ if (isset($exp_nsfile) && strcmp($exp_nsfile, "") &&
     strcmp($exp_nsfile, "none")) {
     $specupload = 1;
 }
+if (!$speclocal && !$specupload && isset($nsdata))  {
+    $specform = 1;
+}
 
-if ($speclocal && $specupload) {
+if ($speclocal + $specupload + $specform > 1) {
     USERERROR("You may not specify both an uploaded NS file and an ".
 	      "NS file that is located on the Emulab server", 1);
 }
@@ -55,9 +60,9 @@ if (!$specupload && strcmp($exp_nsfile_name, "")) {
 }
 
 #
-# Gotta be one or the other!
+# Gotta be one of them!
 #
-if (!$speclocal && !$specupload) {
+if (!$speclocal && !$specupload && !$specform) {
     USERERROR("You must supply an NS file!", 1);
 }
 
@@ -84,7 +89,7 @@ if ($speclocal) {
     $nsfile = $exp_localnsfile;
     $nonsfile = 0;
 }
-else {
+elseif ($specupload) {
     #
     # XXX
     # Set the permissions on the NS file so that the scripts can get to it.
@@ -95,10 +100,40 @@ else {
     chmod($exp_nsfile, 0666);
     $nsfile = $exp_nsfile;
     $nonsfile = 0;
+} else # $specform
+{
+    #
+    # Take the NS file passed in from the form and write it out to a file
+    #
+    $tmpfile = 1;
+
+    #
+    # Generate a hopefully unique filename that is hard to guess.
+    # See backend scripts.
+    # 
+    list($usec, $sec) = explode(' ', microtime());
+    srand((float) $sec + ((float) $usec * 100000));
+    $foo = rand();
+
+    $nsfile = "/tmp/$uid-$foo.nsfile";
+    $handle = fopen($nsfile,"w");
+    fwrite($handle,$nsdata);
+    fclose($handle);
 }
 
 echo "<center>";
 echo "<h2>Starting Syntax Check. Please wait a moment ...</h2>";
+echo "Checking $nsfile - ";
+if ($speclocal) {
+    echo "local file\n";
+}
+if ($specupload) {
+    echo "uploaded file\n";
+}
+if ($specform) {
+    echo "From form\n";
+}
+echo "<br>\n";
 echo "</center>\n";
 flush();
 
@@ -107,6 +142,10 @@ flush();
 #
 $retval = SUEXEC($uid, "nobody", "webnscheck $nsfile",
 		 SUEXEC_ACTION_IGNORE);
+
+if ($tmpfile) {
+    unlink($nsfile);
+}
 
 #
 # Fatal Error. Report to the user, even though there is not much he can
