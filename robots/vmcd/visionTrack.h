@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -119,7 +119,9 @@ void vtCopyTracks(struct lnMinList *dst,
  *
  * @param extra The list to add any duplicate tracks found in the current
  * frame.
- * @param now The list of tracks from all of the cameras.
+ * @param now The list of tracks from all of the cameras.  The list is expected
+ * to be organized so that all of the tracks from a camera are grouped
+ * together.
  * @param vc The array of cameras, coalescing is based on the camera's viewable
  * area.
  * @param vc_len The length of the vc array.

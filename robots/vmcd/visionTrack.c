@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -24,6 +24,11 @@
 
 extern int debug;
 
+/**
+ * Some function I made up that provides a nice curve for computing the weight
+ * for a track.  Plug the formula into gnuplot if you want to see what it looks
+ * like.
+ */
 static float curvy(float x)
 {
     return (1.0f - tanh(x * M_PI));
@@ -282,13 +287,19 @@ void vtCoalesce(struct lnMinList *extra,
     assert(vc != NULL);
     assert(vc_len > 0);
 
+    /*
+     * Walk the list and munge it along the way.  So, as we progress through
+     * the list, any tracks before the current one will be completely coalesced
+     * and any tracks after will be those remaining after previous coalesces.
+     */
     vt = (struct vision_track *)now->lh_Head;
     while (vt->vt_link.ln_Succ != NULL) {
 	int in_camera_count = 0, lpc;
 
 	/*
 	 * Figure out how many cameras this track might be viewable in so we
-	 * can coalesce them.
+	 * can coalesce them.  XXX Should we pad the camera bounds by
+	 * COALESCE_TOLERANCE since the cameras might be off by a bit?
 	 */
 	for (lpc = 0; lpc < vc_len; lpc++) {
 	    if ((vt->vt_position.x >= vc[lpc].vc_left) &&
@@ -328,6 +339,10 @@ void vtCoalesce(struct lnMinList *extra,
 	    int rc;
 	    
 	    lnNewList(&near);
+	    /*
+	     * Extract any other tracks that are close to the current one and
+	     * in the remaining cameras.
+	     */
 	    if ((rc = vtExtractNear(&near,
 				    vt,
 				    vtNextCamera(vt),
@@ -340,15 +355,19 @@ void vtCoalesce(struct lnMinList *extra,
 		    printf("start %.2f %.2f\n", vt->vt_position.x,
 			   vt->vt_position.y);
 		}
-		
+
+		/* Compute the weight for this track, younger is better. */
 		weight = curvy((float)vt->vt_age /
 			       (float)MAX_TRACK_AGE);
 		total_weight += weight;
+
+		/* Initialize the position data with the current track. */
 		rp.x = vt->vt_position.x * weight;
 		rp.y = vt->vt_position.y * weight;
 		rp.theta = vt->vt_position.theta;
 		rp.timestamp = vt->vt_position.timestamp;
-		
+
+		/* Add in the position data from the other tracks. */
 		vt_near = (struct vision_track *)near.lh_Head;
 		while (vt_near->vt_link.ln_Succ != NULL) {
 		    if (debug > 2) {
@@ -369,6 +388,8 @@ void vtCoalesce(struct lnMinList *extra,
 		    
 		    vt_near = (struct vision_track *)vt_near->vt_link.ln_Succ;
 		}
+
+		/* Return merged tracks to the pool. */
 		lnAppendList(extra, &near);
 
 		rp.x /= total_weight;
@@ -404,7 +425,12 @@ void vtMatch(struct lnMinList *pool,
 	float distance = MERGE_TOLERANCE, dummy = MERGE_TOLERANCE;
 	struct vision_track *vt_prev;
 	void dump_vision_list(struct lnMinList *list);
-	
+
+	/*
+	 * Check both ways, the current track is the close to one in the
+	 * previous frame, and the track from the previous frame is closest to
+	 * the one in the current frame.
+	 */
 	if (((vt_prev = vtFindMin(vt,
 				  (struct vision_track *)prev->lh_Head,
 				  &distance)) != NULL) &&
@@ -477,6 +503,7 @@ struct vision_track *vtFindWiggle(struct lnMinList *start,
 	if ((vt_start = vtFindMin(vt,
 				  (struct vision_track *)start->lh_Head,
 				  &distance)) == NULL) {
+	    /* No match. */
 	}
 	else if (((vt->vt_client == vt_start->vt_client) &&
 		  (distance < WIGGLE_TOLERANCE)) ||
