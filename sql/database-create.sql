@@ -1281,6 +1281,24 @@ CREATE TABLE mode_transitions (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `motelogfiles`
+--
+
+CREATE TABLE motelogfiles (
+  logfileid varchar(45) NOT NULL default '',
+  pid varchar(12) NOT NULL default '',
+  gid varchar(12) default NULL,
+  creator varchar(8) NOT NULL default '',
+  created datetime NOT NULL default '0000-00-00 00:00:00',
+  updated datetime default NULL,
+  description tinytext NOT NULL,
+  classfilepath tinytext NOT NULL,
+  specfilepath tinytext,
+  mote_type varchar(30) default NULL,
+  PRIMARY KEY  (logfileid,pid)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `new_interfaces`
 --
 
@@ -2628,6 +2646,18 @@ CREATE TABLE virt_node_desires (
   desire varchar(30) NOT NULL default '',
   weight float default NULL,
   PRIMARY KEY  (pid,eid,vname,desire)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_node_motelog`
+--
+
+CREATE TABLE virt_node_motelog (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  vname varchar(32) NOT NULL default '',
+  logfileid varchar(45) NOT NULL default '',
+  PRIMARY KEY  (pid,eid,vname)
 ) TYPE=MyISAM;
 
 --
