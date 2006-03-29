@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -172,7 +172,8 @@ while (<IF>) {
 		my $spaces = $1;
 		my $nodetype = $2;
 		my $query_result =
-		    DBQueryWarn("select n.node_id,i.IP,i.MAC,r.pid,r.eid, ".
+		    DBQueryWarn("select n.node_id,n.pxe_boot_path, ".
+				"       i.IP,i.MAC,r.pid,r.eid, ".
 				"       r.vname,r.inner_elab_role, ".
 				"       r.inner_elab_boot ".
 				"from nodes as n ".
@@ -212,6 +213,7 @@ while (<IF>) {
 		    my $next_server = "";
 		    my $hostname = "";
 		    my $dns = "";
+		    my $filename = "";
 
 		    if ($vnames && defined($row{"vname"})) {
 			$node_id = $row{"vname"};
@@ -235,10 +237,20 @@ while (<IF>) {
 			    "${spaces}\toption host-name \"$node_id\";\n";
 		    }
 		    
+		    # Handle alternate boot program filename if it exists
+		    if (defined($row{"pxe_boot_path"})) {
+			my $fn = $row{"pxe_boot_path"};
+			# make sure it is pretty constrained
+			if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+			    $filename = "${spaces}\tfilename \"$fn\";\n";
+			}
+		    }
+
 		    # Need to make MAC look right..
 		    $mac =~ s/(..)\B/$1:/g;
 
 		    print $OUT "${spaces}host $ip {\n";
+		    print $OUT $filename;
 		    print $OUT $next_server;
 		    print $OUT $dns;
 		    print $OUT "${spaces}\thardware ethernet $mac;\n";

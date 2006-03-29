@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -38,6 +38,7 @@ use Node;
 my $consetup	= "$TB/libexec/console_setup";
 my $osselect    = "$TB/bin/os_select";
 my $nodereboot  = "$TB/bin/node_reboot";
+my $makeconf    = "$TB/sbin/dhcpd_makeconf";
 my $reloadpid	= "emulab-ops";
 my $pendingeid  = "reloadpending";
 my $reloadeid   = "reloading";
@@ -212,6 +213,30 @@ DBQueryFatal("unlock tables");
 # We are done if called with a -o
 if( $moveToOldReserved ) {
     exit($error);
+}
+
+######################################################################
+# Step 1b
+#
+# Ugh.  If we are resetting the PXE boot program for any of the nodes
+# we need to clear them and regenerate the dhcpd.conf file now, before
+# we start freeing up nodes in Step 2.  If we delayed HUP'ing til after
+# Step 2, then nodes might have already been rebooted by the reload
+# daemon.
+#
+######################################################################
+if (@freed_nodes > 0) {
+    my $nodelist = "(" . join(",", map("'$_'", @freed_nodes)) . ")";
+
+    my $result = 
+	DBQueryFatal("select node_id from nodes where ".
+		     "pxe_boot_path is not NULL and node_id in $nodelist");
+    if ($result->num_rows()) {
+	DBQueryFatal("update nodes set pxe_boot_path=NULL where ".
+		     "node_id in $nodelist");
+	system("$makeconf -i -r") == 0 ||
+	    print STDERR "WARNING: $makeconf failed!\n";
+    }
 }
 
 ######################################################################
