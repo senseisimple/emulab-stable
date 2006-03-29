@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2004 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2004, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -31,8 +31,8 @@ usage()
 		"Usage: %s <options> [-d] [-r | -q] target\n"
 		"options:\n"
 		"-d         - Turn on debugging\n"
-		"-r         - Tell node to query bootinfo again\n"
-		"-q         - Tell node to reboot\n",
+		"-q         - Tell node to query bootinfo again\n"
+		"-r         - Tell node to reboot\n",
 		progname);
 	exit(-1);
 }
