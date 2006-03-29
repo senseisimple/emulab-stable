@@ -1092,26 +1092,38 @@ function SHOWEXPLIST($type,$fromuid,$id,$gid = "") {
 	$title = "Bad id '$id'!";
     }
 
+    global $EXPOSETEMPLATES;
+    $template_join   = "";
+    $template_clause = "";
+    if ($EXPOSETEMPLATES) {
+	$template_join   = "left join experiment_templates as t on ".
+	                   "     t.pid=e.pid and t.eid=e.eid ";
+	$template_clause = " and t.guid is null ";
+    }
+
     if (ISADMIN()) {
 	$query_result =
 	    DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
-			 "round(minimum_nodes+.1,0) as min_nodes ".
+			 "round(e.minimum_nodes+.1,0) as min_nodes ".
 			 "from experiments as e ".
+			 $template_join .
 			 "left join reserved as r on e.pid=r.pid and ".
 			 "     e.eid=r.eid ".
-			 "where $where ".
+			 "where ($where) $template_clause ".
 			 "group by e.pid,e.eid order by e.state,e.eid");
     }
     else {
 	$query_result =
 	    DBQueryFatal("select e.*,count(r.node_id) as nodes, ".
-			 "round(minimum_nodes+.1,0) as min_nodes ".
+			 "round(e.minimum_nodes+.1,0) as min_nodes ".
 			 "from experiments as e ".
+			 $template_join .
 			 "left join reserved as r on e.pid=r.pid and ".
 			 "     e.eid=r.eid ".
 			 "left join group_membership as g on g.pid=e.pid and ".
 			 "     g.gid=e.gid and g.uid='$fromuid' ".
 			 "where g.uid is not null and ($where) ".
+			 $template_clause .
 			 "group by e.pid,e.eid order by e.state,e.eid");
     }
     

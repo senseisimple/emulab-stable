@@ -32,7 +32,7 @@ sub usage()
 	  "<nsfile> - Optional NS file to parse for experiment modify\n");
     exit(-1);
 }
-my  $optlist = "biafres:wq";
+my  $optlist = "biafres:wqx";
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -101,6 +101,7 @@ my $errorstat= -1;
 my $modifyHosed   = 0;
 my $modifySwapped = 0;
 my $robotexp = 0;
+my $template_node = 0;
 
 my $inout;
 my $logname;
@@ -169,6 +170,9 @@ if (defined($options{"e"})) {
 }
 if (defined($options{"q"})) {
     $quiet = 1;
+}
+if (defined($options{"x"})) {
+    $template_mode = 1;
 }
 if (defined($options{"s"})) {
     $inout = $options{"s"};
@@ -727,7 +731,7 @@ if ($inout eq "modify" && defined($modnsfile)) {
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (! $batch) {
+if (! $batch && ! $template_mode) {
     $logname = TBExptCreateLogFile($pid, $eid, "swapexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
@@ -1159,6 +1163,9 @@ TBUnLockExp($pid, $eid);
 # after we change the experiment state (above). 
 #
 TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR);
+
+exit(0)
+    if ($template_mode);
 
 print "Swap Success!\n";
 

@@ -35,10 +35,11 @@ sub usage()
 
 sub fatal($);
 
-my $optlist = "bwq";
+my $optlist  = "bwqx";
 my $waitmode = 0;
 my $batch    = 0;
 my $quiet    = 0;
+my $template_mode = 0;
 
 #
 # Exit codes are important; they tell the web page what has happened so
@@ -126,6 +127,9 @@ if (defined($options{"w"})) {
 }
 if (defined($options{"q"})) {
     $quiet = 1;
+}
+if (defined($options{"x"})) {
+    $template_mode = 1;
 }
 usage()
     if ($waitmode && $batch);
@@ -379,7 +383,7 @@ if (! UserDBInfo($expt_head_login, \$expt_head_name, \$expt_head_email)) {
 #
 # If not in batch mode, go into the background. Parent exits.
 #
-if (! $batch) {
+if (!$batch && !$template_mode) {
     $logname = TBExptCreateLogFile($pid, $eid, "endexp");
     TBExptSetLogFile($pid, $eid, $logname);
     TBExptOpenLogFile($pid, $eid);
@@ -503,8 +507,10 @@ libArchive::TBArchiveExperimentArchive($pid, $eid) == 0 or
 #
 # Terminate the log so the web page stops spewing.
 #
-print "Experiment $pid/$eid has been successfully terminated!\n";
-TBExptClearLogFile($pid, $eid);
+if (!$template_mode) {
+    print "Experiment $pid/$eid has been successfully terminated!\n";
+    TBExptClearLogFile($pid, $eid);
+}
 
 #
 # Cleanup DB state and remove directory.
@@ -514,7 +520,7 @@ TBExptDestroy($pid, $eid);
 #
 # In batch mode, exit now. 
 #
-if ($batch) {
+if ($batch || $template_mode) {
     exit(0);
 }
 

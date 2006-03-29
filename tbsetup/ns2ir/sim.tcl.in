@@ -87,6 +87,9 @@ Simulator instproc init {args} {
     $self instvar topography_list;
     array set topography_list {}
 
+    $self instvar parameter_list;
+    array set parameter_list {}
+
     var_import ::GLOBALS::last_class
     set last_class $self
 
@@ -343,6 +346,7 @@ Simulator instproc run {} {
     $self instvar console_list
     $self instvar tiptunnel_list
     $self instvar topography_list
+    $self instvar parameter_list
     $self instvar simulated
     $self instvar nseconfig
     var_import ::GLOBALS::pid
@@ -649,6 +653,16 @@ Simulator instproc run {} {
 	$self spitxml_data "eventlist" $fields $values
     }
 
+    foreach sourcefile $sourcefile_list {
+	$self spitxml_data "external_sourcefiles" [list "pathname" ] [list $sourcefile ]
+    }
+
+    foreach name [array names parameter_list] {
+	set default_value $parameter_list($name)
+
+	$self spitxml_data "virt_parameters" [list "name" "value"] [list $name $default_value ]	
+    }
+	
     foreach sourcefile $sourcefile_list {
 	$self spitxml_data "external_sourcefiles" [list "pathname" ] [list $sourcefile ]
     }
@@ -1070,6 +1084,18 @@ Simulator instproc add_topography {tg} {
     $self instvar topography_list
 
     set topography_list($tg) {}
+
+    return 0
+}
+
+Simulator instproc define_template_parameter {name args} {
+    $self instvar parameter_list
+
+    if {[llength $args] == 0} {
+	set parameter_list($name) {}
+    } else {
+	set parameter_list($name) [lindex $args 0]
+    }
 
     return 0
 }

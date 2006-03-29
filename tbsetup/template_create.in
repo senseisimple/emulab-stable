@@ -1,0 +1,472 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+
+#
+# Create a new experiment template. 
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: create_expt_template [-q] [-w] [-E description]\n".
+	  "                [-g gid] <pid> <tid> <input file>\n".
+	  "switches and arguments:\n".
+	  "-w       - wait for template to be created.\n".
+	  "-q       - be less chatty\n".
+	  "-E <str> - A pithy sentence describing the template\n".
+	  "-g <gid> - The group in which to create the experiment\n".
+	  "<pid>    - The project in which to create the experiment\n".
+	  "<tid>    - The template name (unique, alphanumeric, no blanks)\n".
+	  "<input>  - Input file for experiment.\n");
+    exit(-1);
+}
+my $optlist	 = "qwE:g:m:";
+my $quiet        = 0;
+my $waitmode     = 0;
+my $description  = "";
+my $modify       = 0;
+my $pid;
+my $tid;
+my $eid;
+my $gid;
+my $inputfile;
+# For modify.
+my $parent_guid;
+my $parent_vers;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $PROJROOT	= "/proj";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL	= "@USERNODE@";
+
+# Locals
+my $user_name;
+my $user_email;
+my $dbuid;
+my $guid;
+my $version = 1;
+# For the END block below.
+my $cleaning   = 0;
+my $exptcreated = 0;
+
+# Programs we need
+my $checkquota  = "$TB/sbin/checkquota";
+my $batchexp    = "$TB/bin/batchexp";
+my $endexp      = "$TB/bin/endexp";
+my $makegraph   = "$TB/bin/template_graph";
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libTemplates;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 120;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    tbdie("Cannot determine your name and email address.");
+}
+
+#
+# Before doing anything else, check for overquota ... lets not waste
+# our time. Make sure user sees the error by exiting with 1.
+#
+if (system("$checkquota $dbuid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; please cleanup!");
+    exit(1);
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
+
+#
+# Make sure UID is allowed to create experiments in this project.
+#
+if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+    tbdie("You do not have permission to create experiments in $pid/$gid");
+}
+
+#
+# On modify, must check access to the parent template.
+#
+if ($modify) {
+    if (!libTemplates::TBValidExperimentTemplate($parent_guid, $parent_vers)) {
+	tbdie("Experiment template $parent_guid/$parent_vers does not exist!");
+    }
+    if (!libTemplates::TBExptTemplateAccessCheck($dbuid,
+						 $parent_guid,
+						 TB_EXPT_READINFO)) {
+	tbdie("You do not have permission to modify experiment template ".
+	      "$parent_guid/$parent_vers");
+    }
+
+    # Hmm, this is redundant in the table. 
+    $guid = $parent_guid;
+}
+else {
+    #
+    # Otherwise, grab new guid before tables are locked.
+    #
+    if (libTemplates::NewGUID(\$guid) < 0) {
+	tbdie("Could not get a new GUID!");
+    }
+}
+
+#
+# Create a template record; the tid has to be unique within the project,
+# across both the experiments and template tables, since there will be
+# two paths to experiment creation for the near term. See corresponding
+# code in batchexp.
+#
+DBQueryFatal("lock tables experiments write, ".
+	     "            experiment_templates write");
+
+my $query_result =
+    DBQueryFatal("select pid,tid from experiment_templates ".
+		 "where tid='$tid' and pid='$pid'");
+
+if ($query_result->numrows) {
+    DBQueryWarn("unlock tables");
+    tbdie("Template ID $tid in project $pid is already in use!");
+}
+
+#
+# Find unused version number now that tables are locked. 
+#
+if ($modify) {
+    $query_result =
+	DBQueryFatal("select MAX(vers) from experiment_templates ".
+		     "where guid='$guid'");
+
+    $version = ($query_result->fetchrow_array())[0];
+    $version++;
+}
+
+# Currently, we make up an eid using the guid and version. This will
+# change later.
+$eid = "T${guid}-${version}";
+
+#
+# Sanity check; make sure this eid is not in use. Tables are still locked.
+#
+$query_result =
+    DBQueryFatal("select pid,eid from experiments ".
+		 "where eid='$eid' and pid='$pid'");
+
+if ($query_result->numrows) {
+    DBQueryWarn("unlock tables");
+    tbdie("Experiment ID $eid in project $pid is already in use!");
+}
+
+#
+# Create a template record to "reserve" the tid. We pass the rest of
+# it off to the normal experiment path right now (too much stuff to
+# duplicate with a deadline looming right around the corner).
+#
+my %args = ();
+
+if ($modify) {
+    $args{'parent_guid'} = $parent_guid;
+    $args{'parent_vers'} = $parent_vers;
+}
+$args{'guid'}        = $guid;
+$args{'vers'}        = $version;
+$args{'pid'}         = $pid;
+$args{'gid'}         = $gid;
+$args{'tid'}         = $tid;
+$args{'eid'}         = $eid;
+$args{'uid'}         = $dbuid;
+$args{'description'} = DBQuoteSpecial($description);
+$args{'description'} =~ s/^\'(.*)\'$/$1/;
+
+if (libTemplates::NewTemplateRecord(\%args) < 0) {
+    tbdie("Could not create a new template record!");
+}
+# Now safe to unlock; the tid/eid is reserved;
+DBQueryFatal("unlock tables");
+
+# Input files are kept in the DB, with the template.
+exit(-1)
+    if (libTemplates::AddTemplateInputFile($guid, $version, $inputfile) < 0);
+
+# Now invoke batchexp to preload the experiment. Note special -x option.
+system("$batchexp -x -q -i -f ".
+       "-E 'Experiment Template Preload $guid/$version' ".
+       "-p $pid -e $eid $inputfile");
+fatal($? >> 8, "Oops")
+    if ($?);
+
+# Need to kill the experiment if we fail after this point.
+$exptcreated = 1;
+
+#
+# Generate the graph for the template.
+#
+system("$makegraph $guid");
+fatal(-1, "Error generating template graph.")
+    if ($?);
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    my %options = ();
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV < 2 || @ARGV > 3) {
+	usage();
+    }
+    #
+    # Pick up pid/tid first and untaint.
+    #
+    $pid = shift(@ARGV);
+
+    if ($pid =~ /^([-\w]+)$/) {
+	$pid = $1;
+    }
+    else {
+	tbdie("Bad data in argument: $pid.");
+    }
+    if (! TBcheck_dbslot($pid, "projects", "newpid",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	tbdie("Improper project name (id)!");
+    }
+    
+    $tid = shift(@ARGV);
+
+    if ($tid =~ /^([-\w]+)$/) {
+	$tid = $1;
+    }
+    else {
+	tbdie("Bad data in argument: $tid.");
+    }
+    if (! TBcheck_dbslot($tid, "experiments", "eid",
+			 TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	tbdie("Improper template name (id)!");
+    }
+    if (@ARGV) {
+	$inputfile = $ARGV[0];
+
+	# Note different taint check (allow /).
+	if ($inputfile =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data in input file: $inputfile");
+	}
+
+	#
+	# Called from ops interactively. Make sure NS file in /proj or /users.
+	#
+	# Use realpath to resolve any symlinks.
+	#
+	my $translated = `realpath $inputfile`;
+	if ($translated =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data returned by realpath: $translated");
+	}
+
+	#
+	# The file must reside in /proj, /groups, or /users. Since this script
+	# runs as the caller, regular file permission checks ensure its a file
+	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
+	# since this script is invoked directly from web interface.
+	#
+	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.nsfile/) &&
+	    ! ($inputfile =~ /^\/tmp\/\d+\.ns/) &&
+	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
+	    ! ($inputfile =~ /^\/proj/) &&
+	    ! ($inputfile =~ /^\/groups/) &&
+	    ! ($inputfile =~ /^\/users/)) {
+	    tberror("$inputfile does not resolve to an allowed directory!");
+	    # Note positive status; so error goes to user not tbops.
+	    exit(1);
+	}
+    }
+    #
+    # Optional gid. Defaults to pid.
+    #
+    if (defined($options{"g"})) {
+	$gid = $options{"g"};
+
+	if ($gid =~ /^([-\w]+)$/) {
+	    $gid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $gid.");
+	}
+    }
+    else {
+	$gid = $pid;
+    }
+
+    #
+    # Parent pointer, for modify. We always create a new template point
+    # it to the parent. 
+    #
+    if (defined($options{"m"})) {
+	if ($options{"m"} =~ /^([\w]*)\/([\d]*)$/) {
+	    $parent_guid = $1;
+	    $parent_vers = $2;
+	    $modify      = 1;
+	}
+	else {
+	    tbdie("Bad data in argument: " . $options{"m"});
+	}
+    }
+
+    if (defined($options{"E"})) {
+	if (! TBcheck_dbslot($options{"E"},
+			     "experiment_templates", "description",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template description!");
+	}
+	$description = $options{"E"};
+    }
+    else {
+	$description = "Created by $dbuid";
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"w"})) {
+	$waitmode = 1;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+    if ($exptcreated) {
+	my $exptidx;
+
+	exit(-1)
+	    if (!TBExptIDX($pid, $eid, \$exptidx));
+		
+	system("$endexp -x -q -w $pid $eid");
+	exit(-1)
+	    if ($?);
+
+	# And delete all the other stuff?
+    }
+    libTemplates::DeleteTemplateRecord($guid, $version)
+	if (defined($guid));
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+
+    #
+    # This exit will drop into the END block below.
+    # 
+    exit($errorstat);
+}
+
+END {
+    # Normal exit, nothing to do.
+    if (!$?) {
+	return;
+    }
+    my $saved_exitcode = $?;
+    
+    if ($cleaning) {
+	#
+	# We are screwed; a recursive error. Someone will have to clean
+	# up by hand. 
+	#
+	SENDMAIL(TBOPS, 
+		 "Template Creation Failure: $pid/$tid",
+		 "Recursive error in cleanup! This is very bad.");
+	$? = $saved_exitcode;
+	return;
+    }
+    $cleaning = 1;
+    cleanup();
+    $? = $saved_exitcode;
+}
+

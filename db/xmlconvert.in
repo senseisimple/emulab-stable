@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -135,6 +135,10 @@ my %virtual_tables =
 				     tag   => "tiptunnels",
 				     row   => "tiptunnel",
 				     attrs => [ "host", "vnode" ]},
+     "virt_parameters"           => { rows  => undef, 
+				      tag   => "parameters",
+				      row   => "parameter",
+				      attrs => [ "name", "value" ]},
      # This is a fake table. See below. If we add more, lets generalize.
      "external_sourcefiles"	=> { rows  => undef, 
 				     tag   => "nsfiles",

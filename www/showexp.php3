@@ -6,6 +6,7 @@
 #
 include("defs.php3");
 include("showstuff.php3");
+include("template_defs.php");
 
 #
 # Only known and logged in users can look at experiments.
@@ -13,6 +14,7 @@ include("showstuff.php3");
 $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
+$tag = "Experiment";
 
 #
 # Verify page arguments.
@@ -34,11 +36,6 @@ if (!isset($sortby)) {
 }
 $exp_eid = $eid;
 $exp_pid = $pid;
-
-#
-# Standard Testbed Header now that we have the pid/eid okay.
-#
-PAGEHEADER("Experiment Information ($pid/$eid)");
 
 #
 # Check to make sure this is a valid PID/EID tuple.
@@ -77,6 +74,18 @@ $paniced    = $row["paniced"];
 $panic_date = $row["panic_date"];
 $lockdown   = $row["lockdown"];
 
+# Template Instance Experiments get special treatment in this page.
+$isinstance = $EXPOSETEMPLATES && TBIsTemplateInstanceExperiment($expindex);
+if ($isinstance) {
+    $tag = "Template Instance";
+    TBPidEid2Template($pid, $eid, &$guid, &$version);
+}
+
+#
+# Standard Testbed Header.
+#
+PAGEHEADER("$tag ($pid/$eid)");
+
 #
 # Get a list of node types and classes in this experiment
 #
@@ -99,14 +108,13 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 }
 
-
-echo "<font size=+2>Experiment <b>".
+echo "<font size=+2>$tag <b>".
      "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 echo "<br /><br />\n";
 SUBPAGESTART();
 
-SUBMENUSTART("Experiment Options");
+SUBMENUSTART("$tag Options");
 
 if ($expstate) {
     if (TBExptLogFile($exp_pid, $exp_eid)) {
@@ -151,7 +159,9 @@ if ($expstate) {
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVE ||
 		    ($expstate == $TB_EXPTSTATE_PANICED && $isadmin)) {
-		WRITESUBMENUBUTTON("Swap Experiment Out",
+		WRITESUBMENUBUTTON(($isinstance ?
+				    "Terminate Instance" :
+				    "Swap Experiment Out"),
 			 "swapexp.php3?inout=out&pid=$exp_pid&eid=$exp_eid");
 	    }
 	    elseif ($expstate == $TB_EXPTSTATE_ACTIVATING) {
@@ -161,14 +171,14 @@ if ($expstate) {
 	    }
 	}
     
-	if ($expstate != $TB_EXPTSTATE_PANICED) {
+	if (!$isinstance && $expstate != $TB_EXPTSTATE_PANICED) {
 	    WRITESUBMENUBUTTON("Terminate Experiment",
 			       "endexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
 
         # Batch experiments can be modifed only when paused.
-	if ($expstate == $TB_EXPTSTATE_SWAPPED ||
-	    (!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE)) {
+	if (!$isinstance && ($expstate == $TB_EXPTSTATE_SWAPPED ||
+	    (!$isbatch && $expstate == $TB_EXPTSTATE_ACTIVE))) {
 	    WRITESUBMENUBUTTON("Modify Experiment",
 			       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
@@ -247,7 +257,7 @@ WRITESUBMENUDIVIDER();
 WRITESUBMENUBUTTON("Show History",
 		   "showstats.php3?showby=expt&which=$expindex");
 
-if (STUDLY()) {
+if (!$isinstance && STUDLY()) {
     WRITESUBMENUBUTTON("Duplicate Experiment",
 		       "beginexp_html.php3?copyid=${exp_pid},${exp_eid}");
 }
@@ -332,7 +342,7 @@ if (TBExptFirewall($exp_pid, $exp_eid) &&
     if ($paniced == 2) {
 	#
 	# Paniced due to failed swapout.
-	# Only be semi-obnoxious (no blinking) since it wasn't their fault.
+	# Only be semi-obnoxious (no blinking) since it was not their fault.
 	#
 	echo "<br><font size=+1 color=red>".
 	     "Your experiment was cut off due to a failed swapout on $panic_date!".
@@ -361,6 +371,13 @@ if (TBExptFirewall($exp_pid, $exp_eid) &&
     echo "</center>\n";
 }
 SUBPAGEEND();
+
+if ($isinstance &&
+    ($expstate == $TB_EXPTSTATE_ACTIVE ||
+     $expstate == $TB_EXPTSTATE_PANICED ||
+     $expstate == $TB_EXPTSTATE_ACTIVATING)) {
+    SHOWTEMPLATEINSTANCEBINDINGS($guid, $version, $expindex);
+}
 
 #
 # Dump the node information.

@@ -26,7 +26,7 @@ use vars qw(@ISA @EXPORT);
 	 NODEBOOTSTATUS_OKAY NODEBOOTSTATUS_FAILED NODEBOOTSTATUS_UNKNOWN
 	 NODESTARTSTATUS_NOSTATUS PROJMEMBERTRUST_NONE PROJMEMBERTRUST_USER
 	 PROJMEMBERTRUST_ROOT PROJMEMBERTRUST_GROUPROOT
-	 PROJMEMBERTRUST_PROJROOT
+	 PROJMEMBERTRUST_PROJROOT PROJMEMBERTRUST_LOCALROOT
 
 	 PROJROOT GROUPROOT USERROOT TBOPSPID EXPTLOGNAME
 	 PLABMOND_PID PLABMOND_EID PLABHOLDING_PID PLABHOLDING_EID
@@ -635,6 +635,7 @@ sub TBDB_STATS_FLAGS_IDLESWAP()	{ 0x01; }
 sub TBDB_STATS_FLAGS_PREMODIFY(){ 0x02; }
 sub TBDB_STATS_FLAGS_START()    { 0x04; }
 sub TBDB_STATS_FLAGS_PRESWAPIN(){ 0x08; }
+sub TBDB_STATS_FLAGS_BATCHCTRL(){ 0x10; }
 # Do not export these variables!
 my $TBDB_STATS_STARTCLOCK;
 my $TBDB_STATS_SAVEDSWAPUID;
@@ -3347,6 +3348,7 @@ sub TBExptContainsNodeCT($$$)
 		   "virt_node_startloc",
 		   "virt_simnode_attributes",
 		   "virt_user_environment",
+		   "virt_parameters",
 		   # vis_nodes is locked during update in prerender, so we
 		   # will get a consistent dataset when we backup.
 		   "vis_nodes",
@@ -4726,6 +4728,7 @@ sub GatherSwapStats($$$$$;$)
 {
     my ($pid, $eid, $uid, $mode, $ecode, $flags) = @_;
     my ($pnodes,$vnodes,$duration);
+    my $batchctrl = 0;
 
     # Optional argument to modify the stats gathering.
     $flags = 0
@@ -4740,7 +4743,6 @@ sub GatherSwapStats($$$$$;$)
 	$TBDB_STATS_STARTCLOCK = time();
 	return;
     }
-    
     my $session = tblog_session();
     $session = 'NULL' unless defined $session;
 

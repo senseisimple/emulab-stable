@@ -5,6 +5,7 @@
 # All rights reserved.
 #
 include("defs.php3");
+include("template_defs.php");
 
 #
 # Only known and logged in users can begin experiments.
@@ -96,6 +97,56 @@ if (isset($copyid) && $copyid != "") {
 
 #
 # Spit back an NS file to the user. 
+#
+
+#
+# A template.
+#
+if (isset($guid) && isset($version)) {
+    if (!TBvalid_guid($guid)) {
+	PAGEARGERROR("Invalid GUID.");
+    }
+    if (!TBvalid_tinyint($version)) {
+	PAGEARGERROR("Invalid GUID version");
+    }
+    #
+    # Check to make sure this is a valid template.
+    #
+    if (! TBValidExperimentTemplate($guid, $version)) {
+	USERERROR("The experiment template $guid/$version is not a valid ".
+		  "experiment template!", 1);
+    }
+
+    #
+    # Verify Permission.
+    #
+    if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
+	USERERROR("You do not have permission to view experiment template ".
+		  "$guid/$version!", 1);
+    }
+    header("Content-Type: text/plain");
+
+    #
+    # Grab all of the input files. Display each one. 
+    #
+    $query_result =
+	DBQueryFatal("select * from experiment_template_inputs ".
+		     "where parent_guid='$guid' and parent_vers='$version'");
+
+    while ($row = mysql_fetch_array($query_result)) {
+	$input_idx = $row['input_idx'];
+
+	$input_query =
+	    DBQueryFatal("select input from experiment_template_input_data ".
+			 "where idx='$input_idx'");
+
+	$input_row = mysql_fetch_array($input_query);
+	echo $input_row['input'];
+	echo "\n\n";
+    }
+    return;
+}
+
 #
 # if requesting a specific pid,eid must have permission.
 #

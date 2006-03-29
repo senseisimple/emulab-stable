@@ -1,0 +1,346 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+
+#
+# Terminate a template instance (okay, swap it out and remove it).
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_swapout [-q] [-w] -e <id> <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-w       - wait for template instance to be terminated\n".
+	  "-q       - be less chatty\n".
+	  "-e <id>  - The instance ID (aka eid)\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qwaie:";
+my %options      = ();
+my $quiet        = 0;
+my $waitmode     = 0;
+my $foreground   = 0;
+my $pid;
+my $eid;
+my $tid;
+my $guid;
+my $version;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+
+# Locals
+my $user_name;
+my $user_email;
+my $dbuid;
+my $logname;
+my $exptidx;
+# For the END block below.
+my $cleaning    = 0;
+my $exptcreated = 0;
+my $justexit    = 1;
+
+# Programs we need
+my $endexp      = "$TB/bin/endexp";
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libTemplates;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    tbdie("Cannot determine your name and email address.");
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
+
+#
+# Grab template info.
+#
+if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
+    tbdie("Could not get info for template $guid/$version!");
+}
+
+if (! TBExptIDX($pid, $eid, \$exptidx)) {
+    fatal(-1, "Could not get experiment index for $pid,$eid!");
+}
+
+#
+# Make sure UID is allowed to create experiments in this project.
+#
+if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+    tberror("You do not have permission to instantiate template ".
+	    "$guid/$version");
+    exit(1);
+}
+#
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
+#
+# Catch this so we can clean up.
+#
+$SIG{TERM} = \&sighandler;
+
+#
+# If not in batch mode, go into the background. Parent exits.
+#
+if (! $foreground) {
+    $logname = TBExptCreateLogFile($pid, $eid, "swapout");
+    TBExptSetLogFile($pid, $eid, $logname);
+    TBExptOpenLogFile($pid, $eid);
+
+    if (my $childpid = TBBackGround($logname)) {
+	#
+	# Parent exits normally, unless in waitmode. We have to set
+	# justexit to make sure the END block below does not run.
+	#
+	$justexit = 1;
+
+	if (!$waitmode) {
+	    print("Template instance is now being terminated.\n".
+		  "You will be notified via email when the this is done.\n")
+		if (! $quiet);
+	    exit(0);
+	}
+	print("Waiting for template instance to terminate.\n")
+	    if (! $quiet);
+	    
+	if (isatty(STDIN) && !$quiet) {
+	    print("You may type ^C at anytime; you will be notified via email.".
+		  "\n".
+		  "You will not actually interrupt the experiment itself.\n");
+	}
+	
+	# Give child a chance to run.
+	select(undef, undef, undef, 0.25);
+	
+	#
+	# Reset signal handlers. User can now kill this process, without
+	# stopping the child.
+	#
+	$SIG{TERM} = 'DEFAULT';
+	$SIG{INT}  = 'DEFAULT';
+	$SIG{QUIT} = 'DEFAULT';
+
+	#
+	# Wait until child exits or until user gets bored and types ^C.
+	#
+	waitpid($childpid, 0);
+	
+	print("Done. Exited with status: $?\n")
+	    if (! $quiet);
+	exit($? >> 8);
+    }
+    TBdbfork();
+}
+
+#
+# When in waitmode, must put ourselves in another process group so that
+# an interrupt to the parent will not have any effect on the backend.
+#
+if ($waitmode) {
+    POSIX::setsid();
+}
+
+#
+# Now do the swapout.
+#
+# Note special -x option.
+#
+my @arguments = ($endexp, "-x", "-q", $pid, $eid);
+
+# Now invoke.
+system(@arguments);
+fatal($? >> 8, "Could not terminate template instance")
+    if ($?);
+
+libTemplates::FinalizeTemplateInstanceRecord($guid, $version, $exptidx) == 0 
+    or fatal(-1, "Could not finalize experiment instance record!");
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"e"})) {
+	$eid = $options{"e"};
+
+	if ($eid =~ /^([-\w]+)$/) {
+	    $eid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $eid.");
+	}
+	if (! TBcheck_dbslot($eid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    else {
+	tberror("Must provide an instance ID!");
+	exit(1);
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"w"})) {
+	$waitmode = 1;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+
+    #
+    # This exit will drop into the END block below.
+    # 
+    exit($errorstat);
+}
+
+sub sighandler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}!");
+}
+
+END {
+    # Normal exit, nothing to do.
+    if (!$? || $justexit) {
+	return;
+    }
+    my $saved_exitcode = $?;
+    
+    if ($cleaning) {
+	#
+	# We are screwed; a recursive error. Someone will have to clean
+	# up by hand. 
+	#
+	SENDMAIL(TBOPS, 
+		 "Instance Termination Failure: $pid/$tid",
+		 "Recursive error in cleanup! This is very bad.");
+	$? = $saved_exitcode;
+	return;
+    }
+    $cleaning = 1;
+    cleanup();
+    $? = $saved_exitcode;
+}
+

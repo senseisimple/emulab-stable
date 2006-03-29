@@ -777,6 +777,21 @@ REPLACE INTO table_regex VALUES ('node_attributes','attrkey','text','regex','^[-
 REPLACE INTO table_regex VALUES ('node_attributes','attrvalue','text','regex','^[-\\w\\.+,\\s]+$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('archive_tags','description','text','redirect','projects:why',1,2048,NULL);
 REPLACE INTO table_regex VALUES ('archive_tags','tag','text','regex','^[a-zA-Z][-\\w\\.\\+]+$',3,64,NULL);
+REPLACE INTO table_regex VALUES ('experiment_templates','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,4096,NULL);
+REPLACE INTO table_regex VALUES ('experiment_templates','guid','text','regex','^[\\w]+$',1,32,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_metadata','name','text','regex','^[\\040-\\176]*$',1,64,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_metadata','value','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,2048,NULL);
+REPLACE INTO table_regex VALUES ('virt_parameters','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_parameters','eid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_parameters','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
+REPLACE INTO table_regex VALUES ('virt_parameters','value','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_instance_bindings','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
+REPLACE INTO table_regex VALUES ('experiment_template_instance_bindings','value','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('experiment_runs','runid','text','redirect','experiments:eid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('experiment_runs','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
+REPLACE INTO table_regex VALUES ('experiment_run_bindings','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
+REPLACE INTO table_regex VALUES ('experiment_run_bindings','value','text','redirect','default:tinytext',0,256,NULL);
+
 
 --
 -- Dumping data for table `testsuite_preentables`

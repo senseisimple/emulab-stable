@@ -1,11 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+include("template_defs.php");
 
 #
 # Only known and logged in users can end experiments.
@@ -84,6 +85,7 @@ $row           = mysql_fetch_array($query_result);
 $exp_gid       = $row[gid];
 $isbatch       = $row[batchmode];
 $state         = $row[state];
+$exptidx       = $row[idx];
 $swappable     = $row[swappable];
 $idleswap_bit  = $row[idleswap];
 $idleswap_time = $row[idleswap_timeout];
@@ -95,6 +97,12 @@ $lockdown      = $row["lockdown"];
 #
 if (! TBExptAccessCheck($uid, $exp_pid, $exp_eid, $TB_EXPT_MODIFY)) {
     USERERROR("You do not have permission for $exp_eid!", 1);
+}
+
+# Template Instance Experiments get special treatment in this page.
+$isinstance = $EXPOSETEMPLATES && TBIsTemplateInstanceExperiment($exptidx);
+if ($isinstance && $inout != "out") {
+    PAGEARGERROR("Invalid action for template instance");
 }
 
 # Convert inout to informative text.
@@ -125,8 +133,13 @@ elseif (!strcmp($inout, "restart")) {
     $action = "restart";
 }
 
-echo "<font size=+2>Experiment <b>".
-     "<a href='showproject.php3?pid=$pid'>$pid</a>/".
+if ($isinstance) {
+    echo "<font size=+2>Template Instance <b>";
+}
+else {
+    echo "<font size=+2>Experiment <b>";
+}
+echo "<a href='showproject.php3?pid=$pid'>$pid</a>/".
      "<a href='showexp.php3?pid=$pid&eid=$eid'>$eid</a></b></font>\n";
 echo "<br>\n";
 flush();
@@ -149,7 +162,13 @@ if (!$confirmed) {
     if ($force) {
 	echo "<font color=red><br>forcibly</br></font> ";
     }
-    echo "$action experiment '$exp_eid?'
+    if ($isinstance) {
+	echo "terminate template instance";
+    }
+    else {
+	echo "$action experiment";
+    }
+    echo " '$exp_eid?'
           </h2>\n";
     
     SHOWEXP($exp_pid, $exp_eid, 1);
@@ -207,6 +226,17 @@ if (!$confirmed) {
 #
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
+if ($isinstance) {
+    if (! TBPidEid2Template($exp_pid, $exp_eid, $guid, $version)) {
+	TBERROR("Could not map $pid/$eid to its template!", 1);
+    }
+    echo "<br>\n";
+    echo "<b>Terminating template instance!</b> ... ";
+    echo "this will take a few minutes; please be patient.";
+    echo "<br>\n";
+    flush();
+}
+
 #
 # Run the scripts. We use a script wrapper to deal with changing
 # to the proper directory and to keep some of these details out
@@ -221,9 +251,11 @@ set_time_limit(0);
 $args = ($idleswap ? "-i" : ($autoswap ? "-a" : ""));
 
 $retval = SUEXEC($uid, "$exp_pid,$unix_gid",
-		 ($force ?
-		  "webidleswap $args $exp_pid $exp_eid" :
-		  "webswapexp -s $inout $exp_pid $exp_eid"),
+		  ($force ?
+		   "webidleswap $args $exp_pid $exp_eid" :
+		   ($isinstance ?
+		    "webtemplate_swapout -e $exp_eid $guid/$version" :
+		    "webswapexp -s $inout $exp_pid $exp_eid")),
 		 SUEXEC_ACTION_IGNORE);
 
 #
@@ -243,11 +275,14 @@ if ($retval < 0) {
 #
 echo "<br>\n";
 if ($retval) {
-    echo "<h3>Experiment $action could not proceed</h3>";
+    echo "<h3>$action could not proceed</h3>";
     echo "<blockquote><pre>$suexec_output<pre></blockquote>";
 }
 else {
-    if ($isbatch) {
+    if ($isinstance) {
+	STARTLOG($pid, $eid);
+    }
+    elseif ($isbatch) {
 	if (strcmp($inout, "in") == 0) {
 	    echo "Batch Mode experiments will be run when enough resources
                   become available. This might happen immediately, or it

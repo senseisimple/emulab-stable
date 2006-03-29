@@ -58,7 +58,7 @@ sub CheckCopyArgs();
 sub CopyInArchive();
 sub fatal($);
 
-my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:b";
+my $optlist = "iE:g:e:p:S:L:a:l:sfwqt:nzc:bx";
 my $batchmode= 1;
 my $frontend = 0;
 my $waitmode = 0;
@@ -67,6 +67,7 @@ my $linktest = 0;	# non-zero means level to run at.
 my $zeemode  = 0;	# Hey, out of options.
 my $zeeopt   = "";	# To pass along.
 my $savestate= 0;
+my $template_mode = 0;	# New stuff; experiment templates.
 # All of these are for experiment dup and branch. Really mucks things up.
 # These globals are set when we parse the -c argument, but used later
 my $copybranch = 0;	# A branch instead of a duplicate
@@ -492,6 +493,9 @@ else {
 		    TBDB_STATS_FLAGS_START);
 }
 
+goto skiplog
+    if ($template_mode);
+
 #
 # The rest of this goes into the background so that the user sees
 # immediate response. We will send email later when the experiment
@@ -554,6 +558,7 @@ if (my $childpid = TBBackGround($logname)) {
     exit $exit_code;
 }
 TBdbfork();
+skiplog:
 
 # We are committed now. Affects how fatal() operates.
 $committed = 1;
@@ -724,8 +729,10 @@ TBExptSetSwapUID($pid, $eid, $dbuid);
 #
 # Close up the log file so the webpage stops.
 #
-print "Experiment $pid/$eid has been successfully created!\n";
-TBExptCloseLogFile($pid, $eid);
+if (!$template_mode) {
+    print "Experiment $pid/$eid has been successfully created!\n";
+    TBExptCloseLogFile($pid, $eid);
+}
 
 #
 # Must unlock and drop batch experiments into the queue before exit.
@@ -742,6 +749,12 @@ else {
 # done after we change the experiment state (above).
 #
 TBSetCancelFlag($pid, $eid, EXPTCANCEL_CLEAR());
+
+#
+# In template_mode we are done; the caller finishes up.
+#
+exit(0)
+    if ($template_mode);
 
 #
 # Dump the report file and the log file to the user via email. 
@@ -1090,6 +1103,9 @@ sub ParseArgs()
     }
     if (defined($options{"w"})) {
 	$waitmode = 1;
+    }
+    if (defined($options{"x"})) {
+	$template_mode = 1;
     }
 }
 

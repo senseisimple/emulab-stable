@@ -222,6 +222,7 @@ function WRITESIDEBAR() {
     global $BUGDBSUPPORT, $BUGDBURL, $CVSSUPPORT, $CHATSUPPORT;
     global $CHECKLOGIN_WIKINAME;
     global $THISHOMEBASE;
+    global $EXPOSETEMPLATES;
     $firstinitstate = TBGetFirstInitState();
 
     #
@@ -457,6 +458,11 @@ function WRITESIDEBAR() {
                 #
  		WRITESIDEBARBUTTON("Begin an Experiment",
 				   $TBBASE, "beginexp_html.php3");
+
+		if ($EXPOSETEMPLATES) {
+		    WRITESIDEBARBUTTON("Create a Template",
+				       $TBBASE, "template_create.php");
+		}
 	
 		# Put _NEW back when Plab is working again.
 		WRITESIDEBARBUTTON("Create a PlanetLab Slice",

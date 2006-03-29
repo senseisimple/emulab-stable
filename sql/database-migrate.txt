@@ -3225,3 +3225,8 @@ last_net_act,last_cpu_act,last_ext_act);
      those entries from the "log" table using:
 
         delete from log where type = 'thecause';
+
+4.41: A lot of Template stuff. This is experimental! 
+
+	mysql tbdb < templates.sql
+

@@ -1,11 +1,12 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
 include("showstuff.php3");
+include("template_defs.php");
 
 #
 # Only known and logged in users can do this.
@@ -85,6 +86,10 @@ if ($yourpcs) {
 # Put a link down to the profile
 #
 echo "<h3><a href=\"#PROFILE\">Manage User Profile</a></h3>\n";
+
+if ($EXPOSETEMPLATES) {
+    SHOWTEMPLATELIST("USER", 0, $uid, $target_uid);
+}
 
 #
 # Lets show Experiments.

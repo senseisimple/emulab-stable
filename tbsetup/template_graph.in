@@ -1,0 +1,178 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+
+#
+# Quickie graph layout.
+#
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_graph <guid>\n".
+	  "switches and arguments:\n".
+	  "-v          - be more chatty\n".
+	  "-p <prefix> - prefix for output files.\n".
+	  "<guid>      - GUID to graph\n");
+    exit(-1);
+}
+my $optlist	 = "vp:";
+my %options      = ();
+my $verbose      = 0;
+my $prefix       = "/tmp/dot$$";
+my $guid;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $PROJROOT	= "/proj";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL	= "@USERNODE@";
+
+# Protos
+sub ParseArgs();
+
+# Locals
+my $DOT         = "/usr/local/bin/dot";
+my %versions    = ();
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libTemplates;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+# Now parse arguments.
+ParseArgs();
+
+# After parsing args.
+my $dotfile	= "$prefix.dot";
+my $imapfile	= "$prefix.imap";
+my $giffile	= "$prefix.gif";
+
+#
+# Grab all the parent pointers.
+#
+my $query_result =
+    DBQueryFatal("select vers, parent_vers from experiment_templates ".
+		 "where guid='$guid' ".
+		 "order by vers");
+
+open(DOT, "> $dotfile") or
+    tbdie("Could not opern $dotfile!");
+
+print DOT "digraph TemplateGraph {\n";
+print DOT "  node [shape=ellipse]\n";
+print DOT "  edge [fontsize=8]\n";
+print DOT "  subgraph guid {\n";
+print DOT "    label = \"$guid\";\n";
+
+while (my ($vers, $parent_vers) = $query_result->fetchrow_array()) {
+    my $url = "$TBBASE/template_show.php?guid=$guid&version=$vers";
+	
+    if (!exists($versions{"$vers"})) {
+	print DOT "    $vers [label=\"$vers\",href=\"$url\"];\n";
+	$versions{"$vers"} = $vers;
+    }
+    print DOT "    $parent_vers -> $vers;\n"
+	if (defined($parent_vers));
+    
+}
+print DOT "  }\n";
+print DOT "}\n";
+close(DOT);
+
+#
+# Now run dot and generate both a gif and an image map file.
+#
+system("$DOT -Tgif -o $giffile  $dotfile");
+system("$DOT -Tcmapx -o $imapfile $dotfile");
+
+#
+# Grab the input data. 
+#
+my $gifdata = `cat $giffile`;
+my $imapdata = `cat $imapfile`;
+
+$gifdata = DBQuoteSpecial($gifdata);
+$imapdata = DBQuoteSpecial($imapdata);
+
+DBQueryFatal("replace into experiment_template_graphs set ".
+	     "    parent_guid='$guid', ".
+	     "    image=$gifdata, ".
+	     "    imap=$imapdata");
+
+#unlink($dotfile, $gifdata, $imapdata);
+exit(0);
+
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    #
+    # Pick up guid and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)$/) {
+	$guid = $1;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+
+    if (defined($options{"p"})) {
+	$prefix = $options{"p"};
+
+	if ($prefix =~ /^([-\w\.\/]*)$/) {
+	    $prefix = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $prefix");
+	}
+    }
+}

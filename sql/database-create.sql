@@ -453,6 +453,31 @@ CREATE TABLE experiment_resources (
 ) TYPE=MyISAM;
 
 --
+-- Table structure for table `experiment_run_bindings`
+--
+
+CREATE TABLE experiment_run_bindings (
+  exptidx int(10) unsigned NOT NULL default '0',
+  runid varchar(32) NOT NULL default '',
+  name varchar(64) NOT NULL default '',
+  value tinytext NOT NULL,
+  PRIMARY KEY  (exptidx,runid,name)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_runs`
+--
+
+CREATE TABLE experiment_runs (
+  exptidx int(10) unsigned NOT NULL default '0',
+  runid varchar(32) NOT NULL default '',
+  description tinytext,
+  start_time datetime default NULL,
+  stop_time datetime default NULL,
+  PRIMARY KEY  (exptidx,runid)
+) TYPE=MyISAM;
+
+--
 -- Table structure for table `experiment_stats`
 --
 
@@ -485,6 +510,183 @@ CREATE TABLE experiment_stats (
   PRIMARY KEY  (eid,pid,exptidx),
   KEY exptidx (exptidx),
   KEY rsrcidx (rsrcidx)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_graphs`
+--
+
+CREATE TABLE experiment_template_graphs (
+  parent_guid varchar(16) NOT NULL default '',
+  image mediumblob,
+  imap mediumtext,
+  PRIMARY KEY  (parent_guid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_input_data`
+--
+
+CREATE TABLE experiment_template_input_data (
+  idx int(10) unsigned NOT NULL auto_increment,
+  md5 varchar(32) NOT NULL default '',
+  input mediumtext,
+  PRIMARY KEY  (idx),
+  UNIQUE KEY md5 (md5)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_inputs`
+--
+
+CREATE TABLE experiment_template_inputs (
+  idx int(10) unsigned NOT NULL auto_increment,
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  pid varchar(12) NOT NULL default '',
+  tid varchar(32) NOT NULL default '',
+  input_idx int(10) unsigned NOT NULL default '0',
+  PRIMARY KEY  (parent_guid,parent_vers,idx),
+  KEY pidtid (pid,tid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_instance_bindings`
+--
+
+CREATE TABLE experiment_template_instance_bindings (
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  exptidx int(10) unsigned NOT NULL default '0',
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  name varchar(64) NOT NULL default '',
+  value tinytext NOT NULL,
+  PRIMARY KEY  (exptidx,name),
+  KEY parent_guid (parent_guid,parent_vers),
+  KEY pidtid (pid,eid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_instances`
+--
+
+CREATE TABLE experiment_template_instances (
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  exptidx int(10) unsigned NOT NULL default '0',
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  uid varchar(8) NOT NULL default '',
+  start_time datetime default NULL,
+  stop_time datetime default NULL,
+  PRIMARY KEY  (exptidx),
+  KEY parent_guid (parent_guid,parent_vers),
+  KEY pid (pid,eid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_metadata`
+--
+
+CREATE TABLE experiment_template_metadata (
+  guid varchar(16) NOT NULL default '',
+  vers smallint(5) unsigned NOT NULL default '0',
+  parent_guid varchar(16) default NULL,
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  template_guid varchar(16) NOT NULL default '',
+  template_vers smallint(5) unsigned NOT NULL default '0',
+  name varchar(64) NOT NULL default '',
+  value tinytext,
+  created datetime default NULL,
+  PRIMARY KEY  (guid,vers,name),
+  KEY parent_guid (parent_guid,parent_vers),
+  KEY template_guid (template_guid,template_vers)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_parameters`
+--
+
+CREATE TABLE experiment_template_parameters (
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  pid varchar(12) NOT NULL default '',
+  tid varchar(32) NOT NULL default '',
+  name varchar(64) NOT NULL default '',
+  value tinytext,
+  PRIMARY KEY  (parent_guid,parent_vers,name),
+  KEY pidtid (pid,tid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_template_settings`
+--
+
+CREATE TABLE experiment_template_settings (
+  parent_guid varchar(16) NOT NULL default '',
+  parent_vers smallint(5) unsigned NOT NULL default '0',
+  pid varchar(12) NOT NULL default '',
+  tid varchar(32) NOT NULL default '',
+  uselinkdelays tinyint(4) NOT NULL default '0',
+  forcelinkdelays tinyint(4) NOT NULL default '0',
+  multiplex_factor smallint(5) default NULL,
+  uselatestwadata tinyint(4) NOT NULL default '0',
+  usewatunnels tinyint(4) NOT NULL default '1',
+  wa_delay_solverweight float default '0',
+  wa_bw_solverweight float default '0',
+  wa_plr_solverweight float default '0',
+  sync_server varchar(32) default NULL,
+  cpu_usage tinyint(4) unsigned NOT NULL default '0',
+  mem_usage tinyint(4) unsigned NOT NULL default '0',
+  veth_encapsulate tinyint(4) NOT NULL default '1',
+  allowfixnode tinyint(4) NOT NULL default '1',
+  jail_osname varchar(20) default NULL,
+  delay_osname varchar(20) default NULL,
+  use_ipassign tinyint(4) NOT NULL default '0',
+  ipassign_args varchar(255) default NULL,
+  linktest_level tinyint(4) NOT NULL default '0',
+  linktest_pid int(11) default '0',
+  useprepass tinyint(1) NOT NULL default '0',
+  elab_in_elab tinyint(1) NOT NULL default '0',
+  elabinelab_eid varchar(32) default NULL,
+  elabinelab_cvstag varchar(64) default NULL,
+  elabinelab_nosetup tinyint(1) NOT NULL default '0',
+  security_level tinyint(1) NOT NULL default '0',
+  delay_capacity tinyint(3) unsigned default NULL,
+  savedisk tinyint(1) NOT NULL default '0',
+  PRIMARY KEY  (parent_guid,parent_vers),
+  KEY pidtid (pid,tid)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `experiment_templates`
+--
+
+CREATE TABLE experiment_templates (
+  guid varchar(16) NOT NULL default '',
+  vers smallint(5) unsigned NOT NULL default '0',
+  parent_guid varchar(16) default NULL,
+  parent_vers smallint(5) unsigned default NULL,
+  pid varchar(12) NOT NULL default '',
+  gid varchar(16) NOT NULL default '',
+  tid varchar(32) NOT NULL default '',
+  uid varchar(8) NOT NULL default '',
+  description mediumtext,
+  eid varchar(32) NOT NULL default '',
+  created datetime default NULL,
+  modified datetime default NULL,
+  locked datetime default NULL,
+  state varchar(16) NOT NULL default 'new',
+  path tinytext,
+  maximum_nodes int(6) unsigned default NULL,
+  minimum_nodes int(6) unsigned default NULL,
+  logfile tinytext,
+  logfile_open tinyint(4) NOT NULL default '0',
+  prerender_pid int(11) default '0',
+  PRIMARY KEY  (guid,vers),
+  KEY pidtid (pid,tid),
+  KEY pideid (pid,eid)
 ) TYPE=MyISAM;
 
 --
@@ -2466,6 +2668,18 @@ CREATE TABLE virt_nodes (
   inner_elab_role enum('boss','boss+router','router','ops','ops+fs','fs','node') default NULL,
   numeric_id int(11) default NULL,
   KEY pid (pid,eid,vname)
+) TYPE=MyISAM;
+
+--
+-- Table structure for table `virt_parameters`
+--
+
+CREATE TABLE virt_parameters (
+  pid varchar(12) NOT NULL default '',
+  eid varchar(32) NOT NULL default '',
+  name varchar(64) NOT NULL default '',
+  value tinytext,
+  PRIMARY KEY  (pid,eid,name)
 ) TYPE=MyISAM;
 
 --

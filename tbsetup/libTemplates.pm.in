@@ -1,0 +1,405 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+# XXX Need to deal with locking at some point ...
+#
+package libTemplates;
+
+use strict;
+use Exporter;
+use vars qw(@ISA @EXPORT);
+
+@ISA    = "Exporter";
+@EXPORT = qw ( );
+
+# Must come after package declaration!
+use lib '@prefix@/lib';
+use libdb;
+use libtestbed;
+use libtblog;
+use English;
+
+# Configure variables
+my $TB		= "@prefix@";
+my $MD5         = "/sbin/md5";
+
+#
+# Grab a new GUID for a template. We do not have to use it of course.
+#
+sub NewGUID($)
+{
+    my ($pidx) = @_;
+    my $idx;
+    
+    DBQueryFatal("lock tables emulab_indicies write");
+
+    my $query_result = 
+	DBQueryFatal("select idx from emulab_indicies ".
+		     "where name='next_guid'");
+	
+    if (! $query_result->num_rows) {
+	$idx = 10000;
+	
+	DBQueryFatal("insert into emulab_indicies (name, idx) ".
+		     "values ('next_guid', $idx)");
+    }
+    else {
+	($idx) = $query_result->fetchrow_array();
+    }
+    my $nextidx = $idx + 1;
+    
+    DBQueryFatal("update emulab_indicies set idx='$nextidx' ".
+		 "where name='next_guid'");
+
+    DBQueryFatal("unlock tables");
+
+    $$pidx = $idx;
+    return 0;
+}
+
+#
+# Check for valid template.
+#
+sub TBValidExperimentTemplate($$)
+{
+    my ($guid, $version) = @_;
+
+    my $query_result =
+	DBQueryFatal("select guid from experiment_templates ".
+		     "where guid='$guid' and vers='$version'");
+
+    return $query_result->num_rows;
+}
+
+#
+# Template permission checks. Using the experiment access check stuff!
+#
+# Usage: TBExptTemplateAccessCheck($uid, $guid, $access_type)
+#	 returns 0 if not allowed.
+#        returns 1 if allowed.
+#
+sub TBExptTemplateAccessCheck($$$)
+{
+    my ($uid, $guid, $access_type) = @_;
+    my $mintrust;
+
+    if ($access_type < TB_EXPT_MIN ||
+	$access_type > TB_EXPT_MAX) {
+	die("*** Invalid access type: $access_type!");
+    }
+
+    #
+    # Admins do whatever they want!
+    #
+    if (TBAdmin($uid)) {
+	return 1;
+    }
+    $uid = MapNumericUID($uid);
+
+    my $query_result =
+	DBQueryFatal("select pid,gid from experiment_templates where ".
+		     "guid='$guid' limit 1");
+    
+    if ($query_result->numrows == 0) {
+	return 0;
+    }
+    my @row = $query_result->fetchrow_array();
+    my $pid = $row[0];
+    my $gid = $row[1];
+
+    #
+    # An experiment may be destroyed by the experiment creator or the
+    # project/group leader.
+    #
+    if ($access_type == TB_EXPT_READINFO) {
+	$mintrust = PROJMEMBERTRUST_USER;
+    }
+    else {
+	$mintrust = PROJMEMBERTRUST_LOCALROOT;
+    }
+
+    #
+    # Either proper permission in the group, or group_root in the project.
+    # This lets group_roots muck with other people's experiments, including
+    # those in groups they do not belong to.
+    #
+    return TBMinTrust(TBGrpTrust($uid, $pid, $gid), $mintrust) ||
+	TBMinTrust(TBGrpTrust($uid, $pid, $pid), PROJMEMBERTRUST_GROUPROOT);
+}
+
+#
+# Create a new template record from the args provided. We assume that
+# the table is locked by the caller. 
+#
+# Usage: int NewTemplateRecord(\%args)
+#
+sub NewTemplateRecord($)
+{
+    my ($args) = @_;
+
+    my $query = "insert into experiment_templates set ".
+	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+
+    # Append some default value stuff.
+    $query .= ",created=now()";
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
+# Delete a template (all tables).
+#
+sub DeleteTemplateRecord($$)
+{
+    my ($guid, $vers) = @_;
+
+    # Make sure the experiment_templates table is always last, in case
+    # something goes wrong. 
+    my @tables = ("experiment_templates");
+
+    foreach my $table (@tables) {
+	DBQueryFatal("delete from $table ".
+		     "where guid='$guid' and vers='$vers'");
+    }
+}
+
+#
+# Create a new template instance record from the args provided. 
+#
+# Usage: int NewTemplateInstanceRecord(\%args)
+#
+sub NewTemplateInstanceRecord($)
+{
+    my ($args) = @_;
+
+    my $query = "insert into experiment_template_instances set ".
+	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+
+    # Append some default value stuff.
+    $query .= ",start_time=now()";
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
+# Delete a template instance record.
+#
+sub DeleteTemplateInstanceRecord($$$)
+{
+    my ($guid, $vers, $exptidx) = @_;
+
+    DBQueryFatal("delete from experiment_template_instances ".
+		 "where parent_guid='$guid' and parent_vers='$vers' and ".
+		 "      exptidx='$exptidx'");
+
+    return 0;
+}
+
+#
+# Finalize a template instance record; usage is similar to above
+#
+# Usage: int FinalizeTemplateInstanceRecord($guid, $vers, $exptidx, \%args)
+#
+sub FinalizeTemplateInstanceRecord($$$;$)
+{
+    my ($guid, $vers, $exptidx, $args) = @_;
+
+    my $query = "update experiment_template_instances set stop_time=now() ";
+
+    if (defined($args) && scalar(keys%{$args})) {
+	$query .= ",";
+	$query .= join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+    }
+    $query .= " where parent_guid='$guid' and parent_vers='$vers' and ".
+	      "       exptidx='$exptidx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
+# Create a new template instance record from the args provided. 
+#
+# Usage: int NewTemplateInstanceRecord(\%args)
+#
+sub NewTemplateInstanceBindingRecord($)
+{
+    my ($args) = @_;
+
+    my $query = "insert into experiment_template_instance_bindings set ".
+	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
+# Delete template instance binding records
+#
+sub DeleteTemplateInstanceBindingRecords($$$)
+{
+    my ($guid, $vers, $exptidx) = @_;
+
+    DBQueryFatal("delete from experiment_template_instance_bindings ".
+		 "where parent_guid='$guid' and parent_vers='$vers' and ".
+		 "      exptidx='$exptidx'");
+
+    return 0;
+}
+
+#
+# Utility routine to get the pid,tid,gid of a template.
+#
+sub TemplateInfo($$$$;$)
+{
+    my ($guid, $version, $ppid, $ptid, $pgid) = @_;
+
+    my $query_result =
+	DBQueryWarn("select pid,tid,gid from experiment_templates ".
+		    "where guid='$guid' and vers='$version'");
+
+    return -1
+	if (!$query_result || !$query_result->numrows);
+
+    my ($pid, $tid, $gid) = $query_result->fetchrow_array();
+    $$ppid = $pid;
+    $$ptid = $tid;
+    $$pgid = $gid
+	if (defined($pgid));
+    return 0;
+}
+
+#
+# Create the directory for a template, update the DB, and return that
+# path to the caller.
+#
+#sub CreateTemplateDirectory($$$)
+#{
+#    my ($guid, $vers, $ppath) = @_;
+#
+#    # See mkexpdir.
+#    my $template_dir = PROJROOT() . "/$pid/templates/$guid/$vers";
+#
+#    if (! -e $template_dir) {
+#	system("/bin/mkdir -p $template_dir") == 0
+#	    or return -1;
+#    }
+#    DBQueryWarn("update experiment_templates set path='$template_dir' ".
+#		"where guid='$guid' and vers='$vers'")
+#	or return -1;
+#
+#    $$ppath = $template_dir;
+#    return 0;
+#}
+
+#
+# Add an input file to the template. The point of this is to reduce
+# duplication by taking an md5 of the input file, and sharing that
+# record/file.
+# 
+sub AddTemplateInputFile($$$)
+{
+    my ($guid, $version, $inputfile) = @_;
+    my $input_idx;
+    my $data_string = `cat $inputfile`;
+    return -1
+	if ($?);
+
+    # pid/tid are inserted for debugging.
+    my ($pid,$tid) = ();
+    if (TemplateInfo($guid, $version, \$pid, \$tid) < 0) {
+	tberror("Could not find pid,tid for experiment template '$guid'!");
+	return -1;
+    }
+
+    if ($data_string) {
+	# As you can see, we md5 the raw data.
+	$data_string = DBQuoteSpecial($data_string);
+	if (length($data_string) >= DBLIMIT_NSFILESIZE()) {
+	    tberror("Input file is too big (> " . DBLIMIT_NSFILESIZE() . ")!");
+	    return -1;
+	}
+
+	#
+	# Grab an MD5 of the file to see if we already have a copy of it.
+	# Avoids needless duplication.
+	#
+	my $md5 = `$MD5 -q $inputfile`;
+	chomp($md5);
+
+	my $query_result =
+	    DBQueryWarn("select idx from experiment_template_input_data ".
+			"where md5='$md5'");
+
+	return -1
+	    if (!$query_result);
+
+	if ($query_result->numrows) {
+	    ($input_idx) = $query_result->fetchrow_array();
+	}
+	else {
+	    $query_result =
+		DBQueryWarn("insert into experiment_template_input_data ".
+			    "(idx, md5, input) ".
+			    "values (NULL, '$md5', $data_string)");
+	    
+	    return -1
+		if (!$query_result);
+	    
+	    $input_idx = $query_result->insertid;
+	}
+
+	return -1
+	    if (!DBQueryWarn("insert into experiment_template_inputs ".
+			     " (idx, parent_guid, parent_vers, ".
+			     "  pid, tid, input_idx) values ".
+			     " (NULL, '$guid', '$version', '$pid', '$tid', ".
+			     "  '$input_idx')"));
+    }
+    return 0;
+}
+
+#
+# Find out if an experiment is a template instantiation; used by existing
+# pages to alter what they do.
+#
+sub IsTemplateInstanceExperiment($)
+{
+    my ($exptidx) = @_;
+    
+    my $query_result =
+	DBQueryFatal("select pid,eid from experiment_template_instances ".
+		     "where exptidx='$exptidx'");
+
+    return $query_result->numrows;
+}
+
+#
+# Map an experiment to its template.
+#
+sub MapExptidxtoTemplate($$$)
+{
+    my ($exptidx, $pguid, $pvers) = @_;
+
+    my $query_result =
+	DBQueryFatal("select parent_guid,parent_vers ".
+		     "  from experiment_template_instances ".
+		     "where exptidx='$exptidx'");
+
+    return -1
+	if (! $query_result->numrows);
+
+    my ($guid,$vers) = $query_result->fetchrow_array();
+    $$pguid = $guid;
+    $$pvers = $vers;
+    return 0;
+}

@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2003, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -43,7 +43,7 @@ my $GRPROOT  = "/groups";
 my $TFTPROOT = "/tftpboot";
 my $CVSREPOS = "$PROJROOT/cvsrepos";
 my @DIRLIST  = ("exp", "images", "logs", "deltas", "tarfiles", "rpms",
-		"groups", "tiplogs", "images/sigs");
+		"groups", "tiplogs", "images/sigs", "templates");
 my $projhead;
 
 #
