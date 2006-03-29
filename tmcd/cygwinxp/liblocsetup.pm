@@ -117,32 +117,43 @@ sub os_account_cleanup()
 {
     # Undo what rc.mounts and rc.accounts did.  
 
-    # The users list could be gotten from multiple places; let's use the /users
-    # directory as truth.
-    if (opendir(DIRHANDLE, "/users")) {
-	while ($name = readdir(DIRHANDLE)) {
-	    if ($name =~ m/^\.+/ || $name =~ m/^Administrator$/) {
+    # Get the users list from NT, dumped into /etc/passwd and preened by the
+    # os_accounts_sync function.  Root and internal admin accounts should have
+    # homedirs under /home, while users are under /users.
+    my ($pwd_line, $name);
+    if (open(PWDHANDLE, "/etc/passwd")) {
+	while ($pwdline = readline(PWDHANDLE)) {
+	    if ($pwdline !~ m|:/users/|) {
 		next;
 	    }
+	    $name = substr($pwdline, 0, index($pwdline, ":"));
 	    print "Removing user: $name\n";
 
 	    # There is always an NT account.
 	    mysystem("$NET user $name /delete >& /dev/null");
 
 	    # There will only be an NT homedir if the user has logged in sometime.
-	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name >& /dev/null");
-	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name >& /dev/null");
-	    system("$RM -rf C:/'Documents and Settings'/$name ");
+	    my $das = "C:/'Documents and Settings'";
+	    if ( -d "$das/$name" ) {
+		print "Removing directory: $das/$name\n";
+		system("$CHMOD -Rf 777 $das/$name >& /dev/null");
+		system("$CHOWN -Rf root $das/$name >& /dev/null");
+		system("$RM -rf $das/$name "); # Show errors.
+	    }
 	    # It sometimes also makes user.PCnnn, user.PCnnn.000, etc.
-	    system("$CHMOD -Rf 777 C:/'Documents and Settings'/$name.* >& /dev/null");
-	    system("$CHOWN -Rf root C:/'Documents and Settings'/$name.* >& /dev/null");
-	    system("$RM -rf C:/'Documents and Settings'/$name.*");
+	    if ( `ls -d $das/$name.* 2>/dev/null` ) {
+		print "Removing directories: $das/$name.*\n";
+		system("$CHMOD -Rf 777 $das/$name.* >& /dev/null");
+		system("$CHOWN -Rf root $das/$name.* >& /dev/null");
+		system("$RM -rf $das/$name.*"); # Show errors.
+	    }
 
-	    # Unmount the homedir so we can get to the mount point.
-	    system("$UMOUNT /users/$name");
-	    system("$RMDIR /users/$name");
+	    # Unmount the homedir so we can get to the mount point and remove it.
+	    system("$UMOUNT /users/$name >& /dev/null");
+	    system("$RMDIR /users/$name")
+		if ( -d "/users/$name" );
 	}
-	closedir(DIRHANDLE);
+	close(PWDHANDLE);
 
 	# Make the CygWin /etc/passwd and /etc/group files match Windows.
 	os_accounts_sync();
@@ -194,9 +205,14 @@ sub os_accounts_sync()
     print "Resetting the CygWin passwd and group files.\n";
 
     my $cmd = "$MKPASSWD -l | $AWK -F: '";
-    $cmd   .=   'BEGIN{ OFS=":" } ';
-    # Make root's UID zero.  Put non-root homedirs under /users, not /home.
-    $cmd   .=   '{ if ($1=="root") $3="0"; else sub("/home/", "/users/"); print }'; 
+    $cmd   .=   'BEGIN{ OFS=":"; ';
+    # Keep Windows admin account homedirs under /home so we know what to clean.
+    $cmd   .=   '  admin["root"]= admin["Administrator"]= admin["Guest"]= 1; ';
+    $cmd   .=   '  admin["HelpAssistant"]= admin["SUPPORT_388945a0"]= 1; }';
+    # Make root's UID zero.
+    $cmd   .=   '{ if ($1=="root") $3="0"; ';
+    # Put genuine user homedirs under /users, instead of /home.
+    $cmd   .=   '    else if ( ! admin[$1] ) sub("/home/", "/users/"); print }'; 
     $cmd   .= "'";
     # Apply the users' shell preferences.
     $cmd   .= " | sed -f $usershellsfile"
