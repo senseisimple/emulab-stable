@@ -633,7 +633,7 @@ if (! ($frontend || $batchmode)) {
     # Look for the unsual case of more than 2 nodes and no vlans. Send a
     # warning message.
     #
-    my @localnodes = ExpNodes($pid, $eid, 1);
+    my @localnodes = ExpNodes($pid, $eid, 1, 0);
     
     if (@localnodes && scalar(@localnodes) > 2) {
 	my $vlans_result =
