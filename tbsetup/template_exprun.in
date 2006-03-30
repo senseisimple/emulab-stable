@@ -1,0 +1,495 @@
+#!/usr/bin/perl -wT
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(isatty setsid);
+use POSIX qw(strftime);
+use Errno qw(EDQUOT);
+use XML::Simple;
+use Data::Dumper;
+
+#
+# Create a new experiment template. 
+#
+# Exit codes are important; they tell the web page what has happened so
+# it can say something useful to the user. Fatal errors are mostly done
+# with die(), but expected errors use this routine. At some point we will
+# use the DB to communicate the actual error.
+#
+# $status < 0 - Fatal error. Something went wrong we did not expect.
+# $status = 0 - Everything okay.
+# $status > 0 - Expected error. User not allowed for some reason. 
+# 
+sub usage()
+{
+    print(STDERR
+	  "Usage: template_exprun [-q] [-w] [-r <runid>] ".
+	  "-a <action> -e <eid> <guid/vers>\n".
+	  "switches and arguments:\n".
+	  "-a <action> - start or stop\n".
+	  "-w          - wait for template to be instantiated\n".
+	  "-q          - be less chatty\n".
+	  "-E <str>    - A pithy sentence describing the template\n".
+	  "-r <runid>  - A token ... we will make on up for you\n".
+	  "-p <file>   - XML file of parameter bindings\n".
+	  "-e <eid>    - The instance name\n".
+	  "<guid/vers> - GUID and version to swapin\n");
+    exit(-1);
+}
+my $optlist	 = "qwp:E:a:r:e:";
+my %options      = ();
+my $quiet        = 0;
+my $waitmode     = 0;
+my $foreground   = 0;
+my $paramfile;
+my %parameters   = ();
+my $action;
+my $description;
+my $pid;
+my $tid;
+my $eid;
+my $gid;
+my $guid;
+my $version;
+my $inputfile;
+my $exptidx;
+my $runid;
+
+#
+# Configure variables
+#
+my $TB		= "@prefix@";
+my $PROJROOT	= "/proj";
+my $EVENTSYS	= @EVENTSYS@;
+my $TBOPS	= "@TBOPSEMAIL@";
+my $TBLOGS	= "@TBLOGSEMAIL@";
+my $TBDOCBASE	= "@TBDOCBASE@";
+my $TBBASE	= "@TBBASE@";
+my $CONTROL	= "@USERNODE@";
+
+# Locals
+my $user_name;
+my $user_email;
+my $dbuid;
+my $logname;
+my $runidx;
+my $currunidx;
+# For the END block below.
+my $cleaning    = 0;
+my $justexit    = 1;
+
+# Programs we need
+my $checkquota  = "$TB/sbin/checkquota";
+
+# Protos
+sub ParseArgs();
+sub fatal($$);
+sub sighandler($);
+
+#
+# Testbed Support libraries
+#
+use lib "@prefix@/lib";
+use libdb;
+use libtestbed;
+use libtblog;
+use libTemplates;
+
+# Be careful not to exit on transient error
+$libdb::DBQUERY_MAXTRIES = 0;
+
+#
+# Turn off line buffering on output
+#
+$| = 1;
+
+#
+# Set umask for start/swap. We want other members in the project to be
+# able to swap/end experiments, so the log and intermediate files need
+# to be 664 since some are opened for append.
+#
+umask(0002);
+
+#
+# Untaint the path
+#
+# un-taint path
+$ENV{'PATH'} = '/bin:/usr/bin:/usr/local/bin';
+delete @ENV{'IFS', 'CDPATH', 'ENV', 'BASH_ENV'};
+
+#
+# Verify user and get his DB uid.
+#
+if (! UNIX2DBUID($UID, \$dbuid)) {
+    tbdie("You do not exist in the Emulab Database!");
+}
+
+#
+# Get email info for user.
+#
+if (! UserDBInfo($dbuid, \$user_name, \$user_email)) {
+    tbdie("Cannot determine your name and email address.");
+}
+
+#
+# Before doing anything else, check for overquota ... lets not waste
+# our time. Make sure user sees the error by exiting with 1.
+#
+if (system("$checkquota $dbuid") != 0) {
+    tberror("You are over your disk quota on $CONTROL; please cleanup!");
+    exit(1);
+}
+
+# Now parse arguments.
+ParseArgs();
+
+#
+# In wait mode, block SIGINT until we spin off the background process.
+#
+if ($waitmode) {
+    $SIG{QUIT} = 'IGNORE';
+    $SIG{TERM} = 'IGNORE';
+    $SIG{INT}  = 'IGNORE';
+}
+
+#
+# Grab template info.
+#
+if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
+    tbdie("Could not get info for template $guid/$version!");
+}
+# This is the instance IDX ...
+if (! TBExptIDX($pid, $eid, \$exptidx)) {
+    fatal(-1, "Could not get experiment index for $pid,$eid!");
+}
+#
+# Make sure it is valid and actually running.
+#
+if (! libTemplates::IsTemplateInstanceExperiment($exptidx)) {
+    tberror("No such template instance experiment $exptidx!");
+    exit(1);
+}
+
+#
+# And get the instance info,
+#
+if (libTemplates::TemplateInstanceInfo($exptidx, \$currunidx) < 0) {
+    fatal(-1, "Could not get current experiment run index!");
+}
+
+if (ExpState($pid, $eid) ne EXPTSTATE_ACTIVE()) {
+    tberror("Template instance experiment $exptidx in not active!");
+    exit(1);
+}
+
+#
+# Make sure UID is allowed to create experiments in this project.
+#
+if (! TBProjAccessCheck($dbuid, $pid, $gid, TB_PROJECT_CREATEEXPT)) {
+    tberror("You do not have permission to instantiate template ".
+	    "$guid/$version");
+    exit(1);
+}
+
+#
+# If we have a parameter file, we need to copyin the values and store
+# them in the DB for this experiment.
+#
+# XXX Do we keep these values in the DB forever? Or just keep the XML file
+# around and archived? 
+#
+if (defined($paramfile)) {
+    my $donebad = 0;
+    
+    my $parse  = XMLin($paramfile,
+		       VarAttr => 'name',
+		       ContentKey => '-content',
+		       SuppressEmpty => undef);
+
+    foreach my $name (keys(%{ $parse->{'parameter'} })) {
+	my $value = $parse->{'parameter'}->{$name}->{'value'};
+
+	if (! TBcheck_dbslot($name,
+			     "experiment_template_instance_bindings", "name",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tberror("Illegal characters in parameter name: $name");
+	    $donebad++;
+	}
+	if (defined($value) &&
+	    ! TBcheck_dbslot($value,
+			     "experiment_template_instance_bindings", "value",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tberror("Illegal characters in parameter value: $value");
+	    $donebad++;
+	}
+	# DB records inserted below, once experiment is pre-loaded.
+	$parameters{$name} = $value;
+    }
+    # User sees this error.
+    exit(1)
+	if ($donebad);
+}
+
+#
+# At this point, we need to force a cleanup no matter how we exit.
+# See the END block below.
+#
+$justexit = 0;
+
+#
+# Finalize running experiment.
+#
+if (defined($currunidx)) {
+    if (libTemplates::FinalizeTemplateExerimentRunRecord($exptidx,
+							 $currunidx) < 0) {
+	fatal(-1, "Could not finalize experiment run index $currunidx!");
+    }
+}
+goto done
+    if ($action eq "stop") ;
+
+#
+# Generate a new run.
+#
+my %args = ();
+$args{'exptidx'}     = $exptidx;
+$args{'runid'}       = $runid;
+if (defined($description)) {
+    $args{'description'} = DBQuoteSpecial($description);
+    $args{'description'} =~ s/^\'(.*)\'$/$1/;
+}
+
+if (libTemplates::NewTemplateExerimentRunRecord(\%args, \$runidx) < 0) {
+    fatal(-1, "Could not insert experiment run record!");
+}
+
+#
+# And the bindings for the run ...
+#
+if ($paramfile) {
+    foreach my $name (keys(%parameters)) {
+	my $value = $parameters{$name};
+
+	my %args = ();
+    
+	$args{'exptidx'}     = $exptidx;
+	$args{'runidx'}      = $runidx;
+	$args{'name'}        = $name;
+	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
+	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
+    
+	libTemplates::NewExperimentRunBindingRecord(\%args) == 0
+	    or tbdie("Error inserting run binding into DB!");
+    }
+}
+
+#
+# Update the instance record to point to the new current run.
+#
+%args = ();
+$args{'runidx'}      = $runidx;
+
+if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
+					       $exptidx, \%args) < 0) {
+    fatal(-1, "Could not insert experiment instance record!");
+}
+
+done:
+# Stop the web interface from spewing.
+TBExptCloseLogFile($pid, $eid)
+    if (defined($logname));
+
+exit(0);
+
+#
+# Parse command arguments. Once we return from getopts, all that are
+# left are the required arguments.
+#
+sub ParseArgs()
+{
+    if (! getopts($optlist, \%options)) {
+	usage();
+    }
+
+    if (@ARGV != 1) {
+	usage();
+    }
+    #
+    # Pick up guid/version first and untaint.
+    #
+    my $tmp = shift(@ARGV);
+
+    if ($tmp =~ /^([\w]*)\/([\d]*)$/) {
+	$guid = $1;
+	$version = $2;
+    }
+    else {
+	tbdie("Bad data in argument: $tmp");
+    }
+    
+    if (defined($options{"e"})) {
+	$eid = $options{"e"};
+
+	if ($eid =~ /^([-\w]+)$/) {
+	    $eid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $eid.");
+	}
+	if (! TBcheck_dbslot($eid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    else {
+	tberror("Must provide an experiment ID (-e option)!");
+	exit(1);
+    }
+
+    if (defined($options{"r"})) {
+	$runid = $options{"r"};
+
+	if ($runid =~ /^([-\w]+)$/) {
+	    $runid = $1;
+	}
+	else {
+	    tbdie("Bad data in argument: $runid.");
+	}
+	if (! TBcheck_dbslot($runid, "experiments", "eid",
+			   TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper experiment name (id)!");
+	}
+    }
+    else {
+	tbdie("Must provide a run ID (-r argument)!");
+    }
+    
+    if (defined($options{"a"})) {
+	$action = $options{"a"};
+
+	if ($action ne "start" and $action ne "stop") {
+	    tbdie("Improper -a argument: $action.");
+	}
+    }
+    else {
+	tbdie("Must provide an action (-a argument)!");
+    }
+
+    if (defined($options{"q"})) {
+	$quiet = 1;
+    }
+    if (defined($options{"w"})) {
+	$waitmode = 1;
+    }
+    if (defined($options{"E"})) {
+	if (! TBcheck_dbslot($options{"E"},
+			     "experiment_templates", "description",
+			     TBDB_CHECKDBSLOT_WARN|TBDB_CHECKDBSLOT_ERROR)) {
+	    tbdie("Improper template description!");
+	}
+	$description = $options{"E"};
+    }
+
+    if (defined($options{"p"})) {
+	my $inputfile = $options{"p"};
+
+	# Note different taint check (allow /).
+	if ($inputfile =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data in parameter file: $inputfile");
+	}
+
+	#
+	# Called from ops interactively. Make sure NS file in /proj or /users.
+	#
+	# Use realpath to resolve any symlinks.
+	#
+	my $translated = `realpath $inputfile`;
+	if ($translated =~ /^([-\w\.\/]+)$/) {
+	    $inputfile = $1;
+	}
+	else {
+	    tbdie("Bad data returned by realpath: $translated");
+	}
+
+	#
+	# The file must reside in /proj, /groups, or /users. Since this script
+	# runs as the caller, regular file permission checks ensure its a file
+	# the user is allowed to use. /tmp/$pid-$eid.nsfile.XXXXX also allowed
+	# since this script is invoked directly from web interface.
+	#
+	if (! ($inputfile =~ /^\/tmp\/[-\w]+-\d+\.xml/) &&
+	    ! ($inputfile =~ /^\/tmp\/\d+\.xml/) &&
+	    ! ($inputfile =~ /^\/var\/tmp\/php\w+/) &&
+	    ! ($inputfile =~ /^\/proj/) &&
+	    ! ($inputfile =~ /^\/groups/) &&
+	    ! ($inputfile =~ /^\/users/)) {
+	    tberror("$inputfile does not resolve to an allowed directory!");
+	    # Note positive status; so error goes to user not tbops.
+	    exit(1);
+	}
+	$paramfile = $inputfile;
+    }
+}
+
+#
+# Cleanup the mess.
+#
+sub cleanup()
+{
+    libTemplates::DeleteTemplateExerimentRunRecord($exptidx, $runidx)
+	if (defined($runidx));
+}
+
+sub fatal($$)
+{
+    my ($errorstat, $msg) = @_;
+    
+    tberror $msg;
+    tbinfo "Cleaning up and exiting with status $errorstat ...";
+
+    #
+    # This exit will drop into the END block below.
+    # 
+    exit($errorstat);
+}
+
+sub sighandler ($) {
+    my ($signame) = @_;
+    
+    $SIG{TERM} = 'IGNORE';
+    my $pgrp = getpgrp(0);
+    kill('TERM', -$pgrp);
+    sleep(1);
+    fatal(-1, "Caught SIG${signame}! Killing experiment setup ...");
+}
+
+END {
+    # Normal exit, nothing to do.
+    if (!$? || $justexit) {
+	return;
+    }
+    my $saved_exitcode = $?;
+    
+    if ($cleaning) {
+	#
+	# We are screwed; a recursive error. Someone will have to clean
+	# up by hand. 
+	#
+	SENDMAIL(TBOPS, 
+		 "Template Creation Failure: $pid/$tid",
+		 "Recursive error in cleanup! This is very bad.");
+	$? = $saved_exitcode;
+	return;
+    }
+    $cleaning = 1;
+    cleanup();
+    $? = $saved_exitcode;
+}
+
