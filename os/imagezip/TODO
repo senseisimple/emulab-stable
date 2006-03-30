@@ -45,34 +45,52 @@ Things to do for image*:
    simple and have a single option and just treat things like the MBR
    special.
 
-8. Encrypted images.
-   This would give us confidentiality.  Images would be chunk-by-chunk
-   encrypted/decrypted using a runtime specified session key.  I assume
-   we want to use symmetric crypto here, since it is faster.  Note that
-   we would need to combine this with some other mechanism if we also want
-   to ensure integrity.
+8. Encrypted images or encrypted transfer of images.
+   Depends on what we want.  By encrypting the image itself, we protect
+   confidentiality while on disk and lessen the CPU usage of the frisbee
+   server.  A possible concern is that, once a user has received an image,
+   they know the key.  If we were to use symmetric crypto, they would be
+   able, at some future time, to spoof the contents of the image as it
+   is being sent to others.  But that is not the point of encrypting the
+   contents, the point is to prevent unauthorized people from seeing the
+   contents, and if you have already received the image, you are clearly
+   authorized.  Even so, we could prevent the problem by using asymmetric
+   crypto.
+
+   If we instead say that we are mostly concerned about secure transfer
+   of images (with confidentiality of images in the filesystem done with
+   filesystem mechanisms) then we could encrypt images as they are sent
+   on a per session basis.  This could be hideously expensive for the
+   frisbee server.
+
+   Either way, the frisbee protocol will need some block-by-block
+   authentication mechanism to ensure integrity.  It has to be per-block
+   and not per-chunk since it is the block header which contains the info
+   on what chunk a block belongs to and in what order the blocks should
+   be reassembled in to reform the chunk.
 
    Imagezip would take as an argument a key (or a file from which to read
-   the key?) and in the code where it compresses, it can also encrypt
-   (encrypt before compression? after?)  The resulting image is one in
-   which the chunk meta-data (header info: disk ranges contained, any
-   relocations) is not encrypted.  Is this a problem?  The block ranges
-   and relocations could give some hint as to what the image contains
-   (e.g., if block 16 is not in the list, it isn't a BSD filesystem since
-   that is where the superblock is).  What the hell, we can independently
-   encrypt the header as well.
+   the key?).  We can perform the encryption either before or after
+   compression.  I'm not sure of the impact on image size, but I suspect
+   that encrypting first might make compression less effective.  Doing
+   it before would also result in an image in which each chunk's meta-data
+   (header info: disk ranges contained, any relocations) is not encrypted.
+   Is this a problem?  The block ranges and relocations could give some
+   hint as to what the image contains (e.g., if block 16 is not in the
+   list, it isn't a BSD filesystem since that is where the superblock is).
+   We can independently encrypt the header if necessary.  But it would
+   probably be better to just wait til a chunk has been fully assembled,
+   including the meta-data, and then encrypt it all before we write it
+   to the image file (ugh, but will this change the size of the chunk?)
 
    Imageunzip (and frisbee) will likewise take a new argument for the key
    to be used.  For frisbee this will be transferred "out-of-band" with
    TMCD.  While decryption could take place in a separate thread, I'm
    inclined not to worry about it right now given that we are mostly working
    with uniprocessor machines where there would be no advantage.  Anyway,
-   imageunzip would collect a chunk, decompress and unencrypt it, and feed
-   it to the disk writer.
-
-   For integrity, we could use the signature-communicated-out-of-band
-   approach (#6 above), or we could include a single, coarser-grained
-   hash/checksum for each chunk.
+   imageunzip would receive blocks, verify them, and assemble them into
+   chunks, decompress and decrypt (or visa-versa) the chunks, and feed
+   them to the disk writer.
 
 9. Recognize unused filesystem metadata blocks.
    Right now we pretty much leave FS metadata structures alone and thus
@@ -92,7 +110,7 @@ Things to do for image*:
    just cannot bring myself to do it!  At any rate, I'm not sure the saving
    vs. complexity trade-off is in our favor here.
 
-   A quick check: out FreeBSD image consists of 3 filesystems.  Lets just
+   A quick check: our FreeBSD image consists of 3 filesystems.  Let's just
    consider /usr (a 2GB filesystem) which has 23552 inodes per cylinder group
    with 12 cylinder groups.  Each inode is 128 bytes so that is 36 (decimal)
    megabytes of which about 80% are free.  Allowing for scattering of the
