@@ -134,6 +134,9 @@ class tb_ptype {
 	inline void add_slots(int additional_slots) {
 	    slots += additional_slots;
 	}
+	inline void remove_slots(int slots_to_remove) {
+	    slots -= slots_to_remove;
+	}
     private:
 	fstring my_name;
 	/* How many users are using this type right now */

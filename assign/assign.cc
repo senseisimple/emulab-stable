@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2003 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -319,12 +319,56 @@ void prune_unusable_pclasses() {
     pclass_list::iterator pclass_iterator = pclasses.begin();
     while (pclass_iterator != pclasses.end()) {
 	if ((*pclass_iterator)->refcount == 0) {
+            /*
+             * Remove the nodes in the pclass we're removing from the slot
+             * counts for their ptypes
+             */
+            tb_pclass::pclass_members_map::iterator ptype_iterator;
+            ptype_iterator = (*pclass_iterator)->members.begin();
+            while (ptype_iterator != (*pclass_iterator)->members.end()) {
+                /*
+                 * Find the recort for this type in the ptypes structure
+                 */
+                fstring this_type = ptype_iterator->first;
+                tb_ptype_map::iterator ptype = ptypes.find(this_type);
+                assert(ptype != ptypes.end());
+                tb_ptype *this_type_p = ptype->second;
+
+                /*
+                 * For every node with this type, we want to remove its slot
+                 * count from the total slot count for the type, since we know
+                 * we will never use this particular node
+                 */
+                tb_pnodelist::list_iter pnode_iterator =
+                    ptype_iterator->second->L.begin();
+                while (pnode_iterator != ptype_iterator->second->L.end()) {
+                    /*
+                     * Get the slotcount for this ptype
+                     */
+                    tb_pnode::types_map::iterator tm_iterator;
+                    tm_iterator = (*pnode_iterator)->types.find(this_type);
+                    assert(tm_iterator != (*pnode_iterator)->types.end());
+
+                    /*
+                     * Remove it from the current ptype
+                     */
+                    this_type_p->remove_slots(tm_iterator->second->max_load);
+
+                    /*
+                     * Move on to the next node
+                     */
+                    pnode_iterator++;
+                }
+                ptype_iterator++;
+            }
+
 	    pclass_list::iterator nukeme = pclass_iterator;
 	    pclass_iterator++;
 #ifdef PCLASS_DEBUG
 	    cout << "Pruning " << (*nukeme)->name << endl;
 #endif
 	    pruned++;
+
 	    delete *nukeme;
 	    pclasses.erase(nukeme);
 	} else {
@@ -390,7 +434,8 @@ int type_precheck() {
 	    if (ptype_it->second->pnode_slots() < vtype_it->second) {
 		cout << "  *** " << vtype_it->second << " nodes of type " <<
 		    vtype_it->first << " requested, but only "
-		    << ptype_it->second->pnode_slots() << " found" << endl;
+		    << ptype_it->second->pnode_slots() << " suitable nodes of "
+                    << "type " << vtype_it->first<< " found" << endl;
 		ok = false;
 	    }
 	    // Okay, there are enough - but are we allowed to use them?
@@ -847,6 +892,12 @@ int main(int argc,char **argv) {
   pclass_debug();
 #endif
 
+  /*
+   * There is a reason for the ordering of the prechecks. The mapping precheck
+   * basically assumes that the type precheck has already run, so it doesn't
+   * have to worry about nodes which cannot map due to type.
+   */
+  
   // Run the type precheck
   if (!type_precheck()) {
       exit(EXIT_UNRETRYABLE);
@@ -857,16 +908,30 @@ int main(int argc,char **argv) {
       exit(EXIT_UNRETRYABLE);
   }
 
+#ifdef PER_VNODE_TT
+  if (prune_pclasses) {
+      prune_unusable_pclasses();
+      /*
+       * Run the type precheck again, this time without the pclasses we just
+       * pruned. Yes, it's a bit redundant, but for the reasons stated above,
+       * we mave to run the type precheck before the mapping precheck. And,
+       * the type precheck is very fast.
+       */
+      if (!type_precheck()) {
+          exit(EXIT_UNRETRYABLE);
+      }
+  }
+#endif
+
+  // Run the type precheck
+  if (!type_precheck()) {
+      exit(EXIT_UNRETRYABLE);
+  }
+
   // Bomb out early if we're only doing the prechecks
   if (prechecks_only) {
       exit(EXIT_SUCCESS);
   }
-
-#ifdef PER_VNODE_TT
-  if (prune_pclasses) {
-      prune_unusable_pclasses();
-  }
-#endif
 
   // Output graphviz if necessary
 #ifdef GRAPHVIZ_SUPPORT
