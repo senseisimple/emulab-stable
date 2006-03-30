@@ -496,6 +496,12 @@ set_time_limit(0);
 # Okay, we can spit back a header now that there is no worry of redirect.
 PAGEHEADER("Instantiate Experiment Template");
 
+echo "<font size=+2>Experiment Template <b>" .
+        MakeLink("template",
+		 "guid=$guid&version=$version", "$guid/$version") . 
+      "</b></font>\n";
+echo "<br><br>\n";
+
 echo "<b>Starting template instantiation!</b> ... ";
 echo "this will take several minutes at least; please be patient.";
 echo "<br><br>\n";

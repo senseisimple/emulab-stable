@@ -17,11 +17,14 @@ $isadmin = ISADMIN($uid);
 #
 # Verify page arguments.
 # 
+if (!isset($exptidx) ||
+    strcmp($exptidx, "") == 0) {
+    USERERROR("You must provide an instance ID", 1);
+}
 if (!isset($guid) ||
     strcmp($guid, "") == 0) {
-    USERERROR("You must provide a template GUID.", 1);
+    USERERROR("You must provide a template ID", 1);
 }
-
 if (!isset($version) ||
     strcmp($version, "") == 0) {
     USERERROR("You must provide a template version number", 1);
@@ -32,11 +35,14 @@ if (!TBvalid_guid($guid)) {
 if (!TBvalid_integer($version)) {
     PAGEARGERROR("Invalid characters in version!");
 }
+if (!TBvalid_integer($exptidx)) {
+    PAGEARGERROR("Invalid characters in instance ID!");
+}
 
 #
 # Standard Testbed Header after argument checking.
 #
-PAGEHEADER("Experiment Template: $guid/$version");
+PAGEHEADER("Template Instance");
 
 #
 # Check to make sure this is a valid template.
@@ -44,6 +50,10 @@ PAGEHEADER("Experiment Template: $guid/$version");
 if (! TBValidExperimentTemplate($guid, $version)) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
+}
+if (! TBIsTemplateInstanceExperiment($exptidx)) {
+    USERERROR("The instance $exptidx is not a valid instance in ".
+              "template $guid/$version!", 1);
 }
 
 #
@@ -54,55 +64,13 @@ if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_READINFO)) {
 	      "$guid/$version!", 1);
 }
 
-echo "<font size=+2>Experiment Template <b>" .
+echo "<font size=+2>Template Instance <b>" .
          MakeLink("template",
 		  "guid=$guid&version=$version", "$guid/$version") . 
       "</b></font>\n";
 echo "<br><br>\n";
 
-SUBPAGESTART();
-SUBMENUSTART("Template Options");
-
-WRITESUBMENUBUTTON("Show NS File &nbsp &nbsp",
-		   "spitnsdata.php3?guid=$guid&version=$version");
-
-WRITESUBMENUBUTTON("Modify Template",
-		   "template_modify.php?guid=$guid&version=$version");
-
-WRITESUBMENUBUTTON("Instantiate Template",
-		   "template_swapin.php?guid=$guid&version=$version");
-
-WRITESUBMENUBUTTON("Add Metadata",
-		   "template_metadata.php?action=add&".
-		   "guid=$guid&version=$version");
-
-WRITESUBMENUBUTTON("Template History",
-		   "template_history.php?guid=$guid&version=$version");
-
-SUBMENUEND_2A();
-
-#
-# Ick.
-#
-TBTemplatePidEid($guid, $version, $pid, $eid);
-$rsrcidx = TBrsrcIndex($pid, $eid);
-
-echo "<br>
-      <img border=1 alt='template visualization'
-           src='showthumb.php3?idx=$rsrcidx'>";
-
-SUBMENUEND_2B();
-
-SHOWTEMPLATE($guid, $version);
-SHOWTEMPLATEMETADATA($guid, $version);
-SUBPAGEEND();
-
-if (SHOWTEMPLATEPARAMETERS($guid, $version)) {
-    echo "<br>\n";
-}
-SHOWTEMPLATEINSTANCES($guid, $version);
-
-SHOWTEMPLATEGRAPH($guid);
+SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, 1);
 
 #
 # Standard Testbed Footer

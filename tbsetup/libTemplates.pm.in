@@ -211,6 +211,18 @@ sub FinalizeTemplateInstanceRecord($$$;$)
 {
     my ($guid, $vers, $exptidx, $args) = @_;
 
+    #
+    # Get the runidx and do it first.
+    #
+    my $runidx;
+    return -1
+	if (TemplateInstanceInfo($exptidx, \$runidx) < 0);
+
+    if (defined($runidx)) {
+	return -1
+	    if (FinalizeTemplateExerimentRunRecord($exptidx, $runidx) < 0);
+    }
+
     my $query = "update experiment_template_instances set stop_time=now() ";
 
     if (defined($args) && scalar(keys%{$args})) {
@@ -222,6 +234,25 @@ sub FinalizeTemplateInstanceRecord($$$;$)
 
     return -1
 	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
+# Get info about a template run.
+#
+sub TemplateInstanceInfo($$)
+{
+    my ($exptidx, $prunidx) = @_;
+
+    my $query_result =
+	DBQueryWarn("select runidx from experiment_template_instances ".
+		    "where exptidx='$exptidx'");
+
+    return -1
+	if (! $query_result);
+
+    my ($runidx) = $query_result->fetchrow_array();
+    $$prunidx = $runidx;
     return 0;
 }
 
@@ -252,6 +283,95 @@ sub DeleteTemplateInstanceBindingRecords($$$)
     DBQueryFatal("delete from experiment_template_instance_bindings ".
 		 "where parent_guid='$guid' and parent_vers='$vers' and ".
 		 "      exptidx='$exptidx'");
+
+    return 0;
+}
+
+#
+# Create a new experiment run record from the args provided, and return the
+# newly generated index for it.
+#
+# Usage: int NewTemplateExerimentRunRecord(\%args, \$idx)
+#
+sub NewTemplateExerimentRunRecord($$)
+{
+    my ($args, $pidx) = @_;
+
+    my $query = "insert into experiment_runs set ".
+	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+
+    # Append some default value stuff.
+    $query .= ",start_time=now()";
+
+    my $query_result = DBQueryWarn($query);
+    return -1
+	if (! $query_result);
+
+    # Grab the insert record.
+    $$pidx = $query_result->insertid;
+    return 0;
+}
+
+#
+# Delete experiment run record, by its index number.
+#
+sub DeleteTemplateExerimentRunRecord($$)
+{
+    my ($exptidx, $runidx) = @_;
+
+    DBQueryFatal("delete from experiment_run_bindings ".
+		 "where exptidx='$exptidx' and runidx='$runidx'");
+
+    DBQueryFatal("delete from experiment_runs ".
+		 "where exptidx='$exptidx' and idx='$runidx'");
+
+    return 0;
+}
+
+#
+# Finalize an experiment run record.
+#
+# Usage: int FinalizeTemplateExerimentRunRecord($exptidx, $runidx)
+#
+sub FinalizeTemplateExerimentRunRecord($$)
+{
+    my ($exptidx, $runidx) = @_;
+
+    my $query = "update experiment_runs set stop_time=now() ";
+    $query   .= "where exptidx='$exptidx' and idx='$runidx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+    
+    return 0;
+}
+
+#
+# Insert new experiment run binding records.
+#
+# Usage: int NewTemplateInstanceRecord(\%args)
+#
+sub NewExperimentRunBindingRecord($)
+{
+    my ($args) = @_;
+
+    my $query = "insert into experiment_run_bindings set ".
+	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
+# Delete template instance binding records
+#
+sub DeleteExperimentRunBindingRecords($$)
+{
+    my ($exptidx, $runidx) = @_;
+
+    DBQueryFatal("delete from experiment_run_bindings ".
+		 "where exptidx='$exptidx' and runidx='$runidx'");
 
     return 0;
 }

@@ -136,6 +136,12 @@ function MakeLink($which, $args, $text)
     elseif ($which == "metadata") {
 	$page = "template_metadata.php";
     }
+    elseif ($which == "instance") {
+	$page = "instance_show.php";
+    }
+    elseif ($which == "run") {
+	$page = "experimentrun_show.php";
+    }
     return "<a href=${page}?${args}>$text</a>";
 }
 
@@ -477,6 +483,7 @@ function SHOWTEMPLATEHISTORY($guid, $version)
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
 	echo "<tr>
+               <th align=center>Expand</th>
                <th>EID</th>
                <th>UID</th>
                <th>Start Time</th>
@@ -492,12 +499,18 @@ function SHOWTEMPLATEHISTORY($guid, $version)
 	    $uid       = $row['uid'];
 	    $start     = $row['start_time'];
 	    $stop      = $row['stop_time'];
+	    $exptidx   = $row['exptidx'];
 
 	    if (! isset($stop)) {
 		$stop = "&nbsp";
 	    }
 	    
-	    echo "<tr>
+	    echo "<tr>\n";
+	    echo " <td align=center>".
+ 		    MakeLink("instance",
+			     "guid=$guid&version=$version&exptidx=$exptidx",
+			     "<img border=0 alt='i' src='greenball.gif'>");
+	    echo " </td>
                    <td>$eid</td>
   		   <td>$uid</td>
                    <td>$start</td>
@@ -505,6 +518,167 @@ function SHOWTEMPLATEHISTORY($guid, $version)
                  </tr>\n";
 	}
 	echo "</table>\n";
+    }
+}
+
+#
+# Show the historical instance list for a template.
+#
+function SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, $withruns)
+{
+    $query_result =
+	DBQueryFatal("select * from experiment_template_instances as i ".
+		     "where (i.parent_guid='$guid' and ".
+		     "       i.parent_vers='$version' and ".
+		     "       i.exptidx='$exptidx') ".
+		     "order by i.start_time");
+
+    if (mysql_num_rows($query_result)) {
+	$irow = mysql_fetch_array($query_result);
+	
+	echo "<center>
+               <h3>Template Instance</h3>
+             </center>\n";
+
+	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
+    
+	ShowItem("Template",
+		 MakeLink("template",
+			  "guid=$guid&version=$version", "$guid/$version"));
+	ShowItem("ID",          $irow['exptidx']);
+	ShowItem("Project",
+		 MakeLink("project", "pid=" . $irow['pid'], $irow['pid']));
+	ShowItem("Creator",
+		 MakeLink("user", "target_uid=" . $irow['uid'], $irow['uid']));
+	ShowItem("Started",     $irow['start_time']);
+	ShowItem("Stopped",     (isset($irow['stop_time']) ?
+				 $irow['stop_time'] : "&nbsp"));
+	ShowItem("Current Run", (isset($irow['runidx']) ?
+				 $irow['runidx'] : "&nbsp"));
+	echo "</table>\n";
+
+	if ($withruns) {
+	    $query_result =
+		DBQueryFatal("select * from experiment_runs ".
+			     "where exptidx='$exptidx'");
+
+	    if (mysql_num_rows($query_result)) {
+		echo "<center>
+                        <h3>Instance History (Runs)</h3>
+                      </center> 
+                      <table align=center border=1
+                             cellpadding=5 cellspacing=2>\n";
+
+		echo "<tr>
+                       <th align=center>Expand</th>
+                       <th>RunID</th>
+                       <th>ID</th>
+                       <th>Start Time</th>
+                       <th>Stop Time</th>
+                       <th>Description</th>
+                      </tr>\n";
+
+		while ($rrow = mysql_fetch_array($query_result)) {
+		    $runidx    = $rrow['idx'];
+		    $runid     = $rrow['runid'];
+		    $start     = $rrow['start_time'];
+		    $stop      = $rrow['stop_time'];
+		    $description = $rrow['description'];
+
+		    if (! isset($stop)) {
+			$stop = "&nbsp";
+		    }
+	    
+		    echo "<tr>\n";
+		    echo " <td align=center>".
+			MakeLink("run",
+				 "guid=$guid&version=$version".
+				 "&exptidx=$exptidx&runidx=$runidx",
+				 "<img border=0 alt='i' src='greenball.gif'>");
+		    echo " </td>
+                            <td>$runid</td>
+  		            <td>$runidx</td>
+                            <td>$start</td>
+                            <td>$stop</td>
+                            <td>$description</td>
+                           </tr>\n";
+		}
+		echo "</table>\n";
+	    }
+	}
+    }
+}
+
+#
+# Show the historical instance list for a template.
+#
+function SHOWEXPERIMENTRUN($exptidx, $runidx)
+{
+    $query_result =
+	DBQueryFatal("select r.*,i.parent_guid,i.parent_vers ".
+		     "  from experiment_runs as r ".
+		     "left join experiment_template_instances as i on ".
+		     "     i.exptidx=r.exptidx ".
+		     "where r.exptidx='$exptidx' and r.idx='$runidx'");
+
+    if (mysql_num_rows($query_result)) {
+	$row = mysql_fetch_array($query_result);
+	$guid     = $row['parent_guid'];
+	$version  = $row['parent_vers'];
+	$start    = $row['start_time'];
+	$stop     = $row['stop_time'];
+
+	if (!isset($stop))
+	    $stop = "&nbsp";
+	
+	echo "<center>
+               <h3>Experiment Run</h3>
+             </center>\n";
+
+	echo "<table align=center cellpadding=2 cellspacing=2 border=1>\n";
+    
+	ShowItem("Template",
+		 MakeLink("template",
+			  "guid=$guid&version=$version", "$guid/$version"));
+	ShowItem("Experiment",
+		 MakeLink("instance",
+			  "guid=$guid&version=$version&exptidx$exptidx",
+			  "$exptidx"));
+	ShowItem("ID",          $runidx);
+	ShowItem("Started",     $start);
+	ShowItem("Stopped",     $stop);
+
+	echo "</table>\n";
+
+	$query_result =
+	    DBQueryFatal("select * from experiment_run_bindings ".
+			 "where exptidx='$exptidx' and runidx='$runidx'");
+
+	if (mysql_num_rows($query_result)) {
+	    echo "<center>
+                   <h3>Experiment Run Bindings</h3>
+                  </center> 
+                  <table align=center border=1 cellpadding=5 cellspacing=2>\n";
+
+	    echo "<tr>
+                    <th>Name</th>
+                    <th>Value</th>
+                  </tr>\n";
+
+	    while ($row = mysql_fetch_array($query_result)) {
+		$name	= $row['name'];
+		$value	= $row['value'];
+		if (!isset($value)) {
+		    $value = "&nbsp";
+		}
+
+		echo "<tr>
+                       <td>$name</td>
+                       <td>$value</td>
+                      </tr>\n";
+	    }
+	    echo "</table>\n";
+	}
     }
 }
 
@@ -636,6 +810,42 @@ function TBTemplatePidEid($guid, $version, &$pid, &$eid)
 }
 
 #
+# Map guid/version/exptidx to its run, if any.
+#
+function TBTemplateCurrentExperimentRun($guid, $version, $exptidx, &$runidx)
+{
+    $query_result =
+	DBQueryFatal("select runidx from experiment_template_instances ".
+		     "where parent_guid='$guid' and parent_vers='$version' ".
+		     "      and exptidx='$exptidx'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $runidx = $row['runidx'];
+    return 1;
+}
+
+#
+# Find next candidate for an experiment run. 
+#
+function TBTemplateNextExperimentRun($guid, $version, $exptidx, &$runidx)
+{
+    $query_result =
+	DBQueryFatal("select MAX(runidx) from experiment_template_instances ".
+		     "where parent_guid='$guid' and parent_vers='$version' ".
+		     "      and exptidx='$exptidx'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $runidx = $row[0] + 1;
+    return 1;
+}
+
+#
 # Map guid/version to the template tid.
 #
 function TBTemplateTid($guid, $version, &$tid)
@@ -649,6 +859,23 @@ function TBTemplateTid($guid, $version, &$tid)
     }
     $row = mysql_fetch_array($query_result);
     $tid = $row['tid'];
+    return 1;
+}
+
+#
+# Map guid/version to the template description
+#
+function TBTemplateDescription($guid, $version, &$description)
+{
+    $query_result =
+	DBQueryFatal("select description from experiment_templates ".
+		     "where guid='$guid' and vers='$version'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $description = $row['description'];
     return 1;
 }
 
@@ -671,7 +898,7 @@ function TBTemplateInputFiles($guid, $version)
 			 "where idx='$input_idx'");
 
 	$input_row = mysql_fetch_array($input_query);
-	$input_list["$input_idx"] = $input_row['input'];
+	$input_list[] = $input_row['input'];
     }
     return $input_list;
 }
@@ -823,7 +1050,8 @@ function TBValidExperimentTemplateInstance($guid, $version, $exptidx)
     $exptidx = addslashes($exptidx);
 
     $query_result =
-	DBQueryFatal("select guid from experiment_template_instances as i ".
+	DBQueryFatal("select parent_guid ".
+		     "  from experiment_template_instances as i ".
 		     "left join experiments as e on e.idx=i.exptidx ".
 		     "where (i.parent_guid='$guid' and ".
 		     "       i.parent_vers='$version' and ".
@@ -834,6 +1062,18 @@ function TBValidExperimentTemplateInstance($guid, $version, $exptidx)
 	return 0;
     }
     return 1;
+}
+
+#
+# Check to see if a runidx is a valid run.
+#
+function TBValidExperimentRun($exptidx, $runidx)
+{
+    $query_result =
+	DBQueryFatal("select * from experiment_runs ".
+		     "where exptidx='$exptidx' and idx='$runidx'");
+
+    return mysql_num_rows($query_result);
 }
 
 #

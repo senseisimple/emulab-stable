@@ -14,6 +14,94 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
+
+#
+# Spit the form out using the array of data.
+#
+function SPITFORM($formfields, $errors)
+{
+    global $TBDB_PIDLEN, $TBDB_GIDLEN, $TBDB_EIDLEN, $TBDOCBASE;
+    global $guid, $version;
+
+    if ($errors) {
+	echo "<table class=nogrid
+                     align=center border=0 cellpadding=6 cellspacing=0>
+              <tr>
+                 <th align=center colspan=2>
+                   <font size=+1 color=red>
+                      &nbsp;Oops, please fix the following errors!&nbsp;
+                   </font>
+                 </td>
+              </tr>\n";
+
+	while (list ($name, $message) = each ($errors)) {
+	    echo "<tr>
+                     <td align=right>
+                       <font color=red>$name:&nbsp;</font></td>
+                     <td align=left>
+                       <font color=red>$message</font></td>
+                  </tr>\n";
+	}
+	echo "</table><br>\n";
+    }
+
+    echo "<font size=+2>Experiment Template <b>" .
+            MakeLink("template",
+		     "guid=$guid&version=$version", "$guid/$version") . 
+	   "</b></font>\n";
+    echo "<br><br>\n";
+
+    echo "<form action='template_modify.php?guid=$guid&version=$version'
+                method='post'>";
+    echo "<table align=center border=1>\n";
+
+    #
+    # TID:
+    #
+    echo "<tr>
+              <td class='pad4'>Template ID:
+              <br><font size='-1'>(alphanumeric, no blanks)</font></td>
+              <td class='pad4' class=left>
+                  <input type=text
+                         name=\"formfields[tid]\"
+                         value=\"" . $formfields[tid] . "\"
+	                 size=$TBDB_EIDLEN
+                         maxlength=$TBDB_EIDLEN>
+              &nbsp (optional; we will generate one for you).
+              </td>
+          </tr>\n";
+
+    echo "<tr>
+              <td colspan=2>
+               Use this text area to optionally describe your template:
+              </td>
+          </tr>
+          <tr>
+              <td colspan=2 align=center class=left>
+                  <textarea name=\"formfields[description]\"
+                    rows=4 cols=100>" .
+	            ereg_replace("\r", "", $formfields[description]) .
+	           "</textarea>
+              </td>
+          </tr>\n";
+
+
+    echo "<tr>
+              <td colspan=2>
+              <textarea name=\"formfields[nsdata]\"
+                   cols=100 rows=40>" . $formfields[nsdata] . "</textarea>
+              </td>
+          </tr>\n";
+
+    echo "<tr>
+              <td class='pad4' align=center colspan=2>
+                <b><input type=submit name=modify value='Modify Template'></b>
+              </td>
+         </tr>
+        </form>
+        </table>\n";
+}
+
 #
 # Standard Testbed Header
 #
@@ -53,12 +141,6 @@ if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_MODIFY)) {
 	      "$guid/$version!", 1);
 }
 
-echo "<font size=+2>Experiment Template <b>$guid/$version</b>".
-     "</font>\n";
-echo "<br><br>\n";
-flush();
-
-
 #
 # Put up the modify form on first load.
 # 
@@ -66,50 +148,32 @@ if (! isset($modify)) {
     #
     # Grab NS file for the template.
     #
-    $input_list = TBTemplateInputFiles($guid, $version);
-    
-    echo "<form action='template_modify.php?guid=$guid&version=$version'
-                method='post'>";
-    echo "<textarea cols='100' rows='40' name='nsdata'>";
+    $input_list  = TBTemplateInputFiles($guid, $version);
+    TBTemplateDescription($guid, $version, $description);
 
-    #
-    # Display only first one for now.
-    #
-    while (list($input_idx, $input_file) = each($input_list)) {
-	echo "$input_file";
-    }
-    echo "</textarea>";
-    echo "<br>";
-    echo "<input type='submit' name='modify' value='Modify Template'>";
-    echo "</form>\n";
+    $defaults = array();
+    $defaults["nsdata"] = $input_list[0];
+    $defaults["description"] = $description;
+    SPITFORM($defaults, 0);
     PAGEFOOTER();
     exit();
 }
-
-#
-# Okay, form has been submitted.
-#
-if (! isset($nsdata)) {
-    USERERROR("NSdata CGI variable missing (How did that happen?)", 1);
+elseif (! isset($formfields)) {
+    PAGEARGERROR();
 }
 
 #
-# Generate a hopefully unique filename that is hard to guess.
-# See backend scripts.
+# Okay, validate form arguments.
+#
+$errors       = array();
+$command_args = "";
+
+#
+# Generate a hopefully unique filename that is hard to guess. See below.
 # 
 list($usec, $sec) = explode(' ', microtime());
 srand((float) $sec + ((float) $usec * 100000));
 $foo = rand();
-    
-$nsfile = "/tmp/$uid-$foo.nsfile";
-
-if (! ($fp = fopen($nsfile, "w"))) {
-    TBERROR("Could not create temporary file $nsfile", 1);
-}
-$nsdata_string = $nsdata;
-fwrite($fp, $nsdata_string);
-fclose($fp);
-chmod($nsfile, 0666);
 
 #
 # Get template group so we can get the unix_gid.
@@ -117,13 +181,66 @@ chmod($nsfile, 0666);
 if (! TBGuid2PidGid($guid, $pid, $gid)) {
     TBERROR("Could not get pid,gid for experiment template $guid/$version", 1);
 }
-TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
+    
+#
+# TID
+#
+if (!isset($formfields[tid]) || $formfields[tid] == "") {
+    #
+    # Generate a unique one.
+    #
+    $tid = "T" . substr(md5(uniqid($foo, true)), 0, 10);
+}
+elseif (!TBvalid_eid($formfields[tid])) {
+    $errors["Template ID"] = TBFieldErrorString();
+}
+elseif (TBValidExperimentTemplate($pid, $formfields[tid])) {
+    $errors["Template ID"] = "Already in use";
+}
+else {
+    $tid = $formfields[tid];
+}
 
 #
-# XXX Generate a new and hopefully unique tid so that we can find this thing
-# later. This needs more thought.
+# Description:
+# 
+if (!isset($formfields[description]) || $formfields[description] == "") {
+    $errors["Description"] = "Missing Field";
+}
+elseif (!TBvalid_template_description($formfields[description])) {
+    $errors["Description"] = TBFieldErrorString();
+}
+else {
+    $command_args .= " -E " . escapeshellarg($formfields[description]);
+}
+
 #
-$tid = "T" . substr(md5(uniqid($foo, true)), 0, 10);
+# NS File.
+#
+if (!isset($formfields[nsdata]) || $formfields[nsdata] == "") {
+    $errors["NS File"] = "Missing Field";
+}
+
+if (count($errors)) {
+    SPITFORM($formfields, $errors);
+    PAGEFOOTER();
+    exit(1);
+}
+
+#
+# Generate a unique and hard to guess filename, and write NS to it.
+#
+$nsfile = "/tmp/$uid-$foo.nsfile";
+
+if (! ($fp = fopen($nsfile, "w"))) {
+    TBERROR("Could not create temporary file $nsfile", 1);
+}
+fwrite($fp, $formfields[nsdata]);
+fclose($fp);
+chmod($nsfile, 0666);
+
+# Need this for running scripts.
+TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 
 echo "<b>Starting template modification!</b> ... ";
 echo "this will take a few moments; please be patient.";
@@ -133,7 +250,7 @@ flush();
 # And run that script!
 $retval = SUEXEC($uid, "$pid,$unix_gid",
 		 "webtemplate_create -w -q ".
-		 "-m $guid/$version $pid $tid $nsfile",
+		 "-m $guid/$version $command_args $pid $tid $nsfile",
 		 SUEXEC_ACTION_IGNORE);
 
 unlink($nsfile);

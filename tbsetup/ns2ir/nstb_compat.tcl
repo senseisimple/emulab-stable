@@ -252,7 +252,7 @@ Node instproc unknown {m args} {
 Simulator instproc connect {src dst} {
 }
 
-Simulator instproc define_template_parameter {name args} {
+Simulator instproc define-template-parameter {name args} {
 }
 
 LanNode instproc trace {args} {

@@ -80,6 +80,7 @@ my $user_email;
 my $dbuid;
 my $logname;
 my $exptidx;
+my $runidx;
 # For the END block below.
 my $cleaning    = 0;
 my $exptcreated = 0;
@@ -377,18 +378,50 @@ fatal($? >> 8, "Could not instantiate the experiment")
     if ($?);
 
 #
-# Insert a template instance record. 
+# All instances currently start with a default run.
 #
 my %args = ();
+$args{'exptidx'}     = $exptidx;
+$args{'runid'}       = $eid;
+
+if (libTemplates::NewTemplateExerimentRunRecord(\%args, \$runidx) < 0) {
+    fatal(-1, "Could not insert experiment run record!");
+}
+
+#
+# Insert a template instance record (now that we have the runidx).
+#
+%args = ();
 $args{'parent_guid'} = $guid;
 $args{'parent_vers'} = $version;
 $args{'pid'}         = $pid;
 $args{'eid'}         = $eid;
 $args{'uid'}         = $dbuid;
 $args{'exptidx'}     = $exptidx;
+$args{'runidx'}      = $runidx;
 
 if (libTemplates::NewTemplateInstanceRecord(\%args) < 0) {
     fatal(-1, "Could not insert experiment instance record!");
+}
+
+#
+# And the bindings for the default run ...
+#
+if ($paramfile) {
+    foreach my $name (keys(%parameters)) {
+	my $value = $parameters{$name};
+
+	my %args = ();
+    
+	$args{'exptidx'}     = $exptidx;
+	$args{'runidx'}      = $runidx;
+	$args{'name'}        = $name;
+	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
+	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
+    
+	libTemplates::NewExperimentRunBindingRecord(\%args) == 0
+	    or tbdie("Error inserting run binding into DB!");
+    }
 }
 
 # Stop the web interface from spewing.
@@ -532,6 +565,9 @@ sub cleanup()
 	system("$endexp -x -q -w $pid $eid");
 	exit(-1)
 	    if ($?);
+
+	libTemplates::DeleteTemplateExerimentRunRecord($exptidx, $runidx)
+	    if (defined($runidx));
 
 	libTemplates::DeleteTemplateInstanceBindingRecords($guid,
 							   $version, $exptidx);

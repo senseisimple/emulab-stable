@@ -75,7 +75,8 @@ $panic_date = $row["panic_date"];
 $lockdown   = $row["lockdown"];
 
 # Template Instance Experiments get special treatment in this page.
-$isinstance = $EXPOSETEMPLATES && TBIsTemplateInstanceExperiment($expindex);
+$isinstance = ($EXPOSETEMPLATES &&
+	       TBIsTemplateInstanceExperiment($expindex) ? 1 : 0);
 if ($isinstance) {
     $tag = "Template Instance";
     TBPidEid2Template($pid, $eid, &$guid, &$version);
@@ -182,6 +183,12 @@ if ($expstate) {
 	    WRITESUBMENUBUTTON("Modify Experiment",
 			       "modifyexp.php3?pid=$exp_pid&eid=$exp_eid");
 	}
+    }
+
+    if ($isinstance && $expstate == $TB_EXPTSTATE_ACTIVE) {
+	WRITESUBMENUBUTTON("Start Experiment Run",
+			   "template_exprun.php?action=start&guid=$guid".
+			   "&version=$version&exptidx=$expindex");
     }
     
     if ($expstate == $TB_EXPTSTATE_ACTIVE) {

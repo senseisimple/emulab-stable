@@ -252,9 +252,12 @@ CREATE TABLE experiment_template_instances (
   -- A little bit of duplication ...
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  -- The current experiment that is running (see below). One at a time!
+  runidx int(10) unsigned default NULL,
   PRIMARY KEY  (exptidx),
   KEY  (parent_guid,parent_vers),
-  KEY  (pid,eid)
+  KEY  (pid,eid),
+  KEY  (exptidx, runidx)
 ) TYPE=MyISAM;
 
 #
@@ -290,6 +293,8 @@ CREATE TABLE experiment_template_instance_bindings (
 CREATE TABLE experiment_runs (
   -- The experiment index (into the current experiments table).
   exptidx int(10) unsigned NOT NULL default '0',
+  -- Auto increment to generate unique per-exptidx IDs
+  idx int(10) unsigned NOT NULL auto_increment,  
   -- Run ID (a per-experiment unique identifier for this run)
   runid varchar(32) NOT NULL default '',
   -- A short description; not sure I really want this. 
@@ -297,7 +302,7 @@ CREATE TABLE experiment_runs (
   -- Timestamps
   start_time datetime default NULL,
   stop_time datetime default NULL,
-  PRIMARY KEY  (exptidx, runid)
+  PRIMARY KEY  (exptidx, idx)
 ) TYPE=MyISAM;
 
 #
@@ -308,10 +313,9 @@ CREATE TABLE experiment_runs (
 CREATE TABLE experiment_run_bindings (
   -- The experiment index (into the current experiments table).
   exptidx int(10) unsigned NOT NULL default '0',
-  -- Run ID (a per-experiment unique identifier for this run)
-  runid varchar(32) NOT NULL default '',
+  runidx int(10) unsigned NOT NULL default '0',
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
-  PRIMARY KEY  (exptidx, runid, name)
+  PRIMARY KEY  (exptidx, runidx, name)
 ) TYPE=MyISAM;
 

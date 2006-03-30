@@ -76,6 +76,7 @@ function SPITFORM($formfields, $parameters, $errors)
                          value=\"" . $formfields[runid] . "\"
 	                 size=$TBDB_EIDLEN
                          maxlength=$TBDB_EIDLEN>
+              &nbsp (optional; we will make up one for you)
               </td>
           </tr>\n";
 
@@ -87,7 +88,7 @@ function SPITFORM($formfields, $parameters, $errors)
           <tr>
               <td colspan=2 align=center class=left>
                   <textarea name=\"formfields[description]\"
-                    rows=10 cols=80>" .
+                    rows=4 cols=80>" .
 	            ereg_replace("\r", "", $formfields[description]) .
 	           "</textarea>
               </td>
@@ -194,9 +195,12 @@ if (! TBExptTemplateAccessCheck($uid, $guid, $TB_EXPT_UPDATE)) {
 # On first load, display virgin form and exit.
 #
 if (!isset($exprun)) {
-    TBTemplatePidEid($guid, $version, $pid, $eid);
+    #
+    # 
+    #
+    TBTemplateNextExperimentRun($guid, $version, $exptidx, $nextidx);
     
-    $defaults[runid] = $eid;
+    $defaults['runid'] = "T${nextidx}";
 
     #
     # Get the current bindings for the template instance.
@@ -240,15 +244,15 @@ if (!isset($formfields[runid]) || $formfields[runid] == "") {
 elseif (!TBvalid_eid($formfields[runid])) {
     $errors["ID"] = TBFieldErrorString();
 }
-elseif (TBValidExperiment($pid, $formfields[eid])) {
+elseif (TBValidExperiment($pid, $formfields[runid])) {
     $errors["ID"] = "Already in use";
 }
 else {
-    $eid = $formfields[eid];
+    $runid = $formfields[runid];
 }
 
 # Set up command options
-$command_options = "";
+$command_options = " -a start ";
 
 #
 # Description:
@@ -340,7 +344,13 @@ TBGroupUnixInfo($pid, $gid, $unix_gid, $unix_name);
 set_time_limit(0);
 
 # Okay, we can spit back a header now that there is no worry of redirect.
-PAGEHEADER("Instantiate Experiment Template");
+PAGEHEADER("Start Experiment Template");
+
+echo "<font size=+2>Experiment Template <b>" .
+        MakeLink("template",
+		 "guid=$guid&version=$version", "$guid/$version") . 
+      "</b></font>\n";
+echo "<br><br>\n";
 
 echo "<b>Starting Experiment run</b> ... ";
 echo "<br><br>\n";
@@ -350,7 +360,7 @@ flush();
 # Run the backend script.
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_swapin $command_options -e $eid $guid/$version",
+		 "webtemplate_exprun $command_options $guid/$version $exptidx",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($deletexmlfile) {
@@ -370,8 +380,6 @@ if ($retval) {
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
     return;
 }
-
-STARTLOG($pid, $eid);
 
 #
 # Standard Testbed Footer

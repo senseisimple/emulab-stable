@@ -458,10 +458,10 @@ CREATE TABLE experiment_resources (
 
 CREATE TABLE experiment_run_bindings (
   exptidx int(10) unsigned NOT NULL default '0',
-  runid varchar(32) NOT NULL default '',
+  runidx int(10) unsigned NOT NULL default '0',
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
-  PRIMARY KEY  (exptidx,runid,name)
+  PRIMARY KEY  (exptidx,runidx,name)
 ) TYPE=MyISAM;
 
 --
@@ -470,11 +470,12 @@ CREATE TABLE experiment_run_bindings (
 
 CREATE TABLE experiment_runs (
   exptidx int(10) unsigned NOT NULL default '0',
+  idx int(10) unsigned NOT NULL auto_increment,  
   runid varchar(32) NOT NULL default '',
   description tinytext,
   start_time datetime default NULL,
   stop_time datetime default NULL,
-  PRIMARY KEY  (exptidx,runid)
+  PRIMARY KEY  (exptidx,idx)
 ) TYPE=MyISAM;
 
 --
@@ -580,9 +581,11 @@ CREATE TABLE experiment_template_instances (
   uid varchar(8) NOT NULL default '',
   start_time datetime default NULL,
   stop_time datetime default NULL,
+  runidx int(10) unsigned default NULL,
   PRIMARY KEY  (exptidx),
   KEY parent_guid (parent_guid,parent_vers),
-  KEY pid (pid,eid)
+  KEY pid (pid,eid),
+  KEY exptidx (exptidx, runidx)
 ) TYPE=MyISAM;
 
 --

@@ -60,6 +60,7 @@ my $user_email;
 my $dbuid;
 my $logname;
 my $exptidx;
+my $runidx;
 # For the END block below.
 my $cleaning    = 0;
 my $exptcreated = 0;
@@ -139,6 +140,10 @@ if (libTemplates::TemplateInfo($guid, $version, \$pid, \$tid, \$gid) < 0) {
 
 if (! TBExptIDX($pid, $eid, \$exptidx)) {
     fatal(-1, "Could not get experiment index for $pid,$eid!");
+}
+
+if (! libtemplates::TemplateInstanceInfo($exptidx, \$runidx)) {
+    fatal(-1, "Could not get experiment run index for $exptidx!");
 }
 
 #
