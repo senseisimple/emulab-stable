@@ -18,6 +18,9 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
+# This will not return if its a sajax request.
+include("showlogfile_sup.php3");
+
 # Used below
 unset($parameter_xmlfile);
 $deletexmlfile = 0;
@@ -28,7 +31,7 @@ $deletexmlfile = 0;
 function SPITFORM($formfields, $parameters, $errors)
 {
     global $TBDB_EIDLEN;
-    global $guid, $version, $exptidx;
+    global $guid, $version, $eid;
 
     PAGEHEADER("Start an Experiment Run");
 
@@ -60,7 +63,7 @@ function SPITFORM($formfields, $parameters, $errors)
     }
 
     echo "<form action=template_exprun.php".
-	    "?action=start&guid=$guid&version=$version&exptidx=$exptidx ".
+	    "?action=start&guid=$guid&version=$version&eid=$eid ".
 	 "      method=post>\n";
     echo "<table align=center border=1>\n";
 
@@ -153,8 +156,8 @@ if (!isset($version) ||
     strcmp($version, "") == 0) {
     USERERROR("You must provide a template version number", 1);
 }
-if (!isset($exptidx) ||
-    strcmp($exptidx, "") == 0) {
+if (!isset($eid) ||
+    strcmp($eid, "") == 0) {
     USERERROR("You must provide a template instance ID", 1);
 }
 if (!TBvalid_guid($guid)) {
@@ -163,7 +166,7 @@ if (!TBvalid_guid($guid)) {
 if (!TBvalid_integer($version)) {
     PAGEARGERROR("Invalid characters in version!");
 }
-if (!TBvalid_integer($exptidx)) {
+if (!TBvalid_eid($eid)) {
     PAGEARGERROR("Invalid characters in instance ID!");
 }
 
@@ -175,6 +178,14 @@ if (! TBValidExperimentTemplate($guid, $version)) {
               "experiment template!", 1);
 }
 
+# Need this below.
+if (! TBGuid2PidGid($guid, $pid, $gid)) {
+    TBERROR("Could not get template pid,gid for template $guid", 1);
+}
+if (($exptidx = TBExptIndex($pid, $eid)) < 0) {
+    TBERROR("Could not instance IDX for template instance $guid/$eid", 1);
+}
+
 #
 # Check to make sure and a valid instance that is actually swapped in.
 #
@@ -182,6 +193,8 @@ if (! TBValidExperimentTemplateInstance($guid, $version, $exptidx)) {
     USERERROR("Experiment Template Instance $guid/$version/$exptidx is not ".
               "a valid experiment template instance!", 1);
 }
+
+# We need the eid for passing to the shell.
 
 #
 # Verify Permission.
@@ -233,7 +246,9 @@ if (! TBGuid2PidGid($guid, $pid, $gid)) {
 # Okay, validate form arguments.
 #
 $errors = array();
-$runid  = "";
+
+# Set up command options
+$command_options = " -a start -e $eid ";
 
 #
 # RunID:
@@ -248,11 +263,8 @@ elseif (TBValidExperiment($pid, $formfields[runid])) {
     $errors["ID"] = "Already in use";
 }
 else {
-    $runid = $formfields[runid];
+    $command_options .= " -r " . escapeshellarg($formfields[runid]);
 }
-
-# Set up command options
-$command_options = " -a start ";
 
 #
 # Description:
@@ -360,7 +372,7 @@ flush();
 # Run the backend script.
 #
 $retval = SUEXEC($uid, "$pid,$unix_gid",
-		 "webtemplate_exprun $command_options $guid/$version $exptidx",
+		 "webtemplate_exprun $command_options $guid/$version",
 		 SUEXEC_ACTION_IGNORE);
 
 if ($deletexmlfile) {
@@ -380,6 +392,8 @@ if ($retval) {
     SUEXECERROR(SUEXEC_ACTION_USERERROR);
     return;
 }
+
+STARTLOG($pid, $eid);
 
 #
 # Standard Testbed Footer

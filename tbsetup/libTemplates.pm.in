@@ -238,21 +238,44 @@ sub FinalizeTemplateInstanceRecord($$$;$)
 }
 
 #
+# Update an instance record.
+#
+sub UpdateTemplateInstanceRecord($$$$)
+{
+    my ($guid, $vers, $exptidx, $args) = @_;
+
+    my $query = "update experiment_template_instances ";
+
+    if (defined($args) && scalar(keys%{$args})) {
+	$query .= ",";
+	$query .= join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+    }
+    $query .= " where parent_guid='$guid' and parent_vers='$vers' and ".
+	      "       exptidx='$exptidx'";
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
 # Get info about a template run.
 #
-sub TemplateInstanceInfo($$)
+sub TemplateInstanceInfo($$;$)
 {
-    my ($exptidx, $prunidx) = @_;
+    my ($exptidx, $prunidx, $peid) = @_;
 
     my $query_result =
-	DBQueryWarn("select runidx from experiment_template_instances ".
+	DBQueryWarn("select eid,runidx from experiment_template_instances ".
 		    "where exptidx='$exptidx'");
 
     return -1
 	if (! $query_result);
 
-    my ($runidx) = $query_result->fetchrow_array();
+    my ($eid,$runidx) = $query_result->fetchrow_array();
     $$prunidx = $runidx;
+    $$peid    = $eid
+	if (defined($peid));
     return 0;
 }
 
