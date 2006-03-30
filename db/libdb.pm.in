@@ -1697,16 +1697,20 @@ sub ExpNodesOldReserved($$)
 #	 If the optional flag is set, returns only local nodes.
 #        Returns 0 if an invalid pid/eid or if an error.
 #
-sub ExpNodes($$;$)
+sub ExpNodes($$;$$)
 {
-    my($pid, $eid, $flag) = @_;
+    my($pid, $eid, $localonly, $physonly) = @_;
     my(@row);
     my(@nodes);
     my $clause = "";
 
-    if (defined($flag)) {
-	$clause = "and nt.isremotenode=0";
+    if (defined($localonly)) {
+	$clause .= " and nt.isremotenode=0";
     }
+    if (defined($physonly)) {
+	$clause .= " and nt.isvirtnode=0";
+    }
+
     my $query_result =
 	DBQueryWarn("select r.node_id from reserved as r ".
 		    "left join nodes as n on n.node_id=r.node_id ".
