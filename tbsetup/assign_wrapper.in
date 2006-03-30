@@ -875,8 +875,8 @@ sub RunAssign ()
 
     TBDebugTimeStamp("assign started");
     # Run assign
-    my $cmdargs = "$ptopfile $topfile";
-    $cmdargs = "-uPod -c .75 $cmdargs"
+    my $cmdargs = "-P $ptopfile $topfile";
+    $cmdargs = "-uod -c .75 $cmdargs"
 	if ($virtcount || $simcount);
     $cmdargs = "-n $cmdargs"
     	if ($precheck);
