@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 require("defs.php3");
@@ -58,21 +58,21 @@ if ($message != "") {
 ?>
 
 <p><em>Emulab</em> provides
-integrated access to three disparate experimental environments:
-<a href="tutorial/docwrapper.php3?docname=nse.html">simulated</a>,
-emulated, and <a href=widearea.html>wide-area</a> network
+integrated access to a wide range of experimental environments:
+from <a href="tutorial/docwrapper.php3?docname=nse.html">simulated</a> to
+emulated to <a href=widearea.html>wide-area</a> network
 testbeds.  Emulab strives to preserve the control and ease of use of
 simulation, without sacrificing the realism of emulation and live
 network experimentation. 
 </p>
 
 <p>
-Emulab unifies all three environments under a common user interface,
+Emulab unifies all of tese environments under a common user interface,
 and integrates the three into a common framework.  This framework
 provides abstractions, services, and namespaces common to all, such as
 allocation and naming of nodes and links.  By mapping the abstractions
 into domain-specific mechanisms and internal names, Emulab masks much
-of the heterogeneity of the three approaches.
+of the heterogeneity of the different approaches.
 </p>
 
 <p>
