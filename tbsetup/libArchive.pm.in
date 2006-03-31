@@ -28,7 +28,9 @@ use Time::HiRes qw(gettimeofday);
 # Configure variables
 my $TB		= "@prefix@";
 my $MAINSITE    = @TBMAINSITE@;
-my $ALLOWEDPID  = "testbed";
+my $ARCHSUPPORT = @ARCHIVESUPPORT@;
+my $USEARCHIVE  = ($MAINSITE || $ARCHSUPPORT);
+my %ALLOWEDPID  = ("testbed" => 1);
 # XXX
 my $ARCHIVEDIR  = "/usr/testbed/exparchive";
 my $TESTMODE    = @TESTMODE@;
@@ -63,6 +65,18 @@ my $TAGTYPE_INTERNAL  = "internal";
 # Set umask so that other people in the project can mess with the archive.
 #
 umask(0002);
+
+
+# On or off
+sub doarchiving($)
+{
+    my ($pid) = @_;
+    
+    return 1
+	if ($USEARCHIVE && exists($ALLOWEDPID{$pid}));
+    
+    return 0;
+}
 
 # Little helper and debug function.
 sub mysystem($)
@@ -1268,8 +1282,8 @@ sub TBCreateExperimentArchive($$)
     my ($pid, $eid) = @_;
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     # Grab experiment indicies we need,
     my $query_result =
 	DBQueryWarn("select e.idx,s.rsrcidx from experiments as e ".
@@ -1328,8 +1342,8 @@ sub TBExperimentArchiveAddFile($$$;$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1348,8 +1362,8 @@ sub TBExperimentArchiveAddTracedFiles($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     return 0;
 
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
@@ -1397,8 +1411,8 @@ sub TBExperimentArchiveAddUserFiles($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1429,8 +1443,8 @@ sub TBExperimentArchiveSavePoint($$;$)
 	if (!defined($tagext));
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1457,8 +1471,8 @@ sub TBExperimentArchivePreSwapMod($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1528,8 +1542,8 @@ sub TBExperimentArchiveSwapModSwapOut($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1618,8 +1632,8 @@ sub TBExperimentArchiveRollBack($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1682,8 +1696,8 @@ sub TBExperimentArchiveSwapModCommit($$$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1774,8 +1788,8 @@ sub TBCommitExperimentArchive($$$;$$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1853,8 +1867,8 @@ sub TBCheckoutExperimentArchive($$$;$$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1872,7 +1886,7 @@ sub TBCheckoutExperimentArchivebyExptIDX($$;$$)
     my ($exptidx, $path, $tag, $subdir) = @_;
 
     return 0
-	if (!$MAINSITE);
+	if (!$USEARCHIVE);
 
     my $query_result =
 	DBQueryWarn("select s.archive_idx,s.pid from experiment_stats as s ".
@@ -1884,7 +1898,7 @@ sub TBCheckoutExperimentArchivebyExptIDX($$;$$)
     my ($archive_idx,$pid) = $query_result->fetchrow_array();
 
     return 0
-	if ($pid ne $ALLOWEDPID);
+	if (! exists($ALLOWEDPID{$pid}));
 
     # Need to deal with no archive yet!
     return 1
@@ -1902,8 +1916,8 @@ sub TBArchiveExperimentArchive($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1923,8 +1937,8 @@ sub TBDeleteExperimentArchive($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1943,8 +1957,8 @@ sub TBDestroyExperimentArchive($$)
     my ($archive_idx, $view);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -1964,8 +1978,8 @@ sub TBForkExperimentArchive($$$$$)
     my ($archive_idx, $copyview);
 
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($copypid, $copyeid,
 				       \$archive_idx, \$copyview);
     return 0
@@ -2012,8 +2026,8 @@ sub TBIsTaqUnique($$$$)
     my ($archive_idx, $view);
     
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
@@ -2035,8 +2049,8 @@ sub TBListExperimentArchive($$$;$$)
 
     @$prval = @filelist;
     return 0
-	if (!$MAINSITE || $pid ne $ALLOWEDPID);
-
+	if (!doarchiving($pid));
+    
     my $rval = TBExperimentArchiveInfo($pid, $eid, \$archive_idx, \$view);
     return 0
 	if ($rval > 0);
