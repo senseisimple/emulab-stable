@@ -1,7 +1,7 @@
 # -*- tcl -*-
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -101,6 +101,10 @@ namespace eval TBCOMPAT {
     variable reserved_type
     variable reserved_node
     set reserved_list {}
+
+    # Input parameters for Templates
+    variable parameter_list_defaults
+    array set parameter_list_defaults {}
 
     # Physical node names
     variable physnodes

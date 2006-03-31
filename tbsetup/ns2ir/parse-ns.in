@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -589,7 +589,29 @@ sub GenDefsFile($)
 	}
     }
     # Be sure to initialize this to something ...
-    print TCL "set elabinelab_maxpcs $maxnodes\n";
+    print TCL "set elabinelab_maxpcs $maxnodes\n\n";
+
+    #
+    # For Templates.
+    #
+    $query_result =
+	DBQueryFatal("select instance_idx from experiments ".
+		     "where pid='$pid' and eid='$eid'");
+    my ($instance_idx) = $query_result->fetchrow_array();
+    if ($instance_idx) {
+	print TCL "# Template goo\n";
+	
+	$query_result =
+	   DBQueryFatal("select * from experiment_template_instance_bindings ".
+			"where instance_idx='$instance_idx'");
+
+	while (my %row = $query_result->fetchhash()) {
+	    my $name  = $row{'name'};
+	    my $value = $row{'value'};
+
+	    print TCL "set parameter_list_defaults($name) \"$value\"\n";
+	}
+    }
 
     print TCL "}\n";
     close(TCL);

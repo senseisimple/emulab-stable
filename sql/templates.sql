@@ -238,6 +238,8 @@ CREATE TABLE virt_parameters (
 # to "ExperimentRecord." 
 #
 CREATE TABLE experiment_template_instances (
+  -- Auto generated unique index.
+  idx int(10) unsigned NOT NULL auto_increment,  
   -- Backlink to the template.
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
@@ -254,10 +256,10 @@ CREATE TABLE experiment_template_instances (
   stop_time datetime default NULL,
   -- The current experiment that is running (see below). One at a time!
   runidx int(10) unsigned default NULL,
-  PRIMARY KEY  (exptidx),
+  PRIMARY KEY  (idx),
+  KEY  (exptidx),
   KEY  (parent_guid,parent_vers),
   KEY  (pid,eid),
-  KEY  (exptidx, runidx)
 ) TYPE=MyISAM;
 
 #
@@ -270,6 +272,8 @@ CREATE TABLE experiment_template_instances (
 # are permanent. 
 #
 CREATE TABLE experiment_template_instance_bindings (
+  -- Backlink to the instance above.
+  instance_idx int(10) unsigned NOT NULL default '0',
   -- Backlink to the template.
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
@@ -281,8 +285,8 @@ CREATE TABLE experiment_template_instance_bindings (
   eid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
-  PRIMARY KEY  (exptidx, name),
-  KEY  (parent_guid,parent_vers),
+  PRIMARY KEY  (instance_idx, name),
+  KEY parent_guid (parent_guid,parent_vers),
   KEY pidtid (pid,eid)
 ) TYPE=MyISAM;
 

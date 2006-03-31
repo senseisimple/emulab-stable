@@ -79,7 +79,7 @@ $isinstance = ($EXPOSETEMPLATES &&
 	       TBIsTemplateInstanceExperiment($expindex) ? 1 : 0);
 if ($isinstance) {
     $tag = "Template Instance";
-    TBPidEid2Template($pid, $eid, &$guid, &$version);
+    TBPidEid2Template($pid, $eid, $guid, $version, $instance_idx);
 }
 
 #
@@ -383,7 +383,7 @@ if ($isinstance &&
     ($expstate == $TB_EXPTSTATE_ACTIVE ||
      $expstate == $TB_EXPTSTATE_PANICED ||
      $expstate == $TB_EXPTSTATE_ACTIVATING)) {
-    SHOWTEMPLATEINSTANCEBINDINGS($guid, $version, $expindex);
+    SHOWTEMPLATEINSTANCEBINDINGS($guid, $version, $instance_idx);
 }
 
 #

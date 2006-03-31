@@ -556,6 +556,7 @@ CREATE TABLE experiment_template_inputs (
 --
 
 CREATE TABLE experiment_template_instance_bindings (
+  instance_idx int(10) unsigned NOT NULL default '0',
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
   exptidx int(10) unsigned NOT NULL default '0',
@@ -563,7 +564,7 @@ CREATE TABLE experiment_template_instance_bindings (
   eid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
-  PRIMARY KEY  (exptidx,name),
+  PRIMARY KEY  (instance_idx, name),
   KEY parent_guid (parent_guid,parent_vers),
   KEY pidtid (pid,eid)
 ) TYPE=MyISAM;
@@ -573,6 +574,7 @@ CREATE TABLE experiment_template_instance_bindings (
 --
 
 CREATE TABLE experiment_template_instances (
+  idx int(10) unsigned NOT NULL auto_increment,  
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
   exptidx int(10) unsigned NOT NULL default '0',
@@ -582,10 +584,10 @@ CREATE TABLE experiment_template_instances (
   start_time datetime default NULL,
   stop_time datetime default NULL,
   runidx int(10) unsigned default NULL,
-  PRIMARY KEY  (exptidx),
+  PRIMARY KEY  (idx),
+  KEY exptidx (exptidx),
   KEY parent_guid (parent_guid,parent_vers),
-  KEY pid (pid,eid),
-  KEY exptidx (exptidx, runidx)
+  KEY pid (pid,eid)
 ) TYPE=MyISAM;
 
 --
@@ -776,6 +778,7 @@ CREATE TABLE experiments (
   savedisk tinyint(1) NOT NULL default '0',
   locpiper_pid int(11) default '0',
   locpiper_port int(11) default '0',
+  instance_idx int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
   KEY batchmode (batchmode)

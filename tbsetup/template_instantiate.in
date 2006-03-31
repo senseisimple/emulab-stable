@@ -219,10 +219,48 @@ if (defined($paramfile)) {
 }
 
 #
+# Generate a new template instance record, and get back its index.
+# We will finish updating it later.
+#
+my %args = ();
+$args{'parent_guid'} = $guid;
+$args{'parent_vers'} = $version;
+$args{'pid'}         = $pid;
+$args{'eid'}         = $eid;
+$args{'uid'}         = $dbuid;
+
+if (libTemplates::NewTemplateInstanceRecord(\%args, \$instidx) < 0) {
+    fatal(-1, "Could not insert new experiment instance record!");
+}
+
+#
 # At this point, we need to force a cleanup no matter how we exit.
 # See the END block below.
 #
 $justexit = 0;
+
+#
+# Now insert the binding records so that the parser can get them.
+#
+if ($paramfile) {
+    foreach my $name (keys(%parameters)) {
+	my $value = $parameters{$name};
+
+	my %args = ();
+    
+	$args{'parent_guid'} = $guid;
+	$args{'parent_vers'} = $version;
+	$args{'pid'}         = $pid;
+	$args{'eid'}         = $eid;
+	$args{'instance_idx'}= $instidx;
+	$args{'name'}        = $name;
+	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
+	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
+    
+	libTemplates::NewTemplateInstanceBindingRecord(\%args) == 0
+	    or tbdie("Error inserting binding into DB!");
+    }
+}
 
 #
 # For now, I am not worrying about reparsing the experiment. Just make
@@ -240,7 +278,8 @@ my $copyeid = "${pid},T${guid}-${version}";
 # Note special -x option.
 #
 my @arguments =
-    ($batchexp, "-x", "-q", "-i", "-f", "-p", $pid, "-e", $eid, "-g", $gid,
+    ($batchexp, "-x", "-y", $instidx, "-q", "-i", "-f",
+     "-p", $pid, "-e", $eid, "-g", $gid,
      "-E", "'Experiment Template Instantiation $guid/$version' ",
      "-c" , $copyeid);
 
@@ -276,28 +315,9 @@ my $workdir = TBExptWorkDir($pid, $eid);
 my $userdir = TBExptUserDir($pid, $eid);
 
 #
-# Now we can insert the parameters into the DB.
+# Now we stash the parameter file.
 #
 if ($paramfile) {
-    foreach my $name (keys(%parameters)) {
-	my $value = $parameters{$name};
-
-	my %args = ();
-    
-	$args{'parent_guid'} = $guid;
-	$args{'parent_vers'} = $version;
-	$args{'exptidx'}     = $exptidx;
-	$args{'pid'}         = $pid;
-	$args{'eid'}         = $eid;
-	$args{'name'}        = $name;
-	$args{'value'}       = (defined($value) ? DBQuoteSpecial($value) : "");
-	$args{'value'}       =~ s/^\'(.*)\'$/$1/;
-    
-	libTemplates::NewTemplateInstanceBindingRecord(\%args) == 0
-	    or tbdie("Error inserting binding into DB!");
-    }
-
-    # Stash parameter file.
     system("/bin/cp", $paramfile, $userdir . "/archive/parameters.xml") == 0
 	or tbdie("Could not copy out $paramfile");
 }
@@ -380,7 +400,7 @@ fatal($? >> 8, "Could not instantiate the experiment")
 #
 # All instances currently start with a default run.
 #
-my %args = ();
+%args = ();
 $args{'exptidx'}     = $exptidx;
 $args{'runid'}       = $eid;
 
@@ -389,19 +409,15 @@ if (libTemplates::NewTemplateExerimentRunRecord(\%args, \$runidx) < 0) {
 }
 
 #
-# Insert a template instance record (now that we have the runidx).
+# Update the Instance
 #
 %args = ();
-$args{'parent_guid'} = $guid;
-$args{'parent_vers'} = $version;
-$args{'pid'}         = $pid;
-$args{'eid'}         = $eid;
-$args{'uid'}         = $dbuid;
 $args{'exptidx'}     = $exptidx;
 $args{'runidx'}      = $runidx;
 
-if (libTemplates::NewTemplateInstanceRecord(\%args) < 0) {
-    fatal(-1, "Could not insert experiment instance record!");
+if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
+					       $instidx, 1, \%args) < 0) {
+    fatal(-1, "Could not update experiment instance record $instidx!");
 }
 
 #
@@ -565,13 +581,14 @@ sub cleanup()
 	system("$endexp -x -q -w $pid $eid");
 	exit(-1)
 	    if ($?);
+    }
+    libTemplates::DeleteTemplateExerimentRunRecord($exptidx, $runidx)
+	if (defined($runidx));
 
-	libTemplates::DeleteTemplateExerimentRunRecord($exptidx, $runidx)
-	    if (defined($runidx));
-
+    if (defined($instidx)) {
 	libTemplates::DeleteTemplateInstanceBindingRecords($guid,
-							   $version, $exptidx);
-	libTemplates::DeleteTemplateInstanceRecord($guid, $version, $exptidx);
+							   $version, $instidx);
+	libTemplates::DeleteTemplateInstanceRecord($guid, $version, $instidx);
     }
 }
 

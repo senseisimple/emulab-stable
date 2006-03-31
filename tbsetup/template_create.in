@@ -255,10 +255,6 @@ if (libTemplates::NewTemplateRecord(\%args) < 0) {
 # Now safe to unlock; the tid/eid is reserved;
 DBQueryFatal("unlock tables");
 
-# Input files are kept in the DB, with the template.
-exit(-1)
-    if (libTemplates::AddTemplateInputFile($guid, $version, $inputfile) < 0);
-
 # Now invoke batchexp to preload the experiment. Note special -x option.
 system("$batchexp -x -q -i -f ".
        "-E 'Experiment Template Preload $guid/$version' ".
@@ -269,6 +265,9 @@ fatal($? >> 8, "Oops")
 # Need to kill the experiment if we fail after this point.
 $exptcreated = 1;
 
+# Input files are kept in the DB, with the template.
+exit(-1)
+    if (libTemplates::AddTemplateInputFile($guid, $version, $inputfile) < 0);
 #
 # Generate the graph for the template.
 #
@@ -430,6 +429,9 @@ sub cleanup()
 
 	# And delete all the other stuff?
     }
+    libTemplates::DeleteTemplateInputFiles($guid, $version)
+	if (defined($guid));
+    
     libTemplates::DeleteTemplateRecord($guid, $version)
 	if (defined($guid));
 }

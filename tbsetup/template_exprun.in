@@ -57,6 +57,7 @@ my $guid;
 my $version;
 my $inputfile;
 my $exptidx;
+my $instidx;
 my $runid;
 
 #
@@ -177,7 +178,8 @@ if (! libTemplates::IsTemplateInstanceExperiment($exptidx)) {
 #
 # And get the instance info,
 #
-if (libTemplates::TemplateInstanceInfo($exptidx, \$currunidx) < 0) {
+if (libTemplates::TemplateInstanceInfoByExptidx($exptidx,
+						\$currunidx, \$instidx) < 0) {
     fatal(-1, "Could not get current experiment run index!");
 }
 
@@ -294,8 +296,8 @@ if ($paramfile) {
 $args{'runidx'}      = $runidx;
 
 if (libTemplates::UpdateTemplateInstanceRecord($guid, $version,
-					       $exptidx, \%args) < 0) {
-    fatal(-1, "Could not insert experiment instance record!");
+					       $instidx, 0, \%args) < 0) {
+    fatal(-1, "Could not update experiment instance record!");
 }
 
 done:

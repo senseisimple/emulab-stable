@@ -193,6 +193,7 @@ if (! TBValidExperimentTemplateInstance($guid, $version, $exptidx)) {
     USERERROR("Experiment Template Instance $guid/$version/$exptidx is not ".
               "a valid experiment template instance!", 1);
 }
+TBTemplateInstanceIndex($guid, $version, $exptidx, $instance_idx);
 
 # We need the eid for passing to the shell.
 
@@ -218,7 +219,7 @@ if (!isset($exprun)) {
     #
     # Get the current bindings for the template instance.
     #
-    TBTemplateInstanceBindings($guid, $version, $exptidx, $bindings);
+    TBTemplateInstanceBindings($guid, $version, $instance_idx, $bindings);
     
     #
     # Allow formfields that are already set to override defaults

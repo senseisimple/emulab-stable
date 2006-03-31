@@ -61,6 +61,7 @@ my $dbuid;
 my $logname;
 my $exptidx;
 my $runidx;
+my $instidx;
 # For the END block below.
 my $cleaning    = 0;
 my $exptcreated = 0;
@@ -142,7 +143,9 @@ if (! TBExptIDX($pid, $eid, \$exptidx)) {
     fatal(-1, "Could not get experiment index for $pid,$eid!");
 }
 
-if (! libtemplates::TemplateInstanceInfo($exptidx, \$runidx)) {
+if (libTemplates::TemplateInstanceInfoByExptidx($exptidx,
+						\$runidx, undef, \$instidx)
+    < 0) {
     fatal(-1, "Could not get experiment run index for $exptidx!");
 }
 
@@ -238,7 +241,7 @@ system(@arguments);
 fatal($? >> 8, "Could not terminate template instance")
     if ($?);
 
-libTemplates::FinalizeTemplateInstanceRecord($guid, $version, $exptidx) == 0 
+libTemplates::FinalizeTemplateInstanceRecord($guid, $version, $instidx) == 0 
     or fatal(-1, "Could not finalize experiment instance record!");
 
 exit(0);

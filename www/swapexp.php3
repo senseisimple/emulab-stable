@@ -227,7 +227,7 @@ if (!$confirmed) {
 TBGroupUnixInfo($exp_pid, $exp_gid, $unix_gid, $unix_name);
 
 if ($isinstance) {
-    if (! TBPidEid2Template($exp_pid, $exp_eid, $guid, $version)) {
+    if (! TBPidEid2Template($exp_pid, $exp_eid, $guid, $version, $instidx)) {
 	TBERROR("Could not map $pid/$eid to its template!", 1);
     }
     echo "<br>\n";

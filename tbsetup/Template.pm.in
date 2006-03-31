@@ -171,20 +171,21 @@ sub DeleteTemplateRecord($$)
 #
 # Create a new template instance record from the args provided. 
 #
-# Usage: int NewTemplateInstanceRecord(\%args)
+# Usage: int NewTemplateInstanceRecord(\%args, \$idx)
 #
-sub NewTemplateInstanceRecord($)
+sub NewTemplateInstanceRecord($$)
 {
-    my ($args) = @_;
+    my ($args, $pidx) = @_;
 
     my $query = "insert into experiment_template_instances set ".
 	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
 
-    # Append some default value stuff.
-    $query .= ",start_time=now()";
-
+    my $query_result = DBQueryWarn($query);
     return -1
-	if (! DBQueryWarn($query));
+	if (! $query_result);
+
+    # Grab the insert record.
+    $$pidx = $query_result->insertid;
     return 0;
 }
 
@@ -193,11 +194,11 @@ sub NewTemplateInstanceRecord($)
 #
 sub DeleteTemplateInstanceRecord($$$)
 {
-    my ($guid, $vers, $exptidx) = @_;
+    my ($guid, $vers, $idx) = @_;
 
     DBQueryFatal("delete from experiment_template_instances ".
 		 "where parent_guid='$guid' and parent_vers='$vers' and ".
-		 "      exptidx='$exptidx'");
+		 "      idx='$idx'");
 
     return 0;
 }
@@ -209,14 +210,15 @@ sub DeleteTemplateInstanceRecord($$$)
 #
 sub FinalizeTemplateInstanceRecord($$$;$)
 {
-    my ($guid, $vers, $exptidx, $args) = @_;
+    my ($guid, $vers, $idx, $args) = @_;
 
     #
     # Get the runidx and do it first.
     #
     my $runidx;
+    my $exptidx;
     return -1
-	if (TemplateInstanceInfo($exptidx, \$runidx) < 0);
+	if (TemplateInstanceInfo($idx, \$runidx, undef, \$exptidx) < 0);
 
     if (defined($runidx)) {
 	return -1
@@ -230,7 +232,7 @@ sub FinalizeTemplateInstanceRecord($$$;$)
 	$query .= join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
     }
     $query .= " where parent_guid='$guid' and parent_vers='$vers' and ".
-	      "       exptidx='$exptidx'";
+	      "       idx='$idx'";
 
     return -1
 	if (! DBQueryWarn($query));
@@ -240,18 +242,23 @@ sub FinalizeTemplateInstanceRecord($$$;$)
 #
 # Update an instance record.
 #
-sub UpdateTemplateInstanceRecord($$$$)
+sub UpdateTemplateInstanceRecord($$$$$)
 {
-    my ($guid, $vers, $exptidx, $args) = @_;
+    my ($guid, $vers, $idx, $start_time, $args) = @_;
 
-    my $query = "update experiment_template_instances ";
+    my $query = "update experiment_template_instances set ";
+
+    $query .= "start_time=now() "
+	if ($start_time);
 
     if (defined($args) && scalar(keys%{$args})) {
-	$query .= ",";
+	$query .= ","
+	    if ($start_time);
+	
 	$query .= join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
     }
     $query .= " where parent_guid='$guid' and parent_vers='$vers' and ".
-	      "       exptidx='$exptidx'";
+	      "       idx='$idx'";
 
     return -1
 	if (! DBQueryWarn($query));
@@ -261,21 +268,45 @@ sub UpdateTemplateInstanceRecord($$$$)
 #
 # Get info about a template run.
 #
-sub TemplateInstanceInfo($$;$)
+sub TemplateInstanceInfo($$;$$)
 {
-    my ($exptidx, $prunidx, $peid) = @_;
+    my ($idx, $prunidx, $peid, $pidx) = @_;
 
     my $query_result =
-	DBQueryWarn("select eid,runidx from experiment_template_instances ".
+	DBQueryWarn("select eid,runidx,exptidx ".
+		    "  from experiment_template_instances ".
+		    "where idx='$idx'");
+
+    return -1
+	if (! $query_result);
+
+    my ($eid,$runidx,$exptidx) = $query_result->fetchrow_array();
+    $$prunidx = $runidx;
+    $$peid    = $eid
+	if (defined($peid));
+    $$pidx    = $exptidx
+	if (defined($pidx));
+    return 0;
+}
+
+sub TemplateInstanceInfoByExptidx($$;$$)
+{
+    my ($exptidx, $prunidx, $peid, $pidx) = @_;
+
+    my $query_result =
+	DBQueryWarn("select eid,runidx,idx ".
+		    "  from experiment_template_instances ".
 		    "where exptidx='$exptidx'");
 
     return -1
 	if (! $query_result);
 
-    my ($eid,$runidx) = $query_result->fetchrow_array();
+    my ($eid,$runidx,$idx) = $query_result->fetchrow_array();
     $$prunidx = $runidx;
     $$peid    = $eid
 	if (defined($peid));
+    $$pidx    = $idx
+	if (defined($pidx));
     return 0;
 }
 
@@ -301,11 +332,11 @@ sub NewTemplateInstanceBindingRecord($)
 #
 sub DeleteTemplateInstanceBindingRecords($$$)
 {
-    my ($guid, $vers, $exptidx) = @_;
+    my ($guid, $vers, $idx) = @_;
 
     DBQueryFatal("delete from experiment_template_instance_bindings ".
 		 "where parent_guid='$guid' and parent_vers='$vers' and ".
-		 "      exptidx='$exptidx'");
+		 "      instance_idx='$idx'");
 
     return 0;
 }
@@ -452,7 +483,7 @@ sub TemplateInfo($$$$;$)
 sub AddTemplateInputFile($$$)
 {
     my ($guid, $version, $inputfile) = @_;
-    my $input_idx;
+    my $input_data_idx;
     my $data_string = `cat $inputfile`;
     return -1
 	if ($?);
@@ -479,15 +510,21 @@ sub AddTemplateInputFile($$$)
 	my $md5 = `$MD5 -q $inputfile`;
 	chomp($md5);
 
+	DBQueryWarn("lock tables experiment_template_inputs write, ".
+		    "            experiment_template_input_data write")
+	    or return -1;
+
 	my $query_result =
 	    DBQueryWarn("select idx from experiment_template_input_data ".
 			"where md5='$md5'");
 
-	return -1
-	    if (!$query_result);
+	if (!$query_result) {
+	    DBQueryWarn("unlock tables");
+	    return -1;
+	}
 
 	if ($query_result->numrows) {
-	    ($input_idx) = $query_result->fetchrow_array();
+	    ($input_data_idx) = $query_result->fetchrow_array();
 	}
 	else {
 	    $query_result =
@@ -495,19 +532,69 @@ sub AddTemplateInputFile($$$)
 			    "(idx, md5, input) ".
 			    "values (NULL, '$md5', $data_string)");
 	    
-	    return -1
-		if (!$query_result);
-	    
-	    $input_idx = $query_result->insertid;
+	    if (!$query_result) {
+		DBQueryWarn("unlock tables");
+		return -1;
+	    }
+	    $input_data_idx = $query_result->insertid;
 	}
 
+	$query_result =
+	    DBQueryWarn("insert into experiment_template_inputs ".
+			" (idx, parent_guid, parent_vers, ".
+			"  pid, tid, input_idx) values ".
+			" (NULL, '$guid', '$version', '$pid', '$tid', ".
+			"  '$input_data_idx')");
+	DBQueryWarn("unlock tables");
 	return -1
-	    if (!DBQueryWarn("insert into experiment_template_inputs ".
-			     " (idx, parent_guid, parent_vers, ".
-			     "  pid, tid, input_idx) values ".
-			     " (NULL, '$guid', '$version', '$pid', '$tid', ".
-			     "  '$input_idx')"));
+	    if (!$query_result);
     }
+    return 0;
+}
+
+#
+# Delete an input file, say for a template create/modify that fails.
+#
+sub DeleteTemplateInputFiles($$)
+{
+    my ($guid, $version) = @_;
+
+    DBQueryWarn("lock tables experiment_template_inputs as i write, ".
+		"            experiment_template_inputs as j write, ".
+		"            experiment_template_input_data write")
+	or return -1;
+
+    #
+    # The point of this query is to see if any of the input files in this
+    # template are shared with some other template, and thus should not
+    # be deleted from the input_data table.
+    #
+    my $query_result =
+	DBQueryWarn("select i.idx,i.input_idx,count(j.input_idx) as count ".
+		    "   from experiment_template_inputs as i ".
+		    "left join experiment_template_inputs as j on ".
+		    "     j.input_idx=i.input_idx ".
+		    "where i.parent_guid='$guid' and ".
+		    "      i.parent_vers='$version' ".
+		    "group by j.input_idx having count > 1");
+
+    if (! $query_result) {
+	DBQueryWarn("unlock tables");
+	return -1;
+    }
+
+    while (my ($input_idx, $data_idx) = $query_result->fetchrow_array()) {
+	DBQueryWarn("delete from experiment_template_input_data ".
+		    "where idx='$data_idx'");
+    }
+    $query_result = 
+	DBQueryWarn("delete from experiment_template_inputs ".
+		    "where parent_guid='$guid' and parent_vers='$version'");
+    DBQueryWarn("unlock tables");
+    
+    return -1
+	if (! $query_result);
+
     return 0;
 }
 

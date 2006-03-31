@@ -279,12 +279,12 @@ function SHOWTEMPLATEMETADATA($guid, $version)
 #
 # Display template instance binding values in a table
 #
-function SHOWTEMPLATEINSTANCEBINDINGS($guid, $version, $exptidx)
+function SHOWTEMPLATEINSTANCEBINDINGS($guid, $version, $instance_idx)
 {
     $query_result =
 	DBQueryFatal("select * from experiment_template_instance_bindings ".
 		     "where parent_guid='$guid' and parent_vers='$version' ".
-		     "      and exptidx='$exptidx'");
+		     "      and instance_idx='$instance_idx'");
 
 
     if (mysql_num_rows($query_result)) {
@@ -773,6 +773,21 @@ function TBPidTid2Template($pid, $tid, &$guid, &$version)
     return 1;
 }
 
+function TBTemplateInstanceIndex($guid, $version, $exptidx, &$instidx)
+{
+    $query_result =
+	DBQueryFatal("select idx from experiment_template_instances ".
+		     "where parent_guid='$guid' and parent_vers='$version' ".
+		     "      and exptidx='$exptidx'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    $row = mysql_fetch_array($query_result);
+    $instidx  = $row['idx'];
+    return 1;
+}
+
 #
 # Map guid to pid/gid.
 #
@@ -919,7 +934,7 @@ function TBIsTemplateInstanceExperiment($exptidx)
 #
 # Map pid/eid to a template guid.
 #
-function TBPidEid2Template($pid, $eid, &$guid, &$version)
+function TBPidEid2Template($pid, $eid, &$guid, &$version, &$instidx)
 {
     $query_result =
 	DBQueryFatal("select * from experiment_template_instances ".
@@ -931,6 +946,7 @@ function TBPidEid2Template($pid, $eid, &$guid, &$version)
     $row = mysql_fetch_array($query_result);
     $guid    = $row['parent_guid'];
     $version = $row['parent_vers'];
+    $instidx = $row['idx'];
     return 1;
 }
 
@@ -1018,14 +1034,14 @@ function TBTemplateFormalParameters($guid, $version, &$parameters)
 #
 # Return an array of the bindings for a template instance.
 #
-function TBTemplateInstanceBindings($guid, $version, $exptidx, &$bindings)
+function TBTemplateInstanceBindings($guid, $version, $instance_idx, &$bindings)
 {
     $bindings = array();
 
     $query_result =
 	DBQueryFatal("select * from experiment_template_instance_bindings ".
 		     "where parent_guid='$guid' and parent_vers='$version' ".
-		     "      and exptidx='$exptidx'");
+		     "      and instance_idx='$instance_idx'");
 
     while ($row = mysql_fetch_array($query_result)) {
 	$name	= $row['name'];

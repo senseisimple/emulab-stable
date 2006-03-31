@@ -3268,3 +3268,8 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.44: Changes to templates.sql. Skip this revision for now.
 
+4.45: More changes to templates.sql. Also:
+
+	alter table experiments add column instance_idx int(10) \
+	    unsigned NOT NULL default '0' AFTER locpiper_port;
+
