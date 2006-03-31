@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2002, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2002, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -38,9 +38,24 @@ $newurl = preg_replace("/cvswebwrap/", "cvsweb", $_SERVER['REQUEST_URI']);
 #
 PAGEHEADER("Emulab CVS Repository");
 
-echo "<iframe width=100% height=800 scrolling=yes src='$newurl' border=0 ".
-     "style=\"width:100%; height:800; border: 0px\"> ".
-     "</iframe>\n";
+?>
+
+<head>
+<style type="text/css">
+
+#cvsfr {
+  width: 100%;
+  height: 800px;
+}
+
+</style>
+</head>
+
+<div id="cvscon">
+<iframe id="cvsfr" scrolling=yes src="<?php echo $newurl ?>" border=0></iframe>
+</div>
+
+<?php
 
 #
 # Standard Testbed Footer
