@@ -42,7 +42,7 @@ WINSUPPORT=1
 PELABSUPPORT=1
 
 #
-# These next six will not work outside of Utah (yet).
+# This next group will not work outside of Utah (yet).
 #
 WIKISUPPORT=1
 BUGDBSUPPORT=1
@@ -51,6 +51,7 @@ SFSSUPPORT=0
 CVSSUPPORT=1
 CHATSUPPORT=1
 NFSTRACESUPPORT=1
+ARCHIVESUPPORT=1
 #
 # SSL Certificate stuff. Used to customize config files in ssl directory.
 # Note that OrganizationalUnit is set in the cnf file.
