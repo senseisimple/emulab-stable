@@ -166,10 +166,10 @@ $EUID = $UID    = $unix_uid;
 $ENV{'USER'}    = $creator;
 $ENV{'LOGNAME'} = $creator;
 
-if (IsTemplateInstanceExperiment($exptidx)) {
+if (0 && IsTemplateInstanceExperiment($exptidx)) {
     my ($guid, $vers);
     
-    if (MapExptidxtoTemplate($exptidx, \$guid, \$version) < 0) {
+    if (MapExptidxtoTemplate($exptidx, \$guid, \$vers) < 0) {
 	die("*** $0:\n".
 	    "    Error mapping experiment to its template!\n");
     }
