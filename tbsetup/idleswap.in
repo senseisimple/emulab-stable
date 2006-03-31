@@ -166,14 +166,14 @@ $EUID = $UID    = $unix_uid;
 $ENV{'USER'}    = $creator;
 $ENV{'LOGNAME'} = $creator;
 
-if (0 && IsTemplateInstanceExperiment($exptidx)) {
+if (libTemplates::IsTemplateInstanceExperiment($exptidx)) {
     my ($guid, $vers);
     
-    if (MapExptidxtoTemplate($exptidx, \$guid, \$vers) < 0) {
+    if (libTemplates::MapExptidxtoTemplate($exptidx, \$guid, \$vers) < 0) {
 	die("*** $0:\n".
 	    "    Error mapping experiment to its template!\n");
     }
-    exec "$template_swapout $guid/$vers $eid";
+    exec "$template_swapout -e $eid $guid/$vers";
 }
 else {
     my $arg = "";
