@@ -776,7 +776,7 @@ REPLACE INTO table_regex VALUES ('default','fulltext','text','regex','^[\\040-\\
 REPLACE INTO table_regex VALUES ('node_attributes','attrkey','text','regex','^[-\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('node_attributes','attrvalue','text','regex','^[-\\w\\.+,\\s]+$',0,255,NULL);
 REPLACE INTO table_regex VALUES ('archive_tags','description','text','redirect','projects:why',1,2048,NULL);
-REPLACE INTO table_regex VALUES ('archive_tags','tag','text','regex','^[a-zA-Z][-\\w\\.\\+]+$',3,64,NULL);
+REPLACE INTO table_regex VALUES ('archive_tags','tag','text','regex','^[a-zA-Z][-\\w\\.\\+]+$',2,64,NULL);
 REPLACE INTO table_regex VALUES ('experiment_templates','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,4096,NULL);
 REPLACE INTO table_regex VALUES ('experiment_templates','guid','text','regex','^[\\w]+$',1,32,NULL);
 REPLACE INTO table_regex VALUES ('experiment_template_metadata','name','text','regex','^[\\040-\\176]*$',1,64,NULL);
