@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Optional flag argument says "do not reboot"
@@ -219,7 +219,7 @@ if [ x"$ADDRESS" != x ]; then
 		$BINDIR/growdisk -vW /dev/$DISK
 		echo "Adjusting slice-related files"
 		$BINDIR/slicefix $PARTITION $DISK
-		echo "Image load complete"
+		echo "Image load complete at `date`"
 
 		#
 		# If requested to reboot, do so.
@@ -255,5 +255,5 @@ if [ x"$ADDRESS" != x ]; then
 else
 	echo "Unable to get address for loading image"
 fi
-echo "Failed to load disk, dropping to login prompt"
+echo "Failed to load disk, dropping to login prompt at `date`"
 exit 1
