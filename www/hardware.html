@@ -104,7 +104,20 @@ Antec IPC3480B, with 300W PS and extra fan.
 <li> 2 Western Digital WDXL80 120GB 7200RPM Serial ATA hard drives.
 <li> Floppy and CD-ROM drive.
 </ul>
+<p>
 
+<a name="tbpc2000"></a>
+<li>8 <a href=shownodetype.php3?node_type=pc2000>pc2000</a>
+	PC nodes (<b>pc170-pc178</b>) consisting of:
+<ul>
+<li> 2.0 GHz Pentium IV processors, 400Mhz FSB
+<li> Based on the Dell Precision WorkStation 340
+<li> 512MB 400Mhz RAMBUS RAM
+<li> 5 10/100 Intel NICs (one NIC is the control net). 
+<li> <a href="http://www.emulab.net/tutorial/docwrapper.php3?docname=ixp.html">
+     Intel IXP 1200 network processor cards</a>.
+<li> 2 x 20GB 7200 RPM IDE disks
+</ul>
 
 </ul>
 <h3>Servers</h3>
@@ -119,9 +132,6 @@ Intel L440GX+ motherboard (the GX+ chipset)
 <li> 512MB PC100 ECC SDRAM
 <li> 90 GB disk space: 5 
 Quantum Atlas IV 18GB 7200RPM Wide LVD SCSI hard drives
-<li> 3 64-port
-<a href="http://www.cyclades.com/products/svrbas/zseries.htm">
-Cyclades-Ze PCI Multiport Serial Boards</a> (model number SEZ0050).
 </ul>
 <p>
 
@@ -139,19 +149,20 @@ Dell PowerEdge 2550 Rack Mount Server
 </ul>
 <p>
 
-<li> a second serial line server, consisting of:
+<li> a motley collection of serial line servers, consisting of:
 <ul>
+<li> a 2U home brew box (our old "ops" node) with
+     3 64-port
+     <a href="http://www.cyclades.com/products/svrbas/zseries.htm">
+     Cyclades-Ze PCI Multiport Serial Boards</a> (model number SEZ0050).
 <li> 1U box from <a href = "http://www.asacomputers.com/">ASA Computers</a>
-<li> 1 64-port
-	<a href="http://www.cyclades.com/products/svrbas/zseries.htm">
-	Cyclades-Ze PCI Multiport Serial Board</a> (model number SEZ0050).
-</ul>
-<p>
-
-<li> a serial line server for critical emulab machines, consisting of:
-<ul>
-<li> An ISP1100 box, like the "pc850" nodes above.
-<li> a 4-port serial card.
+     with another 64-port Cyclades-Ze PCI Multiport Serial Board.
+<li> 2 Dell OptiPlex GX240s with a total of 6 <a
+	href="http://www.comtrol.com/products/hardware/rp_upci.asp">
+	32-port RocketPort Universal PCI interfaces</a>.
+<li> a serial line server for critical Emulab machines, consisting of
+	an ISP1100 box, like the "pc850" nodes above with a 4-port Cyclades
+	card.
 </ul>
 <p>
 
@@ -159,20 +170,18 @@ Dell PowerEdge 2550 Rack Mount Server
 <h3>Switches and Routers</h3>
 <ul>
 
-<li> 6
+<li> 7
     <a href=http://www.cisco.com/warp/public/cc/pd/si/casi/ca6000/index.shtml> 
     Cisco 6500 series high-end switches</a>. Five serve as the
     <a name="tbbackplane"></a>
     <a href=doc/docwrapper.php3?docname=topo.html>testbed backplane</a>
     ("programmable patch panel").<br>
-        The final 6509 contains an MSFC router card and functions as the
+        The other two, a 6506 and 6509
+	providing "control" interfaces for the test nodes with
+        the 6509 hosting an MSFC router card and functioning as the
 	<a name="tbcorerouter"></a>
 	<em>core router</em> for the testbed,
-	providing "control" interfaces for the test nodes as well as
 	regulating access to the testbed servers and the outside world.
-	This switch is configured with full router software,
-	Gigabit ethernet, OC-12 ATM (~600Mbps), and more 
-	10/100 Ethernet ports.
 	<br>
 <p>
 
@@ -184,11 +193,11 @@ Dell PowerEdge 2550 Rack Mount Server
     (The AP9210 is discontinued; replaced in the product line by the
     AP9211.)
 <p>
-
-<li>7 <a href="http://www.baytechdcd.com/products/rpc27.shtml">
-	BayTech RPC27</a> 20 port remote power controllers.<br>
+<li>7 <a href="http://www.baytechdcd.com/products/prodlist.php?show=RPC27">
+	BayTech RPC27</a> 20-port remote power controllers.<br>
 <p>
-
+<li>24 <a href="http://www.baytechdcd.com/products/prodlist.php?show=RPC14">
+	BayTech RPC14</a> 1U 8-port remote power controllers.<br>
 </ul>
 <h3>Racks</h3>
 <ul>
@@ -205,12 +214,10 @@ Dell PowerEdge 2550 Rack Mount Server
 
 Four ethernet ports on each PC node are connected to the
       <a href="#tbbackplane">testbed backplane</a>.
-      All 672 ports can be connected in arbitrary ways by setting up VLANs
+      All of the over 1300 ports can be connected in arbitrary ways by setting up VLANs
       on the switches via remote configuration tools. 
-      Cisco 6500 Switch backplane bandwidth is supposed to be near 50Gb/s,
-      <!-- but we've heard rumors that it's worse. -->
-      though between the testbed backplane switches,
-      bandwidth is currently limited to 2Gb/s.
+      The current PC and switch topology is shown
+      <a href=doc/docwrapper.php3?docname=topo.html>here</a>.
 <p>
 
 The fifth ethernet port on each PC is connected to the
