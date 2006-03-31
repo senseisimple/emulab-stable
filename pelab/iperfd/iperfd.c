@@ -139,7 +139,7 @@ int main(int argc, char **argv) {
                 }
                 break;
             case 'p':
-                if (sscanf(optarg,"%i",&port) != 1) {
+                if (!parsenum(optarg,&port)) {
                     croak("Bad port parameter\n");
                 }
                 break;
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
                 croak("iperfd cannot be used as a client");
                 break;
             case 'w':
-                if (sscanf(optarg,"%i",&windowsize) != 1) {
+                if (!parsenum(optarg,&windowsize)) {
                     croak("Bad window size parameter\n");
                 }
                 break;
@@ -364,14 +364,27 @@ bool parsenum(char *str, int *out) {
     int len = strlen(str);
     int multiplier = 1;
     if (str[len-1] == 'k') {
-        multiplier = 1024;
+        multiplier = 1000;
         str[len-1] = '\0';
     } else if (str[len-1] == 'm') {
+        multiplier = 1000 * 1000;
+        str[len-1] = '\0';
+    } else if (str[len-1] == 'g') {
+        multiplier = 1000 * 1000 * 1000;
+        str[len-1] = '\0';
+    } else if (str[len-1] == 'K') {
+        multiplier = 1024;
+        str[len-1] = '\0';
+    } else if (str[len-1] == 'M') {
         multiplier = 1024 * 1024;
         str[len-1] = '\0';
-    }
+    } else if (str[len-1] == 'G') {
+        multiplier = 1024 * 1024 * 1024;
+        str[len-1] = '\0';
+    } 
     if (sscanf(str,"%i",out) == 1) {
         *out = *out * multiplier;
+        //printf("Returning %i\n",*out);
         return true;
     } else {
         return false;
