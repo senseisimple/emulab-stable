@@ -293,10 +293,10 @@ function SPITFORM($formfields, $errors)
                               Submit.  PlanetLab <font size=+1 color=red>  
                               requires</font>  users
                               to provide detail on what their slice will
-                              be doing via it's description (i.e. what kind 
+                              be doing via its description (i.e., what kind 
                               of network traffic it will be producing).
                               Be sure to read over the
-                              <a href='https://www.planet-lab.org/php/aup/'>
+                              <a href='http://www.planet-lab.org/php/aup/'>
                               PlanetLab AUP</a> if you haven't already.
                        </b></p>
                       </center>\n";
