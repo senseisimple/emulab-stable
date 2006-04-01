@@ -69,6 +69,7 @@ my $user_email;
 my $dbuid;
 my $guid;
 my $version = 1;
+my $archive_idx = 0;
 # For the END block below.
 my $cleaning   = 0;
 my $exptcreated = 0;
@@ -90,6 +91,7 @@ use lib "@prefix@/lib";
 use libdb;
 use libtestbed;
 use libtblog;
+use libArchive;
 use libTemplates;
 
 # Be careful not to exit on transient error
@@ -256,8 +258,9 @@ if (libTemplates::NewTemplateRecord(\%args) < 0) {
 DBQueryFatal("unlock tables");
 
 # Now invoke batchexp to preload the experiment. Note special -x option.
-system("$batchexp -x -q -i -f ".
-       "-E 'Experiment Template Preload $guid/$version' ".
+system("$batchexp ". 
+       "-x " . ($modify ? "T${parent_guid}-${parent_vers}" : "-") . " " .
+       "-q -i -f -E 'Experiment Template Preload $guid/$version' ".
        "-p $pid -e $eid $inputfile");
 fatal($? >> 8, "Oops")
     if ($?);
@@ -268,6 +271,42 @@ $exptcreated = 1;
 # Input files are kept in the DB, with the template.
 exit(-1)
     if (libTemplates::AddTemplateInputFile($guid, $version, $inputfile) < 0);
+#
+# Grab archive index for new templates.
+#
+if (!$modify) {
+    libArchive::TBExperimentArchiveInfo($pid, $eid, \$archive_idx, undef)
+	>= 0 or fatal(-1, "Could not get archive index for new template!");
+
+    # Do a commit point on the template archive since it does not actually
+    # change after it is created (instances are branches).
+    libArchive::TBCommitExperimentArchive($pid, $eid, "TemplateCreate")
+	>= 0 or fatal(-1, "Failed to commit experiment archive!");
+}
+else {
+    #
+    # Grab the archive index for the parent; the archive is shared.
+    #
+    libArchive::TBExperimentArchiveInfo($pid,
+					"T${parent_guid}-${parent_vers}",
+					\$archive_idx, undef)
+	>= 0 or fatal(-1, "Could not get archive index for parent!");
+      
+    # Do a commit point on the template archive since it does not actually
+    # change after it is created (instances are branches).
+    libArchive::TBCommitExperimentArchive($pid,
+					  "T${parent_guid}-${parent_vers}",
+					  "TemplateCreate")
+	>= 0 or fatal(-1, "Failed to commit experiment archive!");
+}
+
+# And update the record.
+%args = ();
+$args{'archive_idx'} = $archive_idx;
+
+libTemplates::UpdateTemplateRecord($guid, $version, \%args) == 0
+    or fatal(-1, "Could not update template record!");
+
 #
 # Generate the graph for the template.
 #

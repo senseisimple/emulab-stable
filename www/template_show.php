@@ -45,6 +45,7 @@ if (! TBValidExperimentTemplate($guid, $version)) {
     USERERROR("The experiment template $guid/$version is not a valid ".
               "experiment template!", 1);
 }
+TBTemplatePidEid($guid, $version, $pid, $eid);
 
 #
 # Verify Permission.
@@ -76,6 +77,9 @@ WRITESUBMENUBUTTON("Add Metadata",
 		   "template_metadata.php?action=add&".
 		   "guid=$guid&version=$version");
 
+WRITESUBMENUBUTTON("Template Archive",
+		   "archive_view.php3?pid=$pid&eid=$eid");
+
 WRITESUBMENUBUTTON("Template History",
 		   "template_history.php?guid=$guid&version=$version");
 
@@ -84,7 +88,6 @@ SUBMENUEND_2A();
 #
 # Ick.
 #
-TBTemplatePidEid($guid, $version, $pid, $eid);
 $rsrcidx = TBrsrcIndex($pid, $eid);
 
 echo "<br>

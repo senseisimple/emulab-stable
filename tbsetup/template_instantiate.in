@@ -278,7 +278,7 @@ my $copyeid = "${pid},T${guid}-${version}";
 # Note special -x option.
 #
 my @arguments =
-    ($batchexp, "-x", "-y", $instidx, "-q", "-i", "-f",
+    ($batchexp, "-x", "T${guid}-${version}", "-y", $instidx, "-q", "-i", "-f",
      "-p", $pid, "-e", $eid, "-g", $gid,
      "-E", "'Experiment Template Instantiation $guid/$version' ",
      "-c" , $copyeid);

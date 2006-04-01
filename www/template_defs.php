@@ -478,7 +478,7 @@ function SHOWTEMPLATEHISTORY($guid, $version)
 
     if (mysql_num_rows($query_result)) {
 	echo "<center>
-               <h3>Template History</h3>
+               <h3>Template History (Swapins)</h3>
              </center> 
              <table align=center border=1 cellpadding=5 cellspacing=2>\n";
 
@@ -488,6 +488,7 @@ function SHOWTEMPLATEHISTORY($guid, $version)
                <th>UID</th>
                <th>Start Time</th>
                <th>Stop Time</th>
+               <th align=center>Archive</th>
               </tr>\n";
 
 	$idlemark = "<b>*</b>";
@@ -515,6 +516,9 @@ function SHOWTEMPLATEHISTORY($guid, $version)
   		   <td>$uid</td>
                    <td>$start</td>
                    <td>$stop</td>
+                   <td align=center>
+                     <a href=cvsweb/cvswebwrap.php3/$exptidx/?exptidx=$exptidx>
+                     <img border=0 alt='i' src='greenball.gif'></a></td>
                  </tr>\n";
 	}
 	echo "</table>\n";
@@ -571,6 +575,7 @@ function SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, $withruns)
 
 		echo "<tr>
                        <th align=center>Expand</th>
+                       <th align=center>Archive</th>
                        <th>RunID</th>
                        <th>ID</th>
                        <th>Start Time</th>
@@ -583,6 +588,7 @@ function SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, $withruns)
 		    $runid     = $rrow['runid'];
 		    $start     = $rrow['start_time'];
 		    $stop      = $rrow['stop_time'];
+		    $exptidx   = $rrow['exptidx'];
 		    $description = $rrow['description'];
 
 		    if (! isset($stop)) {
@@ -596,6 +602,11 @@ function SHOWTEMPLATEINSTANCE($guid, $version, $exptidx, $withruns)
 				 "&exptidx=$exptidx&runidx=$runidx",
 				 "<img border=0 alt='i' src='greenball.gif'>");
 		    echo " </td>
+                            <td align=center>
+                                <a href=cvsweb/cvswebwrap.php3".
+			           "/$exptidx/history/$runid/?exptidx=$exptidx>
+                                <img border=0 alt='i'
+                                     src='greenball.gif'></a></td>
                             <td>$runid</td>
   		            <td>$runidx</td>
                             <td>$start</td>
@@ -848,9 +859,8 @@ function TBTemplateCurrentExperimentRun($guid, $version, $exptidx, &$runidx)
 function TBTemplateNextExperimentRun($guid, $version, $exptidx, &$runidx)
 {
     $query_result =
-	DBQueryFatal("select MAX(runidx) from experiment_template_instances ".
-		     "where parent_guid='$guid' and parent_vers='$version' ".
-		     "      and exptidx='$exptidx'");
+	DBQueryFatal("select MAX(idx) from experiment_runs ".
+		     "where exptidx='$exptidx'");
 
     if (mysql_num_rows($query_result) == 0) {
 	return 0;

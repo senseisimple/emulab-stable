@@ -679,6 +679,7 @@ CREATE TABLE experiment_templates (
   uid varchar(8) NOT NULL default '',
   description mediumtext,
   eid varchar(32) NOT NULL default '',
+  archive_idx int(10) unsigned default NULL,
   created datetime default NULL,
   modified datetime default NULL,
   locked datetime default NULL,

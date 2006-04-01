@@ -152,6 +152,23 @@ sub NewTemplateRecord($)
 }
 
 #
+# Update a template record
+#
+sub UpdateTemplateRecord($$$)
+{
+    my ($guid, $vers, $args) = @_;
+
+    my $query = "update experiment_templates set ".
+	join(",", map("$_='" . $args->{$_} . "'", keys(%{$args})));
+
+    $query .= " where guid='$guid' and vers='$vers'";
+
+    return -1
+	if (! DBQueryWarn($query));
+    return 0;
+}
+
+#
 # Delete a template (all tables).
 #
 sub DeleteTemplateRecord($$)
@@ -561,6 +578,7 @@ sub DeleteTemplateInputFiles($$)
 
     DBQueryWarn("lock tables experiment_template_inputs as i write, ".
 		"            experiment_template_inputs as j write, ".
+		"            experiment_template_inputs write, ".
 		"            experiment_template_input_data write")
 	or return -1;
 

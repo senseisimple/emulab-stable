@@ -85,6 +85,7 @@ my $justexit    = 1;
 
 # Programs we need
 my $checkquota  = "$TB/sbin/checkquota";
+my $archcontrol = "$TB/bin/archive_control";
 
 # Protos
 sub ParseArgs();
@@ -178,8 +179,8 @@ if (! libTemplates::IsTemplateInstanceExperiment($exptidx)) {
 #
 # And get the instance info,
 #
-if (libTemplates::TemplateInstanceInfoByExptidx($exptidx,
-						\$currunidx, \$instidx) < 0) {
+if (libTemplates::TemplateInstanceInfoByExptidx($exptidx, \$currunidx,
+						undef, \$instidx) < 0) {
     fatal(-1, "Could not get current experiment run index!");
 }
 
@@ -251,8 +252,14 @@ if (defined($currunidx)) {
 	fatal(-1, "Could not finalize experiment run index $currunidx!");
     }
 }
+
+#
+# Commit the archive. 
+#
+system("$archcontrol -t $runid commit $pid $eid");
+
 goto done
-    if ($action eq "stop") ;
+    if ($action eq "stop");
 
 #
 # Generate a new run.

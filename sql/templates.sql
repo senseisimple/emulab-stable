@@ -32,8 +32,10 @@ CREATE TABLE experiment_templates (
   uid varchar(8) NOT NULL default '',
   -- Eric says these are really metadata. Probably true.
   description mediumtext,
-  -- EID of the underlying parsed experiment. I think this is temporary.
+  -- EID of the underlying parsed experiment. 
   eid varchar(32) NOT NULL default '',
+  -- The Archive for the template. This is shared with derived templates.
+  archive_idx int(10) unsigned default NULL,
   -- These are all mirrors of what is in the existing experiments table
   created datetime default NULL,
   modified datetime default NULL,

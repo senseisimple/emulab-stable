@@ -3273,3 +3273,5 @@ last_net_act,last_cpu_act,last_ext_act);
 	alter table experiments add column instance_idx int(10) \
 	    unsigned NOT NULL default '0' AFTER locpiper_port;
 
+4.46: Changes to templates.sql. Skip this revision for now.
+

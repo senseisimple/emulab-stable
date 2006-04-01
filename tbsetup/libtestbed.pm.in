@@ -2,7 +2,7 @@
 
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -361,10 +361,14 @@ sub TBScriptLock($;$$)
 	if (!defined($global));
     $lockname = "/var/tmp/testbed_${token}_lockfile";
 
+    my $oldmask = umask(0000);
+
     if (! open(LOCK, ">>$lockname")) {
 	print STDERR "Could not open $lockname!\n";
+	umask($oldmask);
 	return TBSCRIPTLOCK_FAILED();
     }
+    umask($oldmask);
 
     if (! $global) {
 	#
