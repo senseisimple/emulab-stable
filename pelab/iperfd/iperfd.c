@@ -132,6 +132,8 @@ int main(int argc, char **argv) {
         }
     }
     printf("\n");
+    fprinttimestamp(stdout);
+    printf(" Maximum number of clients: %i \n", FD_SETSIZE);
 
     
     /*
@@ -316,7 +318,7 @@ int main(int argc, char **argv) {
                 fprinttimestamp(stdout);
 		printf(" Too many clients, dropping ");
                 fprintaddr(stdout,&clientaddr);
-                printf("\n");
+                printf(" [%i]\n", newclient);
                 close(newclient);
 	    } else if (newclient == -1) {
                 if (errno == EINTR        || errno == EWOULDBLOCK ||
@@ -338,7 +340,7 @@ int main(int argc, char **argv) {
                 fprinttimestamp(stdout);
                 printf(" New client: ");
                 fprintaddr(stdout,&clientaddr);
-                printf("\n");
+                printf(" [%i]\n",newclient);
 
                 /*
                  * Try to set the socket buffer size
@@ -391,7 +393,7 @@ int main(int argc, char **argv) {
                     fprinttimestamp(stdout);
                     printf(" Client disconnected: ");
                     fprintaddr(stdout,clients + i);
-                    printf("\n");
+                    printf(" [%i]\n",i);
 
                     close_connection = true;
                 } else if (readbytes == -1) {
