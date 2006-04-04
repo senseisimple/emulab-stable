@@ -791,6 +791,10 @@ REPLACE INTO table_regex VALUES ('experiment_runs','runid','text','redirect','ex
 REPLACE INTO table_regex VALUES ('experiment_runs','description','text','regex','^[\\040-\\176\\012\\015\\011]*$',1,256,NULL);
 REPLACE INTO table_regex VALUES ('experiment_run_bindings','name','text','regex','^\\w[-\\w]+$',1,64,NULL);
 REPLACE INTO table_regex VALUES ('experiment_run_bindings','value','text','redirect','default:tinytext',0,256,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','vname','text','redirect','virt_nodes:vname',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','logfileid','text','regex','^[-\\w\\.+]+$',2,45,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','pid','text','redirect','projects:pid',0,0,NULL);
+REPLACE INTO table_regex VALUES ('virt_node_motelog','eid','text','redirect','experiments:eid',0,0,NULL);
 
 
 --
