@@ -3275,3 +3275,7 @@ last_net_act,last_cpu_act,last_ext_act);
 
 4.46: Changes to templates.sql. Skip this revision for now.
 
+4.47: Ack, need another field in the primary key for virt_node_motelog:
+
+      alter table virt_node_motelog drop primary key;
+      alter table virt_node_motelog add primary key(pid,eid,vname,logfileid);

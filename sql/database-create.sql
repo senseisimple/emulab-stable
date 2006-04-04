@@ -2662,7 +2662,7 @@ CREATE TABLE virt_node_motelog (
   eid varchar(32) NOT NULL default '',
   vname varchar(32) NOT NULL default '',
   logfileid varchar(45) NOT NULL default '',
-  PRIMARY KEY  (pid,eid,vname)
+  PRIMARY KEY  (pid,eid,vname,logfileid)
 ) TYPE=MyISAM;
 
 --
