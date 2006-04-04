@@ -71,6 +71,7 @@ $BASH		= "/bin/bash";
 $NTS		= "/cygdrive/c/WINDOWS/system32";
 $NET		= "$NTS/net";
 $NETSH		= "$NTS/netsh";
+$IPCONFIG	= "$NTS/ipconfig";
 $NTE		= "$NTS/drivers/etc";
 
 $HOSTSFILE	= "$NTE/hosts";
@@ -297,6 +298,11 @@ sub os_ifconfig_line($$$$$$$;$$)
 	get_dev_map();
 	if ( ! defined( $dev_map{$iface} ) ) {
 	    system("$BINDIR/rc/rc.reboot");
+	    # Sometimes rc.reboot gets fork: Resource temporarily unavailable.
+	    print "rc.reboot returned, trying tsshutddn.";
+	    system("tsshutdn 1 /REBOOT /DELAY:1");
+	    print "tsshutdn failed, sleep forever.";
+	    sleep;
 	}
     }
 
@@ -317,8 +323,15 @@ sub os_ifconfig_line($$$$$$$;$$)
 	#
 	# Check that the configuration took!
 	my $showip =  qq[$NETSH interface ip show address name="$iface"];
-	$test      =  qq[$showip | awk '/IP Address:/{print \$NF}'];
-	$uplines   .= qq{if [ \`$test\` != $inet ]; then\n    };
+	my $ipconf =  qq[$IPCONFIG /all | tr -d '\\r'];
+	my $ipawk  =  qq[/^Ethernet adapter/] .
+	    qq[{ ifc = gensub("Ethernet adapter (.*):", "\\\\\\\\1", 1); next }] .
+		qq[/IP Address/ && ifc == "$iface"{print \$NF}];
+	my $addr1  =  qq[addr1=\`$showip | awk '/IP Address:/{print \$NF}'\`];
+	my $addr2  =  qq[addr2=\`$ipconf | awk '$ipawk'\`];
+	my $iptest = '[[ "$addr1" != '.$inet.' || "$addr2" != '.$inet.' ]]';
+	$uplines   .= qq{$addr1\n    $addr2\n    };
+	$uplines   .= qq{if $iptest; then\n    };
 	#
 	# Re-do it if not.
 	$uplines   .= qq{  echo "    Config failed on $iface, retrying."\n    };
@@ -326,10 +339,11 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines   .= qq{  sleep 5\n    };
 	$uplines   .=   "  $DEVCON enable '$dev_map{$iface}'\n    ";
 	$uplines   .= qq{  sleep 5\n    };
-	$uplines   .= sprintf($IFCONFIG, $iface, $inet, $mask) . qq{\n    };
+	$uplines   .= sprintf("  " . $IFCONFIG, $iface, $inet, $mask) . qq{\n    };
 	#
 	# Re-check.
-	$uplines   .= qq{  if [ \`$test\` != $inet ]; then\n    };
+	$uplines   .= qq{  $addr1\n$addr2\n    };
+	$uplines   .= qq{  if $iptest; then\n    };
 	$uplines   .= qq{    echo "    Reconfig still failed on $iface."\n    };
 	$uplines   .= qq{  else echo "    Reconfig succeeded on $iface."\n    };
 	$uplines   .= qq{  fi\n    };
