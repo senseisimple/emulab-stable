@@ -245,6 +245,7 @@ COMMAND_PROTOTYPE(doltmap);
 COMMAND_PROTOTYPE(doelvindport);
 COMMAND_PROTOTYPE(doplabeventkeys);
 COMMAND_PROTOTYPE(dointfcmap);
+COMMAND_PROTOTYPE(domotelog);
 
 /*
  * The fullconfig slot determines what routines get called when pushing
@@ -333,6 +334,7 @@ struct command {
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
 	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
 	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
+	{ "motelog",     FULLCONFIG_ALL,  F_ALLOCATED, domotelog},
 };
 static int numcommands = sizeof(command_array)/sizeof(struct command);
 
@@ -6436,4 +6438,55 @@ COMMAND_PROTOTYPE(dointfcmap)
 	mysql_free_result(res);
 
 	return 0;
+}
+
+
+/*
+ * Return motelog info for this node.
+ */
+COMMAND_PROTOTYPE(domotelog)
+{
+    MYSQL_RES *res;
+    MYSQL_ROW row;
+    char buf[MYBUFSIZE];
+    int nrows;
+
+    res = mydb_query("select vnm.logfileid,ml.classfilepath,ml.specfilepath "
+		     "from virt_node_motelog as vnm "
+		     "left join motelogfiles as ml on vnm.pid=ml.pid "
+		     "  and vnm.logfileid=ml.logfileid "
+		     "left join reserved as r on r.vname=vnm.vname "
+		     "  and vnm.eid=r.eid and vnm.pid=r.pid "
+		     "where vnm.pid='%s' and vnm.eid='%s' "
+		     "  and vnm.vname='%s'",
+		     3,reqp->pid,reqp->eid,reqp->nickname);
+
+    if (!res) {
+	error("MOTELOG: %s: DB Error getting virt_node_motelog\n",
+	      reqp->nodeid);
+    }
+
+    /* no motelog stuff for this node */
+    if ((nrows = (int)mysql_num_rows(res)) == 0) {
+	mysql_free_result(res);
+	return 0;
+    }
+
+    while (nrows) {
+	row = mysql_fetch_row(res);
+	
+	/* only specfilepath can possibly be null */
+	OUTPUT(buf, sizeof(buf),
+	       "MOTELOGID=%s CLASSFILE=%s SPECFILE=%s\n",
+	       row[0],row[1],row[2]);
+	client_writeback(sock, buf, strlen(buf), tcp);
+    
+	--nrows;
+	if (verbose) {
+	    info("MOTELOG: %s", buf);
+	}
+    }
+
+    mysql_free_result(res);
+    return 0;
 }
