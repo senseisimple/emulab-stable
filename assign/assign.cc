@@ -414,11 +414,22 @@ void print_help() {
 // Perfrom a pre-cehck to make sure that there are enough free nodes of the
 // proper types. Returns 1 if the proper types exist, 0 if they do not.
 // TODO - move away from using global variables
-int type_precheck() {
-    cout << "Type precheck:" << endl;
+int type_precheck(int round) {
+    cout << "Type precheck, round " << round << ":" << endl;
 
     bool ok = true;
 
+    /*
+     * Tailor our error messages, depending on the round - the first round of
+     * the precheck is looking for available pnodes, the second is looking for
+     * sutiable nodes (ie. at least one vnode could map to it)
+     */
+    char *round_str;
+    if (round == 1) {
+        round_str = "available";
+    } else {
+        round_str = "suitable";
+    }
     // First, check the regular types
     for (name_count_map::iterator vtype_it=vtypes.begin();
 	    vtype_it != vtypes.end();++vtype_it) {
@@ -426,16 +437,16 @@ int type_precheck() {
 	// Check to see if there were any pnodes of the type at all
 	tb_ptype_map::iterator ptype_it = ptypes.find(vtype_it->first);
 	if (ptype_it == ptypes.end()) {
-	    cout << "  *** No physical nodes of type " << vtype_it->first
-		<< " found" << endl;
+	    cout << "  *** No " << round_str << " physical nodes of type "
+                << vtype_it->first << " found" << endl;
 	    ok = false;
 	} else {
 	    // Okay, there are some - are there enough?
 	    if (ptype_it->second->pnode_slots() < vtype_it->second) {
 		cout << "  *** " << vtype_it->second << " nodes of type " <<
-		    vtype_it->first << " requested, but only "
-		    << ptype_it->second->pnode_slots() << " suitable nodes of "
-                    << "type " << vtype_it->first<< " found" << endl;
+                    vtype_it->first << " requested, but only " <<
+                    ptype_it->second->pnode_slots() << " " << round_str <<
+                    " nodes of type " << vtype_it->first<< " found" << endl;
 		ok = false;
 	    }
 	    // Okay, there are enough - but are we allowed to use them?
@@ -476,8 +487,8 @@ int type_precheck() {
 	}
 
 	if (!found_match) {
-	    cout << "  *** No physical nodes can satisfy vclass " <<
-		vclass_it->first << endl;
+	    cout << "  *** No " << round_str <<
+                " physical nodes can satisfy vclass " << vclass_it->first << endl;
 	    ok = false;
 	}
     }
@@ -899,7 +910,7 @@ int main(int argc,char **argv) {
    */
   
   // Run the type precheck
-  if (!type_precheck()) {
+  if (!type_precheck(1)) {
       exit(EXIT_UNRETRYABLE);
   }
 
@@ -917,16 +928,11 @@ int main(int argc,char **argv) {
        * we mave to run the type precheck before the mapping precheck. And,
        * the type precheck is very fast.
        */
-      if (!type_precheck()) {
+      if (!type_precheck(2)) {
           exit(EXIT_UNRETRYABLE);
       }
   }
 #endif
-
-  // Run the type precheck
-  if (!type_precheck()) {
-      exit(EXIT_UNRETRYABLE);
-  }
 
   // Bomb out early if we're only doing the prechecks
   if (prechecks_only) {
