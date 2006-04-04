@@ -112,7 +112,7 @@ public final class PacketReader {
 	    
 	    // read byte -- let the exception fly through to the caller
 	    int b = (int)in.read();
-	    debug(4,"read byte: "+b);
+	    debug(5,"read byte: "+b);
 
 	    if (b == ESCAPE_BYTE) {
 		isEscaped = true;

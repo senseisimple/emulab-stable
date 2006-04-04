@@ -3,7 +3,9 @@ import java.util.*;
 import java.lang.reflect.*;
 import javax.sql.*;
 import java.net.*;
+import javax.net.ssl.*;
 import java.io.*;
+import java.security.*;
 
 public class MoteLogger {
 
@@ -17,10 +19,12 @@ public class MoteLogger {
     private String eid;
     private String[] motes;
     private LinkedList packetQueue;
-    private String dbURL = "jdbc.DriverMysql";
-    private String dbUser = "root";
-    private String dbPass = "";
+    private String database;
+    private String dbUser;
     private Hashtable classes;
+    private boolean connectReadOnly = false;
+    private MoteThread moteThreads[];
+    private static FileWriter logWriter;
 
     public static void main(String args[]) {
 	//
@@ -38,12 +42,36 @@ public class MoteLogger {
 
     public static void globalDebug(int level,String msg) {
 	if (MoteLogger.debug >= level) {
-	    System.out.println("DEBUG: " + msg);
+	    if (logWriter != null) {
+		try {
+		    logWriter.write("DEBUG: " + msg + "\n");
+		    logWriter.flush();
+		}
+		catch (Exception e) {
+		    System.err.println("Problem writing to logfile!!!");
+		    e.printStackTrace();
+		}
+	    }
+	    else {
+		System.out.println("DEBUG: " + msg);
+	    }
 	}
     }
 
     public static void globalError(String msg) {
-	System.err.println("ERROR: " + msg);
+	if (logWriter != null) {
+	    try {
+		logWriter.write("ERROR: " + msg + "\n");
+		logWriter.flush();
+	    }
+	    catch (Exception e) {
+		System.err.println("Problem writing to logfile!!!");
+		e.printStackTrace();
+	    }
+	}
+	else {
+	    System.err.println("ERROR: " + msg);
+	}
     }
 
     public static void parseArgsAndRun(String args[]) {
@@ -54,10 +82,54 @@ public class MoteLogger {
 	String eid = null;
 	File aclDir = new File("/var/log/tiplogs");
 	String[] motes = null;
+	boolean connectReadOnly = false;
+	File logFile = null;
+	logWriter = null;
+	String database = "test";
+	String dbUser = "root";
 
 	int i;
 	for (i = 0; i < args.length; ++i) {
-	    if (args[i].equals("-C")) {
+	    if (args[i].equals("-l")) {
+		if (++i < args.length && !args[i].startsWith("-")) {
+		    try {
+			logFile = new File(args[i]);
+
+			logWriter = new FileWriter(logFile);
+		    }
+		    catch (Exception e) {
+			System.err.println("Could not open log file for writing, exiting.");
+			e.printStackTrace();
+			System.exit(-9);
+		    }
+		}
+		else {
+		    System.err.println("option '-l' must have an argument!");
+		    usage();
+		}
+	    }
+	    else if (args[i].equals("-r")) {
+		connectReadOnly = true;
+	    }
+	    else if (args[i].equals("-D")) {
+		if (++i < args.length && !args[i].startsWith("-")) {
+		    database = args[i];
+		}
+		else {
+		    System.err.println("option '-D' must have an argument!");
+		    usage();
+		}
+	    }
+            else if (args[i].equals("-U")) {
+                if (++i < args.length && !args[i].startsWith("-")) {
+                    dbUser = args[i];
+                }
+                else {
+                    System.err.println("option '-U' must have an argument!");
+                    usage();
+                }
+            }
+	    else if (args[i].equals("-C")) {
 		if (++i < args.length && !args[i].startsWith("-")) {
 		    classDir = new File(args[i]);
 		}
@@ -141,7 +213,8 @@ public class MoteLogger {
 
 	// startup
 	MoteLogger ml = new MoteLogger(classDir,classNames,aclDir,motes,
-				       pid,eid,tag);
+				       pid,eid,tag,connectReadOnly,
+				       database,dbUser);
 	ml.run();
     }
 
@@ -158,6 +231,9 @@ public class MoteLogger {
 	    //"\t-m <vname,vname,...>  (list of vnames present in acl dir) \n"+
 	    "\t-M <acldir>  ACL directory \n" +
 	    "\t-d..d  Stay in foreground and debug at level specified \n" +
+	    "\t-r  Connect to capture read-only \n" + 
+	    "\t-D <database>  Localhost database to drop packets in \n" + 
+	    "\t-U <db user>  User to access the db as \n" + 
 	    "";
 
 	System.err.println(usage);
@@ -166,7 +242,8 @@ public class MoteLogger {
 
     public MoteLogger(File classDir,String[] classNames,
 		      File aclDir,String[] motes,String pid,
-		      String eid,String tag) {
+		      String eid,String tag,boolean connectReadOnly,
+		      String database,String dbUser) {
 	this.classDir = classDir;
 	this.classNames = classNames;
 	this.aclDir = aclDir;
@@ -175,6 +252,10 @@ public class MoteLogger {
 	this.logTag = tag;
 	this.motes = motes;
 	this.classes = new Hashtable();
+	this.connectReadOnly = connectReadOnly;
+	this.moteThreads = null;
+	this.database = database;
+	this.dbUser = dbUser;
     }
 
     private void debug(int level,String msg) {
@@ -287,7 +368,10 @@ public class MoteLogger {
 	try {
 	    Class.forName("com.mysql.jdbc.Driver");
 	    conn = java.sql.DriverManager.getConnection("jdbc:mysql:" + 
-					       "//localhost/test?user=root");
+							"//localhost/" + 
+							database + 
+							"?user=" +
+							dbUser);
 	}
 	catch (Exception e) {
 	    error("FATAL -- couldn't connect to the database: " +
@@ -298,10 +382,15 @@ public class MoteLogger {
 	}
 
 	// spawn connection threads
-	for (Enumeration e1 = acls.keys(); e1.hasMoreElements(); ) {
+	moteThreads = new MoteThread[acls.size()];
+	int k = 0;
+	for (Enumeration e1 = acls.keys(); e1.hasMoreElements(); ++k) {
 	    String vNN = (String)e1.nextElement();
 	    ElabACL acl = (ElabACL)acls.get(vNN);
-	    (new MoteThread(vNN,acl,packetQueue)).start();
+	    MoteThread mt = new MoteThread(vNN,acl,packetQueue,
+					   connectReadOnly);
+	    mt.start();
+	    moteThreads[k] = mt;
 	}
 
 	// now, process the packet queue forever.
@@ -313,15 +402,35 @@ public class MoteLogger {
 		
 		while(packetQueue.size() == 0) {
 		    try {
-			packetQueue.wait();
+			packetQueue.wait(8);
 		    }
 		    catch (Exception e) {
 			e.printStackTrace();
 		    }
+
+		    // check if all moteThreads are still cookin'
+		    boolean allDead = true;
+		    for (int j = 0; j < moteThreads.length; ++j) {
+			if (moteThreads[j] != null 
+			    && moteThreads[j].getRunStatus()) {
+			    allDead = false;
+			    break;
+			}
+		    }
+		    
+		    if (allDead && packetQueue.size() == 0) {
+			error("all MoteThreads dead; exiting.");
+			System.exit(-9);
+		    }
+
 		}
 
-		// once we get a packet...
-		lp = (LogPacket)packetQueue.removeLast();
+		
+		    
+		
+		if (packetQueue.size() != 0) {
+		    lp = (LogPacket)packetQueue.removeLast();
+		}
 	    }
 
 	    debug(2,"Dumping packet to db:");
@@ -425,12 +534,16 @@ public class MoteLogger {
 	private ElabACL acl;
 	private LinkedList q;
 	private Socket sock;
+	private SSLSocket ssock;
+	private boolean runStatus;
 
 	public MoteThread(String vNodeName,ElabACL acl,
-			     LinkedList packetQueue) {
+			  LinkedList packetQueue,boolean connectReadOnly) {
 	    this.vNodeName = vNodeName;
 	    this.acl = acl;
 	    this.q = packetQueue;
+	    this.ssock = null;
+	    this.runStatus = true;
 	}
 	
 	private void debug(int level,String msg) {
@@ -440,6 +553,10 @@ public class MoteLogger {
 	
 	private void error(String msg) {
 	    MoteLogger.globalError("MoteThread (" + vNodeName + "): " + msg);
+	}
+
+	public boolean getRunStatus() {
+	    return runStatus;
 	}
 	
 	public void run() {
@@ -455,85 +572,236 @@ public class MoteLogger {
 		error("couldn't connect to " + acl.getHost() +
 		      ":" + acl.getPort());
 		e.printStackTrace();
+		this.runStatus = false;
 		return;
 	    }
 
-	    // authenticate
-	    // send the 4-byte key len in host order :-(
-	    int keylen = acl.getKeyLen();
-	    byte[] len = new byte[4];
-	    len[3] = (byte)(0xff & (keylen >> 24));
-	    len[2] = (byte)(0xff & (keylen >> 16));
-	    len[1] = (byte)(0xff & (keylen >> 8));
-	    len[0] = (byte)(0xff & keylen);
+	    int retval = 0;
+	    String msg = null;
 
-	    // now send the key (and pad its length out to 256 bytes)
-	    // aw heck, lets not pad it, who cares... capture won't...
-	    // oops, it does
-	    String key = acl.getKey();
-	    byte[] authBytes = new byte[260];
-	    byte[] oldbkey = null;
-	    try {
-		oldbkey = key.getBytes("ISO-8859-1");
-	    }
-	    catch (Exception e) {
-		e.printStackTrace();
-	    }
-	    System.arraycopy(len,0,authBytes,0,len.length);
-	    System.arraycopy(oldbkey,0,authBytes,4,oldbkey.length);
-	    for (int i = oldbkey.length + 4; i < 260; ++i) {
-		authBytes[i] = 0;
-	    }
-	    //bkey[0] = 0;
-	    //bkey[255] = 0;
-
-	    debug(4,"sending keylen " + keylen + " and key " + 
-		  key + " bytearraylen = "+key.getBytes().length +
-		  " \n  realkey = '"+new String(authBytes)+"'");
-
-	    try {
-		OutputStream out = sock.getOutputStream();
-		out.write(authBytes);
-		//out.write(bkey);
+	    if (!connectReadOnly) {
 		
-		InputStream in = sock.getInputStream();
-		byte[] rba = new byte[4];
-		int retval = 0;
+		// authenticate to the full read/write port on capture.
+		// send the 4-byte key len in host order :-(
+		int keylen = acl.getKeyLen();
+		byte[] len = new byte[4];
+		len[3] = (byte)(0xff & (keylen >> 24));
+		len[2] = (byte)(0xff & (keylen >> 16));
+		len[1] = (byte)(0xff & (keylen >> 8));
+		len[0] = (byte)(0xff & keylen);
 		
-		// make sure we get them all...
-		retval = in.read(rba);
-		while (retval < 4) {
-		    retval = in.read(rba,retval,rba.length-retval);
+		// now send the key (and pad its length out to 256 bytes)
+		// aw heck, lets not pad it, who cares... capture won't...
+		// oops, it does
+		String key = acl.getKey();
+		byte[] authBytes = new byte[260];
+		byte[] oldbkey = null;
+		try {
+		    oldbkey = key.getBytes("ISO-8859-1");
 		}
-
-		retval = rba[0];
-		retval |= rba[1] << 8;
-		retval |= rba[2] << 16;
-		retval |= rba[3] << 24;
-
-		String msg = null;
-		if (retval == 0) {
-		    msg = "success.";
+		catch (Exception e) {
+		    error("could not convert key bytes!");
+		    e.printStackTrace();
+		    this.runStatus = false;
+		    return;
 		}
-		else if (retval == 1) {
-		    msg = "capture busy.";
+		System.arraycopy(len,0,authBytes,0,len.length);
+		System.arraycopy(oldbkey,0,authBytes,4,oldbkey.length);
+		for (int i = oldbkey.length + 4; i < 260; ++i) {
+		    authBytes[i] = 0;
 		}
-		else {
-		    msg = "failure (" + retval +").";
+		//bkey[0] = 0;
+		//bkey[255] = 0;
+		
+		debug(4,"sending keylen " + keylen + " and key " + 
+		      key + " bytearraylen = "+key.getBytes().length +
+		      " \n  realkey = '"+new String(authBytes)+"'");
+		
+		try {
+		    OutputStream out = sock.getOutputStream();
+		    out.write(authBytes);
+		    //out.write(bkey);
+		    
+		    InputStream in = sock.getInputStream();
+		    byte[] rba = new byte[4];
+		    retval = -1;
+		    
+		    // make sure we get them all...
+		    retval = in.read(rba);
+		    while (retval < 4) {
+			retval = in.read(rba,retval,rba.length-retval);
+		    }
+		    
+		    retval = rba[0];
+		    retval |= rba[1] << 8;
+		    retval |= rba[2] << 16;
+		    retval |= rba[3] << 24;
+
+		    
 		}
-
-		debug(2,"result of authentication: " + msg);
-
-		if (retval != 0) {
+		catch (Exception e) {
+		    error("problem with plaintext auth for " + 
+			  acl.getVnodeName());
+		    e.printStackTrace();
+		    this.runStatus = false;
 		    return;
 		}
 	    }
-	    catch (Exception e) {
-		error("problem authenticating for " + 
-		      acl.getVnodeName());
-		e.printStackTrace();
+	    else {
+		String key = "MOTEREADER";
+		int keylen = 10;
+		byte[] len = new byte[4];
+		len[3] = (byte)(0xff & (keylen >> 24));
+		len[2] = (byte)(0xff & (keylen >> 16));
+		len[1] = (byte)(0xff & (keylen >> 8));
+		len[0] = (byte)(0xff & keylen);
+		
+		byte[] authBytes = new byte[260];
+		byte[] oldbkey = null;
+		try {
+		    oldbkey = key.getBytes("ISO-8859-1");
+		}
+		catch (Exception e) {
+		    error("could not convert key bytes!");
+		    e.printStackTrace();
+		    this.runStatus = false;
+		    return;
+		}
+		System.arraycopy(len,0,authBytes,0,len.length);
+		System.arraycopy(oldbkey,0,authBytes,4,oldbkey.length);
+		for (int i = oldbkey.length + 4; i < 260; ++i) {
+		    authBytes[i] = 0;
+		}
+
+		debug(4,"sending keylen " + keylen + " and key " + 
+		      key + " bytearraylen = "+key.getBytes().length +
+		      " \n  realkey = '"+new String(authBytes)+"'");
+		
+		try {
+		    OutputStream out = sock.getOutputStream();
+		    out.write(authBytes);
+		    out.flush();
+		}
+		catch (Exception e) {
+		    error("problem sending ssl auth hint");
+		    e.printStackTrace();
+		    this.runStatus = false;
+		    return;
+		}
+
+
+		/* now send teh real key */
+		key = acl.getKey();
+		keylen = acl.getKeyLen();
+		len = new byte[4];
+		len[3] = (byte)(0xff & (keylen >> 24));
+		len[2] = (byte)(0xff & (keylen >> 16));
+		len[1] = (byte)(0xff & (keylen >> 8));
+		len[0] = (byte)(0xff & keylen);
+
+		try {
+		    oldbkey = key.getBytes("ISO-8859-1");
+		}
+		catch (Exception e) {
+		    error("could not convert key bytes!");
+		    e.printStackTrace();
+		    this.runStatus = false;
+		    return;
+		}
+		System.arraycopy(len,0,authBytes,0,len.length);
+		System.arraycopy(oldbkey,0,authBytes,4,oldbkey.length);
+		for (int i = oldbkey.length + 4; i < 260; ++i) {
+		    authBytes[i] = 0;
+		}
+
+		debug(4,"sending keylen " + keylen + " and key " + 
+		      key + " bytearraylen = "+key.getBytes().length +
+		      " \n  realkey = '"+new String(authBytes)+"'");
+		
+		try {
+		    OutputStream out = sock.getOutputStream();
+		    out.write(authBytes);
+		    out.flush();
+
+		    InputStream in = sock.getInputStream();
+		    byte[] rba = new byte[4];
+		    retval = -1;
+		    
+		    // make sure we get them all...
+		    retval = in.read(rba);
+		    while (retval < 4) {
+			retval = in.read(rba,retval,rba.length-retval);
+		    }
+		    
+		    retval = rba[0];
+		    retval |= rba[1] << 8;
+		    retval |= rba[2] << 16;
+		    retval |= rba[3] << 24;
+		}
+		catch (Exception e) {
+		    error("problem sending ssl auth hint");
+		    e.printStackTrace();
+		    this.runStatus = false;
+		    return;
+		}
+		    
+//  		// now start up ssl
+//  		SecureRandom sr = new SecureRandom();
+//  		sr.nextInt();
+		
+//  		try {
+//  		    SSLContext sc = SSLContext.getInstance("SSL");
+//  		    sc.init(null,new TrustManager[] { new ElabTrustManager() },sr);
+		
+//  		    SSLSocketFactory sslf = (SSLSocketFactory)sc.getSocketFactory();
+//  		    ssock = (SSLSocket)sslf.createSocket(sock,acl.getHost(),
+//  							 acl.getPort(),false);
+//  		    //ssock.setUseClientMode(true);
+		    
+//  		    String[] suites = ssock.getEnabledCipherSuites();
+//  		    for (int i = 0; i < suites.length; ++i) {
+//  			debug(4,"ssl suites["+i+"] = "+suites[i]);
+//  		    }
+//  		    debug(4,"ssl needs client auth: "+ssock.getNeedClientAuth());
+		    
+//  		    ssock.startHandshake();
+		    
+//  		    System.exit(0);
+//  		}
+//  		catch (Exception e) {
+//  		    error("problem while starting up ssl");
+//  		    e.printStackTrace();
+//  		}
+		
+		
+
+	    }
+
+	    msg = null;
+	    if (retval == 0) {
+		msg = "success.";
+	    }
+	    else if (retval == 1) {
+		msg = "capture busy.";
+	    }
+	    else {
+		msg = "failure (" + retval +").";
+	    }
+	    
+	    debug(2,"result of authentication: " + msg);
+	    
+	    if (retval != 0) {
+		error("could not connect to capture!");
+		this.runStatus = false;
 		return;
 	    }
+	    
+//  	    catch (Exception e) {
+//  		error("problem authenticating for " + 
+//  		      acl.getVnodeName());
+//  		e.printStackTrace();
+//  		return;
+//  	    }
 
 	    // read packets forever:
 	    LogPacket lp = null;
@@ -544,6 +812,7 @@ public class MoteLogger {
 	    }
 	    catch (Exception e) {
 		e.printStackTrace();
+		this.runStatus = false;
 		return;
 	    }
 
