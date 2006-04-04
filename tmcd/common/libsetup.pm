@@ -20,7 +20,7 @@ use Exporter;
 	 TBBackGround TBForkCmd vnodejailsetup plabsetup vnodeplabsetup
 	 jailsetup dojailconfig findiface libsetup_getvnodeid 
 	 ixpsetup libsetup_refresh gettopomap getfwconfig gettiptunnelconfig
-	 gettraceconfig genhostsfile
+	 gettraceconfig genhostsfile getmotelogconfig
 
 	 TBDebugTimeStamp TBDebugTimeStampsOn
 
@@ -1007,6 +1007,36 @@ sub gettiptunnelconfig($)
 	}
     }
     @$rptr = @tiptunnels;
+    return 0;
+}
+
+#
+# Get motelog configuration.
+#
+sub getmotelogconfig($)
+{
+    my ($rptr)   = @_;
+    my @motelogs = ();
+
+    if (tmcc(TMCCCMD_MOTELOG, undef, \@tmccresults) < 0) {
+	warn("*** WARNING: Could not get motelog config from server!\n");
+	return -1;
+    }
+
+    my $pat  = q(MOTELOGID=([-\w]+) CLASSFILE=([\.]+) SPECFILE=([\.]*));
+
+    foreach my $str (@tmccresults) {
+	if ($str =~ /$pat/) {
+	    push(@motelogs, { "MOTELOGID" => $1,
+			      "CLASSFILE" => $2,
+			      "SPECFILE"  => $3
+			    });
+	}
+	else {
+	    warn("*** WARNING: Bad motelog line: $str\n");
+	}
+    }
+    @$rptr = @motelogs;
     return 0;
 }
 
