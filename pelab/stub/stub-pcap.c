@@ -72,6 +72,7 @@ void throughputInit(ThroughputAckState * state, unsigned int sequence,
     state->beginTime = *firstTime;
     state->endTime = *firstTime;
     state->isValid = 1;
+    state->fullAckSize = 0;
   }
 }
 
@@ -104,7 +105,7 @@ void throughputProcessSend(ThroughputAckState * state, unsigned int sequence,
 
 // Notify the throughput monitor that some bytes have been acknowledged.
 void throughputProcessAck(ThroughputAckState * state, unsigned int sequence,
-			  struct timeval const * timestamp)
+			  struct timeval const * timestamp, unsigned int pktsize)
 {
   if (! state->isValid) {
       printf("throughputProcessAck() called with invalid state\n");
@@ -115,12 +116,13 @@ void throughputProcessAck(ThroughputAckState * state, unsigned int sequence,
     state->ackSize += sequence - state->firstUnknown + 1;
     state->firstUnknown = sequence + 1;
   }
+  state->fullAckSize += pktsize;
 }
 
 // How many bytes have been acknowledged since the last call to
 // throughputTick()?
 unsigned int bytesThisTick(ThroughputAckState * state) {
-    return state->ackSize;
+    return state->fullAckSize; //ackSize;
 }
 
 // What is the bandwidth of the acknowledged bytes since the last call to
@@ -139,7 +141,8 @@ unsigned int throughputTick(ThroughputAckState * state)
   }
   else
   {
-      result = (state->ackSize * 8.0) / (divisor * 1000.0);
+      result = (state->fullAckSize * 8.0) / (divisor * 1000.0);
+      //result = (state->ackSize * 8.0) / (divisor * 1000.0);
   }
 //  printf("ByteCount: %u\n", state->ackSize);
 //  printf("UnAck ByteCount: %i (%i - %i)\n",
@@ -148,6 +151,7 @@ unsigned int throughputTick(ThroughputAckState * state)
   state->ackSize = 0;
   state->repeatSize = 0;
   state->beginTime = state->endTime;
+  state->fullAckSize = 0;
   return (unsigned int) result;
 }
 
@@ -206,7 +210,7 @@ void init_sniff_rcvdb(void) {
   }
 }
 
-int push_sniff_rcvdb(int path_id, u_long start_seq, u_long end_seq, const struct timeval *ts){
+int push_sniff_rcvdb(int path_id, u_long start_seq, u_long end_seq, const struct timeval *ts, unsigned int pkt_size){
   struct in_addr addr;
   sniff_path *path;
   int next;
@@ -221,6 +225,7 @@ int push_sniff_rcvdb(int path_id, u_long start_seq, u_long end_seq, const struct
   }
   path->records[next].seq_start = start_seq;
   path->records[next].seq_end   = end_seq;
+  path->records[next].pkt_size  = pkt_size;
   path->records[next].captime.tv_sec  = ts->tv_sec;
   path->records[next].captime.tv_usec = ts->tv_usec;
   path->end=nnmod(next+1, SNIFF_WINSIZE);
@@ -241,18 +246,35 @@ int search_sniff_rcvdb(int path_id, u_long seqnum) {
   return -1;
 }
 
-void pop_sniff_rcvdb(int path_id, u_long to_seqnum){
-  int to_index = search_sniff_rcvdb(path_id, to_seqnum);
+
+unsigned int pop_sniff_rcvdb(int path_id, u_long to_seqnum){
+  int pre_index, to_index, acked_size=0, partial_pkt_size=0;
+  ulong new_seqnum;
+
+  to_index  = search_sniff_rcvdb(path_id, to_seqnum);
+
   if (to_index != -1) {
+    pre_index = sniff_rcvdb[path_id].start;
+
     //if the packet has no payload or the last sent seqnum equals the pop number
     if ((sniff_rcvdb[path_id].records[to_index].seq_end==sniff_rcvdb[path_id].records[to_index].seq_start) 
       || (((unsigned long)(sniff_rcvdb[path_id].records[to_index].seq_end-1)) == to_seqnum)) {
       sniff_rcvdb[path_id].start = nnmod(to_index+1, SNIFF_WINSIZE); //complete pop-up 
     } else {
       sniff_rcvdb[path_id].start = to_index; //partial pop-up
-      sniff_rcvdb[path_id].records[to_index].seq_start = ((unsigned long)(to_seqnum+1));
+      new_seqnum = to_seqnum+1; //PAW
+      partial_pkt_size = new_seqnum -  sniff_rcvdb[path_id].records[to_index].seq_start; //PAW
+      sniff_rcvdb[path_id].records[to_index].seq_start = new_seqnum;
     }
-  }
+
+    while (pre_index != sniff_rcvdb[path_id].start ) {
+      acked_size += sniff_rcvdb[path_id].records[pre_index].pkt_size;
+      pre_index = nnmod(pre_index+1, SNIFF_WINSIZE);
+    }
+    acked_size += partial_pkt_size;
+  } //if
+
+  return acked_size;
 }
 
 /* looking at ethernet headers */
@@ -282,8 +304,9 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
   u_long  seq_start, seq_end, ack_seq, ip_src, ip_dst;
   unsigned short source_port = 0;
   unsigned short dest_port = 0;
-  int path_id, record_id, msecs, end, flag_resend=0;
+  int path_id, record_id, msecs, end;
   sniff_path *path;
+  unsigned int acked_size, tmpuint;
 //  struct in_addr debug_addr;
 
   /* jump pass the ethernet header */
@@ -377,35 +400,31 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	if (path->end == path->start){ //no previous packet
 	  throughputInit(&throughput[path_id], seq_start, &(pkthdr->ts));
 	  throughputProcessSend(&throughput[path_id], seq_start, length);
-	  return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet	
+	  return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts), pkthdr->len); //new packet
 	} else {
 	  throughputProcessSend(&throughput[path_id], seq_start, length);
 	  //find the real received end index
 	  end  = nnmod(path->end-1, SNIFF_WINSIZE);
 
-	  /* Note: we use flag_resend to igore resend-affected-packets in the delay estimation 
-	   * because TCP don't use them to calculate the sample RTT in the RTT estimation */
-
 	  //if the packet has no payload
 	  if (seq_end == seq_start) {
 	    if ((path->records[end].seq_end==path->records[end].seq_start) &&  (path->records[end].seq_end==seq_end)) {
-	      //the last packet also has no payload and has the same seqnum
-	      flag_resend = 1; //pure resent
+	      //the last packet also has no payload and has the same seqnum, pure resent
 	      loss_records[path_id].loss_counter++;
 	      fprintf(loss_log, "Resent: %lu\n",seq_end); //loss log
 	      fflush(loss_log); //loss log
 	    } else { 
-	      return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts)); //new packet
+	      return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts), pkthdr->len); //new packet
 	    }	  
 	  } else if (seq_start >= path->records[end].seq_end) { //new packet
-	    return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts));
+	    return push_sniff_rcvdb(path_id, seq_start, seq_end, &(pkthdr->ts), pkthdr->len);
 	  } else { //resend
-            flag_resend = 1;
             loss_records[path_id].loss_counter++;
 	    if (seq_end > path->records[end].seq_end){ //partial resend
 	      fprintf(loss_log, "Resent: %lu to %lu\n",seq_start, path->records[end].seq_end-1); //loss log
 	      fflush(loss_log); //loss log
-	      return push_sniff_rcvdb(path_id, path->records[end].seq_end+1, seq_end, &(pkthdr->ts));
+              tmpuint = pkthdr->len - (path->records[end].seq_end-seq_start);
+              return push_sniff_rcvdb(path_id, path->records[end].seq_end, seq_end, &(pkthdr->ts), tmpuint);
 	    }
 	    fprintf(loss_log, "Resent: %lu to %lu\n",seq_start, seq_end-1); //loss log
 	    fflush(loss_log); //loss log
@@ -430,23 +449,22 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 	}
 	if (path_id != -1) { //a monitored incoming packet
 	  if (ack_bit == 1) { //has an acknowledgement
-	    ack_seq  = ntohl(tp->ack_seq);	   
-
-	    throughputProcessAck(&throughput[path_id], ack_seq, &(pkthdr->ts));
+            ack_seq    = ntohl(tp->ack_seq);
+            acked_size = 0;
 
 	    record_id = search_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1));
+           /* Note: we use the in-flight widnow to igore the duplicate Acks in the delay estimation
+            * because TCP don't use them to calculate the sample RTT in the RTT estimation */
 	    if (record_id != -1) { //new ack received
-	      if (flag_resend) { //if the ack is triggered by a resend, skip the delay calculation.
-		flag_resend = 0; 
-	      } else { //calculate the delay
-		int delay = 0;
-	        int bandwidth = 0;
-		int goodput = 0;
-		struct tcp_info info;
-		msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
-		delay = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
-		if (delay != 0)
-		{
+              int delay = 0;
+	      int bandwidth = 0;
+	      int goodput = 0;
+	      struct tcp_info info;
+
+              msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
+              delay = (pkthdr->ts.tv_sec-sniff_rcvdb[path_id].records[record_id].captime.tv_sec)*1000 + msecs;
+	      if (delay != 0)
+	      {
 		delays[path_id] += delay;
 		(delay_count[path_id])++;
 		if (delay < base_rtt[path_id])
@@ -455,39 +473,42 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		}
 		if (is_live && delay_count[path_id] > 0)
 		{
-		    int info_size = sizeof(info);
-		    int error = getsockopt(rcvdb[path_id].sockfd,
-					   SOL_TCP, TCP_INFO, &info,
-					   &info_size);
-		    if (error == -1)
-		    {
-			perror("getsockopt() TCP_INFO");
-			clean_exit(1);
-		    }
-		    bandwidth = (info.tcpi_snd_cwnd * info.tcpi_snd_mss)
-			/ base_rtt[path_id];
-		    if (bandwidth > max_throughput[path_id])
-		    {
-			max_throughput[path_id] = bandwidth;
-		    }
-		    goodput = throughputTick(&throughput[path_id]);
-		    logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
-		    logWrite(DELAY_DETAIL, NULL, "Throughput: %lu", bandwidth);
-		    logWrite(DELAY_DETAIL, NULL, "Congestion Window Size: %lu",
-			     info.tcpi_snd_cwnd);
-		    logWrite(DELAY_DETAIL, NULL, "Sending MSS: %lu",
-			     info.tcpi_snd_mss);
-		    logWrite(DELAY_DETAIL, NULL, "Base RTT: %lu",
-			     base_rtt[path_id]);
-		}
-//		append_delay_sample(path_id, delay, &(pkthdr->ts));
+		  int info_size = sizeof(info);
+		  int error = getsockopt(rcvdb[path_id].sockfd,
+					 SOL_TCP, TCP_INFO, &info,
+					 &info_size);
+		  if (error == -1)
+		  {
+		    perror("getsockopt() TCP_INFO");
+		    clean_exit(1);
+		  }
+		  bandwidth = (info.tcpi_snd_cwnd * info.tcpi_snd_mss)
+		    / base_rtt[path_id];
+		  if (bandwidth > max_throughput[path_id])
+		  {
+		    max_throughput[path_id] = bandwidth;
+		  }
+		  goodput = throughputTick(&throughput[path_id]);
+		  logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
+		  logWrite(DELAY_DETAIL, NULL, "Throughput: %lu", bandwidth);
+		  logWrite(DELAY_DETAIL, NULL, "Congestion Window Size: %lu",
+			   info.tcpi_snd_cwnd);
+		  logWrite(DELAY_DETAIL, NULL, "Sending MSS: %lu",
+			   info.tcpi_snd_mss);
+		  logWrite(DELAY_DETAIL, NULL, "Base RTT: %lu",
+			   base_rtt[path_id]);
+		} 
+		//append_delay_sample(path_id, delay, &(pkthdr->ts));
 		logWrite(DELAY_DETAIL, &(pkthdr->ts),
 			 "Delay: %lu, Sum: %lu, Count: %lu", delay,
 			 delays[path_id], delay_count[path_id]);
 	      }
-	      }
-	      pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
+
+              acked_size = pop_sniff_rcvdb(path_id, (unsigned long)(ack_seq-1)); //advance the sniff window base
 	    } //ack in rcvdb
+
+            throughputProcessAck(&throughput[path_id], ack_seq, &(pkthdr->ts), acked_size);
+
 	  } //has ack
 	} //if incoming
       } //if outgoing

@@ -86,6 +86,7 @@ typedef struct {
   struct timeval captime;
   unsigned long  seq_start;
   unsigned long  seq_end;
+  unsigned int   pkt_size;
 } sniff_record;
 typedef struct {
   sniff_record records[SNIFF_WINSIZE];
@@ -140,6 +141,7 @@ typedef struct
   unsigned int firstUnknown;
   unsigned int nextSequence;
   unsigned int ackSize;
+  unsigned int fullAckSize; //full packet size
   unsigned int repeatSize;
   struct timeval beginTime;
   struct timeval endTime;

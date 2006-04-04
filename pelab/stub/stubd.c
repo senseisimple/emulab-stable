@@ -570,21 +570,21 @@ int send_delay_to_monitor(int monitor, int index)
   unsigned long delay = 0;
   unsigned long tmpulong;
 
-//  delay = delays[index];
-//  if (delay_count[index] > 0)
-//  {
-//      delay /= delay_count[index];
-//  }
-//  else
-//  {
-//      delay = last_delays[index];
-//  }
-
-  delay = base_rtt[index];
-  if (delay_count[index] == 0)
+  delay = delays[index];
+  if (delay_count[index] > 0)
   {
-      delay = 0;
+      delay /= delay_count[index];
   }
+  else
+  {
+      delay = last_delays[index];
+  }
+
+  //  delay = base_rtt[index];
+  //  if (delay_count[index] == 0)
+  //{
+  //    delay = 0;
+  //}
 
   // If measurement changed since last send
 //  if (abs((long)delays[index] - (long)last_delays[index])
@@ -650,8 +650,8 @@ int send_bandwidth_to_monitor(int monitor, int index)
   int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
   char outbuf[buffer_size];
   unsigned long code = htonl(CODE_BANDWIDTH);
-//  unsigned long bandwidth = throughputTick(&throughput[index]);
-  unsigned long bandwidth = max_throughput[index];
+  unsigned long bandwidth = throughputTick(&throughput[index]);
+  //unsigned long bandwidth = max_throughput[index];
 
   if (bandwidth != 0) {
     // Insert the address info
