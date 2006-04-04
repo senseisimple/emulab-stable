@@ -25,7 +25,8 @@ function logit () {
     echo "$msg"
 }
 
-logit "Entering rc.firstboot"
+logit "----------------------------------------------------------------"
+logit "Entering rc.firstboot $*"
 
 # Enable WINDOWS() in libsetup.pm .
 iscygwin=/etc/emulab/iscygwin
@@ -39,18 +40,23 @@ chmod -f g-w /etc/emulab
 # by the cached info from tmcd.  Clean up like bootsetup()/tmccclrconfig().
 rm -rf /var/emulab/boot/tmcc
 
-# Special case while running "rc.firstboot -mini" from cmdlines.txt under
+# Capture the hostname early on, for use later.  This avoids confusion in the
+# case where we are going to the same node as the image was saved from.
+hostname=`/bin/hostname`
+
+# Special case while running "rc.firstboot -mini" from Cmdlines.txt under
 # Mini-Setup after Sysprep.
-if ( "$#" == 1 && "$1" == "-mini" ) then
+if [ "$#" == 1 ] && [ "$1" == "-mini" ]; then
     mini=1
 
     # Record the network interface state.
-    logit "================  Mini-Setup network state  ================"
+    logit "================  Mini-Setup network state"
+    logit "id "`id`
     ipconfig /all >> $logfile
     getmac >> $logfile
     ipconfig /all
     getmac
-    logit "============================================================"
+    logit "================"
 
     # The network is set up but not running yet, so we can't contact tmcc to
     # find out the host name.
@@ -64,16 +70,22 @@ if ( "$#" == 1 && "$1" == "-mini" ) then
     # Worst case, if the majority of the NICs on the node have been moved
     # since the image was made, the static table will be wrong and we'll still
     # have to change the hostname and reboot again.
-    nodeid=
-    intfcmap=/var/emulab/boot/intfcmap macs=/var/emulab/boot/macs
+    nodeid= intfcmap=/var/emulab/boot/intfcmap 
     if [[ -r $intfcmap && -s $intfcmap ]]; then
+        # We're running as SYSTEM under Mini-Setup.  Can't write /var/emulab/boot.
+        macs=/tmp/macs
+
+        # Grab the MAC addresses from ipconfig, without dashes and lowercased.
         ipconfig /all | tr -d '\r' | grep 'Physical Address' |\
             sed -e 's/.*: //' -e 's/-//g' -e 'y/ABCDEF/abcdef/' > $macs
-        # NIC's may have been moved, take a majority vote.
+
+        # NIC's may have been physically moved, take a majority vote.
         for intfc in `cat $macs`; do grep $intfc $intfcmap; done | \
-        cut -d ' ' -f 1 | uniq -c | sort -rn | tr -s ' ' > $macs.pc
-        logit "Mac addresses "`cat $macs`
-        logit "Node id votes "`cat $macs.pc`
+            cut -d ' ' -f 1 | uniq -c | sort -rn | tr -s ' ' > $macs.pc
+
+        logit "Mac addresses `cat $macs`"
+        logit "Node id votes `cat $macs.pc`"
+
         nodeid=`cut -d ' ' -f 3 $macs.pc | head -1`
         if [ "$nodeid" != "" ]; then
             logit "Node id = $nodeid"
@@ -152,12 +164,12 @@ regtool -s set /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/CleanWMP \
   'DEL "%USERPROFILE%\Desktop\Windows Media Player.lnk"'
 
 # Reset the host name if it hasn't been done yet.  Requires a reboot.
-hostname=`/bin/hostname`
 host="Host name '$hostname'"
-if [ $nodeid = $hostname ]; then
+# Sysprep generates a temporary host name, so always do it under -mini.
+if [[ $nodeid = $hostname && -z "$mini" ]]; then
     logit "$host matches nodeid '$nodeid'."
 else
-    logit "$host differs from nodeid '$nodeid'."
+    logit "$host will be reset to nodeid '$nodeid'."
 
     # Mash the hostname in all the places it shows up in the registry.
     regtool set -s $tp/Hostname $nodeid
@@ -168,7 +180,13 @@ else
     regtool set -s $svcs/Eventlog/$cn $NODEID
 
     logit "Rebooting as '$nodeid'/'$NODEID'."
-    /usr/local/etc/emulab/rc/rc.reboot
+    if [ -n "$mini" ]; then 
+        # Under Mini-Setup/Cmdlines.txt, it's going to reboot as soon as we exit.
+        logit "Returning to Mini-Setup/Cmdlines.txt ."
+        exit
+    else
+        /usr/local/etc/emulab/rc/rc.reboot
+    fi
 fi
 
 logit "rc.firstboot finished."
