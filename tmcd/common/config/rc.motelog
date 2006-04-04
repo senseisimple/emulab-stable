@@ -1,0 +1,353 @@
+#!/usr/bin/perl -w
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2005 University of Utah and the Flux Group.
+# All rights reserved.
+#
+use English;
+use Getopt::Std;
+use POSIX qw(setsid);
+
+sub usage()
+{
+    print "Usage: " .
+	scriptname() . "boot|shutdown|reconfig|reset\n";
+    exit(1);
+}
+my $action  = "boot";
+
+# Turn off line buffering on output
+$| = 1;
+
+# Drag in path stuff so we can find emulab stuff.
+BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
+
+# Only root.
+if ($EUID != 0) {
+    die("*** $0:\n".
+	"    Must be root to run this script!\n");
+}
+
+#
+# Load the OS independent support library. It will load the OS dependent
+# library and initialize itself. 
+# 
+use libsetup;
+use libtmcc;
+use librc;
+
+#$MY_MYSQL = "/etc/init.d/mysqld_local";
+
+$TBMOTELOG_DIR = "/var/emulab/motelog";
+$TBMOTELOG_FILES_DIR = "$TBMOTELOG_DIR/loggerfiles";
+$TBMOTELOG_DB_DIR = "/opt/mysql/var/lib";
+$TBMOTELOG_REMOTE_DB_DIR = "/proj/%s/motelog/db";
+
+$LOGGER = "/usr/local/etc/emulab/motelogd";
+# XXX: to pass in a tag from the ns file, gotta specify it through here...
+#$LOGGER_ARGS = "-i %s -C $TBMOTELOG_FILES_DIR -r ";
+
+my ($pid,$eid,$vname) = check_nickname();
+
+#
+# Not all clients support this.
+#
+ exit(0)
+    if (MFS() || PLAB() || JAILED() || WINDOWS() || REMOTE());
+
+# Protos.
+sub doboot();
+sub doshutdown();
+sub doreconfig();
+sub docleanup();
+sub CopySingleFile($$);
+
+# Allow default above.
+if (@ARGV) {
+    $action = $ARGV[0];
+}
+
+# Execute the action.
+SWITCH: for ($action) {
+    /^boot$/i && do {
+	doboot();
+	last SWITCH;
+    };
+    /^shutdown$/i && do {
+	doshutdown();
+	last SWITCH;
+    };
+    /^reconfig$/i && do {
+	doreconfig();
+	last SWITCH;
+    };
+    /^reset$/i && do {
+	docleanup();
+	last SWITCH;
+    };
+    fatal("Invalid action: $action\n");
+}
+exit(0);
+
+#
+# Boot Action.
+#
+sub doboot()
+{
+    my $retval;
+    my @motelogids = ();
+    my ($src,$dst);
+
+    # first, check the config, see if there's anything for us to do...
+    if (getmotelogconfig(\@motelogids)) {
+	fatal("Could not get motelog configuration from libsetup!\n");
+    }
+
+    # check and see if there is anything to do...
+    if (!scalar(@motelogids)) {
+	return;
+    }
+    
+    print STDOUT "Setting up motelogging for $vname\n";
+
+    # now that we know we have to do something, first must stop mysql.
+    $retval = system("/etc/init.d/mysqld_local stop");
+    if ($retval) {
+	# something's wrong... for now, ignore.
+
+	# try to see if any mysqld processes are running...
+	my @retlines = `ps ax | grep mysqld`;
+	my $bad = 0;
+	if (scalar(@retlines)) {
+	    foreach $line (@retlines) {
+		if (!($line =~ /grep\s+mysqld/)) {
+		    ++$bad;
+		}
+	    }
+	}
+	if ($bad) {
+	    warn("**** WARNING: there is already a mysqld running on $vname;" .
+		 " this may interfere with motelogging.\n");
+	}
+	else {
+	    warn("**** WARNING: could not stop mysql_local on $vname; " . 
+		 "no other mysqlds running, should be fine\n");
+	}
+    }
+
+    # make file dirs.
+    $retval = system("mkdir -p $TBMOTELOG_FILES_DIR");
+
+    if ($retval) {
+	fatal("Could not store local copies of motelog files on $vname\n");
+    }
+
+    # now copy any classfiles/specfiles over that we have:
+    foreach $m (@motelogids) {
+	my %h = %$m;
+	my $id = "", $classfile = "", $specfile = "";
+	
+	if (defined($h{"MOTELOGID"})) {
+	    $id = $h{"MOTELOGID"};
+	}
+	if (defined($h{"CLASSFILE"})) {
+	    $classfile = $h{"CLASSFILE"};
+	}
+	if (defined($h{"SPECFILE"})) {
+	    $specfile = $h{"SPECFILE"};
+	}
+
+	if ($id eq "" || $classfile eq "") {
+	    fatal("Invalid motelog data from tmcc!\n");
+	}
+
+	## otherwise try to copy files...
+	$src = $classfile;
+	$dst = "$TBMOTELOG_FILES_DIR/$id.class";
+	if (CopySingleFile($src,$dst)) {
+	    fatal("Could not copy classfile for '$id'!\n");
+	}
+
+	# first classfile
+
+	if ($specfile ne "") {
+	    # specfile too
+	    $src = $classfile;
+	    $dst = "$TBMOTELOG_FILES_DIR/$id.spec";
+	    if (CopySingleFile($src,$dst)) {
+		fatal("Could not copy specfile for '$id'!\n");
+	    }
+	}
+    }
+
+    # copy over the db files:
+    # we use rsync for this... that way, there's no tarballs being maintained
+    # on users.emulab, and also the user can easy grab the mysql table files
+    # for offline use.
+    $src = sprintf($TBMOTELOG_REMOTE_DB_DIR,$pid);
+    $dst = $TBMOTELOG_DB_DIR;
+
+    my $cmd = "rsync -avz $src/ $dst/";
+
+    # flip to the user's real id as protection...
+    $retval = system($cmd);
+    if ($retval) {
+	fatal("Could not copy motelog db files for $vname!\n");
+    }
+
+    # restart mysql
+    $retval = system("/etc/init.d/mysqld_local start");
+    if ($retval) {
+	# something's wrong... for now, ignore.
+	warn("**** WARNING: could not start mysql_local for motelog\n");
+    }
+    
+    # start up the java logger:
+    # writes pid to /var/run/motelogd.pid
+    $retval = system("$LOGGER");
+
+    if ($retval) {
+	fatal("Could not start motelogger for $vname!\n");
+    }
+
+    print STDOUT "Motelogger started on $vname\n";
+
+    return;
+}
+
+#
+# Shutdown Action.
+#
+sub doshutdown()
+{
+    my $retval;
+    my @motelogids = ();
+
+    # first, check the config, see if there's anything for us to do...
+    if (getmotelogconfig(\@motelogids)) {
+	fatal("Could not get motelog configuration from libsetup!\n");
+    }
+
+    # check and see if there is anything to do...
+    if (!scalar(@motelogids)) {
+	return;
+    }
+    
+    print STDOUT "Stopping motelogging for $vname\n";
+
+    # kill the logger...
+    if (-e "/var/run/motelogger.pid") {
+	system("kill `cat /var/run/motelogd.pid`");
+	unlink("/var/run/motelogd.pid");
+    }
+    
+    # shutdown mysql:
+    $retval = system("/etc/init.d/mysqld_local stop");
+    if ($retval) {
+	# something's wrong... for now, ignore.
+
+	# try to see if any mysqld processes are running...
+	my @retlines = `ps ax | grep mysqld`;
+	my $bad = 0;
+	if (scalar(@retlines)) {
+	    foreach $line (@retlines) {
+		if (!($line =~ /grep\s+mysqld/)) {
+		    ++$bad;
+		}
+	    }
+	}
+	if ($bad) {
+	    warn("**** WARNING: there is already a mysqld running on $vname;" .
+		 " this may interfere with motelogging.\n");
+	}
+	else {
+	    warn("**** WARNING: could not stop mysql_local on $vname; " . 
+		 "no other mysqlds running, should be fine\n");
+	}
+    }
+
+    # copy the db files back to ops:
+    my $dst = sprintf($TBMOTELOG_REMOTE_DB_DIR,$pid);
+    my $src = $TBMOTELOG_DB_DIR;
+
+    my $cmd = "rsync -avz $src/ $dst/";
+
+    $retval = system($cmd);
+    if ($retval) {
+	fatal("Could not copy motelog db files for $vname!\n");
+    }
+
+    return;
+}
+
+#
+# Node Reconfig Action (without rebooting).
+#
+sub doreconfig()
+{
+    # Shutdown tunnels before doing reconfig.
+    doshutdown();
+    return doboot();
+}
+
+#
+# Node cleanup action (node is reset to completely clean state).
+#
+sub docleanup()
+{
+}
+
+#
+# Copy a single file over NFS, best we can.  Guts from os/install-tarfile.
+#
+sub CopySingleFile($$) {
+    my ($src,$dst) = @_;
+    
+    open(SRC, "< $src")
+	or fatal("Could not open '$src' over nfs!\n");
+    
+    binmode SRC;
+    
+    #
+    # Open the target file and start dumping the data in.
+    #
+    open(DST, "> $dst")
+	or fatal("Could not open local file '$dst': $!\n");
+    
+    binmode DST;
+    
+    #
+    # Deal with NFS read failures
+    #
+    my $foffset = 0;
+    my $retries = 5;
+    
+    while ($bytelen) {
+	my $rlen = sysread(SRC, $buf, 8192);
+	
+	if (! defined($rlen)) {
+	    #
+	    # If we are copying the file via NFS, retry a few times
+	    # on error to avoid the changing-exports-file server problem.
+	    if ($retries > 0 && sysseek(SRC, $foffset, 0)) {
+		warn("*** WARNING retrying read of '$src' ".
+		     "at offset $foffset\n");
+		$retries--;
+		sleep(2);
+		next;
+	    }
+	    fatal("Error reading src file '$src': $!\n");
+	}
+	if ($rlen == 0) {
+	    last;
+	}
+	if (! syswrite(DST, $buf)) {
+	    fatal("Error writing dst file '$dst': $!\n");
+	}
+	$foffset += $rlen;
+	$bytelen -= $rlen;
+	$retries = 5;
+    }
+    close(DST);
+    close(SRC);
+}
