@@ -24,6 +24,7 @@ public class SQLGenerator {
     private String[] tableCreates;
     // view creates... reduces number of tables and data dup.
     private String[] viewCreates;
+    private String[][] arrayViewCreates;
 
     // data insert preparedStatement strings
     private String[] inserts;
@@ -146,11 +147,13 @@ public class SQLGenerator {
 	    // simple, n-table layout with two views; one master table.
 	    int numTables = 1 + arrayFields.length;
 	    int tableIdx = 1;
+	    int arrayViewIdx = 0;
 
 	    tableCreates = new String[numTables];
 	    inserts = new String[numTables];
 	    insertInfo = new ArrayList[numTables];
 	    
+	    // one for our view; one for motelab's
 	    viewCreates = new String[2];
 
 	    // main table
@@ -166,8 +169,37 @@ public class SQLGenerator {
 	    inserts[0] = "insert into " + tableName + 
 		" values (NULL,?," + this.amType + ",?";
 
-	    //viewCreates[0] = "" +
-	    //"CREATE VIEW IF NOT EXISTS " + ZZZZZZZZZZZZZZZZZZZZz
+	    // XXX: for views, we don't have IF NOT EXISTS syntax;
+	    // in fact, the create will silently fail if we don't specify
+	    // OR REPLACE; if we do, then the view is replaced.
+	    // frankly, I don't feel that we can replace a view without
+	    // replacing the tables it depends on... thus, we need some
+	    // code to check if a table that we are going to use again
+	    // still matches the packet fields!!!
+
+	    // do the motelab view:
+	    viewCreates[0] = "" +
+		"CREATE VIEW " + className + "_motelab_" + tag +
+		" as SELECT * FROM " + tableName;
+
+	    // start our better one!
+	    viewCreates[1] = "" + 
+		"CREATE VIEW " + className + "_" + tag +
+		" as SELECT id,time,amType,srcMote";
+	    // we have to build up a separate string of joins, unfortunately.
+	    // this string will get appended to viewCreates[1] later.
+	    String joinStr = " ";
+
+	    // setup the other views:
+	    // we don't know the dimensions of each array, so we simply 
+	    // create a 2-d array.  The second dimension is a list of all
+	    // the field-specific views we need for the hierarchy.
+	    // we must always have one view named 
+	    // className + "__" + fieldName + "__" + v1 + "_" + tag
+	    // that has fields ppid and fieldName... so that we can
+	    // left join the main table to all array tables on the ppid=id
+	    // condition
+	    arrayViewCreates = new String[arrayFields.length][];
 
 	    insertInfo[0] = new ArrayList();
 	    insertInfo[0].add( new String[] { "date",null,null } );
@@ -211,6 +243,10 @@ public class SQLGenerator {
 			    ma[i].getName(),
 			    ma[i].getReturnType().getName(),
 			    getSQLTypeStr(ma[i],signMethod,false) } );
+
+			// add this field to the main view create (the non-
+			// motelab one)
+			viewCreates[1] += "," + mnSansGet;
 		    }
 		    else {
 			// now, IF we have an array, we create a separate 
@@ -218,36 +254,142 @@ public class SQLGenerator {
 			// structs get flattened out for now; we solve the 
 			// hierarchy problem as best we can via views.
 			
+			// get number dims:
+			String fieldName = ma[i].getName().replaceAll("get_","");
+			Method dm = this.classInfo.getMethod("numDimensions_" +
+							     fieldName,
+							     null);
+
+			int nDims = ((Integer)dm.invoke(null,null)).intValue();
+
 			// we add the table now:
 			String aTableName = className + "__" + mnSansGet + 
 			    "__data_" + tag;
 			tableCreates[tableIdx] = "" +
 			    "CREATE TABLE IF NOT EXISTS " + aTableName + 
 			    " (" + "id INT PRIMARY KEY AUTO_INCREMENT," +
-			    "ppid INT NOT NULL, " +
-			    "idx INT NOT NULL, " +
-			    "" + mnSansGet + " " + internalArraySQLType + 
-			    ")";
+			    "ppid INT NOT NULL";
 
 			inserts[tableIdx] = "" + 
 			    "insert into " + aTableName + " values (NULL," + 
-			    "?,?,?)";
+			    "?";
 			
+			for (int k = 0; k < nDims; ++k) {
+			    tableCreates[tableIdx] += ",idx" + (k+1) + 
+				" INT NOT NULL";
+			    inserts[tableIdx] += ",?";
+			}
+
+			tableCreates[tableIdx] += "," + mnSansGet + " " + 
+			    internalArraySQLType + ")";
+			inserts[tableIdx] += ",?)";
+
 			insertInfo[tableIdx] = new ArrayList();
 			//   [ getMethodName, returnType, SQLType ]
 			insertInfo[tableIdx].add( new String[] {
 			    "ppid",null,null } );
 
-			insertInfo[tableIdx].add( new String[] {
-			    "idx",null,null } );
-			    
+			for (int k = 0; k < nDims; ++k) {
+			    insertInfo[tableIdx].add( new String[] {
+				    "idx"+(k+1),null,null } );
+			}
+
 			insertInfo[tableIdx].add( new String[] {
 			    ma[i].getName(),
 			    ma[i].getReturnType().getName(),
 			    internalArraySQLType } );
 
-			++tableIdx;
 
+			// add to the viewCreates:
+			// the top-level view for this array:
+			String topLevelArrayViewName = "" + className + "__" + 
+			    fieldName + "__" + "v1" + "_" + tag;
+
+			viewCreates[1] += "," + topLevelArrayViewName + 
+			    "." + fieldName;
+
+			// add to the join string:
+			joinStr += " left join " + topLevelArrayViewName + 
+			    " on " +
+			    "id="+topLevelArrayViewName+"." + "ppid";
+
+			// now add a complete view hierarchy for this
+			// array:
+			arrayViewCreates[arrayViewIdx] = new String[nDims];
+
+			String baseViewName = className + "__" + fieldName +
+			    "__" + "v";
+			String baseViewNameEnd = "_" + tag;
+
+			// for the first view, we want to pull right out
+			// of the main table; after that, we must pull 
+			// from the most recently created VIEW
+			String currentTableToSelectFromInView = aTableName;
+
+			for (int k = nDims; k > 0; --k) {
+			    String fullViewName = baseViewName + "" + k +
+				baseViewNameEnd;
+			    // this is the fields we select from the table:
+			    String str1 = "ppid";
+			    // this is for an order by inside the group_concat
+			    String str2 = "ppid";
+			    // this is for the group by stmt for the 
+			    // group_concat; it is the field-reverse of
+			    // str1
+			    String str3;
+			    if (nDims-1 == 0) {
+				str3 = "";
+			    }
+			    else {
+				str3 = "idx" + (nDims-1);
+			    }
+
+			    int k2;
+			    for (k2 = 1; k2 < k; ++k2) {
+				str1 += ",idx" + k2;
+				str2 += ",idx" + k2;
+
+				if (str3 == null) {
+				    str3 = "idx" + (nDims-k2);
+				}
+				else {
+				    str3 += ",idx" + (nDims-k2);
+				}
+			    }
+
+			    // finish off str2; it has to be one idx longer
+			    // to get the ordering correct in the group_concat
+			    str2 += ",idx" + k2;
+
+			    // finish off str3 with ppid:
+			    if (str3.equals("")) {
+				str3 = "ppid";
+			    }
+			    else {
+				str3 += ",ppid";
+			    }
+
+			    // now create view at this level:
+			    String tmp = "CREATE VIEW " + fullViewName + 
+				" as SELECT " + str1 + ",concat('['," + 
+				"group_concat(" + fieldName + " order by " +
+				str2 + " separator ','),']') as " + fieldName +
+				" from " + currentTableToSelectFromInView +
+				" group by " + str3 + " order by " + str1;
+
+			    // we create them backwards because the 
+			    // highest-dim view must be created first
+			    arrayViewCreates[arrayViewIdx][nDims-k] = tmp;
+
+			    // change the `parent' table:
+			    currentTableToSelectFromInView = fullViewName;
+			}
+
+			++arrayViewIdx;
+			// done with viewCreates
+
+			++tableIdx;
+			
 			// also add the field as a blob column, just in case
 			tableCreates[0] += ", " + mnSansGet + " " + 
 			    getSQLTypeStr(ma[i],signMethod,false);
@@ -264,12 +406,32 @@ public class SQLGenerator {
 
 	    // finish off the table create and insert:
 	    tableCreates[0] += ")";
+	    //tableCreates[1] += ")";
 	    inserts[0] += ")";
+
+	    viewCreates[1] += " FROM " + tableName + " " + joinStr;
+
 	}
 
 	for (int k = 0; k < tableCreates.length; ++k) {
 	    debug(3,"tableCreates["+k+"] = '" + tableCreates[k] + "'.");
 	    debug(3,"inserts["+k+"] = '" + inserts[k] + "'.");
+	}
+
+	for (int k = 0; k < viewCreates.length; ++k) {
+	    debug(3,"viewCreates["+k+"] = '" + viewCreates[k] + "'.");
+	}
+
+	if (arrayViewCreates != null) {
+	    for (int k = 0; k < arrayViewCreates.length; ++k) {
+		if (arrayViewCreates[k] != null) {
+		    for (int j = 0; j < arrayViewCreates[k].length; ++j) {
+			debug(3,
+			      "arrayViewCreates["+k+"]["+j+"] = '" + 
+			      arrayViewCreates[k][j] + "'.");
+		    }
+		}
+	    }
 	}
 
 	tablesCreated = false;
@@ -323,6 +485,20 @@ public class SQLGenerator {
 		
 		for (int i = 0; i < tableCreates.length; ++i) {
 		    s.execute(tableCreates[i]);
+		}
+
+		// create array views:
+		// we have to do these before the viewCreates because the
+		// viewCreates[1] depend on the arrayViewCreates
+		for (int i = 0; i < arrayViewCreates.length; ++i) {
+		    for (int j = 0; j < arrayViewCreates[i].length; ++j) {
+			s.execute(arrayViewCreates[i][j]);
+		    }
+		}
+
+		// create views too:
+		for (int i = 0; i < viewCreates.length; ++i) {
+		    s.execute(viewCreates[i]);
 		}
 
 		tablesCreated = true;
