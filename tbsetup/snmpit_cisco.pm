@@ -382,10 +382,11 @@ sub vlanLock($) {
 
     #
     # Try max_tries times before we give up, in case some other process just
-    # has it locked.
+    # has it locked. NOTE: snmpitSetWarn is going to retry something like
+    # 10 times, so we don't need to try the look _too_ many times.
     #
     my $tries = 1;
-    my $max_tries = 40;
+    my $max_tries = 10;
     while ($tries <= $max_tries) {
     
 	#
@@ -401,12 +402,27 @@ sub vlanLock($) {
 		(defined($grabBuffer)?$grabBuffer:"undef.") . "\n");
 	if (! $grabBuffer) {
 	    #
-	    # Only print this message every five tries
+	    # Only print this message if we've tried at least twice, to
+            # cut down on error messages
 	    #
-	    if (!($tries % 5)) {
+	    if ($tries >= 2) {
 		print STDERR "$self->{NAME}: VLAN edit buffer request failed - " .
 			     "try $tries of $max_tries.\n";
+                #
+                # Try to find out who is holding the lock. Let's only try a
+                # couple times, since if it's failing due to an unresponsive
+                # switch, there's no point in sending a ton of these get
+                # requests.
+                #
+                my $owner = snmpitGetWarn($self->{SESS}, [$BufferOwner, 1], 2);
+                if ($owner) {
+                    print STDERR "$self->{NAME}: VLAN lock is held by $owner\n";
+                } else {
+                    print STDERR "$self->{NAME}: No owner of the VLAN lock\n";
+                }
+
 	    }
+
 	} else {
 	    last;
 	}
