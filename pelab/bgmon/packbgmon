@@ -4,3 +4,6 @@ rm bgmon.tar.gz
 #tar -czf bgmon.tar.gz bgmon.pl runbgmon event.pm
 tar -czf bgmon.tar.gz bgmon.pl runbgmon
 cp bgmon.tar.gz /proj/tbres/gebhardt/
+rm /proj/tbres/gebhardt/iperfd.tar.gz
+cp /proj/tbres/bin/iperfd .
+tar -zcf /proj/tbres/gebhardt/iperfd.tar.gz iperfd

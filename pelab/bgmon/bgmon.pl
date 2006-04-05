@@ -6,6 +6,8 @@
 #    (1/31) Just checking if "send notification" is successful
 #
 # (2/3/06): CLEANUP ALLOCATED MEMORY using .._free() functions
+# (3/20/06): Look into usefullness of "nohang()"... did not get tested,
+#            and may not be needed
 
 =pod
 HOW TO USE:
@@ -153,7 +155,7 @@ while (1) {
 			    $nextrun;
 			#delete tmp filename
 			my $filename = createtmpfilename($destaddr, $testtype);
-			unlink($filename) or die "can't delete temp file";
+			unlink($filename) or warn "can't delete temp file";
 		    }
 		}		
 	    }
@@ -337,10 +339,21 @@ sub callbackFunc($$$) {
             #      from the manager/controller
 	    
             foreach my $linkdest (@destnodes){
-		$testevents{$linkdest}{$testtype}{"testper"} = $testper;
-		$testevents{$linkdest}{$testtype}{"flag_scheduled"} = 0;
-		$testevents{$linkdest}{$testtype}{"timeOfNextRun"} 
-		    = time_all();
+		#be smart about adding tests
+		# don't want to change already running tests
+		# only change those tests which have been updated
+		if( defined($testevents{$linkdest}{$testtype}{"testper"}) &&
+		    $testper == $testevents{$linkdest}{$testtype}{"testper"} )
+		{
+		    # do nothing... keep test as it is
+		}else{
+		    # update test
+		    $testevents{$linkdest}{$testtype}{"testper"} =$testper;
+		    $testevents{$linkdest}{$testtype}{"flag_scheduled"} =0;
+		    # TODO? be smart about when the first test should run?
+		    $testevents{$linkdest}{$testtype}{"timeOfNextRun"} =
+			time_all();
+		}
 	    }
 	}
 	elsif( $eventtype eq "SINGLE" ){

@@ -16,5 +16,6 @@ if( @ARGV < 1 ){
 
 #system "sudo perl -mevent -I. -I/usr/testbed/lib -d $ARGV[0]bgmon.pl &";
 system "perl $ARGV[0]bgmon.pl -d $ARGV[0] &";
-system "sudo $ARGV[0]iperf -s -p 5002 >& $ARGV[0]iperfout.err > $ARGV[0]iperfout.out &";
+system "sudo rm iperfd.out iperfd.err";
+system "sudo $ARGV[0]iperfd -s -p 5002 >& $ARGV[0]iperfd.err > $ARGV[0]iperfd.out &";
 

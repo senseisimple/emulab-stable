@@ -257,7 +257,7 @@ sub reset
 }
 
 
-# destnodes and testdefs are space-separated strings
+# destnodes is space-separated string
 sub initnode($$$$)
 {
     my ($node, $destnodes, $testper, $testtype) = @_;
