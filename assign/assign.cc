@@ -415,7 +415,7 @@ void print_help() {
 // proper types. Returns 1 if the proper types exist, 0 if they do not.
 // TODO - move away from using global variables
 int type_precheck(int round) {
-    cout << "Type precheck, round " << round << ":" << endl;
+    cout << "Type precheck:" << endl;
 
     bool ok = true;
 
