@@ -1,0 +1,145 @@
+source tb_compat.tcl
+
+set ns [new Simulator]
+$ns rtproto Static
+
+#
+# This control how many _pairs_ of PCs there are. ie. 2 gets you 2 elab PCs
+# and 2 plab PCs
+#
+set num_pcs 2
+
+#
+# Set this to 0 to use the real PlanetLab, not elab nodes pretending to be
+# plab nodes.
+#
+set fake_plab 1
+
+#
+# Where to grab your tarball of pelab software from. To make this tarball:
+#   Go to your testbed source tree
+#   Run 'cvs up'!!!
+#   Run 'gmake' in pelab/stub and pelab/libnetmon
+#   From the root of your source tree, run:
+#       tar czvf /proj/tbres/my-pelab.tar.gz pelab
+#   Of course, don't name it 'my-plab.tar.gz'! You can put this file in
+#       a subdirectory if you want, but it must be somewhere in
+#       /proj/tbres/
+#   Put the path to your tarball in this variable
+#
+set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+
+#
+# When using a fake plab, these are the parameters for the 'control'
+# delay (ie. the latency for the elab nodes to reach the plab nodes
+#
+set control_delay "0ms"
+set control_bw "100Mbps"
+
+#
+# When using a fake plab, these are the parameters for the fake Internet
+# 'cloud' connecting the plab nodes
+#
+set cloud_delay "30ms"
+set cloud_bw "1.5Mbps"
+
+#
+# Hardare type to use for PCs inside of emulab
+#
+set hwtype "pc"
+
+tb-set-delay-os FBSD54-FUTURE
+
+set elan_string ""
+set plan_string ""
+
+set stublist {}
+set monitorlist {}
+set alllist {}
+
+#
+# Create all of the nodes
+#
+for {set i 1} {$i <= $num_pcs} {incr i} {
+    set planet($i) [$ns node]
+
+    if {$fake_plab} {
+        tb-set-node-os $planet($i) PLAB-DEVBOX
+    }
+    if {$fake_plab} {
+        tb-set-hardware $planet($i) $hwtype
+    } else {
+        tb-set-hardware $planet($i) pcplab
+    }
+    append plan_string "$planet(${i}) "
+
+    set stub($i) [$planet($i) program-agent -command "/bin/sh /local/pelab/stub/auto-stub.sh"]
+    lappend stublist $stub($i)
+    lappend alllist $stub($i)
+
+    tb-set-node-tarfiles $planet($i) /local $pelab_tar
+    tb-set-node-rpms $planet($i) /proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm
+
+    set elab($i) [$ns node]
+    tb-set-node-os $elab($i) PLAB-DEVBOX
+    tb-set-hardware $elab($i) $hwtype
+    append elan_string "$elab(${i}) "
+    set monitor($i) [$elab($i) program-agent -command "/bin/sh /local/pelab/monitor/auto-monitor.sh"]
+    lappend monitorlist $monitor($i)
+    lappend alllist $monitor($i)
+
+    tb-set-node-tarfiles $elab($i) /local $pelab_tar
+    tb-set-node-rpms $planet($i) /proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm
+}
+
+#
+# Set up groups to make it easy for us to start/stop program agents
+#
+set stubgroup [$ns event-group $stublist]
+set monitorgroup [$ns event-group $monitorlist]
+set allgroup [$ns event-group $alllist]
+
+#
+# Fake 'Inernet' cloud for fake plab nodes
+#
+if {$fake_plab} {
+    set planetc [$ns make-lan "$plan_string" $cloud_bw $cloud_delay]
+    tb-set-ip-lan $planet(1) $planetc 10.1.0.1
+    $planetc trace
+}
+
+#
+# Lan which will be controlled by the monitor
+#
+set elabc [$ns make-lan "$elan_string" 10Mb 10ms]
+tb-set-ip-lan $elab(1) $elabc 10.0.0.1
+$elabc trace
+
+#
+# We don't want the sync server to end up out there on some plab node
+#
+tb-set-sync-server $elab(1)
+
+#
+# Set up a fake Internet link between the PlanetLab and Emulab sides
+# when using fake plab nodes
+#
+if {$fake_plab} {
+    set erouter [$ns node]
+    set prouter [$ns node]
+
+    set elabcontrol [$ns make-lan "$elan_string $erouter" 100Mbps 0ms]
+    set planetcontrol [$ns make-lan "$plan_string $prouter" 100Mbps 0ms]
+
+    set internet [$ns duplex-link $erouter $prouter $control_bw $control_delay DropTail]
+    $internet trace
+
+    tb-set-ip-lan $elab(1) $elabcontrol 192.168.0.1
+    tb-set-ip-lan $planet(1) $planetcontrol 192.168.1.1
+
+    tb-set-ip-link $erouter $internet 192.168.254.1
+    tb-set-ip-link $prouter $internet 192.168.254.2
+}
+
+$ns run
+

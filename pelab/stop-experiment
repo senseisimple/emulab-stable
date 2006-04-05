@@ -1,0 +1,52 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+my $TEVC = "/usr/testbed/bin/tevc";
+my $LOGHOLE = "/usr/testbed/bin/loghole";
+
+#
+# Require the pid and eid
+#
+if (@ARGV != 2) {
+    die "Usage: $0 pid eid\n";
+}
+
+my ($pid, $eid) = @ARGV;
+
+#
+# Stop the stubs and monitors
+#
+print "##### Stopping stubs and monitors\n";
+if (system "$TEVC -e $pid/$eid now allgroup stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Stop link tracing
+#
+if (system "$TEVC -e $pid/$eid now planetc-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Grab logfiles
+#
+print "##### Gathering logfiles\n";
+if (system "$LOGHOLE -e $pid/$eid sync") {
+    die "Error running loghole\n";
+}
+
+#
+# Create an archive containing these logfiles
+#
+print "##### Creating archive\n";
+if (system "$LOGHOLE -e $pid/$eid archive") {
+    die "Error running loghole\n";
+}
+
+print "##### Done\n";
+

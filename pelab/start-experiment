@@ -1,0 +1,41 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+my $TEVC = "/usr/testbed/bin/tevc";
+
+#
+# Require the pid and eid
+#
+if (@ARGV != 2) {
+    die "Usage: $0 pid eid\n";
+}
+
+my ($pid, $eid) = @ARGV;
+
+#
+# Start link tracing
+#
+print "##### Starting link tracing\n";
+if (system "$TEVC -e $pid/$eid now planetc-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
+    die "Error running tevc\n";
+}
+
+#
+# Start up the stubs and monitors
+#
+print "##### Starting stubs and monitors\n";
+if (system "$TEVC -e $pid/$eid now allgroup stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now allgroup start") {
+    die "Error running tevc\n";
+}
+
+print "##### Done\n";
