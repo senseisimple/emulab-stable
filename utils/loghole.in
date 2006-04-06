@@ -446,7 +446,7 @@ def validate_usage():
 # Print the usage statement for the "clean" action.
 #
 def clean_usage():
-    print "Usage: loghole clean [-fne] [node1 ...]"
+    print "Usage: loghole clean [-fner] [node1 ...]"
     print
     print "Clean the experiment log directory by removing any subdirectories"
     print "and/or clean the log holes on the nodes.  The default behavior is"
@@ -456,6 +456,7 @@ def clean_usage():
     print "  -f, --force         Do not ask for confirmation."
     print "  -n, --nodes         Clean only the nodes log directories."
     print "  -e, --experiment    Clean only the experiment log directory."
+    print "  -r, --root          Use sudo to clean nodes as root."
     print
     print "Examples:"
     print "  $ loghole clean"
@@ -901,7 +902,7 @@ def do_show(args):
 # @retval The exit status of the rsync command-line.
 #
 def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
-          delay = 0):
+          delay = 0, as_root = False):
     global RSYNC, HOME, DEBUG
     
     retval = 0
@@ -967,7 +968,7 @@ def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
     
     return retval
 
-def rmstar(host, port, delay, *args):
+def rmstar(host, port, delay, as_root, *args):
     global HOME, DEBUG
 
     retval = 0
@@ -980,7 +981,10 @@ def rmstar(host, port, delay, *args):
         if port:
             cmd.extend([ "-p", str(port) ])
             pass
-        cmd.extend([ host, "rm", "-rf", path ])
+        cmd.extend([ host ])
+        if as_root:
+            cmd.extend(["sudo"])
+        cmd.extend(["rm", "-rf", path ])
         if DEBUG:
             print `cmd`
             retval = -1
@@ -1169,7 +1173,7 @@ def trace_post(link2trace):
 #
 # @param args Action-specific command line arguments.
 #
-def do_sync(args, mode="sync", must_be_active=1):
+def do_sync(args, mode="sync", must_be_active=1, as_root=False):
     from emulabclient import RESPONSE_SUCCESS
     global OSIDS, SERVER, DOT_LOGHOLES, JOB_PROGRESS_INDEX
     
@@ -1380,12 +1384,14 @@ def do_sync(args, mode="sync", must_be_active=1):
                                     dlhandle.name,
                                     port = ssh_data[phost].get("port", None),
                                     output = True,
-                                    delay = delay)
+                                    delay = delay,
+                                    as_root = as_root)
                         pass
                     elif mode == "clean":
                         pid = rmstar(phost,
                                      ssh_data[phost].get("port", None),
                                      delay,
+                                     as_root,
                                      "/local/logs/*")
                         pass
                     else:
@@ -1927,11 +1933,12 @@ def do_clean(args):
     do_nodes = 1
     do_experiment = 1
     confirm_msg = "Are you sure you want to remove ALL log files? [y/N] "
+    as_root = False
 
     # Parse action-specific options and arguments.
     try:
-        opts, args = getopt.getopt(args, "fne", [
-            "force", "nodes", "experiment", ])
+        opts, args = getopt.getopt(args, "fner", [
+            "force", "nodes", "experiment", "root", ])
         for opt, val in opts:
             if opt in ("-f", "--force"):
                 force = 1
@@ -1948,11 +1955,13 @@ def do_clean(args):
                 confirm_msg = ("Are you sure you want to remove log files "
                                "from the experiment log directory? [y/N] ")
                 pass
+            elif opt in ("-r", "--root"):
+                as_root = True
             pass
         pass
     except getopt.error, e:
         print e.args[0]
-        archive_usage()
+        clean_usage()
         return 2
 
     if not force:
@@ -1982,7 +1991,7 @@ def do_clean(args):
         pass
     
     if do_nodes:
-        do_sync(args, mode="clean", must_be_active=0)
+        do_sync(args, mode="clean", must_be_active=0, as_root = as_root)
         pass
 
     return retval
