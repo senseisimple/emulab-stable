@@ -42,6 +42,7 @@ def main_loop():
   quanta = 0.5# in seconds
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   sys.stdout.write("stub_ip is %s\n" % stub_ip)
+  sys.stdout.flush()
   conn.connect((stub_ip, 4200))
   poll = select.poll()
   poll.register(sys.stdin, select.POLLIN)
@@ -206,13 +207,17 @@ def receive_characteristic(conn):
 
 def set_bandwidth(kbps, dest):
 #  sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
+  now = time.time()
+  sys.stderr.write('BANDWIDTH!purple\n')
+  sys.stderr.write('BANDWIDTH!line ' + ('%0.6f' % now) + ' 0 ' + ('%0.6f' % now)
+	+ ' ' + str(kbps) + '\n')
   return set_link(this_ip, dest, 'bandwidth=' + str(kbps))
 
 # Set delay on the link. We are given round trip time.
 def set_delay(milliseconds, dest):
   now = time.time()
-  sys.stderr.write('purple\n')
-  sys.stderr.write('line ' + ('%0.6f' % now) + ' 0 ' + ('%0.6f' % now)
+  sys.stderr.write('RTT!orange\n')
+  sys.stderr.write('RTT!line ' + ('%0.6f' % now) + ' 0 ' + ('%0.6f' % now)
 	+ ' ' + str(milliseconds) + '\n')
   # Set the delay from here to there to 1/2 rtt.
   error = set_link(this_ip, dest, 'delay=' + str(milliseconds/2))

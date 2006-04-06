@@ -473,32 +473,34 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		}
 		if (is_live && delay_count[path_id] > 0)
 		{
-		  int info_size = sizeof(info);
-		  int error = getsockopt(rcvdb[path_id].sockfd,
-					 SOL_TCP, TCP_INFO, &info,
-					 &info_size);
-		  if (error == -1)
-		  {
-		    perror("getsockopt() TCP_INFO");
-		    clean_exit(1);
-		  }
-		  bandwidth = (info.tcpi_snd_cwnd * info.tcpi_snd_mss)
-		    / base_rtt[path_id];
-		  if (bandwidth > max_throughput[path_id])
-		  {
-		    max_throughput[path_id] = bandwidth;
-		  }
-		  goodput = throughputTick(&throughput[path_id]);
-		  logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
-		  logWrite(DELAY_DETAIL, NULL, "Throughput: %lu", bandwidth);
-		  logWrite(DELAY_DETAIL, NULL, "Congestion Window Size: %lu",
-			   info.tcpi_snd_cwnd);
-		  logWrite(DELAY_DETAIL, NULL, "Sending MSS: %lu",
-			   info.tcpi_snd_mss);
-		  logWrite(DELAY_DETAIL, NULL, "Base RTT: %lu",
-			   base_rtt[path_id]);
-		} 
-		//append_delay_sample(path_id, delay, &(pkthdr->ts));
+		    int info_size = sizeof(info);
+		    int error = getsockopt(rcvdb[path_id].sockfd,
+					   SOL_TCP, TCP_INFO, &info,
+					   &info_size);
+		    if (error == -1)
+		    {
+			perror("getsockopt() TCP_INFO");
+			clean_exit(1);
+		    }
+		    bandwidth = (info.tcpi_snd_cwnd * info.tcpi_snd_mss * 8)
+			/ base_rtt[path_id];
+		    if (bandwidth > max_throughput[path_id])
+		    {
+			max_throughput[path_id] = bandwidth;
+		    }
+		    goodput = throughputTick(&throughput[path_id]);
+		    logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
+		    logWrite(DELAY_DETAIL, NULL, "Throughput: %lu", bandwidth);
+		    logWrite(DELAY_DETAIL, NULL, "Congestion Window Size: %lu",
+			     info.tcpi_snd_cwnd);
+		    logWrite(DELAY_DETAIL, NULL, "Sending MSS: %lu bytes",
+			     info.tcpi_snd_mss);
+		    logWrite(DELAY_DETAIL, NULL, "Base RTT: %lu",
+			     base_rtt[path_id]);
+		    logWrite(DELAY_DETAIL, NULL, "Receive Window: %lu",
+			     tp->window);
+		}
+//		append_delay_sample(path_id, delay, &(pkthdr->ts));
 		logWrite(DELAY_DETAIL, &(pkthdr->ts),
 			 "Delay: %lu, Sum: %lu, Count: %lu", delay,
 			 delays[path_id], delay_count[path_id]);

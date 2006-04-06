@@ -291,11 +291,11 @@ void reconnect_receiver(int index)
     perror("connect");
     clean_exit(1);
   }
-  int send_buf_size = 0;
-  int int_size = sizeof(send_buf_size);
-  getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &send_buf_size,
-	     (socklen_t*)&int_size);
-  fprintf(stderr, "Socket buffer size: %d\n", send_buf_size);
+//  int send_buf_size = 0;
+//  int int_size = sizeof(send_buf_size);
+//  getsockopt(sockfd, SOL_SOCKET, SO_SNDBUF, &send_buf_size,
+//	     (socklen_t*)&int_size);
+//  fprintf(stderr, "Socket buffer size: %d\n", send_buf_size);
 
   struct sockaddr_in source_addr;
   socklen_t len = sizeof(source_addr);

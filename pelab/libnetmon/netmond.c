@@ -233,7 +233,7 @@ int main(int argc, char **argv) {
             clientfd = accept(sockfd, (struct sockaddr*)&clientaddr, &clientlen);
 
             if (clientfd) {
-                fprintf(stderr,"A new client connected\n");
+//                fprintf(stderr,"A new client connected\n");
 
                 FD_SET(clientfd,&real_fdset);
                 sock_types[clientfd] = DATA;
@@ -259,7 +259,7 @@ int main(int argc, char **argv) {
                     &clientlen);
 
             if (clientfd) {
-                fprintf(stderr,"A new client connected to the control socket\n");
+//                fprintf(stderr,"A new client connected to the control socket\n");
 
                 FD_SET(clientfd,&real_fdset);
                 sock_types[clientfd] = CONTROL;

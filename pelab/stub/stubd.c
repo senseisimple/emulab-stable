@@ -570,21 +570,21 @@ int send_delay_to_monitor(int monitor, int index)
   unsigned long delay = 0;
   unsigned long tmpulong;
 
-  delay = delays[index];
-  if (delay_count[index] > 0)
-  {
-      delay /= delay_count[index];
-  }
-  else
+//  delay = delays[index];
+//  if (delay_count[index] > 0)
+//  {
+//      delay /= delay_count[index];
+//  }
+//  else
+//  {
+//      delay = last_delays[index];
+//  }
+
+  delay = base_rtt[index];
+  if (delay_count[index] == 0)
   {
       delay = last_delays[index];
   }
-
-  //  delay = base_rtt[index];
-  //  if (delay_count[index] == 0)
-  //{
-  //    delay = 0;
-  //}
 
   // If measurement changed since last send
 //  if (abs((long)delays[index] - (long)last_delays[index])
@@ -620,18 +620,18 @@ int send_delay_to_monitor(int monitor, int index)
 	gettimeofday(&now, NULL);
 	if (earlier.tv_sec != 0)
 	{
-	    logWrite(TCPTRACE_SEND, NULL, "orange");
-	    logWrite(TCPTRACE_SEND, NULL, "line %d%.6f %d %d%.6f %d",
-		     earlier.tv_sec, earlier.tv_usec/1000000000.0,
+	    logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
+	    logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
+		     earlier.tv_sec + earlier.tv_usec/1000000000.0,
 		     last_delays[index],
-		     now.tv_sec, now.tv_usec/1000000000.0,
+		     now.tv_sec + now.tv_usec/1000000000.0,
 		     last_delays[index]);
 	}
-	logWrite(TCPTRACE_SEND, NULL, "orange");
-	logWrite(TCPTRACE_SEND, NULL, "line %d%.6f %d %d%.6f %d",
-		 now.tv_sec, now.tv_usec/1000000000.0,
+	logWrite(TCPTRACE_SEND, NULL, "RTT!orange");
+	logWrite(TCPTRACE_SEND, NULL, "RTT!line %.6f %d %.6f %d",
+		 now.tv_sec + now.tv_usec/1000000000.0,
 		 last_delays[index],
-		 now.tv_sec, now.tv_usec/1000000000.0,
+		 now.tv_sec + now.tv_usec/1000000000.0,
 		 delay);
 	earlier = now;
     }
@@ -640,7 +640,7 @@ int send_delay_to_monitor(int monitor, int index)
   last_delays[index] = delay;
   delays[index] = 0;
   delay_count[index] = 0;
-//  base_rtt[index] = LONG_MAX;
+  base_rtt[index] = LONG_MAX;
 
   return 1;
 }
@@ -650,8 +650,8 @@ int send_bandwidth_to_monitor(int monitor, int index)
   int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
   char outbuf[buffer_size];
   unsigned long code = htonl(CODE_BANDWIDTH);
-  unsigned long bandwidth = throughputTick(&throughput[index]);
-  //unsigned long bandwidth = max_throughput[index];
+  //unsigned long bandwidth = throughputTick(&throughput[index]);
+  unsigned long bandwidth = max_throughput[index];
 
   if (bandwidth != 0) {
     // Insert the address info
@@ -679,11 +679,11 @@ int send_bandwidth_to_monitor(int monitor, int index)
 	struct timeval now;
 	unsigned long hostBand = ntohl(bandwidth);
 	gettimeofday(&now, NULL);
-	logWrite(TCPTRACE_SEND, NULL, "purple");
-	logWrite(TCPTRACE_SEND, NULL, "line %d%.6f %d %d%.6f %d",
-		 now.tv_sec, now.tv_usec/1000000000.0,
+	logWrite(TCPTRACE_SEND, NULL, "BANDWIDTH!purple");
+	logWrite(TCPTRACE_SEND, NULL, "BANDWIDTH!line %.6f %d %.6f %d",
+		 now.tv_sec + now.tv_usec/1000000000.0,
 		 0,
-		 now.tv_sec, now.tv_usec/1000000000.0,
+		 now.tv_sec + now.tv_usec/1000000000.0,
 		 hostBand);
     }
   }
