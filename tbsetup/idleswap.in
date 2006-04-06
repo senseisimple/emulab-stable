@@ -41,7 +41,6 @@ use libTemplates;
 # Locals.
 my $idleswap   = 0;
 my $autoswap   = 0;
-my $isinstance = 0;
 
 # Untaint the path
 $ENV{'PATH'} = '/bin:/usr/bin';
@@ -119,9 +118,6 @@ my %hashrow = $query_result->fetchhash();
 my $creator = $hashrow{'expt_head_uid'};
 my $gid     = $hashrow{'gid'};
 my $exptidx = $hashrow{'idx'};
-
-# See below; different swapout procedure.
-$isinstance = IsTemplateInstanceExperiment($exptidx);
 
 # Fire off the swap and exit.
 #
