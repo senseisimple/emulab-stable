@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -250,7 +250,7 @@ $query_result =
 		 "  from virt_nodes as v ".
 		 "left join reserved as r on r.pid=v.pid and ".
 		 "     r.eid=v.eid and r.vname=v.vname ".
-		 "left join nodes as n on n.phys_nodeid=r.node_id ".
+		 "left join nodes as n on n.node_id=r.node_id ".
 		 "left join os_info as o on o.osid=n.def_boot_osid ".
 		 "where v.pid='$pid' and v.eid='$eid'");
 
