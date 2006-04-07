@@ -3,6 +3,7 @@
 use strict;
 
 my $TEVC = "/usr/testbed/bin/tevc";
+my $LOGHOLE = "/usr/testbed/bin/loghole";
 
 #
 # Require the pid and eid
@@ -14,15 +15,36 @@ if (@ARGV != 2) {
 my ($pid, $eid) = @ARGV;
 
 #
-# Start link tracing
+# Make sure any old stubs/monitors are dead
 #
-print "##### Starting link tracing\n";
+print "##### Stopping old stubs and monitors\n";
+if (system "$TEVC -e $pid/$eid now allgroup stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Make sure link logs get cleaned up
+#
+print "##### Rolling link tracing files \n";
 if (system "$TEVC -e $pid/$eid now planetc-tracemon snapshot") {
     die "Error running tevc\n";
 }
 if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
     die "Error running tevc\n";
 }
+
+#
+# Clean out the logs so that we can start fresh
+#
+print "##### Cleaning old logfiles (ignore 'No match' errors)\n";
+if (system "$LOGHOLE -e $pid/$eid clean -f -r") {
+    die "Error running loghole\n";
+}
+
+#
+# Start link tracing
+#
+print "##### Starting link tracing\n";
 if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
     die "Error running tevc\n";
 }
@@ -31,9 +53,6 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
 # Start up the stubs and monitors
 #
 print "##### Starting stubs and monitors\n";
-if (system "$TEVC -e $pid/$eid now allgroup stop") {
-    die "Error running tevc\n";
-}
 if (system "$TEVC -e $pid/$eid now allgroup start") {
     die "Error running tevc\n";
 }
