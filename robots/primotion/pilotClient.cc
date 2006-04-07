@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2005 University of Utah and the Flux Group.
+ * Copyright (c) 2005, 2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -212,6 +212,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		}
 	    }
 
+	    /* Figure out if they want us to do a move or a pivot. */
 	    if ((mcg->position.x != 0.0) || (mcg->position.y != 0.0)) {
 		acpValue av;
 		float theta;
@@ -331,6 +332,7 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 
 	    mgt = this->pc_dashboard.getTelemetry();
 
+	    /* Compute "contacts" based on the sensor reports. */
 	    if ((mgt->front_ranger_left != 0.0) &&
 		(mgt->front_ranger_right != 0.0)) {
 		float min_range;
@@ -344,6 +346,10 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		count += 1;
 	    }
 	    else if (mgt->front_ranger_left != 0.0) {
+		/*
+		 * The front sensors are angled out a bit, the 0.40 angle seems
+		 * to work well enough.
+		 */
 		points[count].x = cos(0.40) * mgt->front_ranger_left;
 		points[count].y = sin(0.40) * mgt->front_ranger_left;
 		count += 1;
@@ -379,6 +385,13 @@ bool pilotClient::handlePacket(mtp_packet_t *mp, list &notify_list)
 		count += 1;
 	    }
 	    else if (mgt->rear_ranger_left != 0.0) {
+		/*
+		 * XXX This computation is probably wrong...  We should have a
+		 * constant offset for Y and set X to be the ranger value plus
+		 * some constant.  I don't remember exactly what the ranger
+		 * value means for these (i.e. if it is based off the center
+		 * of the robot or not).
+		 */
 		points[count].x = cos(M_PI - 0.40) * mgt->rear_ranger_left;
 		points[count].y = sin(M_PI - 0.40) * mgt->rear_ranger_left;
 		count += 1;
