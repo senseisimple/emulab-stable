@@ -201,17 +201,17 @@ if ($ISMAINSITE) {
 }
 
 #
-# And then age out entries older then 14 days.
+# And then age out entries.
 #
 DBQueryFatal("delete from log ".
-	     "where stamp < (UNIX_TIMESTAMP(now()) - (14 * 24 * 60 * 60))");
+	     "where stamp < (UNIX_TIMESTAMP(now()) - (7 * 24 * 60 * 60))");
 
 #
-# And age out non critical data older then 7 days.
+# And age out non critical data.
 #
 DBQueryFatal("delete from log ".
 	     "where priority > $NOTICE and ".
-	     "      stamp < (UNIX_TIMESTAMP(now()) - (7 * 24 * 60 * 60))");
+	     "      stamp < (UNIX_TIMESTAMP(now()) - (4 * 24 * 60 * 60))");
 
 unlink("$logname")
     if (-e $logname);
