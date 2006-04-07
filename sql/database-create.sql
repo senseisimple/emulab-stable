@@ -1225,7 +1225,8 @@ CREATE TABLE log (
   relevant tinyint(1) NOT NULL default '0',
   mesg text NOT NULL,
   PRIMARY KEY  (seq),
-  KEY session (session)
+  KEY session (session),
+  KEY stamp (stamp)
 ) TYPE=MyISAM;
 
 --
