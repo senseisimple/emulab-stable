@@ -56,7 +56,6 @@ mtp_dump: mtp_dump.o $(MTPLIBS)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ mtp_dump.o -L. -lmtp -lm
 
 CLASSES_SRC = $(wildcard $(SRCDIR)/*.java)
-
 CLASSES = $(patsubst $(SRCDIR)/%.java,net/emulab/%.class,$(CLASSES_SRC))
 
 $(CLASSES): $(CLASSES_SRC)
