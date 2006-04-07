@@ -956,7 +956,14 @@ def rsync(host, base, dlpath, paths = ["/"], port = None, output = False,
                                      0664)
                         os.dup2(fd, 2)
                         pass
-                    os.execve(RSYNC, cmd, os.environ)
+                    try:
+                        os.execve(RSYNC, cmd, os.environ)
+                    except OSError, e:
+                        sys.stderr.write(
+                            "error: unable to exec '%s' - %s\n"
+                            "error: args=%s\n"
+                            % (RSYNC, e.strerror, `cmd`))
+                        pass
                     os._exit(127)
                     pass
                 except:
