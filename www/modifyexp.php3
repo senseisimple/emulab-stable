@@ -81,7 +81,7 @@ flush();
 # Put up the modify form on first load.
 # 
 if (! isset($go)) {
-    echo "G: $go <a href='faq.php3#swapmod'>".
+    echo "<a href='faq.php3#swapmod'>".
 	 "Modify Experiment Documentation (FAQ)</a></h3>";
 
     echo "<script language=JavaScript>
