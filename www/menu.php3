@@ -904,12 +904,12 @@ function PAGEFOOTER($view = NULL) {
     if (!$view['hide_copyright']) {
 	echo "
                 <ul class='navlist'>
-		<li>[ <a href=http://www.cs.utah.edu/flux/>
-                    Flux&nbsp;Research&nbsp;Group</a> ]</li>
-	        <li>[ <a href=http://www.cs.utah.edu/>
-                    School&nbsp;of&nbsp;Computing</a> ]</li>
-		<li>[ <a href=http://www.utah.edu/>
-                    University&nbsp;of&nbsp;Utah</a> ]</li>
+		<li>[&nbsp;<a href=\"http://www.cs.utah.edu/flux/\"
+                    >Flux&nbsp;Research&nbsp;Group</a>&nbsp;]</li>
+	        <li>[&nbsp;<a href=\"http://www.cs.utah.edu/\"
+                    >School&nbsp;of&nbsp;Computing</a>&nbsp;]</li>
+		<li>[&nbsp;<a href=\"http://www.utah.edu/\"
+                    >University&nbsp;of&nbsp;Utah</a>&nbsp;]</li>
                 </ul>
                 <!-- begin copyright -->
                 <span class='copyright'>
