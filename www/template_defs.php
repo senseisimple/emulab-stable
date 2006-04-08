@@ -50,6 +50,31 @@ function TBValidExperimentTemplate($guid, $version)
 }
 
 #
+# Check if a template is hidden.
+#
+# usage TBIsExperimentTemplateHidden($guid, $version)
+#       returns 1 if hidden
+#       returns 0 if visible
+#
+function TBIsExperimentTemplateHidden($guid, $version)
+{
+    $guid    = addslashes($guid);
+    $version = addslashes($version);
+
+    $query_result =
+	DBQueryFatal("select hidden from experiment_templates ".
+		     "where guid='$guid' and vers='$version'");
+
+    if (mysql_num_rows($query_result) == 0) {
+	return 0;
+    }
+    
+    $row  = mysql_fetch_array($query_result);
+    
+    return $row[hidden];
+}
+
+#
 # Experiment Template permission checks; using the experiment access checks.
 #
 # Usage: TBExptTemplateAccessCheck($uid, $guid, $access_type)

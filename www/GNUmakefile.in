@@ -114,6 +114,12 @@ HYFILES += $(wildcard $(SRCDIR)/hyperviewer/*.gif)
 SDRFILES  = $(wildcard $(SRCDIR)/sdr/*.php3)
 SDRFILES += $(wildcard $(SRCDIR)/sdr/*.html)
 
+TTFILES  = $(wildcard $(SRCDIR)/timetree/*.png)
+TTFILES += $(wildcard $(SRCDIR)/timetree/*.js)
+TTFILES += $(wildcard $(SRCDIR)/timetree/*.css)
+
+JSFILES += $(wildcard $(SRCDIR)/js/*.js)
+
 # need to make it *.gz; with simply "*", 
 # we end up sucking over "CVS"
 DOWNLOADFILES = $(wildcard $(SRCDIR)/downloads/*.gz)
@@ -166,6 +172,8 @@ ALLBUI    = $(notdir $(BUIFILES))
 ALLNL     = $(notdir $(NLFILES))
 ALLHY     = $(notdir $(HYFILES))
 ALLSDR   = $(notdir $(SDRFILES))
+ALLTT     = $(notdir $(TTFILES))
+ALLJS     = $(notdir $(JSFILES))
 ALLROBO   = $(notdir $(ROBOTRACKFILES))
 ALLWISTATS = $(notdir $(WIRELESSSTATSFILES))
 
@@ -181,6 +189,8 @@ INSTALLFILES = $(addprefix $(INSTALL_SBINDIR)/, htmlinstall) \
 	$(addprefix $(INSTALL_WWWDIR)/netlab/, $(ALLNL)) \
 	$(addprefix $(INSTALL_WWWDIR)/hyperviewer/, $(ALLHY)) \
 	$(addprefix $(INSTALL_WWWDIR)/sdr/, $(ALLSDR)) \
+	$(addprefix $(INSTALL_WWWDIR)/timetree/, $(ALLTT)) \
+	$(addprefix $(INSTALL_WWWDIR)/js/, $(ALLJS)) \
 	$(addprefix $(INSTALL_WWWDIR)/robotrack/, $(ALLROBO)) \
 	$(addprefix $(INSTALL_WWWDIR)/wireless-stats/, $(ALLWISTATS)) \
 	$(addprefix $(INSTALL_WWWDIR)/autostatus-icons/, $(ALLICONS)) \
