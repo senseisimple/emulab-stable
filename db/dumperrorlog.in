@@ -133,7 +133,7 @@ if ($ISMAINSITE) {
 		     "where seq > $lastseq " .
 		     "order by seq desc limit 1");
     # Save for later.
-    $lastseq = $query_result->fetchrow_array();
+    ($lastseq) = $query_result->fetchrow_array();
 
     DBQueryFatal("unlock tables");
 
@@ -171,9 +171,33 @@ if ($ISMAINSITE) {
     #
     # Now the other tables Kevin needs
     #
-    foreach my $tablename ("scripts", "priorities", "causes", "errors") {
+    foreach my $tablename ("scripts", "priorities", "causes",
+			   "errors", "users", "experiments") {
 	if ($tablename eq "errors") {
 	    DBQueryFatal("select * from $tablename where session>=$firstseq ".
+			 "into outfile '${tempfile}.${tablename}' ");
+	}
+	elsif ($tablename eq "users") {
+	    DBQueryFatal("select uid,unix_uid from $tablename ".
+			 "into outfile '${tempfile}.${tablename}' ");
+	}
+	elsif ($tablename eq "experiments") {
+	    next
+		if (! defined($lastseq));
+	    
+	    #
+	    # Grab the min,max experiment indexes for dumping stat table below.
+	    #
+	    $query_result =
+		DBQueryFatal("select MIN(exptidx),MAX(exptidx) from log ".
+			     "where (seq > $firstseq and seq <= $lastseq) ".
+			     "      and exptidx!=0");
+
+	    my ($exptidx_min,$exptidx_max) = $query_result->fetchrow_array();
+	    
+	    DBQueryFatal("select exptidx,pid,eid from experiment_stats ".
+			 "where exptidx >  $exptidx_min and ".
+			 "      exptidx <= $exptidx_max ".
 			 "into outfile '${tempfile}.${tablename}' ");
 	}
 	else {
