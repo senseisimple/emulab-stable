@@ -173,6 +173,7 @@ while (<IF>) {
 		my $nodetype = $2;
 		my $query_result =
 		    DBQueryWarn("select n.node_id,n.pxe_boot_path, ".
+				"       t.pxe_boot_path as nt_pxe_boot_path, ".
 				"       i.IP,i.MAC,r.pid,r.eid, ".
 				"       r.vname,r.inner_elab_role, ".
 				"       r.inner_elab_boot ".
@@ -237,9 +238,22 @@ while (<IF>) {
 			    "${spaces}\toption host-name \"$node_id\";\n";
 		    }
 		    
-		    # Handle alternate boot program filename if it exists
+		    #
+		    # Handle alternate boot program filename if it exists.
+		    # Use mutable nodes.pxe_boot_path if it is defined.
+		    # Otherwise use the node_types.pxe_boot_path if it is
+		    # defined.  Otherwise don't set anything (use the global
+		    # default).
+		    #
 		    if (defined($row{"pxe_boot_path"})) {
 			my $fn = $row{"pxe_boot_path"};
+			# make sure it is pretty constrained
+			if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
+			    $filename = "${spaces}\tfilename \"$fn\";\n";
+			}
+		    }
+		    if (!$filename && defined($row{"nt_pxe_boot_path"})) {
+			my $fn = $row{"nt_pxe_boot_path"};
 			# make sure it is pretty constrained
 			if ($fn =~ /^\/tftpboot\// && $fn !~ /\.\./) {
 			    $filename = "${spaces}\tfilename \"$fn\";\n";
