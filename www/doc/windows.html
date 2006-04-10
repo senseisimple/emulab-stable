@@ -39,8 +39,9 @@
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
   <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
-  <li> <a href="#Changes"> Change Log </a>
+  <li> <a href="#Changes"> Change Log
          <img src="../new.gif" alt="&lt;NEW&gt;"></li>
+	 Latest: 2006-04-04 hardware-independent images. </a>
   <li> <a href="#Future"> Future Work </a></li>
 </ol>
 
@@ -140,26 +141,24 @@ All you have to do is put a line specifying a WINXP OS image in your
 experiment .ns file, like this:
 <pre>
     tb-set-node-os $node WINXP-UPDATE
-    tb-set-hardware $node pc850
 </pre>
 
-Notice that the above image only runs on the <a
-href="../shownodetype.php3?node_type=pc850"> pc850 </a> Emulab node type.  At
-present, you have to explicitly specify a different image name and hardware
-type to run on the <a href="docwrapper.php3?docname=pc3000.html"> pc3000's
-</a>.  For example:
+The Emulab Windows XP images are no longer specific to a particular hardware type.
+(See the <a href="#Changes"> Change Log </a> for more information.)  You can
+explicitly <a href="../kb-show.php3?xref_tag=tb-set-hardware">specify the
+hardware type</a> to run on, for example:
 <pre>
-    tb-set-node-os $node WINXP-UPDATE-pc3000
     tb-set-hardware $node pc3000
 </pre>
-
 
 Currently available Windows XP images are:
 
 <ul>
 
-  <li><b>WINXP-UPDATE</b> (pc850), and <b>WINXP-UPDATE-pc3000</b> - Windows
-  XP-SP2+.  These are updated periodically from Windows Update, typically after
+  <li><b>WINXP-UPDATE</b> - The most recent Windows
+  XP-SP2+.  This is usually what you want.  <p>
+
+  It is updated periodically from Windows Update, typically after
   a Microsoft "Patch Tuesday", the second Tuesday of each month.  All critical
   and security fixes are installed, up through the date we pull the image
   file. (See the date created field on the individual WINXP <a
@@ -169,24 +168,29 @@ Currently available Windows XP images are:
   repeatedly!)
   </li>
 
-  <li><b>WINXP-SP2(-pc3000)</b> - Windows XP-SP2.  This has the original SP2 on it,
+  <li><b>WINXP-SP2</b> - Windows XP-SP2.  This has the original SP2 on it,
   with no Windows Update modifications beyond that.  (SP2 includes SP1.)
   </li>
 
-  <li><b>WINXP-SP1(-pc3000)</b> - Windows XP-SP1a.  This is intended for
+  <li><b>WINXP-SP1</b> - Windows XP-SP1a.  This is intended for
   software (in)security work, and has only the updated version of SP1
   (a.k.a. SP1a) installed.
   </li>
 
-  <li><b>WINXP-SP0(-pc3000)</b> - Windows XP, from the original 2001 MSDN CD,
+  <li><b>WINXP-SP0</b> - Windows XP, from the original 2001 MSDN CD,
   with the Emulab client-side management code ported to it.  This is intended
   for software (in)security work, and has no service packs at all.
-  </li>
+  </li> <br>
 
-  <li><b>WINXP-BASE(-pc3000)</b> - Raw Windows XP, from the original 2001 MSDN
-  CD.  There is no Emulab client-side <a href="#Overview"> management code
-  </a> to set up and operate the node, or even Cygwin.  This is only useful
-  for building custom images completely from scratch.
+  <li><b>WINXP-BASE[-SP1,-SP2][-cygwn][-3000,-pc3000]</b> - Raw Windows XP
+  images from the original 2001 MSDN CD, some with service packs and Cygwin.
+  There is no Emulab client-side <a href="#Overview"> management code
+  </a> to set up and operate the node.  This is only useful
+  for building special custom images completely from scratch.  <p>
+
+  Note: These base images are hardware-dependent, and will run only on the
+  pc850 (and possibly the pc600) without a suffix, and on the pc3000 with the
+  <code>-3000</code> or <code>-pc3000</code> suffix.
   </li>
 
 </ul>
@@ -566,12 +570,12 @@ depends on <code>prepare</code> being run.
        Re-enter new password:
     </pre>
 
-    This works becuase you are part of the Windows <code>Administrators</code>
+    This works because you are part of the Windows <code>Administrators</code>
     group.  Otherwise you would have to already know the root password to
     change it.  <p>
 
        <div style="margin-left: 40px;"> <b>NOTE:</b> If you change the root
-       password and reboot Windows before running <code>prepare</code> below,
+       password and reboot Windows <u>before running <code>prepare</code></u> below,
        the root password will not match the definitions of the Emulab Windows
        services (daemons) that run as root, so they will not start up. </div>
   </li> <br>
@@ -989,6 +993,79 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
 <hr style="width: 100%; height: 2px;">
 <h3><a name="Changes"> </a> Change Log </h3>
 
+<b>2006-04-04</b>
+<ul>
+  <li>
+    Switch to hardware-independent images, using the 
+    Microsoft Sysprep/Mini-Setup programs
+    <a href="http://support.microsoft.com/kb/302577">[1]</a>
+    <a href="http://technet2.microsoft.com/WindowsServer/en/Library/fae4952d-6489-4628-89c2-30a1c70447ef1033.mspx">[2]</a>
+    <a href="http://www.microsoft.com/technet/prodtechnol/windows2000pro/deploy/unattend/sp1ch03.mspx">[4]</a>
+    <a href="http://support.microsoft.com/default.aspx?scid=kb;en-us;314479">[5]</a>
+    via the <a href="#Custom_images"><code>prepare -s</code> option</a>.  <p>
+
+    It is no longer necessary to <a
+    href="../kb-show.php3?xref_tag=tb-set-hardware">specify the hardware
+    type</a> with an image suffix, although you may want to do so to control
+    the allocation of physical nodes to your experiment.  <p>
+
+    The unsuffixed <code>WINXP-{SP[012],UPDATE}</code> images will now run on
+    the pc3000 and pc3000w (WiFi) nodes, in addition to the pc850 and pc600.
+    For compatibility with existing experiments, the image names with
+    <code>-pc3000</code> suffixes will still work, but they are just symlinks
+    to the unsuffixed images.  <p>
+
+    Notes:
+    <ul>
+      <li>
+	The WINXP-SP0 image is almost pure from the 2001 XP CD, but has a 2002
+	SP1a <u>pci.sys</u> .  This is needed to boot on the pc3000's which
+	have a newer PCI chipset.
+      </li><br>
+
+      <li>
+	These images work on the <a
+	href="../docwrapper.php3?docname=hardware.html#tbpc3000w"><u>pc3000w
+	(WiFi)</u></a> nodes.  There are drivers for the NetGear WAG311
+	WiFi cards installed, but no <a
+	href="../tutorial/docwrapper.php3?docname=wireless.html">Emulab
+	support</a> to set up wireless networking under Windows XP yet.
+      </li><br>
+
+      <li>
+	Note of these images will boot on the <u>pc2000</u> nodes.  It's
+	probably a boot disk driver error under Mini-Setup for the ATA100 IDE
+	controller.
+      </li><br>
+
+      <li>
+	There is a problem with TCP/IP that affects only <u>SP0 or SP1
+	images running on the pc600's</u>.  (This may be due to the older versions
+	of Sysprep/Mini-Setup for SP0 and SP1.)  Due to this, the pc600 bit is
+	turned off for the hardware-independent WINXP-SP0 and -SP1 images.  <p>
+
+	Details: Outgoing connections work fine, so the node sets up under
+	Emulab correctly.  Incoming ssh connections time-out, although RDP
+	works fine.  Netstat shows the ssh socket 22 listening, but no
+	connection attempts are logged by sshd in /var/log/messages.  Packet
+	capture shows that TCP SYN packets are being received, but the SYN-ACK
+	handshake never goes out, so it's a lower-level problem.
+      </li><br>
+    </ul>
+
+  </li><br>
+
+  <li>
+    Also fix an account creation bug and add more workarounds for Windows
+    boot-time and network-setup flakiness.  <p>
+
+    It seems that adding Sysprep to the mix has also improved the reliability
+    of TCP/IP stack setup, probably because it tears down all of the internal
+    data structures and recreates them.  This adds 1.5 minutes to the Windows
+    setup time, which seems worth-while.
+  </li>
+</ul>
+
 <b>2006-02-14</b>
 <ul>
   <li>
@@ -1019,12 +1096,12 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
   </li><br>
 
   <li>
-    I've also been chasing a random problem where one of the network
+    There is a random problem where one of the network
     interfaces disappears from ipconfig due to a race condition within Windows
     startup.  rc.cygwin/rc.ifconfig now work harder at resetting the
     interfaces, and reboot as a last resort if that fails.  It seems that
     fixing one interface can make the problem move to another one though.
-    Unless you use all four available experimental network interfaces in an
+    Unless you use all four available experimental-network interfaces in an
     experiment topology, this should fix the problem.
   </li>
 </ul>
@@ -1127,11 +1204,11 @@ There are still some things undone: <br>
 
 <ul>
 
-  <li> Use Sysprep (MS WADS) for multi-hardware XP images. </li>
-
   <li> Automate production of <i>Windows XP</i> images for Emulab. </li>
 
   <li> Dynamic routing support for <code>rtproto Session</code>?  </li>
+
+  <li> Support for setting up WiFi networking under <i>Windows XP</i>? </li>
 
 </ul>
 
