@@ -342,7 +342,7 @@ sub os_ifconfig_line($$$$$$$;$$)
 	$uplines   .= sprintf("  " . $IFCONFIG, $iface, $inet, $mask) . qq{\n    };
 	#
 	# Re-check.
-	$uplines   .= qq{  $addr1\n$addr2\n    };
+	$uplines   .= qq{  $addr1\n    $addr2\n    };
 	$uplines   .= qq{  if $iptest; then\n    };
 	$uplines   .= qq{    echo "    Reconfig still failed on $iface."\n    };
 	$uplines   .= qq{  else echo "    Reconfig succeeded on $iface."\n    };
