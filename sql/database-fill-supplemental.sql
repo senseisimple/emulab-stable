@@ -10,7 +10,7 @@ INSERT IGNORE INTO os_info VALUES ('FRISBEE-MFS','emulab-ops','FRISBEE-MFS','roo
 INSERT IGNORE INTO os_info VALUES ('NEWNODE-MFS','emulab-ops','NEWNODE-MFS','root',NULL,'NewNode (FreeBSD) in an MFS','FreeBSD','4.5','boss:/tftpboot/freebsd.newnode',NULL,'','ping,ssh,ipod,isup',0,1,0,'PXEFBSD',NULL,NULL,1,150);
 INSERT IGNORE INTO os_info VALUES ('OPSNODE-BSD','emulab-ops','OPSNODE-BSD','root',NULL,'FreeBSD on the Operations Node','FreeBSD','4.X','',NULL,'','ping,ssh,ipod,isup',0,1,0,'OPSNODEBSD',NULL,NULL,1,150);
 INSERT IGNORE INTO os_info VALUES ('FW-IPFW','emulab-ops','FW-IPFW','root',NULL,'IPFW Firewall','FreeBSD','',NULL,'FreeBSD','','ping,ssh,ipod,isup,veths,mlinks',0,1,1,'NORMAL','emulab-ops-FBSD47-STD',NULL,0,150);
-INSERT IGNORE INTO node_types VALUES ('pcvm','pcvm','PIII',0,0,0.00,0,'emulab-ops-FBSD-JAIL',0,60,'',0,0,0,'eth0',NULL,0,'','',NULL,NULL,1,0,1,1,0,0,0,0,0,0,0,1,NULL,'FREEBSD-MFS','FRISBEE-MFS');
+INSERT IGNORE INTO node_types VALUES ('pcvm','pcvm','PIII',0,0,0.00,0,'emulab-ops-FBSD-JAIL',0,60,'',0,0,0,'eth0',NULL,0,'','',NULL,NULL,'',1,0,1,1,0,0,0,0,0,0,0,1,NULL,'FREEBSD-MFS','FRISBEE-MFS');
 
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','delay','/kernel.delay');
 INSERT IGNORE INTO os_boot_cmd VALUES ('FreeBSD','4.10','vnodehost','/kernel.jail');

@@ -3283,3 +3283,10 @@ last_net_act,last_cpu_act,last_ext_act);
 4.48: Add index to log table.
 
       alter table log add key stamp (stamp);
+
+4.49: Ugh, node_types.pxe_boot_path is back.  Allows alternate PXE boot
+      path for a whole type of node, e.g., one which does not support a
+      serial console.  Put it right back where it was before.
+
+      alter table node_types add column pxe_boot_path text \
+          after modelnetedge_osid;

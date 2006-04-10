@@ -470,7 +470,7 @@ CREATE TABLE experiment_run_bindings (
 
 CREATE TABLE experiment_runs (
   exptidx int(10) unsigned NOT NULL default '0',
-  idx int(10) unsigned NOT NULL auto_increment,  
+  idx int(10) unsigned NOT NULL auto_increment,
   runid varchar(32) NOT NULL default '',
   description tinytext,
   start_time datetime default NULL,
@@ -564,7 +564,7 @@ CREATE TABLE experiment_template_instance_bindings (
   eid varchar(32) NOT NULL default '',
   name varchar(64) NOT NULL default '',
   value tinytext NOT NULL,
-  PRIMARY KEY  (instance_idx, name),
+  PRIMARY KEY  (instance_idx,name),
   KEY parent_guid (parent_guid,parent_vers),
   KEY pidtid (pid,eid)
 ) TYPE=MyISAM;
@@ -574,7 +574,7 @@ CREATE TABLE experiment_template_instance_bindings (
 --
 
 CREATE TABLE experiment_template_instances (
-  idx int(10) unsigned NOT NULL auto_increment,  
+  idx int(10) unsigned NOT NULL auto_increment,
   parent_guid varchar(16) NOT NULL default '',
   parent_vers smallint(5) unsigned NOT NULL default '0',
   exptidx int(10) unsigned NOT NULL default '0',
@@ -1571,6 +1571,7 @@ CREATE TABLE node_types (
   jail_osid varchar(35) default NULL,
   modelnetcore_osid varchar(35) default NULL,
   modelnetedge_osid varchar(35) default NULL,
+  pxe_boot_path text,
   isvirtnode tinyint(4) NOT NULL default '0',
   ismodelnet tinyint(1) NOT NULL default '0',
   isjailed tinyint(1) NOT NULL default '0',
@@ -3028,4 +3029,3 @@ CREATE TABLE wires (
   KEY dest (node_id2,card2,port2),
   KEY src (node_id1,card1,port1)
 ) TYPE=MyISAM;
-
