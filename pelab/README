@@ -1,0 +1,84 @@
+What is supported:
+
+* Automatic creation of an experiment of any number of nodes
+
+* Running experiments on the real PlanetLab or a 'fake' PlanetLab inside
+  of Emulab - or both in the same experiment
+
+* Automatic tcpdumps of emulab-side traffic
+
+* Automatic collection of log files at the end of an experiment
+
+* Easy starting/restarting of stubs and monitors
+
+----------------------------------------------------------------------
+What is not supported:
+
+* Automatic tcpdump on the real PlanetLab (planned)
+
+* Running test clients (ie. 'iperf -c') for you (planned)
+
+* Asking for specific planetlab nodes (planned)
+
+* Specifying point to point traffic shaping for the Elab initial conditions
+  and for fake planetlabs. This should be taken care of by whatever
+  mechanisms are used to fetch wanetmon data
+
+----------------------------------------------------------------------
+Running an experiment with the auto-pelab scripts:
+
+1) Create a tarball of the version of the pelab software (monitor, stub, etc.)
+   that you'd like to test:
+     Go to your testbed source tree
+     Run 'cvs up'!!!
+     Run 'gmake' in pelab/stub and pelab/libnetmon (on a DevBox machine)
+     From the root of your source tree, run:
+         tar czvf /proj/tbres/my-pelab.tar.gz pelab
+     Of course, don't name it 'my-plab.tar.gz'! You can put this file in
+       a subdirectory if you want, but it must be somewhere in
+         /proj/tbres/
+     Put the path to your tarball in the pelab_tar variable in auto-pelab.ns 
+
+2) Read the user-settable options at the top of auto-pelab.ns and change them
+   to your preferences.
+   
+3) Use auto-pelab.ns to create an experiment
+
+4) Once it has swapped in, and you're ready to start an experiment, run the
+   'start-experiment' script on ops. It will
+     Restart monitors and stubs
+     Reset ALL link shaping to the defaults from the NS file
+     Clean logfiles
+     Restart iperf servers on all 'elab-*' nodes
+
+5) Log into the 'elab-*' node or nodes, and run your experiment (ie. one run
+   of iperf). Make sure to run them with 'instrument.sh'.
+
+6) When your're done with your experiment, run 'stop-experiment' on ops. It
+   will:
+    Stop the stubs, monitors, and iperf servers
+    Collect logfiles from all of the nodes in the experiment, including
+      stub/monitor logs, tcpdumps, delay agent logs, and so on
+    Run tcptrace on all tcpdump logs to produce xplot graphs
+    Put all of these things in a zip file for you in the experiment's log
+      directory (/proj/PID/exp/EID/logs)
+
+7) If you want to look at the logs, unzip the .zip file somewhere, and see
+   the description of the files it contains below
+
+----------------------------------------------------------------------
+Important places:
+
+* Logfiles from the monitors, stubs, etc. can all be found in /local/logs
+  on the node while the experiment runs. You can tail the .out or .err
+  files to see the stdout and stderr of these processes
+
+* Inside the archive zip file you will find:
+  elab-*/ - Logifles from the emulator hosts (more detail below)
+  even-sched.log - Log of all events (including dummynet control events) sent
+      during the experiment
+  plab-*/ - Logfiles from the FAKE plabnetlab nodes
+  planet-*/ - Logifles from the REAL planetlab nodes
+  tbsdelay*/ - Logs from the delay nodes, including tcpdump traces
+
+  Node 

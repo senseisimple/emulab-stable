@@ -25,10 +25,19 @@ if (system "$TEVC -e $pid/$eid now allgroup stop") {
 #
 # Stop link tracing
 #
+print "##### Stopping link tracing\n";
 if (system "$TEVC -e $pid/$eid now planetc-tracemon snapshot") {
     die "Error running tevc\n";
 }
 if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
+    die "Error running tevc\n";
+}
+
+#
+# Stop running servers
+#
+print "##### Stopping servers\n";
+if (system "$TEVC -e $pid/$eid now allservers stop") {
     die "Error running tevc\n";
 }
 

@@ -4,6 +4,7 @@ use strict;
 
 my $TEVC = "/usr/testbed/bin/tevc";
 my $LOGHOLE = "/usr/testbed/bin/loghole";
+my $PYTHON = "/usr/local/bin/python";
 
 #
 # Require the pid and eid
@@ -34,12 +35,34 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
 }
 
 #
+# Restart the server program
+
+#
 # Clean out the logs so that we can start fresh
 #
 print "##### Cleaning old logfiles (ignore 'No match' errors)\n";
 if (system "$LOGHOLE -e $pid/$eid clean -f -r") {
     die "Error running loghole\n";
 }
+
+#
+# Reset the links so that we remove any delay changes we might have previously
+# made
+#
+print "##### Resetting all links in the experiment\n";
+if (system "$PYTHON resetlinks.py $pid $eid") {
+    die "Error resetting links\n";
+}
+
+
+print "##### Restarting servers\n";
+if (system "$TEVC -e $pid/$eid now allservers stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now allservers start") {
+    die "Error running tevc\n";
+}
+
 
 #
 # Start link tracing
@@ -52,8 +75,12 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
 #
 # Start up the stubs and monitors
 #
-print "##### Starting stubs and monitors\n";
-if (system "$TEVC -e $pid/$eid now allgroup start") {
+print "##### Starting stubs\n";
+if (system "$TEVC -e $pid/$eid now plabstubs start") {
+    die "Error running tevc\n";
+}
+print "##### Starting monitors\n";
+if (system "$TEVC -e $pid/$eid now monitorgroup start") {
     die "Error running tevc\n";
 }
 

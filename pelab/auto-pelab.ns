@@ -3,6 +3,9 @@ source tb_compat.tcl
 set ns [new Simulator]
 $ns rtproto Static
 
+##########
+# Beginning of user-settable options
+
 #
 # This control how many _pairs_ of PCs there are. ie. 2 gets you 2 elab PCs
 # and 2 plab PCs
@@ -10,10 +13,15 @@ $ns rtproto Static
 set num_pcs 2
 
 #
-# Set this to 0 to use the real PlanetLab, not elab nodes pretending to be
-# plab nodes.
+# If set to 1, we create a fake PlanetLab inside Emulab
 #
 set fake_plab 1
+
+#
+# If set to 1, we grab real PlanetLab nodes. Both this and fake_plab can be
+# set at the same time
+#
+set real_plab 1
 
 #
 # Where to grab your tarball of pelab software from. To make this tarball:
@@ -27,7 +35,7 @@ set fake_plab 1
 #       /proj/tbres/
 #   Put the path to your tarball in this variable
 #
-set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+set pelab_tar "/proj/tbres/ricci/pelab.tar.gz"
 
 #
 # When using a fake plab, these are the parameters for the 'control'
@@ -44,41 +52,75 @@ set cloud_delay "30ms"
 set cloud_bw "1.5Mbps"
 
 #
+# These are the initial conditions for the 'elabc' cloud, the Emulab side of
+# a pelab experiment
+#
+set ecloud_delay "30ms"
+set ecloud_bw "1.5Mbps"
+
+#
 # Hardare type to use for PCs inside of emulab
 #
 set hwtype "pc"
 
+#
+# Server and client to use for automated testing. If set, will automatically
+# be started by the 'start-experiment' script
+#
+set serverprog "/usr/bin/iperf -s "
+# NOTE: No client support for now, you'll have to run the client yourself
+set clientprog "/usr/bin/iperf -t 60 -c "
+
+# End of user-settable options
+##########
+
 tb-set-delay-os FBSD54-FUTURE
+
+#
+# Tarballs and RPMs we install on all nodes
+#
+set tarfiles "/local $pelab_tar"
+set rpms "/proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm"
 
 set elan_string ""
 set plan_string ""
 
 set stublist {}
+set planetstublist {}
+set plabstublist {}
 set monitorlist {}
-set alllist {}
+set planetservers {}
+set serverlist {}
+set clientlist {}
 
 #
 # Create all of the nodes
 #
 for {set i 1} {$i <= $num_pcs} {incr i} {
-    set planet($i) [$ns node]
 
-    if {$fake_plab} {
-        tb-set-node-os $planet($i) PLAB-DEVBOX
-    }
-    if {$fake_plab} {
-        tb-set-hardware $planet($i) $hwtype
-    } else {
+    if {$real_plab} {
+        set planet($i) [$ns node]
         tb-set-hardware $planet($i) pcplab
+        set planetstub($i) [$planet($i) program-agent -command "/bin/sh /local/pelab/stub/auto-stub.sh"]
+        lappend stublist $planetstub($i)
+        lappend planetstublist $planetstub($i)
+
+        tb-set-node-tarfiles $planet($i) $tarfiles
+        tb-set-node-rpms $planet($i) $rpms
     }
-    append plan_string "$planet(${i}) "
 
-    set stub($i) [$planet($i) program-agent -command "/bin/sh /local/pelab/stub/auto-stub.sh"]
-    lappend stublist $stub($i)
-    lappend alllist $stub($i)
+    if {$fake_plab} {
+        set plab($i) [$ns node]
+        tb-set-node-os $plab($i) PLAB-DEVBOX
+        tb-set-hardware $plab($i) $hwtype
+        append plan_string "$plab(${i}) "
+        set plabstub($i) [$plab($i) program-agent -command "/bin/sh /local/pelab/stub/auto-stub.sh"]
+        lappend stublist $plabstub($i)
+        lappend plabstublist $plabstub($i)
 
-    tb-set-node-tarfiles $planet($i) /local $pelab_tar
-    tb-set-node-rpms $planet($i) /proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm
+        tb-set-node-tarfiles $plab($i) $tarfiles
+        tb-set-node-rpms $plab($i) $rpms
+    }
 
     set elab($i) [$ns node]
     tb-set-node-os $elab($i) PLAB-DEVBOX
@@ -86,32 +128,40 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
     append elan_string "$elab(${i}) "
     set monitor($i) [$elab($i) program-agent -command "/bin/sh /local/pelab/monitor/auto-monitor.sh"]
     lappend monitorlist $monitor($i)
-    lappend alllist $monitor($i)
 
-    tb-set-node-tarfiles $elab($i) /local $pelab_tar
-    tb-set-node-rpms $planet($i) /proj/tbres/auto-pelab/libpcap-0.8.3-3.i386.rpm /proj/tbres/auto-pelab/iperf-2.0.2-1.1.fc2.rf.i386.rpm
+    set server($i) [$elab($i) program-agent -command $serverprog]
+    set client($i) [$elab($i) program-agent -command $clientprog]
+    lappend serverlist $server($i)
+    lappend clientlist $client($i)
+
+    tb-set-node-tarfiles $elab($i) $tarfiles
+    tb-set-node-rpms $elab($i) $rpms
 }
 
 #
 # Set up groups to make it easy for us to start/stop program agents
 #
 set stubgroup [$ns event-group $stublist]
+set planetstubs [$ns event-group $planetstublist]
+set plabstubs [$ns event-group $plabstublist]
 set monitorgroup [$ns event-group $monitorlist]
-set allgroup [$ns event-group $alllist]
+
+set allservers [$ns event-group $serverlist]
+set allclients [$ns event-group $clientlist]
 
 #
 # Fake 'Inernet' cloud for fake plab nodes
 #
 if {$fake_plab} {
-    set planetc [$ns make-lan "$plan_string" $cloud_bw $cloud_delay]
-    tb-set-ip-lan $planet(1) $planetc 10.1.0.1
-    $planetc trace
+    set plabc [$ns make-lan "$plan_string" $cloud_bw $cloud_delay]
+    tb-set-ip-lan $plab(1) $plabc 10.1.0.1
+    $plabc trace
 }
 
 #
 # Lan which will be controlled by the monitor
 #
-set elabc [$ns make-lan "$elan_string" 10Mb 10ms]
+set elabc [$ns make-lan "$elan_string" $ecloud_bw $ecloud_delay]
 tb-set-ip-lan $elab(1) $elabc 10.0.0.1
 $elabc trace
 
@@ -129,13 +179,13 @@ if {$fake_plab} {
     set prouter [$ns node]
 
     set elabcontrol [$ns make-lan "$elan_string $erouter" 100Mbps 0ms]
-    set planetcontrol [$ns make-lan "$plan_string $prouter" 100Mbps 0ms]
+    set plabcontrol [$ns make-lan "$plan_string $prouter" 100Mbps 0ms]
 
     set internet [$ns duplex-link $erouter $prouter $control_bw $control_delay DropTail]
     $internet trace
 
     tb-set-ip-lan $elab(1) $elabcontrol 192.168.0.1
-    tb-set-ip-lan $planet(1) $planetcontrol 192.168.1.1
+    tb-set-ip-lan $plab(1) $plabcontrol 192.168.1.1
 
     tb-set-ip-link $erouter $internet 192.168.254.1
     tb-set-ip-link $prouter $internet 192.168.254.2
