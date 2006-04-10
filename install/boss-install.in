@@ -408,11 +408,8 @@ Phase "portfixup", "Fixing up packages", sub {
 	if (!ExecQuiet("$PKG_INFO -x rsync")) {
 	    PhaseSkip("rsync already installed");
 	}
-
-	PhaseFail("Must provide -p (packagedir) argument!")
-	    if (!$packagedir);
-
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD rsync-2.6.3_1");
+	my $pname = GetPackage("rsync", $packagedir);
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
     if ($FBSD_VERSION == 6) {
 	# Temporary for template stuff
@@ -420,23 +417,15 @@ Phase "portfixup", "Fixing up packages", sub {
 	    if (!ExecQuiet("$PKG_INFO -x p5-XML-Simple")) {
 		PhaseSkip("p5-XML-Simple already installed");
 	    }
-
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
-			   "     $PKG_ADD p5-XML-Simple-2.14");
+	    my $pname = GetPackage("p5-XML-Simple", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
 	Phase "Subversion", "Looking for Subversion", sub {
 	    if (!ExecQuiet("$PKG_INFO -x subversion")) {
 		PhaseSkip("subversion already installed");
 	    }
-
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir ".
-			   "     $PKG_ADD subversion-1.3.0.tbz");
+	    my $pname = GetPackage("subversion", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
     if ($WINSUPPORT) {
@@ -445,11 +434,8 @@ Phase "portfixup", "Fixing up packages", sub {
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
-	    
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD gcc30-3.0.4_1");
+	    my $pname = GetPackage("gcc30", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
 };

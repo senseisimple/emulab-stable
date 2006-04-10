@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2003-2005 University of Utah and the Flux Group.
+# Copyright (c) 2003-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -453,6 +453,29 @@ sub FetchFileFatal($$) {
     if (!FetchFile($URL,$localname)) {
 	PhaseFail("Unable to fetch $URL");
     }
+}
+
+#
+# Locate the proper version of a package to install by looking
+# at the available package tarballs.
+#
+# Must be called "in phase" since we will PhashFail on errors.
+#
+sub GetPackage($$) {
+    my ($prefix, $packagedir) = @_;
+
+    PhaseFail("Must provide -p (packagedir) argument!")
+	if (!$packagedir);
+
+    my $pname = `ls $packagedir/$prefix-*.tbz`;
+    if ($?) {
+	$pname = `ls $packagedir/$prefix-*.tgz`;
+	PhaseFail("Cannot find $prefix package in $packagedir!")
+	    if ($?);
+    }
+    chomp($pname);
+
+    return $pname;
 }
 
 #

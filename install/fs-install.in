@@ -263,11 +263,8 @@ Phase "portfixup", "Fixing up packages", sub {
 	if (!ExecQuiet("$PKG_INFO -x rsync")) {
 	    PhaseSkip("rsync already installed");
 	}
-
-	PhaseFail("Must have PKG_PATH environment variable set")
-	    if (!exists($ENV{"PKG_PATH"}));
-	
-	ExecQuietFatal("$PKG_ADD rsync-2.6.3_1");
+	my $pname = GetPackage("rsync", $packagedir);
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
     Phase "samba", "Looking for Samba and installing", sub {
 	if (!$WINSUPPORT) {
@@ -276,11 +273,9 @@ Phase "portfixup", "Fixing up packages", sub {
 	if (!ExecQuiet("$PKG_INFO -x samba")) {
 	    PhaseSkip("samba already installed");
 	}
-	    
-	PhaseFail("Must have PKG_PATH environment variable set")
-	    if (!exists($ENV{"PKG_PATH"}));
 
-	ExecQuietFatal("$PKG_ADD samba-3.0.7,1");
+	my $pname = GetPackage("samba", $packagedir);
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
 };
 

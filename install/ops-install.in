@@ -331,12 +331,7 @@ Phase "ports", "Installing ports", sub {
 	    if (!$packagedir) {
 		PhaseSkip("No package directory provided");
 	    }
-	    # Lets not hardwire the package name; whatever it is will do.
-	    my $pname = `ls $packagedir/mailman-*.tbz`;
-	    PhaseFail("Cannot find mailman package in $packagedir!")
-		if ($?);
-	    chomp($pname);
-	    
+	    my $pname = GetPackage("mailman", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
@@ -351,12 +346,7 @@ Phase "ports", "Installing ports", sub {
 	    if (!$packagedir) {
 		PhaseSkip("No package directory provided");
 	    }
-	    # Lets not hardwire the package name; whatever it is will do.
-	    my $pname = `ls $packagedir/cvsd-*.tbz`;
-	    PhaseFail("Cannot find cvsd package in $packagedir!")
-		if ($?);
-	    chomp($pname);
-	    
+	    my $pname = GetPackage("cvsd", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
@@ -371,12 +361,7 @@ Phase "ports", "Installing ports", sub {
 	    if (!$packagedir) {
 		PhaseSkip("No package directory provided");
 	    }
-	    # Lets not hardwire the package name; whatever it is will do.
-	    my $pname = `ls $packagedir/adodb-*.tbz`;
-	    PhaseFail("Cannot find adodb package in $packagedir!")
-		if ($?);
-	    chomp($pname);
-	    
+	    my $pname = GetPackage("adodb", $packagedir);
 	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
@@ -440,11 +425,8 @@ Phase "portfixup", "Fixing up packages", sub {
 	if (!ExecQuiet("$PKG_INFO -x rsync")) {
 	    PhaseSkip("rsync already installed");
 	}
-
-	PhaseFail("Must provide -p (packagedir) argument!")
-	    if (!$packagedir);
-
-	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD rsync-2.6.3_1");
+	my $pname = GetPackage("rsync", $packagedir);
+	ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
     };
     if ($WINSUPPORT) {
 	Phase "samba", "Looking for Samba and installing", sub {
@@ -454,22 +436,16 @@ Phase "portfixup", "Fixing up packages", sub {
 	    if (!ExecQuiet("$PKG_INFO -x samba")) {
 		PhaseSkip("samba already installed");
 	    }
-	    
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD samba-3.0.7,1");
+	    my $pname = GetPackage("samba", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
 	Phase "gcc30", "Looking for GCC 3.0 and installing", sub {
 	    if ($FBSD_VERSION > 4 ||
 		!ExecQuiet("$PKG_INFO -x gcc30")) {
 		PhaseSkip("GCC 3.0 already installed");
 	    }
-	    
-	    PhaseFail("Must provide -p (packagedir) argument!")
-		if (!$packagedir);
-
-	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD gcc30-3.0.4_1");
+	    my $pname = GetPackage("gcc30", $packagedir);
+	    ExecQuietFatal("$ENV PKG_PATH=$packagedir $PKG_ADD $pname");
 	};
     }
 };
