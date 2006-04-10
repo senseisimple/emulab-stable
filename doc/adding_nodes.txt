@@ -34,9 +34,9 @@ B. If the node is of a new type
    Example:
 
    insert into node_types
-   (class,type,proc,speed,RAM,HD,max_interfaces,osid,control_net,imageid,imageable,delay_capacity,virtnode_capacity,control_iface,disktype,delay_osid,jail_osid)
+   (class,type,proc,speed,RAM,HD,max_interfaces,osid,control_net,imageid,imageable,delay_capacity,virtnode_capacity,control_iface,disktype,bootdisk_unit,delay_osid,jail_osid)
    values
-   ("pc","pc2000","P4",2000,512,20.0,5,"RHL-STD",0,"emulab-ops-FBSD47+RHL73-STD",1,2,10,"eth0","ad","FBSD-STD","FBSD-STD");
+   ("pc","pc2000","P4",2000,512,20.0,5,"RHL-STD",0,"emulab-ops-FBSD47+RHL73-STD",1,2,10,"eth0","ad",0,"FBSD-STD","FBSD-STD");
 
 2. There are several scripts that limit searches to certain classes.
    If the new type you have added does not have class "pc", you may need
