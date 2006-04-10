@@ -22,10 +22,11 @@ frisbee*/
 	this to be as small as possible.  Not intended as an interactive
 	environment, its rc.local script invokes frisbee and then reboots.
 
-freebsd.newnode/
-	kernel/MFS for a PXE-booted memory based FreeBSD system.
-	A specialized version of the frisbee MFS for loading on nodes
-	which are not yet part of Emulab.
+freebsd.newnode*/
+	kernel/MFS for a PXE-booted memory based FreeBSD 4.7 or 5.3 system.
+	A specialized version of the freebsd MFS for loading on nodes
+	which are not yet part of Emulab.  Has a generic kernel and specialized
+	scripts for figuring out the network connections, etc.
 
 mfs-entries.sql
 	At some point in the Emulab setup directions you will be told that
@@ -54,8 +55,9 @@ MFSes.  You almost certainly want to use the 5.3 versions since 5.3 supports
 more hardware.  If you have any problems with those, then try the 4.7 versions.
 Otherwise just use the 4.7 version.  In summary, I recommend:
 
-	frisbee53 (move it to "frisbee")
-	freebsd53 (move one to "freebsd")
+	frisbee53 (rename to "frisbee")
+	freebsd53 (rename to "freebsd")
+	freebsd53.newnode (rename to "freebsd.newnode")
 
 Anyway, after choosing your MFSes, you should have three generic MFSes
 (frisbee, freebsd, freebsd.newnode).  The three MFSes unloaded are "generic"
@@ -72,4 +74,4 @@ loader to drop into interactive mode.  Make sure you replace the loader.conf
 file in the three subdirectories with the -null version as well.
 
 [ This file is a copy of doc/customize-mfs.txt in the Emulab source tree. ]
-[ Last updated 10/03/05 ]
+[ Last updated 04/10/06 ]
