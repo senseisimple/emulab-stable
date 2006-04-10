@@ -1243,6 +1243,18 @@ sub SetupBossNode()
     mysystem("cd /tftpboot; cp -rp frisbee frisbee-53")
 	if ($fv eq "53");
 
+    #
+    # Have recently added a 5.3 based newnode MFS
+    #
+    if (! -e "/tftpboot/freebsd.newnode") {
+	$fv = $emulabconfig{"MFSVERSION"};
+	if (! -e "/tftpboot/newnode${fv}.newnode") {
+	    $fv = "47";
+	}
+	mysystem("cd /tftpboot; mv freebsd${fv}.newnode freebsd.newnode");
+	print "Using freebsd${fv}.newnode version of newnode MFS...\n";
+    }
+
     # Create the compressed versions of the files
     mysystem("cd /tftpboot/frisbee/boot; ./prepare; ".
 	     "cd /tftpboot/freebsd/boot; ./prepare; ".
