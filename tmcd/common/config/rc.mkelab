@@ -1248,7 +1248,7 @@ sub SetupBossNode()
     #
     if (! -e "/tftpboot/freebsd.newnode") {
 	$fv = $emulabconfig{"MFSVERSION"};
-	if (! -e "/tftpboot/newnode${fv}.newnode") {
+	if (! -e "/tftpboot/freebsd${fv}.newnode") {
 	    $fv = "47";
 	}
 	mysystem("cd /tftpboot; mv freebsd${fv}.newnode freebsd.newnode");
