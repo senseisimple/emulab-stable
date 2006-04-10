@@ -4,6 +4,11 @@
 # Make an ipmap file from /etc/hosts
 #
 
+use Getopt::Std;
+
+my %opt;
+getopts('p',\%opt);
+
 use strict;
 my (%elabips, %plabips);
 
@@ -22,8 +27,12 @@ while (<HOSTS>) {
 my $lines_output = 0;
 foreach my $elabnode (keys %elabips) {
     my $plabnode = $elabnode;
-    $plabnode =~ s/elab/planet/i;
-    if (exists $plabips{$plabnode}) {
+    if ($opt{p}) {
+        $plabnode =~ s/elab/planet/i;
+    } else {
+        $plabnode =~ s/elab/plab/i;
+    }
+    if (exists $plabips{$plabnode} && !$opt{p}) {
         print "$elabips{$elabnode} $plabips{$plabnode} elabc-$elabnode\n";
         $lines_output++;
     } else {

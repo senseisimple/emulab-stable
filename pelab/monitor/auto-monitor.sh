@@ -11,7 +11,7 @@ barrier_wait "stub";
 #
 # Start up our own monitor
 #
-$SH ${MONITOR_DIR}/run-monitor-libnetmon.sh &
+$SH ${MONITOR_DIR}/run-monitor-libnetmon.sh $* &
 MONPID=$!
 # Kill the monitor if we get killed - TODO: harsher kill?
 trap "$AS_ROOT kill $MONPID; $AS_ROOT killall netmond" EXIT
