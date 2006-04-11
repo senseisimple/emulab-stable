@@ -291,6 +291,7 @@ if (strcmp($privIP, "1.1.1.1")) {
                     "slice1_md5=24a4f173a7716d47bbc047f8387c86af\n" .
 		    "slicex_slice=3\n" .
 		    "slicex_mount=/users";
+		break;
 		
 	    default:
 		SPITSTATUS(CDROMSTATUS_UPGRADEERROR);
