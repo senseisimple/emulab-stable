@@ -58,6 +58,10 @@ extern "C"
 #define CODE_LOSS       0x00000003 
 #define CODE_LIST_DELAY 0x00000004
 
+//magic numbers for alternative algorithms
+#define METHOD_OPT1 0
+#define METHOD_BASE 1
+
 #define MONITOR_RECORD_SIZE (sizeof(long)*3 + sizeof(unsigned short)*3)
 
 #define PACKET_WRITE 1

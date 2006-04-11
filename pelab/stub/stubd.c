@@ -31,7 +31,7 @@ delay_record delay_records[CONCURRENT_RECEIVERS]; //delay list is calculated at 
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 int last_through[CONCURRENT_RECEIVERS]; 
-int flag_testmode=0;
+int flag_testmode=0, flag_method;
 enum {TEST_NOTTESTING, TEST_NOTSTARTED, TEST_RUNNING, TEST_DONE } test_state;
 unsigned long long total_bytes = 0;
 
@@ -650,8 +650,13 @@ int send_bandwidth_to_monitor(int monitor, int index)
   int buffer_size = 3*SIZEOF_LONG + 2*sizeof(unsigned short);
   char outbuf[buffer_size];
   unsigned long code = htonl(CODE_BANDWIDTH);
-  //unsigned long bandwidth = throughputTick(&throughput[index]);
-  unsigned long bandwidth = max_throughput[index];
+  unsigned long bandwidth;
+
+  if (flag_method == METHOD_BASE) {
+    bandwidth = throughputTick(&throughput[index]);
+  } else {
+    bandwidth = max_throughput[index];
+  }
 
   if (bandwidth != 0) {
     // Insert the address info
@@ -914,6 +919,9 @@ void usage() {
   fprintf(stderr,"                     main-loop -- Print out quanta information and the stages of the main loop\n");
   fprintf(stderr,"                     lookup-db -- Manipulations of the connection db\n");
   fprintf(stderr,"                     delay-detail -- The finest grain delay measurements\n");
+  fprintf(stderr,"       -m <option>:  Specify alternative algorithms.\n");
+  fprintf(stderr,"                     base -- the base goodput measurement with the whole packet sizes.\n");
+  fprintf(stderr,"                     opt1 -- the optimization based on vegas measurement. Default.\n"); 
   fprintf(stderr,"       -r:  Enable replay mode. This also turns on standalone mode. The device is now used as a filename.\n");
   fprintf(stderr,"       -s:  Enable standalone mode\n");
   fprintf(stderr,"       -t:  Enable testing mode\n");
@@ -953,7 +961,7 @@ int main(int argc, char *argv[]) {
   /*
    * Process command-line arguments
    */
-  while ((ch = getopt(argc,argv,"df:l:rst")) != -1) {
+  while ((ch = getopt(argc,argv,"df:l:m:rst")) != -1) {
     switch (ch) {
       case 'd':
         flag_debug = 1; break;
@@ -966,6 +974,14 @@ int main(int argc, char *argv[]) {
 	    perror("Log fopen()");
 	    exit(1);
 	  }
+	}
+	break;
+      case 'm':
+	if (strcmp(optarg, "base") == 0)
+	{
+	  flag_method = METHOD_BASE;
+	} else {
+	  flag_method = METHOD_OPT1;
 	}
 	break;
       case 'l':
