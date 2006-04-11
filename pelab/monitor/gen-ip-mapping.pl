@@ -27,13 +27,19 @@ while (<HOSTS>) {
 my $lines_output = 0;
 foreach my $elabnode (keys %elabips) {
     my $plabnode = $elabnode;
-    if ($opt{p}) {
-        $plabnode =~ s/elab/planet/i;
-    } else {
-        $plabnode =~ s/elab/plab/i;
-    }
-    if (exists $plabips{$plabnode} && !$opt{p}) {
+    my $planetnode = $elabnode;
+    $plabnode =~ s/elab/plab/i;
+    $planetnode =~ s/elab/planet/i;
+    #if ($opt{p}) {
+    #    $plabnode =~ s/elab/planet/i;
+    #} else {
+    #    $plabnode =~ s/elab/plab/i;
+    #}
+    if (exists $plabips{$plabnode}&& !$opt{p}) {
         print "$elabips{$elabnode} $plabips{$plabnode} elabc-$elabnode\n";
+        $lines_output++;
+    } elsif (exists $plabips{$planetnode}&& !$opt{p}) {
+        print "$elabips{$elabnode} $plabips{$planetnode} elabc-$elabnode\n";
         $lines_output++;
     } else {
         # Let's hope this is an experiment with a real (not emulated) planetlab
