@@ -12,6 +12,11 @@
    All rights reserved.
   -->
 <h2>Windows XP in Emulab</h2>
+<div style="margin-left: 40px;">
+<a href="#Changes"> Latest change: 2006-04-04 hardware-independent images. </a>
+<img src="../new.gif" alt="&lt;NEW&gt;">
+</div>
+
 <h3>Table of Contents:</h3>
 <ol>
   <li> <a href="#Overview"> Overview </a></li>
@@ -21,8 +26,7 @@
     <li> <a href="#Experiment_setup"> Experiment setup for Windows nodes </a></li>
     <li> <a href="#Network_config"> Network config </a></li>
     <li> <a href="#Routing"> Routing </a></li>
-    <li> <a href="#Firewalls"> Firewalls </a>
-         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
+    <li> <a href="#Firewalls"> Firewalls </a></li>
     <li> <a href="#Boots_twice"> Windows nodes boot twice </a></li>
     <li> <a href="#Login_connections"> Login connections to Windows </a></li>
     <li> <a href="#RDP_details"> RDP details </a></li>
@@ -32,16 +36,25 @@
   <ul>
     <li> <a href="#Cygwin_documentation"> Cygwin documentation </a></li>
     <li> <a href="#Cygwin_packages"> Cygwin packages </a></li>
-    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a>
-         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
+    <li> <a href="#SMB_mounts"> SMB mounts and Samba </a></li>
     <li> <a href="#Cygwin_arcana"> Cygwin arcana </a>
          <img src="../new.gif" alt="&lt;NEW&gt;"></li>
+      <ul>
+	<li> <a href="#Cygwin_paths"> File paths </a></li>
+	<li> <a href="#Cygwin_mounts"> Mount points </a></li>
+	<li> <a href="#Cygwin_drive_letters"> Drive letter mounts </a></li>
+	<li> <a href="#Cygwin_NTSEC"> NTSEC </a></li>
+	<li> <a href="#Cygwin_setuid"> setuid </a></li>
+	<li> <a href="#Cygwin_root"> <code>root</code> </a></li>
+	<li> <a href="#Cygwin_Administrators"> <code>Administrators</code> group </a></li>
+	<li> <a href="#Cygwin_permissions"> Permissions </a></li>
+	<li> <a href="#Cygwin_executables"> Executables </a></li>
+	<li> <a href="#Cygwin_GUI"> Windows GUI programs </a></li>
+      </ul>
   </ul>
   <li> <a href="#NtEmacs"> NtEmacs </a></li>
   <li> <a href="#DotNet"> Microsoft .Net Runtime </a></li>
-  <li> <a href="#Changes"> Change Log
-         <img src="../new.gif" alt="&lt;NEW&gt;"></li>
-	 Latest: 2006-04-04 hardware-independent images. </a>
+  <li> <a href="#Changes"> Change Log <img src="../new.gif" alt="&lt;NEW&gt;"></a></li>
   <li> <a href="#Future"> Future Work </a></li>
 </ol>
 
@@ -137,10 +150,11 @@ next Emulab watchdog daemon <code>isalive</code> interval.  This should be in
 
 <h4><a name="Experiment_setup"> </a> Experiment setup for Windows nodes </h4>
 
-All you have to do is put a line specifying a WINXP OS image in your
-experiment .ns file, like this:
+All you have to do is put a line <a
+href="../kb-show.php3?xref_tag=tb-set-node-os">specifying a WINXP OS image</a>
+in your experiment .ns file, like this:
 <pre>
-    tb-set-node-os $node WINXP-UPDATE
+    <a href="../kb-show.php3?xref_tag=tb-set-node-os">tb-set-node-os</a> $node WINXP-UPDATE
 </pre>
 
 The Emulab Windows XP images are no longer specific to a particular hardware type.
@@ -148,7 +162,7 @@ The Emulab Windows XP images are no longer specific to a particular hardware typ
 explicitly <a href="../kb-show.php3?xref_tag=tb-set-hardware">specify the
 hardware type</a> to run on, for example:
 <pre>
-    tb-set-hardware $node pc3000
+    <a href="../kb-show.php3?xref_tag=tb-set-hardware">tb-set-hardware</a> $node pc3000
 </pre>
 
 Currently available Windows XP images are:
@@ -195,6 +209,13 @@ Currently available Windows XP images are:
 
 </ul>
 
+If you use these commands:
+<a href="../kb-show.php3?xref_tag=tb-set-node-startcmd">tb-set-node-startcmd</a>,
+<a href="../kb-show.php3?xref_tag=load-software">tb-set-node-tarfiles</a>, or
+<a href="../kb-show.php3?xref_tag=load-software">tb-set-node-rpms</a> you
+should read the sections on <a href="#Cygwin_permissions"> Permissions </a>
+and <a href="#Cygwin_GUI"> Windows GUI programs </a> below.  <p>
+
 <h4><a name="Network_config"> </a> Network config </h4>
 
 Some default Windows networking features are disabled.  <i>NetBT (NetBios over
@@ -215,9 +236,10 @@ The Emulab pc850 node type has five network interfaces, and the pc3000 has
 six.  However, the Windows <b><code>ipconfig /all</code></b> command only
 shows the configuration information for the enabled network interfaces.  There
 will always be one enabled <a
-href="../tutorial/docwrapper.php3?docname=tutorial.html#ControlNet"> control net
-</a> interface on the 155.98.36 network.  The others are disabled if not used
-in your experiment.  <p>
+href="../tutorial/docwrapper.php3?docname=tutorial.html#ControlNet"> control
+net </a> interface on the 155.98.36 network.  The others are disabled if not
+used in your experiment.  (See file
+<code>/var/emulab/boot/ipconfig-cache</code> for a full listing.)  <p>
 
 If you specified links or LANs in your experiment <a
 href="../tutorial/docwrapper.php3?docname=tutorial.html#Designing"> network
@@ -229,10 +251,12 @@ Connection</code></b> and have a number appended.  You can't count on what this
 number is, since it depends on the order the NIC's are probed as Windows
 boots. <p>
 
-<div style="margin-left: 40px;"> <b>NOTE:</b> Sometimes we have seen
+<div style="margin-left: 40px;"> <b>NOTE:</b> Often, we have seen
 <code>ipconfig</code> report an ip address and mask of <code>0.0.0.0</code>,
-while the TCP/IP properties dialog boxes show the proper values.
-<code>ipconfig</code> is wrong.  </div>
+while the TCP/IP properties dialog boxes and the <code>netsh</code> command
+show the proper values.  Our startup scripts disable and re-enable the network
+interface in an attempt to reset this.  Sometimes it doesn't work, and another
+reboot is done in an attempt to get the network up.</div>
 
 <h4><a name="Routing"> </a> Routing </h4>
 
@@ -245,7 +269,7 @@ IPEnableRouter=1 </a> registry key is set on multi-homed hosts in the
 experiment network, before they are rebooted to change the hostname.<p>
 
 <b><code>rtproto Static</code></b> is supported in all recent WINXP images,
-but not in WINXP-02-16 or before. <p>
+but not in WINXP-02-16 (2005) or before. <p>
 
 <b><code>rtproto Static-old</code></b> or <b><code>rtproto Manual</code></b>
 will work in any image.<p>
@@ -300,7 +324,12 @@ nodes.  <p>
 
 Notice that Windows reboots an extra time after being loaded onto a node
 during swap-in.  It has to reboot after changing the node name to set up the
-network stack properly.  Be patient, Windows doesn't boot fast. <p>
+network stack properly.  Be patient, Windows XP doesn't boot quickly. <p>
+
+With <a href="#Hardware_independent">hardware-independent</a> (<a
+href="#Sysprep"><code>Sysprep</code>'ed</a>) images, the first boot is
+actually running <code>Mini-Setup</code> as well, setting up device drivers
+and so on.  <p>
 
 It's best not to log in to the nodes until the experiment is fully swapped-in.
 (You may be able to log in briefly between the first two reboots; if you see
@@ -570,9 +599,10 @@ depends on <code>prepare</code> being run.
        Re-enter new password:
     </pre>
 
-    This works because you are part of the Windows <code>Administrators</code>
-    group.  Otherwise you would have to already know the root password to
-    change it.  <p>
+    This works because you are part of the Windows <a
+    href="#Cygwin_Administrators"><code>Administrators</code> group</a>.
+    Otherwise you would have to already know the root password to change it.
+    <p>
 
        <div style="margin-left: 40px;"> <b>NOTE:</b> If you change the root
        password and reboot Windows <u>before running <code>prepare</code></u> below,
@@ -619,8 +649,10 @@ depends on <code>prepare</code> being run.
 	 </pre>
        </li>
        <li>
+	 <a name="Sysprep"> </a>
 	 The <b><code>-s</code></b> option is used to make
-	 hardware-independent images using the Windows
+	 <a href="#Hardware_independent">hardware-independent</a> 
+	 images using the Windows
 	 <b><code>Sysprep</code></b> deploy tool.  If you use it with the
 	 <code>-n</code> option instead of giving a password, it assumes that
 	 you separately blank the Administrator password, or edit your
@@ -638,27 +670,34 @@ depends on <code>prepare</code> being run.
 
 	 Windows normally casts some aspects of the NT image into concrete at
 	 the first boot after installation, including the specific boot disk
-	 driver to be used by the NT loader (IDE vs. SCSI.)
+	 driver to be used by the NT loader (IDE, SCSI, or SATA.)
 	 <code>Sysprep</code> is used by PC hardware manufacturers as they
 	 make XP installation disks with their own drivers installed.  The
-	 Sysprep option to run an unattended <code>Mini-Setup</code> at first
-	 boot instead of the normal "Out Of the Box Experience" is used in
-	 some large corporate roll-outs.  We do both. <p>
+	 <code>Sysprep</code> option to run an unattended
+	 <code>Mini-Setup</code> at first boot instead of the normal "Out Of
+	 the Box Experience" is used in some large corporate roll-outs.  We do
+	 both. <p>
 
 	 The Emulab <code> /share/windows/sysprep </code> directory contains
-	 various service pack versions of the XP deploy tools, appropriate
-	 device driver directories, and a draft sysprep.inf file to direct the
-	 automated install process. <p>
+	 several versions of the XP deploy tools matched to the XP service
+	 pack level, appropriate device driver directories, and a draft
+	 <code>sysprep.inf</code> file to direct the automated install
+	 process. <p>
 
-	 Unfortunately, the cost of having just one WINXP image for all PC
-	 types is that Mini-setup is slow, being a stripped-down NT kernel.
-	 It also forces an additional reboot when it's finished installing
-	 drivers.  Together, this adds between 4 and 5 minutes to the total
-	 Windows swap-in time, increasing it from about 10 minutes to around
-	 15.
+	 <code>Mini-setup</code> needs to reboot after setting up device
+	 drivers.  XP also needs to <a href="#Boots_twice">reboot</a> after
+	 changing the host name.  We combine the two by using a <a
+	 href="http://support.microsoft.com/?kbid=238955">
+	 <code>Cmdlines.txt</code> script</a> to run <code>rc.firstboot
+	 -mini</code> to set the host name at the end of
+	 <code>Mini-Setup</code>.  <p>
 
-	   <div style="margin-left: 40px;"> <b>NOTE:</b> If you do this, set
-	   the <b>reboot wait-time</b> as you create your Image Descriptor to
+	 Thus we only pay the extra time to set up device drivers and so
+	 on from scratch, about two minutes, rather than adding a third
+	 hardware and XP reboot cycle.
+
+	   <div style="margin-left: 40px;"> <b>NOTE:</b> as you create your
+	   Image Descriptor, set the <b>reboot wait-time</b> to
 	   <b>360</b> rather than 240 so that swap-ins don't time out. </div>
 	   <br>
        </li>
@@ -785,7 +824,7 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
 
 <ul>
 
-  <li> <a name="Cygwin_paths"> </a> Paths <p>
+  <li> <a name="Cygwin_paths"> </a> File paths <p>
 
        Cygwin accepts either flavor of slashes in paths, Unix/POSIX-style
        forward-slashes, or Windows-style back-slashes.  In Unix shell
@@ -816,7 +855,7 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
 	 /cygdrive/c/WINDOWS
 	 </pre> <p>  </li>
 
-  <li> <a name="Cygwin_mounts"> </a> Cygwin mounts <p>
+  <li> <a name="Cygwin_mounts"> </a> Mount points <p>
 
        <a href="http://cygwin.com/cygwin-ug-net/using-utils.html#mount">
        Cygwin mount points </a> are shown by the <b><code>mount</code></b> and
@@ -832,7 +871,7 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
        Another special case is the <b>Unix root</b>, "<code>/</code>".  It's
        mounted to <code>C:\cygwin</code> in the Windows filesystem. </li>
 
-  <li> <a name="Cygwin_drive_letters"> </a> Windows drive letter mounts <p>
+  <li> <a name="Cygwin_drive_letters"> </a> Drive letter mounts <p>
 
        Cygwin knows about drive letter prefixes like
        <b><code>C:</code></b>&nbsp;, which are equivalent to
@@ -844,11 +883,12 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
        its use. <p>
 
        You can use the Windows <b><code>net use</code></b> command to
-       associate drive letters with UNC paths to SMB shares, e.g. <pre>net
-       use W: '\\fs\share\windows'</pre> <p>
+       associate drive letters with UNC paths to SMB shares, e.g.
+       <pre>net use W: '\\fs\share\windows'</pre> <p>
 
        You can use the Windows <b><code>subst</code></b> command to associate
-       drive letters with local paths, e.g. <code>subst T: 'C:\Temp'</code> <p>
+       drive letters with local paths, e.g. 
+       <pre>subst T: 'C:\Temp'</pre> <p>
 
        Filename completion in Cygwin shells with <code>&lt;Tab&gt;</code>
        doesn't work following a drive-letter prefix, but it works normally
@@ -856,7 +896,9 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
        case-sensitive, although the underlying Windows is case-insensitive, so
        a filename in the wrong case is still opened properly. </li>
 
-  <li> Cygwin is running in <a
+  <li> <a name="Cygwin_NTSEC"> </a> NTSEC <p>
+
+       Cygwin is running in <a
        href="http://cygwin.com/cygwin-ug-net/ntsec.html"> <b>NTSEC</b> </a>
        (NT Security) mode, so <code>/etc/passwd</code> and
        <code>/etc/group</code> contain Windows SID's as user and group ID's.
@@ -878,7 +920,9 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
        It was named <code>Everybody</code> on Windows 2000, which was a better
        name.  </li>
 
-  <li> There is no direct equivalent of the Unix <b>setuid</b> programs under
+  <li> <a name="Cygwin_setuid"> </a> setuid <p>
+
+       There is no direct equivalent of the Unix <b>setuid</b> programs under
        Windows, and hence no <code>su</code> or <code>sudo</code> commands. <p>
 
        The Windows equivalent to running a Unix command as <code>root</code>
@@ -892,26 +936,78 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
        You can <code>ssh</code> a command to the node as the target user, as
        long as you arrange for the proper authentication.  <p>
 
-       There is not usually a Windows account named <b><code>root</code></b>.
-       We create one as part of the Emulab setup to own installed software,
-       and to run services and Unix scripts that check that they're running
-       with root privileges.  The <code>root</code> user does not have Samba
-       privileges to access Samba shared mounts, including <code>/proj</code>,
-       <code>/groups</code>, and <code>/users</code>.  <p>
-
        For C/C++ code, there is a <code>setuid()</code> function in the Cygwin
        library, which "impersonates" the user if proper setup is done first.
        </li>
 
-  <li> Cygwin does a pretty good job of mapping Unix user-group-other file
+  <li> <a name="Cygwin_root"> </a> <code>root</code> <p>
+
+       There is not normally a Windows account named <b><code>root</code></b>.
+       <code>root</code> on XP is just another user who is a member of the
+       <code>Administrators</code> group, see below. <p>
+
+       We create a <code>root</code> account as part of the Emulab setup to
+       own installed software, and to run services and Unix scripts that check
+       that they're running with root privileges.  <p>
+
+       You can log in as <code>root</code> via RDP, <code>ssh</code>, or the
+       serial console if you change the root password as described in the <a
+       href="#Custom_images"> custom Windows OS images </a> section. <p>
+
+       The <code>root</code> user does not have any Samba privileges to access
+       Samba shared mounts, including the <code>/proj</code>,
+       <code>/groups</code>, and <code>/users</code>.  <p>
+
+       </li>
+
+  <li> <a name="Cygwin_Administrators"> </a> <code>Administrators</code> group <p>
+
+       All users are members of the Windows <code>Administrators</code> group.
+       (The Emulab non-local-root user property is not implemented on
+       Windows.)  <p>
+
+       Membership in the Windows <code>Administrators</code> group is very
+       different from being<code> root</code> on Unix, and is also different
+       from being logged in as Administrator.  <p>
+
+       <code>Administrators</code> group membership on Windows only means you
+       can set the ownership, group, and permissions on any file using the
+       Cygwin <code>chown</code>, <code>chgrp</code>, <code>chmod</code>, or
+       their Windows equivalents. Until you have done that, you can be
+       completely locked out by read, write, or execute/open permissions of
+       the directory or files.  <p>
+
+       Another subtlety is that the group called <code>None</code> on XP is
+       what used to be named <code>Everybody</code> on Windows 2000.  All
+       users are automatically in group <code>None</code>, so in practice
+       setting group <code>None</code> permissions is no different from
+       setting public access permissions.  </li>
+
+  <li> <a name="Cygwin_permissions"> </a> Permissions <p>
+
+       Cygwin does a pretty good job of mapping Unix user-group-other file
        permissions to Windows NT security ACLs.  <p>
 
-       On Windows, unlike Unix, file permissions can lock out root,
+       On Windows, unlike Unix, file and directory permissions can lock out root,
        Administrator, or SYSTEM user access.  Many Unix scripts don't bother
        with permissions if they're running as root, and hence need
-       modification to run on Cygwin. </li>
+       modification to run on Cygwin.  <p>
 
-  <li> Cygwin tries to treat <code>.exe</code> files the same as executable
+       This creates a potential problem with the <a
+       href="../kb-show.php3?xref_tag=load-software">tb-set-node-tarfiles</a>
+       and <a
+       href="../kb-show.php3?xref_tag=load-software">tb-set-node-rpms</a>
+       commands.  The tb-set-node-tarfiles page says "Notes: 1. ... the files
+       are installed as root".  So you can easily install files that <u>your</u>
+       login doesn't have permission to access.  <p>
+
+       The solution is to <code>chmod</code> the files before making the
+       tarball or rpm file to grant appropriate access permissions.
+ </li>
+
+  <li> <a name="Cygwin_executables"> </a> Executables <p>
+
+       Cygwin tries to treat <code>.exe</code> files the same as executable
        files without the <code>.exe</code> suffix, but with execute
        permissions turned on.  (See the <a
        href="http://cygwin.com/cygwin-ug-net/using-specialnames.html#id4729857">
@@ -920,6 +1016,34 @@ smaller <a href="../docwrapper.php3?docname=groups.html"> subgroups </a>.
        This breaks down in Makefile actions and scripts, where
        <code>rm</code>, <code>ls -l</code>, and <code>install</code> commands
        may need an explicit <code>.exe</code> added. </li>
+
+  <li> <a name="Cygwin_GUI"> </a> Windows GUI programs <p>
+
+       You cannot run Windows GUI (Graphical User Interface) programs under
+       ssh, on the serial console, or by <a
+       href="../kb-show.php3?xref_tag=tb-set-node-startcmd">tb-set-node-startcmd</a>.
+       There is no user login graphics context until you log in via RDP.  <p>
+
+       However, you <u>can</u> use a <code>startcmd</code> to set a Windows
+       registry key that causes a GUI program to be run automatically for all
+       users <u>when they log in to the node via RDP</u>, if that's what you
+       want.  The program can be one that is installed by <a
+       href="../kb-show.php3?xref_tag=load-software">tb-set-node-tarfiles</a>.  <p>
+
+       You can pick any regkey name you want and put it in the
+       <code>Run</code> registry folder. It's good not to step on the ones
+       already there, so choose a name specific to your program.  Put the
+       following in your <code>startcmd</code> script:
+
+       <pre>
+       regtool -s set /HKLM/SOFTWARE/Microsoft/Windows/CurrentVersion/Run/mypgm 'C:\mypgm\mypgm.exe'
+       </pre>
+       (where <code>mypgm</code> is the name of your program, of course.)  <p>
+
+       Notice that the value string is single-quoted with <code>C:</code> and
+       backslashes.  Windows interprets this regkey, and wants its flavor of
+       file path.
+       </li>
 
 </ul>
 
@@ -996,13 +1120,14 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
 <b>2006-04-04</b>
 <ul>
   <li>
+    <a name="Hardware_independent"></a>
     Switch to hardware-independent images, using the 
     Microsoft Sysprep/Mini-Setup programs
     <a href="http://support.microsoft.com/kb/302577">[1]</a>
     <a href="http://technet2.microsoft.com/WindowsServer/en/Library/fae4952d-6489-4628-89c2-30a1c70447ef1033.mspx">[2]</a>
     <a href="http://www.microsoft.com/technet/prodtechnol/windows2000pro/deploy/unattend/sp1ch03.mspx">[4]</a>
     <a href="http://support.microsoft.com/default.aspx?scid=kb;en-us;314479">[5]</a>
-    via the <a href="#Custom_images"><code>prepare -s</code> option</a>.  <p>
+    via the <a href="#Sysprep"><code>prepare -s</code> option</a>.  <p>
 
     It is no longer necessary to <a
     href="../kb-show.php3?xref_tag=tb-set-hardware">specify the hardware
@@ -1061,8 +1186,8 @@ href="http://www.microsoft.com/downloads/details.aspx?FamilyId=9B3A2CA6-3647-407
 
     It seems that adding Sysprep to the mix has also improved the reliability
     of TCP/IP stack setup, probably because it tears down all of the internal
-    data structures and recreates them.  This adds 1.5 minutes to the Windows
-    setup time, which seems worth-while.
+    network interface data structures and recreates them.  This adds about two
+    minutes to the Windows setup time, which seems worth-while.
   </li>
 </ul>
 
