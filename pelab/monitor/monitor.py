@@ -209,8 +209,9 @@ def set_bandwidth(kbps, dest):
 #  sys.stdout.write('<event> bandwidth=' + str(kbps) + '\n')
   now = time.time()
   sys.stderr.write('BANDWIDTH!purple\n')
-  sys.stderr.write('BANDWIDTH!line ' + ('%0.6f' % now) + ' 0 ' + ('%0.6f' % now)
-	+ ' ' + str(kbps) + '\n')
+  sys.stderr.write('BANDWIDTH!line ' + ('%0.6f' % now) + ' 0 '
+                   + ('%0.6f' % now)
+                   + ' ' + str(kbps*1000/8) + '\n')
   return set_link(this_ip, dest, 'bandwidth=' + str(kbps))
 
 # Set delay on the link. We are given round trip time.
