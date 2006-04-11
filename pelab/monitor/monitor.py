@@ -41,6 +41,7 @@ def main_loop():
   read_args()
   quanta = 0.5# in seconds
   conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
   sys.stdout.write("stub_ip is %s\n" % stub_ip)
   sys.stdout.flush()
   conn.connect((stub_ip, 4200))
