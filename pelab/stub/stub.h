@@ -59,8 +59,9 @@ extern "C"
 #define CODE_LIST_DELAY 0x00000004
 
 //magic numbers for alternative algorithms
-#define METHOD_OPT1 0
-#define METHOD_BASE 1
+#define BANDWIDTH_AVERAGE 0
+#define BANDWIDTH_MAX 1
+#define BANDWIDTH_VEGAS 2
 
 #define MONITOR_RECORD_SIZE (sizeof(long)*3 + sizeof(unsigned short)*3)
 
@@ -113,7 +114,8 @@ typedef struct {
 } delay_record;
 
 extern short  flag_debug;
-    extern short flag_standalone;
+extern short flag_standalone;
+extern int bandwidth_method;
 extern int pcapfd;
 extern int maxfd;
 extern connection snddb[CONCURRENT_SENDERS];

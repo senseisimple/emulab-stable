@@ -457,8 +457,6 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
             * because TCP don't use them to calculate the sample RTT in the RTT estimation */
 	    if (record_id != -1) { //new ack received
               int delay = 0;
-	      int bandwidth = 0;
-	      int goodput = 0;
 	      struct tcp_info info;
 
               msecs = floor((pkthdr->ts.tv_usec-sniff_rcvdb[path_id].records[record_id].captime.tv_usec)/1000.0+0.5);
@@ -471,8 +469,10 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		{
 		    base_rtt[path_id] = delay;
 		}
-		if (is_live && delay_count[path_id] > 0)
+		if (is_live && delay_count[path_id] > 0
+		    && bandwidth_method == BANDWIDTH_VEGAS)
 		{
+		    int bandwidth = 0;
 		    int info_size = sizeof(info);
 		    int error = getsockopt(rcvdb[path_id].sockfd,
 					   SOL_TCP, TCP_INFO, &info,
@@ -488,17 +488,25 @@ u_int16_t handle_IP(u_char *args, const struct pcap_pkthdr* pkthdr, const u_char
 		    {
 			max_throughput[path_id] = bandwidth;
 		    }
-		    goodput = throughputTick(&throughput[path_id]);
-		    logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
-		    logWrite(DELAY_DETAIL, NULL, "Throughput: %lu", bandwidth);
-		    logWrite(DELAY_DETAIL, NULL, "Congestion Window Size: %lu",
-			     info.tcpi_snd_cwnd);
-		    logWrite(DELAY_DETAIL, NULL, "Sending MSS: %lu bytes",
-			     info.tcpi_snd_mss);
-		    logWrite(DELAY_DETAIL, NULL, "Base RTT: %lu",
+		    logWrite(DELAY_DETAIL, NULL,
+			     "Kernel RTT: %lu, Kernel Losses: %lu, "
+			     "Receive Window: %lu",
+			     info.tcpi_rtt, info.tcpi_lost, tp->window);
+		    logWrite(DELAY_DETAIL, NULL,
+			     "Tput: %lu, cwnd: %lu, snd_MSS: %lu bytes, "
+			     "Base RTT: %lu",
+			     bandwidth, info.tcpi_snd_cwnd, info.tcpi_snd_mss,
 			     base_rtt[path_id]);
-		    logWrite(DELAY_DETAIL, NULL, "Receive Window: %lu",
-			     tp->window);
+		}
+	        if (bandwidth_method == BANDWIDTH_MAX)
+	        {
+		  int goodput = 0;
+		  goodput = throughputTick(&throughput[path_id]);
+		  logWrite(DELAY_DETAIL, NULL, "Goodput: %d", goodput);
+		  if (goodput > max_throughput[path_id])
+		  {
+		    max_throughput[path_id] = goodput;
+		  }
 		}
 //		append_delay_sample(path_id, delay, &(pkthdr->ts));
 		logWrite(DELAY_DETAIL, &(pkthdr->ts),

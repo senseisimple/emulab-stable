@@ -31,7 +31,8 @@ delay_record delay_records[CONCURRENT_RECEIVERS]; //delay list is calculated at 
 loss_record loss_records[CONCURRENT_RECEIVERS]; //loss is calculated at the sender side
 unsigned long last_loss_rates[CONCURRENT_RECEIVERS]; //loss per billion
 int last_through[CONCURRENT_RECEIVERS]; 
-int flag_testmode=0, flag_method;
+int flag_testmode=0;
+int bandwidth_method = BANDWIDTH_VEGAS;
 enum {TEST_NOTTESTING, TEST_NOTSTARTED, TEST_RUNNING, TEST_DONE } test_state;
 unsigned long long total_bytes = 0;
 
@@ -652,9 +653,10 @@ int send_bandwidth_to_monitor(int monitor, int index)
   unsigned long code = htonl(CODE_BANDWIDTH);
   unsigned long bandwidth;
 
-  if (flag_method == METHOD_BASE) {
+  if (bandwidth_method == BANDWIDTH_AVERAGE) {
     bandwidth = throughputTick(&throughput[index]);
-  } else {
+  } else if (bandwidth_method == BANDWIDTH_MAX
+	     || bandwidth_method == BANDWIDTH_VEGAS) {
     bandwidth = max_throughput[index];
   }
 
@@ -689,7 +691,7 @@ int send_bandwidth_to_monitor(int monitor, int index)
 		 now.tv_sec + now.tv_usec/1000000000.0,
 		 0,
 		 now.tv_sec + now.tv_usec/1000000000.0,
-		 hostBand);
+		 hostBand*1000/8);
     }
   }
   max_throughput[index] = 0;
@@ -919,9 +921,12 @@ void usage() {
   fprintf(stderr,"                     main-loop -- Print out quanta information and the stages of the main loop\n");
   fprintf(stderr,"                     lookup-db -- Manipulations of the connection db\n");
   fprintf(stderr,"                     delay-detail -- The finest grain delay measurements\n");
-  fprintf(stderr,"       -m <option>:  Specify alternative algorithms.\n");
-  fprintf(stderr,"                     base -- the base goodput measurement with the whole packet sizes.\n");
-  fprintf(stderr,"                     opt1 -- the optimization based on vegas measurement. Default.\n"); 
+  fprintf(stderr,"       -b <option>:  Specify alternative bandwidth measurement algorithms.\n");
+  fprintf(stderr,"                     average -- the average goodput measurement with the whole packet sizes.\n"
+                 "                                (Averaged out over each quantum).\n");
+  fprintf(stderr,"                     max -- the maximum instantaneous goodput measurement\n"
+                 "                            (Maximum over each quantum).\n");
+  fprintf(stderr,"                     vegas -- the optimization based on vegas measurement. Default.\n"); 
   fprintf(stderr,"       -r:  Enable replay mode. This also turns on standalone mode. The device is now used as a filename.\n");
   fprintf(stderr,"       -s:  Enable standalone mode\n");
   fprintf(stderr,"       -t:  Enable testing mode\n");
@@ -961,7 +966,7 @@ int main(int argc, char *argv[]) {
   /*
    * Process command-line arguments
    */
-  while ((ch = getopt(argc,argv,"df:l:m:rst")) != -1) {
+  while ((ch = getopt(argc,argv,"df:l:b:rst")) != -1) {
     switch (ch) {
       case 'd':
         flag_debug = 1; break;
@@ -976,12 +981,20 @@ int main(int argc, char *argv[]) {
 	  }
 	}
 	break;
-      case 'm':
-	if (strcmp(optarg, "base") == 0)
+      case 'b':
+	if (strcmp(optarg, "average") == 0)
 	{
-	  flag_method = METHOD_BASE;
-	} else {
-	  flag_method = METHOD_OPT1;
+	  bandwidth_method = BANDWIDTH_AVERAGE;
+	} else if (strcmp(optarg, "max") == 0) {
+	  bandwidth_method = BANDWIDTH_MAX;
+	} else if (strcmp(optarg, "vegas") == 0) {
+	  bandwidth_method = BANDWIDTH_VEGAS;
+	}
+	else
+	{
+	  fprintf(stderr, "Unknown bandwidth method\n");
+	  usage();
+	  exit(1);
 	}
 	break;
       case 'l':
@@ -1245,8 +1258,18 @@ int main(int argc, char *argv[]) {
 	  perror("accept"); 
 	  continue;
 	} else {
+	  int nodelay = 1;
+	  int nodelay_error = setsockopt(sockfd_monitor, IPPROTO_TCP,
+					 TCP_NODELAY, &nodelay,
+					 sizeof(nodelay));
+	  if (nodelay_error == -1)
+	  {
+	    perror("setsockopt (TCP_NODELAY)");
+	    clean_exit(1);
+	  }
 	  logWrite(MAIN_LOOP, NULL, "Accept new monitor (%s)",
 		   inet_ntoa(their_addr.sin_addr));
+
 	  FD_CLR(sockfd_rcv_monitor, &read_fds);  //allow only one monitor connection	  
 	  FD_SET(sockfd_monitor, &read_fds);  //check the monitor connection for read
 //	  FD_SET(sockfd_monitor, &write_fds); //check the monitor connection for write
