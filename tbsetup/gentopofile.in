@@ -25,6 +25,7 @@ my $optlist  = "n";
 my $impotent = 0;
 my $toponame = "topomap";
 my $ltname   = "ltmap";
+my $ltpname  = "ltpmap";
 
 #
 # Configure variables
@@ -325,12 +326,60 @@ foreach my $lan (sort keys(%lans)) {
     print $OUT "$lan,$mask,$cost\n";
 }
 
+#
+# Finally generate a "physical resource" map for linktest if the
+# experiment is swapped in.  This could be part of the ltmap, but
+# for maximum compatibility (and to keep the ltmap "virtual") we
+# put the info in a separate file.  Format:
+#
+#   m vname pcvm290-1 pc290 pc3000 OS OS-version
+#   ...
+#
+
+#
+# Note the regular joins here, not left joins, so that we do not
+# get lines for delay nodes and virtnode hosts that are in reserved
+# but not in virt_nodes.
+#
+my $havepmap = 0;
+$query_result =
+    DBQueryFatal("select v.vname,n.node_id,n.phys_nodeid,n.type,".
+		 " o.OS,o.version".
+		 " from virt_nodes as v,reserved as r,nodes as n,os_info as o".
+		 " where v.pid=r.pid and v.eid=r.eid and v.vname=r.vname".
+		 " and r.node_id=n.node_id and n.def_boot_osid=o.osid and".
+		 " v.pid='$pid' and v.eid='$eid'");
+if ($query_result->numrows) {
+    $havepmap = 1;
+    if ($impotent) {
+	$LTPOUT = *STDERR;
+    } else {
+	unlink("${ltpname}.new")
+	    if (-e "${ltpname}.new");
+    
+	open(LTPMAP, "> ${ltpname}.new") or
+	    die("Could not create ${ltpname}.new: $!\n");
+
+	$LTPOUT = *LTPMAP;
+    }
+    while (my ($vname,$node,$pnode,$ptype,$os,$osvers) =
+	   $query_result->fetchrow_array) {
+	$os = "UNKNOWN" if (!$os);
+	$osvers = "0" if (!$osvers);
+	print $LTPOUT "m $vname $node $pnode $ptype $os $osvers\n";
+    }
+    close(LTPMAP)
+	if (!$impotent);
+}
+
 if (! $impotent) {
     close(MAP);
     close(LTMAP);
 
     system("mv -f ${toponame}.new $toponame");
     system("mv -f ${ltname}.new $ltname");
+    system("mv -f ${ltpname}.new $ltpname")
+	if ($havepmap);
 
     #
     # Create a compressed copy of the file. The experiment nodes will look
@@ -338,6 +387,8 @@ if (! $impotent) {
     #
     system("rm -f ${toponame}.gz ; cat $toponame | gzip > ${toponame}.gz");
     system("rm -f ${ltname}.gz ; cat $ltname | gzip > ${ltname}.gz");
+    system("rm -f ${ltpname}.gz ; cat $ltpname | gzip > ${ltpname}.gz")
+	if ($havepmap);
 
     #
     # Now copy over to the user exp directory since in a normal create/modify
@@ -349,5 +400,7 @@ if (! $impotent) {
 
     system("cp -fp $toponame ${toponame}.gz $userdir/tbdata");
     system("cp -fp $ltname ${ltname}.gz $userdir/tbdata");
+    system("cp -fp $ltpname ${ltpname}.gz $userdir/tbdata")
+	if ($havepmap);
 }
 exit(0);

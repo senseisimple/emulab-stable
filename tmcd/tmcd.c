@@ -242,6 +242,7 @@ COMMAND_PROTOTYPE(dotiptunnels);
 COMMAND_PROTOTYPE(dorelayconfig);
 COMMAND_PROTOTYPE(dotraceconfig);
 COMMAND_PROTOTYPE(doltmap);
+COMMAND_PROTOTYPE(doltpmap);
 COMMAND_PROTOTYPE(doelvindport);
 COMMAND_PROTOTYPE(doplabeventkeys);
 COMMAND_PROTOTYPE(dointfcmap);
@@ -331,6 +332,7 @@ struct command {
 	{ "tiptunnels",	  FULLCONFIG_ALL,  F_ALLOCATED, dotiptunnels},
 	{ "traceinfo",	  FULLCONFIG_ALL,  F_ALLOCATED, dotraceconfig },
 	{ "ltmap",        FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltmap},
+	{ "ltpmap",       FULLCONFIG_NONE, F_MINLOG|F_ALLOCATED, doltpmap},
 	{ "elvindport",   FULLCONFIG_NONE, 0, doelvindport},
 	{ "plabeventkeys",FULLCONFIG_NONE, 0, doplabeventkeys},
 	{ "intfcmap",     FULLCONFIG_NONE, 0, dointfcmap},
@@ -6071,6 +6073,41 @@ COMMAND_PROTOTYPE(doltmap)
 		       reqp->nodeid);
 		return 1;
 	}
+
+	while (1) {
+		cc = fread(buf, sizeof(char), sizeof(buf), fp);
+		if (cc == 0) {
+			if (ferror(fp)) {
+				fclose(fp);
+				return 1;
+			}
+			break;
+		}
+		client_writeback(sock, buf, cc, tcp);
+	}
+	fclose(fp);
+	return 0;
+}
+
+/*
+ * Spit back the ltpmap. This is a backup for when NFS fails.
+ * We send back the gzipped version.  Note that it is ok if this
+ * file does not exist.
+ */
+COMMAND_PROTOTYPE(doltpmap)
+{
+	FILE		*fp;
+	char		buf[MYBUFSIZE];
+	int		cc;
+
+	/*
+	 * Open up the file on boss and spit it back.
+	 */
+	sprintf(buf, "%s/expwork/%s/%s/ltpmap.gz", TBROOT,
+		reqp->pid, reqp->eid);
+
+	if ((fp = fopen(buf, "r")) == NULL)
+		return 0;
 
 	while (1) {
 		cc = fread(buf, sizeof(char), sizeof(buf), fp);
