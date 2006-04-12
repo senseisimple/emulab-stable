@@ -7,8 +7,8 @@ $ns rtproto Static
 # Beginning of user-settable options
 
 #
-# This control how many _pairs_ of PCs there are. ie. 2 gets you 2 elab PCs
-# and 2 plab PCs
+# This control how many _pairs_ of PCs there are. ie. 2 gets you 2 monitors,
+# plus matching stubs
 #
 set num_pcs 2
 
@@ -21,13 +21,38 @@ set fake_plab 1
 # If set to 1, we grab real PlanetLab nodes. Both this and fake_plab can be
 # set at the same time
 #
-set real_plab 1
+set real_plab 0
+
+#
+# If you want to get specific real planetlab nodes, ask for them here by site
+# or by emulab node ID. 
+# NOTES:
+#   An empty list for either selection method turns it off
+#   Do not use both site and node selection at the same time!
+#   The list must be at least as long as num_pcs above, It can be longer, but
+#     extra elements will be ignored
+#   I recommend using the sites option, rather than the nodes option, since that
+#     may get you less-loaded nodes and is more robust to crashed nodes
+#   You can get a list of node IDs and sites at:
+#     https://www.emulab.net/nodecontrol_list.php3?showtype=widearea
+#   Site names are case-sensitive!
+#
+
+# Empty list
+set plabsites {}
+# Example site list
+#set plabsites {UCB Stanford Cornell Jerusalem Taiwan}
+
+# Empty list
+set plabnodes {}
+# Example node list
+#set plabnodes {plab179 pab614 plab588 plab305 plab259}
 
 #
 # Where to grab your tarball of pelab software from. To make this tarball:
 #   Go to your testbed source tree
 #   Run 'cvs up'!!!
-#   Run 'gmake' in pelab/stub and pelab/libnetmon
+#   Run 'gmake' in pelab/stub and pelab/libnetmon (on a DEVBOX node)
 #   From the root of your source tree, run:
 #       tar czvf /proj/tbres/my-pelab.tar.gz pelab
 #   Of course, don't name it 'my-plab.tar.gz'! You can put this file in
@@ -35,7 +60,15 @@ set real_plab 1
 #       /proj/tbres/
 #   Put the path to your tarball in this variable
 #
-set pelab_tar "/proj/tbres/ricci/pelab.tar.gz"
+set pelab_tar "/proj/tbres/CHANGEME.tar.gz"
+
+#
+# When using a fake plab, these are the parameters for the fake Internet
+# 'cloud' connecting the plab nodes. For now, all nodes have the same
+# parameters - hopefully this will change in a later version
+#
+set cloud_delay "30ms"
+set cloud_bw "1.5Mbps"
 
 #
 # When using a fake plab, these are the parameters for the 'control'
@@ -43,13 +76,6 @@ set pelab_tar "/proj/tbres/ricci/pelab.tar.gz"
 #
 set control_delay "0ms"
 set control_bw "100Mbps"
-
-#
-# When using a fake plab, these are the parameters for the fake Internet
-# 'cloud' connecting the plab nodes
-#
-set cloud_delay "30ms"
-set cloud_bw "1.5Mbps"
 
 #
 # These are the initial conditions for the 'elabc' cloud, the Emulab side of
@@ -107,6 +133,14 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
         tb-set-node-tarfiles $planet($i) $tarfiles
         tb-set-node-rpms $planet($i) $rpms
+
+        if {[llength $plabsites] > 0} {
+            set why_doesnt_tcl_have_concat "*&"
+            append why_doesnt_tcl_have_concat [lindex $plabsites [expr $i - 1]]
+            $planet($i) add-desire $why_doesnt_tcl_have_concat 1.0
+        } elseif {[llength $plabnodes] > 0} {
+            tb-fix-node $planet($i) [lindex $plabnodes [expr $i - 1]]
+        }
     }
 
     if {$fake_plab} {
@@ -142,15 +176,19 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 # Set up groups to make it easy for us to start/stop program agents
 #
 set stubgroup [$ns event-group $stublist]
-set planetstubs [$ns event-group $planetstublist]
-set plabstubs [$ns event-group $plabstublist]
+if {$real_plab} {
+    set planetstubs [$ns event-group $planetstublist]
+}
+if {$fake_plab} {
+    set plabstubs [$ns event-group $plabstublist]
+}
 set monitorgroup [$ns event-group $monitorlist]
 
 set allservers [$ns event-group $serverlist]
 set allclients [$ns event-group $clientlist]
 
 #
-# Fake 'Inernet' cloud for fake plab nodes
+# Fake 'Internet' cloud for fake plab nodes
 #
 if {$fake_plab} {
     set plabc [$ns make-lan "$plan_string" $cloud_bw $cloud_delay]
