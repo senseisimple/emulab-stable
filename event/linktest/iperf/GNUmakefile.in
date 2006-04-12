@@ -1,6 +1,6 @@
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 
@@ -21,8 +21,10 @@ endif
 
 ifeq ($(host_cpu),arm)
 TARGETS =
+ITARGETS =
 else
 TARGETS = src/emulab-iperf
+ITARGETS = iperf-install
 endif
 
 all: $(TARGETS)
@@ -43,12 +45,10 @@ build-iperf: Makefile
 
 client: all
 
-ifeq ($(host_cpu),arm)
-client-install:
-else
-client-install: Makefile
-	$(MAKE) -f Makefile install
-endif
+iperf-install: build-iperf
+	$(INSTALL_PROGRAM) -s src/iperf $(CLIENT_BINDIR)/emulab-iperf
+
+client-install: $(ITARGETS)
 
 # Note: GNU make wants to pass options in MAKEFLAGS (w) that are compatible
 # with BSD make.  So we just force configure to assume/use gmake for BSD.

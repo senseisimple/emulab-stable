@@ -55,49 +55,6 @@ diff -c src/Client.cpp:1.1 src/Client.cpp:1.3
           
           if ( delay > 0 ) {
               delay_loop( delay ); 
-Index: src/Makefile.in
-===================================================================
-RCS file: /usr/flux/CVS/emulab-iperf/src/Makefile.in,v
-retrieving revision 1.1.1.1
-diff -c -r1.1.1.1 Makefile.in
-*** src/Makefile.in	24 Oct 2005 15:18:33 -0000	1.1.1.1
---- src/Makefile.in	24 Oct 2005 16:06:10 -0000
-***************
-*** 38,44 ****
-  POST_UNINSTALL = :
-  build_triplet = @build@
-  host_triplet = @host@
-! bin_PROGRAMS = iperf$(EXEEXT)
-  subdir = src
-  DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
-  ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
---- 38,44 ----
-  POST_UNINSTALL = :
-  build_triplet = @build@
-  host_triplet = @host@
-! bin_PROGRAMS = emulab-iperf$(EXEEXT)
-  subdir = src
-  DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
-  ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-***************
-*** 266,273 ****
-  
-  clean-binPROGRAMS:
-  	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
-! iperf$(EXEEXT): $(iperf_OBJECTS) $(iperf_DEPENDENCIES) 
-! 	@rm -f iperf$(EXEEXT)
-  	$(CXXLINK) $(iperf_LDFLAGS) $(iperf_OBJECTS) $(iperf_LDADD) $(LIBS)
-  
-  mostlyclean-compile:
---- 266,273 ----
-  
-  clean-binPROGRAMS:
-  	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
-! emulab-iperf$(EXEEXT): $(iperf_OBJECTS) $(iperf_DEPENDENCIES) 
-! 	@rm -f emulab-iperf$(EXEEXT)
-  	$(CXXLINK) $(iperf_LDFLAGS) $(iperf_OBJECTS) $(iperf_LDADD) $(LIBS)
-  
-  mostlyclean-compile:
 Index: src/main.cpp
 ===================================================================
 RCS file: /usr/flux/CVS/emulab-iperf/src/main.cpp,v
