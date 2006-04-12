@@ -569,6 +569,9 @@ sub mkrootfs($)
     if (-e TMLTMAP()) {
 	mysystem("cp -fp " . TMLTMAP() . " $path/root/var/emulab/boot");
     }
+    if (-e TMLTPMAP()) {
+	mysystem("cp -fp " . TMLTPMAP() . " $path/root/var/emulab/boot");
+    }
 
     #
     # Stash the control net IP if not the same as the host IP
