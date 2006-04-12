@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 # Kernel, jail, netstat, route, ifconfig, ipfw, header files.
@@ -16,7 +16,7 @@ use Fcntl ':flock';
 # Drag in path stuff so we can find emulab stuff. Also untaints path.
 BEGIN { require "/etc/emulab/paths.pm"; import emulabpaths; }
 
-use libsetup qw(REMOTE LOCALROOTFS TMTOPOMAP TMLTMAP TBDebugTimeStamp);
+use libsetup qw(REMOTE LOCALROOTFS TMTOPOMAP TMLTMAP TMLTPMAP TBDebugTimeStamp);
 use libtmcc;
 
 #
@@ -761,6 +761,9 @@ sub restorerootfs($)
     }
     if (-e TMLTMAP()) {
 	mysystem("cp -fp " . TMLTMAP() . " $path/root/var/emulab/boot");
+    }
+    if (-e TMLTPMAP()) {
+	mysystem("cp -fp " . TMLTPMAP() . " $path/root/var/emulab/boot");
     }
 
     #
