@@ -1,7 +1,7 @@
 <?php
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 include("defs.php3");
@@ -107,7 +107,8 @@ elseif (! strcmp($showtype, "widearea")) {
 		 	   "'USA, ','')".
 			   "AS location, ".
 	 		   "wani.connect_type, ".
-			   "wani.hostname";
+			   "wani.hostname, " .
+                           "wani.site";
     $additionalLeftJoin = "LEFT JOIN widearea_nodeinfo AS wani ".
 			  "ON n.node_id=wani.node_id";
 
@@ -453,9 +454,10 @@ elseif (strcmp($showtype, "widearea")) {
 }
 
 if (!strcmp($showtype, "widearea")) {
-    echo "<th align=center>Processor</th>
+    echo "<th align=center>Site</th>
+          <th align=center>Processor</th>
 	  <th align=center>Connection</th>
-	  <th align=center>Location</th>\n";
+	  <th align=center>Location</th>";
 }
     
 echo "</tr>\n";
@@ -473,8 +475,9 @@ while ($row = mysql_fetch_array($query_result)) {
     $status             = $row[status];
 
     if (!strcmp($showtype, "widearea")) {	
+	$site         = $row[site];
 	$machine_type = $row[machine_type];
-	$location = $row[location];
+	$location     = $row[location];
 	$connect_type = $row[connect_type];
 	$vname        = $row[hostname];
     } 
@@ -543,7 +546,8 @@ while ($row = mysql_fetch_array($query_result)) {
     }
 
     if (!strcmp($showtype, "widearea")) {	
-	echo "<td>$machine_type</td>
+	echo "<td>$site</td>
+	      <td>$machine_type</td>
 	      <td>$connect_type</td>
 	      <td><font size='-1'>$location</font></td>\n";
     }
