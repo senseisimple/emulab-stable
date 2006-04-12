@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2005 University of Utah and the Flux Group.
+# Copyright (c) 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -46,8 +46,6 @@ $TBMOTELOG_REMOTE_DB_DIR = "/proj/%s/motelog/db";
 $LOGGER = "/usr/local/etc/emulab/motelogd";
 # XXX: to pass in a tag from the ns file, gotta specify it through here...
 #$LOGGER_ARGS = "-i %s -C $TBMOTELOG_FILES_DIR -r ";
-
-my ($pid,$eid,$vname) = check_nickname();
 
 #
 # Not all clients support this.
@@ -97,6 +95,7 @@ sub doboot()
     my $retval;
     my @motelogids = ();
     my ($src,$dst);
+    my ($pid,$eid,$vname) = check_nickname();
 
     # first, check the config, see if there's anything for us to do...
     if (getmotelogconfig(\@motelogids)) {
@@ -222,6 +221,7 @@ sub doshutdown()
 {
     my $retval;
     my @motelogids = ();
+    my ($pid,$eid,$vname) = check_nickname();
 
     # first, check the config, see if there's anything for us to do...
     if (getmotelogconfig(\@motelogids)) {
