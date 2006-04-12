@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2004, 2005 University of Utah and the Flux Group.
+# Copyright (c) 2004, 2005, 2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -134,8 +134,10 @@ sub dotopomap()
     #
     my $topomap = "/proj/$pid/exp/$eid/tbdata/topomap.gz";
     my $ltmap = "/proj/$pid/exp/$eid/tbdata/ltmap.gz";
+    my $ltpmap = "/proj/$pid/exp/$eid/tbdata/ltpmap.gz";
     my $tempmap = "/tmp/topomap.gz";
     my $templt = "/tmp/ltmap.gz";
+    my $templtp = "/tmp/ltpmap.gz";
 
     #
     # Try a couple of times to get the file cause of NFS sillyness.
@@ -153,6 +155,13 @@ sub dotopomap()
 		if (system("cp -fp $ltmap $templt") == 0);
 	    unlink("$templt");
 	}
+	if (-e $ltpmap) {
+	    for (my $i = 0; $i < 5; $i++) {
+		last
+		    if (system("cp -fp $ltpmap $templtp") == 0);
+		unlink("$templtp");
+	    }
+	}
     }
     #
     # Make sure we always try to fetch it fresh
@@ -160,6 +169,7 @@ sub dotopomap()
     else {
 	unlink("$tempmap");
 	unlink("$templt");
+	unlink("$templtp");
     }
     
     if (! -e $tempmap) {
@@ -188,6 +198,19 @@ sub dotopomap()
 	}
     }
 
+    if (! -e $templtp) {
+	#
+	# Try using tmcc. It returns compressed data so do it directly.
+	#
+	system(TMCC() . " ltpmap > $templtp");
+	#
+	# tmcc does not really return useful error codes.
+	#
+	if ($?) {
+	    fatal("Could not get ltpmap from tmcd or from NFS");
+	}
+    }
+
     if (-s $tempmap) {
 	system("cat ${tempmap} | gunzip > " . TMTOPOMAP());
 	if ($?) {
@@ -208,5 +231,16 @@ sub dotopomap()
     }
     else {
 	warning("Could not get ltmap");
+    }
+
+    if (-s $templtp) {
+	system("cat ${templtp} | gunzip > " . TMLTPMAP());
+	if ($?) {
+	    fatal("Could not unzip ltpmap");
+	}
+	unlink("$templtp");
+    }
+    else {
+	warning("Could not get ltpmap");
     }
 }
