@@ -117,7 +117,7 @@ if ($pid eq "" || $eid eq "") {
 
     my @idle=();
     # Grab a list of inactive expts, so we know who to reset when we're done
-    my $sql = "select pid,eid from experiments where swap_requests > 0";
+    my $sql = "select pid,eid from experiments where state='active' and swap_requests > 0";
     my $q = DBQueryFatal($sql);
     while (%r = $q->fetchhash()) {
 	$pid = $r{'pid'};
