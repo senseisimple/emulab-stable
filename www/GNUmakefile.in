@@ -21,7 +21,7 @@ HTMLINSTALL     = $(INSTALL_SBINDIR)/htmlinstall
 
 include $(OBJDIR)/Makeconf
 
-SUBDIRS = garcia-telemetry
+SUBDIRS = garcia-telemetry tutorial
 
 #
 # Force dependencies to make sure configure regenerates if the .in file
@@ -249,6 +249,9 @@ $(INSTALL_DIR)/opsdir/www/%: %
 	@echo "Installing $<"
 	-mkdir -p $(patsubst %/,%,$(dir $@))
 	$(INSTALL_DATA) $(subst $$,\$$,$<) $(subst $$,\$$,$@) 
+
+clean:		clean-subdirs
+distclean:	distclean-subdirs
 
 # How to recursively descend into subdirectories to make general
 # targets such as `all'.

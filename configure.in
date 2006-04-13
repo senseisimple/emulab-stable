@@ -797,7 +797,8 @@ outfiles="$outfiles Makeconf GNUmakefile \
 	utils/spewconlog utils/webspewconlog utils/xlogin \
 	www/GNUmakefile www/defs.php3 www/dbdefs.php3 www/xmlrpc.php3 \
 	www/xmlrpcpipe.php3 \
-	www/swish.conf www/websearch www/garcia-telemetry/GNUmakefile \
+	www/swish.conf www/websearch \
+	www/garcia-telemetry/GNUmakefile www/tutorial/GNUmakefile \
 	vis/GNUmakefile vis/webvistopology vis/dbvistopology \
 	vis/prerender vis/prerender_all vis/render \
 	vis/floormap vis/webfloormap \

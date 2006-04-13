@@ -1,0 +1,35 @@
+#
+# EMULAB-COPYRIGHT
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
+# All rights reserved.
+#
+SRCDIR		= @srcdir@
+TESTBED_SRCDIR	= @top_srcdir@
+OBJDIR		= ../..
+SUBDIR		= www/tutorial
+
+all: $(SRCDIR)/loghole.html
+
+# We depend on the loghole.1 man page.  It is formated into text and then
+# html, and added to the end of the loghole web page.
+# 
+# We also leave the checked-in loghole.html file, in order to avoid making a
+# hard dependency on having man2html installed.  There will be a warning, but
+# not an error, if this fails.  The original loghole.html will not be wiped out.
+$(SRCDIR)/loghole.html: man1/loghole.1 $(SRCDIR)/loghole.html.head
+	-( man -M . 1 loghole > loghole-man.txt && \
+	   man2html -bare < loghole-man.txt > loghole-man.html && \
+	   cat $(SRCDIR)/loghole.html.head loghole-man.html > loghole.html.new && \
+	   mv loghole.html.new $(SRCDIR)/loghole.html )
+
+# Gotta have a man1 directory for man to search for .1 files.
+man1:
+	mkdir man1
+# Symlink the .1 source files into it for man to find.
+# Add another layer of ../'s because it's a level lower in the tree.
+# Don't error out if the symlink is already there.
+man1/loghole.1: man1
+	- ln -s ../$(TESTBED_SRCDIR)/utils/loghole.1 man1/loghole.1
+
+clean:
+	rm -rf man1 loghole-man.txt loghole-man.html loghole.html.new
