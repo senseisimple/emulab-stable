@@ -782,7 +782,8 @@ CREATE TABLE experiments (
   instance_idx int(10) unsigned NOT NULL default '0',
   PRIMARY KEY  (eid,pid),
   KEY idx (idx),
-  KEY batchmode (batchmode)
+  KEY batchmode (batchmode),
+  KEY state (state)
 ) TYPE=MyISAM;
 
 --
