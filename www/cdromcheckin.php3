@@ -26,7 +26,7 @@ $confslicex = "slicex_tarball=slicex.tar.gz
 slicex_sig=http://${WWWHOST}/images/slicex-v4.tar.gz.sig
 ";
 
-$version_tag["5"] = "24a4f173a7716d47bbc047f8387c86af";
+$version_tags[5] = "24a4f173a7716d47bbc047f8387c86af";
 $confmaps["24a4f173a7716d47bbc047f8387c86af"] = "fdisk=image.fdisk
 fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig
 slice1_image=slice1.ndz
@@ -35,7 +35,7 @@ slice1_sig=https://${WWWHOST}/images/slice1-v5.ndz.sig
 slice1_md5=24a4f173a7716d47bbc047f8387c86af
 " . $slicexbase;
 
-$version_tags["4"] = "c9f8578517f5ebb0eca70b69dce144d";
+$version_tags[4] = "c9f8578517f5ebb0eca70b69dce144d";
 $confmaps["c9f8578517f5ebb0eca70b69dce144d"] = "fdisk=image.fdisk
 fdisk_sig=https://${WWWHOST}/images/image.fdisk.sig
 slice1_image=slice1.ndz
@@ -415,8 +415,8 @@ elseif ($cdvers == 69) {
     }
 }
 else {
-    if ($version_tags["$cdvers"]) {
-        echo $confmaps[$version_tags["$cdvers"]];
+    if ($version_tags[$cdvers]) {
+        echo $confmaps[$version_tags[$cdvers]];
 	echo $confslicex;
     }
     else {
