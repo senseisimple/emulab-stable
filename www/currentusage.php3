@@ -167,13 +167,24 @@ function SHOWFREENODES()
 #
 function FreeNodeHtml() {
     global $uid;
-    
+
     if ($uid) {
 	return SHOWFREENODES();
     }
     else {
 	return SHOWSTATS();
     }
+}
+
+#
+# We need all errors to come back this function so that the Sajax request
+# fails and the timer is terminated. See below.
+# 
+function handle_error($message, $death)
+{
+    echo "failed:$message";
+    # Always exit; ignore $death.
+    exit(1);
 }
      
 #
@@ -182,6 +193,14 @@ function FreeNodeHtml() {
 if ($uid) {
     sajax_init();
     sajax_export("FreeNodeHtml");
+
+    # If this call is to client request function, then turn off
+    # interactive mode; errors will cause the Sajax request to fail
+    # and the timer to stop.
+    if (sajax_client_request()) {
+	$session_interactive  = 0;
+	$session_errorhandler = 'handle_error';
+    }
     sajax_handle_client_request();
 
     PAGEBEGINNING("Free Node Summary", 1, 1);
@@ -191,12 +210,13 @@ if ($uid) {
     ?>
     function FreeNodeHtml_CB(stuff) {
 	getObjbyName('usage').innerHTML = stuff;
+	setTimeout('GetFreeNodeHtml()', 60000);
     }
-    setInterval('GetFreeNodeHtml()', 30000);
-
     function GetFreeNodeHtml() {
 	x_FreeNodeHtml(FreeNodeHtml_CB);
     }
+    setTimeout('GetFreeNodeHtml()', 60000);
+    
     <?php
     echo "</script>\n";
 	  
