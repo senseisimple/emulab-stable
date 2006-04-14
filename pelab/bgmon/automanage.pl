@@ -43,7 +43,7 @@ sub usage
 {
 	warn "Usage: $0 [-BLP] [-f constraint file] [-l latency test period]".
 	     " <bandwidth duty cycle>".
-	     " <number of sites or \"all\">\n".
+#	     " <number of sites or \"all\">\n".
 	     "where: -B = Do not measure bandwidth\n".
 	     "       -L = Do not measure latency\n".
 	     "       -P = Do not measure latency to nodes not responding to pings\n";
@@ -54,10 +54,10 @@ if( !defined $ARGV[0] ){
     exit &usage;
 }
 $bwdutycycle = $ARGV[0];
-if( !defined $ARGV[1] ){
-    exit &usage;
-}
-$numsites = $ARGV[1];
+#if( !defined $ARGV[1] ){
+#    exit &usage;
+#}
+#$numsites = $ARGV[1];
 my %opt;
 getopt("B:L:P:f:l:s:p",\%opt,);
 if( $opt{f}) { $constrFilename = $opt{f}; }
@@ -79,50 +79,28 @@ if (!$tuple) { die "Could not allocate an address tuple\n"; }
 
 
 #############################################################################
- libxmlrpc::Config({"server"  => $RPCSERVER,
+#
+# Initialization
+#
+libxmlrpc::Config({"server"  => $RPCSERVER,
 		    "verbose" => 0,
 #		    "cert"    => $RPCCERT,
 		    "portnum" => $RPCPORT});
 
-=pod
-#retrieve list of nodes
-my $rval = libxmlrpc::CallMethod($MODULE, $METHOD,
-				 {"class" => "pcplabphys"});
-my %allnodes = %$rval;
-
-#populate sitenodes
-foreach my $node (keys %allnodes){
-    my $siteid = $allnodes{$node}{site};
-#    print $siteid;
-#    print $node;
-    push @{$sitenodes{$siteid}}, $node;
-#    print @{$sitenodes{$siteid}}."\n";
-}
-
-print 
-    "$allnodes{plab200}{cpu}\n".
-    "$allnodes{plab200}{node_id}\n".
-    "$allnodes{plab200}{type}\n".
-    "$allnodes{plab200}{free}\n".
-    "$allnodes{plab200}{site}\n";
-=cut
-
-
-#choosenodes();
-#printchosennodes();
-
-
 my $lastupdated_numnodes = 0;
+# TODO: Stop all nodes in constraint set
 
 ###########################################################
+#
+# Main Loop
+#
 while(1)
 {
-
     #update node list
     getnodeinfo();
     choosenodes();
     modifytests();
-    
+
     select(undef, undef, undef, 5.0);
 }
 
@@ -134,8 +112,9 @@ sub getnodeinfo
     #retrieve list of nodes
     my $rval = libxmlrpc::CallMethod($MODULE, $METHOD,
 				     {"class" => "pcplabphys"});
+    print "here";
     %allnodes = %$rval;
-    
+
     #populate sitenodes
     foreach my $node (keys %allnodes){
 	my $siteid = $allnodes{$node}{site};
@@ -156,16 +135,24 @@ sub choosenodes
 {
     foreach my $site (keys %sitenodes){
 	my $bestnode = choosebestnode($site);
-	if( "NONE" eq $bestnode ){
+	if( "NONE" eq $bestnode ){	 
+	    # ** This section handles when a site has no nodes available
 	    #no available node at this site, so remove site from hash
-		delete $intersitenodes{$site};
+	    #TODO: send "stop" signals to all other nodes having this
+	    #  node as the destination
+	    delete $intersitenodes{$site};
 	}
 	else{
 	    if( !defined $intersitenodes{$site} || 
 		$intersitenodes{$site} ne $bestnode )
 	    {
-		#new node to represent this site
+		# ** This section handles when a "bestnode" at a site changes
+
+		# TODO: Stop sigs to other nodes using old "bestnode" value
+		#set new node to represent this site
 		$intersitenodes{$site} = $bestnode;
+		# TODO: start other nodes using this new "bestnode"
+		#       (This uses the EDIT bgmon signal - see bgmon.pl)
 	    }
         }
     }
@@ -174,23 +161,24 @@ sub choosenodes
 
 #
 # Re-adjust the test periods of connections based on number of nodes
-# TODO: This needs careful thought... 
 #
 sub modifytests
 {
     my $numsites = scalar(keys %intersitenodes);
 
     my $bwper = ($numsites - 1) * $IPERFDURATION * 1/$bwdutycycle;
+    #TODO: ?? dynamically change latency period, too?
 
-    #update connections with newly calculated periods
-    if( abs($lastupdated_numnodes - $numsites) > $SITEDIFFTHRESHOLD &&
-	!$opt{B} )
+    #update connections to use  newly calculated periods
+    if( abs($lastupdated_numnodes - $numsites) > $SITEDIFFTHRESHOLD )
     {
-	#TODO: update test periods
-	$test_per{bw} = $bwper;
-	print "new BW per = $bwper\n";
+	if( !$opt{B} ){       
+	    $test_per{bw} = $bwper;
+	    print "new BW per = $bwper\n";
+	}
+
 	$lastupdated_numnodes = $numsites;
-	updateTests();
+	updateTests();   #handles changing number of sites
     }  
 
 }
@@ -252,6 +240,7 @@ sub isnodeinconstrset($)
 }
 
 
+
 #
 # update all nodes with new test periods and destination nodes
 #
@@ -281,8 +270,78 @@ sub updateTests
 }
 
 
+#
+# Stops all nodes in constraint set
+#
+sub stopall()
+{
+    foreach my $node (values %sitenodes){
+	if( isnodeinconstrset($node) ){
+	    %$tuple = ( objtype   => "BGMON",
+			objname   => $node,
+			eventtype => "STOPALL",
+			expt      => "__none" );
+	    my $notification = event_notification_alloc($handle,$tuple);
+	    if (!$notification) { die "Could not allocate notification\n"; }
 
+	    #send notification
+	    if (!event_notify($handle, $notification)) {
+		die("could not send test event notification");
+	    }
+	}
+    }
+}
+
+#
+# stops the tests from given source and destination nodes
+#
+sub stoppairtest($$)
+{
+    my ($srcnode, $destnode) = @_;
+    print "stopping pair tests from $srcnode to $destnode\n";
+    my $testper = 0;
+    my @testtypes = ("latency","bw");
+    %$tuple = ( objtype   => "BGMON",
+		objname   => $srcnode,
+		eventtype => "EDIT",
+		expt      => "__none" );
+
+    foreach my $testtype(@testtypes){
+
+	my $notification = event_notification_alloc($handle,$tuple);
+	if (!$notification) { die "Could not allocate notification\n"; }
+
+	#add destination nodes attribute
+	if( 0 == event_notification_put_string( $handle,
+						$notification,
+						"linkdest",
+						$destnode ) )
+	{ warn "Could not add attribute to notification\n"; }
+
+	#add tests and their default values
+	if( 0 == event_notification_put_string( $handle,
+						$notification,
+						"testper",
+						$testper ) )
+	{ warn "Could not add attribute to notification\n"; }
+
+	#add test type
+	if( 0 == event_notification_put_string( $handle,
+						$notification,
+						"testtype",
+						$testtype ) )
+	{ warn "Could not add attribute to notification\n"; }
+
+	#send notification
+	if (!event_notify($handle, $notification)) {
+	    die("could not send test event notification");
+	}
+    }
+}
+
+#
 # destnodes is space-separated string
+#
 sub initnode($$$$)
 {
     my ($node, $destnodes, $testper, $testtype) = @_;
@@ -314,7 +373,6 @@ sub initnode($$$$)
 					    "testtype",
 					    $testtype ) )
     { warn "Could not add attribute to notification\n"; }
-
 
     #send notification
     if (!event_notify($handle, $notification)) {

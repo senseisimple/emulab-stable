@@ -23,12 +23,14 @@ if( scalar(@ARGV) < 1 ){ exit &usage; }
 my $filename_defaults = $ARGV[0];
 #my $filename_defaults = "destlist";
 my %DEF_PER = (
-	       "latency" => 300,
+#	       "latency" => 300,
+	       "latency" => 600,
 #	       "latency" => 0.4,
 #	       "latency" => 0,
 #	       "bw"=>2450  # start any test every 50 sec, * ~49 connections.
+	       "bw"=>7850  # start any test every 50 sec, * ~157 connections.
 #	       "bw"=>0
-	       "bw"=>950   # start any test every 50 sec, * 19 connections
+#	       "bw"=>950   # start any test every 50 sec, * 19 connections
 #	       "bw"=>200
 	       );
 my %settings;  #misc options
