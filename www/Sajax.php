@@ -164,8 +164,11 @@ if (!isset($SAJAX_INCLUDED)) {
 				x.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
 			}
 			x.onreadystatechange = function() {
-				if (x.readyState != 4) 
+				if (x.readyState != 4)
 					return;
+				if (x.status != 200)
+					return;
+				
 				sajax_debug("received " + x.responseText);
 				
 				var status;
