@@ -18,7 +18,13 @@ my ($pid, $eid) = @ARGV;
 # Stop the stubs and monitors
 #
 print "##### Stopping stubs and monitors\n";
-if (system "$TEVC -e $pid/$eid now allgroup stop") {
+if (system "$TEVC -e $pid/$eid now plabstubs stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planetstubs stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now monitorgroup stop") {
     die "Error running tevc\n";
 }
 
@@ -30,6 +36,18 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon snapshot") {
     die "Error running tevc\n";
 }
 if (system "$TEVC -e $pid/$eid now planetc-tracemon stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now plabc-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now plabc-tracemon stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now elabc-tracemon snapshot") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now elabc-tracemon stop") {
     die "Error running tevc\n";
 }
 

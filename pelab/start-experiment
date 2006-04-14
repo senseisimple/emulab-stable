@@ -19,7 +19,13 @@ my ($pid, $eid) = @ARGV;
 # Make sure any old stubs/monitors are dead
 #
 print "##### Stopping old stubs and monitors\n";
-if (system "$TEVC -e $pid/$eid now allgroup stop") {
+if (system "$TEVC -e $pid/$eid now plabstubs stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now planetstubs stop") {
+    die "Error running tevc\n";
+}
+if (system "$TEVC -e $pid/$eid now monitorgroup stop") {
     die "Error running tevc\n";
 }
 
