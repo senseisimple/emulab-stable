@@ -1181,7 +1181,8 @@ CREATE TABLE linkdelays (
   q_droptail int(11) default '0',
   q_red tinyint(4) default '0',
   q_gentle tinyint(4) default '0',
-  PRIMARY KEY  (node_id,vlan,vnode)
+  PRIMARY KEY  (node_id,vlan,vnode),
+  KEY id (pid,eid)
 ) TYPE=MyISAM;
 
 --

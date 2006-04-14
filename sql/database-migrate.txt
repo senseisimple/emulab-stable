@@ -3296,3 +3296,6 @@ last_net_act,last_cpu_act,last_ext_act);
 
       alter table experiments add index (state);
 
+4.51: Another index to improve lookup in linkdelays.
+
+      alter table linkdelays add index id (pid,eid);
