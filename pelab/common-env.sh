@@ -122,7 +122,7 @@ fi
 #
 # How big is this experiment? Counts the number of planetlab nodes
 #
-export PEER_PAIRS=`$GREP -E -c 'elab-.*-elabc' /etc/hosts`
+export PEER_PAIRS=`$GREP -E -c 'elab-.*-elabc ' /etc/hosts`
 export PEERS=`expr $PEER_PAIRS \* 2`
 
 #
