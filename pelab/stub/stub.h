@@ -44,7 +44,7 @@ extern "C"
 // This is the low water mark of the send buffer. That is, if select
 // says that a write buffer is writable, this is the minimum amount of
 // buffer space available.
-#define LOW_WATER_MARK 110000
+#define LOW_WATER_MARK 8192
 
 #define MAX_TCPDUMP_LINE     256 //the max line size of the tcpdump output
 #define SIZEOF_LONG sizeof(long) //message bulding block
