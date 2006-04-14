@@ -191,7 +191,7 @@ set allclients [$ns event-group $clientlist]
 # Fake 'Internet' cloud for fake plab nodes
 #
 if {$fake_plab} {
-    set plabc [$ns make-cloud "$plan_string" $cloud_bw $cloud_delay]
+    set plabc [$ns make-lan "$plan_string" $cloud_bw $cloud_delay]
     tb-set-ip-lan $plab(1) $plabc 10.1.0.1
     $plabc trace
 }
@@ -199,7 +199,7 @@ if {$fake_plab} {
 #
 # Lan which will be controlled by the monitor
 #
-set elabc [$ns make-cloud "$elan_string" $ecloud_bw $ecloud_delay]
+set elabc [$ns make-lan "$elan_string" $ecloud_bw $ecloud_delay]
 tb-set-ip-lan $elab(1) $elabc 10.0.0.1
 $elabc trace
 
