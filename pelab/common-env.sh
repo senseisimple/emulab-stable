@@ -56,7 +56,7 @@ fi
 # Some 'constants' by convention. 
 #
 export PELAB_LAN=elabc
-export EPLAB_LAN=planetc
+export EPLAB_LAN=plabc
 
 #
 # Name of the barrier for indicating all stubs are ready
