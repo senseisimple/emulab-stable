@@ -3299,3 +3299,7 @@ last_net_act,last_cpu_act,last_ext_act);
 4.51: Another index to improve lookup in linkdelays.
 
       alter table linkdelays add index id (pid,eid);
+
+4.52: Mr. Index strikes again.  Take a nodecontrol_form query from 21 to 1 sec.
+
+      alter table partitions add index (osid);

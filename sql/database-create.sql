@@ -1866,7 +1866,8 @@ CREATE TABLE partitions (
   osid varchar(35) default NULL,
   imageid varchar(45) default NULL,
   imagepid varchar(12) NOT NULL default '',
-  PRIMARY KEY  (node_id,partition)
+  PRIMARY KEY  (node_id,partition),
+  KEY osid (osid)
 ) TYPE=MyISAM;
 
 --
