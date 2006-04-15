@@ -248,6 +248,13 @@ sub saveTestToDB()
 	warn("BW came in as null string at $tstamp for $src,$dst\n");
 	return;
     }
+    if ($latency eq "") {
+	my $src = $results{'linksrc'};
+	my $dst = $results{'linkdest'};
+	
+	warn("Latency came in as null string at $tstamp for $src,$dst\n");
+	return;
+    }
 
     if ($batchsize == 0) {
 	$insertions =
