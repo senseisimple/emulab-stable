@@ -17,7 +17,7 @@ use Getopt::Std;
 #
 sub usage()
 {
-    print("Usage: gentopofile [-d] [-n] <pid> <eid>\n".
+    print("Usage: gentopofile [-n] <pid> <eid>\n".
 	  "  Use -n to print to stdout/stderr, but leave the file alone.\n");
     exit(-1);
 }
@@ -146,7 +146,14 @@ while (my ($vname,$ips) = $query_result->fetchrow_array()) {
 #
 # Generate the linktest config for links, which looks like:
 #
-#   l node0 node1 100000 0.0 0.0
+#   l node0 node1 bw delay loss lname dropstyle
+#
+# where node0 and node1 are the user-given names of the end points,
+# bw is the bandwidth in bits/sec,
+# delay is the latency in (fractional) seconds,
+# loss is the packet loss rate as a fraction,
+# lname is the user-given name of the link,
+# dropstyle is "droptail" or "gred".
 #
 my %virt_lans = ();
 
@@ -328,12 +335,37 @@ foreach my $lan (sort keys(%lans)) {
 
 #
 # Finally generate a "physical resource" map for linktest if the
-# experiment is swapped in.  This could be part of the ltmap, but
-# for maximum compatibility (and to keep the ltmap "virtual") we
-# put the info in a separate file.  Format:
+# experiment is swapped in.  It is a dual of the virtual ltmap,
+# containing "instantiation" information about nodes and links.
+# First we have a version number:
 #
-#   m vname pcvm290-1 pc290 pc3000 OS OS-version
-#   ...
+# V number
+#
+# What a forward-thinking concept!
+#
+# A node info line looks like:
+#
+#   H vname pname phost ptype OSID OS-name OS-version
+#
+# where vname is the experimenter given name like in the ltmap,
+# pname is the physical node name (e.g., "pc10", "pcvm10-2"),
+# phost is the "hosting" physical node for vnodes (or pname for regular nodes),
+# OSID is the emulab OS identifier for the OS running (e.g., "FBSD410-STD"),
+# OS-name is OS (e.g., "FreeBSD", "Linux"),
+# OS-version is the version of that OS (e.g., "4.10", "9.0").
+#
+# A link info line looks like:
+#
+#   L node0 node1 lname node0-mac mpx-style shaping-method
+#
+# where node0 and node1 are the user-specified node names,
+# lname is the user-specified link/lan name,
+# node0-mac is the MAC address of node0's interface
+# (can be mapped to interface name with findif),
+# mpx-style is the multiplexing style: "none" for physical links,
+# "veth" for encapsulated veth, or "veth-ne" for non-encapsulated veth,
+# shaping-method is either "dnode" for delay node shaping or "linkdelay"
+# for end node shaping.
 #
 
 #
@@ -344,7 +376,7 @@ foreach my $lan (sort keys(%lans)) {
 my $havepmap = 0;
 $query_result =
     DBQueryFatal("select v.vname,n.node_id,n.phys_nodeid,n.type,".
-		 " o.OS,o.version".
+		 " o.osid,o.OS,o.version".
 		 " from virt_nodes as v,reserved as r,nodes as n,os_info as o".
 		 " where v.pid=r.pid and v.eid=r.eid and v.vname=r.vname".
 		 " and r.node_id=n.node_id and n.def_boot_osid=o.osid and".
@@ -362,11 +394,92 @@ if ($query_result->numrows) {
 
 	$LTPOUT = *LTPMAP;
     }
-    while (my ($vname,$node,$pnode,$ptype,$os,$osvers) =
+    print $LTPOUT "V 1\n";
+    while (my ($vname,$node,$pnode,$ptype,$osid,$os,$osvers) =
 	   $query_result->fetchrow_array) {
 	$os = "UNKNOWN" if (!$os);
 	$osvers = "0" if (!$osvers);
-	print $LTPOUT "m $vname $node $pnode $ptype $os $osvers\n";
+	print $LTPOUT "H $vname $node $pnode $ptype $osid $os $osvers\n";
+    }
+
+    #
+    # The MAC address is either in interfaces (for physical interfaces)
+    # or veth_interfaces (for virtual interfaces).
+    #
+    # The multiplexing style is either "veth" if there is a row in the
+    # veth_interfaces table or "none" otherwise.  This is reflected in
+    # the following query as: style is "veth" if vmac!=NULL.
+    #
+    # Linkdelays are in use if the link has a row in the linkdelays table.
+    # This is reflected in the following query as: linkdelays if iface!=NULL.
+    # We could look in the delays table to further distinguish unshaped
+    # links, but at the moment, we don't need that info.
+    #
+    $query_result =
+	DBQueryFatal("select v.member,v.vname,i.mac,ve.mac,l.iface".
+		     " from reserved as r, virt_lans as v".
+		     " left join interfaces as i".
+		     "  on v.ip=i.IP and r.node_id=i.node_id".
+		     " left join linkdelays as l".
+		     "  on r.pid=l.pid and r.eid=l.eid and".
+		     "   v.vname=l.vlan and v.vnode=l.vnode and v.ip=l.ip".
+		     " left join veth_interfaces as ve".
+		     "  on v.ip=ve.IP and r.node_id=ve.vnode_id".
+		     " where".
+		     "  r.pid=v.pid and r.eid=v.eid and r.vname=v.vnode and".
+		     "  r.pid='$pid' and r.eid='$eid'");
+    if ($query_result->numrows) {
+	while (my ($memb,$vlan,$imac,$vmac,$iface) =
+	       $query_result->fetchrow_array) {
+	    if (exists($virt_lans{$vlan}->{"MEMBERS"}->{$memb})) {
+		my $member = $virt_lans{$vlan}->{"MEMBERS"}->{$memb};
+		if (defined($vmac)) {
+		    $member->{"mac"} = $vmac;
+		    $member->{"encap"} = "veth";
+		} else {
+		    $member->{"mac"} = $imac;
+		    $member->{"encap"} = "none";
+		}
+		if (defined($iface)) {
+		    $member->{"dstyle"} = "linkdelay";
+		} else {
+		    $member->{"dstyle"} = "dnode";
+		}
+	    } else {
+		print $LTPOUT "E Bogus lan/member $vlan/$memb\n";
+	    }
+	}
+    }
+}
+
+#
+# Now dump the link info
+#
+if ($havepmap) {
+    foreach my $vlan (keys(%virt_lans)) {
+	my @members = @{$virt_lans{$vlan}->{"MEMBERLIST"}};
+	foreach my $memb0 (@members) {
+	    my $member0 = $virt_lans{$vlan}->{"MEMBERS"}->{$memb0};
+	    my $node0 = $member0->{"vnode"};
+
+	    my $mac0 = $member0->{"mac"};
+	    if (!defined($mac0)) {
+		print $LTPOUT "E No link info found for $vlan/$memb0\n";
+		next;
+	    }
+	    my $encap0 = $member0->{"encap"};
+	    my $dstyle0 = $member0->{"dstyle"};
+	    
+	    foreach my $memb1 (@members) {
+		next
+		    if ($memb0 eq $memb1);
+		my $member1 = $virt_lans{$vlan}->{"MEMBERS"}->{$memb1};
+		my $node1 = $member1->{"vnode"};
+
+		print $LTPOUT
+		    "L $node0 $node1 $vlan $mac0 $encap0 $dstyle0\n";
+	    }
+	}
     }
     close(LTPMAP)
 	if (!$impotent);
