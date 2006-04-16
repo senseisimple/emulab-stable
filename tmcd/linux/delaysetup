@@ -1,7 +1,7 @@
 #!/usr/bin/perl -wT
 #
 # EMULAB-COPYRIGHT
-# Copyright (c) 2000-2005 University of Utah and the Flux Group.
+# Copyright (c) 2000-2006 University of Utah and the Flux Group.
 # All rights reserved.
 #
 use English;
@@ -220,6 +220,13 @@ sub LinkDelaySetup()
 	    $rdelay = int($rdelay + 0.5) * 1000;
 
 	    #
+	    # Sweet! 'k' as in "kbit" means 1024, not 1000, to tc.
+	    # Just spell it out as bits here, they can't screw that up!
+	    #
+	    $bandw *= 1000;
+	    $rbandw *= 1000;
+	    
+	    #
 	    # Qsizes are in slots or packets. My perusal of the 4.3 code
 	    # shows the limits are 50 < slots <= 100 or 0 <= bytes <= 1MB.
 	    #
@@ -245,7 +252,6 @@ sub LinkDelaySetup()
 		}
 	    }
 
-	    
             # RED/GRED stuff
 # Just skip this for a minute	    
 #  	    my $redparams = "";
@@ -272,8 +278,8 @@ sub LinkDelaySetup()
             print DEL "parent ${pipeno}:1 htb default 1\n";
 
             print DEL "$TC class add dev $iface classid ". ($pipeno+10) .":1 ";
-            print DEL "parent ". ($pipeno+10) ." htb rate ${bandw}kbit ";
-            print DEL "ceil ${bandw}kbit\n";
+            print DEL "parent ". ($pipeno+10) ." htb rate ${bandw} ";
+            print DEL "ceil ${bandw}\n";
 
             print DEL "$TC qdisc add dev $iface handle ". ($pipeno+20) ." ";
             print DEL "parent ". ($pipeno+10) .":1 delay usecs $delay\n";
@@ -291,7 +297,7 @@ sub LinkDelaySetup()
 
                 print DEL "$TC class add dev imq${imqnum} classid ";
                 print DEL "". ($pipeno+10) .":1 parent ". ($pipeno+10) ." ";
-                print DEL "htb rate ${rbandw}kbit ceil ${rbandw}kbit\n";
+                print DEL "htb rate ${rbandw} ceil ${rbandw}\n";
                 
                 print DEL "$TC qdisc add dev imq${imqnum} handle ";
                 print DEL "". ($pipeno+20) ." parent ". ($pipeno+10) .":1 ";
