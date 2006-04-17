@@ -74,8 +74,10 @@ function SHOWSTATS()
                     <td align=left  class=menuoptusage>
                         <a target=_parent href=explist.php3#swapped>Swapped</a>
                     </td></tr>
-                <tr><td align=right class=menuoptusage><b>$freepcs</b></td>
-                    <td align=left  class=menuoptusage><b>Free PCs</b></td>
+                <tr><td align=right class=menuoptusage>
+                        <font size=+1>$freepcs</font></td>
+                    <td align=left  class=menuoptusage>
+                        <font size=+1>Free PCs</font></td>
                 </tr>
                </table>\n";
     return $output;
@@ -122,29 +124,45 @@ function SHOWFREENODES()
     $reloading = TBReloadingPCs();
 
     $output .= "<table valign=top align=center width=100% height=100% border=1>
-                 <tr><td nowrap colspan=4 class=menuoptusage align=center>
+                 <tr><td nowrap colspan=6 class=menuoptusage align=center>
  	           <font size=+1>$freepcs Free PCs</font></td></tr>\n";
 
     $pccount = count($freecounts);
     $newrow  = 1;
+    $maxcols = (int) ($pccount / 3);
+    if ($pccount % 3)
+	$maxcols++;
+    $cols    = 0;
     foreach($freecounts as $key => $value) {
 	$freecount = $freecounts[$key];
 
-	if ($newrow || $pccount <= 3) 
+	if ($newrow) {
 	    $output .= "<tr>\n";
-	$newrow = ($newrow ? 0 : 1);
+	}
 	
 	$output .= "<td class=menuoptusage align=right>
                      <a target=_parent href=shownodetype.php3?node_type=$key>
                         $key</a></td>
                     <td class=menuoptusage align=left>${freecount}</td>\n";
 
-	if ($newrow || $pccount <= 3) {
+	$cols++;
+	$newrow = 0;
+	if ($cols == $maxcols || $pccount <= 3) {
+	    $cols   = 0;
+	    $newrow = 1;
+	}
+
+	if ($newrow) {
 	    $output .= "</tr>\n";
 	}
     }
-    if (! $newrow && $pccount > 3) {
-	$output .= "<td></td><td></td></tr>\n";
+    if (! $newrow) {
+        # Fill out to $maxcols
+	for ($i = $cols + 1; $i <= $maxcols; $i++) {
+	    $output .= "<td class=menuoptusage>&nbsp</td>";
+	    $output .= "<td class=menuoptusage>&nbsp</td>";
+	}
+	$output .= "</tr>\n";
     }
     # Fill in up to 3 rows.
     if ($pccount < 3) {
@@ -155,8 +173,8 @@ function SHOWFREENODES()
     }
 
     $output .= "<tr>
-                 <td class=menuoptusage colspan=4 align=center>
-                    <b>$reloading PCs reloading</b></td>
+                 <td class=menuoptusage colspan=6 align=center>
+                    <font size=+1>$reloading PCs reloading</font></td>
                </tr>\n";
     $output .= "</table>";
     return $output;
