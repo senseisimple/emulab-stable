@@ -166,7 +166,12 @@ if ($ISMAINSITE) {
 	system("$SSHTB -host $USERNODE $PROXY log") == 0
 	    or fatal("Could not load log entries into ops DB!");
     }
-    unlink("${tempfile}.log");
+    if (-e "${tempfile}.log") {
+	unlink("${tempfile}.log.save")
+	    if (-e "${tempfile}.log.save");
+	
+	system("/bin/mv -f ${tempfile}.log ${tempfile}.log.save");
+    }
 
     #
     # Now the other tables Kevin needs
