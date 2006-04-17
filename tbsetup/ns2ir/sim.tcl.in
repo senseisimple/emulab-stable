@@ -262,11 +262,15 @@ Simulator instproc make-lan {nodelist bw delay args} {
     return $curlan
 }
 
-Simulator instproc make-cloud {nodelist args} {
+Simulator instproc make-cloud {nodelist bw delay args} {
     $self instvar event_list
     $self instvar event_count
 
-    set retval [$self make-lan $nodelist 100Mbps 0ms]
+    if {($args != {})} {
+	punsup "Arguments for make-cloud: $args"
+    }
+
+    set retval [$self make-lan $nodelist $bw $delay]
 
     $retval set iscloud 1
     $retval mustdelay
