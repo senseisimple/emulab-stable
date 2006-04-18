@@ -47,6 +47,7 @@ CREATE TABLE experiment_templates (
   logfile tinytext,
   logfile_open tinyint(4) NOT NULL default '0',
   prerender_pid int(11) default '0',
+  hidden tinyint(1) NOT NULL default '0',
   PRIMARY KEY  (guid, vers),
   KEY pidtid (pid,tid),
   KEY pideid (pid,eid)
