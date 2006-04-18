@@ -16,6 +16,8 @@
 
 static char	*progname;
 static int      counter = 0;
+static char     *ATTRS[] = {"SCHEDULER"};
+static int      numattrs = 1;
 
 void
 usage()
@@ -122,10 +124,12 @@ main(int argc, char **argv)
           exit(1);
         }
 
-        if (!elvin_attrlist_add(attrlist, "OBJNAME", elverr)) {
-          error("Could not add to attribute list");
-          elvin_error_fprintf(stderr, elverr);
-          exit(1);
+        for (i = 0; i < numattrs; ++i) {
+          if (!elvin_attrlist_add(attrlist, ATTRS[i], elverr)) {
+            error("Could not add to attribute list");
+            elvin_error_fprintf(stderr, elverr);
+            exit(1);
+          }
         }
 
         if (!elvin_sync_add_quench(handle->server, attrlist, NULL, 1,
