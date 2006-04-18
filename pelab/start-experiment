@@ -5,6 +5,7 @@ use strict;
 my $TEVC = "/usr/testbed/bin/tevc";
 my $LOGHOLE = "/usr/testbed/bin/loghole";
 my $PYTHON = "/usr/local/bin/python";
+my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
 
 #
 # Require the pid and eid
@@ -60,6 +61,17 @@ if (system "$PYTHON resetlinks.py $pid $eid") {
     die "Error resetting links\n";
 }
 
+#
+# Restart the event system so the 'create' event, necessary for pelab to work,
+# gets fired again
+#
+print "##### Restarting the event system\n";
+if (system "$EVENTSYS -e $pid,$eid stop") {
+    die "Error controlling the event system\n";
+}
+if (system "$EVENTSYS -e $pid,$eid start") {
+    die "Error controlling the event system\n";
+}
 
 print "##### Restarting servers\n";
 if (system "$TEVC -e $pid/$eid now allservers stop") {
