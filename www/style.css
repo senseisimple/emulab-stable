@@ -40,9 +40,9 @@ td.paddedcell2 { padding: 0.5em; }
 
 /* BEGIN Banner - Draw and size the banner div across the top. */
 .bannercell {
-  background-color: #FEFEFE;
+  background-color: #dae3e9;
   background-image: url("logo-background.gif");
-  background-repeat: repeat;
+  background-repeat: repeat-x;
   background-position: 45px 0px;
   border-bottom: solid 2px black;
   padding: 0px;
@@ -51,11 +51,12 @@ td.paddedcell2 { padding: 0.5em; }
   height: 100px;
 }
 iframe.usageframe {
+  width: 275px;
+  height: 100px;
   border: 0px;
   margin: 0px;
   float: right;
-  width: 275px;
-  height: 100px;
+  padding: 0px;
 }
 
 /* Styling for the usage box title and cells. */
@@ -66,7 +67,7 @@ iframe.usageframe {
   font-size: 10pt;
 }
 td.menuoptusage {
-  background-color: white; 
+  background-color: #dae3e9;
   padding-left: 6px;
   padding-top: 1px; 
   padding-bottom: 0px;

@@ -703,9 +703,9 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
     }
     if (! $nobanner ) {
 	echo "<map name=overlaymap>
-                 <area shape=rect coords=\"100,60,369,100\"
+                 <area shape=rect coords=\"100,60,339,100\"
                        href='http://www.emulab.net/index.php3'>
-                 <area shape=rect coords=\"0,0,369,100\"
+                 <area shape=rect coords=\"0,0,339,100\"
                        href='$TBDOCBASE/index.php3'>
               </map>
             <div class='bannercell'>
