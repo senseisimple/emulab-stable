@@ -25,9 +25,13 @@ $uid = GETLOGIN();
 LOGGEDINORDIE($uid);
 $isadmin = ISADMIN($uid);
 
+# Need these below, set in CheckArguments.
+$pid = "";
+$eid = "";
+
 function CheckArguments($guid, $version) {
     global $TB_EXPT_READINFO;
-    global $uid;
+    global $uid, $pid, $eid;
 #
 # Verify page arguments.
 # 
