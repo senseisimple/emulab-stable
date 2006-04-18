@@ -27,7 +27,8 @@ my $TB		= "@prefix@";
 my $TBOPS       = "@TBOPSEMAIL@";
 my $CURL	= "/usr/local/bin/curl";
 my $DATAPOSCGI  = "http://www.datapository.net/input/upload.cgi";
-my $MAXAGE	= (24 * 60 * 60);
+my $CUTAGE      = (1 * 60 * 60);	# All data older then this goes to DP.
+my $MAXAGE	= (24 * 60 * 60);       # All data older then this is deleted.
 
 my $PWDFILE   = "/usr/testbed/etc/pelabdb.pwd";
 my $tempfile  = "/var/tmp/testbed_pelab_dbpush_tempfile";
@@ -152,7 +153,7 @@ unlink("${tempfile}.pair_data")
 # Compute the cutoff age; We leave MAXAGE old entries here, and ship
 # the rest over to the DP.
 #
-my $cutoffage = (time() - $MAXAGE) * 1.0;
+my $cutoffage = (time() - $CUTAGE) * 1.0;
 
 #
 # Must lock the table of course
@@ -175,7 +176,7 @@ $query_result =
 		 "where idx > $lastidx and unixstamp < $cutoffage " .
 		 "order by idx desc limit 1");
 # Save for later.
-$lastidx = $query_result->fetchrow_array();
+($lastidx) = $query_result->fetchrow_array();
 
 DBQueryFatal("unlock tables");
 
@@ -183,6 +184,9 @@ DBQueryFatal("unlock tables");
 # Might not be any new entries ...
 # 
 if (defined($lastidx)) {
+    #
+    # Does not return if any error!
+    #
     SendToDatapository("pair_data");
     
     #
@@ -191,11 +195,14 @@ if (defined($lastidx)) {
     DBQueryFatal("update emulab_indicies set idx='$lastidx' ".
 		 "where name='pair_data_idx'");
 
+    $cutoffage = (time() - $MAXAGE) * 1.0;
+
     #
-    # Delete those entries.
+    # Delete anything older then MAXAGE that has been archived. This leaves
+    # a cache of data on ops.
     #
     DBQueryFatal("delete from pair_data ".
-		 "where idx <= $lastidx ");
+		 "where idx <= $lastidx and unixstamp < $cutoffage");
 }
 
 unlink("${tempfile}.pair_data")
