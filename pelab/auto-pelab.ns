@@ -82,8 +82,8 @@ set control_bw "100Mbps"
 # a pelab experiment
 # NOTE: Currently ignored!
 #
-set ecloud_delay "30ms"
-set ecloud_bw "1.5Mbps"
+set ecloud_delay "0ms"
+set ecloud_bw "100Mbps"
 
 #
 # Hardare type to use for PCs inside of emulab
@@ -200,7 +200,7 @@ if {$fake_plab} {
 #
 # Lan which will be controlled by the monitor
 #
-set elabc [$ns make-cloud "$elan_string"]
+set elabc [$ns make-cloud "$elan_string" $ecloud_bw $ecloud_delay]
 tb-set-ip-lan $elab(1) $elabc 10.0.0.1
 $elabc trace
 
