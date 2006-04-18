@@ -4,7 +4,7 @@ OBJDIR		= ../..
 SUBDIR		= event/example
 
 SYSTEM	       := $(shell uname -s)
-PROGRAMS	= tbrecv tbsend tbrecv.py tbsend.py eventdebug.pl
+PROGRAMS	= tbrecv tbsend tbrecv.py tbsend.py eventdebug.pl dumpevsubs
 
 include $(OBJDIR)/Makeconf
 
@@ -29,6 +29,9 @@ tbrecv:		tbrecv.o
 
 tbsend:		tbsend.o
 	$(CC) $(LDFLAGS) -o $@ tbsend.o $(LIBS)
+
+dumpevsubs:	dumpevsubs.o
+	$(CC) $(LDFLAGS) -o $@ dumpevsubs.o $(LIBS)
 
 $(PROGRAMS):	../lib/libevent.a ../lib/event.h
 
