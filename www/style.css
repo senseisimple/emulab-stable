@@ -40,9 +40,10 @@ td.paddedcell2 { padding: 0.5em; }
 
 /* BEGIN Banner - Draw and size the banner div across the top. */
 .bannercell {
-  background-color: #000;
-  background-image: url("headerbgbb.jpg");
-  background-repeat: repeat-x;
+  background-color: #FEFEFE;
+  background-image: url("logo-background.gif");
+  background-repeat: repeat;
+  background-position: 45px 0px;
   border-bottom: solid 2px black;
   padding: 0px;
   margin: 0px;

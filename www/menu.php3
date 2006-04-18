@@ -711,7 +711,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
             <div class='bannercell'>
 	       <iframe src=$BASEPATH/currentusage.php3 class='usageframe'
                  scrolling=no frameborder=0></iframe></td>
-              <img width=369 height=100 border=0 usemap=\"#overlaymap\" ";
+              <img width=339 height=100 border=0 usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
 	    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
@@ -720,7 +720,7 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
 	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
 	}
 	echo "alt='$THISHOMEBASE - the network testbed'>\n";
-        if (!$MAINPAGE) {
+        if (0 && !$MAINPAGE) {
 	     echo "<span class='devpagename'>$WWW</span>";
 	}
         echo "</div>\n";
