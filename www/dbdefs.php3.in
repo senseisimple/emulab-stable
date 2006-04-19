@@ -2109,7 +2109,8 @@ while ($maxtries) {
     sleep(1);
 }
 if (! $DBlinkid) {
-    TBERROR("Could not connect to mysqld after several attempts!", 1);
+    USERERROR("Temporary resource error; ".
+	      "please try again in a few minutes", 1);
 }
 if (!mysql_select_db($TBDBNAME)) {
     TBERROR("Could not select DB after connecting!", 1);
