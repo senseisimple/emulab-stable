@@ -295,6 +295,7 @@ void nameFD(int fd, const struct sockaddr *localname,
      */
     int gsn_rv;
     if (localname == NULL) {
+	namelen = sizeof(sockname.data);
         gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
         if (gsn_rv != 0) {
             croak("Unable to get local socket name: %s\n", strerror(errno));
