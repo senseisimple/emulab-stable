@@ -271,6 +271,7 @@ void nameFD(int fd, const struct sockaddr *localname,
 
     if (remotename == NULL) {
         int gpn_rv;
+	namelen = sizeof(sockname.data);
         gpn_rv = getpeername(fd,(struct sockaddr *)sockname.data,&namelen);
         if (gpn_rv != 0) {
             croak("Unable to get remote socket name: %s\n", strerror(errno));
