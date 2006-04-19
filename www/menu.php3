@@ -711,12 +711,14 @@ function PAGEBEGINNING( $title, $nobanner = 0, $nocontent = 0,
             <div class='bannercell'>
 	       <iframe src=$BASEPATH/currentusage.php3 class='usageframe'
                  scrolling=no frameborder=0></iframe></td>
-              <img width=339 height=100 border=0 usemap=\"#overlaymap\" ";
+              <img height=100 border=0 usemap=\"#overlaymap\" ";
 
 	if ($ELABINELAB) {
+	    echo "width=239 ";
 	    echo "src='$BASEPATH/overlay.elabinelab.gif' ";
 	}
 	else {
+	    echo "width=339 ";
 	    echo "src='$BASEPATH/overlay.".strtolower($THISHOMEBASE).".gif' ";
 	}
 	echo "alt='$THISHOMEBASE - the network testbed'>\n";
