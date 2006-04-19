@@ -431,7 +431,11 @@ void stopWatchingAll() {
  */
 void fprintID(FILE *f, int fd) {
 
-    fprintf(f,"%i:%s:%i", monitorFDs[fd].local_port,
+    /*
+     * Note, we've switched from local_port to FD for the first field - this is
+     * so that we can report on a connection before connect() finishes
+     */
+    fprintf(f,"%i:%s:%i", fd,
             monitorFDs[fd].remote_hostname,
             monitorFDs[fd].remote_port);
 
@@ -533,7 +537,7 @@ void allocFDspace() {
 }
 
 void allocFDspaceFor(int fd) {
-    while (fd > fdSize) {
+    while (fd >= fdSize) {
 	allocFDspace();
     }
 }
@@ -560,9 +564,6 @@ bool connectedFD_p(int whichFD) {
 
 /*
  * Let the user know that a packet has been sent.
- *
- * TODO: Log someplace other than stdout - possibly IPC to the monitor process,
- * or to a socket.
  */
 void log_packet(int fd, size_t len) {
     struct timeval time;
@@ -705,10 +706,30 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
 
     DEBUG(printf("connect() called on %i\n",sockfd));
 
+    /*
+     * So, this is a bit messy, but we gotta do it this way. We report on the
+     * socket _before_ calling the real connect. This help keep the stub
+     * from getting too far behind - otherwise, it can't start until the real
+     * app has finished the three way handshake and is well on its way to
+     * sending data. If connect() fails, we'll report a socket close below.
+     */
+
+    /*
+     * Find out some things about the address we're trying to connect to. We
+     * decided in socket() if we're going to monitor this connection or not
+     * TODO: We really should verify that serv_addr is a legal pointer
+     */
+    if (monitorFD_p(sockfd)) {
+        nameFD(sockfd,NULL,serv_addr);
+    }
+
     rv = real_connect(sockfd, serv_addr, addrlen);
 
     if (!monitorFD_p(sockfd)) {
-	return rv;
+        /*
+         * Just pass the result back
+         */
+        return rv;
     }
 
     /*
@@ -730,15 +751,21 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
          */
 
         /*
-         * Find out some things about the address we've connected to
-         * Note: The kernel already verified for us that the pointer is okay
+         * Get the local port number so that we can monitor about it
          */
-        nameFD(sockfd,NULL,serv_addr);
+        struct sockaddr_in localaddr;
+        int namelen = sizeof(localaddr);
+        if (getsockname(sockfd, (struct sockaddr*)&localaddr,&namelen) != 0) {
+            croak("Unable to get local socket name: %s\n", strerror(errno));
+        }
+        int local_port = ntohs(localaddr.sin_port);
 
+        fprintf(outstream,"LocalPort: ");
+        fprintID(outstream,sockfd);
+        fprintf(outstream," %i\n",local_port);
     } else {
         /*
-         * Do this in case they called connect() to reconnect a previously
-         * connected socket. If it fails, stop watching the FD
+         * Do this in case the connection really did fail
          */
         stopFD(sockfd);
     }
@@ -762,13 +789,17 @@ int accept(int s, struct sockaddr * addr,
 
     if (!monitorFD_p(s)) {
 	return rv;
-    }
+    } 
 
     if (rv > 0) {
         /*
-         * Got a new client!
+         * Got a new client! Start it up, name it, and report on its local port
          */
+        startFD(rv);
         nameFD(rv,addr,NULL);
+        fprintf(outstream,"LocalPort: ");
+        fprintID(outstream,rv);
+        fprintf(outstream," %i\n",ntohs(((struct sockaddr_in*)addr)->sin_port));
     }
 
     return rv;
@@ -941,7 +972,7 @@ int setsockopt (int s, int level, int optname, const void *optval,
 }
 
 /*
- * The usual way to find 'eof' on a socket is to look for a zero-length
+ * The usual way to find 'eof' on a socket is to look for a small read
  * read. Since some programs might not be well-behaved in the sense that they
  * may not close() the socket, we wrap read() too
  */
@@ -951,10 +982,12 @@ ssize_t read(int d, void *buf, size_t nbytes) {
     lnm_init();
     lnm_control();
 
+    DEBUG(printf("read() called\n"));
+
     rv = real_read(d,buf,nbytes);
     
     if ((rv == 0) && monitorFD_p(d)) {
-        DEBUG(printf("Detected a closed socket with zero-length read()\n"));
+        DEBUG(printf("Detected a closed socket with a zero-length read()\n"));
         stopFD(d);
     }
     
@@ -972,10 +1005,13 @@ ssize_t recv(int s, void *buf, size_t len, int flags) {
 
     rv = real_recv(s,buf,len,flags);
     
+    DEBUG(printf("recv() returned %i\n",rv));
+
     if ((rv == 0) && monitorFD_p(s)) {
-        DEBUG(printf("Detected a closed socket with zero-length recv()\n"));
+        DEBUG(printf("Detected a closed socket with a zero-length recv()\n"));
         stopFD(s);
     }
+
     
     return rv;
 }
