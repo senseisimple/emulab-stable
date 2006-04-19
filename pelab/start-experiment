@@ -69,6 +69,7 @@ print "##### Restarting the event system\n";
 if (system "$EVENTSYS -e $pid,$eid stop") {
     die "Error controlling the event system\n";
 }
+sleep 2;
 if (system "$EVENTSYS -e $pid,$eid start") {
     die "Error controlling the event system\n";
 }
@@ -77,6 +78,7 @@ print "##### Restarting servers\n";
 if (system "$TEVC -e $pid/$eid now allservers stop") {
     die "Error running tevc\n";
 }
+sleep 2;
 if (system "$TEVC -e $pid/$eid now allservers start") {
     die "Error running tevc\n";
 }
