@@ -85,11 +85,6 @@ static bool monitorFD_p(int);
 static bool connectedFD_p(int);
 
 /*
- * Die! Takes printf-style format and args
- */
-static void croak(char *, ...);
-
-/*
  * Log that a packet has been sent to the kernel on a given FD with a given
  * size
  */

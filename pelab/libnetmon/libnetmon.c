@@ -7,12 +7,15 @@
  */
 #include "libnetmon.h"
 
+#undef USE_VARARGS
+
 /*
  * Die with a standard Emulab-type error message format. In the future, I might
  * try to modify this to simply unlink our wrapper functions so that the app
  * can continue to run.
  */
-void croak(char *format, ...) {
+#ifdef USE_VARARGS
+static void croak(char *format, ...) {
     va_list ap;
     fprintf(stderr,"*** ERROR\n    libnetmon: ");
     vfprintf(stderr,format, ap);
@@ -20,6 +23,22 @@ void croak(char *format, ...) {
     fflush(stderr);
     exit(1);
 }
+#define croak0(fmt) croak(fmt)
+#define croak1(fmt,s1) croak(fmt,s1)
+#else
+static void croak0(char *format) {
+    fprintf(stderr,"*** ERROR\n    libnetmon: ");
+    fprintf(stderr,format);
+    exit(1);
+}
+
+static void croak1(char *format, void *arg) {
+    fprintf(stderr,"*** ERROR\n    libnetmon: ");
+    fprintf(stderr,format,arg);
+    exit(1);
+}
+
+#endif
 
 /*
  * Set up our data structures, and go find the real versions of the functions
@@ -47,7 +66,7 @@ void lnm_init() {
         outversion_s = getenv("LIBNETMON_OUTPUTVERSION");
         if (outversion_s) {
             if (!sscanf(outversion_s,"%i",&output_version) == 1) {
-                croak("Bad output version: %s\n",outversion_s);
+                croak1("Bad output version: %s\n",outversion_s);
             }
         } else {
             output_version = 1;
@@ -57,7 +76,7 @@ void lnm_init() {
 #define FIND_REAL_FUN(FUN) \
           real_##FUN = (FUN##_proto_t*)dlsym(RTLD_NEXT,#FUN); \
           if (!real_##FUN) { \
-              croak("Unable to get the address of " #FUN "(): %s\n", \
+              croak1("Unable to get the address of " #FUN "(): %s\n", \
                     dlerror()); \
           }
 
@@ -87,7 +106,7 @@ void lnm_init() {
             
             sockfd = real_socket(AF_LOCAL, SOCK_STREAM, 0);
             if (!sockfd) {
-                croak("Unable to create socket\n");
+                croak0("Unable to create socket\n");
             }
 
             servaddr.sun_family = AF_LOCAL;
@@ -95,12 +114,12 @@ void lnm_init() {
 
             if (real_connect(sockfd, (struct sockaddr*) &servaddr,
                              sizeof(servaddr))) {
-                croak("Unable to connect to netmond socket\n");
+                croak0("Unable to connect to netmond socket\n");
             }
 
             outstream = fdopen(sockfd,"w");
             if (!outstream) {
-                croak("fdopen() failed on socket\n");
+                croak0("fdopen() failed on socket\n");
             }
 
             DEBUG(printf("Done opening socket\n"));
@@ -120,7 +139,7 @@ void lnm_init() {
             
             controlfd = real_socket(AF_LOCAL, SOCK_STREAM, 0);
             if (!controlfd) {
-                croak("Unable to create socket\n");
+                croak0("Unable to create socket\n");
             }
 
             servaddr.sun_family = AF_LOCAL;
@@ -128,7 +147,7 @@ void lnm_init() {
 
             if (real_connect(controlfd, (struct sockaddr*) &servaddr,
                              sizeof(servaddr))) {
-                croak("Unable to connect to netmond control socket\n");
+                croak0("Unable to connect to netmond control socket\n");
             }
 
             /*
@@ -142,7 +161,7 @@ void lnm_init() {
              * good idea.
              */
             if (fcntl(controlfd, F_SETFL, O_NONBLOCK)) {
-                croak("Unable to set control socket nonblocking\n");
+                croak0("Unable to set control socket nonblocking\n");
             }
 
             /*
@@ -168,7 +187,7 @@ void lnm_init() {
                 printf("libnetmon: Forcing socket buffer size %i\n",
                         forced_bufsize);
             } else {
-                croak("Bad sockbufsize: %s\n",bufsize_s);
+                croak1("Bad sockbufsize: %s\n",bufsize_s);
             }
         } else {
             forced_bufsize = 0;
@@ -178,7 +197,7 @@ void lnm_init() {
          * Run a function to clean up state when the program exits
          */
         if (atexit(&stopWatchingAll) != 0) {
-            croak("Unable to register atexit() function\n");
+            croak0("Unable to register atexit() function\n");
         }
 
         intialized = true;
@@ -217,7 +236,7 @@ void lnm_control() {
             break;
         } else {
             // For now, croak. We can probably do something better
-            croak("Error reading on control socket\n");
+            croak0("Error reading on control socket\n");
         }
     }
 
@@ -245,9 +264,9 @@ void lnm_control_wait() {
     DEBUG(printf("Waiting for a control message\n"));
     selectrv = select(controlfd + 1, &fds, NULL, NULL, &tv);
     if (select == 0) {
-        croak("Timed out waiting for a control message\n");
+        croak0("Timed out waiting for a control message\n");
     } else if (select < 0) {
-        croak("Bad return value from select() in lnm_control_wait()\n");
+        croak0("Bad return value from select() in lnm_control_wait()\n");
     }
 
     DEBUG(printf("Done waiting for a control message\n"));
@@ -274,7 +293,7 @@ void nameFD(int fd, const struct sockaddr *localname,
 	namelen = sizeof(sockname.data);
         gpn_rv = getpeername(fd,(struct sockaddr *)sockname.data,&namelen);
         if (gpn_rv != 0) {
-            croak("Unable to get remote socket name: %s\n", strerror(errno));
+            croak1("Unable to get remote socket name: %s\n", strerror(errno));
         }
         /* Assume it's the right address family, since we checked that above */
         remotename = (struct sockaddr*)&(sockname.sa);
@@ -299,7 +318,7 @@ void nameFD(int fd, const struct sockaddr *localname,
 	namelen = sizeof(sockname.data);
         gsn_rv = getsockname(fd,(struct sockaddr *)sockname.data,&namelen);
         if (gsn_rv != 0) {
-            croak("Unable to get local socket name: %s\n", strerror(errno));
+            croak1("Unable to get local socket name: %s\n", strerror(errno));
         }
         /* Assume it's the right address family, since we checked that above */
         localaddr = (struct sockaddr_in *) &(sockname.sa);
@@ -342,7 +361,7 @@ void startFD(int fd) {
      */
     typesize = sizeof(unsigned int);
     if (getsockopt(fd,SOL_SOCKET,SO_TYPE,&socktype,&typesize) != 0) {
-        croak("Unable to get socket type: %s\n",strerror(errno));
+        croak1("Unable to get socket type: %s\n",strerror(errno));
     }
     if (socktype != SOCK_STREAM) {
         DEBUG(printf("Ignoring a non-TCP socket\n"));
@@ -359,12 +378,12 @@ void startFD(int fd) {
         sso_rv = real_setsockopt(fd,SOL_SOCKET,SO_SNDBUF,
                 &forced_bufsize, sizeof(forced_bufsize));
         if (sso_rv == -1) {
-            croak("Unable to force out buffer size: %s\n",strerror(errno));
+            croak1("Unable to force out buffer size: %s\n",strerror(errno));
         }
         sso_rv = real_setsockopt(fd,SOL_SOCKET,SO_RCVBUF,
                 &forced_bufsize, sizeof(forced_bufsize));
         if (sso_rv == -1) {
-            croak("Unable to force in buffer size: %s\n",strerror(errno));
+            croak1("Unable to force in buffer size: %s\n",strerror(errno));
         }
     }
 
@@ -485,7 +504,8 @@ void process_control_packet(generic_m *m) {
 
             break;
         default:
-            croak("Got an unexepected control message type: %i\n",m->type);
+            croak1("Got an unexepected control message type: %i\n",
+		   (void *)m->type);
     }
 }
 
@@ -497,7 +517,7 @@ void control_query() {
     query_m *qmsg;
 
     if (!controlfd) {
-        croak("control_query() called without control socket\n");
+        croak0("control_query() called without control socket\n");
     }
 
     qmsg = (query_m *)&msg;
@@ -505,7 +525,7 @@ void control_query() {
 
     if ((real_write(controlfd,&msg,CONTROL_MESSAGE_SIZE) !=
                 CONTROL_MESSAGE_SIZE)) {
-        croak("Error writing control query\n");
+        croak0("Error writing control query\n");
     }
 
     return;
@@ -524,7 +544,7 @@ void allocFDspace() {
 
     allocRV = realloc(monitorFDs, newFDSize * sizeof(fdRecord));
     if (!allocRV) {
-        croak("Unable to malloc space for monitorFDs array\n");
+        croak0("Unable to malloc space for monitorFDs array\n");
     }
     monitorFDs = allocRV;
 
@@ -574,7 +594,7 @@ void log_packet(int fd, size_t len) {
      * gettimeofday()
      */
     if (gettimeofday(&time,NULL)) {
-        croak("Error in gettimeofday()\n");
+        croak0("Error in gettimeofday()\n");
     }
     switch (output_version) {
         case 0:
@@ -592,7 +612,7 @@ void log_packet(int fd, size_t len) {
             fprintf(outstream," (%i)\n", len);
             break;
         default:
-            croak("Bad output version: %i\n",output_version);
+            croak1("Bad output version: %i\n", (void *)output_version);
     }
     fflush(outstream);
 }
@@ -662,7 +682,7 @@ int getNewSockbuf(int fd, int which) {
     int optsize;
     optsize = sizeof(newsize);
     if (getsockopt(fd,SOL_SOCKET,which,&newsize,&optsize)) {
-	croak("Unable to get socket buffer size");
+	croak0("Unable to get socket buffer size");
 	/* Make GCC happy - won't get called */
 	return 0;
     } else {
@@ -758,7 +778,7 @@ int connect(int sockfd, const struct sockaddr *serv_addr, socklen_t addrlen) {
         struct sockaddr_in localaddr;
         int namelen = sizeof(localaddr);
         if (getsockname(sockfd, (struct sockaddr*)&localaddr,&namelen) != 0) {
-            croak("Unable to get local socket name: %s\n", strerror(errno));
+            croak1("Unable to get local socket name: %s\n", strerror(errno));
         }
         int local_port = ntohs(localaddr.sin_port);
 
