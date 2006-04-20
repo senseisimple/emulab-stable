@@ -1,0 +1,18 @@
+#!/bin/sh
+TEVC=/usr/testbed/bin/tevc
+
+if [ $# != 2 ]; then
+    echo "usage: $0 pid eid"
+    exit 1
+fi
+
+pid=$1
+eid=$2
+
+echo "##### reinstalling tarballs and RPMs"
+$TEVC -e $pid/$eid now tfhosts start
+
+echo "WARNING: you will still need to run start-experiment to restart"
+echo "         stubs and monitors (if they have changed)."
+
+exit $?
