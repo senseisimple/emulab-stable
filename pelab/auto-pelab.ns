@@ -119,10 +119,12 @@ set monitorlist {}
 set planetservers {}
 set serverlist {}
 set clientlist {}
+set tflist {}
 
 #
 # Create all of the nodes
 #
+set tfix 1
 for {set i 1} {$i <= $num_pcs} {incr i} {
 
     if {$real_plab} {
@@ -134,6 +136,9 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
         tb-set-node-tarfiles $planet($i) $tarfiles
         tb-set-node-rpms $planet($i) $rpms
+        set tfupdate($tfix) [$planet($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
+	lappend tflist $tfupdate($tfix)
+	incr tfix
 
         if {[llength $plabsites] > 0} {
             set why_doesnt_tcl_have_concat "*&"
@@ -155,6 +160,9 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
         tb-set-node-tarfiles $plab($i) $tarfiles
         tb-set-node-rpms $plab($i) $rpms
+        set tfupdate($tfix) [$plab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
+	lappend tflist $tfupdate($tfix)
+	incr tfix
     }
 
     set elab($i) [$ns node]
@@ -171,6 +179,9 @@ for {set i 1} {$i <= $num_pcs} {incr i} {
 
     tb-set-node-tarfiles $elab($i) $tarfiles
     tb-set-node-rpms $elab($i) $rpms
+    set tfupdate($tfix) [$elab($i) program-agent -command "sudo /usr/local/etc/emulab/update -t"]
+    lappend tflist $tfupdate($tfix)
+    incr tfix
 }
 
 #
@@ -187,6 +198,8 @@ set monitorgroup [$ns event-group $monitorlist]
 
 set allservers [$ns event-group $serverlist]
 set allclients [$ns event-group $clientlist]
+
+set tfhosts [$ns event-group $tflist]
 
 #
 # Fake 'Internet' cloud for fake plab nodes

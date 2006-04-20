@@ -8,19 +8,26 @@ my $LOGHOLE = "/usr/testbed/bin/loghole";
 my $PYTHON = "/usr/local/bin/python";
 my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
 
+my $realplab = 0;
+
 my $UNKNOWN = "<unknown>";
 my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
 my $stub_cmdargs = $UNKNOWN;
+my $mon_cmd = "/bin/sh /local/pelab/monitor/auto-monitor.sh";
+my $mon_cmdargs = $UNKNOWN;
 
 sub usage()
 {
-    print "Usage: $0 [-C] [ -S command-line ] -s [ command-args ] pid eid\n".
+    print "Usage: $0 [-C] [ -S command-line ] [ -s command-args ] pid eid\n".
+	  "  -p                 monitor real planetlab nodes\n".
 	  "  -S command-line    replace the current stub command arguments\n".
 	  "  -s command-args    append args to stub command line\n".
-	  "  -C                 show current command line\n";
+	  "  -M command-line    replace the current monitor command arguments\n".
+	  "  -m command-args    append args to monitor command line\n".
+	  "  -C                 show current command line(s)\n";
     exit(1);
 }
-my $optlist = "CS:s:";
+my $optlist = "CS:s:M:m:p";
 
 #
 # Parse command arguments.
@@ -37,28 +44,46 @@ if (@ARGV != 2) {
     usage();
 }
 my ($pid, $eid) = @ARGV;
-$stub_cmdargs = get_cmdargs("plab");
+$stub_cmdargs = get_cmdargs("plab", $stub_cmd);
+$mon_cmdargs = get_cmdargs("elab", $mon_cmd);
 if (defined($options{"S"})) {
     $stub_cmdargs = $options{"S"};
 }
 if (defined($options{"s"})) {
     $stub_cmdargs .= " " . $options{"s"};
 }
+if (defined($options{"M"})) {
+    $mon_cmdargs = $options{"M"};
+}
+if (defined($options{"m"})) {
+    $mon_cmdargs .= " " . $options{"m"};
+}
 if (defined($options{"C"})) {
     my $cmdline = $stub_cmd . " " .
 	(($stub_cmdargs eq $UNKNOWN) ? "" : $stub_cmdargs);
     print "Current stub command line: '$cmdline'\n";
+
+    $cmdline = $mon_cmd . " " .
+	(($mon_cmdargs eq $UNKNOWN) ? "" : $mon_cmdargs);
+    print "Current monitor command line: '$cmdline'\n";
+}
+if (defined($options{"p"})) {
+    $realplab = 1;
+    $mon_cmdargs .= " " . "-p";
 }
 
 #
 # Make sure any old stubs/monitors are dead
 #
 print "##### Stopping old stubs and monitors\n";
-if (system "$TEVC -e $pid/$eid now plabstubs stop") {
-    die "Error running tevc\n";
-}
-if (system "$TEVC -e $pid/$eid now planetstubs stop") {
-    die "Error running tevc\n";
+if ($realplab) {
+    if (system "$TEVC -e $pid/$eid now planetstubs stop") {
+	die "Error running tevc\n";
+    }
+} else {
+    if (system "$TEVC -e $pid/$eid now plabstubs stop") {
+	die "Error running tevc\n";
+    }
 }
 if (system "$TEVC -e $pid/$eid now monitorgroup stop") {
     die "Error running tevc\n";
@@ -111,11 +136,9 @@ print "##### Restarting servers\n";
 if (system "$TEVC -e $pid/$eid now allservers stop") {
     die "Error running tevc\n";
 }
-sleep 2;
 if (system "$TEVC -e $pid/$eid now allservers start") {
     die "Error running tevc\n";
 }
-
 
 #
 # Start link tracing
@@ -135,12 +158,23 @@ if ($stub_cmdargs ne $UNKNOWN) {
     $startarg = "'COMMAND={$stub_cmd $stub_cmdargs}'";
 }
 print "\n";
-if (system "$TEVC -e $pid/$eid now plabstubs start $startarg") {
-    die "Error running tevc\n";
+if ($realplab) {
+    if (system "$TEVC -e $pid/$eid now planetstubs start $startarg") {
+	die "Error running tevc\n";
+    }
+} else {
+    if (system "$TEVC -e $pid/$eid now plabstubs start $startarg") {
+	die "Error running tevc\n";
+    }
 }
 
 print "##### Starting monitors\n";
-if (system "$TEVC -e $pid/$eid now monitorgroup start") {
+if ($mon_cmdargs ne $UNKNOWN) {
+    print " with: '$mon_cmd $mon_cmdargs'";
+    $startarg = "'COMMAND={$mon_cmd $mon_cmdargs}'";
+}
+print "\n";
+if (system "$TEVC -e $pid/$eid now monitorgroup start $startarg") {
     die "Error running tevc\n";
 }
 
@@ -152,10 +186,11 @@ exit(0);
 # Dig the command line out of the logs from the previous run
 # (if there was one)
 #
-sub get_cmdargs($)
+sub get_cmdargs($$)
 {
-    my ($ntype) = @_;
+    my ($ntype,$cmd) = @_;
     my $cmdargs = $UNKNOWN;
+    my $lfile = ($ntype eq "plab") ? "plabstub" : "monitor";
 
     my @list = `/bin/ls /proj/$pid/exp/$eid/logs/$eid.*.zip`;
     return $cmdargs
@@ -165,11 +200,11 @@ sub get_cmdargs($)
     my $file = $list[$#list];
     return $cmdargs
 	if (! -r $file);
-    my @info = `unzip -p $file "${ntype}-1/local/logs/${ntype}stub-1.status"`;
+    my @info = `unzip -p $file "${ntype}-1/local/logs/${lfile}-1.status"`;
     foreach (@info) {
 	if (/^COMMAND=(.*)/) {
 	    $cmdargs = $1;
-	    $cmdargs =~ s/$stub_cmd(.*)/$1/;
+	    $cmdargs =~ s/$cmd(.*)/$1/;
 	    last;
 	}
     }

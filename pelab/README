@@ -51,6 +51,24 @@ Running an experiment with the auto-pelab scripts:
      Clean logfiles
      Restart iperf servers on all 'elab-*' nodes
 
+   start-experiment has a few useful options for passing additional
+   arguments to the stubs and monitors, e.g.
+	start-experiment -s '-d' pid eid
+   would turn on debugging in the stubs
+	start-experiment -m '-d' pid eid
+   would do the same for the monitors (assuming it has a '-d' option).
+
+   If you are monitoring real planetlab nodes instead of the emulated
+   nodes, run start-experiment with '-p'.
+
+4a) If you modified something in the pelab (e.g., the stub) and need to
+   deploy it to the nodes, first recreate the tarball as in step 1,
+   and then
+	install-tarball pid eid
+   this triggers a program agent on all the nodes telling it to update
+   the tarballs and RPMs.  You will need to run start-experiment again
+   after this to restart stubs/monitors.
+
 5) Log into the 'elab-*' node or nodes, and run your experiment (ie. one run
    of iperf). Make sure to run them with 'instrument.sh'.
 
