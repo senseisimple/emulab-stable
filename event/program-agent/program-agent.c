@@ -1,6 +1,6 @@
 /*
  * EMULAB-COPYRIGHT
- * Copyright (c) 2000-2005 University of Utah and the Flux Group.
+ * Copyright (c) 2000-2006 University of Utah and the Flux Group.
  * All rights reserved.
  */
 
@@ -1079,14 +1079,18 @@ set_program(struct proginfo *pinfo, char *args)
 		char *value;
 		int rc;
 
-		if ((rc = event_arg_get(args, "COMMAND", &value)) > 0) {
+		if ((rc = event_arg_dup(args, "COMMAND", &value)) >= 0) {
 			if (pinfo->cmdline != NULL) {
-				if (pinfo->cmdline != pinfo->initial_cmdline) {
+				if (pinfo->cmdline != pinfo->initial_cmdline)
 					free(pinfo->cmdline);
-					pinfo->cmdline = NULL;
-				}
 			}
-			asprintf(&pinfo->cmdline, "%s", value);
+			if (rc == 0) {
+				pinfo->cmdline = pinfo->initial_cmdline;
+			} else if (rc > 0) {
+				pinfo->cmdline = value;
+			} else {
+				assert(0);
+			}
 			value = NULL;
 		}
 		if ((rc = event_arg_dup(args, "DIR", &value)) >= 0) {
