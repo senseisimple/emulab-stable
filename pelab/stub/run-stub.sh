@@ -18,4 +18,4 @@ export HOST_ROLE="stub"
 #
 echo "Running PID $$"
 echo "Starting stubd on $PLAB_IFACE ($PLAB_IP) Extra arguments: $*"
-exec $AS_ROOT $STUB_DIR/$STUBD -lcontrol-send -lmain-loop $PLAB_IFACE $*
+exec $AS_ROOT $STUB_DIR/$STUBD -lcontrol-send -lmain-loop $* $PLAB_IFACE

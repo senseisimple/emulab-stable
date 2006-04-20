@@ -1,20 +1,54 @@
 #!/usr/bin/perl -w
 
 use strict;
+use Getopt::Std;
 
 my $TEVC = "/usr/testbed/bin/tevc";
 my $LOGHOLE = "/usr/testbed/bin/loghole";
 my $PYTHON = "/usr/local/bin/python";
 my $EVENTSYS = "/usr/testbed/bin/eventsys_control";
 
+my $UNKNOWN = "<unknown>";
+my $stub_cmd = "/bin/sh /local/pelab/stub/auto-stub.sh";
+my $stub_cmdargs = $UNKNOWN;
+
+sub usage()
+{
+    print "Usage: $0 [-C] [ -S command-line ] -s [ command-args ] pid eid\n".
+	  "  -S command-line    replace the current stub command arguments\n".
+	  "  -s command-args    append args to stub command line\n".
+	  "  -C                 show current command line\n";
+    exit(1);
+}
+my $optlist = "CS:s:";
+
+#
+# Parse command arguments.
+#
+my %options = ();
+if (!getopts($optlist, \%options)) {
+    print "error: cannot parse options\n";
+    usage();
+}
 #
 # Require the pid and eid
 #
 if (@ARGV != 2) {
-    die "Usage: $0 pid eid\n";
+    usage();
 }
-
 my ($pid, $eid) = @ARGV;
+$stub_cmdargs = get_cmdargs("plab");
+if (defined($options{"S"})) {
+    $stub_cmdargs = $options{"S"};
+}
+if (defined($options{"s"})) {
+    $stub_cmdargs .= " " . $options{"s"};
+}
+if (defined($options{"C"})) {
+    my $cmdline = $stub_cmd . " " .
+	(($stub_cmdargs eq $UNKNOWN) ? "" : $stub_cmdargs);
+    print "Current stub command line: '$cmdline'\n";
+}
 
 #
 # Make sure any old stubs/monitors are dead
@@ -95,13 +129,51 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
 #
 # Start up the stubs and monitors
 #
-print "##### Starting stubs\n";
-if (system "$TEVC -e $pid/$eid now plabstubs start") {
+my $startarg = "";
+print "##### Starting stubs";
+if ($stub_cmdargs ne $UNKNOWN) {
+    print " with: '$stub_cmd $stub_cmdargs'";
+    $startarg = "'COMMAND={$stub_cmd $stub_cmdargs}'";
+}
+print "\n";
+if (system "$TEVC -e $pid/$eid now plabstubs start $startarg") {
     die "Error running tevc\n";
 }
+
 print "##### Starting monitors\n";
 if (system "$TEVC -e $pid/$eid now monitorgroup start") {
     die "Error running tevc\n";
 }
 
 print "##### Done\n";
+
+exit(0);
+
+#
+# Dig the command line out of the logs from the previous run
+# (if there was one)
+#
+sub get_cmdargs($)
+{
+    my ($ntype) = @_;
+    my $cmdargs = $UNKNOWN;
+
+    my @list = `/bin/ls /proj/$pid/exp/$eid/logs/$eid.*.zip`;
+    return $cmdargs
+	if ($?);
+    chomp(@list);
+
+    my $file = $list[$#list];
+    return $cmdargs
+	if (! -r $file);
+    my @info = `unzip -p $file "${ntype}-1/local/logs/${ntype}stub-1.status"`;
+    foreach (@info) {
+	if (/^COMMAND=(.*)/) {
+	    $cmdargs = $1;
+	    $cmdargs =~ s/$stub_cmd(.*)/$1/;
+	    last;
+	}
+    }
+
+    return $cmdargs;
+}

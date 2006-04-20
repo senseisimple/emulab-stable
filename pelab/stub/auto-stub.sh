@@ -1,12 +1,14 @@
 #!/bin/sh
 
+ARGS=$*
+
 . `dirname $0`/../common-env.sh
 
 #
 # Start up our own stub
 #
-echo $SH ${STUB_DIR}/run-stub.sh
-$SH ${STUB_DIR}/run-stub.sh &
+echo $SH ${STUB_DIR}/run-stub.sh $ARGS
+$SH ${STUB_DIR}/run-stub.sh $ARGS &
 STUBPID=$!
 # Kill the stub if we get killed - TODO: harsher kill?
 trap "$AS_ROOT kill $STUBPID; $AS_ROOT killall stubd" EXIT
