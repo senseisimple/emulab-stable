@@ -153,7 +153,7 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
 #
 my $startarg = "";
 print "##### Starting stubs";
-if ($stub_cmdargs ne $UNKNOWN) {
+if ($stub_cmdargs ne $UNKNOWN && $stub_cmdargs !~ /^\s*$/) {
     print " with: '$stub_cmd $stub_cmdargs'";
     $startarg = "'COMMAND={$stub_cmd $stub_cmdargs}'";
 }
