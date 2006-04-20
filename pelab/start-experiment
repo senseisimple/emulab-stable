@@ -100,13 +100,12 @@ if (system "$PYTHON resetlinks.py $pid $eid") {
 # gets fired again
 #
 print "##### Restarting the event system\n";
-if (system "$EVENTSYS -e $pid,$eid stop") {
+if (system "$EVENTSYS -e $pid,$eid replay") {
     die "Error controlling the event system\n";
 }
-sleep 2;
-if (system "$EVENTSYS -e $pid,$eid start") {
-    die "Error controlling the event system\n";
-}
+
+print "##### Waiting for event system to start\n";
+sleep(10);
 
 print "##### Restarting servers\n";
 if (system "$TEVC -e $pid/$eid now allservers stop") {
