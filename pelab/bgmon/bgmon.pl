@@ -44,12 +44,17 @@ sub usage {
 #*****************************************
 my %MAX_SIMU_TESTS = (latency => "10",
 		      bw      => "1");
+
 # a ratio of testing period to wait after a test failure
 my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.1);
+#MARK_RELIABLE
+# each result waiting to be acked has an id number and corresponding file
 my $resultDBlimit = 100;
 my $resIndex = 0;
+
 my %testevents = ();
+
 #queue for each test type containing tests that need to
 # be run, but couldn't, due to MAX_SIMU_TESTS.
 # keys are test types, values are lists
@@ -185,9 +190,10 @@ while (1) {
 		     "result" => $parsedData,
 		     "tstamp" => $testevents{$destaddr}{$testtype}
 		               {"tstamp"} );
-		#save results to local DB
+		#MARK_RELIABLE
+		#save result to local DB
 		saveTestToLocalDB(\%results);
-		#send results to remote DB
+		#send result to remote DB
 		sendResults(\%results, $resIndex);
 		$resIndex = ($resIndex+1) % $resultDBlimit;
 
@@ -247,8 +253,9 @@ while (1) {
 	}
     }
 
-
-    #check for results that have not been sent due to error
+    #MARK_RELIABLE
+    #check for results that could not be sent due to error
+    # TODO: horribly inefficient...
     for( my $i=0; $i < $resultDBlimit; $i++ ){
 	if( -e createDBfilename($i) ){
 	    #resend
@@ -264,11 +271,6 @@ while (1) {
 	}
     }
 
-
-    #sleep for a time
-#    my $tmp = select(undef, undef, undef, 0.25);
-#    open NULL,"/dev/null";
-#    printTimeEvents();
 }
 
 #############################################################################
@@ -530,6 +532,7 @@ sub printTimeEvents {
 
 
 #############################################################################
+#MARK_RELIABLE
 sub saveTestToLocalDB($)
 {
     #save result to DB's in files.
@@ -595,7 +598,8 @@ sub sendResults($$){
 					    $results->{tstamp} ) )
     { warn "Could not add attribute to notification\n"; }
     
-    #send notification
+    #MARK_RELIABLE
+    #send notification, and check for send error from event system
     if (!event_notify($handle, $notification_res)) {
 	warn("could not send test event notification");
 	$f_success = 0;
@@ -607,10 +611,11 @@ sub sendResults($$){
 #	$f_success = 0;
 #    }
 
+    #MARK_RELIABLE
     #check for successful send
     if( $f_success == 1 ){
 	#delete file of event result
-	print "successful send: ";
+	print " successful send: ";
 	print "$results->{testtype}=$results->{result}";
 	unlink( createDBfilename($index) );
     }
