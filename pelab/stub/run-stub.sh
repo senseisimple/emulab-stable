@@ -14,8 +14,13 @@ export HOST_ROLE="stub"
 . `dirname $0`/../common-env.sh
 
 #
+# Have libnetmon export to a seperate file
+#
+export LIBNETMON_OUTPUTFILE="/local/logs/libnetmon.out"
+
+#
 # Just run the stub!
 #
 echo "Running PID $$"
 echo "Starting stubd on $PLAB_IFACE ($PLAB_IP) Extra arguments: $*"
-exec $AS_ROOT $STUB_DIR/$STUBD -lcontrol-send -lmain-loop $* $PLAB_IFACE
+exec $AS_ROOT $NETMON_DIR/instrument-standalone.sh $STUB_DIR/$STUBD -lcontrol-send -lmain-loop $* $PLAB_IFACE
