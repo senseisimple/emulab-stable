@@ -1156,7 +1156,7 @@ def trace_post(link2trace):
                 os.chdir(ext[1:])
                 dst = os.path.join(os.path.pardir, dst)
                 pass
-            os.system("tcptrace -G %s > .tcptrace.out" % (dst,))
+            os.system("tcptrace -y -G %s > .tcptrace.out" % (dst,))
             if ext != ".0":
                 os.chdir(os.path.pardir)
                 pass
