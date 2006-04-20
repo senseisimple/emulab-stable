@@ -48,6 +48,7 @@ void lnm_init() {
 
     static bool intialized = false;
     char *sockpath;
+    char *filepath;
 
     if (intialized == false) {
         DEBUG(printf("Initializing\n"));
@@ -98,6 +99,7 @@ void lnm_init() {
          * Connect to netmond if we've been asked to
          */
         sockpath = getenv("LIBNETMON_SOCKPATH");
+        filepath = getenv("LIBNETMON_OUTPUTFILE");
         if (sockpath) {
             int sockfd;
             struct sockaddr_un servaddr;
@@ -124,6 +126,15 @@ void lnm_init() {
 
             DEBUG(printf("Done opening socket\n"));
 
+        } else if (filepath) {
+            /*
+             * Also allow output to a seperate file, so that we don't get
+             * mixed in with the program's own stdout
+             */
+            outstream = fopen(filepath,"w+");
+            if (!outstream) {
+                croak0("Unable to open output file\n");
+            }
         } else {
             outstream = stdout;
         }
