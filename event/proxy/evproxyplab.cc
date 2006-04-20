@@ -58,7 +58,13 @@ static void subscribe_callback(event_handle_t handle,  int result,
 static void async_callback(event_handle_t handle,  int result,
 			   event_subscription_t es, void *data);
 
+static void status_callback(elvin_handle_t handle, char *url, 
+                            elvin_status_event_t event, void *data,
+                            elvin_error_t error);
+
 static void schedule_updateevent();
+
+static int do_remote_register(char *server);
 
 
 int
@@ -148,43 +154,117 @@ main(int argc, char **argv)
 		 server,
 		 (port ? ":"  : ""),
 		 (port ? port : ""));
-	server = buf;
+	server = strdup(buf);
 
-	/*
-	 * Construct an address tuple for generating the event.
-	 */
-	tuple = address_tuple_alloc();
-	if (tuple == NULL) {
-		fatal("could not allocate an address tuple");
-	}
-	
-	/* Register with the event system on boss */
-	bosshandle = event_register(server, 0);
-	if (bosshandle == NULL) {
-		fatal("could not register with remote event system");
-	}
-        /* Setup handle to periodically ping remote event server */
-        event_set_idle_period(bosshandle, 120);
+        /* Create nodeid string from pnode id passed in. */
+	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
 
-	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
+        /* Register with the remote event system. */
+        do_remote_register(server);
 
 	/* Register with the event system on the local node */
+	snprintf(buf, sizeof(buf), "elvin://localhost:%s",lport);
 	localhandle = event_register(buf, 0);
 	if (localhandle == NULL) {
 		fatal("could not register with local event system");
 	}
 	
+        /*
+         * Setup local elvind subscriptions:
+         */
+	tuple = address_tuple_alloc();
+        
+        tuple->host = ADDRESSTUPLE_ALL;
+        tuple->scheduler = 1;
+	
+	if (! event_subscribe(localhandle, sched_callback, tuple,
+			      NULL)) {
+		fatal("could not subscribe to events on local server");
+	}
+
+        info("Successfully setup initial event subscriptions.\n");
+
+	/*
+	 * Stash the pid away.
+	 */
+	snprintf(buf, sizeof(buf), "%s/evproxy.pid", _PATH_VARRUN);
+	fp = fopen(buf, "w");
+	if (fp != NULL) {
+		fprintf(fp, "%d\n", getpid());
+		(void) fclose(fp);
+	}
+
+	/*
+	 * Do this now, once we have had a chance to fail on the above
+	 * event system calls.
+	 */
+	if (!debug) {
+		daemon(0, 0);
+		loginit(0, "/var/emulab/logs/evproxy.log");
+	}
+	
+	/* Begin the event loop, waiting to receive event notifications */
+        info("Entering main event loop.\n");
+        while (1) {
+          event_main(bosshandle);
+          /* If we drop out of the event loop, it's because there was/is
+           * some kind of problem with the connection to the remote elvind.
+           * So, clean up and re-register (re-subscribe).
+           */
+          info("exited event_main\n");
+          event_unregister(bosshandle);
+          exptmap.clear(); /* clear our list of subs - it's invalid now. */
+          do_remote_register(server);
+        }
+
+	/* Unregister with the remote event system: */
+	if (event_unregister(bosshandle) == 0) {
+		fatal("could not unregister with remote event system");
+	}
+	/* Unregister with the local event system: */
+	if (event_unregister(localhandle) == 0) {
+		fatal("could not unregister with local event system");
+	}
+
+	return 0;
+}
+
+
+int do_remote_register(char *server) {
+        address_tuple_t		tuple;
+	char			buf[BUFSIZ];
+
+	/* Register with the event system on boss */
+	while ((bosshandle = event_register(server, 0)) == NULL) {
+		error("Could not register with remote event system\n"
+                      "\tSleeping for a bit, then trying again.\n");
+                sleep(60);
+	}
+
+        /* Setup handle to periodically ping remote event server */
+        event_set_idle_period(bosshandle, 30);
+
+        /* Turn off failover on the remote connection - we'll manage it
+           ourselves via the status callback. */
+        event_set_failover(bosshandle, 0);
+
+        /* Setup a status callback to watch the remote connection. */
+        if (!elvin_handle_set_status_cb(bosshandle->server, status_callback,
+                                        server, bosshandle->status)) {
+          fatal("Could not register status callback!");
+        }
+
 	/*
 	 * Create a subscription to pass to the remote server. We want
 	 * all events for this node, or all events for the experiment
 	 * if the node is unspecified (we want to avoid getting events
 	 * that are directed at specific nodes that are not us!). 
 	 */
-	snprintf(nodeidstr, sizeof(nodeidstr), "__%s_proxy", pnodeid);
 	snprintf(buf, sizeof(buf), "%s,%s,%s", 
                  TBDB_EVENTTYPE_UPDATE, TBDB_EVENTTYPE_CLEAR,
                  TBDB_EVENTTYPE_RELOAD);
 
+        tuple = address_tuple_alloc();
 	tuple->eventtype = buf;
 	tuple->host = ipaddr;
 	tuple->objname = nodeidstr;
@@ -211,58 +291,9 @@ main(int argc, char **argv)
 		fatal("could not subscribe to events on remote server");
         }
 
-        /*
-         * Setup local elvind subscriptions:
-         */
-	address_tuple_free(tuple);
-	tuple = address_tuple_alloc();
-        
-        tuple->host = ADDRESSTUPLE_ALL;
-        tuple->scheduler = 1;
-	
-	if (! event_subscribe(localhandle, sched_callback, tuple,
-			      NULL)) {
-		fatal("could not subscribe to events on local server");
-	}
+        schedule_updateevent();
 
-        info("Successfully setup initial event subscriptions.\n");
-
-	/*
-	 * Stash the pid away.
-	 */
-	snprintf(buf, sizeof(buf), "%s/evproxy.pid", _PATH_VARRUN);
-	fp = fopen(buf, "w");
-	if (fp != NULL) {
-		fprintf(fp, "%d\n", getpid());
-		(void) fclose(fp);
-	}
-
-        /* Tell the schedulers on ops that we want a subscription update. */
-	schedule_updateevent();
-
-	/*
-	 * Do this now, once we have had a chance to fail on the above
-	 * event system calls.
-	 */
-	if (!debug) {
-		daemon(0, 0);
-		loginit(0, "/var/emulab/logs/evproxy.log");
-	}
-	
-	/* Begin the event loop, waiting to receive event notifications */
-        info("Entering main event loop.\n");
-	event_main(bosshandle);
-
-	/* Unregister with the remote event system: */
-	if (event_unregister(bosshandle) == 0) {
-		fatal("could not unregister with remote event system");
-	}
-	/* Unregister with the local event system: */
-	if (event_unregister(localhandle) == 0) {
-		fatal("could not unregister with local event system");
-	}
-
-	return 0;
+        return 1;
 }
 
 
@@ -477,6 +508,39 @@ void async_callback(event_handle_t handle,  int result,
   }
   
 
+}
+
+/* Status callback function - tries to maintain remote connection */
+void status_callback(elvin_handle_t handle, char *url, 
+                     elvin_status_event_t event, void *data,
+                     elvin_error_t status) {
+
+  char *server = (char*) data;
+
+  switch(event) {
+
+  case ELVIN_STATUS_CONNECTION_FAILED:
+    /* sleep, and try to connect again. */
+    error("Failed to connect to remote server");
+    /* XXX: may need to do something more. */
+    break;
+
+  case ELVIN_STATUS_CONNECTION_LOST:
+  case ELVIN_STATUS_PROTOCOL_ERROR:
+    error("Connection loss/failure, trying to reconnect...\n");
+    event_stop_main(bosshandle);
+    //event_unregister(bosshandle);
+    //bosshandle = NULL;
+    //do_remote_register(server);
+    break;
+
+  case ELVIN_STATUS_CONNECTION_FOUND:
+    info("Remote connection established.");
+    break;
+
+  default:
+    break;
+  }
 }
 
 
