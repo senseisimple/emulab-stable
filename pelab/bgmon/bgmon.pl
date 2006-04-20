@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 #TODO!! Result index numbers... window size 2x > buffer size???
-# (1/30/06) NOPE to above. No Ack's, just trust that sent data gets there.
+# (1/30/06) No Ack's, just trust that sent data gets there.
 # Q: how to determine if OPS receives it correctly?
 #    (1/31) Just checking if "send notification" is successful
 #
@@ -45,7 +45,7 @@ sub usage {
 my %MAX_SIMU_TESTS = (latency => "10",
 		      bw      => "1");
 # a ratio of testing period to wait after a test failure
-my %TEST_FAIL_RETRY= (latency => 0.5,
+my %TEST_FAIL_RETRY= (latency => 0.3,
 		      bw      => 0.1);
 my $resultDBlimit = 100;
 my $resIndex = 0;
@@ -240,16 +240,14 @@ while (1) {
 
 	# may not be needed, but may help detect errors
 	my $hangres = detectHang($destaddr);
-	if( $hangres ne "nohang" ){
+	if( $hangres eq "bw" ){
 	    print "HANG: $hangres,  $destaddr\n";
+	    # reset time of next run
+	    $testevents{$destaddr}{bw}{"timeOfNextRun"} = time_all();
 	}
     }
 
 
-
-
-
-=pod    
     #check for results that have not been sent due to error
     for( my $i=0; $i < $resultDBlimit; $i++ ){
 	if( -e createDBfilename($i) ){
@@ -265,7 +263,7 @@ while (1) {
 	    sendResults(\%db,$i);
 	}
     }
-=cut
+
 
     #sleep for a time
 #    my $tmp = select(undef, undef, undef, 0.25);
