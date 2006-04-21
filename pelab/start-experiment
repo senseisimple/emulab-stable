@@ -67,13 +67,18 @@ if (defined($options{"m"})) {
     }
 }
 if (defined($options{"C"})) {
-    my $cmdline = $stub_cmd . " " .
-	(($stub_cmdargs eq $UNKNOWN) ? "" : $stub_cmdargs);
+    my $cmdline = $stub_cmd;
+    if ($stub_cmdargs ne $UNKNOWN) {
+	$cmdline .= " $stub_cmdargs";
+    }
     print "Current stub command line: '$cmdline'\n";
 
-    $cmdline = $mon_cmd . " " .
-	(($mon_cmdargs eq $UNKNOWN) ? "" : $mon_cmdargs);
+    $cmdline = $mon_cmd;
+    if ($mon_cmdargs ne $UNKNOWN) {
+	$cmdline .= " $mon_cmdargs";
+    }
     print "Current monitor command line: '$cmdline'\n";
+    exit(0);
 }
 if (defined($options{"p"})) {
     $realplab = 1;
@@ -217,7 +222,14 @@ sub get_cmdargs($$)
 	if (/^COMMAND=(.*)/) {
 	    if ($1 ne $cmd) {
 		$cmdargs = $1;
-		$cmdargs =~ s/$cmd(.*)/$1/;
+
+		# XXX filter out broken cmdlines (old bug in program_agent)
+		$cmdargs =~ s/\s*}\s*$//;
+
+		$cmdargs =~ s/^$cmd//;
+		if ($cmdargs eq "") {
+		    $cmdargs = $UNKNOWN;
+		}
 	    }
 	    last;
 	}
