@@ -50,13 +50,21 @@ if (defined($options{"S"})) {
     $stub_cmdargs = $options{"S"};
 }
 if (defined($options{"s"})) {
-    $stub_cmdargs .= " " . $options{"s"};
+    if ($stub_cmdargs eq $UNKNOWN) {
+	$stub_cmdargs = $options{"s"};
+    } else {
+	$stub_cmdargs .= " " . $options{"s"};
+    }
 }
 if (defined($options{"M"})) {
     $mon_cmdargs = $options{"M"};
 }
 if (defined($options{"m"})) {
-    $mon_cmdargs .= " " . $options{"m"};
+    if ($mon_cmdargs eq $UNKNOWN) {
+	$mon_cmdargs = $options{"m"};
+    } else {
+	$mon_cmdargs .= " " . $options{"m"};
+    }
 }
 if (defined($options{"C"})) {
     my $cmdline = $stub_cmd . " " .
@@ -69,7 +77,11 @@ if (defined($options{"C"})) {
 }
 if (defined($options{"p"})) {
     $realplab = 1;
-    $mon_cmdargs .= " " . "-p";
+    if ($mon_cmdargs eq $UNKNOWN) {
+	$mon_cmdargs = "-p";
+    } else {
+	$mon_cmdargs .= " " . "-p";
+    }
 }
 
 #
@@ -153,7 +165,7 @@ if (system "$TEVC -e $pid/$eid now planetc-tracemon start") {
 #
 my $startarg = "";
 print "##### Starting stubs";
-if ($stub_cmdargs ne $UNKNOWN && $stub_cmdargs !~ /^\s*$/) {
+if ($stub_cmdargs ne $UNKNOWN) {
     print " with: '$stub_cmd $stub_cmdargs'";
     $startarg = "'COMMAND={$stub_cmd $stub_cmdargs}'";
 }
@@ -203,8 +215,10 @@ sub get_cmdargs($$)
     my @info = `unzip -p $file "${ntype}-1/local/logs/${lfile}-1.status"`;
     foreach (@info) {
 	if (/^COMMAND=(.*)/) {
-	    $cmdargs = $1;
-	    $cmdargs =~ s/$cmd(.*)/$1/;
+	    if ($1 ne $cmd) {
+		$cmdargs = $1;
+		$cmdargs =~ s/$cmd(.*)/$1/;
+	    }
 	    last;
 	}
     }
